@@ -38,6 +38,7 @@ message-service SendMessage
 
 | 项 | 状态 |
 | --- | --- |
+| 目标态总架构 | `docs/architecture/target-architecture.md` 已存在 |
 | ADD | `docs/architecture/add.md` 已存在 |
 | TADD | `docs/architecture/tadd.md` 已存在 |
 | message-service SDD | `docs/sdd/message-service.md` 已冻结 |
@@ -61,11 +62,23 @@ message-service SendMessage
 
 重要变更完成后，邀请独立评审线程评审。
 
-评审线程 ID：
+当前主工作线程 ID：
+
+```text
+019ea0b0-69fd-7be1-9ec4-4b3c6247e36d
+```
+
+独立评审线程 ID：
 
 ```text
 019ea124-dab1-71f2-964b-f5cb8d219aa2
 ```
+
+评审结果回传规则：
+
+- 优先回传到 delegation 的 `source_thread_id`。
+- 如果没有 delegation 元数据，则回传到当前主工作线程 ID。
+- 如果主线程迁移或新建，必须同步更新本文。
 
 发送给评审线程的信息必须包含：
 
@@ -88,6 +101,11 @@ message-service SendMessage
 
 第一阶段压测只验证真实落地的 `message-service SendMessage` 链路。可以在一台电脑上用多线程模拟多个客户端，也可以按 `docs/runbook/local-loadtest.md` 做双机压测。
 
+硬约束：
+
+- 压测命令必须支持 `target`、`vus`、`duration`、`result-dir` 参数或等价环境变量。
+- 第一轮压测只接受真实 `message-service` 进程，不接受固定字符串 toy endpoint。
+
 每轮压测至少记录：
 
 ```text
@@ -107,19 +125,34 @@ error_topn
 
 压测结果输出到 `loadtest/results/`，大文件和临时日志默认不提交。
 
-## 8. 每轮结束检查
+## 8. GitHub 同步要求
+
+有意义的变更需要持久化时，必须：
+
+- 执行并记录 `git status --short`。
+- 执行可用检查，例如 `git diff --check`、生成配置检查、单元测试或集成测试。
+- 提交后记录 `git log -1 --oneline`。
+- 能推送时执行 `git push origin main`，并记录推送结果。
+- 推送后再次确认 `git status --short` 干净。
+- 如果本轮涉及 MacBook、服务器或压测环境，说明是否需要同步对应环境；不默认静默同步。
+
+## 9. 每轮结束检查
 
 每轮结束前确认：
 
 - 文档是否需要同步更新。
 - 是否需要邀请评审线程。
 - 是否执行了可用检查。
-- 是否需要 commit / push。
+- 是否需要 commit / push，并是否已经完成 GitHub 同步。
 - 本文的状态、风险和下一步是否仍然准确。
 
-## 9. 当前风险
+## 10. 当前风险
 
 - Go 工具链和代码生成工具在当前 Windows 环境可能未安装，编码前必须重新检测。
 - 现阶段服务骨架存在，但不等于可运行服务。
 - 还没有真实 SendMessage 集成测试和压测结果。
 - `timeline-service`、`conversation-service`、`delivery-service`、`push-gateway` SDD 未冻结，不能扩展到对应生产逻辑。
+
+## 11. 最近评审状态
+
+- 2026-06-08：独立评审线程指出文档入口顺序、评审回传规则、GitHub 同步闭环、压测硬约束和目标态总架构入口需要补强；本轮已按建议更新本文和 `docs/README.md`。

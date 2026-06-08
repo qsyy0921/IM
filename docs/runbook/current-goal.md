@@ -60,9 +60,9 @@ message-service SendMessage
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
-2. 基于已完成的 `MinAvailableConns=0/4/8/16` 梯度，把 `MinAvailableConns=8` 作为下一轮优先验证的候选之一；继续压测客户端遵守 `RetryInfo`、有限重试和 jitter 后的整体效果。
-3. 设计更细的 adaptive limit，而不是长期使用瞬时 acquired conns 判断。
-4. 评估 outbox relay 追平优化：批量 publish、批量 mark published、batch size、worker 数和故障退避；避免高写入吞吐下 pending 快速增加。
+2. 基于客户端遵守 `RetryInfo` 的正式矩阵，优先优化 outbox relay 追平能力：批量 publish、批量 mark published、batch size、worker 数和故障退避；避免 accepted RPS 回升后 pending 快速增加。
+3. 设计更细的 adaptive limit，把 outbox pending 纳入输入，而不是只看瞬时 acquired conns。
+4. 继续压测客户端 retry 参数：`max_retries=1/2/3`、`jitter=100/300/500ms`。
 5. 继续采集 PostgreSQL wait_event，重点看 `LWLock:WALWrite`、`LWLock:WALInsert`、`LWLock:BufferContent` 和 `CheckpointWriteDelay`。
 6. 视评审复核结果决定是否推送 GitHub。
 
@@ -242,6 +242,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 PostgreSQL loadtest profile 矩阵：`loadtest/results/pgpool-tuned-formal-20260609/`，报告为 `docs/runbook/loadtest-report-20260609-postgres-loadtest-profile.md`。启用 `max_connections=200`、`shared_buffers=1GB`、`max_wal_size=4GB` 后，`PG_MAX_CONNS=64/VU1200` p99 `1161.70ms`，`PG_MAX_CONNS=64/VU1600` p99 `1759.11ms`；`PG_MAX_CONNS=128` 未改善，1200 VU 成功率 `0.9760` 且 p99 `2001.08ms`。新指标确认 `repository_begin` 主体是 `repository_pool_acquire`，`repository_tx_begin` p99 仅约 `14-33ms`。watch 采样显示 `LWLock:WALWrite`、`LWLock:WALInsert`、`LWLock:BufferContent` 和 `CheckpointWriteDelay` 已进入瓶颈视野。
 - 当前 backpressure on/off 正式矩阵：报告为 `docs/runbook/loadtest-report-20260609-backpressure-onoff.md`，结果路径为 `loadtest/results/backpressure-off-formal-20260609/` 与 `loadtest/results/backpressure-on-formal-20260609/`。固定 `PG_MAX_CONNS=64`、relay workers 8 时，off 模式 1200/1600 VU 均 100% 成功，但 success p99 为 `1187.23ms` / `1735.38ms`，且 outbox pending 为 `30689` / `47736`；on 模式 overload rate 为 `97.28%` / `98.01%`，error p99 仅 `12.49ms` / `14.26ms`，但 success p99 仍为 `1403.95ms` / `1808.10ms`。结论：backpressure 快速拒绝有效且能降低 backlog，但当前 `MinAvailableConns=0` 策略过于粗糙，不能宣称成功请求 p99 改善。
 - 当前 backpressure 阈值梯度：报告为 `docs/runbook/loadtest-report-20260609-backpressure-gradient.md`，结果路径为 `loadtest/results/backpressure-minavail-{0,4,8,16}-formal-20260609/`。`MinAvailable=0` 复跑出现 DeadlineExceeded 和 DB_WRITE_FAILED，说明拒绝太晚；`MinAvailable=4/8` 错误基本稳定为 `SERVICE_OVERLOADED`，outbox pending 均为 0。`MinAvailable=8` 是下一轮优先验证的短期候选之一：1200 VU accepted RPS `818.73`、success p99 `1191.10ms`；1600 VU accepted RPS `933.93`、success p99 `1249.85ms`。该策略仍牺牲大量请求成功率，只能作为保护阈值候选，不是生产默认值或容量提升方案。
+- 当前 client retry 正式矩阵：报告为 `docs/runbook/loadtest-report-20260609-client-retry.md`，结果路径为 `loadtest/results/backpressure-client-retry-formal-20260609/`。固定 `MinAvailable=8`、`RetryInfo=500ms`、`max_retries=2`、`jitter=100ms` 时，1200 VU logical success rate `68.68%`、accepted RPS `1526.23`、success p99 `421.58ms`、outbox pending `25579`；1600 VU logical success rate `56.04%`、accepted RPS `1288.98`、success p99 `1154.47ms`、outbox pending `32091`。错误全部是 `SERVICE_OVERLOADED`，没有 DeadlineExceeded / DB_WRITE_FAILED；但 accepted 写入回升后 outbox relay 再次成为瓶颈。
 - 当前 debug metrics collector 保存全量样本并在 snapshot 时排序，适合本地短压测，不适合作为生产 metrics；后续应替换为固定窗口、reservoir、HDR histogram 或 Prometheus histogram。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
@@ -285,4 +286,5 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已在 clean commit `dfb6776` 跑 `MinAvailableConns=0/4/8/16` backpressure 梯度，并新增 `docs/runbook/loadtest-report-20260609-backpressure-gradient.md`。结论：`MinAvailable=0` 拒绝太晚，`MinAvailable=4/8` 的错误语义更稳定；`8` 只是下一轮优先验证的候选之一，同时开始设计 adaptive limit 和客户端退避策略。
 - 2026-06-09：已为 gRPC `SERVICE_OVERLOADED` 增加标准 `RetryInfo` detail，当前固定建议延迟为 `500ms`；`MessageError` detail 保持原错误码、retryable 和 correlation id。后续可让 retry delay 跟随 adaptive limit 动态调整。
 - 2026-06-09：loadtest 已支持可选 `--retry-overloaded --max-retries=N --retry-jitter=D`，用于模拟客户端遵守服务端 `RetryInfo` 后的有限重试；summary 会同时记录实际 gRPC attempts 和用户层 logical request，避免把重试次数误读成消息吞吐。
+- 2026-06-09：已在 clean commit `0c542a1` 跑客户端遵守 `RetryInfo` 的正式矩阵，并新增 `docs/runbook/loadtest-report-20260609-client-retry.md`。结论：客户端 retry 后错误语义稳定、logical success rate 提升，但 accepted RPS 回升使 outbox pending 重新积压；下一阶段优先做 outbox relay 批量优化。
 - 2026-06-09：独立评审线程复核 backpressure 口径修复与正式压测报告，结论为无 P0/P1；`success/error latency` 拆分已解除上一轮 P1。非阻塞建议：`MinAvailableConns=8` 只能写作下一轮候选之一，`RetryInfo=500ms` 是第一版固定 hint，不是验证出的最优值。

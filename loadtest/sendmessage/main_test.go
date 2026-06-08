@@ -3,6 +3,10 @@ package main
 import (
 	"testing"
 	"time"
+
+	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestNormalizeTarget(t *testing.T) {
@@ -153,6 +157,37 @@ func TestAggregatePGPool(t *testing.T) {
 		pool.MaxConns != 32 ||
 		pool.TotalConns != 28 {
 		t.Fatalf("unexpected aggregate pg pool: %+v", pool)
+	}
+}
+
+func TestMessageErrorDetailAndTopMessageErrors(t *testing.T) {
+	st := status.New(codes.Unavailable, "service overloaded")
+	withDetails, err := st.WithDetails(&messagev1.MessageError{
+		Code:      messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_SERVICE_OVERLOADED,
+		Retryable: true,
+	})
+	if err != nil {
+		t.Fatalf("attach detail: %v", err)
+	}
+
+	detail, ok := messageErrorDetail(withDetails.Err())
+	if !ok {
+		t.Fatalf("expected message error detail")
+	}
+	if detail.GetCode() != messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_SERVICE_OVERLOADED ||
+		!detail.GetRetryable() {
+		t.Fatalf("unexpected detail: %+v", detail)
+	}
+
+	counts := topMessageErrors(map[messageErrorKey]int64{
+		{Code: messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_SERVICE_OVERLOADED, Retryable: true}: 3,
+		{Code: messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_DB_WRITE_FAILED, Retryable: true}:    1,
+	}, 10)
+	if len(counts) != 2 ||
+		counts[0].Code != "MESSAGE_ERROR_CODE_SERVICE_OVERLOADED" ||
+		!counts[0].Retryable ||
+		counts[0].Count != 3 {
+		t.Fatalf("unexpected counts: %+v", counts)
 	}
 }
 

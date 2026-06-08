@@ -67,6 +67,8 @@ type summary struct {
 	RequestCount                  int64                      `json:"request_count"`
 	SuccessCount                  int64                      `json:"success_count"`
 	ErrorCount                    int64                      `json:"error_count"`
+	RetryableErrorCount           int64                      `json:"retryable_error_count"`
+	ServiceOverloadedCount        int64                      `json:"service_overloaded_count"`
 	SuccessRate                   float64                    `json:"success_rate"`
 	AvgMS                         float64                    `json:"avg_ms"`
 	P50MS                         float64                    `json:"p50_ms"`
@@ -99,6 +101,7 @@ type summary struct {
 	ServiceLatencyMetrics         map[string]latencySnapshot `json:"service_latency_metrics,omitempty"`
 	RelayLatencyMetrics           map[string]latencySnapshot `json:"relay_latency_metrics,omitempty"`
 	ErrorTopN                     []errorCount               `json:"error_topn"`
+	MessageErrorCounts            []messageErrorCount        `json:"message_error_counts,omitempty"`
 	StartedAt                     string                     `json:"started_at"`
 	FinishedAt                    string                     `json:"finished_at"`
 	ResultFile                    string                     `json:"result_file"`
@@ -107,6 +110,17 @@ type summary struct {
 type errorCount struct {
 	Error string `json:"error"`
 	Count int64  `json:"count"`
+}
+
+type messageErrorCount struct {
+	Code      string `json:"code"`
+	Retryable bool   `json:"retryable"`
+	Count     int64  `json:"count"`
+}
+
+type messageErrorKey struct {
+	Code      messagev1.MessageErrorCode
+	Retryable bool
 }
 
 func main() {
@@ -324,13 +338,25 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 
 	latencies := make([]time.Duration, 0, cfg.VUs*128)
 	errorCounts := map[string]int64{}
+	messageErrorCounts := map[messageErrorKey]int64{}
 	var successCount int64
+	var retryableErrorCount int64
+	var serviceOverloadedCount int64
 	var totalLatency time.Duration
 	for record := range records {
 		latencies = append(latencies, record.latency)
 		totalLatency += record.latency
 		if record.err != nil {
 			errorCounts[errorKey(record.err)]++
+			if detail, ok := messageErrorDetail(record.err); ok {
+				messageErrorCounts[messageErrorKey{Code: detail.GetCode(), Retryable: detail.GetRetryable()}]++
+				if detail.GetRetryable() {
+					retryableErrorCount++
+				}
+				if detail.GetCode() == messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_SERVICE_OVERLOADED {
+					serviceOverloadedCount++
+				}
+			}
 			continue
 		}
 		successCount++
@@ -361,12 +387,15 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 		RequestCount:                  requestCount,
 		SuccessCount:                  successCount,
 		ErrorCount:                    errorCountValue,
+		RetryableErrorCount:           retryableErrorCount,
+		ServiceOverloadedCount:        serviceOverloadedCount,
 		SuccessRate:                   successRate,
 		AvgMS:                         avgMS,
 		P50MS:                         durationMS(percentile(latencies, 0.50)),
 		P95MS:                         durationMS(percentile(latencies, 0.95)),
 		P99MS:                         durationMS(percentile(latencies, 0.99)),
 		ErrorTopN:                     topErrors(errorCounts, 10),
+		MessageErrorCounts:            topMessageErrors(messageErrorCounts, 10),
 		StartedAt:                     started.Format(time.RFC3339Nano),
 		FinishedAt:                    finished.Format(time.RFC3339Nano),
 		ConversationSeqAllocLatencyMS: nil,
@@ -491,12 +520,50 @@ func topErrors(counts map[string]int64, limit int) []errorCount {
 	return errors
 }
 
+func topMessageErrors(counts map[messageErrorKey]int64, limit int) []messageErrorCount {
+	errors := make([]messageErrorCount, 0, len(counts))
+	for key, count := range counts {
+		errors = append(errors, messageErrorCount{
+			Code:      key.Code.String(),
+			Retryable: key.Retryable,
+			Count:     count,
+		})
+	}
+	sort.Slice(errors, func(i, j int) bool {
+		if errors[i].Count == errors[j].Count {
+			if errors[i].Code == errors[j].Code {
+				return !errors[i].Retryable && errors[j].Retryable
+			}
+			return errors[i].Code < errors[j].Code
+		}
+		return errors[i].Count > errors[j].Count
+	})
+	if len(errors) > limit {
+		return errors[:limit]
+	}
+	return errors
+}
+
 func errorKey(err error) string {
 	st, ok := status.FromError(err)
 	if ok {
 		return st.Code().String() + ": " + st.Message()
 	}
 	return err.Error()
+}
+
+func messageErrorDetail(err error) (*messagev1.MessageError, bool) {
+	st, ok := status.FromError(err)
+	if !ok {
+		return nil, false
+	}
+	for _, detail := range st.Details() {
+		messageError, ok := detail.(*messagev1.MessageError)
+		if ok {
+			return messageError, true
+		}
+	}
+	return nil, false
 }
 
 type outboxStats struct {

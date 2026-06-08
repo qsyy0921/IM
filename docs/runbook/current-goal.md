@@ -60,8 +60,8 @@ message-service SendMessage
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
-2. 基于已完成的 backpressure on/off 矩阵，继续跑 `MinAvailableConns=0/4/8/16` 梯度，比较成功率、accepted RPS、success p99、error p99、outbox pending 和 overload rate。
-3. 根据 backpressure 梯度结果设计更细的 adaptive limit，而不是长期使用瞬时 acquired conns 判断。
+2. 基于已完成的 `MinAvailableConns=0/4/8/16` 梯度，短期采用 `MinAvailableConns=8` 作为下一轮实验候选，并补客户端 retry hint / jitter 约束。
+3. 设计更细的 adaptive limit，而不是长期使用瞬时 acquired conns 判断。
 4. 评估 outbox relay 追平优化：批量 publish、批量 mark published、batch size、worker 数和故障退避；避免高写入吞吐下 pending 快速增加。
 5. 继续采集 PostgreSQL wait_event，重点看 `LWLock:WALWrite`、`LWLock:WALInsert`、`LWLock:BufferContent` 和 `CheckpointWriteDelay`。
 6. 视评审复核结果决定是否推送 GitHub。
@@ -241,6 +241,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 multi-instance PG budget 矩阵：`loadtest/results/multi-instance-budget-formal-20260609/`，报告为 `docs/runbook/loadtest-report-20260609-multi-instance-budget.md`。固定每实例预算 `1x16/2x16/4x16` 下 p99 分别为 `2000.53ms` / `1437.37ms` / `1975.75ms`；固定总预算 `1x64/2x32/4x16` 下 p99 分别为 `1178.97ms` / `1509.55ms` / `1657.18ms`。固定总预算下多实例没有降低尾延迟，且 outbox pending 为 `31889` / `64553` / `65323`，说明当前应优先处理 PostgreSQL acquire/begin 排队与 relay 追平，而不是继续堆 gRPC 实例。
 - 当前 PostgreSQL loadtest profile 矩阵：`loadtest/results/pgpool-tuned-formal-20260609/`，报告为 `docs/runbook/loadtest-report-20260609-postgres-loadtest-profile.md`。启用 `max_connections=200`、`shared_buffers=1GB`、`max_wal_size=4GB` 后，`PG_MAX_CONNS=64/VU1200` p99 `1161.70ms`，`PG_MAX_CONNS=64/VU1600` p99 `1759.11ms`；`PG_MAX_CONNS=128` 未改善，1200 VU 成功率 `0.9760` 且 p99 `2001.08ms`。新指标确认 `repository_begin` 主体是 `repository_pool_acquire`，`repository_tx_begin` p99 仅约 `14-33ms`。watch 采样显示 `LWLock:WALWrite`、`LWLock:WALInsert`、`LWLock:BufferContent` 和 `CheckpointWriteDelay` 已进入瓶颈视野。
 - 当前 backpressure on/off 正式矩阵：报告为 `docs/runbook/loadtest-report-20260609-backpressure-onoff.md`，结果路径为 `loadtest/results/backpressure-off-formal-20260609/` 与 `loadtest/results/backpressure-on-formal-20260609/`。固定 `PG_MAX_CONNS=64`、relay workers 8 时，off 模式 1200/1600 VU 均 100% 成功，但 success p99 为 `1187.23ms` / `1735.38ms`，且 outbox pending 为 `30689` / `47736`；on 模式 overload rate 为 `97.28%` / `98.01%`，error p99 仅 `12.49ms` / `14.26ms`，但 success p99 仍为 `1403.95ms` / `1808.10ms`。结论：backpressure 快速拒绝有效且能降低 backlog，但当前 `MinAvailableConns=0` 策略过于粗糙，不能宣称成功请求 p99 改善。
+- 当前 backpressure 阈值梯度：报告为 `docs/runbook/loadtest-report-20260609-backpressure-gradient.md`，结果路径为 `loadtest/results/backpressure-minavail-{0,4,8,16}-formal-20260609/`。`MinAvailable=0` 复跑出现 DeadlineExceeded 和 DB_WRITE_FAILED，说明拒绝太晚；`MinAvailable=4/8` 错误基本稳定为 `SERVICE_OVERLOADED`，outbox pending 均为 0。当前更合理的短期候选是 `MinAvailable=8`：1200 VU accepted RPS `818.73`、success p99 `1191.10ms`；1600 VU accepted RPS `933.93`、success p99 `1249.85ms`。该策略仍牺牲大量请求成功率，只能作为保护阈值，不是容量提升方案。
 - 当前 debug metrics collector 保存全量样本并在 snapshot 时排序，适合本地短压测，不适合作为生产 metrics；后续应替换为固定窗口、reservoir、HDR histogram 或 Prometheus histogram。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
@@ -281,3 +282,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已实现默认关闭的 PostgreSQL pool backpressure，并新增 `SERVICE_OVERLOADED` 错误码。clean smoke commit `78e8375`：`NEXUSIM_PG_BACKPRESSURE_ENABLED=true`、`PG_MAX_CONNS=1`、`VU=20`、`duration=5s`，163055 请求中成功率 `0.0032`，p99 `1.6246ms`，top error 为 `Unavailable: service overloaded`，outbox pending 0；报告为 `docs/runbook/loadtest-report-20260609-backpressure.md`。
 - 2026-06-09：已为 loadtest summary 增加 `retryable_error_count`、`service_overloaded_count` 和 `message_error_counts[]`。clean smoke commit `a9fbdf8`：`PG_MAX_CONNS=1`、`VU=10`、`duration=3s`，`retryable_error_count=62556`、`service_overloaded_count=62556`、`message_error_counts[0]=SERVICE_OVERLOADED`，outbox pending 0。
 - 2026-06-09：评审线程指出正式 backpressure on/off 矩阵不能只看混合 p99，否则大量快速拒绝会掩盖成功写入体验。本轮已补 `success_p99_ms`、`error_p99_ms`、`accepted_rps`、`error_rps`、`overload_rate`，并用 clean commit `6f0aa55` 重跑 on/off 矩阵；新报告明确区分整体 p99、成功 p99 和错误 p99。
+- 2026-06-09：已在 clean commit `dfb6776` 跑 `MinAvailableConns=0/4/8/16` backpressure 梯度，并新增 `docs/runbook/loadtest-report-20260609-backpressure-gradient.md`。结论：`MinAvailable=0` 拒绝太晚，`MinAvailable=4/8` 的错误语义更稳定；短期建议以 `8` 作为下一轮候选，同时开始设计 adaptive limit 和 retry hint。

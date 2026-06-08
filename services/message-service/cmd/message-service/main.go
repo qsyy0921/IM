@@ -55,14 +55,14 @@ func runGRPCServer() error {
 	}
 	listenAddr := envString("NEXUSIM_GRPC_ADDR", "0.0.0.0:10495")
 
-	pool, err := pgxpool.New(ctx, dsn)
+	pool, err := openPGPool(ctx, dsn)
 	if err != nil {
 		return err
 	}
 	defer pool.Close()
 
 	metrics := metricsinfra.NewCollector()
-	stopDebug, err := startDebugServer(ctx, envString("NEXUSIM_DEBUG_ADDR", ""), metrics)
+	stopDebug, err := startDebugServer(ctx, envString("NEXUSIM_DEBUG_ADDR", ""), metricsinfra.NewHandler(metrics, pool))
 	if err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func runGRPCServer() error {
 		return err
 	}
 	server := grpc.NewServer()
-	grpcapi.Register(server, grpcapi.NewServer(useCase))
+	grpcapi.Register(server, grpcapi.NewServer(useCase, grpcapi.WithMetrics(metrics)))
 
 	serveErr := make(chan error, 1)
 	go func() {
@@ -127,14 +127,14 @@ func runOutboxRelay() error {
 		return errors.New("NEXUSIM_KAFKA_BROKERS is required")
 	}
 
-	pool, err := pgxpool.New(ctx, dsn)
+	pool, err := openPGPool(ctx, dsn)
 	if err != nil {
 		return err
 	}
 	defer pool.Close()
 
 	metrics := metricsinfra.NewCollector()
-	stopDebug, err := startDebugServer(ctx, envString("NEXUSIM_DEBUG_ADDR", ""), metrics)
+	stopDebug, err := startDebugServer(ctx, envString("NEXUSIM_DEBUG_ADDR", ""), metricsinfra.NewHandler(metrics, pool))
 	if err != nil {
 		return err
 	}
@@ -204,6 +204,20 @@ func startDebugServer(ctx context.Context, addr string, handler http.Handler) (f
 		_ = server.Shutdown(shutdownCtx)
 		<-done
 	}, nil
+}
+
+func openPGPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
+	config, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	if maxConns := envInt("NEXUSIM_PG_MAX_CONNS", 0); maxConns > 0 {
+		config.MaxConns = int32(maxConns)
+	}
+	if minConns := envInt("NEXUSIM_PG_MIN_CONNS", 0); minConns > 0 {
+		config.MinConns = int32(minConns)
+	}
+	return pgxpool.NewWithConfig(ctx, config)
 }
 
 func envString(name string, fallback string) string {

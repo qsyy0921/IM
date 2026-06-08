@@ -6,15 +6,41 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Collector struct {
-	seqAlloc latencySamples
-	kafka    latencySamples
+	sendMessage      latencySamples
+	repositoryAppend latencySamples
+	repositoryCommit latencySamples
+	seqAlloc         latencySamples
+	kafka            latencySamples
 }
 
 func NewCollector() *Collector {
 	return &Collector{}
+}
+
+func (c *Collector) ObserveSendMessage(duration time.Duration) {
+	if c == nil {
+		return
+	}
+	c.sendMessage.observe(duration)
+}
+
+func (c *Collector) ObserveRepositoryAppend(duration time.Duration) {
+	if c == nil {
+		return
+	}
+	c.repositoryAppend.observe(duration)
+}
+
+func (c *Collector) ObserveRepositoryCommit(duration time.Duration) {
+	if c == nil {
+		return
+	}
+	c.repositoryCommit.observe(duration)
 }
 
 func (c *Collector) ObserveConversationSeqAlloc(duration time.Duration) {
@@ -36,6 +62,9 @@ func (c *Collector) Snapshot() Snapshot {
 		return Snapshot{}
 	}
 	return Snapshot{
+		SendMessageLatencyMS:          c.sendMessage.snapshot(),
+		RepositoryAppendLatencyMS:     c.repositoryAppend.snapshot(),
+		RepositoryCommitLatencyMS:     c.repositoryCommit.snapshot(),
 		ConversationSeqAllocLatencyMS: c.seqAlloc.snapshot(),
 		KafkaPublishLatencyMS:         c.kafka.snapshot(),
 	}
@@ -51,8 +80,57 @@ func (c *Collector) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type Snapshot struct {
+	SendMessageLatencyMS          LatencySnapshot `json:"send_message_latency_ms"`
+	RepositoryAppendLatencyMS     LatencySnapshot `json:"repository_append_latency_ms"`
+	RepositoryCommitLatencyMS     LatencySnapshot `json:"repository_commit_latency_ms"`
 	ConversationSeqAllocLatencyMS LatencySnapshot `json:"conversation_seq_alloc_latency_ms"`
 	KafkaPublishLatencyMS         LatencySnapshot `json:"kafka_publish_latency_ms"`
+	PGPool                        *PGPoolSnapshot `json:"pg_pool,omitempty"`
+}
+
+type PGPoolSnapshot struct {
+	AcquireCount         int64 `json:"acquire_count"`
+	AcquireDurationMS    int64 `json:"acquire_duration_ms"`
+	AcquiredConns        int32 `json:"acquired_conns"`
+	CanceledAcquireCount int64 `json:"canceled_acquire_count"`
+	ConstructingConns    int32 `json:"constructing_conns"`
+	EmptyAcquireCount    int64 `json:"empty_acquire_count"`
+	IdleConns            int32 `json:"idle_conns"`
+	MaxConns             int32 `json:"max_conns"`
+	TotalConns           int32 `json:"total_conns"`
+}
+
+type Handler struct {
+	collector *Collector
+	pool      *pgxpool.Pool
+}
+
+func NewHandler(collector *Collector, pool *pgxpool.Pool) *Handler {
+	return &Handler{collector: collector, pool: pool}
+}
+
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/debug/metrics" {
+		http.NotFound(w, r)
+		return
+	}
+	snapshot := h.collector.Snapshot()
+	if h.pool != nil {
+		stats := h.pool.Stat()
+		snapshot.PGPool = &PGPoolSnapshot{
+			AcquireCount:         stats.AcquireCount(),
+			AcquireDurationMS:    int64(stats.AcquireDuration() / time.Millisecond),
+			AcquiredConns:        stats.AcquiredConns(),
+			CanceledAcquireCount: stats.CanceledAcquireCount(),
+			ConstructingConns:    stats.ConstructingConns(),
+			EmptyAcquireCount:    stats.EmptyAcquireCount(),
+			IdleConns:            stats.IdleConns(),
+			MaxConns:             stats.MaxConns(),
+			TotalConns:           stats.TotalConns(),
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(snapshot)
 }
 
 type LatencySnapshot struct {

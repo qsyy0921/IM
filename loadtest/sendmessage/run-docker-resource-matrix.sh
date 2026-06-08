@@ -18,6 +18,8 @@ docker_network="${DOCKER_NETWORK:-nexusim-local_default}"
 pg_dsn="${PG_DSN:-postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable}"
 kafka_brokers="${KAFKA_BROKERS:-kafka:29092}"
 kafka_topic="${KAFKA_TOPIC:-conversation.timeline.events}"
+pg_max_conns="${PG_MAX_CONNS:-0}"
+pg_min_conns="${PG_MIN_CONNS:-0}"
 batch_size="${BATCH_SIZE:-500}"
 poll_interval="${POLL_INTERVAL:-200ms}"
 failure_backoff="${FAILURE_BACKOFF:-1s}"
@@ -109,9 +111,11 @@ PY
         --cpus "$cpu" \
         --memory "$memory" \
         -e GOMAXPROCS="$gomaxprocs" \
-        -e NEXUSIM_MESSAGE_SERVICE_MODE=grpc \
-        -e NEXUSIM_PG_DSN="$pg_dsn" \
-        -e NEXUSIM_GRPC_ADDR=0.0.0.0:10495 \
+          -e NEXUSIM_MESSAGE_SERVICE_MODE=grpc \
+          -e NEXUSIM_PG_DSN="$pg_dsn" \
+          -e NEXUSIM_PG_MAX_CONNS="$pg_max_conns" \
+          -e NEXUSIM_PG_MIN_CONNS="$pg_min_conns" \
+          -e NEXUSIM_GRPC_ADDR=0.0.0.0:10495 \
         -e NEXUSIM_DEBUG_ADDR=0.0.0.0:10497 \
         "$message_image" >/dev/null
 
@@ -121,9 +125,11 @@ PY
         --cpus "$cpu" \
         --memory "$memory" \
         -e GOMAXPROCS="$gomaxprocs" \
-        -e NEXUSIM_MESSAGE_SERVICE_MODE=outbox-relay \
-        -e NEXUSIM_PG_DSN="$pg_dsn" \
-        -e NEXUSIM_KAFKA_BROKERS="$kafka_brokers" \
+          -e NEXUSIM_MESSAGE_SERVICE_MODE=outbox-relay \
+          -e NEXUSIM_PG_DSN="$pg_dsn" \
+          -e NEXUSIM_PG_MAX_CONNS="$pg_max_conns" \
+          -e NEXUSIM_PG_MIN_CONNS="$pg_min_conns" \
+          -e NEXUSIM_KAFKA_BROKERS="$kafka_brokers" \
         -e NEXUSIM_KAFKA_TOPIC="$kafka_topic" \
         -e NEXUSIM_OUTBOX_WORKERS="$outbox_workers" \
         -e NEXUSIM_OUTBOX_BATCH_SIZE="$batch_size" \

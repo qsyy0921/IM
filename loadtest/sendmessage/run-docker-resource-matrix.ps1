@@ -13,6 +13,8 @@ param(
     [string]$PGDSN = "postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable",
     [string]$KafkaBrokers = "kafka:29092",
     [string]$KafkaTopic = "conversation.timeline.events",
+    [int]$PGMaxConns = 0,
+    [int]$PGMinConns = 0,
     [int]$BatchSize = 500,
     [string]$PollInterval = "200ms",
     [string]$FailureBackoff = "1s",
@@ -83,6 +85,8 @@ foreach ($cpu in $CpuLimits) {
                 -e GOMAXPROCS=$gomaxprocs `
                 -e NEXUSIM_MESSAGE_SERVICE_MODE=grpc `
                 -e NEXUSIM_PG_DSN=$PGDSN `
+                -e NEXUSIM_PG_MAX_CONNS=$PGMaxConns `
+                -e NEXUSIM_PG_MIN_CONNS=$PGMinConns `
                 -e NEXUSIM_GRPC_ADDR=0.0.0.0:10495 `
                 -e NEXUSIM_DEBUG_ADDR=0.0.0.0:10497 `
                 $MessageImage | Out-Null
@@ -95,6 +99,8 @@ foreach ($cpu in $CpuLimits) {
                 -e GOMAXPROCS=$gomaxprocs `
                 -e NEXUSIM_MESSAGE_SERVICE_MODE=outbox-relay `
                 -e NEXUSIM_PG_DSN=$PGDSN `
+                -e NEXUSIM_PG_MAX_CONNS=$PGMaxConns `
+                -e NEXUSIM_PG_MIN_CONNS=$PGMinConns `
                 -e NEXUSIM_KAFKA_BROKERS=$KafkaBrokers `
                 -e NEXUSIM_KAFKA_TOPIC=$KafkaTopic `
                 -e NEXUSIM_OUTBOX_WORKERS=$OutboxWorkers `

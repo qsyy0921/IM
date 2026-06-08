@@ -22,6 +22,7 @@ type Server struct {
 
 	sendMessage SendMessageExecutor
 	now         func() time.Time
+	metrics     types.LatencyRecorder
 }
 
 type Option func(*Server)
@@ -34,10 +35,19 @@ func WithClock(clock func() time.Time) Option {
 	}
 }
 
+func WithMetrics(metrics types.LatencyRecorder) Option {
+	return func(server *Server) {
+		if metrics != nil {
+			server.metrics = metrics
+		}
+	}
+}
+
 func NewServer(sendMessage SendMessageExecutor, opts ...Option) *Server {
 	server := &Server{
 		sendMessage: sendMessage,
 		now:         func() time.Time { return time.Now().UTC() },
+		metrics:     types.NoopLatencyRecorder{},
 	}
 	for _, opt := range opts {
 		opt(server)
@@ -50,6 +60,11 @@ func Register(registrar grpcgo.ServiceRegistrar, server *Server) {
 }
 
 func (s *Server) SendMessage(ctx context.Context, req *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error) {
+	started := time.Now()
+	defer func() {
+		s.metrics.ObserveSendMessage(time.Since(started))
+	}()
+
 	command, err := s.toSendMessageCommand(req)
 	if err != nil {
 		return nil, grpcError(err, reqCorrelationID(req))

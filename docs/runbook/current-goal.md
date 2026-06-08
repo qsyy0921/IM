@@ -54,7 +54,7 @@ message-service SendMessage
 | PostgreSQL repository | 已实现普通会话 `SendMessage` 本地事务：幂等检查、同幂等键 advisory transaction lock、`conversation_seq` row lock、`message_log`、`conversation_timeline_events`、`message_outbox` 同事务写入；outbox payload 对齐 `MessagePersistedV1` 业务 payload；集成测试和并发重复请求测试通过 |
 | Outbox relay / Kafka publish path | 已实现 `trigger/outbox` relay、PostgreSQL outbox store、Kafka writer producer；relay 支持 `NEXUSIM_OUTBOX_WORKERS` 多 worker 与 `NEXUSIM_OUTBOX_FAILURE_BACKOFF` 失败退避；真实 PostgreSQL + Kafka 集成测试通过；真实 PostgreSQL 多 worker / `FOR UPDATE SKIP LOCKED` 测试已覆盖同 conversation 顺序和跨 conversation 并发 |
 | message-service gRPC adapter | 已实现 `SendMessage` gRPC handler、proto request/response 转换、稳定错误码 detail 映射和错误 message 脱敏、`NEXUSIM_MESSAGE_SERVICE_MODE=grpc` 运行入口；支持 `NEXUSIM_DEBUG_ADDR=/debug/metrics` 暴露本进程压测指标；已通过 bufconn client 单测 |
-| SendMessage loadtest | 已实现 `go run ./loadtest/sendmessage` 参数化 gRPC 压测入口；支持 `target`、`vus`、`duration`、`result-dir`、`pg-dsn`、`stats-wait`、`service-metrics-url`、`relay-metrics-url`；summary 记录 full commit、dirty 状态、outbox total/published/pending/DLQ、seq alloc latency、Kafka publish latency；已补 `run-local-gradient.ps1` 本机 worker 梯度压测脚本；真实 gRPC + PostgreSQL + outbox relay + Kafka smoke 与 baseline 已执行 |
+| SendMessage loadtest | 已实现 `go run ./loadtest/sendmessage` 参数化 gRPC 压测入口；支持 `target`、`vus`、`duration`、`result-dir`、`pg-dsn`、`stats-wait`、`service-metrics-url`、`relay-metrics-url`；summary 记录 full commit、dirty 状态、outbox total/published/pending/DLQ、SendMessage/repository/commit/seq/Kafka latency、service/relay pgx pool；已补 `run-local-gradient.ps1` 本机 worker 梯度压测脚本；真实 gRPC + PostgreSQL + outbox relay + Kafka smoke、baseline 与瓶颈诊断已执行 |
 
 ## 5. 下一步优先级
 
@@ -147,6 +147,29 @@ error_topn
 
 压测结果输出到 `loadtest/results/`，大文件和临时日志默认不提交。
 
+每个阶段必须新增一份独立压测报告，不覆盖旧报告。报告放在 `docs/runbook/`，推荐命名：
+
+```text
+loadtest-report-YYYYMMDD-<stage>.md
+```
+
+报告至少说明：
+
+```text
+压测目标
+压测拓扑
+服务端和客户端分别跑在哪里
+CPU / 内存 / Docker / 连接池 / worker 配置
+具体命令或脚本入口
+通过标准
+核心结果
+中间结果文件路径
+瓶颈排查方法
+当前结论和下一步
+```
+
+`loadtest/results/` 保存所有中间结果和趋势图；这些文件默认不提交，但报告必须引用关键结果路径，保证以后能追溯。
+
 ## 8. GitHub 同步要求
 
 GitHub 同步采用批量策略，不对每个小改动都推送。
@@ -203,6 +226,8 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 win-win Docker 资源矩阵已覆盖 `1/2/4 CPU + 256m/512m/1g`、`8/12/16 CPU + 2g/4g/8g`、以及 `16 CPU + 23g` 档位。按 `success_rate >= 0.99`、`p99 <= 1000ms`、`outbox_pending_count <= 1000` 的门槛，已观察到的最佳通过档为 `16 CPU / 23g / relay workers=8 / 1200 VU`，约 `2493 rps`、p99 `736.28ms`、outbox pending 0；`1600 VU` 时 p99 `1120.48ms` 超线。`16 CPU / 23g / relay workers=16` 在 `1200 VU` 即 p99 `1477.19ms` 超线，说明盲目增加 relay worker 会放大争用。
 - 当前 Windows+Mac 分布式双客户端已跑通：Windows 服务端暴露 `10495/10497/10500`，Windows 和 Mac 同时作为 load generator。`600+600 VU` 双客户端全部成功，Windows client p99 `730.11ms`、Mac client p99 `739.50ms`、outbox pending 0；`1000+1000 VU` 双客户端全部成功但 p99 均约 `1331ms`，按当前尾延迟门槛超线。
 - 当前压测趋势图已生成到 `loadtest/results/charts/`：`winwin-rps-trend.png`、`winwin-p99-trend.png`、`distributed-clients-trend.png`，摘要为 `loadtest/results/charts/winwin-distributed-summary.md`；这些结果文件默认不提交。
+- 当前压测正式报告为 `docs/runbook/loadtest-report-20260609.md`，已记录压测拓扑、执行方式、通过标准、结果摘要和瓶颈排查过程。
+- 当前 p99 瓶颈已初步定位：`16 CPU / 23g / 1600 VU / workers=8` 下，request p99 基本等于 repository append p99；commit、conversation_seq、Kafka publish 都是毫秒级；service pgxpool 默认 `max_conns=16` 时 acquire 平均等待约 `646ms`，`NEXUSIM_PG_MAX_CONNS=64` 后 1600 VU p99 改善到 `779.63ms`，但 2400 VU 仍 p99 `1452.87ms` 超线。下一步优先做 PG 连接池梯度、多 message-service 实例和 repository 细分打点。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
 - `timeline-service`、`conversation-service`、`delivery-service`、`push-gateway` SDD 未冻结，不能扩展到对应生产逻辑。

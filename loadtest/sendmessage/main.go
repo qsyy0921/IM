@@ -66,8 +66,18 @@ type summary struct {
 	P50MS                         float64      `json:"p50_ms"`
 	P95MS                         float64      `json:"p95_ms"`
 	P99MS                         float64      `json:"p99_ms"`
+	SendMessageLatencyMS          *float64     `json:"send_message_latency_ms"`
+	SendMessageP95MS              *float64     `json:"send_message_p95_ms"`
+	SendMessageP99MS              *float64     `json:"send_message_p99_ms"`
+	RepositoryAppendLatencyMS     *float64     `json:"repository_append_latency_ms"`
+	RepositoryAppendP95MS         *float64     `json:"repository_append_p95_ms"`
+	RepositoryAppendP99MS         *float64     `json:"repository_append_p99_ms"`
+	RepositoryCommitLatencyMS     *float64     `json:"repository_commit_latency_ms"`
+	RepositoryCommitP95MS         *float64     `json:"repository_commit_p95_ms"`
+	RepositoryCommitP99MS         *float64     `json:"repository_commit_p99_ms"`
 	ConversationSeqAllocLatencyMS *float64     `json:"conversation_seq_alloc_latency_ms"`
 	ConversationSeqAllocP95MS     *float64     `json:"conversation_seq_alloc_p95_ms"`
+	ConversationSeqAllocP99MS     *float64     `json:"conversation_seq_alloc_p99_ms"`
 	OutboxTotalCount              *int64       `json:"outbox_total_count"`
 	OutboxPublishedCount          *int64       `json:"outbox_published_count"`
 	OutboxPendingCount            *int64       `json:"outbox_pending_count"`
@@ -75,6 +85,9 @@ type summary struct {
 	OutboxOldestPendingAgeSeconds *float64     `json:"outbox_oldest_pending_age_seconds"`
 	KafkaPublishLatencyMS         *float64     `json:"kafka_publish_latency_ms"`
 	KafkaPublishP95MS             *float64     `json:"kafka_publish_p95_ms"`
+	KafkaPublishP99MS             *float64     `json:"kafka_publish_p99_ms"`
+	ServicePGPool                 *pgPoolStats `json:"service_pg_pool,omitempty"`
+	RelayPGPool                   *pgPoolStats `json:"relay_pg_pool,omitempty"`
 	ErrorTopN                     []errorCount `json:"error_topn"`
 	StartedAt                     string       `json:"started_at"`
 	FinishedAt                    string       `json:"finished_at"`
@@ -134,14 +147,44 @@ func run(args []string, getenv func(string) string) error {
 		if metricsErr != nil {
 			return metricsErr
 		}
-		applyLatency(&result.ConversationSeqAllocLatencyMS, &result.ConversationSeqAllocP95MS, metrics.ConversationSeqAllocLatencyMS)
+		applyLatency(
+			&result.SendMessageLatencyMS,
+			&result.SendMessageP95MS,
+			&result.SendMessageP99MS,
+			metrics.SendMessageLatencyMS,
+		)
+		applyLatency(
+			&result.RepositoryAppendLatencyMS,
+			&result.RepositoryAppendP95MS,
+			&result.RepositoryAppendP99MS,
+			metrics.RepositoryAppendLatencyMS,
+		)
+		applyLatency(
+			&result.RepositoryCommitLatencyMS,
+			&result.RepositoryCommitP95MS,
+			&result.RepositoryCommitP99MS,
+			metrics.RepositoryCommitLatencyMS,
+		)
+		applyLatency(
+			&result.ConversationSeqAllocLatencyMS,
+			&result.ConversationSeqAllocP95MS,
+			&result.ConversationSeqAllocP99MS,
+			metrics.ConversationSeqAllocLatencyMS,
+		)
+		result.ServicePGPool = metrics.PGPool
 	}
 	if cfg.RelayMetricsURL != "" {
 		metrics, metricsErr := readMetricsSnapshot(context.Background(), cfg.RelayMetricsURL)
 		if metricsErr != nil {
 			return metricsErr
 		}
-		applyLatency(&result.KafkaPublishLatencyMS, &result.KafkaPublishP95MS, metrics.KafkaPublishLatencyMS)
+		applyLatency(
+			&result.KafkaPublishLatencyMS,
+			&result.KafkaPublishP95MS,
+			&result.KafkaPublishP99MS,
+			metrics.KafkaPublishLatencyMS,
+		)
+		result.RelayPGPool = metrics.PGPool
 	}
 
 	if err := writeSummary(cfg.ResultDir, &result); err != nil {
@@ -281,8 +324,10 @@ func executeLoad(ctx context.Context, cfg config, client messagev1.MessageServic
 		FinishedAt:                    finished.Format(time.RFC3339Nano),
 		ConversationSeqAllocLatencyMS: nil,
 		ConversationSeqAllocP95MS:     nil,
+		ConversationSeqAllocP99MS:     nil,
 		KafkaPublishLatencyMS:         nil,
 		KafkaPublishP95MS:             nil,
+		KafkaPublishP99MS:             nil,
 	}, nil
 }
 
@@ -380,14 +425,31 @@ type outboxStats struct {
 }
 
 type metricsSnapshot struct {
+	SendMessageLatencyMS          latencySnapshot `json:"send_message_latency_ms"`
+	RepositoryAppendLatencyMS     latencySnapshot `json:"repository_append_latency_ms"`
+	RepositoryCommitLatencyMS     latencySnapshot `json:"repository_commit_latency_ms"`
 	ConversationSeqAllocLatencyMS latencySnapshot `json:"conversation_seq_alloc_latency_ms"`
 	KafkaPublishLatencyMS         latencySnapshot `json:"kafka_publish_latency_ms"`
+	PGPool                        *pgPoolStats    `json:"pg_pool"`
 }
 
 type latencySnapshot struct {
 	Count int64   `json:"count"`
 	AvgMS float64 `json:"avg_ms"`
 	P95MS float64 `json:"p95_ms"`
+	P99MS float64 `json:"p99_ms"`
+}
+
+type pgPoolStats struct {
+	AcquireCount         int64 `json:"acquire_count"`
+	AcquireDurationMS    int64 `json:"acquire_duration_ms"`
+	AcquiredConns        int32 `json:"acquired_conns"`
+	CanceledAcquireCount int64 `json:"canceled_acquire_count"`
+	ConstructingConns    int32 `json:"constructing_conns"`
+	EmptyAcquireCount    int64 `json:"empty_acquire_count"`
+	IdleConns            int32 `json:"idle_conns"`
+	MaxConns             int32 `json:"max_conns"`
+	TotalConns           int32 `json:"total_conns"`
 }
 
 func readOutboxStats(ctx context.Context, dsn string, tenantID string) (outboxStats, error) {
@@ -471,14 +533,16 @@ func normalizeMetricsURL(value string) (string, error) {
 	return parsed.String(), nil
 }
 
-func applyLatency(avgTarget **float64, p95Target **float64, snapshot latencySnapshot) {
+func applyLatency(avgTarget **float64, p95Target **float64, p99Target **float64, snapshot latencySnapshot) {
 	if snapshot.Count <= 0 {
 		return
 	}
 	avg := snapshot.AvgMS
 	p95 := snapshot.P95MS
+	p99 := snapshot.P99MS
 	*avgTarget = &avg
 	*p95Target = &p95
+	*p99Target = &p99
 }
 
 func writeSummary(resultDir string, result *summary) error {

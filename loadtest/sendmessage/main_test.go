@@ -66,9 +66,10 @@ func TestPercentile(t *testing.T) {
 func TestApplyLatency(t *testing.T) {
 	var avg *float64
 	var p95 *float64
-	applyLatency(&avg, &p95, latencySnapshot{Count: 2, AvgMS: 1.5, P95MS: 2.5})
-	if avg == nil || *avg != 1.5 || p95 == nil || *p95 != 2.5 {
-		t.Fatalf("unexpected latency values avg=%v p95=%v", avg, p95)
+	var p99 *float64
+	applyLatency(&avg, &p95, &p99, latencySnapshot{Count: 2, AvgMS: 1.5, P95MS: 2.5, P99MS: 3.5})
+	if avg == nil || *avg != 1.5 || p95 == nil || *p95 != 2.5 || p99 == nil || *p99 != 3.5 {
+		t.Fatalf("unexpected latency values avg=%v p95=%v p99=%v", avg, p95, p99)
 	}
 }
 

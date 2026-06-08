@@ -234,6 +234,12 @@ func (m *fakeMetrics) ObserveConversationSeqAlloc(time.Duration) {
 	m.seqCount++
 }
 
+func (m *fakeMetrics) ObserveSendMessage(time.Duration) {}
+
+func (m *fakeMetrics) ObserveRepositoryAppend(time.Duration) {}
+
+func (m *fakeMetrics) ObserveRepositoryCommit(time.Duration) {}
+
 func (m *fakeMetrics) ObserveKafkaPublish(time.Duration) {
 	m.kafkaCount++
 }

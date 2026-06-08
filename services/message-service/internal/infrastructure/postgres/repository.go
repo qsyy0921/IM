@@ -80,6 +80,11 @@ func WithIDGenerators(
 }
 
 func (r *MessageRepository) AppendMessage(ctx context.Context, input domain.AppendMessageInput) (domain.AppendMessageResult, error) {
+	appendStarted := time.Now()
+	defer func() {
+		r.metrics.ObserveRepositoryAppend(time.Since(appendStarted))
+	}()
+
 	if r.pool == nil {
 		return domain.AppendMessageResult{}, ErrRepositoryNotConfigured
 	}
@@ -140,9 +145,11 @@ func (r *MessageRepository) AppendMessage(ctx context.Context, input domain.Appe
 	if err := r.insertOutboxEvent(ctx, tx, record); err != nil {
 		return domain.AppendMessageResult{}, err
 	}
+	commitStarted := time.Now()
 	if err := tx.Commit(ctx); err != nil {
 		return domain.AppendMessageResult{}, types.NewDBWriteFailed(err.Error())
 	}
+	r.metrics.ObserveRepositoryCommit(time.Since(commitStarted))
 
 	return domain.AppendMessageResult{
 		MessageID:        record.Message.MessageID,

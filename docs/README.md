@@ -17,6 +17,7 @@
 3. `sdd/message-service.md`：确认第一条可编码切片。
 4. `architecture/tadd.md`：确认工程目录、六层 DDD、Docker Compose 和编码门禁。
 5. `runbook/local-loadtest.md`：确认本地双机压测端口和执行方式。
+6. `runbook/loadtest-report-20260609.md`：查看当前 SendMessage 压测方式、结果和 p99 瓶颈排查结论。
 
 ## 写文档规则
 

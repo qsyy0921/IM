@@ -60,8 +60,8 @@ message-service SendMessage
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
-2. 设计 admission control / backpressure：当 pgxpool acquire 排队明显时快速返回 retryable overload，而不是让请求排队到 2s。
-3. 为 loadtest 增加 overload / retryable 错误统计，区分系统保护性拒绝和真实失败。
+2. 为 loadtest 增加 `SERVICE_OVERLOADED` / retryable 错误专门统计，区分系统保护性拒绝和真实失败。
+3. 在正式 VU 梯度下比较 backpressure on/off：成功率、p99、outbox pending、overload rate。
 4. 评估 outbox relay 追平优化：批量 publish、批量 mark published、batch size、worker 数和故障退避；避免高写入吞吐下 pending 快速增加。
 5. 继续采集 PostgreSQL wait_event，重点看 `LWLock:WALWrite`、`LWLock:WALInsert`、`LWLock:BufferContent` 和 `CheckpointWriteDelay`。
 6. 视评审复核结果决定是否推送 GitHub。
@@ -277,4 +277,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已新增 `watch-postgres-diagnostics.ps1`，用于压测期间按间隔采集 PostgreSQL `pg_stat_activity` wait_event、锁等待、表 dead tuples、bgwriter 和 WAL 统计，输出 `postgres-wait-samples.jsonl`。under-load smoke：`PG_MAX_CONNS=8`、`VU=20`、`duration=5s`，采样 10 次，最大 active backend 为 8，抓到 `LWLock:WALWrite` 等 wait_event。
 - 2026-06-09：已新增 `deploy/local/docker-compose.postgres-loadtest.yml` 作为压测专用 PostgreSQL override，不改变默认开发 compose；目标参数包括 `max_connections=200`、`shared_buffers=1GB`、`max_wal_size=4GB`、`checkpoint_timeout=15min` 和更积极的 autovacuum 阈值。
 - 2026-06-09：已实际启用 PostgreSQL loadtest override 并跑正式 PG pool 矩阵，同时采集 wait_event。结论：调大 PostgreSQL 与 PG pool 不能单独解决 p99，`repository_pool_acquire` 仍是主等待段；`PG_MAX_CONNS=128` 会放大 commit/WAL/outbox 压力。下一步优先做 backpressure 和 outbox relay 批量优化。
-- 2026-06-09：已实现默认关闭的 PostgreSQL pool backpressure，并新增 `SERVICE_OVERLOADED` 错误码。dirty smoke：`NEXUSIM_PG_BACKPRESSURE_ENABLED=true`、`PG_MAX_CONNS=1`、`VU=20`、`duration=5s`，145370 请求中成功率 `0.0029`，p99 `1.68ms`，top error 为 `Unavailable: service overloaded`，outbox pending 0；后续需用 clean commit 重跑并形成正式报告。
+- 2026-06-09：已实现默认关闭的 PostgreSQL pool backpressure，并新增 `SERVICE_OVERLOADED` 错误码。clean smoke commit `78e8375`：`NEXUSIM_PG_BACKPRESSURE_ENABLED=true`、`PG_MAX_CONNS=1`、`VU=20`、`duration=5s`，163055 请求中成功率 `0.0032`，p99 `1.6246ms`，top error 为 `Unavailable: service overloaded`，outbox pending 0；报告为 `docs/runbook/loadtest-report-20260609-backpressure.md`。

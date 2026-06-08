@@ -84,6 +84,35 @@ func TestRelayRunOnceRecordsPublishFailure(t *testing.T) {
 	}
 }
 
+func TestRelayRunContinuesImmediatelyWhenWorkWasFetched(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	store := &countingStore{
+		stats: []types.OutboxRelayStats{
+			{Fetched: 1, Published: 1},
+			{Fetched: 0},
+		},
+		cancel: cancel,
+	}
+	relay := NewRelay(store, &fakePublisher{}, Config{PollInterval: time.Hour})
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- relay.Run(ctx)
+	}()
+
+	select {
+	case err := <-errCh:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("unexpected relay error: %v", err)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("relay did not immediately continue after fetched work")
+	}
+	if store.calls != 2 {
+		t.Fatalf("expected two store calls, got %d", store.calls)
+	}
+}
+
 type publishedMessage struct {
 	topic string
 	key   []byte
@@ -131,6 +160,33 @@ func (s *fakeStore) ProcessReady(
 		stats.Published++
 	}
 	return stats, nil
+}
+
+type countingStore struct {
+	stats  []types.OutboxRelayStats
+	cancel context.CancelFunc
+	calls  int
+}
+
+func (s *countingStore) ProcessReady(
+	context.Context,
+	int,
+	int,
+	time.Duration,
+	func(context.Context, types.OutboxMessage) error,
+) (types.OutboxRelayStats, error) {
+	s.calls++
+	index := s.calls - 1
+	if index >= len(s.stats) {
+		if s.cancel != nil {
+			s.cancel()
+		}
+		return types.OutboxRelayStats{}, nil
+	}
+	if index == len(s.stats)-1 && s.cancel != nil {
+		s.cancel()
+	}
+	return s.stats[index], nil
 }
 
 func testOutboxMessage() types.OutboxMessage {

@@ -56,8 +56,12 @@ func (r *Relay) Run(ctx context.Context) error {
 	defer ticker.Stop()
 
 	for {
-		if _, err := r.RunOnce(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		stats, err := r.RunOnce(ctx)
+		if err != nil && !errors.Is(err, context.Canceled) {
 			return err
+		}
+		if stats.Fetched > 0 {
+			continue
 		}
 		select {
 		case <-ctx.Done():

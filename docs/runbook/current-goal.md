@@ -54,13 +54,14 @@ message-service SendMessage
 | PostgreSQL repository | 已实现普通会话 `SendMessage` 本地事务：幂等检查、同幂等键 advisory transaction lock、`conversation_seq` row lock、`message_log`、`conversation_timeline_events`、`message_outbox` 同事务写入；outbox payload 对齐 `MessagePersistedV1` 业务 payload；集成测试和并发重复请求测试通过 |
 | Outbox relay / Kafka publish path | 已实现 `trigger/outbox` 最小 relay、PostgreSQL outbox store、Kafka writer producer；真实 PostgreSQL + Kafka 集成测试通过 |
 | message-service gRPC adapter | 已实现 `SendMessage` gRPC handler、proto request/response 转换、稳定错误码 detail 映射、`NEXUSIM_MESSAGE_SERVICE_MODE=grpc` 运行入口；已通过 bufconn client 单测 |
+| SendMessage loadtest | 已实现 `go run ./loadtest/sendmessage` 参数化 gRPC 压测入口；支持 `target`、`vus`、`duration`、`result-dir`、`pg-dsn`、`stats-wait`；真实 gRPC + PostgreSQL + outbox relay + Kafka smoke 通过 |
 
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
-2. 补本地多线程 SendMessage 压测入口。
-3. 用真实 `message-service` gRPC 进程压 `SendMessage -> PostgreSQL -> outbox -> Kafka` 链路。
-4. 记录第一轮 smoke/baseline 压测结果到 `loadtest/results/`。
+2. 邀请评审线程复核 gRPC adapter + loadtest runner + relay polling 修正。
+3. 根据评审意见修正文档或代码。
+4. 跑第一轮 baseline 压测，例如 `--vus=100 --duration=60s`，并记录结果。
 5. 视压测结果补强 outbox relay 工程化细节，例如多 worker 锁、显式 idempotency reservation 或 observability。
 
 ## 6. 评审要求
@@ -187,10 +188,11 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 outbox relay 的 publish callback 在 PostgreSQL 事务内执行，这是第一阶段可接受的至少一次发布取舍；压测阶段需要重点观察 batch size、Kafka publish latency、DB lock wait 和重复发布窗口。
 - 当前 relay 只支持 `message.persisted.v1`；启用 Edit/Revoke/Delete 前必须补齐对应 Kafka oneof payload 构造和测试。
 - OutboxStore 后续进入多 worker 或压测前，应补强 `available_at/next_retry_at` 未到期、低版本 PENDING 阻塞、并发 `FOR UPDATE SKIP LOCKED` 等 ready/concurrency 测试。
+- 当前 relay 已改为有 ready event 时立即继续循环，只有空转时才按 `PollInterval` sleep；同一 conversation 仍按最低 `aggregate_version` 串行发布，因此单会话积压追平能力仍受顺序保护限制。
 - 当前 ready 判断使用 DB `now()`，retry 时间写入使用应用时钟；生产硬化时需要统一时间源或明确 DB/relay 节点时钟同步要求。
 - 当前尚未实现 DLQ repair/replay；未来实现时必须清理 `dead_lettered_at`、`last_error`、`next_retry_at` 等旧失败字段。
-- 还没有完整 SendMessage 端到端压测结果。
-- `NEXUSIM_MESSAGE_SERVICE_MODE=grpc` 已能启动真实 gRPC 服务入口，但尚未执行真实进程级 smoke/loadtest。
+- 已有真实进程级 SendMessage smoke 结果，但还没有 `--vus=100 --duration=60s` baseline。
+- 压测 summary 中 `conversation_seq_alloc_latency_ms` 和 `kafka_publish_latency_ms` 仍为 `null`，因为当前服务还没有独立指标采集点。
 - `timeline-service`、`conversation-service`、`delivery-service`、`push-gateway` SDD 未冻结，不能扩展到对应生产逻辑。
 
 ## 11. 最近评审状态
@@ -204,3 +206,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-08：已实现 `trigger/outbox` relay、PostgreSQL outbox store 和真实 Kafka writer producer；本地已启动 `nexusim-kafka`，创建 `conversation.timeline.events` topic，并通过真实 PostgreSQL + Kafka 集成测试验证 outbox 可发布后标记 `PUBLISHED`，Kafka publish 失败时保留 pending/retry/DLQ 状态。
 - 2026-06-08：独立评审线程复核 outbox relay + Kafka publish path，无 P0/P1 阻塞；P2/P3 风险已记录到本文，下一步可以提交本轮切片并推进 `message-service` gRPC adapter 与本地多线程压测。
 - 2026-06-08：已实现 `message-service` gRPC adapter 和 `NEXUSIM_MESSAGE_SERVICE_MODE=grpc` 运行入口；adapter 已覆盖请求转换、响应转换、稳定错误码 detail、unsupported message type、bufconn client 注册调用。按批量策略，本轮暂不单独评审/推送，和后续 loadtest runner + smoke 结果一起评审。
+- 2026-06-08：已实现 `loadtest/sendmessage` gRPC 压测 CLI，并修正 relay 有 ready event 时仍固定 sleep 的追平问题；真实进程 smoke 使用 gRPC server + outbox relay + PostgreSQL + Kafka，`--vus=2 --duration=3s --stats-wait=8s --conversation-count=100` 结果为 1020/1020 成功、p95 7.63ms、p99 9.20ms、本轮 tenant outbox 0 pending。

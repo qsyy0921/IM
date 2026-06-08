@@ -100,20 +100,24 @@ Test-NetConnection 192.168.0.182 -Port 10498
 推荐参数形式：
 
 ```bash
-loadtest/sendmessage \
-  --target=http://192.168.0.141:10495 \
+go run ./loadtest/sendmessage \
+  --target=192.168.0.141:10495 \
   --vus=100 \
   --duration=60s \
-  --result-dir=loadtest/results/2026-06-08
+  --stats-wait=8s \
+  --result-dir=loadtest/results/2026-06-08 \
+  --pg-dsn=postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable
 ```
 
 等价环境变量形式：
 
 ```bash
-NEXUSIM_TARGET=http://192.168.0.141:10495
+NEXUSIM_TARGET=192.168.0.141:10495
 NEXUSIM_VUS=100
 NEXUSIM_DURATION=60s
+NEXUSIM_STATS_WAIT=8s
 NEXUSIM_RESULT_DIR=loadtest/results/2026-06-08
+NEXUSIM_PG_DSN=postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable
 ```
 
 ## 7. 边搭建边压测流程

@@ -169,5 +169,4 @@ VU1600 kafka_p99: 26.30ms -> 26.22ms
 - 重跑一轮 after 矩阵确认 pending 降低是否稳定。
 - 设计 `Publisher.PublishBatch`，让 relay 可以按 batch 调用 Kafka writer。
 - 评估 `ProcessReady` 是否应缩小事务范围，避免 Kafka 慢时长时间持有 outbox row lock。
-- 增加 relay metrics：每轮 fetched/published/retried/DLQ、batch mark latency、batch size、loop duration。
-
+- 在后续矩阵中固定展示已新增的 relay metrics：`outbox_process_ready_latency_ms`、`outbox_fetch_ready_latency_ms`、`outbox_mark_published_latency_ms`、`outbox_commit_latency_ms`。

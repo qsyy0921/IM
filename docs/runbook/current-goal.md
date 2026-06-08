@@ -52,14 +52,15 @@ message-service SendMessage
 | Go 依赖 | `go.mod` 使用 Go `1.26.4`，并已引入 `google.golang.org/grpc v1.81.1`、`google.golang.org/protobuf v1.36.11` |
 | SendMessage app/domain | 已补 `SendMessageUseCase` 单元测试、permission version 一致性短重试、稳定 JSON canonical command hash、append record 构造 |
 | PostgreSQL repository | 已实现普通会话 `SendMessage` 本地事务：幂等检查、同幂等键 advisory transaction lock、`conversation_seq` row lock、`message_log`、`conversation_timeline_events`、`message_outbox` 同事务写入；outbox payload 对齐 `MessagePersistedV1` 业务 payload；集成测试和并发重复请求测试通过 |
+| Outbox relay / Kafka publish path | 已实现 `trigger/outbox` 最小 relay、PostgreSQL outbox store、Kafka writer producer；真实 PostgreSQL + Kafka 集成测试通过 |
 
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
-2. 实现 `trigger/outbox` relay 的最小 publish path。
-3. 接入 Kafka producer，验证 Kafka 不可用时 SendMessage 仍只积压 outbox。
-4. 补 `message-service` gRPC adapter，把 proto `SendMessage` 转换到 app command。
-5. 补本地多线程 SendMessage 压测入口。
+2. 补 `message-service` gRPC adapter，把 proto `SendMessage` 转换到 app command。
+3. 补本地多线程 SendMessage 压测入口。
+4. 用真实 message-service 进程压 `SendMessage -> outbox -> Kafka` 链路。
+5. 视评审结果补强 outbox relay 工程化细节，例如多 worker 锁、显式 idempotency reservation 或 observability。
 
 ## 6. 评审要求
 
@@ -152,7 +153,13 @@ error_topn
 ## 10. 当前风险
 
 - 当前 Codex 进程可能尚未重新读取用户 PATH；本线程运行 Go 命令前执行 `. .\tools\go-env.ps1`。
-- 现阶段已有 app/domain/PostgreSQL repository 测试，但服务入口、outbox relay 和 Kafka producer 尚未完成。
+- 现阶段已有 app/domain/PostgreSQL repository 测试，也已有 outbox relay / Kafka producer 测试；服务入口和本地多线程压测入口尚未完成。
+- 当前 Kafka writer 使用 `segmentio/kafka-go`，已配置 `acks=all`、hash key 和禁用自动建 topic，但该 Writer 不暴露 Kafka `enable.idempotence=true` 开关；生产硬化时需要更换支持幂等 producer 的 client 或接入更底层 transactional producer 能力。
+- 当前 outbox relay 的 publish callback 在 PostgreSQL 事务内执行，这是第一阶段可接受的至少一次发布取舍；压测阶段需要重点观察 batch size、Kafka publish latency、DB lock wait 和重复发布窗口。
+- 当前 relay 只支持 `message.persisted.v1`；启用 Edit/Revoke/Delete 前必须补齐对应 Kafka oneof payload 构造和测试。
+- OutboxStore 后续进入多 worker 或压测前，应补强 `available_at/next_retry_at` 未到期、低版本 PENDING 阻塞、并发 `FOR UPDATE SKIP LOCKED` 等 ready/concurrency 测试。
+- 当前 ready 判断使用 DB `now()`，retry 时间写入使用应用时钟；生产硬化时需要统一时间源或明确 DB/relay 节点时钟同步要求。
+- 当前尚未实现 DLQ repair/replay；未来实现时必须清理 `dead_lettered_at`、`last_error`、`next_retry_at` 等旧失败字段。
 - 还没有完整 SendMessage 端到端压测结果。
 - `timeline-service`、`conversation-service`、`delivery-service`、`push-gateway` SDD 未冻结，不能扩展到对应生产逻辑。
 
@@ -164,3 +171,5 @@ error_topn
 - 2026-06-08：已实现 `SendMessageUseCase` 单元测试、领域 command hash / append record、PostgreSQL repository 本地事务；`go test ./...` 通过，`NEXUSIM_PG_DSN=postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable` 的 repository 集成测试通过。
 - 2026-06-08：根据评审意见修复同一 `client_msg_id` 并发重复请求可能推进 `conversation_seq` 的问题，repository 已使用同幂等键 advisory transaction lock，并新增真实 PostgreSQL 并发集成测试；同时修复 payload JSON canonical 只压缩不稳定排序的问题。
 - 2026-06-08：根据评审意见补齐 `MessagePersistedV1` payload 中的 `command_hash`，明确 `message_outbox.payload_json` 保存业务 payload、envelope/metadata 由 outbox 表字段组装；app 层已增加 `permission_version` 不一致时短重试一次，仍不一致返回可识别 dependency version error；outbox 写入失败已拆为 `ErrOutboxWriteFailed`。
+- 2026-06-08：已实现 `trigger/outbox` relay、PostgreSQL outbox store 和真实 Kafka writer producer；本地已启动 `nexusim-kafka`，创建 `conversation.timeline.events` topic，并通过真实 PostgreSQL + Kafka 集成测试验证 outbox 可发布后标记 `PUBLISHED`，Kafka publish 失败时保留 pending/retry/DLQ 状态。
+- 2026-06-08：独立评审线程复核 outbox relay + Kafka publish path，无 P0/P1 阻塞；P2/P3 风险已记录到本文，下一步可以提交本轮切片并推进 `message-service` gRPC adapter 与本地多线程压测。

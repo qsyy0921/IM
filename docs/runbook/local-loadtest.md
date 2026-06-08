@@ -91,6 +91,26 @@ Test-NetConnection 192.168.0.182 -Port 10498
 ## 6. 压测原则
 
 - 第一轮只压真实服务进程，不压固定字符串 toy endpoint。
+- 压测脚本不能写死 IP、端口、并发和持续时间，必须通过参数或环境变量传入。
 - 每次压测记录目标 commit、机器、端口、并发、请求数、p95/p99、错误率。
 - 压测结果输出到 `loadtest/results/<date>/`。
 - 先跑短压测确认功能，再跑长压测观察资源和稳定性。
+
+推荐参数形式：
+
+```bash
+loadtest/sendmessage \
+  --target=http://192.168.0.141:10495 \
+  --vus=100 \
+  --duration=60s \
+  --result-dir=loadtest/results/2026-06-08
+```
+
+等价环境变量形式：
+
+```bash
+NEXUSIM_TARGET=http://192.168.0.141:10495
+NEXUSIM_VUS=100
+NEXUSIM_DURATION=60s
+NEXUSIM_RESULT_DIR=loadtest/results/2026-06-08
+```

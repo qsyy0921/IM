@@ -1134,6 +1134,17 @@ RAG/Agent 发布必须跑安全评测：
 | P1 | `retrieval-gateway SDD` | strict ACL、EvidencePack、索引版本、shadow rebuild |
 | P1 | `第一轮压测脚本` | WS 建连、消息写入、热点群、补拉、ACK、Kafka lag、RAG lag、Agent approval |
 
+当前工程缺口和代码边界：
+
+| 缺口 | 对第一阶段代码的影响 | 边界约束 |
+| --- | --- | --- |
+| `timeline-service / sequencer SDD` 未完成 | 不阻塞普通会话 `SendMessage`；阻塞热点会话生产实现 | 第一阶段只实现 `LOCAL_ROW_LOCK`，`SEQUENCER_BLOCK` 只定义 port 和 mock |
+| `conversation-service / member_change_saga SDD` 未完成 | 不阻塞会话查询 mock；阻塞真实成员变更、群主/管理员规则和 ACL 投影 | message-service 只能依赖 `ConversationQueryPort`，不能写成员事实或角色规则 |
+| Proto / OpenAPI / AsyncAPI 未落文件 | 阻塞正式业务代码 | 先冻结 `message_service.proto`、错误码和事件契约，再创建 service skeleton |
+| PostgreSQL migration 未落文件 | 阻塞本地事务代码 | 先落 `conversation_seq + message_log + timeline + outbox` 同分片约束 |
+| Kafka schema 未落文件 | 阻塞 outbox relay 对外发布 | 先落 `message.persisted.v1` 和 envelope，再实现 producer |
+| Outbox DLQ repair 接口未定义 | 不阻塞第一阶段 `SendMessage`，但阻塞后续运维闭环 | 先在契约/Runbook 定义 replay、skip、audit 语义 |
+
 本地开发和双机压测配置属于运行手册，不固化在目标态架构正文中。当前机器 IP、端口、防火墙和代理约定见 `docs/runbook/local-loadtest.md`。
 
 工程落地基线：
@@ -1182,6 +1193,21 @@ conversation_timeline_events
 message_outbox
 outbox relay
 Kafka publish path
+```
+
+第一阶段只实现普通会话本地行锁模式：
+
+```text
+LOCAL_ROW_LOCK
+```
+
+热点会话只保留契约和 mock：
+
+```text
+SEQUENCER_BLOCK
+AllocateSeqBlock port
+seq_allocation_journal table contract
+timeline_gap_markers table contract
 ```
 
 第一阶段只定义契约、不实现业务闭环：

@@ -45,6 +45,19 @@ message-service 是 NexusIM 消息事实源服务，负责普通会话消息写�
 | 异步下游 | Kafka | `conversation.timeline.events` |
 | 消费者 | delivery/search/rag/agent/audit | 消费消息事件 |
 
+### 2.1 第一阶段依赖端口
+
+第一阶段代码只能通过 port 调用外部能力，不能把外部服务的领域规则写进 message-service。
+
+| Port | 第一阶段行为 | 禁止事项 |
+| --- | --- | --- |
+| `PolicyCheckPort` | 返回 allow/deny、`permission_version`、拒绝原因 | 不在 message-service 内硬编码角色、群主、管理员或合规规则 |
+| `ConversationQueryPort` | 返回会话存在性、`member_version`、`conversation_mode`、`current_seq_shard` | 不修改成员事实，不生成成员边界事件 |
+| `SequencerPort` | 只为热点会话定义 `AllocateSeqBlock` mock | 不在第一阶段实现 sequencer 状态机、epoch fencing 或 Kubernetes Lease |
+| `EventPublisherPort` | 由 outbox relay 发布 Kafka 事件 | 不允许业务事务绕过 outbox 直接发布 |
+
+第一阶段只实现普通会话 `LOCAL_ROW_LOCK`。`SEQUENCER_BLOCK` 只能保留 port、mock 和表契约，等 `timeline-service / sequencer SDD` 冻结后再实现。
+
 ## 3. 领域模型
 
 | 模型 | 说明 |
@@ -607,6 +620,22 @@ lock batch
 - 消费者必须用 `event_id + handler_name` 幂等。
 - Relay lag 不能影响已提交消息的客户端 accepted 响应。
 
+DLQ repair 操作：
+
+```text
+ReplayOutboxEvent(repair_id, event_id)
+ReplayOutboxBatch(repair_id, tenant_id, event_type, time_range)
+SkipOutboxEvent(repair_id, event_id, reason)
+```
+
+约束：
+
+- `repair_id` 必填，全链路写入 trace 和 audit。
+- 只有 `audit-service` 授权的运维角色可以执行 replay/skip。
+- replay 只能将 `status=DLQ` 的事件改回 `PENDING`，不能直接标记 `PUBLISHED`。
+- batch replay 必须支持 tenant、event_type、time_range 过滤，并按 tenant 限速。
+- skip 必须保留 `last_error`、`reason` 和操作者，且发布 `audit.repair.events`。
+
 ## 11. 失败补偿
 
 | 失败点 | 结果 | 补偿 |
@@ -690,7 +719,7 @@ outbox_publish_duplicate_rate 可观测但不作为错误
 | `EditMessage` | 只定义契约 | 不进入第一条代码切片 |
 | `RevokeMessage` | 只定义契约 | 不进入第一条代码切片 |
 | `DeleteMessage` | 只定义契约 | 不进入第一条代码切片 |
-| 热点 sequencer | 只定义 port/mock | 不实现 timeline-service |
+| 热点 sequencer | 只定义 port/mock | 不实现 timeline-service；不实现 `SEQUENCER_BLOCK` 生产逻辑 |
 | delivery / push / rag / agent | 不实现 | 不进入第一阶段 |
 
 第一阶段允许 mock 的依赖：

@@ -93,7 +93,9 @@ func (r *MessageRepository) AppendMessage(ctx context.Context, input domain.Appe
 		return domain.AppendMessageResult{}, err
 	}
 
+	beginStarted := time.Now()
 	tx, err := r.pool.Begin(ctx)
+	r.metrics.ObserveRepositoryBegin(time.Since(beginStarted))
 	if err != nil {
 		return domain.AppendMessageResult{}, types.NewDBWriteFailed(err.Error())
 	}
@@ -108,7 +110,7 @@ func (r *MessageRepository) AppendMessage(ctx context.Context, input domain.Appe
 	if existing, ok, err := r.findExistingMessage(ctx, tx, input.Command); err != nil {
 		return domain.AppendMessageResult{}, err
 	} else if ok {
-		return replayResult(ctx, tx, existing, commandHash)
+		return r.replayResult(ctx, tx, existing, commandHash)
 	}
 
 	seqAllocStarted := time.Now()
@@ -171,9 +173,11 @@ func (r *MessageRepository) lockCommandIdempotency(
 	tx pgx.Tx,
 	command types.SendMessageCommand,
 ) error {
+	started := time.Now()
 	_, err := tx.Exec(ctx, `
 SELECT pg_advisory_xact_lock(hashtextextended($1, 0))
 `, idempotencyLockKey(command))
+	r.metrics.ObserveRepositoryIdempotencyLock(time.Since(started))
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -195,6 +199,7 @@ func (r *MessageRepository) findExistingMessage(
 	tx pgx.Tx,
 	command types.SendMessageCommand,
 ) (existingMessage, bool, error) {
+	started := time.Now()
 	row := tx.QueryRow(ctx, `
 SELECT message_id, conversation_seq, command_hash, created_at
 FROM message_log
@@ -211,21 +216,25 @@ FOR UPDATE
 	)
 	var existing existingMessage
 	if err := row.Scan(&existing.MessageID, &existing.ConversationSeq, &existing.CommandHash, &existing.CreatedAt); err != nil {
+		r.metrics.ObserveRepositoryFindExisting(time.Since(started))
 		if errors.Is(err, pgx.ErrNoRows) {
 			return existingMessage{}, false, nil
 		}
 		return existingMessage{}, false, types.NewDBWriteFailed(err.Error())
 	}
+	r.metrics.ObserveRepositoryFindExisting(time.Since(started))
 	return existing, true, nil
 }
 
-func replayResult(ctx context.Context, tx pgx.Tx, existing existingMessage, commandHash string) (domain.AppendMessageResult, error) {
+func (r *MessageRepository) replayResult(ctx context.Context, tx pgx.Tx, existing existingMessage, commandHash string) (domain.AppendMessageResult, error) {
 	if existing.CommandHash != commandHash {
 		return domain.AppendMessageResult{}, types.NewIdempotencyConflict("client_msg_id reused with different command")
 	}
+	commitStarted := time.Now()
 	if err := tx.Commit(ctx); err != nil {
 		return domain.AppendMessageResult{}, types.NewDBWriteFailed(err.Error())
 	}
+	r.metrics.ObserveRepositoryCommit(time.Since(commitStarted))
 	return domain.AppendMessageResult{
 		MessageID:        existing.MessageID,
 		ConversationSeq:  existing.ConversationSeq,
@@ -235,6 +244,7 @@ func replayResult(ctx context.Context, tx pgx.Tx, existing existingMessage, comm
 }
 
 func (r *MessageRepository) ensureConversationSeq(ctx context.Context, tx pgx.Tx, input domain.AppendMessageInput) error {
+	started := time.Now()
 	_, err := tx.Exec(ctx, `
 INSERT INTO conversation_seq (tenant_id, conversation_id, current_seq)
 VALUES ($1, $2, 0)
@@ -243,6 +253,7 @@ ON CONFLICT (tenant_id, conversation_id) DO NOTHING
 		input.Command.AuthContext.TenantID,
 		input.Command.ConversationID,
 	)
+	r.metrics.ObserveRepositoryEnsureSeq(time.Since(started))
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -250,6 +261,7 @@ ON CONFLICT (tenant_id, conversation_id) DO NOTHING
 }
 
 func (r *MessageRepository) allocateConversationSeq(ctx context.Context, tx pgx.Tx, input domain.AppendMessageInput) (int64, error) {
+	started := time.Now()
 	row := tx.QueryRow(ctx, `
 UPDATE conversation_seq
 SET current_seq = current_seq + 1,
@@ -263,12 +275,15 @@ RETURNING current_seq
 	)
 	var seq int64
 	if err := row.Scan(&seq); err != nil {
+		r.metrics.ObserveRepositoryAllocateSeq(time.Since(started))
 		return 0, types.NewDBWriteFailed(err.Error())
 	}
+	r.metrics.ObserveRepositoryAllocateSeq(time.Since(started))
 	return seq, nil
 }
 
 func (r *MessageRepository) insertMessage(ctx context.Context, tx pgx.Tx, record domain.AppendMessageRecord) error {
+	started := time.Now()
 	_, err := tx.Exec(ctx, `
 INSERT INTO message_log (
     tenant_id,
@@ -302,6 +317,7 @@ INSERT INTO message_log (
 		record.Timeline.Classification,
 		record.Message.CreatedAt,
 	)
+	r.metrics.ObserveRepositoryInsertMessage(time.Since(started))
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -309,6 +325,7 @@ INSERT INTO message_log (
 }
 
 func (r *MessageRepository) insertTimelineEvent(ctx context.Context, tx pgx.Tx, input domain.AppendMessageInput, record domain.AppendMessageRecord) error {
+	started := time.Now()
 	_, err := tx.Exec(ctx, `
 INSERT INTO conversation_timeline_events (
     tenant_id,
@@ -346,6 +363,7 @@ INSERT INTO conversation_timeline_events (
 		record.Timeline.PayloadJSON,
 		record.Timeline.CreatedAt,
 	)
+	r.metrics.ObserveRepositoryInsertTimeline(time.Since(started))
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -353,6 +371,7 @@ INSERT INTO conversation_timeline_events (
 }
 
 func (r *MessageRepository) insertOutboxEvent(ctx context.Context, tx pgx.Tx, record domain.AppendMessageRecord) error {
+	started := time.Now()
 	_, err := tx.Exec(ctx, `
 INSERT INTO message_outbox (
     event_id,
@@ -384,6 +403,7 @@ INSERT INTO message_outbox (
 		record.Outbox.PayloadJSON,
 		record.Outbox.TraceID,
 	)
+	r.metrics.ObserveRepositoryInsertOutbox(time.Since(started))
 	if err != nil {
 		return types.NewOutboxWriteFailed(err.Error())
 	}

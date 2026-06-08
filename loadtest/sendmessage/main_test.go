@@ -26,6 +26,22 @@ func TestNormalizeTarget(t *testing.T) {
 	}
 }
 
+func TestNormalizeTargets(t *testing.T) {
+	got, err := normalizeTargets("127.0.0.1:10495, http://127.0.0.1:10501,grpc://localhost:10502")
+	if err != nil {
+		t.Fatalf("normalize targets: %v", err)
+	}
+	want := []string{"127.0.0.1:10495", "127.0.0.1:10501", "localhost:10502"}
+	if len(got) != len(want) {
+		t.Fatalf("targets length got %d want %d: %#v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("target[%d] got %q want %q", i, got[i], want[i])
+		}
+	}
+}
+
 func TestNormalizeMetricsURL(t *testing.T) {
 	cases := []struct {
 		input string
@@ -42,6 +58,25 @@ func TestNormalizeMetricsURL(t *testing.T) {
 		}
 		if got != tc.want {
 			t.Fatalf("normalize metrics URL %q: got %q want %q", tc.input, got, tc.want)
+		}
+	}
+}
+
+func TestNormalizeMetricsURLs(t *testing.T) {
+	got, err := normalizeMetricsURLs("127.0.0.1:10498, http://127.0.0.1:10598/debug/metrics")
+	if err != nil {
+		t.Fatalf("normalize metrics URLs: %v", err)
+	}
+	want := []string{
+		"http://127.0.0.1:10498/debug/metrics",
+		"http://127.0.0.1:10598/debug/metrics",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("metrics URL length got %d want %d: %#v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("metrics URL[%d] got %q want %q", i, got[i], want[i])
 		}
 	}
 }
@@ -90,7 +125,7 @@ func TestCommitInfoFromEnv(t *testing.T) {
 
 func TestParseConfigUsesEnvironment(t *testing.T) {
 	env := map[string]string{
-		"NEXUSIM_TARGET":              "127.0.0.1:10495",
+		"NEXUSIM_TARGET":              "127.0.0.1:10495,127.0.0.1:10501",
 		"NEXUSIM_VUS":                 "3",
 		"NEXUSIM_DURATION":            "5s",
 		"NEXUSIM_RESULT_DIR":          "loadtest/results/test",
@@ -102,7 +137,7 @@ func TestParseConfigUsesEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse config: %v", err)
 	}
-	if cfg.Target != "127.0.0.1:10495" ||
+	if cfg.Target != "127.0.0.1:10495,127.0.0.1:10501" ||
 		cfg.VUs != 3 ||
 		cfg.Duration != 5*time.Second ||
 		cfg.ResultDir != "loadtest/results/test" ||

@@ -47,51 +47,61 @@ type sample struct {
 	err     error
 }
 
+type loadClient struct {
+	Target string
+	Client messagev1.MessageServiceClient
+}
+
 type summary struct {
-	Commit                        string       `json:"commit"`
-	CommitFull                    string       `json:"commit_full"`
-	GitDirty                      bool         `json:"git_dirty"`
-	GitStatusShort                string       `json:"git_status_short"`
-	Target                        string       `json:"target"`
-	TenantID                      string       `json:"tenant_id"`
-	VUs                           int          `json:"vus"`
-	Duration                      string       `json:"duration"`
-	StatsWait                     string       `json:"stats_wait"`
-	ConversationCount             int          `json:"conversation_count"`
-	RequestCount                  int64        `json:"request_count"`
-	SuccessCount                  int64        `json:"success_count"`
-	ErrorCount                    int64        `json:"error_count"`
-	SuccessRate                   float64      `json:"success_rate"`
-	AvgMS                         float64      `json:"avg_ms"`
-	P50MS                         float64      `json:"p50_ms"`
-	P95MS                         float64      `json:"p95_ms"`
-	P99MS                         float64      `json:"p99_ms"`
-	SendMessageLatencyMS          *float64     `json:"send_message_latency_ms"`
-	SendMessageP95MS              *float64     `json:"send_message_p95_ms"`
-	SendMessageP99MS              *float64     `json:"send_message_p99_ms"`
-	RepositoryAppendLatencyMS     *float64     `json:"repository_append_latency_ms"`
-	RepositoryAppendP95MS         *float64     `json:"repository_append_p95_ms"`
-	RepositoryAppendP99MS         *float64     `json:"repository_append_p99_ms"`
-	RepositoryCommitLatencyMS     *float64     `json:"repository_commit_latency_ms"`
-	RepositoryCommitP95MS         *float64     `json:"repository_commit_p95_ms"`
-	RepositoryCommitP99MS         *float64     `json:"repository_commit_p99_ms"`
-	ConversationSeqAllocLatencyMS *float64     `json:"conversation_seq_alloc_latency_ms"`
-	ConversationSeqAllocP95MS     *float64     `json:"conversation_seq_alloc_p95_ms"`
-	ConversationSeqAllocP99MS     *float64     `json:"conversation_seq_alloc_p99_ms"`
-	OutboxTotalCount              *int64       `json:"outbox_total_count"`
-	OutboxPublishedCount          *int64       `json:"outbox_published_count"`
-	OutboxPendingCount            *int64       `json:"outbox_pending_count"`
-	OutboxDLQCount                *int64       `json:"outbox_dlq_count"`
-	OutboxOldestPendingAgeSeconds *float64     `json:"outbox_oldest_pending_age_seconds"`
-	KafkaPublishLatencyMS         *float64     `json:"kafka_publish_latency_ms"`
-	KafkaPublishP95MS             *float64     `json:"kafka_publish_p95_ms"`
-	KafkaPublishP99MS             *float64     `json:"kafka_publish_p99_ms"`
-	ServicePGPool                 *pgPoolStats `json:"service_pg_pool,omitempty"`
-	RelayPGPool                   *pgPoolStats `json:"relay_pg_pool,omitempty"`
-	ErrorTopN                     []errorCount `json:"error_topn"`
-	StartedAt                     string       `json:"started_at"`
-	FinishedAt                    string       `json:"finished_at"`
-	ResultFile                    string       `json:"result_file"`
+	Commit                        string                     `json:"commit"`
+	CommitFull                    string                     `json:"commit_full"`
+	GitDirty                      bool                       `json:"git_dirty"`
+	GitStatusShort                string                     `json:"git_status_short"`
+	Target                        string                     `json:"target"`
+	Targets                       []string                   `json:"targets,omitempty"`
+	TenantID                      string                     `json:"tenant_id"`
+	VUs                           int                        `json:"vus"`
+	Duration                      string                     `json:"duration"`
+	StatsWait                     string                     `json:"stats_wait"`
+	ConversationCount             int                        `json:"conversation_count"`
+	RequestCount                  int64                      `json:"request_count"`
+	SuccessCount                  int64                      `json:"success_count"`
+	ErrorCount                    int64                      `json:"error_count"`
+	SuccessRate                   float64                    `json:"success_rate"`
+	AvgMS                         float64                    `json:"avg_ms"`
+	P50MS                         float64                    `json:"p50_ms"`
+	P95MS                         float64                    `json:"p95_ms"`
+	P99MS                         float64                    `json:"p99_ms"`
+	SendMessageLatencyMS          *float64                   `json:"send_message_latency_ms"`
+	SendMessageP95MS              *float64                   `json:"send_message_p95_ms"`
+	SendMessageP99MS              *float64                   `json:"send_message_p99_ms"`
+	RepositoryAppendLatencyMS     *float64                   `json:"repository_append_latency_ms"`
+	RepositoryAppendP95MS         *float64                   `json:"repository_append_p95_ms"`
+	RepositoryAppendP99MS         *float64                   `json:"repository_append_p99_ms"`
+	RepositoryCommitLatencyMS     *float64                   `json:"repository_commit_latency_ms"`
+	RepositoryCommitP95MS         *float64                   `json:"repository_commit_p95_ms"`
+	RepositoryCommitP99MS         *float64                   `json:"repository_commit_p99_ms"`
+	ConversationSeqAllocLatencyMS *float64                   `json:"conversation_seq_alloc_latency_ms"`
+	ConversationSeqAllocP95MS     *float64                   `json:"conversation_seq_alloc_p95_ms"`
+	ConversationSeqAllocP99MS     *float64                   `json:"conversation_seq_alloc_p99_ms"`
+	OutboxTotalCount              *int64                     `json:"outbox_total_count"`
+	OutboxPublishedCount          *int64                     `json:"outbox_published_count"`
+	OutboxPendingCount            *int64                     `json:"outbox_pending_count"`
+	OutboxDLQCount                *int64                     `json:"outbox_dlq_count"`
+	OutboxOldestPendingAgeSeconds *float64                   `json:"outbox_oldest_pending_age_seconds"`
+	KafkaPublishLatencyMS         *float64                   `json:"kafka_publish_latency_ms"`
+	KafkaPublishP95MS             *float64                   `json:"kafka_publish_p95_ms"`
+	KafkaPublishP99MS             *float64                   `json:"kafka_publish_p99_ms"`
+	ServicePGPool                 *pgPoolStats               `json:"service_pg_pool,omitempty"`
+	RelayPGPool                   *pgPoolStats               `json:"relay_pg_pool,omitempty"`
+	ServiceMetrics                []processMetrics           `json:"service_metrics,omitempty"`
+	RelayMetrics                  []processMetrics           `json:"relay_metrics,omitempty"`
+	ServiceLatencyMetrics         map[string]latencySnapshot `json:"service_latency_metrics,omitempty"`
+	RelayLatencyMetrics           map[string]latencySnapshot `json:"relay_latency_metrics,omitempty"`
+	ErrorTopN                     []errorCount               `json:"error_topn"`
+	StartedAt                     string                     `json:"started_at"`
+	FinishedAt                    string                     `json:"finished_at"`
+	ResultFile                    string                     `json:"result_file"`
 }
 
 type errorCount struct {
@@ -111,23 +121,39 @@ func run(args []string, getenv func(string) string) error {
 	if err != nil {
 		return err
 	}
-	grpcTarget, err := normalizeTarget(cfg.Target)
+	grpcTargets, err := normalizeTargets(cfg.Target)
 	if err != nil {
 		return err
 	}
 
-	conn, err := grpc.NewClient(grpcTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return err
+	clients := make([]loadClient, 0, len(grpcTargets))
+	conns := make([]*grpc.ClientConn, 0, len(grpcTargets))
+	for _, grpcTarget := range grpcTargets {
+		conn, err := grpc.NewClient(grpcTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			for _, existing := range conns {
+				_ = existing.Close()
+			}
+			return err
+		}
+		conns = append(conns, conn)
+		clients = append(clients, loadClient{
+			Target: grpcTarget,
+			Client: messagev1.NewMessageServiceClient(conn),
+		})
 	}
-	defer conn.Close()
+	defer func() {
+		for _, conn := range conns {
+			_ = conn.Close()
+		}
+	}()
 
-	client := messagev1.NewMessageServiceClient(conn)
-	result, err := executeLoad(context.Background(), cfg, client)
+	result, err := executeLoad(context.Background(), cfg, clients)
 	if err != nil {
 		return err
 	}
-	result.Target = grpcTarget
+	result.Target = strings.Join(grpcTargets, ",")
+	result.Targets = grpcTargets
 	if cfg.StatsWait > 0 {
 		time.Sleep(cfg.StatsWait)
 	}
@@ -143,48 +169,70 @@ func run(args []string, getenv func(string) string) error {
 		result.OutboxOldestPendingAgeSeconds = &outboxStats.OldestPendingAgeSeconds
 	}
 	if cfg.ServiceMetricsURL != "" {
-		metrics, metricsErr := readMetricsSnapshot(context.Background(), cfg.ServiceMetricsURL)
+		metricURLs, metricsErr := normalizeMetricsURLs(cfg.ServiceMetricsURL)
 		if metricsErr != nil {
 			return metricsErr
 		}
-		applyLatency(
-			&result.SendMessageLatencyMS,
-			&result.SendMessageP95MS,
-			&result.SendMessageP99MS,
-			metrics.SendMessageLatencyMS,
-		)
-		applyLatency(
-			&result.RepositoryAppendLatencyMS,
-			&result.RepositoryAppendP95MS,
-			&result.RepositoryAppendP99MS,
-			metrics.RepositoryAppendLatencyMS,
-		)
-		applyLatency(
-			&result.RepositoryCommitLatencyMS,
-			&result.RepositoryCommitP95MS,
-			&result.RepositoryCommitP99MS,
-			metrics.RepositoryCommitLatencyMS,
-		)
-		applyLatency(
-			&result.ConversationSeqAllocLatencyMS,
-			&result.ConversationSeqAllocP95MS,
-			&result.ConversationSeqAllocP99MS,
-			metrics.ConversationSeqAllocLatencyMS,
-		)
-		result.ServicePGPool = metrics.PGPool
+		for index, metricURL := range metricURLs {
+			metrics, metricsErr := readMetricsSnapshot(context.Background(), metricURL)
+			if metricsErr != nil {
+				return metricsErr
+			}
+			result.ServiceMetrics = append(result.ServiceMetrics, processMetrics{URL: metricURL, Snapshot: metrics})
+			if index > 0 {
+				continue
+			}
+			result.ServiceLatencyMetrics = latencyMetrics(metrics)
+			applyLatency(
+				&result.SendMessageLatencyMS,
+				&result.SendMessageP95MS,
+				&result.SendMessageP99MS,
+				metrics.SendMessageLatencyMS,
+			)
+			applyLatency(
+				&result.RepositoryAppendLatencyMS,
+				&result.RepositoryAppendP95MS,
+				&result.RepositoryAppendP99MS,
+				metrics.RepositoryAppendLatencyMS,
+			)
+			applyLatency(
+				&result.RepositoryCommitLatencyMS,
+				&result.RepositoryCommitP95MS,
+				&result.RepositoryCommitP99MS,
+				metrics.RepositoryCommitLatencyMS,
+			)
+			applyLatency(
+				&result.ConversationSeqAllocLatencyMS,
+				&result.ConversationSeqAllocP95MS,
+				&result.ConversationSeqAllocP99MS,
+				metrics.ConversationSeqAllocLatencyMS,
+			)
+			result.ServicePGPool = metrics.PGPool
+		}
 	}
 	if cfg.RelayMetricsURL != "" {
-		metrics, metricsErr := readMetricsSnapshot(context.Background(), cfg.RelayMetricsURL)
+		metricURLs, metricsErr := normalizeMetricsURLs(cfg.RelayMetricsURL)
 		if metricsErr != nil {
 			return metricsErr
 		}
-		applyLatency(
-			&result.KafkaPublishLatencyMS,
-			&result.KafkaPublishP95MS,
-			&result.KafkaPublishP99MS,
-			metrics.KafkaPublishLatencyMS,
-		)
-		result.RelayPGPool = metrics.PGPool
+		for index, metricURL := range metricURLs {
+			metrics, metricsErr := readMetricsSnapshot(context.Background(), metricURL)
+			if metricsErr != nil {
+				return metricsErr
+			}
+			result.RelayMetrics = append(result.RelayMetrics, processMetrics{URL: metricURL, Snapshot: metrics})
+			if index > 0 {
+				continue
+			}
+			result.RelayLatencyMetrics = latencyMetrics(metrics)
+			applyLatency(
+				&result.KafkaPublishLatencyMS,
+				&result.KafkaPublishP95MS,
+				&result.KafkaPublishP99MS,
+				metrics.KafkaPublishLatencyMS,
+			)
+			result.RelayPGPool = metrics.PGPool
+		}
 	}
 
 	if err := writeSummary(cfg.ResultDir, &result); err != nil {
@@ -205,7 +253,7 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	defaultResultDir := filepath.Join("loadtest", "results", time.Now().Format("20060102-150405"))
 	cfg := config{}
 	flags := flag.NewFlagSet("sendmessage", flag.ContinueOnError)
-	flags.StringVar(&cfg.Target, "target", envString(getenv, "NEXUSIM_TARGET", "127.0.0.1:10495"), "gRPC target, such as 127.0.0.1:10495 or http://192.168.0.141:10495")
+	flags.StringVar(&cfg.Target, "target", envString(getenv, "NEXUSIM_TARGET", "127.0.0.1:10495"), "gRPC target or comma-separated targets, such as 127.0.0.1:10495 or 127.0.0.1:10495,127.0.0.1:10501")
 	flags.IntVar(&cfg.VUs, "vus", envInt(getenv, "NEXUSIM_VUS", 10), "virtual users")
 	flags.DurationVar(&cfg.Duration, "duration", envDuration(getenv, "NEXUSIM_DURATION", 30*time.Second), "test duration")
 	flags.StringVar(&cfg.ResultDir, "result-dir", envString(getenv, "NEXUSIM_RESULT_DIR", defaultResultDir), "result output directory")
@@ -215,8 +263,8 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	flags.StringVar(&cfg.ConversationPrefix, "conversation-prefix", envString(getenv, "NEXUSIM_CONVERSATION_PREFIX", "conv-loadtest"), "conversation id prefix")
 	flags.IntVar(&cfg.ConversationCount, "conversation-count", envInt(getenv, "NEXUSIM_CONVERSATION_COUNT", 1), "number of conversations to spread requests across")
 	flags.StringVar(&cfg.PGDSN, "pg-dsn", envString(getenv, "NEXUSIM_PG_DSN", ""), "optional PostgreSQL DSN for outbox stats")
-	flags.StringVar(&cfg.ServiceMetricsURL, "service-metrics-url", envString(getenv, "NEXUSIM_SERVICE_METRICS_URL", ""), "optional message-service gRPC process metrics URL")
-	flags.StringVar(&cfg.RelayMetricsURL, "relay-metrics-url", envString(getenv, "NEXUSIM_RELAY_METRICS_URL", ""), "optional message-service relay process metrics URL")
+	flags.StringVar(&cfg.ServiceMetricsURL, "service-metrics-url", envString(getenv, "NEXUSIM_SERVICE_METRICS_URL", ""), "optional message-service gRPC process metrics URL or comma-separated URLs")
+	flags.StringVar(&cfg.RelayMetricsURL, "relay-metrics-url", envString(getenv, "NEXUSIM_RELAY_METRICS_URL", ""), "optional message-service relay process metrics URL or comma-separated URLs")
 	if err := flags.Parse(args); err != nil {
 		return config{}, err
 	}
@@ -241,7 +289,10 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	return cfg, nil
 }
 
-func executeLoad(ctx context.Context, cfg config, client messagev1.MessageServiceClient) (summary, error) {
+func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary, error) {
+	if len(clients) == 0 {
+		return summary{}, errors.New("at least one gRPC client is required")
+	}
 	runID := time.Now().UTC().Format("20060102150405")
 	started := time.Now().UTC()
 	loadCtx, cancel := context.WithTimeout(ctx, cfg.Duration)
@@ -261,10 +312,11 @@ func executeLoad(ctx context.Context, cfg config, client messagev1.MessageServic
 				default:
 				}
 				requestSeq := atomic.AddUint64(&sequence, 1)
+				targetClient := clients[int((requestSeq-1)%uint64(len(clients)))]
 				requestCtx, requestCancel := context.WithTimeout(ctx, cfg.RequestTimeout)
 				request := buildRequest(cfg, runID, vu, requestSeq)
 				before := time.Now()
-				_, err := client.SendMessage(requestCtx, request)
+				_, err := targetClient.Client.SendMessage(requestCtx, request)
 				latency := time.Since(before)
 				requestCancel()
 				records <- sample{latency: latency, err: err}
@@ -306,6 +358,7 @@ func executeLoad(ctx context.Context, cfg config, client messagev1.MessageServic
 		GitDirty:                      commit.Dirty,
 		GitStatusShort:                commit.StatusShort,
 		Target:                        cfg.Target,
+		Targets:                       clientTargets(clients),
 		TenantID:                      cfg.TenantID,
 		VUs:                           cfg.VUs,
 		Duration:                      cfg.Duration.String(),
@@ -373,6 +426,42 @@ func normalizeTarget(target string) (string, error) {
 	return strings.TrimRight(target, "/"), nil
 }
 
+func normalizeTargets(targets string) ([]string, error) {
+	parts := splitCSV(targets)
+	if len(parts) == 0 {
+		return nil, errors.New("target is required")
+	}
+	normalized := make([]string, 0, len(parts))
+	for _, part := range parts {
+		target, err := normalizeTarget(part)
+		if err != nil {
+			return nil, err
+		}
+		normalized = append(normalized, target)
+	}
+	return normalized, nil
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+	return result
+}
+
+func clientTargets(clients []loadClient) []string {
+	targets := make([]string, 0, len(clients))
+	for _, client := range clients {
+		targets = append(targets, client.Target)
+	}
+	return targets
+}
+
 func percentile(values []time.Duration, p float64) time.Duration {
 	if len(values) == 0 {
 		return 0
@@ -425,12 +514,25 @@ type outboxStats struct {
 }
 
 type metricsSnapshot struct {
-	SendMessageLatencyMS          latencySnapshot `json:"send_message_latency_ms"`
-	RepositoryAppendLatencyMS     latencySnapshot `json:"repository_append_latency_ms"`
-	RepositoryCommitLatencyMS     latencySnapshot `json:"repository_commit_latency_ms"`
-	ConversationSeqAllocLatencyMS latencySnapshot `json:"conversation_seq_alloc_latency_ms"`
-	KafkaPublishLatencyMS         latencySnapshot `json:"kafka_publish_latency_ms"`
-	PGPool                        *pgPoolStats    `json:"pg_pool"`
+	SendMessageLatencyMS               latencySnapshot `json:"send_message_latency_ms"`
+	RepositoryAppendLatencyMS          latencySnapshot `json:"repository_append_latency_ms"`
+	RepositoryBeginLatencyMS           latencySnapshot `json:"repository_begin_latency_ms"`
+	RepositoryIdempotencyLockLatencyMS latencySnapshot `json:"repository_idempotency_lock_latency_ms"`
+	RepositoryFindExistingLatencyMS    latencySnapshot `json:"repository_find_existing_latency_ms"`
+	RepositoryEnsureSeqLatencyMS       latencySnapshot `json:"repository_ensure_seq_latency_ms"`
+	RepositoryAllocateSeqLatencyMS     latencySnapshot `json:"repository_allocate_seq_latency_ms"`
+	RepositoryInsertMessageLatencyMS   latencySnapshot `json:"repository_insert_message_latency_ms"`
+	RepositoryInsertTimelineLatencyMS  latencySnapshot `json:"repository_insert_timeline_latency_ms"`
+	RepositoryInsertOutboxLatencyMS    latencySnapshot `json:"repository_insert_outbox_latency_ms"`
+	RepositoryCommitLatencyMS          latencySnapshot `json:"repository_commit_latency_ms"`
+	ConversationSeqAllocLatencyMS      latencySnapshot `json:"conversation_seq_alloc_latency_ms"`
+	KafkaPublishLatencyMS              latencySnapshot `json:"kafka_publish_latency_ms"`
+	PGPool                             *pgPoolStats    `json:"pg_pool"`
+}
+
+type processMetrics struct {
+	URL      string          `json:"url"`
+	Snapshot metricsSnapshot `json:"snapshot"`
 }
 
 type latencySnapshot struct {
@@ -531,6 +633,49 @@ func normalizeMetricsURL(value string) (string, error) {
 		parsed.Path = "/debug/metrics"
 	}
 	return parsed.String(), nil
+}
+
+func normalizeMetricsURLs(values string) ([]string, error) {
+	parts := splitCSV(values)
+	if len(parts) == 0 {
+		return nil, errors.New("metrics URL is required")
+	}
+	normalized := make([]string, 0, len(parts))
+	for _, part := range parts {
+		value, err := normalizeMetricsURL(part)
+		if err != nil {
+			return nil, err
+		}
+		normalized = append(normalized, value)
+	}
+	return normalized, nil
+}
+
+func latencyMetrics(snapshot metricsSnapshot) map[string]latencySnapshot {
+	metrics := map[string]latencySnapshot{}
+	addLatency(metrics, "send_message_latency_ms", snapshot.SendMessageLatencyMS)
+	addLatency(metrics, "repository_append_latency_ms", snapshot.RepositoryAppendLatencyMS)
+	addLatency(metrics, "repository_begin_latency_ms", snapshot.RepositoryBeginLatencyMS)
+	addLatency(metrics, "repository_idempotency_lock_latency_ms", snapshot.RepositoryIdempotencyLockLatencyMS)
+	addLatency(metrics, "repository_find_existing_latency_ms", snapshot.RepositoryFindExistingLatencyMS)
+	addLatency(metrics, "repository_ensure_seq_latency_ms", snapshot.RepositoryEnsureSeqLatencyMS)
+	addLatency(metrics, "repository_allocate_seq_latency_ms", snapshot.RepositoryAllocateSeqLatencyMS)
+	addLatency(metrics, "repository_insert_message_latency_ms", snapshot.RepositoryInsertMessageLatencyMS)
+	addLatency(metrics, "repository_insert_timeline_latency_ms", snapshot.RepositoryInsertTimelineLatencyMS)
+	addLatency(metrics, "repository_insert_outbox_latency_ms", snapshot.RepositoryInsertOutboxLatencyMS)
+	addLatency(metrics, "repository_commit_latency_ms", snapshot.RepositoryCommitLatencyMS)
+	addLatency(metrics, "conversation_seq_alloc_latency_ms", snapshot.ConversationSeqAllocLatencyMS)
+	addLatency(metrics, "kafka_publish_latency_ms", snapshot.KafkaPublishLatencyMS)
+	if len(metrics) == 0 {
+		return nil
+	}
+	return metrics
+}
+
+func addLatency(metrics map[string]latencySnapshot, name string, snapshot latencySnapshot) {
+	if snapshot.Count > 0 {
+		metrics[name] = snapshot
+	}
 }
 
 func applyLatency(avgTarget **float64, p95Target **float64, p99Target **float64, snapshot latencySnapshot) {

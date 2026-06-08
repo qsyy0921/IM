@@ -238,6 +238,22 @@ func (m *fakeMetrics) ObserveSendMessage(time.Duration) {}
 
 func (m *fakeMetrics) ObserveRepositoryAppend(time.Duration) {}
 
+func (m *fakeMetrics) ObserveRepositoryBegin(time.Duration) {}
+
+func (m *fakeMetrics) ObserveRepositoryIdempotencyLock(time.Duration) {}
+
+func (m *fakeMetrics) ObserveRepositoryFindExisting(time.Duration) {}
+
+func (m *fakeMetrics) ObserveRepositoryEnsureSeq(time.Duration) {}
+
+func (m *fakeMetrics) ObserveRepositoryAllocateSeq(time.Duration) {}
+
+func (m *fakeMetrics) ObserveRepositoryInsertMessage(time.Duration) {}
+
+func (m *fakeMetrics) ObserveRepositoryInsertTimeline(time.Duration) {}
+
+func (m *fakeMetrics) ObserveRepositoryInsertOutbox(time.Duration) {}
+
 func (m *fakeMetrics) ObserveRepositoryCommit(time.Duration) {}
 
 func (m *fakeMetrics) ObserveKafkaPublish(time.Duration) {

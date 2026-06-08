@@ -8,10 +8,10 @@ import (
 )
 
 type SendMessageUseCase struct {
-	policy        PolicyCheckPort
-	conversation  ConversationQueryPort
-	sequencer     SequencerPort
-	messageRepo   MessageRepository
+	policy       PolicyCheckPort
+	conversation ConversationQueryPort
+	sequencer    SequencerPort
+	messageRepo  MessageRepository
 }
 
 func NewSendMessageUseCase(
@@ -33,7 +33,7 @@ func (u *SendMessageUseCase) Execute(ctx context.Context, command types.SendMess
 		return types.SendMessageResult{}, err
 	}
 
-	permission, err := u.policy.CheckSendPermission(ctx, command)
+	conversation, permission, err := u.readConsistentSendDependencies(ctx, command)
 	if err != nil {
 		return types.SendMessageResult{}, err
 	}
@@ -41,29 +41,50 @@ func (u *SendMessageUseCase) Execute(ctx context.Context, command types.SendMess
 		return types.SendMessageResult{}, types.NewPermissionDenied(permission.Reason)
 	}
 
-	conversation, err := u.conversation.GetSendContext(ctx, command)
-	if err != nil {
-		return types.SendMessageResult{}, err
-	}
-
 	if conversation.ConversationMode != types.ConversationModeLocalRowLock {
 		return types.SendMessageResult{}, types.NewSequencerUnavailable("sequencer mode is contract-only in phase 1")
 	}
 
 	result, err := u.messageRepo.AppendMessage(ctx, domain.AppendMessageInput{
-		Command:          command,
-		Permission:       permission,
-		Conversation:     conversation,
+		Command:      command,
+		Permission:   permission,
+		Conversation: conversation,
 	})
 	if err != nil {
 		return types.SendMessageResult{}, err
 	}
 
 	return types.SendMessageResult{
-		MessageID:       result.MessageID,
-		ConversationID:  command.ConversationID,
-		ConversationSeq: result.ConversationSeq,
-		AcceptedAt:      result.AcceptedAt,
+		MessageID:        result.MessageID,
+		ConversationID:   command.ConversationID,
+		ConversationSeq:  result.ConversationSeq,
+		AcceptedAt:       result.AcceptedAt,
 		IdempotentReplay: result.IdempotentReplay,
 	}, nil
+}
+
+func (u *SendMessageUseCase) readConsistentSendDependencies(
+	ctx context.Context,
+	command types.SendMessageCommand,
+) (types.ConversationSendContext, types.PermissionDecision, error) {
+	var conversation types.ConversationSendContext
+	var permission types.PermissionDecision
+	for attempt := 0; attempt < 2; attempt++ {
+		var err error
+		conversation, err = u.conversation.GetSendContext(ctx, command)
+		if err != nil {
+			return types.ConversationSendContext{}, types.PermissionDecision{}, err
+		}
+
+		permission, err = u.policy.CheckSendPermission(ctx, command)
+		if err != nil {
+			return types.ConversationSendContext{}, types.PermissionDecision{}, err
+		}
+		if !permission.Allowed || permission.PermissionVersion == conversation.PermissionVersion {
+			return conversation, permission, nil
+		}
+	}
+	return types.ConversationSendContext{}, types.PermissionDecision{}, types.NewDependencyVersionMismatch(
+		"permission version changed during send dependency read",
+	)
 }

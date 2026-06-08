@@ -3,6 +3,7 @@ package types
 type PermissionDecision struct {
 	Allowed           bool
 	PermissionVersion int64
+	Classification    string
 	Reason            string
 }
 

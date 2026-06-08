@@ -17,6 +17,8 @@ type TimelineEvent struct {
 	FanoutMode          types.FanoutMode
 	FanoutPolicyVersion int64
 	PermissionVersion   int64
+	Classification      string
+	MappingVersion      string
 	TraceID             string
 	PayloadJSON         []byte
 	CreatedAt           time.Time
@@ -30,6 +32,10 @@ type OutboxEvent struct {
 	EventType        types.TimelineEventType
 	EventVersion     string
 	PartitionKey     string
-	PayloadJSON       []byte
-	TraceID           string
+	MappingVersion   string
+	CorrelationID    string
+	CausationID      string
+	Producer         string
+	PayloadJSON      []byte
+	TraceID          string
 }

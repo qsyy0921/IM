@@ -420,6 +420,9 @@ success_p99_ms
 kafka_publish_records_per_call
 kafka_publish_call_latency_ms
 outbox_process_ready_latency_ms
+outbox_process_ready_active_latency_ms
+outbox_process_ready_idle_latency_ms
+outbox_fetched_per_call
 ```
 
-注意：当前 `outbox_process_ready_latency_ms` 会混入 `stats_wait` 阶段的 idle 样本；做 adaptive limit 前应补 active/idle 拆分或记录 `outbox_fetched_per_call`。
+注意：`outbox_process_ready_latency_ms` 会混入 `stats_wait` 阶段的 idle 样本；做 adaptive limit 时优先使用 `outbox_process_ready_active_latency_ms` 和 `outbox_fetched_per_call`，不要只看混合口径。

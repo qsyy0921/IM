@@ -37,3 +37,8 @@ type OutboxRelayStats struct {
 	Retried      int
 	DeadLettered int
 }
+
+type KafkaPublishRecord struct {
+	Key   []byte
+	Value []byte
+}

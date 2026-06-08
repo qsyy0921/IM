@@ -53,6 +53,25 @@ func (s *OutboxStore) ProcessReady(
 	retryBaseDelay time.Duration,
 	publish func(context.Context, types.OutboxMessage) error,
 ) (types.OutboxRelayStats, error) {
+	if publish == nil {
+		return types.OutboxRelayStats{}, errors.New("outbox publish callback is not configured")
+	}
+	return s.ProcessReadyBatch(ctx, limit, maxAttempts, retryBaseDelay, func(ctx context.Context, messages []types.OutboxMessage) []error {
+		errs := make([]error, len(messages))
+		for i, message := range messages {
+			errs[i] = publish(ctx, message)
+		}
+		return errs
+	})
+}
+
+func (s *OutboxStore) ProcessReadyBatch(
+	ctx context.Context,
+	limit int,
+	maxAttempts int,
+	retryBaseDelay time.Duration,
+	publish func(context.Context, []types.OutboxMessage) []error,
+) (types.OutboxRelayStats, error) {
 	if s.pool == nil {
 		return types.OutboxRelayStats{}, ErrRepositoryNotConfigured
 	}
@@ -86,9 +105,13 @@ func (s *OutboxStore) ProcessReady(
 	stats := types.OutboxRelayStats{Fetched: len(messages)}
 	now := s.now()
 	publishedIDs := make([]int64, 0, len(messages))
+	publishErrors := publish(ctx, messages)
+	if len(publishErrors) != len(messages) {
+		return types.OutboxRelayStats{}, errors.New("outbox batch publish result count mismatch")
+	}
 
-	for _, message := range messages {
-		if err := publish(ctx, message); err != nil {
+	for index, message := range messages {
+		if err := publishErrors[index]; err != nil {
 			attempt := message.RetryCount + 1
 			if attempt >= maxAttempts {
 				if markErr := s.markDeadLettered(ctx, tx, message.ID, attempt, err.Error(), now); markErr != nil {

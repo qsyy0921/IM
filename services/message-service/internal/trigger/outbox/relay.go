@@ -26,8 +26,22 @@ type Store interface {
 	) (types.OutboxRelayStats, error)
 }
 
+type BatchStore interface {
+	ProcessReadyBatch(
+		ctx context.Context,
+		limit int,
+		maxAttempts int,
+		retryBaseDelay time.Duration,
+		publish func(context.Context, []types.OutboxMessage) []error,
+	) (types.OutboxRelayStats, error)
+}
+
 type Publisher interface {
 	Publish(ctx context.Context, topic string, key []byte, value []byte) error
+}
+
+type BatchPublisher interface {
+	PublishBatch(ctx context.Context, topic string, records []types.KafkaPublishRecord) error
 }
 
 type Relay struct {
@@ -118,13 +132,25 @@ func (r *Relay) RunOnce(ctx context.Context) (types.OutboxRelayStats, error) {
 		return types.OutboxRelayStats{}, errors.New("outbox relay publisher is not configured")
 	}
 	started := time.Now()
-	stats, err := r.store.ProcessReady(
-		ctx,
-		r.config.BatchSize,
-		r.config.MaxAttempts,
-		r.config.RetryBaseDelay,
-		r.publishMessage,
-	)
+	var stats types.OutboxRelayStats
+	var err error
+	if store, ok := r.store.(BatchStore); ok {
+		stats, err = store.ProcessReadyBatch(
+			ctx,
+			r.config.BatchSize,
+			r.config.MaxAttempts,
+			r.config.RetryBaseDelay,
+			r.publishMessages,
+		)
+	} else {
+		stats, err = r.store.ProcessReady(
+			ctx,
+			r.config.BatchSize,
+			r.config.MaxAttempts,
+			r.config.RetryBaseDelay,
+			r.publishMessage,
+		)
+	}
 	r.config.Metrics.ObserveOutboxProcessReady(time.Since(started))
 	return stats, err
 }
@@ -135,14 +161,54 @@ func (r *Relay) publishMessage(ctx context.Context, message types.OutboxMessage)
 		return err
 	}
 	started := time.Now()
-	err = r.publisher.Publish(
-		ctx,
-		r.config.Topic,
-		[]byte(message.PartitionKey),
-		value,
-	)
+	err = r.publisher.Publish(ctx, r.config.Topic, []byte(message.PartitionKey), value)
 	r.config.Metrics.ObserveKafkaPublish(time.Since(started))
 	return err
+}
+
+func (r *Relay) publishMessages(ctx context.Context, messages []types.OutboxMessage) []error {
+	errs := make([]error, len(messages))
+	if len(messages) == 0 {
+		return errs
+	}
+	records := make([]types.KafkaPublishRecord, 0, len(messages))
+	indexes := make([]int, 0, len(messages))
+	for index, message := range messages {
+		value, err := BuildKafkaValue(message)
+		if err != nil {
+			errs[index] = err
+			continue
+		}
+		records = append(records, types.KafkaPublishRecord{
+			Key:   []byte(message.PartitionKey),
+			Value: value,
+		})
+		indexes = append(indexes, index)
+	}
+	if len(records) == 0 {
+		return errs
+	}
+
+	started := time.Now()
+	if publisher, ok := r.publisher.(BatchPublisher); ok {
+		err := publisher.PublishBatch(ctx, r.config.Topic, records)
+		r.config.Metrics.ObserveKafkaPublish(time.Since(started))
+		if err != nil {
+			for _, index := range indexes {
+				errs[index] = err
+			}
+		}
+		return errs
+	}
+
+	for recordIndex, record := range records {
+		err := r.publisher.Publish(ctx, r.config.Topic, record.Key, record.Value)
+		if err != nil {
+			errs[indexes[recordIndex]] = err
+		}
+	}
+	r.config.Metrics.ObserveKafkaPublish(time.Since(started))
+	return errs
 }
 
 func BuildKafkaValue(message types.OutboxMessage) ([]byte, error) {

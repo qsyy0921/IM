@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/qsyy0921/IM/services/message-service/internal/types"
 	kafkago "github.com/segmentio/kafka-go"
 )
 
@@ -30,7 +31,7 @@ func NewWriterProducer(brokers []string) (*WriterProducer, error) {
 			Balancer:               &kafkago.Hash{},
 			RequiredAcks:           kafkago.RequireAll,
 			AllowAutoTopicCreation: false,
-			BatchSize:              1,
+			BatchSize:              100,
 			BatchTimeout:           10 * time.Millisecond,
 			WriteTimeout:           5 * time.Second,
 			ReadTimeout:            5 * time.Second,
@@ -47,6 +48,24 @@ func (p *WriterProducer) Publish(ctx context.Context, topic string, key []byte, 
 		Key:   key,
 		Value: value,
 	})
+}
+
+func (p *WriterProducer) PublishBatch(ctx context.Context, topic string, records []types.KafkaPublishRecord) error {
+	if p == nil || p.writer == nil {
+		return errors.New("kafka writer producer is not configured")
+	}
+	if len(records) == 0 {
+		return nil
+	}
+	messages := make([]kafkago.Message, 0, len(records))
+	for _, record := range records {
+		messages = append(messages, kafkago.Message{
+			Topic: topic,
+			Key:   record.Key,
+			Value: record.Value,
+		})
+	}
+	return p.writer.WriteMessages(ctx, messages...)
 }
 
 func (p *WriterProducer) Close() error {

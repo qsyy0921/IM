@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/qsyy0921/IM/services/message-service/internal/types"
 )
 
 func TestNewWriterProducerRequiresBrokers(t *testing.T) {
@@ -40,6 +42,17 @@ func TestWriterProducerPublishesIntegration(t *testing.T) {
 		[]byte("kafka-producer-integration"),
 	); err != nil {
 		t.Fatalf("publish kafka message: %v", err)
+	}
+
+	if err := producer.PublishBatch(
+		context.Background(),
+		topic,
+		[]types.KafkaPublishRecord{
+			{Key: []byte("tenant-it:conversation-it-a"), Value: []byte("kafka-producer-batch-a")},
+			{Key: []byte("tenant-it:conversation-it-b"), Value: []byte("kafka-producer-batch-b")},
+		},
+	); err != nil {
+		t.Fatalf("publish kafka batch: %v", err)
 	}
 }
 

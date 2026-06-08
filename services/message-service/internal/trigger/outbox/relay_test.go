@@ -71,6 +71,49 @@ func TestRelayRunOncePublishesKafkaMessage(t *testing.T) {
 	}
 }
 
+func TestRelayRunOncePublishesKafkaBatchWhenStoreSupportsBatch(t *testing.T) {
+	first := testOutboxMessage()
+	second := testOutboxMessage()
+	second.ID = 2
+	second.EventID = "event-2"
+	second.ConversationID = "conv-2"
+	second.PartitionKey = "tenant-1:conv-2"
+	second.PayloadJSON = []byte(`{
+		"message_id":"msg-2",
+		"conversation_id":"conv-2",
+		"conversation_seq":1,
+		"sender_id":"user-1",
+		"device_id":"device-1",
+		"client_msg_id":"client-2",
+		"command_hash":"hash-2",
+		"message_type":"TEXT",
+		"payload":{"text":"hello-2"},
+		"attachment_ids":["att-2"],
+		"accepted_at":"2026-06-08T12:00:00Z"
+	}`)
+	store := &fakeBatchStore{messages: []types.OutboxMessage{first, second}}
+	publisher := &fakePublisher{}
+	relay := NewRelay(store, publisher, Config{Topic: "topic-it", BatchSize: 10})
+
+	stats, err := relay.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("run relay once: %v", err)
+	}
+	if stats.Fetched != 2 || stats.Published != 2 {
+		t.Fatalf("unexpected stats: %+v", stats)
+	}
+	if len(publisher.messages) != 0 {
+		t.Fatalf("expected batch path, got single publishes: %d", len(publisher.messages))
+	}
+	if len(publisher.batches) != 1 || len(publisher.batches[0]) != 2 {
+		t.Fatalf("unexpected batch publishes: %+v", publisher.batches)
+	}
+	if string(publisher.batches[0][0].Key) != "tenant-1:conv-1" ||
+		string(publisher.batches[0][1].Key) != "tenant-1:conv-2" {
+		t.Fatalf("unexpected batch keys: %+v", publisher.batches[0])
+	}
+}
+
 func TestRelayRunOnceRecordsPublishFailure(t *testing.T) {
 	store := &fakeStore{messages: []types.OutboxMessage{testOutboxMessage()}}
 	publisher := &fakePublisher{err: errors.New("kafka unavailable")}
@@ -213,7 +256,9 @@ type publishedMessage struct {
 
 type fakePublisher struct {
 	err      error
+	batchErr error
 	messages []publishedMessage
+	batches  [][]types.KafkaPublishRecord
 }
 
 func (p *fakePublisher) Publish(_ context.Context, topic string, key []byte, value []byte) error {
@@ -225,6 +270,21 @@ func (p *fakePublisher) Publish(_ context.Context, topic string, key []byte, val
 		key:   append([]byte(nil), key...),
 		value: append([]byte(nil), value...),
 	})
+	return nil
+}
+
+func (p *fakePublisher) PublishBatch(_ context.Context, _ string, records []types.KafkaPublishRecord) error {
+	if p.batchErr != nil {
+		return p.batchErr
+	}
+	copied := make([]types.KafkaPublishRecord, 0, len(records))
+	for _, record := range records {
+		copied = append(copied, types.KafkaPublishRecord{
+			Key:   append([]byte(nil), record.Key...),
+			Value: append([]byte(nil), record.Value...),
+		})
+	}
+	p.batches = append(p.batches, copied)
 	return nil
 }
 
@@ -302,6 +362,58 @@ func (s *fakeStore) ProcessReady(
 	for _, message := range s.messages {
 		if err := publish(ctx, message); err != nil {
 			if message.RetryCount+1 >= maxAttempts {
+				stats.DeadLettered++
+			} else {
+				stats.Retried++
+			}
+			continue
+		}
+		stats.Published++
+	}
+	return stats, nil
+}
+
+type fakeBatchStore struct {
+	messages []types.OutboxMessage
+}
+
+func (s *fakeBatchStore) ProcessReady(
+	ctx context.Context,
+	_ int,
+	maxAttempts int,
+	_ time.Duration,
+	publish func(context.Context, types.OutboxMessage) error,
+) (types.OutboxRelayStats, error) {
+	stats := types.OutboxRelayStats{Fetched: len(s.messages)}
+	for _, message := range s.messages {
+		if err := publish(ctx, message); err != nil {
+			if message.RetryCount+1 >= maxAttempts {
+				stats.DeadLettered++
+			} else {
+				stats.Retried++
+			}
+			continue
+		}
+		stats.Published++
+	}
+	return stats, nil
+}
+
+func (s *fakeBatchStore) ProcessReadyBatch(
+	ctx context.Context,
+	_ int,
+	maxAttempts int,
+	_ time.Duration,
+	publish func(context.Context, []types.OutboxMessage) []error,
+) (types.OutboxRelayStats, error) {
+	stats := types.OutboxRelayStats{Fetched: len(s.messages)}
+	errs := publish(ctx, s.messages)
+	if len(errs) != len(s.messages) {
+		return types.OutboxRelayStats{}, errors.New("unexpected result count")
+	}
+	for index, err := range errs {
+		if err != nil {
+			if s.messages[index].RetryCount+1 >= maxAttempts {
 				stats.DeadLettered++
 			} else {
 				stats.Retried++

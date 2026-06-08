@@ -121,10 +121,11 @@ func (c *Controller) overloadReasons() []string {
 
 	if c.serviceMetrics != nil && c.config.MaxPoolAcquireP95 > 0 {
 		snapshot := c.serviceMetrics.Snapshot()
-		if poolPressure && latencyAbove(snapshot.RepositoryPoolAcquireLatencyMS, c.config.MaxPoolAcquireP95, c.config.MinMetricSamples) {
+		poolAcquire := preferRecentLatency(snapshot.RepositoryPoolAcquireRecentLatencyMS, snapshot.RepositoryPoolAcquireLatencyMS)
+		if poolPressure && latencyAbove(poolAcquire, c.config.MaxPoolAcquireP95, c.config.MinMetricSamples) {
 			reasons = append(reasons, fmt.Sprintf(
 				"repository_pool_acquire_p95=%.2fms threshold=%.2fms",
-				snapshot.RepositoryPoolAcquireLatencyMS.P95MS,
+				poolAcquire.P95MS,
 				ms(c.config.MaxPoolAcquireP95),
 			))
 		}
@@ -141,24 +142,27 @@ func (c *Controller) overloadReasons() []string {
 
 	if value := c.relaySnapshot.Load(); value != nil {
 		snapshot := value.(metricsinfra.Snapshot)
-		if pending > 0 && latencyAbove(snapshot.OutboxProcessReadyActiveLatencyMS, c.config.MaxRelayProcessReadyActiveP95, c.config.MinMetricSamples) {
+		relayActive := preferRecentLatency(snapshot.OutboxProcessReadyActiveRecentLatencyMS, snapshot.OutboxProcessReadyActiveLatencyMS)
+		if pending > 0 && latencyAbove(relayActive, c.config.MaxRelayProcessReadyActiveP95, c.config.MinMetricSamples) {
 			reasons = append(reasons, fmt.Sprintf(
 				"outbox_process_ready_active_p95=%.2fms threshold=%.2fms",
-				snapshot.OutboxProcessReadyActiveLatencyMS.P95MS,
+				relayActive.P95MS,
 				ms(c.config.MaxRelayProcessReadyActiveP95),
 			))
 		}
-		if pending > 0 && valueBelow(snapshot.OutboxFetchedPerCall, c.config.MinOutboxFetchedPerCall, c.config.MinMetricSamples) {
+		fetchedPerCall := preferRecentValue(snapshot.OutboxFetchedPerCallRecent, snapshot.OutboxFetchedPerCall)
+		if pending > 0 && valueBelow(fetchedPerCall, c.config.MinOutboxFetchedPerCall, c.config.MinMetricSamples) {
 			reasons = append(reasons, fmt.Sprintf(
 				"outbox_fetched_per_call_avg=%.2f threshold=%.2f",
-				snapshot.OutboxFetchedPerCall.Avg,
+				fetchedPerCall.Avg,
 				c.config.MinOutboxFetchedPerCall,
 			))
 		}
-		if pending > 0 && valueBelow(snapshot.KafkaPublishRecordsPerCall, c.config.MinKafkaPublishRecordsPerCall, c.config.MinMetricSamples) {
+		kafkaRecordsPerCall := preferRecentValue(snapshot.KafkaPublishRecordsPerCallRecent, snapshot.KafkaPublishRecordsPerCall)
+		if pending > 0 && valueBelow(kafkaRecordsPerCall, c.config.MinKafkaPublishRecordsPerCall, c.config.MinMetricSamples) {
 			reasons = append(reasons, fmt.Sprintf(
 				"kafka_publish_records_per_call_avg=%.2f threshold=%.2f",
-				snapshot.KafkaPublishRecordsPerCall.Avg,
+				kafkaRecordsPerCall.Avg,
 				c.config.MinKafkaPublishRecordsPerCall,
 			))
 		}
@@ -232,6 +236,20 @@ func valueBelow(snapshot metricsinfra.ValueSnapshot, threshold float64, minSampl
 		return false
 	}
 	return snapshot.Avg <= threshold
+}
+
+func preferRecentLatency(recent metricsinfra.LatencySnapshot, cumulative metricsinfra.LatencySnapshot) metricsinfra.LatencySnapshot {
+	if recent.Count > 0 {
+		return recent
+	}
+	return cumulative
+}
+
+func preferRecentValue(recent metricsinfra.ValueSnapshot, cumulative metricsinfra.ValueSnapshot) metricsinfra.ValueSnapshot {
+	if recent.Count > 0 {
+		return recent
+	}
+	return cumulative
 }
 
 func ms(duration time.Duration) float64 {

@@ -46,6 +46,8 @@ func TestCollectorSnapshot(t *testing.T) {
 	if snapshot.RepositoryBeginLatencyMS.Count != 1 ||
 		snapshot.RepositoryPoolAcquireLatencyMS.Count != 1 ||
 		snapshot.RepositoryPoolAcquireLatencyMS.AvgMS != 5 ||
+		snapshot.RepositoryPoolAcquireRecentLatencyMS.Count != 1 ||
+		snapshot.RepositoryPoolAcquireRecentLatencyMS.AvgMS != 5 ||
 		snapshot.RepositoryTxBeginLatencyMS.Count != 1 ||
 		snapshot.RepositoryTxBeginLatencyMS.AvgMS != 1 ||
 		snapshot.RepositoryIdempotencyLockLatencyMS.Count != 1 ||
@@ -72,20 +74,44 @@ func TestCollectorSnapshot(t *testing.T) {
 		snapshot.KafkaPublishRecordLatencyEstimateMS.Count != 2 ||
 		snapshot.KafkaPublishRecordLatencyEstimateMS.AvgMS != 20 ||
 		snapshot.KafkaPublishRecordsPerCall.Count != 2 ||
-		snapshot.KafkaPublishRecordsPerCall.Avg != 2.5 {
+		snapshot.KafkaPublishRecordsPerCall.Avg != 2.5 ||
+		snapshot.KafkaPublishRecordsPerCallRecent.Count != 2 ||
+		snapshot.KafkaPublishRecordsPerCallRecent.Avg != 2.5 {
 		t.Fatalf("unexpected kafka snapshot: %+v", snapshot.KafkaPublishLatencyMS)
 	}
 	if snapshot.OutboxProcessReadyLatencyMS.Count != 3 ||
 		snapshot.OutboxProcessReadyActiveLatencyMS.Count != 1 ||
 		snapshot.OutboxProcessReadyActiveLatencyMS.AvgMS != 60 ||
+		snapshot.OutboxProcessReadyActiveRecentLatencyMS.Count != 1 ||
+		snapshot.OutboxProcessReadyActiveRecentLatencyMS.AvgMS != 60 ||
 		snapshot.OutboxProcessReadyIdleLatencyMS.Count != 1 ||
 		snapshot.OutboxProcessReadyIdleLatencyMS.AvgMS != 5 ||
 		snapshot.OutboxFetchedPerCall.Count != 2 ||
 		snapshot.OutboxFetchedPerCall.Avg != 1.5 ||
+		snapshot.OutboxFetchedPerCallRecent.Count != 2 ||
+		snapshot.OutboxFetchedPerCallRecent.Avg != 1.5 ||
 		snapshot.OutboxFetchReadyLatencyMS.Count != 1 ||
 		snapshot.OutboxMarkPublishedLatencyMS.Count != 1 ||
 		snapshot.OutboxCommitLatencyMS.Count != 1 {
 		t.Fatalf("unexpected outbox snapshots: %+v", snapshot)
+	}
+}
+
+func TestCollectorRecentSnapshotDropsOldSamples(t *testing.T) {
+	collector := NewCollector()
+	collector.ObserveRepositoryPoolAcquire(100 * time.Millisecond)
+	for i := 0; i < recentSampleLimit; i++ {
+		collector.ObserveRepositoryPoolAcquire(time.Millisecond)
+	}
+
+	snapshot := collector.Snapshot()
+	if snapshot.RepositoryPoolAcquireLatencyMS.Count != int64(recentSampleLimit+1) ||
+		snapshot.RepositoryPoolAcquireLatencyMS.MaxMS != 100 {
+		t.Fatalf("unexpected cumulative snapshot: %+v", snapshot.RepositoryPoolAcquireLatencyMS)
+	}
+	if snapshot.RepositoryPoolAcquireRecentLatencyMS.Count != int64(recentSampleLimit) ||
+		snapshot.RepositoryPoolAcquireRecentLatencyMS.MaxMS != 1 {
+		t.Fatalf("unexpected recent snapshot: %+v", snapshot.RepositoryPoolAcquireRecentLatencyMS)
 	}
 }
 

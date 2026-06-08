@@ -149,6 +149,28 @@ func TestControllerRejectsLowFetchedPerCallWhenOutboxHasPending(t *testing.T) {
 	}
 }
 
+func TestControllerUsesRecentRelayLatencyBeforeCumulative(t *testing.T) {
+	controller := NewController(
+		Config{
+			Enabled:                       true,
+			MaxRelayProcessReadyActiveP95: 100 * time.Millisecond,
+			MinMetricSamples:              2,
+		},
+		fakePoolStats{stats: PoolStats{AcquiredConns: 1, MaxConns: 8}},
+		nil,
+		nil,
+	)
+	controller.outboxPending.Store(10)
+	controller.relaySnapshot.Store(metricsinfra.Snapshot{
+		OutboxProcessReadyActiveLatencyMS:       metricsinfra.LatencySnapshot{Count: 2, P95MS: 150},
+		OutboxProcessReadyActiveRecentLatencyMS: metricsinfra.LatencySnapshot{Count: 2, P95MS: 20},
+	})
+
+	if err := controller.CheckSendMessage(context.Background()); err != nil {
+		t.Fatalf("expected recovered recent relay latency to be allowed, got %v", err)
+	}
+}
+
 type fakePoolStats struct {
 	stats PoolStats
 }

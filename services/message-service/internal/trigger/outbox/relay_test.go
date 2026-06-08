@@ -216,6 +216,9 @@ func TestRelayRunOnceRecordsKafkaPublishLatency(t *testing.T) {
 	if metrics.outboxProcessReadyCount != 1 {
 		t.Fatalf("expected one outbox process ready latency sample, got %d", metrics.outboxProcessReadyCount)
 	}
+	if len(metrics.outboxProcessReadyFetched) != 1 || metrics.outboxProcessReadyFetched[0] != 1 {
+		t.Fatalf("unexpected fetched count samples: %+v", metrics.outboxProcessReadyFetched)
+	}
 }
 
 func TestRelayRunContinuesImmediatelyWhenWorkWasPublished(t *testing.T) {
@@ -363,12 +366,13 @@ func (p *fakePublisher) PublishBatch(_ context.Context, _ string, records []type
 }
 
 type fakeMetrics struct {
-	seqCount                 int
-	kafkaCount               int
-	outboxProcessReadyCount  int
-	outboxFetchReadyCount    int
-	outboxMarkPublishedCount int
-	outboxCommitCount        int
+	seqCount                  int
+	kafkaCount                int
+	outboxProcessReadyCount   int
+	outboxProcessReadyFetched []int
+	outboxFetchReadyCount     int
+	outboxMarkPublishedCount  int
+	outboxCommitCount         int
 }
 
 func (m *fakeMetrics) ObserveConversationSeqAlloc(time.Duration) {
@@ -411,6 +415,11 @@ func (m *fakeMetrics) ObserveKafkaPublishCall(time.Duration, int) {
 
 func (m *fakeMetrics) ObserveOutboxProcessReady(time.Duration) {
 	m.outboxProcessReadyCount++
+}
+
+func (m *fakeMetrics) ObserveOutboxProcessReadyResult(_ time.Duration, fetched int) {
+	m.outboxProcessReadyCount++
+	m.outboxProcessReadyFetched = append(m.outboxProcessReadyFetched, fetched)
 }
 
 func (m *fakeMetrics) ObserveOutboxFetchReady(time.Duration) {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -138,19 +139,25 @@ func TestAggregateProcessLatencyMetrics(t *testing.T) {
 		{
 			URL: "http://127.0.0.1:10498/debug/metrics",
 			Snapshot: metricsSnapshot{
-				RepositoryBeginLatencyMS:       latencySnapshot{Count: 2, AvgMS: 10, P95MS: 20, P99MS: 30},
-				RepositoryPoolAcquireLatencyMS: latencySnapshot{Count: 2, AvgMS: 8, P95MS: 18, P99MS: 28},
-				OutboxProcessReadyLatencyMS:    latencySnapshot{Count: 2, AvgMS: 4, P95MS: 5, P99MS: 6},
-				KafkaPublishRecordsPerCall:     valueSnapshot{Count: 2, Avg: 10, P95: 12, P99: 12},
+				RepositoryBeginLatencyMS:          latencySnapshot{Count: 2, AvgMS: 10, P95MS: 20, P99MS: 30},
+				RepositoryPoolAcquireLatencyMS:    latencySnapshot{Count: 2, AvgMS: 8, P95MS: 18, P99MS: 28},
+				OutboxProcessReadyLatencyMS:       latencySnapshot{Count: 2, AvgMS: 4, P95MS: 5, P99MS: 6},
+				OutboxProcessReadyActiveLatencyMS: latencySnapshot{Count: 1, AvgMS: 7, P95MS: 7, P99MS: 7},
+				OutboxProcessReadyIdleLatencyMS:   latencySnapshot{Count: 1, AvgMS: 1, P95MS: 1, P99MS: 1},
+				KafkaPublishRecordsPerCall:        valueSnapshot{Count: 2, Avg: 10, P95: 12, P99: 12},
+				OutboxFetchedPerCall:              valueSnapshot{Count: 2, Avg: 5, P95: 8, P99: 8},
 			},
 		},
 		{
 			URL: "http://127.0.0.1:10598/debug/metrics",
 			Snapshot: metricsSnapshot{
-				RepositoryBeginLatencyMS:       latencySnapshot{Count: 3, AvgMS: 20, P95MS: 25, P99MS: 40},
-				RepositoryPoolAcquireLatencyMS: latencySnapshot{Count: 3, AvgMS: 18, P95MS: 23, P99MS: 38},
-				OutboxProcessReadyLatencyMS:    latencySnapshot{Count: 3, AvgMS: 8, P95MS: 9, P99MS: 10},
-				KafkaPublishRecordsPerCall:     valueSnapshot{Count: 3, Avg: 20, P95: 22, P99: 22},
+				RepositoryBeginLatencyMS:          latencySnapshot{Count: 3, AvgMS: 20, P95MS: 25, P99MS: 40},
+				RepositoryPoolAcquireLatencyMS:    latencySnapshot{Count: 3, AvgMS: 18, P95MS: 23, P99MS: 38},
+				OutboxProcessReadyLatencyMS:       latencySnapshot{Count: 3, AvgMS: 8, P95MS: 9, P99MS: 10},
+				OutboxProcessReadyActiveLatencyMS: latencySnapshot{Count: 2, AvgMS: 11, P95MS: 13, P99MS: 13},
+				OutboxProcessReadyIdleLatencyMS:   latencySnapshot{Count: 1, AvgMS: 2, P95MS: 2, P99MS: 2},
+				KafkaPublishRecordsPerCall:        valueSnapshot{Count: 3, Avg: 20, P95: 22, P99: 22},
+				OutboxFetchedPerCall:              valueSnapshot{Count: 3, Avg: 15, P95: 20, P99: 20},
 			},
 		},
 	})
@@ -176,9 +183,22 @@ func TestAggregateProcessLatencyMetrics(t *testing.T) {
 		outboxProcess.P99MS != 10 {
 		t.Fatalf("unexpected aggregate outbox process metric: %+v", outboxProcess)
 	}
+	outboxActive := metrics["outbox_process_ready_active_latency_ms"]
+	if outboxActive.Count != 3 ||
+		math.Abs(outboxActive.AvgMS-(29.0/3.0)) > 0.000001 ||
+		outboxActive.P95MS != 13 ||
+		outboxActive.P99MS != 13 {
+		t.Fatalf("unexpected aggregate active outbox process metric: %+v", outboxActive)
+	}
 	values := aggregateProcessValueMetrics([]processMetrics{
-		{Snapshot: metricsSnapshot{KafkaPublishRecordsPerCall: valueSnapshot{Count: 2, Avg: 10, P95: 12, P99: 12}}},
-		{Snapshot: metricsSnapshot{KafkaPublishRecordsPerCall: valueSnapshot{Count: 3, Avg: 20, P95: 22, P99: 22}}},
+		{Snapshot: metricsSnapshot{
+			KafkaPublishRecordsPerCall: valueSnapshot{Count: 2, Avg: 10, P95: 12, P99: 12},
+			OutboxFetchedPerCall:       valueSnapshot{Count: 2, Avg: 5, P95: 8, P99: 8},
+		}},
+		{Snapshot: metricsSnapshot{
+			KafkaPublishRecordsPerCall: valueSnapshot{Count: 3, Avg: 20, P95: 22, P99: 22},
+			OutboxFetchedPerCall:       valueSnapshot{Count: 3, Avg: 15, P95: 20, P99: 20},
+		}},
 	})
 	recordsPerCall := values["kafka_publish_records_per_call"]
 	if recordsPerCall.Count != 5 ||
@@ -186,6 +206,13 @@ func TestAggregateProcessLatencyMetrics(t *testing.T) {
 		recordsPerCall.P95 != 22 ||
 		recordsPerCall.P99 != 22 {
 		t.Fatalf("unexpected aggregate records per call metric: %+v", recordsPerCall)
+	}
+	fetchedPerCall := values["outbox_fetched_per_call"]
+	if fetchedPerCall.Count != 5 ||
+		fetchedPerCall.Avg != 11 ||
+		fetchedPerCall.P95 != 20 ||
+		fetchedPerCall.P99 != 20 {
+		t.Fatalf("unexpected aggregate fetched per call metric: %+v", fetchedPerCall)
 	}
 }
 

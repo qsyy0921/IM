@@ -30,6 +30,9 @@ type Collector struct {
 	kafkaRecordEstimate       latencySamples
 	kafkaRecordsPerCall       valueSamples
 	outboxProcessReady        latencySamples
+	outboxProcessReadyActive  latencySamples
+	outboxProcessReadyIdle    latencySamples
+	outboxFetchedPerCall      valueSamples
 	outboxFetchReady          latencySamples
 	outboxMarkPublished       latencySamples
 	outboxCommit              latencySamples
@@ -157,10 +160,22 @@ func (c *Collector) ObserveKafkaPublishCall(duration time.Duration, recordCount 
 }
 
 func (c *Collector) ObserveOutboxProcessReady(duration time.Duration) {
+	c.ObserveOutboxProcessReadyResult(duration, -1)
+}
+
+func (c *Collector) ObserveOutboxProcessReadyResult(duration time.Duration, fetched int) {
 	if c == nil {
 		return
 	}
 	c.outboxProcessReady.observe(duration)
+	if fetched >= 0 {
+		c.outboxFetchedPerCall.observe(float64(fetched))
+	}
+	if fetched > 0 {
+		c.outboxProcessReadyActive.observe(duration)
+	} else if fetched == 0 {
+		c.outboxProcessReadyIdle.observe(duration)
+	}
 }
 
 func (c *Collector) ObserveOutboxFetchReady(duration time.Duration) {
@@ -208,6 +223,9 @@ func (c *Collector) Snapshot() Snapshot {
 		KafkaPublishRecordLatencyEstimateMS: c.kafkaRecordEstimate.snapshot(),
 		KafkaPublishRecordsPerCall:          c.kafkaRecordsPerCall.snapshot(),
 		OutboxProcessReadyLatencyMS:         c.outboxProcessReady.snapshot(),
+		OutboxProcessReadyActiveLatencyMS:   c.outboxProcessReadyActive.snapshot(),
+		OutboxProcessReadyIdleLatencyMS:     c.outboxProcessReadyIdle.snapshot(),
+		OutboxFetchedPerCall:                c.outboxFetchedPerCall.snapshot(),
 		OutboxFetchReadyLatencyMS:           c.outboxFetchReady.snapshot(),
 		OutboxMarkPublishedLatencyMS:        c.outboxMarkPublished.snapshot(),
 		OutboxCommitLatencyMS:               c.outboxCommit.snapshot(),
@@ -243,6 +261,9 @@ type Snapshot struct {
 	KafkaPublishRecordLatencyEstimateMS LatencySnapshot `json:"kafka_publish_record_latency_estimate_ms"`
 	KafkaPublishRecordsPerCall          ValueSnapshot   `json:"kafka_publish_records_per_call"`
 	OutboxProcessReadyLatencyMS         LatencySnapshot `json:"outbox_process_ready_latency_ms"`
+	OutboxProcessReadyActiveLatencyMS   LatencySnapshot `json:"outbox_process_ready_active_latency_ms"`
+	OutboxProcessReadyIdleLatencyMS     LatencySnapshot `json:"outbox_process_ready_idle_latency_ms"`
+	OutboxFetchedPerCall                ValueSnapshot   `json:"outbox_fetched_per_call"`
 	OutboxFetchReadyLatencyMS           LatencySnapshot `json:"outbox_fetch_ready_latency_ms"`
 	OutboxMarkPublishedLatencyMS        LatencySnapshot `json:"outbox_mark_published_latency_ms"`
 	OutboxCommitLatencyMS               LatencySnapshot `json:"outbox_commit_latency_ms"`

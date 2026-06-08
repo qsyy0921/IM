@@ -136,6 +136,15 @@ type summary struct {
 	OutboxProcessReadyLatencyMS     *float64                   `json:"outbox_process_ready_latency_ms"`
 	OutboxProcessReadyP95MS         *float64                   `json:"outbox_process_ready_p95_ms"`
 	OutboxProcessReadyP99MS         *float64                   `json:"outbox_process_ready_p99_ms"`
+	OutboxProcessReadyActiveMS      *float64                   `json:"outbox_process_ready_active_latency_ms"`
+	OutboxProcessReadyActiveP95MS   *float64                   `json:"outbox_process_ready_active_p95_ms"`
+	OutboxProcessReadyActiveP99MS   *float64                   `json:"outbox_process_ready_active_p99_ms"`
+	OutboxProcessReadyIdleMS        *float64                   `json:"outbox_process_ready_idle_latency_ms"`
+	OutboxProcessReadyIdleP95MS     *float64                   `json:"outbox_process_ready_idle_p95_ms"`
+	OutboxProcessReadyIdleP99MS     *float64                   `json:"outbox_process_ready_idle_p99_ms"`
+	OutboxFetchedPerCall            *float64                   `json:"outbox_fetched_per_call"`
+	OutboxFetchedPerCallP95         *float64                   `json:"outbox_fetched_per_call_p95"`
+	OutboxFetchedPerCallP99         *float64                   `json:"outbox_fetched_per_call_p99"`
 	OutboxFetchReadyLatencyMS       *float64                   `json:"outbox_fetch_ready_latency_ms"`
 	OutboxFetchReadyP95MS           *float64                   `json:"outbox_fetch_ready_p95_ms"`
 	OutboxFetchReadyP99MS           *float64                   `json:"outbox_fetch_ready_p99_ms"`
@@ -324,6 +333,24 @@ func run(args []string, getenv func(string) string) error {
 			&result.OutboxProcessReadyP95MS,
 			&result.OutboxProcessReadyP99MS,
 			result.RelayLatencyMetrics["outbox_process_ready_latency_ms"],
+		)
+		applyLatency(
+			&result.OutboxProcessReadyActiveMS,
+			&result.OutboxProcessReadyActiveP95MS,
+			&result.OutboxProcessReadyActiveP99MS,
+			result.RelayLatencyMetrics["outbox_process_ready_active_latency_ms"],
+		)
+		applyLatency(
+			&result.OutboxProcessReadyIdleMS,
+			&result.OutboxProcessReadyIdleP95MS,
+			&result.OutboxProcessReadyIdleP99MS,
+			result.RelayLatencyMetrics["outbox_process_ready_idle_latency_ms"],
+		)
+		applyValue(
+			&result.OutboxFetchedPerCall,
+			&result.OutboxFetchedPerCallP95,
+			&result.OutboxFetchedPerCallP99,
+			result.RelayValueMetrics["outbox_fetched_per_call"],
 		)
 		applyLatency(
 			&result.OutboxFetchReadyLatencyMS,
@@ -630,6 +657,15 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 		OutboxProcessReadyLatencyMS:     nil,
 		OutboxProcessReadyP95MS:         nil,
 		OutboxProcessReadyP99MS:         nil,
+		OutboxProcessReadyActiveMS:      nil,
+		OutboxProcessReadyActiveP95MS:   nil,
+		OutboxProcessReadyActiveP99MS:   nil,
+		OutboxProcessReadyIdleMS:        nil,
+		OutboxProcessReadyIdleP95MS:     nil,
+		OutboxProcessReadyIdleP99MS:     nil,
+		OutboxFetchedPerCall:            nil,
+		OutboxFetchedPerCallP95:         nil,
+		OutboxFetchedPerCallP99:         nil,
 		OutboxFetchReadyLatencyMS:       nil,
 		OutboxFetchReadyP95MS:           nil,
 		OutboxFetchReadyP99MS:           nil,
@@ -877,6 +913,9 @@ type metricsSnapshot struct {
 	KafkaPublishRecordLatencyEstimateMS latencySnapshot `json:"kafka_publish_record_latency_estimate_ms"`
 	KafkaPublishRecordsPerCall          valueSnapshot   `json:"kafka_publish_records_per_call"`
 	OutboxProcessReadyLatencyMS         latencySnapshot `json:"outbox_process_ready_latency_ms"`
+	OutboxProcessReadyActiveLatencyMS   latencySnapshot `json:"outbox_process_ready_active_latency_ms"`
+	OutboxProcessReadyIdleLatencyMS     latencySnapshot `json:"outbox_process_ready_idle_latency_ms"`
+	OutboxFetchedPerCall                valueSnapshot   `json:"outbox_fetched_per_call"`
 	OutboxFetchReadyLatencyMS           latencySnapshot `json:"outbox_fetch_ready_latency_ms"`
 	OutboxMarkPublishedLatencyMS        latencySnapshot `json:"outbox_mark_published_latency_ms"`
 	OutboxCommitLatencyMS               latencySnapshot `json:"outbox_commit_latency_ms"`
@@ -1031,6 +1070,8 @@ func latencyMetrics(snapshot metricsSnapshot) map[string]latencySnapshot {
 	addLatency(metrics, "kafka_publish_call_latency_ms", snapshot.KafkaPublishCallLatencyMS)
 	addLatency(metrics, "kafka_publish_record_latency_estimate_ms", snapshot.KafkaPublishRecordLatencyEstimateMS)
 	addLatency(metrics, "outbox_process_ready_latency_ms", snapshot.OutboxProcessReadyLatencyMS)
+	addLatency(metrics, "outbox_process_ready_active_latency_ms", snapshot.OutboxProcessReadyActiveLatencyMS)
+	addLatency(metrics, "outbox_process_ready_idle_latency_ms", snapshot.OutboxProcessReadyIdleLatencyMS)
 	addLatency(metrics, "outbox_fetch_ready_latency_ms", snapshot.OutboxFetchReadyLatencyMS)
 	addLatency(metrics, "outbox_mark_published_latency_ms", snapshot.OutboxMarkPublishedLatencyMS)
 	addLatency(metrics, "outbox_commit_latency_ms", snapshot.OutboxCommitLatencyMS)
@@ -1043,6 +1084,7 @@ func latencyMetrics(snapshot metricsSnapshot) map[string]latencySnapshot {
 func valueMetrics(snapshot metricsSnapshot) map[string]valueSnapshot {
 	metrics := map[string]valueSnapshot{}
 	addValue(metrics, "kafka_publish_records_per_call", snapshot.KafkaPublishRecordsPerCall)
+	addValue(metrics, "outbox_fetched_per_call", snapshot.OutboxFetchedPerCall)
 	if len(metrics) == 0 {
 		return nil
 	}

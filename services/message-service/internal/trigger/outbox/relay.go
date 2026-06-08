@@ -158,7 +158,7 @@ func (r *Relay) RunOnce(ctx context.Context) (types.OutboxRelayStats, error) {
 			r.publishMessage,
 		)
 	}
-	r.config.Metrics.ObserveOutboxProcessReady(time.Since(started))
+	r.config.Metrics.ObserveOutboxProcessReadyResult(time.Since(started), stats.Fetched)
 	return stats, err
 }
 

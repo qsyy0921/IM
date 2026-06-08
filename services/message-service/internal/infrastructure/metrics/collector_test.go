@@ -28,6 +28,8 @@ func TestCollectorSnapshot(t *testing.T) {
 	collector.ObserveKafkaPublish(30 * time.Millisecond)
 	collector.ObserveKafkaPublishCall(40*time.Millisecond, 4)
 	collector.ObserveOutboxProcessReady(50 * time.Millisecond)
+	collector.ObserveOutboxProcessReadyResult(60*time.Millisecond, 3)
+	collector.ObserveOutboxProcessReadyResult(5*time.Millisecond, 0)
 	collector.ObserveOutboxFetchReady(6 * time.Millisecond)
 	collector.ObserveOutboxMarkPublished(7 * time.Millisecond)
 	collector.ObserveOutboxCommit(8 * time.Millisecond)
@@ -73,8 +75,13 @@ func TestCollectorSnapshot(t *testing.T) {
 		snapshot.KafkaPublishRecordsPerCall.Avg != 2.5 {
 		t.Fatalf("unexpected kafka snapshot: %+v", snapshot.KafkaPublishLatencyMS)
 	}
-	if snapshot.OutboxProcessReadyLatencyMS.Count != 1 ||
-		snapshot.OutboxProcessReadyLatencyMS.AvgMS != 50 ||
+	if snapshot.OutboxProcessReadyLatencyMS.Count != 3 ||
+		snapshot.OutboxProcessReadyActiveLatencyMS.Count != 1 ||
+		snapshot.OutboxProcessReadyActiveLatencyMS.AvgMS != 60 ||
+		snapshot.OutboxProcessReadyIdleLatencyMS.Count != 1 ||
+		snapshot.OutboxProcessReadyIdleLatencyMS.AvgMS != 5 ||
+		snapshot.OutboxFetchedPerCall.Count != 2 ||
+		snapshot.OutboxFetchedPerCall.Avg != 1.5 ||
 		snapshot.OutboxFetchReadyLatencyMS.Count != 1 ||
 		snapshot.OutboxMarkPublishedLatencyMS.Count != 1 ||
 		snapshot.OutboxCommitLatencyMS.Count != 1 {

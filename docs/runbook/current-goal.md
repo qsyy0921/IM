@@ -59,10 +59,10 @@ message-service SendMessage
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
-2. 启用 `deploy/local/docker-compose.postgres-loadtest.yml`，验证 `max_connections=200`、`shared_buffers=1GB`、`max_wal_size=4GB` 等配置生效。
-3. 在 PG loadtest override 下重跑 PG pool / fixed-total multi-instance 对照矩阵，并配合 `watch-postgres-diagnostics.ps1` 采集 wait_event。
-4. 评估 outbox relay 追平优化：批量 publish、批量 mark published、batch size、worker 数和故障退避；避免 `PG_MAX_CONNS=64` 下 pending 快速增加。
-5. 增加 admission control / backpressure 设计，避免请求在连接池中排队到 2s 超时后才失败。
+2. 设计 admission control / backpressure：当 pgxpool acquire 排队明显时快速返回 retryable overload，而不是让请求排队到 2s。
+3. 为 loadtest 增加 overload / retryable 错误统计，区分系统保护性拒绝和真实失败。
+4. 评估 outbox relay 追平优化：批量 publish、批量 mark published、batch size、worker 数和故障退避；避免高写入吞吐下 pending 快速增加。
+5. 继续采集 PostgreSQL wait_event，重点看 `LWLock:WALWrite`、`LWLock:WALInsert`、`LWLock:BufferContent` 和 `CheckpointWriteDelay`。
 6. 视评审复核结果决定是否推送 GitHub。
 
 ## 6. 评审要求
@@ -238,6 +238,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 formal 矩阵追加短 relay drain 后确认 `tenant_count=16 total_pending=0`，没有留下未发布 outbox 积压。
 - 当前 PostgreSQL 诊断脚本为 `loadtest/sendmessage/collect-postgres-diagnostics.ps1`。正式矩阵后采集结果在 `loadtest/results/postgres-diagnostics-20260609-022602/postgres-diagnostics.json`：`max_connections=100`、`shared_buffers=16384`、`max_wal_size=1024`、`checkpoint_timeout=300`、`synchronous_commit=on`、`deadlocks=0`；`message_outbox n_dead_tup=113312`，说明 outbox 高频 update 已产生明显 dead tuples。
 - 当前 multi-instance PG budget 矩阵：`loadtest/results/multi-instance-budget-formal-20260609/`，报告为 `docs/runbook/loadtest-report-20260609-multi-instance-budget.md`。固定每实例预算 `1x16/2x16/4x16` 下 p99 分别为 `2000.53ms` / `1437.37ms` / `1975.75ms`；固定总预算 `1x64/2x32/4x16` 下 p99 分别为 `1178.97ms` / `1509.55ms` / `1657.18ms`。固定总预算下多实例没有降低尾延迟，且 outbox pending 为 `31889` / `64553` / `65323`，说明当前应优先处理 PostgreSQL acquire/begin 排队与 relay 追平，而不是继续堆 gRPC 实例。
+- 当前 PostgreSQL loadtest profile 矩阵：`loadtest/results/pgpool-tuned-formal-20260609/`，报告为 `docs/runbook/loadtest-report-20260609-postgres-loadtest-profile.md`。启用 `max_connections=200`、`shared_buffers=1GB`、`max_wal_size=4GB` 后，`PG_MAX_CONNS=64/VU1200` p99 `1161.70ms`，`PG_MAX_CONNS=64/VU1600` p99 `1759.11ms`；`PG_MAX_CONNS=128` 未改善，1200 VU 成功率 `0.9760` 且 p99 `2001.08ms`。新指标确认 `repository_begin` 主体是 `repository_pool_acquire`，`repository_tx_begin` p99 仅约 `14-33ms`。watch 采样显示 `LWLock:WALWrite`、`LWLock:WALInsert`、`LWLock:BufferContent` 和 `CheckpointWriteDelay` 已进入瓶颈视野。
 - 当前 debug metrics collector 保存全量样本并在 snapshot 时排序，适合本地短压测，不适合作为生产 metrics；后续应替换为固定窗口、reservoir、HDR histogram 或 Prometheus histogram。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
@@ -274,3 +275,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已把 `repository_begin` 拆成 `repository_pool_acquire_latency_ms` 和 `repository_tx_begin_latency_ms`，原 `repository_begin_latency_ms` 保持总耗时用于兼容旧报告。clean smoke commit `c10338e`：`PG_MAX_CONNS=8`、`VU=5`、`duration=3s`，1833/1833 成功，outbox pending 0，两个新指标 count 均为 1833，`git_dirty=false`。
 - 2026-06-09：已新增 `watch-postgres-diagnostics.ps1`，用于压测期间按间隔采集 PostgreSQL `pg_stat_activity` wait_event、锁等待、表 dead tuples、bgwriter 和 WAL 统计，输出 `postgres-wait-samples.jsonl`。under-load smoke：`PG_MAX_CONNS=8`、`VU=20`、`duration=5s`，采样 10 次，最大 active backend 为 8，抓到 `LWLock:WALWrite` 等 wait_event。
 - 2026-06-09：已新增 `deploy/local/docker-compose.postgres-loadtest.yml` 作为压测专用 PostgreSQL override，不改变默认开发 compose；目标参数包括 `max_connections=200`、`shared_buffers=1GB`、`max_wal_size=4GB`、`checkpoint_timeout=15min` 和更积极的 autovacuum 阈值。
+- 2026-06-09：已实际启用 PostgreSQL loadtest override 并跑正式 PG pool 矩阵，同时采集 wait_event。结论：调大 PostgreSQL 与 PG pool 不能单独解决 p99，`repository_pool_acquire` 仍是主等待段；`PG_MAX_CONNS=128` 会放大 commit/WAL/outbox 压力。下一步优先做 backpressure 和 outbox relay 批量优化。

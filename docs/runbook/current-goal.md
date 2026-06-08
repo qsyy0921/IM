@@ -60,11 +60,10 @@ message-service SendMessage
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
 2. 基于 PostgreSQL 诊断结果制定本地 PG 调优方案：`max_connections`、`shared_buffers`、WAL/checkpoint、autovacuum 和 outbox dead tuples。
-3. 设计并执行两组对照压测：固定每实例 PG 连接预算、固定总 PG 连接预算，例如 `1x64`、`2x32`、`4x16`。
-4. 补 PostgreSQL 侧观测或 repository 单语句级别指标，继续拆 `repository_begin` 后是否还有 SQL/锁/磁盘写入瓶颈。
-5. 评估 outbox relay 追平优化：批量 publish、批量 mark published、batch size、worker 数和故障退避；避免 `PG_MAX_CONNS=64` 下 pending 快速增加。
-6. 增加 admission control / backpressure 设计，避免请求在连接池中排队到 2s 超时后才失败。
-7. 视评审复核结果决定是否推送 GitHub。
+3. 补 PostgreSQL 侧观测或 repository 单语句级别指标，继续拆 `repository_begin` 后是否还有 SQL/锁/磁盘写入瓶颈。
+4. 评估 outbox relay 追平优化：批量 publish、批量 mark published、batch size、worker 数和故障退避；避免 `PG_MAX_CONNS=64` 下 pending 快速增加。
+5. 增加 admission control / backpressure 设计，避免请求在连接池中排队到 2s 超时后才失败。
+6. 视评审复核结果决定是否推送 GitHub。
 
 ## 6. 评审要求
 
@@ -238,6 +237,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 formal multi-instance 矩阵：`loadtest/results/multi-instance-formal-20260609-021254/`。在每实例 `PG_MAX_CONNS=16`、1200 VU 下，1/2/4 实例成功率分别为 `0.9660` / `0.5572` / `0.9014`，请求 p99 均约 `2000ms`；用 `service_metrics[]` 重新计算后，4 实例的 per-instance `repository_begin_p99` 范围为 `603.59ms` 到 `2002.33ms`，说明不是每个实例都打满，但整体请求 p99 仍未改善。在当前单 PostgreSQL、当前连接上限和当前写入模型下，多实例不能解决尾延迟。
 - 当前 formal 矩阵追加短 relay drain 后确认 `tenant_count=16 total_pending=0`，没有留下未发布 outbox 积压。
 - 当前 PostgreSQL 诊断脚本为 `loadtest/sendmessage/collect-postgres-diagnostics.ps1`。正式矩阵后采集结果在 `loadtest/results/postgres-diagnostics-20260609-022602/postgres-diagnostics.json`：`max_connections=100`、`shared_buffers=16384`、`max_wal_size=1024`、`checkpoint_timeout=300`、`synchronous_commit=on`、`deadlocks=0`；`message_outbox n_dead_tup=113312`，说明 outbox 高频 update 已产生明显 dead tuples。
+- 当前 multi-instance PG budget 矩阵：`loadtest/results/multi-instance-budget-formal-20260609/`，报告为 `docs/runbook/loadtest-report-20260609-multi-instance-budget.md`。固定每实例预算 `1x16/2x16/4x16` 下 p99 分别为 `2000.53ms` / `1437.37ms` / `1975.75ms`；固定总预算 `1x64/2x32/4x16` 下 p99 分别为 `1178.97ms` / `1509.55ms` / `1657.18ms`。固定总预算下多实例没有降低尾延迟，且 outbox pending 为 `31889` / `64553` / `65323`，说明当前应优先处理 PostgreSQL acquire/begin 排队与 relay 追平，而不是继续堆 gRPC 实例。
 - 当前 debug metrics collector 保存全量样本并在 snapshot 时排序，适合本地短压测，不适合作为生产 metrics；后续应替换为固定窗口、reservoir、HDR histogram 或 Prometheus histogram。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
@@ -270,3 +270,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：评审线程阶段性指出多实例 summary 顶层 `service_latency_metrics` 只取第一个 service metrics URL，报告若直接使用会误导。本轮已修正 loadtest 聚合逻辑，并把报告表改为基于 `service_metrics[]` 的 per-instance min/max。
 - 2026-06-09：已扩展 `run-local-multi-instance.ps1`，支持固定每实例 PG 连接预算和固定总 PG 连接预算两类对照实验；下一轮可直接跑 `FixedPerInstance` 与 `FixedTotal` 矩阵，避免实例数和总数据库连接预算混在一起。
 - 2026-06-09：已用重建后的 loadtest 二进制跑 `FixedTotal` 短 smoke：`1x8` 与 `2x4` 两组均 100% 成功、outbox pending 0，summary 顶层 `service_pg_pool.max_conns` 分别为 `8` / `8`，证明多实例 PG pool 聚合和固定总预算脚本路径生效。
+- 2026-06-09：已在 clean commit `ede5dd7` 跑正式 multi-instance PG budget 矩阵，并新增 `docs/runbook/loadtest-report-20260609-multi-instance-budget.md`。结论：固定总 PG 连接预算时，1 个实例 p99 最低，2/4 实例没有收益；request p99 仍贴近 repository append/begin，outbox pending 暴露 relay 追平为第二瓶颈。矩阵结束后已额外 drain，DB outbox 当前全部为 `PUBLISHED`。

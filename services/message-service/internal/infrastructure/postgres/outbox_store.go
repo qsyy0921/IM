@@ -103,6 +103,16 @@ func (s *OutboxStore) ProcessReadyBatch(
 		return types.OutboxRelayStats{}, err
 	}
 	stats := types.OutboxRelayStats{Fetched: len(messages)}
+	if len(messages) == 0 {
+		commitStarted := time.Now()
+		if err := tx.Commit(ctx); err != nil {
+			s.metrics.ObserveOutboxCommit(time.Since(commitStarted))
+			return types.OutboxRelayStats{}, types.NewDBWriteFailed(err.Error())
+		}
+		s.metrics.ObserveOutboxCommit(time.Since(commitStarted))
+		return stats, nil
+	}
+
 	now := s.now()
 	publishedIDs := make([]int64, 0, len(messages))
 	publishErrors := publish(ctx, messages)

@@ -141,6 +141,7 @@ func TestAggregateProcessLatencyMetrics(t *testing.T) {
 				RepositoryBeginLatencyMS:       latencySnapshot{Count: 2, AvgMS: 10, P95MS: 20, P99MS: 30},
 				RepositoryPoolAcquireLatencyMS: latencySnapshot{Count: 2, AvgMS: 8, P95MS: 18, P99MS: 28},
 				OutboxProcessReadyLatencyMS:    latencySnapshot{Count: 2, AvgMS: 4, P95MS: 5, P99MS: 6},
+				KafkaPublishRecordsPerCall:     valueSnapshot{Count: 2, Avg: 10, P95: 12, P99: 12},
 			},
 		},
 		{
@@ -149,6 +150,7 @@ func TestAggregateProcessLatencyMetrics(t *testing.T) {
 				RepositoryBeginLatencyMS:       latencySnapshot{Count: 3, AvgMS: 20, P95MS: 25, P99MS: 40},
 				RepositoryPoolAcquireLatencyMS: latencySnapshot{Count: 3, AvgMS: 18, P95MS: 23, P99MS: 38},
 				OutboxProcessReadyLatencyMS:    latencySnapshot{Count: 3, AvgMS: 8, P95MS: 9, P99MS: 10},
+				KafkaPublishRecordsPerCall:     valueSnapshot{Count: 3, Avg: 20, P95: 22, P99: 22},
 			},
 		},
 	})
@@ -173,6 +175,17 @@ func TestAggregateProcessLatencyMetrics(t *testing.T) {
 		outboxProcess.P95MS != 9 ||
 		outboxProcess.P99MS != 10 {
 		t.Fatalf("unexpected aggregate outbox process metric: %+v", outboxProcess)
+	}
+	values := aggregateProcessValueMetrics([]processMetrics{
+		{Snapshot: metricsSnapshot{KafkaPublishRecordsPerCall: valueSnapshot{Count: 2, Avg: 10, P95: 12, P99: 12}}},
+		{Snapshot: metricsSnapshot{KafkaPublishRecordsPerCall: valueSnapshot{Count: 3, Avg: 20, P95: 22, P99: 22}}},
+	})
+	recordsPerCall := values["kafka_publish_records_per_call"]
+	if recordsPerCall.Count != 5 ||
+		recordsPerCall.Avg != 16 ||
+		recordsPerCall.P95 != 22 ||
+		recordsPerCall.P99 != 22 {
+		t.Fatalf("unexpected aggregate records per call metric: %+v", recordsPerCall)
 	}
 }
 

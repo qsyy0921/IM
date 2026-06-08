@@ -375,6 +375,10 @@ func (m *fakeMetrics) ObserveKafkaPublish(time.Duration) {
 	m.kafkaCount++
 }
 
+func (m *fakeMetrics) ObserveKafkaPublishCall(time.Duration, int) {
+	m.kafkaCount++
+}
+
 func (m *fakeMetrics) ObserveOutboxProcessReady(time.Duration) {
 	m.outboxProcessReadyCount++
 }

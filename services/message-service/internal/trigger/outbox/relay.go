@@ -162,7 +162,7 @@ func (r *Relay) publishMessage(ctx context.Context, message types.OutboxMessage)
 	}
 	started := time.Now()
 	err = r.publisher.Publish(ctx, r.config.Topic, []byte(message.PartitionKey), value)
-	r.config.Metrics.ObserveKafkaPublish(time.Since(started))
+	r.config.Metrics.ObserveKafkaPublishCall(time.Since(started), 1)
 	return err
 }
 
@@ -192,7 +192,7 @@ func (r *Relay) publishMessages(ctx context.Context, messages []types.OutboxMess
 	started := time.Now()
 	if publisher, ok := r.publisher.(BatchPublisher); ok {
 		err := publisher.PublishBatch(ctx, r.config.Topic, records)
-		r.config.Metrics.ObserveKafkaPublish(time.Since(started))
+		r.config.Metrics.ObserveKafkaPublishCall(time.Since(started), len(records))
 		if err != nil {
 			for _, index := range indexes {
 				errs[index] = err
@@ -207,7 +207,7 @@ func (r *Relay) publishMessages(ctx context.Context, messages []types.OutboxMess
 			errs[indexes[recordIndex]] = err
 		}
 	}
-	r.config.Metrics.ObserveKafkaPublish(time.Since(started))
+	r.config.Metrics.ObserveKafkaPublishCall(time.Since(started), len(records))
 	return errs
 }
 

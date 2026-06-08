@@ -18,6 +18,7 @@ type LatencyRecorder interface {
 	ObserveRepositoryCommit(time.Duration)
 	ObserveConversationSeqAlloc(time.Duration)
 	ObserveKafkaPublish(time.Duration)
+	ObserveKafkaPublishCall(time.Duration, int)
 	ObserveOutboxProcessReady(time.Duration)
 	ObserveOutboxFetchReady(time.Duration)
 	ObserveOutboxMarkPublished(time.Duration)
@@ -55,6 +56,8 @@ func (NoopLatencyRecorder) ObserveRepositoryCommit(time.Duration) {}
 func (NoopLatencyRecorder) ObserveConversationSeqAlloc(time.Duration) {}
 
 func (NoopLatencyRecorder) ObserveKafkaPublish(time.Duration) {}
+
+func (NoopLatencyRecorder) ObserveKafkaPublishCall(time.Duration, int) {}
 
 func (NoopLatencyRecorder) ObserveOutboxProcessReady(time.Duration) {}
 

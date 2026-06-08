@@ -61,92 +61,102 @@ type loadClient struct {
 }
 
 type summary struct {
-	Commit                        string                     `json:"commit"`
-	CommitFull                    string                     `json:"commit_full"`
-	GitDirty                      bool                       `json:"git_dirty"`
-	GitStatusShort                string                     `json:"git_status_short"`
-	Target                        string                     `json:"target"`
-	Targets                       []string                   `json:"targets,omitempty"`
-	TenantID                      string                     `json:"tenant_id"`
-	VUs                           int                        `json:"vus"`
-	Duration                      string                     `json:"duration"`
-	StatsWait                     string                     `json:"stats_wait"`
-	ConversationCount             int                        `json:"conversation_count"`
-	RetryOverloaded               bool                       `json:"retry_overloaded"`
-	MaxRetries                    int                        `json:"max_retries"`
-	RetryJitter                   string                     `json:"retry_jitter"`
-	LogicalRequestCount           int64                      `json:"logical_request_count"`
-	LogicalSuccessCount           int64                      `json:"logical_success_count"`
-	LogicalErrorCount             int64                      `json:"logical_error_count"`
-	LogicalSuccessRate            float64                    `json:"logical_success_rate"`
-	RequestCount                  int64                      `json:"request_count"`
-	RetryAttemptCount             int64                      `json:"retry_attempt_count"`
-	RetriedRequestCount           int64                      `json:"retried_request_count"`
-	SuccessCount                  int64                      `json:"success_count"`
-	ErrorCount                    int64                      `json:"error_count"`
-	RetryableErrorCount           int64                      `json:"retryable_error_count"`
-	ServiceOverloadedCount        int64                      `json:"service_overloaded_count"`
-	RequestRPS                    float64                    `json:"request_rps"`
-	AcceptedRPS                   float64                    `json:"accepted_rps"`
-	ErrorRPS                      float64                    `json:"error_rps"`
-	RetryableErrorRate            float64                    `json:"retryable_error_rate"`
-	OverloadRate                  float64                    `json:"overload_rate"`
-	SuccessRate                   float64                    `json:"success_rate"`
-	AvgMS                         float64                    `json:"avg_ms"`
-	P50MS                         float64                    `json:"p50_ms"`
-	P95MS                         float64                    `json:"p95_ms"`
-	P99MS                         float64                    `json:"p99_ms"`
-	SuccessAvgMS                  float64                    `json:"success_avg_ms"`
-	SuccessP50MS                  float64                    `json:"success_p50_ms"`
-	SuccessP95MS                  float64                    `json:"success_p95_ms"`
-	SuccessP99MS                  float64                    `json:"success_p99_ms"`
-	ErrorAvgMS                    float64                    `json:"error_avg_ms"`
-	ErrorP50MS                    float64                    `json:"error_p50_ms"`
-	ErrorP95MS                    float64                    `json:"error_p95_ms"`
-	ErrorP99MS                    float64                    `json:"error_p99_ms"`
-	SendMessageLatencyMS          *float64                   `json:"send_message_latency_ms"`
-	SendMessageP95MS              *float64                   `json:"send_message_p95_ms"`
-	SendMessageP99MS              *float64                   `json:"send_message_p99_ms"`
-	RepositoryAppendLatencyMS     *float64                   `json:"repository_append_latency_ms"`
-	RepositoryAppendP95MS         *float64                   `json:"repository_append_p95_ms"`
-	RepositoryAppendP99MS         *float64                   `json:"repository_append_p99_ms"`
-	RepositoryCommitLatencyMS     *float64                   `json:"repository_commit_latency_ms"`
-	RepositoryCommitP95MS         *float64                   `json:"repository_commit_p95_ms"`
-	RepositoryCommitP99MS         *float64                   `json:"repository_commit_p99_ms"`
-	ConversationSeqAllocLatencyMS *float64                   `json:"conversation_seq_alloc_latency_ms"`
-	ConversationSeqAllocP95MS     *float64                   `json:"conversation_seq_alloc_p95_ms"`
-	ConversationSeqAllocP99MS     *float64                   `json:"conversation_seq_alloc_p99_ms"`
-	OutboxTotalCount              *int64                     `json:"outbox_total_count"`
-	OutboxPublishedCount          *int64                     `json:"outbox_published_count"`
-	OutboxPendingCount            *int64                     `json:"outbox_pending_count"`
-	OutboxDLQCount                *int64                     `json:"outbox_dlq_count"`
-	OutboxOldestPendingAgeSeconds *float64                   `json:"outbox_oldest_pending_age_seconds"`
-	KafkaPublishLatencyMS         *float64                   `json:"kafka_publish_latency_ms"`
-	KafkaPublishP95MS             *float64                   `json:"kafka_publish_p95_ms"`
-	KafkaPublishP99MS             *float64                   `json:"kafka_publish_p99_ms"`
-	OutboxProcessReadyLatencyMS   *float64                   `json:"outbox_process_ready_latency_ms"`
-	OutboxProcessReadyP95MS       *float64                   `json:"outbox_process_ready_p95_ms"`
-	OutboxProcessReadyP99MS       *float64                   `json:"outbox_process_ready_p99_ms"`
-	OutboxFetchReadyLatencyMS     *float64                   `json:"outbox_fetch_ready_latency_ms"`
-	OutboxFetchReadyP95MS         *float64                   `json:"outbox_fetch_ready_p95_ms"`
-	OutboxFetchReadyP99MS         *float64                   `json:"outbox_fetch_ready_p99_ms"`
-	OutboxMarkPublishedLatencyMS  *float64                   `json:"outbox_mark_published_latency_ms"`
-	OutboxMarkPublishedP95MS      *float64                   `json:"outbox_mark_published_p95_ms"`
-	OutboxMarkPublishedP99MS      *float64                   `json:"outbox_mark_published_p99_ms"`
-	OutboxCommitLatencyMS         *float64                   `json:"outbox_commit_latency_ms"`
-	OutboxCommitP95MS             *float64                   `json:"outbox_commit_p95_ms"`
-	OutboxCommitP99MS             *float64                   `json:"outbox_commit_p99_ms"`
-	ServicePGPool                 *pgPoolStats               `json:"service_pg_pool,omitempty"`
-	RelayPGPool                   *pgPoolStats               `json:"relay_pg_pool,omitempty"`
-	ServiceMetrics                []processMetrics           `json:"service_metrics,omitempty"`
-	RelayMetrics                  []processMetrics           `json:"relay_metrics,omitempty"`
-	ServiceLatencyMetrics         map[string]latencySnapshot `json:"service_latency_metrics,omitempty"`
-	RelayLatencyMetrics           map[string]latencySnapshot `json:"relay_latency_metrics,omitempty"`
-	ErrorTopN                     []errorCount               `json:"error_topn"`
-	MessageErrorCounts            []messageErrorCount        `json:"message_error_counts,omitempty"`
-	StartedAt                     string                     `json:"started_at"`
-	FinishedAt                    string                     `json:"finished_at"`
-	ResultFile                    string                     `json:"result_file"`
+	Commit                          string                     `json:"commit"`
+	CommitFull                      string                     `json:"commit_full"`
+	GitDirty                        bool                       `json:"git_dirty"`
+	GitStatusShort                  string                     `json:"git_status_short"`
+	Target                          string                     `json:"target"`
+	Targets                         []string                   `json:"targets,omitempty"`
+	TenantID                        string                     `json:"tenant_id"`
+	VUs                             int                        `json:"vus"`
+	Duration                        string                     `json:"duration"`
+	StatsWait                       string                     `json:"stats_wait"`
+	ConversationCount               int                        `json:"conversation_count"`
+	RetryOverloaded                 bool                       `json:"retry_overloaded"`
+	MaxRetries                      int                        `json:"max_retries"`
+	RetryJitter                     string                     `json:"retry_jitter"`
+	LogicalRequestCount             int64                      `json:"logical_request_count"`
+	LogicalSuccessCount             int64                      `json:"logical_success_count"`
+	LogicalErrorCount               int64                      `json:"logical_error_count"`
+	LogicalSuccessRate              float64                    `json:"logical_success_rate"`
+	RequestCount                    int64                      `json:"request_count"`
+	RetryAttemptCount               int64                      `json:"retry_attempt_count"`
+	RetriedRequestCount             int64                      `json:"retried_request_count"`
+	SuccessCount                    int64                      `json:"success_count"`
+	ErrorCount                      int64                      `json:"error_count"`
+	RetryableErrorCount             int64                      `json:"retryable_error_count"`
+	ServiceOverloadedCount          int64                      `json:"service_overloaded_count"`
+	RequestRPS                      float64                    `json:"request_rps"`
+	AcceptedRPS                     float64                    `json:"accepted_rps"`
+	ErrorRPS                        float64                    `json:"error_rps"`
+	RetryableErrorRate              float64                    `json:"retryable_error_rate"`
+	OverloadRate                    float64                    `json:"overload_rate"`
+	SuccessRate                     float64                    `json:"success_rate"`
+	AvgMS                           float64                    `json:"avg_ms"`
+	P50MS                           float64                    `json:"p50_ms"`
+	P95MS                           float64                    `json:"p95_ms"`
+	P99MS                           float64                    `json:"p99_ms"`
+	SuccessAvgMS                    float64                    `json:"success_avg_ms"`
+	SuccessP50MS                    float64                    `json:"success_p50_ms"`
+	SuccessP95MS                    float64                    `json:"success_p95_ms"`
+	SuccessP99MS                    float64                    `json:"success_p99_ms"`
+	ErrorAvgMS                      float64                    `json:"error_avg_ms"`
+	ErrorP50MS                      float64                    `json:"error_p50_ms"`
+	ErrorP95MS                      float64                    `json:"error_p95_ms"`
+	ErrorP99MS                      float64                    `json:"error_p99_ms"`
+	SendMessageLatencyMS            *float64                   `json:"send_message_latency_ms"`
+	SendMessageP95MS                *float64                   `json:"send_message_p95_ms"`
+	SendMessageP99MS                *float64                   `json:"send_message_p99_ms"`
+	RepositoryAppendLatencyMS       *float64                   `json:"repository_append_latency_ms"`
+	RepositoryAppendP95MS           *float64                   `json:"repository_append_p95_ms"`
+	RepositoryAppendP99MS           *float64                   `json:"repository_append_p99_ms"`
+	RepositoryCommitLatencyMS       *float64                   `json:"repository_commit_latency_ms"`
+	RepositoryCommitP95MS           *float64                   `json:"repository_commit_p95_ms"`
+	RepositoryCommitP99MS           *float64                   `json:"repository_commit_p99_ms"`
+	ConversationSeqAllocLatencyMS   *float64                   `json:"conversation_seq_alloc_latency_ms"`
+	ConversationSeqAllocP95MS       *float64                   `json:"conversation_seq_alloc_p95_ms"`
+	ConversationSeqAllocP99MS       *float64                   `json:"conversation_seq_alloc_p99_ms"`
+	OutboxTotalCount                *int64                     `json:"outbox_total_count"`
+	OutboxPublishedCount            *int64                     `json:"outbox_published_count"`
+	OutboxPendingCount              *int64                     `json:"outbox_pending_count"`
+	OutboxDLQCount                  *int64                     `json:"outbox_dlq_count"`
+	OutboxOldestPendingAgeSeconds   *float64                   `json:"outbox_oldest_pending_age_seconds"`
+	KafkaPublishLatencyMS           *float64                   `json:"kafka_publish_latency_ms"`
+	KafkaPublishP95MS               *float64                   `json:"kafka_publish_p95_ms"`
+	KafkaPublishP99MS               *float64                   `json:"kafka_publish_p99_ms"`
+	KafkaPublishCallLatencyMS       *float64                   `json:"kafka_publish_call_latency_ms"`
+	KafkaPublishCallP95MS           *float64                   `json:"kafka_publish_call_p95_ms"`
+	KafkaPublishCallP99MS           *float64                   `json:"kafka_publish_call_p99_ms"`
+	KafkaPublishRecordsPerCall      *float64                   `json:"kafka_publish_records_per_call"`
+	KafkaPublishRecordsPerCallP95   *float64                   `json:"kafka_publish_records_per_call_p95"`
+	KafkaPublishRecordsPerCallP99   *float64                   `json:"kafka_publish_records_per_call_p99"`
+	KafkaPublishRecordEstimateMS    *float64                   `json:"kafka_publish_record_latency_estimate_ms"`
+	KafkaPublishRecordEstimateP95MS *float64                   `json:"kafka_publish_record_latency_estimate_p95_ms"`
+	KafkaPublishRecordEstimateP99MS *float64                   `json:"kafka_publish_record_latency_estimate_p99_ms"`
+	OutboxProcessReadyLatencyMS     *float64                   `json:"outbox_process_ready_latency_ms"`
+	OutboxProcessReadyP95MS         *float64                   `json:"outbox_process_ready_p95_ms"`
+	OutboxProcessReadyP99MS         *float64                   `json:"outbox_process_ready_p99_ms"`
+	OutboxFetchReadyLatencyMS       *float64                   `json:"outbox_fetch_ready_latency_ms"`
+	OutboxFetchReadyP95MS           *float64                   `json:"outbox_fetch_ready_p95_ms"`
+	OutboxFetchReadyP99MS           *float64                   `json:"outbox_fetch_ready_p99_ms"`
+	OutboxMarkPublishedLatencyMS    *float64                   `json:"outbox_mark_published_latency_ms"`
+	OutboxMarkPublishedP95MS        *float64                   `json:"outbox_mark_published_p95_ms"`
+	OutboxMarkPublishedP99MS        *float64                   `json:"outbox_mark_published_p99_ms"`
+	OutboxCommitLatencyMS           *float64                   `json:"outbox_commit_latency_ms"`
+	OutboxCommitP95MS               *float64                   `json:"outbox_commit_p95_ms"`
+	OutboxCommitP99MS               *float64                   `json:"outbox_commit_p99_ms"`
+	ServicePGPool                   *pgPoolStats               `json:"service_pg_pool,omitempty"`
+	RelayPGPool                     *pgPoolStats               `json:"relay_pg_pool,omitempty"`
+	ServiceMetrics                  []processMetrics           `json:"service_metrics,omitempty"`
+	RelayMetrics                    []processMetrics           `json:"relay_metrics,omitempty"`
+	ServiceLatencyMetrics           map[string]latencySnapshot `json:"service_latency_metrics,omitempty"`
+	RelayLatencyMetrics             map[string]latencySnapshot `json:"relay_latency_metrics,omitempty"`
+	RelayValueMetrics               map[string]valueSnapshot   `json:"relay_value_metrics,omitempty"`
+	ErrorTopN                       []errorCount               `json:"error_topn"`
+	MessageErrorCounts              []messageErrorCount        `json:"message_error_counts,omitempty"`
+	StartedAt                       string                     `json:"started_at"`
+	FinishedAt                      string                     `json:"finished_at"`
+	ResultFile                      string                     `json:"result_file"`
 }
 
 type errorCount struct {
@@ -283,12 +293,31 @@ func run(args []string, getenv func(string) string) error {
 			result.RelayMetrics = append(result.RelayMetrics, processMetrics{URL: metricURL, Snapshot: metrics})
 		}
 		result.RelayLatencyMetrics = aggregateProcessLatencyMetrics(result.RelayMetrics)
+		result.RelayValueMetrics = aggregateProcessValueMetrics(result.RelayMetrics)
 		result.RelayPGPool = aggregatePGPool(result.RelayMetrics)
 		applyLatency(
 			&result.KafkaPublishLatencyMS,
 			&result.KafkaPublishP95MS,
 			&result.KafkaPublishP99MS,
 			result.RelayLatencyMetrics["kafka_publish_latency_ms"],
+		)
+		applyLatency(
+			&result.KafkaPublishCallLatencyMS,
+			&result.KafkaPublishCallP95MS,
+			&result.KafkaPublishCallP99MS,
+			result.RelayLatencyMetrics["kafka_publish_call_latency_ms"],
+		)
+		applyValue(
+			&result.KafkaPublishRecordsPerCall,
+			&result.KafkaPublishRecordsPerCallP95,
+			&result.KafkaPublishRecordsPerCallP99,
+			result.RelayValueMetrics["kafka_publish_records_per_call"],
+		)
+		applyLatency(
+			&result.KafkaPublishRecordEstimateMS,
+			&result.KafkaPublishRecordEstimateP95MS,
+			&result.KafkaPublishRecordEstimateP99MS,
+			result.RelayLatencyMetrics["kafka_publish_record_latency_estimate_ms"],
 		)
 		applyLatency(
 			&result.OutboxProcessReadyLatencyMS,
@@ -536,71 +565,80 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 
 	commit := currentCommit()
 	return summary{
-		Commit:                        commit.Short,
-		CommitFull:                    commit.Full,
-		GitDirty:                      commit.Dirty,
-		GitStatusShort:                commit.StatusShort,
-		Target:                        cfg.Target,
-		Targets:                       clientTargets(clients),
-		TenantID:                      cfg.TenantID,
-		VUs:                           cfg.VUs,
-		Duration:                      cfg.Duration.String(),
-		StatsWait:                     cfg.StatsWait.String(),
-		ConversationCount:             cfg.ConversationCount,
-		RetryOverloaded:               cfg.RetryOverloaded,
-		MaxRetries:                    cfg.MaxRetries,
-		RetryJitter:                   cfg.RetryJitter.String(),
-		LogicalRequestCount:           logicalRequestCount,
-		LogicalSuccessCount:           logicalSuccessCount,
-		LogicalErrorCount:             logicalErrorCount,
-		LogicalSuccessRate:            logicalSuccessRate,
-		RequestCount:                  requestCount,
-		RetryAttemptCount:             retryAttemptCount,
-		RetriedRequestCount:           retriedRequestCount,
-		SuccessCount:                  successCount,
-		ErrorCount:                    errorCountValue,
-		RetryableErrorCount:           retryableErrorCount,
-		ServiceOverloadedCount:        serviceOverloadedCount,
-		RequestRPS:                    requestRPS,
-		AcceptedRPS:                   acceptedRPS,
-		ErrorRPS:                      errorRPS,
-		RetryableErrorRate:            retryableErrorRate,
-		OverloadRate:                  overloadRate,
-		SuccessRate:                   successRate,
-		AvgMS:                         avgMS,
-		P50MS:                         durationMS(percentile(latencies, 0.50)),
-		P95MS:                         durationMS(percentile(latencies, 0.95)),
-		P99MS:                         durationMS(percentile(latencies, 0.99)),
-		SuccessAvgMS:                  successBreakdown.AvgMS,
-		SuccessP50MS:                  successBreakdown.P50MS,
-		SuccessP95MS:                  successBreakdown.P95MS,
-		SuccessP99MS:                  successBreakdown.P99MS,
-		ErrorAvgMS:                    errorBreakdown.AvgMS,
-		ErrorP50MS:                    errorBreakdown.P50MS,
-		ErrorP95MS:                    errorBreakdown.P95MS,
-		ErrorP99MS:                    errorBreakdown.P99MS,
-		ErrorTopN:                     topErrors(errorCounts, 10),
-		MessageErrorCounts:            topMessageErrors(messageErrorCounts, 10),
-		StartedAt:                     started.Format(time.RFC3339Nano),
-		FinishedAt:                    finished.Format(time.RFC3339Nano),
-		ConversationSeqAllocLatencyMS: nil,
-		ConversationSeqAllocP95MS:     nil,
-		ConversationSeqAllocP99MS:     nil,
-		KafkaPublishLatencyMS:         nil,
-		KafkaPublishP95MS:             nil,
-		KafkaPublishP99MS:             nil,
-		OutboxProcessReadyLatencyMS:   nil,
-		OutboxProcessReadyP95MS:       nil,
-		OutboxProcessReadyP99MS:       nil,
-		OutboxFetchReadyLatencyMS:     nil,
-		OutboxFetchReadyP95MS:         nil,
-		OutboxFetchReadyP99MS:         nil,
-		OutboxMarkPublishedLatencyMS:  nil,
-		OutboxMarkPublishedP95MS:      nil,
-		OutboxMarkPublishedP99MS:      nil,
-		OutboxCommitLatencyMS:         nil,
-		OutboxCommitP95MS:             nil,
-		OutboxCommitP99MS:             nil,
+		Commit:                          commit.Short,
+		CommitFull:                      commit.Full,
+		GitDirty:                        commit.Dirty,
+		GitStatusShort:                  commit.StatusShort,
+		Target:                          cfg.Target,
+		Targets:                         clientTargets(clients),
+		TenantID:                        cfg.TenantID,
+		VUs:                             cfg.VUs,
+		Duration:                        cfg.Duration.String(),
+		StatsWait:                       cfg.StatsWait.String(),
+		ConversationCount:               cfg.ConversationCount,
+		RetryOverloaded:                 cfg.RetryOverloaded,
+		MaxRetries:                      cfg.MaxRetries,
+		RetryJitter:                     cfg.RetryJitter.String(),
+		LogicalRequestCount:             logicalRequestCount,
+		LogicalSuccessCount:             logicalSuccessCount,
+		LogicalErrorCount:               logicalErrorCount,
+		LogicalSuccessRate:              logicalSuccessRate,
+		RequestCount:                    requestCount,
+		RetryAttemptCount:               retryAttemptCount,
+		RetriedRequestCount:             retriedRequestCount,
+		SuccessCount:                    successCount,
+		ErrorCount:                      errorCountValue,
+		RetryableErrorCount:             retryableErrorCount,
+		ServiceOverloadedCount:          serviceOverloadedCount,
+		RequestRPS:                      requestRPS,
+		AcceptedRPS:                     acceptedRPS,
+		ErrorRPS:                        errorRPS,
+		RetryableErrorRate:              retryableErrorRate,
+		OverloadRate:                    overloadRate,
+		SuccessRate:                     successRate,
+		AvgMS:                           avgMS,
+		P50MS:                           durationMS(percentile(latencies, 0.50)),
+		P95MS:                           durationMS(percentile(latencies, 0.95)),
+		P99MS:                           durationMS(percentile(latencies, 0.99)),
+		SuccessAvgMS:                    successBreakdown.AvgMS,
+		SuccessP50MS:                    successBreakdown.P50MS,
+		SuccessP95MS:                    successBreakdown.P95MS,
+		SuccessP99MS:                    successBreakdown.P99MS,
+		ErrorAvgMS:                      errorBreakdown.AvgMS,
+		ErrorP50MS:                      errorBreakdown.P50MS,
+		ErrorP95MS:                      errorBreakdown.P95MS,
+		ErrorP99MS:                      errorBreakdown.P99MS,
+		ErrorTopN:                       topErrors(errorCounts, 10),
+		MessageErrorCounts:              topMessageErrors(messageErrorCounts, 10),
+		StartedAt:                       started.Format(time.RFC3339Nano),
+		FinishedAt:                      finished.Format(time.RFC3339Nano),
+		ConversationSeqAllocLatencyMS:   nil,
+		ConversationSeqAllocP95MS:       nil,
+		ConversationSeqAllocP99MS:       nil,
+		KafkaPublishLatencyMS:           nil,
+		KafkaPublishP95MS:               nil,
+		KafkaPublishP99MS:               nil,
+		KafkaPublishCallLatencyMS:       nil,
+		KafkaPublishCallP95MS:           nil,
+		KafkaPublishCallP99MS:           nil,
+		KafkaPublishRecordsPerCall:      nil,
+		KafkaPublishRecordsPerCallP95:   nil,
+		KafkaPublishRecordsPerCallP99:   nil,
+		KafkaPublishRecordEstimateMS:    nil,
+		KafkaPublishRecordEstimateP95MS: nil,
+		KafkaPublishRecordEstimateP99MS: nil,
+		OutboxProcessReadyLatencyMS:     nil,
+		OutboxProcessReadyP95MS:         nil,
+		OutboxProcessReadyP99MS:         nil,
+		OutboxFetchReadyLatencyMS:       nil,
+		OutboxFetchReadyP95MS:           nil,
+		OutboxFetchReadyP99MS:           nil,
+		OutboxMarkPublishedLatencyMS:    nil,
+		OutboxMarkPublishedP95MS:        nil,
+		OutboxMarkPublishedP99MS:        nil,
+		OutboxCommitLatencyMS:           nil,
+		OutboxCommitP95MS:               nil,
+		OutboxCommitP99MS:               nil,
 	}, nil
 }
 
@@ -820,26 +858,29 @@ type outboxStats struct {
 }
 
 type metricsSnapshot struct {
-	SendMessageLatencyMS               latencySnapshot `json:"send_message_latency_ms"`
-	RepositoryAppendLatencyMS          latencySnapshot `json:"repository_append_latency_ms"`
-	RepositoryBeginLatencyMS           latencySnapshot `json:"repository_begin_latency_ms"`
-	RepositoryPoolAcquireLatencyMS     latencySnapshot `json:"repository_pool_acquire_latency_ms"`
-	RepositoryTxBeginLatencyMS         latencySnapshot `json:"repository_tx_begin_latency_ms"`
-	RepositoryIdempotencyLockLatencyMS latencySnapshot `json:"repository_idempotency_lock_latency_ms"`
-	RepositoryFindExistingLatencyMS    latencySnapshot `json:"repository_find_existing_latency_ms"`
-	RepositoryEnsureSeqLatencyMS       latencySnapshot `json:"repository_ensure_seq_latency_ms"`
-	RepositoryAllocateSeqLatencyMS     latencySnapshot `json:"repository_allocate_seq_latency_ms"`
-	RepositoryInsertMessageLatencyMS   latencySnapshot `json:"repository_insert_message_latency_ms"`
-	RepositoryInsertTimelineLatencyMS  latencySnapshot `json:"repository_insert_timeline_latency_ms"`
-	RepositoryInsertOutboxLatencyMS    latencySnapshot `json:"repository_insert_outbox_latency_ms"`
-	RepositoryCommitLatencyMS          latencySnapshot `json:"repository_commit_latency_ms"`
-	ConversationSeqAllocLatencyMS      latencySnapshot `json:"conversation_seq_alloc_latency_ms"`
-	KafkaPublishLatencyMS              latencySnapshot `json:"kafka_publish_latency_ms"`
-	OutboxProcessReadyLatencyMS        latencySnapshot `json:"outbox_process_ready_latency_ms"`
-	OutboxFetchReadyLatencyMS          latencySnapshot `json:"outbox_fetch_ready_latency_ms"`
-	OutboxMarkPublishedLatencyMS       latencySnapshot `json:"outbox_mark_published_latency_ms"`
-	OutboxCommitLatencyMS              latencySnapshot `json:"outbox_commit_latency_ms"`
-	PGPool                             *pgPoolStats    `json:"pg_pool"`
+	SendMessageLatencyMS                latencySnapshot `json:"send_message_latency_ms"`
+	RepositoryAppendLatencyMS           latencySnapshot `json:"repository_append_latency_ms"`
+	RepositoryBeginLatencyMS            latencySnapshot `json:"repository_begin_latency_ms"`
+	RepositoryPoolAcquireLatencyMS      latencySnapshot `json:"repository_pool_acquire_latency_ms"`
+	RepositoryTxBeginLatencyMS          latencySnapshot `json:"repository_tx_begin_latency_ms"`
+	RepositoryIdempotencyLockLatencyMS  latencySnapshot `json:"repository_idempotency_lock_latency_ms"`
+	RepositoryFindExistingLatencyMS     latencySnapshot `json:"repository_find_existing_latency_ms"`
+	RepositoryEnsureSeqLatencyMS        latencySnapshot `json:"repository_ensure_seq_latency_ms"`
+	RepositoryAllocateSeqLatencyMS      latencySnapshot `json:"repository_allocate_seq_latency_ms"`
+	RepositoryInsertMessageLatencyMS    latencySnapshot `json:"repository_insert_message_latency_ms"`
+	RepositoryInsertTimelineLatencyMS   latencySnapshot `json:"repository_insert_timeline_latency_ms"`
+	RepositoryInsertOutboxLatencyMS     latencySnapshot `json:"repository_insert_outbox_latency_ms"`
+	RepositoryCommitLatencyMS           latencySnapshot `json:"repository_commit_latency_ms"`
+	ConversationSeqAllocLatencyMS       latencySnapshot `json:"conversation_seq_alloc_latency_ms"`
+	KafkaPublishLatencyMS               latencySnapshot `json:"kafka_publish_latency_ms"`
+	KafkaPublishCallLatencyMS           latencySnapshot `json:"kafka_publish_call_latency_ms"`
+	KafkaPublishRecordLatencyEstimateMS latencySnapshot `json:"kafka_publish_record_latency_estimate_ms"`
+	KafkaPublishRecordsPerCall          valueSnapshot   `json:"kafka_publish_records_per_call"`
+	OutboxProcessReadyLatencyMS         latencySnapshot `json:"outbox_process_ready_latency_ms"`
+	OutboxFetchReadyLatencyMS           latencySnapshot `json:"outbox_fetch_ready_latency_ms"`
+	OutboxMarkPublishedLatencyMS        latencySnapshot `json:"outbox_mark_published_latency_ms"`
+	OutboxCommitLatencyMS               latencySnapshot `json:"outbox_commit_latency_ms"`
+	PGPool                              *pgPoolStats    `json:"pg_pool"`
 }
 
 type processMetrics struct {
@@ -852,6 +893,13 @@ type latencySnapshot struct {
 	AvgMS float64 `json:"avg_ms"`
 	P95MS float64 `json:"p95_ms"`
 	P99MS float64 `json:"p99_ms"`
+}
+
+type valueSnapshot struct {
+	Count int64   `json:"count"`
+	Avg   float64 `json:"avg"`
+	P95   float64 `json:"p95"`
+	P99   float64 `json:"p99"`
 }
 
 type pgPoolStats struct {
@@ -980,10 +1028,21 @@ func latencyMetrics(snapshot metricsSnapshot) map[string]latencySnapshot {
 	addLatency(metrics, "repository_commit_latency_ms", snapshot.RepositoryCommitLatencyMS)
 	addLatency(metrics, "conversation_seq_alloc_latency_ms", snapshot.ConversationSeqAllocLatencyMS)
 	addLatency(metrics, "kafka_publish_latency_ms", snapshot.KafkaPublishLatencyMS)
+	addLatency(metrics, "kafka_publish_call_latency_ms", snapshot.KafkaPublishCallLatencyMS)
+	addLatency(metrics, "kafka_publish_record_latency_estimate_ms", snapshot.KafkaPublishRecordLatencyEstimateMS)
 	addLatency(metrics, "outbox_process_ready_latency_ms", snapshot.OutboxProcessReadyLatencyMS)
 	addLatency(metrics, "outbox_fetch_ready_latency_ms", snapshot.OutboxFetchReadyLatencyMS)
 	addLatency(metrics, "outbox_mark_published_latency_ms", snapshot.OutboxMarkPublishedLatencyMS)
 	addLatency(metrics, "outbox_commit_latency_ms", snapshot.OutboxCommitLatencyMS)
+	if len(metrics) == 0 {
+		return nil
+	}
+	return metrics
+}
+
+func valueMetrics(snapshot metricsSnapshot) map[string]valueSnapshot {
+	metrics := map[string]valueSnapshot{}
+	addValue(metrics, "kafka_publish_records_per_call", snapshot.KafkaPublishRecordsPerCall)
 	if len(metrics) == 0 {
 		return nil
 	}
@@ -995,6 +1054,19 @@ func aggregateProcessLatencyMetrics(processes []processMetrics) map[string]laten
 	for _, process := range processes {
 		for name, snapshot := range latencyMetrics(process.Snapshot) {
 			aggregated[name] = mergeLatency(aggregated[name], snapshot)
+		}
+	}
+	if len(aggregated) == 0 {
+		return nil
+	}
+	return aggregated
+}
+
+func aggregateProcessValueMetrics(processes []processMetrics) map[string]valueSnapshot {
+	aggregated := map[string]valueSnapshot{}
+	for _, process := range processes {
+		for name, snapshot := range valueMetrics(process.Snapshot) {
+			aggregated[name] = mergeValue(aggregated[name], snapshot)
 		}
 	}
 	if len(aggregated) == 0 {
@@ -1020,7 +1092,30 @@ func mergeLatency(left latencySnapshot, right latencySnapshot) latencySnapshot {
 	}
 }
 
+func mergeValue(left valueSnapshot, right valueSnapshot) valueSnapshot {
+	if left.Count <= 0 {
+		return right
+	}
+	if right.Count <= 0 {
+		return left
+	}
+	totalCount := left.Count + right.Count
+	avg := ((left.Avg * float64(left.Count)) + (right.Avg * float64(right.Count))) / float64(totalCount)
+	return valueSnapshot{
+		Count: totalCount,
+		Avg:   avg,
+		P95:   math.Max(left.P95, right.P95),
+		P99:   math.Max(left.P99, right.P99),
+	}
+}
+
 func addLatency(metrics map[string]latencySnapshot, name string, snapshot latencySnapshot) {
+	if snapshot.Count > 0 {
+		metrics[name] = snapshot
+	}
+}
+
+func addValue(metrics map[string]valueSnapshot, name string, snapshot valueSnapshot) {
 	if snapshot.Count > 0 {
 		metrics[name] = snapshot
 	}
@@ -1058,6 +1153,18 @@ func applyLatency(avgTarget **float64, p95Target **float64, p99Target **float64,
 	avg := snapshot.AvgMS
 	p95 := snapshot.P95MS
 	p99 := snapshot.P99MS
+	*avgTarget = &avg
+	*p95Target = &p95
+	*p99Target = &p99
+}
+
+func applyValue(avgTarget **float64, p95Target **float64, p99Target **float64, snapshot valueSnapshot) {
+	if snapshot.Count <= 0 {
+		return
+	}
+	avg := snapshot.Avg
+	p95 := snapshot.P95
+	p99 := snapshot.P99
 	*avgTarget = &avg
 	*p95Target = &p95
 	*p99Target = &p99

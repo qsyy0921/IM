@@ -124,6 +124,76 @@ func TestOutboxStoreProcessReadyBatchMarksPublishedAndRetriesFailures(t *testing
 	assertOutboxStatusCounts(t, ctx, pool, tenantID, 1, 1, 0)
 }
 
+func TestOutboxStoreProcessReadyBatchSkipsPublishWhenEmpty(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+	resetMessageCoreTables(t, ctx, pool)
+
+	store := NewOutboxStore(pool)
+	called := false
+	stats, err := store.ProcessReadyBatch(ctx, 10, 3, time.Millisecond, func(context.Context, []types.OutboxMessage) []error {
+		called = true
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("process empty batch: %v", err)
+	}
+	if called {
+		t.Fatalf("publish callback should not be called for empty batch")
+	}
+	if stats.Fetched != 0 || stats.Published != 0 || stats.Retried != 0 || stats.DeadLettered != 0 {
+		t.Fatalf("unexpected empty stats: %+v", stats)
+	}
+}
+
+func TestOutboxStoreProcessReadyBatchDirectlyMarksPublishedAndRetriesFailures(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+	resetMessageCoreTables(t, ctx, pool)
+
+	tenantID := types.TenantID(fmt.Sprintf("tenant-outbox-batch-direct-%d", time.Now().UnixNano()))
+	repo := NewMessageRepository(pool)
+	appendConversationMessages(t, ctx, repo, tenantID, "conversation-a", 1)
+	appendConversationMessages(t, ctx, repo, tenantID, "conversation-b", 1)
+
+	store := NewOutboxStore(pool, WithOutboxClock(func() time.Time {
+		return time.Date(2026, 6, 8, 12, 1, 0, 0, time.UTC)
+	}))
+	stats, err := store.ProcessReadyBatch(ctx, 10, 3, time.Millisecond, func(_ context.Context, messages []types.OutboxMessage) []error {
+		errs := make([]error, len(messages))
+		for i, message := range messages {
+			if message.ConversationID == "conversation-b" {
+				errs[i] = errors.New("kafka unavailable")
+			}
+		}
+		return errs
+	})
+	if err != nil {
+		t.Fatalf("process mixed outbox batch directly: %v", err)
+	}
+	if stats.Fetched != 2 || stats.Published != 1 || stats.Retried != 1 || stats.DeadLettered != 0 {
+		t.Fatalf("unexpected stats=%+v", stats)
+	}
+
+	published := readOutboxStatusByConversation(t, ctx, pool, tenantID, "conversation-a")
+	if published.Status != types.OutboxStatusPublished || !published.Published || published.RetryCount != 0 {
+		t.Fatalf("expected conversation-a published, got %+v", published)
+	}
+	retried := readOutboxStatusByConversation(t, ctx, pool, tenantID, "conversation-b")
+	if retried.Status != types.OutboxStatusPending ||
+		retried.Published ||
+		retried.RetryCount != 1 ||
+		!retried.NextRetry ||
+		!strings.Contains(retried.LastError, "kafka unavailable") {
+		t.Fatalf("expected conversation-b retried, got %+v", retried)
+	}
+	assertOutboxStatusCounts(t, ctx, pool, tenantID, 1, 1, 0)
+}
+
 func TestOutboxStoreProcessReadyRetriesOnPublishFailure(t *testing.T) {
 	ctx := context.Background()
 	pool := openIntegrationPool(t, ctx)

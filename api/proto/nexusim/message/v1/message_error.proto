@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package nexusim.message.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/message/v1;messagev1";
+
+// MessageErrorCode is the stable service-level error contract exposed by
+// message-service. Storage, Kafka, and dependency implementation errors must be
+// mapped to one of these values before crossing the service boundary.
+enum MessageErrorCode {
+  MESSAGE_ERROR_CODE_UNSPECIFIED = 0;
+
+  MESSAGE_ERROR_CODE_PERMISSION_DENIED = 1;
+  MESSAGE_ERROR_CODE_CONVERSATION_NOT_FOUND = 2;
+  MESSAGE_ERROR_CODE_MESSAGE_TOO_LARGE = 3;
+  MESSAGE_ERROR_CODE_UNSUPPORTED_MESSAGE_TYPE = 4;
+  MESSAGE_ERROR_CODE_IDEMPOTENCY_CONFLICT = 5;
+  MESSAGE_ERROR_CODE_SEQUENCER_UNAVAILABLE = 6;
+  MESSAGE_ERROR_CODE_SEQ_BLOCK_EXHAUSTED = 7;
+  MESSAGE_ERROR_CODE_DB_WRITE_FAILED = 8;
+  MESSAGE_ERROR_CODE_OUTBOX_WRITE_FAILED = 9;
+}
+
+message MessageError {
+  MessageErrorCode code = 1;
+  string message = 2;
+  bool retryable = 3;
+  string correlation_id = 4;
+}

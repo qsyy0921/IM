@@ -1,0 +1,113 @@
+syntax = "proto3";
+
+package nexusim.message.v1;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "nexusim/message/v1/message_error.proto";
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/message/v1;messagev1";
+
+service MessageService {
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+  rpc EditMessage(EditMessageRequest) returns (MessageChangeResponse);
+  rpc RevokeMessage(RevokeMessageRequest) returns (MessageChangeResponse);
+  rpc DeleteMessage(DeleteMessageRequest) returns (MessageChangeResponse);
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+enum DeleteScope {
+  DELETE_SCOPE_UNSPECIFIED = 0;
+  DELETE_SCOPE_CONVERSATION_VIEW = 1;
+  DELETE_SCOPE_COMPLIANCE_RETENTION = 2;
+}
+
+message SendMessageRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+
+  // Device-scoped globally unique UUID. The same tenant_id + sender_id +
+  // device_id must never reuse this value across conversations.
+  string client_msg_id = 3;
+
+  string message_type = 4;
+  google.protobuf.Struct payload = 5;
+  repeated string attachment_ids = 6;
+}
+
+message SendMessageResponse {
+  string message_id = 1;
+  string conversation_id = 2;
+  int64 conversation_seq = 3;
+  google.protobuf.Timestamp accepted_at = 4;
+  bool idempotent_replay = 5;
+}
+
+message EditMessageRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  string message_id = 3;
+  string idempotency_key = 4;
+  google.protobuf.Struct payload = 5;
+  string reason = 6;
+}
+
+message RevokeMessageRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  string message_id = 3;
+  string idempotency_key = 4;
+  string reason = 5;
+}
+
+message DeleteMessageRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  string message_id = 3;
+  string idempotency_key = 4;
+  DeleteScope delete_scope = 5;
+  string reason = 6;
+}
+
+message MessageChangeResponse {
+  string message_id = 1;
+  string conversation_id = 2;
+  int64 conversation_seq = 3;
+  int32 change_version = 4;
+  google.protobuf.Timestamp accepted_at = 5;
+  bool idempotent_replay = 6;
+}
+
+// Command hash rule for SendMessage:
+// SHA256(canonical_json({
+//   tenant_id,
+//   conversation_id,
+//   sender_id,
+//   device_id,
+//   client_msg_id,
+//   message_type,
+//   payload,
+//   sorted_attachment_ids
+// }))
+//
+// Excluded from command_hash:
+// request_id, trace_id, accepted_at, client_send_time.
+//
+// The service computes and persists command_hash. Clients do not send it.
+message CommandHashRule {
+  string algorithm = 1;
+  repeated string included_fields = 2;
+  repeated string excluded_fields = 3;
+}
+
+message MessageServiceErrorResponse {
+  MessageError error = 1;
+}

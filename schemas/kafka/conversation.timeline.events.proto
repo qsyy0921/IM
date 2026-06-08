@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package nexusim.conversation.timeline.v1;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/qsyy0921/IM/schemas/kafka/conversationtimeline/v1;conversationtimelinev1";
+
+// Topic: conversation.timeline.events
+// Partition key: tenant_id + ":" + conversation_id
+// Ordering key: tenant_id + conversation_id + aggregate_version
+// Producer: message-service outbox relay for first phase message events.
+message ConversationTimelineEvent {
+  string event_id = 1;
+  string event_type = 2;
+  string event_version = 3;
+
+  string tenant_id = 4;
+  string aggregate_type = 5; // "conversation"
+  string aggregate_id = 6;   // conversation_id
+  int64 aggregate_version = 7; // conversation_seq
+
+  string partition_key = 8;
+  string mapping_version = 9;
+  string trace_id = 10;
+  string correlation_id = 11;
+  string causation_id = 12;
+  string producer = 13;
+  google.protobuf.Timestamp occurred_at = 14;
+
+  TimelineMetadata metadata = 15;
+
+  oneof payload {
+    MessagePersistedV1 message_persisted = 16;
+    MessageEditedV1 message_edited = 17;
+    MessageRevokedV1 message_revoked = 18;
+    MessageDeletedV1 message_deleted = 19;
+  }
+}
+
+message TimelineMetadata {
+  string fanout_mode = 1;
+  int64 fanout_policy_version = 2;
+  int64 permission_version = 3;
+  string classification = 4;
+  string mapping_version = 5;
+}
+
+message MessagePersistedV1 {
+  string message_id = 1;
+  string conversation_id = 2;
+  int64 conversation_seq = 3;
+
+  string sender_id = 4;
+  string device_id = 5;
+  string client_msg_id = 6;
+  string command_hash = 7;
+
+  string message_type = 8;
+  google.protobuf.Struct payload = 9;
+  repeated string attachment_ids = 10;
+
+  google.protobuf.Timestamp accepted_at = 11;
+}
+
+message MessageEditedV1 {
+  string message_id = 1;
+  string conversation_id = 2;
+  int64 conversation_seq = 3;
+  int32 change_version = 4;
+
+  string edited_by = 5;
+  google.protobuf.Struct before_payload = 6;
+  google.protobuf.Struct after_payload = 7;
+  string reason = 8;
+
+  google.protobuf.Timestamp edited_at = 9;
+}
+
+message MessageRevokedV1 {
+  string message_id = 1;
+  string conversation_id = 2;
+  int64 conversation_seq = 3;
+  int32 change_version = 4;
+
+  string revoked_by = 5;
+  string reason = 6;
+
+  google.protobuf.Timestamp revoked_at = 7;
+}
+
+enum MessageDeleteScope {
+  MESSAGE_DELETE_SCOPE_UNSPECIFIED = 0;
+  MESSAGE_DELETE_SCOPE_CONVERSATION_VIEW = 1;
+  MESSAGE_DELETE_SCOPE_COMPLIANCE_RETENTION = 2;
+}
+
+message MessageDeletedV1 {
+  string message_id = 1;
+  string conversation_id = 2;
+  int64 conversation_seq = 3;
+  int32 change_version = 4;
+
+  string deleted_by = 5;
+  MessageDeleteScope delete_scope = 6;
+  string reason = 7;
+
+  google.protobuf.Timestamp deleted_at = 8;
+}

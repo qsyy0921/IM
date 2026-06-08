@@ -113,6 +113,20 @@ go run ./loadtest/sendmessage \
   --relay-metrics-url=http://192.168.0.141:10500/debug/metrics
 ```
 
+本机 worker 梯度压测可以使用脚本启动 gRPC 进程、outbox relay 进程和压测客户端：
+
+```powershell
+.\loadtest\sendmessage\run-local-gradient.ps1 `
+  -Workers 4,8,16 `
+  -VUs 100 `
+  -Duration 60s `
+  -StatsWait 30s `
+  -ConversationCount 1000 `
+  -ResultRoot loadtest\results\gradient-2026-06-08
+```
+
+该脚本会为每个 worker 数分别启动独立的 gRPC 和 relay 进程，并通过 `NEXUSIM_DEBUG_ADDR` 采集 seq alloc / Kafka publish latency。
+
 等价环境变量形式：
 
 ```bash

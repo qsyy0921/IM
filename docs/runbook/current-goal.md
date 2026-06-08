@@ -54,7 +54,7 @@ message-service SendMessage
 | PostgreSQL repository | 已实现普通会话 `SendMessage` 本地事务：幂等检查、同幂等键 advisory transaction lock、`conversation_seq` row lock、`message_log`、`conversation_timeline_events`、`message_outbox` 同事务写入；outbox payload 对齐 `MessagePersistedV1` 业务 payload；集成测试和并发重复请求测试通过 |
 | Outbox relay / Kafka publish path | 已实现 `trigger/outbox` relay、PostgreSQL outbox store、Kafka writer producer；relay 支持 `NEXUSIM_OUTBOX_WORKERS` 多 worker 与 `NEXUSIM_OUTBOX_FAILURE_BACKOFF` 失败退避；真实 PostgreSQL + Kafka 集成测试通过；真实 PostgreSQL 多 worker / `FOR UPDATE SKIP LOCKED` 测试已覆盖同 conversation 顺序和跨 conversation 并发 |
 | message-service gRPC adapter | 已实现 `SendMessage` gRPC handler、proto request/response 转换、稳定错误码 detail 映射和错误 message 脱敏、`NEXUSIM_MESSAGE_SERVICE_MODE=grpc` 运行入口；支持 `NEXUSIM_DEBUG_ADDR=/debug/metrics` 暴露本进程压测指标；已通过 bufconn client 单测 |
-| SendMessage loadtest | 已实现 `go run ./loadtest/sendmessage` 参数化 gRPC 压测入口；支持 `target`、`vus`、`duration`、`result-dir`、`pg-dsn`、`stats-wait`、`service-metrics-url`、`relay-metrics-url`；summary 记录 full commit、dirty 状态、outbox total/published/pending/DLQ、seq alloc latency、Kafka publish latency；真实 gRPC + PostgreSQL + outbox relay + Kafka smoke 与 baseline 已执行 |
+| SendMessage loadtest | 已实现 `go run ./loadtest/sendmessage` 参数化 gRPC 压测入口；支持 `target`、`vus`、`duration`、`result-dir`、`pg-dsn`、`stats-wait`、`service-metrics-url`、`relay-metrics-url`；summary 记录 full commit、dirty 状态、outbox total/published/pending/DLQ、seq alloc latency、Kafka publish latency；已补 `run-local-gradient.ps1` 本机 worker 梯度压测脚本；真实 gRPC + PostgreSQL + outbox relay + Kafka smoke 与 baseline 已执行 |
 
 ## 5. 下一步优先级
 
@@ -198,6 +198,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 worker/backoff dirty baseline：`NEXUSIM_OUTBOX_WORKERS=4`、`--vus=100 --duration=60s --stats-wait=30s --conversation-count=1000`，69608/69608 成功，p95 122.10ms，p99 156.24ms，`stats-wait=30s` 后本轮 tenant outbox `PENDING=2123`、`PUBLISHED=67485`；relay 额外 drain 20s 后该 tenant outbox 全部 `PUBLISHED=69608`。该数据用于开发判断，不能作为 clean commit 正式性能归档。
 - 当前 metrics clean smoke：commit `ea4eb9a`，`--vus=10 --duration=10s --stats-wait=10s --conversation-count=200`，8699/8699 成功，p95 19.46ms，p99 31.68ms，outbox pending 0；summary 已写入 `conversation_seq_alloc_latency_ms=1.47`、`conversation_seq_alloc_p95_ms=2.59`、`kafka_publish_latency_ms=1.01`、`kafka_publish_p95_ms=1.73`，且 `git_dirty=false`。
 - 当前 worker/backoff clean baseline：commit `0ff42d2`，`NEXUSIM_OUTBOX_WORKERS=4`、`--vus=100 --duration=60s --stats-wait=30s --conversation-count=1000`，24714/24714 成功，p95 436.24ms，p99 583.96ms，summary 读取时本轮 tenant outbox `PENDING=392`、`PUBLISHED=24322`、`DLQ=0`，`conversation_seq_alloc_latency_ms=6.98`、`kafka_publish_latency_ms=4.21`，且 `git_dirty=false`；随后查询该 tenant outbox 已全部 `PUBLISHED=24714`。该结果说明 4 worker 能追平，但本机长压测吞吐波动明显，需要重复 clean baseline 或梯度压测后再形成正式性能结论。
+- 当前 gradient script dirty smoke：`run-local-gradient.ps1 -Workers 4,8,16 -VUs 20 -Duration 10s -StatsWait 10s -ConversationCount 500` 已跑通三组真实进程压测，全部成功且 outbox pending 0；由于脚本未提交，summary 为 `git_dirty=true`，仅作为脚本可运行验证，不作为正式梯度趋势证据。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
 - `timeline-service`、`conversation-service`、`delivery-service`、`push-gateway` SDD 未冻结，不能扩展到对应生产逻辑。
@@ -221,3 +222,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-08：已补本地 debug metrics collector，gRPC 进程记录 `conversation_seq_alloc_latency`，relay 进程记录 `kafka_publish_latency`；`loadtest/sendmessage` 支持 `--service-metrics-url` 和 `--relay-metrics-url` 并把 avg/p95 写入 summary。commit `ea4eb9a` 的 clean metrics smoke 已验证两个指标非空。
 - 2026-06-08：已补真实 PostgreSQL 多 worker / `FOR UPDATE SKIP LOCKED` 集成测试：两个 conversation 各 3 条 outbox，4 个并发 worker `ProcessReady(limit=1)`，断言跨 conversation 可同时进入 publish callback、同 conversation 发布顺序保持 `1,2,3`，最终 outbox 全部 `PUBLISHED`。
 - 2026-06-08：已在 clean HEAD `0ff42d2` 跑 4 worker 长 baseline，summary 为 24714/24714 成功、p95 436.24ms、p99 583.96ms、`stats-wait=30s` 后 pending 392；随后 DB 查询显示该 tenant 已全部 published。由于该结果与 dirty baseline 吞吐差异较大，后续需要重复 clean baseline 或按 4/8/16 worker 梯度压测确认趋势。
+- 2026-06-08：已补 `loadtest/sendmessage/run-local-gradient.ps1`，用于本机按 worker 数循环启动真实 gRPC / outbox relay / loadtest 进程并采集 metrics；dirty smoke 已验证 4/8/16 worker 短梯度脚本可运行。

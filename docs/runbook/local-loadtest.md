@@ -114,3 +114,62 @@ NEXUSIM_VUS=100
 NEXUSIM_DURATION=60s
 NEXUSIM_RESULT_DIR=loadtest/results/2026-06-08
 ```
+
+## 7. 边搭建边压测流程
+
+第一阶段不等待全部目标态服务部署完成，只压真实落地的 `message-service SendMessage` 主写链路。
+
+真实范围：
+
+```text
+message-service
+PostgreSQL local transaction
+conversation_seq
+message_log
+conversation_timeline_events
+message_outbox
+outbox relay
+Kafka publish path
+```
+
+mock 范围：
+
+```text
+policy-service
+conversation-service
+timeline-service
+delivery-service
+push-gateway
+RAG
+Agent
+```
+
+压测阶梯：
+
+| 阶段 | 目标 | 建议参数 | 通过标准 |
+| --- | --- | --- | --- |
+| smoke | 验证链路可用 | `--vus=10 --duration=30s` | 无 5xx；事务和 outbox 可查询 |
+| baseline | 建立 SendMessage 基线 | `--vus=100 --duration=60s` | p95/p99、错误率、outbox pending age 有记录 |
+| idempotency | 验证重复发送 | 固定 `client_msg_id` 重放 | 不重复写 `message_log`，冲突返回明确错误 |
+| kafka-outage | 验证 outbox 积压 | 临时停止 Kafka 或 producer mock fail | accepted 不受影响，outbox 可追平 |
+| ramp | 逐步加压 | `--vus=500` 起按倍数增加 | 找到 PG 行锁、producer 或 CPU 瓶颈 |
+
+每轮压测必须记录：
+
+```text
+commit
+target
+vus
+duration
+request_count
+success_rate
+p95
+p99
+conversation_seq_alloc_latency
+outbox_pending_count
+outbox_oldest_pending_age
+kafka_publish_latency
+error_topn
+```
+
+普通会话链路稳定后，才能扩展到热点 sequencer mock、delivery/push mock 和 DLQ repair 演练。

@@ -500,7 +500,7 @@ delivery_consumer_lag
 关键约束：
 
 - 所有业务表必须包含 `tenant_id`。
-- `message_log` 唯一键：`tenant_id + sender_id + device_id + client_msg_id`。
+- `message_log` 唯一键：`tenant_id + sender_id + device_id + client_msg_id`，并保存 `command_hash` 用于判断重复请求是否语义一致。
 - `conversation_timeline_events` 唯一键：`tenant_id + conversation_id + seq`。
 - outbox relay 使用 `FOR UPDATE SKIP LOCKED`。
 - 消费者先完成持久化副作用，再提交 Kafka offset。
@@ -1139,7 +1139,7 @@ RAG/Agent 发布必须跑安全评测：
 | 缺口 | 对第一阶段代码的影响 | 边界约束 |
 | --- | --- | --- |
 | `timeline-service / sequencer SDD` 未完成 | 不阻塞普通会话 `SendMessage`；阻塞热点会话生产实现 | 第一阶段只实现 `LOCAL_ROW_LOCK`，`SEQUENCER_BLOCK` 只定义 port 和 mock |
-| `conversation-service / member_change_saga SDD` 未完成 | 不阻塞会话查询 mock；阻塞真实成员变更、群主/管理员规则和 ACL 投影 | message-service 只能依赖 `ConversationQueryPort`，不能写成员事实或角色规则 |
+| `conversation-service / member_change_saga SDD` 未完成 | 不阻塞会话查询 mock；阻塞真实成员变更、群主/管理员规则和 ACL 投影 | message-service 只能依赖 `ConversationQueryPort`，并从 port 读取 `fanout_mode`，不能写成员事实、角色规则或硬编码 fanout 策略 |
 | Proto / OpenAPI / AsyncAPI 未落文件 | 阻塞正式业务代码 | 先冻结 `message_service.proto`、错误码和事件契约，再创建 service skeleton |
 | PostgreSQL migration 未落文件 | 阻塞本地事务代码 | 先落 `conversation_seq + message_log + timeline + outbox` 同分片约束 |
 | Kafka schema 未落文件 | 阻塞 outbox relay 对外发布 | 先落 `message.persisted.v1` 和 envelope，再实现 producer |
@@ -1181,6 +1181,7 @@ message-service SendMessage
 -> integration test proves idempotency and transaction atomicity
 -> service listens on configured local load-test port
 -> load client runs first baseline from local-loadtest runbook
+-> record SendMessage baseline before expanding service scope
 ```
 
 第一阶段实现范围只包含：
@@ -1223,10 +1224,22 @@ RAG
 Agent
 ```
 
+第一阶段采用边搭建边压测：
+
+```text
+small smoke load
+-> SendMessage baseline
+-> idempotency and conflict test
+-> Kafka outage / outbox backlog test
+-> short duration stability test
+```
+
+不要等 20 个目标态服务全部部署后再压测；每完成一条真实链路就记录容量基线和瓶颈。
+
 进入编码前的门禁：
 
 - `message-service.proto` 必须先冻结 `SendMessage`、`EditMessage`、`RevokeMessage`、`DeleteMessage` 和错误码。
-- PostgreSQL migration 必须覆盖 message-service SDD 中的核心表和唯一约束。
+- PostgreSQL migration 必须覆盖 message-service SDD 中的核心表和唯一约束，尤其是 `conversation_seq` DDL、`message_log.command_hash` 和同分片事务约束。
 - Kafka schema 必须覆盖 `message.persisted.v1`、`message.edited.v1`、`message.revoked.v1`、`message.deleted.v1`。
 - 本地集成测试必须能一键启动依赖并清理数据。
 - 第一轮压测只接受真实服务进程，不接受仅返回固定字符串的 toy endpoint。

@@ -52,11 +52,13 @@ message-service 是 NexusIM 消息事实源服务，负责普通会话消息写�
 | Port | 第一阶段行为 | 禁止事项 |
 | --- | --- | --- |
 | `PolicyCheckPort` | 返回 allow/deny、`permission_version`、拒绝原因 | 不在 message-service 内硬编码角色、群主、管理员或合规规则 |
-| `ConversationQueryPort` | 返回会话存在性、`member_version`、`conversation_mode`、`current_seq_shard` | 不修改成员事实，不生成成员边界事件 |
+| `ConversationQueryPort` | 返回会话存在性、`member_version`、`permission_version`、`conversation_mode`、`fanout_mode`、`current_seq_shard` | 不修改成员事实，不生成成员边界事件，不硬编码 fanout 策略 |
 | `SequencerPort` | 只为热点会话定义 `AllocateSeqBlock` mock | 不在第一阶段实现 sequencer 状态机、epoch fencing 或 Kubernetes Lease |
 | `EventPublisherPort` | 由 outbox relay 发布 Kafka 事件 | 不允许业务事务绕过 outbox 直接发布 |
 
 第一阶段只实现普通会话 `LOCAL_ROW_LOCK`。`SEQUENCER_BLOCK` 只能保留 port、mock 和表契约，等 `timeline-service / sequencer SDD` 冻结后再实现。
+
+第一阶段 `ConversationQueryPort` strict mock 可以返回 `fanout_mode=WRITE_FANOUT`，但这个值必须经由 port 返回，不能在 SendMessage use case 内硬编码。
 
 ## 3. 领域模型
 
@@ -270,7 +272,32 @@ payload
 
 ## 6. 数据库表结构
 
-### 6.1 message_log
+### 6.1 conversation_seq
+
+普通会话 seq 事实源。必须与 `message_log`、`conversation_timeline_events`、`message_outbox` 同库同分片。
+
+```sql
+CREATE TABLE conversation_seq (
+    tenant_id        TEXT        NOT NULL,
+    conversation_id  TEXT        NOT NULL,
+    current_seq      BIGINT      NOT NULL DEFAULT 0,
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (tenant_id, conversation_id)
+);
+```
+
+普通会话分配 seq：
+
+```sql
+UPDATE conversation_seq
+SET current_seq = current_seq + 1,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND conversation_id = $2
+RETURNING current_seq;
+```
+
+### 6.2 message_log
 
 ```sql
 CREATE TABLE message_log (
@@ -281,6 +308,7 @@ CREATE TABLE message_log (
     sender_id           TEXT        NOT NULL,
     device_id           TEXT        NOT NULL,
     client_msg_id       TEXT        NOT NULL,
+    command_hash        TEXT        NOT NULL,
     message_type        TEXT        NOT NULL,
     payload_json        JSONB       NOT NULL,
     status              TEXT        NOT NULL,
@@ -296,7 +324,9 @@ CREATE TABLE message_log (
 );
 ```
 
-### 6.2 conversation_timeline_events
+`command_hash` 是 SendMessage 命令的规范化哈希，用于判断同一 `client_msg_id` 下请求内容是否一致。重复请求命中唯一键时，如果 `command_hash` 不一致，必须返回 `IDEMPOTENCY_CONFLICT`。
+
+### 6.3 conversation_timeline_events
 
 ```sql
 CREATE TABLE conversation_timeline_events (
@@ -320,7 +350,7 @@ CREATE TABLE conversation_timeline_events (
 );
 ```
 
-### 6.3 message_outbox
+### 6.4 message_outbox
 
 ```sql
 CREATE TABLE message_outbox (
@@ -365,7 +395,7 @@ PUBLISHED
 DLQ
 ```
 
-### 6.4 message_change_history
+### 6.5 message_change_history
 
 ```sql
 CREATE TABLE message_change_history (
@@ -395,7 +425,7 @@ DELETE
 
 `EditMessage`、`RevokeMessage`、`DeleteMessage` 都必须写 `message_change_history`，不能只依赖 Kafka 事件或 audit-service 追溯状态变化。
 
-### 6.5 message_command_idempotency
+### 6.6 message_command_idempotency
 
 用于 `EditMessage`、`RevokeMessage`、`DeleteMessage` 等命令幂等。
 
@@ -412,7 +442,7 @@ CREATE TABLE message_command_idempotency (
 );
 ```
 
-### 6.6 seq_allocation_journal
+### 6.7 seq_allocation_journal
 
 仅热点会话使用。
 
@@ -444,7 +474,7 @@ ALLOCATED 超过 30s 未 COMMITTED:
 
 `seq_allocation_journal` 是热点 seq 解释事实源；`message_log/timeline/outbox` 是消息事实源。
 
-### 6.7 timeline_gap_markers
+### 6.8 timeline_gap_markers
 
 用于解释热点会话已分配但未形成消息事实的 seq，保证补拉、审计和修复任务看到的是显式 gap，而不是未知缺口。
 
@@ -491,7 +521,10 @@ message_outbox
 
 ```text
 begin
-  check idempotency by client_msg_id
+  query ConversationQueryPort
+  if conversation_mode == SEQUENCER_BLOCK:
+    return SEQUENCER_UNAVAILABLE(reason=sequencer_not_implemented_in_phase_1)
+  check idempotency by client_msg_id and command_hash
   check permission_version
   allocate seq from conversation_seq by row lock
   insert message_log
@@ -502,6 +535,10 @@ return message_id + seq
 ```
 
 ### 8.2 热点会话 SendMessage
+
+第一阶段不实现该流程。代码必须在识别 `conversation_mode=SEQUENCER_BLOCK` 时直接返回 `SEQUENCER_UNAVAILABLE`，不能写 `seq_allocation_journal`、`timeline_gap_markers`，也不能真实调用 `AllocateSeqBlock`。
+
+目标态流程：
 
 ```text
 pre-check idempotency by client_msg_id
@@ -727,7 +764,7 @@ outbox_publish_duplicate_rate 可观测但不作为错误
 | 依赖 | mock 行为 | 不能做的事 |
 | --- | --- | --- |
 | `policy-service` | 返回 allow/deny 和 `permission_version` | 不能在 message-service 里硬编码角色规则 |
-| `conversation-service` | 返回会话存在、成员版本、普通/热点模式 | 不能由 message-service 修改成员事实 |
+| `conversation-service` | 返回会话存在、成员版本、权限版本、普通/热点模式、fanout 模式 | 不能由 message-service 修改成员事实，不能由 message-service 硬编码 fanout 策略 |
 | `timeline-service` | 热点会话返回 seq block；普通会话不调用 | 不能把热点 sequencer 状态写在 message-service 业务层 |
 | Kafka | 本地可用真实 broker；无 broker 时只能验证 outbox 积压 | 不能跳过 outbox 直接认为事件已发布 |
 

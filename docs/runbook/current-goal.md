@@ -45,7 +45,7 @@ message-service SendMessage
 | Proto 契约 | `api/proto/nexusim/message/v1/` 已存在 |
 | Kafka schema | `schemas/kafka/conversation.timeline.events.proto` 已存在 |
 | PostgreSQL migration | `migrations/postgres/message/000001_message_core.sql` 已存在 |
-| Docker Compose | `deploy/local/docker-compose.yml` 已存在 |
+| Docker Compose | `deploy/local/docker-compose.yml` 已存在；压测专用 PostgreSQL override 为 `deploy/local/docker-compose.postgres-loadtest.yml` |
 | message-service 六层骨架 | `services/message-service/internal/{api,app,domain,infrastructure,types,trigger}` 已存在 |
 | Go 工具链 | 项目基线为 Go `1.26.4`；已通过阿里云镜像安装到 `C:\Users\10495\.local\go\go1.26.4\bin\go.exe`；`protoc-gen-go v1.36.11` 和 `protoc-gen-go-grpc 1.6.2` 已安装到 `C:\Users\10495\go\bin`；`protoc` 可用，路径为 `C:\Users\10495\anaconda3\Library\bin\protoc.exe`；本地命令先执行 `. .\tools\go-env.ps1` |
 | Proto Go 代码 | 已生成 `api/proto/nexusim/message/v1/*.pb.go` 和 `schemas/kafka/conversation.timeline.events.pb.go` |
@@ -59,8 +59,8 @@ message-service SendMessage
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
-2. 基于 PostgreSQL 诊断结果制定本地 PG 调优方案：`max_connections`、`shared_buffers`、WAL/checkpoint、autovacuum 和 outbox dead tuples。
-3. 补 PostgreSQL 侧观测，继续区分 pgxpool 等待、PostgreSQL wait_event、WAL/checkpoint、锁等待和 OS 调度影响。
+2. 启用 `deploy/local/docker-compose.postgres-loadtest.yml`，验证 `max_connections=200`、`shared_buffers=1GB`、`max_wal_size=4GB` 等配置生效。
+3. 在 PG loadtest override 下重跑 PG pool / fixed-total multi-instance 对照矩阵，并配合 `watch-postgres-diagnostics.ps1` 采集 wait_event。
 4. 评估 outbox relay 追平优化：批量 publish、批量 mark published、batch size、worker 数和故障退避；避免 `PG_MAX_CONNS=64` 下 pending 快速增加。
 5. 增加 admission control / backpressure 设计，避免请求在连接池中排队到 2s 超时后才失败。
 6. 视评审复核结果决定是否推送 GitHub。
@@ -273,3 +273,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已在 clean commit `ede5dd7` 跑正式 multi-instance PG budget 矩阵，并新增 `docs/runbook/loadtest-report-20260609-multi-instance-budget.md`。结论：固定总 PG 连接预算时，1 个实例 p99 最低，2/4 实例没有收益；request p99 仍贴近 repository append/begin，outbox pending 暴露 relay 追平为第二瓶颈。矩阵结束后已额外 drain，DB outbox 当前全部为 `PUBLISHED`。
 - 2026-06-09：已把 `repository_begin` 拆成 `repository_pool_acquire_latency_ms` 和 `repository_tx_begin_latency_ms`，原 `repository_begin_latency_ms` 保持总耗时用于兼容旧报告。clean smoke commit `c10338e`：`PG_MAX_CONNS=8`、`VU=5`、`duration=3s`，1833/1833 成功，outbox pending 0，两个新指标 count 均为 1833，`git_dirty=false`。
 - 2026-06-09：已新增 `watch-postgres-diagnostics.ps1`，用于压测期间按间隔采集 PostgreSQL `pg_stat_activity` wait_event、锁等待、表 dead tuples、bgwriter 和 WAL 统计，输出 `postgres-wait-samples.jsonl`。under-load smoke：`PG_MAX_CONNS=8`、`VU=20`、`duration=5s`，采样 10 次，最大 active backend 为 8，抓到 `LWLock:WALWrite` 等 wait_event。
+- 2026-06-09：已新增 `deploy/local/docker-compose.postgres-loadtest.yml` 作为压测专用 PostgreSQL override，不改变默认开发 compose；目标参数包括 `max_connections=200`、`shared_buffers=1GB`、`max_wal_size=4GB`、`checkpoint_timeout=15min` 和更积极的 autovacuum 阈值。

@@ -225,3 +225,51 @@ error_topn
 ```
 
 普通会话链路稳定后，才能扩展到热点 sequencer mock、delivery/push mock 和 DLQ repair 演练。
+
+## 8. PostgreSQL 压测配置
+
+默认 `deploy/local/docker-compose.yml` 保持开发配置，不直接塞入高压压测参数。需要跑 PG 调优矩阵时，叠加压测 override：
+
+```powershell
+docker compose `
+  -f deploy\local\docker-compose.yml `
+  -f deploy\local\docker-compose.postgres-loadtest.yml `
+  up -d postgres
+```
+
+该 override 当前配置：
+
+```text
+max_connections=200
+shared_buffers=1GB
+effective_cache_size=8GB
+work_mem=16MB
+maintenance_work_mem=512MB
+wal_buffers=16MB
+max_wal_size=4GB
+checkpoint_timeout=15min
+checkpoint_completion_target=0.9
+autovacuum_vacuum_scale_factor=0.02
+autovacuum_analyze_scale_factor=0.02
+autovacuum_vacuum_threshold=1000
+autovacuum_analyze_threshold=1000
+```
+
+启用后验证：
+
+```powershell
+docker exec nexusim-postgres psql -U nexusim -d nexusim -c "show max_connections;"
+docker exec nexusim-postgres psql -U nexusim -d nexusim -c "show shared_buffers;"
+docker exec nexusim-postgres psql -U nexusim -d nexusim -c "show max_wal_size;"
+docker exec nexusim-postgres psql -U nexusim -d nexusim -c "show checkpoint_timeout;"
+```
+
+恢复默认开发配置：
+
+```powershell
+docker compose `
+  -f deploy\local\docker-compose.yml `
+  up -d --force-recreate postgres
+```
+
+该操作不删除 named volume；不要执行 `down -v`，除非明确要清空本地数据库。

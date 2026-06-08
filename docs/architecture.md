@@ -1134,6 +1134,34 @@ RAG/Agent 发布必须跑安全评测：
 | P1 | `retrieval-gateway SDD` | strict ACL、EvidencePack、索引版本、shadow rebuild |
 | P1 | `第一轮压测脚本` | WS 建连、消息写入、热点群、补拉、ACK、Kafka lag、RAG lag、Agent approval |
 
+本地双机压测网络约定：
+
+```text
+Windows 本机服务端: 192.168.0.141
+MacBook 压测端: 192.168.0.182
+TCP 端口范围: 10495-10510
+8080 不作为 NexusIM 本地压测端口
+```
+
+端口分配：
+
+| 端口 | 方向 | 用途 |
+| ---: | --- | --- |
+| 10495 | MacBook -> Windows；Windows -> MacBook 可对称使用 | 主 HTTP/API 压测入口 |
+| 10496 | MacBook -> Windows | push-gateway WebSocket 压测入口 |
+| 10497 | MacBook -> Windows | metrics/debug，只在压测窗口开放 |
+| 10498 | Windows -> MacBook | callback/mock receiver，用于双向新建连接场景 |
+| 10499 | MacBook <-> Windows | load coordinator / report endpoint |
+| 10500-10510 | 按需双向 | 预留给服务级 SDD、故障注入、临时对照实验 |
+
+约束：
+
+- 两台机器可以使用相同端口号，因为监听地址不同，例如 `192.168.0.141:10495` 和 `192.168.0.182:10495` 不冲突。
+- Windows 防火墙只允许 `192.168.0.182` 访问 `10495-10510`。
+- MacBook 如开启系统防火墙，只允许 `192.168.0.141` 访问 `10495-10510`。
+- 压测服务必须监听 `0.0.0.0:<port>`；只监听 `127.0.0.1:<port>` 时对端无法访问。
+- 非压测窗口不启动这些端口上的服务。
+
 落地顺序：
 
 ```text

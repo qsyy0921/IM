@@ -341,7 +341,58 @@ error_p99_ms
 
 其中 `request_count` 是实际 gRPC attempt 数，`logical_request_count` 是用户层消息数。开启客户端重试后，两者不能混用；`overload_rate` 也是 attempt-level 指标，不代表用户层最终失败率。
 
-## 11. PublishBatch On/Off
+## 11. Adaptive Limit Smoke
+
+第一版 adaptive admission limit 默认关闭。它发生在 app 用例入口，早于权限读取和 PostgreSQL 写事务。脚本入口：
+
+```powershell
+.\loadtest\sendmessage\run-local-pgpool-gradient.ps1 `
+  -PGMaxConns 4 `
+  -VUs 5 `
+  -Duration 3s `
+  -StatsWait 3s `
+  -ConversationCount 50 `
+  -RelayWorkers 2 `
+  -BatchSize 100 `
+  -PublishBatchEnabled:$true `
+  -AdaptiveLimitEnabled `
+  -AdaptiveMinAvailableConns 4 `
+  -AdaptiveMaxPoolAcquireP95 50ms `
+  -AdaptiveMaxOutboxPending 1 `
+  -AdaptiveMaxRelayActiveP95 50ms `
+  -AdaptiveMinOutboxFetchedPerCall 1 `
+  -AdaptiveMinKafkaRecordsPerCall 1 `
+  -AdaptiveSampleInterval 500ms `
+  -ResultRoot loadtest\results\adaptive-limit-smoke-YYYYMMDD
+```
+
+该 smoke 使用极端阈值强制快速拒绝，只验证链路，不代表容量。通过标准：
+
+```text
+message_error_counts[0].code = MESSAGE_ERROR_CODE_SERVICE_OVERLOADED
+retryable_error_count = request_count
+outbox_total_count = 0
+outbox_pending_count = 0
+```
+
+正式 adaptive 矩阵必须同时看：
+
+```text
+logical_success_rate
+accepted_rps
+attempt-level overload_rate
+success_p99_ms
+error_p99_ms
+repository_pool_acquire_latency_ms
+outbox_process_ready_active_latency_ms
+outbox_fetched_per_call
+kafka_publish_records_per_call
+outbox_pending_count
+```
+
+不要把极端阈值下的低 p99 解释成容量提升；那只是快速拒绝。
+
+## 12. PublishBatch On/Off
 
 对比 Kafka `PublishBatch` 时必须在同一 HEAD 下使用开关，不要用不同 commit 直接比较：
 
@@ -383,7 +434,7 @@ PublishBatch=true  -> kafka_publish_records_per_call 应大于 1
 
 如果使用 `-SkipBuild`，必须先确认 `bin\message-service.exe` 已经由当前 HEAD 重建；否则 summary 的 `commit` 可能是当前仓库 commit，但实际运行的服务二进制仍是旧版本。
 
-## 12. Outbox Batch / Worker Matrix
+## 13. Outbox Batch / Worker Matrix
 
 联合验证 `NEXUSIM_OUTBOX_BATCH_SIZE` 和 `NEXUSIM_OUTBOX_WORKERS` 时，使用包装脚本：
 

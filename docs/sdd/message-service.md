@@ -142,6 +142,17 @@ accepted_at
 
 `SERVICE_OVERLOADED` 的 gRPC response 必须附带标准 `RetryInfo` detail；当前第一阶段使用固定 `500ms` retry delay，客户端仍必须叠加指数退避和 jitter，不能立即重试。
 
+过载保护分两层：
+
+- app 层 `AdmissionPort` 是入口级保护，发生在权限读取、conversation 读取和 PostgreSQL 写事务之前。第一版 adaptive controller 可以基于本进程 PG pool、repository pool acquire p95、outbox pending、relay active process ready、outbox fetched per call、Kafka records per call 触发 `SERVICE_OVERLOADED`。
+- infrastructure/postgres repository backpressure 是最后一道 PG pool 保护，只基于本进程连接池状态，避免请求继续进入事务路径。
+
+约束：
+
+- 两层保护都只能返回 `SERVICE_OVERLOADED`，不能写 message、timeline 或 outbox。
+- adaptive 输入必须来自运行时观测或采样，不允许 domain 直接依赖 metrics、PostgreSQL 或 Kafka。
+- 当前固定 `RetryInfo=500ms` 不是最优值；生产化阶段应由 adaptive limit 根据过载程度动态给出 retry hint。
+
 ### 4.2 同步调用治理
 
 | 调用 | deadline | retry | fallback |

@@ -46,6 +46,39 @@ NexusIM 是面向大规模企业协同的 IM + 智能协作平台。核心原则
 | 发布 | Kubernetes + GitOps + Argo Rollouts | canary、判稳、回滚 |
 | 安全 | mTLS + NetworkPolicy + service identity | 内部 token 校验 audience |
 
+### 2.1 分层冻结策略
+
+技术栈冻结采用分层策略：冻结方向和第一阶段必需技术，不冻结所有容量参数、部署规模和后期服务内部细节。
+
+| 层级 | 状态 | 内容 | 变更规则 |
+| --- | --- | --- | --- |
+| Level 1 | 硬冻结 | Go、Kratos、六层 DDD、gRPC + Protobuf、HTTP/OpenAPI gateway 适配、pgx + sqlc、PostgreSQL 事实源、Kafka + Schema Registry、Transactional Outbox、`message-service SendMessage` 第一阶段主链路、Go module 和工程目录 | 变更必须走 ADR |
+| Level 2 | 软冻结 | Redis route/counter/cache 拆分、OpenSearch、Milvus、Temporal、Kubernetes + GitOps + Argo Rollouts、OpenTelemetry 体系、S3-compatible Object Storage | 方向冻结；服务级 SDD、压测和 ADR 可以细化实现 |
+| Level 3 | 暂不冻结 | Kafka partition 数、PostgreSQL shard 数、Redis shard 数、具体版本小号、HPA 参数、服务副本数、机器规格、OpenSearch mapping 细节、Milvus index 类型、RAG chunk 策略、embedding/rerank model | 由服务级 SDD、压测结果和发布评审决定 |
+
+ADR 触发条件：
+
+```text
+替换 Level 1 技术
+改变事实源或事件平台
+改变服务分层和目录约束
+改变 message-service 第一阶段主链路
+改变历史事件 replay / migration / rollback 语义
+```
+
+ADR 必须说明：
+
+```text
+变更原因
+影响的服务和契约
+数据迁移或事件兼容方案
+历史事件 replay 方案
+压测或验证结果
+回滚方案
+```
+
+依赖小版本升级不属于大架构变更，但必须走依赖升级流程，保留兼容性测试和回滚记录。
+
 ## 3. 总体拓扑
 
 ```mermaid
@@ -1206,7 +1239,7 @@ RAG/Agent 发布必须跑安全评测：
 | `schemas/kafka` | Schema Registry 输入文件 | Protobuf 为主；事件 envelope 与 outbox 表字段保持一致 |
 | `services/<service>` | 服务实现 | `adapter -> application -> domain -> port -> infrastructure -> runtime-governance` |
 | `pkg` | 跨服务公共库 | 只允许放日志、错误码、trace、配置、测试工具；禁止放业务领域模型 |
-| `deploy/local` | 本地开发依赖 | PostgreSQL、Kafka、Redis 等基础设施；本机端口以 runbook 为准 |
+| `deploy/local` | 本地开发依赖 | PostgreSQL、Kafka、Redis 等基础设施；本地可用单 Redis namespace 简化三集群；本机端口以 runbook 为准 |
 | `loadtest` | MacBook/服务器压测脚本 | 每个脚本必须写目标、参数、通过标准和结果输出路径 |
 
 代码依赖规则：

@@ -840,6 +840,30 @@ outbox_publish_duplicate_rate 可观测但不作为错误
 
 第一阶段只落 message-service 主写链路，不扩散到 20 个服务同时开发。
 
+第一阶段硬冻结工程栈：
+
+```text
+Go
+Kratos
+gRPC + Protobuf
+HTTP/OpenAPI via api-gateway
+pgx + sqlc
+PostgreSQL
+Kafka + Schema Registry
+Transactional Outbox
+六层 DDD: adapter / application / domain / port / infrastructure / runtime
+```
+
+禁止在第一阶段引入：
+
+```text
+GORM 或其他 ORM 替代 sqlc
+NATS / RocketMQ / Pulsar 替代 Kafka
+REST-only 内部服务通信
+跨服务共享业务 domain package
+绕过 outbox 的直接 Kafka publish
+```
+
 必须先创建的契约文件：
 
 | 文件 | 内容 | 约束 |

@@ -52,13 +52,13 @@ message-service 是 NexusIM 消息事实源服务，负责普通会话消息写�
 | Port | 第一阶段行为 | 禁止事项 |
 | --- | --- | --- |
 | `PolicyCheckPort` | 返回 allow/deny、`permission_version`、拒绝原因 | 不在 message-service 内硬编码角色、群主、管理员或合规规则 |
-| `ConversationQueryPort` | 返回会话存在性、`member_version`、`permission_version`、`conversation_mode`、`fanout_mode`、`current_seq_shard` | 不修改成员事实，不生成成员边界事件，不硬编码 fanout 策略 |
+| `ConversationQueryPort` | 返回会话存在性、`member_version`、`permission_version`、`conversation_mode`、`fanout_mode`、`fanout_policy_version`、`current_seq_shard` | 不修改成员事实，不生成成员边界事件，不硬编码 fanout 策略 |
 | `SequencerPort` | 只为热点会话定义 `AllocateSeqBlock` mock | 不在第一阶段实现 sequencer 状态机、epoch fencing 或 Kubernetes Lease |
 | `EventPublisherPort` | 由 outbox relay 发布 Kafka 事件 | 不允许业务事务绕过 outbox 直接发布 |
 
 第一阶段只实现普通会话 `LOCAL_ROW_LOCK`。`SEQUENCER_BLOCK` 只能保留 port、mock 和表契约，等 `timeline-service / sequencer SDD` 冻结后再实现。
 
-第一阶段 `ConversationQueryPort` strict mock 可以返回 `fanout_mode=WRITE_FANOUT`，但这个值必须经由 port 返回，不能在 SendMessage use case 内硬编码。
+第一阶段 `ConversationQueryPort` strict mock 可以返回 `fanout_mode=WRITE_FANOUT`、`fanout_policy_version=1`，但这些值必须经由 port 返回，不能在 SendMessage use case 内硬编码。
 
 ## 3. 领域模型
 
@@ -123,6 +123,7 @@ accepted_at
 - 写请求不透明自动重试。
 - 客户端重试必须复用同一 `client_msg_id`。
 - 幂等键：`tenant_id + sender_id + device_id + client_msg_id`。
+- `client_msg_id` 是 device scoped globally unique UUID。同一 `tenant_id + sender_id + device_id` 下不能跨会话复用。
 
 错误码：
 
@@ -270,6 +271,16 @@ producer
 payload
 ```
 
+Timeline event metadata 必须包含：
+
+```text
+fanout_mode
+fanout_policy_version
+permission_version
+classification
+mapping_version
+```
+
 ## 6. 数据库表结构
 
 ### 6.1 conversation_seq
@@ -295,6 +306,21 @@ SET current_seq = current_seq + 1,
 WHERE tenant_id = $1
   AND conversation_id = $2
 RETURNING current_seq;
+```
+
+初始化责任：
+
+```text
+conversation-service 创建会话时初始化 conversation_seq(current_seq=0)。
+message-service 首次发送发现 conversation_seq 缺失时，可以在同事务内幂等补建，但必须记录 metric 和 repair log。
+```
+
+兜底补建 SQL：
+
+```sql
+INSERT INTO conversation_seq (tenant_id, conversation_id, current_seq)
+VALUES ($1, $2, 0)
+ON CONFLICT (tenant_id, conversation_id) DO NOTHING;
 ```
 
 ### 6.2 message_log
@@ -339,6 +365,7 @@ CREATE TABLE conversation_timeline_events (
     message_id         TEXT,
     actor_id           TEXT        NOT NULL,
     fanout_mode        TEXT        NOT NULL,
+    fanout_policy_version BIGINT      NOT NULL,
     permission_version BIGINT,
     classification     TEXT,
     mapping_version    TEXT        NOT NULL,
@@ -385,6 +412,9 @@ WHERE status = 'PENDING' AND published_at IS NULL;
 CREATE INDEX idx_message_outbox_dlq
 ON message_outbox (dead_lettered_at, id)
 WHERE status = 'DLQ';
+
+CREATE INDEX idx_message_outbox_conversation_order
+ON message_outbox (tenant_id, conversation_id, aggregate_version, status);
 ```
 
 `message_outbox.status`：
@@ -627,11 +657,19 @@ Relay 拉取：
 
 ```sql
 SELECT *
-FROM message_outbox
-WHERE status = 'PENDING'
-  AND published_at IS NULL
-  AND COALESCE(next_retry_at, available_at) <= now()
-ORDER BY id
+FROM message_outbox mo
+WHERE mo.status = 'PENDING'
+  AND mo.published_at IS NULL
+  AND COALESCE(mo.next_retry_at, mo.available_at) <= now()
+  AND NOT EXISTS (
+      SELECT 1
+      FROM message_outbox prev
+      WHERE prev.tenant_id = mo.tenant_id
+        AND prev.conversation_id = mo.conversation_id
+        AND prev.aggregate_version < mo.aggregate_version
+        AND prev.status IN ('PENDING', 'DLQ')
+  )
+ORDER BY mo.id
 LIMIT 500
 FOR UPDATE SKIP LOCKED;
 ```
@@ -640,6 +678,8 @@ FOR UPDATE SKIP LOCKED;
 
 ```text
 lock batch
+-> acquire per conversation single-flight lock
+-> skip event if lower aggregate_version is still PENDING or DLQ
 -> publish to Kafka with partition key tenant_id + conversation_id
 -> mark status=PUBLISHED and published_at
 -> on failure update retry_count, last_error, next_retry_at
@@ -656,6 +696,9 @@ lock batch
 - Kafka publish 成功但 mark published 失败，允许重复发布。
 - 消费者必须用 `event_id + handler_name` 幂等。
 - Relay lag 不能影响已提交消息的客户端 accepted 响应。
+- 同一 `tenant_id + conversation_id` 的事件必须按 `aggregate_version` 严格发布。
+- 如果同会话存在更小 `aggregate_version` 的 `PENDING` 或 `DLQ` 事件，Relay 不能发布后续事件。
+- Relay worker 必须对同一会话 single-flight，避免多 worker 并发发布同一 conversation 的事件。
 
 DLQ repair 操作：
 
@@ -670,8 +713,9 @@ SkipOutboxEvent(repair_id, event_id, reason)
 - `repair_id` 必填，全链路写入 trace 和 audit。
 - 只有 `audit-service` 授权的运维角色可以执行 replay/skip。
 - replay 只能将 `status=DLQ` 的事件改回 `PENDING`，不能直接标记 `PUBLISHED`。
+- replay 前必须检查同一 `tenant_id + conversation_id` 是否存在更小 `aggregate_version` 的 `PENDING` 或 `DLQ` 事件；存在则拒绝 replay 当前事件。
 - batch replay 必须支持 tenant、event_type、time_range 过滤，并按 tenant 限速。
-- skip 必须保留 `last_error`、`reason` 和操作者，且发布 `audit.repair.events`。
+- skip timeline 事件必须保留 `last_error`、`reason` 和操作者，发布 `audit.repair.events`，并标记 downstream 需要按 repair event 处理。
 
 ## 11. 失败补偿
 
@@ -696,6 +740,7 @@ timeline out-of-order = 0
 unexplained seq gap = 0
 seq_allocation_journal_allocated_stale_count = 0
 outbox oldest pending age < 5s
+outbox_conversation_order_violation = 0
 outbox_publish_duplicate_rate 可观测但不作为错误
 ```
 
@@ -706,6 +751,7 @@ outbox_publish_duplicate_rate 可观测但不作为错误
 | steady SendMessage | 验证主写链路 | p99 < 120ms |
 | duplicate client_msg_id | 验证幂等 | 不重复写 message_log |
 | Kafka outage | 验证 outbox 积压 | accepted 正常，outbox 可追平 |
+| outbox ordered publish | 验证同会话 Kafka 顺序 | seq 较小事件未发布时，后续 seq 不发布 |
 | hot conversation | 验证 seq block | 无乱序，gap 有 journal |
 | local-to-sequencer switch | 验证普通会话升级热点会话 | 无重复 seq、无乱序、gap 均有 journal |
 | sequencer-to-local switch | 验证热点会话降级 | block drain 正确，next_seq 对齐 |
@@ -730,6 +776,7 @@ outbox_publish_duplicate_rate 可观测但不作为错误
 - 普通会话本地事务集成测试通过。
 - 热点会话 seq journal 集成测试通过。
 - outbox relay 重复发布场景消费幂等通过。
+- outbox relay 同会话按 `aggregate_version` 有序发布。
 - 压测得到 message 写入基线。
 
 ## 16. 编码前契约拆分
@@ -764,7 +811,7 @@ outbox_publish_duplicate_rate 可观测但不作为错误
 | 依赖 | mock 行为 | 不能做的事 |
 | --- | --- | --- |
 | `policy-service` | 返回 allow/deny 和 `permission_version` | 不能在 message-service 里硬编码角色规则 |
-| `conversation-service` | 返回会话存在、成员版本、权限版本、普通/热点模式、fanout 模式 | 不能由 message-service 修改成员事实，不能由 message-service 硬编码 fanout 策略 |
+| `conversation-service` | 返回会话存在、成员版本、权限版本、普通/热点模式、fanout 模式、fanout 策略版本 | 不能由 message-service 修改成员事实，不能由 message-service 硬编码 fanout 策略 |
 | `timeline-service` | 热点会话返回 seq block；普通会话不调用 | 不能把热点 sequencer 状态写在 message-service 业务层 |
 | Kafka | 本地可用真实 broker；无 broker 时只能验证 outbox 积压 | 不能跳过 outbox 直接认为事件已发布 |
 

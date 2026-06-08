@@ -436,7 +436,7 @@ conversation-service receives member command
 
 ### 6.2 Fanout 状态机
 
-每条 timeline event 固化 `fanout_mode`，保证重放可解释。
+每条 timeline event 固化 `fanout_mode` 和 `fanout_policy_version`，保证重放、审计和投递异常排查可解释。
 
 ```text
 WRITE_FANOUT -> HYBRID_FANOUT -> READ_FANOUT -> BROADCAST_SIGNAL
@@ -501,8 +501,11 @@ delivery_consumer_lag
 
 - 所有业务表必须包含 `tenant_id`。
 - `message_log` 唯一键：`tenant_id + sender_id + device_id + client_msg_id`，并保存 `command_hash` 用于判断重复请求是否语义一致。
+- `client_msg_id` 是 device scoped globally unique UUID，同一 `tenant_id + sender_id + device_id` 下不能跨会话复用。
+- `conversation_seq` 由 conversation-service 创建会话时初始化；message-service 只允许幂等兜底补建并记录 metric / repair log。
 - `conversation_timeline_events` 唯一键：`tenant_id + conversation_id + seq`。
 - outbox relay 使用 `FOR UPDATE SKIP LOCKED`。
+- outbox relay 对同一 `tenant_id + conversation_id` 必须按 `aggregate_version` 严格发布；存在更小版本的 `PENDING` 或 `DLQ` 事件时，不允许发布后续事件。
 - 消费者先完成持久化副作用，再提交 Kafka offset。
 - Redis 中的状态必须能从 PostgreSQL/Kafka 重建。
 
@@ -576,7 +579,7 @@ approved_by
 - 迁移期间一个 virtual partition 只能有一个 active physical partition。
 - consumer lag 清零且 checksum 通过后，才能完成映射切换。
 - 迁移失败回滚到上一 `mapping_version`。
-- DLQ replay 必须带 `replay_id`、限速、审计。
+- DLQ replay 必须带 `replay_id`、限速、审计，并遵守同会话 `aggregate_version` 顺序保护。
 
 事件 envelope：
 
@@ -595,6 +598,16 @@ approved_by
   "causation_id": "cmd_01J...",
   "payload": {}
 }
+```
+
+timeline 事件 payload / metadata 必须携带：
+
+```text
+fanout_mode
+fanout_policy_version
+permission_version
+classification
+mapping_version
 ```
 
 Replay Source Policy：
@@ -646,6 +659,12 @@ WebSocket 基础帧：
   "conversation_id": "conv_1",
   "payload": {}
 }
+```
+
+客户端约束：
+
+```text
+client_msg_id 必须是同一 device_id 下全局唯一 UUID，不能只按 conversation 维度递增或复用。
 ```
 
 服务端接受：
@@ -1139,11 +1158,11 @@ RAG/Agent 发布必须跑安全评测：
 | 缺口 | 对第一阶段代码的影响 | 边界约束 |
 | --- | --- | --- |
 | `timeline-service / sequencer SDD` 未完成 | 不阻塞普通会话 `SendMessage`；阻塞热点会话生产实现 | 第一阶段只实现 `LOCAL_ROW_LOCK`，`SEQUENCER_BLOCK` 只定义 port 和 mock |
-| `conversation-service / member_change_saga SDD` 未完成 | 不阻塞会话查询 mock；阻塞真实成员变更、群主/管理员规则和 ACL 投影 | message-service 只能依赖 `ConversationQueryPort`，并从 port 读取 `fanout_mode`，不能写成员事实、角色规则或硬编码 fanout 策略 |
+| `conversation-service / member_change_saga SDD` 未完成 | 不阻塞会话查询 mock；阻塞真实成员变更、群主/管理员规则和 ACL 投影 | message-service 只能依赖 `ConversationQueryPort`，并从 port 读取 `fanout_mode`、`fanout_policy_version`，不能写成员事实、角色规则或硬编码 fanout 策略 |
 | Proto / OpenAPI / AsyncAPI 未落文件 | 阻塞正式业务代码 | 先冻结 `message_service.proto`、错误码和事件契约，再创建 service skeleton |
 | PostgreSQL migration 未落文件 | 阻塞本地事务代码 | 先落 `conversation_seq + message_log + timeline + outbox` 同分片约束 |
 | Kafka schema 未落文件 | 阻塞 outbox relay 对外发布 | 先落 `message.persisted.v1` 和 envelope，再实现 producer |
-| Outbox DLQ repair 接口未定义 | 不阻塞第一阶段 `SendMessage`，但阻塞后续运维闭环 | 先在契约/Runbook 定义 replay、skip、audit 语义 |
+| Outbox DLQ repair 契约文件未落地 | 不阻塞第一阶段 `SendMessage`，但阻塞后续运维闭环 | SDD 已定义 replay/skip 语义；后续必须落 Proto/AsyncAPI 和 `audit.repair.events` schema |
 
 本地开发和双机压测配置属于运行手册，不固化在目标态架构正文中。当前机器 IP、端口、防火墙和代理约定见 `docs/runbook/local-loadtest.md`。
 

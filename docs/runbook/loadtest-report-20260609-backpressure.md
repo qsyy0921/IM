@@ -142,3 +142,34 @@ loadtest/results/backpressure-clean-smoke-20260609/pgmax-1-vu-20-20260609-033732
 ```
 
 后续正式 backpressure 容量压测需要新建独立报告，不覆盖本文。
+
+## 7. Loadtest 错误计数补充
+
+后续又补充了 loadtest summary 的 MessageError 统计字段：
+
+```text
+retryable_error_count
+service_overloaded_count
+message_error_counts[]
+```
+
+clean smoke：
+
+```text
+commit=a9fbdf8
+git_dirty=false
+PG_MAX_CONNS=1
+VU=10
+duration=3s
+request_count=62884
+success_rate=0.0052
+error_count=62556
+retryable_error_count=62556
+service_overloaded_count=62556
+p99=1.3024ms
+outbox_pending_count=0
+message_error_counts[0].code=MESSAGE_ERROR_CODE_SERVICE_OVERLOADED
+message_error_counts[0].count=62556
+```
+
+这让后续正式 backpressure 矩阵可以直接计算 overload rate，不再只能从 `error_topn` 字符串里人工判断。

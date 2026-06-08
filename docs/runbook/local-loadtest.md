@@ -340,3 +340,45 @@ error_p99_ms
 ```
 
 其中 `request_count` 是实际 gRPC attempt 数，`logical_request_count` 是用户层消息数。开启客户端重试后，两者不能混用；`overload_rate` 也是 attempt-level 指标，不代表用户层最终失败率。
+
+## 11. PublishBatch On/Off
+
+对比 Kafka `PublishBatch` 时必须在同一 HEAD 下使用开关，不要用不同 commit 直接比较：
+
+```powershell
+. .\tools\go-env.ps1
+go build -o bin\message-service.exe ./services/message-service/cmd/message-service
+go build -o bin\sendmessage-loadtest.exe ./loadtest/sendmessage
+```
+
+关闭 batch path：
+
+```powershell
+.\loadtest\sendmessage\run-local-pgpool-gradient.ps1 `
+  -PGMaxConns 64 `
+  -VUs 1200,1600 `
+  -Duration 30s `
+  -StatsWait 20s `
+  -ConversationCount 1000 `
+  -RelayWorkers 8 `
+  -BatchSize 500 `
+  -PublishBatchEnabled:$false `
+  -BackpressureEnabled `
+  -BackpressureMinAvailableConns 8 `
+  -RetryOverloaded `
+  -MaxRetries 2 `
+  -RetryJitter 100ms `
+  -ResultRoot loadtest\results\publishbatch-formal-off-YYYYMMDD `
+  -SkipBuild
+```
+
+开启 batch path 时只改为 `-PublishBatchEnabled:$true`。
+
+有效性检查：
+
+```text
+PublishBatch=false -> kafka_publish_records_per_call 应接近 1
+PublishBatch=true  -> kafka_publish_records_per_call 应大于 1
+```
+
+如果使用 `-SkipBuild`，必须先确认 `bin\message-service.exe` 已经由当前 HEAD 重建；否则 summary 的 `commit` 可能是当前仓库 commit，但实际运行的服务二进制仍是旧版本。

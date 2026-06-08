@@ -10,8 +10,12 @@ param(
     [int]$BaseGrpcPort = 10495,
     [int]$BaseServiceDebugPort = 10600,
     [string]$RelayDebugAddr = "127.0.0.1:10700",
+    [ValidateSet("FixedPerInstance", "FixedTotal")]
+    [string]$ConnectionBudgetMode = "FixedPerInstance",
     [int]$PGMaxConns = 64,
     [int]$PGMinConns = 0,
+    [int]$TotalPGMaxConns = 64,
+    [int]$TotalPGMinConns = 0,
     [int]$RelayWorkers = 8,
     [int]$BatchSize = 500,
     [string]$PollInterval = "200ms",
@@ -46,18 +50,35 @@ $loadtest = Join-Path (Get-Location) "bin\sendmessage-loadtest.exe"
 $relayMetricsURL = "http://$RelayDebugAddr/debug/metrics"
 
 foreach ($instanceCount in $Instances) {
-    $runName = "instances-$instanceCount-vu-$VUs-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+    if ($ConnectionBudgetMode -eq "FixedTotal") {
+        if ($TotalPGMaxConns -lt $instanceCount) {
+            throw "TotalPGMaxConns=$TotalPGMaxConns is smaller than instanceCount=$instanceCount"
+        }
+        $effectivePGMaxConns = [Math]::Max(1, [int][Math]::Floor($TotalPGMaxConns / $instanceCount))
+        $effectivePGMinConns = if ($TotalPGMinConns -gt 0) {
+            [Math]::Max(0, [int][Math]::Floor($TotalPGMinConns / $instanceCount))
+        } else {
+            0
+        }
+        $budgetLabel = "fixedtotal-$TotalPGMaxConns"
+    } else {
+        $effectivePGMaxConns = $PGMaxConns
+        $effectivePGMinConns = $PGMinConns
+        $budgetLabel = "fixedper-$PGMaxConns"
+    }
+
+    $runName = "instances-$instanceCount-$budgetLabel-vu-$VUs-" + (Get-Date -Format "yyyyMMdd-HHmmss")
     $resultDir = Join-Path $ResultRoot $runName
     $processes = @()
     $targets = @()
     $serviceMetrics = @()
 
-    Write-Host "Starting multi-instance run instances=$instanceCount vus=$VUs duration=$Duration pg_max=$PGMaxConns"
+    Write-Host "Starting multi-instance run mode=$ConnectionBudgetMode instances=$instanceCount vus=$VUs duration=$Duration pg_max_per_instance=$effectivePGMaxConns"
 
     $env:NEXUSIM_PG_DSN = $PGDSN
-    $env:NEXUSIM_PG_MAX_CONNS = [string]$PGMaxConns
-    if ($PGMinConns -gt 0) {
-        $env:NEXUSIM_PG_MIN_CONNS = [string]$PGMinConns
+    $env:NEXUSIM_PG_MAX_CONNS = [string]$effectivePGMaxConns
+    if ($effectivePGMinConns -gt 0) {
+        $env:NEXUSIM_PG_MIN_CONNS = [string]$effectivePGMinConns
     } else {
         Remove-Item Env:\NEXUSIM_PG_MIN_CONNS -ErrorAction SilentlyContinue
     }

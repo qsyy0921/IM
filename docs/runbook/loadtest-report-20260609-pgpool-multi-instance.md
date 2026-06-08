@@ -450,6 +450,26 @@ outbox relay 批量发布和批量 mark published 优化
 固定总 PG 连接预算：例如 1x64、2x32、4x16，观察入口扩容是否仍有价值。
 ```
 
+`run-local-multi-instance.ps1` 已支持这两种模式。下一轮可以直接使用：
+
+```powershell
+.\loadtest\sendmessage\run-local-multi-instance.ps1 `
+  -ConnectionBudgetMode FixedPerInstance `
+  -Instances 1,2,4 `
+  -PGMaxConns 16 `
+  -VUs 1200 `
+  -Duration 60s `
+  -StatsWait 30s
+
+.\loadtest\sendmessage\run-local-multi-instance.ps1 `
+  -ConnectionBudgetMode FixedTotal `
+  -Instances 1,2,4 `
+  -TotalPGMaxConns 64 `
+  -VUs 1200 `
+  -Duration 60s `
+  -StatsWait 30s
+```
+
 当前 debug metrics collector 会保存全量样本并在 snapshot 时排序，适合本地短压测，不适合作为长期运行的生产 metrics。后续应替换为固定窗口、reservoir、HDR histogram 或 Prometheus histogram。
 
 下一阶段仍需新建独立报告，不覆盖本文。

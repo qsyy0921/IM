@@ -426,3 +426,12 @@ outbox_fetched_per_call
 ```
 
 注意：`outbox_process_ready_latency_ms` 会混入 `stats_wait` 阶段的 idle 样本；做 adaptive limit 时优先使用 `outbox_process_ready_active_latency_ms` 和 `outbox_fetched_per_call`，不要只看混合口径。
+
+当前本地 relay 基线候选：
+
+```text
+NEXUSIM_OUTBOX_BATCH_SIZE=100
+NEXUSIM_OUTBOX_WORKERS=8
+```
+
+该基线来自 `docs/runbook/loadtest-report-20260609-outbox-candidate-repeat.md`，只代表当前 Windows 本机 + Docker PostgreSQL/Kafka + PG_MAX_CONNS=64 的本地压测环境。

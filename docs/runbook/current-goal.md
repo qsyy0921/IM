@@ -60,8 +60,8 @@ message-service SendMessage
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
-2. 用 active/idle relay metrics 对 outbox 候选 `batch_size=100/workers=8` 和 `batch_size=500/workers=8` 各重复 2 轮，确认 1200/1600 VU 下的波动范围。
-3. 设计更细的 adaptive limit，把 outbox pending、relay active process ready、outbox fetched per call、Kafka records/call 和 PG pool acquire 纳入输入，而不是只看瞬时 acquired conns。
+2. 以 `NEXUSIM_OUTBOX_BATCH_SIZE=100`、`NEXUSIM_OUTBOX_WORKERS=8` 作为当前本地 relay 基线，设计 adaptive limit。
+3. adaptive limit 输入包括 PG pool acquire、outbox pending、relay active process ready、outbox fetched per call、Kafka records/call；不要只看瞬时 acquired conns。
 4. 继续压测客户端 retry 参数：`max_retries=1/2/3`、`jitter=100/300/500ms`。
 5. 继续采集 PostgreSQL wait_event，重点看 `LWLock:WALWrite`、`LWLock:WALInsert`、`LWLock:BufferContent` 和 `CheckpointWriteDelay`。
 6. 当前 PublishBatch 开关和正式矩阵已跨并发/消息发布语义，下一次较大代码或压测报告完成后再统一邀请评审线程，避免过于频繁。
@@ -255,6 +255,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 PublishBatch formal 矩阵：报告为 `docs/runbook/loadtest-report-20260609-publishbatch-formal.md`，有效结果路径为 `loadtest/results/publishbatch-formal-valid-{off,on}-r{1,2}-20260609/`。commit `aec449c`、`git_dirty=false`，固定 `PG_MAX_CONNS=64`、relay workers 8、batch 500、backpressure min 8、客户端 retry。`PublishBatch=false` 时 `kafka_publish_records_per_call=1`，1200/1600 VU 的 stats wait pending 平均为 `33776` / `36980`；`PublishBatch=true` 时 records/call 平均为 `381.08` / `188.60`，1600 VU pending 平均降到 `0`，但 1200 VU 仍有平均 `14904` pending，且 success p99 未稳定改善。第一次矩阵因 `-SkipBuild` 误用旧二进制导致 `pbatchoff` 实际未关闭 batch，已标记为无效中间结果，不作为正式证据。
 - 当前 outbox batch/worker 联合矩阵：报告为 `docs/runbook/loadtest-report-20260609-outbox-batch-worker-matrix.md`，结果路径为 `loadtest/results/outbox-batch-worker-matrix-{1200,1600}-formal-20260609/`。commit `134613c`、`git_dirty=false`，固定 `PG_MAX_CONNS=64`、`PublishBatch=true`、backpressure min 8、客户端 retry；batch 100/500/1000 与 workers 8/12/16 的 18 组全部在 `stats_wait=20s` 后 pending 0。1200 VU 下 batch 500/workers 8 accepted RPS 最高为 `1969.90`；1600 VU 下 batch 100/workers 8 accepted RPS 最高为 `1873.23` 且 success p99 最低为 `667.54ms`。当前只把 `100/8` 与 `500/8` 作为下一轮重复验证候选，不作为最终默认值。
 - 当前 outbox active/idle metrics smoke：报告为 `docs/runbook/loadtest-report-20260609-outbox-active-idle-metrics-smoke.md`，结果路径为 `loadtest/results/outbox-active-idle-metrics-smoke-20260609/batch-100-workers-2/bpon-pbatchon-pgmax-16-vu-10-20260609-070214/sendmessage-summary.json`。commit `40baec9`、`git_dirty=false`、5487/5487 成功、pending 0；summary 已写入 `outbox_process_ready_active_latency_ms=18.4141`、`outbox_process_ready_idle_latency_ms=2.2710`、`outbox_fetched_per_call=12.2752`。该结果只证明观测链路可用，不作为容量结论。
+- 当前 outbox 候选重复矩阵：报告为 `docs/runbook/loadtest-report-20260609-outbox-candidate-repeat.md`，结果路径为 `loadtest/results/outbox-candidate-repeat-r{1,2}-20260609/`。commit `c41b26a`、`git_dirty=false`，重复验证 `batch_size=100/workers=8` 和 `batch_size=500/workers=8`。两组均 pending 0；`100/8` 的 success p99 更稳，1200/1600 VU 平均为 `524.74ms` / `818.47ms`，优于 `500/8` 的 `696.28ms` / `1150.13ms`。当前本地 relay 基线收敛为 `batch_size=100/workers=8`。
 - 当前 debug metrics collector 保存全量样本并在 snapshot 时排序，适合本地短压测，不适合作为生产 metrics；后续应替换为固定窗口、reservoir、HDR histogram 或 Prometheus histogram。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
@@ -310,3 +311,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已新增 `NEXUSIM_OUTBOX_PUBLISH_BATCH_ENABLED` 开关和 `run-local-pgpool-gradient.ps1 -PublishBatchEnabled` 参数，支持同一 HEAD 做 PublishBatch on/off 对照；正式矩阵已重建当前 HEAD 二进制后重跑，避免旧 `bin` 污染实验。
 - 2026-06-09：已新增 `run-local-outbox-batch-worker-matrix.ps1`，并跑 batch size 100/500/1000 与 workers 8/12/16 在 1200/1600 VU 下的联合矩阵。结论：当前所有组合均可追平 outbox，workers 8 比 12/16 更稳；下一步重复验证 `100/8` 与 `500/8`。
 - 2026-06-09：已按评审 P2 补 outbox relay active/idle 指标和 `outbox_fetched_per_call`，并用 clean smoke 验证 summary 能读取这些字段。下一轮候选重复矩阵和 adaptive limit 设计应优先使用 active 指标，而不是混合 `outbox_process_ready_latency_ms`。
+- 2026-06-09：已用 active/idle metrics 重复验证 outbox 候选 `100/8` 与 `500/8`。结论：两者均可追平，`100/8` 的 success p99 更稳，作为下一轮 adaptive limit 本地 relay 基线。

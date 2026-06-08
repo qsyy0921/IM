@@ -53,16 +53,16 @@ message-service SendMessage
 | SendMessage app/domain | 已补 `SendMessageUseCase` 单元测试、permission version 一致性短重试、稳定 JSON canonical command hash、append record 构造 |
 | PostgreSQL repository | 已实现普通会话 `SendMessage` 本地事务：幂等检查、同幂等键 advisory transaction lock、`conversation_seq` row lock、`message_log`、`conversation_timeline_events`、`message_outbox` 同事务写入；outbox payload 对齐 `MessagePersistedV1` 业务 payload；集成测试和并发重复请求测试通过 |
 | Outbox relay / Kafka publish path | 已实现 `trigger/outbox` 最小 relay、PostgreSQL outbox store、Kafka writer producer；真实 PostgreSQL + Kafka 集成测试通过 |
-| message-service gRPC adapter | 已实现 `SendMessage` gRPC handler、proto request/response 转换、稳定错误码 detail 映射、`NEXUSIM_MESSAGE_SERVICE_MODE=grpc` 运行入口；已通过 bufconn client 单测 |
-| SendMessage loadtest | 已实现 `go run ./loadtest/sendmessage` 参数化 gRPC 压测入口；支持 `target`、`vus`、`duration`、`result-dir`、`pg-dsn`、`stats-wait`；真实 gRPC + PostgreSQL + outbox relay + Kafka smoke 与 baseline 已执行 |
+| message-service gRPC adapter | 已实现 `SendMessage` gRPC handler、proto request/response 转换、稳定错误码 detail 映射和错误 message 脱敏、`NEXUSIM_MESSAGE_SERVICE_MODE=grpc` 运行入口；已通过 bufconn client 单测 |
+| SendMessage loadtest | 已实现 `go run ./loadtest/sendmessage` 参数化 gRPC 压测入口；支持 `target`、`vus`、`duration`、`result-dir`、`pg-dsn`、`stats-wait`；summary 记录 full commit、dirty 状态、outbox total/published/pending/DLQ；真实 gRPC + PostgreSQL + outbox relay + Kafka smoke 与 baseline 已执行 |
 
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
-2. 等待评审线程最终复核 gRPC adapter + loadtest runner + relay polling 修正。
-3. 根据评审意见修正文档或代码。
-4. 补强 outbox relay 追平能力，优先评估多 worker、按 conversation single-flight、claim/lease 或 Kafka batch 策略。
-5. 补指标采集点，让压测 summary 能记录 `conversation_seq_alloc_latency_ms` 和 `kafka_publish_latency_ms`。
+2. 回传评审线程：gRPC 错误脱敏 P1 已修，baseline 状态 P1 已记录。
+3. 补强 outbox relay 追平能力，优先评估失败 backoff、多 worker、按 conversation single-flight、claim/lease 或 Kafka batch 策略。
+4. 补指标采集点，让压测 summary 能记录 `conversation_seq_alloc_latency_ms` 和 `kafka_publish_latency_ms`。
+5. 视修复和评审复核结果决定是否推送 GitHub。
 
 ## 6. 评审要求
 
@@ -189,11 +189,14 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 relay 只支持 `message.persisted.v1`；启用 Edit/Revoke/Delete 前必须补齐对应 Kafka oneof payload 构造和测试。
 - OutboxStore 后续进入多 worker 或压测前，应补强 `available_at/next_retry_at` 未到期、低版本 PENDING 阻塞、并发 `FOR UPDATE SKIP LOCKED` 等 ready/concurrency 测试。
 - 当前 relay 已改为有 ready event 时立即继续循环，只有空转时才按 `PollInterval` sleep；同一 conversation 仍按最低 `aggregate_version` 串行发布，因此单会话积压追平能力仍受顺序保护限制。
+- 当前 relay 在 Kafka 故障且 backlog 很大时可能连续写 retry/DLQ，后续需要按失败比例增加 backoff 或只在 `Published > 0` 时立即继续。
 - 当前 ready 判断使用 DB `now()`，retry 时间写入使用应用时钟；生产硬化时需要统一时间源或明确 DB/relay 节点时钟同步要求。
 - 当前尚未实现 DLQ repair/replay；未来实现时必须清理 `dead_lettered_at`、`last_error`、`next_retry_at` 等旧失败字段。
 - 已有真实进程级 SendMessage smoke 和 `--vus=100 --duration=60s` baseline 结果；baseline 写入成功率 100%，但 p99 与 outbox backlog 暴露出性能风险。
 - 压测 summary 中 `conversation_seq_alloc_latency_ms` 和 `kafka_publish_latency_ms` 仍为 `null`，因为当前服务还没有独立指标采集点。
 - 当前 `51772e6` baseline：45212/45212 成功，p95 249.62ms，p99 518.03ms，`stats-wait=30s` 后本轮 tenant outbox `PENDING=27181`、`PUBLISHED=18031`；下一步应优先优化 relay 追平能力和补指标。
+- `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
+- 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
 - `timeline-service`、`conversation-service`、`delivery-service`、`push-gateway` SDD 未冻结，不能扩展到对应生产逻辑。
 
 ## 11. 最近评审状态
@@ -209,3 +212,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-08：已实现 `message-service` gRPC adapter 和 `NEXUSIM_MESSAGE_SERVICE_MODE=grpc` 运行入口；adapter 已覆盖请求转换、响应转换、稳定错误码 detail、unsupported message type、bufconn client 注册调用。按批量策略，本轮暂不单独评审/推送，和后续 loadtest runner + smoke 结果一起评审。
 - 2026-06-08：已实现 `loadtest/sendmessage` gRPC 压测 CLI，并修正 relay 有 ready event 时仍固定 sleep 的追平问题；真实进程 smoke 使用 gRPC server + outbox relay + PostgreSQL + Kafka，`--vus=2 --duration=3s --stats-wait=8s --conversation-count=100` 结果为 1020/1020 成功、p95 7.63ms、p99 9.20ms、本轮 tenant outbox 0 pending。
 - 2026-06-08：已在当前 HEAD `51772e6` 跑第一轮 baseline：`--vus=100 --duration=60s --stats-wait=30s --conversation-count=1000`，结果为 45212/45212 成功、p95 249.62ms、p99 518.03ms、outbox pending 27181；已把该结果补充给评审线程作为当前提交验证证据。
+- 2026-06-08：独立评审线程复核 gRPC adapter + loadtest runner，指出 P1：gRPC status/detail 暴露底层 DB/PG 错误文本；本轮已改为稳定 public message，并补 `TestSendMessageSanitizesInternalErrorMessages`。同时已补 loadtest summary 的 full commit、dirty 状态、outbox total/published/pending/DLQ 字段。

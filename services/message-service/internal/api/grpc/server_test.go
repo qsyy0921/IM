@@ -188,6 +188,56 @@ func TestSendMessageMapsUseCaseErrors(t *testing.T) {
 	}
 }
 
+func TestSendMessageSanitizesInternalErrorMessages(t *testing.T) {
+	cases := []struct {
+		name          string
+		err           error
+		publicMessage string
+	}{
+		{
+			name:          "database",
+			err:           types.NewDBWriteFailed(`pq: duplicate key value violates unique constraint "message_log_tenant_id_sender_id_device_id_client_msg_id_key"`),
+			publicMessage: "database write failed",
+		},
+		{
+			name:          "outbox",
+			err:           types.NewOutboxWriteFailed(`insert message_outbox failed: relation "message_outbox" does not exist`),
+			publicMessage: "outbox write failed",
+		},
+		{
+			name:          "unknown",
+			err:           errors.New("panic: internal stack trace"),
+			publicMessage: "message service internal error",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			server := NewServer(&fakeSendMessageExecutor{err: tc.err})
+
+			_, err := server.SendMessage(context.Background(), testSendMessageRequest())
+			st, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("expected status error, got %v", err)
+			}
+			if st.Message() != tc.publicMessage {
+				t.Fatalf("unexpected status message %q", st.Message())
+			}
+			details := st.Details()
+			if len(details) != 1 {
+				t.Fatalf("expected one error detail, got %d", len(details))
+			}
+			detail, ok := details[0].(*messagev1.MessageError)
+			if !ok {
+				t.Fatalf("expected MessageError detail, got %T", details[0])
+			}
+			if detail.GetMessage() != tc.publicMessage {
+				t.Fatalf("unexpected detail message %q", detail.GetMessage())
+			}
+		})
+	}
+}
+
 func testSendMessageRequest() *messagev1.SendMessageRequest {
 	payload, err := structpb.NewStruct(map[string]any{"text": "hello"})
 	if err != nil {

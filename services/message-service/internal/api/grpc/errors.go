@@ -23,10 +23,11 @@ func (e invalidArgumentError) Error() string {
 
 func grpcError(err error, correlationID string) error {
 	grpcCode, messageErrorCode, retryable := classifyError(err)
-	st := status.New(grpcCode, err.Error())
+	publicMessage := publicErrorMessage(err)
+	st := status.New(grpcCode, publicMessage)
 	withDetails, detailErr := st.WithDetails(&messagev1.MessageError{
 		Code:          messageErrorCode,
-		Message:       err.Error(),
+		Message:       publicMessage,
 		Retryable:     retryable,
 		CorrelationId: correlationID,
 	})
@@ -57,5 +58,29 @@ func classifyError(err error) (codes.Code, messagev1.MessageErrorCode, bool) {
 		return codes.Unavailable, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_UNSPECIFIED, true
 	default:
 		return codes.Internal, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_UNSPECIFIED, false
+	}
+}
+
+func publicErrorMessage(err error) string {
+	var invalid invalidArgumentError
+	switch {
+	case errors.As(err, &invalid):
+		return invalid.Error()
+	case errors.Is(err, types.ErrPermissionDenied):
+		return "permission denied"
+	case errors.Is(err, types.ErrUnsupportedMessageType):
+		return "unsupported message type"
+	case errors.Is(err, types.ErrIdempotencyConflict):
+		return "idempotency conflict"
+	case errors.Is(err, types.ErrSequencerUnavailable):
+		return "sequencer unavailable"
+	case errors.Is(err, types.ErrDBWriteFailed):
+		return "database write failed"
+	case errors.Is(err, types.ErrOutboxWriteFailed):
+		return "outbox write failed"
+	case errors.Is(err, types.ErrDependencyVersion):
+		return "dependency version mismatch"
+	default:
+		return "message service internal error"
 	}
 }

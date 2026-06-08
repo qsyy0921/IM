@@ -46,6 +46,9 @@ type sample struct {
 
 type summary struct {
 	Commit                        string       `json:"commit"`
+	CommitFull                    string       `json:"commit_full"`
+	GitDirty                      bool         `json:"git_dirty"`
+	GitStatusShort                string       `json:"git_status_short"`
 	Target                        string       `json:"target"`
 	TenantID                      string       `json:"tenant_id"`
 	VUs                           int          `json:"vus"`
@@ -61,7 +64,10 @@ type summary struct {
 	P95MS                         float64      `json:"p95_ms"`
 	P99MS                         float64      `json:"p99_ms"`
 	ConversationSeqAllocLatencyMS *float64     `json:"conversation_seq_alloc_latency_ms"`
+	OutboxTotalCount              *int64       `json:"outbox_total_count"`
+	OutboxPublishedCount          *int64       `json:"outbox_published_count"`
 	OutboxPendingCount            *int64       `json:"outbox_pending_count"`
+	OutboxDLQCount                *int64       `json:"outbox_dlq_count"`
 	OutboxOldestPendingAgeSeconds *float64     `json:"outbox_oldest_pending_age_seconds"`
 	KafkaPublishLatencyMS         *float64     `json:"kafka_publish_latency_ms"`
 	ErrorTopN                     []errorCount `json:"error_topn"`
@@ -108,12 +114,15 @@ func run(args []string, getenv func(string) string) error {
 		time.Sleep(cfg.StatsWait)
 	}
 	if cfg.PGDSN != "" {
-		pending, oldestAge, statsErr := readOutboxStats(context.Background(), cfg.PGDSN, cfg.TenantID)
+		outboxStats, statsErr := readOutboxStats(context.Background(), cfg.PGDSN, cfg.TenantID)
 		if statsErr != nil {
 			return statsErr
 		}
-		result.OutboxPendingCount = &pending
-		result.OutboxOldestPendingAgeSeconds = &oldestAge
+		result.OutboxTotalCount = &outboxStats.Total
+		result.OutboxPublishedCount = &outboxStats.Published
+		result.OutboxPendingCount = &outboxStats.Pending
+		result.OutboxDLQCount = &outboxStats.DLQ
+		result.OutboxOldestPendingAgeSeconds = &outboxStats.OldestPendingAgeSeconds
 	}
 
 	if err := writeSummary(cfg.ResultDir, &result); err != nil {
@@ -226,8 +235,12 @@ func executeLoad(ctx context.Context, cfg config, client messagev1.MessageServic
 		avgMS = durationMS(totalLatency) / float64(requestCount)
 	}
 
+	commit := currentCommit()
 	return summary{
-		Commit:                        currentCommit(),
+		Commit:                        commit.Short,
+		CommitFull:                    commit.Full,
+		GitDirty:                      commit.Dirty,
+		GitStatusShort:                commit.StatusShort,
 		Target:                        cfg.Target,
 		TenantID:                      cfg.TenantID,
 		VUs:                           cfg.VUs,
@@ -335,28 +348,45 @@ func errorKey(err error) string {
 	return err.Error()
 }
 
-func readOutboxStats(ctx context.Context, dsn string, tenantID string) (int64, float64, error) {
+type outboxStats struct {
+	Total                   int64
+	Published               int64
+	Pending                 int64
+	DLQ                     int64
+	OldestPendingAgeSeconds float64
+}
+
+func readOutboxStats(ctx context.Context, dsn string, tenantID string) (outboxStats, error) {
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
-		return 0, 0, err
+		return outboxStats{}, err
 	}
 	defer pool.Close()
 
-	var pendingCount int64
-	var oldestPendingAgeSeconds float64
+	var stats outboxStats
 	err = pool.QueryRow(ctx, `
 SELECT
-    count(*)::bigint,
-    COALESCE(EXTRACT(EPOCH FROM now() - MIN(available_at)), 0)::float8
+    count(*)::bigint AS total_count,
+    count(*) FILTER (WHERE status = 'PUBLISHED')::bigint AS published_count,
+    count(*) FILTER (WHERE status = 'PENDING' AND published_at IS NULL)::bigint AS pending_count,
+    count(*) FILTER (WHERE status = 'DLQ')::bigint AS dlq_count,
+    COALESCE(
+        EXTRACT(EPOCH FROM now() - MIN(available_at) FILTER (WHERE status = 'PENDING' AND published_at IS NULL)),
+        0
+    )::float8 AS oldest_pending_age_seconds
 FROM message_outbox
-WHERE status = 'PENDING'
-  AND published_at IS NULL
-  AND tenant_id = $1
-`, tenantID).Scan(&pendingCount, &oldestPendingAgeSeconds)
+WHERE tenant_id = $1
+`, tenantID).Scan(
+		&stats.Total,
+		&stats.Published,
+		&stats.Pending,
+		&stats.DLQ,
+		&stats.OldestPendingAgeSeconds,
+	)
 	if err != nil {
-		return 0, 0, err
+		return outboxStats{}, err
 	}
-	return pendingCount, oldestPendingAgeSeconds, nil
+	return stats, nil
 }
 
 func writeSummary(resultDir string, result *summary) error {
@@ -371,12 +401,39 @@ func writeSummary(resultDir string, result *summary) error {
 	return os.WriteFile(result.ResultFile, encoded, 0644)
 }
 
-func currentCommit() string {
-	output, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output()
+type commitInfo struct {
+	Short       string
+	Full        string
+	Dirty       bool
+	StatusShort string
+}
+
+func currentCommit() commitInfo {
+	shortOutput, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output()
 	if err != nil {
-		return "unknown"
+		return commitInfo{Short: "unknown", Full: "unknown"}
 	}
-	return strings.TrimSpace(string(output))
+	fullOutput, err := exec.Command("git", "rev-parse", "HEAD").Output()
+	full := "unknown"
+	if err == nil {
+		full = strings.TrimSpace(string(fullOutput))
+	}
+	statusOutput, err := exec.Command("git", "status", "--short").Output()
+	statusShort := ""
+	if err == nil {
+		statusShort = strings.TrimSpace(string(statusOutput))
+	}
+	short := strings.TrimSpace(string(shortOutput))
+	dirty := statusShort != ""
+	if dirty {
+		short += "-dirty"
+	}
+	return commitInfo{
+		Short:       short,
+		Full:        full,
+		Dirty:       dirty,
+		StatusShort: statusShort,
+	}
 }
 
 func durationMS(value time.Duration) float64 {

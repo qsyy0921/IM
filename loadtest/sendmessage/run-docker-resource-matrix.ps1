@@ -34,9 +34,9 @@ if (-not $ResultRoot) {
 . .\tools\go-env.ps1
 New-Item -ItemType Directory -Force bin\linux, logs, $ResultRoot | Out-Null
 
-$commitShort = (git rev-parse --short HEAD).Trim()
-$commitFull = (git rev-parse HEAD).Trim()
-$gitStatus = (git status --short).Trim()
+$commitShort = ((git rev-parse --short HEAD) -join "").Trim()
+$commitFull = ((git rev-parse HEAD) -join "").Trim()
+$gitStatus = ((git status --short) -join "`n").Trim()
 $gitStatusForEnv = $gitStatus -replace "(`r`n|`n|`r)", " | "
 $gitDirty = if ($gitStatus) { "true" } else { "false" }
 

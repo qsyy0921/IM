@@ -127,6 +127,33 @@ go run ./loadtest/sendmessage \
 
 该脚本会为每个 worker 数分别启动独立的 gRPC 和 relay 进程，并通过 `NEXUSIM_DEBUG_ADDR` 采集 seq alloc / Kafka publish latency。
 
+压测期间需要采集 PostgreSQL wait_event / 锁等待 / WAL / checkpoint / 表 dead tuples 时，先启动采样脚本，再运行压测脚本：
+
+```powershell
+$watch = Start-Job -ScriptBlock {
+  Set-Location 'E:\development\IM'
+  .\loadtest\sendmessage\watch-postgres-diagnostics.ps1 `
+    -Samples 90 `
+    -IntervalSeconds 2 `
+    -ResultDir loadtest\results\postgres-watch-20260609
+}
+
+.\loadtest\sendmessage\run-local-pgpool-gradient.ps1 `
+  -PGMaxConns 64 `
+  -VUs 1200 `
+  -Duration 60s `
+  -StatsWait 30s `
+  -ConversationCount 3000 `
+  -RelayWorkers 8 `
+  -ResultRoot loadtest\results\pgpool-with-pgwatch-20260609
+
+Wait-Job $watch | Out-Null
+Receive-Job $watch
+Remove-Job $watch
+```
+
+采样结果写入 `postgres-wait-samples.jsonl`。每一行是一个时间点，可以和 loadtest summary 的 `started_at` / `finished_at` 对齐。注意 `Client:ClientRead` 通常代表空闲连接等待客户端输入，不等价于数据库内部瓶颈；优先关注 `Lock`、`LWLock`、`IO`、`WALWrite`、checkpoint 和 dead tuple 变化。
+
 等价环境变量形式：
 
 ```bash

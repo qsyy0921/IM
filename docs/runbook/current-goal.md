@@ -52,7 +52,7 @@ message-service SendMessage
 | Go 依赖 | `go.mod` 使用 Go `1.26.4`，并已引入 `google.golang.org/grpc v1.81.1`、`google.golang.org/protobuf v1.36.11` |
 | SendMessage app/domain | 已补 `SendMessageUseCase` 单元测试、permission version 一致性短重试、稳定 JSON canonical command hash、append record 构造 |
 | PostgreSQL repository | 已实现普通会话 `SendMessage` 本地事务：幂等检查、同幂等键 advisory transaction lock、`conversation_seq` row lock、`message_log`、`conversation_timeline_events`、`message_outbox` 同事务写入；outbox payload 对齐 `MessagePersistedV1` 业务 payload；集成测试和并发重复请求测试通过 |
-| Outbox relay / Kafka publish path | 已实现 `trigger/outbox` relay、PostgreSQL outbox store、Kafka writer producer；relay 支持 `NEXUSIM_OUTBOX_WORKERS` 多 worker 与 `NEXUSIM_OUTBOX_FAILURE_BACKOFF` 失败退避；真实 PostgreSQL + Kafka 集成测试通过 |
+| Outbox relay / Kafka publish path | 已实现 `trigger/outbox` relay、PostgreSQL outbox store、Kafka writer producer；relay 支持 `NEXUSIM_OUTBOX_WORKERS` 多 worker 与 `NEXUSIM_OUTBOX_FAILURE_BACKOFF` 失败退避；真实 PostgreSQL + Kafka 集成测试通过；真实 PostgreSQL 多 worker / `FOR UPDATE SKIP LOCKED` 测试已覆盖同 conversation 顺序和跨 conversation 并发 |
 | message-service gRPC adapter | 已实现 `SendMessage` gRPC handler、proto request/response 转换、稳定错误码 detail 映射和错误 message 脱敏、`NEXUSIM_MESSAGE_SERVICE_MODE=grpc` 运行入口；支持 `NEXUSIM_DEBUG_ADDR=/debug/metrics` 暴露本进程压测指标；已通过 bufconn client 单测 |
 | SendMessage loadtest | 已实现 `go run ./loadtest/sendmessage` 参数化 gRPC 压测入口；支持 `target`、`vus`、`duration`、`result-dir`、`pg-dsn`、`stats-wait`、`service-metrics-url`、`relay-metrics-url`；summary 记录 full commit、dirty 状态、outbox total/published/pending/DLQ、seq alloc latency、Kafka publish latency；真实 gRPC + PostgreSQL + outbox relay + Kafka smoke 与 baseline 已执行 |
 
@@ -61,7 +61,7 @@ message-service SendMessage
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
 2. 基于 `NEXUSIM_OUTBOX_WORKERS=4` baseline 结果继续评估 batch size、worker 数、Kafka publish latency 和单会话顺序保护下的追平上限。
 3. 在 clean HEAD 上重跑 4 worker 短 smoke / 长 baseline，替换当前 dirty baseline 证据。
-4. 补真实 PostgreSQL 多 worker / `FOR UPDATE SKIP LOCKED` 集成测试，验证同 conversation 顺序不乱、跨 conversation 可并发追平。
+4. 继续评估部分成功大量失败场景的 relay 退避策略，必要时加入 failure ratio backoff 或 circuit breaker。
 5. 视修复和评审复核结果决定是否推送 GitHub。
 
 ## 6. 评审要求
@@ -187,7 +187,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 Kafka writer 使用 `segmentio/kafka-go`，已配置 `acks=all`、hash key 和禁用自动建 topic，但该 Writer 不暴露 Kafka `enable.idempotence=true` 开关；生产硬化时需要更换支持幂等 producer 的 client 或接入更底层 transactional producer 能力。
 - 当前 outbox relay 的 publish callback 在 PostgreSQL 事务内执行，这是第一阶段可接受的至少一次发布取舍；压测阶段需要重点观察 batch size、Kafka publish latency、DB lock wait 和重复发布窗口。
 - 当前 relay 只支持 `message.persisted.v1`；启用 Edit/Revoke/Delete 前必须补齐对应 Kafka oneof payload 构造和测试。
-- OutboxStore 后续进入多 worker 或压测前，应补强 `available_at/next_retry_at` 未到期、低版本 PENDING 阻塞、并发 `FOR UPDATE SKIP LOCKED` 等 ready/concurrency 测试。
+- OutboxStore 已补真实 PostgreSQL 多 worker / `FOR UPDATE SKIP LOCKED` 集成测试，证明同 conversation 顺序不乱、跨 conversation 可并发追平；后续仍可补强 `available_at/next_retry_at` 未到期、低版本 PENDING 阻塞等 ready 条件测试。
 - 当前 relay 支持可配置多 worker；只有 `Published > 0` 时才立即继续循环，`Fetched > 0` 但没有成功发布时按 `FailureBackoff` 退避，空转时按 `PollInterval` sleep；同一 conversation 仍按最低 `aggregate_version` 串行发布，因此单会话积压追平能力仍受顺序保护限制。
 - 当前 relay 已缓解 Kafka 故障且 backlog 很大时的连续失败放大，但生产化仍需要结合失败比例、Kafka publish latency、DB lock wait 调整 backoff、batch size 和 worker 数。
 - 当前 ready 判断使用 DB `now()`，retry 时间写入使用应用时钟；生产硬化时需要统一时间源或明确 DB/relay 节点时钟同步要求。
@@ -218,3 +218,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-08：独立评审线程复核确认 gRPC 错误脱敏 P1 已解除；同时指出当前工作区有未提交 relay worker/backoff 优化雏形。本轮已继续完善该切片，补 `NEXUSIM_OUTBOX_WORKERS` / `NEXUSIM_OUTBOX_FAILURE_BACKOFF` wiring、worker 并发测试、失败退避测试，并跑 4 worker 真实 baseline：69608/69608 成功，p95 122.10ms，p99 156.24ms，`stats-wait=30s` 后 pending 2123，额外 drain 20s 后清零。
 - 2026-06-08：独立评审线程复核 `cef25f1 feat: add outbox relay worker controls`，结论为无 P0/P1，可作为 relay 追平能力优化切片保留；P2 跟踪项包括 clean commit baseline 归档、部分成功大量失败场景的退避策略、真实 PostgreSQL 多 worker / `SKIP LOCKED` 集成测试、worker 上限与配置日志。
 - 2026-06-08：已补本地 debug metrics collector，gRPC 进程记录 `conversation_seq_alloc_latency`，relay 进程记录 `kafka_publish_latency`；`loadtest/sendmessage` 支持 `--service-metrics-url` 和 `--relay-metrics-url` 并把 avg/p95 写入 summary。commit `ea4eb9a` 的 clean metrics smoke 已验证两个指标非空。
+- 2026-06-08：已补真实 PostgreSQL 多 worker / `FOR UPDATE SKIP LOCKED` 集成测试：两个 conversation 各 3 条 outbox，4 个并发 worker `ProcessReady(limit=1)`，断言跨 conversation 可同时进入 publish callback、同 conversation 发布顺序保持 `1,2,3`，最终 outbox 全部 `PUBLISHED`。

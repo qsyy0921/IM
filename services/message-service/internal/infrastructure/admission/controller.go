@@ -146,7 +146,7 @@ func (c *Controller) overloadReasons() []string {
 				ms(c.config.MaxRelayProcessReadyActiveP95),
 			))
 		}
-		if valueBelow(snapshot.OutboxFetchedPerCall, c.config.MinOutboxFetchedPerCall, c.config.MinMetricSamples) {
+		if pending > 0 && valueBelow(snapshot.OutboxFetchedPerCall, c.config.MinOutboxFetchedPerCall, c.config.MinMetricSamples) {
 			reasons = append(reasons, fmt.Sprintf(
 				"outbox_fetched_per_call_avg=%.2f threshold=%.2f",
 				snapshot.OutboxFetchedPerCall.Avg,

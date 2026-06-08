@@ -82,6 +82,49 @@ func TestControllerRejectsWhenOutboxOrRelaySignalsTrip(t *testing.T) {
 	}
 }
 
+func TestControllerIgnoresLowFetchedPerCallWhenOutboxHasNoPending(t *testing.T) {
+	controller := NewController(
+		Config{
+			Enabled:                 true,
+			MinOutboxFetchedPerCall: 5,
+			MinMetricSamples:        2,
+		},
+		fakePoolStats{stats: PoolStats{AcquiredConns: 1, MaxConns: 8}},
+		nil,
+		nil,
+	)
+	controller.outboxPending.Store(0)
+	controller.relaySnapshot.Store(metricsinfra.Snapshot{
+		OutboxFetchedPerCall: metricsinfra.ValueSnapshot{Count: 2, Avg: 0},
+	})
+
+	if err := controller.CheckSendMessage(context.Background()); err != nil {
+		t.Fatalf("expected idle relay samples to be allowed, got %v", err)
+	}
+}
+
+func TestControllerRejectsLowFetchedPerCallWhenOutboxHasPending(t *testing.T) {
+	controller := NewController(
+		Config{
+			Enabled:                 true,
+			MinOutboxFetchedPerCall: 5,
+			MinMetricSamples:        2,
+		},
+		fakePoolStats{stats: PoolStats{AcquiredConns: 1, MaxConns: 8}},
+		nil,
+		nil,
+	)
+	controller.outboxPending.Store(10)
+	controller.relaySnapshot.Store(metricsinfra.Snapshot{
+		OutboxFetchedPerCall: metricsinfra.ValueSnapshot{Count: 2, Avg: 3},
+	})
+
+	err := controller.CheckSendMessage(context.Background())
+	if !errors.Is(err, types.ErrServiceOverloaded) {
+		t.Fatalf("expected service overloaded, got %v", err)
+	}
+}
+
 type fakePoolStats struct {
 	stats PoolStats
 }

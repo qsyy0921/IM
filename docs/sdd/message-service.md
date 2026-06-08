@@ -851,7 +851,7 @@ pgx + sqlc
 PostgreSQL
 Kafka + Schema Registry
 Transactional Outbox
-六层 DDD: adapter / application / domain / port / infrastructure / runtime
+六层 DDD: api / app / domain / infrastructure / types / trigger
 ```
 
 禁止在第一阶段引入：
@@ -900,14 +900,16 @@ REST-only 内部服务通信
 
 ```text
 services/message-service/cmd
-services/message-service/internal/adapter/grpc
-services/message-service/internal/adapter/http
-services/message-service/internal/application
+services/message-service/internal/api/grpc
+services/message-service/internal/api/http
+services/message-service/internal/app
 services/message-service/internal/domain
-services/message-service/internal/port
 services/message-service/internal/infrastructure/postgres
 services/message-service/internal/infrastructure/kafka
-services/message-service/internal/runtime
+services/message-service/internal/infrastructure/rpc
+services/message-service/internal/types
+services/message-service/internal/trigger/outbox
+services/message-service/internal/trigger/repair
 ```
 
 测试门禁：

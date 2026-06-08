@@ -1,0 +1,28 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Go build outputs
+bin/
+dist/
+*.exe
+*.test
+coverage.out
+
+# Local Docker data
+deploy/local/data/
+
+# Load-test outputs
+loadtest/results/**
+!loadtest/results/.gitkeep

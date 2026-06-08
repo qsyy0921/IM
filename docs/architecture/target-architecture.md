@@ -211,7 +211,47 @@ flowchart TB
 工程分层固定为：
 
 ```text
-adapter -> application -> domain -> port -> infrastructure -> runtime-governance
+api -> app -> domain
+trigger -> app -> domain
+app -> infrastructure
+app/domain/api/trigger -> types
+```
+
+六层职责固定为：
+
+| 层 | 职责 | 示例 |
+| --- | --- | --- |
+| `api` | 对外接口适配层 | gRPC handler、HTTP handler、request/response 转换 |
+| `app` | 应用用例层 | `SendMessageUseCase`、事务编排、调用 domain 和 infrastructure |
+| `domain` | 领域规则层 | `Message`、`TimelineEvent`、`OutboxEvent`、幂等规则、状态流转 |
+| `infrastructure` | 基础设施实现层 | PostgreSQL、Kafka、Redis、外部 RPC client、sqlc repo |
+| `types` | 类型定义层 | Command、DTO、枚举、错误码、常量、跨层轻量类型 |
+| `trigger` | 触发器 / 后台任务层 | Outbox Relay、Kafka consumer、定时巡检、补偿任务 |
+
+依赖方向固定为：
+
+```text
+api -> app
+api -> types
+trigger -> app
+trigger -> types
+app -> domain
+app -> infrastructure
+app -> types
+domain -> types
+infrastructure -> types
+```
+
+禁止方向：
+
+```text
+domain -> infrastructure
+domain -> api
+domain -> trigger
+app -> concrete SDK without infrastructure port
+infrastructure -> api
+infrastructure -> trigger
+types -> app/domain/infrastructure/api/trigger
 ```
 
 领域层不依赖 Kafka、Redis、SQL、OpenSearch、Milvus、Temporal SDK。
@@ -1237,7 +1277,7 @@ RAG/Agent 发布必须跑安全评测：
 | `api/asyncapi` | Kafka topic 事件契约 | topic、partition key、DLQ/retry/replay policy 必须显式声明 |
 | `migrations/postgres` | PostgreSQL schema migration | 按服务分目录；所有变更遵循 `expand -> migrate -> contract` |
 | `schemas/kafka` | Schema Registry 输入文件 | Protobuf 为主；事件 envelope 与 outbox 表字段保持一致 |
-| `services/<service>` | 服务实现 | `adapter -> application -> domain -> port -> infrastructure -> runtime-governance` |
+| `services/<service>` | 服务实现 | `api / app / domain / infrastructure / types / trigger` |
 | `pkg` | 跨服务公共库 | 只允许放日志、错误码、trace、配置、测试工具；禁止放业务领域模型 |
 | `deploy/local` | 本地开发依赖 | PostgreSQL、Kafka、Redis 等基础设施；本地可用单 Redis namespace 简化三集群；本机端口以 runbook 为准 |
 | `loadtest` | MacBook/服务器压测脚本 | 每个脚本必须写目标、参数、通过标准和结果输出路径 |
@@ -1247,8 +1287,11 @@ RAG/Agent 发布必须跑安全评测：
 - Go module 固定为 `github.com/qsyy0921/IM`。
 - 服务之间不能直接 import 对方的 `internal` 或业务实现，只能通过 Protobuf 契约、事件契约或明确的 port interface 交互。
 - `domain` 层不依赖 SQL、Kafka、Redis、OpenSearch、Milvus、Temporal、Kratos SDK。
-- `application` 层只编排 use case、事务和 port，不写协议解析和具体存储细节。
+- `app` 层只编排 use case、事务和 port interface，不写协议解析和具体存储细节。
 - `infrastructure` 层承接 pgx/sqlc、Kafka producer/consumer、Redis、OpenTelemetry exporter。
+- `api` 层只做对外接口适配和 request/response 转换，不写业务规则。
+- `trigger` 层只做后台触发、消费、巡检和补偿任务，不写业务规则。
+- `types` 层只放稳定基础类型，不允许变成全局工具箱或业务模型包。
 - 第一阶段允许 `policy-service`、`conversation-service`、`timeline-service` 使用 strict mock，但 mock 必须实现同名 port，不能把权限、成员、seq 逻辑硬编码进 message-service。
 
 第一条代码切片：

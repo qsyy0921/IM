@@ -140,6 +140,8 @@ accepted_at
 | `OUTBOX_WRITE_FAILED` | outbox 写入失败，事务回滚 | 是 |
 | `SERVICE_OVERLOADED` | 服务过载或连接池保护性拒绝 | 是 |
 
+`SERVICE_OVERLOADED` 的 gRPC response 必须附带标准 `RetryInfo` detail；当前第一阶段使用固定 `500ms` retry delay，客户端仍必须叠加指数退避和 jitter，不能立即重试。
+
 ### 4.2 同步调用治理
 
 | 调用 | deadline | retry | fallback |

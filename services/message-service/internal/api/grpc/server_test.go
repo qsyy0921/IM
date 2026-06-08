@@ -9,6 +9,7 @@ import (
 
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	"github.com/qsyy0921/IM/services/message-service/internal/types"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	grpcgo "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -245,6 +246,31 @@ func TestSendMessageSanitizesInternalErrorMessages(t *testing.T) {
 	}
 }
 
+func TestSendMessageServiceOverloadedIncludesRetryInfo(t *testing.T) {
+	server := NewServer(&fakeSendMessageExecutor{err: types.NewServiceOverloaded("pg pool saturated")})
+
+	_, err := server.SendMessage(context.Background(), testSendMessageRequest())
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	if st.Code() != codes.Unavailable {
+		t.Fatalf("expected unavailable, got %s", st.Code())
+	}
+	var retryInfo *errdetails.RetryInfo
+	for _, detail := range st.Details() {
+		if candidate, ok := detail.(*errdetails.RetryInfo); ok {
+			retryInfo = candidate
+		}
+	}
+	if retryInfo == nil {
+		t.Fatalf("expected RetryInfo detail, got %+v", st.Details())
+	}
+	if retryInfo.GetRetryDelay().AsDuration() != serviceOverloadedRetryDelay {
+		t.Fatalf("unexpected retry delay: %s", retryInfo.GetRetryDelay().AsDuration())
+	}
+}
+
 func testSendMessageRequest() *messagev1.SendMessageRequest {
 	payload, err := structpb.NewStruct(map[string]any{"text": "hello"})
 	if err != nil {
@@ -284,12 +310,15 @@ func assertStatusDetail(
 		t.Fatalf("expected grpc code %s, got %s", expectedCode, st.Code())
 	}
 	details := st.Details()
-	if len(details) != 1 {
-		t.Fatalf("expected one error detail, got %d", len(details))
+	var detail *messagev1.MessageError
+	for _, candidate := range details {
+		if messageError, ok := candidate.(*messagev1.MessageError); ok {
+			detail = messageError
+			break
+		}
 	}
-	detail, ok := details[0].(*messagev1.MessageError)
-	if !ok {
-		t.Fatalf("expected MessageError detail, got %T", details[0])
+	if detail == nil {
+		t.Fatalf("expected MessageError detail, got %+v", details)
 	}
 	if detail.GetCode() != expectedErrorCode ||
 		detail.GetRetryable() != expectedRetryable ||

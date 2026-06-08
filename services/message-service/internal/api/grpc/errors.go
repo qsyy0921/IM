@@ -2,12 +2,17 @@ package grpc
 
 import (
 	"errors"
+	"time"
 
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	"github.com/qsyy0921/IM/services/message-service/internal/types"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
+
+const serviceOverloadedRetryDelay = 500 * time.Millisecond
 
 type invalidArgumentError struct {
 	message string
@@ -25,12 +30,23 @@ func grpcError(err error, correlationID string) error {
 	grpcCode, messageErrorCode, retryable := classifyError(err)
 	publicMessage := publicErrorMessage(err)
 	st := status.New(grpcCode, publicMessage)
-	withDetails, detailErr := st.WithDetails(&messagev1.MessageError{
+	messageError := &messagev1.MessageError{
 		Code:          messageErrorCode,
 		Message:       publicMessage,
 		Retryable:     retryable,
 		CorrelationId: correlationID,
-	})
+	}
+	if errors.Is(err, types.ErrServiceOverloaded) {
+		withDetails, detailErr := st.WithDetails(messageError, &errdetails.RetryInfo{
+			RetryDelay: durationpb.New(serviceOverloadedRetryDelay),
+		})
+		if detailErr != nil {
+			return st.Err()
+		}
+		return withDetails.Err()
+	}
+
+	withDetails, detailErr := st.WithDetails(messageError)
 	if detailErr != nil {
 		return st.Err()
 	}

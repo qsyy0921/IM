@@ -168,16 +168,15 @@ VU1600 success_p99=1988.95ms accepted_rps=654.78
 1. `MinAvailable=0` 不适合作为正式策略，拒绝太晚，容易出现 DeadlineExceeded 和 DB_WRITE_FAILED。
 2. `MinAvailable=4/8` 是当前更合理的保守候选：错误语义稳定，outbox 不积压，accepted RPS 约 820-934。
 3. `MinAvailable=16` 过于保守，成功吞吐下降明显，且 1600 VU 的 success p99 没有稳定改善。
-4. 当前 backpressure 本质是保护数据库和 outbox，不是提升成功请求性能；用户体验上必须配合客户端指数退避和 jitter。
+4. 当前 backpressure 本质是保护数据库和 outbox，不是提升成功请求性能；用户体验上必须让客户端遵守 gRPC `RetryInfo`，并叠加指数退避和 jitter。
 5. 下一阶段不能继续只调静态阈值，应设计 adaptive limit。
 
 ## 8. 下一步
 
 - 短期推荐实验阈值：`MinAvailableConns=8`。
-- 在 app/gRPC 层增加 retry hint，例如 gRPC `RetryInfo` 或文档化 `retry-after + jitter`。
+- 让客户端遵守 gRPC `RetryInfo=500ms`，并叠加指数退避和 jitter；后续再让 retry delay 随 adaptive limit 动态调整。
 - 设计 adaptive limit：
   - 输入：pool acquire p95/p99、acquired conns、timeout/error rate、SERVICE_OVERLOADED rate、outbox pending、PostgreSQL wait_event。
   - 输出：动态 accepted concurrency / min available conns。
   - 目标：维持 accepted RPS，降低 success p99，并避免错误退化成 DeadlineExceeded / DB_WRITE_FAILED。
 - 继续优化 repository 成功路径和 outbox relay，否则 backpressure 只能把过载显式化，不能提高真实容量。
-

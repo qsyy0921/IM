@@ -97,7 +97,7 @@ Test-NetConnection 192.168.0.182 -Port 10498
 - 压测结果输出到 `loadtest/results/<date>/`。
 - 先跑短压测确认功能，再跑长压测观察资源和稳定性。
 - 本地双机结果只用于发现早期瓶颈和趋势，不作为生产容量承诺。
-- 如需记录 `conversation_seq_alloc_latency`、`kafka_publish_latency`、`outbox_process_ready_latency`、`outbox_fetch_ready_latency`、`outbox_mark_published_latency` 和 `outbox_commit_latency`，gRPC 进程与 outbox relay 进程必须分别设置 `NEXUSIM_DEBUG_ADDR`，并把对应地址传给压测脚本。启用 batch publish 后，`kafka_publish_latency` 表示一次 batch 写调用耗时，不能和旧单条 publish 延迟直接等价比较。
+- 如需记录 `conversation_seq_alloc_latency`、Kafka publish、outbox relay 分段指标，gRPC 进程与 outbox relay 进程必须分别设置 `NEXUSIM_DEBUG_ADDR`，并把对应地址传给压测脚本。`kafka_publish_latency` 只保留兼容旧报告；正式报告优先看 `kafka_publish_call_latency`、`kafka_publish_records_per_call` 和 `kafka_publish_record_latency_estimate`，避免 single path 和 batch path 口径混用。
 
 推荐参数形式：
 
@@ -220,7 +220,9 @@ p99
 conversation_seq_alloc_latency
 outbox_pending_count
 outbox_oldest_pending_age
-kafka_publish_latency
+kafka_publish_call_latency
+kafka_publish_records_per_call
+kafka_publish_record_latency_estimate
 error_topn
 ```
 

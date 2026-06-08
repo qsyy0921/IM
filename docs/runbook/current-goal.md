@@ -55,16 +55,17 @@ message-service SendMessage
 | Outbox relay / Kafka publish path | 已实现 `trigger/outbox` relay、PostgreSQL outbox store、Kafka writer producer；relay 支持 `NEXUSIM_OUTBOX_WORKERS` 多 worker 与 `NEXUSIM_OUTBOX_FAILURE_BACKOFF` 失败退避；真实 PostgreSQL + Kafka 集成测试通过；真实 PostgreSQL 多 worker / `FOR UPDATE SKIP LOCKED` 测试已覆盖同 conversation 顺序和跨 conversation 并发；已将成功 publish 后的 outbox `PUBLISHED` 标记从逐条 update 改为同事务批量 update；relay 支持在 `OutboxStore.ProcessReadyBatch` 路径下使用 Kafka `PublishBatch` 批量写入；relay debug metrics 已暴露 `outbox_process_ready_latency_ms`、`outbox_fetch_ready_latency_ms`、`outbox_mark_published_latency_ms`、`outbox_commit_latency_ms` |
 | message-service gRPC adapter | 已实现 `SendMessage` gRPC handler、proto request/response 转换、稳定错误码 detail 映射和错误 message 脱敏、`NEXUSIM_MESSAGE_SERVICE_MODE=grpc` 运行入口；支持 `NEXUSIM_DEBUG_ADDR=/debug/metrics` 暴露本进程压测指标；已通过 bufconn client 单测 |
 | Backpressure | 已新增 `MESSAGE_ERROR_CODE_SERVICE_OVERLOADED`，repository 支持默认关闭的 PostgreSQL pool backpressure；启用 `NEXUSIM_PG_BACKPRESSURE_ENABLED=true` 后，连接池可用连接数小于等于 `NEXUSIM_PG_BACKPRESSURE_MIN_AVAILABLE_CONNS` 时快速返回 retryable `service overloaded`；gRPC `SERVICE_OVERLOADED` 已附带固定 `RetryInfo=500ms` |
-| SendMessage loadtest | 已实现 `go run ./loadtest/sendmessage` 参数化 gRPC 压测入口；支持 `target`、`vus`、`duration`、`result-dir`、`pg-dsn`、`stats-wait`、`service-metrics-url`、`relay-metrics-url`；`target` 和 service metrics URL 已支持逗号分隔，用于模拟多 `message-service` 实例；summary 记录 full commit、dirty 状态、outbox total/published/pending/DLQ、SendMessage/repository/commit/seq/Kafka/outbox relay latency、service/relay pgx pool、repository 和 relay 内部分段指标、多进程 metrics、retryable error count、service overloaded count、`message_error_counts[]`、`request_rps`、`accepted_rps`、`error_rps`、attempt-level `overload_rate`、`success_p99_ms` 和 `error_p99_ms`；压测器已支持可选 `--retry-overloaded`，会遵守 gRPC `RetryInfo` 并记录 `logical_request_count`、`logical_success_rate`、`retry_attempt_count`、`retried_request_count`；多 service metrics 的顶层 latency / pg pool 已改为聚合视图，避免只取第一个实例误导；`run-local-multi-instance.ps1` 已支持 `FixedPerInstance` 和 `FixedTotal` 两种 PG 连接预算模式；`run-local-pgpool-gradient.ps1` 已支持显式 `-BackpressureEnabled` 和 `-RetryOverloaded`；已补 `run-local-gradient.ps1`、`run-local-pgpool-gradient.ps1`、`run-local-multi-instance.ps1`、`collect-postgres-diagnostics.ps1`、`watch-postgres-diagnostics.ps1`；真实 gRPC + PostgreSQL + outbox relay + Kafka smoke、baseline、瓶颈诊断、PG pool / multi-instance 矩阵、PostgreSQL 诊断和 backpressure on/off 矩阵已执行 |
+| SendMessage loadtest | 已实现 `go run ./loadtest/sendmessage` 参数化 gRPC 压测入口；支持 `target`、`vus`、`duration`、`result-dir`、`pg-dsn`、`stats-wait`、`service-metrics-url`、`relay-metrics-url`；`target` 和 service metrics URL 已支持逗号分隔，用于模拟多 `message-service` 实例；summary 记录 full commit、dirty 状态、outbox total/published/pending/DLQ、SendMessage/repository/commit/seq/Kafka/outbox relay latency、service/relay pgx pool、repository 和 relay 内部分段指标、多进程 metrics、retryable error count、service overloaded count、`message_error_counts[]`、`request_rps`、`accepted_rps`、`error_rps`、attempt-level `overload_rate`、`success_p99_ms` 和 `error_p99_ms`；Kafka publish 指标已拆出 `kafka_publish_call_latency_ms`、`kafka_publish_records_per_call`、`kafka_publish_record_latency_estimate_ms`，避免 single path 和 batch path 口径混淆；压测器已支持可选 `--retry-overloaded`，会遵守 gRPC `RetryInfo` 并记录 `logical_request_count`、`logical_success_rate`、`retry_attempt_count`、`retried_request_count`；多 service metrics 的顶层 latency / pg pool 已改为聚合视图，避免只取第一个实例误导；`run-local-multi-instance.ps1` 已支持 `FixedPerInstance` 和 `FixedTotal` 两种 PG 连接预算模式；`run-local-pgpool-gradient.ps1` 已支持显式 `-BackpressureEnabled` 和 `-RetryOverloaded`；已补 `run-local-gradient.ps1`、`run-local-pgpool-gradient.ps1`、`run-local-multi-instance.ps1`、`collect-postgres-diagnostics.ps1`、`watch-postgres-diagnostics.ps1`；真实 gRPC + PostgreSQL + outbox relay + Kafka smoke、baseline、瓶颈诊断、PG pool / multi-instance 矩阵、PostgreSQL 诊断和 backpressure on/off 矩阵已执行 |
 
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
-2. 基于客户端遵守 `RetryInfo` 的正式矩阵，继续优化 outbox relay 追平能力：批量 publish、batch size、worker 数和故障退避；避免 accepted RPS 回升后 pending 快速增加。
-3. 设计更细的 adaptive limit，把 outbox pending 纳入输入，而不是只看瞬时 acquired conns。
-4. 继续压测客户端 retry 参数：`max_retries=1/2/3`、`jitter=100/300/500ms`。
-5. 继续采集 PostgreSQL wait_event，重点看 `LWLock:WALWrite`、`LWLock:WALInsert`、`LWLock:BufferContent` 和 `CheckpointWriteDelay`。
-6. 视评审复核结果决定是否推送 GitHub。
+2. 跑正式 PublishBatch before/after 矩阵，覆盖 1200/1600 VU，至少重复两轮；报告必须展示 `kafka_publish_call_latency_ms`、`kafka_publish_records_per_call`、`kafka_publish_record_latency_estimate_ms`。
+3. 重复验证 outbox batch size 100/500/1000，确认 batch 500 是否只是本机波动下的候选。
+4. 设计更细的 adaptive limit，把 outbox pending 和 relay process ready latency 纳入输入，而不是只看瞬时 acquired conns。
+5. 继续压测客户端 retry 参数：`max_retries=1/2/3`、`jitter=100/300/500ms`。
+6. 继续采集 PostgreSQL wait_event，重点看 `LWLock:WALWrite`、`LWLock:WALInsert`、`LWLock:BufferContent` 和 `CheckpointWriteDelay`。
+7. 视评审复核结果决定是否推送 GitHub。
 
 ## 6. 评审要求
 
@@ -143,7 +144,9 @@ p95
 p99
 outbox_pending_count
 outbox_oldest_pending_age
-kafka_publish_latency
+kafka_publish_call_latency
+kafka_publish_records_per_call
+kafka_publish_record_latency_estimate
 error_topn
 ```
 
@@ -218,7 +221,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 ready 判断使用 DB `now()`，retry 时间写入使用应用时钟；生产硬化时需要统一时间源或明确 DB/relay 节点时钟同步要求。
 - 当前尚未实现 DLQ repair/replay；未来实现时必须清理 `dead_lettered_at`、`last_error`、`next_retry_at` 等旧失败字段。
 - 已有真实进程级 SendMessage smoke 和 `--vus=100 --duration=60s` baseline 结果；baseline 写入成功率 100%，但 p99 与 outbox backlog 暴露出性能风险。
-- 压测 summary 已支持从 gRPC 进程和 relay 进程的 `/debug/metrics` 读取 `conversation_seq_alloc_latency_ms`、`kafka_publish_latency_ms`、`outbox_process_ready_latency_ms`、`outbox_fetch_ready_latency_ms`、`outbox_mark_published_latency_ms` 和 `outbox_commit_latency_ms`；生产化仍需接入统一 metrics/tracing，而不是依赖本地 debug endpoint。
+- 压测 summary 已支持从 gRPC 进程和 relay 进程的 `/debug/metrics` 读取 `conversation_seq_alloc_latency_ms`、兼容旧报告的 `kafka_publish_latency_ms`、`kafka_publish_call_latency_ms`、`kafka_publish_records_per_call`、`kafka_publish_record_latency_estimate_ms`、`outbox_process_ready_latency_ms`、`outbox_fetch_ready_latency_ms`、`outbox_mark_published_latency_ms` 和 `outbox_commit_latency_ms`；生产化仍需接入统一 metrics/tracing，而不是依赖本地 debug endpoint。
 - 当前 `51772e6` baseline：45212/45212 成功，p95 249.62ms，p99 518.03ms，`stats-wait=30s` 后本轮 tenant outbox `PENDING=27181`、`PUBLISHED=18031`。
 - 当前 worker/backoff dirty baseline：`NEXUSIM_OUTBOX_WORKERS=4`、`--vus=100 --duration=60s --stats-wait=30s --conversation-count=1000`，69608/69608 成功，p95 122.10ms，p99 156.24ms，`stats-wait=30s` 后本轮 tenant outbox `PENDING=2123`、`PUBLISHED=67485`；relay 额外 drain 20s 后该 tenant outbox 全部 `PUBLISHED=69608`。该数据用于开发判断，不能作为 clean commit 正式性能归档。
 - 当前 metrics clean smoke：commit `ea4eb9a`，`--vus=10 --duration=10s --stats-wait=10s --conversation-count=200`，8699/8699 成功，p95 19.46ms，p99 31.68ms，outbox pending 0；summary 已写入 `conversation_seq_alloc_latency_ms=1.47`、`conversation_seq_alloc_p95_ms=2.59`、`kafka_publish_latency_ms=1.01`、`kafka_publish_p95_ms=1.73`，且 `git_dirty=false`。
@@ -248,6 +251,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 relay metrics smoke：报告为 `docs/runbook/loadtest-report-20260609-relay-metrics-smoke.md`，结果路径为 `loadtest/results/relay-metrics-smoke-20260609/bpoff-pgmax-16-vu-10-20260609-052152/sendmessage-summary.json`。commit `148938e`、`git_dirty=false`、5244/5244 成功、p95 `12.334ms`、p99 `15.8853ms`、outbox pending 0；summary 已写入 `outbox_process_ready_latency_ms=43.2098`、`outbox_fetch_ready_latency_ms=18.1205`、`outbox_mark_published_latency_ms=2.1892`、`outbox_commit_latency_ms=2.6068`。该结果只证明观测链路可用，不作为容量结论。
 - 当前 outbox batch size 探索矩阵：报告为 `docs/runbook/loadtest-report-20260609-outbox-batchsize-smoke.md`，结果路径为 `loadtest/results/outbox-batchsize-smoke-20260609/`。commit `aeaf88a`、`git_dirty=false`，固定 `PG_MAX_CONNS=64`、relay workers 8、1200 VU、30s、客户端 retry；batch 100/500/1000 均 outbox pending 0。batch 500 的 logical success rate `0.7160` 和 accepted RPS `1694.93` 较好，但 `outbox_process_ready_latency_ms=415.83ms` 最高；batch 100 success p99 最低为 `584.42ms`。当前只把 batch 500 作为下一轮正式矩阵候选，不作为最终默认值。
 - 当前 outbox PublishBatch smoke：报告为 `docs/runbook/loadtest-report-20260609-outbox-publishbatch-smoke.md`，结果路径为 `loadtest/results/outbox-publishbatch-smoke-20260609/` 与 `loadtest/results/outbox-publishbatch-smoke-repeat-20260609/`。commit `9f26d0c`、`git_dirty=false`，固定 batch 500、1200 VU、30s。after run 2 logical success rate `0.7125`、accepted RPS `1658.80`、success p99 `576.48ms`、outbox pending 0；`outbox_process_ready_latency_ms` 从 before 的 `415.83ms` 降到 `41.95ms`。但 after run 1 波动明显，不能宣称整体容量已提升；batch path 下 `kafka_publish_latency_ms` 是 batch 调用耗时，不再等价于旧单条 publish 耗时。
+- 当前 PublishBatch metrics smoke：报告为 `docs/runbook/loadtest-report-20260609-publishbatch-metrics-smoke.md`，结果路径为 `loadtest/results/publishbatch-metrics-smoke-20260609/bpoff-pgmax-16-vu-10-20260609-055454/sendmessage-summary.json`。commit `8742f84`、`git_dirty=false`、5645/5645 成功、p99 `12.7919ms`、outbox pending 0；summary 已写入 `kafka_publish_call_latency_ms=11.5020`、`kafka_publish_records_per_call=21.0672`、`kafka_publish_record_latency_estimate_ms=0.7350`。该结果只证明指标链路可用，不作为容量结论。
 - 当前 debug metrics collector 保存全量样本并在 snapshot 时排序，适合本地短压测，不适合作为生产 metrics；后续应替换为固定窗口、reservoir、HDR histogram 或 Prometheus histogram。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
@@ -299,3 +303,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已新增 relay 分段 metrics，覆盖 `ProcessReady` 总耗时、ready outbox fetch、批量 mark published 和 outbox commit；clean smoke commit `148938e` 已验证真实进程 summary 能读到这些指标。
 - 2026-06-09：已跑 outbox batch size 100/500/1000 的 30 秒探索矩阵，并新增 `docs/runbook/loadtest-report-20260609-outbox-batchsize-smoke.md`。结论：三组均可追平，batch 500 暂作为下一轮正式矩阵候选，但不能跳过重复验证。
 - 2026-06-09：已实现 `OutboxStore.ProcessReadyBatch` 与 Kafka `WriterProducer.PublishBatch`，并在 clean commit `9f26d0c` 跑两轮短 smoke。结论：真实链路可运行且 outbox 可追平，`outbox_process_ready_latency_ms` 在第二轮明显下降；trigger 层已覆盖 Kafka batch error 和单条 payload build error；但单次波动大，需要正式重复矩阵和评审后再宣称阶段完成。
+- 2026-06-09：根据评审 P2 已拆分 Kafka publish metrics，新增 `kafka_publish_call_latency_ms`、`kafka_publish_records_per_call`、`kafka_publish_record_latency_estimate_ms`；旧 `kafka_publish_latency_ms` 仅保留兼容。同时修复 `ProcessReadyBatch` 空批次仍调用 publish callback 的问题，并补直接调用 `ProcessReadyBatch` 的真实 PostgreSQL 混合成功/失败测试。

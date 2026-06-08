@@ -25,7 +25,7 @@ NexusIM 是面向大规模企业协同的 IM + 智能协作平台。核心原则
 
 | 模块 | 技术方案 | 约束 |
 | --- | --- | --- |
-| 语言 | Go | 业务服务和网关统一 Go |
+| 语言 | Go 1.26.4 | 业务服务和网关统一 Go |
 | 微服务框架 | Kratos | 业务微服务统一 Kratos |
 | 内部通信 | gRPC + Protobuf | 服务间同步接口统一 deadline、错误码、幂等语义 |
 | 外部 API | HTTP + OpenAPI | 面向客户端和开放平台 |
@@ -239,6 +239,7 @@ app -> domain
 app -> infrastructure
 app -> types
 domain -> types
+infrastructure -> domain
 infrastructure -> types
 ```
 
@@ -255,6 +256,8 @@ types -> app/domain/infrastructure/api/trigger
 ```
 
 领域层不依赖 Kafka、Redis、SQL、OpenSearch、Milvus、Temporal SDK。
+`infrastructure -> domain` 仅用于 repository / publisher adapter 实现时转换领域输入、结果或领域对象；`domain -> infrastructure` 仍然禁止。
+`app -> infrastructure` 仅用于当前轻量骨架和组合根过渡；正式实现优先由 `app` 定义 port，由 `cmd` / composition root 注入 infrastructure 实现。
 
 ### 4.1 Control Plane
 

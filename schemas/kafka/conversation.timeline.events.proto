@@ -5,7 +5,7 @@ package nexusim.conversation.timeline.v1;
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/qsyy0921/IM/schemas/kafka/conversationtimeline/v1;conversationtimelinev1";
+option go_package = "github.com/qsyy0921/IM/schemas/kafka;conversationtimelinev1";
 
 // Topic: conversation.timeline.events
 // Partition key: tenant_id + ":" + conversation_id

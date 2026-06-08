@@ -6,7 +6,7 @@ TADD（Technical Architecture Design Document）描述技术栈、工程结构�
 
 | 模块 | 方案 | 约束 |
 | --- | --- | --- |
-| 语言 | Go | 业务服务、网关、outbox relay |
+| 语言 | Go 1.26.4 | 业务服务、网关、outbox relay |
 | AI worker | Python | RAG、Embedding、rerank、Agent eval |
 | 微服务框架 | Kratos | Go 服务统一框架 |
 | 内部通信 | gRPC + Protobuf | 统一 deadline、错误码、幂等语义 |
@@ -53,6 +53,7 @@ app -> domain
 app -> infrastructure
 app -> types
 domain -> types
+infrastructure -> domain
 infrastructure -> types
 ```
 
@@ -66,6 +67,12 @@ infrastructure -> api
 infrastructure -> trigger
 types -> app/domain/infrastructure/api/trigger
 ```
+
+说明：
+
+- `infrastructure -> domain` 仅允许基础设施实现 repository / publisher adapter 时使用领域输入、结果或领域对象。
+- `domain -> infrastructure` 仍然禁止，领域层不能依赖 SQL、Kafka、Redis 或外部 SDK。
+- `app -> infrastructure` 仅用于当前轻量骨架和组合根过渡；正式实现时优先由 `app` 定义 port，由 `cmd`/composition root 注入 infrastructure 实现。
 
 ## 3. 仓库目录
 
@@ -200,6 +207,26 @@ api/proto/nexusim/message/v1/message_service.proto
 api/proto/nexusim/message/v1/message_error.proto
 schemas/kafka/conversation.timeline.events.proto
 ```
+
+当前 Go 代码生成基线：
+
+```text
+Go 1.26.4
+protoc 29.3
+protoc-gen-go v1.36.11
+protoc-gen-go-grpc 1.6.2
+google.golang.org/grpc v1.81.1
+google.golang.org/protobuf v1.36.11
+```
+
+当前唯一支持的生成入口：
+
+```text
+make proto
+tools/gen-proto.ps1
+```
+
+`api/proto/buf.gen.yaml` 和 `schemas/kafka/buf.gen.yaml` 暂时只作为 Buf 工作流草稿；在统一 Buf 执行目录和输出根之前，不作为当前生成入口。
 
 待补：
 

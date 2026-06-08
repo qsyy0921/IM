@@ -79,6 +79,7 @@ app -> domain
 app -> infrastructure
 app -> types
 domain -> types
+infrastructure -> domain
 infrastructure -> types
 ```
 
@@ -92,6 +93,12 @@ infrastructure -> api
 infrastructure -> trigger
 types -> app/domain/infrastructure/api/trigger
 ```
+
+依赖说明：
+
+- `infrastructure -> domain` 只用于 repository / publisher adapter 实现时转换领域输入、结果或领域对象；
+- `domain -> infrastructure` 仍然禁止，领域层不能依赖 SQL、Kafka、Redis 或外部 SDK；
+- 正式实现时优先由 `app` 定义 port，由 `cmd`/composition root 注入 infrastructure 实现。
 
 说明：
 
@@ -107,8 +114,18 @@ types -> app/domain/infrastructure/api/trigger
 生成 Protobuf 代码：
 
 ```powershell
+. .\tools\go-env.ps1
 make proto
 ```
+
+Windows 本地也可以直接使用：
+
+```powershell
+. .\tools\go-env.ps1
+.\tools\gen-proto.ps1
+```
+
+当前唯一支持的生成入口是 `make proto` 或 `tools/gen-proto.ps1`。`buf.gen.yaml` 只保留为后续引入 Buf 工作流的配置草稿，不作为当前执行入口。
 
 启动本地依赖：
 

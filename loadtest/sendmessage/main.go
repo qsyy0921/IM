@@ -69,11 +69,24 @@ type summary struct {
 	ErrorCount                    int64                      `json:"error_count"`
 	RetryableErrorCount           int64                      `json:"retryable_error_count"`
 	ServiceOverloadedCount        int64                      `json:"service_overloaded_count"`
+	RequestRPS                    float64                    `json:"request_rps"`
+	AcceptedRPS                   float64                    `json:"accepted_rps"`
+	ErrorRPS                      float64                    `json:"error_rps"`
+	RetryableErrorRate            float64                    `json:"retryable_error_rate"`
+	OverloadRate                  float64                    `json:"overload_rate"`
 	SuccessRate                   float64                    `json:"success_rate"`
 	AvgMS                         float64                    `json:"avg_ms"`
 	P50MS                         float64                    `json:"p50_ms"`
 	P95MS                         float64                    `json:"p95_ms"`
 	P99MS                         float64                    `json:"p99_ms"`
+	SuccessAvgMS                  float64                    `json:"success_avg_ms"`
+	SuccessP50MS                  float64                    `json:"success_p50_ms"`
+	SuccessP95MS                  float64                    `json:"success_p95_ms"`
+	SuccessP99MS                  float64                    `json:"success_p99_ms"`
+	ErrorAvgMS                    float64                    `json:"error_avg_ms"`
+	ErrorP50MS                    float64                    `json:"error_p50_ms"`
+	ErrorP95MS                    float64                    `json:"error_p95_ms"`
+	ErrorP99MS                    float64                    `json:"error_p99_ms"`
 	SendMessageLatencyMS          *float64                   `json:"send_message_latency_ms"`
 	SendMessageP95MS              *float64                   `json:"send_message_p95_ms"`
 	SendMessageP99MS              *float64                   `json:"send_message_p99_ms"`
@@ -121,6 +134,13 @@ type messageErrorCount struct {
 type messageErrorKey struct {
 	Code      messagev1.MessageErrorCode
 	Retryable bool
+}
+
+type latencyBreakdown struct {
+	AvgMS float64
+	P50MS float64
+	P95MS float64
+	P99MS float64
 }
 
 func main() {
@@ -337,16 +357,22 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 	}()
 
 	latencies := make([]time.Duration, 0, cfg.VUs*128)
+	successLatencies := make([]time.Duration, 0, cfg.VUs*128)
+	errorLatencies := make([]time.Duration, 0, cfg.VUs*128)
 	errorCounts := map[string]int64{}
 	messageErrorCounts := map[messageErrorKey]int64{}
 	var successCount int64
 	var retryableErrorCount int64
 	var serviceOverloadedCount int64
 	var totalLatency time.Duration
+	var successLatency time.Duration
+	var errorLatency time.Duration
 	for record := range records {
 		latencies = append(latencies, record.latency)
 		totalLatency += record.latency
 		if record.err != nil {
+			errorLatencies = append(errorLatencies, record.latency)
+			errorLatency += record.latency
 			errorCounts[errorKey(record.err)]++
 			if detail, ok := messageErrorDetail(record.err); ok {
 				messageErrorCounts[messageErrorKey{Code: detail.GetCode(), Retryable: detail.GetRetryable()}]++
@@ -359,6 +385,8 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 			}
 			continue
 		}
+		successLatencies = append(successLatencies, record.latency)
+		successLatency += record.latency
 		successCount++
 	}
 	finished := time.Now().UTC()
@@ -370,6 +398,23 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 		successRate = float64(successCount) / float64(requestCount)
 		avgMS = durationMS(totalLatency) / float64(requestCount)
 	}
+	durationSeconds := cfg.Duration.Seconds()
+	requestRPS := 0.0
+	acceptedRPS := 0.0
+	errorRPS := 0.0
+	if durationSeconds > 0 {
+		requestRPS = float64(requestCount) / durationSeconds
+		acceptedRPS = float64(successCount) / durationSeconds
+		errorRPS = float64(errorCountValue) / durationSeconds
+	}
+	retryableErrorRate := 0.0
+	overloadRate := 0.0
+	if requestCount > 0 {
+		retryableErrorRate = float64(retryableErrorCount) / float64(requestCount)
+		overloadRate = float64(serviceOverloadedCount) / float64(requestCount)
+	}
+	successBreakdown := summarizeLatencies(successLatencies, successLatency)
+	errorBreakdown := summarizeLatencies(errorLatencies, errorLatency)
 
 	commit := currentCommit()
 	return summary{
@@ -389,11 +434,24 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 		ErrorCount:                    errorCountValue,
 		RetryableErrorCount:           retryableErrorCount,
 		ServiceOverloadedCount:        serviceOverloadedCount,
+		RequestRPS:                    requestRPS,
+		AcceptedRPS:                   acceptedRPS,
+		ErrorRPS:                      errorRPS,
+		RetryableErrorRate:            retryableErrorRate,
+		OverloadRate:                  overloadRate,
 		SuccessRate:                   successRate,
 		AvgMS:                         avgMS,
 		P50MS:                         durationMS(percentile(latencies, 0.50)),
 		P95MS:                         durationMS(percentile(latencies, 0.95)),
 		P99MS:                         durationMS(percentile(latencies, 0.99)),
+		SuccessAvgMS:                  successBreakdown.AvgMS,
+		SuccessP50MS:                  successBreakdown.P50MS,
+		SuccessP95MS:                  successBreakdown.P95MS,
+		SuccessP99MS:                  successBreakdown.P99MS,
+		ErrorAvgMS:                    errorBreakdown.AvgMS,
+		ErrorP50MS:                    errorBreakdown.P50MS,
+		ErrorP95MS:                    errorBreakdown.P95MS,
+		ErrorP99MS:                    errorBreakdown.P99MS,
 		ErrorTopN:                     topErrors(errorCounts, 10),
 		MessageErrorCounts:            topMessageErrors(messageErrorCounts, 10),
 		StartedAt:                     started.Format(time.RFC3339Nano),
@@ -501,6 +559,18 @@ func percentile(values []time.Duration, p float64) time.Duration {
 		index = len(sorted) - 1
 	}
 	return sorted[index]
+}
+
+func summarizeLatencies(values []time.Duration, total time.Duration) latencyBreakdown {
+	if len(values) == 0 {
+		return latencyBreakdown{}
+	}
+	return latencyBreakdown{
+		AvgMS: durationMS(total) / float64(len(values)),
+		P50MS: durationMS(percentile(values, 0.50)),
+		P95MS: durationMS(percentile(values, 0.95)),
+		P99MS: durationMS(percentile(values, 0.99)),
+	}
 }
 
 func topErrors(counts map[string]int64, limit int) []errorCount {

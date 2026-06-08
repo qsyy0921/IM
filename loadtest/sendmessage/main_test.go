@@ -102,6 +102,25 @@ func TestPercentile(t *testing.T) {
 	}
 }
 
+func TestSummarizeLatencies(t *testing.T) {
+	values := []time.Duration{
+		10 * time.Millisecond,
+		20 * time.Millisecond,
+		30 * time.Millisecond,
+		40 * time.Millisecond,
+	}
+	summary := summarizeLatencies(values, 100*time.Millisecond)
+	if summary.AvgMS != 25 ||
+		summary.P50MS != 20 ||
+		summary.P95MS != 40 ||
+		summary.P99MS != 40 {
+		t.Fatalf("unexpected latency summary: %+v", summary)
+	}
+	if empty := summarizeLatencies(nil, 0); empty.AvgMS != 0 || empty.P99MS != 0 {
+		t.Fatalf("unexpected empty summary: %+v", empty)
+	}
+}
+
 func TestApplyLatency(t *testing.T) {
 	var avg *float64
 	var p95 *float64

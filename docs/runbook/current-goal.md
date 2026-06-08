@@ -54,15 +54,17 @@ message-service SendMessage
 | PostgreSQL repository | 已实现普通会话 `SendMessage` 本地事务：幂等检查、同幂等键 advisory transaction lock、`conversation_seq` row lock、`message_log`、`conversation_timeline_events`、`message_outbox` 同事务写入；outbox payload 对齐 `MessagePersistedV1` 业务 payload；集成测试和并发重复请求测试通过 |
 | Outbox relay / Kafka publish path | 已实现 `trigger/outbox` relay、PostgreSQL outbox store、Kafka writer producer；relay 支持 `NEXUSIM_OUTBOX_WORKERS` 多 worker 与 `NEXUSIM_OUTBOX_FAILURE_BACKOFF` 失败退避；真实 PostgreSQL + Kafka 集成测试通过；真实 PostgreSQL 多 worker / `FOR UPDATE SKIP LOCKED` 测试已覆盖同 conversation 顺序和跨 conversation 并发 |
 | message-service gRPC adapter | 已实现 `SendMessage` gRPC handler、proto request/response 转换、稳定错误码 detail 映射和错误 message 脱敏、`NEXUSIM_MESSAGE_SERVICE_MODE=grpc` 运行入口；支持 `NEXUSIM_DEBUG_ADDR=/debug/metrics` 暴露本进程压测指标；已通过 bufconn client 单测 |
-| SendMessage loadtest | 已实现 `go run ./loadtest/sendmessage` 参数化 gRPC 压测入口；支持 `target`、`vus`、`duration`、`result-dir`、`pg-dsn`、`stats-wait`、`service-metrics-url`、`relay-metrics-url`；summary 记录 full commit、dirty 状态、outbox total/published/pending/DLQ、SendMessage/repository/commit/seq/Kafka latency、service/relay pgx pool；已补 `run-local-gradient.ps1` 本机 worker 梯度压测脚本；真实 gRPC + PostgreSQL + outbox relay + Kafka smoke、baseline 与瓶颈诊断已执行 |
+| SendMessage loadtest | 已实现 `go run ./loadtest/sendmessage` 参数化 gRPC 压测入口；支持 `target`、`vus`、`duration`、`result-dir`、`pg-dsn`、`stats-wait`、`service-metrics-url`、`relay-metrics-url`；`target` 和 service metrics URL 已支持逗号分隔，用于模拟多 `message-service` 实例；summary 记录 full commit、dirty 状态、outbox total/published/pending/DLQ、SendMessage/repository/commit/seq/Kafka latency、service/relay pgx pool、repository 内部分段指标和多进程 metrics；已补 `run-local-gradient.ps1`、`run-local-pgpool-gradient.ps1`、`run-local-multi-instance.ps1`；真实 gRPC + PostgreSQL + outbox relay + Kafka smoke、baseline、瓶颈诊断与短 PG pool / multi-instance smoke 已执行 |
 
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
-2. 基于 `NEXUSIM_OUTBOX_WORKERS=4` baseline 结果继续评估 batch size、worker 数、Kafka publish latency 和单会话顺序保护下的追平上限。
-3. 重复 clean 4 worker baseline 或做 4/8/16 worker 梯度压测，确认吞吐和 pending 是否稳定，而不是依赖单次本机结果。
-4. 继续评估部分成功大量失败场景的 relay 退避策略，必要时加入 failure ratio backoff 或 circuit breaker。
-5. 视修复和评审复核结果决定是否推送 GitHub。
+2. 运行正式 PG 连接池梯度：`PG_MAX_CONNS=16/32/64/96/128`，`VU=1200/1600/2000/2400`，观察 `repository_begin_latency_ms`、pgxpool acquire、request p99 和 outbox pending。
+3. 运行正式多实例压测：`Instances=1/2/4`，比较单实例与多实例下的 request p99、各实例 service metrics、PostgreSQL 共享瓶颈是否出现。
+4. 根据正式矩阵结果更新或新增下一份容量报告，不覆盖已有报告。
+5. 如果 p99 仍贴近 `repository_begin_latency_ms`，优先做连接池/实例数/PG 写入并发优化；如果瓶颈转移到 insert 或 seq，再进入表结构、索引、WAL/checkpoint 或 seq 分配策略优化。
+6. 视正式矩阵结果决定是否邀请评审线程复核；暂不因短 smoke 频繁评审。
+7. 视修复和评审复核结果决定是否推送 GitHub。
 
 ## 6. 评审要求
 
@@ -227,7 +229,11 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 Windows+Mac 分布式双客户端已跑通：Windows 服务端暴露 `10495/10497/10500`，Windows 和 Mac 同时作为 load generator。`600+600 VU` 双客户端全部成功，Windows client p99 `730.11ms`、Mac client p99 `739.50ms`、outbox pending 0；`1000+1000 VU` 双客户端全部成功但 p99 均约 `1331ms`，按当前尾延迟门槛超线。
 - 当前压测趋势图已生成到 `loadtest/results/charts/`：`winwin-rps-trend.png`、`winwin-p99-trend.png`、`distributed-clients-trend.png`，摘要为 `loadtest/results/charts/winwin-distributed-summary.md`；这些结果文件默认不提交。
 - 当前压测正式报告为 `docs/runbook/loadtest-report-20260609.md`，已记录压测拓扑、执行方式、通过标准、结果摘要和瓶颈排查过程。
+- 当前 PG pool / multi-instance 诊断报告为 `docs/runbook/loadtest-report-20260609-pgpool-multi-instance.md`，已记录 repository 细分指标、多 target loadtest、多 service metrics URL、PG pool smoke 和 multi-instance smoke。该报告是工具链验证和短 smoke，不是最终容量报告。
 - 当前 p99 瓶颈已初步定位：`16 CPU / 23g / 1600 VU / workers=8` 下，request p99 基本等于 repository append p99；commit、conversation_seq、Kafka publish 都是毫秒级；service pgxpool 默认 `max_conns=16` 时 acquire 平均等待约 `646ms`，`NEXUSIM_PG_MAX_CONNS=64` 后 1600 VU p99 改善到 `779.63ms`，但 2400 VU 仍 p99 `1452.87ms` 超线。下一步优先做 PG 连接池梯度、多 message-service 实例和 repository 细分打点。
+- 当前 repository 细分指标已落地：`repository_begin_latency_ms`、`repository_idempotency_lock_latency_ms`、`repository_find_existing_latency_ms`、`repository_ensure_seq_latency_ms`、`repository_allocate_seq_latency_ms`、`repository_insert_message_latency_ms`、`repository_insert_timeline_latency_ms`、`repository_insert_outbox_latency_ms`、`repository_commit_latency_ms`。
+- 当前 clean commit `e87bb9b` PG pool smoke：`PG_MAX_CONNS=16/64`、`VU=20`、`duration=5s`、`stats-wait=5s`，两组全部成功；p99 分别为 `42.52ms`、`33.46ms`，结果在 `loadtest/results/pgpool-smoke-20260609-013424/`，后续短 relay drain 后对应 outbox 均为 `pending=0`。
+- 当前 clean commit `e87bb9b` multi-instance smoke：`Instances=1/2`、`VU=20`、`duration=5s`、`stats-wait=5s`，两组全部成功；p99 分别为 `40.43ms`、`39.35ms`，结果在 `loadtest/results/multi-instance-smoke-20260609-013511/`，多 target 和多 service metrics URL 均已验证；后续短 relay drain 后对应 outbox 均为 `pending=0`。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
 - `timeline-service`、`conversation-service`、`delivery-service`、`push-gateway` SDD 未冻结，不能扩展到对应生产逻辑。
@@ -252,3 +258,5 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-08：已补真实 PostgreSQL 多 worker / `FOR UPDATE SKIP LOCKED` 集成测试：两个 conversation 各 3 条 outbox，4 个并发 worker `ProcessReady(limit=1)`，断言跨 conversation 可同时进入 publish callback、同 conversation 发布顺序保持 `1,2,3`，最终 outbox 全部 `PUBLISHED`。
 - 2026-06-08：已在 clean HEAD `0ff42d2` 跑 4 worker 长 baseline，summary 为 24714/24714 成功、p95 436.24ms、p99 583.96ms、`stats-wait=30s` 后 pending 392；随后 DB 查询显示该 tenant 已全部 published。由于该结果与 dirty baseline 吞吐差异较大，后续需要重复 clean baseline 或按 4/8/16 worker 梯度压测确认趋势。
 - 2026-06-08：已补 `loadtest/sendmessage/run-local-gradient.ps1`，用于本机按 worker 数循环启动真实 gRPC / outbox relay / loadtest 进程并采集 metrics；dirty smoke 已验证 4/8/16 worker 短梯度脚本可运行。
+- 2026-06-09：已提交 `e87bb9b feat: add multi-instance loadtest diagnostics`，补齐 repository 内部分段指标、多 target loadtest、多 service metrics URL、`run-local-pgpool-gradient.ps1` 和 `run-local-multi-instance.ps1`；`go test ./...`、`go build ./services/message-service/cmd/message-service ./loadtest/sendmessage`、PowerShell 脚本语法检查和 `git diff --check` 均已通过。
+- 2026-06-09：已在 clean commit `e87bb9b` 跑 PG pool 短 smoke 和 multi-instance 短 smoke，验证 summary 能记录 repository 分段指标和多实例 service metrics；该结果只作为工具链验证，不作为正式容量结论。下一步必须跑正式长矩阵后再申请阶段评审。

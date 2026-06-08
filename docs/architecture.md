@@ -1164,6 +1164,50 @@ TCP 端口范围: 10495-10510
 - 压测服务必须监听 `0.0.0.0:<port>`；只监听 `127.0.0.1:<port>` 时对端无法访问。
 - 非压测窗口不启动这些端口上的服务。
 
+工程落地基线：
+
+| 目录 | 职责 | 约束 |
+| --- | --- | --- |
+| `api/proto` | gRPC 服务和事件 Protobuf 契约 | 先定义 `nexusim.message.v1`，字段只增不删，破坏性变更必须升版本 |
+| `api/openapi` | HTTP/OpenAPI 契约 | 由 gateway 适配生成，不能手写偏离 Proto 语义的接口 |
+| `api/asyncapi` | Kafka topic 事件契约 | topic、partition key、DLQ/retry/replay policy 必须显式声明 |
+| `migrations/postgres` | PostgreSQL schema migration | 按服务分目录；所有变更遵循 `expand -> migrate -> contract` |
+| `schemas/kafka` | Schema Registry 输入文件 | Protobuf 为主；事件 envelope 与 outbox 表字段保持一致 |
+| `services/<service>` | 服务实现 | `adapter -> application -> domain -> port -> infrastructure -> runtime-governance` |
+| `pkg` | 跨服务公共库 | 只允许放日志、错误码、trace、配置、测试工具；禁止放业务领域模型 |
+| `deploy/local` | 本地开发依赖 | PostgreSQL、Kafka、Redis 等基础设施，服务端口使用 `10495-10510` |
+| `loadtest` | MacBook/服务器压测脚本 | 每个脚本必须写目标、参数、通过标准和结果输出路径 |
+
+代码依赖规则：
+
+- Go module 固定为 `github.com/qsyy0921/IM`。
+- 服务之间不能直接 import 对方的 `internal` 或业务实现，只能通过 Protobuf 契约、事件契约或明确的 port interface 交互。
+- `domain` 层不依赖 SQL、Kafka、Redis、OpenSearch、Milvus、Temporal、Kratos SDK。
+- `application` 层只编排 use case、事务和 port，不写协议解析和具体存储细节。
+- `infrastructure` 层承接 pgx/sqlc、Kafka producer/consumer、Redis、OpenTelemetry exporter。
+- 第一阶段允许 `policy-service`、`conversation-service`、`timeline-service` 使用 strict mock，但 mock 必须实现同名 port，不能把权限、成员、seq 逻辑硬编码进 message-service。
+
+第一条代码切片：
+
+```text
+message-service SendMessage
+-> gRPC/HTTP contract
+-> PostgreSQL migration
+-> local transaction: conversation_seq + message_log + conversation_timeline_events + message_outbox
+-> outbox relay publishes or records publish attempt
+-> integration test proves idempotency and transaction atomicity
+-> Windows listens on 0.0.0.0:10495
+-> MacBook runs loadtest against 192.168.0.141:10495
+```
+
+进入编码前的门禁：
+
+- `message-service.proto` 必须先冻结 `SendMessage`、`EditMessage`、`RevokeMessage`、`DeleteMessage` 和错误码。
+- PostgreSQL migration 必须覆盖 message-service SDD 中的核心表和唯一约束。
+- Kafka schema 必须覆盖 `message.persisted.v1`、`message.edited.v1`、`message.revoked.v1`、`message.deleted.v1`。
+- 本地集成测试必须能一键启动依赖并清理数据。
+- 第一轮压测只接受真实服务进程，不接受仅返回固定字符串的 toy endpoint。
+
 落地顺序：
 
 ```text

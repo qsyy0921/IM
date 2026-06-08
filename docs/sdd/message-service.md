@@ -602,3 +602,48 @@ outbox_publish_duplicate_rate 可观测但不作为错误
 - 热点会话 seq journal 集成测试通过。
 - outbox relay 重复发布场景消费幂等通过。
 - 压测得到 message 写入基线。
+
+## 16. 编码前契约拆分
+
+第一阶段只落 message-service 主写链路，不扩散到 20 个服务同时开发。
+
+必须先创建的契约文件：
+
+| 文件 | 内容 | 约束 |
+| --- | --- | --- |
+| `api/proto/nexusim/message/v1/message_service.proto` | `SendMessage`、`EditMessage`、`RevokeMessage`、`DeleteMessage` | request 必须包含幂等键；response 必须返回 `message_id`、`conversation_seq`、`accepted_at` 或变更版本 |
+| `api/proto/nexusim/message/v1/message_error.proto` | message-service 错误码 | 与 SDD 错误码表保持一致，不直接暴露数据库错误 |
+| `schemas/kafka/conversation.timeline.events.proto` | `message.persisted/edited/revoked/deleted.v1` | envelope 字段与 `message_outbox` 对齐 |
+| `migrations/postgres/message/000001_message_core.sql` | 核心表和唯一约束 | 必须包含 `conversation_seq`、`message_log`、`conversation_timeline_events`、`message_outbox`、`message_versions`、`message_command_idempotency` |
+
+第一阶段允许 mock 的依赖：
+
+| 依赖 | mock 行为 | 不能做的事 |
+| --- | --- | --- |
+| `policy-service` | 返回 allow/deny 和 `permission_version` | 不能在 message-service 里硬编码角色规则 |
+| `conversation-service` | 返回会话存在、成员版本、普通/热点模式 | 不能由 message-service 修改成员事实 |
+| `timeline-service` | 热点会话返回 seq block；普通会话不调用 | 不能把热点 sequencer 状态写在 message-service 业务层 |
+| Kafka | 本地可用真实 broker；无 broker 时只能验证 outbox 积压 | 不能跳过 outbox 直接认为事件已发布 |
+
+代码包边界：
+
+```text
+services/message-service/cmd
+services/message-service/internal/adapter/grpc
+services/message-service/internal/adapter/http
+services/message-service/internal/application
+services/message-service/internal/domain
+services/message-service/internal/port
+services/message-service/internal/infrastructure/postgres
+services/message-service/internal/infrastructure/kafka
+services/message-service/internal/runtime
+```
+
+测试门禁：
+
+- `SendMessage` 重复 `client_msg_id` 不重复写 `message_log`。
+- 相同幂等键但 command hash 不同返回 `IDEMPOTENCY_CONFLICT`。
+- 本地事务失败时不能留下半条 `message_log` 或 `message_outbox`。
+- Kafka publish 成功但 mark published 失败时，重复 publish 被 consumer 幂等处理。
+- 热点会话 `ALLOCATED` 超时巡检能补 `COMMITTED` 或 `GAP_MARKED`。
+- Windows `0.0.0.0:10495` 启动后，MacBook 能跑第一轮 SendMessage 压测。

@@ -54,16 +54,16 @@ message-service SendMessage
 | PostgreSQL repository | 已实现普通会话 `SendMessage` 本地事务：幂等检查、同幂等键 advisory transaction lock、`conversation_seq` row lock、`message_log`、`conversation_timeline_events`、`message_outbox` 同事务写入；outbox payload 对齐 `MessagePersistedV1` 业务 payload；集成测试和并发重复请求测试通过 |
 | Outbox relay / Kafka publish path | 已实现 `trigger/outbox` relay、PostgreSQL outbox store、Kafka writer producer；relay 支持 `NEXUSIM_OUTBOX_WORKERS` 多 worker 与 `NEXUSIM_OUTBOX_FAILURE_BACKOFF` 失败退避；真实 PostgreSQL + Kafka 集成测试通过；真实 PostgreSQL 多 worker / `FOR UPDATE SKIP LOCKED` 测试已覆盖同 conversation 顺序和跨 conversation 并发 |
 | message-service gRPC adapter | 已实现 `SendMessage` gRPC handler、proto request/response 转换、稳定错误码 detail 映射和错误 message 脱敏、`NEXUSIM_MESSAGE_SERVICE_MODE=grpc` 运行入口；支持 `NEXUSIM_DEBUG_ADDR=/debug/metrics` 暴露本进程压测指标；已通过 bufconn client 单测 |
-| SendMessage loadtest | 已实现 `go run ./loadtest/sendmessage` 参数化 gRPC 压测入口；支持 `target`、`vus`、`duration`、`result-dir`、`pg-dsn`、`stats-wait`、`service-metrics-url`、`relay-metrics-url`；`target` 和 service metrics URL 已支持逗号分隔，用于模拟多 `message-service` 实例；summary 记录 full commit、dirty 状态、outbox total/published/pending/DLQ、SendMessage/repository/commit/seq/Kafka latency、service/relay pgx pool、repository 内部分段指标和多进程 metrics；已补 `run-local-gradient.ps1`、`run-local-pgpool-gradient.ps1`、`run-local-multi-instance.ps1`；真实 gRPC + PostgreSQL + outbox relay + Kafka smoke、baseline、瓶颈诊断与短 PG pool / multi-instance smoke 已执行 |
+| SendMessage loadtest | 已实现 `go run ./loadtest/sendmessage` 参数化 gRPC 压测入口；支持 `target`、`vus`、`duration`、`result-dir`、`pg-dsn`、`stats-wait`、`service-metrics-url`、`relay-metrics-url`；`target` 和 service metrics URL 已支持逗号分隔，用于模拟多 `message-service` 实例；summary 记录 full commit、dirty 状态、outbox total/published/pending/DLQ、SendMessage/repository/commit/seq/Kafka latency、service/relay pgx pool、repository 内部分段指标和多进程 metrics；已补 `run-local-gradient.ps1`、`run-local-pgpool-gradient.ps1`、`run-local-multi-instance.ps1`、`collect-postgres-diagnostics.ps1`；真实 gRPC + PostgreSQL + outbox relay + Kafka smoke、baseline、瓶颈诊断、PG pool / multi-instance 矩阵和 PostgreSQL 诊断已执行 |
 
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
-2. 基于正式矩阵结果进入 PostgreSQL 观测：检查 `max_connections`、`shared_buffers`、WAL/checkpoint、`pg_stat_activity`、锁等待和慢 SQL。
-3. 补 repository 单语句级别指标或 PostgreSQL 侧观测，继续拆 `repository_begin` 后是否还有 SQL/锁/磁盘写入瓶颈。
+2. 基于 PostgreSQL 诊断结果制定本地 PG 调优方案：`max_connections`、`shared_buffers`、WAL/checkpoint、autovacuum 和 outbox dead tuples。
+3. 补 PostgreSQL 侧观测或 repository 单语句级别指标，继续拆 `repository_begin` 后是否还有 SQL/锁/磁盘写入瓶颈。
 4. 评估 outbox relay 追平优化：批量 publish、批量 mark published、batch size、worker 数和故障退避；避免 `PG_MAX_CONNS=64` 下 pending 快速增加。
 5. 增加 admission control / backpressure 设计，避免请求在连接池中排队到 2s 超时后才失败。
-6. 正式容量矩阵和报告已经完成，下一步属于高风险性能/并发调优，建议在进入较大改动前邀请评审线程做一次阶段复核。
+6. 正式容量矩阵和报告已经完成，已向评审线程 `019ea124-dab1-71f2-964b-f5cb8d219aa2` 发出阶段复核请求；等待或后续读取评审结果后再进入较大调优改动。
 7. 视评审复核结果决定是否推送 GitHub。
 
 ## 6. 评审要求
@@ -237,6 +237,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 formal PG pool 矩阵：`loadtest/results/pgpool-formal-20260609-014259/`。`PG_MAX_CONNS=16` 时 1200 VU 仍 100% 成功但 p99 `1725.16ms`；1600 VU 成功率降到 `0.6870`。`PG_MAX_CONNS=32` 时 1200/1600 VU 成功率 100%，但 p99 仍为 `1381.33ms` / `1476.37ms`；2000 VU 成功率 `0.9712`。`PG_MAX_CONNS=64` 时 1200/1600/2000 VU 写入成功率高，但 outbox pending 分别升到 `8044` / `19851` / `49948`，说明写入并发放大后 relay 追平成为第二瓶颈。`PG_MAX_CONNS=96/128` 在当前 PostgreSQL `max_connections` 下触发 `FATAL: sorry, too many clients already`，结果无效。
 - 当前 formal multi-instance 矩阵：`loadtest/results/multi-instance-formal-20260609-021254/`。在每实例 `PG_MAX_CONNS=16`、1200 VU 下，1/2/4 实例成功率分别为 `0.9660` / `0.5572` / `0.9014`，p99 均约 `2000ms`，`repository_begin_p99` 同样约 `2000ms`；多实例没有改善 p99，说明共享 PostgreSQL 已是瓶颈。
 - 当前 formal 矩阵追加短 relay drain 后确认 `tenant_count=16 total_pending=0`，没有留下未发布 outbox 积压。
+- 当前 PostgreSQL 诊断脚本为 `loadtest/sendmessage/collect-postgres-diagnostics.ps1`。正式矩阵后采集结果在 `loadtest/results/postgres-diagnostics-20260609-022602/postgres-diagnostics.json`：`max_connections=100`、`shared_buffers=16384`、`max_wal_size=1024`、`checkpoint_timeout=300`、`synchronous_commit=on`、`deadlocks=0`；`message_outbox n_dead_tup=113312`，说明 outbox 高频 update 已产生明显 dead tuples。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
 - `timeline-service`、`conversation-service`、`delivery-service`、`push-gateway` SDD 未冻结，不能扩展到对应生产逻辑。
@@ -264,3 +265,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已提交 `e87bb9b feat: add multi-instance loadtest diagnostics`，补齐 repository 内部分段指标、多 target loadtest、多 service metrics URL、`run-local-pgpool-gradient.ps1` 和 `run-local-multi-instance.ps1`；`go test ./...`、`go build ./services/message-service/cmd/message-service ./loadtest/sendmessage`、PowerShell 脚本语法检查和 `git diff --check` 均已通过。
 - 2026-06-09：已在 clean commit `e87bb9b` 跑 PG pool 短 smoke 和 multi-instance 短 smoke，验证 summary 能记录 repository 分段指标和多实例 service metrics；该结果只作为工具链验证，不作为正式容量结论。下一步必须跑正式长矩阵后再申请阶段评审。
 - 2026-06-09：已跑正式 PG pool 矩阵和正式 multi-instance 矩阵，并更新 `docs/runbook/loadtest-report-20260609-pgpool-multi-instance.md`。阶段结论：p99 主要贴在 `repository_begin`，`PG_MAX_CONNS=96/128` 超出 PostgreSQL 连接上限，多 `message-service` 实例不能解决共享 PostgreSQL 瓶颈；下一步应转入 PostgreSQL 观测、写入路径优化、outbox relay 追平和 backpressure 设计。
+- 2026-06-09：已新增并执行 `collect-postgres-diagnostics.ps1`，确认 PostgreSQL 当前 `max_connections=100`，解释 PG pool 96/128 档位不可用；已把正式矩阵和诊断结果发送给评审线程做阶段复核，本轮不频繁 push。

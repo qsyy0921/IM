@@ -376,7 +376,48 @@ message-service 进入 PostgreSQL 事务前后的连接获取 / begin 阶段。
 
 多实例没有降低 p99，说明瓶颈已经在共享 PostgreSQL，而不是单个 gRPC 进程本身。
 
-## 9. 当前结论
+## 9. PostgreSQL 诊断
+
+本阶段新增只读诊断脚本：
+
+```powershell
+.\loadtest\sendmessage\collect-postgres-diagnostics.ps1
+```
+
+正式矩阵后采集结果：
+
+```text
+result=loadtest/results/postgres-diagnostics-20260609-022602/postgres-diagnostics.json
+max_connections=100
+shared_buffers=16384
+max_wal_size=1024
+checkpoint_timeout=300
+synchronous_commit=on
+deadlocks=0
+xact_commit=2012277
+xact_rollback=79999
+```
+
+表统计摘要：
+
+| table | n_live_tup | n_dead_tup | n_tup_ins | n_tup_upd | idx_scan |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| message_log | 4211748 | 6222 | 1806744 | 0 | 1832893 |
+| conversation_timeline_events | 4209611 | 3951 | 1803312 | 0 | 134539034 |
+| message_outbox | 4215639 | 113312 | 1800686 | 1806169 | 236430976 |
+| conversation_seq | 186184 | 0 | 101519 | 1811665 | 3629996 |
+
+这进一步解释了 `PG_MAX_CONNS=96/128` 为什么不可用：
+
+```text
+当前 PostgreSQL max_connections=100。
+如果单个 gRPC 进程 PG_MAX_CONNS=96，再叠加 relay 进程、loadtest 统计连接、后台连接，就会超过 100。
+所以 too many clients 是配置上限，不是业务语义错误。
+```
+
+`message_outbox` 的 `n_dead_tup=113312` 也说明 outbox 高频 `PENDING -> PUBLISHED` update 会产生明显 dead tuples，后续需要关注 autovacuum 和批量 mark published。
+
+## 10. 当前结论
 
 本阶段可以得出比上一轮更明确的结论：
 
@@ -392,7 +433,7 @@ message-service 进入 PostgreSQL 事务前后的连接获取 / begin 阶段。
 下一步不应该继续盲目增加 `message-service` 实例或连接池，而应优先做：
 
 ```text
-PostgreSQL max_connections / shared_buffers / checkpoint / WAL 参数检查
+PostgreSQL max_connections / shared_buffers / checkpoint / WAL 参数调优
 pg_stat_activity / pg_stat_statements / lock wait 观测
 repository 写入 SQL 的单语句耗时和 EXPLAIN
 outbox relay 批量发布和批量 mark published 优化

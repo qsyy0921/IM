@@ -60,7 +60,7 @@ message-service SendMessage
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
 2. 基于 PostgreSQL 诊断结果制定本地 PG 调优方案：`max_connections`、`shared_buffers`、WAL/checkpoint、autovacuum 和 outbox dead tuples。
-3. 补 PostgreSQL 侧观测或 repository 单语句级别指标，继续拆 `repository_begin` 后是否还有 SQL/锁/磁盘写入瓶颈。
+3. 补 PostgreSQL 侧观测，继续区分 pgxpool 等待、PostgreSQL wait_event、WAL/checkpoint、锁等待和 OS 调度影响。
 4. 评估 outbox relay 追平优化：批量 publish、批量 mark published、batch size、worker 数和故障退避；避免 `PG_MAX_CONNS=64` 下 pending 快速增加。
 5. 增加 admission control / backpressure 设计，避免请求在连接池中排队到 2s 超时后才失败。
 6. 视评审复核结果决定是否推送 GitHub。
@@ -230,7 +230,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前压测正式报告为 `docs/runbook/loadtest-report-20260609.md`，已记录压测拓扑、执行方式、通过标准、结果摘要和瓶颈排查过程。
 - 当前 PG pool / multi-instance 诊断报告为 `docs/runbook/loadtest-report-20260609-pgpool-multi-instance.md`，已记录 repository 细分指标、多 target loadtest、多 service metrics URL、PG pool smoke、multi-instance smoke、正式 PG pool 矩阵和正式 multi-instance 矩阵。
 - 当前 p99 瓶颈已初步定位：`16 CPU / 23g / 1600 VU / workers=8` 下，request p99 基本等于 repository append p99；commit、conversation_seq、Kafka publish 都是毫秒级；service pgxpool 默认 `max_conns=16` 时 acquire 平均等待约 `646ms`，`NEXUSIM_PG_MAX_CONNS=64` 后 1600 VU p99 改善到 `779.63ms`，但 2400 VU 仍 p99 `1452.87ms` 超线。下一步优先做 PG 连接池梯度、多 message-service 实例和 repository 细分打点。
-- 当前 repository 细分指标已落地：`repository_begin_latency_ms`、`repository_idempotency_lock_latency_ms`、`repository_find_existing_latency_ms`、`repository_ensure_seq_latency_ms`、`repository_allocate_seq_latency_ms`、`repository_insert_message_latency_ms`、`repository_insert_timeline_latency_ms`、`repository_insert_outbox_latency_ms`、`repository_commit_latency_ms`。
+- 当前 repository 细分指标已落地：`repository_begin_latency_ms`、`repository_pool_acquire_latency_ms`、`repository_tx_begin_latency_ms`、`repository_idempotency_lock_latency_ms`、`repository_find_existing_latency_ms`、`repository_ensure_seq_latency_ms`、`repository_allocate_seq_latency_ms`、`repository_insert_message_latency_ms`、`repository_insert_timeline_latency_ms`、`repository_insert_outbox_latency_ms`、`repository_commit_latency_ms`。
 - 当前 clean commit `e87bb9b` PG pool smoke：`PG_MAX_CONNS=16/64`、`VU=20`、`duration=5s`、`stats-wait=5s`，两组全部成功；p99 分别为 `42.52ms`、`33.46ms`，结果在 `loadtest/results/pgpool-smoke-20260609-013424/`，后续短 relay drain 后对应 outbox 均为 `pending=0`。
 - 当前 clean commit `e87bb9b` multi-instance smoke：`Instances=1/2`、`VU=20`、`duration=5s`、`stats-wait=5s`，两组全部成功；p99 分别为 `40.43ms`、`39.35ms`，结果在 `loadtest/results/multi-instance-smoke-20260609-013511/`，多 target 和多 service metrics URL 均已验证；后续短 relay drain 后对应 outbox 均为 `pending=0`。
 - 当前 formal PG pool 矩阵：`loadtest/results/pgpool-formal-20260609-014259/`。`PG_MAX_CONNS=16` 时 1200 VU 仍 100% 成功但 p99 `1725.16ms`；1600 VU 成功率降到 `0.6870`。`PG_MAX_CONNS=32` 时 1200/1600 VU 成功率 100%，但 p99 仍为 `1381.33ms` / `1476.37ms`；2000 VU 成功率 `0.9712`。`PG_MAX_CONNS=64` 时 1200/1600/2000 VU 写入成功率高，但 outbox pending 分别升到 `8044` / `19851` / `49948`，说明写入并发放大后 relay 追平成为第二瓶颈。`PG_MAX_CONNS=96/128` 在当前 PostgreSQL `max_connections` 下触发 `FATAL: sorry, too many clients already`，结果无效。
@@ -271,3 +271,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已扩展 `run-local-multi-instance.ps1`，支持固定每实例 PG 连接预算和固定总 PG 连接预算两类对照实验；下一轮可直接跑 `FixedPerInstance` 与 `FixedTotal` 矩阵，避免实例数和总数据库连接预算混在一起。
 - 2026-06-09：已用重建后的 loadtest 二进制跑 `FixedTotal` 短 smoke：`1x8` 与 `2x4` 两组均 100% 成功、outbox pending 0，summary 顶层 `service_pg_pool.max_conns` 分别为 `8` / `8`，证明多实例 PG pool 聚合和固定总预算脚本路径生效。
 - 2026-06-09：已在 clean commit `ede5dd7` 跑正式 multi-instance PG budget 矩阵，并新增 `docs/runbook/loadtest-report-20260609-multi-instance-budget.md`。结论：固定总 PG 连接预算时，1 个实例 p99 最低，2/4 实例没有收益；request p99 仍贴近 repository append/begin，outbox pending 暴露 relay 追平为第二瓶颈。矩阵结束后已额外 drain，DB outbox 当前全部为 `PUBLISHED`。
+- 2026-06-09：已把 `repository_begin` 拆成 `repository_pool_acquire_latency_ms` 和 `repository_tx_begin_latency_ms`，原 `repository_begin_latency_ms` 保持总耗时用于兼容旧报告。dirty smoke：`PG_MAX_CONNS=8`、`VU=5`、`duration=3s`，1661/1661 成功，outbox pending 0，两个新指标 count 均为 1661。

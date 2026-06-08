@@ -14,6 +14,8 @@ type Collector struct {
 	sendMessage               latencySamples
 	repositoryAppend          latencySamples
 	repositoryBegin           latencySamples
+	repositoryPoolAcquire     latencySamples
+	repositoryTxBegin         latencySamples
 	repositoryIdempotencyLock latencySamples
 	repositoryFindExisting    latencySamples
 	repositoryEnsureSeq       latencySamples
@@ -49,6 +51,20 @@ func (c *Collector) ObserveRepositoryBegin(duration time.Duration) {
 		return
 	}
 	c.repositoryBegin.observe(duration)
+}
+
+func (c *Collector) ObserveRepositoryPoolAcquire(duration time.Duration) {
+	if c == nil {
+		return
+	}
+	c.repositoryPoolAcquire.observe(duration)
+}
+
+func (c *Collector) ObserveRepositoryTxBegin(duration time.Duration) {
+	if c == nil {
+		return
+	}
+	c.repositoryTxBegin.observe(duration)
 }
 
 func (c *Collector) ObserveRepositoryIdempotencyLock(duration time.Duration) {
@@ -129,6 +145,8 @@ func (c *Collector) Snapshot() Snapshot {
 		SendMessageLatencyMS:               c.sendMessage.snapshot(),
 		RepositoryAppendLatencyMS:          c.repositoryAppend.snapshot(),
 		RepositoryBeginLatencyMS:           c.repositoryBegin.snapshot(),
+		RepositoryPoolAcquireLatencyMS:     c.repositoryPoolAcquire.snapshot(),
+		RepositoryTxBeginLatencyMS:         c.repositoryTxBegin.snapshot(),
 		RepositoryIdempotencyLockLatencyMS: c.repositoryIdempotencyLock.snapshot(),
 		RepositoryFindExistingLatencyMS:    c.repositoryFindExisting.snapshot(),
 		RepositoryEnsureSeqLatencyMS:       c.repositoryEnsureSeq.snapshot(),
@@ -155,6 +173,8 @@ type Snapshot struct {
 	SendMessageLatencyMS               LatencySnapshot `json:"send_message_latency_ms"`
 	RepositoryAppendLatencyMS          LatencySnapshot `json:"repository_append_latency_ms"`
 	RepositoryBeginLatencyMS           LatencySnapshot `json:"repository_begin_latency_ms"`
+	RepositoryPoolAcquireLatencyMS     LatencySnapshot `json:"repository_pool_acquire_latency_ms"`
+	RepositoryTxBeginLatencyMS         LatencySnapshot `json:"repository_tx_begin_latency_ms"`
 	RepositoryIdempotencyLockLatencyMS LatencySnapshot `json:"repository_idempotency_lock_latency_ms"`
 	RepositoryFindExistingLatencyMS    LatencySnapshot `json:"repository_find_existing_latency_ms"`
 	RepositoryEnsureSeqLatencyMS       LatencySnapshot `json:"repository_ensure_seq_latency_ms"`

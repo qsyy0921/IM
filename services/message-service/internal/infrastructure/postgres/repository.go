@@ -94,7 +94,18 @@ func (r *MessageRepository) AppendMessage(ctx context.Context, input domain.Appe
 	}
 
 	beginStarted := time.Now()
-	tx, err := r.pool.Begin(ctx)
+	acquireStarted := time.Now()
+	conn, err := r.pool.Acquire(ctx)
+	r.metrics.ObserveRepositoryPoolAcquire(time.Since(acquireStarted))
+	if err != nil {
+		r.metrics.ObserveRepositoryBegin(time.Since(beginStarted))
+		return domain.AppendMessageResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer conn.Release()
+
+	txBeginStarted := time.Now()
+	tx, err := conn.Begin(ctx)
+	r.metrics.ObserveRepositoryTxBegin(time.Since(txBeginStarted))
 	r.metrics.ObserveRepositoryBegin(time.Since(beginStarted))
 	if err != nil {
 		return domain.AppendMessageResult{}, types.NewDBWriteFailed(err.Error())

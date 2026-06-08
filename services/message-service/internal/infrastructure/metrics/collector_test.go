@@ -13,6 +13,8 @@ func TestCollectorSnapshot(t *testing.T) {
 	collector.ObserveSendMessage(40 * time.Millisecond)
 	collector.ObserveRepositoryAppend(35 * time.Millisecond)
 	collector.ObserveRepositoryBegin(6 * time.Millisecond)
+	collector.ObserveRepositoryPoolAcquire(5 * time.Millisecond)
+	collector.ObserveRepositoryTxBegin(1 * time.Millisecond)
 	collector.ObserveRepositoryIdempotencyLock(7 * time.Millisecond)
 	collector.ObserveRepositoryFindExisting(8 * time.Millisecond)
 	collector.ObserveRepositoryEnsureSeq(9 * time.Millisecond)
@@ -35,6 +37,10 @@ func TestCollectorSnapshot(t *testing.T) {
 		t.Fatalf("unexpected repository append snapshot: %+v", snapshot.RepositoryAppendLatencyMS)
 	}
 	if snapshot.RepositoryBeginLatencyMS.Count != 1 ||
+		snapshot.RepositoryPoolAcquireLatencyMS.Count != 1 ||
+		snapshot.RepositoryPoolAcquireLatencyMS.AvgMS != 5 ||
+		snapshot.RepositoryTxBeginLatencyMS.Count != 1 ||
+		snapshot.RepositoryTxBeginLatencyMS.AvgMS != 1 ||
 		snapshot.RepositoryIdempotencyLockLatencyMS.Count != 1 ||
 		snapshot.RepositoryFindExistingLatencyMS.Count != 1 ||
 		snapshot.RepositoryEnsureSeqLatencyMS.Count != 1 ||

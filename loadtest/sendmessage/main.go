@@ -511,6 +511,8 @@ type metricsSnapshot struct {
 	SendMessageLatencyMS               latencySnapshot `json:"send_message_latency_ms"`
 	RepositoryAppendLatencyMS          latencySnapshot `json:"repository_append_latency_ms"`
 	RepositoryBeginLatencyMS           latencySnapshot `json:"repository_begin_latency_ms"`
+	RepositoryPoolAcquireLatencyMS     latencySnapshot `json:"repository_pool_acquire_latency_ms"`
+	RepositoryTxBeginLatencyMS         latencySnapshot `json:"repository_tx_begin_latency_ms"`
 	RepositoryIdempotencyLockLatencyMS latencySnapshot `json:"repository_idempotency_lock_latency_ms"`
 	RepositoryFindExistingLatencyMS    latencySnapshot `json:"repository_find_existing_latency_ms"`
 	RepositoryEnsureSeqLatencyMS       latencySnapshot `json:"repository_ensure_seq_latency_ms"`
@@ -650,6 +652,8 @@ func latencyMetrics(snapshot metricsSnapshot) map[string]latencySnapshot {
 	addLatency(metrics, "send_message_latency_ms", snapshot.SendMessageLatencyMS)
 	addLatency(metrics, "repository_append_latency_ms", snapshot.RepositoryAppendLatencyMS)
 	addLatency(metrics, "repository_begin_latency_ms", snapshot.RepositoryBeginLatencyMS)
+	addLatency(metrics, "repository_pool_acquire_latency_ms", snapshot.RepositoryPoolAcquireLatencyMS)
+	addLatency(metrics, "repository_tx_begin_latency_ms", snapshot.RepositoryTxBeginLatencyMS)
 	addLatency(metrics, "repository_idempotency_lock_latency_ms", snapshot.RepositoryIdempotencyLockLatencyMS)
 	addLatency(metrics, "repository_find_existing_latency_ms", snapshot.RepositoryFindExistingLatencyMS)
 	addLatency(metrics, "repository_ensure_seq_latency_ms", snapshot.RepositoryEnsureSeqLatencyMS)

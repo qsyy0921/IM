@@ -240,6 +240,10 @@ func (m *fakeMetrics) ObserveRepositoryAppend(time.Duration) {}
 
 func (m *fakeMetrics) ObserveRepositoryBegin(time.Duration) {}
 
+func (m *fakeMetrics) ObserveRepositoryPoolAcquire(time.Duration) {}
+
+func (m *fakeMetrics) ObserveRepositoryTxBegin(time.Duration) {}
+
 func (m *fakeMetrics) ObserveRepositoryIdempotencyLock(time.Duration) {}
 
 func (m *fakeMetrics) ObserveRepositoryFindExisting(time.Duration) {}

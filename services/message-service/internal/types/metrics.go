@@ -6,6 +6,8 @@ type LatencyRecorder interface {
 	ObserveSendMessage(time.Duration)
 	ObserveRepositoryAppend(time.Duration)
 	ObserveRepositoryBegin(time.Duration)
+	ObserveRepositoryPoolAcquire(time.Duration)
+	ObserveRepositoryTxBegin(time.Duration)
 	ObserveRepositoryIdempotencyLock(time.Duration)
 	ObserveRepositoryFindExisting(time.Duration)
 	ObserveRepositoryEnsureSeq(time.Duration)
@@ -25,6 +27,10 @@ func (NoopLatencyRecorder) ObserveSendMessage(time.Duration) {}
 func (NoopLatencyRecorder) ObserveRepositoryAppend(time.Duration) {}
 
 func (NoopLatencyRecorder) ObserveRepositoryBegin(time.Duration) {}
+
+func (NoopLatencyRecorder) ObserveRepositoryPoolAcquire(time.Duration) {}
+
+func (NoopLatencyRecorder) ObserveRepositoryTxBegin(time.Duration) {}
 
 func (NoopLatencyRecorder) ObserveRepositoryIdempotencyLock(time.Duration) {}
 

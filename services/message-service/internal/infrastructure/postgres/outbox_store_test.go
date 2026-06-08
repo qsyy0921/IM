@@ -52,6 +52,35 @@ func TestOutboxStoreProcessReadyPublishesAndMarksPublished(t *testing.T) {
 	}
 }
 
+func TestOutboxStoreProcessReadyBatchMarksPublished(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+	resetMessageCoreTables(t, ctx, pool)
+
+	tenantID := types.TenantID(fmt.Sprintf("tenant-outbox-batch-publish-%d", time.Now().UnixNano()))
+	repo := NewMessageRepository(pool)
+	appendConversationMessages(t, ctx, repo, tenantID, "conversation-a", 1)
+	appendConversationMessages(t, ctx, repo, tenantID, "conversation-b", 1)
+
+	store := NewOutboxStore(pool, WithOutboxClock(func() time.Time {
+		return time.Date(2026, 6, 8, 12, 1, 0, 0, time.UTC)
+	}))
+	var published int
+	stats, err := store.ProcessReady(ctx, 10, 3, time.Millisecond, func(context.Context, types.OutboxMessage) error {
+		published++
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("process outbox: %v", err)
+	}
+	if stats.Fetched != 2 || stats.Published != 2 || published != 2 {
+		t.Fatalf("unexpected stats=%+v published=%d", stats, published)
+	}
+	assertOutboxStatusCounts(t, ctx, pool, tenantID, 2, 0, 0)
+}
+
 func TestOutboxStoreProcessReadyRetriesOnPublishFailure(t *testing.T) {
 	ctx := context.Background()
 	pool := openIntegrationPool(t, ctx)

@@ -73,6 +73,7 @@ func (s *OutboxStore) ProcessReady(
 	}
 	stats := types.OutboxRelayStats{Fetched: len(messages)}
 	now := s.now()
+	publishedIDs := make([]int64, 0, len(messages))
 
 	for _, message := range messages {
 		if err := publish(ctx, message); err != nil {
@@ -92,10 +93,14 @@ func (s *OutboxStore) ProcessReady(
 			continue
 		}
 
-		if err := s.markPublished(ctx, tx, message.ID, now); err != nil {
+		publishedIDs = append(publishedIDs, message.ID)
+	}
+
+	if len(publishedIDs) > 0 {
+		if err := s.markPublishedBatch(ctx, tx, publishedIDs, now); err != nil {
 			return types.OutboxRelayStats{}, err
 		}
-		stats.Published++
+		stats.Published = len(publishedIDs)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -188,17 +193,24 @@ FOR UPDATE OF mo SKIP LOCKED
 	return messages, nil
 }
 
-func (s *OutboxStore) markPublished(ctx context.Context, tx pgx.Tx, id int64, publishedAt time.Time) error {
-	_, err := tx.Exec(ctx, `
+func (s *OutboxStore) markPublishedBatch(ctx context.Context, tx pgx.Tx, ids []int64, publishedAt time.Time) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	commandTag, err := tx.Exec(ctx, `
 UPDATE message_outbox
 SET status = $2,
     published_at = $3,
     last_error = NULL,
-    next_retry_at = NULL
-WHERE id = $1
-`, id, types.OutboxStatusPublished, publishedAt)
+    next_retry_at = NULL,
+    dead_lettered_at = NULL
+WHERE id = ANY($1::bigint[])
+`, ids, types.OutboxStatusPublished, publishedAt)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
+	}
+	if commandTag.RowsAffected() != int64(len(ids)) {
+		return types.NewDBWriteFailed("outbox published row count mismatch")
 	}
 	return nil
 }

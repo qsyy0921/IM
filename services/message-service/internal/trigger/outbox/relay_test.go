@@ -114,6 +114,50 @@ func TestRelayRunOncePublishesKafkaBatchWhenStoreSupportsBatch(t *testing.T) {
 	}
 }
 
+func TestRelayRunOnceBatchPublishFailureRetriesAllBatchRecords(t *testing.T) {
+	first := testOutboxMessage()
+	second := testOutboxMessage()
+	second.ID = 2
+	second.EventID = "event-2"
+	second.ConversationID = "conv-2"
+	second.PartitionKey = "tenant-1:conv-2"
+	store := &fakeBatchStore{messages: []types.OutboxMessage{first, second}}
+	publisher := &fakePublisher{batchErr: errors.New("kafka batch unavailable")}
+	relay := NewRelay(store, publisher, Config{Topic: "topic-it", BatchSize: 10})
+
+	stats, err := relay.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("run relay once: %v", err)
+	}
+	if stats.Fetched != 2 || stats.Published != 0 || stats.Retried != 2 {
+		t.Fatalf("unexpected stats: %+v", stats)
+	}
+}
+
+func TestRelayRunOnceBatchPayloadErrorRetriesOnlyInvalidMessage(t *testing.T) {
+	valid := testOutboxMessage()
+	invalid := testOutboxMessage()
+	invalid.ID = 2
+	invalid.EventID = "event-2"
+	invalid.ConversationID = "conv-2"
+	invalid.PartitionKey = "tenant-1:conv-2"
+	invalid.PayloadJSON = []byte(`{"message_id":"msg-2"}`)
+	store := &fakeBatchStore{messages: []types.OutboxMessage{valid, invalid}}
+	publisher := &fakePublisher{}
+	relay := NewRelay(store, publisher, Config{Topic: "topic-it", BatchSize: 10})
+
+	stats, err := relay.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("run relay once: %v", err)
+	}
+	if stats.Fetched != 2 || stats.Published != 1 || stats.Retried != 1 {
+		t.Fatalf("unexpected stats: %+v", stats)
+	}
+	if len(publisher.batches) != 1 || len(publisher.batches[0]) != 1 {
+		t.Fatalf("expected one valid record in batch, got %+v", publisher.batches)
+	}
+}
+
 func TestRelayRunOnceRecordsPublishFailure(t *testing.T) {
 	store := &fakeStore{messages: []types.OutboxMessage{testOutboxMessage()}}
 	publisher := &fakePublisher{err: errors.New("kafka unavailable")}

@@ -13,7 +13,8 @@
 1. `architecture/target-architecture.md`：确认目标态、技术栈和不可退让项。
 2. `sdd/message-service.md`：确认第一条可编码切片。
 3. `architecture/tadd.md`：确认工程目录、六层 DDD、Docker Compose 和编码门禁。
-4. `runbook/local-loadtest.md`：确认本地双机压测端口和执行方式。
+4. `runbook/current-goal.md`：确认当前阶段、评审要求、风险和下一步。
+5. `runbook/local-loadtest.md`：确认本地双机压测端口和执行方式。
 
 ## 写文档规则
 

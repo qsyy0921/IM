@@ -108,6 +108,45 @@ func TestApplyLatency(t *testing.T) {
 	}
 }
 
+func TestAggregateProcessLatencyMetrics(t *testing.T) {
+	metrics := aggregateProcessLatencyMetrics([]processMetrics{
+		{
+			URL: "http://127.0.0.1:10498/debug/metrics",
+			Snapshot: metricsSnapshot{
+				RepositoryBeginLatencyMS: latencySnapshot{Count: 2, AvgMS: 10, P95MS: 20, P99MS: 30},
+			},
+		},
+		{
+			URL: "http://127.0.0.1:10598/debug/metrics",
+			Snapshot: metricsSnapshot{
+				RepositoryBeginLatencyMS: latencySnapshot{Count: 3, AvgMS: 20, P95MS: 25, P99MS: 40},
+			},
+		},
+	})
+
+	metric := metrics["repository_begin_latency_ms"]
+	if metric.Count != 5 ||
+		metric.AvgMS != 16 ||
+		metric.P95MS != 25 ||
+		metric.P99MS != 40 {
+		t.Fatalf("unexpected aggregate metric: %+v", metric)
+	}
+}
+
+func TestAggregatePGPool(t *testing.T) {
+	pool := aggregatePGPool([]processMetrics{
+		{Snapshot: metricsSnapshot{PGPool: &pgPoolStats{AcquireCount: 2, AcquireDurationMS: 10, MaxConns: 16, TotalConns: 16}}},
+		{Snapshot: metricsSnapshot{PGPool: &pgPoolStats{AcquireCount: 3, AcquireDurationMS: 30, MaxConns: 16, TotalConns: 12}}},
+	})
+	if pool == nil ||
+		pool.AcquireCount != 5 ||
+		pool.AcquireDurationMS != 40 ||
+		pool.MaxConns != 32 ||
+		pool.TotalConns != 28 {
+		t.Fatalf("unexpected aggregate pg pool: %+v", pool)
+	}
+}
+
 func TestCommitInfoFromEnv(t *testing.T) {
 	t.Setenv("NEXUSIM_COMMIT", "abc1234")
 	t.Setenv("NEXUSIM_COMMIT_FULL", "abc1234full")

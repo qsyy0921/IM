@@ -173,66 +173,60 @@ func run(args []string, getenv func(string) string) error {
 		if metricsErr != nil {
 			return metricsErr
 		}
-		for index, metricURL := range metricURLs {
+		for _, metricURL := range metricURLs {
 			metrics, metricsErr := readMetricsSnapshot(context.Background(), metricURL)
 			if metricsErr != nil {
 				return metricsErr
 			}
 			result.ServiceMetrics = append(result.ServiceMetrics, processMetrics{URL: metricURL, Snapshot: metrics})
-			if index > 0 {
-				continue
-			}
-			result.ServiceLatencyMetrics = latencyMetrics(metrics)
-			applyLatency(
-				&result.SendMessageLatencyMS,
-				&result.SendMessageP95MS,
-				&result.SendMessageP99MS,
-				metrics.SendMessageLatencyMS,
-			)
-			applyLatency(
-				&result.RepositoryAppendLatencyMS,
-				&result.RepositoryAppendP95MS,
-				&result.RepositoryAppendP99MS,
-				metrics.RepositoryAppendLatencyMS,
-			)
-			applyLatency(
-				&result.RepositoryCommitLatencyMS,
-				&result.RepositoryCommitP95MS,
-				&result.RepositoryCommitP99MS,
-				metrics.RepositoryCommitLatencyMS,
-			)
-			applyLatency(
-				&result.ConversationSeqAllocLatencyMS,
-				&result.ConversationSeqAllocP95MS,
-				&result.ConversationSeqAllocP99MS,
-				metrics.ConversationSeqAllocLatencyMS,
-			)
-			result.ServicePGPool = metrics.PGPool
 		}
+		result.ServiceLatencyMetrics = aggregateProcessLatencyMetrics(result.ServiceMetrics)
+		result.ServicePGPool = aggregatePGPool(result.ServiceMetrics)
+		applyLatency(
+			&result.SendMessageLatencyMS,
+			&result.SendMessageP95MS,
+			&result.SendMessageP99MS,
+			result.ServiceLatencyMetrics["send_message_latency_ms"],
+		)
+		applyLatency(
+			&result.RepositoryAppendLatencyMS,
+			&result.RepositoryAppendP95MS,
+			&result.RepositoryAppendP99MS,
+			result.ServiceLatencyMetrics["repository_append_latency_ms"],
+		)
+		applyLatency(
+			&result.RepositoryCommitLatencyMS,
+			&result.RepositoryCommitP95MS,
+			&result.RepositoryCommitP99MS,
+			result.ServiceLatencyMetrics["repository_commit_latency_ms"],
+		)
+		applyLatency(
+			&result.ConversationSeqAllocLatencyMS,
+			&result.ConversationSeqAllocP95MS,
+			&result.ConversationSeqAllocP99MS,
+			result.ServiceLatencyMetrics["conversation_seq_alloc_latency_ms"],
+		)
 	}
 	if cfg.RelayMetricsURL != "" {
 		metricURLs, metricsErr := normalizeMetricsURLs(cfg.RelayMetricsURL)
 		if metricsErr != nil {
 			return metricsErr
 		}
-		for index, metricURL := range metricURLs {
+		for _, metricURL := range metricURLs {
 			metrics, metricsErr := readMetricsSnapshot(context.Background(), metricURL)
 			if metricsErr != nil {
 				return metricsErr
 			}
 			result.RelayMetrics = append(result.RelayMetrics, processMetrics{URL: metricURL, Snapshot: metrics})
-			if index > 0 {
-				continue
-			}
-			result.RelayLatencyMetrics = latencyMetrics(metrics)
-			applyLatency(
-				&result.KafkaPublishLatencyMS,
-				&result.KafkaPublishP95MS,
-				&result.KafkaPublishP99MS,
-				metrics.KafkaPublishLatencyMS,
-			)
-			result.RelayPGPool = metrics.PGPool
 		}
+		result.RelayLatencyMetrics = aggregateProcessLatencyMetrics(result.RelayMetrics)
+		result.RelayPGPool = aggregatePGPool(result.RelayMetrics)
+		applyLatency(
+			&result.KafkaPublishLatencyMS,
+			&result.KafkaPublishP95MS,
+			&result.KafkaPublishP99MS,
+			result.RelayLatencyMetrics["kafka_publish_latency_ms"],
+		)
 	}
 
 	if err := writeSummary(cfg.ResultDir, &result); err != nil {
@@ -672,10 +666,65 @@ func latencyMetrics(snapshot metricsSnapshot) map[string]latencySnapshot {
 	return metrics
 }
 
+func aggregateProcessLatencyMetrics(processes []processMetrics) map[string]latencySnapshot {
+	aggregated := map[string]latencySnapshot{}
+	for _, process := range processes {
+		for name, snapshot := range latencyMetrics(process.Snapshot) {
+			aggregated[name] = mergeLatency(aggregated[name], snapshot)
+		}
+	}
+	if len(aggregated) == 0 {
+		return nil
+	}
+	return aggregated
+}
+
+func mergeLatency(left latencySnapshot, right latencySnapshot) latencySnapshot {
+	if left.Count <= 0 {
+		return right
+	}
+	if right.Count <= 0 {
+		return left
+	}
+	totalCount := left.Count + right.Count
+	avg := ((left.AvgMS * float64(left.Count)) + (right.AvgMS * float64(right.Count))) / float64(totalCount)
+	return latencySnapshot{
+		Count: totalCount,
+		AvgMS: avg,
+		P95MS: math.Max(left.P95MS, right.P95MS),
+		P99MS: math.Max(left.P99MS, right.P99MS),
+	}
+}
+
 func addLatency(metrics map[string]latencySnapshot, name string, snapshot latencySnapshot) {
 	if snapshot.Count > 0 {
 		metrics[name] = snapshot
 	}
+}
+
+func aggregatePGPool(processes []processMetrics) *pgPoolStats {
+	var aggregated pgPoolStats
+	hasStats := false
+	for _, process := range processes {
+		stats := process.Snapshot.PGPool
+		if stats == nil {
+			continue
+		}
+		hasStats = true
+		aggregated.AcquireCount += stats.AcquireCount
+		aggregated.AcquireDurationMS += stats.AcquireDurationMS
+		aggregated.AcquiredConns += stats.AcquiredConns
+		aggregated.CanceledAcquireCount += stats.CanceledAcquireCount
+		aggregated.ConstructingConns += stats.ConstructingConns
+		aggregated.EmptyAcquireCount += stats.EmptyAcquireCount
+		aggregated.IdleConns += stats.IdleConns
+		aggregated.MaxConns += stats.MaxConns
+		aggregated.TotalConns += stats.TotalConns
+	}
+	if !hasStats {
+		return nil
+	}
+	return &aggregated
 }
 
 func applyLatency(avgTarget **float64, p95Target **float64, p99Target **float64, snapshot latencySnapshot) {

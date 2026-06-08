@@ -261,7 +261,8 @@ instances=2:
 无效结果：
 
 ```text
-PG_MAX_CONNS=96/128 时，gRPC 进程 + relay 进程 + loadtest 统计连接会超过 PostgreSQL 当前 max_connections。
+PostgreSQL max_connections=100。
+PG_MAX_CONNS=96/128 时，gRPC 进程 + relay 进程 + loadtest 统计连接会超过 PostgreSQL 当前连接上限。
 PostgreSQL 返回：
 FATAL: sorry, too many clients already (SQLSTATE 53300)
 ```
@@ -295,13 +296,15 @@ p99=0.77ms
 
 结果：
 
-| instances | VU | requests | success | errors | p95 ms | p99 ms | pending@stats | begin p99 ms | append p99 ms | service metrics |
+| instances | VU | requests | success | errors | p95 ms | p99 ms | pending@stats | service count | begin p99 min/max ms | append p99 min/max ms |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 1200 | 58492 | 0.9660 | 1989 | 1781.87 | 2000.52 | 0 | 2000.25 | 2000.37 | 1 |
-| 2 | 1200 | 53979 | 0.5572 | 23902 | 2001.98 | 2005.63 | 0 | 2003.54 | 2003.82 | 2 |
-| 4 | 1200 | 90392 | 0.9014 | 8914 | 2000.43 | 2001.52 | 0 | 2002.29 | 2002.49 | 4 |
+| 1 | 1200 | 58492 | 0.9660 | 1989 | 1781.87 | 2000.52 | 0 | 1 | 2000.25 / 2000.25 | 2000.37 / 2000.37 |
+| 2 | 1200 | 53979 | 0.5572 | 23902 | 2001.98 | 2005.63 | 0 | 2 | 2003.54 / 2005.69 | 2003.82 / 2005.93 |
+| 4 | 1200 | 90392 | 0.9014 | 8914 | 2000.43 | 2001.52 | 0 | 4 | 603.59 / 2002.33 | 650.55 / 2002.58 |
 
-多实例没有改善 p99。原因不是 loadtest 无法分发，summary 中 `service_metrics` 已确认分别采集到 1/2/4 个实例；真正问题是所有实例共享同一个 PostgreSQL，多个服务实例只是把更多请求压到同一个连接池和数据库连接上限。
+多实例没有改善请求 p99。原因不是 loadtest 无法分发，summary 中 `service_metrics` 已确认分别采集到 1/2/4 个实例。需要注意：旧 summary 顶层 `service_latency_metrics` 只代表第一个 service metrics URL，因此本表使用 `service_metrics[]` 重新计算每个实例的 min/max。
+
+4 实例时不是每个实例都达到 2s，但至少部分实例的 `repository_begin` / `repository_append` p99 仍贴近 2s，请求整体 p99 也贴近 2s。这说明本地多实例没有绕开共享 PostgreSQL 压力，继续堆服务实例会把问题转移到 PostgreSQL 连接和写入能力。
 
 ## 7. Outbox 状态
 
@@ -374,7 +377,7 @@ message-service 进入 PostgreSQL 事务前后的连接获取 / begin 阶段。
 4 instance / 1200 VU: success=0.9014, p99=2001.52ms
 ```
 
-多实例没有降低 p99，说明瓶颈已经在共享 PostgreSQL，而不是单个 gRPC 进程本身。
+多实例没有降低请求 p99。更准确地说：在当前单 PostgreSQL、当前连接上限和当前写入模型下，多 gRPC 实例不能解决尾延迟，瓶颈已经不只是单个 gRPC 进程本身。
 
 ## 9. PostgreSQL 诊断
 
@@ -422,12 +425,12 @@ xact_rollback=79999
 本阶段可以得出比上一轮更明确的结论：
 
 ```text
-1. repository 内部分段指标已证明 p99 主要贴在 repository_begin。
+1. 当前 repository 内部分段指标显示 p99 主要贴在 repository_begin。
 2. PG_MAX_CONNS=16 太小，1200 VU 已 p99 1725ms。
 3. PG_MAX_CONNS=32 能提高成功率，但 p99 仍超过 1s。
 4. PG_MAX_CONNS=64 能提高部分高 VU 写入成功率，但 outbox pending 明显增加。
 5. PG_MAX_CONNS=96/128 在当前 PostgreSQL max_connections 下不可用。
-6. 多 message-service 实例不能解决当前问题，因为共享 PostgreSQL 已成为瓶颈。
+6. 多 message-service 实例没有降低当前请求 p99；在当前单 PostgreSQL、当前连接上限和当前写入模型下，继续堆服务实例不能解决尾延迟。
 ```
 
 下一步不应该继续盲目增加 `message-service` 实例或连接池，而应优先做：
@@ -439,5 +442,14 @@ repository 写入 SQL 的单语句耗时和 EXPLAIN
 outbox relay 批量发布和批量 mark published 优化
 降低业务请求直接等待连接池的时间，例如 admission control / backpressure
 ```
+
+下一轮压测需要把变量拆开：
+
+```text
+固定每实例 PG 连接预算：观察服务实例增加后的总连接数放大效应。
+固定总 PG 连接预算：例如 1x64、2x32、4x16，观察入口扩容是否仍有价值。
+```
+
+当前 debug metrics collector 会保存全量样本并在 snapshot 时排序，适合本地短压测，不适合作为长期运行的生产 metrics。后续应替换为固定窗口、reservoir、HDR histogram 或 Prometheus histogram。
 
 下一阶段仍需新建独立报告，不覆盖本文。

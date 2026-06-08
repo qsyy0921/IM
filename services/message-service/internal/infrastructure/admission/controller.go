@@ -102,11 +102,13 @@ func (c *Controller) CheckSendMessage(ctx context.Context) error {
 
 func (c *Controller) overloadReasons() []string {
 	reasons := make([]string, 0, 4)
+	poolPressure := false
 	if c.poolStats != nil {
 		stats := c.poolStats.PoolStats()
 		if stats.MaxConns > 0 {
 			available := stats.MaxConns - stats.AcquiredConns
 			if available <= c.config.MinAvailableConns {
+				poolPressure = true
 				reasons = append(reasons, fmt.Sprintf(
 					"pg pool available=%d max=%d min_available=%d",
 					available,
@@ -119,7 +121,7 @@ func (c *Controller) overloadReasons() []string {
 
 	if c.serviceMetrics != nil && c.config.MaxPoolAcquireP95 > 0 {
 		snapshot := c.serviceMetrics.Snapshot()
-		if latencyAbove(snapshot.RepositoryPoolAcquireLatencyMS, c.config.MaxPoolAcquireP95, c.config.MinMetricSamples) {
+		if poolPressure && latencyAbove(snapshot.RepositoryPoolAcquireLatencyMS, c.config.MaxPoolAcquireP95, c.config.MinMetricSamples) {
 			reasons = append(reasons, fmt.Sprintf(
 				"repository_pool_acquire_p95=%.2fms threshold=%.2fms",
 				snapshot.RepositoryPoolAcquireLatencyMS.P95MS,
@@ -139,7 +141,7 @@ func (c *Controller) overloadReasons() []string {
 
 	if value := c.relaySnapshot.Load(); value != nil {
 		snapshot := value.(metricsinfra.Snapshot)
-		if latencyAbove(snapshot.OutboxProcessReadyActiveLatencyMS, c.config.MaxRelayProcessReadyActiveP95, c.config.MinMetricSamples) {
+		if pending > 0 && latencyAbove(snapshot.OutboxProcessReadyActiveLatencyMS, c.config.MaxRelayProcessReadyActiveP95, c.config.MinMetricSamples) {
 			reasons = append(reasons, fmt.Sprintf(
 				"outbox_process_ready_active_p95=%.2fms threshold=%.2fms",
 				snapshot.OutboxProcessReadyActiveLatencyMS.P95MS,
@@ -153,7 +155,7 @@ func (c *Controller) overloadReasons() []string {
 				c.config.MinOutboxFetchedPerCall,
 			))
 		}
-		if valueBelow(snapshot.KafkaPublishRecordsPerCall, c.config.MinKafkaPublishRecordsPerCall, c.config.MinMetricSamples) {
+		if pending > 0 && valueBelow(snapshot.KafkaPublishRecordsPerCall, c.config.MinKafkaPublishRecordsPerCall, c.config.MinMetricSamples) {
 			reasons = append(reasons, fmt.Sprintf(
 				"kafka_publish_records_per_call_avg=%.2f threshold=%.2f",
 				snapshot.KafkaPublishRecordsPerCall.Avg,

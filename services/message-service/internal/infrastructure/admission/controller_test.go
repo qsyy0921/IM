@@ -32,14 +32,38 @@ func TestControllerRejectsWhenPoolAvailableBelowFloor(t *testing.T) {
 	}
 }
 
-func TestControllerRejectsWhenServiceAcquireP95IsHigh(t *testing.T) {
+func TestControllerAllowsCumulativeAcquireP95WithoutCurrentPoolPressure(t *testing.T) {
 	controller := NewController(
 		Config{
 			Enabled:           true,
+			MinAvailableConns: 2,
 			MaxPoolAcquireP95: 100 * time.Millisecond,
 			MinMetricSamples:  2,
 		},
 		fakePoolStats{stats: PoolStats{AcquiredConns: 1, MaxConns: 8}},
+		fakeMetrics{snapshot: metricsinfra.Snapshot{
+			RepositoryPoolAcquireLatencyMS: metricsinfra.LatencySnapshot{
+				Count: 2,
+				P95MS: 150,
+			},
+		}},
+		nil,
+	)
+
+	if err := controller.CheckSendMessage(context.Background()); err != nil {
+		t.Fatalf("expected cumulative acquire p95 without current pool pressure to be allowed, got %v", err)
+	}
+}
+
+func TestControllerRejectsWhenAcquireP95IsHighAndPoolIsPressured(t *testing.T) {
+	controller := NewController(
+		Config{
+			Enabled:           true,
+			MinAvailableConns: 2,
+			MaxPoolAcquireP95: 100 * time.Millisecond,
+			MinMetricSamples:  2,
+		},
+		fakePoolStats{stats: PoolStats{AcquiredConns: 6, MaxConns: 8}},
 		fakeMetrics{snapshot: metricsinfra.Snapshot{
 			RepositoryPoolAcquireLatencyMS: metricsinfra.LatencySnapshot{
 				Count: 2,

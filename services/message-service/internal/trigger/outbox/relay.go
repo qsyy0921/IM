@@ -51,14 +51,15 @@ type Relay struct {
 }
 
 type Config struct {
-	Topic          string
-	BatchSize      int
-	WorkerCount    int
-	PollInterval   time.Duration
-	FailureBackoff time.Duration
-	MaxAttempts    int
-	RetryBaseDelay time.Duration
-	Metrics        types.LatencyRecorder
+	Topic               string
+	BatchSize           int
+	WorkerCount         int
+	DisablePublishBatch bool
+	PollInterval        time.Duration
+	FailureBackoff      time.Duration
+	MaxAttempts         int
+	RetryBaseDelay      time.Duration
+	Metrics             types.LatencyRecorder
 }
 
 func NewRelay(store Store, publisher Publisher, config Config) *Relay {
@@ -134,15 +135,21 @@ func (r *Relay) RunOnce(ctx context.Context) (types.OutboxRelayStats, error) {
 	started := time.Now()
 	var stats types.OutboxRelayStats
 	var err error
-	if store, ok := r.store.(BatchStore); ok {
-		stats, err = store.ProcessReadyBatch(
-			ctx,
-			r.config.BatchSize,
-			r.config.MaxAttempts,
-			r.config.RetryBaseDelay,
-			r.publishMessages,
-		)
-	} else {
+	useSingle := r.config.DisablePublishBatch
+	if !useSingle {
+		if store, ok := r.store.(BatchStore); ok {
+			stats, err = store.ProcessReadyBatch(
+				ctx,
+				r.config.BatchSize,
+				r.config.MaxAttempts,
+				r.config.RetryBaseDelay,
+				r.publishMessages,
+			)
+		} else {
+			useSingle = true
+		}
+	}
+	if useSingle {
 		stats, err = r.store.ProcessReady(
 			ctx,
 			r.config.BatchSize,

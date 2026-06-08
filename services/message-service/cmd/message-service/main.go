@@ -159,24 +159,27 @@ func runOutboxRelay() error {
 	}()
 
 	pollInterval := envDuration("NEXUSIM_OUTBOX_POLL_INTERVAL", time.Second)
+	publishBatchEnabled := envBool("NEXUSIM_OUTBOX_PUBLISH_BATCH_ENABLED", true)
 	relay := outbox.NewRelay(
 		postgresinfra.NewOutboxStore(pool, postgresinfra.WithOutboxMetrics(metrics)),
 		producer,
 		outbox.Config{
-			Topic:          envString("NEXUSIM_KAFKA_TOPIC", outbox.TopicConversationTimelineEvents),
-			BatchSize:      envInt("NEXUSIM_OUTBOX_BATCH_SIZE", 500),
-			WorkerCount:    envInt("NEXUSIM_OUTBOX_WORKERS", 1),
-			PollInterval:   pollInterval,
-			FailureBackoff: envDuration("NEXUSIM_OUTBOX_FAILURE_BACKOFF", pollInterval),
-			MaxAttempts:    envInt("NEXUSIM_OUTBOX_MAX_ATTEMPTS", 5),
-			RetryBaseDelay: envDuration("NEXUSIM_OUTBOX_RETRY_BASE_DELAY", time.Second),
-			Metrics:        metrics,
+			Topic:               envString("NEXUSIM_KAFKA_TOPIC", outbox.TopicConversationTimelineEvents),
+			BatchSize:           envInt("NEXUSIM_OUTBOX_BATCH_SIZE", 500),
+			WorkerCount:         envInt("NEXUSIM_OUTBOX_WORKERS", 1),
+			DisablePublishBatch: !publishBatchEnabled,
+			PollInterval:        pollInterval,
+			FailureBackoff:      envDuration("NEXUSIM_OUTBOX_FAILURE_BACKOFF", pollInterval),
+			MaxAttempts:         envInt("NEXUSIM_OUTBOX_MAX_ATTEMPTS", 5),
+			RetryBaseDelay:      envDuration("NEXUSIM_OUTBOX_RETRY_BASE_DELAY", time.Second),
+			Metrics:             metrics,
 		},
 	)
 	log.Printf(
-		"message-service outbox relay started workers=%d batch_size=%d poll_interval=%s failure_backoff=%s",
+		"message-service outbox relay started workers=%d batch_size=%d publish_batch_enabled=%t poll_interval=%s failure_backoff=%s",
 		envInt("NEXUSIM_OUTBOX_WORKERS", 1),
 		envInt("NEXUSIM_OUTBOX_BATCH_SIZE", 500),
+		publishBatchEnabled,
 		pollInterval,
 		envDuration("NEXUSIM_OUTBOX_FAILURE_BACKOFF", pollInterval),
 	)

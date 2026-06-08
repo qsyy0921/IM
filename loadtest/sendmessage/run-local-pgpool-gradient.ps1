@@ -13,6 +13,7 @@ param(
     [string]$RelayDebugAddr = "127.0.0.1:10700",
     [int]$RelayWorkers = 8,
     [int]$BatchSize = 500,
+    [bool]$PublishBatchEnabled = $true,
     [string]$PollInterval = "200ms",
     [string]$FailureBackoff = "1s",
     [string]$ResultRoot = "",
@@ -53,14 +54,15 @@ $relayMetricsURL = "http://$RelayDebugAddr/debug/metrics"
 foreach ($pgMax in $PGMaxConns) {
     foreach ($vu in $VUs) {
         $backpressureLabel = if ($BackpressureEnabled) { "bpon" } else { "bpoff" }
-        $runName = "$backpressureLabel-pgmax-$pgMax-vu-$vu-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+        $publishBatchLabel = if ($PublishBatchEnabled) { "pbatchon" } else { "pbatchoff" }
+        $runName = "$backpressureLabel-$publishBatchLabel-pgmax-$pgMax-vu-$vu-" + (Get-Date -Format "yyyyMMdd-HHmmss")
         $resultDir = Join-Path $ResultRoot $runName
         $serviceOut = Join-Path (Get-Location) "logs\message-service-grpc-$runName.out.log"
         $serviceErr = Join-Path (Get-Location) "logs\message-service-grpc-$runName.err.log"
         $relayOut = Join-Path (Get-Location) "logs\message-service-relay-$runName.out.log"
         $relayErr = Join-Path (Get-Location) "logs\message-service-relay-$runName.err.log"
 
-        Write-Host "Starting PG pool run pg_max=$pgMax pg_min=$PGMinConns vus=$vu duration=$Duration"
+        Write-Host "Starting PG pool run pg_max=$pgMax pg_min=$PGMinConns vus=$vu duration=$Duration publish_batch=$PublishBatchEnabled"
 
         $env:NEXUSIM_PG_DSN = $PGDSN
         $env:NEXUSIM_PG_MAX_CONNS = [string]$pgMax
@@ -87,6 +89,7 @@ foreach ($pgMax in $PGMaxConns) {
         $env:NEXUSIM_KAFKA_TOPIC = $KafkaTopic
         $env:NEXUSIM_OUTBOX_WORKERS = [string]$RelayWorkers
         $env:NEXUSIM_OUTBOX_BATCH_SIZE = [string]$BatchSize
+        $env:NEXUSIM_OUTBOX_PUBLISH_BATCH_ENABLED = [string]$PublishBatchEnabled
         $env:NEXUSIM_OUTBOX_POLL_INTERVAL = $PollInterval
         $env:NEXUSIM_OUTBOX_FAILURE_BACKOFF = $FailureBackoff
         $env:NEXUSIM_DEBUG_ADDR = $RelayDebugAddr
@@ -122,6 +125,7 @@ foreach ($pgMax in $PGMaxConns) {
             Remove-Item Env:\NEXUSIM_PG_MIN_CONNS -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_PG_BACKPRESSURE_ENABLED -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_PG_BACKPRESSURE_MIN_AVAILABLE_CONNS -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_OUTBOX_PUBLISH_BATCH_ENABLED -ErrorAction SilentlyContinue
         }
     }
 }

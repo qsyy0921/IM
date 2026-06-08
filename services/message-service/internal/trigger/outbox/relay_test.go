@@ -114,6 +114,36 @@ func TestRelayRunOncePublishesKafkaBatchWhenStoreSupportsBatch(t *testing.T) {
 	}
 }
 
+func TestRelayRunOnceCanDisableKafkaBatch(t *testing.T) {
+	first := testOutboxMessage()
+	second := testOutboxMessage()
+	second.ID = 2
+	second.EventID = "event-2"
+	second.ConversationID = "conv-2"
+	second.PartitionKey = "tenant-1:conv-2"
+	store := &fakeBatchStore{messages: []types.OutboxMessage{first, second}}
+	publisher := &fakePublisher{}
+	relay := NewRelay(store, publisher, Config{
+		Topic:               "topic-it",
+		BatchSize:           10,
+		DisablePublishBatch: true,
+	})
+
+	stats, err := relay.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("run relay once: %v", err)
+	}
+	if stats.Fetched != 2 || stats.Published != 2 {
+		t.Fatalf("unexpected stats: %+v", stats)
+	}
+	if len(publisher.batches) != 0 {
+		t.Fatalf("expected single path, got batch publishes: %+v", publisher.batches)
+	}
+	if len(publisher.messages) != 2 {
+		t.Fatalf("expected two single publishes, got %d", len(publisher.messages))
+	}
+}
+
 func TestRelayRunOnceBatchPublishFailureRetriesAllBatchRecords(t *testing.T) {
 	first := testOutboxMessage()
 	second := testOutboxMessage()

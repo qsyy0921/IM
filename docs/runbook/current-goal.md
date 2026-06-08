@@ -53,18 +53,35 @@ message-service SendMessage
 | SendMessage app/domain | 已补 `SendMessageUseCase` 单元测试、permission version 一致性短重试、稳定 JSON canonical command hash、append record 构造 |
 | PostgreSQL repository | 已实现普通会话 `SendMessage` 本地事务：幂等检查、同幂等键 advisory transaction lock、`conversation_seq` row lock、`message_log`、`conversation_timeline_events`、`message_outbox` 同事务写入；outbox payload 对齐 `MessagePersistedV1` 业务 payload；集成测试和并发重复请求测试通过 |
 | Outbox relay / Kafka publish path | 已实现 `trigger/outbox` 最小 relay、PostgreSQL outbox store、Kafka writer producer；真实 PostgreSQL + Kafka 集成测试通过 |
+| message-service gRPC adapter | 已实现 `SendMessage` gRPC handler、proto request/response 转换、稳定错误码 detail 映射、`NEXUSIM_MESSAGE_SERVICE_MODE=grpc` 运行入口；已通过 bufconn client 单测 |
 
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
-2. 补 `message-service` gRPC adapter，把 proto `SendMessage` 转换到 app command。
-3. 补本地多线程 SendMessage 压测入口。
-4. 用真实 message-service 进程压 `SendMessage -> outbox -> Kafka` 链路。
-5. 视评审结果补强 outbox relay 工程化细节，例如多 worker 锁、显式 idempotency reservation 或 observability。
+2. 补本地多线程 SendMessage 压测入口。
+3. 用真实 `message-service` gRPC 进程压 `SendMessage -> PostgreSQL -> outbox -> Kafka` 链路。
+4. 记录第一轮 smoke/baseline 压测结果到 `loadtest/results/`。
+5. 视压测结果补强 outbox relay 工程化细节，例如多 worker 锁、显式 idempotency reservation 或 observability。
 
 ## 6. 评审要求
 
-重要变更完成后，邀请独立评审线程评审。
+评审采用里程碑触发，不对每个小改动都邀请独立评审线程。
+
+必须邀请评审的情况：
+
+- 一个可运行链路完成，例如 `SendMessage -> outbox -> Kafka`、gRPC adapter + smoke/loadtest、压测闭环。
+- 跨越两层以上 DDD 边界，或修改 ADD / TADD / SDD / migration / proto / Kafka schema。
+- 涉及并发、事务、幂等、消息顺序、错误码契约、数据一致性等高风险逻辑。
+- 准备把某个阶段标记为完成，或准备做较大的 GitHub 同步。
+- 用户明确要求评审。
+
+不需要立即评审的情况：
+
+- 小范围重命名、注释、文档索引、runbook 状态更新。
+- 单层内部测试补强，且没有改变对外契约或事务语义。
+- 修复明显拼写、格式、路径说明等低风险问题。
+
+低风险变更先本地验证并累计到下一次阶段评审；如果连续开发中出现不确定的架构取舍，再主动请求评审。
 
 当前主工作线程 ID：
 
@@ -131,12 +148,24 @@ error_topn
 
 ## 8. GitHub 同步要求
 
-有意义的变更需要持久化时，必须：
+GitHub 同步采用批量策略，不对每个小改动都推送。
+
+优先本地完成并验证一组相关变更；满足以下任一条件再 commit / push：
+
+- 一个可描述的功能切片完成，例如 repository、outbox relay、gRPC adapter、loadtest runner。
+- 修改了公共契约、migration、架构文档或会影响他人协作的文件。
+- 用户要求同步 GitHub / MacBook / 服务器。
+- 工作区累计变更较多，继续开发前需要建立明确恢复点。
+- 评审完成且需要把已验收状态固定下来。
+
+小范围文档状态更新、低风险测试补强、探索性修改可以暂不 push，必要时只保留本地工作区或本地 commit。
+
+需要持久化时，必须：
 
 - 执行并记录 `git status --short`。
 - 执行可用检查，例如 `git diff --check`、生成配置检查、单元测试或集成测试。
 - 提交后记录 `git log -1 --oneline`。
-- 能推送时执行 `git push origin main`，并记录推送结果。
+- 达到同步条件时再执行 `git push origin main`，并记录推送结果。
 - 推送后再次确认 `git status --short` 干净。
 - 如果本轮涉及 MacBook、服务器或压测环境，说明是否需要同步对应环境；不默认静默同步。
 
@@ -145,15 +174,15 @@ error_topn
 每轮结束前确认：
 
 - 文档是否需要同步更新。
-- 是否需要邀请评审线程。
+- 是否达到里程碑评审条件；未达到则不邀请评审线程。
 - 是否执行了可用检查。
-- 是否需要 commit / push，并是否已经完成 GitHub 同步。
+- 是否达到 commit / push 条件；未达到则只记录本地状态，不强行同步 GitHub。
 - 本文的状态、风险和下一步是否仍然准确。
 
 ## 10. 当前风险
 
 - 当前 Codex 进程可能尚未重新读取用户 PATH；本线程运行 Go 命令前执行 `. .\tools\go-env.ps1`。
-- 现阶段已有 app/domain/PostgreSQL repository 测试，也已有 outbox relay / Kafka producer 测试；服务入口和本地多线程压测入口尚未完成。
+- 现阶段已有 app/domain/PostgreSQL repository 测试、outbox relay / Kafka producer 测试、gRPC adapter 测试；本地多线程压测入口尚未完成。
 - 当前 Kafka writer 使用 `segmentio/kafka-go`，已配置 `acks=all`、hash key 和禁用自动建 topic，但该 Writer 不暴露 Kafka `enable.idempotence=true` 开关；生产硬化时需要更换支持幂等 producer 的 client 或接入更底层 transactional producer 能力。
 - 当前 outbox relay 的 publish callback 在 PostgreSQL 事务内执行，这是第一阶段可接受的至少一次发布取舍；压测阶段需要重点观察 batch size、Kafka publish latency、DB lock wait 和重复发布窗口。
 - 当前 relay 只支持 `message.persisted.v1`；启用 Edit/Revoke/Delete 前必须补齐对应 Kafka oneof payload 构造和测试。
@@ -161,6 +190,7 @@ error_topn
 - 当前 ready 判断使用 DB `now()`，retry 时间写入使用应用时钟；生产硬化时需要统一时间源或明确 DB/relay 节点时钟同步要求。
 - 当前尚未实现 DLQ repair/replay；未来实现时必须清理 `dead_lettered_at`、`last_error`、`next_retry_at` 等旧失败字段。
 - 还没有完整 SendMessage 端到端压测结果。
+- `NEXUSIM_MESSAGE_SERVICE_MODE=grpc` 已能启动真实 gRPC 服务入口，但尚未执行真实进程级 smoke/loadtest。
 - `timeline-service`、`conversation-service`、`delivery-service`、`push-gateway` SDD 未冻结，不能扩展到对应生产逻辑。
 
 ## 11. 最近评审状态
@@ -173,3 +203,4 @@ error_topn
 - 2026-06-08：根据评审意见补齐 `MessagePersistedV1` payload 中的 `command_hash`，明确 `message_outbox.payload_json` 保存业务 payload、envelope/metadata 由 outbox 表字段组装；app 层已增加 `permission_version` 不一致时短重试一次，仍不一致返回可识别 dependency version error；outbox 写入失败已拆为 `ErrOutboxWriteFailed`。
 - 2026-06-08：已实现 `trigger/outbox` relay、PostgreSQL outbox store 和真实 Kafka writer producer；本地已启动 `nexusim-kafka`，创建 `conversation.timeline.events` topic，并通过真实 PostgreSQL + Kafka 集成测试验证 outbox 可发布后标记 `PUBLISHED`，Kafka publish 失败时保留 pending/retry/DLQ 状态。
 - 2026-06-08：独立评审线程复核 outbox relay + Kafka publish path，无 P0/P1 阻塞；P2/P3 风险已记录到本文，下一步可以提交本轮切片并推进 `message-service` gRPC adapter 与本地多线程压测。
+- 2026-06-08：已实现 `message-service` gRPC adapter 和 `NEXUSIM_MESSAGE_SERVICE_MODE=grpc` 运行入口；adapter 已覆盖请求转换、响应转换、稳定错误码 detail、unsupported message type、bufconn client 注册调用。按批量策略，本轮暂不单独评审/推送，和后续 loadtest runner + smoke 结果一起评审。

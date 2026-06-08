@@ -16,6 +16,8 @@ param(
     [string]$PollInterval = "200ms",
     [string]$FailureBackoff = "1s",
     [string]$ResultRoot = "",
+    [switch]$BackpressureEnabled,
+    [int]$BackpressureMinAvailableConns = 0,
     [switch]$SkipBuild
 )
 
@@ -47,7 +49,8 @@ $relayMetricsURL = "http://$RelayDebugAddr/debug/metrics"
 
 foreach ($pgMax in $PGMaxConns) {
     foreach ($vu in $VUs) {
-        $runName = "pgmax-$pgMax-vu-$vu-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+        $backpressureLabel = if ($BackpressureEnabled) { "bpon" } else { "bpoff" }
+        $runName = "$backpressureLabel-pgmax-$pgMax-vu-$vu-" + (Get-Date -Format "yyyyMMdd-HHmmss")
         $resultDir = Join-Path $ResultRoot $runName
         $serviceOut = Join-Path (Get-Location) "logs\message-service-grpc-$runName.out.log"
         $serviceErr = Join-Path (Get-Location) "logs\message-service-grpc-$runName.err.log"
@@ -62,6 +65,13 @@ foreach ($pgMax in $PGMaxConns) {
             $env:NEXUSIM_PG_MIN_CONNS = [string]$PGMinConns
         } else {
             Remove-Item Env:\NEXUSIM_PG_MIN_CONNS -ErrorAction SilentlyContinue
+        }
+        if ($BackpressureEnabled) {
+            $env:NEXUSIM_PG_BACKPRESSURE_ENABLED = "true"
+            $env:NEXUSIM_PG_BACKPRESSURE_MIN_AVAILABLE_CONNS = [string]$BackpressureMinAvailableConns
+        } else {
+            Remove-Item Env:\NEXUSIM_PG_BACKPRESSURE_ENABLED -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_PG_BACKPRESSURE_MIN_AVAILABLE_CONNS -ErrorAction SilentlyContinue
         }
 
         $env:NEXUSIM_MESSAGE_SERVICE_MODE = "grpc"
@@ -100,6 +110,8 @@ foreach ($pgMax in $PGMaxConns) {
             }
             Remove-Item Env:\NEXUSIM_PG_MAX_CONNS -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_PG_MIN_CONNS -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_PG_BACKPRESSURE_ENABLED -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_PG_BACKPRESSURE_MIN_AVAILABLE_CONNS -ErrorAction SilentlyContinue
         }
     }
 }

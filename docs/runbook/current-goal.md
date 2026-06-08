@@ -47,16 +47,18 @@ message-service SendMessage
 | PostgreSQL migration | `migrations/postgres/message/000001_message_core.sql` 已存在 |
 | Docker Compose | `deploy/local/docker-compose.yml` 已存在 |
 | message-service 六层骨架 | `services/message-service/internal/{api,app,domain,infrastructure,types,trigger}` 已存在 |
-| Go 工具链 | 当前 Windows 环境尚未确认可用；每次编码前需要重新检测 |
+| Go 工具链 | 当前 Windows 环境未检测到 `go`、`protoc-gen-go`、`protoc-gen-go-grpc`；`protoc` 可用，路径为 `C:\Users\10495\anaconda3\Library\bin\protoc.exe` |
 
 ## 5. 下一步优先级
 
-1. 校验 ADD / TADD / SDD / README 与真实目录、契约、migration、service skeleton 是否一致。
-2. 生成或补齐 Protobuf Go 代码配置。
-3. 实现 `message-service SendMessageUseCase` 的普通会话主链路。
-4. 实现 PostgreSQL repository，本地事务覆盖 `conversation_seq + message_log + conversation_timeline_events + message_outbox`。
-5. 实现 `trigger/outbox` relay 的最小 publish path。
-6. 补集成测试和本地多线程 SendMessage 压测入口。
+1. 补齐 Go 工具链和 Protobuf Go 插件：`go`、`protoc-gen-go`、`protoc-gen-go-grpc`。
+2. 重新验证 `go version`、`protoc --version`、`protoc-gen-go --version`、`protoc-gen-go-grpc --version`。
+3. 校验 ADD / TADD / SDD / README 与真实目录、契约、migration、service skeleton 是否一致。
+4. 生成或补齐 Protobuf Go 代码配置。
+5. 实现 `message-service SendMessageUseCase` 的普通会话主链路。
+6. 实现 PostgreSQL repository，本地事务覆盖 `conversation_seq + message_log + conversation_timeline_events + message_outbox`。
+7. 实现 `trigger/outbox` relay 的最小 publish path。
+8. 补集成测试和本地多线程 SendMessage 压测入口。
 
 ## 6. 评审要求
 
@@ -148,7 +150,7 @@ error_topn
 
 ## 10. 当前风险
 
-- Go 工具链和代码生成工具在当前 Windows 环境可能未安装，编码前必须重新检测。
+- 当前 Windows 环境未检测到 Go 工具链和 Protobuf Go 插件，会阻塞 `make proto`、`go test ./...` 和可验证编码。
 - 现阶段服务骨架存在，但不等于可运行服务。
 - 还没有真实 SendMessage 集成测试和压测结果。
 - `timeline-service`、`conversation-service`、`delivery-service`、`push-gateway` SDD 未冻结，不能扩展到对应生产逻辑。
@@ -156,3 +158,4 @@ error_topn
 ## 11. 最近评审状态
 
 - 2026-06-08：独立评审线程指出文档入口顺序、评审回传规则、GitHub 同步闭环、压测硬约束和目标态总架构入口需要补强；本轮已按建议更新本文和 `docs/README.md`。
+- 2026-06-08：独立评审线程复核通过文档闭环；新增 P0 环境结论：`protoc` 可用，但 `go`、`protoc-gen-go`、`protoc-gen-go-grpc` 未检测到，正式实现和验证前必须补齐。

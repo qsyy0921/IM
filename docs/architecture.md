@@ -356,7 +356,7 @@ seq_allocation_journal:
 ```text
 operator request
 -> message-service validate permission
--> PostgreSQL tx: update message_log + message_versions + timeline + outbox
+-> PostgreSQL tx: update message_log + message_change_history + timeline + outbox
 -> Kafka: message.edited / revoked / deleted
 -> delivery updates inbox visibility
 -> search updates/deletes OpenSearch document
@@ -1127,42 +1127,14 @@ RAG/Agent 发布必须跑安全评测：
 | P0 | `timeline-service / sequencer SDD` | seq block、epoch fencing、journal、gap marker、模式切换 |
 | P0 | `conversation-service / member_change_saga SDD` | 成员事实、边界 seq、Saga、并发冲突、ACL 投影 |
 | P0 | `Proto / OpenAPI / AsyncAPI` | `SendMessage`、`AllocateSeqBlock`、`CreateMemberChange`、`AckDelivery`、`PullOfflineMessages`、`RetrieveEvidence` |
-| P0 | `PostgreSQL migration` | `conversation_seq`、`message_log`、`timeline`、`outbox`、`member_change_saga`、`inbox`、`cursor` |
+| P0 | `PostgreSQL migration` | `conversation_seq`、`message_log`、`timeline`、`outbox`、`message_change_history`、`member_change_saga`、`inbox`、`cursor` |
 | P0 | `Kafka schema and topic config` | timeline、delivery、receipt、media、agent、repair 事件和 DLQ/retry |
 | P1 | `push-gateway SDD` | WebSocket 协议、resume buffer、错误码、连接状态机 |
 | P1 | `delivery-service SDD` | fanout、offline pull、inbox 重建、投递延迟 |
 | P1 | `retrieval-gateway SDD` | strict ACL、EvidencePack、索引版本、shadow rebuild |
 | P1 | `第一轮压测脚本` | WS 建连、消息写入、热点群、补拉、ACK、Kafka lag、RAG lag、Agent approval |
 
-本地双机压测网络约定：
-
-```text
-Windows 本机服务端: 192.168.0.141
-MacBook 压测端: 192.168.0.182
-TCP 端口范围: 10495-10510
-两端本地代理: 127.0.0.1:7890
-8080 不作为 NexusIM 本地压测端口
-```
-
-端口分配：
-
-| 端口 | 方向 | 用途 |
-| ---: | --- | --- |
-| 10495 | MacBook -> Windows；Windows -> MacBook 可对称使用 | 主 HTTP/API 压测入口 |
-| 10496 | MacBook -> Windows | push-gateway WebSocket 压测入口 |
-| 10497 | MacBook -> Windows | metrics/debug，只在压测窗口开放 |
-| 10498 | Windows -> MacBook | callback/mock receiver，用于双向新建连接场景 |
-| 10499 | MacBook <-> Windows | load coordinator / report endpoint |
-| 10500-10510 | 按需双向 | 预留给服务级 SDD、故障注入、临时对照实验 |
-
-约束：
-
-- 两台机器可以使用相同端口号，因为监听地址不同，例如 `192.168.0.141:10495` 和 `192.168.0.182:10495` 不冲突。
-- Windows 防火墙只允许 `192.168.0.182` 访问 `10495-10510`。
-- MacBook 如开启系统防火墙，只允许 `192.168.0.141` 访问 `10495-10510`。
-- Windows 和 MacBook 的 Git/HTTP 本地代理统一使用 `127.0.0.1:7890`，不使用 `7897`。
-- 压测服务必须监听 `0.0.0.0:<port>`；只监听 `127.0.0.1:<port>` 时对端无法访问。
-- 非压测窗口不启动这些端口上的服务。
+本地开发和双机压测配置属于运行手册，不固化在目标态架构正文中。当前机器 IP、端口、防火墙和代理约定见 `docs/runbook/local-loadtest.md`。
 
 工程落地基线：
 
@@ -1175,7 +1147,7 @@ TCP 端口范围: 10495-10510
 | `schemas/kafka` | Schema Registry 输入文件 | Protobuf 为主；事件 envelope 与 outbox 表字段保持一致 |
 | `services/<service>` | 服务实现 | `adapter -> application -> domain -> port -> infrastructure -> runtime-governance` |
 | `pkg` | 跨服务公共库 | 只允许放日志、错误码、trace、配置、测试工具；禁止放业务领域模型 |
-| `deploy/local` | 本地开发依赖 | PostgreSQL、Kafka、Redis 等基础设施，服务端口使用 `10495-10510` |
+| `deploy/local` | 本地开发依赖 | PostgreSQL、Kafka、Redis 等基础设施；本机端口以 runbook 为准 |
 | `loadtest` | MacBook/服务器压测脚本 | 每个脚本必须写目标、参数、通过标准和结果输出路径 |
 
 代码依赖规则：
@@ -1196,8 +1168,33 @@ message-service SendMessage
 -> local transaction: conversation_seq + message_log + conversation_timeline_events + message_outbox
 -> outbox relay publishes or records publish attempt
 -> integration test proves idempotency and transaction atomicity
--> Windows listens on 0.0.0.0:10495
--> MacBook runs loadtest against 192.168.0.141:10495
+-> service listens on configured local load-test port
+-> load client runs first baseline from local-loadtest runbook
+```
+
+第一阶段实现范围只包含：
+
+```text
+SendMessage
+PostgreSQL local transaction
+message_log
+conversation_timeline_events
+message_outbox
+outbox relay
+Kafka publish path
+```
+
+第一阶段只定义契约、不实现业务闭环：
+
+```text
+EditMessage
+RevokeMessage
+DeleteMessage
+hot sequencer
+delivery-service
+push-gateway
+RAG
+Agent
 ```
 
 进入编码前的门禁：
@@ -1211,11 +1208,12 @@ message-service SendMessage
 落地顺序：
 
 ```text
-contracts first
--> database schema first
+service SDD first
+-> Proto / OpenAPI / AsyncAPI contract first
+-> PostgreSQL migration first
 -> Kafka schema first
--> service SDD
 -> code skeleton
+-> integration test baseline
 -> load test baseline
 -> fault drill
 ```

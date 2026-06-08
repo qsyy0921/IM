@@ -50,7 +50,7 @@ message-service 是 NexusIM 消息事实源服务，负责普通会话消息写�
 | 模型 | 说明 |
 | --- | --- |
 | `Message` | 消息事实，包含发送者、设备、类型、正文、状态 |
-| `MessageVersion` | 编辑版本，用于审计和回滚呈现 |
+| `MessageChange` | 编辑、撤回、删除的状态变化历史，用于审计和回滚呈现 |
 | `TimelineEvent` | 会话内可见顺序事件 |
 | `OutboxEvent` | 事务内待发布事件 |
 | `IdempotencyRecord` | `client_msg_id` 或 `idempotency_key` 去重 |
@@ -123,7 +123,23 @@ accepted_at
 | `DB_WRITE_FAILED` | 本地事务失败 | 是 |
 | `OUTBOX_WRITE_FAILED` | outbox 写入失败，事务回滚 | 是 |
 
-### 4.2 EditMessage
+### 4.2 同步调用治理
+
+| 调用 | deadline | retry | fallback |
+| --- | ---: | --- | --- |
+| api-gateway -> message-service.SendMessage | 100ms | 服务端不自动重试写请求；客户端复用 `client_msg_id` 重试 | 返回 retryable error |
+| message-service -> policy-service | 30ms | 短重试 1 次，仅限幂等读取 | fail closed，返回 `PERMISSION_DENIED` 或 retryable policy error |
+| message-service -> conversation-service | 30ms | 短重试 1 次，仅限会话/成员版本读取 | 返回 `CONVERSATION_NOT_FOUND` 或 retryable dependency error |
+| message-service -> timeline-service | 20ms | 仅热点会话可重试 | 返回 `SEQUENCER_UNAVAILABLE` |
+| outbox-relay -> Kafka | producer config | 指数退避，更新 `retry_count`、`last_error`、`next_retry_at` | 留在 outbox；超过上限进入 `DLQ` |
+
+约束：
+
+- 写请求不做透明服务端重试，避免放大重试风暴。
+- 所有 retry 必须带 trace，并可从 metrics 区分依赖失败和业务失败。
+- fallback 不能绕过权限、成员版本或 seq 分配事实源。
+
+### 4.3 EditMessage
 
 Request：
 
@@ -145,10 +161,10 @@ version
 约束：
 
 - 只允许有权限的操作者编辑。
-- 每次编辑写 `message_versions`。
+- 每次编辑写 `message_change_history`。
 - 下游 search/rag 必须通过事件更新或重建。
 
-### 4.3 RevokeMessage
+### 4.4 RevokeMessage
 
 Request：
 
@@ -171,7 +187,7 @@ conversation_seq
 - 补拉只返回 tombstone。
 - audit 记录操作者、原因、trace。
 
-### 4.4 DeleteMessage
+### 4.5 DeleteMessage
 
 Request：
 
@@ -276,9 +292,14 @@ CREATE TABLE conversation_timeline_events (
     seq                BIGINT      NOT NULL,
     event_id           TEXT        NOT NULL,
     event_type         TEXT        NOT NULL,
+    event_version      TEXT        NOT NULL,
     message_id         TEXT,
     actor_id           TEXT        NOT NULL,
     fanout_mode        TEXT        NOT NULL,
+    permission_version BIGINT,
+    classification     TEXT,
+    mapping_version    TEXT        NOT NULL,
+    trace_id           TEXT        NOT NULL,
     payload_json       JSONB       NOT NULL,
     created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (tenant_id, conversation_id, seq),
@@ -304,24 +325,41 @@ CREATE TABLE message_outbox (
     producer          TEXT        NOT NULL DEFAULT 'message-service',
     payload_json      JSONB       NOT NULL,
     trace_id          TEXT        NOT NULL,
+    status            TEXT        NOT NULL DEFAULT 'PENDING',
     available_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    next_retry_at     TIMESTAMPTZ,
     published_at      TIMESTAMPTZ,
     retry_count       INT         NOT NULL DEFAULT 0,
+    last_error        TEXT,
+    dead_lettered_at  TIMESTAMPTZ,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_message_outbox_ready
-ON message_outbox (available_at, id)
-WHERE published_at IS NULL;
+ON message_outbox (COALESCE(next_retry_at, available_at), id)
+WHERE status = 'PENDING' AND published_at IS NULL;
+
+CREATE INDEX idx_message_outbox_dlq
+ON message_outbox (dead_lettered_at, id)
+WHERE status = 'DLQ';
 ```
 
-### 6.4 message_versions
+`message_outbox.status`：
+
+```text
+PENDING
+PUBLISHED
+DLQ
+```
+
+### 6.4 message_change_history
 
 ```sql
-CREATE TABLE message_versions (
+CREATE TABLE message_change_history (
     tenant_id            TEXT        NOT NULL,
     message_id           TEXT        NOT NULL,
-    version              INT         NOT NULL,
+    change_version       INT         NOT NULL,
+    change_type          TEXT        NOT NULL,
     before_payload_json  JSONB,
     after_payload_json   JSONB,
     before_status        TEXT        NOT NULL,
@@ -330,9 +368,19 @@ CREATE TABLE message_versions (
     reason               TEXT,
     trace_id             TEXT        NOT NULL,
     changed_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (tenant_id, message_id, version)
+    PRIMARY KEY (tenant_id, message_id, change_version)
 );
 ```
+
+`message_change_history.change_type`：
+
+```text
+EDIT
+REVOKE
+DELETE
+```
+
+`EditMessage`、`RevokeMessage`、`DeleteMessage` 都必须写 `message_change_history`，不能只依赖 Kafka 事件或 audit-service 追溯状态变化。
 
 ### 6.5 message_command_idempotency
 
@@ -443,6 +491,9 @@ return message_id + seq
 ### 8.2 热点会话 SendMessage
 
 ```text
+pre-check idempotency by client_msg_id
+if hit:
+  return old message_id + seq
 get seq from local seq block cache
 insert seq_allocation_journal(ALLOCATED)
 begin
@@ -453,6 +504,16 @@ begin
   insert message_outbox(message.persisted)
 commit
 mark seq_allocation_journal(COMMITTED)
+```
+
+并发兜底：
+
+```text
+if two requests pass pre-check concurrently:
+  one transaction commits successfully
+  the other hits unique(tenant_id, sender_id, device_id, client_msg_id)
+  failed request queries existing message_log and returns old message_id + seq
+  already allocated seq is marked GAP_MARKED
 ```
 
 事务失败：
@@ -474,7 +535,7 @@ begin
   lock message_log row
   validate operator permission
   update message_log status or payload
-  insert message_versions if edit
+  insert message_change_history
   insert message_command_idempotency with command_hash and result_json
   allocate new timeline seq
   insert conversation_timeline_events
@@ -517,8 +578,9 @@ Relay 拉取：
 ```sql
 SELECT *
 FROM message_outbox
-WHERE published_at IS NULL
-  AND available_at <= now()
+WHERE status = 'PENDING'
+  AND published_at IS NULL
+  AND COALESCE(next_retry_at, available_at) <= now()
 ORDER BY id
 LIMIT 500
 FOR UPDATE SKIP LOCKED;
@@ -529,9 +591,10 @@ FOR UPDATE SKIP LOCKED;
 ```text
 lock batch
 -> publish to Kafka with partition key tenant_id + conversation_id
--> mark published_at
--> on failure update retry_count and available_at
--> retry exceeded -> DLQ repair workflow
+-> mark status=PUBLISHED and published_at
+-> on failure update retry_count, last_error, next_retry_at
+-> retry exceeded -> mark status=DLQ and dead_lettered_at
+-> DLQ repair workflow reviews and requeues by setting status=PENDING
 ```
 
 约束：
@@ -614,7 +677,21 @@ outbox_publish_duplicate_rate 可观测但不作为错误
 | `api/proto/nexusim/message/v1/message_service.proto` | `SendMessage`、`EditMessage`、`RevokeMessage`、`DeleteMessage` | request 必须包含幂等键；response 必须返回 `message_id`、`conversation_seq`、`accepted_at` 或变更版本 |
 | `api/proto/nexusim/message/v1/message_error.proto` | message-service 错误码 | 与 SDD 错误码表保持一致，不直接暴露数据库错误 |
 | `schemas/kafka/conversation.timeline.events.proto` | `message.persisted/edited/revoked/deleted.v1` | envelope 字段与 `message_outbox` 对齐 |
-| `migrations/postgres/message/000001_message_core.sql` | 核心表和唯一约束 | 必须包含 `conversation_seq`、`message_log`、`conversation_timeline_events`、`message_outbox`、`message_versions`、`message_command_idempotency` |
+| `migrations/postgres/message/000001_message_core.sql` | 核心表和唯一约束 | 必须包含 `conversation_seq`、`message_log`、`conversation_timeline_events`、`message_outbox`、`message_change_history`、`message_command_idempotency` |
+
+第一阶段实现范围：
+
+| 项 | 状态 | 说明 |
+| --- | --- | --- |
+| `SendMessage` | 实现 | 打穿主写链路和压测基线 |
+| PostgreSQL 本地事务 | 实现 | `conversation_seq + message_log + timeline + outbox` 同事务 |
+| Outbox Relay | 实现 | 支持 pending、retry、DLQ 状态 |
+| Kafka publish path | 实现 | 可用真实 broker；不可用时保留 outbox 积压测试 |
+| `EditMessage` | 只定义契约 | 不进入第一条代码切片 |
+| `RevokeMessage` | 只定义契约 | 不进入第一条代码切片 |
+| `DeleteMessage` | 只定义契约 | 不进入第一条代码切片 |
+| 热点 sequencer | 只定义 port/mock | 不实现 timeline-service |
+| delivery / push / rag / agent | 不实现 | 不进入第一阶段 |
 
 第一阶段允许 mock 的依赖：
 
@@ -646,4 +723,4 @@ services/message-service/internal/runtime
 - 本地事务失败时不能留下半条 `message_log` 或 `message_outbox`。
 - Kafka publish 成功但 mark published 失败时，重复 publish 被 consumer 幂等处理。
 - 热点会话 `ALLOCATED` 超时巡检能补 `COMMITTED` 或 `GAP_MARKED`。
-- Windows `0.0.0.0:10495` 启动后，MacBook 能跑第一轮 SendMessage 压测。
+- 按 `docs/runbook/local-loadtest.md` 启动本地压测端口后，MacBook 能跑第一轮 SendMessage 压测。

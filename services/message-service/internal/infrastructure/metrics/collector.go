@@ -26,6 +26,10 @@ type Collector struct {
 	repositoryCommit          latencySamples
 	seqAlloc                  latencySamples
 	kafka                     latencySamples
+	outboxProcessReady        latencySamples
+	outboxFetchReady          latencySamples
+	outboxMarkPublished       latencySamples
+	outboxCommit              latencySamples
 }
 
 func NewCollector() *Collector {
@@ -137,6 +141,34 @@ func (c *Collector) ObserveKafkaPublish(duration time.Duration) {
 	c.kafka.observe(duration)
 }
 
+func (c *Collector) ObserveOutboxProcessReady(duration time.Duration) {
+	if c == nil {
+		return
+	}
+	c.outboxProcessReady.observe(duration)
+}
+
+func (c *Collector) ObserveOutboxFetchReady(duration time.Duration) {
+	if c == nil {
+		return
+	}
+	c.outboxFetchReady.observe(duration)
+}
+
+func (c *Collector) ObserveOutboxMarkPublished(duration time.Duration) {
+	if c == nil {
+		return
+	}
+	c.outboxMarkPublished.observe(duration)
+}
+
+func (c *Collector) ObserveOutboxCommit(duration time.Duration) {
+	if c == nil {
+		return
+	}
+	c.outboxCommit.observe(duration)
+}
+
 func (c *Collector) Snapshot() Snapshot {
 	if c == nil {
 		return Snapshot{}
@@ -157,6 +189,10 @@ func (c *Collector) Snapshot() Snapshot {
 		RepositoryCommitLatencyMS:          c.repositoryCommit.snapshot(),
 		ConversationSeqAllocLatencyMS:      c.seqAlloc.snapshot(),
 		KafkaPublishLatencyMS:              c.kafka.snapshot(),
+		OutboxProcessReadyLatencyMS:        c.outboxProcessReady.snapshot(),
+		OutboxFetchReadyLatencyMS:          c.outboxFetchReady.snapshot(),
+		OutboxMarkPublishedLatencyMS:       c.outboxMarkPublished.snapshot(),
+		OutboxCommitLatencyMS:              c.outboxCommit.snapshot(),
 	}
 }
 
@@ -185,6 +221,10 @@ type Snapshot struct {
 	RepositoryCommitLatencyMS          LatencySnapshot `json:"repository_commit_latency_ms"`
 	ConversationSeqAllocLatencyMS      LatencySnapshot `json:"conversation_seq_alloc_latency_ms"`
 	KafkaPublishLatencyMS              LatencySnapshot `json:"kafka_publish_latency_ms"`
+	OutboxProcessReadyLatencyMS        LatencySnapshot `json:"outbox_process_ready_latency_ms"`
+	OutboxFetchReadyLatencyMS          LatencySnapshot `json:"outbox_fetch_ready_latency_ms"`
+	OutboxMarkPublishedLatencyMS       LatencySnapshot `json:"outbox_mark_published_latency_ms"`
+	OutboxCommitLatencyMS              LatencySnapshot `json:"outbox_commit_latency_ms"`
 	PGPool                             *PGPoolSnapshot `json:"pg_pool,omitempty"`
 }
 

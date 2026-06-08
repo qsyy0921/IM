@@ -11,16 +11,18 @@ import (
 )
 
 type OutboxStore struct {
-	pool *pgxpool.Pool
-	now  func() time.Time
+	pool    *pgxpool.Pool
+	now     func() time.Time
+	metrics types.LatencyRecorder
 }
 
 type OutboxStoreOption func(*OutboxStore)
 
 func NewOutboxStore(pool *pgxpool.Pool, opts ...OutboxStoreOption) *OutboxStore {
 	store := &OutboxStore{
-		pool: pool,
-		now:  func() time.Time { return time.Now().UTC() },
+		pool:    pool,
+		now:     func() time.Time { return time.Now().UTC() },
+		metrics: types.NoopLatencyRecorder{},
 	}
 	for _, opt := range opts {
 		opt(store)
@@ -32,6 +34,14 @@ func WithOutboxClock(clock func() time.Time) OutboxStoreOption {
 	return func(store *OutboxStore) {
 		if clock != nil {
 			store.now = clock
+		}
+	}
+}
+
+func WithOutboxMetrics(metrics types.LatencyRecorder) OutboxStoreOption {
+	return func(store *OutboxStore) {
+		if metrics != nil {
+			store.metrics = metrics
 		}
 	}
 }
@@ -67,7 +77,9 @@ func (s *OutboxStore) ProcessReady(
 		_ = tx.Rollback(ctx)
 	}()
 
+	fetchStarted := time.Now()
 	messages, err := s.fetchReadyLocked(ctx, tx, limit)
+	s.metrics.ObserveOutboxFetchReady(time.Since(fetchStarted))
 	if err != nil {
 		return types.OutboxRelayStats{}, err
 	}
@@ -103,9 +115,12 @@ func (s *OutboxStore) ProcessReady(
 		stats.Published = len(publishedIDs)
 	}
 
+	commitStarted := time.Now()
 	if err := tx.Commit(ctx); err != nil {
+		s.metrics.ObserveOutboxCommit(time.Since(commitStarted))
 		return types.OutboxRelayStats{}, types.NewDBWriteFailed(err.Error())
 	}
+	s.metrics.ObserveOutboxCommit(time.Since(commitStarted))
 	return stats, nil
 }
 
@@ -197,6 +212,10 @@ func (s *OutboxStore) markPublishedBatch(ctx context.Context, tx pgx.Tx, ids []i
 	if len(ids) == 0 {
 		return nil
 	}
+	started := time.Now()
+	defer func() {
+		s.metrics.ObserveOutboxMarkPublished(time.Since(started))
+	}()
 	commandTag, err := tx.Exec(ctx, `
 UPDATE message_outbox
 SET status = $2,

@@ -124,6 +124,18 @@ type summary struct {
 	KafkaPublishLatencyMS         *float64                   `json:"kafka_publish_latency_ms"`
 	KafkaPublishP95MS             *float64                   `json:"kafka_publish_p95_ms"`
 	KafkaPublishP99MS             *float64                   `json:"kafka_publish_p99_ms"`
+	OutboxProcessReadyLatencyMS   *float64                   `json:"outbox_process_ready_latency_ms"`
+	OutboxProcessReadyP95MS       *float64                   `json:"outbox_process_ready_p95_ms"`
+	OutboxProcessReadyP99MS       *float64                   `json:"outbox_process_ready_p99_ms"`
+	OutboxFetchReadyLatencyMS     *float64                   `json:"outbox_fetch_ready_latency_ms"`
+	OutboxFetchReadyP95MS         *float64                   `json:"outbox_fetch_ready_p95_ms"`
+	OutboxFetchReadyP99MS         *float64                   `json:"outbox_fetch_ready_p99_ms"`
+	OutboxMarkPublishedLatencyMS  *float64                   `json:"outbox_mark_published_latency_ms"`
+	OutboxMarkPublishedP95MS      *float64                   `json:"outbox_mark_published_p95_ms"`
+	OutboxMarkPublishedP99MS      *float64                   `json:"outbox_mark_published_p99_ms"`
+	OutboxCommitLatencyMS         *float64                   `json:"outbox_commit_latency_ms"`
+	OutboxCommitP95MS             *float64                   `json:"outbox_commit_p95_ms"`
+	OutboxCommitP99MS             *float64                   `json:"outbox_commit_p99_ms"`
 	ServicePGPool                 *pgPoolStats               `json:"service_pg_pool,omitempty"`
 	RelayPGPool                   *pgPoolStats               `json:"relay_pg_pool,omitempty"`
 	ServiceMetrics                []processMetrics           `json:"service_metrics,omitempty"`
@@ -277,6 +289,30 @@ func run(args []string, getenv func(string) string) error {
 			&result.KafkaPublishP95MS,
 			&result.KafkaPublishP99MS,
 			result.RelayLatencyMetrics["kafka_publish_latency_ms"],
+		)
+		applyLatency(
+			&result.OutboxProcessReadyLatencyMS,
+			&result.OutboxProcessReadyP95MS,
+			&result.OutboxProcessReadyP99MS,
+			result.RelayLatencyMetrics["outbox_process_ready_latency_ms"],
+		)
+		applyLatency(
+			&result.OutboxFetchReadyLatencyMS,
+			&result.OutboxFetchReadyP95MS,
+			&result.OutboxFetchReadyP99MS,
+			result.RelayLatencyMetrics["outbox_fetch_ready_latency_ms"],
+		)
+		applyLatency(
+			&result.OutboxMarkPublishedLatencyMS,
+			&result.OutboxMarkPublishedP95MS,
+			&result.OutboxMarkPublishedP99MS,
+			result.RelayLatencyMetrics["outbox_mark_published_latency_ms"],
+		)
+		applyLatency(
+			&result.OutboxCommitLatencyMS,
+			&result.OutboxCommitP95MS,
+			&result.OutboxCommitP99MS,
+			result.RelayLatencyMetrics["outbox_commit_latency_ms"],
 		)
 	}
 
@@ -553,6 +589,18 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 		KafkaPublishLatencyMS:         nil,
 		KafkaPublishP95MS:             nil,
 		KafkaPublishP99MS:             nil,
+		OutboxProcessReadyLatencyMS:   nil,
+		OutboxProcessReadyP95MS:       nil,
+		OutboxProcessReadyP99MS:       nil,
+		OutboxFetchReadyLatencyMS:     nil,
+		OutboxFetchReadyP95MS:         nil,
+		OutboxFetchReadyP99MS:         nil,
+		OutboxMarkPublishedLatencyMS:  nil,
+		OutboxMarkPublishedP95MS:      nil,
+		OutboxMarkPublishedP99MS:      nil,
+		OutboxCommitLatencyMS:         nil,
+		OutboxCommitP95MS:             nil,
+		OutboxCommitP99MS:             nil,
 	}, nil
 }
 
@@ -787,6 +835,10 @@ type metricsSnapshot struct {
 	RepositoryCommitLatencyMS          latencySnapshot `json:"repository_commit_latency_ms"`
 	ConversationSeqAllocLatencyMS      latencySnapshot `json:"conversation_seq_alloc_latency_ms"`
 	KafkaPublishLatencyMS              latencySnapshot `json:"kafka_publish_latency_ms"`
+	OutboxProcessReadyLatencyMS        latencySnapshot `json:"outbox_process_ready_latency_ms"`
+	OutboxFetchReadyLatencyMS          latencySnapshot `json:"outbox_fetch_ready_latency_ms"`
+	OutboxMarkPublishedLatencyMS       latencySnapshot `json:"outbox_mark_published_latency_ms"`
+	OutboxCommitLatencyMS              latencySnapshot `json:"outbox_commit_latency_ms"`
 	PGPool                             *pgPoolStats    `json:"pg_pool"`
 }
 
@@ -928,6 +980,10 @@ func latencyMetrics(snapshot metricsSnapshot) map[string]latencySnapshot {
 	addLatency(metrics, "repository_commit_latency_ms", snapshot.RepositoryCommitLatencyMS)
 	addLatency(metrics, "conversation_seq_alloc_latency_ms", snapshot.ConversationSeqAllocLatencyMS)
 	addLatency(metrics, "kafka_publish_latency_ms", snapshot.KafkaPublishLatencyMS)
+	addLatency(metrics, "outbox_process_ready_latency_ms", snapshot.OutboxProcessReadyLatencyMS)
+	addLatency(metrics, "outbox_fetch_ready_latency_ms", snapshot.OutboxFetchReadyLatencyMS)
+	addLatency(metrics, "outbox_mark_published_latency_ms", snapshot.OutboxMarkPublishedLatencyMS)
+	addLatency(metrics, "outbox_commit_latency_ms", snapshot.OutboxCommitLatencyMS)
 	if len(metrics) == 0 {
 		return nil
 	}

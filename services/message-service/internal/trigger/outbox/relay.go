@@ -117,13 +117,16 @@ func (r *Relay) RunOnce(ctx context.Context) (types.OutboxRelayStats, error) {
 	if r.publisher == nil {
 		return types.OutboxRelayStats{}, errors.New("outbox relay publisher is not configured")
 	}
-	return r.store.ProcessReady(
+	started := time.Now()
+	stats, err := r.store.ProcessReady(
 		ctx,
 		r.config.BatchSize,
 		r.config.MaxAttempts,
 		r.config.RetryBaseDelay,
 		r.publishMessage,
 	)
+	r.config.Metrics.ObserveOutboxProcessReady(time.Since(started))
+	return stats, err
 }
 
 func (r *Relay) publishMessage(ctx context.Context, message types.OutboxMessage) error {

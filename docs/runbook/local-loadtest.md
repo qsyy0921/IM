@@ -97,7 +97,7 @@ Test-NetConnection 192.168.0.182 -Port 10498
 - 压测结果输出到 `loadtest/results/<date>/`。
 - 先跑短压测确认功能，再跑长压测观察资源和稳定性。
 - 本地双机结果只用于发现早期瓶颈和趋势，不作为生产容量承诺。
-- 如需记录 `conversation_seq_alloc_latency` 和 `kafka_publish_latency`，gRPC 进程与 outbox relay 进程必须分别设置 `NEXUSIM_DEBUG_ADDR`，并把对应地址传给压测脚本。
+- 如需记录 `conversation_seq_alloc_latency`、`kafka_publish_latency`、`outbox_process_ready_latency`、`outbox_fetch_ready_latency`、`outbox_mark_published_latency` 和 `outbox_commit_latency`，gRPC 进程与 outbox relay 进程必须分别设置 `NEXUSIM_DEBUG_ADDR`，并把对应地址传给压测脚本。
 
 推荐参数形式：
 
@@ -337,4 +337,4 @@ success_p99_ms
 error_p99_ms
 ```
 
-其中 `request_count` 是实际 gRPC attempt 数，`logical_request_count` 是用户层消息数。开启客户端重试后，两者不能混用。
+其中 `request_count` 是实际 gRPC attempt 数，`logical_request_count` 是用户层消息数。开启客户端重试后，两者不能混用；`overload_rate` 也是 attempt-level 指标，不代表用户层最终失败率。

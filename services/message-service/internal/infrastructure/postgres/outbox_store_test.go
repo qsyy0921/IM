@@ -81,6 +81,49 @@ func TestOutboxStoreProcessReadyBatchMarksPublished(t *testing.T) {
 	assertOutboxStatusCounts(t, ctx, pool, tenantID, 2, 0, 0)
 }
 
+func TestOutboxStoreProcessReadyBatchMarksPublishedAndRetriesFailures(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+	resetMessageCoreTables(t, ctx, pool)
+
+	tenantID := types.TenantID(fmt.Sprintf("tenant-outbox-batch-mixed-%d", time.Now().UnixNano()))
+	repo := NewMessageRepository(pool)
+	appendConversationMessages(t, ctx, repo, tenantID, "conversation-a", 1)
+	appendConversationMessages(t, ctx, repo, tenantID, "conversation-b", 1)
+
+	store := NewOutboxStore(pool, WithOutboxClock(func() time.Time {
+		return time.Date(2026, 6, 8, 12, 1, 0, 0, time.UTC)
+	}))
+	stats, err := store.ProcessReady(ctx, 10, 3, time.Millisecond, func(_ context.Context, message types.OutboxMessage) error {
+		if message.ConversationID == "conversation-b" {
+			return errors.New("kafka unavailable")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("process mixed outbox batch: %v", err)
+	}
+	if stats.Fetched != 2 || stats.Published != 1 || stats.Retried != 1 || stats.DeadLettered != 0 {
+		t.Fatalf("unexpected stats=%+v", stats)
+	}
+
+	published := readOutboxStatusByConversation(t, ctx, pool, tenantID, "conversation-a")
+	if published.Status != types.OutboxStatusPublished || !published.Published || published.RetryCount != 0 {
+		t.Fatalf("expected conversation-a published, got %+v", published)
+	}
+	retried := readOutboxStatusByConversation(t, ctx, pool, tenantID, "conversation-b")
+	if retried.Status != types.OutboxStatusPending ||
+		retried.Published ||
+		retried.RetryCount != 1 ||
+		!retried.NextRetry ||
+		!strings.Contains(retried.LastError, "kafka unavailable") {
+		t.Fatalf("expected conversation-b retried, got %+v", retried)
+	}
+	assertOutboxStatusCounts(t, ctx, pool, tenantID, 1, 1, 0)
+}
+
 func TestOutboxStoreProcessReadyRetriesOnPublishFailure(t *testing.T) {
 	ctx := context.Background()
 	pool := openIntegrationPool(t, ctx)
@@ -286,6 +329,11 @@ func readOutboxStatus(t *testing.T, ctx context.Context, pool *pgxpool.Pool, ten
 func readOutboxStatusByVersion(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID types.TenantID, version int64) outboxStatus {
 	t.Helper()
 	return readOutboxStatusWhere(t, ctx, pool, "tenant_id = $1 AND aggregate_version = $2", tenantID, version)
+}
+
+func readOutboxStatusByConversation(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID types.TenantID, conversationID types.ConversationID) outboxStatus {
+	t.Helper()
+	return readOutboxStatusWhere(t, ctx, pool, "tenant_id = $1 AND conversation_id = $2", tenantID, conversationID)
 }
 
 func readOutboxStatusWhere(t *testing.T, ctx context.Context, pool *pgxpool.Pool, where string, args ...any) outboxStatus {

@@ -160,7 +160,7 @@ func runOutboxRelay() error {
 
 	pollInterval := envDuration("NEXUSIM_OUTBOX_POLL_INTERVAL", time.Second)
 	relay := outbox.NewRelay(
-		postgresinfra.NewOutboxStore(pool),
+		postgresinfra.NewOutboxStore(pool, postgresinfra.WithOutboxMetrics(metrics)),
 		producer,
 		outbox.Config{
 			Topic:          envString("NEXUSIM_KAFKA_TOPIC", outbox.TopicConversationTimelineEvents),

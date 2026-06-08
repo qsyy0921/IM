@@ -96,6 +96,9 @@ func TestRelayRunOnceRecordsKafkaPublishLatency(t *testing.T) {
 	if metrics.kafkaCount != 1 {
 		t.Fatalf("expected one kafka latency sample, got %d", metrics.kafkaCount)
 	}
+	if metrics.outboxProcessReadyCount != 1 {
+		t.Fatalf("expected one outbox process ready latency sample, got %d", metrics.outboxProcessReadyCount)
+	}
 }
 
 func TestRelayRunContinuesImmediatelyWhenWorkWasPublished(t *testing.T) {
@@ -226,8 +229,12 @@ func (p *fakePublisher) Publish(_ context.Context, topic string, key []byte, val
 }
 
 type fakeMetrics struct {
-	seqCount   int
-	kafkaCount int
+	seqCount                 int
+	kafkaCount               int
+	outboxProcessReadyCount  int
+	outboxFetchReadyCount    int
+	outboxMarkPublishedCount int
+	outboxCommitCount        int
 }
 
 func (m *fakeMetrics) ObserveConversationSeqAlloc(time.Duration) {
@@ -262,6 +269,22 @@ func (m *fakeMetrics) ObserveRepositoryCommit(time.Duration) {}
 
 func (m *fakeMetrics) ObserveKafkaPublish(time.Duration) {
 	m.kafkaCount++
+}
+
+func (m *fakeMetrics) ObserveOutboxProcessReady(time.Duration) {
+	m.outboxProcessReadyCount++
+}
+
+func (m *fakeMetrics) ObserveOutboxFetchReady(time.Duration) {
+	m.outboxFetchReadyCount++
+}
+
+func (m *fakeMetrics) ObserveOutboxMarkPublished(time.Duration) {
+	m.outboxMarkPublishedCount++
+}
+
+func (m *fakeMetrics) ObserveOutboxCommit(time.Duration) {
+	m.outboxCommitCount++
 }
 
 type fakeStore struct {

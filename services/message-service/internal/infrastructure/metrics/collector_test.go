@@ -26,6 +26,10 @@ func TestCollectorSnapshot(t *testing.T) {
 	collector.ObserveConversationSeqAlloc(10 * time.Millisecond)
 	collector.ObserveConversationSeqAlloc(20 * time.Millisecond)
 	collector.ObserveKafkaPublish(30 * time.Millisecond)
+	collector.ObserveOutboxProcessReady(50 * time.Millisecond)
+	collector.ObserveOutboxFetchReady(6 * time.Millisecond)
+	collector.ObserveOutboxMarkPublished(7 * time.Millisecond)
+	collector.ObserveOutboxCommit(8 * time.Millisecond)
 
 	snapshot := collector.Snapshot()
 	if snapshot.SendMessageLatencyMS.Count != 1 ||
@@ -62,6 +66,13 @@ func TestCollectorSnapshot(t *testing.T) {
 	if snapshot.KafkaPublishLatencyMS.Count != 1 ||
 		snapshot.KafkaPublishLatencyMS.AvgMS != 30 {
 		t.Fatalf("unexpected kafka snapshot: %+v", snapshot.KafkaPublishLatencyMS)
+	}
+	if snapshot.OutboxProcessReadyLatencyMS.Count != 1 ||
+		snapshot.OutboxProcessReadyLatencyMS.AvgMS != 50 ||
+		snapshot.OutboxFetchReadyLatencyMS.Count != 1 ||
+		snapshot.OutboxMarkPublishedLatencyMS.Count != 1 ||
+		snapshot.OutboxCommitLatencyMS.Count != 1 {
+		t.Fatalf("unexpected outbox snapshots: %+v", snapshot)
 	}
 }
 

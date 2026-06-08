@@ -70,7 +70,7 @@ loadtest/sendmessage --retry-overloaded
 
 ## 5. 结果摘要
 
-| VU | logical requests | logical success rate | gRPC attempts | retry attempts | retried requests | accepted RPS | overload rate | success p99 | error p99 | outbox pending |
+| VU | logical requests | logical success rate | gRPC attempts | retry attempts | retried requests | accepted RPS | attempt overload rate | success p99 | error p99 | outbox pending |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1200 | 133,326 | 68.68% | 255,901 | 122,575 | 69,764 | 1526.23 | 64.22% | 421.58ms | 4.10ms | 25,579 |
 | 1600 | 138,002 | 56.04% | 301,592 | 163,590 | 90,758 | 1288.98 | 74.36% | 1154.47ms | 7.43ms | 32,091 |
@@ -187,4 +187,3 @@ outbox_pending_count
 - 在客户端 retry 矩阵中增加 `max_retries=1/2/3` 和 `jitter=100/300/500ms` 对照。
 - 服务端 adaptive limit 需要把 outbox pending 纳入输入，否则只保护 PG pool 会把瓶颈转移到 relay。
 - 后续报告增加 actual elapsed seconds，避免 retry/wait 模型下只用配置 duration 计算 RPS。
-

@@ -140,6 +140,7 @@ func TestAggregateProcessLatencyMetrics(t *testing.T) {
 			Snapshot: metricsSnapshot{
 				RepositoryBeginLatencyMS:       latencySnapshot{Count: 2, AvgMS: 10, P95MS: 20, P99MS: 30},
 				RepositoryPoolAcquireLatencyMS: latencySnapshot{Count: 2, AvgMS: 8, P95MS: 18, P99MS: 28},
+				OutboxProcessReadyLatencyMS:    latencySnapshot{Count: 2, AvgMS: 4, P95MS: 5, P99MS: 6},
 			},
 		},
 		{
@@ -147,6 +148,7 @@ func TestAggregateProcessLatencyMetrics(t *testing.T) {
 			Snapshot: metricsSnapshot{
 				RepositoryBeginLatencyMS:       latencySnapshot{Count: 3, AvgMS: 20, P95MS: 25, P99MS: 40},
 				RepositoryPoolAcquireLatencyMS: latencySnapshot{Count: 3, AvgMS: 18, P95MS: 23, P99MS: 38},
+				OutboxProcessReadyLatencyMS:    latencySnapshot{Count: 3, AvgMS: 8, P95MS: 9, P99MS: 10},
 			},
 		},
 	})
@@ -164,6 +166,13 @@ func TestAggregateProcessLatencyMetrics(t *testing.T) {
 		poolAcquire.P95MS != 23 ||
 		poolAcquire.P99MS != 38 {
 		t.Fatalf("unexpected aggregate pool acquire metric: %+v", poolAcquire)
+	}
+	outboxProcess := metrics["outbox_process_ready_latency_ms"]
+	if outboxProcess.Count != 5 ||
+		outboxProcess.AvgMS != 6.4 ||
+		outboxProcess.P95MS != 9 ||
+		outboxProcess.P99MS != 10 {
+		t.Fatalf("unexpected aggregate outbox process metric: %+v", outboxProcess)
 	}
 }
 

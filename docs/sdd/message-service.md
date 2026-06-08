@@ -161,6 +161,7 @@ Request：
 
 ```text
 auth_context
+conversation_id
 message_id
 idempotency_key
 payload
@@ -186,6 +187,7 @@ Request：
 
 ```text
 auth_context
+conversation_id
 message_id
 idempotency_key
 reason
@@ -209,6 +211,7 @@ Request：
 
 ```text
 auth_context
+conversation_id
 message_id
 idempotency_key
 delete_scope
@@ -313,6 +316,7 @@ RETURNING current_seq;
 ```text
 conversation-service 创建会话时初始化 conversation_seq(current_seq=0)。
 message-service 首次发送发现 conversation_seq 缺失时，可以在同事务内幂等补建，但必须记录 metric 和 repair log。
+兜底补建只能在 `ConversationQueryPort` 确认 conversation 存在且 `PolicyCheckPort` 确认当前操作者可发送后执行。
 ```
 
 兜底补建 SQL：
@@ -351,6 +355,30 @@ CREATE TABLE message_log (
 ```
 
 `command_hash` 是 SendMessage 命令的规范化哈希，用于判断同一 `client_msg_id` 下请求内容是否一致。重复请求命中唯一键时，如果 `command_hash` 不一致，必须返回 `IDEMPOTENCY_CONFLICT`。
+
+`command_hash` 计算规则：
+
+```text
+SHA256(canonical_json({
+  tenant_id,
+  conversation_id,
+  sender_id,
+  device_id,
+  client_msg_id,
+  message_type,
+  payload,
+  sorted_attachment_ids
+}))
+```
+
+不进入 `command_hash` 的字段：
+
+```text
+request_id
+trace_id
+accepted_at
+client_send_time
+```
 
 ### 6.3 conversation_timeline_events
 
@@ -430,6 +458,7 @@ DLQ
 ```sql
 CREATE TABLE message_change_history (
     tenant_id            TEXT        NOT NULL,
+    conversation_id      TEXT        NOT NULL,
     message_id           TEXT        NOT NULL,
     change_version       INT         NOT NULL,
     change_type          TEXT        NOT NULL,
@@ -441,7 +470,7 @@ CREATE TABLE message_change_history (
     reason               TEXT,
     trace_id             TEXT        NOT NULL,
     changed_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (tenant_id, message_id, change_version)
+    PRIMARY KEY (tenant_id, conversation_id, message_id, change_version)
 );
 ```
 
@@ -462,13 +491,14 @@ DELETE
 ```sql
 CREATE TABLE message_command_idempotency (
     tenant_id        TEXT        NOT NULL,
+    conversation_id  TEXT        NOT NULL,
     command_type     TEXT        NOT NULL,
     idempotency_key  TEXT        NOT NULL,
     message_id       TEXT        NOT NULL,
     command_hash     TEXT        NOT NULL,
     result_json      JSONB       NOT NULL,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (tenant_id, command_type, message_id, idempotency_key)
+    PRIMARY KEY (tenant_id, conversation_id, command_type, message_id, idempotency_key)
 );
 ```
 
@@ -537,6 +567,8 @@ conversation_seq
 message_log
 conversation_timeline_events
 message_outbox
+message_change_history
+message_command_idempotency
 ```
 
 禁止：
@@ -550,12 +582,21 @@ message_outbox
 ### 8.1 普通会话 SendMessage
 
 ```text
-begin
+outside transaction:
+  validate request
+  compute command_hash
   query ConversationQueryPort
+  call PolicyCheckPort
   if conversation_mode == SEQUENCER_BLOCK:
     return SEQUENCER_UNAVAILABLE(reason=sequencer_not_implemented_in_phase_1)
-  check idempotency by client_msg_id and command_hash
-  check permission_version
+  if checked_permission_version != current_permission_version:
+    retry dependency read once or return retryable dependency error
+  pre-check idempotency by client_msg_id and command_hash if possible
+
+begin
+  re-check idempotency by client_msg_id and command_hash
+  re-check expected permission_version / member_version snapshot
+  insert conversation_seq if missing only after conversation and permission were validated
   allocate seq from conversation_seq by row lock
   insert message_log
   insert conversation_timeline_events(message.persisted)
@@ -563,6 +604,12 @@ begin
 commit
 return message_id + seq
 ```
+
+事务边界约束：
+
+- DB transaction 内不能调用 `ConversationQueryPort`、`PolicyCheckPort`、Kafka、Redis 或任何外部 RPC。
+- 外部依赖抖动只能影响事务开始前的等待时间，不能拉长 `conversation_seq` 行锁持有时间。
+- `PolicyCheckPort.checked_permission_version` 与 `ConversationQueryPort.current_permission_version` 不一致时，只允许短重试一次；仍不一致则返回 retryable dependency error。
 
 ### 8.2 热点会话 SendMessage
 
@@ -610,7 +657,7 @@ return retryable error if client can retry same client_msg_id
 
 ```text
 begin
-  check message_command_idempotency by command_type + message_id + idempotency_key
+  check message_command_idempotency by conversation_id + command_type + message_id + idempotency_key
   return IDEMPOTENCY_CONFLICT if same key maps to different command_hash
   lock message_log row
   validate operator permission
@@ -644,9 +691,9 @@ message.delete.compliance
 | 操作 | 幂等键 | 返回 |
 | --- | --- | --- |
 | SendMessage | `tenant_id + sender_id + device_id + client_msg_id` | 原 `message_id + seq` |
-| EditMessage | `tenant_id + message_id + idempotency_key` | 原 version 和 seq |
-| RevokeMessage | `tenant_id + message_id + idempotency_key` | 原 revoke seq |
-| DeleteMessage | `tenant_id + message_id + idempotency_key` | 原 delete seq |
+| EditMessage | `tenant_id + conversation_id + message_id + idempotency_key` | 原 version 和 seq |
+| RevokeMessage | `tenant_id + conversation_id + message_id + idempotency_key` | 原 revoke seq |
+| DeleteMessage | `tenant_id + conversation_id + message_id + idempotency_key` | 原 delete seq |
 | Outbox publish | `event_id` | publish once, consume at least once |
 
 command hash 不一致但幂等键相同，返回 `IDEMPOTENCY_CONFLICT`。
@@ -741,6 +788,10 @@ unexplained seq gap = 0
 seq_allocation_journal_allocated_stale_count = 0
 outbox oldest pending age < 5s
 outbox_conversation_order_violation = 0
+outbox_blocked_conversation_count 可观测
+outbox_blocked_event_count 可观测
+outbox_blocked_oldest_age_seconds 可观测
+outbox_dlq_blocking_conversation_count 可观测
 outbox_publish_duplicate_rate 可观测但不作为错误
 ```
 
@@ -764,6 +815,8 @@ outbox_publish_duplicate_rate 可观测但不作为错误
 | --- | --- | --- |
 | `SendMessage p99` 升高 | PG lock -> seq alloc -> outbox insert -> policy latency | 扩容、限流、热点升级 |
 | `outbox_oldest_age > 5s` | Kafka publish -> relay worker -> DB lock | 扩 relay，检查 Kafka |
+| `outbox_blocked_conversation_count` 上升 | 最小 aggregate_version 的 PENDING/DLQ -> relay error -> repair 状态 | 禁止继续扩大写入压力，按 repair_id replay 或 skip |
+| `outbox_dlq_blocking_conversation_count` 上升 | DLQ root cause -> 同会话后续事件阻塞 -> downstream lag | 修复 DLQ，skip 必须发 `audit.repair.events` |
 | `timeline out-of-order` | partition key -> seq allocation -> transaction log | 冻结写入，按 fact source 修复 |
 | `ALLOCATED` 超时 | message-service 实例 -> transaction commit -> journal | commit 确认或 mark gap |
 | `IDEMPOTENCY_CONFLICT` 增多 | client version -> retry logic -> command hash | 拦截异常客户端 |
@@ -774,10 +827,14 @@ outbox_publish_duplicate_rate 可观测但不作为错误
 - `SendMessage`、`EditMessage`、`RevokeMessage`、`DeleteMessage` 契约冻结。
 - 核心表 migration 可执行。
 - 普通会话本地事务集成测试通过。
-- 热点会话 seq journal 集成测试通过。
 - outbox relay 重复发布场景消费幂等通过。
 - outbox relay 同会话按 `aggregate_version` 有序发布。
 - 压测得到 message 写入基线。
+
+第二阶段门禁：
+
+- `timeline-service / sequencer SDD` 冻结后，热点会话 seq journal 集成测试通过。
+- `ALLOCATED` 超时巡检能补 `COMMITTED` 或 `GAP_MARKED`。
 
 ## 16. 编码前契约拆分
 
@@ -787,10 +844,10 @@ outbox_publish_duplicate_rate 可观测但不作为错误
 
 | 文件 | 内容 | 约束 |
 | --- | --- | --- |
-| `api/proto/nexusim/message/v1/message_service.proto` | `SendMessage`、`EditMessage`、`RevokeMessage`、`DeleteMessage` | request 必须包含幂等键；response 必须返回 `message_id`、`conversation_seq`、`accepted_at` 或变更版本 |
+| `api/proto/nexusim/message/v1/message_service.proto` | `SendMessage`、`EditMessage`、`RevokeMessage`、`DeleteMessage` | request 必须包含幂等键；`Edit/Revoke/Delete` 必须包含 `conversation_id`；`SendMessage` 必须明确 `client_msg_id` scope 和 `command_hash` canonical 规则 |
 | `api/proto/nexusim/message/v1/message_error.proto` | message-service 错误码 | 与 SDD 错误码表保持一致，不直接暴露数据库错误 |
-| `schemas/kafka/conversation.timeline.events.proto` | `message.persisted/edited/revoked/deleted.v1` | envelope 字段与 `message_outbox` 对齐 |
-| `migrations/postgres/message/000001_message_core.sql` | 核心表和唯一约束 | 必须包含 `conversation_seq`、`message_log`、`conversation_timeline_events`、`message_outbox`、`message_change_history`、`message_command_idempotency` |
+| `schemas/kafka/conversation.timeline.events.proto` | `message.persisted/edited/revoked/deleted.v1` | envelope 字段与 `message_outbox` 对齐；metadata 包含 fanout/permission/mapping 版本 |
+| `migrations/postgres/message/000001_message_core.sql` | 核心表和唯一约束 | 必须包含 `conversation_seq`、`message_log`、`conversation_timeline_events`、`message_outbox`、`message_change_history`、`message_command_idempotency`；变更表必须带 `conversation_id` |
 
 第一阶段实现范围：
 

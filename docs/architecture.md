@@ -324,6 +324,34 @@ Seq 规则：
 - 客户端遇到 gap marker 不阻塞后续展示。
 - 补拉接口返回 gap marker，客户端不重试不存在的 seq。
 
+### 5.3 Timeline Append / Publish 顺序
+
+所有进入 `conversation.timeline.events` 的事件必须共享同一 conversation 顺序轴：
+
+```text
+message.persisted / edited / revoked / deleted
+conversation.member.joined / left / role_changed
+boundary event
+gap marker
+repair event
+```
+
+目标态原则：
+
+```text
+所有 conversation timeline event 必须经过同一个 append / publish ordering mechanism。
+```
+
+允许的实现路线：
+
+| 方案 | 说明 | 适用性 |
+| --- | --- | --- |
+| A | conversation-service 只提交 boundary command，最终由 timeline authority 统一写 timeline + outbox | 推荐用于热点和成员边界复杂场景 |
+| B | 多服务各写 outbox，但共享 `conversation_timeline_publish_cursor` 按 `aggregate_version` 全局发布 | 可用但治理复杂 |
+| C | 所有 timeline event 进入同一张 `conversation_timeline_events` 和同一条 outbox 流 | 推荐用于第一批生产化 |
+
+第一阶段只有 message-service 产生 message timeline event，因此 message-service outbox 顺序保护足够。成员边界、gap marker 和 repair event 生产化前，`conversation-service / member_change_saga SDD` 必须选定 A/B/C 之一。
+
 热点 seq 分配流水：
 
 ```text
@@ -349,7 +377,7 @@ seq_allocation_journal:
 - 巡检任务告警长时间停留在 `ALLOCATED` 的 seq。
 - journal 用于证明无重复 seq、无未解释 gap。
 
-### 5.3 消息变更
+### 5.4 消息变更
 
 编辑、撤回、删除流程：
 
@@ -1163,6 +1191,7 @@ RAG/Agent 发布必须跑安全评测：
 | PostgreSQL migration 未落文件 | 阻塞本地事务代码 | 先落 `conversation_seq + message_log + timeline + outbox` 同分片约束 |
 | Kafka schema 未落文件 | 阻塞 outbox relay 对外发布 | 先落 `message.persisted.v1` 和 envelope，再实现 producer |
 | Outbox DLQ repair 契约文件未落地 | 不阻塞第一阶段 `SendMessage`，但阻塞后续运维闭环 | SDD 已定义 replay/skip 语义；后续必须落 Proto/AsyncAPI 和 `audit.repair.events` schema |
+| 跨服务 timeline append / publish ordering 未落地 | 不阻塞第一阶段只有 message event 的 `SendMessage`；阻塞成员边界、gap marker、repair event 生产化 | `conversation-service / member_change_saga SDD` 必须选择统一 timeline append / publish 机制 |
 
 本地开发和双机压测配置属于运行手册，不固化在目标态架构正文中。当前机器 IP、端口、防火墙和代理约定见 `docs/runbook/local-loadtest.md`。
 
@@ -1195,6 +1224,7 @@ RAG/Agent 发布必须跑安全评测：
 message-service SendMessage
 -> gRPC/HTTP contract
 -> PostgreSQL migration
+-> external dependency reads before DB transaction
 -> local transaction: conversation_seq + message_log + conversation_timeline_events + message_outbox
 -> outbox relay publishes or records publish attempt
 -> integration test proves idempotency and transaction atomicity
@@ -1258,8 +1288,12 @@ small smoke load
 进入编码前的门禁：
 
 - `message-service.proto` 必须先冻结 `SendMessage`、`EditMessage`、`RevokeMessage`、`DeleteMessage` 和错误码。
+- `EditMessage`、`RevokeMessage`、`DeleteMessage` request 必须携带 `conversation_id`，不能只靠 `message_id` 路由分片。
+- `SendMessage` 必须明确 `command_hash` canonical 规则和 `client_msg_id` device scope。
+- `SendMessage` 外部依赖读取必须在 DB transaction 外完成，事务内只做本地事实写入。
 - PostgreSQL migration 必须覆盖 message-service SDD 中的核心表和唯一约束，尤其是 `conversation_seq` DDL、`message_log.command_hash` 和同分片事务约束。
 - Kafka schema 必须覆盖 `message.persisted.v1`、`message.edited.v1`、`message.revoked.v1`、`message.deleted.v1`。
+- `conversation.timeline.events` 的跨服务 append / publish 顺序机制必须在成员边界生产化前冻结。
 - 本地集成测试必须能一键启动依赖并清理数据。
 - 第一轮压测只接受真实服务进程，不接受仅返回固定字符串的 toy endpoint。
 

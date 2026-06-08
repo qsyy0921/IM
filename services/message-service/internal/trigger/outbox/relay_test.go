@@ -3,6 +3,7 @@ package outbox
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -113,6 +114,81 @@ func TestRelayRunContinuesImmediatelyWhenWorkWasFetched(t *testing.T) {
 	}
 }
 
+func TestRelayRunStartsConfiguredWorkers(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	store := newBlockingStore(3)
+	relay := NewRelay(store, &fakePublisher{}, Config{
+		WorkerCount:  3,
+		PollInterval: time.Hour,
+	})
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- relay.Run(ctx)
+	}()
+
+	select {
+	case <-store.allStarted:
+	case <-time.After(500 * time.Millisecond):
+		cancel()
+		t.Fatalf("relay did not start configured workers")
+	}
+	cancel()
+
+	select {
+	case err := <-errCh:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("unexpected relay error: %v", err)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatalf("relay did not stop after cancel")
+	}
+	if store.maxActiveCount() < 3 {
+		t.Fatalf("expected 3 active workers, got %d", store.maxActiveCount())
+	}
+}
+
+func TestRelayRunBacksOffWhenFetchedWithoutPublished(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	store := &backoffStore{
+		firstCall:  make(chan struct{}),
+		secondCall: make(chan struct{}),
+	}
+	relay := NewRelay(store, &fakePublisher{}, Config{
+		PollInterval:   time.Hour,
+		FailureBackoff: 500 * time.Millisecond,
+	})
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- relay.Run(ctx)
+	}()
+
+	select {
+	case <-store.firstCall:
+	case <-time.After(200 * time.Millisecond):
+		cancel()
+		t.Fatalf("relay did not process first batch")
+	}
+
+	select {
+	case <-store.secondCall:
+		cancel()
+		t.Fatalf("relay retried failed fetched batch without failure backoff")
+	case <-time.After(100 * time.Millisecond):
+	}
+	cancel()
+
+	select {
+	case err := <-errCh:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("unexpected relay error: %v", err)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatalf("relay did not stop after cancel")
+	}
+}
+
 type publishedMessage struct {
 	topic string
 	key   []byte
@@ -187,6 +263,92 @@ func (s *countingStore) ProcessReady(
 		s.cancel()
 	}
 	return s.stats[index], nil
+}
+
+type blockingStore struct {
+	mu         sync.Mutex
+	expected   int
+	calls      int
+	active     int
+	maxActive  int
+	allStarted chan struct{}
+	closeOnce  sync.Once
+}
+
+func newBlockingStore(expected int) *blockingStore {
+	return &blockingStore{
+		expected:   expected,
+		allStarted: make(chan struct{}),
+	}
+}
+
+func (s *blockingStore) ProcessReady(
+	ctx context.Context,
+	_ int,
+	_ int,
+	_ time.Duration,
+	_ func(context.Context, types.OutboxMessage) error,
+) (types.OutboxRelayStats, error) {
+	s.mu.Lock()
+	s.calls++
+	s.active++
+	if s.active > s.maxActive {
+		s.maxActive = s.active
+	}
+	if s.calls >= s.expected {
+		s.closeOnce.Do(func() {
+			close(s.allStarted)
+		})
+	}
+	s.mu.Unlock()
+
+	<-ctx.Done()
+
+	s.mu.Lock()
+	s.active--
+	s.mu.Unlock()
+	return types.OutboxRelayStats{}, ctx.Err()
+}
+
+func (s *blockingStore) maxActiveCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.maxActive
+}
+
+type backoffStore struct {
+	mu              sync.Mutex
+	calls           int
+	firstCall       chan struct{}
+	secondCall      chan struct{}
+	firstCloseOnce  sync.Once
+	secondCloseOnce sync.Once
+}
+
+func (s *backoffStore) ProcessReady(
+	_ context.Context,
+	_ int,
+	_ int,
+	_ time.Duration,
+	_ func(context.Context, types.OutboxMessage) error,
+) (types.OutboxRelayStats, error) {
+	s.mu.Lock()
+	s.calls++
+	calls := s.calls
+	s.mu.Unlock()
+
+	if calls == 1 {
+		s.firstCloseOnce.Do(func() {
+			close(s.firstCall)
+		})
+		return types.OutboxRelayStats{Fetched: 1, Retried: 1}, nil
+	}
+	if calls == 2 {
+		s.secondCloseOnce.Do(func() {
+			close(s.secondCall)
+		})
+	}
+	return types.OutboxRelayStats{}, nil
 }
 
 func testOutboxMessage() types.OutboxMessage {

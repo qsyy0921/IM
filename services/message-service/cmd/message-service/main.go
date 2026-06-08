@@ -134,13 +134,16 @@ func runOutboxRelay() error {
 		}
 	}()
 
+	pollInterval := envDuration("NEXUSIM_OUTBOX_POLL_INTERVAL", time.Second)
 	relay := outbox.NewRelay(
 		postgresinfra.NewOutboxStore(pool),
 		producer,
 		outbox.Config{
 			Topic:          envString("NEXUSIM_KAFKA_TOPIC", outbox.TopicConversationTimelineEvents),
 			BatchSize:      envInt("NEXUSIM_OUTBOX_BATCH_SIZE", 500),
-			PollInterval:   envDuration("NEXUSIM_OUTBOX_POLL_INTERVAL", time.Second),
+			WorkerCount:    envInt("NEXUSIM_OUTBOX_WORKERS", 1),
+			PollInterval:   pollInterval,
+			FailureBackoff: envDuration("NEXUSIM_OUTBOX_FAILURE_BACKOFF", pollInterval),
 			MaxAttempts:    envInt("NEXUSIM_OUTBOX_MAX_ATTEMPTS", 5),
 			RetryBaseDelay: envDuration("NEXUSIM_OUTBOX_RETRY_BASE_DELAY", time.Second),
 		},

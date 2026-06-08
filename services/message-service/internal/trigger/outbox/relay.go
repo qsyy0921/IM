@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync"
 	"time"
 
 	conversationtimelinev1 "github.com/qsyy0921/IM/schemas/kafka"
@@ -38,7 +39,9 @@ type Relay struct {
 type Config struct {
 	Topic          string
 	BatchSize      int
+	WorkerCount    int
 	PollInterval   time.Duration
+	FailureBackoff time.Duration
 	MaxAttempts    int
 	RetryBaseDelay time.Duration
 }
@@ -52,21 +55,56 @@ func NewRelay(store Store, publisher Publisher, config Config) *Relay {
 }
 
 func (r *Relay) Run(ctx context.Context) error {
-	ticker := time.NewTicker(r.config.PollInterval)
-	defer ticker.Stop()
+	if r.config.WorkerCount <= 1 {
+		return r.runWorker(ctx)
+	}
 
+	workerCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var firstErr error
+	for worker := 0; worker < r.config.WorkerCount; worker++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := r.runWorker(workerCtx); err != nil && !errors.Is(err, context.Canceled) {
+				mu.Lock()
+				if firstErr == nil {
+					firstErr = err
+					cancel()
+				}
+				mu.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+	if firstErr != nil {
+		return firstErr
+	}
+	return ctx.Err()
+}
+
+func (r *Relay) runWorker(ctx context.Context) error {
 	for {
 		stats, err := r.RunOnce(ctx)
 		if err != nil && !errors.Is(err, context.Canceled) {
 			return err
 		}
-		if stats.Fetched > 0 {
+		if stats.Published > 0 {
 			continue
 		}
+		delay := r.config.PollInterval
+		if stats.Fetched > 0 {
+			delay = r.config.FailureBackoff
+		}
+		timer := time.NewTimer(delay)
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			return ctx.Err()
-		case <-ticker.C:
+		case <-timer.C:
 		}
 	}
 }
@@ -215,8 +253,14 @@ func normalizeConfig(config Config) Config {
 	if config.BatchSize <= 0 {
 		config.BatchSize = 500
 	}
+	if config.WorkerCount <= 0 {
+		config.WorkerCount = 1
+	}
 	if config.PollInterval <= 0 {
 		config.PollInterval = time.Second
+	}
+	if config.FailureBackoff <= 0 {
+		config.FailureBackoff = config.PollInterval
 	}
 	if config.MaxAttempts <= 0 {
 		config.MaxAttempts = 5

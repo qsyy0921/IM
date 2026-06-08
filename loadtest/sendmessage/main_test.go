@@ -72,6 +72,21 @@ func TestApplyLatency(t *testing.T) {
 	}
 }
 
+func TestCommitInfoFromEnv(t *testing.T) {
+	t.Setenv("NEXUSIM_COMMIT", "abc1234")
+	t.Setenv("NEXUSIM_COMMIT_FULL", "abc1234full")
+	t.Setenv("NEXUSIM_GIT_DIRTY", "true")
+	t.Setenv("NEXUSIM_GIT_STATUS_SHORT", "M file.go")
+
+	commit := commitInfoFromEnv()
+	if commit.Short != "abc1234-dirty" ||
+		commit.Full != "abc1234full" ||
+		!commit.Dirty ||
+		commit.StatusShort != "M file.go" {
+		t.Fatalf("unexpected commit info: %+v", commit)
+	}
+}
+
 func TestParseConfigUsesEnvironment(t *testing.T) {
 	env := map[string]string{
 		"NEXUSIM_TARGET":              "127.0.0.1:10495",

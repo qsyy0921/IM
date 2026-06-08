@@ -501,6 +501,9 @@ type commitInfo struct {
 }
 
 func currentCommit() commitInfo {
+	if override := commitInfoFromEnv(); override.Short != "" {
+		return override
+	}
 	shortOutput, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output()
 	if err != nil {
 		return commitInfo{Short: "unknown", Full: "unknown"}
@@ -518,6 +521,31 @@ func currentCommit() commitInfo {
 	short := strings.TrimSpace(string(shortOutput))
 	dirty := statusShort != ""
 	if dirty {
+		short += "-dirty"
+	}
+	return commitInfo{
+		Short:       short,
+		Full:        full,
+		Dirty:       dirty,
+		StatusShort: statusShort,
+	}
+}
+
+func commitInfoFromEnv() commitInfo {
+	short := strings.TrimSpace(os.Getenv("NEXUSIM_COMMIT"))
+	if short == "" {
+		return commitInfo{}
+	}
+	full := strings.TrimSpace(os.Getenv("NEXUSIM_COMMIT_FULL"))
+	if full == "" {
+		full = short
+	}
+	statusShort := strings.TrimSpace(os.Getenv("NEXUSIM_GIT_STATUS_SHORT"))
+	dirty, _ := strconv.ParseBool(strings.TrimSpace(os.Getenv("NEXUSIM_GIT_DIRTY")))
+	if statusShort != "" {
+		dirty = true
+	}
+	if dirty && !strings.HasSuffix(short, "-dirty") {
 		short += "-dirty"
 	}
 	return commitInfo{

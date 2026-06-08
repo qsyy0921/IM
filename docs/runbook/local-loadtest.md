@@ -273,3 +273,35 @@ docker compose `
 ```
 
 该操作不删除 named volume；不要执行 `down -v`，除非明确要清空本地数据库。
+
+## 9. Backpressure Smoke
+
+当 PostgreSQL acquire 已经成为主等待段时，可以启用 message-service 的本地 backpressure：
+
+```powershell
+$env:NEXUSIM_PG_BACKPRESSURE_ENABLED = 'true'
+$env:NEXUSIM_PG_BACKPRESSURE_MIN_AVAILABLE_CONNS = '0'
+
+.\loadtest\sendmessage\run-local-pgpool-gradient.ps1 `
+  -PGMaxConns 1 `
+  -VUs 20 `
+  -Duration 5s `
+  -StatsWait 5s `
+  -ConversationCount 100 `
+  -RelayWorkers 2 `
+  -BatchSize 100 `
+  -ResultRoot loadtest\results\backpressure-smoke-20260609
+
+Remove-Item Env:\NEXUSIM_PG_BACKPRESSURE_ENABLED -ErrorAction SilentlyContinue
+Remove-Item Env:\NEXUSIM_PG_BACKPRESSURE_MIN_AVAILABLE_CONNS -ErrorAction SilentlyContinue
+```
+
+预期结果：
+
+```text
+error_topn[0].error = Unavailable: service overloaded
+p99 保持毫秒级
+outbox_pending_count = 0
+```
+
+该 smoke 的目的不是追求高成功率，而是验证系统能快速保护自己，不把请求都堆到连接池里等 2s 超时。正式容量压测仍需单独报告。

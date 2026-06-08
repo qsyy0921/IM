@@ -130,6 +130,38 @@ func TestMessageRepositoryAppendMessageConcurrentReplayDoesNotAdvanceSeq(t *test
 	assertCurrentSeq(t, ctx, pool, tenantID, input.Command.ConversationID, 1)
 }
 
+func TestMessageRepositoryBackpressureRejectsWhenPoolSaturated(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("set NEXUSIM_PG_DSN to run PostgreSQL integration test")
+	}
+	config, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		t.Fatalf("parse postgres config: %v", err)
+	}
+	config.MaxConns = 1
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		t.Fatalf("connect postgres: %v", err)
+	}
+	defer pool.Close()
+
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatalf("acquire saturation connection: %v", err)
+	}
+	defer conn.Release()
+
+	repo := NewMessageRepository(pool, WithBackpressure(BackpressureConfig{Enabled: true}))
+	_, err = repo.AppendMessage(ctx, testAppendInput(types.TenantID("tenant-backpressure"), "client-backpressure", []byte(`{"text":"hello"}`)))
+	if !errors.Is(err, types.ErrServiceOverloaded) {
+		t.Fatalf("expected service overloaded, got %v", err)
+	}
+}
+
 func openIntegrationPool(t *testing.T, ctx context.Context) *pgxpool.Pool {
 	t.Helper()
 	dsn := os.Getenv("NEXUSIM_PG_DSN")

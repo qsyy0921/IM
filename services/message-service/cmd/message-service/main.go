@@ -78,11 +78,19 @@ func runGRPCServer() error {
 	conversation.PermissionVersion = policy.PermissionVersion
 	conversation.FanoutPolicyVersion = envInt64("NEXUSIM_MOCK_FANOUT_POLICY_VERSION", conversation.FanoutPolicyVersion)
 
+	repositoryOptions := []postgresinfra.MessageRepositoryOption{postgresinfra.WithMetrics(metrics)}
+	if envBool("NEXUSIM_PG_BACKPRESSURE_ENABLED", false) {
+		repositoryOptions = append(repositoryOptions, postgresinfra.WithBackpressure(postgresinfra.BackpressureConfig{
+			Enabled:           true,
+			MinAvailableConns: int32(envInt("NEXUSIM_PG_BACKPRESSURE_MIN_AVAILABLE_CONNS", 0)),
+		}))
+	}
+
 	useCase := app.NewSendMessageUseCase(
 		policy,
 		conversation,
 		rpcinfra.NoopSequencer{},
-		postgresinfra.NewMessageRepository(pool, postgresinfra.WithMetrics(metrics)),
+		postgresinfra.NewMessageRepository(pool, repositoryOptions...),
 	)
 
 	listener, err := net.Listen("tcp", listenAddr)

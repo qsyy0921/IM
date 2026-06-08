@@ -164,6 +164,13 @@ func TestSendMessageMapsUseCaseErrors(t *testing.T) {
 			retryable: true,
 		},
 		{
+			name:      "service overloaded",
+			err:       types.NewServiceOverloaded("pg pool saturated"),
+			grpcCode:  codes.Unavailable,
+			errorCode: messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_SERVICE_OVERLOADED,
+			retryable: true,
+		},
+		{
 			name:      "dependency version mismatch",
 			err:       types.NewDependencyVersionMismatch("version drift"),
 			grpcCode:  codes.Unavailable,

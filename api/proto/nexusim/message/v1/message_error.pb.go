@@ -37,21 +37,23 @@ const (
 	MessageErrorCode_MESSAGE_ERROR_CODE_SEQ_BLOCK_EXHAUSTED      MessageErrorCode = 7
 	MessageErrorCode_MESSAGE_ERROR_CODE_DB_WRITE_FAILED          MessageErrorCode = 8
 	MessageErrorCode_MESSAGE_ERROR_CODE_OUTBOX_WRITE_FAILED      MessageErrorCode = 9
+	MessageErrorCode_MESSAGE_ERROR_CODE_SERVICE_OVERLOADED       MessageErrorCode = 10
 )
 
 // Enum value maps for MessageErrorCode.
 var (
 	MessageErrorCode_name = map[int32]string{
-		0: "MESSAGE_ERROR_CODE_UNSPECIFIED",
-		1: "MESSAGE_ERROR_CODE_PERMISSION_DENIED",
-		2: "MESSAGE_ERROR_CODE_CONVERSATION_NOT_FOUND",
-		3: "MESSAGE_ERROR_CODE_MESSAGE_TOO_LARGE",
-		4: "MESSAGE_ERROR_CODE_UNSUPPORTED_MESSAGE_TYPE",
-		5: "MESSAGE_ERROR_CODE_IDEMPOTENCY_CONFLICT",
-		6: "MESSAGE_ERROR_CODE_SEQUENCER_UNAVAILABLE",
-		7: "MESSAGE_ERROR_CODE_SEQ_BLOCK_EXHAUSTED",
-		8: "MESSAGE_ERROR_CODE_DB_WRITE_FAILED",
-		9: "MESSAGE_ERROR_CODE_OUTBOX_WRITE_FAILED",
+		0:  "MESSAGE_ERROR_CODE_UNSPECIFIED",
+		1:  "MESSAGE_ERROR_CODE_PERMISSION_DENIED",
+		2:  "MESSAGE_ERROR_CODE_CONVERSATION_NOT_FOUND",
+		3:  "MESSAGE_ERROR_CODE_MESSAGE_TOO_LARGE",
+		4:  "MESSAGE_ERROR_CODE_UNSUPPORTED_MESSAGE_TYPE",
+		5:  "MESSAGE_ERROR_CODE_IDEMPOTENCY_CONFLICT",
+		6:  "MESSAGE_ERROR_CODE_SEQUENCER_UNAVAILABLE",
+		7:  "MESSAGE_ERROR_CODE_SEQ_BLOCK_EXHAUSTED",
+		8:  "MESSAGE_ERROR_CODE_DB_WRITE_FAILED",
+		9:  "MESSAGE_ERROR_CODE_OUTBOX_WRITE_FAILED",
+		10: "MESSAGE_ERROR_CODE_SERVICE_OVERLOADED",
 	}
 	MessageErrorCode_value = map[string]int32{
 		"MESSAGE_ERROR_CODE_UNSPECIFIED":              0,
@@ -64,6 +66,7 @@ var (
 		"MESSAGE_ERROR_CODE_SEQ_BLOCK_EXHAUSTED":      7,
 		"MESSAGE_ERROR_CODE_DB_WRITE_FAILED":          8,
 		"MESSAGE_ERROR_CODE_OUTBOX_WRITE_FAILED":      9,
+		"MESSAGE_ERROR_CODE_SERVICE_OVERLOADED":       10,
 	}
 )
 
@@ -171,7 +174,7 @@ const file_nexusim_message_v1_message_error_proto_rawDesc = "" +
 	"\x04code\x18\x01 \x01(\x0e2$.nexusim.message.v1.MessageErrorCodeR\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1c\n" +
 	"\tretryable\x18\x03 \x01(\bR\tretryable\x12%\n" +
-	"\x0ecorrelation_id\x18\x04 \x01(\tR\rcorrelationId*\xc5\x03\n" +
+	"\x0ecorrelation_id\x18\x04 \x01(\tR\rcorrelationId*\xf0\x03\n" +
 	"\x10MessageErrorCode\x12\"\n" +
 	"\x1eMESSAGE_ERROR_CODE_UNSPECIFIED\x10\x00\x12(\n" +
 	"$MESSAGE_ERROR_CODE_PERMISSION_DENIED\x10\x01\x12-\n" +
@@ -182,7 +185,9 @@ const file_nexusim_message_v1_message_error_proto_rawDesc = "" +
 	"(MESSAGE_ERROR_CODE_SEQUENCER_UNAVAILABLE\x10\x06\x12*\n" +
 	"&MESSAGE_ERROR_CODE_SEQ_BLOCK_EXHAUSTED\x10\a\x12&\n" +
 	"\"MESSAGE_ERROR_CODE_DB_WRITE_FAILED\x10\b\x12*\n" +
-	"&MESSAGE_ERROR_CODE_OUTBOX_WRITE_FAILED\x10\tB?Z=github.com/qsyy0921/IM/api/proto/nexusim/message/v1;messagev1b\x06proto3"
+	"&MESSAGE_ERROR_CODE_OUTBOX_WRITE_FAILED\x10\t\x12)\n" +
+	"%MESSAGE_ERROR_CODE_SERVICE_OVERLOADED\x10\n" +
+	"B?Z=github.com/qsyy0921/IM/api/proto/nexusim/message/v1;messagev1b\x06proto3"
 
 var (
 	file_nexusim_message_v1_message_error_proto_rawDescOnce sync.Once

@@ -19,9 +19,17 @@ type MessageRepository struct {
 	messageID func() (types.MessageID, error)
 	eventID   func() (types.EventID, error)
 	metrics   types.LatencyRecorder
+
+	backpressureEnabled           bool
+	backpressureMinAvailableConns int32
 }
 
 type MessageRepositoryOption func(*MessageRepository)
+
+type BackpressureConfig struct {
+	Enabled           bool
+	MinAvailableConns int32
+}
 
 func NewMessageRepository(pool *pgxpool.Pool, opts ...MessageRepositoryOption) *MessageRepository {
 	repo := &MessageRepository{
@@ -53,6 +61,15 @@ func WithMetrics(metrics types.LatencyRecorder) MessageRepositoryOption {
 	return func(repo *MessageRepository) {
 		if metrics != nil {
 			repo.metrics = metrics
+		}
+	}
+}
+
+func WithBackpressure(config BackpressureConfig) MessageRepositoryOption {
+	return func(repo *MessageRepository) {
+		repo.backpressureEnabled = config.Enabled
+		if config.MinAvailableConns > 0 {
+			repo.backpressureMinAvailableConns = config.MinAvailableConns
 		}
 	}
 }
@@ -90,6 +107,9 @@ func (r *MessageRepository) AppendMessage(ctx context.Context, input domain.Appe
 	}
 	commandHash, err := domain.ComputeSendMessageCommandHash(input.Command)
 	if err != nil {
+		return domain.AppendMessageResult{}, err
+	}
+	if err := r.checkBackpressure(); err != nil {
 		return domain.AppendMessageResult{}, err
 	}
 
@@ -170,6 +190,23 @@ func (r *MessageRepository) AppendMessage(ctx context.Context, input domain.Appe
 		AcceptedAt:       record.Message.CreatedAt,
 		IdempotentReplay: false,
 	}, nil
+}
+
+func (r *MessageRepository) checkBackpressure() error {
+	if !r.backpressureEnabled || r.pool == nil {
+		return nil
+	}
+	stats := r.pool.Stat()
+	available := stats.MaxConns() - stats.AcquiredConns()
+	if available > r.backpressureMinAvailableConns {
+		return nil
+	}
+	return types.NewServiceOverloaded(fmt.Sprintf(
+		"pg pool saturated acquired=%d max=%d min_available=%d",
+		stats.AcquiredConns(),
+		stats.MaxConns(),
+		r.backpressureMinAvailableConns,
+	))
 }
 
 type existingMessage struct {

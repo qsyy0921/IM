@@ -138,6 +138,7 @@ accepted_at
 | `SEQ_BLOCK_EXHAUSTED` | 本地 seq block 用尽且暂时无法续租 | 是 |
 | `DB_WRITE_FAILED` | 本地事务失败 | 是 |
 | `OUTBOX_WRITE_FAILED` | outbox 写入失败，事务回滚 | 是 |
+| `SERVICE_OVERLOADED` | 服务过载或连接池保护性拒绝 | 是 |
 
 ### 4.2 同步调用治理
 

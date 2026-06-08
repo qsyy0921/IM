@@ -12,6 +12,7 @@ var (
 	ErrUnsupportedMessageType = errors.New("unsupported message type")
 	ErrDBWriteFailed          = errors.New("db write failed")
 	ErrOutboxWriteFailed      = errors.New("outbox write failed")
+	ErrServiceOverloaded      = errors.New("service overloaded")
 	ErrDependencyVersion      = errors.New("dependency version mismatch")
 )
 
@@ -55,6 +56,13 @@ func NewOutboxWriteFailed(reason string) error {
 		return ErrOutboxWriteFailed
 	}
 	return fmt.Errorf("%w: %s", ErrOutboxWriteFailed, reason)
+}
+
+func NewServiceOverloaded(reason string) error {
+	if reason == "" {
+		return ErrServiceOverloaded
+	}
+	return fmt.Errorf("%w: %s", ErrServiceOverloaded, reason)
 }
 
 func NewDependencyVersionMismatch(reason string) error {

@@ -54,6 +54,8 @@ func classifyError(err error) (codes.Code, messagev1.MessageErrorCode, bool) {
 		return codes.Unavailable, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_DB_WRITE_FAILED, true
 	case errors.Is(err, types.ErrOutboxWriteFailed):
 		return codes.Unavailable, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_OUTBOX_WRITE_FAILED, true
+	case errors.Is(err, types.ErrServiceOverloaded):
+		return codes.Unavailable, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_SERVICE_OVERLOADED, true
 	case errors.Is(err, types.ErrDependencyVersion):
 		return codes.Unavailable, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_UNSPECIFIED, true
 	default:
@@ -78,6 +80,8 @@ func publicErrorMessage(err error) string {
 		return "database write failed"
 	case errors.Is(err, types.ErrOutboxWriteFailed):
 		return "outbox write failed"
+	case errors.Is(err, types.ErrServiceOverloaded):
+		return "service overloaded"
 	case errors.Is(err, types.ErrDependencyVersion):
 		return "dependency version mismatch"
 	default:

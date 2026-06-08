@@ -12,25 +12,44 @@ type SendMessageUseCase struct {
 	conversation ConversationQueryPort
 	sequencer    SequencerPort
 	messageRepo  MessageRepository
+	admission    AdmissionPort
 }
+
+type SendMessageUseCaseOption func(*SendMessageUseCase)
 
 func NewSendMessageUseCase(
 	policy PolicyCheckPort,
 	conversation ConversationQueryPort,
 	sequencer SequencerPort,
 	messageRepo MessageRepository,
+	opts ...SendMessageUseCaseOption,
 ) *SendMessageUseCase {
-	return &SendMessageUseCase{
+	useCase := &SendMessageUseCase{
 		policy:       policy,
 		conversation: conversation,
 		sequencer:    sequencer,
 		messageRepo:  messageRepo,
+	}
+	for _, opt := range opts {
+		opt(useCase)
+	}
+	return useCase
+}
+
+func WithAdmission(admission AdmissionPort) SendMessageUseCaseOption {
+	return func(useCase *SendMessageUseCase) {
+		useCase.admission = admission
 	}
 }
 
 func (u *SendMessageUseCase) Execute(ctx context.Context, command types.SendMessageCommand) (types.SendMessageResult, error) {
 	if err := command.Validate(); err != nil {
 		return types.SendMessageResult{}, err
+	}
+	if u.admission != nil {
+		if err := u.admission.CheckSendMessage(ctx); err != nil {
+			return types.SendMessageResult{}, err
+		}
 	}
 
 	conversation, permission, err := u.readConsistentSendDependencies(ctx, command)

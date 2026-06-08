@@ -19,6 +19,14 @@ param(
     [string]$ResultRoot = "",
     [switch]$BackpressureEnabled,
     [int]$BackpressureMinAvailableConns = 0,
+    [switch]$AdaptiveLimitEnabled,
+    [int]$AdaptiveMinAvailableConns = 8,
+    [string]$AdaptiveMaxPoolAcquireP95 = "250ms",
+    [long]$AdaptiveMaxOutboxPending = 20000,
+    [string]$AdaptiveMaxRelayActiveP95 = "200ms",
+    [double]$AdaptiveMinOutboxFetchedPerCall = 5,
+    [double]$AdaptiveMinKafkaRecordsPerCall = 10,
+    [string]$AdaptiveSampleInterval = "1s",
     [switch]$RetryOverloaded,
     [int]$MaxRetries = 0,
     [string]$RetryJitter = "0s",
@@ -54,15 +62,16 @@ $relayMetricsURL = "http://$RelayDebugAddr/debug/metrics"
 foreach ($pgMax in $PGMaxConns) {
     foreach ($vu in $VUs) {
         $backpressureLabel = if ($BackpressureEnabled) { "bpon" } else { "bpoff" }
+        $adaptiveLabel = if ($AdaptiveLimitEnabled) { "adapton" } else { "adaptoff" }
         $publishBatchLabel = if ($PublishBatchEnabled) { "pbatchon" } else { "pbatchoff" }
-        $runName = "$backpressureLabel-$publishBatchLabel-pgmax-$pgMax-vu-$vu-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+        $runName = "$backpressureLabel-$adaptiveLabel-$publishBatchLabel-pgmax-$pgMax-vu-$vu-" + (Get-Date -Format "yyyyMMdd-HHmmss")
         $resultDir = Join-Path $ResultRoot $runName
         $serviceOut = Join-Path (Get-Location) "logs\message-service-grpc-$runName.out.log"
         $serviceErr = Join-Path (Get-Location) "logs\message-service-grpc-$runName.err.log"
         $relayOut = Join-Path (Get-Location) "logs\message-service-relay-$runName.out.log"
         $relayErr = Join-Path (Get-Location) "logs\message-service-relay-$runName.err.log"
 
-        Write-Host "Starting PG pool run pg_max=$pgMax pg_min=$PGMinConns vus=$vu duration=$Duration publish_batch=$PublishBatchEnabled"
+        Write-Host "Starting PG pool run pg_max=$pgMax pg_min=$PGMinConns vus=$vu duration=$Duration publish_batch=$PublishBatchEnabled adaptive=$AdaptiveLimitEnabled"
 
         $env:NEXUSIM_PG_DSN = $PGDSN
         $env:NEXUSIM_PG_MAX_CONNS = [string]$pgMax
@@ -77,6 +86,27 @@ foreach ($pgMax in $PGMaxConns) {
         } else {
             Remove-Item Env:\NEXUSIM_PG_BACKPRESSURE_ENABLED -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_PG_BACKPRESSURE_MIN_AVAILABLE_CONNS -ErrorAction SilentlyContinue
+        }
+        if ($AdaptiveLimitEnabled) {
+            $env:NEXUSIM_ADAPTIVE_LIMIT_ENABLED = "true"
+            $env:NEXUSIM_ADAPTIVE_MIN_AVAILABLE_CONNS = [string]$AdaptiveMinAvailableConns
+            $env:NEXUSIM_ADAPTIVE_MAX_POOL_ACQUIRE_P95 = $AdaptiveMaxPoolAcquireP95
+            $env:NEXUSIM_ADAPTIVE_MAX_OUTBOX_PENDING = [string]$AdaptiveMaxOutboxPending
+            $env:NEXUSIM_ADAPTIVE_MAX_RELAY_ACTIVE_P95 = $AdaptiveMaxRelayActiveP95
+            $env:NEXUSIM_ADAPTIVE_MIN_OUTBOX_FETCHED_PER_CALL = [string]$AdaptiveMinOutboxFetchedPerCall
+            $env:NEXUSIM_ADAPTIVE_MIN_KAFKA_RECORDS_PER_CALL = [string]$AdaptiveMinKafkaRecordsPerCall
+            $env:NEXUSIM_ADAPTIVE_SAMPLE_INTERVAL = $AdaptiveSampleInterval
+            $env:NEXUSIM_ADAPTIVE_RELAY_METRICS_URL = $relayMetricsURL
+        } else {
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_LIMIT_ENABLED -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_MIN_AVAILABLE_CONNS -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_MAX_POOL_ACQUIRE_P95 -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_MAX_OUTBOX_PENDING -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_MAX_RELAY_ACTIVE_P95 -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_MIN_OUTBOX_FETCHED_PER_CALL -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_MIN_KAFKA_RECORDS_PER_CALL -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_SAMPLE_INTERVAL -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_RELAY_METRICS_URL -ErrorAction SilentlyContinue
         }
 
         $env:NEXUSIM_MESSAGE_SERVICE_MODE = "grpc"
@@ -126,6 +156,15 @@ foreach ($pgMax in $PGMaxConns) {
             Remove-Item Env:\NEXUSIM_PG_BACKPRESSURE_ENABLED -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_PG_BACKPRESSURE_MIN_AVAILABLE_CONNS -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_OUTBOX_PUBLISH_BATCH_ENABLED -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_LIMIT_ENABLED -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_MIN_AVAILABLE_CONNS -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_MAX_POOL_ACQUIRE_P95 -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_MAX_OUTBOX_PENDING -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_MAX_RELAY_ACTIVE_P95 -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_MIN_OUTBOX_FETCHED_PER_CALL -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_MIN_KAFKA_RECORDS_PER_CALL -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_SAMPLE_INTERVAL -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_RELAY_METRICS_URL -ErrorAction SilentlyContinue
         }
     }
 }

@@ -22,3 +22,7 @@ type SequencerPort interface {
 type MessageRepository interface {
 	AppendMessage(ctx context.Context, input domain.AppendMessageInput) (domain.AppendMessageResult, error)
 }
+
+type AdmissionPort interface {
+	CheckSendMessage(ctx context.Context) error
+}

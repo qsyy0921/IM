@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	grpcapi "github.com/qsyy0921/IM/services/message-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/message-service/internal/app"
+	admissioninfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/admission"
 	kafkainfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/kafka"
 	metricsinfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/metrics"
 	postgresinfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/postgres"
@@ -86,11 +87,44 @@ func runGRPCServer() error {
 		}))
 	}
 
+	useCaseOptions := make([]app.SendMessageUseCaseOption, 0, 1)
+	if envBool("NEXUSIM_ADAPTIVE_LIMIT_ENABLED", false) {
+		config := admissioninfra.Config{
+			Enabled:                       true,
+			MinAvailableConns:             int32(envInt("NEXUSIM_ADAPTIVE_MIN_AVAILABLE_CONNS", 0)),
+			MaxPoolAcquireP95:             envDuration("NEXUSIM_ADAPTIVE_MAX_POOL_ACQUIRE_P95", 0),
+			MaxOutboxPending:              envInt64("NEXUSIM_ADAPTIVE_MAX_OUTBOX_PENDING", 0),
+			MaxRelayProcessReadyActiveP95: envDuration("NEXUSIM_ADAPTIVE_MAX_RELAY_ACTIVE_P95", 0),
+			MinOutboxFetchedPerCall:       envFloat("NEXUSIM_ADAPTIVE_MIN_OUTBOX_FETCHED_PER_CALL", 0),
+			MinKafkaPublishRecordsPerCall: envFloat("NEXUSIM_ADAPTIVE_MIN_KAFKA_RECORDS_PER_CALL", 0),
+			MinMetricSamples:              int64(envInt("NEXUSIM_ADAPTIVE_MIN_METRIC_SAMPLES", 20)),
+			SampleInterval:                envDuration("NEXUSIM_ADAPTIVE_SAMPLE_INTERVAL", time.Second),
+			RelayMetricsURL:               envString("NEXUSIM_ADAPTIVE_RELAY_METRICS_URL", ""),
+			HTTPTimeout:                   envDuration("NEXUSIM_ADAPTIVE_HTTP_TIMEOUT", time.Second),
+		}
+		admission := admissioninfra.NewController(
+			config,
+			admissioninfra.NewPGXPoolStatsProvider(pool),
+			metrics,
+			admissioninfra.NewPostgresOutboxBacklogProvider(pool),
+		)
+		admission.Start(ctx)
+		useCaseOptions = append(useCaseOptions, app.WithAdmission(admission))
+		log.Printf(
+			"message-service adaptive limit enabled min_available=%d max_pool_acquire_p95=%s max_outbox_pending=%d relay_metrics_url=%s",
+			config.MinAvailableConns,
+			config.MaxPoolAcquireP95,
+			config.MaxOutboxPending,
+			config.RelayMetricsURL,
+		)
+	}
+
 	useCase := app.NewSendMessageUseCase(
 		policy,
 		conversation,
 		rpcinfra.NoopSequencer{},
 		postgresinfra.NewMessageRepository(pool, repositoryOptions...),
+		useCaseOptions...,
 	)
 
 	listener, err := net.Listen("tcp", listenAddr)
@@ -257,6 +291,18 @@ func envInt64(name string, fallback int64) int64 {
 		return fallback
 	}
 	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func envFloat(name string, fallback float64) float64 {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
 	if err != nil || parsed <= 0 {
 		return fallback
 	}

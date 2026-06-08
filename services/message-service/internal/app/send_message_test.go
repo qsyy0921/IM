@@ -55,6 +55,27 @@ func TestSendMessageUseCasePermissionDenied(t *testing.T) {
 	}
 }
 
+func TestSendMessageUseCaseAdmissionRejectsBeforeDependencyReads(t *testing.T) {
+	repo := &fakeMessageRepository{}
+	policy := &fakePolicy{decision: allowedDecision()}
+	conversation := &fakeConversation{context: localConversation()}
+	useCase := NewSendMessageUseCase(
+		policy,
+		conversation,
+		fakeSequencer{},
+		repo,
+		WithAdmission(&fakeAdmission{err: types.NewServiceOverloaded("test overload")}),
+	)
+
+	_, err := useCase.Execute(context.Background(), testCommand())
+	if !errors.Is(err, types.ErrServiceOverloaded) {
+		t.Fatalf("expected service overloaded, got %v", err)
+	}
+	if policy.calls != 0 || conversation.calls != 0 || repo.calls != 0 {
+		t.Fatalf("admission should reject before dependency reads: policy=%d conversation=%d repo=%d", policy.calls, conversation.calls, repo.calls)
+	}
+}
+
 func TestSendMessageUseCaseRejectsSequencerModeInPhaseOne(t *testing.T) {
 	repo := &fakeMessageRepository{}
 	conversation := localConversation()
@@ -255,4 +276,12 @@ func (f *fakeMessageRepository) AppendMessage(_ context.Context, input domain.Ap
 	f.calls++
 	f.input = input
 	return f.result, f.err
+}
+
+type fakeAdmission struct {
+	err error
+}
+
+func (f *fakeAdmission) CheckSendMessage(context.Context) error {
+	return f.err
 }

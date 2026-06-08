@@ -382,3 +382,44 @@ PublishBatch=true  -> kafka_publish_records_per_call 应大于 1
 ```
 
 如果使用 `-SkipBuild`，必须先确认 `bin\message-service.exe` 已经由当前 HEAD 重建；否则 summary 的 `commit` 可能是当前仓库 commit，但实际运行的服务二进制仍是旧版本。
+
+## 12. Outbox Batch / Worker Matrix
+
+联合验证 `NEXUSIM_OUTBOX_BATCH_SIZE` 和 `NEXUSIM_OUTBOX_WORKERS` 时，使用包装脚本：
+
+```powershell
+.\loadtest\sendmessage\run-local-outbox-batch-worker-matrix.ps1 `
+  -BatchSizes 100,500,1000 `
+  -RelayWorkers 8,12,16 `
+  -VUs 1200,1600 `
+  -PGMaxConns 64 `
+  -Duration 30s `
+  -StatsWait 20s `
+  -ConversationCount 1000 `
+  -PublishBatchEnabled:$true `
+  -BackpressureEnabled `
+  -BackpressureMinAvailableConns 8 `
+  -RetryOverloaded `
+  -MaxRetries 2 `
+  -RetryJitter 100ms `
+  -ResultRoot loadtest\results\outbox-batch-worker-matrix-YYYYMMDD
+```
+
+脚本会为每个 batch/worker 组合调用 `run-local-pgpool-gradient.ps1`，并增量写出：
+
+```text
+outbox-batch-worker-matrix-summary.json
+```
+
+正式解读时至少同时看：
+
+```text
+outbox_pending_count
+accepted_rps
+success_p99_ms
+kafka_publish_records_per_call
+kafka_publish_call_latency_ms
+outbox_process_ready_latency_ms
+```
+
+注意：当前 `outbox_process_ready_latency_ms` 会混入 `stats_wait` 阶段的 idle 样本；做 adaptive limit 前应补 active/idle 拆分或记录 `outbox_fetched_per_call`。

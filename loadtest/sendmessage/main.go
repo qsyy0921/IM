@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"math"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -37,6 +38,8 @@ type config struct {
 	ConversationPrefix string
 	ConversationCount  int
 	PGDSN              string
+	ServiceMetricsURL  string
+	RelayMetricsURL    string
 }
 
 type sample struct {
@@ -64,12 +67,14 @@ type summary struct {
 	P95MS                         float64      `json:"p95_ms"`
 	P99MS                         float64      `json:"p99_ms"`
 	ConversationSeqAllocLatencyMS *float64     `json:"conversation_seq_alloc_latency_ms"`
+	ConversationSeqAllocP95MS     *float64     `json:"conversation_seq_alloc_p95_ms"`
 	OutboxTotalCount              *int64       `json:"outbox_total_count"`
 	OutboxPublishedCount          *int64       `json:"outbox_published_count"`
 	OutboxPendingCount            *int64       `json:"outbox_pending_count"`
 	OutboxDLQCount                *int64       `json:"outbox_dlq_count"`
 	OutboxOldestPendingAgeSeconds *float64     `json:"outbox_oldest_pending_age_seconds"`
 	KafkaPublishLatencyMS         *float64     `json:"kafka_publish_latency_ms"`
+	KafkaPublishP95MS             *float64     `json:"kafka_publish_p95_ms"`
 	ErrorTopN                     []errorCount `json:"error_topn"`
 	StartedAt                     string       `json:"started_at"`
 	FinishedAt                    string       `json:"finished_at"`
@@ -124,6 +129,20 @@ func run(args []string, getenv func(string) string) error {
 		result.OutboxDLQCount = &outboxStats.DLQ
 		result.OutboxOldestPendingAgeSeconds = &outboxStats.OldestPendingAgeSeconds
 	}
+	if cfg.ServiceMetricsURL != "" {
+		metrics, metricsErr := readMetricsSnapshot(context.Background(), cfg.ServiceMetricsURL)
+		if metricsErr != nil {
+			return metricsErr
+		}
+		applyLatency(&result.ConversationSeqAllocLatencyMS, &result.ConversationSeqAllocP95MS, metrics.ConversationSeqAllocLatencyMS)
+	}
+	if cfg.RelayMetricsURL != "" {
+		metrics, metricsErr := readMetricsSnapshot(context.Background(), cfg.RelayMetricsURL)
+		if metricsErr != nil {
+			return metricsErr
+		}
+		applyLatency(&result.KafkaPublishLatencyMS, &result.KafkaPublishP95MS, metrics.KafkaPublishLatencyMS)
+	}
 
 	if err := writeSummary(cfg.ResultDir, &result); err != nil {
 		return err
@@ -153,6 +172,8 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	flags.StringVar(&cfg.ConversationPrefix, "conversation-prefix", envString(getenv, "NEXUSIM_CONVERSATION_PREFIX", "conv-loadtest"), "conversation id prefix")
 	flags.IntVar(&cfg.ConversationCount, "conversation-count", envInt(getenv, "NEXUSIM_CONVERSATION_COUNT", 1), "number of conversations to spread requests across")
 	flags.StringVar(&cfg.PGDSN, "pg-dsn", envString(getenv, "NEXUSIM_PG_DSN", ""), "optional PostgreSQL DSN for outbox stats")
+	flags.StringVar(&cfg.ServiceMetricsURL, "service-metrics-url", envString(getenv, "NEXUSIM_SERVICE_METRICS_URL", ""), "optional message-service gRPC process metrics URL")
+	flags.StringVar(&cfg.RelayMetricsURL, "relay-metrics-url", envString(getenv, "NEXUSIM_RELAY_METRICS_URL", ""), "optional message-service relay process metrics URL")
 	if err := flags.Parse(args); err != nil {
 		return config{}, err
 	}
@@ -259,7 +280,9 @@ func executeLoad(ctx context.Context, cfg config, client messagev1.MessageServic
 		StartedAt:                     started.Format(time.RFC3339Nano),
 		FinishedAt:                    finished.Format(time.RFC3339Nano),
 		ConversationSeqAllocLatencyMS: nil,
+		ConversationSeqAllocP95MS:     nil,
 		KafkaPublishLatencyMS:         nil,
+		KafkaPublishP95MS:             nil,
 	}, nil
 }
 
@@ -356,6 +379,17 @@ type outboxStats struct {
 	OldestPendingAgeSeconds float64
 }
 
+type metricsSnapshot struct {
+	ConversationSeqAllocLatencyMS latencySnapshot `json:"conversation_seq_alloc_latency_ms"`
+	KafkaPublishLatencyMS         latencySnapshot `json:"kafka_publish_latency_ms"`
+}
+
+type latencySnapshot struct {
+	Count int64   `json:"count"`
+	AvgMS float64 `json:"avg_ms"`
+	P95MS float64 `json:"p95_ms"`
+}
+
 func readOutboxStats(ctx context.Context, dsn string, tenantID string) (outboxStats, error) {
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
@@ -387,6 +421,64 @@ WHERE tenant_id = $1
 		return outboxStats{}, err
 	}
 	return stats, nil
+}
+
+func readMetricsSnapshot(ctx context.Context, metricsURL string) (metricsSnapshot, error) {
+	normalized, err := normalizeMetricsURL(metricsURL)
+	if err != nil {
+		return metricsSnapshot{}, err
+	}
+	requestCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	request, err := http.NewRequestWithContext(requestCtx, http.MethodGet, normalized, nil)
+	if err != nil {
+		return metricsSnapshot{}, err
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return metricsSnapshot{}, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return metricsSnapshot{}, fmt.Errorf("read metrics %s: unexpected status %d", normalized, response.StatusCode)
+	}
+	var snapshot metricsSnapshot
+	if err := json.NewDecoder(response.Body).Decode(&snapshot); err != nil {
+		return metricsSnapshot{}, err
+	}
+	return snapshot, nil
+}
+
+func normalizeMetricsURL(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", errors.New("metrics URL is required")
+	}
+	if !strings.Contains(value, "://") {
+		value = "http://" + value
+	}
+	parsed, err := url.Parse(value)
+	if err != nil {
+		return "", err
+	}
+	if parsed.Host == "" {
+		return "", errors.New("metrics URL must include host")
+	}
+	if parsed.Path == "" || parsed.Path == "/" {
+		parsed.Path = "/debug/metrics"
+	}
+	return parsed.String(), nil
+}
+
+func applyLatency(avgTarget **float64, p95Target **float64, snapshot latencySnapshot) {
+	if snapshot.Count <= 0 {
+		return
+	}
+	avg := snapshot.AvgMS
+	p95 := snapshot.P95MS
+	*avgTarget = &avg
+	*p95Target = &p95
 }
 
 func writeSummary(resultDir string, result *summary) error {

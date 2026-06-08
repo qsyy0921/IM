@@ -53,15 +53,15 @@ message-service SendMessage
 | SendMessage app/domain | 已补 `SendMessageUseCase` 单元测试、permission version 一致性短重试、稳定 JSON canonical command hash、append record 构造 |
 | PostgreSQL repository | 已实现普通会话 `SendMessage` 本地事务：幂等检查、同幂等键 advisory transaction lock、`conversation_seq` row lock、`message_log`、`conversation_timeline_events`、`message_outbox` 同事务写入；outbox payload 对齐 `MessagePersistedV1` 业务 payload；集成测试和并发重复请求测试通过 |
 | Outbox relay / Kafka publish path | 已实现 `trigger/outbox` relay、PostgreSQL outbox store、Kafka writer producer；relay 支持 `NEXUSIM_OUTBOX_WORKERS` 多 worker 与 `NEXUSIM_OUTBOX_FAILURE_BACKOFF` 失败退避；真实 PostgreSQL + Kafka 集成测试通过 |
-| message-service gRPC adapter | 已实现 `SendMessage` gRPC handler、proto request/response 转换、稳定错误码 detail 映射和错误 message 脱敏、`NEXUSIM_MESSAGE_SERVICE_MODE=grpc` 运行入口；已通过 bufconn client 单测 |
-| SendMessage loadtest | 已实现 `go run ./loadtest/sendmessage` 参数化 gRPC 压测入口；支持 `target`、`vus`、`duration`、`result-dir`、`pg-dsn`、`stats-wait`；summary 记录 full commit、dirty 状态、outbox total/published/pending/DLQ；真实 gRPC + PostgreSQL + outbox relay + Kafka smoke 与 baseline 已执行 |
+| message-service gRPC adapter | 已实现 `SendMessage` gRPC handler、proto request/response 转换、稳定错误码 detail 映射和错误 message 脱敏、`NEXUSIM_MESSAGE_SERVICE_MODE=grpc` 运行入口；支持 `NEXUSIM_DEBUG_ADDR=/debug/metrics` 暴露本进程压测指标；已通过 bufconn client 单测 |
+| SendMessage loadtest | 已实现 `go run ./loadtest/sendmessage` 参数化 gRPC 压测入口；支持 `target`、`vus`、`duration`、`result-dir`、`pg-dsn`、`stats-wait`、`service-metrics-url`、`relay-metrics-url`；summary 记录 full commit、dirty 状态、outbox total/published/pending/DLQ、seq alloc latency、Kafka publish latency；真实 gRPC + PostgreSQL + outbox relay + Kafka smoke 与 baseline 已执行 |
 
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
-2. 回传评审线程：gRPC 错误脱敏 P1 已修，baseline 状态 P1 已记录，relay worker/backoff 优化切片待阶段评审。
-3. 补指标采集点，让压测 summary 能记录 `conversation_seq_alloc_latency_ms` 和 `kafka_publish_latency_ms`。
-4. 基于 `NEXUSIM_OUTBOX_WORKERS=4` baseline 结果继续评估 batch size、worker 数、Kafka publish latency 和单会话顺序保护下的追平上限。
+2. 基于 `NEXUSIM_OUTBOX_WORKERS=4` baseline 结果继续评估 batch size、worker 数、Kafka publish latency 和单会话顺序保护下的追平上限。
+3. 在 clean HEAD 上重跑 4 worker 短 smoke / 长 baseline，替换当前 dirty baseline 证据。
+4. 补真实 PostgreSQL 多 worker / `FOR UPDATE SKIP LOCKED` 集成测试，验证同 conversation 顺序不乱、跨 conversation 可并发追平。
 5. 视修复和评审复核结果决定是否推送 GitHub。
 
 ## 6. 评审要求
@@ -193,9 +193,10 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 ready 判断使用 DB `now()`，retry 时间写入使用应用时钟；生产硬化时需要统一时间源或明确 DB/relay 节点时钟同步要求。
 - 当前尚未实现 DLQ repair/replay；未来实现时必须清理 `dead_lettered_at`、`last_error`、`next_retry_at` 等旧失败字段。
 - 已有真实进程级 SendMessage smoke 和 `--vus=100 --duration=60s` baseline 结果；baseline 写入成功率 100%，但 p99 与 outbox backlog 暴露出性能风险。
-- 压测 summary 中 `conversation_seq_alloc_latency_ms` 和 `kafka_publish_latency_ms` 仍为 `null`，因为当前服务还没有独立指标采集点。
+- 压测 summary 已支持从 gRPC 进程和 relay 进程的 `/debug/metrics` 读取 `conversation_seq_alloc_latency_ms` 与 `kafka_publish_latency_ms`；生产化仍需接入统一 metrics/tracing，而不是依赖本地 debug endpoint。
 - 当前 `51772e6` baseline：45212/45212 成功，p95 249.62ms，p99 518.03ms，`stats-wait=30s` 后本轮 tenant outbox `PENDING=27181`、`PUBLISHED=18031`。
-- 当前 worker/backoff dirty baseline：`NEXUSIM_OUTBOX_WORKERS=4`、`--vus=100 --duration=60s --stats-wait=30s --conversation-count=1000`，69608/69608 成功，p95 122.10ms，p99 156.24ms，`stats-wait=30s` 后本轮 tenant outbox `PENDING=2123`、`PUBLISHED=67485`；relay 额外 drain 20s 后该 tenant outbox 全部 `PUBLISHED=69608`。
+- 当前 worker/backoff dirty baseline：`NEXUSIM_OUTBOX_WORKERS=4`、`--vus=100 --duration=60s --stats-wait=30s --conversation-count=1000`，69608/69608 成功，p95 122.10ms，p99 156.24ms，`stats-wait=30s` 后本轮 tenant outbox `PENDING=2123`、`PUBLISHED=67485`；relay 额外 drain 20s 后该 tenant outbox 全部 `PUBLISHED=69608`。该数据用于开发判断，不能作为 clean commit 正式性能归档。
+- 当前 metrics dirty smoke：`--vus=10 --duration=10s --stats-wait=10s --conversation-count=200`，8412/8412 成功，p95 20.18ms，p99 33.61ms，outbox pending 0；summary 已写入 `conversation_seq_alloc_latency_ms=1.52`、`conversation_seq_alloc_p95_ms=2.67`、`kafka_publish_latency_ms=0.83`、`kafka_publish_p95_ms=1.57`。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
 - `timeline-service`、`conversation-service`、`delivery-service`、`push-gateway` SDD 未冻结，不能扩展到对应生产逻辑。
@@ -215,3 +216,5 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-08：已在当前 HEAD `51772e6` 跑第一轮 baseline：`--vus=100 --duration=60s --stats-wait=30s --conversation-count=1000`，结果为 45212/45212 成功、p95 249.62ms、p99 518.03ms、outbox pending 27181；已把该结果补充给评审线程作为当前提交验证证据。
 - 2026-06-08：独立评审线程复核 gRPC adapter + loadtest runner，指出 P1：gRPC status/detail 暴露底层 DB/PG 错误文本；本轮已改为稳定 public message，并补 `TestSendMessageSanitizesInternalErrorMessages`。同时已补 loadtest summary 的 full commit、dirty 状态、outbox total/published/pending/DLQ 字段。
 - 2026-06-08：独立评审线程复核确认 gRPC 错误脱敏 P1 已解除；同时指出当前工作区有未提交 relay worker/backoff 优化雏形。本轮已继续完善该切片，补 `NEXUSIM_OUTBOX_WORKERS` / `NEXUSIM_OUTBOX_FAILURE_BACKOFF` wiring、worker 并发测试、失败退避测试，并跑 4 worker 真实 baseline：69608/69608 成功，p95 122.10ms，p99 156.24ms，`stats-wait=30s` 后 pending 2123，额外 drain 20s 后清零。
+- 2026-06-08：独立评审线程复核 `cef25f1 feat: add outbox relay worker controls`，结论为无 P0/P1，可作为 relay 追平能力优化切片保留；P2 跟踪项包括 clean commit baseline 归档、部分成功大量失败场景的退避策略、真实 PostgreSQL 多 worker / `SKIP LOCKED` 集成测试、worker 上限与配置日志。
+- 2026-06-08：已补本地 debug metrics collector，gRPC 进程记录 `conversation_seq_alloc_latency`，relay 进程记录 `kafka_publish_latency`；`loadtest/sendmessage` 支持 `--service-metrics-url` 和 `--relay-metrics-url` 并把 avg/p95 写入 summary。dirty metrics smoke 已验证两个指标非空。

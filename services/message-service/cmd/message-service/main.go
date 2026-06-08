@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 	grpcapi "github.com/qsyy0921/IM/services/message-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/message-service/internal/app"
 	kafkainfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/kafka"
+	metricsinfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/metrics"
 	postgresinfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/postgres"
 	rpcinfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/rpc"
 	"github.com/qsyy0921/IM/services/message-service/internal/trigger/outbox"
@@ -59,6 +61,13 @@ func runGRPCServer() error {
 	}
 	defer pool.Close()
 
+	metrics := metricsinfra.NewCollector()
+	stopDebug, err := startDebugServer(ctx, envString("NEXUSIM_DEBUG_ADDR", ""), metrics)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
 	policy := rpcinfra.NewStaticPolicy()
 	policy.Allowed = envBool("NEXUSIM_MOCK_POLICY_ALLOWED", policy.Allowed)
 	policy.PermissionVersion = envInt64("NEXUSIM_MOCK_PERMISSION_VERSION", policy.PermissionVersion)
@@ -73,7 +82,7 @@ func runGRPCServer() error {
 		policy,
 		conversation,
 		rpcinfra.NoopSequencer{},
-		postgresinfra.NewMessageRepository(pool),
+		postgresinfra.NewMessageRepository(pool, postgresinfra.WithMetrics(metrics)),
 	)
 
 	listener, err := net.Listen("tcp", listenAddr)
@@ -124,6 +133,13 @@ func runOutboxRelay() error {
 	}
 	defer pool.Close()
 
+	metrics := metricsinfra.NewCollector()
+	stopDebug, err := startDebugServer(ctx, envString("NEXUSIM_DEBUG_ADDR", ""), metrics)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
 	producer, err := kafkainfra.NewWriterProducer(brokers)
 	if err != nil {
 		return err
@@ -146,10 +162,48 @@ func runOutboxRelay() error {
 			FailureBackoff: envDuration("NEXUSIM_OUTBOX_FAILURE_BACKOFF", pollInterval),
 			MaxAttempts:    envInt("NEXUSIM_OUTBOX_MAX_ATTEMPTS", 5),
 			RetryBaseDelay: envDuration("NEXUSIM_OUTBOX_RETRY_BASE_DELAY", time.Second),
+			Metrics:        metrics,
 		},
 	)
-	log.Println("message-service outbox relay started")
+	log.Printf(
+		"message-service outbox relay started workers=%d batch_size=%d poll_interval=%s failure_backoff=%s",
+		envInt("NEXUSIM_OUTBOX_WORKERS", 1),
+		envInt("NEXUSIM_OUTBOX_BATCH_SIZE", 500),
+		pollInterval,
+		envDuration("NEXUSIM_OUTBOX_FAILURE_BACKOFF", pollInterval),
+	)
 	return relay.Run(ctx)
+}
+
+func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {
+	if strings.TrimSpace(addr) == "" {
+		return func() {}, nil
+	}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	server := &http.Server{Handler: handler}
+	done := make(chan struct{})
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+	}()
+	go func() {
+		defer close(done)
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("message-service debug server stopped with error: %v", err)
+		}
+	}()
+	log.Printf("message-service debug server started on %s", addr)
+	return func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+		<-done
+	}, nil
 }
 
 func envString(name string, fallback string) string {

@@ -85,7 +85,20 @@ func TestRelayRunOnceRecordsPublishFailure(t *testing.T) {
 	}
 }
 
-func TestRelayRunContinuesImmediatelyWhenWorkWasFetched(t *testing.T) {
+func TestRelayRunOnceRecordsKafkaPublishLatency(t *testing.T) {
+	store := &fakeStore{messages: []types.OutboxMessage{testOutboxMessage()}}
+	metrics := &fakeMetrics{}
+	relay := NewRelay(store, &fakePublisher{}, Config{Metrics: metrics})
+
+	if _, err := relay.RunOnce(context.Background()); err != nil {
+		t.Fatalf("run relay once: %v", err)
+	}
+	if metrics.kafkaCount != 1 {
+		t.Fatalf("expected one kafka latency sample, got %d", metrics.kafkaCount)
+	}
+}
+
+func TestRelayRunContinuesImmediatelyWhenWorkWasPublished(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	store := &countingStore{
 		stats: []types.OutboxRelayStats{
@@ -107,7 +120,7 @@ func TestRelayRunContinuesImmediatelyWhenWorkWasFetched(t *testing.T) {
 			t.Fatalf("unexpected relay error: %v", err)
 		}
 	case <-time.After(200 * time.Millisecond):
-		t.Fatalf("relay did not immediately continue after fetched work")
+		t.Fatalf("relay did not immediately continue after published work")
 	}
 	if store.calls != 2 {
 		t.Fatalf("expected two store calls, got %d", store.calls)
@@ -210,6 +223,19 @@ func (p *fakePublisher) Publish(_ context.Context, topic string, key []byte, val
 		value: append([]byte(nil), value...),
 	})
 	return nil
+}
+
+type fakeMetrics struct {
+	seqCount   int
+	kafkaCount int
+}
+
+func (m *fakeMetrics) ObserveConversationSeqAlloc(time.Duration) {
+	m.seqCount++
+}
+
+func (m *fakeMetrics) ObserveKafkaPublish(time.Duration) {
+	m.kafkaCount++
 }
 
 type fakeStore struct {

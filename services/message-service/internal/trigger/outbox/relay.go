@@ -44,6 +44,7 @@ type Config struct {
 	FailureBackoff time.Duration
 	MaxAttempts    int
 	RetryBaseDelay time.Duration
+	Metrics        types.LatencyRecorder
 }
 
 func NewRelay(store Store, publisher Publisher, config Config) *Relay {
@@ -130,12 +131,15 @@ func (r *Relay) publishMessage(ctx context.Context, message types.OutboxMessage)
 	if err != nil {
 		return err
 	}
-	return r.publisher.Publish(
+	started := time.Now()
+	err = r.publisher.Publish(
 		ctx,
 		r.config.Topic,
 		[]byte(message.PartitionKey),
 		value,
 	)
+	r.config.Metrics.ObserveKafkaPublish(time.Since(started))
+	return err
 }
 
 func BuildKafkaValue(message types.OutboxMessage) ([]byte, error) {
@@ -267,6 +271,9 @@ func normalizeConfig(config Config) Config {
 	}
 	if config.RetryBaseDelay <= 0 {
 		config.RetryBaseDelay = time.Second
+	}
+	if config.Metrics == nil {
+		config.Metrics = types.NoopLatencyRecorder{}
 	}
 	return config
 }

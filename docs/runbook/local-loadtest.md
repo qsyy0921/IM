@@ -23,10 +23,11 @@
 | ---: | --- | --- |
 | `10495` | MacBook -> Windows；Windows -> MacBook 可对称使用 | 主 HTTP/API 压测入口 |
 | `10496` | MacBook -> Windows | push-gateway WebSocket 压测入口 |
-| `10497` | MacBook -> Windows | metrics/debug，只在压测窗口开放 |
+| `10497` | MacBook -> Windows | message-service gRPC 进程 metrics/debug，只在压测窗口开放 |
 | `10498` | Windows -> MacBook | callback/mock receiver，用于双向新建连接场景 |
 | `10499` | MacBook <-> Windows | load coordinator / report endpoint |
-| `10500-10510` | 按需双向 | 预留给服务级 SDD、故障注入、临时对照实验 |
+| `10500` | MacBook -> Windows | message-service outbox relay 进程 metrics/debug，只在压测窗口开放 |
+| `10501-10510` | 按需双向 | 预留给服务级 SDD、故障注入、临时对照实验 |
 
 两台机器可以使用相同端口号，因为监听地址不同，例如：
 
@@ -96,6 +97,7 @@ Test-NetConnection 192.168.0.182 -Port 10498
 - 压测结果输出到 `loadtest/results/<date>/`。
 - 先跑短压测确认功能，再跑长压测观察资源和稳定性。
 - 本地双机结果只用于发现早期瓶颈和趋势，不作为生产容量承诺。
+- 如需记录 `conversation_seq_alloc_latency` 和 `kafka_publish_latency`，gRPC 进程与 outbox relay 进程必须分别设置 `NEXUSIM_DEBUG_ADDR`，并把对应地址传给压测脚本。
 
 推荐参数形式：
 
@@ -106,7 +108,9 @@ go run ./loadtest/sendmessage \
   --duration=60s \
   --stats-wait=8s \
   --result-dir=loadtest/results/2026-06-08 \
-  --pg-dsn=postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable
+  --pg-dsn=postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable \
+  --service-metrics-url=http://192.168.0.141:10497/debug/metrics \
+  --relay-metrics-url=http://192.168.0.141:10500/debug/metrics
 ```
 
 等价环境变量形式：
@@ -118,6 +122,8 @@ NEXUSIM_DURATION=60s
 NEXUSIM_STATS_WAIT=8s
 NEXUSIM_RESULT_DIR=loadtest/results/2026-06-08
 NEXUSIM_PG_DSN=postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable
+NEXUSIM_SERVICE_METRICS_URL=http://192.168.0.141:10497/debug/metrics
+NEXUSIM_RELAY_METRICS_URL=http://192.168.0.141:10500/debug/metrics
 ```
 
 ## 7. 边搭建边压测流程

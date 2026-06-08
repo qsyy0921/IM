@@ -18,6 +18,7 @@ type MessageRepository struct {
 	now       func() time.Time
 	messageID func() (types.MessageID, error)
 	eventID   func() (types.EventID, error)
+	metrics   types.LatencyRecorder
 }
 
 type MessageRepositoryOption func(*MessageRepository)
@@ -40,11 +41,20 @@ func NewMessageRepository(pool *pgxpool.Pool, opts ...MessageRepositoryOption) *
 			}
 			return types.EventID(id), nil
 		},
+		metrics: types.NoopLatencyRecorder{},
 	}
 	for _, opt := range opts {
 		opt(repo)
 	}
 	return repo
+}
+
+func WithMetrics(metrics types.LatencyRecorder) MessageRepositoryOption {
+	return func(repo *MessageRepository) {
+		if metrics != nil {
+			repo.metrics = metrics
+		}
+	}
 }
 
 func WithClock(clock func() time.Time) MessageRepositoryOption {
@@ -96,6 +106,7 @@ func (r *MessageRepository) AppendMessage(ctx context.Context, input domain.Appe
 		return replayResult(ctx, tx, existing, commandHash)
 	}
 
+	seqAllocStarted := time.Now()
 	if err := r.ensureConversationSeq(ctx, tx, input); err != nil {
 		return domain.AppendMessageResult{}, err
 	}
@@ -104,6 +115,7 @@ func (r *MessageRepository) AppendMessage(ctx context.Context, input domain.Appe
 	if err != nil {
 		return domain.AppendMessageResult{}, err
 	}
+	r.metrics.ObserveConversationSeqAlloc(time.Since(seqAllocStarted))
 
 	messageID, err := r.messageID()
 	if err != nil {

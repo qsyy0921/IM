@@ -279,9 +279,6 @@ docker compose `
 当 PostgreSQL acquire 已经成为主等待段时，可以启用 message-service 的本地 backpressure：
 
 ```powershell
-$env:NEXUSIM_PG_BACKPRESSURE_ENABLED = 'true'
-$env:NEXUSIM_PG_BACKPRESSURE_MIN_AVAILABLE_CONNS = '0'
-
 .\loadtest\sendmessage\run-local-pgpool-gradient.ps1 `
   -PGMaxConns 1 `
   -VUs 20 `
@@ -290,10 +287,9 @@ $env:NEXUSIM_PG_BACKPRESSURE_MIN_AVAILABLE_CONNS = '0'
   -ConversationCount 100 `
   -RelayWorkers 2 `
   -BatchSize 100 `
+  -BackpressureEnabled `
+  -BackpressureMinAvailableConns 0 `
   -ResultRoot loadtest\results\backpressure-smoke-20260609
-
-Remove-Item Env:\NEXUSIM_PG_BACKPRESSURE_ENABLED -ErrorAction SilentlyContinue
-Remove-Item Env:\NEXUSIM_PG_BACKPRESSURE_MIN_AVAILABLE_CONNS -ErrorAction SilentlyContinue
 ```
 
 预期结果：
@@ -305,3 +301,40 @@ outbox_pending_count = 0
 ```
 
 该 smoke 的目的不是追求高成功率，而是验证系统能快速保护自己，不把请求都堆到连接池里等 2s 超时。正式容量压测仍需单独报告。
+
+## 10. Client Retry Smoke
+
+`SERVICE_OVERLOADED` 会返回 gRPC `RetryInfo`。如果要模拟客户端遵守服务端 retry hint，可以显式打开压测器重试：
+
+```powershell
+.\loadtest\sendmessage\run-local-pgpool-gradient.ps1 `
+  -PGMaxConns 64 `
+  -VUs 1200 `
+  -Duration 60s `
+  -StatsWait 30s `
+  -ConversationCount 3000 `
+  -RelayWorkers 8 `
+  -BatchSize 500 `
+  -BackpressureEnabled `
+  -BackpressureMinAvailableConns 8 `
+  -RetryOverloaded `
+  -MaxRetries 2 `
+  -RetryJitter 100ms `
+  -ResultRoot loadtest\results\backpressure-client-retry-YYYYMMDD
+```
+
+summary 中需要同时看：
+
+```text
+logical_request_count
+logical_success_rate
+request_count
+retry_attempt_count
+retried_request_count
+accepted_rps
+overload_rate
+success_p99_ms
+error_p99_ms
+```
+
+其中 `request_count` 是实际 gRPC attempt 数，`logical_request_count` 是用户层消息数。开启客户端重试后，两者不能混用。

@@ -173,7 +173,7 @@ VU1600 success_p99=1988.95ms accepted_rps=654.78
 
 ## 8. 下一步
 
-- 短期推荐实验阈值：`MinAvailableConns=8`。
+- 短期候选之一：下一轮优先验证 `MinAvailableConns=8`，不要把它写成生产默认值或最优阈值。
 - 让客户端遵守 gRPC `RetryInfo=500ms`，并叠加指数退避和 jitter；后续再让 retry delay 随 adaptive limit 动态调整。
 - 设计 adaptive limit：
   - 输入：pool acquire p95/p99、acquired conns、timeout/error rate、SERVICE_OVERLOADED rate、outbox pending、PostgreSQL wait_event。

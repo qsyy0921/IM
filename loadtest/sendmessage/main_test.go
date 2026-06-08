@@ -5,8 +5,10 @@ import (
 	"time"
 
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 func TestNormalizeTarget(t *testing.T) {
@@ -210,6 +212,39 @@ func TestMessageErrorDetailAndTopMessageErrors(t *testing.T) {
 	}
 }
 
+func TestOverloadRetryDelayUsesRetryInfoAndJitter(t *testing.T) {
+	st := status.New(codes.Unavailable, "service overloaded")
+	withDetails, err := st.WithDetails(
+		&messagev1.MessageError{
+			Code:      messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_SERVICE_OVERLOADED,
+			Retryable: true,
+		},
+		&errdetails.RetryInfo{RetryDelay: durationpb.New(500 * time.Millisecond)},
+	)
+	if err != nil {
+		t.Fatalf("attach detail: %v", err)
+	}
+
+	delay, ok := overloadRetryDelay(withDetails.Err(), 10*time.Millisecond, 7, 1)
+	if !ok {
+		t.Fatalf("expected overload retry delay")
+	}
+	if delay < 500*time.Millisecond || delay > 510*time.Millisecond {
+		t.Fatalf("unexpected retry delay: %s", delay)
+	}
+
+	withoutRetryInfo, err := st.WithDetails(&messagev1.MessageError{
+		Code:      messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_SERVICE_OVERLOADED,
+		Retryable: true,
+	})
+	if err != nil {
+		t.Fatalf("attach detail without retry info: %v", err)
+	}
+	if _, ok := overloadRetryDelay(withoutRetryInfo.Err(), 0, 1, 0); ok {
+		t.Fatalf("expected no retry without RetryInfo")
+	}
+}
+
 func TestCommitInfoFromEnv(t *testing.T) {
 	t.Setenv("NEXUSIM_COMMIT", "abc1234")
 	t.Setenv("NEXUSIM_COMMIT_FULL", "abc1234full")
@@ -234,6 +269,9 @@ func TestParseConfigUsesEnvironment(t *testing.T) {
 		"NEXUSIM_CONVERSATION_COUNT":  "2",
 		"NEXUSIM_SERVICE_METRICS_URL": "127.0.0.1:10498",
 		"NEXUSIM_RELAY_METRICS_URL":   "127.0.0.1:10499",
+		"NEXUSIM_RETRY_OVERLOADED":    "true",
+		"NEXUSIM_MAX_RETRIES":         "2",
+		"NEXUSIM_RETRY_JITTER":        "25ms",
 	}
 	cfg, err := parseConfig(nil, func(name string) string { return env[name] })
 	if err != nil {
@@ -245,7 +283,10 @@ func TestParseConfigUsesEnvironment(t *testing.T) {
 		cfg.ResultDir != "loadtest/results/test" ||
 		cfg.ConversationCount != 2 ||
 		cfg.ServiceMetricsURL != "127.0.0.1:10498" ||
-		cfg.RelayMetricsURL != "127.0.0.1:10499" {
+		cfg.RelayMetricsURL != "127.0.0.1:10499" ||
+		!cfg.RetryOverloaded ||
+		cfg.MaxRetries != 2 ||
+		cfg.RetryJitter != 25*time.Millisecond {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 }

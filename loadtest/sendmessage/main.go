@@ -21,6 +21,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
@@ -40,11 +41,18 @@ type config struct {
 	PGDSN              string
 	ServiceMetricsURL  string
 	RelayMetricsURL    string
+	RetryOverloaded    bool
+	MaxRetries         int
+	RetryJitter        time.Duration
 }
 
 type sample struct {
-	latency time.Duration
-	err     error
+	latency      time.Duration
+	err          error
+	attempt      bool
+	retryAttempt bool
+	logicalFinal bool
+	retried      bool
 }
 
 type loadClient struct {
@@ -64,7 +72,16 @@ type summary struct {
 	Duration                      string                     `json:"duration"`
 	StatsWait                     string                     `json:"stats_wait"`
 	ConversationCount             int                        `json:"conversation_count"`
+	RetryOverloaded               bool                       `json:"retry_overloaded"`
+	MaxRetries                    int                        `json:"max_retries"`
+	RetryJitter                   string                     `json:"retry_jitter"`
+	LogicalRequestCount           int64                      `json:"logical_request_count"`
+	LogicalSuccessCount           int64                      `json:"logical_success_count"`
+	LogicalErrorCount             int64                      `json:"logical_error_count"`
+	LogicalSuccessRate            float64                    `json:"logical_success_rate"`
 	RequestCount                  int64                      `json:"request_count"`
+	RetryAttemptCount             int64                      `json:"retry_attempt_count"`
+	RetriedRequestCount           int64                      `json:"retried_request_count"`
 	SuccessCount                  int64                      `json:"success_count"`
 	ErrorCount                    int64                      `json:"error_count"`
 	RetryableErrorCount           int64                      `json:"retryable_error_count"`
@@ -293,6 +310,9 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	flags.StringVar(&cfg.PGDSN, "pg-dsn", envString(getenv, "NEXUSIM_PG_DSN", ""), "optional PostgreSQL DSN for outbox stats")
 	flags.StringVar(&cfg.ServiceMetricsURL, "service-metrics-url", envString(getenv, "NEXUSIM_SERVICE_METRICS_URL", ""), "optional message-service gRPC process metrics URL or comma-separated URLs")
 	flags.StringVar(&cfg.RelayMetricsURL, "relay-metrics-url", envString(getenv, "NEXUSIM_RELAY_METRICS_URL", ""), "optional message-service relay process metrics URL or comma-separated URLs")
+	flags.BoolVar(&cfg.RetryOverloaded, "retry-overloaded", envBool(getenv, "NEXUSIM_RETRY_OVERLOADED", false), "retry SERVICE_OVERLOADED using gRPC RetryInfo")
+	flags.IntVar(&cfg.MaxRetries, "max-retries", envInt(getenv, "NEXUSIM_MAX_RETRIES", 0), "max retry attempts for one logical request when --retry-overloaded is enabled")
+	flags.DurationVar(&cfg.RetryJitter, "retry-jitter", envDurationAllowZero(getenv, "NEXUSIM_RETRY_JITTER", 0), "max deterministic jitter added to overload retry delay")
 	if err := flags.Parse(args); err != nil {
 		return config{}, err
 	}
@@ -313,6 +333,12 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	}
 	if cfg.ConversationCount <= 0 {
 		return config{}, errors.New("conversation-count must be positive")
+	}
+	if cfg.MaxRetries < 0 {
+		return config{}, errors.New("max-retries must be greater than or equal to zero")
+	}
+	if cfg.RetryJitter < 0 {
+		return config{}, errors.New("retry-jitter must be greater than or equal to zero")
 	}
 	return cfg, nil
 }
@@ -341,13 +367,46 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 				}
 				requestSeq := atomic.AddUint64(&sequence, 1)
 				targetClient := clients[int((requestSeq-1)%uint64(len(clients)))]
-				requestCtx, requestCancel := context.WithTimeout(ctx, cfg.RequestTimeout)
 				request := buildRequest(cfg, runID, vu, requestSeq)
-				before := time.Now()
-				_, err := targetClient.Client.SendMessage(requestCtx, request)
-				latency := time.Since(before)
-				requestCancel()
-				records <- sample{latency: latency, err: err}
+				retried := false
+				for attempt := 0; ; attempt++ {
+					requestCtx, requestCancel := context.WithTimeout(ctx, cfg.RequestTimeout)
+					before := time.Now()
+					_, err := targetClient.Client.SendMessage(requestCtx, request)
+					latency := time.Since(before)
+					requestCancel()
+
+					retryAttempt := attempt > 0
+					if retryAttempt {
+						retried = true
+					}
+					delay, shouldRetry := overloadRetryDelay(err, cfg.RetryJitter, requestSeq, attempt)
+					if err != nil && cfg.RetryOverloaded && attempt < cfg.MaxRetries && shouldRetry {
+						records <- sample{latency: latency, err: err, attempt: true, retryAttempt: retryAttempt}
+						timer := time.NewTimer(delay)
+						select {
+						case <-loadCtx.Done():
+							timer.Stop()
+							records <- sample{
+								err:          err,
+								logicalFinal: true,
+								retried:      retried,
+							}
+							return
+						case <-timer.C:
+						}
+						continue
+					}
+					records <- sample{
+						latency:      latency,
+						err:          err,
+						attempt:      true,
+						retryAttempt: retryAttempt,
+						logicalFinal: true,
+						retried:      retried,
+					}
+					break
+				}
 			}
 		}(vu)
 	}
@@ -362,41 +421,64 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 	errorCounts := map[string]int64{}
 	messageErrorCounts := map[messageErrorKey]int64{}
 	var successCount int64
+	var logicalRequestCount int64
+	var logicalSuccessCount int64
+	var retriedRequestCount int64
+	var retryAttemptCount int64
 	var retryableErrorCount int64
 	var serviceOverloadedCount int64
 	var totalLatency time.Duration
 	var successLatency time.Duration
 	var errorLatency time.Duration
 	for record := range records {
-		latencies = append(latencies, record.latency)
-		totalLatency += record.latency
-		if record.err != nil {
-			errorLatencies = append(errorLatencies, record.latency)
-			errorLatency += record.latency
-			errorCounts[errorKey(record.err)]++
-			if detail, ok := messageErrorDetail(record.err); ok {
-				messageErrorCounts[messageErrorKey{Code: detail.GetCode(), Retryable: detail.GetRetryable()}]++
-				if detail.GetRetryable() {
-					retryableErrorCount++
-				}
-				if detail.GetCode() == messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_SERVICE_OVERLOADED {
-					serviceOverloadedCount++
-				}
+		if record.attempt {
+			latencies = append(latencies, record.latency)
+			totalLatency += record.latency
+			if record.retryAttempt {
+				retryAttemptCount++
 			}
-			continue
+			if record.err != nil {
+				errorLatencies = append(errorLatencies, record.latency)
+				errorLatency += record.latency
+				errorCounts[errorKey(record.err)]++
+				if detail, ok := messageErrorDetail(record.err); ok {
+					messageErrorCounts[messageErrorKey{Code: detail.GetCode(), Retryable: detail.GetRetryable()}]++
+					if detail.GetRetryable() {
+						retryableErrorCount++
+					}
+					if detail.GetCode() == messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_SERVICE_OVERLOADED {
+						serviceOverloadedCount++
+					}
+				}
+			} else {
+				successLatencies = append(successLatencies, record.latency)
+				successLatency += record.latency
+				successCount++
+			}
 		}
-		successLatencies = append(successLatencies, record.latency)
-		successLatency += record.latency
-		successCount++
+		if record.logicalFinal {
+			logicalRequestCount++
+			if record.err == nil {
+				logicalSuccessCount++
+			}
+			if record.retried {
+				retriedRequestCount++
+			}
+		}
 	}
 	finished := time.Now().UTC()
 	requestCount := int64(len(latencies))
 	errorCountValue := requestCount - successCount
+	logicalErrorCount := logicalRequestCount - logicalSuccessCount
 	successRate := 0.0
+	logicalSuccessRate := 0.0
 	avgMS := 0.0
 	if requestCount > 0 {
 		successRate = float64(successCount) / float64(requestCount)
 		avgMS = durationMS(totalLatency) / float64(requestCount)
+	}
+	if logicalRequestCount > 0 {
+		logicalSuccessRate = float64(logicalSuccessCount) / float64(logicalRequestCount)
 	}
 	durationSeconds := cfg.Duration.Seconds()
 	requestRPS := 0.0
@@ -429,7 +511,16 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 		Duration:                      cfg.Duration.String(),
 		StatsWait:                     cfg.StatsWait.String(),
 		ConversationCount:             cfg.ConversationCount,
+		RetryOverloaded:               cfg.RetryOverloaded,
+		MaxRetries:                    cfg.MaxRetries,
+		RetryJitter:                   cfg.RetryJitter.String(),
+		LogicalRequestCount:           logicalRequestCount,
+		LogicalSuccessCount:           logicalSuccessCount,
+		LogicalErrorCount:             logicalErrorCount,
+		LogicalSuccessRate:            logicalSuccessRate,
 		RequestCount:                  requestCount,
+		RetryAttemptCount:             retryAttemptCount,
+		RetriedRequestCount:           retriedRequestCount,
 		SuccessCount:                  successCount,
 		ErrorCount:                    errorCountValue,
 		RetryableErrorCount:           retryableErrorCount,
@@ -634,6 +725,42 @@ func messageErrorDetail(err error) (*messagev1.MessageError, bool) {
 		}
 	}
 	return nil, false
+}
+
+func overloadRetryDelay(err error, jitter time.Duration, requestSeq uint64, attempt int) (time.Duration, bool) {
+	st, ok := status.FromError(err)
+	if !ok {
+		return 0, false
+	}
+	isOverloaded := false
+	hasRetryInfo := false
+	var delay time.Duration
+	for _, detail := range st.Details() {
+		switch typed := detail.(type) {
+		case *messagev1.MessageError:
+			isOverloaded = typed.GetCode() == messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_SERVICE_OVERLOADED &&
+				typed.GetRetryable()
+		case *errdetails.RetryInfo:
+			hasRetryInfo = true
+			delay = typed.GetRetryDelay().AsDuration()
+		}
+	}
+	if !isOverloaded || !hasRetryInfo || delay < 0 {
+		return 0, false
+	}
+	if jitter > 0 {
+		delay += deterministicJitter(jitter, requestSeq, attempt)
+	}
+	return delay, true
+}
+
+func deterministicJitter(max time.Duration, requestSeq uint64, attempt int) time.Duration {
+	if max <= 0 {
+		return 0
+	}
+	nanos := uint64(max.Nanoseconds())
+	value := requestSeq*1103515245 + uint64(attempt+1)*12345
+	return time.Duration(value % (nanos + 1))
 }
 
 type outboxStats struct {
@@ -979,6 +1106,18 @@ func envInt(getenv func(string) string, name string, fallback int) int {
 	return parsed
 }
 
+func envBool(getenv func(string) string, name string, fallback bool) bool {
+	value := strings.TrimSpace(getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
 func envDuration(getenv func(string) string, name string, fallback time.Duration) time.Duration {
 	value := strings.TrimSpace(getenv(name))
 	if value == "" {
@@ -986,6 +1125,18 @@ func envDuration(getenv func(string) string, name string, fallback time.Duration
 	}
 	parsed, err := time.ParseDuration(value)
 	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func envDurationAllowZero(getenv func(string) string, name string, fallback time.Duration) time.Duration {
+	value := strings.TrimSpace(getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed < 0 {
 		return fallback
 	}
 	return parsed

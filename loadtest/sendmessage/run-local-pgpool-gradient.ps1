@@ -18,6 +18,9 @@ param(
     [string]$ResultRoot = "",
     [switch]$BackpressureEnabled,
     [int]$BackpressureMinAvailableConns = 0,
+    [switch]$RetryOverloaded,
+    [int]$MaxRetries = 0,
+    [string]$RetryJitter = "0s",
     [switch]$SkipBuild
 )
 
@@ -91,16 +94,23 @@ foreach ($pgMax in $PGMaxConns) {
 
         try {
             Start-Sleep -Seconds 2
-            & $loadtest `
-                --target=$GrpcAddr `
-                --vus=$vu `
-                --duration=$Duration `
-                --stats-wait=$StatsWait `
-                --conversation-count=$ConversationCount `
-                --pg-dsn=$PGDSN `
-                --service-metrics-url=$serviceMetricsURL `
-                --relay-metrics-url=$relayMetricsURL `
-                --result-dir=$resultDir
+            $loadtestArgs = @(
+                "--target=$GrpcAddr",
+                "--vus=$vu",
+                "--duration=$Duration",
+                "--stats-wait=$StatsWait",
+                "--conversation-count=$ConversationCount",
+                "--pg-dsn=$PGDSN",
+                "--service-metrics-url=$serviceMetricsURL",
+                "--relay-metrics-url=$relayMetricsURL",
+                "--result-dir=$resultDir"
+            )
+            if ($RetryOverloaded) {
+                $loadtestArgs += "--retry-overloaded"
+                $loadtestArgs += "--max-retries=$MaxRetries"
+                $loadtestArgs += "--retry-jitter=$RetryJitter"
+            }
+            & $loadtest @loadtestArgs
         } finally {
             foreach ($process in @($grpc, $relay)) {
                 if ($process -and -not $process.HasExited) {

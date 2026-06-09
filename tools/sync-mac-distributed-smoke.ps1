@@ -1,14 +1,14 @@
 param(
     [string]$MacHost = "172.31.50.2",
     [string]$MacUser = "qsyy0921",
-    [string]$MacPath = "/Users/qsyy0921/Desktop/IM-distributed-smoke",
+    [string]$MacPath = "/Users/qsyy0921/Desktop/IM/_local/distributed-smoke",
     [string]$BundleRoot = "H:\NexusIM",
     [switch]$SkipBuild
 )
 
 $ErrorActionPreference = "Stop"
 
-if ($MacPath -notmatch "/IM-distributed-smoke$") {
+if ($MacPath -notmatch "/IM/_local/distributed-smoke$") {
     throw "Refusing to reset non-smoke Mac path: $MacPath"
 }
 
@@ -36,7 +36,9 @@ if (-not $SkipBuild) {
     }
 }
 
-$remoteBundle = "/Users/$MacUser/Desktop/nexusim-main-$head.bundle"
+$remoteBundleDir = "/Users/$MacUser/Desktop/IM/_local/artifacts/bundles"
+$remoteBundle = "$remoteBundleDir/nexusim-main-$head.bundle"
+ssh -o BatchMode=yes "${MacUser}@${MacHost}" "mkdir -p '$remoteBundleDir'"
 scp $bundlePath "${MacUser}@${MacHost}:$remoteBundle"
 
 $remoteScript = @"

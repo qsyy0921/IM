@@ -96,13 +96,13 @@ SendMessage
 ```text
 1. Windows 本地用当前 HEAD 生成 Git bundle；
 2. 通过 172.31.50.2 有线 SSH/scp 传到 Mac；
-3. 重建 /Users/qsyy0921/Desktop/IM-distributed-smoke；
+3. 重建 /Users/qsyy0921/Desktop/IM/_local/distributed-smoke；
 4. 从 Windows 交叉编译 darwin/arm64 push-gateway 和 pushgateway-smoke；
 5. 通过有线 scp 把二进制放到 Mac checkout 的 bin/darwin-arm64；
 6. 在 Mac 上跑一次 NEXUSIM_PUSH_GATEWAY_MODE=noop 验证二进制能启动。
 ```
 
-脚本默认拒绝操作非 `IM-distributed-smoke` 结尾的 Mac 路径，避免覆盖 Mac 上已有的 `/Users/qsyy0921/Desktop/IM` 工作区。
+脚本默认拒绝操作非 `/Users/qsyy0921/Desktop/IM/_local/distributed-smoke` 的 Mac 路径，避免覆盖 Mac 上已有的 `/Users/qsyy0921/Desktop/IM` 工作区。
 
 ## 4. 结果位置
 
@@ -134,6 +134,14 @@ H:\NexusIM\loadtest-results\push-gateway-redis-fault-smoke-20260609-195200\pushg
 
 该 run 使用 clean commit `074902b`，`git_dirty=false`。runner 在 WebSocket session 已注册后停止 `nexusim-redis`，随后发送一条消息；在线 `delivery.notify` 不作为成功条件，客户端通过 `PullInbox` 拉到 seq `2`，恢复 Redis 后重连并通过 `delivery.ack.ok` 推进 cursor 到 seq `2`，`delivery_outbox PUBLISHED=2/PENDING=0/DLQ=0`。
 
+当前 Win-Mac Docker route smoke 原始结果：
+
+```text
+H:\NexusIM\loadtest-results\push-gateway-win-mac-redis-smoke-20260609-205219\pushgateway-summary.json
+```
+
+该 run 使用工作区 dirty commit `3c07305`，用于验证脚本和双机 Docker 路径，不作为 clean 性能基线。拓扑为：Windows 运行 PostgreSQL / Kafka / Redis / 核心业务进程 / `push-gateway delivery-consumer`，Mac Docker 运行 `nexusim/push-gateway:local` WebSocket gateway。Windows runner 通过 `ws://172.31.50.2:11598` 连接 Mac，Mac gateway 通过 `172.31.50.1:6379` 使用 Redis route，通过 `172.31.50.1:11597` 回调 Windows delivery-service ACK。结果：收到 seq `2` 的 `delivery.notify`，`PullInbox item_count=1/max_seq=2`，`delivery.ack.ok last_received_seq=2`，`delivery_outbox PUBLISHED=2/PENDING=0/DLQ=0`。
+
 ## 5. Win/Mac 双机分布式模拟计划
 
 当前直连网络规划：
@@ -142,12 +150,12 @@ H:\NexusIM\loadtest-results\push-gateway-redis-fault-smoke-20260609-195200\pushg
 Windows wired: 172.31.50.1/24
 Mac wired:     172.31.50.2/24
 Wi-Fi:         两端继续用于上网和下载依赖
-Proxy:         两端对外代理端口统一为 127.0.0.1:7890
+Proxy:         两端各自对外代理端口均为本机 127.0.0.1:7890
 ```
 
 后续双机 smoke / 小压测优先使用 `172.31.50.*`，避免走随身 Wi-Fi 的 `192.168.0.*` 管理网段。
 只要 Win-Mac 之间能通过网线直连，服务间地址、SSH、文件传输和 smoke callback 都优先使用 `172.31.50.*`；Wi-Fi 只负责访问互联网和下载依赖。
-GitHub / Docker / Go module 等必须访问外网的下载才使用本机 `127.0.0.1:7890` 代理。只要数据可以在 Windows 和 Mac 之间直接传输，就必须走有线 `172.31.50.*`，不要绕 GitHub / 云盘 / 外网代理，避免消耗流量。
+GitHub / Docker / Go module 等必须访问外网的下载才使用各自机器的本机 `127.0.0.1:7890` 代理：Windows 的 `127.0.0.1:7890` 只给 Windows 本机外网访问使用，Mac 的 `127.0.0.1:7890` 只给 Mac 本机外网访问使用。它们不是 Win-Mac 服务间代理，也不能给另一台机器当外网代理。只要数据可以在 Windows 和 Mac 之间直接传输，就必须走有线 `172.31.50.*`，不要绕 GitHub / 云盘 / 外网代理，避免消耗流量。
 
 用户当前希望用两台机器模拟多节点，而不是继续做重型单机硬件矩阵。建议资源切分：
 
@@ -223,10 +231,27 @@ mac-node-b: --cpus 4 --memory 4g
 1. Windows 本地生成 Git bundle；
 2. 通过 `scp` / SSH 走 `172.31.50.2` 有线传到 Mac；
 3. 在 Mac 上从 bundle clone / fetch，避免 Mac 直接访问 GitHub；
-4. 若 Mac `Desktop/IM` 不能 fast-forward，则另建 `/Users/qsyy0921/Desktop/IM-distributed-smoke` 作为干净 smoke checkout。
+4. 若 Mac `Desktop/IM` 不能 fast-forward，则使用 `/Users/qsyy0921/Desktop/IM/_local/distributed-smoke` 作为干净 smoke checkout。
 ```
 
-当前已采用第 4 种方式，`/Users/qsyy0921/Desktop/IM-distributed-smoke` 是可重建的专用 smoke checkout。
+当前已采用第 4 种方式，`/Users/qsyy0921/Desktop/IM/_local/distributed-smoke` 是可重建的专用 smoke checkout；Mac 桌面根目录不再散放 NexusIM bundle 或 smoke 目录，bundle 归档到 `/Users/qsyy0921/Desktop/IM/_local/artifacts/bundles`。
+
+四个业务服务镜像已采用本地构建方式准备，避免外网拉取业务镜像：
+
+```powershell
+.\tools\sync-mac-service-docker-images.ps1
+```
+
+该脚本在 Windows 构建 `linux/amd64` 镜像，在 Mac 构建 `linux/arm64` 镜像，镜像名为：
+
+```text
+nexusim/conversation-service:local
+nexusim/message-service:local
+nexusim/delivery-service:local
+nexusim/push-gateway:local
+```
+
+业务镜像基于 `scratch` 和交叉编译后的静态 Go 二进制，不需要从 Docker Hub 拉基础层；Windows -> Mac 的二进制传输走有线 `172.31.50.2`。
 
 压测原始结果继续放机械盘：
 

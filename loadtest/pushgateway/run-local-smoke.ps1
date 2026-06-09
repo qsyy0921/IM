@@ -3,6 +3,8 @@ param(
     [string]$KafkaBrokers = "localhost:9092",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
+    [string]$TenantId = "",
+    [string]$ConversationId = "",
     [string]$ReceiverDeviceIds = "push-device-1",
     [ValidateSet("full", "message-change-notify", "resume-replay", "cross-instance-resume", "slow-client", "redis-fault", "redis-sentinel-failover", "redis-sentinel-master-stop")]
     [string]$Scenario = "full",
@@ -30,6 +32,12 @@ if (-not $RunName) {
 
 $repo = (Get-Location).Path
 $safeRunName = $RunName -replace '[^a-zA-Z0-9_-]', '-'
+if (-not $TenantId) {
+    $TenantId = "tenant-$safeRunName"
+}
+if (-not $ConversationId) {
+    $ConversationId = "conv-$safeRunName"
+}
 $resultDir = Join-Path $ResultRoot $RunName
 $logDir = Join-Path $resultDir "logs"
 $timelineTopic = "conversation.timeline.pushgateway." + (Get-Date -Format "yyyyMMdd-HHmmss")
@@ -423,8 +431,8 @@ try {
         "--reconnect-push-url", $reconnectPushURL,
         "--pg-dsn", $PgDsn,
         "--result-dir", $resultDir,
-        "--tenant-id", "tenant-push-smoke",
-        "--conversation-id", "conv-push-smoke",
+        "--tenant-id", $TenantId,
+        "--conversation-id", $ConversationId,
         "--owner-user-id", "owner-1",
         "--receiver-user-id", "push-user-1",
         "--receiver-device-id", "push-device-1",

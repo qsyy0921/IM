@@ -167,7 +167,7 @@ push_auth_query_identity_sent=false
 - 不重新做 message-service 硬件矩阵。
 - 不把短时 resume buffer 当作 durable inbox。
 - 不把 Redis-backed resume buffer 表述为可靠投递或生产级跨实例恢复。当前第一版只缓存轻量 `delivery.notify`，未知、过期、身份不匹配、Redis miss/error 或 buffer gap 都必须回退 `server.resume_hint + PullInbox`；未知客户端 `resume_token` 必须返回 `buffer_miss` 并由服务端签发新 token。
-- 不把第一版 HMAC gateway token 表述为完整 identity-service。`NEXUSIM_PUSH_AUTH_MODE=hmac` 只校验短期 signed token 的签名、`aud=push-gateway`、过期时间和 device 绑定；设备吊销、session revoke、refresh token、key rotation 和多 issuer 仍是后续真实鉴权切片。`mock` auth 只用于本地 smoke。
+- 不把第一版 HMAC gateway token 表述为完整 identity-service。`NEXUSIM_PUSH_AUTH_MODE=hmac` 只校验短期 signed token 的签名、`aud=push-gateway`、过期时间和 device 绑定；当前支持 current + previous secrets 的最小密钥轮换，但设备吊销、session revoke、refresh token、多 issuer 和 JWK/JWT 标准化仍是后续真实鉴权切片。`mock` auth 只用于本地 smoke。
 - 不把 push smoke 表述为生产容量结论。
 - 不把 queue-full active close 表述为完整慢连接治理；当前 `server.resume_hint` 只是 broad pull fallback，客户端必须用本地 durable cursor 决定 `PullInbox` 起点。已完成单实例 slow-client 真实进程负向 smoke，它验证的是 durable `PullInbox` fallback；已另外完成单实例 resume replay smoke 和 cross-instance resume smoke，分别验证短时 in-memory buffer 命中路径和 Redis-backed 跨 gateway replay 路径；后续还没有多实例慢连接验证。
 - `/debug/metrics` 目前暴露单实例 in-memory registry、Redis route 和 Redis resume 调试指标，用于 smoke 排障；其中 resume token count / expired token count 只说明本进程短时 buffer 状态，`redis_resume_*` 只说明 Redis-backed replay / miss / append 过程；`redis_registry_metrics` 和 `redis_subscriber_metrics` 只说明 online route / PubSub / local fanout 过程，不代表 durable delivery 成功率；该端点不是生产级 Prometheus 指标。WebSocket gateway 可通过 `NEXUSIM_PUSH_WS_ADDR` 暴露该端点，consumer-only gateway 可通过 `NEXUSIM_PUSH_DEBUG_ADDR` 单独暴露只读 debug 端点。

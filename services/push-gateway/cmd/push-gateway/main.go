@@ -115,8 +115,9 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 		}
 		closers = append(closers, closeDelivery)
 		authenticator, err := authinfra.NewAuthenticator(authinfra.Config{
-			Mode:   authinfra.Mode(envString("NEXUSIM_PUSH_AUTH_MODE", "mock")),
-			Secret: os.Getenv("NEXUSIM_PUSH_AUTH_HMAC_SECRET"),
+			Mode:            authinfra.Mode(envString("NEXUSIM_PUSH_AUTH_MODE", "mock")),
+			Secret:          os.Getenv("NEXUSIM_PUSH_AUTH_HMAC_SECRET"),
+			PreviousSecrets: splitCSV(os.Getenv("NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS")),
 		})
 		if err != nil {
 			return err

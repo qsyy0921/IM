@@ -93,7 +93,7 @@ GET /ws?token=...&device_id=...
 - `mock`：本地 smoke 使用，允许 query string 中的 `tenant_id/user_id/device_id` 或 `token=tenant:user[:device]` 生成 `AuthContext`。
 - `hmac`：第一版 signed gateway token，`token` 为 `base64url(json claims).base64url(hmac_sha256(payload, secret))`。claims 至少包含 `tenant_id/user_id/aud/exp`，`aud` 默认必须为 `push-gateway`，可包含 `device_id/trace_id`；如果 token 中带 `device_id`，必须与 query / `client.hello.device_id` 一致。真实客户端优先用 `Authorization: Bearer <token>`，query token 只作为本地兼容入口。
 
-`hmac` 模式只证明 gateway 能拒绝伪造 / 过期 / device mismatch 的客户端身份，不等同完整 identity-service：它暂不做 refresh token、设备吊销、session revoke、key rotation 或多 issuer。后续可以由 api-gateway / identity-service 做登录与 token 交换，push-gateway 只接收已签名的短期 gateway token。
+`hmac` 模式只证明 gateway 能拒绝伪造 / 过期 / device mismatch 的客户端身份，不等同完整 identity-service：它暂不做 refresh token、设备吊销、session revoke 或多 issuer。当前已支持最小密钥轮换：`NEXUSIM_PUSH_AUTH_HMAC_SECRET` 是当前签发密钥，`NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS` 是逗号分隔的旧密钥，只用于验证旧 token。后续可以由 api-gateway / identity-service 做登录与 token 交换，push-gateway 只接收已签名的短期 gateway token。
 
 ### 5.1 Client -> Server frames
 
@@ -548,6 +548,7 @@ HMAC gateway token 可选参数：
 ```text
 NEXUSIM_PUSH_AUTH_MODE=hmac
 NEXUSIM_PUSH_AUTH_HMAC_SECRET=local-dev-secret
+NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS=old-secret-1,old-secret-2
 ```
 
 `hmac` 模式下，query string 裸 `tenant_id/user_id` 不再被信任；缺失 token、签名错误、audience 不匹配、token 与 device 不匹配会返回 `PERMISSION_DENIED`，过期 token 返回 `AUTH_EXPIRED`。

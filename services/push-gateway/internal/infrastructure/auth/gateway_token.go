@@ -22,15 +22,16 @@ const (
 )
 
 type Config struct {
-	Mode     Mode
-	Secret   string
-	Audience string
-	Now      func() time.Time
+	Mode            Mode
+	Secret          string
+	PreviousSecrets []string
+	Audience        string
+	Now             func() time.Time
 }
 
 type Authenticator struct {
 	mode     Mode
-	secret   []byte
+	secrets  [][]byte
 	audience string
 	now      func() time.Time
 }
@@ -65,7 +66,19 @@ func NewAuthenticator(config Config) (*Authenticator, error) {
 		if secret == "" {
 			return nil, errors.New("NEXUSIM_PUSH_AUTH_HMAC_SECRET is required when NEXUSIM_PUSH_AUTH_MODE=hmac")
 		}
-		authenticator.secret = []byte(secret)
+		seenSecrets := map[string]struct{}{secret: {}}
+		authenticator.secrets = append(authenticator.secrets, []byte(secret))
+		for _, previous := range config.PreviousSecrets {
+			previous = strings.TrimSpace(previous)
+			if previous == "" {
+				continue
+			}
+			if _, ok := seenSecrets[previous]; ok {
+				continue
+			}
+			seenSecrets[previous] = struct{}{}
+			authenticator.secrets = append(authenticator.secrets, []byte(previous))
+		}
 		return authenticator, nil
 	default:
 		return nil, errors.New("unsupported NEXUSIM_PUSH_AUTH_MODE")
@@ -130,9 +143,7 @@ func (authenticator *Authenticator) parseToken(token string) (tokenClaims, error
 	if err != nil {
 		return tokenClaims{}, types.ErrPermissionDenied
 	}
-	mac := hmac.New(sha256.New, authenticator.secret)
-	_, _ = mac.Write([]byte(parts[0]))
-	if !hmac.Equal(signature, mac.Sum(nil)) {
+	if !authenticator.validSignature(parts[0], signature) {
 		return tokenClaims{}, types.ErrPermissionDenied
 	}
 	var claims tokenClaims
@@ -146,6 +157,17 @@ func (authenticator *Authenticator) parseToken(token string) (tokenClaims, error
 		return tokenClaims{}, types.NewAuthExpired("token expired")
 	}
 	return claims, nil
+}
+
+func (authenticator *Authenticator) validSignature(payload string, signature []byte) bool {
+	for _, secret := range authenticator.secrets {
+		mac := hmac.New(sha256.New, secret)
+		_, _ = mac.Write([]byte(payload))
+		if hmac.Equal(signature, mac.Sum(nil)) {
+			return true
+		}
+	}
+	return false
 }
 
 func authenticateMock(request *http.Request) (types.AuthContext, error) {
@@ -197,6 +219,9 @@ func firstNonEmpty(values ...string) string {
 }
 
 func SignGatewayToken(secret string, claims map[string]string, expiresAt time.Time) (string, error) {
+	if strings.TrimSpace(secret) == "" {
+		return "", types.ErrPermissionDenied
+	}
 	payload := tokenClaims{
 		TenantID: strings.TrimSpace(claims["tenant_id"]),
 		UserID:   strings.TrimSpace(claims["user_id"]),

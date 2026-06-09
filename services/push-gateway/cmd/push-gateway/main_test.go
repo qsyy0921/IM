@@ -89,3 +89,13 @@ func TestNewRedisUniversalClientRejectsUnsupportedMode(t *testing.T) {
 		t.Fatalf("expected unsupported mode error to include mode value, got %v", err)
 	}
 }
+
+func TestSplitCSVTrimsAndDropsEmptyValues(t *testing.T) {
+	values := splitCSV(" old-1, ,old-2 , old-1 ")
+	if len(values) != 3 || values[0] != "old-1" || values[1] != "old-2" || values[2] != "old-1" {
+		t.Fatalf("unexpected values: %#v", values)
+	}
+	if values := splitCSV(" , , "); len(values) != 0 {
+		t.Fatalf("expected empty values, got %#v", values)
+	}
+}

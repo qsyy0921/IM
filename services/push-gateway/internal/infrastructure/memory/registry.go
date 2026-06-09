@@ -3,10 +3,16 @@ package memory
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/qsyy0921/IM/services/push-gateway/internal/domain"
 	"github.com/qsyy0921/IM/services/push-gateway/internal/types"
 )
+
+type Config struct {
+	ResumeBufferTTL time.Duration
+	Now             func() time.Time
+}
 
 type Registry struct {
 	mu       sync.RWMutex
@@ -14,6 +20,7 @@ type Registry struct {
 	byUser   map[string]map[string]struct{}
 	resumes  map[string]*resumeState
 	metrics  Metrics
+	config   Config
 }
 
 type Metrics struct {
@@ -23,6 +30,8 @@ type Metrics struct {
 	ResumeBufferReplayCount  uint64 `json:"resume_buffer_replay_count"`
 	ResumeBufferMissCount    uint64 `json:"resume_buffer_miss_count"`
 	ResumeBufferStoredFrames int    `json:"resume_buffer_stored_frames"`
+	ResumeBufferTokenCount   int    `json:"resume_buffer_token_count"`
+	ResumeBufferExpiredCount uint64 `json:"resume_buffer_expired_count"`
 }
 
 type session struct {
@@ -34,15 +43,27 @@ type session struct {
 }
 
 type resumeState struct {
-	auth   types.AuthContext
-	frames []types.ServerFrame
+	auth      types.AuthContext
+	frames    []types.ServerFrame
+	expiresAt time.Time
 }
 
 func NewRegistry() *Registry {
+	return NewRegistryWithConfig(Config{})
+}
+
+func NewRegistryWithConfig(config Config) *Registry {
+	if config.ResumeBufferTTL <= 0 {
+		config.ResumeBufferTTL = types.DefaultResumeBufferTTL
+	}
+	if config.Now == nil {
+		config.Now = time.Now
+	}
 	return &Registry{
 		sessions: make(map[string]*session),
 		byUser:   make(map[string]map[string]struct{}),
 		resumes:  make(map[string]*resumeState),
+		config:   config,
 	}
 }
 
@@ -58,6 +79,8 @@ func (registry *Registry) Register(
 	}
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
+	now := registry.config.Now()
+	registry.pruneExpiredResumesLocked(now)
 
 	var state *resumeState
 	bufferMiss := false
@@ -73,9 +96,15 @@ func (registry *Registry) Register(
 			if registration.ResumeRequested {
 				effectiveResumeToken = domain.NewOpaqueID("resume")
 			}
-			state = &resumeState{auth: registration.AuthContext}
+			state = &resumeState{
+				auth:      registration.AuthContext,
+				expiresAt: registry.resumeExpiresAt(now),
+			}
 			registry.resumes[effectiveResumeToken] = state
 		}
+	}
+	if state != nil {
+		state.expiresAt = registry.resumeExpiresAt(now)
 	}
 	if previous, ok := registry.sessions[registration.SessionID]; ok {
 		delete(registry.byUser[userKey(previous.auth)], registration.SessionID)
@@ -123,6 +152,7 @@ func (registry *Registry) EnqueueNotification(
 	key := notification.TenantID + "\x1f" + notification.UserID
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
+	registry.pruneExpiredResumesLocked(registry.config.Now())
 
 	sessionIDs := registry.byUser[key]
 	result := types.NotifyDeliveryResult{MatchedSessions: len(sessionIDs)}
@@ -160,13 +190,15 @@ func (registry *Registry) EnqueueNotification(
 }
 
 func (registry *Registry) Metrics() Metrics {
-	registry.mu.RLock()
-	defer registry.mu.RUnlock()
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	registry.pruneExpiredResumesLocked(registry.config.Now())
 	snapshot := registry.metrics
 	snapshot.ConnectedSessions = len(registry.sessions)
 	for _, state := range registry.resumes {
 		snapshot.ResumeBufferStoredFrames += len(state.frames)
 	}
+	snapshot.ResumeBufferTokenCount = len(registry.resumes)
 	return snapshot
 }
 
@@ -231,6 +263,7 @@ func (registry *Registry) appendResumeLocked(resumeToken string, frame types.Ser
 	if state == nil {
 		return
 	}
+	state.expiresAt = registry.resumeExpiresAt(registry.config.Now())
 	state.frames = append(state.frames, frame)
 	if len(state.frames) > types.DefaultResumeBufferSize {
 		copy(state.frames, state.frames[len(state.frames)-types.DefaultResumeBufferSize:])
@@ -262,4 +295,27 @@ func sameDevice(left types.AuthContext, right types.AuthContext) bool {
 	return left.TenantID == right.TenantID &&
 		left.UserID == right.UserID &&
 		left.DeviceID == right.DeviceID
+}
+
+func (registry *Registry) resumeExpiresAt(now time.Time) time.Time {
+	return now.Add(registry.config.ResumeBufferTTL)
+}
+
+func (registry *Registry) pruneExpiredResumesLocked(now time.Time) {
+	activeTokens := make(map[string]struct{})
+	for _, existing := range registry.sessions {
+		if existing.resumeToken != "" {
+			activeTokens[existing.resumeToken] = struct{}{}
+		}
+	}
+	for token, state := range registry.resumes {
+		if _, ok := activeTokens[token]; ok {
+			state.expiresAt = registry.resumeExpiresAt(now)
+			continue
+		}
+		if !state.expiresAt.IsZero() && !now.Before(state.expiresAt) {
+			delete(registry.resumes, token)
+			registry.metrics.ResumeBufferExpiredCount++
+		}
+	}
 }

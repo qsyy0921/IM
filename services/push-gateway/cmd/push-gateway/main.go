@@ -50,7 +50,9 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	localRegistry := memory.NewRegistry()
+	localRegistry := memory.NewRegistryWithConfig(memory.Config{
+		ResumeBufferTTL: envDuration("NEXUSIM_PUSH_RESUME_BUFFER_TTL", 10*time.Minute),
+	})
 	registry := app.SessionRegistry(localRegistry)
 	errs := make(chan error, 4)
 	var closers []func() error

@@ -6,6 +6,7 @@ const (
 	DefaultHeartbeatInterval = 30 * time.Second
 	DefaultSessionQueueSize  = 256
 	DefaultResumeBufferSize  = 256
+	DefaultResumeBufferTTL   = 10 * time.Minute
 )
 
 type SessionRegistration struct {

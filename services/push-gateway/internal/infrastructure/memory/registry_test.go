@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/qsyy0921/IM/services/push-gateway/internal/types"
 )
@@ -254,6 +255,140 @@ func TestRegistryResumeGapReturnsBufferMissHint(t *testing.T) {
 	hint := <-outbound
 	if hint.Op != types.OpResumeHint || hint.Reason != "buffer_miss" {
 		t.Fatalf("unexpected hint: %+v", hint)
+	}
+}
+
+func TestRegistryExpiredResumeTokenReturnsBufferMissAndNewToken(t *testing.T) {
+	now := time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)
+	registry := NewRegistryWithConfig(Config{
+		ResumeBufferTTL: time.Minute,
+		Now: func() time.Time {
+			return now
+		},
+	})
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"}
+	outbound := make(chan types.ServerFrame, 4)
+	registration, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-1",
+		ResumeToken: "resume-1",
+		Outbound:    outbound,
+	})
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	notification := testNotification()
+	notification.EventID = "delivery-event-expiring"
+	notification.ConversationSeq = 11
+	if _, err := registry.EnqueueNotification(context.Background(), notification); err != nil {
+		t.Fatalf("notify: %v", err)
+	}
+	<-outbound
+	registry.Unregister("session-1")
+
+	now = now.Add(time.Minute)
+	resumedOutbound := make(chan types.ServerFrame, 2)
+	resumedRegistration, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext:     auth,
+		SessionID:       "session-2",
+		ResumeToken:     registration.ResumeToken,
+		ResumeRequested: true,
+		LastReceived:    []types.ConversationCursor{{ConversationID: "conversation-1", Seq: 10}},
+		Outbound:        resumedOutbound,
+	})
+	if err != nil {
+		t.Fatalf("resume register: %v", err)
+	}
+	if resumedRegistration.ResumeToken == "" || resumedRegistration.ResumeToken == registration.ResumeToken {
+		t.Fatalf("expired resume token must be replaced: first=%+v resumed=%+v", registration, resumedRegistration)
+	}
+	if len(resumedOutbound) != 1 {
+		t.Fatalf("expected only buffer miss hint after expiration, got %d frames", len(resumedOutbound))
+	}
+	hint := <-resumedOutbound
+	if hint.Op != types.OpResumeHint || hint.Reason != "buffer_miss" {
+		t.Fatalf("unexpected hint: %+v", hint)
+	}
+	if metrics := registry.Metrics(); metrics.ResumeBufferExpiredCount == 0 {
+		t.Fatalf("expected expired token metric, got %+v", metrics)
+	}
+}
+
+func TestRegistryMetricsPrunesExpiredResumeTokens(t *testing.T) {
+	now := time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)
+	registry := NewRegistryWithConfig(Config{
+		ResumeBufferTTL: time.Minute,
+		Now: func() time.Time {
+			return now
+		},
+	})
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"}
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-1",
+		ResumeToken: "resume-1",
+		Outbound:    make(chan types.ServerFrame, 1),
+	}); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if metrics := registry.Metrics(); metrics.ResumeBufferTokenCount != 1 {
+		t.Fatalf("expected one token before expiry, got %+v", metrics)
+	}
+	registry.Unregister("session-1")
+	now = now.Add(time.Minute)
+	metrics := registry.Metrics()
+	if metrics.ResumeBufferTokenCount != 0 || metrics.ResumeBufferExpiredCount == 0 {
+		t.Fatalf("expected metrics to prune expired token, got %+v", metrics)
+	}
+}
+
+func TestRegistryDoesNotExpireActiveSessionResumeToken(t *testing.T) {
+	now := time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)
+	registry := NewRegistryWithConfig(Config{
+		ResumeBufferTTL: time.Minute,
+		Now: func() time.Time {
+			return now
+		},
+	})
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"}
+	outbound := make(chan types.ServerFrame, 2)
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-1",
+		ResumeToken: "resume-1",
+		Outbound:    outbound,
+	}); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	now = now.Add(time.Minute)
+	if metrics := registry.Metrics(); metrics.ResumeBufferTokenCount != 1 || metrics.ResumeBufferExpiredCount != 0 {
+		t.Fatalf("active session token should not expire, got %+v", metrics)
+	}
+	notification := testNotification()
+	notification.EventID = "delivery-event-active-token"
+	notification.ConversationSeq = 12
+	if _, err := registry.EnqueueNotification(context.Background(), notification); err != nil {
+		t.Fatalf("notify: %v", err)
+	}
+	<-outbound
+	registry.Unregister("session-1")
+
+	resumedOutbound := make(chan types.ServerFrame, 2)
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext:  auth,
+		SessionID:    "session-2",
+		ResumeToken:  "resume-1",
+		LastReceived: []types.ConversationCursor{{ConversationID: "conversation-1", Seq: 11}},
+		Outbound:     resumedOutbound,
+	}); err != nil {
+		t.Fatalf("resume register: %v", err)
+	}
+	if len(resumedOutbound) != 1 {
+		t.Fatalf("expected replay from active token, got %d frames", len(resumedOutbound))
+	}
+	replay := <-resumedOutbound
+	if replay.Op != types.OpDeliveryNotify || replay.EventID != "delivery-event-active-token" {
+		t.Fatalf("unexpected replay: %+v", replay)
 	}
 }
 

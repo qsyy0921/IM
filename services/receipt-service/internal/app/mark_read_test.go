@@ -9,7 +9,7 @@ import (
 )
 
 func TestMarkReadUseCaseValidatesCommand(t *testing.T) {
-	useCase := NewMarkReadUseCase(&fakeReceiptRepository{})
+	useCase := NewMarkReadUseCase(&fakeReceiptRepository{}, nil)
 	_, err := useCase.Execute(context.Background(), types.MarkReadCommand{})
 	if !errors.Is(err, types.ErrInvalidArgument) {
 		t.Fatalf("expected invalid argument, got %v", err)
@@ -18,7 +18,7 @@ func TestMarkReadUseCaseValidatesCommand(t *testing.T) {
 
 func TestMarkReadUseCasePassesCommandToRepository(t *testing.T) {
 	repository := &fakeReceiptRepository{}
-	useCase := NewMarkReadUseCase(repository)
+	useCase := NewMarkReadUseCase(repository, nil)
 	result, err := useCase.Execute(context.Background(), types.MarkReadCommand{
 		AuthContext: types.AuthContext{
 			TenantID: "tenant-1",

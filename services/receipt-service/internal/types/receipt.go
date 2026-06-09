@@ -10,6 +10,7 @@ const (
 
 type MarkReadCommand struct {
 	AuthContext    AuthContext
+	AccessContext  ReceiptAccessContext
 	ConversationID ConversationID
 	ReadSeq        int64
 }
@@ -36,6 +37,7 @@ type MarkReadResult struct {
 
 type GetReceiptStateCommand struct {
 	AuthContext     AuthContext
+	AccessContext   ReceiptAccessContext
 	ConversationID  ConversationID
 	MessageID       string
 	ConversationSeq int64
@@ -80,4 +82,6 @@ type ReceiptAccessContext struct {
 	ConversationID    ConversationID
 	VisibilityMode    string
 	PermissionVersion int64
+	MemberJoinSeq     int64
+	MemberLeaveSeq    int64
 }

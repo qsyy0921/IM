@@ -1,6 +1,6 @@
 # NexusIM receipt-service SDD v0.1 Draft
 
-状态：Draft，proto / Kafka schema / migration / 六层骨架已落草案，等待 repository / consumer 实现前复核。
+状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer 和 `MarkRead` 事务已落地；等待真实进程 smoke 和 receipt outbox relay。
 
 本文定义 `receipt-service` 的第一条可编码切片：基于 `delivery-service` 已经产生的 durable delivery 事件，构建消息送达 / 已读回执 read model，并提供最小查询和 `MarkRead` 写入入口。
 
@@ -263,6 +263,8 @@ source_event_id
 
 - `MarkRead` 和 receipt projection 只写 `receipt_outbox`，不得直接 publish Kafka。
 - outbox relay 保持 at-least-once，下游按 `event_id` 幂等。
+- 第一阶段 `receipt_outbox.aggregate_version` 使用 cursor seq，表达“该用户推进到的 conversation seq”，不承诺同 conversation 所有用户回执事件形成全局严格递增版本。下游不得依赖该字段做唯一排序；如需生产级全序，后续引入独立 receipt event sequence。
+- `receipt.message.read.v1.device_id` 表示触发 `MarkRead` 的设备，不表示 read cursor 是设备维度；权威 read cursor 仍是用户维度。
 - `receipt.message.read.v1` 优先按 cursor 范围或 seq 区间合并，避免每条消息 x 每个成员的事件爆炸；第一阶段 smoke 可以按单条 message / seq 粒度发布，但报告必须说明这不是大群生产模型。
 
 ## 8. 数据库设计草案
@@ -338,19 +340,18 @@ CREATE TABLE message_receipt_states (
 
 ## 9. 第一条可编码切片
 
-当前草案文件已经包括：
+当前已落地文件包括：
 
 - `api/proto/nexusim/receipt/v1/receipt_service.proto`：`MarkRead` 和 `GetReceiptState`。
 - `schemas/kafka/receipt/v1/im.receipt.events.proto`：`receipt.message.received.v1` / `receipt.message.read.v1`。
 - `migrations/postgres/receipt/000001_receipt_core.sql`。
 - `services/receipt-service/internal/{api,app,domain,infrastructure,types,trigger}` 六层骨架。
+- `services/receipt-service/internal/infrastructure/postgres`：receipt projection、received/read cursor、receipt outbox 写入。
+- `services/receipt-service/internal/trigger/delivery`：消费 `im.delivery.events` 并在 PostgreSQL 事务提交后 commit Kafka offset。
 
 下一步按下面顺序推进：
 
-1. 实现 `ReceiptAccessPort` 第一版 mock / adapter，冻结 `CanMarkRead` 和 `CanViewReceiptState` 语义。
-2. 实现 PostgreSQL repository：消费 `delivery.inbox_item.created.v1` / `delivery.ack.recorded.v1`，建立 received projection。
-3. 实现 `MarkReadUseCase`：校验 read_seq 不超过 visible / received 范围，推进 user read cursor，写 receipt outbox。
-4. 实现最小 smoke：
+1. 跑真实进程 smoke：
 
 ```text
 SendMessage
@@ -361,7 +362,10 @@ SendMessage
 -> GetReceiptState shows received/read
 ```
 
-第一条代码切片可以先只覆盖单会话、小群、单条消息：
+2. 实现 receipt outbox relay，发布 `im.receipt.events`。
+3. 后续替换 `StaticAllowAccess` 为 conversation / policy adapter。
+
+第一条 smoke 可以先只覆盖单会话、小群、单条消息：
 
 - 两个成员可见同一条消息。
 - receiver `AckDelivery` 后，receipt projection 显示 received。

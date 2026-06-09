@@ -22,6 +22,7 @@ func TestBuildCommandFromInboxItemCreated(t *testing.T) {
 				ConversationId:  "conversation-1",
 				ConversationSeq: 12,
 				SourceEventId:   "timeline-event-1",
+				SourceEventType: types.SourceEventMessageEdited,
 				MessageId:       "message-1",
 				SenderId:        "sender-1",
 			},
@@ -42,6 +43,7 @@ func TestBuildCommandFromInboxItemCreated(t *testing.T) {
 	if command.UserID != "receiver-1" ||
 		command.SenderID != "sender-1" ||
 		command.MessageID != "message-1" ||
+		command.SourceEventType != types.SourceEventMessageEdited ||
 		command.OffsetValue != 10 {
 		t.Fatalf("unexpected command: %+v", command)
 	}

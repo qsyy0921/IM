@@ -165,6 +165,52 @@ func TestRepositoryListConversationsConcurrentInboxAndMarkReadIntegration(t *tes
 	assertConversationSummary(t, summary, 2, 1, 1)
 }
 
+func TestRepositoryMessageChangeEventsDoNotIncreaseUnreadIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	if _, err := repository.ProjectDeliveryEvent(ctx, inboxCreatedCommand(1, "delivery-inbox-1")); err != nil {
+		t.Fatalf("project persisted inbox item: %v", err)
+	}
+	if _, err := repository.ProjectDeliveryEvent(ctx, ackRecordedCommand(1, "delivery-ack-1")); err != nil {
+		t.Fatalf("project ack: %v", err)
+	}
+	if _, err := repository.MarkRead(ctx, markReadCommand(1)); err != nil {
+		t.Fatalf("mark read: %v", err)
+	}
+	for _, eventType := range []string{
+		types.SourceEventMessageEdited,
+		types.SourceEventMessageRevoked,
+		types.SourceEventMessageDeleted,
+	} {
+		seq := int64(2)
+		if eventType == types.SourceEventMessageRevoked {
+			seq = 3
+		}
+		if eventType == types.SourceEventMessageDeleted {
+			seq = 4
+		}
+		command := inboxCreatedCommand(seq, "delivery-"+eventType)
+		command.SourceEventID = fmt.Sprintf("timeline-change-%d", seq)
+		command.SourceEventType = eventType
+		command.MessageID = "message-1"
+		if _, err := repository.ProjectDeliveryEvent(ctx, command); err != nil {
+			t.Fatalf("project %s: %v", eventType, err)
+		}
+	}
+
+	summary, err := repository.ListConversations(ctx, listConversationsCommand(10, ""))
+	if err != nil {
+		t.Fatalf("list conversations after message changes: %v", err)
+	}
+	assertConversationSummaryWithMessage(t, summary, 4, "message-1", 0, 1)
+	assertReceiptOutboxCount(t, ctx, pool, "receipt.message.received.v1", 1)
+	assertReceiptOutboxCount(t, ctx, pool, "receipt.message.read.v1", 1)
+	assertReceiptStateCount(t, ctx, pool, 1)
+}
+
 func inboxCreatedCommand(seq int64, eventID string) types.ProjectDeliveryEventCommand {
 	return types.ProjectDeliveryEventCommand{
 		TenantID:        "tenant-receipt",
@@ -174,6 +220,7 @@ func inboxCreatedCommand(seq int64, eventID string) types.ProjectDeliveryEventCo
 		ConversationID:  "conv-receipt",
 		ConversationSeq: seq,
 		SourceEventID:   fmt.Sprintf("timeline-event-%d", seq),
+		SourceEventType: types.SourceEventMessagePersisted,
 		MessageID:       fmt.Sprintf("message-%d", seq),
 		SenderID:        "sender-1",
 		ConsumerGroup:   "receipt-test",
@@ -249,6 +296,18 @@ func assertConversationSummary(
 	wantLastReadSeq int64,
 ) {
 	t.Helper()
+	assertConversationSummaryWithMessage(t, result, wantLastVisibleSeq, fmt.Sprintf("message-%d", wantLastVisibleSeq), wantUnread, wantLastReadSeq)
+}
+
+func assertConversationSummaryWithMessage(
+	t *testing.T,
+	result types.ListConversationsResult,
+	wantLastVisibleSeq int64,
+	wantLastMessageID string,
+	wantUnread int64,
+	wantLastReadSeq int64,
+) {
+	t.Helper()
 	if len(result.Items) != 1 {
 		t.Fatalf("expected 1 conversation summary, got %d: %+v", len(result.Items), result.Items)
 	}
@@ -259,7 +318,7 @@ func assertConversationSummary(
 		item.LastReadSeq != wantLastReadSeq {
 		t.Fatalf("unexpected conversation summary: %+v", item)
 	}
-	if item.LastMessageID != fmt.Sprintf("message-%d", wantLastVisibleSeq) {
+	if item.LastMessageID != wantLastMessageID {
 		t.Fatalf("unexpected last_message_id: %+v", item)
 	}
 }
@@ -278,6 +337,22 @@ WHERE tenant_id = 'tenant-receipt'
 	}
 	if got != want {
 		t.Fatalf("expected %d outbox rows for %s, got %d", want, eventType, got)
+	}
+}
+
+func assertReceiptStateCount(t *testing.T, ctx context.Context, pool *pgxpool.Pool, want int) {
+	t.Helper()
+	var got int
+	err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM message_receipt_states
+WHERE tenant_id = 'tenant-receipt'
+`).Scan(&got)
+	if err != nil {
+		t.Fatalf("count receipt states: %v", err)
+	}
+	if got != want {
+		t.Fatalf("expected %d receipt states, got %d", want, got)
 	}
 }
 
@@ -343,6 +418,7 @@ func applyReceiptMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool
 	for _, name := range []string{
 		"000001_receipt_core.sql",
 		"000002_conversation_summary.sql",
+		"000003_receipt_source_event_type.sql",
 	} {
 		migrationPath := filepath.Join(root, "migrations", "postgres", "receipt", name)
 		sqlBytes, err := os.ReadFile(migrationPath)

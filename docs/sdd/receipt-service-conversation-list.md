@@ -44,7 +44,7 @@ im.delivery.events
 
 | 方向 | 服务 / 组件 | 交互 |
 | --- | --- | --- |
-| 上游事件 | Kafka `im.delivery.events` | 消费 `delivery.inbox_item.created.v1`，更新用户会话摘要和 unread |
+| 上游事件 | Kafka `im.delivery.events` | 消费 `delivery.inbox_item.created.v1`，按 `source_event_type` 更新用户会话摘要和 unread |
 | 上游命令 | `receipt-service MarkRead` | 推进 read cursor 后更新 unread |
 | 同步上游 | API gateway / client | 调用 `ListConversations` |
 | 同步依赖 | conversation / policy access port | 校验用户可见会话范围；第一阶段可复用 `ReceiptAccessPort` |
@@ -148,7 +148,7 @@ int64 updated_at_unix_ms
 
 | 来源 | 处理 |
 | --- | --- |
-| `delivery.inbox_item.created.v1` | upsert `user_conversation_summaries`，推进 last visible，并按当前 read cursor 计算 unread |
+| `delivery.inbox_item.created.v1` | upsert `user_conversation_summaries`，推进 last visible，并按当前 read cursor 计算 unread；只有 `source_event_type=message.persisted.v1` 计入 unread |
 | `MarkRead` 事务 | 推进 `last_read_seq`，重算当前会话 unread |
 
 后续如需要客户端在线列表变更提示，可由 receipt-service 通过 `receipt_outbox` 或新 summary outbox 发布轻量事件，但第一阶段不做。
@@ -188,10 +188,12 @@ CREATE TABLE conversation_summary_checkpoints (
 第一阶段 unread 计算可以直接使用：
 
 ```text
-unread_count = count(receipt_inbox_projection where conversation_seq > last_read_seq)
+unread_count = count(receipt_inbox_projection where source_event_type = message.persisted.v1 and conversation_seq > last_read_seq)
 ```
 
 为了控制复杂度，写路径可以先在 projection / MarkRead 事务内针对单会话重算 unread，而不是引入 Redis counter 或异步批处理。Kafka checkpoint 语义与 delivery / receipt 保持一致：`offset_value` 表示 next offset to commit，且只能在 PostgreSQL 事务成功后推进。
+
+`message.edited.v1`、`message.revoked.v1`、`message.deleted.v1` 仍然可以推进 `last_visible_seq` 和列表排序，让客户端知道会话有状态变化；但第一阶段不把这些变更事件当成新未读消息，也不为它们创建新的 read receipt state。这样可以避免用户已读原消息后，因为编辑 / 撤回 / 删除 tombstone 又出现未读数回升。
 
 ## 9. 核心流程
 
@@ -281,7 +283,7 @@ list_conversations_page_size
 | 测试 | 目标 |
 | --- | --- |
 | unit | unread 计算、cursor 分页、read_seq 幂等 |
-| PostgreSQL integration | inbox event upsert summary、MarkRead 清零 unread、重复 event 不重复计数 |
+| PostgreSQL integration | inbox event upsert summary、MarkRead 清零 unread、重复 event 不重复计数、edit/revoke/delete 不增加 unread |
 | gRPC contract | 参数校验、分页、只返回当前 auth user |
 | smoke | `SendMessage -> PullInbox -> ListConversations(unread=1) -> MarkRead -> ListConversations(unread=0)` |
 

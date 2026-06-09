@@ -8,7 +8,7 @@
 
 `receipt-service` 拥有消息回执 read model：
 
-- `receipt_inbox_projection`：从 `delivery.inbox_item.created.v1` 重建用户可见消息索引，只保存回执所需字段，包括 `sender_id`。
+- `receipt_inbox_projection`：从 `delivery.inbox_item.created.v1` 重建用户可见消息索引，只保存回执所需字段，包括 `sender_id` 和 `source_event_type`。
 - `device_received_cursors`：从 `delivery.ack.recorded.v1` 投影每个设备的已接收游标。
 - `user_read_cursors`：用户维度的已读游标；同一用户多设备读到更高 seq 后单调推进。
 - `message_receipt_states`：按 message / conversation seq 聚合用户送达和已读状态。
@@ -73,7 +73,7 @@ services/receipt-service/
 
 | 模型 | 说明 | 不变量 |
 | --- | --- | --- |
-| `ReceiptInboxItem` | 回执服务自己的可见消息索引 | 来自 `delivery.inbox_item.created.v1`，`(tenant_id,user_id,conversation_id,conversation_seq)` 唯一，必须保存 `sender_id` |
+| `ReceiptInboxItem` | 回执服务自己的可见消息索引 | 来自 `delivery.inbox_item.created.v1`，`(tenant_id,user_id,conversation_id,conversation_seq)` 唯一，必须保存 `sender_id` 和 `source_event_type` |
 | `DeviceReceivedCursor` | 某设备已接收 / 已持久化游标 | 只由 `delivery.ack.recorded.v1` 推进，单调递增 |
 | `UserReceivedCursor` | 用户维度已接收游标 | 可由多个设备 received cursor 聚合；第一阶段取该用户任一设备 ack 到的最大 seq |
 | `UserReadCursor` | 用户维度已读游标 | 只由 `MarkRead` 推进，不能超过该用户已接收 / 已可见最大 seq |
@@ -218,7 +218,7 @@ im.delivery.events
 
 | 事件 | 处理 |
 | --- | --- |
-| `delivery.inbox_item.created.v1` | 写 `receipt_inbox_projection`，建立 `(user, conversation_seq) -> message_id/source_event_id` 映射 |
+| `delivery.inbox_item.created.v1` | 写 `receipt_inbox_projection`，建立 `(user, conversation_seq) -> message_id/source_event_id/source_event_type` 映射 |
 | `delivery.ack.recorded.v1` | 推进 `device_received_cursors`，再推进 user received 聚合和 message received 状态 |
 
 消费规则：
@@ -257,6 +257,7 @@ device_id
 cursor_seq
 occurred_at
 source_event_id
+source_event_type
 ```
 
 发布规则：
@@ -284,6 +285,7 @@ CREATE TABLE receipt_inbox_projection (
     conversation_id     TEXT        NOT NULL,
     conversation_seq    BIGINT      NOT NULL,
     source_event_id     TEXT        NOT NULL,
+    source_event_type   TEXT        NOT NULL DEFAULT 'message.persisted.v1',
     delivery_event_id   TEXT        NOT NULL,
     message_id          TEXT        NOT NULL,
     sender_id           TEXT        NOT NULL,

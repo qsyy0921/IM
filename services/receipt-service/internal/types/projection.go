@@ -3,6 +3,11 @@ package types
 const (
 	DeliveryEventInboxItemCreated = "delivery.inbox_item.created.v1"
 	DeliveryEventAckRecorded      = "delivery.ack.recorded.v1"
+
+	SourceEventMessagePersisted = "message.persisted.v1"
+	SourceEventMessageEdited    = "message.edited.v1"
+	SourceEventMessageRevoked   = "message.revoked.v1"
+	SourceEventMessageDeleted   = "message.deleted.v1"
 )
 
 type ProjectDeliveryEventCommand struct {
@@ -14,6 +19,7 @@ type ProjectDeliveryEventCommand struct {
 	ConversationID  ConversationID
 	ConversationSeq int64
 	SourceEventID   string
+	SourceEventType string
 	MessageID       string
 	SenderID        UserID
 	LastReceivedSeq int64
@@ -49,6 +55,13 @@ func (command ProjectDeliveryEventCommand) Validate() error {
 		}
 		if command.SourceEventID == "" {
 			return NewInvalidArgument("source_event_id is required")
+		}
+		switch command.SourceEventType {
+		case SourceEventMessagePersisted, SourceEventMessageEdited, SourceEventMessageRevoked, SourceEventMessageDeleted:
+		case "":
+			return NewInvalidArgument("source_event_type is required")
+		default:
+			return NewInvalidArgument("unsupported source_event_type")
 		}
 		if command.MessageID == "" {
 			return NewInvalidArgument("message_id is required")

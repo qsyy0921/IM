@@ -228,6 +228,7 @@ type DeliveryInboxItemCreatedV1 struct {
 	SourceEventId   string                 `protobuf:"bytes,5,opt,name=source_event_id,json=sourceEventId,proto3" json:"source_event_id,omitempty"`
 	MessageId       string                 `protobuf:"bytes,6,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
 	SenderId        string                 `protobuf:"bytes,7,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
+	SourceEventType string                 `protobuf:"bytes,8,opt,name=source_event_type,json=sourceEventType,proto3" json:"source_event_type,omitempty"` // conversation timeline event type, for example message.persisted.v1
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -307,6 +308,13 @@ func (x *DeliveryInboxItemCreatedV1) GetMessageId() string {
 func (x *DeliveryInboxItemCreatedV1) GetSenderId() string {
 	if x != nil {
 		return x.SenderId
+	}
+	return ""
+}
+
+func (x *DeliveryInboxItemCreatedV1) GetSourceEventType() string {
+	if x != nil {
+		return x.SourceEventType
 	}
 	return ""
 }
@@ -412,7 +420,7 @@ const file_delivery_v1_im_delivery_events_proto_rawDesc = "" +
 	"occurredAt\x12f\n" +
 	"\x12inbox_item_created\x18\x14 \x01(\v26.nexusim.delivery.events.v1.DeliveryInboxItemCreatedV1H\x00R\x10inboxItemCreated\x12V\n" +
 	"\fack_recorded\x18\x15 \x01(\v21.nexusim.delivery.events.v1.DeliveryAckRecordedV1H\x00R\vackRecordedB\t\n" +
-	"\apayload\"\x8a\x02\n" +
+	"\apayload\"\xb6\x02\n" +
 	"\x1aDeliveryInboxItemCreatedV1\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12'\n" +
@@ -421,7 +429,8 @@ const file_delivery_v1_im_delivery_events_proto_rawDesc = "" +
 	"\x0fsource_event_id\x18\x05 \x01(\tR\rsourceEventId\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x06 \x01(\tR\tmessageId\x12\x1b\n" +
-	"\tsender_id\x18\a \x01(\tR\bsenderId\"\xbf\x01\n" +
+	"\tsender_id\x18\a \x01(\tR\bsenderId\x12*\n" +
+	"\x11source_event_type\x18\b \x01(\tR\x0fsourceEventType\"\xbf\x01\n" +
 	"\x15DeliveryAckRecordedV1\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +

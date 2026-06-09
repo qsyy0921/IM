@@ -18,6 +18,7 @@ func TestBuildDeliveryEventInboxItemCreated(t *testing.T) {
 		"conversation_id":"conversation-1",
 		"conversation_seq":12,
 		"source_event_id":"timeline-event-1",
+		"source_event_type":"message.edited.v1",
 		"message_id":"message-1",
 		"sender_id":"sender-1"
 	}`))
@@ -39,6 +40,7 @@ func TestBuildDeliveryEventInboxItemCreated(t *testing.T) {
 		payload.UserId != "user-1" ||
 		payload.ConversationSeq != 12 ||
 		payload.SourceEventId != "timeline-event-1" ||
+		payload.SourceEventType != "message.edited.v1" ||
 		payload.MessageId != "message-1" ||
 		payload.SenderId != "sender-1" {
 		t.Fatalf("unexpected event=%+v payload=%+v", &event, payload)

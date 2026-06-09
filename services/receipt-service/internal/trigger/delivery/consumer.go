@@ -86,6 +86,10 @@ func fillInboxItemCreated(command *types.ProjectDeliveryEventCommand, payload *d
 	command.UserID = types.UserID(payload.GetUserId())
 	command.ConversationSeq = payload.GetConversationSeq()
 	command.SourceEventID = payload.GetSourceEventId()
+	command.SourceEventType = payload.GetSourceEventType()
+	if command.SourceEventType == "" {
+		command.SourceEventType = types.SourceEventMessagePersisted
+	}
 	command.MessageID = payload.GetMessageId()
 	command.SenderID = types.UserID(payload.GetSenderId())
 }

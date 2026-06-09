@@ -1,3 +1,6 @@
+ALTER TABLE receipt_inbox_projection
+    ADD COLUMN IF NOT EXISTS source_event_type TEXT NOT NULL DEFAULT 'message.persisted.v1';
+
 CREATE TABLE IF NOT EXISTS user_conversation_summaries (
     tenant_id         TEXT        NOT NULL,
     user_id           TEXT        NOT NULL,
@@ -43,7 +46,8 @@ summary_counts AS (
         rip.conversation_id,
         COALESCE(urc.last_read_seq, 0) AS last_read_seq,
         COUNT(*) FILTER (
-            WHERE rip.conversation_seq > COALESCE(urc.last_read_seq, 0)
+            WHERE rip.source_event_type = 'message.persisted.v1'
+              AND rip.conversation_seq > COALESCE(urc.last_read_seq, 0)
         ) AS unread_count
     FROM receipt_inbox_projection rip
     LEFT JOIN user_read_cursors urc

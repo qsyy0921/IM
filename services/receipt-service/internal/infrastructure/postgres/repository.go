@@ -45,8 +45,10 @@ func (repository *Repository) ProjectDeliveryEvent(
 		if err := insertInboxProjection(ctx, tx, command); err != nil {
 			return types.ProjectDeliveryEventResult{}, err
 		}
-		if err := upsertInitialReceiptState(ctx, tx, command); err != nil {
-			return types.ProjectDeliveryEventResult{}, err
+		if command.SourceEventType == types.SourceEventMessagePersisted {
+			if err := upsertInitialReceiptState(ctx, tx, command); err != nil {
+				return types.ProjectDeliveryEventResult{}, err
+			}
 		}
 		if err := upsertConversationSummaryFromInbox(ctx, tx, command); err != nil {
 			return types.ProjectDeliveryEventResult{}, err
@@ -410,13 +412,14 @@ INSERT INTO receipt_inbox_projection (
     conversation_id,
     conversation_seq,
     source_event_id,
+    source_event_type,
     delivery_event_id,
     message_id,
     sender_id,
     created_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
 ON CONFLICT (tenant_id, user_id, delivery_event_id) DO NOTHING
-`, command.TenantID, command.UserID, command.ConversationID, command.ConversationSeq, command.SourceEventID, command.EventID, command.MessageID, command.SenderID)
+`, command.TenantID, command.UserID, command.ConversationID, command.ConversationSeq, command.SourceEventID, command.SourceEventType, command.EventID, command.MessageID, command.SenderID)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -438,6 +441,7 @@ unread AS (
     WHERE tenant_id = $1
       AND user_id = $2
       AND conversation_id = $3
+      AND source_event_type = 'message.persisted.v1'
       AND conversation_seq > (SELECT last_read_seq FROM read_cursor)
 )
 INSERT INTO user_conversation_summaries (
@@ -715,6 +719,7 @@ SET last_read_seq = GREATEST(last_read_seq, $4),
         WHERE tenant_id = $1
           AND user_id = $2
           AND conversation_id = $3
+          AND source_event_type = 'message.persisted.v1'
           AND conversation_seq > $4
     ),
     updated_at = now()

@@ -297,13 +297,14 @@ func insertInboxOutbox(
 	userID types.UserID,
 ) error {
 	payload := map[string]any{
-		"tenant_id":        command.TenantID,
-		"user_id":          userID,
-		"conversation_id":  command.ConversationID,
-		"conversation_seq": command.ConversationSeq,
-		"source_event_id":  command.EventID,
-		"message_id":       command.MessageID,
-		"sender_id":        command.SenderID,
+		"tenant_id":         command.TenantID,
+		"user_id":           userID,
+		"conversation_id":   command.ConversationID,
+		"conversation_seq":  command.ConversationSeq,
+		"source_event_id":   command.EventID,
+		"source_event_type": command.EventType,
+		"message_id":        command.MessageID,
+		"sender_id":         command.SenderID,
 	}
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {

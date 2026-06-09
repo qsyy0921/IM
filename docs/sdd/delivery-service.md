@@ -216,7 +216,7 @@ Envelope 映射：
 
 Payload 映射：
 
-- `delivery.inbox_item.created.v1` -> `DeliveryInboxItemCreatedV1`，包含 `tenant_id/user_id/conversation_id/conversation_seq/source_event_id/message_id`。
+- `delivery.inbox_item.created.v1` -> `DeliveryInboxItemCreatedV1`，包含 `tenant_id/user_id/conversation_id/conversation_seq/source_event_id/source_event_type/message_id`。
 - `delivery.ack.recorded.v1` -> `DeliveryAckRecordedV1`，包含 `tenant_id/user_id/device_id/conversation_id/last_received_seq`。
 
 `delivery.inbox_item.created.v1` 第一阶段定位为在线通知和补拉唤醒信号，不承载完整消息体。push-gateway 收到后只能通知在线客户端有新 inbox item，或调用 delivery-service 查询缺失范围；客户端仍以 `PullInbox` 返回的 durable read model 为准。

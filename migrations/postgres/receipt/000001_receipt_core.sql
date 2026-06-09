@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS receipt_inbox_projection (
     conversation_id     TEXT        NOT NULL,
     conversation_seq    BIGINT      NOT NULL,
     source_event_id     TEXT        NOT NULL,
+    source_event_type   TEXT        NOT NULL DEFAULT 'message.persisted.v1',
     delivery_event_id   TEXT        NOT NULL,
     message_id          TEXT        NOT NULL,
     sender_id           TEXT        NOT NULL,

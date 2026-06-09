@@ -19,7 +19,7 @@ conversation-service
 
 1. 当前分布式证据已经够用于面试讲“最小分布式 IM 后端”，不要继续长期停留在重型基础设施故障矩阵。
 2. 当前第三层产品能力已切到送达 / 已读回执：receipt-service 已落 proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer 和 `MarkRead` 事务。
-3. 下一步做 receipt-service 真实进程 smoke：`im.delivery.events -> receipt projection -> MarkRead -> GetReceiptState`；随后补 receipt outbox relay / `im.receipt.events` 发布链路。不要直接读取 delivery-service 内部表。
+3. receipt-service 真实进程 smoke 已跑通：`im.delivery.events -> receipt projection -> MarkRead -> GetReceiptState`。下一步补 receipt outbox relay / `im.receipt.events` 发布链路；不要直接读取 delivery-service 内部表。
 4. 后续第三层候选：消息编辑/撤回/删除、会话列表/未读数、真实鉴权。
 5. RAG / Agent / 智能总结属于第四层，必须等消息事实、权限边界、撤回删除语义更稳定后再做。
 6. Kafka HA、PostgreSQL failover、Redis quorum / 网络分区可作为后续生产化项，不作为当前主线阻塞。
@@ -30,6 +30,7 @@ conversation-service
 - 每个微服务独立六层 DDD：`api / app / domain / infrastructure / types / trigger`。
 - Kafka 事件只能通过 outbox relay 发布，业务事务不能直接 publish Kafka。
 - push-gateway 只做在线唤醒和 ACK 转发；可靠事实在 `delivery-service user_inbox`。
+- 开发时优先降低微服务耦合、控制代码复杂度；不要为了“分布式”引入网状依赖、跨服务内部表读取或过度抽象。
 - 压测原始数据放到 `H:\NexusIM\loadtest-results`，E 盘仓库只放报告和文档。
 - Win/Mac 服务间通信优先使用有线 `172.31.50.*`，不要把服务间流量走外网或代理。
 - 不回滚用户已有修改。

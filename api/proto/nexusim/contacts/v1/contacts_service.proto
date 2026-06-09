@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+package nexusim.contacts.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1;contactsv1";
+
+service ContactsService {
+  rpc SendContactRequest(SendContactRequestRequest) returns (SendContactRequestResponse);
+  rpc RespondContactRequest(RespondContactRequestRequest) returns (RespondContactRequestResponse);
+  rpc ListContacts(ListContactsRequest) returns (ListContactsResponse);
+  rpc GetContactState(GetContactStateRequest) returns (GetContactStateResponse);
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+enum ContactRequestStatus {
+  CONTACT_REQUEST_STATUS_UNSPECIFIED = 0;
+  CONTACT_REQUEST_STATUS_PENDING = 1;
+  CONTACT_REQUEST_STATUS_ACCEPTED = 2;
+  CONTACT_REQUEST_STATUS_DECLINED = 3;
+  CONTACT_REQUEST_STATUS_CANCELED = 4;
+  CONTACT_REQUEST_STATUS_EXPIRED = 5;
+}
+
+enum ContactEdgeStatus {
+  CONTACT_EDGE_STATUS_UNSPECIFIED = 0;
+  CONTACT_EDGE_STATUS_ACTIVE = 1;
+  CONTACT_EDGE_STATUS_DELETED = 2;
+  CONTACT_EDGE_STATUS_BLOCKED = 3;
+}
+
+enum ContactDecision {
+  CONTACT_DECISION_UNSPECIFIED = 0;
+  CONTACT_DECISION_ACCEPT = 1;
+  CONTACT_DECISION_DECLINE = 2;
+}
+
+message SendContactRequestRequest {
+  AuthContext auth_context = 1;
+  string target_user_id = 2;
+  string idempotency_key = 3;
+  string message = 4;
+}
+
+message SendContactRequestResponse {
+  string request_id = 1;
+  string tenant_id = 2;
+  string sender_user_id = 3;
+  string receiver_user_id = 4;
+  ContactRequestStatus status = 5;
+  bool idempotent_replay = 6;
+}
+
+message RespondContactRequestRequest {
+  AuthContext auth_context = 1;
+  string request_id = 2;
+  ContactDecision decision = 3;
+  string idempotency_key = 4;
+}
+
+message RespondContactRequestResponse {
+  string request_id = 1;
+  string tenant_id = 2;
+  string sender_user_id = 3;
+  string receiver_user_id = 4;
+  ContactRequestStatus status = 5;
+  bool idempotent_replay = 6;
+}
+
+message ListContactsRequest {
+  AuthContext auth_context = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ContactItem {
+  string contact_user_id = 1;
+  ContactEdgeStatus status = 2;
+  int64 version = 3;
+  string source_request_id = 4;
+  int64 created_at_unix_ms = 5;
+  int64 updated_at_unix_ms = 6;
+}
+
+message ListContactsResponse {
+  string tenant_id = 1;
+  string owner_user_id = 2;
+  repeated ContactItem contacts = 3;
+  string next_page_token = 4;
+}
+
+message GetContactStateRequest {
+  AuthContext auth_context = 1;
+  string other_user_id = 2;
+}
+
+message GetContactStateResponse {
+  string tenant_id = 1;
+  string owner_user_id = 2;
+  string contact_user_id = 3;
+  ContactEdgeStatus status = 4;
+  string source_request_id = 5;
+  int64 version = 6;
+}

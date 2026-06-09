@@ -11,6 +11,7 @@ protoc `
     --go_opt=paths=source_relative `
     --go-grpc_out=$ApiProtoDir `
     --go-grpc_opt=paths=source_relative `
+    "$ApiProtoDir/nexusim/contacts/v1/contacts_service.proto" `
     "$ApiProtoDir/nexusim/delivery/v1/delivery_service.proto" `
     "$ApiProtoDir/nexusim/receipt/v1/receipt_service.proto" `
     "$ApiProtoDir/nexusim/conversation/v1/conversation_service.proto" `
@@ -34,3 +35,9 @@ protoc `
     --go_out=$KafkaSchemaDir `
     --go_opt=paths=source_relative `
     "$KafkaSchemaDir/receipt/v1/im.receipt.events.proto"
+
+protoc `
+    -I $KafkaSchemaDir `
+    --go_out=$KafkaSchemaDir `
+    --go_opt=paths=source_relative `
+    "$KafkaSchemaDir/contacts/v1/im.contact.events.proto"

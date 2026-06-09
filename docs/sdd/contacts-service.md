@@ -1,6 +1,6 @@
 # NexusIM contacts-service SDD v0.1
 
-状态：Draft
+状态：Draft；proto / Kafka schema / migration / 六层最小可编译骨架已落地，repository 真实事务和 outbox relay 尚未实现。
 
 本文定义第三层 IM 产品能力中的“联系人 / 好友关系”最小服务边界。目标是补齐社交关系事实源，同时保持低耦合：不把好友关系塞进 `conversation_members`，也不让会话、消息、投递服务直接读联系人表。
 
@@ -245,6 +245,7 @@ CREATE TABLE contact_edges (
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (tenant_id, owner_user_id, contact_user_id),
     CHECK (owner_user_id <> contact_user_id),
+    CHECK (version > 0),
     CHECK (status IN ('ACTIVE', 'DELETED', 'BLOCKED'))
 );
 

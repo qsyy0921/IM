@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package nexusim.contact.events.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/qsyy0921/IM/schemas/kafka/contacts/v1;contacteventsv1";
+
+// Topic: im.contact.events
+// Partition key: tenant_id + ":" + canonical user pair.
+// Producer: contacts-service outbox relay.
+message ContactEvent {
+  string event_id = 1;
+  string event_type = 2;
+  string event_version = 3;
+
+  string tenant_id = 4;
+  string aggregate_type = 5;
+  string aggregate_id = 6;
+  int64 aggregate_version = 7;
+
+  string partition_key = 8;
+  int64 mapping_version = 9;
+  string trace_id = 10;
+  string correlation_id = 11;
+  string causation_id = 12;
+  string producer = 13;
+  google.protobuf.Timestamp occurred_at = 14;
+
+  oneof payload {
+    ContactRequestCreatedV1 request_created = 20;
+    ContactRequestAcceptedV1 request_accepted = 21;
+    ContactRequestDeclinedV1 request_declined = 22;
+  }
+}
+
+message ContactRequestCreatedV1 {
+  string tenant_id = 1;
+  string request_id = 2;
+  string sender_user_id = 3;
+  string receiver_user_id = 4;
+  string status = 5;
+  string message = 6;
+  google.protobuf.Timestamp occurred_at = 7;
+}
+
+message ContactRequestAcceptedV1 {
+  string tenant_id = 1;
+  string request_id = 2;
+  string sender_user_id = 3;
+  string receiver_user_id = 4;
+  string status = 5;
+  int64 edge_version = 6;
+  google.protobuf.Timestamp occurred_at = 7;
+}
+
+message ContactRequestDeclinedV1 {
+  string tenant_id = 1;
+  string request_id = 2;
+  string sender_user_id = 3;
+  string receiver_user_id = 4;
+  string status = 5;
+  google.protobuf.Timestamp occurred_at = 6;
+}

@@ -1,0 +1,270 @@
+package grpc
+
+import (
+	"context"
+	"errors"
+
+	contactsv1 "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1"
+	"github.com/qsyy0921/IM/services/contacts-service/internal/types"
+	grpcgo "google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+type SendContactRequestExecutor interface {
+	Execute(context.Context, types.SendContactRequestCommand) (types.SendContactRequestResult, error)
+}
+
+type RespondContactRequestExecutor interface {
+	Execute(context.Context, types.RespondContactRequestCommand) (types.RespondContactRequestResult, error)
+}
+
+type ListContactsExecutor interface {
+	Execute(context.Context, types.ListContactsCommand) (types.ListContactsResult, error)
+}
+
+type GetContactStateExecutor interface {
+	Execute(context.Context, types.GetContactStateCommand) (types.GetContactStateResult, error)
+}
+
+type Server struct {
+	contactsv1.UnimplementedContactsServiceServer
+	sendContactRequest    SendContactRequestExecutor
+	respondContactRequest RespondContactRequestExecutor
+	listContacts          ListContactsExecutor
+	getContactState       GetContactStateExecutor
+}
+
+func NewServer(
+	sendContactRequest SendContactRequestExecutor,
+	respondContactRequest RespondContactRequestExecutor,
+	listContacts ListContactsExecutor,
+	getContactState GetContactStateExecutor,
+) *Server {
+	return &Server{
+		sendContactRequest:    sendContactRequest,
+		respondContactRequest: respondContactRequest,
+		listContacts:          listContacts,
+		getContactState:       getContactState,
+	}
+}
+
+func Register(registrar grpcgo.ServiceRegistrar, server *Server) {
+	contactsv1.RegisterContactsServiceServer(registrar, server)
+}
+
+func (s *Server) SendContactRequest(
+	ctx context.Context,
+	request *contactsv1.SendContactRequestRequest,
+) (*contactsv1.SendContactRequestResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.sendContactRequest == nil {
+		return nil, status.Error(codes.Unimplemented, "send contact request is not configured")
+	}
+	auth := request.GetAuthContext()
+	result, err := s.sendContactRequest.Execute(ctx, types.SendContactRequestCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  types.TenantID(auth.GetTenantId()),
+			UserID:    types.UserID(auth.GetUserId()),
+			DeviceID:  auth.GetDeviceId(),
+			SessionID: auth.GetSessionId(),
+			TraceID:   auth.GetTraceId(),
+			RequestID: auth.GetRequestId(),
+		},
+		TargetUserID:   types.UserID(request.GetTargetUserId()),
+		IdempotencyKey: request.GetIdempotencyKey(),
+		Message:        request.GetMessage(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &contactsv1.SendContactRequestResponse{
+		RequestId:        result.RequestID,
+		TenantId:         string(result.TenantID),
+		SenderUserId:     string(result.SenderUserID),
+		ReceiverUserId:   string(result.ReceiverUserID),
+		Status:           requestStatusToProto(result.Status),
+		IdempotentReplay: result.IdempotentReplay,
+	}, nil
+}
+
+func (s *Server) RespondContactRequest(
+	ctx context.Context,
+	request *contactsv1.RespondContactRequestRequest,
+) (*contactsv1.RespondContactRequestResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.respondContactRequest == nil {
+		return nil, status.Error(codes.Unimplemented, "respond contact request is not configured")
+	}
+	auth := request.GetAuthContext()
+	result, err := s.respondContactRequest.Execute(ctx, types.RespondContactRequestCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  types.TenantID(auth.GetTenantId()),
+			UserID:    types.UserID(auth.GetUserId()),
+			DeviceID:  auth.GetDeviceId(),
+			SessionID: auth.GetSessionId(),
+			TraceID:   auth.GetTraceId(),
+			RequestID: auth.GetRequestId(),
+		},
+		RequestID:      request.GetRequestId(),
+		Decision:       decisionFromProto(request.GetDecision()),
+		IdempotencyKey: request.GetIdempotencyKey(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &contactsv1.RespondContactRequestResponse{
+		RequestId:        result.RequestID,
+		TenantId:         string(result.TenantID),
+		SenderUserId:     string(result.SenderUserID),
+		ReceiverUserId:   string(result.ReceiverUserID),
+		Status:           requestStatusToProto(result.Status),
+		IdempotentReplay: result.IdempotentReplay,
+	}, nil
+}
+
+func (s *Server) ListContacts(
+	ctx context.Context,
+	request *contactsv1.ListContactsRequest,
+) (*contactsv1.ListContactsResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.listContacts == nil {
+		return nil, status.Error(codes.Unimplemented, "list contacts is not configured")
+	}
+	auth := request.GetAuthContext()
+	result, err := s.listContacts.Execute(ctx, types.ListContactsCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  types.TenantID(auth.GetTenantId()),
+			UserID:    types.UserID(auth.GetUserId()),
+			DeviceID:  auth.GetDeviceId(),
+			SessionID: auth.GetSessionId(),
+			TraceID:   auth.GetTraceId(),
+			RequestID: auth.GetRequestId(),
+		},
+		PageSize:  int(request.GetPageSize()),
+		PageToken: request.GetPageToken(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	contacts := make([]*contactsv1.ContactItem, 0, len(result.Contacts))
+	for _, item := range result.Contacts {
+		contacts = append(contacts, &contactsv1.ContactItem{
+			ContactUserId:   string(item.ContactUserID),
+			Status:          edgeStatusToProto(item.Status),
+			Version:         item.Version,
+			SourceRequestId: item.SourceRequestID,
+			CreatedAtUnixMs: item.CreatedAtUnixMS,
+			UpdatedAtUnixMs: item.UpdatedAtUnixMS,
+		})
+	}
+	return &contactsv1.ListContactsResponse{
+		TenantId:      string(result.TenantID),
+		OwnerUserId:   string(result.OwnerUserID),
+		Contacts:      contacts,
+		NextPageToken: result.NextPageToken,
+	}, nil
+}
+
+func (s *Server) GetContactState(
+	ctx context.Context,
+	request *contactsv1.GetContactStateRequest,
+) (*contactsv1.GetContactStateResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.getContactState == nil {
+		return nil, status.Error(codes.Unimplemented, "get contact state is not configured")
+	}
+	auth := request.GetAuthContext()
+	result, err := s.getContactState.Execute(ctx, types.GetContactStateCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  types.TenantID(auth.GetTenantId()),
+			UserID:    types.UserID(auth.GetUserId()),
+			DeviceID:  auth.GetDeviceId(),
+			SessionID: auth.GetSessionId(),
+			TraceID:   auth.GetTraceId(),
+			RequestID: auth.GetRequestId(),
+		},
+		OtherUserID: types.UserID(request.GetOtherUserId()),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &contactsv1.GetContactStateResponse{
+		TenantId:        string(result.TenantID),
+		OwnerUserId:     string(result.OwnerUserID),
+		ContactUserId:   string(result.ContactUserID),
+		Status:          edgeStatusToProto(result.Status),
+		SourceRequestId: result.SourceRequestID,
+		Version:         result.Version,
+	}, nil
+}
+
+func decisionFromProto(value contactsv1.ContactDecision) types.ContactDecision {
+	switch value {
+	case contactsv1.ContactDecision_CONTACT_DECISION_ACCEPT:
+		return types.ContactDecisionAccept
+	case contactsv1.ContactDecision_CONTACT_DECISION_DECLINE:
+		return types.ContactDecisionDecline
+	default:
+		return ""
+	}
+}
+
+func requestStatusToProto(value types.ContactRequestStatus) contactsv1.ContactRequestStatus {
+	switch value {
+	case types.ContactRequestStatusPending:
+		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_PENDING
+	case types.ContactRequestStatusAccepted:
+		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_ACCEPTED
+	case types.ContactRequestStatusDeclined:
+		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_DECLINED
+	case types.ContactRequestStatusCanceled:
+		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_CANCELED
+	case types.ContactRequestStatusExpired:
+		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_EXPIRED
+	default:
+		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_UNSPECIFIED
+	}
+}
+
+func edgeStatusToProto(value types.ContactEdgeStatus) contactsv1.ContactEdgeStatus {
+	switch value {
+	case types.ContactEdgeStatusActive:
+		return contactsv1.ContactEdgeStatus_CONTACT_EDGE_STATUS_ACTIVE
+	case types.ContactEdgeStatusDeleted:
+		return contactsv1.ContactEdgeStatus_CONTACT_EDGE_STATUS_DELETED
+	case types.ContactEdgeStatusBlocked:
+		return contactsv1.ContactEdgeStatus_CONTACT_EDGE_STATUS_BLOCKED
+	default:
+		return contactsv1.ContactEdgeStatus_CONTACT_EDGE_STATUS_UNSPECIFIED
+	}
+}
+
+func grpcError(err error) error {
+	switch {
+	case errors.Is(err, types.ErrInvalidArgument):
+		return status.Error(codes.InvalidArgument, "invalid contact request")
+	case errors.Is(err, types.ErrContactRequestNotFound):
+		return status.Error(codes.NotFound, "contact request not found")
+	case errors.Is(err, types.ErrContactAlreadyExists):
+		return status.Error(codes.AlreadyExists, "contact already exists")
+	case errors.Is(err, types.ErrContactRequestConflict):
+		return status.Error(codes.FailedPrecondition, "contact request conflict")
+	case errors.Is(err, types.ErrPermissionDenied):
+		return status.Error(codes.PermissionDenied, "permission denied")
+	case errors.Is(err, types.ErrDBReadFailed), errors.Is(err, types.ErrDBWriteFailed), errors.Is(err, types.ErrOutboxWriteFailed):
+		return status.Error(codes.Unavailable, "contacts storage unavailable")
+	case errors.Is(err, types.ErrServiceOverloaded):
+		return status.Error(codes.Unavailable, "service overloaded")
+	default:
+		return status.Error(codes.Internal, "internal error")
+	}
+}

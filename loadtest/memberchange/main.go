@@ -87,6 +87,13 @@ type summary struct {
 	MemberListTargetMemberVersion     int64             `json:"member_list_target_member_version,omitempty"`
 	MemberListTargetPermissionVersion int64             `json:"member_list_target_permission_version,omitempty"`
 	MemberListError                   string            `json:"member_list_error,omitempty"`
+	OwnerTransferPreviousOwnerUserID  string            `json:"owner_transfer_previous_owner_user_id,omitempty"`
+	OwnerTransferNewOwnerUserID       string            `json:"owner_transfer_new_owner_user_id,omitempty"`
+	OwnerTransferPreviousOwnerRole    string            `json:"owner_transfer_previous_owner_role,omitempty"`
+	OwnerTransferPreviousOwnerStatus  string            `json:"owner_transfer_previous_owner_status,omitempty"`
+	OwnerTransferNewOwnerRole         string            `json:"owner_transfer_new_owner_role,omitempty"`
+	OwnerTransferNewOwnerStatus       string            `json:"owner_transfer_new_owner_status,omitempty"`
+	OwnerTransferOwnerCount           *int64            `json:"owner_transfer_owner_count,omitempty"`
 	StartedAt                         time.Time         `json:"started_at"`
 	FinishedAt                        time.Time         `json:"finished_at"`
 	Stats                             map[string]string `json:"stats,omitempty"`
@@ -118,7 +125,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.listUserID, "list-user-id", "", "user id used for post-run GetMemberChange/ListConversationMembers; defaults to operator-user-id")
 	flag.StringVar(&cfg.targetPrefix, "target-prefix", "target-user", "target user prefix")
 	flag.StringVar(&cfg.targetUserID, "target-user-id", "", "fixed target user id; when set, use with --request-count 1 for deterministic smoke")
-	flag.StringVar(&cfg.changeType, "change-type", "join", "member change type: join, leave, remove, or role-changed")
+	flag.StringVar(&cfg.changeType, "change-type", "join", "member change type: join, leave, remove, role-changed, or owner-transfer")
 	flag.StringVar(&cfg.targetRole, "target-role", "member", "target role for join/role-changed: owner, admin, or member")
 	flag.StringVar(&cfg.idempotencyPrefix, "idempotency-prefix", "idem", "idempotency key prefix")
 	flag.Int64Var(&cfg.requestCount, "request-count", 0, "fixed request count; 0 means run until duration elapses")
@@ -149,9 +156,17 @@ func run(cfg config) error {
 	if err := os.MkdirAll(cfg.resultDir, 0o755); err != nil {
 		return fmt.Errorf("create result dir: %w", err)
 	}
-	changeType, changeTypeName, err := parseMemberChangeType(cfg.changeType)
-	if err != nil {
-		return err
+	ownerTransfer := isOwnerTransferChange(cfg.changeType)
+	var changeType conversationv1.MemberChangeType
+	var changeTypeName string
+	if ownerTransfer {
+		changeTypeName = "OWNER_TRANSFER"
+	} else {
+		var err error
+		changeType, changeTypeName, err = parseMemberChangeType(cfg.changeType)
+		if err != nil {
+			return err
+		}
 	}
 	targetRole, targetRoleName, err := parseMemberRole(cfg.targetRole)
 	if err != nil {
@@ -172,6 +187,8 @@ func run(cfg config) error {
 	var successCount int64
 	var errorCountTotal int64
 	var sampleChangeID atomic.Value
+	var samplePreviousOwnerUserID atomic.Value
+	var sampleNewOwnerUserID atomic.Value
 	var latencyMu sync.Mutex
 	latencies := make([]float64, 0, 1024)
 	errorCounts := make(map[string]int64)
@@ -198,24 +215,50 @@ func run(cfg config) error {
 				}
 				requestCtx, requestCancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
 				begin := time.Now()
-				response, err := client.CreateMemberChange(requestCtx, &conversationv1.CreateMemberChangeRequest{
-					AuthContext: &conversationv1.AuthContext{
-						TenantId:  cfg.tenantID,
-						UserId:    cfg.operatorUserID,
-						DeviceId:  fmt.Sprintf("vu-%d", vu),
-						SessionId: fmt.Sprintf("session-%d", vu),
-						TraceId:   fmt.Sprintf("trace-%d", seq),
-						RequestId: fmt.Sprintf("memberchange-%d", seq),
-					},
-					ConversationId:        cfg.conversationID,
-					TargetUserId:          targetUserID,
-					ChangeType:            changeType,
-					TargetRole:            targetRole,
-					ExpectedMemberVersion: cfg.expectedVersion,
-					IdempotencyKey:        fmt.Sprintf("%s-%d", cfg.idempotencyPrefix, seq),
-					ConflictPolicy:        conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT,
-					Reason:                fmt.Sprintf("smoke %s", strings.ToLower(changeTypeName)),
-				})
+				auth := &conversationv1.AuthContext{
+					TenantId:  cfg.tenantID,
+					UserId:    cfg.operatorUserID,
+					DeviceId:  fmt.Sprintf("vu-%d", vu),
+					SessionId: fmt.Sprintf("session-%d", vu),
+					TraceId:   fmt.Sprintf("trace-%d", seq),
+					RequestId: fmt.Sprintf("memberchange-%d", seq),
+				}
+				var changeID string
+				var previousOwnerUserID string
+				var newOwnerUserID string
+				var err error
+				if ownerTransfer {
+					var response *conversationv1.TransferConversationOwnerResponse
+					response, err = client.TransferConversationOwner(requestCtx, &conversationv1.TransferConversationOwnerRequest{
+						AuthContext:           auth,
+						ConversationId:        cfg.conversationID,
+						NewOwnerUserId:        targetUserID,
+						ExpectedMemberVersion: cfg.expectedVersion,
+						IdempotencyKey:        fmt.Sprintf("%s-%d", cfg.idempotencyPrefix, seq),
+						Reason:                "smoke owner transfer",
+					})
+					if response != nil {
+						changeID = response.GetChangeId()
+						previousOwnerUserID = response.GetPreviousOwnerUserId()
+						newOwnerUserID = response.GetNewOwnerUserId()
+					}
+				} else {
+					var response *conversationv1.CreateMemberChangeResponse
+					response, err = client.CreateMemberChange(requestCtx, &conversationv1.CreateMemberChangeRequest{
+						AuthContext:           auth,
+						ConversationId:        cfg.conversationID,
+						TargetUserId:          targetUserID,
+						ChangeType:            changeType,
+						TargetRole:            targetRole,
+						ExpectedMemberVersion: cfg.expectedVersion,
+						IdempotencyKey:        fmt.Sprintf("%s-%d", cfg.idempotencyPrefix, seq),
+						ConflictPolicy:        conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT,
+						Reason:                fmt.Sprintf("smoke %s", strings.ToLower(changeTypeName)),
+					})
+					if response != nil {
+						changeID = response.GetChangeId()
+					}
+				}
 				elapsedMS := float64(time.Since(begin).Microseconds()) / 1000
 				requestCancel()
 				latencyMu.Lock()
@@ -228,8 +271,14 @@ func run(cfg config) error {
 					errorMu.Unlock()
 					continue
 				}
-				if response.GetChangeId() != "" && sampleChangeID.Load() == nil {
-					sampleChangeID.Store(response.GetChangeId())
+				if changeID != "" && sampleChangeID.Load() == nil {
+					sampleChangeID.Store(changeID)
+				}
+				if previousOwnerUserID != "" && samplePreviousOwnerUserID.Load() == nil {
+					samplePreviousOwnerUserID.Store(previousOwnerUserID)
+				}
+				if newOwnerUserID != "" && sampleNewOwnerUserID.Load() == nil {
+					sampleNewOwnerUserID.Store(newOwnerUserID)
 				}
 				atomic.AddInt64(&successCount, 1)
 			}
@@ -262,6 +311,9 @@ func run(cfg config) error {
 		StartedAt:      startedAt,
 		FinishedAt:     finishedAt,
 	}
+	if ownerTransfer {
+		result.TargetRole = ""
+	}
 	if result.RequestCount > 0 {
 		result.SuccessRate = float64(result.SuccessCount) / float64(result.RequestCount)
 		result.RPS = float64(result.RequestCount) / cfg.duration.Seconds()
@@ -278,6 +330,12 @@ func run(cfg config) error {
 	}
 	if value := sampleChangeID.Load(); value != nil {
 		result.SampleChangeID = value.(string)
+	}
+	if value := samplePreviousOwnerUserID.Load(); value != nil {
+		result.OwnerTransferPreviousOwnerUserID = value.(string)
+	}
+	if value := sampleNewOwnerUserID.Load(); value != nil {
+		result.OwnerTransferNewOwnerUserID = value.(string)
 	}
 	if result.SampleChangeID != "" {
 		status, err := getMemberChangeStatus(context.Background(), client, cfg, result.SampleChangeID)
@@ -317,6 +375,11 @@ func parseMemberChangeType(value string) (conversationv1.MemberChangeType, strin
 	default:
 		return conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_UNSPECIFIED, "", fmt.Errorf("unsupported change type %q", value)
 	}
+}
+
+func isOwnerTransferChange(value string) bool {
+	normalized := normalizeEnumName(value)
+	return normalized == "OWNER_TRANSFER" || normalized == "OWNERTRANSFER"
 }
 
 func parseMemberRole(value string) (conversationv1.MemberRole, string, error) {
@@ -446,6 +509,13 @@ SELECT COUNT(*) FROM message_outbox WHERE tenant_id = $1 AND conversation_id = $
 `, cfg.tenantID, cfg.conversationID); err != nil {
 		return fmt.Errorf("query outbox dlq: %w", err)
 	}
+	if isOwnerTransferChange(cfg.changeType) {
+		if err := assign(&result.OwnerTransferOwnerCount, `
+SELECT COUNT(*) FROM conversation_members WHERE tenant_id = $1 AND conversation_id = $2 AND role = 'OWNER' AND status = 'ACTIVE'
+`, cfg.tenantID, cfg.conversationID); err != nil {
+			return fmt.Errorf("query owner count: %w", err)
+		}
+	}
 	var currentSeq int64
 	if err := pool.QueryRow(ctx, `
 SELECT COALESCE(current_seq, 0)
@@ -517,6 +587,16 @@ func fillMemberListSample(
 				result.MemberListTargetStatus = member.GetStatus().String()
 				result.MemberListTargetMemberVersion = member.GetMemberVersion()
 				result.MemberListTargetPermissionVersion = member.GetPermissionVersion()
+			}
+			if isOwnerTransferChange(cfg.changeType) {
+				if member.GetUserId() == cfg.operatorUserID {
+					result.OwnerTransferPreviousOwnerRole = member.GetRole().String()
+					result.OwnerTransferPreviousOwnerStatus = member.GetStatus().String()
+				}
+				if cfg.targetUserID != "" && member.GetUserId() == cfg.targetUserID {
+					result.OwnerTransferNewOwnerRole = member.GetRole().String()
+					result.OwnerTransferNewOwnerStatus = member.GetStatus().String()
+				}
 			}
 		}
 		pageToken = response.GetNextPageToken()

@@ -27,6 +27,18 @@ func TestParseMemberChangeType(t *testing.T) {
 	}
 }
 
+func TestIsOwnerTransferChange(t *testing.T) {
+	tests := []string{"owner-transfer", "OWNER_TRANSFER", "owner transfer"}
+	for _, test := range tests {
+		if !isOwnerTransferChange(test) {
+			t.Fatalf("isOwnerTransferChange(%q) = false, want true", test)
+		}
+	}
+	if isOwnerTransferChange("role-changed") {
+		t.Fatal("isOwnerTransferChange(role-changed) = true, want false")
+	}
+}
+
 func TestParseConfigDefaultsListUserToOperator(t *testing.T) {
 	cfg := normalizeConfigDefaults(config{operatorUserID: "operator-1"})
 	if cfg.listUserID != cfg.operatorUserID {

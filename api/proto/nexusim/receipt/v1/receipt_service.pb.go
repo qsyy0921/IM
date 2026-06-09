@@ -642,16 +642,17 @@ func (x *ProjectionWatermark) GetUpdatedAtUnixMs() int64 {
 }
 
 type ConversationSummary struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	ConversationId  string                 `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	LastVisibleSeq  int64                  `protobuf:"varint,2,opt,name=last_visible_seq,json=lastVisibleSeq,proto3" json:"last_visible_seq,omitempty"`
-	LastMessageId   string                 `protobuf:"bytes,3,opt,name=last_message_id,json=lastMessageId,proto3" json:"last_message_id,omitempty"`
-	LastSenderId    string                 `protobuf:"bytes,4,opt,name=last_sender_id,json=lastSenderId,proto3" json:"last_sender_id,omitempty"`
-	UnreadCount     int64                  `protobuf:"varint,5,opt,name=unread_count,json=unreadCount,proto3" json:"unread_count,omitempty"`
-	LastReadSeq     int64                  `protobuf:"varint,6,opt,name=last_read_seq,json=lastReadSeq,proto3" json:"last_read_seq,omitempty"`
-	UpdatedAtUnixMs int64                  `protobuf:"varint,7,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	ConversationId      string                 `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	LastVisibleSeq      int64                  `protobuf:"varint,2,opt,name=last_visible_seq,json=lastVisibleSeq,proto3" json:"last_visible_seq,omitempty"`
+	LastMessageId       string                 `protobuf:"bytes,3,opt,name=last_message_id,json=lastMessageId,proto3" json:"last_message_id,omitempty"`
+	LastSenderId        string                 `protobuf:"bytes,4,opt,name=last_sender_id,json=lastSenderId,proto3" json:"last_sender_id,omitempty"`
+	UnreadCount         int64                  `protobuf:"varint,5,opt,name=unread_count,json=unreadCount,proto3" json:"unread_count,omitempty"`
+	LastReadSeq         int64                  `protobuf:"varint,6,opt,name=last_read_seq,json=lastReadSeq,proto3" json:"last_read_seq,omitempty"`
+	UpdatedAtUnixMs     int64                  `protobuf:"varint,7,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
+	LastSourceEventType string                 `protobuf:"bytes,8,opt,name=last_source_event_type,json=lastSourceEventType,proto3" json:"last_source_event_type,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *ConversationSummary) Reset() {
@@ -731,6 +732,13 @@ func (x *ConversationSummary) GetUpdatedAtUnixMs() int64 {
 		return x.UpdatedAtUnixMs
 	}
 	return 0
+}
+
+func (x *ConversationSummary) GetLastSourceEventType() string {
+	if x != nil {
+		return x.LastSourceEventType
+	}
+	return ""
 }
 
 type ListConversationsResponse struct {
@@ -845,7 +853,7 @@ const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
 	"\x13ProjectionWatermark\x12\x16\n" +
 	"\x06source\x18\x01 \x01(\tR\x06source\x12!\n" +
 	"\foffset_value\x18\x02 \x01(\x03R\voffsetValue\x12+\n" +
-	"\x12updated_at_unix_ms\x18\x03 \x01(\x03R\x0fupdatedAtUnixMs\"\xaa\x02\n" +
+	"\x12updated_at_unix_ms\x18\x03 \x01(\x03R\x0fupdatedAtUnixMs\"\xdf\x02\n" +
 	"\x13ConversationSummary\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12(\n" +
 	"\x10last_visible_seq\x18\x02 \x01(\x03R\x0elastVisibleSeq\x12&\n" +
@@ -853,7 +861,8 @@ const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
 	"\x0elast_sender_id\x18\x04 \x01(\tR\flastSenderId\x12!\n" +
 	"\funread_count\x18\x05 \x01(\x03R\vunreadCount\x12\"\n" +
 	"\rlast_read_seq\x18\x06 \x01(\x03R\vlastReadSeq\x12+\n" +
-	"\x12updated_at_unix_ms\x18\a \x01(\x03R\x0fupdatedAtUnixMs\"\xe0\x01\n" +
+	"\x12updated_at_unix_ms\x18\a \x01(\x03R\x0fupdatedAtUnixMs\x123\n" +
+	"\x16last_source_event_type\x18\b \x01(\tR\x13lastSourceEventType\"\xe0\x01\n" +
 	"\x19ListConversationsResponse\x12=\n" +
 	"\x05items\x18\x01 \x03(\v2'.nexusim.receipt.v1.ConversationSummaryR\x05items\x12(\n" +
 	"\x10next_page_cursor\x18\x02 \x01(\tR\x0enextPageCursor\x12Z\n" +

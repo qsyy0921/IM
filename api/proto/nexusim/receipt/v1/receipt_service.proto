@@ -84,6 +84,7 @@ message ConversationSummary {
   int64 unread_count = 5;
   int64 last_read_seq = 6;
   int64 updated_at_unix_ms = 7;
+  string last_source_event_type = 8;
 }
 
 message ListConversationsResponse {

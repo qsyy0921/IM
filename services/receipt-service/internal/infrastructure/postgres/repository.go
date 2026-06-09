@@ -279,6 +279,7 @@ SELECT
     last_visible_seq,
     last_message_id,
     last_sender_id,
+    last_source_event_type,
     unread_count,
     last_read_seq,
     sort_updated_at
@@ -312,6 +313,7 @@ LIMIT $3
 			&item.LastVisibleSeq,
 			&item.LastMessageID,
 			&item.LastSenderID,
+			&item.LastSourceEventType,
 			&item.UnreadCount,
 			&item.LastReadSeq,
 			&item.UpdatedAt,
@@ -451,6 +453,7 @@ INSERT INTO user_conversation_summaries (
     last_visible_seq,
     last_message_id,
     last_sender_id,
+    last_source_event_type,
     last_read_seq,
     unread_count,
     sort_updated_at,
@@ -462,6 +465,7 @@ INSERT INTO user_conversation_summaries (
     $4,
     $5,
     $6,
+    $7,
     (SELECT last_read_seq FROM read_cursor),
     (SELECT unread_count FROM unread),
     now(),
@@ -477,6 +481,10 @@ SET last_visible_seq = GREATEST(user_conversation_summaries.last_visible_seq, EX
         WHEN EXCLUDED.last_visible_seq >= user_conversation_summaries.last_visible_seq THEN EXCLUDED.last_sender_id
         ELSE user_conversation_summaries.last_sender_id
     END,
+    last_source_event_type = CASE
+        WHEN EXCLUDED.last_visible_seq >= user_conversation_summaries.last_visible_seq THEN EXCLUDED.last_source_event_type
+        ELSE user_conversation_summaries.last_source_event_type
+    END,
     last_read_seq = EXCLUDED.last_read_seq,
     unread_count = EXCLUDED.unread_count,
     sort_updated_at = CASE
@@ -484,7 +492,7 @@ SET last_visible_seq = GREATEST(user_conversation_summaries.last_visible_seq, EX
         ELSE user_conversation_summaries.sort_updated_at
     END,
     updated_at = now()
-`, command.TenantID, command.UserID, command.ConversationID, command.ConversationSeq, command.MessageID, command.SenderID)
+`, command.TenantID, command.UserID, command.ConversationID, command.ConversationSeq, command.MessageID, command.SenderID, command.SourceEventType)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}

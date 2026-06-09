@@ -103,13 +103,14 @@ func (command ListConversationsCommand) Validate() error {
 }
 
 type ConversationSummary struct {
-	ConversationID ConversationID
-	LastVisibleSeq int64
-	LastMessageID  string
-	LastSenderID   UserID
-	UnreadCount    int64
-	LastReadSeq    int64
-	UpdatedAt      time.Time
+	ConversationID      ConversationID
+	LastVisibleSeq      int64
+	LastMessageID       string
+	LastSenderID        UserID
+	LastSourceEventType string
+	UnreadCount         int64
+	LastReadSeq         int64
+	UpdatedAt           time.Time
 }
 
 type ProjectionWatermark struct {

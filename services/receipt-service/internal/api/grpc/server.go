@@ -148,13 +148,14 @@ func (server *Server) ListConversations(
 	items := make([]*receiptv1.ConversationSummary, 0, len(result.Items))
 	for _, item := range result.Items {
 		items = append(items, &receiptv1.ConversationSummary{
-			ConversationId:  string(item.ConversationID),
-			LastVisibleSeq:  item.LastVisibleSeq,
-			LastMessageId:   item.LastMessageID,
-			LastSenderId:    string(item.LastSenderID),
-			UnreadCount:     item.UnreadCount,
-			LastReadSeq:     item.LastReadSeq,
-			UpdatedAtUnixMs: item.UpdatedAt.UnixMilli(),
+			ConversationId:      string(item.ConversationID),
+			LastVisibleSeq:      item.LastVisibleSeq,
+			LastMessageId:       item.LastMessageID,
+			LastSenderId:        string(item.LastSenderID),
+			LastSourceEventType: item.LastSourceEventType,
+			UnreadCount:         item.UnreadCount,
+			LastReadSeq:         item.LastReadSeq,
+			UpdatedAtUnixMs:     item.UpdatedAt.UnixMilli(),
 		})
 	}
 	return &receiptv1.ListConversationsResponse{

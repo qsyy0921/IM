@@ -8,12 +8,16 @@ CREATE TABLE IF NOT EXISTS user_conversation_summaries (
     last_visible_seq  BIGINT      NOT NULL,
     last_message_id   TEXT        NOT NULL,
     last_sender_id    TEXT        NOT NULL,
+    last_source_event_type TEXT    NOT NULL DEFAULT 'message.persisted.v1',
     last_read_seq     BIGINT      NOT NULL DEFAULT 0,
     unread_count      BIGINT      NOT NULL DEFAULT 0,
     sort_updated_at   TIMESTAMPTZ NOT NULL,
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (tenant_id, user_id, conversation_id)
 );
+
+ALTER TABLE user_conversation_summaries
+    ADD COLUMN IF NOT EXISTS last_source_event_type TEXT NOT NULL DEFAULT 'message.persisted.v1';
 
 CREATE INDEX IF NOT EXISTS idx_user_conversation_summaries_list
     ON user_conversation_summaries (tenant_id, user_id, sort_updated_at DESC, conversation_id);
@@ -33,6 +37,7 @@ WITH latest_inbox AS (
         user_id,
         conversation_id,
         conversation_seq,
+        source_event_type,
         message_id,
         sender_id,
         created_at
@@ -63,6 +68,7 @@ INSERT INTO user_conversation_summaries (
     last_visible_seq,
     last_message_id,
     last_sender_id,
+    last_source_event_type,
     last_read_seq,
     unread_count,
     sort_updated_at,
@@ -75,6 +81,7 @@ SELECT
     latest_inbox.conversation_seq,
     latest_inbox.message_id,
     latest_inbox.sender_id,
+    latest_inbox.source_event_type,
     summary_counts.last_read_seq,
     summary_counts.unread_count,
     latest_inbox.created_at,

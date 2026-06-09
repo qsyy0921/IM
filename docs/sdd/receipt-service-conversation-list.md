@@ -84,7 +84,7 @@ services/receipt-service/
 | `ListCursor` | 分页游标 | 基于 `sort_updated_at + conversation_id`，避免 offset 深分页 |
 | `ProjectionWatermark` | 投影水位 | 表示 summary 至少处理到的 Kafka offset 或本地更新时间 |
 
-第一阶段不追求完整消息 preview。列表项只返回 `last_message_id`、`last_message_seq`、`last_sender_id` 和 `updated_at`。客户端需要消息正文时回源 `PullInbox` 或后续 message query API。
+第一阶段不追求完整消息 preview。列表项只返回 `last_message_id`、`last_message_seq`、`last_sender_id`、`last_source_event_type` 和 `updated_at`。客户端可以用 `last_source_event_type` 区分新增 / 编辑 / 撤回 / 删除造成的列表刷新，但需要消息正文或 tombstone 详情时仍回源 `PullInbox` 或后续 message query API。
 
 ## 6. 同步 API 契约
 
@@ -117,6 +117,7 @@ string conversation_id
 int64 last_visible_seq
 string last_message_id
 string last_sender_id
+string last_source_event_type
 int64 unread_count
 int64 last_read_seq
 int64 updated_at_unix_ms

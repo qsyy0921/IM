@@ -205,7 +205,7 @@ func TestRepositoryMessageChangeEventsDoNotIncreaseUnreadIntegration(t *testing.
 	if err != nil {
 		t.Fatalf("list conversations after message changes: %v", err)
 	}
-	assertConversationSummaryWithMessage(t, summary, 4, "message-1", 0, 1)
+	assertConversationSummaryWithMessage(t, summary, 4, "message-1", types.SourceEventMessageDeleted, 0, 1)
 	assertReceiptOutboxCount(t, ctx, pool, "receipt.message.received.v1", 1)
 	assertReceiptOutboxCount(t, ctx, pool, "receipt.message.read.v1", 1)
 	assertReceiptStateCount(t, ctx, pool, 1)
@@ -296,7 +296,15 @@ func assertConversationSummary(
 	wantLastReadSeq int64,
 ) {
 	t.Helper()
-	assertConversationSummaryWithMessage(t, result, wantLastVisibleSeq, fmt.Sprintf("message-%d", wantLastVisibleSeq), wantUnread, wantLastReadSeq)
+	assertConversationSummaryWithMessage(
+		t,
+		result,
+		wantLastVisibleSeq,
+		fmt.Sprintf("message-%d", wantLastVisibleSeq),
+		types.SourceEventMessagePersisted,
+		wantUnread,
+		wantLastReadSeq,
+	)
 }
 
 func assertConversationSummaryWithMessage(
@@ -304,6 +312,7 @@ func assertConversationSummaryWithMessage(
 	result types.ListConversationsResult,
 	wantLastVisibleSeq int64,
 	wantLastMessageID string,
+	wantLastSourceEventType string,
 	wantUnread int64,
 	wantLastReadSeq int64,
 ) {
@@ -320,6 +329,9 @@ func assertConversationSummaryWithMessage(
 	}
 	if item.LastMessageID != wantLastMessageID {
 		t.Fatalf("unexpected last_message_id: %+v", item)
+	}
+	if item.LastSourceEventType != wantLastSourceEventType {
+		t.Fatalf("unexpected last_source_event_type: %+v", item)
 	}
 }
 
@@ -419,6 +431,7 @@ func applyReceiptMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool
 		"000001_receipt_core.sql",
 		"000002_conversation_summary.sql",
 		"000003_receipt_source_event_type.sql",
+		"000004_conversation_summary_source_event_type.sql",
 	} {
 		migrationPath := filepath.Join(root, "migrations", "postgres", "receipt", name)
 		sqlBytes, err := os.ReadFile(migrationPath)

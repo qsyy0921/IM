@@ -10,12 +10,14 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	grpcapi "github.com/qsyy0921/IM/services/delivery-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/delivery-service/internal/app"
 	kafkainfra "github.com/qsyy0921/IM/services/delivery-service/internal/infrastructure/kafka"
 	postgresinfra "github.com/qsyy0921/IM/services/delivery-service/internal/infrastructure/postgres"
+	"github.com/qsyy0921/IM/services/delivery-service/internal/trigger/outbox"
 	"github.com/qsyy0921/IM/services/delivery-service/internal/trigger/timeline"
 	"google.golang.org/grpc"
 )
@@ -36,6 +38,8 @@ func run() error {
 		return runGRPCServer()
 	case "timeline-consumer":
 		return runTimelineConsumer()
+	case "outbox-relay":
+		return runOutboxRelay()
 	default:
 		return errors.New("unsupported NEXUSIM_DELIVERY_SERVICE_MODE")
 	}
@@ -129,6 +133,43 @@ func runTimelineConsumer() error {
 	return worker.Run(ctx)
 }
 
+func runOutboxRelay() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	brokers := splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS"))
+	producer, err := kafkainfra.NewWriterProducer(brokers)
+	if err != nil {
+		return err
+	}
+	defer producer.Close()
+
+	topic := envString("NEXUSIM_DELIVERY_EVENTS_TOPIC", outbox.TopicDeliveryEvents)
+	relay := outbox.NewRelay(
+		postgresinfra.NewOutboxStore(pool),
+		producer,
+		outbox.Config{
+			Topic:          topic,
+			BatchSize:      envInt("NEXUSIM_DELIVERY_OUTBOX_BATCH_SIZE", 500),
+			PollInterval:   envDuration("NEXUSIM_DELIVERY_OUTBOX_POLL_INTERVAL", time.Second),
+			MaxAttempts:    envInt("NEXUSIM_DELIVERY_OUTBOX_MAX_ATTEMPTS", 5),
+			RetryBaseDelay: envDuration("NEXUSIM_DELIVERY_OUTBOX_RETRY_BASE_DELAY", time.Second),
+		},
+	)
+	log.Printf("delivery-service outbox relay started topic=%s", topic)
+	return relay.Run(ctx)
+}
+
 func openPGPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
@@ -154,6 +195,18 @@ func envInt(name string, fallback int) int {
 		return fallback
 	}
 	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func envDuration(name string, fallback time.Duration) time.Duration {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
 	if err != nil || parsed <= 0 {
 		return fallback
 	}

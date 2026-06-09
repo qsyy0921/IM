@@ -32,4 +32,4 @@ conversation-service CreateMemberChange
 - 成员变更事件先进入 `delivery_membership_projection`，消息事件再按成员可见窗口写入 `user_inbox`，避免用“当前成员表”错误解释历史消息可见性。
 - `AckDelivery` 只能 ACK 到该用户已可见的最大 seq，不能让客户端随便把 cursor 推到未来。
 - Kafka checkpoint 使用 `consumer_group + topic + partition`，记录 next offset；业务投影落库成功后才提交 Kafka offset。
-- 当前 `delivery_outbox` 只落库，不发布 `im.delivery.events`；push-gateway 接入前需要再做 delivery outbox relay 或 push event 发布链路。
+- 当前已补 `delivery_outbox -> im.delivery.events` 最小 relay 代码和测试；下一步需要做真实进程 smoke，并在 push-gateway 接入前补 LEAVE/REMOVE 负向可见性验证。

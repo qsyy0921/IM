@@ -12,16 +12,16 @@ import (
 )
 
 type fakeConsumer struct {
-	message   Message
+	message   types.TimelineMessage
 	fetchErr  error
 	committed bool
 }
 
-func (consumer *fakeConsumer) Fetch(context.Context) (Message, error) {
+func (consumer *fakeConsumer) Fetch(context.Context) (types.TimelineMessage, error) {
 	return consumer.message, consumer.fetchErr
 }
 
-func (consumer *fakeConsumer) Commit(context.Context, Message) error {
+func (consumer *fakeConsumer) Commit(context.Context, types.TimelineMessage) error {
 	consumer.committed = true
 	return context.Canceled
 }
@@ -63,7 +63,7 @@ func TestWorkerProjectsAndCommitsMessagePersisted(t *testing.T) {
 			},
 		},
 	})
-	consumer := &fakeConsumer{message: Message{Topic: "conversation.timeline.events", Partition: 3, Offset: 41, Value: value}}
+	consumer := &fakeConsumer{message: types.TimelineMessage{Topic: "conversation.timeline.events", Partition: 3, Offset: 41, Value: value}}
 	projector := &fakeProjector{}
 	err = NewWorker(consumer, projector, "delivery-test").Run(context.Background())
 	if !errors.Is(err, context.Canceled) {
@@ -97,7 +97,7 @@ func TestWorkerDoesNotCommitWhenProjectionFails(t *testing.T) {
 			},
 		},
 	})
-	consumer := &fakeConsumer{message: Message{Topic: "conversation.timeline.events", Value: value}}
+	consumer := &fakeConsumer{message: types.TimelineMessage{Topic: "conversation.timeline.events", Value: value}}
 	projector := &fakeProjector{err: types.NewDBWriteFailed("boom")}
 	err := NewWorker(consumer, projector, "delivery-test").Run(context.Background())
 	if !errors.Is(err, types.ErrDBWriteFailed) {
@@ -109,7 +109,7 @@ func TestWorkerDoesNotCommitWhenProjectionFails(t *testing.T) {
 }
 
 func TestWorkerRejectsMalformedEvent(t *testing.T) {
-	consumer := &fakeConsumer{message: Message{Value: []byte("bad")}}
+	consumer := &fakeConsumer{message: types.TimelineMessage{Value: []byte("bad")}}
 	projector := &fakeProjector{}
 	err := NewWorker(consumer, projector, "delivery-test").Run(context.Background())
 	if err == nil {

@@ -108,3 +108,10 @@ type ProjectTimelineEventResult struct {
 	ProjectedInboxCount int
 	MembershipUpdated   bool
 }
+
+type TimelineMessage struct {
+	Topic     string
+	Partition int
+	Offset    int64
+	Value     []byte
+}

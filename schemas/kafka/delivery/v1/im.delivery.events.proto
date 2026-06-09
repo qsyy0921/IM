@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package nexusim.delivery.events.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/qsyy0921/IM/schemas/kafka/delivery/v1;deliveryeventsv1";
+
+// Topic: im.delivery.events
+// Partition key: tenant_id + ":" + conversation_id
+// Producer: delivery-service outbox relay
+message DeliveryEvent {
+  string event_id = 1;
+  string event_type = 2;
+  string event_version = 3;
+
+  string tenant_id = 4;
+  string aggregate_type = 5; // "delivery"
+  string aggregate_id = 6;   // conversation_id
+  int64 aggregate_version = 7;
+
+  string partition_key = 8;
+  int64 mapping_version = 9;
+  string trace_id = 10;
+  string correlation_id = 11;
+  string causation_id = 12;
+  string producer = 13;
+  google.protobuf.Timestamp occurred_at = 14;
+
+  oneof payload {
+    DeliveryInboxItemCreatedV1 inbox_item_created = 20;
+    DeliveryAckRecordedV1 ack_recorded = 21;
+  }
+}
+
+message DeliveryInboxItemCreatedV1 {
+  string tenant_id = 1;
+  string user_id = 2;
+  string conversation_id = 3;
+  int64 conversation_seq = 4;
+  string source_event_id = 5;
+  string message_id = 6;
+}
+
+message DeliveryAckRecordedV1 {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string conversation_id = 4;
+  int64 last_received_seq = 5;
+}

@@ -86,18 +86,16 @@ delivery-service
 | delivery-service SDD | `docs/sdd/delivery-service.md` 已新增 v0.1 Draft，并已按评审 P1 补齐 delivery membership projection、ACK max visible seq 约束、Kafka checkpoint 维度 |
 | delivery-service 工程基线 | 已新增 `delivery_service.proto`、delivery migration、六层目录、`PullInbox / AckDelivery` 最小 gRPC + app + PostgreSQL 骨架、`ProjectTimelineEventUseCase` / PostgreSQL projection 方法，以及 timeline consumer worker；真实 PostgreSQL 集成测试已覆盖 projection、ACK 越界、ACK 并发幂等 |
 | delivery-service full smoke | 已跑真实进程小规模 smoke：`CreateMemberChange(JOIN) -> Kafka timeline -> delivery projection -> SendMessage -> Kafka timeline -> user_inbox -> PullInbox -> AckDelivery`，SendMessage `64/64` 成功，`delivery-user-1` 拉到 64 条 inbox，ACK 到 seq `66`；`loadtest/delivery` summary 已支持 `--consumer-group`，checkpoint 统计可按本次 consumer group 过滤；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-full-smoke.md` |
-| delivery_outbox / push-gateway | `delivery_outbox` 当前只落本地 `PENDING` 事实，尚未发布 `im.delivery.events`；push-gateway 尚未实现，下一阶段必须先明确它依赖 delivery read model / delivery event，不直接读取 message-service 内部表，也不修改 ACK |
+| delivery_outbox / push-gateway | 已新增 `schemas/kafka/delivery/v1/im.delivery.events.proto`、delivery-service outbox store、trigger relay、Kafka writer producer 和 `NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay`；当前代码测试已覆盖 `delivery_outbox -> im.delivery.events` builder、retry/DLQ 和顺序阻塞，尚需真实进程 smoke；push-gateway 尚未实现，下一阶段必须依赖 delivery read model / delivery event，不直接读取 message-service 内部表，也不修改 ACK |
 
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
 2. 不再继续做 message-service 重型硬件矩阵；只有公共契约、关键并发语义或新服务链路变化时，才跑 smoke / 小规模验证。
-3. 先补 `delivery_outbox relay / im.delivery.events` 小 SDD 或设计小节，明确事件契约、outbox envelope、retry/DLQ、fail-closed、consumer 幂等和与 push-gateway 的边界。
-4. 设计并实现 delivery-service 的 `delivery_outbox -> Kafka im.delivery.events` 最小发布链路；业务事务仍然只写 outbox，不直接 publish Kafka。
-5. 为 delivery outbox relay 补真实 PostgreSQL 集成测试和小规模 smoke 报告，报告放在 `docs/runbook/loadtest/delivery-service/`，不要覆盖旧报告。
-6. 在接入 push-gateway 前，补一个 `LEAVE/REMOVE` 负向可见性 smoke：成员离开或被移除后，新消息不能继续写入该用户 `user_inbox`。
-7. 写 `push-gateway` SDD，明确它只负责在线连接、订阅 delivery event / 查询 delivery read model，不拥有 `user_inbox`，不修改 ACK，不直接读取 message-service / conversation-service 内部表。
-8. push-gateway SDD 冻结后，再进入 proto / migration / 六层骨架和最小在线推送链路。
+3. 为 delivery-service `delivery_outbox -> Kafka im.delivery.events` 跑真实进程小规模 smoke，并把报告放在 `docs/runbook/loadtest/delivery-service/`，不要覆盖旧报告。
+4. 在接入 push-gateway 前，补一个 `LEAVE/REMOVE` 负向可见性 smoke：成员离开或被移除后，新消息不能继续写入该用户 `user_inbox`。
+5. 写 `push-gateway` SDD，明确它只负责在线连接、订阅 delivery event / 查询 delivery read model，不拥有 `user_inbox`，不修改 ACK，不直接读取 message-service / conversation-service 内部表。
+6. push-gateway SDD 冻结后，再进入 proto / migration / 六层骨架和最小在线推送链路。
 
 ## 6. 评审要求
 
@@ -407,3 +405,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：独立评审指出 `delivery-service` SDD v0.1 有 3 个 P1：缺成员可见性投影、ACK 可推进到未来 seq、Kafka checkpoint 维度错误。本轮已修 SDD 和 migration：新增 `delivery_membership_projection`，ACK 必须 `received_seq <= user_inbox max_visible_seq`，Kafka checkpoint 改为 `consumer_group + topic + partition`；同步落地 delivery proto / migration / 六层骨架、`PullInbox / AckDelivery` 最小同步路径和 `ProjectTimelineEventUseCase` / PostgreSQL projection 方法。
 - 2026-06-09：独立评审复核 delivery baseline 后指出 3 个 P1：首次并发 ACK 可能冲突、membership 单行投影 rejoin 窗口不稳、缺真实 PostgreSQL repository 测试。本轮已修：ACK 前加 transaction advisory lock，JOIN 事件会重置 `join_seq` 并清 `leave_seq`；新增真实 PostgreSQL 集成测试覆盖 join/left/rejoin、message projection、checkpoint、ACK 越界、低 seq 幂等、首次并发 ACK 和 timeline replay 去重。
 - 2026-06-09：独立评审复核 delivery P1 修复和 timeline consumer，结论为无 P0/P1，可进入真实小规模 smoke。本轮已新增 `loadtest/delivery` runner，并在 clean commit `ef817f7` 跑通 delivery full smoke：`CreateMemberChange(JOIN user-0 / delivery-user-1) -> message-service outbox relay -> Kafka -> delivery timeline consumer -> SendMessage(user-0) -> Kafka -> user_inbox(delivery-user-1) -> PullInbox -> AckDelivery`。结果：SendMessage `64/64` 成功，`delivery-user-1` 拉到 64 条 inbox，ACK 到 seq `66`，`message_outbox PUBLISHED=66`，`delivery_outbox PENDING=129` 为预期，因为 delivery outbox relay 尚未实现；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-full-smoke.md`。
+- 2026-06-09：已实现 delivery-service `delivery_outbox -> Kafka im.delivery.events` 最小发布链路：新增独立 Kafka schema `schemas/kafka/delivery/v1/im.delivery.events.proto`，补 `NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay`、PostgreSQL outbox store、trigger relay、Kafka writer producer；单元测试覆盖 event builder、malformed fail-closed 和 batch publish error，真实 PostgreSQL 集成测试覆盖 publish/retry/DLQ/低版本阻塞。下一步跑真实进程 smoke 并归档报告。

@@ -180,6 +180,12 @@ Topic：
 im.delivery.events
 ```
 
+Schema：
+
+```text
+schemas/kafka/delivery/v1/im.delivery.events.proto
+```
+
 事件：
 
 | 事件 | 分区键 | 下游 |
@@ -187,7 +193,41 @@ im.delivery.events
 | `delivery.inbox_item.created.v1` | `tenant_id + conversation_id` | push-gateway、audit |
 | `delivery.ack.recorded.v1` | `tenant_id + conversation_id` | receipt-service、audit |
 
-第一阶段可以先只写 `delivery_outbox`，不要求 push-gateway 已消费。
+`delivery_outbox` 是 delivery-service 的本地事务 outbox。业务事务只写 `delivery_outbox`，由 `NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay` 后台进程发布到 Kafka，不允许 `ProjectTimelineEvent` 或 `AckDelivery` 用例直接 publish Kafka。
+
+Envelope 映射：
+
+| `delivery_outbox` 字段 | `DeliveryEvent` 字段 |
+| --- | --- |
+| `event_id` | `event_id` |
+| `event_type` | `event_type` |
+| `event_version` | `event_version` |
+| `tenant_id` | `tenant_id` |
+| `conversation_id` | `aggregate_id` |
+| `aggregate_version` | `aggregate_version` |
+| `partition_key` | `partition_key` |
+| `mapping_version` | `mapping_version` |
+| `trace_id` | `trace_id` |
+| `correlation_id` | `correlation_id` |
+| `causation_id` | `causation_id` |
+| `producer` | `producer` |
+| `created_at` | `occurred_at` |
+| `payload_json` | oneof payload |
+
+Payload 映射：
+
+- `delivery.inbox_item.created.v1` -> `DeliveryInboxItemCreatedV1`，包含 `tenant_id/user_id/conversation_id/conversation_seq/source_event_id/message_id`。
+- `delivery.ack.recorded.v1` -> `DeliveryAckRecordedV1`，包含 `tenant_id/user_id/device_id/conversation_id/last_received_seq`。
+
+`delivery.inbox_item.created.v1` 第一阶段定位为在线通知和补拉唤醒信号，不承载完整消息体。push-gateway 收到后只能通知在线客户端有新 inbox item，或调用 delivery-service 查询缺失范围；客户端仍以 `PullInbox` 返回的 durable read model 为准。
+
+Relay 语义：
+
+- 按 `tenant_id + conversation_id + aggregate_version` 保持 fail-closed 顺序保护；低版本 `PENDING` / `DLQ` 会阻塞同会话更高版本 delivery event。
+- publish 成功后批量标记 `PUBLISHED`；publish 失败按指数退避写回 `retry_count/next_retry_at/last_error`。
+- 超过最大次数进入 `DLQ`，不自动跳过；repair/replay 必须显式审计。
+- unsupported / malformed `payload_json` 不允许 publish，也不能误标记 `PUBLISHED`，必须进入 retry / DLQ。
+- Kafka publish 是 at-least-once；下游按 `event_id` 幂等去重。
 
 ## 7. 数据库设计
 
@@ -422,15 +462,10 @@ delivery_cursor_regression_count
 ```text
 NEXUSIM_DELIVERY_SERVICE_MODE=grpc
 NEXUSIM_DELIVERY_SERVICE_MODE=timeline-consumer
-```
-
-后续规划：
-
-```text
 NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay
 ```
 
-当前 delivery-service 只把 `delivery_outbox` 作为本地事务事实落库，尚未发布 `im.delivery.events`。
+当前 delivery-service 已具备 `delivery_outbox -> Kafka im.delivery.events` 最小 relay 链路；push-gateway 尚未实现，因此 delivery event 的在线推送消费仍是下一阶段。
 
 本地最小 smoke：
 
@@ -440,6 +475,7 @@ conversation-service grpc
 message-service outbox-relay
 delivery-service timeline-consumer
 delivery-service grpc
+delivery-service outbox-relay
 loadtest sendmessage
 loadtest delivery-pull
 ```
@@ -466,5 +502,6 @@ loadtest delivery-pull
 第一阶段完成：
 
 - `SendMessage -> conversation.timeline.events -> delivery-service projection -> PullInbox -> AckDelivery` 真实进程 smoke 通过。
+- `delivery_outbox -> im.delivery.events` relay 单元测试和 PostgreSQL 集成测试通过。
 - 小规模压测报告归档到 `docs/runbook/loadtest/delivery-service/`。
 - 不把 smoke 结果表述为完整 push 闭环或生产容量结论。

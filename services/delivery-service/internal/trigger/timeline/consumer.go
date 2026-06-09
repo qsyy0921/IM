@@ -10,16 +10,9 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type Message struct {
-	Topic     string
-	Partition int
-	Offset    int64
-	Value     []byte
-}
-
 type Consumer interface {
-	Fetch(context.Context) (Message, error)
-	Commit(context.Context, Message) error
+	Fetch(context.Context) (types.TimelineMessage, error)
+	Commit(context.Context, types.TimelineMessage) error
 }
 
 type Projector interface {
@@ -58,7 +51,7 @@ func (worker *Worker) Run(ctx context.Context) error {
 	}
 }
 
-func buildCommand(consumerGroup string, message Message) (types.ProjectTimelineEventCommand, error) {
+func buildCommand(consumerGroup string, message types.TimelineMessage) (types.ProjectTimelineEventCommand, error) {
 	var event conversationtimelinev1.ConversationTimelineEvent
 	if err := proto.Unmarshal(message.Value, &event); err != nil {
 		return types.ProjectTimelineEventCommand{}, err

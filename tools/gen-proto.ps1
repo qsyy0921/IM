@@ -21,3 +21,9 @@ protoc `
     --go_out=$KafkaSchemaDir `
     --go_opt=paths=source_relative `
     "$KafkaSchemaDir/conversation.timeline.events.proto"
+
+protoc `
+    -I $KafkaSchemaDir `
+    --go_out=$KafkaSchemaDir `
+    --go_opt=paths=source_relative `
+    "$KafkaSchemaDir/delivery/v1/im.delivery.events.proto"

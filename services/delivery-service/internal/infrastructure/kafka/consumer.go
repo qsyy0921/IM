@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/qsyy0921/IM/services/delivery-service/internal/trigger/timeline"
+	"github.com/qsyy0921/IM/services/delivery-service/internal/types"
 	kafkago "github.com/segmentio/kafka-go"
 )
 
@@ -42,15 +42,15 @@ func NewReaderConsumer(config ReaderConfig) (*ReaderConsumer, error) {
 	}, nil
 }
 
-func (consumer *ReaderConsumer) Fetch(ctx context.Context) (timeline.Message, error) {
+func (consumer *ReaderConsumer) Fetch(ctx context.Context) (types.TimelineMessage, error) {
 	if consumer == nil || consumer.reader == nil {
-		return timeline.Message{}, errors.New("kafka reader consumer is not configured")
+		return types.TimelineMessage{}, errors.New("kafka reader consumer is not configured")
 	}
 	message, err := consumer.reader.FetchMessage(ctx)
 	if err != nil {
-		return timeline.Message{}, err
+		return types.TimelineMessage{}, err
 	}
-	return timeline.Message{
+	return types.TimelineMessage{
 		Topic:     message.Topic,
 		Partition: message.Partition,
 		Offset:    message.Offset,
@@ -58,7 +58,7 @@ func (consumer *ReaderConsumer) Fetch(ctx context.Context) (timeline.Message, er
 	}, nil
 }
 
-func (consumer *ReaderConsumer) Commit(ctx context.Context, message timeline.Message) error {
+func (consumer *ReaderConsumer) Commit(ctx context.Context, message types.TimelineMessage) error {
 	if consumer == nil || consumer.reader == nil {
 		return errors.New("kafka reader consumer is not configured")
 	}

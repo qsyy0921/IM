@@ -100,7 +100,17 @@ rpc ListConversations(ListConversationsRequest) returns (ListConversationsRespon
 AuthContext auth_context
 int32 limit
 string page_cursor
+ConversationListSort sort
 ```
+
+`ConversationListSort` 第一阶段只支持：
+
+```text
+CONVERSATION_LIST_SORT_UNSPECIFIED
+CONVERSATION_LIST_SORT_UPDATED_AT_DESC
+```
+
+`UNSPECIFIED` 等价于 `UPDATED_AT_DESC`。不要在第一阶段提前加入 unread-first、pin、mute、archive 或自定义排序组合；这些产品字段需要独立设计和索引支持。
 
 响应字段：
 
@@ -122,6 +132,13 @@ int64 unread_count
 int64 last_read_seq
 int64 updated_at_unix_ms
 ```
+
+分页规则：
+
+- v0.1 固定使用 `sort_updated_at DESC, conversation_id ASC`。
+- `page_cursor` 是服务端签发的 opaque cursor，内部绑定 cursor version、sort、`sort_updated_at` 和 `conversation_id`。
+- 客户端不能自行构造 cursor；cursor 缺字段、版本不匹配或 sort 不匹配时返回 `INVALID_ARGUMENT`。
+- 后续新增排序时，必须同步 cursor schema、SQL 条件和索引，不能复用旧 cursor 语义。
 
 `ProjectionWatermark`：
 
@@ -166,6 +183,7 @@ CREATE TABLE user_conversation_summaries (
     last_visible_seq  BIGINT NOT NULL,
     last_message_id   TEXT NOT NULL,
     last_sender_id    TEXT NOT NULL,
+    last_source_event_type TEXT NOT NULL DEFAULT 'message.persisted.v1',
     last_read_seq     BIGINT NOT NULL DEFAULT 0,
     unread_count      BIGINT NOT NULL DEFAULT 0,
     sort_updated_at   TIMESTAMPTZ NOT NULL,
@@ -283,9 +301,9 @@ list_conversations_page_size
 
 | 测试 | 目标 |
 | --- | --- |
-| unit | unread 计算、cursor 分页、read_seq 幂等 |
-| PostgreSQL integration | inbox event upsert summary、MarkRead 清零 unread、重复 event 不重复计数、edit/revoke/delete 不增加 unread |
-| gRPC contract | 参数校验、分页、只返回当前 auth user |
+| unit | unread 计算、sort 校验、cursor 分页、read_seq 幂等 |
+| PostgreSQL integration | inbox event upsert summary、MarkRead 清零 unread、重复 event 不重复计数、edit/revoke/delete 不增加 unread、多会话 keyset 分页、非法 cursor |
+| gRPC contract | 参数校验、sort/page_cursor 映射、分页响应、只返回当前 auth user |
 | smoke | `SendMessage -> PullInbox -> ListConversations(unread=1) -> MarkRead -> ListConversations(unread=0)` |
 
 ## 15. 当前不做

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/qsyy0921/IM/services/receipt-service/internal/types"
@@ -211,6 +213,68 @@ func TestRepositoryMessageChangeEventsDoNotIncreaseUnreadIntegration(t *testing.
 	assertReceiptStateCount(t, ctx, pool, 1)
 }
 
+func TestRepositoryListConversationsPaginatesByStableCursorIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	sortTime := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	insertConversationSummary(t, ctx, pool, "conv-a", 11, sortTime)
+	insertConversationSummary(t, ctx, pool, "conv-b", 12, sortTime)
+	insertConversationSummary(t, ctx, pool, "conv-c", 13, sortTime.Add(-time.Minute))
+
+	first, err := repository.ListConversations(ctx, listConversationsCommand(1, ""))
+	if err != nil {
+		t.Fatalf("list first page: %v", err)
+	}
+	assertConversationIDs(t, first, "conv-a")
+	if first.NextPageCursor == "" {
+		t.Fatal("expected next cursor for first page")
+	}
+
+	second, err := repository.ListConversations(ctx, listConversationsCommand(1, first.NextPageCursor))
+	if err != nil {
+		t.Fatalf("list second page: %v", err)
+	}
+	assertConversationIDs(t, second, "conv-b")
+	if second.NextPageCursor == "" {
+		t.Fatal("expected next cursor for second page")
+	}
+
+	third, err := repository.ListConversations(ctx, listConversationsCommand(1, second.NextPageCursor))
+	if err != nil {
+		t.Fatalf("list third page: %v", err)
+	}
+	assertConversationIDs(t, third, "conv-c")
+	if third.NextPageCursor != "" {
+		t.Fatalf("expected empty next cursor on last page, got %q", third.NextPageCursor)
+	}
+}
+
+func TestRepositoryListConversationsRejectsInvalidCursorIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	_, err := repository.ListConversations(ctx, listConversationsCommand(10, "not-a-valid-cursor"))
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+
+	mismatchedCursor := encodeTestListCursor(t, map[string]any{
+		"v":               1,
+		"sort":            "other_sort",
+		"sort_updated_at": time.Now().UTC(),
+		"conversation_id": "conv-a",
+	})
+	_, err = repository.ListConversations(ctx, listConversationsCommand(10, mismatchedCursor))
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument for mismatched cursor sort, got %v", err)
+	}
+}
+
 func inboxCreatedCommand(seq int64, eventID string) types.ProjectDeliveryEventCommand {
 	return types.ProjectDeliveryEventCommand{
 		TenantID:        "tenant-receipt",
@@ -244,6 +308,56 @@ func ackRecordedCommand(receivedSeq int64, eventID string) types.ProjectDelivery
 		PartitionID:     0,
 		OffsetValue:     receivedSeq + 10,
 	}
+}
+
+func insertConversationSummary(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	conversationID string,
+	lastVisibleSeq int64,
+	sortUpdatedAt time.Time,
+) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+INSERT INTO user_conversation_summaries (
+    tenant_id,
+    user_id,
+    conversation_id,
+    last_visible_seq,
+    last_message_id,
+    last_sender_id,
+    last_source_event_type,
+    last_read_seq,
+    unread_count,
+    sort_updated_at,
+    updated_at
+) VALUES (
+    'tenant-receipt',
+    'receiver-1',
+    $1,
+    $2,
+    $3,
+    'sender-1',
+    'message.persisted.v1',
+    0,
+    1,
+    $4,
+    $4
+)
+`, conversationID, lastVisibleSeq, fmt.Sprintf("message-%d", lastVisibleSeq), sortUpdatedAt)
+	if err != nil {
+		t.Fatalf("insert conversation summary %s: %v", conversationID, err)
+	}
+}
+
+func encodeTestListCursor(t *testing.T, value map[string]any) string {
+	t.Helper()
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("encode test cursor: %v", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(raw)
 }
 
 func markReadCommand(seq int64) types.MarkReadCommand {
@@ -286,6 +400,18 @@ func getStateCommandByMessage(messageID string) types.GetReceiptStateCommand {
 	command := getStateCommandBySeq(0)
 	command.MessageID = messageID
 	return command
+}
+
+func assertConversationIDs(t *testing.T, result types.ListConversationsResult, want ...types.ConversationID) {
+	t.Helper()
+	if len(result.Items) != len(want) {
+		t.Fatalf("expected %d conversation summaries, got %d: %+v", len(want), len(result.Items), result.Items)
+	}
+	for index, conversationID := range want {
+		if result.Items[index].ConversationID != conversationID {
+			t.Fatalf("expected item %d conversation_id=%s, got %s", index, conversationID, result.Items[index].ConversationID)
+		}
+	}
 }
 
 func assertConversationSummary(

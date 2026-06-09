@@ -90,6 +90,7 @@ type ListConversationsCommand struct {
 	AuthContext AuthContext
 	Limit       int
 	PageCursor  string
+	Sort        string
 }
 
 func (command ListConversationsCommand) Validate() error {
@@ -99,7 +100,22 @@ func (command ListConversationsCommand) Validate() error {
 	if command.Limit < 0 {
 		return NewInvalidArgument("limit must be non-negative")
 	}
+	if _, err := NormalizeConversationListSort(command.Sort); err != nil {
+		return err
+	}
 	return nil
+}
+
+const ConversationListSortUpdatedAtDesc = "updated_at_desc"
+
+func NormalizeConversationListSort(sort string) (string, error) {
+	if sort == "" {
+		return ConversationListSortUpdatedAtDesc, nil
+	}
+	if sort == ConversationListSortUpdatedAtDesc {
+		return sort, nil
+	}
+	return "", NewInvalidArgument("unsupported conversation list sort")
 }
 
 type ConversationSummary struct {

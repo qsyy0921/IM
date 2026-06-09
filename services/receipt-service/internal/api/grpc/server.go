@@ -141,6 +141,7 @@ func (server *Server) ListConversations(
 		},
 		Limit:      int(request.GetLimit()),
 		PageCursor: request.GetPageCursor(),
+		Sort:       conversationListSortFromProto(request.GetSort()),
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -167,6 +168,17 @@ func (server *Server) ListConversations(
 			UpdatedAtUnixMs: result.ProjectionWatermark.UpdatedAt.UnixMilli(),
 		},
 	}, nil
+}
+
+func conversationListSortFromProto(sort receiptv1.ConversationListSort) string {
+	switch sort {
+	case receiptv1.ConversationListSort_CONVERSATION_LIST_SORT_UNSPECIFIED:
+		return ""
+	case receiptv1.ConversationListSort_CONVERSATION_LIST_SORT_UPDATED_AT_DESC:
+		return types.ConversationListSortUpdatedAtDesc
+	default:
+		return "unsupported"
+	}
 }
 
 func grpcError(err error) error {

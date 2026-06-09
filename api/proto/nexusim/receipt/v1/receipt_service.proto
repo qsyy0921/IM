@@ -64,10 +64,16 @@ message GetReceiptStateResponse {
   repeated ReceiptUserState receivers = 7;
 }
 
+enum ConversationListSort {
+  CONVERSATION_LIST_SORT_UNSPECIFIED = 0;
+  CONVERSATION_LIST_SORT_UPDATED_AT_DESC = 1;
+}
+
 message ListConversationsRequest {
   AuthContext auth_context = 1;
   int32 limit = 2;
   string page_cursor = 3;
+  ConversationListSort sort = 4;
 }
 
 message ProjectionWatermark {

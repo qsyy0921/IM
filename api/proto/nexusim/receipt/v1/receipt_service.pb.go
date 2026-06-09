@@ -73,6 +73,52 @@ func (ReceiptVisibilityMode) EnumDescriptor() ([]byte, []int) {
 	return file_nexusim_receipt_v1_receipt_service_proto_rawDescGZIP(), []int{0}
 }
 
+type ConversationListSort int32
+
+const (
+	ConversationListSort_CONVERSATION_LIST_SORT_UNSPECIFIED     ConversationListSort = 0
+	ConversationListSort_CONVERSATION_LIST_SORT_UPDATED_AT_DESC ConversationListSort = 1
+)
+
+// Enum value maps for ConversationListSort.
+var (
+	ConversationListSort_name = map[int32]string{
+		0: "CONVERSATION_LIST_SORT_UNSPECIFIED",
+		1: "CONVERSATION_LIST_SORT_UPDATED_AT_DESC",
+	}
+	ConversationListSort_value = map[string]int32{
+		"CONVERSATION_LIST_SORT_UNSPECIFIED":     0,
+		"CONVERSATION_LIST_SORT_UPDATED_AT_DESC": 1,
+	}
+)
+
+func (x ConversationListSort) Enum() *ConversationListSort {
+	p := new(ConversationListSort)
+	*p = x
+	return p
+}
+
+func (x ConversationListSort) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ConversationListSort) Descriptor() protoreflect.EnumDescriptor {
+	return file_nexusim_receipt_v1_receipt_service_proto_enumTypes[1].Descriptor()
+}
+
+func (ConversationListSort) Type() protoreflect.EnumType {
+	return &file_nexusim_receipt_v1_receipt_service_proto_enumTypes[1]
+}
+
+func (x ConversationListSort) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ConversationListSort.Descriptor instead.
+func (ConversationListSort) EnumDescriptor() ([]byte, []int) {
+	return file_nexusim_receipt_v1_receipt_service_proto_rawDescGZIP(), []int{1}
+}
+
 type AuthContext struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
@@ -526,6 +572,7 @@ type ListConversationsRequest struct {
 	AuthContext   *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
 	Limit         int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
 	PageCursor    string                 `protobuf:"bytes,3,opt,name=page_cursor,json=pageCursor,proto3" json:"page_cursor,omitempty"`
+	Sort          ConversationListSort   `protobuf:"varint,4,opt,name=sort,proto3,enum=nexusim.receipt.v1.ConversationListSort" json:"sort,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -579,6 +626,13 @@ func (x *ListConversationsRequest) GetPageCursor() string {
 		return x.PageCursor
 	}
 	return ""
+}
+
+func (x *ListConversationsRequest) GetSort() ConversationListSort {
+	if x != nil {
+		return x.Sort
+	}
+	return ConversationListSort_CONVERSATION_LIST_SORT_UNSPECIFIED
 }
 
 type ProjectionWatermark struct {
@@ -844,12 +898,13 @@ const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
 	"\x13received_user_count\x18\x04 \x01(\x05R\x11receivedUserCount\x12&\n" +
 	"\x0fread_user_count\x18\x05 \x01(\x05R\rreadUserCount\x12R\n" +
 	"\x0fvisibility_mode\x18\x06 \x01(\x0e2).nexusim.receipt.v1.ReceiptVisibilityModeR\x0evisibilityMode\x12B\n" +
-	"\treceivers\x18\a \x03(\v2$.nexusim.receipt.v1.ReceiptUserStateR\treceivers\"\x95\x01\n" +
+	"\treceivers\x18\a \x03(\v2$.nexusim.receipt.v1.ReceiptUserStateR\treceivers\"\xd3\x01\n" +
 	"\x18ListConversationsRequest\x12B\n" +
 	"\fauth_context\x18\x01 \x01(\v2\x1f.nexusim.receipt.v1.AuthContextR\vauthContext\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x1f\n" +
 	"\vpage_cursor\x18\x03 \x01(\tR\n" +
-	"pageCursor\"}\n" +
+	"pageCursor\x12<\n" +
+	"\x04sort\x18\x04 \x01(\x0e2(.nexusim.receipt.v1.ConversationListSortR\x04sort\"}\n" +
 	"\x13ProjectionWatermark\x12\x16\n" +
 	"\x06source\x18\x01 \x01(\tR\x06source\x12!\n" +
 	"\foffset_value\x18\x02 \x01(\x03R\voffsetValue\x12+\n" +
@@ -871,7 +926,10 @@ const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
 	"#RECEIPT_VISIBILITY_MODE_UNSPECIFIED\x10\x00\x12$\n" +
 	" RECEIPT_VISIBILITY_MODE_DETAILED\x10\x01\x12&\n" +
 	"\"RECEIPT_VISIBILITY_MODE_COUNT_ONLY\x10\x02\x12\"\n" +
-	"\x1eRECEIPT_VISIBILITY_MODE_HIDDEN\x10\x032\xc5\x02\n" +
+	"\x1eRECEIPT_VISIBILITY_MODE_HIDDEN\x10\x03*j\n" +
+	"\x14ConversationListSort\x12&\n" +
+	"\"CONVERSATION_LIST_SORT_UNSPECIFIED\x10\x00\x12*\n" +
+	"&CONVERSATION_LIST_SORT_UPDATED_AT_DESC\x10\x012\xc5\x02\n" +
 	"\x0eReceiptService\x12U\n" +
 	"\bMarkRead\x12#.nexusim.receipt.v1.MarkReadRequest\x1a$.nexusim.receipt.v1.MarkReadResponse\x12j\n" +
 	"\x0fGetReceiptState\x12*.nexusim.receipt.v1.GetReceiptStateRequest\x1a+.nexusim.receipt.v1.GetReceiptStateResponse\x12p\n" +
@@ -889,40 +947,42 @@ func file_nexusim_receipt_v1_receipt_service_proto_rawDescGZIP() []byte {
 	return file_nexusim_receipt_v1_receipt_service_proto_rawDescData
 }
 
-var file_nexusim_receipt_v1_receipt_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_nexusim_receipt_v1_receipt_service_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_nexusim_receipt_v1_receipt_service_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_nexusim_receipt_v1_receipt_service_proto_goTypes = []any{
 	(ReceiptVisibilityMode)(0),        // 0: nexusim.receipt.v1.ReceiptVisibilityMode
-	(*AuthContext)(nil),               // 1: nexusim.receipt.v1.AuthContext
-	(*MarkReadRequest)(nil),           // 2: nexusim.receipt.v1.MarkReadRequest
-	(*MarkReadResponse)(nil),          // 3: nexusim.receipt.v1.MarkReadResponse
-	(*GetReceiptStateRequest)(nil),    // 4: nexusim.receipt.v1.GetReceiptStateRequest
-	(*ReceiptUserState)(nil),          // 5: nexusim.receipt.v1.ReceiptUserState
-	(*GetReceiptStateResponse)(nil),   // 6: nexusim.receipt.v1.GetReceiptStateResponse
-	(*ListConversationsRequest)(nil),  // 7: nexusim.receipt.v1.ListConversationsRequest
-	(*ProjectionWatermark)(nil),       // 8: nexusim.receipt.v1.ProjectionWatermark
-	(*ConversationSummary)(nil),       // 9: nexusim.receipt.v1.ConversationSummary
-	(*ListConversationsResponse)(nil), // 10: nexusim.receipt.v1.ListConversationsResponse
+	(ConversationListSort)(0),         // 1: nexusim.receipt.v1.ConversationListSort
+	(*AuthContext)(nil),               // 2: nexusim.receipt.v1.AuthContext
+	(*MarkReadRequest)(nil),           // 3: nexusim.receipt.v1.MarkReadRequest
+	(*MarkReadResponse)(nil),          // 4: nexusim.receipt.v1.MarkReadResponse
+	(*GetReceiptStateRequest)(nil),    // 5: nexusim.receipt.v1.GetReceiptStateRequest
+	(*ReceiptUserState)(nil),          // 6: nexusim.receipt.v1.ReceiptUserState
+	(*GetReceiptStateResponse)(nil),   // 7: nexusim.receipt.v1.GetReceiptStateResponse
+	(*ListConversationsRequest)(nil),  // 8: nexusim.receipt.v1.ListConversationsRequest
+	(*ProjectionWatermark)(nil),       // 9: nexusim.receipt.v1.ProjectionWatermark
+	(*ConversationSummary)(nil),       // 10: nexusim.receipt.v1.ConversationSummary
+	(*ListConversationsResponse)(nil), // 11: nexusim.receipt.v1.ListConversationsResponse
 }
 var file_nexusim_receipt_v1_receipt_service_proto_depIdxs = []int32{
-	1,  // 0: nexusim.receipt.v1.MarkReadRequest.auth_context:type_name -> nexusim.receipt.v1.AuthContext
-	1,  // 1: nexusim.receipt.v1.GetReceiptStateRequest.auth_context:type_name -> nexusim.receipt.v1.AuthContext
+	2,  // 0: nexusim.receipt.v1.MarkReadRequest.auth_context:type_name -> nexusim.receipt.v1.AuthContext
+	2,  // 1: nexusim.receipt.v1.GetReceiptStateRequest.auth_context:type_name -> nexusim.receipt.v1.AuthContext
 	0,  // 2: nexusim.receipt.v1.GetReceiptStateResponse.visibility_mode:type_name -> nexusim.receipt.v1.ReceiptVisibilityMode
-	5,  // 3: nexusim.receipt.v1.GetReceiptStateResponse.receivers:type_name -> nexusim.receipt.v1.ReceiptUserState
-	1,  // 4: nexusim.receipt.v1.ListConversationsRequest.auth_context:type_name -> nexusim.receipt.v1.AuthContext
-	9,  // 5: nexusim.receipt.v1.ListConversationsResponse.items:type_name -> nexusim.receipt.v1.ConversationSummary
-	8,  // 6: nexusim.receipt.v1.ListConversationsResponse.projection_watermark:type_name -> nexusim.receipt.v1.ProjectionWatermark
-	2,  // 7: nexusim.receipt.v1.ReceiptService.MarkRead:input_type -> nexusim.receipt.v1.MarkReadRequest
-	4,  // 8: nexusim.receipt.v1.ReceiptService.GetReceiptState:input_type -> nexusim.receipt.v1.GetReceiptStateRequest
-	7,  // 9: nexusim.receipt.v1.ReceiptService.ListConversations:input_type -> nexusim.receipt.v1.ListConversationsRequest
-	3,  // 10: nexusim.receipt.v1.ReceiptService.MarkRead:output_type -> nexusim.receipt.v1.MarkReadResponse
-	6,  // 11: nexusim.receipt.v1.ReceiptService.GetReceiptState:output_type -> nexusim.receipt.v1.GetReceiptStateResponse
-	10, // 12: nexusim.receipt.v1.ReceiptService.ListConversations:output_type -> nexusim.receipt.v1.ListConversationsResponse
-	10, // [10:13] is the sub-list for method output_type
-	7,  // [7:10] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	6,  // 3: nexusim.receipt.v1.GetReceiptStateResponse.receivers:type_name -> nexusim.receipt.v1.ReceiptUserState
+	2,  // 4: nexusim.receipt.v1.ListConversationsRequest.auth_context:type_name -> nexusim.receipt.v1.AuthContext
+	1,  // 5: nexusim.receipt.v1.ListConversationsRequest.sort:type_name -> nexusim.receipt.v1.ConversationListSort
+	10, // 6: nexusim.receipt.v1.ListConversationsResponse.items:type_name -> nexusim.receipt.v1.ConversationSummary
+	9,  // 7: nexusim.receipt.v1.ListConversationsResponse.projection_watermark:type_name -> nexusim.receipt.v1.ProjectionWatermark
+	3,  // 8: nexusim.receipt.v1.ReceiptService.MarkRead:input_type -> nexusim.receipt.v1.MarkReadRequest
+	5,  // 9: nexusim.receipt.v1.ReceiptService.GetReceiptState:input_type -> nexusim.receipt.v1.GetReceiptStateRequest
+	8,  // 10: nexusim.receipt.v1.ReceiptService.ListConversations:input_type -> nexusim.receipt.v1.ListConversationsRequest
+	4,  // 11: nexusim.receipt.v1.ReceiptService.MarkRead:output_type -> nexusim.receipt.v1.MarkReadResponse
+	7,  // 12: nexusim.receipt.v1.ReceiptService.GetReceiptState:output_type -> nexusim.receipt.v1.GetReceiptStateResponse
+	11, // 13: nexusim.receipt.v1.ReceiptService.ListConversations:output_type -> nexusim.receipt.v1.ListConversationsResponse
+	11, // [11:14] is the sub-list for method output_type
+	8,  // [8:11] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_receipt_v1_receipt_service_proto_init() }
@@ -935,7 +995,7 @@ func file_nexusim_receipt_v1_receipt_service_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_receipt_v1_receipt_service_proto_rawDesc), len(file_nexusim_receipt_v1_receipt_service_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,

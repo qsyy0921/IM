@@ -260,6 +260,10 @@ func (repository *Repository) ListConversations(
 	ctx context.Context,
 	command types.ListConversationsCommand,
 ) (types.ListConversationsResult, error) {
+	sort, err := types.NormalizeConversationListSort(command.Sort)
+	if err != nil {
+		return types.ListConversationsResult{}, err
+	}
 	limit := command.Limit
 	if limit <= 0 {
 		limit = 50
@@ -267,7 +271,7 @@ func (repository *Repository) ListConversations(
 	if limit > 100 {
 		limit = 100
 	}
-	cursor, hasCursor, err := decodeListCursor(command.PageCursor)
+	cursor, hasCursor, err := decodeListCursor(command.PageCursor, sort)
 	if err != nil {
 		return types.ListConversationsResult{}, err
 	}
@@ -330,6 +334,8 @@ LIMIT $3
 	if len(items) > limit {
 		last := items[limit-1]
 		nextCursor = encodeListCursor(listCursor{
+			Version:        listCursorVersion,
+			Sort:           sort,
 			SortUpdatedAt:  last.UpdatedAt,
 			ConversationID: string(last.ConversationID),
 		})
@@ -376,11 +382,15 @@ func validateAccessContext(tenantID types.TenantID, conversationID types.Convers
 }
 
 type listCursor struct {
+	Version        int       `json:"v"`
+	Sort           string    `json:"sort"`
 	SortUpdatedAt  time.Time `json:"sort_updated_at"`
 	ConversationID string    `json:"conversation_id"`
 }
 
-func decodeListCursor(value string) (listCursor, bool, error) {
+const listCursorVersion = 1
+
+func decodeListCursor(value string, sort string) (listCursor, bool, error) {
 	if value == "" {
 		return listCursor{}, false, nil
 	}
@@ -390,6 +400,13 @@ func decodeListCursor(value string) (listCursor, bool, error) {
 	}
 	var cursor listCursor
 	if err := json.Unmarshal(decoded, &cursor); err != nil {
+		return listCursor{}, false, types.NewInvalidArgument("invalid page_cursor")
+	}
+	if cursor.Version == 0 && cursor.Sort == "" {
+		cursor.Version = listCursorVersion
+		cursor.Sort = types.ConversationListSortUpdatedAtDesc
+	}
+	if cursor.Version != listCursorVersion || cursor.Sort != sort {
 		return listCursor{}, false, types.NewInvalidArgument("invalid page_cursor")
 	}
 	if cursor.SortUpdatedAt.IsZero() || cursor.ConversationID == "" {

@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"testing"
+	"time"
 
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
 	"github.com/qsyy0921/IM/services/receipt-service/internal/types"
@@ -45,6 +46,67 @@ func TestListConversationsMapsValidationError(t *testing.T) {
 	}
 }
 
+func TestListConversationsMapsSort(t *testing.T) {
+	list := &fakeListConversationsCapture{}
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, list)
+	_, err := server.ListConversations(context.Background(), &receiptv1.ListConversationsRequest{
+		AuthContext: &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
+		Limit:       20,
+		PageCursor:  "cursor-1",
+		Sort:        receiptv1.ConversationListSort_CONVERSATION_LIST_SORT_UPDATED_AT_DESC,
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if list.command.Sort != types.ConversationListSortUpdatedAtDesc ||
+		list.command.Limit != 20 ||
+		list.command.PageCursor != "cursor-1" {
+		t.Fatalf("unexpected list command: %+v", list.command)
+	}
+}
+
+func TestListConversationsMapsResponse(t *testing.T) {
+	updatedAt := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	list := &fakeListConversationsCapture{
+		result: types.ListConversationsResult{
+			Items: []types.ConversationSummary{{
+				ConversationID:      "conversation-1",
+				LastVisibleSeq:      12,
+				LastMessageID:       "message-12",
+				LastSenderID:        "sender-1",
+				LastSourceEventType: types.SourceEventMessageEdited,
+				UnreadCount:         0,
+				LastReadSeq:         12,
+				UpdatedAt:           updatedAt,
+			}},
+			NextPageCursor: "next-cursor",
+			ProjectionWatermark: types.ProjectionWatermark{
+				Source:      "im.delivery.events",
+				OffsetValue: 22,
+				UpdatedAt:   updatedAt,
+			},
+		},
+	}
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, list)
+	response, err := server.ListConversations(context.Background(), &receiptv1.ListConversationsRequest{
+		AuthContext: &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if response.GetNextPageCursor() != "next-cursor" ||
+		response.GetProjectionWatermark().GetOffsetValue() != 22 ||
+		len(response.GetItems()) != 1 {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+	item := response.GetItems()[0]
+	if item.GetConversationId() != "conversation-1" ||
+		item.GetLastSourceEventType() != types.SourceEventMessageEdited ||
+		item.GetUpdatedAtUnixMs() != updatedAt.UnixMilli() {
+		t.Fatalf("unexpected item: %+v", item)
+	}
+}
+
 type fakeMarkRead struct {
 	err error
 }
@@ -71,4 +133,14 @@ func (fake fakeListConversations) Execute(context.Context, types.ListConversatio
 		return types.ListConversationsResult{}, fake.err
 	}
 	return types.ListConversationsResult{}, nil
+}
+
+type fakeListConversationsCapture struct {
+	command types.ListConversationsCommand
+	result  types.ListConversationsResult
+}
+
+func (fake *fakeListConversationsCapture) Execute(_ context.Context, command types.ListConversationsCommand) (types.ListConversationsResult, error) {
+	fake.command = command
+	return fake.result, nil
 }

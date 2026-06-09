@@ -27,6 +27,13 @@ func TestParseMemberChangeType(t *testing.T) {
 	}
 }
 
+func TestParseConfigDefaultsListUserToOperator(t *testing.T) {
+	cfg := normalizeConfigDefaults(config{operatorUserID: "operator-1"})
+	if cfg.listUserID != cfg.operatorUserID {
+		t.Fatalf("listUserID = %q, want operator user %q", cfg.listUserID, cfg.operatorUserID)
+	}
+}
+
 func TestParseMemberRole(t *testing.T) {
 	tests := []struct {
 		name string

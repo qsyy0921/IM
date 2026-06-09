@@ -30,6 +30,7 @@ type config struct {
 	tenantID          string
 	conversationID    string
 	operatorUserID    string
+	listUserID        string
 	targetPrefix      string
 	targetUserID      string
 	changeType        string
@@ -60,6 +61,8 @@ type summary struct {
 	ErrorTopN                      []errorCount      `json:"error_topn,omitempty"`
 	TenantID                       string            `json:"tenant_id"`
 	ConversationID                 string            `json:"conversation_id"`
+	OperatorUserID                 string            `json:"operator_user_id"`
+	ListUserID                     string            `json:"list_user_id"`
 	ChangeType                     string            `json:"change_type"`
 	TargetRole                     string            `json:"target_role,omitempty"`
 	TargetUserID                   string            `json:"target_user_id,omitempty"`
@@ -108,6 +111,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.tenantID, "tenant-id", "tenant-member-smoke", "tenant id")
 	flag.StringVar(&cfg.conversationID, "conversation-id", "conv-member-smoke", "conversation id")
 	flag.StringVar(&cfg.operatorUserID, "operator-user-id", "owner-1", "operator user id")
+	flag.StringVar(&cfg.listUserID, "list-user-id", "", "user id used for post-run GetMemberChange/ListConversationMembers; defaults to operator-user-id")
 	flag.StringVar(&cfg.targetPrefix, "target-prefix", "target-user", "target user prefix")
 	flag.StringVar(&cfg.targetUserID, "target-user-id", "", "fixed target user id; when set, use with --request-count 1 for deterministic smoke")
 	flag.StringVar(&cfg.changeType, "change-type", "join", "member change type: join, leave, remove, or role-changed")
@@ -118,6 +122,10 @@ func parseConfig() config {
 	flag.DurationVar(&cfg.statsWait, "stats-wait", 0, "wait before querying PostgreSQL stats")
 	flag.Int64Var(&cfg.expectedVersion, "expected-member-version", 0, "expected member version, 0 disables optimistic check")
 	flag.Parse()
+	return normalizeConfigDefaults(cfg)
+}
+
+func normalizeConfigDefaults(cfg config) config {
 	if cfg.vus <= 0 {
 		cfg.vus = 1
 	}
@@ -126,6 +134,9 @@ func parseConfig() config {
 	}
 	if cfg.requestTimeout <= 0 {
 		cfg.requestTimeout = 2 * time.Second
+	}
+	if cfg.listUserID == "" {
+		cfg.listUserID = cfg.operatorUserID
 	}
 	return cfg
 }
@@ -239,6 +250,8 @@ func run(cfg config) error {
 		ErrorCount:     atomic.LoadInt64(&errorCountTotal),
 		TenantID:       cfg.tenantID,
 		ConversationID: cfg.conversationID,
+		OperatorUserID: cfg.operatorUserID,
+		ListUserID:     cfg.listUserID,
 		ChangeType:     changeTypeName,
 		TargetRole:     targetRoleName,
 		TargetUserID:   cfg.targetUserID,
@@ -453,7 +466,7 @@ func getMemberChangeStatus(
 	response, err := client.GetMemberChange(requestCtx, &conversationv1.GetMemberChangeRequest{
 		AuthContext: &conversationv1.AuthContext{
 			TenantId: cfg.tenantID,
-			UserId:   cfg.operatorUserID,
+			UserId:   cfg.listUserID,
 		},
 		ConversationId: cfg.conversationID,
 		ChangeId:       changeID,
@@ -480,7 +493,7 @@ func fillMemberListSample(
 		response, err := client.ListConversationMembers(requestCtx, &conversationv1.ListConversationMembersRequest{
 			AuthContext: &conversationv1.AuthContext{
 				TenantId: cfg.tenantID,
-				UserId:   cfg.operatorUserID,
+				UserId:   cfg.listUserID,
 			},
 			ConversationId: cfg.conversationID,
 			PageSize:       10,

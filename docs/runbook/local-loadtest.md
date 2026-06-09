@@ -384,13 +384,18 @@ attempt-level overload_rate
 success_p99_ms
 error_p99_ms
 repository_pool_acquire_latency_ms
+repository_pool_acquire_recent_latency_ms
 outbox_process_ready_active_latency_ms
+outbox_process_ready_active_recent_latency_ms
 outbox_fetched_per_call
+outbox_fetched_per_call_recent
 kafka_publish_records_per_call
+kafka_publish_records_per_call_recent
 outbox_pending_count
 ```
 
 不要把极端阈值下的低 p99 解释成容量提升；那只是快速拒绝。
+adaptive limit 的硬拒绝判断优先看 `*_recent` 字段，累计字段只用于历史趋势和报告解释。
 
 ## 12. PublishBatch On/Off
 
@@ -469,14 +474,19 @@ outbox_pending_count
 accepted_rps
 success_p99_ms
 kafka_publish_records_per_call
+kafka_publish_records_per_call_recent
 kafka_publish_call_latency_ms
 outbox_process_ready_latency_ms
 outbox_process_ready_active_latency_ms
+outbox_process_ready_active_recent_latency_ms
 outbox_process_ready_idle_latency_ms
 outbox_fetched_per_call
+outbox_fetched_per_call_recent
 ```
 
 注意：`outbox_process_ready_latency_ms` 会混入 `stats_wait` 阶段的 idle 样本；做 adaptive limit 时优先使用 `outbox_process_ready_active_latency_ms` 和 `outbox_fetched_per_call`，不要只看混合口径。
+
+如果报告用于 adaptive limit 调参，优先使用 recent 字段，避免累计样本导致阈值粘住。
 
 当前本地 relay 基线候选：
 

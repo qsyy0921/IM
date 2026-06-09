@@ -60,9 +60,9 @@ message-service SendMessage
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
-2. adaptive limit 第一版已接入并跑完 on/off 对照；debug metrics collector 已新增 recent 窗口字段，下一步给 adaptive controller 增加 hysteresis：进入过载和退出过载使用不同阈值，避免瞬时波动导致误拒绝。
-3. 将固定 `RetryInfo=500ms` 改为根据 adaptive 过载级别动态输出。
-4. 用 recent 字段重跑 adaptive 阈值矩阵，而不是继续用累计 p95 做硬门槛。
+2. adaptive limit 第一版已接入并跑完 on/off 对照；debug metrics collector 已新增 recent 窗口字段，adaptive controller 已新增 hysteresis。下一步将固定 `RetryInfo=500ms` 改为根据 adaptive 过载级别动态输出。
+3. 用 recent 字段和 hysteresis 重跑 adaptive 阈值矩阵，而不是继续用累计 p95 做硬门槛。
+4. 对比 pool release gap `4/8/16` 与 outbox release ratio `50%/25%`。
 5. 继续压测客户端 retry 参数：`max_retries=1/2/3`、`jitter=100/300/500ms`。
 6. 继续采集 PostgreSQL wait_event，重点看 `LWLock:WALWrite`、`LWLock:WALInsert`、`LWLock:BufferContent` 和 `CheckpointWriteDelay`。
 7. 当前 adaptive admission 改动跨 app/infrastructure 且涉及过载控制；完成窗口化/hysteresis 后统一邀请评审线程，避免过于频繁。
@@ -260,6 +260,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 adaptive limit smoke：报告为 `docs/runbook/loadtest-report-20260609-adaptive-limit-smoke.md`，结果路径为 `loadtest/results/adaptive-limit-smoke-final-20260609/bpoff-adapton-pbatchon-pgmax-4-vu-5-20260609-072955/sendmessage-summary.json`。commit `d2af748`、`git_dirty=false`，使用极端阈值 `PG_MAX_CONNS=4`、`AdaptiveMinAvailableConns=4` 验证提前拒绝链路；15136 次请求全部返回 retryable `SERVICE_OVERLOADED`，p99 `3.1742ms`，本轮 tenant outbox `total=0/pending=0/DLQ=0`。该结果只证明 adaptive admission 可运行，不作为容量结论。
 - 当前 adaptive limit on/off 矩阵：报告为 `docs/runbook/loadtest-report-20260609-adaptive-limit-onoff.md`，有效结果路径为 `loadtest/results/adaptive-onoff-v3-repo-backpressure-20260609/` 和 `loadtest/results/adaptive-relaxed-v1-admission-20260609/`。commit `7d6e59f`、`git_dirty=false`，固定 `PG_MAX_CONNS=64`、`batch_size=100`、`workers=8`、客户端 retry；relaxed app adaptive 在 1200/1600 VU 下 accepted RPS 为 `1858.43` / `1772.47`，success p99 为 `575.07ms` / `709.94ms`，outbox pending 均为 0。该结果说明 app admission 可作为入口保护，但没有证明容量提升；累计 p95 和 idle relay 样本不能作为独立硬拒绝条件。
 - 当前 recent metrics smoke：报告为 `docs/runbook/loadtest-report-20260609-recent-metrics-smoke.md`，结果路径为 `loadtest/results/recent-metrics-smoke-20260609/bpoff-adapton-pbatchon-pgmax-16-vu-10-20260609-075920/sendmessage-summary.json`。commit `6d4910b`、`git_dirty=false`，5392/5392 成功、p99 `14.5047ms`、outbox pending 0；summary 已写入 `repository_pool_acquire_recent_latency_ms`、`outbox_process_ready_active_recent_latency_ms`、`outbox_fetched_per_call_recent`、`kafka_publish_records_per_call_recent`。该结果只证明窗口化观测链路可用，不作为容量结论。
+- 当前 adaptive hysteresis smoke：报告为 `docs/runbook/loadtest-report-20260609-adaptive-hysteresis-smoke.md`，结果路径为 `loadtest/results/adaptive-hysteresis-smoke-20260609/bpoff-adapton-pbatchon-pgmax-16-vu-10-20260609-080738/sendmessage-summary.json`。commit `6f9a438`、`git_dirty=false`，5554/5554 成功、p99 `12.5034ms`、service overloaded 0、outbox pending 0；该结果只证明 hysteresis 配置链路可运行，不作为容量结论。
 - 当前 debug metrics collector 保存全量样本并在 snapshot 时排序，适合本地短压测，不适合作为生产 metrics；后续应替换为固定窗口、reservoir、HDR histogram 或 Prometheus histogram。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
@@ -319,3 +320,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已实现默认关闭的 app 层 adaptive admission controller，输入覆盖 PG pool、repository pool acquire p95、outbox pending、relay active process ready、outbox fetched per call、Kafka records per call；clean smoke `d2af748` 证明 `SERVICE_OVERLOADED` 能在依赖读取和写事务之前返回，且不写 outbox。下一步跑 adaptive on/off 或阈值梯度正式矩阵。
 - 2026-06-09：已跑 adaptive limit on/off 对照矩阵，并在过程中修复两类误判：idle relay 的 `outbox_fetched_per_call=0` 不能触发拒绝；全量累计 `repository_pool_acquire_p95` 不能作为独立硬门槛。最终 relaxed app adaptive 与 repository backpressure 行为接近，outbox 均可追平，但未证明容量提升。下一步先做窗口化 metrics、hysteresis 和动态 retry hint，再跑下一轮 adaptive 阈值矩阵。
 - 2026-06-09：已为 debug metrics collector 增加最近 4096 个样本的 recent 视图，并让 adaptive controller 优先读取 recent 字段；clean smoke `6d4910b` 证明 loadtest summary 能读取 recent 指标。下一步实现 hysteresis 和动态 retry hint。
+- 2026-06-09：已为 adaptive admission 增加 hysteresis 配置，支持 `ReleaseAvailableConns` 和 `ReleaseOutboxPending`；clean smoke `6f9a438` 证明低压真实链路正常。下一步把固定 `RetryInfo=500ms` 改成动态 retry hint，并用 recent+hysteresis 跑正式阈值矩阵。

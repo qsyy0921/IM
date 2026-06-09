@@ -357,8 +357,10 @@ error_p99_ms
   -PublishBatchEnabled:$true `
   -AdaptiveLimitEnabled `
   -AdaptiveMinAvailableConns 4 `
+  -AdaptiveReleaseAvailableConns 8 `
   -AdaptiveMaxPoolAcquireP95 50ms `
   -AdaptiveMaxOutboxPending 1 `
+  -AdaptiveReleaseOutboxPending 1 `
   -AdaptiveMaxRelayActiveP95 50ms `
   -AdaptiveMinOutboxFetchedPerCall 1 `
   -AdaptiveMinKafkaRecordsPerCall 1 `

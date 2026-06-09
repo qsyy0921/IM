@@ -168,6 +168,69 @@ func TestSendMessageUseCaseRetriesPermissionVersionMismatchOnce(t *testing.T) {
 	}
 }
 
+func TestSendMessageUseCaseRetriesConversationDependencyUnavailableOnce(t *testing.T) {
+	repo := &fakeMessageRepository{
+		result: domain.AppendMessageResult{
+			MessageID:       "msg-1",
+			ConversationSeq: 1,
+			AcceptedAt:      time.Unix(100, 0).UTC(),
+		},
+	}
+	conversation := &fakeConversation{
+		errs: []error{
+			types.NewDependencyUnavailable("conversation service unavailable"),
+			nil,
+		},
+		context: localConversation(),
+	}
+	useCase := NewSendMessageUseCase(&fakePolicy{decision: allowedDecision()}, conversation, fakeSequencer{}, repo)
+
+	_, err := useCase.Execute(context.Background(), testCommand())
+	if err != nil {
+		t.Fatalf("execute send message: %v", err)
+	}
+	if conversation.calls != 2 {
+		t.Fatalf("expected one conversation retry, got %d calls", conversation.calls)
+	}
+	if repo.calls != 1 {
+		t.Fatalf("repository should be called after retry, got %d", repo.calls)
+	}
+}
+
+func TestSendMessageUseCaseDoesNotRetryConversationBusinessErrors(t *testing.T) {
+	repo := &fakeMessageRepository{}
+	conversation := &fakeConversation{err: types.NewConversationNotFound("missing")}
+	useCase := NewSendMessageUseCase(&fakePolicy{decision: allowedDecision()}, conversation, fakeSequencer{}, repo)
+
+	_, err := useCase.Execute(context.Background(), testCommand())
+	if !errors.Is(err, types.ErrConversationNotFound) {
+		t.Fatalf("expected conversation not found, got %v", err)
+	}
+	if conversation.calls != 1 {
+		t.Fatalf("business error should not be retried, got %d calls", conversation.calls)
+	}
+	if repo.calls != 0 {
+		t.Fatalf("repository should not be called")
+	}
+}
+
+func TestSendMessageUseCaseStopsAfterConversationDependencyRetry(t *testing.T) {
+	repo := &fakeMessageRepository{}
+	conversation := &fakeConversation{err: types.NewDependencyUnavailable("conversation service unavailable")}
+	useCase := NewSendMessageUseCase(&fakePolicy{decision: allowedDecision()}, conversation, fakeSequencer{}, repo)
+
+	_, err := useCase.Execute(context.Background(), testCommand())
+	if !errors.Is(err, types.ErrDependencyUnavailable) {
+		t.Fatalf("expected dependency unavailable, got %v", err)
+	}
+	if conversation.calls != 2 {
+		t.Fatalf("expected exactly one retry, got %d calls", conversation.calls)
+	}
+	if repo.calls != 0 {
+		t.Fatalf("repository should not be called")
+	}
+}
+
 func TestSendMessageUseCaseRejectsPersistentPermissionVersionMismatch(t *testing.T) {
 	repo := &fakeMessageRepository{}
 	conversation := localConversation()
@@ -261,11 +324,21 @@ type fakeConversation struct {
 	context  types.ConversationSendContext
 	contexts []types.ConversationSendContext
 	err      error
+	errs     []error
 	calls    int
 }
 
 func (f *fakeConversation) GetSendContext(context.Context, types.SendMessageCommand) (types.ConversationSendContext, error) {
 	f.calls++
+	if len(f.errs) > 0 {
+		index := f.calls - 1
+		if index >= len(f.errs) {
+			index = len(f.errs) - 1
+		}
+		if f.errs[index] != nil {
+			return types.ConversationSendContext{}, f.errs[index]
+		}
+	}
 	if f.err != nil {
 		return types.ConversationSendContext{}, f.err
 	}

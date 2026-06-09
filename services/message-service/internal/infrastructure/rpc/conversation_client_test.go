@@ -19,6 +19,8 @@ import (
 func TestConversationClientGetSendContext(t *testing.T) {
 	client, cleanup := newBufconnConversationClient(t, &fakeConversationServer{
 		response: &conversationv1.GetSendContextResponse{
+			TenantId:            "tenant-1",
+			ConversationId:      "conv-1",
 			MemberVersion:       5,
 			PermissionVersion:   7,
 			ConversationMode:    conversationv1.ConversationMode_CONVERSATION_MODE_LOCAL_ROW_LOCK,
@@ -74,6 +76,9 @@ func TestConversationClientMapsFanoutModes(t *testing.T) {
 					ConversationMode:  conversationv1.ConversationMode_CONVERSATION_MODE_LOCAL_ROW_LOCK,
 					FanoutMode:        tc.in,
 					PermissionVersion: 1,
+					TenantId:          "tenant-1",
+					ConversationId:    "conv-1",
+					CurrentSeqShard:   "local",
 				},
 			})
 			defer cleanup()
@@ -84,6 +89,67 @@ func TestConversationClientMapsFanoutModes(t *testing.T) {
 			}
 			if result.FanoutMode != tc.want {
 				t.Fatalf("unexpected fanout mode: got %q want %q", result.FanoutMode, tc.want)
+			}
+		})
+	}
+}
+
+func TestConversationClientRejectsInvalidResponseContract(t *testing.T) {
+	cases := []struct {
+		name     string
+		response *conversationv1.GetSendContextResponse
+	}{
+		{
+			name: "mismatched tenant",
+			response: &conversationv1.GetSendContextResponse{
+				TenantId:          "other-tenant",
+				ConversationId:    "conv-1",
+				ConversationMode:  conversationv1.ConversationMode_CONVERSATION_MODE_LOCAL_ROW_LOCK,
+				FanoutMode:        conversationv1.FanoutMode_FANOUT_MODE_WRITE_FANOUT,
+				CurrentSeqShard:   "local",
+				PermissionVersion: 1,
+			},
+		},
+		{
+			name: "unspecified conversation mode",
+			response: &conversationv1.GetSendContextResponse{
+				TenantId:          "tenant-1",
+				ConversationId:    "conv-1",
+				FanoutMode:        conversationv1.FanoutMode_FANOUT_MODE_WRITE_FANOUT,
+				CurrentSeqShard:   "local",
+				PermissionVersion: 1,
+			},
+		},
+		{
+			name: "unspecified fanout mode",
+			response: &conversationv1.GetSendContextResponse{
+				TenantId:          "tenant-1",
+				ConversationId:    "conv-1",
+				ConversationMode:  conversationv1.ConversationMode_CONVERSATION_MODE_LOCAL_ROW_LOCK,
+				CurrentSeqShard:   "local",
+				PermissionVersion: 1,
+			},
+		},
+		{
+			name: "empty seq shard",
+			response: &conversationv1.GetSendContextResponse{
+				TenantId:          "tenant-1",
+				ConversationId:    "conv-1",
+				ConversationMode:  conversationv1.ConversationMode_CONVERSATION_MODE_LOCAL_ROW_LOCK,
+				FanoutMode:        conversationv1.FanoutMode_FANOUT_MODE_WRITE_FANOUT,
+				PermissionVersion: 1,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			client, cleanup := newBufconnConversationClient(t, &fakeConversationServer{response: tc.response})
+			defer cleanup()
+
+			_, err := client.GetSendContext(context.Background(), conversationCommand())
+			if !errors.Is(err, types.ErrDependencyUnavailable) {
+				t.Fatalf("expected dependency unavailable, got %v", err)
 			}
 		})
 	}

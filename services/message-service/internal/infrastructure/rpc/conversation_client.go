@@ -57,6 +57,9 @@ func (c ConversationClient) GetSendContext(
 	if err != nil {
 		return types.ConversationSendContext{}, mapConversationError(err)
 	}
+	if err := validateConversationResponse(command, response); err != nil {
+		return types.ConversationSendContext{}, err
+	}
 	return types.ConversationSendContext{
 		MemberVersion:       response.GetMemberVersion(),
 		PermissionVersion:   response.GetPermissionVersion(),
@@ -65,6 +68,26 @@ func (c ConversationClient) GetSendContext(
 		FanoutPolicyVersion: response.GetFanoutPolicyVersion(),
 		CurrentSeqShard:     response.GetCurrentSeqShard(),
 	}, nil
+}
+
+func validateConversationResponse(command types.SendMessageCommand, response *conversationv1.GetSendContextResponse) error {
+	if response == nil {
+		return types.NewDependencyUnavailable("conversation service returned empty response")
+	}
+	if response.GetTenantId() != string(command.AuthContext.TenantID) ||
+		response.GetConversationId() != string(command.ConversationID) {
+		return types.NewDependencyUnavailable("conversation service returned mismatched context")
+	}
+	if fromProtoConversationMode(response.GetConversationMode()) == "" {
+		return types.NewDependencyUnavailable("conversation service returned invalid conversation mode")
+	}
+	if fromProtoFanoutMode(response.GetFanoutMode()) == "" {
+		return types.NewDependencyUnavailable("conversation service returned invalid fanout mode")
+	}
+	if response.GetCurrentSeqShard() == "" {
+		return types.NewDependencyUnavailable("conversation service returned empty seq shard")
+	}
+	return nil
 }
 
 func mapConversationError(err error) error {

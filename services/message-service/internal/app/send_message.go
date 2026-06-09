@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 
 	"github.com/qsyy0921/IM/services/message-service/internal/domain"
 	"github.com/qsyy0921/IM/services/message-service/internal/types"
@@ -94,7 +95,7 @@ func (u *SendMessageUseCase) readConsistentSendDependencies(
 	var permission types.PermissionDecision
 	for attempt := 0; attempt < 2; attempt++ {
 		var err error
-		conversation, err = u.conversation.GetSendContext(ctx, command)
+		conversation, err = u.readConversationSendContext(ctx, command)
 		if err != nil {
 			return types.ConversationSendContext{}, types.PermissionDecision{}, err
 		}
@@ -110,4 +111,22 @@ func (u *SendMessageUseCase) readConsistentSendDependencies(
 	return types.ConversationSendContext{}, types.PermissionDecision{}, types.NewDependencyVersionMismatch(
 		"permission version changed during send dependency read",
 	)
+}
+
+func (u *SendMessageUseCase) readConversationSendContext(
+	ctx context.Context,
+	command types.SendMessageCommand,
+) (types.ConversationSendContext, error) {
+	var lastErr error
+	for attempt := 0; attempt < 2; attempt++ {
+		conversation, err := u.conversation.GetSendContext(ctx, command)
+		if err == nil {
+			return conversation, nil
+		}
+		if !errors.Is(err, types.ErrDependencyUnavailable) {
+			return types.ConversationSendContext{}, err
+		}
+		lastErr = err
+	}
+	return types.ConversationSendContext{}, lastErr
 }

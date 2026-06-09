@@ -58,6 +58,8 @@ func (s *Server) GetSendContext(
 
 func grpcError(err error) error {
 	switch {
+	case errors.Is(err, types.ErrInvalidArgument):
+		return status.Error(codes.InvalidArgument, "invalid argument")
 	case errors.Is(err, types.ErrConversationNotFound):
 		return status.Error(codes.NotFound, "conversation not found")
 	case errors.Is(err, types.ErrMemberNotActive):

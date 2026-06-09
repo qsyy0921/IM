@@ -58,6 +58,8 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 	var closers []func() error
 
 	var redisClient redis.UniversalClient
+	var redisRegistry *redisroute.Registry
+	var redisSubscriber *redisroute.Subscriber
 	routeBackend := envString("NEXUSIM_PUSH_ROUTE_BACKEND", "memory")
 	if routeBackend == "redis" {
 		gatewayID := envString("NEXUSIM_PUSH_GATEWAY_ID", defaultGatewayID())
@@ -74,15 +76,15 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 			KeyPrefix: envString("NEXUSIM_PUSH_REDIS_KEY_PREFIX", "nexusim:push"),
 			RouteTTL:  envDuration("NEXUSIM_PUSH_ROUTE_TTL", 90*time.Second),
 		}
-		redisRegistry := redisroute.NewRegistry(localRegistry, redisClient, routeConfig)
+		redisRegistry = redisroute.NewRegistry(localRegistry, redisClient, routeConfig)
 		redisRegistry.StartCleanupLoop(ctx, envDurationAllowZero("NEXUSIM_PUSH_ROUTE_CLEANUP_INTERVAL", 30*time.Second))
 		registry = redisRegistry
 		closers = append(closers, redisClient.Close)
 		if enableWS {
-			subscriber := redisroute.NewSubscriber(localRegistry, redisClient, routeConfig)
+			redisSubscriber = redisroute.NewSubscriber(localRegistry, redisClient, routeConfig)
 			go func() {
 				log.Printf("push-gateway redis route subscriber started for gateway_id=%s", gatewayID)
-				errs <- subscriber.Run(ctx)
+				errs <- redisSubscriber.Run(ctx)
 			}()
 		}
 	} else if routeBackend != "memory" {
@@ -114,7 +116,11 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/debug/metrics", func(writer http.ResponseWriter, request *http.Request) {
 			writer.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(writer).Encode(localRegistry.Metrics())
+			_ = json.NewEncoder(writer).Encode(pushDebugMetrics{
+				Metrics:              localRegistry.Metrics(),
+				RedisRegistryMetrics: redisRouteRegistryMetrics(redisRegistry),
+				RedisSubscriberStats: redisRouteSubscriberMetrics(redisSubscriber),
+			})
 		})
 		mux.Handle("/", server)
 		httpServer := &http.Server{
@@ -172,6 +178,26 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 		}
 	}
 	return err
+}
+
+type pushDebugMetrics struct {
+	memory.Metrics
+	RedisRegistryMetrics redisroute.Metrics `json:"redis_registry_metrics,omitempty"`
+	RedisSubscriberStats redisroute.Metrics `json:"redis_subscriber_metrics,omitempty"`
+}
+
+func redisRouteRegistryMetrics(registry *redisroute.Registry) redisroute.Metrics {
+	if registry == nil {
+		return redisroute.Metrics{}
+	}
+	return registry.Metrics()
+}
+
+func redisRouteSubscriberMetrics(subscriber *redisroute.Subscriber) redisroute.Metrics {
+	if subscriber == nil {
+		return redisroute.Metrics{}
+	}
+	return subscriber.Metrics()
 }
 
 func envString(name string, fallback string) string {

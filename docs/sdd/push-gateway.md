@@ -359,7 +359,23 @@ delivery-service local transaction
 -> server returns delivery.ack.ok
 ```
 
-第一阶段可以只对当前 gateway 进程内在线 session 通知。当前已接入 Redis route 最小 adapter，并已用真实进程 smoke 验证 WebSocket gateway 与 delivery consumer gateway 分离时的跨进程在线路由；它证明的是最小分布式在线唤醒链路，不等同于完整生产多实例能力。生产化前仍需补真实 Redis 故障 smoke、跨实例 resume 和正式指标。
+第一阶段可以只对当前 gateway 进程内在线 session 通知。当前已接入 Redis route 最小 adapter，并已用真实进程 smoke 验证 WebSocket gateway 与 delivery consumer gateway 分离时的跨进程在线路由；它证明的是最小分布式在线唤醒链路，不等同于完整生产多实例能力。生产化前仍需补跨实例 resume、Redis HA 和正式指标。
+
+Redis route debug metrics 已提供第一版跨实例在线路由计数：
+
+| 指标 | 含义 |
+| --- | --- |
+| `redis_route_remote_matched_sessions` | 当前 gateway 在 Redis route 中命中的远端 session 数，按 session 计 |
+| `redis_route_remote_publish_call_count` | 当前 gateway 向远端 gateway Pub/Sub channel 发布通知的次数，按 gateway 去重 |
+| `redis_route_remote_enqueued_sessions` | 当前 gateway 估算已转交远端 gateway 的 session 数，不代表远端 WebSocket 已成功写出 |
+| `redis_route_remote_publish_error_count` | Redis Publish 调用失败次数 |
+| `redis_route_lookup_error_count` | Redis route lookup 失败次数；当前策略 fail-open，delivery consumer 不因在线通知失败而阻塞 |
+| `redis_route_stale_removed_count` | lookup 或 cleanup 移除的 stale session route 成员数 |
+| `redis_route_subscriber_message_count` | 当前 gateway 从自身 Pub/Sub channel 收到的远端通知数 |
+| `redis_route_subscriber_enqueued_count` | 远端通知进入当前 gateway 本机 session registry 的数量 |
+| `redis_route_subscriber_malformed_count` | Pub/Sub 收到 malformed payload 并跳过的次数 |
+
+这些指标只解释 online wakeup 路径，不是 durable delivery 成功率。可靠事实仍以 `delivery-service` 的 `user_inbox`、`device_delivery_cursors` 和 `delivery_outbox` 为准。
 
 ### 8.3 重连恢复
 
@@ -494,7 +510,7 @@ NEXUSIM_PUSH_GATEWAY_MODE=all
 
 本地分布式模拟使用 `NEXUSIM_PUSH_GATEWAY_MODE=ws` 和 `NEXUSIM_PUSH_GATEWAY_MODE=delivery-consumer` 启动两个独立 `push-gateway` 进程：WebSocket 连接只落在 ws 进程，Kafka `im.delivery.events` 只由 consumer 进程消费，在线通知必须经过 Redis route / PubSub 才能到达客户端。该模式用于验证分布式路由边界，不作为生产容量结论。
 
-当 WebSocket HTTP server 启动时，`GET /debug/metrics` 返回当前单实例 registry 调试指标，包括 connected sessions、queue-full eviction、resume replay / buffer miss、resume buffer stored frames、resume token count 和 expired token count。该端点只用于本地 smoke 排障，尚不是生产 Prometheus 指标。
+当 WebSocket HTTP server 启动时，`GET /debug/metrics` 返回当前单实例 registry 调试指标，包括 connected sessions、queue-full eviction、resume replay / buffer miss、resume buffer stored frames、resume token count 和 expired token count。启用 Redis route 时还会返回 `redis_registry_metrics` 和 `redis_subscriber_metrics`，用于区分远端 route 命中、Pub/Sub publish、subscriber 入站 fanout 和 stale cleanup。该端点只用于本地 smoke 排障，尚不是生产 Prometheus 指标。
 
 最小本地启动参数：
 

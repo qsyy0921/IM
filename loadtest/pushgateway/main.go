@@ -184,14 +184,32 @@ type redisFaultSummary struct {
 }
 
 type pushMetrics struct {
-	ConnectedSessions        int    `json:"connected_sessions"`
-	SessionQueueFullCount    uint64 `json:"session_queue_full_count"`
-	SlowSessionEvictedCount  uint64 `json:"slow_session_evicted_count"`
-	ResumeBufferReplayCount  uint64 `json:"resume_buffer_replay_count"`
-	ResumeBufferMissCount    uint64 `json:"resume_buffer_miss_count"`
-	ResumeBufferStoredFrames int    `json:"resume_buffer_stored_frames"`
-	ResumeBufferTokenCount   int    `json:"resume_buffer_token_count"`
-	ResumeBufferExpiredCount uint64 `json:"resume_buffer_expired_count"`
+	ConnectedSessions        int               `json:"connected_sessions"`
+	SessionQueueFullCount    uint64            `json:"session_queue_full_count"`
+	SlowSessionEvictedCount  uint64            `json:"slow_session_evicted_count"`
+	ResumeBufferReplayCount  uint64            `json:"resume_buffer_replay_count"`
+	ResumeBufferMissCount    uint64            `json:"resume_buffer_miss_count"`
+	ResumeBufferStoredFrames int               `json:"resume_buffer_stored_frames"`
+	ResumeBufferTokenCount   int               `json:"resume_buffer_token_count"`
+	ResumeBufferExpiredCount uint64            `json:"resume_buffer_expired_count"`
+	RedisRegistryMetrics     redisRouteMetrics `json:"redis_registry_metrics,omitempty"`
+	RedisSubscriberMetrics   redisRouteMetrics `json:"redis_subscriber_metrics,omitempty"`
+}
+
+type redisRouteMetrics struct {
+	RedisRouteRegisterErrorCount       uint64 `json:"redis_route_register_error_count"`
+	RedisRouteRenewErrorCount          uint64 `json:"redis_route_renew_error_count"`
+	RedisRouteLookupErrorCount         uint64 `json:"redis_route_lookup_error_count"`
+	RedisRouteRemoteMatchedSessions    uint64 `json:"redis_route_remote_matched_sessions"`
+	RedisRouteRemotePublishCallCount   uint64 `json:"redis_route_remote_publish_call_count"`
+	RedisRouteRemotePublishErrorCount  uint64 `json:"redis_route_remote_publish_error_count"`
+	RedisRouteRemoteEnqueuedSessions   uint64 `json:"redis_route_remote_enqueued_sessions"`
+	RedisRouteStaleRemovedCount        uint64 `json:"redis_route_stale_removed_count"`
+	RedisRouteCleanupErrorCount        uint64 `json:"redis_route_cleanup_error_count"`
+	RedisRouteSubscriberMessageCount   uint64 `json:"redis_route_subscriber_message_count,omitempty"`
+	RedisRouteSubscriberMalformedCount uint64 `json:"redis_route_subscriber_malformed_count,omitempty"`
+	RedisRouteSubscriberEnqueuedCount  uint64 `json:"redis_route_subscriber_enqueued_count,omitempty"`
+	RedisRouteSubscriberErrorCount     uint64 `json:"redis_route_subscriber_error_count,omitempty"`
 }
 
 type frameSnapshot struct {

@@ -88,6 +88,13 @@ func TestRegistryPublishesRemoteRouteAndEnqueuesLocal(t *testing.T) {
 	if result.Enqueued != 3 || result.MatchedSessions != 3 || len(outbound) != 1 {
 		t.Fatalf("unexpected result=%+v local_queue=%d", result, len(outbound))
 	}
+	metrics := registry.Metrics()
+	if metrics.RedisRouteRemoteMatchedSessions != 2 ||
+		metrics.RedisRouteRemotePublishCallCount != 1 ||
+		metrics.RedisRouteRemoteEnqueuedSessions != 2 ||
+		metrics.RedisRouteRemotePublishErrorCount != 0 {
+		t.Fatalf("unexpected redis route metrics: %+v", metrics)
+	}
 	select {
 	case message := <-pubsub.Channel():
 		var forwarded types.DeliveryNotification
@@ -178,6 +185,9 @@ func TestRegistryCleansStaleRoutesDuringLookup(t *testing.T) {
 			t.Fatalf("expected stale session %s to be removed from user set", sessionID)
 		}
 	}
+	if metrics := registry.Metrics(); metrics.RedisRouteStaleRemovedCount != 3 {
+		t.Fatalf("expected stale removal metric, got %+v", metrics)
+	}
 }
 
 func TestRegistryCleanupStaleRoutesScansUserSets(t *testing.T) {
@@ -252,6 +262,9 @@ func TestRegistryFailsOpenWhenRedisLookupUnavailable(t *testing.T) {
 	if result.Enqueued != 0 || result.MatchedSessions != 0 || result.Dropped != 1 {
 		t.Fatalf("unexpected local result after redis failure: %+v", result)
 	}
+	if metrics := registry.Metrics(); metrics.RedisRouteLookupErrorCount != 1 {
+		t.Fatalf("expected lookup error metric, got %+v", metrics)
+	}
 }
 
 func TestRegistryRegisterFailsClosedWhenRedisUnavailable(t *testing.T) {
@@ -289,8 +302,9 @@ func TestSubscriberEnqueuesRemoteNotificationLocally(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan error, 1)
+	subscriber := NewSubscriber(local, client, Config{GatewayID: "gateway-a"})
 	go func() {
-		done <- NewSubscriber(local, client, Config{GatewayID: "gateway-a"}).Run(ctx)
+		done <- subscriber.Run(ctx)
 	}()
 	time.Sleep(50 * time.Millisecond)
 
@@ -305,6 +319,12 @@ func TestSubscriberEnqueuesRemoteNotificationLocally(t *testing.T) {
 	case frame := <-outbound:
 		if frame.Op != types.OpDeliveryNotify || frame.EventID != "delivery-event-1" {
 			t.Fatalf("unexpected frame: %+v", frame)
+		}
+		metrics := subscriber.Metrics()
+		if metrics.RedisRouteSubscriberMessageCount != 1 ||
+			metrics.RedisRouteSubscriberEnqueuedCount != 1 ||
+			metrics.RedisRouteSubscriberMalformedCount != 0 {
+			t.Fatalf("unexpected subscriber metrics: %+v", metrics)
 		}
 	case <-time.After(time.Second):
 		t.Fatalf("timed out waiting for local enqueue")

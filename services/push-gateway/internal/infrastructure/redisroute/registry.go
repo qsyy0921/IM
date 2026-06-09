@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/qsyy0921/IM/services/push-gateway/internal/types"
@@ -33,6 +34,36 @@ type Registry struct {
 
 	mu     sync.Mutex
 	routes map[string]routeState
+
+	metrics registryMetrics
+}
+
+type Metrics struct {
+	RedisRouteRegisterErrorCount       uint64 `json:"redis_route_register_error_count"`
+	RedisRouteRenewErrorCount          uint64 `json:"redis_route_renew_error_count"`
+	RedisRouteLookupErrorCount         uint64 `json:"redis_route_lookup_error_count"`
+	RedisRouteRemoteMatchedSessions    uint64 `json:"redis_route_remote_matched_sessions"`
+	RedisRouteRemotePublishCallCount   uint64 `json:"redis_route_remote_publish_call_count"`
+	RedisRouteRemotePublishErrorCount  uint64 `json:"redis_route_remote_publish_error_count"`
+	RedisRouteRemoteEnqueuedSessions   uint64 `json:"redis_route_remote_enqueued_sessions"`
+	RedisRouteStaleRemovedCount        uint64 `json:"redis_route_stale_removed_count"`
+	RedisRouteCleanupErrorCount        uint64 `json:"redis_route_cleanup_error_count"`
+	RedisRouteSubscriberMessageCount   uint64 `json:"redis_route_subscriber_message_count,omitempty"`
+	RedisRouteSubscriberMalformedCount uint64 `json:"redis_route_subscriber_malformed_count,omitempty"`
+	RedisRouteSubscriberEnqueuedCount  uint64 `json:"redis_route_subscriber_enqueued_count,omitempty"`
+	RedisRouteSubscriberErrorCount     uint64 `json:"redis_route_subscriber_error_count,omitempty"`
+}
+
+type registryMetrics struct {
+	registerErrorCount      atomic.Uint64
+	renewErrorCount         atomic.Uint64
+	lookupErrorCount        atomic.Uint64
+	remoteMatchedSessions   atomic.Uint64
+	remotePublishCallCount  atomic.Uint64
+	remotePublishErrorCount atomic.Uint64
+	remoteEnqueuedSessions  atomic.Uint64
+	staleRemovedCount       atomic.Uint64
+	cleanupErrorCount       atomic.Uint64
 }
 
 type routeState struct {
@@ -83,6 +114,7 @@ func (registry *Registry) Register(
 	}
 	if err := registry.writeRoute(ctx, entry); err != nil {
 		registry.local.Unregister(registration.SessionID)
+		registry.metrics.registerErrorCount.Add(1)
 		return types.SessionRegistrationResult{}, err
 	}
 	renewCtx, cancel := context.WithCancel(context.Background())
@@ -124,7 +156,10 @@ func (registry *Registry) StartCleanupLoop(ctx context.Context, interval time.Du
 				return
 			case <-ticker.C:
 				cleanupCtx, cancel := context.WithTimeout(ctx, interval)
-				_, _ = registry.CleanupStaleRoutes(cleanupCtx)
+				_, err := registry.CleanupStaleRoutes(cleanupCtx)
+				if err != nil {
+					registry.metrics.cleanupErrorCount.Add(1)
+				}
 				cancel()
 			}
 		}
@@ -165,6 +200,7 @@ func (registry *Registry) EnqueueNotification(
 	routes, err := registry.lookupRoutes(ctx, notification.TenantID, notification.UserID)
 	if err != nil {
 		localResult.Dropped++
+		registry.metrics.lookupErrorCount.Add(1)
 		return localResult, nil
 	}
 	result := localResult
@@ -180,18 +216,42 @@ func (registry *Registry) EnqueueNotification(
 		remoteSessionsByGateway[route.GatewayID]++
 		result.MatchedSessions++
 	}
+	var remoteMatched int
+	for _, sessionCount := range remoteSessionsByGateway {
+		remoteMatched += sessionCount
+	}
+	if remoteMatched > 0 {
+		registry.metrics.remoteMatchedSessions.Add(uint64(remoteMatched))
+	}
 	for gatewayID, sessionCount := range remoteSessionsByGateway {
 		if _, ok := publishedGateways[gatewayID]; ok {
 			continue
 		}
+		registry.metrics.remotePublishCallCount.Add(1)
 		if err := registry.publishRemote(ctx, gatewayID, notification); err != nil {
 			result.Dropped += sessionCount
+			registry.metrics.remotePublishErrorCount.Add(1)
 			continue
 		}
 		publishedGateways[gatewayID] = struct{}{}
 		result.Enqueued += sessionCount
+		registry.metrics.remoteEnqueuedSessions.Add(uint64(sessionCount))
 	}
 	return result, nil
+}
+
+func (registry *Registry) Metrics() Metrics {
+	return Metrics{
+		RedisRouteRegisterErrorCount:      registry.metrics.registerErrorCount.Load(),
+		RedisRouteRenewErrorCount:         registry.metrics.renewErrorCount.Load(),
+		RedisRouteLookupErrorCount:        registry.metrics.lookupErrorCount.Load(),
+		RedisRouteRemoteMatchedSessions:   registry.metrics.remoteMatchedSessions.Load(),
+		RedisRouteRemotePublishCallCount:  registry.metrics.remotePublishCallCount.Load(),
+		RedisRouteRemotePublishErrorCount: registry.metrics.remotePublishErrorCount.Load(),
+		RedisRouteRemoteEnqueuedSessions:  registry.metrics.remoteEnqueuedSessions.Load(),
+		RedisRouteStaleRemovedCount:       registry.metrics.staleRemovedCount.Load(),
+		RedisRouteCleanupErrorCount:       registry.metrics.cleanupErrorCount.Load(),
+	}
 }
 
 func (registry *Registry) writeRoute(ctx context.Context, entry routeEntry) error {
@@ -225,7 +285,9 @@ func (registry *Registry) renewRouteLoop(ctx context.Context, entry routeEntry) 
 			return
 		case <-ticker.C:
 			refreshCtx, cancel := context.WithTimeout(ctx, time.Second)
-			_ = registry.writeRoute(refreshCtx, entry)
+			if err := registry.writeRoute(refreshCtx, entry); err != nil {
+				registry.metrics.renewErrorCount.Add(1)
+			}
 			cancel()
 		}
 	}
@@ -267,6 +329,9 @@ func (registry *Registry) cleanupUserRouteKey(ctx context.Context, userKey strin
 		return 0, nil
 	}
 	removed, err := registry.client.SRem(ctx, userKey, stale...).Result()
+	if removed > 0 {
+		registry.metrics.staleRemovedCount.Add(uint64(removed))
+	}
 	return int(removed), err
 }
 
@@ -298,7 +363,10 @@ func (registry *Registry) lookupRoutes(ctx context.Context, tenantID string, use
 		routes = append(routes, entry)
 	}
 	if len(stale) > 0 {
-		_ = registry.client.SRem(ctx, registry.userKey(tenantID, userID), stale...).Err()
+		removed, _ := registry.client.SRem(ctx, registry.userKey(tenantID, userID), stale...).Result()
+		if removed > 0 {
+			registry.metrics.staleRemovedCount.Add(uint64(removed))
+		}
 	}
 	return routes, nil
 }

@@ -43,49 +43,53 @@ type config struct {
 }
 
 type summary struct {
-	Commit                         string            `json:"commit"`
-	CommitFull                     string            `json:"commit_full"`
-	GitDirty                       bool              `json:"git_dirty"`
-	GitStatusShort                 string            `json:"git_status_short,omitempty"`
-	Target                         string            `json:"target"`
-	VUs                            int               `json:"vus"`
-	Duration                       string            `json:"duration"`
-	RequestCount                   int64             `json:"request_count"`
-	SuccessCount                   int64             `json:"success_count"`
-	ErrorCount                     int64             `json:"error_count"`
-	SuccessRate                    float64           `json:"success_rate"`
-	RPS                            float64           `json:"rps"`
-	AvgMS                          float64           `json:"avg_ms"`
-	P95MS                          float64           `json:"p95_ms"`
-	P99MS                          float64           `json:"p99_ms"`
-	ErrorTopN                      []errorCount      `json:"error_topn,omitempty"`
-	TenantID                       string            `json:"tenant_id"`
-	ConversationID                 string            `json:"conversation_id"`
-	OperatorUserID                 string            `json:"operator_user_id"`
-	ListUserID                     string            `json:"list_user_id"`
-	ChangeType                     string            `json:"change_type"`
-	TargetRole                     string            `json:"target_role,omitempty"`
-	TargetUserID                   string            `json:"target_user_id,omitempty"`
-	SagaCount                      *int64            `json:"saga_count,omitempty"`
-	SagaDoneCount                  *int64            `json:"saga_done_count,omitempty"`
-	TimelineCount                  *int64            `json:"timeline_count,omitempty"`
-	OutboxTotalCount               *int64            `json:"outbox_total_count,omitempty"`
-	OutboxPendingCount             *int64            `json:"outbox_pending_count,omitempty"`
-	OutboxPublishedCount           *int64            `json:"outbox_published_count,omitempty"`
-	OutboxDLQCount                 *int64            `json:"outbox_dlq_count,omitempty"`
-	ConversationSeqCurrent         *int64            `json:"conversation_seq_current,omitempty"`
-	SampleChangeID                 string            `json:"sample_change_id,omitempty"`
-	SampleGetStatus                string            `json:"sample_get_status,omitempty"`
-	SampleGetError                 string            `json:"sample_get_error,omitempty"`
-	MemberListCount                *int64            `json:"member_list_count,omitempty"`
-	MemberListNextPage             string            `json:"member_list_next_page_token,omitempty"`
-	MemberListSampleUsers          []string          `json:"member_list_sample_users,omitempty"`
-	MemberListTargetPresent        *bool             `json:"member_list_target_present,omitempty"`
-	MemberListTargetAbsentVerified *bool             `json:"member_list_target_absent_verified,omitempty"`
-	MemberListError                string            `json:"member_list_error,omitempty"`
-	StartedAt                      time.Time         `json:"started_at"`
-	FinishedAt                     time.Time         `json:"finished_at"`
-	Stats                          map[string]string `json:"stats,omitempty"`
+	Commit                            string            `json:"commit"`
+	CommitFull                        string            `json:"commit_full"`
+	GitDirty                          bool              `json:"git_dirty"`
+	GitStatusShort                    string            `json:"git_status_short,omitempty"`
+	Target                            string            `json:"target"`
+	VUs                               int               `json:"vus"`
+	Duration                          string            `json:"duration"`
+	RequestCount                      int64             `json:"request_count"`
+	SuccessCount                      int64             `json:"success_count"`
+	ErrorCount                        int64             `json:"error_count"`
+	SuccessRate                       float64           `json:"success_rate"`
+	RPS                               float64           `json:"rps"`
+	AvgMS                             float64           `json:"avg_ms"`
+	P95MS                             float64           `json:"p95_ms"`
+	P99MS                             float64           `json:"p99_ms"`
+	ErrorTopN                         []errorCount      `json:"error_topn,omitempty"`
+	TenantID                          string            `json:"tenant_id"`
+	ConversationID                    string            `json:"conversation_id"`
+	OperatorUserID                    string            `json:"operator_user_id"`
+	ListUserID                        string            `json:"list_user_id"`
+	ChangeType                        string            `json:"change_type"`
+	TargetRole                        string            `json:"target_role,omitempty"`
+	TargetUserID                      string            `json:"target_user_id,omitempty"`
+	SagaCount                         *int64            `json:"saga_count,omitempty"`
+	SagaDoneCount                     *int64            `json:"saga_done_count,omitempty"`
+	TimelineCount                     *int64            `json:"timeline_count,omitempty"`
+	OutboxTotalCount                  *int64            `json:"outbox_total_count,omitempty"`
+	OutboxPendingCount                *int64            `json:"outbox_pending_count,omitempty"`
+	OutboxPublishedCount              *int64            `json:"outbox_published_count,omitempty"`
+	OutboxDLQCount                    *int64            `json:"outbox_dlq_count,omitempty"`
+	ConversationSeqCurrent            *int64            `json:"conversation_seq_current,omitempty"`
+	SampleChangeID                    string            `json:"sample_change_id,omitempty"`
+	SampleGetStatus                   string            `json:"sample_get_status,omitempty"`
+	SampleGetError                    string            `json:"sample_get_error,omitempty"`
+	MemberListCount                   *int64            `json:"member_list_count,omitempty"`
+	MemberListNextPage                string            `json:"member_list_next_page_token,omitempty"`
+	MemberListSampleUsers             []string          `json:"member_list_sample_users,omitempty"`
+	MemberListTargetPresent           *bool             `json:"member_list_target_present,omitempty"`
+	MemberListTargetAbsentVerified    *bool             `json:"member_list_target_absent_verified,omitempty"`
+	MemberListTargetRole              string            `json:"member_list_target_role,omitempty"`
+	MemberListTargetStatus            string            `json:"member_list_target_status,omitempty"`
+	MemberListTargetMemberVersion     int64             `json:"member_list_target_member_version,omitempty"`
+	MemberListTargetPermissionVersion int64             `json:"member_list_target_permission_version,omitempty"`
+	MemberListError                   string            `json:"member_list_error,omitempty"`
+	StartedAt                         time.Time         `json:"started_at"`
+	FinishedAt                        time.Time         `json:"finished_at"`
+	Stats                             map[string]string `json:"stats,omitempty"`
 }
 
 type errorCount struct {
@@ -509,6 +513,10 @@ func fillMemberListSample(
 			}
 			if cfg.targetUserID != "" && member.GetUserId() == cfg.targetUserID {
 				targetPresent = true
+				result.MemberListTargetRole = member.GetRole().String()
+				result.MemberListTargetStatus = member.GetStatus().String()
+				result.MemberListTargetMemberVersion = member.GetMemberVersion()
+				result.MemberListTargetPermissionVersion = member.GetPermissionVersion()
 			}
 		}
 		pageToken = response.GetNextPageToken()

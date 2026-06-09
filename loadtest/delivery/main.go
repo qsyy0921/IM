@@ -33,6 +33,7 @@ type config struct {
 	limit          int32
 	expectedCount  int
 	pgDSN          string
+	consumerGroup  string
 	ack            bool
 }
 
@@ -49,6 +50,7 @@ type summary struct {
 	AfterSeq              int64        `json:"after_seq"`
 	Limit                 int32        `json:"limit"`
 	ExpectedCount         int          `json:"expected_count"`
+	ConsumerGroup         string       `json:"consumer_group,omitempty"`
 	PollCount             int          `json:"poll_count"`
 	ItemCount             int          `json:"item_count"`
 	MaxSeq                int64        `json:"max_seq"`
@@ -106,6 +108,7 @@ func parseConfig() config {
 	flag.IntVar(&limit, "limit", 100, "PullInbox limit")
 	flag.IntVar(&cfg.expectedCount, "expected-count", 1, "minimum inbox items expected before success")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "", "optional PostgreSQL DSN for stats")
+	flag.StringVar(&cfg.consumerGroup, "consumer-group", "", "optional delivery timeline consumer group for checkpoint stats")
 	flag.BoolVar(&cfg.ack, "ack", true, "ack max pulled conversation seq")
 	flag.Parse()
 	if cfg.requestTimeout <= 0 {
@@ -148,6 +151,7 @@ func run(cfg config) error {
 		AfterSeq:       cfg.afterSeq,
 		Limit:          cfg.limit,
 		ExpectedCount:  cfg.expectedCount,
+		ConsumerGroup:  cfg.consumerGroup,
 		AckEnabled:     cfg.ack,
 		WaitTimeout:    cfg.waitTimeout.String(),
 		PollInterval:   cfg.pollInterval.String(),
@@ -302,11 +306,21 @@ WHERE tenant_id = $1 AND conversation_id = $2 AND user_id = $3 AND device_id = $
 	}
 	result.CursorLastReceivedSeq = &cursor
 	var checkpoint int64
-	if err := pool.QueryRow(ctx, `
+	checkpointQuery := `
 SELECT COALESCE(MAX(offset_value), 0)
 FROM delivery_kafka_checkpoints
 WHERE topic = 'conversation.timeline.events'
-`).Scan(&checkpoint); err != nil {
+`
+	checkpointArgs := []any{}
+	if cfg.consumerGroup != "" {
+		checkpointQuery = `
+SELECT COALESCE(MAX(offset_value), 0)
+FROM delivery_kafka_checkpoints
+WHERE consumer_group = $1 AND topic = 'conversation.timeline.events'
+`
+		checkpointArgs = append(checkpointArgs, cfg.consumerGroup)
+	}
+	if err := pool.QueryRow(ctx, checkpointQuery, checkpointArgs...).Scan(&checkpoint); err != nil {
 		return fmt.Errorf("query checkpoint: %w", err)
 	}
 	result.CheckpointOffsetValue = &checkpoint

@@ -166,6 +166,7 @@ bin\delivery-loadtest.exe `
   --limit 100 `
   --expected-count 64 `
   --ack=true `
+  --consumer-group nexusim-delivery-smoke-20260609132344 `
   --pg-dsn 'postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable' `
   --result-dir loadtest\results\delivery-fullsmoke-clean-20260609-132344\delivery
 ```

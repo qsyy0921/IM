@@ -253,6 +253,35 @@ member_list_target_absent_verified = true
 conversation_members target status = LEFT
 ```
 
+验证 `LEAVE` 后普通 roster 过滤时，operator 使用退群用户本人，后置 roster 查询使用仍然 ACTIVE 的 owner：
+
+```powershell
+bin\memberchange-loadtest.exe `
+  --target 127.0.0.1:11496 `
+  --vus 1 `
+  --duration 3s `
+  --request-count 1 `
+  --tenant-id tenant-roster-leave-smoke `
+  --conversation-id conv-roster-leave-smoke `
+  --operator-user-id roster-user-leave `
+  --list-user-id owner-1 `
+  --target-user-id roster-user-leave `
+  --change-type leave `
+  --idempotency-prefix roster-leave-manual `
+  --expected-member-version 0 `
+  --pg-dsn 'postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable' `
+  --result-dir loadtest\results\memberchange-leave-smoke-manual
+```
+
+通过标准同样是：
+
+```text
+success_rate = 1
+member_list_target_present = false
+member_list_target_absent_verified = true
+conversation_members target status = LEFT
+```
+
 如果要验证完整成员事件闭环，需要同时启动：
 
 ```text

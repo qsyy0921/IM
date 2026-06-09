@@ -478,7 +478,7 @@ acl_projection_checksum_mismatch_count
 | contract | gRPC code / stable message / proto generated |
 | relay integration | member boundary outbox 可发布 Kafka，DLQ 可观察 |
 | smoke | `CreateMemberChange -> GetSendContext -> SendMessage` 串联 |
-| roster smoke | `JOIN -> ListConversationMembers includes target`；`REMOVE -> ListConversationMembers excludes target` |
+| roster smoke | `JOIN -> ListConversationMembers includes target`；`LEAVE / REMOVE -> ListConversationMembers excludes target` |
 
 第一轮 smoke 不做大规模压测，只验证：
 
@@ -488,6 +488,7 @@ JOIN user
 -> SendMessage succeeds
 LEAVE user
 -> GetSendContext returns PermissionDenied
+-> ListConversationMembers no longer returns left target
 REMOVE user
 -> ListConversationMembers no longer returns removed target
 ```
@@ -499,6 +500,7 @@ REMOVE user
 ```text
 docs/runbook/conversation-service-member-change-local.md
 docs/runbook/loadtest/conversation-service/loadtest-report-YYYYMMDD-member-change-smoke.md
+docs/runbook/loadtest/conversation-service/loadtest-report-YYYYMMDD-list-conversation-members-leave-smoke.md
 docs/runbook/loadtest/conversation-service/loadtest-report-YYYYMMDD-list-conversation-members-remove-smoke.md
 ```
 

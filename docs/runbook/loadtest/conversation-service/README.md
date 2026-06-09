@@ -30,7 +30,7 @@ conversation-service CreateMemberChange
 - 本轮 smoke 没启动 outbox relay，因此 summary 中 `outbox_pending_count=725` 是预期现象；测试结束后已删除本次 tenant 数据，避免污染后续压测。
 - `CreateMemberChange` 最小写路径已完成真实进程 smoke：`279 / 279` 成功，p99 `24.95ms`，`outbox_published_count=279`，`outbox_pending_count=0`。
 - `CreateMemberChange -> outbox relay -> member-change-worker -> GetMemberChange(DONE)` 完整 smoke 已通过：`350 / 350` 成功，p99 `40.90ms`，`saga_done_count=350`，`sample_get_status=MEMBER_CHANGE_STATUS_DONE`。
-- `ListConversationMembers` 最小 roster smoke 已通过：3 条 `JOIN` 后，真实 gRPC 读取到 `member_list_count=4`，成员为 seed owner + 3 个 active target；`REMOVE` 后 roster smoke 也已通过，目标成员变为 `LEFT` 后不再出现在普通 ACTIVE roster；该接口只返回当前 ACTIVE 成员，不承担成员历史 / 审计视图。
+- `ListConversationMembers` 最小 roster smoke 已通过：3 条 `JOIN` 后，真实 gRPC 读取到 `member_list_count=4`，成员为 seed owner + 3 个 active target；`LEAVE` / `REMOVE` 后 roster smoke 也已通过，目标成员变为 `LEFT` 后不再出现在普通 ACTIVE roster；该接口只返回当前 ACTIVE 成员，不承担成员历史 / 审计视图。
 
 ## 报告列表
 
@@ -41,6 +41,7 @@ conversation-service CreateMemberChange
 | 成员变更写路径 smoke | `loadtest-report-20260609-member-change-smoke.md` |
 | 成员变更完整 smoke | `loadtest-report-20260609-member-change-full-smoke.md` |
 | 当前成员列表 smoke | `loadtest-report-20260610-list-conversation-members-smoke.md` |
+| LEAVE 后成员列表过滤 smoke | `loadtest-report-20260610-list-conversation-members-leave-smoke.md` |
 | REMOVE 后成员列表过滤 smoke | `loadtest-report-20260610-list-conversation-members-remove-smoke.md` |
 
 ## 面试可讲点
@@ -51,4 +52,4 @@ conversation-service CreateMemberChange
 - 成员变更写路径采用 saga + timeline/outbox：先写成员事实和边界事件，再由统一 outbox relay 发布 Kafka。
 - saga completion worker 已经能观察 outbox `PUBLISHED` 并把 `member_change_saga` 推进到 `DONE`，`GetMemberChange` 能读到完成态。
 - `ListConversationMembers` 给第三层群管理提供低耦合 roster API：其它服务不跨表读取 `conversation_members`，普通列表只暴露当前 ACTIVE 成员。
-- 当前已验证保守权限矩阵下的最小 `JOIN` 和 `REMOVE` 后普通 roster 过滤；`LEAVE / ROLE_CHANGED`、ACL 投影和 DLQ repair 还在后续阶段。
+- 当前已验证保守权限矩阵下的最小 `JOIN`，以及 `LEAVE / REMOVE` 后普通 roster 过滤；`ROLE_CHANGED`、ACL 投影和 DLQ repair 还在后续阶段。

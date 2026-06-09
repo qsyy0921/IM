@@ -70,6 +70,7 @@ ListConversationMembers
 | `loadtest-report-20260609-member-change-smoke.md` | 279 / 279 成功，p99 24.95ms，outbox 279 条全部 PUBLISHED |
 | `loadtest-report-20260609-member-change-full-smoke.md` | 350 / 350 成功，p99 40.90ms，saga 350 条全部 DONE，GetMemberChange 返回 DONE |
 | `loadtest-report-20260610-list-conversation-members-smoke.md` | 3 / 3 JOIN 成功，随后 `ListConversationMembers` 返回 4 个 ACTIVE 成员 |
+| `loadtest-report-20260610-list-conversation-members-leave-smoke.md` | 1 / 1 LEAVE 成功，目标成员状态变为 `LEFT`，随后 `ListConversationMembers` 不再返回目标成员 |
 | `loadtest-report-20260610-list-conversation-members-remove-smoke.md` | 1 / 1 REMOVE 成功，目标成员状态变为 `LEFT`，随后 `ListConversationMembers` 不再返回目标成员 |
 
 ## 面试讲法
@@ -86,12 +87,12 @@ ListConversationMembers
 
 > 做群管理时我没有让 message-service、delivery-service 或 push-gateway 直接读 conversation_members。conversation-service 作为成员事实源提供 `ListConversationMembers`，第一版只列当前 ACTIVE 成员，并要求调用者本身是 ACTIVE 成员。这样 roster 查询走正式服务边界，后续再补 admin-only 历史成员、owner transfer、邀请审批等能力，不把普通列表接口一次性做复杂。
 
-REMOVE 后 roster 过滤可以这样讲：
+LEAVE / REMOVE 后 roster 过滤可以这样讲：
 
-> `REMOVE` 不做物理删除，而是把目标成员状态写成 `LEFT` 并记录 `leave_seq`。普通 `ListConversationMembers` 只返回 ACTIVE 成员，所以被移除用户不会再出现在普通 roster；历史成员和审计视图后续通过 admin-only 查询单独设计，避免把普通列表接口做复杂。
+> `LEAVE` 和 `REMOVE` 都不做物理删除，而是把目标成员状态写成 `LEFT` 并记录 `leave_seq`。普通 `ListConversationMembers` 只返回 ACTIVE 成员，所以离开或被移除用户不会再出现在普通 roster；历史成员和审计视图后续通过 admin-only 查询单独设计，避免把普通列表接口做复杂。
 
 ## 下一步
 
-1. 补 `LEAVE / ROLE_CHANGED` 的真实进程 smoke 或至少 repository / gRPC 负例覆盖，并验证 `ListConversationMembers` 在成员离开 / 角色变化后的行为。
+1. 补 `ROLE_CHANGED` 的真实进程 smoke 或至少 repository / gRPC 覆盖，并验证 `ListConversationMembers` 在角色变化后的 role 更新。
 2. 补 DLQ repair 设计和最小实现。
 3. 进入 `delivery-service` 或 `push-gateway` 前，先明确它们的 SDD 和最小可运行链路。

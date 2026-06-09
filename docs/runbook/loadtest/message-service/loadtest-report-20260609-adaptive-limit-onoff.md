@@ -53,7 +53,7 @@ ConversationCount=1000
 当前 relay 基线来自：
 
 ```text
-docs/runbook/loadtest-report-20260609-outbox-candidate-repeat.md
+docs/runbook/loadtest/message-service/loadtest-report-20260609-outbox-candidate-repeat.md
 ```
 
 ## 3. 对照组

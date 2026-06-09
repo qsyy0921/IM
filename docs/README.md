@@ -6,7 +6,7 @@
 | --- | --- |
 | `architecture/` | 总架构和架构补充文档。主文档是 `architecture/target-architecture.md`。 |
 | `sdd/` | 服务级软件设计文档。第一阶段主文档是 `sdd/message-service.md`。 |
-| `runbook/` | 本地运行、压测、故障处理和演练说明。 |
+| `runbook/` | 本地运行、压测、故障处理和演练说明。压测报告按微服务归档到 `runbook/loadtest/<service>/`。 |
 
 ## 当前阅读路径
 
@@ -17,8 +17,8 @@
 3. `sdd/message-service.md`：确认第一条可编码切片。
 4. `architecture/tadd.md`：确认工程目录、六层 DDD、Docker Compose 和编码门禁。
 5. `runbook/local-loadtest.md`：确认本地双机压测端口和执行方式。
-6. `runbook/loadtest-report-20260609.md`：查看当前 SendMessage 压测方式、结果和 p99 瓶颈排查结论。
-7. `runbook/loadtest-report-20260609-pgpool-multi-instance.md`：查看 PG 连接池梯度、多实例压测工具和短 smoke 结果。
+6. `runbook/loadtest/message-service/loadtest-report-20260609-message-service-consolidated.md`：查看 `message-service` 第一阶段压测总报告、瓶颈排查过程和面试可讲结论。
+7. `runbook/loadtest/message-service/README.md`：查看 `message-service` 所有小规模压测报告和矩阵报告索引。
 
 ## 写文档规则
 

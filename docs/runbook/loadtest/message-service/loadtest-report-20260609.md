@@ -608,7 +608,7 @@ loadtest/results/charts/winwin-distributed-summary.md
 本报告：
 
 ```text
-docs/runbook/loadtest-report-20260609.md
+docs/runbook/loadtest/message-service/loadtest-report-20260609.md
 ```
 
 ## 10. 后续归档策略
@@ -616,7 +616,7 @@ docs/runbook/loadtest-report-20260609.md
 后续每个阶段都新增一份独立压测报告，不覆盖旧报告。推荐命名：
 
 ```text
-docs/runbook/loadtest-report-YYYYMMDD-<stage>.md
+docs/runbook/loadtest/<service>/loadtest-report-YYYYMMDD-<stage>.md
 ```
 
 报告进入 Git，用于保存阶段结论；`loadtest/results/` 继续保存所有中间 summary、趋势图和临时结果，默认不提交。阶段报告必须引用关键 `loadtest/results/` 路径，确保本地仍可追溯原始数据。

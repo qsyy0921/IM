@@ -444,7 +444,7 @@ adaptive limit 的硬拒绝判断优先看 `*_recent` 字段，累计字段只�
   -ResultRoot loadtest\results\adaptive-inflight-YYYYMMDD
 ```
 
-`AdaptiveMaxInFlight` 限制的是进入 app use case 后续依赖读取和数据库事务的并发请求数。被拒绝的请求返回 `SERVICE_OVERLOADED + RetryInfo`，不会写 `message_log`、`conversation_timeline_events` 或 `message_outbox`。当前 Windows 本机候选见 `docs/runbook/loadtest-report-20260609-adaptive-inflight-v1.md`，不能直接当作生产默认值。
+`AdaptiveMaxInFlight` 限制的是进入 app use case 后续依赖读取和数据库事务的并发请求数。被拒绝的请求返回 `SERVICE_OVERLOADED + RetryInfo`，不会写 `message_log`、`conversation_timeline_events` 或 `message_outbox`。当前 Windows 本机候选见 `docs/runbook/loadtest/message-service/loadtest-report-20260609-adaptive-inflight-v1.md`，不能直接当作生产默认值。
 
 ## 12. PublishBatch On/Off
 
@@ -544,4 +544,4 @@ NEXUSIM_OUTBOX_BATCH_SIZE=100
 NEXUSIM_OUTBOX_WORKERS=8
 ```
 
-该基线来自 `docs/runbook/loadtest-report-20260609-outbox-candidate-repeat.md`，只代表当前 Windows 本机 + Docker PostgreSQL/Kafka + PG_MAX_CONNS=64 的本地压测环境。
+该基线来自 `docs/runbook/loadtest/message-service/loadtest-report-20260609-outbox-candidate-repeat.md`，只代表当前 Windows 本机 + Docker PostgreSQL/Kafka + PG_MAX_CONNS=64 的本地压测环境。

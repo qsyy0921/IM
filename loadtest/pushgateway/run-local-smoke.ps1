@@ -4,7 +4,7 @@ param(
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
     [string]$ReceiverDeviceIds = "push-device-1",
-    [ValidateSet("full", "resume-replay", "cross-instance-resume", "slow-client", "redis-fault", "redis-sentinel-failover")]
+    [ValidateSet("full", "resume-replay", "cross-instance-resume", "slow-client", "redis-fault", "redis-sentinel-failover", "redis-sentinel-master-stop")]
     [string]$Scenario = "full",
     [ValidateSet("memory", "redis")]
     [string]$RouteBackend = "memory",
@@ -60,6 +60,9 @@ $runnerRequestTimeout = "3s"
 if ($Scenario -eq "redis-sentinel-failover") {
     $runnerRequestTimeout = "60s"
 }
+if ($Scenario -eq "redis-sentinel-master-stop") {
+    $runnerRequestTimeout = "90s"
+}
 
 New-Item -ItemType Directory -Force $resultDir | Out-Null
 New-Item -ItemType Directory -Force $logDir | Out-Null
@@ -111,6 +114,91 @@ if ($role.Count -lt 1 -or $role[0].Trim() -ne "master") {
 Write-Output "sentinel_master_after=$afterAddr"
 '@ | Set-Content -LiteralPath $failoverScript -Encoding UTF8
         $RedisFaultCommand = "& '$failoverScript'"
+    }
+}
+if ($Scenario -eq "redis-sentinel-master-stop") {
+    if ($RouteBackend -ne "redis") {
+        throw "redis-sentinel-master-stop requires -RouteBackend redis"
+    }
+    if ($RedisMode -ne "sentinel") {
+        throw "redis-sentinel-master-stop requires -RedisMode sentinel"
+    }
+    if (-not $RedisFaultCommand) {
+        $failoverScript = Join-Path $resultDir "redis-sentinel-stop-master.ps1"
+        @'
+$ErrorActionPreference = "Stop"
+$portToContainer = @{
+    "6380" = "nexusim-redis-ha-master"
+    "6381" = "nexusim-redis-ha-replica-1"
+    "6382" = "nexusim-redis-ha-replica-2"
+}
+$before = @(docker exec nexusim-redis-sentinel-1 redis-cli -p 26379 SENTINEL get-master-addr-by-name mymaster)
+if ($before.Count -lt 2) {
+    throw "Sentinel did not return a current master before stop."
+}
+$beforeHost = $before[0].Trim()
+$beforePort = $before[1].Trim()
+$beforeAddr = "${beforeHost}:${beforePort}"
+if (-not $portToContainer.ContainsKey($beforePort)) {
+    throw "No local Redis container mapping for Sentinel master port $beforePort"
+}
+$container = $portToContainer[$beforePort]
+Set-Content -LiteralPath (Join-Path $PSScriptRoot "redis-sentinel-stopped-container.txt") -Value $container -Encoding ASCII
+Write-Output "sentinel_master_before=$beforeAddr"
+Write-Output "stopped_container=$container"
+docker stop $container | Out-Null
+$deadline = (Get-Date).AddSeconds(75)
+$afterAddr = ""
+$afterHost = ""
+$afterPort = ""
+do {
+    Start-Sleep -Seconds 1
+    $after = @(docker exec nexusim-redis-sentinel-1 redis-cli -p 26379 SENTINEL get-master-addr-by-name mymaster)
+    if ($after.Count -ge 2) {
+        $afterHost = $after[0].Trim()
+        $afterPort = $after[1].Trim()
+        $afterAddr = "${afterHost}:${afterPort}"
+    }
+} while (($afterAddr -eq "" -or $afterAddr -eq $beforeAddr) -and (Get-Date) -lt $deadline)
+if ($afterAddr -eq "" -or $afterAddr -eq $beforeAddr) {
+    throw "Sentinel did not promote a different master after stopping $container; before=$beforeAddr after=$afterAddr"
+}
+$ping = @(docker exec nexusim-redis-sentinel-1 redis-cli -h $afterHost -p $afterPort ping)
+if ($ping.Count -lt 1 -or $ping[0].Trim() -ne "PONG") {
+    throw "Promoted Sentinel master did not respond to PING: $($ping -join ',')"
+}
+$role = @(docker exec nexusim-redis-sentinel-1 redis-cli -h $afterHost -p $afterPort role)
+if ($role.Count -lt 1 -or $role[0].Trim() -ne "master") {
+    throw "Promoted Sentinel master role is not master: $($role -join ',')"
+}
+Write-Output "sentinel_master_after=$afterAddr"
+'@ | Set-Content -LiteralPath $failoverScript -Encoding UTF8
+        $RedisFaultCommand = "& '$failoverScript'"
+    }
+    if (-not $RedisRestoreCommand) {
+        $restoreScript = Join-Path $resultDir "redis-sentinel-restore-stopped.ps1"
+        @'
+$ErrorActionPreference = "Stop"
+$stoppedFile = Join-Path $PSScriptRoot "redis-sentinel-stopped-container.txt"
+if (-not (Test-Path -LiteralPath $stoppedFile)) {
+    Write-Output "sentinel_restore=skipped_no_stopped_container_file"
+    return
+}
+$container = (Get-Content -LiteralPath $stoppedFile -Raw).Trim()
+if ($container -eq "") {
+    Write-Output "sentinel_restore=skipped_empty_container"
+    return
+}
+docker start $container | Out-Null
+$deadline = (Get-Date).AddSeconds(60)
+do {
+    Start-Sleep -Seconds 1
+    $state = docker inspect -f "{{.State.Health.Status}}" $container 2>$null
+} while ($state -ne "healthy" -and (Get-Date) -lt $deadline)
+Write-Output "sentinel_restored_container=$container"
+Write-Output "sentinel_restored_health=$state"
+'@ | Set-Content -LiteralPath $restoreScript -Encoding UTF8
+        $RedisRestoreCommand = "& '$restoreScript'"
     }
 }
 
@@ -274,7 +362,7 @@ try {
             NEXUSIM_PUSH_GATEWAY_ID = $pushWSGatewayID
             NEXUSIM_PUSH_ROUTE_TTL = "90s"
         })
-        if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover") {
+        if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover" -or $Scenario -eq "redis-sentinel-master-stop") {
             $processes += Start-NexusProcess -Name "push-gateway-ws-reconnect" -FilePath $pushGateway -Port 11599 -Env (Add-PushRedisEnv @{
                 NEXUSIM_PUSH_GATEWAY_MODE = "ws"
                 NEXUSIM_PUSH_WS_ADDR = "127.0.0.1:11599"
@@ -322,8 +410,8 @@ try {
         NEXUSIM_MOCK_PERMISSION_VERSION = "2"
     }
 
-    $reconnectPushURL = if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover") { "ws://127.0.0.1:11599" } else { "ws://127.0.0.1:11598" }
-    $reconnectMetricsURL = if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover") { "http://127.0.0.1:11599/debug/metrics" } else { "" }
+    $reconnectPushURL = if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover" -or $Scenario -eq "redis-sentinel-master-stop") { "ws://127.0.0.1:11599" } else { "ws://127.0.0.1:11598" }
+    $reconnectMetricsURL = if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover" -or $Scenario -eq "redis-sentinel-master-stop") { "http://127.0.0.1:11599/debug/metrics" } else { "" }
     $consumerMetricsURL = if ($RouteBackend -eq "redis") { "http://127.0.0.1:11600/debug/metrics" } else { "" }
     $runnerArgs = @(
         "--conversation-target", "127.0.0.1:11596",
@@ -361,7 +449,7 @@ try {
     if ($consumerMetricsURL) {
         $runnerArgs += @("--consumer-push-metrics-url", $consumerMetricsURL)
     }
-    if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover") {
+    if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover" -or $Scenario -eq "redis-sentinel-master-stop") {
         $runnerArgs += @("--push-reconnect-gateway-id", $pushReconnectGatewayID)
     }
     & $runner @runnerArgs
@@ -377,6 +465,9 @@ try {
     if ($Scenario -eq "redis-fault" -and $RedisRestoreCommand) {
         Invoke-Expression $RedisRestoreCommand
         Wait-Tcp -HostName "127.0.0.1" -Port 6379 -TimeoutSeconds 20
+    }
+    if ($Scenario -eq "redis-sentinel-master-stop" -and $RedisRestoreCommand) {
+        Invoke-Expression $RedisRestoreCommand
     }
 }
 

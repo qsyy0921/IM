@@ -304,7 +304,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "push-device-1", "online receiver device id")
 	var receiverDeviceIDs string
 	flag.StringVar(&receiverDeviceIDs, "receiver-device-ids", "", "comma separated online receiver device ids; overrides receiver-device-id when set")
-	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, resume-replay, cross-instance-resume, slow-client, redis-fault, or redis-sentinel-failover")
+	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, resume-replay, cross-instance-resume, slow-client, redis-fault, redis-sentinel-failover, or redis-sentinel-master-stop")
 	flag.IntVar(&cfg.slowMessageCount, "slow-message-count", 128, "number of messages sent while slow client does not read")
 	flag.StringVar(&cfg.pushMetricsURL, "push-metrics-url", "", "push-gateway debug metrics URL")
 	flag.StringVar(&cfg.reconnectMetricsURL, "reconnect-push-metrics-url", "", "optional debug metrics URL for reconnect/resume gateway")
@@ -343,7 +343,7 @@ func run(cfg config) error {
 	if cfg.pgDSN == "" {
 		return errors.New("pg-dsn is required")
 	}
-	if cfg.scenario == "cross-instance-resume" || cfg.scenario == "redis-sentinel-failover" {
+	if cfg.scenario == "cross-instance-resume" || cfg.scenario == "redis-sentinel-failover" || cfg.scenario == "redis-sentinel-master-stop" {
 		if cfg.routeBackend != "redis" {
 			return fmt.Errorf("%s scenario requires --route-backend redis", cfg.scenario)
 		}
@@ -430,6 +430,8 @@ func run(cfg config) error {
 	case "cross-instance-resume":
 		return runResumeReplayScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "redis-sentinel-failover":
+		return runResumeReplayScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
+	case "redis-sentinel-master-stop":
 		return runResumeReplayScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "slow-client":
 		return runSlowClientScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
@@ -691,10 +693,10 @@ func runResumeReplayScenario(
 		return finish(cfg, result, err)
 	}
 
-	if cfg.scenario == "redis-sentinel-failover" {
+	if cfg.scenario == "redis-sentinel-failover" || cfg.scenario == "redis-sentinel-master-stop" {
 		if strings.TrimSpace(cfg.redisFaultCommand) == "" {
 			conn.CloseNow()
-			return finish(cfg, result, errors.New("redis-fault-command is required for redis-sentinel-failover scenario"))
+			return finish(cfg, result, fmt.Errorf("redis-fault-command is required for %s scenario", cfg.scenario))
 		}
 		output, err := executeCommand(ctx, cfg, cfg.redisFaultCommand)
 		result.RedisFault = &redisFaultSummary{

@@ -94,6 +94,7 @@ func runGRPCServer() error {
 			MinAvailableConns:             int32(envInt("NEXUSIM_ADAPTIVE_MIN_AVAILABLE_CONNS", 0)),
 			ReleaseAvailableConns:         int32(envInt("NEXUSIM_ADAPTIVE_RELEASE_AVAILABLE_CONNS", 0)),
 			MaxPoolAcquireP95:             envDuration("NEXUSIM_ADAPTIVE_MAX_POOL_ACQUIRE_P95", 0),
+			MaxInFlight:                   envInt64("NEXUSIM_ADAPTIVE_MAX_IN_FLIGHT", 0),
 			MaxOutboxPending:              envInt64("NEXUSIM_ADAPTIVE_MAX_OUTBOX_PENDING", 0),
 			ReleaseOutboxPending:          envInt64("NEXUSIM_ADAPTIVE_RELEASE_OUTBOX_PENDING", 0),
 			MaxRelayProcessReadyActiveP95: envDuration("NEXUSIM_ADAPTIVE_MAX_RELAY_ACTIVE_P95", 0),
@@ -115,9 +116,10 @@ func runGRPCServer() error {
 		admission.Start(ctx)
 		useCaseOptions = append(useCaseOptions, app.WithAdmission(admission))
 		log.Printf(
-			"message-service adaptive limit enabled min_available=%d max_pool_acquire_p95=%s max_outbox_pending=%d relay_metrics_url=%s",
+			"message-service adaptive limit enabled min_available=%d max_pool_acquire_p95=%s max_in_flight=%d max_outbox_pending=%d relay_metrics_url=%s",
 			config.MinAvailableConns,
 			config.MaxPoolAcquireP95,
+			config.MaxInFlight,
 			config.MaxOutboxPending,
 			config.RelayMetricsURL,
 		)

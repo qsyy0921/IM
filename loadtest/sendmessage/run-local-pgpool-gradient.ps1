@@ -20,6 +20,7 @@ param(
     [switch]$BackpressureEnabled,
     [int]$BackpressureMinAvailableConns = 0,
     [switch]$AdaptiveLimitEnabled,
+    [int]$AdaptiveMaxInFlight = 0,
     [int]$AdaptiveMinAvailableConns = 8,
     [int]$AdaptiveReleaseAvailableConns = 12,
     [string]$AdaptiveMaxPoolAcquireP95 = "250ms",
@@ -68,14 +69,15 @@ foreach ($pgMax in $PGMaxConns) {
         $backpressureLabel = if ($BackpressureEnabled) { "bpon" } else { "bpoff" }
         $adaptiveLabel = if ($AdaptiveLimitEnabled) { "adapton" } else { "adaptoff" }
         $publishBatchLabel = if ($PublishBatchEnabled) { "pbatchon" } else { "pbatchoff" }
-        $runName = "$backpressureLabel-$adaptiveLabel-$publishBatchLabel-pgmax-$pgMax-vu-$vu-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+        $inFlightLabel = if ($AdaptiveLimitEnabled -and $AdaptiveMaxInFlight -gt 0) { "inflight-$AdaptiveMaxInFlight" } else { "inflight-off" }
+        $runName = "$backpressureLabel-$adaptiveLabel-$publishBatchLabel-$inFlightLabel-pgmax-$pgMax-vu-$vu-" + (Get-Date -Format "yyyyMMdd-HHmmss")
         $resultDir = Join-Path $ResultRoot $runName
         $serviceOut = Join-Path (Get-Location) "logs\message-service-grpc-$runName.out.log"
         $serviceErr = Join-Path (Get-Location) "logs\message-service-grpc-$runName.err.log"
         $relayOut = Join-Path (Get-Location) "logs\message-service-relay-$runName.out.log"
         $relayErr = Join-Path (Get-Location) "logs\message-service-relay-$runName.err.log"
 
-        Write-Host "Starting PG pool run pg_max=$pgMax pg_min=$PGMinConns vus=$vu duration=$Duration publish_batch=$PublishBatchEnabled adaptive=$AdaptiveLimitEnabled"
+        Write-Host "Starting PG pool run pg_max=$pgMax pg_min=$PGMinConns vus=$vu duration=$Duration publish_batch=$PublishBatchEnabled adaptive=$AdaptiveLimitEnabled max_in_flight=$AdaptiveMaxInFlight"
 
         $env:NEXUSIM_PG_DSN = $PGDSN
         $env:NEXUSIM_PG_MAX_CONNS = [string]$pgMax
@@ -93,6 +95,11 @@ foreach ($pgMax in $PGMaxConns) {
         }
         if ($AdaptiveLimitEnabled) {
             $env:NEXUSIM_ADAPTIVE_LIMIT_ENABLED = "true"
+            if ($AdaptiveMaxInFlight -gt 0) {
+                $env:NEXUSIM_ADAPTIVE_MAX_IN_FLIGHT = [string]$AdaptiveMaxInFlight
+            } else {
+                Remove-Item Env:\NEXUSIM_ADAPTIVE_MAX_IN_FLIGHT -ErrorAction SilentlyContinue
+            }
             $env:NEXUSIM_ADAPTIVE_MIN_AVAILABLE_CONNS = [string]$AdaptiveMinAvailableConns
             $env:NEXUSIM_ADAPTIVE_RELEASE_AVAILABLE_CONNS = [string]$AdaptiveReleaseAvailableConns
             $env:NEXUSIM_ADAPTIVE_MAX_POOL_ACQUIRE_P95 = $AdaptiveMaxPoolAcquireP95
@@ -107,6 +114,7 @@ foreach ($pgMax in $PGMaxConns) {
             $env:NEXUSIM_ADAPTIVE_RELAY_METRICS_URL = $relayMetricsURL
         } else {
             Remove-Item Env:\NEXUSIM_ADAPTIVE_LIMIT_ENABLED -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_MAX_IN_FLIGHT -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MIN_AVAILABLE_CONNS -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_RELEASE_AVAILABLE_CONNS -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MAX_POOL_ACQUIRE_P95 -ErrorAction SilentlyContinue
@@ -169,6 +177,7 @@ foreach ($pgMax in $PGMaxConns) {
             Remove-Item Env:\NEXUSIM_PG_BACKPRESSURE_MIN_AVAILABLE_CONNS -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_OUTBOX_PUBLISH_BATCH_ENABLED -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_LIMIT_ENABLED -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_MAX_IN_FLIGHT -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MIN_AVAILABLE_CONNS -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_RELEASE_AVAILABLE_CONNS -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MAX_POOL_ACQUIRE_P95 -ErrorAction SilentlyContinue

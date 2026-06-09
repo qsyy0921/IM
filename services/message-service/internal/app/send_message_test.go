@@ -76,6 +76,26 @@ func TestSendMessageUseCaseAdmissionRejectsBeforeDependencyReads(t *testing.T) {
 	}
 }
 
+func TestSendMessageUseCaseReleasesAdmissionPermitOnRepositoryError(t *testing.T) {
+	repo := &fakeMessageRepository{err: types.NewDBWriteFailed("test")}
+	permit := &fakeAdmissionPermit{}
+	useCase := NewSendMessageUseCase(
+		&fakePolicy{decision: allowedDecision()},
+		&fakeConversation{context: localConversation()},
+		fakeSequencer{},
+		repo,
+		WithAdmission(&fakeAdmission{permit: permit}),
+	)
+
+	_, err := useCase.Execute(context.Background(), testCommand())
+	if !errors.Is(err, types.ErrDBWriteFailed) {
+		t.Fatalf("expected db write failed, got %v", err)
+	}
+	if !permit.released {
+		t.Fatalf("expected admission permit to be released")
+	}
+}
+
 func TestSendMessageUseCaseRejectsSequencerModeInPhaseOne(t *testing.T) {
 	repo := &fakeMessageRepository{}
 	conversation := localConversation()
@@ -279,9 +299,18 @@ func (f *fakeMessageRepository) AppendMessage(_ context.Context, input domain.Ap
 }
 
 type fakeAdmission struct {
-	err error
+	permit types.AdmissionPermit
+	err    error
 }
 
-func (f *fakeAdmission) CheckSendMessage(context.Context) error {
-	return f.err
+func (f *fakeAdmission) AdmitSendMessage(context.Context) (types.AdmissionPermit, error) {
+	return f.permit, f.err
+}
+
+type fakeAdmissionPermit struct {
+	released bool
+}
+
+func (p *fakeAdmissionPermit) Release() {
+	p.released = true
 }

@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+type AdmissionPermit interface {
+	Release()
+}
+
 var (
 	ErrPermissionDenied       = errors.New("permission denied")
 	ErrSequencerUnavailable   = errors.New("sequencer unavailable")

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -19,6 +20,7 @@ type Config struct {
 	MinAvailableConns             int32
 	ReleaseAvailableConns         int32
 	MaxPoolAcquireP95             time.Duration
+	MaxInFlight                   int64
 	MaxOutboxPending              int64
 	ReleaseOutboxPending          int64
 	MaxRelayProcessReadyActiveP95 time.Duration
@@ -59,6 +61,7 @@ type Controller struct {
 	outboxPending atomic.Int64
 	relaySnapshot atomic.Value
 	overloaded    atomic.Bool
+	inFlight      atomic.Int64
 }
 
 func NewController(
@@ -107,22 +110,53 @@ func (c *Controller) Start(ctx context.Context) {
 }
 
 func (c *Controller) CheckSendMessage(ctx context.Context) error {
+	permit, err := c.AdmitSendMessage(ctx)
+	if permit != nil {
+		permit.Release()
+	}
+	return err
+}
+
+func (c *Controller) AdmitSendMessage(ctx context.Context) (types.AdmissionPermit, error) {
 	if c == nil || !c.config.Enabled {
-		return nil
+		return nil, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	if c.overloaded.Load() {
 		blockers := c.recoveryBlockers()
 		if len(blockers) > 0 {
-			return c.newServiceOverloaded("adaptive limit recovering", blockers, true)
+			return nil, c.newServiceOverloaded("adaptive limit recovering", blockers, true)
 		}
 		c.overloaded.Store(false)
 	}
 	reasons := c.overloadReasons()
 	if len(reasons) == 0 {
-		return nil
+		permit, err := c.tryAcquirePermit()
+		if err != nil {
+			return nil, err
+		}
+		return permit, nil
 	}
 	c.overloaded.Store(true)
-	return c.newServiceOverloaded("adaptive limit", reasons, false)
+	return nil, c.newServiceOverloaded("adaptive limit", reasons, false)
+}
+
+func (c *Controller) tryAcquirePermit() (types.AdmissionPermit, error) {
+	if c.config.MaxInFlight <= 0 {
+		return nil, nil
+	}
+	for {
+		current := c.inFlight.Load()
+		if current >= c.config.MaxInFlight {
+			reason := fmt.Sprintf("send_message_in_flight=%d max_in_flight=%d", current, c.config.MaxInFlight)
+			return nil, c.newServiceOverloaded("adaptive concurrency limit", []string{reason}, false)
+		}
+		if c.inFlight.CompareAndSwap(current, current+1) {
+			return &permit{release: func() { c.inFlight.Add(-1) }}, nil
+		}
+	}
 }
 
 func (c *Controller) newServiceOverloaded(prefix string, reasons []string, recovering bool) error {
@@ -320,6 +354,18 @@ func preferRecentValue(recent metricsinfra.ValueSnapshot, cumulative metricsinfr
 
 func ms(duration time.Duration) float64 {
 	return float64(duration) / float64(time.Millisecond)
+}
+
+type permit struct {
+	once    sync.Once
+	release func()
+}
+
+func (p *permit) Release() {
+	if p == nil || p.release == nil {
+		return
+	}
+	p.once.Do(p.release)
 }
 
 type PGXPoolStatsProvider struct {

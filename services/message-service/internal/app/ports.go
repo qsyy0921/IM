@@ -24,5 +24,5 @@ type MessageRepository interface {
 }
 
 type AdmissionPort interface {
-	CheckSendMessage(ctx context.Context) error
+	AdmitSendMessage(ctx context.Context) (types.AdmissionPermit, error)
 }

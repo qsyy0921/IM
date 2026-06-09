@@ -47,8 +47,12 @@ func (u *SendMessageUseCase) Execute(ctx context.Context, command types.SendMess
 		return types.SendMessageResult{}, err
 	}
 	if u.admission != nil {
-		if err := u.admission.CheckSendMessage(ctx); err != nil {
+		permit, err := u.admission.AdmitSendMessage(ctx)
+		if err != nil {
 			return types.SendMessageResult{}, err
+		}
+		if permit != nil {
+			defer permit.Release()
 		}
 	}
 

@@ -140,7 +140,7 @@ accepted_at
 | `OUTBOX_WRITE_FAILED` | outbox 写入失败，事务回滚 | 是 |
 | `SERVICE_OVERLOADED` | 服务过载或连接池保护性拒绝 | 是 |
 
-`SERVICE_OVERLOADED` 的 gRPC response 必须附带标准 `RetryInfo` detail；当前第一阶段使用固定 `500ms` retry delay，客户端仍必须叠加指数退避和 jitter，不能立即重试。
+`SERVICE_OVERLOADED` 的 gRPC response 必须附带标准 `RetryInfo` detail；默认 retry delay 为 `500ms`。adaptive admission 可以根据过载原因数量携带动态 retry delay，但客户端仍必须叠加指数退避和 jitter，不能立即重试。
 
 过载保护分两层：
 
@@ -151,7 +151,7 @@ accepted_at
 
 - 两层保护都只能返回 `SERVICE_OVERLOADED`，不能写 message、timeline 或 outbox。
 - adaptive 输入必须来自运行时观测或采样，不允许 domain 直接依赖 metrics、PostgreSQL 或 Kafka。
-- 当前固定 `RetryInfo=500ms` 不是最优值；生产化阶段应由 adaptive limit 根据过载程度动态给出 retry hint。
+- 默认 `RetryInfo=500ms` 不是最优值；adaptive limit 应根据过载程度动态给出 retry hint，且必须有上限。
 
 ### 4.2 同步调用治理
 

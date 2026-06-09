@@ -365,6 +365,8 @@ error_p99_ms
   -AdaptiveMinOutboxFetchedPerCall 1 `
   -AdaptiveMinKafkaRecordsPerCall 1 `
   -AdaptiveSampleInterval 500ms `
+  -AdaptiveRetryBaseDelay 500ms `
+  -AdaptiveRetryMaxDelay 2s `
   -ResultRoot loadtest\results\adaptive-limit-smoke-YYYYMMDD
 ```
 
@@ -398,6 +400,7 @@ outbox_pending_count
 
 不要把极端阈值下的低 p99 解释成容量提升；那只是快速拒绝。
 adaptive limit 的硬拒绝判断优先看 `*_recent` 字段，累计字段只用于历史趋势和报告解释。
+当前 adaptive controller 可动态设置 gRPC `RetryInfo`，summary 已记录 `retry_delay_count`、`retry_delay_avg_ms`、`retry_delay_p95_ms`、`retry_delay_p99_ms`。正式调参报告必须同时展示 attempt latency 和 retry delay，不能只用 gRPC attempt p99 判断客户端等待体验。
 
 ## 12. PublishBatch On/Off
 

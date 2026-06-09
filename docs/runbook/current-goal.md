@@ -2,16 +2,30 @@
 
 本文是 Codex Goal 的持续入口。每轮工作开始时先执行 `git status --short`，然后读取本文，再决定本轮行动。
 
+## 0. 可复制短 Goal Prompt
+
+```text
+持续推进 E:\development\IM 的 NexusIM 项目。
+
+每轮开始先执行 git status --short --branch，并读取 docs/runbook/current-goal.md。
+按 current-goal.md 的当前目标、边界、下一步优先级继续工作；不回滚用户已有修改。
+
+当前重点：补齐 delivery_outbox relay / im.delivery.events，再进入 push-gateway SDD。
+每个微服务独立使用六层 DDD：api / app / domain / infrastructure / types / trigger。
+重要契约、migration、并发/事务/幂等、可运行链路完成时再邀请评审线程 019ea124-dab1-71f2-964b-f5cb8d219aa2。
+完成有意义切片后运行检查、更新 current-goal.md 和对应 runbook/loadtest 报告；必要时提交并推送 GitHub。
+```
+
 ## 1. 当前目标
 
-持续推进 `E:\development\IM` 的 NexusIM 项目落地。`message-service` 第一阶段主链路和压测证据已经形成，`conversation-service` 已完成第二个真实微服务的最小闭环；当前阶段转向第三个真实微服务：
+持续推进 `E:\development\IM` 的 NexusIM 项目落地。`message-service`、`conversation-service`、`delivery-service` 已分别完成最小真实闭环；当前阶段从“证明第三个微服务能跑通”切换到“补齐投递事件发布和 push-gateway 前置设计”：
 
 ```text
 delivery-service
--> consume Kafka conversation.timeline.events
--> project user_inbox / device_delivery_cursors
--> PullInbox / AckDelivery
--> prepare push-gateway online delivery
+-> delivery_outbox relay
+-> Kafka im.delivery.events
+-> push-gateway SDD
+-> prepare online delivery without bypassing durable inbox
 ```
 
 ## 2. 硬边界
@@ -70,21 +84,18 @@ delivery-service
 | delivery-service SDD | `docs/sdd/delivery-service.md` 已新增 v0.1 Draft，并已按评审 P1 补齐 delivery membership projection、ACK max visible seq 约束、Kafka checkpoint 维度 |
 | delivery-service 工程基线 | 已新增 `delivery_service.proto`、delivery migration、六层目录、`PullInbox / AckDelivery` 最小 gRPC + app + PostgreSQL 骨架、`ProjectTimelineEventUseCase` / PostgreSQL projection 方法，以及 timeline consumer worker；真实 PostgreSQL 集成测试已覆盖 projection、ACK 越界、ACK 并发幂等 |
 | delivery-service full smoke | 已跑真实进程小规模 smoke：`CreateMemberChange(JOIN) -> Kafka timeline -> delivery projection -> SendMessage -> Kafka timeline -> user_inbox -> PullInbox -> AckDelivery`，SendMessage `64/64` 成功，`delivery-user-1` 拉到 64 条 inbox，ACK 到 seq `66`；`loadtest/delivery` summary 已支持 `--consumer-group`，checkpoint 统计可按本次 consumer group 过滤；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-full-smoke.md` |
+| delivery_outbox / push-gateway | `delivery_outbox` 当前只落本地 `PENDING` 事实，尚未发布 `im.delivery.events`；push-gateway 尚未实现，下一阶段必须先明确它依赖 delivery read model / delivery event，不直接读取 message-service 内部表，也不修改 ACK |
 
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
-2. adaptive limit 第一版已接入并跑完 on/off 对照；debug metrics collector 已新增 recent 窗口字段，adaptive controller 已新增 hysteresis 和动态 retry hint；loadtest summary 已记录 retry delay histogram。
-3. adaptive best candidate 60s 重复验证已完成，`gap8-outbox50-base1000` 能保护 outbox 清零，但 accepted RPS 过低，不能作为稳定配置。
-4. pool acquire p95 阈值矩阵已完成，单纯放宽 `250ms / 500ms / 750ms` 不能解决 accepted RPS 偏低和 logical p99 过高的问题。
-5. admission token / concurrency limit 已实现并跑完 v1 矩阵；`MaxInFlight=64` 是当前 Windows 本机候选，60s 下 1200/1600 VU accepted RPS 约 `1.92k`、success p99 约 `63ms`、outbox pending 为 0。
-6. message-service 第一阶段压测报告已归档到 `docs/runbook/loadtest/message-service/`，总入口为 `docs/runbook/loadtest/message-service/loadtest-report-20260609-message-service-consolidated.md`；后续不再围绕 message-service 做大规模硬件矩阵，只在关键机制变更后跑 smoke / 小规模验证。
-7. `conversation-service` 最小 RPC read path 已落地并通过真实进程 smoke：SDD、proto、migration、六层骨架、PostgreSQL repository、gRPC handler、`message-service` 可选 gRPC client 和 `message-service -> conversation-service -> PostgreSQL` 小规模验证均已完成。
-8. `conversation-service` 本地运行 runbook 和更多错误路径测试已补齐；独立评审指出的 P1 参数缺失错误映射已修复；P2 中的 `message-service -> conversation-service` 短重试和 response contract 防御也已补。
-9. `conversation-service / member_change_saga` 最小 `CreateMemberChange` 写路径已落地，并已完成真实进程 smoke：`CreateMemberChange -> outbox relay -> Kafka member event -> outbox PUBLISHED`，报告见 `docs/runbook/loadtest/conversation-service/loadtest-report-20260609-member-change-smoke.md`。
-10. 独立评审已确认 `conversation-service` member change full smoke 阶段无 P0/P1；第二个真实微服务最小闭环可以收口。
-11. `delivery-service` 已完成真实小规模 smoke：成员事件和消息事件经 `conversation.timeline.events` 被 timeline consumer 投影到 `user_inbox`，`PullInbox / AckDelivery` 成功；当前 `delivery_outbox` 只落本地 `PENDING` 事实，尚未发布 `im.delivery.events`。
-12. 下一步进入 `delivery_outbox` 发布链路设计或 `push-gateway` SDD；`push-gateway` 不应绕过 durable inbox，也不应直接消费 message-service 的内部表。
+2. 不再继续做 message-service 重型硬件矩阵；只有公共契约、关键并发语义或新服务链路变化时，才跑 smoke / 小规模验证。
+3. 先补 `delivery_outbox relay / im.delivery.events` 小 SDD 或设计小节，明确事件契约、outbox envelope、retry/DLQ、fail-closed、consumer 幂等和与 push-gateway 的边界。
+4. 设计并实现 delivery-service 的 `delivery_outbox -> Kafka im.delivery.events` 最小发布链路；业务事务仍然只写 outbox，不直接 publish Kafka。
+5. 为 delivery outbox relay 补真实 PostgreSQL 集成测试和小规模 smoke 报告，报告放在 `docs/runbook/loadtest/delivery-service/`，不要覆盖旧报告。
+6. 在接入 push-gateway 前，补一个 `LEAVE/REMOVE` 负向可见性 smoke：成员离开或被移除后，新消息不能继续写入该用户 `user_inbox`。
+7. 写 `push-gateway` SDD，明确它只负责在线连接、订阅 delivery event / 查询 delivery read model，不拥有 `user_inbox`，不修改 ACK，不直接读取 message-service / conversation-service 内部表。
+8. push-gateway SDD 冻结后，再进入 proto / migration / 六层骨架和最小在线推送链路。
 
 ## 6. 评审要求
 

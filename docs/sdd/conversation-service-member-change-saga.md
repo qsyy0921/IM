@@ -128,19 +128,21 @@ rpc GetMemberChange(GetMemberChangeRequest) returns (GetMemberChangeResponse);
 `CreateMemberChangeRequest` 必须包含：
 
 ```text
-tenant_id
+auth_context.tenant_id
+auth_context.user_id
+auth_context.trace_id
+auth_context.request_id
 conversation_id
 target_user_id
-operator_user_id
 change_type
 target_role
 expected_member_version
 idempotency_key
 conflict_policy
 reason
-trace_id
-request_id
 ```
+
+说明：`operator_user_id` 由 `auth_context.user_id` 派生。生产模式不信任 request 里的裸 operator 字段；第一版本地 smoke 也按同一字段模拟认证上下文。
 
 `CreateMemberChangeResponse` 必须包含：
 
@@ -211,14 +213,29 @@ reason
 occurred_at
 ```
 
-当前 Kafka schema `schemas/kafka/conversation.timeline.events.proto` 只包含 message payload。编码前必须扩展 oneof，新增 `ConversationMemberJoinedV1` / `ConversationMemberLeftV1` / `ConversationMemberRemovedV1` / `ConversationMemberRoleChangedV1` / `ConversationMemberBoundaryCancelledV1`。
+成员边界 outbox envelope 映射必须固定：
 
-编码前还必须升级现有 outbox relay：
+| 字段 | 来源 / 规则 |
+| --- | --- |
+| `event_id` | saga 创建时生成并持久化到 `member_change_saga.outbox_event_id`；同一幂等键 replay 必须复用 |
+| `event_version` | `v1` |
+| `mapping_version` | 等于具体事件类型，例如 `conversation.member.joined.v1` |
+| `correlation_id` | 优先 `auth_context.request_id`，为空时使用 `change_id` |
+| `causation_id` | `change_id` |
+| `producer` | `conversation-service` |
+| `trace_id` | `auth_context.trace_id`，为空时使用 `auth_context.request_id` |
+| `payload_json` | oneof 业务 payload 的 JSON 形状，不保存完整 envelope |
+
+`conversation_timeline_events.event_id` 和 `message_outbox.event_id` 第一版都使用同一个 `outbox_event_id`，并把该值保存到 `member_change_saga.timeline_event_id` / `member_change_saga.outbox_event_id`。这样 trigger worker 可以用稳定 `outbox_event_id` 查询 outbox 发布状态，再把 saga 推进到 `EVENT_PUBLISHED / DONE`；不得只依赖 `(tenant_id, conversation_id, boundary_seq, event_type)` 反查。
+
+Kafka schema `schemas/kafka/conversation.timeline.events.proto` 必须包含 member boundary oneof payload：`ConversationMemberJoinedV1` / `ConversationMemberLeftV1` / `ConversationMemberRemovedV1` / `ConversationMemberRoleChangedV1` / `ConversationMemberBoundaryCancelledV1`。本契约落地后，真实写入成员 outbox 前仍必须升级 relay builder。
+
+真实写入 member boundary outbox 前还必须升级现有 outbox relay：
 
 - `services/message-service/internal/trigger/outbox/relay.go` 当前只 build `message.persisted.v1`。
 - 未扩展 relay 前，成员事件写入 `message_outbox` 会不断 retry / DLQ。
 - 低版本成员事件一旦 PENDING / DLQ，会按当前 outbox 顺序保护阻塞同会话后续消息事件。
-- 因此成员变更代码不得早于 Kafka schema + relay builder 支持上线。
+- 因此成员变更代码不得早于 Kafka schema + relay builder 支持上线；如果 Kafka schema 已扩展但 relay builder 尚未支持，仍不得把 member event 写入 outbox。
 
 ## 7. 数据库设计
 
@@ -241,6 +258,8 @@ migrations/postgres/conversation/000001_conversation_core.sql
 | `member_change_saga` | `completed_at` | Saga 成功完成时间 |
 | `member_change_saga` | `dead_lettered_at` | 补偿失败或人工处理时间 |
 | `member_change_saga` | `next_retry_at` | trigger worker 重试调度 |
+| `member_change_saga` | `timeline_event_id` | 关联 `conversation_timeline_events.event_id` |
+| `member_change_saga` | `outbox_event_id` | 关联 `message_outbox.event_id`，trigger / repair 以它为主键 |
 | `member_change_saga` | `metadata_json` | 保存旧角色、旧状态、策略版本等扩展字段 |
 | `member_change_saga` | status check 增加 `OUTBOX_ENQUEUED` | 区分已入 outbox 和已发布 Kafka |
 | `conversation_members` | `join_seq` / `leave_seq` | 已存在，用于解释成员边界 |
@@ -281,7 +300,9 @@ api CreateMemberChange
 -> idempotency lookup by (tenant_id, conversation_id, idempotency_key)
 -> lock target conversation_member row or create placeholder
 -> domain validate status / role / expected_member_version / conflict_policy
--> allocate boundary_seq through conversation_seq row
+-> ensure conversation_seq row after conversation ACTIVE is verified
+-> allocate boundary_seq through conversation_seq row using UPDATE ... RETURNING
+-> generate stable outbox_event_id / timeline_event_id for this change_id
 -> insert / update member_change_saga(status=BOUNDARY_ALLOCATED)
 -> update conversation_members
 -> increment conversations.member_version / permission_version
@@ -300,6 +321,7 @@ api CreateMemberChange
 - 这不是让 conversation-service 修改 message-service 的消息事实；它只追加 conversation timeline 边界事件。
 - 不允许启动第二套 relay 竞争同一张 `message_outbox`；必须升级现有统一 outbox relay，使 message/member timeline event 经同一条发布路径输出。
 - 如果暂时没有扩展 Kafka schema 和 relay builder，`member_change_saga` 最多只能记录命令，不得声明成员事件已进入 `conversation.timeline.events` 全序流。
+- `DONE` 是 conversation-service 本地 saga 完成态，只表示成员事实更新完成且边界事件已经通过 outbox 发布到 Kafka；它不表示 delivery、retrieval/search ACL projection、audit sink 都已完成。下游 projection lag / checksum mismatch 由各 consumer、strict ACL fallback 和独立 repair 处理。
 
 ## 9. 一致性和事务
 
@@ -321,6 +343,7 @@ message_outbox
 - 当前 `conversation_seq`、`conversation_timeline_events`、`message_outbox` 由 message migration 创建，这是第一阶段工程落地结果。
 - 成员变更编码前应把这些表在文档和 migration 目录上标记为 conversation timeline shared store，或至少在 SDD 中明确两类服务只能通过 timeline/outbox append port 写入。
 - 不允许 conversation-service 直接修改 `message_log`，也不允许 message-service 修改 `conversation_members`。
+- 当前阶段统一 outbox relay 仍运行在 `message-service/internal/trigger/outbox`，这是工程过渡安排；它承担 shared conversation timeline outbox relay 职责，不代表 member event 归 message-service 所有。生产化时应评估独立为 `timeline-outbox-relay`，或在 TADD 中明确保留现有部署口径。
 
 最终一致边界：
 
@@ -340,6 +363,7 @@ audit sink
 - 同一 idempotency key 重试必须返回同一 `change_id` 和同一 `boundary_seq`。
 - 边界 event 的 `aggregate_version` 必须等于 `boundary_seq`。
 - 边界 event 不允许跳过 outbox 直接 publish Kafka。
+- unsupported event 必须 fail-closed：relay 不崩溃，但事件保持 PENDING retry 或进入 DLQ，并继续阻塞同 conversation 后续更高版本事件；只有受控 repair / audit 流程可以显式 skip。
 
 ## 10. 幂等、重试和补偿
 
@@ -464,8 +488,8 @@ Runbook 必须覆盖：
 - 本 SDD Frozen。
 - `conversation_service.proto` 增加成员变更 RPC。
 - `schemas/kafka/conversation.timeline.events.proto` 增加 member boundary oneof payload。
-- outbox relay builder 支持 `conversation.member.*`，并覆盖 unsupported event 不阻塞后续上线。
-- migration 补齐 saga retry / DLQ / metadata 字段或明确不需要。
+- outbox relay builder 支持 `conversation.member.*`，并覆盖 unsupported event fail-closed：不崩进程、不误标记 `PUBLISHED`、继续按同 conversation 顺序阻塞，除非受控 repair/audit 显式 skip。
+- migration 补齐 saga retry / DLQ / metadata / `outbox_event_id` / `timeline_event_id` 字段或明确不需要。
 - migration / 文档明确 `conversation_seq`、`conversation_timeline_events`、`message_outbox` 是 conversation timeline shared store。
 - 明确 timeline append / outbox append port，不在 API/usecase 里拼 SQL。
 - 单元测试覆盖角色规则和状态机。

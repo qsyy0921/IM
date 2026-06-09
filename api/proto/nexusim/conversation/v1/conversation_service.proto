@@ -6,6 +6,8 @@ option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1;co
 
 service ConversationService {
   rpc GetSendContext(GetSendContextRequest) returns (GetSendContextResponse);
+  rpc CreateMemberChange(CreateMemberChangeRequest) returns (CreateMemberChangeResponse);
+  rpc GetMemberChange(GetMemberChangeRequest) returns (GetMemberChangeResponse);
 }
 
 message GetSendContextRequest {
@@ -29,6 +31,39 @@ enum FanoutMode {
   FANOUT_MODE_BROADCAST_SIGNAL = 4;
 }
 
+enum MemberChangeType {
+  MEMBER_CHANGE_TYPE_UNSPECIFIED = 0;
+  MEMBER_CHANGE_TYPE_JOIN = 1;
+  MEMBER_CHANGE_TYPE_LEAVE = 2;
+  MEMBER_CHANGE_TYPE_REMOVE = 3;
+  MEMBER_CHANGE_TYPE_ROLE_CHANGED = 4;
+}
+
+enum MemberRole {
+  MEMBER_ROLE_UNSPECIFIED = 0;
+  MEMBER_ROLE_OWNER = 1;
+  MEMBER_ROLE_ADMIN = 2;
+  MEMBER_ROLE_MEMBER = 3;
+}
+
+enum MemberChangeConflictPolicy {
+  MEMBER_CHANGE_CONFLICT_POLICY_UNSPECIFIED = 0;
+  MEMBER_CHANGE_CONFLICT_POLICY_REJECT = 1;
+  MEMBER_CHANGE_CONFLICT_POLICY_MERGE = 2;
+  MEMBER_CHANGE_CONFLICT_POLICY_COMPENSATE = 3;
+}
+
+enum MemberChangeStatus {
+  MEMBER_CHANGE_STATUS_UNSPECIFIED = 0;
+  MEMBER_CHANGE_STATUS_PENDING_BOUNDARY = 1;
+  MEMBER_CHANGE_STATUS_BOUNDARY_ALLOCATED = 2;
+  MEMBER_CHANGE_STATUS_MEMBER_UPDATED = 3;
+  MEMBER_CHANGE_STATUS_OUTBOX_ENQUEUED = 4;
+  MEMBER_CHANGE_STATUS_EVENT_PUBLISHED = 5;
+  MEMBER_CHANGE_STATUS_DONE = 6;
+  MEMBER_CHANGE_STATUS_FAILED_COMPENSATED = 7;
+}
+
 message GetSendContextResponse {
   string tenant_id = 1;
   string conversation_id = 2;
@@ -38,4 +73,61 @@ message GetSendContextResponse {
   FanoutMode fanout_mode = 6;
   int64 fanout_policy_version = 7;
   string current_seq_shard = 8;
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+message CreateMemberChangeRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  string target_user_id = 3;
+  MemberChangeType change_type = 4;
+  MemberRole target_role = 5;
+  int64 expected_member_version = 6;
+  string idempotency_key = 7;
+  MemberChangeConflictPolicy conflict_policy = 8;
+  string reason = 9;
+}
+
+message CreateMemberChangeResponse {
+  string change_id = 1;
+  string tenant_id = 2;
+  string conversation_id = 3;
+  string target_user_id = 4;
+  MemberChangeType change_type = 5;
+  MemberChangeStatus status = 6;
+  int64 boundary_seq = 7;
+  int64 member_version = 8;
+  int64 permission_version = 9;
+  bool idempotent_replay = 10;
+}
+
+message GetMemberChangeRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  string change_id = 3;
+}
+
+message GetMemberChangeResponse {
+  string change_id = 1;
+  string tenant_id = 2;
+  string conversation_id = 3;
+  string target_user_id = 4;
+  string operator_user_id = 5;
+  MemberChangeType change_type = 6;
+  MemberChangeStatus status = 7;
+  int64 boundary_seq = 8;
+  int64 member_version = 9;
+  int64 permission_version = 10;
+  MemberRole old_role = 11;
+  MemberRole new_role = 12;
+  string reason = 13;
+  string last_error = 14;
 }

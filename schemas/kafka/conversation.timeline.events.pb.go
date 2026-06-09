@@ -72,6 +72,165 @@ func (MessageDeleteScope) EnumDescriptor() ([]byte, []int) {
 	return file_conversation_timeline_events_proto_rawDescGZIP(), []int{0}
 }
 
+type ConversationMemberChangeType int32
+
+const (
+	ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_UNSPECIFIED  ConversationMemberChangeType = 0
+	ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_JOIN         ConversationMemberChangeType = 1
+	ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_LEAVE        ConversationMemberChangeType = 2
+	ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_REMOVE       ConversationMemberChangeType = 3
+	ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_ROLE_CHANGED ConversationMemberChangeType = 4
+)
+
+// Enum value maps for ConversationMemberChangeType.
+var (
+	ConversationMemberChangeType_name = map[int32]string{
+		0: "CONVERSATION_MEMBER_CHANGE_TYPE_UNSPECIFIED",
+		1: "CONVERSATION_MEMBER_CHANGE_TYPE_JOIN",
+		2: "CONVERSATION_MEMBER_CHANGE_TYPE_LEAVE",
+		3: "CONVERSATION_MEMBER_CHANGE_TYPE_REMOVE",
+		4: "CONVERSATION_MEMBER_CHANGE_TYPE_ROLE_CHANGED",
+	}
+	ConversationMemberChangeType_value = map[string]int32{
+		"CONVERSATION_MEMBER_CHANGE_TYPE_UNSPECIFIED":  0,
+		"CONVERSATION_MEMBER_CHANGE_TYPE_JOIN":         1,
+		"CONVERSATION_MEMBER_CHANGE_TYPE_LEAVE":        2,
+		"CONVERSATION_MEMBER_CHANGE_TYPE_REMOVE":       3,
+		"CONVERSATION_MEMBER_CHANGE_TYPE_ROLE_CHANGED": 4,
+	}
+)
+
+func (x ConversationMemberChangeType) Enum() *ConversationMemberChangeType {
+	p := new(ConversationMemberChangeType)
+	*p = x
+	return p
+}
+
+func (x ConversationMemberChangeType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ConversationMemberChangeType) Descriptor() protoreflect.EnumDescriptor {
+	return file_conversation_timeline_events_proto_enumTypes[1].Descriptor()
+}
+
+func (ConversationMemberChangeType) Type() protoreflect.EnumType {
+	return &file_conversation_timeline_events_proto_enumTypes[1]
+}
+
+func (x ConversationMemberChangeType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ConversationMemberChangeType.Descriptor instead.
+func (ConversationMemberChangeType) EnumDescriptor() ([]byte, []int) {
+	return file_conversation_timeline_events_proto_rawDescGZIP(), []int{1}
+}
+
+type ConversationMemberRole int32
+
+const (
+	ConversationMemberRole_CONVERSATION_MEMBER_ROLE_UNSPECIFIED ConversationMemberRole = 0
+	ConversationMemberRole_CONVERSATION_MEMBER_ROLE_OWNER       ConversationMemberRole = 1
+	ConversationMemberRole_CONVERSATION_MEMBER_ROLE_ADMIN       ConversationMemberRole = 2
+	ConversationMemberRole_CONVERSATION_MEMBER_ROLE_MEMBER      ConversationMemberRole = 3
+)
+
+// Enum value maps for ConversationMemberRole.
+var (
+	ConversationMemberRole_name = map[int32]string{
+		0: "CONVERSATION_MEMBER_ROLE_UNSPECIFIED",
+		1: "CONVERSATION_MEMBER_ROLE_OWNER",
+		2: "CONVERSATION_MEMBER_ROLE_ADMIN",
+		3: "CONVERSATION_MEMBER_ROLE_MEMBER",
+	}
+	ConversationMemberRole_value = map[string]int32{
+		"CONVERSATION_MEMBER_ROLE_UNSPECIFIED": 0,
+		"CONVERSATION_MEMBER_ROLE_OWNER":       1,
+		"CONVERSATION_MEMBER_ROLE_ADMIN":       2,
+		"CONVERSATION_MEMBER_ROLE_MEMBER":      3,
+	}
+)
+
+func (x ConversationMemberRole) Enum() *ConversationMemberRole {
+	p := new(ConversationMemberRole)
+	*p = x
+	return p
+}
+
+func (x ConversationMemberRole) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ConversationMemberRole) Descriptor() protoreflect.EnumDescriptor {
+	return file_conversation_timeline_events_proto_enumTypes[2].Descriptor()
+}
+
+func (ConversationMemberRole) Type() protoreflect.EnumType {
+	return &file_conversation_timeline_events_proto_enumTypes[2]
+}
+
+func (x ConversationMemberRole) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ConversationMemberRole.Descriptor instead.
+func (ConversationMemberRole) EnumDescriptor() ([]byte, []int) {
+	return file_conversation_timeline_events_proto_rawDescGZIP(), []int{2}
+}
+
+type ConversationMemberStatus int32
+
+const (
+	ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_UNSPECIFIED ConversationMemberStatus = 0
+	ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_ACTIVE      ConversationMemberStatus = 1
+	ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_LEFT        ConversationMemberStatus = 2
+	ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_BANNED      ConversationMemberStatus = 3
+)
+
+// Enum value maps for ConversationMemberStatus.
+var (
+	ConversationMemberStatus_name = map[int32]string{
+		0: "CONVERSATION_MEMBER_STATUS_UNSPECIFIED",
+		1: "CONVERSATION_MEMBER_STATUS_ACTIVE",
+		2: "CONVERSATION_MEMBER_STATUS_LEFT",
+		3: "CONVERSATION_MEMBER_STATUS_BANNED",
+	}
+	ConversationMemberStatus_value = map[string]int32{
+		"CONVERSATION_MEMBER_STATUS_UNSPECIFIED": 0,
+		"CONVERSATION_MEMBER_STATUS_ACTIVE":      1,
+		"CONVERSATION_MEMBER_STATUS_LEFT":        2,
+		"CONVERSATION_MEMBER_STATUS_BANNED":      3,
+	}
+)
+
+func (x ConversationMemberStatus) Enum() *ConversationMemberStatus {
+	p := new(ConversationMemberStatus)
+	*p = x
+	return p
+}
+
+func (x ConversationMemberStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ConversationMemberStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_conversation_timeline_events_proto_enumTypes[3].Descriptor()
+}
+
+func (ConversationMemberStatus) Type() protoreflect.EnumType {
+	return &file_conversation_timeline_events_proto_enumTypes[3]
+}
+
+func (x ConversationMemberStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ConversationMemberStatus.Descriptor instead.
+func (ConversationMemberStatus) EnumDescriptor() ([]byte, []int) {
+	return file_conversation_timeline_events_proto_rawDescGZIP(), []int{3}
+}
+
 // Topic: conversation.timeline.events
 // Partition key: tenant_id + ":" + conversation_id
 // Ordering key: tenant_id + conversation_id + aggregate_version
@@ -99,6 +258,11 @@ type ConversationTimelineEvent struct {
 	//	*ConversationTimelineEvent_MessageEdited
 	//	*ConversationTimelineEvent_MessageRevoked
 	//	*ConversationTimelineEvent_MessageDeleted
+	//	*ConversationTimelineEvent_ConversationMemberJoined
+	//	*ConversationTimelineEvent_ConversationMemberLeft
+	//	*ConversationTimelineEvent_ConversationMemberRemoved
+	//	*ConversationTimelineEvent_ConversationMemberRoleChanged
+	//	*ConversationTimelineEvent_ConversationMemberBoundaryCancelled
 	Payload       isConversationTimelineEvent_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -282,6 +446,51 @@ func (x *ConversationTimelineEvent) GetMessageDeleted() *MessageDeletedV1 {
 	return nil
 }
 
+func (x *ConversationTimelineEvent) GetConversationMemberJoined() *ConversationMemberJoinedV1 {
+	if x != nil {
+		if x, ok := x.Payload.(*ConversationTimelineEvent_ConversationMemberJoined); ok {
+			return x.ConversationMemberJoined
+		}
+	}
+	return nil
+}
+
+func (x *ConversationTimelineEvent) GetConversationMemberLeft() *ConversationMemberLeftV1 {
+	if x != nil {
+		if x, ok := x.Payload.(*ConversationTimelineEvent_ConversationMemberLeft); ok {
+			return x.ConversationMemberLeft
+		}
+	}
+	return nil
+}
+
+func (x *ConversationTimelineEvent) GetConversationMemberRemoved() *ConversationMemberRemovedV1 {
+	if x != nil {
+		if x, ok := x.Payload.(*ConversationTimelineEvent_ConversationMemberRemoved); ok {
+			return x.ConversationMemberRemoved
+		}
+	}
+	return nil
+}
+
+func (x *ConversationTimelineEvent) GetConversationMemberRoleChanged() *ConversationMemberRoleChangedV1 {
+	if x != nil {
+		if x, ok := x.Payload.(*ConversationTimelineEvent_ConversationMemberRoleChanged); ok {
+			return x.ConversationMemberRoleChanged
+		}
+	}
+	return nil
+}
+
+func (x *ConversationTimelineEvent) GetConversationMemberBoundaryCancelled() *ConversationMemberBoundaryCancelledV1 {
+	if x != nil {
+		if x, ok := x.Payload.(*ConversationTimelineEvent_ConversationMemberBoundaryCancelled); ok {
+			return x.ConversationMemberBoundaryCancelled
+		}
+	}
+	return nil
+}
+
 type isConversationTimelineEvent_Payload interface {
 	isConversationTimelineEvent_Payload()
 }
@@ -302,6 +511,26 @@ type ConversationTimelineEvent_MessageDeleted struct {
 	MessageDeleted *MessageDeletedV1 `protobuf:"bytes,19,opt,name=message_deleted,json=messageDeleted,proto3,oneof"`
 }
 
+type ConversationTimelineEvent_ConversationMemberJoined struct {
+	ConversationMemberJoined *ConversationMemberJoinedV1 `protobuf:"bytes,20,opt,name=conversation_member_joined,json=conversationMemberJoined,proto3,oneof"`
+}
+
+type ConversationTimelineEvent_ConversationMemberLeft struct {
+	ConversationMemberLeft *ConversationMemberLeftV1 `protobuf:"bytes,21,opt,name=conversation_member_left,json=conversationMemberLeft,proto3,oneof"`
+}
+
+type ConversationTimelineEvent_ConversationMemberRemoved struct {
+	ConversationMemberRemoved *ConversationMemberRemovedV1 `protobuf:"bytes,22,opt,name=conversation_member_removed,json=conversationMemberRemoved,proto3,oneof"`
+}
+
+type ConversationTimelineEvent_ConversationMemberRoleChanged struct {
+	ConversationMemberRoleChanged *ConversationMemberRoleChangedV1 `protobuf:"bytes,23,opt,name=conversation_member_role_changed,json=conversationMemberRoleChanged,proto3,oneof"`
+}
+
+type ConversationTimelineEvent_ConversationMemberBoundaryCancelled struct {
+	ConversationMemberBoundaryCancelled *ConversationMemberBoundaryCancelledV1 `protobuf:"bytes,24,opt,name=conversation_member_boundary_cancelled,json=conversationMemberBoundaryCancelled,proto3,oneof"`
+}
+
 func (*ConversationTimelineEvent_MessagePersisted) isConversationTimelineEvent_Payload() {}
 
 func (*ConversationTimelineEvent_MessageEdited) isConversationTimelineEvent_Payload() {}
@@ -309,6 +538,18 @@ func (*ConversationTimelineEvent_MessageEdited) isConversationTimelineEvent_Payl
 func (*ConversationTimelineEvent_MessageRevoked) isConversationTimelineEvent_Payload() {}
 
 func (*ConversationTimelineEvent_MessageDeleted) isConversationTimelineEvent_Payload() {}
+
+func (*ConversationTimelineEvent_ConversationMemberJoined) isConversationTimelineEvent_Payload() {}
+
+func (*ConversationTimelineEvent_ConversationMemberLeft) isConversationTimelineEvent_Payload() {}
+
+func (*ConversationTimelineEvent_ConversationMemberRemoved) isConversationTimelineEvent_Payload() {}
+
+func (*ConversationTimelineEvent_ConversationMemberRoleChanged) isConversationTimelineEvent_Payload() {
+}
+
+func (*ConversationTimelineEvent_ConversationMemberBoundaryCancelled) isConversationTimelineEvent_Payload() {
+}
 
 type TimelineMetadata struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
@@ -810,11 +1051,751 @@ func (x *MessageDeletedV1) GetDeletedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type ConversationMemberJoinedV1 struct {
+	state             protoimpl.MessageState       `protogen:"open.v1"`
+	ChangeId          string                       `protobuf:"bytes,1,opt,name=change_id,json=changeId,proto3" json:"change_id,omitempty"`
+	ConversationId    string                       `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	BoundarySeq       int64                        `protobuf:"varint,3,opt,name=boundary_seq,json=boundarySeq,proto3" json:"boundary_seq,omitempty"`
+	TargetUserId      string                       `protobuf:"bytes,4,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	OperatorUserId    string                       `protobuf:"bytes,5,opt,name=operator_user_id,json=operatorUserId,proto3" json:"operator_user_id,omitempty"`
+	ChangeType        ConversationMemberChangeType `protobuf:"varint,6,opt,name=change_type,json=changeType,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberChangeType" json:"change_type,omitempty"`
+	OldRole           ConversationMemberRole       `protobuf:"varint,7,opt,name=old_role,json=oldRole,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberRole" json:"old_role,omitempty"`
+	NewRole           ConversationMemberRole       `protobuf:"varint,8,opt,name=new_role,json=newRole,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberRole" json:"new_role,omitempty"`
+	OldStatus         ConversationMemberStatus     `protobuf:"varint,9,opt,name=old_status,json=oldStatus,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberStatus" json:"old_status,omitempty"`
+	NewStatus         ConversationMemberStatus     `protobuf:"varint,10,opt,name=new_status,json=newStatus,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberStatus" json:"new_status,omitempty"`
+	MemberVersion     int64                        `protobuf:"varint,11,opt,name=member_version,json=memberVersion,proto3" json:"member_version,omitempty"`
+	PermissionVersion int64                        `protobuf:"varint,12,opt,name=permission_version,json=permissionVersion,proto3" json:"permission_version,omitempty"`
+	Reason            string                       `protobuf:"bytes,13,opt,name=reason,proto3" json:"reason,omitempty"`
+	OccurredAt        *timestamppb.Timestamp       `protobuf:"bytes,14,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ConversationMemberJoinedV1) Reset() {
+	*x = ConversationMemberJoinedV1{}
+	mi := &file_conversation_timeline_events_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConversationMemberJoinedV1) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConversationMemberJoinedV1) ProtoMessage() {}
+
+func (x *ConversationMemberJoinedV1) ProtoReflect() protoreflect.Message {
+	mi := &file_conversation_timeline_events_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConversationMemberJoinedV1.ProtoReflect.Descriptor instead.
+func (*ConversationMemberJoinedV1) Descriptor() ([]byte, []int) {
+	return file_conversation_timeline_events_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ConversationMemberJoinedV1) GetChangeId() string {
+	if x != nil {
+		return x.ChangeId
+	}
+	return ""
+}
+
+func (x *ConversationMemberJoinedV1) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *ConversationMemberJoinedV1) GetBoundarySeq() int64 {
+	if x != nil {
+		return x.BoundarySeq
+	}
+	return 0
+}
+
+func (x *ConversationMemberJoinedV1) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *ConversationMemberJoinedV1) GetOperatorUserId() string {
+	if x != nil {
+		return x.OperatorUserId
+	}
+	return ""
+}
+
+func (x *ConversationMemberJoinedV1) GetChangeType() ConversationMemberChangeType {
+	if x != nil {
+		return x.ChangeType
+	}
+	return ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_UNSPECIFIED
+}
+
+func (x *ConversationMemberJoinedV1) GetOldRole() ConversationMemberRole {
+	if x != nil {
+		return x.OldRole
+	}
+	return ConversationMemberRole_CONVERSATION_MEMBER_ROLE_UNSPECIFIED
+}
+
+func (x *ConversationMemberJoinedV1) GetNewRole() ConversationMemberRole {
+	if x != nil {
+		return x.NewRole
+	}
+	return ConversationMemberRole_CONVERSATION_MEMBER_ROLE_UNSPECIFIED
+}
+
+func (x *ConversationMemberJoinedV1) GetOldStatus() ConversationMemberStatus {
+	if x != nil {
+		return x.OldStatus
+	}
+	return ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_UNSPECIFIED
+}
+
+func (x *ConversationMemberJoinedV1) GetNewStatus() ConversationMemberStatus {
+	if x != nil {
+		return x.NewStatus
+	}
+	return ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_UNSPECIFIED
+}
+
+func (x *ConversationMemberJoinedV1) GetMemberVersion() int64 {
+	if x != nil {
+		return x.MemberVersion
+	}
+	return 0
+}
+
+func (x *ConversationMemberJoinedV1) GetPermissionVersion() int64 {
+	if x != nil {
+		return x.PermissionVersion
+	}
+	return 0
+}
+
+func (x *ConversationMemberJoinedV1) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *ConversationMemberJoinedV1) GetOccurredAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.OccurredAt
+	}
+	return nil
+}
+
+type ConversationMemberLeftV1 struct {
+	state             protoimpl.MessageState       `protogen:"open.v1"`
+	ChangeId          string                       `protobuf:"bytes,1,opt,name=change_id,json=changeId,proto3" json:"change_id,omitempty"`
+	ConversationId    string                       `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	BoundarySeq       int64                        `protobuf:"varint,3,opt,name=boundary_seq,json=boundarySeq,proto3" json:"boundary_seq,omitempty"`
+	TargetUserId      string                       `protobuf:"bytes,4,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	OperatorUserId    string                       `protobuf:"bytes,5,opt,name=operator_user_id,json=operatorUserId,proto3" json:"operator_user_id,omitempty"`
+	ChangeType        ConversationMemberChangeType `protobuf:"varint,6,opt,name=change_type,json=changeType,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberChangeType" json:"change_type,omitempty"`
+	OldRole           ConversationMemberRole       `protobuf:"varint,7,opt,name=old_role,json=oldRole,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberRole" json:"old_role,omitempty"`
+	NewRole           ConversationMemberRole       `protobuf:"varint,8,opt,name=new_role,json=newRole,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberRole" json:"new_role,omitempty"`
+	OldStatus         ConversationMemberStatus     `protobuf:"varint,9,opt,name=old_status,json=oldStatus,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberStatus" json:"old_status,omitempty"`
+	NewStatus         ConversationMemberStatus     `protobuf:"varint,10,opt,name=new_status,json=newStatus,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberStatus" json:"new_status,omitempty"`
+	MemberVersion     int64                        `protobuf:"varint,11,opt,name=member_version,json=memberVersion,proto3" json:"member_version,omitempty"`
+	PermissionVersion int64                        `protobuf:"varint,12,opt,name=permission_version,json=permissionVersion,proto3" json:"permission_version,omitempty"`
+	Reason            string                       `protobuf:"bytes,13,opt,name=reason,proto3" json:"reason,omitempty"`
+	OccurredAt        *timestamppb.Timestamp       `protobuf:"bytes,14,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ConversationMemberLeftV1) Reset() {
+	*x = ConversationMemberLeftV1{}
+	mi := &file_conversation_timeline_events_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConversationMemberLeftV1) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConversationMemberLeftV1) ProtoMessage() {}
+
+func (x *ConversationMemberLeftV1) ProtoReflect() protoreflect.Message {
+	mi := &file_conversation_timeline_events_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConversationMemberLeftV1.ProtoReflect.Descriptor instead.
+func (*ConversationMemberLeftV1) Descriptor() ([]byte, []int) {
+	return file_conversation_timeline_events_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ConversationMemberLeftV1) GetChangeId() string {
+	if x != nil {
+		return x.ChangeId
+	}
+	return ""
+}
+
+func (x *ConversationMemberLeftV1) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *ConversationMemberLeftV1) GetBoundarySeq() int64 {
+	if x != nil {
+		return x.BoundarySeq
+	}
+	return 0
+}
+
+func (x *ConversationMemberLeftV1) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *ConversationMemberLeftV1) GetOperatorUserId() string {
+	if x != nil {
+		return x.OperatorUserId
+	}
+	return ""
+}
+
+func (x *ConversationMemberLeftV1) GetChangeType() ConversationMemberChangeType {
+	if x != nil {
+		return x.ChangeType
+	}
+	return ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_UNSPECIFIED
+}
+
+func (x *ConversationMemberLeftV1) GetOldRole() ConversationMemberRole {
+	if x != nil {
+		return x.OldRole
+	}
+	return ConversationMemberRole_CONVERSATION_MEMBER_ROLE_UNSPECIFIED
+}
+
+func (x *ConversationMemberLeftV1) GetNewRole() ConversationMemberRole {
+	if x != nil {
+		return x.NewRole
+	}
+	return ConversationMemberRole_CONVERSATION_MEMBER_ROLE_UNSPECIFIED
+}
+
+func (x *ConversationMemberLeftV1) GetOldStatus() ConversationMemberStatus {
+	if x != nil {
+		return x.OldStatus
+	}
+	return ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_UNSPECIFIED
+}
+
+func (x *ConversationMemberLeftV1) GetNewStatus() ConversationMemberStatus {
+	if x != nil {
+		return x.NewStatus
+	}
+	return ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_UNSPECIFIED
+}
+
+func (x *ConversationMemberLeftV1) GetMemberVersion() int64 {
+	if x != nil {
+		return x.MemberVersion
+	}
+	return 0
+}
+
+func (x *ConversationMemberLeftV1) GetPermissionVersion() int64 {
+	if x != nil {
+		return x.PermissionVersion
+	}
+	return 0
+}
+
+func (x *ConversationMemberLeftV1) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *ConversationMemberLeftV1) GetOccurredAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.OccurredAt
+	}
+	return nil
+}
+
+type ConversationMemberRemovedV1 struct {
+	state             protoimpl.MessageState       `protogen:"open.v1"`
+	ChangeId          string                       `protobuf:"bytes,1,opt,name=change_id,json=changeId,proto3" json:"change_id,omitempty"`
+	ConversationId    string                       `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	BoundarySeq       int64                        `protobuf:"varint,3,opt,name=boundary_seq,json=boundarySeq,proto3" json:"boundary_seq,omitempty"`
+	TargetUserId      string                       `protobuf:"bytes,4,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	OperatorUserId    string                       `protobuf:"bytes,5,opt,name=operator_user_id,json=operatorUserId,proto3" json:"operator_user_id,omitempty"`
+	ChangeType        ConversationMemberChangeType `protobuf:"varint,6,opt,name=change_type,json=changeType,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberChangeType" json:"change_type,omitempty"`
+	OldRole           ConversationMemberRole       `protobuf:"varint,7,opt,name=old_role,json=oldRole,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberRole" json:"old_role,omitempty"`
+	NewRole           ConversationMemberRole       `protobuf:"varint,8,opt,name=new_role,json=newRole,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberRole" json:"new_role,omitempty"`
+	OldStatus         ConversationMemberStatus     `protobuf:"varint,9,opt,name=old_status,json=oldStatus,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberStatus" json:"old_status,omitempty"`
+	NewStatus         ConversationMemberStatus     `protobuf:"varint,10,opt,name=new_status,json=newStatus,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberStatus" json:"new_status,omitempty"`
+	MemberVersion     int64                        `protobuf:"varint,11,opt,name=member_version,json=memberVersion,proto3" json:"member_version,omitempty"`
+	PermissionVersion int64                        `protobuf:"varint,12,opt,name=permission_version,json=permissionVersion,proto3" json:"permission_version,omitempty"`
+	Reason            string                       `protobuf:"bytes,13,opt,name=reason,proto3" json:"reason,omitempty"`
+	OccurredAt        *timestamppb.Timestamp       `protobuf:"bytes,14,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ConversationMemberRemovedV1) Reset() {
+	*x = ConversationMemberRemovedV1{}
+	mi := &file_conversation_timeline_events_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConversationMemberRemovedV1) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConversationMemberRemovedV1) ProtoMessage() {}
+
+func (x *ConversationMemberRemovedV1) ProtoReflect() protoreflect.Message {
+	mi := &file_conversation_timeline_events_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConversationMemberRemovedV1.ProtoReflect.Descriptor instead.
+func (*ConversationMemberRemovedV1) Descriptor() ([]byte, []int) {
+	return file_conversation_timeline_events_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ConversationMemberRemovedV1) GetChangeId() string {
+	if x != nil {
+		return x.ChangeId
+	}
+	return ""
+}
+
+func (x *ConversationMemberRemovedV1) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *ConversationMemberRemovedV1) GetBoundarySeq() int64 {
+	if x != nil {
+		return x.BoundarySeq
+	}
+	return 0
+}
+
+func (x *ConversationMemberRemovedV1) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *ConversationMemberRemovedV1) GetOperatorUserId() string {
+	if x != nil {
+		return x.OperatorUserId
+	}
+	return ""
+}
+
+func (x *ConversationMemberRemovedV1) GetChangeType() ConversationMemberChangeType {
+	if x != nil {
+		return x.ChangeType
+	}
+	return ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_UNSPECIFIED
+}
+
+func (x *ConversationMemberRemovedV1) GetOldRole() ConversationMemberRole {
+	if x != nil {
+		return x.OldRole
+	}
+	return ConversationMemberRole_CONVERSATION_MEMBER_ROLE_UNSPECIFIED
+}
+
+func (x *ConversationMemberRemovedV1) GetNewRole() ConversationMemberRole {
+	if x != nil {
+		return x.NewRole
+	}
+	return ConversationMemberRole_CONVERSATION_MEMBER_ROLE_UNSPECIFIED
+}
+
+func (x *ConversationMemberRemovedV1) GetOldStatus() ConversationMemberStatus {
+	if x != nil {
+		return x.OldStatus
+	}
+	return ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_UNSPECIFIED
+}
+
+func (x *ConversationMemberRemovedV1) GetNewStatus() ConversationMemberStatus {
+	if x != nil {
+		return x.NewStatus
+	}
+	return ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_UNSPECIFIED
+}
+
+func (x *ConversationMemberRemovedV1) GetMemberVersion() int64 {
+	if x != nil {
+		return x.MemberVersion
+	}
+	return 0
+}
+
+func (x *ConversationMemberRemovedV1) GetPermissionVersion() int64 {
+	if x != nil {
+		return x.PermissionVersion
+	}
+	return 0
+}
+
+func (x *ConversationMemberRemovedV1) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *ConversationMemberRemovedV1) GetOccurredAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.OccurredAt
+	}
+	return nil
+}
+
+type ConversationMemberRoleChangedV1 struct {
+	state             protoimpl.MessageState       `protogen:"open.v1"`
+	ChangeId          string                       `protobuf:"bytes,1,opt,name=change_id,json=changeId,proto3" json:"change_id,omitempty"`
+	ConversationId    string                       `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	BoundarySeq       int64                        `protobuf:"varint,3,opt,name=boundary_seq,json=boundarySeq,proto3" json:"boundary_seq,omitempty"`
+	TargetUserId      string                       `protobuf:"bytes,4,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	OperatorUserId    string                       `protobuf:"bytes,5,opt,name=operator_user_id,json=operatorUserId,proto3" json:"operator_user_id,omitempty"`
+	ChangeType        ConversationMemberChangeType `protobuf:"varint,6,opt,name=change_type,json=changeType,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberChangeType" json:"change_type,omitempty"`
+	OldRole           ConversationMemberRole       `protobuf:"varint,7,opt,name=old_role,json=oldRole,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberRole" json:"old_role,omitempty"`
+	NewRole           ConversationMemberRole       `protobuf:"varint,8,opt,name=new_role,json=newRole,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberRole" json:"new_role,omitempty"`
+	OldStatus         ConversationMemberStatus     `protobuf:"varint,9,opt,name=old_status,json=oldStatus,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberStatus" json:"old_status,omitempty"`
+	NewStatus         ConversationMemberStatus     `protobuf:"varint,10,opt,name=new_status,json=newStatus,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberStatus" json:"new_status,omitempty"`
+	MemberVersion     int64                        `protobuf:"varint,11,opt,name=member_version,json=memberVersion,proto3" json:"member_version,omitempty"`
+	PermissionVersion int64                        `protobuf:"varint,12,opt,name=permission_version,json=permissionVersion,proto3" json:"permission_version,omitempty"`
+	Reason            string                       `protobuf:"bytes,13,opt,name=reason,proto3" json:"reason,omitempty"`
+	OccurredAt        *timestamppb.Timestamp       `protobuf:"bytes,14,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ConversationMemberRoleChangedV1) Reset() {
+	*x = ConversationMemberRoleChangedV1{}
+	mi := &file_conversation_timeline_events_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConversationMemberRoleChangedV1) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConversationMemberRoleChangedV1) ProtoMessage() {}
+
+func (x *ConversationMemberRoleChangedV1) ProtoReflect() protoreflect.Message {
+	mi := &file_conversation_timeline_events_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConversationMemberRoleChangedV1.ProtoReflect.Descriptor instead.
+func (*ConversationMemberRoleChangedV1) Descriptor() ([]byte, []int) {
+	return file_conversation_timeline_events_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ConversationMemberRoleChangedV1) GetChangeId() string {
+	if x != nil {
+		return x.ChangeId
+	}
+	return ""
+}
+
+func (x *ConversationMemberRoleChangedV1) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *ConversationMemberRoleChangedV1) GetBoundarySeq() int64 {
+	if x != nil {
+		return x.BoundarySeq
+	}
+	return 0
+}
+
+func (x *ConversationMemberRoleChangedV1) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *ConversationMemberRoleChangedV1) GetOperatorUserId() string {
+	if x != nil {
+		return x.OperatorUserId
+	}
+	return ""
+}
+
+func (x *ConversationMemberRoleChangedV1) GetChangeType() ConversationMemberChangeType {
+	if x != nil {
+		return x.ChangeType
+	}
+	return ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_UNSPECIFIED
+}
+
+func (x *ConversationMemberRoleChangedV1) GetOldRole() ConversationMemberRole {
+	if x != nil {
+		return x.OldRole
+	}
+	return ConversationMemberRole_CONVERSATION_MEMBER_ROLE_UNSPECIFIED
+}
+
+func (x *ConversationMemberRoleChangedV1) GetNewRole() ConversationMemberRole {
+	if x != nil {
+		return x.NewRole
+	}
+	return ConversationMemberRole_CONVERSATION_MEMBER_ROLE_UNSPECIFIED
+}
+
+func (x *ConversationMemberRoleChangedV1) GetOldStatus() ConversationMemberStatus {
+	if x != nil {
+		return x.OldStatus
+	}
+	return ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_UNSPECIFIED
+}
+
+func (x *ConversationMemberRoleChangedV1) GetNewStatus() ConversationMemberStatus {
+	if x != nil {
+		return x.NewStatus
+	}
+	return ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_UNSPECIFIED
+}
+
+func (x *ConversationMemberRoleChangedV1) GetMemberVersion() int64 {
+	if x != nil {
+		return x.MemberVersion
+	}
+	return 0
+}
+
+func (x *ConversationMemberRoleChangedV1) GetPermissionVersion() int64 {
+	if x != nil {
+		return x.PermissionVersion
+	}
+	return 0
+}
+
+func (x *ConversationMemberRoleChangedV1) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *ConversationMemberRoleChangedV1) GetOccurredAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.OccurredAt
+	}
+	return nil
+}
+
+type ConversationMemberBoundaryCancelledV1 struct {
+	state             protoimpl.MessageState       `protogen:"open.v1"`
+	ChangeId          string                       `protobuf:"bytes,1,opt,name=change_id,json=changeId,proto3" json:"change_id,omitempty"`
+	ConversationId    string                       `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	BoundarySeq       int64                        `protobuf:"varint,3,opt,name=boundary_seq,json=boundarySeq,proto3" json:"boundary_seq,omitempty"`
+	TargetUserId      string                       `protobuf:"bytes,4,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	OperatorUserId    string                       `protobuf:"bytes,5,opt,name=operator_user_id,json=operatorUserId,proto3" json:"operator_user_id,omitempty"`
+	ChangeType        ConversationMemberChangeType `protobuf:"varint,6,opt,name=change_type,json=changeType,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberChangeType" json:"change_type,omitempty"`
+	OldRole           ConversationMemberRole       `protobuf:"varint,7,opt,name=old_role,json=oldRole,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberRole" json:"old_role,omitempty"`
+	NewRole           ConversationMemberRole       `protobuf:"varint,8,opt,name=new_role,json=newRole,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberRole" json:"new_role,omitempty"`
+	OldStatus         ConversationMemberStatus     `protobuf:"varint,9,opt,name=old_status,json=oldStatus,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberStatus" json:"old_status,omitempty"`
+	NewStatus         ConversationMemberStatus     `protobuf:"varint,10,opt,name=new_status,json=newStatus,proto3,enum=nexusim.conversation.timeline.v1.ConversationMemberStatus" json:"new_status,omitempty"`
+	MemberVersion     int64                        `protobuf:"varint,11,opt,name=member_version,json=memberVersion,proto3" json:"member_version,omitempty"`
+	PermissionVersion int64                        `protobuf:"varint,12,opt,name=permission_version,json=permissionVersion,proto3" json:"permission_version,omitempty"`
+	Reason            string                       `protobuf:"bytes,13,opt,name=reason,proto3" json:"reason,omitempty"`
+	OccurredAt        *timestamppb.Timestamp       `protobuf:"bytes,14,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ConversationMemberBoundaryCancelledV1) Reset() {
+	*x = ConversationMemberBoundaryCancelledV1{}
+	mi := &file_conversation_timeline_events_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConversationMemberBoundaryCancelledV1) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConversationMemberBoundaryCancelledV1) ProtoMessage() {}
+
+func (x *ConversationMemberBoundaryCancelledV1) ProtoReflect() protoreflect.Message {
+	mi := &file_conversation_timeline_events_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConversationMemberBoundaryCancelledV1.ProtoReflect.Descriptor instead.
+func (*ConversationMemberBoundaryCancelledV1) Descriptor() ([]byte, []int) {
+	return file_conversation_timeline_events_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ConversationMemberBoundaryCancelledV1) GetChangeId() string {
+	if x != nil {
+		return x.ChangeId
+	}
+	return ""
+}
+
+func (x *ConversationMemberBoundaryCancelledV1) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *ConversationMemberBoundaryCancelledV1) GetBoundarySeq() int64 {
+	if x != nil {
+		return x.BoundarySeq
+	}
+	return 0
+}
+
+func (x *ConversationMemberBoundaryCancelledV1) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *ConversationMemberBoundaryCancelledV1) GetOperatorUserId() string {
+	if x != nil {
+		return x.OperatorUserId
+	}
+	return ""
+}
+
+func (x *ConversationMemberBoundaryCancelledV1) GetChangeType() ConversationMemberChangeType {
+	if x != nil {
+		return x.ChangeType
+	}
+	return ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_UNSPECIFIED
+}
+
+func (x *ConversationMemberBoundaryCancelledV1) GetOldRole() ConversationMemberRole {
+	if x != nil {
+		return x.OldRole
+	}
+	return ConversationMemberRole_CONVERSATION_MEMBER_ROLE_UNSPECIFIED
+}
+
+func (x *ConversationMemberBoundaryCancelledV1) GetNewRole() ConversationMemberRole {
+	if x != nil {
+		return x.NewRole
+	}
+	return ConversationMemberRole_CONVERSATION_MEMBER_ROLE_UNSPECIFIED
+}
+
+func (x *ConversationMemberBoundaryCancelledV1) GetOldStatus() ConversationMemberStatus {
+	if x != nil {
+		return x.OldStatus
+	}
+	return ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_UNSPECIFIED
+}
+
+func (x *ConversationMemberBoundaryCancelledV1) GetNewStatus() ConversationMemberStatus {
+	if x != nil {
+		return x.NewStatus
+	}
+	return ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_UNSPECIFIED
+}
+
+func (x *ConversationMemberBoundaryCancelledV1) GetMemberVersion() int64 {
+	if x != nil {
+		return x.MemberVersion
+	}
+	return 0
+}
+
+func (x *ConversationMemberBoundaryCancelledV1) GetPermissionVersion() int64 {
+	if x != nil {
+		return x.PermissionVersion
+	}
+	return 0
+}
+
+func (x *ConversationMemberBoundaryCancelledV1) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *ConversationMemberBoundaryCancelledV1) GetOccurredAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.OccurredAt
+	}
+	return nil
+}
+
 var File_conversation_timeline_events_proto protoreflect.FileDescriptor
 
 const file_conversation_timeline_events_proto_rawDesc = "" +
 	"\n" +
-	"\"conversation.timeline.events.proto\x12 nexusim.conversation.timeline.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf4\a\n" +
+	"\"conversation.timeline.events.proto\x12 nexusim.conversation.timeline.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9b\r\n" +
 	"\x19ConversationTimelineEvent\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x1d\n" +
 	"\n" +
@@ -837,7 +1818,12 @@ const file_conversation_timeline_events_proto_rawDesc = "" +
 	"\x11message_persisted\x18\x10 \x01(\v24.nexusim.conversation.timeline.v1.MessagePersistedV1H\x00R\x10messagePersisted\x12Z\n" +
 	"\x0emessage_edited\x18\x11 \x01(\v21.nexusim.conversation.timeline.v1.MessageEditedV1H\x00R\rmessageEdited\x12]\n" +
 	"\x0fmessage_revoked\x18\x12 \x01(\v22.nexusim.conversation.timeline.v1.MessageRevokedV1H\x00R\x0emessageRevoked\x12]\n" +
-	"\x0fmessage_deleted\x18\x13 \x01(\v22.nexusim.conversation.timeline.v1.MessageDeletedV1H\x00R\x0emessageDeletedB\t\n" +
+	"\x0fmessage_deleted\x18\x13 \x01(\v22.nexusim.conversation.timeline.v1.MessageDeletedV1H\x00R\x0emessageDeleted\x12|\n" +
+	"\x1aconversation_member_joined\x18\x14 \x01(\v2<.nexusim.conversation.timeline.v1.ConversationMemberJoinedV1H\x00R\x18conversationMemberJoined\x12v\n" +
+	"\x18conversation_member_left\x18\x15 \x01(\v2:.nexusim.conversation.timeline.v1.ConversationMemberLeftV1H\x00R\x16conversationMemberLeft\x12\x7f\n" +
+	"\x1bconversation_member_removed\x18\x16 \x01(\v2=.nexusim.conversation.timeline.v1.ConversationMemberRemovedV1H\x00R\x19conversationMemberRemoved\x12\x8c\x01\n" +
+	" conversation_member_role_changed\x18\x17 \x01(\v2A.nexusim.conversation.timeline.v1.ConversationMemberRoleChangedV1H\x00R\x1dconversationMemberRoleChanged\x12\x9e\x01\n" +
+	"&conversation_member_boundary_cancelled\x18\x18 \x01(\v2G.nexusim.conversation.timeline.v1.ConversationMemberBoundaryCancelledV1H\x00R#conversationMemberBoundaryCancelledB\t\n" +
 	"\apayload\"\xe7\x01\n" +
 	"\x10TimelineMetadata\x12\x1f\n" +
 	"\vfanout_mode\x18\x01 \x01(\tR\n" +
@@ -894,11 +1880,127 @@ const file_conversation_timeline_events_proto_rawDesc = "" +
 	"\fdelete_scope\x18\x06 \x01(\x0e24.nexusim.conversation.timeline.v1.MessageDeleteScopeR\vdeleteScope\x12\x16\n" +
 	"\x06reason\x18\a \x01(\tR\x06reason\x129\n" +
 	"\n" +
-	"deleted_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tdeletedAt*\x95\x01\n" +
+	"deleted_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tdeletedAt\"\xc1\x06\n" +
+	"\x1aConversationMemberJoinedV1\x12\x1b\n" +
+	"\tchange_id\x18\x01 \x01(\tR\bchangeId\x12'\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12!\n" +
+	"\fboundary_seq\x18\x03 \x01(\x03R\vboundarySeq\x12$\n" +
+	"\x0etarget_user_id\x18\x04 \x01(\tR\ftargetUserId\x12(\n" +
+	"\x10operator_user_id\x18\x05 \x01(\tR\x0eoperatorUserId\x12_\n" +
+	"\vchange_type\x18\x06 \x01(\x0e2>.nexusim.conversation.timeline.v1.ConversationMemberChangeTypeR\n" +
+	"changeType\x12S\n" +
+	"\bold_role\x18\a \x01(\x0e28.nexusim.conversation.timeline.v1.ConversationMemberRoleR\aoldRole\x12S\n" +
+	"\bnew_role\x18\b \x01(\x0e28.nexusim.conversation.timeline.v1.ConversationMemberRoleR\anewRole\x12Y\n" +
+	"\n" +
+	"old_status\x18\t \x01(\x0e2:.nexusim.conversation.timeline.v1.ConversationMemberStatusR\toldStatus\x12Y\n" +
+	"\n" +
+	"new_status\x18\n" +
+	" \x01(\x0e2:.nexusim.conversation.timeline.v1.ConversationMemberStatusR\tnewStatus\x12%\n" +
+	"\x0emember_version\x18\v \x01(\x03R\rmemberVersion\x12-\n" +
+	"\x12permission_version\x18\f \x01(\x03R\x11permissionVersion\x12\x16\n" +
+	"\x06reason\x18\r \x01(\tR\x06reason\x12;\n" +
+	"\voccurred_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"occurredAt\"\xbf\x06\n" +
+	"\x18ConversationMemberLeftV1\x12\x1b\n" +
+	"\tchange_id\x18\x01 \x01(\tR\bchangeId\x12'\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12!\n" +
+	"\fboundary_seq\x18\x03 \x01(\x03R\vboundarySeq\x12$\n" +
+	"\x0etarget_user_id\x18\x04 \x01(\tR\ftargetUserId\x12(\n" +
+	"\x10operator_user_id\x18\x05 \x01(\tR\x0eoperatorUserId\x12_\n" +
+	"\vchange_type\x18\x06 \x01(\x0e2>.nexusim.conversation.timeline.v1.ConversationMemberChangeTypeR\n" +
+	"changeType\x12S\n" +
+	"\bold_role\x18\a \x01(\x0e28.nexusim.conversation.timeline.v1.ConversationMemberRoleR\aoldRole\x12S\n" +
+	"\bnew_role\x18\b \x01(\x0e28.nexusim.conversation.timeline.v1.ConversationMemberRoleR\anewRole\x12Y\n" +
+	"\n" +
+	"old_status\x18\t \x01(\x0e2:.nexusim.conversation.timeline.v1.ConversationMemberStatusR\toldStatus\x12Y\n" +
+	"\n" +
+	"new_status\x18\n" +
+	" \x01(\x0e2:.nexusim.conversation.timeline.v1.ConversationMemberStatusR\tnewStatus\x12%\n" +
+	"\x0emember_version\x18\v \x01(\x03R\rmemberVersion\x12-\n" +
+	"\x12permission_version\x18\f \x01(\x03R\x11permissionVersion\x12\x16\n" +
+	"\x06reason\x18\r \x01(\tR\x06reason\x12;\n" +
+	"\voccurred_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"occurredAt\"\xc2\x06\n" +
+	"\x1bConversationMemberRemovedV1\x12\x1b\n" +
+	"\tchange_id\x18\x01 \x01(\tR\bchangeId\x12'\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12!\n" +
+	"\fboundary_seq\x18\x03 \x01(\x03R\vboundarySeq\x12$\n" +
+	"\x0etarget_user_id\x18\x04 \x01(\tR\ftargetUserId\x12(\n" +
+	"\x10operator_user_id\x18\x05 \x01(\tR\x0eoperatorUserId\x12_\n" +
+	"\vchange_type\x18\x06 \x01(\x0e2>.nexusim.conversation.timeline.v1.ConversationMemberChangeTypeR\n" +
+	"changeType\x12S\n" +
+	"\bold_role\x18\a \x01(\x0e28.nexusim.conversation.timeline.v1.ConversationMemberRoleR\aoldRole\x12S\n" +
+	"\bnew_role\x18\b \x01(\x0e28.nexusim.conversation.timeline.v1.ConversationMemberRoleR\anewRole\x12Y\n" +
+	"\n" +
+	"old_status\x18\t \x01(\x0e2:.nexusim.conversation.timeline.v1.ConversationMemberStatusR\toldStatus\x12Y\n" +
+	"\n" +
+	"new_status\x18\n" +
+	" \x01(\x0e2:.nexusim.conversation.timeline.v1.ConversationMemberStatusR\tnewStatus\x12%\n" +
+	"\x0emember_version\x18\v \x01(\x03R\rmemberVersion\x12-\n" +
+	"\x12permission_version\x18\f \x01(\x03R\x11permissionVersion\x12\x16\n" +
+	"\x06reason\x18\r \x01(\tR\x06reason\x12;\n" +
+	"\voccurred_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"occurredAt\"\xc6\x06\n" +
+	"\x1fConversationMemberRoleChangedV1\x12\x1b\n" +
+	"\tchange_id\x18\x01 \x01(\tR\bchangeId\x12'\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12!\n" +
+	"\fboundary_seq\x18\x03 \x01(\x03R\vboundarySeq\x12$\n" +
+	"\x0etarget_user_id\x18\x04 \x01(\tR\ftargetUserId\x12(\n" +
+	"\x10operator_user_id\x18\x05 \x01(\tR\x0eoperatorUserId\x12_\n" +
+	"\vchange_type\x18\x06 \x01(\x0e2>.nexusim.conversation.timeline.v1.ConversationMemberChangeTypeR\n" +
+	"changeType\x12S\n" +
+	"\bold_role\x18\a \x01(\x0e28.nexusim.conversation.timeline.v1.ConversationMemberRoleR\aoldRole\x12S\n" +
+	"\bnew_role\x18\b \x01(\x0e28.nexusim.conversation.timeline.v1.ConversationMemberRoleR\anewRole\x12Y\n" +
+	"\n" +
+	"old_status\x18\t \x01(\x0e2:.nexusim.conversation.timeline.v1.ConversationMemberStatusR\toldStatus\x12Y\n" +
+	"\n" +
+	"new_status\x18\n" +
+	" \x01(\x0e2:.nexusim.conversation.timeline.v1.ConversationMemberStatusR\tnewStatus\x12%\n" +
+	"\x0emember_version\x18\v \x01(\x03R\rmemberVersion\x12-\n" +
+	"\x12permission_version\x18\f \x01(\x03R\x11permissionVersion\x12\x16\n" +
+	"\x06reason\x18\r \x01(\tR\x06reason\x12;\n" +
+	"\voccurred_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"occurredAt\"\xcc\x06\n" +
+	"%ConversationMemberBoundaryCancelledV1\x12\x1b\n" +
+	"\tchange_id\x18\x01 \x01(\tR\bchangeId\x12'\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12!\n" +
+	"\fboundary_seq\x18\x03 \x01(\x03R\vboundarySeq\x12$\n" +
+	"\x0etarget_user_id\x18\x04 \x01(\tR\ftargetUserId\x12(\n" +
+	"\x10operator_user_id\x18\x05 \x01(\tR\x0eoperatorUserId\x12_\n" +
+	"\vchange_type\x18\x06 \x01(\x0e2>.nexusim.conversation.timeline.v1.ConversationMemberChangeTypeR\n" +
+	"changeType\x12S\n" +
+	"\bold_role\x18\a \x01(\x0e28.nexusim.conversation.timeline.v1.ConversationMemberRoleR\aoldRole\x12S\n" +
+	"\bnew_role\x18\b \x01(\x0e28.nexusim.conversation.timeline.v1.ConversationMemberRoleR\anewRole\x12Y\n" +
+	"\n" +
+	"old_status\x18\t \x01(\x0e2:.nexusim.conversation.timeline.v1.ConversationMemberStatusR\toldStatus\x12Y\n" +
+	"\n" +
+	"new_status\x18\n" +
+	" \x01(\x0e2:.nexusim.conversation.timeline.v1.ConversationMemberStatusR\tnewStatus\x12%\n" +
+	"\x0emember_version\x18\v \x01(\x03R\rmemberVersion\x12-\n" +
+	"\x12permission_version\x18\f \x01(\x03R\x11permissionVersion\x12\x16\n" +
+	"\x06reason\x18\r \x01(\tR\x06reason\x12;\n" +
+	"\voccurred_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"occurredAt*\x95\x01\n" +
 	"\x12MessageDeleteScope\x12$\n" +
 	" MESSAGE_DELETE_SCOPE_UNSPECIFIED\x10\x00\x12*\n" +
 	"&MESSAGE_DELETE_SCOPE_CONVERSATION_VIEW\x10\x01\x12-\n" +
-	")MESSAGE_DELETE_SCOPE_COMPLIANCE_RETENTION\x10\x02B=Z;github.com/qsyy0921/IM/schemas/kafka;conversationtimelinev1b\x06proto3"
+	")MESSAGE_DELETE_SCOPE_COMPLIANCE_RETENTION\x10\x02*\x82\x02\n" +
+	"\x1cConversationMemberChangeType\x12/\n" +
+	"+CONVERSATION_MEMBER_CHANGE_TYPE_UNSPECIFIED\x10\x00\x12(\n" +
+	"$CONVERSATION_MEMBER_CHANGE_TYPE_JOIN\x10\x01\x12)\n" +
+	"%CONVERSATION_MEMBER_CHANGE_TYPE_LEAVE\x10\x02\x12*\n" +
+	"&CONVERSATION_MEMBER_CHANGE_TYPE_REMOVE\x10\x03\x120\n" +
+	",CONVERSATION_MEMBER_CHANGE_TYPE_ROLE_CHANGED\x10\x04*\xaf\x01\n" +
+	"\x16ConversationMemberRole\x12(\n" +
+	"$CONVERSATION_MEMBER_ROLE_UNSPECIFIED\x10\x00\x12\"\n" +
+	"\x1eCONVERSATION_MEMBER_ROLE_OWNER\x10\x01\x12\"\n" +
+	"\x1eCONVERSATION_MEMBER_ROLE_ADMIN\x10\x02\x12#\n" +
+	"\x1fCONVERSATION_MEMBER_ROLE_MEMBER\x10\x03*\xb9\x01\n" +
+	"\x18ConversationMemberStatus\x12*\n" +
+	"&CONVERSATION_MEMBER_STATUS_UNSPECIFIED\x10\x00\x12%\n" +
+	"!CONVERSATION_MEMBER_STATUS_ACTIVE\x10\x01\x12#\n" +
+	"\x1fCONVERSATION_MEMBER_STATUS_LEFT\x10\x02\x12%\n" +
+	"!CONVERSATION_MEMBER_STATUS_BANNED\x10\x03B=Z;github.com/qsyy0921/IM/schemas/kafka;conversationtimelinev1b\x06proto3"
 
 var (
 	file_conversation_timeline_events_proto_rawDescOnce sync.Once
@@ -912,39 +2014,82 @@ func file_conversation_timeline_events_proto_rawDescGZIP() []byte {
 	return file_conversation_timeline_events_proto_rawDescData
 }
 
-var file_conversation_timeline_events_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_conversation_timeline_events_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_conversation_timeline_events_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_conversation_timeline_events_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_conversation_timeline_events_proto_goTypes = []any{
-	(MessageDeleteScope)(0),           // 0: nexusim.conversation.timeline.v1.MessageDeleteScope
-	(*ConversationTimelineEvent)(nil), // 1: nexusim.conversation.timeline.v1.ConversationTimelineEvent
-	(*TimelineMetadata)(nil),          // 2: nexusim.conversation.timeline.v1.TimelineMetadata
-	(*MessagePersistedV1)(nil),        // 3: nexusim.conversation.timeline.v1.MessagePersistedV1
-	(*MessageEditedV1)(nil),           // 4: nexusim.conversation.timeline.v1.MessageEditedV1
-	(*MessageRevokedV1)(nil),          // 5: nexusim.conversation.timeline.v1.MessageRevokedV1
-	(*MessageDeletedV1)(nil),          // 6: nexusim.conversation.timeline.v1.MessageDeletedV1
-	(*timestamppb.Timestamp)(nil),     // 7: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),           // 8: google.protobuf.Struct
+	(MessageDeleteScope)(0),                       // 0: nexusim.conversation.timeline.v1.MessageDeleteScope
+	(ConversationMemberChangeType)(0),             // 1: nexusim.conversation.timeline.v1.ConversationMemberChangeType
+	(ConversationMemberRole)(0),                   // 2: nexusim.conversation.timeline.v1.ConversationMemberRole
+	(ConversationMemberStatus)(0),                 // 3: nexusim.conversation.timeline.v1.ConversationMemberStatus
+	(*ConversationTimelineEvent)(nil),             // 4: nexusim.conversation.timeline.v1.ConversationTimelineEvent
+	(*TimelineMetadata)(nil),                      // 5: nexusim.conversation.timeline.v1.TimelineMetadata
+	(*MessagePersistedV1)(nil),                    // 6: nexusim.conversation.timeline.v1.MessagePersistedV1
+	(*MessageEditedV1)(nil),                       // 7: nexusim.conversation.timeline.v1.MessageEditedV1
+	(*MessageRevokedV1)(nil),                      // 8: nexusim.conversation.timeline.v1.MessageRevokedV1
+	(*MessageDeletedV1)(nil),                      // 9: nexusim.conversation.timeline.v1.MessageDeletedV1
+	(*ConversationMemberJoinedV1)(nil),            // 10: nexusim.conversation.timeline.v1.ConversationMemberJoinedV1
+	(*ConversationMemberLeftV1)(nil),              // 11: nexusim.conversation.timeline.v1.ConversationMemberLeftV1
+	(*ConversationMemberRemovedV1)(nil),           // 12: nexusim.conversation.timeline.v1.ConversationMemberRemovedV1
+	(*ConversationMemberRoleChangedV1)(nil),       // 13: nexusim.conversation.timeline.v1.ConversationMemberRoleChangedV1
+	(*ConversationMemberBoundaryCancelledV1)(nil), // 14: nexusim.conversation.timeline.v1.ConversationMemberBoundaryCancelledV1
+	(*timestamppb.Timestamp)(nil),                 // 15: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),                       // 16: google.protobuf.Struct
 }
 var file_conversation_timeline_events_proto_depIdxs = []int32{
-	7,  // 0: nexusim.conversation.timeline.v1.ConversationTimelineEvent.occurred_at:type_name -> google.protobuf.Timestamp
-	2,  // 1: nexusim.conversation.timeline.v1.ConversationTimelineEvent.metadata:type_name -> nexusim.conversation.timeline.v1.TimelineMetadata
-	3,  // 2: nexusim.conversation.timeline.v1.ConversationTimelineEvent.message_persisted:type_name -> nexusim.conversation.timeline.v1.MessagePersistedV1
-	4,  // 3: nexusim.conversation.timeline.v1.ConversationTimelineEvent.message_edited:type_name -> nexusim.conversation.timeline.v1.MessageEditedV1
-	5,  // 4: nexusim.conversation.timeline.v1.ConversationTimelineEvent.message_revoked:type_name -> nexusim.conversation.timeline.v1.MessageRevokedV1
-	6,  // 5: nexusim.conversation.timeline.v1.ConversationTimelineEvent.message_deleted:type_name -> nexusim.conversation.timeline.v1.MessageDeletedV1
-	8,  // 6: nexusim.conversation.timeline.v1.MessagePersistedV1.payload:type_name -> google.protobuf.Struct
-	7,  // 7: nexusim.conversation.timeline.v1.MessagePersistedV1.accepted_at:type_name -> google.protobuf.Timestamp
-	8,  // 8: nexusim.conversation.timeline.v1.MessageEditedV1.before_payload:type_name -> google.protobuf.Struct
-	8,  // 9: nexusim.conversation.timeline.v1.MessageEditedV1.after_payload:type_name -> google.protobuf.Struct
-	7,  // 10: nexusim.conversation.timeline.v1.MessageEditedV1.edited_at:type_name -> google.protobuf.Timestamp
-	7,  // 11: nexusim.conversation.timeline.v1.MessageRevokedV1.revoked_at:type_name -> google.protobuf.Timestamp
-	0,  // 12: nexusim.conversation.timeline.v1.MessageDeletedV1.delete_scope:type_name -> nexusim.conversation.timeline.v1.MessageDeleteScope
-	7,  // 13: nexusim.conversation.timeline.v1.MessageDeletedV1.deleted_at:type_name -> google.protobuf.Timestamp
-	14, // [14:14] is the sub-list for method output_type
-	14, // [14:14] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	15, // 0: nexusim.conversation.timeline.v1.ConversationTimelineEvent.occurred_at:type_name -> google.protobuf.Timestamp
+	5,  // 1: nexusim.conversation.timeline.v1.ConversationTimelineEvent.metadata:type_name -> nexusim.conversation.timeline.v1.TimelineMetadata
+	6,  // 2: nexusim.conversation.timeline.v1.ConversationTimelineEvent.message_persisted:type_name -> nexusim.conversation.timeline.v1.MessagePersistedV1
+	7,  // 3: nexusim.conversation.timeline.v1.ConversationTimelineEvent.message_edited:type_name -> nexusim.conversation.timeline.v1.MessageEditedV1
+	8,  // 4: nexusim.conversation.timeline.v1.ConversationTimelineEvent.message_revoked:type_name -> nexusim.conversation.timeline.v1.MessageRevokedV1
+	9,  // 5: nexusim.conversation.timeline.v1.ConversationTimelineEvent.message_deleted:type_name -> nexusim.conversation.timeline.v1.MessageDeletedV1
+	10, // 6: nexusim.conversation.timeline.v1.ConversationTimelineEvent.conversation_member_joined:type_name -> nexusim.conversation.timeline.v1.ConversationMemberJoinedV1
+	11, // 7: nexusim.conversation.timeline.v1.ConversationTimelineEvent.conversation_member_left:type_name -> nexusim.conversation.timeline.v1.ConversationMemberLeftV1
+	12, // 8: nexusim.conversation.timeline.v1.ConversationTimelineEvent.conversation_member_removed:type_name -> nexusim.conversation.timeline.v1.ConversationMemberRemovedV1
+	13, // 9: nexusim.conversation.timeline.v1.ConversationTimelineEvent.conversation_member_role_changed:type_name -> nexusim.conversation.timeline.v1.ConversationMemberRoleChangedV1
+	14, // 10: nexusim.conversation.timeline.v1.ConversationTimelineEvent.conversation_member_boundary_cancelled:type_name -> nexusim.conversation.timeline.v1.ConversationMemberBoundaryCancelledV1
+	16, // 11: nexusim.conversation.timeline.v1.MessagePersistedV1.payload:type_name -> google.protobuf.Struct
+	15, // 12: nexusim.conversation.timeline.v1.MessagePersistedV1.accepted_at:type_name -> google.protobuf.Timestamp
+	16, // 13: nexusim.conversation.timeline.v1.MessageEditedV1.before_payload:type_name -> google.protobuf.Struct
+	16, // 14: nexusim.conversation.timeline.v1.MessageEditedV1.after_payload:type_name -> google.protobuf.Struct
+	15, // 15: nexusim.conversation.timeline.v1.MessageEditedV1.edited_at:type_name -> google.protobuf.Timestamp
+	15, // 16: nexusim.conversation.timeline.v1.MessageRevokedV1.revoked_at:type_name -> google.protobuf.Timestamp
+	0,  // 17: nexusim.conversation.timeline.v1.MessageDeletedV1.delete_scope:type_name -> nexusim.conversation.timeline.v1.MessageDeleteScope
+	15, // 18: nexusim.conversation.timeline.v1.MessageDeletedV1.deleted_at:type_name -> google.protobuf.Timestamp
+	1,  // 19: nexusim.conversation.timeline.v1.ConversationMemberJoinedV1.change_type:type_name -> nexusim.conversation.timeline.v1.ConversationMemberChangeType
+	2,  // 20: nexusim.conversation.timeline.v1.ConversationMemberJoinedV1.old_role:type_name -> nexusim.conversation.timeline.v1.ConversationMemberRole
+	2,  // 21: nexusim.conversation.timeline.v1.ConversationMemberJoinedV1.new_role:type_name -> nexusim.conversation.timeline.v1.ConversationMemberRole
+	3,  // 22: nexusim.conversation.timeline.v1.ConversationMemberJoinedV1.old_status:type_name -> nexusim.conversation.timeline.v1.ConversationMemberStatus
+	3,  // 23: nexusim.conversation.timeline.v1.ConversationMemberJoinedV1.new_status:type_name -> nexusim.conversation.timeline.v1.ConversationMemberStatus
+	15, // 24: nexusim.conversation.timeline.v1.ConversationMemberJoinedV1.occurred_at:type_name -> google.protobuf.Timestamp
+	1,  // 25: nexusim.conversation.timeline.v1.ConversationMemberLeftV1.change_type:type_name -> nexusim.conversation.timeline.v1.ConversationMemberChangeType
+	2,  // 26: nexusim.conversation.timeline.v1.ConversationMemberLeftV1.old_role:type_name -> nexusim.conversation.timeline.v1.ConversationMemberRole
+	2,  // 27: nexusim.conversation.timeline.v1.ConversationMemberLeftV1.new_role:type_name -> nexusim.conversation.timeline.v1.ConversationMemberRole
+	3,  // 28: nexusim.conversation.timeline.v1.ConversationMemberLeftV1.old_status:type_name -> nexusim.conversation.timeline.v1.ConversationMemberStatus
+	3,  // 29: nexusim.conversation.timeline.v1.ConversationMemberLeftV1.new_status:type_name -> nexusim.conversation.timeline.v1.ConversationMemberStatus
+	15, // 30: nexusim.conversation.timeline.v1.ConversationMemberLeftV1.occurred_at:type_name -> google.protobuf.Timestamp
+	1,  // 31: nexusim.conversation.timeline.v1.ConversationMemberRemovedV1.change_type:type_name -> nexusim.conversation.timeline.v1.ConversationMemberChangeType
+	2,  // 32: nexusim.conversation.timeline.v1.ConversationMemberRemovedV1.old_role:type_name -> nexusim.conversation.timeline.v1.ConversationMemberRole
+	2,  // 33: nexusim.conversation.timeline.v1.ConversationMemberRemovedV1.new_role:type_name -> nexusim.conversation.timeline.v1.ConversationMemberRole
+	3,  // 34: nexusim.conversation.timeline.v1.ConversationMemberRemovedV1.old_status:type_name -> nexusim.conversation.timeline.v1.ConversationMemberStatus
+	3,  // 35: nexusim.conversation.timeline.v1.ConversationMemberRemovedV1.new_status:type_name -> nexusim.conversation.timeline.v1.ConversationMemberStatus
+	15, // 36: nexusim.conversation.timeline.v1.ConversationMemberRemovedV1.occurred_at:type_name -> google.protobuf.Timestamp
+	1,  // 37: nexusim.conversation.timeline.v1.ConversationMemberRoleChangedV1.change_type:type_name -> nexusim.conversation.timeline.v1.ConversationMemberChangeType
+	2,  // 38: nexusim.conversation.timeline.v1.ConversationMemberRoleChangedV1.old_role:type_name -> nexusim.conversation.timeline.v1.ConversationMemberRole
+	2,  // 39: nexusim.conversation.timeline.v1.ConversationMemberRoleChangedV1.new_role:type_name -> nexusim.conversation.timeline.v1.ConversationMemberRole
+	3,  // 40: nexusim.conversation.timeline.v1.ConversationMemberRoleChangedV1.old_status:type_name -> nexusim.conversation.timeline.v1.ConversationMemberStatus
+	3,  // 41: nexusim.conversation.timeline.v1.ConversationMemberRoleChangedV1.new_status:type_name -> nexusim.conversation.timeline.v1.ConversationMemberStatus
+	15, // 42: nexusim.conversation.timeline.v1.ConversationMemberRoleChangedV1.occurred_at:type_name -> google.protobuf.Timestamp
+	1,  // 43: nexusim.conversation.timeline.v1.ConversationMemberBoundaryCancelledV1.change_type:type_name -> nexusim.conversation.timeline.v1.ConversationMemberChangeType
+	2,  // 44: nexusim.conversation.timeline.v1.ConversationMemberBoundaryCancelledV1.old_role:type_name -> nexusim.conversation.timeline.v1.ConversationMemberRole
+	2,  // 45: nexusim.conversation.timeline.v1.ConversationMemberBoundaryCancelledV1.new_role:type_name -> nexusim.conversation.timeline.v1.ConversationMemberRole
+	3,  // 46: nexusim.conversation.timeline.v1.ConversationMemberBoundaryCancelledV1.old_status:type_name -> nexusim.conversation.timeline.v1.ConversationMemberStatus
+	3,  // 47: nexusim.conversation.timeline.v1.ConversationMemberBoundaryCancelledV1.new_status:type_name -> nexusim.conversation.timeline.v1.ConversationMemberStatus
+	15, // 48: nexusim.conversation.timeline.v1.ConversationMemberBoundaryCancelledV1.occurred_at:type_name -> google.protobuf.Timestamp
+	49, // [49:49] is the sub-list for method output_type
+	49, // [49:49] is the sub-list for method input_type
+	49, // [49:49] is the sub-list for extension type_name
+	49, // [49:49] is the sub-list for extension extendee
+	0,  // [0:49] is the sub-list for field type_name
 }
 
 func init() { file_conversation_timeline_events_proto_init() }
@@ -957,14 +2102,19 @@ func file_conversation_timeline_events_proto_init() {
 		(*ConversationTimelineEvent_MessageEdited)(nil),
 		(*ConversationTimelineEvent_MessageRevoked)(nil),
 		(*ConversationTimelineEvent_MessageDeleted)(nil),
+		(*ConversationTimelineEvent_ConversationMemberJoined)(nil),
+		(*ConversationTimelineEvent_ConversationMemberLeft)(nil),
+		(*ConversationTimelineEvent_ConversationMemberRemoved)(nil),
+		(*ConversationTimelineEvent_ConversationMemberRoleChanged)(nil),
+		(*ConversationTimelineEvent_ConversationMemberBoundaryCancelled)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_conversation_timeline_events_proto_rawDesc), len(file_conversation_timeline_events_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   6,
+			NumEnums:      4,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

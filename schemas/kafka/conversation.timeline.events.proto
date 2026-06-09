@@ -36,6 +36,11 @@ message ConversationTimelineEvent {
     MessageEditedV1 message_edited = 17;
     MessageRevokedV1 message_revoked = 18;
     MessageDeletedV1 message_deleted = 19;
+    ConversationMemberJoinedV1 conversation_member_joined = 20;
+    ConversationMemberLeftV1 conversation_member_left = 21;
+    ConversationMemberRemovedV1 conversation_member_removed = 22;
+    ConversationMemberRoleChangedV1 conversation_member_role_changed = 23;
+    ConversationMemberBoundaryCancelledV1 conversation_member_boundary_cancelled = 24;
   }
 }
 
@@ -107,4 +112,121 @@ message MessageDeletedV1 {
   string reason = 7;
 
   google.protobuf.Timestamp deleted_at = 8;
+}
+
+enum ConversationMemberChangeType {
+  CONVERSATION_MEMBER_CHANGE_TYPE_UNSPECIFIED = 0;
+  CONVERSATION_MEMBER_CHANGE_TYPE_JOIN = 1;
+  CONVERSATION_MEMBER_CHANGE_TYPE_LEAVE = 2;
+  CONVERSATION_MEMBER_CHANGE_TYPE_REMOVE = 3;
+  CONVERSATION_MEMBER_CHANGE_TYPE_ROLE_CHANGED = 4;
+}
+
+enum ConversationMemberRole {
+  CONVERSATION_MEMBER_ROLE_UNSPECIFIED = 0;
+  CONVERSATION_MEMBER_ROLE_OWNER = 1;
+  CONVERSATION_MEMBER_ROLE_ADMIN = 2;
+  CONVERSATION_MEMBER_ROLE_MEMBER = 3;
+}
+
+enum ConversationMemberStatus {
+  CONVERSATION_MEMBER_STATUS_UNSPECIFIED = 0;
+  CONVERSATION_MEMBER_STATUS_ACTIVE = 1;
+  CONVERSATION_MEMBER_STATUS_LEFT = 2;
+  CONVERSATION_MEMBER_STATUS_BANNED = 3;
+}
+
+message ConversationMemberJoinedV1 {
+  string change_id = 1;
+  string conversation_id = 2;
+  int64 boundary_seq = 3;
+
+  string target_user_id = 4;
+  string operator_user_id = 5;
+  ConversationMemberChangeType change_type = 6;
+  ConversationMemberRole old_role = 7;
+  ConversationMemberRole new_role = 8;
+  ConversationMemberStatus old_status = 9;
+  ConversationMemberStatus new_status = 10;
+
+  int64 member_version = 11;
+  int64 permission_version = 12;
+  string reason = 13;
+  google.protobuf.Timestamp occurred_at = 14;
+}
+
+message ConversationMemberLeftV1 {
+  string change_id = 1;
+  string conversation_id = 2;
+  int64 boundary_seq = 3;
+
+  string target_user_id = 4;
+  string operator_user_id = 5;
+  ConversationMemberChangeType change_type = 6;
+  ConversationMemberRole old_role = 7;
+  ConversationMemberRole new_role = 8;
+  ConversationMemberStatus old_status = 9;
+  ConversationMemberStatus new_status = 10;
+
+  int64 member_version = 11;
+  int64 permission_version = 12;
+  string reason = 13;
+  google.protobuf.Timestamp occurred_at = 14;
+}
+
+message ConversationMemberRemovedV1 {
+  string change_id = 1;
+  string conversation_id = 2;
+  int64 boundary_seq = 3;
+
+  string target_user_id = 4;
+  string operator_user_id = 5;
+  ConversationMemberChangeType change_type = 6;
+  ConversationMemberRole old_role = 7;
+  ConversationMemberRole new_role = 8;
+  ConversationMemberStatus old_status = 9;
+  ConversationMemberStatus new_status = 10;
+
+  int64 member_version = 11;
+  int64 permission_version = 12;
+  string reason = 13;
+  google.protobuf.Timestamp occurred_at = 14;
+}
+
+message ConversationMemberRoleChangedV1 {
+  string change_id = 1;
+  string conversation_id = 2;
+  int64 boundary_seq = 3;
+
+  string target_user_id = 4;
+  string operator_user_id = 5;
+  ConversationMemberChangeType change_type = 6;
+  ConversationMemberRole old_role = 7;
+  ConversationMemberRole new_role = 8;
+  ConversationMemberStatus old_status = 9;
+  ConversationMemberStatus new_status = 10;
+
+  int64 member_version = 11;
+  int64 permission_version = 12;
+  string reason = 13;
+  google.protobuf.Timestamp occurred_at = 14;
+}
+
+message ConversationMemberBoundaryCancelledV1 {
+  string change_id = 1;
+  string conversation_id = 2;
+  int64 boundary_seq = 3;
+
+  string target_user_id = 4;
+  string operator_user_id = 5;
+  ConversationMemberChangeType change_type = 6;
+  ConversationMemberRole old_role = 7;
+  ConversationMemberRole new_role = 8;
+  ConversationMemberStatus old_status = 9;
+  ConversationMemberStatus new_status = 10;
+
+  int64 member_version = 11;
+  int64 permission_version = 12;
+  string reason = 13;
+  google.protobuf.Timestamp occurred_at = 14;
 }

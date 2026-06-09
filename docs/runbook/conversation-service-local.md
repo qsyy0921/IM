@@ -43,6 +43,9 @@ docker exec nexusim-postgres psql -U nexusim -d nexusim -v ON_ERROR_STOP=1 -f /t
 
 docker cp migrations\postgres\conversation\000001_conversation_core.sql nexusim-postgres:/tmp/nexusim_conversation_core.sql
 docker exec nexusim-postgres psql -U nexusim -d nexusim -v ON_ERROR_STOP=1 -f /tmp/nexusim_conversation_core.sql
+
+docker cp migrations\postgres\conversation\000002_member_change_saga_v2.sql nexusim-postgres:/tmp/nexusim_conversation_member_change_saga_v2.sql
+docker exec nexusim-postgres psql -U nexusim -d nexusim -v ON_ERROR_STOP=1 -f /tmp/nexusim_conversation_member_change_saga_v2.sql
 ```
 
 确认表存在：

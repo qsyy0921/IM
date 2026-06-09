@@ -19,7 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ConversationService_GetSendContext_FullMethodName = "/nexusim.conversation.v1.ConversationService/GetSendContext"
+	ConversationService_GetSendContext_FullMethodName     = "/nexusim.conversation.v1.ConversationService/GetSendContext"
+	ConversationService_CreateMemberChange_FullMethodName = "/nexusim.conversation.v1.ConversationService/CreateMemberChange"
+	ConversationService_GetMemberChange_FullMethodName    = "/nexusim.conversation.v1.ConversationService/GetMemberChange"
 )
 
 // ConversationServiceClient is the client API for ConversationService service.
@@ -27,6 +29,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ConversationServiceClient interface {
 	GetSendContext(ctx context.Context, in *GetSendContextRequest, opts ...grpc.CallOption) (*GetSendContextResponse, error)
+	CreateMemberChange(ctx context.Context, in *CreateMemberChangeRequest, opts ...grpc.CallOption) (*CreateMemberChangeResponse, error)
+	GetMemberChange(ctx context.Context, in *GetMemberChangeRequest, opts ...grpc.CallOption) (*GetMemberChangeResponse, error)
 }
 
 type conversationServiceClient struct {
@@ -47,11 +51,33 @@ func (c *conversationServiceClient) GetSendContext(ctx context.Context, in *GetS
 	return out, nil
 }
 
+func (c *conversationServiceClient) CreateMemberChange(ctx context.Context, in *CreateMemberChangeRequest, opts ...grpc.CallOption) (*CreateMemberChangeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateMemberChangeResponse)
+	err := c.cc.Invoke(ctx, ConversationService_CreateMemberChange_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conversationServiceClient) GetMemberChange(ctx context.Context, in *GetMemberChangeRequest, opts ...grpc.CallOption) (*GetMemberChangeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMemberChangeResponse)
+	err := c.cc.Invoke(ctx, ConversationService_GetMemberChange_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ConversationServiceServer is the server API for ConversationService service.
 // All implementations must embed UnimplementedConversationServiceServer
 // for forward compatibility.
 type ConversationServiceServer interface {
 	GetSendContext(context.Context, *GetSendContextRequest) (*GetSendContextResponse, error)
+	CreateMemberChange(context.Context, *CreateMemberChangeRequest) (*CreateMemberChangeResponse, error)
+	GetMemberChange(context.Context, *GetMemberChangeRequest) (*GetMemberChangeResponse, error)
 	mustEmbedUnimplementedConversationServiceServer()
 }
 
@@ -64,6 +90,12 @@ type UnimplementedConversationServiceServer struct{}
 
 func (UnimplementedConversationServiceServer) GetSendContext(context.Context, *GetSendContextRequest) (*GetSendContextResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSendContext not implemented")
+}
+func (UnimplementedConversationServiceServer) CreateMemberChange(context.Context, *CreateMemberChangeRequest) (*CreateMemberChangeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateMemberChange not implemented")
+}
+func (UnimplementedConversationServiceServer) GetMemberChange(context.Context, *GetMemberChangeRequest) (*GetMemberChangeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMemberChange not implemented")
 }
 func (UnimplementedConversationServiceServer) mustEmbedUnimplementedConversationServiceServer() {}
 func (UnimplementedConversationServiceServer) testEmbeddedByValue()                             {}
@@ -104,6 +136,42 @@ func _ConversationService_GetSendContext_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ConversationService_CreateMemberChange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateMemberChangeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).CreateMemberChange(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_CreateMemberChange_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).CreateMemberChange(ctx, req.(*CreateMemberChangeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConversationService_GetMemberChange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMemberChangeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).GetMemberChange(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_GetMemberChange_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).GetMemberChange(ctx, req.(*GetMemberChangeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ConversationService_ServiceDesc is the grpc.ServiceDesc for ConversationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +182,14 @@ var ConversationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSendContext",
 			Handler:    _ConversationService_GetSendContext_Handler,
+		},
+		{
+			MethodName: "CreateMemberChange",
+			Handler:    _ConversationService_CreateMemberChange_Handler,
+		},
+		{
+			MethodName: "GetMemberChange",
+			Handler:    _ConversationService_GetMemberChange_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

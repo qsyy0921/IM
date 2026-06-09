@@ -43,6 +43,197 @@ func TestBuildConversationTimelineEventMessagePersisted(t *testing.T) {
 	}
 }
 
+func TestBuildConversationTimelineEventMemberBoundaryPayloads(t *testing.T) {
+	tests := []struct {
+		name      string
+		eventType types.TimelineEventType
+		assert    func(*conversationtimelinev1.ConversationTimelineEvent) *conversationtimelinev1.ConversationMemberJoinedV1
+	}{
+		{
+			name:      "joined",
+			eventType: types.TimelineEventConversationMemberJoined,
+			assert: func(event *conversationtimelinev1.ConversationTimelineEvent) *conversationtimelinev1.ConversationMemberJoinedV1 {
+				return event.GetConversationMemberJoined()
+			},
+		},
+		{
+			name:      "left",
+			eventType: types.TimelineEventConversationMemberLeft,
+			assert: func(event *conversationtimelinev1.ConversationTimelineEvent) *conversationtimelinev1.ConversationMemberJoinedV1 {
+				payload := event.GetConversationMemberLeft()
+				if payload == nil {
+					return nil
+				}
+				return &conversationtimelinev1.ConversationMemberJoinedV1{
+					ChangeId:          payload.ChangeId,
+					ConversationId:    payload.ConversationId,
+					BoundarySeq:       payload.BoundarySeq,
+					TargetUserId:      payload.TargetUserId,
+					OperatorUserId:    payload.OperatorUserId,
+					ChangeType:        payload.ChangeType,
+					OldRole:           payload.OldRole,
+					NewRole:           payload.NewRole,
+					OldStatus:         payload.OldStatus,
+					NewStatus:         payload.NewStatus,
+					MemberVersion:     payload.MemberVersion,
+					PermissionVersion: payload.PermissionVersion,
+					Reason:            payload.Reason,
+					OccurredAt:        payload.OccurredAt,
+				}
+			},
+		},
+		{
+			name:      "removed",
+			eventType: types.TimelineEventConversationMemberRemoved,
+			assert: func(event *conversationtimelinev1.ConversationTimelineEvent) *conversationtimelinev1.ConversationMemberJoinedV1 {
+				payload := event.GetConversationMemberRemoved()
+				if payload == nil {
+					return nil
+				}
+				return &conversationtimelinev1.ConversationMemberJoinedV1{
+					ChangeId:          payload.ChangeId,
+					ConversationId:    payload.ConversationId,
+					BoundarySeq:       payload.BoundarySeq,
+					TargetUserId:      payload.TargetUserId,
+					OperatorUserId:    payload.OperatorUserId,
+					ChangeType:        payload.ChangeType,
+					OldRole:           payload.OldRole,
+					NewRole:           payload.NewRole,
+					OldStatus:         payload.OldStatus,
+					NewStatus:         payload.NewStatus,
+					MemberVersion:     payload.MemberVersion,
+					PermissionVersion: payload.PermissionVersion,
+					Reason:            payload.Reason,
+					OccurredAt:        payload.OccurredAt,
+				}
+			},
+		},
+		{
+			name:      "role_changed",
+			eventType: types.TimelineEventConversationMemberRoleChanged,
+			assert: func(event *conversationtimelinev1.ConversationTimelineEvent) *conversationtimelinev1.ConversationMemberJoinedV1 {
+				payload := event.GetConversationMemberRoleChanged()
+				if payload == nil {
+					return nil
+				}
+				return &conversationtimelinev1.ConversationMemberJoinedV1{
+					ChangeId:          payload.ChangeId,
+					ConversationId:    payload.ConversationId,
+					BoundarySeq:       payload.BoundarySeq,
+					TargetUserId:      payload.TargetUserId,
+					OperatorUserId:    payload.OperatorUserId,
+					ChangeType:        payload.ChangeType,
+					OldRole:           payload.OldRole,
+					NewRole:           payload.NewRole,
+					OldStatus:         payload.OldStatus,
+					NewStatus:         payload.NewStatus,
+					MemberVersion:     payload.MemberVersion,
+					PermissionVersion: payload.PermissionVersion,
+					Reason:            payload.Reason,
+					OccurredAt:        payload.OccurredAt,
+				}
+			},
+		},
+		{
+			name:      "boundary_cancelled",
+			eventType: types.TimelineEventConversationMemberBoundaryCancelled,
+			assert: func(event *conversationtimelinev1.ConversationTimelineEvent) *conversationtimelinev1.ConversationMemberJoinedV1 {
+				payload := event.GetConversationMemberBoundaryCancelled()
+				if payload == nil {
+					return nil
+				}
+				return &conversationtimelinev1.ConversationMemberJoinedV1{
+					ChangeId:          payload.ChangeId,
+					ConversationId:    payload.ConversationId,
+					BoundarySeq:       payload.BoundarySeq,
+					TargetUserId:      payload.TargetUserId,
+					OperatorUserId:    payload.OperatorUserId,
+					ChangeType:        payload.ChangeType,
+					OldRole:           payload.OldRole,
+					NewRole:           payload.NewRole,
+					OldStatus:         payload.OldStatus,
+					NewStatus:         payload.NewStatus,
+					MemberVersion:     payload.MemberVersion,
+					PermissionVersion: payload.PermissionVersion,
+					Reason:            payload.Reason,
+					OccurredAt:        payload.OccurredAt,
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			message := testMemberBoundaryOutboxMessage(tt.eventType)
+			event, err := BuildConversationTimelineEvent(message)
+			if err != nil {
+				t.Fatalf("build member boundary event: %v", err)
+			}
+			if event.EventId != string(message.EventID) ||
+				event.EventType != string(tt.eventType) ||
+				event.AggregateVersion != message.AggregateVersion ||
+				event.Producer != "conversation-service" ||
+				event.Metadata.PermissionVersion != 8 {
+				t.Fatalf("unexpected envelope: %+v", event)
+			}
+			payload := tt.assert(event)
+			if payload == nil {
+				t.Fatalf("expected member boundary payload")
+			}
+			if payload.ChangeId != "change-1" ||
+				payload.ConversationId != "conv-1" ||
+				payload.BoundarySeq != 2 ||
+				payload.TargetUserId != "user-2" ||
+				payload.OperatorUserId != "owner-1" ||
+				payload.ChangeType != conversationtimelinev1.ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_JOIN ||
+				payload.OldRole != conversationtimelinev1.ConversationMemberRole_CONVERSATION_MEMBER_ROLE_MEMBER ||
+				payload.NewRole != conversationtimelinev1.ConversationMemberRole_CONVERSATION_MEMBER_ROLE_ADMIN ||
+				payload.OldStatus != conversationtimelinev1.ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_LEFT ||
+				payload.NewStatus != conversationtimelinev1.ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_ACTIVE ||
+				payload.MemberVersion != 7 ||
+				payload.PermissionVersion != 8 ||
+				payload.OccurredAt == nil {
+				t.Fatalf("unexpected payload: %+v", payload)
+			}
+		})
+	}
+}
+
+func TestBuildConversationTimelineEventUnsupportedEventFailsClosed(t *testing.T) {
+	message := testMemberBoundaryOutboxMessage("conversation.member.unknown.v1")
+
+	if _, err := BuildConversationTimelineEvent(message); err == nil {
+		t.Fatalf("expected unsupported event error")
+	}
+}
+
+func TestBuildConversationTimelineEventMalformedMemberPayloadFailsClosed(t *testing.T) {
+	message := testMemberBoundaryOutboxMessage(types.TimelineEventConversationMemberJoined)
+	message.PayloadJSON = []byte(`{"change_id":"change-1"}`)
+
+	if _, err := BuildConversationTimelineEvent(message); err == nil {
+		t.Fatalf("expected malformed member payload error")
+	}
+}
+
+func TestRelayRunOnceUnsupportedEventFailsClosed(t *testing.T) {
+	message := testMemberBoundaryOutboxMessage("conversation.member.unknown.v1")
+	store := &fakeStore{messages: []types.OutboxMessage{message}}
+	publisher := &fakePublisher{}
+	relay := NewRelay(store, publisher, Config{Topic: "topic-it", BatchSize: 10})
+
+	stats, err := relay.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("run relay once: %v", err)
+	}
+	if stats.Fetched != 1 || stats.Published != 0 || stats.Retried != 1 {
+		t.Fatalf("unexpected stats: %+v", stats)
+	}
+	if len(publisher.messages) != 0 || len(publisher.batches) != 0 {
+		t.Fatalf("unsupported event should not publish: messages=%d batches=%d", len(publisher.messages), len(publisher.batches))
+	}
+}
+
 func TestRelayRunOncePublishesKafkaMessage(t *testing.T) {
 	store := &fakeStore{messages: []types.OutboxMessage{testOutboxMessage()}}
 	publisher := &fakePublisher{}
@@ -658,6 +849,46 @@ func testOutboxMessage() types.OutboxMessage {
 			"payload":{"text":"hello"},
 			"attachment_ids":["att-1"],
 			"accepted_at":"2026-06-08T12:00:00Z"
+		}`),
+	}
+}
+
+func testMemberBoundaryOutboxMessage(eventType types.TimelineEventType) types.OutboxMessage {
+	occurredAt := time.Date(2026, 6, 9, 9, 30, 0, 0, time.UTC)
+	return types.OutboxMessage{
+		ID:                  10,
+		EventID:             "member-event-1",
+		TenantID:            "tenant-1",
+		ConversationID:      "conv-1",
+		AggregateVersion:    2,
+		EventType:           eventType,
+		EventVersion:        "v1",
+		PartitionKey:        "tenant-1:conv-1",
+		MappingVersion:      string(eventType),
+		CorrelationID:       "request-1",
+		CausationID:         "change-1",
+		Producer:            "conversation-service",
+		TraceID:             "trace-1",
+		FanoutMode:          types.FanoutModeWriteFanout,
+		FanoutPolicyVersion: 3,
+		PermissionVersion:   8,
+		Classification:      "MEMBER_BOUNDARY",
+		OccurredAt:          occurredAt,
+		PayloadJSON: []byte(`{
+			"change_id":"change-1",
+			"conversation_id":"conv-1",
+			"boundary_seq":2,
+			"target_user_id":"user-2",
+			"operator_user_id":"owner-1",
+			"change_type":"JOIN",
+			"old_role":"MEMBER",
+			"new_role":"ADMIN",
+			"old_status":"LEFT",
+			"new_status":"ACTIVE",
+			"member_version":7,
+			"permission_version":8,
+			"reason":"invite accepted",
+			"occurred_at":"2026-06-09T09:30:00Z"
 		}`),
 	}
 }

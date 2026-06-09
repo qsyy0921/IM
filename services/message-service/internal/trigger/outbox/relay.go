@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"sync"
 	"time"
 
@@ -245,47 +246,132 @@ func BuildConversationTimelineEvent(message types.OutboxMessage) (*conversationt
 		if occurredAt.IsZero() {
 			occurredAt = acceptedAt
 		}
-		return &conversationtimelinev1.ConversationTimelineEvent{
-			EventId:          string(message.EventID),
-			EventType:        string(message.EventType),
-			EventVersion:     message.EventVersion,
-			TenantId:         string(message.TenantID),
-			AggregateType:    "conversation",
-			AggregateId:      string(message.ConversationID),
-			AggregateVersion: message.AggregateVersion,
-			PartitionKey:     message.PartitionKey,
-			MappingVersion:   message.MappingVersion,
-			TraceId:          message.TraceID,
-			CorrelationId:    message.CorrelationID,
-			CausationId:      message.CausationID,
-			Producer:         message.Producer,
-			OccurredAt:       timestamppb.New(occurredAt),
-			Metadata: &conversationtimelinev1.TimelineMetadata{
-				FanoutMode:          string(message.FanoutMode),
-				FanoutPolicyVersion: message.FanoutPolicyVersion,
-				PermissionVersion:   message.PermissionVersion,
-				Classification:      message.Classification,
-				MappingVersion:      message.MappingVersion,
+		event := buildTimelineEnvelope(message, occurredAt)
+		event.Payload = &conversationtimelinev1.ConversationTimelineEvent_MessagePersisted{
+			MessagePersisted: &conversationtimelinev1.MessagePersistedV1{
+				MessageId:       payload.MessageID,
+				ConversationId:  payload.ConversationID,
+				ConversationSeq: payload.ConversationSeq,
+				SenderId:        payload.SenderID,
+				DeviceId:        payload.DeviceID,
+				ClientMsgId:     payload.ClientMsgID,
+				CommandHash:     payload.CommandHash,
+				MessageType:     payload.MessageType,
+				Payload:         payloadStruct,
+				AttachmentIds:   payload.AttachmentIDs,
+				AcceptedAt:      timestamppb.New(acceptedAt),
 			},
-			Payload: &conversationtimelinev1.ConversationTimelineEvent_MessagePersisted{
-				MessagePersisted: &conversationtimelinev1.MessagePersistedV1{
-					MessageId:       payload.MessageID,
-					ConversationId:  payload.ConversationID,
-					ConversationSeq: payload.ConversationSeq,
-					SenderId:        payload.SenderID,
-					DeviceId:        payload.DeviceID,
-					ClientMsgId:     payload.ClientMsgID,
-					CommandHash:     payload.CommandHash,
-					MessageType:     payload.MessageType,
-					Payload:         payloadStruct,
-					AttachmentIds:   payload.AttachmentIDs,
-					AcceptedAt:      timestamppb.New(acceptedAt),
-				},
-			},
-		}, nil
+		}
+		return event, nil
+	case types.TimelineEventConversationMemberJoined,
+		types.TimelineEventConversationMemberLeft,
+		types.TimelineEventConversationMemberRemoved,
+		types.TimelineEventConversationMemberRoleChanged,
+		types.TimelineEventConversationMemberBoundaryCancelled:
+		return buildMemberBoundaryTimelineEvent(message)
 	default:
 		return nil, errors.New("unsupported outbox event type")
 	}
+}
+
+func buildTimelineEnvelope(message types.OutboxMessage, occurredAt time.Time) *conversationtimelinev1.ConversationTimelineEvent {
+	return &conversationtimelinev1.ConversationTimelineEvent{
+		EventId:          string(message.EventID),
+		EventType:        string(message.EventType),
+		EventVersion:     message.EventVersion,
+		TenantId:         string(message.TenantID),
+		AggregateType:    "conversation",
+		AggregateId:      string(message.ConversationID),
+		AggregateVersion: message.AggregateVersion,
+		PartitionKey:     message.PartitionKey,
+		MappingVersion:   message.MappingVersion,
+		TraceId:          message.TraceID,
+		CorrelationId:    message.CorrelationID,
+		CausationId:      message.CausationID,
+		Producer:         message.Producer,
+		OccurredAt:       timestamppb.New(occurredAt),
+		Metadata: &conversationtimelinev1.TimelineMetadata{
+			FanoutMode:          string(message.FanoutMode),
+			FanoutPolicyVersion: message.FanoutPolicyVersion,
+			PermissionVersion:   message.PermissionVersion,
+			Classification:      message.Classification,
+			MappingVersion:      message.MappingVersion,
+		},
+	}
+}
+
+func buildMemberBoundaryTimelineEvent(message types.OutboxMessage) (*conversationtimelinev1.ConversationTimelineEvent, error) {
+	payload, err := decodeMemberBoundaryPayload(message.PayloadJSON)
+	if err != nil {
+		return nil, err
+	}
+	occurredAt, err := time.Parse(time.RFC3339Nano, payload.OccurredAt)
+	if err != nil {
+		return nil, err
+	}
+	changeType, err := conversationMemberChangeType(payload.ChangeType)
+	if err != nil {
+		return nil, err
+	}
+	oldRole, err := conversationMemberRole(payload.OldRole)
+	if err != nil {
+		return nil, err
+	}
+	newRole, err := conversationMemberRole(payload.NewRole)
+	if err != nil {
+		return nil, err
+	}
+	oldStatus, err := conversationMemberStatus(payload.OldStatus)
+	if err != nil {
+		return nil, err
+	}
+	newStatus, err := conversationMemberStatus(payload.NewStatus)
+	if err != nil {
+		return nil, err
+	}
+
+	event := buildTimelineEnvelope(message, occurredAt)
+	member := memberBoundaryProtoPayload{
+		ChangeID:          payload.ChangeID,
+		ConversationID:    payload.ConversationID,
+		BoundarySeq:       payload.BoundarySeq,
+		TargetUserID:      payload.TargetUserID,
+		OperatorUserID:    payload.OperatorUserID,
+		ChangeType:        changeType,
+		OldRole:           oldRole,
+		NewRole:           newRole,
+		OldStatus:         oldStatus,
+		NewStatus:         newStatus,
+		MemberVersion:     payload.MemberVersion,
+		PermissionVersion: payload.PermissionVersion,
+		Reason:            payload.Reason,
+		OccurredAt:        timestamppb.New(occurredAt),
+	}
+	switch message.EventType {
+	case types.TimelineEventConversationMemberJoined:
+		event.Payload = &conversationtimelinev1.ConversationTimelineEvent_ConversationMemberJoined{
+			ConversationMemberJoined: member.joined(),
+		}
+	case types.TimelineEventConversationMemberLeft:
+		event.Payload = &conversationtimelinev1.ConversationTimelineEvent_ConversationMemberLeft{
+			ConversationMemberLeft: member.left(),
+		}
+	case types.TimelineEventConversationMemberRemoved:
+		event.Payload = &conversationtimelinev1.ConversationTimelineEvent_ConversationMemberRemoved{
+			ConversationMemberRemoved: member.removed(),
+		}
+	case types.TimelineEventConversationMemberRoleChanged:
+		event.Payload = &conversationtimelinev1.ConversationTimelineEvent_ConversationMemberRoleChanged{
+			ConversationMemberRoleChanged: member.roleChanged(),
+		}
+	case types.TimelineEventConversationMemberBoundaryCancelled:
+		event.Payload = &conversationtimelinev1.ConversationTimelineEvent_ConversationMemberBoundaryCancelled{
+			ConversationMemberBoundaryCancelled: member.cancelled(),
+		}
+	default:
+		return nil, errors.New("unsupported member boundary event type")
+	}
+	return event, nil
 }
 
 type messagePersistedPayload struct {
@@ -316,6 +402,199 @@ func decodeMessagePersistedPayload(payloadJSON []byte) (messagePersistedPayload,
 		return messagePersistedPayload{}, errors.New("message persisted payload is incomplete")
 	}
 	return payload, nil
+}
+
+type memberBoundaryPayload struct {
+	ChangeID          string `json:"change_id"`
+	ConversationID    string `json:"conversation_id"`
+	BoundarySeq       int64  `json:"boundary_seq"`
+	TargetUserID      string `json:"target_user_id"`
+	OperatorUserID    string `json:"operator_user_id"`
+	ChangeType        string `json:"change_type"`
+	OldRole           string `json:"old_role"`
+	NewRole           string `json:"new_role"`
+	OldStatus         string `json:"old_status"`
+	NewStatus         string `json:"new_status"`
+	MemberVersion     int64  `json:"member_version"`
+	PermissionVersion int64  `json:"permission_version"`
+	Reason            string `json:"reason"`
+	OccurredAt        string `json:"occurred_at"`
+}
+
+func decodeMemberBoundaryPayload(payloadJSON []byte) (memberBoundaryPayload, error) {
+	var payload memberBoundaryPayload
+	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+		return memberBoundaryPayload{}, err
+	}
+	if payload.ChangeID == "" ||
+		payload.ConversationID == "" ||
+		payload.BoundarySeq <= 0 ||
+		payload.TargetUserID == "" ||
+		payload.OperatorUserID == "" ||
+		payload.ChangeType == "" ||
+		payload.MemberVersion <= 0 ||
+		payload.PermissionVersion <= 0 ||
+		payload.OccurredAt == "" {
+		return memberBoundaryPayload{}, errors.New("member boundary payload is incomplete")
+	}
+	return payload, nil
+}
+
+type memberBoundaryProtoPayload struct {
+	ChangeID          string
+	ConversationID    string
+	BoundarySeq       int64
+	TargetUserID      string
+	OperatorUserID    string
+	ChangeType        conversationtimelinev1.ConversationMemberChangeType
+	OldRole           conversationtimelinev1.ConversationMemberRole
+	NewRole           conversationtimelinev1.ConversationMemberRole
+	OldStatus         conversationtimelinev1.ConversationMemberStatus
+	NewStatus         conversationtimelinev1.ConversationMemberStatus
+	MemberVersion     int64
+	PermissionVersion int64
+	Reason            string
+	OccurredAt        *timestamppb.Timestamp
+}
+
+func (p memberBoundaryProtoPayload) joined() *conversationtimelinev1.ConversationMemberJoinedV1 {
+	return &conversationtimelinev1.ConversationMemberJoinedV1{
+		ChangeId:          p.ChangeID,
+		ConversationId:    p.ConversationID,
+		BoundarySeq:       p.BoundarySeq,
+		TargetUserId:      p.TargetUserID,
+		OperatorUserId:    p.OperatorUserID,
+		ChangeType:        p.ChangeType,
+		OldRole:           p.OldRole,
+		NewRole:           p.NewRole,
+		OldStatus:         p.OldStatus,
+		NewStatus:         p.NewStatus,
+		MemberVersion:     p.MemberVersion,
+		PermissionVersion: p.PermissionVersion,
+		Reason:            p.Reason,
+		OccurredAt:        p.OccurredAt,
+	}
+}
+
+func (p memberBoundaryProtoPayload) left() *conversationtimelinev1.ConversationMemberLeftV1 {
+	return &conversationtimelinev1.ConversationMemberLeftV1{
+		ChangeId:          p.ChangeID,
+		ConversationId:    p.ConversationID,
+		BoundarySeq:       p.BoundarySeq,
+		TargetUserId:      p.TargetUserID,
+		OperatorUserId:    p.OperatorUserID,
+		ChangeType:        p.ChangeType,
+		OldRole:           p.OldRole,
+		NewRole:           p.NewRole,
+		OldStatus:         p.OldStatus,
+		NewStatus:         p.NewStatus,
+		MemberVersion:     p.MemberVersion,
+		PermissionVersion: p.PermissionVersion,
+		Reason:            p.Reason,
+		OccurredAt:        p.OccurredAt,
+	}
+}
+
+func (p memberBoundaryProtoPayload) removed() *conversationtimelinev1.ConversationMemberRemovedV1 {
+	return &conversationtimelinev1.ConversationMemberRemovedV1{
+		ChangeId:          p.ChangeID,
+		ConversationId:    p.ConversationID,
+		BoundarySeq:       p.BoundarySeq,
+		TargetUserId:      p.TargetUserID,
+		OperatorUserId:    p.OperatorUserID,
+		ChangeType:        p.ChangeType,
+		OldRole:           p.OldRole,
+		NewRole:           p.NewRole,
+		OldStatus:         p.OldStatus,
+		NewStatus:         p.NewStatus,
+		MemberVersion:     p.MemberVersion,
+		PermissionVersion: p.PermissionVersion,
+		Reason:            p.Reason,
+		OccurredAt:        p.OccurredAt,
+	}
+}
+
+func (p memberBoundaryProtoPayload) roleChanged() *conversationtimelinev1.ConversationMemberRoleChangedV1 {
+	return &conversationtimelinev1.ConversationMemberRoleChangedV1{
+		ChangeId:          p.ChangeID,
+		ConversationId:    p.ConversationID,
+		BoundarySeq:       p.BoundarySeq,
+		TargetUserId:      p.TargetUserID,
+		OperatorUserId:    p.OperatorUserID,
+		ChangeType:        p.ChangeType,
+		OldRole:           p.OldRole,
+		NewRole:           p.NewRole,
+		OldStatus:         p.OldStatus,
+		NewStatus:         p.NewStatus,
+		MemberVersion:     p.MemberVersion,
+		PermissionVersion: p.PermissionVersion,
+		Reason:            p.Reason,
+		OccurredAt:        p.OccurredAt,
+	}
+}
+
+func (p memberBoundaryProtoPayload) cancelled() *conversationtimelinev1.ConversationMemberBoundaryCancelledV1 {
+	return &conversationtimelinev1.ConversationMemberBoundaryCancelledV1{
+		ChangeId:          p.ChangeID,
+		ConversationId:    p.ConversationID,
+		BoundarySeq:       p.BoundarySeq,
+		TargetUserId:      p.TargetUserID,
+		OperatorUserId:    p.OperatorUserID,
+		ChangeType:        p.ChangeType,
+		OldRole:           p.OldRole,
+		NewRole:           p.NewRole,
+		OldStatus:         p.OldStatus,
+		NewStatus:         p.NewStatus,
+		MemberVersion:     p.MemberVersion,
+		PermissionVersion: p.PermissionVersion,
+		Reason:            p.Reason,
+		OccurredAt:        p.OccurredAt,
+	}
+}
+
+func conversationMemberChangeType(value string) (conversationtimelinev1.ConversationMemberChangeType, error) {
+	switch strings.ToUpper(value) {
+	case "JOIN":
+		return conversationtimelinev1.ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_JOIN, nil
+	case "LEAVE":
+		return conversationtimelinev1.ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_LEAVE, nil
+	case "REMOVE":
+		return conversationtimelinev1.ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_REMOVE, nil
+	case "ROLE_CHANGED":
+		return conversationtimelinev1.ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_ROLE_CHANGED, nil
+	default:
+		return conversationtimelinev1.ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_UNSPECIFIED, errors.New("unknown member change type")
+	}
+}
+
+func conversationMemberRole(value string) (conversationtimelinev1.ConversationMemberRole, error) {
+	switch strings.ToUpper(value) {
+	case "":
+		return conversationtimelinev1.ConversationMemberRole_CONVERSATION_MEMBER_ROLE_UNSPECIFIED, nil
+	case "OWNER":
+		return conversationtimelinev1.ConversationMemberRole_CONVERSATION_MEMBER_ROLE_OWNER, nil
+	case "ADMIN":
+		return conversationtimelinev1.ConversationMemberRole_CONVERSATION_MEMBER_ROLE_ADMIN, nil
+	case "MEMBER":
+		return conversationtimelinev1.ConversationMemberRole_CONVERSATION_MEMBER_ROLE_MEMBER, nil
+	default:
+		return conversationtimelinev1.ConversationMemberRole_CONVERSATION_MEMBER_ROLE_UNSPECIFIED, errors.New("unknown member role")
+	}
+}
+
+func conversationMemberStatus(value string) (conversationtimelinev1.ConversationMemberStatus, error) {
+	switch strings.ToUpper(value) {
+	case "":
+		return conversationtimelinev1.ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_UNSPECIFIED, nil
+	case "ACTIVE":
+		return conversationtimelinev1.ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_ACTIVE, nil
+	case "LEFT":
+		return conversationtimelinev1.ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_LEFT, nil
+	case "BANNED":
+		return conversationtimelinev1.ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_BANNED, nil
+	default:
+		return conversationtimelinev1.ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_UNSPECIFIED, errors.New("unknown member status")
+	}
 }
 
 func structFromRawJSON(payload json.RawMessage) (*structpb.Struct, error) {

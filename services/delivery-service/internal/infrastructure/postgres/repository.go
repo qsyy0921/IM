@@ -68,6 +68,11 @@ func (repository *Repository) ProjectTimelineEvent(
 			return types.ProjectTimelineEventResult{}, err
 		}
 		result.MembershipUpdated = true
+	case types.TimelineEventConversationMemberOwnerTransferred:
+		if err := projectOwnerTransferred(ctx, tx, command); err != nil {
+			return types.ProjectTimelineEventResult{}, err
+		}
+		result.MembershipUpdated = true
 	case types.TimelineEventConversationMemberBoundaryCancelled:
 		// First phase records no compensating inbox mutation for cancelled boundaries.
 	default:
@@ -264,6 +269,25 @@ WHERE delivery_membership_projection.member_version <= EXCLUDED.member_version
 	return nil
 }
 
+func projectOwnerTransferred(ctx context.Context, tx pgx.Tx, command types.ProjectTimelineEventCommand) error {
+	previousOwner := command
+	previousOwner.MemberUserID = command.PreviousOwnerUserID
+	previousOwner.MemberRole = command.PreviousOwnerNewRole
+	previousOwner.MemberStatus = command.PreviousOwnerStatus
+	if err := upsertMembershipProjection(ctx, tx, previousOwner); err != nil {
+		return err
+	}
+
+	newOwner := command
+	newOwner.MemberUserID = command.NewOwnerUserID
+	newOwner.MemberRole = command.NewOwnerNewRole
+	newOwner.MemberStatus = command.NewOwnerStatus
+	if err := upsertMembershipProjection(ctx, tx, newOwner); err != nil {
+		return err
+	}
+	return nil
+}
+
 func memberChangeKind(eventType string) string {
 	switch eventType {
 	case types.TimelineEventConversationMemberJoined:
@@ -274,6 +298,8 @@ func memberChangeKind(eventType string) string {
 		return "REMOVE"
 	case types.TimelineEventConversationMemberRoleChanged:
 		return "ROLE_CHANGED"
+	case types.TimelineEventConversationMemberOwnerTransferred:
+		return "OWNER_TRANSFER"
 	default:
 		return ""
 	}

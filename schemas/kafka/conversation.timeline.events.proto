@@ -41,6 +41,7 @@ message ConversationTimelineEvent {
     ConversationMemberRemovedV1 conversation_member_removed = 22;
     ConversationMemberRoleChangedV1 conversation_member_role_changed = 23;
     ConversationMemberBoundaryCancelledV1 conversation_member_boundary_cancelled = 24;
+    ConversationMemberOwnerTransferredV1 conversation_member_owner_transferred = 25;
   }
 }
 
@@ -120,6 +121,7 @@ enum ConversationMemberChangeType {
   CONVERSATION_MEMBER_CHANGE_TYPE_LEAVE = 2;
   CONVERSATION_MEMBER_CHANGE_TYPE_REMOVE = 3;
   CONVERSATION_MEMBER_CHANGE_TYPE_ROLE_CHANGED = 4;
+  CONVERSATION_MEMBER_CHANGE_TYPE_OWNER_TRANSFER = 5;
 }
 
 enum ConversationMemberRole {
@@ -229,4 +231,27 @@ message ConversationMemberBoundaryCancelledV1 {
   int64 permission_version = 12;
   string reason = 13;
   google.protobuf.Timestamp occurred_at = 14;
+}
+
+message ConversationMemberOwnerTransferredV1 {
+  string change_id = 1;
+  string conversation_id = 2;
+  int64 boundary_seq = 3;
+
+  string previous_owner_user_id = 4;
+  string new_owner_user_id = 5;
+  string operator_user_id = 6;
+  ConversationMemberChangeType change_type = 7;
+
+  ConversationMemberRole previous_owner_old_role = 8;
+  ConversationMemberRole previous_owner_new_role = 9;
+  ConversationMemberRole new_owner_old_role = 10;
+  ConversationMemberRole new_owner_new_role = 11;
+  ConversationMemberStatus previous_owner_status = 12;
+  ConversationMemberStatus new_owner_status = 13;
+
+  int64 member_version = 14;
+  int64 permission_version = 15;
+  string reason = 16;
+  google.protobuf.Timestamp occurred_at = 17;
 }

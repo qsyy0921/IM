@@ -19,6 +19,7 @@ const (
 	TimelineEventConversationMemberRemoved           TimelineEventType = "conversation.member.removed.v1"
 	TimelineEventConversationMemberRoleChanged       TimelineEventType = "conversation.member.role_changed.v1"
 	TimelineEventConversationMemberBoundaryCancelled TimelineEventType = "conversation.member.boundary_cancelled.v1"
+	TimelineEventConversationMemberOwnerTransferred  TimelineEventType = "conversation.member.owner_transferred.v1"
 )
 
 type ConversationMode string

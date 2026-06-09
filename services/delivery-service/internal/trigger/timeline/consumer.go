@@ -93,10 +93,26 @@ func buildCommand(consumerGroup string, message types.TimelineMessage) (types.Pr
 		fillMemberBoundary(&command, payload.ConversationMemberRoleChanged.GetTargetUserId(), payload.ConversationMemberRoleChanged.GetNewRole(), payload.ConversationMemberRoleChanged.GetNewStatus(), payload.ConversationMemberRoleChanged.GetMemberVersion(), payload.ConversationMemberRoleChanged.GetPermissionVersion())
 	case *conversationtimelinev1.ConversationTimelineEvent_ConversationMemberBoundaryCancelled:
 		fillMemberBoundary(&command, payload.ConversationMemberBoundaryCancelled.GetTargetUserId(), payload.ConversationMemberBoundaryCancelled.GetNewRole(), payload.ConversationMemberBoundaryCancelled.GetNewStatus(), payload.ConversationMemberBoundaryCancelled.GetMemberVersion(), payload.ConversationMemberBoundaryCancelled.GetPermissionVersion())
+	case *conversationtimelinev1.ConversationTimelineEvent_ConversationMemberOwnerTransferred:
+		fillOwnerTransferred(&command, payload.ConversationMemberOwnerTransferred)
 	default:
 		return types.ProjectTimelineEventCommand{}, types.NewInvalidArgument("unsupported timeline payload")
 	}
 	return command, nil
+}
+
+func fillOwnerTransferred(command *types.ProjectTimelineEventCommand, payload *conversationtimelinev1.ConversationMemberOwnerTransferredV1) {
+	if payload == nil {
+		return
+	}
+	command.PreviousOwnerUserID = types.UserID(payload.GetPreviousOwnerUserId())
+	command.PreviousOwnerNewRole = memberRole(payload.GetPreviousOwnerNewRole())
+	command.PreviousOwnerStatus = memberStatus(payload.GetPreviousOwnerStatus())
+	command.NewOwnerUserID = types.UserID(payload.GetNewOwnerUserId())
+	command.NewOwnerNewRole = memberRole(payload.GetNewOwnerNewRole())
+	command.NewOwnerStatus = memberStatus(payload.GetNewOwnerStatus())
+	command.MemberVersion = payload.GetMemberVersion()
+	command.PermissionVersion = payload.GetPermissionVersion()
 }
 
 func fillMessagePersisted(command *types.ProjectTimelineEventCommand, payload *conversationtimelinev1.MessagePersistedV1) {

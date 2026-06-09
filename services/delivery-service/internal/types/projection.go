@@ -12,6 +12,7 @@ const (
 	TimelineEventConversationMemberRemoved           = "conversation.member.removed.v1"
 	TimelineEventConversationMemberRoleChanged       = "conversation.member.role_changed.v1"
 	TimelineEventConversationMemberBoundaryCancelled = "conversation.member.boundary_cancelled.v1"
+	TimelineEventConversationMemberOwnerTransferred  = "conversation.member.owner_transferred.v1"
 
 	DeliveryMemberStatusActive = "ACTIVE"
 	DeliveryMemberStatusLeft   = "LEFT"
@@ -19,27 +20,33 @@ const (
 )
 
 type ProjectTimelineEventCommand struct {
-	TenantID          TenantID
-	EventID           string
-	EventType         string
-	ConversationID    ConversationID
-	ConversationSeq   int64
-	FanoutMode        string
-	PermissionVersion int64
-	MessageID         string
-	SenderID          UserID
-	PayloadJSON       json.RawMessage
-	MemberUserID      UserID
-	MemberRole        string
-	MemberStatus      string
-	MemberVersion     int64
-	ConsumerGroup     string
-	Topic             string
-	PartitionID       int32
-	OffsetValue       int64
-	TraceID           string
-	CorrelationID     string
-	CausationID       string
+	TenantID             TenantID
+	EventID              string
+	EventType            string
+	ConversationID       ConversationID
+	ConversationSeq      int64
+	FanoutMode           string
+	PermissionVersion    int64
+	MessageID            string
+	SenderID             UserID
+	PayloadJSON          json.RawMessage
+	MemberUserID         UserID
+	MemberRole           string
+	MemberStatus         string
+	MemberVersion        int64
+	PreviousOwnerUserID  UserID
+	PreviousOwnerNewRole string
+	PreviousOwnerStatus  string
+	NewOwnerUserID       UserID
+	NewOwnerNewRole      string
+	NewOwnerStatus       string
+	ConsumerGroup        string
+	Topic                string
+	PartitionID          int32
+	OffsetValue          int64
+	TraceID              string
+	CorrelationID        string
+	CausationID          string
 }
 
 func (command ProjectTimelineEventCommand) Validate() error {
@@ -70,6 +77,28 @@ func (command ProjectTimelineEventCommand) Validate() error {
 		TimelineEventConversationMemberBoundaryCancelled:
 		if command.MemberUserID == "" {
 			return NewInvalidArgument("member_user_id is required")
+		}
+		if command.MemberVersion <= 0 {
+			return NewInvalidArgument("member_version must be positive")
+		}
+	case TimelineEventConversationMemberOwnerTransferred:
+		if command.PreviousOwnerUserID == "" {
+			return NewInvalidArgument("previous_owner_user_id is required")
+		}
+		if command.PreviousOwnerNewRole == "" {
+			return NewInvalidArgument("previous_owner_new_role is required")
+		}
+		if command.PreviousOwnerStatus != DeliveryMemberStatusActive {
+			return NewInvalidArgument("previous_owner_status must be ACTIVE")
+		}
+		if command.NewOwnerUserID == "" {
+			return NewInvalidArgument("new_owner_user_id is required")
+		}
+		if command.NewOwnerNewRole == "" {
+			return NewInvalidArgument("new_owner_new_role is required")
+		}
+		if command.NewOwnerStatus != DeliveryMemberStatusActive {
+			return NewInvalidArgument("new_owner_status must be ACTIVE")
 		}
 		if command.MemberVersion <= 0 {
 			return NewInvalidArgument("member_version must be positive")

@@ -9,6 +9,7 @@ service ConversationService {
   rpc CreateMemberChange(CreateMemberChangeRequest) returns (CreateMemberChangeResponse);
   rpc GetMemberChange(GetMemberChangeRequest) returns (GetMemberChangeResponse);
   rpc ListConversationMembers(ListConversationMembersRequest) returns (ListConversationMembersResponse);
+  rpc TransferConversationOwner(TransferConversationOwnerRequest) returns (TransferConversationOwnerResponse);
 }
 
 message GetSendContextRequest {
@@ -38,6 +39,7 @@ enum MemberChangeType {
   MEMBER_CHANGE_TYPE_LEAVE = 2;
   MEMBER_CHANGE_TYPE_REMOVE = 3;
   MEMBER_CHANGE_TYPE_ROLE_CHANGED = 4;
+  MEMBER_CHANGE_TYPE_OWNER_TRANSFER = 5;
 }
 
 enum MemberRole {
@@ -165,4 +167,26 @@ message ListConversationMembersResponse {
   int64 permission_version = 4;
   repeated ConversationMember members = 5;
   string next_page_token = 6;
+}
+
+message TransferConversationOwnerRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  string new_owner_user_id = 3;
+  int64 expected_member_version = 4;
+  string idempotency_key = 5;
+  string reason = 6;
+}
+
+message TransferConversationOwnerResponse {
+  string change_id = 1;
+  string tenant_id = 2;
+  string conversation_id = 3;
+  string previous_owner_user_id = 4;
+  string new_owner_user_id = 5;
+  MemberChangeStatus status = 6;
+  int64 boundary_seq = 7;
+  int64 member_version = 8;
+  int64 permission_version = 9;
+  bool idempotent_replay = 10;
 }

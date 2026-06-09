@@ -128,11 +128,12 @@ func (FanoutMode) EnumDescriptor() ([]byte, []int) {
 type MemberChangeType int32
 
 const (
-	MemberChangeType_MEMBER_CHANGE_TYPE_UNSPECIFIED  MemberChangeType = 0
-	MemberChangeType_MEMBER_CHANGE_TYPE_JOIN         MemberChangeType = 1
-	MemberChangeType_MEMBER_CHANGE_TYPE_LEAVE        MemberChangeType = 2
-	MemberChangeType_MEMBER_CHANGE_TYPE_REMOVE       MemberChangeType = 3
-	MemberChangeType_MEMBER_CHANGE_TYPE_ROLE_CHANGED MemberChangeType = 4
+	MemberChangeType_MEMBER_CHANGE_TYPE_UNSPECIFIED    MemberChangeType = 0
+	MemberChangeType_MEMBER_CHANGE_TYPE_JOIN           MemberChangeType = 1
+	MemberChangeType_MEMBER_CHANGE_TYPE_LEAVE          MemberChangeType = 2
+	MemberChangeType_MEMBER_CHANGE_TYPE_REMOVE         MemberChangeType = 3
+	MemberChangeType_MEMBER_CHANGE_TYPE_ROLE_CHANGED   MemberChangeType = 4
+	MemberChangeType_MEMBER_CHANGE_TYPE_OWNER_TRANSFER MemberChangeType = 5
 )
 
 // Enum value maps for MemberChangeType.
@@ -143,13 +144,15 @@ var (
 		2: "MEMBER_CHANGE_TYPE_LEAVE",
 		3: "MEMBER_CHANGE_TYPE_REMOVE",
 		4: "MEMBER_CHANGE_TYPE_ROLE_CHANGED",
+		5: "MEMBER_CHANGE_TYPE_OWNER_TRANSFER",
 	}
 	MemberChangeType_value = map[string]int32{
-		"MEMBER_CHANGE_TYPE_UNSPECIFIED":  0,
-		"MEMBER_CHANGE_TYPE_JOIN":         1,
-		"MEMBER_CHANGE_TYPE_LEAVE":        2,
-		"MEMBER_CHANGE_TYPE_REMOVE":       3,
-		"MEMBER_CHANGE_TYPE_ROLE_CHANGED": 4,
+		"MEMBER_CHANGE_TYPE_UNSPECIFIED":    0,
+		"MEMBER_CHANGE_TYPE_JOIN":           1,
+		"MEMBER_CHANGE_TYPE_LEAVE":          2,
+		"MEMBER_CHANGE_TYPE_REMOVE":         3,
+		"MEMBER_CHANGE_TYPE_ROLE_CHANGED":   4,
+		"MEMBER_CHANGE_TYPE_OWNER_TRANSFER": 5,
 	}
 )
 
@@ -1336,6 +1339,206 @@ func (x *ListConversationMembersResponse) GetNextPageToken() string {
 	return ""
 }
 
+type TransferConversationOwnerRequest struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext           *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	ConversationId        string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	NewOwnerUserId        string                 `protobuf:"bytes,3,opt,name=new_owner_user_id,json=newOwnerUserId,proto3" json:"new_owner_user_id,omitempty"`
+	ExpectedMemberVersion int64                  `protobuf:"varint,4,opt,name=expected_member_version,json=expectedMemberVersion,proto3" json:"expected_member_version,omitempty"`
+	IdempotencyKey        string                 `protobuf:"bytes,5,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	Reason                string                 `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *TransferConversationOwnerRequest) Reset() {
+	*x = TransferConversationOwnerRequest{}
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TransferConversationOwnerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TransferConversationOwnerRequest) ProtoMessage() {}
+
+func (x *TransferConversationOwnerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TransferConversationOwnerRequest.ProtoReflect.Descriptor instead.
+func (*TransferConversationOwnerRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_conversation_v1_conversation_service_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *TransferConversationOwnerRequest) GetAuthContext() *AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *TransferConversationOwnerRequest) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *TransferConversationOwnerRequest) GetNewOwnerUserId() string {
+	if x != nil {
+		return x.NewOwnerUserId
+	}
+	return ""
+}
+
+func (x *TransferConversationOwnerRequest) GetExpectedMemberVersion() int64 {
+	if x != nil {
+		return x.ExpectedMemberVersion
+	}
+	return 0
+}
+
+func (x *TransferConversationOwnerRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *TransferConversationOwnerRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type TransferConversationOwnerResponse struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	ChangeId            string                 `protobuf:"bytes,1,opt,name=change_id,json=changeId,proto3" json:"change_id,omitempty"`
+	TenantId            string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	ConversationId      string                 `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	PreviousOwnerUserId string                 `protobuf:"bytes,4,opt,name=previous_owner_user_id,json=previousOwnerUserId,proto3" json:"previous_owner_user_id,omitempty"`
+	NewOwnerUserId      string                 `protobuf:"bytes,5,opt,name=new_owner_user_id,json=newOwnerUserId,proto3" json:"new_owner_user_id,omitempty"`
+	Status              MemberChangeStatus     `protobuf:"varint,6,opt,name=status,proto3,enum=nexusim.conversation.v1.MemberChangeStatus" json:"status,omitempty"`
+	BoundarySeq         int64                  `protobuf:"varint,7,opt,name=boundary_seq,json=boundarySeq,proto3" json:"boundary_seq,omitempty"`
+	MemberVersion       int64                  `protobuf:"varint,8,opt,name=member_version,json=memberVersion,proto3" json:"member_version,omitempty"`
+	PermissionVersion   int64                  `protobuf:"varint,9,opt,name=permission_version,json=permissionVersion,proto3" json:"permission_version,omitempty"`
+	IdempotentReplay    bool                   `protobuf:"varint,10,opt,name=idempotent_replay,json=idempotentReplay,proto3" json:"idempotent_replay,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *TransferConversationOwnerResponse) Reset() {
+	*x = TransferConversationOwnerResponse{}
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TransferConversationOwnerResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TransferConversationOwnerResponse) ProtoMessage() {}
+
+func (x *TransferConversationOwnerResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TransferConversationOwnerResponse.ProtoReflect.Descriptor instead.
+func (*TransferConversationOwnerResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_conversation_v1_conversation_service_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *TransferConversationOwnerResponse) GetChangeId() string {
+	if x != nil {
+		return x.ChangeId
+	}
+	return ""
+}
+
+func (x *TransferConversationOwnerResponse) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *TransferConversationOwnerResponse) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *TransferConversationOwnerResponse) GetPreviousOwnerUserId() string {
+	if x != nil {
+		return x.PreviousOwnerUserId
+	}
+	return ""
+}
+
+func (x *TransferConversationOwnerResponse) GetNewOwnerUserId() string {
+	if x != nil {
+		return x.NewOwnerUserId
+	}
+	return ""
+}
+
+func (x *TransferConversationOwnerResponse) GetStatus() MemberChangeStatus {
+	if x != nil {
+		return x.Status
+	}
+	return MemberChangeStatus_MEMBER_CHANGE_STATUS_UNSPECIFIED
+}
+
+func (x *TransferConversationOwnerResponse) GetBoundarySeq() int64 {
+	if x != nil {
+		return x.BoundarySeq
+	}
+	return 0
+}
+
+func (x *TransferConversationOwnerResponse) GetMemberVersion() int64 {
+	if x != nil {
+		return x.MemberVersion
+	}
+	return 0
+}
+
+func (x *TransferConversationOwnerResponse) GetPermissionVersion() int64 {
+	if x != nil {
+		return x.PermissionVersion
+	}
+	return 0
+}
+
+func (x *TransferConversationOwnerResponse) GetIdempotentReplay() bool {
+	if x != nil {
+		return x.IdempotentReplay
+	}
+	return false
+}
+
 var File_nexusim_conversation_v1_conversation_service_proto protoreflect.FileDescriptor
 
 const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
@@ -1433,7 +1636,26 @@ const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
 	"\x0emember_version\x18\x03 \x01(\x03R\rmemberVersion\x12-\n" +
 	"\x12permission_version\x18\x04 \x01(\x03R\x11permissionVersion\x12E\n" +
 	"\amembers\x18\x05 \x03(\v2+.nexusim.conversation.v1.ConversationMemberR\amembers\x12&\n" +
-	"\x0fnext_page_token\x18\x06 \x01(\tR\rnextPageToken*\x82\x01\n" +
+	"\x0fnext_page_token\x18\x06 \x01(\tR\rnextPageToken\"\xb8\x02\n" +
+	" TransferConversationOwnerRequest\x12G\n" +
+	"\fauth_context\x18\x01 \x01(\v2$.nexusim.conversation.v1.AuthContextR\vauthContext\x12'\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12)\n" +
+	"\x11new_owner_user_id\x18\x03 \x01(\tR\x0enewOwnerUserId\x126\n" +
+	"\x17expected_member_version\x18\x04 \x01(\x03R\x15expectedMemberVersion\x12'\n" +
+	"\x0fidempotency_key\x18\x05 \x01(\tR\x0eidempotencyKey\x12\x16\n" +
+	"\x06reason\x18\x06 \x01(\tR\x06reason\"\xd1\x03\n" +
+	"!TransferConversationOwnerResponse\x12\x1b\n" +
+	"\tchange_id\x18\x01 \x01(\tR\bchangeId\x12\x1b\n" +
+	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12'\n" +
+	"\x0fconversation_id\x18\x03 \x01(\tR\x0econversationId\x123\n" +
+	"\x16previous_owner_user_id\x18\x04 \x01(\tR\x13previousOwnerUserId\x12)\n" +
+	"\x11new_owner_user_id\x18\x05 \x01(\tR\x0enewOwnerUserId\x12C\n" +
+	"\x06status\x18\x06 \x01(\x0e2+.nexusim.conversation.v1.MemberChangeStatusR\x06status\x12!\n" +
+	"\fboundary_seq\x18\a \x01(\x03R\vboundarySeq\x12%\n" +
+	"\x0emember_version\x18\b \x01(\x03R\rmemberVersion\x12-\n" +
+	"\x12permission_version\x18\t \x01(\x03R\x11permissionVersion\x12+\n" +
+	"\x11idempotent_replay\x18\n" +
+	" \x01(\bR\x10idempotentReplay*\x82\x01\n" +
 	"\x10ConversationMode\x12!\n" +
 	"\x1dCONVERSATION_MODE_UNSPECIFIED\x10\x00\x12$\n" +
 	" CONVERSATION_MODE_LOCAL_ROW_LOCK\x10\x01\x12%\n" +
@@ -1444,13 +1666,14 @@ const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
 	"\x18FANOUT_MODE_WRITE_FANOUT\x10\x01\x12\x1d\n" +
 	"\x19FANOUT_MODE_HYBRID_FANOUT\x10\x02\x12\x1b\n" +
 	"\x17FANOUT_MODE_READ_FANOUT\x10\x03\x12 \n" +
-	"\x1cFANOUT_MODE_BROADCAST_SIGNAL\x10\x04*\xb5\x01\n" +
+	"\x1cFANOUT_MODE_BROADCAST_SIGNAL\x10\x04*\xdc\x01\n" +
 	"\x10MemberChangeType\x12\"\n" +
 	"\x1eMEMBER_CHANGE_TYPE_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17MEMBER_CHANGE_TYPE_JOIN\x10\x01\x12\x1c\n" +
 	"\x18MEMBER_CHANGE_TYPE_LEAVE\x10\x02\x12\x1d\n" +
 	"\x19MEMBER_CHANGE_TYPE_REMOVE\x10\x03\x12#\n" +
-	"\x1fMEMBER_CHANGE_TYPE_ROLE_CHANGED\x10\x04*o\n" +
+	"\x1fMEMBER_CHANGE_TYPE_ROLE_CHANGED\x10\x04\x12%\n" +
+	"!MEMBER_CHANGE_TYPE_OWNER_TRANSFER\x10\x05*o\n" +
 	"\n" +
 	"MemberRole\x12\x1b\n" +
 	"\x17MEMBER_ROLE_UNSPECIFIED\x10\x00\x12\x15\n" +
@@ -1475,12 +1698,13 @@ const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
 	"$MEMBER_CHANGE_STATUS_OUTBOX_ENQUEUED\x10\x04\x12(\n" +
 	"$MEMBER_CHANGE_STATUS_EVENT_PUBLISHED\x10\x05\x12\x1d\n" +
 	"\x19MEMBER_CHANGE_STATUS_DONE\x10\x06\x12+\n" +
-	"'MEMBER_CHANGE_STATUS_FAILED_COMPENSATED\x10\a2\x8c\x04\n" +
+	"'MEMBER_CHANGE_STATUS_FAILED_COMPENSATED\x10\a2\xa1\x05\n" +
 	"\x13ConversationService\x12q\n" +
 	"\x0eGetSendContext\x12..nexusim.conversation.v1.GetSendContextRequest\x1a/.nexusim.conversation.v1.GetSendContextResponse\x12}\n" +
 	"\x12CreateMemberChange\x122.nexusim.conversation.v1.CreateMemberChangeRequest\x1a3.nexusim.conversation.v1.CreateMemberChangeResponse\x12t\n" +
 	"\x0fGetMemberChange\x12/.nexusim.conversation.v1.GetMemberChangeRequest\x1a0.nexusim.conversation.v1.GetMemberChangeResponse\x12\x8c\x01\n" +
-	"\x17ListConversationMembers\x127.nexusim.conversation.v1.ListConversationMembersRequest\x1a8.nexusim.conversation.v1.ListConversationMembersResponseBIZGgithub.com/qsyy0921/IM/api/proto/nexusim/conversation/v1;conversationv1b\x06proto3"
+	"\x17ListConversationMembers\x127.nexusim.conversation.v1.ListConversationMembersRequest\x1a8.nexusim.conversation.v1.ListConversationMembersResponse\x12\x92\x01\n" +
+	"\x19TransferConversationOwner\x129.nexusim.conversation.v1.TransferConversationOwnerRequest\x1a:.nexusim.conversation.v1.TransferConversationOwnerResponseBIZGgithub.com/qsyy0921/IM/api/proto/nexusim/conversation/v1;conversationv1b\x06proto3"
 
 var (
 	file_nexusim_conversation_v1_conversation_service_proto_rawDescOnce sync.Once
@@ -1495,25 +1719,27 @@ func file_nexusim_conversation_v1_conversation_service_proto_rawDescGZIP() []byt
 }
 
 var file_nexusim_conversation_v1_conversation_service_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_nexusim_conversation_v1_conversation_service_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_nexusim_conversation_v1_conversation_service_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_nexusim_conversation_v1_conversation_service_proto_goTypes = []any{
-	(ConversationMode)(0),                   // 0: nexusim.conversation.v1.ConversationMode
-	(FanoutMode)(0),                         // 1: nexusim.conversation.v1.FanoutMode
-	(MemberChangeType)(0),                   // 2: nexusim.conversation.v1.MemberChangeType
-	(MemberRole)(0),                         // 3: nexusim.conversation.v1.MemberRole
-	(MemberStatus)(0),                       // 4: nexusim.conversation.v1.MemberStatus
-	(MemberChangeConflictPolicy)(0),         // 5: nexusim.conversation.v1.MemberChangeConflictPolicy
-	(MemberChangeStatus)(0),                 // 6: nexusim.conversation.v1.MemberChangeStatus
-	(*GetSendContextRequest)(nil),           // 7: nexusim.conversation.v1.GetSendContextRequest
-	(*GetSendContextResponse)(nil),          // 8: nexusim.conversation.v1.GetSendContextResponse
-	(*AuthContext)(nil),                     // 9: nexusim.conversation.v1.AuthContext
-	(*CreateMemberChangeRequest)(nil),       // 10: nexusim.conversation.v1.CreateMemberChangeRequest
-	(*CreateMemberChangeResponse)(nil),      // 11: nexusim.conversation.v1.CreateMemberChangeResponse
-	(*GetMemberChangeRequest)(nil),          // 12: nexusim.conversation.v1.GetMemberChangeRequest
-	(*GetMemberChangeResponse)(nil),         // 13: nexusim.conversation.v1.GetMemberChangeResponse
-	(*ListConversationMembersRequest)(nil),  // 14: nexusim.conversation.v1.ListConversationMembersRequest
-	(*ConversationMember)(nil),              // 15: nexusim.conversation.v1.ConversationMember
-	(*ListConversationMembersResponse)(nil), // 16: nexusim.conversation.v1.ListConversationMembersResponse
+	(ConversationMode)(0),                     // 0: nexusim.conversation.v1.ConversationMode
+	(FanoutMode)(0),                           // 1: nexusim.conversation.v1.FanoutMode
+	(MemberChangeType)(0),                     // 2: nexusim.conversation.v1.MemberChangeType
+	(MemberRole)(0),                           // 3: nexusim.conversation.v1.MemberRole
+	(MemberStatus)(0),                         // 4: nexusim.conversation.v1.MemberStatus
+	(MemberChangeConflictPolicy)(0),           // 5: nexusim.conversation.v1.MemberChangeConflictPolicy
+	(MemberChangeStatus)(0),                   // 6: nexusim.conversation.v1.MemberChangeStatus
+	(*GetSendContextRequest)(nil),             // 7: nexusim.conversation.v1.GetSendContextRequest
+	(*GetSendContextResponse)(nil),            // 8: nexusim.conversation.v1.GetSendContextResponse
+	(*AuthContext)(nil),                       // 9: nexusim.conversation.v1.AuthContext
+	(*CreateMemberChangeRequest)(nil),         // 10: nexusim.conversation.v1.CreateMemberChangeRequest
+	(*CreateMemberChangeResponse)(nil),        // 11: nexusim.conversation.v1.CreateMemberChangeResponse
+	(*GetMemberChangeRequest)(nil),            // 12: nexusim.conversation.v1.GetMemberChangeRequest
+	(*GetMemberChangeResponse)(nil),           // 13: nexusim.conversation.v1.GetMemberChangeResponse
+	(*ListConversationMembersRequest)(nil),    // 14: nexusim.conversation.v1.ListConversationMembersRequest
+	(*ConversationMember)(nil),                // 15: nexusim.conversation.v1.ConversationMember
+	(*ListConversationMembersResponse)(nil),   // 16: nexusim.conversation.v1.ListConversationMembersResponse
+	(*TransferConversationOwnerRequest)(nil),  // 17: nexusim.conversation.v1.TransferConversationOwnerRequest
+	(*TransferConversationOwnerResponse)(nil), // 18: nexusim.conversation.v1.TransferConversationOwnerResponse
 }
 var file_nexusim_conversation_v1_conversation_service_proto_depIdxs = []int32{
 	0,  // 0: nexusim.conversation.v1.GetSendContextResponse.conversation_mode:type_name -> nexusim.conversation.v1.ConversationMode
@@ -1533,19 +1759,23 @@ var file_nexusim_conversation_v1_conversation_service_proto_depIdxs = []int32{
 	3,  // 14: nexusim.conversation.v1.ConversationMember.role:type_name -> nexusim.conversation.v1.MemberRole
 	4,  // 15: nexusim.conversation.v1.ConversationMember.status:type_name -> nexusim.conversation.v1.MemberStatus
 	15, // 16: nexusim.conversation.v1.ListConversationMembersResponse.members:type_name -> nexusim.conversation.v1.ConversationMember
-	7,  // 17: nexusim.conversation.v1.ConversationService.GetSendContext:input_type -> nexusim.conversation.v1.GetSendContextRequest
-	10, // 18: nexusim.conversation.v1.ConversationService.CreateMemberChange:input_type -> nexusim.conversation.v1.CreateMemberChangeRequest
-	12, // 19: nexusim.conversation.v1.ConversationService.GetMemberChange:input_type -> nexusim.conversation.v1.GetMemberChangeRequest
-	14, // 20: nexusim.conversation.v1.ConversationService.ListConversationMembers:input_type -> nexusim.conversation.v1.ListConversationMembersRequest
-	8,  // 21: nexusim.conversation.v1.ConversationService.GetSendContext:output_type -> nexusim.conversation.v1.GetSendContextResponse
-	11, // 22: nexusim.conversation.v1.ConversationService.CreateMemberChange:output_type -> nexusim.conversation.v1.CreateMemberChangeResponse
-	13, // 23: nexusim.conversation.v1.ConversationService.GetMemberChange:output_type -> nexusim.conversation.v1.GetMemberChangeResponse
-	16, // 24: nexusim.conversation.v1.ConversationService.ListConversationMembers:output_type -> nexusim.conversation.v1.ListConversationMembersResponse
-	21, // [21:25] is the sub-list for method output_type
-	17, // [17:21] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	9,  // 17: nexusim.conversation.v1.TransferConversationOwnerRequest.auth_context:type_name -> nexusim.conversation.v1.AuthContext
+	6,  // 18: nexusim.conversation.v1.TransferConversationOwnerResponse.status:type_name -> nexusim.conversation.v1.MemberChangeStatus
+	7,  // 19: nexusim.conversation.v1.ConversationService.GetSendContext:input_type -> nexusim.conversation.v1.GetSendContextRequest
+	10, // 20: nexusim.conversation.v1.ConversationService.CreateMemberChange:input_type -> nexusim.conversation.v1.CreateMemberChangeRequest
+	12, // 21: nexusim.conversation.v1.ConversationService.GetMemberChange:input_type -> nexusim.conversation.v1.GetMemberChangeRequest
+	14, // 22: nexusim.conversation.v1.ConversationService.ListConversationMembers:input_type -> nexusim.conversation.v1.ListConversationMembersRequest
+	17, // 23: nexusim.conversation.v1.ConversationService.TransferConversationOwner:input_type -> nexusim.conversation.v1.TransferConversationOwnerRequest
+	8,  // 24: nexusim.conversation.v1.ConversationService.GetSendContext:output_type -> nexusim.conversation.v1.GetSendContextResponse
+	11, // 25: nexusim.conversation.v1.ConversationService.CreateMemberChange:output_type -> nexusim.conversation.v1.CreateMemberChangeResponse
+	13, // 26: nexusim.conversation.v1.ConversationService.GetMemberChange:output_type -> nexusim.conversation.v1.GetMemberChangeResponse
+	16, // 27: nexusim.conversation.v1.ConversationService.ListConversationMembers:output_type -> nexusim.conversation.v1.ListConversationMembersResponse
+	18, // 28: nexusim.conversation.v1.ConversationService.TransferConversationOwner:output_type -> nexusim.conversation.v1.TransferConversationOwnerResponse
+	24, // [24:29] is the sub-list for method output_type
+	19, // [19:24] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_conversation_v1_conversation_service_proto_init() }
@@ -1559,7 +1789,7 @@ func file_nexusim_conversation_v1_conversation_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_conversation_v1_conversation_service_proto_rawDesc), len(file_nexusim_conversation_v1_conversation_service_proto_rawDesc)),
 			NumEnums:      7,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -360,7 +360,8 @@ func BuildConversationTimelineEvent(message types.OutboxMessage) (*conversationt
 		types.TimelineEventConversationMemberLeft,
 		types.TimelineEventConversationMemberRemoved,
 		types.TimelineEventConversationMemberRoleChanged,
-		types.TimelineEventConversationMemberBoundaryCancelled:
+		types.TimelineEventConversationMemberBoundaryCancelled,
+		types.TimelineEventConversationMemberOwnerTransferred:
 		return buildMemberBoundaryTimelineEvent(message)
 	default:
 		return nil, errors.New("unsupported outbox event type")
@@ -394,6 +395,9 @@ func buildTimelineEnvelope(message types.OutboxMessage, occurredAt time.Time) *c
 }
 
 func buildMemberBoundaryTimelineEvent(message types.OutboxMessage) (*conversationtimelinev1.ConversationTimelineEvent, error) {
+	if message.EventType == types.TimelineEventConversationMemberOwnerTransferred {
+		return buildOwnerTransferredTimelineEvent(message)
+	}
 	payload, err := decodeMemberBoundaryPayload(message.PayloadJSON)
 	if err != nil {
 		return nil, err
@@ -461,8 +465,73 @@ func buildMemberBoundaryTimelineEvent(message types.OutboxMessage) (*conversatio
 		event.Payload = &conversationtimelinev1.ConversationTimelineEvent_ConversationMemberBoundaryCancelled{
 			ConversationMemberBoundaryCancelled: member.cancelled(),
 		}
+	case types.TimelineEventConversationMemberOwnerTransferred:
+		return nil, errors.New("owner transfer must use owner transfer payload")
 	default:
 		return nil, errors.New("unsupported member boundary event type")
+	}
+	return event, nil
+}
+
+func buildOwnerTransferredTimelineEvent(message types.OutboxMessage) (*conversationtimelinev1.ConversationTimelineEvent, error) {
+	payload, err := decodeOwnerTransferredPayload(message.PayloadJSON)
+	if err != nil {
+		return nil, err
+	}
+	occurredAt, err := time.Parse(time.RFC3339Nano, payload.OccurredAt)
+	if err != nil {
+		return nil, err
+	}
+	changeType, err := conversationMemberChangeType(payload.ChangeType)
+	if err != nil {
+		return nil, err
+	}
+	previousOldRole, err := conversationMemberRole(payload.PreviousOwnerOldRole)
+	if err != nil {
+		return nil, err
+	}
+	previousNewRole, err := conversationMemberRole(payload.PreviousOwnerNewRole)
+	if err != nil {
+		return nil, err
+	}
+	newOwnerOldRole, err := conversationMemberRole(payload.NewOwnerOldRole)
+	if err != nil {
+		return nil, err
+	}
+	newOwnerNewRole, err := conversationMemberRole(payload.NewOwnerNewRole)
+	if err != nil {
+		return nil, err
+	}
+	previousStatus, err := conversationMemberStatus(payload.PreviousOwnerStatus)
+	if err != nil {
+		return nil, err
+	}
+	newOwnerStatus, err := conversationMemberStatus(payload.NewOwnerStatus)
+	if err != nil {
+		return nil, err
+	}
+
+	event := buildTimelineEnvelope(message, occurredAt)
+	event.Payload = &conversationtimelinev1.ConversationTimelineEvent_ConversationMemberOwnerTransferred{
+		ConversationMemberOwnerTransferred: &conversationtimelinev1.ConversationMemberOwnerTransferredV1{
+			ChangeId:             payload.ChangeID,
+			ConversationId:       payload.ConversationID,
+			BoundarySeq:          payload.BoundarySeq,
+			PreviousOwnerUserId:  payload.PreviousOwnerUserID,
+			NewOwnerUserId:       payload.NewOwnerUserID,
+			OperatorUserId:       payload.OperatorUserID,
+			ChangeType:           changeType,
+			PreviousOwnerOldRole: previousOldRole,
+			PreviousOwnerNewRole: previousNewRole,
+			NewOwnerOldRole:      newOwnerOldRole,
+			NewOwnerNewRole:      newOwnerNewRole,
+			PreviousOwnerStatus:  previousStatus,
+			NewOwnerStatus:       newOwnerStatus,
+			MemberVersion:        payload.MemberVersion,
+			PermissionVersion:    payload.PermissionVersion,
+			Reason:               payload.Reason,
+			OccurredAt:           timestamppb.New(occurredAt),
+		},
 	}
 	return event, nil
 }
@@ -609,6 +678,26 @@ type memberBoundaryPayload struct {
 	OccurredAt        string `json:"occurred_at"`
 }
 
+type ownerTransferredPayload struct {
+	ChangeID             string `json:"change_id"`
+	ConversationID       string `json:"conversation_id"`
+	BoundarySeq          int64  `json:"boundary_seq"`
+	PreviousOwnerUserID  string `json:"previous_owner_user_id"`
+	NewOwnerUserID       string `json:"new_owner_user_id"`
+	OperatorUserID       string `json:"operator_user_id"`
+	ChangeType           string `json:"change_type"`
+	PreviousOwnerOldRole string `json:"previous_owner_old_role"`
+	PreviousOwnerNewRole string `json:"previous_owner_new_role"`
+	NewOwnerOldRole      string `json:"new_owner_old_role"`
+	NewOwnerNewRole      string `json:"new_owner_new_role"`
+	PreviousOwnerStatus  string `json:"previous_owner_status"`
+	NewOwnerStatus       string `json:"new_owner_status"`
+	MemberVersion        int64  `json:"member_version"`
+	PermissionVersion    int64  `json:"permission_version"`
+	Reason               string `json:"reason"`
+	OccurredAt           string `json:"occurred_at"`
+}
+
 func decodeMemberBoundaryPayload(payloadJSON []byte) (memberBoundaryPayload, error) {
 	var payload memberBoundaryPayload
 	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
@@ -624,6 +713,45 @@ func decodeMemberBoundaryPayload(payloadJSON []byte) (memberBoundaryPayload, err
 		payload.PermissionVersion <= 0 ||
 		payload.OccurredAt == "" {
 		return memberBoundaryPayload{}, errors.New("member boundary payload is incomplete")
+	}
+	return payload, nil
+}
+
+func decodeOwnerTransferredPayload(payloadJSON []byte) (ownerTransferredPayload, error) {
+	var payload ownerTransferredPayload
+	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+		return ownerTransferredPayload{}, err
+	}
+	if payload.ChangeID == "" ||
+		payload.ConversationID == "" ||
+		payload.BoundarySeq <= 0 ||
+		payload.PreviousOwnerUserID == "" ||
+		payload.NewOwnerUserID == "" ||
+		payload.OperatorUserID == "" ||
+		payload.ChangeType == "" ||
+		payload.PreviousOwnerOldRole == "" ||
+		payload.PreviousOwnerNewRole == "" ||
+		payload.NewOwnerOldRole == "" ||
+		payload.NewOwnerNewRole == "" ||
+		payload.PreviousOwnerStatus == "" ||
+		payload.NewOwnerStatus == "" ||
+		payload.MemberVersion <= 0 ||
+		payload.PermissionVersion <= 0 ||
+		payload.OccurredAt == "" {
+		return ownerTransferredPayload{}, errors.New("owner transferred payload is incomplete")
+	}
+	if strings.ToUpper(payload.ChangeType) != "OWNER_TRANSFER" ||
+		strings.ToUpper(payload.PreviousOwnerOldRole) != "OWNER" ||
+		strings.ToUpper(payload.PreviousOwnerNewRole) != "ADMIN" ||
+		strings.ToUpper(payload.NewOwnerNewRole) != "OWNER" ||
+		strings.ToUpper(payload.PreviousOwnerStatus) != "ACTIVE" ||
+		strings.ToUpper(payload.NewOwnerStatus) != "ACTIVE" {
+		return ownerTransferredPayload{}, errors.New("owner transferred payload violates owner transfer contract")
+	}
+	switch strings.ToUpper(payload.NewOwnerOldRole) {
+	case "ADMIN", "MEMBER":
+	default:
+		return ownerTransferredPayload{}, errors.New("owner transferred payload violates owner transfer contract")
 	}
 	return payload, nil
 }
@@ -750,6 +878,8 @@ func conversationMemberChangeType(value string) (conversationtimelinev1.Conversa
 		return conversationtimelinev1.ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_REMOVE, nil
 	case "ROLE_CHANGED":
 		return conversationtimelinev1.ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_ROLE_CHANGED, nil
+	case "OWNER_TRANSFER":
+		return conversationtimelinev1.ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_OWNER_TRANSFER, nil
 	default:
 		return conversationtimelinev1.ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_UNSPECIFIED, errors.New("unknown member change type")
 	}

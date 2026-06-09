@@ -181,6 +181,127 @@ WHERE tenant_id = 'tenant-delivery'
 	}
 }
 
+func TestRepositoryProjectOwnerTransferredIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	_, err := repository.ProjectTimelineEvent(ctx, types.ProjectTimelineEventCommand{
+		TenantID:          "tenant-owner-transfer",
+		EventID:           "owner-joined-1",
+		EventType:         types.TimelineEventConversationMemberJoined,
+		ConversationID:    "conv-owner-transfer",
+		ConversationSeq:   1,
+		MemberUserID:      "owner-1",
+		MemberRole:        "OWNER",
+		MemberStatus:      types.DeliveryMemberStatusActive,
+		MemberVersion:     1,
+		PermissionVersion: 1,
+	})
+	if err != nil {
+		t.Fatalf("project owner join: %v", err)
+	}
+	_, err = repository.ProjectTimelineEvent(ctx, types.ProjectTimelineEventCommand{
+		TenantID:          "tenant-owner-transfer",
+		EventID:           "member-joined-1",
+		EventType:         types.TimelineEventConversationMemberJoined,
+		ConversationID:    "conv-owner-transfer",
+		ConversationSeq:   2,
+		MemberUserID:      "user-2",
+		MemberRole:        "MEMBER",
+		MemberStatus:      types.DeliveryMemberStatusActive,
+		MemberVersion:     2,
+		PermissionVersion: 2,
+	})
+	if err != nil {
+		t.Fatalf("project member join: %v", err)
+	}
+
+	result, err := repository.ProjectTimelineEvent(ctx, types.ProjectTimelineEventCommand{
+		TenantID:             "tenant-owner-transfer",
+		EventID:              "owner-transfer-1",
+		EventType:            types.TimelineEventConversationMemberOwnerTransferred,
+		ConversationID:       "conv-owner-transfer",
+		ConversationSeq:      3,
+		PreviousOwnerUserID:  "owner-1",
+		PreviousOwnerNewRole: "ADMIN",
+		PreviousOwnerStatus:  types.DeliveryMemberStatusActive,
+		NewOwnerUserID:       "user-2",
+		NewOwnerNewRole:      "OWNER",
+		NewOwnerStatus:       types.DeliveryMemberStatusActive,
+		MemberVersion:        3,
+		PermissionVersion:    3,
+		ConsumerGroup:        "delivery-owner-transfer-test",
+		Topic:                "conversation.timeline.events",
+		PartitionID:          1,
+		OffsetValue:          12,
+	})
+	if err != nil {
+		t.Fatalf("project owner transfer: %v", err)
+	}
+	if !result.MembershipUpdated {
+		t.Fatalf("expected membership update: %+v", result)
+	}
+
+	rows, err := pool.Query(ctx, `
+SELECT user_id, role, status, member_version, permission_version
+FROM delivery_membership_projection
+WHERE tenant_id = 'tenant-owner-transfer'
+  AND conversation_id = 'conv-owner-transfer'
+ORDER BY user_id
+`)
+	if err != nil {
+		t.Fatalf("query membership projection: %v", err)
+	}
+	defer rows.Close()
+	got := map[string]struct {
+		role              string
+		status            string
+		memberVersion     int64
+		permissionVersion int64
+	}{}
+	for rows.Next() {
+		var userID string
+		value := struct {
+			role              string
+			status            string
+			memberVersion     int64
+			permissionVersion int64
+		}{}
+		if err := rows.Scan(&userID, &value.role, &value.status, &value.memberVersion, &value.permissionVersion); err != nil {
+			t.Fatalf("scan membership projection: %v", err)
+		}
+		got[userID] = value
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("membership rows: %v", err)
+	}
+	if got["owner-1"].role != "ADMIN" ||
+		got["owner-1"].status != types.DeliveryMemberStatusActive ||
+		got["owner-1"].memberVersion != 3 ||
+		got["user-2"].role != "OWNER" ||
+		got["user-2"].status != types.DeliveryMemberStatusActive ||
+		got["user-2"].memberVersion != 3 {
+		t.Fatalf("unexpected membership projection: %+v", got)
+	}
+
+	var checkpoint int64
+	err = pool.QueryRow(ctx, `
+SELECT offset_value
+FROM delivery_kafka_checkpoints
+WHERE consumer_group = 'delivery-owner-transfer-test'
+  AND topic = 'conversation.timeline.events'
+  AND partition_id = 1
+`).Scan(&checkpoint)
+	if err != nil {
+		t.Fatalf("read checkpoint: %v", err)
+	}
+	if checkpoint != 12 {
+		t.Fatalf("expected checkpoint 12, got %d", checkpoint)
+	}
+}
+
 func TestRepositoryProjectMessageRevokedOnlyTargetsOriginalVisibleUsersIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

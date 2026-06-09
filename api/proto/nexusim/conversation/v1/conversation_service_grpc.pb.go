@@ -19,10 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ConversationService_GetSendContext_FullMethodName          = "/nexusim.conversation.v1.ConversationService/GetSendContext"
-	ConversationService_CreateMemberChange_FullMethodName      = "/nexusim.conversation.v1.ConversationService/CreateMemberChange"
-	ConversationService_GetMemberChange_FullMethodName         = "/nexusim.conversation.v1.ConversationService/GetMemberChange"
-	ConversationService_ListConversationMembers_FullMethodName = "/nexusim.conversation.v1.ConversationService/ListConversationMembers"
+	ConversationService_GetSendContext_FullMethodName            = "/nexusim.conversation.v1.ConversationService/GetSendContext"
+	ConversationService_CreateMemberChange_FullMethodName        = "/nexusim.conversation.v1.ConversationService/CreateMemberChange"
+	ConversationService_GetMemberChange_FullMethodName           = "/nexusim.conversation.v1.ConversationService/GetMemberChange"
+	ConversationService_ListConversationMembers_FullMethodName   = "/nexusim.conversation.v1.ConversationService/ListConversationMembers"
+	ConversationService_TransferConversationOwner_FullMethodName = "/nexusim.conversation.v1.ConversationService/TransferConversationOwner"
 )
 
 // ConversationServiceClient is the client API for ConversationService service.
@@ -33,6 +34,7 @@ type ConversationServiceClient interface {
 	CreateMemberChange(ctx context.Context, in *CreateMemberChangeRequest, opts ...grpc.CallOption) (*CreateMemberChangeResponse, error)
 	GetMemberChange(ctx context.Context, in *GetMemberChangeRequest, opts ...grpc.CallOption) (*GetMemberChangeResponse, error)
 	ListConversationMembers(ctx context.Context, in *ListConversationMembersRequest, opts ...grpc.CallOption) (*ListConversationMembersResponse, error)
+	TransferConversationOwner(ctx context.Context, in *TransferConversationOwnerRequest, opts ...grpc.CallOption) (*TransferConversationOwnerResponse, error)
 }
 
 type conversationServiceClient struct {
@@ -83,6 +85,16 @@ func (c *conversationServiceClient) ListConversationMembers(ctx context.Context,
 	return out, nil
 }
 
+func (c *conversationServiceClient) TransferConversationOwner(ctx context.Context, in *TransferConversationOwnerRequest, opts ...grpc.CallOption) (*TransferConversationOwnerResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TransferConversationOwnerResponse)
+	err := c.cc.Invoke(ctx, ConversationService_TransferConversationOwner_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ConversationServiceServer is the server API for ConversationService service.
 // All implementations must embed UnimplementedConversationServiceServer
 // for forward compatibility.
@@ -91,6 +103,7 @@ type ConversationServiceServer interface {
 	CreateMemberChange(context.Context, *CreateMemberChangeRequest) (*CreateMemberChangeResponse, error)
 	GetMemberChange(context.Context, *GetMemberChangeRequest) (*GetMemberChangeResponse, error)
 	ListConversationMembers(context.Context, *ListConversationMembersRequest) (*ListConversationMembersResponse, error)
+	TransferConversationOwner(context.Context, *TransferConversationOwnerRequest) (*TransferConversationOwnerResponse, error)
 	mustEmbedUnimplementedConversationServiceServer()
 }
 
@@ -112,6 +125,9 @@ func (UnimplementedConversationServiceServer) GetMemberChange(context.Context, *
 }
 func (UnimplementedConversationServiceServer) ListConversationMembers(context.Context, *ListConversationMembersRequest) (*ListConversationMembersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListConversationMembers not implemented")
+}
+func (UnimplementedConversationServiceServer) TransferConversationOwner(context.Context, *TransferConversationOwnerRequest) (*TransferConversationOwnerResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method TransferConversationOwner not implemented")
 }
 func (UnimplementedConversationServiceServer) mustEmbedUnimplementedConversationServiceServer() {}
 func (UnimplementedConversationServiceServer) testEmbeddedByValue()                             {}
@@ -206,6 +222,24 @@ func _ConversationService_ListConversationMembers_Handler(srv interface{}, ctx c
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ConversationService_TransferConversationOwner_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TransferConversationOwnerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).TransferConversationOwner(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_TransferConversationOwner_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).TransferConversationOwner(ctx, req.(*TransferConversationOwnerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ConversationService_ServiceDesc is the grpc.ServiceDesc for ConversationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -228,6 +262,10 @@ var ConversationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListConversationMembers",
 			Handler:    _ConversationService_ListConversationMembers_Handler,
+		},
+		{
+			MethodName: "TransferConversationOwner",
+			Handler:    _ConversationService_TransferConversationOwner_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

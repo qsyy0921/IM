@@ -280,6 +280,70 @@ func TestBuildConversationTimelineEventMemberBoundaryPayloads(t *testing.T) {
 	}
 }
 
+func TestBuildConversationTimelineEventOwnerTransferredPayload(t *testing.T) {
+	message := testOwnerTransferredOutboxMessage()
+
+	event, err := BuildConversationTimelineEvent(message)
+	if err != nil {
+		t.Fatalf("build owner transferred event: %v", err)
+	}
+	if event.EventId != string(message.EventID) ||
+		event.EventType != string(types.TimelineEventConversationMemberOwnerTransferred) ||
+		event.AggregateVersion != message.AggregateVersion ||
+		event.Producer != "conversation-service" ||
+		event.Metadata.PermissionVersion != 9 {
+		t.Fatalf("unexpected envelope: %+v", event)
+	}
+	payload := event.GetConversationMemberOwnerTransferred()
+	if payload == nil {
+		t.Fatalf("expected owner transferred payload")
+	}
+	if payload.ChangeId != "change-owner-1" ||
+		payload.ConversationId != "conv-1" ||
+		payload.BoundarySeq != 3 ||
+		payload.PreviousOwnerUserId != "owner-1" ||
+		payload.NewOwnerUserId != "user-2" ||
+		payload.OperatorUserId != "owner-1" ||
+		payload.ChangeType != conversationtimelinev1.ConversationMemberChangeType_CONVERSATION_MEMBER_CHANGE_TYPE_OWNER_TRANSFER ||
+		payload.PreviousOwnerOldRole != conversationtimelinev1.ConversationMemberRole_CONVERSATION_MEMBER_ROLE_OWNER ||
+		payload.PreviousOwnerNewRole != conversationtimelinev1.ConversationMemberRole_CONVERSATION_MEMBER_ROLE_ADMIN ||
+		payload.NewOwnerOldRole != conversationtimelinev1.ConversationMemberRole_CONVERSATION_MEMBER_ROLE_MEMBER ||
+		payload.NewOwnerNewRole != conversationtimelinev1.ConversationMemberRole_CONVERSATION_MEMBER_ROLE_OWNER ||
+		payload.PreviousOwnerStatus != conversationtimelinev1.ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_ACTIVE ||
+		payload.NewOwnerStatus != conversationtimelinev1.ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_ACTIVE ||
+		payload.MemberVersion != 8 ||
+		payload.PermissionVersion != 9 ||
+		payload.OccurredAt == nil {
+		t.Fatalf("unexpected payload: %+v", payload)
+	}
+}
+
+func TestBuildConversationTimelineEventMalformedOwnerTransferredPayloadFailsClosed(t *testing.T) {
+	message := testOwnerTransferredOutboxMessage()
+	message.PayloadJSON = []byte(`{
+		"change_id":"change-owner-1",
+		"conversation_id":"conv-1",
+		"boundary_seq":3,
+		"previous_owner_user_id":"owner-1",
+		"new_owner_user_id":"user-2",
+		"operator_user_id":"owner-1",
+		"change_type":"OWNER_TRANSFER",
+		"previous_owner_old_role":"OWNER",
+		"previous_owner_new_role":"ADMIN",
+		"new_owner_old_role":"OWNER",
+		"new_owner_new_role":"OWNER",
+		"previous_owner_status":"ACTIVE",
+		"new_owner_status":"ACTIVE",
+		"member_version":8,
+		"permission_version":9,
+		"occurred_at":"2026-06-09T09:31:00Z"
+	}`)
+
+	if _, err := BuildConversationTimelineEvent(message); err == nil {
+		t.Fatalf("expected malformed owner transferred payload error")
+	}
+}
+
 func TestBuildConversationTimelineEventUnsupportedEventFailsClosed(t *testing.T) {
 	message := testMemberBoundaryOutboxMessage("conversation.member.unknown.v1")
 
@@ -972,6 +1036,33 @@ func testMemberBoundaryOutboxMessage(eventType types.TimelineEventType) types.Ou
 			"occurred_at":"2026-06-09T09:30:00Z"
 		}`),
 	}
+}
+
+func testOwnerTransferredOutboxMessage() types.OutboxMessage {
+	message := testMemberBoundaryOutboxMessage(types.TimelineEventConversationMemberOwnerTransferred)
+	message.EventID = "owner-transfer-event-1"
+	message.AggregateVersion = 3
+	message.PermissionVersion = 9
+	message.PayloadJSON = []byte(`{
+		"change_id":"change-owner-1",
+		"conversation_id":"conv-1",
+		"boundary_seq":3,
+		"previous_owner_user_id":"owner-1",
+		"new_owner_user_id":"user-2",
+		"operator_user_id":"owner-1",
+		"change_type":"OWNER_TRANSFER",
+		"previous_owner_old_role":"OWNER",
+		"previous_owner_new_role":"ADMIN",
+		"new_owner_old_role":"MEMBER",
+		"new_owner_new_role":"OWNER",
+		"previous_owner_status":"ACTIVE",
+		"new_owner_status":"ACTIVE",
+		"member_version":8,
+		"permission_version":9,
+		"reason":"owner handoff",
+		"occurred_at":"2026-06-09T09:31:00Z"
+	}`)
+	return message
 }
 
 func testRevokedOutboxMessage() types.OutboxMessage {

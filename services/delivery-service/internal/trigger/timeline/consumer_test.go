@@ -208,6 +208,55 @@ func TestWorkerProjectsAndCommitsMessageDeleted(t *testing.T) {
 	}
 }
 
+func TestWorkerProjectsAndCommitsOwnerTransferred(t *testing.T) {
+	value := mustMarshalTimelineEvent(t, &conversationtimelinev1.ConversationTimelineEvent{
+		EventId:          "owner-transfer-1",
+		EventType:        types.TimelineEventConversationMemberOwnerTransferred,
+		TenantId:         "tenant-1",
+		AggregateId:      "conv-1",
+		AggregateVersion: 12,
+		CorrelationId:    "request-1",
+		Metadata: &conversationtimelinev1.TimelineMetadata{
+			FanoutMode:        "WRITE_FANOUT",
+			PermissionVersion: 8,
+		},
+		Payload: &conversationtimelinev1.ConversationTimelineEvent_ConversationMemberOwnerTransferred{
+			ConversationMemberOwnerTransferred: &conversationtimelinev1.ConversationMemberOwnerTransferredV1{
+				PreviousOwnerUserId:  "owner-1",
+				NewOwnerUserId:       "user-2",
+				PreviousOwnerNewRole: conversationtimelinev1.ConversationMemberRole_CONVERSATION_MEMBER_ROLE_ADMIN,
+				PreviousOwnerStatus:  conversationtimelinev1.ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_ACTIVE,
+				NewOwnerNewRole:      conversationtimelinev1.ConversationMemberRole_CONVERSATION_MEMBER_ROLE_OWNER,
+				NewOwnerStatus:       conversationtimelinev1.ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_ACTIVE,
+				MemberVersion:        9,
+				PermissionVersion:    10,
+			},
+		},
+	})
+	consumer := &fakeConsumer{message: types.TimelineMessage{Topic: "conversation.timeline.events", Partition: 3, Offset: 42, Value: value}}
+	projector := &fakeProjector{}
+	err := NewWorker(consumer, projector, "delivery-test").Run(context.Background())
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected stop after fake commit, got %v", err)
+	}
+	if !consumer.committed {
+		t.Fatal("expected message commit")
+	}
+	if projector.command.EventID != "owner-transfer-1" ||
+		projector.command.EventType != types.TimelineEventConversationMemberOwnerTransferred ||
+		projector.command.PreviousOwnerUserID != "owner-1" ||
+		projector.command.PreviousOwnerNewRole != "ADMIN" ||
+		projector.command.PreviousOwnerStatus != types.DeliveryMemberStatusActive ||
+		projector.command.NewOwnerUserID != "user-2" ||
+		projector.command.NewOwnerNewRole != "OWNER" ||
+		projector.command.NewOwnerStatus != types.DeliveryMemberStatusActive ||
+		projector.command.MemberVersion != 9 ||
+		projector.command.PermissionVersion != 10 ||
+		projector.command.OffsetValue != 43 {
+		t.Fatalf("unexpected command: %+v", projector.command)
+	}
+}
+
 func TestWorkerDoesNotCommitWhenProjectionFails(t *testing.T) {
 	value := mustMarshalTimelineEvent(t, &conversationtimelinev1.ConversationTimelineEvent{
 		EventId:          "event-1",

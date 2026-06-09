@@ -1,6 +1,6 @@
 # push-gateway Loadtest / Smoke Index
 
-本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify`、`delivery.ack.ok`、queue-full broad `server.resume_hint` active close、单实例 in-memory resume buffer TTL、Redis route 最小 adapter 和 Redis-backed cross-instance resume buffer 第一版；真实进程 full smoke、同 user 多 device notify smoke、slow-client 负向 smoke、单实例 resume replay smoke、跨进程 Redis route smoke、cross-instance resume smoke 和 Win-Mac 双机 cross-instance resume smoke 已通过。
+本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify`、`delivery.ack.ok`、queue-full broad `server.resume_hint` active close、单实例 in-memory resume buffer TTL、Redis route 最小 adapter 和 Redis-backed cross-instance resume buffer 第一版；真实进程 full smoke、同 user 多 device notify smoke、slow-client 负向 smoke、单实例 resume replay smoke、跨进程 Redis route smoke、cross-instance resume smoke、Win-Mac 双机 cross-instance resume smoke，以及 `edit / revoke / delete` 三类 message-change notify smoke 均已通过。
 
 ## 当前验证目标
 
@@ -100,6 +100,7 @@ Sentinel 模式当前已证明三件事：客户端 master discovery 正常路�
 | `loadtest-report-20260609-push-gateway-redis-sentinel-route-resume-smoke.md` | Redis Sentinel discovery 正常路径下，跨实例 route / resume smoke 通过；不代表 failover / HA 验收 |
 | `loadtest-report-20260609-push-gateway-redis-sentinel-failover-smoke.md` | 本地三 Redis / 三 Sentinel 拓扑下触发 `SENTINEL failover mymaster`，切主后 route / resume / PullInbox / AckDelivery 恢复通过；不代表完整 Redis HA |
 | `loadtest-report-20260609-push-gateway-redis-sentinel-master-stop-smoke.md` | 停止 Sentinel 当前 master 容器，等待 Sentinel 自主选主后继续 route / resume / PullInbox / AckDelivery；不代表 quorum / 网络分区 / Redis Cluster 验收 |
+| `loadtest-report-20260610-push-gateway-message-change-notify-smoke.md` | `edit / revoke / delete` 三类消息变更均能触发带正确 `source_event_type` 的 `delivery.notify`，且与 `PullInbox` durable item 一致 |
 
 报告 Markdown 保存在仓库内：
 
@@ -135,7 +136,7 @@ E:\development\IM\loadtest\results
 .\loadtest\pushgateway\run-local-smoke.ps1 -Scenario message-change-notify -MessageChangeAction delete
 ```
 
-该 runner 会验证 `delivery.notify.source_event_type` 分别为 `message.edited.v1` / `message.revoked.v1` / `message.deleted.v1`，并继续用 `PullInbox` 精确校验 durable inbox 中的 `event_type + message_id + conversation_seq`。报告归档前不要把 runner 支持误写成三类真实 smoke 都已完成。
+该 runner 会验证 `delivery.notify.source_event_type` 分别为 `message.edited.v1` / `message.revoked.v1` / `message.deleted.v1`，并继续用 `PullInbox` 精确校验 durable inbox 中的 `event_type + message_id + conversation_seq`。三类真实进程 smoke 已在 clean commit `81fe92c` 归档到 `loadtest-report-20260610-push-gateway-message-change-notify-smoke.md`。
 
 ## 第一阶段不做
 

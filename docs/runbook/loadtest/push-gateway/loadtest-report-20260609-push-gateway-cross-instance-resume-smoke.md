@@ -24,18 +24,19 @@ WebSocket gateway A receives first client session
 
 | 项 | 值 |
 | --- | --- |
-| commit | `fa089e9` |
-| full commit | `fa089e9eae78af5dbd05bf79d61c407ba82e7138` |
+| commit | `b8d33da` |
+| full commit | `b8d33da039a1a4d1f229cdaec06a7accac29a44b` |
 | dirty | `false` |
-| 原始结果 | `H:\NexusIM\loadtest-results\push-gateway-cross-instance-resume-smoke-20260609-clean\pushgateway-summary.json` |
+| 原始结果 | `H:\NexusIM\loadtest-results\push-gateway-cross-instance-resume-smoke-20260609-consumer-metrics\pushgateway-summary.json` |
 | scenario | `cross-instance-resume` |
 | route backend | `redis` |
-| Redis key prefix | `nexusim:push:push-gateway-cross-instance-resume-smoke-20260609-clean` |
+| Redis key prefix | `nexusim:push:push-gateway-cross-instance-resume-smoke-20260609-consumer-metrics` |
 | first push URL | `ws://127.0.0.1:11598` |
 | reconnect push URL | `ws://127.0.0.1:11599` |
-| first gateway id | `push-ws-push-gateway-cross-instance-resume-smoke-20260609-clean` |
-| reconnect gateway id | `push-ws-reconnect-push-gateway-cross-instance-resume-smoke-20260609-clean` |
-| consumer gateway id | `push-consumer-push-gateway-cross-instance-resume-smoke-20260609-clean` |
+| consumer metrics URL | `http://127.0.0.1:11600/debug/metrics` |
+| first gateway id | `push-ws-push-gateway-cross-instance-resume-smoke-20260609-consumer-metrics` |
+| reconnect gateway id | `push-ws-reconnect-push-gateway-cross-instance-resume-smoke-20260609-consumer-metrics` |
+| consumer gateway id | `push-consumer-push-gateway-cross-instance-resume-smoke-20260609-consumer-metrics` |
 
 ## 方法
 
@@ -46,7 +47,7 @@ WebSocket gateway A receives first client session
 .\loadtest\pushgateway\run-local-smoke.ps1 `
   -Scenario cross-instance-resume `
   -RouteBackend redis `
-  -RunName push-gateway-cross-instance-resume-smoke-20260609-clean
+  -RunName push-gateway-cross-instance-resume-smoke-20260609-consumer-metrics
 ```
 
 脚本启动真实本地链路：
@@ -79,14 +80,18 @@ Redis / Kafka / PostgreSQL
 | 指标 | 结果 |
 | --- | --- |
 | success | `true` |
-| original session_id | `sess_7b8c28973eb2444c4de8f33e158677ed` |
-| reconnect session_id | `sess_d5e9fe75fdf4b7a81e258001041a59f4` |
-| resume_token | `resume_a2ad141ed6c67b5bea88efa37ad8a783` |
+| original session_id | `sess_64d53d9625b73396d62be3ae70648060` |
+| reconnect session_id | `sess_e18e72da96cf4a016dbeab4cdc342495` |
+| resume_token | `resume_b93f61b0a5a0da0da814175b448bcfa6` |
 | last_received_seq | `1` |
 | notify conversation_seq | `2` |
-| original / replay event_id | `evt_delivery_inbox_fa5018677bcb99679be262bda8f5019b` |
-| message_id | `msg_4ec3e453-42e3-475f-9d83-d87798d9eae5` |
-| source_event_id | `d7c04a78-674c-464d-99dc-1aa5eaaf2357` |
+| original / replay event_id | `evt_delivery_inbox_c9593f2de77d58b3936637756d323815` |
+| message_id | `msg_24b19ff1-e7af-46ba-be51-fdd8d501080d` |
+| source_event_id | `504c0eae-6cbf-4cfb-8af9-83d5e1c6754a` |
+| consumer gateway `redis_resume_append_count` | `1` |
+| consumer gateway `redis_route_remote_matched_sessions` | `1` |
+| consumer gateway `redis_route_remote_publish_call_count` | `1` |
+| consumer gateway `redis_route_remote_publish_error_count` | `0` |
 | reconnect gateway `redis_resume_replay_count` | `1` |
 | reconnect gateway `redis_resume_miss_count` | `0` |
 | reconnect gateway `redis_resume_permission_denied_count` | `0` |
@@ -111,12 +116,15 @@ Redis / Kafka / PostgreSQL
 original_notify.event_id == replayed_notify.event_id
 original_notify.message_id == replayed_notify.message_id
 original_notify.conversation_seq == replayed_notify.conversation_seq
+consumer gateway redis_resume_append_count: 0 -> 1
+consumer gateway redis_route_remote_publish_call_count: 0 -> 1
+consumer gateway redis_route_remote_publish_error_count: 0
 reconnect gateway redis_resume_replay_count: 0 -> 1
 reconnect gateway redis_resume_miss_count: 0
 reconnect gateway local resume_buffer_replay_count: 0
 ```
 
-这些证据说明重连 gateway 不是靠本机 in-memory buffer replay，而是命中了 Redis-backed resume buffer。
+这些证据说明 delivery consumer gateway 已把轻量 notify 写入 Redis-backed resume buffer，且重连 gateway 不是靠本机 in-memory buffer replay，而是命中了 Redis-backed resume buffer。
 
 第二，不能把 Redis resume 当成可靠投递事实。因此还要看 delivery durable path：
 
@@ -148,5 +156,5 @@ delivery_outbox DLQ=0
 - 本轮不覆盖 Redis HA / Sentinel / Cluster。
 - 本轮不覆盖 Redis resume TTL 过期后的真实进程路径。
 - 本轮不覆盖多条 buffer gap、部分 replay + buffer_miss、高并发重连。
-- delivery-consumer gateway 当前不单独暴露 HTTP debug metrics，本轮没有直接记录 consumer 侧 `redis_resume_append_count`；reconnect gateway 的 `redis_resume_replay_count=1`、原始/replay notify 完全一致和 durable path 成立，足以证明最小 cross-instance replay 链路。
+- `delivery-consumer` 模式已通过 `NEXUSIM_PUSH_DEBUG_ADDR` 暴露只读 `/debug/metrics`，本轮已直接记录 consumer 侧 route publish 和 Redis resume append 指标；该端点仍只用于本地 smoke 排障。
 - `/debug/metrics` 仍是本地 smoke 调试端点，不是生产 Prometheus 指标。

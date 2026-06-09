@@ -23,13 +23,18 @@ type GetMemberChangeExecutor interface {
 	Execute(context.Context, types.GetMemberChangeCommand) (types.MemberChangeDetail, error)
 }
 
+type ListConversationMembersExecutor interface {
+	Execute(context.Context, types.ListConversationMembersCommand) (types.ListConversationMembersResult, error)
+}
+
 type Option func(*Server)
 
 type Server struct {
 	conversationv1.UnimplementedConversationServiceServer
-	getSendContext     GetSendContextExecutor
-	createMemberChange CreateMemberChangeExecutor
-	getMemberChange    GetMemberChangeExecutor
+	getSendContext         GetSendContextExecutor
+	createMemberChange     CreateMemberChangeExecutor
+	getMemberChange        GetMemberChangeExecutor
+	listConversationMember ListConversationMembersExecutor
 }
 
 func NewServer(getSendContext GetSendContextExecutor, opts ...Option) *Server {
@@ -49,6 +54,12 @@ func WithCreateMemberChange(executor CreateMemberChangeExecutor) Option {
 func WithGetMemberChange(executor GetMemberChangeExecutor) Option {
 	return func(server *Server) {
 		server.getMemberChange = executor
+	}
+}
+
+func WithListConversationMembers(executor ListConversationMembersExecutor) Option {
+	return func(server *Server) {
+		server.listConversationMember = executor
 	}
 }
 
@@ -174,6 +185,56 @@ func (s *Server) GetMemberChange(
 	}, nil
 }
 
+func (s *Server) ListConversationMembers(
+	ctx context.Context,
+	request *conversationv1.ListConversationMembersRequest,
+) (*conversationv1.ListConversationMembersResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.listConversationMember == nil {
+		return nil, status.Error(codes.Unimplemented, "list conversation members is not configured")
+	}
+	auth := request.GetAuthContext()
+	result, err := s.listConversationMember.Execute(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  types.TenantID(auth.GetTenantId()),
+			UserID:    types.UserID(auth.GetUserId()),
+			DeviceID:  auth.GetDeviceId(),
+			SessionID: auth.GetSessionId(),
+			TraceID:   auth.GetTraceId(),
+			RequestID: auth.GetRequestId(),
+		},
+		ConversationID: types.ConversationID(request.GetConversationId()),
+		PageSize:       int(request.GetPageSize()),
+		PageToken:      request.GetPageToken(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	members := make([]*conversationv1.ConversationMember, 0, len(result.Members))
+	for _, member := range result.Members {
+		members = append(members, &conversationv1.ConversationMember{
+			UserId:            string(member.UserID),
+			Role:              toProtoMemberRole(member.Role),
+			Status:            toProtoMemberStatus(member.Status),
+			JoinSeq:           member.JoinSeq,
+			LeaveSeq:          member.LeaveSeq,
+			MemberVersion:     member.MemberVersion,
+			PermissionVersion: member.PermissionVersion,
+			UpdatedAtUnixMs:   member.UpdatedAt.UnixMilli(),
+		})
+	}
+	return &conversationv1.ListConversationMembersResponse{
+		TenantId:          string(result.TenantID),
+		ConversationId:    string(result.ConversationID),
+		MemberVersion:     result.MemberVersion,
+		PermissionVersion: result.PermissionVersion,
+		Members:           members,
+		NextPageToken:     result.NextPageToken,
+	}, nil
+}
+
 func grpcError(err error) error {
 	switch {
 	case errors.Is(err, types.ErrInvalidArgument):
@@ -265,6 +326,19 @@ func toProtoMemberRole(value types.MemberRole) conversationv1.MemberRole {
 		return conversationv1.MemberRole_MEMBER_ROLE_MEMBER
 	default:
 		return conversationv1.MemberRole_MEMBER_ROLE_UNSPECIFIED
+	}
+}
+
+func toProtoMemberStatus(value types.MemberStatus) conversationv1.MemberStatus {
+	switch value {
+	case types.MemberStatusActive:
+		return conversationv1.MemberStatus_MEMBER_STATUS_ACTIVE
+	case types.MemberStatusLeft:
+		return conversationv1.MemberStatus_MEMBER_STATUS_LEFT
+	case types.MemberStatusBanned:
+		return conversationv1.MemberStatus_MEMBER_STATUS_BANNED
+	default:
+		return conversationv1.MemberStatus_MEMBER_STATUS_UNSPECIFIED
 	}
 }
 

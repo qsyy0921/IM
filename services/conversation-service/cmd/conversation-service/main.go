@@ -68,6 +68,7 @@ func runGRPCServer() error {
 			app.NewGetSendContextUseCase(repository),
 			grpcapi.WithCreateMemberChange(app.NewCreateMemberChangeUseCase(repository)),
 			grpcapi.WithGetMemberChange(app.NewGetMemberChangeUseCase(repository)),
+			grpcapi.WithListConversationMembers(app.NewListConversationMembersUseCase(repository)),
 		),
 	)
 

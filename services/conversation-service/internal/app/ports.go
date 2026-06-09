@@ -18,6 +18,10 @@ type GetMemberChangeRepository interface {
 	GetMemberChange(ctx context.Context, command types.GetMemberChangeCommand) (types.MemberChangeDetail, error)
 }
 
+type ListConversationMembersRepository interface {
+	ListConversationMembers(ctx context.Context, command types.ListConversationMembersCommand) (types.ListConversationMembersResult, error)
+}
+
 type MemberChangeProgressRepository interface {
 	MarkPublishedMemberChanges(ctx context.Context, limit int) (types.MemberChangePublishProgressStats, error)
 }

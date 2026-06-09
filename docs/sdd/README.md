@@ -37,7 +37,7 @@
 | `message-service` | SDD 已冻结 v1.0 | 可以开始 `SendMessage` 普通会话写入链路 |
 | `timeline-service / sequencer` | SDD 未完成 | 不阻塞 `LOCAL_ROW_LOCK`；阻塞热点会话生产实现 |
 | `conversation-service / send context` | SDD v0.1 已存在 | 可以实现 `GetSendContext` 读取路径，替换 message-service strict conversation mock |
-| `conversation-service / member_change_saga` | SDD 已冻结 v1.0；proto / schema / migration v2 / relay builder / 最小 `CreateMemberChange` 写路径、saga publish 状态推进和 full smoke 已落地 | 后续补 LEAVE / REMOVE / ROLE_CHANGED、DLQ repair 和生产韧性 |
+| `conversation-service / member_change_saga` | SDD 已冻结 v1.0；proto / schema / migration v2 / relay builder / 最小 `CreateMemberChange` 写路径、saga publish 状态推进、full smoke 和当前 ACTIVE 成员 `ListConversationMembers` 读接口已落地 | 后续补 LEAVE / REMOVE / ROLE_CHANGED、DLQ repair、admin-only 成员历史查询和生产韧性 |
 | `push-gateway` | SDD v0.1 Draft 已存在 | 进入 proto / 六层骨架前需要阶段评审；第一阶段只做在线通知和回源协调 |
 | `delivery-service` | SDD v0.1 已存在，最小 projection / PullInbox / AckDelivery / delivery outbox relay 已落地 | 可以支撑 push-gateway 第一阶段，只要 push-gateway 不绕过 durable inbox / ACK |
 | `receipt-service` | SDD v0.1 Draft、proto、Kafka schema、migration、六层骨架、PostgreSQL repository、delivery consumer、MarkRead 事务、receipt outbox relay、最小 `ListConversations`、会话未读 read model 和 updated_at desc keyset 分页已落地 | 后续补真实权限、会话置顶 / 静音 / 归档；不得直接读取 delivery-service 内部表 |
@@ -82,6 +82,7 @@ conversation-service GetSendContext
 
 - 已实现会话发送上下文读取。
 - 已实现成员变更 `CreateMemberChange` 最小写路径和 `GetMemberChange` 查询。
+- 已实现当前 ACTIVE 成员 `ListConversationMembers` 读接口；它只暴露会话当前 roster，不承担成员历史 / 审计查询。
 - 已实现成员边界事件通过统一 outbox relay 发布到 Kafka，并由 worker 推进 saga 到 `DONE`。
 - 不在 conversation-service 写消息正文，不直接 publish Kafka；成员变更只通过 shared timeline/outbox 写成员边界事件。
 - `message-service` 未配置 `NEXUSIM_CONVERSATION_SERVICE_ADDR` 时仍可使用 strict mock，便于历史压测复现。

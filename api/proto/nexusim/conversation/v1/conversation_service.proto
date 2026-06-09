@@ -8,6 +8,7 @@ service ConversationService {
   rpc GetSendContext(GetSendContextRequest) returns (GetSendContextResponse);
   rpc CreateMemberChange(CreateMemberChangeRequest) returns (CreateMemberChangeResponse);
   rpc GetMemberChange(GetMemberChangeRequest) returns (GetMemberChangeResponse);
+  rpc ListConversationMembers(ListConversationMembersRequest) returns (ListConversationMembersResponse);
 }
 
 message GetSendContextRequest {
@@ -44,6 +45,13 @@ enum MemberRole {
   MEMBER_ROLE_OWNER = 1;
   MEMBER_ROLE_ADMIN = 2;
   MEMBER_ROLE_MEMBER = 3;
+}
+
+enum MemberStatus {
+  MEMBER_STATUS_UNSPECIFIED = 0;
+  MEMBER_STATUS_ACTIVE = 1;
+  MEMBER_STATUS_LEFT = 2;
+  MEMBER_STATUS_BANNED = 3;
 }
 
 enum MemberChangeConflictPolicy {
@@ -130,4 +138,31 @@ message GetMemberChangeResponse {
   MemberRole new_role = 12;
   string reason = 13;
   string last_error = 14;
+}
+
+message ListConversationMembersRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  int32 page_size = 3;
+  string page_token = 4;
+}
+
+message ConversationMember {
+  string user_id = 1;
+  MemberRole role = 2;
+  MemberStatus status = 3;
+  int64 join_seq = 4;
+  int64 leave_seq = 5;
+  int64 member_version = 6;
+  int64 permission_version = 7;
+  int64 updated_at_unix_ms = 8;
+}
+
+message ListConversationMembersResponse {
+  string tenant_id = 1;
+  string conversation_id = 2;
+  int64 member_version = 3;
+  int64 permission_version = 4;
+  repeated ConversationMember members = 5;
+  string next_page_token = 6;
 }

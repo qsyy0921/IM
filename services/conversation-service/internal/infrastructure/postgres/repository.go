@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -298,6 +300,147 @@ func canViewMemberChange(
 		return false
 	}
 	return authRole == types.MemberRoleOwner || authRole == types.MemberRoleAdmin
+}
+
+type listMembersPageToken struct {
+	Version int    `json:"v"`
+	UserID  string `json:"user_id"`
+}
+
+func (r *Repository) ListConversationMembers(
+	ctx context.Context,
+	command types.ListConversationMembersCommand,
+) (types.ListConversationMembersResult, error) {
+	if r.pool == nil {
+		return types.ListConversationMembersResult{}, types.NewDBReadFailed("repository is not configured")
+	}
+	lastUserID, err := decodeListMembersPageToken(command.PageToken)
+	if err != nil {
+		return types.ListConversationMembersResult{}, err
+	}
+
+	var conversationStatus types.ConversationStatus
+	var authStatus types.MemberStatus
+	result := types.ListConversationMembersResult{
+		TenantID:       command.AuthContext.TenantID,
+		ConversationID: command.ConversationID,
+	}
+	if err := r.pool.QueryRow(ctx, `
+SELECT
+    c.status,
+    c.member_version,
+    c.permission_version,
+    COALESCE(auth_member.status, '')
+FROM conversations c
+LEFT JOIN conversation_members auth_member
+  ON auth_member.tenant_id = c.tenant_id
+ AND auth_member.conversation_id = c.conversation_id
+ AND auth_member.user_id = $3
+WHERE c.tenant_id = $1
+  AND c.conversation_id = $2
+`, command.AuthContext.TenantID, command.ConversationID, command.AuthContext.UserID).Scan(
+		&conversationStatus,
+		&result.MemberVersion,
+		&result.PermissionVersion,
+		&authStatus,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return types.ListConversationMembersResult{}, types.NewConversationNotFound("conversation not found")
+		}
+		return types.ListConversationMembersResult{}, types.NewDBReadFailed(err.Error())
+	}
+	if conversationStatus != types.ConversationStatusActive {
+		return types.ListConversationMembersResult{}, types.NewConversationNotFound("conversation not found")
+	}
+	if authStatus != types.MemberStatusActive {
+		return types.ListConversationMembersResult{}, types.NewMemberNotActive("conversation member is not active")
+	}
+
+	pageSize := command.EffectivePageSize()
+	rows, err := r.pool.Query(ctx, `
+SELECT
+    user_id,
+    role,
+    status,
+    COALESCE(join_seq, 0),
+    COALESCE(leave_seq, 0),
+    member_version,
+    permission_version,
+    updated_at
+FROM conversation_members
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND status = 'ACTIVE'
+  AND ($3 = '' OR user_id > $3)
+ORDER BY user_id ASC
+LIMIT $4
+`, command.AuthContext.TenantID, command.ConversationID, lastUserID, pageSize+1)
+	if err != nil {
+		return types.ListConversationMembersResult{}, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	members := make([]types.ConversationMember, 0, pageSize)
+	for rows.Next() {
+		var member types.ConversationMember
+		if err := rows.Scan(
+			&member.UserID,
+			&member.Role,
+			&member.Status,
+			&member.JoinSeq,
+			&member.LeaveSeq,
+			&member.MemberVersion,
+			&member.PermissionVersion,
+			&member.UpdatedAt,
+		); err != nil {
+			return types.ListConversationMembersResult{}, types.NewDBReadFailed(err.Error())
+		}
+		members = append(members, member)
+	}
+	if err := rows.Err(); err != nil {
+		return types.ListConversationMembersResult{}, types.NewDBReadFailed(err.Error())
+	}
+	if len(members) > pageSize {
+		page := members[:pageSize]
+		nextToken, err := encodeListMembersPageToken(page[len(page)-1].UserID)
+		if err != nil {
+			return types.ListConversationMembersResult{}, types.NewDBReadFailed(err.Error())
+		}
+		result.Members = page
+		result.NextPageToken = nextToken
+		return result, nil
+	}
+	result.Members = members
+	return result, nil
+}
+
+func decodeListMembersPageToken(token string) (string, error) {
+	if token == "" {
+		return "", nil
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil {
+		return "", types.NewInvalidArgument("page_token is invalid")
+	}
+	var decoded listMembersPageToken
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		return "", types.NewInvalidArgument("page_token is invalid")
+	}
+	if decoded.Version != 1 || decoded.UserID == "" {
+		return "", types.NewInvalidArgument("page_token is invalid")
+	}
+	return decoded.UserID, nil
+}
+
+func encodeListMembersPageToken(userID types.UserID) (string, error) {
+	payload, err := json.Marshal(listMembersPageToken{
+		Version: 1,
+		UserID:  string(userID),
+	})
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(payload), nil
 }
 
 func (r *Repository) MarkPublishedMemberChanges(

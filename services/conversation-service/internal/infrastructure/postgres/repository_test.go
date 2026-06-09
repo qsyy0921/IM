@@ -138,6 +138,132 @@ INSERT INTO conversation_members (
 	}
 }
 
+func TestRepositoryListConversationMembersIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pg pool: %v", err)
+	}
+	defer pool.Close()
+
+	resetConversationTables(t, ctx, pool)
+	_, err = pool.Exec(ctx, `
+INSERT INTO conversations (
+    tenant_id, conversation_id, conversation_type, status, conversation_mode,
+    fanout_mode, fanout_policy_version, member_version, permission_version, current_seq_shard
+) VALUES
+    ('tenant-list', 'conv-list', 'GROUP', 'ACTIVE', 'LOCAL_ROW_LOCK', 'WRITE_FANOUT', 3, 10, 12, 'local'),
+    ('tenant-list', 'conv-archived', 'GROUP', 'ARCHIVED', 'LOCAL_ROW_LOCK', 'WRITE_FANOUT', 3, 10, 12, 'local');
+INSERT INTO conversation_members (
+    tenant_id, conversation_id, user_id, role, status, join_seq, leave_seq, member_version, permission_version, updated_at
+) VALUES
+    ('tenant-list', 'conv-list', 'admin-1', 'ADMIN', 'ACTIVE', 2, NULL, 10, 12, '2026-06-10T12:00:00Z'),
+    ('tenant-list', 'conv-list', 'member-1', 'MEMBER', 'ACTIVE', 3, NULL, 10, 12, '2026-06-10T12:01:00Z'),
+    ('tenant-list', 'conv-list', 'member-2', 'MEMBER', 'ACTIVE', 4, NULL, 10, 12, '2026-06-10T12:02:00Z'),
+    ('tenant-list', 'conv-list', 'owner-1', 'OWNER', 'ACTIVE', 1, NULL, 10, 12, '2026-06-10T11:59:00Z'),
+    ('tenant-list', 'conv-list', 'left-1', 'MEMBER', 'LEFT', 1, 5, 9, 11, '2026-06-10T12:03:00Z'),
+    ('tenant-list', 'conv-list', 'banned-1', 'MEMBER', 'BANNED', 1, 6, 9, 11, '2026-06-10T12:04:00Z'),
+    ('tenant-list', 'conv-archived', 'owner-1', 'OWNER', 'ACTIVE', 1, NULL, 10, 12, '2026-06-10T12:00:00Z');
+`)
+	if err != nil {
+		t.Fatalf("seed members: %v", err)
+	}
+
+	repository := NewRepository(pool)
+	firstPage, err := repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-list",
+		PageSize:       2,
+	})
+	if err != nil {
+		t.Fatalf("list first page: %v", err)
+	}
+	if firstPage.TenantID != "tenant-list" ||
+		firstPage.ConversationID != "conv-list" ||
+		firstPage.MemberVersion != 10 ||
+		firstPage.PermissionVersion != 12 ||
+		firstPage.NextPageToken == "" ||
+		len(firstPage.Members) != 2 {
+		t.Fatalf("unexpected first page: %+v", firstPage)
+	}
+	if firstPage.Members[0].UserID != "admin-1" ||
+		firstPage.Members[1].UserID != "member-1" {
+		t.Fatalf("unexpected first page order: %+v", firstPage.Members)
+	}
+	for _, member := range firstPage.Members {
+		if member.Status != types.MemberStatusActive {
+			t.Fatalf("expected only active members, got %+v", member)
+		}
+	}
+
+	secondPage, err := repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-list",
+		PageSize:       2,
+		PageToken:      firstPage.NextPageToken,
+	})
+	if err != nil {
+		t.Fatalf("list second page: %v", err)
+	}
+	if secondPage.NextPageToken != "" || len(secondPage.Members) != 2 {
+		t.Fatalf("unexpected second page: %+v", secondPage)
+	}
+	if secondPage.Members[0].UserID != "member-2" ||
+		secondPage.Members[1].UserID != "owner-1" {
+		t.Fatalf("unexpected second page order: %+v", secondPage.Members)
+	}
+	if secondPage.Members[1].Role != types.MemberRoleOwner ||
+		secondPage.Members[1].JoinSeq != 1 ||
+		secondPage.Members[1].MemberVersion != 10 ||
+		secondPage.Members[1].PermissionVersion != 12 {
+		t.Fatalf("unexpected owner member: %+v", secondPage.Members[1])
+	}
+
+	_, err = repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "left-1",
+		},
+		ConversationID: "conv-list",
+	})
+	if !errors.Is(err, types.ErrMemberNotActive) {
+		t.Fatalf("expected member not active for left caller, got %v", err)
+	}
+
+	_, err = repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-archived",
+	})
+	if !errors.Is(err, types.ErrConversationNotFound) {
+		t.Fatalf("expected archived conversation not found, got %v", err)
+	}
+
+	_, err = repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-list",
+		PageToken:      "not-base64",
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid page token, got %v", err)
+	}
+}
+
 func TestRepositoryCreateMemberChangeIntegration(t *testing.T) {
 	dsn := os.Getenv("NEXUSIM_PG_DSN")
 	if dsn == "" {

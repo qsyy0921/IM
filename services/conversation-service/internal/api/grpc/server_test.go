@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	"github.com/qsyy0921/IM/services/conversation-service/internal/types"
@@ -369,6 +370,111 @@ func TestGetMemberChangeRequiresExecutor(t *testing.T) {
 	}
 }
 
+func TestListConversationMembersConvertsRequestAndResponse(t *testing.T) {
+	updatedAt := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	executor := &fakeListConversationMembersExecutor{
+		result: types.ListConversationMembersResult{
+			TenantID:          "tenant-1",
+			ConversationID:    "conv-1",
+			MemberVersion:     10,
+			PermissionVersion: 12,
+			NextPageToken:     "next-token",
+			Members: []types.ConversationMember{
+				{
+					UserID:            "user-1",
+					Role:              types.MemberRoleOwner,
+					Status:            types.MemberStatusActive,
+					JoinSeq:           1,
+					MemberVersion:     10,
+					PermissionVersion: 12,
+					UpdatedAt:         updatedAt,
+				},
+			},
+		},
+	}
+	server := NewServer(
+		&fakeGetSendContextExecutor{},
+		WithListConversationMembers(executor),
+	)
+
+	response, err := server.ListConversationMembers(context.Background(), &conversationv1.ListConversationMembersRequest{
+		AuthContext: &conversationv1.AuthContext{
+			TenantId:  "tenant-1",
+			UserId:    "user-1",
+			DeviceId:  "device-1",
+			SessionId: "session-1",
+			TraceId:   "trace-1",
+			RequestId: "request-1",
+		},
+		ConversationId: "conv-1",
+		PageSize:       50,
+		PageToken:      "page-token",
+	})
+	if err != nil {
+		t.Fatalf("list conversation members: %v", err)
+	}
+	if executor.command.AuthContext.TenantID != "tenant-1" ||
+		executor.command.AuthContext.UserID != "user-1" ||
+		executor.command.AuthContext.DeviceID != "device-1" ||
+		executor.command.AuthContext.SessionID != "session-1" ||
+		executor.command.AuthContext.TraceID != "trace-1" ||
+		executor.command.AuthContext.RequestID != "request-1" ||
+		executor.command.ConversationID != "conv-1" ||
+		executor.command.PageSize != 50 ||
+		executor.command.PageToken != "page-token" {
+		t.Fatalf("unexpected command: %+v", executor.command)
+	}
+	if response.GetTenantId() != "tenant-1" ||
+		response.GetConversationId() != "conv-1" ||
+		response.GetMemberVersion() != 10 ||
+		response.GetPermissionVersion() != 12 ||
+		response.GetNextPageToken() != "next-token" ||
+		len(response.GetMembers()) != 1 {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+	member := response.GetMembers()[0]
+	if member.GetUserId() != "user-1" ||
+		member.GetRole() != conversationv1.MemberRole_MEMBER_ROLE_OWNER ||
+		member.GetStatus() != conversationv1.MemberStatus_MEMBER_STATUS_ACTIVE ||
+		member.GetJoinSeq() != 1 ||
+		member.GetMemberVersion() != 10 ||
+		member.GetPermissionVersion() != 12 ||
+		member.GetUpdatedAtUnixMs() != updatedAt.UnixMilli() {
+		t.Fatalf("unexpected member: %+v", member)
+	}
+}
+
+func TestListConversationMembersMapsValidationErrors(t *testing.T) {
+	server := NewServer(
+		&fakeGetSendContextExecutor{},
+		WithListConversationMembers(&fakeListConversationMembersExecutor{validate: true}),
+	)
+	_, err := server.ListConversationMembers(context.Background(), &conversationv1.ListConversationMembersRequest{
+		ConversationId: "conv-1",
+	})
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	if st.Code() != codes.InvalidArgument || st.Message() != "invalid argument" {
+		t.Fatalf("unexpected status: %s %q", st.Code(), st.Message())
+	}
+}
+
+func TestListConversationMembersRequiresExecutor(t *testing.T) {
+	_, err := NewServer(&fakeGetSendContextExecutor{}).ListConversationMembers(
+		context.Background(),
+		&conversationv1.ListConversationMembersRequest{},
+	)
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	if st.Code() != codes.Unimplemented {
+		t.Fatalf("expected unimplemented, got %s", st.Code())
+	}
+}
+
 type fakeGetSendContextExecutor struct {
 	result   types.ConversationSendContext
 	err      error
@@ -424,6 +530,26 @@ func (f *fakeCreateMemberChangeExecutor) Execute(
 	if f.validate {
 		if err := command.Validate(); err != nil {
 			return types.MemberChangeResult{}, err
+		}
+	}
+	return f.result, f.err
+}
+
+type fakeListConversationMembersExecutor struct {
+	result   types.ListConversationMembersResult
+	err      error
+	command  types.ListConversationMembersCommand
+	validate bool
+}
+
+func (f *fakeListConversationMembersExecutor) Execute(
+	_ context.Context,
+	command types.ListConversationMembersCommand,
+) (types.ListConversationMembersResult, error) {
+	f.command = command
+	if f.validate {
+		if err := command.Validate(); err != nil {
+			return types.ListConversationMembersResult{}, err
 		}
 	}
 	return f.result, f.err

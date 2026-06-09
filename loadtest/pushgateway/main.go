@@ -66,25 +66,29 @@ type serverFrame struct {
 }
 
 type config struct {
-	conversationTarget string
-	messageTarget      string
-	deliveryTarget     string
-	pushURL            string
-	resultDir          string
-	pgDSN              string
-	requestTimeout     time.Duration
-	waitTimeout        time.Duration
-	pollInterval       time.Duration
-	tenantID           string
-	conversationID     string
-	ownerUserID        string
-	receiverUserID     string
-	receiverDeviceID   string
-	receiverDeviceIDs  []string
-	scenario           string
-	slowMessageCount   int
-	pushMetricsURL     string
-	cleanup            bool
+	conversationTarget    string
+	messageTarget         string
+	deliveryTarget        string
+	pushURL               string
+	resultDir             string
+	pgDSN                 string
+	requestTimeout        time.Duration
+	waitTimeout           time.Duration
+	pollInterval          time.Duration
+	tenantID              string
+	conversationID        string
+	ownerUserID           string
+	receiverUserID        string
+	receiverDeviceID      string
+	receiverDeviceIDs     []string
+	scenario              string
+	slowMessageCount      int
+	pushMetricsURL        string
+	routeBackend          string
+	redisKeyPrefix        string
+	pushWSGatewayID       string
+	pushConsumerGatewayID string
+	cleanup               bool
 }
 
 type summary struct {
@@ -97,6 +101,10 @@ type summary struct {
 	DeliveryTarget          string             `json:"delivery_target"`
 	PushURL                 string             `json:"push_url"`
 	PushMetricsURL          string             `json:"push_metrics_url,omitempty"`
+	RouteBackend            string             `json:"route_backend,omitempty"`
+	RedisKeyPrefix          string             `json:"redis_key_prefix,omitempty"`
+	PushWSGatewayID         string             `json:"push_ws_gateway_id,omitempty"`
+	PushConsumerGatewayID   string             `json:"push_consumer_gateway_id,omitempty"`
 	Scenario                string             `json:"scenario"`
 	TenantID                string             `json:"tenant_id"`
 	ConversationID          string             `json:"conversation_id"`
@@ -237,6 +245,10 @@ func parseConfig() config {
 	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full or slow-client")
 	flag.IntVar(&cfg.slowMessageCount, "slow-message-count", 128, "number of messages sent while slow client does not read")
 	flag.StringVar(&cfg.pushMetricsURL, "push-metrics-url", "", "push-gateway debug metrics URL")
+	flag.StringVar(&cfg.routeBackend, "route-backend", "", "push route backend used by the smoke environment")
+	flag.StringVar(&cfg.redisKeyPrefix, "redis-key-prefix", "", "Redis route key prefix used by the smoke environment")
+	flag.StringVar(&cfg.pushWSGatewayID, "push-ws-gateway-id", "", "WebSocket gateway id used by cross-instance route smoke")
+	flag.StringVar(&cfg.pushConsumerGatewayID, "push-consumer-gateway-id", "", "delivery consumer gateway id used by cross-instance route smoke")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete existing rows for tenant before running")
 	flag.Parse()
 	cfg.receiverDeviceIDs = parseDeviceIDs(receiverDeviceIDs, cfg.receiverDeviceID)
@@ -298,24 +310,28 @@ func run(cfg config) error {
 	deliveryClient := deliveryv1.NewDeliveryServiceClient(deliveryConn)
 
 	result := summary{
-		Commit:             shortCommit(),
-		CommitFull:         fullCommit(),
-		GitDirty:           gitDirty(),
-		GitStatusShort:     gitStatusShort(),
-		ConversationTarget: cfg.conversationTarget,
-		MessageTarget:      cfg.messageTarget,
-		DeliveryTarget:     cfg.deliveryTarget,
-		PushURL:            cfg.pushURL,
-		PushMetricsURL:     cfg.pushMetricsURL,
-		Scenario:           cfg.scenario,
-		TenantID:           cfg.tenantID,
-		ConversationID:     cfg.conversationID,
-		OwnerUserID:        cfg.ownerUserID,
-		ReceiverUserID:     cfg.receiverUserID,
-		ReceiverDeviceID:   cfg.receiverDeviceID,
-		ReceiverDeviceIDs:  cfg.receiverDeviceIDs,
-		StartedAt:          time.Now().UTC(),
-		Latencies:          map[string]float64{},
+		Commit:                shortCommit(),
+		CommitFull:            fullCommit(),
+		GitDirty:              gitDirty(),
+		GitStatusShort:        gitStatusShort(),
+		ConversationTarget:    cfg.conversationTarget,
+		MessageTarget:         cfg.messageTarget,
+		DeliveryTarget:        cfg.deliveryTarget,
+		PushURL:               cfg.pushURL,
+		PushMetricsURL:        cfg.pushMetricsURL,
+		RouteBackend:          cfg.routeBackend,
+		RedisKeyPrefix:        cfg.redisKeyPrefix,
+		PushWSGatewayID:       cfg.pushWSGatewayID,
+		PushConsumerGatewayID: cfg.pushConsumerGatewayID,
+		Scenario:              cfg.scenario,
+		TenantID:              cfg.tenantID,
+		ConversationID:        cfg.conversationID,
+		OwnerUserID:           cfg.ownerUserID,
+		ReceiverUserID:        cfg.receiverUserID,
+		ReceiverDeviceID:      cfg.receiverDeviceID,
+		ReceiverDeviceIDs:     cfg.receiverDeviceIDs,
+		StartedAt:             time.Now().UTC(),
+		Latencies:             map[string]float64{},
 	}
 
 	if metrics, err := fetchPushMetrics(ctx, cfg.pushMetricsURL); err == nil {

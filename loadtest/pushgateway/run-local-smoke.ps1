@@ -6,6 +6,10 @@ param(
     [string]$ReceiverDeviceIds = "push-device-1",
     [ValidateSet("full", "slow-client")]
     [string]$Scenario = "full",
+    [ValidateSet("memory", "redis")]
+    [string]$RouteBackend = "memory",
+    [string]$RedisAddr = "127.0.0.1:6379",
+    [string]$RedisKeyPrefix = "",
     [int]$SlowMessageCount = 128,
     [switch]$SkipBuild
 )
@@ -17,12 +21,20 @@ if (-not $RunName) {
 }
 
 $repo = (Get-Location).Path
+$safeRunName = $RunName -replace '[^a-zA-Z0-9_-]', '-'
 $resultDir = Join-Path $ResultRoot $RunName
 $logDir = Join-Path $resultDir "logs"
 $timelineTopic = "conversation.timeline.pushgateway." + (Get-Date -Format "yyyyMMdd-HHmmss")
 $deliveryTopic = "im.delivery.events"
 $deliveryConsumerGroup = "nexusim-delivery-push-smoke-" + (Get-Date -Format "yyyyMMddHHmmss")
 $pushConsumerGroup = "nexusim-push-gateway-smoke-" + (Get-Date -Format "yyyyMMddHHmmss")
+$pushRouteKeyPrefix = $RedisKeyPrefix
+if (-not $pushRouteKeyPrefix) {
+    $pushRouteKeyPrefix = "nexusim:push:$safeRunName"
+}
+$pushGatewayID = "push-single-$safeRunName"
+$pushWSGatewayID = "push-ws-$safeRunName"
+$pushConsumerGatewayID = "push-consumer-$safeRunName"
 $pushSessionQueueSize = "32"
 $pushWriteTimeout = "2s"
 $pushTestWriteDelay = "0s"
@@ -169,17 +181,45 @@ try {
         NEXUSIM_DELIVERY_OUTBOX_POLL_INTERVAL = "200ms"
     }
 
-    $processes += Start-NexusProcess -Name "push-gateway" -FilePath $pushGateway -Port 11598 -Env @{
-        NEXUSIM_PUSH_GATEWAY_MODE = "all"
-        NEXUSIM_PUSH_WS_ADDR = "127.0.0.1:11598"
-        NEXUSIM_DELIVERY_GRPC_ADDR = "127.0.0.1:11597"
-        NEXUSIM_DELIVERY_GRPC_TIMEOUT = "2s"
-        NEXUSIM_KAFKA_BROKERS = $KafkaBrokers
-        NEXUSIM_DELIVERY_EVENTS_TOPIC = $deliveryTopic
-        NEXUSIM_PUSH_CONSUMER_GROUP = $pushConsumerGroup
-        NEXUSIM_PUSH_SESSION_QUEUE_SIZE = $pushSessionQueueSize
-        NEXUSIM_PUSH_WRITE_TIMEOUT = $pushWriteTimeout
-        NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
+    if ($RouteBackend -eq "redis") {
+        $processes += Start-NexusProcess -Name "push-gateway-ws" -FilePath $pushGateway -Port 11598 -Env @{
+            NEXUSIM_PUSH_GATEWAY_MODE = "ws"
+            NEXUSIM_PUSH_WS_ADDR = "127.0.0.1:11598"
+            NEXUSIM_DELIVERY_GRPC_ADDR = "127.0.0.1:11597"
+            NEXUSIM_DELIVERY_GRPC_TIMEOUT = "2s"
+            NEXUSIM_PUSH_SESSION_QUEUE_SIZE = $pushSessionQueueSize
+            NEXUSIM_PUSH_WRITE_TIMEOUT = $pushWriteTimeout
+            NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
+            NEXUSIM_PUSH_ROUTE_BACKEND = "redis"
+            NEXUSIM_PUSH_GATEWAY_ID = $pushWSGatewayID
+            NEXUSIM_PUSH_REDIS_ADDR = $RedisAddr
+            NEXUSIM_PUSH_REDIS_KEY_PREFIX = $pushRouteKeyPrefix
+            NEXUSIM_PUSH_ROUTE_TTL = "90s"
+        }
+        $processes += Start-NexusProcess -Name "push-gateway-consumer" -FilePath $pushGateway -Env @{
+            NEXUSIM_PUSH_GATEWAY_MODE = "delivery-consumer"
+            NEXUSIM_KAFKA_BROKERS = $KafkaBrokers
+            NEXUSIM_DELIVERY_EVENTS_TOPIC = $deliveryTopic
+            NEXUSIM_PUSH_CONSUMER_GROUP = $pushConsumerGroup
+            NEXUSIM_PUSH_ROUTE_BACKEND = "redis"
+            NEXUSIM_PUSH_GATEWAY_ID = $pushConsumerGatewayID
+            NEXUSIM_PUSH_REDIS_ADDR = $RedisAddr
+            NEXUSIM_PUSH_REDIS_KEY_PREFIX = $pushRouteKeyPrefix
+            NEXUSIM_PUSH_ROUTE_TTL = "90s"
+        }
+    } else {
+        $processes += Start-NexusProcess -Name "push-gateway" -FilePath $pushGateway -Port 11598 -Env @{
+            NEXUSIM_PUSH_GATEWAY_MODE = "all"
+            NEXUSIM_PUSH_WS_ADDR = "127.0.0.1:11598"
+            NEXUSIM_DELIVERY_GRPC_ADDR = "127.0.0.1:11597"
+            NEXUSIM_DELIVERY_GRPC_TIMEOUT = "2s"
+            NEXUSIM_KAFKA_BROKERS = $KafkaBrokers
+            NEXUSIM_DELIVERY_EVENTS_TOPIC = $deliveryTopic
+            NEXUSIM_PUSH_CONSUMER_GROUP = $pushConsumerGroup
+            NEXUSIM_PUSH_SESSION_QUEUE_SIZE = $pushSessionQueueSize
+            NEXUSIM_PUSH_WRITE_TIMEOUT = $pushWriteTimeout
+            NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
+        }
     }
 
     $processes += Start-NexusProcess -Name "message-grpc" -FilePath $messageService -Port 11595 -Env @{
@@ -207,6 +247,10 @@ try {
         --scenario $Scenario `
         --slow-message-count $SlowMessageCount `
         --push-metrics-url "http://127.0.0.1:11598/debug/metrics" `
+        --route-backend $RouteBackend `
+        --redis-key-prefix $pushRouteKeyPrefix `
+        --push-ws-gateway-id $pushWSGatewayID `
+        --push-consumer-gateway-id $pushConsumerGatewayID `
         --wait-timeout 20s `
         --request-timeout 3s
     if ($LASTEXITCODE -ne 0) {
@@ -224,3 +268,10 @@ Write-Host "result_dir=$resultDir"
 Write-Host "timeline_topic=$timelineTopic"
 Write-Host "delivery_consumer_group=$deliveryConsumerGroup"
 Write-Host "push_consumer_group=$pushConsumerGroup"
+Write-Host "route_backend=$RouteBackend"
+if ($RouteBackend -eq "redis") {
+    Write-Host "redis_addr=$RedisAddr"
+    Write-Host "redis_key_prefix=$pushRouteKeyPrefix"
+    Write-Host "push_ws_gateway_id=$pushWSGatewayID"
+    Write-Host "push_consumer_gateway_id=$pushConsumerGatewayID"
+}

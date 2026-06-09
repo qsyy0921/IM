@@ -282,6 +282,36 @@ member_list_target_absent_verified = true
 conversation_members target status = LEFT
 ```
 
+验证 `ROLE_CHANGED` 后普通 roster role 更新时，先 seed 一个 ACTIVE owner 和一个 ACTIVE member，再运行：
+
+```powershell
+bin\memberchange-loadtest.exe `
+  --target 127.0.0.1:11496 `
+  --vus 1 `
+  --duration 3s `
+  --request-count 1 `
+  --tenant-id tenant-roster-role-smoke `
+  --conversation-id conv-roster-role-smoke `
+  --operator-user-id owner-1 `
+  --list-user-id owner-1 `
+  --target-user-id roster-user-role `
+  --change-type role-changed `
+  --target-role admin `
+  --idempotency-prefix roster-role-manual `
+  --expected-member-version 0 `
+  --pg-dsn 'postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable' `
+  --result-dir loadtest\results\memberchange-role-smoke-manual
+```
+
+通过标准：
+
+```text
+success_rate = 1
+member_list_target_present = true
+member_list_target_role = MEMBER_ROLE_ADMIN
+conversation_members target role = ADMIN
+```
+
 如果要验证完整成员事件闭环，需要同时启动：
 
 ```text

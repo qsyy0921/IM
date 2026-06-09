@@ -72,6 +72,7 @@ ListConversationMembers
 | `loadtest-report-20260610-list-conversation-members-smoke.md` | 3 / 3 JOIN 成功，随后 `ListConversationMembers` 返回 4 个 ACTIVE 成员 |
 | `loadtest-report-20260610-list-conversation-members-leave-smoke.md` | 1 / 1 LEAVE 成功，目标成员状态变为 `LEFT`，随后 `ListConversationMembers` 不再返回目标成员 |
 | `loadtest-report-20260610-list-conversation-members-remove-smoke.md` | 1 / 1 REMOVE 成功，目标成员状态变为 `LEFT`，随后 `ListConversationMembers` 不再返回目标成员 |
+| `loadtest-report-20260610-list-conversation-members-role-smoke.md` | 1 / 1 ROLE_CHANGED 成功，目标成员仍为 ACTIVE，随后 `ListConversationMembers` 返回角色 `ADMIN` |
 
 ## 面试讲法
 
@@ -91,8 +92,12 @@ LEAVE / REMOVE 后 roster 过滤可以这样讲：
 
 > `LEAVE` 和 `REMOVE` 都不做物理删除，而是把目标成员状态写成 `LEFT` 并记录 `leave_seq`。普通 `ListConversationMembers` 只返回 ACTIVE 成员，所以离开或被移除用户不会再出现在普通 roster；历史成员和审计视图后续通过 admin-only 查询单独设计，避免把普通列表接口做复杂。
 
+ROLE_CHANGED 后 roster 更新可以这样讲：
+
+> 角色变更不会新增成员，也不会影响是否 ACTIVE，而是更新 `conversation_members.role` 和版本号。普通 roster 返回当前角色，本轮 smoke 证明 `MEMBER -> ADMIN` 后 `ListConversationMembers` 能返回 `ADMIN`。更复杂的 owner transfer、非法降级和审计历史后续单独做，不把普通 roster 做成复杂管理后台。
+
 ## 下一步
 
-1. 补 `ROLE_CHANGED` 的真实进程 smoke 或至少 repository / gRPC 覆盖，并验证 `ListConversationMembers` 在角色变化后的 role 更新。
+1. 补更完整的角色变更负例，例如非法 owner transfer、非 owner 操作和 admin 降级。
 2. 补 DLQ repair 设计和最小实现。
 3. 进入 `delivery-service` 或 `push-gateway` 前，先明确它们的 SDD 和最小可运行链路。

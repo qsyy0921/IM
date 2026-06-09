@@ -210,6 +210,11 @@ type redisRouteMetrics struct {
 	RedisRouteSubscriberMalformedCount uint64 `json:"redis_route_subscriber_malformed_count,omitempty"`
 	RedisRouteSubscriberEnqueuedCount  uint64 `json:"redis_route_subscriber_enqueued_count,omitempty"`
 	RedisRouteSubscriberErrorCount     uint64 `json:"redis_route_subscriber_error_count,omitempty"`
+	RedisResumeReplayCount             uint64 `json:"redis_resume_replay_count,omitempty"`
+	RedisResumeMissCount               uint64 `json:"redis_resume_miss_count,omitempty"`
+	RedisResumeAppendCount             uint64 `json:"redis_resume_append_count,omitempty"`
+	RedisResumeAppendErrorCount        uint64 `json:"redis_resume_append_error_count,omitempty"`
+	RedisResumePermissionDeniedCount   uint64 `json:"redis_resume_permission_denied_count,omitempty"`
 }
 
 type frameSnapshot struct {

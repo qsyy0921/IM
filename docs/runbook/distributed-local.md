@@ -291,14 +291,14 @@ push-gateway 只消费 delivery 事件做在线唤醒，WebSocket 连接和 Kafk
 
 ```text
 当前是本地多进程分布式 smoke。它证明服务边界、outbox、Kafka、durable inbox、Redis route、WebSocket notify 和 ACK 能串起来。
-生产级还需要真实鉴权、Kubernetes 部署、Redis 故障治理、跨实例 resume、正式 metrics、容量和故障演练。
+生产级还需要真实鉴权、Kubernetes 部署、Redis 故障治理、cross-instance resume 真实进程验证、正式 metrics、容量和故障演练。
 ```
 
 ## 7. 已知缺口
 
 - Redis route 已做一次真实 stop/start fault smoke，证明 online notify 可丢但 `PullInbox + AckDelivery` 可恢复；这仍不是 Redis HA、Sentinel、Cluster 或网络分区结论。
 - Redis route 已有 TTL 续期和后台 stale route cleanup；异常进程退出后 session route 仍依赖 TTL 过期，user route set 中的 stale 成员由 lookup / cleanup loop 移除。
-- `push-gateway` 跨实例 resume buffer 尚未实现；跨实例恢复仍应 fallback `PullInbox`。
+- `push-gateway` Redis-backed cross-instance resume buffer 已有最小实现和单元测试；尚未跑真实进程 / Win-Mac cross-instance resume smoke。跨实例 replay miss、Redis error 或 token mismatch 时仍必须 fallback `PullInbox`。
 - `push-gateway` `/debug/metrics` 仍是本地 smoke 调试端点，不是正式 Prometheus 指标。
 - 真实生产部署还未接入 Kubernetes / service discovery / mTLS / OTel。
 - Mac Docker CLI / SSH 已可用；双机 Docker Compose profile 尚未完成配置和验证。Mac `Desktop/IM` 有本地变更，后续跨机 smoke 前需选择 fast-forward 更新或新建干净 smoke checkout。

@@ -3,10 +3,12 @@ package redisroute
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/qsyy0921/IM/services/push-gateway/internal/domain"
 	"github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/memory"
 	"github.com/qsyy0921/IM/services/push-gateway/internal/types"
 	"github.com/redis/go-redis/v9"
@@ -284,6 +286,227 @@ func TestRegistryRegisterFailsClosedWhenRedisUnavailable(t *testing.T) {
 	}
 	if metrics := local.Metrics(); metrics.ConnectedSessions != 0 {
 		t.Fatalf("local session should be rolled back after redis write failure: %+v", metrics)
+	}
+}
+
+func TestRegistryReplaysRedisResumeAcrossGateways(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	ctx := context.Background()
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"}
+	token := "resume-known"
+
+	localA := memory.NewRegistry()
+	gatewayA := NewRegistry(localA, client, Config{GatewayID: "gateway-a", RouteTTL: time.Minute})
+	if _, err := gatewayA.Register(ctx, types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-a",
+		ResumeToken: token,
+		Outbound:    make(chan types.ServerFrame, 1),
+	}); err != nil {
+		t.Fatalf("register gateway A: %v", err)
+	}
+
+	gatewayB := NewRegistry(memory.NewRegistry(), client, Config{GatewayID: "gateway-b", RouteTTL: time.Minute})
+	notification := testNotification()
+	result, err := gatewayB.EnqueueNotification(ctx, notification)
+	if err != nil {
+		t.Fatalf("enqueue from gateway B: %v", err)
+	}
+	if result.MatchedSessions != 1 || result.Enqueued != 1 {
+		t.Fatalf("unexpected enqueue result: %+v", result)
+	}
+	if metrics := gatewayB.Metrics(); metrics.RedisResumeAppendCount != 1 {
+		t.Fatalf("expected redis resume append metric, got %+v", metrics)
+	}
+
+	gatewayA.Unregister("session-a")
+	outbound := make(chan types.ServerFrame, 2)
+	gatewayC := NewRegistry(memory.NewRegistry(), client, Config{GatewayID: "gateway-c", RouteTTL: time.Minute})
+	resumed, err := gatewayC.Register(ctx, types.SessionRegistration{
+		AuthContext:     auth,
+		SessionID:       "session-c",
+		ResumeToken:     token,
+		ResumeRequested: true,
+		LastReceived:    []types.ConversationCursor{{ConversationID: notification.ConversationID, Seq: notification.ConversationSeq - 1}},
+		Outbound:        outbound,
+	})
+	if err != nil {
+		t.Fatalf("resume on gateway C: %v", err)
+	}
+	if resumed.ResumeToken != token {
+		t.Fatalf("expected known redis token to be reused, got %s", resumed.ResumeToken)
+	}
+	select {
+	case frame := <-outbound:
+		if frame.Op != types.OpDeliveryNotify || frame.EventID != notification.EventID {
+			t.Fatalf("unexpected replay frame: %+v", frame)
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for redis resume replay")
+	}
+	if metrics := gatewayC.Metrics(); metrics.RedisResumeReplayCount != 1 || metrics.RedisResumeMissCount != 0 {
+		t.Fatalf("unexpected resume metrics: %+v", metrics)
+	}
+}
+
+func TestRegistryUnknownRedisResumeTokenIssuesNewTokenAndBufferMiss(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	registry := NewRegistry(memory.NewRegistry(), client, Config{GatewayID: "gateway-a", RouteTTL: time.Minute})
+	ctx := context.Background()
+	outbound := make(chan types.ServerFrame, 1)
+
+	result, err := registry.Register(ctx, types.SessionRegistration{
+		AuthContext:     types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"},
+		SessionID:       "session-1",
+		ResumeToken:     "client-chosen-token",
+		ResumeRequested: true,
+		Outbound:        outbound,
+	})
+	if err != nil {
+		t.Fatalf("register unknown resume token: %v", err)
+	}
+	if result.ResumeToken == "" || result.ResumeToken == "client-chosen-token" {
+		t.Fatalf("expected server-generated replacement token, got %q", result.ResumeToken)
+	}
+	if server.Exists("nexusim:push:resume:token:client-chosen-token:meta") {
+		t.Fatalf("unknown client token should not be registered")
+	}
+	if !server.Exists("nexusim:push:resume:token:" + result.ResumeToken + ":meta") {
+		t.Fatalf("replacement token metadata should be stored in redis")
+	}
+	select {
+	case frame := <-outbound:
+		if frame.Op != types.OpResumeHint || frame.Reason != "buffer_miss" {
+			t.Fatalf("unexpected frame: %+v", frame)
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for buffer miss")
+	}
+	if metrics := registry.Metrics(); metrics.RedisResumeMissCount != 1 {
+		t.Fatalf("expected redis resume miss metric, got %+v", metrics)
+	}
+}
+
+func TestRegistryRejectsRedisResumeTokenForDifferentDevice(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	ctx := context.Background()
+	registry := NewRegistry(memory.NewRegistry(), client, Config{GatewayID: "gateway-a", RouteTTL: time.Minute})
+	token := "resume-device-1"
+
+	if _, err := registry.Register(ctx, types.SessionRegistration{
+		AuthContext: types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"},
+		SessionID:   "session-1",
+		ResumeToken: token,
+		Outbound:    make(chan types.ServerFrame, 1),
+	}); err != nil {
+		t.Fatalf("register first device: %v", err)
+	}
+	_, err := registry.Register(ctx, types.SessionRegistration{
+		AuthContext:     types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-2"},
+		SessionID:       "session-2",
+		ResumeToken:     token,
+		ResumeRequested: true,
+		Outbound:        make(chan types.ServerFrame, 1),
+	})
+	if !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected permission denied, got %v", err)
+	}
+	if metrics := registry.Metrics(); metrics.RedisResumePermissionDeniedCount != 1 {
+		t.Fatalf("expected permission denied metric, got %+v", metrics)
+	}
+}
+
+func TestRegistryRedisResumeGapReturnsBufferMiss(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	ctx := context.Background()
+	registry := NewRegistry(memory.NewRegistry(), client, Config{GatewayID: "gateway-a", RouteTTL: time.Minute})
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"}
+	token := "resume-gap"
+
+	if err := registry.writeResumeMeta(ctx, token, auth); err != nil {
+		t.Fatalf("write resume meta: %v", err)
+	}
+	notification := testNotification()
+	notification.ConversationSeq = 10
+	if err := registry.appendRedisResume(ctx, token, domain.DeliveryNotify(notification)); err != nil {
+		t.Fatalf("append resume frame: %v", err)
+	}
+
+	outbound := make(chan types.ServerFrame, 2)
+	result, err := registry.Register(ctx, types.SessionRegistration{
+		AuthContext:     auth,
+		SessionID:       "session-1",
+		ResumeToken:     token,
+		ResumeRequested: true,
+		LastReceived:    []types.ConversationCursor{{ConversationID: notification.ConversationID, Seq: 7}},
+		Outbound:        outbound,
+	})
+	if err != nil {
+		t.Fatalf("register with gapped resume token: %v", err)
+	}
+	if result.ResumeToken != token {
+		t.Fatalf("known token should be preserved on gap, got %q", result.ResumeToken)
+	}
+	select {
+	case frame := <-outbound:
+		if frame.Op != types.OpResumeHint || frame.Reason != "buffer_miss" {
+			t.Fatalf("expected buffer miss, got %+v", frame)
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for buffer miss")
+	}
+	select {
+	case frame := <-outbound:
+		t.Fatalf("should not replay after gap, got %+v", frame)
+	default:
+	}
+	if metrics := registry.Metrics(); metrics.RedisResumeReplayCount != 0 || metrics.RedisResumeMissCount != 1 {
+		t.Fatalf("unexpected gap metrics: %+v", metrics)
+	}
+}
+
+func TestRegistryRedisLookupUnavailableKeepsLocalDeliveryAndResume(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	local := memory.NewRegistry()
+	registry := NewRegistry(local, client, Config{GatewayID: "gateway-a", RouteTTL: time.Minute})
+	ctx := context.Background()
+	outbound := make(chan types.ServerFrame, 1)
+
+	if _, err := registry.Register(ctx, types.SessionRegistration{
+		AuthContext: types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"},
+		SessionID:   "session-1",
+		ResumeToken: "resume-local",
+		Outbound:    outbound,
+	}); err != nil {
+		t.Fatalf("register local session: %v", err)
+	}
+	server.Close()
+	result, err := registry.EnqueueNotification(ctx, testNotification())
+	if err != nil {
+		t.Fatalf("enqueue should fail open after redis lookup error: %v", err)
+	}
+	if result.Enqueued != 1 || result.MatchedSessions != 1 || result.Dropped != 1 {
+		t.Fatalf("expected local enqueue plus redis lookup drop marker, got %+v", result)
+	}
+	select {
+	case frame := <-outbound:
+		if frame.Op != types.OpDeliveryNotify || frame.EventID != "delivery-event-1" {
+			t.Fatalf("unexpected local frame: %+v", frame)
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for local delivery")
+	}
+	localMetrics := local.Metrics()
+	if localMetrics.ResumeBufferStoredFrames != 1 {
+		t.Fatalf("expected local resume buffer to keep frame, got %+v", localMetrics)
+	}
+	if metrics := registry.Metrics(); metrics.RedisRouteLookupErrorCount != 1 {
+		t.Fatalf("expected lookup error metric, got %+v", metrics)
 	}
 }
 

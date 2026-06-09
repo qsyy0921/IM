@@ -1,6 +1,6 @@
 # push-gateway Loadtest / Smoke Index
 
-本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify`、`delivery.ack.ok`、queue-full broad `server.resume_hint` active close、单实例 in-memory resume buffer TTL 和 Redis route 最小 adapter；真实进程 full smoke、同 user 多 device notify smoke、slow-client 负向 smoke、单实例 resume replay smoke 和跨进程 Redis route smoke 已通过。
+本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify`、`delivery.ack.ok`、queue-full broad `server.resume_hint` active close、单实例 in-memory resume buffer TTL、Redis route 最小 adapter 和 Redis-backed cross-instance resume buffer 第一版；真实进程 full smoke、同 user 多 device notify smoke、slow-client 负向 smoke、单实例 resume replay smoke 和跨进程 Redis route smoke 已通过。Redis-backed resume 目前只有单元测试覆盖，真实跨实例 resume smoke 仍待补。
 
 ## 当前验证目标
 
@@ -108,10 +108,10 @@ E:\development\IM\loadtest\results
 - 不打满 Win-Mac 2.5Gbps 链路。
 - 不重新做 message-service 硬件矩阵。
 - 不把短时 resume buffer 当作 durable inbox。
-- 不把单实例 in-memory resume buffer 表述为跨实例 resume；当前 Redis route 只负责在线 session 路由，不负责跨实例 resume buffer；未知或过期客户端 `resume_token` 必须返回 `buffer_miss` 并由服务端签发新 token。
+- 不把 Redis-backed resume buffer 表述为可靠投递或生产级跨实例恢复。当前第一版只缓存轻量 `delivery.notify`，未知、过期、身份不匹配、Redis miss/error 或 buffer gap 都必须回退 `server.resume_hint + PullInbox`；未知客户端 `resume_token` 必须返回 `buffer_miss` 并由服务端签发新 token。
 - 不把 push smoke 表述为生产容量结论。
 - 不把 queue-full active close 表述为完整慢连接治理；当前 `server.resume_hint` 只是 broad pull fallback，客户端必须用本地 durable cursor 决定 `PullInbox` 起点。已完成单实例 slow-client 真实进程负向 smoke，它验证的是 durable `PullInbox` fallback；已另外完成单实例 resume replay smoke，验证短时 in-memory buffer 命中路径；后续还没有多实例慢连接或跨实例 resume 验证。
-- `/debug/metrics` 目前暴露单实例 in-memory registry 和 Redis route 调试指标，用于 smoke 排障；其中 resume token count / expired token count 只说明本进程短时 buffer 状态，不是跨实例恢复能力；`redis_registry_metrics` 和 `redis_subscriber_metrics` 只说明 online route / PubSub / local fanout 过程，不代表 durable delivery 成功率；该端点不是生产级 Prometheus 指标。
+- `/debug/metrics` 目前暴露单实例 in-memory registry、Redis route 和 Redis resume 调试指标，用于 smoke 排障；其中 resume token count / expired token count 只说明本进程短时 buffer 状态，`redis_resume_*` 只说明 Redis-backed replay / miss / append 过程；`redis_registry_metrics` 和 `redis_subscriber_metrics` 只说明 online route / PubSub / local fanout 过程，不代表 durable delivery 成功率；该端点不是生产级 Prometheus 指标。
 - `NEXUSIM_PUSH_TEST_WRITE_DELAY` 只允许本地 smoke 使用，生产环境必须 unset 或保持 `0`。
 - Redis route 当前对在线通知采用 fail-open：lookup / publish 错误不会阻塞 delivery consumer 提交当前 Kafka event；该次在线唤醒可以丢，客户端靠 durable `PullInbox` 恢复。connect 写 route 失败仍 fail-closed，避免把无法跨实例路由的 session 注册成在线。后台 cleanup loop 已能清理 missing / malformed / mismatched stale route；clean commit `074902b` 已完成一次真实 Redis stop/start fault smoke，证明 Redis route 中断时 `PullInbox + AckDelivery` 仍可恢复，但这不是 Redis HA / Sentinel / Cluster 结论。
 
@@ -145,5 +145,6 @@ gateway A 只做在线 notify
 - consumer gateway：`redis_route_remote_matched_sessions`、`redis_route_remote_publish_call_count`、`redis_route_remote_publish_error_count`。
 - WebSocket gateway：`redis_route_subscriber_message_count`、`redis_route_subscriber_enqueued_count`。
 - route 健康：`redis_route_lookup_error_count`、`redis_route_stale_removed_count`、`redis_route_cleanup_error_count`。
+- cross-instance resume：`redis_resume_append_count`、`redis_resume_replay_count`、`redis_resume_miss_count`、`redis_resume_permission_denied_count`。
 
 如果这些指标显示 online route 失败，但 `PullInbox` 能拉到消息并 ACK 成功，说明在线唤醒退化但可靠投递未丢。

@@ -275,6 +275,7 @@ push:route:session:{session_id} -> {
   tenant_id,
   user_id,
   device_id,
+  resume_token,
   gateway_id,
 }
 
@@ -297,6 +298,8 @@ Resume buffer：
 
 ```text
 session_id -> ring buffer of delivery.notify frames
+push:resume:token:{resume_token}:meta   -> tenant_id / user_id / device_id
+push:resume:token:{resume_token}:frames -> list(delivery.notify frame)
 ```
 
 约束：
@@ -307,7 +310,10 @@ session_id -> ring buffer of delivery.notify frames
 - `resume_token` 第一阶段为 in-memory opaque token，绑定 `tenant_id / user_id / device_id`；重连会创建新的 `session_id`，但可以复用同一 token 读取单实例 buffer。TTL 与 resume buffer TTL 一致。
 - `resume_token` 必须由服务端签发。客户端携带未知 token 时，服务端返回 `server.resume_hint(reason=buffer_miss)`，并签发新的 opaque token；不能把客户端自带 token 注册成有效 token。
 - 服务重启、token 过期或 buffer miss 时，服务端返回 `server.resume_hint`，客户端 fallback `PullInbox`；已知 token 绑定身份不匹配时返回 `PERMISSION_DENIED`。
-- 当前单实例第一版已实现 in-memory、按条数和 TTL 裁剪的 best-effort resume buffer；活跃 session 会续住 token，断线后的非活跃 token 到期后返回 `server.resume_hint(reason=buffer_miss)` 并签发新 token。跨实例 resume 仍是后续切片。
+- 当前单实例第一版已实现 in-memory、按条数和 TTL 裁剪的 best-effort resume buffer；活跃 session 会续住 token，断线后的非活跃 token 到期后返回 `server.resume_hint(reason=buffer_miss)` 并签发新 token。
+- 启用 `NEXUSIM_PUSH_ROUTE_BACKEND=redis` 时，Redis route 会把 session route 中的 `resume_token` 作为跨实例 resume 索引。任意 gateway 在处理 `delivery.notify` 时，会为 Redis route 中命中的在线 session 写入 `push:resume:token:{resume_token}:frames`；客户端带同一 token 重连到其他 gateway 时，只要 Redis buffer 覆盖 `last_received` 之后的通知，就可以 replay。
+- Redis-backed resume buffer 仍是 best-effort 体验优化，不是可靠投递层。Redis meta / frames miss、TTL 到期、JSON 损坏、buffer gap、Redis 读写错误或 token 身份不匹配时，不得伪造送达；应返回 `server.resume_hint(reason=buffer_miss)` 或 `PERMISSION_DENIED`，最终回退到 durable `PullInbox`。
+- Redis route 与 Redis resume 是两个不同职责：route 找在线 session，resume buffer 支持短断线 replay。Pub/Sub publish 成功不代表 WebSocket 写出成功，Redis resume replay 成功也不代表客户端已 ACK。
 
 当前已接入 runtime 的配置：
 
@@ -359,7 +365,8 @@ delivery-service local transaction
 -> server returns delivery.ack.ok
 ```
 
-第一阶段可以只对当前 gateway 进程内在线 session 通知。当前已接入 Redis route 最小 adapter，并已用真实进程 smoke 验证 WebSocket gateway 与 delivery consumer gateway 分离时的跨进程在线路由；它证明的是最小分布式在线唤醒链路，不等同于完整生产多实例能力。生产化前仍需补跨实例 resume、Redis HA 和正式指标。
+第一阶段可以只对当前 gateway 进程内在线 session 通知。当前已接入 Redis route 最小 adapter，并已用真实进程 smoke 验证 WebSocket gateway 与 delivery consumer gateway 分离时的跨进程在线路由；它证明的是最小分布式在线唤醒链路，不等同于完整生产多实例能力。生产化前仍需补 cross-instance resume 真实进程 smoke、Redis HA 和正式指标。
+当前 Redis-backed resume buffer 已有最小代码和单元测试覆盖，证明不同 gateway 可以通过同一 Redis token buffer replay `delivery.notify`；但尚未跑真实进程 cross-instance resume smoke，因此不能宣称生产级跨实例恢复完成。
 
 Redis route debug metrics 已提供第一版跨实例在线路由计数：
 
@@ -374,6 +381,11 @@ Redis route debug metrics 已提供第一版跨实例在线路由计数：
 | `redis_route_subscriber_message_count` | 当前 gateway 从自身 Pub/Sub channel 收到的远端通知数 |
 | `redis_route_subscriber_enqueued_count` | 远端通知进入当前 gateway 本机 session registry 的数量 |
 | `redis_route_subscriber_malformed_count` | Pub/Sub 收到 malformed payload 并跳过的次数 |
+| `redis_resume_append_count` | 当前 gateway 写入 Redis-backed resume buffer 的 delivery.notify frame 数 |
+| `redis_resume_append_error_count` | 写入 Redis-backed resume buffer 失败次数；失败只降级 resume，不改变 durable inbox |
+| `redis_resume_replay_count` | 从 Redis-backed resume buffer replay 的 delivery.notify frame 数 |
+| `redis_resume_miss_count` | 未知 token、buffer gap 或 replay queue 满导致的 buffer miss 次数 |
+| `redis_resume_permission_denied_count` | 已知 token 与当前 tenant/user/device 不匹配的拒绝次数 |
 
 这些指标只解释 online wakeup 路径，不是 durable delivery 成功率。可靠事实仍以 `delivery-service` 的 `user_inbox`、`device_delivery_cursors` 和 `delivery_outbox` 为准。
 

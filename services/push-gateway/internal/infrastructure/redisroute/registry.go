@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/qsyy0921/IM/services/push-gateway/internal/domain"
 	"github.com/qsyy0921/IM/services/push-gateway/internal/types"
 	"github.com/redis/go-redis/v9"
 )
@@ -25,6 +26,7 @@ type Config struct {
 	GatewayID string
 	KeyPrefix string
 	RouteTTL  time.Duration
+	ResumeTTL time.Duration
 }
 
 type Registry struct {
@@ -52,6 +54,11 @@ type Metrics struct {
 	RedisRouteSubscriberMalformedCount uint64 `json:"redis_route_subscriber_malformed_count,omitempty"`
 	RedisRouteSubscriberEnqueuedCount  uint64 `json:"redis_route_subscriber_enqueued_count,omitempty"`
 	RedisRouteSubscriberErrorCount     uint64 `json:"redis_route_subscriber_error_count,omitempty"`
+	RedisResumeReplayCount             uint64 `json:"redis_resume_replay_count"`
+	RedisResumeMissCount               uint64 `json:"redis_resume_miss_count"`
+	RedisResumeAppendCount             uint64 `json:"redis_resume_append_count"`
+	RedisResumeAppendErrorCount        uint64 `json:"redis_resume_append_error_count"`
+	RedisResumePermissionDeniedCount   uint64 `json:"redis_resume_permission_denied_count"`
 }
 
 type registryMetrics struct {
@@ -64,6 +71,11 @@ type registryMetrics struct {
 	remoteEnqueuedSessions  atomic.Uint64
 	staleRemovedCount       atomic.Uint64
 	cleanupErrorCount       atomic.Uint64
+	resumeReplayCount       atomic.Uint64
+	resumeMissCount         atomic.Uint64
+	resumeAppendCount       atomic.Uint64
+	resumeAppendErrorCount  atomic.Uint64
+	resumePermissionDenied  atomic.Uint64
 }
 
 type routeState struct {
@@ -72,11 +84,23 @@ type routeState struct {
 }
 
 type routeEntry struct {
-	TenantID  string `json:"tenant_id"`
-	UserID    string `json:"user_id"`
-	DeviceID  string `json:"device_id"`
-	SessionID string `json:"session_id"`
-	GatewayID string `json:"gateway_id"`
+	TenantID    string `json:"tenant_id"`
+	UserID      string `json:"user_id"`
+	DeviceID    string `json:"device_id"`
+	SessionID   string `json:"session_id"`
+	GatewayID   string `json:"gateway_id"`
+	ResumeToken string `json:"resume_token,omitempty"`
+}
+
+type resumeMeta struct {
+	TenantID string `json:"tenant_id"`
+	UserID   string `json:"user_id"`
+	DeviceID string `json:"device_id"`
+}
+
+type redisResumeState struct {
+	meta   resumeMeta
+	frames []types.ServerFrame
 }
 
 func NewRegistry(local LocalRegistry, client redis.UniversalClient, config Config) *Registry {
@@ -85,6 +109,9 @@ func NewRegistry(local LocalRegistry, client redis.UniversalClient, config Confi
 	}
 	if config.RouteTTL <= 0 {
 		config.RouteTTL = 90 * time.Second
+	}
+	if config.ResumeTTL <= 0 {
+		config.ResumeTTL = types.DefaultResumeBufferTTL
 	}
 	return &Registry{
 		local:  local,
@@ -101,16 +128,41 @@ func (registry *Registry) Register(
 	if registry.config.GatewayID == "" {
 		return types.SessionRegistrationResult{}, types.NewInvalidFrame("gateway id is required")
 	}
+	redisResume, knownRedisToken, err := registry.loadRedisResume(ctx, registration.ResumeToken)
+	if err != nil {
+		registry.metrics.registerErrorCount.Add(1)
+		return types.SessionRegistrationResult{}, err
+	}
+	replayFromRedis := knownRedisToken
+	if knownRedisToken {
+		if !sameDevice(redisResume.meta, registration.AuthContext) {
+			registry.metrics.resumePermissionDenied.Add(1)
+			return types.SessionRegistrationResult{}, types.ErrPermissionDenied
+		}
+		registration.ResumeRequested = false
+	} else if registration.ResumeRequested {
+		registry.metrics.resumeMissCount.Add(1)
+	}
+
 	result, err := registry.local.Register(ctx, registration)
 	if err != nil {
 		return types.SessionRegistrationResult{}, err
 	}
+	if result.ResumeToken == "" {
+		result.ResumeToken = registration.ResumeToken
+	}
+	if err := registry.writeResumeMeta(ctx, result.ResumeToken, registration.AuthContext); err != nil {
+		registry.local.Unregister(registration.SessionID)
+		registry.metrics.registerErrorCount.Add(1)
+		return types.SessionRegistrationResult{}, err
+	}
 	entry := routeEntry{
-		TenantID:  registration.AuthContext.TenantID,
-		UserID:    registration.AuthContext.UserID,
-		DeviceID:  registration.AuthContext.DeviceID,
-		SessionID: registration.SessionID,
-		GatewayID: registry.config.GatewayID,
+		TenantID:    registration.AuthContext.TenantID,
+		UserID:      registration.AuthContext.UserID,
+		DeviceID:    registration.AuthContext.DeviceID,
+		SessionID:   registration.SessionID,
+		GatewayID:   registry.config.GatewayID,
+		ResumeToken: result.ResumeToken,
 	}
 	if err := registry.writeRoute(ctx, entry); err != nil {
 		registry.local.Unregister(registration.SessionID)
@@ -122,6 +174,10 @@ func (registry *Registry) Register(
 	registry.routes[registration.SessionID] = routeState{entry: entry, cancel: cancel}
 	registry.mu.Unlock()
 	go registry.renewRouteLoop(renewCtx, entry)
+	if replayFromRedis && registry.replayRedisResume(registration, redisResume.frames) {
+		registry.enqueueResumeHint(registration.Outbound)
+		registry.metrics.resumeMissCount.Add(1)
+	}
 	return result, nil
 }
 
@@ -210,6 +266,11 @@ func (registry *Registry) EnqueueNotification(
 		if route.GatewayID == "" || route.SessionID == "" {
 			continue
 		}
+		if route.ResumeToken != "" {
+			if err := registry.appendRedisResume(ctx, route.ResumeToken, domain.DeliveryNotify(notification)); err != nil {
+				registry.metrics.resumeAppendErrorCount.Add(1)
+			}
+		}
 		if route.GatewayID == registry.config.GatewayID {
 			continue
 		}
@@ -251,6 +312,11 @@ func (registry *Registry) Metrics() Metrics {
 		RedisRouteRemoteEnqueuedSessions:  registry.metrics.remoteEnqueuedSessions.Load(),
 		RedisRouteStaleRemovedCount:       registry.metrics.staleRemovedCount.Load(),
 		RedisRouteCleanupErrorCount:       registry.metrics.cleanupErrorCount.Load(),
+		RedisResumeReplayCount:            registry.metrics.resumeReplayCount.Load(),
+		RedisResumeMissCount:              registry.metrics.resumeMissCount.Load(),
+		RedisResumeAppendCount:            registry.metrics.resumeAppendCount.Load(),
+		RedisResumeAppendErrorCount:       registry.metrics.resumeAppendErrorCount.Load(),
+		RedisResumePermissionDeniedCount:  registry.metrics.resumePermissionDenied.Load(),
 	}
 }
 
@@ -286,6 +352,13 @@ func (registry *Registry) renewRouteLoop(ctx context.Context, entry routeEntry) 
 		case <-ticker.C:
 			refreshCtx, cancel := context.WithTimeout(ctx, time.Second)
 			if err := registry.writeRoute(refreshCtx, entry); err != nil {
+				registry.metrics.renewErrorCount.Add(1)
+			}
+			if err := registry.writeResumeMeta(refreshCtx, entry.ResumeToken, types.AuthContext{
+				TenantID: entry.TenantID,
+				UserID:   entry.UserID,
+				DeviceID: entry.DeviceID,
+			}); err != nil {
 				registry.metrics.renewErrorCount.Add(1)
 			}
 			cancel()
@@ -393,6 +466,147 @@ func (registry *Registry) userKey(tenantID string, userID string) string {
 
 func (registry *Registry) gatewayChannel(gatewayID string) string {
 	return GatewayChannel(registry.config.KeyPrefix, gatewayID)
+}
+
+func (registry *Registry) writeResumeMeta(ctx context.Context, token string, auth types.AuthContext) error {
+	if token == "" {
+		return nil
+	}
+	payload, err := json.Marshal(resumeMeta{
+		TenantID: auth.TenantID,
+		UserID:   auth.UserID,
+		DeviceID: auth.DeviceID,
+	})
+	if err != nil {
+		return err
+	}
+	pipe := registry.client.TxPipeline()
+	pipe.Set(ctx, registry.resumeMetaKey(token), payload, registry.config.ResumeTTL)
+	pipe.Expire(ctx, registry.resumeFramesKey(token), registry.config.ResumeTTL)
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
+func (registry *Registry) loadRedisResume(ctx context.Context, token string) (redisResumeState, bool, error) {
+	if token == "" {
+		return redisResumeState{}, false, nil
+	}
+	rawMeta, err := registry.client.Get(ctx, registry.resumeMetaKey(token)).Result()
+	if errors.Is(err, redis.Nil) {
+		return redisResumeState{}, false, nil
+	}
+	if err != nil {
+		return redisResumeState{}, false, err
+	}
+	var meta resumeMeta
+	if err := json.Unmarshal([]byte(rawMeta), &meta); err != nil {
+		return redisResumeState{}, false, nil
+	}
+	rawFrames, err := registry.client.LRange(ctx, registry.resumeFramesKey(token), 0, -1).Result()
+	if err != nil {
+		return redisResumeState{}, false, err
+	}
+	frames := make([]types.ServerFrame, 0, len(rawFrames))
+	for _, rawFrame := range rawFrames {
+		var frame types.ServerFrame
+		if err := json.Unmarshal([]byte(rawFrame), &frame); err != nil {
+			return redisResumeState{meta: meta}, true, nil
+		}
+		if frame.Op == types.OpDeliveryNotify {
+			frames = append(frames, frame)
+		}
+	}
+	return redisResumeState{meta: meta, frames: frames}, true, nil
+}
+
+func (registry *Registry) appendRedisResume(ctx context.Context, token string, frame types.ServerFrame) error {
+	if token == "" || frame.Op != types.OpDeliveryNotify {
+		return nil
+	}
+	payload, err := json.Marshal(frame)
+	if err != nil {
+		return err
+	}
+	pipe := registry.client.TxPipeline()
+	pipe.RPush(ctx, registry.resumeFramesKey(token), payload)
+	pipe.LTrim(ctx, registry.resumeFramesKey(token), int64(-types.DefaultResumeBufferSize), -1)
+	pipe.Expire(ctx, registry.resumeMetaKey(token), registry.config.ResumeTTL)
+	pipe.Expire(ctx, registry.resumeFramesKey(token), registry.config.ResumeTTL)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return err
+	}
+	registry.metrics.resumeAppendCount.Add(1)
+	return nil
+}
+
+func (registry *Registry) replayRedisResume(
+	registration types.SessionRegistration,
+	frames []types.ServerFrame,
+) bool {
+	if len(frames) == 0 {
+		return false
+	}
+	lastReceived := make(map[string]int64, len(registration.LastReceived))
+	for _, cursor := range registration.LastReceived {
+		if cursor.ConversationID == "" {
+			continue
+		}
+		if cursor.Seq > lastReceived[cursor.ConversationID] {
+			lastReceived[cursor.ConversationID] = cursor.Seq
+		}
+	}
+	oldestByConversation := make(map[string]int64)
+	for _, frame := range frames {
+		if frame.Op != types.OpDeliveryNotify || frame.ConversationID == "" {
+			continue
+		}
+		if oldestByConversation[frame.ConversationID] == 0 ||
+			frame.ConversationSeq < oldestByConversation[frame.ConversationID] {
+			oldestByConversation[frame.ConversationID] = frame.ConversationSeq
+		}
+	}
+	for conversationID, seq := range lastReceived {
+		oldest := oldestByConversation[conversationID]
+		if oldest > 0 && seq+1 < oldest {
+			return true
+		}
+	}
+	for _, frame := range frames {
+		if frame.Op != types.OpDeliveryNotify {
+			continue
+		}
+		if frame.ConversationID != "" && frame.ConversationSeq <= lastReceived[frame.ConversationID] {
+			continue
+		}
+		select {
+		case registration.Outbound <- frame:
+			registry.metrics.resumeReplayCount.Add(1)
+		default:
+			return true
+		}
+	}
+	return false
+}
+
+func (registry *Registry) enqueueResumeHint(outbound chan<- types.ServerFrame) {
+	select {
+	case outbound <- domain.ResumeHint("buffer_miss", nil):
+	default:
+	}
+}
+
+func sameDevice(left resumeMeta, right types.AuthContext) bool {
+	return left.TenantID == right.TenantID &&
+		left.UserID == right.UserID &&
+		left.DeviceID == right.DeviceID
+}
+
+func (registry *Registry) resumeMetaKey(token string) string {
+	return strings.Join([]string{registry.config.KeyPrefix, "resume", "token", token, "meta"}, ":")
+}
+
+func (registry *Registry) resumeFramesKey(token string) string {
+	return strings.Join([]string{registry.config.KeyPrefix, "resume", "token", token, "frames"}, ":")
 }
 
 func GatewayChannel(keyPrefix string, gatewayID string) string {

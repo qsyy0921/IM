@@ -75,6 +75,7 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 			GatewayID: gatewayID,
 			KeyPrefix: envString("NEXUSIM_PUSH_REDIS_KEY_PREFIX", "nexusim:push"),
 			RouteTTL:  envDuration("NEXUSIM_PUSH_ROUTE_TTL", 90*time.Second),
+			ResumeTTL: envDuration("NEXUSIM_PUSH_RESUME_BUFFER_TTL", 10*time.Minute),
 		}
 		redisRegistry = redisroute.NewRegistry(localRegistry, redisClient, routeConfig)
 		redisRegistry.StartCleanupLoop(ctx, envDurationAllowZero("NEXUSIM_PUSH_ROUTE_CLEANUP_INTERVAL", 30*time.Second))

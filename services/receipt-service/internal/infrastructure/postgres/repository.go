@@ -515,12 +515,23 @@ SET offset_value = GREATEST(receipt_kafka_checkpoints.offset_value, EXCLUDED.off
 }
 
 func insertReceivedOutbox(ctx context.Context, tx pgx.Tx, command types.ProjectDeliveryEventCommand) error {
+	messageID, sourceEventID, err := receiptEventMessageRef(
+		ctx,
+		tx,
+		command.TenantID,
+		command.UserID,
+		command.ConversationID,
+		command.LastReceivedSeq,
+	)
+	if err != nil {
+		return err
+	}
 	return insertReceiptOutbox(ctx, tx, receiptOutboxInput{
 		EventID:          receivedEventID(command),
 		TenantID:         command.TenantID,
 		ConversationID:   command.ConversationID,
 		AggregateVersion: command.LastReceivedSeq,
-		EventType:        "receipt.message.received.v1",
+		EventType:        types.ReceiptEventMessageReceived,
 		CorrelationID:    command.CorrelationID,
 		CausationID:      command.EventID,
 		TraceID:          command.TraceID,
@@ -528,22 +539,33 @@ func insertReceivedOutbox(ctx context.Context, tx pgx.Tx, command types.ProjectD
 			"tenant_id":        command.TenantID,
 			"conversation_id":  command.ConversationID,
 			"conversation_seq": command.LastReceivedSeq,
-			"message_id":       "",
+			"message_id":       messageID,
 			"user_id":          command.UserID,
 			"device_id":        command.DeviceID,
 			"cursor_seq":       command.LastReceivedSeq,
-			"source_event_id":  command.EventID,
+			"source_event_id":  sourceEventID,
 		},
 	})
 }
 
 func insertReadOutbox(ctx context.Context, tx pgx.Tx, command types.MarkReadCommand, readSeq int64) error {
+	messageID, sourceEventID, err := receiptEventMessageRef(
+		ctx,
+		tx,
+		command.AuthContext.TenantID,
+		command.AuthContext.UserID,
+		command.ConversationID,
+		readSeq,
+	)
+	if err != nil {
+		return err
+	}
 	return insertReceiptOutbox(ctx, tx, receiptOutboxInput{
 		EventID:          readEventID(command, readSeq),
 		TenantID:         command.AuthContext.TenantID,
 		ConversationID:   command.ConversationID,
 		AggregateVersion: readSeq,
-		EventType:        "receipt.message.read.v1",
+		EventType:        types.ReceiptEventMessageRead,
 		CorrelationID:    command.AuthContext.RequestID,
 		CausationID:      command.AuthContext.RequestID,
 		TraceID:          command.AuthContext.TraceID,
@@ -551,13 +573,40 @@ func insertReadOutbox(ctx context.Context, tx pgx.Tx, command types.MarkReadComm
 			"tenant_id":        command.AuthContext.TenantID,
 			"conversation_id":  command.ConversationID,
 			"conversation_seq": readSeq,
-			"message_id":       "",
+			"message_id":       messageID,
 			"user_id":          command.AuthContext.UserID,
 			"device_id":        command.AuthContext.DeviceID,
 			"cursor_seq":       readSeq,
-			"source_event_id":  command.AuthContext.RequestID,
+			"source_event_id":  sourceEventID,
 		},
 	})
+}
+
+func receiptEventMessageRef(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	userID types.UserID,
+	conversationID types.ConversationID,
+	conversationSeq int64,
+) (string, string, error) {
+	var messageID string
+	var sourceEventID string
+	err := tx.QueryRow(ctx, `
+SELECT message_id, source_event_id
+FROM receipt_inbox_projection
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND conversation_id = $3
+  AND conversation_seq = $4
+`, tenantID, userID, conversationID, conversationSeq).Scan(&messageID, &sourceEventID)
+	if err == pgx.ErrNoRows {
+		return "", "", types.NewProjectionLagging("receipt message reference not projected")
+	}
+	if err != nil {
+		return "", "", types.NewDBReadFailed(err.Error())
+	}
+	return messageID, sourceEventID, nil
 }
 
 type receiptOutboxInput struct {

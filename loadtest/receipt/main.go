@@ -19,10 +19,13 @@ import (
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
+	receipteventsv1 "github.com/qsyy0921/IM/schemas/kafka/receipt/v1"
+	kafkago "github.com/segmentio/kafka-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -43,6 +46,9 @@ type config struct {
 	receiverDeviceID   string
 	deliveryGroup      string
 	receiptGroup       string
+	kafkaBrokers       []string
+	receiptEventsTopic string
+	receiptEventsGroup string
 	cleanup            bool
 }
 
@@ -63,6 +69,8 @@ type summary struct {
 	ReceiverDeviceID        string                 `json:"receiver_device_id"`
 	DeliveryConsumerGroup   string                 `json:"delivery_consumer_group,omitempty"`
 	ReceiptConsumerGroup    string                 `json:"receipt_consumer_group,omitempty"`
+	ReceiptEventsTopic      string                 `json:"receipt_events_topic,omitempty"`
+	ReceiptEventsGroup      string                 `json:"receipt_events_group,omitempty"`
 	StartedAt               time.Time              `json:"started_at"`
 	FinishedAt              time.Time              `json:"finished_at"`
 	Success                 bool                   `json:"success"`
@@ -78,6 +86,7 @@ type summary struct {
 	MarkReadTooFar          negativeCallSummary    `json:"mark_read_too_far"`
 	ReceiptProjection       receiptProjectionStats `json:"receipt_projection"`
 	ReceiptOutbox           receiptOutboxStats     `json:"receipt_outbox"`
+	ReceiptKafkaEvents      []receiptKafkaEvent    `json:"receipt_kafka_events"`
 	DeliveryOutbox          outboxStats            `json:"delivery_outbox"`
 	LatenciesMS             map[string]float64     `json:"latencies_ms"`
 }
@@ -165,6 +174,20 @@ type receiptOutboxStats struct {
 	ByEventType map[string]int64 `json:"by_event_type"`
 }
 
+type receiptKafkaEvent struct {
+	EventID          string `json:"event_id"`
+	EventType        string `json:"event_type"`
+	Partition        int    `json:"partition"`
+	Offset           int64  `json:"offset"`
+	AggregateVersion int64  `json:"aggregate_version"`
+	PartitionKey     string `json:"partition_key"`
+	PayloadType      string `json:"payload_type"`
+	MessageID        string `json:"message_id"`
+	UserID           string `json:"user_id"`
+	DeviceID         string `json:"device_id"`
+	CursorSeq        int64  `json:"cursor_seq"`
+}
+
 type outboxStats struct {
 	Total     int64 `json:"total"`
 	Pending   int64 `json:"pending"`
@@ -198,6 +221,10 @@ func parseConfig() config {
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "receipt-device-1", "receiver device id")
 	flag.StringVar(&cfg.deliveryGroup, "delivery-consumer-group", "", "delivery timeline consumer group")
 	flag.StringVar(&cfg.receiptGroup, "receipt-consumer-group", "", "receipt delivery event consumer group")
+	var kafkaBrokers string
+	flag.StringVar(&kafkaBrokers, "kafka-brokers", "localhost:9092", "Kafka brokers for receipt event readback")
+	flag.StringVar(&cfg.receiptEventsTopic, "receipt-events-topic", "im.receipt.events", "receipt events topic")
+	flag.StringVar(&cfg.receiptEventsGroup, "receipt-events-consumer-group", "", "receipt event readback consumer group")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete existing rows for tenant before smoke")
 	flag.Parse()
 	if cfg.requestTimeout <= 0 {
@@ -209,6 +236,7 @@ func parseConfig() config {
 	if cfg.pollInterval <= 0 {
 		cfg.pollInterval = 200 * time.Millisecond
 	}
+	cfg.kafkaBrokers = splitCSV(kafkaBrokers)
 	return cfg
 }
 
@@ -277,6 +305,8 @@ func run(cfg config) error {
 		ReceiverDeviceID:      cfg.receiverDeviceID,
 		DeliveryConsumerGroup: cfg.deliveryGroup,
 		ReceiptConsumerGroup:  cfg.receiptGroup,
+		ReceiptEventsTopic:    cfg.receiptEventsTopic,
+		ReceiptEventsGroup:    cfg.receiptEventsGroup,
 		StartedAt:             time.Now().UTC(),
 		LatenciesMS:           map[string]float64{},
 	}
@@ -408,9 +438,17 @@ func executeSmoke(
 		return fmt.Errorf("mark read too far code=%s message=%s", statusErr.Code(), statusErr.Message())
 	}
 
+	if err := waitReceiptOutboxPublished(ctx, pool, cfg, 2); err != nil {
+		return err
+	}
 	if err := fillPostgresStats(ctx, pool, cfg, result); err != nil {
 		return err
 	}
+	events, err := readReceiptEvents(ctx, cfg, result.ReceiptOutbox.ByEventType)
+	if err != nil {
+		return err
+	}
+	result.ReceiptKafkaEvents = events
 	return nil
 }
 
@@ -684,6 +722,35 @@ WHERE tenant_id = $1
 	return errors.New("receipt received projection timeout")
 }
 
+func waitReceiptOutboxPublished(ctx context.Context, pool *pgxpool.Pool, cfg config, wantPublished int64) error {
+	deadline := time.Now().Add(cfg.waitTimeout)
+	for time.Now().Before(deadline) {
+		var total int64
+		var published int64
+		var dlq int64
+		err := pool.QueryRow(ctx, `
+SELECT
+    COUNT(*),
+    COUNT(*) FILTER (WHERE status = 'PUBLISHED'),
+    COUNT(*) FILTER (WHERE status = 'DLQ')
+FROM receipt_outbox
+WHERE tenant_id = $1
+  AND conversation_id = $2
+`, cfg.tenantID, cfg.conversationID).Scan(&total, &published, &dlq)
+		if err != nil {
+			return fmt.Errorf("query receipt outbox publish state: %w", err)
+		}
+		if dlq > 0 {
+			return fmt.Errorf("receipt outbox reached DLQ: dlq=%d", dlq)
+		}
+		if total >= wantPublished && published >= wantPublished {
+			return nil
+		}
+		time.Sleep(cfg.pollInterval)
+	}
+	return fmt.Errorf("receipt outbox publish timeout: want_published=%d", wantPublished)
+}
+
 func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
 	statements := []string{
 		`DELETE FROM receipt_outbox WHERE tenant_id = $1`,
@@ -883,6 +950,86 @@ WHERE tenant_id = $1 AND conversation_id = $2
 	return nil
 }
 
+func readReceiptEvents(ctx context.Context, cfg config, wantByType map[string]int64) ([]receiptKafkaEvent, error) {
+	wantTotal := 0
+	for _, count := range wantByType {
+		wantTotal += int(count)
+	}
+	if wantTotal == 0 {
+		return nil, nil
+	}
+	if cfg.receiptEventsTopic == "" || len(cfg.kafkaBrokers) == 0 || cfg.receiptEventsGroup == "" {
+		return nil, errors.New("receipt event readback requires kafka brokers, topic, and consumer group")
+	}
+	reader := kafkago.NewReader(kafkago.ReaderConfig{
+		Brokers: cfg.kafkaBrokers,
+		Topic:   cfg.receiptEventsTopic,
+		GroupID: cfg.receiptEventsGroup,
+	})
+	defer reader.Close()
+
+	deadline := time.Now().Add(cfg.waitTimeout)
+	events := make([]receiptKafkaEvent, 0, wantTotal)
+	seen := map[string]struct{}{}
+	for len(events) < wantTotal && time.Now().Before(deadline) {
+		readCtx, cancel := context.WithTimeout(ctx, cfg.pollInterval)
+		message, err := reader.ReadMessage(readCtx)
+		cancel()
+		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+				continue
+			}
+			return events, fmt.Errorf("read receipt event: %w", err)
+		}
+		var event receipteventsv1.ReceiptEvent
+		if err := proto.Unmarshal(message.Value, &event); err != nil {
+			return events, fmt.Errorf("decode receipt event: %w", err)
+		}
+		if event.TenantId != cfg.tenantID || event.AggregateId != cfg.conversationID {
+			continue
+		}
+		if _, ok := wantByType[event.EventType]; !ok {
+			continue
+		}
+		if _, ok := seen[event.EventId]; ok {
+			continue
+		}
+		seen[event.EventId] = struct{}{}
+		events = append(events, summarizeReceiptKafkaEvent(message, &event))
+	}
+	if len(events) < wantTotal {
+		return events, fmt.Errorf("receipt event readback timeout: got=%d want=%d", len(events), wantTotal)
+	}
+	return events, nil
+}
+
+func summarizeReceiptKafkaEvent(message kafkago.Message, event *receipteventsv1.ReceiptEvent) receiptKafkaEvent {
+	result := receiptKafkaEvent{
+		EventID:          event.EventId,
+		EventType:        event.EventType,
+		Partition:        message.Partition,
+		Offset:           message.Offset,
+		AggregateVersion: event.AggregateVersion,
+		PartitionKey:     event.PartitionKey,
+	}
+	if payload := event.GetMessageReceived(); payload != nil {
+		result.PayloadType = "message_received"
+		result.MessageID = payload.MessageId
+		result.UserID = payload.UserId
+		result.DeviceID = payload.DeviceId
+		result.CursorSeq = payload.CursorSeq
+		return result
+	}
+	if payload := event.GetMessageRead(); payload != nil {
+		result.PayloadType = "message_read"
+		result.MessageID = payload.MessageId
+		result.UserID = payload.UserId
+		result.DeviceID = payload.DeviceId
+		result.CursorSeq = payload.CursorSeq
+	}
+	return result
+}
+
 func writeSummary(cfg config, result summary) error {
 	encoded, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
@@ -943,4 +1090,16 @@ func gitStatusShort() string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+	return result
 }

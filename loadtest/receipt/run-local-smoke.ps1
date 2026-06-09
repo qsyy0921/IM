@@ -17,8 +17,10 @@ $resultDir = Join-Path $ResultRoot $RunName
 $logDir = Join-Path $resultDir "logs"
 $timelineTopic = "conversation.timeline.receipt." + (Get-Date -Format "yyyyMMdd-HHmmss")
 $deliveryTopic = "im.delivery.events"
+$receiptTopic = "im.receipt.events"
 $deliveryConsumerGroup = "nexusim-delivery-receipt-smoke-" + (Get-Date -Format "yyyyMMddHHmmss")
 $receiptConsumerGroup = "nexusim-receipt-smoke-" + (Get-Date -Format "yyyyMMddHHmmss")
+$receiptEventsConsumerGroup = "nexusim-receipt-events-smoke-" + (Get-Date -Format "yyyyMMddHHmmss")
 
 New-Item -ItemType Directory -Force $resultDir | Out-Null
 New-Item -ItemType Directory -Force $logDir | Out-Null
@@ -133,8 +135,10 @@ try {
 
     Ensure-KafkaTopic -Topic $timelineTopic
     Ensure-KafkaTopic -Topic $deliveryTopic
+    Ensure-KafkaTopic -Topic $receiptTopic
     Reset-ConsumerGroupToLatest -Group $deliveryConsumerGroup -Topic $timelineTopic
     Reset-ConsumerGroupToLatest -Group $receiptConsumerGroup -Topic $deliveryTopic
+    Reset-ConsumerGroupToLatest -Group $receiptEventsConsumerGroup -Topic $receiptTopic
 
     $conversationService = Join-Path $repo "bin\conversation-service.exe"
     $messageService = Join-Path $repo "bin\message-service.exe"
@@ -188,6 +192,14 @@ try {
         NEXUSIM_RECEIPT_CONSUMER_GROUP = $receiptConsumerGroup
     }
 
+    $processes += Start-NexusProcess -Name "receipt-outbox-relay" -FilePath $receiptService -Env @{
+        NEXUSIM_RECEIPT_SERVICE_MODE = "outbox-relay"
+        NEXUSIM_PG_DSN = $PgDsn
+        NEXUSIM_KAFKA_BROKERS = $KafkaBrokers
+        NEXUSIM_RECEIPT_EVENTS_TOPIC = $receiptTopic
+        NEXUSIM_RECEIPT_OUTBOX_POLL_INTERVAL = "200ms"
+    }
+
     $processes += Start-NexusProcess -Name "receipt-grpc" -FilePath $receiptService -Port 11699 -Env @{
         NEXUSIM_RECEIPT_SERVICE_MODE = "grpc"
         NEXUSIM_RECEIPT_GRPC_ADDR = "127.0.0.1:11699"
@@ -217,6 +229,9 @@ try {
         --receiver-device-id "receipt-device-1" `
         --delivery-consumer-group $deliveryConsumerGroup `
         --receipt-consumer-group $receiptConsumerGroup `
+        --kafka-brokers $KafkaBrokers `
+        --receipt-events-topic $receiptTopic `
+        --receipt-events-consumer-group $receiptEventsConsumerGroup `
         --wait-timeout "30s" `
         --request-timeout "5s"
     if ($LASTEXITCODE -ne 0) {
@@ -233,5 +248,7 @@ try {
 Write-Host "result_dir=$resultDir"
 Write-Host "timeline_topic=$timelineTopic"
 Write-Host "delivery_topic=$deliveryTopic"
+Write-Host "receipt_topic=$receiptTopic"
 Write-Host "delivery_consumer_group=$deliveryConsumerGroup"
 Write-Host "receipt_consumer_group=$receiptConsumerGroup"
+Write-Host "receipt_events_consumer_group=$receiptEventsConsumerGroup"

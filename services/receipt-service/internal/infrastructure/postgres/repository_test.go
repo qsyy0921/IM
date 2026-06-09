@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -49,6 +50,8 @@ func TestRepositoryProjectDeliveryEventAndMarkReadIntegration(t *testing.T) {
 	}
 	assertReceiptOutboxCount(t, ctx, pool, "receipt.message.received.v1", 1)
 	assertReceiptOutboxCount(t, ctx, pool, "receipt.message.read.v1", 1)
+	assertReceiptOutboxPayload(t, ctx, pool, "receipt.message.received.v1", "message-1", "timeline-event-1", "device-1", 1)
+	assertReceiptOutboxPayload(t, ctx, pool, "receipt.message.read.v1", "message-1", "timeline-event-1", "device-1", 1)
 
 	result, err = repository.MarkRead(ctx, markReadCommand(1))
 	if err != nil {
@@ -102,6 +105,7 @@ func TestRepositoryProjectsAckBeforeInboxIntegration(t *testing.T) {
 		t.Fatalf("expected inbox projected as already received, got %d", state.ReceivedUserCount)
 	}
 	assertReceiptOutboxCount(t, ctx, pool, "receipt.message.received.v1", 1)
+	assertReceiptOutboxPayload(t, ctx, pool, "receipt.message.received.v1", "message-1", "timeline-event-1", "device-1", 1)
 }
 
 func inboxCreatedCommand(seq int64, eventID string) types.ProjectDeliveryEventCommand {
@@ -182,6 +186,46 @@ WHERE tenant_id = 'tenant-receipt'
 	}
 	if got != want {
 		t.Fatalf("expected %d outbox rows for %s, got %d", want, eventType, got)
+	}
+}
+
+func assertReceiptOutboxPayload(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	eventType string,
+	wantMessageID string,
+	wantSourceEventID string,
+	wantDeviceID string,
+	wantCursorSeq int64,
+) {
+	t.Helper()
+	var raw []byte
+	err := pool.QueryRow(ctx, `
+SELECT payload_json
+FROM receipt_outbox
+WHERE tenant_id = 'tenant-receipt'
+  AND event_type = $1
+ORDER BY id DESC
+LIMIT 1
+`, eventType).Scan(&raw)
+	if err != nil {
+		t.Fatalf("query receipt outbox payload: %v", err)
+	}
+	var payload struct {
+		MessageID     string `json:"message_id"`
+		SourceEventID string `json:"source_event_id"`
+		DeviceID      string `json:"device_id"`
+		CursorSeq     int64  `json:"cursor_seq"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		t.Fatalf("decode receipt outbox payload: %v", err)
+	}
+	if payload.MessageID != wantMessageID ||
+		payload.SourceEventID != wantSourceEventID ||
+		payload.DeviceID != wantDeviceID ||
+		payload.CursorSeq != wantCursorSeq {
+		t.Fatalf("unexpected payload: %+v", payload)
 	}
 }
 

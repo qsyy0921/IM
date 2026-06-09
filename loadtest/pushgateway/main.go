@@ -74,6 +74,7 @@ type config struct {
 	ownerUserID        string
 	receiverUserID     string
 	receiverDeviceID   string
+	receiverDeviceIDs  []string
 	cleanup            bool
 }
 
@@ -91,6 +92,7 @@ type summary struct {
 	OwnerUserID             string             `json:"owner_user_id"`
 	ReceiverUserID          string             `json:"receiver_user_id"`
 	ReceiverDeviceID        string             `json:"receiver_device_id"`
+	ReceiverDeviceIDs       []string           `json:"receiver_device_ids,omitempty"`
 	StartedAt               time.Time          `json:"started_at"`
 	FinishedAt              time.Time          `json:"finished_at"`
 	Success                 bool               `json:"success"`
@@ -99,6 +101,7 @@ type summary struct {
 	MemberJoin              memberJoinSummary  `json:"member_join"`
 	SendMessage             sendSummary        `json:"send_message"`
 	DeliveryNotify          frameSnapshot      `json:"delivery_notify"`
+	DeviceNotifications     []deviceSummary    `json:"device_notifications,omitempty"`
 	PullInbox               pullSummary        `json:"pull_inbox"`
 	DeliveryAckOK           frameSnapshot      `json:"delivery_ack_ok"`
 	CursorLastReceivedSeq   *int64             `json:"cursor_last_received_seq,omitempty"`
@@ -108,6 +111,14 @@ type summary struct {
 	DeliveryOutboxPublished *int64             `json:"delivery_outbox_published,omitempty"`
 	DeliveryOutboxDLQ       *int64             `json:"delivery_outbox_dlq,omitempty"`
 	Latencies               map[string]float64 `json:"latencies_ms"`
+}
+
+type deviceSummary struct {
+	DeviceID              string        `json:"device_id"`
+	ServerHello           frameSnapshot `json:"server_hello"`
+	DeliveryNotify        frameSnapshot `json:"delivery_notify"`
+	DeliveryAckOK         frameSnapshot `json:"delivery_ack_ok"`
+	CursorLastReceivedSeq *int64        `json:"cursor_last_received_seq,omitempty"`
 }
 
 type frameSnapshot struct {
@@ -177,8 +188,12 @@ func parseConfig() config {
 	flag.StringVar(&cfg.ownerUserID, "owner-user-id", "owner-1", "owner/sender user id")
 	flag.StringVar(&cfg.receiverUserID, "receiver-user-id", "push-user-1", "online receiver user id")
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "push-device-1", "online receiver device id")
+	var receiverDeviceIDs string
+	flag.StringVar(&receiverDeviceIDs, "receiver-device-ids", "", "comma separated online receiver device ids; overrides receiver-device-id when set")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete existing rows for tenant before running")
 	flag.Parse()
+	cfg.receiverDeviceIDs = parseDeviceIDs(receiverDeviceIDs, cfg.receiverDeviceID)
+	cfg.receiverDeviceID = cfg.receiverDeviceIDs[0]
 	return cfg
 }
 
@@ -239,16 +254,27 @@ func run(cfg config) error {
 		OwnerUserID:        cfg.ownerUserID,
 		ReceiverUserID:     cfg.receiverUserID,
 		ReceiverDeviceID:   cfg.receiverDeviceID,
+		ReceiverDeviceIDs:  cfg.receiverDeviceIDs,
 		StartedAt:          time.Now().UTC(),
 		Latencies:          map[string]float64{},
 	}
 
-	conn, hello, err := connectWebSocket(ctx, cfg)
-	if err != nil {
-		return finish(cfg, &result, fmt.Errorf("connect websocket: %w", err))
+	type onlineDevice struct {
+		deviceID string
+		conn     *nhooyr.Conn
 	}
-	defer conn.Close(nhooyr.StatusNormalClosure, "")
-	result.ServerHello = snapshotFrame(hello)
+	devices := make([]onlineDevice, 0, len(cfg.receiverDeviceIDs))
+	for _, deviceID := range cfg.receiverDeviceIDs {
+		conn, hello, err := connectWebSocket(ctx, cfg, deviceID)
+		if err != nil {
+			return finish(cfg, &result, fmt.Errorf("connect websocket %s: %w", deviceID, err))
+		}
+		defer conn.Close(nhooyr.StatusNormalClosure, "")
+		devices = append(devices, onlineDevice{deviceID: deviceID, conn: conn})
+		deviceResult := deviceSummary{DeviceID: deviceID, ServerHello: snapshotFrame(hello)}
+		result.DeviceNotifications = append(result.DeviceNotifications, deviceResult)
+	}
+	result.ServerHello = result.DeviceNotifications[0].ServerHello
 
 	begin := time.Now()
 	join, err := createReceiverJoin(ctx, cfg, conversationClient)
@@ -274,35 +300,46 @@ func run(cfg config) error {
 	}
 	result.SendMessage = sendSummary{MessageID: send.GetMessageId(), ConversationSeq: send.GetConversationSeq()}
 
-	notify, err := waitNotify(ctx, cfg, conn)
-	if err != nil {
-		return finish(cfg, &result, fmt.Errorf("wait notify: %w", err))
+	for i, device := range devices {
+		notify, err := waitNotify(ctx, cfg, device.conn)
+		if err != nil {
+			return finish(cfg, &result, fmt.Errorf("wait notify %s: %w", device.deviceID, err))
+		}
+		result.DeviceNotifications[i].DeliveryNotify = snapshotFrame(notify)
+		if notify.ConversationSeq != send.GetConversationSeq() || notify.MessageID != send.GetMessageId() {
+			return finish(cfg, &result, fmt.Errorf("notify mismatch for %s: notify=%+v send=%+v", device.deviceID, notify, send))
+		}
 	}
-	result.DeliveryNotify = snapshotFrame(notify)
-	if notify.ConversationSeq != send.GetConversationSeq() || notify.MessageID != send.GetMessageId() {
-		return finish(cfg, &result, fmt.Errorf("notify mismatch: notify=%+v send=%+v", notify, send))
-	}
+	result.DeliveryNotify = result.DeviceNotifications[0].DeliveryNotify
 
 	pull, err := pullInbox(ctx, cfg, deliveryClient)
 	if err != nil {
 		return finish(cfg, &result, fmt.Errorf("pull inbox: %w", err))
 	}
 	result.PullInbox = pull
-	if pull.ItemCount == 0 || pull.MaxSeq < notify.ConversationSeq {
+	if pull.ItemCount == 0 || pull.MaxSeq < send.GetConversationSeq() {
 		return finish(cfg, &result, fmt.Errorf("pull inbox did not include notify seq: %+v", pull))
 	}
 
-	ackOK, err := ackViaWebSocket(ctx, cfg, conn, notify.ConversationSeq)
-	if err != nil {
-		return finish(cfg, &result, fmt.Errorf("websocket ack: %w", err))
+	for i, device := range devices {
+		ackOK, err := ackViaWebSocket(ctx, cfg, device.conn, send.GetConversationSeq())
+		if err != nil {
+			return finish(cfg, &result, fmt.Errorf("websocket ack %s: %w", device.deviceID, err))
+		}
+		result.DeviceNotifications[i].DeliveryAckOK = snapshotFrame(ackOK)
+		if ackOK.LastReceivedSeq != send.GetConversationSeq() {
+			return finish(cfg, &result, fmt.Errorf("ack seq mismatch for %s: %+v", device.deviceID, ackOK))
+		}
+		if err := waitCursor(ctx, pool, cfg, device.deviceID, send.GetConversationSeq()); err != nil {
+			return finish(cfg, &result, err)
+		}
+		cursor, err := queryCursor(ctx, pool, cfg, device.deviceID)
+		if err != nil {
+			return finish(cfg, &result, err)
+		}
+		result.DeviceNotifications[i].CursorLastReceivedSeq = &cursor
 	}
-	result.DeliveryAckOK = snapshotFrame(ackOK)
-	if ackOK.LastReceivedSeq != notify.ConversationSeq {
-		return finish(cfg, &result, fmt.Errorf("ack seq mismatch: %+v", ackOK))
-	}
-	if err := waitCursor(ctx, pool, cfg, notify.ConversationSeq); err != nil {
-		return finish(cfg, &result, err)
-	}
+	result.DeliveryAckOK = result.DeviceNotifications[0].DeliveryAckOK
 	if err := waitDeliveryOutboxDrain(ctx, pool, cfg); err != nil {
 		return finish(cfg, &result, err)
 	}
@@ -313,7 +350,7 @@ func run(cfg config) error {
 	return finish(cfg, &result, nil)
 }
 
-func connectWebSocket(ctx context.Context, cfg config) (*nhooyr.Conn, serverFrame, error) {
+func connectWebSocket(ctx context.Context, cfg config, deviceID string) (*nhooyr.Conn, serverFrame, error) {
 	u, err := url.Parse(cfg.pushURL)
 	if err != nil {
 		return nil, serverFrame{}, err
@@ -321,7 +358,7 @@ func connectWebSocket(ctx context.Context, cfg config) (*nhooyr.Conn, serverFram
 	query := u.Query()
 	query.Set("tenant_id", cfg.tenantID)
 	query.Set("user_id", cfg.receiverUserID)
-	query.Set("device_id", cfg.receiverDeviceID)
+	query.Set("device_id", deviceID)
 	u.RawQuery = query.Encode()
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
@@ -331,8 +368,8 @@ func connectWebSocket(ctx context.Context, cfg config) (*nhooyr.Conn, serverFram
 	}
 	if err := wsjson.Write(requestCtx, conn, clientFrame{
 		Op:        opClientHello,
-		RequestID: "push-smoke-hello",
-		DeviceID:  cfg.receiverDeviceID,
+		RequestID: "push-smoke-hello-" + deviceID,
+		DeviceID:  deviceID,
 	}); err != nil {
 		conn.CloseNow()
 		return nil, serverFrame{}, err
@@ -518,24 +555,29 @@ WHERE tenant_id = $1
 	return errors.New("delivery membership projection timeout")
 }
 
-func waitCursor(ctx context.Context, pool *pgxpool.Pool, cfg config, seq int64) error {
+func waitCursor(ctx context.Context, pool *pgxpool.Pool, cfg config, deviceID string, seq int64) error {
 	deadline := time.Now().Add(cfg.waitTimeout)
 	for time.Now().Before(deadline) {
-		var current int64
-		err := pool.QueryRow(ctx, `
-SELECT COALESCE(MAX(last_received_seq), 0)
-FROM device_delivery_cursors
-WHERE tenant_id = $1
-  AND conversation_id = $2
-  AND user_id = $3
-  AND device_id = $4
-`, cfg.tenantID, cfg.conversationID, cfg.receiverUserID, cfg.receiverDeviceID).Scan(&current)
+		current, err := queryCursor(ctx, pool, cfg, deviceID)
 		if err == nil && current >= seq {
 			return nil
 		}
 		time.Sleep(cfg.pollInterval)
 	}
 	return errors.New("delivery cursor timeout")
+}
+
+func queryCursor(ctx context.Context, pool *pgxpool.Pool, cfg config, deviceID string) (int64, error) {
+	var current int64
+	err := pool.QueryRow(ctx, `
+SELECT COALESCE(MAX(last_received_seq), 0)
+FROM device_delivery_cursors
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND user_id = $3
+  AND device_id = $4
+`, cfg.tenantID, cfg.conversationID, cfg.receiverUserID, deviceID).Scan(&current)
+	return current, err
 }
 
 func waitDeliveryOutboxDrain(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
@@ -652,6 +694,29 @@ WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'DLQ'
 		return fmt.Errorf("query delivery outbox dlq: %w", err)
 	}
 	return nil
+}
+
+func parseDeviceIDs(list string, fallback string) []string {
+	if strings.TrimSpace(list) == "" {
+		return []string{fallback}
+	}
+	seen := map[string]struct{}{}
+	result := make([]string, 0)
+	for _, raw := range strings.Split(list, ",") {
+		deviceID := strings.TrimSpace(raw)
+		if deviceID == "" {
+			continue
+		}
+		if _, ok := seen[deviceID]; ok {
+			continue
+		}
+		seen[deviceID] = struct{}{}
+		result = append(result, deviceID)
+	}
+	if len(result) == 0 {
+		return []string{fallback}
+	}
+	return result
 }
 
 func finish(cfg config, result *summary, runErr error) error {

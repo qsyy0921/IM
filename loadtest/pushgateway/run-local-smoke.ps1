@@ -3,6 +3,7 @@ param(
     [string]$KafkaBrokers = "localhost:9092",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
+    [string]$ReceiverDeviceIds = "push-device-1",
     [switch]$SkipBuild
 )
 
@@ -190,6 +191,7 @@ try {
         --owner-user-id "owner-1" `
         --receiver-user-id "push-user-1" `
         --receiver-device-id "push-device-1" `
+        --receiver-device-ids $ReceiverDeviceIds `
         --wait-timeout 20s `
         --request-timeout 3s
     if ($LASTEXITCODE -ne 0) {

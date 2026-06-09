@@ -430,6 +430,17 @@ Outbox / DLQ repair：
 - `REMOVE`：`OWNER` 可以移除 `ADMIN / MEMBER`，不能移除另一个 `OWNER`；`ADMIN` 只能移除普通 `MEMBER`，不能移除 `ADMIN / OWNER`。第一版 `REMOVE` 写入状态为 `LEFT`，表示踢出但后续可再加入；永久封禁后续用 `BANNED` 或独立 ban 流程。
 - `ROLE_CHANGED`：第一版只允许 `OWNER` 在 `ADMIN / MEMBER` 之间调整角色；不允许把任何人改成 `OWNER`，也不允许调整已有 `OWNER`。
 
+Owner transfer v0.1 采用专用流程，不复用 `ROLE_CHANGED`：
+
+- API 使用独立 `TransferConversationOwner` RPC，避免把“双成员角色变更”伪装成单目标 `CreateMemberChange`。
+- 第一版只允许当前 `OWNER` 主动把所有权转给当前 `ACTIVE` 的 `ADMIN / MEMBER`；不允许转给非成员、`LEFT/BANNED` 成员、自己或已有 `OWNER`。
+- 转移成功后，新 owner 变为 `OWNER`，原 owner 保留在会话内并降级为 `ADMIN`。后续如需 “transfer and leave” 或 owner 多人制，必须另写 SDD，不塞进 v0.1。
+- 事务必须在同一个 conversation 本地事务中完成：锁 conversation、锁当前 owner 和目标成员、校验 `expected_member_version`、分配一个 `conversation_seq`、更新两条 `conversation_members`、只推进一次 `member_version / permission_version`、写一条 timeline/outbox 事件。
+- Kafka 事件使用专用 `conversation.member.owner_transferred.v1`，payload 必须同时包含 `previous_owner_user_id`、`new_owner_user_id`、`previous_owner_new_role`、`new_owner_old_role`、`new_owner_new_role`、`member_version`、`permission_version`、`reason` 和 `occurred_at`。
+- `member_change_saga` 可以通过 expand-only migration 增加 `OWNER_TRANSFER` change_type，并把 `user_id` 解释为 new owner；previous owner 信息必须进入 `metadata_json` 和 event payload。不要新增独立 `owner_transfer_saga`，除非实现时证明复用会显著增加复杂度。
+- 下游 projection 必须显式支持该事件：delivery membership projection 至少要把新 owner / 原 owner 的 role 更新到最新；unsupported owner transfer event 必须 fail-closed，不得被误标记为 published / committed。
+- 实现必须分阶段：先冻结 proto/schema/migration/relay builder，再做 repository/usecase/RPC，最后跑 owner transfer roster smoke。不要在一个提交里同时完成所有生产 hardening。
+
 安全要求：
 
 - API 层只接受 authenticated operator context，不信任 request 里的裸 operator 字段。
@@ -479,6 +490,9 @@ acl_projection_checksum_mismatch_count
 | relay integration | member boundary outbox 可发布 Kafka，DLQ 可观察 |
 | smoke | `CreateMemberChange -> GetSendContext -> SendMessage` 串联 |
 | roster smoke | `JOIN -> ListConversationMembers includes target`；`LEAVE / REMOVE -> ListConversationMembers excludes target`；`ROLE_CHANGED -> ListConversationMembers returns updated role` |
+| owner transfer contract | `OWNER_TRANSFER` 不复用 `ROLE_CHANGED`；proto / Kafka schema / relay builder / delivery projection 明确支持 `conversation.member.owner_transferred.v1` |
+| owner transfer transaction | 一个 transfer 只分配一个 seq、一条 saga、一条 timeline、一条 outbox；两条 member row 同事务更新；conversation version 只递增一次 |
+| owner transfer smoke | `TransferConversationOwner -> ListConversationMembers` 返回新 owner 为 `OWNER`、旧 owner 为 `ADMIN`、owner 数量为 1；outbox drain 到 0 |
 
 第一轮 smoke 不做大规模压测，只验证：
 
@@ -493,6 +507,8 @@ REMOVE user
 -> ListConversationMembers no longer returns removed target
 ROLE_CHANGED user MEMBER -> ADMIN
 -> ListConversationMembers returns ADMIN role
+OWNER_TRANSFER owner -> active member
+-> ListConversationMembers returns target OWNER and previous owner ADMIN
 ```
 
 ## 14. Runbook
@@ -505,6 +521,7 @@ docs/runbook/loadtest/conversation-service/loadtest-report-YYYYMMDD-member-chang
 docs/runbook/loadtest/conversation-service/loadtest-report-YYYYMMDD-list-conversation-members-leave-smoke.md
 docs/runbook/loadtest/conversation-service/loadtest-report-YYYYMMDD-list-conversation-members-remove-smoke.md
 docs/runbook/loadtest/conversation-service/loadtest-report-YYYYMMDD-list-conversation-members-role-smoke.md
+docs/runbook/loadtest/conversation-service/loadtest-report-YYYYMMDD-owner-transfer-smoke.md
 ```
 
 Runbook 必须覆盖：

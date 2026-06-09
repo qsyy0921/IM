@@ -22,6 +22,20 @@ func TestCreateMemberChangeUseCaseValidatesCommand(t *testing.T) {
 	}
 }
 
+func TestCreateMemberChangeUseCaseRejectsReservedConflictPolicy(t *testing.T) {
+	repository := &fakeMemberChangeRepository{}
+	command := validCreateMemberChangeCommand()
+	command.ConflictPolicy = types.MemberChangeConflictPolicyMerge
+
+	_, err := NewCreateMemberChangeUseCase(repository).Execute(context.Background(), command)
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+	if repository.called {
+		t.Fatal("repository should not be called for reserved conflict policy")
+	}
+}
+
 func TestCreateMemberChangeUseCaseForwardsCommand(t *testing.T) {
 	repository := &fakeMemberChangeRepository{
 		result: types.MemberChangeResult{

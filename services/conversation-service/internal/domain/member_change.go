@@ -224,23 +224,58 @@ func validateMemberChange(input MemberChangeInput) error {
 		input.Command.AuthContext.UserID == input.Command.TargetUserID {
 		return nil
 	}
+	if input.Command.ChangeType == types.MemberChangeTypeLeave {
+		return types.NewPermissionDenied("leave is only allowed for target user")
+	}
 	if input.Operator.Status != types.MemberStatusActive {
 		return types.NewPermissionDenied("operator is not active")
 	}
 	switch input.Operator.Role {
 	case types.MemberRoleOwner:
-		return nil
+		return validateOwnerMemberChange(input)
 	case types.MemberRoleAdmin:
-		if input.Target.Role == types.MemberRoleOwner || input.Command.TargetRole == types.MemberRoleOwner {
-			return types.NewPermissionDenied("admin cannot change owner")
-		}
-		if input.Command.ChangeType == types.MemberChangeTypeRemove ||
-			input.Command.ChangeType == types.MemberChangeTypeRoleChanged ||
-			input.Command.ChangeType == types.MemberChangeTypeJoin {
-			return nil
-		}
+		return validateAdminMemberChange(input)
 	}
 	return types.NewPermissionDenied("operator cannot change member")
+}
+
+func validateOwnerMemberChange(input MemberChangeInput) error {
+	switch input.Command.ChangeType {
+	case types.MemberChangeTypeJoin:
+		if input.Command.TargetRole == types.MemberRoleOwner {
+			return types.NewPermissionDenied("owner transfer is not supported")
+		}
+		return nil
+	case types.MemberChangeTypeRemove:
+		if input.Target.Role == types.MemberRoleOwner {
+			return types.NewPermissionDenied("owner transfer is not supported")
+		}
+		return nil
+	case types.MemberChangeTypeRoleChanged:
+		if input.Target.Role == types.MemberRoleOwner || input.Command.TargetRole == types.MemberRoleOwner {
+			return types.NewPermissionDenied("owner transfer is not supported")
+		}
+		return nil
+	default:
+		return types.NewPermissionDenied("operator cannot change member")
+	}
+}
+
+func validateAdminMemberChange(input MemberChangeInput) error {
+	switch input.Command.ChangeType {
+	case types.MemberChangeTypeJoin:
+		if input.Command.TargetRole != types.MemberRoleMember {
+			return types.NewPermissionDenied("admin can only add member role")
+		}
+		return nil
+	case types.MemberChangeTypeRemove:
+		if input.Target.Role != types.MemberRoleMember {
+			return types.NewPermissionDenied("admin can only remove ordinary member")
+		}
+		return nil
+	default:
+		return types.NewPermissionDenied("admin cannot perform member change")
+	}
 }
 
 func buildMemberMutation(input MemberChangeInput, boundarySeq int64) (MemberMutation, error) {

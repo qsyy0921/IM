@@ -144,6 +144,8 @@ reason
 
 说明：`operator_user_id` 由 `auth_context.user_id` 派生。生产模式不信任 request 里的裸 operator 字段；第一版本地 smoke 也按同一字段模拟认证上下文。
 
+第一版 `conflict_policy` 只接受 `REJECT`。`MERGE` 和 `COMPENSATE` 是协议预留值，真实语义未实现前必须返回 `INVALID_ARGUMENT`，避免调用方误以为系统已经执行自动合并或补偿。
+
 `CreateMemberChangeResponse` 必须包含：
 
 ```text
@@ -394,10 +396,10 @@ Outbox / DLQ repair：
 
 权限规则：
 
-- `JOIN`：根据会话类型和邀请策略校验，可由 operator 或邀请者触发。
-- `LEAVE`：用户本人或管理员触发。
-- `REMOVE`：OWNER / ADMIN 才能移除普通成员；ADMIN 不能移除 OWNER。
-- `ROLE_CHANGED`：OWNER 可以改 ADMIN / MEMBER；ADMIN 不能提升 OWNER。
+- `JOIN`：第一版只允许 `OWNER` 添加 `ADMIN / MEMBER`，允许 `ADMIN` 添加普通 `MEMBER`；不支持通过 `JOIN` 创建新 `OWNER`，OWNER 转移后续用专用流程。
+- `LEAVE`：只允许用户本人触发；管理员代办退群在第一版使用 `REMOVE`，避免 `LEAVE` 同时表达本人退出和管理移除。
+- `REMOVE`：`OWNER` 可以移除 `ADMIN / MEMBER`，不能移除另一个 `OWNER`；`ADMIN` 只能移除普通 `MEMBER`，不能移除 `ADMIN / OWNER`。第一版 `REMOVE` 写入状态为 `LEFT`，表示踢出但后续可再加入；永久封禁后续用 `BANNED` 或独立 ban 流程。
+- `ROLE_CHANGED`：第一版只允许 `OWNER` 在 `ADMIN / MEMBER` 之间调整角色；不允许把任何人改成 `OWNER`，也不允许调整已有 `OWNER`。
 
 安全要求：
 

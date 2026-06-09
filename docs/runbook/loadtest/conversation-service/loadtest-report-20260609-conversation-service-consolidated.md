@@ -2,7 +2,7 @@
 
 ## 阶段定位
 
-`conversation-service` 当前阶段只完成第一条 read path：
+`conversation-service` 当前阶段已经完成两条最小链路：
 
 ```text
 GetSendContext
@@ -11,7 +11,17 @@ GetSendContext
 -> message-service SendMessage 使用真实 gRPC 依赖
 ```
 
-它不是完整的会话服务。成员变更命令、成员变更 Saga、群主/管理员规则、ACL 投影和成员边界 timeline event 后续单独实现。
+```text
+CreateMemberChange
+-> member_change_saga / conversation_members / conversations version
+-> conversation_seq
+-> conversation_timeline_events
+-> message_outbox
+-> outbox relay
+-> Kafka conversation.timeline.events
+```
+
+它仍不是完整的会话服务。`GetMemberChange`、成员变更 Saga completion worker、DLQ repair、ACL 投影和完整角色变更流程后续单独实现。
 
 ## 当前能力
 
@@ -21,10 +31,12 @@ GetSendContext
 | gRPC proto | 已完成，`api/proto/nexusim/conversation/v1/conversation_service.proto` |
 | PostgreSQL migration | 已完成，`migrations/postgres/conversation/000001_conversation_core.sql` |
 | `GetSendContext` app/domain/repository | 已完成 |
+| `CreateMemberChange` app/domain/repository | 已完成最小 `JOIN` 写路径 |
 | gRPC handler | 已完成 |
 | message-service gRPC client | 已完成，可通过 `NEXUSIM_CONVERSATION_SERVICE_ADDR` 启用 |
 | 真实 PostgreSQL repository 集成测试 | 已通过 |
 | message-service -> conversation-service smoke | 已通过 |
+| CreateMemberChange -> outbox relay -> Kafka smoke | 已通过 |
 
 ## 核心结论
 
@@ -33,6 +45,8 @@ GetSendContext
 - `message-service` 不再只能依赖 conversation strict mock。
 - 会话发送上下文已经由真实 `conversation-service` 读取。
 - `message-service` 仍保持边界：只读 conversation context，不写成员事实。
+- `conversation-service` 已经能独立写成员事实，并把成员边界事件放入共享 timeline/outbox。
+- 统一 outbox relay 可以发布 `conversation.member.*` 到 Kafka，并把 outbox 标记为 `PUBLISHED`。
 - 当前链路足以支撑后续继续开发 `delivery-service` / `push-gateway`，不需要继续在 `message-service` 上做大规模压测。
 
 ## 验证记录
@@ -40,6 +54,7 @@ GetSendContext
 | 报告 | 结论 |
 | --- | --- |
 | `loadtest-report-20260609-send-context-smoke.md` | 725 / 725 成功，p99 13.26ms，跨服务 read path 打通 |
+| `loadtest-report-20260609-member-change-smoke.md` | 279 / 279 成功，p99 24.95ms，outbox 279 条全部 PUBLISHED |
 
 ## 面试讲法
 
@@ -47,9 +62,13 @@ GetSendContext
 
 > 第一阶段我先把 `message-service` 的 SendMessage 主链路做完整。后面没有继续只刷压测数字，而是把 mock 依赖拆出来，落了第二个真实微服务 `conversation-service`。它拥有 conversations 和 conversation_members 两张核心事实表，提供 `GetSendContext` gRPC 接口。message-service 通过端口读取 member_version、permission_version、conversation_mode 和 fanout_mode，再进入本地事务写消息。这样服务边界更真实，也能解释为什么 message-service 不能直接写成员事实。
 
+成员变更可以这样讲：
+
+> `conversation-service` 负责成员事实变更。`CreateMemberChange` 会在一个 PostgreSQL 事务里推进 member_change_saga、conversation_members、conversation 版本号、conversation_seq、conversation_timeline_events 和 message_outbox。成员边界事件和消息事件共享同一条 conversation timeline，所以 delivery、retrieval 和 audit 后续只需要消费统一的 `conversation.timeline.events`。本地 smoke 里 279 条成员加入全部成功，outbox relay 发布后 279 条都变成 PUBLISHED，说明第二个微服务已经不是文档服务，而是有真实写路径和事件出口。当前只验证保守权限矩阵下的 JOIN，不能把它说成完整成员管理系统。
+
 ## 下一步
 
-1. 给 `conversation-service` 增加本地运行 runbook。
-2. 补 `GetSendContext` 的更多错误路径测试：会话 archived/deleted、成员 left/banned、不存在成员。
-3. 冻结 `conversation-service-member-change-saga.md`，再实现成员变更命令。
+1. 实现 `GetMemberChange` 查询接口。
+2. 补 saga `EVENT_PUBLISHED / DONE` 推进 worker。
+3. 补 `LEAVE / REMOVE / ROLE_CHANGED` 的真实进程 smoke。
 4. 进入 `delivery-service` 或 `push-gateway` 前，先明确它们的 SDD 和最小可运行链路。

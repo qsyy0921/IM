@@ -99,6 +99,156 @@ func TestNewMemberChangeRecordRejectsInvalidState(t *testing.T) {
 	}
 }
 
+func TestNewMemberChangeRecordPermissionMatrix(t *testing.T) {
+	cases := []struct {
+		name         string
+		operatorRole types.MemberRole
+		targetRole   types.MemberRole
+		targetStatus types.MemberStatus
+		changeType   types.MemberChangeType
+		targetUserID types.UserID
+		targetRoleTo types.MemberRole
+		wantErr      error
+	}{
+		{
+			name:         "self leave allowed",
+			operatorRole: types.MemberRoleMember,
+			targetRole:   types.MemberRoleMember,
+			targetStatus: types.MemberStatusActive,
+			changeType:   types.MemberChangeTypeLeave,
+			targetUserID: "operator-1",
+		},
+		{
+			name:         "non self leave denied",
+			operatorRole: types.MemberRoleOwner,
+			targetRole:   types.MemberRoleMember,
+			targetStatus: types.MemberStatusActive,
+			changeType:   types.MemberChangeTypeLeave,
+			targetUserID: "target-1",
+			wantErr:      types.ErrPermissionDenied,
+		},
+		{
+			name:         "owner can add admin",
+			operatorRole: types.MemberRoleOwner,
+			targetStatus: "",
+			changeType:   types.MemberChangeTypeJoin,
+			targetUserID: "target-1",
+			targetRoleTo: types.MemberRoleAdmin,
+		},
+		{
+			name:         "owner cannot add owner",
+			operatorRole: types.MemberRoleOwner,
+			targetStatus: "",
+			changeType:   types.MemberChangeTypeJoin,
+			targetUserID: "target-1",
+			targetRoleTo: types.MemberRoleOwner,
+			wantErr:      types.ErrPermissionDenied,
+		},
+		{
+			name:         "owner cannot remove owner",
+			operatorRole: types.MemberRoleOwner,
+			targetRole:   types.MemberRoleOwner,
+			targetStatus: types.MemberStatusActive,
+			changeType:   types.MemberChangeTypeRemove,
+			targetUserID: "target-1",
+			wantErr:      types.ErrPermissionDenied,
+		},
+		{
+			name:         "owner can role change member to admin",
+			operatorRole: types.MemberRoleOwner,
+			targetRole:   types.MemberRoleMember,
+			targetStatus: types.MemberStatusActive,
+			changeType:   types.MemberChangeTypeRoleChanged,
+			targetUserID: "target-1",
+			targetRoleTo: types.MemberRoleAdmin,
+		},
+		{
+			name:         "owner cannot role change owner",
+			operatorRole: types.MemberRoleOwner,
+			targetRole:   types.MemberRoleOwner,
+			targetStatus: types.MemberStatusActive,
+			changeType:   types.MemberChangeTypeRoleChanged,
+			targetUserID: "target-1",
+			targetRoleTo: types.MemberRoleMember,
+			wantErr:      types.ErrPermissionDenied,
+		},
+		{
+			name:         "admin can add ordinary member",
+			operatorRole: types.MemberRoleAdmin,
+			targetStatus: "",
+			changeType:   types.MemberChangeTypeJoin,
+			targetUserID: "target-1",
+			targetRoleTo: types.MemberRoleMember,
+		},
+		{
+			name:         "admin cannot add admin",
+			operatorRole: types.MemberRoleAdmin,
+			targetStatus: "",
+			changeType:   types.MemberChangeTypeJoin,
+			targetUserID: "target-1",
+			targetRoleTo: types.MemberRoleAdmin,
+			wantErr:      types.ErrPermissionDenied,
+		},
+		{
+			name:         "admin can remove ordinary member",
+			operatorRole: types.MemberRoleAdmin,
+			targetRole:   types.MemberRoleMember,
+			targetStatus: types.MemberStatusActive,
+			changeType:   types.MemberChangeTypeRemove,
+			targetUserID: "target-1",
+		},
+		{
+			name:         "admin cannot remove admin",
+			operatorRole: types.MemberRoleAdmin,
+			targetRole:   types.MemberRoleAdmin,
+			targetStatus: types.MemberStatusActive,
+			changeType:   types.MemberChangeTypeRemove,
+			targetUserID: "target-1",
+			wantErr:      types.ErrPermissionDenied,
+		},
+		{
+			name:         "admin cannot role change member",
+			operatorRole: types.MemberRoleAdmin,
+			targetRole:   types.MemberRoleMember,
+			targetStatus: types.MemberStatusActive,
+			changeType:   types.MemberChangeTypeRoleChanged,
+			targetUserID: "target-1",
+			targetRoleTo: types.MemberRoleAdmin,
+			wantErr:      types.ErrPermissionDenied,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			input := validMemberChangeInput()
+			input.Command.AuthContext.UserID = "operator-1"
+			input.Command.TargetUserID = tc.targetUserID
+			input.Command.ChangeType = tc.changeType
+			input.Command.TargetRole = tc.targetRoleTo
+			input.Operator = memberWithRole("operator-1", tc.operatorRole)
+			input.Target = Member{
+				UserID:            tc.targetUserID,
+				Role:              tc.targetRole,
+				Status:            tc.targetStatus,
+				MemberVersion:     5,
+				PermissionVersion: 7,
+			}
+			if tc.targetUserID == "operator-1" {
+				input.Target = input.Operator
+			}
+			_, err := NewMemberChangeRecord(input, "change-1", "event-1", 11, time.Now())
+			if tc.wantErr == nil {
+				if err != nil {
+					t.Fatalf("expected success, got %v", err)
+				}
+				return
+			}
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("expected %v, got %v", tc.wantErr, err)
+			}
+		})
+	}
+}
+
 func TestComputeMemberChangeCommandHashIsStable(t *testing.T) {
 	command := validMemberChangeCommand()
 	hash1, err := ComputeMemberChangeCommandHash(command)

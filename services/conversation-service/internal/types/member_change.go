@@ -88,7 +88,7 @@ func isValidMemberRole(value MemberRole) bool {
 
 func isValidConflictPolicy(value MemberChangeConflictPolicy) bool {
 	switch value {
-	case MemberChangeConflictPolicyReject, MemberChangeConflictPolicyMerge, MemberChangeConflictPolicyCompensate:
+	case MemberChangeConflictPolicyReject:
 		return true
 	default:
 		return false

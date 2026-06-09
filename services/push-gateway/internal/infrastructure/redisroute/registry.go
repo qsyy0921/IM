@@ -32,7 +32,12 @@ type Registry struct {
 	config Config
 
 	mu     sync.Mutex
-	routes map[string]routeEntry
+	routes map[string]routeState
+}
+
+type routeState struct {
+	entry  routeEntry
+	cancel context.CancelFunc
 }
 
 type routeEntry struct {
@@ -54,7 +59,7 @@ func NewRegistry(local LocalRegistry, client redis.UniversalClient, config Confi
 		local:  local,
 		client: client,
 		config: config,
-		routes: make(map[string]routeEntry),
+		routes: make(map[string]routeState),
 	}
 }
 
@@ -80,9 +85,11 @@ func (registry *Registry) Register(
 		registry.local.Unregister(registration.SessionID)
 		return types.SessionRegistrationResult{}, err
 	}
+	renewCtx, cancel := context.WithCancel(context.Background())
 	registry.mu.Lock()
-	registry.routes[registration.SessionID] = entry
+	registry.routes[registration.SessionID] = routeState{entry: entry, cancel: cancel}
 	registry.mu.Unlock()
+	go registry.renewRouteLoop(renewCtx, entry)
 	return result, nil
 }
 
@@ -90,7 +97,7 @@ func (registry *Registry) Unregister(sessionID string) {
 	registry.local.Unregister(sessionID)
 
 	registry.mu.Lock()
-	entry, ok := registry.routes[sessionID]
+	state, ok := registry.routes[sessionID]
 	if ok {
 		delete(registry.routes, sessionID)
 	}
@@ -98,9 +105,10 @@ func (registry *Registry) Unregister(sessionID string) {
 	if !ok {
 		return
 	}
+	state.cancel()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	_ = registry.deleteRoute(ctx, entry)
+	_ = registry.deleteRoute(ctx, state.entry)
 }
 
 func (registry *Registry) EnqueueNotification(
@@ -149,6 +157,28 @@ func (registry *Registry) writeRoute(ctx context.Context, entry routeEntry) erro
 	pipe.Expire(ctx, userKey, registry.config.RouteTTL)
 	_, err = pipe.Exec(ctx)
 	return err
+}
+
+func (registry *Registry) renewRouteLoop(ctx context.Context, entry routeEntry) {
+	interval := registry.config.RouteTTL / 3
+	if interval <= 0 {
+		interval = time.Second
+	}
+	if interval < 50*time.Millisecond {
+		interval = 50 * time.Millisecond
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			refreshCtx, cancel := context.WithTimeout(ctx, time.Second)
+			_ = registry.writeRoute(refreshCtx, entry)
+			cancel()
+		}
+	}
 }
 
 func (registry *Registry) deleteRoute(ctx context.Context, entry routeEntry) error {

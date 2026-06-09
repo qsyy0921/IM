@@ -1,6 +1,6 @@
 # push-gateway Loadtest / Smoke Index
 
-本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify`、`delivery.ack.ok`、queue-full broad `server.resume_hint` active close、单实例 in-memory resume buffer 和 Redis route 最小 adapter；真实进程 full smoke、同 user 多 device notify smoke 和 slow-client 负向 smoke 已通过。
+本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify`、`delivery.ack.ok`、queue-full broad `server.resume_hint` active close、单实例 in-memory resume buffer 和 Redis route 最小 adapter；真实进程 full smoke、同 user 多 device notify smoke、slow-client 负向 smoke 和跨进程 Redis route smoke 已通过。
 
 ## 当前验证目标
 
@@ -39,6 +39,16 @@ NEXUSIM_PUSH_CONSUMER_GROUP=nexusim-push-gateway-smoke
 ```
 
 `all` 模式只用于第一阶段本地 smoke：WebSocket handler 和 `im.delivery.events` consumer 共享同一个进程内 session registry。默认 route backend 仍是 memory；跨实例在线路由需要启用 Redis route。
+
+本地分布式模拟使用两个独立 `push-gateway` 进程：
+
+```text
+push-gateway-ws       -> 只负责 WebSocket 连接和本机 session registry
+push-gateway-consumer -> 只消费 Kafka im.delivery.events
+Redis route / PubSub  -> 把 consumer 进程收到的 delivery.notify 转发到 ws 进程
+```
+
+这能在一台机器上证明 push-gateway 已经从单进程 `all` 模式推进到最小分布式在线路由模型。它仍不是生产多实例结论：Redis Pub/Sub 是 best-effort online wakeup，可靠恢复仍依赖 `delivery-service PullInbox`。
 
 Redis route 最小参数：
 
@@ -93,9 +103,9 @@ E:\development\IM\loadtest\results
 - 不打满 Win-Mac 2.5Gbps 链路。
 - 不重新做 message-service 硬件矩阵。
 - 不把短时 resume buffer 当作 durable inbox。
-- 不把单实例 in-memory resume buffer 表述为跨实例 resume；当前 Redis route 只负责在线 session 路由，不负责跨实例 resume buffer，TTL 续期也尚未完成；未知客户端 `resume_token` 必须返回 `buffer_miss` 并由服务端签发新 token。
+- 不把单实例 in-memory resume buffer 表述为跨实例 resume；当前 Redis route 只负责在线 session 路由，不负责跨实例 resume buffer；未知客户端 `resume_token` 必须返回 `buffer_miss` 并由服务端签发新 token。
 - 不把 push smoke 表述为生产容量结论。
-- 不把 queue-full active close 表述为完整慢连接治理；当前 `server.resume_hint` 只是 broad pull fallback，客户端必须用本地 durable cursor 决定 `PullInbox` 起点。已完成单实例 slow-client 真实进程负向 smoke，但它验证的是 durable `PullInbox` fallback，不验证 resume buffer replay；后续还没有 Redis route 真实跨实例 smoke / 多实例慢连接验证。
+- 不把 queue-full active close 表述为完整慢连接治理；当前 `server.resume_hint` 只是 broad pull fallback，客户端必须用本地 durable cursor 决定 `PullInbox` 起点。已完成单实例 slow-client 真实进程负向 smoke，但它验证的是 durable `PullInbox` fallback，不验证 resume buffer replay；后续还没有多实例慢连接验证。
 - `/debug/metrics` 目前只暴露单实例 in-memory registry 调试指标，用于 smoke 排障；不是生产级 Prometheus 指标。
 - `NEXUSIM_PUSH_TEST_WRITE_DELAY` 只允许本地 smoke 使用，生产环境必须 unset 或保持 `0`。
 
@@ -111,3 +121,15 @@ message-service 写消息事实
 ```
 
 这样断线、重连、成员边界、ACK 丢失和服务重启都可以由 `delivery-service` 的 durable inbox / cursor 兜底。
+
+分布式可讲点：
+
+```text
+同一个用户的 WebSocket 连接可能落在 gateway A
+Kafka delivery event 可能被 gateway B 消费
+gateway B 通过 Redis route 找到 gateway A
+gateway A 只做在线 notify
+客户端最终仍通过 PullInbox / AckDelivery 完成可靠投递
+```
+
+这体现了在线唤醒层和可靠投递层解耦：Redis route 可以丢，WebSocket 可以断，但 message fact、user_inbox 和 ACK cursor 不丢。

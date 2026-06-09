@@ -285,7 +285,8 @@ push:route:gateway:{gateway_id}:notify -> Pub/Sub delivery notification
 Redis 约束：
 
 - 所有 route key 必须有 TTL。
-- 第一版 `NEXUSIM_PUSH_ROUTE_BACKEND=redis` 会在 connect 时写入 session route，在 disconnect 时 best-effort 删除 route；TTL 续期 / cleanup ticker 仍是后续 hardening。
+- 第一版 `NEXUSIM_PUSH_ROUTE_BACKEND=redis` 会在 connect 时写入 session route，并由 gateway 进程按 TTL 比例周期性刷新 route；disconnect 时 best-effort 删除 route。
+- 进程崩溃、机器断电或 Redis 短故障时，route 最终依赖 TTL 过期清理；主动 cleanup ticker 和 Redis 故障 smoke 仍是后续 hardening。
 - disconnect / timeout 必须 best-effort 删除 route。
 - Redis route 是在线状态，不是投递事实源；Redis 丢失后客户端重连恢复。
 - 同一远端 gateway 上有多个 session 时，只向该 gateway Pub/Sub channel 发布一次，远端本地 registry 再 fanout 到本机 session。
@@ -356,7 +357,7 @@ delivery-service local transaction
 -> server returns delivery.ack.ok
 ```
 
-第一阶段可以只对当前 gateway 进程内在线 session 通知。当前已接入 Redis route 最小 adapter，但仍需真实跨实例 route smoke 验证；在 smoke 通过前，不能把它表述为完整多实例在线路由能力。
+第一阶段可以只对当前 gateway 进程内在线 session 通知。当前已接入 Redis route 最小 adapter，并已用真实进程 smoke 验证 WebSocket gateway 与 delivery consumer gateway 分离时的跨进程在线路由；它证明的是最小分布式在线唤醒链路，不等同于完整生产多实例能力。生产化前仍需补 Redis 故障语义、route cleanup、跨实例 resume 和正式指标。
 
 ### 8.3 重连恢复
 
@@ -488,6 +489,8 @@ NEXUSIM_PUSH_GATEWAY_MODE=all
 ```
 
 `all` 是第一阶段本地 smoke 推荐模式：WebSocket handler 和 delivery consumer 在同一个进程里共享 session registry。默认 route backend 为 in-memory；需要跨实例在线路由时启用 `NEXUSIM_PUSH_ROUTE_BACKEND=redis`。
+
+本地分布式模拟使用 `NEXUSIM_PUSH_GATEWAY_MODE=ws` 和 `NEXUSIM_PUSH_GATEWAY_MODE=delivery-consumer` 启动两个独立 `push-gateway` 进程：WebSocket 连接只落在 ws 进程，Kafka `im.delivery.events` 只由 consumer 进程消费，在线通知必须经过 Redis route / PubSub 才能到达客户端。该模式用于验证分布式路由边界，不作为生产容量结论。
 
 当 WebSocket HTTP server 启动时，`GET /debug/metrics` 返回当前单实例 registry 调试指标，包括 connected sessions、queue-full eviction、resume replay / buffer miss 和 resume buffer stored frames。该端点只用于本地 smoke 排障，尚不是生产 Prometheus 指标。
 

@@ -107,6 +107,35 @@ func TestRegistryPublishesRemoteRouteAndEnqueuesLocal(t *testing.T) {
 	}
 }
 
+func TestRegistryRenewsRouteTTLUntilUnregister(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	local := memory.NewRegistry()
+	registry := NewRegistry(local, client, Config{
+		GatewayID: "gateway-a",
+		RouteTTL:  3 * time.Second,
+	})
+
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"},
+		SessionID:   "session-1",
+		Outbound:    make(chan types.ServerFrame, 1),
+	}); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	time.Sleep(1200 * time.Millisecond)
+	server.FastForward(2500 * time.Millisecond)
+	if !server.Exists("nexusim:push:route:session:session-1") {
+		t.Fatalf("expected session route key to be renewed before TTL expiry")
+	}
+
+	registry.Unregister("session-1")
+	if server.Exists("nexusim:push:route:session:session-1") {
+		t.Fatalf("session route key should be removed after unregister")
+	}
+}
+
 func TestSubscriberEnqueuesRemoteNotificationLocally(t *testing.T) {
 	server := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: server.Addr()})

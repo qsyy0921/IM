@@ -85,6 +85,25 @@ SendMessage
 .\tools\local-distributed-smoke.ps1 -SkipBuild
 ```
 
+同步 Mac 专用 smoke checkout：
+
+```powershell
+.\tools\sync-mac-distributed-smoke.ps1
+```
+
+该脚本会：
+
+```text
+1. Windows 本地用当前 HEAD 生成 Git bundle；
+2. 通过 172.31.50.2 有线 SSH/scp 传到 Mac；
+3. 重建 /Users/qsyy0921/Desktop/IM-distributed-smoke；
+4. 从 Windows 交叉编译 darwin/arm64 push-gateway 和 pushgateway-smoke；
+5. 通过有线 scp 把二进制放到 Mac checkout 的 bin/darwin-arm64；
+6. 在 Mac 上跑一次 NEXUSIM_PUSH_GATEWAY_MODE=noop 验证二进制能启动。
+```
+
+脚本默认拒绝操作非 `IM-distributed-smoke` 结尾的 Mac 路径，避免覆盖 Mac 上已有的 `/Users/qsyy0921/Desktop/IM` 工作区。
+
 ## 4. 结果位置
 
 大结果文件保存到机械盘：
@@ -179,6 +198,8 @@ docker info
 3. 在 Mac 上从 bundle clone / fetch，避免 Mac 直接访问 GitHub；
 4. 若 Mac `Desktop/IM` 不能 fast-forward，则另建 `/Users/qsyy0921/Desktop/IM-distributed-smoke` 作为干净 smoke checkout。
 ```
+
+当前已采用第 4 种方式，`/Users/qsyy0921/Desktop/IM-distributed-smoke` 是可重建的专用 smoke checkout。
 
 压测原始结果继续放机械盘：
 

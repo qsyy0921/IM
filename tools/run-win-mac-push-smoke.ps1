@@ -15,6 +15,8 @@ param(
     [string]$RedisAddrForWindows = "127.0.0.1:6379",
     [string]$RedisAddrForMac = "172.31.50.1:6379",
     [string]$ReceiverDeviceIds = "push-device-1",
+    [ValidateSet("full", "cross-instance-resume")]
+    [string]$Scenario = "full",
     [switch]$SkipBuild,
     [switch]$SkipMacSync
 )
@@ -35,6 +37,7 @@ $deliveryConsumerGroup = "nexusim-delivery-winmac-smoke-" + (Get-Date -Format "y
 $pushConsumerGroup = "nexusim-push-winmac-smoke-" + (Get-Date -Format "yyyyMMddHHmmss")
 $pushRouteKeyPrefix = "nexusim:push:$safeRunName"
 $pushWSGatewayID = "push-mac-ws-$safeRunName"
+$pushReconnectGatewayID = "push-win-reconnect-$safeRunName"
 $pushConsumerGatewayID = "push-win-consumer-$safeRunName"
 $remoteLogDir = "$MacPath/logs/$safeRunName"
 
@@ -299,8 +302,26 @@ try {
 
     $macHandle = Start-MacPushGatewayWS
 
+    if ($Scenario -eq "cross-instance-resume") {
+        $processes += Start-NexusProcess -Name "push-gateway-ws-reconnect" -FilePath $pushGateway -Port 11599 -Env @{
+            NEXUSIM_PUSH_GATEWAY_MODE = "ws"
+            NEXUSIM_PUSH_WS_ADDR = "127.0.0.1:11599"
+            NEXUSIM_DELIVERY_GRPC_ADDR = "127.0.0.1:11597"
+            NEXUSIM_DELIVERY_GRPC_TIMEOUT = "2s"
+            NEXUSIM_PUSH_SESSION_QUEUE_SIZE = "32"
+            NEXUSIM_PUSH_WRITE_TIMEOUT = "2s"
+            NEXUSIM_PUSH_TEST_WRITE_DELAY = "0s"
+            NEXUSIM_PUSH_ROUTE_BACKEND = "redis"
+            NEXUSIM_PUSH_GATEWAY_ID = $pushReconnectGatewayID
+            NEXUSIM_PUSH_REDIS_ADDR = $RedisAddrForWindows
+            NEXUSIM_PUSH_REDIS_KEY_PREFIX = $pushRouteKeyPrefix
+            NEXUSIM_PUSH_ROUTE_TTL = "90s"
+        }
+    }
+
     $processes += Start-NexusProcess -Name "push-gateway-consumer" -FilePath $pushGateway -Env @{
         NEXUSIM_PUSH_GATEWAY_MODE = "delivery-consumer"
+        NEXUSIM_PUSH_DEBUG_ADDR = "127.0.0.1:11600"
         NEXUSIM_KAFKA_BROKERS = $KafkaBrokers
         NEXUSIM_DELIVERY_EVENTS_TOPIC = $deliveryTopic
         NEXUSIM_PUSH_CONSUMER_GROUP = $pushConsumerGroup
@@ -333,11 +354,15 @@ try {
         --receiver-user-id "push-user-1" `
         --receiver-device-id "push-device-1" `
         --receiver-device-ids $ReceiverDeviceIds `
-        --scenario full `
+        --scenario $Scenario `
+        --reconnect-push-url $(if ($Scenario -eq "cross-instance-resume") { "ws://127.0.0.1:11599" } else { "ws://${MacHost}:11598" }) `
         --push-metrics-url "http://${MacHost}:11598/debug/metrics" `
+        --reconnect-push-metrics-url $(if ($Scenario -eq "cross-instance-resume") { "http://127.0.0.1:11599/debug/metrics" } else { "" }) `
+        --consumer-push-metrics-url "http://127.0.0.1:11600/debug/metrics" `
         --route-backend redis `
         --redis-key-prefix $pushRouteKeyPrefix `
         --push-ws-gateway-id $pushWSGatewayID `
+        --push-reconnect-gateway-id $(if ($Scenario -eq "cross-instance-resume") { $pushReconnectGatewayID } else { "" }) `
         --push-consumer-gateway-id $pushConsumerGatewayID `
         --wait-timeout 25s `
         --request-timeout 3s
@@ -371,6 +396,7 @@ Write-Host "timeline_topic=$timelineTopic"
 Write-Host "delivery_consumer_group=$deliveryConsumerGroup"
 Write-Host "push_consumer_group=$pushConsumerGroup"
 Write-Host "route_backend=redis"
+Write-Host "scenario=$Scenario"
 Write-Host "mac_host=$MacHost"
 Write-Host "mac_path=$MacPath"
 Write-Host "mac_run_mode=$MacRunMode"
@@ -381,4 +407,7 @@ if ($MacRunMode -eq "docker") {
 Write-Host "redis_addr_for_mac=$RedisAddrForMac"
 Write-Host "redis_key_prefix=$pushRouteKeyPrefix"
 Write-Host "push_ws_gateway_id=$pushWSGatewayID"
+if ($Scenario -eq "cross-instance-resume") {
+    Write-Host "push_reconnect_gateway_id=$pushReconnectGatewayID"
+}
 Write-Host "push_consumer_gateway_id=$pushConsumerGatewayID"

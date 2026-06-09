@@ -1,6 +1,6 @@
 # push-gateway Loadtest / Smoke Index
 
-本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify`、`delivery.ack.ok`、queue-full broad `server.resume_hint` active close 和单实例 in-memory resume buffer 的单元 / 集成测试；真实进程 full smoke 和同 user 多 device notify smoke 已通过。
+本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify`、`delivery.ack.ok`、queue-full broad `server.resume_hint` active close 和单实例 in-memory resume buffer；真实进程 full smoke、同 user 多 device notify smoke 和 slow-client 负向 smoke 已通过。
 
 ## 当前验证目标
 
@@ -48,6 +48,7 @@ NEXUSIM_PUSH_CONSUMER_GROUP=nexusim-push-gateway-smoke
 | --- | --- |
 | `loadtest-report-20260609-push-gateway-full-smoke.md` | `delivery_outbox -> im.delivery.events -> push-gateway -> WebSocket notify -> PullInbox -> AckDelivery` 真实进程 smoke |
 | `loadtest-report-20260609-push-gateway-multidevice-smoke.md` | 同一 user 两个在线 device 均收到同一条 `delivery.notify`，并分别 ACK 到各自 cursor |
+| `loadtest-report-20260609-push-gateway-slow-client-smoke.md` | 慢客户端触发 queue full / active close 后，通过 durable `PullInbox` 补拉并 ACK |
 
 报告 Markdown 保存在仓库内：
 
@@ -81,7 +82,7 @@ E:\development\IM\loadtest\results
 - 不把短时 resume buffer 当作 durable inbox。
 - 不把单实例 in-memory resume buffer 表述为跨实例 resume；当前没有 Redis route，也没有 TTL；未知客户端 `resume_token` 必须返回 `buffer_miss` 并由服务端签发新 token。
 - 不把 push smoke 表述为生产容量结论。
-- 不把 queue-full active close 表述为完整慢连接治理；当前 `server.resume_hint` 只是 broad pull fallback，客户端必须用本地 durable cursor 决定 `PullInbox` 起点，且还没有 slow-client 真实进程负向 smoke。
+- 不把 queue-full active close 表述为完整慢连接治理；当前 `server.resume_hint` 只是 broad pull fallback，客户端必须用本地 durable cursor 决定 `PullInbox` 起点。已完成单实例 slow-client 真实进程负向 smoke，但还没有 Redis route / 多实例慢连接验证。
 - `/debug/metrics` 目前只暴露单实例 in-memory registry 调试指标，用于 smoke 排障；不是生产级 Prometheus 指标。
 
 ## 面试可讲点

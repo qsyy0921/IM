@@ -5,7 +5,7 @@
 | 目录 / 文档 | 说明 |
 | --- | --- |
 | `architecture/` | 总架构和架构补充文档。主文档是 `architecture/target-architecture.md`。 |
-| `sdd/` | 服务级软件设计文档。`message-service` 已完成第一阶段主链路，当前推进 `conversation-service`。 |
+| `sdd/` | 服务级软件设计文档。当前已落地 `message-service`、`conversation-service`、`delivery-service` 和 `push-gateway` 的最小真实链路。 |
 | `runbook/` | 本地运行、压测、故障处理和演练说明。压测报告按微服务归档到 `runbook/loadtest/<service>/`。 |
 
 ## 当前阅读路径
@@ -18,10 +18,11 @@
 4. `sdd/conversation-service-member-change-saga.md`：确认下一步成员变更 Saga、边界事件和 ACL 投影失败窗口。
 5. `sdd/message-service.md`：确认已完成的 `SendMessage` 普通会话写入链路和对 conversation port 的依赖。
 6. `architecture/tadd.md`：确认工程目录、六层 DDD、Docker Compose 和编码门禁。
-7. `runbook/conversation-service-local.md`：确认当前 conversation-service 本地启动和跨服务 smoke 方式。
-8. `runbook/local-loadtest.md`：确认本地双机压测端口和执行方式。
-9. `runbook/loadtest/message-service/loadtest-report-20260609-message-service-consolidated.md`：查看 `message-service` 第一阶段压测总报告、瓶颈排查过程和面试可讲结论。
-10. `runbook/loadtest/message-service/README.md`：查看 `message-service` 所有小规模压测报告和矩阵报告索引。
+7. `runbook/distributed-local.md`：确认当前本地多进程分布式 smoke 拓扑和运行入口。
+8. `runbook/conversation-service-local.md`：确认 conversation-service 本地启动和跨服务 smoke 方式。
+9. `runbook/local-loadtest.md`：确认本地双机压测端口和执行方式。
+10. `runbook/loadtest/message-service/loadtest-report-20260609-message-service-consolidated.md`：查看 `message-service` 第一阶段压测总报告、瓶颈排查过程和面试可讲结论。
+11. `runbook/loadtest/message-service/README.md`：查看 `message-service` 所有小规模压测报告和矩阵报告索引。
 
 ## 写文档规则
 

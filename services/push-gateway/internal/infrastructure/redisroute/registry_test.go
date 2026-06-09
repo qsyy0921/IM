@@ -136,6 +136,86 @@ func TestRegistryRenewsRouteTTLUntilUnregister(t *testing.T) {
 	}
 }
 
+func TestRegistryCleansStaleRoutesDuringLookup(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	local := memory.NewRegistry()
+	registry := NewRegistry(local, client, Config{GatewayID: "gateway-a", RouteTTL: time.Minute})
+	ctx := context.Background()
+
+	if err := client.SAdd(ctx, "nexusim:push:route:user:tenant-1:user-1",
+		"missing-session",
+		"malformed-session",
+		"wrong-user-session",
+	).Err(); err != nil {
+		t.Fatalf("seed user set: %v", err)
+	}
+	if err := client.Set(ctx, "nexusim:push:route:session:malformed-session", "{", time.Minute).Err(); err != nil {
+		t.Fatalf("seed malformed route: %v", err)
+	}
+	if err := registry.writeRoute(ctx, routeEntry{
+		TenantID:  "tenant-1",
+		UserID:    "other-user",
+		DeviceID:  "device-1",
+		SessionID: "wrong-user-session",
+		GatewayID: "gateway-b",
+	}); err != nil {
+		t.Fatalf("seed wrong user route: %v", err)
+	}
+	if err := client.SAdd(ctx, "nexusim:push:route:user:tenant-1:user-1", "wrong-user-session").Err(); err != nil {
+		t.Fatalf("re-seed wrong user membership: %v", err)
+	}
+
+	result, err := registry.EnqueueNotification(ctx, testNotification())
+	if err != nil {
+		t.Fatalf("enqueue: %v", err)
+	}
+	if result.MatchedSessions != 0 || result.Enqueued != 0 {
+		t.Fatalf("unexpected result for stale-only routes: %+v", result)
+	}
+	for _, sessionID := range []string{"missing-session", "malformed-session", "wrong-user-session"} {
+		if redisSetHasMember(t, server, "nexusim:push:route:user:tenant-1:user-1", sessionID) {
+			t.Fatalf("expected stale session %s to be removed from user set", sessionID)
+		}
+	}
+}
+
+func TestRegistryFailsOpenWhenRedisLookupUnavailable(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	local := memory.NewRegistry()
+	registry := NewRegistry(local, client, Config{GatewayID: "gateway-a", RouteTTL: time.Minute})
+
+	server.Close()
+	result, err := registry.EnqueueNotification(context.Background(), testNotification())
+	if err != nil {
+		t.Fatalf("enqueue should fail open when redis lookup is unavailable: %v", err)
+	}
+	if result.Enqueued != 0 || result.MatchedSessions != 0 || result.Dropped != 1 {
+		t.Fatalf("unexpected local result after redis failure: %+v", result)
+	}
+}
+
+func TestRegistryRegisterFailsClosedWhenRedisUnavailable(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	local := memory.NewRegistry()
+	registry := NewRegistry(local, client, Config{GatewayID: "gateway-a", RouteTTL: time.Minute})
+
+	server.Close()
+	_, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"},
+		SessionID:   "session-1",
+		Outbound:    make(chan types.ServerFrame, 1),
+	})
+	if err == nil {
+		t.Fatalf("expected register to fail when redis route cannot be written")
+	}
+	if metrics := local.Metrics(); metrics.ConnectedSessions != 0 {
+		t.Fatalf("local session should be rolled back after redis write failure: %+v", metrics)
+	}
+}
+
 func TestSubscriberEnqueuesRemoteNotificationLocally(t *testing.T) {
 	server := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: server.Addr()})

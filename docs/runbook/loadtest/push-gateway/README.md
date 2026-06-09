@@ -109,6 +109,7 @@ E:\development\IM\loadtest\results
 - 不把 queue-full active close 表述为完整慢连接治理；当前 `server.resume_hint` 只是 broad pull fallback，客户端必须用本地 durable cursor 决定 `PullInbox` 起点。已完成单实例 slow-client 真实进程负向 smoke，但它验证的是 durable `PullInbox` fallback，不验证 resume buffer replay；后续还没有多实例慢连接验证。
 - `/debug/metrics` 目前只暴露单实例 in-memory registry 调试指标，用于 smoke 排障；不是生产级 Prometheus 指标。
 - `NEXUSIM_PUSH_TEST_WRITE_DELAY` 只允许本地 smoke 使用，生产环境必须 unset 或保持 `0`。
+- Redis route 当前对在线通知采用 fail-open：lookup / publish 错误不会阻塞 delivery consumer 提交当前 Kafka event；该次在线唤醒可以丢，客户端靠 durable `PullInbox` 恢复。connect 写 route 失败仍 fail-closed，避免把无法跨实例路由的 session 注册成在线。当前只有单元测试覆盖 Redis unavailable / stale route cleanup，尚未做真实 Redis 故障 smoke。
 
 ## 面试可讲点
 

@@ -290,6 +290,8 @@ Redis 约束：
 - disconnect / timeout 必须 best-effort 删除 route。
 - Redis route 是在线状态，不是投递事实源；Redis 丢失后客户端重连恢复。
 - 同一远端 gateway 上有多个 session 时，只向该 gateway Pub/Sub channel 发布一次，远端本地 registry 再 fanout 到本机 session。
+- lookup 时如果发现 session key 已过期、route JSON 损坏或 route tenant/user 与当前通知不匹配，必须把该 session 从 user route set 中移除，避免 stale route 长期放大。
+- 当前最小策略采用在线通知 fail-open：Redis lookup / publish 返回错误时，不阻塞 delivery consumer 提交当前 Kafka event；该 notify 视为在线唤醒失败，客户端通过 durable `PullInbox` 恢复。connect 写 route 失败仍采用 fail-closed，避免把只有本地可见、跨实例不可路由的 session 伪装为在线。
 
 Resume buffer：
 

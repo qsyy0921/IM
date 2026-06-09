@@ -121,10 +121,12 @@ func (registry *Registry) EnqueueNotification(
 	}
 	routes, err := registry.lookupRoutes(ctx, notification.TenantID, notification.UserID)
 	if err != nil {
-		return localResult, err
+		localResult.Dropped++
+		return localResult, nil
 	}
 	result := localResult
 	publishedGateways := make(map[string]struct{})
+	remoteSessionsByGateway := make(map[string]int)
 	for _, route := range routes {
 		if route.GatewayID == "" || route.SessionID == "" {
 			continue
@@ -132,14 +134,19 @@ func (registry *Registry) EnqueueNotification(
 		if route.GatewayID == registry.config.GatewayID {
 			continue
 		}
-		if _, ok := publishedGateways[route.GatewayID]; !ok {
-			if err := registry.publishRemote(ctx, route.GatewayID, notification); err != nil {
-				return result, err
-			}
-			publishedGateways[route.GatewayID] = struct{}{}
-		}
+		remoteSessionsByGateway[route.GatewayID]++
 		result.MatchedSessions++
-		result.Enqueued++
+	}
+	for gatewayID, sessionCount := range remoteSessionsByGateway {
+		if _, ok := publishedGateways[gatewayID]; ok {
+			continue
+		}
+		if err := registry.publishRemote(ctx, gatewayID, notification); err != nil {
+			result.Dropped += sessionCount
+			continue
+		}
+		publishedGateways[gatewayID] = struct{}{}
+		result.Enqueued += sessionCount
 	}
 	return result, nil
 }

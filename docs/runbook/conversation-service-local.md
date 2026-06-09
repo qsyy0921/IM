@@ -225,6 +225,34 @@ member_list_count >= 2
 member_list_sample_users includes owner and joined target
 ```
 
+验证 `REMOVE` 后普通 roster 过滤时，先 seed 一个 ACTIVE owner 和一个 ACTIVE target，再运行：
+
+```powershell
+bin\memberchange-loadtest.exe `
+  --target 127.0.0.1:11496 `
+  --vus 1 `
+  --duration 3s `
+  --request-count 1 `
+  --tenant-id tenant-roster-remove-smoke `
+  --conversation-id conv-roster-remove-smoke `
+  --operator-user-id owner-1 `
+  --target-user-id roster-user-remove `
+  --change-type remove `
+  --idempotency-prefix roster-remove-manual `
+  --expected-member-version 0 `
+  --pg-dsn 'postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable' `
+  --result-dir loadtest\results\memberchange-remove-smoke-manual
+```
+
+通过标准：
+
+```text
+success_rate = 1
+member_list_target_present = false
+member_list_target_absent_verified = true
+conversation_members target status = LEFT
+```
+
 如果要验证完整成员事件闭环，需要同时启动：
 
 ```text

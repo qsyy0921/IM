@@ -81,6 +81,7 @@ bin\memberchange-loadtest.exe `
 ## 限制
 
 - 本轮只验证 `JOIN -> ACTIVE roster`。
-- 未覆盖 `LEAVE / REMOVE / ROLE_CHANGED` 后的 roster 变化。
+- 本报告只覆盖 `JOIN -> ACTIVE roster`；`REMOVE -> roster excludes target` 已由 `loadtest-report-20260610-list-conversation-members-remove-smoke.md` 覆盖。
+- 未覆盖 `LEAVE / ROLE_CHANGED` 后的 roster 变化。
 - 未验证大群分页容量；当前只证明 keyset 分页契约和真实进程可用。
 - 未启动 outbox relay / member-change-worker，所以 summary 里 `outbox_pending_count=3`、`saga_done_count=0` 是预期现象。

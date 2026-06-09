@@ -345,3 +345,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已实现 app 入口 `NEXUSIM_ADAPTIVE_MAX_IN_FLIGHT` token / concurrency gate，并在 clean commit `7bf37fe` 跑 30s cap 梯度和 60s 候选重复验证；新增 `docs/runbook/loadtest/message-service/loadtest-report-20260609-adaptive-inflight-v1.md`。结论：`MaxInFlight=64` 当前最稳，accepted RPS 回到约 `1.92k` 且 outbox 可清零，但 logical p99 仍约 `2.2s`；下一步调 retry delay / max retries，而不是继续放宽 token 上限。
 - 2026-06-09：根据用户反馈，message-service 不再继续做大规模压测矩阵；已新增 `docs/runbook/loadtest/message-service/loadtest-report-20260609-message-service-consolidated.md`，整合 27 份原始压测报告、瓶颈排查过程和面试可讲要点。下一步转向第二个真实微服务，优先 `conversation-service`。
 - 2026-06-09：已按“每个微服务一个压测报告文件夹”的规则整理 `message-service` 压测报告；所有小报告和总报告均归档到 `docs/runbook/loadtest/message-service/`，目录入口为 `docs/runbook/loadtest/message-service/README.md`。
+- 2026-06-09：已将 `docs/runbook/loadtest/message-service/README.md` 从简单索引扩展为 `message-service` 压测结论和面试材料入口，包含真实链路范围、核心压测数字、瓶颈排查路径、outbox/admission 结论和面试讲法。

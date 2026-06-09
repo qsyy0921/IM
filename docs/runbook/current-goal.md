@@ -5,26 +5,29 @@
 ## 0. 可复制短 Goal Prompt
 
 ```text
-持续推进 E:\development\IM 的 NexusIM 项目。
+持续推进当前工作区的 NexusIM 项目。
 
-每轮开始先执行 git status --short --branch，并读取 docs/runbook/current-goal.md。
-按 current-goal.md 的当前目标、边界、下一步优先级继续工作；不回滚用户已有修改，不把重心放在耗尽硬件的重型压测上。
+每轮开始：
+1. 执行 git status --short --branch。
+2. 读取 docs/runbook/current-goal.md。
+3. 按 current-goal.md 的当前目标、硬边界、下一步优先级继续工作。
+4. 不回滚用户已有修改。
 
-当前重点：补齐 delivery-service 的 LEAVE/REMOVE 负向可见性 smoke，然后进入 push-gateway SDD。
-每个微服务独立使用六层 DDD：api / app / domain / infrastructure / types / trigger。
-开发过程中主动创建并使用 sub-agent：设计/契约找 Gauss，实现/事务/幂等找 Noether，测试/smoke/报告找 Dewey；不要等到最后才评审。
-优先把系统做完整：message-service、conversation-service、delivery-service、delivery outbox 已完成最小链路，下一步推进 push-gateway。
-重要契约、migration、并发/事务/幂等、可运行链路完成时再邀请评审线程 019ea124-dab1-71f2-964b-f5cb8d219aa2。
-完成有意义切片后运行检查、更新 current-goal.md 和对应 runbook/loadtest 报告；必要时提交并推送 GitHub。
+工作原则：
+1. 优先把系统链路做完整，不把主要时间消耗在重型压测矩阵上。
+2. 每个微服务独立使用六层 DDD：api / app / domain / infrastructure / types / trigger。
+3. 开发过程中主动使用可用 sub-agent 做设计、实现、测试、文档或风险复核，不等到最后才集中评审。
+4. 公共契约、migration、事务、幂等、消息顺序、错误码、可运行链路完成时，再按 current-goal.md 的评审规则邀请独立评审。
+5. 有意义的切片完成后运行必要检查，更新 current-goal.md 和对应 runbook/loadtest 报告。
+6. 按 current-goal.md 的 GitHub 同步策略批量提交和推送，不为低风险小改动频繁推送。
 ```
 
 ## 1. 当前目标
 
-持续推进 `E:\development\IM` 的 NexusIM 项目落地。`message-service`、`conversation-service`、`delivery-service` 已分别完成最小真实闭环，`delivery_outbox -> Kafka im.delivery.events` 也已通过真实 smoke；当前阶段切换到“补齐投递负向可见性验证，并设计 push-gateway”：
+持续推进 `E:\development\IM` 的 NexusIM 项目落地。`message-service`、`conversation-service`、`delivery-service` 已分别完成最小真实闭环，`delivery_outbox -> Kafka im.delivery.events` 和 `LEAVE/REMOVE` 负向可见性也已通过真实 smoke；当前阶段切换到“设计 push-gateway，并准备最小在线推送链路”：
 
 ```text
-delivery-service LEAVE/REMOVE negative visibility smoke
--> push-gateway SDD
+push-gateway SDD
 -> push-gateway proto / skeleton
 -> minimal online delivery without bypassing durable inbox
 ```
@@ -86,14 +89,15 @@ delivery-service LEAVE/REMOVE negative visibility smoke
 | delivery-service 工程基线 | 已新增 `delivery_service.proto`、delivery migration、六层目录、`PullInbox / AckDelivery` 最小 gRPC + app + PostgreSQL 骨架、`ProjectTimelineEventUseCase` / PostgreSQL projection 方法，以及 timeline consumer worker；真实 PostgreSQL 集成测试已覆盖 projection、ACK 越界、ACK 并发幂等 |
 | delivery-service full smoke | 已跑真实进程小规模 smoke：`CreateMemberChange(JOIN) -> Kafka timeline -> delivery projection -> SendMessage -> Kafka timeline -> user_inbox -> PullInbox -> AckDelivery`，SendMessage `64/64` 成功，`delivery-user-1` 拉到 64 条 inbox，ACK 到 seq `66`；`loadtest/delivery` summary 已支持 `--consumer-group`，checkpoint 统计可按本次 consumer group 过滤；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-full-smoke.md` |
 | delivery_outbox / push-gateway | 已新增 `schemas/kafka/delivery/v1/im.delivery.events.proto`、delivery-service outbox store、trigger relay、Kafka writer producer 和 `NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay`；真实 Kafka smoke 已验证 `delivery_outbox PENDING -> PUBLISHED`，并从 `im.delivery.events` 解码出 `DeliveryEvent_AckRecorded`；push-gateway 尚未实现，下一阶段必须依赖 delivery read model / delivery event，不直接读取 message-service 内部表，也不修改 ACK |
+| delivery-service negative visibility | 已新增 `loadtest/deliveryvisibility`，并在 clean commit `a87fc3f` 跑通 `LEAVE / REMOVE` 负向可见性 smoke：目标用户边界前各收到 1 条 inbox，边界后 `membership_status=LEFT`、`leave_seq=boundary_seq=4`，active sender 收到 post-boundary message，目标用户 `target_post_inbox_count=0` 且 `PullInbox(after_seq=boundary_seq)=0`；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-visibility-negative-smoke.md` |
 
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
 2. 不再继续做 message-service 重型硬件矩阵；只有公共契约、关键并发语义或新服务链路变化时，才跑 smoke / 小规模验证。
-3. 在接入 push-gateway 前，补一个 `LEAVE/REMOVE` 负向可见性 smoke：成员离开或被移除后，新消息不能继续写入该用户 `user_inbox`。
-4. 写 `push-gateway` SDD，明确它只负责在线连接、订阅 delivery event / 查询 delivery read model，不拥有 `user_inbox`，不修改 ACK，不直接读取 message-service / conversation-service 内部表。
-5. push-gateway SDD 冻结后，再进入 proto / migration / 六层骨架和最小在线推送链路。
+3. 写 `push-gateway` SDD，明确它只负责在线连接、订阅 delivery event / 查询 delivery read model，不拥有 `user_inbox`，不修改 ACK，不直接读取 message-service / conversation-service 内部表。
+4. push-gateway SDD 冻结后，再进入 proto / migration / 六层骨架和最小在线推送链路。
+5. push-gateway 最小链路只做在线通知和客户端回源提示，不把 message payload 当事实源。
 
 ## 6. 评审要求
 
@@ -405,3 +409,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：独立评审复核 delivery P1 修复和 timeline consumer，结论为无 P0/P1，可进入真实小规模 smoke。本轮已新增 `loadtest/delivery` runner，并在 clean commit `ef817f7` 跑通 delivery full smoke：`CreateMemberChange(JOIN user-0 / delivery-user-1) -> message-service outbox relay -> Kafka -> delivery timeline consumer -> SendMessage(user-0) -> Kafka -> user_inbox(delivery-user-1) -> PullInbox -> AckDelivery`。结果：SendMessage `64/64` 成功，`delivery-user-1` 拉到 64 条 inbox，ACK 到 seq `66`，`message_outbox PUBLISHED=66`，`delivery_outbox PENDING=129` 为预期，因为 delivery outbox relay 尚未实现；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-full-smoke.md`。
 - 2026-06-09：已实现 delivery-service `delivery_outbox -> Kafka im.delivery.events` 最小发布链路：新增独立 Kafka schema `schemas/kafka/delivery/v1/im.delivery.events.proto`，补 `NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay`、PostgreSQL outbox store、trigger relay、Kafka writer producer；单元测试覆盖 event builder、malformed fail-closed 和 batch publish error，真实 PostgreSQL 集成测试覆盖 publish/retry/DLQ/低版本阻塞。下一步跑真实进程 smoke 并归档报告。
 - 2026-06-09：已完成 delivery-service outbox relay 真实 Kafka smoke：创建 `im.delivery.events` topic，启动 `NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay`，把 1 条 `delivery.ack.recorded.v1` 从 `PENDING` 发布为 `PUBLISHED`，并从 Kafka partition 1 offset 0 解码出 `DeliveryEvent_AckRecorded`；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-outbox-smoke.md`。
+- 2026-06-09：已完成 delivery-service `LEAVE / REMOVE` 负向可见性 smoke：新增 `loadtest/deliveryvisibility` runner；clean commit `a87fc3f` 使用临时 topic `conversation.timeline.visibility.20260609-152208` 跑通两个场景。结论：边界后的 message event 已被 active sender 消费，但离开/移除用户没有任何 `conversation_seq > boundary_seq` 的 `user_inbox`，`PullInbox(after_seq=boundary_seq)` 也返回 0；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-visibility-negative-smoke.md`。

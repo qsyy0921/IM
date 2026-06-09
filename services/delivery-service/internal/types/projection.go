@@ -74,11 +74,34 @@ func (command ProjectTimelineEventCommand) Validate() error {
 	default:
 		return NewInvalidArgument("unsupported timeline event type")
 	}
+	if err := command.validateCheckpoint(); err != nil {
+		return err
+	}
 	return nil
 }
 
 func (command ProjectTimelineEventCommand) ShouldCheckpoint() bool {
 	return command.ConsumerGroup != "" && command.Topic != ""
+}
+
+func (command ProjectTimelineEventCommand) validateCheckpoint() error {
+	hasCheckpointField := command.ConsumerGroup != "" || command.Topic != "" || command.PartitionID != 0 || command.OffsetValue != 0
+	if !hasCheckpointField {
+		return nil
+	}
+	if command.ConsumerGroup == "" {
+		return NewInvalidArgument("consumer_group is required for checkpoint")
+	}
+	if command.Topic == "" {
+		return NewInvalidArgument("topic is required for checkpoint")
+	}
+	if command.PartitionID < 0 {
+		return NewInvalidArgument("partition_id must be non-negative")
+	}
+	if command.OffsetValue <= 0 {
+		return NewInvalidArgument("offset_value must be next offset")
+	}
+	return nil
 }
 
 type ProjectTimelineEventResult struct {

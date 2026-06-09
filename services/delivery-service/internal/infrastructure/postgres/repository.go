@@ -84,14 +84,23 @@ ORDER BY user_id
 	if err != nil {
 		return 0, types.NewDBReadFailed(err.Error())
 	}
-	defer rows.Close()
 
-	projected := 0
+	userIDs := make([]types.UserID, 0)
 	for rows.Next() {
 		var userID types.UserID
 		if err := rows.Scan(&userID); err != nil {
+			rows.Close()
 			return 0, types.NewDBReadFailed(err.Error())
 		}
+		userIDs = append(userIDs, userID)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, types.NewDBReadFailed(err.Error())
+	}
+
+	projected := 0
+	for _, userID := range userIDs {
 		if err := insertInboxItem(ctx, tx, command, userID); err != nil {
 			return 0, err
 		}
@@ -99,9 +108,6 @@ ORDER BY user_id
 			return 0, err
 		}
 		projected++
-	}
-	if err := rows.Err(); err != nil {
-		return 0, types.NewDBReadFailed(err.Error())
 	}
 	return projected, nil
 }
@@ -174,17 +180,36 @@ INSERT INTO delivery_membership_projection (
 ON CONFLICT (tenant_id, conversation_id, user_id) DO UPDATE
 SET role = EXCLUDED.role,
     status = EXCLUDED.status,
+    join_seq = CASE
+        WHEN $11 = 'JOIN' THEN EXCLUDED.join_seq
+        ELSE delivery_membership_projection.join_seq
+    END,
     leave_seq = EXCLUDED.leave_seq,
     member_version = EXCLUDED.member_version,
     permission_version = EXCLUDED.permission_version,
     updated_by_event_id = EXCLUDED.updated_by_event_id,
     updated_at = now()
 WHERE delivery_membership_projection.member_version <= EXCLUDED.member_version
-`, command.TenantID, command.ConversationID, command.MemberUserID, role, status, joinSeq, leaveSeq, command.MemberVersion, command.PermissionVersion, command.EventID)
+`, command.TenantID, command.ConversationID, command.MemberUserID, role, status, joinSeq, leaveSeq, command.MemberVersion, command.PermissionVersion, command.EventID, memberChangeKind(command.EventType))
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
+}
+
+func memberChangeKind(eventType string) string {
+	switch eventType {
+	case types.TimelineEventConversationMemberJoined:
+		return "JOIN"
+	case types.TimelineEventConversationMemberLeft:
+		return "LEAVE"
+	case types.TimelineEventConversationMemberRemoved:
+		return "REMOVE"
+	case types.TimelineEventConversationMemberRoleChanged:
+		return "ROLE_CHANGED"
+	default:
+		return ""
+	}
 }
 
 func memberStatusForEvent(eventType string) string {
@@ -331,6 +356,9 @@ func (repository *Repository) AckDelivery(
 		_ = tx.Rollback(ctx)
 	}()
 
+	if err := lockAckKey(ctx, tx, command); err != nil {
+		return types.AckDeliveryResult{}, err
+	}
 	current, exists, err := lockDeliveryCursor(ctx, tx, command)
 	if err != nil {
 		return types.AckDeliveryResult{}, err
@@ -390,6 +418,25 @@ WHERE tenant_id = $1
 		return 0, types.NewDBReadFailed(err.Error())
 	}
 	return maxSeq, nil
+}
+
+func lockAckKey(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.AckDeliveryCommand,
+) error {
+	key := fmt.Sprintf(
+		"%s\x1f%s\x1f%s\x1f%s",
+		command.AuthContext.TenantID,
+		command.AuthContext.UserID,
+		command.AuthContext.DeviceID,
+		command.ConversationID,
+	)
+	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, key)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
 }
 
 func lockDeliveryCursor(

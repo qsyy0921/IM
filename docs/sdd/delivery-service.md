@@ -278,6 +278,8 @@ CREATE TABLE delivery_outbox (
 );
 ```
 
+`delivery_kafka_checkpoints.offset_value` 固定表示 next offset to commit。处理 Kafka record offset `N` 成功后，本表写入 `N + 1`；Kafka commit 也提交同一个 next offset 语义。
+
 约束：
 
 - `user_inbox` 是可重建投影，不是 message 事实源。

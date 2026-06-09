@@ -15,6 +15,7 @@
 | delivery-service SDD | `docs/sdd/delivery-service.md` | timeline 投影、user_inbox、离线补拉和设备 ACK |
 | push-gateway SDD | `docs/sdd/push-gateway.md` | WebSocket 在线连接、delivery event 唤醒、PullInbox / AckDelivery 协调 |
 | receipt-service SDD | `docs/sdd/receipt-service.md` | 送达 / 已读回执 read model、MarkRead 和 receipt event 边界 |
+| receipt-service conversation list SDD | `docs/sdd/receipt-service-conversation-list.md` | 会话列表 / 未读数 read model，复用 receipt-service projection |
 
 ## 六层 DDD 约定
 
@@ -39,7 +40,7 @@
 | `conversation-service / member_change_saga` | SDD 已冻结 v1.0；proto / schema / migration v2 / relay builder / 最小 `CreateMemberChange` 写路径、saga publish 状态推进和 full smoke 已落地 | 后续补 LEAVE / REMOVE / ROLE_CHANGED、DLQ repair 和生产韧性 |
 | `push-gateway` | SDD v0.1 Draft 已存在 | 进入 proto / 六层骨架前需要阶段评审；第一阶段只做在线通知和回源协调 |
 | `delivery-service` | SDD v0.1 已存在，最小 projection / PullInbox / AckDelivery / delivery outbox relay 已落地 | 可以支撑 push-gateway 第一阶段，只要 push-gateway 不绕过 durable inbox / ACK |
-| `receipt-service` | SDD v0.1 Draft、proto、Kafka schema、migration、六层骨架、PostgreSQL repository、delivery consumer 和 MarkRead 事务已新增 | 下一步做真实进程 smoke 和 receipt outbox relay；不得直接读取 delivery-service 内部表 |
+| `receipt-service` | SDD v0.1 Draft、proto、Kafka schema、migration、六层骨架、PostgreSQL repository、delivery consumer、MarkRead 事务和 receipt outbox relay 已落地；conversation list / unread SDD v0.1 Draft 已新增 | 下一步可评审并实现会话列表 / 未读数；不得直接读取 delivery-service 内部表 |
 | `retrieval-gateway` | SDD 未完成 | 不进入第一条代码切片 |
 
 ## 已完成的 message-service 切片
@@ -126,7 +127,7 @@ Kafka im.delivery.events
 - `delivery.notify` 只是唤醒信号，客户端展示事实仍以 `PullInbox` 为准。
 - 第一阶段不新增 PostgreSQL migration；多实例前再接 Redis route。
 
-## 下一步 receipt-service 切片
+## 下一步 receipt-service / conversation list 切片
 
 当前优先范围：
 
@@ -137,6 +138,7 @@ Kafka im.delivery.events
 -> MarkRead
 -> GetReceiptState
 -> receipt_outbox
+-> user_conversation_summaries / ListConversations
 ```
 
 边界：
@@ -146,6 +148,7 @@ Kafka im.delivery.events
 - receipt-service 不直接读取 `delivery-service` 内部表；它消费 `im.delivery.events` 建自己的 projection。
 - receipt event 只能通过 receipt outbox 发布。
 - 权限来源必须通过 `ReceiptAccessPort` 表达；不能用 receipt projection 的存在性替代会话访问权限。
+- 会话列表 / 未读数复用 receipt-service projection，不新增独立服务，不直接读取 delivery-service 内部表。
 
 ## 已补齐的工程基线
 
@@ -165,7 +168,7 @@ Kafka im.delivery.events
 
 优先级：
 
-1. `receipt-service` 真实进程 smoke / receipt outbox relay
+1. `receipt-service` 会话列表 / 未读数 SDD 评审和最小实现
 2. `timeline-service-sequencer.md`
 3. `retrieval-gateway.md`
 

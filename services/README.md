@@ -35,7 +35,7 @@ services/<service-name>/
 | `conversation-service` | 最小 read/write path 已落地 | 提供 `GetSendContext`，并已实现成员变更 `CreateMemberChange / GetMemberChange`、成员边界事件和 saga progress worker。 |
 | `delivery-service` | 最小投递链路已落地 | 消费 conversation timeline，维护 `user_inbox`、`AckDelivery` cursor、`delivery_outbox` 和 `im.delivery.events`。 |
 | `push-gateway` | 最小在线通知 / 分布式 route 已落地 | 消费 `im.delivery.events`，通过 WebSocket 发送轻量 notify，并通过 Redis route / resume 支持跨实例在线唤醒。 |
-| `receipt-service` | 最小回执链路已落地 | 已跑通 `im.delivery.events -> receipt projection -> MarkRead -> GetReceiptState -> receipt_outbox -> im.receipt.events` 真实进程 smoke；后续可接 receipt event 下游消费者。 |
+| `receipt-service` | 最小回执链路已落地 | 已跑通 `im.delivery.events -> receipt projection -> MarkRead -> GetReceiptState -> receipt_outbox -> im.receipt.events` 真实进程 smoke；已新增会话列表 / 未读数 SDD，作为 receipt-service 扩展 projection，不新增独立服务。 |
 
 ## 约束
 

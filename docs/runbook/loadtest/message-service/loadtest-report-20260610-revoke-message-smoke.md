@@ -5,10 +5,10 @@
 原始结果：
 
 ```text
-H:\NexusIM\loadtest-results\message-revoke-smoke-20260610-021639\message-revoke-summary.json
+H:\NexusIM\loadtest-results\message-revoke-smoke-20260610-023321\message-revoke-summary.json
 ```
 
-Commit：`9a1a776`，`git_dirty=false`。
+Commit：`8d008de`，`git_dirty=false`。
 
 ## 结论
 
@@ -50,9 +50,9 @@ CreateMemberChange(JOIN)
 样本消息：
 
 ```text
-message_id=msg_a5771f10-e1f7-40be-ac8d-c687b57c1f03
-persisted_event_id=8ec64e94-daac-41d2-82b0-526d273683c2
-revoked_event_id=b8b3f8c6-ab80-499d-81ad-40a1881f5e29
+message_id=msg_95c439de-50c5-4bf5-bdc2-ce5079e6695d
+persisted_event_id=548b5c9a-b0e1-4489-9fb9-ee892a57a38f
+revoked_event_id=8c73751e-0bae-449b-a1a8-c76d86c15a5a
 ```
 
 ## 实现边界

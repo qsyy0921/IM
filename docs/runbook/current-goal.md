@@ -60,6 +60,7 @@ conversation-service
 | 压测报告归档 | 每个微服务一个目录：`docs/runbook/loadtest/<service>/`；目录内保存小报告、矩阵报告和 consolidated 总报告。`message-service` 当前入口为 `docs/runbook/loadtest/message-service/README.md` |
 | conversation-service smoke | 已跑真实进程小规模 smoke：`message-service -> conversation-service -> PostgreSQL`，725/725 成功，p99 13.26ms；报告见 `docs/runbook/loadtest/conversation-service/` |
 | conversation-service local runbook | `docs/runbook/conversation-service-local.md` 已存在，记录 migration、seed、双服务启动、smoke 和清理步骤 |
+| conversation-service member_change_saga SDD | `docs/sdd/conversation-service-member-change-saga.md` 已冻结 v1.0，选定 timeline append/publish 方案 C，真实编码前需补成员边界 Kafka schema 和成员变更 RPC |
 
 ## 5. 下一步优先级
 
@@ -70,8 +71,9 @@ conversation-service
 5. admission token / concurrency limit 已实现并跑完 v1 矩阵；`MaxInFlight=64` 是当前 Windows 本机候选，60s 下 1200/1600 VU accepted RPS 约 `1.92k`、success p99 约 `63ms`、outbox pending 为 0。
 6. message-service 第一阶段压测报告已归档到 `docs/runbook/loadtest/message-service/`，总入口为 `docs/runbook/loadtest/message-service/loadtest-report-20260609-message-service-consolidated.md`；后续不再围绕 message-service 做大规模硬件矩阵，只在关键机制变更后跑 smoke / 小规模验证。
 7. `conversation-service` 最小 RPC read path 已落地并通过真实进程 smoke：SDD、proto、migration、六层骨架、PostgreSQL repository、gRPC handler、`message-service` 可选 gRPC client 和 `message-service -> conversation-service -> PostgreSQL` 小规模验证均已完成。
-8. `conversation-service` 本地运行 runbook 和更多错误路径测试已补齐；独立评审指出的 P1 参数缺失错误映射已修复；P2 中的 `message-service -> conversation-service` 短重试和 response contract 防御也已补。下一步继续跟踪剩余 P2，优先进入成员变更 Saga SDD 或下一个微服务设计。
-9. 暂不推 GitHub；等 conversation-service 最小 RPC 切片评审后再批量同步。
+8. `conversation-service` 本地运行 runbook 和更多错误路径测试已补齐；独立评审指出的 P1 参数缺失错误映射已修复；P2 中的 `message-service -> conversation-service` 短重试和 response contract 防御也已补。
+9. `conversation-service / member_change_saga` SDD 已冻结，下一步优先补成员变更 RPC proto、member boundary Kafka schema 和 migration v2，再实现最小成员变更命令。
+10. 暂不推 GitHub；等 conversation-service member change 契约/最小实现评审后再批量同步。
 
 ## 6. 评审要求
 
@@ -285,7 +287,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 debug metrics collector 保存全量样本并在 snapshot 时排序，适合本地短压测，不适合作为生产 metrics；后续应替换为固定窗口、reservoir、HDR histogram 或 Prometheus histogram。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
-- `timeline-service`、`delivery-service`、`push-gateway` SDD 未冻结；`conversation-service` 只有 `GetSendContext` read path SDD v0.1，`member_change_saga` 仍未冻结，不能扩展到真实成员变更和成员边界事件生产逻辑。
+- `timeline-service`、`delivery-service`、`push-gateway` SDD 未冻结；`conversation-service / member_change_saga` SDD 已冻结，但成员变更代码前仍必须补 Proto、Kafka schema 和 migration v2。
 
 ## 11. 最近评审状态
 
@@ -356,3 +358,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已完成 `conversation-service` 第一轮真实进程 smoke：启动 `conversation-service` 和 `message-service`，由 `message-service` 通过 gRPC 调用真实 `GetSendContext`，`loadtest/sendmessage --vus=2 --duration=3s` 结果为 725/725 成功、p95 10.36ms、p99 13.26ms；本轮未启动 outbox relay，测试结束后已清理 `tenant-conv-smoke` 数据，报告归档到 `docs/runbook/loadtest/conversation-service/`。
 - 2026-06-09：已补 `conversation-service` 错误路径测试，覆盖 domain inactive conversation/member、app command validation 和 repository error propagation、gRPC 稳定错误 message、真实 PostgreSQL missing/archived/left/member missing 场景；已新增 `docs/runbook/conversation-service-local.md` 作为本地启动与 smoke 说明。
 - 2026-06-09：独立评审线程复核 `conversation-service` 最小 read path，结论为无 P0，但指出 P1：参数缺失会被映射为 Internal。本轮已新增 `ErrInvalidArgument`，`Validate()` 返回稳定 sentinel，gRPC 映射为 `InvalidArgument`，并补 tenant/conversation/user 缺失单测；同时补 `message-service` ConversationClient 响应 tenant/conversation/enum/current_seq_shard 契约校验，以及 conversation dependency unavailable 的一次短重试。
+- 2026-06-09：已冻结 `docs/sdd/conversation-service-member-change-saga.md`，明确成员变更 Saga 采用目标架构方案 C：成员边界事件与 message event 共享 `conversation_seq`、`conversation_timeline_events` 和 outbox 流；编码前必须补 `CreateMemberChange` proto、member boundary Kafka oneof payload、saga retry/DLQ migration 字段和本地 smoke runbook。

@@ -11,6 +11,7 @@
 | SDD Template | `docs/sdd/TEMPLATE.md` | 后续服务级 SDD 的统一模板 |
 | message-service SDD | `docs/sdd/message-service.md` | 第一条可编码切片的服务设计 |
 | conversation-service SDD | `docs/sdd/conversation-service.md` | 会话发送上下文读取、成员事实和成员变更 Saga 边界 |
+| conversation-service member_change_saga SDD | `docs/sdd/conversation-service-member-change-saga.md` | 成员变更 Saga、成员边界 timeline event、ACL 投影失败窗口 |
 
 ## 六层 DDD 约定
 
@@ -32,7 +33,7 @@
 | `message-service` | SDD 已冻结 v1.0 | 可以开始 `SendMessage` 普通会话写入链路 |
 | `timeline-service / sequencer` | SDD 未完成 | 不阻塞 `LOCAL_ROW_LOCK`；阻塞热点会话生产实现 |
 | `conversation-service / send context` | SDD v0.1 已存在 | 可以实现 `GetSendContext` 读取路径，替换 message-service strict conversation mock |
-| `conversation-service / member_change_saga` | SDD 未完成 | 不阻塞 send context；阻塞真实成员变更、成员边界事件和 ACL 投影 |
+| `conversation-service / member_change_saga` | SDD 已冻结 v1.0 | 可以开始 proto / schema / migration / 代码切片；真实编码前必须补 member boundary Kafka schema |
 | `push-gateway` | SDD 未完成 | 不阻塞 `message-service`；阻塞 WebSocket 完整闭环 |
 | `delivery-service` | SDD 未完成 | 不阻塞 `message-service`；阻塞 fanout、offline pull、ACK 闭环 |
 | `retrieval-gateway` | SDD 未完成 | 不进入第一条代码切片 |
@@ -98,9 +99,8 @@ conversation-service GetSendContext
 优先级：
 
 1. `timeline-service-sequencer.md`
-2. `conversation-service-member-change-saga.md`
-3. `delivery-service.md`
-4. `push-gateway.md`
-5. `retrieval-gateway.md`
+2. `delivery-service.md`
+3. `push-gateway.md`
+4. `retrieval-gateway.md`
 
-其中 `timeline-service` SDD 和 `conversation-service / member_change_saga` SDD 不阻塞当前 `GetSendContext` read path，但必须在热点会话、成员变更、成员边界投递和 ACL 投影生产化前冻结。
+其中 `timeline-service` SDD 不阻塞当前 `GetSendContext` read path，但阻塞热点会话生产化。`conversation-service / member_change_saga` 已冻结，下一步可以进入成员变更 Proto / Kafka schema / migration 切片。

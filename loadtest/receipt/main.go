@@ -53,44 +53,54 @@ type config struct {
 }
 
 type summary struct {
-	Commit                  string                  `json:"commit"`
-	CommitFull              string                  `json:"commit_full"`
-	GitDirty                bool                    `json:"git_dirty"`
-	GitStatusShort          string                  `json:"git_status_short,omitempty"`
-	ConversationTarget      string                  `json:"conversation_target"`
-	MessageTarget           string                  `json:"message_target"`
-	DeliveryTarget          string                  `json:"delivery_target"`
-	ReceiptTarget           string                  `json:"receipt_target"`
-	ResultDir               string                  `json:"result_dir"`
-	TenantID                string                  `json:"tenant_id"`
-	ConversationID          string                  `json:"conversation_id"`
-	OwnerUserID             string                  `json:"owner_user_id"`
-	ReceiverUserID          string                  `json:"receiver_user_id"`
-	ReceiverDeviceID        string                  `json:"receiver_device_id"`
-	DeliveryConsumerGroup   string                  `json:"delivery_consumer_group,omitempty"`
-	ReceiptConsumerGroup    string                  `json:"receipt_consumer_group,omitempty"`
-	ReceiptEventsTopic      string                  `json:"receipt_events_topic,omitempty"`
-	ReceiptEventsGroup      string                  `json:"receipt_events_group,omitempty"`
-	StartedAt               time.Time               `json:"started_at"`
-	FinishedAt              time.Time               `json:"finished_at"`
-	Success                 bool                    `json:"success"`
-	Error                   string                  `json:"error,omitempty"`
-	MemberJoin              memberJoinSummary       `json:"member_join"`
-	SendMessage             sendSummary             `json:"send_message"`
-	PullInbox               pullSummary             `json:"pull_inbox"`
-	AckDelivery             ackSummary              `json:"ack_delivery"`
-	ReceiptBeforeReadBySeq  receiptStateSummary     `json:"receipt_before_read_by_seq"`
-	ConversationListBefore  conversationListSummary `json:"conversation_list_before_read"`
-	ReceiptAfterReadBySeq   receiptStateSummary     `json:"receipt_after_read_by_seq"`
-	ReceiptAfterReadByMsgID receiptStateSummary     `json:"receipt_after_read_by_message_id"`
-	ConversationListAfter   conversationListSummary `json:"conversation_list_after_read"`
-	MarkRead                markReadSummary         `json:"mark_read"`
-	MarkReadTooFar          negativeCallSummary     `json:"mark_read_too_far"`
-	ReceiptProjection       receiptProjectionStats  `json:"receipt_projection"`
-	ReceiptOutbox           receiptOutboxStats      `json:"receipt_outbox"`
-	ReceiptKafkaEvents      []receiptKafkaEvent     `json:"receipt_kafka_events"`
-	DeliveryOutbox          outboxStats             `json:"delivery_outbox"`
-	LatenciesMS             map[string]float64      `json:"latencies_ms"`
+	Commit                                   string                  `json:"commit"`
+	CommitFull                               string                  `json:"commit_full"`
+	GitDirty                                 bool                    `json:"git_dirty"`
+	GitStatusShort                           string                  `json:"git_status_short,omitempty"`
+	ConversationTarget                       string                  `json:"conversation_target"`
+	MessageTarget                            string                  `json:"message_target"`
+	DeliveryTarget                           string                  `json:"delivery_target"`
+	ReceiptTarget                            string                  `json:"receipt_target"`
+	ResultDir                                string                  `json:"result_dir"`
+	TenantID                                 string                  `json:"tenant_id"`
+	ConversationID                           string                  `json:"conversation_id"`
+	OwnerUserID                              string                  `json:"owner_user_id"`
+	ReceiverUserID                           string                  `json:"receiver_user_id"`
+	ReceiverDeviceID                         string                  `json:"receiver_device_id"`
+	DeliveryConsumerGroup                    string                  `json:"delivery_consumer_group,omitempty"`
+	ReceiptConsumerGroup                     string                  `json:"receipt_consumer_group,omitempty"`
+	ReceiptEventsTopic                       string                  `json:"receipt_events_topic,omitempty"`
+	ReceiptEventsGroup                       string                  `json:"receipt_events_group,omitempty"`
+	StartedAt                                time.Time               `json:"started_at"`
+	FinishedAt                               time.Time               `json:"finished_at"`
+	Success                                  bool                    `json:"success"`
+	Error                                    string                  `json:"error,omitempty"`
+	MemberJoin                               memberJoinSummary       `json:"member_join"`
+	SendMessage                              sendSummary             `json:"send_message"`
+	PullInbox                                pullSummary             `json:"pull_inbox"`
+	AckDelivery                              ackSummary              `json:"ack_delivery"`
+	ReceiptBeforeReadBySeq                   receiptStateSummary     `json:"receipt_before_read_by_seq"`
+	ConversationListBefore                   conversationListSummary `json:"conversation_list_before_read"`
+	ReceiptAfterReadBySeq                    receiptStateSummary     `json:"receipt_after_read_by_seq"`
+	ReceiptAfterReadByMsgID                  receiptStateSummary     `json:"receipt_after_read_by_message_id"`
+	ConversationListAfter                    conversationListSummary `json:"conversation_list_after_read"`
+	ArchiveConversation                      archiveSummary          `json:"archive_conversation"`
+	ConversationListArchivedDefault          conversationListSummary `json:"conversation_list_archived_default"`
+	ConversationListArchivedIncluded         conversationListSummary `json:"conversation_list_archived_included"`
+	SendMessageWhileArchived                 sendSummary             `json:"send_message_while_archived"`
+	PullInboxWhileArchived                   pullSummary             `json:"pull_inbox_while_archived"`
+	AckDeliveryWhileArchived                 ackSummary              `json:"ack_delivery_while_archived"`
+	ConversationListAfterArchivedNewDefault  conversationListSummary `json:"conversation_list_after_archived_new_message_default"`
+	ConversationListAfterArchivedNewIncluded conversationListSummary `json:"conversation_list_after_archived_new_message_included"`
+	UnarchiveConversation                    archiveSummary          `json:"unarchive_conversation"`
+	ConversationListAfterUnarchive           conversationListSummary `json:"conversation_list_after_unarchive"`
+	MarkRead                                 markReadSummary         `json:"mark_read"`
+	MarkReadTooFar                           negativeCallSummary     `json:"mark_read_too_far"`
+	ReceiptProjection                        receiptProjectionStats  `json:"receipt_projection"`
+	ReceiptOutbox                            receiptOutboxStats      `json:"receipt_outbox"`
+	ReceiptKafkaEvents                       []receiptKafkaEvent     `json:"receipt_kafka_events"`
+	DeliveryOutbox                           outboxStats             `json:"delivery_outbox"`
+	LatenciesMS                              map[string]float64      `json:"latencies_ms"`
 }
 
 type memberJoinSummary struct {
@@ -128,6 +138,11 @@ type ackSummary struct {
 type markReadSummary struct {
 	LastReadSeq int64   `json:"last_read_seq"`
 	LatencyMS   float64 `json:"latency_ms"`
+}
+
+type archiveSummary struct {
+	Archived  bool    `json:"archived"`
+	LatencyMS float64 `json:"latency_ms"`
 }
 
 type negativeCallSummary struct {
@@ -170,6 +185,7 @@ type conversationSummaryItem struct {
 	UnreadCount     int64  `json:"unread_count"`
 	LastReadSeq     int64  `json:"last_read_seq"`
 	UpdatedAtUnixMS int64  `json:"updated_at_unix_ms"`
+	Archived        bool   `json:"archived"`
 }
 
 type projectionWatermarkSummary struct {
@@ -378,7 +394,7 @@ func executeSmoke(
 	}
 
 	begin = time.Now()
-	send, err := sendMessage(ctx, cfg, messageClient)
+	send, err := sendMessage(ctx, cfg, messageClient, 1)
 	result.LatenciesMS["send_message"] = elapsedMS(begin)
 	if err != nil {
 		return fmt.Errorf("send message: %w", err)
@@ -421,7 +437,7 @@ func executeSmoke(
 		return fmt.Errorf("unexpected receipt before read receiver=%+v", receiverBefore)
 	}
 	begin = time.Now()
-	conversationListBefore, err := listConversations(ctx, cfg, receiptClient)
+	conversationListBefore, err := listConversations(ctx, cfg, receiptClient, false)
 	conversationListBefore.LatencyMS = elapsedMS(begin)
 	if err != nil {
 		return fmt.Errorf("list conversations before read: %w", err)
@@ -457,7 +473,7 @@ func executeSmoke(
 		return fmt.Errorf("unexpected receipt after read receiver=%+v", receiverAfter)
 	}
 	begin = time.Now()
-	conversationListAfter, err := listConversations(ctx, cfg, receiptClient)
+	conversationListAfter, err := listConversations(ctx, cfg, receiptClient, false)
 	conversationListAfter.LatencyMS = elapsedMS(begin)
 	if err != nil {
 		return fmt.Errorf("list conversations after read: %w", err)
@@ -467,7 +483,118 @@ func executeSmoke(
 		return fmt.Errorf("conversation list after read: %w", err)
 	}
 
-	tooFar, err := markRead(ctx, cfg, receiptClient, send.GetConversationSeq()+1)
+	begin = time.Now()
+	archiveResponse, err := archiveConversation(ctx, cfg, receiptClient, true)
+	result.ArchiveConversation.LatencyMS = elapsedMS(begin)
+	if err != nil {
+		return fmt.Errorf("archive conversation: %w", err)
+	}
+	result.ArchiveConversation.Archived = archiveResponse.GetConversation().GetArchived()
+	if !result.ArchiveConversation.Archived {
+		return fmt.Errorf("archive response did not mark conversation archived: %+v", archiveResponse.GetConversation())
+	}
+
+	begin = time.Now()
+	archivedDefault, err := listConversations(ctx, cfg, receiptClient, false)
+	archivedDefault.LatencyMS = elapsedMS(begin)
+	if err != nil {
+		return fmt.Errorf("list conversations after archive default: %w", err)
+	}
+	result.ConversationListArchivedDefault = archivedDefault
+	if err := assertConversationListHidden(archivedDefault); err != nil {
+		return fmt.Errorf("conversation list archive default: %w", err)
+	}
+
+	begin = time.Now()
+	archivedIncluded, err := listConversations(ctx, cfg, receiptClient, true)
+	archivedIncluded.LatencyMS = elapsedMS(begin)
+	if err != nil {
+		return fmt.Errorf("list conversations after archive include_archived: %w", err)
+	}
+	result.ConversationListArchivedIncluded = archivedIncluded
+	if err := assertConversationListArchived(archivedIncluded, cfg.conversationID, send.GetConversationSeq(), true); err != nil {
+		return fmt.Errorf("conversation list archive included: %w", err)
+	}
+
+	begin = time.Now()
+	sendWhileArchived, err := sendMessage(ctx, cfg, messageClient, 2)
+	result.LatenciesMS["send_message_while_archived"] = elapsedMS(begin)
+	if err != nil {
+		return fmt.Errorf("send message while archived: %w", err)
+	}
+	result.SendMessageWhileArchived = sendSummary{
+		MessageID:       sendWhileArchived.GetMessageId(),
+		ConversationSeq: sendWhileArchived.GetConversationSeq(),
+	}
+
+	pullWhileArchived, err := pullInboxAtLeast(ctx, cfg, deliveryClient, sendWhileArchived.GetConversationSeq())
+	if err != nil {
+		return fmt.Errorf("pull inbox while archived: %w", err)
+	}
+	result.PullInboxWhileArchived = pullWhileArchived
+	if pullWhileArchived.MaxSeq < sendWhileArchived.GetConversationSeq() {
+		return fmt.Errorf("pull inbox while archived max seq %d did not reach sent seq %d", pullWhileArchived.MaxSeq, sendWhileArchived.GetConversationSeq())
+	}
+
+	begin = time.Now()
+	ackWhileArchived, err := ackDelivery(ctx, cfg, deliveryClient, sendWhileArchived.GetConversationSeq())
+	result.AckDeliveryWhileArchived.LatencyMS = elapsedMS(begin)
+	if err != nil {
+		return fmt.Errorf("ack delivery while archived: %w", err)
+	}
+	result.AckDeliveryWhileArchived.LastReceivedSeq = ackWhileArchived.GetLastReceivedSeq()
+	if result.AckDeliveryWhileArchived.LastReceivedSeq < sendWhileArchived.GetConversationSeq() {
+		return fmt.Errorf("ack while archived last_received_seq %d did not reach sent seq %d", result.AckDeliveryWhileArchived.LastReceivedSeq, sendWhileArchived.GetConversationSeq())
+	}
+	if err := waitReceiptReceived(ctx, pool, cfg, sendWhileArchived.GetConversationSeq()); err != nil {
+		return err
+	}
+
+	begin = time.Now()
+	archivedNewDefault, err := listConversations(ctx, cfg, receiptClient, false)
+	archivedNewDefault.LatencyMS = elapsedMS(begin)
+	if err != nil {
+		return fmt.Errorf("list conversations after archived new message default: %w", err)
+	}
+	result.ConversationListAfterArchivedNewDefault = archivedNewDefault
+	if err := assertConversationListHidden(archivedNewDefault); err != nil {
+		return fmt.Errorf("conversation list after archived new message default: %w", err)
+	}
+
+	begin = time.Now()
+	archivedNewIncluded, err := listConversations(ctx, cfg, receiptClient, true)
+	archivedNewIncluded.LatencyMS = elapsedMS(begin)
+	if err != nil {
+		return fmt.Errorf("list conversations after archived new message include_archived: %w", err)
+	}
+	result.ConversationListAfterArchivedNewIncluded = archivedNewIncluded
+	if err := assertConversationListArchived(archivedNewIncluded, cfg.conversationID, sendWhileArchived.GetConversationSeq(), true); err != nil {
+		return fmt.Errorf("conversation list after archived new message included: %w", err)
+	}
+
+	begin = time.Now()
+	unarchiveResponse, err := archiveConversation(ctx, cfg, receiptClient, false)
+	result.UnarchiveConversation.LatencyMS = elapsedMS(begin)
+	if err != nil {
+		return fmt.Errorf("unarchive conversation: %w", err)
+	}
+	result.UnarchiveConversation.Archived = unarchiveResponse.GetConversation().GetArchived()
+	if result.UnarchiveConversation.Archived {
+		return fmt.Errorf("unarchive response still marked conversation archived: %+v", unarchiveResponse.GetConversation())
+	}
+
+	begin = time.Now()
+	afterUnarchive, err := listConversations(ctx, cfg, receiptClient, false)
+	afterUnarchive.LatencyMS = elapsedMS(begin)
+	if err != nil {
+		return fmt.Errorf("list conversations after unarchive: %w", err)
+	}
+	result.ConversationListAfterUnarchive = afterUnarchive
+	if err := assertConversationListArchived(afterUnarchive, cfg.conversationID, sendWhileArchived.GetConversationSeq(), false); err != nil {
+		return fmt.Errorf("conversation list after unarchive: %w", err)
+	}
+
+	tooFar, err := markRead(ctx, cfg, receiptClient, sendWhileArchived.GetConversationSeq()+1)
 	if err == nil {
 		return fmt.Errorf("mark read too far unexpectedly succeeded: %+v", tooFar)
 	}
@@ -484,7 +611,7 @@ func executeSmoke(
 		return fmt.Errorf("mark read too far code=%s message=%s", statusErr.Code(), statusErr.Message())
 	}
 
-	if err := waitReceiptOutboxPublished(ctx, pool, cfg, 2); err != nil {
+	if err := waitReceiptOutboxPublished(ctx, pool, cfg, 3); err != nil {
 		return err
 	}
 	if err := fillPostgresStats(ctx, pool, cfg, result); err != nil {
@@ -525,8 +652,8 @@ func createReceiverJoin(
 	})
 }
 
-func sendMessage(ctx context.Context, cfg config, client messagev1.MessageServiceClient) (*messagev1.SendMessageResponse, error) {
-	payload, err := structpb.NewStruct(map[string]any{"text": "receipt smoke"})
+func sendMessage(ctx context.Context, cfg config, client messagev1.MessageServiceClient, index int) (*messagev1.SendMessageResponse, error) {
+	payload, err := structpb.NewStruct(map[string]any{"text": fmt.Sprintf("receipt smoke %d", index)})
 	if err != nil {
 		return nil, err
 	}
@@ -539,10 +666,10 @@ func sendMessage(ctx context.Context, cfg config, client messagev1.MessageServic
 			DeviceId:  "receipt-smoke-owner-device",
 			SessionId: "receipt-smoke-owner-session",
 			TraceId:   "receipt-smoke-send",
-			RequestId: "receipt-smoke-send",
+			RequestId: fmt.Sprintf("receipt-smoke-send-%d", index),
 		},
 		ConversationId: cfg.conversationID,
-		ClientMsgId:    "receipt-smoke-client-message-1",
+		ClientMsgId:    fmt.Sprintf("receipt-smoke-client-message-%d", index),
 		MessageType:    "TEXT",
 		Payload:        payload,
 	})
@@ -680,6 +807,7 @@ func listConversations(
 	ctx context.Context,
 	cfg config,
 	client receiptv1.ReceiptServiceClient,
+	includeArchived bool,
 ) (conversationListSummary, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
@@ -692,12 +820,35 @@ func listConversations(
 			TraceId:   "receipt-smoke-list",
 			RequestId: "receipt-smoke-list",
 		},
-		Limit: 10,
+		Limit:           10,
+		IncludeArchived: includeArchived,
 	})
 	if err != nil {
 		return conversationListSummary{}, err
 	}
 	return summarizeConversationList(response), nil
+}
+
+func archiveConversation(
+	ctx context.Context,
+	cfg config,
+	client receiptv1.ReceiptServiceClient,
+	archived bool,
+) (*receiptv1.ArchiveConversationResponse, error) {
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	return client.ArchiveConversation(requestCtx, &receiptv1.ArchiveConversationRequest{
+		AuthContext: &receiptv1.AuthContext{
+			TenantId:  cfg.tenantID,
+			UserId:    cfg.receiverUserID,
+			DeviceId:  cfg.receiverDeviceID,
+			SessionId: "receipt-smoke",
+			TraceId:   "receipt-smoke-archive",
+			RequestId: fmt.Sprintf("receipt-smoke-archive-%v", archived),
+		},
+		ConversationId: cfg.conversationID,
+		Archived:       archived,
+	})
 }
 
 func markRead(
@@ -725,6 +876,7 @@ func markRead(
 func summarizeConversationList(response *receiptv1.ListConversationsResponse) conversationListSummary {
 	result := conversationListSummary{
 		ItemCount:      len(response.GetItems()),
+		Items:          []conversationSummaryItem{},
 		NextPageCursor: response.GetNextPageCursor(),
 	}
 	if watermark := response.GetProjectionWatermark(); watermark != nil {
@@ -743,6 +895,7 @@ func summarizeConversationList(response *receiptv1.ListConversationsResponse) co
 			UnreadCount:     item.GetUnreadCount(),
 			LastReadSeq:     item.GetLastReadSeq(),
 			UpdatedAtUnixMS: item.GetUpdatedAtUnixMs(),
+			Archived:        item.GetArchived(),
 		})
 	}
 	return result
@@ -765,8 +918,37 @@ func assertConversationListState(
 	if item.LastVisibleSeq != seq || item.UnreadCount != unread || item.LastReadSeq != readSeq {
 		return fmt.Errorf("unexpected item state: %+v", item)
 	}
+	if item.Archived {
+		return fmt.Errorf("expected visible item not archived: %+v", item)
+	}
 	if item.LastMessageID == "" || item.LastSenderID == "" {
 		return fmt.Errorf("missing last message fields: %+v", item)
+	}
+	return nil
+}
+
+func assertConversationListHidden(state conversationListSummary) error {
+	if len(state.Items) != 0 {
+		return fmt.Errorf("expected archived conversation hidden, got %+v", state.Items)
+	}
+	return nil
+}
+
+func assertConversationListArchived(
+	state conversationListSummary,
+	conversationID string,
+	seq int64,
+	archived bool,
+) error {
+	if len(state.Items) != 1 {
+		return fmt.Errorf("expected 1 item, got %d", len(state.Items))
+	}
+	item := state.Items[0]
+	if item.ConversationID != conversationID {
+		return fmt.Errorf("conversation_id=%s want=%s", item.ConversationID, conversationID)
+	}
+	if item.LastVisibleSeq != seq || item.Archived != archived {
+		return fmt.Errorf("unexpected archived item state: %+v", item)
 	}
 	return nil
 }

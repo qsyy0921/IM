@@ -133,6 +133,9 @@ try {
     Apply-PostgresMigration -Path "migrations\postgres\delivery\000001_delivery_core.sql" -Name "nexusim_delivery_core.sql"
     Apply-PostgresMigration -Path "migrations\postgres\receipt\000001_receipt_core.sql" -Name "nexusim_receipt_core.sql"
     Apply-PostgresMigration -Path "migrations\postgres\receipt\000002_conversation_summary.sql" -Name "nexusim_receipt_conversation_summary.sql"
+    Apply-PostgresMigration -Path "migrations\postgres\receipt\000003_receipt_source_event_type.sql" -Name "nexusim_receipt_source_event_type.sql"
+    Apply-PostgresMigration -Path "migrations\postgres\receipt\000004_conversation_summary_source_event_type.sql" -Name "nexusim_receipt_conversation_summary_source_event_type.sql"
+    Apply-PostgresMigration -Path "migrations\postgres\receipt\000005_conversation_archive.sql" -Name "nexusim_receipt_conversation_archive.sql"
 
     Ensure-KafkaTopic -Topic $timelineTopic
     Ensure-KafkaTopic -Topic $deliveryTopic

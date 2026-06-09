@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestLoadRedisClientConfigSingleDefaults(t *testing.T) {
 	t.Setenv("NEXUSIM_PUSH_REDIS_MODE", "")
@@ -82,5 +85,7 @@ func TestNewRedisUniversalClientValidatesSentinelConfig(t *testing.T) {
 func TestNewRedisUniversalClientRejectsUnsupportedMode(t *testing.T) {
 	if _, err := newRedisUniversalClient(redisClientConfig{Mode: "cluster"}); err == nil {
 		t.Fatalf("expected unsupported mode error")
+	} else if !strings.Contains(err.Error(), "cluster") {
+		t.Fatalf("expected unsupported mode error to include mode value, got %v", err)
 	}
 }

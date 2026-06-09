@@ -225,7 +225,7 @@ func newRedisUniversalClient(config redisClientConfig) (redis.UniversalClient, e
 			SentinelPassword: config.SentinelPassword,
 		}), nil
 	default:
-		return nil, errors.New("unsupported NEXUSIM_PUSH_REDIS_MODE")
+		return nil, errors.New("unsupported NEXUSIM_PUSH_REDIS_MODE=" + config.Mode)
 	}
 }
 

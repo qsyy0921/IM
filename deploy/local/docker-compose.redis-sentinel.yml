@@ -19,7 +19,7 @@ services:
         condition: service_healthy
     ports:
       - "6381:6379"
-    command: ["redis-server", "--replicaof", "redis-ha-master", "6379", "--replica-announce-ip", "172.31.50.1", "--replica-announce-port", "6381", "--appendonly", "yes", "--protected-mode", "no"]
+    command: ["redis-server", "--replicaof", "redis-ha-master", "6379", "--replica-announce-ip", "${NEXUSIM_REDIS_SENTINEL_ANNOUNCE_IP:-172.31.50.1}", "--replica-announce-port", "6381", "--appendonly", "yes", "--protected-mode", "no"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -34,7 +34,7 @@ services:
         condition: service_healthy
     ports:
       - "6382:6379"
-    command: ["redis-server", "--replicaof", "redis-ha-master", "6379", "--replica-announce-ip", "172.31.50.1", "--replica-announce-port", "6382", "--appendonly", "yes", "--protected-mode", "no"]
+    command: ["redis-server", "--replicaof", "redis-ha-master", "6379", "--replica-announce-ip", "${NEXUSIM_REDIS_SENTINEL_ANNOUNCE_IP:-172.31.50.1}", "--replica-announce-port", "6382", "--appendonly", "yes", "--protected-mode", "no"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -55,11 +55,12 @@ services:
       - "26379:26379"
     command: >
       sh -c "echo 'port 26379' > /tmp/sentinel.conf &&
+      echo 'protected-mode no' >> /tmp/sentinel.conf &&
       echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
       echo 'sentinel announce-hostnames yes' >> /tmp/sentinel.conf &&
-      echo 'sentinel announce-ip 172.31.50.1' >> /tmp/sentinel.conf &&
+      echo 'sentinel announce-ip ${NEXUSIM_REDIS_SENTINEL_ANNOUNCE_IP:-172.31.50.1}' >> /tmp/sentinel.conf &&
       echo 'sentinel announce-port 26379' >> /tmp/sentinel.conf &&
-      echo 'sentinel monitor mymaster 172.31.50.1 6380 2' >> /tmp/sentinel.conf &&
+      echo 'sentinel monitor mymaster ${NEXUSIM_REDIS_SENTINEL_ANNOUNCE_IP:-172.31.50.1} 6380 2' >> /tmp/sentinel.conf &&
       echo 'sentinel down-after-milliseconds mymaster 5000' >> /tmp/sentinel.conf &&
       echo 'sentinel failover-timeout mymaster 15000' >> /tmp/sentinel.conf &&
       echo 'sentinel parallel-syncs mymaster 1' >> /tmp/sentinel.conf &&
@@ -84,11 +85,12 @@ services:
       - "26380:26379"
     command: >
       sh -c "echo 'port 26379' > /tmp/sentinel.conf &&
+      echo 'protected-mode no' >> /tmp/sentinel.conf &&
       echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
       echo 'sentinel announce-hostnames yes' >> /tmp/sentinel.conf &&
-      echo 'sentinel announce-ip 172.31.50.1' >> /tmp/sentinel.conf &&
+      echo 'sentinel announce-ip ${NEXUSIM_REDIS_SENTINEL_ANNOUNCE_IP:-172.31.50.1}' >> /tmp/sentinel.conf &&
       echo 'sentinel announce-port 26380' >> /tmp/sentinel.conf &&
-      echo 'sentinel monitor mymaster 172.31.50.1 6380 2' >> /tmp/sentinel.conf &&
+      echo 'sentinel monitor mymaster ${NEXUSIM_REDIS_SENTINEL_ANNOUNCE_IP:-172.31.50.1} 6380 2' >> /tmp/sentinel.conf &&
       echo 'sentinel down-after-milliseconds mymaster 5000' >> /tmp/sentinel.conf &&
       echo 'sentinel failover-timeout mymaster 15000' >> /tmp/sentinel.conf &&
       echo 'sentinel parallel-syncs mymaster 1' >> /tmp/sentinel.conf &&
@@ -113,11 +115,12 @@ services:
       - "26381:26379"
     command: >
       sh -c "echo 'port 26379' > /tmp/sentinel.conf &&
+      echo 'protected-mode no' >> /tmp/sentinel.conf &&
       echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
       echo 'sentinel announce-hostnames yes' >> /tmp/sentinel.conf &&
-      echo 'sentinel announce-ip 172.31.50.1' >> /tmp/sentinel.conf &&
+      echo 'sentinel announce-ip ${NEXUSIM_REDIS_SENTINEL_ANNOUNCE_IP:-172.31.50.1}' >> /tmp/sentinel.conf &&
       echo 'sentinel announce-port 26381' >> /tmp/sentinel.conf &&
-      echo 'sentinel monitor mymaster 172.31.50.1 6380 2' >> /tmp/sentinel.conf &&
+      echo 'sentinel monitor mymaster ${NEXUSIM_REDIS_SENTINEL_ANNOUNCE_IP:-172.31.50.1} 6380 2' >> /tmp/sentinel.conf &&
       echo 'sentinel down-after-milliseconds mymaster 5000' >> /tmp/sentinel.conf &&
       echo 'sentinel failover-timeout mymaster 15000' >> /tmp/sentinel.conf &&
       echo 'sentinel parallel-syncs mymaster 1' >> /tmp/sentinel.conf &&

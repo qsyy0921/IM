@@ -125,6 +125,18 @@ H:\NexusIM\loadtest-results
 E:\development\IM\loadtest\results
 ```
 
+## Message Change Notify Smoke
+
+`loadtest/pushgateway/run-local-smoke.ps1` 已支持 `message-change-notify` 场景，用同一条在线 WebSocket 链路验证消息变更通知：
+
+```powershell
+.\loadtest\pushgateway\run-local-smoke.ps1 -Scenario message-change-notify -MessageChangeAction edit
+.\loadtest\pushgateway\run-local-smoke.ps1 -Scenario message-change-notify -MessageChangeAction revoke
+.\loadtest\pushgateway\run-local-smoke.ps1 -Scenario message-change-notify -MessageChangeAction delete
+```
+
+该 runner 会验证 `delivery.notify.source_event_type` 分别为 `message.edited.v1` / `message.revoked.v1` / `message.deleted.v1`，并继续用 `PullInbox` 精确校验 durable inbox 中的 `event_type + message_id + conversation_seq`。报告归档前不要把 runner 支持误写成三类真实 smoke 都已完成。
+
 ## 第一阶段不做
 
 - 不做十万级 WebSocket 长连接压测。

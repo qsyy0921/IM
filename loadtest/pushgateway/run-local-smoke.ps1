@@ -4,8 +4,10 @@ param(
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
     [string]$ReceiverDeviceIds = "push-device-1",
-    [ValidateSet("full", "resume-replay", "cross-instance-resume", "slow-client", "redis-fault", "redis-sentinel-failover", "redis-sentinel-master-stop")]
+    [ValidateSet("full", "message-change-notify", "resume-replay", "cross-instance-resume", "slow-client", "redis-fault", "redis-sentinel-failover", "redis-sentinel-master-stop")]
     [string]$Scenario = "full",
+    [ValidateSet("edit", "revoke", "delete")]
+    [string]$MessageChangeAction = "edit",
     [ValidateSet("memory", "redis")]
     [string]$RouteBackend = "memory",
     [ValidateSet("single", "sentinel")]
@@ -428,6 +430,7 @@ try {
         "--receiver-device-id", "push-device-1",
         "--receiver-device-ids", $ReceiverDeviceIds,
         "--scenario", $Scenario,
+        "--message-change-action", $MessageChangeAction,
         "--slow-message-count", [string]$SlowMessageCount,
         "--push-metrics-url", "http://127.0.0.1:11598/debug/metrics",
         "--route-backend", $RouteBackend,

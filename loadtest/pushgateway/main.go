@@ -93,6 +93,7 @@ type config struct {
 	pushWSGatewayID        string
 	pushReconnectGatewayID string
 	pushConsumerGatewayID  string
+	messageChangeAction    string
 	redisFaultCommand      string
 	redisRestoreCommand    string
 	cleanup                bool
@@ -130,9 +131,12 @@ type summary struct {
 	ServerHello             frameSnapshot        `json:"server_hello"`
 	MemberJoin              memberJoinSummary    `json:"member_join"`
 	SendMessage             sendSummary          `json:"send_message"`
+	MessageChange           messageChangeSummary `json:"message_change,omitempty"`
 	DeliveryNotify          frameSnapshot        `json:"delivery_notify"`
+	ChangeDeliveryNotify    frameSnapshot        `json:"change_delivery_notify,omitempty"`
 	DeviceNotifications     []deviceSummary      `json:"device_notifications,omitempty"`
 	PullInbox               pullSummary          `json:"pull_inbox"`
+	ChangePullInbox         pullSummary          `json:"change_pull_inbox,omitempty"`
 	DeliveryAckOK           frameSnapshot        `json:"delivery_ack_ok"`
 	SlowClient              *slowClientSummary   `json:"slow_client,omitempty"`
 	ResumeReplay            *resumeReplaySummary `json:"resume_replay,omitempty"`
@@ -259,6 +263,14 @@ type sendSummary struct {
 	ConversationSeq int64  `json:"conversation_seq"`
 }
 
+type messageChangeSummary struct {
+	Action          string `json:"action,omitempty"`
+	MessageID       string `json:"message_id,omitempty"`
+	ConversationSeq int64  `json:"conversation_seq,omitempty"`
+	ChangeVersion   int32  `json:"change_version,omitempty"`
+	SourceEventType string `json:"source_event_type,omitempty"`
+}
+
 type pullSummary struct {
 	ItemCount int     `json:"item_count"`
 	MaxSeq    int64   `json:"max_seq"`
@@ -270,6 +282,7 @@ type pullSummary struct {
 type item struct {
 	ConversationSeq int64  `json:"conversation_seq"`
 	EventID         string `json:"event_id"`
+	EventType       string `json:"event_type"`
 	MessageID       string `json:"message_id"`
 	SenderID        string `json:"sender_id"`
 }
@@ -306,8 +319,9 @@ func parseConfig() config {
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "push-device-1", "online receiver device id")
 	var receiverDeviceIDs string
 	flag.StringVar(&receiverDeviceIDs, "receiver-device-ids", "", "comma separated online receiver device ids; overrides receiver-device-id when set")
-	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, resume-replay, cross-instance-resume, slow-client, redis-fault, redis-sentinel-failover, or redis-sentinel-master-stop")
+	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, message-change-notify, resume-replay, cross-instance-resume, slow-client, redis-fault, redis-sentinel-failover, or redis-sentinel-master-stop")
 	flag.IntVar(&cfg.slowMessageCount, "slow-message-count", 128, "number of messages sent while slow client does not read")
+	flag.StringVar(&cfg.messageChangeAction, "message-change-action", "edit", "message-change-notify action: edit, revoke, or delete")
 	flag.StringVar(&cfg.pushMetricsURL, "push-metrics-url", "", "push-gateway debug metrics URL")
 	flag.StringVar(&cfg.reconnectMetricsURL, "reconnect-push-metrics-url", "", "optional debug metrics URL for reconnect/resume gateway")
 	flag.StringVar(&cfg.consumerMetricsURL, "consumer-push-metrics-url", "", "optional debug metrics URL for delivery-consumer gateway")
@@ -325,6 +339,10 @@ func parseConfig() config {
 	cfg.scenario = strings.TrimSpace(cfg.scenario)
 	if cfg.scenario == "" {
 		cfg.scenario = "full"
+	}
+	cfg.messageChangeAction = strings.ToLower(strings.TrimSpace(cfg.messageChangeAction))
+	if cfg.messageChangeAction == "" {
+		cfg.messageChangeAction = "edit"
 	}
 	if cfg.slowMessageCount <= 0 {
 		cfg.slowMessageCount = 1
@@ -427,6 +445,8 @@ func run(cfg config) error {
 
 	switch cfg.scenario {
 	case "full":
+	case "message-change-notify":
+		return runMessageChangeNotifyScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "resume-replay":
 		return runResumeReplayScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "cross-instance-resume":
@@ -532,6 +552,124 @@ func run(cfg config) error {
 	}
 	result.Success = true
 	return finish(cfg, &result, nil)
+}
+
+func runMessageChangeNotifyScenario(
+	ctx context.Context,
+	cfg config,
+	pool *pgxpool.Pool,
+	conversationClient conversationv1.ConversationServiceClient,
+	messageClient messagev1.MessageServiceClient,
+	deliveryClient deliveryv1.DeliveryServiceClient,
+	result *summary,
+) error {
+	expectedSourceType, err := sourceEventTypeForAction(cfg.messageChangeAction)
+	if err != nil {
+		return finish(cfg, result, err)
+	}
+	conn, hello, err := connectWebSocket(ctx, cfg, cfg.receiverDeviceID)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("connect websocket: %w", err))
+	}
+	defer conn.Close(nhooyr.StatusNormalClosure, "")
+	result.ServerHello = snapshotFrame(hello)
+	result.DeviceNotifications = append(result.DeviceNotifications, deviceSummary{
+		DeviceID:    cfg.receiverDeviceID,
+		ServerHello: snapshotFrame(hello),
+	})
+
+	begin := time.Now()
+	join, err := createReceiverJoin(ctx, cfg, conversationClient)
+	result.Latencies["create_member_join"] = elapsedMS(begin)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("create receiver join: %w", err))
+	}
+	result.MemberJoin = memberJoinSummary{
+		ChangeID:          join.GetChangeId(),
+		BoundarySeq:       join.GetBoundarySeq(),
+		MemberVersion:     join.GetMemberVersion(),
+		PermissionVersion: join.GetPermissionVersion(),
+	}
+	if err := waitMembership(ctx, pool, cfg); err != nil {
+		return finish(cfg, result, err)
+	}
+
+	begin = time.Now()
+	send, err := sendMessage(ctx, cfg, messageClient, 1)
+	result.Latencies["send_message"] = elapsedMS(begin)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("send message: %w", err))
+	}
+	result.SendMessage = sendSummary{MessageID: send.GetMessageId(), ConversationSeq: send.GetConversationSeq()}
+	notify, err := waitNotify(ctx, cfg, conn)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("wait persisted notify: %w", err))
+	}
+	result.DeliveryNotify = snapshotFrame(notify)
+	result.DeviceNotifications[0].DeliveryNotify = snapshotFrame(notify)
+	if notify.ConversationSeq != send.GetConversationSeq() ||
+		notify.MessageID != send.GetMessageId() ||
+		notify.SourceEventType != "message.persisted.v1" {
+		return finish(cfg, result, fmt.Errorf("persisted notify mismatch: notify=%+v send=%+v", notify, send))
+	}
+
+	begin = time.Now()
+	change, err := changeMessage(ctx, cfg, messageClient, send.GetMessageId())
+	result.Latencies["message_change"] = elapsedMS(begin)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("%s message: %w", cfg.messageChangeAction, err))
+	}
+	result.MessageChange = messageChangeSummary{
+		Action:          cfg.messageChangeAction,
+		MessageID:       change.GetMessageId(),
+		ConversationSeq: change.GetConversationSeq(),
+		ChangeVersion:   change.GetChangeVersion(),
+		SourceEventType: expectedSourceType,
+	}
+	changeNotify, err := waitNotify(ctx, cfg, conn)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("wait change notify: %w", err))
+	}
+	result.ChangeDeliveryNotify = snapshotFrame(changeNotify)
+	if changeNotify.ConversationSeq != change.GetConversationSeq() ||
+		changeNotify.MessageID != send.GetMessageId() ||
+		changeNotify.SourceEventType != expectedSourceType {
+		return finish(cfg, result, fmt.Errorf("change notify mismatch: notify=%+v change=%+v", changeNotify, change))
+	}
+
+	changePull, err := pullInboxUntilEvent(ctx, cfg, deliveryClient, send.GetConversationSeq(), expectedSourceType, send.GetMessageId(), change.GetConversationSeq())
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("pull inbox after change: %w", err))
+	}
+	result.ChangePullInbox = changePull
+	result.PullInbox = changePull
+
+	ackOK, err := ackViaWebSocket(ctx, cfg, conn, cfg.receiverDeviceID, change.GetConversationSeq())
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("websocket ack change: %w", err))
+	}
+	result.DeliveryAckOK = snapshotFrame(ackOK)
+	result.DeviceNotifications[0].DeliveryAckOK = snapshotFrame(ackOK)
+	if ackOK.LastReceivedSeq != change.GetConversationSeq() {
+		return finish(cfg, result, fmt.Errorf("ack seq mismatch: %+v", ackOK))
+	}
+	if err := waitCursor(ctx, pool, cfg, cfg.receiverDeviceID, change.GetConversationSeq()); err != nil {
+		return finish(cfg, result, err)
+	}
+	cursor, err := queryCursor(ctx, pool, cfg, cfg.receiverDeviceID)
+	if err != nil {
+		return finish(cfg, result, err)
+	}
+	result.CursorLastReceivedSeq = &cursor
+	result.DeviceNotifications[0].CursorLastReceivedSeq = &cursor
+	if err := waitDeliveryOutboxDrain(ctx, pool, cfg); err != nil {
+		return finish(cfg, result, err)
+	}
+	if err := fillPostgresStats(ctx, pool, cfg, result); err != nil {
+		return finish(cfg, result, err)
+	}
+	result.Success = true
+	return finish(cfg, result, nil)
 }
 
 func runSlowClientScenario(
@@ -1045,6 +1183,71 @@ func sendMessage(
 	})
 }
 
+func changeMessage(
+	ctx context.Context,
+	cfg config,
+	client messagev1.MessageServiceClient,
+	messageID string,
+) (*messagev1.MessageChangeResponse, error) {
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	auth := &messagev1.AuthContext{
+		TenantId:  cfg.tenantID,
+		UserId:    cfg.ownerUserID,
+		DeviceId:  "push-smoke-owner-device",
+		SessionId: "push-smoke-owner-session",
+		TraceId:   "push-smoke-message-change",
+		RequestId: "push-smoke-message-change",
+	}
+	switch cfg.messageChangeAction {
+	case "edit":
+		payload, err := structpb.NewStruct(map[string]any{"text": "push gateway edited message"})
+		if err != nil {
+			return nil, err
+		}
+		return client.EditMessage(requestCtx, &messagev1.EditMessageRequest{
+			AuthContext:    auth,
+			ConversationId: cfg.conversationID,
+			MessageId:      messageID,
+			IdempotencyKey: "push-smoke-edit-1",
+			Payload:        payload,
+			Reason:         "push gateway message-change notify smoke",
+		})
+	case "revoke":
+		return client.RevokeMessage(requestCtx, &messagev1.RevokeMessageRequest{
+			AuthContext:    auth,
+			ConversationId: cfg.conversationID,
+			MessageId:      messageID,
+			IdempotencyKey: "push-smoke-revoke-1",
+			Reason:         "push gateway message-change notify smoke",
+		})
+	case "delete":
+		return client.DeleteMessage(requestCtx, &messagev1.DeleteMessageRequest{
+			AuthContext:    auth,
+			ConversationId: cfg.conversationID,
+			MessageId:      messageID,
+			IdempotencyKey: "push-smoke-delete-1",
+			DeleteScope:    messagev1.DeleteScope_DELETE_SCOPE_CONVERSATION_VIEW,
+			Reason:         "push gateway message-change notify smoke",
+		})
+	default:
+		return nil, fmt.Errorf("unsupported message-change-action: %s", cfg.messageChangeAction)
+	}
+}
+
+func sourceEventTypeForAction(action string) (string, error) {
+	switch action {
+	case "edit":
+		return "message.edited.v1", nil
+	case "revoke":
+		return "message.revoked.v1", nil
+	case "delete":
+		return "message.deleted.v1", nil
+	default:
+		return "", fmt.Errorf("unsupported message-change-action: %s", action)
+	}
+}
+
 func waitNotify(ctx context.Context, cfg config, conn *nhooyr.Conn) (serverFrame, error) {
 	return waitNotifyFor(ctx, cfg, conn, cfg.waitTimeout)
 }
@@ -1175,6 +1378,7 @@ func pullInboxAtLeast(
 				result.Items = append(result.Items, item{
 					ConversationSeq: inboxItem.GetConversationSeq(),
 					EventID:         inboxItem.GetEventId(),
+					EventType:       inboxItem.GetEventType(),
 					MessageID:       inboxItem.GetMessageId(),
 					SenderID:        inboxItem.GetSenderId(),
 				})
@@ -1185,6 +1389,37 @@ func pullInboxAtLeast(
 			result.P95MS = percentile(latencies, 0.95)
 			result.P99MS = percentile(latencies, 0.99)
 			return result, nil
+		}
+		time.Sleep(cfg.pollInterval)
+	}
+}
+
+func pullInboxUntilEvent(
+	ctx context.Context,
+	cfg config,
+	client deliveryv1.DeliveryServiceClient,
+	afterSeq int64,
+	eventType string,
+	messageID string,
+	seq int64,
+) (pullSummary, error) {
+	deadline := time.Now().Add(cfg.waitTimeout)
+	var last pullSummary
+	for {
+		pull, err := pullInboxAtLeast(ctx, cfg, client, afterSeq, 100, 0, seq)
+		if err != nil {
+			return pullSummary{}, err
+		}
+		last = pull
+		for _, item := range pull.Items {
+			if item.EventType == eventType &&
+				item.MessageID == messageID &&
+				item.ConversationSeq == seq {
+				return pull, nil
+			}
+		}
+		if time.Now().After(deadline) {
+			return last, fmt.Errorf("pull inbox missing %s item for message %s seq %d: %+v", eventType, messageID, seq, last)
 		}
 		time.Sleep(cfg.pollInterval)
 	}

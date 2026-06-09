@@ -35,11 +35,13 @@ func TestRegistryEnqueueNotificationDeduplicatesPerSession(t *testing.T) {
 func TestRegistryEnqueueNotificationFailsClosedWhenQueueFull(t *testing.T) {
 	registry := NewRegistry()
 	outbound := make(chan types.ServerFrame)
+	evicted := make(chan types.SessionEviction, 1)
 	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"}
 	if err := registry.Register(context.Background(), types.SessionRegistration{
 		AuthContext: auth,
 		SessionID:   "session-1",
 		Outbound:    outbound,
+		Evicted:     evicted,
 	}); err != nil {
 		t.Fatalf("register: %v", err)
 	}
@@ -49,6 +51,17 @@ func TestRegistryEnqueueNotificationFailsClosedWhenQueueFull(t *testing.T) {
 	}
 	if result.Dropped != 1 || result.Enqueued != 0 {
 		t.Fatalf("unexpected result: %+v", result)
+	}
+	select {
+	case eviction := <-evicted:
+		if eviction.Reason != "slow_session" ||
+			len(eviction.Conversations) != 1 ||
+			eviction.Conversations[0].ConversationID != "conversation-1" ||
+			eviction.Conversations[0].Seq != 6 {
+			t.Fatalf("unexpected eviction: %+v", eviction)
+		}
+	default:
+		t.Fatalf("expected eviction signal")
 	}
 	next, err := registry.EnqueueNotification(context.Background(), testNotification())
 	if err != nil {

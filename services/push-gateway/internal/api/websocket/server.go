@@ -83,11 +83,12 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	}
 
 	outbound := make(chan types.ServerFrame, server.config.QueueSize)
+	evicted := make(chan types.SessionEviction, 1)
 	result, err := server.connect.Execute(request.Context(), types.ConnectSessionCommand{
 		AuthContext:       auth,
 		QueueSize:         server.config.QueueSize,
 		HeartbeatInterval: server.config.HeartbeatInterval,
-	}, outbound)
+	}, outbound, evicted)
 	if err != nil {
 		_ = wsjson.Write(request.Context(), conn, app.PublicErrorFrame("", err))
 		return
@@ -101,7 +102,7 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 
 	writeDone := make(chan error, 1)
 	go func() {
-		writeDone <- writeLoop(request.Context(), conn, outbound, server.config.WriteTimeout)
+		writeDone <- writeLoop(request.Context(), conn, outbound, evicted, server.config.WriteTimeout)
 	}()
 
 	readErr := server.readLoop(request.Context(), conn, auth, outbound)
@@ -142,13 +143,28 @@ func (server *Server) readLoop(
 	}
 }
 
-func writeLoop(ctx context.Context, conn *nhooyr.Conn, outbound <-chan types.ServerFrame, timeout time.Duration) error {
-	for frame := range outbound {
-		if err := writeFrame(ctx, conn, frame, timeout); err != nil {
-			return err
+func writeLoop(
+	ctx context.Context,
+	conn *nhooyr.Conn,
+	outbound <-chan types.ServerFrame,
+	evicted <-chan types.SessionEviction,
+	timeout time.Duration,
+) error {
+	for {
+		select {
+		case eviction := <-evicted:
+			_ = writeFrame(ctx, conn, domain.ResumeHint(eviction.Reason, eviction.Conversations), timeout)
+			_ = conn.Close(nhooyr.StatusPolicyViolation, "slow session")
+			return types.ErrSessionEvicted
+		case frame, ok := <-outbound:
+			if !ok {
+				return nil
+			}
+			if err := writeFrame(ctx, conn, frame, timeout); err != nil {
+				return err
+			}
 		}
 	}
-	return nil
 }
 
 func writeFrame(ctx context.Context, conn *nhooyr.Conn, frame types.ServerFrame, timeout time.Duration) error {
@@ -214,6 +230,7 @@ func isNormalClose(err error) bool {
 		return true
 	}
 	return errors.Is(err, context.Canceled) ||
+		errors.Is(err, types.ErrSessionEvicted) ||
 		nhooyr.CloseStatus(err) == nhooyr.StatusNormalClosure ||
 		nhooyr.CloseStatus(err) == nhooyr.StatusGoingAway
 }

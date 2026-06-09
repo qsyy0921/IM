@@ -57,6 +57,15 @@ func DeliveryAckOK(requestID string, result types.AckDeliveryResult) types.Serve
 	}
 }
 
+func ResumeHint(reason string, conversations []types.ConversationCursor) types.ServerFrame {
+	return types.ServerFrame{
+		Op:            types.OpResumeHint,
+		Reason:        reason,
+		PullRequired:  true,
+		Conversations: conversations,
+	}
+}
+
 func ErrorFrame(requestID string, code string, message string, retryable bool) types.ServerFrame {
 	return types.ServerFrame{
 		Op:        types.OpError,

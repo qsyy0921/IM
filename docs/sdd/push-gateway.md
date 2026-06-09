@@ -374,7 +374,8 @@ Client reconnects with resume_token and last_received seq
 session send queue over threshold
 -> mark DEGRADED
 -> send server.resume_hint if possible
--> if write timeout / queue-full failure repeats NEXUSIM_PUSH_SLOW_EVICT_AFTER times, close connection
+-> first implementation closes the WebSocket on queue-full eviction
+-> future implementation may add NEXUSIM_PUSH_SLOW_EVICT_AFTER before active close
 -> route cleanup
 -> client reconnects and PullInbox
 ```

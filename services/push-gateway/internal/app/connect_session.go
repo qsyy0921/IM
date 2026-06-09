@@ -19,6 +19,7 @@ func (usecase *ConnectSessionUseCase) Execute(
 	ctx context.Context,
 	command types.ConnectSessionCommand,
 	outbound chan<- types.ServerFrame,
+	evicted chan<- types.SessionEviction,
 ) (types.ConnectSessionResult, error) {
 	if err := command.AuthContext.Validate(); err != nil {
 		return types.ConnectSessionResult{}, err
@@ -47,6 +48,7 @@ func (usecase *ConnectSessionUseCase) Execute(
 		SessionID:   result.SessionID,
 		ResumeToken: result.ResumeToken,
 		Outbound:    outbound,
+		Evicted:     evicted,
 	}); err != nil {
 		return types.ConnectSessionResult{}, err
 	}

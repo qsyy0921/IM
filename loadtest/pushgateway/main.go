@@ -322,7 +322,7 @@ func run(cfg config) error {
 	}
 
 	for i, device := range devices {
-		ackOK, err := ackViaWebSocket(ctx, cfg, device.conn, send.GetConversationSeq())
+		ackOK, err := ackViaWebSocket(ctx, cfg, device.conn, device.deviceID, send.GetConversationSeq())
 		if err != nil {
 			return finish(cfg, &result, fmt.Errorf("websocket ack %s: %w", device.deviceID, err))
 		}
@@ -513,13 +513,14 @@ func ackViaWebSocket(
 	ctx context.Context,
 	cfg config,
 	conn *nhooyr.Conn,
+	deviceID string,
 	seq int64,
 ) (serverFrame, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
 	if err := wsjson.Write(requestCtx, conn, clientFrame{
 		Op:             opDeliveryAck,
-		RequestID:      "push-smoke-ack",
+		RequestID:      "push-smoke-ack-" + deviceID,
 		ConversationID: cfg.conversationID,
 		ReceivedSeq:    seq,
 	}); err != nil {

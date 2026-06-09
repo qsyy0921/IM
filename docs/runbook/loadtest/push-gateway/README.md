@@ -1,6 +1,6 @@
 # push-gateway Loadtest / Smoke Index
 
-本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify` 和 `delivery.ack.ok` 的单元 / 集成测试；真实进程 full smoke 和同 user 多 device notify smoke 已通过。
+本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify`、`delivery.ack.ok` 和 queue-full `server.resume_hint` active close 的单元 / 集成测试；真实进程 full smoke 和同 user 多 device notify smoke 已通过。
 
 ## 当前验证目标
 
@@ -80,6 +80,7 @@ E:\development\IM\loadtest\results
 - 不重新做 message-service 硬件矩阵。
 - 不把短时 resume buffer 当作 durable inbox。
 - 不把 push smoke 表述为生产容量结论。
+- 不把 queue-full active close 表述为完整慢连接治理；当前还没有 slow-client 真实进程负向 smoke 和 metrics。
 
 ## 面试可讲点
 

@@ -17,6 +17,7 @@ type Registry struct {
 type session struct {
 	auth     types.AuthContext
 	outbound chan<- types.ServerFrame
+	evicted  chan<- types.SessionEviction
 	seen     map[string]struct{}
 }
 
@@ -43,6 +44,7 @@ func (registry *Registry) Register(ctx context.Context, registration types.Sessi
 	registry.sessions[registration.SessionID] = &session{
 		auth:     registration.AuthContext,
 		outbound: registration.Outbound,
+		evicted:  registration.Evicted,
 		seen:     make(map[string]struct{}),
 	}
 	key := userKey(registration.AuthContext)
@@ -97,12 +99,34 @@ func (registry *Registry) EnqueueNotification(
 		case <-ctx.Done():
 			return result, ctx.Err()
 		default:
-			delete(registry.sessions, sessionID)
-			delete(sessionIDs, sessionID)
+			registry.evictLocked(sessionID, target, types.SessionEviction{
+				Reason: "slow_session",
+				Conversations: []types.ConversationCursor{{
+					ConversationID: notification.ConversationID,
+					Seq:            notification.ConversationSeq - 1,
+				}},
+			})
 			result.Dropped++
+			result.Evicted++
 		}
 	}
 	return result, nil
+}
+
+func (registry *Registry) evictLocked(sessionID string, target *session, eviction types.SessionEviction) {
+	delete(registry.sessions, sessionID)
+	key := userKey(target.auth)
+	delete(registry.byUser[key], sessionID)
+	if len(registry.byUser[key]) == 0 {
+		delete(registry.byUser, key)
+	}
+	if target.evicted == nil {
+		return
+	}
+	select {
+	case target.evicted <- eviction:
+	default:
+	}
 }
 
 func userKey(auth types.AuthContext) string {

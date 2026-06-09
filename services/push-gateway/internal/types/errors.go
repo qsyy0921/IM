@@ -12,6 +12,7 @@ var (
 	ErrAckOutOfVisibleRange     = errors.New("ack out of visible range")
 	ErrNoOnlineSession          = errors.New("no online session")
 	ErrSessionQueueFull         = errors.New("session queue full")
+	ErrSessionEvicted           = errors.New("session evicted")
 	ErrUnsupportedDeliveryEvent = errors.New("unsupported delivery event")
 )
 

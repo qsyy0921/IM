@@ -3,6 +3,7 @@ package websocket
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -218,5 +219,55 @@ func TestWebSocketAckPermissionDeniedIsNotRetryable(t *testing.T) {
 		frame.Message != "permission denied" ||
 		frame.Retryable {
 		t.Fatalf("unexpected permission error frame: %+v", frame)
+	}
+}
+
+func TestWriteLoopSendsResumeHintAndClosesOnEviction(t *testing.T) {
+	outbound := make(chan types.ServerFrame)
+	evicted := make(chan types.SessionEviction, 1)
+	httpServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		conn, err := nhooyr.Accept(writer, request, &nhooyr.AcceptOptions{InsecureSkipVerify: true})
+		if err != nil {
+			return
+		}
+		defer conn.Close(nhooyr.StatusNormalClosure, "")
+		evicted <- types.SessionEviction{
+			Reason: "slow_session",
+			Conversations: []types.ConversationCursor{{
+				ConversationID: "conversation-1",
+				Seq:            12,
+			}},
+		}
+		_ = writeLoop(request.Context(), conn, outbound, evicted, time.Second)
+	}))
+	defer httpServer.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, _, err := nhooyr.Dial(ctx, "ws"+httpServer.URL[len("http"):], nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close(nhooyr.StatusNormalClosure, "")
+
+	var frame types.ServerFrame
+	if err := wsjson.Read(ctx, conn, &frame); err != nil {
+		t.Fatalf("read resume hint: %v", err)
+	}
+	if frame.Op != types.OpResumeHint ||
+		frame.Reason != "slow_session" ||
+		!frame.PullRequired ||
+		len(frame.Conversations) != 1 ||
+		frame.Conversations[0].ConversationID != "conversation-1" ||
+		frame.Conversations[0].Seq != 12 {
+		t.Fatalf("unexpected resume hint: %+v", frame)
+	}
+	var next types.ServerFrame
+	err = wsjson.Read(ctx, conn, &next)
+	if err == nil {
+		t.Fatalf("expected close after resume hint, got frame: %+v", next)
+	}
+	if nhooyr.CloseStatus(err) != nhooyr.StatusPolicyViolation {
+		t.Fatalf("expected policy violation close, got %v", err)
 	}
 }

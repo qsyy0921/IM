@@ -12,6 +12,12 @@ type SessionRegistration struct {
 	SessionID   string
 	ResumeToken string
 	Outbound    chan<- ServerFrame
+	Evicted     chan<- SessionEviction
+}
+
+type SessionEviction struct {
+	Reason        string
+	Conversations []ConversationCursor
 }
 
 type ConnectSessionCommand struct {
@@ -45,6 +51,7 @@ type NotifyDeliveryResult struct {
 	MatchedSessions int
 	Enqueued        int
 	Dropped         int
+	Evicted         int
 }
 
 type AckDeliveryCommand struct {

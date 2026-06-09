@@ -134,6 +134,18 @@ func TestApplyLatency(t *testing.T) {
 	}
 }
 
+func TestApplyCount(t *testing.T) {
+	var count *int64
+	applyCount(&count, 0)
+	if count != nil {
+		t.Fatalf("expected nil count for zero sample count")
+	}
+	applyCount(&count, 7)
+	if count == nil || *count != 7 {
+		t.Fatalf("unexpected count: %v", count)
+	}
+}
+
 func TestAggregateProcessLatencyMetrics(t *testing.T) {
 	metrics := aggregateProcessLatencyMetrics([]processMetrics{
 		{

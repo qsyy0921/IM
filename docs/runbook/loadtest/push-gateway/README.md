@@ -15,6 +15,7 @@ delivery_outbox
 -> client PullInbox reads durable user_inbox
 -> client sends delivery.ack frame
 -> push-gateway calls delivery-service AckDelivery
+-> client receives delivery.ack.ok
 ```
 
 必须证明：
@@ -23,6 +24,7 @@ delivery_outbox
 - `delivery.notify` 是轻量唤醒信号，不是 message 事实源。
 - 客户端展示和本地持久化以 `PullInbox` 返回为准。
 - ACK 仍由 `delivery-service AckDelivery` 推进 cursor。
+- `delivery.ack` 成功必须有 `delivery.ack.ok`，失败必须返回稳定 error frame。
 - push-gateway 不直接读写 `message_log`、`conversation_members`、`user_inbox`、`device_delivery_cursors`。
 
 ## 报告位置

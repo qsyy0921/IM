@@ -90,14 +90,14 @@ push-gateway SDD review
 | delivery-service full smoke | 已跑真实进程小规模 smoke：`CreateMemberChange(JOIN) -> Kafka timeline -> delivery projection -> SendMessage -> Kafka timeline -> user_inbox -> PullInbox -> AckDelivery`，SendMessage `64/64` 成功，`delivery-user-1` 拉到 64 条 inbox，ACK 到 seq `66`；`loadtest/delivery` summary 已支持 `--consumer-group`，checkpoint 统计可按本次 consumer group 过滤；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-full-smoke.md` |
 | delivery_outbox / push-gateway | 已新增 `schemas/kafka/delivery/v1/im.delivery.events.proto`、delivery-service outbox store、trigger relay、Kafka writer producer 和 `NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay`；真实 Kafka smoke 已验证 `delivery_outbox PENDING -> PUBLISHED`，并从 `im.delivery.events` 解码出 `DeliveryEvent_AckRecorded`；push-gateway 尚未实现，下一阶段必须依赖 delivery read model / delivery event，不直接读取 message-service 内部表，也不修改 ACK |
 | delivery-service negative visibility | 已新增 `loadtest/deliveryvisibility`，并在 clean commit `a87fc3f` 跑通 `LEAVE / REMOVE` 负向可见性 smoke：目标用户边界前各收到 1 条 inbox，边界后 `membership_status=LEFT`、`leave_seq=boundary_seq=4`，active sender 收到 post-boundary message，目标用户 `target_post_inbox_count=0` 且 `PullInbox(after_seq=boundary_seq)=0`；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-visibility-negative-smoke.md` |
-| push-gateway SDD | `docs/sdd/push-gateway.md` 已新增 v0.1 Draft；边界为 WebSocket 在线连接、`im.delivery.events` 轻量通知、客户端回源 `PullInbox` 和 ACK frame 转发到 `delivery-service AckDelivery`；第一阶段不新增 PostgreSQL migration，不直接读内部表，不拥有 durable inbox |
+| push-gateway SDD | `docs/sdd/push-gateway.md` 已新增 v0.1 Draft；边界为 WebSocket 在线连接、`im.delivery.events` 轻量通知、客户端回源 `PullInbox` 和 ACK frame 转发到 `delivery-service AckDelivery`；评审 P1 已补 `server.pong` 和 `delivery.ack.ok`，第一阶段不新增 PostgreSQL migration，不直接读内部表，不拥有 durable inbox |
 
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
 2. 不再继续做 message-service 重型硬件矩阵；只有公共契约、关键并发语义或新服务链路变化时，才跑 smoke / 小规模验证。
-3. 邀请阶段评审复核 `push-gateway` SDD，重点看服务边界、WebSocket frame、delivery event 消费、ACK/Pull 代理和“不绕过 durable inbox”。
-4. push-gateway SDD 冻结后，再进入 WebSocket frame 契约、六层骨架和最小在线推送链路；第一阶段通常不需要 PostgreSQL migration。
+3. `push-gateway` SDD 已完成阶段评审并修复 frame 契约 P1；后续若实现 WebSocket handler、Kafka consumer 或 ACK/Pull 代理，再按里程碑邀请复核。
+4. 下一步进入 push-gateway 六层骨架和最小在线推送链路；第一阶段通常不需要 PostgreSQL migration。
 5. push-gateway 最小链路只做在线通知和客户端回源提示，不把 message payload 当事实源。
 
 ## 6. 评审要求
@@ -418,3 +418,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已完成 delivery-service outbox relay 真实 Kafka smoke：创建 `im.delivery.events` topic，启动 `NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay`，把 1 条 `delivery.ack.recorded.v1` 从 `PENDING` 发布为 `PUBLISHED`，并从 Kafka partition 1 offset 0 解码出 `DeliveryEvent_AckRecorded`；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-outbox-smoke.md`。
 - 2026-06-09：已完成 delivery-service `LEAVE / REMOVE` 负向可见性 smoke：新增 `loadtest/deliveryvisibility` runner；clean commit `a87fc3f` 使用临时 topic `conversation.timeline.visibility.20260609-152208` 跑通两个场景。结论：边界后的 message event 已被 active sender 消费，但离开/移除用户没有任何 `conversation_seq > boundary_seq` 的 `user_inbox`，`PullInbox(after_seq=boundary_seq)` 也返回 0；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-visibility-negative-smoke.md`。
 - 2026-06-09：已新增 `docs/sdd/push-gateway.md` v0.1 Draft 和 `docs/runbook/loadtest/push-gateway/README.md`。push-gateway 第一阶段定位为 WebSocket 在线连接、`im.delivery.events` 唤醒、客户端回源 `PullInbox` 和 ACK frame 转发，不拥有 `user_inbox` / cursor，不直接读内部表；下一步应做阶段评审，评审通过后再进入 WebSocket frame 契约和六层骨架。
+- 2026-06-09：独立评审复核 `push-gateway` SDD，结论为服务边界正确、无 P0；指出 WebSocket frame 契约缺少 ACK 成功响应和 heartbeat 响应两个 P1。本轮已补 `delivery.ack.ok`、`server.pong`，并明确慢连接队列、resume token、多设备通知和 ACK 成功 / 失败语义；下一步进入 push-gateway 六层骨架和最小在线通知实现。

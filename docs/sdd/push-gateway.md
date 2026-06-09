@@ -268,32 +268,27 @@ session_id -> websocket connection
 session_id -> resume buffer
 ```
 
-多实例前必须接入 Redis route：
+Redis route 第一版最小实现已经落地，用于把 user 级 `delivery.notify` 从消费到事件的 gateway 转发到持有目标 WebSocket session 的 gateway。当前实现保存 session route，并通过 Redis Pub/Sub 按 `gateway_id` 转发通知：
 
 ```text
-push:route:{tenant_id}:{user_id}:{device_id} -> {
-  gateway_id,
-  session_id,
-  connected_at,
-  expires_at
-}
-
-push:session:{session_id} -> {
+push:route:session:{session_id} -> {
   tenant_id,
   user_id,
   device_id,
   gateway_id,
-  state,
-  last_heartbeat_at
 }
+
+push:route:user:{tenant_id}:{user_id} -> set(session_id)
+push:route:gateway:{gateway_id}:notify -> Pub/Sub delivery notification
 ```
 
 Redis 约束：
 
 - 所有 route key 必须有 TTL。
-- heartbeat 成功后续期。
+- 第一版 `NEXUSIM_PUSH_ROUTE_BACKEND=redis` 会在 connect 时写入 session route，在 disconnect 时 best-effort 删除 route；TTL 续期 / cleanup ticker 仍是后续 hardening。
 - disconnect / timeout 必须 best-effort 删除 route。
 - Redis route 是在线状态，不是投递事实源；Redis 丢失后客户端重连恢复。
+- 同一远端 gateway 上有多个 session 时，只向该 gateway Pub/Sub channel 发布一次，远端本地 registry 再 fanout 到本机 session。
 
 Resume buffer：
 
@@ -303,23 +298,28 @@ session_id -> ring buffer of delivery.notify frames
 
 约束：
 
-- buffer 按 session 保留最近 N 条或 N 秒。
+- buffer 按服务端签发的 `resume_token` 保留最近 N 条通知；重连会创建新的 `session_id`，但可以复用同一 token 读取单实例 buffer。
 - buffer 中只放轻量 notification，不放完整 message fact。
 - buffer miss 必须回退到 delivery-service `PullInbox`。
 - `resume_token` 第一阶段为 in-memory opaque token，绑定 `tenant_id / user_id / device_id`；重连会创建新的 `session_id`，但可以复用同一 token 读取单实例 buffer。TTL 与 resume buffer TTL 一致。
 - `resume_token` 必须由服务端签发。客户端携带未知 token 时，服务端返回 `server.resume_hint(reason=buffer_miss)`，并签发新的 opaque token；不能把客户端自带 token 注册成有效 token。
-- 服务重启、token 过期或 token 与 device/session 不匹配时，resume 失败，服务端返回 `server.resume_hint`，客户端 fallback `PullInbox`。
-- 当前单实例第一版只实现 in-memory、按条数裁剪的 best-effort resume buffer；TTL、Redis route 和跨实例 resume 仍是后续切片。
+- 服务重启、token 过期或 buffer miss 时，服务端返回 `server.resume_hint`，客户端 fallback `PullInbox`；已知 token 绑定身份不匹配时返回 `PERMISSION_DENIED`。
+- 当前单实例第一版只实现 in-memory、按条数裁剪的 best-effort resume buffer；TTL 和跨实例 resume 仍是后续切片。
 
-第一版可编码配置：
+当前已接入 runtime 的配置：
 
 ```text
 NEXUSIM_PUSH_SESSION_QUEUE_SIZE=256
 NEXUSIM_PUSH_WRITE_TIMEOUT=2s
-NEXUSIM_PUSH_SLOW_EVICT_AFTER=3
-NEXUSIM_PUSH_RESUME_BUFFER_SIZE=256
-NEXUSIM_PUSH_RESUME_BUFFER_TTL=5m
 NEXUSIM_PUSH_HEARTBEAT_INTERVAL=30s
+NEXUSIM_PUSH_TEST_WRITE_DELAY=0
+```
+
+规划配置，尚未接入 runtime：
+
+```text
+NEXUSIM_PUSH_SLOW_EVICT_AFTER=3
+NEXUSIM_PUSH_RESUME_BUFFER_TTL=5m
 NEXUSIM_PUSH_IDLE_TIMEOUT=75s
 ```
 
@@ -356,7 +356,7 @@ delivery-service local transaction
 -> server returns delivery.ack.ok
 ```
 
-第一阶段可以只对当前 gateway 进程内在线 session 通知；多实例前必须接入 Redis route 或统一 consumer ownership。
+第一阶段可以只对当前 gateway 进程内在线 session 通知。当前已接入 Redis route 最小 adapter，但仍需真实跨实例 route smoke 验证；在 smoke 通过前，不能把它表述为完整多实例在线路由能力。
 
 ### 8.3 重连恢复
 
@@ -487,7 +487,7 @@ NEXUSIM_PUSH_GATEWAY_MODE=delivery-consumer
 NEXUSIM_PUSH_GATEWAY_MODE=all
 ```
 
-`all` 是第一阶段本地 smoke 推荐模式：WebSocket handler 和 delivery consumer 在同一个进程里共享 in-memory session registry。后续多实例或压测隔离时再拆成 `ws` 与 `delivery-consumer`，并接入 Redis route。
+`all` 是第一阶段本地 smoke 推荐模式：WebSocket handler 和 delivery consumer 在同一个进程里共享 session registry。默认 route backend 为 in-memory；需要跨实例在线路由时启用 `NEXUSIM_PUSH_ROUTE_BACKEND=redis`。
 
 当 WebSocket HTTP server 启动时，`GET /debug/metrics` 返回当前单实例 registry 调试指标，包括 connected sessions、queue-full eviction、resume replay / buffer miss 和 resume buffer stored frames。该端点只用于本地 smoke 排障，尚不是生产 Prometheus 指标。
 
@@ -500,6 +500,18 @@ NEXUSIM_DELIVERY_GRPC_ADDR=127.0.0.1:10497
 NEXUSIM_KAFKA_BROKERS=localhost:9092
 NEXUSIM_DELIVERY_EVENTS_TOPIC=im.delivery.events
 NEXUSIM_PUSH_CONSUMER_GROUP=nexusim-push-gateway
+```
+
+Redis route 可选参数：
+
+```text
+NEXUSIM_PUSH_ROUTE_BACKEND=redis
+NEXUSIM_PUSH_GATEWAY_ID=push-gateway-a
+NEXUSIM_PUSH_REDIS_ADDR=127.0.0.1:6379
+NEXUSIM_PUSH_REDIS_PASSWORD=
+NEXUSIM_PUSH_REDIS_DB=0
+NEXUSIM_PUSH_REDIS_KEY_PREFIX=nexusim:push
+NEXUSIM_PUSH_ROUTE_TTL=90s
 ```
 
 本地依赖：

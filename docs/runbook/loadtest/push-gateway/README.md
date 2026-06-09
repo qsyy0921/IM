@@ -1,6 +1,6 @@
 # push-gateway Loadtest / Smoke Index
 
-本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify`、`delivery.ack.ok`、queue-full broad `server.resume_hint` active close 和单实例 in-memory resume buffer；真实进程 full smoke、同 user 多 device notify smoke 和 slow-client 负向 smoke 已通过。
+本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify`、`delivery.ack.ok`、queue-full broad `server.resume_hint` active close、单实例 in-memory resume buffer 和 Redis route 最小 adapter；真实进程 full smoke、同 user 多 device notify smoke 和 slow-client 负向 smoke 已通过。
 
 ## 当前验证目标
 
@@ -38,7 +38,19 @@ NEXUSIM_DELIVERY_EVENTS_TOPIC=im.delivery.events
 NEXUSIM_PUSH_CONSUMER_GROUP=nexusim-push-gateway-smoke
 ```
 
-`all` 模式只用于第一阶段本地 smoke：WebSocket handler 和 `im.delivery.events` consumer 共享同一个 in-memory session registry。多实例前必须改用 Redis route。
+`all` 模式只用于第一阶段本地 smoke：WebSocket handler 和 `im.delivery.events` consumer 共享同一个进程内 session registry。默认 route backend 仍是 memory；跨实例在线路由需要启用 Redis route。
+
+Redis route 最小参数：
+
+```text
+NEXUSIM_PUSH_ROUTE_BACKEND=redis
+NEXUSIM_PUSH_GATEWAY_ID=push-gateway-a
+NEXUSIM_PUSH_REDIS_ADDR=127.0.0.1:6379
+NEXUSIM_PUSH_REDIS_PASSWORD=
+NEXUSIM_PUSH_REDIS_DB=0
+NEXUSIM_PUSH_REDIS_KEY_PREFIX=nexusim:push
+NEXUSIM_PUSH_ROUTE_TTL=90s
+```
 
 ## 报告位置
 
@@ -80,9 +92,9 @@ E:\development\IM\loadtest\results
 - 不打满 Win-Mac 2.5Gbps 链路。
 - 不重新做 message-service 硬件矩阵。
 - 不把短时 resume buffer 当作 durable inbox。
-- 不把单实例 in-memory resume buffer 表述为跨实例 resume；当前没有 Redis route，也没有 TTL；未知客户端 `resume_token` 必须返回 `buffer_miss` 并由服务端签发新 token。
+- 不把单实例 in-memory resume buffer 表述为跨实例 resume；当前 Redis route 只负责在线 session 路由，不负责跨实例 resume buffer，TTL 续期也尚未完成；未知客户端 `resume_token` 必须返回 `buffer_miss` 并由服务端签发新 token。
 - 不把 push smoke 表述为生产容量结论。
-- 不把 queue-full active close 表述为完整慢连接治理；当前 `server.resume_hint` 只是 broad pull fallback，客户端必须用本地 durable cursor 决定 `PullInbox` 起点。已完成单实例 slow-client 真实进程负向 smoke，但它验证的是 durable `PullInbox` fallback，不验证 resume buffer replay；后续还没有 Redis route / 多实例慢连接验证。
+- 不把 queue-full active close 表述为完整慢连接治理；当前 `server.resume_hint` 只是 broad pull fallback，客户端必须用本地 durable cursor 决定 `PullInbox` 起点。已完成单实例 slow-client 真实进程负向 smoke，但它验证的是 durable `PullInbox` fallback，不验证 resume buffer replay；后续还没有 Redis route 真实跨实例 smoke / 多实例慢连接验证。
 - `/debug/metrics` 目前只暴露单实例 in-memory registry 调试指标，用于 smoke 排障；不是生产级 Prometheus 指标。
 - `NEXUSIM_PUSH_TEST_WRITE_DELAY` 只允许本地 smoke 使用，生产环境必须 unset 或保持 `0`。
 

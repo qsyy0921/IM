@@ -17,8 +17,10 @@ import (
 	"github.com/qsyy0921/IM/services/push-gateway/internal/app"
 	kafkainfra "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/kafka"
 	"github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/memory"
+	redisroute "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/redisroute"
 	rpcinfra "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/rpc"
 	"github.com/qsyy0921/IM/services/push-gateway/internal/trigger/delivery"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -48,9 +50,40 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	registry := memory.NewRegistry()
-	errs := make(chan error, 2)
+	localRegistry := memory.NewRegistry()
+	registry := app.SessionRegistry(localRegistry)
+	errs := make(chan error, 4)
 	var closers []func() error
+
+	var redisClient redis.UniversalClient
+	routeBackend := envString("NEXUSIM_PUSH_ROUTE_BACKEND", "memory")
+	if routeBackend == "redis" {
+		gatewayID := envString("NEXUSIM_PUSH_GATEWAY_ID", defaultGatewayID())
+		redisClient = redis.NewClient(&redis.Options{
+			Addr:     envString("NEXUSIM_PUSH_REDIS_ADDR", "127.0.0.1:6379"),
+			Password: os.Getenv("NEXUSIM_PUSH_REDIS_PASSWORD"),
+			DB:       envIntAllowZero("NEXUSIM_PUSH_REDIS_DB", 0),
+		})
+		if err := redisClient.Ping(ctx).Err(); err != nil {
+			return err
+		}
+		routeConfig := redisroute.Config{
+			GatewayID: gatewayID,
+			KeyPrefix: envString("NEXUSIM_PUSH_REDIS_KEY_PREFIX", "nexusim:push"),
+			RouteTTL:  envDuration("NEXUSIM_PUSH_ROUTE_TTL", 90*time.Second),
+		}
+		registry = redisroute.NewRegistry(localRegistry, redisClient, routeConfig)
+		closers = append(closers, redisClient.Close)
+		if enableWS {
+			subscriber := redisroute.NewSubscriber(localRegistry, redisClient, routeConfig)
+			go func() {
+				log.Printf("push-gateway redis route subscriber started for gateway_id=%s", gatewayID)
+				errs <- subscriber.Run(ctx)
+			}()
+		}
+	} else if routeBackend != "memory" {
+		return errors.New("unsupported NEXUSIM_PUSH_ROUTE_BACKEND")
+	}
 
 	if enableWS {
 		deliveryAddr := envString("NEXUSIM_DELIVERY_GRPC_ADDR", "127.0.0.1:10497")
@@ -77,7 +110,7 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/debug/metrics", func(writer http.ResponseWriter, request *http.Request) {
 			writer.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(writer).Encode(registry.Metrics())
+			_ = json.NewEncoder(writer).Encode(localRegistry.Metrics())
 		})
 		mux.Handle("/", server)
 		httpServer := &http.Server{
@@ -157,6 +190,18 @@ func envInt(name string, fallback int) int {
 	return parsed
 }
 
+func envIntAllowZero(name string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 0 {
+		return fallback
+	}
+	return parsed
+}
+
 func envDuration(name string, fallback time.Duration) time.Duration {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
@@ -167,6 +212,14 @@ func envDuration(name string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return parsed
+}
+
+func defaultGatewayID() string {
+	hostname, err := os.Hostname()
+	if err != nil || hostname == "" {
+		hostname = "gateway"
+	}
+	return hostname + "-" + strconv.Itoa(os.Getpid())
 }
 
 func splitCSV(value string) []string {

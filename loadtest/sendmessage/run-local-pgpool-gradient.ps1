@@ -29,6 +29,8 @@ param(
     [double]$AdaptiveMinOutboxFetchedPerCall = 5,
     [double]$AdaptiveMinKafkaRecordsPerCall = 10,
     [string]$AdaptiveSampleInterval = "1s",
+    [string]$AdaptiveRetryBaseDelay = "500ms",
+    [string]$AdaptiveRetryMaxDelay = "2s",
     [switch]$RetryOverloaded,
     [int]$MaxRetries = 0,
     [string]$RetryJitter = "0s",
@@ -100,6 +102,8 @@ foreach ($pgMax in $PGMaxConns) {
             $env:NEXUSIM_ADAPTIVE_MIN_OUTBOX_FETCHED_PER_CALL = [string]$AdaptiveMinOutboxFetchedPerCall
             $env:NEXUSIM_ADAPTIVE_MIN_KAFKA_RECORDS_PER_CALL = [string]$AdaptiveMinKafkaRecordsPerCall
             $env:NEXUSIM_ADAPTIVE_SAMPLE_INTERVAL = $AdaptiveSampleInterval
+            $env:NEXUSIM_ADAPTIVE_RETRY_BASE_DELAY = $AdaptiveRetryBaseDelay
+            $env:NEXUSIM_ADAPTIVE_RETRY_MAX_DELAY = $AdaptiveRetryMaxDelay
             $env:NEXUSIM_ADAPTIVE_RELAY_METRICS_URL = $relayMetricsURL
         } else {
             Remove-Item Env:\NEXUSIM_ADAPTIVE_LIMIT_ENABLED -ErrorAction SilentlyContinue
@@ -112,6 +116,8 @@ foreach ($pgMax in $PGMaxConns) {
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MIN_OUTBOX_FETCHED_PER_CALL -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MIN_KAFKA_RECORDS_PER_CALL -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_SAMPLE_INTERVAL -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_RETRY_BASE_DELAY -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_RETRY_MAX_DELAY -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_RELAY_METRICS_URL -ErrorAction SilentlyContinue
         }
 
@@ -172,6 +178,8 @@ foreach ($pgMax in $PGMaxConns) {
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MIN_OUTBOX_FETCHED_PER_CALL -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MIN_KAFKA_RECORDS_PER_CALL -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_SAMPLE_INTERVAL -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_RETRY_BASE_DELAY -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_RETRY_MAX_DELAY -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_RELAY_METRICS_URL -ErrorAction SilentlyContinue
         }
     }

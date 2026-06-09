@@ -20,7 +20,7 @@ func TestControllerAllowsWhenDisabled(t *testing.T) {
 
 func TestControllerRejectsWhenPoolAvailableBelowFloor(t *testing.T) {
 	controller := NewController(
-		Config{Enabled: true, MinAvailableConns: 2},
+		Config{Enabled: true, MinAvailableConns: 2, RetryBaseDelay: 250 * time.Millisecond},
 		fakePoolStats{stats: PoolStats{AcquiredConns: 7, MaxConns: 8}},
 		nil,
 		nil,
@@ -29,6 +29,9 @@ func TestControllerRejectsWhenPoolAvailableBelowFloor(t *testing.T) {
 	err := controller.CheckSendMessage(context.Background())
 	if !errors.Is(err, types.ErrServiceOverloaded) {
 		t.Fatalf("expected service overloaded, got %v", err)
+	}
+	if delay, ok := types.ServiceOverloadedRetryDelay(err); !ok || delay != 250*time.Millisecond {
+		t.Fatalf("expected dynamic retry delay, delay=%s ok=%t", delay, ok)
 	}
 }
 

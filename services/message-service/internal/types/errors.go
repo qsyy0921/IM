@@ -3,6 +3,7 @@ package types
 import (
 	"errors"
 	"fmt"
+	"time"
 )
 
 var (
@@ -62,7 +63,41 @@ func NewServiceOverloaded(reason string) error {
 	if reason == "" {
 		return ErrServiceOverloaded
 	}
-	return fmt.Errorf("%w: %s", ErrServiceOverloaded, reason)
+	return ServiceOverloadedError{Reason: reason}
+}
+
+func NewServiceOverloadedWithRetryDelay(reason string, retryDelay time.Duration) error {
+	if retryDelay <= 0 {
+		return NewServiceOverloaded(reason)
+	}
+	return ServiceOverloadedError{
+		Reason:     reason,
+		RetryDelay: retryDelay,
+	}
+}
+
+type ServiceOverloadedError struct {
+	Reason     string
+	RetryDelay time.Duration
+}
+
+func (e ServiceOverloadedError) Error() string {
+	if e.Reason == "" {
+		return ErrServiceOverloaded.Error()
+	}
+	return fmt.Sprintf("%s: %s", ErrServiceOverloaded, e.Reason)
+}
+
+func (e ServiceOverloadedError) Unwrap() error {
+	return ErrServiceOverloaded
+}
+
+func ServiceOverloadedRetryDelay(err error) (time.Duration, bool) {
+	var overloaded ServiceOverloadedError
+	if !errors.As(err, &overloaded) || overloaded.RetryDelay <= 0 {
+		return 0, false
+	}
+	return overloaded.RetryDelay, true
 }
 
 func NewDependencyVersionMismatch(reason string) error {

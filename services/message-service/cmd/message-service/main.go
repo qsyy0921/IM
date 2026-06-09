@@ -103,6 +103,8 @@ func runGRPCServer() error {
 			SampleInterval:                envDuration("NEXUSIM_ADAPTIVE_SAMPLE_INTERVAL", time.Second),
 			RelayMetricsURL:               envString("NEXUSIM_ADAPTIVE_RELAY_METRICS_URL", ""),
 			HTTPTimeout:                   envDuration("NEXUSIM_ADAPTIVE_HTTP_TIMEOUT", time.Second),
+			RetryBaseDelay:                envDuration("NEXUSIM_ADAPTIVE_RETRY_BASE_DELAY", 500*time.Millisecond),
+			RetryMaxDelay:                 envDuration("NEXUSIM_ADAPTIVE_RETRY_MAX_DELAY", 2*time.Second),
 		}
 		admission := admissioninfra.NewController(
 			config,

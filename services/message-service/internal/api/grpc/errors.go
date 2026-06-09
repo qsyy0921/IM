@@ -37,8 +37,12 @@ func grpcError(err error, correlationID string) error {
 		CorrelationId: correlationID,
 	}
 	if errors.Is(err, types.ErrServiceOverloaded) {
+		retryDelay := serviceOverloadedRetryDelay
+		if dynamicDelay, ok := types.ServiceOverloadedRetryDelay(err); ok {
+			retryDelay = dynamicDelay
+		}
 		withDetails, detailErr := st.WithDetails(messageError, &errdetails.RetryInfo{
-			RetryDelay: durationpb.New(serviceOverloadedRetryDelay),
+			RetryDelay: durationpb.New(retryDelay),
 		})
 		if detailErr != nil {
 			return st.Err()

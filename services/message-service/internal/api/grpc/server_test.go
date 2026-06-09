@@ -271,6 +271,30 @@ func TestSendMessageServiceOverloadedIncludesRetryInfo(t *testing.T) {
 	}
 }
 
+func TestSendMessageServiceOverloadedUsesDynamicRetryInfo(t *testing.T) {
+	server := NewServer(&fakeSendMessageExecutor{
+		err: types.NewServiceOverloadedWithRetryDelay("adaptive limit", 1500*time.Millisecond),
+	})
+
+	_, err := server.SendMessage(context.Background(), testSendMessageRequest())
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	var retryInfo *errdetails.RetryInfo
+	for _, detail := range st.Details() {
+		if candidate, ok := detail.(*errdetails.RetryInfo); ok {
+			retryInfo = candidate
+		}
+	}
+	if retryInfo == nil {
+		t.Fatalf("expected RetryInfo detail, got %+v", st.Details())
+	}
+	if retryInfo.GetRetryDelay().AsDuration() != 1500*time.Millisecond {
+		t.Fatalf("unexpected retry delay: %s", retryInfo.GetRetryDelay().AsDuration())
+	}
+}
+
 func testSendMessageRequest() *messagev1.SendMessageRequest {
 	payload, err := structpb.NewStruct(map[string]any{"text": "hello"})
 	if err != nil {

@@ -28,6 +28,8 @@ type Config struct {
 	SampleInterval                time.Duration
 	RelayMetricsURL               string
 	HTTPTimeout                   time.Duration
+	RetryBaseDelay                time.Duration
+	RetryMaxDelay                 time.Duration
 }
 
 type PoolStats struct {
@@ -71,6 +73,12 @@ func NewController(
 	if config.HTTPTimeout <= 0 {
 		config.HTTPTimeout = time.Second
 	}
+	if config.RetryBaseDelay <= 0 {
+		config.RetryBaseDelay = 500 * time.Millisecond
+	}
+	if config.RetryMaxDelay <= 0 {
+		config.RetryMaxDelay = 2 * time.Second
+	}
 	if config.MinMetricSamples <= 0 {
 		config.MinMetricSamples = 20
 	}
@@ -105,7 +113,7 @@ func (c *Controller) CheckSendMessage(ctx context.Context) error {
 	if c.overloaded.Load() {
 		blockers := c.recoveryBlockers()
 		if len(blockers) > 0 {
-			return types.NewServiceOverloaded("adaptive limit recovering: " + strings.Join(blockers, "; "))
+			return c.newServiceOverloaded("adaptive limit recovering", blockers, true)
 		}
 		c.overloaded.Store(false)
 	}
@@ -114,7 +122,22 @@ func (c *Controller) CheckSendMessage(ctx context.Context) error {
 		return nil
 	}
 	c.overloaded.Store(true)
-	return types.NewServiceOverloaded("adaptive limit: " + strings.Join(reasons, "; "))
+	return c.newServiceOverloaded("adaptive limit", reasons, false)
+}
+
+func (c *Controller) newServiceOverloaded(prefix string, reasons []string, recovering bool) error {
+	reasonCount := len(reasons)
+	if recovering {
+		reasonCount++
+	}
+	if reasonCount < 1 {
+		reasonCount = 1
+	}
+	delay := time.Duration(reasonCount) * c.config.RetryBaseDelay
+	if delay > c.config.RetryMaxDelay {
+		delay = c.config.RetryMaxDelay
+	}
+	return types.NewServiceOverloadedWithRetryDelay(prefix+": "+strings.Join(reasons, "; "), delay)
 }
 
 func (c *Controller) recoveryBlockers() []string {

@@ -25,6 +25,7 @@ conversation-service CreateMemberChange
 | 报告 | 内容 |
 | --- | --- |
 | `loadtest-report-20260609-delivery-full-smoke.md` | `member joined + SendMessage -> delivery projection -> PullInbox -> AckDelivery` 真实进程 smoke |
+| `loadtest-report-20260609-delivery-outbox-smoke.md` | `delivery_outbox -> im.delivery.events` 真实 Kafka 发布 smoke |
 
 ## 面试可讲重点
 
@@ -32,4 +33,4 @@ conversation-service CreateMemberChange
 - 成员变更事件先进入 `delivery_membership_projection`，消息事件再按成员可见窗口写入 `user_inbox`，避免用“当前成员表”错误解释历史消息可见性。
 - `AckDelivery` 只能 ACK 到该用户已可见的最大 seq，不能让客户端随便把 cursor 推到未来。
 - Kafka checkpoint 使用 `consumer_group + topic + partition`，记录 next offset；业务投影落库成功后才提交 Kafka offset。
-- 当前已补 `delivery_outbox -> im.delivery.events` 最小 relay 代码和测试；下一步需要做真实进程 smoke，并在 push-gateway 接入前补 LEAVE/REMOVE 负向可见性验证。
+- 当前已补 `delivery_outbox -> im.delivery.events` 最小 relay，并通过真实 Kafka smoke 验证 `PENDING -> PUBLISHED` 和 protobuf `DeliveryEvent` 解码；push-gateway 接入前还需要补 LEAVE/REMOVE 负向可见性验证。

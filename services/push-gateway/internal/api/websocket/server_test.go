@@ -151,10 +151,14 @@ func containsString(value string, want string) bool {
 
 type fakeDeliveryClient struct {
 	last types.AckDeliveryCommand
+	err  error
 }
 
 func (client *fakeDeliveryClient) AckDelivery(ctx context.Context, command types.AckDeliveryCommand) (types.AckDeliveryResult, error) {
 	client.last = command
+	if client.err != nil {
+		return types.AckDeliveryResult{}, client.err
+	}
 	return types.AckDeliveryResult{
 		TenantID:        command.AuthContext.TenantID,
 		UserID:          command.AuthContext.UserID,
@@ -162,4 +166,57 @@ func (client *fakeDeliveryClient) AckDelivery(ctx context.Context, command types
 		ConversationID:  command.ConversationID,
 		LastReceivedSeq: command.ReceivedSeq,
 	}, nil
+}
+
+func TestWebSocketAckPermissionDeniedIsNotRetryable(t *testing.T) {
+	registry := memory.NewRegistry()
+	delivery := &fakeDeliveryClient{err: types.ErrPermissionDenied}
+	server := NewServer(
+		app.NewConnectSessionUseCase(registry),
+		app.NewDisconnectSessionUseCase(registry),
+		app.NewHandleClientFrameUseCase(delivery),
+		Config{QueueSize: 8, HeartbeatInterval: time.Second},
+	)
+	httpServer := httptest.NewServer(server)
+	defer httpServer.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, _, err := nhooyr.Dial(ctx, "ws"+httpServer.URL[len("http"):]+"/ws?tenant_id=tenant-1&user_id=user-1&device_id=device-1", nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close(nhooyr.StatusNormalClosure, "")
+
+	if err := wsjson.Write(ctx, conn, types.ClientFrame{
+		Op:        types.OpClientHello,
+		RequestID: "hello-1",
+		DeviceID:  "device-1",
+	}); err != nil {
+		t.Fatalf("write hello: %v", err)
+	}
+	var hello types.ServerFrame
+	if err := wsjson.Read(ctx, conn, &hello); err != nil {
+		t.Fatalf("read hello: %v", err)
+	}
+
+	if err := wsjson.Write(ctx, conn, types.ClientFrame{
+		Op:             types.OpDeliveryAck,
+		RequestID:      "ack-denied",
+		ConversationID: "conversation-1",
+		ReceivedSeq:    12,
+	}); err != nil {
+		t.Fatalf("write ack: %v", err)
+	}
+	var frame types.ServerFrame
+	if err := wsjson.Read(ctx, conn, &frame); err != nil {
+		t.Fatalf("read error: %v", err)
+	}
+	if frame.Op != types.OpError ||
+		frame.RequestID != "ack-denied" ||
+		frame.Code != "PERMISSION_DENIED" ||
+		frame.Message != "permission denied" ||
+		frame.Retryable {
+		t.Fatalf("unexpected permission error frame: %+v", frame)
+	}
 }

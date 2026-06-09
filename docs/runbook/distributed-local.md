@@ -190,6 +190,33 @@ docker version
 docker info
 ```
 
+Windows 侧可用脚本复查 Mac Docker Desktop 配置：
+
+```powershell
+.\tools\check-mac-docker-desktop.ps1
+```
+
+当前验证结果：
+
+```text
+docker_cli=Docker version 29.5.2
+docker_context=desktop-linux
+cpus=8
+memory_mib=8192
+swap_mib=1024
+proxy_http=http://127.0.0.1:7890
+proxy_https=http://127.0.0.1:7890
+proxy_exclude includes 172.16.0.0/12
+mac_docker_desktop_config=OK
+```
+
+后续如果要在 Mac 上模拟两个节点，不再改 Docker Desktop 全局资源池；直接对容器设置资源上限：
+
+```text
+mac-node-a: --cpus 4 --memory 4g
+mac-node-b: --cpus 4 --memory 4g
+```
+
 注意：Mac 的 `/Users/qsyy0921/Desktop/IM` 当前不是由 Windows 侧管理的干净工作区，已有本地 ahead / untracked 文件。后续同步代码时不能强行 reset；优先选择：
 
 ```text

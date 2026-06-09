@@ -11,7 +11,7 @@ import (
 )
 
 func TestMarkReadMapsValidationError(t *testing.T) {
-	server := NewServer(fakeMarkRead{err: types.NewInvalidArgument("tenant_id is required")}, fakeGetReceiptState{})
+	server := NewServer(fakeMarkRead{err: types.NewInvalidArgument("tenant_id is required")}, fakeGetReceiptState{}, fakeListConversations{})
 	_, err := server.MarkRead(context.Background(), &receiptv1.MarkReadRequest{})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", status.Code(err))
@@ -19,7 +19,7 @@ func TestMarkReadMapsValidationError(t *testing.T) {
 }
 
 func TestMarkReadSanitizesDBWriteError(t *testing.T) {
-	server := NewServer(fakeMarkRead{err: types.NewDBWriteFailed("duplicate key value violates unique constraint receipt_outbox_event_id_key")}, fakeGetReceiptState{})
+	server := NewServer(fakeMarkRead{err: types.NewDBWriteFailed("duplicate key value violates unique constraint receipt_outbox_event_id_key")}, fakeGetReceiptState{}, fakeListConversations{})
 	_, err := server.MarkRead(context.Background(), &receiptv1.MarkReadRequest{
 		AuthContext:    &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
 		ConversationId: "conversation-1",
@@ -34,6 +34,14 @@ func TestMarkReadSanitizesDBWriteError(t *testing.T) {
 	}
 	if statusErr.Message() != "receipt write failed" {
 		t.Fatalf("expected sanitized message, got %q", statusErr.Message())
+	}
+}
+
+func TestListConversationsMapsValidationError(t *testing.T) {
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListConversations{err: types.NewInvalidArgument("tenant_id is required")})
+	_, err := server.ListConversations(context.Background(), &receiptv1.ListConversationsRequest{})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", status.Code(err))
 	}
 }
 
@@ -52,4 +60,15 @@ type fakeGetReceiptState struct{}
 
 func (fakeGetReceiptState) Execute(context.Context, types.GetReceiptStateCommand) (types.GetReceiptStateResult, error) {
 	return types.GetReceiptStateResult{}, nil
+}
+
+type fakeListConversations struct {
+	err error
+}
+
+func (fake fakeListConversations) Execute(context.Context, types.ListConversationsCommand) (types.ListConversationsResult, error) {
+	if fake.err != nil {
+		return types.ListConversationsResult{}, fake.err
+	}
+	return types.ListConversationsResult{}, nil
 }

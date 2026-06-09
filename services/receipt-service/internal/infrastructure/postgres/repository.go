@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/sha256"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -43,6 +45,9 @@ func (repository *Repository) ProjectDeliveryEvent(
 		if err := upsertInitialReceiptState(ctx, tx, command); err != nil {
 			return types.ProjectDeliveryEventResult{}, err
 		}
+		if err := upsertConversationSummaryFromInbox(ctx, tx, command); err != nil {
+			return types.ProjectDeliveryEventResult{}, err
+		}
 		result.ProjectedInboxItem = true
 	case types.DeliveryEventAckRecorded:
 		if err := lockReceivedKey(ctx, tx, command); err != nil {
@@ -66,6 +71,9 @@ func (repository *Repository) ProjectDeliveryEvent(
 	}
 	if command.ShouldCheckpoint() {
 		if err := upsertKafkaCheckpoint(ctx, tx, command); err != nil {
+			return types.ProjectDeliveryEventResult{}, err
+		}
+		if err := upsertConversationSummaryCheckpoint(ctx, tx, command); err != nil {
 			return types.ProjectDeliveryEventResult{}, err
 		}
 	}
@@ -117,6 +125,9 @@ func (repository *Repository) MarkRead(
 			return types.MarkReadResult{}, err
 		}
 		if err := insertReadOutbox(ctx, tx, command, next); err != nil {
+			return types.MarkReadResult{}, err
+		}
+		if err := updateConversationSummaryAfterRead(ctx, tx, command, next); err != nil {
 			return types.MarkReadResult{}, err
 		}
 	}
@@ -240,6 +251,113 @@ ORDER BY user_id ASC
 	}, nil
 }
 
+func (repository *Repository) ListConversations(
+	ctx context.Context,
+	command types.ListConversationsCommand,
+) (types.ListConversationsResult, error) {
+	limit := command.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	cursor, hasCursor, err := decodeListCursor(command.PageCursor)
+	if err != nil {
+		return types.ListConversationsResult{}, err
+	}
+
+	args := []any{command.AuthContext.TenantID, command.AuthContext.UserID, limit + 1}
+	query := `
+SELECT
+    conversation_id,
+    last_visible_seq,
+    last_message_id,
+    last_sender_id,
+    unread_count,
+    last_read_seq,
+    sort_updated_at
+FROM user_conversation_summaries
+WHERE tenant_id = $1
+  AND user_id = $2
+`
+	if hasCursor {
+		query += `  AND (
+      sort_updated_at < $4
+      OR (sort_updated_at = $4 AND conversation_id > $5)
+  )
+`
+		args = append(args, cursor.SortUpdatedAt, cursor.ConversationID)
+	}
+	query += `ORDER BY sort_updated_at DESC, conversation_id ASC
+LIMIT $3
+`
+
+	rows, err := repository.pool.Query(ctx, query, args...)
+	if err != nil {
+		return types.ListConversationsResult{}, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	items := make([]types.ConversationSummary, 0, limit)
+	for rows.Next() {
+		var item types.ConversationSummary
+		if err := rows.Scan(
+			&item.ConversationID,
+			&item.LastVisibleSeq,
+			&item.LastMessageID,
+			&item.LastSenderID,
+			&item.UnreadCount,
+			&item.LastReadSeq,
+			&item.UpdatedAt,
+		); err != nil {
+			return types.ListConversationsResult{}, types.NewDBReadFailed(err.Error())
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return types.ListConversationsResult{}, types.NewDBReadFailed(err.Error())
+	}
+
+	nextCursor := ""
+	if len(items) > limit {
+		last := items[limit-1]
+		nextCursor = encodeListCursor(listCursor{
+			SortUpdatedAt:  last.UpdatedAt,
+			ConversationID: string(last.ConversationID),
+		})
+		items = items[:limit]
+	}
+	watermark, err := repository.conversationSummaryWatermark(ctx)
+	if err != nil {
+		return types.ListConversationsResult{}, err
+	}
+	return types.ListConversationsResult{
+		Items:               items,
+		NextPageCursor:      nextCursor,
+		ProjectionWatermark: watermark,
+	}, nil
+}
+
+func (repository *Repository) conversationSummaryWatermark(ctx context.Context) (types.ProjectionWatermark, error) {
+	var watermark types.ProjectionWatermark
+	var updatedAt sql.NullTime
+	err := repository.pool.QueryRow(ctx, `
+SELECT
+    COALESCE(MAX(offset_value), 0),
+    MAX(updated_at)
+FROM conversation_summary_checkpoints
+`).Scan(&watermark.OffsetValue, &updatedAt)
+	if err != nil {
+		return types.ProjectionWatermark{}, types.NewDBReadFailed(err.Error())
+	}
+	watermark.Source = "im.delivery.events"
+	if updatedAt.Valid {
+		watermark.UpdatedAt = updatedAt.Time
+	}
+	return watermark, nil
+}
+
 func validateAccessContext(tenantID types.TenantID, conversationID types.ConversationID, access types.ReceiptAccessContext) error {
 	if access.TenantID == "" && access.ConversationID == "" {
 		return nil
@@ -248,6 +366,37 @@ func validateAccessContext(tenantID types.TenantID, conversationID types.Convers
 		return types.NewPermissionDenied("receipt access context mismatch")
 	}
 	return nil
+}
+
+type listCursor struct {
+	SortUpdatedAt  time.Time `json:"sort_updated_at"`
+	ConversationID string    `json:"conversation_id"`
+}
+
+func decodeListCursor(value string) (listCursor, bool, error) {
+	if value == "" {
+		return listCursor{}, false, nil
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		return listCursor{}, false, types.NewInvalidArgument("invalid page_cursor")
+	}
+	var cursor listCursor
+	if err := json.Unmarshal(decoded, &cursor); err != nil {
+		return listCursor{}, false, types.NewInvalidArgument("invalid page_cursor")
+	}
+	if cursor.SortUpdatedAt.IsZero() || cursor.ConversationID == "" {
+		return listCursor{}, false, types.NewInvalidArgument("invalid page_cursor")
+	}
+	return cursor, true, nil
+}
+
+func encodeListCursor(cursor listCursor) string {
+	encoded, err := json.Marshal(cursor)
+	if err != nil {
+		return ""
+	}
+	return base64.RawURLEncoding.EncodeToString(encoded)
 }
 
 func insertInboxProjection(ctx context.Context, tx pgx.Tx, command types.ProjectDeliveryEventCommand) error {
@@ -265,6 +414,70 @@ INSERT INTO receipt_inbox_projection (
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
 ON CONFLICT (tenant_id, user_id, delivery_event_id) DO NOTHING
 `, command.TenantID, command.UserID, command.ConversationID, command.ConversationSeq, command.SourceEventID, command.EventID, command.MessageID, command.SenderID)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func upsertConversationSummaryFromInbox(ctx context.Context, tx pgx.Tx, command types.ProjectDeliveryEventCommand) error {
+	_, err := tx.Exec(ctx, `
+WITH read_cursor AS (
+    SELECT COALESCE(MAX(last_read_seq), 0) AS last_read_seq
+    FROM user_read_cursors
+    WHERE tenant_id = $1
+      AND user_id = $2
+      AND conversation_id = $3
+),
+unread AS (
+    SELECT COUNT(*) AS unread_count
+    FROM receipt_inbox_projection
+    WHERE tenant_id = $1
+      AND user_id = $2
+      AND conversation_id = $3
+      AND conversation_seq > (SELECT last_read_seq FROM read_cursor)
+)
+INSERT INTO user_conversation_summaries (
+    tenant_id,
+    user_id,
+    conversation_id,
+    last_visible_seq,
+    last_message_id,
+    last_sender_id,
+    last_read_seq,
+    unread_count,
+    sort_updated_at,
+    updated_at
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    (SELECT last_read_seq FROM read_cursor),
+    (SELECT unread_count FROM unread),
+    now(),
+    now()
+)
+ON CONFLICT (tenant_id, user_id, conversation_id) DO UPDATE
+SET last_visible_seq = GREATEST(user_conversation_summaries.last_visible_seq, EXCLUDED.last_visible_seq),
+    last_message_id = CASE
+        WHEN EXCLUDED.last_visible_seq >= user_conversation_summaries.last_visible_seq THEN EXCLUDED.last_message_id
+        ELSE user_conversation_summaries.last_message_id
+    END,
+    last_sender_id = CASE
+        WHEN EXCLUDED.last_visible_seq >= user_conversation_summaries.last_visible_seq THEN EXCLUDED.last_sender_id
+        ELSE user_conversation_summaries.last_sender_id
+    END,
+    last_read_seq = EXCLUDED.last_read_seq,
+    unread_count = EXCLUDED.unread_count,
+    sort_updated_at = CASE
+        WHEN EXCLUDED.last_visible_seq >= user_conversation_summaries.last_visible_seq THEN EXCLUDED.sort_updated_at
+        ELSE user_conversation_summaries.sort_updated_at
+    END,
+    updated_at = now()
+`, command.TenantID, command.UserID, command.ConversationID, command.ConversationSeq, command.MessageID, command.SenderID)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -479,6 +692,29 @@ SET last_read_seq = GREATEST(user_read_cursors.last_read_seq, EXCLUDED.last_read
 	return nil
 }
 
+func updateConversationSummaryAfterRead(ctx context.Context, tx pgx.Tx, command types.MarkReadCommand, readSeq int64) error {
+	_, err := tx.Exec(ctx, `
+UPDATE user_conversation_summaries
+SET last_read_seq = GREATEST(last_read_seq, $4),
+    unread_count = (
+        SELECT COUNT(*)
+        FROM receipt_inbox_projection
+        WHERE tenant_id = $1
+          AND user_id = $2
+          AND conversation_id = $3
+          AND conversation_seq > $4
+    ),
+    updated_at = now()
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND conversation_id = $3
+`, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, readSeq)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
 func markReadStates(ctx context.Context, tx pgx.Tx, command types.MarkReadCommand, readSeq int64) error {
 	_, err := tx.Exec(ctx, `
 UPDATE message_receipt_states
@@ -506,6 +742,25 @@ INSERT INTO receipt_kafka_checkpoints (
 ) VALUES ($1, $2, $3, $4, now())
 ON CONFLICT (consumer_group, topic, partition_id) DO UPDATE
 SET offset_value = GREATEST(receipt_kafka_checkpoints.offset_value, EXCLUDED.offset_value),
+    updated_at = now()
+`, command.ConsumerGroup, command.Topic, command.PartitionID, command.OffsetValue)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func upsertConversationSummaryCheckpoint(ctx context.Context, tx pgx.Tx, command types.ProjectDeliveryEventCommand) error {
+	_, err := tx.Exec(ctx, `
+INSERT INTO conversation_summary_checkpoints (
+    consumer_group,
+    topic,
+    partition_id,
+    offset_value,
+    updated_at
+) VALUES ($1, $2, $3, $4, now())
+ON CONFLICT (consumer_group, topic, partition_id) DO UPDATE
+SET offset_value = GREATEST(conversation_summary_checkpoints.offset_value, EXCLUDED.offset_value),
     updated_at = now()
 `, command.ConsumerGroup, command.Topic, command.PartitionID, command.OffsetValue)
 	if err != nil {

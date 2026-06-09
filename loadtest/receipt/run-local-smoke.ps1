@@ -132,6 +132,7 @@ try {
     Apply-PostgresMigration -Path "migrations\postgres\conversation\000003_member_change_event_unique.sql" -Name "nexusim_conversation_member_change_event_unique.sql"
     Apply-PostgresMigration -Path "migrations\postgres\delivery\000001_delivery_core.sql" -Name "nexusim_delivery_core.sql"
     Apply-PostgresMigration -Path "migrations\postgres\receipt\000001_receipt_core.sql" -Name "nexusim_receipt_core.sql"
+    Apply-PostgresMigration -Path "migrations\postgres\receipt\000002_conversation_summary.sql" -Name "nexusim_receipt_conversation_summary.sql"
 
     Ensure-KafkaTopic -Topic $timelineTopic
     Ensure-KafkaTopic -Topic $deliveryTopic

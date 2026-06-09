@@ -521,6 +521,278 @@ func (x *GetReceiptStateResponse) GetReceivers() []*ReceiptUserState {
 	return nil
 }
 
+type ListConversationsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext   *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	Limit         int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	PageCursor    string                 `protobuf:"bytes,3,opt,name=page_cursor,json=pageCursor,proto3" json:"page_cursor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListConversationsRequest) Reset() {
+	*x = ListConversationsRequest{}
+	mi := &file_nexusim_receipt_v1_receipt_service_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListConversationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListConversationsRequest) ProtoMessage() {}
+
+func (x *ListConversationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_receipt_v1_receipt_service_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListConversationsRequest.ProtoReflect.Descriptor instead.
+func (*ListConversationsRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_receipt_v1_receipt_service_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ListConversationsRequest) GetAuthContext() *AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *ListConversationsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *ListConversationsRequest) GetPageCursor() string {
+	if x != nil {
+		return x.PageCursor
+	}
+	return ""
+}
+
+type ProjectionWatermark struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Source          string                 `protobuf:"bytes,1,opt,name=source,proto3" json:"source,omitempty"`
+	OffsetValue     int64                  `protobuf:"varint,2,opt,name=offset_value,json=offsetValue,proto3" json:"offset_value,omitempty"`
+	UpdatedAtUnixMs int64                  `protobuf:"varint,3,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ProjectionWatermark) Reset() {
+	*x = ProjectionWatermark{}
+	mi := &file_nexusim_receipt_v1_receipt_service_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProjectionWatermark) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProjectionWatermark) ProtoMessage() {}
+
+func (x *ProjectionWatermark) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_receipt_v1_receipt_service_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProjectionWatermark.ProtoReflect.Descriptor instead.
+func (*ProjectionWatermark) Descriptor() ([]byte, []int) {
+	return file_nexusim_receipt_v1_receipt_service_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ProjectionWatermark) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *ProjectionWatermark) GetOffsetValue() int64 {
+	if x != nil {
+		return x.OffsetValue
+	}
+	return 0
+}
+
+func (x *ProjectionWatermark) GetUpdatedAtUnixMs() int64 {
+	if x != nil {
+		return x.UpdatedAtUnixMs
+	}
+	return 0
+}
+
+type ConversationSummary struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ConversationId  string                 `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	LastVisibleSeq  int64                  `protobuf:"varint,2,opt,name=last_visible_seq,json=lastVisibleSeq,proto3" json:"last_visible_seq,omitempty"`
+	LastMessageId   string                 `protobuf:"bytes,3,opt,name=last_message_id,json=lastMessageId,proto3" json:"last_message_id,omitempty"`
+	LastSenderId    string                 `protobuf:"bytes,4,opt,name=last_sender_id,json=lastSenderId,proto3" json:"last_sender_id,omitempty"`
+	UnreadCount     int64                  `protobuf:"varint,5,opt,name=unread_count,json=unreadCount,proto3" json:"unread_count,omitempty"`
+	LastReadSeq     int64                  `protobuf:"varint,6,opt,name=last_read_seq,json=lastReadSeq,proto3" json:"last_read_seq,omitempty"`
+	UpdatedAtUnixMs int64                  `protobuf:"varint,7,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ConversationSummary) Reset() {
+	*x = ConversationSummary{}
+	mi := &file_nexusim_receipt_v1_receipt_service_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConversationSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConversationSummary) ProtoMessage() {}
+
+func (x *ConversationSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_receipt_v1_receipt_service_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConversationSummary.ProtoReflect.Descriptor instead.
+func (*ConversationSummary) Descriptor() ([]byte, []int) {
+	return file_nexusim_receipt_v1_receipt_service_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ConversationSummary) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *ConversationSummary) GetLastVisibleSeq() int64 {
+	if x != nil {
+		return x.LastVisibleSeq
+	}
+	return 0
+}
+
+func (x *ConversationSummary) GetLastMessageId() string {
+	if x != nil {
+		return x.LastMessageId
+	}
+	return ""
+}
+
+func (x *ConversationSummary) GetLastSenderId() string {
+	if x != nil {
+		return x.LastSenderId
+	}
+	return ""
+}
+
+func (x *ConversationSummary) GetUnreadCount() int64 {
+	if x != nil {
+		return x.UnreadCount
+	}
+	return 0
+}
+
+func (x *ConversationSummary) GetLastReadSeq() int64 {
+	if x != nil {
+		return x.LastReadSeq
+	}
+	return 0
+}
+
+func (x *ConversationSummary) GetUpdatedAtUnixMs() int64 {
+	if x != nil {
+		return x.UpdatedAtUnixMs
+	}
+	return 0
+}
+
+type ListConversationsResponse struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Items               []*ConversationSummary `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	NextPageCursor      string                 `protobuf:"bytes,2,opt,name=next_page_cursor,json=nextPageCursor,proto3" json:"next_page_cursor,omitempty"`
+	ProjectionWatermark *ProjectionWatermark   `protobuf:"bytes,3,opt,name=projection_watermark,json=projectionWatermark,proto3" json:"projection_watermark,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *ListConversationsResponse) Reset() {
+	*x = ListConversationsResponse{}
+	mi := &file_nexusim_receipt_v1_receipt_service_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListConversationsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListConversationsResponse) ProtoMessage() {}
+
+func (x *ListConversationsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_receipt_v1_receipt_service_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListConversationsResponse.ProtoReflect.Descriptor instead.
+func (*ListConversationsResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_receipt_v1_receipt_service_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ListConversationsResponse) GetItems() []*ConversationSummary {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *ListConversationsResponse) GetNextPageCursor() string {
+	if x != nil {
+		return x.NextPageCursor
+	}
+	return ""
+}
+
+func (x *ListConversationsResponse) GetProjectionWatermark() *ProjectionWatermark {
+	if x != nil {
+		return x.ProjectionWatermark
+	}
+	return nil
+}
+
 var File_nexusim_receipt_v1_receipt_service_proto protoreflect.FileDescriptor
 
 const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
@@ -564,15 +836,37 @@ const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
 	"\x13received_user_count\x18\x04 \x01(\x05R\x11receivedUserCount\x12&\n" +
 	"\x0fread_user_count\x18\x05 \x01(\x05R\rreadUserCount\x12R\n" +
 	"\x0fvisibility_mode\x18\x06 \x01(\x0e2).nexusim.receipt.v1.ReceiptVisibilityModeR\x0evisibilityMode\x12B\n" +
-	"\treceivers\x18\a \x03(\v2$.nexusim.receipt.v1.ReceiptUserStateR\treceivers*\xb2\x01\n" +
+	"\treceivers\x18\a \x03(\v2$.nexusim.receipt.v1.ReceiptUserStateR\treceivers\"\x95\x01\n" +
+	"\x18ListConversationsRequest\x12B\n" +
+	"\fauth_context\x18\x01 \x01(\v2\x1f.nexusim.receipt.v1.AuthContextR\vauthContext\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x1f\n" +
+	"\vpage_cursor\x18\x03 \x01(\tR\n" +
+	"pageCursor\"}\n" +
+	"\x13ProjectionWatermark\x12\x16\n" +
+	"\x06source\x18\x01 \x01(\tR\x06source\x12!\n" +
+	"\foffset_value\x18\x02 \x01(\x03R\voffsetValue\x12+\n" +
+	"\x12updated_at_unix_ms\x18\x03 \x01(\x03R\x0fupdatedAtUnixMs\"\xaa\x02\n" +
+	"\x13ConversationSummary\x12'\n" +
+	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12(\n" +
+	"\x10last_visible_seq\x18\x02 \x01(\x03R\x0elastVisibleSeq\x12&\n" +
+	"\x0flast_message_id\x18\x03 \x01(\tR\rlastMessageId\x12$\n" +
+	"\x0elast_sender_id\x18\x04 \x01(\tR\flastSenderId\x12!\n" +
+	"\funread_count\x18\x05 \x01(\x03R\vunreadCount\x12\"\n" +
+	"\rlast_read_seq\x18\x06 \x01(\x03R\vlastReadSeq\x12+\n" +
+	"\x12updated_at_unix_ms\x18\a \x01(\x03R\x0fupdatedAtUnixMs\"\xe0\x01\n" +
+	"\x19ListConversationsResponse\x12=\n" +
+	"\x05items\x18\x01 \x03(\v2'.nexusim.receipt.v1.ConversationSummaryR\x05items\x12(\n" +
+	"\x10next_page_cursor\x18\x02 \x01(\tR\x0enextPageCursor\x12Z\n" +
+	"\x14projection_watermark\x18\x03 \x01(\v2'.nexusim.receipt.v1.ProjectionWatermarkR\x13projectionWatermark*\xb2\x01\n" +
 	"\x15ReceiptVisibilityMode\x12'\n" +
 	"#RECEIPT_VISIBILITY_MODE_UNSPECIFIED\x10\x00\x12$\n" +
 	" RECEIPT_VISIBILITY_MODE_DETAILED\x10\x01\x12&\n" +
 	"\"RECEIPT_VISIBILITY_MODE_COUNT_ONLY\x10\x02\x12\"\n" +
-	"\x1eRECEIPT_VISIBILITY_MODE_HIDDEN\x10\x032\xd3\x01\n" +
+	"\x1eRECEIPT_VISIBILITY_MODE_HIDDEN\x10\x032\xc5\x02\n" +
 	"\x0eReceiptService\x12U\n" +
 	"\bMarkRead\x12#.nexusim.receipt.v1.MarkReadRequest\x1a$.nexusim.receipt.v1.MarkReadResponse\x12j\n" +
-	"\x0fGetReceiptState\x12*.nexusim.receipt.v1.GetReceiptStateRequest\x1a+.nexusim.receipt.v1.GetReceiptStateResponseB?Z=github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1;receiptv1b\x06proto3"
+	"\x0fGetReceiptState\x12*.nexusim.receipt.v1.GetReceiptStateRequest\x1a+.nexusim.receipt.v1.GetReceiptStateResponse\x12p\n" +
+	"\x11ListConversations\x12,.nexusim.receipt.v1.ListConversationsRequest\x1a-.nexusim.receipt.v1.ListConversationsResponseB?Z=github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1;receiptv1b\x06proto3"
 
 var (
 	file_nexusim_receipt_v1_receipt_service_proto_rawDescOnce sync.Once
@@ -587,30 +881,39 @@ func file_nexusim_receipt_v1_receipt_service_proto_rawDescGZIP() []byte {
 }
 
 var file_nexusim_receipt_v1_receipt_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_nexusim_receipt_v1_receipt_service_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_nexusim_receipt_v1_receipt_service_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_nexusim_receipt_v1_receipt_service_proto_goTypes = []any{
-	(ReceiptVisibilityMode)(0),      // 0: nexusim.receipt.v1.ReceiptVisibilityMode
-	(*AuthContext)(nil),             // 1: nexusim.receipt.v1.AuthContext
-	(*MarkReadRequest)(nil),         // 2: nexusim.receipt.v1.MarkReadRequest
-	(*MarkReadResponse)(nil),        // 3: nexusim.receipt.v1.MarkReadResponse
-	(*GetReceiptStateRequest)(nil),  // 4: nexusim.receipt.v1.GetReceiptStateRequest
-	(*ReceiptUserState)(nil),        // 5: nexusim.receipt.v1.ReceiptUserState
-	(*GetReceiptStateResponse)(nil), // 6: nexusim.receipt.v1.GetReceiptStateResponse
+	(ReceiptVisibilityMode)(0),        // 0: nexusim.receipt.v1.ReceiptVisibilityMode
+	(*AuthContext)(nil),               // 1: nexusim.receipt.v1.AuthContext
+	(*MarkReadRequest)(nil),           // 2: nexusim.receipt.v1.MarkReadRequest
+	(*MarkReadResponse)(nil),          // 3: nexusim.receipt.v1.MarkReadResponse
+	(*GetReceiptStateRequest)(nil),    // 4: nexusim.receipt.v1.GetReceiptStateRequest
+	(*ReceiptUserState)(nil),          // 5: nexusim.receipt.v1.ReceiptUserState
+	(*GetReceiptStateResponse)(nil),   // 6: nexusim.receipt.v1.GetReceiptStateResponse
+	(*ListConversationsRequest)(nil),  // 7: nexusim.receipt.v1.ListConversationsRequest
+	(*ProjectionWatermark)(nil),       // 8: nexusim.receipt.v1.ProjectionWatermark
+	(*ConversationSummary)(nil),       // 9: nexusim.receipt.v1.ConversationSummary
+	(*ListConversationsResponse)(nil), // 10: nexusim.receipt.v1.ListConversationsResponse
 }
 var file_nexusim_receipt_v1_receipt_service_proto_depIdxs = []int32{
-	1, // 0: nexusim.receipt.v1.MarkReadRequest.auth_context:type_name -> nexusim.receipt.v1.AuthContext
-	1, // 1: nexusim.receipt.v1.GetReceiptStateRequest.auth_context:type_name -> nexusim.receipt.v1.AuthContext
-	0, // 2: nexusim.receipt.v1.GetReceiptStateResponse.visibility_mode:type_name -> nexusim.receipt.v1.ReceiptVisibilityMode
-	5, // 3: nexusim.receipt.v1.GetReceiptStateResponse.receivers:type_name -> nexusim.receipt.v1.ReceiptUserState
-	2, // 4: nexusim.receipt.v1.ReceiptService.MarkRead:input_type -> nexusim.receipt.v1.MarkReadRequest
-	4, // 5: nexusim.receipt.v1.ReceiptService.GetReceiptState:input_type -> nexusim.receipt.v1.GetReceiptStateRequest
-	3, // 6: nexusim.receipt.v1.ReceiptService.MarkRead:output_type -> nexusim.receipt.v1.MarkReadResponse
-	6, // 7: nexusim.receipt.v1.ReceiptService.GetReceiptState:output_type -> nexusim.receipt.v1.GetReceiptStateResponse
-	6, // [6:8] is the sub-list for method output_type
-	4, // [4:6] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	1,  // 0: nexusim.receipt.v1.MarkReadRequest.auth_context:type_name -> nexusim.receipt.v1.AuthContext
+	1,  // 1: nexusim.receipt.v1.GetReceiptStateRequest.auth_context:type_name -> nexusim.receipt.v1.AuthContext
+	0,  // 2: nexusim.receipt.v1.GetReceiptStateResponse.visibility_mode:type_name -> nexusim.receipt.v1.ReceiptVisibilityMode
+	5,  // 3: nexusim.receipt.v1.GetReceiptStateResponse.receivers:type_name -> nexusim.receipt.v1.ReceiptUserState
+	1,  // 4: nexusim.receipt.v1.ListConversationsRequest.auth_context:type_name -> nexusim.receipt.v1.AuthContext
+	9,  // 5: nexusim.receipt.v1.ListConversationsResponse.items:type_name -> nexusim.receipt.v1.ConversationSummary
+	8,  // 6: nexusim.receipt.v1.ListConversationsResponse.projection_watermark:type_name -> nexusim.receipt.v1.ProjectionWatermark
+	2,  // 7: nexusim.receipt.v1.ReceiptService.MarkRead:input_type -> nexusim.receipt.v1.MarkReadRequest
+	4,  // 8: nexusim.receipt.v1.ReceiptService.GetReceiptState:input_type -> nexusim.receipt.v1.GetReceiptStateRequest
+	7,  // 9: nexusim.receipt.v1.ReceiptService.ListConversations:input_type -> nexusim.receipt.v1.ListConversationsRequest
+	3,  // 10: nexusim.receipt.v1.ReceiptService.MarkRead:output_type -> nexusim.receipt.v1.MarkReadResponse
+	6,  // 11: nexusim.receipt.v1.ReceiptService.GetReceiptState:output_type -> nexusim.receipt.v1.GetReceiptStateResponse
+	10, // 12: nexusim.receipt.v1.ReceiptService.ListConversations:output_type -> nexusim.receipt.v1.ListConversationsResponse
+	10, // [10:13] is the sub-list for method output_type
+	7,  // [7:10] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_receipt_v1_receipt_service_proto_init() }
@@ -624,7 +927,7 @@ func file_nexusim_receipt_v1_receipt_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_receipt_v1_receipt_service_proto_rawDesc), len(file_nexusim_receipt_v1_receipt_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   6,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

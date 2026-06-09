@@ -47,6 +47,10 @@ func (repository fakeReceiptRepository) GetReceiptState(context.Context, types.G
 	return types.GetReceiptStateResult{}, nil
 }
 
+func (repository fakeReceiptRepository) ListConversations(context.Context, types.ListConversationsCommand) (types.ListConversationsResult, error) {
+	return types.ListConversationsResult{}, nil
+}
+
 func (repository *fakeReceiptRepository) MarkRead(_ context.Context, command types.MarkReadCommand) (types.MarkReadResult, error) {
 	repository.markReadCommand = command
 	return types.MarkReadResult{

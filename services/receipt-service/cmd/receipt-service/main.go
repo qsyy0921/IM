@@ -69,6 +69,7 @@ func runGRPCServer() error {
 		grpcapi.NewServer(
 			app.NewMarkReadUseCase(repository, access),
 			app.NewGetReceiptStateUseCase(repository, access),
+			app.NewListConversationsUseCase(repository),
 		),
 	)
 

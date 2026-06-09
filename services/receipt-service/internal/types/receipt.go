@@ -85,3 +85,41 @@ type ReceiptAccessContext struct {
 	MemberJoinSeq     int64
 	MemberLeaveSeq    int64
 }
+
+type ListConversationsCommand struct {
+	AuthContext AuthContext
+	Limit       int
+	PageCursor  string
+}
+
+func (command ListConversationsCommand) Validate() error {
+	if err := command.AuthContext.Validate(); err != nil {
+		return err
+	}
+	if command.Limit < 0 {
+		return NewInvalidArgument("limit must be non-negative")
+	}
+	return nil
+}
+
+type ConversationSummary struct {
+	ConversationID ConversationID
+	LastVisibleSeq int64
+	LastMessageID  string
+	LastSenderID   UserID
+	UnreadCount    int64
+	LastReadSeq    int64
+	UpdatedAt      time.Time
+}
+
+type ProjectionWatermark struct {
+	Source      string
+	OffsetValue int64
+	UpdatedAt   time.Time
+}
+
+type ListConversationsResult struct {
+	Items               []ConversationSummary
+	NextPageCursor      string
+	ProjectionWatermark ProjectionWatermark
+}

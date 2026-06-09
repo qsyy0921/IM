@@ -9,6 +9,7 @@ import (
 type ReceiptRepository interface {
 	MarkRead(ctx context.Context, command types.MarkReadCommand) (types.MarkReadResult, error)
 	GetReceiptState(ctx context.Context, command types.GetReceiptStateCommand) (types.GetReceiptStateResult, error)
+	ListConversations(ctx context.Context, command types.ListConversationsCommand) (types.ListConversationsResult, error)
 }
 
 type ReceiptAccessPort interface {

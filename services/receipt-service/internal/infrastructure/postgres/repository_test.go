@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -33,6 +34,11 @@ func TestRepositoryProjectDeliveryEventAndMarkReadIntegration(t *testing.T) {
 	if state.ReceivedUserCount != 1 || state.ReadUserCount != 0 {
 		t.Fatalf("unexpected counts after ack: received=%d read=%d", state.ReceivedUserCount, state.ReadUserCount)
 	}
+	summary, err := repository.ListConversations(ctx, listConversationsCommand(10, ""))
+	if err != nil {
+		t.Fatalf("list conversations before read: %v", err)
+	}
+	assertConversationSummary(t, summary, 1, 1, 0)
 
 	result, err := repository.MarkRead(ctx, markReadCommand(1))
 	if err != nil {
@@ -48,6 +54,11 @@ func TestRepositoryProjectDeliveryEventAndMarkReadIntegration(t *testing.T) {
 	if state.ReceivedUserCount != 1 || state.ReadUserCount != 1 {
 		t.Fatalf("unexpected counts after read: received=%d read=%d", state.ReceivedUserCount, state.ReadUserCount)
 	}
+	summary, err = repository.ListConversations(ctx, listConversationsCommand(10, ""))
+	if err != nil {
+		t.Fatalf("list conversations after read: %v", err)
+	}
+	assertConversationSummary(t, summary, 1, 0, 1)
 	assertReceiptOutboxCount(t, ctx, pool, "receipt.message.received.v1", 1)
 	assertReceiptOutboxCount(t, ctx, pool, "receipt.message.read.v1", 1)
 	assertReceiptOutboxPayload(t, ctx, pool, "receipt.message.received.v1", "message-1", "timeline-event-1", "device-1", 1)
@@ -116,8 +127,8 @@ func inboxCreatedCommand(seq int64, eventID string) types.ProjectDeliveryEventCo
 		UserID:          "receiver-1",
 		ConversationID:  "conv-receipt",
 		ConversationSeq: seq,
-		SourceEventID:   "timeline-event-1",
-		MessageID:       "message-1",
+		SourceEventID:   fmt.Sprintf("timeline-event-%d", seq),
+		MessageID:       fmt.Sprintf("message-%d", seq),
 		SenderID:        "sender-1",
 		ConsumerGroup:   "receipt-test",
 		Topic:           "im.delivery.events",
@@ -154,6 +165,18 @@ func markReadCommand(seq int64) types.MarkReadCommand {
 	}
 }
 
+func listConversationsCommand(limit int, cursor string) types.ListConversationsCommand {
+	return types.ListConversationsCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-receipt",
+			UserID:   "receiver-1",
+			DeviceID: "device-1",
+		},
+		Limit:      limit,
+		PageCursor: cursor,
+	}
+}
+
 func getStateCommandBySeq(seq int64) types.GetReceiptStateCommand {
 	return types.GetReceiptStateCommand{
 		AuthContext: types.AuthContext{
@@ -170,6 +193,29 @@ func getStateCommandByMessage(messageID string) types.GetReceiptStateCommand {
 	command := getStateCommandBySeq(0)
 	command.MessageID = messageID
 	return command
+}
+
+func assertConversationSummary(
+	t *testing.T,
+	result types.ListConversationsResult,
+	wantLastVisibleSeq int64,
+	wantUnread int64,
+	wantLastReadSeq int64,
+) {
+	t.Helper()
+	if len(result.Items) != 1 {
+		t.Fatalf("expected 1 conversation summary, got %d: %+v", len(result.Items), result.Items)
+	}
+	item := result.Items[0]
+	if item.ConversationID != "conv-receipt" ||
+		item.LastVisibleSeq != wantLastVisibleSeq ||
+		item.UnreadCount != wantUnread ||
+		item.LastReadSeq != wantLastReadSeq {
+		t.Fatalf("unexpected conversation summary: %+v", item)
+	}
+	if item.LastMessageID != fmt.Sprintf("message-%d", wantLastVisibleSeq) {
+		t.Fatalf("unexpected last_message_id: %+v", item)
+	}
 }
 
 func assertReceiptOutboxCount(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventType string, want int) {
@@ -248,13 +294,18 @@ func openTestPool(t *testing.T) *pgxpool.Pool {
 func applyReceiptMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	root := findRepoRoot(t)
-	migrationPath := filepath.Join(root, "migrations", "postgres", "receipt", "000001_receipt_core.sql")
-	sqlBytes, err := os.ReadFile(migrationPath)
-	if err != nil {
-		t.Fatalf("read migration: %v", err)
-	}
-	if _, err := pool.Exec(ctx, string(sqlBytes)); err != nil {
-		t.Fatalf("apply migration: %v", err)
+	for _, name := range []string{
+		"000001_receipt_core.sql",
+		"000002_conversation_summary.sql",
+	} {
+		migrationPath := filepath.Join(root, "migrations", "postgres", "receipt", name)
+		sqlBytes, err := os.ReadFile(migrationPath)
+		if err != nil {
+			t.Fatalf("read migration %s: %v", name, err)
+		}
+		if _, err := pool.Exec(ctx, string(sqlBytes)); err != nil {
+			t.Fatalf("apply migration %s: %v", name, err)
+		}
 	}
 }
 
@@ -262,6 +313,8 @@ func resetReceiptTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	_, err := pool.Exec(ctx, `
 TRUNCATE
+    conversation_summary_checkpoints,
+    user_conversation_summaries,
     receipt_outbox,
     receipt_kafka_checkpoints,
     message_receipt_states,

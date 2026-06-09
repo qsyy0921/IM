@@ -53,42 +53,44 @@ type config struct {
 }
 
 type summary struct {
-	Commit                  string                 `json:"commit"`
-	CommitFull              string                 `json:"commit_full"`
-	GitDirty                bool                   `json:"git_dirty"`
-	GitStatusShort          string                 `json:"git_status_short,omitempty"`
-	ConversationTarget      string                 `json:"conversation_target"`
-	MessageTarget           string                 `json:"message_target"`
-	DeliveryTarget          string                 `json:"delivery_target"`
-	ReceiptTarget           string                 `json:"receipt_target"`
-	ResultDir               string                 `json:"result_dir"`
-	TenantID                string                 `json:"tenant_id"`
-	ConversationID          string                 `json:"conversation_id"`
-	OwnerUserID             string                 `json:"owner_user_id"`
-	ReceiverUserID          string                 `json:"receiver_user_id"`
-	ReceiverDeviceID        string                 `json:"receiver_device_id"`
-	DeliveryConsumerGroup   string                 `json:"delivery_consumer_group,omitempty"`
-	ReceiptConsumerGroup    string                 `json:"receipt_consumer_group,omitempty"`
-	ReceiptEventsTopic      string                 `json:"receipt_events_topic,omitempty"`
-	ReceiptEventsGroup      string                 `json:"receipt_events_group,omitempty"`
-	StartedAt               time.Time              `json:"started_at"`
-	FinishedAt              time.Time              `json:"finished_at"`
-	Success                 bool                   `json:"success"`
-	Error                   string                 `json:"error,omitempty"`
-	MemberJoin              memberJoinSummary      `json:"member_join"`
-	SendMessage             sendSummary            `json:"send_message"`
-	PullInbox               pullSummary            `json:"pull_inbox"`
-	AckDelivery             ackSummary             `json:"ack_delivery"`
-	ReceiptBeforeReadBySeq  receiptStateSummary    `json:"receipt_before_read_by_seq"`
-	ReceiptAfterReadBySeq   receiptStateSummary    `json:"receipt_after_read_by_seq"`
-	ReceiptAfterReadByMsgID receiptStateSummary    `json:"receipt_after_read_by_message_id"`
-	MarkRead                markReadSummary        `json:"mark_read"`
-	MarkReadTooFar          negativeCallSummary    `json:"mark_read_too_far"`
-	ReceiptProjection       receiptProjectionStats `json:"receipt_projection"`
-	ReceiptOutbox           receiptOutboxStats     `json:"receipt_outbox"`
-	ReceiptKafkaEvents      []receiptKafkaEvent    `json:"receipt_kafka_events"`
-	DeliveryOutbox          outboxStats            `json:"delivery_outbox"`
-	LatenciesMS             map[string]float64     `json:"latencies_ms"`
+	Commit                  string                  `json:"commit"`
+	CommitFull              string                  `json:"commit_full"`
+	GitDirty                bool                    `json:"git_dirty"`
+	GitStatusShort          string                  `json:"git_status_short,omitempty"`
+	ConversationTarget      string                  `json:"conversation_target"`
+	MessageTarget           string                  `json:"message_target"`
+	DeliveryTarget          string                  `json:"delivery_target"`
+	ReceiptTarget           string                  `json:"receipt_target"`
+	ResultDir               string                  `json:"result_dir"`
+	TenantID                string                  `json:"tenant_id"`
+	ConversationID          string                  `json:"conversation_id"`
+	OwnerUserID             string                  `json:"owner_user_id"`
+	ReceiverUserID          string                  `json:"receiver_user_id"`
+	ReceiverDeviceID        string                  `json:"receiver_device_id"`
+	DeliveryConsumerGroup   string                  `json:"delivery_consumer_group,omitempty"`
+	ReceiptConsumerGroup    string                  `json:"receipt_consumer_group,omitempty"`
+	ReceiptEventsTopic      string                  `json:"receipt_events_topic,omitempty"`
+	ReceiptEventsGroup      string                  `json:"receipt_events_group,omitempty"`
+	StartedAt               time.Time               `json:"started_at"`
+	FinishedAt              time.Time               `json:"finished_at"`
+	Success                 bool                    `json:"success"`
+	Error                   string                  `json:"error,omitempty"`
+	MemberJoin              memberJoinSummary       `json:"member_join"`
+	SendMessage             sendSummary             `json:"send_message"`
+	PullInbox               pullSummary             `json:"pull_inbox"`
+	AckDelivery             ackSummary              `json:"ack_delivery"`
+	ReceiptBeforeReadBySeq  receiptStateSummary     `json:"receipt_before_read_by_seq"`
+	ConversationListBefore  conversationListSummary `json:"conversation_list_before_read"`
+	ReceiptAfterReadBySeq   receiptStateSummary     `json:"receipt_after_read_by_seq"`
+	ReceiptAfterReadByMsgID receiptStateSummary     `json:"receipt_after_read_by_message_id"`
+	ConversationListAfter   conversationListSummary `json:"conversation_list_after_read"`
+	MarkRead                markReadSummary         `json:"mark_read"`
+	MarkReadTooFar          negativeCallSummary     `json:"mark_read_too_far"`
+	ReceiptProjection       receiptProjectionStats  `json:"receipt_projection"`
+	ReceiptOutbox           receiptOutboxStats      `json:"receipt_outbox"`
+	ReceiptKafkaEvents      []receiptKafkaEvent     `json:"receipt_kafka_events"`
+	DeliveryOutbox          outboxStats             `json:"delivery_outbox"`
+	LatenciesMS             map[string]float64      `json:"latencies_ms"`
 }
 
 type memberJoinSummary struct {
@@ -150,6 +152,30 @@ type receiptUserState struct {
 	ReceivedAtUnixMS int64  `json:"received_at_unix_ms"`
 	ReadSeq          int64  `json:"read_seq"`
 	ReadAtUnixMS     int64  `json:"read_at_unix_ms"`
+}
+
+type conversationListSummary struct {
+	ItemCount           int                        `json:"item_count"`
+	Items               []conversationSummaryItem  `json:"items"`
+	NextPageCursor      string                     `json:"next_page_cursor,omitempty"`
+	ProjectionWatermark projectionWatermarkSummary `json:"projection_watermark"`
+	LatencyMS           float64                    `json:"latency_ms"`
+}
+
+type conversationSummaryItem struct {
+	ConversationID  string `json:"conversation_id"`
+	LastVisibleSeq  int64  `json:"last_visible_seq"`
+	LastMessageID   string `json:"last_message_id"`
+	LastSenderID    string `json:"last_sender_id"`
+	UnreadCount     int64  `json:"unread_count"`
+	LastReadSeq     int64  `json:"last_read_seq"`
+	UpdatedAtUnixMS int64  `json:"updated_at_unix_ms"`
+}
+
+type projectionWatermarkSummary struct {
+	Source          string `json:"source"`
+	OffsetValue     int64  `json:"offset_value"`
+	UpdatedAtUnixMS int64  `json:"updated_at_unix_ms"`
 }
 
 type receiptProjectionStats struct {
@@ -394,6 +420,16 @@ func executeSmoke(
 	if receiverBefore.ReceivedSeq != send.GetConversationSeq() || receiverBefore.ReadSeq != 0 {
 		return fmt.Errorf("unexpected receipt before read receiver=%+v", receiverBefore)
 	}
+	begin = time.Now()
+	conversationListBefore, err := listConversations(ctx, cfg, receiptClient)
+	conversationListBefore.LatencyMS = elapsedMS(begin)
+	if err != nil {
+		return fmt.Errorf("list conversations before read: %w", err)
+	}
+	result.ConversationListBefore = conversationListBefore
+	if err := assertConversationListState(conversationListBefore, cfg.conversationID, send.GetConversationSeq(), 1, 0); err != nil {
+		return fmt.Errorf("conversation list before read: %w", err)
+	}
 
 	begin = time.Now()
 	markResponse, err := markRead(ctx, cfg, receiptClient, send.GetConversationSeq())
@@ -419,6 +455,16 @@ func executeSmoke(
 	receiverAfter := findReceiver(afterSeq, cfg.receiverUserID)
 	if receiverAfter.ReadSeq != send.GetConversationSeq() {
 		return fmt.Errorf("unexpected receipt after read receiver=%+v", receiverAfter)
+	}
+	begin = time.Now()
+	conversationListAfter, err := listConversations(ctx, cfg, receiptClient)
+	conversationListAfter.LatencyMS = elapsedMS(begin)
+	if err != nil {
+		return fmt.Errorf("list conversations after read: %w", err)
+	}
+	result.ConversationListAfter = conversationListAfter
+	if err := assertConversationListState(conversationListAfter, cfg.conversationID, send.GetConversationSeq(), 0, send.GetConversationSeq()); err != nil {
+		return fmt.Errorf("conversation list after read: %w", err)
 	}
 
 	tooFar, err := markRead(ctx, cfg, receiptClient, send.GetConversationSeq()+1)
@@ -630,6 +676,30 @@ func getReceipt(
 	})
 }
 
+func listConversations(
+	ctx context.Context,
+	cfg config,
+	client receiptv1.ReceiptServiceClient,
+) (conversationListSummary, error) {
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	response, err := client.ListConversations(requestCtx, &receiptv1.ListConversationsRequest{
+		AuthContext: &receiptv1.AuthContext{
+			TenantId:  cfg.tenantID,
+			UserId:    cfg.receiverUserID,
+			DeviceId:  cfg.receiverDeviceID,
+			SessionId: "receipt-smoke",
+			TraceId:   "receipt-smoke-list",
+			RequestId: "receipt-smoke-list",
+		},
+		Limit: 10,
+	})
+	if err != nil {
+		return conversationListSummary{}, err
+	}
+	return summarizeConversationList(response), nil
+}
+
 func markRead(
 	ctx context.Context,
 	cfg config,
@@ -650,6 +720,55 @@ func markRead(
 		ConversationId: cfg.conversationID,
 		ReadSeq:        seq,
 	})
+}
+
+func summarizeConversationList(response *receiptv1.ListConversationsResponse) conversationListSummary {
+	result := conversationListSummary{
+		ItemCount:      len(response.GetItems()),
+		NextPageCursor: response.GetNextPageCursor(),
+	}
+	if watermark := response.GetProjectionWatermark(); watermark != nil {
+		result.ProjectionWatermark = projectionWatermarkSummary{
+			Source:          watermark.GetSource(),
+			OffsetValue:     watermark.GetOffsetValue(),
+			UpdatedAtUnixMS: watermark.GetUpdatedAtUnixMs(),
+		}
+	}
+	for _, item := range response.GetItems() {
+		result.Items = append(result.Items, conversationSummaryItem{
+			ConversationID:  item.GetConversationId(),
+			LastVisibleSeq:  item.GetLastVisibleSeq(),
+			LastMessageID:   item.GetLastMessageId(),
+			LastSenderID:    item.GetLastSenderId(),
+			UnreadCount:     item.GetUnreadCount(),
+			LastReadSeq:     item.GetLastReadSeq(),
+			UpdatedAtUnixMS: item.GetUpdatedAtUnixMs(),
+		})
+	}
+	return result
+}
+
+func assertConversationListState(
+	state conversationListSummary,
+	conversationID string,
+	seq int64,
+	unread int64,
+	readSeq int64,
+) error {
+	if len(state.Items) != 1 {
+		return fmt.Errorf("expected 1 item, got %d", len(state.Items))
+	}
+	item := state.Items[0]
+	if item.ConversationID != conversationID {
+		return fmt.Errorf("conversation_id=%s want=%s", item.ConversationID, conversationID)
+	}
+	if item.LastVisibleSeq != seq || item.UnreadCount != unread || item.LastReadSeq != readSeq {
+		return fmt.Errorf("unexpected item state: %+v", item)
+	}
+	if item.LastMessageID == "" || item.LastSenderID == "" {
+		return fmt.Errorf("missing last message fields: %+v", item)
+	}
+	return nil
 }
 
 func summarizeReceipt(requestBy string, response *receiptv1.GetReceiptStateResponse) receiptStateSummary {
@@ -753,6 +872,8 @@ WHERE tenant_id = $1
 
 func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
 	statements := []string{
+		`DELETE FROM conversation_summary_checkpoints WHERE consumer_group = $1`,
+		`DELETE FROM user_conversation_summaries WHERE tenant_id = $1`,
 		`DELETE FROM receipt_outbox WHERE tenant_id = $1`,
 		`DELETE FROM receipt_kafka_checkpoints WHERE consumer_group = $1`,
 		`DELETE FROM message_receipt_states WHERE tenant_id = $1`,
@@ -775,7 +896,7 @@ func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
 	}
 	for _, statement := range statements {
 		arg := any(cfg.tenantID)
-		if strings.Contains(statement, "receipt_kafka_checkpoints") {
+		if strings.Contains(statement, "receipt_kafka_checkpoints") || strings.Contains(statement, "conversation_summary_checkpoints") {
 			arg = cfg.receiptGroup
 		}
 		if strings.Contains(statement, "delivery_kafka_checkpoints") {

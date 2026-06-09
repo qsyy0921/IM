@@ -19,14 +19,27 @@ type GetReceiptStateExecutor interface {
 	Execute(context.Context, types.GetReceiptStateCommand) (types.GetReceiptStateResult, error)
 }
 
-type Server struct {
-	receiptv1.UnimplementedReceiptServiceServer
-	markRead        MarkReadExecutor
-	getReceiptState GetReceiptStateExecutor
+type ListConversationsExecutor interface {
+	Execute(context.Context, types.ListConversationsCommand) (types.ListConversationsResult, error)
 }
 
-func NewServer(markRead MarkReadExecutor, getReceiptState GetReceiptStateExecutor) *Server {
-	return &Server{markRead: markRead, getReceiptState: getReceiptState}
+type Server struct {
+	receiptv1.UnimplementedReceiptServiceServer
+	markRead          MarkReadExecutor
+	getReceiptState   GetReceiptStateExecutor
+	listConversations ListConversationsExecutor
+}
+
+func NewServer(
+	markRead MarkReadExecutor,
+	getReceiptState GetReceiptStateExecutor,
+	listConversations ListConversationsExecutor,
+) *Server {
+	return &Server{
+		markRead:          markRead,
+		getReceiptState:   getReceiptState,
+		listConversations: listConversations,
+	}
 }
 
 func Register(registrar grpcgo.ServiceRegistrar, server *Server) {
@@ -106,6 +119,52 @@ func (server *Server) GetReceiptState(
 		ReadUserCount:     int32(result.ReadUserCount),
 		VisibilityMode:    toProtoVisibility(result.VisibilityMode),
 		Receivers:         receivers,
+	}, nil
+}
+
+func (server *Server) ListConversations(
+	ctx context.Context,
+	request *receiptv1.ListConversationsRequest,
+) (*receiptv1.ListConversationsResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	auth := request.GetAuthContext()
+	result, err := server.listConversations.Execute(ctx, types.ListConversationsCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  types.TenantID(auth.GetTenantId()),
+			UserID:    types.UserID(auth.GetUserId()),
+			DeviceID:  auth.GetDeviceId(),
+			SessionID: auth.GetSessionId(),
+			TraceID:   auth.GetTraceId(),
+			RequestID: auth.GetRequestId(),
+		},
+		Limit:      int(request.GetLimit()),
+		PageCursor: request.GetPageCursor(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	items := make([]*receiptv1.ConversationSummary, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, &receiptv1.ConversationSummary{
+			ConversationId:  string(item.ConversationID),
+			LastVisibleSeq:  item.LastVisibleSeq,
+			LastMessageId:   item.LastMessageID,
+			LastSenderId:    string(item.LastSenderID),
+			UnreadCount:     item.UnreadCount,
+			LastReadSeq:     item.LastReadSeq,
+			UpdatedAtUnixMs: item.UpdatedAt.UnixMilli(),
+		})
+	}
+	return &receiptv1.ListConversationsResponse{
+		Items:          items,
+		NextPageCursor: result.NextPageCursor,
+		ProjectionWatermark: &receiptv1.ProjectionWatermark{
+			Source:          result.ProjectionWatermark.Source,
+			OffsetValue:     result.ProjectionWatermark.OffsetValue,
+			UpdatedAtUnixMs: result.ProjectionWatermark.UpdatedAt.UnixMilli(),
+		},
 	}, nil
 }
 

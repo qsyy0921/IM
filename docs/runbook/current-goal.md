@@ -67,7 +67,8 @@ delivery-service
 | conversation-service member change full smoke | 已跑真实进程小规模 smoke：`CreateMemberChange -> outbox relay -> Kafka member event -> member-change-worker -> GetMemberChange(DONE)`，350/350 成功，p99 40.90ms，saga/outbox/timeline 各 350，outbox `PUBLISHED=350`，saga `DONE=350`，报告见 `docs/runbook/loadtest/conversation-service/loadtest-report-20260609-member-change-full-smoke.md` |
 | conversation-service review fixes | 独立评审指出的 `GetMemberChange` 读取授权和 `last_error` 脱敏 P1 已修复：只允许操作者、目标用户、当前 ACTIVE 的 OWNER/ADMIN 查询；对外只返回稳定 `member change processing failed`，不透出 raw DB/Kafka/repair 文本；worker 推进 SQL 已补 conversation/producer/member event 防御性过滤；复核结论无 P0/P1 |
 | delivery-service SDD | `docs/sdd/delivery-service.md` 已新增 v0.1 Draft，并已按评审 P1 补齐 delivery membership projection、ACK max visible seq 约束、Kafka checkpoint 维度 |
-| delivery-service 工程基线 | 已新增 `delivery_service.proto`、delivery migration、六层目录、`PullInbox / AckDelivery` 最小 gRPC + app + PostgreSQL 骨架、`ProjectTimelineEventUseCase` / PostgreSQL projection 方法，以及 timeline consumer worker 草案；真实 PostgreSQL 集成测试已覆盖 projection、ACK 越界、ACK 并发幂等 |
+| delivery-service 工程基线 | 已新增 `delivery_service.proto`、delivery migration、六层目录、`PullInbox / AckDelivery` 最小 gRPC + app + PostgreSQL 骨架、`ProjectTimelineEventUseCase` / PostgreSQL projection 方法，以及 timeline consumer worker；真实 PostgreSQL 集成测试已覆盖 projection、ACK 越界、ACK 并发幂等 |
+| delivery-service full smoke | 已跑真实进程小规模 smoke：`CreateMemberChange(JOIN) -> Kafka timeline -> delivery projection -> SendMessage -> Kafka timeline -> user_inbox -> PullInbox -> AckDelivery`，SendMessage `64/64` 成功，`delivery-user-1` 拉到 64 条 inbox，ACK 到 seq `66`；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-full-smoke.md` |
 
 ## 5. 下一步优先级
 
@@ -81,7 +82,8 @@ delivery-service
 8. `conversation-service` 本地运行 runbook 和更多错误路径测试已补齐；独立评审指出的 P1 参数缺失错误映射已修复；P2 中的 `message-service -> conversation-service` 短重试和 response contract 防御也已补。
 9. `conversation-service / member_change_saga` 最小 `CreateMemberChange` 写路径已落地，并已完成真实进程 smoke：`CreateMemberChange -> outbox relay -> Kafka member event -> outbox PUBLISHED`，报告见 `docs/runbook/loadtest/conversation-service/loadtest-report-20260609-member-change-smoke.md`。
 10. 独立评审已确认 `conversation-service` member change full smoke 阶段无 P0/P1；第二个真实微服务最小闭环可以收口。
-11. 当前进入 `delivery-service`：SDD 评审 P1 已应用；proto、migration、六层骨架、`PullInbox / AckDelivery` 最小同步路径、`ProjectTimelineEventUseCase`、真实 PostgreSQL 集成测试和 timeline consumer worker 草案已开始落地；下一步做真实小规模 smoke。`push-gateway` 暂只做后续 SDD，不先抢实现。
+11. `delivery-service` 已完成真实小规模 smoke：成员事件和消息事件经 `conversation.timeline.events` 被 timeline consumer 投影到 `user_inbox`，`PullInbox / AckDelivery` 成功；当前 `delivery_outbox` 只落本地 `PENDING` 事实，尚未发布 `im.delivery.events`。
+12. 下一步进入 `delivery_outbox` 发布链路设计或 `push-gateway` SDD；`push-gateway` 不应绕过 durable inbox，也不应直接消费 message-service 的内部表。
 
 ## 6. 评审要求
 
@@ -380,3 +382,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：独立评审复核 `conversation-service` P1/P2 修复，结论为无 P0/P1，可进入 `delivery-service / push-gateway` SDD 和最小链路；当前已新增 `docs/sdd/delivery-service.md` v0.1 Draft，范围限定为消费 `conversation.timeline.events`、投影 `user_inbox`、提供 `PullInbox / AckDelivery`，不先实现 WebSocket。
 - 2026-06-09：独立评审指出 `delivery-service` SDD v0.1 有 3 个 P1：缺成员可见性投影、ACK 可推进到未来 seq、Kafka checkpoint 维度错误。本轮已修 SDD 和 migration：新增 `delivery_membership_projection`，ACK 必须 `received_seq <= user_inbox max_visible_seq`，Kafka checkpoint 改为 `consumer_group + topic + partition`；同步落地 delivery proto / migration / 六层骨架、`PullInbox / AckDelivery` 最小同步路径和 `ProjectTimelineEventUseCase` / PostgreSQL projection 方法。
 - 2026-06-09：独立评审复核 delivery baseline 后指出 3 个 P1：首次并发 ACK 可能冲突、membership 单行投影 rejoin 窗口不稳、缺真实 PostgreSQL repository 测试。本轮已修：ACK 前加 transaction advisory lock，JOIN 事件会重置 `join_seq` 并清 `leave_seq`；新增真实 PostgreSQL 集成测试覆盖 join/left/rejoin、message projection、checkpoint、ACK 越界、低 seq 幂等、首次并发 ACK 和 timeline replay 去重。
+- 2026-06-09：独立评审复核 delivery P1 修复和 timeline consumer，结论为无 P0/P1，可进入真实小规模 smoke。本轮已新增 `loadtest/delivery` runner，并在 clean commit `ef817f7` 跑通 delivery full smoke：`CreateMemberChange(JOIN user-0 / delivery-user-1) -> message-service outbox relay -> Kafka -> delivery timeline consumer -> SendMessage(user-0) -> Kafka -> user_inbox(delivery-user-1) -> PullInbox -> AckDelivery`。结果：SendMessage `64/64` 成功，`delivery-user-1` 拉到 64 条 inbox，ACK 到 seq `66`，`message_outbox PUBLISHED=66`，`delivery_outbox PENDING=129` 为预期，因为 delivery outbox relay 尚未实现；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-full-smoke.md`。

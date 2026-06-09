@@ -1,6 +1,6 @@
 # push-gateway Loadtest / Smoke Index
 
-本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify`、`delivery.ack.ok`、queue-full broad `server.resume_hint` active close、单实例 in-memory resume buffer TTL、Redis route 最小 adapter 和 Redis-backed cross-instance resume buffer 第一版；真实进程 full smoke、同 user 多 device notify smoke、slow-client 负向 smoke、单实例 resume replay smoke、跨进程 Redis route smoke、cross-instance resume smoke、Win-Mac 双机 cross-instance resume smoke，以及 `edit / revoke / delete` 三类 message-change notify smoke 均已通过。
+本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify`、`delivery.ack.ok`、queue-full broad `server.resume_hint` active close、单实例 in-memory resume buffer TTL、Redis route 最小 adapter、Redis-backed cross-instance resume buffer 第一版和 HMAC signed gateway token 第一版；真实进程 full smoke、HMAC auth smoke、同 user 多 device notify smoke、slow-client 负向 smoke、单实例 resume replay smoke、跨进程 Redis route smoke、cross-instance resume smoke、Win-Mac 双机 cross-instance resume smoke，以及 `edit / revoke / delete` 三类 message-change notify smoke 均已通过。
 
 ## 当前验证目标
 
@@ -89,6 +89,7 @@ Sentinel 模式当前已证明三件事：客户端 master discovery 正常路�
 | 报告 | 说明 |
 | --- | --- |
 | `loadtest-report-20260609-push-gateway-full-smoke.md` | `delivery_outbox -> im.delivery.events -> push-gateway -> WebSocket notify -> PullInbox -> AckDelivery` 真实进程 smoke |
+| `loadtest-report-20260610-push-gateway-hmac-auth-smoke.md` | `NEXUSIM_PUSH_AUTH_MODE=hmac` 下使用 `Authorization: Bearer` signed gateway token 完成 WebSocket notify / PullInbox / AckDelivery |
 | `loadtest-report-20260609-push-gateway-multidevice-smoke.md` | 同一 user 两个在线 device 均收到同一条 `delivery.notify`，并分别 ACK 到各自 cursor |
 | `loadtest-report-20260609-push-gateway-slow-client-smoke.md` | 慢客户端触发 queue full / active close 后，通过 durable `PullInbox` 补拉并 ACK |
 | `loadtest-report-20260609-push-gateway-resume-replay-smoke.md` | 单实例 in-memory resume buffer 命中后，重连客户端收到同一条 `delivery.notify` replay |
@@ -137,6 +138,27 @@ E:\development\IM\loadtest\results
 ```
 
 该 runner 会验证 `delivery.notify.source_event_type` 分别为 `message.edited.v1` / `message.revoked.v1` / `message.deleted.v1`，并继续用 `PullInbox` 精确校验 durable inbox 中的 `event_type + message_id + conversation_seq`。三类真实进程 smoke 已在 clean commit `81fe92c` 归档到 `loadtest-report-20260610-push-gateway-message-change-notify-smoke.md`。
+
+## HMAC Auth Smoke
+
+`loadtest/pushgateway/run-local-smoke.ps1` 支持在同一条 full smoke 链路中启用 HMAC signed gateway token：
+
+```powershell
+.\loadtest\pushgateway\run-local-smoke.ps1 `
+  -Scenario full `
+  -PushAuthMode hmac `
+  -PushAuthHmacSecret local-push-smoke-secret
+```
+
+HMAC 模式下 runner 用 `Authorization: Bearer` 传 token，summary 会记录：
+
+```text
+push_auth_mode=hmac
+push_auth_token_transport=authorization_header
+push_auth_query_identity_sent=false
+```
+
+这证明 smoke 没有依赖 WebSocket query 中的裸 `tenant_id/user_id`。报告见 `loadtest-report-20260610-push-gateway-hmac-auth-smoke.md`。
 
 ## 第一阶段不做
 

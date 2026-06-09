@@ -552,6 +552,17 @@ NEXUSIM_PUSH_AUTH_HMAC_SECRET=local-dev-secret
 
 `hmac` 模式下，query string 裸 `tenant_id/user_id` 不再被信任；缺失 token、签名错误、audience 不匹配、token 与 device 不匹配会返回 `PERMISSION_DENIED`，过期 token 返回 `AUTH_EXPIRED`。
 
+本地 smoke 可用：
+
+```powershell
+.\loadtest\pushgateway\run-local-smoke.ps1 `
+  -Scenario full `
+  -PushAuthMode hmac `
+  -PushAuthHmacSecret local-push-smoke-secret
+```
+
+runner 会使用 `Authorization: Bearer` 传 token，并在 summary 中记录 `push_auth_query_identity_sent=false`，用于证明没有依赖裸 query 身份。
+
 Redis route 可选参数：
 
 ```text

@@ -344,6 +344,79 @@ func TestRepositoryArchiveConversationRejectsUnknownSummaryIntegration(t *testin
 	}
 }
 
+func TestRepositoryPinConversationSortsPinnedFirstIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	sortTime := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	insertConversationSummary(t, ctx, pool, "conv-a", 11, sortTime)
+	insertConversationSummary(t, ctx, pool, "conv-b", 12, sortTime.Add(-time.Minute))
+	insertConversationSummary(t, ctx, pool, "conv-c", 13, sortTime.Add(-2*time.Minute))
+
+	pinResult, err := repository.PinConversation(ctx, pinConversationCommand("conv-c", true))
+	if err != nil {
+		t.Fatalf("pin conversation: %v", err)
+	}
+	if !pinResult.Conversation.Pinned {
+		t.Fatalf("expected pinned conversation response: %+v", pinResult)
+	}
+
+	defaultList, err := repository.ListConversations(ctx, listConversationsCommand(10, ""))
+	if err != nil {
+		t.Fatalf("list pinned conversations: %v", err)
+	}
+	assertConversationIDs(t, defaultList, "conv-c", "conv-a", "conv-b")
+	if !defaultList.Items[0].Pinned {
+		t.Fatalf("expected first item pinned: %+v", defaultList.Items)
+	}
+
+	updatedSort := listConversationsCommand(10, "")
+	updatedSort.Sort = types.ConversationListSortUpdatedAtDesc
+	updatedList, err := repository.ListConversations(ctx, updatedSort)
+	if err != nil {
+		t.Fatalf("list updated conversations: %v", err)
+	}
+	assertConversationIDs(t, updatedList, "conv-a", "conv-b", "conv-c")
+
+	first, err := repository.ListConversations(ctx, listConversationsCommand(1, ""))
+	if err != nil {
+		t.Fatalf("list first pinned page: %v", err)
+	}
+	assertConversationIDs(t, first, "conv-c")
+	second, err := repository.ListConversations(ctx, listConversationsCommand(1, first.NextPageCursor))
+	if err != nil {
+		t.Fatalf("list second pinned page: %v", err)
+	}
+	assertConversationIDs(t, second, "conv-a")
+	third, err := repository.ListConversations(ctx, listConversationsCommand(1, second.NextPageCursor))
+	if err != nil {
+		t.Fatalf("list third pinned page: %v", err)
+	}
+	assertConversationIDs(t, third, "conv-b")
+
+	unpinResult, err := repository.PinConversation(ctx, pinConversationCommand("conv-c", false))
+	if err != nil {
+		t.Fatalf("unpin conversation: %v", err)
+	}
+	if unpinResult.Conversation.Pinned {
+		t.Fatalf("expected unpinned conversation response: %+v", unpinResult)
+	}
+}
+
+func TestRepositoryPinConversationRejectsUnknownSummaryIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	_, err := repository.PinConversation(ctx, pinConversationCommand("conv-receipt", true))
+	if !errors.Is(err, types.ErrConversationNotFound) {
+		t.Fatalf("expected conversation not found, got %v", err)
+	}
+}
+
 func inboxCreatedCommand(seq int64, eventID string) types.ProjectDeliveryEventCommand {
 	return types.ProjectDeliveryEventCommand{
 		TenantID:        "tenant-receipt",
@@ -468,6 +541,18 @@ func archiveConversationCommand(archived bool) types.ArchiveConversationCommand 
 		},
 		ConversationID: "conv-receipt",
 		Archived:       archived,
+	}
+}
+
+func pinConversationCommand(conversationID string, pinned bool) types.PinConversationCommand {
+	return types.PinConversationCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-receipt",
+			UserID:   "receiver-1",
+			DeviceID: "device-1",
+		},
+		ConversationID: types.ConversationID(conversationID),
+		Pinned:         pinned,
 	}
 }
 
@@ -659,6 +744,7 @@ func applyReceiptMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool
 		"000003_receipt_source_event_type.sql",
 		"000004_conversation_summary_source_event_type.sql",
 		"000005_conversation_archive.sql",
+		"000006_conversation_pin.sql",
 	} {
 		migrationPath := filepath.Join(root, "migrations", "postgres", "receipt", name)
 		sqlBytes, err := os.ReadFile(migrationPath)

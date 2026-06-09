@@ -10,6 +10,7 @@ service ReceiptService {
   rpc ListReceiptStates(ListReceiptStatesRequest) returns (ListReceiptStatesResponse);
   rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
   rpc ArchiveConversation(ArchiveConversationRequest) returns (ArchiveConversationResponse);
+  rpc PinConversation(PinConversationRequest) returns (PinConversationResponse);
 }
 
 message AuthContext {
@@ -84,6 +85,7 @@ message ListReceiptStatesResponse {
 enum ConversationListSort {
   CONVERSATION_LIST_SORT_UNSPECIFIED = 0;
   CONVERSATION_LIST_SORT_UPDATED_AT_DESC = 1;
+  CONVERSATION_LIST_SORT_PINNED_UPDATED_AT_DESC = 2;
 }
 
 message ListConversationsRequest {
@@ -110,6 +112,7 @@ message ConversationSummary {
   int64 updated_at_unix_ms = 7;
   string last_source_event_type = 8;
   bool archived = 9;
+  bool pinned = 10;
 }
 
 message ListConversationsResponse {
@@ -125,5 +128,15 @@ message ArchiveConversationRequest {
 }
 
 message ArchiveConversationResponse {
+  ConversationSummary conversation = 1;
+}
+
+message PinConversationRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  bool pinned = 3;
+}
+
+message PinConversationResponse {
   ConversationSummary conversation = 1;
 }

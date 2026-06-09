@@ -153,13 +153,16 @@ func (command ListConversationsCommand) Validate() error {
 	return nil
 }
 
-const ConversationListSortUpdatedAtDesc = "updated_at_desc"
+const (
+	ConversationListSortUpdatedAtDesc       = "updated_at_desc"
+	ConversationListSortPinnedUpdatedAtDesc = "pinned_updated_at_desc"
+)
 
 func NormalizeConversationListSort(sort string) (string, error) {
 	if sort == "" {
-		return ConversationListSortUpdatedAtDesc, nil
+		return ConversationListSortPinnedUpdatedAtDesc, nil
 	}
-	if sort == ConversationListSortUpdatedAtDesc {
+	if sort == ConversationListSortUpdatedAtDesc || sort == ConversationListSortPinnedUpdatedAtDesc {
 		return sort, nil
 	}
 	return "", NewInvalidArgument("unsupported conversation list sort")
@@ -175,6 +178,7 @@ type ConversationSummary struct {
 	LastReadSeq         int64
 	UpdatedAt           time.Time
 	Archived            bool
+	Pinned              bool
 }
 
 type ProjectionWatermark struct {
@@ -206,5 +210,25 @@ func (command ArchiveConversationCommand) Validate() error {
 }
 
 type ArchiveConversationResult struct {
+	Conversation ConversationSummary
+}
+
+type PinConversationCommand struct {
+	AuthContext    AuthContext
+	ConversationID ConversationID
+	Pinned         bool
+}
+
+func (command PinConversationCommand) Validate() error {
+	if err := command.AuthContext.Validate(); err != nil {
+		return err
+	}
+	if command.ConversationID == "" {
+		return NewInvalidArgument("conversation_id is required")
+	}
+	return nil
+}
+
+type PinConversationResult struct {
 	Conversation ConversationSummary
 }

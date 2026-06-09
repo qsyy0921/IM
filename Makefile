@@ -9,6 +9,8 @@ proto:
 		--go_opt=paths=source_relative \
 		--go-grpc_out=$(PROTO_API_DIR) \
 		--go-grpc_opt=paths=source_relative \
+		$(PROTO_API_DIR)/nexusim/delivery/v1/delivery_service.proto \
+		$(PROTO_API_DIR)/nexusim/receipt/v1/receipt_service.proto \
 		$(PROTO_API_DIR)/nexusim/conversation/v1/conversation_service.proto \
 		$(PROTO_API_DIR)/nexusim/message/v1/message_error.proto \
 		$(PROTO_API_DIR)/nexusim/message/v1/message_service.proto
@@ -17,6 +19,16 @@ proto:
 		--go_out=$(PROTO_KAFKA_DIR) \
 		--go_opt=paths=source_relative \
 		$(PROTO_KAFKA_DIR)/conversation.timeline.events.proto
+	protoc \
+		-I $(PROTO_KAFKA_DIR) \
+		--go_out=$(PROTO_KAFKA_DIR) \
+		--go_opt=paths=source_relative \
+		$(PROTO_KAFKA_DIR)/delivery/v1/im.delivery.events.proto
+	protoc \
+		-I $(PROTO_KAFKA_DIR) \
+		--go_out=$(PROTO_KAFKA_DIR) \
+		--go_opt=paths=source_relative \
+		$(PROTO_KAFKA_DIR)/receipt/v1/im.receipt.events.proto
 
 .PHONY: local-up
 local-up:

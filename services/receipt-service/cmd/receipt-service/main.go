@@ -72,6 +72,7 @@ func runGRPCServer() error {
 			app.NewListReceiptStatesUseCase(repository, access),
 			app.NewListConversationsUseCase(repository),
 			app.NewArchiveConversationUseCase(repository),
+			app.NewPinConversationUseCase(repository),
 		),
 	)
 

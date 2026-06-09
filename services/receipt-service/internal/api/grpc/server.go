@@ -31,6 +31,10 @@ type ArchiveConversationExecutor interface {
 	Execute(context.Context, types.ArchiveConversationCommand) (types.ArchiveConversationResult, error)
 }
 
+type PinConversationExecutor interface {
+	Execute(context.Context, types.PinConversationCommand) (types.PinConversationResult, error)
+}
+
 type Server struct {
 	receiptv1.UnimplementedReceiptServiceServer
 	markRead            MarkReadExecutor
@@ -38,6 +42,7 @@ type Server struct {
 	listReceiptStates   ListReceiptStatesExecutor
 	listConversations   ListConversationsExecutor
 	archiveConversation ArchiveConversationExecutor
+	pinConversation     PinConversationExecutor
 }
 
 func NewServer(
@@ -46,6 +51,7 @@ func NewServer(
 	listReceiptStates ListReceiptStatesExecutor,
 	listConversations ListConversationsExecutor,
 	archiveConversation ArchiveConversationExecutor,
+	pinConversation PinConversationExecutor,
 ) *Server {
 	return &Server{
 		markRead:            markRead,
@@ -53,6 +59,7 @@ func NewServer(
 		listReceiptStates:   listReceiptStates,
 		listConversations:   listConversations,
 		archiveConversation: archiveConversation,
+		pinConversation:     pinConversation,
 	}
 }
 
@@ -216,6 +223,7 @@ func (server *Server) ListConversations(
 			LastReadSeq:         item.LastReadSeq,
 			UpdatedAtUnixMs:     item.UpdatedAt.UnixMilli(),
 			Archived:            item.Archived,
+			Pinned:              item.Pinned,
 		})
 	}
 	return &receiptv1.ListConversationsResponse{
@@ -257,6 +265,34 @@ func (server *Server) ArchiveConversation(
 	}, nil
 }
 
+func (server *Server) PinConversation(
+	ctx context.Context,
+	request *receiptv1.PinConversationRequest,
+) (*receiptv1.PinConversationResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	auth := request.GetAuthContext()
+	result, err := server.pinConversation.Execute(ctx, types.PinConversationCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  types.TenantID(auth.GetTenantId()),
+			UserID:    types.UserID(auth.GetUserId()),
+			DeviceID:  auth.GetDeviceId(),
+			SessionID: auth.GetSessionId(),
+			TraceID:   auth.GetTraceId(),
+			RequestID: auth.GetRequestId(),
+		},
+		ConversationID: types.ConversationID(request.GetConversationId()),
+		Pinned:         request.GetPinned(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &receiptv1.PinConversationResponse{
+		Conversation: conversationSummaryResponse(result.Conversation),
+	}, nil
+}
+
 func conversationSummaryResponse(item types.ConversationSummary) *receiptv1.ConversationSummary {
 	return &receiptv1.ConversationSummary{
 		ConversationId:      string(item.ConversationID),
@@ -268,6 +304,7 @@ func conversationSummaryResponse(item types.ConversationSummary) *receiptv1.Conv
 		LastReadSeq:         item.LastReadSeq,
 		UpdatedAtUnixMs:     item.UpdatedAt.UnixMilli(),
 		Archived:            item.Archived,
+		Pinned:              item.Pinned,
 	}
 }
 
@@ -277,6 +314,8 @@ func conversationListSortFromProto(sort receiptv1.ConversationListSort) string {
 		return ""
 	case receiptv1.ConversationListSort_CONVERSATION_LIST_SORT_UPDATED_AT_DESC:
 		return types.ConversationListSortUpdatedAtDesc
+	case receiptv1.ConversationListSort_CONVERSATION_LIST_SORT_PINNED_UPDATED_AT_DESC:
+		return types.ConversationListSortPinnedUpdatedAtDesc
 	default:
 		return "unsupported"
 	}

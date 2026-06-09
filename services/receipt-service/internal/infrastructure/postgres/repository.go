@@ -287,23 +287,40 @@ SELECT
     unread_count,
     last_read_seq,
     sort_updated_at,
-    archived
+    archived,
+    pinned
 FROM user_conversation_summaries
 WHERE tenant_id = $1
   AND user_id = $2
   AND ($4 OR archived = FALSE)
 `
 	if hasCursor {
-		query += `  AND (
+		if sort == types.ConversationListSortPinnedUpdatedAtDesc {
+			query += `  AND (
+      pinned < $5
+      OR (pinned = $5 AND sort_updated_at < $6)
+      OR (pinned = $5 AND sort_updated_at = $6 AND conversation_id > $7)
+  )
+`
+			args = append(args, cursor.Pinned, cursor.SortUpdatedAt, cursor.ConversationID)
+		} else {
+			query += `  AND (
       sort_updated_at < $5
       OR (sort_updated_at = $5 AND conversation_id > $6)
   )
 `
-		args = append(args, cursor.SortUpdatedAt, cursor.ConversationID)
+			args = append(args, cursor.SortUpdatedAt, cursor.ConversationID)
+		}
 	}
-	query += `ORDER BY sort_updated_at DESC, conversation_id ASC
+	if sort == types.ConversationListSortPinnedUpdatedAtDesc {
+		query += `ORDER BY pinned DESC, sort_updated_at DESC, conversation_id ASC
 LIMIT $3
 `
+	} else {
+		query += `ORDER BY sort_updated_at DESC, conversation_id ASC
+LIMIT $3
+`
+	}
 
 	rows, err := repository.pool.Query(ctx, query, args...)
 	if err != nil {
@@ -324,6 +341,7 @@ LIMIT $3
 			&item.LastReadSeq,
 			&item.UpdatedAt,
 			&item.Archived,
+			&item.Pinned,
 		); err != nil {
 			return types.ListConversationsResult{}, types.NewDBReadFailed(err.Error())
 		}
@@ -340,6 +358,7 @@ LIMIT $3
 			Version:         listCursorVersion,
 			Sort:            sort,
 			IncludeArchived: command.IncludeArchived,
+			Pinned:          last.Pinned,
 			SortUpdatedAt:   last.UpdatedAt,
 			ConversationID:  string(last.ConversationID),
 		})
@@ -383,6 +402,7 @@ RETURNING
     last_read_seq,
     sort_updated_at,
     archived,
+    pinned,
     archived_at
 `, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.Archived).Scan(
 		&item.ConversationID,
@@ -394,6 +414,7 @@ RETURNING
 		&item.LastReadSeq,
 		&item.UpdatedAt,
 		&item.Archived,
+		&item.Pinned,
 		&archivedAt,
 	)
 	if err == pgx.ErrNoRows {
@@ -403,6 +424,57 @@ RETURNING
 		return types.ArchiveConversationResult{}, types.NewDBWriteFailed(err.Error())
 	}
 	return types.ArchiveConversationResult{Conversation: item}, nil
+}
+
+func (repository *Repository) PinConversation(
+	ctx context.Context,
+	command types.PinConversationCommand,
+) (types.PinConversationResult, error) {
+	if err := command.Validate(); err != nil {
+		return types.PinConversationResult{}, err
+	}
+	var item types.ConversationSummary
+	var pinnedAt sql.NullTime
+	err := repository.pool.QueryRow(ctx, `
+UPDATE user_conversation_summaries
+SET pinned = $4,
+    pinned_at = CASE WHEN $4 THEN now() ELSE NULL END,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND conversation_id = $3
+RETURNING
+    conversation_id,
+    last_visible_seq,
+    last_message_id,
+    last_sender_id,
+    last_source_event_type,
+    unread_count,
+    last_read_seq,
+    sort_updated_at,
+    archived,
+    pinned,
+    pinned_at
+`, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.Pinned).Scan(
+		&item.ConversationID,
+		&item.LastVisibleSeq,
+		&item.LastMessageID,
+		&item.LastSenderID,
+		&item.LastSourceEventType,
+		&item.UnreadCount,
+		&item.LastReadSeq,
+		&item.UpdatedAt,
+		&item.Archived,
+		&item.Pinned,
+		&pinnedAt,
+	)
+	if err == pgx.ErrNoRows {
+		return types.PinConversationResult{}, types.NewConversationNotFound("conversation summary not found")
+	}
+	if err != nil {
+		return types.PinConversationResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.PinConversationResult{Conversation: item}, nil
 }
 
 func (repository *Repository) conversationSummaryWatermark(ctx context.Context) (types.ProjectionWatermark, error) {
@@ -438,11 +510,12 @@ type listCursor struct {
 	Version         int       `json:"v"`
 	Sort            string    `json:"sort"`
 	IncludeArchived bool      `json:"include_archived"`
+	Pinned          bool      `json:"pinned"`
 	SortUpdatedAt   time.Time `json:"sort_updated_at"`
 	ConversationID  string    `json:"conversation_id"`
 }
 
-const listCursorVersion = 1
+const listCursorVersion = 2
 
 func decodeListCursor(value string, sort string, includeArchived bool) (listCursor, bool, error) {
 	if value == "" {
@@ -457,7 +530,7 @@ func decodeListCursor(value string, sort string, includeArchived bool) (listCurs
 		return listCursor{}, false, types.NewInvalidArgument("invalid page_cursor")
 	}
 	if cursor.Version == 0 && cursor.Sort == "" {
-		cursor.Version = listCursorVersion
+		cursor.Version = 1
 		cursor.Sort = types.ConversationListSortUpdatedAtDesc
 	}
 	if cursor.Version != listCursorVersion || cursor.Sort != sort || cursor.IncludeArchived != includeArchived {

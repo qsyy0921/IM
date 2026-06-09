@@ -94,6 +94,10 @@ type summary struct {
 	ConversationListAfterArchivedNewIncluded conversationListSummary `json:"conversation_list_after_archived_new_message_included"`
 	UnarchiveConversation                    archiveSummary          `json:"unarchive_conversation"`
 	ConversationListAfterUnarchive           conversationListSummary `json:"conversation_list_after_unarchive"`
+	PinConversation                          pinSummary              `json:"pin_conversation"`
+	ConversationListAfterPin                 conversationListSummary `json:"conversation_list_after_pin"`
+	UnpinConversation                        pinSummary              `json:"unpin_conversation"`
+	ConversationListAfterUnpin               conversationListSummary `json:"conversation_list_after_unpin"`
 	MarkRead                                 markReadSummary         `json:"mark_read"`
 	MarkReadTooFar                           negativeCallSummary     `json:"mark_read_too_far"`
 	ReceiptProjection                        receiptProjectionStats  `json:"receipt_projection"`
@@ -145,6 +149,11 @@ type archiveSummary struct {
 	LatencyMS float64 `json:"latency_ms"`
 }
 
+type pinSummary struct {
+	Pinned    bool    `json:"pinned"`
+	LatencyMS float64 `json:"latency_ms"`
+}
+
 type negativeCallSummary struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
@@ -186,6 +195,7 @@ type conversationSummaryItem struct {
 	LastReadSeq     int64  `json:"last_read_seq"`
 	UpdatedAtUnixMS int64  `json:"updated_at_unix_ms"`
 	Archived        bool   `json:"archived"`
+	Pinned          bool   `json:"pinned"`
 }
 
 type projectionWatermarkSummary struct {
@@ -594,6 +604,50 @@ func executeSmoke(
 		return fmt.Errorf("conversation list after unarchive: %w", err)
 	}
 
+	begin = time.Now()
+	pinResponse, err := pinConversation(ctx, cfg, receiptClient, true)
+	result.PinConversation.LatencyMS = elapsedMS(begin)
+	if err != nil {
+		return fmt.Errorf("pin conversation: %w", err)
+	}
+	result.PinConversation.Pinned = pinResponse.GetConversation().GetPinned()
+	if !result.PinConversation.Pinned {
+		return fmt.Errorf("pin response did not mark conversation pinned: %+v", pinResponse.GetConversation())
+	}
+
+	begin = time.Now()
+	afterPin, err := listConversations(ctx, cfg, receiptClient, false)
+	afterPin.LatencyMS = elapsedMS(begin)
+	if err != nil {
+		return fmt.Errorf("list conversations after pin: %w", err)
+	}
+	result.ConversationListAfterPin = afterPin
+	if err := assertConversationListPinned(afterPin, cfg.conversationID, sendWhileArchived.GetConversationSeq(), true); err != nil {
+		return fmt.Errorf("conversation list after pin: %w", err)
+	}
+
+	begin = time.Now()
+	unpinResponse, err := pinConversation(ctx, cfg, receiptClient, false)
+	result.UnpinConversation.LatencyMS = elapsedMS(begin)
+	if err != nil {
+		return fmt.Errorf("unpin conversation: %w", err)
+	}
+	result.UnpinConversation.Pinned = unpinResponse.GetConversation().GetPinned()
+	if result.UnpinConversation.Pinned {
+		return fmt.Errorf("unpin response still marked conversation pinned: %+v", unpinResponse.GetConversation())
+	}
+
+	begin = time.Now()
+	afterUnpin, err := listConversations(ctx, cfg, receiptClient, false)
+	afterUnpin.LatencyMS = elapsedMS(begin)
+	if err != nil {
+		return fmt.Errorf("list conversations after unpin: %w", err)
+	}
+	result.ConversationListAfterUnpin = afterUnpin
+	if err := assertConversationListPinned(afterUnpin, cfg.conversationID, sendWhileArchived.GetConversationSeq(), false); err != nil {
+		return fmt.Errorf("conversation list after unpin: %w", err)
+	}
+
 	tooFar, err := markRead(ctx, cfg, receiptClient, sendWhileArchived.GetConversationSeq()+1)
 	if err == nil {
 		return fmt.Errorf("mark read too far unexpectedly succeeded: %+v", tooFar)
@@ -851,6 +905,28 @@ func archiveConversation(
 	})
 }
 
+func pinConversation(
+	ctx context.Context,
+	cfg config,
+	client receiptv1.ReceiptServiceClient,
+	pinned bool,
+) (*receiptv1.PinConversationResponse, error) {
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	return client.PinConversation(requestCtx, &receiptv1.PinConversationRequest{
+		AuthContext: &receiptv1.AuthContext{
+			TenantId:  cfg.tenantID,
+			UserId:    cfg.receiverUserID,
+			DeviceId:  cfg.receiverDeviceID,
+			SessionId: "receipt-smoke",
+			TraceId:   "receipt-smoke-pin",
+			RequestId: fmt.Sprintf("receipt-smoke-pin-%v", pinned),
+		},
+		ConversationId: cfg.conversationID,
+		Pinned:         pinned,
+	})
+}
+
 func markRead(
 	ctx context.Context,
 	cfg config,
@@ -896,6 +972,7 @@ func summarizeConversationList(response *receiptv1.ListConversationsResponse) co
 			LastReadSeq:     item.GetLastReadSeq(),
 			UpdatedAtUnixMS: item.GetUpdatedAtUnixMs(),
 			Archived:        item.GetArchived(),
+			Pinned:          item.GetPinned(),
 		})
 	}
 	return result
@@ -949,6 +1026,25 @@ func assertConversationListArchived(
 	}
 	if item.LastVisibleSeq != seq || item.Archived != archived {
 		return fmt.Errorf("unexpected archived item state: %+v", item)
+	}
+	return nil
+}
+
+func assertConversationListPinned(
+	state conversationListSummary,
+	conversationID string,
+	seq int64,
+	pinned bool,
+) error {
+	if len(state.Items) != 1 {
+		return fmt.Errorf("expected 1 item, got %d", len(state.Items))
+	}
+	item := state.Items[0]
+	if item.ConversationID != conversationID {
+		return fmt.Errorf("conversation_id=%s want=%s", item.ConversationID, conversationID)
+	}
+	if item.LastVisibleSeq != seq || item.Pinned != pinned || item.Archived {
+		return fmt.Errorf("unexpected pinned item state: %+v", item)
 	}
 	return nil
 }

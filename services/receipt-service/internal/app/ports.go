@@ -11,6 +11,7 @@ type ReceiptRepository interface {
 	GetReceiptState(ctx context.Context, command types.GetReceiptStateCommand) (types.GetReceiptStateResult, error)
 	ListConversations(ctx context.Context, command types.ListConversationsCommand) (types.ListConversationsResult, error)
 	ArchiveConversation(ctx context.Context, command types.ArchiveConversationCommand) (types.ArchiveConversationResult, error)
+	PinConversation(ctx context.Context, command types.PinConversationCommand) (types.PinConversationResult, error)
 }
 
 type ReceiptAccessPort interface {

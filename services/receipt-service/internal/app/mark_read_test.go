@@ -44,6 +44,7 @@ type fakeReceiptRepository struct {
 	getReceiptStateCalls       []types.GetReceiptStateCommand
 	listCommand                types.ListConversationsCommand
 	archiveConversationCommand types.ArchiveConversationCommand
+	pinConversationCommand     types.PinConversationCommand
 }
 
 func (repository *fakeReceiptRepository) GetReceiptState(_ context.Context, command types.GetReceiptStateCommand) (types.GetReceiptStateResult, error) {
@@ -66,6 +67,16 @@ func (repository *fakeReceiptRepository) ArchiveConversation(_ context.Context, 
 		Conversation: types.ConversationSummary{
 			ConversationID: command.ConversationID,
 			Archived:       command.Archived,
+		},
+	}, nil
+}
+
+func (repository *fakeReceiptRepository) PinConversation(_ context.Context, command types.PinConversationCommand) (types.PinConversationResult, error) {
+	repository.pinConversationCommand = command
+	return types.PinConversationResult{
+		Conversation: types.ConversationSummary{
+			ConversationID: command.ConversationID,
+			Pinned:         command.Pinned,
 		},
 	}, nil
 }

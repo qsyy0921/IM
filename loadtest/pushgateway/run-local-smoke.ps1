@@ -223,6 +223,7 @@ try {
         }
         $processes += Start-NexusProcess -Name "push-gateway-consumer" -FilePath $pushGateway -Env @{
             NEXUSIM_PUSH_GATEWAY_MODE = "delivery-consumer"
+            NEXUSIM_PUSH_DEBUG_ADDR = "127.0.0.1:11600"
             NEXUSIM_KAFKA_BROKERS = $KafkaBrokers
             NEXUSIM_DELIVERY_EVENTS_TOPIC = $deliveryTopic
             NEXUSIM_PUSH_CONSUMER_GROUP = $pushConsumerGroup
@@ -276,6 +277,7 @@ try {
         --redis-restore-command $RedisRestoreCommand `
         --push-metrics-url "http://127.0.0.1:11598/debug/metrics" `
         --reconnect-push-metrics-url $(if ($Scenario -eq "cross-instance-resume") { "http://127.0.0.1:11599/debug/metrics" } else { "" }) `
+        --consumer-push-metrics-url $(if ($RouteBackend -eq "redis") { "http://127.0.0.1:11600/debug/metrics" } else { "" }) `
         --route-backend $RouteBackend `
         --redis-key-prefix $pushRouteKeyPrefix `
         --push-ws-gateway-id $pushWSGatewayID `

@@ -92,6 +92,16 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 		return errors.New("unsupported NEXUSIM_PUSH_ROUTE_BACKEND")
 	}
 
+	metricsHandler := func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(writer).Encode(pushDebugMetrics{
+			Metrics:              localRegistry.Metrics(),
+			RedisRegistryMetrics: redisRouteRegistryMetrics(redisRegistry),
+			RedisSubscriberStats: redisRouteSubscriberMetrics(redisSubscriber),
+		})
+	}
+
+	var wsAddr string
 	if enableWS {
 		deliveryAddr := envString("NEXUSIM_DELIVERY_GRPC_ADDR", "127.0.0.1:10497")
 		deliveryClient, closeDelivery, err := rpcinfra.DialDeliveryClient(
@@ -115,34 +125,16 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 			},
 		)
 		mux := http.NewServeMux()
-		mux.HandleFunc("/debug/metrics", func(writer http.ResponseWriter, request *http.Request) {
-			writer.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(writer).Encode(pushDebugMetrics{
-				Metrics:              localRegistry.Metrics(),
-				RedisRegistryMetrics: redisRouteRegistryMetrics(redisRegistry),
-				RedisSubscriberStats: redisRouteSubscriberMetrics(redisSubscriber),
-			})
-		})
+		mux.HandleFunc("/debug/metrics", metricsHandler)
 		mux.Handle("/", server)
-		httpServer := &http.Server{
-			Addr:              envString("NEXUSIM_PUSH_WS_ADDR", "0.0.0.0:10496"),
-			Handler:           mux,
-			ReadHeaderTimeout: 5 * time.Second,
-		}
-		go func() {
-			log.Printf("push-gateway websocket started on %s", httpServer.Addr)
-			err := httpServer.ListenAndServe()
-			if errors.Is(err, http.ErrServerClosed) {
-				err = context.Canceled
-			}
-			errs <- err
-		}()
-		go func() {
-			<-ctx.Done()
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			_ = httpServer.Shutdown(shutdownCtx)
-		}()
+		wsAddr = envString("NEXUSIM_PUSH_WS_ADDR", "0.0.0.0:10496")
+		startHTTPServer(ctx, errs, "websocket", wsAddr, mux)
+	}
+
+	if debugAddr := envString("NEXUSIM_PUSH_DEBUG_ADDR", ""); debugAddr != "" && debugAddr != wsAddr {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/debug/metrics", metricsHandler)
+		startHTTPServer(ctx, errs, "debug metrics", debugAddr, mux)
 	}
 
 	if enableConsumer {
@@ -179,6 +171,28 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 		}
 	}
 	return err
+}
+
+func startHTTPServer(ctx context.Context, errs chan<- error, name string, addr string, handler http.Handler) {
+	httpServer := &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	go func() {
+		log.Printf("push-gateway %s started on %s", name, httpServer.Addr)
+		err := httpServer.ListenAndServe()
+		if errors.Is(err, http.ErrServerClosed) {
+			err = context.Canceled
+		}
+		errs <- err
+	}()
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = httpServer.Shutdown(shutdownCtx)
+	}()
 }
 
 type pushDebugMetrics struct {

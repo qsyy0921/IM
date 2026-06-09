@@ -86,6 +86,7 @@ type config struct {
 	slowMessageCount       int
 	pushMetricsURL         string
 	reconnectMetricsURL    string
+	consumerMetricsURL     string
 	routeBackend           string
 	redisKeyPrefix         string
 	pushWSGatewayID        string
@@ -108,6 +109,7 @@ type summary struct {
 	ReconnectPushURL        string               `json:"reconnect_push_url,omitempty"`
 	PushMetricsURL          string               `json:"push_metrics_url,omitempty"`
 	ReconnectPushMetricsURL string               `json:"reconnect_push_metrics_url,omitempty"`
+	PushConsumerMetricsURL  string               `json:"push_consumer_metrics_url,omitempty"`
 	RouteBackend            string               `json:"route_backend,omitempty"`
 	RedisKeyPrefix          string               `json:"redis_key_prefix,omitempty"`
 	PushWSGatewayID         string               `json:"push_ws_gateway_id,omitempty"`
@@ -136,6 +138,7 @@ type summary struct {
 	RedisFault              *redisFaultSummary   `json:"redis_fault,omitempty"`
 	PushMetricsBefore       *pushMetrics         `json:"push_metrics_before,omitempty"`
 	PushMetricsAfter        *pushMetrics         `json:"push_metrics_after,omitempty"`
+	PushConsumerMetrics     *pushMetrics         `json:"push_consumer_metrics,omitempty"`
 	CursorLastReceivedSeq   *int64               `json:"cursor_last_received_seq,omitempty"`
 	UserInboxCount          *int64               `json:"user_inbox_count,omitempty"`
 	DeliveryOutboxTotal     *int64               `json:"delivery_outbox_total,omitempty"`
@@ -304,6 +307,7 @@ func parseConfig() config {
 	flag.IntVar(&cfg.slowMessageCount, "slow-message-count", 128, "number of messages sent while slow client does not read")
 	flag.StringVar(&cfg.pushMetricsURL, "push-metrics-url", "", "push-gateway debug metrics URL")
 	flag.StringVar(&cfg.reconnectMetricsURL, "reconnect-push-metrics-url", "", "optional debug metrics URL for reconnect/resume gateway")
+	flag.StringVar(&cfg.consumerMetricsURL, "consumer-push-metrics-url", "", "optional debug metrics URL for delivery-consumer gateway")
 	flag.StringVar(&cfg.routeBackend, "route-backend", "", "push route backend used by the smoke environment")
 	flag.StringVar(&cfg.redisKeyPrefix, "redis-key-prefix", "", "Redis route key prefix used by the smoke environment")
 	flag.StringVar(&cfg.pushWSGatewayID, "push-ws-gateway-id", "", "WebSocket gateway id used by cross-instance route smoke")
@@ -397,6 +401,7 @@ func run(cfg config) error {
 		ReconnectPushURL:        cfg.reconnectPushURL,
 		PushMetricsURL:          cfg.pushMetricsURL,
 		ReconnectPushMetricsURL: cfg.reconnectMetricsURL,
+		PushConsumerMetricsURL:  cfg.consumerMetricsURL,
 		RouteBackend:            cfg.routeBackend,
 		RedisKeyPrefix:          cfg.redisKeyPrefix,
 		PushWSGatewayID:         cfg.pushWSGatewayID,
@@ -1469,6 +1474,13 @@ func finish(cfg config, result *summary, runErr error) error {
 		result.Error = runErr.Error()
 	} else {
 		result.Success = true
+	}
+	if cfg.consumerMetricsURL != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
+		defer cancel()
+		if metrics, err := fetchPushMetrics(ctx, cfg.consumerMetricsURL); err == nil {
+			result.PushConsumerMetrics = &metrics
+		}
 	}
 	encoded, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {

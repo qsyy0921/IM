@@ -97,7 +97,7 @@ push-gateway slow-client smoke
 2. 不再继续做 message-service 重型硬件矩阵；只有公共契约、关键并发语义或新服务链路变化时，才跑 smoke / 小规模验证。
 3. `push-gateway` SDD 已完成阶段评审并修复 frame 契约 P1；六层骨架和第一版 WebSocket / delivery consumer 已落地。
 4. `delivery_outbox -> im.delivery.events -> push-gateway all mode -> online WebSocket client delivery.notify -> PullInbox -> delivery.ack -> AckDelivery -> delivery.ack.ok` 已通过 clean commit smoke；同 user 双 device notify smoke 也已通过。
-5. push-gateway slow-client 真实进程负向 smoke 已通过；后续优先补 Redis route / 跨实例 route，以及 resume buffer TTL / cleanup。不要把当前 in-memory `all` 模式表述为多实例生产方案。
+5. push-gateway slow-client 真实进程负向 smoke 已通过；该 smoke 证明 durable `PullInbox` fallback，不证明 resume buffer replay。后续优先补 Redis route / 跨实例 route、resume buffer TTL / cleanup，并单独设计 resume replay smoke。不要把当前 in-memory `all` 模式表述为多实例生产方案。
 
 ## 6. 评审要求
 
@@ -427,3 +427,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已补 push-gateway 单实例 in-memory resume buffer：`client.hello.resume_token + last_received` 会绑定到同 tenant/user/device，并按本地 cursor 过滤重放最近 `delivery.notify`；buffer 只保存轻量通知，不保存完整消息事实。当前仍无 TTL / Redis route / 跨实例 resume，可靠恢复仍以 delivery-service durable inbox 和客户端本地 cursor 为准。
 - 2026-06-09：独立评审指出单实例 resume buffer 有 P1：未知客户端 `resume_token` 会被注册成有效 token。本轮已修复为“未知 token -> `buffer_miss` + 服务端签发新 token”，并补 registry / WebSocket 回归测试；同时在 push-gateway WebSocket HTTP server 暴露 `/debug/metrics`，返回单实例 registry 调试指标，供后续 slow-client smoke 排障使用。
 - 2026-06-09：已扩展 `loadtest/pushgateway` 和 `run-local-smoke.ps1` 支持 `--scenario slow-client`，并在 clean commit `b362dd7` 跑通 slow-client 真实进程负向 smoke：128 条 SendMessage 触发 `session_queue_full_count=1`、`slow_session_evicted_count=1`，客户端通过 `PullInbox` 拉到 128 条、max seq `129`，随后 `delivery.ack.ok` 推进 cursor 到 `129`，`delivery_outbox PUBLISHED=129/PENDING=0/DLQ=0`；报告见 `docs/runbook/loadtest/push-gateway/loadtest-report-20260609-push-gateway-slow-client-smoke.md`。
+- 2026-06-09：独立评审复核 push-gateway slow-client smoke，结论无 P0/P1，不阻塞继续 Redis route / cross-instance route。P2 已记录：`NEXUSIM_PUSH_TEST_WRITE_DELAY` 仍是生产二进制可见的测试 knob，生产必须 unset/0；本轮 slow-client smoke 证明的是 durable `PullInbox` fallback，不证明 resume buffer replay，后续需单独设计 resume replay smoke。

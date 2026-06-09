@@ -2,7 +2,7 @@
 
 ## 结论
 
-本轮验证的是 `push-gateway` 单实例慢客户端负向链路，不是 WebSocket 容量压测。
+本轮验证的是 `push-gateway` 单实例慢客户端负向链路，不是 WebSocket 容量压测，也不是 resume buffer replay 验证。
 
 结果通过：当在线 WebSocket 客户端不及时读取、触发 session queue full 后，`push-gateway` 会驱逐该 session，真实数据仍保留在 `delivery-service` 的 durable inbox 中。客户端重连后用本地 cursor / `PullInbox` 能补齐消息，再通过 `delivery.ack` 调用 `delivery-service AckDelivery` 推进 device cursor。
 
@@ -30,7 +30,7 @@ slow WebSocket client
 | push test write delay | `50ms` |
 | push metrics | `http://127.0.0.1:11598/debug/metrics` |
 
-`NEXUSIM_PUSH_TEST_WRITE_DELAY` 只用于本地 smoke 稳定模拟慢网络 / 慢写出，不是生产配置。
+`NEXUSIM_PUSH_TEST_WRITE_DELAY` 只用于本地 smoke 稳定模拟慢网络 / 慢写出，不是生产配置。生产环境必须保持 unset 或 `0`。
 
 ## 方法
 
@@ -111,6 +111,6 @@ delivery_outbox pending=0
 ## 限制
 
 - 本轮是单实例 `all` mode，不证明 Redis route / 多实例在线路由。
-- 本轮不证明 resume buffer TTL，也不证明跨实例 resume。
+- 本轮不证明 resume buffer replay、resume buffer TTL，也不证明跨实例 resume。runner 在重连前已经通过 `PullInbox` 拉到 `max_seq=129`，因此验收点是 durable inbox fallback，而不是短时 buffer 重放。
 - 本轮通过测试写延迟稳定制造慢连接，不代表生产默认写路径有该延迟。
 - `/debug/metrics` 是当前单实例调试指标，不是最终 Prometheus 体系。

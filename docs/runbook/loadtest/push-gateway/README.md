@@ -82,8 +82,9 @@ E:\development\IM\loadtest\results
 - 不把短时 resume buffer 当作 durable inbox。
 - 不把单实例 in-memory resume buffer 表述为跨实例 resume；当前没有 Redis route，也没有 TTL；未知客户端 `resume_token` 必须返回 `buffer_miss` 并由服务端签发新 token。
 - 不把 push smoke 表述为生产容量结论。
-- 不把 queue-full active close 表述为完整慢连接治理；当前 `server.resume_hint` 只是 broad pull fallback，客户端必须用本地 durable cursor 决定 `PullInbox` 起点。已完成单实例 slow-client 真实进程负向 smoke，但还没有 Redis route / 多实例慢连接验证。
+- 不把 queue-full active close 表述为完整慢连接治理；当前 `server.resume_hint` 只是 broad pull fallback，客户端必须用本地 durable cursor 决定 `PullInbox` 起点。已完成单实例 slow-client 真实进程负向 smoke，但它验证的是 durable `PullInbox` fallback，不验证 resume buffer replay；后续还没有 Redis route / 多实例慢连接验证。
 - `/debug/metrics` 目前只暴露单实例 in-memory registry 调试指标，用于 smoke 排障；不是生产级 Prometheus 指标。
+- `NEXUSIM_PUSH_TEST_WRITE_DELAY` 只允许本地 smoke 使用，生产环境必须 unset 或保持 `0`。
 
 ## 面试可讲点
 

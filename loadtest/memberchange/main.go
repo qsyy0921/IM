@@ -32,6 +32,8 @@ type config struct {
 	operatorUserID    string
 	targetPrefix      string
 	targetUserID      string
+	changeType        string
+	targetRole        string
 	idempotencyPrefix string
 	requestCount      int64
 	pgDSN             string
@@ -40,42 +42,47 @@ type config struct {
 }
 
 type summary struct {
-	Commit                 string            `json:"commit"`
-	CommitFull             string            `json:"commit_full"`
-	GitDirty               bool              `json:"git_dirty"`
-	GitStatusShort         string            `json:"git_status_short,omitempty"`
-	Target                 string            `json:"target"`
-	VUs                    int               `json:"vus"`
-	Duration               string            `json:"duration"`
-	RequestCount           int64             `json:"request_count"`
-	SuccessCount           int64             `json:"success_count"`
-	ErrorCount             int64             `json:"error_count"`
-	SuccessRate            float64           `json:"success_rate"`
-	RPS                    float64           `json:"rps"`
-	AvgMS                  float64           `json:"avg_ms"`
-	P95MS                  float64           `json:"p95_ms"`
-	P99MS                  float64           `json:"p99_ms"`
-	ErrorTopN              []errorCount      `json:"error_topn,omitempty"`
-	TenantID               string            `json:"tenant_id"`
-	ConversationID         string            `json:"conversation_id"`
-	SagaCount              *int64            `json:"saga_count,omitempty"`
-	SagaDoneCount          *int64            `json:"saga_done_count,omitempty"`
-	TimelineCount          *int64            `json:"timeline_count,omitempty"`
-	OutboxTotalCount       *int64            `json:"outbox_total_count,omitempty"`
-	OutboxPendingCount     *int64            `json:"outbox_pending_count,omitempty"`
-	OutboxPublishedCount   *int64            `json:"outbox_published_count,omitempty"`
-	OutboxDLQCount         *int64            `json:"outbox_dlq_count,omitempty"`
-	ConversationSeqCurrent *int64            `json:"conversation_seq_current,omitempty"`
-	SampleChangeID         string            `json:"sample_change_id,omitempty"`
-	SampleGetStatus        string            `json:"sample_get_status,omitempty"`
-	SampleGetError         string            `json:"sample_get_error,omitempty"`
-	MemberListCount        *int64            `json:"member_list_count,omitempty"`
-	MemberListNextPage     string            `json:"member_list_next_page_token,omitempty"`
-	MemberListSampleUsers  []string          `json:"member_list_sample_users,omitempty"`
-	MemberListError        string            `json:"member_list_error,omitempty"`
-	StartedAt              time.Time         `json:"started_at"`
-	FinishedAt             time.Time         `json:"finished_at"`
-	Stats                  map[string]string `json:"stats,omitempty"`
+	Commit                         string            `json:"commit"`
+	CommitFull                     string            `json:"commit_full"`
+	GitDirty                       bool              `json:"git_dirty"`
+	GitStatusShort                 string            `json:"git_status_short,omitempty"`
+	Target                         string            `json:"target"`
+	VUs                            int               `json:"vus"`
+	Duration                       string            `json:"duration"`
+	RequestCount                   int64             `json:"request_count"`
+	SuccessCount                   int64             `json:"success_count"`
+	ErrorCount                     int64             `json:"error_count"`
+	SuccessRate                    float64           `json:"success_rate"`
+	RPS                            float64           `json:"rps"`
+	AvgMS                          float64           `json:"avg_ms"`
+	P95MS                          float64           `json:"p95_ms"`
+	P99MS                          float64           `json:"p99_ms"`
+	ErrorTopN                      []errorCount      `json:"error_topn,omitempty"`
+	TenantID                       string            `json:"tenant_id"`
+	ConversationID                 string            `json:"conversation_id"`
+	ChangeType                     string            `json:"change_type"`
+	TargetRole                     string            `json:"target_role,omitempty"`
+	TargetUserID                   string            `json:"target_user_id,omitempty"`
+	SagaCount                      *int64            `json:"saga_count,omitempty"`
+	SagaDoneCount                  *int64            `json:"saga_done_count,omitempty"`
+	TimelineCount                  *int64            `json:"timeline_count,omitempty"`
+	OutboxTotalCount               *int64            `json:"outbox_total_count,omitempty"`
+	OutboxPendingCount             *int64            `json:"outbox_pending_count,omitempty"`
+	OutboxPublishedCount           *int64            `json:"outbox_published_count,omitempty"`
+	OutboxDLQCount                 *int64            `json:"outbox_dlq_count,omitempty"`
+	ConversationSeqCurrent         *int64            `json:"conversation_seq_current,omitempty"`
+	SampleChangeID                 string            `json:"sample_change_id,omitempty"`
+	SampleGetStatus                string            `json:"sample_get_status,omitempty"`
+	SampleGetError                 string            `json:"sample_get_error,omitempty"`
+	MemberListCount                *int64            `json:"member_list_count,omitempty"`
+	MemberListNextPage             string            `json:"member_list_next_page_token,omitempty"`
+	MemberListSampleUsers          []string          `json:"member_list_sample_users,omitempty"`
+	MemberListTargetPresent        *bool             `json:"member_list_target_present,omitempty"`
+	MemberListTargetAbsentVerified *bool             `json:"member_list_target_absent_verified,omitempty"`
+	MemberListError                string            `json:"member_list_error,omitempty"`
+	StartedAt                      time.Time         `json:"started_at"`
+	FinishedAt                     time.Time         `json:"finished_at"`
+	Stats                          map[string]string `json:"stats,omitempty"`
 }
 
 type errorCount struct {
@@ -103,6 +110,8 @@ func parseConfig() config {
 	flag.StringVar(&cfg.operatorUserID, "operator-user-id", "owner-1", "operator user id")
 	flag.StringVar(&cfg.targetPrefix, "target-prefix", "target-user", "target user prefix")
 	flag.StringVar(&cfg.targetUserID, "target-user-id", "", "fixed target user id; when set, use with --request-count 1 for deterministic smoke")
+	flag.StringVar(&cfg.changeType, "change-type", "join", "member change type: join, leave, remove, or role-changed")
+	flag.StringVar(&cfg.targetRole, "target-role", "member", "target role for join/role-changed: owner, admin, or member")
 	flag.StringVar(&cfg.idempotencyPrefix, "idempotency-prefix", "idem", "idempotency key prefix")
 	flag.Int64Var(&cfg.requestCount, "request-count", 0, "fixed request count; 0 means run until duration elapses")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "", "optional PostgreSQL DSN for post-run stats")
@@ -124,6 +133,14 @@ func parseConfig() config {
 func run(cfg config) error {
 	if err := os.MkdirAll(cfg.resultDir, 0o755); err != nil {
 		return fmt.Errorf("create result dir: %w", err)
+	}
+	changeType, changeTypeName, err := parseMemberChangeType(cfg.changeType)
+	if err != nil {
+		return err
+	}
+	targetRole, targetRoleName, err := parseMemberRole(cfg.targetRole)
+	if err != nil {
+		return err
 	}
 	conn, err := grpc.NewClient(cfg.target, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -177,12 +194,12 @@ func run(cfg config) error {
 					},
 					ConversationId:        cfg.conversationID,
 					TargetUserId:          targetUserID,
-					ChangeType:            conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_JOIN,
-					TargetRole:            conversationv1.MemberRole_MEMBER_ROLE_MEMBER,
+					ChangeType:            changeType,
+					TargetRole:            targetRole,
 					ExpectedMemberVersion: cfg.expectedVersion,
 					IdempotencyKey:        fmt.Sprintf("%s-%d", cfg.idempotencyPrefix, seq),
 					ConflictPolicy:        conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT,
-					Reason:                "smoke join",
+					Reason:                fmt.Sprintf("smoke %s", strings.ToLower(changeTypeName)),
 				})
 				elapsedMS := float64(time.Since(begin).Microseconds()) / 1000
 				requestCancel()
@@ -222,6 +239,9 @@ func run(cfg config) error {
 		ErrorCount:     atomic.LoadInt64(&errorCountTotal),
 		TenantID:       cfg.tenantID,
 		ConversationID: cfg.conversationID,
+		ChangeType:     changeTypeName,
+		TargetRole:     targetRoleName,
+		TargetUserID:   cfg.targetUserID,
 		StartedAt:      startedAt,
 		FinishedAt:     finishedAt,
 	}
@@ -264,6 +284,43 @@ func run(cfg config) error {
 	fmt.Println(string(encoded))
 	fmt.Printf("summary: %s\n", path)
 	return nil
+}
+
+func parseMemberChangeType(value string) (conversationv1.MemberChangeType, string, error) {
+	normalized := normalizeEnumName(value)
+	switch normalized {
+	case "JOIN":
+		return conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_JOIN, "JOIN", nil
+	case "LEAVE":
+		return conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_LEAVE, "LEAVE", nil
+	case "REMOVE":
+		return conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_REMOVE, "REMOVE", nil
+	case "ROLE_CHANGED", "ROLECHANGE", "ROLECHANGED":
+		return conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_ROLE_CHANGED, "ROLE_CHANGED", nil
+	default:
+		return conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_UNSPECIFIED, "", fmt.Errorf("unsupported change type %q", value)
+	}
+}
+
+func parseMemberRole(value string) (conversationv1.MemberRole, string, error) {
+	normalized := normalizeEnumName(value)
+	switch normalized {
+	case "OWNER":
+		return conversationv1.MemberRole_MEMBER_ROLE_OWNER, "OWNER", nil
+	case "ADMIN":
+		return conversationv1.MemberRole_MEMBER_ROLE_ADMIN, "ADMIN", nil
+	case "MEMBER":
+		return conversationv1.MemberRole_MEMBER_ROLE_MEMBER, "MEMBER", nil
+	default:
+		return conversationv1.MemberRole_MEMBER_ROLE_UNSPECIFIED, "", fmt.Errorf("unsupported target role %q", value)
+	}
+}
+
+func normalizeEnumName(value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.ReplaceAll(value, "-", "_")
+	value = strings.ReplaceAll(value, " ", "_")
+	return strings.ToUpper(value)
 }
 
 func nextSequence(counter *int64, max int64) (int64, bool) {
@@ -415,23 +472,43 @@ func fillMemberListSample(
 ) error {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
-	response, err := client.ListConversationMembers(requestCtx, &conversationv1.ListConversationMembersRequest{
-		AuthContext: &conversationv1.AuthContext{
-			TenantId: cfg.tenantID,
-			UserId:   cfg.operatorUserID,
-		},
-		ConversationId: cfg.conversationID,
-		PageSize:       10,
-	})
-	if err != nil {
-		return err
+	var count int64
+	pageToken := ""
+	targetPresent := false
+	result.MemberListSampleUsers = make([]string, 0, 10)
+	for {
+		response, err := client.ListConversationMembers(requestCtx, &conversationv1.ListConversationMembersRequest{
+			AuthContext: &conversationv1.AuthContext{
+				TenantId: cfg.tenantID,
+				UserId:   cfg.operatorUserID,
+			},
+			ConversationId: cfg.conversationID,
+			PageSize:       10,
+			PageToken:      pageToken,
+		})
+		if err != nil {
+			return err
+		}
+		for _, member := range response.GetMembers() {
+			count++
+			if len(result.MemberListSampleUsers) < 10 {
+				result.MemberListSampleUsers = append(result.MemberListSampleUsers, member.GetUserId())
+			}
+			if cfg.targetUserID != "" && member.GetUserId() == cfg.targetUserID {
+				targetPresent = true
+			}
+		}
+		pageToken = response.GetNextPageToken()
+		if pageToken == "" {
+			break
+		}
 	}
-	count := int64(len(response.GetMembers()))
 	result.MemberListCount = &count
-	result.MemberListNextPage = response.GetNextPageToken()
-	result.MemberListSampleUsers = make([]string, 0, len(response.GetMembers()))
-	for _, member := range response.GetMembers() {
-		result.MemberListSampleUsers = append(result.MemberListSampleUsers, member.GetUserId())
+	result.MemberListNextPage = pageToken
+	if cfg.targetUserID != "" {
+		result.MemberListTargetPresent = &targetPresent
+		targetAbsentVerified := !targetPresent
+		result.MemberListTargetAbsentVerified = &targetAbsentVerified
 	}
 	return nil
 }

@@ -152,19 +152,20 @@ DLQ=0
 
 ## 5. 如何判断 RetryInfo 生效
 
-注意：`p95/p99` 是单次 gRPC attempt 延迟，不包含 retry sleep。现在 summary 已新增 `retry_delay_*` 字段，应直接看 retry delay histogram。
+注意：`p95/p99` 是单次 gRPC attempt 延迟，不包含 retry sleep。现在 summary 已新增 `retry_delay_*` 字段，应同时看 retry delay histogram 和 retry attempt 计数。
 
 本轮判断方式：
 
 1. 单元测试确认 gRPC 会读取 `ServiceOverloadedError.RetryDelay`，并把 `1500ms` 写入 `RetryInfo`。
 2. 真实进程 smoke 中开启 `MaxRetries=1`、`RetryJitter=0s`。
-3. summary 记录 `retry_delay_count=31`，`retry_delay_p95_ms=500`，证明压测器确实读取并等待了 RetryInfo。
+3. summary 记录 `retry_delay_count=31`，`retry_delay_p95_ms=500`，证明压测器确实读取并计划遵守 RetryInfo。
 4. 本轮配置 `base=250ms`，但 hysteresis recovering 状态会额外增加一个 reason 权重，因此大部分 retry delay 被动态放大到 `500ms`。
 5. outbox 没有新增，说明拒绝仍发生在写事务之前。
 
 当前缺口：
 
 - 本轮只验证链路，不是最佳 retry delay。
+- `retry_delay_count` 表示收到并计划遵守的 RetryInfo 数量，不严格等于完成 sleep 后进入下一次 attempt 的次数；本轮 `retry_delay_count=31`、`retry_attempt_count=26` 就能看到这种差异。
 - 正式矩阵需要比较 `base=250/500/1000ms` 和不同 hysteresis release gap。
 
 ## 6. 当前结论

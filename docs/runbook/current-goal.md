@@ -65,8 +65,8 @@ message-service SendMessage
 4. 对比 pool release gap `4/8/16`、outbox release ratio `50%/25%`、retry base delay `250/500/1000ms`。
 5. 继续压测客户端 retry 参数：`max_retries=1/2/3`、`jitter=100/300/500ms`。
 6. 继续采集 PostgreSQL wait_event，重点看 `LWLock:WALWrite`、`LWLock:WALInsert`、`LWLock:BufferContent` 和 `CheckpointWriteDelay`。
-7. 当前 adaptive admission 已完成窗口化、hysteresis 和动态 retry hint；本阶段文档基线提交后邀请评审线程做一次合并阶段评审，避免逐小改动频繁评审。
-8. 视阶段评审结果决定是否推送 GitHub。
+7. adaptive admission 合并阶段评审已完成，无 P0/P1；下一轮正式矩阵需要显式展示 recent sample count、retry delay histogram、retry attempt count、logical success rate、overload rate 和 success p99。
+8. 暂不推 GitHub；等 adaptive threshold matrix 和评审 P2 口径收敛后再做批量同步。
 
 ## 6. 评审要求
 
@@ -262,6 +262,10 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 recent metrics smoke：报告为 `docs/runbook/loadtest-report-20260609-recent-metrics-smoke.md`，结果路径为 `loadtest/results/recent-metrics-smoke-20260609/bpoff-adapton-pbatchon-pgmax-16-vu-10-20260609-075920/sendmessage-summary.json`。commit `6d4910b`、`git_dirty=false`，5392/5392 成功、p99 `14.5047ms`、outbox pending 0；summary 已写入 `repository_pool_acquire_recent_latency_ms`、`outbox_process_ready_active_recent_latency_ms`、`outbox_fetched_per_call_recent`、`kafka_publish_records_per_call_recent`。该结果只证明窗口化观测链路可用，不作为容量结论。
 - 当前 adaptive hysteresis smoke：报告为 `docs/runbook/loadtest-report-20260609-adaptive-hysteresis-smoke.md`，结果路径为 `loadtest/results/adaptive-hysteresis-smoke-20260609/bpoff-adapton-pbatchon-pgmax-16-vu-10-20260609-080738/sendmessage-summary.json`。commit `6f9a438`、`git_dirty=false`，5554/5554 成功、p99 `12.5034ms`、service overloaded 0、outbox pending 0；该结果只证明 hysteresis 配置链路可运行，不作为容量结论。
 - 当前 adaptive retry hint smoke：报告为 `docs/runbook/loadtest-report-20260609-adaptive-retry-hint-smoke.md`，结果路径为 `loadtest/results/adaptive-retry-hint-metrics-smoke-20260609/adaptive-retry-hint-metrics-grpc-only-20260609-082000/sendmessage-summary.json`。commit `c9e6cf1`、`git_dirty=false`，极端过载下 57 次 gRPC attempt 全部返回 `SERVICE_OVERLOADED`，outbox pending 0；summary 已记录 `retry_delay_count=31`、`retry_delay_avg_ms=491.94`、`retry_delay_p95_ms=500`、`retry_delay_p99_ms=500`，证明压测器读取并执行了 gRPC `RetryInfo`。
+- 当前评审确认 `retry_delay_count` 表示收到并计划遵守的 RetryInfo 数量，不严格等于完成 sleep 后进入下一次 attempt 的次数；正式 adaptive 矩阵必须同时展示 `retry_delay_count`、`retry_attempt_count` 和 logical success，避免把计划等待次数误读成真实重试次数。
+- 当前评审确认 `*_recent` 是最近 4096 个样本窗口，不是时间窗口；低流量或样本数低于 `MinMetricSamples` 时不能基于 recent 指标下调参结论，后续报告必须展示 recent sample count。
+- 当前评审确认 relay 相关 adaptive 条件隐含依赖 outbox pending 采样；如果配置了 relay active p95、outbox fetched per call 或 Kafka records per call 条件，必须同时配置 outbox pending 采样阈值，否则这些 relay 条件不会独立触发拒绝。
+- 当前 dynamic retry hint 公式仍是启发式：`min(reason_count * base_delay, max_delay)`，recovering 状态额外加一档；不能作为稳定控制律或最优 retry delay，后续应结合 accepted RPS、outbox drain rate 和 pool acquire recent p95 调整。
 - 当前 debug metrics collector 保存全量样本并在 snapshot 时排序，适合本地短压测，不适合作为生产 metrics；后续应替换为固定窗口、reservoir、HDR histogram 或 Prometheus histogram。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
@@ -323,3 +327,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已为 debug metrics collector 增加最近 4096 个样本的 recent 视图，并让 adaptive controller 优先读取 recent 字段；clean smoke `6d4910b` 证明 loadtest summary 能读取 recent 指标。下一步实现 hysteresis 和动态 retry hint。
 - 2026-06-09：已为 adaptive admission 增加 hysteresis 配置，支持 `ReleaseAvailableConns` 和 `ReleaseOutboxPending`；clean smoke `6f9a438` 证明低压真实链路正常。下一步把固定 `RetryInfo=500ms` 改成动态 retry hint，并用 recent+hysteresis 跑正式阈值矩阵。
 - 2026-06-09：已为 `SERVICE_OVERLOADED` 增加可携带 retry delay 的错误类型，adaptive controller 会根据过载原因数量生成动态 retry hint；clean smoke `31408e7` 验证真实进程链路可运行。随后在 `c9e6cf1` 为 loadtest summary 增加 retry delay histogram，并用真实进程 smoke 验证 `retry_delay_p95_ms=500`。下一步跑正式 adaptive 阈值矩阵。
+- 2026-06-09：独立评审线程复核 adaptive admission / recent metrics / hysteresis / dynamic RetryInfo / retry delay histogram，结论为无 P0/P1，不阻塞继续做 adaptive threshold matrix。P2 已记录：relay 条件依赖 outbox pending 采样、recent 是样本窗口不是时间窗口、`retry_delay_count` 是收到并计划遵守的 hint 数量、dynamic retry hint 仍是启发式控制信号。

@@ -389,18 +389,27 @@ success_p99_ms
 error_p99_ms
 repository_pool_acquire_latency_ms
 repository_pool_acquire_recent_latency_ms
+repository_pool_acquire_recent_sample_count
 outbox_process_ready_active_latency_ms
 outbox_process_ready_active_recent_latency_ms
+outbox_process_ready_active_recent_sample_count
 outbox_fetched_per_call
 outbox_fetched_per_call_recent
+outbox_fetched_per_call_recent_sample_count
 kafka_publish_records_per_call
 kafka_publish_records_per_call_recent
+kafka_publish_records_per_call_recent_sample_count
 outbox_pending_count
+retry_delay_count
+retry_delay_p95_ms
+retry_attempt_count
 ```
 
 不要把极端阈值下的低 p99 解释成容量提升；那只是快速拒绝。
 adaptive limit 的硬拒绝判断优先看 `*_recent` 字段，累计字段只用于历史趋势和报告解释。
-当前 adaptive controller 可动态设置 gRPC `RetryInfo`，summary 已记录 `retry_delay_count`、`retry_delay_avg_ms`、`retry_delay_p95_ms`、`retry_delay_p99_ms`。正式调参报告必须同时展示 attempt latency 和 retry delay，不能只用 gRPC attempt p99 判断客户端等待体验。
+`*_recent` 是最近 4096 个样本窗口，不是时间窗口。低流量或样本数低于 `MinMetricSamples` 时，不能基于 recent 指标下调参结论。
+启用 relay 相关 adaptive 条件时，必须同时启用 outbox pending 采样阈值，例如 `-AdaptiveMaxOutboxPending`。否则 relay active p95、outbox fetched per call 和 Kafka records per call 不会独立触发拒绝。
+当前 adaptive controller 可动态设置 gRPC `RetryInfo`，summary 已记录 `retry_delay_count`、`retry_delay_avg_ms`、`retry_delay_p95_ms`、`retry_delay_p99_ms`。`retry_delay_count` 表示收到并计划遵守的 RetryInfo 数量，不等于完成 sleep 后进入下一次 attempt 的次数；正式调参报告必须同时展示 attempt latency、retry delay、`retry_attempt_count` 和 logical success。
 
 ## 12. PublishBatch On/Off
 

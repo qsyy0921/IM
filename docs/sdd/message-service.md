@@ -152,6 +152,8 @@ accepted_at
 - 两层保护都只能返回 `SERVICE_OVERLOADED`，不能写 message、timeline 或 outbox。
 - adaptive 输入必须来自运行时观测或采样，不允许 domain 直接依赖 metrics、PostgreSQL 或 Kafka。
 - 默认 `RetryInfo=500ms` 不是最优值；adaptive limit 应根据过载程度动态给出 retry hint，且必须有上限。
+- relay 相关 adaptive 条件必须和 outbox pending 采样一起使用；否则 relay active p95、outbox fetched per call 和 Kafka records per call 只能作为观测，不应单独触发拒绝。
+- recent 指标是最近样本窗口，不是时间窗口；样本不足时只能作为 warm-up 信号，不能直接作为容量结论。
 
 ### 4.2 同步调用治理
 

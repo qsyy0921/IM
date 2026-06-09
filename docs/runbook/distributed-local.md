@@ -107,7 +107,72 @@ H:\NexusIM\loadtest-results\nexusim-distributed-smoke-redis-cleanup-20260609-193
 
 该 run 使用 clean commit `29b8cc6`，`git_dirty=false`，WebSocket gateway 与 delivery consumer gateway 分离，通过 Redis route 收到 `delivery.notify`，随后 `PullInbox` 返回 1 条 inbox，`delivery.ack.ok` 推进 cursor 到 seq `2`，`delivery_outbox PUBLISHED=2/PENDING=0/DLQ=0`。
 
-## 5. 面试讲法
+当前 Redis route 故障 smoke 原始结果：
+
+```text
+H:\NexusIM\loadtest-results\push-gateway-redis-fault-smoke-20260609-195200\pushgateway-summary.json
+```
+
+该 run 使用 clean commit `074902b`，`git_dirty=false`。runner 在 WebSocket session 已注册后停止 `nexusim-redis`，随后发送一条消息；在线 `delivery.notify` 不作为成功条件，客户端通过 `PullInbox` 拉到 seq `2`，恢复 Redis 后重连并通过 `delivery.ack.ok` 推进 cursor 到 seq `2`，`delivery_outbox PUBLISHED=2/PENDING=0/DLQ=0`。
+
+## 5. Win/Mac 双机分布式模拟计划
+
+当前直连网络规划：
+
+```text
+Windows wired: 172.31.50.1/24
+Mac wired:     172.31.50.2/24
+Wi-Fi:         两端继续用于上网和下载依赖
+```
+
+后续双机 smoke / 小压测优先使用 `172.31.50.*`，避免走随身 Wi-Fi 的 `192.168.0.*` 管理网段。
+
+用户当前希望用两台机器模拟多节点，而不是继续做重型单机硬件矩阵。建议资源切分：
+
+| 机器 | 模拟节点 | 建议资源上限 | 初始用途 |
+| --- | --- | --- | --- |
+| Windows | `win-node-a` | 4 CPU / 8GB | PostgreSQL、Kafka、Redis、message/conversation 核心写链路 |
+| Windows | `win-node-b` | 4 CPU / 8GB | delivery-service、push-gateway consumer、局部压测器 |
+| Mac | `mac-node-a` | 4 CPU / 4GB | push-gateway WebSocket 实例、Redis route 跨机验证 |
+| Mac | `mac-node-b` | 4 CPU / 4GB | 轻量 load generator / 第二 gateway 实例 |
+
+第一阶段不需要真的把每个服务都拆进独立容器。更稳的顺序是：
+
+1. 先在 Mac 配好 Docker / Go / repo 路径，确认 `docker version`、`go test ./...` 或必要 smoke runner 可用。
+2. 在 Windows 保留 PostgreSQL / Kafka / Redis，Mac 运行一个或两个 `push-gateway` 实例，使用 `172.31.50.1` 访问 Windows 基础设施。
+3. 跑跨机器 route smoke：Windows consumer gateway -> Redis route -> Mac WebSocket gateway，验证 `delivery.notify -> PullInbox -> ACK`。
+4. 再考虑用 Docker Compose profiles / resource limits 把服务按 `win-node-a/win-node-b/mac-node-a/mac-node-b` 分组。
+
+当前 Mac 准备状态：
+
+```text
+172.31.50.2:22 reachable
+192.168.0.182:22 reachable
+Windows -> Mac SSH key auth: not accepted yet
+```
+
+下一步需要在 Mac 的 `/Users/qsyy0921/.ssh/authorized_keys` 加入 Windows 当前公钥。Windows 侧可用：
+
+```powershell
+Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub
+```
+
+免密恢复后再在 Mac 上验证：
+
+```bash
+docker version
+docker info
+```
+
+压测原始结果继续放机械盘：
+
+```text
+H:\NexusIM\loadtest-results
+```
+
+仓库内只保存 Markdown 报告、脚本和小体积 summary 链接。
+
+## 6. 面试讲法
 
 可以说：
 
@@ -132,10 +197,11 @@ push-gateway 只消费 delivery 事件做在线唤醒，WebSocket 连接和 Kafk
 生产级还需要真实鉴权、Kubernetes 部署、Redis 故障治理、跨实例 resume、正式 metrics、容量和故障演练。
 ```
 
-## 6. 已知缺口
+## 7. 已知缺口
 
-- Redis route 故障目前只有单元测试覆盖，尚未做真实故障 smoke；当前策略是 connect 写 route 失败 fail-closed，online notify lookup / publish 失败 fail-open，并依赖 `PullInbox` 兜底。
+- Redis route 已做一次真实 stop/start fault smoke，证明 online notify 可丢但 `PullInbox + AckDelivery` 可恢复；这仍不是 Redis HA、Sentinel、Cluster 或网络分区结论。
 - Redis route 已有 TTL 续期和后台 stale route cleanup；异常进程退出后 session route 仍依赖 TTL 过期，user route set 中的 stale 成员由 lookup / cleanup loop 移除。
 - `push-gateway` 跨实例 resume buffer 尚未实现；跨实例恢复仍应 fallback `PullInbox`。
 - `push-gateway` `/debug/metrics` 仍是本地 smoke 调试端点，不是正式 Prometheus 指标。
 - 真实生产部署还未接入 Kubernetes / service discovery / mTLS / OTel。
+- Mac Docker / 双机 Docker Compose profile 尚未完成配置和验证；当前阻塞是 Windows -> Mac SSH 免密未恢复，两个地址的 22 端口均可达。

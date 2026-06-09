@@ -4,14 +4,14 @@
 
 ## 1. 当前目标
 
-持续推进 `E:\development\IM` 的 NexusIM 项目落地。`message-service` 第一阶段主链路和压测证据已经形成，当前阶段转向第二个真实微服务：
+持续推进 `E:\development\IM` 的 NexusIM 项目落地。`message-service` 第一阶段主链路和压测证据已经形成，`conversation-service` 已完成第二个真实微服务的最小闭环；当前阶段转向第三个真实微服务：
 
 ```text
-conversation-service
--> conversation / member / permission version read model
--> gRPC contract
--> message-service strict mock replacement
--> real cross-service RPC dependency
+delivery-service
+-> consume Kafka conversation.timeline.events
+-> project user_inbox / device_delivery_cursors
+-> PullInbox / AckDelivery
+-> prepare push-gateway online delivery
 ```
 
 ## 2. 硬边界
@@ -65,7 +65,8 @@ conversation-service
 | conversation-service CreateMemberChange | 最小写路径已实现：gRPC adapter -> app usecase -> PostgreSQL repository；同事务写 `member_change_saga`、`conversation_members`、`conversations` version、`conversation_seq`、`conversation_timeline_events`、`message_outbox`；真实 PostgreSQL 集成测试已覆盖首写、幂等 replay、同 key 冲突和 event/timeline/outbox 一致性；权限矩阵已收紧为第一版保守规则，`MERGE/COMPENSATE` 冲突策略暂不接受 |
 | conversation-service GetMemberChange / saga progress | `GetMemberChange` 查询接口已实现；`NEXUSIM_CONVERSATION_SERVICE_MODE=member-change-worker` 可启动 saga 推进 worker，观察 `message_outbox.status=PUBLISHED` 后把 `member_change_saga` 从 `OUTBOX_ENQUEUED` 推进到 `DONE`；真实 PostgreSQL 集成测试已覆盖 outbox 未发布不推进、发布后推进、limit 控制 |
 | conversation-service member change full smoke | 已跑真实进程小规模 smoke：`CreateMemberChange -> outbox relay -> Kafka member event -> member-change-worker -> GetMemberChange(DONE)`，350/350 成功，p99 40.90ms，saga/outbox/timeline 各 350，outbox `PUBLISHED=350`，saga `DONE=350`，报告见 `docs/runbook/loadtest/conversation-service/loadtest-report-20260609-member-change-full-smoke.md` |
-| conversation-service review fixes | 独立评审指出的 `GetMemberChange` 读取授权和 `last_error` 脱敏 P1 已修复：只允许操作者、目标用户、当前 ACTIVE 的 OWNER/ADMIN 查询；对外只返回稳定 `member change processing failed`，不透出 raw DB/Kafka/repair 文本；worker 推进 SQL 已补 conversation/producer/member event 防御性过滤 |
+| conversation-service review fixes | 独立评审指出的 `GetMemberChange` 读取授权和 `last_error` 脱敏 P1 已修复：只允许操作者、目标用户、当前 ACTIVE 的 OWNER/ADMIN 查询；对外只返回稳定 `member change processing failed`，不透出 raw DB/Kafka/repair 文本；worker 推进 SQL 已补 conversation/producer/member event 防御性过滤；复核结论无 P0/P1 |
+| delivery-service SDD | `docs/sdd/delivery-service.md` 已新增 v0.1 Draft，定义 `conversation.timeline.events -> user_inbox -> PullInbox / AckDelivery` 第一条可编码切片 |
 
 ## 5. 下一步优先级
 
@@ -78,7 +79,8 @@ conversation-service
 7. `conversation-service` 最小 RPC read path 已落地并通过真实进程 smoke：SDD、proto、migration、六层骨架、PostgreSQL repository、gRPC handler、`message-service` 可选 gRPC client 和 `message-service -> conversation-service -> PostgreSQL` 小规模验证均已完成。
 8. `conversation-service` 本地运行 runbook 和更多错误路径测试已补齐；独立评审指出的 P1 参数缺失错误映射已修复；P2 中的 `message-service -> conversation-service` 短重试和 response contract 防御也已补。
 9. `conversation-service / member_change_saga` 最小 `CreateMemberChange` 写路径已落地，并已完成真实进程 smoke：`CreateMemberChange -> outbox relay -> Kafka member event -> outbox PUBLISHED`，报告见 `docs/runbook/loadtest/conversation-service/loadtest-report-20260609-member-change-smoke.md`。
-10. `GetMemberChange` 查询接口和 saga `EVENT_PUBLISHED / DONE` 推进 worker 已落地，真实进程 full smoke 已通过；评审 P1 已修复，下一步确认评审线程最终复核后进入 `delivery-service` / `push-gateway` SDD 和最小可运行链路；暂不推 GitHub，等 conversation-service member change 阶段评审通过后再批量同步。
+10. 独立评审已确认 `conversation-service` member change full smoke 阶段无 P0/P1；第二个真实微服务最小闭环可以收口。
+11. 当前进入 `delivery-service`：先冻结 SDD，再落地 proto、migration、六层骨架、`PullInbox / AckDelivery` 和 timeline projection 最小链路；`push-gateway` 暂只做后续 SDD，不先抢实现。
 
 ## 6. 评审要求
 
@@ -292,7 +294,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 debug metrics collector 保存全量样本并在 snapshot 时排序，适合本地短压测，不适合作为生产 metrics；后续应替换为固定窗口、reservoir、HDR histogram 或 Prometheus histogram。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
-- `timeline-service`、`delivery-service`、`push-gateway` SDD 未冻结；`conversation-service / member_change_saga` SDD 已冻结，Proto / Kafka schema / migration v2 和 relay builder 已补；成员变更代码必须继续通过 shared timeline/outbox append port 落库，不得绕过统一 outbox。
+- `delivery-service` SDD v0.1 已存在但未冻结；`timeline-service`、`push-gateway` SDD 未冻结；`conversation-service / member_change_saga` SDD 已冻结，Proto / Kafka schema / migration v2 和 relay builder 已补；成员变更代码必须继续通过 shared timeline/outbox append port 落库，不得绕过统一 outbox。
 - `conversation-service` 当前已实现 `CreateMemberChange`、`GetMemberChange` 和最小 saga publish progress worker；DLQ repair 仍未完成。
 - `conversation-service` 当前已完成 `CreateMemberChange(JOIN)` 写路径 smoke 和 `CreateMemberChange -> outbox relay -> member-change-worker -> GetMemberChange(DONE)` full smoke；`LEAVE / REMOVE / ROLE_CHANGED` 真实进程 smoke 可后置。
 - 统一 outbox relay 当前仍位于 `message-service/internal/trigger/outbox`，但后续会发布 message/member 两类 conversation timeline event；这是阶段性部署折中，生产化前需要在 TADD 中决定是否拆成独立 `timeline-outbox-relay`。
@@ -374,3 +376,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已实现 `conversation-service` 的 `GetMemberChange` 查询接口和 saga publish progress worker：`NEXUSIM_CONVERSATION_SERVICE_MODE=member-change-worker` 会观察 outbox `PUBLISHED` 事件并把 `member_change_saga` 推进到 `DONE`；`go test ./...`、关键二进制 build 和真实 PostgreSQL repository 集成测试均通过。下一步做真实进程 smoke 和阶段评审。
 - 2026-06-09：已完成 clean HEAD `ca0a0b6` 的 conversation-service member change full smoke：`CreateMemberChange -> outbox relay -> Kafka member event -> member-change-worker -> GetMemberChange(DONE)`，350/350 成功，p99 40.90ms，`outbox_published_count=350`、`outbox_pending_count=0`、`saga_done_count=350`，样本 `GetMemberChange` 返回 `MEMBER_CHANGE_STATUS_DONE`；报告归档到 `docs/runbook/loadtest/conversation-service/loadtest-report-20260609-member-change-full-smoke.md`。下一步邀请阶段评审。
 - 2026-06-09：独立评审指出 `GetMemberChange` 读取授权和 `last_error` 脱敏两个 P1；本轮已修复：repository 校验操作者/目标用户/当前 ACTIVE OWNER 或 ADMIN，未授权返回 `ErrPermissionDenied`；raw `last_error` 映射为稳定 public message；`MarkPublishedMemberChanges` 额外校验 outbox conversation、producer 和 member event type。当前 HEAD `76fff53` 短 full smoke 217/217 成功，`saga_done_count=217`，`sample_get_status=MEMBER_CHANGE_STATUS_DONE`。
+- 2026-06-09：独立评审复核 `conversation-service` P1/P2 修复，结论为无 P0/P1，可进入 `delivery-service / push-gateway` SDD 和最小链路；当前已新增 `docs/sdd/delivery-service.md` v0.1 Draft，范围限定为消费 `conversation.timeline.events`、投影 `user_inbox`、提供 `PullInbox / AckDelivery`，不先实现 WebSocket。

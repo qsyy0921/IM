@@ -12,6 +12,7 @@
 | message-service SDD | `docs/sdd/message-service.md` | 第一条可编码切片的服务设计 |
 | conversation-service SDD | `docs/sdd/conversation-service.md` | 会话发送上下文读取、成员事实和成员变更 Saga 边界 |
 | conversation-service member_change_saga SDD | `docs/sdd/conversation-service-member-change-saga.md` | 成员变更 Saga、成员边界 timeline event、ACL 投影失败窗口 |
+| delivery-service SDD | `docs/sdd/delivery-service.md` | timeline 投影、user_inbox、离线补拉和设备 ACK |
 
 ## 六层 DDD 约定
 
@@ -33,9 +34,9 @@
 | `message-service` | SDD 已冻结 v1.0 | 可以开始 `SendMessage` 普通会话写入链路 |
 | `timeline-service / sequencer` | SDD 未完成 | 不阻塞 `LOCAL_ROW_LOCK`；阻塞热点会话生产实现 |
 | `conversation-service / send context` | SDD v0.1 已存在 | 可以实现 `GetSendContext` 读取路径，替换 message-service strict conversation mock |
-| `conversation-service / member_change_saga` | SDD 已冻结 v1.0；proto / schema / migration v2 / relay builder / 最小 `CreateMemberChange` 写路径已落地 | 下一步做真实进程 smoke、saga publish 状态推进和小规模报告 |
+| `conversation-service / member_change_saga` | SDD 已冻结 v1.0；proto / schema / migration v2 / relay builder / 最小 `CreateMemberChange` 写路径、saga publish 状态推进和 full smoke 已落地 | 后续补 LEAVE / REMOVE / ROLE_CHANGED、DLQ repair 和生产韧性 |
 | `push-gateway` | SDD 未完成 | 不阻塞 `message-service`；阻塞 WebSocket 完整闭环 |
-| `delivery-service` | SDD 未完成 | 不阻塞 `message-service`；阻塞 fanout、offline pull、ACK 闭环 |
+| `delivery-service` | SDD v0.1 已存在 | 可以进入 `PullInbox / AckDelivery / timeline projection` 最小链路 |
 | `retrieval-gateway` | SDD 未完成 | 不进入第一条代码切片 |
 
 ## 已完成的 message-service 切片
@@ -64,7 +65,7 @@ message-service SendMessage
 
 ## 当前 conversation-service 切片
 
-当前优先编码范围：
+当前已完成的主要范围：
 
 ```text
 conversation-service GetSendContext
@@ -75,10 +76,29 @@ conversation-service GetSendContext
 
 边界：
 
-- 只读取会话发送上下文，不实现成员变更命令。
-- 不在 conversation-service 写消息、时间线事件或 Kafka。
-- `member_change_saga` 表先落库，Saga 业务后续单独冻结 SDD。
+- 已实现会话发送上下文读取。
+- 已实现成员变更 `CreateMemberChange` 最小写路径和 `GetMemberChange` 查询。
+- 已实现成员边界事件通过统一 outbox relay 发布到 Kafka，并由 worker 推进 saga 到 `DONE`。
+- 不在 conversation-service 写消息正文，不直接 publish Kafka；成员变更只通过 shared timeline/outbox 写成员边界事件。
 - `message-service` 未配置 `NEXUSIM_CONVERSATION_SERVICE_ADDR` 时仍可使用 strict mock，便于历史压测复现。
+
+## 当前 delivery-service 切片
+
+当前优先编码范围：
+
+```text
+Kafka conversation.timeline.events
+-> delivery-service timeline projection
+-> PostgreSQL user_inbox / delivery cursor
+-> PullInbox / AckDelivery
+```
+
+边界：
+
+- 只实现 durable delivery read model，不实现 WebSocket 长连接。
+- `push-gateway` 后续只做连接和在线推送，不写 `user_inbox`。
+- `user_inbox` 是可重建投影，不是 message 事实源。
+- 第一阶段只做小规模 smoke，不继续做重型硬件矩阵。
 
 ## 已补齐的工程基线
 
@@ -98,9 +118,8 @@ conversation-service GetSendContext
 
 优先级：
 
-1. `timeline-service-sequencer.md`
-2. `delivery-service.md`
-3. `push-gateway.md`
-4. `retrieval-gateway.md`
+1. `push-gateway.md`
+2. `timeline-service-sequencer.md`
+3. `retrieval-gateway.md`
 
-其中 `timeline-service` SDD 不阻塞当前 `GetSendContext` read path，但阻塞热点会话生产化。`conversation-service / member_change_saga` 已冻结，成员变更 Proto / Kafka schema / migration v2、relay builder 和最小 `CreateMemberChange` 写路径已落地，下一步应优先做真实进程 smoke 和 saga 发布状态推进。
+其中 `delivery-service.md` 已补 v0.1，下一步应优先落地 proto / migration / 六层骨架和最小 `PullInbox / AckDelivery` 链路。`timeline-service` SDD 不阻塞普通会话当前实现，但阻塞热点会话生产化。

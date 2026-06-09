@@ -62,8 +62,8 @@ message-service SendMessage
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
 2. adaptive limit 第一版已接入并跑完 on/off 对照；debug metrics collector 已新增 recent 窗口字段，adaptive controller 已新增 hysteresis 和动态 retry hint；loadtest summary 已记录 retry delay histogram。
 3. adaptive best candidate 60s 重复验证已完成，`gap8-outbox50-base1000` 能保护 outbox 清零，但 accepted RPS 过低，不能作为稳定配置。
-4. 下一步对比更宽松的 pool acquire p95 阈值，例如 `250ms / 500ms / 750ms`，观察 accepted RPS 是否提升且 outbox pending 仍为 0。
-5. logical end-to-end latency 已接入 summary 并通过 smoke 验证；下一轮矩阵必须同时展示 logical p99 和 attempt success p99。
+4. pool acquire p95 阈值矩阵已完成，单纯放宽 `250ms / 500ms / 750ms` 不能解决 accepted RPS 偏低和 logical p99 过高的问题。
+5. 下一步转向 admission token / concurrency limit，避免只靠 reason count 线性放大 retry delay；后续矩阵必须以 logical p99 作为主口径。
 6. 继续采集 PostgreSQL wait_event，重点看 `LWLock:WALWrite`、`LWLock:WALInsert`、`LWLock:BufferContent` 和 `CheckpointWriteDelay`。
 7. adaptive admission 合并阶段评审已完成，无 P0/P1；下一轮正式矩阵需要显式展示 recent sample count、retry delay histogram、retry attempt count、logical success rate、overload rate 和 success p99。
 8. 暂不推 GitHub；等 adaptive threshold matrix 和评审 P2 口径收敛后再做批量同步。
@@ -269,6 +269,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 adaptive threshold matrix v1：报告为 `docs/runbook/loadtest-report-20260609-adaptive-threshold-v1.md`，正式结果路径为 `loadtest/results/adaptive-threshold-v1-clean-20260609/`。commit `9830f34`、`git_dirty=false`，固定 `PG_MAX_CONNS=64`、relay workers `8`、batch size `100`、PublishBatch on、`max_retries=2`、`retry_jitter=100ms`。本轮最佳候选为 `gap8-outbox50-base1000`：1200 VU logical success `80.78%`、accepted RPS `578.30`、success p99 `1955.41ms`；1600 VU logical success `56.28%`、accepted RPS `456.07`、success p99 `1819.91ms`；两组 outbox pending 均为 0。该结果说明更长 retry hint 能缓解重试压力，但 adaptive admission 仍是保护机制，不是容量提升结论。
 - 当前 adaptive best candidate 60s repeat：报告为 `docs/runbook/loadtest-report-20260609-adaptive-best-repeat.md`，正式结果路径为 `loadtest/results/adaptive-threshold-best-repeat-20260609/`。commit `fb872a9`、`git_dirty=false`，重复验证 `gap8-outbox50-base1000`。1200 VU 两轮 logical success 为 `39.01%` / `41.69%`，accepted RPS 为 `261.55` / `273.58`；1600 VU 两轮 logical success 为 `27.96%` / `30.59%`，accepted RPS 为 `226.45` / `246.82`；所有 outbox pending 均为 0。该结果推翻了 30s 短测的乐观判断，说明当前 adaptive admission 过度保护。
 - 当前 logical latency smoke：报告为 `docs/runbook/loadtest-report-20260609-logical-latency-smoke.md`，结果路径为 `loadtest/results/logical-latency-smoke-20260609/bpoff-adapton-pbatchon-pgmax-4-vu-5-20260609-092242/sendmessage-summary.json`。commit `91cbb8c`、`git_dirty=false`，attempt p99 `7.3318ms`，logical p99 `507.6808ms`，retry delay p95 `500ms`，证明 summary 已能把 retry sleep 计入用户层等待。
+- 当前 adaptive pool acquire p95 matrix v1：报告为 `docs/runbook/loadtest-report-20260609-adaptive-poolp95-v1.md`，正式结果路径为 `loadtest/results/adaptive-poolp95-v1-20260609/`。commit `b98e3c9`、`git_dirty=false`，对比 `AdaptiveMaxPoolAcquireP95=250ms/500ms/750ms`。所有组合 outbox pending 均为 0；1200 VU 下 accepted RPS 最高为 `277.55`，logical p99 仍为 `5968.57ms`；1600 VU 下 accepted RPS 约 `195-203`，logical p99 约 `5091-5463ms`。该结果说明单纯放宽 pool acquire p95 阈值不能解决当前过度保护和用户层等待过长问题。
 - 当前 debug metrics collector 保存全量样本并在 snapshot 时排序，适合本地短压测，不适合作为生产 metrics；后续应替换为固定窗口、reservoir、HDR histogram 或 Prometheus histogram。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
@@ -334,3 +335,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已在 clean commit `9830f34` 跑 adaptive threshold matrix v1，并新增 `docs/runbook/loadtest-report-20260609-adaptive-threshold-v1.md`。结论：`RetryBase=1000ms` 的 `gap8-outbox50-base1000` 当前最好，outbox 全部追平；pool release gap 和 outbox release ratio 未显示稳定收益。下一步做 60s 重复验证和 pool acquire p95 阈值矩阵。
 - 2026-06-09：已在 clean commit `fb872a9` 对 `gap8-outbox50-base1000` 做 60s 重复验证，并新增 `docs/runbook/loadtest-report-20260609-adaptive-best-repeat.md`。结论：该配置能保持 outbox 清零，但 accepted RPS 过低，不能作为稳定配置。随后已给 loadtest summary 补 logical end-to-end latency；下一步做 `AdaptiveMaxPoolAcquireP95=250/500/750ms` 阈值矩阵。
 - 2026-06-09：已在 clean commit `91cbb8c` 跑 logical latency smoke，并新增 `docs/runbook/loadtest-report-20260609-logical-latency-smoke.md`。结论：attempt p99 与 logical p99 差异明显，后续 adaptive 矩阵必须用 logical p99 判断用户层等待。
+- 2026-06-09：已在 clean commit `b98e3c9` 跑 `AdaptiveMaxPoolAcquireP95=250/500/750ms` 矩阵，并新增 `docs/runbook/loadtest-report-20260609-adaptive-poolp95-v1.md`。结论：outbox 全部清零，但 accepted RPS 偏低、logical p99 仍为 5s 以上；下一步应设计 admission token / concurrency limit，而不是继续只调 p95 阈值。

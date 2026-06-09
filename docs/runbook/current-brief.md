@@ -18,8 +18,8 @@ conversation-service
 ## 当前优先级
 
 1. 当前分布式证据已经够用于面试讲“最小分布式 IM 后端”，不要继续长期停留在重型基础设施故障矩阵。
-2. 当前第三层产品能力已切到送达 / 已读回执：`docs/sdd/receipt-service.md` 已新增 v0.1 Draft。
-3. 下一步先冻结 receipt-service SDD，再落 proto / migration / 六层骨架；不要直接读取 delivery-service 内部表。
+2. 当前第三层产品能力已切到送达 / 已读回执：`docs/sdd/receipt-service.md` 已新增 v0.1 Draft，并已落 receipt proto / Kafka schema / migration / 六层骨架草案。
+3. 下一步实现 receipt-service PostgreSQL repository 和 delivery event consumer：投影 `delivery.inbox_item.created.v1` / `delivery.ack.recorded.v1`，再实现 `MarkRead` 写 cursor + receipt outbox；不要直接读取 delivery-service 内部表。
 4. 后续第三层候选：消息编辑/撤回/删除、会话列表/未读数、真实鉴权。
 5. RAG / Agent / 智能总结属于第四层，必须等消息事实、权限边界、撤回删除语义更稳定后再做。
 6. Kafka HA、PostgreSQL failover、Redis quorum / 网络分区可作为后续生产化项，不作为当前主线阻塞。

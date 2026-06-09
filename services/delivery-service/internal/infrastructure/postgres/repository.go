@@ -236,6 +236,7 @@ func insertInboxOutbox(
 		"conversation_seq": command.ConversationSeq,
 		"source_event_id":  command.EventID,
 		"message_id":       command.MessageID,
+		"sender_id":        command.SenderID,
 	}
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {

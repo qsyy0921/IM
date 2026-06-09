@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package nexusim.receipt.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1;receiptv1";
+
+service ReceiptService {
+  rpc MarkRead(MarkReadRequest) returns (MarkReadResponse);
+  rpc GetReceiptState(GetReceiptStateRequest) returns (GetReceiptStateResponse);
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+message MarkReadRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  int64 read_seq = 3;
+}
+
+message MarkReadResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  string conversation_id = 3;
+  int64 last_read_seq = 4;
+}
+
+message GetReceiptStateRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  string message_id = 3;
+  int64 conversation_seq = 4;
+}
+
+message ReceiptUserState {
+  string user_id = 1;
+  int64 received_seq = 2;
+  int64 received_at_unix_ms = 3;
+  int64 read_seq = 4;
+  int64 read_at_unix_ms = 5;
+}
+
+enum ReceiptVisibilityMode {
+  RECEIPT_VISIBILITY_MODE_UNSPECIFIED = 0;
+  RECEIPT_VISIBILITY_MODE_DETAILED = 1;
+  RECEIPT_VISIBILITY_MODE_COUNT_ONLY = 2;
+  RECEIPT_VISIBILITY_MODE_HIDDEN = 3;
+}
+
+message GetReceiptStateResponse {
+  string conversation_id = 1;
+  int64 conversation_seq = 2;
+  string message_id = 3;
+  int32 received_user_count = 4;
+  int32 read_user_count = 5;
+  ReceiptVisibilityMode visibility_mode = 6;
+  repeated ReceiptUserState receivers = 7;
+}

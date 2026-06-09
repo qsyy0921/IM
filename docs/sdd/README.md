@@ -39,7 +39,7 @@
 | `conversation-service / member_change_saga` | SDD 已冻结 v1.0；proto / schema / migration v2 / relay builder / 最小 `CreateMemberChange` 写路径、saga publish 状态推进和 full smoke 已落地 | 后续补 LEAVE / REMOVE / ROLE_CHANGED、DLQ repair 和生产韧性 |
 | `push-gateway` | SDD v0.1 Draft 已存在 | 进入 proto / 六层骨架前需要阶段评审；第一阶段只做在线通知和回源协调 |
 | `delivery-service` | SDD v0.1 已存在，最小 projection / PullInbox / AckDelivery / delivery outbox relay 已落地 | 可以支撑 push-gateway 第一阶段，只要 push-gateway 不绕过 durable inbox / ACK |
-| `receipt-service` | SDD v0.1 Draft 已新增 | 下一步先冻结 SDD，再落 proto / migration / 六层骨架；不得直接读取 delivery-service 内部表 |
+| `receipt-service` | SDD v0.1 Draft、proto、Kafka schema、migration、六层骨架草案已新增 | 下一步实现 PostgreSQL repository / delivery event consumer / MarkRead 事务；不得直接读取 delivery-service 内部表 |
 | `retrieval-gateway` | SDD 未完成 | 不进入第一条代码切片 |
 
 ## 已完成的 message-service 切片
@@ -145,6 +145,7 @@ Kafka im.delivery.events
 - read 必须由客户端显式 `MarkRead` 推进。
 - receipt-service 不直接读取 `delivery-service` 内部表；它消费 `im.delivery.events` 建自己的 projection。
 - receipt event 只能通过 receipt outbox 发布。
+- 权限来源必须通过 `ReceiptAccessPort` 表达；不能用 receipt projection 的存在性替代会话访问权限。
 
 ## 已补齐的工程基线
 
@@ -164,7 +165,7 @@ Kafka im.delivery.events
 
 优先级：
 
-1. `receipt-service` proto / migration / 六层骨架
+1. `receipt-service` PostgreSQL repository / delivery consumer / MarkRead 事务
 2. `timeline-service-sequencer.md`
 3. `retrieval-gateway.md`
 

@@ -1,6 +1,6 @@
 # NexusIM receipt-service SDD v0.1 Draft
 
-状态：Draft
+状态：Draft，proto / Kafka schema / migration / 六层骨架已落草案，等待 repository / consumer 实现前复核。
 
 本文定义 `receipt-service` 的第一条可编码切片：基于 `delivery-service` 已经产生的 durable delivery 事件，构建消息送达 / 已读回执 read model，并提供最小查询和 `MarkRead` 写入入口。
 
@@ -8,11 +8,11 @@
 
 `receipt-service` 拥有消息回执 read model：
 
-- `receipt_inbox_projection`：从 `delivery.inbox_item.created.v1` 重建用户可见消息索引，只保存回执所需字段。
+- `receipt_inbox_projection`：从 `delivery.inbox_item.created.v1` 重建用户可见消息索引，只保存回执所需字段，包括 `sender_id`。
 - `device_received_cursors`：从 `delivery.ack.recorded.v1` 投影每个设备的已接收游标。
 - `user_read_cursors`：用户维度的已读游标；同一用户多设备读到更高 seq 后单调推进。
 - `message_receipt_states`：按 message / conversation seq 聚合用户送达和已读状态。
-- `receipt_outbox`：后续向 sender、audit 或 push-gateway 发布回执变更事件。
+- `receipt_outbox`：后续向 sender、audit、会话列表或未读数投影发布回执变更事件。
 
 职责：
 
@@ -20,15 +20,15 @@
 - 将 `delivery.inbox_item.created.v1` 投影为回执所需的用户可见消息索引。
 - 将 `delivery.ack.recorded.v1` 转换为“设备已接收 / user received”状态。
 - 提供 `MarkRead`，由客户端显式报告用户已读到某个 conversation seq。
-- 提供 `GetReceiptState` / `ListReceiptStates`，查询某条消息或某段 seq 的送达 / 已读聚合。
-- 通过 outbox 发布 receipt event，供 push-gateway、audit、会话列表或未读数投影消费。
+- 提供 `GetReceiptState`，查询某条消息或某个 seq 的送达 / 已读聚合；批量 `ListReceiptStates` 是后续范围。
+- 通过 outbox 发布 receipt event，供 audit、会话列表或未读数投影消费；push-gateway 的在线回执通知需要单独 SDD 和 consumer，不属于第一阶段。
 
 不负责：
 
 - 不修改 `message_log`、`conversation_timeline_events`、`message_outbox`。
 - 不修改 `user_inbox`、`device_delivery_cursors`；这些仍归 `delivery-service`。
-- 不判断成员事实，不替代 `conversation-service`。
-- 不直接 WebSocket 推送；在线通知仍由 `push-gateway` 消费事件后完成。
+- 不拥有成员事实，不替代 `conversation-service`；但必须通过 `ReceiptAccessPort` 查询当前用户是否可上报 / 查看指定会话回执。
+- 不直接 WebSocket 推送；在线回执通知需要后续扩展 `push-gateway` receipt consumer，本阶段不做。
 - 不做 RAG / Agent；RAG 只能在回执、撤回/删除和 ACL 语义更稳定后进入。
 
 ## 2. 上下游
@@ -38,10 +38,13 @@
 | 上游事件 | Kafka `im.delivery.events` | 消费 `delivery.inbox_item.created.v1` 和 `delivery.ack.recorded.v1` |
 | 同步上游 | API gateway / client | 调用 `MarkRead`、`GetReceiptState` |
 | 同步依赖 | PostgreSQL | 写回执 projection、cursor、outbox、checkpoint |
+| 同步依赖 | conversation / policy access port | 校验 `MarkRead` 和 `GetReceiptState` 的会话访问权限、隐私模式和版本 |
 | 异步下游 | Kafka `im.receipt.events` | 发布 receipt received/read event |
-| 下游 | push-gateway / conversation-list projection / audit | 在线提示、会话摘要、审计 |
+| 下游 | conversation-list projection / audit | 会话摘要、审计；push-gateway 在线回执提示后置 |
 
 `receipt-service` 不读取 `delivery-service` 内部表。它通过 `im.delivery.events` 重建必要投影；如果 projection lag 或数据缺失，API 必须返回可解释错误或要求客户端回源 `PullInbox`，不能直接跨服务读内部表补洞。
+
+权限来源必须显式化：app 层通过 `ReceiptAccessPort` 调用 conversation / policy 能力，第一阶段可以用本地 mock，但接口必须表达 `CanMarkRead` 和 `CanViewReceiptState` 两种语义。该端口返回 visibility mode、permission version 和必要的 membership window；无权限返回 `PERMISSION_DENIED`。不能用 receipt projection 的存在性替代权限判断。
 
 ## 3. 六层 DDD 包结构
 
@@ -60,7 +63,7 @@ services/receipt-service/
 | 层 | 本服务内容 |
 | --- | --- |
 | `api` | gRPC handler：`MarkRead`、`GetReceiptState`、错误码映射 |
-| `app` | `ProjectDeliveryEventUseCase`、`MarkReadUseCase`、`GetReceiptStateUseCase` |
+| `app` | `ProjectDeliveryEventUseCase`、`MarkReadUseCase`、`GetReceiptStateUseCase`、`ReceiptAccessPort` |
 | `domain` | received/read cursor 单调性、message receipt 聚合、权限窗口校验 |
 | `infrastructure` | PostgreSQL repository、Kafka delivery consumer、receipt outbox relay |
 | `types` | Command、DTO、错误 sentinel、枚举 |
@@ -70,7 +73,7 @@ services/receipt-service/
 
 | 模型 | 说明 | 不变量 |
 | --- | --- | --- |
-| `ReceiptInboxItem` | 回执服务自己的可见消息索引 | 来自 `delivery.inbox_item.created.v1`，`(tenant_id,user_id,conversation_id,conversation_seq)` 唯一 |
+| `ReceiptInboxItem` | 回执服务自己的可见消息索引 | 来自 `delivery.inbox_item.created.v1`，`(tenant_id,user_id,conversation_id,conversation_seq)` 唯一，必须保存 `sender_id` |
 | `DeviceReceivedCursor` | 某设备已接收 / 已持久化游标 | 只由 `delivery.ack.recorded.v1` 推进，单调递增 |
 | `UserReceivedCursor` | 用户维度已接收游标 | 可由多个设备 received cursor 聚合；第一阶段取该用户任一设备 ack 到的最大 seq |
 | `UserReadCursor` | 用户维度已读游标 | 只由 `MarkRead` 推进，不能超过该用户已接收 / 已可见最大 seq |
@@ -119,7 +122,7 @@ MarkRead(conversation_id, read_seq)
 
 - 用户可关闭“向他人展示已读”，关闭后仍可本地推进 read cursor，但对外 `GetReceiptState` 不展示该用户 read 明细。
 - 群聊可以按规模降级：小群展示用户列表，大群只展示计数或摘要。
-- sender 只能查看自己有权访问的 conversation / message 的回执；被移出会话后，不能查看离开后消息的回执。
+- sender 只能查看自己有权访问的 conversation / message 的回执；被移出会话后，不能查看离开后消息的回执。sender 判断来自 `delivery.inbox_item.created.v1.sender_id`，不能回读 message-service 内部表。
 - message 撤回 / 删除上线后，回执查询必须遵守消息可见性，不得因为 receipt projection 保留历史状态而泄露被删除消息。
 - receipt-service 可以保留 audit 级内部状态，但对普通 API 返回必须经过权限和隐私过滤。
 
@@ -221,6 +224,8 @@ im.delivery.events
 消费规则：
 
 - Kafka offset 只在 PostgreSQL 事务提交后推进。
+- receipt-service 是可靠 projection，新的 consumer group 必须从 topic earliest / `FirstOffset` 开始构建 read model；不能照抄 push-gateway 的 latest offset 策略。
+- 如果 topic retention 不足以重建 projection，本阶段直接返回 `PROJECTION_LAGGING` / 运维告警；后续再设计受控 backfill，不允许通过读取 delivery-service 内部表临时补洞。
 - 消费 `delivery.ack.recorded.v1` 时，如果对应 inbox projection 尚未到达，必须 fail-closed 或进入可重试 lag 状态，不能丢弃 ack。
 - duplicate delivery event 必须幂等：按 `event_id` 或唯一键去重。
 - unsupported / malformed event 不得静默 commit；第一阶段可以 fail-closed 阻塞并报警，后续补 projection DLQ / repair。
@@ -237,8 +242,8 @@ im.receipt.events
 
 | 事件 | 分区键 | 下游 |
 | --- | --- | --- |
-| `receipt.message.received.v1` | `tenant_id + conversation_id` | push-gateway、conversation-list projection、audit |
-| `receipt.message.read.v1` | `tenant_id + conversation_id` | push-gateway、conversation-list projection、audit |
+| `receipt.message.received.v1` | `tenant_id + conversation_id` | conversation-list projection、audit |
+| `receipt.message.read.v1` | `tenant_id + conversation_id` | conversation-list projection、audit |
 
 Payload 建议：
 
@@ -279,6 +284,7 @@ CREATE TABLE receipt_inbox_projection (
     source_event_id     TEXT        NOT NULL,
     delivery_event_id   TEXT        NOT NULL,
     message_id          TEXT        NOT NULL,
+    sender_id           TEXT        NOT NULL,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (tenant_id, user_id, conversation_id, conversation_seq),
     UNIQUE (tenant_id, user_id, delivery_event_id)
@@ -332,16 +338,19 @@ CREATE TABLE message_receipt_states (
 
 ## 9. 第一条可编码切片
 
-建议按下面顺序推进：
+当前草案文件已经包括：
 
-1. 冻结本 SDD v0.1：确认 receipt-service 独立服务边界，不把 read receipt 塞进 push-gateway。
-2. 新增 proto：`api/proto/nexusim/receipt/v1/receipt_service.proto`，只放 `MarkRead` 和 `GetReceiptState`。
-3. 新增 Kafka schema：`schemas/kafka/receipt/v1/im.receipt.events.proto`。
-4. 新增 migration：`migrations/postgres/receipt/000001_receipt_core.sql`。
-5. 新增六层骨架：`services/receipt-service/internal/{api,app,domain,infrastructure,types,trigger}`。
-6. 实现 `ProjectDeliveryEventUseCase`：消费 `delivery.inbox_item.created.v1` / `delivery.ack.recorded.v1`，建立 received projection。
-7. 实现 `MarkReadUseCase`：校验 read_seq 不超过 visible / received 范围，推进 user read cursor，写 receipt outbox。
-8. 实现最小 smoke：
+- `api/proto/nexusim/receipt/v1/receipt_service.proto`：`MarkRead` 和 `GetReceiptState`。
+- `schemas/kafka/receipt/v1/im.receipt.events.proto`：`receipt.message.received.v1` / `receipt.message.read.v1`。
+- `migrations/postgres/receipt/000001_receipt_core.sql`。
+- `services/receipt-service/internal/{api,app,domain,infrastructure,types,trigger}` 六层骨架。
+
+下一步按下面顺序推进：
+
+1. 实现 `ReceiptAccessPort` 第一版 mock / adapter，冻结 `CanMarkRead` 和 `CanViewReceiptState` 语义。
+2. 实现 PostgreSQL repository：消费 `delivery.inbox_item.created.v1` / `delivery.ack.recorded.v1`，建立 received projection。
+3. 实现 `MarkReadUseCase`：校验 read_seq 不超过 visible / received 范围，推进 user read cursor，写 receipt outbox。
+4. 实现最小 smoke：
 
 ```text
 SendMessage

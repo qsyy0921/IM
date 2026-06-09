@@ -40,6 +40,7 @@ message DeliveryInboxItemCreatedV1 {
   int64 conversation_seq = 4;
   string source_event_id = 5;
   string message_id = 6;
+  string sender_id = 7;
 }
 
 message DeliveryAckRecordedV1 {

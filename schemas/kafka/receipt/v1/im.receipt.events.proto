@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package nexusim.receipt.events.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/qsyy0921/IM/schemas/kafka/receipt/v1;receipteventsv1";
+
+// Topic: im.receipt.events
+// Partition key: tenant_id + ":" + conversation_id
+// Producer: receipt-service outbox relay
+message ReceiptEvent {
+  string event_id = 1;
+  string event_type = 2;
+  string event_version = 3;
+
+  string tenant_id = 4;
+  string aggregate_type = 5; // "receipt"
+  string aggregate_id = 6;   // conversation_id
+  int64 aggregate_version = 7;
+
+  string partition_key = 8;
+  int64 mapping_version = 9;
+  string trace_id = 10;
+  string correlation_id = 11;
+  string causation_id = 12;
+  string producer = 13;
+  google.protobuf.Timestamp occurred_at = 14;
+
+  oneof payload {
+    ReceiptMessageReceivedV1 message_received = 20;
+    ReceiptMessageReadV1 message_read = 21;
+  }
+}
+
+message ReceiptMessageReceivedV1 {
+  string tenant_id = 1;
+  string conversation_id = 2;
+  int64 conversation_seq = 3;
+  string message_id = 4;
+  string user_id = 5;
+  string device_id = 6;
+  int64 cursor_seq = 7;
+  string source_event_id = 8;
+}
+
+message ReceiptMessageReadV1 {
+  string tenant_id = 1;
+  string conversation_id = 2;
+  int64 conversation_seq = 3;
+  string message_id = 4;
+  string user_id = 5;
+  string device_id = 6;
+  int64 cursor_seq = 7;
+  string source_event_id = 8;
+}

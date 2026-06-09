@@ -152,6 +152,7 @@ func BuildDeliveryEvent(message types.OutboxMessage) (*deliveryeventsv1.Delivery
 				ConversationSeq: payload.ConversationSeq,
 				SourceEventId:   payload.SourceEventID,
 				MessageId:       payload.MessageID,
+				SenderId:        payload.SenderID,
 			},
 		}
 		return event, nil
@@ -183,6 +184,7 @@ type inboxItemCreatedPayload struct {
 	SourceEventID   string `json:"source_event_id"`
 	LegacyEventID   string `json:"event_id"`
 	MessageID       string `json:"message_id"`
+	SenderID        string `json:"sender_id"`
 }
 
 func decodeInboxItemCreatedPayload(payloadJSON []byte) (inboxItemCreatedPayload, error) {
@@ -198,7 +200,8 @@ func decodeInboxItemCreatedPayload(payloadJSON []byte) (inboxItemCreatedPayload,
 		payload.ConversationID == "" ||
 		payload.ConversationSeq <= 0 ||
 		payload.SourceEventID == "" ||
-		payload.MessageID == "" {
+		payload.MessageID == "" ||
+		payload.SenderID == "" {
 		return inboxItemCreatedPayload{}, errors.New("delivery inbox item payload is incomplete")
 	}
 	return payload, nil

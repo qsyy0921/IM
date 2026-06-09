@@ -225,4 +225,3 @@ checkpoint|nexusim-delivery-smoke-20260609132344|1|3600811
 1. 将 `delivery-service` smoke 结果纳入 `current-goal.md`。
 2. 后续补 `delivery_outbox` relay 或先写 `push-gateway` SDD，明确 online push 依赖 durable inbox。
 3. 在 push 前补小规模 `LEAVE/REMOVE` 可见性 smoke，验证离开后不再写入新的 inbox。
-

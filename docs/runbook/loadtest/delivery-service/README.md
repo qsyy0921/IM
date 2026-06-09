@@ -33,4 +33,3 @@ conversation-service CreateMemberChange
 - `AckDelivery` 只能 ACK 到该用户已可见的最大 seq，不能让客户端随便把 cursor 推到未来。
 - Kafka checkpoint 使用 `consumer_group + topic + partition`，记录 next offset；业务投影落库成功后才提交 Kafka offset。
 - 当前 `delivery_outbox` 只落库，不发布 `im.delivery.events`；push-gateway 接入前需要再做 delivery outbox relay 或 push event 发布链路。
-

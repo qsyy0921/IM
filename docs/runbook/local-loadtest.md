@@ -6,8 +6,36 @@
 
 | 角色 | 地址 | 用途 |
 | --- | --- | --- |
-| Windows 本机 | `192.168.0.141` | 服务端、开发机 |
-| MacBook | `192.168.0.182` | 压测客户端、双向 callback/mock receiver |
+| Windows 本机 Wi-Fi | `192.168.0.141` | 上网、SSH fallback |
+| MacBook Wi-Fi | `192.168.0.182` | 上网、SSH fallback |
+| Windows 本机有线直连 | `172.31.50.1` | Win-Mac 压测服务端 / 客户端 |
+| MacBook 有线直连 | `172.31.50.2` | Win-Mac 压测客户端 / callback/mock receiver |
+
+Win-Mac 之间的压测流量统一走有线直连网段：
+
+```text
+172.31.50.0/24
+```
+
+两端有线网卡都不设置默认网关；Wi-Fi 继续负责上网和普通局域网访问。Windows 网络面板显示“无网络访问权限”是正常的，因为该有线网段只用于双机直连。
+
+当前静态地址配置：
+
+Windows 管理员 PowerShell：
+
+```powershell
+Set-NetIPInterface -InterfaceAlias '以太网' -AddressFamily IPv4 -Dhcp Disabled
+New-NetIPAddress -InterfaceAlias '以太网' -IPAddress 172.31.50.1 -PrefixLength 24
+```
+
+MacBook：
+
+```bash
+sudo networksetup -createnetworkservice 'NexusIM Direct Ethernet' en5
+sudo networksetup -setmanual 'NexusIM Direct Ethernet' 172.31.50.2 255.255.255.0 0.0.0.0
+```
+
+如果服务已经存在，只需要执行 `networksetup -setmanual`。不要给该服务配置真实 router / gateway。
 
 两端本地 Git/HTTP 代理统一使用：
 
@@ -32,8 +60,8 @@
 两台机器可以使用相同端口号，因为监听地址不同，例如：
 
 ```text
-192.168.0.141:10495
-192.168.0.182:10495
+172.31.50.1:10495
+172.31.50.2:10495
 ```
 
 这两个监听不冲突。
@@ -46,14 +74,14 @@ Windows 防火墙规则：
 规则名: NexusIM LoadTest 10495-10510 from MacBook
 协议: TCP
 本地端口: 10495-10510
-远端地址: 192.168.0.182
+远端地址: 172.31.50.2
 动作: Allow
 ```
 
 如 MacBook 开启系统防火墙，只允许 Windows 访问同一端口段：
 
 ```text
-192.168.0.141 -> 10495-10510
+172.31.50.1 -> 10495-10510
 ```
 
 非压测窗口不启动这些端口上的服务。
@@ -79,14 +107,28 @@ Windows 防火墙规则：
 MacBook 验证 Windows 服务端口：
 
 ```bash
-nc -vz 192.168.0.141 10495
-curl -I http://192.168.0.141:10495/healthz
+nc -vz 172.31.50.1 10495
+curl -I http://172.31.50.1:10495/healthz
 ```
 
 Windows 验证 MacBook callback/mock receiver：
 
 ```powershell
-Test-NetConnection 192.168.0.182 -Port 10498
+Test-NetConnection 172.31.50.2 -Port 10498
+```
+
+验证 Win-Mac SSH 直连路径：
+
+```powershell
+Test-NetConnection 172.31.50.2 -Port 22
+```
+
+预期结果：
+
+```text
+InterfaceAlias   : 以太网
+SourceAddress    : 172.31.50.1
+TcpTestSucceeded : True
 ```
 
 ## 6. 压测原则
@@ -103,14 +145,14 @@ Test-NetConnection 192.168.0.182 -Port 10498
 
 ```bash
 go run ./loadtest/sendmessage \
-  --target=192.168.0.141:10495 \
+  --target=172.31.50.1:10495 \
   --vus=100 \
   --duration=60s \
   --stats-wait=8s \
   --result-dir=loadtest/results/2026-06-08 \
   --pg-dsn=postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable \
-  --service-metrics-url=http://192.168.0.141:10497/debug/metrics \
-  --relay-metrics-url=http://192.168.0.141:10500/debug/metrics
+  --service-metrics-url=http://172.31.50.1:10497/debug/metrics \
+  --relay-metrics-url=http://172.31.50.1:10500/debug/metrics
 ```
 
 本机 worker 梯度压测可以使用脚本启动 gRPC 进程、outbox relay 进程和压测客户端：
@@ -157,14 +199,14 @@ Remove-Job $watch
 等价环境变量形式：
 
 ```bash
-NEXUSIM_TARGET=192.168.0.141:10495
+NEXUSIM_TARGET=172.31.50.1:10495
 NEXUSIM_VUS=100
 NEXUSIM_DURATION=60s
 NEXUSIM_STATS_WAIT=8s
 NEXUSIM_RESULT_DIR=loadtest/results/2026-06-08
 NEXUSIM_PG_DSN=postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable
-NEXUSIM_SERVICE_METRICS_URL=http://192.168.0.141:10497/debug/metrics
-NEXUSIM_RELAY_METRICS_URL=http://192.168.0.141:10500/debug/metrics
+NEXUSIM_SERVICE_METRICS_URL=http://172.31.50.1:10497/debug/metrics
+NEXUSIM_RELAY_METRICS_URL=http://172.31.50.1:10500/debug/metrics
 ```
 
 ## 7. 边搭建边压测流程

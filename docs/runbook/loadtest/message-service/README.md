@@ -131,6 +131,8 @@ outbox_pending_count <= 1000
 
 第一次做了四组，后续按用户要求只保留 `Windows -> Mac` / `Mac -> Windows` 方向的必要验证。已经跑通的双客户端场景：
 
+当前 Win-Mac 压测网络已改为有线直连：Windows `172.31.50.1/24`，Mac `172.31.50.2/24`，两端 Wi-Fi 继续负责上网。历史结果中的 `192.168.0.*` 地址只代表当时 Wi-Fi 局域网路径，后续压测目标地址以 `docs/runbook/local-loadtest.md` 为准。
+
 | 场景 | 结果 |
 | --- | --- |
 | Windows + Mac 各 600 VU | 两端全部成功，Windows p99 730.11ms，Mac p99 739.50ms，outbox pending 0 |

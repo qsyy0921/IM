@@ -12,6 +12,7 @@
 
 当前重点：补齐 delivery_outbox relay / im.delivery.events，再进入 push-gateway SDD。
 每个微服务独立使用六层 DDD：api / app / domain / infrastructure / types / trigger。
+开发过程中主动使用 sub-agent 做设计审查、实现审查、测试/报告审查；不要等到最后才评审。
 重要契约、migration、并发/事务/幂等、可运行链路完成时再邀请评审线程 019ea124-dab1-71f2-964b-f5cb8d219aa2。
 完成有意义切片后运行检查、更新 current-goal.md 和对应 runbook/loadtest 报告；必要时提交并推送 GitHub。
 ```
@@ -100,6 +101,16 @@ delivery-service
 ## 6. 评审要求
 
 评审采用里程碑触发，不对每个小改动都邀请独立评审线程。
+
+开发阶段应主动使用 sub-agent 分担专项检查，但不要把所有小改动都升级为正式独立评审。推荐分工：
+
+| sub-agent | 使用时机 | 重点 |
+| --- | --- | --- |
+| Gauss | 设计和契约阶段 | SDD / ADD / TADD、proto、Kafka schema、migration、服务边界 |
+| Noether | 编码阶段 | 六层 DDD 依赖、事务、幂等、并发、错误码、数据一致性 |
+| Dewey | 验证和报告阶段 | 测试覆盖、smoke/loadtest 方法、runbook、报告口径、面试可讲结论 |
+
+sub-agent 输出默认作为工作中参考；只有出现公共契约、migration、并发/事务/幂等、可运行链路完成等里程碑时，才整理后发送给独立评审线程。
 
 必须邀请评审的情况：
 

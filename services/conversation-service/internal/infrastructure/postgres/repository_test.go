@@ -215,6 +215,43 @@ INSERT INTO conversation_members (
 		t.Fatalf("unexpected replay result: %+v", replay)
 	}
 
+	detail, err := repository.GetMemberChange(ctx, types.GetMemberChangeCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-member",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-member",
+		ChangeID:       result.ChangeID,
+	})
+	if err != nil {
+		t.Fatalf("get member change: %v", err)
+	}
+	if detail.ChangeID != result.ChangeID ||
+		detail.TargetUserID != "target-1" ||
+		detail.OperatorUserID != "owner-1" ||
+		detail.ChangeType != types.MemberChangeTypeJoin ||
+		detail.Status != types.MemberChangeStatusOutboxEnqueued ||
+		detail.BoundarySeq != 1 ||
+		detail.MemberVersion != 6 ||
+		detail.PermissionVersion != 8 ||
+		detail.OldRole != "" ||
+		detail.NewRole != types.MemberRoleMember ||
+		detail.Reason != "invite target" {
+		t.Fatalf("unexpected member change detail: %+v", detail)
+	}
+
+	_, err = repository.GetMemberChange(ctx, types.GetMemberChangeCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-member",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-member",
+		ChangeID:       "missing-change",
+	})
+	if !errors.Is(err, types.ErrMemberChangeNotFound) {
+		t.Fatalf("expected member change not found, got %v", err)
+	}
+
 	conflict := command
 	conflict.TargetRole = types.MemberRoleAdmin
 	_, err = repository.CreateMemberChange(ctx, conflict)
@@ -376,6 +413,136 @@ WHERE event_id = 'event-1'
 	}
 }
 
+func TestRepositoryMarkPublishedMemberChangesIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pg pool: %v", err)
+	}
+	defer pool.Close()
+
+	resetMemberChangeTables(t, ctx, pool)
+	seedMemberChangeConversation(t, ctx, pool)
+	repository := NewRepository(
+		pool,
+		WithClock(func() time.Time {
+			return time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)
+		}),
+		WithIDGenerators(
+			func() (types.ChangeID, error) { return "change-progress-1", nil },
+			func() (types.EventID, error) { return "event-progress-1", nil },
+		),
+	)
+	command := types.CreateMemberChangeCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  "tenant-member",
+			UserID:    "owner-1",
+			TraceID:   "trace-progress",
+			RequestID: "request-progress",
+		},
+		ConversationID:        "conv-member",
+		TargetUserID:          "target-progress-1",
+		ChangeType:            types.MemberChangeTypeJoin,
+		TargetRole:            types.MemberRoleMember,
+		ExpectedMemberVersion: 5,
+		IdempotencyKey:        "idem-progress-1",
+		ConflictPolicy:        types.MemberChangeConflictPolicyReject,
+		Reason:                "invite progress",
+	}
+	result, err := repository.CreateMemberChange(ctx, command)
+	if err != nil {
+		t.Fatalf("create member change: %v", err)
+	}
+
+	stats, err := repository.MarkPublishedMemberChanges(ctx, 100)
+	if err != nil {
+		t.Fatalf("mark before outbox published: %v", err)
+	}
+	if stats.Advanced != 0 {
+		t.Fatalf("expected no advance before outbox published, got %+v", stats)
+	}
+	assertMemberChangeStatus(t, ctx, pool, result.ChangeID, types.MemberChangeStatusOutboxEnqueued, false)
+
+	if _, err := pool.Exec(ctx, `
+UPDATE message_outbox
+SET status = 'PUBLISHED',
+    published_at = now()
+WHERE tenant_id = 'tenant-member'
+  AND event_id = 'event-progress-1'
+`); err != nil {
+		t.Fatalf("publish outbox: %v", err)
+	}
+
+	stats, err = repository.MarkPublishedMemberChanges(ctx, 100)
+	if err != nil {
+		t.Fatalf("mark after outbox published: %v", err)
+	}
+	if stats.Advanced != 1 {
+		t.Fatalf("expected one advance, got %+v", stats)
+	}
+	assertMemberChangeStatus(t, ctx, pool, result.ChangeID, types.MemberChangeStatusDone, true)
+
+	stats, err = repository.MarkPublishedMemberChanges(ctx, 100)
+	if err != nil {
+		t.Fatalf("mark idempotent: %v", err)
+	}
+	if stats.Advanced != 0 {
+		t.Fatalf("expected no second advance, got %+v", stats)
+	}
+}
+
+func TestRepositoryMarkPublishedMemberChangesHonorsLimit(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pg pool: %v", err)
+	}
+	defer pool.Close()
+
+	resetMemberChangeTables(t, ctx, pool)
+	if _, err := pool.Exec(ctx, `
+INSERT INTO member_change_saga (
+    change_id, tenant_id, conversation_id, user_id, change_type, status,
+    idempotency_key, command_hash, operator_id, conflict_policy,
+    outbox_event_id, timeline_event_id
+) VALUES
+    ('change-limit-1', 'tenant-member', 'conv-member', 'target-1', 'JOIN', 'OUTBOX_ENQUEUED', 'idem-limit-1', 'hash-1', 'owner-1', 'REJECT', 'event-limit-1', 'event-limit-1'),
+    ('change-limit-2', 'tenant-member', 'conv-member', 'target-2', 'JOIN', 'OUTBOX_ENQUEUED', 'idem-limit-2', 'hash-2', 'owner-1', 'REJECT', 'event-limit-2', 'event-limit-2');
+INSERT INTO message_outbox (
+    event_id, tenant_id, conversation_id, aggregate_version, event_type,
+    event_version, partition_key, mapping_version, correlation_id, causation_id,
+    producer, payload_json, trace_id, status, published_at
+) VALUES
+    ('event-limit-1', 'tenant-member', 'conv-member', 1, 'conversation.member.joined.v1', '1', 'tenant-member:conv-member', '1', 'c1', 'c1', 'conversation-service', '{}'::jsonb, 'trace-1', 'PUBLISHED', now()),
+    ('event-limit-2', 'tenant-member', 'conv-member', 2, 'conversation.member.joined.v1', '1', 'tenant-member:conv-member', '1', 'c2', 'c2', 'conversation-service', '{}'::jsonb, 'trace-2', 'PUBLISHED', now());
+`); err != nil {
+		t.Fatalf("seed limit data: %v", err)
+	}
+
+	stats, err := NewRepository(pool).MarkPublishedMemberChanges(ctx, 1)
+	if err != nil {
+		t.Fatalf("mark limit: %v", err)
+	}
+	if stats.Advanced != 1 {
+		t.Fatalf("expected one advance, got %+v", stats)
+	}
+	stats, err = NewRepository(pool).MarkPublishedMemberChanges(ctx, 1)
+	if err != nil {
+		t.Fatalf("mark second limit: %v", err)
+	}
+	if stats.Advanced != 1 {
+		t.Fatalf("expected second one advance, got %+v", stats)
+	}
+}
+
 func resetConversationTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	if _, err := pool.Exec(ctx, `
@@ -386,6 +553,45 @@ TRUNCATE TABLE
 CASCADE
 `); err != nil {
 		t.Fatalf("truncate conversation tables: %v", err)
+	}
+}
+
+func seedMemberChangeConversation(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+INSERT INTO conversations (
+    tenant_id, conversation_id, conversation_type, status, conversation_mode,
+    fanout_mode, fanout_policy_version, member_version, permission_version, current_seq_shard
+) VALUES ('tenant-member', 'conv-member', 'GROUP', 'ACTIVE', 'LOCAL_ROW_LOCK', 'WRITE_FANOUT', 3, 5, 7, 'local');
+INSERT INTO conversation_members (
+    tenant_id, conversation_id, user_id, role, status, member_version, permission_version
+) VALUES ('tenant-member', 'conv-member', 'owner-1', 'OWNER', 'ACTIVE', 5, 7);
+`)
+	if err != nil {
+		t.Fatalf("seed member change conversation: %v", err)
+	}
+}
+
+func assertMemberChangeStatus(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	changeID types.ChangeID,
+	want types.MemberChangeStatus,
+	wantCompleted bool,
+) {
+	t.Helper()
+	var status types.MemberChangeStatus
+	var completedAt sql.NullTime
+	if err := pool.QueryRow(ctx, `
+SELECT status, completed_at
+FROM member_change_saga
+WHERE change_id = $1
+`, changeID).Scan(&status, &completedAt); err != nil {
+		t.Fatalf("query member change status: %v", err)
+	}
+	if status != want || completedAt.Valid != wantCompleted {
+		t.Fatalf("unexpected member change state: status=%s completed=%v", status, completedAt)
 	}
 }
 

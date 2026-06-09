@@ -10,11 +10,13 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	grpcapi "github.com/qsyy0921/IM/services/conversation-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/conversation-service/internal/app"
 	postgresinfra "github.com/qsyy0921/IM/services/conversation-service/internal/infrastructure/postgres"
+	"github.com/qsyy0921/IM/services/conversation-service/internal/trigger/memberchange"
 	"google.golang.org/grpc"
 )
 
@@ -28,10 +30,12 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_CONVERSATION_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("conversation-service runtime wiring is idle; set NEXUSIM_CONVERSATION_SERVICE_MODE=grpc")
+		log.Println("conversation-service runtime wiring is idle; set NEXUSIM_CONVERSATION_SERVICE_MODE=grpc or member-change-worker")
 		return nil
 	case "grpc":
 		return runGRPCServer()
+	case "member-change-worker":
+		return runMemberChangeWorker()
 	default:
 		return errors.New("unsupported NEXUSIM_CONVERSATION_SERVICE_MODE")
 	}
@@ -63,6 +67,7 @@ func runGRPCServer() error {
 		grpcapi.NewServer(
 			app.NewGetSendContextUseCase(repository),
 			grpcapi.WithCreateMemberChange(app.NewCreateMemberChangeUseCase(repository)),
+			grpcapi.WithGetMemberChange(app.NewGetMemberChangeUseCase(repository)),
 		),
 	)
 
@@ -86,6 +91,38 @@ func runGRPCServer() error {
 		}
 		return context.Canceled
 	}
+}
+
+func runMemberChangeWorker() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	repository := postgresinfra.NewRepository(pool)
+	useCase := app.NewMarkPublishedMemberChangesUseCase(
+		repository,
+		envInt("NEXUSIM_MEMBER_CHANGE_PROGRESS_BATCH_SIZE", 100),
+	)
+	pollInterval := envDuration("NEXUSIM_MEMBER_CHANGE_PROGRESS_POLL_INTERVAL", time.Second)
+	worker := memberchange.NewProgressWorker(
+		useCase,
+		memberchange.ProgressConfig{PollInterval: pollInterval},
+	)
+	log.Printf(
+		"conversation-service member change progress worker started batch_size=%d poll_interval=%s",
+		envInt("NEXUSIM_MEMBER_CHANGE_PROGRESS_BATCH_SIZE", 100),
+		pollInterval,
+	)
+	return worker.Run(ctx)
 }
 
 func openPGPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
@@ -113,6 +150,18 @@ func envInt(name string, fallback int) int {
 		return fallback
 	}
 	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func envDuration(name string, fallback time.Duration) time.Duration {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
 	if err != nil || parsed <= 0 {
 		return fallback
 	}

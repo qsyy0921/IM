@@ -61,6 +61,7 @@ func TestGetSendContextMapsErrors(t *testing.T) {
 	}{
 		{name: "invalid argument", err: types.NewInvalidArgument("tenant_id is required"), code: codes.InvalidArgument, message: "invalid argument"},
 		{name: "not found", err: types.NewConversationNotFound("missing"), code: codes.NotFound, message: "conversation not found"},
+		{name: "member change not found", err: types.NewMemberChangeNotFound("missing"), code: codes.NotFound, message: "member change not found"},
 		{name: "member inactive", err: types.NewMemberNotActive("left"), code: codes.PermissionDenied, message: "conversation member is not active"},
 		{name: "permission denied", err: types.NewPermissionDenied("not admin"), code: codes.PermissionDenied, message: "permission denied"},
 		{name: "member conflict", err: types.NewMemberConflict("version conflict"), code: codes.FailedPrecondition, message: "member conflict"},
@@ -273,11 +274,126 @@ func TestCreateMemberChangeRequiresExecutor(t *testing.T) {
 	}
 }
 
+func TestGetMemberChangeConvertsRequestAndResponse(t *testing.T) {
+	executor := &fakeGetMemberChangeExecutor{
+		result: types.MemberChangeDetail{
+			ChangeID:          "change-1",
+			TenantID:          "tenant-1",
+			ConversationID:    "conv-1",
+			TargetUserID:      "target-1",
+			OperatorUserID:    "owner-1",
+			ChangeType:        types.MemberChangeTypeJoin,
+			Status:            types.MemberChangeStatusDone,
+			BoundarySeq:       12,
+			MemberVersion:     6,
+			PermissionVersion: 8,
+			OldRole:           "",
+			NewRole:           types.MemberRoleMember,
+			Reason:            "invite",
+			LastError:         "last error",
+		},
+	}
+	server := NewServer(
+		&fakeGetSendContextExecutor{},
+		WithGetMemberChange(executor),
+	)
+
+	response, err := server.GetMemberChange(context.Background(), &conversationv1.GetMemberChangeRequest{
+		AuthContext: &conversationv1.AuthContext{
+			TenantId:  "tenant-1",
+			UserId:    "owner-1",
+			DeviceId:  "device-1",
+			SessionId: "session-1",
+			TraceId:   "trace-1",
+			RequestId: "request-1",
+		},
+		ConversationId: "conv-1",
+		ChangeId:       "change-1",
+	})
+	if err != nil {
+		t.Fatalf("get member change: %v", err)
+	}
+	if executor.command.AuthContext.TenantID != "tenant-1" ||
+		executor.command.AuthContext.UserID != "owner-1" ||
+		executor.command.ConversationID != "conv-1" ||
+		executor.command.ChangeID != "change-1" {
+		t.Fatalf("unexpected command: %+v", executor.command)
+	}
+	if response.GetChangeId() != "change-1" ||
+		response.GetTenantId() != "tenant-1" ||
+		response.GetConversationId() != "conv-1" ||
+		response.GetTargetUserId() != "target-1" ||
+		response.GetOperatorUserId() != "owner-1" ||
+		response.GetChangeType() != conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_JOIN ||
+		response.GetStatus() != conversationv1.MemberChangeStatus_MEMBER_CHANGE_STATUS_DONE ||
+		response.GetBoundarySeq() != 12 ||
+		response.GetMemberVersion() != 6 ||
+		response.GetPermissionVersion() != 8 ||
+		response.GetOldRole() != conversationv1.MemberRole_MEMBER_ROLE_UNSPECIFIED ||
+		response.GetNewRole() != conversationv1.MemberRole_MEMBER_ROLE_MEMBER ||
+		response.GetReason() != "invite" ||
+		response.GetLastError() != "last error" {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
+func TestGetMemberChangeMapsValidationErrors(t *testing.T) {
+	server := NewServer(
+		&fakeGetSendContextExecutor{},
+		WithGetMemberChange(&fakeGetMemberChangeExecutor{validate: true}),
+	)
+	_, err := server.GetMemberChange(context.Background(), &conversationv1.GetMemberChangeRequest{
+		ConversationId: "conv-1",
+		ChangeId:       "change-1",
+	})
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	if st.Code() != codes.InvalidArgument || st.Message() != "invalid argument" {
+		t.Fatalf("unexpected status: %s %q", st.Code(), st.Message())
+	}
+}
+
+func TestGetMemberChangeRequiresExecutor(t *testing.T) {
+	_, err := NewServer(&fakeGetSendContextExecutor{}).GetMemberChange(
+		context.Background(),
+		&conversationv1.GetMemberChangeRequest{},
+	)
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	if st.Code() != codes.Unimplemented {
+		t.Fatalf("expected unimplemented, got %s", st.Code())
+	}
+}
+
 type fakeGetSendContextExecutor struct {
 	result   types.ConversationSendContext
 	err      error
 	command  types.GetSendContextCommand
 	validate bool
+}
+
+type fakeGetMemberChangeExecutor struct {
+	result   types.MemberChangeDetail
+	err      error
+	command  types.GetMemberChangeCommand
+	validate bool
+}
+
+func (f *fakeGetMemberChangeExecutor) Execute(
+	_ context.Context,
+	command types.GetMemberChangeCommand,
+) (types.MemberChangeDetail, error) {
+	f.command = command
+	if f.validate {
+		if err := command.Validate(); err != nil {
+			return types.MemberChangeDetail{}, err
+		}
+	}
+	return f.result, f.err
 }
 
 func (f *fakeGetSendContextExecutor) Execute(

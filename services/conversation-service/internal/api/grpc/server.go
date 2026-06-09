@@ -19,12 +19,17 @@ type CreateMemberChangeExecutor interface {
 	Execute(context.Context, types.CreateMemberChangeCommand) (types.MemberChangeResult, error)
 }
 
+type GetMemberChangeExecutor interface {
+	Execute(context.Context, types.GetMemberChangeCommand) (types.MemberChangeDetail, error)
+}
+
 type Option func(*Server)
 
 type Server struct {
 	conversationv1.UnimplementedConversationServiceServer
 	getSendContext     GetSendContextExecutor
 	createMemberChange CreateMemberChangeExecutor
+	getMemberChange    GetMemberChangeExecutor
 }
 
 func NewServer(getSendContext GetSendContextExecutor, opts ...Option) *Server {
@@ -38,6 +43,12 @@ func NewServer(getSendContext GetSendContextExecutor, opts ...Option) *Server {
 func WithCreateMemberChange(executor CreateMemberChangeExecutor) Option {
 	return func(server *Server) {
 		server.createMemberChange = executor
+	}
+}
+
+func WithGetMemberChange(executor GetMemberChangeExecutor) Option {
+	return func(server *Server) {
+		server.getMemberChange = executor
 	}
 }
 
@@ -119,12 +130,58 @@ func (s *Server) CreateMemberChange(
 	}, nil
 }
 
+func (s *Server) GetMemberChange(
+	ctx context.Context,
+	request *conversationv1.GetMemberChangeRequest,
+) (*conversationv1.GetMemberChangeResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.getMemberChange == nil {
+		return nil, status.Error(codes.Unimplemented, "get member change is not configured")
+	}
+	auth := request.GetAuthContext()
+	result, err := s.getMemberChange.Execute(ctx, types.GetMemberChangeCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  types.TenantID(auth.GetTenantId()),
+			UserID:    types.UserID(auth.GetUserId()),
+			DeviceID:  auth.GetDeviceId(),
+			SessionID: auth.GetSessionId(),
+			TraceID:   auth.GetTraceId(),
+			RequestID: auth.GetRequestId(),
+		},
+		ConversationID: types.ConversationID(request.GetConversationId()),
+		ChangeID:       types.ChangeID(request.GetChangeId()),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &conversationv1.GetMemberChangeResponse{
+		ChangeId:          string(result.ChangeID),
+		TenantId:          string(result.TenantID),
+		ConversationId:    string(result.ConversationID),
+		TargetUserId:      string(result.TargetUserID),
+		OperatorUserId:    string(result.OperatorUserID),
+		ChangeType:        toProtoMemberChangeType(result.ChangeType),
+		Status:            toProtoMemberChangeStatus(result.Status),
+		BoundarySeq:       result.BoundarySeq,
+		MemberVersion:     result.MemberVersion,
+		PermissionVersion: result.PermissionVersion,
+		OldRole:           toProtoMemberRole(result.OldRole),
+		NewRole:           toProtoMemberRole(result.NewRole),
+		Reason:            result.Reason,
+		LastError:         result.LastError,
+	}, nil
+}
+
 func grpcError(err error) error {
 	switch {
 	case errors.Is(err, types.ErrInvalidArgument):
 		return status.Error(codes.InvalidArgument, "invalid argument")
 	case errors.Is(err, types.ErrConversationNotFound):
 		return status.Error(codes.NotFound, "conversation not found")
+	case errors.Is(err, types.ErrMemberChangeNotFound):
+		return status.Error(codes.NotFound, "member change not found")
 	case errors.Is(err, types.ErrMemberNotActive):
 		return status.Error(codes.PermissionDenied, "conversation member is not active")
 	case errors.Is(err, types.ErrPermissionDenied):
@@ -195,6 +252,19 @@ func fromProtoMemberRole(value conversationv1.MemberRole) types.MemberRole {
 		return types.MemberRoleMember
 	default:
 		return ""
+	}
+}
+
+func toProtoMemberRole(value types.MemberRole) conversationv1.MemberRole {
+	switch value {
+	case types.MemberRoleOwner:
+		return conversationv1.MemberRole_MEMBER_ROLE_OWNER
+	case types.MemberRoleAdmin:
+		return conversationv1.MemberRole_MEMBER_ROLE_ADMIN
+	case types.MemberRoleMember:
+		return conversationv1.MemberRole_MEMBER_ROLE_MEMBER
+	default:
+		return conversationv1.MemberRole_MEMBER_ROLE_UNSPECIFIED
 	}
 }
 

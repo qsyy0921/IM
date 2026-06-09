@@ -68,6 +68,49 @@ type MemberChangeResult struct {
 	IdempotentReplay  bool
 }
 
+type GetMemberChangeCommand struct {
+	AuthContext    AuthContext
+	ConversationID ConversationID
+	ChangeID       ChangeID
+}
+
+func (c GetMemberChangeCommand) Validate() error {
+	if c.AuthContext.TenantID == "" {
+		return NewInvalidArgument("auth_context.tenant_id is required")
+	}
+	if c.AuthContext.UserID == "" {
+		return NewInvalidArgument("auth_context.user_id is required")
+	}
+	if c.ConversationID == "" {
+		return NewInvalidArgument("conversation_id is required")
+	}
+	if c.ChangeID == "" {
+		return NewInvalidArgument("change_id is required")
+	}
+	return nil
+}
+
+type MemberChangeDetail struct {
+	ChangeID          ChangeID
+	TenantID          TenantID
+	ConversationID    ConversationID
+	TargetUserID      UserID
+	OperatorUserID    UserID
+	ChangeType        MemberChangeType
+	Status            MemberChangeStatus
+	BoundarySeq       int64
+	MemberVersion     int64
+	PermissionVersion int64
+	OldRole           MemberRole
+	NewRole           MemberRole
+	Reason            string
+	LastError         string
+}
+
+type MemberChangePublishProgressStats struct {
+	Advanced int
+}
+
 func isValidMemberChangeType(value MemberChangeType) bool {
 	switch value {
 	case MemberChangeTypeJoin, MemberChangeTypeLeave, MemberChangeTypeRemove, MemberChangeTypeRoleChanged:

@@ -108,7 +108,7 @@ any state -> FAILED_COMPENSATED
 
 - `OUTBOX_ENQUEUED` 表示本地事务已经写入 `conversation_timeline_events` 和 `message_outbox`。
 - `EVENT_PUBLISHED` 表示 relay 已经把 outbox 事件发布到 Kafka 并标记 `PUBLISHED`。
-- 当前 migration 里已有 `EVENT_PUBLISHED`，但缺 `OUTBOX_ENQUEUED`；编码前 migration v2 必须补齐状态枚举，避免把“已入 outbox”误写成“已发布 Kafka”。
+- migration v2 已补齐 `OUTBOX_ENQUEUED` 状态，避免把“已入 outbox”误写成“已发布 Kafka”。
 
 ## 5. 同步 API 契约
 

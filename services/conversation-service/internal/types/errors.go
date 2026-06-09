@@ -8,6 +8,7 @@ import (
 var (
 	ErrInvalidArgument      = errors.New("invalid argument")
 	ErrConversationNotFound = errors.New("conversation not found")
+	ErrMemberChangeNotFound = errors.New("member change not found")
 	ErrMemberNotActive      = errors.New("conversation member is not active")
 	ErrMemberConflict       = errors.New("member conflict")
 	ErrPermissionDenied     = errors.New("permission denied")
@@ -29,6 +30,13 @@ func NewConversationNotFound(reason string) error {
 		return ErrConversationNotFound
 	}
 	return fmt.Errorf("%w: %s", ErrConversationNotFound, reason)
+}
+
+func NewMemberChangeNotFound(reason string) error {
+	if reason == "" {
+		return ErrMemberChangeNotFound
+	}
+	return fmt.Errorf("%w: %s", ErrMemberChangeNotFound, reason)
 }
 
 func NewMemberNotActive(reason string) error {

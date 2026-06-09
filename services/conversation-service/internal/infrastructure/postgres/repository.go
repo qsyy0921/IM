@@ -213,6 +213,144 @@ func (r *Repository) CreateMemberChange(
 	return memberChangeResult(record, false), nil
 }
 
+func (r *Repository) GetMemberChange(
+	ctx context.Context,
+	command types.GetMemberChangeCommand,
+) (types.MemberChangeDetail, error) {
+	if r.pool == nil {
+		return types.MemberChangeDetail{}, types.NewDBReadFailed("repository is not configured")
+	}
+	row := r.pool.QueryRow(ctx, `
+SELECT
+    mcs.change_id,
+    mcs.tenant_id,
+    mcs.conversation_id,
+    mcs.user_id,
+    mcs.operator_id,
+    mcs.change_type,
+    mcs.status,
+    COALESCE(mcs.boundary_seq, 0),
+    COALESCE((metadata_json->>'member_version')::bigint, 0),
+    COALESCE((metadata_json->>'permission_version')::bigint, 0),
+    COALESCE(metadata_json->>'old_role', ''),
+    COALESCE(metadata_json->>'new_role', ''),
+    COALESCE(cte.payload_json->>'reason', ''),
+    COALESCE(last_error, '')
+FROM member_change_saga mcs
+LEFT JOIN conversation_timeline_events cte
+  ON cte.tenant_id = mcs.tenant_id
+ AND cte.event_id = mcs.timeline_event_id
+WHERE mcs.tenant_id = $1
+  AND mcs.conversation_id = $2
+  AND mcs.change_id = $3
+`, command.AuthContext.TenantID, command.ConversationID, command.ChangeID)
+	var result types.MemberChangeDetail
+	if err := row.Scan(
+		&result.ChangeID,
+		&result.TenantID,
+		&result.ConversationID,
+		&result.TargetUserID,
+		&result.OperatorUserID,
+		&result.ChangeType,
+		&result.Status,
+		&result.BoundarySeq,
+		&result.MemberVersion,
+		&result.PermissionVersion,
+		&result.OldRole,
+		&result.NewRole,
+		&result.Reason,
+		&result.LastError,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return types.MemberChangeDetail{}, types.NewMemberChangeNotFound("member change not found")
+		}
+		return types.MemberChangeDetail{}, types.NewDBReadFailed(err.Error())
+	}
+	return result, nil
+}
+
+func (r *Repository) MarkPublishedMemberChanges(
+	ctx context.Context,
+	limit int,
+) (types.MemberChangePublishProgressStats, error) {
+	if r.pool == nil {
+		return types.MemberChangePublishProgressStats{}, types.NewDBWriteFailed("repository is not configured")
+	}
+	if limit <= 0 {
+		limit = 100
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.MemberChangePublishProgressStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	rows, err := tx.Query(ctx, `
+SELECT mcs.change_id
+FROM member_change_saga mcs
+JOIN message_outbox mo
+  ON mo.tenant_id = mcs.tenant_id
+ AND mo.event_id = mcs.outbox_event_id
+WHERE mcs.status = $1
+  AND mo.status = 'PUBLISHED'
+  AND mo.published_at IS NOT NULL
+ORDER BY mcs.updated_at, mcs.change_id
+LIMIT $2
+FOR UPDATE OF mcs SKIP LOCKED
+`,
+		types.MemberChangeStatusOutboxEnqueued,
+		limit,
+	)
+	if err != nil {
+		return types.MemberChangePublishProgressStats{}, types.NewDBWriteFailed(err.Error())
+	}
+
+	changeIDs := make([]string, 0, limit)
+	for rows.Next() {
+		var changeID types.ChangeID
+		if err := rows.Scan(&changeID); err != nil {
+			rows.Close()
+			return types.MemberChangePublishProgressStats{}, types.NewDBWriteFailed(err.Error())
+		}
+		changeIDs = append(changeIDs, string(changeID))
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return types.MemberChangePublishProgressStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	rows.Close()
+	if len(changeIDs) == 0 {
+		if err := tx.Commit(ctx); err != nil {
+			return types.MemberChangePublishProgressStats{}, types.NewDBWriteFailed(err.Error())
+		}
+		return types.MemberChangePublishProgressStats{}, nil
+	}
+
+	if _, err := tx.Exec(ctx, `
+UPDATE member_change_saga
+SET status = $2,
+    updated_at = now()
+WHERE change_id = ANY($1)
+`, changeIDs, types.MemberChangeStatusEventPublished); err != nil {
+		return types.MemberChangePublishProgressStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	if _, err := tx.Exec(ctx, `
+UPDATE member_change_saga
+SET status = $2,
+    completed_at = COALESCE(completed_at, now()),
+    updated_at = now()
+WHERE change_id = ANY($1)
+`, changeIDs, types.MemberChangeStatusDone); err != nil {
+		return types.MemberChangePublishProgressStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.MemberChangePublishProgressStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.MemberChangePublishProgressStats{Advanced: len(changeIDs)}, nil
+}
+
 type existingMemberChange struct {
 	ChangeID          types.ChangeID
 	TenantID          types.TenantID

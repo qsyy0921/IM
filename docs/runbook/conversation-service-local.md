@@ -1,6 +1,6 @@
 # conversation-service 本地运行说明
 
-本文用于本地启动 `conversation-service`，并让 `message-service` 通过真实 gRPC 依赖读取会话发送上下文。
+本文用于本地启动 `conversation-service`，并让 `message-service` 通过真实 gRPC 依赖读取会话发送上下文；同时记录成员变更 Saga 的最小后台推进 worker。
 
 当前范围只覆盖：
 
@@ -8,9 +8,14 @@
 conversation-service GetSendContext
 -> PostgreSQL conversations / conversation_members
 -> message-service ConversationQueryPort
+
+conversation-service CreateMemberChange / GetMemberChange
+-> PostgreSQL member_change_saga / conversation_members
+-> shared conversation_timeline_events / message_outbox
+-> member-change-worker observes outbox PUBLISHED and marks saga DONE
 ```
 
-不覆盖成员变更 Saga、delivery、push、Kafka relay 容量压测。
+不覆盖 delivery、push、Kafka relay 容量压测和 DLQ repair。
 
 ## 1. 前置条件
 
@@ -46,6 +51,9 @@ docker exec nexusim-postgres psql -U nexusim -d nexusim -v ON_ERROR_STOP=1 -f /t
 
 docker cp migrations\postgres\conversation\000002_member_change_saga_v2.sql nexusim-postgres:/tmp/nexusim_conversation_member_change_saga_v2.sql
 docker exec nexusim-postgres psql -U nexusim -d nexusim -v ON_ERROR_STOP=1 -f /tmp/nexusim_conversation_member_change_saga_v2.sql
+
+docker cp migrations\postgres\conversation\000003_member_change_event_unique.sql nexusim-postgres:/tmp/nexusim_conversation_member_change_event_unique.sql
+docker exec nexusim-postgres psql -U nexusim -d nexusim -v ON_ERROR_STOP=1 -f /tmp/nexusim_conversation_member_change_event_unique.sql
 ```
 
 确认表存在：
@@ -84,6 +92,7 @@ docker exec nexusim-postgres psql -U nexusim -d nexusim -v ON_ERROR_STOP=1 -c $s
 go build -o bin\conversation-service.exe ./services/conversation-service/cmd/conversation-service
 go build -o bin\message-service.exe ./services/message-service/cmd/message-service
 go build -o bin\sendmessage-loadtest.exe ./loadtest/sendmessage
+go build -o bin\memberchange-loadtest.exe ./loadtest/memberchange
 ```
 
 ## 5. 启动 conversation-service
@@ -140,7 +149,29 @@ NEXUSIM_MOCK_PERMISSION_VERSION == conversations.permission_version
 
 否则 `message-service` 会按设计返回 dependency version mismatch，这不是 conversation-service 查询失败。
 
-## 7. 小规模 smoke
+## 7. 启动成员变更 Saga 推进 worker
+
+成员变更事件仍由统一 outbox relay 发布 Kafka。outbox 标记为 `PUBLISHED` 后，`conversation-service` 自己的 worker 负责把 `member_change_saga` 推进到 `DONE`。
+
+新开一个 PowerShell：
+
+```powershell
+cd E:\development\IM
+. .\tools\go-env.ps1
+$env:NEXUSIM_CONVERSATION_SERVICE_MODE='member-change-worker'
+$env:NEXUSIM_PG_DSN='postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable'
+$env:NEXUSIM_MEMBER_CHANGE_PROGRESS_BATCH_SIZE='100'
+$env:NEXUSIM_MEMBER_CHANGE_PROGRESS_POLL_INTERVAL='500ms'
+bin\conversation-service.exe
+```
+
+成功日志：
+
+```text
+conversation-service member change progress worker started batch_size=100 poll_interval=500ms
+```
+
+## 8. 小规模 SendMessage smoke
 
 ```powershell
 bin\sendmessage-loadtest.exe `
@@ -165,7 +196,39 @@ error_count = 0
 
 本 smoke 不启动 outbox relay，因此 `outbox_pending_count` 会等于成功写入数，这是预期现象。
 
-## 8. 清理 smoke 数据
+## 9. 成员变更 smoke 入口
+
+成员变更最小 smoke 使用：
+
+```powershell
+bin\memberchange-loadtest.exe `
+  --target 127.0.0.1:11496 `
+  --vus 2 `
+  --duration 3s `
+  --tenant-id tenant-member-smoke `
+  --conversation-prefix conv-member-smoke `
+  --conversation-count 2 `
+  --pg-dsn 'postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable' `
+  --result-dir loadtest\results\memberchange-smoke-manual
+```
+
+如果要验证完整成员事件闭环，需要同时启动：
+
+```text
+conversation-service grpc
+message-service outbox-relay
+conversation-service member-change-worker
+```
+
+通过标准：
+
+```text
+success_rate = 1
+message_outbox PENDING = 0
+member_change_saga DONE > 0
+```
+
+## 10. 清理 smoke 数据
 
 ```powershell
 $cleanup = @"
@@ -179,7 +242,7 @@ DELETE FROM conversations WHERE tenant_id = 'tenant-conv-smoke';
 docker exec nexusim-postgres psql -U nexusim -d nexusim -v ON_ERROR_STOP=1 -c $cleanup
 ```
 
-## 9. 常见问题
+## 11. 常见问题
 
 | 现象 | 处理 |
 | --- | --- |
@@ -187,4 +250,6 @@ docker exec nexusim-postgres psql -U nexusim -d nexusim -v ON_ERROR_STOP=1 -c $c
 | `conversation not found` | 检查 tenant / conversation id 是否和 seed 数据一致 |
 | `PermissionDenied: conversation member is not active` | 检查 `conversation_members` 是否包含当前 `user-<vu>`，且 status 为 `ACTIVE` |
 | `permission version changed during send dependency read` | 检查 `NEXUSIM_MOCK_PERMISSION_VERSION` 是否等于 conversation 的 `permission_version` |
+| `member_change_saga` 停在 `OUTBOX_ENQUEUED` | 检查 `message-service outbox-relay` 是否启动，`message_outbox.status` 是否已变成 `PUBLISHED` |
+| outbox 已 `PUBLISHED` 但 saga 未 `DONE` | 检查 `conversation-service member-change-worker` 是否启动，`NEXUSIM_MEMBER_CHANGE_PROGRESS_POLL_INTERVAL` 是否过长 |
 | PowerShell 管道执行 SQL 报 `syntax error at or near BEGIN` | 使用本文的 `docker cp` + `psql -f` 方式执行 migration |

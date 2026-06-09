@@ -7,10 +7,10 @@ import (
 )
 
 type CreateMemberChangeUseCase struct {
-	repository MemberChangeRepository
+	repository CreateMemberChangeRepository
 }
 
-func NewCreateMemberChangeUseCase(repository MemberChangeRepository) *CreateMemberChangeUseCase {
+func NewCreateMemberChangeUseCase(repository CreateMemberChangeRepository) *CreateMemberChangeUseCase {
 	return &CreateMemberChangeUseCase{repository: repository}
 }
 

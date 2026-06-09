@@ -356,6 +356,7 @@ error_p99_ms
   -BatchSize 100 `
   -PublishBatchEnabled:$true `
   -AdaptiveLimitEnabled `
+  -AdaptiveMaxInFlight 0 `
   -AdaptiveMinAvailableConns 4 `
   -AdaptiveReleaseAvailableConns 8 `
   -AdaptiveMaxPoolAcquireP95 50ms `
@@ -413,6 +414,37 @@ adaptive limit 的硬拒绝判断优先看 `*_recent` 字段，累计字段只�
 `*_recent` 是最近 4096 个样本窗口，不是时间窗口。低流量或样本数低于 `MinMetricSamples` 时，不能基于 recent 指标下调参结论。
 启用 relay 相关 adaptive 条件时，必须同时启用 outbox pending 采样阈值，例如 `-AdaptiveMaxOutboxPending`。否则 relay active p95、outbox fetched per call 和 Kafka records per call 不会独立触发拒绝。
 当前 adaptive controller 可动态设置 gRPC `RetryInfo`，summary 已记录 `retry_delay_count`、`retry_delay_avg_ms`、`retry_delay_p95_ms`、`retry_delay_p99_ms`。`retry_delay_count` 表示收到并计划遵守的 RetryInfo 数量，不等于完成 sleep 后进入下一次 attempt 的次数；正式调参报告必须同时展示 attempt latency、retry delay、`retry_attempt_count` 和 logical success。
+
+如果要只验证 app 入口 token / concurrency gate，可以关闭其它 adaptive 阈值，只设置 `-AdaptiveMaxInFlight`：
+
+```powershell
+.\loadtest\sendmessage\run-local-pgpool-gradient.ps1 `
+  -PGMaxConns 64 `
+  -VUs 1200,1600 `
+  -Duration 60s `
+  -StatsWait 30s `
+  -ConversationCount 1000 `
+  -RelayWorkers 8 `
+  -BatchSize 100 `
+  -AdaptiveLimitEnabled `
+  -AdaptiveMaxInFlight 64 `
+  -AdaptiveMinAvailableConns 0 `
+  -AdaptiveReleaseAvailableConns 0 `
+  -AdaptiveMaxPoolAcquireP95 0s `
+  -AdaptiveMaxOutboxPending 0 `
+  -AdaptiveReleaseOutboxPending 0 `
+  -AdaptiveMaxRelayActiveP95 0s `
+  -AdaptiveMinOutboxFetchedPerCall 0 `
+  -AdaptiveMinKafkaRecordsPerCall 0 `
+  -AdaptiveRetryBaseDelay 500ms `
+  -AdaptiveRetryMaxDelay 2s `
+  -RetryOverloaded `
+  -MaxRetries 2 `
+  -RetryJitter 100ms `
+  -ResultRoot loadtest\results\adaptive-inflight-YYYYMMDD
+```
+
+`AdaptiveMaxInFlight` 限制的是进入 app use case 后续依赖读取和数据库事务的并发请求数。被拒绝的请求返回 `SERVICE_OVERLOADED + RetryInfo`，不会写 `message_log`、`conversation_timeline_events` 或 `message_outbox`。当前 Windows 本机候选见 `docs/runbook/loadtest-report-20260609-adaptive-inflight-v1.md`，不能直接当作生产默认值。
 
 ## 12. PublishBatch On/Off
 

@@ -235,16 +235,24 @@ SELECT
     COALESCE(metadata_json->>'old_role', ''),
     COALESCE(metadata_json->>'new_role', ''),
     COALESCE(cte.payload_json->>'reason', ''),
-    COALESCE(last_error, '')
+    COALESCE(last_error, ''),
+    COALESCE(auth_member.role, ''),
+    COALESCE(auth_member.status, '')
 FROM member_change_saga mcs
 LEFT JOIN conversation_timeline_events cte
   ON cte.tenant_id = mcs.tenant_id
  AND cte.event_id = mcs.timeline_event_id
+LEFT JOIN conversation_members auth_member
+  ON auth_member.tenant_id = mcs.tenant_id
+ AND auth_member.conversation_id = mcs.conversation_id
+ AND auth_member.user_id = $4
 WHERE mcs.tenant_id = $1
   AND mcs.conversation_id = $2
   AND mcs.change_id = $3
-`, command.AuthContext.TenantID, command.ConversationID, command.ChangeID)
+`, command.AuthContext.TenantID, command.ConversationID, command.ChangeID, command.AuthContext.UserID)
 	var result types.MemberChangeDetail
+	var authRole types.MemberRole
+	var authStatus types.MemberStatus
 	if err := row.Scan(
 		&result.ChangeID,
 		&result.TenantID,
@@ -260,13 +268,33 @@ WHERE mcs.tenant_id = $1
 		&result.NewRole,
 		&result.Reason,
 		&result.LastError,
+		&authRole,
+		&authStatus,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return types.MemberChangeDetail{}, types.NewMemberChangeNotFound("member change not found")
 		}
 		return types.MemberChangeDetail{}, types.NewDBReadFailed(err.Error())
 	}
+	if !canViewMemberChange(command.AuthContext.UserID, authRole, authStatus, result) {
+		return types.MemberChangeDetail{}, types.NewPermissionDenied("member change is not visible to caller")
+	}
 	return result, nil
+}
+
+func canViewMemberChange(
+	userID types.UserID,
+	authRole types.MemberRole,
+	authStatus types.MemberStatus,
+	change types.MemberChangeDetail,
+) bool {
+	if userID == change.OperatorUserID || userID == change.TargetUserID {
+		return true
+	}
+	if authStatus != types.MemberStatusActive {
+		return false
+	}
+	return authRole == types.MemberRoleOwner || authRole == types.MemberRoleAdmin
 }
 
 func (r *Repository) MarkPublishedMemberChanges(

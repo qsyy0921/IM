@@ -240,6 +240,56 @@ INSERT INTO conversation_members (
 		t.Fatalf("unexpected member change detail: %+v", detail)
 	}
 
+	targetDetail, err := repository.GetMemberChange(ctx, types.GetMemberChangeCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-member",
+			UserID:   "target-1",
+		},
+		ConversationID: "conv-member",
+		ChangeID:       result.ChangeID,
+	})
+	if err != nil {
+		t.Fatalf("target get member change: %v", err)
+	}
+	if targetDetail.ChangeID != result.ChangeID {
+		t.Fatalf("unexpected target detail: %+v", targetDetail)
+	}
+
+	_, err = pool.Exec(ctx, `
+INSERT INTO conversation_members (
+    tenant_id, conversation_id, user_id, role, status, member_version, permission_version
+) VALUES ('tenant-member', 'conv-member', 'admin-1', 'ADMIN', 'ACTIVE', 6, 8)
+`)
+	if err != nil {
+		t.Fatalf("seed admin member: %v", err)
+	}
+	adminDetail, err := repository.GetMemberChange(ctx, types.GetMemberChangeCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-member",
+			UserID:   "admin-1",
+		},
+		ConversationID: "conv-member",
+		ChangeID:       result.ChangeID,
+	})
+	if err != nil {
+		t.Fatalf("admin get member change: %v", err)
+	}
+	if adminDetail.ChangeID != result.ChangeID {
+		t.Fatalf("unexpected admin detail: %+v", adminDetail)
+	}
+
+	_, err = repository.GetMemberChange(ctx, types.GetMemberChangeCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-member",
+			UserID:   "stranger-1",
+		},
+		ConversationID: "conv-member",
+		ChangeID:       result.ChangeID,
+	})
+	if !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected permission denied for stranger, got %v", err)
+	}
+
 	_, err = repository.GetMemberChange(ctx, types.GetMemberChangeCommand{
 		AuthContext: types.AuthContext{
 			TenantID: "tenant-member",

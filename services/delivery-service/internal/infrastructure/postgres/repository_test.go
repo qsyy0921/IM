@@ -266,6 +266,149 @@ WHERE tenant_id = 'tenant-delivery'
 	}
 }
 
+func TestRepositoryProjectMessageEditedOnlyTargetsOriginalVisibleUsersIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	_, err := repository.ProjectTimelineEvent(ctx, types.ProjectTimelineEventCommand{
+		TenantID:          "tenant-delivery",
+		EventID:           "member-joined-edit-user-1",
+		EventType:         types.TimelineEventConversationMemberJoined,
+		ConversationID:    "conv-delivery",
+		ConversationSeq:   1,
+		MemberUserID:      "user-1",
+		MemberRole:        "MEMBER",
+		MemberStatus:      types.DeliveryMemberStatusActive,
+		MemberVersion:     1,
+		PermissionVersion: 1,
+	})
+	if err != nil {
+		t.Fatalf("project user-1 join: %v", err)
+	}
+	result, err := repository.ProjectTimelineEvent(ctx, messageEvent("message-edit-visible-before-user-2", "msg-edit-visible-before-user-2", 2))
+	if err != nil {
+		t.Fatalf("project message before user-2 join: %v", err)
+	}
+	if result.ProjectedInboxCount != 1 {
+		t.Fatalf("expected original message to target one user, got %d", result.ProjectedInboxCount)
+	}
+	_, err = repository.ProjectTimelineEvent(ctx, types.ProjectTimelineEventCommand{
+		TenantID:          "tenant-delivery",
+		EventID:           "member-joined-edit-user-2",
+		EventType:         types.TimelineEventConversationMemberJoined,
+		ConversationID:    "conv-delivery",
+		ConversationSeq:   3,
+		MemberUserID:      "user-2",
+		MemberRole:        "MEMBER",
+		MemberStatus:      types.DeliveryMemberStatusActive,
+		MemberVersion:     2,
+		PermissionVersion: 2,
+	})
+	if err != nil {
+		t.Fatalf("project user-2 join: %v", err)
+	}
+	result, err = repository.ProjectTimelineEvent(ctx, editEvent("message-edited-after-user-2-join", "msg-edit-visible-before-user-2", 4))
+	if err != nil {
+		t.Fatalf("project edit after user-2 join: %v", err)
+	}
+	if result.ProjectedInboxCount != 1 {
+		t.Fatalf("expected edit to target only original visible user, got %d", result.ProjectedInboxCount)
+	}
+
+	var user1Edits int
+	err = pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM user_inbox
+WHERE tenant_id = 'tenant-delivery'
+  AND conversation_id = 'conv-delivery'
+  AND user_id = 'user-1'
+  AND message_id = 'msg-edit-visible-before-user-2'
+  AND event_type = $1
+`, types.TimelineEventMessageEdited).Scan(&user1Edits)
+	if err != nil {
+		t.Fatalf("count user-1 edits: %v", err)
+	}
+	if user1Edits != 1 {
+		t.Fatalf("expected user-1 edit event, got %d", user1Edits)
+	}
+
+	var user2Rows int
+	err = pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM user_inbox
+WHERE tenant_id = 'tenant-delivery'
+  AND conversation_id = 'conv-delivery'
+  AND user_id = 'user-2'
+  AND message_id = 'msg-edit-visible-before-user-2'
+`).Scan(&user2Rows)
+	if err != nil {
+		t.Fatalf("count user-2 rows: %v", err)
+	}
+	if user2Rows != 0 {
+		t.Fatalf("expected user-2 not to see original or edit delta, got %d rows", user2Rows)
+	}
+}
+
+func TestRepositoryProjectMessageEditedFailsClosedWhenOriginalMissingIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	_, err := repository.ProjectTimelineEvent(ctx, types.ProjectTimelineEventCommand{
+		TenantID:          "tenant-delivery",
+		EventID:           "member-joined-before-edit",
+		EventType:         types.TimelineEventConversationMemberJoined,
+		ConversationID:    "conv-delivery",
+		ConversationSeq:   1,
+		MemberUserID:      "user-1",
+		MemberRole:        "MEMBER",
+		MemberStatus:      types.DeliveryMemberStatusActive,
+		MemberVersion:     1,
+		PermissionVersion: 1,
+	})
+	if err != nil {
+		t.Fatalf("project member join: %v", err)
+	}
+	edit := editEvent("message-edited-without-original", "msg-missing-original-edit", 2)
+	edit.ConsumerGroup = "delivery-test"
+	edit.Topic = "conversation.timeline.events"
+	edit.PartitionID = 1
+	edit.OffsetValue = 9
+	_, err = repository.ProjectTimelineEvent(ctx, edit)
+	if !errors.Is(err, types.ErrProjectionDependency) {
+		t.Fatalf("expected projection dependency error, got %v", err)
+	}
+
+	var inboxRows int
+	if err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM user_inbox
+WHERE tenant_id = 'tenant-delivery'
+  AND conversation_id = 'conv-delivery'
+  AND message_id = 'msg-missing-original-edit'
+`).Scan(&inboxRows); err != nil {
+		t.Fatalf("count inbox rows: %v", err)
+	}
+	if inboxRows != 0 {
+		t.Fatalf("expected no edit without original message, got %d rows", inboxRows)
+	}
+
+	var checkpointRows int
+	if err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM delivery_kafka_checkpoints
+WHERE consumer_group = 'delivery-test'
+`).Scan(&checkpointRows); err != nil {
+		t.Fatalf("count checkpoint rows: %v", err)
+	}
+	if checkpointRows != 0 {
+		t.Fatalf("expected no checkpoint on fail-closed edit, got %d", checkpointRows)
+	}
+}
+
 func TestRepositoryProjectMessageRevokedFailsClosedWhenOriginalMissingIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -413,6 +556,21 @@ func revokeEvent(eventID string, messageID string, seq int64) types.ProjectTimel
 		MessageID:         messageID,
 		SenderID:          "sender-1",
 		PayloadJSON:       []byte(`{"message_id":"msg-3","conversation_seq":7,"change_version":1,"revoked_by":"sender-1"}`),
+	}
+}
+
+func editEvent(eventID string, messageID string, seq int64) types.ProjectTimelineEventCommand {
+	return types.ProjectTimelineEventCommand{
+		TenantID:          "tenant-delivery",
+		EventID:           eventID,
+		EventType:         types.TimelineEventMessageEdited,
+		ConversationID:    "conv-delivery",
+		ConversationSeq:   seq,
+		FanoutMode:        "WRITE_FANOUT",
+		PermissionVersion: 1,
+		MessageID:         messageID,
+		SenderID:          "sender-1",
+		PayloadJSON:       []byte(`{"message_id":"msg-3","conversation_seq":7,"change_version":1,"edited_by":"sender-1","before_payload":{"text":"old"},"after_payload":{"text":"new"}}`),
 	}
 }
 

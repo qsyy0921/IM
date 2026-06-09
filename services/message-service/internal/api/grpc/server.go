@@ -21,10 +21,15 @@ type RevokeMessageExecutor interface {
 	Execute(ctx context.Context, command types.RevokeMessageCommand) (types.MessageChangeResult, error)
 }
 
+type EditMessageExecutor interface {
+	Execute(ctx context.Context, command types.EditMessageCommand) (types.MessageChangeResult, error)
+}
+
 type Server struct {
 	messagev1.UnimplementedMessageServiceServer
 
 	sendMessage   SendMessageExecutor
+	editMessage   EditMessageExecutor
 	revokeMessage RevokeMessageExecutor
 	now           func() time.Time
 	metrics       types.LatencyRecorder
@@ -51,6 +56,12 @@ func WithMetrics(metrics types.LatencyRecorder) Option {
 func WithRevokeMessage(revokeMessage RevokeMessageExecutor) Option {
 	return func(server *Server) {
 		server.revokeMessage = revokeMessage
+	}
+}
+
+func WithEditMessage(editMessage EditMessageExecutor) Option {
+	return func(server *Server) {
+		server.editMessage = editMessage
 	}
 }
 
@@ -90,6 +101,27 @@ func (s *Server) SendMessage(ctx context.Context, req *messagev1.SendMessageRequ
 		MessageId:        string(result.MessageID),
 		ConversationId:   string(result.ConversationID),
 		ConversationSeq:  result.ConversationSeq,
+		AcceptedAt:       timestamppb.New(result.AcceptedAt),
+		IdempotentReplay: result.IdempotentReplay,
+	}, nil
+}
+
+func (s *Server) EditMessage(ctx context.Context, req *messagev1.EditMessageRequest) (*messagev1.MessageChangeResponse, error) {
+	command, err := s.toEditMessageCommand(req)
+	if err != nil {
+		return nil, grpcError(err, editReqCorrelationID(req))
+	}
+
+	result, err := s.editMessage.Execute(ctx, command)
+	if err != nil {
+		return nil, grpcError(err, editReqCorrelationID(req))
+	}
+
+	return &messagev1.MessageChangeResponse{
+		MessageId:        string(result.MessageID),
+		ConversationId:   string(result.ConversationID),
+		ConversationSeq:  result.ConversationSeq,
+		ChangeVersion:    result.ChangeVersion,
 		AcceptedAt:       timestamppb.New(result.AcceptedAt),
 		IdempotentReplay: result.IdempotentReplay,
 	}, nil
@@ -190,6 +222,43 @@ func (s *Server) toRevokeMessageCommand(req *messagev1.RevokeMessageRequest) (ty
 	return command, nil
 }
 
+func (s *Server) toEditMessageCommand(req *messagev1.EditMessageRequest) (types.EditMessageCommand, error) {
+	if s.editMessage == nil {
+		return types.EditMessageCommand{}, errors.New("edit message use case is not configured")
+	}
+	if req == nil {
+		return types.EditMessageCommand{}, newInvalidArgument("request is required")
+	}
+	auth := req.GetAuthContext()
+	if auth == nil {
+		return types.EditMessageCommand{}, newInvalidArgument("auth_context is required")
+	}
+	payloadJSON, err := payloadToJSON(req.GetPayload())
+	if err != nil {
+		return types.EditMessageCommand{}, newInvalidArgument(err.Error())
+	}
+	command := types.EditMessageCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  types.TenantID(auth.GetTenantId()),
+			UserID:    types.UserID(auth.GetUserId()),
+			DeviceID:  types.DeviceID(auth.GetDeviceId()),
+			SessionID: types.SessionID(auth.GetSessionId()),
+			TraceID:   auth.GetTraceId(),
+			RequestID: auth.GetRequestId(),
+		},
+		ConversationID: types.ConversationID(req.GetConversationId()),
+		MessageID:      types.MessageID(req.GetMessageId()),
+		IdempotencyKey: req.GetIdempotencyKey(),
+		PayloadJSON:    payloadJSON,
+		Reason:         req.GetReason(),
+		ReceivedAt:     s.now(),
+	}
+	if err := command.Validate(); err != nil {
+		return types.EditMessageCommand{}, newInvalidArgument(err.Error())
+	}
+	return command, nil
+}
+
 func payloadToJSON(payload *structpb.Struct) ([]byte, error) {
 	if payload == nil {
 		return []byte("{}"), nil
@@ -216,6 +285,23 @@ func reqCorrelationID(req *messagev1.SendMessageRequest) string {
 		return auth.GetTraceId()
 	}
 	return req.GetClientMsgId()
+}
+
+func editReqCorrelationID(req *messagev1.EditMessageRequest) string {
+	if req == nil {
+		return ""
+	}
+	auth := req.GetAuthContext()
+	if auth == nil {
+		return req.GetIdempotencyKey()
+	}
+	if auth.GetRequestId() != "" {
+		return auth.GetRequestId()
+	}
+	if auth.GetTraceId() != "" {
+		return auth.GetTraceId()
+	}
+	return req.GetIdempotencyKey()
 }
 
 func revokeReqCorrelationID(req *messagev1.RevokeMessageRequest) string {

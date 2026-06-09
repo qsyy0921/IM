@@ -57,6 +57,32 @@ type RevokeMessageCommand struct {
 	ReceivedAt     time.Time
 }
 
+type EditMessageCommand struct {
+	AuthContext    AuthContext
+	ConversationID ConversationID
+	MessageID      MessageID
+	IdempotencyKey string
+	PayloadJSON    []byte
+	Reason         string
+	ReceivedAt     time.Time
+}
+
+func (c EditMessageCommand) Validate() error {
+	if c.AuthContext.TenantID == "" || c.AuthContext.UserID == "" || c.AuthContext.DeviceID == "" {
+		return errors.New("auth context is required")
+	}
+	if c.ConversationID == "" {
+		return errors.New("conversation_id is required")
+	}
+	if c.MessageID == "" {
+		return errors.New("message_id is required")
+	}
+	if c.IdempotencyKey == "" {
+		return errors.New("idempotency_key is required")
+	}
+	return nil
+}
+
 func (c RevokeMessageCommand) Validate() error {
 	if c.AuthContext.TenantID == "" || c.AuthContext.UserID == "" || c.AuthContext.DeviceID == "" {
 		return errors.New("auth context is required")

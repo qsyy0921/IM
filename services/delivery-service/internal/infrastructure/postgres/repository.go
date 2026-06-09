@@ -42,8 +42,14 @@ func (repository *Repository) ProjectTimelineEvent(
 			return types.ProjectTimelineEventResult{}, err
 		}
 		result.ProjectedInboxCount = count
+	case types.TimelineEventMessageEdited:
+		count, err := projectMessageChangedForOriginalRecipients(ctx, tx, command, "message edit has no projected original message")
+		if err != nil {
+			return types.ProjectTimelineEventResult{}, err
+		}
+		result.ProjectedInboxCount = count
 	case types.TimelineEventMessageRevoked:
-		count, err := projectMessageRevoked(ctx, tx, command)
+		count, err := projectMessageChangedForOriginalRecipients(ctx, tx, command, "message revoke has no projected original message")
 		if err != nil {
 			return types.ProjectTimelineEventResult{}, err
 		}
@@ -118,10 +124,11 @@ ORDER BY user_id
 	return projected, nil
 }
 
-func projectMessageRevoked(
+func projectMessageChangedForOriginalRecipients(
 	ctx context.Context,
 	tx pgx.Tx,
 	command types.ProjectTimelineEventCommand,
+	missingMessage string,
 ) (int, error) {
 	rows, err := tx.Query(ctx, `
 SELECT DISTINCT user_id
@@ -150,7 +157,7 @@ ORDER BY user_id
 		return 0, types.NewDBReadFailed(err.Error())
 	}
 	if len(userIDs) == 0 {
-		return 0, types.NewProjectionDependencyMissing("message revoke has no projected original message")
+		return 0, types.NewProjectionDependencyMissing(missingMessage)
 	}
 
 	projected := 0

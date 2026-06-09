@@ -12,9 +12,9 @@ import (
 	"github.com/qsyy0921/IM/services/message-service/internal/types"
 )
 
-const commandTypeRevoke = "REVOKE"
+const commandTypeEdit = "EDIT"
 
-type revokeReplayResult struct {
+type editReplayResult struct {
 	MessageID       types.MessageID      `json:"message_id"`
 	ConversationID  types.ConversationID `json:"conversation_id"`
 	ConversationSeq int64                `json:"conversation_seq"`
@@ -22,14 +22,14 @@ type revokeReplayResult struct {
 	AcceptedAt      string               `json:"accepted_at"`
 }
 
-func (r *MessageRepository) RevokeMessage(
+func (r *MessageRepository) EditMessage(
 	ctx context.Context,
-	input domain.RevokeMessageInput,
+	input domain.EditMessageInput,
 ) (domain.MessageChangeResult, error) {
 	if r.pool == nil {
 		return domain.MessageChangeResult{}, ErrRepositoryNotConfigured
 	}
-	commandHash, err := domain.ComputeRevokeMessageCommandHash(input.Command)
+	commandHash, err := domain.ComputeEditMessageCommandHash(input.Command)
 	if err != nil {
 		return domain.MessageChangeResult{}, err
 	}
@@ -51,24 +51,24 @@ func (r *MessageRepository) RevokeMessage(
 		_ = tx.Rollback(ctx)
 	}()
 
-	if err := lockRevokeIdempotency(ctx, tx, input.Command); err != nil {
+	if err := lockEditIdempotency(ctx, tx, input.Command); err != nil {
 		return domain.MessageChangeResult{}, err
 	}
-	if existing, ok, err := findExistingRevokeCommand(ctx, tx, input.Command); err != nil {
+	if existing, ok, err := findExistingEditCommand(ctx, tx, input.Command); err != nil {
 		return domain.MessageChangeResult{}, err
 	} else if ok {
-		return replayRevokeResult(ctx, tx, existing, commandHash)
+		return replayEditResult(ctx, tx, existing, commandHash)
 	}
 
-	message, err := lockMessageForRevoke(ctx, tx, input.Command)
+	message, err := lockMessageForEdit(ctx, tx, input.Command)
 	if err != nil {
 		return domain.MessageChangeResult{}, err
 	}
 	if message.SenderID != input.Command.AuthContext.UserID {
-		return domain.MessageChangeResult{}, types.NewPermissionDenied("only the original sender can revoke this message in phase 1")
+		return domain.MessageChangeResult{}, types.NewPermissionDenied("only the original sender can edit this message in phase 1")
 	}
-	if !message.CanRevoke() {
-		return domain.MessageChangeResult{}, types.NewInvalidMessageState("message cannot be revoked")
+	if !message.CanEdit() {
+		return domain.MessageChangeResult{}, types.NewInvalidMessageState("message cannot be edited")
 	}
 
 	if err := ensureConversationSeqFor(ctx, tx, input.Command.AuthContext.TenantID, input.Command.ConversationID); err != nil {
@@ -78,7 +78,7 @@ func (r *MessageRepository) RevokeMessage(
 	if err != nil {
 		return domain.MessageChangeResult{}, err
 	}
-	changeVersion, err := nextMessageChangeVersion(ctx, tx, input.Command)
+	changeVersion, err := nextMessageChangeVersionFor(ctx, tx, input.Command.AuthContext.TenantID, input.Command.ConversationID, input.Command.MessageID)
 	if err != nil {
 		return domain.MessageChangeResult{}, err
 	}
@@ -87,21 +87,21 @@ func (r *MessageRepository) RevokeMessage(
 		return domain.MessageChangeResult{}, err
 	}
 	acceptedAt := r.now()
-	record, err := domain.NewRevokeMessageRecord(input, message, eventID, seq, changeVersion, acceptedAt)
+	record, err := domain.NewEditMessageRecord(input, message, eventID, seq, changeVersion, acceptedAt)
 	if err != nil {
 		return domain.MessageChangeResult{}, err
 	}
 
-	if err := updateMessageRevoked(ctx, tx, record); err != nil {
+	if err := updateMessageEdited(ctx, tx, record); err != nil {
 		return domain.MessageChangeResult{}, err
 	}
-	if err := insertMessageChangeHistory(ctx, tx, input, record); err != nil {
+	if err := insertEditMessageChangeHistory(ctx, tx, input, record); err != nil {
 		return domain.MessageChangeResult{}, err
 	}
-	if err := insertRevokeCommandResult(ctx, tx, input.Command, record); err != nil {
+	if err := insertEditCommandResult(ctx, tx, input.Command, record); err != nil {
 		return domain.MessageChangeResult{}, err
 	}
-	if err := insertMessageChangeTimelineEvent(ctx, tx, input, record); err != nil {
+	if err := insertEditMessageTimelineEvent(ctx, tx, input, record); err != nil {
 		return domain.MessageChangeResult{}, err
 	}
 	if err := insertMessageChangeOutboxEvent(ctx, tx, record); err != nil {
@@ -119,35 +119,35 @@ func (r *MessageRepository) RevokeMessage(
 	}, nil
 }
 
-func lockRevokeIdempotency(ctx context.Context, tx pgx.Tx, command types.RevokeMessageCommand) error {
-	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, revokeIdempotencyLockKey(command))
+func lockEditIdempotency(ctx context.Context, tx pgx.Tx, command types.EditMessageCommand) error {
+	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, editIdempotencyLockKey(command))
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
 }
 
-func revokeIdempotencyLockKey(command types.RevokeMessageCommand) string {
+func editIdempotencyLockKey(command types.EditMessageCommand) string {
 	return fmt.Sprintf(
 		"%s\x1f%s\x1f%s\x1f%s\x1f%s",
 		command.AuthContext.TenantID,
 		command.ConversationID,
 		command.MessageID,
-		commandTypeRevoke,
+		commandTypeEdit,
 		command.IdempotencyKey,
 	)
 }
 
-type existingRevokeCommand struct {
+type existingEditCommand struct {
 	CommandHash string
 	ResultJSON  []byte
 }
 
-func findExistingRevokeCommand(
+func findExistingEditCommand(
 	ctx context.Context,
 	tx pgx.Tx,
-	command types.RevokeMessageCommand,
-) (existingRevokeCommand, bool, error) {
+	command types.EditMessageCommand,
+) (existingEditCommand, bool, error) {
 	row := tx.QueryRow(ctx, `
 SELECT command_hash, result_json
 FROM message_command_idempotency
@@ -157,27 +157,27 @@ WHERE tenant_id = $1
   AND message_id = $4
   AND idempotency_key = $5
 FOR UPDATE
-`, command.AuthContext.TenantID, command.ConversationID, commandTypeRevoke, command.MessageID, command.IdempotencyKey)
-	var existing existingRevokeCommand
+`, command.AuthContext.TenantID, command.ConversationID, commandTypeEdit, command.MessageID, command.IdempotencyKey)
+	var existing existingEditCommand
 	if err := row.Scan(&existing.CommandHash, &existing.ResultJSON); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return existingRevokeCommand{}, false, nil
+			return existingEditCommand{}, false, nil
 		}
-		return existingRevokeCommand{}, false, types.NewDBWriteFailed(err.Error())
+		return existingEditCommand{}, false, types.NewDBWriteFailed(err.Error())
 	}
 	return existing, true, nil
 }
 
-func replayRevokeResult(
+func replayEditResult(
 	ctx context.Context,
 	tx pgx.Tx,
-	existing existingRevokeCommand,
+	existing existingEditCommand,
 	commandHash string,
 ) (domain.MessageChangeResult, error) {
 	if existing.CommandHash != commandHash {
-		return domain.MessageChangeResult{}, types.NewIdempotencyConflict("idempotency_key reused with different revoke command")
+		return domain.MessageChangeResult{}, types.NewIdempotencyConflict("idempotency_key reused with different edit command")
 	}
-	var replay revokeReplayResult
+	var replay editReplayResult
 	if err := json.Unmarshal(existing.ResultJSON, &replay); err != nil {
 		return domain.MessageChangeResult{}, types.NewDBWriteFailed(err.Error())
 	}
@@ -197,10 +197,10 @@ func replayRevokeResult(
 	}, nil
 }
 
-func lockMessageForRevoke(
+func lockMessageForEdit(
 	ctx context.Context,
 	tx pgx.Tx,
-	command types.RevokeMessageCommand,
+	command types.EditMessageCommand,
 ) (domain.Message, error) {
 	row := tx.QueryRow(ctx, `
 SELECT
@@ -244,82 +244,26 @@ FOR UPDATE
 	return message, nil
 }
 
-func ensureConversationSeqFor(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, conversationID types.ConversationID) error {
-	_, err := tx.Exec(ctx, `
-INSERT INTO conversation_seq (tenant_id, conversation_id, current_seq)
-VALUES ($1, $2, 0)
-ON CONFLICT (tenant_id, conversation_id) DO NOTHING
-`, tenantID, conversationID)
-	if err != nil {
-		return types.NewDBWriteFailed(err.Error())
-	}
-	return nil
-}
-
-func allocateConversationSeqFor(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, conversationID types.ConversationID) (int64, error) {
-	row := tx.QueryRow(ctx, `
-UPDATE conversation_seq
-SET current_seq = current_seq + 1,
-    updated_at = now()
-WHERE tenant_id = $1
-  AND conversation_id = $2
-RETURNING current_seq
-`, tenantID, conversationID)
-	var seq int64
-	if err := row.Scan(&seq); err != nil {
-		return 0, types.NewDBWriteFailed(err.Error())
-	}
-	return seq, nil
-}
-
-func nextMessageChangeVersion(
-	ctx context.Context,
-	tx pgx.Tx,
-	command types.RevokeMessageCommand,
-) (int32, error) {
-	return nextMessageChangeVersionFor(ctx, tx, command.AuthContext.TenantID, command.ConversationID, command.MessageID)
-}
-
-func nextMessageChangeVersionFor(
-	ctx context.Context,
-	tx pgx.Tx,
-	tenantID types.TenantID,
-	conversationID types.ConversationID,
-	messageID types.MessageID,
-) (int32, error) {
-	var version int32
-	err := tx.QueryRow(ctx, `
-SELECT COALESCE(MAX(change_version), 0) + 1
-FROM message_change_history
-WHERE tenant_id = $1
-  AND conversation_id = $2
-  AND message_id = $3
-`, tenantID, conversationID, messageID).Scan(&version)
-	if err != nil {
-		return 0, types.NewDBWriteFailed(err.Error())
-	}
-	return version, nil
-}
-
-func updateMessageRevoked(ctx context.Context, tx pgx.Tx, record domain.MessageChangeRecord) error {
+func updateMessageEdited(ctx context.Context, tx pgx.Tx, record domain.MessageChangeRecord) error {
 	_, err := tx.Exec(ctx, `
 UPDATE message_log
-SET status = 'REVOKED',
-    revoked_at = $4
+SET status = 'EDITED',
+    payload_json = $4::jsonb,
+    edited_at = $5
 WHERE tenant_id = $1
   AND conversation_id = $2
   AND message_id = $3
-`, record.Timeline.TenantID, record.ConversationID, record.MessageID, record.ChangedAt)
+`, record.Timeline.TenantID, record.ConversationID, record.MessageID, record.AfterPayload, record.ChangedAt)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
 }
 
-func insertMessageChangeHistory(
+func insertEditMessageChangeHistory(
 	ctx context.Context,
 	tx pgx.Tx,
-	input domain.RevokeMessageInput,
+	input domain.EditMessageInput,
 	record domain.MessageChangeRecord,
 ) error {
 	_, err := tx.Exec(ctx, `
@@ -337,21 +281,21 @@ INSERT INTO message_change_history (
     reason,
     trace_id,
     changed_at
-) VALUES ($1, $2, $3, $4, $5, $6::jsonb, NULL, $7, $8, $9, $10, $11, $12)
-`, record.Timeline.TenantID, record.ConversationID, record.MessageID, record.ChangeVersion, record.ChangeType, record.BeforePayload, record.BeforeStatus, record.AfterStatus, input.Command.AuthContext.UserID, input.Command.Reason, record.Timeline.TraceID, record.ChangedAt)
+) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11, $12, $13)
+`, record.Timeline.TenantID, record.ConversationID, record.MessageID, record.ChangeVersion, record.ChangeType, record.BeforePayload, record.AfterPayload, record.BeforeStatus, record.AfterStatus, input.Command.AuthContext.UserID, input.Command.Reason, record.Timeline.TraceID, record.ChangedAt)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
 }
 
-func insertRevokeCommandResult(
+func insertEditCommandResult(
 	ctx context.Context,
 	tx pgx.Tx,
-	command types.RevokeMessageCommand,
+	command types.EditMessageCommand,
 	record domain.MessageChangeRecord,
 ) error {
-	result := revokeReplayResult{
+	result := editReplayResult{
 		MessageID:       record.MessageID,
 		ConversationID:  record.ConversationID,
 		ConversationSeq: record.ConversationSeq,
@@ -373,17 +317,17 @@ INSERT INTO message_command_idempotency (
     result_json,
     created_at
 ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
-`, command.AuthContext.TenantID, command.ConversationID, commandTypeRevoke, command.IdempotencyKey, command.MessageID, record.CommandHash, resultJSON, record.ChangedAt)
+`, command.AuthContext.TenantID, command.ConversationID, commandTypeEdit, command.IdempotencyKey, command.MessageID, record.CommandHash, resultJSON, record.ChangedAt)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
 }
 
-func insertMessageChangeTimelineEvent(
+func insertEditMessageTimelineEvent(
 	ctx context.Context,
 	tx pgx.Tx,
-	input domain.RevokeMessageInput,
+	input domain.EditMessageInput,
 	record domain.MessageChangeRecord,
 ) error {
 	_, err := tx.Exec(ctx, `
@@ -425,44 +369,6 @@ INSERT INTO conversation_timeline_events (
 	)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
-	}
-	return nil
-}
-
-func insertMessageChangeOutboxEvent(ctx context.Context, tx pgx.Tx, record domain.MessageChangeRecord) error {
-	_, err := tx.Exec(ctx, `
-INSERT INTO message_outbox (
-    event_id,
-    tenant_id,
-    conversation_id,
-    aggregate_version,
-    event_type,
-    event_version,
-    partition_key,
-    mapping_version,
-    correlation_id,
-    causation_id,
-    producer,
-    payload_json,
-    trace_id
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13)
-`,
-		record.Outbox.EventID,
-		record.Outbox.TenantID,
-		record.Outbox.ConversationID,
-		record.Outbox.AggregateVersion,
-		record.Outbox.EventType,
-		record.Outbox.EventVersion,
-		record.Outbox.PartitionKey,
-		record.Outbox.MappingVersion,
-		record.Outbox.CorrelationID,
-		record.Outbox.CausationID,
-		record.Outbox.Producer,
-		record.Outbox.PayloadJSON,
-		record.Outbox.TraceID,
-	)
-	if err != nil {
-		return types.NewOutboxWriteFailed(err.Error())
 	}
 	return nil
 }

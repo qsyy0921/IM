@@ -249,6 +249,126 @@ WHERE tenant_id = $1
 	}
 }
 
+func TestMessageRepositoryEditMessageIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	now := time.Date(2026, 6, 10, 2, 0, 0, 0, time.UTC)
+	runID := time.Now().UnixNano()
+	messageCounter := 0
+	eventCounter := 0
+	repo := NewMessageRepository(
+		pool,
+		WithClock(func() time.Time { return now }),
+		WithIDGenerators(
+			func() (types.MessageID, error) {
+				messageCounter++
+				return types.MessageID(fmt.Sprintf("msg-edit-%d-%d", runID, messageCounter)), nil
+			},
+			func() (types.EventID, error) {
+				eventCounter++
+				return types.EventID(fmt.Sprintf("event-edit-%d-%d", runID, eventCounter)), nil
+			},
+		),
+	)
+	tenantID := types.TenantID(fmt.Sprintf("tenant-it-edit-%d", runID))
+	appendInput := testAppendInput(tenantID, "client-edit-source", []byte(`{"text":"hello"}`))
+	appendResult, err := repo.AppendMessage(ctx, appendInput)
+	if err != nil {
+		t.Fatalf("append source message: %v", err)
+	}
+
+	editInput := testEditInput(appendInput, appendResult.MessageID, "edit-key-1", []byte(`{"text":"hello edited"}`), "typo")
+	result, err := repo.EditMessage(ctx, editInput)
+	if err != nil {
+		t.Fatalf("edit message: %v", err)
+	}
+	if result.MessageID != appendResult.MessageID ||
+		result.ConversationSeq != 2 ||
+		result.ChangeVersion != 1 ||
+		result.IdempotentReplay {
+		t.Fatalf("unexpected edit result: %+v", result)
+	}
+
+	replay, err := repo.EditMessage(ctx, editInput)
+	if err != nil {
+		t.Fatalf("replay edit: %v", err)
+	}
+	if !replay.IdempotentReplay ||
+		replay.ConversationSeq != result.ConversationSeq ||
+		replay.ChangeVersion != result.ChangeVersion {
+		t.Fatalf("unexpected edit replay: %+v", replay)
+	}
+	conflictInput := testEditInput(appendInput, appendResult.MessageID, "edit-key-1", []byte(`{"text":"different"}`), "typo")
+	_, err = repo.EditMessage(ctx, conflictInput)
+	if !errors.Is(err, types.ErrIdempotencyConflict) {
+		t.Fatalf("expected edit idempotency conflict, got %v", err)
+	}
+
+	assertCount(t, ctx, pool, "message_log", tenantID, 1)
+	assertCount(t, ctx, pool, "message_change_history", tenantID, 1)
+	assertCount(t, ctx, pool, "conversation_timeline_events", tenantID, 2)
+	assertCount(t, ctx, pool, "message_outbox", tenantID, 2)
+	assertCurrentSeq(t, ctx, pool, tenantID, appendInput.Command.ConversationID, 2)
+	assertEditedFacts(t, ctx, pool, editInput, result)
+}
+
+func TestMessageRepositoryEditMessageRejectsNonSenderIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	runID := time.Now().UnixNano()
+	messageCounter := 0
+	eventCounter := 0
+	repo := NewMessageRepository(
+		pool,
+		WithIDGenerators(
+			func() (types.MessageID, error) {
+				messageCounter++
+				return types.MessageID(fmt.Sprintf("msg-edit-nonsender-%d-%d", runID, messageCounter)), nil
+			},
+			func() (types.EventID, error) {
+				eventCounter++
+				return types.EventID(fmt.Sprintf("event-edit-nonsender-%d-%d", runID, eventCounter)), nil
+			},
+		),
+	)
+	tenantID := types.TenantID(fmt.Sprintf("tenant-it-edit-nonsender-%d", runID))
+	appendInput := testAppendInput(tenantID, "client-edit-nonsender", []byte(`{"text":"hello"}`))
+	appendResult, err := repo.AppendMessage(ctx, appendInput)
+	if err != nil {
+		t.Fatalf("append source message: %v", err)
+	}
+
+	editInput := testEditInput(appendInput, appendResult.MessageID, "edit-nonsender-key", []byte(`{"text":"not mine"}`), "not mine")
+	editInput.Command.AuthContext.UserID = "other-user"
+	_, err = repo.EditMessage(ctx, editInput)
+	if !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected permission denied, got %v", err)
+	}
+	assertCurrentSeq(t, ctx, pool, tenantID, appendInput.Command.ConversationID, 1)
+	assertCount(t, ctx, pool, "message_change_history", tenantID, 0)
+
+	var status string
+	var payload string
+	if err := pool.QueryRow(ctx, `
+SELECT status, payload_json::text
+FROM message_log
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND message_id = $3
+`, tenantID, appendInput.Command.ConversationID, appendResult.MessageID).Scan(&status, &payload); err != nil {
+		t.Fatalf("read message status: %v", err)
+	}
+	if status != "NORMAL" || payload != `{"text": "hello"}` {
+		t.Fatalf("expected message unchanged, status=%s payload=%s", status, payload)
+	}
+}
+
 func TestMessageRepositoryBackpressureRejectsWhenPoolSaturated(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -278,6 +398,28 @@ func TestMessageRepositoryBackpressureRejectsWhenPoolSaturated(t *testing.T) {
 	_, err = repo.AppendMessage(ctx, testAppendInput(types.TenantID("tenant-backpressure"), "client-backpressure", []byte(`{"text":"hello"}`)))
 	if !errors.Is(err, types.ErrServiceOverloaded) {
 		t.Fatalf("expected service overloaded, got %v", err)
+	}
+}
+
+func testEditInput(
+	appendInput domain.AppendMessageInput,
+	messageID types.MessageID,
+	idempotencyKey string,
+	payload []byte,
+	reason string,
+) domain.EditMessageInput {
+	return domain.EditMessageInput{
+		Command: types.EditMessageCommand{
+			AuthContext:    appendInput.Command.AuthContext,
+			ConversationID: appendInput.Command.ConversationID,
+			MessageID:      messageID,
+			IdempotencyKey: idempotencyKey,
+			PayloadJSON:    payload,
+			Reason:         reason,
+			ReceivedAt:     time.Date(2026, 6, 10, 2, 0, 0, 0, time.UTC),
+		},
+		Permission:   appendInput.Permission,
+		Conversation: appendInput.Conversation,
 	}
 }
 
@@ -368,6 +510,120 @@ func assertCount(t *testing.T, ctx context.Context, pool *pgxpool.Pool, table st
 	}
 	if got != want {
 		t.Fatalf("unexpected %s count: got %d want %d", table, got, want)
+	}
+}
+
+func assertEditedFacts(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	input domain.EditMessageInput,
+	result domain.MessageChangeResult,
+) {
+	t.Helper()
+	var (
+		status           string
+		payloadString    string
+		editedAt         *time.Time
+		changeType       string
+		beforePayload    string
+		afterPayload     string
+		beforeStatus     string
+		afterStatus      string
+		changeVersion    int32
+		timelineEventID  types.EventID
+		timelineType     string
+		timelineSeq      int64
+		outboxEventID    types.EventID
+		outboxType       string
+		outboxVersion    int64
+		outboxPayloadRaw string
+	)
+	if err := pool.QueryRow(ctx, `
+SELECT
+    ml.status,
+    ml.payload_json::text,
+    ml.edited_at,
+    mch.change_type,
+    mch.before_payload_json::text,
+    mch.after_payload_json::text,
+    mch.before_status,
+    mch.after_status,
+    mch.change_version,
+    te.event_id,
+    te.event_type,
+    te.seq,
+    mo.event_id,
+    mo.event_type,
+    mo.aggregate_version,
+    mo.payload_json::text
+FROM message_log ml
+JOIN message_change_history mch
+  ON mch.tenant_id = ml.tenant_id
+ AND mch.conversation_id = ml.conversation_id
+ AND mch.message_id = ml.message_id
+JOIN conversation_timeline_events te
+  ON te.tenant_id = ml.tenant_id
+ AND te.conversation_id = ml.conversation_id
+ AND te.seq = $4
+JOIN message_outbox mo
+  ON mo.tenant_id = te.tenant_id
+ AND mo.conversation_id = te.conversation_id
+ AND mo.aggregate_version = te.seq
+WHERE ml.tenant_id = $1
+  AND ml.conversation_id = $2
+  AND ml.message_id = $3
+`,
+		input.Command.AuthContext.TenantID,
+		input.Command.ConversationID,
+		input.Command.MessageID,
+		result.ConversationSeq,
+	).Scan(
+		&status,
+		&payloadString,
+		&editedAt,
+		&changeType,
+		&beforePayload,
+		&afterPayload,
+		&beforeStatus,
+		&afterStatus,
+		&changeVersion,
+		&timelineEventID,
+		&timelineType,
+		&timelineSeq,
+		&outboxEventID,
+		&outboxType,
+		&outboxVersion,
+		&outboxPayloadRaw,
+	); err != nil {
+		t.Fatalf("read edited facts: %v", err)
+	}
+	if status != "EDITED" || editedAt == nil || payloadString != `{"text": "hello edited"}` {
+		t.Fatalf("unexpected message edit status=%s editedAt=%v payload=%s", status, editedAt, payloadString)
+	}
+	if changeType != "EDIT" ||
+		beforePayload != `{"text": "hello"}` ||
+		afterPayload != `{"text": "hello edited"}` ||
+		beforeStatus != "NORMAL" ||
+		afterStatus != "EDITED" ||
+		changeVersion != result.ChangeVersion {
+		t.Fatalf("unexpected change history type=%s beforePayload=%s afterPayload=%s before=%s after=%s version=%d", changeType, beforePayload, afterPayload, beforeStatus, afterStatus, changeVersion)
+	}
+	if timelineEventID != outboxEventID ||
+		timelineType != string(types.TimelineEventMessageEdited) ||
+		outboxType != string(types.TimelineEventMessageEdited) ||
+		timelineSeq != result.ConversationSeq ||
+		outboxVersion != result.ConversationSeq {
+		t.Fatalf("unexpected edit timeline/outbox event timeline=%s/%s seq=%d outbox=%s/%s version=%d", timelineEventID, timelineType, timelineSeq, outboxEventID, outboxType, outboxVersion)
+	}
+	var outboxPayload map[string]any
+	if err := json.Unmarshal([]byte(outboxPayloadRaw), &outboxPayload); err != nil {
+		t.Fatalf("decode edit outbox payload: %v", err)
+	}
+	if outboxPayload["message_id"] != string(input.Command.MessageID) ||
+		outboxPayload["edited_by"] != string(input.Command.AuthContext.UserID) ||
+		int64(outboxPayload["conversation_seq"].(float64)) != result.ConversationSeq {
+		t.Fatalf("unexpected edit payload: %+v", outboxPayload)
 	}
 }
 

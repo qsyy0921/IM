@@ -263,6 +263,42 @@ func BuildConversationTimelineEvent(message types.OutboxMessage) (*conversationt
 			},
 		}
 		return event, nil
+	case types.TimelineEventMessageEdited:
+		payload, err := decodeMessageEditedPayload(message.PayloadJSON)
+		if err != nil {
+			return nil, err
+		}
+		editedAt, err := time.Parse(time.RFC3339Nano, payload.EditedAt)
+		if err != nil {
+			return nil, err
+		}
+		beforePayload, err := structFromRawJSON(payload.BeforePayload)
+		if err != nil {
+			return nil, err
+		}
+		afterPayload, err := structFromRawJSON(payload.AfterPayload)
+		if err != nil {
+			return nil, err
+		}
+		occurredAt := message.OccurredAt
+		if occurredAt.IsZero() {
+			occurredAt = editedAt
+		}
+		event := buildTimelineEnvelope(message, occurredAt)
+		event.Payload = &conversationtimelinev1.ConversationTimelineEvent_MessageEdited{
+			MessageEdited: &conversationtimelinev1.MessageEditedV1{
+				MessageId:       payload.MessageID,
+				ConversationId:  payload.ConversationID,
+				ConversationSeq: payload.ConversationSeq,
+				ChangeVersion:   payload.ChangeVersion,
+				EditedBy:        payload.EditedBy,
+				BeforePayload:   beforePayload,
+				AfterPayload:    afterPayload,
+				Reason:          payload.Reason,
+				EditedAt:        timestamppb.New(editedAt),
+			},
+		}
+		return event, nil
 	case types.TimelineEventMessageRevoked:
 		payload, err := decodeMessageRevokedPayload(message.PayloadJSON)
 		if err != nil {
@@ -424,6 +460,18 @@ type messageRevokedPayload struct {
 	RevokedAt       string `json:"revoked_at"`
 }
 
+type messageEditedPayload struct {
+	MessageID       string          `json:"message_id"`
+	ConversationID  string          `json:"conversation_id"`
+	ConversationSeq int64           `json:"conversation_seq"`
+	ChangeVersion   int32           `json:"change_version"`
+	EditedBy        string          `json:"edited_by"`
+	BeforePayload   json.RawMessage `json:"before_payload"`
+	AfterPayload    json.RawMessage `json:"after_payload"`
+	Reason          string          `json:"reason"`
+	EditedAt        string          `json:"edited_at"`
+}
+
 func decodeMessagePersistedPayload(payloadJSON []byte) (messagePersistedPayload, error) {
 	var payload messagePersistedPayload
 	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
@@ -452,6 +500,24 @@ func decodeMessageRevokedPayload(payloadJSON []byte) (messageRevokedPayload, err
 		payload.RevokedBy == "" ||
 		payload.RevokedAt == "" {
 		return messageRevokedPayload{}, errors.New("message revoked payload is incomplete")
+	}
+	return payload, nil
+}
+
+func decodeMessageEditedPayload(payloadJSON []byte) (messageEditedPayload, error) {
+	var payload messageEditedPayload
+	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+		return messageEditedPayload{}, err
+	}
+	if payload.MessageID == "" ||
+		payload.ConversationID == "" ||
+		payload.ConversationSeq <= 0 ||
+		payload.ChangeVersion <= 0 ||
+		payload.EditedBy == "" ||
+		len(payload.BeforePayload) == 0 ||
+		len(payload.AfterPayload) == 0 ||
+		payload.EditedAt == "" {
+		return messageEditedPayload{}, errors.New("message edited payload is incomplete")
 	}
 	return payload, nil
 }

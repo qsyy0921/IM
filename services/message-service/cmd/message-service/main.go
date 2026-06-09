@@ -153,6 +153,7 @@ func runGRPCServer() error {
 		messageRepository,
 		useCaseOptions...,
 	)
+	editUseCase := app.NewEditMessageUseCase(policy, conversation, messageRepository)
 	revokeUseCase := app.NewRevokeMessageUseCase(policy, conversation, messageRepository)
 
 	listener, err := net.Listen("tcp", listenAddr)
@@ -163,6 +164,7 @@ func runGRPCServer() error {
 	grpcapi.Register(server, grpcapi.NewServer(
 		sendUseCase,
 		grpcapi.WithMetrics(metrics),
+		grpcapi.WithEditMessage(editUseCase),
 		grpcapi.WithRevokeMessage(revokeUseCase),
 	))
 

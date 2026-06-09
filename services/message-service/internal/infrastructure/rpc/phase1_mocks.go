@@ -30,6 +30,15 @@ func (p StaticPolicy) CheckSendPermission(context.Context, types.SendMessageComm
 	}, nil
 }
 
+func (p StaticPolicy) CheckEditPermission(context.Context, types.EditMessageCommand) (types.PermissionDecision, error) {
+	return types.PermissionDecision{
+		Allowed:           p.Allowed,
+		Reason:            p.Reason,
+		PermissionVersion: p.PermissionVersion,
+		Classification:    p.Classification,
+	}, nil
+}
+
 func (p StaticPolicy) CheckRevokePermission(context.Context, types.RevokeMessageCommand) (types.PermissionDecision, error) {
 	return types.PermissionDecision{
 		Allowed:           p.Allowed,

@@ -4,6 +4,7 @@ import "encoding/json"
 
 const (
 	TimelineEventMessagePersisted                    = "message.persisted.v1"
+	TimelineEventMessageEdited                       = "message.edited.v1"
 	TimelineEventMessageRevoked                      = "message.revoked.v1"
 	TimelineEventConversationMemberJoined            = "conversation.member.joined.v1"
 	TimelineEventConversationMemberLeft              = "conversation.member.left.v1"
@@ -57,7 +58,7 @@ func (command ProjectTimelineEventCommand) Validate() error {
 		return NewInvalidArgument("conversation_seq must be positive")
 	}
 	switch command.EventType {
-	case TimelineEventMessagePersisted, TimelineEventMessageRevoked:
+	case TimelineEventMessagePersisted, TimelineEventMessageEdited, TimelineEventMessageRevoked:
 		if command.MessageID == "" {
 			return NewInvalidArgument("message_id is required")
 		}

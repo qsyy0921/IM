@@ -320,6 +320,21 @@ func (f *fakePolicy) CheckSendPermission(context.Context, types.SendMessageComma
 	return f.decision, f.err
 }
 
+func (f *fakePolicy) CheckEditPermission(context.Context, types.EditMessageCommand) (types.PermissionDecision, error) {
+	f.calls++
+	if f.err != nil {
+		return types.PermissionDecision{}, f.err
+	}
+	if len(f.decisions) > 0 {
+		index := f.calls - 1
+		if index >= len(f.decisions) {
+			index = len(f.decisions) - 1
+		}
+		return f.decisions[index], nil
+	}
+	return f.decision, nil
+}
+
 func (f *fakePolicy) CheckRevokePermission(context.Context, types.RevokeMessageCommand) (types.PermissionDecision, error) {
 	f.calls++
 	if f.err != nil {
@@ -383,6 +398,11 @@ type fakeMessageRepository struct {
 	revokeErr    error
 	revokeCalls  int
 	revokeInput  domain.RevokeMessageInput
+
+	editResult domain.MessageChangeResult
+	editErr    error
+	editCalls  int
+	editInput  domain.EditMessageInput
 }
 
 func (f *fakeMessageRepository) AppendMessage(_ context.Context, input domain.AppendMessageInput) (domain.AppendMessageResult, error) {
@@ -395,6 +415,12 @@ func (f *fakeMessageRepository) RevokeMessage(_ context.Context, input domain.Re
 	f.revokeCalls++
 	f.revokeInput = input
 	return f.revokeResult, f.revokeErr
+}
+
+func (f *fakeMessageRepository) EditMessage(_ context.Context, input domain.EditMessageInput) (domain.MessageChangeResult, error) {
+	f.editCalls++
+	f.editInput = input
+	return f.editResult, f.editErr
 }
 
 type fakeAdmission struct {

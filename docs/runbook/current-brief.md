@@ -22,7 +22,7 @@ conversation-service
 3. receipt-service 真实进程 smoke 已跑通：`im.delivery.events -> receipt projection -> MarkRead -> GetReceiptState -> receipt_outbox -> im.receipt.events`；不要直接读取 delivery-service 内部表。
 4. 会话列表 / 未读数最小 `ListConversations` 已在 receipt-service 内落地并跑通真实进程 smoke：`unread_count` 从投递后的 `1` 在 `MarkRead` 后变为 `0`；该能力复用 `im.delivery.events`、`receipt_inbox_projection` 和 `user_read_cursors`，没有新增独立服务，也不读取其它服务内部表。
 5. 当前第三层消息变更能力已在 clean commit `8d008de` 跑通 `RevokeMessage` 最小真实进程 smoke：`SendMessage -> PullInbox(message.persisted.v1) -> RevokeMessage -> message outbox relay -> delivery tombstone projection -> PullInbox(message.revoked.v1) -> AckDelivery`；并已补 hardening：第一阶段只允许原发送者撤回，delivery tombstone 只投给已在 `user_inbox` 收到原消息的用户，revoke 早于 persisted 投影时 fail-closed 不提交 checkpoint。报告见 `docs/runbook/loadtest/message-service/loadtest-report-20260610-revoke-message-smoke.md`。
-6. 后续第三层候选：消息编辑/删除、真实鉴权、多会话分页 / 权限校验强化；优先选能补全 IM 产品闭环、且不会显著增加跨服务耦合和代码复杂度的切片。下一步建议先做 RevokeMessage 阶段复核收口，再决定是否扩展 Edit/Delete。
+6. 当前正在推进 `EditMessage` 最小链路：复用 message-service 本地事务、message outbox relay、`conversation.timeline.events` 和 delivery projection；第一阶段限定原发送者编辑自己的 TEXT 消息，采用 last-write-wins + `message_change_history` 保留 before/after payload，不引入新服务或跨服务内部表读取。下一步优先跑真实进程 smoke：`SendMessage -> PullInbox(message.persisted.v1) -> EditMessage -> message outbox relay -> delivery edit projection -> PullInbox(message.edited.v1) -> AckDelivery`。
 7. RAG / Agent / 智能总结属于第四层，必须等消息事实、权限边界、撤回删除语义更稳定后再做。
 8. Kafka HA、PostgreSQL failover、Redis quorum / 网络分区可作为后续生产化项，不作为当前主线阻塞。
 

@@ -11,6 +11,7 @@ loadtest-report-20260609-message-service-consolidated.md
 最新功能 smoke：
 
 ```text
+loadtest-report-20260610-edit-message-smoke.md
 loadtest-report-20260610-revoke-message-smoke.md
 ```
 
@@ -36,7 +37,7 @@ loadtest-report-20260610-revoke-message-smoke.md
 - 盲目增加 CPU、内存、relay worker 或 message-service 实例不能根治问题，因为共享 PostgreSQL 仍然是核心资源。
 - 当前已经有 backpressure、RetryInfo、client retry、adaptive admission、MaxInFlight token gate 等容量治理证据，可以在面试中讲清楚“怎么发现瓶颈、怎么验证假设、怎么保护系统”。
 - 用户机器资源有限，后续不再继续做重型硬件矩阵；这些结果已经足够支撑面试叙事，下一阶段应开发 `conversation-service` 等其它真实微服务。
-- 第三层消息变更已开始补齐：`RevokeMessage` 最小真实进程 smoke 已证明撤回事件能从 `message-service` 本地事务进入 `conversation.timeline.events`，再由 `delivery-service` 投影成 `PullInbox` 可见的 `message.revoked.v1` tombstone。
+- 第三层消息变更已开始补齐：`RevokeMessage` 和 `EditMessage` 最小真实进程 smoke 已证明消息变更事件能从 `message-service` 本地事务进入 `conversation.timeline.events`，再由 `delivery-service` 投影成 `PullInbox` 可见的 tombstone / edited item。
 
 ## 2. 覆盖范围
 

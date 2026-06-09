@@ -32,6 +32,32 @@ func TestControllerRejectsWhenPoolAvailableBelowFloor(t *testing.T) {
 	}
 }
 
+func TestControllerHysteresisWaitsForReleaseAvailableConns(t *testing.T) {
+	pool := &fakePoolStats{stats: PoolStats{AcquiredConns: 6, MaxConns: 8}}
+	controller := NewController(
+		Config{
+			Enabled:               true,
+			MinAvailableConns:     2,
+			ReleaseAvailableConns: 4,
+		},
+		pool,
+		nil,
+		nil,
+	)
+
+	if err := controller.CheckSendMessage(context.Background()); !errors.Is(err, types.ErrServiceOverloaded) {
+		t.Fatalf("expected initial overload, got %v", err)
+	}
+	pool.stats = PoolStats{AcquiredConns: 5, MaxConns: 8}
+	if err := controller.CheckSendMessage(context.Background()); !errors.Is(err, types.ErrServiceOverloaded) {
+		t.Fatalf("expected overload while below release threshold, got %v", err)
+	}
+	pool.stats = PoolStats{AcquiredConns: 3, MaxConns: 8}
+	if err := controller.CheckSendMessage(context.Background()); err != nil {
+		t.Fatalf("expected release after recovery, got %v", err)
+	}
+}
+
 func TestControllerAllowsCumulativeAcquireP95WithoutCurrentPoolPressure(t *testing.T) {
 	controller := NewController(
 		Config{

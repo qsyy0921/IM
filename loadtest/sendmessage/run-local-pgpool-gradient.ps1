@@ -21,8 +21,10 @@ param(
     [int]$BackpressureMinAvailableConns = 0,
     [switch]$AdaptiveLimitEnabled,
     [int]$AdaptiveMinAvailableConns = 8,
+    [int]$AdaptiveReleaseAvailableConns = 12,
     [string]$AdaptiveMaxPoolAcquireP95 = "250ms",
     [long]$AdaptiveMaxOutboxPending = 20000,
+    [long]$AdaptiveReleaseOutboxPending = 10000,
     [string]$AdaptiveMaxRelayActiveP95 = "200ms",
     [double]$AdaptiveMinOutboxFetchedPerCall = 5,
     [double]$AdaptiveMinKafkaRecordsPerCall = 10,
@@ -90,8 +92,10 @@ foreach ($pgMax in $PGMaxConns) {
         if ($AdaptiveLimitEnabled) {
             $env:NEXUSIM_ADAPTIVE_LIMIT_ENABLED = "true"
             $env:NEXUSIM_ADAPTIVE_MIN_AVAILABLE_CONNS = [string]$AdaptiveMinAvailableConns
+            $env:NEXUSIM_ADAPTIVE_RELEASE_AVAILABLE_CONNS = [string]$AdaptiveReleaseAvailableConns
             $env:NEXUSIM_ADAPTIVE_MAX_POOL_ACQUIRE_P95 = $AdaptiveMaxPoolAcquireP95
             $env:NEXUSIM_ADAPTIVE_MAX_OUTBOX_PENDING = [string]$AdaptiveMaxOutboxPending
+            $env:NEXUSIM_ADAPTIVE_RELEASE_OUTBOX_PENDING = [string]$AdaptiveReleaseOutboxPending
             $env:NEXUSIM_ADAPTIVE_MAX_RELAY_ACTIVE_P95 = $AdaptiveMaxRelayActiveP95
             $env:NEXUSIM_ADAPTIVE_MIN_OUTBOX_FETCHED_PER_CALL = [string]$AdaptiveMinOutboxFetchedPerCall
             $env:NEXUSIM_ADAPTIVE_MIN_KAFKA_RECORDS_PER_CALL = [string]$AdaptiveMinKafkaRecordsPerCall
@@ -100,8 +104,10 @@ foreach ($pgMax in $PGMaxConns) {
         } else {
             Remove-Item Env:\NEXUSIM_ADAPTIVE_LIMIT_ENABLED -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MIN_AVAILABLE_CONNS -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_RELEASE_AVAILABLE_CONNS -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MAX_POOL_ACQUIRE_P95 -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MAX_OUTBOX_PENDING -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_RELEASE_OUTBOX_PENDING -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MAX_RELAY_ACTIVE_P95 -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MIN_OUTBOX_FETCHED_PER_CALL -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MIN_KAFKA_RECORDS_PER_CALL -ErrorAction SilentlyContinue
@@ -158,8 +164,10 @@ foreach ($pgMax in $PGMaxConns) {
             Remove-Item Env:\NEXUSIM_OUTBOX_PUBLISH_BATCH_ENABLED -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_LIMIT_ENABLED -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MIN_AVAILABLE_CONNS -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_RELEASE_AVAILABLE_CONNS -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MAX_POOL_ACQUIRE_P95 -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MAX_OUTBOX_PENDING -ErrorAction SilentlyContinue
+            Remove-Item Env:\NEXUSIM_ADAPTIVE_RELEASE_OUTBOX_PENDING -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MAX_RELAY_ACTIVE_P95 -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MIN_OUTBOX_FETCHED_PER_CALL -ErrorAction SilentlyContinue
             Remove-Item Env:\NEXUSIM_ADAPTIVE_MIN_KAFKA_RECORDS_PER_CALL -ErrorAction SilentlyContinue

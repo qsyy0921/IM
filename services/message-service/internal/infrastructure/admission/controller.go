@@ -17,8 +17,10 @@ import (
 type Config struct {
 	Enabled                       bool
 	MinAvailableConns             int32
+	ReleaseAvailableConns         int32
 	MaxPoolAcquireP95             time.Duration
 	MaxOutboxPending              int64
+	ReleaseOutboxPending          int64
 	MaxRelayProcessReadyActiveP95 time.Duration
 	MinOutboxFetchedPerCall       float64
 	MinKafkaPublishRecordsPerCall float64
@@ -54,6 +56,7 @@ type Controller struct {
 
 	outboxPending atomic.Int64
 	relaySnapshot atomic.Value
+	overloaded    atomic.Bool
 }
 
 func NewController(
@@ -70,6 +73,12 @@ func NewController(
 	}
 	if config.MinMetricSamples <= 0 {
 		config.MinMetricSamples = 20
+	}
+	if config.ReleaseAvailableConns <= config.MinAvailableConns {
+		config.ReleaseAvailableConns = config.MinAvailableConns + 4
+	}
+	if config.MaxOutboxPending > 0 && config.ReleaseOutboxPending <= 0 {
+		config.ReleaseOutboxPending = config.MaxOutboxPending / 2
 	}
 	controller := &Controller{
 		config:         config,
@@ -93,11 +102,45 @@ func (c *Controller) CheckSendMessage(ctx context.Context) error {
 	if c == nil || !c.config.Enabled {
 		return nil
 	}
+	if c.overloaded.Load() {
+		blockers := c.recoveryBlockers()
+		if len(blockers) > 0 {
+			return types.NewServiceOverloaded("adaptive limit recovering: " + strings.Join(blockers, "; "))
+		}
+		c.overloaded.Store(false)
+	}
 	reasons := c.overloadReasons()
 	if len(reasons) == 0 {
 		return nil
 	}
+	c.overloaded.Store(true)
 	return types.NewServiceOverloaded("adaptive limit: " + strings.Join(reasons, "; "))
+}
+
+func (c *Controller) recoveryBlockers() []string {
+	blockers := make([]string, 0, 2)
+	if c.poolStats != nil {
+		stats := c.poolStats.PoolStats()
+		if stats.MaxConns > 0 {
+			available := stats.MaxConns - stats.AcquiredConns
+			if available <= c.config.ReleaseAvailableConns {
+				blockers = append(blockers, fmt.Sprintf(
+					"pg pool available=%d release_available=%d",
+					available,
+					c.config.ReleaseAvailableConns,
+				))
+			}
+		}
+	}
+	pending := c.outboxPending.Load()
+	if c.config.ReleaseOutboxPending > 0 && pending >= c.config.ReleaseOutboxPending {
+		blockers = append(blockers, fmt.Sprintf(
+			"outbox_pending=%d release_pending=%d",
+			pending,
+			c.config.ReleaseOutboxPending,
+		))
+	}
+	return blockers
 }
 
 func (c *Controller) overloadReasons() []string {

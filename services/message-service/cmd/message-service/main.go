@@ -155,6 +155,7 @@ func runGRPCServer() error {
 	)
 	editUseCase := app.NewEditMessageUseCase(policy, conversation, messageRepository)
 	revokeUseCase := app.NewRevokeMessageUseCase(policy, conversation, messageRepository)
+	deleteUseCase := app.NewDeleteMessageUseCase(policy, conversation, messageRepository)
 
 	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
@@ -166,6 +167,7 @@ func runGRPCServer() error {
 		grpcapi.WithMetrics(metrics),
 		grpcapi.WithEditMessage(editUseCase),
 		grpcapi.WithRevokeMessage(revokeUseCase),
+		grpcapi.WithDeleteMessage(deleteUseCase),
 	))
 
 	serveErr := make(chan error, 1)

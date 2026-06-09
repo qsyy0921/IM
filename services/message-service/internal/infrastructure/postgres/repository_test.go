@@ -369,6 +369,125 @@ WHERE tenant_id = $1
 	}
 }
 
+func TestMessageRepositoryDeleteMessageIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	now := time.Date(2026, 6, 10, 3, 0, 0, 0, time.UTC)
+	runID := time.Now().UnixNano()
+	messageCounter := 0
+	eventCounter := 0
+	repo := NewMessageRepository(
+		pool,
+		WithClock(func() time.Time { return now }),
+		WithIDGenerators(
+			func() (types.MessageID, error) {
+				messageCounter++
+				return types.MessageID(fmt.Sprintf("msg-delete-%d-%d", runID, messageCounter)), nil
+			},
+			func() (types.EventID, error) {
+				eventCounter++
+				return types.EventID(fmt.Sprintf("event-delete-%d-%d", runID, eventCounter)), nil
+			},
+		),
+	)
+	tenantID := types.TenantID(fmt.Sprintf("tenant-it-delete-%d", runID))
+	appendInput := testAppendInput(tenantID, "client-delete-source", []byte(`{"text":"hello"}`))
+	appendResult, err := repo.AppendMessage(ctx, appendInput)
+	if err != nil {
+		t.Fatalf("append source message: %v", err)
+	}
+
+	deleteInput := testDeleteInput(appendInput, appendResult.MessageID, "delete-key-1", types.DeleteScopeConversationView, "cleanup")
+	result, err := repo.DeleteMessage(ctx, deleteInput)
+	if err != nil {
+		t.Fatalf("delete message: %v", err)
+	}
+	if result.MessageID != appendResult.MessageID ||
+		result.ConversationSeq != 2 ||
+		result.ChangeVersion != 1 ||
+		result.IdempotentReplay {
+		t.Fatalf("unexpected delete result: %+v", result)
+	}
+
+	replay, err := repo.DeleteMessage(ctx, deleteInput)
+	if err != nil {
+		t.Fatalf("replay delete: %v", err)
+	}
+	if !replay.IdempotentReplay ||
+		replay.ConversationSeq != result.ConversationSeq ||
+		replay.ChangeVersion != result.ChangeVersion {
+		t.Fatalf("unexpected delete replay: %+v", replay)
+	}
+	conflictInput := testDeleteInput(appendInput, appendResult.MessageID, "delete-key-1", types.DeleteScopeConversationView, "different")
+	_, err = repo.DeleteMessage(ctx, conflictInput)
+	if !errors.Is(err, types.ErrIdempotencyConflict) {
+		t.Fatalf("expected delete idempotency conflict, got %v", err)
+	}
+
+	assertCount(t, ctx, pool, "message_log", tenantID, 1)
+	assertCount(t, ctx, pool, "message_change_history", tenantID, 1)
+	assertCount(t, ctx, pool, "conversation_timeline_events", tenantID, 2)
+	assertCount(t, ctx, pool, "message_outbox", tenantID, 2)
+	assertCurrentSeq(t, ctx, pool, tenantID, appendInput.Command.ConversationID, 2)
+	assertDeletedFacts(t, ctx, pool, deleteInput, result)
+}
+
+func TestMessageRepositoryDeleteMessageRejectsNonSenderIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	runID := time.Now().UnixNano()
+	messageCounter := 0
+	eventCounter := 0
+	repo := NewMessageRepository(
+		pool,
+		WithIDGenerators(
+			func() (types.MessageID, error) {
+				messageCounter++
+				return types.MessageID(fmt.Sprintf("msg-delete-nonsender-%d-%d", runID, messageCounter)), nil
+			},
+			func() (types.EventID, error) {
+				eventCounter++
+				return types.EventID(fmt.Sprintf("event-delete-nonsender-%d-%d", runID, eventCounter)), nil
+			},
+		),
+	)
+	tenantID := types.TenantID(fmt.Sprintf("tenant-it-delete-nonsender-%d", runID))
+	appendInput := testAppendInput(tenantID, "client-delete-nonsender", []byte(`{"text":"hello"}`))
+	appendResult, err := repo.AppendMessage(ctx, appendInput)
+	if err != nil {
+		t.Fatalf("append source message: %v", err)
+	}
+
+	deleteInput := testDeleteInput(appendInput, appendResult.MessageID, "delete-nonsender-key", types.DeleteScopeConversationView, "not mine")
+	deleteInput.Command.AuthContext.UserID = "other-user"
+	_, err = repo.DeleteMessage(ctx, deleteInput)
+	if !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected permission denied, got %v", err)
+	}
+	assertCurrentSeq(t, ctx, pool, tenantID, appendInput.Command.ConversationID, 1)
+	assertCount(t, ctx, pool, "message_change_history", tenantID, 0)
+
+	var status string
+	if err := pool.QueryRow(ctx, `
+SELECT status
+FROM message_log
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND message_id = $3
+`, tenantID, appendInput.Command.ConversationID, appendResult.MessageID).Scan(&status); err != nil {
+		t.Fatalf("read message status: %v", err)
+	}
+	if status != "NORMAL" {
+		t.Fatalf("expected message unchanged, status=%s", status)
+	}
+}
+
 func TestMessageRepositoryBackpressureRejectsWhenPoolSaturated(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -437,6 +556,28 @@ func testRevokeInput(
 			IdempotencyKey: idempotencyKey,
 			Reason:         reason,
 			ReceivedAt:     time.Date(2026, 6, 10, 1, 0, 0, 0, time.UTC),
+		},
+		Permission:   appendInput.Permission,
+		Conversation: appendInput.Conversation,
+	}
+}
+
+func testDeleteInput(
+	appendInput domain.AppendMessageInput,
+	messageID types.MessageID,
+	idempotencyKey string,
+	deleteScope types.DeleteScope,
+	reason string,
+) domain.DeleteMessageInput {
+	return domain.DeleteMessageInput{
+		Command: types.DeleteMessageCommand{
+			AuthContext:    appendInput.Command.AuthContext,
+			ConversationID: appendInput.Command.ConversationID,
+			MessageID:      messageID,
+			IdempotencyKey: idempotencyKey,
+			DeleteScope:    deleteScope,
+			Reason:         reason,
+			ReceivedAt:     time.Date(2026, 6, 10, 3, 0, 0, 0, time.UTC),
 		},
 		Permission:   appendInput.Permission,
 		Conversation: appendInput.Conversation,
@@ -724,6 +865,107 @@ WHERE ml.tenant_id = $1
 		outboxPayload["revoked_by"] != string(input.Command.AuthContext.UserID) ||
 		int64(outboxPayload["conversation_seq"].(float64)) != result.ConversationSeq {
 		t.Fatalf("unexpected revoke payload: %+v", outboxPayload)
+	}
+}
+
+func assertDeletedFacts(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	input domain.DeleteMessageInput,
+	result domain.MessageChangeResult,
+) {
+	t.Helper()
+	var (
+		status           string
+		deletedAt        *time.Time
+		changeType       string
+		beforeStatus     string
+		afterStatus      string
+		changeVersion    int32
+		timelineEventID  types.EventID
+		timelineType     string
+		timelineSeq      int64
+		outboxEventID    types.EventID
+		outboxType       string
+		outboxVersion    int64
+		outboxPayloadRaw string
+	)
+	if err := pool.QueryRow(ctx, `
+SELECT
+    ml.status,
+    ml.deleted_at,
+    mch.change_type,
+    mch.before_status,
+    mch.after_status,
+    mch.change_version,
+    te.event_id,
+    te.event_type,
+    te.seq,
+    mo.event_id,
+    mo.event_type,
+    mo.aggregate_version,
+    mo.payload_json::text
+FROM message_log ml
+JOIN message_change_history mch
+  ON mch.tenant_id = ml.tenant_id
+ AND mch.conversation_id = ml.conversation_id
+ AND mch.message_id = ml.message_id
+JOIN conversation_timeline_events te
+  ON te.tenant_id = ml.tenant_id
+ AND te.conversation_id = ml.conversation_id
+ AND te.seq = $4
+JOIN message_outbox mo
+  ON mo.tenant_id = te.tenant_id
+ AND mo.conversation_id = te.conversation_id
+ AND mo.aggregate_version = te.seq
+WHERE ml.tenant_id = $1
+  AND ml.conversation_id = $2
+  AND ml.message_id = $3
+`,
+		input.Command.AuthContext.TenantID,
+		input.Command.ConversationID,
+		input.Command.MessageID,
+		result.ConversationSeq,
+	).Scan(
+		&status,
+		&deletedAt,
+		&changeType,
+		&beforeStatus,
+		&afterStatus,
+		&changeVersion,
+		&timelineEventID,
+		&timelineType,
+		&timelineSeq,
+		&outboxEventID,
+		&outboxType,
+		&outboxVersion,
+		&outboxPayloadRaw,
+	); err != nil {
+		t.Fatalf("read deleted facts: %v", err)
+	}
+	if status != "DELETED" || deletedAt == nil {
+		t.Fatalf("unexpected message delete status=%s deletedAt=%v", status, deletedAt)
+	}
+	if changeType != "DELETE" || beforeStatus != "NORMAL" || afterStatus != "DELETED" || changeVersion != result.ChangeVersion {
+		t.Fatalf("unexpected change history type=%s before=%s after=%s version=%d", changeType, beforeStatus, afterStatus, changeVersion)
+	}
+	if timelineEventID != outboxEventID ||
+		timelineType != string(types.TimelineEventMessageDeleted) ||
+		outboxType != string(types.TimelineEventMessageDeleted) ||
+		timelineSeq != result.ConversationSeq ||
+		outboxVersion != result.ConversationSeq {
+		t.Fatalf("unexpected delete timeline/outbox event timeline=%s/%s seq=%d outbox=%s/%s version=%d", timelineEventID, timelineType, timelineSeq, outboxEventID, outboxType, outboxVersion)
+	}
+	var outboxPayload map[string]any
+	if err := json.Unmarshal([]byte(outboxPayloadRaw), &outboxPayload); err != nil {
+		t.Fatalf("decode delete outbox payload: %v", err)
+	}
+	if outboxPayload["message_id"] != string(input.Command.MessageID) ||
+		outboxPayload["deleted_by"] != string(input.Command.AuthContext.UserID) ||
+		outboxPayload["delete_scope"] != string(types.DeleteScopeConversationView) ||
+		int64(outboxPayload["conversation_seq"].(float64)) != result.ConversationSeq {
+		t.Fatalf("unexpected delete payload: %+v", outboxPayload)
 	}
 }
 

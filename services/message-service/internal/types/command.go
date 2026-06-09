@@ -57,6 +57,23 @@ type RevokeMessageCommand struct {
 	ReceivedAt     time.Time
 }
 
+type DeleteScope string
+
+const (
+	DeleteScopeConversationView DeleteScope = "CONVERSATION_VIEW"
+	DeleteScopeCompliance       DeleteScope = "COMPLIANCE_RETENTION"
+)
+
+type DeleteMessageCommand struct {
+	AuthContext    AuthContext
+	ConversationID ConversationID
+	MessageID      MessageID
+	IdempotencyKey string
+	DeleteScope    DeleteScope
+	Reason         string
+	ReceivedAt     time.Time
+}
+
 type EditMessageCommand struct {
 	AuthContext    AuthContext
 	ConversationID ConversationID
@@ -79,6 +96,25 @@ func (c EditMessageCommand) Validate() error {
 	}
 	if c.IdempotencyKey == "" {
 		return errors.New("idempotency_key is required")
+	}
+	return nil
+}
+
+func (c DeleteMessageCommand) Validate() error {
+	if c.AuthContext.TenantID == "" || c.AuthContext.UserID == "" || c.AuthContext.DeviceID == "" {
+		return errors.New("auth context is required")
+	}
+	if c.ConversationID == "" {
+		return errors.New("conversation_id is required")
+	}
+	if c.MessageID == "" {
+		return errors.New("message_id is required")
+	}
+	if c.IdempotencyKey == "" {
+		return errors.New("idempotency_key is required")
+	}
+	if c.DeleteScope == "" {
+		return errors.New("delete_scope is required")
 	}
 	return nil
 }

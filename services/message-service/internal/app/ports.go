@@ -11,6 +11,7 @@ type PolicyCheckPort interface {
 	CheckSendPermission(ctx context.Context, command types.SendMessageCommand) (types.PermissionDecision, error)
 	CheckEditPermission(ctx context.Context, command types.EditMessageCommand) (types.PermissionDecision, error)
 	CheckRevokePermission(ctx context.Context, command types.RevokeMessageCommand) (types.PermissionDecision, error)
+	CheckDeletePermission(ctx context.Context, command types.DeleteMessageCommand) (types.PermissionDecision, error)
 }
 
 type ConversationQueryPort interface {
@@ -25,6 +26,7 @@ type MessageRepository interface {
 	AppendMessage(ctx context.Context, input domain.AppendMessageInput) (domain.AppendMessageResult, error)
 	EditMessage(ctx context.Context, input domain.EditMessageInput) (domain.MessageChangeResult, error)
 	RevokeMessage(ctx context.Context, input domain.RevokeMessageInput) (domain.MessageChangeResult, error)
+	DeleteMessage(ctx context.Context, input domain.DeleteMessageInput) (domain.MessageChangeResult, error)
 }
 
 type AdmissionPort interface {

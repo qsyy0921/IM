@@ -25,12 +25,17 @@ type EditMessageExecutor interface {
 	Execute(ctx context.Context, command types.EditMessageCommand) (types.MessageChangeResult, error)
 }
 
+type DeleteMessageExecutor interface {
+	Execute(ctx context.Context, command types.DeleteMessageCommand) (types.MessageChangeResult, error)
+}
+
 type Server struct {
 	messagev1.UnimplementedMessageServiceServer
 
 	sendMessage   SendMessageExecutor
 	editMessage   EditMessageExecutor
 	revokeMessage RevokeMessageExecutor
+	deleteMessage DeleteMessageExecutor
 	now           func() time.Time
 	metrics       types.LatencyRecorder
 }
@@ -62,6 +67,12 @@ func WithRevokeMessage(revokeMessage RevokeMessageExecutor) Option {
 func WithEditMessage(editMessage EditMessageExecutor) Option {
 	return func(server *Server) {
 		server.editMessage = editMessage
+	}
+}
+
+func WithDeleteMessage(deleteMessage DeleteMessageExecutor) Option {
+	return func(server *Server) {
+		server.deleteMessage = deleteMessage
 	}
 }
 
@@ -136,6 +147,27 @@ func (s *Server) RevokeMessage(ctx context.Context, req *messagev1.RevokeMessage
 	result, err := s.revokeMessage.Execute(ctx, command)
 	if err != nil {
 		return nil, grpcError(err, revokeReqCorrelationID(req))
+	}
+
+	return &messagev1.MessageChangeResponse{
+		MessageId:        string(result.MessageID),
+		ConversationId:   string(result.ConversationID),
+		ConversationSeq:  result.ConversationSeq,
+		ChangeVersion:    result.ChangeVersion,
+		AcceptedAt:       timestamppb.New(result.AcceptedAt),
+		IdempotentReplay: result.IdempotentReplay,
+	}, nil
+}
+
+func (s *Server) DeleteMessage(ctx context.Context, req *messagev1.DeleteMessageRequest) (*messagev1.MessageChangeResponse, error) {
+	command, err := s.toDeleteMessageCommand(req)
+	if err != nil {
+		return nil, grpcError(err, deleteReqCorrelationID(req))
+	}
+
+	result, err := s.deleteMessage.Execute(ctx, command)
+	if err != nil {
+		return nil, grpcError(err, deleteReqCorrelationID(req))
 	}
 
 	return &messagev1.MessageChangeResponse{
@@ -259,6 +291,54 @@ func (s *Server) toEditMessageCommand(req *messagev1.EditMessageRequest) (types.
 	return command, nil
 }
 
+func (s *Server) toDeleteMessageCommand(req *messagev1.DeleteMessageRequest) (types.DeleteMessageCommand, error) {
+	if s.deleteMessage == nil {
+		return types.DeleteMessageCommand{}, errors.New("delete message use case is not configured")
+	}
+	if req == nil {
+		return types.DeleteMessageCommand{}, newInvalidArgument("request is required")
+	}
+	auth := req.GetAuthContext()
+	if auth == nil {
+		return types.DeleteMessageCommand{}, newInvalidArgument("auth_context is required")
+	}
+	scope, err := deleteScopeFromProto(req.GetDeleteScope())
+	if err != nil {
+		return types.DeleteMessageCommand{}, newInvalidArgument(err.Error())
+	}
+	command := types.DeleteMessageCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  types.TenantID(auth.GetTenantId()),
+			UserID:    types.UserID(auth.GetUserId()),
+			DeviceID:  types.DeviceID(auth.GetDeviceId()),
+			SessionID: types.SessionID(auth.GetSessionId()),
+			TraceID:   auth.GetTraceId(),
+			RequestID: auth.GetRequestId(),
+		},
+		ConversationID: types.ConversationID(req.GetConversationId()),
+		MessageID:      types.MessageID(req.GetMessageId()),
+		IdempotencyKey: req.GetIdempotencyKey(),
+		DeleteScope:    scope,
+		Reason:         req.GetReason(),
+		ReceivedAt:     s.now(),
+	}
+	if err := command.Validate(); err != nil {
+		return types.DeleteMessageCommand{}, newInvalidArgument(err.Error())
+	}
+	return command, nil
+}
+
+func deleteScopeFromProto(scope messagev1.DeleteScope) (types.DeleteScope, error) {
+	switch scope {
+	case messagev1.DeleteScope_DELETE_SCOPE_CONVERSATION_VIEW:
+		return types.DeleteScopeConversationView, nil
+	case messagev1.DeleteScope_DELETE_SCOPE_COMPLIANCE_RETENTION:
+		return types.DeleteScopeCompliance, nil
+	default:
+		return "", errors.New("delete_scope is required")
+	}
+}
+
 func payloadToJSON(payload *structpb.Struct) ([]byte, error) {
 	if payload == nil {
 		return []byte("{}"), nil
@@ -305,6 +385,23 @@ func editReqCorrelationID(req *messagev1.EditMessageRequest) string {
 }
 
 func revokeReqCorrelationID(req *messagev1.RevokeMessageRequest) string {
+	if req == nil {
+		return ""
+	}
+	auth := req.GetAuthContext()
+	if auth == nil {
+		return req.GetIdempotencyKey()
+	}
+	if auth.GetRequestId() != "" {
+		return auth.GetRequestId()
+	}
+	if auth.GetTraceId() != "" {
+		return auth.GetTraceId()
+	}
+	return req.GetIdempotencyKey()
+}
+
+func deleteReqCorrelationID(req *messagev1.DeleteMessageRequest) string {
 	if req == nil {
 		return ""
 	}

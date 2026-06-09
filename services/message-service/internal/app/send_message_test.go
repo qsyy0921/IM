@@ -350,6 +350,21 @@ func (f *fakePolicy) CheckRevokePermission(context.Context, types.RevokeMessageC
 	return f.decision, nil
 }
 
+func (f *fakePolicy) CheckDeletePermission(context.Context, types.DeleteMessageCommand) (types.PermissionDecision, error) {
+	f.calls++
+	if f.err != nil {
+		return types.PermissionDecision{}, f.err
+	}
+	if len(f.decisions) > 0 {
+		index := f.calls - 1
+		if index >= len(f.decisions) {
+			index = len(f.decisions) - 1
+		}
+		return f.decisions[index], nil
+	}
+	return f.decision, nil
+}
+
 type fakeConversation struct {
 	context  types.ConversationSendContext
 	contexts []types.ConversationSendContext
@@ -403,6 +418,11 @@ type fakeMessageRepository struct {
 	editErr    error
 	editCalls  int
 	editInput  domain.EditMessageInput
+
+	deleteResult domain.MessageChangeResult
+	deleteErr    error
+	deleteCalls  int
+	deleteInput  domain.DeleteMessageInput
 }
 
 func (f *fakeMessageRepository) AppendMessage(_ context.Context, input domain.AppendMessageInput) (domain.AppendMessageResult, error) {
@@ -421,6 +441,12 @@ func (f *fakeMessageRepository) EditMessage(_ context.Context, input domain.Edit
 	f.editCalls++
 	f.editInput = input
 	return f.editResult, f.editErr
+}
+
+func (f *fakeMessageRepository) DeleteMessage(_ context.Context, input domain.DeleteMessageInput) (domain.MessageChangeResult, error) {
+	f.deleteCalls++
+	f.deleteInput = input
+	return f.deleteResult, f.deleteErr
 }
 
 type fakeAdmission struct {

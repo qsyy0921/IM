@@ -168,6 +168,46 @@ func TestWorkerProjectsAndCommitsMessageEdited(t *testing.T) {
 	}
 }
 
+func TestWorkerProjectsAndCommitsMessageDeleted(t *testing.T) {
+	value := mustMarshalTimelineEvent(t, &conversationtimelinev1.ConversationTimelineEvent{
+		EventId:          "event-delete-1",
+		EventType:        types.TimelineEventMessageDeleted,
+		TenantId:         "tenant-1",
+		AggregateId:      "conv-1",
+		AggregateVersion: 11,
+		CorrelationId:    "request-1",
+		Metadata: &conversationtimelinev1.TimelineMetadata{
+			FanoutMode:        "WRITE_FANOUT",
+			PermissionVersion: 7,
+		},
+		Payload: &conversationtimelinev1.ConversationTimelineEvent_MessageDeleted{
+			MessageDeleted: &conversationtimelinev1.MessageDeletedV1{
+				MessageId:       "msg-1",
+				ConversationSeq: 11,
+				ChangeVersion:   1,
+				DeletedBy:       "sender-1",
+				DeleteScope:     conversationtimelinev1.MessageDeleteScope_MESSAGE_DELETE_SCOPE_CONVERSATION_VIEW,
+			},
+		},
+	})
+	consumer := &fakeConsumer{message: types.TimelineMessage{Topic: "conversation.timeline.events", Partition: 3, Offset: 42, Value: value}}
+	projector := &fakeProjector{}
+	err := NewWorker(consumer, projector, "delivery-test").Run(context.Background())
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected stop after fake commit, got %v", err)
+	}
+	if !consumer.committed {
+		t.Fatal("expected message commit")
+	}
+	if projector.command.EventID != "event-delete-1" ||
+		projector.command.EventType != types.TimelineEventMessageDeleted ||
+		projector.command.MessageID != "msg-1" ||
+		projector.command.SenderID != "sender-1" ||
+		projector.command.OffsetValue != 43 {
+		t.Fatalf("unexpected command: %+v", projector.command)
+	}
+}
+
 func TestWorkerDoesNotCommitWhenProjectionFails(t *testing.T) {
 	value := mustMarshalTimelineEvent(t, &conversationtimelinev1.ConversationTimelineEvent{
 		EventId:          "event-1",

@@ -12,6 +12,7 @@ import (
 const (
 	MessageChangeTypeEdit   = "EDIT"
 	MessageChangeTypeRevoke = "REVOKE"
+	MessageChangeTypeDelete = "DELETE"
 )
 
 type EditMessageInput struct {
@@ -22,6 +23,12 @@ type EditMessageInput struct {
 
 type RevokeMessageInput struct {
 	Command      types.RevokeMessageCommand
+	Permission   types.PermissionDecision
+	Conversation types.ConversationSendContext
+}
+
+type DeleteMessageInput struct {
+	Command      types.DeleteMessageCommand
 	Permission   types.PermissionDecision
 	Conversation types.ConversationSendContext
 }
@@ -199,6 +206,78 @@ func NewEditMessageRecord(
 	}, nil
 }
 
+func NewDeleteMessageRecord(
+	input DeleteMessageInput,
+	message Message,
+	eventID types.EventID,
+	seq int64,
+	changeVersion int32,
+	acceptedAt time.Time,
+) (MessageChangeRecord, error) {
+	commandHash, err := ComputeDeleteMessageCommandHash(input.Command)
+	if err != nil {
+		return MessageChangeRecord{}, err
+	}
+	classification := input.Permission.Classification
+	if classification == "" {
+		classification = "UNCLASSIFIED"
+	}
+	traceID := input.Command.AuthContext.TraceID
+	if traceID == "" {
+		traceID = input.Command.AuthContext.RequestID
+	}
+	partitionKey := string(input.Command.AuthContext.TenantID) + ":" + string(input.Command.ConversationID)
+	payloadJSON, err := buildMessageDeletedPayload(input, seq, changeVersion, acceptedAt)
+	if err != nil {
+		return MessageChangeRecord{}, err
+	}
+
+	return MessageChangeRecord{
+		MessageID:       input.Command.MessageID,
+		ConversationID:  input.Command.ConversationID,
+		ConversationSeq: seq,
+		ChangeVersion:   changeVersion,
+		ChangedAt:       acceptedAt,
+		CommandHash:     commandHash,
+		BeforePayload:   append([]byte(nil), message.PayloadJSON...),
+		BeforeStatus:    message.Status,
+		AfterStatus:     MessageStatusDeleted,
+		ChangeType:      MessageChangeTypeDelete,
+		Timeline: TimelineEvent{
+			EventID:             eventID,
+			EventType:           types.TimelineEventMessageDeleted,
+			EventVersion:        "v1",
+			TenantID:            input.Command.AuthContext.TenantID,
+			ConversationID:      input.Command.ConversationID,
+			ConversationSeq:     seq,
+			MessageID:           input.Command.MessageID,
+			FanoutMode:          input.Conversation.FanoutMode,
+			FanoutPolicyVersion: input.Conversation.FanoutPolicyVersion,
+			PermissionVersion:   input.Permission.PermissionVersion,
+			Classification:      classification,
+			MappingVersion:      "message.deleted.v1",
+			TraceID:             traceID,
+			PayloadJSON:         payloadJSON,
+			CreatedAt:           acceptedAt,
+		},
+		Outbox: OutboxEvent{
+			EventID:          eventID,
+			TenantID:         input.Command.AuthContext.TenantID,
+			ConversationID:   input.Command.ConversationID,
+			AggregateVersion: seq,
+			EventType:        types.TimelineEventMessageDeleted,
+			EventVersion:     "v1",
+			PartitionKey:     partitionKey,
+			MappingVersion:   "message.deleted.v1",
+			CorrelationID:    firstNonEmpty(input.Command.AuthContext.RequestID, traceID, input.Command.IdempotencyKey),
+			CausationID:      firstNonEmpty(input.Command.IdempotencyKey, input.Command.AuthContext.RequestID, traceID),
+			Producer:         "message-service",
+			PayloadJSON:      payloadJSON,
+			TraceID:          traceID,
+		},
+	}, nil
+}
+
 func ComputeEditMessageCommandHash(command types.EditMessageCommand) (string, error) {
 	payloadJSON, err := NormalizePayloadJSON(command.PayloadJSON)
 	if err != nil {
@@ -221,6 +300,34 @@ func ComputeEditMessageCommandHash(command types.EditMessageCommand) (string, er
 		MessageID:      command.MessageID,
 		IdempotencyKey: command.IdempotencyKey,
 		Payload:        json.RawMessage(payloadJSON),
+		Reason:         command.Reason,
+	}
+	encoded, err := json.Marshal(hashInput)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(encoded)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+func ComputeDeleteMessageCommandHash(command types.DeleteMessageCommand) (string, error) {
+	hashInput := struct {
+		TenantID       types.TenantID       `json:"tenant_id"`
+		ConversationID types.ConversationID `json:"conversation_id"`
+		ActorID        types.UserID         `json:"actor_id"`
+		DeviceID       types.DeviceID       `json:"device_id"`
+		MessageID      types.MessageID      `json:"message_id"`
+		IdempotencyKey string               `json:"idempotency_key"`
+		DeleteScope    types.DeleteScope    `json:"delete_scope"`
+		Reason         string               `json:"reason"`
+	}{
+		TenantID:       command.AuthContext.TenantID,
+		ConversationID: command.ConversationID,
+		ActorID:        command.AuthContext.UserID,
+		DeviceID:       command.AuthContext.DeviceID,
+		MessageID:      command.MessageID,
+		IdempotencyKey: command.IdempotencyKey,
+		DeleteScope:    command.DeleteScope,
 		Reason:         command.Reason,
 	}
 	encoded, err := json.Marshal(hashInput)
@@ -255,6 +362,24 @@ func ComputeRevokeMessageCommandHash(command types.RevokeMessageCommand) (string
 	}
 	sum := sha256.Sum256(encoded)
 	return hex.EncodeToString(sum[:]), nil
+}
+
+func buildMessageDeletedPayload(
+	input DeleteMessageInput,
+	seq int64,
+	changeVersion int32,
+	acceptedAt time.Time,
+) ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"message_id":       input.Command.MessageID,
+		"conversation_id":  input.Command.ConversationID,
+		"conversation_seq": seq,
+		"change_version":   changeVersion,
+		"deleted_by":       input.Command.AuthContext.UserID,
+		"delete_scope":     input.Command.DeleteScope,
+		"reason":           input.Command.Reason,
+		"deleted_at":       acceptedAt.UTC().Format(time.RFC3339Nano),
+	})
 }
 
 func buildMessageEditedPayload(

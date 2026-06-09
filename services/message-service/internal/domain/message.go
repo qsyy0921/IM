@@ -7,7 +7,7 @@ import (
 )
 
 type Message struct {
-	TenantID        types.TenantID
+	TenantID       types.TenantID
 	ConversationID types.ConversationID
 	Seq            int64
 	MessageID      types.MessageID
@@ -36,4 +36,8 @@ func (m Message) CanEdit() bool {
 
 func (m Message) CanRevoke() bool {
 	return m.Status == MessageStatusNormal || m.Status == MessageStatusEdited
+}
+
+func (m Message) CanDelete() bool {
+	return m.Status == MessageStatusNormal || m.Status == MessageStatusEdited || m.Status == MessageStatusRevoked
 }

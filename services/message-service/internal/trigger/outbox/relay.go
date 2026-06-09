@@ -325,6 +325,37 @@ func BuildConversationTimelineEvent(message types.OutboxMessage) (*conversationt
 			},
 		}
 		return event, nil
+	case types.TimelineEventMessageDeleted:
+		payload, err := decodeMessageDeletedPayload(message.PayloadJSON)
+		if err != nil {
+			return nil, err
+		}
+		deletedAt, err := time.Parse(time.RFC3339Nano, payload.DeletedAt)
+		if err != nil {
+			return nil, err
+		}
+		deleteScope, err := messageDeleteScope(payload.DeleteScope)
+		if err != nil {
+			return nil, err
+		}
+		occurredAt := message.OccurredAt
+		if occurredAt.IsZero() {
+			occurredAt = deletedAt
+		}
+		event := buildTimelineEnvelope(message, occurredAt)
+		event.Payload = &conversationtimelinev1.ConversationTimelineEvent_MessageDeleted{
+			MessageDeleted: &conversationtimelinev1.MessageDeletedV1{
+				MessageId:       payload.MessageID,
+				ConversationId:  payload.ConversationID,
+				ConversationSeq: payload.ConversationSeq,
+				ChangeVersion:   payload.ChangeVersion,
+				DeletedBy:       payload.DeletedBy,
+				DeleteScope:     deleteScope,
+				Reason:          payload.Reason,
+				DeletedAt:       timestamppb.New(deletedAt),
+			},
+		}
+		return event, nil
 	case types.TimelineEventConversationMemberJoined,
 		types.TimelineEventConversationMemberLeft,
 		types.TimelineEventConversationMemberRemoved,
@@ -472,6 +503,17 @@ type messageEditedPayload struct {
 	EditedAt        string          `json:"edited_at"`
 }
 
+type messageDeletedPayload struct {
+	MessageID       string `json:"message_id"`
+	ConversationID  string `json:"conversation_id"`
+	ConversationSeq int64  `json:"conversation_seq"`
+	ChangeVersion   int32  `json:"change_version"`
+	DeletedBy       string `json:"deleted_by"`
+	DeleteScope     string `json:"delete_scope"`
+	Reason          string `json:"reason"`
+	DeletedAt       string `json:"deleted_at"`
+}
+
 func decodeMessagePersistedPayload(payloadJSON []byte) (messagePersistedPayload, error) {
 	var payload messagePersistedPayload
 	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
@@ -520,6 +562,34 @@ func decodeMessageEditedPayload(payloadJSON []byte) (messageEditedPayload, error
 		return messageEditedPayload{}, errors.New("message edited payload is incomplete")
 	}
 	return payload, nil
+}
+
+func decodeMessageDeletedPayload(payloadJSON []byte) (messageDeletedPayload, error) {
+	var payload messageDeletedPayload
+	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+		return messageDeletedPayload{}, err
+	}
+	if payload.MessageID == "" ||
+		payload.ConversationID == "" ||
+		payload.ConversationSeq <= 0 ||
+		payload.ChangeVersion <= 0 ||
+		payload.DeletedBy == "" ||
+		payload.DeleteScope == "" ||
+		payload.DeletedAt == "" {
+		return messageDeletedPayload{}, errors.New("message deleted payload is incomplete")
+	}
+	return payload, nil
+}
+
+func messageDeleteScope(scope string) (conversationtimelinev1.MessageDeleteScope, error) {
+	switch scope {
+	case "CONVERSATION_VIEW":
+		return conversationtimelinev1.MessageDeleteScope_MESSAGE_DELETE_SCOPE_CONVERSATION_VIEW, nil
+	case "COMPLIANCE_RETENTION":
+		return conversationtimelinev1.MessageDeleteScope_MESSAGE_DELETE_SCOPE_COMPLIANCE_RETENTION, nil
+	default:
+		return conversationtimelinev1.MessageDeleteScope_MESSAGE_DELETE_SCOPE_UNSPECIFIED, errors.New("unsupported message delete scope")
+	}
 }
 
 type memberBoundaryPayload struct {

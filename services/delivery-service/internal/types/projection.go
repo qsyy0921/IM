@@ -6,6 +6,7 @@ const (
 	TimelineEventMessagePersisted                    = "message.persisted.v1"
 	TimelineEventMessageEdited                       = "message.edited.v1"
 	TimelineEventMessageRevoked                      = "message.revoked.v1"
+	TimelineEventMessageDeleted                      = "message.deleted.v1"
 	TimelineEventConversationMemberJoined            = "conversation.member.joined.v1"
 	TimelineEventConversationMemberLeft              = "conversation.member.left.v1"
 	TimelineEventConversationMemberRemoved           = "conversation.member.removed.v1"
@@ -58,7 +59,7 @@ func (command ProjectTimelineEventCommand) Validate() error {
 		return NewInvalidArgument("conversation_seq must be positive")
 	}
 	switch command.EventType {
-	case TimelineEventMessagePersisted, TimelineEventMessageEdited, TimelineEventMessageRevoked:
+	case TimelineEventMessagePersisted, TimelineEventMessageEdited, TimelineEventMessageRevoked, TimelineEventMessageDeleted:
 		if command.MessageID == "" {
 			return NewInvalidArgument("message_id is required")
 		}

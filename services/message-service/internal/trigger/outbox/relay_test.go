@@ -97,6 +97,33 @@ func TestBuildConversationTimelineEventMessageEdited(t *testing.T) {
 	}
 }
 
+func TestBuildConversationTimelineEventMessageDeleted(t *testing.T) {
+	message := testDeletedOutboxMessage()
+
+	event, err := BuildConversationTimelineEvent(message)
+	if err != nil {
+		t.Fatalf("build event: %v", err)
+	}
+	if event.EventId != string(message.EventID) ||
+		event.EventType != string(types.TimelineEventMessageDeleted) ||
+		event.AggregateVersion != message.AggregateVersion ||
+		event.PartitionKey != message.PartitionKey {
+		t.Fatalf("unexpected envelope: %+v", event)
+	}
+	payload := event.GetMessageDeleted()
+	if payload == nil {
+		t.Fatalf("expected message_deleted payload")
+	}
+	if payload.MessageId != "msg-1" ||
+		payload.ConversationSeq != 2 ||
+		payload.ChangeVersion != 1 ||
+		payload.DeletedBy != "user-1" ||
+		payload.DeleteScope != conversationtimelinev1.MessageDeleteScope_MESSAGE_DELETE_SCOPE_CONVERSATION_VIEW ||
+		payload.DeletedAt == nil {
+		t.Fatalf("unexpected delete payload: %+v", payload)
+	}
+}
+
 func TestBuildConversationTimelineEventMemberBoundaryPayloads(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -1011,6 +1038,40 @@ func testEditedOutboxMessage() types.OutboxMessage {
 			"after_payload":{"text":"hello edited"},
 			"reason":"typo",
 			"edited_at":"2026-06-08T12:01:00Z"
+		}`),
+	}
+}
+
+func testDeletedOutboxMessage() types.OutboxMessage {
+	occurredAt := time.Date(2026, 6, 8, 12, 1, 0, 0, time.UTC)
+	return types.OutboxMessage{
+		ID:                  4,
+		EventID:             "event-delete-1",
+		TenantID:            "tenant-1",
+		ConversationID:      "conv-1",
+		AggregateVersion:    2,
+		EventType:           types.TimelineEventMessageDeleted,
+		EventVersion:        "v1",
+		PartitionKey:        "tenant-1:conv-1",
+		MappingVersion:      "message.deleted.v1",
+		CorrelationID:       "request-1",
+		CausationID:         "delete-1",
+		Producer:            "message-service",
+		TraceID:             "trace-1",
+		FanoutMode:          types.FanoutModeWriteFanout,
+		FanoutPolicyVersion: 1,
+		PermissionVersion:   1,
+		Classification:      "INTERNAL",
+		OccurredAt:          occurredAt,
+		PayloadJSON: []byte(`{
+			"message_id":"msg-1",
+			"conversation_id":"conv-1",
+			"conversation_seq":2,
+			"change_version":1,
+			"deleted_by":"user-1",
+			"delete_scope":"CONVERSATION_VIEW",
+			"reason":"cleanup",
+			"deleted_at":"2026-06-08T12:01:00Z"
 		}`),
 	}
 }

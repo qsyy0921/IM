@@ -54,6 +54,12 @@ func (repository *Repository) ProjectTimelineEvent(
 			return types.ProjectTimelineEventResult{}, err
 		}
 		result.ProjectedInboxCount = count
+	case types.TimelineEventMessageDeleted:
+		count, err := projectMessageChangedForOriginalRecipients(ctx, tx, command, "message delete has no projected original message")
+		if err != nil {
+			return types.ProjectTimelineEventResult{}, err
+		}
+		result.ProjectedInboxCount = count
 	case types.TimelineEventConversationMemberJoined,
 		types.TimelineEventConversationMemberLeft,
 		types.TimelineEventConversationMemberRemoved,

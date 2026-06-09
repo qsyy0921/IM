@@ -81,6 +81,8 @@ func buildCommand(consumerGroup string, message types.TimelineMessage) (types.Pr
 		fillMessageEdited(&command, payload.MessageEdited)
 	case *conversationtimelinev1.ConversationTimelineEvent_MessageRevoked:
 		fillMessageRevoked(&command, payload.MessageRevoked)
+	case *conversationtimelinev1.ConversationTimelineEvent_MessageDeleted:
+		fillMessageDeleted(&command, payload.MessageDeleted)
 	case *conversationtimelinev1.ConversationTimelineEvent_ConversationMemberJoined:
 		fillMemberBoundary(&command, payload.ConversationMemberJoined.GetTargetUserId(), payload.ConversationMemberJoined.GetNewRole(), payload.ConversationMemberJoined.GetNewStatus(), payload.ConversationMemberJoined.GetMemberVersion(), payload.ConversationMemberJoined.GetPermissionVersion())
 	case *conversationtimelinev1.ConversationTimelineEvent_ConversationMemberLeft:
@@ -125,6 +127,15 @@ func fillMessageEdited(command *types.ProjectTimelineEventCommand, payload *conv
 	}
 	command.MessageID = payload.GetMessageId()
 	command.SenderID = types.UserID(payload.GetEditedBy())
+	command.PayloadJSON, _ = protojson.Marshal(payload)
+}
+
+func fillMessageDeleted(command *types.ProjectTimelineEventCommand, payload *conversationtimelinev1.MessageDeletedV1) {
+	if payload == nil {
+		return
+	}
+	command.MessageID = payload.GetMessageId()
+	command.SenderID = types.UserID(payload.GetDeletedBy())
 	command.PayloadJSON, _ = protojson.Marshal(payload)
 }
 

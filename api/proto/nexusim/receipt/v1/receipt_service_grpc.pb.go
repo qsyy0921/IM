@@ -19,10 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ReceiptService_MarkRead_FullMethodName          = "/nexusim.receipt.v1.ReceiptService/MarkRead"
-	ReceiptService_GetReceiptState_FullMethodName   = "/nexusim.receipt.v1.ReceiptService/GetReceiptState"
-	ReceiptService_ListReceiptStates_FullMethodName = "/nexusim.receipt.v1.ReceiptService/ListReceiptStates"
-	ReceiptService_ListConversations_FullMethodName = "/nexusim.receipt.v1.ReceiptService/ListConversations"
+	ReceiptService_MarkRead_FullMethodName            = "/nexusim.receipt.v1.ReceiptService/MarkRead"
+	ReceiptService_GetReceiptState_FullMethodName     = "/nexusim.receipt.v1.ReceiptService/GetReceiptState"
+	ReceiptService_ListReceiptStates_FullMethodName   = "/nexusim.receipt.v1.ReceiptService/ListReceiptStates"
+	ReceiptService_ListConversations_FullMethodName   = "/nexusim.receipt.v1.ReceiptService/ListConversations"
+	ReceiptService_ArchiveConversation_FullMethodName = "/nexusim.receipt.v1.ReceiptService/ArchiveConversation"
 )
 
 // ReceiptServiceClient is the client API for ReceiptService service.
@@ -33,6 +34,7 @@ type ReceiptServiceClient interface {
 	GetReceiptState(ctx context.Context, in *GetReceiptStateRequest, opts ...grpc.CallOption) (*GetReceiptStateResponse, error)
 	ListReceiptStates(ctx context.Context, in *ListReceiptStatesRequest, opts ...grpc.CallOption) (*ListReceiptStatesResponse, error)
 	ListConversations(ctx context.Context, in *ListConversationsRequest, opts ...grpc.CallOption) (*ListConversationsResponse, error)
+	ArchiveConversation(ctx context.Context, in *ArchiveConversationRequest, opts ...grpc.CallOption) (*ArchiveConversationResponse, error)
 }
 
 type receiptServiceClient struct {
@@ -83,6 +85,16 @@ func (c *receiptServiceClient) ListConversations(ctx context.Context, in *ListCo
 	return out, nil
 }
 
+func (c *receiptServiceClient) ArchiveConversation(ctx context.Context, in *ArchiveConversationRequest, opts ...grpc.CallOption) (*ArchiveConversationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ArchiveConversationResponse)
+	err := c.cc.Invoke(ctx, ReceiptService_ArchiveConversation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ReceiptServiceServer is the server API for ReceiptService service.
 // All implementations must embed UnimplementedReceiptServiceServer
 // for forward compatibility.
@@ -91,6 +103,7 @@ type ReceiptServiceServer interface {
 	GetReceiptState(context.Context, *GetReceiptStateRequest) (*GetReceiptStateResponse, error)
 	ListReceiptStates(context.Context, *ListReceiptStatesRequest) (*ListReceiptStatesResponse, error)
 	ListConversations(context.Context, *ListConversationsRequest) (*ListConversationsResponse, error)
+	ArchiveConversation(context.Context, *ArchiveConversationRequest) (*ArchiveConversationResponse, error)
 	mustEmbedUnimplementedReceiptServiceServer()
 }
 
@@ -112,6 +125,9 @@ func (UnimplementedReceiptServiceServer) ListReceiptStates(context.Context, *Lis
 }
 func (UnimplementedReceiptServiceServer) ListConversations(context.Context, *ListConversationsRequest) (*ListConversationsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListConversations not implemented")
+}
+func (UnimplementedReceiptServiceServer) ArchiveConversation(context.Context, *ArchiveConversationRequest) (*ArchiveConversationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ArchiveConversation not implemented")
 }
 func (UnimplementedReceiptServiceServer) mustEmbedUnimplementedReceiptServiceServer() {}
 func (UnimplementedReceiptServiceServer) testEmbeddedByValue()                        {}
@@ -206,6 +222,24 @@ func _ReceiptService_ListConversations_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ReceiptService_ArchiveConversation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ArchiveConversationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReceiptServiceServer).ArchiveConversation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReceiptService_ArchiveConversation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReceiptServiceServer).ArchiveConversation(ctx, req.(*ArchiveConversationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ReceiptService_ServiceDesc is the grpc.ServiceDesc for ReceiptService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -228,6 +262,10 @@ var ReceiptService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListConversations",
 			Handler:    _ReceiptService_ListConversations_Handler,
+		},
+		{
+			MethodName: "ArchiveConversation",
+			Handler:    _ReceiptService_ArchiveConversation_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

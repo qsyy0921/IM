@@ -12,7 +12,7 @@ import (
 )
 
 func TestMarkReadMapsValidationError(t *testing.T) {
-	server := NewServer(fakeMarkRead{err: types.NewInvalidArgument("tenant_id is required")}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{})
+	server := NewServer(fakeMarkRead{err: types.NewInvalidArgument("tenant_id is required")}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{}, fakeArchiveConversation{})
 	_, err := server.MarkRead(context.Background(), &receiptv1.MarkReadRequest{})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", status.Code(err))
@@ -20,7 +20,7 @@ func TestMarkReadMapsValidationError(t *testing.T) {
 }
 
 func TestMarkReadSanitizesDBWriteError(t *testing.T) {
-	server := NewServer(fakeMarkRead{err: types.NewDBWriteFailed("duplicate key value violates unique constraint receipt_outbox_event_id_key")}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{})
+	server := NewServer(fakeMarkRead{err: types.NewDBWriteFailed("duplicate key value violates unique constraint receipt_outbox_event_id_key")}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{}, fakeArchiveConversation{})
 	_, err := server.MarkRead(context.Background(), &receiptv1.MarkReadRequest{
 		AuthContext:    &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
 		ConversationId: "conversation-1",
@@ -39,7 +39,7 @@ func TestMarkReadSanitizesDBWriteError(t *testing.T) {
 }
 
 func TestListConversationsMapsValidationError(t *testing.T) {
-	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{err: types.NewInvalidArgument("tenant_id is required")})
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{err: types.NewInvalidArgument("tenant_id is required")}, fakeArchiveConversation{})
 	_, err := server.ListConversations(context.Background(), &receiptv1.ListConversationsRequest{})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", status.Code(err))
@@ -48,7 +48,7 @@ func TestListConversationsMapsValidationError(t *testing.T) {
 
 func TestListConversationsMapsSort(t *testing.T) {
 	list := &fakeListConversationsCapture{}
-	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, list)
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, list, fakeArchiveConversation{})
 	_, err := server.ListConversations(context.Background(), &receiptv1.ListConversationsRequest{
 		AuthContext: &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
 		Limit:       20,
@@ -87,7 +87,7 @@ func TestListConversationsMapsResponse(t *testing.T) {
 			},
 		},
 	}
-	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, list)
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, list, fakeArchiveConversation{})
 	response, err := server.ListConversations(context.Background(), &receiptv1.ListConversationsRequest{
 		AuthContext: &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
 	})
@@ -102,7 +102,8 @@ func TestListConversationsMapsResponse(t *testing.T) {
 	item := response.GetItems()[0]
 	if item.GetConversationId() != "conversation-1" ||
 		item.GetLastSourceEventType() != types.SourceEventMessageEdited ||
-		item.GetUpdatedAtUnixMs() != updatedAt.UnixMilli() {
+		item.GetUpdatedAtUnixMs() != updatedAt.UnixMilli() ||
+		item.GetArchived() {
 		t.Fatalf("unexpected item: %+v", item)
 	}
 }
@@ -125,7 +126,7 @@ func TestListReceiptStatesMapsRequestAndResponse(t *testing.T) {
 			}},
 		},
 	}
-	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, list, fakeListConversations{})
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, list, fakeListConversations{}, fakeArchiveConversation{})
 	response, err := server.ListReceiptStates(context.Background(), &receiptv1.ListReceiptStatesRequest{
 		AuthContext:    &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
 		ConversationId: "conversation-1",
@@ -146,6 +147,35 @@ func TestListReceiptStatesMapsRequestAndResponse(t *testing.T) {
 	if len(response.GetItems()) != 1 ||
 		response.GetItems()[0].GetConversationSeq() != 11 ||
 		response.GetItems()[0].GetReadUserCount() != 1 {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
+func TestArchiveConversationMapsRequestAndResponse(t *testing.T) {
+	archive := &fakeArchiveConversationCapture{
+		result: types.ArchiveConversationResult{
+			Conversation: types.ConversationSummary{
+				ConversationID: "conversation-1",
+				LastVisibleSeq: 7,
+				LastMessageID:  "message-7",
+				Archived:       true,
+			},
+		},
+	}
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{}, archive)
+	response, err := server.ArchiveConversation(context.Background(), &receiptv1.ArchiveConversationRequest{
+		AuthContext:    &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
+		ConversationId: "conversation-1",
+		Archived:       true,
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if archive.command.ConversationID != "conversation-1" || !archive.command.Archived {
+		t.Fatalf("unexpected command: %+v", archive.command)
+	}
+	if response.GetConversation().GetConversationId() != "conversation-1" ||
+		!response.GetConversation().GetArchived() {
 		t.Fatalf("unexpected response: %+v", response)
 	}
 }
@@ -200,6 +230,22 @@ type fakeListConversationsCapture struct {
 }
 
 func (fake *fakeListConversationsCapture) Execute(_ context.Context, command types.ListConversationsCommand) (types.ListConversationsResult, error) {
+	fake.command = command
+	return fake.result, nil
+}
+
+type fakeArchiveConversation struct{}
+
+func (fakeArchiveConversation) Execute(context.Context, types.ArchiveConversationCommand) (types.ArchiveConversationResult, error) {
+	return types.ArchiveConversationResult{}, nil
+}
+
+type fakeArchiveConversationCapture struct {
+	command types.ArchiveConversationCommand
+	result  types.ArchiveConversationResult
+}
+
+func (fake *fakeArchiveConversationCapture) Execute(_ context.Context, command types.ArchiveConversationCommand) (types.ArchiveConversationResult, error) {
 	fake.command = command
 	return fake.result, nil
 }

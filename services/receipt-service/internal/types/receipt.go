@@ -133,10 +133,11 @@ type ReceiptAccessContext struct {
 }
 
 type ListConversationsCommand struct {
-	AuthContext AuthContext
-	Limit       int
-	PageCursor  string
-	Sort        string
+	AuthContext     AuthContext
+	Limit           int
+	PageCursor      string
+	Sort            string
+	IncludeArchived bool
 }
 
 func (command ListConversationsCommand) Validate() error {
@@ -173,6 +174,7 @@ type ConversationSummary struct {
 	UnreadCount         int64
 	LastReadSeq         int64
 	UpdatedAt           time.Time
+	Archived            bool
 }
 
 type ProjectionWatermark struct {
@@ -185,4 +187,24 @@ type ListConversationsResult struct {
 	Items               []ConversationSummary
 	NextPageCursor      string
 	ProjectionWatermark ProjectionWatermark
+}
+
+type ArchiveConversationCommand struct {
+	AuthContext    AuthContext
+	ConversationID ConversationID
+	Archived       bool
+}
+
+func (command ArchiveConversationCommand) Validate() error {
+	if err := command.AuthContext.Validate(); err != nil {
+		return err
+	}
+	if command.ConversationID == "" {
+		return NewInvalidArgument("conversation_id is required")
+	}
+	return nil
+}
+
+type ArchiveConversationResult struct {
+	Conversation ConversationSummary
 }

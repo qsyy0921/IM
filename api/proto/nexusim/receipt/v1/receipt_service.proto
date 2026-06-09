@@ -9,6 +9,7 @@ service ReceiptService {
   rpc GetReceiptState(GetReceiptStateRequest) returns (GetReceiptStateResponse);
   rpc ListReceiptStates(ListReceiptStatesRequest) returns (ListReceiptStatesResponse);
   rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
+  rpc ArchiveConversation(ArchiveConversationRequest) returns (ArchiveConversationResponse);
 }
 
 message AuthContext {
@@ -90,6 +91,7 @@ message ListConversationsRequest {
   int32 limit = 2;
   string page_cursor = 3;
   ConversationListSort sort = 4;
+  bool include_archived = 5;
 }
 
 message ProjectionWatermark {
@@ -107,10 +109,21 @@ message ConversationSummary {
   int64 last_read_seq = 6;
   int64 updated_at_unix_ms = 7;
   string last_source_event_type = 8;
+  bool archived = 9;
 }
 
 message ListConversationsResponse {
   repeated ConversationSummary items = 1;
   string next_page_cursor = 2;
   ProjectionWatermark projection_watermark = 3;
+}
+
+message ArchiveConversationRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  bool archived = 3;
+}
+
+message ArchiveConversationResponse {
+  ConversationSummary conversation = 1;
 }

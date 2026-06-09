@@ -11,6 +11,7 @@ var (
 	ErrReadOutOfVisibleRange  = errors.New("read out of visible range")
 	ErrReadOutOfReceivedRange = errors.New("read out of received range")
 	ErrReceiptNotFound        = errors.New("receipt not found")
+	ErrConversationNotFound   = errors.New("conversation not found")
 	ErrProjectionLagging      = errors.New("projection lagging")
 	ErrDBReadFailed           = errors.New("db read failed")
 	ErrDBWriteFailed          = errors.New("db write failed")
@@ -50,6 +51,13 @@ func NewReceiptNotFound(reason string) error {
 		return ErrReceiptNotFound
 	}
 	return fmt.Errorf("%w: %s", ErrReceiptNotFound, reason)
+}
+
+func NewConversationNotFound(reason string) error {
+	if reason == "" {
+		return ErrConversationNotFound
+	}
+	return fmt.Errorf("%w: %s", ErrConversationNotFound, reason)
 }
 
 func NewProjectionLagging(reason string) error {

@@ -271,12 +271,12 @@ func (repository *Repository) ListConversations(
 	if limit > 100 {
 		limit = 100
 	}
-	cursor, hasCursor, err := decodeListCursor(command.PageCursor, sort)
+	cursor, hasCursor, err := decodeListCursor(command.PageCursor, sort, command.IncludeArchived)
 	if err != nil {
 		return types.ListConversationsResult{}, err
 	}
 
-	args := []any{command.AuthContext.TenantID, command.AuthContext.UserID, limit + 1}
+	args := []any{command.AuthContext.TenantID, command.AuthContext.UserID, limit + 1, command.IncludeArchived}
 	query := `
 SELECT
     conversation_id,
@@ -286,15 +286,17 @@ SELECT
     last_source_event_type,
     unread_count,
     last_read_seq,
-    sort_updated_at
+    sort_updated_at,
+    archived
 FROM user_conversation_summaries
 WHERE tenant_id = $1
   AND user_id = $2
+  AND ($4 OR archived = FALSE)
 `
 	if hasCursor {
 		query += `  AND (
-      sort_updated_at < $4
-      OR (sort_updated_at = $4 AND conversation_id > $5)
+      sort_updated_at < $5
+      OR (sort_updated_at = $5 AND conversation_id > $6)
   )
 `
 		args = append(args, cursor.SortUpdatedAt, cursor.ConversationID)
@@ -321,6 +323,7 @@ LIMIT $3
 			&item.UnreadCount,
 			&item.LastReadSeq,
 			&item.UpdatedAt,
+			&item.Archived,
 		); err != nil {
 			return types.ListConversationsResult{}, types.NewDBReadFailed(err.Error())
 		}
@@ -334,10 +337,11 @@ LIMIT $3
 	if len(items) > limit {
 		last := items[limit-1]
 		nextCursor = encodeListCursor(listCursor{
-			Version:        listCursorVersion,
-			Sort:           sort,
-			SortUpdatedAt:  last.UpdatedAt,
-			ConversationID: string(last.ConversationID),
+			Version:         listCursorVersion,
+			Sort:            sort,
+			IncludeArchived: command.IncludeArchived,
+			SortUpdatedAt:   last.UpdatedAt,
+			ConversationID:  string(last.ConversationID),
 		})
 		items = items[:limit]
 	}
@@ -350,6 +354,55 @@ LIMIT $3
 		NextPageCursor:      nextCursor,
 		ProjectionWatermark: watermark,
 	}, nil
+}
+
+func (repository *Repository) ArchiveConversation(
+	ctx context.Context,
+	command types.ArchiveConversationCommand,
+) (types.ArchiveConversationResult, error) {
+	if err := command.Validate(); err != nil {
+		return types.ArchiveConversationResult{}, err
+	}
+	var item types.ConversationSummary
+	var archivedAt sql.NullTime
+	err := repository.pool.QueryRow(ctx, `
+UPDATE user_conversation_summaries
+SET archived = $4,
+    archived_at = CASE WHEN $4 THEN now() ELSE NULL END,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND conversation_id = $3
+RETURNING
+    conversation_id,
+    last_visible_seq,
+    last_message_id,
+    last_sender_id,
+    last_source_event_type,
+    unread_count,
+    last_read_seq,
+    sort_updated_at,
+    archived,
+    archived_at
+`, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.Archived).Scan(
+		&item.ConversationID,
+		&item.LastVisibleSeq,
+		&item.LastMessageID,
+		&item.LastSenderID,
+		&item.LastSourceEventType,
+		&item.UnreadCount,
+		&item.LastReadSeq,
+		&item.UpdatedAt,
+		&item.Archived,
+		&archivedAt,
+	)
+	if err == pgx.ErrNoRows {
+		return types.ArchiveConversationResult{}, types.NewConversationNotFound("conversation summary not found")
+	}
+	if err != nil {
+		return types.ArchiveConversationResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.ArchiveConversationResult{Conversation: item}, nil
 }
 
 func (repository *Repository) conversationSummaryWatermark(ctx context.Context) (types.ProjectionWatermark, error) {
@@ -382,15 +435,16 @@ func validateAccessContext(tenantID types.TenantID, conversationID types.Convers
 }
 
 type listCursor struct {
-	Version        int       `json:"v"`
-	Sort           string    `json:"sort"`
-	SortUpdatedAt  time.Time `json:"sort_updated_at"`
-	ConversationID string    `json:"conversation_id"`
+	Version         int       `json:"v"`
+	Sort            string    `json:"sort"`
+	IncludeArchived bool      `json:"include_archived"`
+	SortUpdatedAt   time.Time `json:"sort_updated_at"`
+	ConversationID  string    `json:"conversation_id"`
 }
 
 const listCursorVersion = 1
 
-func decodeListCursor(value string, sort string) (listCursor, bool, error) {
+func decodeListCursor(value string, sort string, includeArchived bool) (listCursor, bool, error) {
 	if value == "" {
 		return listCursor{}, false, nil
 	}
@@ -406,7 +460,7 @@ func decodeListCursor(value string, sort string) (listCursor, bool, error) {
 		cursor.Version = listCursorVersion
 		cursor.Sort = types.ConversationListSortUpdatedAtDesc
 	}
-	if cursor.Version != listCursorVersion || cursor.Sort != sort {
+	if cursor.Version != listCursorVersion || cursor.Sort != sort || cursor.IncludeArchived != includeArchived {
 		return listCursor{}, false, types.NewInvalidArgument("invalid page_cursor")
 	}
 	if cursor.SortUpdatedAt.IsZero() || cursor.ConversationID == "" {

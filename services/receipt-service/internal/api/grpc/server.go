@@ -27,12 +27,17 @@ type ListConversationsExecutor interface {
 	Execute(context.Context, types.ListConversationsCommand) (types.ListConversationsResult, error)
 }
 
+type ArchiveConversationExecutor interface {
+	Execute(context.Context, types.ArchiveConversationCommand) (types.ArchiveConversationResult, error)
+}
+
 type Server struct {
 	receiptv1.UnimplementedReceiptServiceServer
-	markRead          MarkReadExecutor
-	getReceiptState   GetReceiptStateExecutor
-	listReceiptStates ListReceiptStatesExecutor
-	listConversations ListConversationsExecutor
+	markRead            MarkReadExecutor
+	getReceiptState     GetReceiptStateExecutor
+	listReceiptStates   ListReceiptStatesExecutor
+	listConversations   ListConversationsExecutor
+	archiveConversation ArchiveConversationExecutor
 }
 
 func NewServer(
@@ -40,12 +45,14 @@ func NewServer(
 	getReceiptState GetReceiptStateExecutor,
 	listReceiptStates ListReceiptStatesExecutor,
 	listConversations ListConversationsExecutor,
+	archiveConversation ArchiveConversationExecutor,
 ) *Server {
 	return &Server{
-		markRead:          markRead,
-		getReceiptState:   getReceiptState,
-		listReceiptStates: listReceiptStates,
-		listConversations: listConversations,
+		markRead:            markRead,
+		getReceiptState:     getReceiptState,
+		listReceiptStates:   listReceiptStates,
+		listConversations:   listConversations,
+		archiveConversation: archiveConversation,
 	}
 }
 
@@ -189,9 +196,10 @@ func (server *Server) ListConversations(
 			TraceID:   auth.GetTraceId(),
 			RequestID: auth.GetRequestId(),
 		},
-		Limit:      int(request.GetLimit()),
-		PageCursor: request.GetPageCursor(),
-		Sort:       conversationListSortFromProto(request.GetSort()),
+		Limit:           int(request.GetLimit()),
+		PageCursor:      request.GetPageCursor(),
+		Sort:            conversationListSortFromProto(request.GetSort()),
+		IncludeArchived: request.GetIncludeArchived(),
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -207,6 +215,7 @@ func (server *Server) ListConversations(
 			UnreadCount:         item.UnreadCount,
 			LastReadSeq:         item.LastReadSeq,
 			UpdatedAtUnixMs:     item.UpdatedAt.UnixMilli(),
+			Archived:            item.Archived,
 		})
 	}
 	return &receiptv1.ListConversationsResponse{
@@ -218,6 +227,48 @@ func (server *Server) ListConversations(
 			UpdatedAtUnixMs: result.ProjectionWatermark.UpdatedAt.UnixMilli(),
 		},
 	}, nil
+}
+
+func (server *Server) ArchiveConversation(
+	ctx context.Context,
+	request *receiptv1.ArchiveConversationRequest,
+) (*receiptv1.ArchiveConversationResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	auth := request.GetAuthContext()
+	result, err := server.archiveConversation.Execute(ctx, types.ArchiveConversationCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  types.TenantID(auth.GetTenantId()),
+			UserID:    types.UserID(auth.GetUserId()),
+			DeviceID:  auth.GetDeviceId(),
+			SessionID: auth.GetSessionId(),
+			TraceID:   auth.GetTraceId(),
+			RequestID: auth.GetRequestId(),
+		},
+		ConversationID: types.ConversationID(request.GetConversationId()),
+		Archived:       request.GetArchived(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &receiptv1.ArchiveConversationResponse{
+		Conversation: conversationSummaryResponse(result.Conversation),
+	}, nil
+}
+
+func conversationSummaryResponse(item types.ConversationSummary) *receiptv1.ConversationSummary {
+	return &receiptv1.ConversationSummary{
+		ConversationId:      string(item.ConversationID),
+		LastVisibleSeq:      item.LastVisibleSeq,
+		LastMessageId:       item.LastMessageID,
+		LastSenderId:        string(item.LastSenderID),
+		LastSourceEventType: item.LastSourceEventType,
+		UnreadCount:         item.UnreadCount,
+		LastReadSeq:         item.LastReadSeq,
+		UpdatedAtUnixMs:     item.UpdatedAt.UnixMilli(),
+		Archived:            item.Archived,
+	}
 }
 
 func conversationListSortFromProto(sort receiptv1.ConversationListSort) string {
@@ -243,6 +294,8 @@ func grpcError(err error) error {
 		return status.Error(codes.FailedPrecondition, "read out of received range")
 	case errors.Is(err, types.ErrReceiptNotFound):
 		return status.Error(codes.NotFound, "receipt not found")
+	case errors.Is(err, types.ErrConversationNotFound):
+		return status.Error(codes.NotFound, "conversation not found")
 	case errors.Is(err, types.ErrProjectionLagging):
 		return status.Error(codes.Unavailable, "receipt projection lagging")
 	case errors.Is(err, types.ErrDBReadFailed):

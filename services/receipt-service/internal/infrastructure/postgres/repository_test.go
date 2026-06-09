@@ -275,6 +275,75 @@ func TestRepositoryListConversationsRejectsInvalidCursorIntegration(t *testing.T
 	}
 }
 
+func TestRepositoryArchiveConversationFiltersListIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	if _, err := repository.ProjectDeliveryEvent(ctx, inboxCreatedCommand(1, "delivery-inbox-1")); err != nil {
+		t.Fatalf("project inbox item: %v", err)
+	}
+	archiveResult, err := repository.ArchiveConversation(ctx, archiveConversationCommand(true))
+	if err != nil {
+		t.Fatalf("archive conversation: %v", err)
+	}
+	if !archiveResult.Conversation.Archived {
+		t.Fatalf("expected archived conversation in response: %+v", archiveResult)
+	}
+
+	defaultList, err := repository.ListConversations(ctx, listConversationsCommand(10, ""))
+	if err != nil {
+		t.Fatalf("list default conversations: %v", err)
+	}
+	assertConversationIDs(t, defaultList)
+
+	archivedList, err := repository.ListConversations(ctx, listConversationsCommandIncludingArchived(10, ""))
+	if err != nil {
+		t.Fatalf("list including archived conversations: %v", err)
+	}
+	assertConversationSummaryWithArchive(t, archivedList, 1, true)
+
+	if _, err := repository.ProjectDeliveryEvent(ctx, inboxCreatedCommand(2, "delivery-inbox-2")); err != nil {
+		t.Fatalf("project inbox while archived: %v", err)
+	}
+	defaultList, err = repository.ListConversations(ctx, listConversationsCommand(10, ""))
+	if err != nil {
+		t.Fatalf("list default conversations after new event: %v", err)
+	}
+	assertConversationIDs(t, defaultList)
+	archivedList, err = repository.ListConversations(ctx, listConversationsCommandIncludingArchived(10, ""))
+	if err != nil {
+		t.Fatalf("list including archived conversations after new event: %v", err)
+	}
+	assertConversationSummaryWithArchive(t, archivedList, 2, true)
+
+	unarchiveResult, err := repository.ArchiveConversation(ctx, archiveConversationCommand(false))
+	if err != nil {
+		t.Fatalf("unarchive conversation: %v", err)
+	}
+	if unarchiveResult.Conversation.Archived {
+		t.Fatalf("expected unarchived conversation in response: %+v", unarchiveResult)
+	}
+	defaultList, err = repository.ListConversations(ctx, listConversationsCommand(10, ""))
+	if err != nil {
+		t.Fatalf("list default conversations after unarchive: %v", err)
+	}
+	assertConversationSummaryWithArchive(t, defaultList, 2, false)
+}
+
+func TestRepositoryArchiveConversationRejectsUnknownSummaryIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	_, err := repository.ArchiveConversation(ctx, archiveConversationCommand(true))
+	if !errors.Is(err, types.ErrConversationNotFound) {
+		t.Fatalf("expected conversation not found, got %v", err)
+	}
+}
+
 func inboxCreatedCommand(seq int64, eventID string) types.ProjectDeliveryEventCommand {
 	return types.ProjectDeliveryEventCommand{
 		TenantID:        "tenant-receipt",
@@ -384,6 +453,24 @@ func listConversationsCommand(limit int, cursor string) types.ListConversationsC
 	}
 }
 
+func listConversationsCommandIncludingArchived(limit int, cursor string) types.ListConversationsCommand {
+	command := listConversationsCommand(limit, cursor)
+	command.IncludeArchived = true
+	return command
+}
+
+func archiveConversationCommand(archived bool) types.ArchiveConversationCommand {
+	return types.ArchiveConversationCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-receipt",
+			UserID:   "receiver-1",
+			DeviceID: "device-1",
+		},
+		ConversationID: "conv-receipt",
+		Archived:       archived,
+	}
+}
+
 func getStateCommandBySeq(seq int64) types.GetReceiptStateCommand {
 	return types.GetReceiptStateCommand{
 		AuthContext: types.AuthContext{
@@ -458,6 +545,19 @@ func assertConversationSummaryWithMessage(
 	}
 	if item.LastSourceEventType != wantLastSourceEventType {
 		t.Fatalf("unexpected last_source_event_type: %+v", item)
+	}
+}
+
+func assertConversationSummaryWithArchive(
+	t *testing.T,
+	result types.ListConversationsResult,
+	wantLastVisibleSeq int64,
+	wantArchived bool,
+) {
+	t.Helper()
+	assertConversationSummary(t, result, wantLastVisibleSeq, wantLastVisibleSeq, 0)
+	if result.Items[0].Archived != wantArchived {
+		t.Fatalf("expected archived=%v, got %+v", wantArchived, result.Items[0])
 	}
 }
 
@@ -558,6 +658,7 @@ func applyReceiptMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool
 		"000002_conversation_summary.sql",
 		"000003_receipt_source_event_type.sql",
 		"000004_conversation_summary_source_event_type.sql",
+		"000005_conversation_archive.sql",
 	} {
 		migrationPath := filepath.Join(root, "migrations", "postgres", "receipt", name)
 		sqlBytes, err := os.ReadFile(migrationPath)

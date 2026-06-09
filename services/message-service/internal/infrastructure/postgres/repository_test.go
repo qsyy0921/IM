@@ -196,6 +196,59 @@ func TestMessageRepositoryRevokeMessageIntegration(t *testing.T) {
 	assertRevokedFacts(t, ctx, pool, revokeInput, result)
 }
 
+func TestMessageRepositoryRevokeMessageRejectsNonSenderIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	runID := time.Now().UnixNano()
+	messageCounter := 0
+	eventCounter := 0
+	repo := NewMessageRepository(
+		pool,
+		WithIDGenerators(
+			func() (types.MessageID, error) {
+				messageCounter++
+				return types.MessageID(fmt.Sprintf("msg-revoke-nonsender-%d-%d", runID, messageCounter)), nil
+			},
+			func() (types.EventID, error) {
+				eventCounter++
+				return types.EventID(fmt.Sprintf("event-revoke-nonsender-%d-%d", runID, eventCounter)), nil
+			},
+		),
+	)
+	tenantID := types.TenantID(fmt.Sprintf("tenant-it-revoke-nonsender-%d", runID))
+	appendInput := testAppendInput(tenantID, "client-revoke-nonsender", []byte(`{"text":"hello"}`))
+	appendResult, err := repo.AppendMessage(ctx, appendInput)
+	if err != nil {
+		t.Fatalf("append source message: %v", err)
+	}
+
+	revokeInput := testRevokeInput(appendInput, appendResult.MessageID, "revoke-nonsender-key", "not mine")
+	revokeInput.Command.AuthContext.UserID = "other-user"
+	_, err = repo.RevokeMessage(ctx, revokeInput)
+	if !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected permission denied, got %v", err)
+	}
+	assertCurrentSeq(t, ctx, pool, tenantID, appendInput.Command.ConversationID, 1)
+	assertCount(t, ctx, pool, "message_change_history", tenantID, 0)
+
+	var status string
+	if err := pool.QueryRow(ctx, `
+SELECT status
+FROM message_log
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND message_id = $3
+`, tenantID, appendInput.Command.ConversationID, appendResult.MessageID).Scan(&status); err != nil {
+		t.Fatalf("read message status: %v", err)
+	}
+	if status != "NORMAL" {
+		t.Fatalf("expected message to remain NORMAL, got %s", status)
+	}
+}
+
 func TestMessageRepositoryBackpressureRejectsWhenPoolSaturated(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

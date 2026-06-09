@@ -13,6 +13,7 @@ var (
 	ErrDBReadFailed         = errors.New("db read failed")
 	ErrDBWriteFailed        = errors.New("db write failed")
 	ErrServiceOverloaded    = errors.New("service overloaded")
+	ErrProjectionDependency = errors.New("projection dependency missing")
 )
 
 func NewInvalidArgument(reason string) error {
@@ -62,4 +63,11 @@ func NewServiceOverloaded(reason string) error {
 		return ErrServiceOverloaded
 	}
 	return fmt.Errorf("%w: %s", ErrServiceOverloaded, reason)
+}
+
+func NewProjectionDependencyMissing(reason string) error {
+	if reason == "" {
+		return ErrProjectionDependency
+	}
+	return fmt.Errorf("%w: %s", ErrProjectionDependency, reason)
 }

@@ -42,6 +42,18 @@ function Ensure-KafkaTopic {
         --replication-factor 1 | Out-Null
 }
 
+function Clear-StaleSmokeOutboxRows {
+    docker exec nexusim-postgres psql -U nexusim -d nexusim -v ON_ERROR_STOP=1 -c @"
+DELETE FROM message_outbox
+WHERE status IN ('PENDING', 'DLQ')
+  AND (
+    tenant_id LIKE 'tenant-it-%'
+    OR tenant_id = 'tenant-backpressure'
+    OR tenant_id = 'tenant-message-revoke-smoke'
+  );
+"@ | Out-Null
+}
+
 function Wait-Tcp {
     param(
         [string]$HostName,
@@ -95,6 +107,7 @@ $processes = @()
 try {
     Ensure-KafkaTopic -Topic $timelineTopic
     Ensure-KafkaTopic -Topic $deliveryTopic
+    Clear-StaleSmokeOutboxRows
 
     $conversationService = Join-Path $repo "bin\conversation-service.exe"
     $messageService = Join-Path $repo "bin\message-service.exe"

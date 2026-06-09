@@ -36,8 +36,14 @@ func (repository *Repository) ProjectTimelineEvent(
 
 	result := types.ProjectTimelineEventResult{}
 	switch command.EventType {
-	case types.TimelineEventMessagePersisted, types.TimelineEventMessageRevoked:
+	case types.TimelineEventMessagePersisted:
 		count, err := projectMessagePersisted(ctx, tx, command)
+		if err != nil {
+			return types.ProjectTimelineEventResult{}, err
+		}
+		result.ProjectedInboxCount = count
+	case types.TimelineEventMessageRevoked:
+		count, err := projectMessageRevoked(ctx, tx, command)
 		if err != nil {
 			return types.ProjectTimelineEventResult{}, err
 		}
@@ -97,6 +103,54 @@ ORDER BY user_id
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return 0, types.NewDBReadFailed(err.Error())
+	}
+
+	projected := 0
+	for _, userID := range userIDs {
+		if err := insertInboxItem(ctx, tx, command, userID); err != nil {
+			return 0, err
+		}
+		if err := insertInboxOutbox(ctx, tx, command, userID); err != nil {
+			return 0, err
+		}
+		projected++
+	}
+	return projected, nil
+}
+
+func projectMessageRevoked(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.ProjectTimelineEventCommand,
+) (int, error) {
+	rows, err := tx.Query(ctx, `
+SELECT DISTINCT user_id
+FROM user_inbox
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND message_id = $3
+  AND event_type = $4
+ORDER BY user_id
+`, command.TenantID, command.ConversationID, command.MessageID, types.TimelineEventMessagePersisted)
+	if err != nil {
+		return 0, types.NewDBReadFailed(err.Error())
+	}
+
+	userIDs := make([]types.UserID, 0)
+	for rows.Next() {
+		var userID types.UserID
+		if err := rows.Scan(&userID); err != nil {
+			rows.Close()
+			return 0, types.NewDBReadFailed(err.Error())
+		}
+		userIDs = append(userIDs, userID)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, types.NewDBReadFailed(err.Error())
+	}
+	if len(userIDs) == 0 {
+		return 0, types.NewProjectionDependencyMissing("message revoke has no projected original message")
 	}
 
 	projected := 0

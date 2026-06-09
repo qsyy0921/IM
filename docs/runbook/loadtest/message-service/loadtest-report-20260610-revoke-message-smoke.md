@@ -65,6 +65,9 @@ revoked_event_id=b8b3f8c6-ab80-499d-81ad-40a1881f5e29
 - message outbox relay 构造 `message.revoked.v1` Kafka payload。
 - delivery timeline consumer / repository 将 revoke 事件投影为 `user_inbox` tombstone。
 - `PullInbox` 可见 tombstone，`AckDelivery` 可推进到 revoke seq。
+- delivery tombstone 可见性 hardening：撤回只投给已经在 `user_inbox` 收到原 `message.persisted.v1` 的用户；原消息发送后才加入的成员，即使撤回时是 ACTIVE，也不会收到该消息的 tombstone。
+- Revoke 权限 hardening：第一阶段只允许原消息发送者撤回自己的消息；`message.revoke.any` 这类管理员能力留给真实 policy-service 后续扩展。
+- Projection fail-closed：delivery-service 如果先收到 `message.revoked.v1`，但本地还没有原 `message.persisted.v1` inbox 投影，会返回 projection dependency error，不提交 Kafka checkpoint，避免静默丢 tombstone。
 
 本轮不覆盖：
 
@@ -78,6 +81,12 @@ revoked_event_id=b8b3f8c6-ab80-499d-81ad-40a1881f5e29
 第一次 smoke 没有失败在业务链路，而是暴露出 runner 清理逻辑耦合了 receipt-service 的表；当前本地库没有 `receipt_events`，导致清理阶段报错。修复方式是把 `loadtest/messagerevoke` 的清理范围收窄到 message / conversation / delivery 三条链路相关表，不把 receipt 表纳入 RevokeMessage smoke。
 
 第二次 smoke 主链路通过，但立即采样时 `delivery_outbox` 仍有 2 条 `PENDING`，原因是 runner 在 `AckDelivery` 后立刻读 DB，没有等 delivery outbox relay 追平。随后 runner 增加了 `waitDeliveryOutboxDrained`，最终结果为 `delivery_outbox PUBLISHED=3`、无 `PENDING/DLQ`。
+
+阶段复核时发现一个可见性风险：如果 revoke 按撤回时的 ACTIVE 成员窗口投影，原消息发送后才加入的成员也可能收到 tombstone。修复后 delivery-service 不再用当前成员窗口决定 revoke fanout，而是从自己的 `user_inbox` 查询已收到原消息的用户作为 tombstone 目标；新增真实 PostgreSQL 集成测试覆盖 `user-2` 在原消息后加入、撤回发生时仍不收到该 tombstone。
+
+阶段复核还发现两个边界问题：第一，policy check 在 app 层发生时还不知道原消息 sender，容易把“任意活跃成员撤回任意消息”放过；修复后 repository 在锁住原消息后校验 actor 必须等于 sender。第二，delivery projection 不能只依赖上游顺序；现在 revoke 找不到本地原消息投影时会 fail-closed，不写 checkpoint，等待重试或 repair。
+
+本地 smoke 还暴露了一个测试隔离问题：message outbox relay 会全局扫描 `message_outbox`，历史 PostgreSQL 集成测试残留的 `tenant-it-*` PENDING rows 会污染本次临时 Kafka topic。`loadtest/messagerevoke/run-local-smoke.ps1` 已在启动 relay 前清理测试租户和本 smoke 租户的 PENDING/DLQ outbox rows，只用于本地 smoke 隔离，不是生产逻辑。
 
 ## 面试讲法
 

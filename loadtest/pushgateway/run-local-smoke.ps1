@@ -4,7 +4,7 @@ param(
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
     [string]$ReceiverDeviceIds = "push-device-1",
-    [ValidateSet("full", "resume-replay", "slow-client", "redis-fault")]
+    [ValidateSet("full", "resume-replay", "cross-instance-resume", "slow-client", "redis-fault")]
     [string]$Scenario = "full",
     [ValidateSet("memory", "redis")]
     [string]$RouteBackend = "memory",
@@ -36,6 +36,7 @@ if (-not $pushRouteKeyPrefix) {
 }
 $pushGatewayID = "push-single-$safeRunName"
 $pushWSGatewayID = "push-ws-$safeRunName"
+$pushReconnectGatewayID = "push-ws-reconnect-$safeRunName"
 $pushConsumerGatewayID = "push-consumer-$safeRunName"
 $pushSessionQueueSize = "32"
 $pushWriteTimeout = "2s"
@@ -204,6 +205,22 @@ try {
             NEXUSIM_PUSH_REDIS_KEY_PREFIX = $pushRouteKeyPrefix
             NEXUSIM_PUSH_ROUTE_TTL = "90s"
         }
+        if ($Scenario -eq "cross-instance-resume") {
+            $processes += Start-NexusProcess -Name "push-gateway-ws-reconnect" -FilePath $pushGateway -Port 11599 -Env @{
+                NEXUSIM_PUSH_GATEWAY_MODE = "ws"
+                NEXUSIM_PUSH_WS_ADDR = "127.0.0.1:11599"
+                NEXUSIM_DELIVERY_GRPC_ADDR = "127.0.0.1:11597"
+                NEXUSIM_DELIVERY_GRPC_TIMEOUT = "2s"
+                NEXUSIM_PUSH_SESSION_QUEUE_SIZE = $pushSessionQueueSize
+                NEXUSIM_PUSH_WRITE_TIMEOUT = $pushWriteTimeout
+                NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
+                NEXUSIM_PUSH_ROUTE_BACKEND = "redis"
+                NEXUSIM_PUSH_GATEWAY_ID = $pushReconnectGatewayID
+                NEXUSIM_PUSH_REDIS_ADDR = $RedisAddr
+                NEXUSIM_PUSH_REDIS_KEY_PREFIX = $pushRouteKeyPrefix
+                NEXUSIM_PUSH_ROUTE_TTL = "90s"
+            }
+        }
         $processes += Start-NexusProcess -Name "push-gateway-consumer" -FilePath $pushGateway -Env @{
             NEXUSIM_PUSH_GATEWAY_MODE = "delivery-consumer"
             NEXUSIM_KAFKA_BROKERS = $KafkaBrokers
@@ -244,6 +261,7 @@ try {
         --message-target 127.0.0.1:11595 `
         --delivery-target 127.0.0.1:11597 `
         --push-url ws://127.0.0.1:11598 `
+        --reconnect-push-url $(if ($Scenario -eq "cross-instance-resume") { "ws://127.0.0.1:11599" } else { "ws://127.0.0.1:11598" }) `
         --pg-dsn $PgDsn `
         --result-dir $resultDir `
         --tenant-id "tenant-push-smoke" `
@@ -257,9 +275,11 @@ try {
         --redis-fault-command $RedisFaultCommand `
         --redis-restore-command $RedisRestoreCommand `
         --push-metrics-url "http://127.0.0.1:11598/debug/metrics" `
+        --reconnect-push-metrics-url $(if ($Scenario -eq "cross-instance-resume") { "http://127.0.0.1:11599/debug/metrics" } else { "" }) `
         --route-backend $RouteBackend `
         --redis-key-prefix $pushRouteKeyPrefix `
         --push-ws-gateway-id $pushWSGatewayID `
+        --push-reconnect-gateway-id $(if ($Scenario -eq "cross-instance-resume") { $pushReconnectGatewayID } else { "" }) `
         --push-consumer-gateway-id $pushConsumerGatewayID `
         --wait-timeout 20s `
         --request-timeout 3s

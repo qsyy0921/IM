@@ -66,31 +66,34 @@ type serverFrame struct {
 }
 
 type config struct {
-	conversationTarget    string
-	messageTarget         string
-	deliveryTarget        string
-	pushURL               string
-	resultDir             string
-	pgDSN                 string
-	requestTimeout        time.Duration
-	waitTimeout           time.Duration
-	pollInterval          time.Duration
-	tenantID              string
-	conversationID        string
-	ownerUserID           string
-	receiverUserID        string
-	receiverDeviceID      string
-	receiverDeviceIDs     []string
-	scenario              string
-	slowMessageCount      int
-	pushMetricsURL        string
-	routeBackend          string
-	redisKeyPrefix        string
-	pushWSGatewayID       string
-	pushConsumerGatewayID string
-	redisFaultCommand     string
-	redisRestoreCommand   string
-	cleanup               bool
+	conversationTarget     string
+	messageTarget          string
+	deliveryTarget         string
+	pushURL                string
+	reconnectPushURL       string
+	resultDir              string
+	pgDSN                  string
+	requestTimeout         time.Duration
+	waitTimeout            time.Duration
+	pollInterval           time.Duration
+	tenantID               string
+	conversationID         string
+	ownerUserID            string
+	receiverUserID         string
+	receiverDeviceID       string
+	receiverDeviceIDs      []string
+	scenario               string
+	slowMessageCount       int
+	pushMetricsURL         string
+	reconnectMetricsURL    string
+	routeBackend           string
+	redisKeyPrefix         string
+	pushWSGatewayID        string
+	pushReconnectGatewayID string
+	pushConsumerGatewayID  string
+	redisFaultCommand      string
+	redisRestoreCommand    string
+	cleanup                bool
 }
 
 type summary struct {
@@ -102,10 +105,13 @@ type summary struct {
 	MessageTarget           string               `json:"message_target"`
 	DeliveryTarget          string               `json:"delivery_target"`
 	PushURL                 string               `json:"push_url"`
+	ReconnectPushURL        string               `json:"reconnect_push_url,omitempty"`
 	PushMetricsURL          string               `json:"push_metrics_url,omitempty"`
+	ReconnectPushMetricsURL string               `json:"reconnect_push_metrics_url,omitempty"`
 	RouteBackend            string               `json:"route_backend,omitempty"`
 	RedisKeyPrefix          string               `json:"redis_key_prefix,omitempty"`
 	PushWSGatewayID         string               `json:"push_ws_gateway_id,omitempty"`
+	PushReconnectGatewayID  string               `json:"push_reconnect_gateway_id,omitempty"`
 	PushConsumerGatewayID   string               `json:"push_consumer_gateway_id,omitempty"`
 	Scenario                string               `json:"scenario"`
 	TenantID                string               `json:"tenant_id"`
@@ -281,6 +287,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.messageTarget, "message-target", "127.0.0.1:11595", "message-service gRPC target")
 	flag.StringVar(&cfg.deliveryTarget, "delivery-target", "127.0.0.1:11597", "delivery-service gRPC target")
 	flag.StringVar(&cfg.pushURL, "push-url", "ws://127.0.0.1:11598", "push-gateway WebSocket URL")
+	flag.StringVar(&cfg.reconnectPushURL, "reconnect-push-url", "", "optional WebSocket URL used for reconnect/resume scenarios")
 	flag.StringVar(&cfg.resultDir, "result-dir", "H:/NexusIM/loadtest-results/push-gateway-smoke", "result directory")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "", "PostgreSQL DSN")
 	flag.DurationVar(&cfg.requestTimeout, "request-timeout", 3*time.Second, "per request timeout")
@@ -293,12 +300,14 @@ func parseConfig() config {
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "push-device-1", "online receiver device id")
 	var receiverDeviceIDs string
 	flag.StringVar(&receiverDeviceIDs, "receiver-device-ids", "", "comma separated online receiver device ids; overrides receiver-device-id when set")
-	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, resume-replay, slow-client, or redis-fault")
+	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, resume-replay, cross-instance-resume, slow-client, or redis-fault")
 	flag.IntVar(&cfg.slowMessageCount, "slow-message-count", 128, "number of messages sent while slow client does not read")
 	flag.StringVar(&cfg.pushMetricsURL, "push-metrics-url", "", "push-gateway debug metrics URL")
+	flag.StringVar(&cfg.reconnectMetricsURL, "reconnect-push-metrics-url", "", "optional debug metrics URL for reconnect/resume gateway")
 	flag.StringVar(&cfg.routeBackend, "route-backend", "", "push route backend used by the smoke environment")
 	flag.StringVar(&cfg.redisKeyPrefix, "redis-key-prefix", "", "Redis route key prefix used by the smoke environment")
 	flag.StringVar(&cfg.pushWSGatewayID, "push-ws-gateway-id", "", "WebSocket gateway id used by cross-instance route smoke")
+	flag.StringVar(&cfg.pushReconnectGatewayID, "push-reconnect-gateway-id", "", "reconnect WebSocket gateway id used by cross-instance resume smoke")
 	flag.StringVar(&cfg.pushConsumerGatewayID, "push-consumer-gateway-id", "", "delivery consumer gateway id used by cross-instance route smoke")
 	flag.StringVar(&cfg.redisFaultCommand, "redis-fault-command", "", "optional command executed after WebSocket route registration and before SendMessage in redis-fault scenario")
 	flag.StringVar(&cfg.redisRestoreCommand, "redis-restore-command", "", "optional command executed after PullInbox recovery and before reconnect/ACK in redis-fault scenario")
@@ -316,12 +325,26 @@ func parseConfig() config {
 	if cfg.pushMetricsURL == "" {
 		cfg.pushMetricsURL = derivePushMetricsURL(cfg.pushURL)
 	}
+	if cfg.reconnectPushURL == "" {
+		cfg.reconnectPushURL = cfg.pushURL
+	}
+	if cfg.reconnectMetricsURL == "" && cfg.reconnectPushURL != cfg.pushURL {
+		cfg.reconnectMetricsURL = derivePushMetricsURL(cfg.reconnectPushURL)
+	}
 	return cfg
 }
 
 func run(cfg config) error {
 	if cfg.pgDSN == "" {
 		return errors.New("pg-dsn is required")
+	}
+	if cfg.scenario == "cross-instance-resume" {
+		if cfg.routeBackend != "redis" {
+			return errors.New("cross-instance-resume scenario requires --route-backend redis")
+		}
+		if cfg.reconnectPushURL == "" || cfg.reconnectPushURL == cfg.pushURL {
+			return errors.New("cross-instance-resume scenario requires --reconnect-push-url to point at a different gateway")
+		}
 	}
 	if err := os.MkdirAll(cfg.resultDir, 0o755); err != nil {
 		return fmt.Errorf("create result dir: %w", err)
@@ -363,28 +386,31 @@ func run(cfg config) error {
 	deliveryClient := deliveryv1.NewDeliveryServiceClient(deliveryConn)
 
 	result := summary{
-		Commit:                shortCommit(),
-		CommitFull:            fullCommit(),
-		GitDirty:              gitDirty(),
-		GitStatusShort:        gitStatusShort(),
-		ConversationTarget:    cfg.conversationTarget,
-		MessageTarget:         cfg.messageTarget,
-		DeliveryTarget:        cfg.deliveryTarget,
-		PushURL:               cfg.pushURL,
-		PushMetricsURL:        cfg.pushMetricsURL,
-		RouteBackend:          cfg.routeBackend,
-		RedisKeyPrefix:        cfg.redisKeyPrefix,
-		PushWSGatewayID:       cfg.pushWSGatewayID,
-		PushConsumerGatewayID: cfg.pushConsumerGatewayID,
-		Scenario:              cfg.scenario,
-		TenantID:              cfg.tenantID,
-		ConversationID:        cfg.conversationID,
-		OwnerUserID:           cfg.ownerUserID,
-		ReceiverUserID:        cfg.receiverUserID,
-		ReceiverDeviceID:      cfg.receiverDeviceID,
-		ReceiverDeviceIDs:     cfg.receiverDeviceIDs,
-		StartedAt:             time.Now().UTC(),
-		Latencies:             map[string]float64{},
+		Commit:                  shortCommit(),
+		CommitFull:              fullCommit(),
+		GitDirty:                gitDirty(),
+		GitStatusShort:          gitStatusShort(),
+		ConversationTarget:      cfg.conversationTarget,
+		MessageTarget:           cfg.messageTarget,
+		DeliveryTarget:          cfg.deliveryTarget,
+		PushURL:                 cfg.pushURL,
+		ReconnectPushURL:        cfg.reconnectPushURL,
+		PushMetricsURL:          cfg.pushMetricsURL,
+		ReconnectPushMetricsURL: cfg.reconnectMetricsURL,
+		RouteBackend:            cfg.routeBackend,
+		RedisKeyPrefix:          cfg.redisKeyPrefix,
+		PushWSGatewayID:         cfg.pushWSGatewayID,
+		PushReconnectGatewayID:  cfg.pushReconnectGatewayID,
+		PushConsumerGatewayID:   cfg.pushConsumerGatewayID,
+		Scenario:                cfg.scenario,
+		TenantID:                cfg.tenantID,
+		ConversationID:          cfg.conversationID,
+		OwnerUserID:             cfg.ownerUserID,
+		ReceiverUserID:          cfg.receiverUserID,
+		ReceiverDeviceID:        cfg.receiverDeviceID,
+		ReceiverDeviceIDs:       cfg.receiverDeviceIDs,
+		StartedAt:               time.Now().UTC(),
+		Latencies:               map[string]float64{},
 	}
 
 	if metrics, err := fetchPushMetrics(ctx, cfg.pushMetricsURL); err == nil {
@@ -394,6 +420,8 @@ func run(cfg config) error {
 	switch cfg.scenario {
 	case "full":
 	case "resume-replay":
+		return runResumeReplayScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
+	case "cross-instance-resume":
 		return runResumeReplayScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "slow-client":
 		return runSlowClientScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
@@ -680,10 +708,12 @@ func runResumeReplayScenario(
 	result.DeviceNotifications[0].DeliveryNotify = snapshotFrame(notify)
 	_ = conn.Close(nhooyr.StatusNormalClosure, "resume replay")
 
-	replayMetricsBefore, _ := fetchPushMetrics(ctx, cfg.pushMetricsURL)
+	replayMetricsBefore := fetchResumeGatewayMetrics(ctx, cfg)
+	reconnectCfg := cfg
+	reconnectCfg.pushURL = cfg.reconnectPushURL
 	reconnected, reconnectedHello, err := connectWebSocketWithResume(
 		ctx,
-		cfg,
+		reconnectCfg,
 		cfg.receiverDeviceID,
 		hello.ResumeToken,
 		[]cursor{{ConversationID: cfg.conversationID, Seq: join.GetBoundarySeq()}},
@@ -693,7 +723,7 @@ func runResumeReplayScenario(
 	}
 	defer reconnected.Close(nhooyr.StatusNormalClosure, "")
 
-	replayed, err := waitNotify(ctx, cfg, reconnected)
+	replayed, err := waitNotify(ctx, reconnectCfg, reconnected)
 	if err != nil {
 		return finish(cfg, result, fmt.Errorf("wait replayed notify: %w", err))
 	}
@@ -702,7 +732,7 @@ func runResumeReplayScenario(
 		replayed.MessageID != notify.MessageID {
 		return finish(cfg, result, fmt.Errorf("replayed notify mismatch: original=%+v replayed=%+v", notify, replayed))
 	}
-	replayMetricsAfter, _ := fetchPushMetrics(ctx, cfg.pushMetricsURL)
+	replayMetricsAfter := fetchResumeGatewayMetrics(ctx, cfg)
 
 	pull, err := pullInbox(ctx, cfg, deliveryClient)
 	if err != nil {
@@ -751,6 +781,15 @@ func runResumeReplayScenario(
 	}
 	result.Success = true
 	return finish(cfg, result, nil)
+}
+
+func fetchResumeGatewayMetrics(ctx context.Context, cfg config) pushMetrics {
+	metricsURL := cfg.pushMetricsURL
+	if cfg.reconnectMetricsURL != "" {
+		metricsURL = cfg.reconnectMetricsURL
+	}
+	metrics, _ := fetchPushMetrics(ctx, metricsURL)
+	return metrics
 }
 
 func runRedisFaultScenario(

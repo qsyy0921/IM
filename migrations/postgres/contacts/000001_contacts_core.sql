@@ -98,4 +98,8 @@ CREATE INDEX IF NOT EXISTS idx_contacts_outbox_dlq
     ON contacts_outbox (tenant_id, status, dead_lettered_at)
     WHERE status = 'DLQ';
 
+CREATE INDEX IF NOT EXISTS idx_contacts_outbox_partition_blockers
+    ON contacts_outbox (tenant_id, partition_key, aggregate_version, status)
+    WHERE status IN ('PENDING', 'DLQ');
+
 COMMIT;

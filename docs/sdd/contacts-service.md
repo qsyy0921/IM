@@ -1,6 +1,6 @@
 # NexusIM contacts-service SDD v0.1
 
-状态：Draft；proto / Kafka schema / migration / 六层最小可编译骨架已落地，repository 真实事务和 outbox relay 尚未实现。
+状态：Draft；proto / Kafka schema / migration / 六层骨架和 PostgreSQL repository 真实事务已落地，contacts outbox relay 和真实进程 smoke 尚未实现。
 
 本文定义第三层 IM 产品能力中的“联系人 / 好友关系”最小服务边界。目标是补齐社交关系事实源，同时保持低耦合：不把好友关系塞进 `conversation_members`，也不让会话、消息、投递服务直接读联系人表。
 
@@ -158,9 +158,9 @@ im.contact.events
 
 | 事件 | Topic | 分区键 | 下游 |
 | --- | --- | --- | --- |
-| `contact.request.created.v1` | `im.contact.events` | `tenant_id:user_id`，按 receiver 优先 | push / audit |
+| `contact.request.created.v1` | `im.contact.events` | `tenant_id:canonical_user_pair` | push / audit |
 | `contact.request.accepted.v1` | `im.contact.events` | `tenant_id:canonical_user_pair` | push / audit / recommendation |
-| `contact.request.declined.v1` | `im.contact.events` | `tenant_id:user_id`，按 sender 优先 | push / audit |
+| `contact.request.declined.v1` | `im.contact.events` | `tenant_id:canonical_user_pair` | push / audit |
 
 Envelope 字段与现有 outbox 口径保持一致：
 
@@ -298,6 +298,8 @@ CREATE TABLE contacts_outbox (
 SendContactRequest
 -> validate auth / target / idempotency
 -> lock idempotency key
+-> if contact_requests has same sender idempotency key and same command hash, replay
+-> if same idempotency key but different command hash, conflict
 -> check existing ACTIVE contact edge
 -> check pending request pair
 -> insert contact_requests(PENDING)
@@ -312,7 +314,9 @@ RespondContactRequest(ACCEPT)
 -> validate receiver auth
 -> lock contact_command_idempotency(tenant, receiver, idempotency_key)
 -> lock request row FOR UPDATE
--> if already ACCEPTED replay result
+-> if same idempotency key and same command hash, replay
+-> if request already has the same terminal status, return existing result
+-> if request has the opposite terminal status, conflict
 -> update request ACCEPTED
 -> upsert contact_edges(sender -> receiver ACTIVE)
 -> upsert contact_edges(receiver -> sender ACTIVE)
@@ -328,6 +332,7 @@ ListContacts
 -> validate auth
 -> query contact_edges where owner_user_id = auth.user_id and status = ACTIVE
 -> keyset page by contact_user_id
+-> page_token binds tenant_id / owner_user_id / page_size / last_contact_user_id
 ```
 
 ## 9. 一致性和事务
@@ -350,9 +355,16 @@ contacts_outbox -> Kafka im.contact.events -> push / audit / recommendation
 
 | 场景 | 幂等键 | 重试策略 | 补偿 |
 | --- | --- | --- | --- |
-| SendContactRequest | `tenant_id + sender_user_id + idempotency_key` | 同 command hash replay；不同 hash 返回 conflict | 无需补偿 |
-| RespondContactRequest | `tenant_id + receiver_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；ACCEPT/DECLINE 已完成时返回既有 result | 后续通过重新申请恢复 |
-| contacts outbox publish | `event_id` | at-least-once retry，max attempts 后 DLQ | repair/replay worker 后续实现 |
+| SendContactRequest | `tenant_id + sender_user_id + idempotency_key`，事实源为 `contact_requests` 唯一键和 `command_hash` | 同 command hash replay；不同 hash 返回 conflict；不额外写 `contact_command_idempotency` | 无需补偿 |
+| RespondContactRequest | `tenant_id + receiver_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；已完成且同 decision 返回既有 result；已完成但相反 decision 返回 conflict | 后续通过重新申请恢复 |
+| contacts outbox publish | `event_id` | at-least-once retry，max attempts 后 DLQ；relay 必须按 `partition_key + aggregate_version` fail-closed 阻塞低版本 PENDING/DLQ，避免 accepted 早于 created 发布 | repair/replay worker 后续实现 |
+
+Command hash 规则：
+
+- 不包含 `idempotency_key`、`request_id`、`trace_id`、`session_id`、`device_id`。
+- `SendContactRequest` 包含 command type、tenant、sender、target、message 原文。
+- `RespondContactRequest` 包含 command type、tenant、receiver、request_id、decision。
+- 第一阶段不 trim message；消息长度和敏感词等内容治理后续接 policy/identity 端口。
 
 ## 11. 权限和安全
 
@@ -386,7 +398,7 @@ contacts_outbox_dlq_count
 | domain unit | 自己加自己、重复 pending、accept 写双向 edge、非 receiver 响应 |
 | app unit | command validation、repository error propagation |
 | api unit | gRPC request/response 转换、稳定错误映射 |
-| postgres integration | SendContactRequest / RespondContactRequest / ListContacts 真实事务、幂等 replay、冲突 |
+| postgres integration | SendContactRequest / RespondContactRequest / ListContacts 真实事务、幂等 replay、并发首次申请、反向 pending、终态相反 decision、分页 token 绑定 |
 | outbox integration | contacts_outbox retry / DLQ / mark PUBLISHED |
 | smoke | `SendContactRequest -> RespondContactRequest(ACCEPT) -> ListContacts` |
 

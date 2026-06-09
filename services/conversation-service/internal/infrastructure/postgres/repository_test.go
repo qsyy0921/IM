@@ -290,6 +290,29 @@ INSERT INTO conversation_members (
 		t.Fatalf("expected permission denied for stranger, got %v", err)
 	}
 
+	_, err = pool.Exec(ctx, `
+UPDATE member_change_saga
+SET last_error = 'duplicate key value violates unique constraint member_change_saga_command_hash_key'
+WHERE change_id = $1
+`, result.ChangeID)
+	if err != nil {
+		t.Fatalf("seed raw last error: %v", err)
+	}
+	detail, err = repository.GetMemberChange(ctx, types.GetMemberChangeCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-member",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-member",
+		ChangeID:       result.ChangeID,
+	})
+	if err != nil {
+		t.Fatalf("get member change with last error: %v", err)
+	}
+	if detail.LastError != "member change processing failed" {
+		t.Fatalf("expected sanitized last error, got %q", detail.LastError)
+	}
+
 	_, err = repository.GetMemberChange(ctx, types.GetMemberChangeCommand{
 		AuthContext: types.AuthContext{
 			TenantID: "tenant-member",

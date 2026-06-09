@@ -235,7 +235,10 @@ SELECT
     COALESCE(metadata_json->>'old_role', ''),
     COALESCE(metadata_json->>'new_role', ''),
     COALESCE(cte.payload_json->>'reason', ''),
-    COALESCE(last_error, ''),
+    CASE
+        WHEN COALESCE(last_error, '') = '' THEN ''
+        ELSE 'member change processing failed'
+    END,
     COALESCE(auth_member.role, ''),
     COALESCE(auth_member.status, '')
 FROM member_change_saga mcs
@@ -321,9 +324,18 @@ FROM member_change_saga mcs
 JOIN message_outbox mo
   ON mo.tenant_id = mcs.tenant_id
  AND mo.event_id = mcs.outbox_event_id
+ AND mo.conversation_id = mcs.conversation_id
 WHERE mcs.status = $1
   AND mo.status = 'PUBLISHED'
   AND mo.published_at IS NOT NULL
+  AND mo.producer = 'conversation-service'
+  AND mo.event_type IN (
+      'conversation.member.joined.v1',
+      'conversation.member.left.v1',
+      'conversation.member.removed.v1',
+      'conversation.member.role_changed.v1',
+      'conversation.member.boundary_cancelled.v1'
+  )
 ORDER BY mcs.updated_at, mcs.change_id
 LIMIT $2
 FOR UPDATE OF mcs SKIP LOCKED

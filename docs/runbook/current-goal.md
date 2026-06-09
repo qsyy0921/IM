@@ -10,24 +10,23 @@
 每轮开始先执行 git status --short --branch，并读取 docs/runbook/current-goal.md。
 按 current-goal.md 的当前目标、边界、下一步优先级继续工作；不回滚用户已有修改，不把重心放在耗尽硬件的重型压测上。
 
-当前重点：补齐 delivery_outbox relay / im.delivery.events，再进入 push-gateway SDD。
+当前重点：补齐 delivery-service 的 LEAVE/REMOVE 负向可见性 smoke，然后进入 push-gateway SDD。
 每个微服务独立使用六层 DDD：api / app / domain / infrastructure / types / trigger。
 开发过程中主动创建并使用 sub-agent：设计/契约找 Gauss，实现/事务/幂等找 Noether，测试/smoke/报告找 Dewey；不要等到最后才评审。
-优先把系统做完整：message-service、conversation-service、delivery-service、delivery outbox、push-gateway 逐步形成真实链路。
+优先把系统做完整：message-service、conversation-service、delivery-service、delivery outbox 已完成最小链路，下一步推进 push-gateway。
 重要契约、migration、并发/事务/幂等、可运行链路完成时再邀请评审线程 019ea124-dab1-71f2-964b-f5cb8d219aa2。
 完成有意义切片后运行检查、更新 current-goal.md 和对应 runbook/loadtest 报告；必要时提交并推送 GitHub。
 ```
 
 ## 1. 当前目标
 
-持续推进 `E:\development\IM` 的 NexusIM 项目落地。`message-service`、`conversation-service`、`delivery-service` 已分别完成最小真实闭环；当前阶段从“证明第三个微服务能跑通”切换到“补齐投递事件发布和 push-gateway 前置设计”：
+持续推进 `E:\development\IM` 的 NexusIM 项目落地。`message-service`、`conversation-service`、`delivery-service` 已分别完成最小真实闭环，`delivery_outbox -> Kafka im.delivery.events` 也已通过真实 smoke；当前阶段切换到“补齐投递负向可见性验证，并设计 push-gateway”：
 
 ```text
-delivery-service
--> delivery_outbox relay
--> Kafka im.delivery.events
+delivery-service LEAVE/REMOVE negative visibility smoke
 -> push-gateway SDD
--> prepare online delivery without bypassing durable inbox
+-> push-gateway proto / skeleton
+-> minimal online delivery without bypassing durable inbox
 ```
 
 ## 2. 硬边界

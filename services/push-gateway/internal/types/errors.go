@@ -7,6 +7,7 @@ import (
 
 var (
 	ErrInvalidFrame             = errors.New("invalid frame")
+	ErrAuthExpired              = errors.New("auth expired")
 	ErrPermissionDenied         = errors.New("permission denied")
 	ErrDeliveryUnavailable      = errors.New("delivery unavailable")
 	ErrAckOutOfVisibleRange     = errors.New("ack out of visible range")
@@ -21,6 +22,13 @@ func NewInvalidFrame(reason string) error {
 		return ErrInvalidFrame
 	}
 	return fmt.Errorf("%w: %s", ErrInvalidFrame, reason)
+}
+
+func NewAuthExpired(reason string) error {
+	if reason == "" {
+		return ErrAuthExpired
+	}
+	return fmt.Errorf("%w: %s", ErrAuthExpired, reason)
 }
 
 func NewDeliveryUnavailable(reason string) error {

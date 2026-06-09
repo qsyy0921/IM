@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/qsyy0921/IM/services/push-gateway/internal/app"
+	authinfra "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/auth"
 	"github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/memory"
 	"github.com/qsyy0921/IM/services/push-gateway/internal/types"
 	nhooyr "nhooyr.io/websocket"
@@ -221,6 +222,93 @@ func TestWebSocketAckPermissionDeniedIsNotRetryable(t *testing.T) {
 		frame.Message != "permission denied" ||
 		frame.Retryable {
 		t.Fatalf("unexpected permission error frame: %+v", frame)
+	}
+}
+
+func TestWebSocketHMACAuthRejectsNakedQueryIdentity(t *testing.T) {
+	registry := memory.NewRegistry()
+	authenticator, err := authinfra.NewAuthenticator(authinfra.Config{
+		Mode:   authinfra.ModeHMAC,
+		Secret: "secret",
+		Now:    func() time.Time { return time.Unix(1_800_000_000, 0) },
+	})
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	server := NewServer(
+		app.NewConnectSessionUseCase(registry),
+		app.NewDisconnectSessionUseCase(registry),
+		app.NewHandleClientFrameUseCase(&fakeDeliveryClient{}),
+		Config{QueueSize: 8, HeartbeatInterval: time.Second, Authenticator: authenticator},
+	)
+	httpServer := httptest.NewServer(server)
+	defer httpServer.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, _, err := nhooyr.Dial(ctx, "ws"+httpServer.URL[len("http"):]+"/ws?tenant_id=tenant-1&user_id=user-1&device_id=device-1", nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close(nhooyr.StatusNormalClosure, "")
+
+	var frame types.ServerFrame
+	if err := wsjson.Read(ctx, conn, &frame); err != nil {
+		t.Fatalf("read error: %v", err)
+	}
+	if frame.Op != types.OpError || frame.Code != "PERMISSION_DENIED" || frame.Retryable {
+		t.Fatalf("unexpected auth error: %+v", frame)
+	}
+}
+
+func TestWebSocketHMACAuthAcceptsSignedGatewayToken(t *testing.T) {
+	registry := memory.NewRegistry()
+	now := time.Unix(1_800_000_000, 0)
+	authenticator, err := authinfra.NewAuthenticator(authinfra.Config{
+		Mode:   authinfra.ModeHMAC,
+		Secret: "secret",
+		Now:    func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	token, err := authinfra.SignGatewayToken("secret", map[string]string{
+		"tenant_id": "tenant-1",
+		"user_id":   "user-1",
+		"device_id": "device-1",
+	}, now.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("sign token: %v", err)
+	}
+	server := NewServer(
+		app.NewConnectSessionUseCase(registry),
+		app.NewDisconnectSessionUseCase(registry),
+		app.NewHandleClientFrameUseCase(&fakeDeliveryClient{}),
+		Config{QueueSize: 8, HeartbeatInterval: time.Second, Authenticator: authenticator},
+	)
+	httpServer := httptest.NewServer(server)
+	defer httpServer.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, _, err := nhooyr.Dial(ctx, "ws"+httpServer.URL[len("http"):]+"/ws?token="+token+"&device_id=device-1", nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close(nhooyr.StatusNormalClosure, "")
+	if err := wsjson.Write(ctx, conn, types.ClientFrame{
+		Op:        types.OpClientHello,
+		RequestID: "hello-1",
+		DeviceID:  "device-1",
+	}); err != nil {
+		t.Fatalf("write hello: %v", err)
+	}
+	var hello types.ServerFrame
+	if err := wsjson.Read(ctx, conn, &hello); err != nil {
+		t.Fatalf("read hello: %v", err)
+	}
+	if hello.Op != types.OpServerHello || hello.SessionID == "" {
+		t.Fatalf("unexpected hello: %+v", hello)
 	}
 }
 

@@ -59,6 +59,8 @@ func PublicErrorFrame(requestID string, err error) types.ServerFrame {
 	switch {
 	case errors.Is(err, types.ErrInvalidFrame):
 		return domain.ErrorFrame(requestID, "INVALID_FRAME", "invalid frame", false)
+	case errors.Is(err, types.ErrAuthExpired):
+		return domain.ErrorFrame(requestID, "AUTH_EXPIRED", "auth expired", true)
 	case errors.Is(err, types.ErrAckOutOfVisibleRange):
 		return domain.ErrorFrame(requestID, "ACK_OUT_OF_VISIBLE_RANGE", "ack out of visible range", false)
 	case errors.Is(err, types.ErrPermissionDenied):

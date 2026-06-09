@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/qsyy0921/IM/services/push-gateway/internal/app"
@@ -22,11 +21,16 @@ type Server struct {
 	config     Config
 }
 
+type Authenticator interface {
+	Authenticate(request *http.Request) (types.AuthContext, error)
+}
+
 type Config struct {
 	QueueSize         int
 	HeartbeatInterval time.Duration
 	WriteTimeout      time.Duration
 	WriteDelay        time.Duration
+	Authenticator     Authenticator
 }
 
 func NewServer(
@@ -54,7 +58,7 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	}
 	defer conn.Close(nhooyr.StatusNormalClosure, "")
 
-	auth, err := authFromRequest(request)
+	auth, err := server.authFromRequest(request)
 	if err != nil {
 		_ = wsjson.Write(request.Context(), conn, app.PublicErrorFrame("", err))
 		return
@@ -249,20 +253,16 @@ func DecodeClientFrame(raw json.RawMessage) (types.ClientFrame, string, error) {
 	return frame, frame.RequestID, nil
 }
 
-func authFromRequest(request *http.Request) (types.AuthContext, error) {
+func (server *Server) authFromRequest(request *http.Request) (types.AuthContext, error) {
+	if server.config.Authenticator != nil {
+		return server.config.Authenticator.Authenticate(request)
+	}
 	query := request.URL.Query()
 	auth := types.AuthContext{
 		TenantID: query.Get("tenant_id"),
 		UserID:   query.Get("user_id"),
 		DeviceID: query.Get("device_id"),
 		TraceID:  query.Get("trace_id"),
-	}
-	if token := strings.TrimSpace(query.Get("token")); token != "" && (auth.TenantID == "" || auth.UserID == "") {
-		parts := strings.Split(token, ":")
-		if len(parts) >= 2 {
-			auth.TenantID = parts[0]
-			auth.UserID = parts[1]
-		}
 	}
 	if auth.TenantID == "" {
 		return types.AuthContext{}, types.NewInvalidFrame("tenant_id is required")

@@ -15,6 +15,7 @@ import (
 
 	wsapi "github.com/qsyy0921/IM/services/push-gateway/internal/api/websocket"
 	"github.com/qsyy0921/IM/services/push-gateway/internal/app"
+	authinfra "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/auth"
 	kafkainfra "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/kafka"
 	"github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/memory"
 	redisroute "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/redisroute"
@@ -113,6 +114,13 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 			return err
 		}
 		closers = append(closers, closeDelivery)
+		authenticator, err := authinfra.NewAuthenticator(authinfra.Config{
+			Mode:   authinfra.Mode(envString("NEXUSIM_PUSH_AUTH_MODE", "mock")),
+			Secret: os.Getenv("NEXUSIM_PUSH_AUTH_HMAC_SECRET"),
+		})
+		if err != nil {
+			return err
+		}
 		server := wsapi.NewServer(
 			app.NewConnectSessionUseCase(registry),
 			app.NewDisconnectSessionUseCase(registry),
@@ -122,6 +130,7 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 				HeartbeatInterval: envDuration("NEXUSIM_PUSH_HEARTBEAT_INTERVAL", 30*time.Second),
 				WriteTimeout:      envDuration("NEXUSIM_PUSH_WRITE_TIMEOUT", 2*time.Second),
 				WriteDelay:        envDuration("NEXUSIM_PUSH_TEST_WRITE_DELAY", 0),
+				Authenticator:     authenticator,
 			},
 		)
 		mux := http.NewServeMux()

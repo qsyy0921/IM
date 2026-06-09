@@ -40,7 +40,7 @@
 | 上游客户端 | Web / Desktop Client | WebSocket connect、heartbeat、resume、ACK frame |
 | 上游事件 | Kafka `im.delivery.events` | 消费 delivery notification / ack 事件 |
 | 同步依赖 | delivery-service gRPC | `PullInbox`、`AckDelivery` |
-| 同步依赖 | auth / identity provider | 第一阶段可用本地 mock，生产需校验 token 和 device |
+| 同步依赖 | auth / identity provider | 当前已支持本地 mock 和 HMAC signed gateway token；生产仍需接入 identity / device 状态 |
 | 临时状态 | Redis route / in-memory registry | 连接路由、在线 session、短时 resume buffer |
 | 下游客户端 | Web / Desktop Client | `delivery.notify`、`server.resume_hint`、错误 frame |
 
@@ -88,7 +88,12 @@ services/push-gateway/
 GET /ws?token=...&device_id=...
 ```
 
-后续可以由 api-gateway 做 token 交换，push-gateway 只接收已签名的 gateway token。
+当前代码支持两种 auth 模式：
+
+- `mock`：本地 smoke 使用，允许 query string 中的 `tenant_id/user_id/device_id` 或 `token=tenant:user[:device]` 生成 `AuthContext`。
+- `hmac`：第一版 signed gateway token，`token` 为 `base64url(json claims).base64url(hmac_sha256(payload, secret))`。claims 至少包含 `tenant_id/user_id/aud/exp`，`aud` 默认必须为 `push-gateway`，可包含 `device_id/trace_id`；如果 token 中带 `device_id`，必须与 query / `client.hello.device_id` 一致。真实客户端优先用 `Authorization: Bearer <token>`，query token 只作为本地兼容入口。
+
+`hmac` 模式只证明 gateway 能拒绝伪造 / 过期 / device mismatch 的客户端身份，不等同完整 identity-service：它暂不做 refresh token、设备吊销、session revoke、key rotation 或多 issuer。后续可以由 api-gateway / identity-service 做登录与 token 交换，push-gateway 只接收已签名的短期 gateway token。
 
 ### 5.1 Client -> Server frames
 
@@ -454,7 +459,8 @@ delivery-service delivery_outbox
 ## 11. 权限和安全
 
 - `tenant_id / user_id / device_id / session_id` 必须从认证上下文派生，不信任客户端 frame 裸字段。
-- WebSocket 建连必须校验 token、device 状态和 session 状态。
+- 本地 smoke 可使用 `NEXUSIM_PUSH_AUTH_MODE=mock`；进入真实客户端或跨机器演示时优先使用 `NEXUSIM_PUSH_AUTH_MODE=hmac` 和短期 signed gateway token。
+- WebSocket 建连必须校验 token。当前 HMAC 模式校验签名、过期时间和 device 绑定；device 状态 / session 吊销仍是后续 identity-service 或 gateway policy 的职责。
 - `delivery.notify` 只能发给同 tenant 的目标 user/device session。
 - ACK frame 的 user/device 以 session auth context 为准。
 - error frame 不返回内部 Redis / Kafka / gRPC 错误文本。
@@ -534,7 +540,17 @@ NEXUSIM_DELIVERY_GRPC_ADDR=127.0.0.1:10497
 NEXUSIM_KAFKA_BROKERS=localhost:9092
 NEXUSIM_DELIVERY_EVENTS_TOPIC=im.delivery.events
 NEXUSIM_PUSH_CONSUMER_GROUP=nexusim-push-gateway
+NEXUSIM_PUSH_AUTH_MODE=mock
 ```
+
+HMAC gateway token 可选参数：
+
+```text
+NEXUSIM_PUSH_AUTH_MODE=hmac
+NEXUSIM_PUSH_AUTH_HMAC_SECRET=local-dev-secret
+```
+
+`hmac` 模式下，query string 裸 `tenant_id/user_id` 不再被信任；缺失 token、签名错误、audience 不匹配、token 与 device 不匹配会返回 `PERMISSION_DENIED`，过期 token 返回 `AUTH_EXPIRED`。
 
 Redis route 可选参数：
 

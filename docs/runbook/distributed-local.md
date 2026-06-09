@@ -99,11 +99,13 @@ H:\NexusIM\loadtest-results\<run-name>\pushgateway-summary.json
 docs/runbook/loadtest/push-gateway/
 ```
 
-当前最接近系统级分布式证据的报告：
+当前系统级分布式 smoke 原始结果：
 
 ```text
-docs/runbook/loadtest/push-gateway/loadtest-report-20260609-push-gateway-redis-route-ttl-smoke.md
+H:\NexusIM\loadtest-results\nexusim-distributed-smoke-redis-cleanup-20260609-193331\pushgateway-summary.json
 ```
+
+该 run 使用 clean commit `29b8cc6`，`git_dirty=false`，WebSocket gateway 与 delivery consumer gateway 分离，通过 Redis route 收到 `delivery.notify`，随后 `PullInbox` 返回 1 条 inbox，`delivery.ack.ok` 推进 cursor 到 seq `2`，`delivery_outbox PUBLISHED=2/PENDING=0/DLQ=0`。
 
 ## 5. 面试讲法
 

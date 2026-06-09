@@ -4,13 +4,16 @@ param(
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
     [string]$ReceiverDeviceIds = "push-device-1",
+    [ValidateSet("full", "slow-client")]
+    [string]$Scenario = "full",
+    [int]$SlowMessageCount = 128,
     [switch]$SkipBuild
 )
 
 $ErrorActionPreference = "Stop"
 
 if (-not $RunName) {
-    $RunName = "push-gateway-smoke-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+    $RunName = "push-gateway-$Scenario-smoke-" + (Get-Date -Format "yyyyMMdd-HHmmss")
 }
 
 $repo = (Get-Location).Path
@@ -20,6 +23,14 @@ $timelineTopic = "conversation.timeline.pushgateway." + (Get-Date -Format "yyyyM
 $deliveryTopic = "im.delivery.events"
 $deliveryConsumerGroup = "nexusim-delivery-push-smoke-" + (Get-Date -Format "yyyyMMddHHmmss")
 $pushConsumerGroup = "nexusim-push-gateway-smoke-" + (Get-Date -Format "yyyyMMddHHmmss")
+$pushSessionQueueSize = "32"
+$pushWriteTimeout = "2s"
+$pushTestWriteDelay = "0s"
+if ($Scenario -eq "slow-client") {
+    $pushSessionQueueSize = "1"
+    $pushWriteTimeout = "1ms"
+    $pushTestWriteDelay = "50ms"
+}
 
 New-Item -ItemType Directory -Force $resultDir | Out-Null
 New-Item -ItemType Directory -Force $logDir | Out-Null
@@ -166,8 +177,9 @@ try {
         NEXUSIM_KAFKA_BROKERS = $KafkaBrokers
         NEXUSIM_DELIVERY_EVENTS_TOPIC = $deliveryTopic
         NEXUSIM_PUSH_CONSUMER_GROUP = $pushConsumerGroup
-        NEXUSIM_PUSH_SESSION_QUEUE_SIZE = "32"
-        NEXUSIM_PUSH_WRITE_TIMEOUT = "2s"
+        NEXUSIM_PUSH_SESSION_QUEUE_SIZE = $pushSessionQueueSize
+        NEXUSIM_PUSH_WRITE_TIMEOUT = $pushWriteTimeout
+        NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
     }
 
     $processes += Start-NexusProcess -Name "message-grpc" -FilePath $messageService -Port 11595 -Env @{
@@ -192,6 +204,9 @@ try {
         --receiver-user-id "push-user-1" `
         --receiver-device-id "push-device-1" `
         --receiver-device-ids $ReceiverDeviceIds `
+        --scenario $Scenario `
+        --slow-message-count $SlowMessageCount `
+        --push-metrics-url "http://127.0.0.1:11598/debug/metrics" `
         --wait-timeout 20s `
         --request-timeout 3s
     if ($LASTEXITCODE -ne 0) {

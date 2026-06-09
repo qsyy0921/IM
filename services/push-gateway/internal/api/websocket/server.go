@@ -26,6 +26,7 @@ type Config struct {
 	QueueSize         int
 	HeartbeatInterval time.Duration
 	WriteTimeout      time.Duration
+	WriteDelay        time.Duration
 }
 
 func NewServer(
@@ -115,7 +116,7 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 
 	writeDone := make(chan error, 1)
 	go func() {
-		err := writeLoop(sessionCtx, conn, outbound, evicted, server.config.WriteTimeout)
+		err := writeLoop(sessionCtx, conn, outbound, evicted, server.config.WriteTimeout, server.config.WriteDelay)
 		cancelSession()
 		writeDone <- err
 	}()
@@ -180,6 +181,7 @@ func writeLoop(
 	outbound <-chan types.ServerFrame,
 	evicted <-chan types.SessionEviction,
 	timeout time.Duration,
+	writeDelay time.Duration,
 ) error {
 	for {
 		select {
@@ -196,6 +198,15 @@ func writeLoop(
 		case frame, ok := <-outbound:
 			if !ok {
 				return nil
+			}
+			if writeDelay > 0 {
+				timer := time.NewTimer(writeDelay)
+				select {
+				case <-ctx.Done():
+					timer.Stop()
+					return ctx.Err()
+				case <-timer.C:
+				}
 			}
 			if err := writeFrame(ctx, conn, frame, timeout); err != nil {
 				return err

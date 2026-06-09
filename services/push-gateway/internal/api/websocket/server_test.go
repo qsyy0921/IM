@@ -497,7 +497,7 @@ func TestWriteLoopSendsResumeHintAndClosesOnEviction(t *testing.T) {
 				Seq:            12,
 			}},
 		}
-		_ = writeLoop(request.Context(), conn, outbound, evicted, time.Second)
+		_ = writeLoop(request.Context(), conn, outbound, evicted, time.Second, 0)
 	}))
 	defer httpServer.Close()
 

@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"math"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -32,21 +33,25 @@ const (
 	opServerHello    = "server.hello"
 	opDeliveryNotify = "delivery.notify"
 	opDeliveryAckOK  = "delivery.ack.ok"
+	opResumeHint     = "server.resume_hint"
 	opError          = "error"
 )
 
 type clientFrame struct {
-	Op             string `json:"op"`
-	RequestID      string `json:"request_id,omitempty"`
-	DeviceID       string `json:"device_id,omitempty"`
-	ConversationID string `json:"conversation_id,omitempty"`
-	ReceivedSeq    int64  `json:"received_seq,omitempty"`
+	Op             string   `json:"op"`
+	RequestID      string   `json:"request_id,omitempty"`
+	DeviceID       string   `json:"device_id,omitempty"`
+	ConversationID string   `json:"conversation_id,omitempty"`
+	ReceivedSeq    int64    `json:"received_seq,omitempty"`
+	ResumeToken    string   `json:"resume_token,omitempty"`
+	LastReceived   []cursor `json:"last_received,omitempty"`
 }
 
 type serverFrame struct {
 	Op              string `json:"op"`
 	RequestID       string `json:"request_id,omitempty"`
 	SessionID       string `json:"session_id,omitempty"`
+	ResumeToken     string `json:"resume_token,omitempty"`
 	EventID         string `json:"event_id,omitempty"`
 	ConversationID  string `json:"conversation_id,omitempty"`
 	ConversationSeq int64  `json:"conversation_seq,omitempty"`
@@ -56,6 +61,7 @@ type serverFrame struct {
 	LastReceivedSeq int64  `json:"last_received_seq,omitempty"`
 	Code            string `json:"code,omitempty"`
 	Message         string `json:"message,omitempty"`
+	Reason          string `json:"reason,omitempty"`
 	Retryable       bool   `json:"retryable"`
 }
 
@@ -75,6 +81,9 @@ type config struct {
 	receiverUserID     string
 	receiverDeviceID   string
 	receiverDeviceIDs  []string
+	scenario           string
+	slowMessageCount   int
+	pushMetricsURL     string
 	cleanup            bool
 }
 
@@ -87,6 +96,8 @@ type summary struct {
 	MessageTarget           string             `json:"message_target"`
 	DeliveryTarget          string             `json:"delivery_target"`
 	PushURL                 string             `json:"push_url"`
+	PushMetricsURL          string             `json:"push_metrics_url,omitempty"`
+	Scenario                string             `json:"scenario"`
 	TenantID                string             `json:"tenant_id"`
 	ConversationID          string             `json:"conversation_id"`
 	OwnerUserID             string             `json:"owner_user_id"`
@@ -104,6 +115,9 @@ type summary struct {
 	DeviceNotifications     []deviceSummary    `json:"device_notifications,omitempty"`
 	PullInbox               pullSummary        `json:"pull_inbox"`
 	DeliveryAckOK           frameSnapshot      `json:"delivery_ack_ok"`
+	SlowClient              *slowClientSummary `json:"slow_client,omitempty"`
+	PushMetricsBefore       *pushMetrics       `json:"push_metrics_before,omitempty"`
+	PushMetricsAfter        *pushMetrics       `json:"push_metrics_after,omitempty"`
 	CursorLastReceivedSeq   *int64             `json:"cursor_last_received_seq,omitempty"`
 	UserInboxCount          *int64             `json:"user_inbox_count,omitempty"`
 	DeliveryOutboxTotal     *int64             `json:"delivery_outbox_total,omitempty"`
@@ -121,10 +135,34 @@ type deviceSummary struct {
 	CursorLastReceivedSeq *int64        `json:"cursor_last_received_seq,omitempty"`
 }
 
+type slowClientSummary struct {
+	MessageCount       int           `json:"message_count"`
+	FirstSeq           int64         `json:"first_seq"`
+	LastSeq            int64         `json:"last_seq"`
+	NotifyFramesRead   int           `json:"notify_frames_read"`
+	ResumeHintReceived bool          `json:"resume_hint_received"`
+	ResumeHint         frameSnapshot `json:"resume_hint,omitempty"`
+	CloseStatus        string        `json:"close_status,omitempty"`
+	ReconnectedHello   frameSnapshot `json:"reconnected_hello"`
+	ReplayFramesRead   int           `json:"replay_frames_read"`
+	RecoveryPullInbox  pullSummary   `json:"recovery_pull_inbox"`
+	AckOK              frameSnapshot `json:"ack_ok"`
+}
+
+type pushMetrics struct {
+	ConnectedSessions        int    `json:"connected_sessions"`
+	SessionQueueFullCount    uint64 `json:"session_queue_full_count"`
+	SlowSessionEvictedCount  uint64 `json:"slow_session_evicted_count"`
+	ResumeBufferReplayCount  uint64 `json:"resume_buffer_replay_count"`
+	ResumeBufferMissCount    uint64 `json:"resume_buffer_miss_count"`
+	ResumeBufferStoredFrames int    `json:"resume_buffer_stored_frames"`
+}
+
 type frameSnapshot struct {
 	Op              string `json:"op"`
 	RequestID       string `json:"request_id,omitempty"`
 	SessionID       string `json:"session_id,omitempty"`
+	ResumeToken     string `json:"resume_token,omitempty"`
 	EventID         string `json:"event_id,omitempty"`
 	ConversationID  string `json:"conversation_id,omitempty"`
 	ConversationSeq int64  `json:"conversation_seq,omitempty"`
@@ -134,6 +172,7 @@ type frameSnapshot struct {
 	LastReceivedSeq int64  `json:"last_received_seq,omitempty"`
 	Code            string `json:"code,omitempty"`
 	Message         string `json:"message,omitempty"`
+	Reason          string `json:"reason,omitempty"`
 	Retryable       bool   `json:"retryable,omitempty"`
 }
 
@@ -164,6 +203,11 @@ type item struct {
 	SenderID        string `json:"sender_id"`
 }
 
+type cursor struct {
+	ConversationID string `json:"conversation_id"`
+	Seq            int64  `json:"seq"`
+}
+
 func main() {
 	cfg := parseConfig()
 	if err := run(cfg); err != nil {
@@ -190,10 +234,23 @@ func parseConfig() config {
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "push-device-1", "online receiver device id")
 	var receiverDeviceIDs string
 	flag.StringVar(&receiverDeviceIDs, "receiver-device-ids", "", "comma separated online receiver device ids; overrides receiver-device-id when set")
+	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full or slow-client")
+	flag.IntVar(&cfg.slowMessageCount, "slow-message-count", 128, "number of messages sent while slow client does not read")
+	flag.StringVar(&cfg.pushMetricsURL, "push-metrics-url", "", "push-gateway debug metrics URL")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete existing rows for tenant before running")
 	flag.Parse()
 	cfg.receiverDeviceIDs = parseDeviceIDs(receiverDeviceIDs, cfg.receiverDeviceID)
 	cfg.receiverDeviceID = cfg.receiverDeviceIDs[0]
+	cfg.scenario = strings.TrimSpace(cfg.scenario)
+	if cfg.scenario == "" {
+		cfg.scenario = "full"
+	}
+	if cfg.slowMessageCount <= 0 {
+		cfg.slowMessageCount = 1
+	}
+	if cfg.pushMetricsURL == "" {
+		cfg.pushMetricsURL = derivePushMetricsURL(cfg.pushURL)
+	}
 	return cfg
 }
 
@@ -249,6 +306,8 @@ func run(cfg config) error {
 		MessageTarget:      cfg.messageTarget,
 		DeliveryTarget:     cfg.deliveryTarget,
 		PushURL:            cfg.pushURL,
+		PushMetricsURL:     cfg.pushMetricsURL,
+		Scenario:           cfg.scenario,
 		TenantID:           cfg.tenantID,
 		ConversationID:     cfg.conversationID,
 		OwnerUserID:        cfg.ownerUserID,
@@ -257,6 +316,18 @@ func run(cfg config) error {
 		ReceiverDeviceIDs:  cfg.receiverDeviceIDs,
 		StartedAt:          time.Now().UTC(),
 		Latencies:          map[string]float64{},
+	}
+
+	if metrics, err := fetchPushMetrics(ctx, cfg.pushMetricsURL); err == nil {
+		result.PushMetricsBefore = &metrics
+	}
+
+	switch cfg.scenario {
+	case "full":
+	case "slow-client":
+		return runSlowClientScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
+	default:
+		return finish(cfg, &result, fmt.Errorf("unsupported scenario: %s", cfg.scenario))
 	}
 
 	type onlineDevice struct {
@@ -293,7 +364,7 @@ func run(cfg config) error {
 	}
 
 	begin = time.Now()
-	send, err := sendMessage(ctx, cfg, messageClient)
+	send, err := sendMessage(ctx, cfg, messageClient, 1)
 	result.Latencies["send_message"] = elapsedMS(begin)
 	if err != nil {
 		return finish(cfg, &result, fmt.Errorf("send message: %w", err))
@@ -350,7 +421,141 @@ func run(cfg config) error {
 	return finish(cfg, &result, nil)
 }
 
+func runSlowClientScenario(
+	ctx context.Context,
+	cfg config,
+	pool *pgxpool.Pool,
+	conversationClient conversationv1.ConversationServiceClient,
+	messageClient messagev1.MessageServiceClient,
+	deliveryClient deliveryv1.DeliveryServiceClient,
+	result *summary,
+) error {
+	conn, hello, err := connectWebSocket(ctx, cfg, cfg.receiverDeviceID)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("connect slow websocket: %w", err))
+	}
+	result.ServerHello = snapshotFrame(hello)
+
+	begin := time.Now()
+	join, err := createReceiverJoin(ctx, cfg, conversationClient)
+	result.Latencies["create_member_join"] = elapsedMS(begin)
+	if err != nil {
+		conn.CloseNow()
+		return finish(cfg, result, fmt.Errorf("create receiver join: %w", err))
+	}
+	result.MemberJoin = memberJoinSummary{
+		ChangeID:          join.GetChangeId(),
+		BoundarySeq:       join.GetBoundarySeq(),
+		MemberVersion:     join.GetMemberVersion(),
+		PermissionVersion: join.GetPermissionVersion(),
+	}
+	if err := waitMembership(ctx, pool, cfg); err != nil {
+		conn.CloseNow()
+		return finish(cfg, result, err)
+	}
+
+	beforeMetrics, _ := fetchPushMetrics(ctx, cfg.pushMetricsURL)
+	result.PushMetricsBefore = &beforeMetrics
+
+	var firstSeq int64
+	var lastSeq int64
+	begin = time.Now()
+	for i := 1; i <= cfg.slowMessageCount; i++ {
+		send, err := sendMessage(ctx, cfg, messageClient, i)
+		if err != nil {
+			conn.CloseNow()
+			return finish(cfg, result, fmt.Errorf("send slow message %d: %w", i, err))
+		}
+		if firstSeq == 0 {
+			firstSeq = send.GetConversationSeq()
+			result.SendMessage = sendSummary{MessageID: send.GetMessageId(), ConversationSeq: send.GetConversationSeq()}
+		}
+		lastSeq = send.GetConversationSeq()
+	}
+	result.Latencies["send_messages"] = elapsedMS(begin)
+
+	afterMetrics, err := waitPushEviction(ctx, cfg, beforeMetrics.SlowSessionEvictedCount)
+	if err != nil {
+		conn.CloseNow()
+		return finish(cfg, result, err)
+	}
+	result.PushMetricsAfter = &afterMetrics
+
+	readResult := readUntilResumeHintOrClose(ctx, cfg, conn)
+	_ = conn.Close(nhooyr.StatusNormalClosure, "slow done")
+
+	pull, err := pullInboxAtLeast(ctx, cfg, deliveryClient, 0, cfg.slowMessageCount+10, cfg.slowMessageCount, lastSeq)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("pull inbox after slow close: %w", err))
+	}
+	if pull.ItemCount < cfg.slowMessageCount || pull.MaxSeq < lastSeq {
+		return finish(cfg, result, fmt.Errorf("pull inbox did not recover slow messages: count=%d max_seq=%d want_count=%d want_seq=%d", pull.ItemCount, pull.MaxSeq, cfg.slowMessageCount, lastSeq))
+	}
+	if err := waitDeliveryOutboxDrain(ctx, pool, cfg); err != nil {
+		return finish(cfg, result, err)
+	}
+
+	reconnected, reconnectedHello, err := connectWebSocketWithResume(
+		ctx,
+		cfg,
+		cfg.receiverDeviceID,
+		hello.ResumeToken,
+		[]cursor{{ConversationID: cfg.conversationID, Seq: pull.MaxSeq}},
+	)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("reconnect websocket: %w", err))
+	}
+	defer reconnected.Close(nhooyr.StatusNormalClosure, "")
+
+	ackOK, replayCount, err := ackViaWebSocketWithSkipped(ctx, cfg, reconnected, cfg.receiverDeviceID, pull.MaxSeq)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("ack after slow close: %w", err))
+	}
+	if err := waitCursor(ctx, pool, cfg, cfg.receiverDeviceID, pull.MaxSeq); err != nil {
+		return finish(cfg, result, err)
+	}
+	cursorSeq, err := queryCursor(ctx, pool, cfg, cfg.receiverDeviceID)
+	if err != nil {
+		return finish(cfg, result, err)
+	}
+	result.CursorLastReceivedSeq = &cursorSeq
+	if err := waitDeliveryOutboxDrain(ctx, pool, cfg); err != nil {
+		return finish(cfg, result, err)
+	}
+	if err := fillPostgresStats(ctx, pool, cfg, result); err != nil {
+		return finish(cfg, result, err)
+	}
+
+	result.SlowClient = &slowClientSummary{
+		MessageCount:       cfg.slowMessageCount,
+		FirstSeq:           firstSeq,
+		LastSeq:            lastSeq,
+		NotifyFramesRead:   readResult.notifyFrames,
+		ResumeHintReceived: readResult.resumeHint.Op == opResumeHint,
+		ResumeHint:         snapshotFrame(readResult.resumeHint),
+		CloseStatus:        readResult.closeStatus,
+		ReconnectedHello:   snapshotFrame(reconnectedHello),
+		ReplayFramesRead:   replayCount,
+		RecoveryPullInbox:  pull,
+		AckOK:              snapshotFrame(ackOK),
+	}
+	result.PullInbox = pull
+	result.DeliveryAckOK = snapshotFrame(ackOK)
+	result.Success = true
+	return finish(cfg, result, nil)
+}
+
 func connectWebSocket(ctx context.Context, cfg config, deviceID string) (*nhooyr.Conn, serverFrame, error) {
+	return connectWebSocketWithResume(ctx, cfg, deviceID, "", nil)
+}
+
+func connectWebSocketWithResume(
+	ctx context.Context,
+	cfg config,
+	deviceID string,
+	resumeToken string,
+	lastReceived []cursor,
+) (*nhooyr.Conn, serverFrame, error) {
 	u, err := url.Parse(cfg.pushURL)
 	if err != nil {
 		return nil, serverFrame{}, err
@@ -367,9 +572,11 @@ func connectWebSocket(ctx context.Context, cfg config, deviceID string) (*nhooyr
 		return nil, serverFrame{}, err
 	}
 	if err := wsjson.Write(requestCtx, conn, clientFrame{
-		Op:        opClientHello,
-		RequestID: "push-smoke-hello-" + deviceID,
-		DeviceID:  deviceID,
+		Op:           opClientHello,
+		RequestID:    "push-smoke-hello-" + deviceID,
+		DeviceID:     deviceID,
+		ResumeToken:  resumeToken,
+		LastReceived: lastReceived,
 	}); err != nil {
 		conn.CloseNow()
 		return nil, serverFrame{}, err
@@ -417,8 +624,9 @@ func sendMessage(
 	ctx context.Context,
 	cfg config,
 	client messagev1.MessageServiceClient,
+	index int,
 ) (*messagev1.SendMessageResponse, error) {
-	payload, err := structpb.NewStruct(map[string]any{"text": "push gateway smoke"})
+	payload, err := structpb.NewStruct(map[string]any{"text": fmt.Sprintf("push gateway smoke %d", index)})
 	if err != nil {
 		return nil, err
 	}
@@ -434,7 +642,7 @@ func sendMessage(
 			RequestId: "push-smoke-send",
 		},
 		ConversationId: cfg.conversationID,
-		ClientMsgId:    "push-smoke-client-message-1",
+		ClientMsgId:    fmt.Sprintf("push-smoke-client-message-%d", index),
 		MessageType:    "TEXT",
 		Payload:        payload,
 	})
@@ -461,9 +669,65 @@ func waitNotify(ctx context.Context, cfg config, conn *nhooyr.Conn) (serverFrame
 	}
 }
 
+type slowReadResult struct {
+	notifyFrames int
+	resumeHint   serverFrame
+	closeStatus  string
+}
+
+func readUntilResumeHintOrClose(ctx context.Context, cfg config, conn *nhooyr.Conn) slowReadResult {
+	readCtx, cancel := context.WithTimeout(ctx, cfg.waitTimeout)
+	defer cancel()
+	result := slowReadResult{}
+	for {
+		var frame serverFrame
+		err := wsjson.Read(readCtx, conn, &frame)
+		if err != nil {
+			status := nhooyr.CloseStatus(err)
+			if status != -1 {
+				result.closeStatus = status.String()
+			} else {
+				result.closeStatus = err.Error()
+			}
+			return result
+		}
+		switch frame.Op {
+		case opDeliveryNotify:
+			result.notifyFrames++
+		case opResumeHint:
+			result.resumeHint = frame
+		}
+	}
+}
+
 func pullInbox(ctx context.Context, cfg config, client deliveryv1.DeliveryServiceClient) (pullSummary, error) {
+	return pullInboxWithLimit(ctx, cfg, client, 0, 100)
+}
+
+func pullInboxWithLimit(
+	ctx context.Context,
+	cfg config,
+	client deliveryv1.DeliveryServiceClient,
+	afterSeq int64,
+	limit int,
+) (pullSummary, error) {
+	return pullInboxAtLeast(ctx, cfg, client, afterSeq, limit, 1, 0)
+}
+
+func pullInboxAtLeast(
+	ctx context.Context,
+	cfg config,
+	client deliveryv1.DeliveryServiceClient,
+	afterSeq int64,
+	limit int,
+	minItems int,
+	minSeq int64,
+) (pullSummary, error) {
 	deadline := time.Now().Add(cfg.waitTimeout)
 	latencies := make([]float64, 0, 8)
+	if limit <= 0 {
+		limit = 100
+	}
 	for {
 		requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 		begin := time.Now()
@@ -477,15 +741,15 @@ func pullInbox(ctx context.Context, cfg config, client deliveryv1.DeliveryServic
 				RequestId: "push-smoke-pull",
 			},
 			ConversationId: cfg.conversationID,
-			AfterSeq:       0,
-			Limit:          100,
+			AfterSeq:       afterSeq,
+			Limit:          int32(limit),
 		})
 		latencies = append(latencies, elapsedMS(begin))
 		cancel()
 		if err != nil {
 			return pullSummary{}, err
 		}
-		if len(response.GetItems()) > 0 || time.Now().After(deadline) {
+		if len(response.GetItems()) >= minItems || maxInboxSeq(response.GetItems()) >= minSeq || time.Now().After(deadline) {
 			result := pullSummary{ItemCount: len(response.GetItems())}
 			for _, inboxItem := range response.GetItems() {
 				if inboxItem.GetConversationSeq() > result.MaxSeq {
@@ -509,6 +773,16 @@ func pullInbox(ctx context.Context, cfg config, client deliveryv1.DeliveryServic
 	}
 }
 
+func maxInboxSeq(items []*deliveryv1.InboxItem) int64 {
+	var maxSeq int64
+	for _, inboxItem := range items {
+		if inboxItem.GetConversationSeq() > maxSeq {
+			maxSeq = inboxItem.GetConversationSeq()
+		}
+	}
+	return maxSeq
+}
+
 func ackViaWebSocket(
 	ctx context.Context,
 	cfg config,
@@ -516,6 +790,17 @@ func ackViaWebSocket(
 	deviceID string,
 	seq int64,
 ) (serverFrame, error) {
+	frame, _, err := ackViaWebSocketWithSkipped(ctx, cfg, conn, deviceID, seq)
+	return frame, err
+}
+
+func ackViaWebSocketWithSkipped(
+	ctx context.Context,
+	cfg config,
+	conn *nhooyr.Conn,
+	deviceID string,
+	seq int64,
+) (serverFrame, int, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
 	if err := wsjson.Write(requestCtx, conn, clientFrame{
@@ -524,16 +809,24 @@ func ackViaWebSocket(
 		ConversationID: cfg.conversationID,
 		ReceivedSeq:    seq,
 	}); err != nil {
-		return serverFrame{}, err
+		return serverFrame{}, 0, err
 	}
-	var frame serverFrame
-	if err := wsjson.Read(requestCtx, conn, &frame); err != nil {
-		return serverFrame{}, err
+	skipped := 0
+	for {
+		var frame serverFrame
+		if err := wsjson.Read(requestCtx, conn, &frame); err != nil {
+			return serverFrame{}, skipped, err
+		}
+		switch frame.Op {
+		case opDeliveryAckOK:
+			return frame, skipped, nil
+		case opDeliveryNotify, opResumeHint:
+			skipped++
+			continue
+		default:
+			return frame, skipped, fmt.Errorf("unexpected ack frame: %+v", frame)
+		}
 	}
-	if frame.Op != opDeliveryAckOK {
-		return frame, fmt.Errorf("unexpected ack frame: %+v", frame)
-	}
-	return frame, nil
 }
 
 func waitMembership(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
@@ -598,6 +891,51 @@ WHERE tenant_id = $1
 		time.Sleep(cfg.pollInterval)
 	}
 	return errors.New("delivery outbox drain timeout")
+}
+
+func waitPushEviction(ctx context.Context, cfg config, previous uint64) (pushMetrics, error) {
+	deadline := time.Now().Add(cfg.waitTimeout)
+	var last pushMetrics
+	var lastErr error
+	for time.Now().Before(deadline) {
+		metrics, err := fetchPushMetrics(ctx, cfg.pushMetricsURL)
+		if err == nil {
+			last = metrics
+			if metrics.SlowSessionEvictedCount > previous {
+				return metrics, nil
+			}
+		} else {
+			lastErr = err
+		}
+		time.Sleep(cfg.pollInterval)
+	}
+	if lastErr != nil {
+		return last, fmt.Errorf("wait push eviction: last metrics error: %w", lastErr)
+	}
+	return last, fmt.Errorf("wait push eviction timeout: metrics=%+v previous_evicted=%d", last, previous)
+}
+
+func fetchPushMetrics(ctx context.Context, metricsURL string) (pushMetrics, error) {
+	if strings.TrimSpace(metricsURL) == "" {
+		return pushMetrics{}, errors.New("push metrics url is empty")
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, metricsURL, nil)
+	if err != nil {
+		return pushMetrics{}, err
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return pushMetrics{}, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return pushMetrics{}, fmt.Errorf("push metrics returned status %d", response.StatusCode)
+	}
+	var metrics pushMetrics
+	if err := json.NewDecoder(response.Body).Decode(&metrics); err != nil {
+		return pushMetrics{}, err
+	}
+	return metrics, nil
 }
 
 func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string) error {
@@ -720,6 +1058,25 @@ func parseDeviceIDs(list string, fallback string) []string {
 	return result
 }
 
+func derivePushMetricsURL(pushURL string) string {
+	parsed, err := url.Parse(pushURL)
+	if err != nil {
+		return ""
+	}
+	switch parsed.Scheme {
+	case "ws":
+		parsed.Scheme = "http"
+	case "wss":
+		parsed.Scheme = "https"
+	default:
+		return ""
+	}
+	parsed.Path = "/debug/metrics"
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String()
+}
+
 func finish(cfg config, result *summary, runErr error) error {
 	result.FinishedAt = time.Now().UTC()
 	if runErr != nil {
@@ -749,6 +1106,7 @@ func snapshotFrame(frame serverFrame) frameSnapshot {
 		Op:              frame.Op,
 		RequestID:       frame.RequestID,
 		SessionID:       frame.SessionID,
+		ResumeToken:     frame.ResumeToken,
 		EventID:         frame.EventID,
 		ConversationID:  frame.ConversationID,
 		ConversationSeq: frame.ConversationSeq,

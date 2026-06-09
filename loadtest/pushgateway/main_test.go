@@ -47,3 +47,22 @@ func TestParseDeviceIDs(t *testing.T) {
 		})
 	}
 }
+
+func TestDerivePushMetricsURL(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "ws", in: "ws://127.0.0.1:11598", want: "http://127.0.0.1:11598/debug/metrics"},
+		{name: "wss", in: "wss://push.example/ws?token=x", want: "https://push.example/debug/metrics"},
+		{name: "invalid scheme", in: "http://127.0.0.1:11598", want: ""},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := derivePushMetricsURL(test.in); got != test.want {
+				t.Fatalf("derivePushMetricsURL(%q) = %q, want %q", test.in, got, test.want)
+			}
+		})
+	}
+}

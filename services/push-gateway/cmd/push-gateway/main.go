@@ -71,6 +71,7 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 				QueueSize:         envInt("NEXUSIM_PUSH_SESSION_QUEUE_SIZE", 256),
 				HeartbeatInterval: envDuration("NEXUSIM_PUSH_HEARTBEAT_INTERVAL", 30*time.Second),
 				WriteTimeout:      envDuration("NEXUSIM_PUSH_WRITE_TIMEOUT", 2*time.Second),
+				WriteDelay:        envDuration("NEXUSIM_PUSH_TEST_WRITE_DELAY", 0),
 			},
 		)
 		mux := http.NewServeMux()

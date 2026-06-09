@@ -61,7 +61,8 @@ conversation-service
 | conversation-service smoke | 已跑真实进程小规模 smoke：`message-service -> conversation-service -> PostgreSQL`，725/725 成功，p99 13.26ms；报告见 `docs/runbook/loadtest/conversation-service/` |
 | conversation-service local runbook | `docs/runbook/conversation-service-local.md` 已存在，记录 migration、seed、双服务启动、smoke 和清理步骤 |
 | conversation-service member_change_saga SDD | `docs/sdd/conversation-service-member-change-saga.md` 已冻结 v1.0，选定 timeline append/publish 方案 C |
-| conversation-service member change contract | `conversation_service.proto` 已新增 `CreateMemberChange` / `GetMemberChange` 契约；`conversation.timeline.events.proto` 已新增 member boundary oneof payload；`000002_member_change_saga_v2.sql` 已补 saga retry/DLQ/metadata/event id 字段 |
+| conversation-service member change contract | `conversation_service.proto` 已新增 `CreateMemberChange` / `GetMemberChange` 契约；`conversation.timeline.events.proto` 已新增 member boundary oneof payload；`000002_member_change_saga_v2.sql` 已补 saga retry/DLQ/metadata/event id 字段；outbox relay builder 已支持 `conversation.member.*` fail-closed；`000003_member_change_saga_event_unique.sql` 补 saga event id 唯一约束 |
+| conversation-service CreateMemberChange | 最小写路径已实现：gRPC adapter -> app usecase -> PostgreSQL repository；同事务写 `member_change_saga`、`conversation_members`、`conversations` version、`conversation_seq`、`conversation_timeline_events`、`message_outbox`；真实 PostgreSQL 集成测试已覆盖首写、幂等 replay、同 key 冲突和 event/timeline/outbox 一致性 |
 
 ## 5. 下一步优先级
 
@@ -73,8 +74,8 @@ conversation-service
 6. message-service 第一阶段压测报告已归档到 `docs/runbook/loadtest/message-service/`，总入口为 `docs/runbook/loadtest/message-service/loadtest-report-20260609-message-service-consolidated.md`；后续不再围绕 message-service 做大规模硬件矩阵，只在关键机制变更后跑 smoke / 小规模验证。
 7. `conversation-service` 最小 RPC read path 已落地并通过真实进程 smoke：SDD、proto、migration、六层骨架、PostgreSQL repository、gRPC handler、`message-service` 可选 gRPC client 和 `message-service -> conversation-service -> PostgreSQL` 小规模验证均已完成。
 8. `conversation-service` 本地运行 runbook 和更多错误路径测试已补齐；独立评审指出的 P1 参数缺失错误映射已修复；P2 中的 `message-service -> conversation-service` 短重试和 response contract 防御也已补。
-9. `conversation-service / member_change_saga` SDD 已冻结，成员变更 RPC proto、member boundary Kafka schema 和 migration v2 已落地；下一步优先补 shared timeline/outbox append port、relay builder 支持 `conversation.member.*` 和 unsupported event fail-closed 测试，再实现最小成员变更命令。
-10. 暂不推 GitHub；等 conversation-service member change 契约/最小实现评审后再批量同步。
+9. `conversation-service / member_change_saga` 最小 `CreateMemberChange` 写路径已落地；下一步做真实进程 smoke：`CreateMemberChange -> outbox relay -> Kafka member event`，再补小规模报告到 `docs/runbook/loadtest/conversation-service/`。
+10. 暂不推 GitHub；等 conversation-service member change 最小写路径 smoke 和评审后再批量同步。
 
 ## 6. 评审要求
 
@@ -288,7 +289,8 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 debug metrics collector 保存全量样本并在 snapshot 时排序，适合本地短压测，不适合作为生产 metrics；后续应替换为固定窗口、reservoir、HDR histogram 或 Prometheus histogram。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
-- `timeline-service`、`delivery-service`、`push-gateway` SDD 未冻结；`conversation-service / member_change_saga` SDD 已冻结，Proto / Kafka schema / migration v2 已补，但成员变更代码前仍必须补 shared timeline/outbox append port 和 relay builder 对 `conversation.member.*` 的支持。
+- `timeline-service`、`delivery-service`、`push-gateway` SDD 未冻结；`conversation-service / member_change_saga` SDD 已冻结，Proto / Kafka schema / migration v2 和 relay builder 已补；成员变更代码必须继续通过 shared timeline/outbox append port 落库，不得绕过统一 outbox。
+- `conversation-service` 当前只实现 `CreateMemberChange` 最小写路径；`GetMemberChange` 查询、saga `EVENT_PUBLISHED / DONE` 推进 worker、DLQ repair、member event 真实进程 smoke 和压测报告仍未完成。
 - 统一 outbox relay 当前仍位于 `message-service/internal/trigger/outbox`，但后续会发布 message/member 两类 conversation timeline event；这是阶段性部署折中，生产化前需要在 TADD 中决定是否拆成独立 `timeline-outbox-relay`。
 
 ## 11. 最近评审状态
@@ -361,4 +363,5 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已补 `conversation-service` 错误路径测试，覆盖 domain inactive conversation/member、app command validation 和 repository error propagation、gRPC 稳定错误 message、真实 PostgreSQL missing/archived/left/member missing 场景；已新增 `docs/runbook/conversation-service-local.md` 作为本地启动与 smoke 说明。
 - 2026-06-09：独立评审线程复核 `conversation-service` 最小 read path，结论为无 P0，但指出 P1：参数缺失会被映射为 Internal。本轮已新增 `ErrInvalidArgument`，`Validate()` 返回稳定 sentinel，gRPC 映射为 `InvalidArgument`，并补 tenant/conversation/user 缺失单测；同时补 `message-service` ConversationClient 响应 tenant/conversation/enum/current_seq_shard 契约校验，以及 conversation dependency unavailable 的一次短重试。
 - 2026-06-09：已冻结 `docs/sdd/conversation-service-member-change-saga.md`，明确成员变更 Saga 采用目标架构方案 C：成员边界事件与 message event 共享 `conversation_seq`、`conversation_timeline_events` 和 outbox 流；编码前必须补 `CreateMemberChange` proto、member boundary Kafka oneof payload、saga retry/DLQ migration 字段和本地 smoke runbook。
-- 2026-06-09：已落地成员变更第一批公共契约：`conversation_service.proto` 新增 `CreateMemberChange` / `GetMemberChange`、`conversation.timeline.events.proto` 新增 member boundary oneof payload、`000002_member_change_saga_v2.sql` 新增 saga retry/DLQ/metadata/`timeline_event_id`/`outbox_event_id` 字段；下一步不能直接写成员变更业务，必须先补 relay builder 支持和 append port。
+- 2026-06-09：已落地成员变更第一批公共契约：`conversation_service.proto` 新增 `CreateMemberChange` / `GetMemberChange`、`conversation.timeline.events.proto` 新增 member boundary oneof payload、`000002_member_change_saga_v2.sql` 新增 saga retry/DLQ/metadata/`timeline_event_id`/`outbox_event_id` 字段；outbox relay builder 已支持 `conversation.member.*` 且覆盖 unsupported fail-closed；下一步补 shared append port 和最小 `CreateMemberChange` 写路径。
+- 2026-06-09：已实现 `conversation-service` 最小 `CreateMemberChange` 写路径，包含 app/domain/types、gRPC adapter、cmd wiring、PostgreSQL repository 同事务写 saga/member/version/timeline/outbox，以及 v3 saga event id 唯一约束；`go test ./...`、关键二进制 build、真实 PostgreSQL `CreateMemberChange` 集成测试均通过。下一步做真实进程 smoke 和阶段评审。

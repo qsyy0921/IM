@@ -228,14 +228,13 @@ occurred_at
 
 `conversation_timeline_events.event_id` 和 `message_outbox.event_id` 第一版都使用同一个 `outbox_event_id`，并把该值保存到 `member_change_saga.timeline_event_id` / `member_change_saga.outbox_event_id`。这样 trigger worker 可以用稳定 `outbox_event_id` 查询 outbox 发布状态，再把 saga 推进到 `EVENT_PUBLISHED / DONE`；不得只依赖 `(tenant_id, conversation_id, boundary_seq, event_type)` 反查。
 
-Kafka schema `schemas/kafka/conversation.timeline.events.proto` 必须包含 member boundary oneof payload：`ConversationMemberJoinedV1` / `ConversationMemberLeftV1` / `ConversationMemberRemovedV1` / `ConversationMemberRoleChangedV1` / `ConversationMemberBoundaryCancelledV1`。本契约落地后，真实写入成员 outbox 前仍必须升级 relay builder。
+Kafka schema `schemas/kafka/conversation.timeline.events.proto` 已包含 member boundary oneof payload：`ConversationMemberJoinedV1` / `ConversationMemberLeftV1` / `ConversationMemberRemovedV1` / `ConversationMemberRoleChangedV1` / `ConversationMemberBoundaryCancelledV1`。
 
-真实写入 member boundary outbox 前还必须升级现有 outbox relay：
+现有统一 outbox relay 已升级为支持 `conversation.member.*`：
 
-- `services/message-service/internal/trigger/outbox/relay.go` 当前只 build `message.persisted.v1`。
-- 未扩展 relay 前，成员事件写入 `message_outbox` 会不断 retry / DLQ。
-- 低版本成员事件一旦 PENDING / DLQ，会按当前 outbox 顺序保护阻塞同会话后续消息事件。
-- 因此成员变更代码不得早于 Kafka schema + relay builder 支持上线；如果 Kafka schema 已扩展但 relay builder 尚未支持，仍不得把 member event 写入 outbox。
+- `services/message-service/internal/trigger/outbox/relay.go` 可以 build message/member 两类 conversation timeline event。
+- unsupported / malformed event 必须 fail-closed：不崩进程、不误标记 `PUBLISHED`，进入 retry / DLQ，并继续按同 conversation 顺序阻塞，除非受控 repair / audit 显式 skip。
+- 真实成员变更写路径仍必须通过 shared timeline/outbox append port 在同一事务内写 `conversation_timeline_events` 和 `message_outbox`，不得在 API / usecase 中拼接跨表 SQL 或直接 publish Kafka。
 
 ## 7. 数据库设计
 
@@ -488,7 +487,7 @@ Runbook 必须覆盖：
 - 本 SDD Frozen。
 - `conversation_service.proto` 增加成员变更 RPC。
 - `schemas/kafka/conversation.timeline.events.proto` 增加 member boundary oneof payload。
-- outbox relay builder 支持 `conversation.member.*`，并覆盖 unsupported event fail-closed：不崩进程、不误标记 `PUBLISHED`、继续按同 conversation 顺序阻塞，除非受控 repair/audit 显式 skip。
+- outbox relay builder 已支持 `conversation.member.*`，并覆盖 unsupported event fail-closed：不崩进程、不误标记 `PUBLISHED`、继续按同 conversation 顺序阻塞，除非受控 repair/audit 显式 skip。
 - migration 补齐 saga retry / DLQ / metadata / `outbox_event_id` / `timeline_event_id` 字段或明确不需要。
 - migration / 文档明确 `conversation_seq`、`conversation_timeline_events`、`message_outbox` 是 conversation timeline shared store。
 - 明确 timeline append / outbox append port，不在 API/usecase 里拼 SQL。

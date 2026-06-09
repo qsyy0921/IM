@@ -15,13 +15,30 @@ type GetSendContextExecutor interface {
 	Execute(context.Context, types.GetSendContextCommand) (types.ConversationSendContext, error)
 }
 
-type Server struct {
-	conversationv1.UnimplementedConversationServiceServer
-	getSendContext GetSendContextExecutor
+type CreateMemberChangeExecutor interface {
+	Execute(context.Context, types.CreateMemberChangeCommand) (types.MemberChangeResult, error)
 }
 
-func NewServer(getSendContext GetSendContextExecutor) *Server {
-	return &Server{getSendContext: getSendContext}
+type Option func(*Server)
+
+type Server struct {
+	conversationv1.UnimplementedConversationServiceServer
+	getSendContext     GetSendContextExecutor
+	createMemberChange CreateMemberChangeExecutor
+}
+
+func NewServer(getSendContext GetSendContextExecutor, opts ...Option) *Server {
+	server := &Server{getSendContext: getSendContext}
+	for _, opt := range opts {
+		opt(server)
+	}
+	return server
+}
+
+func WithCreateMemberChange(executor CreateMemberChangeExecutor) Option {
+	return func(server *Server) {
+		server.createMemberChange = executor
+	}
 }
 
 func Register(registrar grpcgo.ServiceRegistrar, server *Server) {
@@ -56,6 +73,52 @@ func (s *Server) GetSendContext(
 	}, nil
 }
 
+func (s *Server) CreateMemberChange(
+	ctx context.Context,
+	request *conversationv1.CreateMemberChangeRequest,
+) (*conversationv1.CreateMemberChangeResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.createMemberChange == nil {
+		return nil, status.Error(codes.Unimplemented, "create member change is not configured")
+	}
+	auth := request.GetAuthContext()
+	result, err := s.createMemberChange.Execute(ctx, types.CreateMemberChangeCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  types.TenantID(auth.GetTenantId()),
+			UserID:    types.UserID(auth.GetUserId()),
+			DeviceID:  auth.GetDeviceId(),
+			SessionID: auth.GetSessionId(),
+			TraceID:   auth.GetTraceId(),
+			RequestID: auth.GetRequestId(),
+		},
+		ConversationID:        types.ConversationID(request.GetConversationId()),
+		TargetUserID:          types.UserID(request.GetTargetUserId()),
+		ChangeType:            fromProtoMemberChangeType(request.GetChangeType()),
+		TargetRole:            fromProtoMemberRole(request.GetTargetRole()),
+		ExpectedMemberVersion: request.GetExpectedMemberVersion(),
+		IdempotencyKey:        request.GetIdempotencyKey(),
+		ConflictPolicy:        fromProtoConflictPolicy(request.GetConflictPolicy()),
+		Reason:                request.GetReason(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &conversationv1.CreateMemberChangeResponse{
+		ChangeId:          string(result.ChangeID),
+		TenantId:          string(result.TenantID),
+		ConversationId:    string(result.ConversationID),
+		TargetUserId:      string(result.TargetUserID),
+		ChangeType:        toProtoMemberChangeType(result.ChangeType),
+		Status:            toProtoMemberChangeStatus(result.Status),
+		BoundarySeq:       result.BoundarySeq,
+		MemberVersion:     result.MemberVersion,
+		PermissionVersion: result.PermissionVersion,
+		IdempotentReplay:  result.IdempotentReplay,
+	}, nil
+}
+
 func grpcError(err error) error {
 	switch {
 	case errors.Is(err, types.ErrInvalidArgument):
@@ -64,8 +127,18 @@ func grpcError(err error) error {
 		return status.Error(codes.NotFound, "conversation not found")
 	case errors.Is(err, types.ErrMemberNotActive):
 		return status.Error(codes.PermissionDenied, "conversation member is not active")
+	case errors.Is(err, types.ErrPermissionDenied):
+		return status.Error(codes.PermissionDenied, "permission denied")
+	case errors.Is(err, types.ErrMemberConflict):
+		return status.Error(codes.FailedPrecondition, "member conflict")
 	case errors.Is(err, types.ErrDBReadFailed):
 		return status.Error(codes.Unavailable, "conversation read failed")
+	case errors.Is(err, types.ErrDBWriteFailed):
+		return status.Error(codes.Unavailable, "conversation write failed")
+	case errors.Is(err, types.ErrOutboxWriteFailed):
+		return status.Error(codes.Unavailable, "outbox write failed")
+	case errors.Is(err, types.ErrSequencerUnavailable):
+		return status.Error(codes.Unavailable, "sequencer unavailable")
 	default:
 		return status.Error(codes.Internal, "conversation service internal error")
 	}
@@ -79,6 +152,83 @@ func toProtoConversationMode(mode types.ConversationMode) conversationv1.Convers
 		return conversationv1.ConversationMode_CONVERSATION_MODE_SEQUENCER_BLOCK
 	default:
 		return conversationv1.ConversationMode_CONVERSATION_MODE_UNSPECIFIED
+	}
+}
+
+func fromProtoMemberChangeType(value conversationv1.MemberChangeType) types.MemberChangeType {
+	switch value {
+	case conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_JOIN:
+		return types.MemberChangeTypeJoin
+	case conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_LEAVE:
+		return types.MemberChangeTypeLeave
+	case conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_REMOVE:
+		return types.MemberChangeTypeRemove
+	case conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_ROLE_CHANGED:
+		return types.MemberChangeTypeRoleChanged
+	default:
+		return ""
+	}
+}
+
+func toProtoMemberChangeType(value types.MemberChangeType) conversationv1.MemberChangeType {
+	switch value {
+	case types.MemberChangeTypeJoin:
+		return conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_JOIN
+	case types.MemberChangeTypeLeave:
+		return conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_LEAVE
+	case types.MemberChangeTypeRemove:
+		return conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_REMOVE
+	case types.MemberChangeTypeRoleChanged:
+		return conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_ROLE_CHANGED
+	default:
+		return conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_UNSPECIFIED
+	}
+}
+
+func fromProtoMemberRole(value conversationv1.MemberRole) types.MemberRole {
+	switch value {
+	case conversationv1.MemberRole_MEMBER_ROLE_OWNER:
+		return types.MemberRoleOwner
+	case conversationv1.MemberRole_MEMBER_ROLE_ADMIN:
+		return types.MemberRoleAdmin
+	case conversationv1.MemberRole_MEMBER_ROLE_MEMBER:
+		return types.MemberRoleMember
+	default:
+		return ""
+	}
+}
+
+func fromProtoConflictPolicy(value conversationv1.MemberChangeConflictPolicy) types.MemberChangeConflictPolicy {
+	switch value {
+	case conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT:
+		return types.MemberChangeConflictPolicyReject
+	case conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_MERGE:
+		return types.MemberChangeConflictPolicyMerge
+	case conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_COMPENSATE:
+		return types.MemberChangeConflictPolicyCompensate
+	default:
+		return ""
+	}
+}
+
+func toProtoMemberChangeStatus(value types.MemberChangeStatus) conversationv1.MemberChangeStatus {
+	switch value {
+	case types.MemberChangeStatusPendingBoundary:
+		return conversationv1.MemberChangeStatus_MEMBER_CHANGE_STATUS_PENDING_BOUNDARY
+	case types.MemberChangeStatusBoundaryAllocated:
+		return conversationv1.MemberChangeStatus_MEMBER_CHANGE_STATUS_BOUNDARY_ALLOCATED
+	case types.MemberChangeStatusMemberUpdated:
+		return conversationv1.MemberChangeStatus_MEMBER_CHANGE_STATUS_MEMBER_UPDATED
+	case types.MemberChangeStatusOutboxEnqueued:
+		return conversationv1.MemberChangeStatus_MEMBER_CHANGE_STATUS_OUTBOX_ENQUEUED
+	case types.MemberChangeStatusEventPublished:
+		return conversationv1.MemberChangeStatus_MEMBER_CHANGE_STATUS_EVENT_PUBLISHED
+	case types.MemberChangeStatusDone:
+		return conversationv1.MemberChangeStatus_MEMBER_CHANGE_STATUS_DONE
+	case types.MemberChangeStatusFailedCompensated:
+		return conversationv1.MemberChangeStatus_MEMBER_CHANGE_STATUS_FAILED_COMPENSATED
+	default:
+		return conversationv1.MemberChangeStatus_MEMBER_CHANGE_STATUS_UNSPECIFIED
 	}
 }
 

@@ -33,7 +33,7 @@
 | `message-service` | SDD 已冻结 v1.0 | 可以开始 `SendMessage` 普通会话写入链路 |
 | `timeline-service / sequencer` | SDD 未完成 | 不阻塞 `LOCAL_ROW_LOCK`；阻塞热点会话生产实现 |
 | `conversation-service / send context` | SDD v0.1 已存在 | 可以实现 `GetSendContext` 读取路径，替换 message-service strict conversation mock |
-| `conversation-service / member_change_saga` | SDD 已冻结 v1.0；proto / schema / migration v2 已开始落地 | 可以继续 relay builder / append port / 代码切片；真实成员变更写 outbox 前必须支持 `conversation.member.*` |
+| `conversation-service / member_change_saga` | SDD 已冻结 v1.0；proto / schema / migration v2 / relay builder / 最小 `CreateMemberChange` 写路径已落地 | 下一步做真实进程 smoke、saga publish 状态推进和小规模报告 |
 | `push-gateway` | SDD 未完成 | 不阻塞 `message-service`；阻塞 WebSocket 完整闭环 |
 | `delivery-service` | SDD 未完成 | 不阻塞 `message-service`；阻塞 fanout、offline pull、ACK 闭环 |
 | `retrieval-gateway` | SDD 未完成 | 不进入第一条代码切片 |
@@ -103,4 +103,4 @@ conversation-service GetSendContext
 3. `push-gateway.md`
 4. `retrieval-gateway.md`
 
-其中 `timeline-service` SDD 不阻塞当前 `GetSendContext` read path，但阻塞热点会话生产化。`conversation-service / member_change_saga` 已冻结，成员变更 Proto / Kafka schema / migration v2 已开始落地，下一步应优先补 shared timeline/outbox append port 和 relay builder 支持。
+其中 `timeline-service` SDD 不阻塞当前 `GetSendContext` read path，但阻塞热点会话生产化。`conversation-service / member_change_saga` 已冻结，成员变更 Proto / Kafka schema / migration v2、relay builder 和最小 `CreateMemberChange` 写路径已落地，下一步应优先做真实进程 smoke 和 saga 发布状态推进。

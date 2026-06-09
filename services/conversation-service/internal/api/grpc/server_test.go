@@ -62,7 +62,12 @@ func TestGetSendContextMapsErrors(t *testing.T) {
 		{name: "invalid argument", err: types.NewInvalidArgument("tenant_id is required"), code: codes.InvalidArgument, message: "invalid argument"},
 		{name: "not found", err: types.NewConversationNotFound("missing"), code: codes.NotFound, message: "conversation not found"},
 		{name: "member inactive", err: types.NewMemberNotActive("left"), code: codes.PermissionDenied, message: "conversation member is not active"},
+		{name: "permission denied", err: types.NewPermissionDenied("not admin"), code: codes.PermissionDenied, message: "permission denied"},
+		{name: "member conflict", err: types.NewMemberConflict("version conflict"), code: codes.FailedPrecondition, message: "member conflict"},
 		{name: "db read", err: types.NewDBReadFailed("select conversations timeout"), code: codes.Unavailable, message: "conversation read failed"},
+		{name: "db write", err: types.NewDBWriteFailed("insert member_change_saga failed"), code: codes.Unavailable, message: "conversation write failed"},
+		{name: "outbox write", err: types.NewOutboxWriteFailed("message_outbox constraint failed"), code: codes.Unavailable, message: "outbox write failed"},
+		{name: "sequencer unavailable", err: types.NewSequencerUnavailable("hot shard"), code: codes.Unavailable, message: "sequencer unavailable"},
 		{name: "unknown", err: errors.New("boom"), code: codes.Internal, message: "conversation service internal error"},
 	}
 
@@ -148,6 +153,126 @@ func TestGetSendContextRejectsNilRequest(t *testing.T) {
 	}
 }
 
+func TestCreateMemberChangeConvertsRequestAndResponse(t *testing.T) {
+	executor := &fakeCreateMemberChangeExecutor{
+		result: types.MemberChangeResult{
+			ChangeID:          "change-1",
+			TenantID:          "tenant-1",
+			ConversationID:    "conv-1",
+			TargetUserID:      "target-1",
+			OperatorUserID:    "owner-1",
+			ChangeType:        types.MemberChangeTypeJoin,
+			Status:            types.MemberChangeStatusOutboxEnqueued,
+			BoundarySeq:       12,
+			MemberVersion:     6,
+			PermissionVersion: 8,
+			IdempotentReplay:  true,
+		},
+	}
+	server := NewServer(
+		&fakeGetSendContextExecutor{},
+		WithCreateMemberChange(executor),
+	)
+
+	response, err := server.CreateMemberChange(context.Background(), &conversationv1.CreateMemberChangeRequest{
+		AuthContext: &conversationv1.AuthContext{
+			TenantId:  "tenant-1",
+			UserId:    "owner-1",
+			DeviceId:  "device-1",
+			SessionId: "session-1",
+			TraceId:   "trace-1",
+			RequestId: "request-1",
+		},
+		ConversationId:        "conv-1",
+		TargetUserId:          "target-1",
+		ChangeType:            conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_JOIN,
+		TargetRole:            conversationv1.MemberRole_MEMBER_ROLE_MEMBER,
+		ExpectedMemberVersion: 5,
+		IdempotencyKey:        "idem-1",
+		ConflictPolicy:        conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT,
+		Reason:                "invite",
+	})
+	if err != nil {
+		t.Fatalf("create member change: %v", err)
+	}
+	if executor.command.AuthContext.TenantID != "tenant-1" ||
+		executor.command.AuthContext.UserID != "owner-1" ||
+		executor.command.AuthContext.DeviceID != "device-1" ||
+		executor.command.AuthContext.SessionID != "session-1" ||
+		executor.command.AuthContext.TraceID != "trace-1" ||
+		executor.command.AuthContext.RequestID != "request-1" ||
+		executor.command.ConversationID != "conv-1" ||
+		executor.command.TargetUserID != "target-1" ||
+		executor.command.ChangeType != types.MemberChangeTypeJoin ||
+		executor.command.TargetRole != types.MemberRoleMember ||
+		executor.command.ExpectedMemberVersion != 5 ||
+		executor.command.IdempotencyKey != "idem-1" ||
+		executor.command.ConflictPolicy != types.MemberChangeConflictPolicyReject ||
+		executor.command.Reason != "invite" {
+		t.Fatalf("unexpected command: %+v", executor.command)
+	}
+	if response.GetChangeId() != "change-1" ||
+		response.GetChangeType() != conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_JOIN ||
+		response.GetStatus() != conversationv1.MemberChangeStatus_MEMBER_CHANGE_STATUS_OUTBOX_ENQUEUED ||
+		response.GetBoundarySeq() != 12 ||
+		response.GetMemberVersion() != 6 ||
+		response.GetPermissionVersion() != 8 ||
+		!response.GetIdempotentReplay() {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
+func TestCreateMemberChangeMapsValidationErrors(t *testing.T) {
+	server := NewServer(
+		&fakeGetSendContextExecutor{},
+		WithCreateMemberChange(&fakeCreateMemberChangeExecutor{validate: true}),
+	)
+	_, err := server.CreateMemberChange(context.Background(), &conversationv1.CreateMemberChangeRequest{
+		ConversationId: "conv-1",
+		TargetUserId:   "target-1",
+		ChangeType:     conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_JOIN,
+		TargetRole:     conversationv1.MemberRole_MEMBER_ROLE_MEMBER,
+		ConflictPolicy: conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT,
+		IdempotencyKey: "idem-1",
+	})
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	if st.Code() != codes.InvalidArgument || st.Message() != "invalid argument" {
+		t.Fatalf("unexpected status: %s %q", st.Code(), st.Message())
+	}
+}
+
+func TestCreateMemberChangeRejectsNilRequest(t *testing.T) {
+	server := NewServer(
+		&fakeGetSendContextExecutor{},
+		WithCreateMemberChange(&fakeCreateMemberChangeExecutor{}),
+	)
+	_, err := server.CreateMemberChange(context.Background(), nil)
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	if st.Code() != codes.InvalidArgument {
+		t.Fatalf("expected invalid argument, got %s", st.Code())
+	}
+}
+
+func TestCreateMemberChangeRequiresExecutor(t *testing.T) {
+	_, err := NewServer(&fakeGetSendContextExecutor{}).CreateMemberChange(
+		context.Background(),
+		&conversationv1.CreateMemberChangeRequest{},
+	)
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	if st.Code() != codes.Unimplemented {
+		t.Fatalf("expected unimplemented, got %s", st.Code())
+	}
+}
+
 type fakeGetSendContextExecutor struct {
 	result   types.ConversationSendContext
 	err      error
@@ -163,6 +288,26 @@ func (f *fakeGetSendContextExecutor) Execute(
 	if f.validate {
 		if err := command.Validate(); err != nil {
 			return types.ConversationSendContext{}, err
+		}
+	}
+	return f.result, f.err
+}
+
+type fakeCreateMemberChangeExecutor struct {
+	result   types.MemberChangeResult
+	err      error
+	command  types.CreateMemberChangeCommand
+	validate bool
+}
+
+func (f *fakeCreateMemberChangeExecutor) Execute(
+	_ context.Context,
+	command types.CreateMemberChangeCommand,
+) (types.MemberChangeResult, error) {
+	f.command = command
+	if f.validate {
+		if err := command.Validate(); err != nil {
+			return types.MemberChangeResult{}, err
 		}
 	}
 	return f.result, f.err

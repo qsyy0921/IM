@@ -16,6 +16,7 @@ type Conversation struct {
 
 type Member struct {
 	UserID            types.UserID
+	Role              types.MemberRole
 	Status            types.MemberStatus
 	MemberVersion     int64
 	PermissionVersion int64

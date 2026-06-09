@@ -57,9 +57,13 @@ func runGRPCServer() error {
 		return err
 	}
 	server := grpc.NewServer()
+	repository := postgresinfra.NewRepository(pool)
 	grpcapi.Register(
 		server,
-		grpcapi.NewServer(app.NewGetSendContextUseCase(postgresinfra.NewRepository(pool))),
+		grpcapi.NewServer(
+			app.NewGetSendContextUseCase(repository),
+			grpcapi.WithCreateMemberChange(app.NewCreateMemberChangeUseCase(repository)),
+		),
 	)
 
 	serveErr := make(chan error, 1)

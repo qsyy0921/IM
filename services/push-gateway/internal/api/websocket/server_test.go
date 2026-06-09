@@ -286,6 +286,95 @@ func TestWebSocketDisconnectUnregistersBeforeFurtherNotify(t *testing.T) {
 	}
 }
 
+func TestWebSocketReplaysResumeBuffer(t *testing.T) {
+	registry := memory.NewRegistry()
+	server := NewServer(
+		app.NewConnectSessionUseCase(registry),
+		app.NewDisconnectSessionUseCase(registry),
+		app.NewHandleClientFrameUseCase(&fakeDeliveryClient{}),
+		Config{QueueSize: 4, HeartbeatInterval: time.Second},
+	)
+	httpServer := httptest.NewServer(server)
+	defer httpServer.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	target := "ws" + httpServer.URL[len("http"):] + "/ws?tenant_id=tenant-1&user_id=user-1&device_id=device-1"
+	conn, _, err := nhooyr.Dial(ctx, target, nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	if err := wsjson.Write(ctx, conn, types.ClientFrame{
+		Op:        types.OpClientHello,
+		RequestID: "hello-1",
+		DeviceID:  "device-1",
+	}); err != nil {
+		t.Fatalf("write hello: %v", err)
+	}
+	var hello types.ServerFrame
+	if err := wsjson.Read(ctx, conn, &hello); err != nil {
+		t.Fatalf("read hello: %v", err)
+	}
+	if hello.ResumeToken == "" {
+		t.Fatalf("expected resume token")
+	}
+	if _, err := app.NewNotifyDeliveryUseCase(registry).Execute(ctx, types.NotifyDeliveryCommand{
+		Notification: types.DeliveryNotification{
+			EventID:         "delivery-event-7",
+			TenantID:        "tenant-1",
+			UserID:          "user-1",
+			ConversationID:  "conversation-1",
+			ConversationSeq: 7,
+			MessageID:       "message-7",
+		},
+	}); err != nil {
+		t.Fatalf("notify: %v", err)
+	}
+	var notify types.ServerFrame
+	if err := wsjson.Read(ctx, conn, &notify); err != nil {
+		t.Fatalf("read notify: %v", err)
+	}
+	if notify.EventID != "delivery-event-7" {
+		t.Fatalf("unexpected notify: %+v", notify)
+	}
+	_ = conn.Close(nhooyr.StatusNormalClosure, "resume")
+
+	resumed, _, err := nhooyr.Dial(ctx, target, nil)
+	if err != nil {
+		t.Fatalf("redial: %v", err)
+	}
+	defer resumed.Close(nhooyr.StatusNormalClosure, "")
+	if err := wsjson.Write(ctx, resumed, types.ClientFrame{
+		Op:          types.OpClientHello,
+		RequestID:   "hello-2",
+		DeviceID:    "device-1",
+		ResumeToken: hello.ResumeToken,
+		LastReceived: []types.ConversationCursor{{
+			ConversationID: "conversation-1",
+			Seq:            6,
+		}},
+	}); err != nil {
+		t.Fatalf("write resume hello: %v", err)
+	}
+	var resumedHello types.ServerFrame
+	if err := wsjson.Read(ctx, resumed, &resumedHello); err != nil {
+		t.Fatalf("read resumed hello: %v", err)
+	}
+	if resumedHello.ResumeToken != hello.ResumeToken {
+		t.Fatalf("expected same resume token, got %+v", resumedHello)
+	}
+	var replay types.ServerFrame
+	if err := wsjson.Read(ctx, resumed, &replay); err != nil {
+		t.Fatalf("read replay: %v", err)
+	}
+	if replay.Op != types.OpDeliveryNotify ||
+		replay.EventID != "delivery-event-7" ||
+		replay.ConversationSeq != 7 ||
+		!replay.PullRequired {
+		t.Fatalf("unexpected replay: %+v", replay)
+	}
+}
+
 func TestWriteLoopSendsResumeHintAndClosesOnEviction(t *testing.T) {
 	outbound := make(chan types.ServerFrame)
 	evicted := make(chan types.SessionEviction, 1)

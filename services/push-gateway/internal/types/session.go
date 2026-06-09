@@ -5,14 +5,17 @@ import "time"
 const (
 	DefaultHeartbeatInterval = 30 * time.Second
 	DefaultSessionQueueSize  = 256
+	DefaultResumeBufferSize  = 256
 )
 
 type SessionRegistration struct {
-	AuthContext AuthContext
-	SessionID   string
-	ResumeToken string
-	Outbound    chan<- ServerFrame
-	Evicted     chan<- SessionEviction
+	AuthContext     AuthContext
+	SessionID       string
+	ResumeToken     string
+	ResumeRequested bool
+	LastReceived    []ConversationCursor
+	Outbound        chan<- ServerFrame
+	Evicted         chan<- SessionEviction
 }
 
 type SessionEviction struct {
@@ -22,6 +25,8 @@ type SessionEviction struct {
 
 type ConnectSessionCommand struct {
 	AuthContext       AuthContext
+	ResumeToken       string
+	LastReceived      []ConversationCursor
 	QueueSize         int
 	HeartbeatInterval time.Duration
 }

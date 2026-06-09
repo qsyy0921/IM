@@ -306,8 +306,9 @@ session_id -> ring buffer of delivery.notify frames
 - buffer 按 session 保留最近 N 条或 N 秒。
 - buffer 中只放轻量 notification，不放完整 message fact。
 - buffer miss 必须回退到 delivery-service `PullInbox`。
-- `resume_token` 第一阶段为 in-memory opaque token，绑定 `tenant_id / user_id / device_id / session_id`，TTL 与 resume buffer TTL 一致。
+- `resume_token` 第一阶段为 in-memory opaque token，绑定 `tenant_id / user_id / device_id`；重连会创建新的 `session_id`，但可以复用同一 token 读取单实例 buffer。TTL 与 resume buffer TTL 一致。
 - 服务重启、token 过期或 token 与 device/session 不匹配时，resume 失败，服务端返回 `server.resume_hint`，客户端 fallback `PullInbox`。
+- 当前单实例第一版只实现 in-memory、按条数裁剪的 best-effort resume buffer；TTL、Redis route 和跨实例 resume 仍是后续切片。
 
 第一版可编码配置：
 

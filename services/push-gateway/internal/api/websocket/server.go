@@ -86,6 +86,8 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	evicted := make(chan types.SessionEviction, 1)
 	result, err := server.connect.Execute(request.Context(), types.ConnectSessionCommand{
 		AuthContext:       auth,
+		ResumeToken:       helloFrame.ResumeToken,
+		LastReceived:      helloFrame.LastReceived,
 		QueueSize:         server.config.QueueSize,
 		HeartbeatInterval: server.config.HeartbeatInterval,
 	}, outbound, evicted)

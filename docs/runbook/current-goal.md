@@ -27,8 +27,8 @@
 持续推进 `E:\development\IM` 的 NexusIM 项目落地。`message-service`、`conversation-service`、`delivery-service` 已分别完成最小真实闭环，`push-gateway` 也已跑通第一条真实在线通知 smoke；当前阶段切换到“复核 push-gateway full smoke，并继续补在线网关生产化能力”：
 
 ```text
-push-gateway slow session active close
--> Redis route / resume buffer
+push-gateway single-instance resume buffer
+-> slow-client smoke / Redis route
 ```
 
 ## 2. 硬边界
@@ -89,7 +89,7 @@ push-gateway slow session active close
 | delivery-service full smoke | 已跑真实进程小规模 smoke：`CreateMemberChange(JOIN) -> Kafka timeline -> delivery projection -> SendMessage -> Kafka timeline -> user_inbox -> PullInbox -> AckDelivery`，SendMessage `64/64` 成功，`delivery-user-1` 拉到 64 条 inbox，ACK 到 seq `66`；`loadtest/delivery` summary 已支持 `--consumer-group`，checkpoint 统计可按本次 consumer group 过滤；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-full-smoke.md` |
 | delivery_outbox / push-gateway | 已新增 `schemas/kafka/delivery/v1/im.delivery.events.proto`、delivery-service outbox store、trigger relay、Kafka writer producer 和 `NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay`；真实 Kafka smoke 已验证 `delivery_outbox PENDING -> PUBLISHED`，并从 `im.delivery.events` 解码出 `DeliveryEvent_AckRecorded`；push-gateway 已完成最小在线通知 smoke，后续生产化依赖 Redis route / resume buffer / slow session active close；push-gateway 仍必须依赖 delivery read model / delivery event，不直接读取 message-service 内部表，也不修改 ACK |
 | delivery-service negative visibility | 已新增 `loadtest/deliveryvisibility`，并在 clean commit `a87fc3f` 跑通 `LEAVE / REMOVE` 负向可见性 smoke：目标用户边界前各收到 1 条 inbox，边界后 `membership_status=LEFT`、`leave_seq=boundary_seq=4`，active sender 收到 post-boundary message，目标用户 `target_post_inbox_count=0` 且 `PullInbox(after_seq=boundary_seq)=0`；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-visibility-negative-smoke.md` |
-| push-gateway SDD / skeleton / smoke | `docs/sdd/push-gateway.md` 已新增 v0.1 Draft；边界为 WebSocket 在线连接、`im.delivery.events` 轻量通知、客户端回源 `PullInbox` 和 ACK frame 转发到 `delivery-service AckDelivery`；评审 P1 已补 `server.pong`、`delivery.ack.ok` 和 `PERMISSION_DENIED retryable=false`；`services/push-gateway/internal/{api,app,domain,infrastructure,types,trigger}` 六层骨架、WebSocket adapter、in-memory registry、delivery-service gRPC client、Kafka delivery consumer 和 `NEXUSIM_PUSH_GATEWAY_MODE=all` 已落地；clean commit `984080d` 真实进程 full smoke 已通过；clean commit `99efdc3` 同 user 双 device notify smoke 已通过，两个 device 都收到同一条 `delivery.notify` 并分别 ACK 到 device cursor；queue-full slow session 第一版已支持 registry eviction signal -> WebSocket broad `server.resume_hint` -> active close，且已修复普通断连时 close outbound 与 registry send 的竞态；报告见 `docs/runbook/loadtest/push-gateway/` |
+| push-gateway SDD / skeleton / smoke | `docs/sdd/push-gateway.md` 已新增 v0.1 Draft；边界为 WebSocket 在线连接、`im.delivery.events` 轻量通知、客户端回源 `PullInbox` 和 ACK frame 转发到 `delivery-service AckDelivery`；评审 P1 已补 `server.pong`、`delivery.ack.ok` 和 `PERMISSION_DENIED retryable=false`；`services/push-gateway/internal/{api,app,domain,infrastructure,types,trigger}` 六层骨架、WebSocket adapter、in-memory registry、delivery-service gRPC client、Kafka delivery consumer 和 `NEXUSIM_PUSH_GATEWAY_MODE=all` 已落地；clean commit `984080d` 真实进程 full smoke 已通过；clean commit `99efdc3` 同 user 双 device notify smoke 已通过，两个 device 都收到同一条 `delivery.notify` 并分别 ACK 到 device cursor；queue-full slow session 第一版已支持 registry eviction signal -> WebSocket broad `server.resume_hint` -> active close，且已修复普通断连时 close outbound 与 registry send 的竞态；单实例 in-memory resume buffer 已支持按 `resume_token + last_received` 重放最近 `delivery.notify`，但尚未实现 TTL / Redis route / 跨实例 resume；报告见 `docs/runbook/loadtest/push-gateway/` |
 
 ## 5. 下一步优先级
 
@@ -97,7 +97,7 @@ push-gateway slow session active close
 2. 不再继续做 message-service 重型硬件矩阵；只有公共契约、关键并发语义或新服务链路变化时，才跑 smoke / 小规模验证。
 3. `push-gateway` SDD 已完成阶段评审并修复 frame 契约 P1；六层骨架和第一版 WebSocket / delivery consumer 已落地。
 4. `delivery_outbox -> im.delivery.events -> push-gateway all mode -> online WebSocket client delivery.notify -> PullInbox -> delivery.ack -> AckDelivery -> delivery.ack.ok` 已通过 clean commit smoke；同 user 双 device notify smoke 也已通过。
-5. push-gateway 后续优先补 Redis route 和 resume buffer；queue-full active close 已有单元 / 集成测试，但还没有 slow-client 真实进程负向 smoke 和 metrics；不要把当前 in-memory `all` 模式表述为多实例生产方案。
+5. push-gateway 后续优先补 slow-client 真实进程负向 smoke、基础 metrics 和 Redis route；queue-full active close 与单实例 resume buffer 已有单元 / 集成测试，但还没有跨实例 route / TTL / 真实慢客户端验证；不要把当前 in-memory `all` 模式表述为多实例生产方案。
 
 ## 6. 评审要求
 
@@ -424,3 +424,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：独立评审复核 `push-gateway` full smoke，结论无 P0/P1，可以确认第四个真实微服务完成单实例最小在线通知闭环；本轮已清理 `current-goal.md` 中过期的未实现状态，并把 `PERMISSION_DENIED retryable=false` 补入 `docs/sdd/push-gateway.md` 错误码表。后续继续做同 user 多 device notify smoke、slow session active close / resume_hint 和 Redis route。
 - 2026-06-09：已扩展 `loadtest/pushgateway`，支持 `--receiver-device-ids` 多设备连接；clean commit `99efdc3` 跑通同 user 双 device notify smoke：`push-device-1` 和 `push-device-2` 都收到同一条 `delivery.notify`，并分别返回 `delivery.ack.ok`、cursor 推进到 seq `2`；`delivery_outbox PUBLISHED=3/PENDING=0/DLQ=0`。报告见 `docs/runbook/loadtest/push-gateway/loadtest-report-20260609-push-gateway-multidevice-smoke.md`。
 - 2026-06-09：已补 push-gateway slow session active close 第一版：session queue full 时 registry 发出 eviction signal，WebSocket writer 尽量发送 broad `server.resume_hint` 后主动以 policy violation close 连接，客户端随后应按本地 durable cursor 重连并 `PullInbox`；同时修复多设备 smoke ACK request_id 可读性，并补 `parseDeviceIDs` 单测。独立评审指出的 `notify_seq - 1` 提示语义和普通断连 `close(outbound)` 竞态已修复。下一步补 Redis route / resume buffer，或增加 slow-client 真实进程负向 smoke 与指标。
+- 2026-06-09：已补 push-gateway 单实例 in-memory resume buffer：`client.hello.resume_token + last_received` 会绑定到同 tenant/user/device，并按本地 cursor 过滤重放最近 `delivery.notify`；buffer 只保存轻量通知，不保存完整消息事实。当前仍无 TTL / Redis route / 跨实例 resume，可靠恢复仍以 delivery-service durable inbox 和客户端本地 cursor 为准。

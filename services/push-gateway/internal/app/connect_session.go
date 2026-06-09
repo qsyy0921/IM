@@ -36,19 +36,26 @@ func (usecase *ConnectSessionUseCase) Execute(
 	if sessionID == "" {
 		sessionID = domain.NewOpaqueID("sess")
 	}
+	resumeRequested := command.ResumeToken != ""
+	resumeToken := command.ResumeToken
+	if resumeToken == "" {
+		resumeToken = domain.NewOpaqueID("resume")
+	}
 	result := types.ConnectSessionResult{
 		SessionID:           sessionID,
-		ResumeToken:         domain.NewOpaqueID("resume"),
+		ResumeToken:         resumeToken,
 		HeartbeatIntervalMS: heartbeat.Milliseconds(),
 	}
 	auth := command.AuthContext
 	auth.SessionID = result.SessionID
 	if err := usecase.registry.Register(ctx, types.SessionRegistration{
-		AuthContext: auth,
-		SessionID:   result.SessionID,
-		ResumeToken: result.ResumeToken,
-		Outbound:    outbound,
-		Evicted:     evicted,
+		AuthContext:     auth,
+		SessionID:       result.SessionID,
+		ResumeToken:     result.ResumeToken,
+		ResumeRequested: resumeRequested,
+		LastReceived:    command.LastReceived,
+		Outbound:        outbound,
+		Evicted:         evicted,
 	}); err != nil {
 		return types.ConnectSessionResult{}, err
 	}

@@ -30,6 +30,15 @@ func (p StaticPolicy) CheckSendPermission(context.Context, types.SendMessageComm
 	}, nil
 }
 
+func (p StaticPolicy) CheckRevokePermission(context.Context, types.RevokeMessageCommand) (types.PermissionDecision, error) {
+	return types.PermissionDecision{
+		Allowed:           p.Allowed,
+		Reason:            p.Reason,
+		PermissionVersion: p.PermissionVersion,
+		Classification:    p.Classification,
+	}, nil
+}
+
 type StaticConversation struct {
 	MemberVersion       int64
 	PermissionVersion   int64

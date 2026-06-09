@@ -130,6 +130,72 @@ func TestMessageRepositoryAppendMessageConcurrentReplayDoesNotAdvanceSeq(t *test
 	assertCurrentSeq(t, ctx, pool, tenantID, input.Command.ConversationID, 1)
 }
 
+func TestMessageRepositoryRevokeMessageIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	now := time.Date(2026, 6, 10, 1, 0, 0, 0, time.UTC)
+	runID := time.Now().UnixNano()
+	messageCounter := 0
+	eventCounter := 0
+	repo := NewMessageRepository(
+		pool,
+		WithClock(func() time.Time { return now }),
+		WithIDGenerators(
+			func() (types.MessageID, error) {
+				messageCounter++
+				return types.MessageID(fmt.Sprintf("msg-revoke-%d-%d", runID, messageCounter)), nil
+			},
+			func() (types.EventID, error) {
+				eventCounter++
+				return types.EventID(fmt.Sprintf("event-revoke-%d-%d", runID, eventCounter)), nil
+			},
+		),
+	)
+	tenantID := types.TenantID(fmt.Sprintf("tenant-it-revoke-%d", runID))
+	appendInput := testAppendInput(tenantID, "client-revoke-source", []byte(`{"text":"hello"}`))
+	appendResult, err := repo.AppendMessage(ctx, appendInput)
+	if err != nil {
+		t.Fatalf("append source message: %v", err)
+	}
+
+	revokeInput := testRevokeInput(appendInput, appendResult.MessageID, "revoke-key-1", "mistake")
+	result, err := repo.RevokeMessage(ctx, revokeInput)
+	if err != nil {
+		t.Fatalf("revoke message: %v", err)
+	}
+	if result.MessageID != appendResult.MessageID ||
+		result.ConversationSeq != 2 ||
+		result.ChangeVersion != 1 ||
+		result.IdempotentReplay {
+		t.Fatalf("unexpected revoke result: %+v", result)
+	}
+
+	replay, err := repo.RevokeMessage(ctx, revokeInput)
+	if err != nil {
+		t.Fatalf("replay revoke: %v", err)
+	}
+	if !replay.IdempotentReplay ||
+		replay.ConversationSeq != result.ConversationSeq ||
+		replay.ChangeVersion != result.ChangeVersion {
+		t.Fatalf("unexpected revoke replay: %+v", replay)
+	}
+	conflictInput := testRevokeInput(appendInput, appendResult.MessageID, "revoke-key-1", "different")
+	_, err = repo.RevokeMessage(ctx, conflictInput)
+	if !errors.Is(err, types.ErrIdempotencyConflict) {
+		t.Fatalf("expected revoke idempotency conflict, got %v", err)
+	}
+
+	assertCount(t, ctx, pool, "message_log", tenantID, 1)
+	assertCount(t, ctx, pool, "message_change_history", tenantID, 1)
+	assertCount(t, ctx, pool, "conversation_timeline_events", tenantID, 2)
+	assertCount(t, ctx, pool, "message_outbox", tenantID, 2)
+	assertCurrentSeq(t, ctx, pool, tenantID, appendInput.Command.ConversationID, 2)
+	assertRevokedFacts(t, ctx, pool, revokeInput, result)
+}
+
 func TestMessageRepositoryBackpressureRejectsWhenPoolSaturated(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -159,6 +225,26 @@ func TestMessageRepositoryBackpressureRejectsWhenPoolSaturated(t *testing.T) {
 	_, err = repo.AppendMessage(ctx, testAppendInput(types.TenantID("tenant-backpressure"), "client-backpressure", []byte(`{"text":"hello"}`)))
 	if !errors.Is(err, types.ErrServiceOverloaded) {
 		t.Fatalf("expected service overloaded, got %v", err)
+	}
+}
+
+func testRevokeInput(
+	appendInput domain.AppendMessageInput,
+	messageID types.MessageID,
+	idempotencyKey string,
+	reason string,
+) domain.RevokeMessageInput {
+	return domain.RevokeMessageInput{
+		Command: types.RevokeMessageCommand{
+			AuthContext:    appendInput.Command.AuthContext,
+			ConversationID: appendInput.Command.ConversationID,
+			MessageID:      messageID,
+			IdempotencyKey: idempotencyKey,
+			Reason:         reason,
+			ReceivedAt:     time.Date(2026, 6, 10, 1, 0, 0, 0, time.UTC),
+		},
+		Permission:   appendInput.Permission,
+		Conversation: appendInput.Conversation,
 	}
 }
 
@@ -229,6 +315,106 @@ func assertCount(t *testing.T, ctx context.Context, pool *pgxpool.Pool, table st
 	}
 	if got != want {
 		t.Fatalf("unexpected %s count: got %d want %d", table, got, want)
+	}
+}
+
+func assertRevokedFacts(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	input domain.RevokeMessageInput,
+	result domain.MessageChangeResult,
+) {
+	t.Helper()
+	var (
+		status           string
+		revokedAt        *time.Time
+		changeType       string
+		beforeStatus     string
+		afterStatus      string
+		changeVersion    int32
+		timelineEventID  types.EventID
+		timelineType     string
+		timelineSeq      int64
+		outboxEventID    types.EventID
+		outboxType       string
+		outboxVersion    int64
+		outboxPayloadRaw string
+	)
+	if err := pool.QueryRow(ctx, `
+SELECT
+    ml.status,
+    ml.revoked_at,
+    mch.change_type,
+    mch.before_status,
+    mch.after_status,
+    mch.change_version,
+    te.event_id,
+    te.event_type,
+    te.seq,
+    mo.event_id,
+    mo.event_type,
+    mo.aggregate_version,
+    mo.payload_json::text
+FROM message_log ml
+JOIN message_change_history mch
+  ON mch.tenant_id = ml.tenant_id
+ AND mch.conversation_id = ml.conversation_id
+ AND mch.message_id = ml.message_id
+JOIN conversation_timeline_events te
+  ON te.tenant_id = ml.tenant_id
+ AND te.conversation_id = ml.conversation_id
+ AND te.seq = $4
+JOIN message_outbox mo
+  ON mo.tenant_id = te.tenant_id
+ AND mo.conversation_id = te.conversation_id
+ AND mo.aggregate_version = te.seq
+WHERE ml.tenant_id = $1
+  AND ml.conversation_id = $2
+  AND ml.message_id = $3
+`,
+		input.Command.AuthContext.TenantID,
+		input.Command.ConversationID,
+		input.Command.MessageID,
+		result.ConversationSeq,
+	).Scan(
+		&status,
+		&revokedAt,
+		&changeType,
+		&beforeStatus,
+		&afterStatus,
+		&changeVersion,
+		&timelineEventID,
+		&timelineType,
+		&timelineSeq,
+		&outboxEventID,
+		&outboxType,
+		&outboxVersion,
+		&outboxPayloadRaw,
+	); err != nil {
+		t.Fatalf("read revoked facts: %v", err)
+	}
+	if status != "REVOKED" || revokedAt == nil {
+		t.Fatalf("unexpected message revoke status=%s revokedAt=%v", status, revokedAt)
+	}
+	if changeType != "REVOKE" || beforeStatus != "NORMAL" || afterStatus != "REVOKED" || changeVersion != result.ChangeVersion {
+		t.Fatalf("unexpected change history type=%s before=%s after=%s version=%d", changeType, beforeStatus, afterStatus, changeVersion)
+	}
+	if timelineEventID != outboxEventID ||
+		timelineType != string(types.TimelineEventMessageRevoked) ||
+		outboxType != string(types.TimelineEventMessageRevoked) ||
+		timelineSeq != result.ConversationSeq ||
+		outboxVersion != result.ConversationSeq {
+		t.Fatalf("unexpected revoke timeline/outbox event timeline=%s/%s seq=%d outbox=%s/%s version=%d", timelineEventID, timelineType, timelineSeq, outboxEventID, outboxType, outboxVersion)
+	}
+	var outboxPayload map[string]any
+	if err := json.Unmarshal([]byte(outboxPayloadRaw), &outboxPayload); err != nil {
+		t.Fatalf("decode revoke outbox payload: %v", err)
+	}
+	if outboxPayload["message_id"] != string(input.Command.MessageID) ||
+		outboxPayload["revoked_by"] != string(input.Command.AuthContext.UserID) ||
+		int64(outboxPayload["conversation_seq"].(float64)) != result.ConversationSeq {
+		t.Fatalf("unexpected revoke payload: %+v", outboxPayload)
 	}
 }
 

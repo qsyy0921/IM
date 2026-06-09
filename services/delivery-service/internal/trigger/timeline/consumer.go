@@ -77,6 +77,8 @@ func buildCommand(consumerGroup string, message types.TimelineMessage) (types.Pr
 	switch payload := event.GetPayload().(type) {
 	case *conversationtimelinev1.ConversationTimelineEvent_MessagePersisted:
 		fillMessagePersisted(&command, payload.MessagePersisted)
+	case *conversationtimelinev1.ConversationTimelineEvent_MessageRevoked:
+		fillMessageRevoked(&command, payload.MessageRevoked)
 	case *conversationtimelinev1.ConversationTimelineEvent_ConversationMemberJoined:
 		fillMemberBoundary(&command, payload.ConversationMemberJoined.GetTargetUserId(), payload.ConversationMemberJoined.GetNewRole(), payload.ConversationMemberJoined.GetNewStatus(), payload.ConversationMemberJoined.GetMemberVersion(), payload.ConversationMemberJoined.GetPermissionVersion())
 	case *conversationtimelinev1.ConversationTimelineEvent_ConversationMemberLeft:
@@ -104,6 +106,15 @@ func fillMessagePersisted(command *types.ProjectTimelineEventCommand, payload *c
 		return
 	}
 	command.PayloadJSON, _ = protojson.Marshal(payload.GetPayload())
+}
+
+func fillMessageRevoked(command *types.ProjectTimelineEventCommand, payload *conversationtimelinev1.MessageRevokedV1) {
+	if payload == nil {
+		return
+	}
+	command.MessageID = payload.GetMessageId()
+	command.SenderID = types.UserID(payload.GetRevokedBy())
+	command.PayloadJSON, _ = protojson.Marshal(payload)
 }
 
 func fillMemberBoundary(

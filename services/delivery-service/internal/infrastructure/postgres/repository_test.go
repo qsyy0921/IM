@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -89,6 +90,13 @@ func TestRepositoryProjectTimelineEventIntegration(t *testing.T) {
 	if result.ProjectedInboxCount != 1 {
 		t.Fatalf("expected inbox after rejoin, got %d", result.ProjectedInboxCount)
 	}
+	result, err = repository.ProjectTimelineEvent(ctx, revokeEvent("message-revoked-1", "msg-3", 7))
+	if err != nil {
+		t.Fatalf("project revoke after rejoin: %v", err)
+	}
+	if result.ProjectedInboxCount != 1 {
+		t.Fatalf("expected revoke tombstone inbox after rejoin, got %d", result.ProjectedInboxCount)
+	}
 
 	var inboxCount int
 	err = pool.QueryRow(ctx, `
@@ -101,8 +109,24 @@ WHERE tenant_id = 'tenant-delivery'
 	if err != nil {
 		t.Fatalf("count inbox: %v", err)
 	}
-	if inboxCount != 2 {
-		t.Fatalf("expected 2 inbox rows, got %d", inboxCount)
+	if inboxCount != 3 {
+		t.Fatalf("expected 3 inbox rows, got %d", inboxCount)
+	}
+	var revokeEventType string
+	var revokePayload string
+	err = pool.QueryRow(ctx, `
+SELECT event_type, payload_json::text
+FROM user_inbox
+WHERE tenant_id = 'tenant-delivery'
+  AND user_id = 'user-1'
+  AND conversation_id = 'conv-delivery'
+  AND conversation_seq = 7
+`).Scan(&revokeEventType, &revokePayload)
+	if err != nil {
+		t.Fatalf("read revoke inbox: %v", err)
+	}
+	if revokeEventType != types.TimelineEventMessageRevoked || !strings.Contains(revokePayload, "revoked_by") {
+		t.Fatalf("unexpected revoke inbox event_type=%s payload=%s", revokeEventType, revokePayload)
 	}
 	var joinSeq int64
 	var leaveSeq *int64
@@ -231,6 +255,21 @@ func messageEvent(eventID string, messageID string, seq int64) types.ProjectTime
 		MessageID:         messageID,
 		SenderID:          "sender-1",
 		PayloadJSON:       []byte(`{"text":"hello"}`),
+	}
+}
+
+func revokeEvent(eventID string, messageID string, seq int64) types.ProjectTimelineEventCommand {
+	return types.ProjectTimelineEventCommand{
+		TenantID:          "tenant-delivery",
+		EventID:           eventID,
+		EventType:         types.TimelineEventMessageRevoked,
+		ConversationID:    "conv-delivery",
+		ConversationSeq:   seq,
+		FanoutMode:        "WRITE_FANOUT",
+		PermissionVersion: 1,
+		MessageID:         messageID,
+		SenderID:          "sender-1",
+		PayloadJSON:       []byte(`{"message_id":"msg-3","conversation_seq":7,"change_version":1,"revoked_by":"sender-1"}`),
 	}
 }
 

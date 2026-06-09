@@ -36,7 +36,7 @@ func (repository *Repository) ProjectTimelineEvent(
 
 	result := types.ProjectTimelineEventResult{}
 	switch command.EventType {
-	case types.TimelineEventMessagePersisted:
+	case types.TimelineEventMessagePersisted, types.TimelineEventMessageRevoked:
 		count, err := projectMessagePersisted(ctx, tx, command)
 		if err != nil {
 			return types.ProjectTimelineEventResult{}, err

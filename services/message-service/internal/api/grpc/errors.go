@@ -68,6 +68,10 @@ func classifyError(err error) (codes.Code, messagev1.MessageErrorCode, bool) {
 		return codes.InvalidArgument, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_UNSUPPORTED_MESSAGE_TYPE, false
 	case errors.Is(err, types.ErrConversationNotFound):
 		return codes.NotFound, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_CONVERSATION_NOT_FOUND, false
+	case errors.Is(err, types.ErrMessageNotFound):
+		return codes.NotFound, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_UNSPECIFIED, false
+	case errors.Is(err, types.ErrInvalidMessageState):
+		return codes.FailedPrecondition, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_UNSPECIFIED, false
 	case errors.Is(err, types.ErrIdempotencyConflict):
 		return codes.Aborted, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_IDEMPOTENCY_CONFLICT, false
 	case errors.Is(err, types.ErrSequencerUnavailable):
@@ -98,6 +102,10 @@ func publicErrorMessage(err error) string {
 		return "unsupported message type"
 	case errors.Is(err, types.ErrConversationNotFound):
 		return "conversation not found"
+	case errors.Is(err, types.ErrMessageNotFound):
+		return "message not found"
+	case errors.Is(err, types.ErrInvalidMessageState):
+		return "invalid message state"
 	case errors.Is(err, types.ErrIdempotencyConflict):
 		return "idempotency conflict"
 	case errors.Is(err, types.ErrSequencerUnavailable):

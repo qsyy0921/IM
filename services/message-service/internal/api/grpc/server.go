@@ -17,12 +17,17 @@ type SendMessageExecutor interface {
 	Execute(ctx context.Context, command types.SendMessageCommand) (types.SendMessageResult, error)
 }
 
+type RevokeMessageExecutor interface {
+	Execute(ctx context.Context, command types.RevokeMessageCommand) (types.MessageChangeResult, error)
+}
+
 type Server struct {
 	messagev1.UnimplementedMessageServiceServer
 
-	sendMessage SendMessageExecutor
-	now         func() time.Time
-	metrics     types.LatencyRecorder
+	sendMessage   SendMessageExecutor
+	revokeMessage RevokeMessageExecutor
+	now           func() time.Time
+	metrics       types.LatencyRecorder
 }
 
 type Option func(*Server)
@@ -40,6 +45,12 @@ func WithMetrics(metrics types.LatencyRecorder) Option {
 		if metrics != nil {
 			server.metrics = metrics
 		}
+	}
+}
+
+func WithRevokeMessage(revokeMessage RevokeMessageExecutor) Option {
+	return func(server *Server) {
+		server.revokeMessage = revokeMessage
 	}
 }
 
@@ -79,6 +90,27 @@ func (s *Server) SendMessage(ctx context.Context, req *messagev1.SendMessageRequ
 		MessageId:        string(result.MessageID),
 		ConversationId:   string(result.ConversationID),
 		ConversationSeq:  result.ConversationSeq,
+		AcceptedAt:       timestamppb.New(result.AcceptedAt),
+		IdempotentReplay: result.IdempotentReplay,
+	}, nil
+}
+
+func (s *Server) RevokeMessage(ctx context.Context, req *messagev1.RevokeMessageRequest) (*messagev1.MessageChangeResponse, error) {
+	command, err := s.toRevokeMessageCommand(req)
+	if err != nil {
+		return nil, grpcError(err, revokeReqCorrelationID(req))
+	}
+
+	result, err := s.revokeMessage.Execute(ctx, command)
+	if err != nil {
+		return nil, grpcError(err, revokeReqCorrelationID(req))
+	}
+
+	return &messagev1.MessageChangeResponse{
+		MessageId:        string(result.MessageID),
+		ConversationId:   string(result.ConversationID),
+		ConversationSeq:  result.ConversationSeq,
+		ChangeVersion:    result.ChangeVersion,
 		AcceptedAt:       timestamppb.New(result.AcceptedAt),
 		IdempotentReplay: result.IdempotentReplay,
 	}, nil
@@ -126,6 +158,38 @@ func (s *Server) toSendMessageCommand(req *messagev1.SendMessageRequest) (types.
 	return command, nil
 }
 
+func (s *Server) toRevokeMessageCommand(req *messagev1.RevokeMessageRequest) (types.RevokeMessageCommand, error) {
+	if s.revokeMessage == nil {
+		return types.RevokeMessageCommand{}, errors.New("revoke message use case is not configured")
+	}
+	if req == nil {
+		return types.RevokeMessageCommand{}, newInvalidArgument("request is required")
+	}
+	auth := req.GetAuthContext()
+	if auth == nil {
+		return types.RevokeMessageCommand{}, newInvalidArgument("auth_context is required")
+	}
+	command := types.RevokeMessageCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  types.TenantID(auth.GetTenantId()),
+			UserID:    types.UserID(auth.GetUserId()),
+			DeviceID:  types.DeviceID(auth.GetDeviceId()),
+			SessionID: types.SessionID(auth.GetSessionId()),
+			TraceID:   auth.GetTraceId(),
+			RequestID: auth.GetRequestId(),
+		},
+		ConversationID: types.ConversationID(req.GetConversationId()),
+		MessageID:      types.MessageID(req.GetMessageId()),
+		IdempotencyKey: req.GetIdempotencyKey(),
+		Reason:         req.GetReason(),
+		ReceivedAt:     s.now(),
+	}
+	if err := command.Validate(); err != nil {
+		return types.RevokeMessageCommand{}, newInvalidArgument(err.Error())
+	}
+	return command, nil
+}
+
 func payloadToJSON(payload *structpb.Struct) ([]byte, error) {
 	if payload == nil {
 		return []byte("{}"), nil
@@ -152,4 +216,21 @@ func reqCorrelationID(req *messagev1.SendMessageRequest) string {
 		return auth.GetTraceId()
 	}
 	return req.GetClientMsgId()
+}
+
+func revokeReqCorrelationID(req *messagev1.RevokeMessageRequest) string {
+	if req == nil {
+		return ""
+	}
+	auth := req.GetAuthContext()
+	if auth == nil {
+		return req.GetIdempotencyKey()
+	}
+	if auth.GetRequestId() != "" {
+		return auth.GetRequestId()
+	}
+	if auth.GetTraceId() != "" {
+		return auth.GetTraceId()
+	}
+	return req.GetIdempotencyKey()
 }

@@ -47,3 +47,37 @@ type SendMessageResult struct {
 	AcceptedAt       time.Time
 	IdempotentReplay bool
 }
+
+type RevokeMessageCommand struct {
+	AuthContext    AuthContext
+	ConversationID ConversationID
+	MessageID      MessageID
+	IdempotencyKey string
+	Reason         string
+	ReceivedAt     time.Time
+}
+
+func (c RevokeMessageCommand) Validate() error {
+	if c.AuthContext.TenantID == "" || c.AuthContext.UserID == "" || c.AuthContext.DeviceID == "" {
+		return errors.New("auth context is required")
+	}
+	if c.ConversationID == "" {
+		return errors.New("conversation_id is required")
+	}
+	if c.MessageID == "" {
+		return errors.New("message_id is required")
+	}
+	if c.IdempotencyKey == "" {
+		return errors.New("idempotency_key is required")
+	}
+	return nil
+}
+
+type MessageChangeResult struct {
+	MessageID        MessageID
+	ConversationID   ConversationID
+	ConversationSeq  int64
+	ChangeVersion    int32
+	AcceptedAt       time.Time
+	IdempotentReplay bool
+}

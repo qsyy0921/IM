@@ -263,6 +263,32 @@ func BuildConversationTimelineEvent(message types.OutboxMessage) (*conversationt
 			},
 		}
 		return event, nil
+	case types.TimelineEventMessageRevoked:
+		payload, err := decodeMessageRevokedPayload(message.PayloadJSON)
+		if err != nil {
+			return nil, err
+		}
+		revokedAt, err := time.Parse(time.RFC3339Nano, payload.RevokedAt)
+		if err != nil {
+			return nil, err
+		}
+		occurredAt := message.OccurredAt
+		if occurredAt.IsZero() {
+			occurredAt = revokedAt
+		}
+		event := buildTimelineEnvelope(message, occurredAt)
+		event.Payload = &conversationtimelinev1.ConversationTimelineEvent_MessageRevoked{
+			MessageRevoked: &conversationtimelinev1.MessageRevokedV1{
+				MessageId:       payload.MessageID,
+				ConversationId:  payload.ConversationID,
+				ConversationSeq: payload.ConversationSeq,
+				ChangeVersion:   payload.ChangeVersion,
+				RevokedBy:       payload.RevokedBy,
+				Reason:          payload.Reason,
+				RevokedAt:       timestamppb.New(revokedAt),
+			},
+		}
+		return event, nil
 	case types.TimelineEventConversationMemberJoined,
 		types.TimelineEventConversationMemberLeft,
 		types.TimelineEventConversationMemberRemoved,
@@ -388,6 +414,16 @@ type messagePersistedPayload struct {
 	AcceptedAt      string          `json:"accepted_at"`
 }
 
+type messageRevokedPayload struct {
+	MessageID       string `json:"message_id"`
+	ConversationID  string `json:"conversation_id"`
+	ConversationSeq int64  `json:"conversation_seq"`
+	ChangeVersion   int32  `json:"change_version"`
+	RevokedBy       string `json:"revoked_by"`
+	Reason          string `json:"reason"`
+	RevokedAt       string `json:"revoked_at"`
+}
+
 func decodeMessagePersistedPayload(payloadJSON []byte) (messagePersistedPayload, error) {
 	var payload messagePersistedPayload
 	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
@@ -400,6 +436,22 @@ func decodeMessagePersistedPayload(payloadJSON []byte) (messagePersistedPayload,
 		len(payload.Payload) == 0 ||
 		payload.AcceptedAt == "" {
 		return messagePersistedPayload{}, errors.New("message persisted payload is incomplete")
+	}
+	return payload, nil
+}
+
+func decodeMessageRevokedPayload(payloadJSON []byte) (messageRevokedPayload, error) {
+	var payload messageRevokedPayload
+	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+		return messageRevokedPayload{}, err
+	}
+	if payload.MessageID == "" ||
+		payload.ConversationID == "" ||
+		payload.ConversationSeq <= 0 ||
+		payload.ChangeVersion <= 0 ||
+		payload.RevokedBy == "" ||
+		payload.RevokedAt == "" {
+		return messageRevokedPayload{}, errors.New("message revoked payload is incomplete")
 	}
 	return payload, nil
 }

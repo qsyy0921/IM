@@ -43,6 +43,32 @@ func TestBuildConversationTimelineEventMessagePersisted(t *testing.T) {
 	}
 }
 
+func TestBuildConversationTimelineEventMessageRevoked(t *testing.T) {
+	message := testRevokedOutboxMessage()
+
+	event, err := BuildConversationTimelineEvent(message)
+	if err != nil {
+		t.Fatalf("build event: %v", err)
+	}
+	if event.EventId != string(message.EventID) ||
+		event.EventType != string(types.TimelineEventMessageRevoked) ||
+		event.AggregateVersion != message.AggregateVersion ||
+		event.PartitionKey != message.PartitionKey {
+		t.Fatalf("unexpected envelope: %+v", event)
+	}
+	payload := event.GetMessageRevoked()
+	if payload == nil {
+		t.Fatalf("expected message_revoked payload")
+	}
+	if payload.MessageId != "msg-1" ||
+		payload.ConversationSeq != 2 ||
+		payload.ChangeVersion != 1 ||
+		payload.RevokedBy != "user-1" ||
+		payload.RevokedAt == nil {
+		t.Fatalf("unexpected revoke payload: %+v", payload)
+	}
+}
+
 func TestBuildConversationTimelineEventMemberBoundaryPayloads(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -889,6 +915,39 @@ func testMemberBoundaryOutboxMessage(eventType types.TimelineEventType) types.Ou
 			"permission_version":8,
 			"reason":"invite accepted",
 			"occurred_at":"2026-06-09T09:30:00Z"
+		}`),
+	}
+}
+
+func testRevokedOutboxMessage() types.OutboxMessage {
+	occurredAt := time.Date(2026, 6, 8, 12, 1, 0, 0, time.UTC)
+	return types.OutboxMessage{
+		ID:                  2,
+		EventID:             "event-revoke-1",
+		TenantID:            "tenant-1",
+		ConversationID:      "conv-1",
+		AggregateVersion:    2,
+		EventType:           types.TimelineEventMessageRevoked,
+		EventVersion:        "v1",
+		PartitionKey:        "tenant-1:conv-1",
+		MappingVersion:      "message.revoked.v1",
+		CorrelationID:       "request-1",
+		CausationID:         "revoke-1",
+		Producer:            "message-service",
+		TraceID:             "trace-1",
+		FanoutMode:          types.FanoutModeWriteFanout,
+		FanoutPolicyVersion: 1,
+		PermissionVersion:   1,
+		Classification:      "INTERNAL",
+		OccurredAt:          occurredAt,
+		PayloadJSON: []byte(`{
+			"message_id":"msg-1",
+			"conversation_id":"conv-1",
+			"conversation_seq":2,
+			"change_version":1,
+			"revoked_by":"user-1",
+			"reason":"mistake",
+			"revoked_at":"2026-06-08T12:01:00Z"
 		}`),
 	}
 }

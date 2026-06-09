@@ -320,6 +320,21 @@ func (f *fakePolicy) CheckSendPermission(context.Context, types.SendMessageComma
 	return f.decision, f.err
 }
 
+func (f *fakePolicy) CheckRevokePermission(context.Context, types.RevokeMessageCommand) (types.PermissionDecision, error) {
+	f.calls++
+	if f.err != nil {
+		return types.PermissionDecision{}, f.err
+	}
+	if len(f.decisions) > 0 {
+		index := f.calls - 1
+		if index >= len(f.decisions) {
+			index = len(f.decisions) - 1
+		}
+		return f.decisions[index], nil
+	}
+	return f.decision, nil
+}
+
 type fakeConversation struct {
 	context  types.ConversationSendContext
 	contexts []types.ConversationSendContext
@@ -363,12 +378,23 @@ type fakeMessageRepository struct {
 	err    error
 	calls  int
 	input  domain.AppendMessageInput
+
+	revokeResult domain.MessageChangeResult
+	revokeErr    error
+	revokeCalls  int
+	revokeInput  domain.RevokeMessageInput
 }
 
 func (f *fakeMessageRepository) AppendMessage(_ context.Context, input domain.AppendMessageInput) (domain.AppendMessageResult, error) {
 	f.calls++
 	f.input = input
 	return f.result, f.err
+}
+
+func (f *fakeMessageRepository) RevokeMessage(_ context.Context, input domain.RevokeMessageInput) (domain.MessageChangeResult, error) {
+	f.revokeCalls++
+	f.revokeInput = input
+	return f.revokeResult, f.revokeErr
 }
 
 type fakeAdmission struct {

@@ -16,6 +16,8 @@ var (
 	ErrIdempotencyConflict    = errors.New("idempotency conflict")
 	ErrUnsupportedMessageType = errors.New("unsupported message type")
 	ErrConversationNotFound   = errors.New("conversation not found")
+	ErrMessageNotFound        = errors.New("message not found")
+	ErrInvalidMessageState    = errors.New("invalid message state")
 	ErrDBWriteFailed          = errors.New("db write failed")
 	ErrOutboxWriteFailed      = errors.New("outbox write failed")
 	ErrServiceOverloaded      = errors.New("service overloaded")
@@ -56,6 +58,20 @@ func NewConversationNotFound(reason string) error {
 		return ErrConversationNotFound
 	}
 	return fmt.Errorf("%w: %s", ErrConversationNotFound, reason)
+}
+
+func NewMessageNotFound(reason string) error {
+	if reason == "" {
+		return ErrMessageNotFound
+	}
+	return fmt.Errorf("%w: %s", ErrMessageNotFound, reason)
+}
+
+func NewInvalidMessageState(reason string) error {
+	if reason == "" {
+		return ErrInvalidMessageState
+	}
+	return fmt.Errorf("%w: %s", ErrInvalidMessageState, reason)
 }
 
 func NewDBWriteFailed(reason string) error {

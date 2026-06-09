@@ -145,20 +145,26 @@ func runGRPCServer() error {
 		)
 	}
 
-	useCase := app.NewSendMessageUseCase(
+	messageRepository := postgresinfra.NewMessageRepository(pool, repositoryOptions...)
+	sendUseCase := app.NewSendMessageUseCase(
 		policy,
 		conversation,
 		rpcinfra.NoopSequencer{},
-		postgresinfra.NewMessageRepository(pool, repositoryOptions...),
+		messageRepository,
 		useCaseOptions...,
 	)
+	revokeUseCase := app.NewRevokeMessageUseCase(policy, conversation, messageRepository)
 
 	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		return err
 	}
 	server := grpc.NewServer()
-	grpcapi.Register(server, grpcapi.NewServer(useCase, grpcapi.WithMetrics(metrics)))
+	grpcapi.Register(server, grpcapi.NewServer(
+		sendUseCase,
+		grpcapi.WithMetrics(metrics),
+		grpcapi.WithRevokeMessage(revokeUseCase),
+	))
 
 	serveErr := make(chan error, 1)
 	go func() {

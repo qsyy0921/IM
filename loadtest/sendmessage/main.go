@@ -53,6 +53,7 @@ type sample struct {
 	retryAttempt bool
 	logicalFinal bool
 	retried      bool
+	retryDelay   time.Duration
 }
 
 type loadClient struct {
@@ -82,6 +83,10 @@ type summary struct {
 	RequestCount                        int64                      `json:"request_count"`
 	RetryAttemptCount                   int64                      `json:"retry_attempt_count"`
 	RetriedRequestCount                 int64                      `json:"retried_request_count"`
+	RetryDelayCount                     int64                      `json:"retry_delay_count"`
+	RetryDelayAvgMS                     float64                    `json:"retry_delay_avg_ms"`
+	RetryDelayP95MS                     float64                    `json:"retry_delay_p95_ms"`
+	RetryDelayP99MS                     float64                    `json:"retry_delay_p99_ms"`
 	SuccessCount                        int64                      `json:"success_count"`
 	ErrorCount                          int64                      `json:"error_count"`
 	RetryableErrorCount                 int64                      `json:"retryable_error_count"`
@@ -510,7 +515,13 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 					}
 					delay, shouldRetry := overloadRetryDelay(err, cfg.RetryJitter, requestSeq, attempt)
 					if err != nil && cfg.RetryOverloaded && attempt < cfg.MaxRetries && shouldRetry {
-						records <- sample{latency: latency, err: err, attempt: true, retryAttempt: retryAttempt}
+						records <- sample{
+							latency:      latency,
+							err:          err,
+							attempt:      true,
+							retryAttempt: retryAttempt,
+							retryDelay:   delay,
+						}
 						timer := time.NewTimer(delay)
 						select {
 						case <-loadCtx.Done():
@@ -546,6 +557,7 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 	latencies := make([]time.Duration, 0, cfg.VUs*128)
 	successLatencies := make([]time.Duration, 0, cfg.VUs*128)
 	errorLatencies := make([]time.Duration, 0, cfg.VUs*128)
+	retryDelays := make([]time.Duration, 0, cfg.VUs*16)
 	errorCounts := map[string]int64{}
 	messageErrorCounts := map[messageErrorKey]int64{}
 	var successCount int64
@@ -558,12 +570,17 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 	var totalLatency time.Duration
 	var successLatency time.Duration
 	var errorLatency time.Duration
+	var retryDelayTotal time.Duration
 	for record := range records {
 		if record.attempt {
 			latencies = append(latencies, record.latency)
 			totalLatency += record.latency
 			if record.retryAttempt {
 				retryAttemptCount++
+			}
+			if record.retryDelay > 0 {
+				retryDelays = append(retryDelays, record.retryDelay)
+				retryDelayTotal += record.retryDelay
 			}
 			if record.err != nil {
 				errorLatencies = append(errorLatencies, record.latency)
@@ -625,6 +642,7 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 	}
 	successBreakdown := summarizeLatencies(successLatencies, successLatency)
 	errorBreakdown := summarizeLatencies(errorLatencies, errorLatency)
+	retryDelayBreakdown := summarizeLatencies(retryDelays, retryDelayTotal)
 
 	commit := currentCommit()
 	return summary{
@@ -649,6 +667,10 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 		RequestCount:                    requestCount,
 		RetryAttemptCount:               retryAttemptCount,
 		RetriedRequestCount:             retriedRequestCount,
+		RetryDelayCount:                 int64(len(retryDelays)),
+		RetryDelayAvgMS:                 retryDelayBreakdown.AvgMS,
+		RetryDelayP95MS:                 retryDelayBreakdown.P95MS,
+		RetryDelayP99MS:                 retryDelayBreakdown.P99MS,
 		SuccessCount:                    successCount,
 		ErrorCount:                      errorCountValue,
 		RetryableErrorCount:             retryableErrorCount,

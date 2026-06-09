@@ -19,6 +19,10 @@ type GetReceiptStateExecutor interface {
 	Execute(context.Context, types.GetReceiptStateCommand) (types.GetReceiptStateResult, error)
 }
 
+type ListReceiptStatesExecutor interface {
+	Execute(context.Context, types.ListReceiptStatesCommand) (types.ListReceiptStatesResult, error)
+}
+
 type ListConversationsExecutor interface {
 	Execute(context.Context, types.ListConversationsCommand) (types.ListConversationsResult, error)
 }
@@ -27,17 +31,20 @@ type Server struct {
 	receiptv1.UnimplementedReceiptServiceServer
 	markRead          MarkReadExecutor
 	getReceiptState   GetReceiptStateExecutor
+	listReceiptStates ListReceiptStatesExecutor
 	listConversations ListConversationsExecutor
 }
 
 func NewServer(
 	markRead MarkReadExecutor,
 	getReceiptState GetReceiptStateExecutor,
+	listReceiptStates ListReceiptStatesExecutor,
 	listConversations ListConversationsExecutor,
 ) *Server {
 	return &Server{
 		markRead:          markRead,
 		getReceiptState:   getReceiptState,
+		listReceiptStates: listReceiptStates,
 		listConversations: listConversations,
 	}
 }
@@ -101,6 +108,49 @@ func (server *Server) GetReceiptState(
 	if err != nil {
 		return nil, grpcError(err)
 	}
+	return receiptStateResponse(result), nil
+}
+
+func (server *Server) ListReceiptStates(
+	ctx context.Context,
+	request *receiptv1.ListReceiptStatesRequest,
+) (*receiptv1.ListReceiptStatesResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	auth := request.GetAuthContext()
+	items := make([]types.ReceiptStateQuery, 0, len(request.GetItems()))
+	for _, item := range request.GetItems() {
+		items = append(items, types.ReceiptStateQuery{
+			MessageID:       item.GetMessageId(),
+			ConversationSeq: item.GetConversationSeq(),
+		})
+	}
+	result, err := server.listReceiptStates.Execute(ctx, types.ListReceiptStatesCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  types.TenantID(auth.GetTenantId()),
+			UserID:    types.UserID(auth.GetUserId()),
+			DeviceID:  auth.GetDeviceId(),
+			SessionID: auth.GetSessionId(),
+			TraceID:   auth.GetTraceId(),
+			RequestID: auth.GetRequestId(),
+		},
+		ConversationID: types.ConversationID(request.GetConversationId()),
+		Items:          items,
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	response := &receiptv1.ListReceiptStatesResponse{
+		Items: make([]*receiptv1.GetReceiptStateResponse, 0, len(result.Items)),
+	}
+	for _, item := range result.Items {
+		response.Items = append(response.Items, receiptStateResponse(item))
+	}
+	return response, nil
+}
+
+func receiptStateResponse(result types.GetReceiptStateResult) *receiptv1.GetReceiptStateResponse {
 	receivers := make([]*receiptv1.ReceiptUserState, 0, len(result.Receivers))
 	for _, receiver := range result.Receivers {
 		receivers = append(receivers, &receiptv1.ReceiptUserState{
@@ -119,7 +169,7 @@ func (server *Server) GetReceiptState(
 		ReadUserCount:     int32(result.ReadUserCount),
 		VisibilityMode:    toProtoVisibility(result.VisibilityMode),
 		Receivers:         receivers,
-	}, nil
+	}
 }
 
 func (server *Server) ListConversations(

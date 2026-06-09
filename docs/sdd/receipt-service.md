@@ -1,6 +1,6 @@
 # NexusIM receipt-service SDD v0.1 Draft
 
-状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务和 receipt outbox relay 已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events`。
+状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务、`ListReceiptStates` 薄批量查询和 receipt outbox relay 已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events`。
 
 本文定义 `receipt-service` 的第一条可编码切片：基于 `delivery-service` 已经产生的 durable delivery 事件，构建消息送达 / 已读回执 read model，并提供最小查询和 `MarkRead` 写入入口。
 
@@ -20,7 +20,7 @@
 - 将 `delivery.inbox_item.created.v1` 投影为回执所需的用户可见消息索引。
 - 将 `delivery.ack.recorded.v1` 转换为“设备已接收 / user received”状态。
 - 提供 `MarkRead`，由客户端显式报告用户已读到某个 conversation seq。
-- 提供 `GetReceiptState`，查询某条消息或某个 seq 的送达 / 已读聚合；批量 `ListReceiptStates` 是后续范围。
+- 提供 `GetReceiptState`，查询某条消息或某个 seq 的送达 / 已读聚合；提供最小批量 `ListReceiptStates`，用于同一会话内一次查询少量消息回执。
 - 通过 outbox 发布 receipt event，供 audit、会话列表或未读数投影消费；push-gateway 的在线回执通知需要单独 SDD 和 consumer，不属于第一阶段。
 
 不负责：
@@ -36,9 +36,9 @@
 | 方向 | 服务 / 组件 | 交互 |
 | --- | --- | --- |
 | 上游事件 | Kafka `im.delivery.events` | 消费 `delivery.inbox_item.created.v1` 和 `delivery.ack.recorded.v1` |
-| 同步上游 | API gateway / client | 调用 `MarkRead`、`GetReceiptState` |
+| 同步上游 | API gateway / client | 调用 `MarkRead`、`GetReceiptState`、`ListReceiptStates` |
 | 同步依赖 | PostgreSQL | 写回执 projection、cursor、outbox、checkpoint |
-| 同步依赖 | conversation / policy access port | 校验 `MarkRead` 和 `GetReceiptState` 的会话访问权限、隐私模式和版本 |
+| 同步依赖 | conversation / policy access port | 校验 `MarkRead`、`GetReceiptState` 和 `ListReceiptStates` 的会话访问权限、隐私模式和版本 |
 | 异步下游 | Kafka `im.receipt.events` | 发布 receipt received/read event |
 | 下游 | conversation-list projection / audit | 会话摘要、审计；push-gateway 在线回执提示后置 |
 
@@ -62,8 +62,8 @@ services/receipt-service/
 
 | 层 | 本服务内容 |
 | --- | --- |
-| `api` | gRPC handler：`MarkRead`、`GetReceiptState`、错误码映射 |
-| `app` | `ProjectDeliveryEventUseCase`、`MarkReadUseCase`、`GetReceiptStateUseCase`、`ReceiptAccessPort` |
+| `api` | gRPC handler：`MarkRead`、`GetReceiptState`、`ListReceiptStates`、错误码映射 |
+| `app` | `ProjectDeliveryEventUseCase`、`MarkReadUseCase`、`GetReceiptStateUseCase`、`ListReceiptStatesUseCase`、`ReceiptAccessPort` |
 | `domain` | received/read cursor 单调性、message receipt 聚合、权限窗口校验 |
 | `infrastructure` | PostgreSQL repository、Kafka delivery consumer、receipt outbox relay |
 | `types` | Command、DTO、错误 sentinel、枚举 |
@@ -139,6 +139,7 @@ api/proto/nexusim/receipt/v1/receipt_service.proto
 ```text
 rpc MarkRead(MarkReadRequest) returns (MarkReadResponse)
 rpc GetReceiptState(GetReceiptStateRequest) returns (GetReceiptStateResponse)
+rpc ListReceiptStates(ListReceiptStatesRequest) returns (ListReceiptStatesResponse)
 ```
 
 `MarkReadRequest`：
@@ -191,6 +192,24 @@ receivers[] {
   read_at_unix_ms
 }
 ```
+
+`ListReceiptStatesRequest`：
+
+```text
+auth_context
+conversation_id
+items[] {
+  message_id
+  conversation_seq
+}
+```
+
+规则：
+
+- 每个 item 必须且只能提供 `message_id` 或 `conversation_seq`。
+- 第一阶段最多 50 个 item，响应顺序必须与请求顺序一致。
+- `ListReceiptStates` 只做同一会话内薄批量查询：app 层只调用一次 `ReceiptAccessPort.CanViewReceiptState`，随后按请求顺序复用既有 `GetReceiptState` repository 读模型；不新增批量 SQL、不跨服务读内部表、不新增公共抽象。
+- 第一阶段采用 whole-request failure：任一 item 参数错误、无权限、projection lag、not found 或 DB 读取失败，整个 RPC 返回现有稳定错误码；不做 item 级 error 协议。若未来需要部分成功，必须先扩展 proto 契约。
 
 错误码：
 
@@ -344,7 +363,7 @@ CREATE TABLE message_receipt_states (
 
 当前已落地文件包括：
 
-- `api/proto/nexusim/receipt/v1/receipt_service.proto`：`MarkRead` 和 `GetReceiptState`。
+- `api/proto/nexusim/receipt/v1/receipt_service.proto`：`MarkRead`、`GetReceiptState`、`ListReceiptStates`。
 - `schemas/kafka/receipt/v1/im.receipt.events.proto`：`receipt.message.received.v1` / `receipt.message.read.v1`。
 - `migrations/postgres/receipt/000001_receipt_core.sql`。
 - `services/receipt-service/internal/{api,app,domain,infrastructure,types,trigger}` 六层骨架。

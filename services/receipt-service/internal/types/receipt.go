@@ -76,6 +76,52 @@ type GetReceiptStateResult struct {
 	Receivers         []ReceiptUserState
 }
 
+type ReceiptStateQuery struct {
+	MessageID       string
+	ConversationSeq int64
+}
+
+func (query ReceiptStateQuery) Validate() error {
+	hasMessageID := query.MessageID != ""
+	hasSeq := query.ConversationSeq > 0
+	if hasMessageID == hasSeq {
+		return NewInvalidArgument("exactly one of message_id or conversation_seq is required")
+	}
+	return nil
+}
+
+type ListReceiptStatesCommand struct {
+	AuthContext    AuthContext
+	AccessContext  ReceiptAccessContext
+	ConversationID ConversationID
+	Items          []ReceiptStateQuery
+}
+
+func (command ListReceiptStatesCommand) Validate() error {
+	if err := command.AuthContext.Validate(); err != nil {
+		return err
+	}
+	if command.ConversationID == "" {
+		return NewInvalidArgument("conversation_id is required")
+	}
+	if len(command.Items) == 0 {
+		return NewInvalidArgument("items are required")
+	}
+	if len(command.Items) > 50 {
+		return NewInvalidArgument("items exceeds max batch size")
+	}
+	for _, item := range command.Items {
+		if err := item.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type ListReceiptStatesResult struct {
+	Items []GetReceiptStateResult
+}
+
 type ReceiptAccessContext struct {
 	TenantID          TenantID
 	UserID            UserID

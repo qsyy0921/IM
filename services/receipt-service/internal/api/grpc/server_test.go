@@ -12,7 +12,7 @@ import (
 )
 
 func TestMarkReadMapsValidationError(t *testing.T) {
-	server := NewServer(fakeMarkRead{err: types.NewInvalidArgument("tenant_id is required")}, fakeGetReceiptState{}, fakeListConversations{})
+	server := NewServer(fakeMarkRead{err: types.NewInvalidArgument("tenant_id is required")}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{})
 	_, err := server.MarkRead(context.Background(), &receiptv1.MarkReadRequest{})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", status.Code(err))
@@ -20,7 +20,7 @@ func TestMarkReadMapsValidationError(t *testing.T) {
 }
 
 func TestMarkReadSanitizesDBWriteError(t *testing.T) {
-	server := NewServer(fakeMarkRead{err: types.NewDBWriteFailed("duplicate key value violates unique constraint receipt_outbox_event_id_key")}, fakeGetReceiptState{}, fakeListConversations{})
+	server := NewServer(fakeMarkRead{err: types.NewDBWriteFailed("duplicate key value violates unique constraint receipt_outbox_event_id_key")}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{})
 	_, err := server.MarkRead(context.Background(), &receiptv1.MarkReadRequest{
 		AuthContext:    &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
 		ConversationId: "conversation-1",
@@ -39,7 +39,7 @@ func TestMarkReadSanitizesDBWriteError(t *testing.T) {
 }
 
 func TestListConversationsMapsValidationError(t *testing.T) {
-	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListConversations{err: types.NewInvalidArgument("tenant_id is required")})
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{err: types.NewInvalidArgument("tenant_id is required")})
 	_, err := server.ListConversations(context.Background(), &receiptv1.ListConversationsRequest{})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", status.Code(err))
@@ -48,7 +48,7 @@ func TestListConversationsMapsValidationError(t *testing.T) {
 
 func TestListConversationsMapsSort(t *testing.T) {
 	list := &fakeListConversationsCapture{}
-	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, list)
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, list)
 	_, err := server.ListConversations(context.Background(), &receiptv1.ListConversationsRequest{
 		AuthContext: &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
 		Limit:       20,
@@ -87,7 +87,7 @@ func TestListConversationsMapsResponse(t *testing.T) {
 			},
 		},
 	}
-	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, list)
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, list)
 	response, err := server.ListConversations(context.Background(), &receiptv1.ListConversationsRequest{
 		AuthContext: &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
 	})
@@ -107,6 +107,49 @@ func TestListConversationsMapsResponse(t *testing.T) {
 	}
 }
 
+func TestListReceiptStatesMapsRequestAndResponse(t *testing.T) {
+	list := &fakeListReceiptStatesCapture{
+		result: types.ListReceiptStatesResult{
+			Items: []types.GetReceiptStateResult{{
+				ConversationID:    "conversation-1",
+				ConversationSeq:   11,
+				MessageID:         "message-11",
+				ReceivedUserCount: 2,
+				ReadUserCount:     1,
+				VisibilityMode:    types.ReceiptVisibilityDetailed,
+				Receivers: []types.ReceiptUserState{{
+					UserID:      "user-2",
+					ReceivedSeq: 11,
+					ReadSeq:     11,
+				}},
+			}},
+		},
+	}
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, list, fakeListConversations{})
+	response, err := server.ListReceiptStates(context.Background(), &receiptv1.ListReceiptStatesRequest{
+		AuthContext:    &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
+		ConversationId: "conversation-1",
+		Items: []*receiptv1.ReceiptStateQuery{
+			{MessageId: "message-11"},
+			{ConversationSeq: 12},
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if list.command.ConversationID != "conversation-1" ||
+		len(list.command.Items) != 2 ||
+		list.command.Items[0].MessageID != "message-11" ||
+		list.command.Items[1].ConversationSeq != 12 {
+		t.Fatalf("unexpected command: %+v", list.command)
+	}
+	if len(response.GetItems()) != 1 ||
+		response.GetItems()[0].GetConversationSeq() != 11 ||
+		response.GetItems()[0].GetReadUserCount() != 1 {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
 type fakeMarkRead struct {
 	err error
 }
@@ -122,6 +165,22 @@ type fakeGetReceiptState struct{}
 
 func (fakeGetReceiptState) Execute(context.Context, types.GetReceiptStateCommand) (types.GetReceiptStateResult, error) {
 	return types.GetReceiptStateResult{}, nil
+}
+
+type fakeListReceiptStates struct{}
+
+func (fakeListReceiptStates) Execute(context.Context, types.ListReceiptStatesCommand) (types.ListReceiptStatesResult, error) {
+	return types.ListReceiptStatesResult{}, nil
+}
+
+type fakeListReceiptStatesCapture struct {
+	command types.ListReceiptStatesCommand
+	result  types.ListReceiptStatesResult
+}
+
+func (fake *fakeListReceiptStatesCapture) Execute(_ context.Context, command types.ListReceiptStatesCommand) (types.ListReceiptStatesResult, error) {
+	fake.command = command
+	return fake.result, nil
 }
 
 type fakeListConversations struct {

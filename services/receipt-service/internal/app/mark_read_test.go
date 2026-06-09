@@ -40,12 +40,18 @@ func TestMarkReadUseCasePassesCommandToRepository(t *testing.T) {
 }
 
 type fakeReceiptRepository struct {
-	markReadCommand types.MarkReadCommand
-	listCommand     types.ListConversationsCommand
+	markReadCommand      types.MarkReadCommand
+	getReceiptStateCalls []types.GetReceiptStateCommand
+	listCommand          types.ListConversationsCommand
 }
 
-func (repository fakeReceiptRepository) GetReceiptState(context.Context, types.GetReceiptStateCommand) (types.GetReceiptStateResult, error) {
-	return types.GetReceiptStateResult{}, nil
+func (repository *fakeReceiptRepository) GetReceiptState(_ context.Context, command types.GetReceiptStateCommand) (types.GetReceiptStateResult, error) {
+	repository.getReceiptStateCalls = append(repository.getReceiptStateCalls, command)
+	return types.GetReceiptStateResult{
+		ConversationID:  command.ConversationID,
+		ConversationSeq: command.ConversationSeq,
+		MessageID:       command.MessageID,
+	}, nil
 }
 
 func (repository *fakeReceiptRepository) ListConversations(_ context.Context, command types.ListConversationsCommand) (types.ListConversationsResult, error) {

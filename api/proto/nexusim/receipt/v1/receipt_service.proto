@@ -7,6 +7,7 @@ option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1;receipt
 service ReceiptService {
   rpc MarkRead(MarkReadRequest) returns (MarkReadResponse);
   rpc GetReceiptState(GetReceiptStateRequest) returns (GetReceiptStateResponse);
+  rpc ListReceiptStates(ListReceiptStatesRequest) returns (ListReceiptStatesResponse);
   rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
 }
 
@@ -62,6 +63,21 @@ message GetReceiptStateResponse {
   int32 read_user_count = 5;
   ReceiptVisibilityMode visibility_mode = 6;
   repeated ReceiptUserState receivers = 7;
+}
+
+message ReceiptStateQuery {
+  string message_id = 1;
+  int64 conversation_seq = 2;
+}
+
+message ListReceiptStatesRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  repeated ReceiptStateQuery items = 3;
+}
+
+message ListReceiptStatesResponse {
+  repeated GetReceiptStateResponse items = 1;
 }
 
 enum ConversationListSort {

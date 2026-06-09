@@ -50,6 +50,7 @@ Search/RAG/Agent 是异步投影和智能协作层。
 | Desktop Client | 后续桌面客户端，复用 Web/HTTP/WebSocket 协议 |
 | api-gateway | HTTP/OpenAPI 入口和协议适配 |
 | push-gateway | WebSocket 长连接和推送入口 |
+| contacts-service | 联系人 / 好友关系事实源 |
 | message-service | 消息事实源服务 |
 | conversation-service | 会话、成员、权限版本事实源 |
 | delivery-service | fanout、inbox、offline pull |
@@ -65,6 +66,7 @@ Search/RAG/Agent 是异步投影和智能协作层。
 | 服务 | 拥有事实 | 职责 | 禁止事项 |
 | --- | --- | --- | --- |
 | identity-service | user、device、session | 登录、设备、token | 不维护会话成员 |
+| contacts-service | contact request、contact edge | 好友申请、联系人列表、联系人事件 | 不维护会话成员，不自动创建会话 |
 | conversation-service | conversation、member、permission version | 会话和成员边界 | 不写消息 |
 | message-service | message、timeline、outbox | 消息写入和变更 | 不做推送、搜索、RAG |
 | delivery-service | inbox、delivery cursor | fanout、离线补拉 | 不修改 message fact |
@@ -160,6 +162,7 @@ audit export
 | 上下文 | 服务 | 聚合 / 模型 |
 | --- | --- | --- |
 | 身份上下文 | identity-service | User、Device、Session |
+| 联系人上下文 | contacts-service | ContactRequest、ContactEdge |
 | 会话上下文 | conversation-service | Conversation、Member、PermissionVersion |
 | 消息上下文 | message-service | Message、TimelineEvent、OutboxEvent |
 | 投递上下文 | delivery-service | Inbox、DeliveryCursor、FanoutTask |

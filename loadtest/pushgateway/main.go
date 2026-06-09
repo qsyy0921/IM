@@ -404,15 +404,14 @@ func sendMessage(
 }
 
 func waitNotify(ctx context.Context, cfg config, conn *nhooyr.Conn) (serverFrame, error) {
-	deadline := time.Now().Add(cfg.waitTimeout)
-	for time.Now().Before(deadline) {
-		readCtx, cancel := context.WithTimeout(ctx, cfg.pollInterval)
+	readCtx, cancel := context.WithTimeout(ctx, cfg.waitTimeout)
+	defer cancel()
+	for {
 		var frame serverFrame
 		err := wsjson.Read(readCtx, conn, &frame)
-		cancel()
 		if err != nil {
-			if errors.Is(err, context.DeadlineExceeded) || nhooyr.CloseStatus(err) == -1 {
-				continue
+			if errors.Is(err, context.DeadlineExceeded) {
+				return serverFrame{}, errors.New("notify timeout")
 			}
 			return serverFrame{}, err
 		}
@@ -423,7 +422,6 @@ func waitNotify(ctx context.Context, cfg config, conn *nhooyr.Conn) (serverFrame
 			return frame, nil
 		}
 	}
-	return serverFrame{}, errors.New("notify timeout")
 }
 
 func pullInbox(ctx context.Context, cfg config, client deliveryv1.DeliveryServiceClient) (pullSummary, error) {

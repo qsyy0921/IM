@@ -34,6 +34,7 @@ func NewReaderConsumer(config ReaderConfig) (*ReaderConsumer, error) {
 			Brokers:        config.Brokers,
 			Topic:          config.Topic,
 			GroupID:        config.GroupID,
+			StartOffset:    kafkago.LastOffset,
 			MinBytes:       1,
 			MaxBytes:       10e6,
 			CommitInterval: 0,

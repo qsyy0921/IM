@@ -44,6 +44,20 @@ function Ensure-KafkaTopic {
         --replication-factor 1 | Out-Null
 }
 
+function Reset-ConsumerGroupToLatest {
+    param(
+        [string]$Group,
+        [string]$Topic
+    )
+    docker exec nexusim-kafka kafka-consumer-groups `
+        --bootstrap-server localhost:9092 `
+        --group $Group `
+        --topic $Topic `
+        --reset-offsets `
+        --to-latest `
+        --execute | Out-Null
+}
+
 function Wait-Tcp {
     param(
         [string]$HostName,
@@ -97,6 +111,7 @@ $processes = @()
 try {
     Ensure-KafkaTopic -Topic $timelineTopic
     Ensure-KafkaTopic -Topic $deliveryTopic
+    Reset-ConsumerGroupToLatest -Group $pushConsumerGroup -Topic $deliveryTopic
 
     $conversationService = Join-Path $repo "bin\conversation-service.exe"
     $messageService = Join-Path $repo "bin\message-service.exe"
@@ -177,6 +192,9 @@ try {
         --receiver-device-id "push-device-1" `
         --wait-timeout 20s `
         --request-timeout 3s
+    if ($LASTEXITCODE -ne 0) {
+        throw "pushgateway smoke runner failed with exit code $LASTEXITCODE"
+    }
 } finally {
     foreach ($proc in $processes) {
         if ($null -ne $proc -and -not $proc.HasExited) {

@@ -79,9 +79,10 @@ E:\development\IM\loadtest\results
 - 不打满 Win-Mac 2.5Gbps 链路。
 - 不重新做 message-service 硬件矩阵。
 - 不把短时 resume buffer 当作 durable inbox。
-- 不把单实例 in-memory resume buffer 表述为跨实例 resume；当前没有 Redis route，也没有 TTL。
+- 不把单实例 in-memory resume buffer 表述为跨实例 resume；当前没有 Redis route，也没有 TTL；未知客户端 `resume_token` 必须返回 `buffer_miss` 并由服务端签发新 token。
 - 不把 push smoke 表述为生产容量结论。
-- 不把 queue-full active close 表述为完整慢连接治理；当前 `server.resume_hint` 只是 broad pull fallback，客户端必须用本地 durable cursor 决定 `PullInbox` 起点，且还没有 slow-client 真实进程负向 smoke 和 metrics。
+- 不把 queue-full active close 表述为完整慢连接治理；当前 `server.resume_hint` 只是 broad pull fallback，客户端必须用本地 durable cursor 决定 `PullInbox` 起点，且还没有 slow-client 真实进程负向 smoke。
+- `/debug/metrics` 目前只暴露单实例 in-memory registry 调试指标，用于 smoke 排障；不是生产级 Prometheus 指标。
 
 ## 面试可讲点
 

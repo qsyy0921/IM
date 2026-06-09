@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -72,9 +73,15 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 				WriteTimeout:      envDuration("NEXUSIM_PUSH_WRITE_TIMEOUT", 2*time.Second),
 			},
 		)
+		mux := http.NewServeMux()
+		mux.HandleFunc("/debug/metrics", func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(writer).Encode(registry.Metrics())
+		})
+		mux.Handle("/", server)
 		httpServer := &http.Server{
 			Addr:              envString("NEXUSIM_PUSH_WS_ADDR", "0.0.0.0:10496"),
-			Handler:           server,
+			Handler:           mux,
 			ReadHeaderTimeout: 5 * time.Second,
 		}
 		go func() {

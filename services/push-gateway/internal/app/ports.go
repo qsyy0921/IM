@@ -7,7 +7,7 @@ import (
 )
 
 type SessionRegistry interface {
-	Register(context.Context, types.SessionRegistration) error
+	Register(context.Context, types.SessionRegistration) (types.SessionRegistrationResult, error)
 	Unregister(sessionID string)
 	EnqueueNotification(context.Context, types.DeliveryNotification) (types.NotifyDeliveryResult, error)
 }

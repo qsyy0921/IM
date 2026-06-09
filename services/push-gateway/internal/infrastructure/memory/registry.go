@@ -13,6 +13,16 @@ type Registry struct {
 	sessions map[string]*session
 	byUser   map[string]map[string]struct{}
 	resumes  map[string]*resumeState
+	metrics  Metrics
+}
+
+type Metrics struct {
+	ConnectedSessions        int    `json:"connected_sessions"`
+	SessionQueueFullCount    uint64 `json:"session_queue_full_count"`
+	SlowSessionEvictedCount  uint64 `json:"slow_session_evicted_count"`
+	ResumeBufferReplayCount  uint64 `json:"resume_buffer_replay_count"`
+	ResumeBufferMissCount    uint64 `json:"resume_buffer_miss_count"`
+	ResumeBufferStoredFrames int    `json:"resume_buffer_stored_frames"`
 }
 
 type session struct {
@@ -36,28 +46,35 @@ func NewRegistry() *Registry {
 	}
 }
 
-func (registry *Registry) Register(ctx context.Context, registration types.SessionRegistration) error {
+func (registry *Registry) Register(
+	ctx context.Context,
+	registration types.SessionRegistration,
+) (types.SessionRegistrationResult, error) {
 	if registration.SessionID == "" || registration.Outbound == nil {
-		return types.NewInvalidFrame("session registration is incomplete")
+		return types.SessionRegistrationResult{}, types.NewInvalidFrame("session registration is incomplete")
 	}
 	if err := registration.AuthContext.Validate(); err != nil {
-		return err
+		return types.SessionRegistrationResult{}, err
 	}
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
 
 	var state *resumeState
 	bufferMiss := false
+	effectiveResumeToken := registration.ResumeToken
 	if registration.ResumeToken != "" {
 		var ok bool
 		state, ok = registry.resumes[registration.ResumeToken]
 		if ok && !sameDevice(state.auth, registration.AuthContext) {
-			return types.ErrPermissionDenied
+			return types.SessionRegistrationResult{}, types.ErrPermissionDenied
 		}
 		if !ok {
 			bufferMiss = registration.ResumeRequested
+			if registration.ResumeRequested {
+				effectiveResumeToken = domain.NewOpaqueID("resume")
+			}
 			state = &resumeState{auth: registration.AuthContext}
-			registry.resumes[registration.ResumeToken] = state
+			registry.resumes[effectiveResumeToken] = state
 		}
 	}
 	if previous, ok := registry.sessions[registration.SessionID]; ok {
@@ -65,7 +82,7 @@ func (registry *Registry) Register(ctx context.Context, registration types.Sessi
 	}
 	registry.sessions[registration.SessionID] = &session{
 		auth:        registration.AuthContext,
-		resumeToken: registration.ResumeToken,
+		resumeToken: effectiveResumeToken,
 		outbound:    registration.Outbound,
 		evicted:     registration.Evicted,
 		seen:        make(map[string]struct{}),
@@ -73,6 +90,7 @@ func (registry *Registry) Register(ctx context.Context, registration types.Sessi
 	if state != nil {
 		if bufferMiss || registry.replayLocked(registration, state) {
 			registry.enqueueResumeHintLocked(registration.Outbound)
+			registry.metrics.ResumeBufferMissCount++
 		}
 	}
 	key := userKey(registration.AuthContext)
@@ -80,7 +98,7 @@ func (registry *Registry) Register(ctx context.Context, registration types.Sessi
 		registry.byUser[key] = make(map[string]struct{})
 	}
 	registry.byUser[key][registration.SessionID] = struct{}{}
-	return nil
+	return types.SessionRegistrationResult{ResumeToken: effectiveResumeToken}, nil
 }
 
 func (registry *Registry) Unregister(sessionID string) {
@@ -132,11 +150,24 @@ func (registry *Registry) EnqueueNotification(
 			registry.evictLocked(sessionID, target, types.SessionEviction{
 				Reason: "slow_session",
 			})
+			registry.metrics.SessionQueueFullCount++
+			registry.metrics.SlowSessionEvictedCount++
 			result.Dropped++
 			result.Evicted++
 		}
 	}
 	return result, nil
+}
+
+func (registry *Registry) Metrics() Metrics {
+	registry.mu.RLock()
+	defer registry.mu.RUnlock()
+	snapshot := registry.metrics
+	snapshot.ConnectedSessions = len(registry.sessions)
+	for _, state := range registry.resumes {
+		snapshot.ResumeBufferStoredFrames += len(state.frames)
+	}
+	return snapshot
 }
 
 func (registry *Registry) replayLocked(registration types.SessionRegistration, state *resumeState) bool {
@@ -177,6 +208,7 @@ func (registry *Registry) replayLocked(registration types.SessionRegistration, s
 		}
 		select {
 		case registration.Outbound <- frame:
+			registry.metrics.ResumeBufferReplayCount++
 		default:
 			return true
 		}

@@ -41,24 +41,24 @@ func (usecase *ConnectSessionUseCase) Execute(
 	if resumeToken == "" {
 		resumeToken = domain.NewOpaqueID("resume")
 	}
-	result := types.ConnectSessionResult{
-		SessionID:           sessionID,
-		ResumeToken:         resumeToken,
-		HeartbeatIntervalMS: heartbeat.Milliseconds(),
-	}
 	auth := command.AuthContext
-	auth.SessionID = result.SessionID
-	if err := usecase.registry.Register(ctx, types.SessionRegistration{
+	auth.SessionID = sessionID
+	registration, err := usecase.registry.Register(ctx, types.SessionRegistration{
 		AuthContext:     auth,
-		SessionID:       result.SessionID,
-		ResumeToken:     result.ResumeToken,
+		SessionID:       sessionID,
+		ResumeToken:     resumeToken,
 		ResumeRequested: resumeRequested,
 		LastReceived:    command.LastReceived,
 		Outbound:        outbound,
 		Evicted:         evicted,
-	}); err != nil {
+	})
+	if err != nil {
 		return types.ConnectSessionResult{}, err
 	}
 	_ = queueSize
-	return result, nil
+	return types.ConnectSessionResult{
+		SessionID:           sessionID,
+		ResumeToken:         registration.ResumeToken,
+		HeartbeatIntervalMS: heartbeat.Milliseconds(),
+	}, nil
 }

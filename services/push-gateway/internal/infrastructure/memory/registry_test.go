@@ -11,7 +11,7 @@ func TestRegistryEnqueueNotificationDeduplicatesPerSession(t *testing.T) {
 	registry := NewRegistry()
 	outbound := make(chan types.ServerFrame, 2)
 	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"}
-	if err := registry.Register(context.Background(), types.SessionRegistration{
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
 		AuthContext: auth,
 		SessionID:   "session-1",
 		Outbound:    outbound,
@@ -37,7 +37,7 @@ func TestRegistryEnqueueNotificationFailsClosedWhenQueueFull(t *testing.T) {
 	outbound := make(chan types.ServerFrame)
 	evicted := make(chan types.SessionEviction, 1)
 	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"}
-	if err := registry.Register(context.Background(), types.SessionRegistration{
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
 		AuthContext: auth,
 		SessionID:   "session-1",
 		Outbound:    outbound,
@@ -74,7 +74,7 @@ func TestRegistryReplaysResumeBufferAfterLastReceived(t *testing.T) {
 	registry := NewRegistry()
 	outbound := make(chan types.ServerFrame, 4)
 	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"}
-	if err := registry.Register(context.Background(), types.SessionRegistration{
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
 		AuthContext: auth,
 		SessionID:   "session-1",
 		ResumeToken: "resume-1",
@@ -97,7 +97,7 @@ func TestRegistryReplaysResumeBufferAfterLastReceived(t *testing.T) {
 	registry.Unregister("session-1")
 
 	resumedOutbound := make(chan types.ServerFrame, 2)
-	if err := registry.Register(context.Background(), types.SessionRegistration{
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
 		AuthContext: auth,
 		SessionID:   "session-2",
 		ResumeToken: "resume-1",
@@ -122,7 +122,7 @@ func TestRegistryReplaysResumeBufferAfterLastReceived(t *testing.T) {
 
 func TestRegistryRejectsResumeTokenForDifferentDevice(t *testing.T) {
 	registry := NewRegistry()
-	if err := registry.Register(context.Background(), types.SessionRegistration{
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
 		AuthContext: types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"},
 		SessionID:   "session-1",
 		ResumeToken: "resume-1",
@@ -130,7 +130,7 @@ func TestRegistryRejectsResumeTokenForDifferentDevice(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("register: %v", err)
 	}
-	err := registry.Register(context.Background(), types.SessionRegistration{
+	_, err := registry.Register(context.Background(), types.SessionRegistration{
 		AuthContext: types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-2"},
 		SessionID:   "session-2",
 		ResumeToken: "resume-1",
@@ -143,16 +143,20 @@ func TestRegistryRejectsResumeTokenForDifferentDevice(t *testing.T) {
 
 func TestRegistryResumeUnknownTokenReturnsBufferMissHint(t *testing.T) {
 	registry := NewRegistry()
-	outbound := make(chan types.ServerFrame, 1)
-	if err := registry.Register(context.Background(), types.SessionRegistration{
+	outbound := make(chan types.ServerFrame, 2)
+	registration, err := registry.Register(context.Background(), types.SessionRegistration{
 		AuthContext:     types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"},
 		SessionID:       "session-1",
 		ResumeToken:     "resume-missing",
 		ResumeRequested: true,
 		LastReceived:    []types.ConversationCursor{{ConversationID: "conversation-1", Seq: 7}},
 		Outbound:        outbound,
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("register: %v", err)
+	}
+	if registration.ResumeToken == "" || registration.ResumeToken == "resume-missing" {
+		t.Fatalf("unknown client token must be replaced by server token: %+v", registration)
 	}
 	if len(outbound) != 1 {
 		t.Fatalf("expected resume hint")
@@ -161,12 +165,63 @@ func TestRegistryResumeUnknownTokenReturnsBufferMissHint(t *testing.T) {
 	if hint.Op != types.OpResumeHint || hint.Reason != "buffer_miss" || !hint.PullRequired || len(hint.Conversations) != 0 {
 		t.Fatalf("unexpected hint: %+v", hint)
 	}
+
+	notification := testNotification()
+	notification.EventID = "delivery-event-after-miss"
+	notification.ConversationSeq = 9
+	if _, err := registry.EnqueueNotification(context.Background(), notification); err != nil {
+		t.Fatalf("notify: %v", err)
+	}
+	<-outbound
+	registry.Unregister("session-1")
+
+	oldTokenOutbound := make(chan types.ServerFrame, 2)
+	oldRegistration, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext:     types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"},
+		SessionID:       "session-old-token",
+		ResumeToken:     "resume-missing",
+		ResumeRequested: true,
+		LastReceived:    []types.ConversationCursor{{ConversationID: "conversation-1", Seq: 8}},
+		Outbound:        oldTokenOutbound,
+	})
+	if err != nil {
+		t.Fatalf("old token register: %v", err)
+	}
+	if oldRegistration.ResumeToken == "resume-missing" || oldRegistration.ResumeToken == registration.ResumeToken {
+		t.Fatalf("old unknown token must not be reused: old=%+v first=%+v", oldRegistration, registration)
+	}
+	if len(oldTokenOutbound) != 1 {
+		t.Fatalf("old unknown token should receive only buffer miss, got %d", len(oldTokenOutbound))
+	}
+	oldHint := <-oldTokenOutbound
+	if oldHint.Op != types.OpResumeHint || oldHint.Reason != "buffer_miss" {
+		t.Fatalf("unexpected old token hint: %+v", oldHint)
+	}
+	registry.Unregister("session-old-token")
+
+	newTokenOutbound := make(chan types.ServerFrame, 2)
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext:  types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"},
+		SessionID:    "session-new-token",
+		ResumeToken:  registration.ResumeToken,
+		LastReceived: []types.ConversationCursor{{ConversationID: "conversation-1", Seq: 8}},
+		Outbound:     newTokenOutbound,
+	}); err != nil {
+		t.Fatalf("new token register: %v", err)
+	}
+	if len(newTokenOutbound) != 1 {
+		t.Fatalf("new server token should replay one frame, got %d", len(newTokenOutbound))
+	}
+	replay := <-newTokenOutbound
+	if replay.Op != types.OpDeliveryNotify || replay.EventID != "delivery-event-after-miss" {
+		t.Fatalf("unexpected replay: %+v", replay)
+	}
 }
 
 func TestRegistryResumeGapReturnsBufferMissHint(t *testing.T) {
 	registry := NewRegistry()
 	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"}
-	if err := registry.Register(context.Background(), types.SessionRegistration{
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
 		AuthContext: auth,
 		SessionID:   "session-1",
 		ResumeToken: "resume-1",
@@ -183,7 +238,7 @@ func TestRegistryResumeGapReturnsBufferMissHint(t *testing.T) {
 	registry.Unregister("session-1")
 
 	outbound := make(chan types.ServerFrame, 2)
-	if err := registry.Register(context.Background(), types.SessionRegistration{
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
 		AuthContext:     auth,
 		SessionID:       "session-2",
 		ResumeToken:     "resume-1",

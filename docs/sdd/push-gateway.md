@@ -307,6 +307,7 @@ session_id -> ring buffer of delivery.notify frames
 - buffer 中只放轻量 notification，不放完整 message fact。
 - buffer miss 必须回退到 delivery-service `PullInbox`。
 - `resume_token` 第一阶段为 in-memory opaque token，绑定 `tenant_id / user_id / device_id`；重连会创建新的 `session_id`，但可以复用同一 token 读取单实例 buffer。TTL 与 resume buffer TTL 一致。
+- `resume_token` 必须由服务端签发。客户端携带未知 token 时，服务端返回 `server.resume_hint(reason=buffer_miss)`，并签发新的 opaque token；不能把客户端自带 token 注册成有效 token。
 - 服务重启、token 过期或 token 与 device/session 不匹配时，resume 失败，服务端返回 `server.resume_hint`，客户端 fallback `PullInbox`。
 - 当前单实例第一版只实现 in-memory、按条数裁剪的 best-effort resume buffer；TTL、Redis route 和跨实例 resume 仍是后续切片。
 
@@ -488,6 +489,8 @@ NEXUSIM_PUSH_GATEWAY_MODE=all
 
 `all` 是第一阶段本地 smoke 推荐模式：WebSocket handler 和 delivery consumer 在同一个进程里共享 in-memory session registry。后续多实例或压测隔离时再拆成 `ws` 与 `delivery-consumer`，并接入 Redis route。
 
+当 WebSocket HTTP server 启动时，`GET /debug/metrics` 返回当前单实例 registry 调试指标，包括 connected sessions、queue-full eviction、resume replay / buffer miss 和 resume buffer stored frames。该端点只用于本地 smoke 排障，尚不是生产 Prometheus 指标。
+
 最小本地启动参数：
 
 ```text
@@ -512,8 +515,8 @@ delivery-service outbox-relay
 本地默认端口：
 
 ```text
-10496  push-gateway WebSocket
-10497  debug / metrics
+10496  push-gateway WebSocket and /debug/metrics
+10497  delivery-service gRPC dependency
 ```
 
 常见故障：

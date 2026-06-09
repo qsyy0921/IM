@@ -18,6 +18,10 @@ type SessionRegistration struct {
 	Evicted         chan<- SessionEviction
 }
 
+type SessionRegistrationResult struct {
+	ResumeToken string
+}
+
 type SessionEviction struct {
 	Reason        string
 	Conversations []ConversationCursor

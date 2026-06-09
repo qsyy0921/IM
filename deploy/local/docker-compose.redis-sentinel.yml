@@ -1,0 +1,129 @@
+services:
+  redis-ha-master:
+    image: redis:7-alpine
+    container_name: nexusim-redis-ha-master
+    ports:
+      - "6380:6379"
+    command: ["redis-server", "--appendonly", "yes", "--protected-mode", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis-ha-replica-1:
+    image: redis:7-alpine
+    container_name: nexusim-redis-ha-replica-1
+    depends_on:
+      redis-ha-master:
+        condition: service_healthy
+    ports:
+      - "6381:6379"
+    command: ["redis-server", "--replicaof", "redis-ha-master", "6379", "--replica-announce-ip", "172.31.50.1", "--replica-announce-port", "6381", "--appendonly", "yes", "--protected-mode", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis-ha-replica-2:
+    image: redis:7-alpine
+    container_name: nexusim-redis-ha-replica-2
+    depends_on:
+      redis-ha-master:
+        condition: service_healthy
+    ports:
+      - "6382:6379"
+    command: ["redis-server", "--replicaof", "redis-ha-master", "6379", "--replica-announce-ip", "172.31.50.1", "--replica-announce-port", "6382", "--appendonly", "yes", "--protected-mode", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis-sentinel-1:
+    image: redis:7-alpine
+    container_name: nexusim-redis-sentinel-1
+    depends_on:
+      redis-ha-master:
+        condition: service_healthy
+      redis-ha-replica-1:
+        condition: service_healthy
+      redis-ha-replica-2:
+        condition: service_healthy
+    ports:
+      - "26379:26379"
+    command: >
+      sh -c "echo 'port 26379' > /tmp/sentinel.conf &&
+      echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
+      echo 'sentinel announce-hostnames yes' >> /tmp/sentinel.conf &&
+      echo 'sentinel announce-ip 172.31.50.1' >> /tmp/sentinel.conf &&
+      echo 'sentinel announce-port 26379' >> /tmp/sentinel.conf &&
+      echo 'sentinel monitor mymaster 172.31.50.1 6380 2' >> /tmp/sentinel.conf &&
+      echo 'sentinel down-after-milliseconds mymaster 5000' >> /tmp/sentinel.conf &&
+      echo 'sentinel failover-timeout mymaster 15000' >> /tmp/sentinel.conf &&
+      echo 'sentinel parallel-syncs mymaster 1' >> /tmp/sentinel.conf &&
+      redis-server /tmp/sentinel.conf --sentinel"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis-sentinel-2:
+    image: redis:7-alpine
+    container_name: nexusim-redis-sentinel-2
+    depends_on:
+      redis-ha-master:
+        condition: service_healthy
+      redis-ha-replica-1:
+        condition: service_healthy
+      redis-ha-replica-2:
+        condition: service_healthy
+    ports:
+      - "26380:26379"
+    command: >
+      sh -c "echo 'port 26379' > /tmp/sentinel.conf &&
+      echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
+      echo 'sentinel announce-hostnames yes' >> /tmp/sentinel.conf &&
+      echo 'sentinel announce-ip 172.31.50.1' >> /tmp/sentinel.conf &&
+      echo 'sentinel announce-port 26380' >> /tmp/sentinel.conf &&
+      echo 'sentinel monitor mymaster 172.31.50.1 6380 2' >> /tmp/sentinel.conf &&
+      echo 'sentinel down-after-milliseconds mymaster 5000' >> /tmp/sentinel.conf &&
+      echo 'sentinel failover-timeout mymaster 15000' >> /tmp/sentinel.conf &&
+      echo 'sentinel parallel-syncs mymaster 1' >> /tmp/sentinel.conf &&
+      redis-server /tmp/sentinel.conf --sentinel"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis-sentinel-3:
+    image: redis:7-alpine
+    container_name: nexusim-redis-sentinel-3
+    depends_on:
+      redis-ha-master:
+        condition: service_healthy
+      redis-ha-replica-1:
+        condition: service_healthy
+      redis-ha-replica-2:
+        condition: service_healthy
+    ports:
+      - "26381:26379"
+    command: >
+      sh -c "echo 'port 26379' > /tmp/sentinel.conf &&
+      echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
+      echo 'sentinel announce-hostnames yes' >> /tmp/sentinel.conf &&
+      echo 'sentinel announce-ip 172.31.50.1' >> /tmp/sentinel.conf &&
+      echo 'sentinel announce-port 26381' >> /tmp/sentinel.conf &&
+      echo 'sentinel monitor mymaster 172.31.50.1 6380 2' >> /tmp/sentinel.conf &&
+      echo 'sentinel down-after-milliseconds mymaster 5000' >> /tmp/sentinel.conf &&
+      echo 'sentinel failover-timeout mymaster 15000' >> /tmp/sentinel.conf &&
+      echo 'sentinel parallel-syncs mymaster 1' >> /tmp/sentinel.conf &&
+      redis-server /tmp/sentinel.conf --sentinel"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20

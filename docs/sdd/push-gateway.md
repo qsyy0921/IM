@@ -540,13 +540,30 @@ Redis route 可选参数：
 ```text
 NEXUSIM_PUSH_ROUTE_BACKEND=redis
 NEXUSIM_PUSH_GATEWAY_ID=push-gateway-a
+NEXUSIM_PUSH_REDIS_MODE=single
 NEXUSIM_PUSH_REDIS_ADDR=127.0.0.1:6379
+NEXUSIM_PUSH_REDIS_USERNAME=
 NEXUSIM_PUSH_REDIS_PASSWORD=
 NEXUSIM_PUSH_REDIS_DB=0
 NEXUSIM_PUSH_REDIS_KEY_PREFIX=nexusim:push
 NEXUSIM_PUSH_ROUTE_TTL=90s
 NEXUSIM_PUSH_ROUTE_CLEANUP_INTERVAL=30s
 ```
+
+Redis Sentinel 可选参数：
+
+```text
+NEXUSIM_PUSH_REDIS_MODE=sentinel
+NEXUSIM_PUSH_REDIS_SENTINEL_MASTER_NAME=mymaster
+NEXUSIM_PUSH_REDIS_SENTINEL_ADDRS=127.0.0.1:26379,127.0.0.1:26380,127.0.0.1:26381
+NEXUSIM_PUSH_REDIS_USERNAME=
+NEXUSIM_PUSH_REDIS_PASSWORD=
+NEXUSIM_PUSH_REDIS_SENTINEL_USERNAME=
+NEXUSIM_PUSH_REDIS_SENTINEL_PASSWORD=
+NEXUSIM_PUSH_REDIS_DB=0
+```
+
+当前代码已支持 `single` 和 `sentinel` 两种 Redis client 模式。Sentinel 模式只表示 push-gateway 通过 Sentinel 发现当前 Redis master；它不改变 route / resume 的业务语义：Redis route 仍是 best-effort online wakeup，Redis resume 仍是短时体验优化，可靠投递仍必须回到 `PullInbox / AckDelivery`。本地三节点 Sentinel smoke 尚未完成前，不应把它表述为 Redis HA 已验收。
 
 本地依赖：
 

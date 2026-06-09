@@ -63,11 +63,11 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 	routeBackend := envString("NEXUSIM_PUSH_ROUTE_BACKEND", "memory")
 	if routeBackend == "redis" {
 		gatewayID := envString("NEXUSIM_PUSH_GATEWAY_ID", defaultGatewayID())
-		redisClient = redis.NewClient(&redis.Options{
-			Addr:     envString("NEXUSIM_PUSH_REDIS_ADDR", "127.0.0.1:6379"),
-			Password: os.Getenv("NEXUSIM_PUSH_REDIS_PASSWORD"),
-			DB:       envIntAllowZero("NEXUSIM_PUSH_REDIS_DB", 0),
-		})
+		var err error
+		redisClient, err = newRedisUniversalClient(loadRedisClientConfigFromEnv())
+		if err != nil {
+			return err
+		}
 		if err := redisClient.Ping(ctx).Err(); err != nil {
 			return err
 		}
@@ -171,6 +171,62 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 		}
 	}
 	return err
+}
+
+type redisClientConfig struct {
+	Mode               string
+	Addr               string
+	SentinelAddrs      []string
+	SentinelMasterName string
+	Username           string
+	Password           string
+	DB                 int
+	SentinelUsername   string
+	SentinelPassword   string
+}
+
+func loadRedisClientConfigFromEnv() redisClientConfig {
+	return redisClientConfig{
+		Mode:               envString("NEXUSIM_PUSH_REDIS_MODE", "single"),
+		Addr:               envString("NEXUSIM_PUSH_REDIS_ADDR", "127.0.0.1:6379"),
+		SentinelAddrs:      splitCSV(os.Getenv("NEXUSIM_PUSH_REDIS_SENTINEL_ADDRS")),
+		SentinelMasterName: envString("NEXUSIM_PUSH_REDIS_SENTINEL_MASTER_NAME", ""),
+		Username:           os.Getenv("NEXUSIM_PUSH_REDIS_USERNAME"),
+		Password:           os.Getenv("NEXUSIM_PUSH_REDIS_PASSWORD"),
+		DB:                 envIntAllowZero("NEXUSIM_PUSH_REDIS_DB", 0),
+		SentinelUsername:   os.Getenv("NEXUSIM_PUSH_REDIS_SENTINEL_USERNAME"),
+		SentinelPassword:   os.Getenv("NEXUSIM_PUSH_REDIS_SENTINEL_PASSWORD"),
+	}
+}
+
+func newRedisUniversalClient(config redisClientConfig) (redis.UniversalClient, error) {
+	switch strings.ToLower(strings.TrimSpace(config.Mode)) {
+	case "", "single":
+		return redis.NewClient(&redis.Options{
+			Addr:     config.Addr,
+			Username: config.Username,
+			Password: config.Password,
+			DB:       config.DB,
+		}), nil
+	case "sentinel":
+		if strings.TrimSpace(config.SentinelMasterName) == "" {
+			return nil, errors.New("NEXUSIM_PUSH_REDIS_SENTINEL_MASTER_NAME is required when NEXUSIM_PUSH_REDIS_MODE=sentinel")
+		}
+		if len(config.SentinelAddrs) == 0 {
+			return nil, errors.New("NEXUSIM_PUSH_REDIS_SENTINEL_ADDRS is required when NEXUSIM_PUSH_REDIS_MODE=sentinel")
+		}
+		return redis.NewFailoverClient(&redis.FailoverOptions{
+			MasterName:       config.SentinelMasterName,
+			SentinelAddrs:    config.SentinelAddrs,
+			Username:         config.Username,
+			Password:         config.Password,
+			DB:               config.DB,
+			SentinelUsername: config.SentinelUsername,
+			SentinelPassword: config.SentinelPassword,
+		}), nil
+	default:
+		return nil, errors.New("unsupported NEXUSIM_PUSH_REDIS_MODE")
+	}
 }
 
 func startHTTPServer(ctx context.Context, errs chan<- error, name string, addr string, handler http.Handler) {

@@ -8,7 +8,11 @@ param(
     [string]$Scenario = "full",
     [ValidateSet("memory", "redis")]
     [string]$RouteBackend = "memory",
+    [ValidateSet("single", "sentinel")]
+    [string]$RedisMode = "single",
     [string]$RedisAddr = "127.0.0.1:6379",
+    [string]$RedisSentinelAddrs = "127.0.0.1:26379,127.0.0.1:26380,127.0.0.1:26381",
+    [string]$RedisSentinelMasterName = "mymaster",
     [string]$RedisKeyPrefix = "",
     [string]$RedisFaultCommand = "",
     [string]$RedisRestoreCommand = "",
@@ -140,6 +144,19 @@ function Start-NexusProcess {
     return $proc
 }
 
+function Add-PushRedisEnv {
+    param([hashtable]$Env)
+    $Env["NEXUSIM_PUSH_REDIS_MODE"] = $RedisMode
+    $Env["NEXUSIM_PUSH_REDIS_KEY_PREFIX"] = $pushRouteKeyPrefix
+    if ($RedisMode -eq "sentinel") {
+        $Env["NEXUSIM_PUSH_REDIS_SENTINEL_ADDRS"] = $RedisSentinelAddrs
+        $Env["NEXUSIM_PUSH_REDIS_SENTINEL_MASTER_NAME"] = $RedisSentinelMasterName
+    } else {
+        $Env["NEXUSIM_PUSH_REDIS_ADDR"] = $RedisAddr
+    }
+    return $Env
+}
+
 $processes = @()
 try {
     Ensure-KafkaTopic -Topic $timelineTopic
@@ -191,7 +208,7 @@ try {
     }
 
     if ($RouteBackend -eq "redis") {
-        $processes += Start-NexusProcess -Name "push-gateway-ws" -FilePath $pushGateway -Port 11598 -Env @{
+        $processes += Start-NexusProcess -Name "push-gateway-ws" -FilePath $pushGateway -Port 11598 -Env (Add-PushRedisEnv @{
             NEXUSIM_PUSH_GATEWAY_MODE = "ws"
             NEXUSIM_PUSH_WS_ADDR = "127.0.0.1:11598"
             NEXUSIM_DELIVERY_GRPC_ADDR = "127.0.0.1:11597"
@@ -201,12 +218,10 @@ try {
             NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
             NEXUSIM_PUSH_ROUTE_BACKEND = "redis"
             NEXUSIM_PUSH_GATEWAY_ID = $pushWSGatewayID
-            NEXUSIM_PUSH_REDIS_ADDR = $RedisAddr
-            NEXUSIM_PUSH_REDIS_KEY_PREFIX = $pushRouteKeyPrefix
             NEXUSIM_PUSH_ROUTE_TTL = "90s"
-        }
+        })
         if ($Scenario -eq "cross-instance-resume") {
-            $processes += Start-NexusProcess -Name "push-gateway-ws-reconnect" -FilePath $pushGateway -Port 11599 -Env @{
+            $processes += Start-NexusProcess -Name "push-gateway-ws-reconnect" -FilePath $pushGateway -Port 11599 -Env (Add-PushRedisEnv @{
                 NEXUSIM_PUSH_GATEWAY_MODE = "ws"
                 NEXUSIM_PUSH_WS_ADDR = "127.0.0.1:11599"
                 NEXUSIM_DELIVERY_GRPC_ADDR = "127.0.0.1:11597"
@@ -216,12 +231,10 @@ try {
                 NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
                 NEXUSIM_PUSH_ROUTE_BACKEND = "redis"
                 NEXUSIM_PUSH_GATEWAY_ID = $pushReconnectGatewayID
-                NEXUSIM_PUSH_REDIS_ADDR = $RedisAddr
-                NEXUSIM_PUSH_REDIS_KEY_PREFIX = $pushRouteKeyPrefix
                 NEXUSIM_PUSH_ROUTE_TTL = "90s"
-            }
+            })
         }
-        $processes += Start-NexusProcess -Name "push-gateway-consumer" -FilePath $pushGateway -Env @{
+        $processes += Start-NexusProcess -Name "push-gateway-consumer" -FilePath $pushGateway -Env (Add-PushRedisEnv @{
             NEXUSIM_PUSH_GATEWAY_MODE = "delivery-consumer"
             NEXUSIM_PUSH_DEBUG_ADDR = "127.0.0.1:11600"
             NEXUSIM_KAFKA_BROKERS = $KafkaBrokers
@@ -229,10 +242,8 @@ try {
             NEXUSIM_PUSH_CONSUMER_GROUP = $pushConsumerGroup
             NEXUSIM_PUSH_ROUTE_BACKEND = "redis"
             NEXUSIM_PUSH_GATEWAY_ID = $pushConsumerGatewayID
-            NEXUSIM_PUSH_REDIS_ADDR = $RedisAddr
-            NEXUSIM_PUSH_REDIS_KEY_PREFIX = $pushRouteKeyPrefix
             NEXUSIM_PUSH_ROUTE_TTL = "90s"
-        }
+        })
     } else {
         $processes += Start-NexusProcess -Name "push-gateway" -FilePath $pushGateway -Port 11598 -Env @{
             NEXUSIM_PUSH_GATEWAY_MODE = "all"
@@ -306,7 +317,13 @@ Write-Host "delivery_consumer_group=$deliveryConsumerGroup"
 Write-Host "push_consumer_group=$pushConsumerGroup"
 Write-Host "route_backend=$RouteBackend"
 if ($RouteBackend -eq "redis") {
-    Write-Host "redis_addr=$RedisAddr"
+    Write-Host "redis_mode=$RedisMode"
+    if ($RedisMode -eq "sentinel") {
+        Write-Host "redis_sentinel_addrs=$RedisSentinelAddrs"
+        Write-Host "redis_sentinel_master_name=$RedisSentinelMasterName"
+    } else {
+        Write-Host "redis_addr=$RedisAddr"
+    }
     Write-Host "redis_key_prefix=$pushRouteKeyPrefix"
     Write-Host "push_ws_gateway_id=$pushWSGatewayID"
     Write-Host "push_consumer_gateway_id=$pushConsumerGatewayID"

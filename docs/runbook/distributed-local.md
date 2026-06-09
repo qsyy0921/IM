@@ -304,7 +304,7 @@ push-gateway 只消费 delivery 事件做在线唤醒，WebSocket 连接和 Kafk
 
 ## 7. 已知缺口
 
-- Redis route 已做一次真实 stop/start fault smoke，证明 online notify 可丢但 `PullInbox + AckDelivery` 可恢复；这仍不是 Redis HA、Sentinel、Cluster 或网络分区结论。
+- Redis route 已做一次真实 stop/start fault smoke，证明 online notify 可丢但 `PullInbox + AckDelivery` 可恢复；push-gateway 代码已支持 `NEXUSIM_PUSH_REDIS_MODE=sentinel`，但尚未跑三节点 Redis / Sentinel 的真实故障切换 smoke，因此仍不是 Redis HA、Sentinel、Cluster 或网络分区结论。
 - Redis route 已有 TTL 续期和后台 stale route cleanup；异常进程退出后 session route 仍依赖 TTL 过期，user route set 中的 stale 成员由 lookup / cleanup loop 移除。
 - `push-gateway` Redis-backed cross-instance resume buffer 已有本机跨进程 smoke 和 Win-Mac Docker smoke；跨实例 replay miss、Redis error 或 token mismatch 时仍必须 fallback `PullInbox`。
 - `push-gateway` `/debug/metrics` 仍是本地 smoke 调试端点，不是正式 Prometheus 指标。

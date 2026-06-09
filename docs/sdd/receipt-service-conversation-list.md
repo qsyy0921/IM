@@ -28,7 +28,7 @@ im.delivery.events
 - 不拥有会话成员事实，不修改 `conversation_members`。
 - 不推进 delivery ACK；设备收到仍由 `delivery-service AckDelivery` 负责。
 - 不做 WebSocket 在线推送；push-gateway 仍只做在线唤醒。
-- 第一阶段只做最小 archive/unarchive 列表过滤偏好；不做 pin/mute/草稿/会话头像/消息 preview 富文本渲染。
+- 第一阶段先做最小 archive/unarchive 列表过滤偏好；随后已补最小 pin/unpin 排序偏好。不做 mute/草稿/会话头像/消息 preview 富文本渲染。
 
 ## 2. 为什么放在 receipt-service
 
@@ -82,7 +82,8 @@ services/receipt-service/
 | `LastVisibleMessage` | 用户可见的最新消息索引 | 只能由 `delivery.inbox_item.created.v1` 推进 |
 | `UnreadState` | 未读计数和 read cursor 派生状态 | `unread_count >= 0`，`read_seq <= last_visible_seq` |
 | `ConversationArchivePreference` | 当前用户是否在默认列表隐藏该会话 | 只影响该用户 `ListConversations` 过滤，不影响 unread、delivery、push 或消息事实 |
-| `ListCursor` | 分页游标 | 基于 `sort_updated_at + conversation_id`，避免 offset 深分页 |
+| `ConversationPinPreference` | 当前用户是否置顶该会话 | 只影响该用户默认列表排序，不影响 unread、delivery、push 或消息事实 |
+| `ListCursor` | 分页游标 | 基于 `pinned + sort_updated_at + conversation_id` 或 `sort_updated_at + conversation_id`，避免 offset 深分页 |
 | `ProjectionWatermark` | 投影水位 | 表示 summary 至少处理到的 Kafka offset 或本地更新时间 |
 
 第一阶段不追求完整消息 preview。列表项只返回 `last_message_id`、`last_message_seq`、`last_sender_id`、`last_source_event_type` 和 `updated_at`。客户端可以用 `last_source_event_type` 区分新增 / 编辑 / 撤回 / 删除造成的列表刷新，但需要消息正文或 tombstone 详情时仍回源 `PullInbox` 或后续 message query API。
@@ -94,6 +95,7 @@ services/receipt-service/
 ```text
 rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse)
 rpc ArchiveConversation(ArchiveConversationRequest) returns (ArchiveConversationResponse)
+rpc PinConversation(PinConversationRequest) returns (PinConversationResponse)
 ```
 
 请求字段：
@@ -111,9 +113,10 @@ bool include_archived
 ```text
 CONVERSATION_LIST_SORT_UNSPECIFIED
 CONVERSATION_LIST_SORT_UPDATED_AT_DESC
+CONVERSATION_LIST_SORT_PINNED_UPDATED_AT_DESC
 ```
 
-`UNSPECIFIED` 等价于 `UPDATED_AT_DESC`。不要在第一阶段提前加入 unread-first、pin、mute 或自定义排序组合；这些产品字段需要独立设计和索引支持。`include_archived=false` 是默认列表；`include_archived=true` 用于归档管理视图。
+`UNSPECIFIED` 等价于 `PINNED_UPDATED_AT_DESC`。`PINNED_UPDATED_AT_DESC` 按 `pinned desc + updated_at desc + conversation_id asc` 排序；`UPDATED_AT_DESC` 保留纯 `updated_at desc + conversation_id asc` 排序。不要在第一阶段提前加入 unread-first、mute 或自定义排序组合；这些产品字段需要独立设计和索引支持。`include_archived=false` 是默认列表；`include_archived=true` 用于归档管理视图。
 
 响应字段：
 
@@ -135,6 +138,7 @@ int64 unread_count
 int64 last_read_seq
 int64 updated_at_unix_ms
 bool archived
+bool pinned
 ```
 
 `ArchiveConversationRequest`：
@@ -153,10 +157,26 @@ bool archived
 - 新消息投影不会自动取消归档；v0.1 将 archive 定义为用户显式列表过滤偏好，不是一次性“清理当前列表”动作。
 - 如果本服务尚未投影出该用户的会话摘要，返回 `CONVERSATION_NOT_FOUND`。
 
+`PinConversationRequest`：
+
+```text
+AuthContext auth_context
+string conversation_id
+bool pinned
+```
+
+语义：
+
+- 只修改当前 `auth_context.user_id` 自己的会话摘要行；不修改 message、delivery、conversation 成员事实。
+- `pinned=true` 后默认 `ListConversations` 会把该会话排在非置顶会话之前，同一组内仍按 `updated_at desc + conversation_id asc` 排序。
+- `pinned=false` 恢复普通排序。
+- pin/unpin 不改变 unread、last_visible_seq、last_source_event_type 或 push 通知。
+- 如果本服务尚未投影出该用户的会话摘要，返回 `CONVERSATION_NOT_FOUND`。
+
 分页规则：
 
-- v0.1 固定使用 `sort_updated_at DESC, conversation_id ASC`。
-- `page_cursor` 是服务端签发的 opaque cursor，内部绑定 cursor version、sort、`include_archived`、`sort_updated_at` 和 `conversation_id`。
+- v0.1 默认使用 `pinned DESC, sort_updated_at DESC, conversation_id ASC`；显式 `UPDATED_AT_DESC` 使用 `sort_updated_at DESC, conversation_id ASC`。
+- `page_cursor` 是服务端签发的 opaque cursor，内部绑定 cursor version、sort、`include_archived`、`pinned`、`sort_updated_at` 和 `conversation_id`。
 - 客户端不能自行构造 cursor；cursor 缺字段、版本不匹配、sort 不匹配或 `include_archived` 不匹配时返回 `INVALID_ARGUMENT`。
 - 后续新增排序时，必须同步 cursor schema、SQL 条件和索引，不能复用旧 cursor 语义。
 
@@ -176,7 +196,7 @@ int64 updated_at_unix_ms
 | --- | --- | --- |
 | `INVALID_ARGUMENT` | limit/page_cursor/auth 参数错误 | 否 |
 | `PERMISSION_DENIED` | 用户无权列出该租户会话 | 否 |
-| `CONVERSATION_NOT_FOUND` | 归档目标会话摘要尚未投影到当前用户 | 否 |
+| `CONVERSATION_NOT_FOUND` | 归档 / 置顶目标会话摘要尚未投影到当前用户 | 否 |
 | `DB_READ_FAILED` | 数据库读取失败 | 是 |
 
 ## 7. 异步事件契约
@@ -210,12 +230,17 @@ CREATE TABLE user_conversation_summaries (
     sort_updated_at   TIMESTAMPTZ NOT NULL,
     archived          BOOLEAN NOT NULL DEFAULT FALSE,
     archived_at       TIMESTAMPTZ,
+    pinned            BOOLEAN NOT NULL DEFAULT FALSE,
+    pinned_at         TIMESTAMPTZ,
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (tenant_id, user_id, conversation_id)
 );
 
 CREATE INDEX idx_user_conversation_summaries_list
 ON user_conversation_summaries (tenant_id, user_id, archived, sort_updated_at DESC, conversation_id);
+
+CREATE INDEX idx_user_conversation_summaries_list_pinned
+ON user_conversation_summaries (tenant_id, user_id, archived, pinned DESC, sort_updated_at DESC, conversation_id);
 
 CREATE TABLE conversation_summary_checkpoints (
     consumer_group TEXT NOT NULL,
@@ -291,6 +316,7 @@ ListConversations
 | 重复 `delivery.inbox_item.created.v1` | `tenant_id + user_id + conversation_id + conversation_seq` | `receipt_inbox_projection` upsert，summary 使用最大 seq |
 | 重复 `MarkRead` | `tenant_id + user_id + conversation_id + read_seq` | `read_seq <= current` 视为幂等成功 |
 | 重复 `ArchiveConversation` | `tenant_id + user_id + conversation_id` | 幂等设置 `archived`，不改变 unread 和 last visible |
+| 重复 `PinConversation` | `tenant_id + user_id + conversation_id` | 幂等设置 `pinned`，不改变 unread 和 last visible |
 | projection lag | Kafka offset 不提交 | fail-closed，等待重放 |
 | malformed / unsupported event | `event_id` | 不静默 commit；后续 repair/backfill 处理 |
 | summary 损坏 | tenant/user/conversation | 后续 repair 从 `receipt_inbox_projection` 和 `user_read_cursors` 重建 |
@@ -326,8 +352,8 @@ list_conversations_page_size
 | 测试 | 目标 |
 | --- | --- |
 | unit | unread 计算、sort 校验、cursor 分页、read_seq 幂等 |
-| PostgreSQL integration | inbox event upsert summary、MarkRead 清零 unread、重复 event 不重复计数、edit/revoke/delete 不增加 unread、多会话 keyset 分页、非法 cursor、archive 默认隐藏 / include_archived 可见 / 新投影保留 archive |
-| gRPC contract | 参数校验、sort/page_cursor/include_archived 映射、archive request/response、分页响应、只返回当前 auth user |
+| PostgreSQL integration | inbox event upsert summary、MarkRead 清零 unread、重复 event 不重复计数、edit/revoke/delete 不增加 unread、多会话 keyset 分页、非法 cursor、archive 默认隐藏 / include_archived 可见 / 新投影保留 archive、pinned-first 排序、显式 updated sort、跨 pinned/unpinned 分页 |
+| gRPC contract | 参数校验、sort/page_cursor/include_archived 映射、archive/pin request/response、分页响应、只返回当前 auth user |
 | smoke | `SendMessage -> PullInbox -> ListConversations(unread=1) -> MarkRead -> ListConversations(unread=0)` |
 
 ## 15. 当前不做
@@ -335,7 +361,7 @@ list_conversations_page_size
 - 不新增独立 `conversation-list-service`。
 - 不直接读取 `delivery-service.user_inbox` 或 `message-service.message_log`。
 - 不返回 message payload / preview 富文本。
-- 不做 pin/mute/draft；archive v0.1 只作为当前用户的列表过滤偏好，不影响通知或 unread。
+- 不做 mute/draft；archive 和 pin v0.1 只作为当前用户的列表偏好，不影响通知或 unread。
 - 不引入 Redis unread counter。
 - 不做大规模压测矩阵。
 - 不把 `delivery.ack.recorded.v1` 当成 read；ACK 只说明 received。

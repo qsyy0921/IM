@@ -4,7 +4,7 @@
 
 ## 当前阶段结论
 
-`receipt-service` 已完成第一条真实小闭环、最小 outbox 发布链路、最小会话列表 / 未读数 read model，以及当前用户侧会话归档过滤偏好：
+`receipt-service` 已完成第一条真实小闭环、最小 outbox 发布链路、最小会话列表 / 未读数 read model，以及当前用户侧会话归档 / 置顶偏好：
 
 ```text
 im.delivery.events
@@ -18,6 +18,7 @@ im.delivery.events
 -> Kafka im.receipt.events
 -> user_conversation_summaries / ListConversations
 -> ArchiveConversation / include_archived filtering
+-> PinConversation / pinned-first sorting
 ```
 
 本阶段重点不是容量，而是证明送达 / 已读回执不直接读取 `delivery-service` 内部表，而是基于 `im.delivery.events` 重建自己的 read model。
@@ -30,6 +31,7 @@ im.delivery.events
 | `loadtest-report-20260610-receipt-outbox-smoke.md` | `receipt_outbox -> im.receipt.events` 真实进程 smoke，读回 `received/read` 两条 Kafka event |
 | `loadtest-report-20260610-conversation-list-smoke.md` | `receipt projection -> user_conversation_summaries -> ListConversations` 真实进程 smoke，验证未读 `1 -> 0` |
 | `loadtest-report-20260610-receipt-archive-smoke.md` | `ArchiveConversation` 真实进程 smoke，验证默认列表隐藏、`include_archived` 可见、归档期间新消息不自动取消归档、取消归档后恢复 |
+| `loadtest-report-20260610-receipt-pin-smoke.md` | `PinConversation` 真实进程 smoke，验证当前用户置顶 / 取消置顶标志；PostgreSQL integration 覆盖 pinned-first 排序和 cursor |
 
 ## 面试可讲重点
 
@@ -43,4 +45,5 @@ im.delivery.events
 - `ListConversations` 的 unread 由 `receipt_inbox_projection` 中 `source_event_type=message.persisted.v1` 的可见消息行数减去 read cursor 得出，不把 conversation seq 差值当成未读数，也不把 edit/revoke/delete tombstone 当新未读消息。
 - `ListConversations.last_source_event_type` 会返回最后一次可见变化的事件类型，客户端可据此刷新会话列表 UI；消息正文和 tombstone 详情仍以 `PullInbox` 为准。
 - `ArchiveConversation` 是当前用户的列表过滤偏好；它不删除消息、不清未读、不停止 delivery/push/receipt projection。新消息不会自动取消归档，客户端需要通过 `include_archived=true` 或用户手动取消归档查看。
+- `PinConversation` 也是当前用户的列表偏好；默认列表按 pinned-first 再按 `updated_at desc` 排序，显式 `UPDATED_AT_DESC` 仍可获得纯更新时间排序。pin 不进入 Kafka、不影响 unread 或通知。
 - 当前 gRPC 访问控制仍使用本地 `StaticAllowAccess`，真实权限应后续接入 policy / AuthContext。

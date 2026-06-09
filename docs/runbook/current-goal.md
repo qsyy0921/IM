@@ -200,7 +200,7 @@ error_topn
 H:\NexusIM\loadtest-results
 ```
 
-每个阶段必须新增一份独立压测报告，不覆盖旧报告。报告按微服务放在 `docs/runbook/loadtest/<service>/`，推荐命名：
+每个阶段必须新增一份独立压测报告，不覆盖旧报告。报告文档仍保存在当前仓库，也就是 `E:\development\IM\docs\runbook\loadtest\<service>\`；不要把报告 Markdown 写到 H 盘。推荐命名：
 
 ```text
 docs/runbook/loadtest/<service>/loadtest-report-YYYYMMDD-<stage>.md
@@ -227,7 +227,7 @@ CPU / 内存 / Docker / 连接池 / worker 配置
 当前结论和下一步
 ```
 
-`loadtest/results/` 只保存小 smoke 或历史索引；中大型中间结果和趋势图保存到 `H:\NexusIM\loadtest-results`。这些文件默认不提交，但报告必须引用关键结果路径，保证以后能追溯。
+`loadtest/results/` 只保存小 smoke 或历史索引；中大型原始数据、中间结果和趋势图保存到 `H:\NexusIM\loadtest-results`。这些数据文件默认不提交，但 E 盘仓库内的报告必须引用关键结果路径，保证以后能追溯。
 
 ## 8. GitHub 同步要求
 

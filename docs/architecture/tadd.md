@@ -139,7 +139,7 @@ Go 服务前期建议本机直接运行，便于调试；服务骨架稳定后�
 | message-service metrics/debug | 10497 |
 | PostgreSQL | 5432 |
 | Kafka | 9092 |
-| Schema Registry | 8081 |
+| Schema Registry | 18081 |
 | Redis | 6379 |
 
 本地双机压测端口以 `docs/runbook/local-loadtest.md` 为准。

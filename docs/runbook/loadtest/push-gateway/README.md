@@ -150,11 +150,25 @@ E:\development\IM\loadtest\results
   -PushAuthHmacSecret local-push-smoke-secret
 ```
 
+密钥轮换窗口可以用 current + previous secrets 做最小 smoke：服务端用 current secret 配置新签发密钥，同时把旧密钥放入 previous secrets；runner 用旧密钥签 token，验证旧 token 在 TTL 窗口内仍可建连。
+
+```powershell
+.\loadtest\pushgateway\run-local-smoke.ps1 `
+  -Scenario full `
+  -PushAuthMode hmac `
+  -PushAuthHmacSecret new-local-push-secret `
+  -PushAuthHmacPreviousSecrets old-local-push-secret `
+  -PushAuthTokenSigningSecret old-local-push-secret
+```
+
 HMAC 模式下 runner 用 `Authorization: Bearer` 传 token，summary 会记录：
 
 ```text
 push_auth_mode=hmac
 push_auth_token_transport=authorization_header
+push_auth_hmac_previous_secrets_configured=true|false
+push_auth_token_signing_secret_explicit=true|false
+push_auth_token_signed_with_non_current_secret=true|false
 push_auth_query_identity_sent=false
 ```
 

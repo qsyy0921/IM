@@ -562,7 +562,18 @@ NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS=old-secret-1,old-secret-2
   -PushAuthHmacSecret local-push-smoke-secret
 ```
 
-runner 会使用 `Authorization: Bearer` 传 token，并在 summary 中记录 `push_auth_query_identity_sent=false`，用于证明没有依赖裸 query 身份。
+密钥轮换窗口可用 current + previous secrets 验证：服务端 current secret 使用新密钥，previous secrets 放旧密钥，runner 用旧密钥签发 token。
+
+```powershell
+.\loadtest\pushgateway\run-local-smoke.ps1 `
+  -Scenario full `
+  -PushAuthMode hmac `
+  -PushAuthHmacSecret new-local-push-secret `
+  -PushAuthHmacPreviousSecrets old-local-push-secret `
+  -PushAuthTokenSigningSecret old-local-push-secret
+```
+
+runner 会使用 `Authorization: Bearer` 传 token，并在 summary 中记录 `push_auth_query_identity_sent=false`、`push_auth_hmac_previous_secrets_configured`、`push_auth_token_signing_secret_explicit` 和 `push_auth_token_signed_with_non_current_secret`，用于证明没有依赖裸 query 身份，也能区分服务端是否配置 previous secrets、客户端 token 是否显式用非 current secret 签名。
 
 Redis route 可选参数：
 

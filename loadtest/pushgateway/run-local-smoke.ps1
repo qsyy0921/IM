@@ -15,6 +15,8 @@ param(
     [ValidateSet("mock", "hmac")]
     [string]$PushAuthMode = "mock",
     [string]$PushAuthHmacSecret = "local-push-smoke-secret",
+    [string]$PushAuthHmacPreviousSecrets = "",
+    [string]$PushAuthTokenSigningSecret = "",
     [string]$PushAuthTokenTtl = "10m",
     [ValidateSet("single", "sentinel")]
     [string]$RedisMode = "single",
@@ -374,6 +376,7 @@ try {
             NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
             NEXUSIM_PUSH_AUTH_MODE = $PushAuthMode
             NEXUSIM_PUSH_AUTH_HMAC_SECRET = $PushAuthHmacSecret
+            NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS = $PushAuthHmacPreviousSecrets
             NEXUSIM_PUSH_ROUTE_BACKEND = "redis"
             NEXUSIM_PUSH_GATEWAY_ID = $pushWSGatewayID
             NEXUSIM_PUSH_ROUTE_TTL = "90s"
@@ -389,6 +392,7 @@ try {
                 NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
                 NEXUSIM_PUSH_AUTH_MODE = $PushAuthMode
                 NEXUSIM_PUSH_AUTH_HMAC_SECRET = $PushAuthHmacSecret
+                NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS = $PushAuthHmacPreviousSecrets
                 NEXUSIM_PUSH_ROUTE_BACKEND = "redis"
                 NEXUSIM_PUSH_GATEWAY_ID = $pushReconnectGatewayID
                 NEXUSIM_PUSH_ROUTE_TTL = "90s"
@@ -418,6 +422,7 @@ try {
             NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
             NEXUSIM_PUSH_AUTH_MODE = $PushAuthMode
             NEXUSIM_PUSH_AUTH_HMAC_SECRET = $PushAuthHmacSecret
+            NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS = $PushAuthHmacPreviousSecrets
         }
     }
 
@@ -454,6 +459,8 @@ try {
         "--route-backend", $RouteBackend,
         "--push-auth-mode", $PushAuthMode,
         "--push-auth-hmac-secret", $PushAuthHmacSecret,
+        "--push-auth-hmac-previous-secrets", $PushAuthHmacPreviousSecrets,
+        "--push-auth-token-signing-secret", $PushAuthTokenSigningSecret,
         "--push-auth-token-ttl", $PushAuthTokenTtl,
         "--redis-key-prefix", $pushRouteKeyPrefix,
         "--push-ws-gateway-id", $pushWSGatewayID,
@@ -501,6 +508,10 @@ Write-Host "delivery_consumer_group=$deliveryConsumerGroup"
 Write-Host "push_consumer_group=$pushConsumerGroup"
 Write-Host "route_backend=$RouteBackend"
 Write-Host "push_auth_mode=$PushAuthMode"
+if ($PushAuthMode -eq "hmac") {
+    Write-Host "push_auth_hmac_previous_secrets_configured=$([bool]$PushAuthHmacPreviousSecrets)"
+    Write-Host "push_auth_token_signing_secret_explicit=$([bool]$PushAuthTokenSigningSecret)"
+}
 if ($RouteBackend -eq "redis") {
     Write-Host "redis_mode=$RedisMode"
     if ($RedisMode -eq "sentinel") {

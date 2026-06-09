@@ -4,7 +4,7 @@ param(
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
     [string]$ReceiverDeviceIds = "push-device-1",
-    [ValidateSet("full", "resume-replay", "cross-instance-resume", "slow-client", "redis-fault")]
+    [ValidateSet("full", "resume-replay", "cross-instance-resume", "slow-client", "redis-fault", "redis-sentinel-failover")]
     [string]$Scenario = "full",
     [ValidateSet("memory", "redis")]
     [string]$RouteBackend = "memory",
@@ -56,9 +56,63 @@ if ($Scenario -eq "redis-fault" -and -not $RedisFaultCommand) {
 if ($Scenario -eq "redis-fault" -and -not $RedisRestoreCommand) {
     $RedisRestoreCommand = "docker start nexusim-redis | Out-Null"
 }
+$runnerRequestTimeout = "3s"
+if ($Scenario -eq "redis-sentinel-failover") {
+    $runnerRequestTimeout = "60s"
+}
 
 New-Item -ItemType Directory -Force $resultDir | Out-Null
 New-Item -ItemType Directory -Force $logDir | Out-Null
+
+if ($Scenario -eq "redis-sentinel-failover") {
+    if ($RouteBackend -ne "redis") {
+        throw "redis-sentinel-failover requires -RouteBackend redis"
+    }
+    if ($RedisMode -ne "sentinel") {
+        throw "redis-sentinel-failover requires -RedisMode sentinel"
+    }
+    if (-not $RedisFaultCommand) {
+        $failoverScript = Join-Path $resultDir "redis-sentinel-failover.ps1"
+        @'
+$ErrorActionPreference = "Stop"
+$before = @(docker exec nexusim-redis-sentinel-1 redis-cli -p 26379 SENTINEL get-master-addr-by-name mymaster)
+if ($before.Count -lt 2) {
+    throw "Sentinel did not return a current master before failover."
+}
+$beforeHost = $before[0].Trim()
+$beforePort = $before[1].Trim()
+$beforeAddr = "${beforeHost}:${beforePort}"
+Write-Output "sentinel_master_before=$beforeAddr"
+docker exec nexusim-redis-sentinel-1 redis-cli -p 26379 SENTINEL failover mymaster | Out-Null
+$deadline = (Get-Date).AddSeconds(45)
+$afterAddr = ""
+$afterHost = ""
+$afterPort = ""
+do {
+    Start-Sleep -Seconds 1
+    $after = @(docker exec nexusim-redis-sentinel-1 redis-cli -p 26379 SENTINEL get-master-addr-by-name mymaster)
+    if ($after.Count -ge 2) {
+        $afterHost = $after[0].Trim()
+        $afterPort = $after[1].Trim()
+        $afterAddr = "${afterHost}:${afterPort}"
+    }
+} while (($afterAddr -eq "" -or $afterAddr -eq $beforeAddr) -and (Get-Date) -lt $deadline)
+if ($afterAddr -eq "" -or $afterAddr -eq $beforeAddr) {
+    throw "Sentinel failover did not change master before timeout; before=$beforeAddr after=$afterAddr"
+}
+$ping = @(docker exec nexusim-redis-sentinel-1 redis-cli -h $afterHost -p $afterPort ping)
+if ($ping.Count -lt 1 -or $ping[0].Trim() -ne "PONG") {
+    throw "New Sentinel master did not respond to PING: $($ping -join ',')"
+}
+$role = @(docker exec nexusim-redis-sentinel-1 redis-cli -h $afterHost -p $afterPort role)
+if ($role.Count -lt 1 -or $role[0].Trim() -ne "master") {
+    throw "New Sentinel master role is not master: $($role -join ',')"
+}
+Write-Output "sentinel_master_after=$afterAddr"
+'@ | Set-Content -LiteralPath $failoverScript -Encoding UTF8
+        $RedisFaultCommand = "& '$failoverScript'"
+    }
+}
 
 . .\tools\go-env.ps1
 
@@ -220,7 +274,7 @@ try {
             NEXUSIM_PUSH_GATEWAY_ID = $pushWSGatewayID
             NEXUSIM_PUSH_ROUTE_TTL = "90s"
         })
-        if ($Scenario -eq "cross-instance-resume") {
+        if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover") {
             $processes += Start-NexusProcess -Name "push-gateway-ws-reconnect" -FilePath $pushGateway -Port 11599 -Env (Add-PushRedisEnv @{
                 NEXUSIM_PUSH_GATEWAY_MODE = "ws"
                 NEXUSIM_PUSH_WS_ADDR = "127.0.0.1:11599"
@@ -268,34 +322,49 @@ try {
         NEXUSIM_MOCK_PERMISSION_VERSION = "2"
     }
 
-    & $runner `
-        --conversation-target 127.0.0.1:11596 `
-        --message-target 127.0.0.1:11595 `
-        --delivery-target 127.0.0.1:11597 `
-        --push-url ws://127.0.0.1:11598 `
-        --reconnect-push-url $(if ($Scenario -eq "cross-instance-resume") { "ws://127.0.0.1:11599" } else { "ws://127.0.0.1:11598" }) `
-        --pg-dsn $PgDsn `
-        --result-dir $resultDir `
-        --tenant-id "tenant-push-smoke" `
-        --conversation-id "conv-push-smoke" `
-        --owner-user-id "owner-1" `
-        --receiver-user-id "push-user-1" `
-        --receiver-device-id "push-device-1" `
-        --receiver-device-ids $ReceiverDeviceIds `
-        --scenario $Scenario `
-        --slow-message-count $SlowMessageCount `
-        --redis-fault-command $RedisFaultCommand `
-        --redis-restore-command $RedisRestoreCommand `
-        --push-metrics-url "http://127.0.0.1:11598/debug/metrics" `
-        --reconnect-push-metrics-url $(if ($Scenario -eq "cross-instance-resume") { "http://127.0.0.1:11599/debug/metrics" } else { "" }) `
-        --consumer-push-metrics-url $(if ($RouteBackend -eq "redis") { "http://127.0.0.1:11600/debug/metrics" } else { "" }) `
-        --route-backend $RouteBackend `
-        --redis-key-prefix $pushRouteKeyPrefix `
-        --push-ws-gateway-id $pushWSGatewayID `
-        --push-reconnect-gateway-id $(if ($Scenario -eq "cross-instance-resume") { $pushReconnectGatewayID } else { "" }) `
-        --push-consumer-gateway-id $pushConsumerGatewayID `
-        --wait-timeout 20s `
-        --request-timeout 3s
+    $reconnectPushURL = if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover") { "ws://127.0.0.1:11599" } else { "ws://127.0.0.1:11598" }
+    $reconnectMetricsURL = if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover") { "http://127.0.0.1:11599/debug/metrics" } else { "" }
+    $consumerMetricsURL = if ($RouteBackend -eq "redis") { "http://127.0.0.1:11600/debug/metrics" } else { "" }
+    $runnerArgs = @(
+        "--conversation-target", "127.0.0.1:11596",
+        "--message-target", "127.0.0.1:11595",
+        "--delivery-target", "127.0.0.1:11597",
+        "--push-url", "ws://127.0.0.1:11598",
+        "--reconnect-push-url", $reconnectPushURL,
+        "--pg-dsn", $PgDsn,
+        "--result-dir", $resultDir,
+        "--tenant-id", "tenant-push-smoke",
+        "--conversation-id", "conv-push-smoke",
+        "--owner-user-id", "owner-1",
+        "--receiver-user-id", "push-user-1",
+        "--receiver-device-id", "push-device-1",
+        "--receiver-device-ids", $ReceiverDeviceIds,
+        "--scenario", $Scenario,
+        "--slow-message-count", [string]$SlowMessageCount,
+        "--push-metrics-url", "http://127.0.0.1:11598/debug/metrics",
+        "--route-backend", $RouteBackend,
+        "--redis-key-prefix", $pushRouteKeyPrefix,
+        "--push-ws-gateway-id", $pushWSGatewayID,
+        "--push-consumer-gateway-id", $pushConsumerGatewayID,
+        "--wait-timeout", "20s",
+        "--request-timeout", $runnerRequestTimeout
+    )
+    if ($RedisFaultCommand) {
+        $runnerArgs += @("--redis-fault-command", $RedisFaultCommand)
+    }
+    if ($RedisRestoreCommand) {
+        $runnerArgs += @("--redis-restore-command", $RedisRestoreCommand)
+    }
+    if ($reconnectMetricsURL) {
+        $runnerArgs += @("--reconnect-push-metrics-url", $reconnectMetricsURL)
+    }
+    if ($consumerMetricsURL) {
+        $runnerArgs += @("--consumer-push-metrics-url", $consumerMetricsURL)
+    }
+    if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover") {
+        $runnerArgs += @("--push-reconnect-gateway-id", $pushReconnectGatewayID)
+    }
+    & $runner @runnerArgs
     if ($LASTEXITCODE -ne 0) {
         throw "pushgateway smoke runner failed with exit code $LASTEXITCODE"
     }

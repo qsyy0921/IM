@@ -184,6 +184,7 @@ type resumeReplaySummary struct {
 
 type redisFaultSummary struct {
 	FaultCommand        string        `json:"fault_command"`
+	CommandOutput       string        `json:"command_output,omitempty"`
 	NotifyReceived      bool          `json:"notify_received"`
 	UnexpectedNotify    frameSnapshot `json:"unexpected_notify,omitempty"`
 	NotifyWaitError     string        `json:"notify_wait_error,omitempty"`
@@ -303,7 +304,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "push-device-1", "online receiver device id")
 	var receiverDeviceIDs string
 	flag.StringVar(&receiverDeviceIDs, "receiver-device-ids", "", "comma separated online receiver device ids; overrides receiver-device-id when set")
-	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, resume-replay, cross-instance-resume, slow-client, or redis-fault")
+	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, resume-replay, cross-instance-resume, slow-client, redis-fault, or redis-sentinel-failover")
 	flag.IntVar(&cfg.slowMessageCount, "slow-message-count", 128, "number of messages sent while slow client does not read")
 	flag.StringVar(&cfg.pushMetricsURL, "push-metrics-url", "", "push-gateway debug metrics URL")
 	flag.StringVar(&cfg.reconnectMetricsURL, "reconnect-push-metrics-url", "", "optional debug metrics URL for reconnect/resume gateway")
@@ -342,12 +343,12 @@ func run(cfg config) error {
 	if cfg.pgDSN == "" {
 		return errors.New("pg-dsn is required")
 	}
-	if cfg.scenario == "cross-instance-resume" {
+	if cfg.scenario == "cross-instance-resume" || cfg.scenario == "redis-sentinel-failover" {
 		if cfg.routeBackend != "redis" {
-			return errors.New("cross-instance-resume scenario requires --route-backend redis")
+			return fmt.Errorf("%s scenario requires --route-backend redis", cfg.scenario)
 		}
 		if cfg.reconnectPushURL == "" || cfg.reconnectPushURL == cfg.pushURL {
-			return errors.New("cross-instance-resume scenario requires --reconnect-push-url to point at a different gateway")
+			return fmt.Errorf("%s scenario requires --reconnect-push-url to point at a different gateway", cfg.scenario)
 		}
 	}
 	if err := os.MkdirAll(cfg.resultDir, 0o755); err != nil {
@@ -427,6 +428,8 @@ func run(cfg config) error {
 	case "resume-replay":
 		return runResumeReplayScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "cross-instance-resume":
+		return runResumeReplayScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
+	case "redis-sentinel-failover":
 		return runResumeReplayScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "slow-client":
 		return runSlowClientScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
@@ -688,6 +691,24 @@ func runResumeReplayScenario(
 		return finish(cfg, result, err)
 	}
 
+	if cfg.scenario == "redis-sentinel-failover" {
+		if strings.TrimSpace(cfg.redisFaultCommand) == "" {
+			conn.CloseNow()
+			return finish(cfg, result, errors.New("redis-fault-command is required for redis-sentinel-failover scenario"))
+		}
+		output, err := executeCommand(ctx, cfg, cfg.redisFaultCommand)
+		result.RedisFault = &redisFaultSummary{
+			FaultCommand:    cfg.redisFaultCommand,
+			CommandOutput:   output,
+			NotifyReceived:  true,
+			NotifyWaitError: "online notify is expected after failover command reports a new master",
+		}
+		if err != nil {
+			conn.CloseNow()
+			return finish(cfg, result, fmt.Errorf("execute redis sentinel failover command: %w", err))
+		}
+	}
+
 	beforeMetrics, _ := fetchPushMetrics(ctx, cfg.pushMetricsURL)
 	result.PushMetricsBefore = &beforeMetrics
 
@@ -836,7 +857,8 @@ func runRedisFaultScenario(
 		return finish(cfg, result, err)
 	}
 
-	if err := executeCommand(ctx, cfg, cfg.redisFaultCommand); err != nil {
+	output, err := executeCommand(ctx, cfg, cfg.redisFaultCommand)
+	if err != nil {
 		return finish(cfg, result, fmt.Errorf("execute redis fault command: %w", err))
 	}
 
@@ -848,7 +870,7 @@ func runRedisFaultScenario(
 	}
 	result.SendMessage = sendSummary{MessageID: send.GetMessageId(), ConversationSeq: send.GetConversationSeq()}
 
-	fault := &redisFaultSummary{FaultCommand: cfg.redisFaultCommand}
+	fault := &redisFaultSummary{FaultCommand: cfg.redisFaultCommand, CommandOutput: output}
 	fault.NotifyReceived = false
 	fault.NotifyWaitError = "not attempted; redis-fault scenario validates durable PullInbox fallback without blocking the WebSocket read path"
 
@@ -864,7 +886,7 @@ func runRedisFaultScenario(
 	}
 
 	if strings.TrimSpace(cfg.redisRestoreCommand) != "" {
-		if err := executeCommand(ctx, cfg, cfg.redisRestoreCommand); err != nil {
+		if _, err := executeCommand(ctx, cfg, cfg.redisRestoreCommand); err != nil {
 			return finish(cfg, result, fmt.Errorf("execute redis restore command: %w", err))
 		}
 	}
@@ -1044,19 +1066,20 @@ func waitNotifyFor(ctx context.Context, cfg config, conn *nhooyr.Conn, timeout t
 	}
 }
 
-func executeCommand(ctx context.Context, cfg config, command string) error {
+func executeCommand(ctx context.Context, cfg config, command string) (string, error) {
 	command = strings.TrimSpace(command)
 	if command == "" {
-		return nil
+		return "", nil
 	}
 	runCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(runCtx, "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command)
 	output, err := cmd.CombinedOutput()
+	trimmed := strings.TrimSpace(string(output))
 	if err != nil {
-		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))
+		return trimmed, fmt.Errorf("%w: %s", err, trimmed)
 	}
-	return nil
+	return trimmed, nil
 }
 
 type slowReadResult struct {

@@ -137,6 +137,14 @@ H:\NexusIM\loadtest-results\push-gateway-redis-fault-smoke-20260609-195200\pushg
 当前 Win-Mac Docker route smoke 原始结果：
 
 ```text
+H:\NexusIM\loadtest-results\push-gateway-win-mac-redis-smoke-20260609-210034\pushgateway-summary.json
+```
+
+该 run 使用 clean commit `8c322fc`，`git_dirty=false`。拓扑为：Windows 运行 PostgreSQL / Kafka / Redis / 核心业务进程 / `push-gateway delivery-consumer`，Windows Docker 运行 `nexusim/delivery-service:local` gRPC，Mac Docker 运行 `nexusim/push-gateway:local` WebSocket gateway。Windows runner 通过 `ws://172.31.50.2:11598` 连接 Mac；Mac gateway 通过有线 `172.31.50.1:6379` 使用 Redis route，并通过 `172.31.50.1:11597` 回调 Windows Docker delivery-service ACK。结果：收到 seq `2` 的 `delivery.notify`，`PullInbox item_count=1/max_seq=2`，`delivery.ack.ok last_received_seq=2`，`delivery_outbox PUBLISHED=2/PENDING=0/DLQ=0`。
+
+前一轮脚本验证结果：
+
+```text
 H:\NexusIM\loadtest-results\push-gateway-win-mac-redis-smoke-20260609-205219\pushgateway-summary.json
 ```
 

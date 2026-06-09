@@ -93,20 +93,34 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 		_ = wsjson.Write(request.Context(), conn, app.PublicErrorFrame("", err))
 		return
 	}
-	defer server.disconnect.Execute(result.SessionID)
+	disconnected := false
+	disconnect := func() {
+		if disconnected {
+			return
+		}
+		disconnected = true
+		server.disconnect.Execute(result.SessionID)
+	}
+	defer disconnect()
 
 	auth.SessionID = result.SessionID
 	if err := writeFrame(request.Context(), conn, domain.ServerHello(helloFrame.RequestID, result), server.config.WriteTimeout); err != nil {
 		return
 	}
 
+	sessionCtx, cancelSession := context.WithCancel(request.Context())
+	defer cancelSession()
+
 	writeDone := make(chan error, 1)
 	go func() {
-		writeDone <- writeLoop(request.Context(), conn, outbound, evicted, server.config.WriteTimeout)
+		err := writeLoop(sessionCtx, conn, outbound, evicted, server.config.WriteTimeout)
+		cancelSession()
+		writeDone <- err
 	}()
 
-	readErr := server.readLoop(request.Context(), conn, auth, outbound)
-	close(outbound)
+	readErr := server.readLoop(sessionCtx, conn, auth, outbound)
+	cancelSession()
+	disconnect()
 	writeErr := <-writeDone
 	if readErr != nil && !isNormalClose(readErr) {
 		return
@@ -129,17 +143,32 @@ func (server *Server) readLoop(
 		}
 		frame, requestID, err := DecodeClientFrame(raw)
 		if err != nil {
-			outbound <- app.PublicErrorFrame(requestID, err)
+			if err := enqueueOutbound(ctx, outbound, app.PublicErrorFrame(requestID, err)); err != nil {
+				return err
+			}
 			continue
 		}
 		response, err := server.frames.Execute(ctx, auth, frame)
 		if err != nil {
-			outbound <- app.PublicErrorFrame(frame.RequestID, err)
+			if err := enqueueOutbound(ctx, outbound, app.PublicErrorFrame(frame.RequestID, err)); err != nil {
+				return err
+			}
 			continue
 		}
 		if response.Op != "" {
-			outbound <- response
+			if err := enqueueOutbound(ctx, outbound, response); err != nil {
+				return err
+			}
 		}
+	}
+}
+
+func enqueueOutbound(ctx context.Context, outbound chan<- types.ServerFrame, frame types.ServerFrame) error {
+	select {
+	case outbound <- frame:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
@@ -152,7 +181,13 @@ func writeLoop(
 ) error {
 	for {
 		select {
-		case eviction := <-evicted:
+		case <-ctx.Done():
+			return ctx.Err()
+		case eviction, ok := <-evicted:
+			if !ok {
+				evicted = nil
+				continue
+			}
 			_ = writeFrame(ctx, conn, domain.ResumeHint(eviction.Reason, eviction.Conversations), timeout)
 			_ = conn.Close(nhooyr.StatusPolicyViolation, "slow session")
 			return types.ErrSessionEvicted

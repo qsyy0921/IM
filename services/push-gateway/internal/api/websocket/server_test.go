@@ -222,6 +222,70 @@ func TestWebSocketAckPermissionDeniedIsNotRetryable(t *testing.T) {
 	}
 }
 
+func TestEnqueueOutboundReturnsWhenContextCanceled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	outbound := make(chan types.ServerFrame)
+	cancel()
+	if err := enqueueOutbound(ctx, outbound, types.ServerFrame{Op: types.OpServerPong}); err == nil {
+		t.Fatalf("expected context cancellation")
+	}
+}
+
+func TestWebSocketDisconnectUnregistersBeforeFurtherNotify(t *testing.T) {
+	registry := memory.NewRegistry()
+	server := NewServer(
+		app.NewConnectSessionUseCase(registry),
+		app.NewDisconnectSessionUseCase(registry),
+		app.NewHandleClientFrameUseCase(&fakeDeliveryClient{}),
+		Config{QueueSize: 1, HeartbeatInterval: time.Second},
+	)
+	httpServer := httptest.NewServer(server)
+	defer httpServer.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, _, err := nhooyr.Dial(ctx, "ws"+httpServer.URL[len("http"):]+"/ws?tenant_id=tenant-1&user_id=user-1&device_id=device-1", nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	if err := wsjson.Write(ctx, conn, types.ClientFrame{
+		Op:        types.OpClientHello,
+		RequestID: "hello-1",
+		DeviceID:  "device-1",
+	}); err != nil {
+		t.Fatalf("write hello: %v", err)
+	}
+	var hello types.ServerFrame
+	if err := wsjson.Read(ctx, conn, &hello); err != nil {
+		t.Fatalf("read hello: %v", err)
+	}
+	if err := conn.Close(nhooyr.StatusNormalClosure, "done"); err != nil {
+		t.Fatalf("close client: %v", err)
+	}
+
+	notify := app.NewNotifyDeliveryUseCase(registry)
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		result, err := notify.Execute(ctx, types.NotifyDeliveryCommand{Notification: types.DeliveryNotification{
+			EventID:         "delivery-event-disconnect",
+			TenantID:        "tenant-1",
+			UserID:          "user-1",
+			ConversationID:  "conversation-1",
+			ConversationSeq: 7,
+		}})
+		if err != nil {
+			t.Fatalf("notify after disconnect: %v", err)
+		}
+		if result.MatchedSessions == 0 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("session was not unregistered after disconnect: %+v", result)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func TestWriteLoopSendsResumeHintAndClosesOnEviction(t *testing.T) {
 	outbound := make(chan types.ServerFrame)
 	evicted := make(chan types.SessionEviction, 1)

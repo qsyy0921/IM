@@ -55,9 +55,7 @@ func TestRegistryEnqueueNotificationFailsClosedWhenQueueFull(t *testing.T) {
 	select {
 	case eviction := <-evicted:
 		if eviction.Reason != "slow_session" ||
-			len(eviction.Conversations) != 1 ||
-			eviction.Conversations[0].ConversationID != "conversation-1" ||
-			eviction.Conversations[0].Seq != 6 {
+			len(eviction.Conversations) != 0 {
 			t.Fatalf("unexpected eviction: %+v", eviction)
 		}
 	default:

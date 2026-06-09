@@ -101,10 +101,6 @@ func (registry *Registry) EnqueueNotification(
 		default:
 			registry.evictLocked(sessionID, target, types.SessionEviction{
 				Reason: "slow_session",
-				Conversations: []types.ConversationCursor{{
-					ConversationID: notification.ConversationID,
-					Seq:            notification.ConversationSeq - 1,
-				}},
 			})
 			result.Dropped++
 			result.Evicted++

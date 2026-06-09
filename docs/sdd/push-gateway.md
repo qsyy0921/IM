@@ -202,6 +202,8 @@ GET /ws?token=...&device_id=...
 }
 ```
 
+`conversations` 是可选提示，不是服务端对客户端已持久化进度的权威判断。queue-full / slow-session 场景下，gateway 可以不返回具体 `conversation_id / seq`；客户端必须以本地 durable cursor / `last_received` 为准调用 `PullInbox`，不能把 gateway 提示的 seq 当作可靠 ACK 或已送达水位。
+
 `error`：
 
 ```json
@@ -373,7 +375,7 @@ Client reconnects with resume_token and last_received seq
 ```text
 session send queue over threshold
 -> mark DEGRADED
--> send server.resume_hint if possible
+-> send broad server.resume_hint if possible
 -> first implementation closes the WebSocket on queue-full eviction
 -> future implementation may add NEXUSIM_PUSH_SLOW_EVICT_AFTER before active close
 -> route cleanup

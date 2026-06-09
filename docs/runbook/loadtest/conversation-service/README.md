@@ -12,6 +12,15 @@ message-service SendMessage
 -> message-service PostgreSQL local transaction
 ```
 
+```text
+conversation-service CreateMemberChange
+-> shared timeline/outbox
+-> message-service outbox relay
+-> Kafka conversation.timeline.events
+-> conversation-service member-change-worker
+-> GetMemberChange(DONE)
+```
+
 ## 当前结论
 
 - `conversation-service` 已有独立六层 DDD 骨架。
@@ -20,6 +29,7 @@ message-service SendMessage
 - 第一轮真实进程 smoke 结果：`725 / 725` 成功，p95 `10.36ms`，p99 `13.26ms`。
 - 本轮 smoke 没启动 outbox relay，因此 summary 中 `outbox_pending_count=725` 是预期现象；测试结束后已删除本次 tenant 数据，避免污染后续压测。
 - `CreateMemberChange` 最小写路径已完成真实进程 smoke：`279 / 279` 成功，p99 `24.95ms`，`outbox_published_count=279`，`outbox_pending_count=0`。
+- `CreateMemberChange -> outbox relay -> member-change-worker -> GetMemberChange(DONE)` 完整 smoke 已通过：`350 / 350` 成功，p99 `40.90ms`，`saga_done_count=350`，`sample_get_status=MEMBER_CHANGE_STATUS_DONE`。
 
 ## 报告列表
 
@@ -28,6 +38,7 @@ message-service SendMessage
 | 阶段总报告 | `loadtest-report-20260609-conversation-service-consolidated.md` |
 | 第一轮跨服务 smoke | `loadtest-report-20260609-send-context-smoke.md` |
 | 成员变更写路径 smoke | `loadtest-report-20260609-member-change-smoke.md` |
+| 成员变更完整 smoke | `loadtest-report-20260609-member-change-full-smoke.md` |
 
 ## 面试可讲点
 
@@ -35,4 +46,5 @@ message-service SendMessage
 - `conversation-service` 是会话和成员事实源，`message-service` 只读取发送上下文，不写成员事实。
 - 版本号通过 `member_version` / `permission_version` 返回给 `message-service`，用于发送前的一致性校验。
 - 成员变更写路径采用 saga + timeline/outbox：先写成员事实和边界事件，再由统一 outbox relay 发布 Kafka。
-- 当前只验证保守权限矩阵下的最小 `JOIN`，`LEAVE / REMOVE / ROLE_CHANGED`、ACL 投影和 saga completion worker 还在后续阶段。
+- saga completion worker 已经能观察 outbox `PUBLISHED` 并把 `member_change_saga` 推进到 `DONE`，`GetMemberChange` 能读到完成态。
+- 当前只验证保守权限矩阵下的最小 `JOIN`，`LEAVE / REMOVE / ROLE_CHANGED`、ACL 投影和 DLQ repair 还在后续阶段。

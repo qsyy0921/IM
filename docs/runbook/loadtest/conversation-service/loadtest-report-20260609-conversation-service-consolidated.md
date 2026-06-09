@@ -21,7 +21,7 @@ CreateMemberChange
 -> Kafka conversation.timeline.events
 ```
 
-它仍不是完整的会话服务。`GetMemberChange`、成员变更 Saga completion worker、DLQ repair、ACL 投影和完整角色变更流程后续单独实现。
+它仍不是完整的会话服务。`GetMemberChange` 和成员变更 Saga completion worker 已经完成最小闭环；DLQ repair、ACL 投影和完整角色变更流程后续单独实现。
 
 ## 当前能力
 
@@ -37,6 +37,8 @@ CreateMemberChange
 | 真实 PostgreSQL repository 集成测试 | 已通过 |
 | message-service -> conversation-service smoke | 已通过 |
 | CreateMemberChange -> outbox relay -> Kafka smoke | 已通过 |
+| GetMemberChange | 已完成，并在完整 smoke 中返回 `DONE` |
+| member-change-worker | 已完成，能观察 outbox `PUBLISHED` 并推进 saga `DONE` |
 
 ## 核心结论
 
@@ -47,6 +49,8 @@ CreateMemberChange
 - `message-service` 仍保持边界：只读 conversation context，不写成员事实。
 - `conversation-service` 已经能独立写成员事实，并把成员边界事件放入共享 timeline/outbox。
 - 统一 outbox relay 可以发布 `conversation.member.*` 到 Kafka，并把 outbox 标记为 `PUBLISHED`。
+- `conversation-service` 的 member-change-worker 可以观察已发布 outbox，并把本地 saga 推进到 `DONE`。
+- `GetMemberChange` 可以通过 gRPC 返回成员变更完成态。
 - 当前链路足以支撑后续继续开发 `delivery-service` / `push-gateway`，不需要继续在 `message-service` 上做大规模压测。
 
 ## 验证记录
@@ -55,6 +59,7 @@ CreateMemberChange
 | --- | --- |
 | `loadtest-report-20260609-send-context-smoke.md` | 725 / 725 成功，p99 13.26ms，跨服务 read path 打通 |
 | `loadtest-report-20260609-member-change-smoke.md` | 279 / 279 成功，p99 24.95ms，outbox 279 条全部 PUBLISHED |
+| `loadtest-report-20260609-member-change-full-smoke.md` | 350 / 350 成功，p99 40.90ms，saga 350 条全部 DONE，GetMemberChange 返回 DONE |
 
 ## 面试讲法
 
@@ -64,11 +69,10 @@ CreateMemberChange
 
 成员变更可以这样讲：
 
-> `conversation-service` 负责成员事实变更。`CreateMemberChange` 会在一个 PostgreSQL 事务里推进 member_change_saga、conversation_members、conversation 版本号、conversation_seq、conversation_timeline_events 和 message_outbox。成员边界事件和消息事件共享同一条 conversation timeline，所以 delivery、retrieval 和 audit 后续只需要消费统一的 `conversation.timeline.events`。本地 smoke 里 279 条成员加入全部成功，outbox relay 发布后 279 条都变成 PUBLISHED，说明第二个微服务已经不是文档服务，而是有真实写路径和事件出口。当前只验证保守权限矩阵下的 JOIN，不能把它说成完整成员管理系统。
+> `conversation-service` 负责成员事实变更。`CreateMemberChange` 会在一个 PostgreSQL 事务里推进 member_change_saga、conversation_members、conversation 版本号、conversation_seq、conversation_timeline_events 和 message_outbox。成员边界事件和消息事件共享同一条 conversation timeline，所以 delivery、retrieval 和 audit 后续只需要消费统一的 `conversation.timeline.events`。本地完整 smoke 里 350 条成员加入全部成功，outbox relay 发布后 350 条都变成 PUBLISHED，member-change-worker 又把 350 条 saga 推进到 DONE，GetMemberChange 能读到 DONE。这个阶段证明第二个微服务已经不是文档服务，而是有真实写路径、事件出口和后台任务闭环。当前只验证保守权限矩阵下的 JOIN，不能把它说成完整成员管理系统。
 
 ## 下一步
 
-1. 实现 `GetMemberChange` 查询接口。
-2. 补 saga `EVENT_PUBLISHED / DONE` 推进 worker。
-3. 补 `LEAVE / REMOVE / ROLE_CHANGED` 的真实进程 smoke。
-4. 进入 `delivery-service` 或 `push-gateway` 前，先明确它们的 SDD 和最小可运行链路。
+1. 补 `LEAVE / REMOVE / ROLE_CHANGED` 的真实进程 smoke 或至少 repository / gRPC 负例覆盖。
+2. 补 DLQ repair 设计和最小实现。
+3. 进入 `delivery-service` 或 `push-gateway` 前，先明确它们的 SDD 和最小可运行链路。

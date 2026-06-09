@@ -123,9 +123,12 @@ H:\NexusIM\loadtest-results\push-gateway-redis-fault-smoke-20260609-195200\pushg
 Windows wired: 172.31.50.1/24
 Mac wired:     172.31.50.2/24
 Wi-Fi:         两端继续用于上网和下载依赖
+Proxy:         两端对外代理端口统一为 127.0.0.1:7890
 ```
 
 后续双机 smoke / 小压测优先使用 `172.31.50.*`，避免走随身 Wi-Fi 的 `192.168.0.*` 管理网段。
+只要 Win-Mac 之间能通过网线直连，服务间地址、SSH、文件传输和 smoke callback 都优先使用 `172.31.50.*`；Wi-Fi 只负责访问互联网和下载依赖。
+GitHub / Docker / Go module 等必须访问外网的下载才使用本机 `127.0.0.1:7890` 代理。只要数据可以在 Windows 和 Mac 之间直接传输，就必须走有线 `172.31.50.*`，不要绕 GitHub / 云盘 / 外网代理，避免消耗流量。
 
 用户当前希望用两台机器模拟多节点，而不是继续做重型单机硬件矩阵。建议资源切分：
 
@@ -148,20 +151,33 @@ Wi-Fi:         两端继续用于上网和下载依赖
 ```text
 172.31.50.2:22 reachable
 192.168.0.182:22 reachable
-Windows -> Mac SSH key auth: not accepted yet
+Windows -> Mac SSH key auth: OK
+Docker CLI: OK
+Docker Desktop: 29.5.2
+Docker resource pool observed through Docker info: 8 CPU / about 8GB memory
+Mac repo path: /Users/qsyy0921/Desktop/IM exists
 ```
 
-下一步需要在 Mac 的 `/Users/qsyy0921/.ssh/authorized_keys` 加入 Windows 当前公钥。Windows 侧可用：
+Windows 当前公钥已加入 Mac 的 `/Users/qsyy0921/.ssh/authorized_keys`。Windows 侧可用：
 
 ```powershell
 Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub
 ```
 
-免密恢复后再在 Mac 上验证：
+Mac 侧 Docker CLI 已加入用户级 PATH，可通过 SSH 验证：
 
 ```bash
 docker version
 docker info
+```
+
+注意：Mac 的 `/Users/qsyy0921/Desktop/IM` 当前不是由 Windows 侧管理的干净工作区，已有本地 ahead / untracked 文件。后续同步代码时不能强行 reset；优先选择：
+
+```text
+1. Windows 本地生成 Git bundle；
+2. 通过 `scp` / SSH 走 `172.31.50.2` 有线传到 Mac；
+3. 在 Mac 上从 bundle clone / fetch，避免 Mac 直接访问 GitHub；
+4. 若 Mac `Desktop/IM` 不能 fast-forward，则另建 `/Users/qsyy0921/Desktop/IM-distributed-smoke` 作为干净 smoke checkout。
 ```
 
 压测原始结果继续放机械盘：
@@ -204,4 +220,4 @@ push-gateway 只消费 delivery 事件做在线唤醒，WebSocket 连接和 Kafk
 - `push-gateway` 跨实例 resume buffer 尚未实现；跨实例恢复仍应 fallback `PullInbox`。
 - `push-gateway` `/debug/metrics` 仍是本地 smoke 调试端点，不是正式 Prometheus 指标。
 - 真实生产部署还未接入 Kubernetes / service discovery / mTLS / OTel。
-- Mac Docker / 双机 Docker Compose profile 尚未完成配置和验证；当前阻塞是 Windows -> Mac SSH 免密未恢复，两个地址的 22 端口均可达。
+- Mac Docker CLI / SSH 已可用；双机 Docker Compose profile 尚未完成配置和验证。Mac `Desktop/IM` 有本地变更，后续跨机 smoke 前需选择 fast-forward 更新或新建干净 smoke checkout。

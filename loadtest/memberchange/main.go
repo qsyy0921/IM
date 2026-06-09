@@ -56,12 +56,16 @@ type summary struct {
 	TenantID               string            `json:"tenant_id"`
 	ConversationID         string            `json:"conversation_id"`
 	SagaCount              *int64            `json:"saga_count,omitempty"`
+	SagaDoneCount          *int64            `json:"saga_done_count,omitempty"`
 	TimelineCount          *int64            `json:"timeline_count,omitempty"`
 	OutboxTotalCount       *int64            `json:"outbox_total_count,omitempty"`
 	OutboxPendingCount     *int64            `json:"outbox_pending_count,omitempty"`
 	OutboxPublishedCount   *int64            `json:"outbox_published_count,omitempty"`
 	OutboxDLQCount         *int64            `json:"outbox_dlq_count,omitempty"`
 	ConversationSeqCurrent *int64            `json:"conversation_seq_current,omitempty"`
+	SampleChangeID         string            `json:"sample_change_id,omitempty"`
+	SampleGetStatus        string            `json:"sample_get_status,omitempty"`
+	SampleGetError         string            `json:"sample_get_error,omitempty"`
 	StartedAt              time.Time         `json:"started_at"`
 	FinishedAt             time.Time         `json:"finished_at"`
 	Stats                  map[string]string `json:"stats,omitempty"`
@@ -125,6 +129,7 @@ func run(cfg config) error {
 	var sequence int64
 	var successCount int64
 	var errorCountTotal int64
+	var sampleChangeID atomic.Value
 	var latencyMu sync.Mutex
 	latencies := make([]float64, 0, 1024)
 	errorCounts := make(map[string]int64)
@@ -145,7 +150,7 @@ func run(cfg config) error {
 				targetUserID := fmt.Sprintf("%s-%d", cfg.targetPrefix, seq)
 				requestCtx, requestCancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
 				begin := time.Now()
-				_, err := client.CreateMemberChange(requestCtx, &conversationv1.CreateMemberChangeRequest{
+				response, err := client.CreateMemberChange(requestCtx, &conversationv1.CreateMemberChangeRequest{
 					AuthContext: &conversationv1.AuthContext{
 						TenantId:  cfg.tenantID,
 						UserId:    cfg.operatorUserID,
@@ -174,6 +179,9 @@ func run(cfg config) error {
 					errorCounts[err.Error()]++
 					errorMu.Unlock()
 					continue
+				}
+				if response.GetChangeId() != "" && sampleChangeID.Load() == nil {
+					sampleChangeID.Store(response.GetChangeId())
 				}
 				atomic.AddInt64(&successCount, 1)
 			}
@@ -213,6 +221,17 @@ func run(cfg config) error {
 				result.Stats = make(map[string]string)
 			}
 			result.Stats["postgres_error"] = err.Error()
+		}
+	}
+	if value := sampleChangeID.Load(); value != nil {
+		result.SampleChangeID = value.(string)
+	}
+	if result.SampleChangeID != "" {
+		status, err := getMemberChangeStatus(context.Background(), client, cfg, result.SampleChangeID)
+		if err != nil {
+			result.SampleGetError = err.Error()
+		} else {
+			result.SampleGetStatus = status
 		}
 	}
 	encoded, err := json.MarshalIndent(result, "", "  ")
@@ -291,6 +310,11 @@ SELECT COUNT(*) FROM member_change_saga WHERE tenant_id = $1 AND conversation_id
 `, cfg.tenantID, cfg.conversationID); err != nil {
 		return fmt.Errorf("query saga count: %w", err)
 	}
+	if err := assign(&result.SagaDoneCount, `
+SELECT COUNT(*) FROM member_change_saga WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'DONE'
+`, cfg.tenantID, cfg.conversationID); err != nil {
+		return fmt.Errorf("query saga done count: %w", err)
+	}
 	if err := assign(&result.TimelineCount, `
 SELECT COUNT(*) FROM conversation_timeline_events WHERE tenant_id = $1 AND conversation_id = $2
 `, cfg.tenantID, cfg.conversationID); err != nil {
@@ -327,6 +351,28 @@ WHERE tenant_id = $1 AND conversation_id = $2
 		result.ConversationSeqCurrent = &currentSeq
 	}
 	return nil
+}
+
+func getMemberChangeStatus(
+	ctx context.Context,
+	client conversationv1.ConversationServiceClient,
+	cfg config,
+	changeID string,
+) (string, error) {
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	response, err := client.GetMemberChange(requestCtx, &conversationv1.GetMemberChangeRequest{
+		AuthContext: &conversationv1.AuthContext{
+			TenantId: cfg.tenantID,
+			UserId:   cfg.operatorUserID,
+		},
+		ConversationId: cfg.conversationID,
+		ChangeId:       changeID,
+	})
+	if err != nil {
+		return "", err
+	}
+	return response.GetStatus().String(), nil
 }
 
 func shortCommit() string {

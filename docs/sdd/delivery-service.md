@@ -9,9 +9,10 @@
 `delivery-service` 拥有 durable delivery read model：
 
 - `user_inbox`：用户维度的可投递事件索引。
+- `delivery_membership_projection`：delivery 自己的成员可见性投影，用于 fanout，不是成员事实源。
 - `device_delivery_cursors`：设备维度的已收游标。
-- `conversation_read_cursors`：后续 receipt-service 接入前的可选只读边界，本阶段不实现已读聚合。
-- delivery projection checkpoint：Kafka consumer offset、重放进度和投影版本。
+- `delivery_kafka_checkpoints`：consumer group 维度的 Kafka partition checkpoint。
+- delivery projection rebuild job：后续租户级重放任务，不和 Kafka offset 混用。
 - delivery outbox：后续通知 `push-gateway` 在线推送。
 
 职责：
@@ -69,8 +70,9 @@ services/delivery-service/
 | 模型 | 说明 | 不变量 |
 | --- | --- | --- |
 | `InboxItem` | 用户维度可投递事件 | `(tenant_id, user_id, conversation_id, seq)` 唯一 |
+| `DeliveryMembership` | 成员可见性投影 | 由 member boundary event 重建，不能作为成员事实源 |
 | `DeliveryCursor` | 设备已接收游标 | cursor 只能单调前进 |
-| `TimelineProjection` | timeline event 投影进度 | 同一 conversation 按 seq 顺序处理 |
+| `TimelineProjection` | timeline event 投影进度 | DB 副作用成功后才提交 Kafka offset |
 | `FanoutDecision` | 基于 event metadata 的投递策略 | 只能使用事件内固化的 fanout policy，不读取当前策略覆盖历史 |
 | `DeliveryOutboxEvent` | 给 push-gateway / audit 的投递事件 | 必须在本地事务内与 inbox/cursor 副作用一起写入 |
 
@@ -137,7 +139,8 @@ trace_id
 | --- | --- | --- | --- |
 | `INVALID_ARGUMENT` | `InvalidArgument` | 参数缺失或 limit 非法 | 否 |
 | `PERMISSION_DENIED` | `PermissionDenied` | 用户无权访问 conversation inbox | 否 |
-| `CURSOR_REGRESSION` | `FailedPrecondition` | ACK 小于已记录游标 | 否 |
+| `CURSOR_REGRESSION` | `FailedPrecondition` | 严格调试模式下 ACK 小于已记录游标 | 否 |
+| `ACK_OUT_OF_VISIBLE_RANGE` | `FailedPrecondition` | ACK 大于该用户已可见最大 seq | 否 |
 | `DB_READ_FAILED` | `Unavailable` | 读取 inbox 失败 | 是 |
 | `DB_WRITE_FAILED` | `Unavailable` | 写 cursor / outbox 失败 | 是 |
 | `SERVICE_OVERLOADED` | `Unavailable` | delivery-service 主动过载保护 | 是 |
@@ -154,6 +157,20 @@ trace_id
 | `conversation.member.removed.v1` | `conversation.timeline.events` | `tenant_id + conversation_id` | 截断后续可见性 |
 | `conversation.member.role_changed.v1` | `conversation.timeline.events` | `tenant_id + conversation_id` | 更新投递权限投影 |
 | `conversation.member.boundary_cancelled.v1` | `conversation.timeline.events` | `tenant_id + conversation_id` | 记录边界取消事实，第一阶段不自动回滚历史 inbox |
+
+消费规则：
+
+- `conversation.member.*` 事件先更新 `delivery_membership_projection`。
+- `message.persisted.v1` 只能 fanout 到 `delivery_membership_projection` 中满足可见窗口的用户：
+
+```text
+join_seq <= message_seq
+AND (leave_seq IS NULL OR leave_seq >= message_seq)
+AND status = ACTIVE
+```
+
+- 禁止为了生成历史 inbox 去实时查询 `conversation-service` 当前成员表；当前成员状态不能覆盖旧 timeline event 的可见性。
+- unsupported / malformed timeline event 必须 fail-closed：不能误写 inbox，也不能静默提交业务完成状态；第一阶段进入 projection DLQ 或阻塞并报警，repair 后再推进 checkpoint。
 
 ### 6.2 发布事件
 
@@ -200,6 +217,21 @@ CREATE TABLE user_inbox (
     UNIQUE (tenant_id, user_id, event_id)
 );
 
+CREATE TABLE delivery_membership_projection (
+    tenant_id           TEXT        NOT NULL,
+    conversation_id     TEXT        NOT NULL,
+    user_id             TEXT        NOT NULL,
+    role                TEXT        NOT NULL,
+    status              TEXT        NOT NULL,
+    join_seq            BIGINT      NOT NULL,
+    leave_seq           BIGINT,
+    member_version      BIGINT      NOT NULL,
+    permission_version  BIGINT      NOT NULL,
+    updated_by_event_id TEXT        NOT NULL,
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (tenant_id, conversation_id, user_id)
+);
+
 CREATE TABLE device_delivery_cursors (
     tenant_id           TEXT        NOT NULL,
     user_id             TEXT        NOT NULL,
@@ -210,13 +242,13 @@ CREATE TABLE device_delivery_cursors (
     PRIMARY KEY (tenant_id, user_id, device_id, conversation_id)
 );
 
-CREATE TABLE delivery_projection_offsets (
-    tenant_id           TEXT        NOT NULL,
+CREATE TABLE delivery_kafka_checkpoints (
+    consumer_group      TEXT        NOT NULL,
     topic               TEXT        NOT NULL,
     partition_id        INT         NOT NULL,
     offset_value        BIGINT      NOT NULL,
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (tenant_id, topic, partition_id)
+    PRIMARY KEY (consumer_group, topic, partition_id)
 );
 
 CREATE TABLE delivery_outbox (
@@ -226,11 +258,20 @@ CREATE TABLE delivery_outbox (
     conversation_id     TEXT        NOT NULL,
     aggregate_version   BIGINT      NOT NULL,
     event_type          TEXT        NOT NULL,
+    event_version       TEXT        NOT NULL,
+    partition_key       TEXT        NOT NULL,
+    mapping_version     BIGINT      NOT NULL,
+    correlation_id      TEXT        NOT NULL DEFAULT '',
+    causation_id        TEXT        NOT NULL DEFAULT '',
+    producer            TEXT        NOT NULL,
+    trace_id            TEXT        NOT NULL DEFAULT '',
     payload_json        JSONB       NOT NULL,
     status              TEXT        NOT NULL DEFAULT 'PENDING',
     retry_count         INT         NOT NULL DEFAULT 0,
     last_error          TEXT        NOT NULL DEFAULT '',
     available_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    next_retry_at       TIMESTAMPTZ,
+    dead_lettered_at    TIMESTAMPTZ,
     published_at        TIMESTAMPTZ,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -240,7 +281,9 @@ CREATE TABLE delivery_outbox (
 约束：
 
 - `user_inbox` 是可重建投影，不是 message 事实源。
+- `delivery_membership_projection` 是可重建投影，不是 member 事实源。
 - timeline event 必须先持久化投影副作用，再提交 Kafka offset。
+- Kafka checkpoint 是 `consumer_group + topic + partition` 维度，不按 tenant 维度记录；同一 partition 可能混有多个 tenant。
 - `delivery_outbox` 与 `user_inbox` / cursor 更新在同一个 PostgreSQL 事务内写入。
 - `delivery_outbox.last_error` 不直接返回给普通客户端。
 
@@ -254,8 +297,9 @@ Kafka conversation.timeline.events
 -> app ProjectTimelineEventUseCase
 -> domain fanout decision
 -> PostgreSQL transaction:
+   delivery_membership_projection update for member boundary
    user_inbox upsert
-   delivery_projection_offsets update
+   delivery_kafka_checkpoints update
    delivery_outbox insert
 -> commit
 -> commit Kafka offset
@@ -277,7 +321,11 @@ Client reconnect / sync
 Client durable local write
 -> delivery-service AckDelivery
 -> PostgreSQL transaction:
-   upsert device_delivery_cursors with max(old, received_seq)
+   lock current device_delivery_cursors
+   query max visible seq from user_inbox
+   if received_seq > max_visible_seq -> ACK_OUT_OF_VISIBLE_RANGE
+   if received_seq <= current cursor -> idempotent success
+   else update cursor to received_seq
    delivery_outbox insert delivery.ack.recorded.v1
 -> response
 ```
@@ -290,6 +338,15 @@ Client durable local write
 同一 timeline event 的 inbox 写入、projection offset 更新、delivery_outbox 写入必须同事务。
 同一 ACK 的 cursor 更新、delivery_outbox 写入必须同事务。
 ```
+
+Kafka offset 处理：
+
+```text
+DB transaction commit succeeds
+-> commit Kafka offset
+```
+
+如果进程在 DB commit 后、Kafka commit 前崩溃，重放同一 event 必须依赖 `tenant_id + user_id + event_id` 和 checkpoint 幂等去重。
 
 最终一致边界：
 
@@ -308,7 +365,7 @@ message-service / conversation-service 发布 timeline event
 | --- | --- | --- | --- |
 | timeline event projection | `tenant_id + user_id + event_id` | consumer 可重复处理，upsert 去重 | Kafka replay 或 PostgreSQL projection rebuild |
 | PullInbox | request 无副作用 | 客户端可重试 | 无 |
-| AckDelivery | `tenant_id + user_id + device_id + conversation_id` | cursor 使用 `max(old, received_seq)` | 低 seq ACK 视为幂等或返回 `CURSOR_REGRESSION` |
+| AckDelivery | `tenant_id + user_id + device_id + conversation_id` | `received_seq <= current` 视为幂等成功，`current < received_seq <= max_visible_seq` 才推进 | `received_seq > max_visible_seq` 返回 `ACK_OUT_OF_VISIBLE_RANGE` |
 | delivery outbox publish | `event_id` | at-least-once publish | 下游按 event_id 去重 |
 
 ## 11. 权限和安全
@@ -316,6 +373,7 @@ message-service / conversation-service 发布 timeline event
 - `PullInbox` 和 `AckDelivery` 必须使用 authenticated `tenant_id/user_id/device_id`，不信任请求体裸 user。
 - 第一阶段可以通过 `user_inbox` 是否存在判断可见性；没有 inbox item 不等于 conversation 不存在。
 - 成员边界事件决定投递可见窗口，不能用当前成员表回写历史可见性。
+- `delivery_membership_projection` 只能由 Kafka timeline event 重建；manual repair 必须留审计。
 - 普通客户端不返回内部 projection / outbox raw error。
 - repair / replay 必须有审计记录。
 

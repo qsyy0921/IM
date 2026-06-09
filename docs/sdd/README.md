@@ -36,7 +36,7 @@
 | `conversation-service / send context` | SDD v0.1 已存在 | 可以实现 `GetSendContext` 读取路径，替换 message-service strict conversation mock |
 | `conversation-service / member_change_saga` | SDD 已冻结 v1.0；proto / schema / migration v2 / relay builder / 最小 `CreateMemberChange` 写路径、saga publish 状态推进和 full smoke 已落地 | 后续补 LEAVE / REMOVE / ROLE_CHANGED、DLQ repair 和生产韧性 |
 | `push-gateway` | SDD 未完成 | 不阻塞 `message-service`；阻塞 WebSocket 完整闭环 |
-| `delivery-service` | SDD v0.1 已存在 | 可以进入 `PullInbox / AckDelivery / timeline projection` 最小链路 |
+| `delivery-service` | SDD v0.1 已存在，评审 P1 已应用但尚未冻结 | 可以进入 `PullInbox / AckDelivery` 最小同步路径；timeline projection / consumer 仍需补齐 |
 | `retrieval-gateway` | SDD 未完成 | 不进入第一条代码切片 |
 
 ## 已完成的 message-service 切片
@@ -122,4 +122,4 @@ Kafka conversation.timeline.events
 2. `timeline-service-sequencer.md`
 3. `retrieval-gateway.md`
 
-其中 `delivery-service.md` 已补 v0.1，下一步应优先落地 proto / migration / 六层骨架和最小 `PullInbox / AckDelivery` 链路。`timeline-service` SDD 不阻塞普通会话当前实现，但阻塞热点会话生产化。
+其中 `delivery-service.md` 已补 v0.1，并已按评审 P1 补成员可见性投影、ACK max visible seq 和 Kafka checkpoint 维度。下一步应优先补 timeline projection use case / consumer，让 `conversation.timeline.events -> user_inbox -> PullInbox -> AckDelivery` 形成真实小闭环。`timeline-service` SDD 不阻塞普通会话当前实现，但阻塞热点会话生产化。

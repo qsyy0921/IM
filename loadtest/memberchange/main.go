@@ -22,18 +22,21 @@ import (
 )
 
 type config struct {
-	target          string
-	vus             int
-	duration        time.Duration
-	requestTimeout  time.Duration
-	resultDir       string
-	tenantID        string
-	conversationID  string
-	operatorUserID  string
-	targetPrefix    string
-	pgDSN           string
-	statsWait       time.Duration
-	expectedVersion int64
+	target            string
+	vus               int
+	duration          time.Duration
+	requestTimeout    time.Duration
+	resultDir         string
+	tenantID          string
+	conversationID    string
+	operatorUserID    string
+	targetPrefix      string
+	targetUserID      string
+	idempotencyPrefix string
+	requestCount      int64
+	pgDSN             string
+	statsWait         time.Duration
+	expectedVersion   int64
 }
 
 type summary struct {
@@ -95,6 +98,9 @@ func parseConfig() config {
 	flag.StringVar(&cfg.conversationID, "conversation-id", "conv-member-smoke", "conversation id")
 	flag.StringVar(&cfg.operatorUserID, "operator-user-id", "owner-1", "operator user id")
 	flag.StringVar(&cfg.targetPrefix, "target-prefix", "target-user", "target user prefix")
+	flag.StringVar(&cfg.targetUserID, "target-user-id", "", "fixed target user id; when set, use with --request-count 1 for deterministic smoke")
+	flag.StringVar(&cfg.idempotencyPrefix, "idempotency-prefix", "idem", "idempotency key prefix")
+	flag.Int64Var(&cfg.requestCount, "request-count", 0, "fixed request count; 0 means run until duration elapses")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "", "optional PostgreSQL DSN for post-run stats")
 	flag.DurationVar(&cfg.statsWait, "stats-wait", 0, "wait before querying PostgreSQL stats")
 	flag.Int64Var(&cfg.expectedVersion, "expected-member-version", 0, "expected member version, 0 disables optimistic check")
@@ -146,8 +152,14 @@ func run(cfg config) error {
 					return
 				default:
 				}
-				seq := atomic.AddInt64(&sequence, 1)
-				targetUserID := fmt.Sprintf("%s-%d", cfg.targetPrefix, seq)
+				seq, ok := nextSequence(&sequence, cfg.requestCount)
+				if !ok {
+					return
+				}
+				targetUserID := cfg.targetUserID
+				if targetUserID == "" {
+					targetUserID = fmt.Sprintf("%s-%d", cfg.targetPrefix, seq)
+				}
 				requestCtx, requestCancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
 				begin := time.Now()
 				response, err := client.CreateMemberChange(requestCtx, &conversationv1.CreateMemberChangeRequest{
@@ -164,7 +176,7 @@ func run(cfg config) error {
 					ChangeType:            conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_JOIN,
 					TargetRole:            conversationv1.MemberRole_MEMBER_ROLE_MEMBER,
 					ExpectedMemberVersion: cfg.expectedVersion,
-					IdempotencyKey:        fmt.Sprintf("idem-%d", seq),
+					IdempotencyKey:        fmt.Sprintf("%s-%d", cfg.idempotencyPrefix, seq),
 					ConflictPolicy:        conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT,
 					Reason:                "smoke join",
 				})
@@ -245,6 +257,19 @@ func run(cfg config) error {
 	fmt.Println(string(encoded))
 	fmt.Printf("summary: %s\n", path)
 	return nil
+}
+
+func nextSequence(counter *int64, max int64) (int64, bool) {
+	for {
+		current := atomic.LoadInt64(counter)
+		if max > 0 && current >= max {
+			return 0, false
+		}
+		next := current + 1
+		if atomic.CompareAndSwapInt64(counter, current, next) {
+			return next, true
+		}
+	}
 }
 
 func summarizeLatencies(values []float64) (float64, float64, float64) {

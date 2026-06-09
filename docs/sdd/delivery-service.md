@@ -422,8 +422,15 @@ delivery_cursor_regression_count
 ```text
 NEXUSIM_DELIVERY_SERVICE_MODE=grpc
 NEXUSIM_DELIVERY_SERVICE_MODE=timeline-consumer
+```
+
+后续规划：
+
+```text
 NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay
 ```
+
+当前 delivery-service 只把 `delivery_outbox` 作为本地事务事实落库，尚未发布 `im.delivery.events`。
 
 本地最小 smoke：
 

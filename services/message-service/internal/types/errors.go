@@ -15,10 +15,12 @@ var (
 	ErrSequencerUnavailable   = errors.New("sequencer unavailable")
 	ErrIdempotencyConflict    = errors.New("idempotency conflict")
 	ErrUnsupportedMessageType = errors.New("unsupported message type")
+	ErrConversationNotFound   = errors.New("conversation not found")
 	ErrDBWriteFailed          = errors.New("db write failed")
 	ErrOutboxWriteFailed      = errors.New("outbox write failed")
 	ErrServiceOverloaded      = errors.New("service overloaded")
 	ErrDependencyVersion      = errors.New("dependency version mismatch")
+	ErrDependencyUnavailable  = errors.New("dependency unavailable")
 )
 
 func NewPermissionDenied(reason string) error {
@@ -47,6 +49,13 @@ func NewUnsupportedMessageType(reason string) error {
 		return ErrUnsupportedMessageType
 	}
 	return fmt.Errorf("%w: %s", ErrUnsupportedMessageType, reason)
+}
+
+func NewConversationNotFound(reason string) error {
+	if reason == "" {
+		return ErrConversationNotFound
+	}
+	return fmt.Errorf("%w: %s", ErrConversationNotFound, reason)
 }
 
 func NewDBWriteFailed(reason string) error {
@@ -109,4 +118,11 @@ func NewDependencyVersionMismatch(reason string) error {
 		return ErrDependencyVersion
 	}
 	return fmt.Errorf("%w: %s", ErrDependencyVersion, reason)
+}
+
+func NewDependencyUnavailable(reason string) error {
+	if reason == "" {
+		return ErrDependencyUnavailable
+	}
+	return fmt.Errorf("%w: %s", ErrDependencyUnavailable, reason)
 }

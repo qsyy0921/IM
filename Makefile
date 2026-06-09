@@ -9,6 +9,7 @@ proto:
 		--go_opt=paths=source_relative \
 		--go-grpc_out=$(PROTO_API_DIR) \
 		--go-grpc_opt=paths=source_relative \
+		$(PROTO_API_DIR)/nexusim/conversation/v1/conversation_service.proto \
 		$(PROTO_API_DIR)/nexusim/message/v1/message_error.proto \
 		$(PROTO_API_DIR)/nexusim/message/v1/message_service.proto
 	protoc \

@@ -1,0 +1,114 @@
+package rpc
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
+	"github.com/qsyy0921/IM/services/message-service/internal/types"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
+)
+
+type ConversationClient struct {
+	client  conversationv1.ConversationServiceClient
+	timeout time.Duration
+}
+
+func NewConversationClient(client conversationv1.ConversationServiceClient, timeout time.Duration) ConversationClient {
+	if timeout <= 0 {
+		timeout = 30 * time.Millisecond
+	}
+	return ConversationClient{client: client, timeout: timeout}
+}
+
+func DialConversationClient(
+	ctx context.Context,
+	addr string,
+	timeout time.Duration,
+) (ConversationClient, func() error, error) {
+	conn, err := grpc.NewClient(
+		"passthrough:///"+addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return ConversationClient{}, nil, err
+	}
+	return NewConversationClient(conversationv1.NewConversationServiceClient(conn), timeout), conn.Close, nil
+}
+
+func (c ConversationClient) GetSendContext(
+	ctx context.Context,
+	command types.SendMessageCommand,
+) (types.ConversationSendContext, error) {
+	callCtx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	response, err := c.client.GetSendContext(callCtx, &conversationv1.GetSendContextRequest{
+		TenantId:       string(command.AuthContext.TenantID),
+		ConversationId: string(command.ConversationID),
+		UserId:         string(command.AuthContext.UserID),
+		TraceId:        command.AuthContext.TraceID,
+	})
+	if err != nil {
+		return types.ConversationSendContext{}, mapConversationError(err)
+	}
+	return types.ConversationSendContext{
+		MemberVersion:       response.GetMemberVersion(),
+		PermissionVersion:   response.GetPermissionVersion(),
+		ConversationMode:    fromProtoConversationMode(response.GetConversationMode()),
+		FanoutMode:          fromProtoFanoutMode(response.GetFanoutMode()),
+		FanoutPolicyVersion: response.GetFanoutPolicyVersion(),
+		CurrentSeqShard:     response.GetCurrentSeqShard(),
+	}, nil
+}
+
+func mapConversationError(err error) error {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return types.NewDependencyUnavailable("conversation service deadline exceeded")
+	}
+	st, ok := status.FromError(err)
+	if !ok {
+		return types.NewDependencyUnavailable("conversation service error")
+	}
+	switch st.Code() {
+	case codes.NotFound:
+		return types.NewConversationNotFound("conversation service returned not found")
+	case codes.PermissionDenied:
+		return types.NewPermissionDenied("conversation member is not active")
+	case codes.Unavailable, codes.DeadlineExceeded:
+		return types.NewDependencyUnavailable("conversation service unavailable")
+	default:
+		return types.NewDependencyUnavailable(fmt.Sprintf("conversation service returned %s", st.Code()))
+	}
+}
+
+func fromProtoConversationMode(mode conversationv1.ConversationMode) types.ConversationMode {
+	switch mode {
+	case conversationv1.ConversationMode_CONVERSATION_MODE_LOCAL_ROW_LOCK:
+		return types.ConversationModeLocalRowLock
+	case conversationv1.ConversationMode_CONVERSATION_MODE_SEQUENCER_BLOCK:
+		return types.ConversationModeSequencerBlock
+	default:
+		return ""
+	}
+}
+
+func fromProtoFanoutMode(mode conversationv1.FanoutMode) types.FanoutMode {
+	switch mode {
+	case conversationv1.FanoutMode_FANOUT_MODE_WRITE_FANOUT:
+		return types.FanoutModeWriteFanout
+	case conversationv1.FanoutMode_FANOUT_MODE_HYBRID_FANOUT:
+		return types.FanoutModeHybridFanout
+	case conversationv1.FanoutMode_FANOUT_MODE_READ_FANOUT:
+		return types.FanoutModeReadFanout
+	case conversationv1.FanoutMode_FANOUT_MODE_BROADCAST_SIGNAL:
+		return types.FanoutModeBroadcastSignal
+	default:
+		return ""
+	}
+}

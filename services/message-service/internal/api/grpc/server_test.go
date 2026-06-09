@@ -151,6 +151,12 @@ func TestSendMessageMapsUseCaseErrors(t *testing.T) {
 			errorCode: messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_IDEMPOTENCY_CONFLICT,
 		},
 		{
+			name:      "conversation not found",
+			err:       types.NewConversationNotFound("missing"),
+			grpcCode:  codes.NotFound,
+			errorCode: messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_CONVERSATION_NOT_FOUND,
+		},
+		{
 			name:      "db write failed",
 			err:       types.NewDBWriteFailed("deadlock"),
 			grpcCode:  codes.Unavailable,

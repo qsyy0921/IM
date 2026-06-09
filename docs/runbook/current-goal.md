@@ -41,10 +41,13 @@ conversation-service
 | TADD | `docs/architecture/tadd.md` 已存在 |
 | message-service SDD | `docs/sdd/message-service.md` 已冻结 |
 | Proto 契约 | `api/proto/nexusim/message/v1/` 已存在 |
+| conversation-service Proto | `api/proto/nexusim/conversation/v1/conversation_service.proto` 已存在，定义 `GetSendContext` |
 | Kafka schema | `schemas/kafka/conversation.timeline.events.proto` 已存在 |
 | PostgreSQL migration | `migrations/postgres/message/000001_message_core.sql` 已存在 |
+| conversation-service migration | `migrations/postgres/conversation/000001_conversation_core.sql` 已存在，包含 `conversations`、`conversation_members`、`member_change_saga` |
 | Docker Compose | `deploy/local/docker-compose.yml` 已存在；压测专用 PostgreSQL override 为 `deploy/local/docker-compose.postgres-loadtest.yml` |
 | message-service 六层骨架 | `services/message-service/internal/{api,app,domain,infrastructure,types,trigger}` 已存在 |
+| conversation-service 六层骨架 | `services/conversation-service/internal/{api,app,domain,infrastructure,types,trigger}` 已存在；第一条 read path 为 `GetSendContext` |
 | Go 工具链 | 项目基线为 Go `1.26.4`；已通过阿里云镜像安装到 `C:\Users\10495\.local\go\go1.26.4\bin\go.exe`；`protoc-gen-go v1.36.11` 和 `protoc-gen-go-grpc 1.6.2` 已安装到 `C:\Users\10495\go\bin`；`protoc` 可用，路径为 `C:\Users\10495\anaconda3\Library\bin\protoc.exe`；本地命令先执行 `. .\tools\go-env.ps1` |
 | Proto Go 代码 | 已生成 `api/proto/nexusim/message/v1/*.pb.go` 和 `schemas/kafka/conversation.timeline.events.pb.go` |
 | Go 依赖 | `go.mod` 使用 Go `1.26.4`，并已引入 `google.golang.org/grpc v1.81.1`、`google.golang.org/protobuf v1.36.11` |
@@ -55,6 +58,7 @@ conversation-service
 | Backpressure / adaptive admission | 已新增 `MESSAGE_ERROR_CODE_SERVICE_OVERLOADED`，repository 支持默认关闭的 PostgreSQL pool backpressure；启用 `NEXUSIM_PG_BACKPRESSURE_ENABLED=true` 后，连接池可用连接数小于等于 `NEXUSIM_PG_BACKPRESSURE_MIN_AVAILABLE_CONNS` 时快速返回 retryable `service overloaded`；gRPC `SERVICE_OVERLOADED` 默认附带 `RetryInfo=500ms`，adaptive admission 可携带动态 retry delay；app 层已新增默认关闭的 `AdmissionPort`，`infrastructure/admission` 第一版 adaptive controller 可按 PG pool、repository pool acquire p95、outbox pending、relay active process ready、outbox fetched per call、Kafka records per call 触发提前拒绝；已新增 `NEXUSIM_ADAPTIVE_MAX_IN_FLIGHT` app 入口 token / concurrency gate，用于限制进入依赖读取和 DB 事务的并发数 |
 | SendMessage loadtest | 已实现 `go run ./loadtest/sendmessage` 参数化 gRPC 压测入口；支持 `target`、`vus`、`duration`、`result-dir`、`pg-dsn`、`stats-wait`、`service-metrics-url`、`relay-metrics-url`；`target` 和 service metrics URL 已支持逗号分隔，用于模拟多 `message-service` 实例；summary 记录 full commit、dirty 状态、outbox total/published/pending/DLQ、SendMessage/repository/commit/seq/Kafka/outbox relay latency、service/relay pgx pool、repository 和 relay 内部分段指标、多进程 metrics、retryable error count、service overloaded count、`message_error_counts[]`、`request_rps`、`accepted_rps`、`error_rps`、attempt-level `overload_rate`、`success_p99_ms`、`error_p99_ms`、logical end-to-end latency；Kafka publish 指标已拆出 `kafka_publish_call_latency_ms`、`kafka_publish_records_per_call`、`kafka_publish_record_latency_estimate_ms`，避免 single path 和 batch path 口径混淆；outbox relay 指标已拆出 `outbox_process_ready_active_latency_ms`、`outbox_process_ready_idle_latency_ms`、`outbox_fetched_per_call`，避免 stats-wait idle 样本稀释 active relay 判断；recent 指标已在 summary 顶层暴露 sample count，便于 adaptive 矩阵判断 warm-up；压测器已支持可选 `--retry-overloaded`，会遵守 gRPC `RetryInfo` 并记录 `logical_request_count`、`logical_success_rate`、`retry_attempt_count`、`retried_request_count`、`retry_delay_count`、`retry_delay_avg_ms`、`retry_delay_p95_ms`、`retry_delay_p99_ms`；多 service metrics 的顶层 latency / pg pool 已改为聚合视图，避免只取第一个实例误导；`run-local-multi-instance.ps1` 已支持 `FixedPerInstance` 和 `FixedTotal` 两种 PG 连接预算模式；`run-local-pgpool-gradient.ps1` 已支持显式 `-BackpressureEnabled` 和 `-RetryOverloaded`；已补 `run-local-gradient.ps1`、`run-local-pgpool-gradient.ps1`、`run-local-multi-instance.ps1`、`run-local-outbox-batch-worker-matrix.ps1`、`collect-postgres-diagnostics.ps1`、`watch-postgres-diagnostics.ps1`；真实 gRPC + PostgreSQL + outbox relay + Kafka smoke、baseline、瓶颈诊断、PG pool / multi-instance 矩阵、PostgreSQL 诊断和 backpressure on/off 矩阵已执行；message-service 第一阶段 27 份压测报告已整合为 `docs/runbook/loadtest/message-service/loadtest-report-20260609-message-service-consolidated.md` |
 | 压测报告归档 | 每个微服务一个目录：`docs/runbook/loadtest/<service>/`；目录内保存小报告、矩阵报告和 consolidated 总报告。`message-service` 当前入口为 `docs/runbook/loadtest/message-service/README.md` |
+| conversation-service smoke | 已跑真实进程小规模 smoke：`message-service -> conversation-service -> PostgreSQL`，725/725 成功，p99 13.26ms；报告见 `docs/runbook/loadtest/conversation-service/` |
 
 ## 5. 下一步优先级
 
@@ -64,8 +68,9 @@ conversation-service
 4. pool acquire p95 阈值矩阵已完成，单纯放宽 `250ms / 500ms / 750ms` 不能解决 accepted RPS 偏低和 logical p99 过高的问题。
 5. admission token / concurrency limit 已实现并跑完 v1 矩阵；`MaxInFlight=64` 是当前 Windows 本机候选，60s 下 1200/1600 VU accepted RPS 约 `1.92k`、success p99 约 `63ms`、outbox pending 为 0。
 6. message-service 第一阶段压测报告已归档到 `docs/runbook/loadtest/message-service/`，总入口为 `docs/runbook/loadtest/message-service/loadtest-report-20260609-message-service-consolidated.md`；后续不再围绕 message-service 做大规模硬件矩阵，只在关键机制变更后跑 smoke / 小规模验证。
-7. 下一步优先补第二个真实微服务：`conversation-service`。先建立六层 DDD 骨架、SDD、proto/migration，再实现最小 gRPC read path，用于替换 message-service 的 strict conversation mock。
-8. 暂不推 GitHub；等 conversation-service 骨架和最小 RPC 切片完成后再批量同步。
+7. `conversation-service` 最小 RPC read path 已落地并通过真实进程 smoke：SDD、proto、migration、六层骨架、PostgreSQL repository、gRPC handler、`message-service` 可选 gRPC client 和 `message-service -> conversation-service -> PostgreSQL` 小规模验证均已完成。
+8. 下一步优先补 `conversation-service` 本地运行 runbook 和更多错误路径测试，然后进入成员变更 Saga SDD 或下一个微服务设计。
+9. 暂不推 GitHub；等 conversation-service 最小 RPC 切片评审后再批量同步。
 
 ## 6. 评审要求
 
@@ -279,7 +284,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 debug metrics collector 保存全量样本并在 snapshot 时排序，适合本地短压测，不适合作为生产 metrics；后续应替换为固定窗口、reservoir、HDR histogram 或 Prometheus histogram。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
-- `timeline-service`、`conversation-service`、`delivery-service`、`push-gateway` SDD 未冻结，不能扩展到对应生产逻辑。
+- `timeline-service`、`delivery-service`、`push-gateway` SDD 未冻结；`conversation-service` 只有 `GetSendContext` read path SDD v0.1，`member_change_saga` 仍未冻结，不能扩展到真实成员变更和成员边界事件生产逻辑。
 
 ## 11. 最近评审状态
 
@@ -346,3 +351,5 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：根据用户反馈，message-service 不再继续做大规模压测矩阵；已新增 `docs/runbook/loadtest/message-service/loadtest-report-20260609-message-service-consolidated.md`，整合 27 份原始压测报告、瓶颈排查过程和面试可讲要点。下一步转向第二个真实微服务，优先 `conversation-service`。
 - 2026-06-09：已按“每个微服务一个压测报告文件夹”的规则整理 `message-service` 压测报告；所有小报告和总报告均归档到 `docs/runbook/loadtest/message-service/`，目录入口为 `docs/runbook/loadtest/message-service/README.md`。
 - 2026-06-09：已将 `docs/runbook/loadtest/message-service/README.md` 从简单索引扩展为 `message-service` 压测结论和面试材料入口，包含真实链路范围、核心压测数字、瓶颈排查路径、outbox/admission 结论和面试讲法。
+- 2026-06-09：已开始 `conversation-service` 最小真实 read path：新增 SDD、`conversation_service.proto`、conversation PostgreSQL migration、六层 DDD 骨架、`GetSendContext` app/domain/postgres/api 实现，并为 `message-service` 增加可选 `NEXUSIM_CONVERSATION_SERVICE_ADDR` gRPC client，用于替换 strict conversation mock。
+- 2026-06-09：已完成 `conversation-service` 第一轮真实进程 smoke：启动 `conversation-service` 和 `message-service`，由 `message-service` 通过 gRPC 调用真实 `GetSendContext`，`loadtest/sendmessage --vus=2 --duration=3s` 结果为 725/725 成功、p95 10.36ms、p99 13.26ms；本轮未启动 outbox relay，测试结束后已清理 `tenant-conv-smoke` 数据，报告归档到 `docs/runbook/loadtest/conversation-service/`。

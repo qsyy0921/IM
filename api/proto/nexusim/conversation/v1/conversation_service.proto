@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package nexusim.conversation.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1;conversationv1";
+
+service ConversationService {
+  rpc GetSendContext(GetSendContextRequest) returns (GetSendContextResponse);
+}
+
+message GetSendContextRequest {
+  string tenant_id = 1;
+  string conversation_id = 2;
+  string user_id = 3;
+  string trace_id = 4;
+}
+
+enum ConversationMode {
+  CONVERSATION_MODE_UNSPECIFIED = 0;
+  CONVERSATION_MODE_LOCAL_ROW_LOCK = 1;
+  CONVERSATION_MODE_SEQUENCER_BLOCK = 2;
+}
+
+enum FanoutMode {
+  FANOUT_MODE_UNSPECIFIED = 0;
+  FANOUT_MODE_WRITE_FANOUT = 1;
+  FANOUT_MODE_HYBRID_FANOUT = 2;
+  FANOUT_MODE_READ_FANOUT = 3;
+  FANOUT_MODE_BROADCAST_SIGNAL = 4;
+}
+
+message GetSendContextResponse {
+  string tenant_id = 1;
+  string conversation_id = 2;
+  int64 member_version = 3;
+  int64 permission_version = 4;
+  ConversationMode conversation_mode = 5;
+  FanoutMode fanout_mode = 6;
+  int64 fanout_policy_version = 7;
+  string current_seq_shard = 8;
+}

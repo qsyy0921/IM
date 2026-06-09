@@ -66,6 +66,8 @@ func classifyError(err error) (codes.Code, messagev1.MessageErrorCode, bool) {
 		return codes.PermissionDenied, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_PERMISSION_DENIED, false
 	case errors.Is(err, types.ErrUnsupportedMessageType):
 		return codes.InvalidArgument, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_UNSUPPORTED_MESSAGE_TYPE, false
+	case errors.Is(err, types.ErrConversationNotFound):
+		return codes.NotFound, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_CONVERSATION_NOT_FOUND, false
 	case errors.Is(err, types.ErrIdempotencyConflict):
 		return codes.Aborted, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_IDEMPOTENCY_CONFLICT, false
 	case errors.Is(err, types.ErrSequencerUnavailable):
@@ -77,6 +79,8 @@ func classifyError(err error) (codes.Code, messagev1.MessageErrorCode, bool) {
 	case errors.Is(err, types.ErrServiceOverloaded):
 		return codes.Unavailable, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_SERVICE_OVERLOADED, true
 	case errors.Is(err, types.ErrDependencyVersion):
+		return codes.Unavailable, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_UNSPECIFIED, true
+	case errors.Is(err, types.ErrDependencyUnavailable):
 		return codes.Unavailable, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_UNSPECIFIED, true
 	default:
 		return codes.Internal, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_UNSPECIFIED, false
@@ -92,6 +96,8 @@ func publicErrorMessage(err error) string {
 		return "permission denied"
 	case errors.Is(err, types.ErrUnsupportedMessageType):
 		return "unsupported message type"
+	case errors.Is(err, types.ErrConversationNotFound):
+		return "conversation not found"
 	case errors.Is(err, types.ErrIdempotencyConflict):
 		return "idempotency conflict"
 	case errors.Is(err, types.ErrSequencerUnavailable):
@@ -104,6 +110,8 @@ func publicErrorMessage(err error) string {
 		return "service overloaded"
 	case errors.Is(err, types.ErrDependencyVersion):
 		return "dependency version mismatch"
+	case errors.Is(err, types.ErrDependencyUnavailable):
+		return "dependency unavailable"
 	default:
 		return "message service internal error"
 	}

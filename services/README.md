@@ -1,6 +1,6 @@
 # 服务目录
 
-`services/` 存放 NexusIM 的服务实现。当前只落第一阶段 `message-service`，其他服务在 SDD 和契约冻结前不创建实现目录。
+`services/` 存放 NexusIM 的服务实现。每个微服务独立使用六层 DDD。
 
 ## 六层 DDD 结构
 
@@ -31,7 +31,8 @@ services/<service-name>/
 
 | 服务 | 状态 | 说明 |
 | --- | --- | --- |
-| `message-service` | 第一阶段实现中 | 只实现普通会话 `SendMessage` 主写链路；热点 sequencer、delivery、push、RAG、Agent 暂不实现。 |
+| `message-service` | 第一阶段主链路已落地 | 普通会话 `SendMessage -> PostgreSQL transaction -> outbox -> Kafka` 已实现；热点 sequencer、delivery、push、RAG、Agent 暂不实现。 |
+| `conversation-service` | 第一条 read path 实现中 | 提供 `GetSendContext`，返回会话存在性、成员版本、权限版本、会话模式和 fanout 策略，用于替换 message-service strict conversation mock。 |
 
 ## 约束
 

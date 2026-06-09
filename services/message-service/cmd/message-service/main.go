@@ -74,10 +74,30 @@ func runGRPCServer() error {
 	policy.PermissionVersion = envInt64("NEXUSIM_MOCK_PERMISSION_VERSION", policy.PermissionVersion)
 	policy.Classification = envString("NEXUSIM_MOCK_CLASSIFICATION", policy.Classification)
 
-	conversation := rpcinfra.NewStaticConversation()
-	conversation.MemberVersion = envInt64("NEXUSIM_MOCK_MEMBER_VERSION", conversation.MemberVersion)
-	conversation.PermissionVersion = policy.PermissionVersion
-	conversation.FanoutPolicyVersion = envInt64("NEXUSIM_MOCK_FANOUT_POLICY_VERSION", conversation.FanoutPolicyVersion)
+	var conversation app.ConversationQueryPort
+	if conversationAddr := envString("NEXUSIM_CONVERSATION_SERVICE_ADDR", ""); conversationAddr != "" {
+		client, closeClient, err := rpcinfra.DialConversationClient(
+			ctx,
+			conversationAddr,
+			envDuration("NEXUSIM_CONVERSATION_RPC_TIMEOUT", 30*time.Millisecond),
+		)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err := closeClient(); err != nil {
+				log.Printf("close conversation-service client: %v", err)
+			}
+		}()
+		conversation = client
+		log.Printf("message-service using conversation-service at %s", conversationAddr)
+	} else {
+		staticConversation := rpcinfra.NewStaticConversation()
+		staticConversation.MemberVersion = envInt64("NEXUSIM_MOCK_MEMBER_VERSION", staticConversation.MemberVersion)
+		staticConversation.PermissionVersion = policy.PermissionVersion
+		staticConversation.FanoutPolicyVersion = envInt64("NEXUSIM_MOCK_FANOUT_POLICY_VERSION", staticConversation.FanoutPolicyVersion)
+		conversation = staticConversation
+	}
 
 	repositoryOptions := []postgresinfra.MessageRepositoryOption{postgresinfra.WithMetrics(metrics)}
 	if envBool("NEXUSIM_PG_BACKPRESSURE_ENABLED", false) {

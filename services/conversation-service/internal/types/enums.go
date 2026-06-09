@@ -1,20 +1,5 @@
 package types
 
-type MessageType string
-
-const (
-	MessageTypeText MessageType = "TEXT"
-)
-
-type TimelineEventType string
-
-const (
-	TimelineEventMessagePersisted TimelineEventType = "message.persisted.v1"
-	TimelineEventMessageEdited    TimelineEventType = "message.edited.v1"
-	TimelineEventMessageRevoked   TimelineEventType = "message.revoked.v1"
-	TimelineEventMessageDeleted   TimelineEventType = "message.deleted.v1"
-)
-
 type ConversationMode string
 
 const (
@@ -29,4 +14,20 @@ const (
 	FanoutModeHybridFanout    FanoutMode = "HYBRID_FANOUT"
 	FanoutModeReadFanout      FanoutMode = "READ_FANOUT"
 	FanoutModeBroadcastSignal FanoutMode = "BROADCAST_SIGNAL"
+)
+
+type ConversationStatus string
+
+const (
+	ConversationStatusActive   ConversationStatus = "ACTIVE"
+	ConversationStatusArchived ConversationStatus = "ARCHIVED"
+	ConversationStatusDeleted  ConversationStatus = "DELETED"
+)
+
+type MemberStatus string
+
+const (
+	MemberStatusActive MemberStatus = "ACTIVE"
+	MemberStatusLeft   MemberStatus = "LEFT"
+	MemberStatusBanned MemberStatus = "BANNED"
 )

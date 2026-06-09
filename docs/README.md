@@ -5,7 +5,7 @@
 | 目录 / 文档 | 说明 |
 | --- | --- |
 | `architecture/` | 总架构和架构补充文档。主文档是 `architecture/target-architecture.md`。 |
-| `sdd/` | 服务级软件设计文档。第一阶段主文档是 `sdd/message-service.md`。 |
+| `sdd/` | 服务级软件设计文档。`message-service` 已完成第一阶段主链路，当前推进 `conversation-service`。 |
 | `runbook/` | 本地运行、压测、故障处理和演练说明。压测报告按微服务归档到 `runbook/loadtest/<service>/`。 |
 
 ## 当前阅读路径
@@ -14,11 +14,12 @@
 
 1. `runbook/current-goal.md`：确认当前阶段、评审要求、风险和下一步。
 2. `architecture/target-architecture.md`：确认目标态、技术栈和不可退让项。
-3. `sdd/message-service.md`：确认第一条可编码切片。
-4. `architecture/tadd.md`：确认工程目录、六层 DDD、Docker Compose 和编码门禁。
-5. `runbook/local-loadtest.md`：确认本地双机压测端口和执行方式。
-6. `runbook/loadtest/message-service/loadtest-report-20260609-message-service-consolidated.md`：查看 `message-service` 第一阶段压测总报告、瓶颈排查过程和面试可讲结论。
-7. `runbook/loadtest/message-service/README.md`：查看 `message-service` 所有小规模压测报告和矩阵报告索引。
+3. `sdd/conversation-service.md`：确认当前 `GetSendContext` read path 和成员事实边界。
+4. `sdd/message-service.md`：确认已完成的 `SendMessage` 普通会话写入链路和对 conversation port 的依赖。
+5. `architecture/tadd.md`：确认工程目录、六层 DDD、Docker Compose 和编码门禁。
+6. `runbook/local-loadtest.md`：确认本地双机压测端口和执行方式。
+7. `runbook/loadtest/message-service/loadtest-report-20260609-message-service-consolidated.md`：查看 `message-service` 第一阶段压测总报告、瓶颈排查过程和面试可讲结论。
+8. `runbook/loadtest/message-service/README.md`：查看 `message-service` 所有小规模压测报告和矩阵报告索引。
 
 ## 写文档规则
 

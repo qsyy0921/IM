@@ -5,6 +5,7 @@
 | 微服务 | 入口 |
 | --- | --- |
 | `message-service` | `message-service/loadtest-report-20260609-message-service-consolidated.md` |
+| `conversation-service` | `conversation-service/loadtest-report-20260609-conversation-service-consolidated.md` |
 
 ## 归档规则
 

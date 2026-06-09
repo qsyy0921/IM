@@ -1,6 +1,6 @@
 # push-gateway Loadtest / Smoke Index
 
-本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify` 和 `delivery.ack.ok` 的单元 / 集成测试；真实进程 full smoke 仍待执行。
+本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify` 和 `delivery.ack.ok` 的单元 / 集成测试；真实进程 full smoke 已通过。
 
 ## 当前验证目标
 
@@ -41,6 +41,12 @@ NEXUSIM_PUSH_CONSUMER_GROUP=nexusim-push-gateway-smoke
 `all` 模式只用于第一阶段本地 smoke：WebSocket handler 和 `im.delivery.events` consumer 共享同一个 in-memory session registry。多实例前必须改用 Redis route。
 
 ## 报告位置
+
+当前报告：
+
+| 报告 | 说明 |
+| --- | --- |
+| `loadtest-report-20260609-push-gateway-full-smoke.md` | `delivery_outbox -> im.delivery.events -> push-gateway -> WebSocket notify -> PullInbox -> AckDelivery` 真实进程 smoke |
 
 报告 Markdown 保存在仓库内：
 

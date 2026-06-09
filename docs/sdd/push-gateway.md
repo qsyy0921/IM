@@ -241,6 +241,7 @@ GET /ws?token=...&device_id=...
 消费规则：
 
 - Kafka consumer 只能在 notification 已成功交给本地 session queue 或确认目标用户不在线后提交 offset。
+- 对没有历史提交位点的新 consumer group，push-gateway 从 latest delivery event 开始消费；它不负责重放历史在线通知，历史缺口由客户端 `PullInbox` 兜底。
 - `delivery.inbox_item.created.v1` 是 user 级投递事件；push-gateway 应向该 user 当前所有在线 device/session 发送 `delivery.notify`，同一 device/session 通过 `event_id` 去重。
 - 如果目标用户不在线，事件可直接视为已处理；离线补拉由 `user_inbox` 保证。
 - 如果发送队列满，不能无限阻塞 Kafka consumer；应标记 session slow，发送 `server.resume_hint` 或断开连接，让客户端回源 `PullInbox`。

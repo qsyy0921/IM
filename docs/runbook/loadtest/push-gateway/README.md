@@ -61,6 +61,7 @@ NEXUSIM_PUSH_ROUTE_TTL=90s
 | `loadtest-report-20260609-push-gateway-full-smoke.md` | `delivery_outbox -> im.delivery.events -> push-gateway -> WebSocket notify -> PullInbox -> AckDelivery` 真实进程 smoke |
 | `loadtest-report-20260609-push-gateway-multidevice-smoke.md` | 同一 user 两个在线 device 均收到同一条 `delivery.notify`，并分别 ACK 到各自 cursor |
 | `loadtest-report-20260609-push-gateway-slow-client-smoke.md` | 慢客户端触发 queue full / active close 后，通过 durable `PullInbox` 补拉并 ACK |
+| `loadtest-report-20260609-push-gateway-redis-route-smoke.md` | WebSocket gateway 与 delivery consumer gateway 分离后，通过 Redis route / PubSub 完成跨进程在线通知 |
 
 报告 Markdown 保存在仓库内：
 

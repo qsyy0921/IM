@@ -39,6 +39,9 @@ func (repository *Repository) ProjectDeliveryEvent(
 	result := types.ProjectDeliveryEventResult{}
 	switch command.EventType {
 	case types.DeliveryEventInboxItemCreated:
+		if err := lockConversationSummaryKey(ctx, tx, command.TenantID, command.UserID, command.ConversationID); err != nil {
+			return types.ProjectDeliveryEventResult{}, err
+		}
 		if err := insertInboxProjection(ctx, tx, command); err != nil {
 			return types.ProjectDeliveryEventResult{}, err
 		}
@@ -613,7 +616,17 @@ WHERE tenant_id = $1
 }
 
 func lockReadKey(ctx context.Context, tx pgx.Tx, command types.MarkReadCommand) error {
-	key := fmt.Sprintf("%s\x1f%s\x1f%s\x1fread", command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID)
+	return lockConversationSummaryKey(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID)
+}
+
+func lockConversationSummaryKey(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	userID types.UserID,
+	conversationID types.ConversationID,
+) error {
+	key := fmt.Sprintf("%s\x1f%s\x1f%s\x1fconversation_summary", tenantID, userID, conversationID)
 	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, key)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())

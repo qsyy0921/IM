@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -117,6 +118,51 @@ func TestRepositoryProjectsAckBeforeInboxIntegration(t *testing.T) {
 	}
 	assertReceiptOutboxCount(t, ctx, pool, "receipt.message.received.v1", 1)
 	assertReceiptOutboxPayload(t, ctx, pool, "receipt.message.received.v1", "message-1", "timeline-event-1", "device-1", 1)
+}
+
+func TestRepositoryListConversationsConcurrentInboxAndMarkReadIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	if _, err := repository.ProjectDeliveryEvent(ctx, inboxCreatedCommand(1, "delivery-inbox-1")); err != nil {
+		t.Fatalf("project first inbox item: %v", err)
+	}
+	if _, err := repository.ProjectDeliveryEvent(ctx, ackRecordedCommand(1, "delivery-ack-1")); err != nil {
+		t.Fatalf("project first ack: %v", err)
+	}
+
+	start := make(chan struct{})
+	errs := make(chan error, 2)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		<-start
+		_, err := repository.ProjectDeliveryEvent(ctx, inboxCreatedCommand(2, "delivery-inbox-2"))
+		errs <- err
+	}()
+	go func() {
+		defer wg.Done()
+		<-start
+		_, err := repository.MarkRead(ctx, markReadCommand(1))
+		errs <- err
+	}()
+	close(start)
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("concurrent operation failed: %v", err)
+		}
+	}
+
+	summary, err := repository.ListConversations(ctx, listConversationsCommand(10, ""))
+	if err != nil {
+		t.Fatalf("list conversations after concurrent update: %v", err)
+	}
+	assertConversationSummary(t, summary, 2, 1, 1)
 }
 
 func inboxCreatedCommand(seq int64, eventID string) types.ProjectDeliveryEventCommand {

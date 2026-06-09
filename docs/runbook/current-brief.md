@@ -32,7 +32,9 @@ conversation-service
 - 每个微服务独立六层 DDD：`api / app / domain / infrastructure / types / trigger`。
 - Kafka 事件只能通过 outbox relay 发布，业务事务不能直接 publish Kafka。
 - push-gateway 只做在线唤醒和 ACK 转发；可靠事实在 `delivery-service user_inbox`。
-- 开发时优先降低微服务耦合、控制代码复杂度；不要为了“分布式”引入网状依赖、跨服务内部表读取或过度抽象。
+- 开发时优先降低微服务耦合、控制代码复杂度；不要为了“分布式”引入网状依赖、跨服务内部表读取、不必要的同步 RPC 或过度抽象。
+- 新能力优先复用已有事实流、outbox、projection、read model 和端口；只有能减少重复、稳定边界或支撑真实链路时才新增服务、表、公共包或抽象。
+- 单个切片保持小闭环：先补契约 / migration / 本地事务 / consumer 或 relay / smoke，再扩展 hardening；不要一次性横跨多个产品能力。
 - 压测原始数据放到 `H:\NexusIM\loadtest-results`，E 盘仓库只放报告和文档。
 - Win/Mac 服务间通信优先使用有线 `172.31.50.*`，不要把服务间流量走外网或代理。
 - 不回滚用户已有修改。

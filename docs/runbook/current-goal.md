@@ -17,13 +17,15 @@
 工作原则：
 1. 优先把系统链路做完整，不把主要时间消耗在重型压测矩阵上。
 2. 每个微服务独立使用六层 DDD：api / app / domain / infrastructure / types / trigger。
-3. 开发时优先降低微服务耦合、控制代码复杂度；避免网状依赖、跨服务内部表读取、不必要的同步 RPC 和过度抽象。
-4. 开发过程中主动使用可用 sub-agent 做设计、实现、测试、文档或风险复核，不等到最后才集中评审。
-5. sub-agent 完成任务后及时关闭，避免线程池被历史任务占满；如果线程池已满，优先复用或关闭不再需要的 sub-agent。
-6. 不把具体任务写死在 prompt 里；具体下一步以 current-brief.md 为准，current-goal.md 只作长档案和按需索引。
-7. 公共契约、migration、事务、幂等、消息顺序、错误码、可运行链路完成时，再按 current-goal.md 的评审规则邀请独立评审。
-8. 有意义的切片完成后运行必要检查，更新 current-brief.md；阶段状态变化时同步 current-goal.md 和对应 runbook/loadtest 报告。
-9. 按 current-goal.md 的 GitHub 同步策略批量提交和推送，不为低风险小改动频繁推送。
+3. 优先降低微服务耦合、控制代码复杂度：不跨服务读取内部表，不引入网状依赖，不为短期功能增加不必要同步 RPC、公共包或抽象层。
+4. 新能力优先复用已有事实流、outbox、projection、read model 和端口；只有能减少重复、稳定边界或支撑真实链路时才新增服务、表或抽象。
+5. 单个切片保持小闭环：契约 / migration / 本地事务 / consumer 或 relay / smoke 分阶段推进，不一次性横跨多个产品能力。
+6. 开发过程中主动使用可用 sub-agent 做设计、实现、测试、文档或风险复核，不等到最后才集中评审。
+7. sub-agent 完成任务后及时关闭，避免线程池被历史任务占满；如果线程池已满，优先复用或关闭不再需要的 sub-agent。
+8. 不把具体任务写死在 prompt 里；具体下一步以 current-brief.md 为准，current-goal.md 只作长档案和按需索引。
+9. 公共契约、migration、事务、幂等、消息顺序、错误码、可运行链路完成时，再按 current-goal.md 的评审规则邀请独立评审。
+10. 有意义的切片完成后运行必要检查，更新 current-brief.md；阶段状态变化时同步 current-goal.md 和对应 runbook/loadtest 报告。
+11. 按 current-goal.md 的 GitHub 同步策略批量提交和推送，不为低风险小改动频繁推送。
 ```
 
 ## 1. 当前目标
@@ -114,6 +116,10 @@ NexusIM 按四层逐步推进。每层都必须建立在前一层可运行、可
 - 微服务内固定六层：`api / app / domain / infrastructure / types / trigger`。
 - 根目录 `api/` 只放全局接口契约；`services/<service>/internal/api/` 才是服务内部接口适配实现。
 - 开发时优先降低微服务耦合、控制代码复杂度；不要为了“分布式”引入网状依赖、跨服务内部表读取、不必要的同步 RPC 或过度抽象。
+- 新增能力前先判断能否复用已有事实事件、outbox relay、read model、service port 或当前服务内 repository；只有复用会制造更高耦合或明显重复时，才新增独立服务 / 表 / 公共抽象。
+- 不把“未来可能用到”作为抽象理由；公共包、共享 helper、跨服务接口和统一框架必须有两个以上真实调用方或明确降低复杂度，否则保持在单服务内。
+- 服务间同步调用只用于查询当前请求必须依赖的权限 / 上下文；状态传播优先走 Kafka 事实事件和本服务 projection，避免形成调用链雪崩。
+- 单次实现优先形成可运行小闭环和可解释测试，不同时改动多个产品能力；复杂功能拆成契约、事务、投影、relay、smoke、hardening 多个切片。
 - `message-service` 第一阶段只实现普通会话 `LOCAL_ROW_LOCK` 的 `SendMessage` 主链路。
 - 后续优先补齐真实微服务边界，不继续在单个 `message-service` 上做重型硬件矩阵。
 - Kafka 事件只能通过 outbox relay 发布，业务事务不能直接 publish Kafka。

@@ -113,7 +113,7 @@ ack_seq=5
 - 本轮只验证了 `delivery.ack.recorded.v1`；`delivery.inbox_item.created.v1` 仍需在后续 smoke 覆盖。
 - malformed / unsupported 的 fail-closed 已有单元测试和 PostgreSQL store 测试，本轮没有再用真实 Kafka 故障场景验证。
 - `delivery_outbox` relay 暂无 debug metrics endpoint；后续 push-gateway smoke 至少应记录 outbox total/pending/published/DLQ 和 Kafka read count。
-- push-gateway 尚未实现，不能把本轮表述为完整在线推送链路。
+- 本轮报告生成时 push-gateway 尚未实现，因此不能把本轮单独表述为完整在线推送链路；后续报告已验证单实例最小在线通知闭环。
 
 ## 面试可讲
 

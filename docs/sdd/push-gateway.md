@@ -184,7 +184,7 @@ GET /ws?token=...&device_id=...
 }
 ```
 
-`delivery.ack` 成功调用 `delivery-service AckDelivery` 后必须返回 `delivery.ack.ok`。失败时返回 `error` frame，并使用稳定错误码，例如 `DELIVERY_UNAVAILABLE` 或 `ACK_OUT_OF_VISIBLE_RANGE`。客户端不得把“没有返回 error”解释成 ACK 成功。
+`delivery.ack` 成功调用 `delivery-service AckDelivery` 后必须返回 `delivery.ack.ok`。失败时返回 `error` frame，并使用稳定错误码，例如 `PERMISSION_DENIED`、`DELIVERY_UNAVAILABLE` 或 `ACK_OUT_OF_VISIBLE_RANGE`。客户端不得把“没有返回 error”解释成 ACK 成功。
 
 `server.resume_hint`：
 
@@ -221,6 +221,7 @@ GET /ws?token=...&device_id=...
 | `INVALID_FRAME` | frame JSON 或 op 不合法 | 修正客户端逻辑 | 否 |
 | `AUTH_EXPIRED` | token 过期 | 刷新 token 后重连 | 是 |
 | `DEVICE_REVOKED` | device/session 被吊销 | 退出登录或重新认证 | 否 |
+| `PERMISSION_DENIED` | 当前 session 无权执行 ACK 或访问资源 | 停止重试，重新同步权限或重新登录 | 否 |
 | `RATE_LIMITED` | 连接或 frame 超限 | 按 `retry_after_ms` 退避 | 是 |
 | `SERVER_BUSY` | gateway 过载 | 指数退避重连 | 是 |
 | `DELIVERY_UNAVAILABLE` | delivery-service 暂不可用 | 稍后重试 / pull fallback | 是 |
@@ -517,7 +518,7 @@ delivery-service outbox-relay
 | --- | --- |
 | 连接成功但没有推送 | 查 `im.delivery.events`、consumer group lag、route 是否存在 |
 | 客户端收到通知但拉不到 | 查 delivery-service `user_inbox` 和 conversation seq |
-| ACK 失败 | 查 `AckDelivery` 错误码，尤其 `ACK_OUT_OF_VISIBLE_RANGE` |
+| ACK 失败 | 查 `AckDelivery` 错误码和 session auth context，尤其 `PERMISSION_DENIED` / `ACK_OUT_OF_VISIBLE_RANGE` |
 | 多实例漏推 | 查 Redis route / gateway_id / session TTL |
 | 慢连接堆积 | 查 send queue、eviction count、client reconnect |
 

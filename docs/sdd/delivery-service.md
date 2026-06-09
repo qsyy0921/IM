@@ -465,7 +465,7 @@ NEXUSIM_DELIVERY_SERVICE_MODE=timeline-consumer
 NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay
 ```
 
-当前 delivery-service 已具备 `delivery_outbox -> Kafka im.delivery.events` 最小 relay 链路；push-gateway 尚未实现，因此 delivery event 的在线推送消费仍是下一阶段。
+当前 delivery-service 已具备 `delivery_outbox -> Kafka im.delivery.events` 最小 relay 链路；push-gateway 已完成单实例最小在线通知 smoke，可以消费 `im.delivery.events` 并把在线唤醒交给 WebSocket 客户端。后续多实例在线路由仍需要 Redis route / resume buffer / slow session active close。
 
 本地最小 smoke：
 

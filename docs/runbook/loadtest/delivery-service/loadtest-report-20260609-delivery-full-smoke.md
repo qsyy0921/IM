@@ -218,7 +218,7 @@ checkpoint|nexusim-delivery-smoke-20260609132344|1|3600811
 
 - `delivery-service` 已经不是单纯骨架：它能消费统一 timeline，维护成员可见性投影，按消息事件写 `user_inbox`，并支持客户端 `PullInbox / AckDelivery`。
 - `AckDelivery` 的 max visible seq 约束在真实链路中生效，ACK 到 `66` 后 cursor 正确落库。
-- 当前 `delivery_outbox` 只写本地 PENDING 事件，尚未实现 delivery outbox relay / `im.delivery.events` 发布；这正是下一阶段 push-gateway 前需要补的链路。
+- 本轮报告生成时 `delivery_outbox` 只写本地 PENDING 事件，尚未实现 delivery outbox relay / `im.delivery.events` 发布；后续已补齐 `delivery_outbox -> im.delivery.events`，并完成 push-gateway 单实例在线通知 smoke。
 - 本轮只覆盖 `JOIN + TEXT SendMessage + Pull/Ack`，尚未覆盖 LEAVE/REMOVE/ROLE_CHANGED 对历史可见窗口的影响，也未覆盖 projection DLQ/repair。
 
 ## 下一步

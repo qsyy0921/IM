@@ -365,8 +365,8 @@ delivery-service local transaction
 -> server returns delivery.ack.ok
 ```
 
-第一阶段可以只对当前 gateway 进程内在线 session 通知。当前已接入 Redis route 最小 adapter，并已用真实进程 smoke 验证 WebSocket gateway 与 delivery consumer gateway 分离时的跨进程在线路由；它证明的是最小分布式在线唤醒链路，不等同于完整生产多实例能力。生产化前仍需补 cross-instance resume 真实进程 smoke、Redis HA 和正式指标。
-当前 Redis-backed resume buffer 已有最小代码和单元测试覆盖，证明不同 gateway 可以通过同一 Redis token buffer replay `delivery.notify`；但尚未跑真实进程 cross-instance resume smoke，因此不能宣称生产级跨实例恢复完成。
+第一阶段可以只对当前 gateway 进程内在线 session 通知。当前已接入 Redis route 最小 adapter，并已用真实进程 smoke 验证 WebSocket gateway 与 delivery consumer gateway 分离时的跨进程在线路由；它证明的是最小分布式在线唤醒链路，不等同于完整生产多实例能力。生产化前仍需补 Redis HA / failover、跨实例慢连接组合和正式指标。
+当前 Redis-backed resume buffer 已有最小代码、单元测试、本机跨进程 smoke 和 Win-Mac Docker smoke 覆盖，证明不同 gateway 可以通过同一 Redis token buffer replay `delivery.notify`；但这仍是短时体验优化，不是可靠投递。Redis miss、token mismatch、buffer gap、Redis error 或 gateway 重启后仍必须回退 `PullInbox`。
 
 Redis route debug metrics 已提供第一版跨实例在线路由计数：
 
@@ -563,7 +563,7 @@ NEXUSIM_PUSH_REDIS_SENTINEL_PASSWORD=
 NEXUSIM_PUSH_REDIS_DB=0
 ```
 
-当前代码已支持 `single` 和 `sentinel` 两种 Redis client 模式。Sentinel 模式只表示 push-gateway 通过 Sentinel 发现当前 Redis master；它不改变 route / resume 的业务语义：Redis route 仍是 best-effort online wakeup，Redis resume 仍是短时体验优化，可靠投递仍必须回到 `PullInbox / AckDelivery`。本地三节点 Sentinel smoke 尚未完成前，不应把它表述为 Redis HA 已验收。
+当前代码已支持 `single` 和 `sentinel` 两种 Redis client 模式。Sentinel 模式只表示 push-gateway 通过 Sentinel 发现当前 Redis master；它不改变 route / resume 的业务语义：Redis route 仍是 best-effort online wakeup，Redis resume 仍是短时体验优化，可靠投递仍必须回到 `PullInbox / AckDelivery`。本地三 Redis / 三 Sentinel discovery 正常路径 smoke 已通过，但 master failover smoke 尚未完成前，不应把它表述为 Redis HA 已验收。
 
 本地依赖：
 

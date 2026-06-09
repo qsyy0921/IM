@@ -150,6 +150,14 @@ H:\NexusIM\loadtest-results\push-gateway-win-mac-cross-instance-resume-20260609\
 
 该 run 使用 clean commit `b8d8f92`，`git_dirty=false`。拓扑为：Windows 运行 PostgreSQL / Kafka / Redis / 核心业务进程 / `push-gateway delivery-consumer` / `push-gateway ws-reconnect`，Windows Docker 运行 `nexusim/delivery-service:local` gRPC，Mac Docker 运行 `nexusim/push-gateway:local` 首连 WebSocket gateway。客户端第一次连接 `ws://172.31.50.2:11598`，收到 seq `2` 的 `delivery.notify` 后在 ACK 前断开；随后携带同一 `resume_token` 和 `last_received=1` 重连到 Windows `ws://127.0.0.1:11599`，命中 Redis-backed resume buffer，replay 同一条 `event_id/message_id/conversation_seq` 的 notify。结果：consumer gateway `redis_resume_append_count=1`，重连 gateway `redis_resume_replay_count=1 / redis_resume_miss_count=0`，随后 `PullInbox item_count=1/max_seq=2`，`delivery.ack.ok last_received_seq=2`，`delivery_outbox PUBLISHED=2/PENDING=0/DLQ=0`。
 
+当前 Redis Sentinel discovery route / resume smoke 原始结果：
+
+```text
+H:\NexusIM\loadtest-results\push-gateway-redis-sentinel-route-resume-final-20260609\pushgateway-summary.json
+```
+
+该 run 使用 clean commit `7bc35a5`，`git_dirty=false`。拓扑为本地三 Redis / 三 Sentinel，push-gateway 使用 `NEXUSIM_PUSH_REDIS_MODE=sentinel` 和 `mymaster` 发现 master；Sentinel 返回 master `172.31.50.1:6380`，启动脚本已验证该地址可从宿主机 TCP 连接、可从 Sentinel 容器内 `PING`。结果：consumer gateway `redis_resume_append_count=1`、`redis_route_remote_publish_call_count=1`、`redis_route_remote_publish_error_count=0`，重连 gateway `redis_resume_replay_count=1 / redis_resume_miss_count=0`，随后 `PullInbox item_count=1/max_seq=2`，`delivery.ack.ok last_received_seq=2`，`delivery_outbox PUBLISHED=2/PENDING=0/DLQ=0`。这证明 Sentinel discovery 正常路径可用，不证明 master failover / Redis HA。
+
 前一轮脚本验证结果：
 
 ```text
@@ -304,7 +312,7 @@ push-gateway 只消费 delivery 事件做在线唤醒，WebSocket 连接和 Kafk
 
 ## 7. 已知缺口
 
-- Redis route 已做一次真实 stop/start fault smoke，证明 online notify 可丢但 `PullInbox + AckDelivery` 可恢复；push-gateway 代码已支持 `NEXUSIM_PUSH_REDIS_MODE=sentinel`，但尚未跑三节点 Redis / Sentinel 的真实故障切换 smoke，因此仍不是 Redis HA、Sentinel、Cluster 或网络分区结论。
+- Redis route 已做一次真实 stop/start fault smoke，证明 online notify 可丢但 `PullInbox + AckDelivery` 可恢复；push-gateway 已在三 Redis / 三 Sentinel 拓扑上跑通 Sentinel discovery 正常路径的 route / resume smoke，但尚未跑 master failover / quorum 异常 / 网络分区，因此仍不是 Redis HA、Redis Cluster 或生产级高可用结论。
 - Redis route 已有 TTL 续期和后台 stale route cleanup；异常进程退出后 session route 仍依赖 TTL 过期，user route set 中的 stale 成员由 lookup / cleanup loop 移除。
 - `push-gateway` Redis-backed cross-instance resume buffer 已有本机跨进程 smoke 和 Win-Mac Docker smoke；跨实例 replay miss、Redis error 或 token mismatch 时仍必须 fallback `PullInbox`。
 - `push-gateway` `/debug/metrics` 仍是本地 smoke 调试端点，不是正式 Prometheus 指标。

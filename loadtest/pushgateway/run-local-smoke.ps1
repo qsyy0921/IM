@@ -12,6 +12,10 @@ param(
     [string]$MessageChangeAction = "edit",
     [ValidateSet("memory", "redis")]
     [string]$RouteBackend = "memory",
+    [ValidateSet("mock", "hmac")]
+    [string]$PushAuthMode = "mock",
+    [string]$PushAuthHmacSecret = "local-push-smoke-secret",
+    [string]$PushAuthTokenTtl = "10m",
     [ValidateSet("single", "sentinel")]
     [string]$RedisMode = "single",
     [string]$RedisAddr = "127.0.0.1:6379",
@@ -368,6 +372,8 @@ try {
             NEXUSIM_PUSH_SESSION_QUEUE_SIZE = $pushSessionQueueSize
             NEXUSIM_PUSH_WRITE_TIMEOUT = $pushWriteTimeout
             NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
+            NEXUSIM_PUSH_AUTH_MODE = $PushAuthMode
+            NEXUSIM_PUSH_AUTH_HMAC_SECRET = $PushAuthHmacSecret
             NEXUSIM_PUSH_ROUTE_BACKEND = "redis"
             NEXUSIM_PUSH_GATEWAY_ID = $pushWSGatewayID
             NEXUSIM_PUSH_ROUTE_TTL = "90s"
@@ -381,6 +387,8 @@ try {
                 NEXUSIM_PUSH_SESSION_QUEUE_SIZE = $pushSessionQueueSize
                 NEXUSIM_PUSH_WRITE_TIMEOUT = $pushWriteTimeout
                 NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
+                NEXUSIM_PUSH_AUTH_MODE = $PushAuthMode
+                NEXUSIM_PUSH_AUTH_HMAC_SECRET = $PushAuthHmacSecret
                 NEXUSIM_PUSH_ROUTE_BACKEND = "redis"
                 NEXUSIM_PUSH_GATEWAY_ID = $pushReconnectGatewayID
                 NEXUSIM_PUSH_ROUTE_TTL = "90s"
@@ -408,6 +416,8 @@ try {
             NEXUSIM_PUSH_SESSION_QUEUE_SIZE = $pushSessionQueueSize
             NEXUSIM_PUSH_WRITE_TIMEOUT = $pushWriteTimeout
             NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
+            NEXUSIM_PUSH_AUTH_MODE = $PushAuthMode
+            NEXUSIM_PUSH_AUTH_HMAC_SECRET = $PushAuthHmacSecret
         }
     }
 
@@ -442,6 +452,9 @@ try {
         "--slow-message-count", [string]$SlowMessageCount,
         "--push-metrics-url", "http://127.0.0.1:11598/debug/metrics",
         "--route-backend", $RouteBackend,
+        "--push-auth-mode", $PushAuthMode,
+        "--push-auth-hmac-secret", $PushAuthHmacSecret,
+        "--push-auth-token-ttl", $PushAuthTokenTtl,
         "--redis-key-prefix", $pushRouteKeyPrefix,
         "--push-ws-gateway-id", $pushWSGatewayID,
         "--push-consumer-gateway-id", $pushConsumerGatewayID,
@@ -487,6 +500,7 @@ Write-Host "timeline_topic=$timelineTopic"
 Write-Host "delivery_consumer_group=$deliveryConsumerGroup"
 Write-Host "push_consumer_group=$pushConsumerGroup"
 Write-Host "route_backend=$RouteBackend"
+Write-Host "push_auth_mode=$PushAuthMode"
 if ($RouteBackend -eq "redis") {
     Write-Host "redis_mode=$RedisMode"
     if ($RedisMode -eq "sentinel") {

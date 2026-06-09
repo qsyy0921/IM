@@ -20,8 +20,8 @@ conversation-service
 1. 当前分布式证据已经够用于面试讲“最小分布式 IM 后端”，不要继续长期停留在重型基础设施故障矩阵。
 2. 当前第三层产品能力已切到送达 / 已读回执：receipt-service 已完成 proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务和 receipt outbox relay。
 3. receipt-service 真实进程 smoke 已跑通：`im.delivery.events -> receipt projection -> MarkRead -> GetReceiptState -> receipt_outbox -> im.receipt.events`；不要直接读取 delivery-service 内部表。
-4. 当前已新增会话列表 / 未读数 SDD Draft：放在 receipt-service 扩展切片内，复用 `im.delivery.events`、`receipt_inbox_projection` 和 `user_read_cursors`，不新增独立服务、不读取其它服务内部表。下一步优先评审并实现最小 `ListConversations`。
-5. 后续第三层候选：消息编辑/撤回/删除、真实鉴权；优先选能补全 IM 产品闭环、且不会显著增加跨服务耦合的切片。
+4. 会话列表 / 未读数最小 `ListConversations` 已在 receipt-service 内落地并跑通真实进程 smoke：`unread_count` 从投递后的 `1` 在 `MarkRead` 后变为 `0`；该能力复用 `im.delivery.events`、`receipt_inbox_projection` 和 `user_read_cursors`，没有新增独立服务，也不读取其它服务内部表。
+5. 后续第三层候选：消息编辑/撤回/删除、真实鉴权、多会话分页 / 权限校验强化；优先选能补全 IM 产品闭环、且不会显著增加跨服务耦合和代码复杂度的切片。
 6. RAG / Agent / 智能总结属于第四层，必须等消息事实、权限边界、撤回删除语义更稳定后再做。
 7. Kafka HA、PostgreSQL failover、Redis quorum / 网络分区可作为后续生产化项，不作为当前主线阻塞。
 

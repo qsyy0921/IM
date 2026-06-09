@@ -1,17 +1,18 @@
 # NexusIM Current Goal
 
-本文是 Codex Goal 的持续入口。每轮工作开始时先执行 `git status --short`，然后读取本文，再决定本轮行动。
+本文是 NexusIM 的完整持续目标档案，包含历史事实、风险、评审规则和报告索引。为节省 token，每轮默认先读短入口 `docs/runbook/current-brief.md`；只有需要细节、历史证据或风险上下文时，才按关键词查询本文。
 
 ## 0. 可复制短 Goal Prompt
 
 ```text
-持续推进当前工作区的 NexusIM 项目。
+持续推进 E:\development\IM 的 NexusIM 项目。
 
 每轮开始：
 1. 执行 git status --short --branch。
-2. 读取 docs/runbook/current-goal.md。
-3. 按 current-goal.md 的当前目标、硬边界、下一步优先级继续工作。
-4. 不回滚用户已有修改。
+2. 读取 docs/runbook/current-brief.md。
+3. 只在需要细节时，用 Select-String 按关键词查询 docs/runbook/current-goal.md，不要每轮全文读取。
+4. 按 brief/current-goal 的当前目标、硬边界、下一步优先级继续工作。
+5. 不回滚用户已有修改。
 
 工作原则：
 1. 优先把系统链路做完整，不把主要时间消耗在重型压测矩阵上。
@@ -19,7 +20,7 @@
 3. 开发过程中主动使用可用 sub-agent 做设计、实现、测试、文档或风险复核，不等到最后才集中评审。
 4. sub-agent 完成任务后及时关闭，避免线程池被历史任务占满；如果线程池已满，优先复用或关闭不再需要的 sub-agent。
 5. 公共契约、migration、事务、幂等、消息顺序、错误码、可运行链路完成时，再按 current-goal.md 的评审规则邀请独立评审。
-6. 有意义的切片完成后运行必要检查，更新 current-goal.md 和对应 runbook/loadtest 报告。
+6. 有意义的切片完成后运行必要检查，更新 current-brief.md；阶段状态变化时同步 current-goal.md 和对应 runbook/loadtest 报告。
 7. 按 current-goal.md 的 GitHub 同步策略批量提交和推送，不为低风险小改动频繁推送。
 ```
 
@@ -33,7 +34,78 @@ local distributed smoke
 -> cross-instance route / resume hardening
 ```
 
-## 2. 硬边界
+## 2. 长期路线图
+
+NexusIM 按四层逐步推进。每层都必须建立在前一层可运行、可验证、可解释的基础上；不要为了追求亮点而跳过核心 IM 链路，也不要在单个基础设施维度上无限压测。
+
+### 第一层：最小可运行 IM 主链路
+
+目标是证明用户发出的消息可以可靠进入系统、形成会话时间线、投递到接收方，并通过在线通道通知客户端。
+
+核心能力：
+
+- `SendMessage`：普通会话发消息，写入 `message_log`、`conversation_timeline_events`、`message_outbox`。
+- 会话上下文：`conversation-service` 提供发送所需的会话模式、成员版本、fanout 策略和 seq shard。
+- 本地事务 + outbox：业务事务只写本地 PostgreSQL 和 outbox，不在事务内直接 publish Kafka。
+- timeline event：通过 outbox relay 发布到 `conversation.timeline.events`。
+- delivery projection：`delivery-service` 消费 timeline，生成 durable `user_inbox`。
+- `PullInbox` / `AckDelivery`：客户端可以补拉投递结果，并推进设备级 ACK cursor。
+- 在线通知：`push-gateway` 消费 `im.delivery.events`，通过 WebSocket 发送轻量 `delivery.notify`，客户端展示事实仍以 `PullInbox` 为准。
+
+当前状态：这一层已经形成最小闭环，四个真实微服务均有 smoke 证据。后续只在新增核心业务语义时补小规模 smoke，不再围绕第一层做重型压测矩阵。
+
+### 第二层：分布式与可靠性
+
+目标是把第一层从“单进程能跑”提升为“多服务、多实例、跨机器、可降级恢复”的最小分布式系统。
+
+核心能力：
+
+- outbox relay：所有跨服务事件通过 outbox 发布，保持至少一次投递和同会话顺序保护。
+- Kafka 事件流：`conversation.timeline.events` 承载会话事实流，`im.delivery.events` 承载投递通知流。
+- durable inbox：可靠投递事实在 `delivery-service user_inbox`，不是 WebSocket 内存。
+- Redis route：`push-gateway` 多实例用 Redis 维护在线 session route，通过 Pub/Sub 转发在线通知。
+- Redis-backed resume buffer：短断线可跨 gateway best-effort replay 最近轻量 notify；失败时回退 `PullInbox`。
+- 故障恢复：Redis stop/start、Sentinel discovery、Sentinel failover、慢连接主动关闭等场景要用 smoke 证明降级边界。
+- 双机分布式：Windows / Mac 通过有线 `172.31.50.*` 运行跨机器 smoke，优先使用本地网线传输，避免外网流量。
+- 观测和报告：每个关键 smoke 都保留原始 result JSON、runbook 报告、成功条件和限制，方便面试复盘。
+
+当前状态：本机多进程、Win/Mac 双机 Docker、Redis route、cross-instance resume、Redis Sentinel discovery / 手动 failover / 停止当前 master 后自动切主 recovery 已跑通；分布式证据已经够用于面试讲“最小分布式 IM 后端”，下一步应转回第三层 IM 产品能力。
+
+注意边界：第二层的目标是“面试可讲、能运行、能解释故障降级”的分布式能力，不是完整生产级基础设施平台。Kafka HA、PostgreSQL 主从/故障切换、服务发现、配置中心、统一 tracing/metrics/alert 和部署编排属于后续生产化项，除非它们阻塞下一层业务能力，否则不要长期停留在重型基础设施矩阵。
+
+### 第三层：完整 IM 产品能力
+
+目标是从“主链路可运行”扩展到更完整的 IM 产品语义。第三层优先补真实用户会遇到的核心功能，而不是继续扩大压测范围。
+
+候选能力：
+
+- 已读回执 / 送达回执：基于 `AckDelivery`、设备 cursor 和后续 receipt event，形成用户可见的阅读状态。
+- 消息编辑 / 撤回 / 删除：补齐 `EditMessage`、`RevokeMessage`、`DeleteMessage` 的事实写入、timeline event、delivery projection 和客户端可见性。
+- 会话列表 / 未读数：基于 durable inbox、conversation timeline 和 cursor 生成用户侧会话摘要。
+- 联系人 / 群管理：完善成员变更、角色、邀请、退出、移除、owner transfer 等业务语义。
+- 真实鉴权：从本地 mock auth 过渡到 gateway / identity / token 校验，统一 `AuthContext`。
+- policy-service：把当前 mock permission check 收敛为真实权限服务或本地投影。
+- 客户端 UI：桌面端或 Web 端只在后端链路稳定后接入，展示事实必须来自 `PullInbox` / 查询 API。
+- repair / audit：为 outbox、projection、DLQ、member_change_saga 增加可解释的修复入口和审计记录。
+
+推进原则：优先选择“能串起已有链路、能体现 IM 产品完整性”的功能。当前更适合做已读/送达回执、撤回/编辑/删除、会话列表/未读数，而不是继续做大规模硬件压测。
+
+### 第四层：智能化扩展
+
+目标是在稳定的消息事实、权限边界和可重建投影之上增加 AI 能力。RAG / Agent 不应早于核心 IM 语义上线，否则容易出现权限泄露、数据不完整或演示与主系统脱节。
+
+候选能力：
+
+- 聊天记录搜索：对 message timeline 建索引，按 tenant / conversation / member ACL 做权限过滤。
+- RAG 问答：基于用户可见的会话历史做检索增强回答，必须严格遵守成员可见窗口和消息撤回/删除语义。
+- 智能总结：按会话、时间窗口、主题生成摘要，摘要本身也要有权限和版本边界。
+- 群聊问答 Agent：只在用户有权访问的 conversation 范围内检索和回答。
+- 客服机器人：可作为独立 consumer / agent service 接入，不直接写消息事实源，必要时通过正式消息发送 API 进入会话。
+- 推荐 / 风控辅助：用于辅助排序、异常检测或运营，不改变消息事实和权限事实。
+
+推进原则：第四层只在第三层核心产品能力基本稳定后启动。任何 RAG / Agent 功能都必须先定义数据来源、ACL 过滤、撤回/删除后的索引修正、审计和失败降级。
+
+## 3. 硬边界
 
 - 项目统一命名为 `NexusIM`，不再使用旧项目名。
 - 每个微服务独立使用六层 DDD，不做全局统一 DDD。
@@ -43,7 +115,7 @@ local distributed smoke
 - 后续优先补齐真实微服务边界，不继续在单个 `message-service` 上做重型硬件矩阵。
 - Kafka 事件只能通过 outbox relay 发布，业务事务不能直接 publish Kafka。
 
-## 3. 暂不实现
+## 4. 暂不实现
 
 - 生产级完整 WebSocket / push / delivery 平台。
 - 桌面客户端完整 UI。
@@ -51,7 +123,7 @@ local distributed smoke
 - 热点会话 sequencer 生产逻辑。
 - `EditMessage`、`RevokeMessage`、`DeleteMessage` 业务实现。
 
-## 4. 当前事实
+## 5. 当前事实
 
 | 项 | 状态 |
 | --- | --- |
@@ -92,17 +164,17 @@ local distributed smoke
 | delivery-service full smoke | 已跑真实进程小规模 smoke：`CreateMemberChange(JOIN) -> Kafka timeline -> delivery projection -> SendMessage -> Kafka timeline -> user_inbox -> PullInbox -> AckDelivery`，SendMessage `64/64` 成功，`delivery-user-1` 拉到 64 条 inbox，ACK 到 seq `66`；`loadtest/delivery` summary 已支持 `--consumer-group`，checkpoint 统计可按本次 consumer group 过滤；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-full-smoke.md` |
 | delivery_outbox / push-gateway | 已新增 `schemas/kafka/delivery/v1/im.delivery.events.proto`、delivery-service outbox store、trigger relay、Kafka writer producer 和 `NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay`；真实 Kafka smoke 已验证 `delivery_outbox PENDING -> PUBLISHED`，并从 `im.delivery.events` 解码出 `DeliveryEvent_AckRecorded`；push-gateway 已完成最小在线通知 smoke，后续生产化依赖 Redis route / resume buffer / slow session active close；push-gateway 仍必须依赖 delivery read model / delivery event，不直接读取 message-service 内部表，也不修改 ACK |
 | delivery-service negative visibility | 已新增 `loadtest/deliveryvisibility`，并在 clean commit `a87fc3f` 跑通 `LEAVE / REMOVE` 负向可见性 smoke：目标用户边界前各收到 1 条 inbox，边界后 `membership_status=LEFT`、`leave_seq=boundary_seq=4`，active sender 收到 post-boundary message，目标用户 `target_post_inbox_count=0` 且 `PullInbox(after_seq=boundary_seq)=0`；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-visibility-negative-smoke.md` |
-| push-gateway SDD / skeleton / smoke | `docs/sdd/push-gateway.md` 已新增 v0.1 Draft；边界为 WebSocket 在线连接、`im.delivery.events` 轻量通知、客户端回源 `PullInbox` 和 ACK frame 转发到 `delivery-service AckDelivery`；评审 P1 已补 `server.pong`、`delivery.ack.ok` 和 `PERMISSION_DENIED retryable=false`；`services/push-gateway/internal/{api,app,domain,infrastructure,types,trigger}` 六层骨架、WebSocket adapter、in-memory registry、delivery-service gRPC client、Kafka delivery consumer 和 `NEXUSIM_PUSH_GATEWAY_MODE=all` 已落地；clean commit `984080d` 真实进程 full smoke 已通过；clean commit `99efdc3` 同 user 双 device notify smoke 已通过，两个 device 都收到同一条 `delivery.notify` 并分别 ACK 到 device cursor；queue-full slow session 第一版已支持 registry eviction signal -> WebSocket broad `server.resume_hint` -> active close，且已修复普通断连时 close outbound 与 registry send 的竞态；单实例 in-memory resume buffer 已支持按服务端签发的 `resume_token + last_received` 重放最近 `delivery.notify`，未知或过期客户端 token 会返回 `buffer_miss` 并替换为新服务端 token；clean commit `b362dd7` 已跑通 slow-client 真实进程负向 smoke，证明 queue full / active close 后可通过 durable `PullInbox` 补拉并 ACK；clean commit `80033de` 已跑通单实例 resume replay smoke，证明同一 `resume_token` 重连可重放同一条 buffered `delivery.notify`；Redis route 最小 adapter 已落地，支持 `NEXUSIM_PUSH_ROUTE_BACKEND=redis`、session route TTL、route TTL 周期续期、stale route lookup 清理、后台 stale route cleanup loop、按 gateway Pub/Sub 转发和本机 fanout；Redis-backed cross-instance resume buffer 第一版已落地，支持 Redis token meta / frame list、跨 gateway replay、未知 token buffer_miss 换新 token、跨 device token 拒绝、buffer gap fallback 和 Redis lookup 故障下本地在线 fallback；`/debug/metrics` 已新增 Redis route / Redis resume 调试指标，consumer-only gateway 可用 `NEXUSIM_PUSH_DEBUG_ADDR` 暴露只读 debug metrics；clean commit `903f205` 已跑通真实跨进程 Redis route smoke：WebSocket gateway 和 delivery consumer gateway 分离后仍收到 `delivery.notify`；Redis unavailable / stale route cleanup 已有单元测试覆盖，策略为 connect 写 route 失败 fail-closed、在线 notify lookup/publish 失败 fail-open；clean commit `074902b` 已跑通真实 Redis stop/start fault smoke，证明 Redis route 中断时 online notify 可丢但 `PullInbox + AckDelivery` 可恢复；clean commit `b8d33da` 已跑通本机 cross-instance resume 真实进程 smoke；clean commit `b8d8f92` 已跑通 Win-Mac Docker cross-instance resume smoke：首连 Mac Docker gateway，重连 Windows gateway，consumer gateway 记录 `redis_resume_append_count=1`，重连 gateway 记录 `redis_resume_replay_count=1 / redis_resume_miss_count=0`，并 replay 同一条 `delivery.notify`；push-gateway Redis client 已支持 `single` / `sentinel` 两种模式；clean commit `7bc35a5` 已跑通三 Redis / 三 Sentinel discovery 正常路径下的 route / resume smoke，Sentinel 返回 master `172.31.50.1:6380`；clean commit `819c14a` 已跑通手动 `SENTINEL failover mymaster` 后的 route / resume recovery smoke，master 从 `172.31.50.1:6380` 切到 `172.31.50.1:6381`；当前仍未完成 Redis Cluster、Sentinel quorum / 网络分区、自动停 master 触发和跨实例慢连接组合 smoke；报告见 `docs/runbook/loadtest/push-gateway/` |
+| push-gateway SDD / skeleton / smoke | `docs/sdd/push-gateway.md` 已新增 v0.1 Draft；边界为 WebSocket 在线连接、`im.delivery.events` 轻量通知、客户端回源 `PullInbox` 和 ACK frame 转发到 `delivery-service AckDelivery`；评审 P1 已补 `server.pong`、`delivery.ack.ok` 和 `PERMISSION_DENIED retryable=false`；`services/push-gateway/internal/{api,app,domain,infrastructure,types,trigger}` 六层骨架、WebSocket adapter、in-memory registry、delivery-service gRPC client、Kafka delivery consumer 和 `NEXUSIM_PUSH_GATEWAY_MODE=all` 已落地；clean commit `984080d` 真实进程 full smoke 已通过；clean commit `99efdc3` 同 user 双 device notify smoke 已通过，两个 device 都收到同一条 `delivery.notify` 并分别 ACK 到 device cursor；queue-full slow session 第一版已支持 registry eviction signal -> WebSocket broad `server.resume_hint` -> active close，且已修复普通断连时 close outbound 与 registry send 的竞态；单实例 in-memory resume buffer 已支持按服务端签发的 `resume_token + last_received` 重放最近 `delivery.notify`，未知或过期客户端 token 会返回 `buffer_miss` 并替换为新服务端 token；clean commit `b362dd7` 已跑通 slow-client 真实进程负向 smoke，证明 queue full / active close 后可通过 durable `PullInbox` 补拉并 ACK；clean commit `80033de` 已跑通单实例 resume replay smoke，证明同一 `resume_token` 重连可重放同一条 buffered `delivery.notify`；Redis route 最小 adapter 已落地，支持 `NEXUSIM_PUSH_ROUTE_BACKEND=redis`、session route TTL、route TTL 周期续期、stale route lookup 清理、后台 stale route cleanup loop、按 gateway Pub/Sub 转发和本机 fanout；Redis-backed cross-instance resume buffer 第一版已落地，支持 Redis token meta / frame list、跨 gateway replay、未知 token buffer_miss 换新 token、跨 device token 拒绝、buffer gap fallback 和 Redis lookup 故障下本地在线 fallback；`/debug/metrics` 已新增 Redis route / Redis resume 调试指标，consumer-only gateway 可用 `NEXUSIM_PUSH_DEBUG_ADDR` 暴露只读 debug metrics；clean commit `903f205` 已跑通真实跨进程 Redis route smoke：WebSocket gateway 和 delivery consumer gateway 分离后仍收到 `delivery.notify`；Redis unavailable / stale route cleanup 已有单元测试覆盖，策略为 connect 写 route 失败 fail-closed、在线 notify lookup/publish 失败 fail-open；clean commit `074902b` 已跑通真实 Redis stop/start fault smoke，证明 Redis route 中断时 online notify 可丢但 `PullInbox + AckDelivery` 可恢复；clean commit `b8d33da` 已跑通本机 cross-instance resume 真实进程 smoke；clean commit `b8d8f92` 已跑通 Win-Mac Docker cross-instance resume smoke：首连 Mac Docker gateway，重连 Windows gateway，consumer gateway 记录 `redis_resume_append_count=1`，重连 gateway 记录 `redis_resume_replay_count=1 / redis_resume_miss_count=0`，并 replay 同一条 `delivery.notify`；push-gateway Redis client 已支持 `single` / `sentinel` 两种模式；clean commit `7bc35a5` 已跑通三 Redis / 三 Sentinel discovery 正常路径下的 route / resume smoke，Sentinel 返回 master `172.31.50.1:6380`；clean commit `819c14a` 已跑通手动 `SENTINEL failover mymaster` 后的 route / resume recovery smoke，master 从 `172.31.50.1:6380` 切到 `172.31.50.1:6381`；clean commit `8ddc2fb` 已跑通停止 Sentinel 当前 master 容器后的自动切主 recovery smoke，master 从 `172.31.50.1:6381` 切回 `172.31.50.1:6380`；当前仍未完成 Redis Cluster、Sentinel quorum / 网络分区和跨实例慢连接组合 smoke；报告见 `docs/runbook/loadtest/push-gateway/` |
 
-## 5. 下一步优先级
+## 6. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
 2. 不再继续做 message-service 重型硬件矩阵；只有公共契约、关键并发语义或新服务链路变化时，才跑 smoke / 小规模验证。
 3. `push-gateway` SDD 已完成阶段评审并修复 frame 契约 P1；六层骨架和第一版 WebSocket / delivery consumer 已落地。
 4. `delivery_outbox -> im.delivery.events -> push-gateway all mode -> online WebSocket client delivery.notify -> PullInbox -> delivery.ack -> AckDelivery -> delivery.ack.ok` 已通过 clean commit smoke；同 user 双 device notify smoke 也已通过。
-5. 当前系统可以表述为“本地多进程 + Win/Mac 双机 Docker 最小分布式 IM 链路”：`conversation-service / message-service / delivery-service / push-gateway` 独立协作，通过 PostgreSQL outbox、Kafka、durable inbox、Redis route、Redis-backed best-effort resume buffer 和 WebSocket notify 串联；已在 clean commit `8c322fc` 跑通 Windows -> Mac Docker WebSocket gateway 的有线直连 smoke，在 clean commit `b8d33da` 跑通带 consumer metrics 的本机多进程 cross-instance resume smoke，在 clean commit `b8d8f92` 跑通 Win-Mac Docker cross-instance resume smoke，在 clean commit `7bc35a5` 跑通三 Redis / 三 Sentinel discovery 正常路径的 route / resume smoke，并在 clean commit `819c14a` 跑通手动 Sentinel master failover 后的 route / resume recovery smoke。下一步优先做自动停当前 master 触发的 Sentinel failover、跨实例慢连接组合 smoke，而不是继续扩展单机 `all` 模式。
+5. 当前系统可以表述为“本地多进程 + Win/Mac 双机 Docker 最小分布式 IM 链路”：`conversation-service / message-service / delivery-service / push-gateway` 独立协作，通过 PostgreSQL outbox、Kafka、durable inbox、Redis route、Redis-backed best-effort resume buffer 和 WebSocket notify 串联；已在 clean commit `8c322fc` 跑通 Windows -> Mac Docker WebSocket gateway 的有线直连 smoke，在 clean commit `b8d33da` 跑通带 consumer metrics 的本机多进程 cross-instance resume smoke，在 clean commit `b8d8f92` 跑通 Win-Mac Docker cross-instance resume smoke，在 clean commit `7bc35a5` 跑通三 Redis / 三 Sentinel discovery 正常路径的 route / resume smoke，在 clean commit `819c14a` 跑通手动 Sentinel master failover 后的 route / resume recovery smoke，并在 clean commit `8ddc2fb` 跑通停止 Sentinel 当前 master 容器后的自动切主 recovery smoke。下一步不再继续做重型基础设施矩阵，优先转回第三层 IM 产品能力，例如已读/送达回执、消息编辑/撤回/删除、会话列表/未读数、真实鉴权。
 
-## 6. 评审要求
+## 7. 评审要求
 
 评审采用里程碑触发，不对每个小改动都邀请独立评审线程。
 
@@ -169,7 +241,7 @@ sub-agent 必须按任务生命周期管理：专项任务完成后及时关闭�
 - 非阻塞问题记录到本文或对应 runbook。
 - 合理建议需要同步到文档或代码。
 
-## 7. 压测要求
+## 8. 压测要求
 
 压测只服务于验证关键链路和形成可解释证据，不再追求耗尽本机硬件资源的极限矩阵。可以在一台电脑上用多线程模拟多个客户端，也可以按 `docs/runbook/local-loadtest.md` 做双机压测。
 
@@ -234,7 +306,7 @@ CPU / 内存 / Docker / 连接池 / worker 配置
 
 `loadtest/results/` 只保存小 smoke 或历史索引；中大型原始数据、中间结果和趋势图保存到 `H:\NexusIM\loadtest-results`。这些数据文件默认不提交，但 E 盘仓库内的报告必须引用关键结果路径，保证以后能追溯。
 
-## 8. GitHub 同步要求
+## 9. GitHub 同步要求
 
 GitHub 同步采用批量策略，不对每个小改动都推送。
 
@@ -257,7 +329,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 推送后再次确认 `git status --short` 干净。
 - 如果本轮涉及 MacBook、服务器或压测环境，说明是否需要同步对应环境；不默认静默同步。
 
-## 9. 每轮结束检查
+## 10. 每轮结束检查
 
 每轮结束前确认：
 
@@ -267,7 +339,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 是否达到 commit / push 条件；未达到则只记录本地状态，不强行同步 GitHub。
 - 本文的状态、风险和下一步是否仍然准确。
 
-## 10. 当前风险
+## 11. 当前风险
 
 - 当前 Codex 进程可能尚未重新读取用户 PATH；本线程运行 Go 命令前执行 `. .\tools\go-env.ps1`。
 - 现阶段已有 app/domain/PostgreSQL repository 测试、outbox relay / Kafka producer 测试、gRPC adapter 测试和真实进程多线程压测入口。
@@ -337,7 +409,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - `conversation-service` 当前已完成 `CreateMemberChange(JOIN)` 写路径 smoke 和 `CreateMemberChange -> outbox relay -> member-change-worker -> GetMemberChange(DONE)` full smoke；`LEAVE / REMOVE / ROLE_CHANGED` 真实进程 smoke 可后置。
 - 统一 outbox relay 当前仍位于 `message-service/internal/trigger/outbox`，但后续会发布 message/member 两类 conversation timeline event；这是阶段性部署折中，生产化前需要在 TADD 中决定是否拆成独立 `timeline-outbox-relay`。
 
-## 11. 最近评审状态
+## 12. 最近评审状态
 
 - 2026-06-08：独立评审线程指出文档入口顺序、评审回传规则、GitHub 同步闭环、压测硬约束和目标态总架构入口需要补强；本轮已按建议更新本文和 `docs/README.md`。
 - 2026-06-08：独立评审线程复核通过文档闭环；新增 P0 环境结论：`protoc` 可用，但 `go`、`protoc-gen-go`、`protoc-gen-go-grpc` 未检测到，正式实现和验证前必须补齐。
@@ -460,3 +532,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已在 clean commit `b8d8f92` 跑通 Win-Mac Docker cross-instance resume smoke：客户端首次连接 Mac Docker `push-gateway` WebSocket gateway `ws://172.31.50.2:11598`，收到 seq `2` 的 `delivery.notify` 后在 ACK 前断开；随后携带同一 `resume_token` 和 `last_received=1` 重连到 Windows `push-gateway` reconnect gateway `ws://127.0.0.1:11599`，命中 Redis-backed resume buffer 并 replay 同一 `event_id/message_id/conversation_seq` 的通知；Windows consumer gateway 记录 `redis_resume_append_count=1`、`redis_route_remote_publish_call_count=1`、`redis_route_remote_publish_error_count=0`，Windows reconnect gateway 记录 `redis_resume_replay_count=1`、`redis_resume_miss_count=0`；随后 `PullInbox item_count=1/max_seq=2`、`delivery.ack.ok last_received_seq=2`、`delivery_outbox PUBLISHED=2/PENDING=0/DLQ=0`。原始结果在 `H:\NexusIM\loadtest-results\push-gateway-win-mac-cross-instance-resume-20260609\pushgateway-summary.json`，报告见 `docs/runbook/loadtest/push-gateway/loadtest-report-20260609-push-gateway-win-mac-cross-instance-resume-smoke.md`；它证明双机 route/resume 链路可运行，但仍不是 Redis HA 或生产容量结论。
 - 2026-06-09：已为 push-gateway Redis route 增加 Sentinel client 配置支持：`NEXUSIM_PUSH_REDIS_MODE=single|sentinel`，Sentinel 模式使用 `NEXUSIM_PUSH_REDIS_SENTINEL_MASTER_NAME` 和 `NEXUSIM_PUSH_REDIS_SENTINEL_ADDRS` 发现 master；本地 Redis/Sentinel compose 已显式关闭 Sentinel protected mode，并通过 `NEXUSIM_REDIS_SENTINEL_ANNOUNCE_IP` 参数化 announce / monitor 地址；`tools/local-up-redis-sentinel.ps1` 会验证 Sentinel 返回的 master 可从宿主机 TCP 连接、可从 Sentinel 容器内 `PING`。clean commit `7bc35a5` 已跑通三 Redis / 三 Sentinel discovery 正常路径 route / resume smoke：Sentinel 返回 master `172.31.50.1:6380`，consumer gateway `redis_resume_append_count=1`，reconnect gateway `redis_resume_replay_count=1 / redis_resume_miss_count=0`，`PullInbox item_count=1/max_seq=2`，`delivery_outbox PUBLISHED=2/PENDING=0/DLQ=0`。这仍不等同于 Redis HA 验收，下一步需补 master failover smoke。
 - 2026-06-09：已新增 `redis-sentinel-failover` pushgateway smoke 场景，并在 clean commit `819c14a` 跑通手动 Sentinel failover recovery：WebSocket route 注册后执行 `SENTINEL failover mymaster`，默认脚本等待 master 从 `172.31.50.1:6380` 切到 `172.31.50.1:6381`，并验证新 master 可 `PING` 且 `ROLE=master` 后再继续 `SendMessage`；随后客户端收到 seq `2` 的 `delivery.notify`，断开后重连另一个 gateway 命中 Redis-backed resume replay，同一 `event_id/message_id/conversation_seq` 匹配，`PullInbox item_count=1/max_seq=2`、`delivery.ack.ok last_received_seq=2`、`delivery_outbox PUBLISHED=2/PENDING=0/DLQ=0`。报告见 `docs/runbook/loadtest/push-gateway/loadtest-report-20260609-push-gateway-redis-sentinel-failover-smoke.md`；这仍不是完整 Redis HA，未覆盖 quorum 异常、网络分区、自动停 master 触发和容量结论。
+- 2026-06-09：已新增 `redis-sentinel-master-stop` pushgateway smoke 场景，并在 clean commit `8ddc2fb` 跑通自动 master-stop recovery：脚本先查询 Sentinel 当前 master，再停止对应容器 `nexusim-redis-ha-replica-1`，等待 Sentinel master 从 `172.31.50.1:6381` 切到 `172.31.50.1:6380`，验证新 master 可 `PING` 且 `ROLE=master` 后继续完整链路；随后客户端收到 seq `2` 的 `delivery.notify`，断开后重连另一个 gateway 命中 Redis-backed resume replay，同一 `event_id/message_id/conversation_seq` 匹配，`PullInbox item_count=1/max_seq=2`、`delivery.ack.ok last_received_seq=2`、`delivery_outbox PUBLISHED=2/PENDING=0/DLQ=0`。恢复脚本已重启被停容器并确认 healthy，报告见 `docs/runbook/loadtest/push-gateway/loadtest-report-20260609-push-gateway-redis-sentinel-master-stop-smoke.md`；这仍不是完整 Redis HA，未覆盖 quorum 异常、网络分区、Redis Cluster、切主窗口零丢失和容量结论。

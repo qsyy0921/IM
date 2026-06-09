@@ -79,7 +79,7 @@ NEXUSIM_PUSH_REDIS_SENTINEL_PASSWORD=
 NEXUSIM_PUSH_REDIS_DB=0
 ```
 
-Sentinel 模式当前已证明两件事：客户端 master discovery 正常路径可用；本地三 Redis + 三 Sentinel Docker 拓扑下，手动 `SENTINEL failover mymaster` 后 route / resume / `PullInbox + AckDelivery` recovery smoke 通过。它仍不等于完整 Redis HA 验收；quorum 异常、网络分区、自动停 master 触发、切主窗口内零丢失和容量结论仍未覆盖。
+Sentinel 模式当前已证明三件事：客户端 master discovery 正常路径可用；本地三 Redis + 三 Sentinel Docker 拓扑下，手动 `SENTINEL failover mymaster` 后 route / resume / `PullInbox + AckDelivery` recovery smoke 通过；停止 Sentinel 当前 master 容器后，Sentinel 自主选主，route / resume / `PullInbox + AckDelivery` recovery smoke 也通过。它仍不等于完整 Redis HA 验收；quorum 异常、网络分区、Redis Cluster、切主窗口内零丢失和容量结论仍未覆盖。
 
 ## 报告位置
 
@@ -98,6 +98,7 @@ Sentinel 模式当前已证明两件事：客户端 master discovery 正常路�
 | `loadtest-report-20260609-push-gateway-win-mac-cross-instance-resume-smoke.md` | 首连 WebSocket gateway 在 Mac Docker，重连 gateway 在 Windows，命中 Redis-backed resume buffer 并 replay 同一条 `delivery.notify` |
 | `loadtest-report-20260609-push-gateway-redis-sentinel-route-resume-smoke.md` | Redis Sentinel discovery 正常路径下，跨实例 route / resume smoke 通过；不代表 failover / HA 验收 |
 | `loadtest-report-20260609-push-gateway-redis-sentinel-failover-smoke.md` | 本地三 Redis / 三 Sentinel 拓扑下触发 `SENTINEL failover mymaster`，切主后 route / resume / PullInbox / AckDelivery 恢复通过；不代表完整 Redis HA |
+| `loadtest-report-20260609-push-gateway-redis-sentinel-master-stop-smoke.md` | 停止 Sentinel 当前 master 容器，等待 Sentinel 自主选主后继续 route / resume / PullInbox / AckDelivery；不代表 quorum / 网络分区 / Redis Cluster 验收 |
 
 报告 Markdown 保存在仓库内：
 
@@ -134,7 +135,7 @@ E:\development\IM\loadtest\results
 - 不把 queue-full active close 表述为完整慢连接治理；当前 `server.resume_hint` 只是 broad pull fallback，客户端必须用本地 durable cursor 决定 `PullInbox` 起点。已完成单实例 slow-client 真实进程负向 smoke，它验证的是 durable `PullInbox` fallback；已另外完成单实例 resume replay smoke 和 cross-instance resume smoke，分别验证短时 in-memory buffer 命中路径和 Redis-backed 跨 gateway replay 路径；后续还没有多实例慢连接验证。
 - `/debug/metrics` 目前暴露单实例 in-memory registry、Redis route 和 Redis resume 调试指标，用于 smoke 排障；其中 resume token count / expired token count 只说明本进程短时 buffer 状态，`redis_resume_*` 只说明 Redis-backed replay / miss / append 过程；`redis_registry_metrics` 和 `redis_subscriber_metrics` 只说明 online route / PubSub / local fanout 过程，不代表 durable delivery 成功率；该端点不是生产级 Prometheus 指标。WebSocket gateway 可通过 `NEXUSIM_PUSH_WS_ADDR` 暴露该端点，consumer-only gateway 可通过 `NEXUSIM_PUSH_DEBUG_ADDR` 单独暴露只读 debug 端点。
 - `NEXUSIM_PUSH_TEST_WRITE_DELAY` 只允许本地 smoke 使用，生产环境必须 unset 或保持 `0`。
-- Redis route 当前对在线通知采用 fail-open：lookup / publish 错误不会阻塞 delivery consumer 提交当前 Kafka event；该次在线唤醒可以丢，客户端靠 durable `PullInbox` 恢复。connect 写 route 失败仍 fail-closed，避免把无法跨实例路由的 session 注册成在线。后台 cleanup loop 已能清理 missing / malformed / mismatched stale route；clean commit `074902b` 已完成一次真实 Redis stop/start fault smoke，证明 Redis route 中断时 `PullInbox + AckDelivery` 仍可恢复；clean commit `7bc35a5` 已完成 Redis Sentinel discovery 正常路径下的 route / resume smoke；clean commit `819c14a` 已完成手动 Sentinel master failover 后的 route / resume recovery smoke。它们仍不是完整 Redis HA / quorum / 网络分区 / Cluster 结论。
+- Redis route 当前对在线通知采用 fail-open：lookup / publish 错误不会阻塞 delivery consumer 提交当前 Kafka event；该次在线唤醒可以丢，客户端靠 durable `PullInbox` 恢复。connect 写 route 失败仍 fail-closed，避免把无法跨实例路由的 session 注册成在线。后台 cleanup loop 已能清理 missing / malformed / mismatched stale route；clean commit `074902b` 已完成一次真实 Redis stop/start fault smoke，证明 Redis route 中断时 `PullInbox + AckDelivery` 仍可恢复；clean commit `7bc35a5` 已完成 Redis Sentinel discovery 正常路径下的 route / resume smoke；clean commit `819c14a` 已完成手动 Sentinel master failover 后的 route / resume recovery smoke；clean commit `8ddc2fb` 已完成停止 Sentinel 当前 master 容器后的自动切主 recovery smoke。它们仍不是完整 Redis HA / quorum / 网络分区 / Cluster 结论。
 
 ## 面试可讲点
 

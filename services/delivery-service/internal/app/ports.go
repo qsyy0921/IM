@@ -13,3 +13,7 @@ type InboxRepository interface {
 type DeliveryCursorRepository interface {
 	AckDelivery(ctx context.Context, command types.AckDeliveryCommand) (types.AckDeliveryResult, error)
 }
+
+type TimelineProjectionRepository interface {
+	ProjectTimelineEvent(ctx context.Context, command types.ProjectTimelineEventCommand) (types.ProjectTimelineEventResult, error)
+}

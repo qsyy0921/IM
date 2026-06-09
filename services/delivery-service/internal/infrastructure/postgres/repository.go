@@ -22,6 +22,252 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
+func (repository *Repository) ProjectTimelineEvent(
+	ctx context.Context,
+	command types.ProjectTimelineEventCommand,
+) (types.ProjectTimelineEventResult, error) {
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return types.ProjectTimelineEventResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	result := types.ProjectTimelineEventResult{}
+	switch command.EventType {
+	case types.TimelineEventMessagePersisted:
+		count, err := projectMessagePersisted(ctx, tx, command)
+		if err != nil {
+			return types.ProjectTimelineEventResult{}, err
+		}
+		result.ProjectedInboxCount = count
+	case types.TimelineEventConversationMemberJoined,
+		types.TimelineEventConversationMemberLeft,
+		types.TimelineEventConversationMemberRemoved,
+		types.TimelineEventConversationMemberRoleChanged:
+		if err := upsertMembershipProjection(ctx, tx, command); err != nil {
+			return types.ProjectTimelineEventResult{}, err
+		}
+		result.MembershipUpdated = true
+	case types.TimelineEventConversationMemberBoundaryCancelled:
+		// First phase records no compensating inbox mutation for cancelled boundaries.
+	default:
+		return types.ProjectTimelineEventResult{}, types.NewInvalidArgument("unsupported timeline event type")
+	}
+	if command.ShouldCheckpoint() {
+		if err := upsertKafkaCheckpoint(ctx, tx, command); err != nil {
+			return types.ProjectTimelineEventResult{}, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.ProjectTimelineEventResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return result, nil
+}
+
+func projectMessagePersisted(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.ProjectTimelineEventCommand,
+) (int, error) {
+	rows, err := tx.Query(ctx, `
+SELECT user_id
+FROM delivery_membership_projection
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND status = 'ACTIVE'
+  AND join_seq <= $3
+  AND (leave_seq IS NULL OR leave_seq >= $3)
+ORDER BY user_id
+`, command.TenantID, command.ConversationID, command.ConversationSeq)
+	if err != nil {
+		return 0, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	projected := 0
+	for rows.Next() {
+		var userID types.UserID
+		if err := rows.Scan(&userID); err != nil {
+			return 0, types.NewDBReadFailed(err.Error())
+		}
+		if err := insertInboxItem(ctx, tx, command, userID); err != nil {
+			return 0, err
+		}
+		if err := insertInboxOutbox(ctx, tx, command, userID); err != nil {
+			return 0, err
+		}
+		projected++
+	}
+	if err := rows.Err(); err != nil {
+		return 0, types.NewDBReadFailed(err.Error())
+	}
+	return projected, nil
+}
+
+func insertInboxItem(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.ProjectTimelineEventCommand,
+	userID types.UserID,
+) error {
+	payloadJSON := command.PayloadJSON
+	if len(payloadJSON) == 0 {
+		payloadJSON = json.RawMessage(`{}`)
+	}
+	_, err := tx.Exec(ctx, `
+INSERT INTO user_inbox (
+    tenant_id,
+    user_id,
+    conversation_id,
+    conversation_seq,
+    event_id,
+    event_type,
+    message_id,
+    sender_id,
+    payload_json,
+    fanout_mode,
+    permission_version,
+    created_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
+ON CONFLICT (tenant_id, user_id, event_id) DO NOTHING
+`, command.TenantID, userID, command.ConversationID, command.ConversationSeq, command.EventID, command.EventType, command.MessageID, command.SenderID, payloadJSON, command.FanoutMode, command.PermissionVersion)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func upsertMembershipProjection(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.ProjectTimelineEventCommand,
+) error {
+	role := command.MemberRole
+	if role == "" {
+		role = "MEMBER"
+	}
+	status := command.MemberStatus
+	if status == "" {
+		status = memberStatusForEvent(command.EventType)
+	}
+	joinSeq := command.ConversationSeq
+	var leaveSeq *int64
+	if status != types.DeliveryMemberStatusActive {
+		leaveSeq = &command.ConversationSeq
+	}
+	_, err := tx.Exec(ctx, `
+INSERT INTO delivery_membership_projection (
+    tenant_id,
+    conversation_id,
+    user_id,
+    role,
+    status,
+    join_seq,
+    leave_seq,
+    member_version,
+    permission_version,
+    updated_by_event_id,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
+ON CONFLICT (tenant_id, conversation_id, user_id) DO UPDATE
+SET role = EXCLUDED.role,
+    status = EXCLUDED.status,
+    leave_seq = EXCLUDED.leave_seq,
+    member_version = EXCLUDED.member_version,
+    permission_version = EXCLUDED.permission_version,
+    updated_by_event_id = EXCLUDED.updated_by_event_id,
+    updated_at = now()
+WHERE delivery_membership_projection.member_version <= EXCLUDED.member_version
+`, command.TenantID, command.ConversationID, command.MemberUserID, role, status, joinSeq, leaveSeq, command.MemberVersion, command.PermissionVersion, command.EventID)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func memberStatusForEvent(eventType string) string {
+	switch eventType {
+	case types.TimelineEventConversationMemberLeft:
+		return types.DeliveryMemberStatusLeft
+	case types.TimelineEventConversationMemberRemoved:
+		return types.DeliveryMemberStatusBanned
+	default:
+		return types.DeliveryMemberStatusActive
+	}
+}
+
+func insertInboxOutbox(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.ProjectTimelineEventCommand,
+	userID types.UserID,
+) error {
+	payload := map[string]any{
+		"tenant_id":        command.TenantID,
+		"user_id":          userID,
+		"conversation_id":  command.ConversationID,
+		"conversation_seq": command.ConversationSeq,
+		"event_id":         command.EventID,
+		"message_id":       command.MessageID,
+	}
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	eventID := inboxEventID(command, userID)
+	_, err = tx.Exec(ctx, `
+INSERT INTO delivery_outbox (
+    event_id,
+    tenant_id,
+    conversation_id,
+    aggregate_version,
+    event_type,
+    event_version,
+    partition_key,
+    mapping_version,
+    correlation_id,
+    causation_id,
+    producer,
+    trace_id,
+    payload_json,
+    status,
+    available_at,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, 'delivery.inbox_item.created.v1', '1.0.0', $5, 1, $6, $7, 'delivery-service', $8, $9, 'PENDING', now(), now(), now())
+ON CONFLICT (event_id) DO NOTHING
+`, eventID, command.TenantID, command.ConversationID, command.ConversationSeq, partitionKeyFor(command.TenantID, command.ConversationID), command.CorrelationID, command.EventID, command.TraceID, payloadBytes)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func upsertKafkaCheckpoint(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.ProjectTimelineEventCommand,
+) error {
+	_, err := tx.Exec(ctx, `
+INSERT INTO delivery_kafka_checkpoints (
+    consumer_group,
+    topic,
+    partition_id,
+    offset_value,
+    updated_at
+) VALUES ($1, $2, $3, $4, now())
+ON CONFLICT (consumer_group, topic, partition_id) DO UPDATE
+SET offset_value = GREATEST(delivery_kafka_checkpoints.offset_value, EXCLUDED.offset_value),
+    updated_at = now()
+`, command.ConsumerGroup, command.Topic, command.PartitionID, command.OffsetValue)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
 func (repository *Repository) PullInbox(
 	ctx context.Context,
 	command types.PullInboxCommand,
@@ -259,7 +505,7 @@ ON CONFLICT (event_id) DO NOTHING
 		command.AuthContext.TenantID,
 		command.ConversationID,
 		receivedSeq,
-		partitionKey(command),
+		partitionKeyFor(command.AuthContext.TenantID, command.ConversationID),
 		command.AuthContext.RequestID,
 		command.AuthContext.RequestID,
 		command.AuthContext.TraceID,
@@ -271,8 +517,21 @@ ON CONFLICT (event_id) DO NOTHING
 	return nil
 }
 
-func partitionKey(command types.AckDeliveryCommand) string {
-	return fmt.Sprintf("%s:%s", command.AuthContext.TenantID, command.ConversationID)
+func partitionKeyFor(tenantID types.TenantID, conversationID types.ConversationID) string {
+	return fmt.Sprintf("%s:%s", tenantID, conversationID)
+}
+
+func inboxEventID(command types.ProjectTimelineEventCommand, userID types.UserID) string {
+	raw := fmt.Sprintf(
+		"%s\x1f%s\x1f%s\x1f%d\x1f%s",
+		command.TenantID,
+		userID,
+		command.ConversationID,
+		command.ConversationSeq,
+		command.EventID,
+	)
+	sum := sha256.Sum256([]byte(raw))
+	return "evt_delivery_inbox_" + hex.EncodeToString(sum[:16])
 }
 
 func ackEventID(command types.AckDeliveryCommand, receivedSeq int64) string {

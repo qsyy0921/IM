@@ -192,7 +192,13 @@ kafka_publish_record_latency_estimate
 error_topn
 ```
 
-压测结果输出到 `loadtest/results/`，大文件和临时日志默认不提交。
+小规模 smoke 可以输出到仓库内 `loadtest/results/`，大文件和临时日志默认不提交。
+
+中大型压测、趋势图、跨机器测试和长时间运行结果不要再写入 C 盘或 Docker 数据盘；本机默认暂存到机械盘：
+
+```text
+H:\NexusIM\loadtest-results
+```
 
 每个阶段必须新增一份独立压测报告，不覆盖旧报告。报告按微服务放在 `docs/runbook/loadtest/<service>/`，推荐命名：
 
@@ -221,7 +227,7 @@ CPU / 内存 / Docker / 连接池 / worker 配置
 当前结论和下一步
 ```
 
-`loadtest/results/` 保存所有中间结果和趋势图；这些文件默认不提交，但报告必须引用关键结果路径，保证以后能追溯。
+`loadtest/results/` 只保存小 smoke 或历史索引；中大型中间结果和趋势图保存到 `H:\NexusIM\loadtest-results`。这些文件默认不提交，但报告必须引用关键结果路径，保证以后能追溯。
 
 ## 8. GitHub 同步要求
 

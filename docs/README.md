@@ -10,19 +10,19 @@
 
 ## 当前阅读路径
 
-每轮 Codex 工作必须先读 `runbook/current-goal.md`，再按当前目标进入其他文档。
+每轮 Codex 工作必须先读 `runbook/current-brief.md`。只有需要细节、历史证据或风险上下文时，再按关键词查询 `runbook/current-goal.md`，不要每轮全文读取长文档。
 
-1. `runbook/current-goal.md`：确认当前阶段、评审要求、风险和下一步。
-2. `architecture/target-architecture.md`：确认目标态、技术栈和不可退让项。
-3. `sdd/conversation-service.md`：确认当前 `GetSendContext` read path 和成员事实边界。
-4. `sdd/conversation-service-member-change-saga.md`：确认下一步成员变更 Saga、边界事件和 ACL 投影失败窗口。
-5. `sdd/message-service.md`：确认已完成的 `SendMessage` 普通会话写入链路和对 conversation port 的依赖。
-6. `architecture/tadd.md`：确认工程目录、六层 DDD、Docker Compose 和编码门禁。
-7. `runbook/distributed-local.md`：确认当前本地多进程分布式 smoke 拓扑和运行入口。
-8. `runbook/conversation-service-local.md`：确认 conversation-service 本地启动和跨服务 smoke 方式。
-9. `runbook/local-loadtest.md`：确认本地双机压测端口和执行方式。
-10. `runbook/loadtest/message-service/loadtest-report-20260609-message-service-consolidated.md`：查看 `message-service` 第一阶段压测总报告、瓶颈排查过程和面试可讲结论。
-11. `runbook/loadtest/message-service/README.md`：查看 `message-service` 所有小规模压测报告和矩阵报告索引。
+1. `runbook/current-brief.md`：低 token 当前入口，确认当前优先级、硬边界和下一步。
+2. `runbook/current-goal.md`：完整历史、风险、评审要求和报告索引；只按需查询。
+3. `architecture/target-architecture.md`：确认目标态、技术栈和不可退让项。
+4. `sdd/receipt-service.md`：确认当前第三层产品能力切片，送达 / 已读回执边界。
+5. `sdd/delivery-service.md`：确认 durable inbox、AckDelivery 和 delivery event 边界。
+6. `sdd/push-gateway.md`：确认在线通知、Redis route、resume buffer 和 ACK 转发边界。
+7. `sdd/conversation-service.md`：确认当前 `GetSendContext` read path 和成员事实边界。
+8. `sdd/conversation-service-member-change-saga.md`：确认成员变更 Saga、边界事件和 ACL 投影失败窗口。
+9. `sdd/message-service.md`：确认已完成的 `SendMessage` 普通会话写入链路和对 conversation port 的依赖。
+10. `architecture/tadd.md`：确认工程目录、六层 DDD、Docker Compose 和编码门禁。
+11. `runbook/distributed-local.md`：确认当前本地多进程分布式 smoke 拓扑和运行入口。
 
 ## 写文档规则
 

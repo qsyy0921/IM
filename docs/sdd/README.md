@@ -14,6 +14,7 @@
 | conversation-service member_change_saga SDD | `docs/sdd/conversation-service-member-change-saga.md` | 成员变更 Saga、成员边界 timeline event、ACL 投影失败窗口 |
 | delivery-service SDD | `docs/sdd/delivery-service.md` | timeline 投影、user_inbox、离线补拉和设备 ACK |
 | push-gateway SDD | `docs/sdd/push-gateway.md` | WebSocket 在线连接、delivery event 唤醒、PullInbox / AckDelivery 协调 |
+| receipt-service SDD | `docs/sdd/receipt-service.md` | 送达 / 已读回执 read model、MarkRead 和 receipt event 边界 |
 
 ## 六层 DDD 约定
 
@@ -38,6 +39,7 @@
 | `conversation-service / member_change_saga` | SDD 已冻结 v1.0；proto / schema / migration v2 / relay builder / 最小 `CreateMemberChange` 写路径、saga publish 状态推进和 full smoke 已落地 | 后续补 LEAVE / REMOVE / ROLE_CHANGED、DLQ repair 和生产韧性 |
 | `push-gateway` | SDD v0.1 Draft 已存在 | 进入 proto / 六层骨架前需要阶段评审；第一阶段只做在线通知和回源协调 |
 | `delivery-service` | SDD v0.1 已存在，最小 projection / PullInbox / AckDelivery / delivery outbox relay 已落地 | 可以支撑 push-gateway 第一阶段，只要 push-gateway 不绕过 durable inbox / ACK |
+| `receipt-service` | SDD v0.1 Draft 已新增 | 下一步先冻结 SDD，再落 proto / migration / 六层骨架；不得直接读取 delivery-service 内部表 |
 | `retrieval-gateway` | SDD 未完成 | 不进入第一条代码切片 |
 
 ## 已完成的 message-service 切片
@@ -124,6 +126,26 @@ Kafka im.delivery.events
 - `delivery.notify` 只是唤醒信号，客户端展示事实仍以 `PullInbox` 为准。
 - 第一阶段不新增 PostgreSQL migration；多实例前再接 Redis route。
 
+## 下一步 receipt-service 切片
+
+当前优先范围：
+
+```text
+Kafka im.delivery.events
+-> receipt-service delivery event projection
+-> received / read cursor
+-> MarkRead
+-> GetReceiptState
+-> receipt_outbox
+```
+
+边界：
+
+- `delivery.ack.recorded.v1` 是 received / device persisted 事实，不等于 read。
+- read 必须由客户端显式 `MarkRead` 推进。
+- receipt-service 不直接读取 `delivery-service` 内部表；它消费 `im.delivery.events` 建自己的 projection。
+- receipt event 只能通过 receipt outbox 发布。
+
 ## 已补齐的工程基线
 
 | 文件 | 状态 | 说明 |
@@ -142,7 +164,8 @@ Kafka im.delivery.events
 
 优先级：
 
-1. `timeline-service-sequencer.md`
-2. `retrieval-gateway.md`
+1. `receipt-service` proto / migration / 六层骨架
+2. `timeline-service-sequencer.md`
+3. `retrieval-gateway.md`
 
 其中 `push-gateway.md` 已补 v0.1 Draft，下一步应先做阶段评审，再落 WebSocket frame 契约、六层骨架和最小在线通知 smoke。`timeline-service` SDD 不阻塞普通会话当前实现，但阻塞热点会话生产化。

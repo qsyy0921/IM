@@ -31,8 +31,11 @@ services/<service-name>/
 
 | 服务 | 状态 | 说明 |
 | --- | --- | --- |
-| `message-service` | 第一阶段主链路已落地 | 普通会话 `SendMessage -> PostgreSQL transaction -> outbox -> Kafka` 已实现；热点 sequencer、delivery、push、RAG、Agent 暂不实现。 |
-| `conversation-service` | 第一条 read path 实现中 | 提供 `GetSendContext`，返回会话存在性、成员版本、权限版本、会话模式和 fanout 策略，用于替换 message-service strict conversation mock。 |
+| `message-service` | 第一阶段主链路已落地 | 普通会话 `SendMessage -> PostgreSQL transaction -> outbox -> Kafka` 已实现；热点 sequencer、RAG、Agent 暂不实现。 |
+| `conversation-service` | 最小 read/write path 已落地 | 提供 `GetSendContext`，并已实现成员变更 `CreateMemberChange / GetMemberChange`、成员边界事件和 saga progress worker。 |
+| `delivery-service` | 最小投递链路已落地 | 消费 conversation timeline，维护 `user_inbox`、`AckDelivery` cursor、`delivery_outbox` 和 `im.delivery.events`。 |
+| `push-gateway` | 最小在线通知 / 分布式 route 已落地 | 消费 `im.delivery.events`，通过 WebSocket 发送轻量 notify，并通过 Redis route / resume 支持跨实例在线唤醒。 |
+| `receipt-service` | SDD v0.1 Draft | 下一步第三层产品能力：基于 `im.delivery.events` 建送达 / 已读回执 read model，先冻结 SDD 再落代码。 |
 
 ## 约束
 

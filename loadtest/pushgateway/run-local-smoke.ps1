@@ -4,12 +4,14 @@ param(
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
     [string]$ReceiverDeviceIds = "push-device-1",
-    [ValidateSet("full", "slow-client")]
+    [ValidateSet("full", "slow-client", "redis-fault")]
     [string]$Scenario = "full",
     [ValidateSet("memory", "redis")]
     [string]$RouteBackend = "memory",
     [string]$RedisAddr = "127.0.0.1:6379",
     [string]$RedisKeyPrefix = "",
+    [string]$RedisFaultCommand = "",
+    [string]$RedisRestoreCommand = "",
     [int]$SlowMessageCount = 128,
     [switch]$SkipBuild
 )
@@ -42,6 +44,12 @@ if ($Scenario -eq "slow-client") {
     $pushSessionQueueSize = "1"
     $pushWriteTimeout = "1ms"
     $pushTestWriteDelay = "50ms"
+}
+if ($Scenario -eq "redis-fault" -and -not $RedisFaultCommand) {
+    $RedisFaultCommand = "docker stop nexusim-redis | Out-Null"
+}
+if ($Scenario -eq "redis-fault" -and -not $RedisRestoreCommand) {
+    $RedisRestoreCommand = "docker start nexusim-redis | Out-Null"
 }
 
 New-Item -ItemType Directory -Force $resultDir | Out-Null
@@ -246,6 +254,8 @@ try {
         --receiver-device-ids $ReceiverDeviceIds `
         --scenario $Scenario `
         --slow-message-count $SlowMessageCount `
+        --redis-fault-command $RedisFaultCommand `
+        --redis-restore-command $RedisRestoreCommand `
         --push-metrics-url "http://127.0.0.1:11598/debug/metrics" `
         --route-backend $RouteBackend `
         --redis-key-prefix $pushRouteKeyPrefix `
@@ -261,6 +271,10 @@ try {
         if ($null -ne $proc -and -not $proc.HasExited) {
             Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
         }
+    }
+    if ($Scenario -eq "redis-fault" -and $RedisRestoreCommand) {
+        Invoke-Expression $RedisRestoreCommand
+        Wait-Tcp -HostName "127.0.0.1" -Port 6379 -TimeoutSeconds 20
     }
 }
 

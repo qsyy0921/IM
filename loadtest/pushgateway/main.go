@@ -88,6 +88,8 @@ type config struct {
 	redisKeyPrefix        string
 	pushWSGatewayID       string
 	pushConsumerGatewayID string
+	redisFaultCommand     string
+	redisRestoreCommand   string
 	cleanup               bool
 }
 
@@ -124,6 +126,7 @@ type summary struct {
 	PullInbox               pullSummary        `json:"pull_inbox"`
 	DeliveryAckOK           frameSnapshot      `json:"delivery_ack_ok"`
 	SlowClient              *slowClientSummary `json:"slow_client,omitempty"`
+	RedisFault              *redisFaultSummary `json:"redis_fault,omitempty"`
 	PushMetricsBefore       *pushMetrics       `json:"push_metrics_before,omitempty"`
 	PushMetricsAfter        *pushMetrics       `json:"push_metrics_after,omitempty"`
 	CursorLastReceivedSeq   *int64             `json:"cursor_last_received_seq,omitempty"`
@@ -155,6 +158,16 @@ type slowClientSummary struct {
 	ReplayFramesRead   int           `json:"replay_frames_read"`
 	RecoveryPullInbox  pullSummary   `json:"recovery_pull_inbox"`
 	AckOK              frameSnapshot `json:"ack_ok"`
+}
+
+type redisFaultSummary struct {
+	FaultCommand        string        `json:"fault_command"`
+	NotifyReceived      bool          `json:"notify_received"`
+	UnexpectedNotify    frameSnapshot `json:"unexpected_notify,omitempty"`
+	NotifyWaitError     string        `json:"notify_wait_error,omitempty"`
+	RecoveryPullInbox   pullSummary   `json:"recovery_pull_inbox"`
+	AckOK               frameSnapshot `json:"ack_ok"`
+	DeliveryOutboxTotal int64         `json:"delivery_outbox_total"`
 }
 
 type pushMetrics struct {
@@ -242,13 +255,15 @@ func parseConfig() config {
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "push-device-1", "online receiver device id")
 	var receiverDeviceIDs string
 	flag.StringVar(&receiverDeviceIDs, "receiver-device-ids", "", "comma separated online receiver device ids; overrides receiver-device-id when set")
-	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full or slow-client")
+	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, slow-client, or redis-fault")
 	flag.IntVar(&cfg.slowMessageCount, "slow-message-count", 128, "number of messages sent while slow client does not read")
 	flag.StringVar(&cfg.pushMetricsURL, "push-metrics-url", "", "push-gateway debug metrics URL")
 	flag.StringVar(&cfg.routeBackend, "route-backend", "", "push route backend used by the smoke environment")
 	flag.StringVar(&cfg.redisKeyPrefix, "redis-key-prefix", "", "Redis route key prefix used by the smoke environment")
 	flag.StringVar(&cfg.pushWSGatewayID, "push-ws-gateway-id", "", "WebSocket gateway id used by cross-instance route smoke")
 	flag.StringVar(&cfg.pushConsumerGatewayID, "push-consumer-gateway-id", "", "delivery consumer gateway id used by cross-instance route smoke")
+	flag.StringVar(&cfg.redisFaultCommand, "redis-fault-command", "", "optional command executed after WebSocket route registration and before SendMessage in redis-fault scenario")
+	flag.StringVar(&cfg.redisRestoreCommand, "redis-restore-command", "", "optional command executed after PullInbox recovery and before reconnect/ACK in redis-fault scenario")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete existing rows for tenant before running")
 	flag.Parse()
 	cfg.receiverDeviceIDs = parseDeviceIDs(receiverDeviceIDs, cfg.receiverDeviceID)
@@ -342,6 +357,8 @@ func run(cfg config) error {
 	case "full":
 	case "slow-client":
 		return runSlowClientScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
+	case "redis-fault":
+		return runRedisFaultScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	default:
 		return finish(cfg, &result, fmt.Errorf("unsupported scenario: %s", cfg.scenario))
 	}
@@ -561,6 +578,125 @@ func runSlowClientScenario(
 	return finish(cfg, result, nil)
 }
 
+func runRedisFaultScenario(
+	ctx context.Context,
+	cfg config,
+	pool *pgxpool.Pool,
+	conversationClient conversationv1.ConversationServiceClient,
+	messageClient messagev1.MessageServiceClient,
+	deliveryClient deliveryv1.DeliveryServiceClient,
+	result *summary,
+) error {
+	if strings.TrimSpace(cfg.redisFaultCommand) == "" {
+		return finish(cfg, result, errors.New("redis-fault-command is required for redis-fault scenario"))
+	}
+	conn, hello, err := connectWebSocket(ctx, cfg, cfg.receiverDeviceID)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("connect websocket before redis fault: %w", err))
+	}
+	defer conn.Close(nhooyr.StatusNormalClosure, "")
+	result.ServerHello = snapshotFrame(hello)
+	result.DeviceNotifications = []deviceSummary{{
+		DeviceID:    cfg.receiverDeviceID,
+		ServerHello: snapshotFrame(hello),
+	}}
+
+	begin := time.Now()
+	join, err := createReceiverJoin(ctx, cfg, conversationClient)
+	result.Latencies["create_member_join"] = elapsedMS(begin)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("create receiver join: %w", err))
+	}
+	result.MemberJoin = memberJoinSummary{
+		ChangeID:          join.GetChangeId(),
+		BoundarySeq:       join.GetBoundarySeq(),
+		MemberVersion:     join.GetMemberVersion(),
+		PermissionVersion: join.GetPermissionVersion(),
+	}
+	if err := waitMembership(ctx, pool, cfg); err != nil {
+		return finish(cfg, result, err)
+	}
+
+	if err := executeCommand(ctx, cfg, cfg.redisFaultCommand); err != nil {
+		return finish(cfg, result, fmt.Errorf("execute redis fault command: %w", err))
+	}
+
+	begin = time.Now()
+	send, err := sendMessage(ctx, cfg, messageClient, 1)
+	result.Latencies["send_message"] = elapsedMS(begin)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("send message after redis fault: %w", err))
+	}
+	result.SendMessage = sendSummary{MessageID: send.GetMessageId(), ConversationSeq: send.GetConversationSeq()}
+
+	fault := &redisFaultSummary{FaultCommand: cfg.redisFaultCommand}
+	fault.NotifyReceived = false
+	fault.NotifyWaitError = "not attempted; redis-fault scenario validates durable PullInbox fallback without blocking the WebSocket read path"
+
+	pull, err := pullInboxAtLeast(ctx, cfg, deliveryClient, 0, 100, 1, send.GetConversationSeq())
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("pull inbox after redis fault: %w", err))
+	}
+	result.PullInbox = pull
+	fault.RecoveryPullInbox = pull
+	if pull.ItemCount == 0 || pull.MaxSeq < send.GetConversationSeq() {
+		result.RedisFault = fault
+		return finish(cfg, result, fmt.Errorf("pull inbox did not recover redis fault message: %+v", pull))
+	}
+
+	if strings.TrimSpace(cfg.redisRestoreCommand) != "" {
+		if err := executeCommand(ctx, cfg, cfg.redisRestoreCommand); err != nil {
+			return finish(cfg, result, fmt.Errorf("execute redis restore command: %w", err))
+		}
+	}
+	conn.CloseNow()
+	reconnected, reconnectedHello, err := connectWebSocketWithResume(
+		ctx,
+		cfg,
+		cfg.receiverDeviceID,
+		hello.ResumeToken,
+		[]cursor{{ConversationID: cfg.conversationID, Seq: pull.MaxSeq}},
+	)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("reconnect websocket after redis restore: %w", err))
+	}
+	defer reconnected.Close(nhooyr.StatusNormalClosure, "")
+	result.ServerHello = snapshotFrame(reconnectedHello)
+	result.DeviceNotifications[0].ServerHello = snapshotFrame(reconnectedHello)
+
+	ackOK, skipped, err := ackViaWebSocketWithSkipped(ctx, cfg, reconnected, cfg.receiverDeviceID, pull.MaxSeq)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("ack after redis fault: %w", err))
+	}
+	if skipped > 0 {
+		return finish(cfg, result, fmt.Errorf("unexpected pushed frames while acking after redis fault: skipped=%d", skipped))
+	}
+	result.DeliveryAckOK = snapshotFrame(ackOK)
+	result.DeviceNotifications[0].DeliveryAckOK = snapshotFrame(ackOK)
+	fault.AckOK = snapshotFrame(ackOK)
+	if err := waitCursor(ctx, pool, cfg, cfg.receiverDeviceID, pull.MaxSeq); err != nil {
+		return finish(cfg, result, err)
+	}
+	cursorSeq, err := queryCursor(ctx, pool, cfg, cfg.receiverDeviceID)
+	if err != nil {
+		return finish(cfg, result, err)
+	}
+	result.CursorLastReceivedSeq = &cursorSeq
+	result.DeviceNotifications[0].CursorLastReceivedSeq = &cursorSeq
+	if err := waitDeliveryOutboxDrain(ctx, pool, cfg); err != nil {
+		return finish(cfg, result, err)
+	}
+	if err := fillPostgresStats(ctx, pool, cfg, result); err != nil {
+		return finish(cfg, result, err)
+	}
+	if result.DeliveryOutboxTotal != nil {
+		fault.DeliveryOutboxTotal = *result.DeliveryOutboxTotal
+	}
+	result.RedisFault = fault
+	result.Success = true
+	return finish(cfg, result, nil)
+}
+
 func connectWebSocket(ctx context.Context, cfg config, deviceID string) (*nhooyr.Conn, serverFrame, error) {
 	return connectWebSocketWithResume(ctx, cfg, deviceID, "", nil)
 }
@@ -665,7 +801,11 @@ func sendMessage(
 }
 
 func waitNotify(ctx context.Context, cfg config, conn *nhooyr.Conn) (serverFrame, error) {
-	readCtx, cancel := context.WithTimeout(ctx, cfg.waitTimeout)
+	return waitNotifyFor(ctx, cfg, conn, cfg.waitTimeout)
+}
+
+func waitNotifyFor(ctx context.Context, cfg config, conn *nhooyr.Conn, timeout time.Duration) (serverFrame, error) {
+	readCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	for {
 		var frame serverFrame
@@ -683,6 +823,21 @@ func waitNotify(ctx context.Context, cfg config, conn *nhooyr.Conn) (serverFrame
 			return frame, nil
 		}
 	}
+}
+
+func executeCommand(ctx context.Context, cfg config, command string) error {
+	command = strings.TrimSpace(command)
+	if command == "" {
+		return nil
+	}
+	runCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(runCtx, "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))
+	}
+	return nil
 }
 
 type slowReadResult struct {

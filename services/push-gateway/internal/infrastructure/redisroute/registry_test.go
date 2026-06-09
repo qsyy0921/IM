@@ -313,6 +313,53 @@ func TestSubscriberEnqueuesRemoteNotificationLocally(t *testing.T) {
 	<-done
 }
 
+func TestSubscriberSkipsMalformedPayloadAndContinues(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	local := memory.NewRegistry()
+	outbound := make(chan types.ServerFrame, 1)
+	if _, err := local.Register(context.Background(), types.SessionRegistration{
+		AuthContext: types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"},
+		SessionID:   "session-1",
+		Outbound:    outbound,
+	}); err != nil {
+		t.Fatalf("local register: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- NewSubscriber(local, client, Config{GatewayID: "gateway-a"}).Run(ctx)
+	}()
+	time.Sleep(50 * time.Millisecond)
+
+	channel := GatewayChannel(defaultKeyPrefix, "gateway-a")
+	if err := client.Publish(ctx, channel, "{").Err(); err != nil {
+		t.Fatalf("publish malformed payload: %v", err)
+	}
+	time.Sleep(50 * time.Millisecond)
+	payload, err := json.Marshal(testNotification())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Publish(ctx, channel, payload).Err(); err != nil {
+		t.Fatalf("publish valid payload: %v", err)
+	}
+
+	select {
+	case frame := <-outbound:
+		if frame.Op != types.OpDeliveryNotify || frame.EventID != "delivery-event-1" {
+			t.Fatalf("unexpected frame: %+v", frame)
+		}
+	case err := <-done:
+		t.Fatalf("subscriber exited after malformed payload: %v", err)
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for local enqueue")
+	}
+	cancel()
+	<-done
+}
+
 func testNotification() types.DeliveryNotification {
 	return types.DeliveryNotification{
 		EventID:         "delivery-event-1",

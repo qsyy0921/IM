@@ -23,7 +23,8 @@ func (usecase *NotifyDeliveryUseCase) Execute(
 		notification.UserID == "" ||
 		notification.ConversationID == "" ||
 		notification.ConversationSeq <= 0 ||
-		notification.EventID == "" {
+		notification.EventID == "" ||
+		notification.SourceEventType == "" {
 		return types.NotifyDeliveryResult{}, types.NewInvalidFrame("delivery notification is incomplete")
 	}
 	return usecase.registry.EnqueueNotification(ctx, notification)

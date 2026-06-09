@@ -39,6 +39,7 @@ type ServerFrame struct {
 	ConversationID    string               `json:"conversation_id,omitempty"`
 	ConversationSeq   int64                `json:"conversation_seq,omitempty"`
 	SourceEventID     string               `json:"source_event_id,omitempty"`
+	SourceEventType   string               `json:"source_event_type,omitempty"`
 	MessageID         string               `json:"message_id,omitempty"`
 	CorrelationID     string               `json:"correlation_id,omitempty"`
 	PullRequired      bool                 `json:"pull_required,omitempty"`

@@ -22,6 +22,7 @@ delivery_outbox
 
 - push-gateway 消费的是 `im.delivery.events`，不是 `conversation.timeline.events`。
 - `delivery.notify` 是轻量唤醒信号，不是 message 事实源。
+- `delivery.notify.source_event_type` 只用于区分新增 / 编辑 / 撤回 / 删除唤醒，客户端展示事实仍以 `PullInbox` 为准。
 - 客户端展示和本地持久化以 `PullInbox` 返回为准。
 - ACK 仍由 `delivery-service AckDelivery` 推进 cursor。
 - `delivery.ack` 成功必须有 `delivery.ack.ok`，失败必须返回稳定 error frame。

@@ -24,8 +24,9 @@ conversation-service
 5. 当前第三层消息变更能力已在 clean commit `8d008de` 跑通 `RevokeMessage` 最小真实进程 smoke：`SendMessage -> PullInbox(message.persisted.v1) -> RevokeMessage -> message outbox relay -> delivery tombstone projection -> PullInbox(message.revoked.v1) -> AckDelivery`；并已补 hardening：第一阶段只允许原发送者撤回，delivery tombstone 只投给已在 `user_inbox` 收到原消息的用户，revoke 早于 persisted 投影时 fail-closed 不提交 checkpoint。报告见 `docs/runbook/loadtest/message-service/loadtest-report-20260610-revoke-message-smoke.md`。
 6. 当前第三层消息变更能力已在 clean commit `cb2f07d` 跑通 `EditMessage` 最小真实进程 smoke：`SendMessage -> PullInbox(message.persisted.v1) -> EditMessage -> message outbox relay -> delivery edit projection -> PullInbox(message.edited.v1) -> AckDelivery`；第一阶段限定原发送者编辑自己的 TEXT 消息，采用 last-write-wins + `message_change_history` 保留 before/after payload，不引入新服务或跨服务内部表读取。报告见 `docs/runbook/loadtest/message-service/loadtest-report-20260610-edit-message-smoke.md`。
 7. 当前第三层消息变更能力已在 clean commit `b001eb1` 跑通 `DeleteMessage` 最小真实进程 smoke：`SendMessage -> PullInbox(message.persisted.v1) -> DeleteMessage -> message outbox relay -> delivery delete projection -> PullInbox(message.deleted.v1) -> AckDelivery`；第一阶段语义是全局 `CONVERSATION_VIEW` tombstone，不是用户私有删除或合规物理擦除。报告见 `docs/runbook/loadtest/message-service/loadtest-report-20260610-delete-message-smoke.md`。
-8. RAG / Agent / 智能总结属于第四层，必须等消息事实、权限边界、撤回/编辑/删除语义更稳定后再做。
-9. Kafka HA、PostgreSQL failover、Redis quorum / 网络分区可作为后续生产化项，不作为当前主线阻塞。
+8. push-gateway 在线 `delivery.notify` 保持轻量通知边界，同时需要透传 `source_event_type`，让客户端能区分新增 / 编辑 / 撤回 / 删除唤醒；展示事实仍以 `PullInbox` 为准。
+9. RAG / Agent / 智能总结属于第四层，必须等消息事实、权限边界、撤回/编辑/删除语义更稳定后再做。
+10. Kafka HA、PostgreSQL failover、Redis quorum / 网络分区可作为后续生产化项，不作为当前主线阻塞。
 
 ## 硬边界
 

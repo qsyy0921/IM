@@ -611,6 +611,7 @@ func testNotification() types.DeliveryNotification {
 		ConversationID:  "conversation-1",
 		ConversationSeq: 7,
 		SourceEventID:   "timeline-event-1",
+		SourceEventType: "message.persisted.v1",
 		MessageID:       "message-1",
 	}
 }

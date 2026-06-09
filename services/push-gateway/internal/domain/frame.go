@@ -42,6 +42,7 @@ func DeliveryNotify(notification types.DeliveryNotification) types.ServerFrame {
 		ConversationID:  notification.ConversationID,
 		ConversationSeq: notification.ConversationSeq,
 		SourceEventID:   notification.SourceEventID,
+		SourceEventType: notification.SourceEventType,
 		MessageID:       notification.MessageID,
 		CorrelationID:   notification.CorrelationID,
 		PullRequired:    true,

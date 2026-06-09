@@ -75,6 +75,7 @@ func TestWebSocketPingAndAck(t *testing.T) {
 			ConversationID:  "conversation-1",
 			ConversationSeq: 11,
 			SourceEventID:   "timeline-event-1",
+			SourceEventType: "message.persisted.v1",
 			MessageID:       "message-1",
 			CorrelationID:   "corr-1",
 		},
@@ -89,6 +90,7 @@ func TestWebSocketPingAndAck(t *testing.T) {
 		notify.EventID != "delivery-event-1" ||
 		notify.ConversationSeq != 11 ||
 		notify.SourceEventID != "timeline-event-1" ||
+		notify.SourceEventType != "message.persisted.v1" ||
 		notify.MessageID != "message-1" ||
 		!notify.PullRequired {
 		t.Fatalf("unexpected notify: %+v", notify)
@@ -272,6 +274,7 @@ func TestWebSocketDisconnectUnregistersBeforeFurtherNotify(t *testing.T) {
 			UserID:          "user-1",
 			ConversationID:  "conversation-1",
 			ConversationSeq: 7,
+			SourceEventType: "message.persisted.v1",
 		}})
 		if err != nil {
 			t.Fatalf("notify after disconnect: %v", err)
@@ -325,6 +328,7 @@ func TestWebSocketReplaysResumeBuffer(t *testing.T) {
 			UserID:          "user-1",
 			ConversationID:  "conversation-1",
 			ConversationSeq: 7,
+			SourceEventType: "message.persisted.v1",
 			MessageID:       "message-7",
 		},
 	}); err != nil {
@@ -432,6 +436,7 @@ func TestWebSocketUnknownResumeTokenIsReplaced(t *testing.T) {
 			UserID:          "user-1",
 			ConversationID:  "conversation-1",
 			ConversationSeq: 7,
+			SourceEventType: "message.persisted.v1",
 			MessageID:       "message-7",
 		},
 	}); err != nil {

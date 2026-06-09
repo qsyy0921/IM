@@ -26,6 +26,7 @@ func TestWorkerNotifiesAndCommitsInboxItemCreated(t *testing.T) {
 				ConversationId:  "conversation-1",
 				ConversationSeq: 7,
 				SourceEventId:   "timeline-event-1",
+				SourceEventType: "message.edited.v1",
 				MessageId:       "message-1",
 			},
 		},
@@ -40,11 +41,44 @@ func TestWorkerNotifiesAndCommitsInboxItemCreated(t *testing.T) {
 	}
 	if notifier.calls != 1 ||
 		notifier.command.Notification.UserID != "user-1" ||
-		notifier.command.Notification.ConversationSeq != 7 {
+		notifier.command.Notification.ConversationSeq != 7 ||
+		notifier.command.Notification.SourceEventType != "message.edited.v1" {
 		t.Fatalf("unexpected notifier=%+v", notifier)
 	}
 	if consumer.commits != 1 {
 		t.Fatalf("expected commit, got %d", consumer.commits)
+	}
+}
+
+func TestWorkerDefaultsMissingSourceEventTypeForOlderEvents(t *testing.T) {
+	event := &deliveryeventsv1.DeliveryEvent{
+		EventId:      "delivery-event-1",
+		EventType:    EventInboxItemCreatedV1,
+		EventVersion: "1.0.0",
+		TenantId:     "tenant-1",
+		AggregateId:  "conversation-1",
+		PartitionKey: "tenant-1:conversation-1",
+		Payload: &deliveryeventsv1.DeliveryEvent_InboxItemCreated{
+			InboxItemCreated: &deliveryeventsv1.DeliveryInboxItemCreatedV1{
+				TenantId:        "tenant-1",
+				UserId:          "user-1",
+				ConversationId:  "conversation-1",
+				ConversationSeq: 7,
+				SourceEventId:   "timeline-event-1",
+				MessageId:       "message-1",
+			},
+		},
+	}
+	value, _ := proto.Marshal(event)
+	consumer := &fakeConsumer{messages: []types.DeliveryEventMessage{{Value: value}}}
+	notifier := &recordingNotifier{}
+	worker := NewWorker(consumer, notifier)
+
+	if err := worker.Run(context.Background()); !errors.Is(err, context.Canceled) {
+		t.Fatalf("run: %v", err)
+	}
+	if notifier.command.Notification.SourceEventType != SourceEventMessagePersisted {
+		t.Fatalf("expected persisted fallback, got %+v", notifier.command.Notification)
 	}
 }
 

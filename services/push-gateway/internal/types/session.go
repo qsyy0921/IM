@@ -49,6 +49,7 @@ type DeliveryNotification struct {
 	ConversationID  string
 	ConversationSeq int64
 	SourceEventID   string
+	SourceEventType string
 	MessageID       string
 	CorrelationID   string
 }

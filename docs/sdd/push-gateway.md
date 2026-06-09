@@ -167,6 +167,7 @@ GET /ws?token=...&device_id=...
   "conversation_id": "conv_1",
   "conversation_seq": 1025,
   "source_event_id": "timeline_evt_01",
+  "source_event_type": "message.persisted.v1",
   "message_id": "msg_01",
   "correlation_id": "corr_01",
   "pull_required": true

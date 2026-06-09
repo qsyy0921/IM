@@ -56,6 +56,7 @@ type serverFrame struct {
 	ConversationID  string `json:"conversation_id,omitempty"`
 	ConversationSeq int64  `json:"conversation_seq,omitempty"`
 	SourceEventID   string `json:"source_event_id,omitempty"`
+	SourceEventType string `json:"source_event_type,omitempty"`
 	MessageID       string `json:"message_id,omitempty"`
 	PullRequired    bool   `json:"pull_required,omitempty"`
 	LastReceivedSeq int64  `json:"last_received_seq,omitempty"`
@@ -236,6 +237,7 @@ type frameSnapshot struct {
 	ConversationID  string `json:"conversation_id,omitempty"`
 	ConversationSeq int64  `json:"conversation_seq,omitempty"`
 	SourceEventID   string `json:"source_event_id,omitempty"`
+	SourceEventType string `json:"source_event_type,omitempty"`
 	MessageID       string `json:"message_id,omitempty"`
 	PullRequired    bool   `json:"pull_required,omitempty"`
 	LastReceivedSeq int64  `json:"last_received_seq,omitempty"`
@@ -1533,6 +1535,7 @@ func snapshotFrame(frame serverFrame) frameSnapshot {
 		ConversationID:  frame.ConversationID,
 		ConversationSeq: frame.ConversationSeq,
 		SourceEventID:   frame.SourceEventID,
+		SourceEventType: frame.SourceEventType,
 		MessageID:       frame.MessageID,
 		PullRequired:    frame.PullRequired,
 		LastReceivedSeq: frame.LastReceivedSeq,

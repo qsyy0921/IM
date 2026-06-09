@@ -10,9 +10,10 @@ import (
 )
 
 const (
-	TopicDeliveryEvents        = "im.delivery.events"
-	EventInboxItemCreatedV1    = "delivery.inbox_item.created.v1"
-	EventDeliveryAckRecordedV1 = "delivery.ack.recorded.v1"
+	TopicDeliveryEvents         = "im.delivery.events"
+	EventInboxItemCreatedV1     = "delivery.inbox_item.created.v1"
+	EventDeliveryAckRecordedV1  = "delivery.ack.recorded.v1"
+	SourceEventMessagePersisted = "message.persisted.v1"
 )
 
 type Consumer interface {
@@ -88,6 +89,10 @@ func buildCommand(message types.DeliveryEventMessage) (types.NotifyDeliveryComma
 		if event.GetTenantId() != created.GetTenantId() || event.GetAggregateId() != created.GetConversationId() {
 			return types.NotifyDeliveryCommand{}, false, types.NewInvalidFrame("delivery event envelope mismatch")
 		}
+		sourceEventType := created.GetSourceEventType()
+		if sourceEventType == "" {
+			sourceEventType = SourceEventMessagePersisted
+		}
 		return types.NotifyDeliveryCommand{
 			Notification: types.DeliveryNotification{
 				EventID:         event.GetEventId(),
@@ -96,6 +101,7 @@ func buildCommand(message types.DeliveryEventMessage) (types.NotifyDeliveryComma
 				ConversationID:  created.GetConversationId(),
 				ConversationSeq: created.GetConversationSeq(),
 				SourceEventID:   created.GetSourceEventId(),
+				SourceEventType: sourceEventType,
 				MessageID:       created.GetMessageId(),
 				CorrelationID:   event.GetCorrelationId(),
 			},

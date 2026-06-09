@@ -1,6 +1,6 @@
 # push-gateway Loadtest / Smoke Index
 
-本文是 `push-gateway` 验证报告入口。当前服务仍处于 SDD Draft 阶段，尚未实现最小在线推送链路。
+本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify` 和 `delivery.ack.ok` 的单元 / 集成测试；真实进程 full smoke 仍待执行。
 
 ## 当前验证目标
 
@@ -26,6 +26,19 @@ delivery_outbox
 - ACK 仍由 `delivery-service AckDelivery` 推进 cursor。
 - `delivery.ack` 成功必须有 `delivery.ack.ok`，失败必须返回稳定 error frame。
 - push-gateway 不直接读写 `message_log`、`conversation_members`、`user_inbox`、`device_delivery_cursors`。
+
+当前最小运行模式：
+
+```text
+NEXUSIM_PUSH_GATEWAY_MODE=all
+NEXUSIM_PUSH_WS_ADDR=0.0.0.0:10496
+NEXUSIM_DELIVERY_GRPC_ADDR=127.0.0.1:10497
+NEXUSIM_KAFKA_BROKERS=localhost:9092
+NEXUSIM_DELIVERY_EVENTS_TOPIC=im.delivery.events
+NEXUSIM_PUSH_CONSUMER_GROUP=nexusim-push-gateway-smoke
+```
+
+`all` 模式只用于第一阶段本地 smoke：WebSocket handler 和 `im.delivery.events` consumer 共享同一个 in-memory session registry。多实例前必须改用 Redis route。
 
 ## 报告位置
 

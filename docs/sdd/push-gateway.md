@@ -477,9 +477,21 @@ docs/runbook/loadtest/push-gateway/
 ```text
 NEXUSIM_PUSH_GATEWAY_MODE=ws
 NEXUSIM_PUSH_GATEWAY_MODE=delivery-consumer
+NEXUSIM_PUSH_GATEWAY_MODE=all
 ```
 
-第一阶段也可以单进程同时启动 WebSocket handler 和 delivery consumer，但文档和代码必须保留拆分能力，方便后续压测隔离。
+`all` 是第一阶段本地 smoke 推荐模式：WebSocket handler 和 delivery consumer 在同一个进程里共享 in-memory session registry。后续多实例或压测隔离时再拆成 `ws` 与 `delivery-consumer`，并接入 Redis route。
+
+最小本地启动参数：
+
+```text
+NEXUSIM_PUSH_GATEWAY_MODE=all
+NEXUSIM_PUSH_WS_ADDR=0.0.0.0:10496
+NEXUSIM_DELIVERY_GRPC_ADDR=127.0.0.1:10497
+NEXUSIM_KAFKA_BROKERS=localhost:9092
+NEXUSIM_DELIVERY_EVENTS_TOPIC=im.delivery.events
+NEXUSIM_PUSH_CONSUMER_GROUP=nexusim-push-gateway
+```
 
 本地依赖：
 

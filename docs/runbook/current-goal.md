@@ -8,11 +8,12 @@
 持续推进 E:\development\IM 的 NexusIM 项目。
 
 每轮开始先执行 git status --short --branch，并读取 docs/runbook/current-goal.md。
-按 current-goal.md 的当前目标、边界、下一步优先级继续工作；不回滚用户已有修改。
+按 current-goal.md 的当前目标、边界、下一步优先级继续工作；不回滚用户已有修改，不把重心放在耗尽硬件的重型压测上。
 
 当前重点：补齐 delivery_outbox relay / im.delivery.events，再进入 push-gateway SDD。
 每个微服务独立使用六层 DDD：api / app / domain / infrastructure / types / trigger。
-开发过程中主动使用 sub-agent 做设计审查、实现审查、测试/报告审查；不要等到最后才评审。
+开发过程中主动创建并使用 sub-agent：设计/契约找 Gauss，实现/事务/幂等找 Noether，测试/smoke/报告找 Dewey；不要等到最后才评审。
+优先把系统做完整：message-service、conversation-service、delivery-service、delivery outbox、push-gateway 逐步形成真实链路。
 重要契约、migration、并发/事务/幂等、可运行链路完成时再邀请评审线程 019ea124-dab1-71f2-964b-f5cb8d219aa2。
 完成有意义切片后运行检查、更新 current-goal.md 和对应 runbook/loadtest 报告；必要时提交并推送 GitHub。
 ```

@@ -17,9 +17,10 @@
 1. 优先把系统链路做完整，不把主要时间消耗在重型压测矩阵上。
 2. 每个微服务独立使用六层 DDD：api / app / domain / infrastructure / types / trigger。
 3. 开发过程中主动使用可用 sub-agent 做设计、实现、测试、文档或风险复核，不等到最后才集中评审。
-4. 公共契约、migration、事务、幂等、消息顺序、错误码、可运行链路完成时，再按 current-goal.md 的评审规则邀请独立评审。
-5. 有意义的切片完成后运行必要检查，更新 current-goal.md 和对应 runbook/loadtest 报告。
-6. 按 current-goal.md 的 GitHub 同步策略批量提交和推送，不为低风险小改动频繁推送。
+4. sub-agent 完成任务后及时关闭，避免线程池被历史任务占满；如果线程池已满，优先复用或关闭不再需要的 sub-agent。
+5. 公共契约、migration、事务、幂等、消息顺序、错误码、可运行链路完成时，再按 current-goal.md 的评审规则邀请独立评审。
+6. 有意义的切片完成后运行必要检查，更新 current-goal.md 和对应 runbook/loadtest 报告。
+7. 按 current-goal.md 的 GitHub 同步策略批量提交和推送，不为低风险小改动频繁推送。
 ```
 
 ## 1. 当前目标
@@ -114,6 +115,8 @@ local distributed smoke
 | Dewey | 验证和报告阶段 | 测试覆盖、smoke/loadtest 方法、runbook、报告口径、面试可讲结论 |
 
 sub-agent 输出默认作为工作中参考；只有出现公共契约、migration、并发/事务/幂等、可运行链路完成等里程碑时，才整理后发送给独立评审线程。
+
+sub-agent 必须按任务生命周期管理：专项任务完成后及时关闭；不要长期保留已经无用的 sub-agent；线程池已满时，先复用或关闭旧 sub-agent，再创建新的。
 
 必须邀请评审的情况：
 

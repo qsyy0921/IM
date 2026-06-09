@@ -4,7 +4,7 @@ param(
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
     [string]$ReceiverDeviceIds = "push-device-1",
-    [ValidateSet("full", "slow-client", "redis-fault")]
+    [ValidateSet("full", "resume-replay", "slow-client", "redis-fault")]
     [string]$Scenario = "full",
     [ValidateSet("memory", "redis")]
     [string]$RouteBackend = "memory",

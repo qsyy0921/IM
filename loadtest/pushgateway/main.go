@@ -94,48 +94,49 @@ type config struct {
 }
 
 type summary struct {
-	Commit                  string             `json:"commit"`
-	CommitFull              string             `json:"commit_full"`
-	GitDirty                bool               `json:"git_dirty"`
-	GitStatusShort          string             `json:"git_status_short,omitempty"`
-	ConversationTarget      string             `json:"conversation_target"`
-	MessageTarget           string             `json:"message_target"`
-	DeliveryTarget          string             `json:"delivery_target"`
-	PushURL                 string             `json:"push_url"`
-	PushMetricsURL          string             `json:"push_metrics_url,omitempty"`
-	RouteBackend            string             `json:"route_backend,omitempty"`
-	RedisKeyPrefix          string             `json:"redis_key_prefix,omitempty"`
-	PushWSGatewayID         string             `json:"push_ws_gateway_id,omitempty"`
-	PushConsumerGatewayID   string             `json:"push_consumer_gateway_id,omitempty"`
-	Scenario                string             `json:"scenario"`
-	TenantID                string             `json:"tenant_id"`
-	ConversationID          string             `json:"conversation_id"`
-	OwnerUserID             string             `json:"owner_user_id"`
-	ReceiverUserID          string             `json:"receiver_user_id"`
-	ReceiverDeviceID        string             `json:"receiver_device_id"`
-	ReceiverDeviceIDs       []string           `json:"receiver_device_ids,omitempty"`
-	StartedAt               time.Time          `json:"started_at"`
-	FinishedAt              time.Time          `json:"finished_at"`
-	Success                 bool               `json:"success"`
-	Error                   string             `json:"error,omitempty"`
-	ServerHello             frameSnapshot      `json:"server_hello"`
-	MemberJoin              memberJoinSummary  `json:"member_join"`
-	SendMessage             sendSummary        `json:"send_message"`
-	DeliveryNotify          frameSnapshot      `json:"delivery_notify"`
-	DeviceNotifications     []deviceSummary    `json:"device_notifications,omitempty"`
-	PullInbox               pullSummary        `json:"pull_inbox"`
-	DeliveryAckOK           frameSnapshot      `json:"delivery_ack_ok"`
-	SlowClient              *slowClientSummary `json:"slow_client,omitempty"`
-	RedisFault              *redisFaultSummary `json:"redis_fault,omitempty"`
-	PushMetricsBefore       *pushMetrics       `json:"push_metrics_before,omitempty"`
-	PushMetricsAfter        *pushMetrics       `json:"push_metrics_after,omitempty"`
-	CursorLastReceivedSeq   *int64             `json:"cursor_last_received_seq,omitempty"`
-	UserInboxCount          *int64             `json:"user_inbox_count,omitempty"`
-	DeliveryOutboxTotal     *int64             `json:"delivery_outbox_total,omitempty"`
-	DeliveryOutboxPending   *int64             `json:"delivery_outbox_pending,omitempty"`
-	DeliveryOutboxPublished *int64             `json:"delivery_outbox_published,omitempty"`
-	DeliveryOutboxDLQ       *int64             `json:"delivery_outbox_dlq,omitempty"`
-	Latencies               map[string]float64 `json:"latencies_ms"`
+	Commit                  string               `json:"commit"`
+	CommitFull              string               `json:"commit_full"`
+	GitDirty                bool                 `json:"git_dirty"`
+	GitStatusShort          string               `json:"git_status_short,omitempty"`
+	ConversationTarget      string               `json:"conversation_target"`
+	MessageTarget           string               `json:"message_target"`
+	DeliveryTarget          string               `json:"delivery_target"`
+	PushURL                 string               `json:"push_url"`
+	PushMetricsURL          string               `json:"push_metrics_url,omitempty"`
+	RouteBackend            string               `json:"route_backend,omitempty"`
+	RedisKeyPrefix          string               `json:"redis_key_prefix,omitempty"`
+	PushWSGatewayID         string               `json:"push_ws_gateway_id,omitempty"`
+	PushConsumerGatewayID   string               `json:"push_consumer_gateway_id,omitempty"`
+	Scenario                string               `json:"scenario"`
+	TenantID                string               `json:"tenant_id"`
+	ConversationID          string               `json:"conversation_id"`
+	OwnerUserID             string               `json:"owner_user_id"`
+	ReceiverUserID          string               `json:"receiver_user_id"`
+	ReceiverDeviceID        string               `json:"receiver_device_id"`
+	ReceiverDeviceIDs       []string             `json:"receiver_device_ids,omitempty"`
+	StartedAt               time.Time            `json:"started_at"`
+	FinishedAt              time.Time            `json:"finished_at"`
+	Success                 bool                 `json:"success"`
+	Error                   string               `json:"error,omitempty"`
+	ServerHello             frameSnapshot        `json:"server_hello"`
+	MemberJoin              memberJoinSummary    `json:"member_join"`
+	SendMessage             sendSummary          `json:"send_message"`
+	DeliveryNotify          frameSnapshot        `json:"delivery_notify"`
+	DeviceNotifications     []deviceSummary      `json:"device_notifications,omitempty"`
+	PullInbox               pullSummary          `json:"pull_inbox"`
+	DeliveryAckOK           frameSnapshot        `json:"delivery_ack_ok"`
+	SlowClient              *slowClientSummary   `json:"slow_client,omitempty"`
+	ResumeReplay            *resumeReplaySummary `json:"resume_replay,omitempty"`
+	RedisFault              *redisFaultSummary   `json:"redis_fault,omitempty"`
+	PushMetricsBefore       *pushMetrics         `json:"push_metrics_before,omitempty"`
+	PushMetricsAfter        *pushMetrics         `json:"push_metrics_after,omitempty"`
+	CursorLastReceivedSeq   *int64               `json:"cursor_last_received_seq,omitempty"`
+	UserInboxCount          *int64               `json:"user_inbox_count,omitempty"`
+	DeliveryOutboxTotal     *int64               `json:"delivery_outbox_total,omitempty"`
+	DeliveryOutboxPending   *int64               `json:"delivery_outbox_pending,omitempty"`
+	DeliveryOutboxPublished *int64               `json:"delivery_outbox_published,omitempty"`
+	DeliveryOutboxDLQ       *int64               `json:"delivery_outbox_dlq,omitempty"`
+	Latencies               map[string]float64   `json:"latencies_ms"`
 }
 
 type deviceSummary struct {
@@ -160,6 +161,18 @@ type slowClientSummary struct {
 	AckOK              frameSnapshot `json:"ack_ok"`
 }
 
+type resumeReplaySummary struct {
+	OriginalHello       frameSnapshot `json:"original_hello"`
+	OriginalNotify      frameSnapshot `json:"original_notify"`
+	ReconnectedHello    frameSnapshot `json:"reconnected_hello"`
+	ReplayedNotify      frameSnapshot `json:"replayed_notify"`
+	LastReceivedSeq     int64         `json:"last_received_seq"`
+	ReplayMetricsBefore *pushMetrics  `json:"replay_metrics_before,omitempty"`
+	ReplayMetricsAfter  *pushMetrics  `json:"replay_metrics_after,omitempty"`
+	PullInbox           pullSummary   `json:"pull_inbox"`
+	AckOK               frameSnapshot `json:"ack_ok"`
+}
+
 type redisFaultSummary struct {
 	FaultCommand        string        `json:"fault_command"`
 	NotifyReceived      bool          `json:"notify_received"`
@@ -177,6 +190,8 @@ type pushMetrics struct {
 	ResumeBufferReplayCount  uint64 `json:"resume_buffer_replay_count"`
 	ResumeBufferMissCount    uint64 `json:"resume_buffer_miss_count"`
 	ResumeBufferStoredFrames int    `json:"resume_buffer_stored_frames"`
+	ResumeBufferTokenCount   int    `json:"resume_buffer_token_count"`
+	ResumeBufferExpiredCount uint64 `json:"resume_buffer_expired_count"`
 }
 
 type frameSnapshot struct {
@@ -255,7 +270,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "push-device-1", "online receiver device id")
 	var receiverDeviceIDs string
 	flag.StringVar(&receiverDeviceIDs, "receiver-device-ids", "", "comma separated online receiver device ids; overrides receiver-device-id when set")
-	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, slow-client, or redis-fault")
+	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, resume-replay, slow-client, or redis-fault")
 	flag.IntVar(&cfg.slowMessageCount, "slow-message-count", 128, "number of messages sent while slow client does not read")
 	flag.StringVar(&cfg.pushMetricsURL, "push-metrics-url", "", "push-gateway debug metrics URL")
 	flag.StringVar(&cfg.routeBackend, "route-backend", "", "push route backend used by the smoke environment")
@@ -355,6 +370,8 @@ func run(cfg config) error {
 
 	switch cfg.scenario {
 	case "full":
+	case "resume-replay":
+		return runResumeReplayScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "slow-client":
 		return runSlowClientScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "redis-fault":
@@ -574,6 +591,141 @@ func runSlowClientScenario(
 	}
 	result.PullInbox = pull
 	result.DeliveryAckOK = snapshotFrame(ackOK)
+	result.Success = true
+	return finish(cfg, result, nil)
+}
+
+func runResumeReplayScenario(
+	ctx context.Context,
+	cfg config,
+	pool *pgxpool.Pool,
+	conversationClient conversationv1.ConversationServiceClient,
+	messageClient messagev1.MessageServiceClient,
+	deliveryClient deliveryv1.DeliveryServiceClient,
+	result *summary,
+) error {
+	conn, hello, err := connectWebSocket(ctx, cfg, cfg.receiverDeviceID)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("connect websocket: %w", err))
+	}
+	result.ServerHello = snapshotFrame(hello)
+	result.DeviceNotifications = []deviceSummary{{
+		DeviceID:    cfg.receiverDeviceID,
+		ServerHello: snapshotFrame(hello),
+	}}
+
+	begin := time.Now()
+	join, err := createReceiverJoin(ctx, cfg, conversationClient)
+	result.Latencies["create_member_join"] = elapsedMS(begin)
+	if err != nil {
+		conn.CloseNow()
+		return finish(cfg, result, fmt.Errorf("create receiver join: %w", err))
+	}
+	result.MemberJoin = memberJoinSummary{
+		ChangeID:          join.GetChangeId(),
+		BoundarySeq:       join.GetBoundarySeq(),
+		MemberVersion:     join.GetMemberVersion(),
+		PermissionVersion: join.GetPermissionVersion(),
+	}
+	if err := waitMembership(ctx, pool, cfg); err != nil {
+		conn.CloseNow()
+		return finish(cfg, result, err)
+	}
+
+	beforeMetrics, _ := fetchPushMetrics(ctx, cfg.pushMetricsURL)
+	result.PushMetricsBefore = &beforeMetrics
+
+	begin = time.Now()
+	send, err := sendMessage(ctx, cfg, messageClient, 1)
+	result.Latencies["send_message"] = elapsedMS(begin)
+	if err != nil {
+		conn.CloseNow()
+		return finish(cfg, result, fmt.Errorf("send message: %w", err))
+	}
+	result.SendMessage = sendSummary{MessageID: send.GetMessageId(), ConversationSeq: send.GetConversationSeq()}
+
+	notify, err := waitNotify(ctx, cfg, conn)
+	if err != nil {
+		conn.CloseNow()
+		return finish(cfg, result, fmt.Errorf("wait original notify: %w", err))
+	}
+	if notify.ConversationSeq != send.GetConversationSeq() || notify.MessageID != send.GetMessageId() {
+		conn.CloseNow()
+		return finish(cfg, result, fmt.Errorf("original notify mismatch: notify=%+v send=%+v", notify, send))
+	}
+	result.DeliveryNotify = snapshotFrame(notify)
+	result.DeviceNotifications[0].DeliveryNotify = snapshotFrame(notify)
+	_ = conn.Close(nhooyr.StatusNormalClosure, "resume replay")
+
+	replayMetricsBefore, _ := fetchPushMetrics(ctx, cfg.pushMetricsURL)
+	reconnected, reconnectedHello, err := connectWebSocketWithResume(
+		ctx,
+		cfg,
+		cfg.receiverDeviceID,
+		hello.ResumeToken,
+		[]cursor{{ConversationID: cfg.conversationID, Seq: join.GetBoundarySeq()}},
+	)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("reconnect websocket: %w", err))
+	}
+	defer reconnected.Close(nhooyr.StatusNormalClosure, "")
+
+	replayed, err := waitNotify(ctx, cfg, reconnected)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("wait replayed notify: %w", err))
+	}
+	if replayed.EventID != notify.EventID ||
+		replayed.ConversationSeq != notify.ConversationSeq ||
+		replayed.MessageID != notify.MessageID {
+		return finish(cfg, result, fmt.Errorf("replayed notify mismatch: original=%+v replayed=%+v", notify, replayed))
+	}
+	replayMetricsAfter, _ := fetchPushMetrics(ctx, cfg.pushMetricsURL)
+
+	pull, err := pullInbox(ctx, cfg, deliveryClient)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("pull inbox after replay: %w", err))
+	}
+	if pull.ItemCount == 0 || pull.MaxSeq < send.GetConversationSeq() {
+		return finish(cfg, result, fmt.Errorf("pull inbox did not include replayed seq: %+v", pull))
+	}
+	result.PullInbox = pull
+
+	ackOK, skipped, err := ackViaWebSocketWithSkipped(ctx, cfg, reconnected, cfg.receiverDeviceID, send.GetConversationSeq())
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("ack after replay: %w", err))
+	}
+	if skipped != 0 {
+		return finish(cfg, result, fmt.Errorf("unexpected extra frames while acking after replay: skipped=%d", skipped))
+	}
+	if err := waitCursor(ctx, pool, cfg, cfg.receiverDeviceID, send.GetConversationSeq()); err != nil {
+		return finish(cfg, result, err)
+	}
+	cursorSeq, err := queryCursor(ctx, pool, cfg, cfg.receiverDeviceID)
+	if err != nil {
+		return finish(cfg, result, err)
+	}
+	result.CursorLastReceivedSeq = &cursorSeq
+	if err := waitDeliveryOutboxDrain(ctx, pool, cfg); err != nil {
+		return finish(cfg, result, err)
+	}
+	if err := fillPostgresStats(ctx, pool, cfg, result); err != nil {
+		return finish(cfg, result, err)
+	}
+
+	result.DeliveryAckOK = snapshotFrame(ackOK)
+	result.DeviceNotifications[0].DeliveryAckOK = snapshotFrame(ackOK)
+	result.DeviceNotifications[0].CursorLastReceivedSeq = &cursorSeq
+	result.ResumeReplay = &resumeReplaySummary{
+		OriginalHello:       snapshotFrame(hello),
+		OriginalNotify:      snapshotFrame(notify),
+		ReconnectedHello:    snapshotFrame(reconnectedHello),
+		ReplayedNotify:      snapshotFrame(replayed),
+		LastReceivedSeq:     join.GetBoundarySeq(),
+		ReplayMetricsBefore: &replayMetricsBefore,
+		ReplayMetricsAfter:  &replayMetricsAfter,
+		PullInbox:           pull,
+		AckOK:               snapshotFrame(ackOK),
+	}
 	result.Success = true
 	return finish(cfg, result, nil)
 }

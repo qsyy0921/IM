@@ -13,6 +13,7 @@
 | conversation-service SDD | `docs/sdd/conversation-service.md` | 会话发送上下文读取、成员事实和成员变更 Saga 边界 |
 | conversation-service member_change_saga SDD | `docs/sdd/conversation-service-member-change-saga.md` | 成员变更 Saga、成员边界 timeline event、ACL 投影失败窗口 |
 | delivery-service SDD | `docs/sdd/delivery-service.md` | timeline 投影、user_inbox、离线补拉和设备 ACK |
+| push-gateway SDD | `docs/sdd/push-gateway.md` | WebSocket 在线连接、delivery event 唤醒、PullInbox / AckDelivery 协调 |
 
 ## 六层 DDD 约定
 
@@ -35,8 +36,8 @@
 | `timeline-service / sequencer` | SDD 未完成 | 不阻塞 `LOCAL_ROW_LOCK`；阻塞热点会话生产实现 |
 | `conversation-service / send context` | SDD v0.1 已存在 | 可以实现 `GetSendContext` 读取路径，替换 message-service strict conversation mock |
 | `conversation-service / member_change_saga` | SDD 已冻结 v1.0；proto / schema / migration v2 / relay builder / 最小 `CreateMemberChange` 写路径、saga publish 状态推进和 full smoke 已落地 | 后续补 LEAVE / REMOVE / ROLE_CHANGED、DLQ repair 和生产韧性 |
-| `push-gateway` | SDD 未完成 | 不阻塞 `message-service`；阻塞 WebSocket 完整闭环 |
-| `delivery-service` | SDD v0.1 已存在，评审 P1 已应用但尚未冻结 | 可以进入 `PullInbox / AckDelivery` 最小同步路径；timeline projection / consumer 仍需补齐 |
+| `push-gateway` | SDD v0.1 Draft 已存在 | 进入 proto / 六层骨架前需要阶段评审；第一阶段只做在线通知和回源协调 |
+| `delivery-service` | SDD v0.1 已存在，最小 projection / PullInbox / AckDelivery / delivery outbox relay 已落地 | 可以支撑 push-gateway 第一阶段，只要 push-gateway 不绕过 durable inbox / ACK |
 | `retrieval-gateway` | SDD 未完成 | 不进入第一条代码切片 |
 
 ## 已完成的 message-service 切片
@@ -84,13 +85,15 @@ conversation-service GetSendContext
 
 ## 当前 delivery-service 切片
 
-当前优先编码范围：
+当前已完成的主要范围：
 
 ```text
 Kafka conversation.timeline.events
 -> delivery-service timeline projection
 -> PostgreSQL user_inbox / delivery cursor
 -> PullInbox / AckDelivery
+-> delivery_outbox
+-> Kafka im.delivery.events
 ```
 
 边界：
@@ -98,7 +101,28 @@ Kafka conversation.timeline.events
 - 只实现 durable delivery read model，不实现 WebSocket 长连接。
 - `push-gateway` 后续只做连接和在线推送，不写 `user_inbox`。
 - `user_inbox` 是可重建投影，不是 message 事实源。
-- 第一阶段只做小规模 smoke，不继续做重型硬件矩阵。
+- 已完成小规模 full smoke、delivery outbox smoke 和 LEAVE / REMOVE 负向可见性 smoke。
+- 不继续做重型硬件矩阵。
+
+## 当前 push-gateway 设计切片
+
+当前优先范围：
+
+```text
+Kafka im.delivery.events
+-> push-gateway delivery event consumer
+-> online WebSocket notification
+-> client PullInbox
+-> client AckDelivery through push-gateway
+```
+
+边界：
+
+- 只做在线连接、轻量通知、短时 resume buffer 和 ACK/Pull 协调。
+- 不拥有 `user_inbox`，不修改 `device_delivery_cursors`。
+- 不直接读取 message-service / conversation-service / delivery-service 内部表。
+- `delivery.notify` 只是唤醒信号，客户端展示事实仍以 `PullInbox` 为准。
+- 第一阶段不新增 PostgreSQL migration；多实例前再接 Redis route。
 
 ## 已补齐的工程基线
 
@@ -118,8 +142,7 @@ Kafka conversation.timeline.events
 
 优先级：
 
-1. `push-gateway.md`
-2. `timeline-service-sequencer.md`
-3. `retrieval-gateway.md`
+1. `timeline-service-sequencer.md`
+2. `retrieval-gateway.md`
 
-其中 `delivery-service.md` 已补 v0.1，并已按评审 P1 补成员可见性投影、ACK max visible seq 和 Kafka checkpoint 维度。下一步应优先补 timeline projection use case / consumer，让 `conversation.timeline.events -> user_inbox -> PullInbox -> AckDelivery` 形成真实小闭环。`timeline-service` SDD 不阻塞普通会话当前实现，但阻塞热点会话生产化。
+其中 `push-gateway.md` 已补 v0.1 Draft，下一步应先做阶段评审，再落 WebSocket frame 契约、六层骨架和最小在线通知 smoke。`timeline-service` SDD 不阻塞普通会话当前实现，但阻塞热点会话生产化。

@@ -24,11 +24,11 @@
 
 ## 1. 当前目标
 
-持续推进 `E:\development\IM` 的 NexusIM 项目落地。`message-service`、`conversation-service`、`delivery-service` 已分别完成最小真实闭环，`delivery_outbox -> Kafka im.delivery.events` 和 `LEAVE/REMOVE` 负向可见性也已通过真实 smoke；当前阶段切换到“设计 push-gateway，并准备最小在线推送链路”：
+持续推进 `E:\development\IM` 的 NexusIM 项目落地。`message-service`、`conversation-service`、`delivery-service` 已分别完成最小真实闭环，`delivery_outbox -> Kafka im.delivery.events` 和 `LEAVE/REMOVE` 负向可见性也已通过真实 smoke；当前阶段切换到“冻结 push-gateway 设计，并准备最小在线推送链路”：
 
 ```text
-push-gateway SDD
--> push-gateway proto / skeleton
+push-gateway SDD review
+-> push-gateway WebSocket frame contract / skeleton
 -> minimal online delivery without bypassing durable inbox
 ```
 
@@ -90,13 +90,14 @@ push-gateway SDD
 | delivery-service full smoke | 已跑真实进程小规模 smoke：`CreateMemberChange(JOIN) -> Kafka timeline -> delivery projection -> SendMessage -> Kafka timeline -> user_inbox -> PullInbox -> AckDelivery`，SendMessage `64/64` 成功，`delivery-user-1` 拉到 64 条 inbox，ACK 到 seq `66`；`loadtest/delivery` summary 已支持 `--consumer-group`，checkpoint 统计可按本次 consumer group 过滤；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-full-smoke.md` |
 | delivery_outbox / push-gateway | 已新增 `schemas/kafka/delivery/v1/im.delivery.events.proto`、delivery-service outbox store、trigger relay、Kafka writer producer 和 `NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay`；真实 Kafka smoke 已验证 `delivery_outbox PENDING -> PUBLISHED`，并从 `im.delivery.events` 解码出 `DeliveryEvent_AckRecorded`；push-gateway 尚未实现，下一阶段必须依赖 delivery read model / delivery event，不直接读取 message-service 内部表，也不修改 ACK |
 | delivery-service negative visibility | 已新增 `loadtest/deliveryvisibility`，并在 clean commit `a87fc3f` 跑通 `LEAVE / REMOVE` 负向可见性 smoke：目标用户边界前各收到 1 条 inbox，边界后 `membership_status=LEFT`、`leave_seq=boundary_seq=4`，active sender 收到 post-boundary message，目标用户 `target_post_inbox_count=0` 且 `PullInbox(after_seq=boundary_seq)=0`；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-visibility-negative-smoke.md` |
+| push-gateway SDD | `docs/sdd/push-gateway.md` 已新增 v0.1 Draft；边界为 WebSocket 在线连接、`im.delivery.events` 轻量通知、客户端回源 `PullInbox` 和 ACK frame 转发到 `delivery-service AckDelivery`；第一阶段不新增 PostgreSQL migration，不直接读内部表，不拥有 durable inbox |
 
 ## 5. 下一步优先级
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
 2. 不再继续做 message-service 重型硬件矩阵；只有公共契约、关键并发语义或新服务链路变化时，才跑 smoke / 小规模验证。
-3. 写 `push-gateway` SDD，明确它只负责在线连接、订阅 delivery event / 查询 delivery read model，不拥有 `user_inbox`，不修改 ACK，不直接读取 message-service / conversation-service 内部表。
-4. push-gateway SDD 冻结后，再进入 proto / migration / 六层骨架和最小在线推送链路。
+3. 邀请阶段评审复核 `push-gateway` SDD，重点看服务边界、WebSocket frame、delivery event 消费、ACK/Pull 代理和“不绕过 durable inbox”。
+4. push-gateway SDD 冻结后，再进入 WebSocket frame 契约、六层骨架和最小在线推送链路；第一阶段通常不需要 PostgreSQL migration。
 5. push-gateway 最小链路只做在线通知和客户端回源提示，不把 message payload 当事实源。
 
 ## 6. 评审要求
@@ -327,7 +328,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前 debug metrics collector 保存全量样本并在 snapshot 时排序，适合本地短压测，不适合作为生产 metrics；后续应替换为固定窗口、reservoir、HDR histogram 或 Prometheus histogram。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
-- `delivery-service` SDD v0.1 已存在并已应用评审 P1，但尚未冻结；`timeline-service`、`push-gateway` SDD 未冻结；`conversation-service / member_change_saga` SDD 已冻结，Proto / Kafka schema / migration v2 和 relay builder 已补；成员变更代码必须继续通过 shared timeline/outbox append port 落库，不得绕过统一 outbox。
+- `delivery-service` 已完成最小 projection / PullInbox / AckDelivery / delivery outbox relay 链路；`push-gateway` SDD v0.1 Draft 已存在但尚未评审冻结；`timeline-service` SDD 未冻结；`conversation-service / member_change_saga` SDD 已冻结，Proto / Kafka schema / migration v2 和 relay builder 已补；成员变更代码必须继续通过 shared timeline/outbox append port 落库，不得绕过统一 outbox。
 - `conversation-service` 当前已实现 `CreateMemberChange`、`GetMemberChange` 和最小 saga publish progress worker；DLQ repair 仍未完成。
 - `conversation-service` 当前已完成 `CreateMemberChange(JOIN)` 写路径 smoke 和 `CreateMemberChange -> outbox relay -> member-change-worker -> GetMemberChange(DONE)` full smoke；`LEAVE / REMOVE / ROLE_CHANGED` 真实进程 smoke 可后置。
 - 统一 outbox relay 当前仍位于 `message-service/internal/trigger/outbox`，但后续会发布 message/member 两类 conversation timeline event；这是阶段性部署折中，生产化前需要在 TADD 中决定是否拆成独立 `timeline-outbox-relay`。
@@ -416,3 +417,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已实现 delivery-service `delivery_outbox -> Kafka im.delivery.events` 最小发布链路：新增独立 Kafka schema `schemas/kafka/delivery/v1/im.delivery.events.proto`，补 `NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay`、PostgreSQL outbox store、trigger relay、Kafka writer producer；单元测试覆盖 event builder、malformed fail-closed 和 batch publish error，真实 PostgreSQL 集成测试覆盖 publish/retry/DLQ/低版本阻塞。下一步跑真实进程 smoke 并归档报告。
 - 2026-06-09：已完成 delivery-service outbox relay 真实 Kafka smoke：创建 `im.delivery.events` topic，启动 `NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay`，把 1 条 `delivery.ack.recorded.v1` 从 `PENDING` 发布为 `PUBLISHED`，并从 Kafka partition 1 offset 0 解码出 `DeliveryEvent_AckRecorded`；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-outbox-smoke.md`。
 - 2026-06-09：已完成 delivery-service `LEAVE / REMOVE` 负向可见性 smoke：新增 `loadtest/deliveryvisibility` runner；clean commit `a87fc3f` 使用临时 topic `conversation.timeline.visibility.20260609-152208` 跑通两个场景。结论：边界后的 message event 已被 active sender 消费，但离开/移除用户没有任何 `conversation_seq > boundary_seq` 的 `user_inbox`，`PullInbox(after_seq=boundary_seq)` 也返回 0；报告见 `docs/runbook/loadtest/delivery-service/loadtest-report-20260609-delivery-visibility-negative-smoke.md`。
+- 2026-06-09：已新增 `docs/sdd/push-gateway.md` v0.1 Draft 和 `docs/runbook/loadtest/push-gateway/README.md`。push-gateway 第一阶段定位为 WebSocket 在线连接、`im.delivery.events` 唤醒、客户端回源 `PullInbox` 和 ACK frame 转发，不拥有 `user_inbox` / cursor，不直接读内部表；下一步应做阶段评审，评审通过后再进入 WebSocket frame 契约和六层骨架。

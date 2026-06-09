@@ -1,6 +1,6 @@
 # NexusIM receipt-service SDD v0.1 Draft
 
-状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer 和 `MarkRead` 事务已落地；等待真实进程 smoke 和 receipt outbox relay。
+状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务和 receipt outbox relay 已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events`。
 
 本文定义 `receipt-service` 的第一条可编码切片：基于 `delivery-service` 已经产生的 durable delivery 事件，构建消息送达 / 已读回执 read model，并提供最小查询和 `MarkRead` 写入入口。
 
@@ -348,10 +348,11 @@ CREATE TABLE message_receipt_states (
 - `services/receipt-service/internal/{api,app,domain,infrastructure,types,trigger}` 六层骨架。
 - `services/receipt-service/internal/infrastructure/postgres`：receipt projection、received/read cursor、receipt outbox 写入。
 - `services/receipt-service/internal/trigger/delivery`：消费 `im.delivery.events` 并在 PostgreSQL 事务提交后 commit Kafka offset。
+- `services/receipt-service/internal/trigger/outbox`：发布 `receipt.message.received.v1` / `receipt.message.read.v1` 到 `im.receipt.events`。
 
 下一步按下面顺序推进：
 
-1. 跑真实进程 smoke：
+1. 已跑真实进程 smoke：
 
 ```text
 SendMessage
@@ -360,10 +361,11 @@ SendMessage
 -> receipt-service projects delivery.ack.recorded
 -> MarkRead
 -> GetReceiptState shows received/read
+-> receipt outbox relay publishes im.receipt.events
 ```
 
-2. 实现 receipt outbox relay，发布 `im.receipt.events`。
-3. 后续替换 `StaticAllowAccess` 为 conversation / policy adapter。
+2. 后续替换 `StaticAllowAccess` 为 conversation / policy adapter。
+3. 后续按产品优先级接入 receipt event 下游消费者，例如会话摘要、审计或在线回执提示。
 
 第一条 smoke 可以先只覆盖单会话、小群、单条消息：
 

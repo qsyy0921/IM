@@ -13,6 +13,10 @@ conversation-service CreateMemberChange / GetMemberChange
 -> PostgreSQL member_change_saga / conversation_members
 -> shared conversation_timeline_events / message_outbox
 -> member-change-worker observes outbox PUBLISHED and marks saga DONE
+
+conversation-service ListConversationMembers
+-> PostgreSQL conversations / conversation_members
+-> current ACTIVE member roster
 ```
 
 不覆盖 delivery、push、Kafka relay 容量压测和 DLQ repair。
@@ -206,10 +210,19 @@ bin\memberchange-loadtest.exe `
   --vus 2 `
   --duration 3s `
   --tenant-id tenant-member-smoke `
-  --conversation-prefix conv-member-smoke `
-  --conversation-count 2 `
+  --conversation-id conv-member-smoke `
+  --operator-user-id owner-1 `
+  --target-prefix target-user `
   --pg-dsn 'postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable' `
   --result-dir loadtest\results\memberchange-smoke-manual
+```
+
+`memberchange-loadtest` 会在写入成员变更后调用一次 `ListConversationMembers`，summary 中应出现：
+
+```text
+member_list_error = empty
+member_list_count >= 2
+member_list_sample_users includes owner and joined target
 ```
 
 如果要验证完整成员事件闭环，需要同时启动：

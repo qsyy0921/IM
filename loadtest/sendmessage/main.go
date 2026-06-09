@@ -47,13 +47,14 @@ type config struct {
 }
 
 type sample struct {
-	latency      time.Duration
-	err          error
-	attempt      bool
-	retryAttempt bool
-	logicalFinal bool
-	retried      bool
-	retryDelay   time.Duration
+	latency        time.Duration
+	logicalLatency time.Duration
+	err            error
+	attempt        bool
+	retryAttempt   bool
+	logicalFinal   bool
+	retried        bool
+	retryDelay     time.Duration
 }
 
 type loadClient struct {
@@ -80,6 +81,18 @@ type summary struct {
 	LogicalSuccessCount                   int64                      `json:"logical_success_count"`
 	LogicalErrorCount                     int64                      `json:"logical_error_count"`
 	LogicalSuccessRate                    float64                    `json:"logical_success_rate"`
+	LogicalAvgMS                          float64                    `json:"logical_avg_ms"`
+	LogicalP50MS                          float64                    `json:"logical_p50_ms"`
+	LogicalP95MS                          float64                    `json:"logical_p95_ms"`
+	LogicalP99MS                          float64                    `json:"logical_p99_ms"`
+	LogicalSuccessAvgMS                   float64                    `json:"logical_success_avg_ms"`
+	LogicalSuccessP50MS                   float64                    `json:"logical_success_p50_ms"`
+	LogicalSuccessP95MS                   float64                    `json:"logical_success_p95_ms"`
+	LogicalSuccessP99MS                   float64                    `json:"logical_success_p99_ms"`
+	LogicalErrorAvgMS                     float64                    `json:"logical_error_avg_ms"`
+	LogicalErrorP50MS                     float64                    `json:"logical_error_p50_ms"`
+	LogicalErrorP95MS                     float64                    `json:"logical_error_p95_ms"`
+	LogicalErrorP99MS                     float64                    `json:"logical_error_p99_ms"`
 	RequestCount                          int64                      `json:"request_count"`
 	RetryAttemptCount                     int64                      `json:"retry_attempt_count"`
 	RetriedRequestCount                   int64                      `json:"retried_request_count"`
@@ -509,6 +522,7 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 				requestSeq := atomic.AddUint64(&sequence, 1)
 				targetClient := clients[int((requestSeq-1)%uint64(len(clients)))]
 				request := buildRequest(cfg, runID, vu, requestSeq)
+				logicalStart := time.Now()
 				retried := false
 				for attempt := 0; ; attempt++ {
 					requestCtx, requestCancel := context.WithTimeout(ctx, cfg.RequestTimeout)
@@ -535,9 +549,10 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 						case <-loadCtx.Done():
 							timer.Stop()
 							records <- sample{
-								err:          err,
-								logicalFinal: true,
-								retried:      retried,
+								logicalLatency: time.Since(logicalStart),
+								err:            err,
+								logicalFinal:   true,
+								retried:        retried,
 							}
 							return
 						case <-timer.C:
@@ -545,12 +560,13 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 						continue
 					}
 					records <- sample{
-						latency:      latency,
-						err:          err,
-						attempt:      true,
-						retryAttempt: retryAttempt,
-						logicalFinal: true,
-						retried:      retried,
+						latency:        latency,
+						logicalLatency: time.Since(logicalStart),
+						err:            err,
+						attempt:        true,
+						retryAttempt:   retryAttempt,
+						logicalFinal:   true,
+						retried:        retried,
 					}
 					break
 				}
@@ -565,6 +581,9 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 	latencies := make([]time.Duration, 0, cfg.VUs*128)
 	successLatencies := make([]time.Duration, 0, cfg.VUs*128)
 	errorLatencies := make([]time.Duration, 0, cfg.VUs*128)
+	logicalLatencies := make([]time.Duration, 0, cfg.VUs*128)
+	logicalSuccessLatencies := make([]time.Duration, 0, cfg.VUs*128)
+	logicalErrorLatencies := make([]time.Duration, 0, cfg.VUs*128)
 	retryDelays := make([]time.Duration, 0, cfg.VUs*16)
 	errorCounts := map[string]int64{}
 	messageErrorCounts := map[messageErrorKey]int64{}
@@ -578,6 +597,9 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 	var totalLatency time.Duration
 	var successLatency time.Duration
 	var errorLatency time.Duration
+	var logicalLatencyTotal time.Duration
+	var logicalSuccessLatencyTotal time.Duration
+	var logicalErrorLatencyTotal time.Duration
 	var retryDelayTotal time.Duration
 	for record := range records {
 		if record.attempt {
@@ -611,8 +633,15 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 		}
 		if record.logicalFinal {
 			logicalRequestCount++
+			logicalLatencies = append(logicalLatencies, record.logicalLatency)
+			logicalLatencyTotal += record.logicalLatency
 			if record.err == nil {
 				logicalSuccessCount++
+				logicalSuccessLatencies = append(logicalSuccessLatencies, record.logicalLatency)
+				logicalSuccessLatencyTotal += record.logicalLatency
+			} else {
+				logicalErrorLatencies = append(logicalErrorLatencies, record.logicalLatency)
+				logicalErrorLatencyTotal += record.logicalLatency
 			}
 			if record.retried {
 				retriedRequestCount++
@@ -650,6 +679,9 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 	}
 	successBreakdown := summarizeLatencies(successLatencies, successLatency)
 	errorBreakdown := summarizeLatencies(errorLatencies, errorLatency)
+	logicalBreakdown := summarizeLatencies(logicalLatencies, logicalLatencyTotal)
+	logicalSuccessBreakdown := summarizeLatencies(logicalSuccessLatencies, logicalSuccessLatencyTotal)
+	logicalErrorBreakdown := summarizeLatencies(logicalErrorLatencies, logicalErrorLatencyTotal)
 	retryDelayBreakdown := summarizeLatencies(retryDelays, retryDelayTotal)
 
 	commit := currentCommit()
@@ -672,6 +704,18 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 		LogicalSuccessCount:             logicalSuccessCount,
 		LogicalErrorCount:               logicalErrorCount,
 		LogicalSuccessRate:              logicalSuccessRate,
+		LogicalAvgMS:                    logicalBreakdown.AvgMS,
+		LogicalP50MS:                    logicalBreakdown.P50MS,
+		LogicalP95MS:                    logicalBreakdown.P95MS,
+		LogicalP99MS:                    logicalBreakdown.P99MS,
+		LogicalSuccessAvgMS:             logicalSuccessBreakdown.AvgMS,
+		LogicalSuccessP50MS:             logicalSuccessBreakdown.P50MS,
+		LogicalSuccessP95MS:             logicalSuccessBreakdown.P95MS,
+		LogicalSuccessP99MS:             logicalSuccessBreakdown.P99MS,
+		LogicalErrorAvgMS:               logicalErrorBreakdown.AvgMS,
+		LogicalErrorP50MS:               logicalErrorBreakdown.P50MS,
+		LogicalErrorP95MS:               logicalErrorBreakdown.P95MS,
+		LogicalErrorP99MS:               logicalErrorBreakdown.P99MS,
 		RequestCount:                    requestCount,
 		RetryAttemptCount:               retryAttemptCount,
 		RetriedRequestCount:             retriedRequestCount,

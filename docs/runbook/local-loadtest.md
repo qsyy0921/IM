@@ -383,6 +383,9 @@ outbox_pending_count = 0
 
 ```text
 logical_success_rate
+logical_p99_ms
+logical_success_p99_ms
+logical_error_p99_ms
 accepted_rps
 attempt-level overload_rate
 success_p99_ms

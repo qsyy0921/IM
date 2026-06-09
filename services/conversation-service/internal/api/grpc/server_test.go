@@ -275,6 +275,117 @@ func TestCreateMemberChangeRequiresExecutor(t *testing.T) {
 	}
 }
 
+func TestTransferConversationOwnerConvertsRequestAndResponse(t *testing.T) {
+	executor := &fakeTransferConversationOwnerExecutor{
+		result: types.TransferConversationOwnerResult{
+			ChangeID:            "change-owner-1",
+			TenantID:            "tenant-1",
+			ConversationID:      "conv-1",
+			PreviousOwnerUserID: "owner-1",
+			NewOwnerUserID:      "user-2",
+			Status:              types.MemberChangeStatusOutboxEnqueued,
+			BoundarySeq:         12,
+			MemberVersion:       6,
+			PermissionVersion:   8,
+			IdempotentReplay:    true,
+		},
+	}
+	server := NewServer(
+		&fakeGetSendContextExecutor{},
+		WithTransferConversationOwner(executor),
+	)
+
+	response, err := server.TransferConversationOwner(context.Background(), &conversationv1.TransferConversationOwnerRequest{
+		AuthContext: &conversationv1.AuthContext{
+			TenantId:  "tenant-1",
+			UserId:    "owner-1",
+			DeviceId:  "device-1",
+			SessionId: "session-1",
+			TraceId:   "trace-1",
+			RequestId: "request-1",
+		},
+		ConversationId:        "conv-1",
+		NewOwnerUserId:        "user-2",
+		ExpectedMemberVersion: 5,
+		IdempotencyKey:        "idem-owner-1",
+		Reason:                "handoff",
+	})
+	if err != nil {
+		t.Fatalf("transfer conversation owner: %v", err)
+	}
+	if executor.command.AuthContext.TenantID != "tenant-1" ||
+		executor.command.AuthContext.UserID != "owner-1" ||
+		executor.command.AuthContext.DeviceID != "device-1" ||
+		executor.command.AuthContext.SessionID != "session-1" ||
+		executor.command.AuthContext.TraceID != "trace-1" ||
+		executor.command.AuthContext.RequestID != "request-1" ||
+		executor.command.ConversationID != "conv-1" ||
+		executor.command.NewOwnerUserID != "user-2" ||
+		executor.command.ExpectedMemberVersion != 5 ||
+		executor.command.IdempotencyKey != "idem-owner-1" ||
+		executor.command.Reason != "handoff" {
+		t.Fatalf("unexpected command: %+v", executor.command)
+	}
+	if response.GetChangeId() != "change-owner-1" ||
+		response.GetTenantId() != "tenant-1" ||
+		response.GetConversationId() != "conv-1" ||
+		response.GetPreviousOwnerUserId() != "owner-1" ||
+		response.GetNewOwnerUserId() != "user-2" ||
+		response.GetStatus() != conversationv1.MemberChangeStatus_MEMBER_CHANGE_STATUS_OUTBOX_ENQUEUED ||
+		response.GetBoundarySeq() != 12 ||
+		response.GetMemberVersion() != 6 ||
+		response.GetPermissionVersion() != 8 ||
+		!response.GetIdempotentReplay() {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
+func TestTransferConversationOwnerMapsValidationErrors(t *testing.T) {
+	server := NewServer(
+		&fakeGetSendContextExecutor{},
+		WithTransferConversationOwner(&fakeTransferConversationOwnerExecutor{validate: true}),
+	)
+	_, err := server.TransferConversationOwner(context.Background(), &conversationv1.TransferConversationOwnerRequest{
+		ConversationId: "conv-1",
+	})
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	if st.Code() != codes.InvalidArgument || st.Message() != "invalid argument" {
+		t.Fatalf("unexpected status: %s %q", st.Code(), st.Message())
+	}
+}
+
+func TestTransferConversationOwnerRejectsNilRequest(t *testing.T) {
+	server := NewServer(
+		&fakeGetSendContextExecutor{},
+		WithTransferConversationOwner(&fakeTransferConversationOwnerExecutor{}),
+	)
+	_, err := server.TransferConversationOwner(context.Background(), nil)
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	if st.Code() != codes.InvalidArgument {
+		t.Fatalf("expected invalid argument, got %s", st.Code())
+	}
+}
+
+func TestTransferConversationOwnerRequiresExecutor(t *testing.T) {
+	_, err := NewServer(&fakeGetSendContextExecutor{}).TransferConversationOwner(
+		context.Background(),
+		&conversationv1.TransferConversationOwnerRequest{},
+	)
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	if st.Code() != codes.Unimplemented {
+		t.Fatalf("expected unimplemented, got %s", st.Code())
+	}
+}
+
 func TestGetMemberChangeConvertsRequestAndResponse(t *testing.T) {
 	executor := &fakeGetMemberChangeExecutor{
 		result: types.MemberChangeDetail{
@@ -530,6 +641,26 @@ func (f *fakeCreateMemberChangeExecutor) Execute(
 	if f.validate {
 		if err := command.Validate(); err != nil {
 			return types.MemberChangeResult{}, err
+		}
+	}
+	return f.result, f.err
+}
+
+type fakeTransferConversationOwnerExecutor struct {
+	result   types.TransferConversationOwnerResult
+	err      error
+	command  types.TransferConversationOwnerCommand
+	validate bool
+}
+
+func (f *fakeTransferConversationOwnerExecutor) Execute(
+	_ context.Context,
+	command types.TransferConversationOwnerCommand,
+) (types.TransferConversationOwnerResult, error) {
+	f.command = command
+	if f.validate {
+		if err := command.Validate(); err != nil {
+			return types.TransferConversationOwnerResult{}, err
 		}
 	}
 	return f.result, f.err

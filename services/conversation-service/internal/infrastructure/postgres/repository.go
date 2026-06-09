@@ -191,7 +191,7 @@ func (r *Repository) CreateMemberChange(
 		return types.MemberChangeResult{}, err
 	}
 
-	if err := insertMemberChangeSaga(ctx, tx, record); err != nil {
+	if err := insertMemberChangeSaga(ctx, tx, record.Change); err != nil {
 		return types.MemberChangeResult{}, err
 	}
 	if err := upsertConversationMember(ctx, tx, command, record); err != nil {
@@ -200,13 +200,13 @@ func (r *Repository) CreateMemberChange(
 	if err := updateConversationVersions(ctx, tx, command, record); err != nil {
 		return types.MemberChangeResult{}, err
 	}
-	if err := insertMemberTimelineEvent(ctx, tx, record); err != nil {
+	if err := insertMemberTimelineEvent(ctx, tx, record.Timeline); err != nil {
 		return types.MemberChangeResult{}, err
 	}
-	if err := insertMemberOutboxEvent(ctx, tx, record); err != nil {
+	if err := insertMemberOutboxEvent(ctx, tx, record.Outbox); err != nil {
 		return types.MemberChangeResult{}, err
 	}
-	if err := markMemberChangeOutboxEnqueued(ctx, tx, record); err != nil {
+	if err := markMemberChangeOutboxEnqueued(ctx, tx, record.Change); err != nil {
 		return types.MemberChangeResult{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -285,6 +285,100 @@ WHERE mcs.tenant_id = $1
 		return types.MemberChangeDetail{}, types.NewPermissionDenied("member change is not visible to caller")
 	}
 	return result, nil
+}
+
+func (r *Repository) TransferConversationOwner(
+	ctx context.Context,
+	command types.TransferConversationOwnerCommand,
+) (types.TransferConversationOwnerResult, error) {
+	if r.pool == nil {
+		return types.TransferConversationOwnerResult{}, types.NewDBWriteFailed("repository is not configured")
+	}
+	memberCommand := ownerTransferMemberChangeCommand(command)
+	commandHash, err := domain.ComputeOwnerTransferCommandHash(command)
+	if err != nil {
+		return types.TransferConversationOwnerResult{}, err
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.TransferConversationOwnerResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	if err := lockMemberChangeIdempotency(ctx, tx, memberCommand); err != nil {
+		return types.TransferConversationOwnerResult{}, err
+	}
+	if existing, ok, err := findExistingMemberChange(ctx, tx, memberCommand); err != nil {
+		return types.TransferConversationOwnerResult{}, err
+	} else if ok {
+		return replayOwnerTransfer(ctx, tx, existing, commandHash)
+	}
+
+	conversation, err := lockConversation(ctx, tx, memberCommand)
+	if err != nil {
+		return types.TransferConversationOwnerResult{}, err
+	}
+	previousOwner, err := lockConversationMember(ctx, tx, command.AuthContext.TenantID, command.ConversationID, command.AuthContext.UserID)
+	if err != nil {
+		return types.TransferConversationOwnerResult{}, err
+	}
+	newOwner, err := lockConversationMember(ctx, tx, command.AuthContext.TenantID, command.ConversationID, command.NewOwnerUserID)
+	if err != nil {
+		return types.TransferConversationOwnerResult{}, err
+	}
+
+	if err := ensureConversationSeq(ctx, tx, memberCommand); err != nil {
+		return types.TransferConversationOwnerResult{}, err
+	}
+	boundarySeq, err := allocateConversationSeq(ctx, tx, memberCommand)
+	if err != nil {
+		return types.TransferConversationOwnerResult{}, err
+	}
+	changeID, err := r.changeID()
+	if err != nil {
+		return types.TransferConversationOwnerResult{}, err
+	}
+	eventID, err := r.eventID()
+	if err != nil {
+		return types.TransferConversationOwnerResult{}, err
+	}
+	record, err := domain.NewOwnerTransferRecord(domain.OwnerTransferInput{
+		Command:       command,
+		Conversation:  conversation,
+		PreviousOwner: previousOwner,
+		NewOwner:      newOwner,
+	}, changeID, eventID, boundarySeq, r.now())
+	if err != nil {
+		return types.TransferConversationOwnerResult{}, err
+	}
+
+	if err := insertMemberChangeSaga(ctx, tx, record.Change); err != nil {
+		return types.TransferConversationOwnerResult{}, err
+	}
+	if err := upsertMemberMutation(ctx, tx, record.Change.TenantID, record.Change.ConversationID, record.PreviousOwner); err != nil {
+		return types.TransferConversationOwnerResult{}, err
+	}
+	if err := upsertMemberMutation(ctx, tx, record.Change.TenantID, record.Change.ConversationID, record.NewOwner); err != nil {
+		return types.TransferConversationOwnerResult{}, err
+	}
+	if err := updateConversationVersionValues(ctx, tx, record.Change.TenantID, record.Change.ConversationID, record.Change.MemberVersion, record.Change.PermissionVersion); err != nil {
+		return types.TransferConversationOwnerResult{}, err
+	}
+	if err := insertMemberTimelineEvent(ctx, tx, record.Timeline); err != nil {
+		return types.TransferConversationOwnerResult{}, err
+	}
+	if err := insertMemberOutboxEvent(ctx, tx, record.Outbox); err != nil {
+		return types.TransferConversationOwnerResult{}, err
+	}
+	if err := markMemberChangeOutboxEnqueued(ctx, tx, record.Change); err != nil {
+		return types.TransferConversationOwnerResult{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.TransferConversationOwnerResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return ownerTransferResult(record, false), nil
 }
 
 func canViewMemberChange(
@@ -477,6 +571,7 @@ WHERE mcs.status = $1
       'conversation.member.left.v1',
       'conversation.member.removed.v1',
       'conversation.member.role_changed.v1',
+      'conversation.member.owner_transferred.v1',
       'conversation.member.boundary_cancelled.v1'
   )
 ORDER BY mcs.updated_at, mcs.change_id
@@ -633,6 +728,46 @@ func replayMemberChange(
 	}, nil
 }
 
+func replayOwnerTransfer(
+	ctx context.Context,
+	tx pgx.Tx,
+	existing existingMemberChange,
+	commandHash string,
+) (types.TransferConversationOwnerResult, error) {
+	if existing.CommandHash != commandHash {
+		return types.TransferConversationOwnerResult{}, types.NewMemberConflict("idempotency_key reused with different command")
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.TransferConversationOwnerResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.TransferConversationOwnerResult{
+		ChangeID:            existing.ChangeID,
+		TenantID:            existing.TenantID,
+		ConversationID:      existing.ConversationID,
+		PreviousOwnerUserID: existing.OperatorUserID,
+		NewOwnerUserID:      existing.TargetUserID,
+		Status:              existing.Status,
+		BoundarySeq:         existing.BoundarySeq.Int64,
+		MemberVersion:       existing.MemberVersion.Int64,
+		PermissionVersion:   existing.PermissionVersion.Int64,
+		IdempotentReplay:    true,
+	}, nil
+}
+
+func ownerTransferMemberChangeCommand(command types.TransferConversationOwnerCommand) types.CreateMemberChangeCommand {
+	return types.CreateMemberChangeCommand{
+		AuthContext:           command.AuthContext,
+		ConversationID:        command.ConversationID,
+		TargetUserID:          command.NewOwnerUserID,
+		ChangeType:            types.MemberChangeTypeOwnerTransfer,
+		TargetRole:            types.MemberRoleOwner,
+		ExpectedMemberVersion: command.ExpectedMemberVersion,
+		IdempotencyKey:        command.IdempotencyKey,
+		ConflictPolicy:        types.MemberChangeConflictPolicyReject,
+		Reason:                command.Reason,
+	}
+}
+
 func lockConversation(ctx context.Context, tx pgx.Tx, command types.CreateMemberChangeCommand) (domain.Conversation, error) {
 	row := tx.QueryRow(ctx, `
 SELECT
@@ -727,7 +862,7 @@ RETURNING current_seq
 	return seq, nil
 }
 
-func insertMemberChangeSaga(ctx context.Context, tx pgx.Tx, record domain.MemberChangeRecord) error {
+func insertMemberChangeSaga(ctx context.Context, tx pgx.Tx, change domain.MemberChange) error {
 	_, err := tx.Exec(ctx, `
 INSERT INTO member_change_saga (
     change_id,
@@ -749,22 +884,22 @@ INSERT INTO member_change_saga (
     updated_at
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, 0), $10, $11, $12, $13, $14, $15::jsonb, $16, $16)
 `,
-		record.Change.ChangeID,
-		record.Change.TenantID,
-		record.Change.ConversationID,
-		record.Change.TargetUserID,
-		record.Change.ChangeType,
-		record.Change.BoundarySeq,
+		change.ChangeID,
+		change.TenantID,
+		change.ConversationID,
+		change.TargetUserID,
+		change.ChangeType,
+		change.BoundarySeq,
 		types.MemberChangeStatusBoundaryAllocated,
-		record.Change.IdempotencyKey,
-		record.Change.ExpectedMemberVersion,
-		record.Change.CommandHash,
-		record.Change.OperatorUserID,
-		record.Change.ConflictPolicy,
-		record.Change.TimelineEventID,
-		record.Change.OutboxEventID,
-		record.Change.MetadataJSON,
-		record.Change.CreatedAt,
+		change.IdempotencyKey,
+		change.ExpectedMemberVersion,
+		change.CommandHash,
+		change.OperatorUserID,
+		change.ConflictPolicy,
+		change.TimelineEventID,
+		change.OutboxEventID,
+		change.MetadataJSON,
+		change.CreatedAt,
 	)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
@@ -773,6 +908,16 @@ INSERT INTO member_change_saga (
 }
 
 func upsertConversationMember(ctx context.Context, tx pgx.Tx, command types.CreateMemberChangeCommand, record domain.MemberChangeRecord) error {
+	return upsertMemberMutation(ctx, tx, command.AuthContext.TenantID, command.ConversationID, record.Target)
+}
+
+func upsertMemberMutation(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	conversationID types.ConversationID,
+	mutation domain.MemberMutation,
+) error {
 	_, err := tx.Exec(ctx, `
 INSERT INTO conversation_members (
     tenant_id,
@@ -796,15 +941,15 @@ SET role = EXCLUDED.role,
     permission_version = EXCLUDED.permission_version,
     updated_at = now()
 `,
-		command.AuthContext.TenantID,
-		command.ConversationID,
-		record.Target.UserID,
-		record.Target.NewRole,
-		record.Target.NewStatus,
-		nullableInt64(record.Target.JoinSeq),
-		nullableInt64(record.Target.LeaveSeq),
-		record.Target.MemberVersion,
-		record.Target.PermissionVersion,
+		tenantID,
+		conversationID,
+		mutation.UserID,
+		mutation.NewRole,
+		mutation.NewStatus,
+		nullableInt64(mutation.JoinSeq),
+		nullableInt64(mutation.LeaveSeq),
+		mutation.MemberVersion,
+		mutation.PermissionVersion,
 	)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
@@ -813,6 +958,17 @@ SET role = EXCLUDED.role,
 }
 
 func updateConversationVersions(ctx context.Context, tx pgx.Tx, command types.CreateMemberChangeCommand, record domain.MemberChangeRecord) error {
+	return updateConversationVersionValues(ctx, tx, command.AuthContext.TenantID, command.ConversationID, record.Target.MemberVersion, record.Target.PermissionVersion)
+}
+
+func updateConversationVersionValues(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	conversationID types.ConversationID,
+	memberVersion int64,
+	permissionVersion int64,
+) error {
 	_, err := tx.Exec(ctx, `
 UPDATE conversations
 SET member_version = $3,
@@ -820,14 +976,14 @@ SET member_version = $3,
     updated_at = now()
 WHERE tenant_id = $1
   AND conversation_id = $2
-`, command.AuthContext.TenantID, command.ConversationID, record.Target.MemberVersion, record.Target.PermissionVersion)
+`, tenantID, conversationID, memberVersion, permissionVersion)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
 }
 
-func insertMemberTimelineEvent(ctx context.Context, tx pgx.Tx, record domain.MemberChangeRecord) error {
+func insertMemberTimelineEvent(ctx context.Context, tx pgx.Tx, event domain.TimelineEvent) error {
 	_, err := tx.Exec(ctx, `
 INSERT INTO conversation_timeline_events (
     tenant_id,
@@ -848,21 +1004,21 @@ INSERT INTO conversation_timeline_events (
     created_at
 ) VALUES ($1, $2, $3, $4, $5, $6, NULL, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15)
 `,
-		record.Timeline.TenantID,
-		record.Timeline.ConversationID,
-		record.Timeline.ConversationSeq,
-		record.Timeline.EventID,
-		record.Timeline.EventType,
-		record.Timeline.EventVersion,
-		record.Timeline.ActorID,
-		record.Timeline.FanoutMode,
-		record.Timeline.FanoutPolicyVersion,
-		record.Timeline.PermissionVersion,
-		record.Timeline.Classification,
-		record.Timeline.MappingVersion,
-		record.Timeline.TraceID,
-		record.Timeline.PayloadJSON,
-		record.Timeline.CreatedAt,
+		event.TenantID,
+		event.ConversationID,
+		event.ConversationSeq,
+		event.EventID,
+		event.EventType,
+		event.EventVersion,
+		event.ActorID,
+		event.FanoutMode,
+		event.FanoutPolicyVersion,
+		event.PermissionVersion,
+		event.Classification,
+		event.MappingVersion,
+		event.TraceID,
+		event.PayloadJSON,
+		event.CreatedAt,
 	)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
@@ -870,7 +1026,7 @@ INSERT INTO conversation_timeline_events (
 	return nil
 }
 
-func insertMemberOutboxEvent(ctx context.Context, tx pgx.Tx, record domain.MemberChangeRecord) error {
+func insertMemberOutboxEvent(ctx context.Context, tx pgx.Tx, event domain.OutboxEvent) error {
 	_, err := tx.Exec(ctx, `
 INSERT INTO message_outbox (
     event_id,
@@ -888,19 +1044,19 @@ INSERT INTO message_outbox (
     trace_id
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13)
 `,
-		record.Outbox.EventID,
-		record.Outbox.TenantID,
-		record.Outbox.ConversationID,
-		record.Outbox.AggregateVersion,
-		record.Outbox.EventType,
-		record.Outbox.EventVersion,
-		record.Outbox.PartitionKey,
-		record.Outbox.MappingVersion,
-		record.Outbox.CorrelationID,
-		record.Outbox.CausationID,
-		record.Outbox.Producer,
-		record.Outbox.PayloadJSON,
-		record.Outbox.TraceID,
+		event.EventID,
+		event.TenantID,
+		event.ConversationID,
+		event.AggregateVersion,
+		event.EventType,
+		event.EventVersion,
+		event.PartitionKey,
+		event.MappingVersion,
+		event.CorrelationID,
+		event.CausationID,
+		event.Producer,
+		event.PayloadJSON,
+		event.TraceID,
 	)
 	if err != nil {
 		return types.NewOutboxWriteFailed(err.Error())
@@ -908,14 +1064,14 @@ INSERT INTO message_outbox (
 	return nil
 }
 
-func markMemberChangeOutboxEnqueued(ctx context.Context, tx pgx.Tx, record domain.MemberChangeRecord) error {
+func markMemberChangeOutboxEnqueued(ctx context.Context, tx pgx.Tx, change domain.MemberChange) error {
 	_, err := tx.Exec(ctx, `
 UPDATE member_change_saga
 SET status = $2,
     metadata_json = $3::jsonb,
     updated_at = now()
 WHERE change_id = $1
-`, record.Change.ChangeID, types.MemberChangeStatusOutboxEnqueued, record.Change.MetadataJSON)
+`, change.ChangeID, types.MemberChangeStatusOutboxEnqueued, change.MetadataJSON)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -935,6 +1091,21 @@ func memberChangeResult(record domain.MemberChangeRecord, replay bool) types.Mem
 		MemberVersion:     record.Change.MemberVersion,
 		PermissionVersion: record.Change.PermissionVersion,
 		IdempotentReplay:  replay,
+	}
+}
+
+func ownerTransferResult(record domain.OwnerTransferRecord, replay bool) types.TransferConversationOwnerResult {
+	return types.TransferConversationOwnerResult{
+		ChangeID:            record.Change.ChangeID,
+		TenantID:            record.Change.TenantID,
+		ConversationID:      record.Change.ConversationID,
+		PreviousOwnerUserID: record.Change.OperatorUserID,
+		NewOwnerUserID:      record.Change.TargetUserID,
+		Status:              record.Change.Status,
+		BoundarySeq:         record.Change.BoundarySeq,
+		MemberVersion:       record.Change.MemberVersion,
+		PermissionVersion:   record.Change.PermissionVersion,
+		IdempotentReplay:    replay,
 	}
 }
 

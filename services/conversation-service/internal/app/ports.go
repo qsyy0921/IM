@@ -14,6 +14,10 @@ type CreateMemberChangeRepository interface {
 	CreateMemberChange(ctx context.Context, command types.CreateMemberChangeCommand) (types.MemberChangeResult, error)
 }
 
+type TransferConversationOwnerRepository interface {
+	TransferConversationOwner(ctx context.Context, command types.TransferConversationOwnerCommand) (types.TransferConversationOwnerResult, error)
+}
+
 type GetMemberChangeRepository interface {
 	GetMemberChange(ctx context.Context, command types.GetMemberChangeCommand) (types.MemberChangeDetail, error)
 }

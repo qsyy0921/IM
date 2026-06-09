@@ -68,6 +68,50 @@ type MemberChangeResult struct {
 	IdempotentReplay  bool
 }
 
+type TransferConversationOwnerCommand struct {
+	AuthContext           AuthContext
+	ConversationID        ConversationID
+	NewOwnerUserID        UserID
+	ExpectedMemberVersion int64
+	IdempotencyKey        string
+	Reason                string
+}
+
+func (c TransferConversationOwnerCommand) Validate() error {
+	if c.AuthContext.TenantID == "" {
+		return NewInvalidArgument("auth_context.tenant_id is required")
+	}
+	if c.AuthContext.UserID == "" {
+		return NewInvalidArgument("auth_context.user_id is required")
+	}
+	if c.ConversationID == "" {
+		return NewInvalidArgument("conversation_id is required")
+	}
+	if c.NewOwnerUserID == "" {
+		return NewInvalidArgument("new_owner_user_id is required")
+	}
+	if c.NewOwnerUserID == c.AuthContext.UserID {
+		return NewInvalidArgument("new_owner_user_id must differ from current owner")
+	}
+	if c.IdempotencyKey == "" {
+		return NewInvalidArgument("idempotency_key is required")
+	}
+	return nil
+}
+
+type TransferConversationOwnerResult struct {
+	ChangeID            ChangeID
+	TenantID            TenantID
+	ConversationID      ConversationID
+	PreviousOwnerUserID UserID
+	NewOwnerUserID      UserID
+	Status              MemberChangeStatus
+	BoundarySeq         int64
+	MemberVersion       int64
+	PermissionVersion   int64
+	IdempotentReplay    bool
+}
+
 type GetMemberChangeCommand struct {
 	AuthContext    AuthContext
 	ConversationID ConversationID

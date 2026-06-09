@@ -19,6 +19,10 @@ type CreateMemberChangeExecutor interface {
 	Execute(context.Context, types.CreateMemberChangeCommand) (types.MemberChangeResult, error)
 }
 
+type TransferConversationOwnerExecutor interface {
+	Execute(context.Context, types.TransferConversationOwnerCommand) (types.TransferConversationOwnerResult, error)
+}
+
 type GetMemberChangeExecutor interface {
 	Execute(context.Context, types.GetMemberChangeCommand) (types.MemberChangeDetail, error)
 }
@@ -33,6 +37,7 @@ type Server struct {
 	conversationv1.UnimplementedConversationServiceServer
 	getSendContext         GetSendContextExecutor
 	createMemberChange     CreateMemberChangeExecutor
+	transferOwner          TransferConversationOwnerExecutor
 	getMemberChange        GetMemberChangeExecutor
 	listConversationMember ListConversationMembersExecutor
 }
@@ -48,6 +53,12 @@ func NewServer(getSendContext GetSendContextExecutor, opts ...Option) *Server {
 func WithCreateMemberChange(executor CreateMemberChangeExecutor) Option {
 	return func(server *Server) {
 		server.createMemberChange = executor
+	}
+}
+
+func WithTransferConversationOwner(executor TransferConversationOwnerExecutor) Option {
+	return func(server *Server) {
+		server.transferOwner = executor
 	}
 }
 
@@ -138,6 +149,49 @@ func (s *Server) CreateMemberChange(
 		MemberVersion:     result.MemberVersion,
 		PermissionVersion: result.PermissionVersion,
 		IdempotentReplay:  result.IdempotentReplay,
+	}, nil
+}
+
+func (s *Server) TransferConversationOwner(
+	ctx context.Context,
+	request *conversationv1.TransferConversationOwnerRequest,
+) (*conversationv1.TransferConversationOwnerResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.transferOwner == nil {
+		return nil, status.Error(codes.Unimplemented, "transfer conversation owner is not configured")
+	}
+	auth := request.GetAuthContext()
+	result, err := s.transferOwner.Execute(ctx, types.TransferConversationOwnerCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  types.TenantID(auth.GetTenantId()),
+			UserID:    types.UserID(auth.GetUserId()),
+			DeviceID:  auth.GetDeviceId(),
+			SessionID: auth.GetSessionId(),
+			TraceID:   auth.GetTraceId(),
+			RequestID: auth.GetRequestId(),
+		},
+		ConversationID:        types.ConversationID(request.GetConversationId()),
+		NewOwnerUserID:        types.UserID(request.GetNewOwnerUserId()),
+		ExpectedMemberVersion: request.GetExpectedMemberVersion(),
+		IdempotencyKey:        request.GetIdempotencyKey(),
+		Reason:                request.GetReason(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &conversationv1.TransferConversationOwnerResponse{
+		ChangeId:            string(result.ChangeID),
+		TenantId:            string(result.TenantID),
+		ConversationId:      string(result.ConversationID),
+		PreviousOwnerUserId: string(result.PreviousOwnerUserID),
+		NewOwnerUserId:      string(result.NewOwnerUserID),
+		Status:              toProtoMemberChangeStatus(result.Status),
+		BoundarySeq:         result.BoundarySeq,
+		MemberVersion:       result.MemberVersion,
+		PermissionVersion:   result.PermissionVersion,
+		IdempotentReplay:    result.IdempotentReplay,
 	}, nil
 }
 
@@ -298,6 +352,8 @@ func toProtoMemberChangeType(value types.MemberChangeType) conversationv1.Member
 		return conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_REMOVE
 	case types.MemberChangeTypeRoleChanged:
 		return conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_ROLE_CHANGED
+	case types.MemberChangeTypeOwnerTransfer:
+		return conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_OWNER_TRANSFER
 	default:
 		return conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_UNSPECIFIED
 	}

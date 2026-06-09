@@ -43,10 +43,11 @@ const (
 type MemberChangeType string
 
 const (
-	MemberChangeTypeJoin        MemberChangeType = "JOIN"
-	MemberChangeTypeLeave       MemberChangeType = "LEAVE"
-	MemberChangeTypeRemove      MemberChangeType = "REMOVE"
-	MemberChangeTypeRoleChanged MemberChangeType = "ROLE_CHANGED"
+	MemberChangeTypeJoin          MemberChangeType = "JOIN"
+	MemberChangeTypeLeave         MemberChangeType = "LEAVE"
+	MemberChangeTypeRemove        MemberChangeType = "REMOVE"
+	MemberChangeTypeRoleChanged   MemberChangeType = "ROLE_CHANGED"
+	MemberChangeTypeOwnerTransfer MemberChangeType = "OWNER_TRANSFER"
 )
 
 type MemberChangeConflictPolicy string
@@ -77,4 +78,5 @@ const (
 	TimelineEventConversationMemberRemoved           TimelineEventType = "conversation.member.removed.v1"
 	TimelineEventConversationMemberRoleChanged       TimelineEventType = "conversation.member.role_changed.v1"
 	TimelineEventConversationMemberBoundaryCancelled TimelineEventType = "conversation.member.boundary_cancelled.v1"
+	TimelineEventConversationMemberOwnerTransferred  TimelineEventType = "conversation.member.owner_transferred.v1"
 )

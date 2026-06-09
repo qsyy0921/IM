@@ -180,6 +180,64 @@ func TestRegistryCleansStaleRoutesDuringLookup(t *testing.T) {
 	}
 }
 
+func TestRegistryCleanupStaleRoutesScansUserSets(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	local := memory.NewRegistry()
+	registry := NewRegistry(local, client, Config{GatewayID: "gateway-a", RouteTTL: time.Minute})
+	ctx := context.Background()
+	userKey := "nexusim:push:route:user:tenant-1:user-1"
+
+	if err := client.SAdd(ctx, userKey,
+		"valid-session",
+		"missing-session",
+		"malformed-session",
+		"wrong-user-session",
+	).Err(); err != nil {
+		t.Fatalf("seed user set: %v", err)
+	}
+	if err := registry.writeRoute(ctx, routeEntry{
+		TenantID:  "tenant-1",
+		UserID:    "user-1",
+		DeviceID:  "device-1",
+		SessionID: "valid-session",
+		GatewayID: "gateway-b",
+	}); err != nil {
+		t.Fatalf("seed valid route: %v", err)
+	}
+	if err := client.Set(ctx, "nexusim:push:route:session:malformed-session", "{", time.Minute).Err(); err != nil {
+		t.Fatalf("seed malformed route: %v", err)
+	}
+	if err := registry.writeRoute(ctx, routeEntry{
+		TenantID:  "tenant-1",
+		UserID:    "other-user",
+		DeviceID:  "device-2",
+		SessionID: "wrong-user-session",
+		GatewayID: "gateway-b",
+	}); err != nil {
+		t.Fatalf("seed wrong user route: %v", err)
+	}
+	if err := client.SAdd(ctx, userKey, "wrong-user-session").Err(); err != nil {
+		t.Fatalf("re-seed wrong user membership: %v", err)
+	}
+
+	removed, err := registry.CleanupStaleRoutes(ctx)
+	if err != nil {
+		t.Fatalf("cleanup stale routes: %v", err)
+	}
+	if removed != 3 {
+		t.Fatalf("expected 3 stale routes removed, got %d", removed)
+	}
+	if !redisSetHasMember(t, server, userKey, "valid-session") {
+		t.Fatalf("valid route should remain")
+	}
+	for _, sessionID := range []string{"missing-session", "malformed-session", "wrong-user-session"} {
+		if redisSetHasMember(t, server, userKey, sessionID) {
+			t.Fatalf("expected stale session %s to be removed", sessionID)
+		}
+	}
+}
+
 func TestRegistryFailsOpenWhenRedisLookupUnavailable(t *testing.T) {
 	server := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: server.Addr()})

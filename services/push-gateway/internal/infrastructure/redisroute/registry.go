@@ -111,6 +111,49 @@ func (registry *Registry) Unregister(sessionID string) {
 	_ = registry.deleteRoute(ctx, state.entry)
 }
 
+func (registry *Registry) StartCleanupLoop(ctx context.Context, interval time.Duration) {
+	if interval <= 0 {
+		return
+	}
+	ticker := time.NewTicker(interval)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				cleanupCtx, cancel := context.WithTimeout(ctx, interval)
+				_, _ = registry.CleanupStaleRoutes(cleanupCtx)
+				cancel()
+			}
+		}
+	}()
+}
+
+func (registry *Registry) CleanupStaleRoutes(ctx context.Context) (int, error) {
+	pattern := registry.config.KeyPrefix + ":route:user:*"
+	var cursor uint64
+	totalRemoved := 0
+	for {
+		keys, nextCursor, err := registry.client.Scan(ctx, cursor, pattern, 100).Result()
+		if err != nil {
+			return totalRemoved, err
+		}
+		for _, key := range keys {
+			removed, err := registry.cleanupUserRouteKey(ctx, key)
+			if err != nil {
+				return totalRemoved, err
+			}
+			totalRemoved += removed
+		}
+		cursor = nextCursor
+		if cursor == 0 {
+			return totalRemoved, nil
+		}
+	}
+}
+
 func (registry *Registry) EnqueueNotification(
 	ctx context.Context,
 	notification types.DeliveryNotification,
@@ -194,6 +237,37 @@ func (registry *Registry) deleteRoute(ctx context.Context, entry routeEntry) err
 	pipe.SRem(ctx, registry.userKey(entry.TenantID, entry.UserID), entry.SessionID)
 	_, err := pipe.Exec(ctx)
 	return err
+}
+
+func (registry *Registry) cleanupUserRouteKey(ctx context.Context, userKey string) (int, error) {
+	sessionIDs, err := registry.client.SMembers(ctx, userKey).Result()
+	if err != nil {
+		return 0, err
+	}
+	stale := make([]interface{}, 0)
+	for _, sessionID := range sessionIDs {
+		raw, err := registry.client.Get(ctx, registry.sessionKey(sessionID)).Result()
+		if errors.Is(err, redis.Nil) {
+			stale = append(stale, sessionID)
+			continue
+		}
+		if err != nil {
+			return 0, err
+		}
+		var entry routeEntry
+		if err := json.Unmarshal([]byte(raw), &entry); err != nil {
+			stale = append(stale, sessionID)
+			continue
+		}
+		if registry.userKey(entry.TenantID, entry.UserID) != userKey {
+			stale = append(stale, sessionID)
+		}
+	}
+	if len(stale) == 0 {
+		return 0, nil
+	}
+	removed, err := registry.client.SRem(ctx, userKey, stale...).Result()
+	return int(removed), err
 }
 
 func (registry *Registry) lookupRoutes(ctx context.Context, tenantID string, userID string) ([]routeEntry, error) {

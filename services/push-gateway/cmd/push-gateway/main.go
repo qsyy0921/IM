@@ -72,7 +72,9 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 			KeyPrefix: envString("NEXUSIM_PUSH_REDIS_KEY_PREFIX", "nexusim:push"),
 			RouteTTL:  envDuration("NEXUSIM_PUSH_ROUTE_TTL", 90*time.Second),
 		}
-		registry = redisroute.NewRegistry(localRegistry, redisClient, routeConfig)
+		redisRegistry := redisroute.NewRegistry(localRegistry, redisClient, routeConfig)
+		redisRegistry.StartCleanupLoop(ctx, envDurationAllowZero("NEXUSIM_PUSH_ROUTE_CLEANUP_INTERVAL", 30*time.Second))
+		registry = redisRegistry
 		closers = append(closers, redisClient.Close)
 		if enableWS {
 			subscriber := redisroute.NewSubscriber(localRegistry, redisClient, routeConfig)
@@ -209,6 +211,21 @@ func envDuration(name string, fallback time.Duration) time.Duration {
 	}
 	parsed, err := time.ParseDuration(value)
 	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func envDurationAllowZero(name string, fallback time.Duration) time.Duration {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	if value == "0" {
+		return 0
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed < 0 {
 		return fallback
 	}
 	return parsed

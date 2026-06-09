@@ -286,7 +286,7 @@ Redis 约束：
 
 - 所有 route key 必须有 TTL。
 - 第一版 `NEXUSIM_PUSH_ROUTE_BACKEND=redis` 会在 connect 时写入 session route，并由 gateway 进程按 TTL 比例周期性刷新 route；disconnect 时 best-effort 删除 route。
-- 进程崩溃、机器断电或 Redis 短故障时，route 最终依赖 TTL 过期清理；主动 cleanup ticker 和 Redis 故障 smoke 仍是后续 hardening。
+- 进程崩溃、机器断电或 Redis 短故障时，session route 最终依赖 TTL 过期；gateway 已接入后台 stale route cleanup，会周期扫描 `route:user:*` set 并移除 session key 缺失、JSON 损坏或 tenant/user 不匹配的成员。
 - disconnect / timeout 必须 best-effort 删除 route。
 - Redis route 是在线状态，不是投递事实源；Redis 丢失后客户端重连恢复。
 - 同一远端 gateway 上有多个 session 时，只向该 gateway Pub/Sub channel 发布一次，远端本地 registry 再 fanout 到本机 session。
@@ -359,7 +359,7 @@ delivery-service local transaction
 -> server returns delivery.ack.ok
 ```
 
-第一阶段可以只对当前 gateway 进程内在线 session 通知。当前已接入 Redis route 最小 adapter，并已用真实进程 smoke 验证 WebSocket gateway 与 delivery consumer gateway 分离时的跨进程在线路由；它证明的是最小分布式在线唤醒链路，不等同于完整生产多实例能力。生产化前仍需补 Redis 故障语义、route cleanup、跨实例 resume 和正式指标。
+第一阶段可以只对当前 gateway 进程内在线 session 通知。当前已接入 Redis route 最小 adapter，并已用真实进程 smoke 验证 WebSocket gateway 与 delivery consumer gateway 分离时的跨进程在线路由；它证明的是最小分布式在线唤醒链路，不等同于完整生产多实例能力。生产化前仍需补真实 Redis 故障 smoke、跨实例 resume 和正式指标。
 
 ### 8.3 重连恢复
 
@@ -517,6 +517,7 @@ NEXUSIM_PUSH_REDIS_PASSWORD=
 NEXUSIM_PUSH_REDIS_DB=0
 NEXUSIM_PUSH_REDIS_KEY_PREFIX=nexusim:push
 NEXUSIM_PUSH_ROUTE_TTL=90s
+NEXUSIM_PUSH_ROUTE_CLEANUP_INTERVAL=30s
 ```
 
 本地依赖：

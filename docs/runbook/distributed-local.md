@@ -133,7 +133,7 @@ push-gateway 只消费 delivery 事件做在线唤醒，WebSocket 连接和 Kafk
 ## 6. 已知缺口
 
 - Redis route 故障目前只有单元测试覆盖，尚未做真实故障 smoke；当前策略是 connect 写 route 失败 fail-closed，online notify lookup / publish 失败 fail-open，并依赖 `PullInbox` 兜底。
-- Redis route cleanup ticker 尚未实现，异常进程退出依赖 TTL 过期。
+- Redis route 已有 TTL 续期和后台 stale route cleanup；异常进程退出后 session route 仍依赖 TTL 过期，user route set 中的 stale 成员由 lookup / cleanup loop 移除。
 - `push-gateway` 跨实例 resume buffer 尚未实现；跨实例恢复仍应 fallback `PullInbox`。
 - `push-gateway` `/debug/metrics` 仍是本地 smoke 调试端点，不是正式 Prometheus 指标。
 - 真实生产部署还未接入 Kubernetes / service discovery / mTLS / OTel。

@@ -69,6 +69,10 @@ type summary struct {
 	SampleChangeID         string            `json:"sample_change_id,omitempty"`
 	SampleGetStatus        string            `json:"sample_get_status,omitempty"`
 	SampleGetError         string            `json:"sample_get_error,omitempty"`
+	MemberListCount        *int64            `json:"member_list_count,omitempty"`
+	MemberListNextPage     string            `json:"member_list_next_page_token,omitempty"`
+	MemberListSampleUsers  []string          `json:"member_list_sample_users,omitempty"`
+	MemberListError        string            `json:"member_list_error,omitempty"`
 	StartedAt              time.Time         `json:"started_at"`
 	FinishedAt             time.Time         `json:"finished_at"`
 	Stats                  map[string]string `json:"stats,omitempty"`
@@ -246,6 +250,9 @@ func run(cfg config) error {
 			result.SampleGetStatus = status
 		}
 	}
+	if err := fillMemberListSample(context.Background(), client, cfg, &result); err != nil {
+		result.MemberListError = err.Error()
+	}
 	encoded, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode summary: %w", err)
@@ -398,6 +405,35 @@ func getMemberChangeStatus(
 		return "", err
 	}
 	return response.GetStatus().String(), nil
+}
+
+func fillMemberListSample(
+	ctx context.Context,
+	client conversationv1.ConversationServiceClient,
+	cfg config,
+	result *summary,
+) error {
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	response, err := client.ListConversationMembers(requestCtx, &conversationv1.ListConversationMembersRequest{
+		AuthContext: &conversationv1.AuthContext{
+			TenantId: cfg.tenantID,
+			UserId:   cfg.operatorUserID,
+		},
+		ConversationId: cfg.conversationID,
+		PageSize:       10,
+	})
+	if err != nil {
+		return err
+	}
+	count := int64(len(response.GetMembers()))
+	result.MemberListCount = &count
+	result.MemberListNextPage = response.GetNextPageToken()
+	result.MemberListSampleUsers = make([]string, 0, len(response.GetMembers()))
+	for _, member := range response.GetMembers() {
+		result.MemberListSampleUsers = append(result.MemberListSampleUsers, member.GetUserId())
+	}
+	return nil
 }
 
 func shortCommit() string {

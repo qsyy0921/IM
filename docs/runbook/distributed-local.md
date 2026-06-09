@@ -172,7 +172,7 @@ GitHub / Docker / Go module 等必须访问外网的下载才使用本机 `127.0
 192.168.0.182:22 reachable
 Windows -> Mac SSH key auth: OK
 Docker CLI: OK
-Docker Desktop: 29.5.2
+Docker Desktop: 29.5.3
 Docker resource pool observed through Docker info: 8 CPU / about 8GB memory
 Mac repo path: /Users/qsyy0921/Desktop/IM exists
 ```
@@ -199,7 +199,7 @@ Windows 侧可用脚本复查 Mac Docker Desktop 配置：
 当前验证结果：
 
 ```text
-docker_cli=Docker version 29.5.2
+docker_cli=Docker version 29.5.3
 docker_context=desktop-linux
 cpus=8
 memory_mib=8192

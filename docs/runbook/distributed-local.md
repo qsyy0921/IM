@@ -142,6 +142,14 @@ H:\NexusIM\loadtest-results\push-gateway-win-mac-redis-smoke-20260609-210034\pus
 
 该 run 使用 clean commit `8c322fc`，`git_dirty=false`。拓扑为：Windows 运行 PostgreSQL / Kafka / Redis / 核心业务进程 / `push-gateway delivery-consumer`，Windows Docker 运行 `nexusim/delivery-service:local` gRPC，Mac Docker 运行 `nexusim/push-gateway:local` WebSocket gateway。Windows runner 通过 `ws://172.31.50.2:11598` 连接 Mac；Mac gateway 通过有线 `172.31.50.1:6379` 使用 Redis route，并通过 `172.31.50.1:11597` 回调 Windows Docker delivery-service ACK。结果：收到 seq `2` 的 `delivery.notify`，`PullInbox item_count=1/max_seq=2`，`delivery.ack.ok last_received_seq=2`，`delivery_outbox PUBLISHED=2/PENDING=0/DLQ=0`。
 
+当前 Win-Mac Docker cross-instance resume smoke 原始结果：
+
+```text
+H:\NexusIM\loadtest-results\push-gateway-win-mac-cross-instance-resume-20260609\pushgateway-summary.json
+```
+
+该 run 使用 clean commit `b8d8f92`，`git_dirty=false`。拓扑为：Windows 运行 PostgreSQL / Kafka / Redis / 核心业务进程 / `push-gateway delivery-consumer` / `push-gateway ws-reconnect`，Windows Docker 运行 `nexusim/delivery-service:local` gRPC，Mac Docker 运行 `nexusim/push-gateway:local` 首连 WebSocket gateway。客户端第一次连接 `ws://172.31.50.2:11598`，收到 seq `2` 的 `delivery.notify` 后在 ACK 前断开；随后携带同一 `resume_token` 和 `last_received=1` 重连到 Windows `ws://127.0.0.1:11599`，命中 Redis-backed resume buffer，replay 同一条 `event_id/message_id/conversation_seq` 的 notify。结果：consumer gateway `redis_resume_append_count=1`，重连 gateway `redis_resume_replay_count=1 / redis_resume_miss_count=0`，随后 `PullInbox item_count=1/max_seq=2`，`delivery.ack.ok last_received_seq=2`，`delivery_outbox PUBLISHED=2/PENDING=0/DLQ=0`。
+
 前一轮脚本验证结果：
 
 ```text
@@ -291,14 +299,14 @@ push-gateway 只消费 delivery 事件做在线唤醒，WebSocket 连接和 Kafk
 
 ```text
 当前是本地多进程分布式 smoke。它证明服务边界、outbox、Kafka、durable inbox、Redis route、WebSocket notify 和 ACK 能串起来。
-生产级还需要真实鉴权、Kubernetes 部署、Redis 故障治理、cross-instance resume 真实进程验证、正式 metrics、容量和故障演练。
+生产级还需要真实鉴权、Kubernetes 部署、Redis HA / Sentinel / Cluster、跨实例慢连接组合验证、正式 metrics、容量和故障演练。
 ```
 
 ## 7. 已知缺口
 
 - Redis route 已做一次真实 stop/start fault smoke，证明 online notify 可丢但 `PullInbox + AckDelivery` 可恢复；这仍不是 Redis HA、Sentinel、Cluster 或网络分区结论。
 - Redis route 已有 TTL 续期和后台 stale route cleanup；异常进程退出后 session route 仍依赖 TTL 过期，user route set 中的 stale 成员由 lookup / cleanup loop 移除。
-- `push-gateway` Redis-backed cross-instance resume buffer 已有最小实现和单元测试；尚未跑真实进程 / Win-Mac cross-instance resume smoke。跨实例 replay miss、Redis error 或 token mismatch 时仍必须 fallback `PullInbox`。
+- `push-gateway` Redis-backed cross-instance resume buffer 已有本机跨进程 smoke 和 Win-Mac Docker smoke；跨实例 replay miss、Redis error 或 token mismatch 时仍必须 fallback `PullInbox`。
 - `push-gateway` `/debug/metrics` 仍是本地 smoke 调试端点，不是正式 Prometheus 指标。
 - 真实生产部署还未接入 Kubernetes / service discovery / mTLS / OTel。
 - Mac Docker CLI / SSH 已可用；双机 Docker Compose profile 尚未完成配置和验证。Mac `Desktop/IM` 有本地变更，后续跨机 smoke 前需选择 fast-forward 更新或新建干净 smoke checkout。

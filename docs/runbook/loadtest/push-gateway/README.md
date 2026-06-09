@@ -1,6 +1,6 @@
 # push-gateway Loadtest / Smoke Index
 
-本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify`、`delivery.ack.ok`、queue-full broad `server.resume_hint` active close、单实例 in-memory resume buffer TTL、Redis route 最小 adapter 和 Redis-backed cross-instance resume buffer 第一版；真实进程 full smoke、同 user 多 device notify smoke、slow-client 负向 smoke、单实例 resume replay smoke、跨进程 Redis route smoke 和 cross-instance resume smoke 已通过。
+本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify`、`delivery.ack.ok`、queue-full broad `server.resume_hint` active close、单实例 in-memory resume buffer TTL、Redis route 最小 adapter 和 Redis-backed cross-instance resume buffer 第一版；真实进程 full smoke、同 user 多 device notify smoke、slow-client 负向 smoke、单实例 resume replay smoke、跨进程 Redis route smoke、cross-instance resume smoke 和 Win-Mac 双机 cross-instance resume smoke 已通过。
 
 ## 当前验证目标
 
@@ -78,6 +78,7 @@ NEXUSIM_PUSH_ROUTE_CLEANUP_INTERVAL=30s
 | `loadtest-report-20260609-push-gateway-redis-route-ttl-smoke.md` | Redis route 增加 TTL 续期后，clean commit 上再次验证跨进程在线通知 |
 | `loadtest-report-20260609-push-gateway-redis-fault-smoke.md` | Redis route 中断时，在线 notify 可丢，但客户端可通过 durable `PullInbox` 恢复并 ACK |
 | `loadtest-report-20260609-push-gateway-cross-instance-resume-smoke.md` | 客户端从 WebSocket gateway A 断开后重连到 gateway B，命中 Redis-backed resume buffer 并 replay 同一条 `delivery.notify` |
+| `loadtest-report-20260609-push-gateway-win-mac-cross-instance-resume-smoke.md` | 首连 WebSocket gateway 在 Mac Docker，重连 gateway 在 Windows，命中 Redis-backed resume buffer 并 replay 同一条 `delivery.notify` |
 
 报告 Markdown 保存在仓库内：
 
@@ -140,6 +141,18 @@ gateway A 只做在线 notify
 ```
 
 这体现了在线唤醒层和可靠投递层解耦：Redis route 可以丢，WebSocket 可以断，但 message fact、user_inbox 和 ACK cursor 不丢。
+
+双机可讲点：
+
+```text
+Windows 运行 PostgreSQL / Kafka / Redis / 核心业务服务 / push delivery-consumer
+Mac Docker 运行 push-gateway WebSocket gateway
+客户端首连 Mac gateway，断开后重连 Windows gateway
+Redis-backed resume buffer replay 同一条 delivery.notify
+最终仍用 PullInbox / AckDelivery 验证可靠投递
+```
+
+这证明当前系统已经不是单进程 WebSocket demo，而是能把在线连接、Kafka consumer、Redis route、Redis resume 和 durable delivery read model 拆到不同进程 / 不同机器上协作。
 
 排查跨实例在线路由时，优先看 `/debug/metrics` 中的几类计数：
 

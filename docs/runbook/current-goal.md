@@ -61,9 +61,9 @@ message-service SendMessage
 
 1. 当前 Codex 进程如果仍找不到 `go`，先执行 `. .\tools\go-env.ps1`。
 2. adaptive limit 第一版已接入并跑完 on/off 对照；debug metrics collector 已新增 recent 窗口字段，adaptive controller 已新增 hysteresis 和动态 retry hint；loadtest summary 已记录 retry delay histogram。
-3. 下一步用 recent 字段、hysteresis、动态 retry hint 和 retry delay histogram 重跑 adaptive 阈值矩阵，而不是继续用累计 p95 做硬门槛。
-4. 对比 pool release gap `4/8/16`、outbox release ratio `50%/25%`、retry base delay `250/500/1000ms`。
-5. 继续压测客户端 retry 参数：`max_retries=1/2/3`、`jitter=100/300/500ms`。
+3. adaptive threshold matrix v1 已跑完；下一步以 `gap8-outbox50-base1000` 为候选做 60s 重复验证。
+4. 对比更宽松的 pool acquire p95 阈值，例如 `250ms / 500ms / 750ms`，观察 accepted RPS 是否提升且 outbox pending 仍为 0。
+5. 继续压测客户端 retry 参数：`max_retries=1/2/3`、`jitter=100/300/500ms`，并补 logical end-to-end latency，避免只看最终成功 attempt 延迟。
 6. 继续采集 PostgreSQL wait_event，重点看 `LWLock:WALWrite`、`LWLock:WALInsert`、`LWLock:BufferContent` 和 `CheckpointWriteDelay`。
 7. adaptive admission 合并阶段评审已完成，无 P0/P1；下一轮正式矩阵需要显式展示 recent sample count、retry delay histogram、retry attempt count、logical success rate、overload rate 和 success p99。
 8. 暂不推 GitHub；等 adaptive threshold matrix 和评审 P2 口径收敛后再做批量同步。
@@ -266,6 +266,7 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 当前评审确认 `*_recent` 是最近 4096 个样本窗口，不是时间窗口；低流量或样本数低于 `MinMetricSamples` 时不能基于 recent 指标下调参结论，后续报告必须展示 recent sample count。
 - 当前评审确认 relay 相关 adaptive 条件隐含依赖 outbox pending 采样；如果配置了 relay active p95、outbox fetched per call 或 Kafka records per call 条件，必须同时配置 outbox pending 采样阈值，否则这些 relay 条件不会独立触发拒绝。
 - 当前 dynamic retry hint 公式仍是启发式：`min(reason_count * base_delay, max_delay)`，recovering 状态额外加一档；不能作为稳定控制律或最优 retry delay，后续应结合 accepted RPS、outbox drain rate 和 pool acquire recent p95 调整。
+- 当前 adaptive threshold matrix v1：报告为 `docs/runbook/loadtest-report-20260609-adaptive-threshold-v1.md`，正式结果路径为 `loadtest/results/adaptive-threshold-v1-clean-20260609/`。commit `9830f34`、`git_dirty=false`，固定 `PG_MAX_CONNS=64`、relay workers `8`、batch size `100`、PublishBatch on、`max_retries=2`、`retry_jitter=100ms`。本轮最佳候选为 `gap8-outbox50-base1000`：1200 VU logical success `80.78%`、accepted RPS `578.30`、success p99 `1955.41ms`；1600 VU logical success `56.28%`、accepted RPS `456.07`、success p99 `1819.91ms`；两组 outbox pending 均为 0。该结果说明更长 retry hint 能缓解重试压力，但 adaptive admission 仍是保护机制，不是容量提升结论。
 - 当前 debug metrics collector 保存全量样本并在 snapshot 时排序，适合本地短压测，不适合作为生产 metrics；后续应替换为固定窗口、reservoir、HDR histogram 或 Prometheus histogram。
 - `CONVERSATION_NOT_FOUND`、`MESSAGE_TOO_LARGE`、`SEQ_BLOCK_EXHAUSTED` 错误 sentinel 和 gRPC 映射暂未补齐；phase-1 普通会话 happy path 不阻塞，但不能声称完整错误契约已完成。
 - 当前 raw gRPC server 还没有统一 deadline / trace / metrics interceptor；后续接 Kratos 或统一 gRPC interceptor。
@@ -328,3 +329,4 @@ GitHub 同步采用批量策略，不对每个小改动都推送。
 - 2026-06-09：已为 adaptive admission 增加 hysteresis 配置，支持 `ReleaseAvailableConns` 和 `ReleaseOutboxPending`；clean smoke `6f9a438` 证明低压真实链路正常。下一步把固定 `RetryInfo=500ms` 改成动态 retry hint，并用 recent+hysteresis 跑正式阈值矩阵。
 - 2026-06-09：已为 `SERVICE_OVERLOADED` 增加可携带 retry delay 的错误类型，adaptive controller 会根据过载原因数量生成动态 retry hint；clean smoke `31408e7` 验证真实进程链路可运行。随后在 `c9e6cf1` 为 loadtest summary 增加 retry delay histogram，并用真实进程 smoke 验证 `retry_delay_p95_ms=500`。下一步跑正式 adaptive 阈值矩阵。
 - 2026-06-09：独立评审线程复核 adaptive admission / recent metrics / hysteresis / dynamic RetryInfo / retry delay histogram，结论为无 P0/P1，不阻塞继续做 adaptive threshold matrix。P2 已记录：relay 条件依赖 outbox pending 采样、recent 是样本窗口不是时间窗口、`retry_delay_count` 是收到并计划遵守的 hint 数量、dynamic retry hint 仍是启发式控制信号。
+- 2026-06-09：已在 clean commit `9830f34` 跑 adaptive threshold matrix v1，并新增 `docs/runbook/loadtest-report-20260609-adaptive-threshold-v1.md`。结论：`RetryBase=1000ms` 的 `gap8-outbox50-base1000` 当前最好，outbox 全部追平；pool release gap 和 outbox release ratio 未显示稳定收益。下一步做 60s 重复验证和 pool acquire p95 阈值矩阵。

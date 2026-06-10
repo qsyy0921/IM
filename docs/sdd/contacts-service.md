@@ -1,6 +1,6 @@
 # NexusIM contacts-service SDD v0.1
 
-状态：Draft；proto / Kafka schema / migration / 六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 `ACCEPT / DECLINE` 真实进程 smoke 已落地。
+状态：Draft；proto / Kafka schema / migration / 六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 `ACCEPT / DECLINE` 真实进程 smoke 已落地；下一阶段联系人删除 / 拉黑 / 备注名设计已冻结为 v0.2 编码输入。
 
 本文定义第三层 IM 产品能力中的“联系人 / 好友关系”最小服务边界。目标是补齐社交关系事实源，同时保持低耦合：不把好友关系塞进 `conversation_members`，也不让会话、消息、投递服务直接读联系人表。
 
@@ -12,6 +12,7 @@
 
 - 发起好友申请；
 - 接受 / 拒绝好友申请；
+- 删除联系人、拉黑联系人、更新本人的联系人备注；
 - 查询当前联系人列表；
 - 查询两名用户之间的联系人状态；
 - 通过 outbox 发布联系人事件，供通知、审计、推荐或后续搜索投影消费。
@@ -30,6 +31,13 @@
 - 好友申请接受后只写 contacts-service 自己的关系表，不自动创建 direct conversation。
 - 如果后续要“加好友后自动创建私聊”，必须通过 app 层显式调用 conversation-service port 或异步 saga 设计，不能在 SQL 层跨库写 `conversations`。
 - message-service 不直接同步调用 contacts-service；好友可发消息策略后续由 policy-service 或 conversation-service 成员关系统一表达。
+
+第二阶段约束：
+
+- 删除 / 拉黑 / 备注名只修改 contacts-service 自己的关系 read model 和 outbox，不修改会话、消息、投递或在线状态。
+- 删除联系人是当前用户的单向关系操作：只把 `owner_user_id -> contact_user_id` 这条 edge 标为 `DELETED`，不强制删除对方视角的 edge。是否双向解除关系由产品策略或后续 saga 单独设计。
+- 拉黑联系人是当前用户的单向关系操作：只把 `owner_user_id -> contact_user_id` 标为 `BLOCKED`，并发布 `contact.edge.blocked.v1`。是否影响发消息权限不由 contacts-service 直接决定，后续由 policy-service / conversation-service 投影消费该事件后统一表达。
+- 备注名是当前用户私有资料：只更新 `owner_user_id -> contact_user_id` 的 `remark`，不进入对方视图，不复制用户 profile。
 
 ## 2. 上下游
 
@@ -69,7 +77,7 @@ services/contacts-service/
 | 模型 | 说明 | 不变量 |
 | --- | --- | --- |
 | ContactRequest | A 向 B 发起的好友申请 | sender != receiver；同一对用户同一时间最多一个 PENDING 请求；requester 只能取消自己的请求；receiver 才能接受或拒绝 |
-| ContactEdge | 方向性联系人边 | ACCEPT 后写两条 ACTIVE 边；删除 / 拉黑后不能物理删除历史请求；`owner_user_id + contact_user_id` 唯一 |
+| ContactEdge | 方向性联系人边 | ACCEPT 后写两条 ACTIVE 边；删除 / 拉黑 / 备注名只更新当前 owner 的方向性 edge；不能物理删除历史请求；`owner_user_id + contact_user_id` 唯一 |
 | ContactEvent | 联系人边界事件 | 只通过 `contacts_outbox` 发布；event_id 幂等 |
 
 状态：
@@ -88,7 +96,7 @@ DELETED
 BLOCKED
 ```
 
-第一阶段只实现 `PENDING -> ACCEPTED / DECLINED` 和 ACTIVE 联系人列表。`BLOCKED` 先保留，不做消息权限联动。
+第一阶段已实现 `PENDING -> ACCEPTED / DECLINED` 和 ACTIVE 联系人列表。第二阶段实现当前用户视角的 `ACTIVE -> DELETED / BLOCKED` 和 `remark` 更新；`BLOCKED` 只产生联系人事实事件，不直接改 `SendMessage` 权限。
 
 ## 5. 同步 API 契约
 
@@ -105,6 +113,9 @@ rpc SendContactRequest(SendContactRequestRequest) returns (SendContactRequestRes
 rpc RespondContactRequest(RespondContactRequestRequest) returns (RespondContactRequestResponse)
 rpc ListContacts(ListContactsRequest) returns (ListContactsResponse)
 rpc GetContactState(GetContactStateRequest) returns (GetContactStateResponse)
+rpc DeleteContact(DeleteContactRequest) returns (DeleteContactResponse)
+rpc BlockContact(BlockContactRequest) returns (BlockContactResponse)
+rpc UpdateContactRemark(UpdateContactRemarkRequest) returns (UpdateContactRemarkResponse)
 ```
 
 `SendContactRequestRequest`：
@@ -133,6 +144,34 @@ page_size
 page_token
 ```
 
+`DeleteContactRequest`：
+
+```text
+auth_context
+contact_user_id
+idempotency_key
+```
+
+`BlockContactRequest`：
+
+```text
+auth_context
+contact_user_id
+idempotency_key
+reason
+```
+
+`UpdateContactRemarkRequest`：
+
+```text
+auth_context
+contact_user_id
+remark
+idempotency_key
+```
+
+删除 / 拉黑 / 备注名返回当前 owner 视角的 `ContactItem` 或 `ContactState`，不返回对方状态。
+
 错误码：
 
 | 错误码 | 语义 | 是否可重试 |
@@ -140,6 +179,7 @@ page_token
 | `INVALID_ARGUMENT` | 参数缺失、自己加自己、page token 非法 | 否 |
 | `CONTACT_REQUEST_NOT_FOUND` | request 不存在或对当前用户不可见 | 否 |
 | `CONTACT_ALREADY_EXISTS` | 双方已经是 ACTIVE 联系人 | 否 |
+| `CONTACT_NOT_FOUND` | 当前用户没有对应联系人 edge，或操作对象不可见 | 否 |
 | `CONTACT_REQUEST_CONFLICT` | 幂等键复用但 command hash 不同，或已有反向 pending 需要先处理 | 否 |
 | `PERMISSION_DENIED` | 非 receiver 响应请求，或当前用户无权读取 | 否 |
 | `DB_WRITE_FAILED` | PostgreSQL 写失败 | 是 |
@@ -161,6 +201,9 @@ im.contact.events
 | `contact.request.created.v1` | `im.contact.events` | `tenant_id:canonical_user_pair` | push / audit |
 | `contact.request.accepted.v1` | `im.contact.events` | `tenant_id:canonical_user_pair` | push / audit / recommendation |
 | `contact.request.declined.v1` | `im.contact.events` | `tenant_id:canonical_user_pair` | push / audit |
+| `contact.edge.deleted.v1` | `im.contact.events` | `tenant_id:canonical_user_pair` | push / audit / recommendation |
+| `contact.edge.blocked.v1` | `im.contact.events` | `tenant_id:canonical_user_pair` | push / audit / policy projection |
+| `contact.edge.remark_updated.v1` | `im.contact.events` | `tenant_id:canonical_user_pair` | audit / user preference projection |
 
 Envelope 字段与现有 outbox 口径保持一致：
 
@@ -202,13 +245,47 @@ occurred_at
 
 用户昵称、头像、组织信息由 profile/identity 投影补充，contacts-service 不复制用户资料。
 
+第二阶段事件 payload 继续只表达 contacts-service 自己的关系事实：
+
+```text
+contact.edge.deleted.v1:
+  owner_user_id
+  contact_user_id
+  previous_status
+  status = DELETED
+  edge_version
+  occurred_at
+
+contact.edge.blocked.v1:
+  owner_user_id
+  contact_user_id
+  previous_status
+  status = BLOCKED
+  edge_version
+  reason
+  occurred_at
+
+contact.edge.remark_updated.v1:
+  owner_user_id
+  contact_user_id
+  status
+  edge_version
+  remark
+  occurred_at
+```
+
+这些事件不表示 conversation membership 已变化，也不表示 message-service 发送权限立即变化。policy-service / conversation-service 后续可以消费 `contact.edge.blocked.v1` 建立自己的权限投影，但 contacts-service 不直接写其它服务内部表。
+
 ## 7. 数据库设计
 
 Migration：
 
 ```text
 migrations/postgres/contacts/000001_contacts_core.sql
+migrations/postgres/contacts/000002_contact_edge_management.sql
 ```
+
+以下 DDL 表示 v0.2 后目标结构。`000001_contacts_core.sql` 已作为第一阶段基线存在；第二阶段只能通过 `000002_contact_edge_management.sql` expand-only 增加 `remark` 和扩展 command type check，不回写旧 migration。
 
 核心表：
 
@@ -239,6 +316,7 @@ CREATE TABLE contact_edges (
     owner_user_id    TEXT        NOT NULL,
     contact_user_id  TEXT        NOT NULL,
     status           TEXT        NOT NULL,
+    remark           TEXT        NOT NULL DEFAULT '',
     source_request_id TEXT       NOT NULL,
     version          BIGINT      NOT NULL,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -258,7 +336,13 @@ CREATE TABLE contact_command_idempotency (
     result_id        TEXT        NOT NULL,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (tenant_id, user_id, idempotency_key),
-    CHECK (command_type IN ('SEND_CONTACT_REQUEST', 'RESPOND_CONTACT_REQUEST'))
+    CHECK (command_type IN (
+        'SEND_CONTACT_REQUEST',
+        'RESPOND_CONTACT_REQUEST',
+        'DELETE_CONTACT',
+        'BLOCK_CONTACT',
+        'UPDATE_CONTACT_REMARK'
+    ))
 );
 
 CREATE TABLE contacts_outbox (
@@ -289,6 +373,18 @@ CREATE TABLE contacts_outbox (
     CHECK (status IN ('PENDING', 'PUBLISHED', 'DLQ'))
 );
 ```
+
+第二阶段 migration 必须保持 expand-only，不修改 `000001_contacts_core.sql`：
+
+```text
+migrations/postgres/contacts/000002_contact_edge_management.sql
+```
+
+计划变更：
+
+- `contact_edges.remark TEXT NOT NULL DEFAULT ''`；
+- 扩展 `contact_command_idempotency.command_type` check，加入 `DELETE_CONTACT / BLOCK_CONTACT / UPDATE_CONTACT_REMARK`；
+- 不新增跨服务外键，不引用 `conversation_members`、`message_log` 或 delivery / receipt 内部表。
 
 ## 8. 核心流程
 
@@ -335,6 +431,58 @@ ListContacts
 -> page_token binds tenant_id / owner_user_id / page_size / last_contact_user_id
 ```
 
+### 8.4 删除联系人
+
+```text
+DeleteContact
+-> validate auth / contact_user_id / idempotency_key
+-> lock contact_command_idempotency(tenant, owner, idempotency_key)
+-> lock contact_edges(tenant, owner, contact_user_id) FOR UPDATE
+-> if same idempotency key and same command hash, replay
+-> if edge missing or status != ACTIVE, return CONTACT_NOT_FOUND or replay existing terminal result
+-> update current owner edge status = DELETED, version = version + 1
+-> insert / reuse contact_command_idempotency result_id = owner_user_id + ":" + contact_user_id
+-> insert contacts_outbox(contact.edge.deleted.v1)
+-> commit
+```
+
+删除联系人是当前 owner 的单向列表偏好和关系事实，不删除对方视角 edge，不删除历史 contact request，也不影响已有会话、消息或投递事实。
+
+### 8.5 拉黑联系人
+
+```text
+BlockContact
+-> validate auth / contact_user_id / idempotency_key / reason
+-> lock contact_command_idempotency(tenant, owner, idempotency_key)
+-> lock contact_edges(tenant, owner, contact_user_id) FOR UPDATE
+-> if same idempotency key and same command hash, replay
+-> if edge missing, return CONTACT_NOT_FOUND
+-> if edge already BLOCKED and command hash matches, replay
+-> update current owner edge status = BLOCKED, version = version + 1
+-> insert / reuse contact_command_idempotency result_id = owner_user_id + ":" + contact_user_id
+-> insert contacts_outbox(contact.edge.blocked.v1)
+-> commit
+```
+
+BLOCKED 是 contacts-service 的当前 owner 关系状态。它不直接拒绝 `SendMessage`；发送权限必须由 policy-service / conversation-service 的权限投影或正式检查表达，避免 message-service 同步依赖 contacts-service。
+
+### 8.6 更新备注名
+
+```text
+UpdateContactRemark
+-> validate auth / contact_user_id / idempotency_key / remark
+-> lock contact_command_idempotency(tenant, owner, idempotency_key)
+-> lock contact_edges(tenant, owner, contact_user_id) FOR UPDATE
+-> if same idempotency key and same command hash, replay
+-> if edge missing or status != ACTIVE, return CONTACT_NOT_FOUND
+-> update current owner edge remark, version = version + 1
+-> insert / reuse contact_command_idempotency result_id = owner_user_id + ":" + contact_user_id
+-> insert contacts_outbox(contact.edge.remark_updated.v1)
+-> commit
+```
+
+备注名只属于当前 owner 的联系人视图，不复制到对方，不写 profile/identity，不进入消息事实。
+
 ## 9. 一致性和事务
 
 强一致边界：
@@ -357,6 +505,9 @@ contacts_outbox -> Kafka im.contact.events -> push / audit / recommendation
 | --- | --- | --- | --- |
 | SendContactRequest | `tenant_id + sender_user_id + idempotency_key`，事实源为 `contact_requests` 唯一键和 `command_hash` | 同 command hash replay；不同 hash 返回 conflict；不额外写 `contact_command_idempotency` | 无需补偿 |
 | RespondContactRequest | `tenant_id + receiver_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；已完成且同 decision 返回既有 result；已完成但相反 decision 返回 conflict | 后续通过重新申请恢复 |
+| DeleteContact | `tenant_id + owner_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；只更新 owner -> contact 单向 edge | 可通过重新申请或对方仍 ACTIVE edge 恢复 |
+| BlockContact | `tenant_id + owner_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；重复 BLOCKED 返回既有 result | 后续 UnblockContact 单独设计，不混入删除 |
+| UpdateContactRemark | `tenant_id + owner_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；remark 相同可 replay | 再次 UpdateContactRemark 覆盖 |
 | contacts outbox publish | `event_id` | at-least-once retry，max attempts 后 DLQ；relay 必须按 `partition_key + aggregate_version` fail-closed 阻塞低版本 PENDING/DLQ，避免 accepted 早于 created 发布 | repair/replay worker 后续实现 |
 
 Command hash 规则：
@@ -364,7 +515,11 @@ Command hash 规则：
 - 不包含 `idempotency_key`、`request_id`、`trace_id`、`session_id`、`device_id`。
 - `SendContactRequest` 包含 command type、tenant、sender、target、message 原文。
 - `RespondContactRequest` 包含 command type、tenant、receiver、request_id、decision。
+- `DeleteContact` 包含 command type、tenant、owner、contact。
+- `BlockContact` 包含 command type、tenant、owner、contact、reason 原文。
+- `UpdateContactRemark` 包含 command type、tenant、owner、contact、remark 原文。
 - 第一阶段不 trim message；消息长度和敏感词等内容治理后续接 policy/identity 端口。
+- 第二阶段不 trim remark / reason；长度上限、敏感词、profile 展示规则后续接 policy/identity 端口。第一版实现必须至少拒绝过长输入，避免写入无限 payload。
 
 ## 11. 权限和安全
 
@@ -372,6 +527,8 @@ Command hash 规则：
 - 发送申请只能以当前 auth user 作为 sender。
 - 响应申请只能由 receiver 执行。
 - `ListContacts` 只能查询当前 auth user 的联系人列表，第一阶段不提供 admin 查询。
+- 删除 / 拉黑 / 备注名只能操作当前 auth user 自己的 `owner_user_id -> contact_user_id` edge。
+- `BLOCKED` 不直接等同于消息发送权限拒绝；其它服务必须通过正式 policy / projection 使用该事实，不能同步读 contacts-service 内部表。
 - 不在事件 payload 里暴露私密用户资料，只放 user id 和关系状态。
 - 用户存在性、封禁状态、组织策略后续通过 identity/policy port 接入；第一阶段先保留端口边界或 strict mock。
 
@@ -386,6 +543,9 @@ contacts_request_created_total
 contacts_request_accepted_total
 contacts_request_declined_total
 contacts_request_conflict_total
+contacts_edge_deleted_total
+contacts_edge_blocked_total
+contacts_remark_updated_total
 contacts_list_latency_ms
 contacts_outbox_pending_count
 contacts_outbox_dlq_count
@@ -398,9 +558,10 @@ contacts_outbox_dlq_count
 | domain unit | 自己加自己、重复 pending、accept 写双向 edge、非 receiver 响应 |
 | app unit | command validation、repository error propagation |
 | api unit | gRPC request/response 转换、稳定错误映射 |
-| postgres integration | SendContactRequest / RespondContactRequest / ListContacts 真实事务、幂等 replay、并发首次申请、反向 pending、终态相反 decision、分页 token 绑定 |
+| postgres integration | SendContactRequest / RespondContactRequest / ListContacts / DeleteContact / BlockContact / UpdateContactRemark 真实事务、幂等 replay、并发首次申请、反向 pending、终态相反 decision、分页 token 绑定、单向 edge 变更 |
 | outbox integration | contacts_outbox retry / DLQ / mark PUBLISHED |
 | smoke | `SendContactRequest -> RespondContactRequest(ACCEPT) -> ListContacts` |
+| v0.2 smoke | `ACCEPT -> DeleteContact`、`ACCEPT -> BlockContact`、`ACCEPT -> UpdateContactRemark`，分别验证 contacts_outbox / Kafka / ListContacts / GetContactState |
 
 ## 14. Runbook
 
@@ -419,6 +580,16 @@ contacts-service grpc
 -> loadtest/contacts RespondContactRequest(ACCEPT)
 -> loadtest/contacts ListContacts
 ```
+
+第二阶段 smoke：
+
+```text
+loadtest/contacts --scenario delete
+loadtest/contacts --scenario block
+loadtest/contacts --scenario remark
+```
+
+这些场景必须继续使用 `H:\NexusIM\loadtest-results` 保存原始 summary；E 盘仓库只保存报告和索引文档。
 
 完整事件 smoke 后续再加：
 
@@ -440,3 +611,12 @@ contacts-service outbox-relay
 - `go test ./services/contacts-service/...` 通过；
 - 真实 PostgreSQL integration 覆盖 request、accept、list；
 - smoke 报告归档到 `docs/runbook/loadtest/contacts-service/`。
+
+进入第二轮联系人管理编码前：
+
+- SDD 明确删除 / 拉黑 / 备注名是当前 owner 单向 edge 操作；
+- migration v0.2 只扩展 contacts-service 自己的表；
+- proto / Kafka schema 增量添加 `DeleteContact / BlockContact / UpdateContactRemark` 和 `contact.edge.*` 事件，不复用旧 tag；
+- 不新增 message-service / conversation-service 对 contacts-service 的同步依赖；
+- 真实 PostgreSQL 测试覆盖三类操作的幂等、状态转换、outbox 和单向可见性；
+- 三条真实进程 smoke 报告归档到 `docs/runbook/loadtest/contacts-service/`。

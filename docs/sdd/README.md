@@ -16,7 +16,7 @@
 | push-gateway SDD | `docs/sdd/push-gateway.md` | WebSocket 在线连接、delivery event 唤醒、PullInbox / AckDelivery 协调 |
 | receipt-service SDD | `docs/sdd/receipt-service.md` | 送达 / 已读回执 read model、MarkRead 和 receipt event 边界 |
 | receipt-service conversation list SDD | `docs/sdd/receipt-service-conversation-list.md` | 会话列表 / 未读数 read model，复用 receipt-service projection |
-| contacts-service SDD | `docs/sdd/contacts-service.md` | 联系人 / 好友关系事实源、好友申请、联系人列表和 contact outbox 边界 |
+| contacts-service SDD | `docs/sdd/contacts-service.md` | 联系人 / 好友关系事实源、好友申请、联系人列表、删除 / 拉黑 / 备注名和 contact outbox 边界 |
 
 ## 六层 DDD 约定
 
@@ -42,7 +42,7 @@
 | `push-gateway` | SDD v0.1 Draft 已存在 | 进入 proto / 六层骨架前需要阶段评审；第一阶段只做在线通知和回源协调 |
 | `delivery-service` | SDD v0.1 已存在，最小 projection / PullInbox / AckDelivery / delivery outbox relay 已落地 | 可以支撑 push-gateway 第一阶段，只要 push-gateway 不绕过 durable inbox / ACK |
 | `receipt-service` | SDD v0.1 Draft、proto、Kafka schema、migration、六层骨架、PostgreSQL repository、delivery consumer、MarkRead 事务、receipt outbox relay、最小 `ListConversations`、会话未读 read model 和 updated_at desc keyset 分页已落地 | 后续补真实权限、会话置顶 / 静音 / 归档；不得直接读取 delivery-service 内部表 |
-| `contacts-service` | SDD v0.1 Draft 已新增；`contacts_service.proto`、`im.contact.events` schema、`000001_contacts_core.sql`、生成代码、六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 ACCEPT / DECLINE 真实进程 smoke 已落地；定位为联系人 / 好友关系事实源，第一阶段只做好友申请、接受 / 拒绝和当前联系人列表 | 后续做删除 / 拉黑 / 备注名设计；不得把好友关系写入 `conversation_members`，也不得自动创建会话 |
+| `contacts-service` | SDD v0.1 Draft 已新增；`contacts_service.proto`、`im.contact.events` schema、`000001_contacts_core.sql`、生成代码、六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 ACCEPT / DECLINE 真实进程 smoke 已落地；删除 / 拉黑 / 备注名 v0.2 设计已冻结为当前 owner 单向 edge 操作 | 下一步做 v0.2 proto / schema / migration / repository / smoke；不得把好友关系写入 `conversation_members`，也不得自动创建会话或让 message-service 同步依赖 contacts-service |
 | `retrieval-gateway` | SDD 未完成 | 不进入第一条代码切片 |
 
 ## 已完成的 message-service 切片

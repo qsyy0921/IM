@@ -3,21 +3,23 @@ param(
     [string]$KafkaBrokers = "localhost:9092",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
+    [ValidateSet("accept", "decline")]
+    [string]$Scenario = "accept",
     [switch]$SkipBuild
 )
 
 $ErrorActionPreference = "Stop"
 
 if (-not $RunName) {
-    $RunName = "contacts-smoke-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+    $RunName = "contacts-$Scenario-smoke-" + (Get-Date -Format "yyyyMMdd-HHmmss")
 }
 
 $repo = (Get-Location).Path
 $resultDir = Join-Path $ResultRoot $RunName
 $logDir = Join-Path $resultDir "logs"
 $topicSuffix = Get-Date -Format "yyyyMMdd-HHmmss"
-$contactTopic = "im.contact.events.contacts-smoke.$topicSuffix"
-$tenantId = "tenant-contacts-smoke-$topicSuffix"
+$contactTopic = "im.contact.events.contacts-$Scenario-smoke.$topicSuffix"
+$tenantId = "tenant-contacts-$Scenario-smoke-$topicSuffix"
 $senderUserId = "contacts-sender"
 $receiverUserId = "contacts-receiver"
 $contactsGrpcPort = 0
@@ -126,8 +128,11 @@ function Assert-Summary {
     if ($summary.send_contact_request.status -ne "CONTACT_REQUEST_STATUS_PENDING") {
         throw "unexpected send status: $($summary.send_contact_request.status)"
     }
-    if ($summary.respond_contact_request.status -ne "CONTACT_REQUEST_STATUS_ACCEPTED") {
-        throw "unexpected respond status: $($summary.respond_contact_request.status)"
+    if ($Scenario -eq "accept" -and $summary.respond_contact_request.status -ne "CONTACT_REQUEST_STATUS_ACCEPTED") {
+        throw "unexpected accept status: $($summary.respond_contact_request.status)"
+    }
+    if ($Scenario -eq "decline" -and $summary.respond_contact_request.status -ne "CONTACT_REQUEST_STATUS_DECLINED") {
+        throw "unexpected decline status: $($summary.respond_contact_request.status)"
     }
     if ($summary.contacts_outbox.pending -ne 0 -or $summary.contacts_outbox.dlq -ne 0 -or $summary.contacts_outbox.published -lt 2) {
         throw "contacts outbox did not drain: pending=$($summary.contacts_outbox.pending) published=$($summary.contacts_outbox.published) dlq=$($summary.contacts_outbox.dlq)"
@@ -170,6 +175,7 @@ try {
         --tenant-id $tenantId `
         --sender-user-id $senderUserId `
         --receiver-user-id $receiverUserId `
+        --scenario $Scenario `
         --cleanup `
         --wait-timeout 15s `
         --result-dir $resultDir

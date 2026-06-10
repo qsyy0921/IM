@@ -16,7 +16,9 @@ import (
 	contacteventsv1 "github.com/qsyy0921/IM/schemas/kafka/contacts/v1"
 	kafkago "github.com/segmentio/kafka-go"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -34,6 +36,7 @@ type config struct {
 	receiverUserID   string
 	senderDeviceID   string
 	receiverDeviceID string
+	scenario         string
 	cleanup          bool
 }
 
@@ -47,6 +50,7 @@ type summary struct {
 	TenantID              string              `json:"tenant_id"`
 	SenderUserID          string              `json:"sender_user_id"`
 	ReceiverUserID        string              `json:"receiver_user_id"`
+	Scenario              string              `json:"scenario"`
 	ContactTopic          string              `json:"contact_topic"`
 	StartedAt             time.Time           `json:"started_at"`
 	FinishedAt            time.Time           `json:"finished_at"`
@@ -87,6 +91,7 @@ type stateSummary struct {
 	Status          string `json:"status"`
 	SourceRequestID string `json:"source_request_id"`
 	Version         int64  `json:"version"`
+	Error           string `json:"error,omitempty"`
 }
 
 type outboxStats struct {
@@ -131,9 +136,14 @@ func parseConfig() config {
 	flag.StringVar(&cfg.receiverUserID, "receiver-user-id", "contact-receiver", "receiver user id")
 	flag.StringVar(&cfg.senderDeviceID, "sender-device-id", "sender-device-1", "sender device id")
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "receiver-device-1", "receiver device id")
+	flag.StringVar(&cfg.scenario, "scenario", "accept", "scenario: accept or decline")
 	flag.BoolVar(&cfg.cleanup, "cleanup", false, "delete tenant contacts rows before running")
 	flag.Parse()
 	cfg.kafkaBrokers = splitCSV(brokers)
+	cfg.scenario = strings.ToLower(strings.TrimSpace(cfg.scenario))
+	if cfg.scenario == "" {
+		cfg.scenario = "accept"
+	}
 	if cfg.pollInterval <= 0 {
 		cfg.pollInterval = 200 * time.Millisecond
 	}
@@ -160,6 +170,7 @@ func run(cfg config) error {
 		TenantID:       cfg.tenantID,
 		SenderUserID:   cfg.senderUserID,
 		ReceiverUserID: cfg.receiverUserID,
+		Scenario:       cfg.scenario,
 		ContactTopic:   cfg.contactTopic,
 		StartedAt:      startedAt,
 		LatenciesMS:    map[string]float64{},
@@ -227,14 +238,14 @@ func run(cfg config) error {
 
 	senderState, elapsed, err := getContactState(cfg, client, cfg.senderUserID, cfg.receiverUserID)
 	s.LatenciesMS["get_sender_state"] = elapsed
-	if err != nil {
+	if err != nil && cfg.scenario == "accept" {
 		s.Error = err.Error()
 		return err
 	}
 	s.SenderState = senderState
 	receiverState, elapsed, err := getContactState(cfg, client, cfg.receiverUserID, cfg.senderUserID)
 	s.LatenciesMS["get_receiver_state"] = elapsed
-	if err != nil {
+	if err != nil && cfg.scenario == "accept" {
 		s.Error = err.Error()
 		return err
 	}
@@ -301,6 +312,10 @@ func respondContactRequest(cfg config, client contactsv1.ContactsServiceClient, 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
 	defer cancel()
 	begin := time.Now()
+	decision := contactsv1.ContactDecision_CONTACT_DECISION_ACCEPT
+	if cfg.scenario == "decline" {
+		decision = contactsv1.ContactDecision_CONTACT_DECISION_DECLINE
+	}
 	resp, err := client.RespondContactRequest(ctx, &contactsv1.RespondContactRequestRequest{
 		AuthContext: &contactsv1.AuthContext{
 			TenantId:  cfg.tenantID,
@@ -310,7 +325,7 @@ func respondContactRequest(cfg config, client contactsv1.ContactsServiceClient, 
 			TraceId:   "trace-contact-" + suffix,
 		},
 		RequestId:      requestID,
-		Decision:       contactsv1.ContactDecision_CONTACT_DECISION_ACCEPT,
+		Decision:       decision,
 		IdempotencyKey: "respond-" + suffix,
 	})
 	elapsed := elapsedMS(begin)
@@ -363,7 +378,11 @@ func getContactState(cfg config, client contactsv1.ContactsServiceClient, userID
 	})
 	elapsed := elapsedMS(begin)
 	if err != nil {
-		return stateSummary{}, elapsed, fmt.Errorf("get contact state %s -> %s: %w", userID, otherUserID, err)
+		return stateSummary{
+			OwnerUserID:   userID,
+			ContactUserID: otherUserID,
+			Error:         status.Code(err).String(),
+		}, elapsed, fmt.Errorf("get contact state %s -> %s: %w", userID, otherUserID, err)
 	}
 	return stateSummary{
 		OwnerUserID:     resp.GetOwnerUserId(),
@@ -474,6 +493,17 @@ func summarizeContactEvent(event *contacteventsv1.ContactEvent) contactKafkaEven
 }
 
 func validateSummary(s summary) error {
+	switch s.Scenario {
+	case "accept":
+		return validateAcceptSummary(s)
+	case "decline":
+		return validateDeclineSummary(s)
+	default:
+		return fmt.Errorf("unsupported scenario %q", s.Scenario)
+	}
+}
+
+func validateAcceptSummary(s summary) error {
 	if s.SendContactRequest.Status != "CONTACT_REQUEST_STATUS_PENDING" {
 		return fmt.Errorf("send status=%s, want PENDING", s.SendContactRequest.Status)
 	}
@@ -497,6 +527,32 @@ func validateSummary(s summary) error {
 		eventTypes[event.EventType] = true
 	}
 	if len(s.ContactKafkaEvents) > 0 && (!eventTypes["contact.request.created.v1"] || !eventTypes["contact.request.accepted.v1"]) {
+		return fmt.Errorf("missing expected contact Kafka events: %+v", s.ContactKafkaEvents)
+	}
+	return nil
+}
+
+func validateDeclineSummary(s summary) error {
+	if s.SendContactRequest.Status != "CONTACT_REQUEST_STATUS_PENDING" {
+		return fmt.Errorf("send status=%s, want PENDING", s.SendContactRequest.Status)
+	}
+	if s.RespondContactRequest.Status != "CONTACT_REQUEST_STATUS_DECLINED" {
+		return fmt.Errorf("respond status=%s, want DECLINED", s.RespondContactRequest.Status)
+	}
+	if s.SenderList.ContactCount != 0 || s.ReceiverList.ContactCount != 0 {
+		return fmt.Errorf("decline should not create contacts: sender=%+v receiver=%+v", s.SenderList, s.ReceiverList)
+	}
+	if s.SenderState.Error != codes.NotFound.String() || s.ReceiverState.Error != codes.NotFound.String() {
+		return fmt.Errorf("decline should leave no contact state: sender=%+v receiver=%+v", s.SenderState, s.ReceiverState)
+	}
+	if s.ContactsOutbox.Total > 0 && (s.ContactsOutbox.Pending != 0 || s.ContactsOutbox.DLQ != 0 || s.ContactsOutbox.Published < 2) {
+		return fmt.Errorf("unexpected outbox stats: %+v", s.ContactsOutbox)
+	}
+	eventTypes := map[string]bool{}
+	for _, event := range s.ContactKafkaEvents {
+		eventTypes[event.EventType] = true
+	}
+	if len(s.ContactKafkaEvents) > 0 && (!eventTypes["contact.request.created.v1"] || !eventTypes["contact.request.declined.v1"]) {
 		return fmt.Errorf("missing expected contact Kafka events: %+v", s.ContactKafkaEvents)
 	}
 	return nil

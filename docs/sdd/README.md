@@ -39,10 +39,10 @@
 | `timeline-service / sequencer` | SDD 未完成 | 不阻塞 `LOCAL_ROW_LOCK`；阻塞热点会话生产实现 |
 | `conversation-service / send context` | SDD v0.1 已存在 | 可以实现 `GetSendContext` 读取路径，替换 message-service strict conversation mock |
 | `conversation-service / member_change_saga` | SDD 已冻结 v1.0；proto / schema / migration v2 / relay builder / 最小 `CreateMemberChange` 写路径、saga publish 状态推进、full smoke 和当前 ACTIVE 成员 `ListConversationMembers` 读接口已落地；`LEAVE / REMOVE` 后 roster 过滤和 `ROLE_CHANGED` 后 role 更新 smoke 已覆盖 | 后续补 DLQ repair、admin-only 成员历史查询、更完整权限负例和生产韧性 |
-| `push-gateway` | SDD v0.1 Draft 已存在 | 进入 proto / 六层骨架前需要阶段评审；第一阶段只做在线通知和回源协调 |
+| `push-gateway` | SDD v0.1 Draft、WebSocket frame、`im.delivery.events` consumer、ACK 转发、HMAC auth、Redis route / resume、slow session close 和多实例 smoke 已落地 | 只做在线唤醒和回源协调；后续补真实 identity、session revoke、Redis route hardening 和生产指标 |
 | `delivery-service` | SDD v0.1 已存在，最小 projection / PullInbox / AckDelivery / delivery outbox relay 已落地 | 可以支撑 push-gateway 第一阶段，只要 push-gateway 不绕过 durable inbox / ACK |
-| `receipt-service` | SDD v0.1 Draft、proto、Kafka schema、migration、六层骨架、PostgreSQL repository、delivery consumer、MarkRead 事务、receipt outbox relay、最小 `ListConversations`、会话未读 read model 和 updated_at desc keyset 分页已落地 | 后续补真实权限、会话置顶 / 静音 / 归档；不得直接读取 delivery-service 内部表 |
-| `contacts-service` | SDD v0.1 Draft 已新增；`contacts_service.proto`、`im.contact.events` schema、`000001_contacts_core.sql`、生成代码、六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 ACCEPT / DECLINE 真实进程 smoke 已落地；删除 / 拉黑 / 备注名 v0.2 已完成 proto / schema / migration / repository / relay builder / loadtest runner 代码切片和真实 PostgreSQL 集成测试 | 下一步跑 `delete` / `block` / `remark` 三条真实进程 smoke 并归档报告；不得把好友关系写入 `conversation_members`，也不得自动创建会话或让 message-service 同步依赖 contacts-service |
+| `receipt-service` | SDD v0.1 Draft、proto、Kafka schema、migration、六层骨架、PostgreSQL repository、delivery consumer、MarkRead、receipt outbox relay、`ListReceiptStates`、最小 `ListConversations`、会话未读 read model、Archive / Pin 用户列表偏好已落地 | 后续补真实权限、静音、更多列表筛选；不得直接读取 delivery-service 内部表 |
+| `contacts-service` | SDD v0.1 Draft、proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、contacts outbox relay 和 ACCEPT / DECLINE / Delete / Block / Unblock / Remark / Re-add 真实进程 smoke 已落地 | 继续保持联系人关系独立事实源；不得把好友关系写入 `conversation_members`，也不得自动创建会话或让 message-service 同步依赖 contacts-service |
 | `retrieval-gateway` | SDD 未完成 | 不进入第一条代码切片 |
 
 ## 已完成的 message-service 切片

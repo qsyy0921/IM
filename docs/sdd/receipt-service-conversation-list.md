@@ -19,7 +19,7 @@ im.delivery.events
 
 - 为用户生成会话摘要：最近可见消息 seq、message_id、sender_id、更新时间。
 - 维护未读数：基于用户可见消息和 `MarkRead` 推进的 read cursor 计算。
-- 提供最小 `ListConversations` 查询接口，供客户端首页展示。
+- 提供最小 `ListConversations` 查询接口，供客户端首页展示；支持 `unread_only` 过滤未读会话。
 - 保持与 `delivery-service user_inbox` 和 `message-service message_log` 解耦，不直接读取其它服务内部表。
 
 不负责：
@@ -108,6 +108,7 @@ int32 limit
 string page_cursor
 ConversationListSort sort
 bool include_archived
+bool unread_only
 ```
 
 `ConversationListSort` 第一阶段只支持：
@@ -118,7 +119,7 @@ CONVERSATION_LIST_SORT_UPDATED_AT_DESC
 CONVERSATION_LIST_SORT_PINNED_UPDATED_AT_DESC
 ```
 
-`UNSPECIFIED` 等价于 `PINNED_UPDATED_AT_DESC`。`PINNED_UPDATED_AT_DESC` 按 `pinned desc + updated_at desc + conversation_id asc` 排序；`UPDATED_AT_DESC` 保留纯 `updated_at desc + conversation_id asc` 排序。不要在第一阶段提前加入 unread-first 或自定义排序组合；这些产品字段需要独立设计和索引支持。`muted` 是返回给客户端的偏好标志，不参与 v0.1 排序。`include_archived=false` 是默认列表；`include_archived=true` 用于归档管理视图。
+`UNSPECIFIED` 等价于 `PINNED_UPDATED_AT_DESC`。`PINNED_UPDATED_AT_DESC` 按 `pinned desc + updated_at desc + conversation_id asc` 排序；`UPDATED_AT_DESC` 保留纯 `updated_at desc + conversation_id asc` 排序。不要在第一阶段提前加入 unread-first 或自定义排序组合；这些产品字段需要独立设计和索引支持。`unread_only=true` 是过滤条件，语义是只返回 `unread_count > 0` 的会话，不改变排序。`muted` 是返回给客户端的偏好标志，不参与 v0.1 排序。`include_archived=false` 是默认列表；`include_archived=true` 用于归档管理视图。
 
 响应字段：
 
@@ -196,8 +197,8 @@ bool muted
 分页规则：
 
 - v0.1 默认使用 `pinned DESC, sort_updated_at DESC, conversation_id ASC`；显式 `UPDATED_AT_DESC` 使用 `sort_updated_at DESC, conversation_id ASC`。
-- `page_cursor` 是服务端签发的 opaque cursor，内部绑定 cursor version、sort、`include_archived`、`pinned`、`sort_updated_at` 和 `conversation_id`。
-- 客户端不能自行构造 cursor；cursor 缺字段、版本不匹配、sort 不匹配或 `include_archived` 不匹配时返回 `INVALID_ARGUMENT`。
+- `page_cursor` 是服务端签发的 opaque cursor，内部绑定 cursor version、sort、`include_archived`、`unread_only`、`pinned`、`sort_updated_at` 和 `conversation_id`。
+- 客户端不能自行构造 cursor；cursor 缺字段、版本不匹配、sort 不匹配、`include_archived` 不匹配或 `unread_only` 不匹配时返回 `INVALID_ARGUMENT`。
 - 后续新增排序时，必须同步 cursor schema、SQL 条件和索引，不能复用旧 cursor 语义。
 
 `ProjectionWatermark`：
@@ -263,6 +264,14 @@ ON user_conversation_summaries (tenant_id, user_id, archived, sort_updated_at DE
 
 CREATE INDEX idx_user_conversation_summaries_list_pinned
 ON user_conversation_summaries (tenant_id, user_id, archived, pinned DESC, sort_updated_at DESC, conversation_id);
+
+CREATE INDEX idx_user_conversation_summaries_list_unread
+ON user_conversation_summaries (tenant_id, user_id, archived, sort_updated_at DESC, conversation_id)
+WHERE unread_count > 0;
+
+CREATE INDEX idx_user_conversation_summaries_list_pinned_unread
+ON user_conversation_summaries (tenant_id, user_id, archived, pinned DESC, sort_updated_at DESC, conversation_id)
+WHERE unread_count > 0;
 
 CREATE TABLE conversation_summary_checkpoints (
     consumer_group TEXT NOT NULL,
@@ -375,8 +384,8 @@ list_conversations_page_size
 | 测试 | 目标 |
 | --- | --- |
 | unit | unread 计算、sort 校验、cursor 分页、read_seq 幂等 |
-| PostgreSQL integration | inbox event upsert summary、MarkRead 清零 unread、重复 event 不重复计数、edit/revoke/delete 不增加 unread、多会话 keyset 分页、非法 cursor、archive 默认隐藏 / include_archived 可见 / 新投影保留 archive、pinned-first 排序、显式 updated sort、跨 pinned/unpinned 分页、mute/unmute 不改变 unread/read cursor |
-| gRPC contract | 参数校验、sort/page_cursor/include_archived 映射、archive/pin/mute request/response、分页响应、只返回当前 auth user |
+| PostgreSQL integration | inbox event upsert summary、MarkRead 清零 unread、重复 event 不重复计数、edit/revoke/delete 不增加 unread、多会话 keyset 分页、非法 cursor、archive 默认隐藏 / include_archived 可见 / 新投影保留 archive、pinned-first 排序、显式 updated sort、跨 pinned/unpinned 分页、unread_only 过滤和 cursor 绑定、mute/unmute 不改变 unread/read cursor |
+| gRPC contract | 参数校验、sort/page_cursor/include_archived/unread_only 映射、archive/pin/mute request/response、分页响应、只返回当前 auth user |
 | smoke | `SendMessage -> PullInbox -> ListConversations(unread=1) -> MarkRead -> ListConversations(unread=0)` |
 
 ## 15. 当前不做

@@ -4,7 +4,7 @@
 
 ## 当前阶段结论
 
-`receipt-service` 已完成第一条真实小闭环、最小 outbox 发布链路、最小会话列表 / 未读数 read model，以及当前用户侧会话归档 / 置顶 / 静音偏好：
+`receipt-service` 已完成第一条真实小闭环、最小 outbox 发布链路、最小会话列表 / 未读数 read model、未读列表过滤，以及当前用户侧会话归档 / 置顶 / 静音偏好：
 
 ```text
 im.delivery.events
@@ -17,6 +17,7 @@ im.delivery.events
 -> receipt-service outbox-relay
 -> Kafka im.receipt.events
 -> user_conversation_summaries / ListConversations
+-> ListConversations(unread_only=true)
 -> ArchiveConversation / include_archived filtering
 -> PinConversation / pinned-first sorting
 -> MuteConversation / muted flag
@@ -34,6 +35,7 @@ im.delivery.events
 | `loadtest-report-20260610-receipt-archive-smoke.md` | `ArchiveConversation` 真实进程 smoke，验证默认列表隐藏、`include_archived` 可见、归档期间新消息不自动取消归档、取消归档后恢复 |
 | `loadtest-report-20260610-receipt-pin-smoke.md` | `PinConversation` 真实进程 smoke，验证当前用户置顶 / 取消置顶标志；PostgreSQL integration 覆盖 pinned-first 排序和 cursor |
 | `loadtest-report-20260611-receipt-mute-smoke.md` | `MuteConversation` 真实进程 smoke，验证当前用户静音 / 取消静音标志；静音不改变 unread、read cursor、delivery、push 或消息事实 |
+| `loadtest-report-20260611-receipt-unread-filter-smoke.md` | `ListConversations(unread_only=true)` 真实进程 smoke，验证投递后未读列表可见、`MarkRead` 后未读列表为空 |
 
 ## 面试可讲重点
 
@@ -45,6 +47,7 @@ im.delivery.events
 - receipt outbox 的 `aggregate_version` 是 cursor seq，不是 conversation 全局顺序轴，所以 relay 不用低版本 PENDING/DLQ 阻塞同会话更高版本回执事件，避免某个用户回执阻塞其它用户。
 - 会话列表 / 未读数放在 `receipt-service` 内扩展，不新增 `conversation-list-service`，降低服务间耦合和部署复杂度。
 - `ListConversations` 的 unread 由 `receipt_inbox_projection` 中 `source_event_type=message.persisted.v1` 的可见消息行数减去 read cursor 得出，不把 conversation seq 差值当成未读数，也不把 edit/revoke/delete tombstone 当新未读消息。
+- `ListConversations(unread_only=true)` 是过滤条件，不是新的排序模式；它在 SQL 层使用 `unread_count > 0`，cursor 绑定 `unread_only`，避免普通列表 cursor 和未读列表 cursor 混用造成漏页。
 - `ListConversations.last_source_event_type` 会返回最后一次可见变化的事件类型，客户端可据此刷新会话列表 UI；消息正文和 tombstone 详情仍以 `PullInbox` 为准。
 - `ArchiveConversation` 是当前用户的列表过滤偏好；它不删除消息、不清未读、不停止 delivery/push/receipt projection。新消息不会自动取消归档，客户端需要通过 `include_archived=true` 或用户手动取消归档查看。
 - `PinConversation` 也是当前用户的列表偏好；默认列表按 pinned-first 再按 `updated_at desc` 排序，显式 `UPDATED_AT_DESC` 仍可获得纯更新时间排序。pin 不进入 Kafka、不影响 unread 或通知。

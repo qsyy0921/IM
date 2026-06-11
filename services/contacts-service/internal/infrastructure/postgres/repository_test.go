@@ -117,6 +117,55 @@ func TestRepositoryDeclineDoesNotCreateEdgesIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryCancelContactRequestIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	sendResult, err := repository.SendContactRequest(ctx, sendCommand("alice", "bob", "send-cancel", "hello"))
+	if err != nil {
+		t.Fatalf("send contact request: %v", err)
+	}
+	cancelResult, err := repository.CancelContactRequest(ctx, cancelCommand("alice", sendResult.RequestID, "cancel-1"))
+	if err != nil {
+		t.Fatalf("cancel contact request: %v", err)
+	}
+	if cancelResult.Status != types.ContactRequestStatusCanceled || cancelResult.SenderUserID != "alice" || cancelResult.ReceiverUserID != "bob" {
+		t.Fatalf("unexpected cancel result: %+v", cancelResult)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCanceled, 1)
+	assertNoContactEdges(t, ctx, pool)
+
+	replay, err := repository.CancelContactRequest(ctx, cancelCommand("alice", sendResult.RequestID, "cancel-1"))
+	if err != nil {
+		t.Fatalf("cancel replay: %v", err)
+	}
+	if !replay.IdempotentReplay || replay.Status != types.ContactRequestStatusCanceled || replay.RequestID != sendResult.RequestID {
+		t.Fatalf("expected cancel replay, got %+v", replay)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCanceled, 1)
+
+	_, err = repository.RespondContactRequest(ctx, respondCommand("bob", sendResult.RequestID, "respond-after-cancel", types.ContactDecisionAccept))
+	if !errors.Is(err, types.ErrContactRequestConflict) {
+		t.Fatalf("expected accept after cancel conflict, got %v", err)
+	}
+	_, err = repository.CancelContactRequest(ctx, cancelCommand("bob", sendResult.RequestID, "cancel-by-receiver"))
+	if !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected receiver cancel permission denied, got %v", err)
+	}
+	pendingIncoming, err := repository.ListContactRequests(ctx, listContactRequestsCommand("bob", types.ContactRequestListDirectionIncoming, types.ContactRequestStatusPending, 10, ""))
+	if err != nil {
+		t.Fatalf("list pending incoming: %v", err)
+	}
+	assertContactRequestIDs(t, pendingIncoming)
+	canceledOutgoing, err := repository.ListContactRequests(ctx, listContactRequestsCommand("alice", types.ContactRequestListDirectionOutgoing, types.ContactRequestStatusCanceled, 10, ""))
+	if err != nil {
+		t.Fatalf("list canceled outgoing: %v", err)
+	}
+	assertContactRequestIDs(t, canceledOutgoing, sendResult.RequestID)
+}
+
 func TestRepositoryListContactRequestsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -517,6 +566,20 @@ func respondCommand(receiver string, requestID string, key string, decision type
 		},
 		RequestID:      requestID,
 		Decision:       decision,
+		IdempotencyKey: key,
+	}
+}
+
+func cancelCommand(sender string, requestID string, key string) types.CancelContactRequestCommand {
+	return types.CancelContactRequestCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  "tenant-contacts",
+			UserID:    types.UserID(sender),
+			DeviceID:  "device-1",
+			RequestID: "request-" + key,
+			TraceID:   "trace-" + key,
+		},
+		RequestID:      requestID,
 		IdempotencyKey: key,
 	}
 }

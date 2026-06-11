@@ -10,6 +10,7 @@ const (
 	ContactEventRequestCreated  = "contact.request.created.v1"
 	ContactEventRequestAccepted = "contact.request.accepted.v1"
 	ContactEventRequestDeclined = "contact.request.declined.v1"
+	ContactEventRequestCanceled = "contact.request.canceled.v1"
 	ContactEventEdgeDeleted     = "contact.edge.deleted.v1"
 	ContactEventEdgeBlocked     = "contact.edge.blocked.v1"
 	ContactEventEdgeUnblocked   = "contact.edge.unblocked.v1"

@@ -200,6 +200,22 @@ func BuildContactEvent(message types.OutboxMessage) (*contacteventsv1.ContactEve
 			},
 		}
 		return event, nil
+	case types.ContactEventRequestCanceled:
+		payload, err := decodeContactResponsePayload(message.PayloadJSON, false)
+		if err != nil {
+			return nil, err
+		}
+		event.Payload = &contacteventsv1.ContactEvent_RequestCanceled{
+			RequestCanceled: &contacteventsv1.ContactRequestCanceledV1{
+				TenantId:       payload.TenantID,
+				RequestId:      payload.RequestID,
+				SenderUserId:   payload.SenderUserID,
+				ReceiverUserId: payload.ReceiverUserID,
+				Status:         payload.Status,
+				OccurredAt:     payload.Timestamp(),
+			},
+		}
+		return event, nil
 	case types.ContactEventEdgeDeleted:
 		payload, err := decodeContactEdgePayload(message.PayloadJSON, true)
 		if err != nil {

@@ -100,6 +100,37 @@ type RespondContactRequestResult struct {
 	IdempotentReplay bool
 }
 
+type CancelContactRequestCommand struct {
+	AuthContext    AuthContext
+	RequestID      string
+	IdempotencyKey string
+}
+
+func (c CancelContactRequestCommand) Validate() error {
+	if c.AuthContext.TenantID == "" {
+		return NewInvalidArgument("tenant_id is required")
+	}
+	if c.AuthContext.UserID == "" {
+		return NewInvalidArgument("user_id is required")
+	}
+	if strings.TrimSpace(c.RequestID) == "" {
+		return NewInvalidArgument("request_id is required")
+	}
+	if strings.TrimSpace(c.IdempotencyKey) == "" {
+		return NewInvalidArgument("idempotency_key is required")
+	}
+	return nil
+}
+
+type CancelContactRequestResult struct {
+	RequestID        string
+	TenantID         TenantID
+	SenderUserID     UserID
+	ReceiverUserID   UserID
+	Status           ContactRequestStatus
+	IdempotentReplay bool
+}
+
 type ListContactRequestsCommand struct {
 	AuthContext AuthContext
 	Direction   ContactRequestListDirection

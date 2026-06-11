@@ -7,6 +7,7 @@ option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1;contac
 service ContactsService {
   rpc SendContactRequest(SendContactRequestRequest) returns (SendContactRequestResponse);
   rpc RespondContactRequest(RespondContactRequestRequest) returns (RespondContactRequestResponse);
+  rpc CancelContactRequest(CancelContactRequestRequest) returns (CancelContactRequestResponse);
   rpc ListContactRequests(ListContactRequestsRequest) returns (ListContactRequestsResponse);
   rpc ListContacts(ListContactsRequest) returns (ListContactsResponse);
   rpc GetContactState(GetContactStateRequest) returns (GetContactStateResponse);
@@ -77,6 +78,21 @@ message RespondContactRequestRequest {
 }
 
 message RespondContactRequestResponse {
+  string request_id = 1;
+  string tenant_id = 2;
+  string sender_user_id = 3;
+  string receiver_user_id = 4;
+  ContactRequestStatus status = 5;
+  bool idempotent_replay = 6;
+}
+
+message CancelContactRequestRequest {
+  AuthContext auth_context = 1;
+  string request_id = 2;
+  string idempotency_key = 3;
+}
+
+message CancelContactRequestResponse {
   string request_id = 1;
   string tenant_id = 2;
   string sender_user_id = 3;

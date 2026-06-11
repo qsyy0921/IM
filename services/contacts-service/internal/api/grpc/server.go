@@ -19,6 +19,10 @@ type RespondContactRequestExecutor interface {
 	Execute(context.Context, types.RespondContactRequestCommand) (types.RespondContactRequestResult, error)
 }
 
+type CancelContactRequestExecutor interface {
+	Execute(context.Context, types.CancelContactRequestCommand) (types.CancelContactRequestResult, error)
+}
+
 type ListContactRequestsExecutor interface {
 	Execute(context.Context, types.ListContactRequestsCommand) (types.ListContactRequestsResult, error)
 }
@@ -51,6 +55,7 @@ type Server struct {
 	contactsv1.UnimplementedContactsServiceServer
 	sendContactRequest    SendContactRequestExecutor
 	respondContactRequest RespondContactRequestExecutor
+	cancelContactRequest  CancelContactRequestExecutor
 	listContactRequests   ListContactRequestsExecutor
 	listContacts          ListContactsExecutor
 	getContactState       GetContactStateExecutor
@@ -63,6 +68,7 @@ type Server struct {
 func NewServer(
 	sendContactRequest SendContactRequestExecutor,
 	respondContactRequest RespondContactRequestExecutor,
+	cancelContactRequest CancelContactRequestExecutor,
 	listContactRequests ListContactRequestsExecutor,
 	listContacts ListContactsExecutor,
 	getContactState GetContactStateExecutor,
@@ -74,6 +80,7 @@ func NewServer(
 	return &Server{
 		sendContactRequest:    sendContactRequest,
 		respondContactRequest: respondContactRequest,
+		cancelContactRequest:  cancelContactRequest,
 		listContactRequests:   listContactRequests,
 		listContacts:          listContacts,
 		getContactState:       getContactState,
@@ -137,6 +144,34 @@ func (s *Server) RespondContactRequest(
 		return nil, grpcError(err)
 	}
 	return &contactsv1.RespondContactRequestResponse{
+		RequestId:        result.RequestID,
+		TenantId:         string(result.TenantID),
+		SenderUserId:     string(result.SenderUserID),
+		ReceiverUserId:   string(result.ReceiverUserID),
+		Status:           requestStatusToProto(result.Status),
+		IdempotentReplay: result.IdempotentReplay,
+	}, nil
+}
+
+func (s *Server) CancelContactRequest(
+	ctx context.Context,
+	request *contactsv1.CancelContactRequestRequest,
+) (*contactsv1.CancelContactRequestResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.cancelContactRequest == nil {
+		return nil, status.Error(codes.Unimplemented, "cancel contact request is not configured")
+	}
+	result, err := s.cancelContactRequest.Execute(ctx, types.CancelContactRequestCommand{
+		AuthContext:    authFromProto(request.GetAuthContext()),
+		RequestID:      request.GetRequestId(),
+		IdempotencyKey: request.GetIdempotencyKey(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &contactsv1.CancelContactRequestResponse{
 		RequestId:        result.RequestID,
 		TenantId:         string(result.TenantID),
 		SenderUserId:     string(result.SenderUserID),

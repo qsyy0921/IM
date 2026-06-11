@@ -617,6 +617,150 @@ func (x *RespondContactRequestResponse) GetIdempotentReplay() bool {
 	return false
 }
 
+type CancelContactRequestRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext    *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	RequestId      string                 `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CancelContactRequestRequest) Reset() {
+	*x = CancelContactRequestRequest{}
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelContactRequestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelContactRequestRequest) ProtoMessage() {}
+
+func (x *CancelContactRequestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelContactRequestRequest.ProtoReflect.Descriptor instead.
+func (*CancelContactRequestRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *CancelContactRequestRequest) GetAuthContext() *AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *CancelContactRequestRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *CancelContactRequestRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type CancelContactRequestResponse struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	RequestId        string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	TenantId         string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	SenderUserId     string                 `protobuf:"bytes,3,opt,name=sender_user_id,json=senderUserId,proto3" json:"sender_user_id,omitempty"`
+	ReceiverUserId   string                 `protobuf:"bytes,4,opt,name=receiver_user_id,json=receiverUserId,proto3" json:"receiver_user_id,omitempty"`
+	Status           ContactRequestStatus   `protobuf:"varint,5,opt,name=status,proto3,enum=nexusim.contacts.v1.ContactRequestStatus" json:"status,omitempty"`
+	IdempotentReplay bool                   `protobuf:"varint,6,opt,name=idempotent_replay,json=idempotentReplay,proto3" json:"idempotent_replay,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *CancelContactRequestResponse) Reset() {
+	*x = CancelContactRequestResponse{}
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelContactRequestResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelContactRequestResponse) ProtoMessage() {}
+
+func (x *CancelContactRequestResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelContactRequestResponse.ProtoReflect.Descriptor instead.
+func (*CancelContactRequestResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *CancelContactRequestResponse) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *CancelContactRequestResponse) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *CancelContactRequestResponse) GetSenderUserId() string {
+	if x != nil {
+		return x.SenderUserId
+	}
+	return ""
+}
+
+func (x *CancelContactRequestResponse) GetReceiverUserId() string {
+	if x != nil {
+		return x.ReceiverUserId
+	}
+	return ""
+}
+
+func (x *CancelContactRequestResponse) GetStatus() ContactRequestStatus {
+	if x != nil {
+		return x.Status
+	}
+	return ContactRequestStatus_CONTACT_REQUEST_STATUS_UNSPECIFIED
+}
+
+func (x *CancelContactRequestResponse) GetIdempotentReplay() bool {
+	if x != nil {
+		return x.IdempotentReplay
+	}
+	return false
+}
+
 type ListContactRequestsRequest struct {
 	state         protoimpl.MessageState      `protogen:"open.v1"`
 	AuthContext   *AuthContext                `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
@@ -630,7 +774,7 @@ type ListContactRequestsRequest struct {
 
 func (x *ListContactRequestsRequest) Reset() {
 	*x = ListContactRequestsRequest{}
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[5]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -642,7 +786,7 @@ func (x *ListContactRequestsRequest) String() string {
 func (*ListContactRequestsRequest) ProtoMessage() {}
 
 func (x *ListContactRequestsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[5]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -655,7 +799,7 @@ func (x *ListContactRequestsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListContactRequestsRequest.ProtoReflect.Descriptor instead.
 func (*ListContactRequestsRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{5}
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ListContactRequestsRequest) GetAuthContext() *AuthContext {
@@ -709,7 +853,7 @@ type ContactRequestItem struct {
 
 func (x *ContactRequestItem) Reset() {
 	*x = ContactRequestItem{}
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[6]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -721,7 +865,7 @@ func (x *ContactRequestItem) String() string {
 func (*ContactRequestItem) ProtoMessage() {}
 
 func (x *ContactRequestItem) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[6]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -734,7 +878,7 @@ func (x *ContactRequestItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContactRequestItem.ProtoReflect.Descriptor instead.
 func (*ContactRequestItem) Descriptor() ([]byte, []int) {
-	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{6}
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ContactRequestItem) GetRequestId() string {
@@ -807,7 +951,7 @@ type ListContactRequestsResponse struct {
 
 func (x *ListContactRequestsResponse) Reset() {
 	*x = ListContactRequestsResponse{}
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[7]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -819,7 +963,7 @@ func (x *ListContactRequestsResponse) String() string {
 func (*ListContactRequestsResponse) ProtoMessage() {}
 
 func (x *ListContactRequestsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[7]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -832,7 +976,7 @@ func (x *ListContactRequestsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListContactRequestsResponse.ProtoReflect.Descriptor instead.
 func (*ListContactRequestsResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{7}
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListContactRequestsResponse) GetTenantId() string {
@@ -888,7 +1032,7 @@ type ListContactsRequest struct {
 
 func (x *ListContactsRequest) Reset() {
 	*x = ListContactsRequest{}
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[8]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -900,7 +1044,7 @@ func (x *ListContactsRequest) String() string {
 func (*ListContactsRequest) ProtoMessage() {}
 
 func (x *ListContactsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[8]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -913,7 +1057,7 @@ func (x *ListContactsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListContactsRequest.ProtoReflect.Descriptor instead.
 func (*ListContactsRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{8}
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListContactsRequest) GetAuthContext() *AuthContext {
@@ -952,7 +1096,7 @@ type ContactItem struct {
 
 func (x *ContactItem) Reset() {
 	*x = ContactItem{}
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[9]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -964,7 +1108,7 @@ func (x *ContactItem) String() string {
 func (*ContactItem) ProtoMessage() {}
 
 func (x *ContactItem) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[9]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -977,7 +1121,7 @@ func (x *ContactItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContactItem.ProtoReflect.Descriptor instead.
 func (*ContactItem) Descriptor() ([]byte, []int) {
-	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{9}
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ContactItem) GetContactUserId() string {
@@ -1041,7 +1185,7 @@ type ListContactsResponse struct {
 
 func (x *ListContactsResponse) Reset() {
 	*x = ListContactsResponse{}
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[10]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1053,7 +1197,7 @@ func (x *ListContactsResponse) String() string {
 func (*ListContactsResponse) ProtoMessage() {}
 
 func (x *ListContactsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[10]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1066,7 +1210,7 @@ func (x *ListContactsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListContactsResponse.ProtoReflect.Descriptor instead.
 func (*ListContactsResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{10}
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ListContactsResponse) GetTenantId() string {
@@ -1107,7 +1251,7 @@ type GetContactStateRequest struct {
 
 func (x *GetContactStateRequest) Reset() {
 	*x = GetContactStateRequest{}
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[11]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1119,7 +1263,7 @@ func (x *GetContactStateRequest) String() string {
 func (*GetContactStateRequest) ProtoMessage() {}
 
 func (x *GetContactStateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[11]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1132,7 +1276,7 @@ func (x *GetContactStateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetContactStateRequest.ProtoReflect.Descriptor instead.
 func (*GetContactStateRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{11}
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetContactStateRequest) GetAuthContext() *AuthContext {
@@ -1164,7 +1308,7 @@ type GetContactStateResponse struct {
 
 func (x *GetContactStateResponse) Reset() {
 	*x = GetContactStateResponse{}
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[12]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1176,7 +1320,7 @@ func (x *GetContactStateResponse) String() string {
 func (*GetContactStateResponse) ProtoMessage() {}
 
 func (x *GetContactStateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[12]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1189,7 +1333,7 @@ func (x *GetContactStateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetContactStateResponse.ProtoReflect.Descriptor instead.
 func (*GetContactStateResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{12}
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetContactStateResponse) GetTenantId() string {
@@ -1252,7 +1396,7 @@ type DeleteContactRequest struct {
 
 func (x *DeleteContactRequest) Reset() {
 	*x = DeleteContactRequest{}
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[13]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1264,7 +1408,7 @@ func (x *DeleteContactRequest) String() string {
 func (*DeleteContactRequest) ProtoMessage() {}
 
 func (x *DeleteContactRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[13]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1277,7 +1421,7 @@ func (x *DeleteContactRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteContactRequest.ProtoReflect.Descriptor instead.
 func (*DeleteContactRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{13}
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *DeleteContactRequest) GetAuthContext() *AuthContext {
@@ -1316,7 +1460,7 @@ type DeleteContactResponse struct {
 
 func (x *DeleteContactResponse) Reset() {
 	*x = DeleteContactResponse{}
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[14]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1328,7 +1472,7 @@ func (x *DeleteContactResponse) String() string {
 func (*DeleteContactResponse) ProtoMessage() {}
 
 func (x *DeleteContactResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[14]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1341,7 +1485,7 @@ func (x *DeleteContactResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteContactResponse.ProtoReflect.Descriptor instead.
 func (*DeleteContactResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{14}
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *DeleteContactResponse) GetTenantId() string {
@@ -1405,7 +1549,7 @@ type BlockContactRequest struct {
 
 func (x *BlockContactRequest) Reset() {
 	*x = BlockContactRequest{}
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[15]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1417,7 +1561,7 @@ func (x *BlockContactRequest) String() string {
 func (*BlockContactRequest) ProtoMessage() {}
 
 func (x *BlockContactRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[15]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1430,7 +1574,7 @@ func (x *BlockContactRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockContactRequest.ProtoReflect.Descriptor instead.
 func (*BlockContactRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{15}
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *BlockContactRequest) GetAuthContext() *AuthContext {
@@ -1476,7 +1620,7 @@ type BlockContactResponse struct {
 
 func (x *BlockContactResponse) Reset() {
 	*x = BlockContactResponse{}
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[16]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1488,7 +1632,7 @@ func (x *BlockContactResponse) String() string {
 func (*BlockContactResponse) ProtoMessage() {}
 
 func (x *BlockContactResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[16]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1501,7 +1645,7 @@ func (x *BlockContactResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockContactResponse.ProtoReflect.Descriptor instead.
 func (*BlockContactResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{16}
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *BlockContactResponse) GetTenantId() string {
@@ -1564,7 +1708,7 @@ type UnblockContactRequest struct {
 
 func (x *UnblockContactRequest) Reset() {
 	*x = UnblockContactRequest{}
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[17]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1576,7 +1720,7 @@ func (x *UnblockContactRequest) String() string {
 func (*UnblockContactRequest) ProtoMessage() {}
 
 func (x *UnblockContactRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[17]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1589,7 +1733,7 @@ func (x *UnblockContactRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnblockContactRequest.ProtoReflect.Descriptor instead.
 func (*UnblockContactRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{17}
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *UnblockContactRequest) GetAuthContext() *AuthContext {
@@ -1628,7 +1772,7 @@ type UnblockContactResponse struct {
 
 func (x *UnblockContactResponse) Reset() {
 	*x = UnblockContactResponse{}
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[18]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1640,7 +1784,7 @@ func (x *UnblockContactResponse) String() string {
 func (*UnblockContactResponse) ProtoMessage() {}
 
 func (x *UnblockContactResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[18]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1653,7 +1797,7 @@ func (x *UnblockContactResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnblockContactResponse.ProtoReflect.Descriptor instead.
 func (*UnblockContactResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{18}
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *UnblockContactResponse) GetTenantId() string {
@@ -1717,7 +1861,7 @@ type UpdateContactRemarkRequest struct {
 
 func (x *UpdateContactRemarkRequest) Reset() {
 	*x = UpdateContactRemarkRequest{}
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[19]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1729,7 +1873,7 @@ func (x *UpdateContactRemarkRequest) String() string {
 func (*UpdateContactRemarkRequest) ProtoMessage() {}
 
 func (x *UpdateContactRemarkRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[19]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1742,7 +1886,7 @@ func (x *UpdateContactRemarkRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateContactRemarkRequest.ProtoReflect.Descriptor instead.
 func (*UpdateContactRemarkRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{19}
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *UpdateContactRemarkRequest) GetAuthContext() *AuthContext {
@@ -1789,7 +1933,7 @@ type UpdateContactRemarkResponse struct {
 
 func (x *UpdateContactRemarkResponse) Reset() {
 	*x = UpdateContactRemarkResponse{}
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[20]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1801,7 +1945,7 @@ func (x *UpdateContactRemarkResponse) String() string {
 func (*UpdateContactRemarkResponse) ProtoMessage() {}
 
 func (x *UpdateContactRemarkResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[20]
+	mi := &file_nexusim_contacts_v1_contacts_service_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1814,7 +1958,7 @@ func (x *UpdateContactRemarkResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateContactRemarkResponse.ProtoReflect.Descriptor instead.
 func (*UpdateContactRemarkResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{20}
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *UpdateContactRemarkResponse) GetTenantId() string {
@@ -1907,6 +2051,19 @@ const file_nexusim_contacts_v1_contacts_service_proto_rawDesc = "" +
 	"\bdecision\x18\x03 \x01(\x0e2$.nexusim.contacts.v1.ContactDecisionR\bdecision\x12'\n" +
 	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\"\x9b\x02\n" +
 	"\x1dRespondContactRequestResponse\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1b\n" +
+	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12$\n" +
+	"\x0esender_user_id\x18\x03 \x01(\tR\fsenderUserId\x12(\n" +
+	"\x10receiver_user_id\x18\x04 \x01(\tR\x0ereceiverUserId\x12A\n" +
+	"\x06status\x18\x05 \x01(\x0e2).nexusim.contacts.v1.ContactRequestStatusR\x06status\x12+\n" +
+	"\x11idempotent_replay\x18\x06 \x01(\bR\x10idempotentReplay\"\xaa\x01\n" +
+	"\x1bCancelContactRequestRequest\x12C\n" +
+	"\fauth_context\x18\x01 \x01(\v2 .nexusim.contacts.v1.AuthContextR\vauthContext\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x02 \x01(\tR\trequestId\x12'\n" +
+	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\"\x9a\x02\n" +
+	"\x1cCancelContactRequestResponse\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12$\n" +
@@ -2037,10 +2194,11 @@ const file_nexusim_contacts_v1_contacts_service_proto_rawDesc = "" +
 	"\x1bContactRequestListDirection\x12.\n" +
 	"*CONTACT_REQUEST_LIST_DIRECTION_UNSPECIFIED\x10\x00\x12+\n" +
 	"'CONTACT_REQUEST_LIST_DIRECTION_INCOMING\x10\x01\x12+\n" +
-	"'CONTACT_REQUEST_LIST_DIRECTION_OUTGOING\x10\x022\x87\b\n" +
+	"'CONTACT_REQUEST_LIST_DIRECTION_OUTGOING\x10\x022\x84\t\n" +
 	"\x0fContactsService\x12u\n" +
 	"\x12SendContactRequest\x12..nexusim.contacts.v1.SendContactRequestRequest\x1a/.nexusim.contacts.v1.SendContactRequestResponse\x12~\n" +
-	"\x15RespondContactRequest\x121.nexusim.contacts.v1.RespondContactRequestRequest\x1a2.nexusim.contacts.v1.RespondContactRequestResponse\x12x\n" +
+	"\x15RespondContactRequest\x121.nexusim.contacts.v1.RespondContactRequestRequest\x1a2.nexusim.contacts.v1.RespondContactRequestResponse\x12{\n" +
+	"\x14CancelContactRequest\x120.nexusim.contacts.v1.CancelContactRequestRequest\x1a1.nexusim.contacts.v1.CancelContactRequestResponse\x12x\n" +
 	"\x13ListContactRequests\x12/.nexusim.contacts.v1.ListContactRequestsRequest\x1a0.nexusim.contacts.v1.ListContactRequestsResponse\x12c\n" +
 	"\fListContacts\x12(.nexusim.contacts.v1.ListContactsRequest\x1a).nexusim.contacts.v1.ListContactsResponse\x12l\n" +
 	"\x0fGetContactState\x12+.nexusim.contacts.v1.GetContactStateRequest\x1a,.nexusim.contacts.v1.GetContactStateResponse\x12f\n" +
@@ -2062,7 +2220,7 @@ func file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP() []byte {
 }
 
 var file_nexusim_contacts_v1_contacts_service_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_nexusim_contacts_v1_contacts_service_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
+var file_nexusim_contacts_v1_contacts_service_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_nexusim_contacts_v1_contacts_service_proto_goTypes = []any{
 	(ContactRequestStatus)(0),             // 0: nexusim.contacts.v1.ContactRequestStatus
 	(ContactEdgeStatus)(0),                // 1: nexusim.contacts.v1.ContactEdgeStatus
@@ -2073,22 +2231,24 @@ var file_nexusim_contacts_v1_contacts_service_proto_goTypes = []any{
 	(*SendContactRequestResponse)(nil),    // 6: nexusim.contacts.v1.SendContactRequestResponse
 	(*RespondContactRequestRequest)(nil),  // 7: nexusim.contacts.v1.RespondContactRequestRequest
 	(*RespondContactRequestResponse)(nil), // 8: nexusim.contacts.v1.RespondContactRequestResponse
-	(*ListContactRequestsRequest)(nil),    // 9: nexusim.contacts.v1.ListContactRequestsRequest
-	(*ContactRequestItem)(nil),            // 10: nexusim.contacts.v1.ContactRequestItem
-	(*ListContactRequestsResponse)(nil),   // 11: nexusim.contacts.v1.ListContactRequestsResponse
-	(*ListContactsRequest)(nil),           // 12: nexusim.contacts.v1.ListContactsRequest
-	(*ContactItem)(nil),                   // 13: nexusim.contacts.v1.ContactItem
-	(*ListContactsResponse)(nil),          // 14: nexusim.contacts.v1.ListContactsResponse
-	(*GetContactStateRequest)(nil),        // 15: nexusim.contacts.v1.GetContactStateRequest
-	(*GetContactStateResponse)(nil),       // 16: nexusim.contacts.v1.GetContactStateResponse
-	(*DeleteContactRequest)(nil),          // 17: nexusim.contacts.v1.DeleteContactRequest
-	(*DeleteContactResponse)(nil),         // 18: nexusim.contacts.v1.DeleteContactResponse
-	(*BlockContactRequest)(nil),           // 19: nexusim.contacts.v1.BlockContactRequest
-	(*BlockContactResponse)(nil),          // 20: nexusim.contacts.v1.BlockContactResponse
-	(*UnblockContactRequest)(nil),         // 21: nexusim.contacts.v1.UnblockContactRequest
-	(*UnblockContactResponse)(nil),        // 22: nexusim.contacts.v1.UnblockContactResponse
-	(*UpdateContactRemarkRequest)(nil),    // 23: nexusim.contacts.v1.UpdateContactRemarkRequest
-	(*UpdateContactRemarkResponse)(nil),   // 24: nexusim.contacts.v1.UpdateContactRemarkResponse
+	(*CancelContactRequestRequest)(nil),   // 9: nexusim.contacts.v1.CancelContactRequestRequest
+	(*CancelContactRequestResponse)(nil),  // 10: nexusim.contacts.v1.CancelContactRequestResponse
+	(*ListContactRequestsRequest)(nil),    // 11: nexusim.contacts.v1.ListContactRequestsRequest
+	(*ContactRequestItem)(nil),            // 12: nexusim.contacts.v1.ContactRequestItem
+	(*ListContactRequestsResponse)(nil),   // 13: nexusim.contacts.v1.ListContactRequestsResponse
+	(*ListContactsRequest)(nil),           // 14: nexusim.contacts.v1.ListContactsRequest
+	(*ContactItem)(nil),                   // 15: nexusim.contacts.v1.ContactItem
+	(*ListContactsResponse)(nil),          // 16: nexusim.contacts.v1.ListContactsResponse
+	(*GetContactStateRequest)(nil),        // 17: nexusim.contacts.v1.GetContactStateRequest
+	(*GetContactStateResponse)(nil),       // 18: nexusim.contacts.v1.GetContactStateResponse
+	(*DeleteContactRequest)(nil),          // 19: nexusim.contacts.v1.DeleteContactRequest
+	(*DeleteContactResponse)(nil),         // 20: nexusim.contacts.v1.DeleteContactResponse
+	(*BlockContactRequest)(nil),           // 21: nexusim.contacts.v1.BlockContactRequest
+	(*BlockContactResponse)(nil),          // 22: nexusim.contacts.v1.BlockContactResponse
+	(*UnblockContactRequest)(nil),         // 23: nexusim.contacts.v1.UnblockContactRequest
+	(*UnblockContactResponse)(nil),        // 24: nexusim.contacts.v1.UnblockContactResponse
+	(*UpdateContactRemarkRequest)(nil),    // 25: nexusim.contacts.v1.UpdateContactRemarkRequest
+	(*UpdateContactRemarkResponse)(nil),   // 26: nexusim.contacts.v1.UpdateContactRemarkResponse
 }
 var file_nexusim_contacts_v1_contacts_service_proto_depIdxs = []int32{
 	4,  // 0: nexusim.contacts.v1.SendContactRequestRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
@@ -2096,49 +2256,53 @@ var file_nexusim_contacts_v1_contacts_service_proto_depIdxs = []int32{
 	4,  // 2: nexusim.contacts.v1.RespondContactRequestRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
 	2,  // 3: nexusim.contacts.v1.RespondContactRequestRequest.decision:type_name -> nexusim.contacts.v1.ContactDecision
 	0,  // 4: nexusim.contacts.v1.RespondContactRequestResponse.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
-	4,  // 5: nexusim.contacts.v1.ListContactRequestsRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	3,  // 6: nexusim.contacts.v1.ListContactRequestsRequest.direction:type_name -> nexusim.contacts.v1.ContactRequestListDirection
-	0,  // 7: nexusim.contacts.v1.ListContactRequestsRequest.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
-	0,  // 8: nexusim.contacts.v1.ContactRequestItem.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
-	3,  // 9: nexusim.contacts.v1.ListContactRequestsResponse.direction:type_name -> nexusim.contacts.v1.ContactRequestListDirection
-	0,  // 10: nexusim.contacts.v1.ListContactRequestsResponse.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
-	10, // 11: nexusim.contacts.v1.ListContactRequestsResponse.requests:type_name -> nexusim.contacts.v1.ContactRequestItem
-	4,  // 12: nexusim.contacts.v1.ListContactsRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	1,  // 13: nexusim.contacts.v1.ContactItem.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
-	13, // 14: nexusim.contacts.v1.ListContactsResponse.contacts:type_name -> nexusim.contacts.v1.ContactItem
-	4,  // 15: nexusim.contacts.v1.GetContactStateRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	1,  // 16: nexusim.contacts.v1.GetContactStateResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
-	4,  // 17: nexusim.contacts.v1.DeleteContactRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	1,  // 18: nexusim.contacts.v1.DeleteContactResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
-	4,  // 19: nexusim.contacts.v1.BlockContactRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	1,  // 20: nexusim.contacts.v1.BlockContactResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
-	4,  // 21: nexusim.contacts.v1.UnblockContactRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	1,  // 22: nexusim.contacts.v1.UnblockContactResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
-	4,  // 23: nexusim.contacts.v1.UpdateContactRemarkRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	1,  // 24: nexusim.contacts.v1.UpdateContactRemarkResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
-	5,  // 25: nexusim.contacts.v1.ContactsService.SendContactRequest:input_type -> nexusim.contacts.v1.SendContactRequestRequest
-	7,  // 26: nexusim.contacts.v1.ContactsService.RespondContactRequest:input_type -> nexusim.contacts.v1.RespondContactRequestRequest
-	9,  // 27: nexusim.contacts.v1.ContactsService.ListContactRequests:input_type -> nexusim.contacts.v1.ListContactRequestsRequest
-	12, // 28: nexusim.contacts.v1.ContactsService.ListContacts:input_type -> nexusim.contacts.v1.ListContactsRequest
-	15, // 29: nexusim.contacts.v1.ContactsService.GetContactState:input_type -> nexusim.contacts.v1.GetContactStateRequest
-	17, // 30: nexusim.contacts.v1.ContactsService.DeleteContact:input_type -> nexusim.contacts.v1.DeleteContactRequest
-	19, // 31: nexusim.contacts.v1.ContactsService.BlockContact:input_type -> nexusim.contacts.v1.BlockContactRequest
-	21, // 32: nexusim.contacts.v1.ContactsService.UnblockContact:input_type -> nexusim.contacts.v1.UnblockContactRequest
-	23, // 33: nexusim.contacts.v1.ContactsService.UpdateContactRemark:input_type -> nexusim.contacts.v1.UpdateContactRemarkRequest
-	6,  // 34: nexusim.contacts.v1.ContactsService.SendContactRequest:output_type -> nexusim.contacts.v1.SendContactRequestResponse
-	8,  // 35: nexusim.contacts.v1.ContactsService.RespondContactRequest:output_type -> nexusim.contacts.v1.RespondContactRequestResponse
-	11, // 36: nexusim.contacts.v1.ContactsService.ListContactRequests:output_type -> nexusim.contacts.v1.ListContactRequestsResponse
-	14, // 37: nexusim.contacts.v1.ContactsService.ListContacts:output_type -> nexusim.contacts.v1.ListContactsResponse
-	16, // 38: nexusim.contacts.v1.ContactsService.GetContactState:output_type -> nexusim.contacts.v1.GetContactStateResponse
-	18, // 39: nexusim.contacts.v1.ContactsService.DeleteContact:output_type -> nexusim.contacts.v1.DeleteContactResponse
-	20, // 40: nexusim.contacts.v1.ContactsService.BlockContact:output_type -> nexusim.contacts.v1.BlockContactResponse
-	22, // 41: nexusim.contacts.v1.ContactsService.UnblockContact:output_type -> nexusim.contacts.v1.UnblockContactResponse
-	24, // 42: nexusim.contacts.v1.ContactsService.UpdateContactRemark:output_type -> nexusim.contacts.v1.UpdateContactRemarkResponse
-	34, // [34:43] is the sub-list for method output_type
-	25, // [25:34] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	4,  // 5: nexusim.contacts.v1.CancelContactRequestRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	0,  // 6: nexusim.contacts.v1.CancelContactRequestResponse.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
+	4,  // 7: nexusim.contacts.v1.ListContactRequestsRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	3,  // 8: nexusim.contacts.v1.ListContactRequestsRequest.direction:type_name -> nexusim.contacts.v1.ContactRequestListDirection
+	0,  // 9: nexusim.contacts.v1.ListContactRequestsRequest.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
+	0,  // 10: nexusim.contacts.v1.ContactRequestItem.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
+	3,  // 11: nexusim.contacts.v1.ListContactRequestsResponse.direction:type_name -> nexusim.contacts.v1.ContactRequestListDirection
+	0,  // 12: nexusim.contacts.v1.ListContactRequestsResponse.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
+	12, // 13: nexusim.contacts.v1.ListContactRequestsResponse.requests:type_name -> nexusim.contacts.v1.ContactRequestItem
+	4,  // 14: nexusim.contacts.v1.ListContactsRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	1,  // 15: nexusim.contacts.v1.ContactItem.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
+	15, // 16: nexusim.contacts.v1.ListContactsResponse.contacts:type_name -> nexusim.contacts.v1.ContactItem
+	4,  // 17: nexusim.contacts.v1.GetContactStateRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	1,  // 18: nexusim.contacts.v1.GetContactStateResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
+	4,  // 19: nexusim.contacts.v1.DeleteContactRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	1,  // 20: nexusim.contacts.v1.DeleteContactResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
+	4,  // 21: nexusim.contacts.v1.BlockContactRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	1,  // 22: nexusim.contacts.v1.BlockContactResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
+	4,  // 23: nexusim.contacts.v1.UnblockContactRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	1,  // 24: nexusim.contacts.v1.UnblockContactResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
+	4,  // 25: nexusim.contacts.v1.UpdateContactRemarkRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	1,  // 26: nexusim.contacts.v1.UpdateContactRemarkResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
+	5,  // 27: nexusim.contacts.v1.ContactsService.SendContactRequest:input_type -> nexusim.contacts.v1.SendContactRequestRequest
+	7,  // 28: nexusim.contacts.v1.ContactsService.RespondContactRequest:input_type -> nexusim.contacts.v1.RespondContactRequestRequest
+	9,  // 29: nexusim.contacts.v1.ContactsService.CancelContactRequest:input_type -> nexusim.contacts.v1.CancelContactRequestRequest
+	11, // 30: nexusim.contacts.v1.ContactsService.ListContactRequests:input_type -> nexusim.contacts.v1.ListContactRequestsRequest
+	14, // 31: nexusim.contacts.v1.ContactsService.ListContacts:input_type -> nexusim.contacts.v1.ListContactsRequest
+	17, // 32: nexusim.contacts.v1.ContactsService.GetContactState:input_type -> nexusim.contacts.v1.GetContactStateRequest
+	19, // 33: nexusim.contacts.v1.ContactsService.DeleteContact:input_type -> nexusim.contacts.v1.DeleteContactRequest
+	21, // 34: nexusim.contacts.v1.ContactsService.BlockContact:input_type -> nexusim.contacts.v1.BlockContactRequest
+	23, // 35: nexusim.contacts.v1.ContactsService.UnblockContact:input_type -> nexusim.contacts.v1.UnblockContactRequest
+	25, // 36: nexusim.contacts.v1.ContactsService.UpdateContactRemark:input_type -> nexusim.contacts.v1.UpdateContactRemarkRequest
+	6,  // 37: nexusim.contacts.v1.ContactsService.SendContactRequest:output_type -> nexusim.contacts.v1.SendContactRequestResponse
+	8,  // 38: nexusim.contacts.v1.ContactsService.RespondContactRequest:output_type -> nexusim.contacts.v1.RespondContactRequestResponse
+	10, // 39: nexusim.contacts.v1.ContactsService.CancelContactRequest:output_type -> nexusim.contacts.v1.CancelContactRequestResponse
+	13, // 40: nexusim.contacts.v1.ContactsService.ListContactRequests:output_type -> nexusim.contacts.v1.ListContactRequestsResponse
+	16, // 41: nexusim.contacts.v1.ContactsService.ListContacts:output_type -> nexusim.contacts.v1.ListContactsResponse
+	18, // 42: nexusim.contacts.v1.ContactsService.GetContactState:output_type -> nexusim.contacts.v1.GetContactStateResponse
+	20, // 43: nexusim.contacts.v1.ContactsService.DeleteContact:output_type -> nexusim.contacts.v1.DeleteContactResponse
+	22, // 44: nexusim.contacts.v1.ContactsService.BlockContact:output_type -> nexusim.contacts.v1.BlockContactResponse
+	24, // 45: nexusim.contacts.v1.ContactsService.UnblockContact:output_type -> nexusim.contacts.v1.UnblockContactResponse
+	26, // 46: nexusim.contacts.v1.ContactsService.UpdateContactRemark:output_type -> nexusim.contacts.v1.UpdateContactRemarkResponse
+	37, // [37:47] is the sub-list for method output_type
+	27, // [27:37] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_contacts_v1_contacts_service_proto_init() }
@@ -2152,7 +2316,7 @@ func file_nexusim_contacts_v1_contacts_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_contacts_v1_contacts_service_proto_rawDesc), len(file_nexusim_contacts_v1_contacts_service_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   21,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

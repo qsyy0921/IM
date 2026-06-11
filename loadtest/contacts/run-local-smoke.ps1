@@ -3,7 +3,7 @@ param(
     [string]$KafkaBrokers = "localhost:9092",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
-    [ValidateSet("accept", "decline", "delete", "block", "unblock", "remark", "readd")]
+    [ValidateSet("accept", "decline", "cancel", "delete", "block", "unblock", "remark", "readd")]
     [string]$Scenario = "accept",
     [switch]$SkipBuild
 )

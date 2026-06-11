@@ -14,6 +14,10 @@ type RespondContactRequestRepository interface {
 	RespondContactRequest(context.Context, types.RespondContactRequestCommand) (types.RespondContactRequestResult, error)
 }
 
+type CancelContactRequestRepository interface {
+	CancelContactRequest(context.Context, types.CancelContactRequestCommand) (types.CancelContactRequestResult, error)
+}
+
 type ListContactRequestsRepository interface {
 	ListContactRequests(context.Context, types.ListContactRequestsCommand) (types.ListContactRequestsResult, error)
 }

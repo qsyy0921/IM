@@ -41,6 +41,36 @@ func TestBuildContactEventAccepted(t *testing.T) {
 	}
 }
 
+func TestBuildContactEventCanceled(t *testing.T) {
+	message := outboxMessage(types.ContactEventRequestCanceled, map[string]any{
+		"tenant_id":        "tenant-contacts",
+		"request_id":       "request-1",
+		"sender_user_id":   "alice",
+		"receiver_user_id": "bob",
+		"status":           "CANCELED",
+		"occurred_at":      "2026-06-10T08:00:00Z",
+	})
+	value, err := BuildKafkaValue(message)
+	if err != nil {
+		t.Fatalf("build kafka value: %v", err)
+	}
+	var event contacteventsv1.ContactEvent
+	if err := proto.Unmarshal(value, &event); err != nil {
+		t.Fatalf("decode contact event: %v", err)
+	}
+	canceled := event.GetRequestCanceled()
+	if canceled == nil {
+		t.Fatalf("expected canceled payload: %+v", &event)
+	}
+	if event.EventType != types.ContactEventRequestCanceled ||
+		canceled.RequestId != "request-1" ||
+		canceled.Status != "CANCELED" ||
+		canceled.SenderUserId != "alice" ||
+		canceled.ReceiverUserId != "bob" {
+		t.Fatalf("unexpected canceled event: %+v payload=%+v", &event, canceled)
+	}
+}
+
 func TestBuildContactEventEdgeBlockedUnblockedAndRemarkUpdated(t *testing.T) {
 	blockedMessage := outboxMessage(types.ContactEventEdgeBlocked, map[string]any{
 		"tenant_id":       "tenant-contacts",

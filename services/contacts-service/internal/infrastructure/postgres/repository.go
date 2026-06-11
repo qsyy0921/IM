@@ -20,6 +20,7 @@ import (
 const (
 	commandTypeSendContactRequest    = "SEND_CONTACT_REQUEST"
 	commandTypeRespondContactRequest = "RESPOND_CONTACT_REQUEST"
+	commandTypeCancelContactRequest  = "CANCEL_CONTACT_REQUEST"
 	commandTypeDeleteContact         = "DELETE_CONTACT"
 	commandTypeBlockContact          = "BLOCK_CONTACT"
 	commandTypeUnblockContact        = "UNBLOCK_CONTACT"
@@ -28,6 +29,7 @@ const (
 	eventTypeContactRequestCreated  = "contact.request.created.v1"
 	eventTypeContactRequestAccepted = "contact.request.accepted.v1"
 	eventTypeContactRequestDeclined = "contact.request.declined.v1"
+	eventTypeContactRequestCanceled = "contact.request.canceled.v1"
 	eventTypeContactEdgeDeleted     = "contact.edge.deleted.v1"
 	eventTypeContactEdgeBlocked     = "contact.edge.blocked.v1"
 	eventTypeContactEdgeUnblocked   = "contact.edge.unblocked.v1"
@@ -296,6 +298,104 @@ func (r *Repository) RespondContactRequest(
 		SenderUserID:   request.SenderUserID,
 		ReceiverUserID: request.ReceiverUserID,
 		Status:         expectedStatus,
+	})
+}
+
+func (r *Repository) CancelContactRequest(
+	ctx context.Context,
+	command types.CancelContactRequestCommand,
+) (types.CancelContactRequestResult, error) {
+	if r.pool == nil {
+		return types.CancelContactRequestResult{}, types.NewDBWriteFailed("contacts repository is not configured")
+	}
+	commandHash, err := commandHash(commandHashPayload{
+		Kind:      commandTypeCancelContactRequest,
+		TenantID:  string(command.AuthContext.TenantID),
+		UserID:    string(command.AuthContext.UserID),
+		RequestID: command.RequestID,
+	})
+	if err != nil {
+		return types.CancelContactRequestResult{}, err
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.CancelContactRequestResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+	if err := lockIdempotencyKey(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey); err != nil {
+		return types.CancelContactRequestResult{}, err
+	}
+	if existing, ok, err := findCommandIdempotency(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey); err != nil {
+		return types.CancelContactRequestResult{}, err
+	} else if ok {
+		if existing.CommandType != commandTypeCancelContactRequest || existing.CommandHash != commandHash {
+			return types.CancelContactRequestResult{}, types.NewContactRequestConflict("idempotency key conflict")
+		}
+		result, err := getCancelContactRequestResult(ctx, tx, command.AuthContext.TenantID, existing.ResultID)
+		if err != nil {
+			return types.CancelContactRequestResult{}, err
+		}
+		result.IdempotentReplay = true
+		return commitCancelResult(ctx, tx, result)
+	}
+	request, err := lockContactRequest(ctx, tx, command.AuthContext.TenantID, command.RequestID)
+	if err != nil {
+		return types.CancelContactRequestResult{}, err
+	}
+	if request.SenderUserID != command.AuthContext.UserID {
+		return types.CancelContactRequestResult{}, types.NewPermissionDenied("only request sender can cancel")
+	}
+	if err := lockContactPair(ctx, tx, request.TenantID, request.SenderUserID, request.ReceiverUserID); err != nil {
+		return types.CancelContactRequestResult{}, err
+	}
+	if request.Status != types.ContactRequestStatusPending {
+		if request.Status != types.ContactRequestStatusCanceled {
+			return types.CancelContactRequestResult{}, types.NewContactRequestConflict("contact request already completed with a different status")
+		}
+		if err := insertCommandIdempotency(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey, commandTypeCancelContactRequest, commandHash, request.RequestID); err != nil {
+			return types.CancelContactRequestResult{}, err
+		}
+		return commitCancelResult(ctx, tx, cancelResultFromRequest(request, true))
+	}
+
+	if err := updateContactRequestStatus(ctx, tx, request, types.ContactRequestStatusCanceled); err != nil {
+		return types.CancelContactRequestResult{}, err
+	}
+	if err := insertCommandIdempotency(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey, commandTypeCancelContactRequest, commandHash, request.RequestID); err != nil {
+		return types.CancelContactRequestResult{}, err
+	}
+	eventID, err := r.eventID()
+	if err != nil {
+		return types.CancelContactRequestResult{}, types.NewOutboxWriteFailed(err.Error())
+	}
+	partitionKey := partitionKeyFor(request.TenantID, request.SenderUserID, request.ReceiverUserID)
+	aggregateVersion, err := nextContactOutboxAggregateVersion(ctx, tx, request.TenantID, partitionKey)
+	if err != nil {
+		return types.CancelContactRequestResult{}, err
+	}
+	if err := insertContactOutbox(ctx, tx, contactOutboxInput{
+		EventID:          eventID,
+		TenantID:         request.TenantID,
+		AggregateType:    "CONTACT_REQUEST",
+		AggregateID:      request.RequestID,
+		AggregateVersion: aggregateVersion,
+		EventType:        eventTypeContactRequestCanceled,
+		PartitionKey:     partitionKey,
+		CorrelationID:    command.AuthContext.RequestID,
+		CausationID:      request.RequestID,
+		TraceID:          command.AuthContext.TraceID,
+		Payload:          responsePayload(request, types.ContactRequestStatusCanceled, 0, r.now()),
+	}); err != nil {
+		return types.CancelContactRequestResult{}, err
+	}
+	return commitCancelResult(ctx, tx, types.CancelContactRequestResult{
+		RequestID:      request.RequestID,
+		TenantID:       request.TenantID,
+		SenderUserID:   request.SenderUserID,
+		ReceiverUserID: request.ReceiverUserID,
+		Status:         types.ContactRequestStatusCanceled,
 	})
 }
 
@@ -974,6 +1074,14 @@ func getRespondContactRequestResult(ctx context.Context, tx pgx.Tx, tenantID typ
 	return respondResultFromRequest(row, false), nil
 }
 
+func getCancelContactRequestResult(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, requestID string) (types.CancelContactRequestResult, error) {
+	row, err := getContactRequest(ctx, tx, tenantID, requestID)
+	if err != nil {
+		return types.CancelContactRequestResult{}, err
+	}
+	return cancelResultFromRequest(row, false), nil
+}
+
 func getContactRequest(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, requestID string) (contactRequestRow, error) {
 	var row contactRequestRow
 	err := tx.QueryRow(ctx, `
@@ -1466,6 +1574,13 @@ func commitRespondResult(ctx context.Context, tx pgx.Tx, result types.RespondCon
 	return result, nil
 }
 
+func commitCancelResult(ctx context.Context, tx pgx.Tx, result types.CancelContactRequestResult) (types.CancelContactRequestResult, error) {
+	if err := tx.Commit(ctx); err != nil {
+		return types.CancelContactRequestResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return result, nil
+}
+
 func commitDeleteContactResult(ctx context.Context, tx pgx.Tx, result types.DeleteContactResult) (types.DeleteContactResult, error) {
 	if err := tx.Commit(ctx); err != nil {
 		return types.DeleteContactResult{}, types.NewDBWriteFailed(err.Error())
@@ -1496,6 +1611,17 @@ func commitUpdateContactRemarkResult(ctx context.Context, tx pgx.Tx, result type
 
 func respondResultFromRequest(request contactRequestRow, replay bool) types.RespondContactRequestResult {
 	return types.RespondContactRequestResult{
+		RequestID:        request.RequestID,
+		TenantID:         request.TenantID,
+		SenderUserID:     request.SenderUserID,
+		ReceiverUserID:   request.ReceiverUserID,
+		Status:           request.Status,
+		IdempotentReplay: replay,
+	}
+}
+
+func cancelResultFromRequest(request contactRequestRow, replay bool) types.CancelContactRequestResult {
+	return types.CancelContactRequestResult{
 		RequestID:        request.RequestID,
 		TenantID:         request.TenantID,
 		SenderUserID:     request.SenderUserID,

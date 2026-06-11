@@ -58,9 +58,12 @@ type summary struct {
 	Error                        string              `json:"error,omitempty"`
 	SendContactRequest           sendSummary         `json:"send_contact_request"`
 	RespondContactRequest        respondSummary      `json:"respond_contact_request"`
+	CancelContactRequest         respondSummary      `json:"cancel_contact_request,omitempty"`
 	ReceiverPendingBeforeRespond requestListSummary  `json:"receiver_incoming_pending_before_respond"`
 	ReceiverPendingAfterRespond  requestListSummary  `json:"receiver_incoming_pending_after_respond"`
 	ReceiverTerminalAfterRespond requestListSummary  `json:"receiver_incoming_terminal_after_respond"`
+	ReceiverPendingAfterCancel   requestListSummary  `json:"receiver_incoming_pending_after_cancel,omitempty"`
+	SenderCanceledAfterCancel    requestListSummary  `json:"sender_outgoing_canceled_after_cancel,omitempty"`
 	SecondSendContactRequest     sendSummary         `json:"second_send_contact_request,omitempty"`
 	SecondRespondContactRequest  respondSummary      `json:"second_respond_contact_request,omitempty"`
 	DeleteContact                edgeActionSummary   `json:"delete_contact,omitempty"`
@@ -167,7 +170,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.receiverUserID, "receiver-user-id", "contact-receiver", "receiver user id")
 	flag.StringVar(&cfg.senderDeviceID, "sender-device-id", "sender-device-1", "sender device id")
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "receiver-device-1", "receiver device id")
-	flag.StringVar(&cfg.scenario, "scenario", "accept", "scenario: accept, decline, delete, block, unblock, remark, or readd")
+	flag.StringVar(&cfg.scenario, "scenario", "accept", "scenario: accept, decline, cancel, delete, block, unblock, remark, or readd")
 	flag.BoolVar(&cfg.cleanup, "cleanup", false, "delete tenant contacts rows before running")
 	flag.Parse()
 	cfg.kafkaBrokers = splitCSV(brokers)
@@ -252,27 +255,51 @@ func run(cfg config) error {
 	}
 	s.ReceiverPendingBeforeRespond = pendingBefore
 
-	respondResult, elapsed, err := respondContactRequest(cfg, client, sendResult.RequestID, requestIDSuffix)
-	s.LatenciesMS["respond_contact_request"] = elapsed
-	if err != nil {
-		s.Error = err.Error()
-		return err
+	if cfg.scenario == "cancel" {
+		cancelResult, elapsed, err := cancelContactRequest(cfg, client, sendResult.RequestID, requestIDSuffix)
+		s.LatenciesMS["cancel_contact_request"] = elapsed
+		if err != nil {
+			s.Error = err.Error()
+			return err
+		}
+		s.CancelContactRequest = cancelResult
+		pendingAfterCancel, elapsed, err := listContactRequests(cfg, client, cfg.receiverUserID, contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_INCOMING, contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_PENDING)
+		s.LatenciesMS["list_receiver_pending_requests_after_cancel"] = elapsed
+		if err != nil {
+			s.Error = err.Error()
+			return err
+		}
+		s.ReceiverPendingAfterCancel = pendingAfterCancel
+		canceledOutgoing, elapsed, err := listContactRequests(cfg, client, cfg.senderUserID, contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_OUTGOING, contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_CANCELED)
+		s.LatenciesMS["list_sender_canceled_requests_after_cancel"] = elapsed
+		if err != nil {
+			s.Error = err.Error()
+			return err
+		}
+		s.SenderCanceledAfterCancel = canceledOutgoing
+	} else {
+		respondResult, elapsed, err := respondContactRequest(cfg, client, sendResult.RequestID, requestIDSuffix)
+		s.LatenciesMS["respond_contact_request"] = elapsed
+		if err != nil {
+			s.Error = err.Error()
+			return err
+		}
+		s.RespondContactRequest = respondResult
+		pendingAfter, elapsed, err := listContactRequests(cfg, client, cfg.receiverUserID, contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_INCOMING, contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_PENDING)
+		s.LatenciesMS["list_receiver_pending_requests_after_respond"] = elapsed
+		if err != nil {
+			s.Error = err.Error()
+			return err
+		}
+		s.ReceiverPendingAfterRespond = pendingAfter
+		terminalAfter, elapsed, err := listContactRequests(cfg, client, cfg.receiverUserID, contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_INCOMING, terminalRequestStatusForScenario(cfg.scenario))
+		s.LatenciesMS["list_receiver_terminal_requests_after_respond"] = elapsed
+		if err != nil {
+			s.Error = err.Error()
+			return err
+		}
+		s.ReceiverTerminalAfterRespond = terminalAfter
 	}
-	s.RespondContactRequest = respondResult
-	pendingAfter, elapsed, err := listContactRequests(cfg, client, cfg.receiverUserID, contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_INCOMING, contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_PENDING)
-	s.LatenciesMS["list_receiver_pending_requests_after_respond"] = elapsed
-	if err != nil {
-		s.Error = err.Error()
-		return err
-	}
-	s.ReceiverPendingAfterRespond = pendingAfter
-	terminalAfter, elapsed, err := listContactRequests(cfg, client, cfg.receiverUserID, contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_INCOMING, terminalRequestStatusForScenario(cfg.scenario))
-	s.LatenciesMS["list_receiver_terminal_requests_after_respond"] = elapsed
-	if err != nil {
-		s.Error = err.Error()
-		return err
-	}
-	s.ReceiverTerminalAfterRespond = terminalAfter
 
 	switch cfg.scenario {
 	case "delete":
@@ -452,6 +479,32 @@ func respondContactRequest(cfg config, client contactsv1.ContactsServiceClient, 
 	elapsed := elapsedMS(begin)
 	if err != nil {
 		return respondSummary{}, elapsed, fmt.Errorf("respond contact request: %w", err)
+	}
+	return respondSummary{
+		RequestID:        resp.GetRequestId(),
+		Status:           resp.GetStatus().String(),
+		IdempotentReplay: resp.GetIdempotentReplay(),
+	}, elapsed, nil
+}
+
+func cancelContactRequest(cfg config, client contactsv1.ContactsServiceClient, requestID string, suffix string) (respondSummary, float64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
+	defer cancel()
+	begin := time.Now()
+	resp, err := client.CancelContactRequest(ctx, &contactsv1.CancelContactRequestRequest{
+		AuthContext: &contactsv1.AuthContext{
+			TenantId:  cfg.tenantID,
+			UserId:    cfg.senderUserID,
+			DeviceId:  cfg.senderDeviceID,
+			RequestId: "contact-cancel-" + suffix,
+			TraceId:   "trace-contact-" + suffix,
+		},
+		RequestId:      requestID,
+		IdempotencyKey: "cancel-" + suffix,
+	})
+	elapsed := elapsedMS(begin)
+	if err != nil {
+		return respondSummary{}, elapsed, fmt.Errorf("cancel contact request: %w", err)
 	}
 	return respondSummary{
 		RequestID:        resp.GetRequestId(),
@@ -757,6 +810,11 @@ func summarizeContactEvent(event *contacteventsv1.ContactEvent) contactKafkaEven
 		result.SenderUserID = payload.RequestDeclined.GetSenderUserId()
 		result.ReceiverUserID = payload.RequestDeclined.GetReceiverUserId()
 		result.Status = payload.RequestDeclined.GetStatus()
+	case *contacteventsv1.ContactEvent_RequestCanceled:
+		result.RequestID = payload.RequestCanceled.GetRequestId()
+		result.SenderUserID = payload.RequestCanceled.GetSenderUserId()
+		result.ReceiverUserID = payload.RequestCanceled.GetReceiverUserId()
+		result.Status = payload.RequestCanceled.GetStatus()
 	case *contacteventsv1.ContactEvent_EdgeDeleted:
 		result.OwnerUserID = payload.EdgeDeleted.GetOwnerUserId()
 		result.ContactUserID = payload.EdgeDeleted.GetContactUserId()
@@ -785,6 +843,8 @@ func validateSummary(s summary) error {
 		return validateAcceptSummary(s)
 	case "decline":
 		return validateDeclineSummary(s)
+	case "cancel":
+		return validateCancelSummary(s)
 	case "delete":
 		return validateDeleteSummary(s)
 	case "block":
@@ -817,6 +877,34 @@ func validateDeleteSummary(s summary) error {
 		return fmt.Errorf("unexpected delete states: sender=%+v receiver=%+v", s.SenderState, s.ReceiverState)
 	}
 	return validateOutboxAndEvents(s, "contact.edge.deleted.v1", expectedEventCount(s.Scenario))
+}
+
+func validateCancelSummary(s summary) error {
+	if s.SendContactRequest.Status != "CONTACT_REQUEST_STATUS_PENDING" {
+		return fmt.Errorf("send status=%s, want PENDING", s.SendContactRequest.Status)
+	}
+	if s.CancelContactRequest.Status != "CONTACT_REQUEST_STATUS_CANCELED" {
+		return fmt.Errorf("cancel status=%s, want CANCELED", s.CancelContactRequest.Status)
+	}
+	if s.ReceiverPendingBeforeRespond.RequestCount != 1 ||
+		!contains(s.ReceiverPendingBeforeRespond.RequestIDs, s.SendContactRequest.RequestID) {
+		return fmt.Errorf("pending contact request before cancel not visible: %+v", s.ReceiverPendingBeforeRespond)
+	}
+	if s.ReceiverPendingAfterCancel.RequestCount != 0 {
+		return fmt.Errorf("receiver pending request should disappear after cancel: %+v", s.ReceiverPendingAfterCancel)
+	}
+	if s.SenderCanceledAfterCancel.Status != "CONTACT_REQUEST_STATUS_CANCELED" ||
+		s.SenderCanceledAfterCancel.RequestCount != 1 ||
+		!contains(s.SenderCanceledAfterCancel.RequestIDs, s.SendContactRequest.RequestID) {
+		return fmt.Errorf("sender canceled request after cancel not visible: %+v", s.SenderCanceledAfterCancel)
+	}
+	if s.SenderList.ContactCount != 0 || s.ReceiverList.ContactCount != 0 {
+		return fmt.Errorf("cancel should not create contacts: sender=%+v receiver=%+v", s.SenderList, s.ReceiverList)
+	}
+	if s.SenderState.Error != codes.NotFound.String() || s.ReceiverState.Error != codes.NotFound.String() {
+		return fmt.Errorf("cancel should leave no contact state: sender=%+v receiver=%+v", s.SenderState, s.ReceiverState)
+	}
+	return validateOutboxAndEvents(s, "contact.request.canceled.v1", expectedEventCount(s.Scenario))
 }
 
 func validateBlockSummary(s summary) error {
@@ -1015,7 +1103,8 @@ func validateOutboxAndEvents(s summary, requiredEventType string, wantEvents int
 	for _, event := range s.ContactKafkaEvents {
 		eventTypes[event.EventType] = true
 	}
-	if len(s.ContactKafkaEvents) > 0 && (!eventTypes["contact.request.created.v1"] || !eventTypes["contact.request.accepted.v1"] || !eventTypes[requiredEventType]) {
+	requiresAccepted := requiredEventType != "contact.request.declined.v1" && requiredEventType != "contact.request.canceled.v1"
+	if len(s.ContactKafkaEvents) > 0 && (!eventTypes["contact.request.created.v1"] || (requiresAccepted && !eventTypes["contact.request.accepted.v1"]) || !eventTypes[requiredEventType]) {
 		return fmt.Errorf("missing expected contact Kafka events: %+v", s.ContactKafkaEvents)
 	}
 	return nil
@@ -1024,6 +1113,9 @@ func validateOutboxAndEvents(s summary, requiredEventType string, wantEvents int
 func terminalRequestStatusForScenario(scenario string) contactsv1.ContactRequestStatus {
 	if scenario == "decline" {
 		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_DECLINED
+	}
+	if scenario == "cancel" {
+		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_CANCELED
 	}
 	return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_ACCEPTED
 }

@@ -582,7 +582,9 @@ Command hash 规则：
 
 ## 11. 权限和安全
 
-- `tenant_id / user_id / device_id / session_id / trace_id / request_id` 来自 `AuthContext`。
+- 生产模式必须设置 `NEXUSIM_CONTACTS_AUTH_MODE=metadata`，由 gRPC metadata 中的 gateway verified identity 派生 `tenant_id / user_id`，并忽略请求体中伪造的身份字段。
+- 默认 `body` auth mode 只保留给本地 smoke / 兼容旧 runner 使用，不作为生产安全边界。
+- 受信 metadata key：`x-nexusim-tenant-id`、`x-nexusim-user-id`、`x-nexusim-device-id`、`x-nexusim-session-id`、`x-nexusim-trace-id`、`x-nexusim-request-id`。
 - 发送申请只能以当前 auth user 作为 sender。
 - 响应申请只能由 receiver 执行。
 - 取消申请只能由原 sender 执行，receiver 不能取消对方发来的申请。
@@ -612,6 +614,16 @@ contacts_outbox_pending_count
 contacts_outbox_dlq_count
 ```
 
+生产化基础观测入口已接入 `NEXUSIM_CONTACTS_DEBUG_ADDR`：
+
+```text
+GET /healthz
+GET /readyz
+GET /debug/metrics
+```
+
+`/readyz` 会检查 PostgreSQL ping；`/debug/metrics` 第一版输出 pgx pool 状态和 `contacts_outbox` 的 total / pending / published / DLQ / ready_pending / oldest age。该入口只暴露本服务自己的健康与 outbox 状态，不读取其它服务内部表。
+
 ## 13. 测试方案
 
 | 测试 | 目标 |
@@ -632,6 +644,9 @@ contacts_outbox_dlq_count
 ```text
 NEXUSIM_CONTACTS_SERVICE_MODE=grpc
 NEXUSIM_CONTACTS_SERVICE_MODE=outbox-relay
+NEXUSIM_CONTACTS_AUTH_MODE=metadata   # production / gateway verified identity
+NEXUSIM_CONTACTS_AUTH_MODE=body       # local smoke compatibility only
+NEXUSIM_CONTACTS_DEBUG_ADDR=0.0.0.0:10501
 ```
 
 本地 smoke：

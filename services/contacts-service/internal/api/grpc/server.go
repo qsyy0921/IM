@@ -106,7 +106,7 @@ func (s *Server) SendContactRequest(
 		return nil, status.Error(codes.Unimplemented, "send contact request is not configured")
 	}
 	result, err := s.sendContactRequest.Execute(ctx, types.SendContactRequestCommand{
-		AuthContext:    authFromProto(request.GetAuthContext()),
+		AuthContext:    authFromProto(ctx, request.GetAuthContext()),
 		TargetUserID:   types.UserID(request.GetTargetUserId()),
 		IdempotencyKey: request.GetIdempotencyKey(),
 		Message:        request.GetMessage(),
@@ -135,7 +135,7 @@ func (s *Server) RespondContactRequest(
 		return nil, status.Error(codes.Unimplemented, "respond contact request is not configured")
 	}
 	result, err := s.respondContactRequest.Execute(ctx, types.RespondContactRequestCommand{
-		AuthContext:    authFromProto(request.GetAuthContext()),
+		AuthContext:    authFromProto(ctx, request.GetAuthContext()),
 		RequestID:      request.GetRequestId(),
 		Decision:       decisionFromProto(request.GetDecision()),
 		IdempotencyKey: request.GetIdempotencyKey(),
@@ -164,7 +164,7 @@ func (s *Server) CancelContactRequest(
 		return nil, status.Error(codes.Unimplemented, "cancel contact request is not configured")
 	}
 	result, err := s.cancelContactRequest.Execute(ctx, types.CancelContactRequestCommand{
-		AuthContext:    authFromProto(request.GetAuthContext()),
+		AuthContext:    authFromProto(ctx, request.GetAuthContext()),
 		RequestID:      request.GetRequestId(),
 		IdempotencyKey: request.GetIdempotencyKey(),
 	})
@@ -192,7 +192,7 @@ func (s *Server) ListContactRequests(
 		return nil, status.Error(codes.Unimplemented, "list contact requests is not configured")
 	}
 	result, err := s.listContactRequests.Execute(ctx, types.ListContactRequestsCommand{
-		AuthContext: authFromProto(request.GetAuthContext()),
+		AuthContext: authFromProto(ctx, request.GetAuthContext()),
 		Direction:   requestListDirectionFromProto(request.GetDirection()),
 		Status:      requestStatusFromProto(request.GetStatus()),
 		PageSize:    int(request.GetPageSize()),
@@ -235,7 +235,7 @@ func (s *Server) ListContacts(
 		return nil, status.Error(codes.Unimplemented, "list contacts is not configured")
 	}
 	result, err := s.listContacts.Execute(ctx, types.ListContactsCommand{
-		AuthContext: authFromProto(request.GetAuthContext()),
+		AuthContext: authFromProto(ctx, request.GetAuthContext()),
 		PageSize:    int(request.GetPageSize()),
 		PageToken:   request.GetPageToken(),
 	})
@@ -273,7 +273,7 @@ func (s *Server) GetContactState(
 		return nil, status.Error(codes.Unimplemented, "get contact state is not configured")
 	}
 	result, err := s.getContactState.Execute(ctx, types.GetContactStateCommand{
-		AuthContext: authFromProto(request.GetAuthContext()),
+		AuthContext: authFromProto(ctx, request.GetAuthContext()),
 		OtherUserID: types.UserID(request.GetOtherUserId()),
 	})
 	if err != nil {
@@ -301,7 +301,7 @@ func (s *Server) DeleteContact(
 		return nil, status.Error(codes.Unimplemented, "delete contact is not configured")
 	}
 	result, err := s.deleteContact.Execute(ctx, types.DeleteContactCommand{
-		AuthContext:    authFromProto(request.GetAuthContext()),
+		AuthContext:    authFromProto(ctx, request.GetAuthContext()),
 		ContactUserID:  types.UserID(request.GetContactUserId()),
 		IdempotencyKey: request.GetIdempotencyKey(),
 	})
@@ -330,7 +330,7 @@ func (s *Server) BlockContact(
 		return nil, status.Error(codes.Unimplemented, "block contact is not configured")
 	}
 	result, err := s.blockContact.Execute(ctx, types.BlockContactCommand{
-		AuthContext:    authFromProto(request.GetAuthContext()),
+		AuthContext:    authFromProto(ctx, request.GetAuthContext()),
 		ContactUserID:  types.UserID(request.GetContactUserId()),
 		IdempotencyKey: request.GetIdempotencyKey(),
 		Reason:         request.GetReason(),
@@ -360,7 +360,7 @@ func (s *Server) UnblockContact(
 		return nil, status.Error(codes.Unimplemented, "unblock contact is not configured")
 	}
 	result, err := s.unblockContact.Execute(ctx, types.UnblockContactCommand{
-		AuthContext:    authFromProto(request.GetAuthContext()),
+		AuthContext:    authFromProto(ctx, request.GetAuthContext()),
 		ContactUserID:  types.UserID(request.GetContactUserId()),
 		IdempotencyKey: request.GetIdempotencyKey(),
 	})
@@ -389,7 +389,7 @@ func (s *Server) UpdateContactRemark(
 		return nil, status.Error(codes.Unimplemented, "update contact remark is not configured")
 	}
 	result, err := s.updateContactRemark.Execute(ctx, types.UpdateContactRemarkCommand{
-		AuthContext:    authFromProto(request.GetAuthContext()),
+		AuthContext:    authFromProto(ctx, request.GetAuthContext()),
 		ContactUserID:  types.UserID(request.GetContactUserId()),
 		IdempotencyKey: request.GetIdempotencyKey(),
 		Remark:         request.GetRemark(),
@@ -409,7 +409,24 @@ func (s *Server) UpdateContactRemark(
 	}, nil
 }
 
-func authFromProto(auth *contactsv1.AuthContext) types.AuthContext {
+func authFromProto(ctx context.Context, auth *contactsv1.AuthContext) types.AuthContext {
+	if verified, ok := verifiedAuthFromContext(ctx); ok {
+		if auth != nil {
+			if verified.DeviceID == "" {
+				verified.DeviceID = auth.GetDeviceId()
+			}
+			if verified.SessionID == "" {
+				verified.SessionID = auth.GetSessionId()
+			}
+			if verified.TraceID == "" {
+				verified.TraceID = auth.GetTraceId()
+			}
+			if verified.RequestID == "" {
+				verified.RequestID = auth.GetRequestId()
+			}
+		}
+		return verified
+	}
 	if auth == nil {
 		return types.AuthContext{}
 	}

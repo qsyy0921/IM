@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 	contactsgrpc "github.com/qsyy0921/IM/services/contacts-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/contacts-service/internal/app"
 	kafkainfra "github.com/qsyy0921/IM/services/contacts-service/internal/infrastructure/kafka"
+	monitoringinfra "github.com/qsyy0921/IM/services/contacts-service/internal/infrastructure/monitoring"
 	postgresinfra "github.com/qsyy0921/IM/services/contacts-service/internal/infrastructure/postgres"
 	"github.com/qsyy0921/IM/services/contacts-service/internal/trigger/outbox"
 	"google.golang.org/grpc"
@@ -51,6 +53,11 @@ func runGRPC() error {
 		return err
 	}
 	defer pool.Close()
+	stopDebug, err := startDebugServer(ctx, contactsDebugAddr(), monitoringinfra.NewHandler(pool))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 
 	addr := envString("NEXUSIM_CONTACTS_GRPC_ADDR", "0.0.0.0:10500")
 	listener, err := net.Listen("tcp", addr)
@@ -58,7 +65,10 @@ func runGRPC() error {
 		return err
 	}
 	repository := postgresinfra.NewRepository(pool)
-	server := grpc.NewServer()
+	server, err := newGRPCServer()
+	if err != nil {
+		return err
+	}
 	contactsgrpc.Register(server, contactsgrpc.NewServer(
 		app.NewSendContactRequestUseCase(repository),
 		app.NewRespondContactRequestUseCase(repository),
@@ -103,6 +113,11 @@ func runOutboxRelay() error {
 		return err
 	}
 	defer pool.Close()
+	stopDebug, err := startDebugServer(ctx, contactsDebugAddr(), monitoringinfra.NewHandler(pool))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 
 	brokers := splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS"))
 	producer, err := kafkainfra.NewWriterProducer(brokers)
@@ -127,6 +142,37 @@ func runOutboxRelay() error {
 	return relay.Run(ctx)
 }
 
+func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {
+	if strings.TrimSpace(addr) == "" {
+		return func() {}, nil
+	}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	server := &http.Server{Handler: handler}
+	done := make(chan struct{})
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+	}()
+	go func() {
+		defer close(done)
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("contacts-service debug server stopped with error: %v", err)
+		}
+	}()
+	log.Printf("contacts-service debug server started on %s", addr)
+	return func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+		<-done
+	}, nil
+}
+
 func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {
 	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
 	if dsn == "" {
@@ -140,6 +186,21 @@ func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {
 		config.MaxConns = int32(maxConns)
 	}
 	return pgxpool.NewWithConfig(ctx, config)
+}
+
+func contactsDebugAddr() string {
+	return envString("NEXUSIM_CONTACTS_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
+}
+
+func newGRPCServer() (*grpc.Server, error) {
+	switch strings.ToLower(envString("NEXUSIM_CONTACTS_AUTH_MODE", "body")) {
+	case "body", "request", "legacy":
+		return grpc.NewServer(), nil
+	case "metadata", "verified-metadata":
+		return grpc.NewServer(grpc.UnaryInterceptor(contactsgrpc.VerifiedAuthUnaryInterceptor(true))), nil
+	default:
+		return nil, errors.New("unsupported NEXUSIM_CONTACTS_AUTH_MODE")
+	}
 }
 
 func envString(name string, fallback string) string {

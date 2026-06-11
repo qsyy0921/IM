@@ -664,6 +664,17 @@ $env:NEXUSIM_CONTACTS_OUTBOX_REPAIR_REASON='operator retried after kafka recover
 
 `outbox-repair` 只处理明确列出的 `contacts_outbox.status='DLQ'` 事件，把它们重置为 `PENDING`、清理 retry / error / DLQ 时间字段，并写入 `contacts_outbox_repair_audit` 保存原状态、原 retry/error 和 repair reason。随后事件交回普通 outbox relay 按 `partition_key + aggregate_version` 顺序发布；不会直接 publish Kafka，也不会跳过低版本阻塞。`PUBLISHED`、仍在 `PENDING` 或不存在的 event 会计入 skipped。
 
+本地容器编排：
+
+```powershell
+$env:GOOS='linux'; $env:GOARCH='amd64'
+. .\tools\go-env.ps1
+go build -o bin\linux\contacts-service ./services/contacts-service/cmd/contacts-service
+docker compose -f deploy\local\docker-compose.yml -f deploy\local\docker-compose.contacts-service.yml up -d postgres kafka contacts-service-grpc contacts-service-outbox-relay
+```
+
+`contacts-service-grpc` 和 `contacts-service-outbox-relay` 分进程运行，共用同一个 runtime image；`contacts-service-outbox-repair` 放在 `contacts-repair` profile 下，只用于一次性人工修复，不应常驻运行。生产环境还需要镜像签名、灰度发布、配置中心和正式观测栈，本 compose 只作为本地/双机 smoke 的最小编排样例。
+
 本地 smoke：
 
 ```text

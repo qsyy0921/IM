@@ -1,6 +1,6 @@
 # NexusIM Current Brief
 
-本文是每轮 Codex 工作的低 token 入口。需要细节、历史、风险和报告索引时，再查 `docs/runbook/current-goal.md`。
+本文是每轮 Codex 工作的低 token 入口。每轮默认只读本文；需要哪类信息，就按关键词读取对应文档的相关片段，不要把 `current-goal.md`、SDD、压测报告或历史文档整篇读一遍。旧版长目标档案已归档到 `docs/runbook/history/current-goal-archive-20260611.md`，只在追溯历史证据时按关键词查询。
 
 ## 当前定位
 
@@ -27,7 +27,7 @@ conversation-service
 8. push-gateway 在线 `delivery.notify` 已保持轻量通知边界并透传 `source_event_type`，让客户端能区分新增 / 编辑 / 撤回 / 删除唤醒；展示事实仍以 `PullInbox` 为准。
 9. push-gateway 标准 smoke runner 已在 clean commit `81fe92c` 跑通 `message-change-notify` 三类真实进程 smoke：`edit / revoke / delete` 均证明在线 `delivery.notify.source_event_type` 与 durable `PullInbox.event_type + message_id + conversation_seq` 一致；报告见 `docs/runbook/loadtest/push-gateway/loadtest-report-20260610-push-gateway-message-change-notify-smoke.md`。
 10. push-gateway 已新增第一版低耦合真实鉴权入口，并在 clean commit `8aa414c` 跑通 HMAC auth full smoke：`NEXUSIM_PUSH_AUTH_MODE=hmac` 时校验短期 signed gateway token 的 HMAC 签名、`aud=push-gateway`、过期时间和 device 绑定；runner 使用 `Authorization: Bearer`，`push_auth_query_identity_sent=false`，随后完整通过 `delivery.notify -> PullInbox -> delivery.ack.ok`。当前支持 current + previous secrets 的最小密钥轮换，smoke runner 已能用 previous secret 签发 token 验证兼容窗口。它不是完整 identity-service，后续仍需 device revoke、session revoke、refresh token、多 issuer 和 JWK/JWT 标准化。报告见 `docs/runbook/loadtest/push-gateway/loadtest-report-20260610-push-gateway-hmac-auth-smoke.md`。
-11. conversation-service 已补第三层群管理最小读能力：`ListConversationMembers` 只返回当前 ACTIVE 成员，调用者必须是 ACTIVE 成员；clean commit `99aacc6` 的 `JOIN` roster smoke、clean commit `14ffedc` 的 `LEAVE` roster smoke、clean commit `be2e039` 的 `REMOVE` roster smoke 和 clean commit `7150944` 的 `ROLE_CHANGED` roster smoke 均通过，证明 JOIN 后出现、LEAVE/REMOVE 后消失、ROLE_CHANGED 后当前 role 更新。它是低耦合 roster API，不让其它服务跨表读取 `conversation_members`，也不把成员历史 / 审计视图塞进普通列表。owner transfer 已完成专用 RPC、Kafka schema、migration、relay/projection、conversation-service 写路径和 clean commit `490db1a` 的真实进程 smoke：旧 owner 降级为 ACTIVE ADMIN，新 owner 成为唯一 ACTIVE OWNER，saga DONE，outbox `PUBLISHED=1/PENDING=0`。联系人 / 好友关系已新增 `docs/sdd/contacts-service.md` v0.1 Draft，并完成 `contacts_service.proto`、`im.contact.events` Kafka schema、`000001_contacts_core.sql`、contacts-service 六层骨架、PostgreSQL repository 真实事务、contacts outbox relay / Kafka producer 和两条真实进程 smoke：clean commit `584017f` 的 ACCEPT smoke 证明双向 ACTIVE edge、outbox `PUBLISHED=2/PENDING=0/DLQ=0`、Kafka 读回 `created/accepted`；clean commit `3a392df` 的 DECLINE smoke 证明不创建联系人 edge、双方 ListContacts 为空、GetContactState 返回 NotFound、Kafka 读回 `created/declined`。它定位为独立 contacts-service，不写 `conversation_members`、不自动创建会话、message-service 不同步依赖 contacts-service。好友删除 / 拉黑 / 备注名 v0.2 设计已冻结为当前用户单向 edge 操作，下一步进入 proto / schema / migration / 代码小切片。
+11. conversation-service 已补第三层群管理最小读能力：`ListConversationMembers` 只返回当前 ACTIVE 成员，调用者必须是 ACTIVE 成员；clean commit `99aacc6` 的 `JOIN` roster smoke、clean commit `14ffedc` 的 `LEAVE` roster smoke、clean commit `be2e039` 的 `REMOVE` roster smoke 和 clean commit `7150944` 的 `ROLE_CHANGED` roster smoke 均通过，证明 JOIN 后出现、LEAVE/REMOVE 后消失、ROLE_CHANGED 后当前 role 更新。它是低耦合 roster API，不让其它服务跨表读取 `conversation_members`，也不把成员历史 / 审计视图塞进普通列表。owner transfer 已完成专用 RPC、Kafka schema、migration、relay/projection、conversation-service 写路径和 clean commit `490db1a` 的真实进程 smoke：旧 owner 降级为 ACTIVE ADMIN，新 owner 成为唯一 ACTIVE OWNER，saga DONE，outbox `PUBLISHED=1/PENDING=0`。联系人 / 好友关系已新增 `docs/sdd/contacts-service.md` v0.1 Draft，并完成 `contacts_service.proto`、`im.contact.events` Kafka schema、`000001_contacts_core.sql`、contacts-service 六层骨架、PostgreSQL repository 真实事务、contacts outbox relay / Kafka producer 和两条真实进程 smoke：clean commit `584017f` 的 ACCEPT smoke 证明双向 ACTIVE edge、outbox `PUBLISHED=2/PENDING=0/DLQ=0`、Kafka 读回 `created/accepted`；clean commit `3a392df` 的 DECLINE smoke 证明不创建联系人 edge、双方 ListContacts 为空、GetContactState 返回 NotFound、Kafka 读回 `created/declined`。它定位为独立 contacts-service，不写 `conversation_members`、不自动创建会话、message-service 不同步依赖 contacts-service。好友删除 / 拉黑 / 备注名 v0.2 已完成 proto / schema / migration / repository / relay builder / loadtest runner 的代码切片和真实 PostgreSQL 集成测试，下一步跑 `delete` / `block` / `remark` 三条真实进程 smoke 并归档报告。
 12. RAG / Agent / 智能总结属于第四层，必须等消息事实、权限边界、撤回/编辑/删除语义更稳定后再做。
 13. Kafka HA、PostgreSQL failover、Redis quorum / 网络分区可作为后续生产化项，不作为当前主线阻塞。
 
@@ -44,6 +44,7 @@ conversation-service
 - 开发中可以主动创建 sub-agent 做设计、实现、测试、文档或风险复核；专项任务结束后及时关闭，不要长期占用线程池。
 - 压测原始数据放到 `H:\NexusIM\loadtest-results`，E 盘仓库只放报告和文档。
 - Win/Mac 服务间通信优先使用有线 `172.31.50.*`，不要把服务间流量走外网或代理。
+- 除非用户明确要求，不再把流量诊断、代理用量归因、外网消耗排查列为当前任务；日常开发只保留“少下载、用已有镜像/依赖、服务间走本地有线”的约束。
 - 不回滚用户已有修改。
 
 ## 每轮开始
@@ -53,11 +54,17 @@ git status --short --branch
 Get-Content docs\runbook\current-brief.md -Raw
 ```
 
-如需细节再按需查询：
+按需读取规则：
 
 ```powershell
 Select-String -Path docs\runbook\current-goal.md -Pattern "关键词" -Context 2,4
 ```
+
+- 查长期目标 / 历史事实 / 风险时，只用 `Select-String` 查 `docs/runbook/current-goal.md` 的相关段落。
+- 查某个服务设计时，只读对应 `docs/sdd/<service>.md` 的相关章节。
+- 查压测或 smoke 证据时，只读 `docs/runbook/loadtest/<service>/README.md` 或指定报告的相关段落。
+- 查当前实现时，优先 `rg` 定位入口和符号，再读取目标文件片段；不要为了“了解项目”全量扫描所有文档。
+- 只有在明确需要重构文档结构或做完整审计时，才允许全文读取长文档。
 
 ## 每轮结束
 

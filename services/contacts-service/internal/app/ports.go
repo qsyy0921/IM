@@ -21,3 +21,15 @@ type ListContactsRepository interface {
 type GetContactStateRepository interface {
 	GetContactState(context.Context, types.GetContactStateCommand) (types.GetContactStateResult, error)
 }
+
+type DeleteContactRepository interface {
+	DeleteContact(context.Context, types.DeleteContactCommand) (types.DeleteContactResult, error)
+}
+
+type BlockContactRepository interface {
+	BlockContact(context.Context, types.BlockContactCommand) (types.BlockContactResult, error)
+}
+
+type UpdateContactRemarkRepository interface {
+	UpdateContactRemark(context.Context, types.UpdateContactRemarkCommand) (types.UpdateContactRemarkResult, error)
+}

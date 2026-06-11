@@ -31,6 +31,9 @@ message ContactEvent {
     ContactRequestCreatedV1 request_created = 20;
     ContactRequestAcceptedV1 request_accepted = 21;
     ContactRequestDeclinedV1 request_declined = 22;
+    ContactEdgeDeletedV1 edge_deleted = 23;
+    ContactEdgeBlockedV1 edge_blocked = 24;
+    ContactEdgeRemarkUpdatedV1 edge_remark_updated = 25;
   }
 }
 
@@ -61,4 +64,35 @@ message ContactRequestDeclinedV1 {
   string receiver_user_id = 4;
   string status = 5;
   google.protobuf.Timestamp occurred_at = 6;
+}
+
+message ContactEdgeDeletedV1 {
+  string tenant_id = 1;
+  string owner_user_id = 2;
+  string contact_user_id = 3;
+  string previous_status = 4;
+  string status = 5;
+  int64 edge_version = 6;
+  google.protobuf.Timestamp occurred_at = 7;
+}
+
+message ContactEdgeBlockedV1 {
+  string tenant_id = 1;
+  string owner_user_id = 2;
+  string contact_user_id = 3;
+  string previous_status = 4;
+  string status = 5;
+  int64 edge_version = 6;
+  string reason = 7;
+  google.protobuf.Timestamp occurred_at = 8;
+}
+
+message ContactEdgeRemarkUpdatedV1 {
+  string tenant_id = 1;
+  string owner_user_id = 2;
+  string contact_user_id = 3;
+  string status = 4;
+  int64 edge_version = 5;
+  string remark = 6;
+  google.protobuf.Timestamp occurred_at = 7;
 }

@@ -9,6 +9,9 @@ service ContactsService {
   rpc RespondContactRequest(RespondContactRequestRequest) returns (RespondContactRequestResponse);
   rpc ListContacts(ListContactsRequest) returns (ListContactsResponse);
   rpc GetContactState(GetContactStateRequest) returns (GetContactStateResponse);
+  rpc DeleteContact(DeleteContactRequest) returns (DeleteContactResponse);
+  rpc BlockContact(BlockContactRequest) returns (BlockContactResponse);
+  rpc UpdateContactRemark(UpdateContactRemarkRequest) returns (UpdateContactRemarkResponse);
 }
 
 message AuthContext {
@@ -87,6 +90,7 @@ message ContactItem {
   string source_request_id = 4;
   int64 created_at_unix_ms = 5;
   int64 updated_at_unix_ms = 6;
+  string remark = 7;
 }
 
 message ListContactsResponse {
@@ -108,4 +112,56 @@ message GetContactStateResponse {
   ContactEdgeStatus status = 4;
   string source_request_id = 5;
   int64 version = 6;
+  string remark = 7;
+}
+
+message DeleteContactRequest {
+  AuthContext auth_context = 1;
+  string contact_user_id = 2;
+  string idempotency_key = 3;
+}
+
+message DeleteContactResponse {
+  string tenant_id = 1;
+  string owner_user_id = 2;
+  string contact_user_id = 3;
+  ContactEdgeStatus status = 4;
+  string source_request_id = 5;
+  int64 version = 6;
+  bool idempotent_replay = 7;
+}
+
+message BlockContactRequest {
+  AuthContext auth_context = 1;
+  string contact_user_id = 2;
+  string idempotency_key = 3;
+  string reason = 4;
+}
+
+message BlockContactResponse {
+  string tenant_id = 1;
+  string owner_user_id = 2;
+  string contact_user_id = 3;
+  ContactEdgeStatus status = 4;
+  string source_request_id = 5;
+  int64 version = 6;
+  bool idempotent_replay = 7;
+}
+
+message UpdateContactRemarkRequest {
+  AuthContext auth_context = 1;
+  string contact_user_id = 2;
+  string remark = 3;
+  string idempotency_key = 4;
+}
+
+message UpdateContactRemarkResponse {
+  string tenant_id = 1;
+  string owner_user_id = 2;
+  string contact_user_id = 3;
+  ContactEdgeStatus status = 4;
+  string source_request_id = 5;
+  int64 version = 6;
+  string remark = 7;
+  bool idempotent_replay = 8;
 }

@@ -5,6 +5,7 @@ import "errors"
 var (
 	ErrInvalidArgument        = errors.New("invalid argument")
 	ErrContactRequestNotFound = errors.New("contact request not found")
+	ErrContactNotFound        = errors.New("contact not found")
 	ErrContactAlreadyExists   = errors.New("contact already exists")
 	ErrContactRequestConflict = errors.New("contact request conflict")
 	ErrPermissionDenied       = errors.New("permission denied")
@@ -20,6 +21,10 @@ func NewInvalidArgument(message string) error {
 
 func NewContactRequestNotFound(message string) error {
 	return errors.Join(ErrContactRequestNotFound, errors.New(message))
+}
+
+func NewContactNotFound(message string) error {
+	return errors.Join(ErrContactNotFound, errors.New(message))
 }
 
 func NewContactAlreadyExists(message string) error {

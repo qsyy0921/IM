@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -113,6 +114,189 @@ func TestRepositoryDeclineDoesNotCreateEdgesIntegration(t *testing.T) {
 	_, err = repository.GetContactState(ctx, stateCommand("alice", "carol"))
 	if !errors.Is(err, types.ErrContactRequestNotFound) {
 		t.Fatalf("expected no contact state, got %v", err)
+	}
+}
+
+func TestRepositoryUpdateContactRemarkIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+	acceptContact(t, ctx, repository, "alice", "bob")
+
+	result, err := repository.UpdateContactRemark(ctx, remarkCommand("alice", "bob", "remark-1", "Bob from school"))
+	if err != nil {
+		t.Fatalf("update contact remark: %v", err)
+	}
+	if result.Status != types.ContactEdgeStatusActive || result.Version != 2 || result.Remark != "Bob from school" {
+		t.Fatalf("unexpected remark result: %+v", result)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRemarkUpdated, 1)
+
+	replay, err := repository.UpdateContactRemark(ctx, remarkCommand("alice", "bob", "remark-1", "Bob from school"))
+	if err != nil {
+		t.Fatalf("update contact remark replay: %v", err)
+	}
+	if !replay.IdempotentReplay || replay.Version != result.Version || replay.Remark != result.Remark {
+		t.Fatalf("expected remark replay, got %+v", replay)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRemarkUpdated, 1)
+
+	aliceContacts, err := repository.ListContacts(ctx, listCommand("alice", 10, ""))
+	if err != nil {
+		t.Fatalf("list alice contacts: %v", err)
+	}
+	if len(aliceContacts.Contacts) != 1 || aliceContacts.Contacts[0].Remark != "Bob from school" {
+		t.Fatalf("expected remark in list result, got %+v", aliceContacts.Contacts)
+	}
+	state, err := repository.GetContactState(ctx, stateCommand("alice", "bob"))
+	if err != nil {
+		t.Fatalf("get contact state: %v", err)
+	}
+	if state.Remark != "Bob from school" {
+		t.Fatalf("expected remark in state, got %+v", state)
+	}
+}
+
+func TestRepositoryUpdateContactRemarkReplayUsesOriginalSnapshotIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+	acceptContact(t, ctx, repository, "alice", "bob")
+
+	first, err := repository.UpdateContactRemark(ctx, remarkCommand("alice", "bob", "remark-1", "Bob from school"))
+	if err != nil {
+		t.Fatalf("update first remark: %v", err)
+	}
+	second, err := repository.UpdateContactRemark(ctx, remarkCommand("alice", "bob", "remark-2", "Robert from work"))
+	if err != nil {
+		t.Fatalf("update second remark: %v", err)
+	}
+	if second.Remark != "Robert from work" || second.Version <= first.Version {
+		t.Fatalf("unexpected second remark result: %+v", second)
+	}
+
+	replay, err := repository.UpdateContactRemark(ctx, remarkCommand("alice", "bob", "remark-1", "Bob from school"))
+	if err != nil {
+		t.Fatalf("replay first remark: %v", err)
+	}
+	if !replay.IdempotentReplay || replay.Remark != first.Remark || replay.Version != first.Version {
+		t.Fatalf("expected original remark replay %+v, got %+v", first, replay)
+	}
+}
+
+func TestRepositoryDeleteContactIsOwnerScopedIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+	acceptContact(t, ctx, repository, "alice", "bob")
+
+	result, err := repository.DeleteContact(ctx, deleteCommand("alice", "bob", "delete-1"))
+	if err != nil {
+		t.Fatalf("delete contact: %v", err)
+	}
+	if result.Status != types.ContactEdgeStatusDeleted || result.Version != 2 {
+		t.Fatalf("unexpected delete result: %+v", result)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactEdgeDeleted, 1)
+	assertContactEdge(t, ctx, pool, "alice", "bob", types.ContactEdgeStatusDeleted, 2)
+	assertContactEdge(t, ctx, pool, "bob", "alice", types.ContactEdgeStatusActive, 1)
+
+	aliceContacts, err := repository.ListContacts(ctx, listCommand("alice", 10, ""))
+	if err != nil {
+		t.Fatalf("list alice contacts: %v", err)
+	}
+	assertContactIDs(t, aliceContacts)
+	bobContacts, err := repository.ListContacts(ctx, listCommand("bob", 10, ""))
+	if err != nil {
+		t.Fatalf("list bob contacts: %v", err)
+	}
+	assertContactIDs(t, bobContacts, "alice")
+
+	replay, err := repository.DeleteContact(ctx, deleteCommand("alice", "bob", "delete-1"))
+	if err != nil {
+		t.Fatalf("delete replay: %v", err)
+	}
+	if !replay.IdempotentReplay || replay.Status != types.ContactEdgeStatusDeleted {
+		t.Fatalf("expected delete replay, got %+v", replay)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactEdgeDeleted, 1)
+}
+
+func TestRepositoryBlockContactIsOwnerScopedIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+	acceptContact(t, ctx, repository, "alice", "bob")
+
+	result, err := repository.BlockContact(ctx, blockCommand("alice", "bob", "block-1", "spam"))
+	if err != nil {
+		t.Fatalf("block contact: %v", err)
+	}
+	if result.Status != types.ContactEdgeStatusBlocked || result.Version != 2 {
+		t.Fatalf("unexpected block result: %+v", result)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactEdgeBlocked, 1)
+	assertContactEdge(t, ctx, pool, "alice", "bob", types.ContactEdgeStatusBlocked, 2)
+	assertContactEdge(t, ctx, pool, "bob", "alice", types.ContactEdgeStatusActive, 1)
+
+	aliceContacts, err := repository.ListContacts(ctx, listCommand("alice", 10, ""))
+	if err != nil {
+		t.Fatalf("list alice contacts: %v", err)
+	}
+	assertContactIDs(t, aliceContacts)
+	bobContacts, err := repository.ListContacts(ctx, listCommand("bob", 10, ""))
+	if err != nil {
+		t.Fatalf("list bob contacts: %v", err)
+	}
+	assertContactIDs(t, bobContacts, "alice")
+
+	replay, err := repository.BlockContact(ctx, blockCommand("alice", "bob", "block-1", "spam"))
+	if err != nil {
+		t.Fatalf("block replay: %v", err)
+	}
+	if !replay.IdempotentReplay || replay.Status != types.ContactEdgeStatusBlocked {
+		t.Fatalf("expected block replay, got %+v", replay)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactEdgeBlocked, 1)
+}
+
+func TestRepositoryContactOutboxVersionsStayMonotonicAfterReAddIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	firstSend, err := repository.SendContactRequest(ctx, sendCommand("alice", "bob", "send-1", "hello"))
+	if err != nil {
+		t.Fatalf("first send: %v", err)
+	}
+	if _, err := repository.RespondContactRequest(ctx, respondCommand("bob", firstSend.RequestID, "respond-1", types.ContactDecisionAccept)); err != nil {
+		t.Fatalf("first accept: %v", err)
+	}
+	if _, err := repository.DeleteContact(ctx, deleteCommand("alice", "bob", "delete-1")); err != nil {
+		t.Fatalf("delete contact: %v", err)
+	}
+	secondSend, err := repository.SendContactRequest(ctx, sendCommand("alice", "bob", "send-2", "hello again"))
+	if err != nil {
+		t.Fatalf("second send: %v", err)
+	}
+	if _, err := repository.RespondContactRequest(ctx, respondCommand("bob", secondSend.RequestID, "respond-2", types.ContactDecisionAccept)); err != nil {
+		t.Fatalf("second accept: %v", err)
+	}
+
+	versions := contactOutboxVersionsForPair(t, ctx, pool, "alice", "bob")
+	want := []int64{1, 2, 3, 4, 5}
+	if len(versions) != len(want) {
+		t.Fatalf("expected versions %v, got %v", want, versions)
+	}
+	for index := range want {
+		if versions[index] != want[index] {
+			t.Fatalf("expected versions %v, got %v", want, versions)
+		}
 	}
 }
 
@@ -229,6 +413,63 @@ func respondCommand(receiver string, requestID string, key string, decision type
 	}
 }
 
+func deleteCommand(owner string, contact string, key string) types.DeleteContactCommand {
+	return types.DeleteContactCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  "tenant-contacts",
+			UserID:    types.UserID(owner),
+			DeviceID:  "device-1",
+			RequestID: "request-" + key,
+			TraceID:   "trace-" + key,
+		},
+		ContactUserID:  types.UserID(contact),
+		IdempotencyKey: key,
+	}
+}
+
+func blockCommand(owner string, contact string, key string, reason string) types.BlockContactCommand {
+	return types.BlockContactCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  "tenant-contacts",
+			UserID:    types.UserID(owner),
+			DeviceID:  "device-1",
+			RequestID: "request-" + key,
+			TraceID:   "trace-" + key,
+		},
+		ContactUserID:  types.UserID(contact),
+		IdempotencyKey: key,
+		Reason:         reason,
+	}
+}
+
+func remarkCommand(owner string, contact string, key string, remark string) types.UpdateContactRemarkCommand {
+	return types.UpdateContactRemarkCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  "tenant-contacts",
+			UserID:    types.UserID(owner),
+			DeviceID:  "device-1",
+			RequestID: "request-" + key,
+			TraceID:   "trace-" + key,
+		},
+		ContactUserID:  types.UserID(contact),
+		IdempotencyKey: key,
+		Remark:         remark,
+	}
+}
+
+func acceptContact(t *testing.T, ctx context.Context, repository *Repository, sender string, receiver string) string {
+	t.Helper()
+	keySuffix := sender + "-" + receiver
+	sendResult, err := repository.SendContactRequest(ctx, sendCommand(sender, receiver, "send-"+keySuffix, "hello"))
+	if err != nil {
+		t.Fatalf("send contact request: %v", err)
+	}
+	if _, err := repository.RespondContactRequest(ctx, respondCommand(receiver, sendResult.RequestID, "respond-"+keySuffix, types.ContactDecisionAccept)); err != nil {
+		t.Fatalf("accept contact request: %v", err)
+	}
+	return sendResult.RequestID
+}
+
 func listCommand(owner string, pageSize int, pageToken string) types.ListContactsCommand {
 	return types.ListContactsCommand{
 		AuthContext: types.AuthContext{
@@ -335,6 +576,33 @@ WHERE tenant_id = 'tenant-contacts'
 	}
 }
 
+func contactOutboxVersionsForPair(t *testing.T, ctx context.Context, pool *pgxpool.Pool, first string, second string) []int64 {
+	t.Helper()
+	rows, err := pool.Query(ctx, `
+SELECT aggregate_version
+FROM contacts_outbox
+WHERE tenant_id = 'tenant-contacts'
+  AND partition_key = $1
+ORDER BY aggregate_version ASC
+`, partitionKeyFor("tenant-contacts", types.UserID(first), types.UserID(second)))
+	if err != nil {
+		t.Fatalf("query contact outbox versions: %v", err)
+	}
+	defer rows.Close()
+	var versions []int64
+	for rows.Next() {
+		var version int64
+		if err := rows.Scan(&version); err != nil {
+			t.Fatalf("scan contact outbox version: %v", err)
+		}
+		versions = append(versions, version)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate contact outbox versions: %v", err)
+	}
+	return versions
+}
+
 func insertContactEdge(t *testing.T, ctx context.Context, pool *pgxpool.Pool, owner string, contact string) {
 	t.Helper()
 	_, err := pool.Exec(ctx, `
@@ -373,13 +641,26 @@ func openTestPool(t *testing.T) *pgxpool.Pool {
 func applyContactsMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	root := findRepoRoot(t)
-	migrationPath := filepath.Join(root, "migrations", "postgres", "contacts", "000001_contacts_core.sql")
-	sqlBytes, err := os.ReadFile(migrationPath)
+	migrationDir := filepath.Join(root, "migrations", "postgres", "contacts")
+	entries, err := os.ReadDir(migrationDir)
 	if err != nil {
-		t.Fatalf("read contacts migration: %v", err)
+		t.Fatalf("read contacts migrations: %v", err)
 	}
-	if _, err := pool.Exec(ctx, string(sqlBytes)); err != nil {
-		t.Fatalf("apply contacts migration: %v", err)
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".sql" {
+			names = append(names, entry.Name())
+		}
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		sqlBytes, err := os.ReadFile(filepath.Join(migrationDir, name))
+		if err != nil {
+			t.Fatalf("read contacts migration %s: %v", name, err)
+		}
+		if _, err := pool.Exec(ctx, string(sqlBytes)); err != nil {
+			t.Fatalf("apply contacts migration %s: %v", name, err)
+		}
 	}
 }
 

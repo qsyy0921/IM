@@ -20,10 +20,16 @@ import (
 const (
 	commandTypeSendContactRequest    = "SEND_CONTACT_REQUEST"
 	commandTypeRespondContactRequest = "RESPOND_CONTACT_REQUEST"
+	commandTypeDeleteContact         = "DELETE_CONTACT"
+	commandTypeBlockContact          = "BLOCK_CONTACT"
+	commandTypeUpdateContactRemark   = "UPDATE_CONTACT_REMARK"
 
 	eventTypeContactRequestCreated  = "contact.request.created.v1"
 	eventTypeContactRequestAccepted = "contact.request.accepted.v1"
 	eventTypeContactRequestDeclined = "contact.request.declined.v1"
+	eventTypeContactEdgeDeleted     = "contact.edge.deleted.v1"
+	eventTypeContactEdgeBlocked     = "contact.edge.blocked.v1"
+	eventTypeContactRemarkUpdated   = "contact.edge.remark_updated.v1"
 
 	contactsOutboxEventVersion   = "1.0.0"
 	contactsOutboxMappingVersion = 1
@@ -140,14 +146,19 @@ func (r *Repository) SendContactRequest(
 	if err != nil {
 		return types.SendContactRequestResult{}, types.NewOutboxWriteFailed(err.Error())
 	}
+	partitionKey := partitionKeyFor(command.AuthContext.TenantID, command.AuthContext.UserID, command.TargetUserID)
+	aggregateVersion, err := nextContactOutboxAggregateVersion(ctx, tx, command.AuthContext.TenantID, partitionKey)
+	if err != nil {
+		return types.SendContactRequestResult{}, err
+	}
 	if err := insertContactOutbox(ctx, tx, contactOutboxInput{
 		EventID:          eventID,
 		TenantID:         command.AuthContext.TenantID,
 		AggregateType:    "CONTACT_REQUEST",
 		AggregateID:      requestID,
-		AggregateVersion: 1,
+		AggregateVersion: aggregateVersion,
 		EventType:        eventTypeContactRequestCreated,
-		PartitionKey:     partitionKeyFor(command.AuthContext.TenantID, command.AuthContext.UserID, command.TargetUserID),
+		PartitionKey:     partitionKey,
 		CorrelationID:    command.AuthContext.RequestID,
 		CausationID:      command.AuthContext.RequestID,
 		TraceID:          command.AuthContext.TraceID,
@@ -257,14 +268,19 @@ func (r *Repository) RespondContactRequest(
 	if err != nil {
 		return types.RespondContactRequestResult{}, types.NewOutboxWriteFailed(err.Error())
 	}
+	partitionKey := partitionKeyFor(request.TenantID, request.SenderUserID, request.ReceiverUserID)
+	aggregateVersion, err := nextContactOutboxAggregateVersion(ctx, tx, request.TenantID, partitionKey)
+	if err != nil {
+		return types.RespondContactRequestResult{}, err
+	}
 	if err := insertContactOutbox(ctx, tx, contactOutboxInput{
 		EventID:          eventID,
 		TenantID:         request.TenantID,
 		AggregateType:    "CONTACT_REQUEST",
 		AggregateID:      request.RequestID,
-		AggregateVersion: 2,
+		AggregateVersion: aggregateVersion,
 		EventType:        eventTypeForDecision(command.Decision),
-		PartitionKey:     partitionKeyFor(request.TenantID, request.SenderUserID, request.ReceiverUserID),
+		PartitionKey:     partitionKey,
 		CorrelationID:    command.AuthContext.RequestID,
 		CausationID:      request.RequestID,
 		TraceID:          command.AuthContext.TraceID,
@@ -300,6 +316,7 @@ SELECT
     status,
     version,
     source_request_id,
+    remark,
     created_at,
     updated_at
 FROM contact_edges
@@ -325,7 +342,7 @@ LIMIT $3
 		var item types.ContactItem
 		var createdAt time.Time
 		var updatedAt time.Time
-		if err := rows.Scan(&item.ContactUserID, &item.Status, &item.Version, &item.SourceRequestID, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&item.ContactUserID, &item.Status, &item.Version, &item.SourceRequestID, &item.Remark, &createdAt, &updatedAt); err != nil {
 			return types.ListContactsResult{}, types.NewDBReadFailed(err.Error())
 		}
 		item.CreatedAtUnixMS = createdAt.UnixMilli()
@@ -370,7 +387,8 @@ SELECT
     contact_user_id,
     status,
     source_request_id,
-    version
+    version,
+    remark
 FROM contact_edges
 WHERE tenant_id = $1
   AND owner_user_id = $2
@@ -382,6 +400,7 @@ WHERE tenant_id = $1
 		&result.Status,
 		&result.SourceRequestID,
 		&result.Version,
+		&result.Remark,
 	)
 	if err == pgx.ErrNoRows {
 		return types.GetContactStateResult{}, types.NewContactRequestNotFound("contact state not found")
@@ -392,14 +411,254 @@ WHERE tenant_id = $1
 	return result, nil
 }
 
+func (r *Repository) DeleteContact(
+	ctx context.Context,
+	command types.DeleteContactCommand,
+) (types.DeleteContactResult, error) {
+	if r.pool == nil {
+		return types.DeleteContactResult{}, types.NewDBWriteFailed("contacts repository is not configured")
+	}
+	commandHash, err := commandHash(commandHashPayload{
+		Kind:          commandTypeDeleteContact,
+		TenantID:      string(command.AuthContext.TenantID),
+		UserID:        string(command.AuthContext.UserID),
+		ContactUserID: string(command.ContactUserID),
+	})
+	if err != nil {
+		return types.DeleteContactResult{}, err
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.DeleteContactResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+	if err := lockIdempotencyKey(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey); err != nil {
+		return types.DeleteContactResult{}, err
+	}
+	if existing, ok, err := findCommandIdempotency(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey); err != nil {
+		return types.DeleteContactResult{}, err
+	} else if ok {
+		if existing.CommandType != commandTypeDeleteContact || existing.CommandHash != commandHash {
+			return types.DeleteContactResult{}, types.NewContactRequestConflict("idempotency key conflict")
+		}
+		row, err := contactEdgeRowFromIdempotencyResult(existing)
+		if err != nil {
+			return types.DeleteContactResult{}, err
+		}
+		return commitDeleteContactResult(ctx, tx, deleteContactResultFromEdge(row, true))
+	}
+	if err := lockContactPair(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.ContactUserID); err != nil {
+		return types.DeleteContactResult{}, err
+	}
+	row, err := lockContactEdge(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.ContactUserID)
+	if err != nil {
+		return types.DeleteContactResult{}, err
+	}
+	if row.Status != types.ContactEdgeStatusActive {
+		return types.DeleteContactResult{}, types.NewContactNotFound("active contact edge not found")
+	}
+	updated, err := updateContactEdgeStatus(ctx, tx, row, types.ContactEdgeStatusDeleted)
+	if err != nil {
+		return types.DeleteContactResult{}, err
+	}
+	resultJSON, err := edgeResultJSON(updated)
+	if err != nil {
+		return types.DeleteContactResult{}, err
+	}
+	if err := insertCommandIdempotencyWithResult(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey, commandTypeDeleteContact, commandHash, contactEdgeID(command.AuthContext.UserID, command.ContactUserID), resultJSON); err != nil {
+		return types.DeleteContactResult{}, err
+	}
+	if err := r.insertEdgeOutbox(ctx, tx, edgeOutboxInput{
+		TenantID:       command.AuthContext.TenantID,
+		OwnerUserID:    command.AuthContext.UserID,
+		ContactUserID:  command.ContactUserID,
+		EventType:      eventTypeContactEdgeDeleted,
+		CorrelationID:  command.AuthContext.RequestID,
+		CausationID:    command.AuthContext.RequestID,
+		TraceID:        command.AuthContext.TraceID,
+		PreviousStatus: row.Status,
+		Edge:           updated,
+	}); err != nil {
+		return types.DeleteContactResult{}, err
+	}
+	return commitDeleteContactResult(ctx, tx, deleteContactResultFromEdge(updated, false))
+}
+
+func (r *Repository) BlockContact(
+	ctx context.Context,
+	command types.BlockContactCommand,
+) (types.BlockContactResult, error) {
+	if r.pool == nil {
+		return types.BlockContactResult{}, types.NewDBWriteFailed("contacts repository is not configured")
+	}
+	commandHash, err := commandHash(commandHashPayload{
+		Kind:          commandTypeBlockContact,
+		TenantID:      string(command.AuthContext.TenantID),
+		UserID:        string(command.AuthContext.UserID),
+		ContactUserID: string(command.ContactUserID),
+		Reason:        command.Reason,
+	})
+	if err != nil {
+		return types.BlockContactResult{}, err
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.BlockContactResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+	if err := lockIdempotencyKey(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey); err != nil {
+		return types.BlockContactResult{}, err
+	}
+	if existing, ok, err := findCommandIdempotency(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey); err != nil {
+		return types.BlockContactResult{}, err
+	} else if ok {
+		if existing.CommandType != commandTypeBlockContact || existing.CommandHash != commandHash {
+			return types.BlockContactResult{}, types.NewContactRequestConflict("idempotency key conflict")
+		}
+		row, err := contactEdgeRowFromIdempotencyResult(existing)
+		if err != nil {
+			return types.BlockContactResult{}, err
+		}
+		return commitBlockContactResult(ctx, tx, blockContactResultFromEdge(row, true))
+	}
+	if err := lockContactPair(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.ContactUserID); err != nil {
+		return types.BlockContactResult{}, err
+	}
+	row, err := lockContactEdge(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.ContactUserID)
+	if err != nil {
+		return types.BlockContactResult{}, err
+	}
+	if row.Status != types.ContactEdgeStatusActive {
+		return types.BlockContactResult{}, types.NewContactNotFound("active contact edge not found")
+	}
+	updated, err := updateContactEdgeStatus(ctx, tx, row, types.ContactEdgeStatusBlocked)
+	if err != nil {
+		return types.BlockContactResult{}, err
+	}
+	resultJSON, err := edgeResultJSON(updated)
+	if err != nil {
+		return types.BlockContactResult{}, err
+	}
+	if err := insertCommandIdempotencyWithResult(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey, commandTypeBlockContact, commandHash, contactEdgeID(command.AuthContext.UserID, command.ContactUserID), resultJSON); err != nil {
+		return types.BlockContactResult{}, err
+	}
+	if err := r.insertEdgeOutbox(ctx, tx, edgeOutboxInput{
+		TenantID:       command.AuthContext.TenantID,
+		OwnerUserID:    command.AuthContext.UserID,
+		ContactUserID:  command.ContactUserID,
+		EventType:      eventTypeContactEdgeBlocked,
+		CorrelationID:  command.AuthContext.RequestID,
+		CausationID:    command.AuthContext.RequestID,
+		TraceID:        command.AuthContext.TraceID,
+		PreviousStatus: row.Status,
+		Edge:           updated,
+		Reason:         command.Reason,
+	}); err != nil {
+		return types.BlockContactResult{}, err
+	}
+	return commitBlockContactResult(ctx, tx, blockContactResultFromEdge(updated, false))
+}
+
+func (r *Repository) UpdateContactRemark(
+	ctx context.Context,
+	command types.UpdateContactRemarkCommand,
+) (types.UpdateContactRemarkResult, error) {
+	if r.pool == nil {
+		return types.UpdateContactRemarkResult{}, types.NewDBWriteFailed("contacts repository is not configured")
+	}
+	commandHash, err := commandHash(commandHashPayload{
+		Kind:          commandTypeUpdateContactRemark,
+		TenantID:      string(command.AuthContext.TenantID),
+		UserID:        string(command.AuthContext.UserID),
+		ContactUserID: string(command.ContactUserID),
+		Remark:        command.Remark,
+	})
+	if err != nil {
+		return types.UpdateContactRemarkResult{}, err
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.UpdateContactRemarkResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+	if err := lockIdempotencyKey(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey); err != nil {
+		return types.UpdateContactRemarkResult{}, err
+	}
+	if existing, ok, err := findCommandIdempotency(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey); err != nil {
+		return types.UpdateContactRemarkResult{}, err
+	} else if ok {
+		if existing.CommandType != commandTypeUpdateContactRemark || existing.CommandHash != commandHash {
+			return types.UpdateContactRemarkResult{}, types.NewContactRequestConflict("idempotency key conflict")
+		}
+		row, err := contactEdgeRowFromIdempotencyResult(existing)
+		if err != nil {
+			return types.UpdateContactRemarkResult{}, err
+		}
+		return commitUpdateContactRemarkResult(ctx, tx, updateContactRemarkResultFromEdge(row, true))
+	}
+	if err := lockContactPair(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.ContactUserID); err != nil {
+		return types.UpdateContactRemarkResult{}, err
+	}
+	row, err := lockContactEdge(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.ContactUserID)
+	if err != nil {
+		return types.UpdateContactRemarkResult{}, err
+	}
+	if row.Status != types.ContactEdgeStatusActive {
+		return types.UpdateContactRemarkResult{}, types.NewContactNotFound("active contact edge not found")
+	}
+	if row.Remark == command.Remark {
+		resultJSON, err := edgeResultJSON(row)
+		if err != nil {
+			return types.UpdateContactRemarkResult{}, err
+		}
+		if err := insertCommandIdempotencyWithResult(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey, commandTypeUpdateContactRemark, commandHash, contactEdgeID(command.AuthContext.UserID, command.ContactUserID), resultJSON); err != nil {
+			return types.UpdateContactRemarkResult{}, err
+		}
+		return commitUpdateContactRemarkResult(ctx, tx, updateContactRemarkResultFromEdge(row, false))
+	}
+	updated, err := updateContactEdgeRemark(ctx, tx, row, command.Remark)
+	if err != nil {
+		return types.UpdateContactRemarkResult{}, err
+	}
+	resultJSON, err := edgeResultJSON(updated)
+	if err != nil {
+		return types.UpdateContactRemarkResult{}, err
+	}
+	if err := insertCommandIdempotencyWithResult(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey, commandTypeUpdateContactRemark, commandHash, contactEdgeID(command.AuthContext.UserID, command.ContactUserID), resultJSON); err != nil {
+		return types.UpdateContactRemarkResult{}, err
+	}
+	if err := r.insertEdgeOutbox(ctx, tx, edgeOutboxInput{
+		TenantID:      command.AuthContext.TenantID,
+		OwnerUserID:   command.AuthContext.UserID,
+		ContactUserID: command.ContactUserID,
+		EventType:     eventTypeContactRemarkUpdated,
+		CorrelationID: command.AuthContext.RequestID,
+		CausationID:   command.AuthContext.RequestID,
+		TraceID:       command.AuthContext.TraceID,
+		Edge:          updated,
+	}); err != nil {
+		return types.UpdateContactRemarkResult{}, err
+	}
+	return commitUpdateContactRemarkResult(ctx, tx, updateContactRemarkResultFromEdge(updated, false))
+}
+
 type commandHashPayload struct {
-	Kind         string `json:"kind"`
-	TenantID     string `json:"tenant_id"`
-	UserID       string `json:"user_id"`
-	TargetUserID string `json:"target_user_id,omitempty"`
-	RequestID    string `json:"request_id,omitempty"`
-	Decision     string `json:"decision,omitempty"`
-	Message      string `json:"message,omitempty"`
+	Kind          string `json:"kind"`
+	TenantID      string `json:"tenant_id"`
+	UserID        string `json:"user_id"`
+	TargetUserID  string `json:"target_user_id,omitempty"`
+	ContactUserID string `json:"contact_user_id,omitempty"`
+	RequestID     string `json:"request_id,omitempty"`
+	Decision      string `json:"decision,omitempty"`
+	Message       string `json:"message,omitempty"`
+	Reason        string `json:"reason,omitempty"`
+	Remark        string `json:"remark,omitempty"`
 }
 
 func commandHash(payload commandHashPayload) (string, error) {
@@ -415,6 +674,7 @@ type commandIdempotency struct {
 	CommandType string
 	CommandHash string
 	ResultID    string
+	ResultJSON  []byte
 }
 
 func findCommandIdempotency(
@@ -426,13 +686,13 @@ func findCommandIdempotency(
 ) (commandIdempotency, bool, error) {
 	var existing commandIdempotency
 	err := tx.QueryRow(ctx, `
-SELECT command_type, command_hash, result_id
+SELECT command_type, command_hash, result_id, result_json
 FROM contact_command_idempotency
 WHERE tenant_id = $1
   AND user_id = $2
   AND idempotency_key = $3
 FOR UPDATE
-`, tenantID, userID, idempotencyKey).Scan(&existing.CommandType, &existing.CommandHash, &existing.ResultID)
+`, tenantID, userID, idempotencyKey).Scan(&existing.CommandType, &existing.CommandHash, &existing.ResultID, &existing.ResultJSON)
 	if err == pgx.ErrNoRows {
 		return commandIdempotency{}, false, nil
 	}
@@ -452,6 +712,23 @@ func insertCommandIdempotency(
 	commandHash string,
 	resultID string,
 ) error {
+	return insertCommandIdempotencyWithResult(ctx, tx, tenantID, userID, idempotencyKey, commandType, commandHash, resultID, nil)
+}
+
+func insertCommandIdempotencyWithResult(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	userID types.UserID,
+	idempotencyKey string,
+	commandType string,
+	commandHash string,
+	resultID string,
+	resultJSON []byte,
+) error {
+	if len(resultJSON) == 0 {
+		resultJSON = []byte(`{}`)
+	}
 	_, err := tx.Exec(ctx, `
 INSERT INTO contact_command_idempotency (
     tenant_id,
@@ -460,9 +737,10 @@ INSERT INTO contact_command_idempotency (
     command_type,
     command_hash,
     result_id,
+    result_json,
     created_at
-) VALUES ($1, $2, $3, $4, $5, $6, now())
-`, tenantID, userID, idempotencyKey, commandType, commandHash, resultID)
+) VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+`, tenantID, userID, idempotencyKey, commandType, commandHash, resultID, resultJSON)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -719,6 +997,205 @@ RETURNING version
 	return version, nil
 }
 
+type contactEdgeRow struct {
+	TenantID        types.TenantID
+	OwnerUserID     types.UserID
+	ContactUserID   types.UserID
+	Status          types.ContactEdgeStatus
+	SourceRequestID string
+	Version         int64
+	Remark          string
+}
+
+func getContactEdge(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	ownerUserID types.UserID,
+	contactUserID types.UserID,
+) (contactEdgeRow, error) {
+	return scanContactEdge(ctx, tx, `
+SELECT tenant_id, owner_user_id, contact_user_id, status, source_request_id, version, remark
+FROM contact_edges
+WHERE tenant_id = $1
+  AND owner_user_id = $2
+  AND contact_user_id = $3
+`, tenantID, ownerUserID, contactUserID)
+}
+
+func lockContactEdge(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	ownerUserID types.UserID,
+	contactUserID types.UserID,
+) (contactEdgeRow, error) {
+	return scanContactEdge(ctx, tx, `
+SELECT tenant_id, owner_user_id, contact_user_id, status, source_request_id, version, remark
+FROM contact_edges
+WHERE tenant_id = $1
+  AND owner_user_id = $2
+  AND contact_user_id = $3
+FOR UPDATE
+`, tenantID, ownerUserID, contactUserID)
+}
+
+func scanContactEdge(
+	ctx context.Context,
+	tx pgx.Tx,
+	query string,
+	tenantID types.TenantID,
+	ownerUserID types.UserID,
+	contactUserID types.UserID,
+) (contactEdgeRow, error) {
+	var row contactEdgeRow
+	err := tx.QueryRow(ctx, query, tenantID, ownerUserID, contactUserID).Scan(
+		&row.TenantID,
+		&row.OwnerUserID,
+		&row.ContactUserID,
+		&row.Status,
+		&row.SourceRequestID,
+		&row.Version,
+		&row.Remark,
+	)
+	if err == pgx.ErrNoRows {
+		return contactEdgeRow{}, types.NewContactNotFound("contact edge not found")
+	}
+	if err != nil {
+		return contactEdgeRow{}, types.NewDBReadFailed(err.Error())
+	}
+	return row, nil
+}
+
+func updateContactEdgeStatus(
+	ctx context.Context,
+	tx pgx.Tx,
+	row contactEdgeRow,
+	status types.ContactEdgeStatus,
+) (contactEdgeRow, error) {
+	var updated contactEdgeRow
+	err := tx.QueryRow(ctx, `
+UPDATE contact_edges
+SET status = $4,
+    version = version + 1,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND owner_user_id = $2
+  AND contact_user_id = $3
+RETURNING tenant_id, owner_user_id, contact_user_id, status, source_request_id, version, remark
+`, row.TenantID, row.OwnerUserID, row.ContactUserID, status).Scan(
+		&updated.TenantID,
+		&updated.OwnerUserID,
+		&updated.ContactUserID,
+		&updated.Status,
+		&updated.SourceRequestID,
+		&updated.Version,
+		&updated.Remark,
+	)
+	if err != nil {
+		return contactEdgeRow{}, types.NewDBWriteFailed(err.Error())
+	}
+	return updated, nil
+}
+
+func updateContactEdgeRemark(
+	ctx context.Context,
+	tx pgx.Tx,
+	row contactEdgeRow,
+	remark string,
+) (contactEdgeRow, error) {
+	var updated contactEdgeRow
+	err := tx.QueryRow(ctx, `
+UPDATE contact_edges
+SET remark = $4,
+    version = version + 1,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND owner_user_id = $2
+  AND contact_user_id = $3
+RETURNING tenant_id, owner_user_id, contact_user_id, status, source_request_id, version, remark
+`, row.TenantID, row.OwnerUserID, row.ContactUserID, remark).Scan(
+		&updated.TenantID,
+		&updated.OwnerUserID,
+		&updated.ContactUserID,
+		&updated.Status,
+		&updated.SourceRequestID,
+		&updated.Version,
+		&updated.Remark,
+	)
+	if err != nil {
+		return contactEdgeRow{}, types.NewDBWriteFailed(err.Error())
+	}
+	return updated, nil
+}
+
+type edgeOutboxInput struct {
+	TenantID       types.TenantID
+	OwnerUserID    types.UserID
+	ContactUserID  types.UserID
+	EventType      string
+	CorrelationID  string
+	CausationID    string
+	TraceID        string
+	PreviousStatus types.ContactEdgeStatus
+	Edge           contactEdgeRow
+	Reason         string
+}
+
+func (r *Repository) insertEdgeOutbox(ctx context.Context, tx pgx.Tx, input edgeOutboxInput) error {
+	eventID, err := r.eventID()
+	if err != nil {
+		return types.NewOutboxWriteFailed(err.Error())
+	}
+	partitionKey := partitionKeyFor(input.TenantID, input.OwnerUserID, input.ContactUserID)
+	aggregateVersion, err := nextContactOutboxAggregateVersion(ctx, tx, input.TenantID, partitionKey)
+	if err != nil {
+		return err
+	}
+	payload := map[string]any{
+		"tenant_id":       input.TenantID,
+		"owner_user_id":   input.OwnerUserID,
+		"contact_user_id": input.ContactUserID,
+		"status":          input.Edge.Status,
+		"edge_version":    input.Edge.Version,
+		"remark":          input.Edge.Remark,
+		"occurred_at":     r.now().Format(time.RFC3339Nano),
+	}
+	if input.PreviousStatus != "" {
+		payload["previous_status"] = input.PreviousStatus
+	}
+	if input.Reason != "" {
+		payload["reason"] = input.Reason
+	}
+	return insertContactOutbox(ctx, tx, contactOutboxInput{
+		EventID:          eventID,
+		TenantID:         input.TenantID,
+		AggregateType:    "CONTACT_EDGE",
+		AggregateID:      contactEdgeID(input.OwnerUserID, input.ContactUserID),
+		AggregateVersion: aggregateVersion,
+		EventType:        input.EventType,
+		PartitionKey:     partitionKey,
+		CorrelationID:    input.CorrelationID,
+		CausationID:      input.CausationID,
+		TraceID:          input.TraceID,
+		Payload:          payload,
+	})
+}
+
+func nextContactOutboxAggregateVersion(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, partitionKey string) (int64, error) {
+	var version int64
+	err := tx.QueryRow(ctx, `
+SELECT COALESCE(MAX(aggregate_version), 0) + 1
+FROM contacts_outbox
+WHERE tenant_id = $1
+  AND partition_key = $2
+`, tenantID, partitionKey).Scan(&version)
+	if err != nil {
+		return 0, types.NewDBReadFailed(err.Error())
+	}
+	return version, nil
+}
+
 type contactOutboxInput struct {
 	EventID          string
 	TenantID         types.TenantID
@@ -798,6 +1275,27 @@ func commitRespondResult(ctx context.Context, tx pgx.Tx, result types.RespondCon
 	return result, nil
 }
 
+func commitDeleteContactResult(ctx context.Context, tx pgx.Tx, result types.DeleteContactResult) (types.DeleteContactResult, error) {
+	if err := tx.Commit(ctx); err != nil {
+		return types.DeleteContactResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return result, nil
+}
+
+func commitBlockContactResult(ctx context.Context, tx pgx.Tx, result types.BlockContactResult) (types.BlockContactResult, error) {
+	if err := tx.Commit(ctx); err != nil {
+		return types.BlockContactResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return result, nil
+}
+
+func commitUpdateContactRemarkResult(ctx context.Context, tx pgx.Tx, result types.UpdateContactRemarkResult) (types.UpdateContactRemarkResult, error) {
+	if err := tx.Commit(ctx); err != nil {
+		return types.UpdateContactRemarkResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return result, nil
+}
+
 func respondResultFromRequest(request contactRequestRow, replay bool) types.RespondContactRequestResult {
 	return types.RespondContactRequestResult{
 		RequestID:        request.RequestID,
@@ -807,6 +1305,91 @@ func respondResultFromRequest(request contactRequestRow, replay bool) types.Resp
 		Status:           request.Status,
 		IdempotentReplay: replay,
 	}
+}
+
+func deleteContactResultFromEdge(row contactEdgeRow, replay bool) types.DeleteContactResult {
+	return types.DeleteContactResult{
+		TenantID:         row.TenantID,
+		OwnerUserID:      row.OwnerUserID,
+		ContactUserID:    row.ContactUserID,
+		Status:           row.Status,
+		SourceRequestID:  row.SourceRequestID,
+		Version:          row.Version,
+		IdempotentReplay: replay,
+	}
+}
+
+func blockContactResultFromEdge(row contactEdgeRow, replay bool) types.BlockContactResult {
+	return types.BlockContactResult{
+		TenantID:         row.TenantID,
+		OwnerUserID:      row.OwnerUserID,
+		ContactUserID:    row.ContactUserID,
+		Status:           row.Status,
+		SourceRequestID:  row.SourceRequestID,
+		Version:          row.Version,
+		IdempotentReplay: replay,
+	}
+}
+
+func updateContactRemarkResultFromEdge(row contactEdgeRow, replay bool) types.UpdateContactRemarkResult {
+	return types.UpdateContactRemarkResult{
+		TenantID:         row.TenantID,
+		OwnerUserID:      row.OwnerUserID,
+		ContactUserID:    row.ContactUserID,
+		Status:           row.Status,
+		SourceRequestID:  row.SourceRequestID,
+		Version:          row.Version,
+		Remark:           row.Remark,
+		IdempotentReplay: replay,
+	}
+}
+
+type contactEdgeResultSnapshot struct {
+	TenantID        types.TenantID          `json:"tenant_id"`
+	OwnerUserID     types.UserID            `json:"owner_user_id"`
+	ContactUserID   types.UserID            `json:"contact_user_id"`
+	Status          types.ContactEdgeStatus `json:"status"`
+	SourceRequestID string                  `json:"source_request_id"`
+	Version         int64                   `json:"version"`
+	Remark          string                  `json:"remark"`
+}
+
+func edgeResultJSON(row contactEdgeRow) ([]byte, error) {
+	raw, err := json.Marshal(contactEdgeResultSnapshot{
+		TenantID:        row.TenantID,
+		OwnerUserID:     row.OwnerUserID,
+		ContactUserID:   row.ContactUserID,
+		Status:          row.Status,
+		SourceRequestID: row.SourceRequestID,
+		Version:         row.Version,
+		Remark:          row.Remark,
+	})
+	if err != nil {
+		return nil, types.NewDBWriteFailed(err.Error())
+	}
+	return raw, nil
+}
+
+func contactEdgeRowFromIdempotencyResult(existing commandIdempotency) (contactEdgeRow, error) {
+	var snapshot contactEdgeResultSnapshot
+	if len(existing.ResultJSON) == 0 || string(existing.ResultJSON) == "{}" {
+		return contactEdgeRow{}, types.NewDBReadFailed("contact edge idempotency result snapshot missing")
+	}
+	if err := json.Unmarshal(existing.ResultJSON, &snapshot); err != nil {
+		return contactEdgeRow{}, types.NewDBReadFailed(err.Error())
+	}
+	if snapshot.TenantID == "" || snapshot.OwnerUserID == "" || snapshot.ContactUserID == "" || snapshot.Status == "" || snapshot.Version <= 0 {
+		return contactEdgeRow{}, types.NewDBReadFailed("contact edge idempotency result snapshot incomplete")
+	}
+	return contactEdgeRow{
+		TenantID:        snapshot.TenantID,
+		OwnerUserID:     snapshot.OwnerUserID,
+		ContactUserID:   snapshot.ContactUserID,
+		Status:          snapshot.Status,
+		SourceRequestID: snapshot.SourceRequestID,
+		Version:         snapshot.Version,
+		Remark:          snapshot.Remark,
+	}, nil
 }
 
 func requestStatusForDecision(decision types.ContactDecision) types.ContactRequestStatus {
@@ -880,6 +1463,10 @@ func encodePageToken(cursor contactPageCursor) string {
 
 func partitionKeyFor(tenantID types.TenantID, first types.UserID, second types.UserID) string {
 	return fmt.Sprintf("%s:%s", tenantID, canonicalPair(first, second))
+}
+
+func contactEdgeID(ownerUserID types.UserID, contactUserID types.UserID) string {
+	return fmt.Sprintf("%s:%s", ownerUserID, contactUserID)
 }
 
 func canonicalPair(first types.UserID, second types.UserID) string {

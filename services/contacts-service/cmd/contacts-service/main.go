@@ -64,6 +64,9 @@ func runGRPC() error {
 		app.NewRespondContactRequestUseCase(repository),
 		app.NewListContactsUseCase(repository),
 		app.NewGetContactStateUseCase(repository),
+		app.NewDeleteContactUseCase(repository),
+		app.NewBlockContactUseCase(repository),
+		app.NewUpdateContactRemarkUseCase(repository),
 	))
 
 	serveErr := make(chan error, 1)

@@ -27,12 +27,27 @@ type GetContactStateExecutor interface {
 	Execute(context.Context, types.GetContactStateCommand) (types.GetContactStateResult, error)
 }
 
+type DeleteContactExecutor interface {
+	Execute(context.Context, types.DeleteContactCommand) (types.DeleteContactResult, error)
+}
+
+type BlockContactExecutor interface {
+	Execute(context.Context, types.BlockContactCommand) (types.BlockContactResult, error)
+}
+
+type UpdateContactRemarkExecutor interface {
+	Execute(context.Context, types.UpdateContactRemarkCommand) (types.UpdateContactRemarkResult, error)
+}
+
 type Server struct {
 	contactsv1.UnimplementedContactsServiceServer
 	sendContactRequest    SendContactRequestExecutor
 	respondContactRequest RespondContactRequestExecutor
 	listContacts          ListContactsExecutor
 	getContactState       GetContactStateExecutor
+	deleteContact         DeleteContactExecutor
+	blockContact          BlockContactExecutor
+	updateContactRemark   UpdateContactRemarkExecutor
 }
 
 func NewServer(
@@ -40,12 +55,18 @@ func NewServer(
 	respondContactRequest RespondContactRequestExecutor,
 	listContacts ListContactsExecutor,
 	getContactState GetContactStateExecutor,
+	deleteContact DeleteContactExecutor,
+	blockContact BlockContactExecutor,
+	updateContactRemark UpdateContactRemarkExecutor,
 ) *Server {
 	return &Server{
 		sendContactRequest:    sendContactRequest,
 		respondContactRequest: respondContactRequest,
 		listContacts:          listContacts,
 		getContactState:       getContactState,
+		deleteContact:         deleteContact,
+		blockContact:          blockContact,
+		updateContactRemark:   updateContactRemark,
 	}
 }
 
@@ -63,16 +84,8 @@ func (s *Server) SendContactRequest(
 	if s.sendContactRequest == nil {
 		return nil, status.Error(codes.Unimplemented, "send contact request is not configured")
 	}
-	auth := request.GetAuthContext()
 	result, err := s.sendContactRequest.Execute(ctx, types.SendContactRequestCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  auth.GetDeviceId(),
-			SessionID: auth.GetSessionId(),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:    authFromProto(request.GetAuthContext()),
 		TargetUserID:   types.UserID(request.GetTargetUserId()),
 		IdempotencyKey: request.GetIdempotencyKey(),
 		Message:        request.GetMessage(),
@@ -100,16 +113,8 @@ func (s *Server) RespondContactRequest(
 	if s.respondContactRequest == nil {
 		return nil, status.Error(codes.Unimplemented, "respond contact request is not configured")
 	}
-	auth := request.GetAuthContext()
 	result, err := s.respondContactRequest.Execute(ctx, types.RespondContactRequestCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  auth.GetDeviceId(),
-			SessionID: auth.GetSessionId(),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:    authFromProto(request.GetAuthContext()),
 		RequestID:      request.GetRequestId(),
 		Decision:       decisionFromProto(request.GetDecision()),
 		IdempotencyKey: request.GetIdempotencyKey(),
@@ -137,18 +142,10 @@ func (s *Server) ListContacts(
 	if s.listContacts == nil {
 		return nil, status.Error(codes.Unimplemented, "list contacts is not configured")
 	}
-	auth := request.GetAuthContext()
 	result, err := s.listContacts.Execute(ctx, types.ListContactsCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  auth.GetDeviceId(),
-			SessionID: auth.GetSessionId(),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
-		PageSize:  int(request.GetPageSize()),
-		PageToken: request.GetPageToken(),
+		AuthContext: authFromProto(request.GetAuthContext()),
+		PageSize:    int(request.GetPageSize()),
+		PageToken:   request.GetPageToken(),
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -162,6 +159,7 @@ func (s *Server) ListContacts(
 			SourceRequestId: item.SourceRequestID,
 			CreatedAtUnixMs: item.CreatedAtUnixMS,
 			UpdatedAtUnixMs: item.UpdatedAtUnixMS,
+			Remark:          item.Remark,
 		})
 	}
 	return &contactsv1.ListContactsResponse{
@@ -182,16 +180,8 @@ func (s *Server) GetContactState(
 	if s.getContactState == nil {
 		return nil, status.Error(codes.Unimplemented, "get contact state is not configured")
 	}
-	auth := request.GetAuthContext()
 	result, err := s.getContactState.Execute(ctx, types.GetContactStateCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  auth.GetDeviceId(),
-			SessionID: auth.GetSessionId(),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext: authFromProto(request.GetAuthContext()),
 		OtherUserID: types.UserID(request.GetOtherUserId()),
 	})
 	if err != nil {
@@ -204,7 +194,112 @@ func (s *Server) GetContactState(
 		Status:          edgeStatusToProto(result.Status),
 		SourceRequestId: result.SourceRequestID,
 		Version:         result.Version,
+		Remark:          result.Remark,
 	}, nil
+}
+
+func (s *Server) DeleteContact(
+	ctx context.Context,
+	request *contactsv1.DeleteContactRequest,
+) (*contactsv1.DeleteContactResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.deleteContact == nil {
+		return nil, status.Error(codes.Unimplemented, "delete contact is not configured")
+	}
+	result, err := s.deleteContact.Execute(ctx, types.DeleteContactCommand{
+		AuthContext:    authFromProto(request.GetAuthContext()),
+		ContactUserID:  types.UserID(request.GetContactUserId()),
+		IdempotencyKey: request.GetIdempotencyKey(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &contactsv1.DeleteContactResponse{
+		TenantId:         string(result.TenantID),
+		OwnerUserId:      string(result.OwnerUserID),
+		ContactUserId:    string(result.ContactUserID),
+		Status:           edgeStatusToProto(result.Status),
+		SourceRequestId:  result.SourceRequestID,
+		Version:          result.Version,
+		IdempotentReplay: result.IdempotentReplay,
+	}, nil
+}
+
+func (s *Server) BlockContact(
+	ctx context.Context,
+	request *contactsv1.BlockContactRequest,
+) (*contactsv1.BlockContactResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.blockContact == nil {
+		return nil, status.Error(codes.Unimplemented, "block contact is not configured")
+	}
+	result, err := s.blockContact.Execute(ctx, types.BlockContactCommand{
+		AuthContext:    authFromProto(request.GetAuthContext()),
+		ContactUserID:  types.UserID(request.GetContactUserId()),
+		IdempotencyKey: request.GetIdempotencyKey(),
+		Reason:         request.GetReason(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &contactsv1.BlockContactResponse{
+		TenantId:         string(result.TenantID),
+		OwnerUserId:      string(result.OwnerUserID),
+		ContactUserId:    string(result.ContactUserID),
+		Status:           edgeStatusToProto(result.Status),
+		SourceRequestId:  result.SourceRequestID,
+		Version:          result.Version,
+		IdempotentReplay: result.IdempotentReplay,
+	}, nil
+}
+
+func (s *Server) UpdateContactRemark(
+	ctx context.Context,
+	request *contactsv1.UpdateContactRemarkRequest,
+) (*contactsv1.UpdateContactRemarkResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.updateContactRemark == nil {
+		return nil, status.Error(codes.Unimplemented, "update contact remark is not configured")
+	}
+	result, err := s.updateContactRemark.Execute(ctx, types.UpdateContactRemarkCommand{
+		AuthContext:    authFromProto(request.GetAuthContext()),
+		ContactUserID:  types.UserID(request.GetContactUserId()),
+		IdempotencyKey: request.GetIdempotencyKey(),
+		Remark:         request.GetRemark(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &contactsv1.UpdateContactRemarkResponse{
+		TenantId:         string(result.TenantID),
+		OwnerUserId:      string(result.OwnerUserID),
+		ContactUserId:    string(result.ContactUserID),
+		Status:           edgeStatusToProto(result.Status),
+		SourceRequestId:  result.SourceRequestID,
+		Version:          result.Version,
+		Remark:           result.Remark,
+		IdempotentReplay: result.IdempotentReplay,
+	}, nil
+}
+
+func authFromProto(auth *contactsv1.AuthContext) types.AuthContext {
+	if auth == nil {
+		return types.AuthContext{}
+	}
+	return types.AuthContext{
+		TenantID:  types.TenantID(auth.GetTenantId()),
+		UserID:    types.UserID(auth.GetUserId()),
+		DeviceID:  auth.GetDeviceId(),
+		SessionID: auth.GetSessionId(),
+		TraceID:   auth.GetTraceId(),
+		RequestID: auth.GetRequestId(),
+	}
 }
 
 func decisionFromProto(value contactsv1.ContactDecision) types.ContactDecision {
@@ -254,6 +349,8 @@ func grpcError(err error) error {
 		return status.Error(codes.InvalidArgument, "invalid contact request")
 	case errors.Is(err, types.ErrContactRequestNotFound):
 		return status.Error(codes.NotFound, "contact request not found")
+	case errors.Is(err, types.ErrContactNotFound):
+		return status.Error(codes.NotFound, "contact not found")
 	case errors.Is(err, types.ErrContactAlreadyExists):
 		return status.Error(codes.AlreadyExists, "contact already exists")
 	case errors.Is(err, types.ErrContactRequestConflict):

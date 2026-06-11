@@ -2,6 +2,11 @@ package types
 
 import "strings"
 
+const (
+	maxContactRemarkLength = 128
+	maxContactReasonLength = 512
+)
+
 type ContactRequestStatus string
 type ContactEdgeStatus string
 type ContactDecision string
@@ -114,6 +119,7 @@ type ContactItem struct {
 	SourceRequestID string
 	CreatedAtUnixMS int64
 	UpdatedAtUnixMS int64
+	Remark          string
 }
 
 type ListContactsResult struct {
@@ -151,4 +157,119 @@ type GetContactStateResult struct {
 	Status          ContactEdgeStatus
 	SourceRequestID string
 	Version         int64
+	Remark          string
+}
+
+type DeleteContactCommand struct {
+	AuthContext    AuthContext
+	ContactUserID  UserID
+	IdempotencyKey string
+}
+
+func (c DeleteContactCommand) Validate() error {
+	if c.AuthContext.TenantID == "" {
+		return NewInvalidArgument("tenant_id is required")
+	}
+	if c.AuthContext.UserID == "" {
+		return NewInvalidArgument("user_id is required")
+	}
+	if c.ContactUserID == "" {
+		return NewInvalidArgument("contact_user_id is required")
+	}
+	if c.AuthContext.UserID == c.ContactUserID {
+		return NewInvalidArgument("contact_user_id must differ from user_id")
+	}
+	if strings.TrimSpace(c.IdempotencyKey) == "" {
+		return NewInvalidArgument("idempotency_key is required")
+	}
+	return nil
+}
+
+type DeleteContactResult struct {
+	TenantID         TenantID
+	OwnerUserID      UserID
+	ContactUserID    UserID
+	Status           ContactEdgeStatus
+	SourceRequestID  string
+	Version          int64
+	IdempotentReplay bool
+}
+
+type BlockContactCommand struct {
+	AuthContext    AuthContext
+	ContactUserID  UserID
+	IdempotencyKey string
+	Reason         string
+}
+
+func (c BlockContactCommand) Validate() error {
+	if c.AuthContext.TenantID == "" {
+		return NewInvalidArgument("tenant_id is required")
+	}
+	if c.AuthContext.UserID == "" {
+		return NewInvalidArgument("user_id is required")
+	}
+	if c.ContactUserID == "" {
+		return NewInvalidArgument("contact_user_id is required")
+	}
+	if c.AuthContext.UserID == c.ContactUserID {
+		return NewInvalidArgument("contact_user_id must differ from user_id")
+	}
+	if strings.TrimSpace(c.IdempotencyKey) == "" {
+		return NewInvalidArgument("idempotency_key is required")
+	}
+	if len(c.Reason) > maxContactReasonLength {
+		return NewInvalidArgument("reason is too long")
+	}
+	return nil
+}
+
+type BlockContactResult struct {
+	TenantID         TenantID
+	OwnerUserID      UserID
+	ContactUserID    UserID
+	Status           ContactEdgeStatus
+	SourceRequestID  string
+	Version          int64
+	IdempotentReplay bool
+}
+
+type UpdateContactRemarkCommand struct {
+	AuthContext    AuthContext
+	ContactUserID  UserID
+	IdempotencyKey string
+	Remark         string
+}
+
+func (c UpdateContactRemarkCommand) Validate() error {
+	if c.AuthContext.TenantID == "" {
+		return NewInvalidArgument("tenant_id is required")
+	}
+	if c.AuthContext.UserID == "" {
+		return NewInvalidArgument("user_id is required")
+	}
+	if c.ContactUserID == "" {
+		return NewInvalidArgument("contact_user_id is required")
+	}
+	if c.AuthContext.UserID == c.ContactUserID {
+		return NewInvalidArgument("contact_user_id must differ from user_id")
+	}
+	if strings.TrimSpace(c.IdempotencyKey) == "" {
+		return NewInvalidArgument("idempotency_key is required")
+	}
+	if len(c.Remark) > maxContactRemarkLength {
+		return NewInvalidArgument("remark is too long")
+	}
+	return nil
+}
+
+type UpdateContactRemarkResult struct {
+	TenantID         TenantID
+	OwnerUserID      UserID
+	ContactUserID    UserID
+	Status           ContactEdgeStatus
+	SourceRequestID  string
+	Version          int64
+	Remark           string
+	IdempotentReplay bool
 }

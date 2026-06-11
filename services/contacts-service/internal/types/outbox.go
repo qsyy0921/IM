@@ -10,6 +10,9 @@ const (
 	ContactEventRequestCreated  = "contact.request.created.v1"
 	ContactEventRequestAccepted = "contact.request.accepted.v1"
 	ContactEventRequestDeclined = "contact.request.declined.v1"
+	ContactEventEdgeDeleted     = "contact.edge.deleted.v1"
+	ContactEventEdgeBlocked     = "contact.edge.blocked.v1"
+	ContactEventRemarkUpdated   = "contact.edge.remark_updated.v1"
 )
 
 type OutboxMessage struct {

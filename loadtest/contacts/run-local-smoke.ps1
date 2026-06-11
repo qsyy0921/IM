@@ -3,7 +3,7 @@ param(
     [string]$KafkaBrokers = "localhost:9092",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
-    [ValidateSet("accept", "decline")]
+    [ValidateSet("accept", "decline", "delete", "block", "remark")]
     [string]$Scenario = "accept",
     [switch]$SkipBuild
 )
@@ -144,7 +144,11 @@ function Assert-Summary {
 
 $processes = @()
 try {
-    Apply-PostgresMigration -Path "migrations\postgres\contacts\000001_contacts_core.sql" -Name "nexusim_contacts_core.sql"
+    Get-ChildItem -Path "migrations\postgres\contacts" -Filter "*.sql" |
+        Sort-Object Name |
+        ForEach-Object {
+            Apply-PostgresMigration -Path $_.FullName -Name $_.Name
+        }
     Ensure-KafkaTopic -Topic $contactTopic
 
     $contactsService = Join-Path $repo "bin\contacts-service.exe"

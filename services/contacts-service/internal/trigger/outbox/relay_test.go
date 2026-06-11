@@ -41,6 +41,59 @@ func TestBuildContactEventAccepted(t *testing.T) {
 	}
 }
 
+func TestBuildContactEventEdgeBlockedAndRemarkUpdated(t *testing.T) {
+	blockedMessage := outboxMessage(types.ContactEventEdgeBlocked, map[string]any{
+		"tenant_id":       "tenant-contacts",
+		"owner_user_id":   "alice",
+		"contact_user_id": "bob",
+		"previous_status": "ACTIVE",
+		"status":          "BLOCKED",
+		"edge_version":    2,
+		"reason":          "spam",
+		"occurred_at":     "2026-06-10T08:00:00Z",
+	})
+	blockedEvent, err := BuildContactEvent(blockedMessage)
+	if err != nil {
+		t.Fatalf("build blocked event: %v", err)
+	}
+	blocked := blockedEvent.GetEdgeBlocked()
+	if blocked == nil || blocked.OwnerUserId != "alice" || blocked.ContactUserId != "bob" || blocked.Reason != "spam" || blocked.EdgeVersion != 2 {
+		t.Fatalf("unexpected blocked event: %+v payload=%+v", blockedEvent, blocked)
+	}
+
+	remarkMessage := outboxMessage(types.ContactEventRemarkUpdated, map[string]any{
+		"tenant_id":       "tenant-contacts",
+		"owner_user_id":   "alice",
+		"contact_user_id": "bob",
+		"status":          "ACTIVE",
+		"edge_version":    3,
+		"remark":          "Bob from school",
+		"occurred_at":     "2026-06-10T08:00:00Z",
+	})
+	remarkEvent, err := BuildContactEvent(remarkMessage)
+	if err != nil {
+		t.Fatalf("build remark event: %v", err)
+	}
+	remark := remarkEvent.GetEdgeRemarkUpdated()
+	if remark == nil || remark.Remark != "Bob from school" || remark.EdgeVersion != 3 {
+		t.Fatalf("unexpected remark event: %+v payload=%+v", remarkEvent, remark)
+	}
+}
+
+func TestBuildContactEventRejectsMalformedEdgeEvent(t *testing.T) {
+	_, err := BuildContactEvent(outboxMessage(types.ContactEventEdgeDeleted, map[string]any{
+		"tenant_id":       "tenant-contacts",
+		"owner_user_id":   "alice",
+		"contact_user_id": "bob",
+		"status":          "DELETED",
+		"edge_version":    2,
+		"occurred_at":     "2026-06-10T08:00:00Z",
+	}))
+	if err == nil {
+		t.Fatal("expected malformed edge deleted event error")
+	}
+}
+
 func TestBuildContactEventRejectsUnsupportedAndMalformed(t *testing.T) {
 	_, err := BuildKafkaValue(outboxMessage("contact.unknown.v1", map[string]any{
 		"tenant_id": "tenant-contacts",

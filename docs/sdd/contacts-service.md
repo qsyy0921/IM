@@ -1,6 +1,6 @@
 # NexusIM contacts-service SDD v0.1
 
-状态：Draft；proto / Kafka schema / migration / 六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 `ACCEPT / DECLINE` 真实进程 smoke 已落地；下一阶段联系人删除 / 拉黑 / 备注名设计已冻结为 v0.2 编码输入。
+状态：Draft；proto / Kafka schema / migration / 六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 `ACCEPT / DECLINE` 真实进程 smoke 已落地；联系人删除 / 拉黑 / 备注名 v0.2 已完成代码切片和真实 PostgreSQL 集成测试，真实进程 smoke 待跑。
 
 本文定义第三层 IM 产品能力中的“联系人 / 好友关系”最小服务边界。目标是补齐社交关系事实源，同时保持低耦合：不把好友关系塞进 `conversation_members`，也不让会话、消息、投递服务直接读联系人表。
 
@@ -66,7 +66,7 @@ services/contacts-service/
 | 层 | 本服务内容 |
 | --- | --- |
 | `api` | gRPC handler、request/response 转换、稳定错误映射 |
-| `app` | `SendContactRequestUseCase`、`RespondContactRequestUseCase`、`ListContactsUseCase` |
+| `app` | `SendContactRequestUseCase`、`RespondContactRequestUseCase`、`ListContactsUseCase`、`DeleteContactUseCase`、`BlockContactUseCase`、`UpdateContactRemarkUseCase` |
 | `domain` | 好友申请状态机、联系人边不变量、幂等规则 |
 | `infrastructure` | PostgreSQL repository、outbox store、Kafka producer |
 | `types` | Command、DTO、错误 sentinel、枚举 |
@@ -608,7 +608,8 @@ contacts-service outbox-relay
 - `000001_contacts_core.sql` 存在；
 - 六层目录存在；
 - 第一轮代码只实现 `SendContactRequest / RespondContactRequest / ListContacts`，不自动创建会话；
-- `go test ./services/contacts-service/...` 通过；
+- 第二轮代码已实现 `DeleteContact / BlockContact / UpdateContactRemark` 的 proto / schema / migration / repository / relay builder / smoke runner；
+- `go test ./services/contacts-service/...` 通过，带 `NEXUSIM_PG_DSN` 的 contacts PostgreSQL 集成测试通过；
 - 真实 PostgreSQL integration 覆盖 request、accept、list；
 - smoke 报告归档到 `docs/runbook/loadtest/contacts-service/`。
 

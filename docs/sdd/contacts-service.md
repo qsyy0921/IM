@@ -1,6 +1,6 @@
 # NexusIM contacts-service SDD v0.1
 
-状态：Draft；proto / Kafka schema / migration / 六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 `ACCEPT / DECLINE` 真实进程 smoke 已落地；联系人删除 / 拉黑 / 解除拉黑 / 备注名 v0.2 已完成代码切片，删除 / 拉黑 / 备注名 / 解除拉黑真实进程 smoke 已通过；删除后重新申请 / 接受恢复联系人关系的 re-add smoke 已通过。
+状态：Draft；proto / Kafka schema / migration / 六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 `ACCEPT / DECLINE / CANCEL` 真实进程 smoke 已落地；联系人删除 / 拉黑 / 解除拉黑 / 备注名 v0.2 已完成代码切片，删除 / 拉黑 / 备注名 / 解除拉黑真实进程 smoke 已通过；删除后重新申请 / 接受恢复联系人关系的 re-add smoke 已通过。
 
 本文定义第三层 IM 产品能力中的“联系人 / 好友关系”最小服务边界。目标是补齐社交关系事实源，同时保持低耦合：不把好友关系塞进 `conversation_members`，也不让会话、消息、投递服务直接读联系人表。
 
@@ -11,7 +11,7 @@
 职责：
 
 - 发起好友申请；
-- 接受 / 拒绝好友申请；
+- 接受 / 拒绝 / 取消好友申请；
 - 删除联系人、拉黑联系人、解除拉黑、更新本人的联系人备注；
 - 查询当前用户收到 / 发出的好友申请列表；
 - 查询当前联系人列表；
@@ -45,7 +45,7 @@
 
 | 方向 | 服务 / 组件 | 交互 |
 | --- | --- | --- |
-| 上游 | api-gateway / client | gRPC/HTTP 调用 `SendContactRequest`、`RespondContactRequest`、`ListContactRequests`、`ListContacts` |
+| 上游 | api-gateway / client | gRPC/HTTP 调用 `SendContactRequest`、`RespondContactRequest`、`CancelContactRequest`、`ListContactRequests`、`ListContacts` |
 | 同步依赖 | identity-service（后续） | 校验 user 是否存在、是否禁用；第一阶段可用 strict mock / 本地端口 |
 | 异步下游 | push-gateway / notification-service（后续） | 消费 `im.contact.events` 做轻量通知 |
 | 异步下游 | audit-service / recommendation（后续） | 消费联系人事件做审计和推荐 |
@@ -68,7 +68,7 @@ services/contacts-service/
 | 层 | 本服务内容 |
 | --- | --- |
 | `api` | gRPC handler、request/response 转换、稳定错误映射 |
-| `app` | `SendContactRequestUseCase`、`RespondContactRequestUseCase`、`ListContactRequestsUseCase`、`ListContactsUseCase`、`DeleteContactUseCase`、`BlockContactUseCase`、`UpdateContactRemarkUseCase` |
+| `app` | `SendContactRequestUseCase`、`RespondContactRequestUseCase`、`CancelContactRequestUseCase`、`ListContactRequestsUseCase`、`ListContactsUseCase`、`DeleteContactUseCase`、`BlockContactUseCase`、`UpdateContactRemarkUseCase` |
 | `domain` | 好友申请状态机、联系人边不变量、幂等规则 |
 | `infrastructure` | PostgreSQL repository、outbox store、Kafka producer |
 | `types` | Command、DTO、错误 sentinel、枚举 |
@@ -98,7 +98,7 @@ DELETED
 BLOCKED
 ```
 
-第一阶段已实现 `PENDING -> ACCEPTED / DECLINED` 和 ACTIVE 联系人列表。第二阶段实现当前用户视角的 `ACTIVE -> DELETED / BLOCKED`、`BLOCKED -> ACTIVE` 和 `remark` 更新；`BLOCKED` / `ACTIVE` 转换只产生联系人事实事件，不直接改 `SendMessage` 权限。
+第一阶段已实现 `PENDING -> ACCEPTED / DECLINED / CANCELED` 和 ACTIVE 联系人列表。第二阶段实现当前用户视角的 `ACTIVE -> DELETED / BLOCKED`、`BLOCKED -> ACTIVE` 和 `remark` 更新；`BLOCKED` / `ACTIVE` 转换只产生联系人事实事件，不直接改 `SendMessage` 权限。
 
 ## 5. 同步 API 契约
 
@@ -113,6 +113,7 @@ api/proto/nexusim/contacts/v1/contacts_service.proto
 ```text
 rpc SendContactRequest(SendContactRequestRequest) returns (SendContactRequestResponse)
 rpc RespondContactRequest(RespondContactRequestRequest) returns (RespondContactRequestResponse)
+rpc CancelContactRequest(CancelContactRequestRequest) returns (CancelContactRequestResponse)
 rpc ListContactRequests(ListContactRequestsRequest) returns (ListContactRequestsResponse)
 rpc ListContacts(ListContactsRequest) returns (ListContactsResponse)
 rpc GetContactState(GetContactStateRequest) returns (GetContactStateResponse)
@@ -138,6 +139,16 @@ request_id
 decision = ACCEPT / DECLINE
 idempotency_key
 ```
+
+`CancelContactRequestRequest`：
+
+```text
+auth_context
+request_id
+idempotency_key
+```
+
+`CancelContactRequest` 只能由原 sender 对 `PENDING` 申请执行，成功后状态变为 `CANCELED`，不创建联系人边。
 
 `ListContactsRequest`：
 
@@ -257,6 +268,8 @@ status
 message
 occurred_at
 ```
+
+`contact.request.canceled.v1` 使用同一组申请索引字段，但不带完整申请 message；它只表达 sender 撤销已发出的 pending 申请，不表示 conversation membership 或消息权限变化。
 
 用户昵称、头像、组织信息由 profile/identity 投影补充，contacts-service 不复制用户资料。
 
@@ -398,7 +411,7 @@ migrations/postgres/contacts/000002_contact_edge_management.sql
 计划变更：
 
 - `contact_edges.remark TEXT NOT NULL DEFAULT ''`；
-- 扩展 `contact_command_idempotency.command_type` check，加入 `DELETE_CONTACT / BLOCK_CONTACT / UPDATE_CONTACT_REMARK`；
+- 扩展 `contact_command_idempotency.command_type` check，加入 `CANCEL_CONTACT_REQUEST / DELETE_CONTACT / BLOCK_CONTACT / UPDATE_CONTACT_REMARK`；
 - 不新增跨服务外键，不引用 `conversation_members`、`message_log` 或 delivery / receipt 内部表。
 
 ## 8. 核心流程
@@ -436,7 +449,24 @@ RespondContactRequest(ACCEPT)
 -> commit
 ```
 
-### 8.3 查询联系人列表
+### 8.3 取消好友申请
+
+```text
+CancelContactRequest
+-> validate sender auth / request_id / idempotency_key
+-> lock contact_command_idempotency(tenant, sender, idempotency_key)
+-> lock request row FOR UPDATE
+-> if same idempotency key and same command hash, replay
+-> if request sender != auth.user_id, permission denied
+-> if request already CANCELED, replay existing canceled result
+-> if request already ACCEPTED / DECLINED / EXPIRED, conflict
+-> update request CANCELED
+-> insert / reuse contact_command_idempotency result_id=request_id
+-> insert contacts_outbox(contact.request.canceled.v1)
+-> commit
+```
+
+### 8.4 查询联系人列表
 
 ```text
 ListContacts
@@ -456,7 +486,7 @@ ListContactRequests
 -> page_token binds tenant_id / user_id / direction / status / page_size / cursor
 ```
 
-### 8.4 删除联系人
+### 8.5 删除联系人
 
 ```text
 DeleteContact
@@ -473,7 +503,7 @@ DeleteContact
 
 删除联系人是当前 owner 的单向列表偏好和关系事实，不删除对方视角 edge，不删除历史 contact request，也不影响已有会话、消息或投递事实。
 
-### 8.5 拉黑联系人
+### 8.6 拉黑联系人
 
 ```text
 BlockContact
@@ -491,7 +521,7 @@ BlockContact
 
 BLOCKED 是 contacts-service 的当前 owner 关系状态。它不直接拒绝 `SendMessage`；发送权限必须由 policy-service / conversation-service 的权限投影或正式检查表达，避免 message-service 同步依赖 contacts-service。
 
-### 8.6 更新备注名
+### 8.7 更新备注名
 
 ```text
 UpdateContactRemark
@@ -530,6 +560,7 @@ contacts_outbox -> Kafka im.contact.events -> push / audit / recommendation
 | --- | --- | --- | --- |
 | SendContactRequest | `tenant_id + sender_user_id + idempotency_key`，事实源为 `contact_requests` 唯一键和 `command_hash` | 同 command hash replay；不同 hash 返回 conflict；不额外写 `contact_command_idempotency` | 无需补偿 |
 | RespondContactRequest | `tenant_id + receiver_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；已完成且同 decision 返回既有 result；已完成但相反 decision 返回 conflict | 后续通过重新申请恢复 |
+| CancelContactRequest | `tenant_id + sender_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；`PENDING -> CANCELED`；已 CANCELED 返回既有 result；已 ACCEPTED / DECLINED / EXPIRED 返回 conflict | 可重新发起申请 |
 | DeleteContact | `tenant_id + owner_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；只更新 owner -> contact 单向 edge | 可通过重新申请或对方仍 ACTIVE edge 恢复 |
 | BlockContact | `tenant_id + owner_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；重复 BLOCKED 返回既有 result | 通过 UnblockContact 从 BLOCKED 恢复 ACTIVE；不混入删除 |
 | UnblockContact | `tenant_id + owner_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；只允许 `BLOCKED -> ACTIVE`，并 replay 原始 result snapshot | 不能恢复 DELETED；重新加好友仍走申请 / 接受链路 |
@@ -541,6 +572,7 @@ Command hash 规则：
 - 不包含 `idempotency_key`、`request_id`、`trace_id`、`session_id`、`device_id`。
 - `SendContactRequest` 包含 command type、tenant、sender、target、message 原文。
 - `RespondContactRequest` 包含 command type、tenant、receiver、request_id、decision。
+- `CancelContactRequest` 包含 command type、tenant、sender、request_id。
 - `DeleteContact` 包含 command type、tenant、owner、contact。
 - `BlockContact` 包含 command type、tenant、owner、contact、reason 原文。
 - `UnblockContact` 包含 command type、tenant、owner、contact。
@@ -553,6 +585,7 @@ Command hash 规则：
 - `tenant_id / user_id / device_id / session_id / trace_id / request_id` 来自 `AuthContext`。
 - 发送申请只能以当前 auth user 作为 sender。
 - 响应申请只能由 receiver 执行。
+- 取消申请只能由原 sender 执行，receiver 不能取消对方发来的申请。
 - `ListContactRequests` 只能查询当前 auth user 收到或发出的好友申请列表；第一阶段不提供 admin 查询或全站搜索。
 - `ListContacts` 只能查询当前 auth user 的联系人列表，第一阶段不提供 admin 查询。
 - 删除 / 拉黑 / 解除拉黑 / 备注名只能操作当前 auth user 自己的 `owner_user_id -> contact_user_id` edge。
@@ -586,9 +619,10 @@ contacts_outbox_dlq_count
 | domain unit | 自己加自己、重复 pending、accept 写双向 edge、非 receiver 响应 |
 | app unit | command validation、repository error propagation |
 | api unit | gRPC request/response 转换、稳定错误映射 |
-| postgres integration | SendContactRequest / RespondContactRequest / ListContactRequests / ListContacts / DeleteContact / BlockContact / UpdateContactRemark 真实事务、幂等 replay、并发首次申请、反向 pending、终态相反 decision、分页 token 绑定、单向 edge 变更 |
+| postgres integration | SendContactRequest / RespondContactRequest / CancelContactRequest / ListContactRequests / ListContacts / DeleteContact / BlockContact / UpdateContactRemark 真实事务、幂等 replay、并发首次申请、反向 pending、终态相反 decision、分页 token 绑定、单向 edge 变更 |
 | outbox integration | contacts_outbox retry / DLQ / mark PUBLISHED |
 | smoke | `SendContactRequest -> ListContactRequests(PENDING) -> RespondContactRequest(ACCEPT) -> ListContactRequests(ACCEPTED) -> ListContacts` |
+| cancel smoke | `SendContactRequest -> ListContactRequests(INCOMING,PENDING) -> CancelContactRequest -> ListContactRequests(INCOMING,PENDING)=0 -> ListContactRequests(OUTGOING,CANCELED)=1` |
 | v0.2 smoke | `ACCEPT -> DeleteContact`、`ACCEPT -> BlockContact`、`ACCEPT -> BlockContact -> UnblockContact`、`ACCEPT -> UpdateContactRemark`、`ACCEPT -> DeleteContact -> SendContactRequest -> ACCEPT`，分别验证 contacts_outbox / Kafka / ListContacts / GetContactState |
 
 ## 14. Runbook
@@ -609,6 +643,12 @@ contacts-service grpc
 -> loadtest/contacts RespondContactRequest(ACCEPT)
 -> loadtest/contacts ListContactRequests(ACCEPTED)
 -> loadtest/contacts ListContacts
+```
+
+取消申请 smoke：
+
+```text
+loadtest/contacts --scenario cancel
 ```
 
 第二阶段 smoke：
@@ -637,10 +677,10 @@ contacts-service outbox-relay
 - `contacts_service.proto` 存在并生成 Go 代码；
 - `000001_contacts_core.sql` 存在；
 - 六层目录存在；
-- 第一轮代码实现 `SendContactRequest / RespondContactRequest / ListContactRequests / ListContacts`，不自动创建会话；
+- 第一轮代码实现 `SendContactRequest / RespondContactRequest / CancelContactRequest / ListContactRequests / ListContacts`，不自动创建会话；
 - 第二轮代码已实现 `DeleteContact / BlockContact / UpdateContactRemark` 的 proto / schema / migration / repository / relay builder / smoke runner；
 - `go test ./services/contacts-service/...` 通过，带 `NEXUSIM_PG_DSN` 的 contacts PostgreSQL 集成测试通过；
-- 真实 PostgreSQL integration 覆盖 request、accept、list；
+- 真实 PostgreSQL integration 覆盖 request、accept、cancel、list；
 - smoke 报告归档到 `docs/runbook/loadtest/contacts-service/`。
 
 进入第二轮联系人管理编码前：

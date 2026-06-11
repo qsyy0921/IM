@@ -25,6 +25,7 @@ const (
 	ReceiptService_ListConversations_FullMethodName   = "/nexusim.receipt.v1.ReceiptService/ListConversations"
 	ReceiptService_ArchiveConversation_FullMethodName = "/nexusim.receipt.v1.ReceiptService/ArchiveConversation"
 	ReceiptService_PinConversation_FullMethodName     = "/nexusim.receipt.v1.ReceiptService/PinConversation"
+	ReceiptService_MuteConversation_FullMethodName    = "/nexusim.receipt.v1.ReceiptService/MuteConversation"
 )
 
 // ReceiptServiceClient is the client API for ReceiptService service.
@@ -37,6 +38,7 @@ type ReceiptServiceClient interface {
 	ListConversations(ctx context.Context, in *ListConversationsRequest, opts ...grpc.CallOption) (*ListConversationsResponse, error)
 	ArchiveConversation(ctx context.Context, in *ArchiveConversationRequest, opts ...grpc.CallOption) (*ArchiveConversationResponse, error)
 	PinConversation(ctx context.Context, in *PinConversationRequest, opts ...grpc.CallOption) (*PinConversationResponse, error)
+	MuteConversation(ctx context.Context, in *MuteConversationRequest, opts ...grpc.CallOption) (*MuteConversationResponse, error)
 }
 
 type receiptServiceClient struct {
@@ -107,6 +109,16 @@ func (c *receiptServiceClient) PinConversation(ctx context.Context, in *PinConve
 	return out, nil
 }
 
+func (c *receiptServiceClient) MuteConversation(ctx context.Context, in *MuteConversationRequest, opts ...grpc.CallOption) (*MuteConversationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MuteConversationResponse)
+	err := c.cc.Invoke(ctx, ReceiptService_MuteConversation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ReceiptServiceServer is the server API for ReceiptService service.
 // All implementations must embed UnimplementedReceiptServiceServer
 // for forward compatibility.
@@ -117,6 +129,7 @@ type ReceiptServiceServer interface {
 	ListConversations(context.Context, *ListConversationsRequest) (*ListConversationsResponse, error)
 	ArchiveConversation(context.Context, *ArchiveConversationRequest) (*ArchiveConversationResponse, error)
 	PinConversation(context.Context, *PinConversationRequest) (*PinConversationResponse, error)
+	MuteConversation(context.Context, *MuteConversationRequest) (*MuteConversationResponse, error)
 	mustEmbedUnimplementedReceiptServiceServer()
 }
 
@@ -144,6 +157,9 @@ func (UnimplementedReceiptServiceServer) ArchiveConversation(context.Context, *A
 }
 func (UnimplementedReceiptServiceServer) PinConversation(context.Context, *PinConversationRequest) (*PinConversationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PinConversation not implemented")
+}
+func (UnimplementedReceiptServiceServer) MuteConversation(context.Context, *MuteConversationRequest) (*MuteConversationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method MuteConversation not implemented")
 }
 func (UnimplementedReceiptServiceServer) mustEmbedUnimplementedReceiptServiceServer() {}
 func (UnimplementedReceiptServiceServer) testEmbeddedByValue()                        {}
@@ -274,6 +290,24 @@ func _ReceiptService_PinConversation_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ReceiptService_MuteConversation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MuteConversationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReceiptServiceServer).MuteConversation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReceiptService_MuteConversation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReceiptServiceServer).MuteConversation(ctx, req.(*MuteConversationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ReceiptService_ServiceDesc is the grpc.ServiceDesc for ReceiptService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -304,6 +338,10 @@ var ReceiptService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PinConversation",
 			Handler:    _ReceiptService_PinConversation_Handler,
+		},
+		{
+			MethodName: "MuteConversation",
+			Handler:    _ReceiptService_MuteConversation_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -288,7 +288,8 @@ SELECT
     last_read_seq,
     sort_updated_at,
     archived,
-    pinned
+    pinned,
+    muted
 FROM user_conversation_summaries
 WHERE tenant_id = $1
   AND user_id = $2
@@ -342,6 +343,7 @@ LIMIT $3
 			&item.UpdatedAt,
 			&item.Archived,
 			&item.Pinned,
+			&item.Muted,
 		); err != nil {
 			return types.ListConversationsResult{}, types.NewDBReadFailed(err.Error())
 		}
@@ -403,6 +405,7 @@ RETURNING
     sort_updated_at,
     archived,
     pinned,
+    muted,
     archived_at
 `, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.Archived).Scan(
 		&item.ConversationID,
@@ -415,6 +418,7 @@ RETURNING
 		&item.UpdatedAt,
 		&item.Archived,
 		&item.Pinned,
+		&item.Muted,
 		&archivedAt,
 	)
 	if err == pgx.ErrNoRows {
@@ -454,6 +458,7 @@ RETURNING
     sort_updated_at,
     archived,
     pinned,
+    muted,
     pinned_at
 `, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.Pinned).Scan(
 		&item.ConversationID,
@@ -466,6 +471,7 @@ RETURNING
 		&item.UpdatedAt,
 		&item.Archived,
 		&item.Pinned,
+		&item.Muted,
 		&pinnedAt,
 	)
 	if err == pgx.ErrNoRows {
@@ -475,6 +481,59 @@ RETURNING
 		return types.PinConversationResult{}, types.NewDBWriteFailed(err.Error())
 	}
 	return types.PinConversationResult{Conversation: item}, nil
+}
+
+func (repository *Repository) MuteConversation(
+	ctx context.Context,
+	command types.MuteConversationCommand,
+) (types.MuteConversationResult, error) {
+	if err := command.Validate(); err != nil {
+		return types.MuteConversationResult{}, err
+	}
+	var item types.ConversationSummary
+	var mutedAt sql.NullTime
+	err := repository.pool.QueryRow(ctx, `
+UPDATE user_conversation_summaries
+SET muted = $4,
+    muted_at = CASE WHEN $4 THEN now() ELSE NULL END,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND conversation_id = $3
+RETURNING
+    conversation_id,
+    last_visible_seq,
+    last_message_id,
+    last_sender_id,
+    last_source_event_type,
+    unread_count,
+    last_read_seq,
+    sort_updated_at,
+    archived,
+    pinned,
+    muted,
+    muted_at
+`, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.Muted).Scan(
+		&item.ConversationID,
+		&item.LastVisibleSeq,
+		&item.LastMessageID,
+		&item.LastSenderID,
+		&item.LastSourceEventType,
+		&item.UnreadCount,
+		&item.LastReadSeq,
+		&item.UpdatedAt,
+		&item.Archived,
+		&item.Pinned,
+		&item.Muted,
+		&mutedAt,
+	)
+	if err == pgx.ErrNoRows {
+		return types.MuteConversationResult{}, types.NewConversationNotFound("conversation summary not found")
+	}
+	if err != nil {
+		return types.MuteConversationResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.MuteConversationResult{Conversation: item}, nil
 }
 
 func (repository *Repository) conversationSummaryWatermark(ctx context.Context) (types.ProjectionWatermark, error) {

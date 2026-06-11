@@ -179,6 +179,7 @@ type ConversationSummary struct {
 	UpdatedAt           time.Time
 	Archived            bool
 	Pinned              bool
+	Muted               bool
 }
 
 type ProjectionWatermark struct {
@@ -230,5 +231,25 @@ func (command PinConversationCommand) Validate() error {
 }
 
 type PinConversationResult struct {
+	Conversation ConversationSummary
+}
+
+type MuteConversationCommand struct {
+	AuthContext    AuthContext
+	ConversationID ConversationID
+	Muted          bool
+}
+
+func (command MuteConversationCommand) Validate() error {
+	if err := command.AuthContext.Validate(); err != nil {
+		return err
+	}
+	if command.ConversationID == "" {
+		return NewInvalidArgument("conversation_id is required")
+	}
+	return nil
+}
+
+type MuteConversationResult struct {
 	Conversation ConversationSummary
 }

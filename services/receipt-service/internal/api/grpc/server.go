@@ -35,6 +35,10 @@ type PinConversationExecutor interface {
 	Execute(context.Context, types.PinConversationCommand) (types.PinConversationResult, error)
 }
 
+type MuteConversationExecutor interface {
+	Execute(context.Context, types.MuteConversationCommand) (types.MuteConversationResult, error)
+}
+
 type Server struct {
 	receiptv1.UnimplementedReceiptServiceServer
 	markRead            MarkReadExecutor
@@ -43,6 +47,7 @@ type Server struct {
 	listConversations   ListConversationsExecutor
 	archiveConversation ArchiveConversationExecutor
 	pinConversation     PinConversationExecutor
+	muteConversation    MuteConversationExecutor
 }
 
 func NewServer(
@@ -52,6 +57,7 @@ func NewServer(
 	listConversations ListConversationsExecutor,
 	archiveConversation ArchiveConversationExecutor,
 	pinConversation PinConversationExecutor,
+	muteConversation MuteConversationExecutor,
 ) *Server {
 	return &Server{
 		markRead:            markRead,
@@ -60,6 +66,7 @@ func NewServer(
 		listConversations:   listConversations,
 		archiveConversation: archiveConversation,
 		pinConversation:     pinConversation,
+		muteConversation:    muteConversation,
 	}
 }
 
@@ -224,6 +231,7 @@ func (server *Server) ListConversations(
 			UpdatedAtUnixMs:     item.UpdatedAt.UnixMilli(),
 			Archived:            item.Archived,
 			Pinned:              item.Pinned,
+			Muted:               item.Muted,
 		})
 	}
 	return &receiptv1.ListConversationsResponse{
@@ -293,6 +301,34 @@ func (server *Server) PinConversation(
 	}, nil
 }
 
+func (server *Server) MuteConversation(
+	ctx context.Context,
+	request *receiptv1.MuteConversationRequest,
+) (*receiptv1.MuteConversationResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	auth := request.GetAuthContext()
+	result, err := server.muteConversation.Execute(ctx, types.MuteConversationCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  types.TenantID(auth.GetTenantId()),
+			UserID:    types.UserID(auth.GetUserId()),
+			DeviceID:  auth.GetDeviceId(),
+			SessionID: auth.GetSessionId(),
+			TraceID:   auth.GetTraceId(),
+			RequestID: auth.GetRequestId(),
+		},
+		ConversationID: types.ConversationID(request.GetConversationId()),
+		Muted:          request.GetMuted(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &receiptv1.MuteConversationResponse{
+		Conversation: conversationSummaryResponse(result.Conversation),
+	}, nil
+}
+
 func conversationSummaryResponse(item types.ConversationSummary) *receiptv1.ConversationSummary {
 	return &receiptv1.ConversationSummary{
 		ConversationId:      string(item.ConversationID),
@@ -305,6 +341,7 @@ func conversationSummaryResponse(item types.ConversationSummary) *receiptv1.Conv
 		UpdatedAtUnixMs:     item.UpdatedAt.UnixMilli(),
 		Archived:            item.Archived,
 		Pinned:              item.Pinned,
+		Muted:               item.Muted,
 	}
 }
 

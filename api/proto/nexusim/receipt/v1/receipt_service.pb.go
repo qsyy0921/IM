@@ -874,6 +874,7 @@ type ConversationSummary struct {
 	LastSourceEventType string                 `protobuf:"bytes,8,opt,name=last_source_event_type,json=lastSourceEventType,proto3" json:"last_source_event_type,omitempty"`
 	Archived            bool                   `protobuf:"varint,9,opt,name=archived,proto3" json:"archived,omitempty"`
 	Pinned              bool                   `protobuf:"varint,10,opt,name=pinned,proto3" json:"pinned,omitempty"`
+	Muted               bool                   `protobuf:"varint,11,opt,name=muted,proto3" json:"muted,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -974,6 +975,13 @@ func (x *ConversationSummary) GetArchived() bool {
 func (x *ConversationSummary) GetPinned() bool {
 	if x != nil {
 		return x.Pinned
+	}
+	return false
+}
+
+func (x *ConversationSummary) GetMuted() bool {
+	if x != nil {
+		return x.Muted
 	}
 	return false
 }
@@ -1246,6 +1254,110 @@ func (x *PinConversationResponse) GetConversation() *ConversationSummary {
 	return nil
 }
 
+type MuteConversationRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext    *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	ConversationId string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	Muted          bool                   `protobuf:"varint,3,opt,name=muted,proto3" json:"muted,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *MuteConversationRequest) Reset() {
+	*x = MuteConversationRequest{}
+	mi := &file_nexusim_receipt_v1_receipt_service_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MuteConversationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MuteConversationRequest) ProtoMessage() {}
+
+func (x *MuteConversationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_receipt_v1_receipt_service_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MuteConversationRequest.ProtoReflect.Descriptor instead.
+func (*MuteConversationRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_receipt_v1_receipt_service_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *MuteConversationRequest) GetAuthContext() *AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *MuteConversationRequest) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *MuteConversationRequest) GetMuted() bool {
+	if x != nil {
+		return x.Muted
+	}
+	return false
+}
+
+type MuteConversationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Conversation  *ConversationSummary   `protobuf:"bytes,1,opt,name=conversation,proto3" json:"conversation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MuteConversationResponse) Reset() {
+	*x = MuteConversationResponse{}
+	mi := &file_nexusim_receipt_v1_receipt_service_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MuteConversationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MuteConversationResponse) ProtoMessage() {}
+
+func (x *MuteConversationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_receipt_v1_receipt_service_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MuteConversationResponse.ProtoReflect.Descriptor instead.
+func (*MuteConversationResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_receipt_v1_receipt_service_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *MuteConversationResponse) GetConversation() *ConversationSummary {
+	if x != nil {
+		return x.Conversation
+	}
+	return nil
+}
+
 var File_nexusim_receipt_v1_receipt_service_proto protoreflect.FileDescriptor
 
 const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
@@ -1310,7 +1422,7 @@ const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
 	"\x13ProjectionWatermark\x12\x16\n" +
 	"\x06source\x18\x01 \x01(\tR\x06source\x12!\n" +
 	"\foffset_value\x18\x02 \x01(\x03R\voffsetValue\x12+\n" +
-	"\x12updated_at_unix_ms\x18\x03 \x01(\x03R\x0fupdatedAtUnixMs\"\x93\x03\n" +
+	"\x12updated_at_unix_ms\x18\x03 \x01(\x03R\x0fupdatedAtUnixMs\"\xa9\x03\n" +
 	"\x13ConversationSummary\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12(\n" +
 	"\x10last_visible_seq\x18\x02 \x01(\x03R\x0elastVisibleSeq\x12&\n" +
@@ -1322,7 +1434,8 @@ const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
 	"\x16last_source_event_type\x18\b \x01(\tR\x13lastSourceEventType\x12\x1a\n" +
 	"\barchived\x18\t \x01(\bR\barchived\x12\x16\n" +
 	"\x06pinned\x18\n" +
-	" \x01(\bR\x06pinned\"\xe0\x01\n" +
+	" \x01(\bR\x06pinned\x12\x14\n" +
+	"\x05muted\x18\v \x01(\bR\x05muted\"\xe0\x01\n" +
 	"\x19ListConversationsResponse\x12=\n" +
 	"\x05items\x18\x01 \x03(\v2'.nexusim.receipt.v1.ConversationSummaryR\x05items\x12(\n" +
 	"\x10next_page_cursor\x18\x02 \x01(\tR\x0enextPageCursor\x12Z\n" +
@@ -1338,6 +1451,12 @@ const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x16\n" +
 	"\x06pinned\x18\x03 \x01(\bR\x06pinned\"f\n" +
 	"\x17PinConversationResponse\x12K\n" +
+	"\fconversation\x18\x01 \x01(\v2'.nexusim.receipt.v1.ConversationSummaryR\fconversation\"\x9c\x01\n" +
+	"\x17MuteConversationRequest\x12B\n" +
+	"\fauth_context\x18\x01 \x01(\v2\x1f.nexusim.receipt.v1.AuthContextR\vauthContext\x12'\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x14\n" +
+	"\x05muted\x18\x03 \x01(\bR\x05muted\"g\n" +
+	"\x18MuteConversationResponse\x12K\n" +
 	"\fconversation\x18\x01 \x01(\v2'.nexusim.receipt.v1.ConversationSummaryR\fconversation*\xb2\x01\n" +
 	"\x15ReceiptVisibilityMode\x12'\n" +
 	"#RECEIPT_VISIBILITY_MODE_UNSPECIFIED\x10\x00\x12$\n" +
@@ -1347,14 +1466,15 @@ const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
 	"\x14ConversationListSort\x12&\n" +
 	"\"CONVERSATION_LIST_SORT_UNSPECIFIED\x10\x00\x12*\n" +
 	"&CONVERSATION_LIST_SORT_UPDATED_AT_DESC\x10\x01\x121\n" +
-	"-CONVERSATION_LIST_SORT_PINNED_UPDATED_AT_DESC\x10\x022\x9b\x05\n" +
+	"-CONVERSATION_LIST_SORT_PINNED_UPDATED_AT_DESC\x10\x022\x8a\x06\n" +
 	"\x0eReceiptService\x12U\n" +
 	"\bMarkRead\x12#.nexusim.receipt.v1.MarkReadRequest\x1a$.nexusim.receipt.v1.MarkReadResponse\x12j\n" +
 	"\x0fGetReceiptState\x12*.nexusim.receipt.v1.GetReceiptStateRequest\x1a+.nexusim.receipt.v1.GetReceiptStateResponse\x12p\n" +
 	"\x11ListReceiptStates\x12,.nexusim.receipt.v1.ListReceiptStatesRequest\x1a-.nexusim.receipt.v1.ListReceiptStatesResponse\x12p\n" +
 	"\x11ListConversations\x12,.nexusim.receipt.v1.ListConversationsRequest\x1a-.nexusim.receipt.v1.ListConversationsResponse\x12v\n" +
 	"\x13ArchiveConversation\x12..nexusim.receipt.v1.ArchiveConversationRequest\x1a/.nexusim.receipt.v1.ArchiveConversationResponse\x12j\n" +
-	"\x0fPinConversation\x12*.nexusim.receipt.v1.PinConversationRequest\x1a+.nexusim.receipt.v1.PinConversationResponseB?Z=github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1;receiptv1b\x06proto3"
+	"\x0fPinConversation\x12*.nexusim.receipt.v1.PinConversationRequest\x1a+.nexusim.receipt.v1.PinConversationResponse\x12m\n" +
+	"\x10MuteConversation\x12+.nexusim.receipt.v1.MuteConversationRequest\x1a,.nexusim.receipt.v1.MuteConversationResponseB?Z=github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1;receiptv1b\x06proto3"
 
 var (
 	file_nexusim_receipt_v1_receipt_service_proto_rawDescOnce sync.Once
@@ -1369,7 +1489,7 @@ func file_nexusim_receipt_v1_receipt_service_proto_rawDescGZIP() []byte {
 }
 
 var file_nexusim_receipt_v1_receipt_service_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_nexusim_receipt_v1_receipt_service_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_nexusim_receipt_v1_receipt_service_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_nexusim_receipt_v1_receipt_service_proto_goTypes = []any{
 	(ReceiptVisibilityMode)(0),          // 0: nexusim.receipt.v1.ReceiptVisibilityMode
 	(ConversationListSort)(0),           // 1: nexusim.receipt.v1.ConversationListSort
@@ -1390,6 +1510,8 @@ var file_nexusim_receipt_v1_receipt_service_proto_goTypes = []any{
 	(*ArchiveConversationResponse)(nil), // 16: nexusim.receipt.v1.ArchiveConversationResponse
 	(*PinConversationRequest)(nil),      // 17: nexusim.receipt.v1.PinConversationRequest
 	(*PinConversationResponse)(nil),     // 18: nexusim.receipt.v1.PinConversationResponse
+	(*MuteConversationRequest)(nil),     // 19: nexusim.receipt.v1.MuteConversationRequest
+	(*MuteConversationResponse)(nil),    // 20: nexusim.receipt.v1.MuteConversationResponse
 }
 var file_nexusim_receipt_v1_receipt_service_proto_depIdxs = []int32{
 	2,  // 0: nexusim.receipt.v1.MarkReadRequest.auth_context:type_name -> nexusim.receipt.v1.AuthContext
@@ -1407,23 +1529,27 @@ var file_nexusim_receipt_v1_receipt_service_proto_depIdxs = []int32{
 	13, // 12: nexusim.receipt.v1.ArchiveConversationResponse.conversation:type_name -> nexusim.receipt.v1.ConversationSummary
 	2,  // 13: nexusim.receipt.v1.PinConversationRequest.auth_context:type_name -> nexusim.receipt.v1.AuthContext
 	13, // 14: nexusim.receipt.v1.PinConversationResponse.conversation:type_name -> nexusim.receipt.v1.ConversationSummary
-	3,  // 15: nexusim.receipt.v1.ReceiptService.MarkRead:input_type -> nexusim.receipt.v1.MarkReadRequest
-	5,  // 16: nexusim.receipt.v1.ReceiptService.GetReceiptState:input_type -> nexusim.receipt.v1.GetReceiptStateRequest
-	9,  // 17: nexusim.receipt.v1.ReceiptService.ListReceiptStates:input_type -> nexusim.receipt.v1.ListReceiptStatesRequest
-	11, // 18: nexusim.receipt.v1.ReceiptService.ListConversations:input_type -> nexusim.receipt.v1.ListConversationsRequest
-	15, // 19: nexusim.receipt.v1.ReceiptService.ArchiveConversation:input_type -> nexusim.receipt.v1.ArchiveConversationRequest
-	17, // 20: nexusim.receipt.v1.ReceiptService.PinConversation:input_type -> nexusim.receipt.v1.PinConversationRequest
-	4,  // 21: nexusim.receipt.v1.ReceiptService.MarkRead:output_type -> nexusim.receipt.v1.MarkReadResponse
-	7,  // 22: nexusim.receipt.v1.ReceiptService.GetReceiptState:output_type -> nexusim.receipt.v1.GetReceiptStateResponse
-	10, // 23: nexusim.receipt.v1.ReceiptService.ListReceiptStates:output_type -> nexusim.receipt.v1.ListReceiptStatesResponse
-	14, // 24: nexusim.receipt.v1.ReceiptService.ListConversations:output_type -> nexusim.receipt.v1.ListConversationsResponse
-	16, // 25: nexusim.receipt.v1.ReceiptService.ArchiveConversation:output_type -> nexusim.receipt.v1.ArchiveConversationResponse
-	18, // 26: nexusim.receipt.v1.ReceiptService.PinConversation:output_type -> nexusim.receipt.v1.PinConversationResponse
-	21, // [21:27] is the sub-list for method output_type
-	15, // [15:21] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	2,  // 15: nexusim.receipt.v1.MuteConversationRequest.auth_context:type_name -> nexusim.receipt.v1.AuthContext
+	13, // 16: nexusim.receipt.v1.MuteConversationResponse.conversation:type_name -> nexusim.receipt.v1.ConversationSummary
+	3,  // 17: nexusim.receipt.v1.ReceiptService.MarkRead:input_type -> nexusim.receipt.v1.MarkReadRequest
+	5,  // 18: nexusim.receipt.v1.ReceiptService.GetReceiptState:input_type -> nexusim.receipt.v1.GetReceiptStateRequest
+	9,  // 19: nexusim.receipt.v1.ReceiptService.ListReceiptStates:input_type -> nexusim.receipt.v1.ListReceiptStatesRequest
+	11, // 20: nexusim.receipt.v1.ReceiptService.ListConversations:input_type -> nexusim.receipt.v1.ListConversationsRequest
+	15, // 21: nexusim.receipt.v1.ReceiptService.ArchiveConversation:input_type -> nexusim.receipt.v1.ArchiveConversationRequest
+	17, // 22: nexusim.receipt.v1.ReceiptService.PinConversation:input_type -> nexusim.receipt.v1.PinConversationRequest
+	19, // 23: nexusim.receipt.v1.ReceiptService.MuteConversation:input_type -> nexusim.receipt.v1.MuteConversationRequest
+	4,  // 24: nexusim.receipt.v1.ReceiptService.MarkRead:output_type -> nexusim.receipt.v1.MarkReadResponse
+	7,  // 25: nexusim.receipt.v1.ReceiptService.GetReceiptState:output_type -> nexusim.receipt.v1.GetReceiptStateResponse
+	10, // 26: nexusim.receipt.v1.ReceiptService.ListReceiptStates:output_type -> nexusim.receipt.v1.ListReceiptStatesResponse
+	14, // 27: nexusim.receipt.v1.ReceiptService.ListConversations:output_type -> nexusim.receipt.v1.ListConversationsResponse
+	16, // 28: nexusim.receipt.v1.ReceiptService.ArchiveConversation:output_type -> nexusim.receipt.v1.ArchiveConversationResponse
+	18, // 29: nexusim.receipt.v1.ReceiptService.PinConversation:output_type -> nexusim.receipt.v1.PinConversationResponse
+	20, // 30: nexusim.receipt.v1.ReceiptService.MuteConversation:output_type -> nexusim.receipt.v1.MuteConversationResponse
+	24, // [24:31] is the sub-list for method output_type
+	17, // [17:24] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_receipt_v1_receipt_service_proto_init() }
@@ -1437,7 +1563,7 @@ func file_nexusim_receipt_v1_receipt_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_receipt_v1_receipt_service_proto_rawDesc), len(file_nexusim_receipt_v1_receipt_service_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   17,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

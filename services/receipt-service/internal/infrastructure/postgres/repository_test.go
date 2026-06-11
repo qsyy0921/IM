@@ -417,6 +417,52 @@ func TestRepositoryPinConversationRejectsUnknownSummaryIntegration(t *testing.T)
 	}
 }
 
+func TestRepositoryMuteConversationUpdatesListPreferenceIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	insertConversationSummary(t, ctx, pool, "conv-receipt", 11, time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC))
+
+	muteResult, err := repository.MuteConversation(ctx, muteConversationCommand("conv-receipt", true))
+	if err != nil {
+		t.Fatalf("mute conversation: %v", err)
+	}
+	if !muteResult.Conversation.Muted {
+		t.Fatalf("expected muted conversation response: %+v", muteResult)
+	}
+
+	list, err := repository.ListConversations(ctx, listConversationsCommand(10, ""))
+	if err != nil {
+		t.Fatalf("list muted conversations: %v", err)
+	}
+	assertConversationIDs(t, list, "conv-receipt")
+	if !list.Items[0].Muted || list.Items[0].UnreadCount != 11 {
+		t.Fatalf("expected muted flag without unread change: %+v", list.Items[0])
+	}
+
+	unmuteResult, err := repository.MuteConversation(ctx, muteConversationCommand("conv-receipt", false))
+	if err != nil {
+		t.Fatalf("unmute conversation: %v", err)
+	}
+	if unmuteResult.Conversation.Muted {
+		t.Fatalf("expected unmuted conversation response: %+v", unmuteResult)
+	}
+}
+
+func TestRepositoryMuteConversationRejectsUnknownSummaryIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	_, err := repository.MuteConversation(ctx, muteConversationCommand("conv-receipt", true))
+	if !errors.Is(err, types.ErrConversationNotFound) {
+		t.Fatalf("expected conversation not found, got %v", err)
+	}
+}
+
 func inboxCreatedCommand(seq int64, eventID string) types.ProjectDeliveryEventCommand {
 	return types.ProjectDeliveryEventCommand{
 		TenantID:        "tenant-receipt",
@@ -553,6 +599,18 @@ func pinConversationCommand(conversationID string, pinned bool) types.PinConvers
 		},
 		ConversationID: types.ConversationID(conversationID),
 		Pinned:         pinned,
+	}
+}
+
+func muteConversationCommand(conversationID string, muted bool) types.MuteConversationCommand {
+	return types.MuteConversationCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-receipt",
+			UserID:   "receiver-1",
+			DeviceID: "device-1",
+		},
+		ConversationID: types.ConversationID(conversationID),
+		Muted:          muted,
 	}
 }
 

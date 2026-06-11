@@ -11,6 +11,7 @@ service ReceiptService {
   rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
   rpc ArchiveConversation(ArchiveConversationRequest) returns (ArchiveConversationResponse);
   rpc PinConversation(PinConversationRequest) returns (PinConversationResponse);
+  rpc MuteConversation(MuteConversationRequest) returns (MuteConversationResponse);
 }
 
 message AuthContext {
@@ -113,6 +114,7 @@ message ConversationSummary {
   string last_source_event_type = 8;
   bool archived = 9;
   bool pinned = 10;
+  bool muted = 11;
 }
 
 message ListConversationsResponse {
@@ -138,5 +140,15 @@ message PinConversationRequest {
 }
 
 message PinConversationResponse {
+  ConversationSummary conversation = 1;
+}
+
+message MuteConversationRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  bool muted = 3;
+}
+
+message MuteConversationResponse {
   ConversationSummary conversation = 1;
 }

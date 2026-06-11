@@ -12,6 +12,7 @@ type ReceiptRepository interface {
 	ListConversations(ctx context.Context, command types.ListConversationsCommand) (types.ListConversationsResult, error)
 	ArchiveConversation(ctx context.Context, command types.ArchiveConversationCommand) (types.ArchiveConversationResult, error)
 	PinConversation(ctx context.Context, command types.PinConversationCommand) (types.PinConversationResult, error)
+	MuteConversation(ctx context.Context, command types.MuteConversationCommand) (types.MuteConversationResult, error)
 }
 
 type ReceiptAccessPort interface {

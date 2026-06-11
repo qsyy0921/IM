@@ -101,6 +101,7 @@ Sentinel 模式当前已证明三件事：客户端 master discovery 正常路�
 | `loadtest-report-20260609-push-gateway-redis-sentinel-route-resume-smoke.md` | Redis Sentinel discovery 正常路径下，跨实例 route / resume smoke 通过；不代表 failover / HA 验收 |
 | `loadtest-report-20260609-push-gateway-redis-sentinel-failover-smoke.md` | 本地三 Redis / 三 Sentinel 拓扑下触发 `SENTINEL failover mymaster`，切主后 route / resume / PullInbox / AckDelivery 恢复通过；不代表完整 Redis HA |
 | `loadtest-report-20260609-push-gateway-redis-sentinel-master-stop-smoke.md` | 停止 Sentinel 当前 master 容器，等待 Sentinel 自主选主后继续 route / resume / PullInbox / AckDelivery；不代表 quorum / 网络分区 / Redis Cluster 验收 |
+| `loadtest-report-20260612-win-mac-arm64-distributed-smoke.md` | Mac Docker arm64 WebSocket gateway + Windows core services / Kafka / Redis 的双机 full route 和 cross-instance resume smoke |
 | `loadtest-report-20260610-push-gateway-message-change-notify-smoke.md` | `edit / revoke / delete` 三类消息变更均能触发带正确 `source_event_type` 的 `delivery.notify`，且与 `PullInbox` durable item 一致 |
 
 报告 Markdown 保存在仓库内：

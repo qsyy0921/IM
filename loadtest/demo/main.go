@@ -23,7 +23,9 @@ import (
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	nhooyr "nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
@@ -300,9 +302,9 @@ func run(ctx context.Context, cfg config) error {
 	result.PullInbox = pull
 
 	receiptClient := receiptv1.NewReceiptServiceClient(receiptConn)
-	beforeRead, err := listConversations(ctx, cfg, receiptClient)
+	beforeRead, err := waitConversationSummary(ctx, cfg, receiptClient, pull.MaxSeq, 1, false)
 	if err != nil {
-		return finish(cfg, &result, fmt.Errorf("list conversations before read: %w", err))
+		return finish(cfg, &result, fmt.Errorf("wait list conversations before read: %w", err))
 	}
 	result.ListBeforeRead = beforeRead
 
@@ -312,15 +314,15 @@ func run(ctx context.Context, cfg config) error {
 	}
 	result.WebSocketAck = ack
 
-	markReadResponse, err := markRead(ctx, cfg, receiptClient, pull.MaxSeq)
+	markReadResponse, err := waitMarkRead(ctx, cfg, receiptClient, pull.MaxSeq)
 	if err != nil {
 		return finish(cfg, &result, fmt.Errorf("mark read: %w", err))
 	}
 	result.MarkRead = markReadSummary{LastReadSeq: markReadResponse.GetLastReadSeq()}
 
-	afterRead, err := listConversations(ctx, cfg, receiptClient)
+	afterRead, err := waitConversationSummary(ctx, cfg, receiptClient, pull.MaxSeq, 0, true)
 	if err != nil {
-		return finish(cfg, &result, fmt.Errorf("list conversations after read: %w", err))
+		return finish(cfg, &result, fmt.Errorf("wait list conversations after read: %w", err))
 	}
 	result.ListAfterRead = afterRead
 	if err := waitReadCursor(ctx, pool, cfg, pull.MaxSeq); err != nil {
@@ -446,6 +448,20 @@ func markRead(ctx context.Context, cfg config, client receiptv1.ReceiptServiceCl
 	})
 }
 
+func waitMarkRead(ctx context.Context, cfg config, client receiptv1.ReceiptServiceClient, seq int64) (*receiptv1.MarkReadResponse, error) {
+	deadline := time.Now().Add(cfg.waitTimeout)
+	for {
+		response, err := markRead(ctx, cfg, client, seq)
+		if err == nil {
+			return response, nil
+		}
+		if status.Code(err) != codes.FailedPrecondition || time.Now().After(deadline) {
+			return nil, err
+		}
+		time.Sleep(cfg.pollInterval)
+	}
+}
+
 func listConversations(ctx context.Context, cfg config, client receiptv1.ReceiptServiceClient) (conversationListSummary, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
@@ -474,6 +490,37 @@ func listConversations(ctx context.Context, cfg config, client receiptv1.Receipt
 		})
 	}
 	return result, nil
+}
+
+func waitConversationSummary(ctx context.Context, cfg config, client receiptv1.ReceiptServiceClient, minSeq int64, expectedUnread int64, requireRead bool) (conversationListSummary, error) {
+	deadline := time.Now().Add(cfg.waitTimeout)
+	var last conversationListSummary
+	for {
+		result, err := listConversations(ctx, cfg, client)
+		if err != nil {
+			return result, err
+		}
+		last = result
+		for _, item := range result.Items {
+			if item.ConversationID != cfg.conversationID {
+				continue
+			}
+			if item.LastVisibleSeq < minSeq {
+				continue
+			}
+			if item.UnreadCount != expectedUnread {
+				continue
+			}
+			if requireRead && item.LastReadSeq < minSeq {
+				continue
+			}
+			return result, nil
+		}
+		if time.Now().After(deadline) {
+			return last, fmt.Errorf("conversation summary did not reach seq=%d unread=%d require_read=%t", minSeq, expectedUnread, requireRead)
+		}
+		time.Sleep(cfg.pollInterval)
+	}
 }
 
 func connectWebSocket(ctx context.Context, cfg config) (*nhooyr.Conn, serverFrame, error) {

@@ -39,6 +39,8 @@ func run() error {
 		return runGRPC()
 	case "outbox-relay":
 		return runOutboxRelay()
+	case "outbox-repair":
+		return runOutboxRepair()
 	default:
 		return errors.New("unsupported NEXUSIM_CONTACTS_SERVICE_MODE")
 	}
@@ -140,6 +142,31 @@ func runOutboxRelay() error {
 	)
 	log.Printf("contacts-service outbox relay started topic=%s", topic)
 	return relay.Run(ctx)
+}
+
+func runOutboxRepair() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	eventIDs := splitCSV(os.Getenv("NEXUSIM_CONTACTS_OUTBOX_REPAIR_EVENT_IDS"))
+	reason := envString("NEXUSIM_CONTACTS_OUTBOX_REPAIR_REASON", "manual contacts outbox repair")
+	stats, err := postgresinfra.NewOutboxStore(pool).RepairDLQEvents(ctx, eventIDs, reason)
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"contacts-service outbox repair completed requested=%d repaired=%d skipped=%d",
+		stats.Requested,
+		stats.Repaired,
+		stats.Skipped,
+	)
+	return nil
 }
 
 func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {

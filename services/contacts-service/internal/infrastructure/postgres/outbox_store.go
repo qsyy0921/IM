@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -115,6 +116,96 @@ func (store *OutboxStore) ProcessReadyBatch(
 
 	if err := tx.Commit(ctx); err != nil {
 		return types.OutboxRelayStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	return stats, nil
+}
+
+func (store *OutboxStore) RepairDLQEvents(ctx context.Context, eventIDs []string, reason string) (types.OutboxRepairStats, error) {
+	if store == nil || store.pool == nil {
+		return types.OutboxRepairStats{}, errors.New("contacts outbox store is not configured")
+	}
+	ids := normalizeEventIDs(eventIDs)
+	if len(ids) == 0 {
+		return types.OutboxRepairStats{}, types.NewInvalidArgument("event_ids are required")
+	}
+	if strings.TrimSpace(reason) == "" {
+		reason = "manual contacts outbox repair"
+	}
+
+	tx, err := store.pool.Begin(ctx)
+	if err != nil {
+		return types.OutboxRepairStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	var stats types.OutboxRepairStats
+	err = tx.QueryRow(ctx, `
+WITH requested AS (
+    SELECT DISTINCT unnest($1::text[]) AS event_id
+),
+target AS (
+    SELECT
+        co.id,
+        co.event_id,
+        co.tenant_id,
+        co.status,
+        co.retry_count,
+        co.last_error,
+        co.dead_lettered_at
+    FROM contacts_outbox co
+    JOIN requested r ON r.event_id = co.event_id
+    WHERE co.status = $3
+    FOR UPDATE OF co
+),
+updated AS (
+    UPDATE contacts_outbox co
+    SET status = $2,
+        retry_count = 0,
+        last_error = '',
+        next_retry_at = NULL,
+        dead_lettered_at = NULL,
+        available_at = now(),
+        updated_at = now()
+    FROM target t
+    WHERE co.id = t.id
+    RETURNING co.event_id
+),
+audit AS (
+    INSERT INTO contacts_outbox_repair_audit (
+        event_id,
+        tenant_id,
+        previous_status,
+        previous_retry_count,
+        previous_last_error,
+        previous_dead_lettered_at,
+        repair_reason
+    )
+    SELECT
+        event_id,
+        tenant_id,
+        status,
+        retry_count,
+        last_error,
+        dead_lettered_at,
+        $4
+    FROM target
+    RETURNING event_id
+)
+SELECT
+    (SELECT COUNT(*) FROM requested) AS requested,
+    (SELECT COUNT(*) FROM updated) AS repaired
+`, ids, types.OutboxStatusPending, types.OutboxStatusDLQ, reason).Scan(&stats.Requested, &stats.Repaired)
+	if err != nil {
+		return types.OutboxRepairStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	stats.Skipped = stats.Requested - stats.Repaired
+	if stats.Skipped < 0 {
+		stats.Skipped = 0
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.OutboxRepairStats{}, types.NewDBWriteFailed(err.Error())
 	}
 	return stats, nil
 }
@@ -242,6 +333,23 @@ WHERE id = $1
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
+}
+
+func normalizeEventIDs(eventIDs []string) []string {
+	seen := make(map[string]struct{}, len(eventIDs))
+	ids := make([]string, 0, len(eventIDs))
+	for _, eventID := range eventIDs {
+		eventID = strings.TrimSpace(eventID)
+		if eventID == "" {
+			continue
+		}
+		if _, ok := seen[eventID]; ok {
+			continue
+		}
+		seen[eventID] = struct{}{}
+		ids = append(ids, eventID)
+	}
+	return ids
 }
 
 func retryDelay(base time.Duration, attempt int) time.Duration {

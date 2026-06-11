@@ -565,7 +565,7 @@ contacts_outbox -> Kafka im.contact.events -> push / audit / recommendation
 | BlockContact | `tenant_id + owner_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；重复 BLOCKED 返回既有 result | 通过 UnblockContact 从 BLOCKED 恢复 ACTIVE；不混入删除 |
 | UnblockContact | `tenant_id + owner_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；只允许 `BLOCKED -> ACTIVE`，并 replay 原始 result snapshot | 不能恢复 DELETED；重新加好友仍走申请 / 接受链路 |
 | UpdateContactRemark | `tenant_id + owner_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；remark 相同可 replay | 再次 UpdateContactRemark 覆盖 |
-| contacts outbox publish | `event_id` | at-least-once retry，max attempts 后 DLQ；relay 必须按 `partition_key + aggregate_version` fail-closed 阻塞低版本 PENDING/DLQ，避免 accepted 早于 created 发布 | repair/replay worker 后续实现 |
+| contacts outbox publish | `event_id` | at-least-once retry，max attempts 后 DLQ；relay 必须按 `partition_key + aggregate_version` fail-closed 阻塞低版本 PENDING/DLQ，避免 accepted 早于 created 发布 | 已有按 `event_id` 受控 repair 入口，可把 DLQ 重置为 PENDING 后重新进入 relay，并写 `contacts_outbox_repair_audit`；批量 repair 平台和审批 UI 后续实现 |
 
 Command hash 规则：
 
@@ -632,7 +632,7 @@ GET /debug/metrics
 | app unit | command validation、repository error propagation |
 | api unit | gRPC request/response 转换、稳定错误映射 |
 | postgres integration | SendContactRequest / RespondContactRequest / CancelContactRequest / ListContactRequests / ListContacts / DeleteContact / BlockContact / UpdateContactRemark 真实事务、幂等 replay、并发首次申请、反向 pending、终态相反 decision、分页 token 绑定、单向 edge 变更 |
-| outbox integration | contacts_outbox retry / DLQ / mark PUBLISHED |
+| outbox integration | contacts_outbox retry / DLQ / mark PUBLISHED / 按 event_id repair DLQ 后恢复顺序发布 |
 | smoke | `SendContactRequest -> ListContactRequests(PENDING) -> RespondContactRequest(ACCEPT) -> ListContactRequests(ACCEPTED) -> ListContacts` |
 | cancel smoke | `SendContactRequest -> ListContactRequests(INCOMING,PENDING) -> CancelContactRequest -> ListContactRequests(INCOMING,PENDING)=0 -> ListContactRequests(OUTGOING,CANCELED)=1` |
 | v0.2 smoke | `ACCEPT -> DeleteContact`、`ACCEPT -> BlockContact`、`ACCEPT -> BlockContact -> UnblockContact`、`ACCEPT -> UpdateContactRemark`、`ACCEPT -> DeleteContact -> SendContactRequest -> ACCEPT`，分别验证 contacts_outbox / Kafka / ListContacts / GetContactState |
@@ -644,10 +644,22 @@ GET /debug/metrics
 ```text
 NEXUSIM_CONTACTS_SERVICE_MODE=grpc
 NEXUSIM_CONTACTS_SERVICE_MODE=outbox-relay
+NEXUSIM_CONTACTS_SERVICE_MODE=outbox-repair
 NEXUSIM_CONTACTS_AUTH_MODE=metadata   # production / gateway verified identity
 NEXUSIM_CONTACTS_AUTH_MODE=body       # local smoke compatibility only
 NEXUSIM_CONTACTS_DEBUG_ADDR=0.0.0.0:10501
 ```
+
+受控 outbox repair：
+
+```powershell
+$env:NEXUSIM_CONTACTS_SERVICE_MODE='outbox-repair'
+$env:NEXUSIM_CONTACTS_OUTBOX_REPAIR_EVENT_IDS='evt_contact_1,evt_contact_2'
+$env:NEXUSIM_CONTACTS_OUTBOX_REPAIR_REASON='operator retried after kafka recovery'
+.\contacts-service.exe
+```
+
+`outbox-repair` 只处理明确列出的 `contacts_outbox.status='DLQ'` 事件，把它们重置为 `PENDING`、清理 retry / error / DLQ 时间字段，并写入 `contacts_outbox_repair_audit` 保存原状态、原 retry/error 和 repair reason。随后事件交回普通 outbox relay 按 `partition_key + aggregate_version` 顺序发布；不会直接 publish Kafka，也不会跳过低版本阻塞。`PUBLISHED`、仍在 `PENDING` 或不存在的 event 会计入 skipped。
 
 本地 smoke：
 

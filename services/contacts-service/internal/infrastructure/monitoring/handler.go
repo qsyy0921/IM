@@ -12,11 +12,16 @@ import (
 const serviceName = "contacts-service"
 
 type Handler struct {
-	pool *pgxpool.Pool
+	pool        *pgxpool.Pool
+	grpcMetrics *GRPCMetrics
 }
 
-func NewHandler(pool *pgxpool.Pool) *Handler {
-	return &Handler{pool: pool}
+func NewHandler(pool *pgxpool.Pool, grpcMetrics ...*GRPCMetrics) *Handler {
+	handler := &Handler{pool: pool}
+	if len(grpcMetrics) > 0 {
+		handler.grpcMetrics = grpcMetrics[0]
+	}
+	return handler
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +55,10 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	snapshot := Snapshot{
 		Service:       serviceName,
 		GeneratedAtMS: time.Now().UnixMilli(),
+	}
+	if h.grpcMetrics != nil {
+		grpcSnapshot := h.grpcMetrics.Snapshot()
+		snapshot.GRPC = &grpcSnapshot
 	}
 	if h.pool != nil {
 		stats := h.pool.Stat()
@@ -88,6 +97,7 @@ type Snapshot struct {
 	PGPool        *PGPoolSnapshot `json:"pg_pool,omitempty"`
 	Outbox        *OutboxSnapshot `json:"contacts_outbox,omitempty"`
 	OutboxError   string          `json:"contacts_outbox_error,omitempty"`
+	GRPC          *GRPCSnapshot   `json:"grpc,omitempty"`
 }
 
 type PGPoolSnapshot struct {

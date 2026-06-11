@@ -612,6 +612,9 @@ contacts_remark_updated_total
 contacts_list_latency_ms
 contacts_outbox_pending_count
 contacts_outbox_dlq_count
+contacts_grpc_requests_total
+contacts_grpc_errors_total
+contacts_grpc_latency_ms
 ```
 
 生产化基础观测入口已接入 `NEXUSIM_CONTACTS_DEBUG_ADDR`：
@@ -622,7 +625,7 @@ GET /readyz
 GET /debug/metrics
 ```
 
-`/readyz` 会检查 PostgreSQL ping；`/debug/metrics` 第一版输出 pgx pool 状态和 `contacts_outbox` 的 total / pending / published / DLQ / ready_pending / oldest age。该入口只暴露本服务自己的健康与 outbox 状态，不读取其它服务内部表。
+`/readyz` 会检查 PostgreSQL ping；`/debug/metrics` 第一版输出 pgx pool 状态、`contacts_outbox` 的 total / pending / published / DLQ / ready_pending / oldest age，以及 gRPC method/code 计数、错误计数和平均 / 最大延迟。gRPC interceptor 会输出 JSON 结构化请求日志，包含 service、method、code、latency_ms。该入口只暴露本服务自己的健康与 outbox 状态，不读取其它服务内部表。当前仍是本地 debug/运维入口，不等同于完整 Prometheus / OpenTelemetry / alertmanager 生产栈。
 
 ## 13. 测试方案
 

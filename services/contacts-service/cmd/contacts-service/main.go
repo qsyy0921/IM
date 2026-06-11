@@ -55,7 +55,8 @@ func runGRPC() error {
 		return err
 	}
 	defer pool.Close()
-	stopDebug, err := startDebugServer(ctx, contactsDebugAddr(), monitoringinfra.NewHandler(pool))
+	grpcMetrics := monitoringinfra.NewGRPCMetrics()
+	stopDebug, err := startDebugServer(ctx, contactsDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics))
 	if err != nil {
 		return err
 	}
@@ -67,7 +68,7 @@ func runGRPC() error {
 		return err
 	}
 	repository := postgresinfra.NewRepository(pool)
-	server, err := newGRPCServer()
+	server, err := newGRPCServer(grpcMetrics)
 	if err != nil {
 		return err
 	}
@@ -219,15 +220,22 @@ func contactsDebugAddr() string {
 	return envString("NEXUSIM_CONTACTS_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
 }
 
-func newGRPCServer() (*grpc.Server, error) {
+func newGRPCServer(grpcMetrics *monitoringinfra.GRPCMetrics) (*grpc.Server, error) {
+	interceptors := make([]grpc.UnaryServerInterceptor, 0, 2)
+	if grpcMetrics != nil {
+		interceptors = append(interceptors, grpcMetrics.UnaryServerInterceptor(log.Default()))
+	}
 	switch strings.ToLower(envString("NEXUSIM_CONTACTS_AUTH_MODE", "body")) {
 	case "body", "request", "legacy":
-		return grpc.NewServer(), nil
 	case "metadata", "verified-metadata":
-		return grpc.NewServer(grpc.UnaryInterceptor(contactsgrpc.VerifiedAuthUnaryInterceptor(true))), nil
+		interceptors = append(interceptors, contactsgrpc.VerifiedAuthUnaryInterceptor(true))
 	default:
 		return nil, errors.New("unsupported NEXUSIM_CONTACTS_AUTH_MODE")
 	}
+	if len(interceptors) == 0 {
+		return grpc.NewServer(), nil
+	}
+	return grpc.NewServer(grpc.ChainUnaryInterceptor(interceptors...)), nil
 }
 
 func envString(name string, fallback string) string {

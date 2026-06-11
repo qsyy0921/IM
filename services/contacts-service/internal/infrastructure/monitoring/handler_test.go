@@ -60,3 +60,22 @@ func TestHandlerMetricsWithoutPool(t *testing.T) {
 		t.Fatalf("nil pool should not include pg/outbox metrics: %+v", body)
 	}
 }
+
+func TestHandlerMetricsIncludesGRPCSnapshot(t *testing.T) {
+	grpcMetrics := NewGRPCMetrics()
+	grpcMetrics.record("/nexusim.contacts.v1.ContactsService/ListContacts", "OK", 12)
+	handler := NewHandler(nil, grpcMetrics)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/debug/metrics", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", response.Code)
+	}
+	var body Snapshot
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode metrics response: %v", err)
+	}
+	if body.GRPC == nil || body.GRPC.TotalRequests != 1 || len(body.GRPC.Methods) != 1 {
+		t.Fatalf("expected grpc metrics, got %+v", body.GRPC)
+	}
+}

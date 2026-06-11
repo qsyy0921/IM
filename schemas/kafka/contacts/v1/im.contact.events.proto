@@ -34,6 +34,7 @@ message ContactEvent {
     ContactEdgeDeletedV1 edge_deleted = 23;
     ContactEdgeBlockedV1 edge_blocked = 24;
     ContactEdgeRemarkUpdatedV1 edge_remark_updated = 25;
+    ContactEdgeUnblockedV1 edge_unblocked = 26;
   }
 }
 
@@ -94,5 +95,15 @@ message ContactEdgeRemarkUpdatedV1 {
   string status = 4;
   int64 edge_version = 5;
   string remark = 6;
+  google.protobuf.Timestamp occurred_at = 7;
+}
+
+message ContactEdgeUnblockedV1 {
+  string tenant_id = 1;
+  string owner_user_id = 2;
+  string contact_user_id = 3;
+  string previous_status = 4;
+  string status = 5;
+  int64 edge_version = 6;
   google.protobuf.Timestamp occurred_at = 7;
 }

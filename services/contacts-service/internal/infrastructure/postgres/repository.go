@@ -22,6 +22,7 @@ const (
 	commandTypeRespondContactRequest = "RESPOND_CONTACT_REQUEST"
 	commandTypeDeleteContact         = "DELETE_CONTACT"
 	commandTypeBlockContact          = "BLOCK_CONTACT"
+	commandTypeUnblockContact        = "UNBLOCK_CONTACT"
 	commandTypeUpdateContactRemark   = "UPDATE_CONTACT_REMARK"
 
 	eventTypeContactRequestCreated  = "contact.request.created.v1"
@@ -29,6 +30,7 @@ const (
 	eventTypeContactRequestDeclined = "contact.request.declined.v1"
 	eventTypeContactEdgeDeleted     = "contact.edge.deleted.v1"
 	eventTypeContactEdgeBlocked     = "contact.edge.blocked.v1"
+	eventTypeContactEdgeUnblocked   = "contact.edge.unblocked.v1"
 	eventTypeContactRemarkUpdated   = "contact.edge.remark_updated.v1"
 
 	contactsOutboxEventVersion   = "1.0.0"
@@ -561,6 +563,81 @@ func (r *Repository) BlockContact(
 		return types.BlockContactResult{}, err
 	}
 	return commitBlockContactResult(ctx, tx, blockContactResultFromEdge(updated, false))
+}
+
+func (r *Repository) UnblockContact(
+	ctx context.Context,
+	command types.UnblockContactCommand,
+) (types.UnblockContactResult, error) {
+	if r.pool == nil {
+		return types.UnblockContactResult{}, types.NewDBWriteFailed("contacts repository is not configured")
+	}
+	commandHash, err := commandHash(commandHashPayload{
+		Kind:          commandTypeUnblockContact,
+		TenantID:      string(command.AuthContext.TenantID),
+		UserID:        string(command.AuthContext.UserID),
+		ContactUserID: string(command.ContactUserID),
+	})
+	if err != nil {
+		return types.UnblockContactResult{}, err
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.UnblockContactResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+	if err := lockIdempotencyKey(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey); err != nil {
+		return types.UnblockContactResult{}, err
+	}
+	if existing, ok, err := findCommandIdempotency(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey); err != nil {
+		return types.UnblockContactResult{}, err
+	} else if ok {
+		if existing.CommandType != commandTypeUnblockContact || existing.CommandHash != commandHash {
+			return types.UnblockContactResult{}, types.NewContactRequestConflict("idempotency key conflict")
+		}
+		row, err := contactEdgeRowFromIdempotencyResult(existing)
+		if err != nil {
+			return types.UnblockContactResult{}, err
+		}
+		return commitUnblockContactResult(ctx, tx, unblockContactResultFromEdge(row, true))
+	}
+	if err := lockContactPair(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.ContactUserID); err != nil {
+		return types.UnblockContactResult{}, err
+	}
+	row, err := lockContactEdge(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.ContactUserID)
+	if err != nil {
+		return types.UnblockContactResult{}, err
+	}
+	if row.Status != types.ContactEdgeStatusBlocked {
+		return types.UnblockContactResult{}, types.NewContactNotFound("blocked contact edge not found")
+	}
+	updated, err := updateContactEdgeStatus(ctx, tx, row, types.ContactEdgeStatusActive)
+	if err != nil {
+		return types.UnblockContactResult{}, err
+	}
+	resultJSON, err := edgeResultJSON(updated)
+	if err != nil {
+		return types.UnblockContactResult{}, err
+	}
+	if err := insertCommandIdempotencyWithResult(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey, commandTypeUnblockContact, commandHash, contactEdgeID(command.AuthContext.UserID, command.ContactUserID), resultJSON); err != nil {
+		return types.UnblockContactResult{}, err
+	}
+	if err := r.insertEdgeOutbox(ctx, tx, edgeOutboxInput{
+		TenantID:       command.AuthContext.TenantID,
+		OwnerUserID:    command.AuthContext.UserID,
+		ContactUserID:  command.ContactUserID,
+		EventType:      eventTypeContactEdgeUnblocked,
+		CorrelationID:  command.AuthContext.RequestID,
+		CausationID:    command.AuthContext.RequestID,
+		TraceID:        command.AuthContext.TraceID,
+		PreviousStatus: row.Status,
+		Edge:           updated,
+	}); err != nil {
+		return types.UnblockContactResult{}, err
+	}
+	return commitUnblockContactResult(ctx, tx, unblockContactResultFromEdge(updated, false))
 }
 
 func (r *Repository) UpdateContactRemark(
@@ -1289,6 +1366,13 @@ func commitBlockContactResult(ctx context.Context, tx pgx.Tx, result types.Block
 	return result, nil
 }
 
+func commitUnblockContactResult(ctx context.Context, tx pgx.Tx, result types.UnblockContactResult) (types.UnblockContactResult, error) {
+	if err := tx.Commit(ctx); err != nil {
+		return types.UnblockContactResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return result, nil
+}
+
 func commitUpdateContactRemarkResult(ctx context.Context, tx pgx.Tx, result types.UpdateContactRemarkResult) (types.UpdateContactRemarkResult, error) {
 	if err := tx.Commit(ctx); err != nil {
 		return types.UpdateContactRemarkResult{}, types.NewDBWriteFailed(err.Error())
@@ -1321,6 +1405,18 @@ func deleteContactResultFromEdge(row contactEdgeRow, replay bool) types.DeleteCo
 
 func blockContactResultFromEdge(row contactEdgeRow, replay bool) types.BlockContactResult {
 	return types.BlockContactResult{
+		TenantID:         row.TenantID,
+		OwnerUserID:      row.OwnerUserID,
+		ContactUserID:    row.ContactUserID,
+		Status:           row.Status,
+		SourceRequestID:  row.SourceRequestID,
+		Version:          row.Version,
+		IdempotentReplay: replay,
+	}
+}
+
+func unblockContactResultFromEdge(row contactEdgeRow, replay bool) types.UnblockContactResult {
+	return types.UnblockContactResult{
 		TenantID:         row.TenantID,
 		OwnerUserID:      row.OwnerUserID,
 		ContactUserID:    row.ContactUserID,

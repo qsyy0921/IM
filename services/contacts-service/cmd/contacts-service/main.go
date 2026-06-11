@@ -66,6 +66,7 @@ func runGRPC() error {
 		app.NewGetContactStateUseCase(repository),
 		app.NewDeleteContactUseCase(repository),
 		app.NewBlockContactUseCase(repository),
+		app.NewUnblockContactUseCase(repository),
 		app.NewUpdateContactRemarkUseCase(repository),
 	))
 

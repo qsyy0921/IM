@@ -60,6 +60,7 @@ type summary struct {
 	RespondContactRequest respondSummary      `json:"respond_contact_request"`
 	DeleteContact         edgeActionSummary   `json:"delete_contact,omitempty"`
 	BlockContact          edgeActionSummary   `json:"block_contact,omitempty"`
+	UnblockContact        edgeActionSummary   `json:"unblock_contact,omitempty"`
 	UpdateContactRemark   edgeActionSummary   `json:"update_contact_remark,omitempty"`
 	SenderList            listSummary         `json:"sender_list"`
 	ReceiverList          listSummary         `json:"receiver_list"`
@@ -151,7 +152,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.receiverUserID, "receiver-user-id", "contact-receiver", "receiver user id")
 	flag.StringVar(&cfg.senderDeviceID, "sender-device-id", "sender-device-1", "sender device id")
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "receiver-device-1", "receiver device id")
-	flag.StringVar(&cfg.scenario, "scenario", "accept", "scenario: accept, decline, delete, block, or remark")
+	flag.StringVar(&cfg.scenario, "scenario", "accept", "scenario: accept, decline, delete, block, unblock, or remark")
 	flag.BoolVar(&cfg.cleanup, "cleanup", false, "delete tenant contacts rows before running")
 	flag.Parse()
 	cfg.kafkaBrokers = splitCSV(brokers)
@@ -253,6 +254,21 @@ func run(cfg config) error {
 			return err
 		}
 		s.BlockContact = blockResult
+	case "unblock":
+		blockResult, elapsed, err := blockContact(cfg, client, requestIDSuffix)
+		s.LatenciesMS["block_contact"] = elapsed
+		if err != nil {
+			s.Error = err.Error()
+			return err
+		}
+		s.BlockContact = blockResult
+		unblockResult, elapsed, err := unblockContact(cfg, client, requestIDSuffix)
+		s.LatenciesMS["unblock_contact"] = elapsed
+		if err != nil {
+			s.Error = err.Error()
+			return err
+		}
+		s.UnblockContact = unblockResult
 	case "remark":
 		remarkResult, elapsed, err := updateContactRemark(cfg, client, requestIDSuffix)
 		s.LatenciesMS["update_contact_remark"] = elapsed
@@ -427,6 +443,32 @@ func blockContact(cfg config, client contactsv1.ContactsServiceClient, suffix st
 	elapsed := elapsedMS(begin)
 	if err != nil {
 		return edgeActionSummary{}, elapsed, fmt.Errorf("block contact: %w", err)
+	}
+	return edgeActionSummary{
+		Status:           resp.GetStatus().String(),
+		Version:          resp.GetVersion(),
+		IdempotentReplay: resp.GetIdempotentReplay(),
+	}, elapsed, nil
+}
+
+func unblockContact(cfg config, client contactsv1.ContactsServiceClient, suffix string) (edgeActionSummary, float64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
+	defer cancel()
+	begin := time.Now()
+	resp, err := client.UnblockContact(ctx, &contactsv1.UnblockContactRequest{
+		AuthContext: &contactsv1.AuthContext{
+			TenantId:  cfg.tenantID,
+			UserId:    cfg.senderUserID,
+			DeviceId:  cfg.senderDeviceID,
+			RequestId: "contact-unblock-" + suffix,
+			TraceId:   "trace-contact-" + suffix,
+		},
+		ContactUserId:  cfg.receiverUserID,
+		IdempotencyKey: "unblock-" + suffix,
+	})
+	elapsed := elapsedMS(begin)
+	if err != nil {
+		return edgeActionSummary{}, elapsed, fmt.Errorf("unblock contact: %w", err)
 	}
 	return edgeActionSummary{
 		Status:           resp.GetStatus().String(),
@@ -622,6 +664,10 @@ func summarizeContactEvent(event *contacteventsv1.ContactEvent) contactKafkaEven
 		result.ContactUserID = payload.EdgeBlocked.GetContactUserId()
 		result.Status = payload.EdgeBlocked.GetStatus()
 		result.Reason = payload.EdgeBlocked.GetReason()
+	case *contacteventsv1.ContactEvent_EdgeUnblocked:
+		result.OwnerUserID = payload.EdgeUnblocked.GetOwnerUserId()
+		result.ContactUserID = payload.EdgeUnblocked.GetContactUserId()
+		result.Status = payload.EdgeUnblocked.GetStatus()
 	case *contacteventsv1.ContactEvent_EdgeRemarkUpdated:
 		result.OwnerUserID = payload.EdgeRemarkUpdated.GetOwnerUserId()
 		result.ContactUserID = payload.EdgeRemarkUpdated.GetContactUserId()
@@ -641,6 +687,8 @@ func validateSummary(s summary) error {
 		return validateDeleteSummary(s)
 	case "block":
 		return validateBlockSummary(s)
+	case "unblock":
+		return validateUnblockSummary(s)
 	case "remark":
 		return validateRemarkSummary(s)
 	default:
@@ -684,6 +732,28 @@ func validateBlockSummary(s summary) error {
 		return fmt.Errorf("unexpected block states: sender=%+v receiver=%+v", s.SenderState, s.ReceiverState)
 	}
 	return validateOutboxAndEvents(s, "contact.edge.blocked.v1", expectedEventCount(s.Scenario))
+}
+
+func validateUnblockSummary(s summary) error {
+	if err := validateAcceptPrefix(s); err != nil {
+		return err
+	}
+	if s.BlockContact.Status != "CONTACT_EDGE_STATUS_BLOCKED" {
+		return fmt.Errorf("block status=%s, want BLOCKED", s.BlockContact.Status)
+	}
+	if s.UnblockContact.Status != "CONTACT_EDGE_STATUS_ACTIVE" {
+		return fmt.Errorf("unblock status=%s, want ACTIVE", s.UnblockContact.Status)
+	}
+	if !contains(s.SenderList.ContactUserIDs, s.ReceiverUserID) || !contains(s.ReceiverList.ContactUserIDs, s.SenderUserID) {
+		return fmt.Errorf("unblocked contact should be visible to both sides: sender=%+v receiver=%+v", s.SenderList, s.ReceiverList)
+	}
+	if s.SenderState.Status != "CONTACT_EDGE_STATUS_ACTIVE" || s.ReceiverState.Status != "CONTACT_EDGE_STATUS_ACTIVE" {
+		return fmt.Errorf("unexpected unblock states: sender=%+v receiver=%+v", s.SenderState, s.ReceiverState)
+	}
+	if err := validateOutboxAndEvents(s, "contact.edge.blocked.v1", expectedEventCount(s.Scenario)); err != nil {
+		return err
+	}
+	return validateOutboxAndEvents(s, "contact.edge.unblocked.v1", expectedEventCount(s.Scenario))
 }
 
 func validateRemarkSummary(s summary) error {
@@ -782,6 +852,8 @@ func expectedEventCount(scenario string) int {
 	switch scenario {
 	case "delete", "block", "remark":
 		return 3
+	case "unblock":
+		return 4
 	default:
 		return 2
 	}

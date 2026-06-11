@@ -30,6 +30,10 @@ type BlockContactRepository interface {
 	BlockContact(context.Context, types.BlockContactCommand) (types.BlockContactResult, error)
 }
 
+type UnblockContactRepository interface {
+	UnblockContact(context.Context, types.UnblockContactCommand) (types.UnblockContactResult, error)
+}
+
 type UpdateContactRemarkRepository interface {
 	UpdateContactRemark(context.Context, types.UpdateContactRemarkCommand) (types.UpdateContactRemarkResult, error)
 }

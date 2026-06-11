@@ -234,6 +234,41 @@ type BlockContactResult struct {
 	IdempotentReplay bool
 }
 
+type UnblockContactCommand struct {
+	AuthContext    AuthContext
+	ContactUserID  UserID
+	IdempotencyKey string
+}
+
+func (c UnblockContactCommand) Validate() error {
+	if c.AuthContext.TenantID == "" {
+		return NewInvalidArgument("tenant_id is required")
+	}
+	if c.AuthContext.UserID == "" {
+		return NewInvalidArgument("user_id is required")
+	}
+	if c.ContactUserID == "" {
+		return NewInvalidArgument("contact_user_id is required")
+	}
+	if c.AuthContext.UserID == c.ContactUserID {
+		return NewInvalidArgument("cannot unblock self")
+	}
+	if strings.TrimSpace(c.IdempotencyKey) == "" {
+		return NewInvalidArgument("idempotency_key is required")
+	}
+	return nil
+}
+
+type UnblockContactResult struct {
+	TenantID         TenantID
+	OwnerUserID      UserID
+	ContactUserID    UserID
+	Status           ContactEdgeStatus
+	SourceRequestID  string
+	Version          int64
+	IdempotentReplay bool
+}
+
 type UpdateContactRemarkCommand struct {
 	AuthContext    AuthContext
 	ContactUserID  UserID

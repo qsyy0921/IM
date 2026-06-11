@@ -11,6 +11,7 @@ service ContactsService {
   rpc GetContactState(GetContactStateRequest) returns (GetContactStateResponse);
   rpc DeleteContact(DeleteContactRequest) returns (DeleteContactResponse);
   rpc BlockContact(BlockContactRequest) returns (BlockContactResponse);
+  rpc UnblockContact(UnblockContactRequest) returns (UnblockContactResponse);
   rpc UpdateContactRemark(UpdateContactRemarkRequest) returns (UpdateContactRemarkResponse);
 }
 
@@ -139,6 +140,22 @@ message BlockContactRequest {
 }
 
 message BlockContactResponse {
+  string tenant_id = 1;
+  string owner_user_id = 2;
+  string contact_user_id = 3;
+  ContactEdgeStatus status = 4;
+  string source_request_id = 5;
+  int64 version = 6;
+  bool idempotent_replay = 7;
+}
+
+message UnblockContactRequest {
+  AuthContext auth_context = 1;
+  string contact_user_id = 2;
+  string idempotency_key = 3;
+}
+
+message UnblockContactResponse {
   string tenant_id = 1;
   string owner_user_id = 2;
   string contact_user_id = 3;

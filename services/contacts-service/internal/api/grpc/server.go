@@ -35,6 +35,10 @@ type BlockContactExecutor interface {
 	Execute(context.Context, types.BlockContactCommand) (types.BlockContactResult, error)
 }
 
+type UnblockContactExecutor interface {
+	Execute(context.Context, types.UnblockContactCommand) (types.UnblockContactResult, error)
+}
+
 type UpdateContactRemarkExecutor interface {
 	Execute(context.Context, types.UpdateContactRemarkCommand) (types.UpdateContactRemarkResult, error)
 }
@@ -47,6 +51,7 @@ type Server struct {
 	getContactState       GetContactStateExecutor
 	deleteContact         DeleteContactExecutor
 	blockContact          BlockContactExecutor
+	unblockContact        UnblockContactExecutor
 	updateContactRemark   UpdateContactRemarkExecutor
 }
 
@@ -57,6 +62,7 @@ func NewServer(
 	getContactState GetContactStateExecutor,
 	deleteContact DeleteContactExecutor,
 	blockContact BlockContactExecutor,
+	unblockContact UnblockContactExecutor,
 	updateContactRemark UpdateContactRemarkExecutor,
 ) *Server {
 	return &Server{
@@ -66,6 +72,7 @@ func NewServer(
 		getContactState:       getContactState,
 		deleteContact:         deleteContact,
 		blockContact:          blockContact,
+		unblockContact:        unblockContact,
 		updateContactRemark:   updateContactRemark,
 	}
 }
@@ -247,6 +254,35 @@ func (s *Server) BlockContact(
 		return nil, grpcError(err)
 	}
 	return &contactsv1.BlockContactResponse{
+		TenantId:         string(result.TenantID),
+		OwnerUserId:      string(result.OwnerUserID),
+		ContactUserId:    string(result.ContactUserID),
+		Status:           edgeStatusToProto(result.Status),
+		SourceRequestId:  result.SourceRequestID,
+		Version:          result.Version,
+		IdempotentReplay: result.IdempotentReplay,
+	}, nil
+}
+
+func (s *Server) UnblockContact(
+	ctx context.Context,
+	request *contactsv1.UnblockContactRequest,
+) (*contactsv1.UnblockContactResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.unblockContact == nil {
+		return nil, status.Error(codes.Unimplemented, "unblock contact is not configured")
+	}
+	result, err := s.unblockContact.Execute(ctx, types.UnblockContactCommand{
+		AuthContext:    authFromProto(request.GetAuthContext()),
+		ContactUserID:  types.UserID(request.GetContactUserId()),
+		IdempotencyKey: request.GetIdempotencyKey(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &contactsv1.UnblockContactResponse{
 		TenantId:         string(result.TenantID),
 		OwnerUserId:      string(result.OwnerUserID),
 		ContactUserId:    string(result.ContactUserID),

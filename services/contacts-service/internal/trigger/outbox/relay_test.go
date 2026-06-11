@@ -41,7 +41,7 @@ func TestBuildContactEventAccepted(t *testing.T) {
 	}
 }
 
-func TestBuildContactEventEdgeBlockedAndRemarkUpdated(t *testing.T) {
+func TestBuildContactEventEdgeBlockedUnblockedAndRemarkUpdated(t *testing.T) {
 	blockedMessage := outboxMessage(types.ContactEventEdgeBlocked, map[string]any{
 		"tenant_id":       "tenant-contacts",
 		"owner_user_id":   "alice",
@@ -59,6 +59,24 @@ func TestBuildContactEventEdgeBlockedAndRemarkUpdated(t *testing.T) {
 	blocked := blockedEvent.GetEdgeBlocked()
 	if blocked == nil || blocked.OwnerUserId != "alice" || blocked.ContactUserId != "bob" || blocked.Reason != "spam" || blocked.EdgeVersion != 2 {
 		t.Fatalf("unexpected blocked event: %+v payload=%+v", blockedEvent, blocked)
+	}
+
+	unblockedMessage := outboxMessage(types.ContactEventEdgeUnblocked, map[string]any{
+		"tenant_id":       "tenant-contacts",
+		"owner_user_id":   "alice",
+		"contact_user_id": "bob",
+		"previous_status": "BLOCKED",
+		"status":          "ACTIVE",
+		"edge_version":    3,
+		"occurred_at":     "2026-06-10T08:00:00Z",
+	})
+	unblockedEvent, err := BuildContactEvent(unblockedMessage)
+	if err != nil {
+		t.Fatalf("build unblocked event: %v", err)
+	}
+	unblocked := unblockedEvent.GetEdgeUnblocked()
+	if unblocked == nil || unblocked.PreviousStatus != "BLOCKED" || unblocked.Status != "ACTIVE" || unblocked.EdgeVersion != 3 {
+		t.Fatalf("unexpected unblocked event: %+v payload=%+v", unblockedEvent, unblocked)
 	}
 
 	remarkMessage := outboxMessage(types.ContactEventRemarkUpdated, map[string]any{

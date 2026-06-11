@@ -42,6 +42,24 @@ func (u *BlockContactUseCase) Execute(
 	return u.repository.BlockContact(ctx, command)
 }
 
+type UnblockContactUseCase struct {
+	repository UnblockContactRepository
+}
+
+func NewUnblockContactUseCase(repository UnblockContactRepository) *UnblockContactUseCase {
+	return &UnblockContactUseCase{repository: repository}
+}
+
+func (u *UnblockContactUseCase) Execute(
+	ctx context.Context,
+	command types.UnblockContactCommand,
+) (types.UnblockContactResult, error) {
+	if err := command.Validate(); err != nil {
+		return types.UnblockContactResult{}, err
+	}
+	return u.repository.UnblockContact(ctx, command)
+}
+
 type UpdateContactRemarkUseCase struct {
 	repository UpdateContactRemarkRepository
 }

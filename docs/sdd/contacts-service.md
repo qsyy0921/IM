@@ -1,6 +1,6 @@
 # NexusIM contacts-service SDD v0.1
 
-状态：Draft；proto / Kafka schema / migration / 六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 `ACCEPT / DECLINE` 真实进程 smoke 已落地；联系人删除 / 拉黑 / 备注名 v0.2 已完成代码切片和真实 PostgreSQL 集成测试，真实进程 smoke 待跑。
+状态：Draft；proto / Kafka schema / migration / 六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 `ACCEPT / DECLINE` 真实进程 smoke 已落地；联系人删除 / 拉黑 / 解除拉黑 / 备注名 v0.2 已完成代码切片，删除 / 拉黑 / 备注名真实进程 smoke 已通过，解除拉黑 smoke 待跑。
 
 本文定义第三层 IM 产品能力中的“联系人 / 好友关系”最小服务边界。目标是补齐社交关系事实源，同时保持低耦合：不把好友关系塞进 `conversation_members`，也不让会话、消息、投递服务直接读联系人表。
 
@@ -12,7 +12,7 @@
 
 - 发起好友申请；
 - 接受 / 拒绝好友申请；
-- 删除联系人、拉黑联系人、更新本人的联系人备注；
+- 删除联系人、拉黑联系人、解除拉黑、更新本人的联系人备注；
 - 查询当前联系人列表；
 - 查询两名用户之间的联系人状态；
 - 通过 outbox 发布联系人事件，供通知、审计、推荐或后续搜索投影消费。
@@ -37,6 +37,7 @@
 - 删除 / 拉黑 / 备注名只修改 contacts-service 自己的关系 read model 和 outbox，不修改会话、消息、投递或在线状态。
 - 删除联系人是当前用户的单向关系操作：只把 `owner_user_id -> contact_user_id` 这条 edge 标为 `DELETED`，不强制删除对方视角的 edge。是否双向解除关系由产品策略或后续 saga 单独设计。
 - 拉黑联系人是当前用户的单向关系操作：只把 `owner_user_id -> contact_user_id` 标为 `BLOCKED`，并发布 `contact.edge.blocked.v1`。是否影响发消息权限不由 contacts-service 直接决定，后续由 policy-service / conversation-service 投影消费该事件后统一表达。
+- 解除拉黑是当前用户的单向关系操作：只允许 `BLOCKED -> ACTIVE`，并发布 `contact.edge.unblocked.v1`；不能把 `DELETED`、不存在或从未接受的关系恢复成好友。
 - 备注名是当前用户私有资料：只更新 `owner_user_id -> contact_user_id` 的 `remark`，不进入对方视图，不复制用户 profile。
 
 ## 2. 上下游
@@ -96,7 +97,7 @@ DELETED
 BLOCKED
 ```
 
-第一阶段已实现 `PENDING -> ACCEPTED / DECLINED` 和 ACTIVE 联系人列表。第二阶段实现当前用户视角的 `ACTIVE -> DELETED / BLOCKED` 和 `remark` 更新；`BLOCKED` 只产生联系人事实事件，不直接改 `SendMessage` 权限。
+第一阶段已实现 `PENDING -> ACCEPTED / DECLINED` 和 ACTIVE 联系人列表。第二阶段实现当前用户视角的 `ACTIVE -> DELETED / BLOCKED`、`BLOCKED -> ACTIVE` 和 `remark` 更新；`BLOCKED` / `ACTIVE` 转换只产生联系人事实事件，不直接改 `SendMessage` 权限。
 
 ## 5. 同步 API 契约
 
@@ -506,7 +507,8 @@ contacts_outbox -> Kafka im.contact.events -> push / audit / recommendation
 | SendContactRequest | `tenant_id + sender_user_id + idempotency_key`，事实源为 `contact_requests` 唯一键和 `command_hash` | 同 command hash replay；不同 hash 返回 conflict；不额外写 `contact_command_idempotency` | 无需补偿 |
 | RespondContactRequest | `tenant_id + receiver_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；已完成且同 decision 返回既有 result；已完成但相反 decision 返回 conflict | 后续通过重新申请恢复 |
 | DeleteContact | `tenant_id + owner_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；只更新 owner -> contact 单向 edge | 可通过重新申请或对方仍 ACTIVE edge 恢复 |
-| BlockContact | `tenant_id + owner_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；重复 BLOCKED 返回既有 result | 后续 UnblockContact 单独设计，不混入删除 |
+| BlockContact | `tenant_id + owner_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；重复 BLOCKED 返回既有 result | 通过 UnblockContact 从 BLOCKED 恢复 ACTIVE；不混入删除 |
+| UnblockContact | `tenant_id + owner_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；只允许 `BLOCKED -> ACTIVE`，并 replay 原始 result snapshot | 不能恢复 DELETED；重新加好友仍走申请 / 接受链路 |
 | UpdateContactRemark | `tenant_id + owner_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；remark 相同可 replay | 再次 UpdateContactRemark 覆盖 |
 | contacts outbox publish | `event_id` | at-least-once retry，max attempts 后 DLQ；relay 必须按 `partition_key + aggregate_version` fail-closed 阻塞低版本 PENDING/DLQ，避免 accepted 早于 created 发布 | repair/replay worker 后续实现 |
 
@@ -517,6 +519,7 @@ Command hash 规则：
 - `RespondContactRequest` 包含 command type、tenant、receiver、request_id、decision。
 - `DeleteContact` 包含 command type、tenant、owner、contact。
 - `BlockContact` 包含 command type、tenant、owner、contact、reason 原文。
+- `UnblockContact` 包含 command type、tenant、owner、contact。
 - `UpdateContactRemark` 包含 command type、tenant、owner、contact、remark 原文。
 - 第一阶段不 trim message；消息长度和敏感词等内容治理后续接 policy/identity 端口。
 - 第二阶段不 trim remark / reason；长度上限、敏感词、profile 展示规则后续接 policy/identity 端口。第一版实现必须至少拒绝过长输入，避免写入无限 payload。
@@ -527,7 +530,7 @@ Command hash 规则：
 - 发送申请只能以当前 auth user 作为 sender。
 - 响应申请只能由 receiver 执行。
 - `ListContacts` 只能查询当前 auth user 的联系人列表，第一阶段不提供 admin 查询。
-- 删除 / 拉黑 / 备注名只能操作当前 auth user 自己的 `owner_user_id -> contact_user_id` edge。
+- 删除 / 拉黑 / 解除拉黑 / 备注名只能操作当前 auth user 自己的 `owner_user_id -> contact_user_id` edge。
 - `BLOCKED` 不直接等同于消息发送权限拒绝；其它服务必须通过正式 policy / projection 使用该事实，不能同步读 contacts-service 内部表。
 - 不在事件 payload 里暴露私密用户资料，只放 user id 和关系状态。
 - 用户存在性、封禁状态、组织策略后续通过 identity/policy port 接入；第一阶段先保留端口边界或 strict mock。
@@ -561,7 +564,7 @@ contacts_outbox_dlq_count
 | postgres integration | SendContactRequest / RespondContactRequest / ListContacts / DeleteContact / BlockContact / UpdateContactRemark 真实事务、幂等 replay、并发首次申请、反向 pending、终态相反 decision、分页 token 绑定、单向 edge 变更 |
 | outbox integration | contacts_outbox retry / DLQ / mark PUBLISHED |
 | smoke | `SendContactRequest -> RespondContactRequest(ACCEPT) -> ListContacts` |
-| v0.2 smoke | `ACCEPT -> DeleteContact`、`ACCEPT -> BlockContact`、`ACCEPT -> UpdateContactRemark`，分别验证 contacts_outbox / Kafka / ListContacts / GetContactState |
+| v0.2 smoke | `ACCEPT -> DeleteContact`、`ACCEPT -> BlockContact`、`ACCEPT -> BlockContact -> UnblockContact`、`ACCEPT -> UpdateContactRemark`，分别验证 contacts_outbox / Kafka / ListContacts / GetContactState |
 
 ## 14. Runbook
 
@@ -615,9 +618,9 @@ contacts-service outbox-relay
 
 进入第二轮联系人管理编码前：
 
-- SDD 明确删除 / 拉黑 / 备注名是当前 owner 单向 edge 操作；
+- SDD 明确删除 / 拉黑 / 解除拉黑 / 备注名是当前 owner 单向 edge 操作；
 - migration v0.2 只扩展 contacts-service 自己的表；
-- proto / Kafka schema 增量添加 `DeleteContact / BlockContact / UpdateContactRemark` 和 `contact.edge.*` 事件，不复用旧 tag；
+- proto / Kafka schema 增量添加 `DeleteContact / BlockContact / UnblockContact / UpdateContactRemark` 和 `contact.edge.*` 事件，不复用旧 tag；
 - 不新增 message-service / conversation-service 对 contacts-service 的同步依赖；
 - 真实 PostgreSQL 测试覆盖三类操作的幂等、状态转换、outbox 和单向可见性；
 - 三条真实进程 smoke 报告归档到 `docs/runbook/loadtest/contacts-service/`。

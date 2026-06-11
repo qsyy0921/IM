@@ -264,6 +264,43 @@ func TestRepositoryBlockContactIsOwnerScopedIntegration(t *testing.T) {
 	assertContactsOutboxCount(t, ctx, pool, eventTypeContactEdgeBlocked, 1)
 }
 
+func TestRepositoryUnblockContactRestoresOwnerScopedEdgeIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+	acceptContact(t, ctx, repository, "alice", "bob")
+	if _, err := repository.BlockContact(ctx, blockCommand("alice", "bob", "block-1", "spam")); err != nil {
+		t.Fatalf("block contact: %v", err)
+	}
+
+	result, err := repository.UnblockContact(ctx, unblockCommand("alice", "bob", "unblock-1"))
+	if err != nil {
+		t.Fatalf("unblock contact: %v", err)
+	}
+	if result.Status != types.ContactEdgeStatusActive || result.Version != 3 {
+		t.Fatalf("unexpected unblock result: %+v", result)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactEdgeUnblocked, 1)
+	assertContactEdge(t, ctx, pool, "alice", "bob", types.ContactEdgeStatusActive, 3)
+	assertContactEdge(t, ctx, pool, "bob", "alice", types.ContactEdgeStatusActive, 1)
+
+	aliceContacts, err := repository.ListContacts(ctx, listCommand("alice", 10, ""))
+	if err != nil {
+		t.Fatalf("list alice contacts: %v", err)
+	}
+	assertContactIDs(t, aliceContacts, "bob")
+
+	replay, err := repository.UnblockContact(ctx, unblockCommand("alice", "bob", "unblock-1"))
+	if err != nil {
+		t.Fatalf("unblock replay: %v", err)
+	}
+	if !replay.IdempotentReplay || replay.Status != types.ContactEdgeStatusActive || replay.Version != result.Version {
+		t.Fatalf("expected unblock replay, got %+v", replay)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactEdgeUnblocked, 1)
+}
+
 func TestRepositoryContactOutboxVersionsStayMonotonicAfterReAddIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -439,6 +476,20 @@ func blockCommand(owner string, contact string, key string, reason string) types
 		ContactUserID:  types.UserID(contact),
 		IdempotencyKey: key,
 		Reason:         reason,
+	}
+}
+
+func unblockCommand(owner string, contact string, key string) types.UnblockContactCommand {
+	return types.UnblockContactCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  "tenant-contacts",
+			UserID:    types.UserID(owner),
+			DeviceID:  "device-1",
+			RequestID: "request-" + key,
+			TraceID:   "trace-" + key,
+		},
+		ContactUserID:  types.UserID(contact),
+		IdempotencyKey: key,
 	}
 }
 

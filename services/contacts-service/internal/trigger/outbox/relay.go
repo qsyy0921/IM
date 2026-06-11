@@ -235,6 +235,23 @@ func BuildContactEvent(message types.OutboxMessage) (*contacteventsv1.ContactEve
 			},
 		}
 		return event, nil
+	case types.ContactEventEdgeUnblocked:
+		payload, err := decodeContactEdgePayload(message.PayloadJSON, true)
+		if err != nil {
+			return nil, err
+		}
+		event.Payload = &contacteventsv1.ContactEvent_EdgeUnblocked{
+			EdgeUnblocked: &contacteventsv1.ContactEdgeUnblockedV1{
+				TenantId:       payload.TenantID,
+				OwnerUserId:    payload.OwnerUserID,
+				ContactUserId:  payload.ContactUserID,
+				PreviousStatus: payload.PreviousStatus,
+				Status:         payload.Status,
+				EdgeVersion:    payload.EdgeVersion,
+				OccurredAt:     payload.Timestamp(),
+			},
+		}
+		return event, nil
 	case types.ContactEventRemarkUpdated:
 		payload, err := decodeContactEdgePayload(message.PayloadJSON, false)
 		if err != nil {

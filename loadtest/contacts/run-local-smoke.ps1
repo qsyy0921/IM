@@ -3,7 +3,7 @@ param(
     [string]$KafkaBrokers = "localhost:9092",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
-    [ValidateSet("accept", "decline", "delete", "block", "unblock", "remark")]
+    [ValidateSet("accept", "decline", "delete", "block", "unblock", "remark", "readd")]
     [string]$Scenario = "accept",
     [switch]$SkipBuild
 )
@@ -133,6 +133,14 @@ function Assert-Summary {
     }
     if ($Scenario -eq "decline" -and $summary.respond_contact_request.status -ne "CONTACT_REQUEST_STATUS_DECLINED") {
         throw "unexpected decline status: $($summary.respond_contact_request.status)"
+    }
+    if ($Scenario -eq "readd") {
+        if ($summary.second_send_contact_request.status -ne "CONTACT_REQUEST_STATUS_PENDING") {
+            throw "unexpected second send status: $($summary.second_send_contact_request.status)"
+        }
+        if ($summary.second_respond_contact_request.status -ne "CONTACT_REQUEST_STATUS_ACCEPTED") {
+            throw "unexpected second accept status: $($summary.second_respond_contact_request.status)"
+        }
     }
     if ($summary.contacts_outbox.pending -ne 0 -or $summary.contacts_outbox.dlq -ne 0 -or $summary.contacts_outbox.published -lt 2) {
         throw "contacts outbox did not drain: pending=$($summary.contacts_outbox.pending) published=$($summary.contacts_outbox.published) dlq=$($summary.contacts_outbox.dlq)"

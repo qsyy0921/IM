@@ -41,34 +41,36 @@ type config struct {
 }
 
 type summary struct {
-	Commit                string              `json:"commit"`
-	CommitFull            string              `json:"commit_full"`
-	GitDirty              bool                `json:"git_dirty"`
-	GitStatusShort        string              `json:"git_status_short,omitempty"`
-	Target                string              `json:"target"`
-	ResultDir             string              `json:"result_dir"`
-	TenantID              string              `json:"tenant_id"`
-	SenderUserID          string              `json:"sender_user_id"`
-	ReceiverUserID        string              `json:"receiver_user_id"`
-	Scenario              string              `json:"scenario"`
-	ContactTopic          string              `json:"contact_topic"`
-	StartedAt             time.Time           `json:"started_at"`
-	FinishedAt            time.Time           `json:"finished_at"`
-	Success               bool                `json:"success"`
-	Error                 string              `json:"error,omitempty"`
-	SendContactRequest    sendSummary         `json:"send_contact_request"`
-	RespondContactRequest respondSummary      `json:"respond_contact_request"`
-	DeleteContact         edgeActionSummary   `json:"delete_contact,omitempty"`
-	BlockContact          edgeActionSummary   `json:"block_contact,omitempty"`
-	UnblockContact        edgeActionSummary   `json:"unblock_contact,omitempty"`
-	UpdateContactRemark   edgeActionSummary   `json:"update_contact_remark,omitempty"`
-	SenderList            listSummary         `json:"sender_list"`
-	ReceiverList          listSummary         `json:"receiver_list"`
-	SenderState           stateSummary        `json:"sender_state"`
-	ReceiverState         stateSummary        `json:"receiver_state"`
-	ContactsOutbox        outboxStats         `json:"contacts_outbox"`
-	ContactKafkaEvents    []contactKafkaEvent `json:"contact_kafka_events"`
-	LatenciesMS           map[string]float64  `json:"latencies_ms"`
+	Commit                      string              `json:"commit"`
+	CommitFull                  string              `json:"commit_full"`
+	GitDirty                    bool                `json:"git_dirty"`
+	GitStatusShort              string              `json:"git_status_short,omitempty"`
+	Target                      string              `json:"target"`
+	ResultDir                   string              `json:"result_dir"`
+	TenantID                    string              `json:"tenant_id"`
+	SenderUserID                string              `json:"sender_user_id"`
+	ReceiverUserID              string              `json:"receiver_user_id"`
+	Scenario                    string              `json:"scenario"`
+	ContactTopic                string              `json:"contact_topic"`
+	StartedAt                   time.Time           `json:"started_at"`
+	FinishedAt                  time.Time           `json:"finished_at"`
+	Success                     bool                `json:"success"`
+	Error                       string              `json:"error,omitempty"`
+	SendContactRequest          sendSummary         `json:"send_contact_request"`
+	RespondContactRequest       respondSummary      `json:"respond_contact_request"`
+	SecondSendContactRequest    sendSummary         `json:"second_send_contact_request,omitempty"`
+	SecondRespondContactRequest respondSummary      `json:"second_respond_contact_request,omitempty"`
+	DeleteContact               edgeActionSummary   `json:"delete_contact,omitempty"`
+	BlockContact                edgeActionSummary   `json:"block_contact,omitempty"`
+	UnblockContact              edgeActionSummary   `json:"unblock_contact,omitempty"`
+	UpdateContactRemark         edgeActionSummary   `json:"update_contact_remark,omitempty"`
+	SenderList                  listSummary         `json:"sender_list"`
+	ReceiverList                listSummary         `json:"receiver_list"`
+	SenderState                 stateSummary        `json:"sender_state"`
+	ReceiverState               stateSummary        `json:"receiver_state"`
+	ContactsOutbox              outboxStats         `json:"contacts_outbox"`
+	ContactKafkaEvents          []contactKafkaEvent `json:"contact_kafka_events"`
+	LatenciesMS                 map[string]float64  `json:"latencies_ms"`
 }
 
 type sendSummary struct {
@@ -152,7 +154,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.receiverUserID, "receiver-user-id", "contact-receiver", "receiver user id")
 	flag.StringVar(&cfg.senderDeviceID, "sender-device-id", "sender-device-1", "sender device id")
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "receiver-device-1", "receiver device id")
-	flag.StringVar(&cfg.scenario, "scenario", "accept", "scenario: accept, decline, delete, block, unblock, or remark")
+	flag.StringVar(&cfg.scenario, "scenario", "accept", "scenario: accept, decline, delete, block, unblock, remark, or readd")
 	flag.BoolVar(&cfg.cleanup, "cleanup", false, "delete tenant contacts rows before running")
 	flag.Parse()
 	cfg.kafkaBrokers = splitCSV(brokers)
@@ -277,6 +279,31 @@ func run(cfg config) error {
 			return err
 		}
 		s.UpdateContactRemark = remarkResult
+	case "readd":
+		deleteResult, elapsed, err := deleteContact(cfg, client, requestIDSuffix)
+		s.LatenciesMS["delete_contact"] = elapsed
+		if err != nil {
+			s.Error = err.Error()
+			return err
+		}
+		s.DeleteContact = deleteResult
+
+		secondSuffix := "second-" + requestIDSuffix
+		secondSendResult, elapsed, err := sendContactRequest(cfg, client, secondSuffix)
+		s.LatenciesMS["second_send_contact_request"] = elapsed
+		if err != nil {
+			s.Error = err.Error()
+			return err
+		}
+		s.SecondSendContactRequest = secondSendResult
+
+		secondRespondResult, elapsed, err := respondContactRequest(cfg, client, secondSendResult.RequestID, secondSuffix)
+		s.LatenciesMS["second_respond_contact_request"] = elapsed
+		if err != nil {
+			s.Error = err.Error()
+			return err
+		}
+		s.SecondRespondContactRequest = secondRespondResult
 	}
 
 	senderList, elapsed, err := listContacts(cfg, client, cfg.senderUserID)
@@ -691,6 +718,8 @@ func validateSummary(s summary) error {
 		return validateUnblockSummary(s)
 	case "remark":
 		return validateRemarkSummary(s)
+	case "readd":
+		return validateReaddSummary(s)
 	default:
 		return fmt.Errorf("unsupported scenario %q", s.Scenario)
 	}
@@ -767,6 +796,48 @@ func validateRemarkSummary(s summary) error {
 		return fmt.Errorf("sender state missing remark: %+v", s.SenderState)
 	}
 	return validateOutboxAndEvents(s, "contact.edge.remark_updated.v1", expectedEventCount(s.Scenario))
+}
+
+func validateReaddSummary(s summary) error {
+	if err := validateAcceptPrefix(s); err != nil {
+		return err
+	}
+	if s.DeleteContact.Status != "CONTACT_EDGE_STATUS_DELETED" {
+		return fmt.Errorf("delete status=%s, want DELETED", s.DeleteContact.Status)
+	}
+	if s.SecondSendContactRequest.Status != "CONTACT_REQUEST_STATUS_PENDING" {
+		return fmt.Errorf("second send status=%s, want PENDING", s.SecondSendContactRequest.Status)
+	}
+	if s.SecondRespondContactRequest.Status != "CONTACT_REQUEST_STATUS_ACCEPTED" {
+		return fmt.Errorf("second respond status=%s, want ACCEPTED", s.SecondRespondContactRequest.Status)
+	}
+	if !contains(s.SenderList.ContactUserIDs, s.ReceiverUserID) || !contains(s.ReceiverList.ContactUserIDs, s.SenderUserID) {
+		return fmt.Errorf("re-added contact should be visible to both sides: sender=%+v receiver=%+v", s.SenderList, s.ReceiverList)
+	}
+	if s.SenderState.Status != "CONTACT_EDGE_STATUS_ACTIVE" || s.ReceiverState.Status != "CONTACT_EDGE_STATUS_ACTIVE" {
+		return fmt.Errorf("unexpected readd states: sender=%+v receiver=%+v", s.SenderState, s.ReceiverState)
+	}
+	if err := validateOutboxAndEvents(s, "contact.edge.deleted.v1", expectedEventCount(s.Scenario)); err != nil {
+		return err
+	}
+	if len(s.ContactKafkaEvents) > 0 {
+		counts := map[string]int{}
+		versions := make([]int64, 0, len(s.ContactKafkaEvents))
+		for _, event := range s.ContactKafkaEvents {
+			counts[event.EventType]++
+			versions = append(versions, event.AggregateVersion)
+		}
+		if counts["contact.request.created.v1"] != 2 || counts["contact.request.accepted.v1"] != 2 || counts["contact.edge.deleted.v1"] != 1 {
+			return fmt.Errorf("unexpected readd event counts: %+v", counts)
+		}
+		wantVersions := []int64{1, 2, 3, 4, 5}
+		for index, want := range wantVersions {
+			if index >= len(versions) || versions[index] != want {
+				return fmt.Errorf("unexpected readd aggregate versions: got %v want %v", versions, wantVersions)
+			}
+		}
+	}
+	return nil
 }
 
 func validateAcceptPrefix(s summary) error {
@@ -854,6 +925,8 @@ func expectedEventCount(scenario string) int {
 		return 3
 	case "unblock":
 		return 4
+	case "readd":
+		return 5
 	default:
 		return 2
 	}

@@ -13,6 +13,7 @@
 - 发起好友申请；
 - 接受 / 拒绝好友申请；
 - 删除联系人、拉黑联系人、解除拉黑、更新本人的联系人备注；
+- 查询当前用户收到 / 发出的好友申请列表；
 - 查询当前联系人列表；
 - 查询两名用户之间的联系人状态；
 - 通过 outbox 发布联系人事件，供通知、审计、推荐或后续搜索投影消费。
@@ -44,7 +45,7 @@
 
 | 方向 | 服务 / 组件 | 交互 |
 | --- | --- | --- |
-| 上游 | api-gateway / client | gRPC/HTTP 调用 `SendContactRequest`、`RespondContactRequest`、`ListContacts` |
+| 上游 | api-gateway / client | gRPC/HTTP 调用 `SendContactRequest`、`RespondContactRequest`、`ListContactRequests`、`ListContacts` |
 | 同步依赖 | identity-service（后续） | 校验 user 是否存在、是否禁用；第一阶段可用 strict mock / 本地端口 |
 | 异步下游 | push-gateway / notification-service（后续） | 消费 `im.contact.events` 做轻量通知 |
 | 异步下游 | audit-service / recommendation（后续） | 消费联系人事件做审计和推荐 |
@@ -67,7 +68,7 @@ services/contacts-service/
 | 层 | 本服务内容 |
 | --- | --- |
 | `api` | gRPC handler、request/response 转换、稳定错误映射 |
-| `app` | `SendContactRequestUseCase`、`RespondContactRequestUseCase`、`ListContactsUseCase`、`DeleteContactUseCase`、`BlockContactUseCase`、`UpdateContactRemarkUseCase` |
+| `app` | `SendContactRequestUseCase`、`RespondContactRequestUseCase`、`ListContactRequestsUseCase`、`ListContactsUseCase`、`DeleteContactUseCase`、`BlockContactUseCase`、`UpdateContactRemarkUseCase` |
 | `domain` | 好友申请状态机、联系人边不变量、幂等规则 |
 | `infrastructure` | PostgreSQL repository、outbox store、Kafka producer |
 | `types` | Command、DTO、错误 sentinel、枚举 |
@@ -112,6 +113,7 @@ api/proto/nexusim/contacts/v1/contacts_service.proto
 ```text
 rpc SendContactRequest(SendContactRequestRequest) returns (SendContactRequestResponse)
 rpc RespondContactRequest(RespondContactRequestRequest) returns (RespondContactRequestResponse)
+rpc ListContactRequests(ListContactRequestsRequest) returns (ListContactRequestsResponse)
 rpc ListContacts(ListContactsRequest) returns (ListContactsResponse)
 rpc GetContactState(GetContactStateRequest) returns (GetContactStateResponse)
 rpc DeleteContact(DeleteContactRequest) returns (DeleteContactResponse)
@@ -144,6 +146,18 @@ auth_context
 page_size
 page_token
 ```
+
+`ListContactRequestsRequest`：
+
+```text
+auth_context
+direction = INCOMING | OUTGOING, default INCOMING
+status = PENDING | ACCEPTED | DECLINED | CANCELED | EXPIRED, default PENDING
+page_size
+page_token
+```
+
+`ListContactRequestsResponse` 返回当前用户视角的好友申请列表，按 `created_at DESC, request_id ASC` keyset 分页。`page_token` 绑定 `tenant_id / user_id / direction / status / page_size / last_created_at / last_request_id`，不能跨用户、跨方向、跨状态或跨 page size 复用。
 
 `DeleteContactRequest`：
 
@@ -432,6 +446,16 @@ ListContacts
 -> page_token binds tenant_id / owner_user_id / page_size / last_contact_user_id
 ```
 
+```text
+ListContactRequests
+-> validate auth
+-> normalize direction/status
+-> query contact_requests by receiver_user_id(INCOMING) or sender_user_id(OUTGOING)
+-> filter by exact request status, default PENDING
+-> keyset page by created_at DESC + request_id ASC
+-> page_token binds tenant_id / user_id / direction / status / page_size / cursor
+```
+
 ### 8.4 删除联系人
 
 ```text
@@ -529,6 +553,7 @@ Command hash 规则：
 - `tenant_id / user_id / device_id / session_id / trace_id / request_id` 来自 `AuthContext`。
 - 发送申请只能以当前 auth user 作为 sender。
 - 响应申请只能由 receiver 执行。
+- `ListContactRequests` 只能查询当前 auth user 收到或发出的好友申请列表；第一阶段不提供 admin 查询或全站搜索。
 - `ListContacts` 只能查询当前 auth user 的联系人列表，第一阶段不提供 admin 查询。
 - 删除 / 拉黑 / 解除拉黑 / 备注名只能操作当前 auth user 自己的 `owner_user_id -> contact_user_id` edge。
 - `BLOCKED` 不直接等同于消息发送权限拒绝；其它服务必须通过正式 policy / projection 使用该事实，不能同步读 contacts-service 内部表。
@@ -561,9 +586,9 @@ contacts_outbox_dlq_count
 | domain unit | 自己加自己、重复 pending、accept 写双向 edge、非 receiver 响应 |
 | app unit | command validation、repository error propagation |
 | api unit | gRPC request/response 转换、稳定错误映射 |
-| postgres integration | SendContactRequest / RespondContactRequest / ListContacts / DeleteContact / BlockContact / UpdateContactRemark 真实事务、幂等 replay、并发首次申请、反向 pending、终态相反 decision、分页 token 绑定、单向 edge 变更 |
+| postgres integration | SendContactRequest / RespondContactRequest / ListContactRequests / ListContacts / DeleteContact / BlockContact / UpdateContactRemark 真实事务、幂等 replay、并发首次申请、反向 pending、终态相反 decision、分页 token 绑定、单向 edge 变更 |
 | outbox integration | contacts_outbox retry / DLQ / mark PUBLISHED |
-| smoke | `SendContactRequest -> RespondContactRequest(ACCEPT) -> ListContacts` |
+| smoke | `SendContactRequest -> ListContactRequests(PENDING) -> RespondContactRequest(ACCEPT) -> ListContactRequests(ACCEPTED) -> ListContacts` |
 | v0.2 smoke | `ACCEPT -> DeleteContact`、`ACCEPT -> BlockContact`、`ACCEPT -> BlockContact -> UnblockContact`、`ACCEPT -> UpdateContactRemark`、`ACCEPT -> DeleteContact -> SendContactRequest -> ACCEPT`，分别验证 contacts_outbox / Kafka / ListContacts / GetContactState |
 
 ## 14. Runbook
@@ -580,7 +605,9 @@ NEXUSIM_CONTACTS_SERVICE_MODE=outbox-relay
 ```text
 contacts-service grpc
 -> loadtest/contacts SendContactRequest
+-> loadtest/contacts ListContactRequests(PENDING)
 -> loadtest/contacts RespondContactRequest(ACCEPT)
+-> loadtest/contacts ListContactRequests(ACCEPTED)
 -> loadtest/contacts ListContacts
 ```
 
@@ -610,7 +637,7 @@ contacts-service outbox-relay
 - `contacts_service.proto` 存在并生成 Go 代码；
 - `000001_contacts_core.sql` 存在；
 - 六层目录存在；
-- 第一轮代码只实现 `SendContactRequest / RespondContactRequest / ListContacts`，不自动创建会话；
+- 第一轮代码实现 `SendContactRequest / RespondContactRequest / ListContactRequests / ListContacts`，不自动创建会话；
 - 第二轮代码已实现 `DeleteContact / BlockContact / UpdateContactRemark` 的 proto / schema / migration / repository / relay builder / smoke runner；
 - `go test ./services/contacts-service/...` 通过，带 `NEXUSIM_PG_DSN` 的 contacts PostgreSQL 集成测试通过；
 - 真实 PostgreSQL integration 覆盖 request、accept、list；

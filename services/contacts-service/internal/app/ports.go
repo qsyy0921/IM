@@ -14,6 +14,10 @@ type RespondContactRequestRepository interface {
 	RespondContactRequest(context.Context, types.RespondContactRequestCommand) (types.RespondContactRequestResult, error)
 }
 
+type ListContactRequestsRepository interface {
+	ListContactRequests(context.Context, types.ListContactRequestsCommand) (types.ListContactRequestsResult, error)
+}
+
 type ListContactsRepository interface {
 	ListContacts(context.Context, types.ListContactsCommand) (types.ListContactsResult, error)
 }

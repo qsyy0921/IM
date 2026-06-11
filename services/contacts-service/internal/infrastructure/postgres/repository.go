@@ -299,6 +299,120 @@ func (r *Repository) RespondContactRequest(
 	})
 }
 
+func (r *Repository) ListContactRequests(
+	ctx context.Context,
+	command types.ListContactRequestsCommand,
+) (types.ListContactRequestsResult, error) {
+	if r.pool == nil {
+		return types.ListContactRequestsResult{}, types.NewDBReadFailed("contacts repository is not configured")
+	}
+	direction := command.NormalizedDirection()
+	status := command.NormalizedStatus()
+	limit := domain.NormalizePageSize(command.PageSize)
+	cursor, hasCursor, err := decodeContactRequestPageTokenFor(command, direction, status, limit)
+	if err != nil {
+		return types.ListContactRequestsResult{}, err
+	}
+
+	userColumn := "receiver_user_id"
+	if direction == types.ContactRequestListDirectionOutgoing {
+		userColumn = "sender_user_id"
+	}
+	args := []any{command.AuthContext.TenantID, command.AuthContext.UserID, status, limit + 1}
+	query := fmt.Sprintf(`
+SELECT
+    request_id,
+    sender_user_id,
+    receiver_user_id,
+    status,
+    message,
+    created_at,
+    updated_at,
+    decided_at IS NOT NULL AS has_decided_at,
+    COALESCE(decided_at, 'epoch'::timestamptz) AS decided_at
+FROM contact_requests
+WHERE tenant_id = $1
+  AND %s = $2
+  AND status = $3
+`, userColumn)
+	if hasCursor {
+		query += `  AND (created_at < $5 OR (created_at = $5 AND request_id > $6))
+`
+		args = append(args, cursor.CreatedAt, cursor.RequestID)
+	}
+	query += `ORDER BY created_at DESC, request_id ASC
+LIMIT $4
+`
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return types.ListContactRequestsResult{}, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	type listedRequest struct {
+		item      types.ContactRequestItem
+		createdAt time.Time
+	}
+	listed := make([]listedRequest, 0, limit)
+	for rows.Next() {
+		var item types.ContactRequestItem
+		var createdAt time.Time
+		var updatedAt time.Time
+		var decidedAt time.Time
+		var hasDecidedAt bool
+		if err := rows.Scan(
+			&item.RequestID,
+			&item.SenderUserID,
+			&item.ReceiverUserID,
+			&item.Status,
+			&item.Message,
+			&createdAt,
+			&updatedAt,
+			&hasDecidedAt,
+			&decidedAt,
+		); err != nil {
+			return types.ListContactRequestsResult{}, types.NewDBReadFailed(err.Error())
+		}
+		item.CreatedAtUnixMS = createdAt.UnixMilli()
+		item.UpdatedAtUnixMS = updatedAt.UnixMilli()
+		if hasDecidedAt {
+			item.DecidedAtUnixMS = decidedAt.UnixMilli()
+		}
+		listed = append(listed, listedRequest{item: item, createdAt: createdAt})
+	}
+	if err := rows.Err(); err != nil {
+		return types.ListContactRequestsResult{}, types.NewDBReadFailed(err.Error())
+	}
+
+	nextToken := ""
+	if len(listed) > limit {
+		last := listed[limit-1]
+		nextToken = encodeContactRequestPageToken(contactRequestPageCursor{
+			Version:   1,
+			TenantID:  command.AuthContext.TenantID,
+			UserID:    command.AuthContext.UserID,
+			Direction: direction,
+			Status:    status,
+			PageSize:  limit,
+			CreatedAt: last.createdAt,
+			RequestID: last.item.RequestID,
+		})
+		listed = listed[:limit]
+	}
+	items := make([]types.ContactRequestItem, 0, len(listed))
+	for _, row := range listed {
+		items = append(items, row.item)
+	}
+	return types.ListContactRequestsResult{
+		TenantID:      command.AuthContext.TenantID,
+		UserID:        command.AuthContext.UserID,
+		Direction:     direction,
+		Status:        status,
+		Requests:      items,
+		NextPageToken: nextToken,
+	}, nil
+}
+
 func (r *Repository) ListContacts(
 	ctx context.Context,
 	command types.ListContactsCommand,
@@ -1523,6 +1637,56 @@ type contactPageCursor struct {
 	OwnerUserID   types.UserID   `json:"owner_user_id"`
 	PageSize      int            `json:"page_size"`
 	ContactUserID string         `json:"contact_user_id"`
+}
+
+type contactRequestPageCursor struct {
+	Version   int                               `json:"v"`
+	TenantID  types.TenantID                    `json:"tenant_id"`
+	UserID    types.UserID                      `json:"user_id"`
+	Direction types.ContactRequestListDirection `json:"direction"`
+	Status    types.ContactRequestStatus        `json:"status"`
+	PageSize  int                               `json:"page_size"`
+	CreatedAt time.Time                         `json:"created_at"`
+	RequestID string                            `json:"request_id"`
+}
+
+func decodeContactRequestPageTokenFor(
+	command types.ListContactRequestsCommand,
+	direction types.ContactRequestListDirection,
+	status types.ContactRequestStatus,
+	pageSize int,
+) (contactRequestPageCursor, bool, error) {
+	value := command.PageToken
+	if value == "" {
+		return contactRequestPageCursor{}, false, nil
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		return contactRequestPageCursor{}, false, types.NewInvalidArgument("invalid page_token")
+	}
+	var cursor contactRequestPageCursor
+	if err := json.Unmarshal(raw, &cursor); err != nil {
+		return contactRequestPageCursor{}, false, types.NewInvalidArgument("invalid page_token")
+	}
+	if cursor.Version != 1 || cursor.RequestID == "" || cursor.CreatedAt.IsZero() {
+		return contactRequestPageCursor{}, false, types.NewInvalidArgument("invalid page_token")
+	}
+	if cursor.TenantID != command.AuthContext.TenantID ||
+		cursor.UserID != command.AuthContext.UserID ||
+		cursor.Direction != direction ||
+		cursor.Status != status ||
+		cursor.PageSize != pageSize {
+		return contactRequestPageCursor{}, false, types.NewInvalidArgument("invalid page_token")
+	}
+	return cursor, true, nil
+}
+
+func encodeContactRequestPageToken(cursor contactRequestPageCursor) string {
+	raw, err := json.Marshal(cursor)
+	if err != nil {
+		return ""
+	}
+	return base64.RawURLEncoding.EncodeToString(raw)
 }
 
 func decodePageTokenFor(command types.ListContactsCommand, pageSize int) (contactPageCursor, bool, error) {

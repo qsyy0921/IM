@@ -41,36 +41,39 @@ type config struct {
 }
 
 type summary struct {
-	Commit                      string              `json:"commit"`
-	CommitFull                  string              `json:"commit_full"`
-	GitDirty                    bool                `json:"git_dirty"`
-	GitStatusShort              string              `json:"git_status_short,omitempty"`
-	Target                      string              `json:"target"`
-	ResultDir                   string              `json:"result_dir"`
-	TenantID                    string              `json:"tenant_id"`
-	SenderUserID                string              `json:"sender_user_id"`
-	ReceiverUserID              string              `json:"receiver_user_id"`
-	Scenario                    string              `json:"scenario"`
-	ContactTopic                string              `json:"contact_topic"`
-	StartedAt                   time.Time           `json:"started_at"`
-	FinishedAt                  time.Time           `json:"finished_at"`
-	Success                     bool                `json:"success"`
-	Error                       string              `json:"error,omitempty"`
-	SendContactRequest          sendSummary         `json:"send_contact_request"`
-	RespondContactRequest       respondSummary      `json:"respond_contact_request"`
-	SecondSendContactRequest    sendSummary         `json:"second_send_contact_request,omitempty"`
-	SecondRespondContactRequest respondSummary      `json:"second_respond_contact_request,omitempty"`
-	DeleteContact               edgeActionSummary   `json:"delete_contact,omitempty"`
-	BlockContact                edgeActionSummary   `json:"block_contact,omitempty"`
-	UnblockContact              edgeActionSummary   `json:"unblock_contact,omitempty"`
-	UpdateContactRemark         edgeActionSummary   `json:"update_contact_remark,omitempty"`
-	SenderList                  listSummary         `json:"sender_list"`
-	ReceiverList                listSummary         `json:"receiver_list"`
-	SenderState                 stateSummary        `json:"sender_state"`
-	ReceiverState               stateSummary        `json:"receiver_state"`
-	ContactsOutbox              outboxStats         `json:"contacts_outbox"`
-	ContactKafkaEvents          []contactKafkaEvent `json:"contact_kafka_events"`
-	LatenciesMS                 map[string]float64  `json:"latencies_ms"`
+	Commit                       string              `json:"commit"`
+	CommitFull                   string              `json:"commit_full"`
+	GitDirty                     bool                `json:"git_dirty"`
+	GitStatusShort               string              `json:"git_status_short,omitempty"`
+	Target                       string              `json:"target"`
+	ResultDir                    string              `json:"result_dir"`
+	TenantID                     string              `json:"tenant_id"`
+	SenderUserID                 string              `json:"sender_user_id"`
+	ReceiverUserID               string              `json:"receiver_user_id"`
+	Scenario                     string              `json:"scenario"`
+	ContactTopic                 string              `json:"contact_topic"`
+	StartedAt                    time.Time           `json:"started_at"`
+	FinishedAt                   time.Time           `json:"finished_at"`
+	Success                      bool                `json:"success"`
+	Error                        string              `json:"error,omitempty"`
+	SendContactRequest           sendSummary         `json:"send_contact_request"`
+	RespondContactRequest        respondSummary      `json:"respond_contact_request"`
+	ReceiverPendingBeforeRespond requestListSummary  `json:"receiver_incoming_pending_before_respond"`
+	ReceiverPendingAfterRespond  requestListSummary  `json:"receiver_incoming_pending_after_respond"`
+	ReceiverTerminalAfterRespond requestListSummary  `json:"receiver_incoming_terminal_after_respond"`
+	SecondSendContactRequest     sendSummary         `json:"second_send_contact_request,omitempty"`
+	SecondRespondContactRequest  respondSummary      `json:"second_respond_contact_request,omitempty"`
+	DeleteContact                edgeActionSummary   `json:"delete_contact,omitempty"`
+	BlockContact                 edgeActionSummary   `json:"block_contact,omitempty"`
+	UnblockContact               edgeActionSummary   `json:"unblock_contact,omitempty"`
+	UpdateContactRemark          edgeActionSummary   `json:"update_contact_remark,omitempty"`
+	SenderList                   listSummary         `json:"sender_list"`
+	ReceiverList                 listSummary         `json:"receiver_list"`
+	SenderState                  stateSummary        `json:"sender_state"`
+	ReceiverState                stateSummary        `json:"receiver_state"`
+	ContactsOutbox               outboxStats         `json:"contacts_outbox"`
+	ContactKafkaEvents           []contactKafkaEvent `json:"contact_kafka_events"`
+	LatenciesMS                  map[string]float64  `json:"latencies_ms"`
 }
 
 type sendSummary struct {
@@ -96,6 +99,16 @@ type listSummary struct {
 	OwnerUserID    string   `json:"owner_user_id"`
 	ContactCount   int      `json:"contact_count"`
 	ContactUserIDs []string `json:"contact_user_ids"`
+}
+
+type requestListSummary struct {
+	UserID          string   `json:"user_id"`
+	Direction       string   `json:"direction"`
+	Status          string   `json:"status"`
+	RequestCount    int      `json:"request_count"`
+	RequestIDs      []string `json:"request_ids"`
+	SenderUserIDs   []string `json:"sender_user_ids"`
+	ReceiverUserIDs []string `json:"receiver_user_ids"`
 }
 
 type stateSummary struct {
@@ -231,6 +244,14 @@ func run(cfg config) error {
 	}
 	s.SendContactRequest = sendResult
 
+	pendingBefore, elapsed, err := listContactRequests(cfg, client, cfg.receiverUserID, contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_INCOMING, contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_PENDING)
+	s.LatenciesMS["list_receiver_pending_requests_before_respond"] = elapsed
+	if err != nil {
+		s.Error = err.Error()
+		return err
+	}
+	s.ReceiverPendingBeforeRespond = pendingBefore
+
 	respondResult, elapsed, err := respondContactRequest(cfg, client, sendResult.RequestID, requestIDSuffix)
 	s.LatenciesMS["respond_contact_request"] = elapsed
 	if err != nil {
@@ -238,6 +259,20 @@ func run(cfg config) error {
 		return err
 	}
 	s.RespondContactRequest = respondResult
+	pendingAfter, elapsed, err := listContactRequests(cfg, client, cfg.receiverUserID, contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_INCOMING, contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_PENDING)
+	s.LatenciesMS["list_receiver_pending_requests_after_respond"] = elapsed
+	if err != nil {
+		s.Error = err.Error()
+		return err
+	}
+	s.ReceiverPendingAfterRespond = pendingAfter
+	terminalAfter, elapsed, err := listContactRequests(cfg, client, cfg.receiverUserID, contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_INCOMING, terminalRequestStatusForScenario(cfg.scenario))
+	s.LatenciesMS["list_receiver_terminal_requests_after_respond"] = elapsed
+	if err != nil {
+		s.Error = err.Error()
+		return err
+	}
+	s.ReceiverTerminalAfterRespond = terminalAfter
 
 	switch cfg.scenario {
 	case "delete":
@@ -558,6 +593,46 @@ func listContacts(cfg config, client contactsv1.ContactsServiceClient, userID st
 	return result, elapsed, nil
 }
 
+func listContactRequests(
+	cfg config,
+	client contactsv1.ContactsServiceClient,
+	userID string,
+	direction contactsv1.ContactRequestListDirection,
+	statusValue contactsv1.ContactRequestStatus,
+) (requestListSummary, float64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
+	defer cancel()
+	begin := time.Now()
+	resp, err := client.ListContactRequests(ctx, &contactsv1.ListContactRequestsRequest{
+		AuthContext: &contactsv1.AuthContext{
+			TenantId: cfg.tenantID,
+			UserId:   userID,
+		},
+		Direction: direction,
+		Status:    statusValue,
+		PageSize:  10,
+	})
+	elapsed := elapsedMS(begin)
+	if err != nil {
+		return requestListSummary{}, elapsed, fmt.Errorf("list contact requests for %s: %w", userID, err)
+	}
+	result := requestListSummary{
+		UserID:          resp.GetUserId(),
+		Direction:       resp.GetDirection().String(),
+		Status:          resp.GetStatus().String(),
+		RequestCount:    len(resp.GetRequests()),
+		RequestIDs:      make([]string, 0, len(resp.GetRequests())),
+		SenderUserIDs:   make([]string, 0, len(resp.GetRequests())),
+		ReceiverUserIDs: make([]string, 0, len(resp.GetRequests())),
+	}
+	for _, item := range resp.GetRequests() {
+		result.RequestIDs = append(result.RequestIDs, item.GetRequestId())
+		result.SenderUserIDs = append(result.SenderUserIDs, item.GetSenderUserId())
+		result.ReceiverUserIDs = append(result.ReceiverUserIDs, item.GetReceiverUserId())
+	}
+	return result, elapsed, nil
+}
+
 func getContactState(cfg config, client contactsv1.ContactsServiceClient, userID string, otherUserID string) (stateSummary, float64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
 	defer cancel()
@@ -847,6 +922,9 @@ func validateAcceptPrefix(s summary) error {
 	if s.RespondContactRequest.Status != "CONTACT_REQUEST_STATUS_ACCEPTED" {
 		return fmt.Errorf("respond status=%s, want ACCEPTED", s.RespondContactRequest.Status)
 	}
+	if err := validateContactRequestLists(s, "CONTACT_REQUEST_STATUS_ACCEPTED"); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -856,6 +934,9 @@ func validateAcceptSummary(s summary) error {
 	}
 	if s.RespondContactRequest.Status != "CONTACT_REQUEST_STATUS_ACCEPTED" {
 		return fmt.Errorf("respond status=%s, want ACCEPTED", s.RespondContactRequest.Status)
+	}
+	if err := validateContactRequestLists(s, "CONTACT_REQUEST_STATUS_ACCEPTED"); err != nil {
+		return err
 	}
 	if !contains(s.SenderList.ContactUserIDs, s.ReceiverUserID) {
 		return fmt.Errorf("sender list missing receiver: %+v", s.SenderList)
@@ -886,6 +967,9 @@ func validateDeclineSummary(s summary) error {
 	if s.RespondContactRequest.Status != "CONTACT_REQUEST_STATUS_DECLINED" {
 		return fmt.Errorf("respond status=%s, want DECLINED", s.RespondContactRequest.Status)
 	}
+	if err := validateContactRequestLists(s, "CONTACT_REQUEST_STATUS_DECLINED"); err != nil {
+		return err
+	}
 	if s.SenderList.ContactCount != 0 || s.ReceiverList.ContactCount != 0 {
 		return fmt.Errorf("decline should not create contacts: sender=%+v receiver=%+v", s.SenderList, s.ReceiverList)
 	}
@@ -905,6 +989,24 @@ func validateDeclineSummary(s summary) error {
 	return nil
 }
 
+func validateContactRequestLists(s summary, terminalStatus string) error {
+	if s.ReceiverPendingBeforeRespond.RequestCount != 1 ||
+		!contains(s.ReceiverPendingBeforeRespond.RequestIDs, s.SendContactRequest.RequestID) ||
+		!contains(s.ReceiverPendingBeforeRespond.SenderUserIDs, s.SenderUserID) ||
+		!contains(s.ReceiverPendingBeforeRespond.ReceiverUserIDs, s.ReceiverUserID) {
+		return fmt.Errorf("pending contact request before respond not visible: %+v", s.ReceiverPendingBeforeRespond)
+	}
+	if s.ReceiverPendingAfterRespond.RequestCount != 0 {
+		return fmt.Errorf("pending contact request should disappear after respond: %+v", s.ReceiverPendingAfterRespond)
+	}
+	if s.ReceiverTerminalAfterRespond.Status != terminalStatus ||
+		s.ReceiverTerminalAfterRespond.RequestCount != 1 ||
+		!contains(s.ReceiverTerminalAfterRespond.RequestIDs, s.SendContactRequest.RequestID) {
+		return fmt.Errorf("terminal contact request after respond not visible: %+v", s.ReceiverTerminalAfterRespond)
+	}
+	return nil
+}
+
 func validateOutboxAndEvents(s summary, requiredEventType string, wantEvents int) error {
 	if s.ContactsOutbox.Total > 0 && (s.ContactsOutbox.Pending != 0 || s.ContactsOutbox.DLQ != 0 || s.ContactsOutbox.Published < int64(wantEvents)) {
 		return fmt.Errorf("unexpected outbox stats: %+v", s.ContactsOutbox)
@@ -917,6 +1019,13 @@ func validateOutboxAndEvents(s summary, requiredEventType string, wantEvents int
 		return fmt.Errorf("missing expected contact Kafka events: %+v", s.ContactKafkaEvents)
 	}
 	return nil
+}
+
+func terminalRequestStatusForScenario(scenario string) contactsv1.ContactRequestStatus {
+	if scenario == "decline" {
+		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_DECLINED
+	}
+	return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_ACCEPTED
 }
 
 func expectedEventCount(scenario string) int {

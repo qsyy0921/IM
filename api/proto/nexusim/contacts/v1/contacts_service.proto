@@ -7,6 +7,7 @@ option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1;contac
 service ContactsService {
   rpc SendContactRequest(SendContactRequestRequest) returns (SendContactRequestResponse);
   rpc RespondContactRequest(RespondContactRequestRequest) returns (RespondContactRequestResponse);
+  rpc ListContactRequests(ListContactRequestsRequest) returns (ListContactRequestsResponse);
   rpc ListContacts(ListContactsRequest) returns (ListContactsResponse);
   rpc GetContactState(GetContactStateRequest) returns (GetContactStateResponse);
   rpc DeleteContact(DeleteContactRequest) returns (DeleteContactResponse);
@@ -46,6 +47,12 @@ enum ContactDecision {
   CONTACT_DECISION_DECLINE = 2;
 }
 
+enum ContactRequestListDirection {
+  CONTACT_REQUEST_LIST_DIRECTION_UNSPECIFIED = 0;
+  CONTACT_REQUEST_LIST_DIRECTION_INCOMING = 1;
+  CONTACT_REQUEST_LIST_DIRECTION_OUTGOING = 2;
+}
+
 message SendContactRequestRequest {
   AuthContext auth_context = 1;
   string target_user_id = 2;
@@ -76,6 +83,34 @@ message RespondContactRequestResponse {
   string receiver_user_id = 4;
   ContactRequestStatus status = 5;
   bool idempotent_replay = 6;
+}
+
+message ListContactRequestsRequest {
+  AuthContext auth_context = 1;
+  ContactRequestListDirection direction = 2;
+  ContactRequestStatus status = 3;
+  int32 page_size = 4;
+  string page_token = 5;
+}
+
+message ContactRequestItem {
+  string request_id = 1;
+  string sender_user_id = 2;
+  string receiver_user_id = 3;
+  ContactRequestStatus status = 4;
+  string message = 5;
+  int64 created_at_unix_ms = 6;
+  int64 updated_at_unix_ms = 7;
+  int64 decided_at_unix_ms = 8;
+}
+
+message ListContactRequestsResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  ContactRequestListDirection direction = 3;
+  ContactRequestStatus status = 4;
+  repeated ContactRequestItem requests = 5;
+  string next_page_token = 6;
 }
 
 message ListContactsRequest {

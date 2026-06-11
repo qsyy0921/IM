@@ -10,6 +10,7 @@ const (
 type ContactRequestStatus string
 type ContactEdgeStatus string
 type ContactDecision string
+type ContactRequestListDirection string
 
 const (
 	ContactRequestStatusPending  ContactRequestStatus = "PENDING"
@@ -24,6 +25,9 @@ const (
 
 	ContactDecisionAccept  ContactDecision = "ACCEPT"
 	ContactDecisionDecline ContactDecision = "DECLINE"
+
+	ContactRequestListDirectionIncoming ContactRequestListDirection = "INCOMING"
+	ContactRequestListDirectionOutgoing ContactRequestListDirection = "OUTGOING"
 )
 
 type SendContactRequestCommand struct {
@@ -94,6 +98,76 @@ type RespondContactRequestResult struct {
 	ReceiverUserID   UserID
 	Status           ContactRequestStatus
 	IdempotentReplay bool
+}
+
+type ListContactRequestsCommand struct {
+	AuthContext AuthContext
+	Direction   ContactRequestListDirection
+	Status      ContactRequestStatus
+	PageSize    int
+	PageToken   string
+}
+
+func (c ListContactRequestsCommand) Validate() error {
+	if c.AuthContext.TenantID == "" {
+		return NewInvalidArgument("tenant_id is required")
+	}
+	if c.AuthContext.UserID == "" {
+		return NewInvalidArgument("user_id is required")
+	}
+	if c.NormalizedDirection() == "" {
+		return NewInvalidArgument("direction is invalid")
+	}
+	if c.NormalizedStatus() == "" {
+		return NewInvalidArgument("status is invalid")
+	}
+	return nil
+}
+
+func (c ListContactRequestsCommand) NormalizedDirection() ContactRequestListDirection {
+	if c.Direction == "" {
+		return ContactRequestListDirectionIncoming
+	}
+	if c.Direction == ContactRequestListDirectionIncoming || c.Direction == ContactRequestListDirectionOutgoing {
+		return c.Direction
+	}
+	return ""
+}
+
+func (c ListContactRequestsCommand) NormalizedStatus() ContactRequestStatus {
+	if c.Status == "" {
+		return ContactRequestStatusPending
+	}
+	switch c.Status {
+	case ContactRequestStatusPending,
+		ContactRequestStatusAccepted,
+		ContactRequestStatusDeclined,
+		ContactRequestStatusCanceled,
+		ContactRequestStatusExpired:
+		return c.Status
+	default:
+		return ""
+	}
+}
+
+type ContactRequestItem struct {
+	RequestID       string
+	SenderUserID    UserID
+	ReceiverUserID  UserID
+	Status          ContactRequestStatus
+	Message         string
+	CreatedAtUnixMS int64
+	UpdatedAtUnixMS int64
+	DecidedAtUnixMS int64
+}
+
+type ListContactRequestsResult struct {
+	TenantID      TenantID
+	UserID        UserID
+	Direction     ContactRequestListDirection
+	Status        ContactRequestStatus
+	Requests      []ContactRequestItem
+	NextPageToken string
 }
 
 type ListContactsCommand struct {

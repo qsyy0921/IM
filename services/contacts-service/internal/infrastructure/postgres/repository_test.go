@@ -117,6 +117,77 @@ func TestRepositoryDeclineDoesNotCreateEdgesIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryListContactRequestsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	aliceToBob, err := repository.SendContactRequest(ctx, sendCommand("alice", "bob", "send-alice-bob", "alice says hi"))
+	if err != nil {
+		t.Fatalf("send alice -> bob: %v", err)
+	}
+	carolToBob, err := repository.SendContactRequest(ctx, sendCommand("carol", "bob", "send-carol-bob", "carol says hi"))
+	if err != nil {
+		t.Fatalf("send carol -> bob: %v", err)
+	}
+	bobToDave, err := repository.SendContactRequest(ctx, sendCommand("bob", "dave", "send-bob-dave", "bob says hi"))
+	if err != nil {
+		t.Fatalf("send bob -> dave: %v", err)
+	}
+	setContactRequestCreatedAt(t, ctx, pool, aliceToBob.RequestID, time.Date(2026, 6, 10, 8, 0, 0, 0, time.UTC))
+	setContactRequestCreatedAt(t, ctx, pool, carolToBob.RequestID, time.Date(2026, 6, 10, 8, 1, 0, 0, time.UTC))
+	setContactRequestCreatedAt(t, ctx, pool, bobToDave.RequestID, time.Date(2026, 6, 10, 8, 2, 0, 0, time.UTC))
+
+	firstIncoming, err := repository.ListContactRequests(ctx, listContactRequestsCommand("bob", types.ContactRequestListDirectionIncoming, types.ContactRequestStatusPending, 1, ""))
+	if err != nil {
+		t.Fatalf("list first incoming pending: %v", err)
+	}
+	assertContactRequestIDs(t, firstIncoming, carolToBob.RequestID)
+	if firstIncoming.Direction != types.ContactRequestListDirectionIncoming || firstIncoming.Status != types.ContactRequestStatusPending {
+		t.Fatalf("unexpected first incoming metadata: %+v", firstIncoming)
+	}
+	if firstIncoming.NextPageToken == "" {
+		t.Fatal("expected incoming pending next_page_token")
+	}
+	secondIncoming, err := repository.ListContactRequests(ctx, listContactRequestsCommand("bob", types.ContactRequestListDirectionIncoming, types.ContactRequestStatusPending, 1, firstIncoming.NextPageToken))
+	if err != nil {
+		t.Fatalf("list second incoming pending: %v", err)
+	}
+	assertContactRequestIDs(t, secondIncoming, aliceToBob.RequestID)
+	_, err = repository.ListContactRequests(ctx, listContactRequestsCommand("bob", types.ContactRequestListDirectionOutgoing, types.ContactRequestStatusPending, 1, firstIncoming.NextPageToken))
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected direction cursor mismatch, got %v", err)
+	}
+	_, err = repository.ListContactRequests(ctx, listContactRequestsCommand("bob", types.ContactRequestListDirectionIncoming, types.ContactRequestStatusAccepted, 1, firstIncoming.NextPageToken))
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected status cursor mismatch, got %v", err)
+	}
+
+	outgoing, err := repository.ListContactRequests(ctx, listContactRequestsCommand("bob", types.ContactRequestListDirectionOutgoing, types.ContactRequestStatusPending, 10, ""))
+	if err != nil {
+		t.Fatalf("list outgoing pending: %v", err)
+	}
+	assertContactRequestIDs(t, outgoing, bobToDave.RequestID)
+
+	if _, err := repository.RespondContactRequest(ctx, respondCommand("bob", aliceToBob.RequestID, "respond-alice-bob", types.ContactDecisionAccept)); err != nil {
+		t.Fatalf("accept alice -> bob: %v", err)
+	}
+	pendingAfterAccept, err := repository.ListContactRequests(ctx, listContactRequestsCommand("bob", types.ContactRequestListDirectionIncoming, types.ContactRequestStatusPending, 10, ""))
+	if err != nil {
+		t.Fatalf("list pending after accept: %v", err)
+	}
+	assertContactRequestIDs(t, pendingAfterAccept, carolToBob.RequestID)
+	accepted, err := repository.ListContactRequests(ctx, listContactRequestsCommand("bob", types.ContactRequestListDirectionIncoming, types.ContactRequestStatusAccepted, 10, ""))
+	if err != nil {
+		t.Fatalf("list accepted incoming: %v", err)
+	}
+	assertContactRequestIDs(t, accepted, aliceToBob.RequestID)
+	if len(accepted.Requests) != 1 || accepted.Requests[0].DecidedAtUnixMS == 0 || accepted.Requests[0].Message != "alice says hi" {
+		t.Fatalf("unexpected accepted request item: %+v", accepted.Requests)
+	}
+}
+
 func TestRepositoryUpdateContactRemarkIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -532,6 +603,25 @@ func listCommand(owner string, pageSize int, pageToken string) types.ListContact
 	}
 }
 
+func listContactRequestsCommand(
+	user string,
+	direction types.ContactRequestListDirection,
+	status types.ContactRequestStatus,
+	pageSize int,
+	pageToken string,
+) types.ListContactRequestsCommand {
+	return types.ListContactRequestsCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-contacts",
+			UserID:   types.UserID(user),
+		},
+		Direction: direction,
+		Status:    status,
+		PageSize:  pageSize,
+		PageToken: pageToken,
+	}
+}
+
 func stateCommand(owner string, other string) types.GetContactStateCommand {
 	return types.GetContactStateCommand{
 		AuthContext: types.AuthContext{
@@ -571,6 +661,18 @@ func assertContactIDs(t *testing.T, result types.ListContactsResult, want ...typ
 	for index, userID := range want {
 		if result.Contacts[index].ContactUserID != userID {
 			t.Fatalf("expected contact %d = %s, got %+v", index, userID, result.Contacts[index])
+		}
+	}
+}
+
+func assertContactRequestIDs(t *testing.T, result types.ListContactRequestsResult, want ...string) {
+	t.Helper()
+	if len(result.Requests) != len(want) {
+		t.Fatalf("expected %d contact requests, got %d: %+v", len(want), len(result.Requests), result.Requests)
+	}
+	for index, requestID := range want {
+		if result.Requests[index].RequestID != requestID {
+			t.Fatalf("expected request %d = %s, got %+v", index, requestID, result.Requests[index])
 		}
 	}
 }
@@ -670,6 +772,20 @@ INSERT INTO contact_edges (
 `, owner, contact)
 	if err != nil {
 		t.Fatalf("insert contact edge: %v", err)
+	}
+}
+
+func setContactRequestCreatedAt(t *testing.T, ctx context.Context, pool *pgxpool.Pool, requestID string, createdAt time.Time) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+UPDATE contact_requests
+SET created_at = $2,
+    updated_at = $2
+WHERE tenant_id = 'tenant-contacts'
+  AND request_id = $1
+`, requestID, createdAt)
+	if err != nil {
+		t.Fatalf("set contact request created_at: %v", err)
 	}
 }
 

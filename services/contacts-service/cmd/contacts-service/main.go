@@ -62,6 +62,7 @@ func runGRPC() error {
 	contactsgrpc.Register(server, contactsgrpc.NewServer(
 		app.NewSendContactRequestUseCase(repository),
 		app.NewRespondContactRequestUseCase(repository),
+		app.NewListContactRequestsUseCase(repository),
 		app.NewListContactsUseCase(repository),
 		app.NewGetContactStateUseCase(repository),
 		app.NewDeleteContactUseCase(repository),

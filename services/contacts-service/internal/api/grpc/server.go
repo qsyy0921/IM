@@ -19,6 +19,10 @@ type RespondContactRequestExecutor interface {
 	Execute(context.Context, types.RespondContactRequestCommand) (types.RespondContactRequestResult, error)
 }
 
+type ListContactRequestsExecutor interface {
+	Execute(context.Context, types.ListContactRequestsCommand) (types.ListContactRequestsResult, error)
+}
+
 type ListContactsExecutor interface {
 	Execute(context.Context, types.ListContactsCommand) (types.ListContactsResult, error)
 }
@@ -47,6 +51,7 @@ type Server struct {
 	contactsv1.UnimplementedContactsServiceServer
 	sendContactRequest    SendContactRequestExecutor
 	respondContactRequest RespondContactRequestExecutor
+	listContactRequests   ListContactRequestsExecutor
 	listContacts          ListContactsExecutor
 	getContactState       GetContactStateExecutor
 	deleteContact         DeleteContactExecutor
@@ -58,6 +63,7 @@ type Server struct {
 func NewServer(
 	sendContactRequest SendContactRequestExecutor,
 	respondContactRequest RespondContactRequestExecutor,
+	listContactRequests ListContactRequestsExecutor,
 	listContacts ListContactsExecutor,
 	getContactState GetContactStateExecutor,
 	deleteContact DeleteContactExecutor,
@@ -68,6 +74,7 @@ func NewServer(
 	return &Server{
 		sendContactRequest:    sendContactRequest,
 		respondContactRequest: respondContactRequest,
+		listContactRequests:   listContactRequests,
 		listContacts:          listContacts,
 		getContactState:       getContactState,
 		deleteContact:         deleteContact,
@@ -136,6 +143,49 @@ func (s *Server) RespondContactRequest(
 		ReceiverUserId:   string(result.ReceiverUserID),
 		Status:           requestStatusToProto(result.Status),
 		IdempotentReplay: result.IdempotentReplay,
+	}, nil
+}
+
+func (s *Server) ListContactRequests(
+	ctx context.Context,
+	request *contactsv1.ListContactRequestsRequest,
+) (*contactsv1.ListContactRequestsResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.listContactRequests == nil {
+		return nil, status.Error(codes.Unimplemented, "list contact requests is not configured")
+	}
+	result, err := s.listContactRequests.Execute(ctx, types.ListContactRequestsCommand{
+		AuthContext: authFromProto(request.GetAuthContext()),
+		Direction:   requestListDirectionFromProto(request.GetDirection()),
+		Status:      requestStatusFromProto(request.GetStatus()),
+		PageSize:    int(request.GetPageSize()),
+		PageToken:   request.GetPageToken(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	requests := make([]*contactsv1.ContactRequestItem, 0, len(result.Requests))
+	for _, item := range result.Requests {
+		requests = append(requests, &contactsv1.ContactRequestItem{
+			RequestId:       item.RequestID,
+			SenderUserId:    string(item.SenderUserID),
+			ReceiverUserId:  string(item.ReceiverUserID),
+			Status:          requestStatusToProto(item.Status),
+			Message:         item.Message,
+			CreatedAtUnixMs: item.CreatedAtUnixMS,
+			UpdatedAtUnixMs: item.UpdatedAtUnixMS,
+			DecidedAtUnixMs: item.DecidedAtUnixMS,
+		})
+	}
+	return &contactsv1.ListContactRequestsResponse{
+		TenantId:      string(result.TenantID),
+		UserId:        string(result.UserID),
+		Direction:     requestListDirectionToProto(result.Direction),
+		Status:        requestStatusToProto(result.Status),
+		Requests:      requests,
+		NextPageToken: result.NextPageToken,
 	}, nil
 }
 
@@ -349,6 +399,23 @@ func decisionFromProto(value contactsv1.ContactDecision) types.ContactDecision {
 	}
 }
 
+func requestStatusFromProto(value contactsv1.ContactRequestStatus) types.ContactRequestStatus {
+	switch value {
+	case contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_PENDING:
+		return types.ContactRequestStatusPending
+	case contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_ACCEPTED:
+		return types.ContactRequestStatusAccepted
+	case contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_DECLINED:
+		return types.ContactRequestStatusDeclined
+	case contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_CANCELED:
+		return types.ContactRequestStatusCanceled
+	case contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_EXPIRED:
+		return types.ContactRequestStatusExpired
+	default:
+		return ""
+	}
+}
+
 func requestStatusToProto(value types.ContactRequestStatus) contactsv1.ContactRequestStatus {
 	switch value {
 	case types.ContactRequestStatusPending:
@@ -363,6 +430,28 @@ func requestStatusToProto(value types.ContactRequestStatus) contactsv1.ContactRe
 		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_EXPIRED
 	default:
 		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_UNSPECIFIED
+	}
+}
+
+func requestListDirectionFromProto(value contactsv1.ContactRequestListDirection) types.ContactRequestListDirection {
+	switch value {
+	case contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_INCOMING:
+		return types.ContactRequestListDirectionIncoming
+	case contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_OUTGOING:
+		return types.ContactRequestListDirectionOutgoing
+	default:
+		return ""
+	}
+}
+
+func requestListDirectionToProto(value types.ContactRequestListDirection) contactsv1.ContactRequestListDirection {
+	switch value {
+	case types.ContactRequestListDirectionIncoming:
+		return contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_INCOMING
+	case types.ContactRequestListDirectionOutgoing:
+		return contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_OUTGOING
+	default:
+		return contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_UNSPECIFIED
 	}
 }
 

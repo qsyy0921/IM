@@ -1,6 +1,6 @@
 # NexusIM contacts-service SDD v0.1
 
-状态：Draft；proto / Kafka schema / migration / 六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 `ACCEPT / DECLINE` 真实进程 smoke 已落地；联系人删除 / 拉黑 / 解除拉黑 / 备注名 v0.2 已完成代码切片，删除 / 拉黑 / 备注名真实进程 smoke 已通过，解除拉黑 smoke 待跑。
+状态：Draft；proto / Kafka schema / migration / 六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 `ACCEPT / DECLINE` 真实进程 smoke 已落地；联系人删除 / 拉黑 / 解除拉黑 / 备注名 v0.2 已完成代码切片，删除 / 拉黑 / 备注名 / 解除拉黑真实进程 smoke 已通过；删除后重新申请 / 接受恢复联系人关系的 re-add smoke 已通过。
 
 本文定义第三层 IM 产品能力中的“联系人 / 好友关系”最小服务边界。目标是补齐社交关系事实源，同时保持低耦合：不把好友关系塞进 `conversation_members`，也不让会话、消息、投递服务直接读联系人表。
 
@@ -564,7 +564,7 @@ contacts_outbox_dlq_count
 | postgres integration | SendContactRequest / RespondContactRequest / ListContacts / DeleteContact / BlockContact / UpdateContactRemark 真实事务、幂等 replay、并发首次申请、反向 pending、终态相反 decision、分页 token 绑定、单向 edge 变更 |
 | outbox integration | contacts_outbox retry / DLQ / mark PUBLISHED |
 | smoke | `SendContactRequest -> RespondContactRequest(ACCEPT) -> ListContacts` |
-| v0.2 smoke | `ACCEPT -> DeleteContact`、`ACCEPT -> BlockContact`、`ACCEPT -> BlockContact -> UnblockContact`、`ACCEPT -> UpdateContactRemark`，分别验证 contacts_outbox / Kafka / ListContacts / GetContactState |
+| v0.2 smoke | `ACCEPT -> DeleteContact`、`ACCEPT -> BlockContact`、`ACCEPT -> BlockContact -> UnblockContact`、`ACCEPT -> UpdateContactRemark`、`ACCEPT -> DeleteContact -> SendContactRequest -> ACCEPT`，分别验证 contacts_outbox / Kafka / ListContacts / GetContactState |
 
 ## 14. Runbook
 

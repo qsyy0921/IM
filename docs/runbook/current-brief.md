@@ -29,8 +29,9 @@ conversation-service
 10. push-gateway 已新增第一版低耦合真实鉴权入口，并在 clean commit `8aa414c` 跑通 HMAC auth full smoke：`NEXUSIM_PUSH_AUTH_MODE=hmac` 时校验短期 signed gateway token 的 HMAC 签名、`aud=push-gateway`、过期时间和 device 绑定；runner 使用 `Authorization: Bearer`，`push_auth_query_identity_sent=false`，随后完整通过 `delivery.notify -> PullInbox -> delivery.ack.ok`。当前支持 current + previous secrets 的最小密钥轮换，smoke runner 已能用 previous secret 签发 token 验证兼容窗口。它不是完整 identity-service，后续仍需 device revoke、session revoke、refresh token、多 issuer 和 JWK/JWT 标准化。报告见 `docs/runbook/loadtest/push-gateway/loadtest-report-20260610-push-gateway-hmac-auth-smoke.md`。
 11. conversation-service 群管理最小读能力已完成：`ListConversationMembers` 的 JOIN / LEAVE / REMOVE / ROLE_CHANGED roster smoke 均通过；owner transfer 也已完成专用 RPC、事件、projection 和真实进程 smoke。它是低耦合 roster API，不让其它服务跨表读取 `conversation_members`。
 12. contacts-service 已完成好友申请、申请列表、接受、拒绝、取消、删除、拉黑、解除拉黑、备注名和删除后重新申请恢复的最小闭环。clean commit `eecdccb` 跑通 `ListContactRequests` smoke：`SendContactRequest -> ListContactRequests(INCOMING,PENDING)=1 -> RespondContactRequest(ACCEPT) -> ListContactRequests(INCOMING,PENDING)=0 -> ListContactRequests(INCOMING,ACCEPTED)=1 -> ListContacts`，outbox `PUBLISHED=2/PENDING=0/DLQ=0`；clean commit `f291aa5` 跑通 `CancelContactRequest` smoke：`SendContactRequest -> ListContactRequests(INCOMING,PENDING)=1 -> CancelContactRequest(CANCELED) -> ListContactRequests(INCOMING,PENDING)=0 -> ListContactRequests(OUTGOING,CANCELED)=1`，outbox `PUBLISHED=2/PENDING=0/DLQ=0`，Kafka 读回 `contact.request.created.v1 / contact.request.canceled.v1`；报告见 `docs/runbook/loadtest/contacts-service/loadtest-report-20260611-contacts-cancel-smoke.md`。contacts-service 仍保持独立事实源，不写 `conversation_members`，不自动创建会话，message-service 不同步依赖 contacts-service。
-13. RAG / Agent / 智能总结属于第四层，必须等消息事实、权限边界、撤回/编辑/删除语义更稳定后再做。
-14. Kafka HA、PostgreSQL failover、Redis quorum / 网络分区可作为后续生产化项，不作为当前主线阻塞。
+13. 本地端到端演示入口已新增到 `loadtest/demo`：通过公开 gRPC / WebSocket 串起 `CreateMemberChange(JOIN) -> SendMessage -> delivery.notify -> PullInbox -> delivery.ack -> MarkRead -> ListConversations`，结果写入 `H:\NexusIM\loadtest-results`。当前只完成功能实现和编译级检查，尚未跑真实多进程 demo smoke；下一步优先启动现有服务后跑通并归档报告。
+14. RAG / Agent / 智能总结属于第四层，必须等消息事实、权限边界、撤回/编辑/删除语义更稳定后再做。
+15. Kafka HA、PostgreSQL failover、Redis quorum / 网络分区可作为后续生产化项，不作为当前主线阻塞。
 
 ## 硬边界
 

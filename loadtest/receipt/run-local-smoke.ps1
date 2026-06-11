@@ -138,6 +138,7 @@ try {
     Apply-PostgresMigration -Path "migrations\postgres\receipt\000005_conversation_archive.sql" -Name "nexusim_receipt_conversation_archive.sql"
     Apply-PostgresMigration -Path "migrations\postgres\receipt\000006_conversation_pin.sql" -Name "nexusim_receipt_conversation_pin.sql"
     Apply-PostgresMigration -Path "migrations\postgres\receipt\000007_conversation_mute.sql" -Name "nexusim_receipt_conversation_mute.sql"
+    Apply-PostgresMigration -Path "migrations\postgres\receipt\000008_conversation_unread_filter.sql" -Name "nexusim_receipt_conversation_unread_filter.sql"
 
     Ensure-KafkaTopic -Topic $timelineTopic
     Ensure-KafkaTopic -Topic $deliveryTopic

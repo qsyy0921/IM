@@ -54,13 +54,15 @@ func TestListConversationsMapsSort(t *testing.T) {
 		Limit:       20,
 		PageCursor:  "cursor-1",
 		Sort:        receiptv1.ConversationListSort_CONVERSATION_LIST_SORT_UPDATED_AT_DESC,
+		UnreadOnly:  true,
 	})
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 	if list.command.Sort != types.ConversationListSortUpdatedAtDesc ||
 		list.command.Limit != 20 ||
-		list.command.PageCursor != "cursor-1" {
+		list.command.PageCursor != "cursor-1" ||
+		!list.command.UnreadOnly {
 		t.Fatalf("unexpected list command: %+v", list.command)
 	}
 }

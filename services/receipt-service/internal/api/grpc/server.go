@@ -214,6 +214,7 @@ func (server *Server) ListConversations(
 		PageCursor:      request.GetPageCursor(),
 		Sort:            conversationListSortFromProto(request.GetSort()),
 		IncludeArchived: request.GetIncludeArchived(),
+		UnreadOnly:      request.GetUnreadOnly(),
 	})
 	if err != nil {
 		return nil, grpcError(err)

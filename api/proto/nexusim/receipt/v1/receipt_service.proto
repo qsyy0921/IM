@@ -95,6 +95,7 @@ message ListConversationsRequest {
   string page_cursor = 3;
   ConversationListSort sort = 4;
   bool include_archived = 5;
+  bool unread_only = 6;
 }
 
 message ProjectionWatermark {

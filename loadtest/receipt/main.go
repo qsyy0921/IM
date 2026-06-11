@@ -81,9 +81,11 @@ type summary struct {
 	AckDelivery                              ackSummary              `json:"ack_delivery"`
 	ReceiptBeforeReadBySeq                   receiptStateSummary     `json:"receipt_before_read_by_seq"`
 	ConversationListBefore                   conversationListSummary `json:"conversation_list_before_read"`
+	ConversationListUnreadBeforeRead         conversationListSummary `json:"conversation_list_unread_before_read"`
 	ReceiptAfterReadBySeq                    receiptStateSummary     `json:"receipt_after_read_by_seq"`
 	ReceiptAfterReadByMsgID                  receiptStateSummary     `json:"receipt_after_read_by_message_id"`
 	ConversationListAfter                    conversationListSummary `json:"conversation_list_after_read"`
+	ConversationListUnreadAfterRead          conversationListSummary `json:"conversation_list_unread_after_read"`
 	ArchiveConversation                      archiveSummary          `json:"archive_conversation"`
 	ConversationListArchivedDefault          conversationListSummary `json:"conversation_list_archived_default"`
 	ConversationListArchivedIncluded         conversationListSummary `json:"conversation_list_archived_included"`
@@ -457,7 +459,7 @@ func executeSmoke(
 		return fmt.Errorf("unexpected receipt before read receiver=%+v", receiverBefore)
 	}
 	begin = time.Now()
-	conversationListBefore, err := listConversations(ctx, cfg, receiptClient, false)
+	conversationListBefore, err := listConversations(ctx, cfg, receiptClient, false, false)
 	conversationListBefore.LatencyMS = elapsedMS(begin)
 	if err != nil {
 		return fmt.Errorf("list conversations before read: %w", err)
@@ -465,6 +467,17 @@ func executeSmoke(
 	result.ConversationListBefore = conversationListBefore
 	if err := assertConversationListState(conversationListBefore, cfg.conversationID, send.GetConversationSeq(), 1, 0); err != nil {
 		return fmt.Errorf("conversation list before read: %w", err)
+	}
+
+	begin = time.Now()
+	conversationListUnreadBefore, err := listConversations(ctx, cfg, receiptClient, false, true)
+	conversationListUnreadBefore.LatencyMS = elapsedMS(begin)
+	if err != nil {
+		return fmt.Errorf("list unread conversations before read: %w", err)
+	}
+	result.ConversationListUnreadBeforeRead = conversationListUnreadBefore
+	if err := assertConversationListState(conversationListUnreadBefore, cfg.conversationID, send.GetConversationSeq(), 1, 0); err != nil {
+		return fmt.Errorf("unread conversation list before read: %w", err)
 	}
 
 	begin = time.Now()
@@ -493,7 +506,7 @@ func executeSmoke(
 		return fmt.Errorf("unexpected receipt after read receiver=%+v", receiverAfter)
 	}
 	begin = time.Now()
-	conversationListAfter, err := listConversations(ctx, cfg, receiptClient, false)
+	conversationListAfter, err := listConversations(ctx, cfg, receiptClient, false, false)
 	conversationListAfter.LatencyMS = elapsedMS(begin)
 	if err != nil {
 		return fmt.Errorf("list conversations after read: %w", err)
@@ -501,6 +514,17 @@ func executeSmoke(
 	result.ConversationListAfter = conversationListAfter
 	if err := assertConversationListState(conversationListAfter, cfg.conversationID, send.GetConversationSeq(), 0, send.GetConversationSeq()); err != nil {
 		return fmt.Errorf("conversation list after read: %w", err)
+	}
+
+	begin = time.Now()
+	conversationListUnreadAfter, err := listConversations(ctx, cfg, receiptClient, false, true)
+	conversationListUnreadAfter.LatencyMS = elapsedMS(begin)
+	if err != nil {
+		return fmt.Errorf("list unread conversations after read: %w", err)
+	}
+	result.ConversationListUnreadAfterRead = conversationListUnreadAfter
+	if err := assertConversationListHidden(conversationListUnreadAfter); err != nil {
+		return fmt.Errorf("unread conversation list after read: %w", err)
 	}
 
 	begin = time.Now()
@@ -515,7 +539,7 @@ func executeSmoke(
 	}
 
 	begin = time.Now()
-	archivedDefault, err := listConversations(ctx, cfg, receiptClient, false)
+	archivedDefault, err := listConversations(ctx, cfg, receiptClient, false, false)
 	archivedDefault.LatencyMS = elapsedMS(begin)
 	if err != nil {
 		return fmt.Errorf("list conversations after archive default: %w", err)
@@ -526,7 +550,7 @@ func executeSmoke(
 	}
 
 	begin = time.Now()
-	archivedIncluded, err := listConversations(ctx, cfg, receiptClient, true)
+	archivedIncluded, err := listConversations(ctx, cfg, receiptClient, true, false)
 	archivedIncluded.LatencyMS = elapsedMS(begin)
 	if err != nil {
 		return fmt.Errorf("list conversations after archive include_archived: %w", err)
@@ -571,7 +595,7 @@ func executeSmoke(
 	}
 
 	begin = time.Now()
-	archivedNewDefault, err := listConversations(ctx, cfg, receiptClient, false)
+	archivedNewDefault, err := listConversations(ctx, cfg, receiptClient, false, false)
 	archivedNewDefault.LatencyMS = elapsedMS(begin)
 	if err != nil {
 		return fmt.Errorf("list conversations after archived new message default: %w", err)
@@ -582,7 +606,7 @@ func executeSmoke(
 	}
 
 	begin = time.Now()
-	archivedNewIncluded, err := listConversations(ctx, cfg, receiptClient, true)
+	archivedNewIncluded, err := listConversations(ctx, cfg, receiptClient, true, false)
 	archivedNewIncluded.LatencyMS = elapsedMS(begin)
 	if err != nil {
 		return fmt.Errorf("list conversations after archived new message include_archived: %w", err)
@@ -604,7 +628,7 @@ func executeSmoke(
 	}
 
 	begin = time.Now()
-	afterUnarchive, err := listConversations(ctx, cfg, receiptClient, false)
+	afterUnarchive, err := listConversations(ctx, cfg, receiptClient, false, false)
 	afterUnarchive.LatencyMS = elapsedMS(begin)
 	if err != nil {
 		return fmt.Errorf("list conversations after unarchive: %w", err)
@@ -626,7 +650,7 @@ func executeSmoke(
 	}
 
 	begin = time.Now()
-	afterPin, err := listConversations(ctx, cfg, receiptClient, false)
+	afterPin, err := listConversations(ctx, cfg, receiptClient, false, false)
 	afterPin.LatencyMS = elapsedMS(begin)
 	if err != nil {
 		return fmt.Errorf("list conversations after pin: %w", err)
@@ -648,7 +672,7 @@ func executeSmoke(
 	}
 
 	begin = time.Now()
-	afterUnpin, err := listConversations(ctx, cfg, receiptClient, false)
+	afterUnpin, err := listConversations(ctx, cfg, receiptClient, false, false)
 	afterUnpin.LatencyMS = elapsedMS(begin)
 	if err != nil {
 		return fmt.Errorf("list conversations after unpin: %w", err)
@@ -670,7 +694,7 @@ func executeSmoke(
 	}
 
 	begin = time.Now()
-	afterMute, err := listConversations(ctx, cfg, receiptClient, false)
+	afterMute, err := listConversations(ctx, cfg, receiptClient, false, false)
 	afterMute.LatencyMS = elapsedMS(begin)
 	if err != nil {
 		return fmt.Errorf("list conversations after mute: %w", err)
@@ -692,7 +716,7 @@ func executeSmoke(
 	}
 
 	begin = time.Now()
-	afterUnmute, err := listConversations(ctx, cfg, receiptClient, false)
+	afterUnmute, err := listConversations(ctx, cfg, receiptClient, false, false)
 	afterUnmute.LatencyMS = elapsedMS(begin)
 	if err != nil {
 		return fmt.Errorf("list conversations after unmute: %w", err)
@@ -916,6 +940,7 @@ func listConversations(
 	cfg config,
 	client receiptv1.ReceiptServiceClient,
 	includeArchived bool,
+	unreadOnly bool,
 ) (conversationListSummary, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
@@ -930,6 +955,7 @@ func listConversations(
 		},
 		Limit:           10,
 		IncludeArchived: includeArchived,
+		UnreadOnly:      unreadOnly,
 	})
 	if err != nil {
 		return conversationListSummary{}, err

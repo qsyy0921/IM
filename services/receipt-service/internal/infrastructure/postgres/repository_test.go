@@ -252,6 +252,43 @@ func TestRepositoryListConversationsPaginatesByStableCursorIntegration(t *testin
 	}
 }
 
+func TestRepositoryListConversationsFiltersUnreadOnlyIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	sortTime := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	insertConversationSummary(t, ctx, pool, "conv-a", 11, sortTime)
+	insertConversationSummary(t, ctx, pool, "conv-b", 12, sortTime.Add(-time.Minute))
+	insertConversationSummary(t, ctx, pool, "conv-c", 13, sortTime.Add(-2*time.Minute))
+	setConversationUnread(t, ctx, pool, "conv-b", 0)
+
+	firstCommand := listConversationsCommandUnreadOnly(1, "")
+	first, err := repository.ListConversations(ctx, firstCommand)
+	if err != nil {
+		t.Fatalf("list first unread page: %v", err)
+	}
+	assertConversationIDs(t, first, "conv-a")
+	if first.NextPageCursor == "" {
+		t.Fatal("expected next cursor for unread first page")
+	}
+
+	second, err := repository.ListConversations(ctx, listConversationsCommandUnreadOnly(1, first.NextPageCursor))
+	if err != nil {
+		t.Fatalf("list second unread page: %v", err)
+	}
+	assertConversationIDs(t, second, "conv-c")
+	if second.NextPageCursor != "" {
+		t.Fatalf("expected empty next cursor on unread last page, got %q", second.NextPageCursor)
+	}
+
+	_, err = repository.ListConversations(ctx, listConversationsCommand(1, first.NextPageCursor))
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid cursor when unread_only changes, got %v", err)
+	}
+}
+
 func TestRepositoryListConversationsRejectsInvalidCursorIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -312,11 +349,25 @@ func TestRepositoryArchiveConversationFiltersListIntegration(t *testing.T) {
 		t.Fatalf("list default conversations after new event: %v", err)
 	}
 	assertConversationIDs(t, defaultList)
+	unreadDefault := listConversationsCommandUnreadOnly(10, "")
+	unreadDefaultList, err := repository.ListConversations(ctx, unreadDefault)
+	if err != nil {
+		t.Fatalf("list default unread conversations after new event: %v", err)
+	}
+	assertConversationIDs(t, unreadDefaultList)
+
 	archivedList, err = repository.ListConversations(ctx, listConversationsCommandIncludingArchived(10, ""))
 	if err != nil {
 		t.Fatalf("list including archived conversations after new event: %v", err)
 	}
 	assertConversationSummaryWithArchive(t, archivedList, 2, true)
+	unreadArchived := listConversationsCommandIncludingArchived(10, "")
+	unreadArchived.UnreadOnly = true
+	unreadArchivedList, err := repository.ListConversations(ctx, unreadArchived)
+	if err != nil {
+		t.Fatalf("list included archived unread conversations after new event: %v", err)
+	}
+	assertConversationSummaryWithArchive(t, unreadArchivedList, 2, true)
 
 	unarchiveResult, err := repository.ArchiveConversation(ctx, archiveConversationCommand(false))
 	if err != nil {
@@ -576,6 +627,32 @@ func listConversationsCommandIncludingArchived(limit int, cursor string) types.L
 	command := listConversationsCommand(limit, cursor)
 	command.IncludeArchived = true
 	return command
+}
+
+func listConversationsCommandUnreadOnly(limit int, cursor string) types.ListConversationsCommand {
+	command := listConversationsCommand(limit, cursor)
+	command.UnreadOnly = true
+	return command
+}
+
+func setConversationUnread(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	conversationID string,
+	unreadCount int64,
+) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+UPDATE user_conversation_summaries
+SET unread_count = $1
+WHERE tenant_id = 'tenant-receipt'
+  AND user_id = 'receiver-1'
+  AND conversation_id = $2
+`, unreadCount, conversationID)
+	if err != nil {
+		t.Fatalf("set conversation unread %s: %v", conversationID, err)
+	}
 }
 
 func archiveConversationCommand(archived bool) types.ArchiveConversationCommand {

@@ -138,6 +138,7 @@ type ListConversationsCommand struct {
 	PageCursor      string
 	Sort            string
 	IncludeArchived bool
+	UnreadOnly      bool
 }
 
 func (command ListConversationsCommand) Validate() error {

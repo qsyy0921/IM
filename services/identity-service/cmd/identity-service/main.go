@@ -19,6 +19,7 @@ import (
 	"github.com/qsyy0921/IM/services/identity-service/internal/app"
 	credentialinfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/credential"
 	kafkainfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/kafka"
+	mfainfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/mfa"
 	monitoringinfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/monitoring"
 	postgresinfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/postgres"
 	tokeninfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/token"
@@ -69,6 +70,10 @@ func runGRPC() error {
 	refreshTokens := tokeninfra.NewRefreshTokenCodec()
 	challengeTokens := tokeninfra.NewChallengeTokenCodec()
 	passwords := credentialinfra.NewPBKDF2Hasher(envInt("NEXUSIM_IDENTITY_PASSWORD_PBKDF2_ITERATIONS", 0))
+	mfaManager, err := newMFASecretManager()
+	if err != nil {
+		return err
+	}
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
 	jwkSet, err := gatewayTokenJWKSetWithAdditionalKeys(signer.JWKSet())
 	if err != nil {
@@ -108,6 +113,9 @@ func runGRPC() error {
 		app.NewConfirmVerificationChallengeUseCase(repository, challengeTokens),
 		app.NewRequestPasswordResetUseCase(repository, challengeTokens, app.ChallengeOptions{ReturnDevToken: envBool("NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN", false)}),
 		app.NewConfirmPasswordResetUseCase(repository, challengeTokens, passwords),
+		app.NewBeginMFAEnrollmentUseCase(repository, passwords, mfaManager),
+		app.NewConfirmMFAEnrollmentUseCase(repository, mfaManager),
+		app.NewDisableMFAFactorUseCase(repository, passwords),
 		app.NewIssueGatewayTokenUseCase(repository, signer),
 		app.NewRevokeDeviceUseCase(repository),
 		app.NewRevokeSessionUseCase(repository),
@@ -134,6 +142,31 @@ func runGRPC() error {
 		}
 		return context.Canceled
 	}
+}
+
+func newMFASecretManager() (app.MFASecretManager, error) {
+	secret := envString(
+		"NEXUSIM_IDENTITY_MFA_SECRET_KEY",
+		envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_SECRET", envString("NEXUSIM_PUSH_AUTH_HMAC_SECRET", "")),
+	)
+	if secret == "" {
+		return disabledMFASecretManager{}, nil
+	}
+	return mfainfra.NewTOTPManager(secret)
+}
+
+type disabledMFASecretManager struct{}
+
+func (disabledMFASecretManager) NewTOTPSecret() (string, types.EncryptedMFASecret, error) {
+	return "", types.EncryptedMFASecret{}, types.NewTokenSigningFailed("mfa secret encryption key is required")
+}
+
+func (disabledMFASecretManager) VerifyTOTP(types.EncryptedMFASecret, string, time.Time) (bool, error) {
+	return false, types.NewTokenSigningFailed("mfa secret encryption key is required")
+}
+
+func (disabledMFASecretManager) OTPAuthURI(string, string, string) string {
+	return ""
 }
 
 func newGatewayTokenSigner() (gatewayTokenSigner, error) {

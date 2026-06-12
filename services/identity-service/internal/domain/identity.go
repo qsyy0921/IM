@@ -113,6 +113,54 @@ func ValidateConfirmPasswordReset(command types.ConfirmPasswordResetCommand) err
 	return nil
 }
 
+func ValidateBeginMFAEnrollment(command types.BeginMFAEnrollmentCommand) error {
+	if command.TenantID == "" {
+		return types.NewInvalidArgument("tenant_id is required")
+	}
+	if command.UserID == "" {
+		return types.NewInvalidArgument("user_id is required")
+	}
+	if command.FactorType != types.MFAFactorTypeTOTP {
+		return types.NewInvalidArgument("mfa factor type is invalid")
+	}
+	if strings.TrimSpace(command.Password) == "" {
+		return types.NewInvalidArgument("password is required")
+	}
+	return nil
+}
+
+func ValidateConfirmMFAEnrollment(command types.ConfirmMFAEnrollmentCommand) error {
+	if command.TenantID == "" {
+		return types.NewInvalidArgument("tenant_id is required")
+	}
+	if command.UserID == "" {
+		return types.NewInvalidArgument("user_id is required")
+	}
+	if command.FactorID == "" {
+		return types.NewInvalidArgument("factor_id is required")
+	}
+	if !isSixDigitCode(command.Code) {
+		return types.NewInvalidArgument("mfa code is invalid")
+	}
+	return nil
+}
+
+func ValidateDisableMFAFactor(command types.DisableMFAFactorCommand) error {
+	if command.TenantID == "" {
+		return types.NewInvalidArgument("tenant_id is required")
+	}
+	if command.UserID == "" {
+		return types.NewInvalidArgument("user_id is required")
+	}
+	if command.FactorID == "" {
+		return types.NewInvalidArgument("factor_id is required")
+	}
+	if strings.TrimSpace(command.Password) == "" {
+		return types.NewInvalidArgument("password is required")
+	}
+	return nil
+}
+
 func NormalizeAudience(audience string) string {
 	audience = strings.TrimSpace(audience)
 	if audience == "" {
@@ -212,4 +260,16 @@ func validateChallengeConfirmation(tenantID types.TenantID, userID types.UserID,
 		return types.NewInvalidArgument("challenge_token is required")
 	}
 	return nil
+}
+
+func isSixDigitCode(code string) bool {
+	if len(code) != 6 {
+		return false
+	}
+	for _, r := range code {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }

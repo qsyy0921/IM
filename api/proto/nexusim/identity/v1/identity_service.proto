@@ -12,6 +12,9 @@ service IdentityService {
   rpc ConfirmVerificationChallenge(ConfirmVerificationChallengeRequest) returns (ConfirmVerificationChallengeResponse);
   rpc RequestPasswordReset(RequestPasswordResetRequest) returns (RequestPasswordResetResponse);
   rpc ConfirmPasswordReset(ConfirmPasswordResetRequest) returns (ConfirmPasswordResetResponse);
+  rpc BeginMFAEnrollment(BeginMFAEnrollmentRequest) returns (BeginMFAEnrollmentResponse);
+  rpc ConfirmMFAEnrollment(ConfirmMFAEnrollmentRequest) returns (ConfirmMFAEnrollmentResponse);
+  rpc DisableMFAFactor(DisableMFAFactorRequest) returns (DisableMFAFactorResponse);
   rpc IssueGatewayToken(IssueGatewayTokenRequest) returns (IssueGatewayTokenResponse);
   rpc RevokeDevice(RevokeDeviceRequest) returns (RevokeDeviceResponse);
   rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
@@ -166,6 +169,62 @@ message ConfirmPasswordResetResponse {
   int64 reset_at_unix_ms = 3;
 }
 
+message BeginMFAEnrollmentRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  MFAFactorType factor_type = 3;
+  string password = 4;
+  string display_name = 5;
+  string issuer = 6;
+  string trace_id = 7;
+  string request_id = 8;
+}
+
+message BeginMFAEnrollmentResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  string factor_id = 3;
+  MFAFactorType factor_type = 4;
+  MFAFactorStatus status = 5;
+  string secret = 6;
+  string otpauth_uri = 7;
+  int64 created_at_unix_ms = 8;
+}
+
+message ConfirmMFAEnrollmentRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  string factor_id = 3;
+  string code = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+message ConfirmMFAEnrollmentResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  string factor_id = 3;
+  MFAFactorStatus status = 4;
+  int64 verified_at_unix_ms = 5;
+}
+
+message DisableMFAFactorRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  string factor_id = 3;
+  string password = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+message DisableMFAFactorResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  string factor_id = 3;
+  MFAFactorStatus status = 4;
+  int64 disabled_at_unix_ms = 5;
+}
+
 message IssueGatewayTokenRequest {
   string tenant_id = 1;
   string user_id = 2;
@@ -251,6 +310,18 @@ enum VerificationChannel {
   VERIFICATION_CHANNEL_UNSPECIFIED = 0;
   VERIFICATION_CHANNEL_EMAIL = 1;
   VERIFICATION_CHANNEL_PHONE = 2;
+}
+
+enum MFAFactorType {
+  MFA_FACTOR_TYPE_UNSPECIFIED = 0;
+  MFA_FACTOR_TYPE_TOTP = 1;
+}
+
+enum MFAFactorStatus {
+  MFA_FACTOR_STATUS_UNSPECIFIED = 0;
+  MFA_FACTOR_STATUS_PENDING = 1;
+  MFA_FACTOR_STATUS_ACTIVE = 2;
+  MFA_FACTOR_STATUS_DISABLED = 3;
 }
 
 enum SessionStatus {

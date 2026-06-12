@@ -11,11 +11,12 @@
 - rotate opaque refresh tokens;
 - issue and confirm email / phone verification challenges;
 - issue and confirm password reset challenges;
+- enroll, confirm and disable first-stage TOTP MFA factors;
 - persist users, devices and sessions;
 - revoke devices and sessions;
 - keep push-gateway verification local to avoid synchronous auth RPC on every WebSocket handshake.
 
-It is not yet a full OAuth/OIDC identity platform. It does not implement email / SMS sending, MFA, external IdP federation, production-grade account-risk workflows or production-grade asymmetric key management.
+It is not yet a full OAuth/OIDC identity platform. It does not implement email / SMS sending, MFA enforcement during Login, recovery codes, WebAuthn/passkeys, external IdP federation, production-grade account-risk workflows or production-grade asymmetric key management.
 
 ## Boundary
 
@@ -26,8 +27,10 @@ Owns:
 - `identity_sessions`
 - `identity_refresh_tokens`
 - `identity_challenges`
+- `identity_mfa_factors`
 - password hash verification for existing users
 - email / phone verification and password reset challenge state
+- TOTP MFA factor secret lifecycle
 - gateway token issuance
 - device/session revoke state
 
@@ -55,11 +58,11 @@ In metadata mode, admin/read-state RPCs derive the trusted tenant/operator from 
 - `x-nexusim-trace-id` (optional)
 - `x-nexusim-request-id` (optional)
 
-This mode applies to `RevokeDevice`, `RevokeSession` and `GetDeviceState`. `RegisterUser`, `Login`, `RefreshGatewayToken` and `IssueGatewayToken` intentionally remain outside this admin gate. `RegisterUser` creates a first-stage local credential; `Login` verifies user credentials; `RefreshGatewayToken` verifies an opaque refresh token; `IssueGatewayToken` is kept as an internal / compatibility signing path for local smoke and gateway-token workflows.
+This mode applies to `RevokeDevice`, `RevokeSession` and `GetDeviceState`. `RegisterUser`, `Login`, `RefreshGatewayToken`, `BeginMFAEnrollment`, `ConfirmMFAEnrollment`, `DisableMFAFactor` and `IssueGatewayToken` intentionally remain outside this admin gate. `RegisterUser` creates a first-stage local credential; `Login` verifies user credentials; `RefreshGatewayToken` verifies an opaque refresh token; MFA factor RPCs are protected by current password and/or one-time TOTP proof; `IssueGatewayToken` is kept as an internal / compatibility signing path for local smoke and gateway-token workflows.
 
 ## Register / Login / Refresh
 
-First-stage registration creates an ACTIVE `identity_users` credential with a service-local password hash. It is a strict create path: an existing `tenant_id + user_id` returns `ALREADY_EXISTS`, and account claiming / recovery for pre-created users is a later workflow. It does not create contacts, conversation membership, profile state, or any cross-service user projection. MFA, tenant-level rate limiting and external IdP federation are separate future flows.
+First-stage registration creates an ACTIVE `identity_users` credential with a service-local password hash. It is a strict create path: an existing `tenant_id + user_id` returns `ALREADY_EXISTS`, and account claiming / recovery for pre-created users is a later workflow. It does not create contacts, conversation membership, profile state, or any cross-service user projection. Tenant-level rate limiting and external IdP federation are separate future flows.
 
 ```text
 RegisterUser
@@ -100,6 +103,45 @@ Login risk first-stage rules:
 - The first-stage lock applies only to password Login. A valid refresh token can still rotate through `RefreshGatewayToken`; refresh token theft / reuse is handled by the separate rotation and session-revoke logic. This avoids letting an external password brute-force attempt break an already authenticated client session.
 - Defaults are `NEXUSIM_IDENTITY_LOGIN_MAX_FAILED_ATTEMPTS=5`, `NEXUSIM_IDENTITY_LOGIN_FAILURE_WINDOW=15m` and `NEXUSIM_IDENTITY_LOGIN_LOCK_DURATION=15m`; deployments may tune them.
 - This is not a complete fraud/risk engine. IP/device reputation, CAPTCHA, geo-anomaly, tenant policy, alert routing, adaptive throttling and tenant-level rate limits remain future hardening.
+
+## MFA TOTP Factors
+
+First-stage MFA support is limited to TOTP factor lifecycle. It deliberately does not yet enforce MFA in `Login`; the next slice must add an explicit login challenge / step-up flow before MFA can be considered complete for authentication.
+
+```text
+BeginMFAEnrollment
+-> validate tenant/user/type/password
+-> verify current password
+-> generate TOTP secret
+-> store encrypted secret in identity_mfa_factors as PENDING
+-> return raw secret and otpauth_uri once
+
+ConfirmMFAEnrollment
+-> load encrypted PENDING factor
+-> verify 6-digit TOTP code
+-> mark factor ACTIVE
+
+DisableMFAFactor
+-> verify current password
+-> mark PENDING / ACTIVE factor DISABLED
+```
+
+MFA factor rules:
+
+- only `TOTP` is supported in this slice;
+- `identity_mfa_factors.secret_ciphertext`, `secret_nonce` and `secret_key_version` store encrypted secret material;
+- raw TOTP secret is returned only by `BeginMFAEnrollment` and is never persisted as plaintext;
+- `ConfirmMFAEnrollment` accepts only a pending TOTP factor and a six-digit code;
+- `DisableMFAFactor` requires the current password and does not delete historical rows;
+- `NEXUSIM_IDENTITY_MFA_SECRET_KEY` is the local AES-GCM encryption key input; local smoke may fall back to the existing gateway token secret, but production profiles should use a dedicated secret managed by KMS/HSM. If no MFA key is configured, the service still starts and existing Login/JWKS flows are unaffected, but MFA factor RPCs fail until the key is configured.
+
+Known MFA hardening still pending:
+
+- Login / Refresh step-up enforcement and public `MFA_REQUIRED` flow;
+- recovery codes and backup factor handling;
+- WebAuthn / passkeys;
+- secret key rotation and KMS/HSM-backed envelope encryption;
+- per-factor audit events, last-used tracking and risk-based challenge policy.
 
 ## Verification / Password Reset
 
@@ -148,7 +190,7 @@ Known hardening still pending:
 - timing- and sender-side account-enumeration resistance;
 - tenant / IP / device rate limits for challenge creation and confirmation;
 - email / SMS provider integration and audit;
-- MFA and OIDC federation;
+- MFA login enforcement and OIDC federation;
 - production alerting for repeated challenge failures.
 
 ## Gateway Token

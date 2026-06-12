@@ -43,6 +43,18 @@ type ConfirmPasswordResetExecutor interface {
 	Execute(context.Context, types.ConfirmPasswordResetCommand) (types.ConfirmPasswordResetResult, error)
 }
 
+type BeginMFAEnrollmentExecutor interface {
+	Execute(context.Context, types.BeginMFAEnrollmentCommand) (types.BeginMFAEnrollmentResult, error)
+}
+
+type ConfirmMFAEnrollmentExecutor interface {
+	Execute(context.Context, types.ConfirmMFAEnrollmentCommand) (types.ConfirmMFAEnrollmentResult, error)
+}
+
+type DisableMFAFactorExecutor interface {
+	Execute(context.Context, types.DisableMFAFactorCommand) (types.DisableMFAFactorResult, error)
+}
+
 type RevokeDeviceExecutor interface {
 	Execute(context.Context, types.RevokeDeviceCommand) (types.RevokeDeviceResult, error)
 }
@@ -64,6 +76,9 @@ type Server struct {
 	confirmVerification  ConfirmVerificationChallengeExecutor
 	requestPasswordReset RequestPasswordResetExecutor
 	confirmPasswordReset ConfirmPasswordResetExecutor
+	beginMFAEnrollment   BeginMFAEnrollmentExecutor
+	confirmMFAEnrollment ConfirmMFAEnrollmentExecutor
+	disableMFAFactor     DisableMFAFactorExecutor
 	issueGatewayToken    IssueGatewayTokenExecutor
 	revokeDevice         RevokeDeviceExecutor
 	revokeSession        RevokeSessionExecutor
@@ -78,6 +93,9 @@ func NewServer(
 	confirmVerification ConfirmVerificationChallengeExecutor,
 	requestPasswordReset RequestPasswordResetExecutor,
 	confirmPasswordReset ConfirmPasswordResetExecutor,
+	beginMFAEnrollment BeginMFAEnrollmentExecutor,
+	confirmMFAEnrollment ConfirmMFAEnrollmentExecutor,
+	disableMFAFactor DisableMFAFactorExecutor,
 	issueGatewayToken IssueGatewayTokenExecutor,
 	revokeDevice RevokeDeviceExecutor,
 	revokeSession RevokeSessionExecutor,
@@ -91,6 +109,9 @@ func NewServer(
 		confirmVerification:  confirmVerification,
 		requestPasswordReset: requestPasswordReset,
 		confirmPasswordReset: confirmPasswordReset,
+		beginMFAEnrollment:   beginMFAEnrollment,
+		confirmMFAEnrollment: confirmMFAEnrollment,
+		disableMFAFactor:     disableMFAFactor,
 		issueGatewayToken:    issueGatewayToken,
 		revokeDevice:         revokeDevice,
 		revokeSession:        revokeSession,
@@ -313,6 +334,92 @@ func (s *Server) ConfirmPasswordReset(ctx context.Context, request *identityv1.C
 	}, nil
 }
 
+func (s *Server) BeginMFAEnrollment(ctx context.Context, request *identityv1.BeginMFAEnrollmentRequest) (*identityv1.BeginMFAEnrollmentResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.beginMFAEnrollment == nil {
+		return nil, status.Error(codes.Unimplemented, "begin mfa enrollment is not configured")
+	}
+	result, err := s.beginMFAEnrollment.Execute(ctx, types.BeginMFAEnrollmentCommand{
+		TenantID:    types.TenantID(request.GetTenantId()),
+		UserID:      types.UserID(request.GetUserId()),
+		FactorType:  mfaFactorTypeFromProto(request.GetFactorType()),
+		Password:    request.GetPassword(),
+		DisplayName: request.GetDisplayName(),
+		Issuer:      request.GetIssuer(),
+		TraceID:     request.GetTraceId(),
+		RequestID:   request.GetRequestId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &identityv1.BeginMFAEnrollmentResponse{
+		TenantId:        string(result.TenantID),
+		UserId:          string(result.UserID),
+		FactorId:        string(result.FactorID),
+		FactorType:      mfaFactorTypeToProto(result.FactorType),
+		Status:          mfaFactorStatusToProto(result.Status),
+		Secret:          result.Secret,
+		OtpauthUri:      result.OTPAuthURI,
+		CreatedAtUnixMs: result.CreatedAtUnixMS,
+	}, nil
+}
+
+func (s *Server) ConfirmMFAEnrollment(ctx context.Context, request *identityv1.ConfirmMFAEnrollmentRequest) (*identityv1.ConfirmMFAEnrollmentResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.confirmMFAEnrollment == nil {
+		return nil, status.Error(codes.Unimplemented, "confirm mfa enrollment is not configured")
+	}
+	result, err := s.confirmMFAEnrollment.Execute(ctx, types.ConfirmMFAEnrollmentCommand{
+		TenantID:  types.TenantID(request.GetTenantId()),
+		UserID:    types.UserID(request.GetUserId()),
+		FactorID:  types.MFAFactorID(request.GetFactorId()),
+		Code:      request.GetCode(),
+		TraceID:   request.GetTraceId(),
+		RequestID: request.GetRequestId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &identityv1.ConfirmMFAEnrollmentResponse{
+		TenantId:         string(result.TenantID),
+		UserId:           string(result.UserID),
+		FactorId:         string(result.FactorID),
+		Status:           mfaFactorStatusToProto(result.Status),
+		VerifiedAtUnixMs: result.VerifiedAtUnixMS,
+	}, nil
+}
+
+func (s *Server) DisableMFAFactor(ctx context.Context, request *identityv1.DisableMFAFactorRequest) (*identityv1.DisableMFAFactorResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.disableMFAFactor == nil {
+		return nil, status.Error(codes.Unimplemented, "disable mfa factor is not configured")
+	}
+	result, err := s.disableMFAFactor.Execute(ctx, types.DisableMFAFactorCommand{
+		TenantID:  types.TenantID(request.GetTenantId()),
+		UserID:    types.UserID(request.GetUserId()),
+		FactorID:  types.MFAFactorID(request.GetFactorId()),
+		Password:  request.GetPassword(),
+		TraceID:   request.GetTraceId(),
+		RequestID: request.GetRequestId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &identityv1.DisableMFAFactorResponse{
+		TenantId:         string(result.TenantID),
+		UserId:           string(result.UserID),
+		FactorId:         string(result.FactorID),
+		Status:           mfaFactorStatusToProto(result.Status),
+		DisabledAtUnixMs: result.DisabledAtUnixMS,
+	}, nil
+}
+
 func (s *Server) IssueGatewayToken(ctx context.Context, request *identityv1.IssueGatewayTokenRequest) (*identityv1.IssueGatewayTokenResponse, error) {
 	if request == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
@@ -499,6 +606,37 @@ func verificationChannelToProto(channel types.VerificationChannel) identityv1.Ve
 	}
 }
 
+func mfaFactorTypeFromProto(factorType identityv1.MFAFactorType) types.MFAFactorType {
+	switch factorType {
+	case identityv1.MFAFactorType_MFA_FACTOR_TYPE_TOTP:
+		return types.MFAFactorTypeTOTP
+	default:
+		return ""
+	}
+}
+
+func mfaFactorTypeToProto(factorType types.MFAFactorType) identityv1.MFAFactorType {
+	switch factorType {
+	case types.MFAFactorTypeTOTP:
+		return identityv1.MFAFactorType_MFA_FACTOR_TYPE_TOTP
+	default:
+		return identityv1.MFAFactorType_MFA_FACTOR_TYPE_UNSPECIFIED
+	}
+}
+
+func mfaFactorStatusToProto(factorStatus types.MFAFactorStatus) identityv1.MFAFactorStatus {
+	switch factorStatus {
+	case types.MFAFactorStatusPending:
+		return identityv1.MFAFactorStatus_MFA_FACTOR_STATUS_PENDING
+	case types.MFAFactorStatusActive:
+		return identityv1.MFAFactorStatus_MFA_FACTOR_STATUS_ACTIVE
+	case types.MFAFactorStatusDisabled:
+		return identityv1.MFAFactorStatus_MFA_FACTOR_STATUS_DISABLED
+	default:
+		return identityv1.MFAFactorStatus_MFA_FACTOR_STATUS_UNSPECIFIED
+	}
+}
+
 func grpcError(err error) error {
 	switch {
 	case errors.Is(err, types.ErrInvalidArgument):
@@ -533,6 +671,12 @@ func grpcError(err error) error {
 		return status.Error(codes.Unauthenticated, "challenge expired")
 	case errors.Is(err, types.ErrChallengeRateLimited):
 		return status.Error(codes.ResourceExhausted, "challenge rate limited")
+	case errors.Is(err, types.ErrMFARequired):
+		return status.Error(codes.FailedPrecondition, "mfa required")
+	case errors.Is(err, types.ErrInvalidMFA):
+		return status.Error(codes.Unauthenticated, "invalid mfa")
+	case errors.Is(err, types.ErrMFAFactorNotFound):
+		return status.Error(codes.NotFound, "mfa factor not found")
 	default:
 		return status.Error(codes.Internal, "internal error")
 	}

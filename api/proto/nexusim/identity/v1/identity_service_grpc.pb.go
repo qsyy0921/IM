@@ -26,6 +26,9 @@ const (
 	IdentityService_ConfirmVerificationChallenge_FullMethodName = "/nexusim.identity.v1.IdentityService/ConfirmVerificationChallenge"
 	IdentityService_RequestPasswordReset_FullMethodName         = "/nexusim.identity.v1.IdentityService/RequestPasswordReset"
 	IdentityService_ConfirmPasswordReset_FullMethodName         = "/nexusim.identity.v1.IdentityService/ConfirmPasswordReset"
+	IdentityService_BeginMFAEnrollment_FullMethodName           = "/nexusim.identity.v1.IdentityService/BeginMFAEnrollment"
+	IdentityService_ConfirmMFAEnrollment_FullMethodName         = "/nexusim.identity.v1.IdentityService/ConfirmMFAEnrollment"
+	IdentityService_DisableMFAFactor_FullMethodName             = "/nexusim.identity.v1.IdentityService/DisableMFAFactor"
 	IdentityService_IssueGatewayToken_FullMethodName            = "/nexusim.identity.v1.IdentityService/IssueGatewayToken"
 	IdentityService_RevokeDevice_FullMethodName                 = "/nexusim.identity.v1.IdentityService/RevokeDevice"
 	IdentityService_RevokeSession_FullMethodName                = "/nexusim.identity.v1.IdentityService/RevokeSession"
@@ -43,6 +46,9 @@ type IdentityServiceClient interface {
 	ConfirmVerificationChallenge(ctx context.Context, in *ConfirmVerificationChallengeRequest, opts ...grpc.CallOption) (*ConfirmVerificationChallengeResponse, error)
 	RequestPasswordReset(ctx context.Context, in *RequestPasswordResetRequest, opts ...grpc.CallOption) (*RequestPasswordResetResponse, error)
 	ConfirmPasswordReset(ctx context.Context, in *ConfirmPasswordResetRequest, opts ...grpc.CallOption) (*ConfirmPasswordResetResponse, error)
+	BeginMFAEnrollment(ctx context.Context, in *BeginMFAEnrollmentRequest, opts ...grpc.CallOption) (*BeginMFAEnrollmentResponse, error)
+	ConfirmMFAEnrollment(ctx context.Context, in *ConfirmMFAEnrollmentRequest, opts ...grpc.CallOption) (*ConfirmMFAEnrollmentResponse, error)
+	DisableMFAFactor(ctx context.Context, in *DisableMFAFactorRequest, opts ...grpc.CallOption) (*DisableMFAFactorResponse, error)
 	IssueGatewayToken(ctx context.Context, in *IssueGatewayTokenRequest, opts ...grpc.CallOption) (*IssueGatewayTokenResponse, error)
 	RevokeDevice(ctx context.Context, in *RevokeDeviceRequest, opts ...grpc.CallOption) (*RevokeDeviceResponse, error)
 	RevokeSession(ctx context.Context, in *RevokeSessionRequest, opts ...grpc.CallOption) (*RevokeSessionResponse, error)
@@ -127,6 +133,36 @@ func (c *identityServiceClient) ConfirmPasswordReset(ctx context.Context, in *Co
 	return out, nil
 }
 
+func (c *identityServiceClient) BeginMFAEnrollment(ctx context.Context, in *BeginMFAEnrollmentRequest, opts ...grpc.CallOption) (*BeginMFAEnrollmentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BeginMFAEnrollmentResponse)
+	err := c.cc.Invoke(ctx, IdentityService_BeginMFAEnrollment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) ConfirmMFAEnrollment(ctx context.Context, in *ConfirmMFAEnrollmentRequest, opts ...grpc.CallOption) (*ConfirmMFAEnrollmentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConfirmMFAEnrollmentResponse)
+	err := c.cc.Invoke(ctx, IdentityService_ConfirmMFAEnrollment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) DisableMFAFactor(ctx context.Context, in *DisableMFAFactorRequest, opts ...grpc.CallOption) (*DisableMFAFactorResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DisableMFAFactorResponse)
+	err := c.cc.Invoke(ctx, IdentityService_DisableMFAFactor_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *identityServiceClient) IssueGatewayToken(ctx context.Context, in *IssueGatewayTokenRequest, opts ...grpc.CallOption) (*IssueGatewayTokenResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(IssueGatewayTokenResponse)
@@ -178,6 +214,9 @@ type IdentityServiceServer interface {
 	ConfirmVerificationChallenge(context.Context, *ConfirmVerificationChallengeRequest) (*ConfirmVerificationChallengeResponse, error)
 	RequestPasswordReset(context.Context, *RequestPasswordResetRequest) (*RequestPasswordResetResponse, error)
 	ConfirmPasswordReset(context.Context, *ConfirmPasswordResetRequest) (*ConfirmPasswordResetResponse, error)
+	BeginMFAEnrollment(context.Context, *BeginMFAEnrollmentRequest) (*BeginMFAEnrollmentResponse, error)
+	ConfirmMFAEnrollment(context.Context, *ConfirmMFAEnrollmentRequest) (*ConfirmMFAEnrollmentResponse, error)
+	DisableMFAFactor(context.Context, *DisableMFAFactorRequest) (*DisableMFAFactorResponse, error)
 	IssueGatewayToken(context.Context, *IssueGatewayTokenRequest) (*IssueGatewayTokenResponse, error)
 	RevokeDevice(context.Context, *RevokeDeviceRequest) (*RevokeDeviceResponse, error)
 	RevokeSession(context.Context, *RevokeSessionRequest) (*RevokeSessionResponse, error)
@@ -212,6 +251,15 @@ func (UnimplementedIdentityServiceServer) RequestPasswordReset(context.Context, 
 }
 func (UnimplementedIdentityServiceServer) ConfirmPasswordReset(context.Context, *ConfirmPasswordResetRequest) (*ConfirmPasswordResetResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ConfirmPasswordReset not implemented")
+}
+func (UnimplementedIdentityServiceServer) BeginMFAEnrollment(context.Context, *BeginMFAEnrollmentRequest) (*BeginMFAEnrollmentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BeginMFAEnrollment not implemented")
+}
+func (UnimplementedIdentityServiceServer) ConfirmMFAEnrollment(context.Context, *ConfirmMFAEnrollmentRequest) (*ConfirmMFAEnrollmentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ConfirmMFAEnrollment not implemented")
+}
+func (UnimplementedIdentityServiceServer) DisableMFAFactor(context.Context, *DisableMFAFactorRequest) (*DisableMFAFactorResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DisableMFAFactor not implemented")
 }
 func (UnimplementedIdentityServiceServer) IssueGatewayToken(context.Context, *IssueGatewayTokenRequest) (*IssueGatewayTokenResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method IssueGatewayToken not implemented")
@@ -372,6 +420,60 @@ func _IdentityService_ConfirmPasswordReset_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _IdentityService_BeginMFAEnrollment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BeginMFAEnrollmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).BeginMFAEnrollment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_BeginMFAEnrollment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).BeginMFAEnrollment(ctx, req.(*BeginMFAEnrollmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_ConfirmMFAEnrollment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConfirmMFAEnrollmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).ConfirmMFAEnrollment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_ConfirmMFAEnrollment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).ConfirmMFAEnrollment(ctx, req.(*ConfirmMFAEnrollmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_DisableMFAFactor_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DisableMFAFactorRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).DisableMFAFactor(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_DisableMFAFactor_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).DisableMFAFactor(ctx, req.(*DisableMFAFactorRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _IdentityService_IssueGatewayToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(IssueGatewayTokenRequest)
 	if err := dec(in); err != nil {
@@ -478,6 +580,18 @@ var IdentityService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ConfirmPasswordReset",
 			Handler:    _IdentityService_ConfirmPasswordReset_Handler,
+		},
+		{
+			MethodName: "BeginMFAEnrollment",
+			Handler:    _IdentityService_BeginMFAEnrollment_Handler,
+		},
+		{
+			MethodName: "ConfirmMFAEnrollment",
+			Handler:    _IdentityService_ConfirmMFAEnrollment_Handler,
+		},
+		{
+			MethodName: "DisableMFAFactor",
+			Handler:    _IdentityService_DisableMFAFactor_Handler,
 		},
 		{
 			MethodName: "IssueGatewayToken",

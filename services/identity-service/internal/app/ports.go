@@ -45,3 +45,9 @@ type ChallengeTokenCodec interface {
 	NewChallengeToken() (plain string, record types.ChallengeRecord, err error)
 	HashChallengeToken(token string) string
 }
+
+type MFASecretManager interface {
+	NewTOTPSecret() (plain string, encrypted types.EncryptedMFASecret, err error)
+	VerifyTOTP(encrypted types.EncryptedMFASecret, code string, now time.Time) (bool, error)
+	OTPAuthURI(issuer string, accountName string, secret string) string
+}

@@ -21,9 +21,11 @@ type Repository struct {
 	pool      *pgxpool.Pool
 	sessionID func() (string, error)
 	eventID   func() (string, error)
+	factorID  func() (string, error)
 }
 
 const maxActiveChallengesPerTarget = 3
+const maxEnabledMFAFactorsPerUser = 5
 
 type RepositoryOption func(*Repository)
 
@@ -35,6 +37,9 @@ func NewRepository(pool *pgxpool.Pool, opts ...RepositoryOption) *Repository {
 		},
 		eventID: func() (string, error) {
 			return newID("evt")
+		},
+		factorID: func() (string, error) {
+			return newID("mfa")
 		},
 	}
 	for _, opt := range opts {
@@ -55,6 +60,14 @@ func WithSessionIDGenerator(generator func() (string, error)) RepositoryOption {
 	return func(repository *Repository) {
 		if generator != nil {
 			repository.sessionID = generator
+		}
+	}
+}
+
+func WithMFAFactorIDGenerator(generator func() (string, error)) RepositoryOption {
+	return func(repository *Repository) {
+		if generator != nil {
+			repository.factorID = generator
 		}
 	}
 }
@@ -515,6 +528,157 @@ func (r *Repository) ConfirmPasswordReset(
 		TenantID:      command.TenantID,
 		UserID:        command.UserID,
 		ResetAtUnixMS: resetAt.UnixMilli(),
+	}, nil
+}
+
+func (r *Repository) CreateMFAFactor(
+	ctx context.Context,
+	command types.BeginMFAEnrollmentCommand,
+	secret types.EncryptedMFASecret,
+	createdAt time.Time,
+) (types.BeginMFAEnrollmentResult, error) {
+	if r.pool == nil {
+		return types.BeginMFAEnrollmentResult{}, types.NewDBWriteFailed("identity repository is not configured")
+	}
+	factorID, err := r.factorID()
+	if err != nil {
+		return types.BeginMFAEnrollmentResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.BeginMFAEnrollmentResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err := lockExistingUser(ctx, tx, command.TenantID, command.UserID); err != nil {
+		return types.BeginMFAEnrollmentResult{}, err
+	}
+	if err := ensureMFAFactorCreationAllowed(ctx, tx, command.TenantID, command.UserID); err != nil {
+		return types.BeginMFAEnrollmentResult{}, err
+	}
+	_, err = tx.Exec(ctx, `
+INSERT INTO identity_mfa_factors (
+    tenant_id,
+    user_id,
+    factor_id,
+    factor_type,
+    status,
+    display_name,
+    secret_ciphertext,
+    secret_nonce,
+    secret_key_version,
+    created_at,
+    trace_id,
+    request_id,
+    updated_at
+) VALUES ($1, $2, $3, 'TOTP', 'PENDING', $4, $5, $6, $7, $8, $9, $10, $8)
+`, command.TenantID, command.UserID, factorID, strings.TrimSpace(command.DisplayName), secret.Ciphertext, secret.Nonce, secret.KeyVersion, createdAt, command.TraceID, command.RequestID)
+	if err != nil {
+		return types.BeginMFAEnrollmentResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.BeginMFAEnrollmentResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.BeginMFAEnrollmentResult{
+		TenantID:        command.TenantID,
+		UserID:          command.UserID,
+		FactorID:        types.MFAFactorID(factorID),
+		FactorType:      types.MFAFactorTypeTOTP,
+		Status:          types.MFAFactorStatusPending,
+		CreatedAtUnixMS: createdAt.UnixMilli(),
+	}, nil
+}
+
+func (r *Repository) GetMFAFactorSecret(ctx context.Context, tenantID types.TenantID, userID types.UserID, factorID types.MFAFactorID) (types.MFAFactorSecret, error) {
+	if r.pool == nil {
+		return types.MFAFactorSecret{}, types.NewDBReadFailed("identity repository is not configured")
+	}
+	var row types.MFAFactorSecret
+	err := r.pool.QueryRow(ctx, `
+SELECT tenant_id, user_id, factor_id, factor_type, status, secret_ciphertext, secret_nonce, secret_key_version
+FROM identity_mfa_factors
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND factor_id = $3
+`, tenantID, userID, factorID).Scan(
+		&row.TenantID,
+		&row.UserID,
+		&row.FactorID,
+		&row.Type,
+		&row.Status,
+		&row.Secret.Ciphertext,
+		&row.Secret.Nonce,
+		&row.Secret.KeyVersion,
+	)
+	if err == pgx.ErrNoRows {
+		return types.MFAFactorSecret{}, types.NewMFAFactorNotFound("mfa factor not found")
+	}
+	if err != nil {
+		return types.MFAFactorSecret{}, types.NewDBReadFailed(err.Error())
+	}
+	return row, nil
+}
+
+func (r *Repository) ConfirmMFAFactor(ctx context.Context, command types.ConfirmMFAEnrollmentCommand, verifiedAt time.Time) (types.ConfirmMFAEnrollmentResult, error) {
+	if r.pool == nil {
+		return types.ConfirmMFAEnrollmentResult{}, types.NewDBWriteFailed("identity repository is not configured")
+	}
+	var status types.MFAFactorStatus
+	err := r.pool.QueryRow(ctx, `
+UPDATE identity_mfa_factors
+SET status = 'ACTIVE',
+    verified_at = $4,
+    updated_at = $4
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND factor_id = $3
+  AND factor_type = 'TOTP'
+  AND status = 'PENDING'
+RETURNING status
+`, command.TenantID, command.UserID, command.FactorID, verifiedAt).Scan(&status)
+	if err == pgx.ErrNoRows {
+		return types.ConfirmMFAEnrollmentResult{}, types.NewMFAFactorNotFound("mfa factor not found")
+	}
+	if err != nil {
+		return types.ConfirmMFAEnrollmentResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.ConfirmMFAEnrollmentResult{
+		TenantID:         command.TenantID,
+		UserID:           command.UserID,
+		FactorID:         command.FactorID,
+		Status:           status,
+		VerifiedAtUnixMS: verifiedAt.UnixMilli(),
+	}, nil
+}
+
+func (r *Repository) DisableMFAFactor(ctx context.Context, command types.DisableMFAFactorCommand, disabledAt time.Time) (types.DisableMFAFactorResult, error) {
+	if r.pool == nil {
+		return types.DisableMFAFactorResult{}, types.NewDBWriteFailed("identity repository is not configured")
+	}
+	var status types.MFAFactorStatus
+	err := r.pool.QueryRow(ctx, `
+UPDATE identity_mfa_factors
+SET status = 'DISABLED',
+    disabled_at = $4,
+    updated_at = $4
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND factor_id = $3
+  AND factor_type = 'TOTP'
+  AND status IN ('PENDING', 'ACTIVE')
+RETURNING status
+`, command.TenantID, command.UserID, command.FactorID, disabledAt).Scan(&status)
+	if err == pgx.ErrNoRows {
+		return types.DisableMFAFactorResult{}, types.NewMFAFactorNotFound("mfa factor not found")
+	}
+	if err != nil {
+		return types.DisableMFAFactorResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.DisableMFAFactorResult{
+		TenantID:         command.TenantID,
+		UserID:           command.UserID,
+		FactorID:         command.FactorID,
+		Status:           status,
+		DisabledAtUnixMS: disabledAt.UnixMilli(),
 	}, nil
 }
 
@@ -1248,6 +1412,24 @@ WHERE tenant_id = $1
 	}
 	if activeCount >= maxActiveChallengesPerTarget {
 		return types.NewChallengeRateLimited("too many active challenges")
+	}
+	return nil
+}
+
+func ensureMFAFactorCreationAllowed(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID) error {
+	var factorCount int
+	err := tx.QueryRow(ctx, `
+SELECT count(*)
+FROM identity_mfa_factors
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND status IN ('PENDING', 'ACTIVE')
+`, tenantID, userID).Scan(&factorCount)
+	if err != nil {
+		return types.NewDBReadFailed(err.Error())
+	}
+	if factorCount >= maxEnabledMFAFactorsPerUser {
+		return types.NewChallengeRateLimited("too many mfa factors")
 	}
 	return nil
 }

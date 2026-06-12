@@ -83,7 +83,7 @@ func TestServerRegisterUserMapsRequestAndResponse(t *testing.T) {
 			CreatedAtUnixMS: 1_800_000_000_000,
 		},
 	}
-	server := NewServer(executor, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	server := &Server{registerUser: executor}
 	response, err := server.RegisterUser(context.Background(), &identityv1.RegisterUserRequest{
 		TenantId:  "tenant-1",
 		UserId:    "user-1",
@@ -103,7 +103,7 @@ func TestServerRegisterUserMapsRequestAndResponse(t *testing.T) {
 }
 
 func TestServerRegisterUserMapsDuplicateToAlreadyExists(t *testing.T) {
-	server := NewServer(&fakeRegisterUserExecutor{err: types.NewUserAlreadyExists("duplicate")}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	server := &Server{registerUser: &fakeRegisterUserExecutor{err: types.NewUserAlreadyExists("duplicate")}}
 	_, err := server.RegisterUser(context.Background(), &identityv1.RegisterUserRequest{
 		TenantId: "tenant-1",
 		UserId:   "user-1",
@@ -115,7 +115,7 @@ func TestServerRegisterUserMapsDuplicateToAlreadyExists(t *testing.T) {
 }
 
 func TestServerLoginMapsAccountLockedToResourceExhausted(t *testing.T) {
-	server := NewServer(nil, &fakeLoginExecutor{err: types.NewAccountLocked("locked")}, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	server := &Server{login: &fakeLoginExecutor{err: types.NewAccountLocked("locked")}}
 	_, err := server.Login(context.Background(), &identityv1.LoginRequest{
 		TenantId: "tenant-1",
 		UserId:   "user-1",
@@ -139,7 +139,7 @@ func TestServerRequestPasswordResetReturnsAcceptedShape(t *testing.T) {
 			DevChallengeToken: "",
 		},
 	}
-	server := NewServer(nil, nil, nil, nil, nil, executor, nil, nil, nil, nil, nil)
+	server := &Server{requestPasswordReset: executor}
 	response, err := server.RequestPasswordReset(context.Background(), &identityv1.RequestPasswordResetRequest{
 		TenantId:    "tenant-1",
 		UserId:      "user-1",
@@ -155,6 +155,82 @@ func TestServerRequestPasswordResetReturnsAcceptedShape(t *testing.T) {
 	}
 	if response.GetChallengeId() != "challenge-neutral" || response.GetDevChallengeToken() != "" {
 		t.Fatalf("unexpected password reset response: %+v", response)
+	}
+}
+
+func TestServerBeginMFAEnrollmentMapsRequestAndResponse(t *testing.T) {
+	executor := &fakeBeginMFAEnrollmentExecutor{
+		result: types.BeginMFAEnrollmentResult{
+			TenantID:        "tenant-1",
+			UserID:          "user-1",
+			FactorID:        "mfa-1",
+			FactorType:      types.MFAFactorTypeTOTP,
+			Status:          types.MFAFactorStatusPending,
+			Secret:          "TOTPSECRET",
+			OTPAuthURI:      "otpauth://totp/NexusIM:user-1?secret=TOTPSECRET",
+			CreatedAtUnixMS: 1_800_000_000_000,
+		},
+	}
+	server := &Server{beginMFAEnrollment: executor}
+	response, err := server.BeginMFAEnrollment(context.Background(), &identityv1.BeginMFAEnrollmentRequest{
+		TenantId:    "tenant-1",
+		UserId:      "user-1",
+		FactorType:  identityv1.MFAFactorType_MFA_FACTOR_TYPE_TOTP,
+		Password:    "correct horse battery staple",
+		DisplayName: "Authenticator",
+		Issuer:      "NexusIM",
+		TraceId:     "trace-1",
+		RequestId:   "request-1",
+	})
+	if err != nil {
+		t.Fatalf("begin mfa enrollment: %v", err)
+	}
+	if executor.command.FactorType != types.MFAFactorTypeTOTP || executor.command.Password == "" || executor.command.DisplayName != "Authenticator" {
+		t.Fatalf("unexpected command: %+v", executor.command)
+	}
+	if response.GetFactorType() != identityv1.MFAFactorType_MFA_FACTOR_TYPE_TOTP ||
+		response.GetStatus() != identityv1.MFAFactorStatus_MFA_FACTOR_STATUS_PENDING ||
+		response.GetSecret() != "TOTPSECRET" ||
+		response.GetOtpauthUri() == "" {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
+func TestServerConfirmMFAEnrollmentMapsInvalidMFAToUnauthenticated(t *testing.T) {
+	server := &Server{confirmMFAEnrollment: &fakeConfirmMFAEnrollmentExecutor{err: types.NewInvalidMFA("bad code")}}
+	_, err := server.ConfirmMFAEnrollment(context.Background(), &identityv1.ConfirmMFAEnrollmentRequest{
+		TenantId: "tenant-1",
+		UserId:   "user-1",
+		FactorId: "mfa-1",
+		Code:     "123456",
+	})
+	if status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("expected invalid mfa to map to unauthenticated, got %v (%v)", status.Code(err), err)
+	}
+}
+
+func TestServerDisableMFAFactorMapsResponse(t *testing.T) {
+	executor := &fakeDisableMFAFactorExecutor{
+		result: types.DisableMFAFactorResult{
+			TenantID:         "tenant-1",
+			UserID:           "user-1",
+			FactorID:         "mfa-1",
+			Status:           types.MFAFactorStatusDisabled,
+			DisabledAtUnixMS: 1_800_000_001_000,
+		},
+	}
+	server := &Server{disableMFAFactor: executor}
+	response, err := server.DisableMFAFactor(context.Background(), &identityv1.DisableMFAFactorRequest{
+		TenantId: "tenant-1",
+		UserId:   "user-1",
+		FactorId: "mfa-1",
+		Password: "correct horse battery staple",
+	})
+	if err != nil {
+		t.Fatalf("disable mfa factor: %v", err)
+	}
+	if executor.command.FactorID != "mfa-1" || response.GetStatus() != identityv1.MFAFactorStatus_MFA_FACTOR_STATUS_DISABLED {
+		t.Fatalf("unexpected disable mfa mapping: command=%+v response=%+v", executor.command, response)
 	}
 }
 
@@ -192,6 +268,24 @@ type fakeRequestPasswordResetExecutor struct {
 	err     error
 }
 
+type fakeBeginMFAEnrollmentExecutor struct {
+	command types.BeginMFAEnrollmentCommand
+	result  types.BeginMFAEnrollmentResult
+	err     error
+}
+
+type fakeConfirmMFAEnrollmentExecutor struct {
+	command types.ConfirmMFAEnrollmentCommand
+	result  types.ConfirmMFAEnrollmentResult
+	err     error
+}
+
+type fakeDisableMFAFactorExecutor struct {
+	command types.DisableMFAFactorCommand
+	result  types.DisableMFAFactorResult
+	err     error
+}
+
 func (executor *fakeLoginExecutor) Execute(context.Context, types.LoginCommand) (types.LoginResult, error) {
 	return types.LoginResult{}, executor.err
 }
@@ -200,6 +294,30 @@ func (executor *fakeRequestPasswordResetExecutor) Execute(_ context.Context, com
 	executor.command = command
 	if executor.err != nil {
 		return types.RequestPasswordResetResult{}, executor.err
+	}
+	return executor.result, nil
+}
+
+func (executor *fakeBeginMFAEnrollmentExecutor) Execute(_ context.Context, command types.BeginMFAEnrollmentCommand) (types.BeginMFAEnrollmentResult, error) {
+	executor.command = command
+	if executor.err != nil {
+		return types.BeginMFAEnrollmentResult{}, executor.err
+	}
+	return executor.result, nil
+}
+
+func (executor *fakeConfirmMFAEnrollmentExecutor) Execute(_ context.Context, command types.ConfirmMFAEnrollmentCommand) (types.ConfirmMFAEnrollmentResult, error) {
+	executor.command = command
+	if executor.err != nil {
+		return types.ConfirmMFAEnrollmentResult{}, executor.err
+	}
+	return executor.result, nil
+}
+
+func (executor *fakeDisableMFAFactorExecutor) Execute(_ context.Context, command types.DisableMFAFactorCommand) (types.DisableMFAFactorResult, error) {
+	executor.command = command
+	if executor.err != nil {
+		return types.DisableMFAFactorResult{}, executor.err
 	}
 	return executor.result, nil
 }

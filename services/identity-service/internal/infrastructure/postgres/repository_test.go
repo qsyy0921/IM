@@ -378,6 +378,94 @@ func TestRepositoryPasswordResetChallengeRateLimitIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryMFAFactorLifecycleIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	repository := NewRepository(pool, WithMFAFactorIDGenerator(func() (string, error) { return "mfa-factor-1", nil }))
+	now := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := repository.RegisterUser(ctx, types.RegisterUserCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+	}, "password-hash", now); err != nil {
+		t.Fatalf("register user: %v", err)
+	}
+
+	secret := types.EncryptedMFASecret{
+		Ciphertext: "encrypted-secret",
+		Nonce:      "nonce-value",
+		KeyVersion: "local-v1",
+	}
+	beginResult, err := repository.CreateMFAFactor(ctx, types.BeginMFAEnrollmentCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		FactorType:  types.MFAFactorTypeTOTP,
+		DisplayName: "Authenticator",
+		TraceID:     "trace-mfa",
+		RequestID:   "request-mfa",
+	}, secret, now)
+	if err != nil {
+		t.Fatalf("create mfa factor: %v", err)
+	}
+	if beginResult.FactorID != "mfa-factor-1" || beginResult.Status != types.MFAFactorStatusPending {
+		t.Fatalf("unexpected begin mfa result: %+v", beginResult)
+	}
+	stored := readMFASecret(t, ctx, pool, "mfa-factor-1")
+	if stored.Secret != secret || stored.Secret.Ciphertext == "PLAINSECRET" || stored.Status != types.MFAFactorStatusPending {
+		t.Fatalf("unexpected stored mfa secret: %+v", stored)
+	}
+
+	loaded, err := repository.GetMFAFactorSecret(ctx, "tenant-identity", "user-1", "mfa-factor-1")
+	if err != nil {
+		t.Fatalf("get mfa factor secret: %v", err)
+	}
+	if loaded.Secret != secret || loaded.Status != types.MFAFactorStatusPending {
+		t.Fatalf("unexpected loaded mfa secret: %+v", loaded)
+	}
+
+	confirmedAt := now.Add(time.Minute)
+	confirmResult, err := repository.ConfirmMFAFactor(ctx, types.ConfirmMFAEnrollmentCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		FactorID: "mfa-factor-1",
+	}, confirmedAt)
+	if err != nil {
+		t.Fatalf("confirm mfa factor: %v", err)
+	}
+	if confirmResult.Status != types.MFAFactorStatusActive || confirmResult.VerifiedAtUnixMS != confirmedAt.UnixMilli() {
+		t.Fatalf("unexpected confirm result: %+v", confirmResult)
+	}
+	_, err = repository.ConfirmMFAFactor(ctx, types.ConfirmMFAEnrollmentCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		FactorID: "mfa-factor-1",
+	}, confirmedAt.Add(time.Minute))
+	if !errors.Is(err, types.ErrMFAFactorNotFound) {
+		t.Fatalf("expected replay confirm to fail as not pending, got %v", err)
+	}
+
+	disabledAt := now.Add(2 * time.Minute)
+	disableResult, err := repository.DisableMFAFactor(ctx, types.DisableMFAFactorCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		FactorID: "mfa-factor-1",
+	}, disabledAt)
+	if err != nil {
+		t.Fatalf("disable mfa factor: %v", err)
+	}
+	if disableResult.Status != types.MFAFactorStatusDisabled || disableResult.DisabledAtUnixMS != disabledAt.UnixMilli() {
+		t.Fatalf("unexpected disable result: %+v", disableResult)
+	}
+	_, err = repository.DisableMFAFactor(ctx, types.DisableMFAFactorCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		FactorID: "mfa-factor-1",
+	}, disabledAt.Add(time.Minute))
+	if !errors.Is(err, types.ErrMFAFactorNotFound) {
+		t.Fatalf("expected disabled factor not found for repeat disable, got %v", err)
+	}
+}
+
 func TestRepositoryLoginFailureLocksAndSuccessClearsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -729,6 +817,31 @@ WHERE tenant_id = 'tenant-identity'
 	}
 }
 
+func readMFASecret(t *testing.T, ctx context.Context, pool *pgxpool.Pool, factorID string) types.MFAFactorSecret {
+	t.Helper()
+	var row types.MFAFactorSecret
+	err := pool.QueryRow(ctx, `
+SELECT tenant_id, user_id, factor_id, factor_type, status, secret_ciphertext, secret_nonce, secret_key_version
+FROM identity_mfa_factors
+WHERE tenant_id = 'tenant-identity'
+  AND user_id = 'user-1'
+  AND factor_id = $1
+`, factorID).Scan(
+		&row.TenantID,
+		&row.UserID,
+		&row.FactorID,
+		&row.Type,
+		&row.Status,
+		&row.Secret.Ciphertext,
+		&row.Secret.Nonce,
+		&row.Secret.KeyVersion,
+	)
+	if err != nil {
+		t.Fatalf("read mfa secret: %v", err)
+	}
+	return row
+}
+
 func openTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	dsn := os.Getenv("NEXUSIM_PG_DSN")
@@ -767,6 +880,7 @@ func resetIdentityTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) 
 	t.Helper()
 	_, err := pool.Exec(ctx, `
 TRUNCATE
+    identity_mfa_factors,
     identity_challenges,
     identity_outbox,
     identity_refresh_tokens,

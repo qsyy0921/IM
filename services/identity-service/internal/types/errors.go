@@ -20,6 +20,9 @@ var (
 	ErrInvalidChallenge          = errors.New("invalid challenge")
 	ErrChallengeExpired          = errors.New("challenge expired")
 	ErrChallengeRateLimited      = errors.New("challenge rate limited")
+	ErrMFARequired               = errors.New("mfa required")
+	ErrInvalidMFA                = errors.New("invalid mfa")
+	ErrMFAFactorNotFound         = errors.New("mfa factor not found")
 )
 
 type serviceError struct {
@@ -64,3 +67,6 @@ func NewChallengeExpired(message string) error { return wrap(ErrChallengeExpired
 func NewChallengeRateLimited(message string) error {
 	return wrap(ErrChallengeRateLimited, message)
 }
+func NewMFARequired(message string) error       { return wrap(ErrMFARequired, message) }
+func NewInvalidMFA(message string) error        { return wrap(ErrInvalidMFA, message) }
+func NewMFAFactorNotFound(message string) error { return wrap(ErrMFAFactorNotFound, message) }

@@ -14,6 +14,9 @@ type UserStatus string
 type VerificationChannel string
 type ChallengeType string
 type ChallengeID string
+type MFAFactorID string
+type MFAFactorType string
+type MFAFactorStatus string
 
 const (
 	DeviceStatusActive  DeviceStatus = "ACTIVE"
@@ -30,6 +33,12 @@ const (
 	ChallengeTypeEmailVerification ChallengeType = "EMAIL_VERIFICATION"
 	ChallengeTypePhoneVerification ChallengeType = "PHONE_VERIFICATION"
 	ChallengeTypePasswordReset     ChallengeType = "PASSWORD_RESET"
+
+	MFAFactorTypeTOTP MFAFactorType = "TOTP"
+
+	MFAFactorStatusPending  MFAFactorStatus = "PENDING"
+	MFAFactorStatusActive   MFAFactorStatus = "ACTIVE"
+	MFAFactorStatusDisabled MFAFactorStatus = "DISABLED"
 )
 
 type AdminContext struct {
@@ -201,9 +210,80 @@ type ConfirmPasswordResetResult struct {
 	ResetAtUnixMS int64
 }
 
+type BeginMFAEnrollmentCommand struct {
+	TenantID    TenantID
+	UserID      UserID
+	FactorType  MFAFactorType
+	Password    string
+	DisplayName string
+	Issuer      string
+	TraceID     string
+	RequestID   string
+}
+
+type BeginMFAEnrollmentResult struct {
+	TenantID        TenantID
+	UserID          UserID
+	FactorID        MFAFactorID
+	FactorType      MFAFactorType
+	Status          MFAFactorStatus
+	Secret          string
+	OTPAuthURI      string
+	CreatedAtUnixMS int64
+}
+
+type ConfirmMFAEnrollmentCommand struct {
+	TenantID  TenantID
+	UserID    UserID
+	FactorID  MFAFactorID
+	Code      string
+	TraceID   string
+	RequestID string
+}
+
+type ConfirmMFAEnrollmentResult struct {
+	TenantID         TenantID
+	UserID           UserID
+	FactorID         MFAFactorID
+	Status           MFAFactorStatus
+	VerifiedAtUnixMS int64
+}
+
+type DisableMFAFactorCommand struct {
+	TenantID  TenantID
+	UserID    UserID
+	FactorID  MFAFactorID
+	Password  string
+	TraceID   string
+	RequestID string
+}
+
+type DisableMFAFactorResult struct {
+	TenantID         TenantID
+	UserID           UserID
+	FactorID         MFAFactorID
+	Status           MFAFactorStatus
+	DisabledAtUnixMS int64
+}
+
 type ChallengeRecord struct {
 	ChallengeID ChallengeID
 	TokenHash   string
+}
+
+type EncryptedMFASecret struct {
+	Ciphertext string
+	Nonce      string
+	KeyVersion string
+}
+
+type MFAFactorSecret struct {
+	TenantID TenantID
+	UserID   UserID
+	FactorID MFAFactorID
+	Type     MFAFactorType
+	Status   MFAFactorStatus
+	Secret   EncryptedMFASecret
 }
 
 type IdentityChallenge struct {

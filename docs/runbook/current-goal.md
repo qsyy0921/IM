@@ -80,7 +80,7 @@
 - 编辑 / 撤回 / 删除。
 - 群成员列表、owner transfer、群管理规则。
 - 联系人 / 好友关系 / 申请列表 / 取消申请 / 拉黑 / 删除 / 备注。
-- 真实鉴权、设备绑定、session revoke：当前已完成短期 gateway token、push-gateway 本地验签、device/session revoke event consumer 和 device revoke deny-list smoke；完整 Login / refresh token / JWK / 多 issuer 仍是后续项。
+- 真实鉴权、设备绑定、session revoke：当前已完成短期 gateway token、push-gateway 本地验签、device/session revoke event consumer、device revoke deny-list smoke 和 device revoke active close smoke；完整 Login / refresh token / JWK / 多 issuer、session revoke 真实进程 smoke 仍是后续项。
 - 客户端 UI 或最小端到端演示。
 
 推进原则：优先选择能复用已有事实流、read model 和 outbox 的小闭环；不要为了产品功能让服务间耦合变高。

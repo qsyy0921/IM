@@ -93,7 +93,7 @@ GET /ws?token=...&device_id=...
 - `mock`：本地 smoke 使用，允许 query string 中的 `tenant_id/user_id/device_id` 或 `token=tenant:user[:device]` 生成 `AuthContext`。
 - `hmac`：第一版 signed gateway token，`token` 为 `base64url(json claims).base64url(hmac_sha256(payload, secret))`。claims 至少包含 `tenant_id/user_id/aud/exp`，`aud` 默认必须为 `push-gateway`，可包含 `device_id/session_id/trace_id`；如果 token 中带 `device_id`，必须与 query / `client.hello.device_id` 一致。真实客户端优先用 `Authorization: Bearer <token>`，query token 只作为本地兼容入口。
 
-`hmac` 模式只证明 gateway 能拒绝伪造 / 过期 / device mismatch 的客户端身份，不等同完整 identity-service。当前已支持最小密钥轮换：`NEXUSIM_PUSH_AUTH_HMAC_SECRET` 是当前签发密钥，`NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS` 是逗号分隔的旧密钥，只用于验证旧 token。当前也支持 `im.identity.events` 异步 revoke projection：`identity.device.revoked.v1` / `identity.session.revoked.v1` 会进入 in-memory 或 Redis deny-list，WebSocket 建连时命中 deny-list 返回 `PERMISSION_DENIED`。后续可以由 api-gateway / identity-service 做完整登录、refresh token、JWK/JWT、多 issuer 和 token 交换，push-gateway 只接收已签名的短期 gateway token。
+`hmac` 模式只证明 gateway 能拒绝伪造 / 过期 / device mismatch 的客户端身份，不等同完整 identity-service。当前已支持最小密钥轮换：`NEXUSIM_PUSH_AUTH_HMAC_SECRET` 是当前签发密钥，`NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS` 是逗号分隔的旧密钥，只用于验证旧 token。当前也支持 `im.identity.events` 异步 revoke projection：`identity.device.revoked.v1` / `identity.session.revoked.v1` 会进入 in-memory 或 Redis deny-list，WebSocket 建连时命中 deny-list 返回 `PERMISSION_DENIED`；已在线 session 会收到 broad `server.resume_hint(reason=identity_revoked)` 并被 active close。后续可以由 api-gateway / identity-service 做完整登录、refresh token、JWK/JWT、多 issuer 和 token 交换，push-gateway 只接收已签名的短期 gateway token。
 
 ### 5.1 Client -> Server frames
 
@@ -297,8 +297,10 @@ Redis 约束：
 - disconnect / timeout 必须 best-effort 删除 route。
 - Redis route 是在线状态，不是投递事实源；Redis 丢失后客户端重连恢复。
 - 同一远端 gateway 上有多个 session 时，只向该 gateway Pub/Sub channel 发布一次，远端本地 registry 再 fanout 到本机 session。
+- identity revoke 也复用同一套 Redis route 控制面：identity-consumer 写入 deny-list 后，可按 `tenant/user/device/session` 查 route，并向持有 WebSocket 的 gateway 发布 eviction 控制消息；远端 gateway 本地 registry 再发送 `server.resume_hint(reason=identity_revoked)` 并关闭对应 session。
 - lookup 时如果发现 session key 已过期、route JSON 损坏或 route tenant/user 与当前通知不匹配，必须把该 session 从 user route set 中移除，避免 stale route 长期放大。
 - 当前最小策略采用在线通知 fail-open：Redis lookup / publish 返回错误时，不阻塞 delivery consumer 提交当前 Kafka event；该 notify 视为在线唤醒失败，客户端通过 durable `PullInbox` 恢复。connect 写 route 失败仍采用 fail-closed，避免把只有本地可见、跨实例不可路由的 session 伪装为在线。
+- Redis route eviction 是 online control，不是安全事实源。Pub/Sub publish 成功不代表远端 session 一定关闭；deny-list 才是 revoke 后拒绝新建连的安全线。
 
 Resume buffer：
 
@@ -386,6 +388,7 @@ Redis route debug metrics 已提供第一版跨实例在线路由计数：
 | `redis_route_stale_removed_count` | lookup 或 cleanup 移除的 stale session route 成员数 |
 | `redis_route_subscriber_message_count` | 当前 gateway 从自身 Pub/Sub channel 收到的远端通知数 |
 | `redis_route_subscriber_enqueued_count` | 远端通知进入当前 gateway 本机 session registry 的数量 |
+| `redis_route_subscriber_evicted_count` | 远端 revoke eviction 控制消息导致当前 gateway 本机 session 被关闭的数量 |
 | `redis_route_subscriber_malformed_count` | Pub/Sub 收到 malformed payload 并跳过的次数 |
 | `redis_resume_append_count` | 当前 gateway 写入 Redis-backed resume buffer 的 delivery.notify frame 数 |
 | `redis_resume_append_error_count` | 写入 Redis-backed resume buffer 失败次数；失败只降级 resume，不改变 durable inbox |
@@ -460,7 +463,7 @@ delivery-service delivery_outbox
 
 - `tenant_id / user_id / device_id / session_id` 必须从认证上下文派生，不信任客户端 frame 裸字段。
 - 本地 smoke 可使用 `NEXUSIM_PUSH_AUTH_MODE=mock`；进入真实客户端或跨机器演示时优先使用 `NEXUSIM_PUSH_AUTH_MODE=hmac` 和短期 signed gateway token。
-- WebSocket 建连必须校验 token。当前 HMAC 模式校验签名、过期时间、device 绑定和本地 / Redis deny-list；device / session revoke 由 `im.identity.events` 异步投影，热路径不同步 RPC 查询 identity-service。
+- WebSocket 建连必须校验 token。当前 HMAC 模式校验签名、过期时间、device 绑定和本地 / Redis deny-list；device / session revoke 由 `im.identity.events` 异步投影，热路径不同步 RPC 查询 identity-service。revoke event 也会 best-effort 主动关闭当前在线 session；安全语义仍以 deny-list 拒绝后续建连为准。
 - `delivery.notify` 只能发给同 tenant 的目标 user/device session。
 - ACK frame 的 user/device 以 session auth context 为准。
 - error frame 不返回内部 Redis / Kafka / gRPC 错误文本。
@@ -649,6 +652,6 @@ delivery-service outbox-relay
 - 客户端收到 notify 后通过 `PullInbox` 拉到 durable inbox item。
 - 客户端 ACK frame 通过 push-gateway 转发到 `delivery-service AckDelivery`。
 - push-gateway 离线或重启不造成 durable inbox 丢失；客户端重连后可补拉。
-- HMAC token 可由 identity-service 签发；device / session revoke 事件可异步投影到 gateway deny-list，旧 token 建连返回稳定 `PERMISSION_DENIED`。
+- HMAC token 可由 identity-service 签发；device / session revoke 事件可异步投影到 gateway deny-list，旧 token 建连返回稳定 `PERMISSION_DENIED`；device revoke 的在线旧连接 active close 已有真实进程 smoke。
 - 小规模 smoke 报告归档到 `docs/runbook/loadtest/push-gateway/`。
 - 不把 smoke 表述为完整生产 WebSocket 平台或容量结论。

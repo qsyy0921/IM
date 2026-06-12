@@ -5,7 +5,15 @@ param(
     [string]$ImagePrefix = "nexusim",
     [string]$ImageTag = "local",
     [string]$BundleRoot = "H:\NexusIM",
-    [string[]]$Services = @("conversation-service", "message-service", "delivery-service", "push-gateway"),
+    [string[]]$Services = @(
+        "conversation-service",
+        "message-service",
+        "delivery-service",
+        "push-gateway",
+        "receipt-service",
+        "contacts-service",
+        "identity-service"
+    ),
     [switch]$SkipBuild,
     [switch]$SkipWindowsImages
 )
@@ -24,6 +32,9 @@ $serviceCommands = @{
     "message-service" = "./services/message-service/cmd/message-service"
     "delivery-service" = "./services/delivery-service/cmd/delivery-service"
     "push-gateway" = "./services/push-gateway/cmd/push-gateway"
+    "receipt-service" = "./services/receipt-service/cmd/receipt-service"
+    "contacts-service" = "./services/contacts-service/cmd/contacts-service"
+    "identity-service" = "./services/identity-service/cmd/identity-service"
 }
 
 foreach ($service in $Services) {

@@ -2,8 +2,12 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"log"
 	"math/big"
@@ -11,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -72,7 +77,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("identity-service runtime wiring is idle; set NEXUSIM_IDENTITY_SERVICE_MODE=grpc, outbox-relay, challenge-delivery-worker, or challenge-delivery-repair")
+		log.Println("identity-service runtime wiring is idle; set NEXUSIM_IDENTITY_SERVICE_MODE=grpc, outbox-relay, challenge-delivery-worker, challenge-delivery-repair, or gateway-token-keyring-rotate")
 		return nil
 	case "grpc":
 		return runGRPC()
@@ -82,6 +87,8 @@ func run() error {
 		return runChallengeDeliveryWorker()
 	case "challenge-delivery-repair":
 		return runChallengeDeliveryRepair()
+	case "gateway-token-keyring-rotate":
+		return runGatewayTokenKeyRingRotate()
 	default:
 		return errors.New("unsupported NEXUSIM_IDENTITY_SERVICE_MODE")
 	}
@@ -406,6 +413,179 @@ func loadRS256KeyRingPrivateKeyPEM(current gatewayTokenRS256CurrentKey) (string,
 		return "", err
 	}
 	return string(content), nil
+}
+
+func runGatewayTokenKeyRingRotate() error {
+	path := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_RS256_KEYRING_FILE"))
+	if path == "" {
+		return errors.New("NEXUSIM_IDENTITY_GATEWAY_TOKEN_RS256_KEYRING_FILE is required")
+	}
+	rotated, err := rotateRS256KeyRingFile(path, gatewayTokenKeyRingRotateOptions{
+		NewKeyID:    envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ROTATE_NEW_KID", ""),
+		RSABits:     envInt("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ROTATE_RSA_BITS", 2048),
+		OldKeyLimit: envInt("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ROTATE_OLD_KEY_LIMIT", 3),
+		Now:         time.Now().UTC(),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("rotated identity gateway RS256 keyring file=%s current_kid=%s old_public_keys=%d", path, rotated.Current.KeyID, len(rotated.OldPublicKeys))
+	return nil
+}
+
+type gatewayTokenKeyRingRotateOptions struct {
+	NewKeyID    string
+	RSABits     int
+	OldKeyLimit int
+	Now         time.Time
+}
+
+func rotateRS256KeyRingFile(path string, options gatewayTokenKeyRingRotateOptions) (gatewayTokenRS256KeyRingConfig, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return gatewayTokenRS256KeyRingConfig{}, err
+	}
+	var config gatewayTokenRS256KeyRingConfig
+	if err := json.Unmarshal(content, &config); err != nil {
+		return gatewayTokenRS256KeyRingConfig{}, err
+	}
+	rotated, err := rotateRS256KeyRing(config, options)
+	if err != nil {
+		return gatewayTokenRS256KeyRingConfig{}, err
+	}
+	raw, err := json.MarshalIndent(rotated, "", "  ")
+	if err != nil {
+		return gatewayTokenRS256KeyRingConfig{}, err
+	}
+	raw = append(raw, '\n')
+	perm := os.FileMode(0o600)
+	if info, err := os.Stat(path); err == nil {
+		perm = info.Mode().Perm()
+	}
+	if err := writeFileReplace(path, raw, perm); err != nil {
+		return gatewayTokenRS256KeyRingConfig{}, err
+	}
+	return rotated, nil
+}
+
+func rotateRS256KeyRing(config gatewayTokenRS256KeyRingConfig, options gatewayTokenKeyRingRotateOptions) (gatewayTokenRS256KeyRingConfig, error) {
+	oldCurrentKey, err := currentRS256PublicJWK(config.Current)
+	if err != nil {
+		return gatewayTokenRS256KeyRingConfig{}, err
+	}
+	now := options.Now
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	newKeyID := strings.TrimSpace(options.NewKeyID)
+	if newKeyID == "" {
+		newKeyID = "nexusim-gateway-rs256-" + now.UTC().Format("20060102T150405Z")
+	}
+	if newKeyID == oldCurrentKey.KeyID {
+		return gatewayTokenRS256KeyRingConfig{}, errors.New("new gateway token kid must differ from current kid")
+	}
+	for _, key := range config.OldPublicKeys {
+		publicKey, ok := publicGatewayTokenJWK(key)
+		if !ok {
+			return gatewayTokenRS256KeyRingConfig{}, errors.New("gateway token keyring old_public_keys may only contain RS256 public keys")
+		}
+		if publicKey.KeyID == newKeyID {
+			return gatewayTokenRS256KeyRingConfig{}, errors.New("new gateway token kid must not already exist in old_public_keys")
+		}
+	}
+	bits := options.RSABits
+	if bits == 0 {
+		bits = 2048
+	}
+	if bits < 2048 {
+		return gatewayTokenRS256KeyRingConfig{}, errors.New("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ROTATE_RSA_BITS must be at least 2048")
+	}
+	oldLimit := options.OldKeyLimit
+	if oldLimit == 0 {
+		oldLimit = 3
+	}
+	if oldLimit < 0 {
+		return gatewayTokenRS256KeyRingConfig{}, errors.New("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ROTATE_OLD_KEY_LIMIT must be non-negative")
+	}
+	newPrivateKey, err := rsa.GenerateKey(rand.Reader, bits)
+	if err != nil {
+		return gatewayTokenRS256KeyRingConfig{}, err
+	}
+	oldKeys, err := mergeGatewayTokenPublicJWKSets(
+		tokeninfra.JWKSet{Keys: []tokeninfra.JWK{oldCurrentKey}},
+		tokeninfra.JWKSet{Keys: config.OldPublicKeys},
+	)
+	if err != nil {
+		return gatewayTokenRS256KeyRingConfig{}, err
+	}
+	if oldLimit < len(oldKeys.Keys) {
+		oldKeys.Keys = oldKeys.Keys[:oldLimit]
+	}
+	return gatewayTokenRS256KeyRingConfig{
+		Issuer: strings.TrimSpace(config.Issuer),
+		Current: gatewayTokenRS256CurrentKey{
+			KeyID:         newKeyID,
+			PrivateKeyPEM: marshalRSAPrivateKeyPEM(newPrivateKey),
+		},
+		OldPublicKeys: oldKeys.Keys,
+	}, nil
+}
+
+func currentRS256PublicJWK(current gatewayTokenRS256CurrentKey) (tokeninfra.JWK, error) {
+	keyID := strings.TrimSpace(current.KeyID)
+	if keyID == "" {
+		return tokeninfra.JWK{}, errors.New("gateway token keyring current.kid is required")
+	}
+	privateKeyPEM, err := loadRS256KeyRingPrivateKeyPEM(current)
+	if err != nil {
+		return tokeninfra.JWK{}, err
+	}
+	signer, err := tokeninfra.NewRS256SignerFromPEM(privateKeyPEM, keyID, "")
+	if err != nil {
+		return tokeninfra.JWK{}, err
+	}
+	jwks := signer.JWKSet()
+	if len(jwks.Keys) != 1 {
+		return tokeninfra.JWK{}, errors.New("gateway token keyring current key did not produce one public jwk")
+	}
+	return jwks.Keys[0], nil
+}
+
+func marshalRSAPrivateKeyPEM(privateKey *rsa.PrivateKey) string {
+	return string(pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	}))
+}
+
+func writeFileReplace(path string, content []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	defer func() {
+		_ = os.Remove(tmpPath)
+	}()
+	if _, err := tmp.Write(content); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err == nil {
+		return nil
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return os.Rename(tmpPath, path)
 }
 
 func loadRSAPrivateKeyPEM() (string, error) {

@@ -240,6 +240,140 @@ func TestLoadRS256KeyRingSignerRejectsPrivateOldPublicKeyMaterial(t *testing.T) 
 	}
 }
 
+func TestRotateRS256KeyRingPromotesCurrentToPublicOldKey(t *testing.T) {
+	currentKey := generateGatewayTestRSAKey(t)
+	oldKey := generateGatewayTestRSAKey(t)
+	config := gatewayTokenRS256KeyRingConfig{
+		Issuer: "issuer-rotate",
+		Current: gatewayTokenRS256CurrentKey{
+			KeyID:         "current-old",
+			PrivateKeyPEM: testGatewayRSAPrivateKeyPEM(currentKey),
+		},
+		OldPublicKeys: []tokeninfra.JWK{testGatewayRSAJWK(t, oldKey, "previous-old")},
+	}
+
+	rotated, err := rotateRS256KeyRing(config, gatewayTokenKeyRingRotateOptions{
+		NewKeyID:    "current-new",
+		RSABits:     2048,
+		OldKeyLimit: 2,
+		Now:         time.Unix(1_800_000_000, 0),
+	})
+	if err != nil {
+		t.Fatalf("rotate keyring: %v", err)
+	}
+	if rotated.Issuer != "issuer-rotate" {
+		t.Fatalf("expected issuer to be preserved, got %q", rotated.Issuer)
+	}
+	if rotated.Current.KeyID != "current-new" || rotated.Current.PrivateKeyPEM == "" || rotated.Current.PrivateKeyFile != "" {
+		t.Fatalf("unexpected current key after rotation: %+v", rotated.Current)
+	}
+	if _, err := tokeninfra.NewRS256SignerFromPEM(rotated.Current.PrivateKeyPEM, rotated.Current.KeyID, rotated.Issuer); err != nil {
+		t.Fatalf("rotated current key should be signable: %v", err)
+	}
+	if len(rotated.OldPublicKeys) != 2 {
+		t.Fatalf("expected two old public keys, got %+v", rotated.OldPublicKeys)
+	}
+	if rotated.OldPublicKeys[0].KeyID != "current-old" || rotated.OldPublicKeys[0].Modulus != testGatewayRSAJWK(t, currentKey, "current-old").Modulus {
+		t.Fatalf("expected previous current key first in old public keys, got %+v", rotated.OldPublicKeys[0])
+	}
+	if rotated.OldPublicKeys[1].KeyID != "previous-old" {
+		t.Fatalf("expected previous old key to remain, got %+v", rotated.OldPublicKeys[1])
+	}
+	for _, key := range rotated.OldPublicKeys {
+		if key.Key != "" || key.PrivateExponent != "" || key.Prime1 != "" || key.Prime2 != "" || key.Exponent1 != "" || key.Exponent2 != "" || key.Coefficient != "" || len(key.OtherPrimes) != 0 {
+			t.Fatalf("old public keys must not contain private material: %+v", key)
+		}
+	}
+}
+
+func TestRotateRS256KeyRingDefaultKidAndOldKeyLimit(t *testing.T) {
+	currentKey := generateGatewayTestRSAKey(t)
+	old1 := generateGatewayTestRSAKey(t)
+	old2 := generateGatewayTestRSAKey(t)
+	config := gatewayTokenRS256KeyRingConfig{
+		Current: gatewayTokenRS256CurrentKey{
+			KeyID:         "current-old",
+			PrivateKeyPEM: testGatewayRSAPrivateKeyPEM(currentKey),
+		},
+		OldPublicKeys: []tokeninfra.JWK{
+			testGatewayRSAJWK(t, old1, "old-1"),
+			testGatewayRSAJWK(t, old2, "old-2"),
+		},
+	}
+
+	rotated, err := rotateRS256KeyRing(config, gatewayTokenKeyRingRotateOptions{
+		RSABits:     2048,
+		OldKeyLimit: 1,
+		Now:         time.Date(2026, 6, 13, 4, 5, 6, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("rotate keyring: %v", err)
+	}
+	if rotated.Current.KeyID != "nexusim-gateway-rs256-20260613T040506Z" {
+		t.Fatalf("unexpected generated kid: %s", rotated.Current.KeyID)
+	}
+	if len(rotated.OldPublicKeys) != 1 || rotated.OldPublicKeys[0].KeyID != "current-old" {
+		t.Fatalf("expected old key limit to keep only previous current key, got %+v", rotated.OldPublicKeys)
+	}
+}
+
+func TestRotateRS256KeyRingRejectsDuplicateNewKid(t *testing.T) {
+	currentKey := generateGatewayTestRSAKey(t)
+	oldKey := generateGatewayTestRSAKey(t)
+	config := gatewayTokenRS256KeyRingConfig{
+		Current: gatewayTokenRS256CurrentKey{
+			KeyID:         "current-old",
+			PrivateKeyPEM: testGatewayRSAPrivateKeyPEM(currentKey),
+		},
+		OldPublicKeys: []tokeninfra.JWK{testGatewayRSAJWK(t, oldKey, "old-1")},
+	}
+
+	if _, err := rotateRS256KeyRing(config, gatewayTokenKeyRingRotateOptions{NewKeyID: "current-old", RSABits: 2048, OldKeyLimit: 2}); err == nil {
+		t.Fatal("expected duplicate current kid to fail")
+	}
+	if _, err := rotateRS256KeyRing(config, gatewayTokenKeyRingRotateOptions{NewKeyID: "old-1", RSABits: 2048, OldKeyLimit: 2}); err == nil {
+		t.Fatal("expected duplicate old public kid to fail")
+	}
+}
+
+func TestRotateRS256KeyRingFileWritesUpdatedKeyRing(t *testing.T) {
+	currentKey := generateGatewayTestRSAKey(t)
+	path := filepath.Join(t.TempDir(), "gateway-keyring.json")
+	config := gatewayTokenRS256KeyRingConfig{
+		Current: gatewayTokenRS256CurrentKey{
+			KeyID:         "current-old",
+			PrivateKeyPEM: testGatewayRSAPrivateKeyPEM(currentKey),
+		},
+	}
+	raw, err := json.Marshal(config)
+	if err != nil {
+		t.Fatalf("marshal keyring: %v", err)
+	}
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatalf("write keyring: %v", err)
+	}
+
+	rotated, err := rotateRS256KeyRingFile(path, gatewayTokenKeyRingRotateOptions{
+		NewKeyID:    "current-new",
+		RSABits:     2048,
+		OldKeyLimit: 3,
+	})
+	if err != nil {
+		t.Fatalf("rotate keyring file: %v", err)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read rotated keyring: %v", err)
+	}
+	var onDisk gatewayTokenRS256KeyRingConfig
+	if err := json.Unmarshal(content, &onDisk); err != nil {
+		t.Fatalf("unmarshal rotated keyring: %v", err)
+	}
+	if onDisk.Current.KeyID != rotated.Current.KeyID || len(onDisk.OldPublicKeys) != 1 || onDisk.OldPublicKeys[0].KeyID != "current-old" {
+		t.Fatalf("unexpected keyring on disk: %+v", onDisk)
+	}
+}
+
 func generateGatewayTestRSAKey(t *testing.T) *rsa.PrivateKey {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)

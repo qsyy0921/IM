@@ -291,6 +291,18 @@ The default audience is `push-gateway`. Tokens are short-lived. Revocation is en
 
 The first RS256 implementation now supports a static local key-ring slice, a remote JWKS URL cache with periodic refresh, and a manual old-public-key overlap window through key-ring `old_public_keys` or additional JWKS env/file configuration. The JWKS response is public-key only: additional / old entries must be RS256 RSA public keys, and HS256 symmetric keys or RSA private JWK fields are intentionally rejected. RSA private keys must be at least 2048 bits. It is still not a complete production key management system. Production hardening still needs automatic key rotation workflows, KMS / HSM backed private keys, stronger issuer governance, trace / alert coverage and operational runbooks.
 
+`NEXUSIM_IDENTITY_SERVICE_MODE=gateway-token-keyring-rotate` is a one-shot local key-ring operator for the static RS256 file format. It requires `NEXUSIM_IDENTITY_GATEWAY_TOKEN_RS256_KEYRING_FILE`, generates a new current RSA private key, moves the previous current key into `old_public_keys` as public JWK only, preserves the issuer, rejects duplicate `kid` values, and keeps at most `NEXUSIM_IDENTITY_GATEWAY_TOKEN_ROTATE_OLD_KEY_LIMIT` old public keys. Optional inputs are `NEXUSIM_IDENTITY_GATEWAY_TOKEN_ROTATE_NEW_KID` and `NEXUSIM_IDENTITY_GATEWAY_TOKEN_ROTATE_RSA_BITS` (minimum 2048). The safe rollout order is:
+
+```text
+publish key ring with current + old public keys
+-> let push-gateway refresh JWKS
+-> switch identity signing current kid through the rotated key ring
+-> wait max gateway token TTL + JWKS refresh interval
+-> remove old public key overlap
+```
+
+This operator updates a local secret-bearing JSON file. It is intentionally not KMS / HSM rotation and does not distribute keys across hosts.
+
 ## Revoke Events
 
 Device and session revoke operations write identity events through the local outbox in the same PostgreSQL transaction:

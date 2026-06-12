@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -26,23 +27,30 @@ type Config struct {
 	Secret          string
 	PreviousSecrets []string
 	Audience        string
+	Revocation      RevocationChecker
 	Now             func() time.Time
 }
 
+type RevocationChecker interface {
+	IsRevoked(context.Context, types.AuthContext) (bool, error)
+}
+
 type Authenticator struct {
-	mode     Mode
-	secrets  [][]byte
-	audience string
-	now      func() time.Time
+	mode       Mode
+	secrets    [][]byte
+	audience   string
+	revocation RevocationChecker
+	now        func() time.Time
 }
 
 type tokenClaims struct {
-	TenantID string `json:"tenant_id"`
-	UserID   string `json:"user_id"`
-	DeviceID string `json:"device_id,omitempty"`
-	TraceID  string `json:"trace_id,omitempty"`
-	Audience string `json:"aud"`
-	Expires  int64  `json:"exp"`
+	TenantID  string `json:"tenant_id"`
+	UserID    string `json:"user_id"`
+	DeviceID  string `json:"device_id,omitempty"`
+	SessionID string `json:"session_id,omitempty"`
+	TraceID   string `json:"trace_id,omitempty"`
+	Audience  string `json:"aud"`
+	Expires   int64  `json:"exp"`
 }
 
 func NewAuthenticator(config Config) (*Authenticator, error) {
@@ -54,7 +62,7 @@ func NewAuthenticator(config Config) (*Authenticator, error) {
 	if audience == "" {
 		audience = "push-gateway"
 	}
-	authenticator := &Authenticator{mode: mode, audience: audience, now: config.Now}
+	authenticator := &Authenticator{mode: mode, audience: audience, revocation: config.Revocation, now: config.Now}
 	if authenticator.now == nil {
 		authenticator.now = time.Now
 	}
@@ -113,10 +121,11 @@ func (authenticator *Authenticator) authenticateHMAC(request *http.Request) (typ
 		return types.AuthContext{}, err
 	}
 	auth := types.AuthContext{
-		TenantID: claims.TenantID,
-		UserID:   claims.UserID,
-		DeviceID: claims.DeviceID,
-		TraceID:  firstNonEmpty(claims.TraceID, query.Get("trace_id")),
+		TenantID:  claims.TenantID,
+		UserID:    claims.UserID,
+		DeviceID:  claims.DeviceID,
+		SessionID: claims.SessionID,
+		TraceID:   firstNonEmpty(claims.TraceID, query.Get("trace_id")),
 	}
 	if deviceID := strings.TrimSpace(query.Get("device_id")); deviceID != "" {
 		if auth.DeviceID != "" && auth.DeviceID != deviceID {
@@ -126,6 +135,12 @@ func (authenticator *Authenticator) authenticateHMAC(request *http.Request) (typ
 	}
 	if auth.TenantID == "" || auth.UserID == "" {
 		return types.AuthContext{}, types.ErrPermissionDenied
+	}
+	if authenticator.revocation != nil {
+		revoked, err := authenticator.revocation.IsRevoked(request.Context(), auth)
+		if err != nil || revoked {
+			return types.AuthContext{}, types.ErrPermissionDenied
+		}
 	}
 	return auth, nil
 }
@@ -223,12 +238,13 @@ func SignGatewayToken(secret string, claims map[string]string, expiresAt time.Ti
 		return "", types.ErrPermissionDenied
 	}
 	payload := tokenClaims{
-		TenantID: strings.TrimSpace(claims["tenant_id"]),
-		UserID:   strings.TrimSpace(claims["user_id"]),
-		DeviceID: strings.TrimSpace(claims["device_id"]),
-		TraceID:  strings.TrimSpace(claims["trace_id"]),
-		Audience: firstNonEmpty(claims["aud"], "push-gateway"),
-		Expires:  expiresAt.Unix(),
+		TenantID:  strings.TrimSpace(claims["tenant_id"]),
+		UserID:    strings.TrimSpace(claims["user_id"]),
+		DeviceID:  strings.TrimSpace(claims["device_id"]),
+		SessionID: strings.TrimSpace(claims["session_id"]),
+		TraceID:   strings.TrimSpace(claims["trace_id"]),
+		Audience:  firstNonEmpty(claims["aud"], "push-gateway"),
+		Expires:   expiresAt.Unix(),
 	}
 	if payload.TenantID == "" || payload.UserID == "" || payload.Expires <= 0 {
 		return "", types.ErrPermissionDenied

@@ -15,6 +15,7 @@ var (
 	ErrSessionQueueFull         = errors.New("session queue full")
 	ErrSessionEvicted           = errors.New("session evicted")
 	ErrUnsupportedDeliveryEvent = errors.New("unsupported delivery event")
+	ErrUnsupportedIdentityEvent = errors.New("unsupported identity event")
 )
 
 func NewInvalidFrame(reason string) error {

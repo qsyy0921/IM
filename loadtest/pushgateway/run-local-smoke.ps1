@@ -6,7 +6,7 @@ param(
     [string]$TenantId = "",
     [string]$ConversationId = "",
     [string]$ReceiverDeviceIds = "push-device-1",
-    [ValidateSet("full", "message-change-notify", "resume-replay", "cross-instance-resume", "slow-client", "redis-fault", "redis-sentinel-failover", "redis-sentinel-master-stop")]
+    [ValidateSet("full", "message-change-notify", "resume-replay", "cross-instance-resume", "slow-client", "redis-fault", "redis-sentinel-failover", "redis-sentinel-master-stop", "identity-revoke")]
     [string]$Scenario = "full",
     [ValidateSet("edit", "revoke", "delete")]
     [string]$MessageChangeAction = "edit",
@@ -49,8 +49,10 @@ $resultDir = Join-Path $ResultRoot $RunName
 $logDir = Join-Path $resultDir "logs"
 $timelineTopic = "conversation.timeline.pushgateway." + (Get-Date -Format "yyyyMMdd-HHmmss")
 $deliveryTopic = "im.delivery.events"
+$identityTopic = "im.identity.events"
 $deliveryConsumerGroup = "nexusim-delivery-push-smoke-" + (Get-Date -Format "yyyyMMddHHmmss")
 $pushConsumerGroup = "nexusim-push-gateway-smoke-" + (Get-Date -Format "yyyyMMddHHmmss")
+$pushIdentityConsumerGroup = "nexusim-push-gateway-identity-smoke-" + (Get-Date -Format "yyyyMMddHHmmss")
 $pushRouteKeyPrefix = $RedisKeyPrefix
 if (-not $pushRouteKeyPrefix) {
     $pushRouteKeyPrefix = "nexusim:push:$safeRunName"
@@ -224,6 +226,9 @@ Write-Output "sentinel_restored_health=$state"
 if ($UseIdentityServiceToken -and $PushAuthMode -ne "hmac") {
     throw "-UseIdentityServiceToken requires -PushAuthMode hmac"
 }
+if ($Scenario -eq "identity-revoke" -and -not $UseIdentityServiceToken) {
+    throw "identity-revoke scenario requires -UseIdentityServiceToken"
+}
 
 if (-not $SkipBuild) {
     go build -o bin\conversation-service.exe ./services/conversation-service/cmd/conversation-service
@@ -325,7 +330,13 @@ $processes = @()
 try {
     Ensure-KafkaTopic -Topic $timelineTopic
     Ensure-KafkaTopic -Topic $deliveryTopic
+    if ($Scenario -eq "identity-revoke") {
+        Ensure-KafkaTopic -Topic $identityTopic
+    }
     Reset-ConsumerGroupToLatest -Group $pushConsumerGroup -Topic $deliveryTopic
+    if ($Scenario -eq "identity-revoke") {
+        Reset-ConsumerGroupToLatest -Group $pushIdentityConsumerGroup -Topic $identityTopic
+    }
     if ($UseIdentityServiceToken) {
         $identityMigration = Join-Path $repo "migrations\postgres\identity\000001_identity_core.sql"
         docker cp $identityMigration nexusim-postgres:/tmp/nexusim_identity.sql | Out-Null
@@ -384,6 +395,15 @@ try {
             NEXUSIM_PG_DSN = $PgDsn
             NEXUSIM_IDENTITY_GATEWAY_TOKEN_SECRET = $PushAuthHmacSecret
         }
+        if ($Scenario -eq "identity-revoke") {
+            $processes += Start-NexusProcess -Name "identity-outbox-relay" -FilePath $identityService -Env @{
+                NEXUSIM_IDENTITY_SERVICE_MODE = "outbox-relay"
+                NEXUSIM_PG_DSN = $PgDsn
+                NEXUSIM_KAFKA_BROKERS = $KafkaBrokers
+                NEXUSIM_IDENTITY_EVENTS_TOPIC = $identityTopic
+                NEXUSIM_IDENTITY_OUTBOX_POLL_INTERVAL = "200ms"
+            }
+        }
     }
 
     if ($RouteBackend -eq "redis") {
@@ -429,6 +449,18 @@ try {
             NEXUSIM_PUSH_GATEWAY_ID = $pushConsumerGatewayID
             NEXUSIM_PUSH_ROUTE_TTL = "90s"
         })
+        if ($Scenario -eq "identity-revoke") {
+            $processes += Start-NexusProcess -Name "push-gateway-identity-consumer" -FilePath $pushGateway -Env (Add-PushRedisEnv @{
+                NEXUSIM_PUSH_GATEWAY_MODE = "identity-consumer"
+                NEXUSIM_PUSH_DEBUG_ADDR = "127.0.0.1:11601"
+                NEXUSIM_KAFKA_BROKERS = $KafkaBrokers
+                NEXUSIM_IDENTITY_EVENTS_TOPIC = $identityTopic
+                NEXUSIM_PUSH_IDENTITY_CONSUMER_GROUP = $pushIdentityConsumerGroup
+                NEXUSIM_PUSH_ROUTE_BACKEND = "redis"
+                NEXUSIM_PUSH_GATEWAY_ID = "push-identity-$safeRunName"
+                NEXUSIM_PUSH_ROUTE_TTL = "90s"
+            })
+        }
     } else {
         $processes += Start-NexusProcess -Name "push-gateway" -FilePath $pushGateway -Port 11598 -Env @{
             NEXUSIM_PUSH_GATEWAY_MODE = "all"
@@ -437,7 +469,9 @@ try {
             NEXUSIM_DELIVERY_GRPC_TIMEOUT = "2s"
             NEXUSIM_KAFKA_BROKERS = $KafkaBrokers
             NEXUSIM_DELIVERY_EVENTS_TOPIC = $deliveryTopic
+            NEXUSIM_IDENTITY_EVENTS_TOPIC = $identityTopic
             NEXUSIM_PUSH_CONSUMER_GROUP = $pushConsumerGroup
+            NEXUSIM_PUSH_IDENTITY_CONSUMER_GROUP = $pushIdentityConsumerGroup
             NEXUSIM_PUSH_SESSION_QUEUE_SIZE = $pushSessionQueueSize
             NEXUSIM_PUSH_WRITE_TIMEOUT = $pushWriteTimeout
             NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
@@ -530,6 +564,10 @@ Write-Host "result_dir=$resultDir"
 Write-Host "timeline_topic=$timelineTopic"
 Write-Host "delivery_consumer_group=$deliveryConsumerGroup"
 Write-Host "push_consumer_group=$pushConsumerGroup"
+if ($Scenario -eq "identity-revoke") {
+    Write-Host "identity_topic=$identityTopic"
+    Write-Host "push_identity_consumer_group=$pushIdentityConsumerGroup"
+}
 Write-Host "route_backend=$RouteBackend"
 Write-Host "push_auth_mode=$PushAuthMode"
 if ($PushAuthMode -eq "hmac") {

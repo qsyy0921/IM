@@ -19,8 +19,10 @@ import (
 	kafkainfra "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/kafka"
 	"github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/memory"
 	redisroute "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/redisroute"
+	revocationinfra "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/revocation"
 	rpcinfra "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/rpc"
 	"github.com/qsyy0921/IM/services/push-gateway/internal/trigger/delivery"
+	identitytrigger "github.com/qsyy0921/IM/services/push-gateway/internal/trigger/identity"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -34,20 +36,22 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_PUSH_GATEWAY_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("push-gateway runtime wiring is idle; set NEXUSIM_PUSH_GATEWAY_MODE=ws|delivery-consumer|all")
+		log.Println("push-gateway runtime wiring is idle; set NEXUSIM_PUSH_GATEWAY_MODE=ws|delivery-consumer|identity-consumer|all")
 		return nil
 	case "ws":
-		return runRuntime(true, false)
+		return runRuntime(true, false, false)
 	case "delivery-consumer":
-		return runRuntime(false, true)
+		return runRuntime(false, true, false)
+	case "identity-consumer":
+		return runRuntime(false, false, true)
 	case "all":
-		return runRuntime(true, true)
+		return runRuntime(true, true, true)
 	default:
 		return errors.New("unsupported NEXUSIM_PUSH_GATEWAY_MODE")
 	}
 }
 
-func runRuntime(enableWS bool, enableConsumer bool) error {
+func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsumer bool) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -55,7 +59,8 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 		ResumeBufferTTL: envDuration("NEXUSIM_PUSH_RESUME_BUFFER_TTL", 10*time.Minute),
 	})
 	registry := app.SessionRegistry(localRegistry)
-	errs := make(chan error, 4)
+	var revocationStore revocationinfra.Store = revocationinfra.NewMemoryStore()
+	errs := make(chan error, 6)
 	var closers []func() error
 
 	var redisClient redis.UniversalClient
@@ -79,6 +84,7 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 			ResumeTTL: envDuration("NEXUSIM_PUSH_RESUME_BUFFER_TTL", 10*time.Minute),
 		}
 		redisRegistry = redisroute.NewRegistry(localRegistry, redisClient, routeConfig)
+		revocationStore = revocationinfra.NewRedisStore(redisClient, routeConfig.KeyPrefix)
 		redisRegistry.StartCleanupLoop(ctx, envDurationAllowZero("NEXUSIM_PUSH_ROUTE_CLEANUP_INTERVAL", 30*time.Second))
 		registry = redisRegistry
 		closers = append(closers, redisClient.Close)
@@ -118,6 +124,7 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 			Mode:            authinfra.Mode(envString("NEXUSIM_PUSH_AUTH_MODE", "mock")),
 			Secret:          os.Getenv("NEXUSIM_PUSH_AUTH_HMAC_SECRET"),
 			PreviousSecrets: splitCSV(os.Getenv("NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS")),
+			Revocation:      revocationStore,
 		})
 		if err != nil {
 			return err
@@ -147,7 +154,7 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 		startHTTPServer(ctx, errs, "debug metrics", debugAddr, mux)
 	}
 
-	if enableConsumer {
+	if enableDeliveryConsumer {
 		topic := envString("NEXUSIM_DELIVERY_EVENTS_TOPIC", delivery.TopicDeliveryEvents)
 		if topic != delivery.TopicDeliveryEvents {
 			return errors.New("push-gateway may only consume im.delivery.events")
@@ -164,6 +171,26 @@ func runRuntime(enableWS bool, enableConsumer bool) error {
 		worker := delivery.NewWorker(consumer, app.NewNotifyDeliveryUseCase(registry))
 		go func() {
 			log.Printf("push-gateway delivery consumer started")
+			errs <- worker.Run(ctx)
+		}()
+	}
+	if enableIdentityConsumer {
+		topic := envString("NEXUSIM_IDENTITY_EVENTS_TOPIC", identitytrigger.TopicIdentityEvents)
+		if topic != identitytrigger.TopicIdentityEvents {
+			return errors.New("push-gateway may only consume im.identity.events")
+		}
+		consumer, err := kafkainfra.NewReaderConsumer(kafkainfra.ReaderConfig{
+			Brokers: splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS")),
+			Topic:   topic,
+			GroupID: envString("NEXUSIM_PUSH_IDENTITY_CONSUMER_GROUP", "nexusim-push-gateway-identity"),
+		})
+		if err != nil {
+			return err
+		}
+		closers = append(closers, consumer.Close)
+		worker := identitytrigger.NewWorker(consumer, revocationStore)
+		go func() {
+			log.Printf("push-gateway identity consumer started")
 			errs <- worker.Run(ctx)
 		}()
 	}

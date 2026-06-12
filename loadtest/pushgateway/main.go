@@ -26,6 +26,7 @@ import (
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/structpb"
 	nhooyr "nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
@@ -111,67 +112,68 @@ type config struct {
 }
 
 type summary struct {
-	Commit                                  string               `json:"commit"`
-	CommitFull                              string               `json:"commit_full"`
-	GitDirty                                bool                 `json:"git_dirty"`
-	GitStatusShort                          string               `json:"git_status_short,omitempty"`
-	ConversationTarget                      string               `json:"conversation_target"`
-	MessageTarget                           string               `json:"message_target"`
-	DeliveryTarget                          string               `json:"delivery_target"`
-	IdentityTarget                          string               `json:"identity_target,omitempty"`
-	PushURL                                 string               `json:"push_url"`
-	ReconnectPushURL                        string               `json:"reconnect_push_url,omitempty"`
-	PushMetricsURL                          string               `json:"push_metrics_url,omitempty"`
-	ReconnectPushMetricsURL                 string               `json:"reconnect_push_metrics_url,omitempty"`
-	PushConsumerMetricsURL                  string               `json:"push_consumer_metrics_url,omitempty"`
-	RouteBackend                            string               `json:"route_backend,omitempty"`
-	PushAuthMode                            string               `json:"push_auth_mode,omitempty"`
-	PushAuthTokenTransport                  string               `json:"push_auth_token_transport,omitempty"`
-	PushAuthTokenSource                     string               `json:"push_auth_token_source,omitempty"`
-	PushAuthTokenTTLSeconds                 int64                `json:"push_auth_token_ttl_seconds,omitempty"`
-	PushAuthSecretConfigured                bool                 `json:"push_auth_hmac_secret_configured"`
-	PushAuthPreviousSecretsConfigured       bool                 `json:"push_auth_hmac_previous_secrets_configured"`
-	PushAuthTokenSigningSecretExplicit      bool                 `json:"push_auth_token_signing_secret_explicit"`
-	PushAuthTokenSignedWithNonCurrentSecret bool                 `json:"push_auth_token_signed_with_non_current_secret"`
-	PushAuthQueryIdentitySent               bool                 `json:"push_auth_query_identity_sent"`
-	RedisKeyPrefix                          string               `json:"redis_key_prefix,omitempty"`
-	PushWSGatewayID                         string               `json:"push_ws_gateway_id,omitempty"`
-	PushReconnectGatewayID                  string               `json:"push_reconnect_gateway_id,omitempty"`
-	PushConsumerGatewayID                   string               `json:"push_consumer_gateway_id,omitempty"`
-	Scenario                                string               `json:"scenario"`
-	TenantID                                string               `json:"tenant_id"`
-	ConversationID                          string               `json:"conversation_id"`
-	OwnerUserID                             string               `json:"owner_user_id"`
-	ReceiverUserID                          string               `json:"receiver_user_id"`
-	ReceiverDeviceID                        string               `json:"receiver_device_id"`
-	ReceiverDeviceIDs                       []string             `json:"receiver_device_ids,omitempty"`
-	StartedAt                               time.Time            `json:"started_at"`
-	FinishedAt                              time.Time            `json:"finished_at"`
-	Success                                 bool                 `json:"success"`
-	Error                                   string               `json:"error,omitempty"`
-	ServerHello                             frameSnapshot        `json:"server_hello"`
-	MemberJoin                              memberJoinSummary    `json:"member_join"`
-	SendMessage                             sendSummary          `json:"send_message"`
-	MessageChange                           messageChangeSummary `json:"message_change,omitempty"`
-	DeliveryNotify                          frameSnapshot        `json:"delivery_notify"`
-	ChangeDeliveryNotify                    frameSnapshot        `json:"change_delivery_notify,omitempty"`
-	DeviceNotifications                     []deviceSummary      `json:"device_notifications,omitempty"`
-	PullInbox                               pullSummary          `json:"pull_inbox"`
-	ChangePullInbox                         pullSummary          `json:"change_pull_inbox,omitempty"`
-	DeliveryAckOK                           frameSnapshot        `json:"delivery_ack_ok"`
-	SlowClient                              *slowClientSummary   `json:"slow_client,omitempty"`
-	ResumeReplay                            *resumeReplaySummary `json:"resume_replay,omitempty"`
-	RedisFault                              *redisFaultSummary   `json:"redis_fault,omitempty"`
-	PushMetricsBefore                       *pushMetrics         `json:"push_metrics_before,omitempty"`
-	PushMetricsAfter                        *pushMetrics         `json:"push_metrics_after,omitempty"`
-	PushConsumerMetrics                     *pushMetrics         `json:"push_consumer_metrics,omitempty"`
-	CursorLastReceivedSeq                   *int64               `json:"cursor_last_received_seq,omitempty"`
-	UserInboxCount                          *int64               `json:"user_inbox_count,omitempty"`
-	DeliveryOutboxTotal                     *int64               `json:"delivery_outbox_total,omitempty"`
-	DeliveryOutboxPending                   *int64               `json:"delivery_outbox_pending,omitempty"`
-	DeliveryOutboxPublished                 *int64               `json:"delivery_outbox_published,omitempty"`
-	DeliveryOutboxDLQ                       *int64               `json:"delivery_outbox_dlq,omitempty"`
-	Latencies                               map[string]float64   `json:"latencies_ms"`
+	Commit                                  string                 `json:"commit"`
+	CommitFull                              string                 `json:"commit_full"`
+	GitDirty                                bool                   `json:"git_dirty"`
+	GitStatusShort                          string                 `json:"git_status_short,omitempty"`
+	ConversationTarget                      string                 `json:"conversation_target"`
+	MessageTarget                           string                 `json:"message_target"`
+	DeliveryTarget                          string                 `json:"delivery_target"`
+	IdentityTarget                          string                 `json:"identity_target,omitempty"`
+	PushURL                                 string                 `json:"push_url"`
+	ReconnectPushURL                        string                 `json:"reconnect_push_url,omitempty"`
+	PushMetricsURL                          string                 `json:"push_metrics_url,omitempty"`
+	ReconnectPushMetricsURL                 string                 `json:"reconnect_push_metrics_url,omitempty"`
+	PushConsumerMetricsURL                  string                 `json:"push_consumer_metrics_url,omitempty"`
+	RouteBackend                            string                 `json:"route_backend,omitempty"`
+	PushAuthMode                            string                 `json:"push_auth_mode,omitempty"`
+	PushAuthTokenTransport                  string                 `json:"push_auth_token_transport,omitempty"`
+	PushAuthTokenSource                     string                 `json:"push_auth_token_source,omitempty"`
+	PushAuthTokenTTLSeconds                 int64                  `json:"push_auth_token_ttl_seconds,omitempty"`
+	PushAuthSecretConfigured                bool                   `json:"push_auth_hmac_secret_configured"`
+	PushAuthPreviousSecretsConfigured       bool                   `json:"push_auth_hmac_previous_secrets_configured"`
+	PushAuthTokenSigningSecretExplicit      bool                   `json:"push_auth_token_signing_secret_explicit"`
+	PushAuthTokenSignedWithNonCurrentSecret bool                   `json:"push_auth_token_signed_with_non_current_secret"`
+	PushAuthQueryIdentitySent               bool                   `json:"push_auth_query_identity_sent"`
+	RedisKeyPrefix                          string                 `json:"redis_key_prefix,omitempty"`
+	PushWSGatewayID                         string                 `json:"push_ws_gateway_id,omitempty"`
+	PushReconnectGatewayID                  string                 `json:"push_reconnect_gateway_id,omitempty"`
+	PushConsumerGatewayID                   string                 `json:"push_consumer_gateway_id,omitempty"`
+	Scenario                                string                 `json:"scenario"`
+	TenantID                                string                 `json:"tenant_id"`
+	ConversationID                          string                 `json:"conversation_id"`
+	OwnerUserID                             string                 `json:"owner_user_id"`
+	ReceiverUserID                          string                 `json:"receiver_user_id"`
+	ReceiverDeviceID                        string                 `json:"receiver_device_id"`
+	ReceiverDeviceIDs                       []string               `json:"receiver_device_ids,omitempty"`
+	StartedAt                               time.Time              `json:"started_at"`
+	FinishedAt                              time.Time              `json:"finished_at"`
+	Success                                 bool                   `json:"success"`
+	Error                                   string                 `json:"error,omitempty"`
+	ServerHello                             frameSnapshot          `json:"server_hello"`
+	MemberJoin                              memberJoinSummary      `json:"member_join"`
+	SendMessage                             sendSummary            `json:"send_message"`
+	MessageChange                           messageChangeSummary   `json:"message_change,omitempty"`
+	DeliveryNotify                          frameSnapshot          `json:"delivery_notify"`
+	ChangeDeliveryNotify                    frameSnapshot          `json:"change_delivery_notify,omitempty"`
+	DeviceNotifications                     []deviceSummary        `json:"device_notifications,omitempty"`
+	PullInbox                               pullSummary            `json:"pull_inbox"`
+	ChangePullInbox                         pullSummary            `json:"change_pull_inbox,omitempty"`
+	DeliveryAckOK                           frameSnapshot          `json:"delivery_ack_ok"`
+	SlowClient                              *slowClientSummary     `json:"slow_client,omitempty"`
+	ResumeReplay                            *resumeReplaySummary   `json:"resume_replay,omitempty"`
+	RedisFault                              *redisFaultSummary     `json:"redis_fault,omitempty"`
+	IdentityRevoke                          *identityRevokeSummary `json:"identity_revoke,omitempty"`
+	PushMetricsBefore                       *pushMetrics           `json:"push_metrics_before,omitempty"`
+	PushMetricsAfter                        *pushMetrics           `json:"push_metrics_after,omitempty"`
+	PushConsumerMetrics                     *pushMetrics           `json:"push_consumer_metrics,omitempty"`
+	CursorLastReceivedSeq                   *int64                 `json:"cursor_last_received_seq,omitempty"`
+	UserInboxCount                          *int64                 `json:"user_inbox_count,omitempty"`
+	DeliveryOutboxTotal                     *int64                 `json:"delivery_outbox_total,omitempty"`
+	DeliveryOutboxPending                   *int64                 `json:"delivery_outbox_pending,omitempty"`
+	DeliveryOutboxPublished                 *int64                 `json:"delivery_outbox_published,omitempty"`
+	DeliveryOutboxDLQ                       *int64                 `json:"delivery_outbox_dlq,omitempty"`
+	Latencies                               map[string]float64     `json:"latencies_ms"`
 }
 
 type deviceSummary struct {
@@ -217,6 +219,13 @@ type redisFaultSummary struct {
 	RecoveryPullInbox   pullSummary   `json:"recovery_pull_inbox"`
 	AckOK               frameSnapshot `json:"ack_ok"`
 	DeliveryOutboxTotal int64         `json:"delivery_outbox_total"`
+}
+
+type identityRevokeSummary struct {
+	InitialHello      frameSnapshot `json:"initial_hello"`
+	RevokedDeviceID   string        `json:"revoked_device_id"`
+	DeniedFrame       frameSnapshot `json:"denied_frame"`
+	ReconnectAttempts int           `json:"reconnect_attempts"`
 }
 
 type pushMetrics struct {
@@ -341,7 +350,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "push-device-1", "online receiver device id")
 	var receiverDeviceIDs string
 	flag.StringVar(&receiverDeviceIDs, "receiver-device-ids", "", "comma separated online receiver device ids; overrides receiver-device-id when set")
-	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, message-change-notify, resume-replay, cross-instance-resume, slow-client, redis-fault, redis-sentinel-failover, or redis-sentinel-master-stop")
+	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, message-change-notify, resume-replay, cross-instance-resume, slow-client, redis-fault, redis-sentinel-failover, redis-sentinel-master-stop, or identity-revoke")
 	flag.IntVar(&cfg.slowMessageCount, "slow-message-count", 128, "number of messages sent while slow client does not read")
 	flag.StringVar(&cfg.messageChangeAction, "message-change-action", "edit", "message-change-notify action: edit, revoke, or delete")
 	flag.StringVar(&cfg.pushMetricsURL, "push-metrics-url", "", "push-gateway debug metrics URL")
@@ -507,6 +516,8 @@ func run(cfg config) error {
 		return runSlowClientScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "redis-fault":
 		return runRedisFaultScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
+	case "identity-revoke":
+		return runIdentityRevokeScenario(ctx, cfg, &result)
 	default:
 		return finish(cfg, &result, fmt.Errorf("unsupported scenario: %s", cfg.scenario))
 	}
@@ -1128,14 +1139,64 @@ func runRedisFaultScenario(
 	return finish(cfg, result, nil)
 }
 
+func runIdentityRevokeScenario(ctx context.Context, cfg config, result *summary) error {
+	if cfg.pushAuthMode != "hmac" {
+		return finish(cfg, result, errors.New("identity-revoke scenario requires --push-auth-mode=hmac"))
+	}
+	if strings.TrimSpace(cfg.identityTarget) == "" {
+		return finish(cfg, result, errors.New("identity-revoke scenario requires --identity-target"))
+	}
+	token, err := gatewayToken(ctx, cfg, cfg.receiverDeviceID)
+	if err != nil {
+		return finish(cfg, result, err)
+	}
+	conn, hello, err := connectWebSocketWithToken(ctx, cfg, cfg.receiverDeviceID, token)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("connect websocket before revoke: %w", err))
+	}
+	_ = conn.Close(nhooyr.StatusNormalClosure, "identity revoke smoke")
+
+	if err := revokeIdentityDevice(ctx, cfg); err != nil {
+		return finish(cfg, result, err)
+	}
+	denied, attempts, err := waitWebSocketPermissionDenied(ctx, cfg, cfg.receiverDeviceID, token)
+	if err != nil {
+		return finish(cfg, result, err)
+	}
+	result.IdentityRevoke = &identityRevokeSummary{
+		InitialHello:      snapshotFrame(hello),
+		RevokedDeviceID:   cfg.receiverDeviceID,
+		DeniedFrame:       snapshotFrame(denied),
+		ReconnectAttempts: attempts,
+	}
+	result.ServerHello = snapshotFrame(hello)
+	result.Success = true
+	return finish(cfg, result, nil)
+}
+
 func connectWebSocket(ctx context.Context, cfg config, deviceID string) (*nhooyr.Conn, serverFrame, error) {
 	return connectWebSocketWithResume(ctx, cfg, deviceID, "", nil)
+}
+
+func connectWebSocketWithToken(ctx context.Context, cfg config, deviceID string, token string) (*nhooyr.Conn, serverFrame, error) {
+	return connectWebSocketWithTokenAndResume(ctx, cfg, deviceID, token, "", nil)
 }
 
 func connectWebSocketWithResume(
 	ctx context.Context,
 	cfg config,
 	deviceID string,
+	resumeToken string,
+	lastReceived []cursor,
+) (*nhooyr.Conn, serverFrame, error) {
+	return connectWebSocketWithTokenAndResume(ctx, cfg, deviceID, "", resumeToken, lastReceived)
+}
+
+func connectWebSocketWithTokenAndResume(
+	ctx context.Context,
+	cfg config,
+	deviceID string,
+	token string,
 	resumeToken string,
 	lastReceived []cursor,
 ) (*nhooyr.Conn, serverFrame, error) {
@@ -1151,9 +1212,11 @@ func connectWebSocketWithResume(
 		query.Set("tenant_id", cfg.tenantID)
 		query.Set("user_id", cfg.receiverUserID)
 	case "hmac":
-		token, err := gatewayToken(ctx, cfg, deviceID)
-		if err != nil {
-			return nil, serverFrame{}, err
+		if token == "" {
+			token, err = gatewayToken(ctx, cfg, deviceID)
+			if err != nil {
+				return nil, serverFrame{}, err
+			}
 		}
 		dialOptions = &nhooyr.DialOptions{HTTPHeader: http.Header{"Authorization": []string{"Bearer " + token}}}
 	default:
@@ -1186,6 +1249,56 @@ func connectWebSocketWithResume(
 		return nil, serverFrame{}, fmt.Errorf("unexpected hello: %+v", hello)
 	}
 	return conn, hello, nil
+}
+
+func waitWebSocketPermissionDenied(ctx context.Context, cfg config, deviceID string, token string) (serverFrame, int, error) {
+	deadline := time.Now().Add(cfg.waitTimeout)
+	attempts := 0
+	var lastErr error
+	for {
+		attempts++
+		frame, err := readAuthErrorFrame(ctx, cfg, deviceID, token)
+		if err == nil && frame.Op == opError && frame.Code == "PERMISSION_DENIED" {
+			return frame, attempts, nil
+		}
+		if err == nil {
+			lastErr = fmt.Errorf("unexpected auth frame: %+v", frame)
+		} else {
+			lastErr = err
+		}
+		if time.Now().Add(cfg.pollInterval).After(deadline) {
+			return serverFrame{}, attempts, fmt.Errorf("wait for revoked token rejection: %w", lastErr)
+		}
+		select {
+		case <-ctx.Done():
+			return serverFrame{}, attempts, ctx.Err()
+		case <-time.After(cfg.pollInterval):
+		}
+	}
+}
+
+func readAuthErrorFrame(ctx context.Context, cfg config, deviceID string, token string) (serverFrame, error) {
+	u, err := url.Parse(cfg.pushURL)
+	if err != nil {
+		return serverFrame{}, err
+	}
+	query := u.Query()
+	query.Set("device_id", deviceID)
+	u.RawQuery = query.Encode()
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	conn, _, err := nhooyr.Dial(requestCtx, u.String(), &nhooyr.DialOptions{
+		HTTPHeader: http.Header{"Authorization": []string{"Bearer " + token}},
+	})
+	if err != nil {
+		return serverFrame{}, err
+	}
+	defer conn.CloseNow()
+	var frame serverFrame
+	if err := wsjson.Read(requestCtx, conn, &frame); err != nil {
+		return serverFrame{}, err
+	}
+	return frame, nil
 }
 
 type pushGatewayTokenClaims struct {
@@ -1247,6 +1360,38 @@ func issueGatewayToken(ctx context.Context, cfg config, deviceID string) (string
 		return "", errors.New("identity-service returned empty gateway token")
 	}
 	return response.GetGatewayToken(), nil
+}
+
+func revokeIdentityDevice(ctx context.Context, cfg config) error {
+	conn, err := grpc.NewClient(cfg.identityTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("dial identity-service: %w", err)
+	}
+	defer conn.Close()
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	requestCtx = metadata.AppendToOutgoingContext(
+		requestCtx,
+		"x-nexusim-tenant-id", cfg.tenantID,
+		"x-nexusim-user-id", cfg.ownerUserID,
+		"x-nexusim-trace-id", "push-smoke-identity-revoke",
+		"x-nexusim-request-id", "push-smoke-identity-revoke",
+	)
+	_, err = identityv1.NewIdentityServiceClient(conn).RevokeDevice(requestCtx, &identityv1.RevokeDeviceRequest{
+		AdminContext: &identityv1.AdminContext{
+			TenantId:       cfg.tenantID,
+			OperatorUserId: cfg.ownerUserID,
+			TraceId:        "push-smoke-identity-revoke",
+			RequestId:      "push-smoke-identity-revoke",
+		},
+		UserId:   cfg.receiverUserID,
+		DeviceId: cfg.receiverDeviceID,
+		Reason:   "push gateway identity revoke smoke",
+	})
+	if err != nil {
+		return fmt.Errorf("revoke identity device: %w", err)
+	}
+	return nil
 }
 
 func pushAuthTokenTransport(cfg config) string {

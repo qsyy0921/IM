@@ -46,7 +46,11 @@ func TestRepositoryRevokeDeviceRejectsFutureIssueIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
 	resetIdentityTables(t, ctx, pool)
-	repository := NewRepository(pool, WithSessionIDGenerator(func() (string, error) { return "session-1", nil }))
+	repository := NewRepository(
+		pool,
+		WithSessionIDGenerator(func() (string, error) { return "session-1", nil }),
+		WithEventIDGenerator(func() (string, error) { return "event-device-revoked-1", nil }),
+	)
 	issuedAt := time.Unix(1_800_000_000, 0).UTC()
 	expiresAt := issuedAt.Add(15 * time.Minute)
 	if _, err := repository.IssueGatewaySession(ctx, issueCommand(""), issuedAt, expiresAt); err != nil {

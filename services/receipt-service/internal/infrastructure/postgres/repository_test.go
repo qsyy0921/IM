@@ -489,7 +489,7 @@ func TestRepositoryMuteConversationUpdatesListPreferenceIntegration(t *testing.T
 		t.Fatalf("list muted conversations: %v", err)
 	}
 	assertConversationIDs(t, list, "conv-receipt")
-	if !list.Items[0].Muted || list.Items[0].UnreadCount != 11 {
+	if !list.Items[0].Muted || list.Items[0].UnreadCount != 1 {
 		t.Fatalf("expected muted flag without unread change: %+v", list.Items[0])
 	}
 

@@ -17,7 +17,7 @@ This is still a policy rule-store smoke, not a contacts / conversation role / te
 ## Raw Result
 
 - Raw directory: `H:\NexusIM\loadtest-results\policy-message-action-rules-smoke-20260613`
-- Runner commit: `446437c test: extend policy message action smoke`
+- Runner commit: `4017387 test: harden policy action smoke checks`
 - Runner dirty flag: `false`
 - Script:
 
@@ -32,14 +32,14 @@ The script applies message and policy PostgreSQL migrations, starts `policy-serv
 
 ## Result Matrix
 
-| Action | Scenario | gRPC | Message status | Timeline event | Action DB delta |
+| Action | Scenario | gRPC | Message status | Timeline event / history | Action DB delta |
 | --- | --- | --- | --- | --- | --- |
-| edit | allow | OK | EDITED | `message.edited.v1` | timeline/outbox `1 -> 2`, change_history/idempotency `0 -> 1` |
-| edit | deny | PermissionDenied | unchanged | none | timeline/outbox/change_history/idempotency unchanged after base send |
-| revoke | allow | OK | REVOKED | `message.revoked.v1` | timeline/outbox `1 -> 2`, change_history/idempotency `0 -> 1` |
-| revoke | deny | PermissionDenied | unchanged | none | timeline/outbox/change_history/idempotency unchanged after base send |
-| delete | allow | OK | DELETED | `message.deleted.v1` | timeline/outbox `1 -> 2`, change_history/idempotency `0 -> 1` |
-| delete | deny | PermissionDenied | unchanged | none | timeline/outbox/change_history/idempotency unchanged after base send |
+| edit | allow | OK | EDITED | `message.edited.v1` / `EDIT` | conversation_seq/timeline/outbox `1 -> 2`, change_history/idempotency `0 -> 1` |
+| edit | deny | PermissionDenied | unchanged | none | conversation_seq/timeline/outbox/change_history/idempotency unchanged after base send |
+| revoke | allow | OK | REVOKED | `message.revoked.v1` / `REVOKE` | conversation_seq/timeline/outbox `1 -> 2`, change_history/idempotency `0 -> 1` |
+| revoke | deny | PermissionDenied | unchanged | none | conversation_seq/timeline/outbox/change_history/idempotency unchanged after base send |
+| delete | allow | OK | DELETED | `message.deleted.v1` / `DELETE` | conversation_seq/timeline/outbox `1 -> 2`, change_history/idempotency `0 -> 1` |
+| delete | deny | PermissionDenied | unchanged | none | conversation_seq/timeline/outbox/change_history/idempotency unchanged after base send |
 
 All deny responses carried `MESSAGE_ERROR_CODE_PERMISSION_DENIED` and `retryable=false`.
 
@@ -47,7 +47,7 @@ All deny responses carried `MESSAGE_ERROR_CODE_PERMISSION_DENIED` and `retryable
 
 `EditMessage`, `RevokeMessage`, and `DeleteMessage` now have real-process evidence that message-service uses policy-service decisions for mutation commands, not only for `SendMessage`.
 
-The deny scenarios are the important safety evidence: after the baseline message exists, a target-action deny rule rejects before mutation state is written. No target mutation timeline event, outbox row, change history row, or mutation idempotency row is created.
+The allow scenarios verify the mutation response, exact `conversation_seq` advance, `message_change_history` type and before/after status, mutation timestamp, timeline event, and outbox row. The deny scenarios are the important safety evidence: after the baseline message exists, a target-action deny rule rejects before mutation state is written. No target mutation timeline event, outbox row, change history row, mutation idempotency row, or sequence advance is created.
 
 ## Limits
 

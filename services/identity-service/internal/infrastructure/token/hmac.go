@@ -145,14 +145,5 @@ func (signer *HMACSigner) signJWT(payload gatewayClaims) (string, error) {
 }
 
 func (signer *HMACSigner) JWKSet() JWKSet {
-	if signer == nil || len(signer.secret) == 0 {
-		return JWKSet{Keys: []JWK{}}
-	}
-	return JWKSet{Keys: []JWK{{
-		KeyType:   "oct",
-		KeyUse:    "sig",
-		KeyID:     signer.keyID,
-		Algorithm: "HS256",
-		Key:       base64.RawURLEncoding.EncodeToString(signer.secret),
-	}}}
+	return JWKSet{Keys: []JWK{}}
 }

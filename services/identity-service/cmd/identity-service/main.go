@@ -292,28 +292,52 @@ func gatewayTokenJWKSetWithAdditionalKeys(base tokeninfra.JWKSet) (tokeninfra.JW
 	if err != nil {
 		return tokeninfra.JWKSet{}, err
 	}
-	if len(additional.Keys) == 0 {
-		return base, nil
-	}
 	result := tokeninfra.JWKSet{Keys: make([]tokeninfra.JWK, 0, len(base.Keys)+len(additional.Keys))}
 	seen := make(map[string]struct{}, len(base.Keys)+len(additional.Keys))
-	appendKey := func(key tokeninfra.JWK) {
-		keyID := strings.TrimSpace(key.KeyID)
-		if keyID != "" {
-			if _, ok := seen[keyID]; ok {
-				return
-			}
-			seen[keyID] = struct{}{}
+	appendKey := func(key tokeninfra.JWK) error {
+		publicKey, ok := publicGatewayTokenJWK(key)
+		if !ok {
+			return errors.New("gateway token JWKS may only expose RS256 public keys")
 		}
-		result.Keys = append(result.Keys, key)
+		if _, ok := seen[publicKey.KeyID]; ok {
+			return nil
+		}
+		seen[publicKey.KeyID] = struct{}{}
+		result.Keys = append(result.Keys, publicKey)
+		return nil
 	}
 	for _, key := range base.Keys {
-		appendKey(key)
+		if err := appendKey(key); err != nil {
+			return tokeninfra.JWKSet{}, err
+		}
 	}
 	for _, key := range additional.Keys {
-		appendKey(key)
+		if err := appendKey(key); err != nil {
+			return tokeninfra.JWKSet{}, err
+		}
 	}
 	return result, nil
+}
+
+func publicGatewayTokenJWK(key tokeninfra.JWK) (tokeninfra.JWK, bool) {
+	publicKey := tokeninfra.JWK{
+		KeyType:   strings.TrimSpace(key.KeyType),
+		KeyUse:    strings.TrimSpace(key.KeyUse),
+		KeyID:     strings.TrimSpace(key.KeyID),
+		Algorithm: strings.TrimSpace(key.Algorithm),
+		Modulus:   strings.TrimSpace(key.Modulus),
+		Exponent:  strings.TrimSpace(key.Exponent),
+	}
+	if publicKey.KeyType != "RSA" || publicKey.Algorithm != "RS256" || publicKey.KeyID == "" {
+		return tokeninfra.JWK{}, false
+	}
+	if publicKey.KeyUse != "" && publicKey.KeyUse != "sig" {
+		return tokeninfra.JWK{}, false
+	}
+	if publicKey.Modulus == "" || publicKey.Exponent == "" || strings.TrimSpace(key.Key) != "" {
+		return tokeninfra.JWK{}, false
+	}
+	return publicKey, true
 }
 
 func loadAdditionalGatewayTokenJWKSet() (tokeninfra.JWKSet, error) {

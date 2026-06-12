@@ -611,7 +611,7 @@ NEXUSIM_PUSH_AUTH_JWKS_REFRESH_INTERVAL=5m
 NEXUSIM_PUSH_AUTH_TRUSTED_ISSUERS=nexusim-identity
 ```
 
-identity debug server 会暴露 `/.well-known/jwks.json` 和 `/jwks.json`。HS256 JWK 是内部对称 key 发现入口，只能用于本地 smoke / 内部调试；RS256 JWK 只包含公钥 `n/e`，可供 push-gateway 本地验签。identity-service 可用 `NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_JSON` / `NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_FILE` 在轮换窗口额外暴露旧公钥；当前签名 key 的 `kid` 优先。`NEXUSIM_PUSH_AUTH_JWKS_URL` 会在启动时拉取一次；如果没有静态 fallback 且拉取失败则 fail-closed，如果已有静态 key set 则记录失败并继续启动。后台定期刷新失败时保留上一份可用 key set，并在 `/debug/metrics.auth_jwks` 记录失败计数。当前仍不等于生产级自动轮换、KMS/HSM 私钥托管或完整 issuer federation。
+identity debug server 会暴露 `/.well-known/jwks.json` 和 `/jwks.json`。该 JWKS 只用于 RS256 公钥发现：HS256 对称密钥只能通过双方本地配置共享，不会作为 `oct` JWK 暴露。RS256 JWK 只包含公钥 `n/e`，可供 push-gateway 本地验签。identity-service 可用 `NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_JSON` / `NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_FILE` 在轮换窗口额外暴露旧公钥；额外 JWKS 只接受 RS256 RSA 公钥，当前签名 key 的 `kid` 优先。`NEXUSIM_PUSH_AUTH_JWKS_URL` 会在启动时拉取一次；如果没有静态 fallback 且拉取失败则 fail-closed，如果已有静态 key set 则记录失败并继续启动。后台定期刷新失败时保留上一份可用 key set，并在 `/debug/metrics.auth_jwks` 记录失败计数。当前仍不等于生产级自动轮换、KMS/HSM 私钥托管或完整 issuer federation。
 
 Redis route 可选参数：
 

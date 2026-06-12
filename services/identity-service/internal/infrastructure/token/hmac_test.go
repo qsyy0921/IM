@@ -98,18 +98,14 @@ func TestJWTSignerSignsStandardGatewayJWT(t *testing.T) {
 	}
 }
 
-func TestJWTSignerExposesJWKSet(t *testing.T) {
+func TestJWTSignerDoesNotExposeSymmetricJWK(t *testing.T) {
 	signer, err := NewJWTSigner("secret", "kid-1", "issuer-1")
 	if err != nil {
 		t.Fatalf("new signer: %v", err)
 	}
 	jwks := signer.JWKSet()
-	if len(jwks.Keys) != 1 {
-		t.Fatalf("expected one key, got %+v", jwks)
-	}
-	key := jwks.Keys[0]
-	if key.KeyType != "oct" || key.KeyUse != "sig" || key.KeyID != "kid-1" || key.Algorithm != "HS256" || key.Key == "" {
-		t.Fatalf("unexpected jwk: %+v", key)
+	if len(jwks.Keys) != 0 {
+		t.Fatalf("symmetric signer must not expose public jwks, got %+v", jwks)
 	}
 }
 

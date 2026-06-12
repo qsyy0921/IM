@@ -2,7 +2,7 @@
 
 本报告记录 `identity-service` 作为 push-gateway gateway token 签发方的最小真实进程 smoke。
 
-这不是完整 OAuth / identity 平台验收；它证明 push-gateway 可以不再依赖 runner 本地签名，而由独立 identity-service 签发短期 gateway token，同时 push-gateway 握手仍保持本地验签，不同步 RPC 依赖 identity-service。2026-06-12 已补充标准三段 JWT HS256 兼容 smoke、Login 签发 JWT gateway token smoke，以及 RegisterUser -> Login -> JWT gateway token smoke；当前 JWKS 是 identity debug server 上的内部对称 key 发现入口，不应作为公网生产 JWKS。
+这不是完整 OAuth / identity 平台验收；它证明 push-gateway 可以不再依赖 runner 本地签名，而由独立 identity-service 签发短期 gateway token，同时 push-gateway 握手仍保持本地验签，不同步 RPC 依赖 identity-service。2026-06-12 已补充标准三段 JWT HS256 兼容 smoke、Login 签发 JWT gateway token smoke，以及 RegisterUser -> Login -> JWT gateway token smoke。历史执行时曾把 HS256 JWK 视为内部对称 key 发现入口；当前实现已收紧为 HS256 只通过本地配置共享密钥验签，identity JWKS 只暴露 RS256 公钥和旧公钥 overlap。
 
 ## Chain
 

@@ -38,6 +38,36 @@ func TestGatewayTokenJWKSetWithAdditionalKeysMergesAndDeduplicates(t *testing.T)
 	}
 }
 
+func TestGatewayTokenJWKSetWithAdditionalKeysRejectsSymmetricKeys(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_JSON", `{"keys":[{"kty":"oct","use":"sig","kid":"shared","alg":"HS256","k":"secret"}]}`)
+	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_FILE", "")
+	base := tokeninfra.JWKSet{Keys: []tokeninfra.JWK{{
+		KeyType:   "RSA",
+		KeyUse:    "sig",
+		KeyID:     "current",
+		Algorithm: "RS256",
+		Modulus:   "base",
+		Exponent:  "AQAB",
+	}}}
+
+	if _, err := gatewayTokenJWKSetWithAdditionalKeys(base); err == nil {
+		t.Fatal("expected symmetric jwk to be rejected")
+	}
+}
+
+func TestGatewayTokenJWKSetWithAdditionalKeysAllowsNoPublicKeys(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_JSON", "")
+	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_FILE", "")
+
+	merged, err := gatewayTokenJWKSetWithAdditionalKeys(tokeninfra.JWKSet{})
+	if err != nil {
+		t.Fatalf("merge empty jwks: %v", err)
+	}
+	if len(merged.Keys) != 0 {
+		t.Fatalf("expected no public keys, got %+v", merged)
+	}
+}
+
 func TestLoadAdditionalGatewayTokenJWKSetReadsFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "jwks.json")

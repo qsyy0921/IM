@@ -198,7 +198,7 @@ identity-service 也可以在相同链路中签发标准三段 JWT HS256 gateway
   -PushAuthHmacSecret local-push-smoke-secret
 ```
 
-该模式下 summary 会记录 `identity_gateway_token_format=jwt`。identity-service debug server 暴露 `/.well-known/jwks.json` / `/jwks.json`，但当前 HS256 JWK 是内部对称 key 发现入口，不应暴露为公网生产 JWKS；生产级多 issuer / 非对称 JWK key ring 仍是后续切片。
+该模式下 summary 会记录 `identity_gateway_token_format=jwt`。HS256 仍是本地共享密钥兼容模式：push-gateway 通过 `NEXUSIM_PUSH_AUTH_HMAC_SECRET` 本地验签，identity-service 不再通过 JWKS 暴露对称密钥。identity-service debug server 的 `/.well-known/jwks.json` / `/jwks.json` 只用于 RS256 公钥发现和旧公钥 overlap；生产级自动 key rotation、KMS/HSM 和多 issuer 治理仍是后续切片。
 
 如果要验证真实 Login 凭据入口，而不是直接调用内部签发 RPC，可以使用 `-IdentityTokenMethod login`。runner 只 seed 已有用户的密码哈希；device、session、refresh token 和 gateway token 都由 identity-service `Login` 写入 / 签发：
 

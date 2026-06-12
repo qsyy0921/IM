@@ -1051,7 +1051,8 @@ func TestRequestVerificationChallengeUseCaseRequiresCurrentPassword(t *testing.T
 		},
 	}
 	verifier := &fakePasswordVerifier{ok: false}
-	useCase := NewRequestVerificationChallengeUseCase(repository, fakeChallengeTokenCodec{}, verifier, ChallengeOptions{ReturnDevToken: true})
+	notifier := &fakeChallengeNotifier{}
+	useCase := NewRequestVerificationChallengeUseCase(repository, fakeChallengeTokenCodec{}, verifier, ChallengeOptions{ReturnDevToken: true, Notifier: notifier})
 	_, err := useCase.Execute(context.Background(), types.RequestVerificationChallengeCommand{
 		TenantID:    "tenant-1",
 		UserID:      "user-1",
@@ -1064,6 +1065,9 @@ func TestRequestVerificationChallengeUseCaseRequiresCurrentPassword(t *testing.T
 	}
 	if repository.createVerificationCalled {
 		t.Fatal("verification challenge should not be created after invalid password")
+	}
+	if notifier.called {
+		t.Fatal("verification challenge should not be sent after invalid password")
 	}
 
 	verifier.ok = true
@@ -1079,6 +1083,35 @@ func TestRequestVerificationChallengeUseCaseRequiresCurrentPassword(t *testing.T
 	}
 	if !repository.createVerificationCalled || result.DevChallengeToken != "challenge-token" {
 		t.Fatalf("expected challenge creation with dev token, result=%+v called=%v", result, repository.createVerificationCalled)
+	}
+	if !notifier.called || notifier.notification.Token != "challenge-token" || notifier.notification.Type != types.ChallengeTypeEmailVerification {
+		t.Fatalf("expected verification notification with challenge token, got called=%v notification=%+v", notifier.called, notifier.notification)
+	}
+}
+
+func TestRequestVerificationChallengeUseCaseReturnsDeliveryFailure(t *testing.T) {
+	repository := &fakeIdentityRepository{
+		credential: types.UserCredential{
+			TenantID:     "tenant-1",
+			UserID:       "user-1",
+			Status:       "ACTIVE",
+			PasswordHash: "expected-hash",
+		},
+	}
+	notifier := &fakeChallengeNotifier{err: types.NewChallengeDeliveryFailed("webhook failed")}
+	useCase := NewRequestVerificationChallengeUseCase(repository, fakeChallengeTokenCodec{}, &fakePasswordVerifier{ok: true}, ChallengeOptions{Notifier: notifier})
+	_, err := useCase.Execute(context.Background(), types.RequestVerificationChallengeCommand{
+		TenantID:    "tenant-1",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "user1@example.com",
+		Password:    "correct horse battery staple",
+	})
+	if !errors.Is(err, types.ErrChallengeDeliveryFailed) {
+		t.Fatalf("expected delivery failure, got %v", err)
+	}
+	if !repository.createVerificationCalled || !notifier.called {
+		t.Fatalf("expected challenge to be created then sent, created=%v sent=%v", repository.createVerificationCalled, notifier.called)
 	}
 }
 
@@ -1102,7 +1135,8 @@ func TestConfirmPasswordResetUseCaseHashesNewPassword(t *testing.T) {
 
 func TestRequestPasswordResetUseCaseNeverReturnsDevToken(t *testing.T) {
 	repository := &fakeIdentityRepository{}
-	useCase := NewRequestPasswordResetUseCase(repository, fakeChallengeTokenCodec{}, ChallengeOptions{ReturnDevToken: true})
+	notifier := &fakeChallengeNotifier{}
+	useCase := NewRequestPasswordResetUseCase(repository, fakeChallengeTokenCodec{}, ChallengeOptions{ReturnDevToken: true, Notifier: notifier})
 	result, err := useCase.Execute(context.Background(), types.RequestPasswordResetCommand{
 		TenantID:    "tenant-1",
 		UserID:      "user-1",
@@ -1118,6 +1152,9 @@ func TestRequestPasswordResetUseCaseNeverReturnsDevToken(t *testing.T) {
 	if result.ChallengeID != "challenge-1" || result.DevChallengeToken != "" {
 		t.Fatalf("password reset response must not expose dev token: %+v", result)
 	}
+	if !notifier.called || notifier.notification.Token != "challenge-token" || notifier.notification.Type != types.ChallengeTypePasswordReset {
+		t.Fatalf("expected password reset notification with challenge token, got called=%v notification=%+v", notifier.called, notifier.notification)
+	}
 }
 
 func TestRequestPasswordResetUseCaseHidesInvalidOrRateLimitedTarget(t *testing.T) {
@@ -1130,7 +1167,8 @@ func TestRequestPasswordResetUseCaseHidesInvalidOrRateLimitedTarget(t *testing.T
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			repository := &fakeIdentityRepository{createPasswordResetErr: tc.err}
-			useCase := NewRequestPasswordResetUseCase(repository, fakeChallengeTokenCodec{}, ChallengeOptions{ReturnDevToken: true})
+			notifier := &fakeChallengeNotifier{}
+			useCase := NewRequestPasswordResetUseCase(repository, fakeChallengeTokenCodec{}, ChallengeOptions{ReturnDevToken: true, Notifier: notifier})
 			useCase.now = func() time.Time { return time.Unix(1_800_000_000, 0).UTC() }
 			result, err := useCase.Execute(context.Background(), types.RequestPasswordResetCommand{
 				TenantID:    "tenant-1",
@@ -1147,6 +1185,9 @@ func TestRequestPasswordResetUseCaseHidesInvalidOrRateLimitedTarget(t *testing.T
 			}
 			if result.ChallengeID != "challenge-1" || result.DevChallengeToken != "" || result.ExpiresAtUnixMS != time.Unix(1_800_000_600, 0).UnixMilli() {
 				t.Fatalf("unexpected neutral result: %+v", result)
+			}
+			if notifier.called {
+				t.Fatalf("neutral password reset response must not send challenge notification: %+v", notifier.notification)
 			}
 		})
 	}
@@ -1393,6 +1434,18 @@ func (fakeChallengeTokenCodec) NewChallengeToken() (string, types.ChallengeRecor
 
 func (fakeChallengeTokenCodec) HashChallengeToken(token string) string {
 	return "hash-" + token
+}
+
+type fakeChallengeNotifier struct {
+	called       bool
+	notification types.ChallengeNotification
+	err          error
+}
+
+func (notifier *fakeChallengeNotifier) SendChallenge(_ context.Context, notification types.ChallengeNotification) error {
+	notifier.called = true
+	notifier.notification = notification
+	return notifier.err
 }
 
 type fakeRecoveryCodeManager struct {

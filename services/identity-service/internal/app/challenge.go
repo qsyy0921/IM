@@ -11,6 +11,7 @@ import (
 
 type ChallengeOptions struct {
 	ReturnDevToken bool
+	Notifier       ChallengeNotifier
 }
 
 type RequestVerificationChallengeUseCase struct {
@@ -46,6 +47,20 @@ func (uc *RequestVerificationChallengeUseCase) Execute(ctx context.Context, comm
 	issuedAt := uc.now()
 	result, err := uc.repository.CreateVerificationChallenge(ctx, command, domain.ChallengeTypeForVerificationChannel(command.Channel), record, issuedAt, issuedAt.Add(domain.NormalizeChallengeTTL(command.TTLSeconds)))
 	if err != nil {
+		return types.RequestVerificationChallengeResult{}, err
+	}
+	if err := challengeNotifier(uc.options).SendChallenge(ctx, types.ChallengeNotification{
+		TenantID:        command.TenantID,
+		UserID:          command.UserID,
+		ChallengeID:     result.ChallengeID,
+		Type:            domain.ChallengeTypeForVerificationChannel(command.Channel),
+		Channel:         result.Channel,
+		Destination:     result.Destination,
+		Token:           plain,
+		ExpiresAtUnixMS: result.ExpiresAtUnixMS,
+		TraceID:         command.TraceID,
+		RequestID:       command.RequestID,
+	}); err != nil {
 		return types.RequestVerificationChallengeResult{}, err
 	}
 	if uc.options.ReturnDevToken {
@@ -92,7 +107,7 @@ func (uc *RequestPasswordResetUseCase) Execute(ctx context.Context, command type
 	if uc.repository == nil || uc.tokens == nil {
 		return types.RequestPasswordResetResult{}, types.NewDBWriteFailed("identity challenge dependencies are not configured")
 	}
-	_, record, err := uc.tokens.NewChallengeToken()
+	plain, record, err := uc.tokens.NewChallengeToken()
 	if err != nil {
 		return types.RequestPasswordResetResult{}, err
 	}
@@ -104,7 +119,34 @@ func (uc *RequestPasswordResetUseCase) Execute(ctx context.Context, command type
 		}
 		return types.RequestPasswordResetResult{}, err
 	}
+	if err := challengeNotifier(uc.options).SendChallenge(ctx, types.ChallengeNotification{
+		TenantID:        command.TenantID,
+		UserID:          command.UserID,
+		ChallengeID:     result.ChallengeID,
+		Type:            types.ChallengeTypePasswordReset,
+		Channel:         result.Channel,
+		Destination:     result.Destination,
+		Token:           plain,
+		ExpiresAtUnixMS: result.ExpiresAtUnixMS,
+		TraceID:         command.TraceID,
+		RequestID:       command.RequestID,
+	}); err != nil {
+		return types.RequestPasswordResetResult{}, err
+	}
 	return result, nil
+}
+
+func challengeNotifier(options ChallengeOptions) ChallengeNotifier {
+	if options.Notifier != nil {
+		return options.Notifier
+	}
+	return noopChallengeNotifier{}
+}
+
+type noopChallengeNotifier struct{}
+
+func (noopChallengeNotifier) SendChallenge(context.Context, types.ChallengeNotification) error {
+	return nil
 }
 
 func neutralPasswordResetResult(command types.RequestPasswordResetCommand, challengeID types.ChallengeID, expiresAt time.Time) types.RequestPasswordResetResult {

@@ -20,6 +20,7 @@ var (
 	ErrInvalidChallenge          = errors.New("invalid challenge")
 	ErrChallengeExpired          = errors.New("challenge expired")
 	ErrChallengeRateLimited      = errors.New("challenge rate limited")
+	ErrChallengeDeliveryFailed   = errors.New("challenge delivery failed")
 	ErrMFARequired               = errors.New("mfa required")
 	ErrInvalidMFA                = errors.New("invalid mfa")
 	ErrMFAFactorNotFound         = errors.New("mfa factor not found")
@@ -68,6 +69,9 @@ func NewInvalidChallenge(message string) error { return wrap(ErrInvalidChallenge
 func NewChallengeExpired(message string) error { return wrap(ErrChallengeExpired, message) }
 func NewChallengeRateLimited(message string) error {
 	return wrap(ErrChallengeRateLimited, message)
+}
+func NewChallengeDeliveryFailed(message string) error {
+	return wrap(ErrChallengeDeliveryFailed, message)
 }
 func NewMFARequired(message string) error       { return wrap(ErrMFARequired, message) }
 func NewInvalidMFA(message string) error        { return wrap(ErrInvalidMFA, message) }

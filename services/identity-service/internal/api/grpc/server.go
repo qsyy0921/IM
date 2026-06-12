@@ -745,6 +745,8 @@ func grpcError(err error) error {
 		return status.Error(codes.Unauthenticated, "challenge expired")
 	case errors.Is(err, types.ErrChallengeRateLimited):
 		return status.Error(codes.ResourceExhausted, "challenge rate limited")
+	case errors.Is(err, types.ErrChallengeDeliveryFailed):
+		return status.Error(codes.Unavailable, "challenge delivery unavailable")
 	case errors.Is(err, types.ErrMFARequired):
 		return status.Error(codes.FailedPrecondition, "mfa required")
 	case errors.Is(err, types.ErrInvalidMFA):

@@ -212,6 +212,19 @@ type RequestPasswordResetResult struct {
 	DevChallengeToken string
 }
 
+type ChallengeNotification struct {
+	TenantID        TenantID            `json:"tenant_id"`
+	UserID          UserID              `json:"user_id"`
+	ChallengeID     ChallengeID         `json:"challenge_id"`
+	Type            ChallengeType       `json:"challenge_type"`
+	Channel         VerificationChannel `json:"channel"`
+	Destination     string              `json:"destination"`
+	Token           string              `json:"token"`
+	ExpiresAtUnixMS int64               `json:"expires_at_unix_ms"`
+	TraceID         string              `json:"trace_id,omitempty"`
+	RequestID       string              `json:"request_id,omitempty"`
+}
+
 type ConfirmPasswordResetCommand struct {
 	TenantID       TenantID
 	UserID         UserID

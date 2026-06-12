@@ -21,6 +21,7 @@ import (
 	kafkainfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/kafka"
 	mfainfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/mfa"
 	monitoringinfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/monitoring"
+	notificationinfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/notification"
 	postgresinfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/postgres"
 	tokeninfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/token"
 	"github.com/qsyy0921/IM/services/identity-service/internal/trigger/outbox"
@@ -82,6 +83,10 @@ func runGRPC() error {
 	if err != nil {
 		return err
 	}
+	challengeNotifier, err := newChallengeNotifier()
+	if err != nil {
+		return err
+	}
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
 	jwkSet, err := gatewayTokenJWKSetWithAdditionalKeys(signer.JWKSet())
 	if err != nil {
@@ -136,9 +141,15 @@ func runGRPC() error {
 			app.WithRefreshMFASecretManager(mfaManager),
 			app.WithRefreshMFARecoveryCodeManager(mfaRecoveryCodes),
 		),
-		app.NewRequestVerificationChallengeUseCase(repository, challengeTokens, passwords, app.ChallengeOptions{ReturnDevToken: envBool("NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN", false)}),
+		app.NewRequestVerificationChallengeUseCase(repository, challengeTokens, passwords, app.ChallengeOptions{
+			ReturnDevToken: envBool("NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN", false),
+			Notifier:       challengeNotifier,
+		}),
 		app.NewConfirmVerificationChallengeUseCase(repository, challengeTokens),
-		app.NewRequestPasswordResetUseCase(repository, challengeTokens, app.ChallengeOptions{ReturnDevToken: envBool("NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN", false)}),
+		app.NewRequestPasswordResetUseCase(repository, challengeTokens, app.ChallengeOptions{
+			ReturnDevToken: envBool("NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN", false),
+			Notifier:       challengeNotifier,
+		}),
 		app.NewConfirmPasswordResetUseCase(repository, challengeTokens, passwords),
 		app.NewBeginMFAEnrollmentUseCase(repository, passwords, mfaManager),
 		app.NewConfirmMFAEnrollmentUseCase(repository, mfaManager, mfaRecoveryCodes),
@@ -170,6 +181,22 @@ func runGRPC() error {
 			return err
 		}
 		return context.Canceled
+	}
+}
+
+func newChallengeNotifier() (app.ChallengeNotifier, error) {
+	mode := strings.ToLower(envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MODE", "noop"))
+	switch mode {
+	case "", "noop", "disabled":
+		return notificationinfra.NewNoopChallengeNotifier(), nil
+	case "webhook":
+		return notificationinfra.NewWebhookChallengeNotifier(
+			envString("NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_URL", ""),
+			envString("NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_BEARER_TOKEN", ""),
+			envDuration("NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_TIMEOUT", 5*time.Second),
+		)
+	default:
+		return nil, errors.New("unsupported NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MODE")
 	}
 }
 

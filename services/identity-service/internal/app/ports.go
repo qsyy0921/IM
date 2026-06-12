@@ -51,6 +51,10 @@ type ChallengeTokenCodec interface {
 	HashChallengeToken(token string) string
 }
 
+type ChallengeNotifier interface {
+	SendChallenge(context.Context, types.ChallengeNotification) error
+}
+
 type MFASecretManager interface {
 	NewTOTPSecret() (plain string, encrypted types.EncryptedMFASecret, err error)
 	VerifyTOTP(encrypted types.EncryptedMFASecret, code string, now time.Time) (bool, error)

@@ -11,6 +11,7 @@ proto:
 		--go-grpc_opt=paths=source_relative \
 		$(PROTO_API_DIR)/nexusim/contacts/v1/contacts_service.proto \
 		$(PROTO_API_DIR)/nexusim/delivery/v1/delivery_service.proto \
+		$(PROTO_API_DIR)/nexusim/identity/v1/identity_service.proto \
 		$(PROTO_API_DIR)/nexusim/receipt/v1/receipt_service.proto \
 		$(PROTO_API_DIR)/nexusim/conversation/v1/conversation_service.proto \
 		$(PROTO_API_DIR)/nexusim/message/v1/message_error.proto \

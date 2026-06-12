@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	identityv1 "github.com/qsyy0921/IM/api/proto/nexusim/identity/v1"
@@ -73,6 +74,46 @@ func TestVerifiedAdminUnaryInterceptorDoesNotRequireMetadataForPublicTokenMethod
 	}
 }
 
+func TestServerRegisterUserMapsRequestAndResponse(t *testing.T) {
+	executor := &fakeRegisterUserExecutor{
+		result: types.RegisterUserResult{
+			TenantID:        "tenant-1",
+			UserID:          "user-1",
+			Status:          types.UserStatusActive,
+			CreatedAtUnixMS: 1_800_000_000_000,
+		},
+	}
+	server := NewServer(executor, nil, nil, nil, nil, nil, nil)
+	response, err := server.RegisterUser(context.Background(), &identityv1.RegisterUserRequest{
+		TenantId:  "tenant-1",
+		UserId:    "user-1",
+		Password:  "correct horse battery staple",
+		TraceId:   "trace-1",
+		RequestId: "request-1",
+	})
+	if err != nil {
+		t.Fatalf("register user: %v", err)
+	}
+	if executor.command.TenantID != "tenant-1" || executor.command.UserID != "user-1" || executor.command.Password == "" {
+		t.Fatalf("unexpected command: %+v", executor.command)
+	}
+	if response.GetStatus() != identityv1.UserStatus_USER_STATUS_ACTIVE || response.GetCreatedAtUnixMs() != 1_800_000_000_000 {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
+func TestServerRegisterUserMapsDuplicateToAlreadyExists(t *testing.T) {
+	server := NewServer(&fakeRegisterUserExecutor{err: types.NewUserAlreadyExists("duplicate")}, nil, nil, nil, nil, nil, nil)
+	_, err := server.RegisterUser(context.Background(), &identityv1.RegisterUserRequest{
+		TenantId: "tenant-1",
+		UserId:   "user-1",
+		Password: "correct horse battery staple",
+	})
+	if status.Code(err) != codes.AlreadyExists {
+		t.Fatalf("expected already exists, got %v (%v)", status.Code(err), err)
+	}
+}
+
 func TestGRPCErrorMapsCredentialErrors(t *testing.T) {
 	if code := status.Code(grpcError(types.NewUserAlreadyExists("duplicate"))); code != codes.AlreadyExists {
 		t.Fatalf("expected user already exists to map to already exists, got %v", code)
@@ -86,4 +127,21 @@ func TestGRPCErrorMapsCredentialErrors(t *testing.T) {
 	if code := status.Code(grpcError(types.NewRefreshTokenReuseDetected("reuse"))); code != codes.PermissionDenied {
 		t.Fatalf("expected refresh token reuse to map to permission denied, got %v", code)
 	}
+}
+
+type fakeRegisterUserExecutor struct {
+	command types.RegisterUserCommand
+	result  types.RegisterUserResult
+	err     error
+}
+
+func (executor *fakeRegisterUserExecutor) Execute(_ context.Context, command types.RegisterUserCommand) (types.RegisterUserResult, error) {
+	executor.command = command
+	if executor.err != nil {
+		return types.RegisterUserResult{}, executor.err
+	}
+	if executor.result.TenantID == "" {
+		return types.RegisterUserResult{}, errors.New("fake result is not configured")
+	}
+	return executor.result, nil
 }

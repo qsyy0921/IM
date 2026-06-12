@@ -48,13 +48,18 @@ In metadata mode, admin/read-state RPCs derive the trusted tenant/operator from 
 - `x-nexusim-trace-id` (optional)
 - `x-nexusim-request-id` (optional)
 
-This mode applies to `RevokeDevice`, `RevokeSession` and `GetDeviceState`. `Login`, `RefreshGatewayToken` and `IssueGatewayToken` intentionally remain outside this admin gate. `Login` verifies user credentials; `RefreshGatewayToken` verifies an opaque refresh token; `IssueGatewayToken` is kept as an internal / compatibility signing path for local smoke and gateway-token workflows.
+This mode applies to `RevokeDevice`, `RevokeSession` and `GetDeviceState`. `RegisterUser`, `Login`, `RefreshGatewayToken` and `IssueGatewayToken` intentionally remain outside this admin gate. `RegisterUser` creates a first-stage local credential; `Login` verifies user credentials; `RefreshGatewayToken` verifies an opaque refresh token; `IssueGatewayToken` is kept as an internal / compatibility signing path for local smoke and gateway-token workflows.
 
-## Login / Refresh
+## Register / Login / Refresh
 
-First-stage login expects the user row and `identity_users.password_hash` to already exist. Registration, password reset, MFA, rate limiting and external IdP federation are separate future flows.
+First-stage registration creates an ACTIVE `identity_users` credential with a service-local password hash. It is a strict create path: an existing `tenant_id + user_id` returns `ALREADY_EXISTS`, and account claiming / recovery for pre-created users is a later workflow. It does not create contacts, conversation membership, profile state, or any cross-service user projection. Email / phone verification, password reset, MFA, rate limiting and external IdP federation are separate future flows.
 
 ```text
+RegisterUser
+-> validate tenant/user/password
+-> hash password
+-> identity_users ACTIVE
+
 Login
 -> verify password_hash
 -> identity_devices / identity_sessions
@@ -129,18 +134,19 @@ These events are designed for push-gateway local deny-list projection and audit 
 ## First Smoke Target
 
 ```text
-identity-service IssueGatewayToken or Login
+identity-service IssueGatewayToken or RegisterUser + Login
 -> push-gateway WebSocket HMAC auth
 -> delivery.notify
 -> PullInbox
 -> delivery.ack.ok
 ```
 
-This proves identity-service can replace runner-side local token signing without adding a synchronous dependency to push-gateway's hot path. The latest smoke also covers `Login` with an existing password hash: `Login` creates a session and refresh token, returns a JWT gateway token, and push-gateway verifies that token locally before completing `delivery.notify -> PullInbox -> delivery.ack.ok`.
+This proves identity-service can replace runner-side local token signing without adding a synchronous dependency to push-gateway's hot path. The latest smoke also covers `RegisterUser + Login`: `RegisterUser` creates an ACTIVE user credential, `Login` verifies that password hash, creates a session and refresh token, returns a JWT gateway token, and push-gateway verifies that token locally before completing `delivery.notify -> PullInbox -> delivery.ack.ok`.
 
-The current Login / Refresh implementation is validated by app tests, PostgreSQL integration tests, and a push-gateway Login + JWT smoke:
+The current Register / Login / Refresh implementation is validated by app tests, PostgreSQL integration tests, and push-gateway JWT smokes:
 
 ```text
+RegisterUser -> ACTIVE user credential
 Login -> ACTIVE refresh token
 RefreshGatewayToken -> old token USED + new token ACTIVE
 Reuse old refresh token -> session REVOKED + identity.session.revoked.v1 outbox

@@ -385,6 +385,7 @@ func TestLoginUseCaseAcceptsRecoveryCodeBeforeIssuingToken(t *testing.T) {
 }
 
 func TestLoginUseCaseRejectsInvalidRecoveryCodeBeforeSessionWrite(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0).UTC()
 	repository := &fakeIdentityRepository{
 		credential: types.UserCredential{
 			TenantID:     "tenant-1",
@@ -407,6 +408,8 @@ func TestLoginUseCaseRejectsInvalidRecoveryCodeBeforeSessionWrite(t *testing.T) 
 		fakeTokenSigner{},
 		&fakePasswordVerifier{ok: true},
 		fakeRefreshTokenCodec{},
+		WithLoginClock(func() time.Time { return now }),
+		WithLoginMFARiskPolicy(LoginRiskPolicy{MaxFailedAttempts: 3, FailureWindow: 20 * time.Minute, LockDuration: 10 * time.Minute}),
 		WithLoginMFARecoveryCodeManager(&fakeRecoveryCodeManager{hash: "hash-missing"}),
 	)
 	_, err := useCase.Execute(context.Background(), types.LoginCommand{
@@ -419,8 +422,102 @@ func TestLoginUseCaseRejectsInvalidRecoveryCodeBeforeSessionWrite(t *testing.T) 
 	if !errors.Is(err, types.ErrInvalidMFA) {
 		t.Fatalf("expected invalid mfa, got %v", err)
 	}
+	if !repository.mfaRecoveryFailureRecorded || repository.mfaRecoveryFailureAt != now || repository.mfaRecoveryLockUntil != now.Add(10*time.Minute) || repository.mfaRecoveryMaxFailedAttempts != 3 || repository.mfaRecoveryFailureWindowStart != now.Add(-20*time.Minute) {
+		t.Fatalf("unexpected recovery failure record: recorded=%v at=%s lock=%s max=%d window=%s",
+			repository.mfaRecoveryFailureRecorded,
+			repository.mfaRecoveryFailureAt,
+			repository.mfaRecoveryLockUntil,
+			repository.mfaRecoveryMaxFailedAttempts,
+			repository.mfaRecoveryFailureWindowStart,
+		)
+	}
 	if repository.loginCalled {
 		t.Fatal("invalid recovery code must not write login session")
+	}
+}
+
+func TestLoginUseCaseReturnsMFALockedWhenRecoveryCodeFailuresReachThreshold(t *testing.T) {
+	repository := &fakeIdentityRepository{
+		credential: types.UserCredential{
+			TenantID:     "tenant-1",
+			UserID:       "user-1",
+			Status:       "ACTIVE",
+			PasswordHash: "expected-hash",
+		},
+		activeMFAFactors: []types.MFAFactorSecret{{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			FactorID: "mfa-1",
+			Type:     types.MFAFactorTypeTOTP,
+			Status:   types.MFAFactorStatusActive,
+			Secret:   types.EncryptedMFASecret{Ciphertext: "ciphertext", Nonce: "nonce", KeyVersion: "local-v1"},
+		}},
+		findRecoveryCodeErr:         types.NewInvalidMFA("invalid recovery code"),
+		recordMFARecoveryFailureErr: types.NewMFALocked("mfa temporarily locked"),
+	}
+	useCase := NewLoginUseCase(
+		repository,
+		fakeTokenSigner{},
+		&fakePasswordVerifier{ok: true},
+		fakeRefreshTokenCodec{},
+		WithLoginMFARecoveryCodeManager(&fakeRecoveryCodeManager{hash: "hash-missing"}),
+	)
+	_, err := useCase.Execute(context.Background(), types.LoginCommand{
+		TenantID:        "tenant-1",
+		UserID:          "user-1",
+		Password:        "correct horse battery staple",
+		DeviceID:        "device-1",
+		MFARecoveryCode: "wrong-code",
+	})
+	if !errors.Is(err, types.ErrMFALocked) {
+		t.Fatalf("expected mfa locked, got %v", err)
+	}
+	if repository.loginCalled {
+		t.Fatal("locked recovery-code risk must not write login session")
+	}
+}
+
+func TestLoginUseCaseRejectsLockedRecoveryCodeBeforeLookup(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0).UTC()
+	repository := &fakeIdentityRepository{
+		credential: types.UserCredential{
+			TenantID:               "tenant-1",
+			UserID:                 "user-1",
+			Status:                 "ACTIVE",
+			PasswordHash:           "expected-hash",
+			MFARecoveryLockedUntil: now.Add(time.Minute),
+			MFARecoveryFailedCount: 5,
+		},
+		activeMFAFactors: []types.MFAFactorSecret{{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			FactorID: "mfa-1",
+			Type:     types.MFAFactorTypeTOTP,
+			Status:   types.MFAFactorStatusActive,
+			Secret:   types.EncryptedMFASecret{Ciphertext: "ciphertext", Nonce: "nonce", KeyVersion: "local-v1"},
+		}},
+	}
+	recovery := &fakeRecoveryCodeManager{hash: "hash-1"}
+	useCase := NewLoginUseCase(
+		repository,
+		fakeTokenSigner{},
+		&fakePasswordVerifier{ok: true},
+		fakeRefreshTokenCodec{},
+		WithLoginClock(func() time.Time { return now }),
+		WithLoginMFARecoveryCodeManager(recovery),
+	)
+	_, err := useCase.Execute(context.Background(), types.LoginCommand{
+		TenantID:        "tenant-1",
+		UserID:          "user-1",
+		Password:        "correct horse battery staple",
+		DeviceID:        "device-1",
+		MFARecoveryCode: "aaaa-bbbb-cccc-dddd",
+	})
+	if !errors.Is(err, types.ErrMFALocked) {
+		t.Fatalf("expected mfa locked, got %v", err)
+	}
+	if recovery.hashCalled || repository.recoveryCodeHash != "" || repository.mfaRecoveryFailureRecorded || repository.loginCalled {
+		t.Fatal("locked recovery-code risk must not hash, lookup, record another failure, or write login session")
 	}
 }
 
@@ -701,37 +798,43 @@ func TestRequestPasswordResetUseCaseHidesInvalidOrRateLimitedTarget(t *testing.T
 }
 
 type fakeIdentityRepository struct {
-	credential                 types.UserCredential
-	registerCalled             bool
-	registerPasswordHash       string
-	loginCalled                bool
-	loginCommand               types.LoginCommand
-	failureRecorded            bool
-	failureAt                  time.Time
-	lockUntil                  time.Time
-	maxFailedAttempts          int
-	failureWindowStart         time.Time
-	recordFailureErr           error
-	mfaFailureRecorded         bool
-	mfaFailureAt               time.Time
-	mfaLockUntil               time.Time
-	mfaMaxFailedAttempts       int
-	mfaFailureWindowStart      time.Time
-	mfaFailureFactorID         types.MFAFactorID
-	recordMFAFailureErr        error
-	recoveryCodeRecord         types.MFARecoveryCodeRecord
-	recoveryCodeHash           string
-	findRecoveryCodeErr        error
-	refreshCalled              bool
-	presentedTokenID           types.RefreshTokenID
-	presentedTokenHash         string
-	createVerificationCalled   bool
-	createPasswordResetCalled  bool
-	createPasswordResetErr     error
-	confirmPasswordResetCalled bool
-	resetPasswordHash          string
-	resetTokenHash             string
-	activeMFAFactors           []types.MFAFactorSecret
+	credential                    types.UserCredential
+	registerCalled                bool
+	registerPasswordHash          string
+	loginCalled                   bool
+	loginCommand                  types.LoginCommand
+	failureRecorded               bool
+	failureAt                     time.Time
+	lockUntil                     time.Time
+	maxFailedAttempts             int
+	failureWindowStart            time.Time
+	recordFailureErr              error
+	mfaFailureRecorded            bool
+	mfaFailureAt                  time.Time
+	mfaLockUntil                  time.Time
+	mfaMaxFailedAttempts          int
+	mfaFailureWindowStart         time.Time
+	mfaFailureFactorID            types.MFAFactorID
+	recordMFAFailureErr           error
+	mfaRecoveryFailureRecorded    bool
+	mfaRecoveryFailureAt          time.Time
+	mfaRecoveryLockUntil          time.Time
+	mfaRecoveryMaxFailedAttempts  int
+	mfaRecoveryFailureWindowStart time.Time
+	recordMFARecoveryFailureErr   error
+	recoveryCodeRecord            types.MFARecoveryCodeRecord
+	recoveryCodeHash              string
+	findRecoveryCodeErr           error
+	refreshCalled                 bool
+	presentedTokenID              types.RefreshTokenID
+	presentedTokenHash            string
+	createVerificationCalled      bool
+	createPasswordResetCalled     bool
+	createPasswordResetErr        error
+	confirmPasswordResetCalled    bool
+	resetPasswordHash             string
+	resetTokenHash                string
+	activeMFAFactors              []types.MFAFactorSecret
 }
 
 func (repo *fakeIdentityRepository) RegisterUser(_ context.Context, command types.RegisterUserCommand, passwordHash string, createdAt time.Time) (types.RegisterUserResult, error) {
@@ -785,6 +888,15 @@ func (repo *fakeIdentityRepository) RecordMFALoginFailure(_ context.Context, _ t
 	repo.mfaMaxFailedAttempts = maxFailedAttempts
 	repo.mfaFailureWindowStart = failureWindowStart
 	return repo.recordMFAFailureErr
+}
+
+func (repo *fakeIdentityRepository) RecordMFARecoveryLoginFailure(_ context.Context, _ types.TenantID, _ types.UserID, failedAt time.Time, lockUntil time.Time, maxFailedAttempts int, failureWindowStart time.Time) error {
+	repo.mfaRecoveryFailureRecorded = true
+	repo.mfaRecoveryFailureAt = failedAt
+	repo.mfaRecoveryLockUntil = lockUntil
+	repo.mfaRecoveryMaxFailedAttempts = maxFailedAttempts
+	repo.mfaRecoveryFailureWindowStart = failureWindowStart
+	return repo.recordMFARecoveryFailureErr
 }
 
 func (repo *fakeIdentityRepository) FindActiveMFARecoveryCode(_ context.Context, _ types.TenantID, _ types.UserID, codeHash string) (types.MFARecoveryCodeRecord, error) {
@@ -908,8 +1020,9 @@ func (fakeChallengeTokenCodec) HashChallengeToken(token string) string {
 }
 
 type fakeRecoveryCodeManager struct {
-	hash string
-	err  error
+	hash       string
+	err        error
+	hashCalled bool
 }
 
 func (manager *fakeRecoveryCodeManager) NewRecoveryCodes(int) ([]types.MFARecoveryCode, error) {
@@ -917,6 +1030,7 @@ func (manager *fakeRecoveryCodeManager) NewRecoveryCodes(int) ([]types.MFARecove
 }
 
 func (manager *fakeRecoveryCodeManager) HashRecoveryCode(string) (string, error) {
+	manager.hashCalled = true
 	if manager.err != nil {
 		return "", manager.err
 	}

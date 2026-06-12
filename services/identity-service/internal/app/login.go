@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -44,6 +45,7 @@ type LoginRepository interface {
 	LoginGatewaySession(context.Context, types.LoginCommand, types.RefreshTokenRecord, time.Time, time.Time, time.Time) (types.LoginResult, error)
 	ListActiveMFAFactorSecrets(context.Context, types.TenantID, types.UserID) ([]types.MFAFactorSecret, error)
 	RecordMFALoginFailure(context.Context, types.TenantID, types.UserID, types.MFAFactorID, time.Time, time.Time, int, time.Time) error
+	RecordMFARecoveryLoginFailure(context.Context, types.TenantID, types.UserID, time.Time, time.Time, int, time.Time) error
 	FindActiveMFARecoveryCode(context.Context, types.TenantID, types.UserID, string) (types.MFARecoveryCodeRecord, error)
 }
 
@@ -160,7 +162,7 @@ func (uc *LoginUseCase) Execute(ctx context.Context, command types.LoginCommand)
 		}
 		return types.LoginResult{}, types.NewInvalidCredentials("invalid credentials")
 	}
-	verifiedMFAFactorID, usedRecoveryCode, err := uc.verifyMFAIfRequired(ctx, command, now)
+	verifiedMFAFactorID, usedRecoveryCode, err := uc.verifyMFAIfRequired(ctx, command, credential, now)
 	if err != nil {
 		return types.LoginResult{}, err
 	}
@@ -199,7 +201,7 @@ func (uc *LoginUseCase) Execute(ctx context.Context, command types.LoginCommand)
 	return result, nil
 }
 
-func (uc *LoginUseCase) verifyMFAIfRequired(ctx context.Context, command types.LoginCommand, now time.Time) (types.MFAFactorID, types.MFARecoveryCodeRecord, error) {
+func (uc *LoginUseCase) verifyMFAIfRequired(ctx context.Context, command types.LoginCommand, credential types.UserCredential, now time.Time) (types.MFAFactorID, types.MFARecoveryCodeRecord, error) {
 	factors, err := uc.repository.ListActiveMFAFactorSecrets(ctx, command.TenantID, command.UserID)
 	if err != nil {
 		return "", types.MFARecoveryCodeRecord{}, err
@@ -212,12 +214,21 @@ func (uc *LoginUseCase) verifyMFAIfRequired(ctx context.Context, command types.L
 		if uc.recoveryCodes == nil {
 			return "", types.MFARecoveryCodeRecord{}, types.NewMFAUnavailable("mfa recovery code manager is not configured")
 		}
+		if credential.MFARecoveryLockedUntil.After(now) {
+			return "", types.MFARecoveryCodeRecord{}, types.NewMFALocked("mfa temporarily locked")
+		}
 		codeHash, err := uc.recoveryCodes.HashRecoveryCode(recoveryCode)
 		if err != nil {
 			return "", types.MFARecoveryCodeRecord{}, err
 		}
 		record, err := uc.repository.FindActiveMFARecoveryCode(ctx, command.TenantID, command.UserID, codeHash)
 		if err != nil {
+			if errors.Is(err, types.ErrInvalidMFA) {
+				lockUntil := now.Add(uc.mfaRisk.LockDuration)
+				if recordErr := uc.repository.RecordMFARecoveryLoginFailure(ctx, command.TenantID, command.UserID, now, lockUntil, uc.mfaRisk.MaxFailedAttempts, now.Add(-uc.mfaRisk.FailureWindow)); recordErr != nil {
+					return "", types.MFARecoveryCodeRecord{}, recordErr
+				}
+			}
 			return "", types.MFARecoveryCodeRecord{}, err
 		}
 		return "", record, nil

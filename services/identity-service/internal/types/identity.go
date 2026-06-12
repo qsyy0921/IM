@@ -348,12 +348,14 @@ type IdentityChallenge struct {
 }
 
 type UserCredential struct {
-	TenantID         TenantID
-	UserID           UserID
-	Status           string
-	PasswordHash     string
-	FailedLoginCount int
-	LockedUntil      time.Time
+	TenantID               TenantID
+	UserID                 UserID
+	Status                 string
+	PasswordHash           string
+	FailedLoginCount       int
+	LockedUntil            time.Time
+	MFARecoveryFailedCount int
+	MFARecoveryLockedUntil time.Time
 }
 
 type RefreshTokenRecord struct {

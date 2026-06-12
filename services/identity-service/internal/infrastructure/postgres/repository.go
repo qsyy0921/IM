@@ -125,7 +125,9 @@ SELECT
     status,
     password_hash,
     failed_login_count,
-    COALESCE(locked_until, 'epoch'::timestamptz)
+    COALESCE(locked_until, 'epoch'::timestamptz),
+    mfa_recovery_failed_count,
+    COALESCE(mfa_recovery_locked_until, 'epoch'::timestamptz)
 FROM identity_users
 WHERE tenant_id = $1
   AND user_id = $2
@@ -136,6 +138,8 @@ WHERE tenant_id = $1
 		&credential.PasswordHash,
 		&credential.FailedLoginCount,
 		&credential.LockedUntil,
+		&credential.MFARecoveryFailedCount,
+		&credential.MFARecoveryLockedUntil,
 	)
 	if err == pgx.ErrNoRows {
 		return types.UserCredential{}, types.NewInvalidCredentials("invalid credentials")
@@ -208,6 +212,65 @@ RETURNING failed_login_count, COALESCE(locked_until, 'epoch'::timestamptz)
 	return nil
 }
 
+func (r *Repository) RecordMFARecoveryLoginFailure(
+	ctx context.Context,
+	tenantID types.TenantID,
+	userID types.UserID,
+	failedAt time.Time,
+	lockUntil time.Time,
+	maxFailedAttempts int,
+	failureWindowStart time.Time,
+) error {
+	if r.pool == nil {
+		return types.NewDBWriteFailed("identity repository is not configured")
+	}
+	if maxFailedAttempts <= 0 {
+		return types.NewInvalidArgument("max failed attempts must be positive")
+	}
+	var failedCount int
+	var lockedUntil time.Time
+	err := r.pool.QueryRow(ctx, `
+WITH next_failure AS (
+    SELECT
+        tenant_id,
+        user_id,
+        CASE
+            WHEN mfa_recovery_failed_last_at IS NULL
+              OR mfa_recovery_failed_last_at < $6
+              OR (mfa_recovery_failed_count >= $5 AND COALESCE(mfa_recovery_locked_until, 'epoch'::timestamptz) <= $3)
+                THEN 1
+            ELSE mfa_recovery_failed_count + 1
+        END AS next_failed_login_count
+    FROM identity_users
+    WHERE tenant_id = $1
+      AND user_id = $2
+    FOR UPDATE
+)
+UPDATE identity_users
+SET mfa_recovery_failed_count = next_failure.next_failed_login_count,
+    mfa_recovery_failed_last_at = $3,
+    mfa_recovery_locked_until = CASE
+        WHEN next_failure.next_failed_login_count >= $5 THEN $4::timestamptz
+        ELSE NULL
+    END,
+    updated_at = $3
+FROM next_failure
+WHERE identity_users.tenant_id = next_failure.tenant_id
+  AND identity_users.user_id = next_failure.user_id
+RETURNING mfa_recovery_failed_count, COALESCE(mfa_recovery_locked_until, 'epoch'::timestamptz)
+`, tenantID, userID, failedAt, lockUntil, maxFailedAttempts, failureWindowStart).Scan(&failedCount, &lockedUntil)
+	if err == pgx.ErrNoRows {
+		return types.NewInvalidCredentials("invalid credentials")
+	}
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if lockedUntil.After(failedAt) {
+		return types.NewMFALocked("mfa temporarily locked")
+	}
+	return nil
+}
+
 func (r *Repository) LoginGatewaySession(
 	ctx context.Context,
 	command types.LoginCommand,
@@ -253,6 +316,9 @@ func (r *Repository) LoginGatewaySession(
 	}
 	if command.UsedMFARecoveryCode.CodeID != "" || command.UsedMFARecoveryCode.CodeHash != "" {
 		if err := consumeMFARecoveryCode(ctx, tx, command.TenantID, command.UserID, command.UsedMFARecoveryCode, issuedAt); err != nil {
+			return types.LoginResult{}, err
+		}
+		if err := clearMFARecoveryLoginFailures(ctx, tx, command.TenantID, command.UserID, issuedAt); err != nil {
 			return types.LoginResult{}, err
 		}
 	}
@@ -1887,6 +1953,25 @@ UPDATE identity_users
 SET failed_login_count = 0,
     failed_login_last_at = NULL,
     locked_until = NULL,
+    updated_at = $3
+WHERE tenant_id = $1
+  AND user_id = $2
+`, tenantID, userID, now)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if tag.RowsAffected() == 0 {
+		return types.NewInvalidCredentials("invalid credentials")
+	}
+	return nil
+}
+
+func clearMFARecoveryLoginFailures(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, now time.Time) error {
+	tag, err := tx.Exec(ctx, `
+UPDATE identity_users
+SET mfa_recovery_failed_count = 0,
+    mfa_recovery_failed_last_at = NULL,
+    mfa_recovery_locked_until = NULL,
     updated_at = $3
 WHERE tenant_id = $1
   AND user_id = $2

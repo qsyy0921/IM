@@ -132,6 +132,8 @@ type IdentitySnapshot struct {
 	Users                  int64 `json:"users"`
 	UsersWithFailures      int64 `json:"users_with_failures"`
 	PasswordLoginLocked    int64 `json:"password_login_locked"`
+	MFARecoveryFailures    int64 `json:"mfa_recovery_failures"`
+	MFARecoveryLocked      int64 `json:"mfa_recovery_locked"`
 	MFAFactors             int64 `json:"mfa_factors"`
 	MFAFactorsWithFailures int64 `json:"mfa_factors_with_failures"`
 	MFALoginLocked         int64 `json:"mfa_login_locked"`
@@ -149,6 +151,8 @@ SELECT
     (SELECT COUNT(*) FROM identity_users),
     (SELECT COUNT(*) FROM identity_users WHERE failed_login_count > 0),
     (SELECT COUNT(*) FROM identity_users WHERE locked_until > now()),
+    (SELECT COUNT(*) FROM identity_users WHERE mfa_recovery_failed_count > 0),
+    (SELECT COUNT(*) FROM identity_users WHERE mfa_recovery_locked_until > now()),
     (SELECT COUNT(*) FROM identity_mfa_factors),
     (SELECT COUNT(*) FROM identity_mfa_factors WHERE login_failed_count > 0),
     (SELECT COUNT(*) FROM identity_mfa_factors WHERE status = 'ACTIVE' AND login_locked_until > now()),
@@ -161,6 +165,8 @@ SELECT
 		&snapshot.Users,
 		&snapshot.UsersWithFailures,
 		&snapshot.PasswordLoginLocked,
+		&snapshot.MFARecoveryFailures,
+		&snapshot.MFARecoveryLocked,
 		&snapshot.MFAFactors,
 		&snapshot.MFAFactorsWithFailures,
 		&snapshot.MFALoginLocked,

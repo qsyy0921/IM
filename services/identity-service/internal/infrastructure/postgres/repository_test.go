@@ -595,6 +595,11 @@ func TestRepositoryMFARecoveryCodeLoginConsumesCodeIntegration(t *testing.T) {
 		t.Fatalf("find recovery code before login: %v", err)
 	}
 	loginAt := now.Add(2 * time.Minute)
+	failureAt := loginAt.Add(-time.Minute)
+	if err := repository.RecordMFARecoveryLoginFailure(ctx, "tenant-identity", "user-1", failureAt, failureAt.Add(15*time.Minute), 2, failureAt.Add(-15*time.Minute)); err != nil {
+		t.Fatalf("record first recovery-code failure: %v", err)
+	}
+	assertMFARecoveryLoginRisk(t, ctx, pool, 1, false)
 	if _, err := repository.LoginGatewaySession(ctx, types.LoginCommand{
 		TenantID:            "tenant-identity",
 		UserID:              "user-1",
@@ -610,6 +615,7 @@ func TestRepositoryMFARecoveryCodeLoginConsumesCodeIntegration(t *testing.T) {
 	if _, err := repository.FindActiveMFARecoveryCode(ctx, "tenant-identity", "user-1", "recovery-login-hash-1"); !errors.Is(err, types.ErrInvalidMFA) {
 		t.Fatalf("expected consumed recovery code to be inactive, got %v", err)
 	}
+	assertMFARecoveryLoginRisk(t, ctx, pool, 0, false)
 	if _, err := repository.LoginGatewaySession(ctx, types.LoginCommand{
 		TenantID:            "tenant-identity",
 		UserID:              "user-1",
@@ -621,6 +627,40 @@ func TestRepositoryMFARecoveryCodeLoginConsumesCodeIntegration(t *testing.T) {
 		TokenHash: "hash-recovery-replay",
 	}, loginAt.Add(time.Minute), loginAt.Add(16*time.Minute), loginAt.Add(30*24*time.Hour)); !errors.Is(err, types.ErrInvalidMFA) {
 		t.Fatalf("expected replayed recovery code to fail, got %v", err)
+	}
+}
+
+func TestRepositoryMFARecoveryLoginFailureLocksIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	repository := NewRepository(pool)
+	now := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := repository.RegisterUser(ctx, types.RegisterUserCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+	}, "password-hash", now); err != nil {
+		t.Fatalf("register user: %v", err)
+	}
+	firstFailureAt := now.Add(time.Minute)
+	lockUntil := firstFailureAt.Add(15 * time.Minute)
+	if err := repository.RecordMFARecoveryLoginFailure(ctx, "tenant-identity", "user-1", firstFailureAt, lockUntil, 2, firstFailureAt.Add(-15*time.Minute)); err != nil {
+		t.Fatalf("record first recovery-code failure: %v", err)
+	}
+	assertMFARecoveryLoginRisk(t, ctx, pool, 1, false)
+
+	err := repository.RecordMFARecoveryLoginFailure(ctx, "tenant-identity", "user-1", firstFailureAt.Add(time.Minute), lockUntil.Add(time.Minute), 2, firstFailureAt.Add(-14*time.Minute))
+	if !errors.Is(err, types.ErrMFALocked) {
+		t.Fatalf("expected recovery-code mfa lock on threshold, got %v", err)
+	}
+	assertMFARecoveryLoginRisk(t, ctx, pool, 2, true)
+
+	credential, err := repository.GetUserCredential(ctx, "tenant-identity", "user-1")
+	if err != nil {
+		t.Fatalf("get credential after recovery-code lock: %v", err)
+	}
+	if credential.MFARecoveryFailedCount != 2 || !credential.MFARecoveryLockedUntil.After(firstFailureAt) {
+		t.Fatalf("expected credential to carry recovery-code risk state, got %+v", credential)
 	}
 }
 
@@ -1017,6 +1057,30 @@ WHERE tenant_id = 'tenant-identity'
 	}
 	if !wantLocked && lockedUntil != nil {
 		t.Fatalf("expected account to be unlocked, got locked_until=%s", lockedUntil)
+	}
+}
+
+func assertMFARecoveryLoginRisk(t *testing.T, ctx context.Context, pool *pgxpool.Pool, wantFailedCount int, wantLocked bool) {
+	t.Helper()
+	var failedCount int
+	var lockedUntil *time.Time
+	err := pool.QueryRow(ctx, `
+SELECT mfa_recovery_failed_count, mfa_recovery_locked_until
+FROM identity_users
+WHERE tenant_id = 'tenant-identity'
+  AND user_id = 'user-1'
+`).Scan(&failedCount, &lockedUntil)
+	if err != nil {
+		t.Fatalf("read mfa recovery login risk: %v", err)
+	}
+	if failedCount != wantFailedCount {
+		t.Fatalf("expected mfa recovery failed count %d, got %d", wantFailedCount, failedCount)
+	}
+	if wantLocked && lockedUntil == nil {
+		t.Fatal("expected mfa recovery login to be locked")
+	}
+	if !wantLocked && lockedUntil != nil {
+		t.Fatalf("expected mfa recovery login to be unlocked, got mfa_recovery_locked_until=%s", lockedUntil)
 	}
 }
 

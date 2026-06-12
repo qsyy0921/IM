@@ -72,12 +72,15 @@ NEXUSIM_IDENTITY_GRPC_TLS_CERT_FILE=/path/to/server.crt
 NEXUSIM_IDENTITY_GRPC_TLS_KEY_FILE=/path/to/server.key
 NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_CA_FILE=/path/to/client-ca.crt
 NEXUSIM_IDENTITY_GRPC_TLS_REQUIRE_CLIENT_CERT=true
+NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES=push-gateway.nexusim.local
+NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_ALLOWED_URIS=spiffe://nexusim/push-gateway
 ```
 
 - `CERT_FILE` and `KEY_FILE` must be configured together.
 - `CLIENT_CA_FILE` enables client certificate verification and is also required when `REQUIRE_CLIENT_CERT=true`.
 - `REQUIRE_CLIENT_CERT` is parsed strictly; invalid boolean values fail startup.
-- The first version only configures the identity-service gRPC server transport. It does not migrate all clients to TLS, does not implement service identity authorization or SAN allowlists, and does not manage certificate issuance, rotation or cross-host distribution.
+- `CLIENT_ALLOWED_DNS_NAMES` and `CLIENT_ALLOWED_URIS` are optional exact-match client certificate SAN allowlists. If either is configured, identity-service requires mTLS and rejects verified client certificates whose DNS SAN / URI SAN does not match the configured list.
+- This remains first-stage transport hardening. It does not migrate all clients to TLS, does not implement a dynamic service identity registry or policy engine, and does not manage certificate issuance, rotation or cross-host distribution.
 
 ## Register / Login / Refresh
 

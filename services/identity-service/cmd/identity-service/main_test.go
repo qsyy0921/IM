@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"math/big"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -419,9 +420,15 @@ func clearIdentityGRPCTLSConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_KEY_FILE", "")
 	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_CA_FILE", "")
 	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_REQUIRE_CLIENT_CERT", "")
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES", "")
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_ALLOWED_URIS", "")
 }
 
 func writeIdentityTLSTestCert(t *testing.T, dir string, name string) (string, string) {
+	return writeIdentityTLSTestCertWithSANs(t, dir, name, []string{"localhost"}, nil)
+}
+
+func writeIdentityTLSTestCertWithSANs(t *testing.T, dir string, name string, dnsNames []string, uriNames []string) (string, string) {
 	t.Helper()
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -430,6 +437,14 @@ func writeIdentityTLSTestCert(t *testing.T, dir string, name string) (string, st
 	serialNumber, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
 	if err != nil {
 		t.Fatalf("generate tls serial: %v", err)
+	}
+	uris := make([]*url.URL, 0, len(uriNames))
+	for _, uriName := range uriNames {
+		parsed, err := url.Parse(uriName)
+		if err != nil {
+			t.Fatalf("parse tls uri san: %v", err)
+		}
+		uris = append(uris, parsed)
 	}
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
@@ -442,7 +457,8 @@ func writeIdentityTLSTestCert(t *testing.T, dir string, name string) (string, st
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
 		IsCA:                  true,
-		DNSNames:              []string{"localhost"},
+		DNSNames:              dnsNames,
+		URIs:                  uris,
 	}
 	der, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
 	if err != nil {
@@ -458,6 +474,23 @@ func writeIdentityTLSTestCert(t *testing.T, dir string, name string) (string, st
 		t.Fatalf("write tls key: %v", err)
 	}
 	return certFile, keyFile
+}
+
+func readIdentityTLSTestCert(t *testing.T, certFile string) *x509.Certificate {
+	t.Helper()
+	raw, err := os.ReadFile(certFile)
+	if err != nil {
+		t.Fatalf("read tls cert: %v", err)
+	}
+	block, _ := pem.Decode(raw)
+	if block == nil {
+		t.Fatalf("expected PEM certificate in %s", certFile)
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		t.Fatalf("parse tls cert: %v", err)
+	}
+	return cert
 }
 
 func TestDisabledMFASecretManagerReturnsMFAUnavailable(t *testing.T) {
@@ -612,6 +645,18 @@ func TestLoadIdentityGRPCCredentialsFromEnvRequiresClientCAForMTLS(t *testing.T)
 	}
 }
 
+func TestLoadIdentityGRPCCredentialsFromEnvRequiresClientCAForClientAllowlist(t *testing.T) {
+	clearIdentityGRPCTLSConfig(t)
+	dir := t.TempDir()
+	certFile, keyFile := writeIdentityTLSTestCert(t, dir, "server")
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CERT_FILE", certFile)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_KEY_FILE", keyFile)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES", "push-gateway.nexusim.local")
+	if _, ok, err := loadIdentityGRPCCredentialsFromEnv(); err == nil || !ok {
+		t.Fatalf("expected client identity allowlist without ca to fail, ok=%t err=%v", ok, err)
+	}
+}
+
 func TestLoadIdentityGRPCCredentialsFromEnvRejectsInvalidClientCAPEM(t *testing.T) {
 	clearIdentityGRPCTLSConfig(t)
 	dir := t.TempDir()
@@ -625,6 +670,14 @@ func TestLoadIdentityGRPCCredentialsFromEnvRejectsInvalidClientCAPEM(t *testing.
 	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_CA_FILE", caFile)
 	if _, ok, err := loadIdentityGRPCCredentialsFromEnv(); err == nil || !ok {
 		t.Fatalf("expected invalid ca pem to fail, ok=%t err=%v", ok, err)
+	}
+}
+
+func TestLoadIdentityGRPCCredentialsFromEnvRejectsInvalidClientURIAllowlist(t *testing.T) {
+	clearIdentityGRPCTLSConfig(t)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_ALLOWED_URIS", "://bad-uri")
+	if _, ok, err := loadIdentityGRPCCredentialsFromEnv(); err == nil || !ok {
+		t.Fatalf("expected invalid client uri allowlist to fail, ok=%t err=%v", ok, err)
 	}
 }
 
@@ -656,6 +709,72 @@ func TestLoadIdentityGRPCCredentialsFromEnvLoadsMTLS(t *testing.T) {
 	}
 	if !ok || creds == nil {
 		t.Fatalf("expected grpc mtls credentials, ok=%t creds=%T", ok, creds)
+	}
+}
+
+func TestIdentityGRPCTLSConfigAllowsClientDNSName(t *testing.T) {
+	clearIdentityGRPCTLSConfig(t)
+	dir := t.TempDir()
+	certFile, keyFile := writeIdentityTLSTestCert(t, dir, "server")
+	caFile, _ := writeIdentityTLSTestCert(t, dir, "ca")
+	clientCertFile, _ := writeIdentityTLSTestCertWithSANs(t, dir, "client", []string{"push-gateway.nexusim.local"}, nil)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CERT_FILE", certFile)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_KEY_FILE", keyFile)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_CA_FILE", caFile)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES", " PUSH-GATEWAY.NEXUSIM.LOCAL ")
+	tlsConfig, ok, err := identityGRPCTLSConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load grpc mtls config: %v", err)
+	}
+	if !ok || tlsConfig.VerifyConnection == nil {
+		t.Fatalf("expected client identity verifier, ok=%t has_verifier=%t", ok, tlsConfig.VerifyConnection != nil)
+	}
+	if err := tlsConfig.VerifyConnection(tls.ConnectionState{PeerCertificates: []*x509.Certificate{readIdentityTLSTestCert(t, clientCertFile)}}); err != nil {
+		t.Fatalf("expected client dns identity to be allowed: %v", err)
+	}
+}
+
+func TestIdentityGRPCTLSConfigAllowsClientURI(t *testing.T) {
+	clearIdentityGRPCTLSConfig(t)
+	dir := t.TempDir()
+	certFile, keyFile := writeIdentityTLSTestCert(t, dir, "server")
+	caFile, _ := writeIdentityTLSTestCert(t, dir, "ca")
+	clientCertFile, _ := writeIdentityTLSTestCertWithSANs(t, dir, "client", nil, []string{"spiffe://nexusim/push-gateway"})
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CERT_FILE", certFile)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_KEY_FILE", keyFile)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_CA_FILE", caFile)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_ALLOWED_URIS", "spiffe://nexusim/push-gateway")
+	tlsConfig, ok, err := identityGRPCTLSConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load grpc mtls config: %v", err)
+	}
+	if !ok || tlsConfig.VerifyConnection == nil {
+		t.Fatalf("expected client identity verifier, ok=%t has_verifier=%t", ok, tlsConfig.VerifyConnection != nil)
+	}
+	if err := tlsConfig.VerifyConnection(tls.ConnectionState{PeerCertificates: []*x509.Certificate{readIdentityTLSTestCert(t, clientCertFile)}}); err != nil {
+		t.Fatalf("expected client uri identity to be allowed: %v", err)
+	}
+}
+
+func TestIdentityGRPCTLSConfigRejectsUnlistedClientIdentity(t *testing.T) {
+	clearIdentityGRPCTLSConfig(t)
+	dir := t.TempDir()
+	certFile, keyFile := writeIdentityTLSTestCert(t, dir, "server")
+	caFile, _ := writeIdentityTLSTestCert(t, dir, "ca")
+	clientCertFile, _ := writeIdentityTLSTestCertWithSANs(t, dir, "client", []string{"contacts-service.nexusim.local"}, nil)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CERT_FILE", certFile)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_KEY_FILE", keyFile)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_CA_FILE", caFile)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES", "push-gateway.nexusim.local")
+	tlsConfig, ok, err := identityGRPCTLSConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load grpc mtls config: %v", err)
+	}
+	if !ok || tlsConfig.VerifyConnection == nil {
+		t.Fatalf("expected client identity verifier, ok=%t has_verifier=%t", ok, tlsConfig.VerifyConnection != nil)
+	}
+	if err := tlsConfig.VerifyConnection(tls.ConnectionState{PeerCertificates: []*x509.Certificate{readIdentityTLSTestCert(t, clientCertFile)}}); err == nil {
+		t.Fatalf("expected unlisted client identity to be rejected")
 	}
 }
 

@@ -15,6 +15,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -1045,12 +1046,18 @@ func identityGRPCTLSConfigFromEnv() (*tls.Config, bool, error) {
 	certFile := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_GRPC_TLS_CERT_FILE"))
 	keyFile := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_GRPC_TLS_KEY_FILE"))
 	clientCAFile := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_CA_FILE"))
+	allowedClientDNSNames := envStringSet("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES", strings.ToLower)
+	allowedClientURIs, err := envURIStringSet("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_ALLOWED_URIS")
+	if err != nil {
+		return nil, true, err
+	}
 	requireClientCert, requireClientCertConfigured, err := envOptionalBool("NEXUSIM_IDENTITY_GRPC_TLS_REQUIRE_CLIENT_CERT")
 	if err != nil {
 		return nil, true, err
 	}
-	requireClientCert = clientCAFile != "" || (requireClientCertConfigured && requireClientCert)
-	if certFile == "" && keyFile == "" && clientCAFile == "" && !requireClientCert {
+	hasClientAllowlist := len(allowedClientDNSNames) > 0 || len(allowedClientURIs) > 0
+	requireClientCert = clientCAFile != "" || hasClientAllowlist || (requireClientCertConfigured && requireClientCert)
+	if certFile == "" && keyFile == "" && clientCAFile == "" && !requireClientCert && !hasClientAllowlist {
 		return nil, false, nil
 	}
 	if certFile == "" || keyFile == "" {
@@ -1078,8 +1085,34 @@ func identityGRPCTLSConfigFromEnv() (*tls.Config, bool, error) {
 		}
 		tlsConfig.ClientCAs = pool
 		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+		if hasClientAllowlist {
+			tlsConfig.VerifyConnection = verifyAllowedIdentityGRPCClient(allowedClientDNSNames, allowedClientURIs)
+		}
 	}
 	return tlsConfig, true, nil
+}
+
+func verifyAllowedIdentityGRPCClient(allowedDNSNames map[string]struct{}, allowedURIs map[string]struct{}) func(tls.ConnectionState) error {
+	return func(state tls.ConnectionState) error {
+		if len(state.PeerCertificates) == 0 {
+			return errors.New("identity grpc client certificate is required")
+		}
+		cert := state.PeerCertificates[0]
+		for _, dnsName := range cert.DNSNames {
+			if _, ok := allowedDNSNames[strings.ToLower(strings.TrimSpace(dnsName))]; ok {
+				return nil
+			}
+		}
+		for _, uri := range cert.URIs {
+			if uri == nil {
+				continue
+			}
+			if _, ok := allowedURIs[uri.String()]; ok {
+				return nil
+			}
+		}
+		return errors.New("identity grpc client certificate identity is not allowed")
+	}
 }
 
 func envString(name string, fallback string) string {
@@ -1088,6 +1121,45 @@ func envString(name string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func envStringSet(name string, normalize func(string) string) map[string]struct{} {
+	values := make(map[string]struct{})
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return values
+	}
+	for _, item := range strings.Split(raw, ",") {
+		value := strings.TrimSpace(item)
+		if value == "" {
+			continue
+		}
+		if normalize != nil {
+			value = normalize(value)
+		}
+		values[value] = struct{}{}
+	}
+	return values
+}
+
+func envURIStringSet(name string) (map[string]struct{}, error) {
+	values := make(map[string]struct{})
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return values, nil
+	}
+	for _, item := range strings.Split(raw, ",") {
+		value := strings.TrimSpace(item)
+		if value == "" {
+			continue
+		}
+		parsed, err := url.Parse(value)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" && parsed.Opaque == "" {
+			return nil, fmt.Errorf("%s contains an invalid URI", name)
+		}
+		values[parsed.String()] = struct{}{}
+	}
+	return values, nil
 }
 
 func envInt(name string, fallback int) int {

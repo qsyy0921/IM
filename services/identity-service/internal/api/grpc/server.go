@@ -357,6 +357,8 @@ func grpcError(err error) error {
 		return status.Error(codes.AlreadyExists, "user already exists")
 	case errors.Is(err, types.ErrInvalidCredentials):
 		return status.Error(codes.Unauthenticated, "invalid credentials")
+	case errors.Is(err, types.ErrAccountLocked):
+		return status.Error(codes.ResourceExhausted, "account temporarily locked")
 	case errors.Is(err, types.ErrInvalidRefreshToken):
 		return status.Error(codes.Unauthenticated, "invalid refresh token")
 	case errors.Is(err, types.ErrRefreshTokenReuseDetected):

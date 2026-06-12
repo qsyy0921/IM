@@ -14,6 +14,7 @@ var (
 	ErrTokenSigningFailed        = errors.New("token signing failed")
 	ErrUserAlreadyExists         = errors.New("user already exists")
 	ErrInvalidCredentials        = errors.New("invalid credentials")
+	ErrAccountLocked             = errors.New("account locked")
 	ErrInvalidRefreshToken       = errors.New("invalid refresh token")
 	ErrRefreshTokenReuseDetected = errors.New("refresh token reuse detected")
 )
@@ -50,6 +51,7 @@ func NewDBWriteFailed(message string) error       { return wrap(ErrDBWriteFailed
 func NewTokenSigningFailed(message string) error  { return wrap(ErrTokenSigningFailed, message) }
 func NewUserAlreadyExists(message string) error   { return wrap(ErrUserAlreadyExists, message) }
 func NewInvalidCredentials(message string) error  { return wrap(ErrInvalidCredentials, message) }
+func NewAccountLocked(message string) error       { return wrap(ErrAccountLocked, message) }
 func NewInvalidRefreshToken(message string) error { return wrap(ErrInvalidRefreshToken, message) }
 func NewRefreshTokenReuseDetected(message string) error {
 	return wrap(ErrRefreshTokenReuseDetected, message)

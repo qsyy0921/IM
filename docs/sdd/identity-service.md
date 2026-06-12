@@ -4,14 +4,16 @@
 
 `identity-service` is the dedicated identity boundary for NexusIM login, gateway tokens and device/session lifecycle. The first implementation intentionally stays small:
 
-- verify existing user credentials for first-stage password login;
+- create first-stage local user credentials;
+- verify user credentials for first-stage password login;
+- apply a small persistent failed-login counter and temporary account lockout;
 - issue short-lived push gateway tokens;
 - rotate opaque refresh tokens;
 - persist users, devices and sessions;
 - revoke devices and sessions;
 - keep push-gateway verification local to avoid synchronous auth RPC on every WebSocket handshake.
 
-It is not yet a full OAuth/OIDC identity platform. It does not implement user registration, MFA, external IdP federation, account recovery or production-grade asymmetric key management.
+It is not yet a full OAuth/OIDC identity platform. It does not implement email / phone verification, MFA, external IdP federation, account recovery or production-grade asymmetric key management.
 
 ## Boundary
 
@@ -83,6 +85,17 @@ Refresh token rules:
 - expired refresh tokens are marked `REVOKED` and rejected;
 - reuse of a `USED` or `REVOKED` refresh token is treated as credential compromise: the session is marked `REVOKED`, active refresh tokens for that session are revoked, and `identity.session.revoked.v1` is written through `identity_outbox`.
 
+Login risk first-stage rules:
+
+- `identity_users.failed_login_count`, `failed_login_last_at` and `locked_until` are owned by identity-service.
+- A failed password login records one durable failure for the user.
+- Failures are counted within `NEXUSIM_IDENTITY_LOGIN_FAILURE_WINDOW`; older failures do not keep accumulating forever.
+- When the configured threshold is reached, password `Login` is temporarily locked and public Login returns stable `account temporarily locked`.
+- A successful Login clears the failure counter and lock fields in the same PostgreSQL transaction that writes session / refresh-token state.
+- The first-stage lock applies only to password Login. A valid refresh token can still rotate through `RefreshGatewayToken`; refresh token theft / reuse is handled by the separate rotation and session-revoke logic. This avoids letting an external password brute-force attempt break an already authenticated client session.
+- Defaults are `NEXUSIM_IDENTITY_LOGIN_MAX_FAILED_ATTEMPTS=5`, `NEXUSIM_IDENTITY_LOGIN_FAILURE_WINDOW=15m` and `NEXUSIM_IDENTITY_LOGIN_LOCK_DURATION=15m`; deployments may tune them.
+- This is not a complete fraud/risk engine. IP/device reputation, CAPTCHA, geo-anomaly, tenant policy, alert routing, adaptive throttling and tenant-level rate limits remain future hardening.
+
 ## Gateway Token
 
 Gateway tokens are compatible with push-gateway HMAC mode. The legacy token format is:
@@ -148,6 +161,7 @@ The current Register / Login / Refresh implementation is validated by app tests,
 ```text
 RegisterUser -> ACTIVE user credential
 Login -> ACTIVE refresh token
+Repeated failed Login -> durable failed_login_count + temporary account lockout
 RefreshGatewayToken -> old token USED + new token ACTIVE
 Reuse old refresh token -> session REVOKED + identity.session.revoked.v1 outbox
 Expired refresh token -> token REVOKED + stable invalid refresh error
@@ -159,8 +173,8 @@ Expired refresh token -> token REVOKED + stable invalid refresh error
 
 - `GET /healthz`: process liveness, no dependency check.
 - `GET /readyz`: PostgreSQL ping readiness.
-- `GET /debug/metrics`: pgx pool counters, identity user/device/session counts, and gRPC method/code/latency counters.
+- `GET /debug/metrics`: pgx pool counters, identity user/device/session counts, failed password-login user counts, currently password-login-locked user counts, and gRPC method/code/latency counters.
 
 The gRPC server also emits one JSON request log per unary RPC with stable fields: `service`, `event`, `method`, `code`, and `latency_ms`.
 
-This is intentionally a lightweight local/debug endpoint. Production tracing, alerting, mTLS, gateway verified metadata and revoke projection/deny-list remain future hardening items.
+This is intentionally a lightweight local/debug endpoint. Production tracing, alerting, mTLS, external SIEM / audit sinks and adaptive risk analytics remain future hardening items.

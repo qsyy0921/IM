@@ -201,6 +201,68 @@ func TestRepositoryLoginAndRefreshRotationIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryLoginFailureLocksAndSuccessClearsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	seedUserCredential(t, ctx, pool, "password-hash")
+	repository := NewRepository(pool, WithSessionIDGenerator(func() (string, error) { return "session-login-locked", nil }))
+	firstFailureAt := time.Unix(1_800_000_000, 0).UTC()
+	lockUntil := firstFailureAt.Add(15 * time.Minute)
+
+	if err := repository.RecordLoginFailure(ctx, "tenant-identity", "user-1", firstFailureAt, lockUntil, 2, firstFailureAt.Add(-15*time.Minute)); err != nil {
+		t.Fatalf("record first login failure: %v", err)
+	}
+	assertLoginRisk(t, ctx, pool, 1, false)
+
+	err := repository.RecordLoginFailure(ctx, "tenant-identity", "user-1", firstFailureAt.Add(time.Minute), lockUntil.Add(time.Minute), 2, firstFailureAt.Add(-14*time.Minute))
+	if !errors.Is(err, types.ErrAccountLocked) {
+		t.Fatalf("expected account locked on threshold, got %v", err)
+	}
+	assertLoginRisk(t, ctx, pool, 2, true)
+
+	_, err = repository.LoginGatewaySession(ctx, types.LoginCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		DeviceID: "device-1",
+		Audience: "push-gateway",
+	}, types.RefreshTokenRecord{
+		TokenID:   "rft_locked",
+		TokenHash: "hash-locked",
+	}, firstFailureAt.Add(2*time.Minute), firstFailureAt.Add(17*time.Minute), firstFailureAt.Add(30*24*time.Hour))
+	if !errors.Is(err, types.ErrAccountLocked) {
+		t.Fatalf("expected locked login to fail, got %v", err)
+	}
+
+	if _, err := pool.Exec(ctx, `
+UPDATE identity_users
+SET locked_until = $1
+WHERE tenant_id = 'tenant-identity'
+  AND user_id = 'user-1'
+`, firstFailureAt.Add(-time.Minute)); err != nil {
+		t.Fatalf("expire lock: %v", err)
+	}
+	issuedAt := firstFailureAt.Add(20 * time.Minute)
+	if _, err := repository.LoginGatewaySession(ctx, types.LoginCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		DeviceID: "device-1",
+		Audience: "push-gateway",
+	}, types.RefreshTokenRecord{
+		TokenID:   "rft_after_lock",
+		TokenHash: "hash-after-lock",
+	}, issuedAt, issuedAt.Add(15*time.Minute), issuedAt.Add(30*24*time.Hour)); err != nil {
+		t.Fatalf("login after lock expiry: %v", err)
+	}
+	assertLoginRisk(t, ctx, pool, 0, false)
+	assertSessionStatus(t, ctx, pool, "session-login-locked", "ACTIVE")
+
+	if err := repository.RecordLoginFailure(ctx, "tenant-identity", "user-1", issuedAt.Add(time.Hour), issuedAt.Add(time.Hour+15*time.Minute), 2, issuedAt.Add(45*time.Minute)); err != nil {
+		t.Fatalf("record fresh window login failure: %v", err)
+	}
+	assertLoginRisk(t, ctx, pool, 1, false)
+}
+
 func TestRepositoryRefreshRejectsWrongSecretIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -232,6 +294,53 @@ func TestRepositoryRefreshRejectsWrongSecretIntegration(t *testing.T) {
 		t.Fatalf("expected invalid refresh token, got %v", err)
 	}
 	assertRefreshTokenStatus(t, ctx, pool, "rft_login", "ACTIVE")
+}
+
+func TestRepositoryRefreshAllowedWhilePasswordLoginLockedIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	seedUserCredential(t, ctx, pool, "password-hash")
+	repository := NewRepository(pool, WithSessionIDGenerator(func() (string, error) { return "session-login-1", nil }))
+	issuedAt := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := repository.LoginGatewaySession(ctx, types.LoginCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		DeviceID: "device-1",
+		Audience: "push-gateway",
+	}, types.RefreshTokenRecord{
+		TokenID:   "rft_login",
+		TokenHash: "hash-login",
+	}, issuedAt, issuedAt.Add(15*time.Minute), issuedAt.Add(30*24*time.Hour)); err != nil {
+		t.Fatalf("login session: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+UPDATE identity_users
+SET failed_login_count = 5,
+    failed_login_last_at = $1,
+    locked_until = $2
+WHERE tenant_id = 'tenant-identity'
+  AND user_id = 'user-1'
+`, issuedAt.Add(time.Minute), issuedAt.Add(15*time.Minute)); err != nil {
+		t.Fatalf("lock password login: %v", err)
+	}
+	refreshResult, err := repository.RefreshGatewaySession(ctx, types.RefreshGatewayTokenCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		DeviceID: "device-1",
+		Audience: "push-gateway",
+	}, "rft_login", "hash-login", types.RefreshTokenRecord{
+		TokenID:   "rft_next",
+		TokenHash: "hash-next",
+	}, issuedAt.Add(2*time.Minute), issuedAt.Add(17*time.Minute), issuedAt.Add(30*24*time.Hour))
+	if err != nil {
+		t.Fatalf("refresh while password login locked: %v", err)
+	}
+	if refreshResult.SessionID != "session-login-1" {
+		t.Fatalf("unexpected refresh result: %+v", refreshResult)
+	}
+	assertRefreshTokenStatus(t, ctx, pool, "rft_login", "USED")
+	assertRefreshTokenStatus(t, ctx, pool, "rft_next", "ACTIVE")
 }
 
 func TestRepositoryRefreshExpiresTokenIntegration(t *testing.T) {
@@ -348,6 +457,30 @@ WHERE tenant_id = 'tenant-identity'
 	}
 	if got != want {
 		t.Fatalf("expected refresh token status %s, got %s", want, got)
+	}
+}
+
+func assertLoginRisk(t *testing.T, ctx context.Context, pool *pgxpool.Pool, wantFailedCount int, wantLocked bool) {
+	t.Helper()
+	var failedCount int
+	var lockedUntil *time.Time
+	err := pool.QueryRow(ctx, `
+SELECT failed_login_count, locked_until
+FROM identity_users
+WHERE tenant_id = 'tenant-identity'
+  AND user_id = 'user-1'
+`).Scan(&failedCount, &lockedUntil)
+	if err != nil {
+		t.Fatalf("read login risk: %v", err)
+	}
+	if failedCount != wantFailedCount {
+		t.Fatalf("expected failed login count %d, got %d", wantFailedCount, failedCount)
+	}
+	if wantLocked && lockedUntil == nil {
+		t.Fatal("expected account to be locked")
+	}
+	if !wantLocked && lockedUntil != nil {
+		t.Fatalf("expected account to be unlocked, got locked_until=%s", lockedUntil)
 	}
 }
 

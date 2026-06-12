@@ -80,7 +80,17 @@ func runGRPC() error {
 	}
 	identitygrpc.Register(server, identitygrpc.NewServer(
 		app.NewRegisterUserUseCase(repository, passwords),
-		app.NewLoginUseCase(repository, signer, passwords, refreshTokens),
+		app.NewLoginUseCase(
+			repository,
+			signer,
+			passwords,
+			refreshTokens,
+			app.WithLoginRiskPolicy(app.LoginRiskPolicy{
+				MaxFailedAttempts: envInt("NEXUSIM_IDENTITY_LOGIN_MAX_FAILED_ATTEMPTS", app.DefaultLoginMaxFailedAttempts),
+				FailureWindow:     envDuration("NEXUSIM_IDENTITY_LOGIN_FAILURE_WINDOW", app.DefaultLoginFailureWindow),
+				LockDuration:      envDuration("NEXUSIM_IDENTITY_LOGIN_LOCK_DURATION", app.DefaultLoginLockDuration),
+			}),
+		),
 		app.NewRefreshGatewayTokenUseCase(repository, signer, refreshTokens),
 		app.NewIssueGatewayTokenUseCase(repository, signer),
 		app.NewRevokeDeviceUseCase(repository),

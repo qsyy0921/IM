@@ -129,12 +129,14 @@ type PGPoolSnapshot struct {
 }
 
 type IdentitySnapshot struct {
-	Users           int64 `json:"users"`
-	ActiveDevices   int64 `json:"active_devices"`
-	RevokedDevices  int64 `json:"revoked_devices"`
-	ActiveSessions  int64 `json:"active_sessions"`
-	RevokedSessions int64 `json:"revoked_sessions"`
-	ExpiredSessions int64 `json:"expired_sessions"`
+	Users               int64 `json:"users"`
+	UsersWithFailures   int64 `json:"users_with_failures"`
+	PasswordLoginLocked int64 `json:"password_login_locked"`
+	ActiveDevices       int64 `json:"active_devices"`
+	RevokedDevices      int64 `json:"revoked_devices"`
+	ActiveSessions      int64 `json:"active_sessions"`
+	RevokedSessions     int64 `json:"revoked_sessions"`
+	ExpiredSessions     int64 `json:"expired_sessions"`
 }
 
 func queryIdentitySnapshot(ctx context.Context, pool *pgxpool.Pool) (IdentitySnapshot, error) {
@@ -142,6 +144,8 @@ func queryIdentitySnapshot(ctx context.Context, pool *pgxpool.Pool) (IdentitySna
 	err := pool.QueryRow(ctx, `
 SELECT
     (SELECT COUNT(*) FROM identity_users),
+    (SELECT COUNT(*) FROM identity_users WHERE failed_login_count > 0),
+    (SELECT COUNT(*) FROM identity_users WHERE locked_until > now()),
     (SELECT COUNT(*) FROM identity_devices WHERE status = 'ACTIVE'),
     (SELECT COUNT(*) FROM identity_devices WHERE status = 'REVOKED'),
     (SELECT COUNT(*) FROM identity_sessions WHERE status = 'ACTIVE' AND expires_at > now()),
@@ -149,6 +153,8 @@ SELECT
     (SELECT COUNT(*) FROM identity_sessions WHERE status = 'ACTIVE' AND expires_at <= now())
 `).Scan(
 		&snapshot.Users,
+		&snapshot.UsersWithFailures,
+		&snapshot.PasswordLoginLocked,
 		&snapshot.ActiveDevices,
 		&snapshot.RevokedDevices,
 		&snapshot.ActiveSessions,

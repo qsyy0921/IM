@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 type TenantID string
 type UserID string
 type DeviceID string
@@ -116,10 +118,12 @@ type RefreshGatewayTokenResult struct {
 }
 
 type UserCredential struct {
-	TenantID     TenantID
-	UserID       UserID
-	Status       string
-	PasswordHash string
+	TenantID         TenantID
+	UserID           UserID
+	Status           string
+	PasswordHash     string
+	FailedLoginCount int
+	LockedUntil      time.Time
 }
 
 type RefreshTokenRecord struct {

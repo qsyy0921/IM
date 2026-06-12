@@ -114,12 +114,28 @@ func TestServerRegisterUserMapsDuplicateToAlreadyExists(t *testing.T) {
 	}
 }
 
+func TestServerLoginMapsAccountLockedToResourceExhausted(t *testing.T) {
+	server := NewServer(nil, &fakeLoginExecutor{err: types.NewAccountLocked("locked")}, nil, nil, nil, nil, nil)
+	_, err := server.Login(context.Background(), &identityv1.LoginRequest{
+		TenantId: "tenant-1",
+		UserId:   "user-1",
+		Password: "correct horse battery staple",
+		DeviceId: "device-1",
+	})
+	if status.Code(err) != codes.ResourceExhausted {
+		t.Fatalf("expected resource exhausted, got %v (%v)", status.Code(err), err)
+	}
+}
+
 func TestGRPCErrorMapsCredentialErrors(t *testing.T) {
 	if code := status.Code(grpcError(types.NewUserAlreadyExists("duplicate"))); code != codes.AlreadyExists {
 		t.Fatalf("expected user already exists to map to already exists, got %v", code)
 	}
 	if code := status.Code(grpcError(types.NewInvalidCredentials("bad password"))); code != codes.Unauthenticated {
 		t.Fatalf("expected invalid credentials to map to unauthenticated, got %v", code)
+	}
+	if code := status.Code(grpcError(types.NewAccountLocked("too many attempts"))); code != codes.ResourceExhausted {
+		t.Fatalf("expected account locked to map to resource exhausted, got %v", code)
 	}
 	if code := status.Code(grpcError(types.NewInvalidRefreshToken("bad refresh"))); code != codes.Unauthenticated {
 		t.Fatalf("expected invalid refresh token to map to unauthenticated, got %v", code)
@@ -133,6 +149,14 @@ type fakeRegisterUserExecutor struct {
 	command types.RegisterUserCommand
 	result  types.RegisterUserResult
 	err     error
+}
+
+type fakeLoginExecutor struct {
+	err error
+}
+
+func (executor *fakeLoginExecutor) Execute(context.Context, types.LoginCommand) (types.LoginResult, error) {
+	return types.LoginResult{}, executor.err
 }
 
 func (executor *fakeRegisterUserExecutor) Execute(_ context.Context, command types.RegisterUserCommand) (types.RegisterUserResult, error) {

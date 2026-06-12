@@ -90,6 +90,68 @@ func TestLoginUseCaseRecordsInvalidPasswordBeforeSessionWrite(t *testing.T) {
 	}
 }
 
+func TestLoginUseCaseRunsDummyPasswordVerifyForMissingCredential(t *testing.T) {
+	repository := &fakeIdentityRepository{
+		getCredentialErr: types.NewInvalidCredentials("invalid credentials"),
+	}
+	verifier := &fakePasswordVerifier{ok: false}
+	useCase := NewLoginUseCase(
+		repository,
+		fakeTokenSigner{},
+		verifier,
+		fakeRefreshTokenCodec{},
+		WithLoginDummyPasswordHash("dummy-password-hash"),
+	)
+	_, err := useCase.Execute(context.Background(), types.LoginCommand{
+		TenantID: "tenant-1",
+		UserID:   "missing-user",
+		Password: "wrong",
+		DeviceID: "device-1",
+	})
+	if !errors.Is(err, types.ErrInvalidCredentials) {
+		t.Fatalf("expected invalid credentials, got %v", err)
+	}
+	if verifier.calls != 1 || verifier.lastPassword != "wrong" || verifier.lastHash != "dummy-password-hash" {
+		t.Fatalf("expected dummy password verification, calls=%d password=%q hash=%q", verifier.calls, verifier.lastPassword, verifier.lastHash)
+	}
+	if repository.failureRecorded || repository.loginCalled {
+		t.Fatal("missing credential must not write failure counters or session state")
+	}
+}
+
+func TestLoginUseCaseVerifiesPasswordBeforeRejectingInactiveUser(t *testing.T) {
+	repository := &fakeIdentityRepository{
+		credential: types.UserCredential{
+			TenantID:     "tenant-1",
+			UserID:       "user-1",
+			Status:       "DISABLED",
+			PasswordHash: "expected-hash",
+		},
+	}
+	verifier := &fakePasswordVerifier{ok: true}
+	useCase := NewLoginUseCase(
+		repository,
+		fakeTokenSigner{},
+		verifier,
+		fakeRefreshTokenCodec{},
+	)
+	_, err := useCase.Execute(context.Background(), types.LoginCommand{
+		TenantID: "tenant-1",
+		UserID:   "user-1",
+		Password: "correct horse battery staple",
+		DeviceID: "device-1",
+	})
+	if !errors.Is(err, types.ErrInvalidCredentials) {
+		t.Fatalf("expected invalid credentials, got %v", err)
+	}
+	if verifier.calls != 1 || verifier.lastHash != "expected-hash" {
+		t.Fatalf("expected inactive user path to still verify password, calls=%d hash=%q", verifier.calls, verifier.lastHash)
+	}
+	if !repository.failureRecorded || repository.loginCalled {
+		t.Fatalf("inactive user should record the failed login attempt and not write session, failureRecorded=%v loginCalled=%v", repository.failureRecorded, repository.loginCalled)
+	}
+}
+
 func TestLoginUseCaseRejectsLockedAccountBeforePasswordVerify(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0).UTC()
 	repository := &fakeIdentityRepository{
@@ -981,6 +1043,7 @@ func TestRequestPasswordResetUseCaseHidesInvalidOrRateLimitedTarget(t *testing.T
 
 type fakeIdentityRepository struct {
 	credential                    types.UserCredential
+	getCredentialErr              error
 	registerCalled                bool
 	registerPasswordHash          string
 	loginCalled                   bool
@@ -1032,6 +1095,9 @@ func (repo *fakeIdentityRepository) RegisterUser(_ context.Context, command type
 }
 
 func (repo *fakeIdentityRepository) GetUserCredential(context.Context, types.TenantID, types.UserID) (types.UserCredential, error) {
+	if repo.getCredentialErr != nil {
+		return types.UserCredential{}, repo.getCredentialErr
+	}
 	return repo.credential, nil
 }
 
@@ -1161,12 +1227,16 @@ func (fakeTokenSigner) SignGatewayToken(types.TokenClaims) (string, error) {
 }
 
 type fakePasswordVerifier struct {
-	ok    bool
-	calls int
+	ok           bool
+	calls        int
+	lastPassword string
+	lastHash     string
 }
 
-func (verifier *fakePasswordVerifier) VerifyPassword(string, string) bool {
+func (verifier *fakePasswordVerifier) VerifyPassword(password string, passwordHash string) bool {
 	verifier.calls++
+	verifier.lastPassword = password
+	verifier.lastHash = passwordHash
 	return verifier.ok
 }
 

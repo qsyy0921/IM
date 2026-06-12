@@ -70,6 +70,10 @@ func runGRPC() error {
 	refreshTokens := tokeninfra.NewRefreshTokenCodec()
 	challengeTokens := tokeninfra.NewChallengeTokenCodec()
 	passwords := credentialinfra.NewPBKDF2Hasher(envInt("NEXUSIM_IDENTITY_PASSWORD_PBKDF2_ITERATIONS", 0))
+	dummyPasswordHash, err := passwords.HashPassword("nexusim dummy login password")
+	if err != nil {
+		return err
+	}
 	mfaManager, err := newMFASecretManager()
 	if err != nil {
 		return err
@@ -116,6 +120,7 @@ func runGRPC() error {
 				FailureWindow:     envDuration("NEXUSIM_IDENTITY_MFA_FAILURE_WINDOW", app.DefaultMFAFailureWindow),
 				LockDuration:      envDuration("NEXUSIM_IDENTITY_MFA_LOCK_DURATION", app.DefaultMFALockDuration),
 			}),
+			app.WithLoginDummyPasswordHash(dummyPasswordHash),
 			app.WithLoginMFASecretManager(mfaManager),
 			app.WithLoginMFARecoveryCodeManager(mfaRecoveryCodes),
 		),

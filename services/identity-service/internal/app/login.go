@@ -32,6 +32,7 @@ type LoginUseCase struct {
 	signer        TokenSigner
 	passwords     PasswordVerifier
 	refreshTokens RefreshTokenCodec
+	dummyHash     string
 	mfaSecrets    MFASecretManager
 	recoveryCodes MFARecoveryCodeManager
 	now           func() time.Time
@@ -93,6 +94,12 @@ func WithLoginMFARecoveryCodeManager(manager MFARecoveryCodeManager) LoginUseCas
 	}
 }
 
+func WithLoginDummyPasswordHash(passwordHash string) LoginUseCaseOption {
+	return func(uc *LoginUseCase) {
+		uc.dummyHash = strings.TrimSpace(passwordHash)
+	}
+}
+
 func WithLoginMFARiskPolicy(policy LoginRiskPolicy) LoginUseCaseOption {
 	return func(uc *LoginUseCase) {
 		uc.mfaRisk = policy
@@ -150,12 +157,17 @@ func (uc *LoginUseCase) Execute(ctx context.Context, command types.LoginCommand)
 	now := uc.now()
 	credential, err := uc.repository.GetUserCredential(ctx, command.TenantID, command.UserID)
 	if err != nil {
+		if errors.Is(err, types.ErrInvalidCredentials) {
+			uc.verifyDummyPassword(command.Password)
+			return types.LoginResult{}, types.NewInvalidCredentials("invalid credentials")
+		}
 		return types.LoginResult{}, err
 	}
 	if credential.LockedUntil.After(now) {
 		return types.LoginResult{}, types.NewAccountLocked("account temporarily locked")
 	}
-	if credential.Status != "ACTIVE" || !uc.passwords.VerifyPassword(command.Password, credential.PasswordHash) {
+	passwordOK := uc.passwords.VerifyPassword(command.Password, credential.PasswordHash)
+	if credential.Status != "ACTIVE" || !passwordOK {
 		lockUntil := now.Add(uc.risk.LockDuration)
 		if err := uc.repository.RecordLoginFailure(ctx, command.TenantID, command.UserID, now, lockUntil, uc.risk.MaxFailedAttempts, now.Add(-uc.risk.FailureWindow)); err != nil {
 			return types.LoginResult{}, err
@@ -199,6 +211,13 @@ func (uc *LoginUseCase) Execute(ctx context.Context, command types.LoginCommand)
 	result.GatewayToken = gatewayToken
 	result.RefreshToken = refreshToken
 	return result, nil
+}
+
+func (uc *LoginUseCase) verifyDummyPassword(password string) {
+	if uc.passwords == nil || uc.dummyHash == "" {
+		return
+	}
+	_ = uc.passwords.VerifyPassword(password, uc.dummyHash)
 }
 
 func (uc *LoginUseCase) verifyMFAIfRequired(ctx context.Context, command types.LoginCommand, credential types.UserCredential, now time.Time) (types.MFAFactorID, types.MFARecoveryCodeRecord, error) {

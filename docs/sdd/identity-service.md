@@ -102,6 +102,7 @@ Login risk first-stage rules:
 
 - `identity_users.failed_login_count`, `failed_login_last_at` and `locked_until` are owned by identity-service.
 - A failed password login records one durable failure for the user.
+- If `GetUserCredential` returns stable invalid credentials for a missing credential, `Login` still runs one dummy password verification before returning the same public error. If a credential exists but is not ACTIVE, `Login` also verifies the submitted password before rejecting. This reduces first-stage username-enumeration timing differences without pretending to be complete account-enumeration protection.
 - Failures are counted within `NEXUSIM_IDENTITY_LOGIN_FAILURE_WINDOW`; older failures do not keep accumulating forever.
 - When the configured threshold is reached, password `Login` is temporarily locked and public Login returns stable `account temporarily locked`.
 - A successful Login clears the failure counter and lock fields in the same PostgreSQL transaction that writes session / refresh-token state.

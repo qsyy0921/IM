@@ -14,6 +14,7 @@ Implemented:
 - Direct gRPC allow/deny smoke for `SEND`, `EDIT`, `REVOKE`, and `DELETE`: `loadtest-report-20260613-policy-service-smoke.md`.
 - message-service `SendMessage` allow/deny integration smoke through `NEXUSIM_POLICY_SERVICE_ADDR`: `loadtest-report-20260613-policy-message-integration-smoke.md`.
 - message-service `SendMessage` allow/deny integration smoke through PostgreSQL-backed exact policy rules: `loadtest-report-20260613-policy-message-rule-store-smoke.md`.
+- message-service `EditMessage` / `RevokeMessage` / `DeleteMessage` allow/deny integration smoke through PostgreSQL-backed exact policy rules: `loadtest-report-20260613-policy-message-actions-rule-store-smoke.md`.
 
 Not yet implemented:
 
@@ -52,6 +53,12 @@ Run the PostgreSQL exact-rule integration smoke with:
 .\loadtest\policyintegration\run-local-smoke.ps1 -UsePolicyRules
 ```
 
+Run exact-rule mutation action coverage with:
+
+```powershell
+.\loadtest\policyintegration\run-local-smoke.ps1 -UsePolicyRules -Actions edit,revoke,delete
+```
+
 Raw summaries are written under `H:\NexusIM\loadtest-results\<run-name>`:
 
 ```text
@@ -60,7 +67,7 @@ deny\policy-summary.json
 policy-smoke-summary.json
 ```
 
-The heavier integration shape for edit / revoke / delete is still:
+The message mutation integration shape is:
 
 ```text
 policy-service grpc

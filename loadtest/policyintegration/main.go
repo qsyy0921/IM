@@ -111,11 +111,14 @@ type dbStats struct {
 	MessageOutbox        int64 `json:"message_outbox"`
 	MessageChangeHistory int64 `json:"message_change_history"`
 	CommandIdempotency   int64 `json:"message_command_idempotency"`
+	ConversationSeq      int64 `json:"conversation_seq"`
 }
 
 type messageRow struct {
 	MessageID                 string `json:"message_id"`
 	ConversationSeq           int64  `json:"conversation_seq"`
+	MessageStatus             string `json:"message_status"`
+	MessagePayload            string `json:"message_payload,omitempty"`
 	MessagePermissionVersion  int64  `json:"message_permission_version"`
 	MessageClassification     string `json:"message_classification"`
 	TimelinePermissionVersion int64  `json:"timeline_permission_version"`
@@ -133,6 +136,12 @@ type changeRow struct {
 	TimelineClassification    string `json:"timeline_classification"`
 	OutboxStatus              string `json:"outbox_status"`
 	ChangeHistoryRows         int64  `json:"message_change_history_rows"`
+	ChangeHistoryType         string `json:"message_change_history_type,omitempty"`
+	ChangeHistoryBeforeStatus string `json:"message_change_history_before_status,omitempty"`
+	ChangeHistoryAfterStatus  string `json:"message_change_history_after_status,omitempty"`
+	EditedAtSet               bool   `json:"edited_at_set,omitempty"`
+	RevokedAtSet              bool   `json:"revoked_at_set,omitempty"`
+	DeletedAtSet              bool   `json:"deleted_at_set,omitempty"`
 }
 
 func main() {
@@ -231,7 +240,7 @@ func run(cfg config) error {
 		_ = writeSummary(cfg.resultDir, s)
 	}()
 
-	before, err := readDBStats(ctx, pool, cfg.tenantID)
+	before, err := readDBStats(ctx, pool, cfg)
 	if err != nil {
 		s.Error = err.Error()
 		return err
@@ -250,7 +259,7 @@ func run(cfg config) error {
 		}
 	}
 
-	after, err := readDBStats(ctx, pool, cfg.tenantID)
+	after, err := readDBStats(ctx, pool, cfg)
 	if err != nil {
 		s.Error = err.Error()
 		return err
@@ -314,12 +323,12 @@ func runChangeScenario(ctx context.Context, pool *pgxpool.Pool, cfg config, s *s
 	if err != nil {
 		return err
 	}
-	if err := validateBaseSend(row); err != nil {
+	if err := validateBaseSend(cfg, response, row); err != nil {
 		return err
 	}
 	s.MessageRow = row
 
-	beforeAction, err := readDBStats(ctx, pool, cfg.tenantID)
+	beforeAction, err := readDBStats(ctx, pool, cfg)
 	if err != nil {
 		return err
 	}
@@ -355,12 +364,19 @@ func runChangeScenario(ctx context.Context, pool *pgxpool.Pool, cfg config, s *s
 	}
 	s.ChangeMessage = changeSummary{GRPCCode: codes.PermissionDenied.String()}
 	s.MessageError = errorSummary
-	afterAction, err := readDBStats(ctx, pool, cfg.tenantID)
+	afterAction, err := readDBStats(ctx, pool, cfg)
 	if err != nil {
 		return err
 	}
 	if afterAction != beforeAction {
 		return fmt.Errorf("%s deny changed DB counts before=%+v after=%+v", cfg.action, beforeAction, afterAction)
+	}
+	afterRow, err := readMessageRow(ctx, pool, cfg, response.GetMessageId())
+	if err != nil {
+		return err
+	}
+	if afterRow != row {
+		return fmt.Errorf("%s deny changed base message row before=%+v after=%+v", cfg.action, row, afterRow)
 	}
 	return nil
 }
@@ -461,6 +477,21 @@ func validateSendAllow(cfg config, response *messagev1.SendMessageResponse, row 
 	if response.GetMessageId() == "" || response.GetConversationSeq() <= 0 {
 		return fmt.Errorf("allow returned invalid response message_id=%q seq=%d", response.GetMessageId(), response.GetConversationSeq())
 	}
+	if response.GetAcceptedAt() == nil {
+		return fmt.Errorf("allow returned nil accepted_at")
+	}
+	if response.GetIdempotentReplay() {
+		return fmt.Errorf("allow unexpectedly returned idempotent replay")
+	}
+	if row.MessageID != response.GetMessageId() || row.ConversationSeq != response.GetConversationSeq() {
+		return fmt.Errorf("message row does not match response row=%+v response_message_id=%q response_seq=%d", row, response.GetMessageId(), response.GetConversationSeq())
+	}
+	if row.MessageStatus != "NORMAL" {
+		return fmt.Errorf("message status=%q expected NORMAL", row.MessageStatus)
+	}
+	if !strings.Contains(row.MessagePayload, "policy integration smoke") {
+		return fmt.Errorf("message payload does not contain smoke text: %s", row.MessagePayload)
+	}
 	if row.MessagePermissionVersion != cfg.expectedPermissionVer ||
 		row.TimelinePermissionVersion != cfg.expectedPermissionVer {
 		return fmt.Errorf("permission_version mismatch row=%+v expected=%d", row, cfg.expectedPermissionVer)
@@ -475,9 +506,33 @@ func validateSendAllow(cfg config, response *messagev1.SendMessageResponse, row 
 	return nil
 }
 
-func validateBaseSend(row messageRow) error {
+func validateBaseSend(cfg config, response *messagev1.SendMessageResponse, row messageRow) error {
 	if row.MessageID == "" || row.ConversationSeq <= 0 {
 		return fmt.Errorf("base SendMessage did not persist a message: %+v", row)
+	}
+	if response.GetMessageId() == "" || response.GetConversationSeq() <= 0 {
+		return fmt.Errorf("base SendMessage returned invalid response message_id=%q seq=%d", response.GetMessageId(), response.GetConversationSeq())
+	}
+	if response.GetAcceptedAt() == nil {
+		return fmt.Errorf("base SendMessage returned nil accepted_at")
+	}
+	if response.GetIdempotentReplay() {
+		return fmt.Errorf("base SendMessage unexpectedly returned idempotent replay")
+	}
+	if row.MessageID != response.GetMessageId() || row.ConversationSeq != response.GetConversationSeq() {
+		return fmt.Errorf("base SendMessage row does not match response row=%+v response_message_id=%q response_seq=%d", row, response.GetMessageId(), response.GetConversationSeq())
+	}
+	if row.MessageStatus != "NORMAL" {
+		return fmt.Errorf("base SendMessage status=%q expected NORMAL", row.MessageStatus)
+	}
+	if !strings.Contains(row.MessagePayload, "policy integration smoke") {
+		return fmt.Errorf("base SendMessage payload does not contain smoke text: %s", row.MessagePayload)
+	}
+	if row.MessagePermissionVersion != cfg.expectedPermissionVer || row.TimelinePermissionVersion != cfg.expectedPermissionVer {
+		return fmt.Errorf("base SendMessage permission_version mismatch row=%+v expected=%d", row, cfg.expectedPermissionVer)
+	}
+	if row.MessageClassification != "POLICY_SEND_SEED" || row.TimelineClassification != "POLICY_SEND_SEED" {
+		return fmt.Errorf("base SendMessage classification mismatch row=%+v expected POLICY_SEND_SEED", row)
 	}
 	if row.OutboxStatus != "PENDING" && row.OutboxStatus != "PUBLISHED" {
 		return fmt.Errorf("unexpected base SendMessage outbox status %q", row.OutboxStatus)
@@ -494,11 +549,20 @@ func validateChangeAllow(
 	if change.GetMessageId() != send.GetMessageId() {
 		return fmt.Errorf("change message_id=%q expected %q", change.GetMessageId(), send.GetMessageId())
 	}
-	if change.GetConversationSeq() <= send.GetConversationSeq() {
-		return fmt.Errorf("change seq=%d did not advance past send seq=%d", change.GetConversationSeq(), send.GetConversationSeq())
+	if change.GetConversationId() != cfg.conversationID {
+		return fmt.Errorf("change conversation_id=%q expected %q", change.GetConversationId(), cfg.conversationID)
+	}
+	if change.GetConversationSeq() != send.GetConversationSeq()+1 {
+		return fmt.Errorf("change seq=%d expected send seq + 1 (%d)", change.GetConversationSeq(), send.GetConversationSeq()+1)
 	}
 	if change.GetChangeVersion() <= 0 {
 		return fmt.Errorf("change version must be positive, got %d", change.GetChangeVersion())
+	}
+	if change.GetAcceptedAt() == nil {
+		return fmt.Errorf("change returned nil accepted_at")
+	}
+	if change.GetIdempotentReplay() {
+		return fmt.Errorf("change unexpectedly returned idempotent replay")
 	}
 	expectedStatus := map[string]string{
 		"edit":   "EDITED",
@@ -513,6 +577,9 @@ func validateChangeAllow(
 	if row.MessageStatus != expectedStatus {
 		return fmt.Errorf("message status=%s expected %s", row.MessageStatus, expectedStatus)
 	}
+	if row.MessageID != send.GetMessageId() {
+		return fmt.Errorf("change row message_id=%q expected %q", row.MessageID, send.GetMessageId())
+	}
 	if row.TimelineEventType != expectedEventType {
 		return fmt.Errorf("timeline event_type=%s expected %s", row.TimelineEventType, expectedEventType)
 	}
@@ -525,11 +592,32 @@ func validateChangeAllow(
 	if row.ChangeHistoryRows <= 0 {
 		return fmt.Errorf("expected change history row, got %d", row.ChangeHistoryRows)
 	}
+	expectedChangeType := strings.ToUpper(cfg.action)
+	if row.ChangeHistoryType != expectedChangeType {
+		return fmt.Errorf("change_history type=%q expected %q", row.ChangeHistoryType, expectedChangeType)
+	}
+	if row.ChangeHistoryBeforeStatus != "NORMAL" || row.ChangeHistoryAfterStatus != expectedStatus {
+		return fmt.Errorf("unexpected change_history statuses before=%q after=%q expected before=NORMAL after=%s", row.ChangeHistoryBeforeStatus, row.ChangeHistoryAfterStatus, expectedStatus)
+	}
 	if row.OutboxStatus != "PENDING" && row.OutboxStatus != "PUBLISHED" {
 		return fmt.Errorf("unexpected change outbox status %q", row.OutboxStatus)
 	}
-	if cfg.action == "edit" && !strings.Contains(row.MessagePayload, "policy integration smoke edited") {
-		return fmt.Errorf("edited payload does not contain updated text: %s", row.MessagePayload)
+	switch cfg.action {
+	case "edit":
+		if !row.EditedAtSet || row.RevokedAtSet || row.DeletedAtSet {
+			return fmt.Errorf("unexpected edit timestamp flags edited=%v revoked=%v deleted=%v", row.EditedAtSet, row.RevokedAtSet, row.DeletedAtSet)
+		}
+		if !strings.Contains(row.MessagePayload, "policy integration smoke edited") {
+			return fmt.Errorf("edited payload does not contain updated text: %s", row.MessagePayload)
+		}
+	case "revoke":
+		if row.EditedAtSet || !row.RevokedAtSet || row.DeletedAtSet {
+			return fmt.Errorf("unexpected revoke timestamp flags edited=%v revoked=%v deleted=%v", row.EditedAtSet, row.RevokedAtSet, row.DeletedAtSet)
+		}
+	case "delete":
+		if row.EditedAtSet || row.RevokedAtSet || !row.DeletedAtSet {
+			return fmt.Errorf("unexpected delete timestamp flags edited=%v revoked=%v deleted=%v", row.EditedAtSet, row.RevokedAtSet, row.DeletedAtSet)
+		}
 	}
 	return nil
 }
@@ -568,21 +656,29 @@ func validateDeny(err error) (errorSummary, error) {
 	return result, nil
 }
 
-func readDBStats(ctx context.Context, pool *pgxpool.Pool, tenantID string) (dbStats, error) {
+func readDBStats(ctx context.Context, pool *pgxpool.Pool, cfg config) (dbStats, error) {
 	var stats dbStats
-	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM message_log WHERE tenant_id = $1`, tenantID).Scan(&stats.MessageLog); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM message_log WHERE tenant_id = $1`, cfg.tenantID).Scan(&stats.MessageLog); err != nil {
 		return stats, err
 	}
-	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM conversation_timeline_events WHERE tenant_id = $1`, tenantID).Scan(&stats.TimelineEvents); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM conversation_timeline_events WHERE tenant_id = $1`, cfg.tenantID).Scan(&stats.TimelineEvents); err != nil {
 		return stats, err
 	}
-	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM message_outbox WHERE tenant_id = $1`, tenantID).Scan(&stats.MessageOutbox); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM message_outbox WHERE tenant_id = $1`, cfg.tenantID).Scan(&stats.MessageOutbox); err != nil {
 		return stats, err
 	}
-	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM message_change_history WHERE tenant_id = $1`, tenantID).Scan(&stats.MessageChangeHistory); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM message_change_history WHERE tenant_id = $1`, cfg.tenantID).Scan(&stats.MessageChangeHistory); err != nil {
 		return stats, err
 	}
-	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM message_command_idempotency WHERE tenant_id = $1`, tenantID).Scan(&stats.CommandIdempotency); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM message_command_idempotency WHERE tenant_id = $1`, cfg.tenantID).Scan(&stats.CommandIdempotency); err != nil {
+		return stats, err
+	}
+	if err := pool.QueryRow(ctx, `
+SELECT COALESCE(MAX(current_seq), 0)
+FROM conversation_seq
+WHERE tenant_id = $1
+  AND conversation_id = $2
+`, cfg.tenantID, cfg.conversationID).Scan(&stats.ConversationSeq); err != nil {
 		return stats, err
 	}
 	return stats, nil
@@ -593,6 +689,8 @@ func readMessageRow(ctx context.Context, pool *pgxpool.Pool, cfg config, message
 SELECT
     ml.message_id,
     ml.conversation_seq,
+    ml.status,
+    ml.payload_json::text,
     ml.permission_version,
     ml.classification,
     te.permission_version,
@@ -615,6 +713,8 @@ WHERE ml.tenant_id = $1
 	if err := row.Scan(
 		&result.MessageID,
 		&result.ConversationSeq,
+		&result.MessageStatus,
+		&result.MessagePayload,
 		&result.MessagePermissionVersion,
 		&result.MessageClassification,
 		&result.TimelinePermissionVersion,
@@ -649,7 +749,13 @@ SELECT
       WHERE mch.tenant_id = ml.tenant_id
         AND mch.conversation_id = ml.conversation_id
         AND mch.message_id = ml.message_id
-    )
+    ),
+    COALESCE(latest.change_type, ''),
+    COALESCE(latest.before_status, ''),
+    COALESCE(latest.after_status, ''),
+    ml.edited_at IS NOT NULL,
+    ml.revoked_at IS NOT NULL,
+    ml.deleted_at IS NOT NULL
 FROM message_log ml
 JOIN conversation_timeline_events te
   ON te.tenant_id = ml.tenant_id
@@ -659,6 +765,15 @@ LEFT JOIN message_outbox mo
   ON mo.tenant_id = te.tenant_id
  AND mo.conversation_id = te.conversation_id
  AND mo.aggregate_version = te.seq
+LEFT JOIN LATERAL (
+  SELECT mch.change_type, mch.before_status, mch.after_status
+  FROM message_change_history mch
+  WHERE mch.tenant_id = ml.tenant_id
+    AND mch.conversation_id = ml.conversation_id
+    AND mch.message_id = ml.message_id
+  ORDER BY mch.change_version DESC
+  LIMIT 1
+) latest ON TRUE
 WHERE ml.tenant_id = $1
   AND ml.message_id = $2
 `, cfg.tenantID, messageID, conversationSeq)
@@ -672,6 +787,12 @@ WHERE ml.tenant_id = $1
 		&result.TimelineClassification,
 		&result.OutboxStatus,
 		&result.ChangeHistoryRows,
+		&result.ChangeHistoryType,
+		&result.ChangeHistoryBeforeStatus,
+		&result.ChangeHistoryAfterStatus,
+		&result.EditedAtSet,
+		&result.RevokedAtSet,
+		&result.DeletedAtSet,
 	); err != nil {
 		return result, err
 	}

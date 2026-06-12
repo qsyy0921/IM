@@ -32,6 +32,52 @@ func TestChallengeDeliveryTokenManagerEncryptsToken(t *testing.T) {
 	}
 }
 
+func TestChallengeDeliveryTokenManagerKeyRingOpensOldKeyAndWritesCurrentKey(t *testing.T) {
+	oldManager, err := NewChallengeDeliveryTokenManager("old-delivery-secret")
+	if err != nil {
+		t.Fatalf("new old manager: %v", err)
+	}
+	oldEncrypted, err := oldManager.SealChallengeToken("old-token")
+	if err != nil {
+		t.Fatalf("seal old token: %v", err)
+	}
+	keyRing, err := NewChallengeDeliveryTokenManagerWithKeyRing("v2", map[string]string{
+		"local-v1": "old-delivery-secret",
+		"v2":       "new-delivery-secret",
+	})
+	if err != nil {
+		t.Fatalf("new keyring manager: %v", err)
+	}
+	openedOld, err := keyRing.OpenChallengeToken(oldEncrypted)
+	if err != nil {
+		t.Fatalf("open old token: %v", err)
+	}
+	if openedOld != "old-token" {
+		t.Fatalf("unexpected old token %q", openedOld)
+	}
+	newEncrypted, err := keyRing.SealChallengeToken("new-token")
+	if err != nil {
+		t.Fatalf("seal new token: %v", err)
+	}
+	if newEncrypted.KeyVersion != "v2" {
+		t.Fatalf("expected new key version v2, got %q", newEncrypted.KeyVersion)
+	}
+	openedNew, err := keyRing.OpenChallengeToken(newEncrypted)
+	if err != nil {
+		t.Fatalf("open new token: %v", err)
+	}
+	if openedNew != "new-token" {
+		t.Fatalf("unexpected new token %q", openedNew)
+	}
+}
+
+func TestChallengeDeliveryTokenManagerKeyRingRequiresCurrentKey(t *testing.T) {
+	_, err := NewChallengeDeliveryTokenManagerWithKeyRing("v2", map[string]string{"local-v1": "old-delivery-secret"})
+	if !errors.Is(err, types.ErrChallengeDeliveryFailed) {
+		t.Fatalf("expected challenge delivery failed for missing current key, got %v", err)
+	}
+}
+
 func TestChallengeDeliveryTokenManagerRequiresSecret(t *testing.T) {
 	_, err := NewChallengeDeliveryTokenManager(" ")
 	if !errors.Is(err, types.ErrChallengeDeliveryFailed) {

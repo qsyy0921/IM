@@ -26,6 +26,7 @@ func TestChallengeDeliveryStoreDeliversIntegration(t *testing.T) {
 		message := messages[0]
 		if message.ChallengeID != "challenge-deliver" ||
 			message.EncryptedToken.Ciphertext != "encrypted-challenge-deliver" ||
+			message.EncryptedToken.KeyVersion != "v2" ||
 			message.TraceID != "trace-challenge-deliver" ||
 			message.RequestID != "request-challenge-deliver" {
 			t.Fatalf("unexpected delivery message: %+v", message)
@@ -301,7 +302,7 @@ func seedChallengeDeliveryOutbox(t *testing.T, ctx context.Context, repository *
 		EncryptedToken: types.EncryptedChallengeToken{
 			Ciphertext: "encrypted-" + string(challengeID),
 			Nonce:      "nonce-" + string(challengeID),
-			KeyVersion: "local-v1",
+			KeyVersion: "v2",
 		},
 	}, issuedAt, expiresAt); err != nil {
 		t.Fatalf("create challenge delivery outbox: %v", err)

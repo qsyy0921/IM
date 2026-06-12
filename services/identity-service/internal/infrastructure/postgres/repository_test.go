@@ -801,7 +801,7 @@ func TestRepositoryChallengeDeliveryOutboxIntegration(t *testing.T) {
 		EncryptedToken: types.EncryptedChallengeToken{
 			Ciphertext: "encrypted-token",
 			Nonce:      "nonce-value",
-			KeyVersion: "local-v1",
+			KeyVersion: "v2",
 		},
 	}, issuedAt, issuedAt.Add(15*time.Minute))
 	if err != nil {
@@ -836,7 +836,7 @@ WHERE tenant_id = 'tenant-identity'
 		destination != "user1@example.com" ||
 		ciphertext != "encrypted-token" ||
 		nonce != "nonce-value" ||
-		keyVersion != "local-v1" ||
+		keyVersion != "v2" ||
 		traceID != "trace-outbox" ||
 		requestID != "request-outbox" ||
 		!expiresAt.Equal(issuedAt.Add(15*time.Minute)) {
@@ -1236,7 +1236,7 @@ func TestRepositoryMFAFactorLifecycleIntegration(t *testing.T) {
 	secret := types.EncryptedMFASecret{
 		Ciphertext: "encrypted-secret",
 		Nonce:      "nonce-value",
-		KeyVersion: "local-v1",
+		KeyVersion: "v2",
 	}
 	beginResult, err := repository.CreateMFAFactor(ctx, types.BeginMFAEnrollmentCommand{
 		TenantID:    "tenant-identity",

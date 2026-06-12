@@ -46,6 +46,54 @@ func TestTOTPManagerEncryptsAndVerifiesCode(t *testing.T) {
 	}
 }
 
+func TestTOTPManagerKeyRingVerifiesOldKeyAndWritesCurrentKey(t *testing.T) {
+	oldManager, err := NewTOTPManager("old-mfa-encryption-key")
+	if err != nil {
+		t.Fatalf("new old totp manager: %v", err)
+	}
+	oldPlain, oldEncrypted, err := oldManager.NewTOTPSecret()
+	if err != nil {
+		t.Fatalf("new old totp secret: %v", err)
+	}
+	now := time.Unix(1_800_000_000, 0).UTC()
+	keyRing, err := NewTOTPManagerWithKeyRing("v2", map[string]string{
+		"local-v1": "old-mfa-encryption-key",
+		"v2":       "new-mfa-encryption-key",
+	})
+	if err != nil {
+		t.Fatalf("new keyring totp manager: %v", err)
+	}
+
+	oldOK, err := keyRing.VerifyTOTP(oldEncrypted, generateTOTPCode(oldPlain, now), now)
+	if err != nil {
+		t.Fatalf("verify old encrypted totp: %v", err)
+	}
+	if !oldOK {
+		t.Fatal("expected old key version to verify")
+	}
+	newPlain, newEncrypted, err := keyRing.NewTOTPSecret()
+	if err != nil {
+		t.Fatalf("new keyring totp secret: %v", err)
+	}
+	if newEncrypted.KeyVersion != "v2" {
+		t.Fatalf("expected new secret key version v2, got %q", newEncrypted.KeyVersion)
+	}
+	newOK, err := keyRing.VerifyTOTP(newEncrypted, generateTOTPCode(newPlain, now), now)
+	if err != nil {
+		t.Fatalf("verify new encrypted totp: %v", err)
+	}
+	if !newOK {
+		t.Fatal("expected current key version to verify")
+	}
+}
+
+func TestTOTPManagerKeyRingRequiresCurrentKey(t *testing.T) {
+	_, err := NewTOTPManagerWithKeyRing("v2", map[string]string{"local-v1": "old-mfa-encryption-key"})
+	if !errors.Is(err, types.ErrMFAUnavailable) {
+		t.Fatalf("expected mfa unavailable for missing current key, got %v", err)
+	}
+}
+
 func TestTOTPManagerRejectsInvalidEncryptedSecret(t *testing.T) {
 	manager, err := NewTOTPManager("test-mfa-encryption-key")
 	if err != nil {

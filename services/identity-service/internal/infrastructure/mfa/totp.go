@@ -28,11 +28,38 @@ const (
 )
 
 type TOTPManager struct {
-	aead       cipher.AEAD
-	keyVersion string
+	currentKeyVersion string
+	keys              map[string]cipher.AEAD
 }
 
 func NewTOTPManager(secret string) (*TOTPManager, error) {
+	return NewTOTPManagerWithKeyRing(defaultKeyVersion, map[string]string{defaultKeyVersion: secret})
+}
+
+func NewTOTPManagerWithKeyRing(currentKeyVersion string, secrets map[string]string) (*TOTPManager, error) {
+	currentKeyVersion = strings.TrimSpace(currentKeyVersion)
+	if currentKeyVersion == "" {
+		currentKeyVersion = defaultKeyVersion
+	}
+	keys := make(map[string]cipher.AEAD, len(secrets))
+	for keyVersion, secret := range secrets {
+		keyVersion = strings.TrimSpace(keyVersion)
+		if keyVersion == "" {
+			return nil, types.NewMFAUnavailable("mfa secret key version is required")
+		}
+		aead, err := newTOTPSecretAEAD(secret)
+		if err != nil {
+			return nil, err
+		}
+		keys[keyVersion] = aead
+	}
+	if _, ok := keys[currentKeyVersion]; !ok {
+		return nil, types.NewMFAUnavailable("current mfa secret key version is not configured")
+	}
+	return &TOTPManager{keys: keys, currentKeyVersion: currentKeyVersion}, nil
+}
+
+func newTOTPSecretAEAD(secret string) (cipher.AEAD, error) {
 	secret = strings.TrimSpace(secret)
 	if secret == "" {
 		return nil, types.NewMFAUnavailable("mfa secret encryption key is required")
@@ -46,7 +73,7 @@ func NewTOTPManager(secret string) (*TOTPManager, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &TOTPManager{aead: aead, keyVersion: defaultKeyVersion}, nil
+	return aead, nil
 }
 
 func (manager *TOTPManager) NewTOTPSecret() (string, types.EncryptedMFASecret, error) {
@@ -93,19 +120,31 @@ func (manager *TOTPManager) OTPAuthURI(issuer string, accountName string, secret
 }
 
 func (manager *TOTPManager) encrypt(plain string) (types.EncryptedMFASecret, error) {
-	nonce := make([]byte, manager.aead.NonceSize())
+	aead, ok := manager.keys[manager.currentKeyVersion]
+	if !ok {
+		return types.EncryptedMFASecret{}, types.NewMFAUnavailable("current mfa secret key version is not configured")
+	}
+	nonce := make([]byte, aead.NonceSize())
 	if _, err := rand.Read(nonce); err != nil {
 		return types.EncryptedMFASecret{}, err
 	}
-	ciphertext := manager.aead.Seal(nil, nonce, []byte(plain), nil)
+	ciphertext := aead.Seal(nil, nonce, []byte(plain), nil)
 	return types.EncryptedMFASecret{
 		Ciphertext: base64.RawURLEncoding.EncodeToString(ciphertext),
 		Nonce:      base64.RawURLEncoding.EncodeToString(nonce),
-		KeyVersion: manager.keyVersion,
+		KeyVersion: manager.currentKeyVersion,
 	}, nil
 }
 
 func (manager *TOTPManager) decrypt(encrypted types.EncryptedMFASecret) (string, error) {
+	keyVersion := strings.TrimSpace(encrypted.KeyVersion)
+	if keyVersion == "" {
+		keyVersion = defaultKeyVersion
+	}
+	aead, ok := manager.keys[keyVersion]
+	if !ok {
+		return "", types.NewInvalidMFA("mfa secret key version is not configured")
+	}
 	ciphertext, err := base64.RawURLEncoding.DecodeString(encrypted.Ciphertext)
 	if err != nil {
 		return "", types.NewInvalidMFA("mfa secret ciphertext is invalid")
@@ -114,10 +153,10 @@ func (manager *TOTPManager) decrypt(encrypted types.EncryptedMFASecret) (string,
 	if err != nil {
 		return "", types.NewInvalidMFA("mfa secret nonce is invalid")
 	}
-	if len(nonce) != manager.aead.NonceSize() {
+	if len(nonce) != aead.NonceSize() {
 		return "", types.NewInvalidMFA("mfa secret nonce is invalid")
 	}
-	plain, err := manager.aead.Open(nil, nonce, ciphertext, nil)
+	plain, err := aead.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return "", types.NewInvalidMFA("mfa secret decrypt failed")
 	}

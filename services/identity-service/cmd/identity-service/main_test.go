@@ -421,6 +421,83 @@ func TestDisabledMFASecretManagerReturnsMFAUnavailable(t *testing.T) {
 	}
 }
 
+func TestMFASecretManagerUsesConfiguredKeyRing(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_MFA_SECRET_KEYRING_JSON", `{"current":"v2","keys":{"local-v1":"old-mfa-key","v2":"new-mfa-key"}}`)
+	t.Setenv("NEXUSIM_IDENTITY_MFA_SECRET_KEYRING_FILE", "")
+	t.Setenv("NEXUSIM_IDENTITY_MFA_SECRET_KEY", "")
+	manager, err := newMFASecretManager()
+	if err != nil {
+		t.Fatalf("new mfa manager: %v", err)
+	}
+	_, encrypted, err := manager.NewTOTPSecret()
+	if err != nil {
+		t.Fatalf("new totp secret: %v", err)
+	}
+	if encrypted.KeyVersion != "v2" {
+		t.Fatalf("expected current key version v2, got %q", encrypted.KeyVersion)
+	}
+}
+
+func TestLoadSecretKeyRingConfigReadsFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "secret-keyring.json")
+	if err := os.WriteFile(path, []byte(`{"current":"v2","keys":{"local-v1":"old","v2":"new"}}`), 0o600); err != nil {
+		t.Fatalf("write keyring file: %v", err)
+	}
+	t.Setenv("TEST_SECRET_KEYRING_JSON", "")
+	t.Setenv("TEST_SECRET_KEYRING_FILE", path)
+	config, ok, err := loadSecretKeyRingConfig("TEST_SECRET_KEYRING_JSON", "TEST_SECRET_KEYRING_FILE")
+	if err != nil {
+		t.Fatalf("load secret keyring: %v", err)
+	}
+	if !ok || config.Current != "v2" || config.Keys["local-v1"] != "old" || config.Keys["v2"] != "new" {
+		t.Fatalf("unexpected keyring config ok=%t config=%+v", ok, config)
+	}
+}
+
+func TestLoadSecretKeyRingConfigRejectsMissingCurrent(t *testing.T) {
+	t.Setenv("TEST_SECRET_KEYRING_JSON", `{"keys":{"v1":"secret"}}`)
+	t.Setenv("TEST_SECRET_KEYRING_FILE", "")
+	if _, ok, err := loadSecretKeyRingConfig("TEST_SECRET_KEYRING_JSON", "TEST_SECRET_KEYRING_FILE"); err == nil || !ok {
+		t.Fatalf("expected configured keyring with missing current to fail, ok=%t err=%v", ok, err)
+	}
+}
+
+func TestLoadSecretKeyRingConfigRejectsEmptyFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "empty-keyring.json")
+	if err := os.WriteFile(path, []byte(" \n"), 0o600); err != nil {
+		t.Fatalf("write empty keyring: %v", err)
+	}
+	t.Setenv("TEST_SECRET_KEYRING_JSON", "")
+	t.Setenv("TEST_SECRET_KEYRING_FILE", path)
+	if _, ok, err := loadSecretKeyRingConfig("TEST_SECRET_KEYRING_JSON", "TEST_SECRET_KEYRING_FILE"); err == nil || !ok {
+		t.Fatalf("expected configured empty keyring file to fail, ok=%t err=%v", ok, err)
+	}
+}
+
+func TestLoadSecretKeyRingConfigRejectsMalformedJSON(t *testing.T) {
+	t.Setenv("TEST_SECRET_KEYRING_JSON", "{")
+	t.Setenv("TEST_SECRET_KEYRING_FILE", "")
+	if _, ok, err := loadSecretKeyRingConfig("TEST_SECRET_KEYRING_JSON", "TEST_SECRET_KEYRING_FILE"); err == nil || !ok {
+		t.Fatalf("expected malformed keyring json to fail, ok=%t err=%v", ok, err)
+	}
+}
+
+func TestLoadSecretKeyRingConfigRejectsCurrentNotInKeys(t *testing.T) {
+	t.Setenv("TEST_SECRET_KEYRING_JSON", `{"current":"v2","keys":{"v1":"secret"}}`)
+	t.Setenv("TEST_SECRET_KEYRING_FILE", "")
+	if _, ok, err := loadSecretKeyRingConfig("TEST_SECRET_KEYRING_JSON", "TEST_SECRET_KEYRING_FILE"); err == nil || !ok {
+		t.Fatalf("expected keyring missing current key to fail, ok=%t err=%v", ok, err)
+	}
+}
+
+func TestLoadSecretKeyRingConfigRejectsTrimmedDuplicateKeyVersion(t *testing.T) {
+	t.Setenv("TEST_SECRET_KEYRING_JSON", `{"current":"v1","keys":{"v1":"secret-1"," v1 ":"secret-2"}}`)
+	t.Setenv("TEST_SECRET_KEYRING_FILE", "")
+	if _, ok, err := loadSecretKeyRingConfig("TEST_SECRET_KEYRING_JSON", "TEST_SECRET_KEYRING_FILE"); err == nil || !ok {
+		t.Fatalf("expected duplicate key version to fail, ok=%t err=%v", ok, err)
+	}
+}
+
 func TestChallengeNotifierAcceptsOutboxMode(t *testing.T) {
 	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MODE", "outbox")
 	notifier, mode, err := newChallengeNotifier()
@@ -429,6 +506,24 @@ func TestChallengeNotifierAcceptsOutboxMode(t *testing.T) {
 	}
 	if notifier == nil || mode != "outbox" {
 		t.Fatalf("expected noop notifier for outbox mode, mode=%q notifier=%T", mode, notifier)
+	}
+}
+
+func TestChallengeDeliveryTokenManagerUsesConfiguredKeyRing(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEYRING_JSON", `{"current":"v2","keys":{"local-v1":"old-delivery-key","v2":"new-delivery-key"}}`)
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEYRING_FILE", "")
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY", "")
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_SECRET", "")
+	manager, err := newChallengeDeliveryTokenManager()
+	if err != nil {
+		t.Fatalf("new challenge delivery token manager: %v", err)
+	}
+	encrypted, err := manager.SealChallengeToken("challenge-token")
+	if err != nil {
+		t.Fatalf("seal challenge token: %v", err)
+	}
+	if encrypted.KeyVersion != "v2" {
+		t.Fatalf("expected current key version v2, got %q", encrypted.KeyVersion)
 	}
 }
 

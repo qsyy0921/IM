@@ -173,8 +173,15 @@ MFA factor rules:
 - `identity_users.mfa_recovery_failed_count`, `mfa_recovery_failed_last_at` and `mfa_recovery_locked_until` are user-level MFA recovery-code Login risk state, not password lock state;
 - successful MFA Login clears the selected factor's Login failure state and updates `last_used_at` in the same PostgreSQL transaction that writes session / refresh-token state;
 - session MFA proof fields are protected by database constraints: empty `mfa_method` cannot carry proof data, TOTP proof requires `mfa_verified_at` and `mfa_factor_id`, and recovery-code proof requires `mfa_verified_at` with no TOTP factor id;
-- `NEXUSIM_IDENTITY_MFA_SECRET_KEY` is the local AES-GCM encryption key input; local smoke may fall back to the existing gateway token secret, but production profiles should use a dedicated secret managed by KMS/HSM. If no MFA key is configured, the service still starts and existing Login/JWKS flows are unaffected, but MFA factor RPCs and MFA-protected Login return stable `MFA_UNAVAILABLE` / `mfa temporarily unavailable` until the key is configured.
+- `NEXUSIM_IDENTITY_MFA_SECRET_KEY` is the local AES-GCM encryption key input; local smoke may fall back to the existing gateway token secret. Production-like local profiles can use `NEXUSIM_IDENTITY_MFA_SECRET_KEYRING_JSON` / `NEXUSIM_IDENTITY_MFA_SECRET_KEYRING_FILE` with one current key version plus old key versions, so newly enrolled TOTP factors are encrypted with the current version while existing factors can still be decrypted during a rotation window. This is local envelope keyring support, not KMS/HSM. If no MFA key is configured, the service still starts and existing Login/JWKS flows are unaffected, but MFA factor RPCs and MFA-protected Login return stable `MFA_UNAVAILABLE` / `mfa temporarily unavailable` until the key is configured.
 - `NEXUSIM_IDENTITY_MFA_RECOVERY_CODE_SECRET` is the preferred HMAC secret for recovery-code hashes. Local smoke may fall back to `NEXUSIM_IDENTITY_MFA_SECRET_KEY`; it does not fall back to gateway / push token secrets.
+
+```text
+NEXUSIM_IDENTITY_MFA_SECRET_KEY=...
+NEXUSIM_IDENTITY_MFA_SECRET_KEYRING_JSON={"current":"v2","keys":{"local-v1":"old-secret","v2":"new-secret"}}
+NEXUSIM_IDENTITY_MFA_SECRET_KEYRING_FILE=/run/secrets/identity-mfa-keyring.json
+NEXUSIM_IDENTITY_MFA_RECOVERY_CODE_SECRET=...
+```
 
 Known MFA hardening still pending:
 
@@ -182,7 +189,7 @@ Known MFA hardening still pending:
 - backup factor handling beyond TOTP recovery codes;
 - WebAuthn / passkeys;
 - richer MFA risk policy beyond the first factor-level failed-code counter and short lockout;
-- secret key rotation and KMS/HSM-backed envelope encryption;
+- KMS/HSM-backed envelope encryption and automated key distribution;
 - per-factor audit events and risk-based challenge policy.
 
 ## Verification / Password Reset
@@ -230,7 +237,7 @@ Challenge token rules:
 - `NEXUSIM_IDENTITY_SERVICE_MODE=challenge-request-limit-cleanup` is a one-shot operator that deletes stale hashed-target limiter rows whose `last_request_at` and `locked_until` are both older than the retention cutoff. It is a table-retention guard for random-target spam, not a risk-decision engine.
 - `identity-service` supports three challenge delivery modes: `noop`, synchronous `webhook`, and durable `outbox`. In all modes PostgreSQL stores only `identity_challenges.token_hash`, never the raw challenge token.
 - In synchronous `webhook` mode, the webhook receives the raw one-time token in memory after the challenge row is created. If the webhook returns an error, the RPC returns stable `challenge delivery unavailable` and identity-service immediately marks the newly created challenge `EXPIRED` as compensation, so the unusable token hash does not consume the active challenge cap.
-- In durable `outbox` mode, the challenge row and `identity_challenge_delivery_outbox` row are committed in the same PostgreSQL transaction. The delivery row stores the challenge token encrypted with AES-GCM under `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY`; the RPC success means durable enqueue, not provider delivery. A separate `challenge-delivery-worker` locks ready rows with `FOR UPDATE SKIP LOCKED`, rechecks that the challenge is still `ACTIVE` and unexpired, decrypts the token in memory, calls the configured webhook, and marks the delivery `DELIVERED`, retry, `DLQ`, or `CANCELED`. Max-attempt DLQ expires the challenge and records delivery failure, preserving the active-cap safety property.
+- In durable `outbox` mode, the challenge row and `identity_challenge_delivery_outbox` row are committed in the same PostgreSQL transaction. The delivery row stores the challenge token encrypted with AES-GCM under `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY` or the current key version from `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEYRING_JSON` / `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEYRING_FILE`; old key versions remain readable during a local rotation window. The RPC success means durable enqueue, not provider delivery. A separate `challenge-delivery-worker` locks ready rows with `FOR UPDATE SKIP LOCKED`, rechecks that the challenge is still `ACTIVE` and unexpired, decrypts the token in memory, calls the configured webhook, and marks the delivery `DELIVERED`, retry, `DLQ`, or `CANCELED`. Max-attempt DLQ expires the challenge and records delivery failure, preserving the active-cap safety property.
 - Delivery outcome is persisted on `identity_challenges` through `delivery_status`, `delivery_attempt_count`, `delivered_at`, `delivery_failed_at`, sanitized `delivery_last_error` and low-sensitive `delivery_failure_class`. Durable delivery rows also store low-sensitive `failure_class`, and repair audit records previous/new failure classes for operator diagnostics. This is a first durable retry / DLQ slice, but still not a full provider platform: provider templates, bounce handling, keyring / KMS rotation and provider-specific alerts remain future work.
 - `NEXUSIM_IDENTITY_SERVICE_MODE=challenge-delivery-repair` is a one-shot operator tool with audit-first semantics. It accepts explicit delivery row IDs and supports `audit`, `redrive-active-pending` and `cancel-inactive`. It never decrypts challenge tokens, never marks delivery `DELIVERED`, and never reactivates `EXPIRED` / `CONSUMED` challenges. DLQ rows are audited/skipped because worker DLQ has already expired the challenge; users must request a fresh challenge through the normal API.
 - `/debug/metrics` exposes only aggregate challenge delivery counters, low-sensitive challenge delivery failure classes, durable delivery outbox status counts and identity risk counters. For password reset hashed-target limiting it reports only total limiter rows and currently locked rows. For challenge delivery outbox it reports only PENDING / ready / scheduled / expired / DELIVERED / DLQ / CANCELED counts and max pending retry count. Challenge delivery failure classes are coarse values such as `configuration`, `provider_non_success`, `timeout` or `network`; metrics must not expose raw challenge tokens, encrypted token blobs, HMAC target keys, user IDs, destinations, template data, provider URLs or provider error bodies.
@@ -239,7 +246,7 @@ Known hardening still pending:
 
 - timing- and sender-side account-enumeration resistance;
 - tenant / IP / device adaptive rate limits for challenge creation and confirmation beyond the first target-level and hashed-target windows;
-- provider-specific email / SMS templates, bounce handling, keyring / KMS rotation and provider-grade alerting;
+- provider-specific email / SMS templates, bounce handling, KMS-backed key rotation and provider-grade alerting;
 - WebAuthn and OIDC federation;
 - production alerting for repeated challenge failures.
 
@@ -251,6 +258,8 @@ NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_URL=https://provider.example/send
 NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_BEARER_TOKEN=...
 NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_TIMEOUT=5s
 NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY=...
+NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEYRING_JSON={"current":"v2","keys":{"local-v1":"old-secret","v2":"new-secret"}}
+NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEYRING_FILE=/run/secrets/identity-challenge-delivery-keyring.json
 NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_SECRET=...
 NEXUSIM_IDENTITY_CHALLENGE_REQUEST_MAX_PER_WINDOW=5
 NEXUSIM_IDENTITY_CHALLENGE_REQUEST_WINDOW=15m

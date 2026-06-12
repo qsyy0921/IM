@@ -4,9 +4,11 @@
 
 ## 目标
 
-验证 `identity-service` 的设备吊销事件能通过异步链路投影到 `push-gateway`，并让旧 gateway token 在 WebSocket 建连时被拒绝。
+验证 `identity-service` 的设备 / session 吊销事件能通过异步链路投影到 `push-gateway`，并让旧 gateway token 在 WebSocket 建连时被拒绝。
 
 2026-06-12 补充验证：旧 WebSocket 连接保持在线时，`identity.device.revoked.v1` 可通过 Redis route 控制面主动关闭对应在线 session。
+
+2026-06-12 再补充验证：`identity.session.revoked.v1` 可只主动关闭被吊销的单个 session；同一 device 的另一个在线 session 保持可用。
 
 链路：
 
@@ -89,6 +91,31 @@ online WebSocket session stays connected
   -RunName push-gateway-identity-revoke-active-close-20260612-184738
 ```
 
+### Session active close smoke
+
+- Commit: `37dd03143e84351f4e5072aced54b731ee69da18`
+- Git dirty: `false`
+- Raw summary: `H:\NexusIM\loadtest-results\push-gateway-identity-session-revoke-20260612-191103\pushgateway-summary.json`
+- Route backend: `redis`
+- Push auth mode: `hmac`
+- Token source: `identity_service`
+- Identity event topic: `im.identity.events`
+- Push WebSocket gateway: `127.0.0.1:11598`
+- Push identity consumer group: `nexusim-push-gateway-identity-smoke-20260612191103`
+
+运行命令：
+
+```powershell
+. .\tools\go-env.ps1
+.\loadtest\pushgateway\run-local-smoke.ps1 `
+  -Scenario identity-revoke `
+  -UseIdentityServiceToken `
+  -PushAuthMode hmac `
+  -RouteBackend redis `
+  -IdentityRevokeScope session `
+  -RunName push-gateway-identity-session-revoke-20260612-191103
+```
+
 ## 结果
 
 ### Deny-list reconnect smoke
@@ -134,6 +161,32 @@ git_dirty=false
 - WebSocket gateway 向旧连接发送 broad `server.resume_hint(reason=identity_revoked, pull_required=true)`，随后以 `StatusPolicyViolation` 主动关闭连接。
 - 同一个旧 token 再次建连返回 `PERMISSION_DENIED`。
 
+### Session active close smoke
+
+```text
+success=true
+scope=session
+revoked_session_id=sess_5d845651810f85f64a65502588fc5454
+active_close_hint.op=server.resume_hint
+active_close_hint.reason=identity_revoked
+active_close_hint.pull_required=true
+active_close_status=StatusPolicyViolation
+survivor_hello.session_id=sess_6c99c284c2503608881deee478b9ea3c
+survivor_pong.op=server.pong
+survivor_pong.request_id=push-smoke-session-revoke-survivor-ping
+denied_frame.op=error
+denied_frame.code=PERMISSION_DENIED
+reconnect_attempts=1
+git_dirty=false
+```
+
+关键证据：
+
+- runner 使用 identity-service 签发两个同 user / same device 的不同 session gateway token，并分别建立 WebSocket。
+- `RevokeSession` 只吊销第一条 session；该 session 收到 `server.resume_hint(reason=identity_revoked, pull_required=true)` 后被 `StatusPolicyViolation` 主动关闭。
+- 同一 device 的第二条 survivor session 没有被关闭，随后 `client.ping` 能收到 `server.pong`。
+- 旧被吊销 session 的 token 再次建连返回稳定错误帧 `PERMISSION_DENIED`。
+
 ## 结论
 
 当前 `push-gateway` 已补齐第一版低耦合 revoke projection：
@@ -141,13 +194,13 @@ git_dirty=false
 - WebSocket 热路径仍是本地 HMAC 验签 + 本地/Redis deny-list 查询，不同步 RPC 调 identity-service。
 - 单进程 `all` 模式可用 in-memory deny-list。
 - 分进程 / Redis route 模式下，`identity-consumer` 与 `ws` 进程通过 Redis deny-list 共享 revoke 状态。
-- 分进程 / Redis route 模式下，device revoke 还能通过 Redis route eviction 控制面主动关闭已经在线的旧 WebSocket session。
-- device revoke 会拒绝同设备所有旧 gateway token；session revoke 已有事件 consumer 和 session_id 解析，但本轮 smoke 只覆盖 device revoke。
+- 分进程 / Redis route 模式下，device revoke 和 session revoke 都能通过 Redis route eviction 控制面主动关闭对应的旧 WebSocket session。
+- device revoke 会拒绝同设备所有旧 gateway token；session revoke 只拒绝被吊销的 session token，已用 same-device survivor session 验证不会扩大关闭范围。
 
 ## 限制
 
 - 这不是完整登录系统；`Login / refresh token / JWT JWK / 多 issuer` 仍未实现。
 - deny-list 当前无 TTL / compact / repair UI；设备吊销按持久黑名单处理。
 - Redis 故障时 revoke checker fail-closed，会拒绝建连；这是安全优先策略，但后续需要 metrics 和故障 smoke。
-- 本轮 active close 只覆盖 device revoke；session revoke 有代码路径和单元测试，尚未单独跑真实进程 smoke。
+- 本轮 session revoke smoke 只覆盖同一 user / same device 的两个 session；不代表多设备、多 issuer 或容量场景。
 - Redis route eviction 是在线控制面，不是可靠投递或安全事实源；deny-list 才是撤销后拒绝新建连的安全线。

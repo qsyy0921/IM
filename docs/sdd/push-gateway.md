@@ -652,6 +652,6 @@ delivery-service outbox-relay
 - 客户端收到 notify 后通过 `PullInbox` 拉到 durable inbox item。
 - 客户端 ACK frame 通过 push-gateway 转发到 `delivery-service AckDelivery`。
 - push-gateway 离线或重启不造成 durable inbox 丢失；客户端重连后可补拉。
-- HMAC token 可由 identity-service 签发；device / session revoke 事件可异步投影到 gateway deny-list，旧 token 建连返回稳定 `PERMISSION_DENIED`；device revoke 的在线旧连接 active close 已有真实进程 smoke。
+- HMAC token 可由 identity-service 签发；device / session revoke 事件可异步投影到 gateway deny-list，旧 token 建连返回稳定 `PERMISSION_DENIED`；device revoke 和 session revoke 的在线旧连接 active close 已有真实进程 smoke。
 - 小规模 smoke 报告归档到 `docs/runbook/loadtest/push-gateway/`。
 - 不把 smoke 表述为完整生产 WebSocket 平台或容量结论。

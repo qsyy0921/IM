@@ -12,11 +12,12 @@
 - issue and confirm email / phone verification challenges;
 - issue and confirm password reset challenges;
 - enroll, confirm and disable first-stage TOTP MFA factors;
+- issue one-time MFA recovery codes during factor confirmation;
 - persist users, devices and sessions;
 - revoke devices and sessions;
 - keep push-gateway verification local to avoid synchronous auth RPC on every WebSocket handshake.
 
-It is not yet a full OAuth/OIDC identity platform. It does not implement email / SMS sending, recovery codes, WebAuthn/passkeys, external IdP federation, production-grade account-risk workflows or production-grade asymmetric key management.
+It is not yet a full OAuth/OIDC identity platform. It does not implement email / SMS sending, recovery-code regeneration / revocation APIs, WebAuthn/passkeys, external IdP federation, production-grade account-risk workflows or production-grade asymmetric key management.
 
 ## Boundary
 
@@ -28,9 +29,11 @@ Owns:
 - `identity_refresh_tokens`
 - `identity_challenges`
 - `identity_mfa_factors`
+- `identity_mfa_recovery_codes`
 - password hash verification for existing users
 - email / phone verification and password reset challenge state
 - TOTP MFA factor secret lifecycle
+- MFA recovery-code hash lifecycle
 - gateway token issuance
 - device/session revoke state
 
@@ -72,7 +75,7 @@ RegisterUser
 
 Login
 -> verify password_hash
--> if ACTIVE TOTP factors exist, require and verify mfa_code
+-> if ACTIVE TOTP factors exist, require and verify mfa_code or one-time mfa_recovery_code
 -> identity_devices / identity_sessions
 -> identity_refresh_tokens ACTIVE
 -> short-lived gateway token + opaque refresh token
@@ -102,14 +105,15 @@ Login risk first-stage rules:
 - When the configured threshold is reached, password `Login` is temporarily locked and public Login returns stable `account temporarily locked`.
 - A successful Login clears the failure counter and lock fields in the same PostgreSQL transaction that writes session / refresh-token state.
 - The first-stage lock applies only to password Login. A valid refresh token can still rotate through `RefreshGatewayToken`; refresh token theft / reuse is handled by the separate rotation and session-revoke logic. This avoids letting an external password brute-force attempt break an already authenticated client session.
-- If the user has one or more ACTIVE TOTP MFA factors, `Login` must verify `mfa_code` before generating refresh token, session or gateway token state. Missing code returns stable `MFA_REQUIRED`; invalid code returns stable `INVALID_MFA`.
+- If the user has one or more ACTIVE TOTP MFA factors, `Login` must verify either `mfa_code` or a one-time `mfa_recovery_code` before generating refresh token, session or gateway token state. Missing proof returns stable `MFA_REQUIRED`; invalid proof returns stable `INVALID_MFA`.
 - Invalid TOTP codes are counted on the selected MFA factor, independent from password failure counters. Reaching `NEXUSIM_IDENTITY_MFA_MAX_FAILED_ATTEMPTS` within `NEXUSIM_IDENTITY_MFA_FAILURE_WINDOW` locks that factor for `NEXUSIM_IDENTITY_MFA_LOCK_DURATION` and public Login returns stable `mfa temporarily locked`.
+- A valid MFA recovery code is consumed in the same PostgreSQL transaction that writes session / refresh-token state. Recovery-code proof does not update TOTP `last_used_at` and does not count as a TOTP failed-code attempt.
 - Defaults are `NEXUSIM_IDENTITY_LOGIN_MAX_FAILED_ATTEMPTS=5`, `NEXUSIM_IDENTITY_LOGIN_FAILURE_WINDOW=15m` and `NEXUSIM_IDENTITY_LOGIN_LOCK_DURATION=15m`; deployments may tune them.
 - This is not a complete fraud/risk engine. IP/device reputation, CAPTCHA, geo-anomaly, tenant policy, alert routing, adaptive throttling and tenant-level rate limits remain future hardening.
 
 ## MFA TOTP Factors
 
-First-stage MFA support is limited to TOTP factors and password Login enforcement. It does not yet implement refresh-token step-up, recovery codes, WebAuthn/passkeys or tenant-specific factor policy.
+First-stage MFA support is limited to TOTP factors, password Login enforcement and one-time recovery codes generated during TOTP confirmation. It does not yet implement refresh-token step-up, recovery-code regeneration / revocation APIs, WebAuthn/passkeys or tenant-specific factor policy.
 
 ```text
 BeginMFAEnrollment
@@ -123,6 +127,8 @@ ConfirmMFAEnrollment
 -> load encrypted PENDING factor
 -> verify 6-digit TOTP code
 -> mark factor ACTIVE
+-> replace ACTIVE recovery-code hashes
+-> return plaintext recovery codes once
 
 DisableMFAFactor
 -> verify current password
@@ -131,8 +137,8 @@ DisableMFAFactor
 Login with ACTIVE MFA
 -> verify password_hash
 -> list ACTIVE TOTP factors
--> require mfa_code when any ACTIVE factor exists
--> verify selected factor before session / refresh-token write
+-> require mfa_code or mfa_recovery_code when any ACTIVE factor exists
+-> verify selected factor or consume recovery code before session / refresh-token write
 ```
 
 MFA factor rules:
@@ -141,17 +147,20 @@ MFA factor rules:
 - `identity_mfa_factors.secret_ciphertext`, `secret_nonce` and `secret_key_version` store encrypted secret material;
 - raw TOTP secret is returned only by `BeginMFAEnrollment` and is never persisted as plaintext;
 - `ConfirmMFAEnrollment` accepts only a pending TOTP factor and a six-digit code;
+- `ConfirmMFAEnrollment` returns plaintext recovery codes once; PostgreSQL stores only `identity_mfa_recovery_codes.code_hash`, never raw recovery codes;
 - `DisableMFAFactor` requires the current password and does not delete historical rows;
 - `LoginRequest.mfa_factor_id` selects a factor; if omitted and exactly one ACTIVE factor exists, that factor is used;
 - `LoginRequest.mfa_code` must be a six-digit TOTP code; session and refresh-token state are written only after MFA succeeds;
+- `LoginRequest.mfa_recovery_code` is mutually exclusive with `mfa_code` and `mfa_factor_id`; it is normalized, hashed, matched against ACTIVE recovery-code hashes and marked `USED` in the same transaction as session / refresh-token creation;
 - `identity_mfa_factors.login_failed_count`, `login_failed_last_at` and `login_locked_until` are factor-level Login risk state, not global account lock state;
 - successful MFA Login clears the selected factor's Login failure state and updates `last_used_at` in the same PostgreSQL transaction that writes session / refresh-token state;
 - `NEXUSIM_IDENTITY_MFA_SECRET_KEY` is the local AES-GCM encryption key input; local smoke may fall back to the existing gateway token secret, but production profiles should use a dedicated secret managed by KMS/HSM. If no MFA key is configured, the service still starts and existing Login/JWKS flows are unaffected, but MFA factor RPCs and MFA-protected Login return stable `MFA_UNAVAILABLE` / `mfa temporarily unavailable` until the key is configured.
+- `NEXUSIM_IDENTITY_MFA_RECOVERY_CODE_SECRET` is the preferred HMAC secret for recovery-code hashes. Local smoke may fall back to `NEXUSIM_IDENTITY_MFA_SECRET_KEY`; it does not fall back to gateway / push token secrets.
 
 Known MFA hardening still pending:
 
 - Refresh-token step-up enforcement;
-- recovery codes and backup factor handling;
+- recovery-code regeneration / revocation API and backup factor handling;
 - WebAuthn / passkeys;
 - richer MFA risk policy beyond the first factor-level failed-code counter and short lockout;
 - secret key rotation and KMS/HSM-backed envelope encryption;
@@ -293,7 +302,7 @@ ConfirmPasswordReset -> password hash updated + active session / refresh token r
 
 - `GET /healthz`: process liveness, no dependency check.
 - `GET /readyz`: PostgreSQL ping readiness.
-- `GET /debug/metrics`: pgx pool counters, identity user/device/session counts, failed password-login user counts, currently password-login-locked user counts, MFA factor counts, MFA factor failed-login counts, currently MFA-login-locked factor counts, and gRPC method/code/latency counters.
+- `GET /debug/metrics`: pgx pool counters, identity user/device/session counts, failed password-login user counts, currently password-login-locked user counts, MFA factor counts, MFA factor failed-login counts, currently MFA-login-locked ACTIVE factor counts, and gRPC method/code/latency counters.
 
 The gRPC server also emits one JSON request log per unary RPC with stable fields: `service`, `event`, `method`, `code`, and `latency_ms`.
 

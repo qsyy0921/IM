@@ -50,6 +50,12 @@ func ValidateLogin(command types.LoginCommand) error {
 	if strings.TrimSpace(command.MFACode) != "" && !isSixDigitCode(command.MFACode) {
 		return types.NewInvalidArgument("mfa code is invalid")
 	}
+	if strings.TrimSpace(command.MFACode) != "" && strings.TrimSpace(command.MFARecoveryCode) != "" {
+		return types.NewInvalidArgument("only one mfa credential is allowed")
+	}
+	if strings.TrimSpace(command.MFARecoveryCode) != "" && strings.TrimSpace(string(command.MFAFactorID)) != "" {
+		return types.NewInvalidArgument("mfa_factor_id is not allowed with recovery code")
+	}
 	return nil
 }
 

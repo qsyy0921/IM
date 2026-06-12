@@ -537,6 +537,7 @@ type LoginRequest struct {
 	RequestId         string                 `protobuf:"bytes,9,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	MfaFactorId       string                 `protobuf:"bytes,10,opt,name=mfa_factor_id,json=mfaFactorId,proto3" json:"mfa_factor_id,omitempty"`
 	MfaCode           string                 `protobuf:"bytes,11,opt,name=mfa_code,json=mfaCode,proto3" json:"mfa_code,omitempty"`
+	MfaRecoveryCode   string                 `protobuf:"bytes,12,opt,name=mfa_recovery_code,json=mfaRecoveryCode,proto3" json:"mfa_recovery_code,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -644,6 +645,13 @@ func (x *LoginRequest) GetMfaFactorId() string {
 func (x *LoginRequest) GetMfaCode() string {
 	if x != nil {
 		return x.MfaCode
+	}
+	return ""
+}
+
+func (x *LoginRequest) GetMfaRecoveryCode() string {
+	if x != nil {
+		return x.MfaRecoveryCode
 	}
 	return ""
 }
@@ -1983,6 +1991,7 @@ type ConfirmMFAEnrollmentResponse struct {
 	FactorId         string                 `protobuf:"bytes,3,opt,name=factor_id,json=factorId,proto3" json:"factor_id,omitempty"`
 	Status           MFAFactorStatus        `protobuf:"varint,4,opt,name=status,proto3,enum=nexusim.identity.v1.MFAFactorStatus" json:"status,omitempty"`
 	VerifiedAtUnixMs int64                  `protobuf:"varint,5,opt,name=verified_at_unix_ms,json=verifiedAtUnixMs,proto3" json:"verified_at_unix_ms,omitempty"`
+	RecoveryCodes    []string               `protobuf:"bytes,6,rep,name=recovery_codes,json=recoveryCodes,proto3" json:"recovery_codes,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -2050,6 +2059,13 @@ func (x *ConfirmMFAEnrollmentResponse) GetVerifiedAtUnixMs() int64 {
 		return x.VerifiedAtUnixMs
 	}
 	return 0
+}
+
+func (x *ConfirmMFAEnrollmentResponse) GetRecoveryCodes() []string {
+	if x != nil {
+		return x.RecoveryCodes
+	}
+	return nil
 }
 
 type DisableMFAFactorRequest struct {
@@ -2890,7 +2906,7 @@ const file_nexusim_identity_v1_identity_service_proto_rawDesc = "" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x127\n" +
 	"\x06status\x18\x03 \x01(\x0e2\x1f.nexusim.identity.v1.UserStatusR\x06status\x12+\n" +
-	"\x12created_at_unix_ms\x18\x04 \x01(\x03R\x0fcreatedAtUnixMs\"\xf2\x02\n" +
+	"\x12created_at_unix_ms\x18\x04 \x01(\x03R\x0fcreatedAtUnixMs\"\x9e\x03\n" +
 	"\fLoginRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1a\n" +
@@ -2904,7 +2920,8 @@ const file_nexusim_identity_v1_identity_service_proto_rawDesc = "" +
 	"request_id\x18\t \x01(\tR\trequestId\x12\"\n" +
 	"\rmfa_factor_id\x18\n" +
 	" \x01(\tR\vmfaFactorId\x12\x19\n" +
-	"\bmfa_code\x18\v \x01(\tR\amfaCode\"\xa9\x03\n" +
+	"\bmfa_code\x18\v \x01(\tR\amfaCode\x12*\n" +
+	"\x11mfa_recovery_code\x18\f \x01(\tR\x0fmfaRecoveryCode\"\xa9\x03\n" +
 	"\rLoginResponse\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +
@@ -3039,13 +3056,14 @@ const file_nexusim_identity_v1_identity_service_proto_rawDesc = "" +
 	"\x04code\x18\x04 \x01(\tR\x04code\x12\x19\n" +
 	"\btrace_id\x18\x05 \x01(\tR\atraceId\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x06 \x01(\tR\trequestId\"\xde\x01\n" +
+	"request_id\x18\x06 \x01(\tR\trequestId\"\x85\x02\n" +
 	"\x1cConfirmMFAEnrollmentResponse\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +
 	"\tfactor_id\x18\x03 \x01(\tR\bfactorId\x12<\n" +
 	"\x06status\x18\x04 \x01(\x0e2$.nexusim.identity.v1.MFAFactorStatusR\x06status\x12-\n" +
-	"\x13verified_at_unix_ms\x18\x05 \x01(\x03R\x10verifiedAtUnixMs\"\xc2\x01\n" +
+	"\x13verified_at_unix_ms\x18\x05 \x01(\x03R\x10verifiedAtUnixMs\x12%\n" +
+	"\x0erecovery_codes\x18\x06 \x03(\tR\rrecoveryCodes\"\xc2\x01\n" +
 	"\x17DisableMFAFactorRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +

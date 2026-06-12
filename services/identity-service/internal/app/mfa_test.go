@@ -146,7 +146,11 @@ func TestConfirmMFAEnrollmentUseCaseVerifiesPendingTOTP(t *testing.T) {
 		},
 	}
 	secrets := &fakeMFASecretManager{verifyOK: true}
-	useCase := NewConfirmMFAEnrollmentUseCase(repository, secrets)
+	recovery := &fakeMFARecoveryCodeManager{codes: []types.MFARecoveryCode{
+		{CodeID: "recovery-1", Code: "aaaa-bbbb-cccc-dddd", CodeHash: "hash-1"},
+		{CodeID: "recovery-2", Code: "eeee-ffff-gggg-hhhh", CodeHash: "hash-2"},
+	}}
+	useCase := NewConfirmMFAEnrollmentUseCase(repository, secrets, recovery)
 	useCase.now = func() time.Time { return now }
 
 	result, err := useCase.Execute(context.Background(), types.ConfirmMFAEnrollmentCommand{
@@ -160,6 +164,12 @@ func TestConfirmMFAEnrollmentUseCaseVerifiesPendingTOTP(t *testing.T) {
 	}
 	if !repository.confirmCalled || result.Status != types.MFAFactorStatusActive {
 		t.Fatalf("expected active mfa factor, result=%+v called=%v", result, repository.confirmCalled)
+	}
+	if len(result.RecoveryCodes) != 2 || result.RecoveryCodes[0] != "aaaa-bbbb-cccc-dddd" {
+		t.Fatalf("expected recovery codes to be returned once, got %+v", result.RecoveryCodes)
+	}
+	if len(repository.recoveryRecords) != 2 || repository.recoveryRecords[0].CodeHash != "hash-1" {
+		t.Fatalf("expected hashed recovery code records to be stored, got %+v", repository.recoveryRecords)
 	}
 	if secrets.verifySecret != secret || secrets.verifyCode != "123456" || !secrets.verifyNow.Equal(now) {
 		t.Fatalf("unexpected verify input: secret=%+v code=%s now=%s", secrets.verifySecret, secrets.verifyCode, secrets.verifyNow)
@@ -177,7 +187,7 @@ func TestConfirmMFAEnrollmentUseCaseRejectsInvalidCodeBeforeActivation(t *testin
 			Secret:   types.EncryptedMFASecret{Ciphertext: "ciphertext", Nonce: "nonce", KeyVersion: "local-v1"},
 		},
 	}
-	useCase := NewConfirmMFAEnrollmentUseCase(repository, &fakeMFASecretManager{verifyOK: false})
+	useCase := NewConfirmMFAEnrollmentUseCase(repository, &fakeMFASecretManager{verifyOK: false}, &fakeMFARecoveryCodeManager{})
 
 	_, err := useCase.Execute(context.Background(), types.ConfirmMFAEnrollmentCommand{
 		TenantID: "tenant-1",
@@ -204,7 +214,7 @@ func TestConfirmMFAEnrollmentUseCaseReturnsMFAUnavailableWhenSecretManagerFails(
 			Secret:   types.EncryptedMFASecret{Ciphertext: "ciphertext", Nonce: "nonce", KeyVersion: "local-v1"},
 		},
 	}
-	useCase := NewConfirmMFAEnrollmentUseCase(repository, &fakeMFASecretManager{verifyErr: types.NewMFAUnavailable("mfa secret encryption key is required")})
+	useCase := NewConfirmMFAEnrollmentUseCase(repository, &fakeMFASecretManager{verifyErr: types.NewMFAUnavailable("mfa secret encryption key is required")}, &fakeMFARecoveryCodeManager{})
 
 	_, err := useCase.Execute(context.Background(), types.ConfirmMFAEnrollmentCommand{
 		TenantID: "tenant-1",
@@ -222,6 +232,20 @@ func TestConfirmMFAEnrollmentUseCaseReturnsMFAUnavailableWhenSecretManagerFails(
 
 func TestConfirmMFAEnrollmentUseCaseReturnsMFAUnavailableWhenSecretManagerMissing(t *testing.T) {
 	useCase := NewConfirmMFAEnrollmentUseCase(&fakeMFARepository{}, nil)
+
+	_, err := useCase.Execute(context.Background(), types.ConfirmMFAEnrollmentCommand{
+		TenantID: "tenant-1",
+		UserID:   "user-1",
+		FactorID: "mfa-1",
+		Code:     "123456",
+	})
+	if !errors.Is(err, types.ErrMFAUnavailable) {
+		t.Fatalf("expected mfa unavailable, got %v", err)
+	}
+}
+
+func TestConfirmMFAEnrollmentUseCaseReturnsMFAUnavailableWhenRecoveryCodeManagerMissing(t *testing.T) {
+	useCase := NewConfirmMFAEnrollmentUseCase(&fakeMFARepository{}, &fakeMFASecretManager{})
 
 	_, err := useCase.Execute(context.Background(), types.ConfirmMFAEnrollmentCommand{
 		TenantID: "tenant-1",
@@ -259,13 +283,14 @@ func TestDisableMFAFactorUseCaseRequiresCurrentPassword(t *testing.T) {
 }
 
 type fakeMFARepository struct {
-	credential    types.UserCredential
-	factorSecret  types.MFAFactorSecret
-	createCalled  bool
-	confirmCalled bool
-	disableCalled bool
-	createdSecret types.EncryptedMFASecret
-	createdAt     time.Time
+	credential      types.UserCredential
+	factorSecret    types.MFAFactorSecret
+	createCalled    bool
+	confirmCalled   bool
+	disableCalled   bool
+	createdSecret   types.EncryptedMFASecret
+	createdAt       time.Time
+	recoveryRecords []types.MFARecoveryCodeRecord
 }
 
 func (repo *fakeMFARepository) GetUserCredential(context.Context, types.TenantID, types.UserID) (types.UserCredential, error) {
@@ -290,8 +315,9 @@ func (repo *fakeMFARepository) GetMFAFactorSecret(context.Context, types.TenantI
 	return repo.factorSecret, nil
 }
 
-func (repo *fakeMFARepository) ConfirmMFAFactor(_ context.Context, command types.ConfirmMFAEnrollmentCommand, verifiedAt time.Time) (types.ConfirmMFAEnrollmentResult, error) {
+func (repo *fakeMFARepository) ConfirmMFAFactor(_ context.Context, command types.ConfirmMFAEnrollmentCommand, recoveryCodes []types.MFARecoveryCodeRecord, verifiedAt time.Time) (types.ConfirmMFAEnrollmentResult, error) {
 	repo.confirmCalled = true
+	repo.recoveryRecords = append([]types.MFARecoveryCodeRecord(nil), recoveryCodes...)
 	return types.ConfirmMFAEnrollmentResult{
 		TenantID:         command.TenantID,
 		UserID:           command.UserID,
@@ -344,4 +370,27 @@ func (manager *fakeMFASecretManager) VerifyTOTP(encrypted types.EncryptedMFASecr
 
 func (manager *fakeMFASecretManager) OTPAuthURI(issuer string, accountName string, secret string) string {
 	return "otpauth://" + issuer + "/" + accountName + "?secret=" + secret
+}
+
+type fakeMFARecoveryCodeManager struct {
+	codes   []types.MFARecoveryCode
+	hash    string
+	hashErr error
+}
+
+func (manager *fakeMFARecoveryCodeManager) NewRecoveryCodes(int) ([]types.MFARecoveryCode, error) {
+	if len(manager.codes) == 0 {
+		return []types.MFARecoveryCode{{CodeID: "recovery-1", Code: "aaaa-bbbb-cccc-dddd", CodeHash: "hash-1"}}, nil
+	}
+	return append([]types.MFARecoveryCode(nil), manager.codes...), nil
+}
+
+func (manager *fakeMFARecoveryCodeManager) HashRecoveryCode(string) (string, error) {
+	if manager.hashErr != nil {
+		return "", manager.hashErr
+	}
+	if manager.hash == "" {
+		return "hash-1", nil
+	}
+	return manager.hash, nil
 }

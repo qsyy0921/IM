@@ -165,6 +165,7 @@ func (s *Server) Login(ctx context.Context, request *identityv1.LoginRequest) (*
 		RefreshTTLSeconds: request.GetRefreshTtlSeconds(),
 		MFAFactorID:       types.MFAFactorID(request.GetMfaFactorId()),
 		MFACode:           request.GetMfaCode(),
+		MFARecoveryCode:   request.GetMfaRecoveryCode(),
 		TraceID:           request.GetTraceId(),
 		RequestID:         request.GetRequestId(),
 	})
@@ -392,6 +393,7 @@ func (s *Server) ConfirmMFAEnrollment(ctx context.Context, request *identityv1.C
 		FactorId:         string(result.FactorID),
 		Status:           mfaFactorStatusToProto(result.Status),
 		VerifiedAtUnixMs: result.VerifiedAtUnixMS,
+		RecoveryCodes:    append([]string(nil), result.RecoveryCodes...),
 	}, nil
 }
 

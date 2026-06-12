@@ -160,6 +160,38 @@ func TestServerLoginMapsMFAFields(t *testing.T) {
 	}
 }
 
+func TestServerLoginMapsMFARecoveryCode(t *testing.T) {
+	executor := &fakeLoginExecutor{
+		result: types.LoginResult{
+			TenantID:               "tenant-1",
+			UserID:                 "user-1",
+			DeviceID:               "device-1",
+			SessionID:              "session-1",
+			Audience:               "push-gateway",
+			TokenType:              "Bearer",
+			GatewayToken:           "gateway-token",
+			RefreshToken:           "refresh-token",
+			GatewayExpiresAtUnixMS: 1_800_000_900_000,
+			RefreshExpiresAtUnixMS: 1_802_592_000_000,
+			IssuedAtUnixMS:         1_800_000_000_000,
+		},
+	}
+	server := &Server{login: executor}
+	_, err := server.Login(context.Background(), &identityv1.LoginRequest{
+		TenantId:        "tenant-1",
+		UserId:          "user-1",
+		Password:        "correct horse battery staple",
+		DeviceId:        "device-1",
+		MfaRecoveryCode: "aaaa-bbbb-cccc-dddd",
+	})
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	if executor.command.MFARecoveryCode != "aaaa-bbbb-cccc-dddd" {
+		t.Fatalf("expected recovery code to map to command, got %+v", executor.command)
+	}
+}
+
 func TestServerLoginMapsMFARequiredToFailedPrecondition(t *testing.T) {
 	server := &Server{login: &fakeLoginExecutor{err: types.NewMFARequired("mfa required")}}
 	_, err := server.Login(context.Background(), &identityv1.LoginRequest{
@@ -252,6 +284,32 @@ func TestServerConfirmMFAEnrollmentMapsInvalidMFAToUnauthenticated(t *testing.T)
 	})
 	if status.Code(err) != codes.Unauthenticated {
 		t.Fatalf("expected invalid mfa to map to unauthenticated, got %v (%v)", status.Code(err), err)
+	}
+}
+
+func TestServerConfirmMFAEnrollmentReturnsRecoveryCodes(t *testing.T) {
+	executor := &fakeConfirmMFAEnrollmentExecutor{
+		result: types.ConfirmMFAEnrollmentResult{
+			TenantID:         "tenant-1",
+			UserID:           "user-1",
+			FactorID:         "mfa-1",
+			Status:           types.MFAFactorStatusActive,
+			VerifiedAtUnixMS: 1_800_000_000_000,
+			RecoveryCodes:    []string{"aaaa-bbbb-cccc-dddd", "eeee-ffff-gggg-hhhh"},
+		},
+	}
+	server := &Server{confirmMFAEnrollment: executor}
+	response, err := server.ConfirmMFAEnrollment(context.Background(), &identityv1.ConfirmMFAEnrollmentRequest{
+		TenantId: "tenant-1",
+		UserId:   "user-1",
+		FactorId: "mfa-1",
+		Code:     "123456",
+	})
+	if err != nil {
+		t.Fatalf("confirm mfa enrollment: %v", err)
+	}
+	if len(response.GetRecoveryCodes()) != 2 || response.GetRecoveryCodes()[0] != "aaaa-bbbb-cccc-dddd" {
+		t.Fatalf("expected recovery codes to be returned, got %+v", response.GetRecoveryCodes())
 	}
 }
 

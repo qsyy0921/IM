@@ -20,7 +20,7 @@ type MFARepository interface {
 	GetUserCredential(context.Context, types.TenantID, types.UserID) (types.UserCredential, error)
 	CreateMFAFactor(context.Context, types.BeginMFAEnrollmentCommand, types.EncryptedMFASecret, time.Time) (types.BeginMFAEnrollmentResult, error)
 	GetMFAFactorSecret(context.Context, types.TenantID, types.UserID, types.MFAFactorID) (types.MFAFactorSecret, error)
-	ConfirmMFAFactor(context.Context, types.ConfirmMFAEnrollmentCommand, time.Time) (types.ConfirmMFAEnrollmentResult, error)
+	ConfirmMFAFactor(context.Context, types.ConfirmMFAEnrollmentCommand, []types.MFARecoveryCodeRecord, time.Time) (types.ConfirmMFAEnrollmentResult, error)
 	DisableMFAFactor(context.Context, types.DisableMFAFactorCommand, time.Time) (types.DisableMFAFactorResult, error)
 }
 
@@ -61,11 +61,18 @@ func (uc *BeginMFAEnrollmentUseCase) Execute(ctx context.Context, command types.
 type ConfirmMFAEnrollmentUseCase struct {
 	repository MFARepository
 	secrets    MFASecretManager
+	recovery   MFARecoveryCodeManager
 	now        func() time.Time
 }
 
-func NewConfirmMFAEnrollmentUseCase(repository MFARepository, secrets MFASecretManager) *ConfirmMFAEnrollmentUseCase {
-	return &ConfirmMFAEnrollmentUseCase{repository: repository, secrets: secrets, now: func() time.Time { return time.Now().UTC() }}
+const defaultMFARecoveryCodeCount = 10
+
+func NewConfirmMFAEnrollmentUseCase(repository MFARepository, secrets MFASecretManager, recovery ...MFARecoveryCodeManager) *ConfirmMFAEnrollmentUseCase {
+	uc := &ConfirmMFAEnrollmentUseCase{repository: repository, secrets: secrets, now: func() time.Time { return time.Now().UTC() }}
+	if len(recovery) > 0 {
+		uc.recovery = recovery[0]
+	}
+	return uc
 }
 
 func (uc *ConfirmMFAEnrollmentUseCase) Execute(ctx context.Context, command types.ConfirmMFAEnrollmentCommand) (types.ConfirmMFAEnrollmentResult, error) {
@@ -77,6 +84,9 @@ func (uc *ConfirmMFAEnrollmentUseCase) Execute(ctx context.Context, command type
 	}
 	if uc.secrets == nil {
 		return types.ConfirmMFAEnrollmentResult{}, types.NewMFAUnavailable("mfa secret manager is not configured")
+	}
+	if uc.recovery == nil {
+		return types.ConfirmMFAEnrollmentResult{}, types.NewMFAUnavailable("mfa recovery code manager is not configured")
 	}
 	factor, err := uc.repository.GetMFAFactorSecret(ctx, command.TenantID, command.UserID, command.FactorID)
 	if err != nil {
@@ -93,7 +103,22 @@ func (uc *ConfirmMFAEnrollmentUseCase) Execute(ctx context.Context, command type
 	if !ok {
 		return types.ConfirmMFAEnrollmentResult{}, types.NewInvalidMFA("invalid mfa code")
 	}
-	return uc.repository.ConfirmMFAFactor(ctx, command, now)
+	recoveryCodes, err := uc.recovery.NewRecoveryCodes(defaultMFARecoveryCodeCount)
+	if err != nil {
+		return types.ConfirmMFAEnrollmentResult{}, err
+	}
+	records := make([]types.MFARecoveryCodeRecord, 0, len(recoveryCodes))
+	plainCodes := make([]string, 0, len(recoveryCodes))
+	for _, code := range recoveryCodes {
+		records = append(records, types.MFARecoveryCodeRecord{CodeID: code.CodeID, CodeHash: code.CodeHash})
+		plainCodes = append(plainCodes, code.Code)
+	}
+	result, err := uc.repository.ConfirmMFAFactor(ctx, command, records, now)
+	if err != nil {
+		return types.ConfirmMFAEnrollmentResult{}, err
+	}
+	result.RecoveryCodes = plainCodes
+	return result, nil
 }
 
 type DisableMFAFactorUseCase struct {

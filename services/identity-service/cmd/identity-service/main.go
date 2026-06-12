@@ -74,6 +74,10 @@ func runGRPC() error {
 	if err != nil {
 		return err
 	}
+	mfaRecoveryCodes, err := newMFARecoveryCodeManager()
+	if err != nil {
+		return err
+	}
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
 	jwkSet, err := gatewayTokenJWKSetWithAdditionalKeys(signer.JWKSet())
 	if err != nil {
@@ -113,6 +117,7 @@ func runGRPC() error {
 				LockDuration:      envDuration("NEXUSIM_IDENTITY_MFA_LOCK_DURATION", app.DefaultMFALockDuration),
 			}),
 			app.WithLoginMFASecretManager(mfaManager),
+			app.WithLoginMFARecoveryCodeManager(mfaRecoveryCodes),
 		),
 		app.NewRefreshGatewayTokenUseCase(repository, signer, refreshTokens),
 		app.NewRequestVerificationChallengeUseCase(repository, challengeTokens, passwords, app.ChallengeOptions{ReturnDevToken: envBool("NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN", false)}),
@@ -120,7 +125,7 @@ func runGRPC() error {
 		app.NewRequestPasswordResetUseCase(repository, challengeTokens, app.ChallengeOptions{ReturnDevToken: envBool("NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN", false)}),
 		app.NewConfirmPasswordResetUseCase(repository, challengeTokens, passwords),
 		app.NewBeginMFAEnrollmentUseCase(repository, passwords, mfaManager),
-		app.NewConfirmMFAEnrollmentUseCase(repository, mfaManager),
+		app.NewConfirmMFAEnrollmentUseCase(repository, mfaManager, mfaRecoveryCodes),
 		app.NewDisableMFAFactorUseCase(repository, passwords),
 		app.NewIssueGatewayTokenUseCase(repository, signer),
 		app.NewRevokeDeviceUseCase(repository),
@@ -161,6 +166,17 @@ func newMFASecretManager() (app.MFASecretManager, error) {
 	return mfainfra.NewTOTPManager(secret)
 }
 
+func newMFARecoveryCodeManager() (app.MFARecoveryCodeManager, error) {
+	secret := envString(
+		"NEXUSIM_IDENTITY_MFA_RECOVERY_CODE_SECRET",
+		envString("NEXUSIM_IDENTITY_MFA_SECRET_KEY", ""),
+	)
+	if secret == "" {
+		return disabledMFARecoveryCodeManager{}, nil
+	}
+	return mfainfra.NewRecoveryCodeManager(secret)
+}
+
 type disabledMFASecretManager struct{}
 
 func (disabledMFASecretManager) NewTOTPSecret() (string, types.EncryptedMFASecret, error) {
@@ -173,6 +189,16 @@ func (disabledMFASecretManager) VerifyTOTP(types.EncryptedMFASecret, string, tim
 
 func (disabledMFASecretManager) OTPAuthURI(string, string, string) string {
 	return ""
+}
+
+type disabledMFARecoveryCodeManager struct{}
+
+func (disabledMFARecoveryCodeManager) NewRecoveryCodes(int) ([]types.MFARecoveryCode, error) {
+	return nil, types.NewMFAUnavailable("mfa recovery code key is required")
+}
+
+func (disabledMFARecoveryCodeManager) HashRecoveryCode(string) (string, error) {
+	return "", types.NewMFAUnavailable("mfa recovery code key is required")
 }
 
 func newGatewayTokenSigner() (gatewayTokenSigner, error) {

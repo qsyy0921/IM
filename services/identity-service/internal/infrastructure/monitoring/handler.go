@@ -151,7 +151,7 @@ SELECT
     (SELECT COUNT(*) FROM identity_users WHERE locked_until > now()),
     (SELECT COUNT(*) FROM identity_mfa_factors),
     (SELECT COUNT(*) FROM identity_mfa_factors WHERE login_failed_count > 0),
-    (SELECT COUNT(*) FROM identity_mfa_factors WHERE login_locked_until > now()),
+    (SELECT COUNT(*) FROM identity_mfa_factors WHERE status = 'ACTIVE' AND login_locked_until > now()),
     (SELECT COUNT(*) FROM identity_devices WHERE status = 'ACTIVE'),
     (SELECT COUNT(*) FROM identity_devices WHERE status = 'REVOKED'),
     (SELECT COUNT(*) FROM identity_sessions WHERE status = 'ACTIVE' AND expires_at > now()),

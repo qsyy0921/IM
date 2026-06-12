@@ -251,6 +251,11 @@ func (r *Repository) LoginGatewaySession(
 	if err := insertRefreshToken(ctx, tx, command.TenantID, command.UserID, command.DeviceID, sessionID, refreshToken, issuedAt, refreshExpiresAt, command.TraceID, command.RequestID); err != nil {
 		return types.LoginResult{}, err
 	}
+	if command.UsedMFARecoveryCode.CodeID != "" || command.UsedMFARecoveryCode.CodeHash != "" {
+		if err := consumeMFARecoveryCode(ctx, tx, command.TenantID, command.UserID, command.UsedMFARecoveryCode, issuedAt); err != nil {
+			return types.LoginResult{}, err
+		}
+	}
 	if err := clearLoginFailures(ctx, tx, command.TenantID, command.UserID, issuedAt); err != nil {
 		return types.LoginResult{}, err
 	}
@@ -748,12 +753,17 @@ RETURNING login_failed_count, COALESCE(login_locked_until, 'epoch'::timestamptz)
 	return nil
 }
 
-func (r *Repository) ConfirmMFAFactor(ctx context.Context, command types.ConfirmMFAEnrollmentCommand, verifiedAt time.Time) (types.ConfirmMFAEnrollmentResult, error) {
+func (r *Repository) ConfirmMFAFactor(ctx context.Context, command types.ConfirmMFAEnrollmentCommand, recoveryCodes []types.MFARecoveryCodeRecord, verifiedAt time.Time) (types.ConfirmMFAEnrollmentResult, error) {
 	if r.pool == nil {
 		return types.ConfirmMFAEnrollmentResult{}, types.NewDBWriteFailed("identity repository is not configured")
 	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.ConfirmMFAEnrollmentResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
 	var status types.MFAFactorStatus
-	err := r.pool.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 UPDATE identity_mfa_factors
 SET status = 'ACTIVE',
     verified_at = $4,
@@ -771,6 +781,12 @@ RETURNING status
 	if err != nil {
 		return types.ConfirmMFAEnrollmentResult{}, types.NewDBWriteFailed(err.Error())
 	}
+	if err := replaceMFARecoveryCodes(ctx, tx, command, recoveryCodes, verifiedAt); err != nil {
+		return types.ConfirmMFAEnrollmentResult{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.ConfirmMFAEnrollmentResult{}, types.NewDBWriteFailed(err.Error())
+	}
 	return types.ConfirmMFAEnrollmentResult{
 		TenantID:         command.TenantID,
 		UserID:           command.UserID,
@@ -778,6 +794,28 @@ RETURNING status
 		Status:           status,
 		VerifiedAtUnixMS: verifiedAt.UnixMilli(),
 	}, nil
+}
+
+func (r *Repository) FindActiveMFARecoveryCode(ctx context.Context, tenantID types.TenantID, userID types.UserID, codeHash string) (types.MFARecoveryCodeRecord, error) {
+	if r.pool == nil {
+		return types.MFARecoveryCodeRecord{}, types.NewDBReadFailed("identity repository is not configured")
+	}
+	var record types.MFARecoveryCodeRecord
+	err := r.pool.QueryRow(ctx, `
+SELECT code_id, code_hash
+FROM identity_mfa_recovery_codes
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND code_hash = $3
+  AND status = 'ACTIVE'
+`, tenantID, userID, codeHash).Scan(&record.CodeID, &record.CodeHash)
+	if err == pgx.ErrNoRows {
+		return types.MFARecoveryCodeRecord{}, types.NewInvalidMFA("invalid recovery code")
+	}
+	if err != nil {
+		return types.MFARecoveryCodeRecord{}, types.NewDBReadFailed(err.Error())
+	}
+	return record, nil
 }
 
 func (r *Repository) DisableMFAFactor(ctx context.Context, command types.DisableMFAFactorCommand, disabledAt time.Time) (types.DisableMFAFactorResult, error) {
@@ -1829,6 +1867,65 @@ WHERE tenant_id = $1
 	}
 	if tag.RowsAffected() == 0 {
 		return types.NewMFAFactorNotFound("mfa factor not found")
+	}
+	return nil
+}
+
+func replaceMFARecoveryCodes(ctx context.Context, tx pgx.Tx, command types.ConfirmMFAEnrollmentCommand, recoveryCodes []types.MFARecoveryCodeRecord, now time.Time) error {
+	if len(recoveryCodes) == 0 {
+		return types.NewMFAUnavailable("mfa recovery codes are not configured")
+	}
+	if _, err := tx.Exec(ctx, `
+UPDATE identity_mfa_recovery_codes
+SET status = 'DISABLED',
+    disabled_at = $3,
+    updated_at = $3
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND status = 'ACTIVE'
+`, command.TenantID, command.UserID, now); err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	for _, code := range recoveryCodes {
+		if strings.TrimSpace(code.CodeID) == "" || strings.TrimSpace(code.CodeHash) == "" {
+			return types.NewMFAUnavailable("mfa recovery code record is invalid")
+		}
+		if _, err := tx.Exec(ctx, `
+INSERT INTO identity_mfa_recovery_codes (
+    tenant_id,
+    user_id,
+    code_id,
+    code_hash,
+    status,
+    created_at,
+    trace_id,
+    request_id,
+    updated_at
+) VALUES ($1, $2, $3, $4, 'ACTIVE', $5, $6, $7, $5)
+`, command.TenantID, command.UserID, code.CodeID, code.CodeHash, now, command.TraceID, command.RequestID); err != nil {
+			return types.NewDBWriteFailed(err.Error())
+		}
+	}
+	return nil
+}
+
+func consumeMFARecoveryCode(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, record types.MFARecoveryCodeRecord, now time.Time) error {
+	tag, err := tx.Exec(ctx, `
+UPDATE identity_mfa_recovery_codes
+SET status = 'USED',
+    used_at = $5,
+    updated_at = $5
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND code_id = $3
+  AND code_hash = $4
+  AND status = 'ACTIVE'
+`, tenantID, userID, record.CodeID, record.CodeHash, now)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if tag.RowsAffected() == 0 {
+		return types.NewInvalidMFA("invalid recovery code")
 	}
 	return nil
 }

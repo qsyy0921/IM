@@ -428,6 +428,9 @@ func TestRepositoryMFAFactorLifecycleIntegration(t *testing.T) {
 		TenantID: "tenant-identity",
 		UserID:   "user-1",
 		FactorID: "mfa-factor-1",
+	}, []types.MFARecoveryCodeRecord{
+		{CodeID: "recovery-1", CodeHash: "recovery-hash-1"},
+		{CodeID: "recovery-2", CodeHash: "recovery-hash-2"},
 	}, confirmedAt)
 	if err != nil {
 		t.Fatalf("confirm mfa factor: %v", err)
@@ -442,11 +445,18 @@ func TestRepositoryMFAFactorLifecycleIntegration(t *testing.T) {
 	if len(activeFactors) != 1 || activeFactors[0].FactorID != "mfa-factor-1" || activeFactors[0].Secret != secret {
 		t.Fatalf("unexpected active factors after confirm: %+v", activeFactors)
 	}
+	recovery, err := repository.FindActiveMFARecoveryCode(ctx, "tenant-identity", "user-1", "recovery-hash-1")
+	if err != nil {
+		t.Fatalf("find recovery code: %v", err)
+	}
+	if recovery.CodeID != "recovery-1" || recovery.CodeHash != "recovery-hash-1" {
+		t.Fatalf("unexpected recovery code record: %+v", recovery)
+	}
 	_, err = repository.ConfirmMFAFactor(ctx, types.ConfirmMFAEnrollmentCommand{
 		TenantID: "tenant-identity",
 		UserID:   "user-1",
 		FactorID: "mfa-factor-1",
-	}, confirmedAt.Add(time.Minute))
+	}, []types.MFARecoveryCodeRecord{{CodeID: "recovery-replay", CodeHash: "recovery-hash-replay"}}, confirmedAt.Add(time.Minute))
 	if !errors.Is(err, types.ErrMFAFactorNotFound) {
 		t.Fatalf("expected replay confirm to fail as not pending, got %v", err)
 	}
@@ -508,7 +518,7 @@ func TestRepositoryMFALoginFailureLocksAndSuccessClearsIntegration(t *testing.T)
 		TenantID: "tenant-identity",
 		UserID:   "user-1",
 		FactorID: "mfa-factor-login",
-	}, now.Add(time.Minute)); err != nil {
+	}, []types.MFARecoveryCodeRecord{{CodeID: "recovery-login", CodeHash: "recovery-login-hash"}}, now.Add(time.Minute)); err != nil {
 		t.Fatalf("confirm mfa factor: %v", err)
 	}
 
@@ -548,6 +558,70 @@ func TestRepositoryMFALoginFailureLocksAndSuccessClearsIntegration(t *testing.T)
 		t.Fatalf("login after mfa lock window: %v", err)
 	}
 	assertMFALoginRisk(t, ctx, pool, "mfa-factor-login", 0, false, true)
+}
+
+func TestRepositoryMFARecoveryCodeLoginConsumesCodeIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	repository := NewRepository(
+		pool,
+		WithMFAFactorIDGenerator(func() (string, error) { return "mfa-factor-recovery-login", nil }),
+		WithSessionIDGenerator(func() (string, error) { return "session-recovery-login", nil }),
+	)
+	now := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := repository.RegisterUser(ctx, types.RegisterUserCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+	}, "password-hash", now); err != nil {
+		t.Fatalf("register user: %v", err)
+	}
+	if _, err := repository.CreateMFAFactor(ctx, types.BeginMFAEnrollmentCommand{
+		TenantID:   "tenant-identity",
+		UserID:     "user-1",
+		FactorType: types.MFAFactorTypeTOTP,
+	}, types.EncryptedMFASecret{Ciphertext: "encrypted-secret", Nonce: "nonce-value", KeyVersion: "local-v1"}, now); err != nil {
+		t.Fatalf("create mfa factor: %v", err)
+	}
+	if _, err := repository.ConfirmMFAFactor(ctx, types.ConfirmMFAEnrollmentCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		FactorID: "mfa-factor-recovery-login",
+	}, []types.MFARecoveryCodeRecord{{CodeID: "recovery-login-1", CodeHash: "recovery-login-hash-1"}}, now.Add(time.Minute)); err != nil {
+		t.Fatalf("confirm mfa factor: %v", err)
+	}
+	recovery, err := repository.FindActiveMFARecoveryCode(ctx, "tenant-identity", "user-1", "recovery-login-hash-1")
+	if err != nil {
+		t.Fatalf("find recovery code before login: %v", err)
+	}
+	loginAt := now.Add(2 * time.Minute)
+	if _, err := repository.LoginGatewaySession(ctx, types.LoginCommand{
+		TenantID:            "tenant-identity",
+		UserID:              "user-1",
+		DeviceID:            "device-1",
+		Audience:            "push-gateway",
+		UsedMFARecoveryCode: recovery,
+	}, types.RefreshTokenRecord{
+		TokenID:   "rft_recovery_login",
+		TokenHash: "hash-recovery-login",
+	}, loginAt, loginAt.Add(15*time.Minute), loginAt.Add(30*24*time.Hour)); err != nil {
+		t.Fatalf("login with recovery code: %v", err)
+	}
+	if _, err := repository.FindActiveMFARecoveryCode(ctx, "tenant-identity", "user-1", "recovery-login-hash-1"); !errors.Is(err, types.ErrInvalidMFA) {
+		t.Fatalf("expected consumed recovery code to be inactive, got %v", err)
+	}
+	if _, err := repository.LoginGatewaySession(ctx, types.LoginCommand{
+		TenantID:            "tenant-identity",
+		UserID:              "user-1",
+		DeviceID:            "device-2",
+		Audience:            "push-gateway",
+		UsedMFARecoveryCode: recovery,
+	}, types.RefreshTokenRecord{
+		TokenID:   "rft_recovery_replay",
+		TokenHash: "hash-recovery-replay",
+	}, loginAt.Add(time.Minute), loginAt.Add(16*time.Minute), loginAt.Add(30*24*time.Hour)); !errors.Is(err, types.ErrInvalidMFA) {
+		t.Fatalf("expected replayed recovery code to fail, got %v", err)
+	}
 }
 
 func TestRepositoryLoginFailureLocksAndSuccessClearsIntegration(t *testing.T) {

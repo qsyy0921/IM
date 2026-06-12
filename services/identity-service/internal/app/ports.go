@@ -51,3 +51,8 @@ type MFASecretManager interface {
 	VerifyTOTP(encrypted types.EncryptedMFASecret, code string, now time.Time) (bool, error)
 	OTPAuthURI(issuer string, accountName string, secret string) string
 }
+
+type MFARecoveryCodeManager interface {
+	NewRecoveryCodes(count int) ([]types.MFARecoveryCode, error)
+	HashRecoveryCode(code string) (string, error)
+}

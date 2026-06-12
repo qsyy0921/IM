@@ -32,6 +32,7 @@ type LoginUseCase struct {
 	passwords     PasswordVerifier
 	refreshTokens RefreshTokenCodec
 	mfaSecrets    MFASecretManager
+	recoveryCodes MFARecoveryCodeManager
 	now           func() time.Time
 	risk          LoginRiskPolicy
 	mfaRisk       LoginRiskPolicy
@@ -43,6 +44,7 @@ type LoginRepository interface {
 	LoginGatewaySession(context.Context, types.LoginCommand, types.RefreshTokenRecord, time.Time, time.Time, time.Time) (types.LoginResult, error)
 	ListActiveMFAFactorSecrets(context.Context, types.TenantID, types.UserID) ([]types.MFAFactorSecret, error)
 	RecordMFALoginFailure(context.Context, types.TenantID, types.UserID, types.MFAFactorID, time.Time, time.Time, int, time.Time) error
+	FindActiveMFARecoveryCode(context.Context, types.TenantID, types.UserID, string) (types.MFARecoveryCodeRecord, error)
 }
 
 func NewLoginUseCase(repository LoginRepository, signer TokenSigner, passwords PasswordVerifier, refreshTokens RefreshTokenCodec, opts ...LoginUseCaseOption) *LoginUseCase {
@@ -80,6 +82,12 @@ func WithLoginRiskPolicy(policy LoginRiskPolicy) LoginUseCaseOption {
 func WithLoginMFASecretManager(manager MFASecretManager) LoginUseCaseOption {
 	return func(uc *LoginUseCase) {
 		uc.mfaSecrets = manager
+	}
+}
+
+func WithLoginMFARecoveryCodeManager(manager MFARecoveryCodeManager) LoginUseCaseOption {
+	return func(uc *LoginUseCase) {
+		uc.recoveryCodes = manager
 	}
 }
 
@@ -152,11 +160,12 @@ func (uc *LoginUseCase) Execute(ctx context.Context, command types.LoginCommand)
 		}
 		return types.LoginResult{}, types.NewInvalidCredentials("invalid credentials")
 	}
-	verifiedMFAFactorID, err := uc.verifyMFAIfRequired(ctx, command, now)
+	verifiedMFAFactorID, usedRecoveryCode, err := uc.verifyMFAIfRequired(ctx, command, now)
 	if err != nil {
 		return types.LoginResult{}, err
 	}
 	command.VerifiedMFAFactorID = verifiedMFAFactorID
+	command.UsedMFARecoveryCode = usedRecoveryCode
 
 	command.Audience = domain.NormalizeAudience(command.Audience)
 	issuedAt := now
@@ -190,40 +199,55 @@ func (uc *LoginUseCase) Execute(ctx context.Context, command types.LoginCommand)
 	return result, nil
 }
 
-func (uc *LoginUseCase) verifyMFAIfRequired(ctx context.Context, command types.LoginCommand, now time.Time) (types.MFAFactorID, error) {
+func (uc *LoginUseCase) verifyMFAIfRequired(ctx context.Context, command types.LoginCommand, now time.Time) (types.MFAFactorID, types.MFARecoveryCodeRecord, error) {
 	factors, err := uc.repository.ListActiveMFAFactorSecrets(ctx, command.TenantID, command.UserID)
 	if err != nil {
-		return "", err
+		return "", types.MFARecoveryCodeRecord{}, err
 	}
 	if len(factors) == 0 {
-		return "", nil
+		return "", types.MFARecoveryCodeRecord{}, nil
+	}
+	recoveryCode := strings.TrimSpace(command.MFARecoveryCode)
+	if recoveryCode != "" {
+		if uc.recoveryCodes == nil {
+			return "", types.MFARecoveryCodeRecord{}, types.NewMFAUnavailable("mfa recovery code manager is not configured")
+		}
+		codeHash, err := uc.recoveryCodes.HashRecoveryCode(recoveryCode)
+		if err != nil {
+			return "", types.MFARecoveryCodeRecord{}, err
+		}
+		record, err := uc.repository.FindActiveMFARecoveryCode(ctx, command.TenantID, command.UserID, codeHash)
+		if err != nil {
+			return "", types.MFARecoveryCodeRecord{}, err
+		}
+		return "", record, nil
 	}
 	code := strings.TrimSpace(command.MFACode)
 	if code == "" {
-		return "", types.NewMFARequired("mfa required")
+		return "", types.MFARecoveryCodeRecord{}, types.NewMFARequired("mfa required")
 	}
 	if uc.mfaSecrets == nil {
-		return "", types.NewMFAUnavailable("mfa secret manager is not configured")
+		return "", types.MFARecoveryCodeRecord{}, types.NewMFAUnavailable("mfa secret manager is not configured")
 	}
 	factor, ok := selectMFAFactor(factors, command.MFAFactorID)
 	if !ok {
-		return "", types.NewInvalidMFA("invalid mfa factor")
+		return "", types.MFARecoveryCodeRecord{}, types.NewInvalidMFA("invalid mfa factor")
 	}
 	if factor.LoginLockedUntil.After(now) {
-		return "", types.NewMFALocked("mfa temporarily locked")
+		return "", types.MFARecoveryCodeRecord{}, types.NewMFALocked("mfa temporarily locked")
 	}
 	verified, err := uc.mfaSecrets.VerifyTOTP(factor.Secret, code, now)
 	if err != nil {
-		return "", err
+		return "", types.MFARecoveryCodeRecord{}, err
 	}
 	if !verified {
 		lockUntil := now.Add(uc.mfaRisk.LockDuration)
 		if err := uc.repository.RecordMFALoginFailure(ctx, command.TenantID, command.UserID, factor.FactorID, now, lockUntil, uc.mfaRisk.MaxFailedAttempts, now.Add(-uc.mfaRisk.FailureWindow)); err != nil {
-			return "", err
+			return "", types.MFARecoveryCodeRecord{}, err
 		}
-		return "", types.NewInvalidMFA("invalid mfa code")
+		return "", types.MFARecoveryCodeRecord{}, types.NewInvalidMFA("invalid mfa code")
 	}
-	return factor.FactorID, nil
+	return factor.FactorID, types.MFARecoveryCodeRecord{}, nil
 }
 
 func selectMFAFactor(factors []types.MFAFactorSecret, factorID types.MFAFactorID) (types.MFAFactorSecret, bool) {

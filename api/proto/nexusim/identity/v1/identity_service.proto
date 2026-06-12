@@ -55,6 +55,7 @@ message LoginRequest {
   string request_id = 9;
   string mfa_factor_id = 10;
   string mfa_code = 11;
+  string mfa_recovery_code = 12;
 }
 
 message LoginResponse {
@@ -208,6 +209,7 @@ message ConfirmMFAEnrollmentResponse {
   string factor_id = 3;
   MFAFactorStatus status = 4;
   int64 verified_at_unix_ms = 5;
+  repeated string recovery_codes = 6;
 }
 
 message DisableMFAFactorRequest {

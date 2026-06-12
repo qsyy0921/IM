@@ -94,7 +94,9 @@ type LoginCommand struct {
 	RefreshTTLSeconds   int64
 	MFAFactorID         MFAFactorID
 	MFACode             string
+	MFARecoveryCode     string
 	VerifiedMFAFactorID MFAFactorID
+	UsedMFARecoveryCode MFARecoveryCodeRecord
 	TraceID             string
 	RequestID           string
 }
@@ -250,6 +252,7 @@ type ConfirmMFAEnrollmentResult struct {
 	FactorID         MFAFactorID
 	Status           MFAFactorStatus
 	VerifiedAtUnixMS int64
+	RecoveryCodes    []string
 }
 
 type DisableMFAFactorCommand struct {
@@ -289,6 +292,17 @@ type MFAFactorSecret struct {
 	Secret           EncryptedMFASecret
 	LoginFailedCount int
 	LoginLockedUntil time.Time
+}
+
+type MFARecoveryCodeRecord struct {
+	CodeID   string
+	CodeHash string
+}
+
+type MFARecoveryCode struct {
+	CodeID   string
+	Code     string
+	CodeHash string
 }
 
 type IdentityChallenge struct {

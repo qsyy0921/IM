@@ -120,10 +120,16 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 			return err
 		}
 		closers = append(closers, closeDelivery)
+		jwksJSON, err := loadPushAuthJWKSetJSON()
+		if err != nil {
+			return err
+		}
 		authenticator, err := authinfra.NewAuthenticator(authinfra.Config{
 			Mode:            authinfra.Mode(envString("NEXUSIM_PUSH_AUTH_MODE", "mock")),
 			Secret:          os.Getenv("NEXUSIM_PUSH_AUTH_HMAC_SECRET"),
 			PreviousSecrets: splitCSV(os.Getenv("NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS")),
+			JWKSetJSON:      jwksJSON,
+			TrustedIssuers:  splitCSV(os.Getenv("NEXUSIM_PUSH_AUTH_TRUSTED_ISSUERS")),
 			Revocation:      revocationStore,
 		})
 		if err != nil {
@@ -373,6 +379,21 @@ func defaultGatewayID() string {
 		hostname = "gateway"
 	}
 	return hostname + "-" + strconv.Itoa(os.Getpid())
+}
+
+func loadPushAuthJWKSetJSON() (string, error) {
+	if value := strings.TrimSpace(os.Getenv("NEXUSIM_PUSH_AUTH_JWKS_JSON")); value != "" {
+		return value, nil
+	}
+	path := strings.TrimSpace(os.Getenv("NEXUSIM_PUSH_AUTH_JWKS_FILE"))
+	if path == "" {
+		return "", nil
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return string(content), nil
 }
 
 func splitCSV(value string) []string {

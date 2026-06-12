@@ -22,8 +22,14 @@ import (
 	postgresinfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/postgres"
 	tokeninfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/token"
 	"github.com/qsyy0921/IM/services/identity-service/internal/trigger/outbox"
+	"github.com/qsyy0921/IM/services/identity-service/internal/types"
 	"google.golang.org/grpc"
 )
+
+type gatewayTokenSigner interface {
+	SignGatewayToken(types.TokenClaims) (string, error)
+	JWKSet() tokeninfra.JWKSet
+}
 
 func main() {
 	if err := run(); err != nil && !errors.Is(err, context.Canceled) {
@@ -120,7 +126,7 @@ func runGRPC() error {
 	}
 }
 
-func newGatewayTokenSigner() (*tokeninfra.HMACSigner, error) {
+func newGatewayTokenSigner() (gatewayTokenSigner, error) {
 	secret := envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_SECRET", envString("NEXUSIM_PUSH_AUTH_HMAC_SECRET", ""))
 	switch strings.ToLower(envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_FORMAT", "legacy")) {
 	case "legacy", "hmac", "custom":
@@ -131,9 +137,34 @@ func newGatewayTokenSigner() (*tokeninfra.HMACSigner, error) {
 			envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_KEY_ID", ""),
 			envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ISSUER", ""),
 		)
+	case "jwt-rs256", "rs256":
+		privateKeyPEM, err := loadRSAPrivateKeyPEM()
+		if err != nil {
+			return nil, err
+		}
+		return tokeninfra.NewRS256SignerFromPEM(
+			privateKeyPEM,
+			envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_KEY_ID", ""),
+			envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ISSUER", ""),
+		)
 	default:
 		return nil, errors.New("unsupported NEXUSIM_IDENTITY_GATEWAY_TOKEN_FORMAT")
 	}
+}
+
+func loadRSAPrivateKeyPEM() (string, error) {
+	if pemValue := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_RSA_PRIVATE_KEY_PEM")); pemValue != "" {
+		return pemValue, nil
+	}
+	path := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_RSA_PRIVATE_KEY_FILE"))
+	if path == "" {
+		return "", errors.New("NEXUSIM_IDENTITY_GATEWAY_TOKEN_RSA_PRIVATE_KEY_PEM or NEXUSIM_IDENTITY_GATEWAY_TOKEN_RSA_PRIVATE_KEY_FILE is required for RS256")
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return string(content), nil
 }
 
 func runOutboxRelay() error {

@@ -12,7 +12,7 @@ param(
     [string]$MessageChangeAction = "edit",
     [ValidateSet("memory", "redis")]
     [string]$RouteBackend = "memory",
-    [ValidateSet("mock", "hmac")]
+    [ValidateSet("mock", "hmac", "jwt")]
     [string]$PushAuthMode = "mock",
     [switch]$UseIdentityServiceToken,
     [ValidateSet("device", "session")]
@@ -20,7 +20,7 @@ param(
     [string]$PushAuthHmacSecret = "local-push-smoke-secret",
     [string]$PushAuthHmacPreviousSecrets = "",
     [string]$PushAuthTokenSigningSecret = "",
-    [ValidateSet("legacy", "jwt")]
+    [ValidateSet("legacy", "jwt", "jwt-rs256", "rs256")]
     [string]$IdentityGatewayTokenFormat = "legacy",
     [ValidateSet("issue_gateway_token", "login", "register_login")]
     [string]$IdentityTokenMethod = "issue_gateway_token",
@@ -230,11 +230,22 @@ Write-Output "sentinel_restored_health=$state"
 
 . .\tools\go-env.ps1
 
-if ($UseIdentityServiceToken -and $PushAuthMode -ne "hmac") {
-    throw "-UseIdentityServiceToken requires -PushAuthMode hmac"
+if ($UseIdentityServiceToken -and $PushAuthMode -notin @("hmac", "jwt")) {
+    throw "-UseIdentityServiceToken requires -PushAuthMode hmac or jwt"
+}
+if ($PushAuthMode -eq "jwt") {
+    if (-not $UseIdentityServiceToken) {
+        throw "-PushAuthMode jwt requires -UseIdentityServiceToken"
+    }
+    if ($IdentityGatewayTokenFormat -notin @("jwt-rs256", "rs256")) {
+        throw "-PushAuthMode jwt requires -IdentityGatewayTokenFormat jwt-rs256"
+    }
 }
 if ($Scenario -eq "identity-revoke" -and -not $UseIdentityServiceToken) {
     throw "identity-revoke scenario requires -UseIdentityServiceToken"
+}
+if ($Scenario -eq "identity-revoke" -and $PushAuthMode -ne "hmac") {
+    throw "identity-revoke scenario currently requires -PushAuthMode hmac"
 }
 
 if (-not $SkipBuild) {
@@ -333,8 +344,95 @@ function Add-PushRedisEnv {
     return $Env
 }
 
+function Add-PushAuthEnv {
+    param([hashtable]$Env)
+    $Env["NEXUSIM_PUSH_AUTH_MODE"] = $PushAuthMode
+    $Env["NEXUSIM_PUSH_AUTH_HMAC_SECRET"] = $PushAuthHmacSecret
+    $Env["NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS"] = $PushAuthHmacPreviousSecrets
+    if ($rs256SmokeKeyMaterial) {
+        $Env["NEXUSIM_PUSH_AUTH_JWKS_FILE"] = $rs256SmokeKeyMaterial.JwksFile
+        $Env["NEXUSIM_PUSH_AUTH_TRUSTED_ISSUERS"] = "nexusim-identity"
+    }
+    return $Env
+}
+
+function New-RS256SmokeKeyMaterial {
+    param(
+        [string]$Directory,
+        [string]$KeyID
+    )
+    $generator = Join-Path $Directory "generate-rs256-smoke-key.go"
+    @'
+package main
+
+import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/json"
+	"encoding/pem"
+	"os"
+	"math/big"
+)
+
+func base64URL(bytes []byte) string {
+	return base64.RawURLEncoding.EncodeToString(bytes)
+}
+
+func main() {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		panic(err)
+	}
+	privatePEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(key),
+	})
+	jwks, err := json.Marshal(map[string]any{
+		"keys": []map[string]string{{
+			"kty": "RSA",
+			"use": "sig",
+			"kid": os.Args[1],
+			"alg": "RS256",
+			"n":   base64URL(key.PublicKey.N.Bytes()),
+			"e":   base64URL(big.NewInt(int64(key.PublicKey.E)).Bytes()),
+		}},
+	})
+	if err != nil {
+		panic(err)
+	}
+	if err := json.NewEncoder(os.Stdout).Encode(map[string]string{
+		"private_key_pem": string(privatePEM),
+		"jwks_json":       string(jwks),
+	}); err != nil {
+		panic(err)
+	}
+}
+'@ | Set-Content -LiteralPath $generator -Encoding UTF8
+    $raw = & go run $generator $KeyID
+    if ($LASTEXITCODE -ne 0) {
+        throw "failed to generate RS256 smoke key"
+    }
+    $material = $raw | ConvertFrom-Json
+    $privateKeyFile = Join-Path $Directory "identity-gateway-rs256-private.pem"
+    $jwksFile = Join-Path $Directory "push-auth-rs256-jwks.json"
+    Set-Content -LiteralPath $privateKeyFile -Value $material.private_key_pem -Encoding ASCII
+    Set-Content -LiteralPath $jwksFile -Value $material.jwks_json -Encoding ASCII
+    return @{
+        KeyID = $KeyID
+        PrivateKeyFile = $privateKeyFile
+        JwksFile = $jwksFile
+    }
+}
+
 $processes = @()
 try {
+    $rs256SmokeKeyMaterial = $null
+    if ($UseIdentityServiceToken -and $IdentityGatewayTokenFormat -in @("jwt-rs256", "rs256")) {
+        $rs256SmokeKeyMaterial = New-RS256SmokeKeyMaterial -Directory $resultDir -KeyID "push-smoke-gateway-rs256"
+    }
+
     Ensure-KafkaTopic -Topic $timelineTopic
     Ensure-KafkaTopic -Topic $deliveryTopic
     if ($Scenario -eq "identity-revoke") {
@@ -399,15 +497,19 @@ try {
     }
 
     if ($UseIdentityServiceToken) {
-        $processes += Start-NexusProcess -Name "identity-grpc" -FilePath $identityService -Port 11610 -Env @{
+        $identityEnv = @{
             NEXUSIM_IDENTITY_SERVICE_MODE = "grpc"
             NEXUSIM_IDENTITY_GRPC_ADDR = "127.0.0.1:11610"
             NEXUSIM_PG_DSN = $PgDsn
             NEXUSIM_IDENTITY_GATEWAY_TOKEN_SECRET = $PushAuthHmacSecret
             NEXUSIM_IDENTITY_GATEWAY_TOKEN_FORMAT = $IdentityGatewayTokenFormat
-            NEXUSIM_IDENTITY_GATEWAY_TOKEN_KEY_ID = "push-smoke-gateway-hs256"
+            NEXUSIM_IDENTITY_GATEWAY_TOKEN_KEY_ID = $(if ($rs256SmokeKeyMaterial) { $rs256SmokeKeyMaterial.KeyID } else { "push-smoke-gateway-hs256" })
             NEXUSIM_IDENTITY_GATEWAY_TOKEN_ISSUER = "nexusim-identity"
         }
+        if ($rs256SmokeKeyMaterial) {
+            $identityEnv["NEXUSIM_IDENTITY_GATEWAY_TOKEN_RSA_PRIVATE_KEY_FILE"] = $rs256SmokeKeyMaterial.PrivateKeyFile
+        }
+        $processes += Start-NexusProcess -Name "identity-grpc" -FilePath $identityService -Port 11610 -Env $identityEnv
         if ($Scenario -eq "identity-revoke") {
             $processes += Start-NexusProcess -Name "identity-outbox-relay" -FilePath $identityService -Env @{
                 NEXUSIM_IDENTITY_SERVICE_MODE = "outbox-relay"
@@ -420,7 +522,7 @@ try {
     }
 
     if ($RouteBackend -eq "redis") {
-        $processes += Start-NexusProcess -Name "push-gateway-ws" -FilePath $pushGateway -Port 11598 -Env (Add-PushRedisEnv @{
+        $processes += Start-NexusProcess -Name "push-gateway-ws" -FilePath $pushGateway -Port 11598 -Env (Add-PushRedisEnv (Add-PushAuthEnv @{
             NEXUSIM_PUSH_GATEWAY_MODE = "ws"
             NEXUSIM_PUSH_WS_ADDR = "127.0.0.1:11598"
             NEXUSIM_DELIVERY_GRPC_ADDR = "127.0.0.1:11597"
@@ -428,15 +530,12 @@ try {
             NEXUSIM_PUSH_SESSION_QUEUE_SIZE = $pushSessionQueueSize
             NEXUSIM_PUSH_WRITE_TIMEOUT = $pushWriteTimeout
             NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
-            NEXUSIM_PUSH_AUTH_MODE = $PushAuthMode
-            NEXUSIM_PUSH_AUTH_HMAC_SECRET = $PushAuthHmacSecret
-            NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS = $PushAuthHmacPreviousSecrets
             NEXUSIM_PUSH_ROUTE_BACKEND = "redis"
             NEXUSIM_PUSH_GATEWAY_ID = $pushWSGatewayID
             NEXUSIM_PUSH_ROUTE_TTL = "90s"
-        })
+        }))
         if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover" -or $Scenario -eq "redis-sentinel-master-stop") {
-            $processes += Start-NexusProcess -Name "push-gateway-ws-reconnect" -FilePath $pushGateway -Port 11599 -Env (Add-PushRedisEnv @{
+            $processes += Start-NexusProcess -Name "push-gateway-ws-reconnect" -FilePath $pushGateway -Port 11599 -Env (Add-PushRedisEnv (Add-PushAuthEnv @{
                 NEXUSIM_PUSH_GATEWAY_MODE = "ws"
                 NEXUSIM_PUSH_WS_ADDR = "127.0.0.1:11599"
                 NEXUSIM_DELIVERY_GRPC_ADDR = "127.0.0.1:11597"
@@ -444,13 +543,10 @@ try {
                 NEXUSIM_PUSH_SESSION_QUEUE_SIZE = $pushSessionQueueSize
                 NEXUSIM_PUSH_WRITE_TIMEOUT = $pushWriteTimeout
                 NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
-                NEXUSIM_PUSH_AUTH_MODE = $PushAuthMode
-                NEXUSIM_PUSH_AUTH_HMAC_SECRET = $PushAuthHmacSecret
-                NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS = $PushAuthHmacPreviousSecrets
                 NEXUSIM_PUSH_ROUTE_BACKEND = "redis"
                 NEXUSIM_PUSH_GATEWAY_ID = $pushReconnectGatewayID
                 NEXUSIM_PUSH_ROUTE_TTL = "90s"
-            })
+            }))
         }
         $processes += Start-NexusProcess -Name "push-gateway-consumer" -FilePath $pushGateway -Env (Add-PushRedisEnv @{
             NEXUSIM_PUSH_GATEWAY_MODE = "delivery-consumer"
@@ -475,7 +571,7 @@ try {
             })
         }
     } else {
-        $processes += Start-NexusProcess -Name "push-gateway" -FilePath $pushGateway -Port 11598 -Env @{
+        $processes += Start-NexusProcess -Name "push-gateway" -FilePath $pushGateway -Port 11598 -Env (Add-PushAuthEnv @{
             NEXUSIM_PUSH_GATEWAY_MODE = "all"
             NEXUSIM_PUSH_WS_ADDR = "127.0.0.1:11598"
             NEXUSIM_DELIVERY_GRPC_ADDR = "127.0.0.1:11597"
@@ -488,10 +584,7 @@ try {
             NEXUSIM_PUSH_SESSION_QUEUE_SIZE = $pushSessionQueueSize
             NEXUSIM_PUSH_WRITE_TIMEOUT = $pushWriteTimeout
             NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
-            NEXUSIM_PUSH_AUTH_MODE = $PushAuthMode
-            NEXUSIM_PUSH_AUTH_HMAC_SECRET = $PushAuthHmacSecret
-            NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS = $PushAuthHmacPreviousSecrets
-        }
+        })
     }
 
     $processes += Start-NexusProcess -Name "message-grpc" -FilePath $messageService -Port 11595 -Env @{

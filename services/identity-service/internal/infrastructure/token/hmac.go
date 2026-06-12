@@ -59,6 +59,8 @@ type JWK struct {
 	KeyID     string `json:"kid,omitempty"`
 	Algorithm string `json:"alg,omitempty"`
 	Key       string `json:"k,omitempty"`
+	Modulus   string `json:"n,omitempty"`
+	Exponent  string `json:"e,omitempty"`
 }
 
 func NewHMACSigner(secret string) (*HMACSigner, error) {

@@ -375,12 +375,12 @@ func parseConfig() config {
 	flag.StringVar(&cfg.reconnectMetricsURL, "reconnect-push-metrics-url", "", "optional debug metrics URL for reconnect/resume gateway")
 	flag.StringVar(&cfg.consumerMetricsURL, "consumer-push-metrics-url", "", "optional debug metrics URL for delivery-consumer gateway")
 	flag.StringVar(&cfg.routeBackend, "route-backend", "", "push route backend used by the smoke environment")
-	flag.StringVar(&cfg.pushAuthMode, "push-auth-mode", "mock", "push-gateway auth mode used by the smoke environment: mock or hmac")
+	flag.StringVar(&cfg.pushAuthMode, "push-auth-mode", "mock", "push-gateway auth mode used by the smoke environment: mock, hmac, or jwt")
 	flag.StringVar(&cfg.pushAuthHMACSecret, "push-auth-hmac-secret", "", "HMAC secret used to sign push gateway smoke tokens when --push-auth-mode=hmac")
 	flag.StringVar(&cfg.pushAuthHMACPreviousSecrets, "push-auth-hmac-previous-secrets", "", "comma separated previous HMAC secrets configured on push-gateway during rotation smoke; used only for summary evidence")
 	flag.StringVar(&cfg.pushAuthTokenSigningSecret, "push-auth-token-signing-secret", "", "optional HMAC secret used only for signing smoke tokens; defaults to --push-auth-hmac-secret")
 	flag.DurationVar(&cfg.pushAuthTokenTTL, "push-auth-token-ttl", 10*time.Minute, "TTL for generated push gateway HMAC smoke tokens")
-	flag.StringVar(&cfg.identityGatewayTokenFormat, "identity-gateway-token-format", "legacy", "identity-service gateway token format used by smoke environment: legacy or jwt")
+	flag.StringVar(&cfg.identityGatewayTokenFormat, "identity-gateway-token-format", "legacy", "identity-service gateway token format used by smoke environment: legacy, jwt, or jwt-rs256")
 	flag.StringVar(&cfg.identityTokenMethod, "identity-token-method", "issue_gateway_token", "identity-service token method: issue_gateway_token, login, or register_login")
 	flag.StringVar(&cfg.identityLoginPassword, "identity-login-password", "push-smoke-password", "password used when --identity-token-method=login or register_login")
 	flag.StringVar(&cfg.redisKeyPrefix, "redis-key-prefix", "", "Redis route key prefix used by the smoke environment")
@@ -433,6 +433,9 @@ func run(cfg config) error {
 	}
 	if cfg.pushAuthMode == "hmac" && strings.TrimSpace(cfg.pushAuthHMACSecret) == "" {
 		return fmt.Errorf("--push-auth-hmac-secret is required when --push-auth-mode=hmac")
+	}
+	if cfg.pushAuthMode == "jwt" && strings.TrimSpace(cfg.identityTarget) == "" {
+		return fmt.Errorf("--identity-target is required when --push-auth-mode=jwt")
 	}
 	if strings.TrimSpace(cfg.identityTarget) != "" && cfg.identityTokenMethod != "issue_gateway_token" && cfg.identityTokenMethod != "login" && cfg.identityTokenMethod != "register_login" {
 		return fmt.Errorf("--identity-token-method must be issue_gateway_token, login, or register_login")
@@ -525,7 +528,7 @@ func run(cfg config) error {
 		PushAuthPreviousSecretsConfigured:       strings.TrimSpace(cfg.pushAuthHMACPreviousSecrets) != "",
 		PushAuthTokenSigningSecretExplicit:      cfg.pushAuthTokenSigningSecretExplicit,
 		PushAuthTokenSignedWithNonCurrentSecret: pushAuthTokenSignedWithNonCurrentSecret(cfg),
-		PushAuthQueryIdentitySent:               cfg.pushAuthMode != "hmac",
+		PushAuthQueryIdentitySent:               pushAuthQueryIdentitySent(cfg),
 		RedisKeyPrefix:                          cfg.redisKeyPrefix,
 		PushWSGatewayID:                         cfg.pushWSGatewayID,
 		PushReconnectGatewayID:                  cfg.pushReconnectGatewayID,
@@ -1309,7 +1312,7 @@ func connectWebSocketWithTokenAndResume(
 	case "", "mock":
 		query.Set("tenant_id", cfg.tenantID)
 		query.Set("user_id", cfg.receiverUserID)
-	case "hmac":
+	case "hmac", "jwt":
 		if token == "" {
 			token, err = gatewayToken(ctx, cfg, deviceID)
 			if err != nil {
@@ -1627,14 +1630,18 @@ func revokeIdentitySession(ctx context.Context, cfg config, sessionID string) er
 }
 
 func pushAuthTokenTransport(cfg config) string {
-	if cfg.pushAuthMode == "hmac" {
+	if isSignedPushAuthMode(cfg.pushAuthMode) {
 		return "authorization_header"
 	}
 	return "query"
 }
 
+func pushAuthQueryIdentitySent(cfg config) bool {
+	return !isSignedPushAuthMode(cfg.pushAuthMode)
+}
+
 func pushAuthTokenSource(cfg config) string {
-	if cfg.pushAuthMode != "hmac" {
+	if !isSignedPushAuthMode(cfg.pushAuthMode) {
 		return "query_identity"
 	}
 	if strings.TrimSpace(cfg.identityTarget) != "" {
@@ -1648,6 +1655,10 @@ func pushAuthTokenSource(cfg config) string {
 		}
 	}
 	return "local_hmac"
+}
+
+func isSignedPushAuthMode(mode string) bool {
+	return mode == "hmac" || mode == "jwt"
 }
 
 func identityGatewayTokenFormat(cfg config) string {

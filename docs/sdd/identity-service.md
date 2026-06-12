@@ -104,11 +104,17 @@ Gateway tokens are compatible with push-gateway HMAC mode. The legacy token form
 base64url(json claims) + "." + base64url(hmac_sha256(payload, secret))
 ```
 
-The current implementation also supports standard three-part JWT HS256 gateway tokens:
+The current implementation also supports standard three-part JWT gateway tokens:
 
 ```text
 base64url(header) + "." + base64url(claims) + "." + base64url(signature)
 ```
+
+Supported signing modes:
+
+- `legacy` / `hmac`: local HMAC compatibility token for old smoke runners.
+- `jwt` / `jwt-hs256`: standard JWT with HS256. This is still local / internal debug compatibility because push-gateway must know the symmetric signing secret.
+- `jwt-rs256` / `rs256`: standard JWT with RS256. `identity-service` loads an RSA private key from `NEXUSIM_IDENTITY_GATEWAY_TOKEN_RSA_PRIVATE_KEY_PEM` or `NEXUSIM_IDENTITY_GATEWAY_TOKEN_RSA_PRIVATE_KEY_FILE`; its debug server exposes only public RSA JWK material through `/.well-known/jwks.json` / `/jwks.json`. `push-gateway` verifies locally with `NEXUSIM_PUSH_AUTH_MODE=jwt` plus `NEXUSIM_PUSH_AUTH_JWKS_JSON` or `NEXUSIM_PUSH_AUTH_JWKS_FILE`, and may restrict `iss` with `NEXUSIM_PUSH_AUTH_TRUSTED_ISSUERS`.
 
 Claims:
 
@@ -123,7 +129,7 @@ Claims:
 
 The default audience is `push-gateway`. Tokens are short-lived. Revocation is enforced at issuance / refresh time and asynchronously projected to push-gateway deny-lists through `im.identity.events`.
 
-The identity debug server can expose `/.well-known/jwks.json` / `/jwks.json` for the current HS256 key. This is internal debug compatibility only because it exposes a symmetric `oct` key; production-grade JWKS should use an asymmetric key ring so gateways only receive public keys.
+The first RS256 implementation is a local static key-ring slice, not a complete production key management system. Production hardening still needs remote JWKS refresh / cache, multiple active RSA or EC keys, overlap windows for rotation, KMS / HSM backed private keys, stronger issuer governance, trace / alert coverage and operational runbooks.
 
 ## Revoke Events
 

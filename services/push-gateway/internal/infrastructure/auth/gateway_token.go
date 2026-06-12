@@ -2,11 +2,14 @@ package auth
 
 import (
 	"context"
+	"crypto"
 	"crypto/hmac"
+	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"math/big"
 	"net/http"
 	"strconv"
 	"strings"
@@ -20,12 +23,15 @@ type Mode string
 const (
 	ModeMock Mode = "mock"
 	ModeHMAC Mode = "hmac"
+	ModeJWT  Mode = "jwt"
 )
 
 type Config struct {
 	Mode            Mode
 	Secret          string
 	PreviousSecrets []string
+	JWKSetJSON      string
+	TrustedIssuers  []string
 	Audience        string
 	Revocation      RevocationChecker
 	Now             func() time.Time
@@ -38,6 +44,8 @@ type RevocationChecker interface {
 type Authenticator struct {
 	mode       Mode
 	secrets    [][]byte
+	publicKeys map[string]*rsa.PublicKey
+	issuers    map[string]struct{}
 	audience   string
 	revocation RevocationChecker
 	now        func() time.Time
@@ -60,6 +68,19 @@ type tokenHeader struct {
 	Algorithm string `json:"alg"`
 	Type      string `json:"typ"`
 	KeyID     string `json:"kid,omitempty"`
+}
+
+type jwkSet struct {
+	Keys []jwk `json:"keys"`
+}
+
+type jwk struct {
+	KeyType   string `json:"kty"`
+	KeyUse    string `json:"use,omitempty"`
+	KeyID     string `json:"kid,omitempty"`
+	Algorithm string `json:"alg,omitempty"`
+	Modulus   string `json:"n,omitempty"`
+	Exponent  string `json:"e,omitempty"`
 }
 
 func NewAuthenticator(config Config) (*Authenticator, error) {
@@ -97,6 +118,14 @@ func NewAuthenticator(config Config) (*Authenticator, error) {
 			authenticator.secrets = append(authenticator.secrets, []byte(previous))
 		}
 		return authenticator, nil
+	case ModeJWT:
+		keys, err := parseRS256JWKSet(config.JWKSetJSON)
+		if err != nil {
+			return nil, err
+		}
+		authenticator.publicKeys = keys
+		authenticator.issuers = normalizeIssuers(config.TrustedIssuers)
+		return authenticator, nil
 	default:
 		return nil, errors.New("unsupported NEXUSIM_PUSH_AUTH_MODE")
 	}
@@ -110,13 +139,15 @@ func (authenticator *Authenticator) Authenticate(request *http.Request) (types.A
 	case ModeMock:
 		return authenticateMock(request)
 	case ModeHMAC:
-		return authenticator.authenticateHMAC(request)
+		return authenticator.authenticateSignedToken(request)
+	case ModeJWT:
+		return authenticator.authenticateSignedToken(request)
 	default:
 		return types.AuthContext{}, types.ErrPermissionDenied
 	}
 }
 
-func (authenticator *Authenticator) authenticateHMAC(request *http.Request) (types.AuthContext, error) {
+func (authenticator *Authenticator) authenticateSignedToken(request *http.Request) (types.AuthContext, error) {
 	query := request.URL.Query()
 	token := strings.TrimSpace(query.Get("token"))
 	if token == "" {
@@ -158,6 +189,9 @@ func (authenticator *Authenticator) parseToken(token string) (tokenClaims, error
 	parts := strings.Split(token, ".")
 	switch len(parts) {
 	case 2:
+		if authenticator.mode != ModeHMAC {
+			return tokenClaims{}, types.ErrPermissionDenied
+		}
 		return authenticator.parseLegacyToken(parts)
 	case 3:
 		return authenticator.parseJWT(parts)
@@ -178,7 +212,7 @@ func (authenticator *Authenticator) parseLegacyToken(parts []string) (tokenClaim
 	if err != nil {
 		return tokenClaims{}, types.ErrPermissionDenied
 	}
-	if !authenticator.validSignature(parts[0], signature) {
+	if !authenticator.validHMACSignature(parts[0], signature) {
 		return tokenClaims{}, types.ErrPermissionDenied
 	}
 	return authenticator.parseClaims(payloadBytes)
@@ -196,14 +230,23 @@ func (authenticator *Authenticator) parseJWT(parts []string) (tokenClaims, error
 	if err := json.Unmarshal(headerBytes, &header); err != nil {
 		return tokenClaims{}, types.ErrPermissionDenied
 	}
-	if header.Algorithm != "HS256" || header.Type != "JWT" {
+	if header.Type != "JWT" {
 		return tokenClaims{}, types.ErrPermissionDenied
 	}
 	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
 	if err != nil {
 		return tokenClaims{}, types.ErrPermissionDenied
 	}
-	if !authenticator.validSignature(parts[0]+"."+parts[1], signature) {
+	switch authenticator.mode {
+	case ModeHMAC:
+		if header.Algorithm != "HS256" || !authenticator.validHMACSignature(parts[0]+"."+parts[1], signature) {
+			return tokenClaims{}, types.ErrPermissionDenied
+		}
+	case ModeJWT:
+		if header.Algorithm != "RS256" || !authenticator.validRS256Signature(header.KeyID, parts[0]+"."+parts[1], signature) {
+			return tokenClaims{}, types.ErrPermissionDenied
+		}
+	default:
 		return tokenClaims{}, types.ErrPermissionDenied
 	}
 	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
@@ -221,13 +264,18 @@ func (authenticator *Authenticator) parseClaims(payloadBytes []byte) (tokenClaim
 	if claims.TenantID == "" || claims.UserID == "" || claims.Audience != authenticator.audience {
 		return tokenClaims{}, types.ErrPermissionDenied
 	}
+	if len(authenticator.issuers) > 0 {
+		if _, ok := authenticator.issuers[claims.Issuer]; !ok {
+			return tokenClaims{}, types.ErrPermissionDenied
+		}
+	}
 	if claims.Expires <= 0 || authenticator.now().Unix() >= claims.Expires {
 		return tokenClaims{}, types.NewAuthExpired("token expired")
 	}
 	return claims, nil
 }
 
-func (authenticator *Authenticator) validSignature(payload string, signature []byte) bool {
+func (authenticator *Authenticator) validHMACSignature(payload string, signature []byte) bool {
 	for _, secret := range authenticator.secrets {
 		mac := hmac.New(sha256.New, secret)
 		_, _ = mac.Write([]byte(payload))
@@ -236,6 +284,64 @@ func (authenticator *Authenticator) validSignature(payload string, signature []b
 		}
 	}
 	return false
+}
+
+func (authenticator *Authenticator) validRS256Signature(keyID string, payload string, signature []byte) bool {
+	keyID = strings.TrimSpace(keyID)
+	if keyID == "" {
+		return false
+	}
+	publicKey := authenticator.publicKeys[keyID]
+	if publicKey == nil {
+		return false
+	}
+	digest := sha256.Sum256([]byte(payload))
+	return rsa.VerifyPKCS1v15(publicKey, crypto.SHA256, digest[:], signature) == nil
+}
+
+func parseRS256JWKSet(raw string) (map[string]*rsa.PublicKey, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, errors.New("NEXUSIM_PUSH_AUTH_JWKS_JSON is required when NEXUSIM_PUSH_AUTH_MODE=jwt")
+	}
+	var set jwkSet
+	if err := json.Unmarshal([]byte(raw), &set); err != nil {
+		return nil, err
+	}
+	keys := make(map[string]*rsa.PublicKey)
+	for _, key := range set.Keys {
+		if key.KeyType != "RSA" || key.Algorithm != "RS256" || strings.TrimSpace(key.KeyID) == "" {
+			continue
+		}
+		modulus, err := base64.RawURLEncoding.DecodeString(key.Modulus)
+		if err != nil || len(modulus) == 0 {
+			continue
+		}
+		exponentBytes, err := base64.RawURLEncoding.DecodeString(key.Exponent)
+		if err != nil || len(exponentBytes) == 0 {
+			continue
+		}
+		exponent := int(new(big.Int).SetBytes(exponentBytes).Int64())
+		if exponent <= 1 {
+			continue
+		}
+		keys[key.KeyID] = &rsa.PublicKey{N: new(big.Int).SetBytes(modulus), E: exponent}
+	}
+	if len(keys) == 0 {
+		return nil, errors.New("no usable RS256 JWK keys configured")
+	}
+	return keys, nil
+}
+
+func normalizeIssuers(values []string) map[string]struct{} {
+	result := make(map[string]struct{})
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			result[value] = struct{}{}
+		}
+	}
+	return result
 }
 
 func authenticateMock(request *http.Request) (types.AuthContext, error) {

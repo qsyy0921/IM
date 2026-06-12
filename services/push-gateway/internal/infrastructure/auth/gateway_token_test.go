@@ -2,8 +2,14 @@ package auth
 
 import (
 	"context"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"math/big"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -63,6 +69,90 @@ func TestAuthenticatorHMACAcceptsJWTGatewayToken(t *testing.T) {
 	}
 	if auth.TenantID != "tenant-1" || auth.UserID != "user-1" || auth.DeviceID != "device-1" || auth.SessionID != "session-1" || auth.TraceID != "trace-1" {
 		t.Fatalf("unexpected auth: %+v", auth)
+	}
+}
+
+func TestAuthenticatorJWTAcceptsRS256GatewayToken(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	privateKey := generateTestRSAKey(t)
+	authenticator, err := NewAuthenticator(Config{
+		Mode:           ModeJWT,
+		JWKSetJSON:     testRSAJWKSetJSON(t, privateKey, "rsa-kid-1"),
+		TrustedIssuers: []string{"issuer-1"},
+		Now:            func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	token := signTestRS256JWT(t, privateKey, "rsa-kid-1", map[string]string{
+		"tenant_id":  "tenant-1",
+		"user_id":    "user-1",
+		"device_id":  "device-1",
+		"session_id": "session-1",
+		"trace_id":   "trace-1",
+		"iss":        "issuer-1",
+		"aud":        "push-gateway",
+	}, now.Add(time.Minute))
+
+	request := httptest.NewRequest("GET", "/ws?device_id=device-1", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+	auth, err := authenticator.Authenticate(request)
+	if err != nil {
+		t.Fatalf("authenticate jwt: %v", err)
+	}
+	if auth.TenantID != "tenant-1" || auth.UserID != "user-1" || auth.DeviceID != "device-1" || auth.SessionID != "session-1" || auth.TraceID != "trace-1" {
+		t.Fatalf("unexpected auth: %+v", auth)
+	}
+}
+
+func TestAuthenticatorJWTRejectsHS256GatewayToken(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	privateKey := generateTestRSAKey(t)
+	authenticator, err := NewAuthenticator(Config{
+		Mode:       ModeJWT,
+		JWKSetJSON: testRSAJWKSetJSON(t, privateKey, "rsa-kid-1"),
+		Now:        func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	token, err := SignGatewayJWT("secret", map[string]string{
+		"tenant_id": "tenant-1",
+		"user_id":   "user-1",
+		"device_id": "device-1",
+	}, now.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("sign jwt: %v", err)
+	}
+	_, err = authenticator.Authenticate(httptest.NewRequest("GET", "/ws?token="+token, nil))
+	if err == nil || !strings.Contains(err.Error(), types.ErrPermissionDenied.Error()) {
+		t.Fatalf("expected permission denied, got %v", err)
+	}
+}
+
+func TestAuthenticatorJWTRejectsUntrustedIssuer(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	privateKey := generateTestRSAKey(t)
+	authenticator, err := NewAuthenticator(Config{
+		Mode:           ModeJWT,
+		JWKSetJSON:     testRSAJWKSetJSON(t, privateKey, "rsa-kid-1"),
+		TrustedIssuers: []string{"issuer-1"},
+		Now:            func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	token := signTestRS256JWT(t, privateKey, "rsa-kid-1", map[string]string{
+		"tenant_id": "tenant-1",
+		"user_id":   "user-1",
+		"device_id": "device-1",
+		"iss":       "issuer-2",
+		"aud":       "push-gateway",
+	}, now.Add(time.Minute))
+
+	_, err = authenticator.Authenticate(httptest.NewRequest("GET", "/ws?token="+token, nil))
+	if err == nil || !strings.Contains(err.Error(), types.ErrPermissionDenied.Error()) {
+		t.Fatalf("expected permission denied, got %v", err)
 	}
 }
 
@@ -298,4 +388,60 @@ func (checker *fakeRevocationChecker) IsRevoked(ctx context.Context, auth types.
 		return false, checker.err
 	}
 	return checker.revoked, nil
+}
+
+func generateTestRSAKey(t *testing.T) *rsa.PrivateKey {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate rsa key: %v", err)
+	}
+	return key
+}
+
+func testRSAJWKSetJSON(t *testing.T, privateKey *rsa.PrivateKey, keyID string) string {
+	t.Helper()
+	raw, err := json.Marshal(jwkSet{Keys: []jwk{{
+		KeyType:   "RSA",
+		KeyUse:    "sig",
+		KeyID:     keyID,
+		Algorithm: "RS256",
+		Modulus:   base64.RawURLEncoding.EncodeToString(privateKey.PublicKey.N.Bytes()),
+		Exponent:  base64.RawURLEncoding.EncodeToString(big.NewInt(int64(privateKey.PublicKey.E)).Bytes()),
+	}}})
+	if err != nil {
+		t.Fatalf("marshal jwks: %v", err)
+	}
+	return string(raw)
+}
+
+func signTestRS256JWT(t *testing.T, privateKey *rsa.PrivateKey, keyID string, claims map[string]string, expiresAt time.Time) string {
+	t.Helper()
+	headerRaw, err := json.Marshal(tokenHeader{Algorithm: "RS256", Type: "JWT", KeyID: keyID})
+	if err != nil {
+		t.Fatalf("marshal header: %v", err)
+	}
+	payload := tokenClaims{
+		TenantID:  claims["tenant_id"],
+		UserID:    claims["user_id"],
+		DeviceID:  claims["device_id"],
+		SessionID: claims["session_id"],
+		TraceID:   claims["trace_id"],
+		Issuer:    firstNonEmpty(claims["iss"], "issuer-1"),
+		Subject:   firstNonEmpty(claims["sub"], claims["user_id"]),
+		Audience:  firstNonEmpty(claims["aud"], "push-gateway"),
+		IssuedAt:  time.Now().Unix(),
+		Expires:   expiresAt.Unix(),
+	}
+	payloadRaw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal claims: %v", err)
+	}
+	signingInput := base64.RawURLEncoding.EncodeToString(headerRaw) + "." + base64.RawURLEncoding.EncodeToString(payloadRaw)
+	digest := sha256.Sum256([]byte(signingInput))
+	signature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, digest[:])
+	if err != nil {
+		t.Fatalf("sign jwt: %v", err)
+	}
+	return signingInput + "." + base64.RawURLEncoding.EncodeToString(signature)
 }

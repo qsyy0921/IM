@@ -153,6 +153,36 @@ func TestPushAuthTokenSourceMarksIdentityLogin(t *testing.T) {
 	if registerSource != "identity_service_register_login" {
 		t.Fatalf("expected identity_service_register_login, got %q", registerSource)
 	}
+	rs256Source := pushAuthTokenSource(config{
+		pushAuthMode:               "jwt",
+		identityTarget:             "127.0.0.1:11610",
+		identityGatewayTokenFormat: "jwt-rs256",
+		identityTokenMethod:        "issue_gateway_token",
+	})
+	if rs256Source != "identity_service" {
+		t.Fatalf("expected identity_service for RS256 issue token path, got %q", rs256Source)
+	}
+}
+
+func TestPushAuthTokenTransportUsesAuthorizationForJWT(t *testing.T) {
+	if got := pushAuthTokenTransport(config{pushAuthMode: "jwt"}); got != "authorization_header" {
+		t.Fatalf("expected jwt auth to use authorization header, got %q", got)
+	}
+	if got := pushAuthTokenTransport(config{pushAuthMode: "mock"}); got != "query" {
+		t.Fatalf("expected mock auth to use query identity, got %q", got)
+	}
+}
+
+func TestPushAuthQueryIdentitySentIsFalseForSignedModes(t *testing.T) {
+	if pushAuthQueryIdentitySent(config{pushAuthMode: "hmac"}) {
+		t.Fatalf("hmac auth should not send query identity")
+	}
+	if pushAuthQueryIdentitySent(config{pushAuthMode: "jwt"}) {
+		t.Fatalf("jwt auth should not send query identity")
+	}
+	if !pushAuthQueryIdentitySent(config{pushAuthMode: "mock"}) {
+		t.Fatalf("mock auth should send query identity")
+	}
 }
 
 func TestSmokePasswordHashUsesPBKDF2Format(t *testing.T) {

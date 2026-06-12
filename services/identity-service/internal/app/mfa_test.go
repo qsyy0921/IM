@@ -324,11 +324,41 @@ func TestRegenerateMFARecoveryCodesUseCaseRequiresPasswordAndTOTP(t *testing.T) 
 	if !repository.replaceRecoveryCalled || len(repository.recoveryRecords) != 2 {
 		t.Fatalf("expected repository to receive recovery hashes, called=%v records=%+v", repository.replaceRecoveryCalled, repository.recoveryRecords)
 	}
+	if result.FactorID != "mfa-1" {
+		t.Fatalf("expected factor id in result, got %+v", result)
+	}
 	if repository.recoveryRecords[0].CodeHash != "hash-new-1" || result.RecoveryCodes[0] != "aaaa-bbbb-cccc-dddd" {
 		t.Fatalf("expected plaintext returned and hashes stored, result=%+v records=%+v", result, repository.recoveryRecords)
 	}
 	if secrets.verifySecret != secret || secrets.verifyCode != "123456" || !secrets.verifyNow.Equal(now) {
 		t.Fatalf("unexpected TOTP verification input: secret=%+v code=%s now=%s", secrets.verifySecret, secrets.verifyCode, secrets.verifyNow)
+	}
+}
+
+func TestRegenerateMFARecoveryCodesUseCaseRejectsWrongPasswordBeforeGenerating(t *testing.T) {
+	repository := &fakeMFARepository{
+		credential: types.UserCredential{
+			TenantID:     "tenant-1",
+			UserID:       "user-1",
+			Status:       "ACTIVE",
+			PasswordHash: "expected-hash",
+		},
+	}
+	recovery := &fakeMFARecoveryCodeManager{}
+	useCase := NewRegenerateMFARecoveryCodesUseCase(repository, &fakePasswordVerifier{ok: false}, &fakeMFASecretManager{verifyOK: true}, recovery)
+
+	_, err := useCase.Execute(context.Background(), types.RegenerateMFARecoveryCodesCommand{
+		TenantID: "tenant-1",
+		UserID:   "user-1",
+		FactorID: "mfa-1",
+		Password: "wrong password",
+		Code:     "123456",
+	})
+	if !errors.Is(err, types.ErrInvalidCredentials) {
+		t.Fatalf("expected invalid credentials, got %v", err)
+	}
+	if repository.replaceRecoveryCalled || recovery.newCalled {
+		t.Fatalf("wrong password must not generate or replace recovery codes: replace=%v generate=%v", repository.replaceRecoveryCalled, recovery.newCalled)
 	}
 }
 
@@ -387,6 +417,30 @@ func TestRevokeMFARecoveryCodesUseCaseRequiresCurrentPassword(t *testing.T) {
 	}
 	if !repository.revokeRecoveryCalled || result.RevokedCount != 2 || result.RevokedAtUnixMS != now.UnixMilli() {
 		t.Fatalf("unexpected revoke result: result=%+v called=%v", result, repository.revokeRecoveryCalled)
+	}
+}
+
+func TestRevokeMFARecoveryCodesUseCaseRejectsWrongPasswordBeforeRepositoryWrite(t *testing.T) {
+	repository := &fakeMFARepository{
+		credential: types.UserCredential{
+			TenantID:     "tenant-1",
+			UserID:       "user-1",
+			Status:       "ACTIVE",
+			PasswordHash: "expected-hash",
+		},
+	}
+	useCase := NewRevokeMFARecoveryCodesUseCase(repository, &fakePasswordVerifier{ok: false})
+
+	_, err := useCase.Execute(context.Background(), types.RevokeMFARecoveryCodesCommand{
+		TenantID: "tenant-1",
+		UserID:   "user-1",
+		Password: "wrong password",
+	})
+	if !errors.Is(err, types.ErrInvalidCredentials) {
+		t.Fatalf("expected invalid credentials, got %v", err)
+	}
+	if repository.revokeRecoveryCalled {
+		t.Fatal("wrong password must not revoke recovery codes")
 	}
 }
 
@@ -455,6 +509,7 @@ func (repo *fakeMFARepository) ReplaceMFARecoveryCodes(_ context.Context, comman
 	return types.RegenerateMFARecoveryCodesResult{
 		TenantID:          command.TenantID,
 		UserID:            command.UserID,
+		FactorID:          command.FactorID,
 		GeneratedAtUnixMS: generatedAt.UnixMilli(),
 	}, nil
 }
@@ -504,12 +559,14 @@ func (manager *fakeMFASecretManager) OTPAuthURI(issuer string, accountName strin
 }
 
 type fakeMFARecoveryCodeManager struct {
-	codes   []types.MFARecoveryCode
-	hash    string
-	hashErr error
+	codes     []types.MFARecoveryCode
+	hash      string
+	hashErr   error
+	newCalled bool
 }
 
 func (manager *fakeMFARecoveryCodeManager) NewRecoveryCodes(int) ([]types.MFARecoveryCode, error) {
+	manager.newCalled = true
 	if len(manager.codes) == 0 {
 		return []types.MFARecoveryCode{{CodeID: "recovery-1", Code: "aaaa-bbbb-cccc-dddd", CodeHash: "hash-1"}}, nil
 	}

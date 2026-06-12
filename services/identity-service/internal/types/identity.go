@@ -285,6 +285,7 @@ type RegenerateMFARecoveryCodesCommand struct {
 type RegenerateMFARecoveryCodesResult struct {
 	TenantID          TenantID
 	UserID            UserID
+	FactorID          MFAFactorID
 	RecoveryCodes     []string
 	GeneratedAtUnixMS int64
 }

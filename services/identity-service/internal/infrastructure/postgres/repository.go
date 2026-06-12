@@ -859,6 +859,9 @@ func (r *Repository) ReplaceMFARecoveryCodes(ctx context.Context, command types.
 		return types.RegenerateMFARecoveryCodesResult{}, types.NewDBWriteFailed(err.Error())
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	if err := lockActiveTOTPFactor(ctx, tx, command.TenantID, command.UserID, command.FactorID); err != nil {
+		return types.RegenerateMFARecoveryCodesResult{}, err
+	}
 	if err := replaceMFARecoveryCodes(ctx, tx, command.TenantID, command.UserID, command.TraceID, command.RequestID, recoveryCodes, generatedAt); err != nil {
 		return types.RegenerateMFARecoveryCodesResult{}, err
 	}
@@ -868,6 +871,7 @@ func (r *Repository) ReplaceMFARecoveryCodes(ctx context.Context, command types.
 	return types.RegenerateMFARecoveryCodesResult{
 		TenantID:          command.TenantID,
 		UserID:            command.UserID,
+		FactorID:          command.FactorID,
 		GeneratedAtUnixMS: generatedAt.UnixMilli(),
 	}, nil
 }
@@ -1915,6 +1919,27 @@ WHERE tenant_id = $1
 	}
 	if tag.RowsAffected() == 0 {
 		return types.NewMFAFactorNotFound("mfa factor not found")
+	}
+	return nil
+}
+
+func lockActiveTOTPFactor(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, factorID types.MFAFactorID) error {
+	var lockedFactorID string
+	err := tx.QueryRow(ctx, `
+SELECT factor_id
+FROM identity_mfa_factors
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND factor_id = $3
+  AND factor_type = 'TOTP'
+  AND status = 'ACTIVE'
+FOR UPDATE
+`, tenantID, userID, factorID).Scan(&lockedFactorID)
+	if err == pgx.ErrNoRows {
+		return types.NewMFAFactorNotFound("mfa factor not found")
+	}
+	if err != nil {
+		return types.NewDBReadFailed(err.Error())
 	}
 	return nil
 }

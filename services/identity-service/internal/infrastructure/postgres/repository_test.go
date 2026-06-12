@@ -660,6 +660,7 @@ func TestRepositoryMFARecoveryCodeRegenerateAndRevokeIntegration(t *testing.T) {
 	result, err := repository.ReplaceMFARecoveryCodes(ctx, types.RegenerateMFARecoveryCodesCommand{
 		TenantID:  "tenant-identity",
 		UserID:    "user-1",
+		FactorID:  "mfa-factor-recovery-manage",
 		TraceID:   "trace-regenerate",
 		RequestID: "request-regenerate",
 	}, []types.MFARecoveryCodeRecord{
@@ -669,7 +670,7 @@ func TestRepositoryMFARecoveryCodeRegenerateAndRevokeIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("replace recovery codes: %v", err)
 	}
-	if result.GeneratedAtUnixMS != generatedAt.UnixMilli() {
+	if result.FactorID != "mfa-factor-recovery-manage" || result.GeneratedAtUnixMS != generatedAt.UnixMilli() {
 		t.Fatalf("unexpected regenerate result: %+v", result)
 	}
 	if _, err := repository.FindActiveMFARecoveryCode(ctx, "tenant-identity", "user-1", "recovery-old-hash-1"); !errors.Is(err, types.ErrInvalidMFA) {
@@ -703,6 +704,21 @@ func TestRepositoryMFARecoveryCodeRegenerateAndRevokeIntegration(t *testing.T) {
 	}
 	if replay.RevokedCount != 0 {
 		t.Fatalf("expected idempotent replay to revoke zero codes, got %+v", replay)
+	}
+	if _, err := repository.DisableMFAFactor(ctx, types.DisableMFAFactorCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		FactorID: "mfa-factor-recovery-manage",
+	}, revokedAt.Add(2*time.Minute)); err != nil {
+		t.Fatalf("disable mfa factor: %v", err)
+	}
+	_, err = repository.ReplaceMFARecoveryCodes(ctx, types.RegenerateMFARecoveryCodesCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		FactorID: "mfa-factor-recovery-manage",
+	}, []types.MFARecoveryCodeRecord{{CodeID: "recovery-after-disabled", CodeHash: "recovery-after-disabled-hash"}}, revokedAt.Add(3*time.Minute))
+	if !errors.Is(err, types.ErrMFAFactorNotFound) {
+		t.Fatalf("expected disabled factor to reject recovery code replace, got %v", err)
 	}
 }
 

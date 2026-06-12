@@ -160,7 +160,7 @@ MFA factor rules:
 - `ConfirmMFAEnrollment` accepts only a pending TOTP factor and a six-digit code;
 - `ConfirmMFAEnrollment` returns plaintext recovery codes once; PostgreSQL stores only `identity_mfa_recovery_codes.code_hash`, never raw recovery codes;
 - `DisableMFAFactor` requires the current password and does not delete historical rows;
-- `RegenerateMFARecoveryCodes` requires the current password plus an ACTIVE TOTP factor's six-digit code; it disables previous ACTIVE recovery-code hashes and returns new plaintext recovery codes once;
+- `RegenerateMFARecoveryCodes` requires the current password plus an ACTIVE TOTP factor's six-digit code; the repository re-checks and locks that ACTIVE TOTP factor in the replace transaction, disables previous ACTIVE recovery-code hashes and returns new plaintext recovery codes once;
 - `RevokeMFARecoveryCodes` requires the current password and idempotently disables all ACTIVE recovery-code hashes for that user;
 - `LoginRequest.mfa_factor_id` selects a factor; if omitted and exactly one ACTIVE factor exists, that factor is used;
 - `LoginRequest.mfa_code` must be a six-digit TOTP code; session and refresh-token state are written only after MFA succeeds;

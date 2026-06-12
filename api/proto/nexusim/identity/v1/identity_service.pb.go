@@ -2326,6 +2326,7 @@ type RegenerateMFARecoveryCodesResponse struct {
 	UserId            string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	RecoveryCodes     []string               `protobuf:"bytes,3,rep,name=recovery_codes,json=recoveryCodes,proto3" json:"recovery_codes,omitempty"`
 	GeneratedAtUnixMs int64                  `protobuf:"varint,4,opt,name=generated_at_unix_ms,json=generatedAtUnixMs,proto3" json:"generated_at_unix_ms,omitempty"`
+	FactorId          string                 `protobuf:"bytes,5,opt,name=factor_id,json=factorId,proto3" json:"factor_id,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -2386,6 +2387,13 @@ func (x *RegenerateMFARecoveryCodesResponse) GetGeneratedAtUnixMs() int64 {
 		return x.GeneratedAtUnixMs
 	}
 	return 0
+}
+
+func (x *RegenerateMFARecoveryCodesResponse) GetFactorId() string {
+	if x != nil {
+		return x.FactorId
+	}
+	return ""
 }
 
 type RevokeMFARecoveryCodesRequest struct {
@@ -3390,12 +3398,13 @@ const file_nexusim_identity_v1_identity_service_proto_rawDesc = "" +
 	"\x04code\x18\x05 \x01(\tR\x04code\x12\x19\n" +
 	"\btrace_id\x18\x06 \x01(\tR\atraceId\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\a \x01(\tR\trequestId\"\xb2\x01\n" +
+	"request_id\x18\a \x01(\tR\trequestId\"\xcf\x01\n" +
 	"\"RegenerateMFARecoveryCodesResponse\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12%\n" +
 	"\x0erecovery_codes\x18\x03 \x03(\tR\rrecoveryCodes\x12/\n" +
-	"\x14generated_at_unix_ms\x18\x04 \x01(\x03R\x11generatedAtUnixMs\"\xab\x01\n" +
+	"\x14generated_at_unix_ms\x18\x04 \x01(\x03R\x11generatedAtUnixMs\x12\x1b\n" +
+	"\tfactor_id\x18\x05 \x01(\tR\bfactorId\"\xab\x01\n" +
 	"\x1dRevokeMFARecoveryCodesRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1a\n" +

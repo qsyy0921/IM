@@ -343,6 +343,7 @@ func TestServerRegenerateMFARecoveryCodesMapsRequestAndResponse(t *testing.T) {
 		result: types.RegenerateMFARecoveryCodesResult{
 			TenantID:          "tenant-1",
 			UserID:            "user-1",
+			FactorID:          "mfa-1",
 			RecoveryCodes:     []string{"aaaa-bbbb-cccc-dddd", "eeee-ffff-gggg-hhhh"},
 			GeneratedAtUnixMS: 1_800_000_002_000,
 		},
@@ -363,7 +364,7 @@ func TestServerRegenerateMFARecoveryCodesMapsRequestAndResponse(t *testing.T) {
 	if executor.command.FactorID != "mfa-1" || executor.command.Code != "123456" || executor.command.Password == "" {
 		t.Fatalf("unexpected command: %+v", executor.command)
 	}
-	if len(response.GetRecoveryCodes()) != 2 || response.GetGeneratedAtUnixMs() != 1_800_000_002_000 {
+	if response.GetFactorId() != "mfa-1" || len(response.GetRecoveryCodes()) != 2 || response.GetGeneratedAtUnixMs() != 1_800_000_002_000 {
 		t.Fatalf("unexpected response: %+v", response)
 	}
 }

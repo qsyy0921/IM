@@ -460,6 +460,7 @@ func (s *Server) RegenerateMFARecoveryCodes(ctx context.Context, request *identi
 	return &identityv1.RegenerateMFARecoveryCodesResponse{
 		TenantId:          string(result.TenantID),
 		UserId:            string(result.UserID),
+		FactorId:          string(result.FactorID),
 		RecoveryCodes:     append([]string(nil), result.RecoveryCodes...),
 		GeneratedAtUnixMs: result.GeneratedAtUnixMS,
 	}, nil

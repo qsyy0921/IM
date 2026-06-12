@@ -129,16 +129,16 @@ These events are designed for push-gateway local deny-list projection and audit 
 ## First Smoke Target
 
 ```text
-identity-service IssueGatewayToken
+identity-service IssueGatewayToken or Login
 -> push-gateway WebSocket HMAC auth
 -> delivery.notify
 -> PullInbox
 -> delivery.ack.ok
 ```
 
-This proves identity-service can replace runner-side local token signing without adding a synchronous dependency to push-gateway's hot path.
+This proves identity-service can replace runner-side local token signing without adding a synchronous dependency to push-gateway's hot path. The latest smoke also covers `Login` with an existing password hash: `Login` creates a session and refresh token, returns a JWT gateway token, and push-gateway verifies that token locally before completing `delivery.notify -> PullInbox -> delivery.ack.ok`.
 
-The current Login / Refresh implementation is validated by app tests and PostgreSQL integration tests:
+The current Login / Refresh implementation is validated by app tests, PostgreSQL integration tests, and a push-gateway Login + JWT smoke:
 
 ```text
 Login -> ACTIVE refresh token

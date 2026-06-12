@@ -1,11 +1,14 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	tokeninfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/token"
+	"github.com/qsyy0921/IM/services/identity-service/internal/types"
 )
 
 func TestGatewayTokenJWKSetWithAdditionalKeysMergesAndDeduplicates(t *testing.T) {
@@ -59,5 +62,15 @@ func TestLoadAdditionalGatewayTokenJWKSetRejectsInvalidJSON(t *testing.T) {
 
 	if _, err := loadAdditionalGatewayTokenJWKSet(); err == nil {
 		t.Fatalf("expected invalid additional jwks json to fail")
+	}
+}
+
+func TestDisabledMFASecretManagerReturnsMFAUnavailable(t *testing.T) {
+	manager := disabledMFASecretManager{}
+	if _, _, err := manager.NewTOTPSecret(); !errors.Is(err, types.ErrMFAUnavailable) {
+		t.Fatalf("expected new totp to return mfa unavailable, got %v", err)
+	}
+	if _, err := manager.VerifyTOTP(types.EncryptedMFASecret{}, "123456", time.Now()); !errors.Is(err, types.ErrMFAUnavailable) {
+		t.Fatalf("expected verify totp to return mfa unavailable, got %v", err)
 	}
 }

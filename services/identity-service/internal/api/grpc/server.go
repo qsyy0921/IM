@@ -681,6 +681,8 @@ func grpcError(err error) error {
 		return status.Error(codes.NotFound, "mfa factor not found")
 	case errors.Is(err, types.ErrMFALocked):
 		return status.Error(codes.ResourceExhausted, "mfa temporarily locked")
+	case errors.Is(err, types.ErrMFAUnavailable):
+		return status.Error(codes.Unavailable, "mfa temporarily unavailable")
 	default:
 		return status.Error(codes.Internal, "internal error")
 	}

@@ -203,7 +203,7 @@ func (uc *LoginUseCase) verifyMFAIfRequired(ctx context.Context, command types.L
 		return "", types.NewMFARequired("mfa required")
 	}
 	if uc.mfaSecrets == nil {
-		return "", types.NewTokenSigningFailed("mfa secret manager is not configured")
+		return "", types.NewMFAUnavailable("mfa secret manager is not configured")
 	}
 	factor, ok := selectMFAFactor(factors, command.MFAFactorID)
 	if !ok {

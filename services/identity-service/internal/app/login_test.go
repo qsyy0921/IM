@@ -195,6 +195,45 @@ func TestLoginUseCaseRequiresMFAWhenActiveFactorExists(t *testing.T) {
 	}
 }
 
+func TestLoginUseCaseReturnsMFAUnavailableWhenSecretManagerMissing(t *testing.T) {
+	repository := &fakeIdentityRepository{
+		credential: types.UserCredential{
+			TenantID:     "tenant-1",
+			UserID:       "user-1",
+			Status:       "ACTIVE",
+			PasswordHash: "expected-hash",
+		},
+		activeMFAFactors: []types.MFAFactorSecret{{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			FactorID: "mfa-1",
+			Type:     types.MFAFactorTypeTOTP,
+			Status:   types.MFAFactorStatusActive,
+			Secret:   types.EncryptedMFASecret{Ciphertext: "ciphertext", Nonce: "nonce", KeyVersion: "local-v1"},
+		}},
+	}
+	useCase := NewLoginUseCase(
+		repository,
+		fakeTokenSigner{},
+		&fakePasswordVerifier{ok: true},
+		fakeRefreshTokenCodec{},
+	)
+	_, err := useCase.Execute(context.Background(), types.LoginCommand{
+		TenantID:    "tenant-1",
+		UserID:      "user-1",
+		Password:    "correct horse battery staple",
+		DeviceID:    "device-1",
+		MFAFactorID: "mfa-1",
+		MFACode:     "123456",
+	})
+	if !errors.Is(err, types.ErrMFAUnavailable) {
+		t.Fatalf("expected mfa unavailable, got %v", err)
+	}
+	if repository.loginCalled || repository.mfaFailureRecorded {
+		t.Fatal("unavailable mfa manager must not write login session or record invalid-code failure")
+	}
+}
+
 func TestLoginUseCaseRejectsAmbiguousActiveMFAFactors(t *testing.T) {
 	repository := &fakeIdentityRepository{
 		credential: types.UserCredential{

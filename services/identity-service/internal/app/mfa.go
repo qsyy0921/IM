@@ -32,8 +32,11 @@ func (uc *BeginMFAEnrollmentUseCase) Execute(ctx context.Context, command types.
 	if err := domain.ValidateBeginMFAEnrollment(command); err != nil {
 		return types.BeginMFAEnrollmentResult{}, err
 	}
-	if uc.repository == nil || uc.passwords == nil || uc.secrets == nil {
+	if uc.repository == nil || uc.passwords == nil {
 		return types.BeginMFAEnrollmentResult{}, types.NewDBWriteFailed("identity mfa dependencies are not configured")
+	}
+	if uc.secrets == nil {
+		return types.BeginMFAEnrollmentResult{}, types.NewMFAUnavailable("mfa secret manager is not configured")
 	}
 	credential, err := uc.repository.GetUserCredential(ctx, command.TenantID, command.UserID)
 	if err != nil {
@@ -69,8 +72,11 @@ func (uc *ConfirmMFAEnrollmentUseCase) Execute(ctx context.Context, command type
 	if err := domain.ValidateConfirmMFAEnrollment(command); err != nil {
 		return types.ConfirmMFAEnrollmentResult{}, err
 	}
-	if uc.repository == nil || uc.secrets == nil {
+	if uc.repository == nil {
 		return types.ConfirmMFAEnrollmentResult{}, types.NewDBWriteFailed("identity mfa dependencies are not configured")
+	}
+	if uc.secrets == nil {
+		return types.ConfirmMFAEnrollmentResult{}, types.NewMFAUnavailable("mfa secret manager is not configured")
 	}
 	factor, err := uc.repository.GetMFAFactorSecret(ctx, command.TenantID, command.UserID, command.FactorID)
 	if err != nil {

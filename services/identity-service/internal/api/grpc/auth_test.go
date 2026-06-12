@@ -299,6 +299,13 @@ func TestGRPCErrorMapsCredentialErrors(t *testing.T) {
 	if code := status.Code(grpcError(types.NewMFALocked("locked"))); code != codes.ResourceExhausted {
 		t.Fatalf("expected mfa locked to map to resource exhausted, got %v", code)
 	}
+	err := grpcError(types.NewMFAUnavailable("mfa secret encryption key is required"))
+	if code := status.Code(err); code != codes.Unavailable {
+		t.Fatalf("expected mfa unavailable to map to unavailable, got %v", code)
+	}
+	if msg := status.Convert(err).Message(); msg != "mfa temporarily unavailable" {
+		t.Fatalf("expected stable mfa unavailable message, got %q", msg)
+	}
 }
 
 type fakeRegisterUserExecutor struct {

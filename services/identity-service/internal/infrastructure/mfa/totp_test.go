@@ -1,12 +1,20 @@
 package mfa
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/qsyy0921/IM/services/identity-service/internal/types"
 )
+
+func TestTOTPManagerRequiresEncryptionKey(t *testing.T) {
+	_, err := NewTOTPManager(" ")
+	if !errors.Is(err, types.ErrMFAUnavailable) {
+		t.Fatalf("expected mfa unavailable for empty encryption key, got %v", err)
+	}
+}
 
 func TestTOTPManagerEncryptsAndVerifiesCode(t *testing.T) {
 	manager, err := NewTOTPManager("test-mfa-encryption-key")

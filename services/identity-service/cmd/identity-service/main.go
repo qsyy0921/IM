@@ -164,11 +164,11 @@ func newMFASecretManager() (app.MFASecretManager, error) {
 type disabledMFASecretManager struct{}
 
 func (disabledMFASecretManager) NewTOTPSecret() (string, types.EncryptedMFASecret, error) {
-	return "", types.EncryptedMFASecret{}, types.NewTokenSigningFailed("mfa secret encryption key is required")
+	return "", types.EncryptedMFASecret{}, types.NewMFAUnavailable("mfa secret encryption key is required")
 }
 
 func (disabledMFASecretManager) VerifyTOTP(types.EncryptedMFASecret, string, time.Time) (bool, error) {
-	return false, types.NewTokenSigningFailed("mfa secret encryption key is required")
+	return false, types.NewMFAUnavailable("mfa secret encryption key is required")
 }
 
 func (disabledMFASecretManager) OTPAuthURI(string, string, string) string {

@@ -35,7 +35,7 @@ type TOTPManager struct {
 func NewTOTPManager(secret string) (*TOTPManager, error) {
 	secret = strings.TrimSpace(secret)
 	if secret == "" {
-		return nil, types.NewTokenSigningFailed("mfa secret encryption key is required")
+		return nil, types.NewMFAUnavailable("mfa secret encryption key is required")
 	}
 	key := sha256.Sum256([]byte(secret))
 	block, err := aes.NewCipher(key[:])

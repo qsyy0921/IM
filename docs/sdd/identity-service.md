@@ -146,7 +146,7 @@ MFA factor rules:
 - `LoginRequest.mfa_code` must be a six-digit TOTP code; session and refresh-token state are written only after MFA succeeds;
 - `identity_mfa_factors.login_failed_count`, `login_failed_last_at` and `login_locked_until` are factor-level Login risk state, not global account lock state;
 - successful MFA Login clears the selected factor's Login failure state and updates `last_used_at` in the same PostgreSQL transaction that writes session / refresh-token state;
-- `NEXUSIM_IDENTITY_MFA_SECRET_KEY` is the local AES-GCM encryption key input; local smoke may fall back to the existing gateway token secret, but production profiles should use a dedicated secret managed by KMS/HSM. If no MFA key is configured, the service still starts and existing Login/JWKS flows are unaffected, but MFA factor RPCs fail until the key is configured.
+- `NEXUSIM_IDENTITY_MFA_SECRET_KEY` is the local AES-GCM encryption key input; local smoke may fall back to the existing gateway token secret, but production profiles should use a dedicated secret managed by KMS/HSM. If no MFA key is configured, the service still starts and existing Login/JWKS flows are unaffected, but MFA factor RPCs and MFA-protected Login return stable `MFA_UNAVAILABLE` / `mfa temporarily unavailable` until the key is configured.
 
 Known MFA hardening still pending:
 

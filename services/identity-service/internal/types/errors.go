@@ -19,6 +19,7 @@ var (
 	ErrRefreshTokenReuseDetected = errors.New("refresh token reuse detected")
 	ErrInvalidChallenge          = errors.New("invalid challenge")
 	ErrChallengeExpired          = errors.New("challenge expired")
+	ErrChallengeRateLimited      = errors.New("challenge rate limited")
 )
 
 type serviceError struct {
@@ -60,3 +61,6 @@ func NewRefreshTokenReuseDetected(message string) error {
 }
 func NewInvalidChallenge(message string) error { return wrap(ErrInvalidChallenge, message) }
 func NewChallengeExpired(message string) error { return wrap(ErrChallengeExpired, message) }
+func NewChallengeRateLimited(message string) error {
+	return wrap(ErrChallengeRateLimited, message)
+}

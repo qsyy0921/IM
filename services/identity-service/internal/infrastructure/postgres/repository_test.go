@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -318,6 +319,65 @@ func TestRepositoryVerificationAndPasswordResetChallengesIntegration(t *testing.
 	}
 }
 
+func TestRepositoryPasswordResetChallengeRateLimitIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	repository := NewRepository(pool)
+	issuedAt := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := repository.RegisterUser(ctx, types.RegisterUserCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+	}, "password-hash", issuedAt); err != nil {
+		t.Fatalf("register user: %v", err)
+	}
+	seedVerifiedEmail(t, ctx, pool, "user1@example.com", issuedAt)
+
+	for i := 1; i <= 3; i++ {
+		if _, err := repository.CreatePasswordResetChallenge(ctx, types.RequestPasswordResetCommand{
+			TenantID:    "tenant-identity",
+			UserID:      "user-1",
+			Channel:     types.VerificationChannelEmail,
+			Destination: "user1@example.com",
+		}, types.ChallengeRecord{
+			ChallengeID: types.ChallengeID(fmt.Sprintf("challenge-reset-limit-%d", i)),
+			TokenHash:   fmt.Sprintf("reset-limit-hash-%d", i),
+		}, issuedAt.Add(time.Duration(i)*time.Minute), issuedAt.Add(30*time.Minute)); err != nil {
+			t.Fatalf("create reset challenge %d: %v", i, err)
+		}
+	}
+	_, err := repository.CreatePasswordResetChallenge(ctx, types.RequestPasswordResetCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "user1@example.com",
+	}, types.ChallengeRecord{
+		ChallengeID: "challenge-reset-limit-4",
+		TokenHash:   "reset-limit-hash-4",
+	}, issuedAt.Add(4*time.Minute), issuedAt.Add(30*time.Minute))
+	if !errors.Is(err, types.ErrChallengeRateLimited) {
+		t.Fatalf("expected challenge rate limit, got %v", err)
+	}
+	if _, err := repository.ConfirmPasswordReset(ctx, types.ConfirmPasswordResetCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		ChallengeID: "challenge-reset-limit-1",
+	}, "reset-limit-hash-1", "new-password-hash", issuedAt.Add(5*time.Minute)); err != nil {
+		t.Fatalf("consume reset challenge: %v", err)
+	}
+	if _, err := repository.CreatePasswordResetChallenge(ctx, types.RequestPasswordResetCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "user1@example.com",
+	}, types.ChallengeRecord{
+		ChallengeID: "challenge-reset-limit-4",
+		TokenHash:   "reset-limit-hash-4",
+	}, issuedAt.Add(6*time.Minute), issuedAt.Add(30*time.Minute)); err != nil {
+		t.Fatalf("create reset challenge after consuming one active challenge: %v", err)
+	}
+}
+
 func TestRepositoryLoginFailureLocksAndSuccessClearsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -518,6 +578,21 @@ SET status = 'ACTIVE',
 `, passwordHash)
 	if err != nil {
 		t.Fatalf("seed user credential: %v", err)
+	}
+}
+
+func seedVerifiedEmail(t *testing.T, ctx context.Context, pool *pgxpool.Pool, email string, verifiedAt time.Time) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+UPDATE identity_users
+SET email = $3,
+    email_verified_at = $4,
+    updated_at = $4
+WHERE tenant_id = $1
+  AND user_id = $2
+`, "tenant-identity", "user-1", email, verifiedAt)
+	if err != nil {
+		t.Fatalf("seed verified email: %v", err)
 	}
 }
 

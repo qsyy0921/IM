@@ -120,6 +120,7 @@ ConfirmVerificationChallenge
 RequestPasswordReset
 -> require already verified email / phone destination
 -> identity_challenges ACTIVE
+-> invalid destination or active-challenge limit returns neutral accepted shape
 
 ConfirmPasswordReset
 -> lock challenge FOR UPDATE
@@ -132,16 +133,19 @@ ConfirmPasswordReset
 
 Challenge token rules:
 
-- raw challenge tokens are returned only to the caller when `NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN=true`; this is a local smoke / development aid and must stay disabled in production profiles.
+- raw verification challenge tokens are returned only to the caller when `NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN=true`; this is a local smoke / development aid and must stay disabled in production profiles.
+- password reset requests never return raw challenge tokens, even when the development token flag is enabled.
 - PostgreSQL stores only `identity_challenges.token_hash`, never the raw token.
 - Invalid token attempts increment `attempt_count`; reaching `max_attempts` expires the challenge.
 - Password reset requires an already verified destination for the same `tenant_id + user_id`.
+- `RequestPasswordReset` hides invalid credentials and active-challenge throttling behind the same accepted response shape; it does not return raw tokens in that path.
 - Verification challenge creation requires the current password to avoid unauthenticated email / phone takeover.
+- A first-stage durable cap limits active challenges per `tenant_id + user_id + challenge_type + channel + destination`.
 - `identity-service` does not send email or SMS directly in this slice. A sender adapter or notification service can consume an explicit future command/event without changing the challenge table ownership.
 
 Known hardening still pending:
 
-- account-enumeration resistant password reset responses;
+- timing- and sender-side account-enumeration resistance;
 - tenant / IP / device rate limits for challenge creation and confirmation;
 - email / SMS provider integration and audit;
 - MFA and OIDC federation;

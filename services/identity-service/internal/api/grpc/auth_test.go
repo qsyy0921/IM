@@ -127,6 +127,37 @@ func TestServerLoginMapsAccountLockedToResourceExhausted(t *testing.T) {
 	}
 }
 
+func TestServerRequestPasswordResetReturnsAcceptedShape(t *testing.T) {
+	executor := &fakeRequestPasswordResetExecutor{
+		result: types.RequestPasswordResetResult{
+			TenantID:          "tenant-1",
+			UserID:            "user-1",
+			ChallengeID:       "challenge-neutral",
+			Channel:           types.VerificationChannelEmail,
+			Destination:       "user1@example.com",
+			ExpiresAtUnixMS:   1_800_000_600_000,
+			DevChallengeToken: "",
+		},
+	}
+	server := NewServer(nil, nil, nil, nil, nil, executor, nil, nil, nil, nil, nil)
+	response, err := server.RequestPasswordReset(context.Background(), &identityv1.RequestPasswordResetRequest{
+		TenantId:    "tenant-1",
+		UserId:      "user-1",
+		Channel:     identityv1.VerificationChannel_VERIFICATION_CHANNEL_EMAIL,
+		Destination: "user1@example.com",
+		TtlSeconds:  600,
+	})
+	if err != nil {
+		t.Fatalf("request password reset should return OK accepted shape: %v", err)
+	}
+	if executor.command.TenantID != "tenant-1" || executor.command.Channel != types.VerificationChannelEmail {
+		t.Fatalf("unexpected command: %+v", executor.command)
+	}
+	if response.GetChallengeId() != "challenge-neutral" || response.GetDevChallengeToken() != "" {
+		t.Fatalf("unexpected password reset response: %+v", response)
+	}
+}
+
 func TestGRPCErrorMapsCredentialErrors(t *testing.T) {
 	if code := status.Code(grpcError(types.NewUserAlreadyExists("duplicate"))); code != codes.AlreadyExists {
 		t.Fatalf("expected user already exists to map to already exists, got %v", code)
@@ -155,8 +186,22 @@ type fakeLoginExecutor struct {
 	err error
 }
 
+type fakeRequestPasswordResetExecutor struct {
+	command types.RequestPasswordResetCommand
+	result  types.RequestPasswordResetResult
+	err     error
+}
+
 func (executor *fakeLoginExecutor) Execute(context.Context, types.LoginCommand) (types.LoginResult, error) {
 	return types.LoginResult{}, executor.err
+}
+
+func (executor *fakeRequestPasswordResetExecutor) Execute(_ context.Context, command types.RequestPasswordResetCommand) (types.RequestPasswordResetResult, error) {
+	executor.command = command
+	if executor.err != nil {
+		return types.RequestPasswordResetResult{}, executor.err
+	}
+	return executor.result, nil
 }
 
 func (executor *fakeRegisterUserExecutor) Execute(_ context.Context, command types.RegisterUserCommand) (types.RegisterUserResult, error) {

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/qsyy0921/IM/services/identity-service/internal/domain"
@@ -91,19 +92,30 @@ func (uc *RequestPasswordResetUseCase) Execute(ctx context.Context, command type
 	if uc.repository == nil || uc.tokens == nil {
 		return types.RequestPasswordResetResult{}, types.NewDBWriteFailed("identity challenge dependencies are not configured")
 	}
-	plain, record, err := uc.tokens.NewChallengeToken()
+	_, record, err := uc.tokens.NewChallengeToken()
 	if err != nil {
 		return types.RequestPasswordResetResult{}, err
 	}
 	issuedAt := uc.now()
 	result, err := uc.repository.CreatePasswordResetChallenge(ctx, command, record, issuedAt, issuedAt.Add(domain.NormalizeChallengeTTL(command.TTLSeconds)))
 	if err != nil {
+		if errors.Is(err, types.ErrInvalidCredentials) || errors.Is(err, types.ErrChallengeRateLimited) {
+			return neutralPasswordResetResult(command, record.ChallengeID, issuedAt.Add(domain.NormalizeChallengeTTL(command.TTLSeconds))), nil
+		}
 		return types.RequestPasswordResetResult{}, err
 	}
-	if uc.options.ReturnDevToken {
-		result.DevChallengeToken = plain
-	}
 	return result, nil
+}
+
+func neutralPasswordResetResult(command types.RequestPasswordResetCommand, challengeID types.ChallengeID, expiresAt time.Time) types.RequestPasswordResetResult {
+	return types.RequestPasswordResetResult{
+		TenantID:        command.TenantID,
+		UserID:          command.UserID,
+		ChallengeID:     challengeID,
+		Channel:         command.Channel,
+		Destination:     command.Destination,
+		ExpiresAtUnixMS: expiresAt.UnixMilli(),
+	}
 }
 
 type ConfirmPasswordResetUseCase struct {

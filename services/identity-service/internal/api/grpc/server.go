@@ -531,6 +531,8 @@ func grpcError(err error) error {
 		return status.Error(codes.Unauthenticated, "invalid challenge")
 	case errors.Is(err, types.ErrChallengeExpired):
 		return status.Error(codes.Unauthenticated, "challenge expired")
+	case errors.Is(err, types.ErrChallengeRateLimited):
+		return status.Error(codes.ResourceExhausted, "challenge rate limited")
 	default:
 		return status.Error(codes.Internal, "internal error")
 	}

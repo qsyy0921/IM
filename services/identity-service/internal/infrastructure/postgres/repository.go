@@ -23,6 +23,8 @@ type Repository struct {
 	eventID   func() (string, error)
 }
 
+const maxActiveChallengesPerTarget = 3
+
 type RepositoryOption func(*Repository)
 
 func NewRepository(pool *pgxpool.Pool, opts ...RepositoryOption) *Repository {
@@ -374,6 +376,9 @@ func (r *Repository) CreateVerificationChallenge(
 	if err := upsertChallengeDestination(ctx, tx, command.TenantID, command.UserID, command.Channel, command.Destination, issuedAt); err != nil {
 		return types.RequestVerificationChallengeResult{}, err
 	}
+	if err := ensureChallengeCreationAllowed(ctx, tx, command.TenantID, command.UserID, challengeType, command.Channel, command.Destination, issuedAt); err != nil {
+		return types.RequestVerificationChallengeResult{}, err
+	}
 	if err := insertIdentityChallenge(ctx, tx, command.TenantID, command.UserID, challenge.ChallengeID, challengeType, command.Channel, command.Destination, challenge.TokenHash, issuedAt, expiresAt, command.TraceID, command.RequestID); err != nil {
 		return types.RequestVerificationChallengeResult{}, err
 	}
@@ -448,6 +453,9 @@ func (r *Repository) CreatePasswordResetChallenge(
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	if err := lockVerifiedDestination(ctx, tx, command.TenantID, command.UserID, command.Channel, command.Destination); err != nil {
+		return types.RequestPasswordResetResult{}, err
+	}
+	if err := ensureChallengeCreationAllowed(ctx, tx, command.TenantID, command.UserID, types.ChallengeTypePasswordReset, command.Channel, command.Destination, issuedAt); err != nil {
 		return types.RequestPasswordResetResult{}, err
 	}
 	if err := insertIdentityChallenge(ctx, tx, command.TenantID, command.UserID, challenge.ChallengeID, types.ChallengeTypePasswordReset, command.Channel, command.Destination, challenge.TokenHash, issuedAt, expiresAt, command.TraceID, command.RequestID); err != nil {
@@ -1209,6 +1217,37 @@ INSERT INTO identity_challenges (
 	}
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func ensureChallengeCreationAllowed(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	userID types.UserID,
+	challengeType types.ChallengeType,
+	channel types.VerificationChannel,
+	destination string,
+	now time.Time,
+) error {
+	var activeCount int
+	err := tx.QueryRow(ctx, `
+SELECT count(*)
+FROM identity_challenges
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND challenge_type = $3
+  AND channel = $4
+  AND destination = $5
+  AND status = 'ACTIVE'
+  AND expires_at > $6
+`, tenantID, userID, challengeType, channel, destination, now).Scan(&activeCount)
+	if err != nil {
+		return types.NewDBReadFailed(err.Error())
+	}
+	if activeCount >= maxActiveChallengesPerTarget {
+		return types.NewChallengeRateLimited("too many active challenges")
 	}
 	return nil
 }

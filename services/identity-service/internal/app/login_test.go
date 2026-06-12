@@ -208,6 +208,58 @@ func TestConfirmPasswordResetUseCaseHashesNewPassword(t *testing.T) {
 	}
 }
 
+func TestRequestPasswordResetUseCaseNeverReturnsDevToken(t *testing.T) {
+	repository := &fakeIdentityRepository{}
+	useCase := NewRequestPasswordResetUseCase(repository, fakeChallengeTokenCodec{}, ChallengeOptions{ReturnDevToken: true})
+	result, err := useCase.Execute(context.Background(), types.RequestPasswordResetCommand{
+		TenantID:    "tenant-1",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "user1@example.com",
+	})
+	if err != nil {
+		t.Fatalf("request password reset: %v", err)
+	}
+	if !repository.createPasswordResetCalled {
+		t.Fatal("expected repository to create reset challenge")
+	}
+	if result.ChallengeID != "challenge-1" || result.DevChallengeToken != "" {
+		t.Fatalf("password reset response must not expose dev token: %+v", result)
+	}
+}
+
+func TestRequestPasswordResetUseCaseHidesInvalidOrRateLimitedTarget(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+	}{
+		{name: "invalid credentials", err: types.NewInvalidCredentials("invalid credentials")},
+		{name: "rate limited", err: types.NewChallengeRateLimited("too many active challenges")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repository := &fakeIdentityRepository{createPasswordResetErr: tc.err}
+			useCase := NewRequestPasswordResetUseCase(repository, fakeChallengeTokenCodec{}, ChallengeOptions{ReturnDevToken: true})
+			useCase.now = func() time.Time { return time.Unix(1_800_000_000, 0).UTC() }
+			result, err := useCase.Execute(context.Background(), types.RequestPasswordResetCommand{
+				TenantID:    "tenant-1",
+				UserID:      "user-1",
+				Channel:     types.VerificationChannelEmail,
+				Destination: "user1@example.com",
+				TTLSeconds:  600,
+			})
+			if err != nil {
+				t.Fatalf("request password reset should return neutral success: %v", err)
+			}
+			if !repository.createPasswordResetCalled {
+				t.Fatal("expected repository to be asked to create reset challenge")
+			}
+			if result.ChallengeID != "challenge-1" || result.DevChallengeToken != "" || result.ExpiresAtUnixMS != time.Unix(1_800_000_600, 0).UnixMilli() {
+				t.Fatalf("unexpected neutral result: %+v", result)
+			}
+		})
+	}
+}
+
 type fakeIdentityRepository struct {
 	credential                 types.UserCredential
 	registerCalled             bool
@@ -223,6 +275,8 @@ type fakeIdentityRepository struct {
 	presentedTokenID           types.RefreshTokenID
 	presentedTokenHash         string
 	createVerificationCalled   bool
+	createPasswordResetCalled  bool
+	createPasswordResetErr     error
 	confirmPasswordResetCalled bool
 	resetPasswordHash          string
 	resetTokenHash             string
@@ -291,8 +345,19 @@ func (repo *fakeIdentityRepository) ConfirmVerificationChallenge(context.Context
 	return types.ConfirmVerificationChallengeResult{}, nil
 }
 
-func (repo *fakeIdentityRepository) CreatePasswordResetChallenge(context.Context, types.RequestPasswordResetCommand, types.ChallengeRecord, time.Time, time.Time) (types.RequestPasswordResetResult, error) {
-	return types.RequestPasswordResetResult{}, nil
+func (repo *fakeIdentityRepository) CreatePasswordResetChallenge(_ context.Context, command types.RequestPasswordResetCommand, record types.ChallengeRecord, _ time.Time, expiresAt time.Time) (types.RequestPasswordResetResult, error) {
+	repo.createPasswordResetCalled = true
+	if repo.createPasswordResetErr != nil {
+		return types.RequestPasswordResetResult{}, repo.createPasswordResetErr
+	}
+	return types.RequestPasswordResetResult{
+		TenantID:        command.TenantID,
+		UserID:          command.UserID,
+		ChallengeID:     record.ChallengeID,
+		Channel:         command.Channel,
+		Destination:     command.Destination,
+		ExpiresAtUnixMS: expiresAt.UnixMilli(),
+	}, nil
 }
 
 func (repo *fakeIdentityRepository) ConfirmPasswordReset(_ context.Context, _ types.ConfirmPasswordResetCommand, tokenHash string, passwordHash string, _ time.Time) (types.ConfirmPasswordResetResult, error) {

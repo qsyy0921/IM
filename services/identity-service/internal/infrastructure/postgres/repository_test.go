@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -696,6 +697,77 @@ func TestRepositoryVerificationAndPasswordResetChallengesIntegration(t *testing.
 	}, "reset-hash", "another-password-hash", issuedAt.Add(5*time.Minute))
 	if !errors.Is(err, types.ErrInvalidChallenge) {
 		t.Fatalf("expected consumed reset challenge to reject replay, got %v", err)
+	}
+}
+
+func TestRepositoryChallengeDeliveryStatusIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	repository := NewRepository(pool)
+	issuedAt := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := repository.RegisterUser(ctx, types.RegisterUserCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+	}, "password-hash", issuedAt); err != nil {
+		t.Fatalf("register user: %v", err)
+	}
+	verification, err := repository.CreateVerificationChallenge(ctx, types.RequestVerificationChallengeCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "user1@example.com",
+	}, types.ChallengeTypeEmailVerification, types.ChallengeRecord{
+		ChallengeID: "challenge-delivery-success",
+		TokenHash:   "delivery-success-hash",
+	}, issuedAt, issuedAt.Add(15*time.Minute))
+	if err != nil {
+		t.Fatalf("create verification challenge: %v", err)
+	}
+	if err := repository.RecordChallengeDeliverySuccess(ctx, verification.TenantID, verification.UserID, verification.ChallengeID, issuedAt.Add(time.Second)); err != nil {
+		t.Fatalf("record delivery success: %v", err)
+	}
+	successState := readChallengeDeliveryState(t, ctx, pool, "challenge-delivery-success")
+	if successState.Status != "ACTIVE" ||
+		successState.DeliveryStatus != "DELIVERED" ||
+		successState.DeliveryAttemptCount != 1 ||
+		successState.DeliveredAt == nil ||
+		successState.DeliveryFailedAt != nil ||
+		successState.DeliveryLastError != "" {
+		t.Fatalf("unexpected delivered challenge state: %+v", successState)
+	}
+
+	seedVerifiedEmail(t, ctx, pool, "user1@example.com", issuedAt)
+	reset, err := repository.CreatePasswordResetChallenge(ctx, types.RequestPasswordResetCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "user1@example.com",
+	}, types.ChallengeRecord{
+		ChallengeID: "challenge-delivery-failed",
+		TokenHash:   "delivery-failed-hash",
+	}, issuedAt.Add(time.Minute), issuedAt.Add(16*time.Minute))
+	if err != nil {
+		t.Fatalf("create reset challenge: %v", err)
+	}
+	if err := repository.RecordChallengeDeliveryFailure(ctx, reset.TenantID, reset.UserID, reset.ChallengeID, strings.Repeat("x", 300), issuedAt.Add(2*time.Minute)); err != nil {
+		t.Fatalf("record delivery failure: %v", err)
+	}
+	failedState := readChallengeDeliveryState(t, ctx, pool, "challenge-delivery-failed")
+	if failedState.Status != "EXPIRED" ||
+		failedState.DeliveryStatus != "FAILED" ||
+		failedState.DeliveryAttemptCount != 1 ||
+		failedState.DeliveryFailedAt == nil ||
+		len(failedState.DeliveryLastError) != 256 {
+		t.Fatalf("unexpected failed challenge state: %+v", failedState)
+	}
+	_, err = repository.ConfirmPasswordReset(ctx, types.ConfirmPasswordResetCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		ChallengeID: "challenge-delivery-failed",
+	}, "delivery-failed-hash", "new-password-hash", issuedAt.Add(3*time.Minute))
+	if !errors.Is(err, types.ErrInvalidChallenge) {
+		t.Fatalf("expected failed delivery challenge to reject confirmation, got %v", err)
 	}
 }
 
@@ -1545,6 +1617,44 @@ WHERE tenant_id = 'tenant-identity'
 	if !wantLocked && lockedUntil != nil {
 		t.Fatalf("expected mfa recovery login to be unlocked, got mfa_recovery_locked_until=%s", lockedUntil)
 	}
+}
+
+type challengeDeliveryState struct {
+	Status               string
+	DeliveryStatus       string
+	DeliveryAttemptCount int
+	DeliveredAt          *time.Time
+	DeliveryFailedAt     *time.Time
+	DeliveryLastError    string
+}
+
+func readChallengeDeliveryState(t *testing.T, ctx context.Context, pool *pgxpool.Pool, challengeID string) challengeDeliveryState {
+	t.Helper()
+	var state challengeDeliveryState
+	err := pool.QueryRow(ctx, `
+SELECT
+    status,
+    delivery_status,
+    delivery_attempt_count,
+    delivered_at,
+    delivery_failed_at,
+    delivery_last_error
+FROM identity_challenges
+WHERE tenant_id = 'tenant-identity'
+  AND user_id = 'user-1'
+  AND challenge_id = $1
+`, challengeID).Scan(
+		&state.Status,
+		&state.DeliveryStatus,
+		&state.DeliveryAttemptCount,
+		&state.DeliveredAt,
+		&state.DeliveryFailedAt,
+		&state.DeliveryLastError,
+	)
+	if err != nil {
+		t.Fatalf("read challenge delivery state: %v", err)
+	}
+	return state
 }
 
 func assertOutboxEvent(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventType string, aggregateType string, eventID string) {

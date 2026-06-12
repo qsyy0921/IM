@@ -1087,6 +1087,9 @@ func TestRequestVerificationChallengeUseCaseRequiresCurrentPassword(t *testing.T
 	if !notifier.called || notifier.notification.Token != "challenge-token" || notifier.notification.Type != types.ChallengeTypeEmailVerification {
 		t.Fatalf("expected verification notification with challenge token, got called=%v notification=%+v", notifier.called, notifier.notification)
 	}
+	if !repository.deliverySuccessCalled || repository.deliverySuccessChallengeID != "challenge-1" {
+		t.Fatalf("expected verification challenge delivery success to be recorded, called=%v challenge=%q", repository.deliverySuccessCalled, repository.deliverySuccessChallengeID)
+	}
 }
 
 func TestRequestVerificationChallengeUseCaseReturnsDeliveryFailure(t *testing.T) {
@@ -1113,8 +1116,11 @@ func TestRequestVerificationChallengeUseCaseReturnsDeliveryFailure(t *testing.T)
 	if !repository.createVerificationCalled || !notifier.called {
 		t.Fatalf("expected challenge to be created then sent, created=%v sent=%v", repository.createVerificationCalled, notifier.called)
 	}
-	if !repository.expireChallengeCalled || repository.expiredChallengeID != "challenge-1" {
-		t.Fatalf("expected failed delivery challenge to be expired, called=%v challenge=%q", repository.expireChallengeCalled, repository.expiredChallengeID)
+	if !repository.deliveryFailureCalled || repository.deliveryFailureChallengeID != "challenge-1" || repository.deliveryFailureLastError != "challenge delivery unavailable" {
+		t.Fatalf("expected failed delivery challenge to be recorded, called=%v challenge=%q error=%q", repository.deliveryFailureCalled, repository.deliveryFailureChallengeID, repository.deliveryFailureLastError)
+	}
+	if repository.expireChallengeCalled {
+		t.Fatal("delivery failure should be recorded through the delivery failure path, not bare ExpireChallenge")
 	}
 }
 
@@ -1158,9 +1164,12 @@ func TestRequestPasswordResetUseCaseNeverReturnsDevToken(t *testing.T) {
 	if !notifier.called || notifier.notification.Token != "challenge-token" || notifier.notification.Type != types.ChallengeTypePasswordReset {
 		t.Fatalf("expected password reset notification with challenge token, got called=%v notification=%+v", notifier.called, notifier.notification)
 	}
+	if !repository.deliverySuccessCalled || repository.deliverySuccessChallengeID != "challenge-1" {
+		t.Fatalf("expected password reset delivery success to be recorded, called=%v challenge=%q", repository.deliverySuccessCalled, repository.deliverySuccessChallengeID)
+	}
 }
 
-func TestRequestPasswordResetUseCaseExpiresChallengeOnDeliveryFailure(t *testing.T) {
+func TestRequestPasswordResetUseCaseRecordsChallengeDeliveryFailure(t *testing.T) {
 	repository := &fakeIdentityRepository{}
 	notifier := &fakeChallengeNotifier{err: types.NewChallengeDeliveryFailed("webhook failed")}
 	useCase := NewRequestPasswordResetUseCase(repository, fakeChallengeTokenCodec{}, ChallengeOptions{Notifier: notifier})
@@ -1176,8 +1185,11 @@ func TestRequestPasswordResetUseCaseExpiresChallengeOnDeliveryFailure(t *testing
 	if !repository.createPasswordResetCalled || !notifier.called {
 		t.Fatalf("expected reset challenge to be created then sent, created=%v sent=%v", repository.createPasswordResetCalled, notifier.called)
 	}
-	if !repository.expireChallengeCalled || repository.expiredChallengeID != "challenge-1" {
-		t.Fatalf("expected failed delivery reset challenge to be expired, called=%v challenge=%q", repository.expireChallengeCalled, repository.expiredChallengeID)
+	if !repository.deliveryFailureCalled || repository.deliveryFailureChallengeID != "challenge-1" || repository.deliveryFailureLastError != "challenge delivery unavailable" {
+		t.Fatalf("expected failed reset delivery to be recorded, called=%v challenge=%q error=%q", repository.deliveryFailureCalled, repository.deliveryFailureChallengeID, repository.deliveryFailureLastError)
+	}
+	if repository.expireChallengeCalled {
+		t.Fatal("delivery failure should be recorded through the delivery failure path, not bare ExpireChallenge")
 	}
 }
 
@@ -1260,6 +1272,13 @@ type fakeIdentityRepository struct {
 	expireChallengeCalled         bool
 	expiredChallengeID            types.ChallengeID
 	expireChallengeErr            error
+	deliverySuccessCalled         bool
+	deliverySuccessChallengeID    types.ChallengeID
+	deliverySuccessErr            error
+	deliveryFailureCalled         bool
+	deliveryFailureChallengeID    types.ChallengeID
+	deliveryFailureLastError      string
+	deliveryFailureErr            error
 	confirmPasswordResetCalled    bool
 	resetPasswordHash             string
 	resetTokenHash                string
@@ -1376,6 +1395,19 @@ func (repo *fakeIdentityRepository) ExpireChallenge(_ context.Context, _ types.T
 	repo.expireChallengeCalled = true
 	repo.expiredChallengeID = challengeID
 	return repo.expireChallengeErr
+}
+
+func (repo *fakeIdentityRepository) RecordChallengeDeliverySuccess(_ context.Context, _ types.TenantID, _ types.UserID, challengeID types.ChallengeID, _ time.Time) error {
+	repo.deliverySuccessCalled = true
+	repo.deliverySuccessChallengeID = challengeID
+	return repo.deliverySuccessErr
+}
+
+func (repo *fakeIdentityRepository) RecordChallengeDeliveryFailure(_ context.Context, _ types.TenantID, _ types.UserID, challengeID types.ChallengeID, lastError string, _ time.Time) error {
+	repo.deliveryFailureCalled = true
+	repo.deliveryFailureChallengeID = challengeID
+	repo.deliveryFailureLastError = lastError
+	return repo.deliveryFailureErr
 }
 
 func (repo *fakeIdentityRepository) CreatePasswordResetChallenge(_ context.Context, command types.RequestPasswordResetCommand, record types.ChallengeRecord, _ time.Time, expiresAt time.Time) (types.RequestPasswordResetResult, error) {

@@ -226,14 +226,14 @@ Challenge token rules:
 - Verification challenge creation requires the current password to avoid unauthenticated email / phone takeover.
 - A first-stage durable cap limits active challenges per `tenant_id + user_id + challenge_type + channel + destination`.
 - `identity-service` can call a configured challenge delivery webhook after a challenge row is created. The webhook receives the raw one-time token in memory; PostgreSQL still stores only `token_hash`. Default mode is `noop`, and production deployments must configure the webhook provider and keep development token return disabled.
-- If the webhook returns an error, the RPC returns stable `challenge delivery unavailable` and identity-service immediately marks the newly created challenge `EXPIRED` as compensation, so the unusable token hash does not consume the active challenge cap. If compensation itself fails, the RPC surfaces the storage error because the row may still be active. This is still a first-stage synchronous sender, not provider-grade outbox / retry / delivery audit.
+- If the webhook returns an error, the RPC returns stable `challenge delivery unavailable` and identity-service immediately marks the newly created challenge `EXPIRED` as compensation, so the unusable token hash does not consume the active challenge cap. Delivery outcome is persisted on `identity_challenges` through `delivery_status`, `delivery_attempt_count`, `delivered_at`, `delivery_failed_at` and a sanitized `delivery_last_error`. If compensation itself fails, the RPC surfaces the storage error because the row may still be active. This is still a first-stage synchronous sender and local delivery audit, not provider-grade outbox / retry / DLQ.
 - `/debug/metrics` exposes only aggregate challenge delivery counters: configured mode, total requests, success / failure counts, latency avg / max and last success / failure timestamps. It must not expose raw challenge tokens, user IDs, destinations, template data or provider error bodies.
 
 Known hardening still pending:
 
 - timing- and sender-side account-enumeration resistance;
 - tenant / IP / device rate limits for challenge creation and confirmation;
-- provider-specific email / SMS templates, bounce handling, delivery audit and alerting;
+- provider-specific email / SMS templates, bounce handling, provider-grade delivery retry / DLQ and alerting;
 - WebAuthn and OIDC federation;
 - production alerting for repeated challenge failures.
 

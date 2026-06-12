@@ -643,6 +643,84 @@ func (r *Repository) ExpireChallenge(
 	return nil
 }
 
+func (r *Repository) RecordChallengeDeliverySuccess(
+	ctx context.Context,
+	tenantID types.TenantID,
+	userID types.UserID,
+	challengeID types.ChallengeID,
+	deliveredAt time.Time,
+) error {
+	if r.pool == nil {
+		return types.NewDBWriteFailed("identity repository is not configured")
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := lockIdentityChallenge(ctx, tx, tenantID, userID, challengeID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+UPDATE identity_challenges
+SET delivery_status = 'DELIVERED',
+    delivery_attempt_count = delivery_attempt_count + 1,
+    delivered_at = $4,
+    delivery_failed_at = NULL,
+    delivery_last_error = '',
+    updated_at = $4
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND challenge_id = $3
+`, tenantID, userID, challengeID, deliveredAt); err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func (r *Repository) RecordChallengeDeliveryFailure(
+	ctx context.Context,
+	tenantID types.TenantID,
+	userID types.UserID,
+	challengeID types.ChallengeID,
+	lastError string,
+	failedAt time.Time,
+) error {
+	if r.pool == nil {
+		return types.NewDBWriteFailed("identity repository is not configured")
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := lockIdentityChallenge(ctx, tx, tenantID, userID, challengeID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+UPDATE identity_challenges
+SET status = CASE WHEN status = 'ACTIVE' THEN 'EXPIRED' ELSE status END,
+    delivery_status = 'FAILED',
+    delivery_attempt_count = delivery_attempt_count + 1,
+    delivered_at = NULL,
+    delivery_failed_at = $5,
+    delivery_last_error = $4,
+    updated_at = $5
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND challenge_id = $3
+`, tenantID, userID, challengeID, sanitizeChallengeDeliveryError(lastError), failedAt); err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
 func (r *Repository) CreatePasswordResetChallenge(
 	ctx context.Context,
 	command types.RequestPasswordResetCommand,
@@ -1955,6 +2033,17 @@ WHERE tenant_id = $1
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
+}
+
+func sanitizeChallengeDeliveryError(lastError string) string {
+	lastError = strings.TrimSpace(lastError)
+	if lastError == "" {
+		return "challenge delivery unavailable"
+	}
+	if len(lastError) > 256 {
+		return lastError[:256]
+	}
+	return lastError
 }
 
 func markDestinationVerified(ctx context.Context, tx pgx.Tx, challenge identityChallengeRow, now time.Time) error {

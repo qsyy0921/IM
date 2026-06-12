@@ -61,9 +61,9 @@ func (uc *RequestVerificationChallengeUseCase) Execute(ctx context.Context, comm
 		TraceID:         command.TraceID,
 		RequestID:       command.RequestID,
 	}); err != nil {
-		if expireErr := uc.repository.ExpireChallenge(ctx, result.TenantID, result.UserID, result.ChallengeID, uc.now()); expireErr != nil {
-			return types.RequestVerificationChallengeResult{}, expireErr
-		}
+		return types.RequestVerificationChallengeResult{}, recordChallengeDeliveryFailure(ctx, uc.repository, result.TenantID, result.UserID, result.ChallengeID, uc.now(), err)
+	}
+	if err := uc.repository.RecordChallengeDeliverySuccess(ctx, result.TenantID, result.UserID, result.ChallengeID, uc.now()); err != nil {
 		return types.RequestVerificationChallengeResult{}, err
 	}
 	if uc.options.ReturnDevToken {
@@ -134,9 +134,9 @@ func (uc *RequestPasswordResetUseCase) Execute(ctx context.Context, command type
 		TraceID:         command.TraceID,
 		RequestID:       command.RequestID,
 	}); err != nil {
-		if expireErr := uc.repository.ExpireChallenge(ctx, result.TenantID, result.UserID, result.ChallengeID, uc.now()); expireErr != nil {
-			return types.RequestPasswordResetResult{}, expireErr
-		}
+		return types.RequestPasswordResetResult{}, recordChallengeDeliveryFailure(ctx, uc.repository, result.TenantID, result.UserID, result.ChallengeID, uc.now(), err)
+	}
+	if err := uc.repository.RecordChallengeDeliverySuccess(ctx, result.TenantID, result.UserID, result.ChallengeID, uc.now()); err != nil {
 		return types.RequestPasswordResetResult{}, err
 	}
 	return result, nil
@@ -153,6 +153,21 @@ type noopChallengeNotifier struct{}
 
 func (noopChallengeNotifier) SendChallenge(context.Context, types.ChallengeNotification) error {
 	return nil
+}
+
+func recordChallengeDeliveryFailure(
+	ctx context.Context,
+	repository Repository,
+	tenantID types.TenantID,
+	userID types.UserID,
+	challengeID types.ChallengeID,
+	now time.Time,
+	cause error,
+) error {
+	if err := repository.RecordChallengeDeliveryFailure(ctx, tenantID, userID, challengeID, "challenge delivery unavailable", now); err != nil {
+		return err
+	}
+	return cause
 }
 
 func neutralPasswordResetResult(command types.RequestPasswordResetCommand, challengeID types.ChallengeID, expiresAt time.Time) types.RequestPasswordResetResult {

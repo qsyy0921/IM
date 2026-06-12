@@ -12,9 +12,10 @@ import (
 const serviceName = "identity-service"
 
 type Handler struct {
-	pool        *pgxpool.Pool
-	grpcMetrics *GRPCMetrics
-	jwkSet      any
+	pool                     *pgxpool.Pool
+	grpcMetrics              *GRPCMetrics
+	challengeDeliveryMetrics *ChallengeDeliveryMetrics
+	jwkSet                   any
 }
 
 func NewHandler(pool *pgxpool.Pool, grpcMetrics ...*GRPCMetrics) *Handler {
@@ -27,6 +28,11 @@ func NewHandler(pool *pgxpool.Pool, grpcMetrics ...*GRPCMetrics) *Handler {
 
 func (h *Handler) WithJWKSet(jwkSet any) *Handler {
 	h.jwkSet = jwkSet
+	return h
+}
+
+func (h *Handler) WithChallengeDeliveryMetrics(metrics *ChallengeDeliveryMetrics) *Handler {
+	h.challengeDeliveryMetrics = metrics
 	return h
 }
 
@@ -76,6 +82,10 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		grpcSnapshot := h.grpcMetrics.Snapshot()
 		snapshot.GRPC = &grpcSnapshot
 	}
+	if h.challengeDeliveryMetrics != nil {
+		challengeDeliverySnapshot := h.challengeDeliveryMetrics.Snapshot()
+		snapshot.ChallengeDelivery = &challengeDeliverySnapshot
+	}
 	if h.pool != nil {
 		stats := h.pool.Stat()
 		snapshot.PGPool = &PGPoolSnapshot{
@@ -108,12 +118,13 @@ type healthResponse struct {
 }
 
 type Snapshot struct {
-	Service       string            `json:"service"`
-	GeneratedAtMS int64             `json:"generated_at_ms"`
-	PGPool        *PGPoolSnapshot   `json:"pg_pool,omitempty"`
-	Identity      *IdentitySnapshot `json:"identity,omitempty"`
-	IdentityError string            `json:"identity_error,omitempty"`
-	GRPC          *GRPCSnapshot     `json:"grpc,omitempty"`
+	Service           string                     `json:"service"`
+	GeneratedAtMS     int64                      `json:"generated_at_ms"`
+	PGPool            *PGPoolSnapshot            `json:"pg_pool,omitempty"`
+	Identity          *IdentitySnapshot          `json:"identity,omitempty"`
+	IdentityError     string                     `json:"identity_error,omitempty"`
+	GRPC              *GRPCSnapshot              `json:"grpc,omitempty"`
+	ChallengeDelivery *ChallengeDeliverySnapshot `json:"challenge_delivery,omitempty"`
 }
 
 type PGPoolSnapshot struct {

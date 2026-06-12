@@ -85,16 +85,20 @@ func runGRPC() error {
 	if err != nil {
 		return err
 	}
-	challengeNotifier, err := newChallengeNotifier()
+	challengeNotifier, challengeDeliveryMode, err := newChallengeNotifier()
 	if err != nil {
 		return err
 	}
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
+	challengeDeliveryMetrics := monitoringinfra.NewChallengeDeliveryMetrics(challengeDeliveryMode)
+	challengeNotifier = monitoringinfra.NewInstrumentedChallengeNotifier(challengeNotifier, challengeDeliveryMetrics)
 	jwkSet, err := gatewayTokenJWKSetWithAdditionalKeys(signer.JWKSet())
 	if err != nil {
 		return err
 	}
-	stopDebug, err := startDebugServer(ctx, identityDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics).WithJWKSet(jwkSet))
+	stopDebug, err := startDebugServer(ctx, identityDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics).
+		WithJWKSet(jwkSet).
+		WithChallengeDeliveryMetrics(challengeDeliveryMetrics))
 	if err != nil {
 		return err
 	}
@@ -186,20 +190,29 @@ func runGRPC() error {
 	}
 }
 
-func newChallengeNotifier() (app.ChallengeNotifier, error) {
-	mode := strings.ToLower(envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MODE", "noop"))
+func newChallengeNotifier() (app.ChallengeNotifier, string, error) {
+	mode := challengeDeliveryMode()
 	switch mode {
 	case "", "noop", "disabled":
-		return notificationinfra.NewNoopChallengeNotifier(), nil
+		return notificationinfra.NewNoopChallengeNotifier(), mode, nil
 	case "webhook":
-		return notificationinfra.NewWebhookChallengeNotifier(
+		notifier, err := notificationinfra.NewWebhookChallengeNotifier(
 			envString("NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_URL", ""),
 			envString("NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_BEARER_TOKEN", ""),
 			envDuration("NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_TIMEOUT", 5*time.Second),
 		)
+		return notifier, mode, err
 	default:
-		return nil, errors.New("unsupported NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MODE")
+		return nil, mode, errors.New("unsupported NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MODE")
 	}
+}
+
+func challengeDeliveryMode() string {
+	mode := strings.ToLower(strings.TrimSpace(envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MODE", "noop")))
+	if mode == "" {
+		return "noop"
+	}
+	return mode
 }
 
 func newMFASecretManager() (app.MFASecretManager, error) {

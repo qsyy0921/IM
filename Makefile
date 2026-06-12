@@ -12,6 +12,7 @@ proto:
 		$(PROTO_API_DIR)/nexusim/contacts/v1/contacts_service.proto \
 		$(PROTO_API_DIR)/nexusim/delivery/v1/delivery_service.proto \
 		$(PROTO_API_DIR)/nexusim/identity/v1/identity_service.proto \
+		$(PROTO_API_DIR)/nexusim/policy/v1/policy_service.proto \
 		$(PROTO_API_DIR)/nexusim/receipt/v1/receipt_service.proto \
 		$(PROTO_API_DIR)/nexusim/conversation/v1/conversation_service.proto \
 		$(PROTO_API_DIR)/nexusim/message/v1/message_error.proto \
@@ -36,6 +37,11 @@ proto:
 		--go_out=$(PROTO_KAFKA_DIR) \
 		--go_opt=paths=source_relative \
 		$(PROTO_KAFKA_DIR)/contacts/v1/im.contact.events.proto
+	protoc \
+		-I $(PROTO_KAFKA_DIR) \
+		--go_out=$(PROTO_KAFKA_DIR) \
+		--go_opt=paths=source_relative \
+		$(PROTO_KAFKA_DIR)/identity/v1/im.identity.events.proto
 
 .PHONY: local-up
 local-up:

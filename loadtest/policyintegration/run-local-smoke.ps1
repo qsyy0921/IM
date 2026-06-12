@@ -141,8 +141,9 @@ function Run-Scenario {
             NEXUSIM_PG_DSN = $PgDsn
             NEXUSIM_POLICY_SERVICE_ADDR = $policyAddr
             NEXUSIM_POLICY_RPC_TIMEOUT = "2s"
+            NEXUSIM_MOCK_POLICY_ALLOWED = [string](-not $Allowed)
             NEXUSIM_MOCK_PERMISSION_VERSION = [string]$PermissionVersion
-            NEXUSIM_MOCK_CLASSIFICATION = $Classification
+            NEXUSIM_MOCK_CLASSIFICATION = "LOCAL_STATIC_SHOULD_NOT_APPEAR"
         }
         $runner = Join-Path $repo "bin\policy-message-loadtest.exe"
         $tenant = "tenant-policy-message-$Scenario-" + (Get-Date -Format "yyyyMMddHHmmss")

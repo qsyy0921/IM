@@ -20,6 +20,8 @@ type LocalRegistry interface {
 	Register(context.Context, types.SessionRegistration) (types.SessionRegistrationResult, error)
 	Unregister(sessionID string)
 	EnqueueNotification(context.Context, types.DeliveryNotification) (types.NotifyDeliveryResult, error)
+	EvictDevice(ctx context.Context, tenantID string, userID string, deviceID string, reason string) (types.SessionEvictionResult, error)
+	EvictSession(ctx context.Context, tenantID string, userID string, deviceID string, sessionID string, reason string) (types.SessionEvictionResult, error)
 }
 
 type Config struct {
@@ -53,6 +55,7 @@ type Metrics struct {
 	RedisRouteSubscriberMessageCount   uint64 `json:"redis_route_subscriber_message_count,omitempty"`
 	RedisRouteSubscriberMalformedCount uint64 `json:"redis_route_subscriber_malformed_count,omitempty"`
 	RedisRouteSubscriberEnqueuedCount  uint64 `json:"redis_route_subscriber_enqueued_count,omitempty"`
+	RedisRouteSubscriberEvictedCount   uint64 `json:"redis_route_subscriber_evicted_count,omitempty"`
 	RedisRouteSubscriberErrorCount     uint64 `json:"redis_route_subscriber_error_count,omitempty"`
 	RedisResumeReplayCount             uint64 `json:"redis_resume_replay_count"`
 	RedisResumeMissCount               uint64 `json:"redis_resume_miss_count"`
@@ -90,6 +93,14 @@ type routeEntry struct {
 	SessionID   string `json:"session_id"`
 	GatewayID   string `json:"gateway_id"`
 	ResumeToken string `json:"resume_token,omitempty"`
+}
+
+type evictionMessage struct {
+	TenantID  string `json:"tenant_id"`
+	UserID    string `json:"user_id"`
+	DeviceID  string `json:"device_id"`
+	SessionID string `json:"session_id,omitempty"`
+	Reason    string `json:"reason"`
 }
 
 type resumeMeta struct {
@@ -301,6 +312,79 @@ func (registry *Registry) EnqueueNotification(
 	return result, nil
 }
 
+func (registry *Registry) EvictDevice(ctx context.Context, tenantID string, userID string, deviceID string, reason string) (types.SessionEvictionResult, error) {
+	localResult, err := registry.local.EvictDevice(ctx, tenantID, userID, deviceID, reason)
+	if err != nil {
+		return localResult, err
+	}
+	routes, err := registry.lookupRoutes(ctx, tenantID, userID)
+	if err != nil {
+		registry.metrics.lookupErrorCount.Add(1)
+		return localResult, nil
+	}
+	result := localResult
+	remoteSessionsByGateway := make(map[string]int)
+	for _, route := range routes {
+		if route.GatewayID == "" || route.GatewayID == registry.config.GatewayID || route.DeviceID != deviceID {
+			continue
+		}
+		remoteSessionsByGateway[route.GatewayID]++
+		result.MatchedSessions++
+	}
+	for gatewayID, sessionCount := range remoteSessionsByGateway {
+		if err := registry.publishRemoteEviction(ctx, gatewayID, evictionMessage{
+			TenantID: tenantID,
+			UserID:   userID,
+			DeviceID: deviceID,
+			Reason:   firstNonEmpty(reason, "identity_revoked"),
+		}); err != nil {
+			registry.metrics.remotePublishErrorCount.Add(1)
+			continue
+		}
+		result.Evicted += sessionCount
+	}
+	return result, nil
+}
+
+func (registry *Registry) EvictSession(ctx context.Context, tenantID string, userID string, deviceID string, sessionID string, reason string) (types.SessionEvictionResult, error) {
+	localResult, err := registry.local.EvictSession(ctx, tenantID, userID, deviceID, sessionID, reason)
+	if err != nil {
+		return localResult, err
+	}
+	routes, err := registry.lookupRoutes(ctx, tenantID, userID)
+	if err != nil {
+		registry.metrics.lookupErrorCount.Add(1)
+		return localResult, nil
+	}
+	result := localResult
+	publishedGateways := make(map[string]struct{})
+	for _, route := range routes {
+		if route.GatewayID == "" ||
+			route.GatewayID == registry.config.GatewayID ||
+			route.DeviceID != deviceID ||
+			route.SessionID != sessionID {
+			continue
+		}
+		result.MatchedSessions++
+		if _, ok := publishedGateways[route.GatewayID]; ok {
+			continue
+		}
+		if err := registry.publishRemoteEviction(ctx, route.GatewayID, evictionMessage{
+			TenantID:  tenantID,
+			UserID:    userID,
+			DeviceID:  deviceID,
+			SessionID: sessionID,
+			Reason:    firstNonEmpty(reason, "identity_revoked"),
+		}); err != nil {
+			registry.metrics.remotePublishErrorCount.Add(1)
+			continue
+		}
+		publishedGateways[route.GatewayID] = struct{}{}
+		result.Evicted++
+	}
+	return result, nil
+}
+
 func (registry *Registry) Metrics() Metrics {
 	return Metrics{
 		RedisRouteRegisterErrorCount:      registry.metrics.registerErrorCount.Load(),
@@ -456,6 +540,18 @@ func (registry *Registry) publishRemote(
 	return registry.client.Publish(ctx, registry.gatewayChannel(gatewayID), payload).Err()
 }
 
+func (registry *Registry) publishRemoteEviction(
+	ctx context.Context,
+	gatewayID string,
+	eviction evictionMessage,
+) error {
+	payload, err := json.Marshal(eviction)
+	if err != nil {
+		return err
+	}
+	return registry.client.Publish(ctx, registry.gatewayEvictionChannel(gatewayID), payload).Err()
+}
+
 func (registry *Registry) sessionKey(sessionID string) string {
 	return strings.Join([]string{registry.config.KeyPrefix, "route", "session", sessionID}, ":")
 }
@@ -466,6 +562,10 @@ func (registry *Registry) userKey(tenantID string, userID string) string {
 
 func (registry *Registry) gatewayChannel(gatewayID string) string {
 	return GatewayChannel(registry.config.KeyPrefix, gatewayID)
+}
+
+func (registry *Registry) gatewayEvictionChannel(gatewayID string) string {
+	return GatewayEvictionChannel(registry.config.KeyPrefix, gatewayID)
 }
 
 func (registry *Registry) writeResumeMeta(ctx context.Context, token string, auth types.AuthContext) error {
@@ -614,4 +714,20 @@ func GatewayChannel(keyPrefix string, gatewayID string) string {
 		keyPrefix = defaultKeyPrefix
 	}
 	return strings.Join([]string{keyPrefix, "route", "gateway", gatewayID, "notify"}, ":")
+}
+
+func GatewayEvictionChannel(keyPrefix string, gatewayID string) string {
+	if keyPrefix == "" {
+		keyPrefix = defaultKeyPrefix
+	}
+	return strings.Join([]string{keyPrefix, "route", "gateway", gatewayID, "evict"}, ":")
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }

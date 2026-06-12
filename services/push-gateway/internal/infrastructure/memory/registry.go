@@ -24,14 +24,15 @@ type Registry struct {
 }
 
 type Metrics struct {
-	ConnectedSessions        int    `json:"connected_sessions"`
-	SessionQueueFullCount    uint64 `json:"session_queue_full_count"`
-	SlowSessionEvictedCount  uint64 `json:"slow_session_evicted_count"`
-	ResumeBufferReplayCount  uint64 `json:"resume_buffer_replay_count"`
-	ResumeBufferMissCount    uint64 `json:"resume_buffer_miss_count"`
-	ResumeBufferStoredFrames int    `json:"resume_buffer_stored_frames"`
-	ResumeBufferTokenCount   int    `json:"resume_buffer_token_count"`
-	ResumeBufferExpiredCount uint64 `json:"resume_buffer_expired_count"`
+	ConnectedSessions           int    `json:"connected_sessions"`
+	SessionQueueFullCount       uint64 `json:"session_queue_full_count"`
+	SlowSessionEvictedCount     uint64 `json:"slow_session_evicted_count"`
+	IdentitySessionEvictedCount uint64 `json:"identity_session_evicted_count"`
+	ResumeBufferReplayCount     uint64 `json:"resume_buffer_replay_count"`
+	ResumeBufferMissCount       uint64 `json:"resume_buffer_miss_count"`
+	ResumeBufferStoredFrames    int    `json:"resume_buffer_stored_frames"`
+	ResumeBufferTokenCount      int    `json:"resume_buffer_token_count"`
+	ResumeBufferExpiredCount    uint64 `json:"resume_buffer_expired_count"`
 }
 
 type session struct {
@@ -187,6 +188,51 @@ func (registry *Registry) EnqueueNotification(
 		}
 	}
 	return result, nil
+}
+
+func (registry *Registry) EvictDevice(ctx context.Context, tenantID string, userID string, deviceID string, reason string) (types.SessionEvictionResult, error) {
+	if reason == "" {
+		reason = "identity_revoked"
+	}
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	matches := make([]string, 0)
+	for sessionID, existing := range registry.sessions {
+		if existing.auth.TenantID == tenantID &&
+			existing.auth.UserID == userID &&
+			existing.auth.DeviceID == deviceID {
+			matches = append(matches, sessionID)
+		}
+	}
+	result := types.SessionEvictionResult{MatchedSessions: len(matches)}
+	for _, sessionID := range matches {
+		target := registry.sessions[sessionID]
+		if target == nil {
+			continue
+		}
+		registry.evictLocked(sessionID, target, types.SessionEviction{Reason: reason})
+		registry.metrics.IdentitySessionEvictedCount++
+		result.Evicted++
+	}
+	return result, nil
+}
+
+func (registry *Registry) EvictSession(ctx context.Context, tenantID string, userID string, deviceID string, sessionID string, reason string) (types.SessionEvictionResult, error) {
+	if reason == "" {
+		reason = "identity_revoked"
+	}
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	target := registry.sessions[sessionID]
+	if target == nil ||
+		target.auth.TenantID != tenantID ||
+		target.auth.UserID != userID ||
+		target.auth.DeviceID != deviceID {
+		return types.SessionEvictionResult{}, nil
+	}
+	registry.evictLocked(sessionID, target, types.SessionEviction{Reason: reason})
+	registry.metrics.IdentitySessionEvictedCount++
+	return types.SessionEvictionResult{MatchedSessions: 1, Evicted: 1}, nil
 }
 
 func (registry *Registry) Metrics() Metrics {

@@ -65,6 +65,11 @@ type NotifyDeliveryResult struct {
 	Evicted         int
 }
 
+type SessionEvictionResult struct {
+	MatchedSessions int
+	Evicted         int
+}
+
 type AckDeliveryCommand struct {
 	AuthContext    AuthContext
 	ConversationID string

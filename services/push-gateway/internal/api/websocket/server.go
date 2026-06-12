@@ -197,7 +197,7 @@ func writeLoop(
 				continue
 			}
 			_ = writeFrame(ctx, conn, domain.ResumeHint(eviction.Reason, eviction.Conversations), timeout)
-			_ = conn.Close(nhooyr.StatusPolicyViolation, "slow session")
+			_ = conn.Close(nhooyr.StatusPolicyViolation, closeReason(eviction.Reason))
 			return types.ErrSessionEvicted
 		case frame, ok := <-outbound:
 			if !ok {
@@ -223,6 +223,17 @@ func writeFrame(ctx context.Context, conn *nhooyr.Conn, frame types.ServerFrame,
 	writeCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	return wsjson.Write(writeCtx, conn, frame)
+}
+
+func closeReason(reason string) string {
+	switch reason {
+	case "identity_revoked":
+		return "identity revoked"
+	case "slow_session":
+		return "slow session"
+	default:
+		return "session evicted"
+	}
 }
 
 func DecodeClientFrame(raw json.RawMessage) (types.ClientFrame, string, error) {

@@ -71,6 +71,96 @@ func TestRegistryEnqueueNotificationFailsClosedWhenQueueFull(t *testing.T) {
 	}
 }
 
+func TestRegistryEvictDeviceClosesMatchingSessions(t *testing.T) {
+	registry := NewRegistry()
+	firstEvicted := make(chan types.SessionEviction, 1)
+	secondEvicted := make(chan types.SessionEviction, 1)
+	otherEvicted := make(chan types.SessionEviction, 1)
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"}
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-1",
+		Outbound:    make(chan types.ServerFrame, 1),
+		Evicted:     firstEvicted,
+	}); err != nil {
+		t.Fatalf("register first: %v", err)
+	}
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-2",
+		Outbound:    make(chan types.ServerFrame, 1),
+		Evicted:     secondEvicted,
+	}); err != nil {
+		t.Fatalf("register second: %v", err)
+	}
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-2"},
+		SessionID:   "session-3",
+		Outbound:    make(chan types.ServerFrame, 1),
+		Evicted:     otherEvicted,
+	}); err != nil {
+		t.Fatalf("register other: %v", err)
+	}
+
+	result, err := registry.EvictDevice(context.Background(), "tenant-1", "user-1", "device-1", "identity_revoked")
+	if err != nil {
+		t.Fatalf("evict device: %v", err)
+	}
+	if result.MatchedSessions != 2 || result.Evicted != 2 {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	assertEvictionReason(t, firstEvicted, "identity_revoked")
+	assertEvictionReason(t, secondEvicted, "identity_revoked")
+	select {
+	case eviction := <-otherEvicted:
+		t.Fatalf("other device must not be evicted: %+v", eviction)
+	default:
+	}
+	if metrics := registry.Metrics(); metrics.IdentitySessionEvictedCount != 2 || metrics.ConnectedSessions != 1 {
+		t.Fatalf("unexpected metrics: %+v", metrics)
+	}
+}
+
+func TestRegistryEvictSessionClosesOnlyMatchingSession(t *testing.T) {
+	registry := NewRegistry()
+	targetEvicted := make(chan types.SessionEviction, 1)
+	otherEvicted := make(chan types.SessionEviction, 1)
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"}
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-1",
+		Outbound:    make(chan types.ServerFrame, 1),
+		Evicted:     targetEvicted,
+	}); err != nil {
+		t.Fatalf("register target: %v", err)
+	}
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-2",
+		Outbound:    make(chan types.ServerFrame, 1),
+		Evicted:     otherEvicted,
+	}); err != nil {
+		t.Fatalf("register other: %v", err)
+	}
+
+	result, err := registry.EvictSession(context.Background(), "tenant-1", "user-1", "device-1", "session-1", "identity_revoked")
+	if err != nil {
+		t.Fatalf("evict session: %v", err)
+	}
+	if result.MatchedSessions != 1 || result.Evicted != 1 {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	assertEvictionReason(t, targetEvicted, "identity_revoked")
+	select {
+	case eviction := <-otherEvicted:
+		t.Fatalf("other session must not be evicted: %+v", eviction)
+	default:
+	}
+	if metrics := registry.Metrics(); metrics.IdentitySessionEvictedCount != 1 || metrics.ConnectedSessions != 1 {
+		t.Fatalf("unexpected metrics: %+v", metrics)
+	}
+}
+
 func TestRegistryReplaysResumeBufferAfterLastReceived(t *testing.T) {
 	registry := NewRegistry()
 	outbound := make(chan types.ServerFrame, 4)
@@ -389,6 +479,18 @@ func TestRegistryDoesNotExpireActiveSessionResumeToken(t *testing.T) {
 	replay := <-resumedOutbound
 	if replay.Op != types.OpDeliveryNotify || replay.EventID != "delivery-event-active-token" {
 		t.Fatalf("unexpected replay: %+v", replay)
+	}
+}
+
+func assertEvictionReason(t *testing.T, evicted <-chan types.SessionEviction, reason string) {
+	t.Helper()
+	select {
+	case eviction := <-evicted:
+		if eviction.Reason != reason {
+			t.Fatalf("expected reason %q, got %+v", reason, eviction)
+		}
+	default:
+		t.Fatalf("expected eviction")
 	}
 }
 

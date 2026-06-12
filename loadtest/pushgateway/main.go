@@ -222,23 +222,27 @@ type redisFaultSummary struct {
 }
 
 type identityRevokeSummary struct {
-	InitialHello      frameSnapshot `json:"initial_hello"`
-	RevokedDeviceID   string        `json:"revoked_device_id"`
-	DeniedFrame       frameSnapshot `json:"denied_frame"`
-	ReconnectAttempts int           `json:"reconnect_attempts"`
+	InitialHello           frameSnapshot `json:"initial_hello"`
+	RevokedDeviceID        string        `json:"revoked_device_id"`
+	ActiveCloseHint        frameSnapshot `json:"active_close_hint"`
+	ActiveCloseStatus      string        `json:"active_close_status,omitempty"`
+	ActiveNotifyFramesRead int           `json:"active_notify_frames_read"`
+	DeniedFrame            frameSnapshot `json:"denied_frame"`
+	ReconnectAttempts      int           `json:"reconnect_attempts"`
 }
 
 type pushMetrics struct {
-	ConnectedSessions        int               `json:"connected_sessions"`
-	SessionQueueFullCount    uint64            `json:"session_queue_full_count"`
-	SlowSessionEvictedCount  uint64            `json:"slow_session_evicted_count"`
-	ResumeBufferReplayCount  uint64            `json:"resume_buffer_replay_count"`
-	ResumeBufferMissCount    uint64            `json:"resume_buffer_miss_count"`
-	ResumeBufferStoredFrames int               `json:"resume_buffer_stored_frames"`
-	ResumeBufferTokenCount   int               `json:"resume_buffer_token_count"`
-	ResumeBufferExpiredCount uint64            `json:"resume_buffer_expired_count"`
-	RedisRegistryMetrics     redisRouteMetrics `json:"redis_registry_metrics,omitempty"`
-	RedisSubscriberMetrics   redisRouteMetrics `json:"redis_subscriber_metrics,omitempty"`
+	ConnectedSessions           int               `json:"connected_sessions"`
+	SessionQueueFullCount       uint64            `json:"session_queue_full_count"`
+	SlowSessionEvictedCount     uint64            `json:"slow_session_evicted_count"`
+	IdentitySessionEvictedCount uint64            `json:"identity_session_evicted_count"`
+	ResumeBufferReplayCount     uint64            `json:"resume_buffer_replay_count"`
+	ResumeBufferMissCount       uint64            `json:"resume_buffer_miss_count"`
+	ResumeBufferStoredFrames    int               `json:"resume_buffer_stored_frames"`
+	ResumeBufferTokenCount      int               `json:"resume_buffer_token_count"`
+	ResumeBufferExpiredCount    uint64            `json:"resume_buffer_expired_count"`
+	RedisRegistryMetrics        redisRouteMetrics `json:"redis_registry_metrics,omitempty"`
+	RedisSubscriberMetrics      redisRouteMetrics `json:"redis_subscriber_metrics,omitempty"`
 }
 
 type redisRouteMetrics struct {
@@ -254,6 +258,7 @@ type redisRouteMetrics struct {
 	RedisRouteSubscriberMessageCount   uint64 `json:"redis_route_subscriber_message_count,omitempty"`
 	RedisRouteSubscriberMalformedCount uint64 `json:"redis_route_subscriber_malformed_count,omitempty"`
 	RedisRouteSubscriberEnqueuedCount  uint64 `json:"redis_route_subscriber_enqueued_count,omitempty"`
+	RedisRouteSubscriberEvictedCount   uint64 `json:"redis_route_subscriber_evicted_count,omitempty"`
 	RedisRouteSubscriberErrorCount     uint64 `json:"redis_route_subscriber_error_count,omitempty"`
 	RedisResumeReplayCount             uint64 `json:"redis_resume_replay_count,omitempty"`
 	RedisResumeMissCount               uint64 `json:"redis_resume_miss_count,omitempty"`
@@ -1154,20 +1159,32 @@ func runIdentityRevokeScenario(ctx context.Context, cfg config, result *summary)
 	if err != nil {
 		return finish(cfg, result, fmt.Errorf("connect websocket before revoke: %w", err))
 	}
-	_ = conn.Close(nhooyr.StatusNormalClosure, "identity revoke smoke")
+	activeClose := make(chan slowReadResult, 1)
+	go func() {
+		activeClose <- readUntilResumeHintOrClose(ctx, cfg, conn)
+	}()
 
 	if err := revokeIdentityDevice(ctx, cfg); err != nil {
+		conn.CloseNow()
 		return finish(cfg, result, err)
+	}
+	closeResult := <-activeClose
+	if closeResult.resumeHint.Op != opResumeHint || closeResult.resumeHint.Reason != "identity_revoked" {
+		conn.CloseNow()
+		return finish(cfg, result, fmt.Errorf("expected identity revoked resume hint, got hint=%+v close=%s", closeResult.resumeHint, closeResult.closeStatus))
 	}
 	denied, attempts, err := waitWebSocketPermissionDenied(ctx, cfg, cfg.receiverDeviceID, token)
 	if err != nil {
 		return finish(cfg, result, err)
 	}
 	result.IdentityRevoke = &identityRevokeSummary{
-		InitialHello:      snapshotFrame(hello),
-		RevokedDeviceID:   cfg.receiverDeviceID,
-		DeniedFrame:       snapshotFrame(denied),
-		ReconnectAttempts: attempts,
+		InitialHello:           snapshotFrame(hello),
+		RevokedDeviceID:        cfg.receiverDeviceID,
+		ActiveCloseHint:        snapshotFrame(closeResult.resumeHint),
+		ActiveCloseStatus:      closeResult.closeStatus,
+		ActiveNotifyFramesRead: closeResult.notifyFrames,
+		DeniedFrame:            snapshotFrame(denied),
+		ReconnectAttempts:      attempts,
 	}
 	result.ServerHello = snapshotFrame(hello)
 	result.Success = true
@@ -2081,6 +2098,7 @@ func snapshotFrame(frame serverFrame) frameSnapshot {
 		LastReceivedSeq: frame.LastReceivedSeq,
 		Code:            frame.Code,
 		Message:         frame.Message,
+		Reason:          frame.Reason,
 		Retryable:       frame.Retryable,
 	}
 }

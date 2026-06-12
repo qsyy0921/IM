@@ -188,7 +188,7 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 			return err
 		}
 		closers = append(closers, consumer.Close)
-		worker := identitytrigger.NewWorker(consumer, revocationStore)
+		worker := identitytrigger.NewWorker(consumer, revocationinfra.NewRecorder(revocationStore, registry))
 		go func() {
 			log.Printf("push-gateway identity consumer started")
 			errs <- worker.Run(ctx)

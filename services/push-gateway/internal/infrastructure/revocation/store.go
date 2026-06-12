@@ -16,6 +16,52 @@ type Store interface {
 	RevokeSession(ctx context.Context, tenantID string, userID string, deviceID string, sessionID string) error
 }
 
+type SessionEvicter interface {
+	EvictDevice(ctx context.Context, tenantID string, userID string, deviceID string, reason string) (types.SessionEvictionResult, error)
+	EvictSession(ctx context.Context, tenantID string, userID string, deviceID string, sessionID string, reason string) (types.SessionEvictionResult, error)
+}
+
+type Recorder struct {
+	store   Store
+	evicter SessionEvicter
+}
+
+func NewRecorder(store Store, evicter SessionEvicter) *Recorder {
+	return &Recorder{store: store, evicter: evicter}
+}
+
+func (recorder *Recorder) RevokeDevice(ctx context.Context, tenantID string, userID string, deviceID string) error {
+	if recorder == nil {
+		return nil
+	}
+	if recorder.store != nil {
+		if err := recorder.store.RevokeDevice(ctx, tenantID, userID, deviceID); err != nil {
+			return err
+		}
+	}
+	if recorder.evicter != nil {
+		_, err := recorder.evicter.EvictDevice(ctx, tenantID, userID, deviceID, "identity_revoked")
+		return err
+	}
+	return nil
+}
+
+func (recorder *Recorder) RevokeSession(ctx context.Context, tenantID string, userID string, deviceID string, sessionID string) error {
+	if recorder == nil {
+		return nil
+	}
+	if recorder.store != nil {
+		if err := recorder.store.RevokeSession(ctx, tenantID, userID, deviceID, sessionID); err != nil {
+			return err
+		}
+	}
+	if recorder.evicter != nil {
+		_, err := recorder.evicter.EvictSession(ctx, tenantID, userID, deviceID, sessionID, "identity_revoked")
+		return err
+	}
+	return nil
+}
+
 type MemoryStore struct {
 	mu       sync.RWMutex
 	devices  map[string]struct{}

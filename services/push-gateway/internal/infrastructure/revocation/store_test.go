@@ -84,3 +84,65 @@ func TestRedisStoreSharesRevocation(t *testing.T) {
 		t.Fatalf("expected redis revocation to be shared")
 	}
 }
+
+func TestRecorderWritesStoreAndEvictsDevice(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	evicter := &fakeEvicter{}
+	recorder := NewRecorder(store, evicter)
+
+	if err := recorder.RevokeDevice(ctx, "tenant-1", "user-1", "device-1"); err != nil {
+		t.Fatalf("revoke device: %v", err)
+	}
+	revoked, err := store.IsRevoked(ctx, types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"})
+	if err != nil {
+		t.Fatalf("check revoked: %v", err)
+	}
+	if !revoked {
+		t.Fatalf("expected store to record device revocation")
+	}
+	if evicter.deviceCalls != 1 || evicter.reason != "identity_revoked" {
+		t.Fatalf("unexpected evicter: %+v", evicter)
+	}
+}
+
+func TestRecorderWritesStoreAndEvictsSession(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	evicter := &fakeEvicter{}
+	recorder := NewRecorder(store, evicter)
+
+	if err := recorder.RevokeSession(ctx, "tenant-1", "user-1", "device-1", "session-1"); err != nil {
+		t.Fatalf("revoke session: %v", err)
+	}
+	revoked, err := store.IsRevoked(ctx, types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1", SessionID: "session-1"})
+	if err != nil {
+		t.Fatalf("check revoked: %v", err)
+	}
+	if !revoked {
+		t.Fatalf("expected store to record session revocation")
+	}
+	if evicter.sessionCalls != 1 || evicter.sessionID != "session-1" || evicter.reason != "identity_revoked" {
+		t.Fatalf("unexpected evicter: %+v", evicter)
+	}
+}
+
+type fakeEvicter struct {
+	deviceCalls  int
+	sessionCalls int
+	sessionID    string
+	reason       string
+}
+
+func (evicter *fakeEvicter) EvictDevice(ctx context.Context, tenantID string, userID string, deviceID string, reason string) (types.SessionEvictionResult, error) {
+	evicter.deviceCalls++
+	evicter.reason = reason
+	return types.SessionEvictionResult{MatchedSessions: 1, Evicted: 1}, nil
+}
+
+func (evicter *fakeEvicter) EvictSession(ctx context.Context, tenantID string, userID string, deviceID string, sessionID string, reason string) (types.SessionEvictionResult, error) {
+	evicter.sessionCalls++
+	evicter.sessionID = sessionID
+	evicter.reason = reason
+	return types.SessionEvictionResult{MatchedSessions: 1, Evicted: 1}, nil
+}

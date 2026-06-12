@@ -321,6 +321,15 @@ func TestEnqueueOutboundReturnsWhenContextCanceled(t *testing.T) {
 	}
 }
 
+func TestCloseReasonUsesIdentityRevokedText(t *testing.T) {
+	if got := closeReason("identity_revoked"); got != "identity revoked" {
+		t.Fatalf("unexpected identity close reason: %q", got)
+	}
+	if got := closeReason("slow_session"); got != "slow session" {
+		t.Fatalf("unexpected slow close reason: %q", got)
+	}
+}
+
 func TestWebSocketDisconnectUnregistersBeforeFurtherNotify(t *testing.T) {
 	registry := memory.NewRegistry()
 	server := NewServer(

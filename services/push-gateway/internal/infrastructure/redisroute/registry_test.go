@@ -116,6 +116,110 @@ func TestRegistryPublishesRemoteRouteAndEnqueuesLocal(t *testing.T) {
 	}
 }
 
+func TestRegistryPublishesRemoteDeviceEvictionAndSubscriberEvicts(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	gatewayA := NewRegistry(memory.NewRegistry(), client, Config{GatewayID: "gateway-a", RouteTTL: time.Minute})
+	localB := memory.NewRegistry()
+	gatewayB := NewRegistry(localB, client, Config{GatewayID: "gateway-b", RouteTTL: time.Minute})
+	evicted := make(chan types.SessionEviction, 1)
+	if _, err := gatewayB.Register(ctx, types.SessionRegistration{
+		AuthContext: types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"},
+		SessionID:   "session-b",
+		Outbound:    make(chan types.ServerFrame, 1),
+		Evicted:     evicted,
+	}); err != nil {
+		t.Fatalf("register remote session: %v", err)
+	}
+	done := make(chan error, 1)
+	subscriber := NewSubscriber(localB, client, Config{GatewayID: "gateway-b"})
+	go func() {
+		done <- subscriber.Run(ctx)
+	}()
+	time.Sleep(50 * time.Millisecond)
+
+	result, err := gatewayA.EvictDevice(ctx, "tenant-1", "user-1", "device-1", "identity_revoked")
+	if err != nil {
+		t.Fatalf("evict remote device: %v", err)
+	}
+	if result.MatchedSessions != 1 || result.Evicted != 1 {
+		t.Fatalf("unexpected remote eviction result: %+v", result)
+	}
+	select {
+	case eviction := <-evicted:
+		if eviction.Reason != "identity_revoked" {
+			t.Fatalf("unexpected eviction: %+v", eviction)
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for remote eviction")
+	}
+	if metrics := subscriber.Metrics(); metrics.RedisRouteSubscriberEvictedCount != 1 {
+		t.Fatalf("unexpected subscriber metrics: %+v", metrics)
+	}
+	cancel()
+	<-done
+}
+
+func TestRegistryPublishesRemoteSessionEvictionOnlyForTarget(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	gatewayA := NewRegistry(memory.NewRegistry(), client, Config{GatewayID: "gateway-a", RouteTTL: time.Minute})
+	localB := memory.NewRegistry()
+	gatewayB := NewRegistry(localB, client, Config{GatewayID: "gateway-b", RouteTTL: time.Minute})
+	targetEvicted := make(chan types.SessionEviction, 1)
+	otherEvicted := make(chan types.SessionEviction, 1)
+	if _, err := gatewayB.Register(ctx, types.SessionRegistration{
+		AuthContext: types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"},
+		SessionID:   "session-target",
+		Outbound:    make(chan types.ServerFrame, 1),
+		Evicted:     targetEvicted,
+	}); err != nil {
+		t.Fatalf("register target session: %v", err)
+	}
+	if _, err := gatewayB.Register(ctx, types.SessionRegistration{
+		AuthContext: types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"},
+		SessionID:   "session-other",
+		Outbound:    make(chan types.ServerFrame, 1),
+		Evicted:     otherEvicted,
+	}); err != nil {
+		t.Fatalf("register other session: %v", err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		done <- NewSubscriber(localB, client, Config{GatewayID: "gateway-b"}).Run(ctx)
+	}()
+	time.Sleep(50 * time.Millisecond)
+
+	result, err := gatewayA.EvictSession(ctx, "tenant-1", "user-1", "device-1", "session-target", "identity_revoked")
+	if err != nil {
+		t.Fatalf("evict remote session: %v", err)
+	}
+	if result.MatchedSessions != 1 || result.Evicted != 1 {
+		t.Fatalf("unexpected remote session eviction result: %+v", result)
+	}
+	select {
+	case eviction := <-targetEvicted:
+		if eviction.Reason != "identity_revoked" {
+			t.Fatalf("unexpected target eviction: %+v", eviction)
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for target eviction")
+	}
+	select {
+	case eviction := <-otherEvicted:
+		t.Fatalf("other session should not be evicted: %+v", eviction)
+	case <-time.After(100 * time.Millisecond):
+	}
+	cancel()
+	<-done
+}
+
 func TestRegistryRenewsRouteTTLUntilUnregister(t *testing.T) {
 	server := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: server.Addr()})

@@ -10,6 +10,8 @@ type SessionRegistry interface {
 	Register(context.Context, types.SessionRegistration) (types.SessionRegistrationResult, error)
 	Unregister(sessionID string)
 	EnqueueNotification(context.Context, types.DeliveryNotification) (types.NotifyDeliveryResult, error)
+	EvictDevice(ctx context.Context, tenantID string, userID string, deviceID string, reason string) (types.SessionEvictionResult, error)
+	EvictSession(ctx context.Context, tenantID string, userID string, deviceID string, sessionID string, reason string) (types.SessionEvictionResult, error)
 }
 
 type DeliveryClient interface {

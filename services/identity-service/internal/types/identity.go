@@ -4,6 +4,7 @@ type TenantID string
 type UserID string
 type DeviceID string
 type SessionID string
+type RefreshTokenID string
 
 type DeviceStatus string
 type SessionStatus string
@@ -42,6 +43,75 @@ type IssueGatewayTokenCommand struct {
 	TTLSeconds int64
 	TraceID    string
 	RequestID  string
+}
+
+type LoginCommand struct {
+	TenantID          TenantID
+	UserID            UserID
+	Password          string
+	DeviceID          DeviceID
+	Audience          string
+	GatewayTTLSeconds int64
+	RefreshTTLSeconds int64
+	TraceID           string
+	RequestID         string
+}
+
+type LoginResult struct {
+	TenantID               TenantID
+	UserID                 UserID
+	DeviceID               DeviceID
+	SessionID              SessionID
+	Audience               string
+	TokenType              string
+	GatewayToken           string
+	RefreshToken           string
+	GatewayExpiresAtUnixMS int64
+	RefreshExpiresAtUnixMS int64
+	IssuedAtUnixMS         int64
+}
+
+type RefreshGatewayTokenCommand struct {
+	TenantID          TenantID
+	UserID            UserID
+	DeviceID          DeviceID
+	RefreshToken      string
+	Audience          string
+	GatewayTTLSeconds int64
+	RefreshTTLSeconds int64
+	TraceID           string
+	RequestID         string
+}
+
+type RefreshGatewayTokenResult struct {
+	TenantID               TenantID
+	UserID                 UserID
+	DeviceID               DeviceID
+	SessionID              SessionID
+	Audience               string
+	TokenType              string
+	GatewayToken           string
+	RefreshToken           string
+	GatewayExpiresAtUnixMS int64
+	RefreshExpiresAtUnixMS int64
+	IssuedAtUnixMS         int64
+}
+
+type UserCredential struct {
+	TenantID     TenantID
+	UserID       UserID
+	Status       string
+	PasswordHash string
+}
+
+type RefreshTokenRecord struct {
+	TokenID   RefreshTokenID
+	TokenHash string
+}
+
+type ParsedRefreshToken struct {
+	TokenID RefreshTokenID
+	Secret  string
 }
 
 type IssueGatewayTokenResult struct {

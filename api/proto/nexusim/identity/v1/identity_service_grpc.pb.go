@@ -19,16 +19,20 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	IdentityService_IssueGatewayToken_FullMethodName = "/nexusim.identity.v1.IdentityService/IssueGatewayToken"
-	IdentityService_RevokeDevice_FullMethodName      = "/nexusim.identity.v1.IdentityService/RevokeDevice"
-	IdentityService_RevokeSession_FullMethodName     = "/nexusim.identity.v1.IdentityService/RevokeSession"
-	IdentityService_GetDeviceState_FullMethodName    = "/nexusim.identity.v1.IdentityService/GetDeviceState"
+	IdentityService_Login_FullMethodName               = "/nexusim.identity.v1.IdentityService/Login"
+	IdentityService_RefreshGatewayToken_FullMethodName = "/nexusim.identity.v1.IdentityService/RefreshGatewayToken"
+	IdentityService_IssueGatewayToken_FullMethodName   = "/nexusim.identity.v1.IdentityService/IssueGatewayToken"
+	IdentityService_RevokeDevice_FullMethodName        = "/nexusim.identity.v1.IdentityService/RevokeDevice"
+	IdentityService_RevokeSession_FullMethodName       = "/nexusim.identity.v1.IdentityService/RevokeSession"
+	IdentityService_GetDeviceState_FullMethodName      = "/nexusim.identity.v1.IdentityService/GetDeviceState"
 )
 
 // IdentityServiceClient is the client API for IdentityService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type IdentityServiceClient interface {
+	Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginResponse, error)
+	RefreshGatewayToken(ctx context.Context, in *RefreshGatewayTokenRequest, opts ...grpc.CallOption) (*RefreshGatewayTokenResponse, error)
 	IssueGatewayToken(ctx context.Context, in *IssueGatewayTokenRequest, opts ...grpc.CallOption) (*IssueGatewayTokenResponse, error)
 	RevokeDevice(ctx context.Context, in *RevokeDeviceRequest, opts ...grpc.CallOption) (*RevokeDeviceResponse, error)
 	RevokeSession(ctx context.Context, in *RevokeSessionRequest, opts ...grpc.CallOption) (*RevokeSessionResponse, error)
@@ -41,6 +45,26 @@ type identityServiceClient struct {
 
 func NewIdentityServiceClient(cc grpc.ClientConnInterface) IdentityServiceClient {
 	return &identityServiceClient{cc}
+}
+
+func (c *identityServiceClient) Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LoginResponse)
+	err := c.cc.Invoke(ctx, IdentityService_Login_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) RefreshGatewayToken(ctx context.Context, in *RefreshGatewayTokenRequest, opts ...grpc.CallOption) (*RefreshGatewayTokenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RefreshGatewayTokenResponse)
+	err := c.cc.Invoke(ctx, IdentityService_RefreshGatewayToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *identityServiceClient) IssueGatewayToken(ctx context.Context, in *IssueGatewayTokenRequest, opts ...grpc.CallOption) (*IssueGatewayTokenResponse, error) {
@@ -87,6 +111,8 @@ func (c *identityServiceClient) GetDeviceState(ctx context.Context, in *GetDevic
 // All implementations must embed UnimplementedIdentityServiceServer
 // for forward compatibility.
 type IdentityServiceServer interface {
+	Login(context.Context, *LoginRequest) (*LoginResponse, error)
+	RefreshGatewayToken(context.Context, *RefreshGatewayTokenRequest) (*RefreshGatewayTokenResponse, error)
 	IssueGatewayToken(context.Context, *IssueGatewayTokenRequest) (*IssueGatewayTokenResponse, error)
 	RevokeDevice(context.Context, *RevokeDeviceRequest) (*RevokeDeviceResponse, error)
 	RevokeSession(context.Context, *RevokeSessionRequest) (*RevokeSessionResponse, error)
@@ -101,6 +127,12 @@ type IdentityServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedIdentityServiceServer struct{}
 
+func (UnimplementedIdentityServiceServer) Login(context.Context, *LoginRequest) (*LoginResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Login not implemented")
+}
+func (UnimplementedIdentityServiceServer) RefreshGatewayToken(context.Context, *RefreshGatewayTokenRequest) (*RefreshGatewayTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RefreshGatewayToken not implemented")
+}
 func (UnimplementedIdentityServiceServer) IssueGatewayToken(context.Context, *IssueGatewayTokenRequest) (*IssueGatewayTokenResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method IssueGatewayToken not implemented")
 }
@@ -132,6 +164,42 @@ func RegisterIdentityServiceServer(s grpc.ServiceRegistrar, srv IdentityServiceS
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&IdentityService_ServiceDesc, srv)
+}
+
+func _IdentityService_Login_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LoginRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).Login(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_Login_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).Login(ctx, req.(*LoginRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_RefreshGatewayToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RefreshGatewayTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).RefreshGatewayToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_RefreshGatewayToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).RefreshGatewayToken(ctx, req.(*RefreshGatewayTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _IdentityService_IssueGatewayToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -213,6 +281,14 @@ var IdentityService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "nexusim.identity.v1.IdentityService",
 	HandlerType: (*IdentityServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Login",
+			Handler:    _IdentityService_Login_Handler,
+		},
+		{
+			MethodName: "RefreshGatewayToken",
+			Handler:    _IdentityService_RefreshGatewayToken_Handler,
+		},
 		{
 			MethodName: "IssueGatewayToken",
 			Handler:    _IdentityService_IssueGatewayToken_Handler,

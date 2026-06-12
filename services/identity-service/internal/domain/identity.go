@@ -11,7 +11,41 @@ const (
 	DefaultGatewayAudience = "push-gateway"
 	DefaultGatewayTTL      = 15 * time.Minute
 	MaxGatewayTTL          = 24 * time.Hour
+	DefaultRefreshTTL      = 30 * 24 * time.Hour
+	MaxRefreshTTL          = 90 * 24 * time.Hour
 )
+
+func ValidateLogin(command types.LoginCommand) error {
+	if command.TenantID == "" {
+		return types.NewInvalidArgument("tenant_id is required")
+	}
+	if command.UserID == "" {
+		return types.NewInvalidArgument("user_id is required")
+	}
+	if command.DeviceID == "" {
+		return types.NewInvalidArgument("device_id is required")
+	}
+	if strings.TrimSpace(command.Password) == "" {
+		return types.NewInvalidArgument("password is required")
+	}
+	return nil
+}
+
+func ValidateRefreshGatewayToken(command types.RefreshGatewayTokenCommand) error {
+	if command.TenantID == "" {
+		return types.NewInvalidArgument("tenant_id is required")
+	}
+	if command.UserID == "" {
+		return types.NewInvalidArgument("user_id is required")
+	}
+	if command.DeviceID == "" {
+		return types.NewInvalidArgument("device_id is required")
+	}
+	if strings.TrimSpace(command.RefreshToken) == "" {
+		return types.NewInvalidArgument("refresh_token is required")
+	}
+	return nil
+}
 
 func ValidateIssueGatewayToken(command types.IssueGatewayTokenCommand) error {
 	if command.TenantID == "" {
@@ -41,6 +75,17 @@ func NormalizeTTL(seconds int64) time.Duration {
 	ttl := time.Duration(seconds) * time.Second
 	if ttl > MaxGatewayTTL {
 		return MaxGatewayTTL
+	}
+	return ttl
+}
+
+func NormalizeRefreshTTL(seconds int64) time.Duration {
+	if seconds <= 0 {
+		return DefaultRefreshTTL
+	}
+	ttl := time.Duration(seconds) * time.Second
+	if ttl > MaxRefreshTTL {
+		return MaxRefreshTTL
 	}
 	return ttl
 }

@@ -15,6 +15,14 @@ type IssueGatewayTokenExecutor interface {
 	Execute(context.Context, types.IssueGatewayTokenCommand) (types.IssueGatewayTokenResult, error)
 }
 
+type LoginExecutor interface {
+	Execute(context.Context, types.LoginCommand) (types.LoginResult, error)
+}
+
+type RefreshGatewayTokenExecutor interface {
+	Execute(context.Context, types.RefreshGatewayTokenCommand) (types.RefreshGatewayTokenResult, error)
+}
+
 type RevokeDeviceExecutor interface {
 	Execute(context.Context, types.RevokeDeviceCommand) (types.RevokeDeviceResult, error)
 }
@@ -29,28 +37,106 @@ type GetDeviceStateExecutor interface {
 
 type Server struct {
 	identityv1.UnimplementedIdentityServiceServer
-	issueGatewayToken IssueGatewayTokenExecutor
-	revokeDevice      RevokeDeviceExecutor
-	revokeSession     RevokeSessionExecutor
-	getDeviceState    GetDeviceStateExecutor
+	login               LoginExecutor
+	refreshGatewayToken RefreshGatewayTokenExecutor
+	issueGatewayToken   IssueGatewayTokenExecutor
+	revokeDevice        RevokeDeviceExecutor
+	revokeSession       RevokeSessionExecutor
+	getDeviceState      GetDeviceStateExecutor
 }
 
 func NewServer(
+	login LoginExecutor,
+	refreshGatewayToken RefreshGatewayTokenExecutor,
 	issueGatewayToken IssueGatewayTokenExecutor,
 	revokeDevice RevokeDeviceExecutor,
 	revokeSession RevokeSessionExecutor,
 	getDeviceState GetDeviceStateExecutor,
 ) *Server {
 	return &Server{
-		issueGatewayToken: issueGatewayToken,
-		revokeDevice:      revokeDevice,
-		revokeSession:     revokeSession,
-		getDeviceState:    getDeviceState,
+		login:               login,
+		refreshGatewayToken: refreshGatewayToken,
+		issueGatewayToken:   issueGatewayToken,
+		revokeDevice:        revokeDevice,
+		revokeSession:       revokeSession,
+		getDeviceState:      getDeviceState,
 	}
 }
 
 func Register(registrar grpcgo.ServiceRegistrar, server *Server) {
 	identityv1.RegisterIdentityServiceServer(registrar, server)
+}
+
+func (s *Server) Login(ctx context.Context, request *identityv1.LoginRequest) (*identityv1.LoginResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.login == nil {
+		return nil, status.Error(codes.Unimplemented, "login is not configured")
+	}
+	result, err := s.login.Execute(ctx, types.LoginCommand{
+		TenantID:          types.TenantID(request.GetTenantId()),
+		UserID:            types.UserID(request.GetUserId()),
+		Password:          request.GetPassword(),
+		DeviceID:          types.DeviceID(request.GetDeviceId()),
+		Audience:          request.GetAudience(),
+		GatewayTTLSeconds: request.GetGatewayTtlSeconds(),
+		RefreshTTLSeconds: request.GetRefreshTtlSeconds(),
+		TraceID:           request.GetTraceId(),
+		RequestID:         request.GetRequestId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &identityv1.LoginResponse{
+		TenantId:               string(result.TenantID),
+		UserId:                 string(result.UserID),
+		DeviceId:               string(result.DeviceID),
+		SessionId:              string(result.SessionID),
+		Audience:               result.Audience,
+		TokenType:              result.TokenType,
+		GatewayToken:           result.GatewayToken,
+		RefreshToken:           result.RefreshToken,
+		GatewayExpiresAtUnixMs: result.GatewayExpiresAtUnixMS,
+		RefreshExpiresAtUnixMs: result.RefreshExpiresAtUnixMS,
+		IssuedAtUnixMs:         result.IssuedAtUnixMS,
+	}, nil
+}
+
+func (s *Server) RefreshGatewayToken(ctx context.Context, request *identityv1.RefreshGatewayTokenRequest) (*identityv1.RefreshGatewayTokenResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.refreshGatewayToken == nil {
+		return nil, status.Error(codes.Unimplemented, "refresh gateway token is not configured")
+	}
+	result, err := s.refreshGatewayToken.Execute(ctx, types.RefreshGatewayTokenCommand{
+		TenantID:          types.TenantID(request.GetTenantId()),
+		UserID:            types.UserID(request.GetUserId()),
+		DeviceID:          types.DeviceID(request.GetDeviceId()),
+		RefreshToken:      request.GetRefreshToken(),
+		Audience:          request.GetAudience(),
+		GatewayTTLSeconds: request.GetGatewayTtlSeconds(),
+		RefreshTTLSeconds: request.GetRefreshTtlSeconds(),
+		TraceID:           request.GetTraceId(),
+		RequestID:         request.GetRequestId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &identityv1.RefreshGatewayTokenResponse{
+		TenantId:               string(result.TenantID),
+		UserId:                 string(result.UserID),
+		DeviceId:               string(result.DeviceID),
+		SessionId:              string(result.SessionID),
+		Audience:               result.Audience,
+		TokenType:              result.TokenType,
+		GatewayToken:           result.GatewayToken,
+		RefreshToken:           result.RefreshToken,
+		GatewayExpiresAtUnixMs: result.GatewayExpiresAtUnixMS,
+		RefreshExpiresAtUnixMs: result.RefreshExpiresAtUnixMS,
+		IssuedAtUnixMs:         result.IssuedAtUnixMS,
+	}, nil
 }
 
 func (s *Server) IssueGatewayToken(ctx context.Context, request *identityv1.IssueGatewayTokenRequest) (*identityv1.IssueGatewayTokenResponse, error) {
@@ -226,6 +312,12 @@ func grpcError(err error) error {
 		return status.Error(codes.Unavailable, "identity storage unavailable")
 	case errors.Is(err, types.ErrTokenSigningFailed):
 		return status.Error(codes.Internal, "token signing failed")
+	case errors.Is(err, types.ErrInvalidCredentials):
+		return status.Error(codes.Unauthenticated, "invalid credentials")
+	case errors.Is(err, types.ErrInvalidRefreshToken):
+		return status.Error(codes.Unauthenticated, "invalid refresh token")
+	case errors.Is(err, types.ErrRefreshTokenReuseDetected):
+		return status.Error(codes.PermissionDenied, "refresh token rejected")
 	default:
 		return status.Error(codes.Internal, "internal error")
 	}

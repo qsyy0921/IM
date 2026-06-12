@@ -99,6 +99,138 @@ func TestRepositoryRevokeSessionRejectsSameSessionIDIntegration(t *testing.T) {
 	assertOutboxEvent(t, ctx, pool, "identity.session.revoked.v1", "identity_session", "event-session-revoked-1")
 }
 
+func TestRepositoryLoginAndRefreshRotationIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	seedUserCredential(t, ctx, pool, "password-hash")
+	repository := NewRepository(pool, WithSessionIDGenerator(func() (string, error) { return "session-login-1", nil }))
+	issuedAt := time.Unix(1_800_000_000, 0).UTC()
+	gatewayExpiresAt := issuedAt.Add(15 * time.Minute)
+	refreshExpiresAt := issuedAt.Add(30 * 24 * time.Hour)
+
+	loginResult, err := repository.LoginGatewaySession(ctx, types.LoginCommand{
+		TenantID:  "tenant-identity",
+		UserID:    "user-1",
+		DeviceID:  "device-1",
+		Audience:  "push-gateway",
+		TraceID:   "trace-login",
+		RequestID: "request-login",
+	}, types.RefreshTokenRecord{
+		TokenID:   "rft_login",
+		TokenHash: "hash-login",
+	}, issuedAt, gatewayExpiresAt, refreshExpiresAt)
+	if err != nil {
+		t.Fatalf("login session: %v", err)
+	}
+	if loginResult.SessionID != "session-login-1" || loginResult.RefreshExpiresAtUnixMS != refreshExpiresAt.UnixMilli() {
+		t.Fatalf("unexpected login result: %+v", loginResult)
+	}
+	assertSessionStatus(t, ctx, pool, "session-login-1", "ACTIVE")
+	assertRefreshTokenStatus(t, ctx, pool, "rft_login", "ACTIVE")
+
+	refreshedAt := issuedAt.Add(time.Minute)
+	nextRefreshExpiresAt := refreshedAt.Add(30 * 24 * time.Hour)
+	refreshResult, err := repository.RefreshGatewaySession(ctx, types.RefreshGatewayTokenCommand{
+		TenantID:  "tenant-identity",
+		UserID:    "user-1",
+		DeviceID:  "device-1",
+		Audience:  "push-gateway",
+		TraceID:   "trace-refresh",
+		RequestID: "request-refresh",
+	}, "rft_login", "hash-login", types.RefreshTokenRecord{
+		TokenID:   "rft_next",
+		TokenHash: "hash-next",
+	}, refreshedAt, refreshedAt.Add(15*time.Minute), nextRefreshExpiresAt)
+	if err != nil {
+		t.Fatalf("refresh gateway session: %v", err)
+	}
+	if refreshResult.SessionID != "session-login-1" || refreshResult.RefreshExpiresAtUnixMS != nextRefreshExpiresAt.UnixMilli() {
+		t.Fatalf("unexpected refresh result: %+v", refreshResult)
+	}
+	assertRefreshTokenStatus(t, ctx, pool, "rft_login", "USED")
+	assertRefreshTokenStatus(t, ctx, pool, "rft_next", "ACTIVE")
+
+	_, err = repository.RefreshGatewaySession(ctx, types.RefreshGatewayTokenCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		DeviceID: "device-1",
+		Audience: "push-gateway",
+	}, "rft_login", "hash-login", types.RefreshTokenRecord{
+		TokenID:   "rft_reuse",
+		TokenHash: "hash-reuse",
+	}, refreshedAt.Add(time.Minute), refreshedAt.Add(16*time.Minute), nextRefreshExpiresAt.Add(time.Minute))
+	if !errors.Is(err, types.ErrRefreshTokenReuseDetected) {
+		t.Fatalf("expected refresh token reuse error, got %v", err)
+	}
+}
+
+func TestRepositoryRefreshRejectsWrongSecretIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	seedUserCredential(t, ctx, pool, "password-hash")
+	repository := NewRepository(pool, WithSessionIDGenerator(func() (string, error) { return "session-login-1", nil }))
+	issuedAt := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := repository.LoginGatewaySession(ctx, types.LoginCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		DeviceID: "device-1",
+		Audience: "push-gateway",
+	}, types.RefreshTokenRecord{
+		TokenID:   "rft_login",
+		TokenHash: "hash-login",
+	}, issuedAt, issuedAt.Add(15*time.Minute), issuedAt.Add(30*24*time.Hour)); err != nil {
+		t.Fatalf("login session: %v", err)
+	}
+	_, err := repository.RefreshGatewaySession(ctx, types.RefreshGatewayTokenCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		DeviceID: "device-1",
+		Audience: "push-gateway",
+	}, "rft_login", "wrong-hash", types.RefreshTokenRecord{
+		TokenID:   "rft_next",
+		TokenHash: "hash-next",
+	}, issuedAt.Add(time.Minute), issuedAt.Add(16*time.Minute), issuedAt.Add(30*24*time.Hour))
+	if !errors.Is(err, types.ErrInvalidRefreshToken) {
+		t.Fatalf("expected invalid refresh token, got %v", err)
+	}
+	assertRefreshTokenStatus(t, ctx, pool, "rft_login", "ACTIVE")
+}
+
+func TestRepositoryRefreshExpiresTokenIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	seedUserCredential(t, ctx, pool, "password-hash")
+	repository := NewRepository(pool, WithSessionIDGenerator(func() (string, error) { return "session-login-1", nil }))
+	issuedAt := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := repository.LoginGatewaySession(ctx, types.LoginCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		DeviceID: "device-1",
+		Audience: "push-gateway",
+	}, types.RefreshTokenRecord{
+		TokenID:   "rft_login",
+		TokenHash: "hash-login",
+	}, issuedAt, issuedAt.Add(15*time.Minute), issuedAt.Add(time.Minute)); err != nil {
+		t.Fatalf("login session: %v", err)
+	}
+	_, err := repository.RefreshGatewaySession(ctx, types.RefreshGatewayTokenCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		DeviceID: "device-1",
+		Audience: "push-gateway",
+	}, "rft_login", "hash-login", types.RefreshTokenRecord{
+		TokenID:   "rft_next",
+		TokenHash: "hash-next",
+	}, issuedAt.Add(2*time.Minute), issuedAt.Add(17*time.Minute), issuedAt.Add(30*24*time.Hour))
+	if !errors.Is(err, types.ErrInvalidRefreshToken) {
+		t.Fatalf("expected invalid refresh token, got %v", err)
+	}
+	assertRefreshTokenStatus(t, ctx, pool, "rft_login", "REVOKED")
+}
+
 func issueCommand(sessionID types.SessionID) types.IssueGatewayTokenCommand {
 	return types.IssueGatewayTokenCommand{
 		TenantID:  "tenant-identity",
@@ -108,6 +240,22 @@ func issueCommand(sessionID types.SessionID) types.IssueGatewayTokenCommand {
 		Audience:  "push-gateway",
 		TraceID:   "trace-1",
 		RequestID: "request-1",
+	}
+}
+
+func seedUserCredential(t *testing.T, ctx context.Context, pool *pgxpool.Pool, passwordHash string) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+INSERT INTO identity_users (tenant_id, user_id, status, password_hash, password_updated_at, created_at, updated_at)
+VALUES ('tenant-identity', 'user-1', 'ACTIVE', $1, now(), now(), now())
+ON CONFLICT (tenant_id, user_id) DO UPDATE
+SET status = 'ACTIVE',
+    password_hash = EXCLUDED.password_hash,
+    password_updated_at = EXCLUDED.password_updated_at,
+    updated_at = EXCLUDED.updated_at
+`, passwordHash)
+	if err != nil {
+		t.Fatalf("seed user credential: %v", err)
 	}
 }
 
@@ -145,6 +293,25 @@ WHERE tenant_id = 'tenant-identity'
 	}
 	if got != want {
 		t.Fatalf("expected session status %s, got %s", want, got)
+	}
+}
+
+func assertRefreshTokenStatus(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tokenID string, want string) {
+	t.Helper()
+	var got string
+	err := pool.QueryRow(ctx, `
+SELECT status
+FROM identity_refresh_tokens
+WHERE tenant_id = 'tenant-identity'
+  AND user_id = 'user-1'
+  AND device_id = 'device-1'
+  AND token_id = $1
+`, tokenID).Scan(&got)
+	if err != nil {
+		t.Fatalf("read refresh token status: %v", err)
+	}
+	if got != want {
+		t.Fatalf("expected refresh token status %s, got %s", want, got)
 	}
 }
 
@@ -222,6 +389,7 @@ func resetIdentityTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) 
 	_, err := pool.Exec(ctx, `
 TRUNCATE
     identity_outbox,
+    identity_refresh_tokens,
     identity_sessions,
     identity_devices,
     identity_users

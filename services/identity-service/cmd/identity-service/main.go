@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	identitygrpc "github.com/qsyy0921/IM/services/identity-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/identity-service/internal/app"
+	credentialinfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/credential"
 	kafkainfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/kafka"
 	monitoringinfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/monitoring"
 	postgresinfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/postgres"
@@ -58,6 +59,8 @@ func runGRPC() error {
 	if err != nil {
 		return err
 	}
+	refreshTokens := tokeninfra.NewRefreshTokenCodec()
+	passwords := credentialinfra.NewPBKDF2Hasher(envInt("NEXUSIM_IDENTITY_PASSWORD_PBKDF2_ITERATIONS", 0))
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
 	stopDebug, err := startDebugServer(ctx, identityDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics).WithJWKSet(signer.JWKSet()))
 	if err != nil {
@@ -76,6 +79,8 @@ func runGRPC() error {
 		return err
 	}
 	identitygrpc.Register(server, identitygrpc.NewServer(
+		app.NewLoginUseCase(repository, signer, passwords, refreshTokens),
+		app.NewRefreshGatewayTokenUseCase(repository, signer, refreshTokens),
 		app.NewIssueGatewayTokenUseCase(repository, signer),
 		app.NewRevokeDeviceUseCase(repository),
 		app.NewRevokeSessionUseCase(repository),

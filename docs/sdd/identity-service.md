@@ -2,14 +2,16 @@
 
 ## Status
 
-`identity-service` is the dedicated identity boundary for NexusIM gateway tokens and device/session lifecycle. The first implementation intentionally stays small:
+`identity-service` is the dedicated identity boundary for NexusIM login, gateway tokens and device/session lifecycle. The first implementation intentionally stays small:
 
-- issue short-lived push gateway HMAC tokens;
+- verify existing user credentials for first-stage password login;
+- issue short-lived push gateway tokens;
+- rotate opaque refresh tokens;
 - persist users, devices and sessions;
 - revoke devices and sessions;
 - keep push-gateway verification local to avoid synchronous auth RPC on every WebSocket handshake.
 
-It is not yet a full OAuth/JWK identity platform.
+It is not yet a full OAuth/OIDC identity platform. It does not implement user registration, MFA, external IdP federation, account recovery or production-grade asymmetric key management.
 
 ## Boundary
 
@@ -18,6 +20,8 @@ Owns:
 - `identity_users`
 - `identity_devices`
 - `identity_sessions`
+- `identity_refresh_tokens`
+- password hash verification for existing users
 - gateway token issuance
 - device/session revoke state
 
@@ -44,14 +48,48 @@ In metadata mode, admin/read-state RPCs derive the trusted tenant/operator from 
 - `x-nexusim-trace-id` (optional)
 - `x-nexusim-request-id` (optional)
 
-This mode applies to `RevokeDevice`, `RevokeSession` and `GetDeviceState`. `IssueGatewayToken` intentionally remains outside this admin gate, because token issuance is the identity boundary itself and will later be replaced by a real login / identity provider flow.
+This mode applies to `RevokeDevice`, `RevokeSession` and `GetDeviceState`. `Login`, `RefreshGatewayToken` and `IssueGatewayToken` intentionally remain outside this admin gate. `Login` verifies user credentials; `RefreshGatewayToken` verifies an opaque refresh token; `IssueGatewayToken` is kept as an internal / compatibility signing path for local smoke and gateway-token workflows.
+
+## Login / Refresh
+
+First-stage login expects the user row and `identity_users.password_hash` to already exist. Registration, password reset, MFA, rate limiting and external IdP federation are separate future flows.
+
+```text
+Login
+-> verify password_hash
+-> identity_devices / identity_sessions
+-> identity_refresh_tokens ACTIVE
+-> short-lived gateway token + opaque refresh token
+```
+
+Password hashes use service-local PBKDF2-SHA256 encoding:
+
+```text
+pbkdf2-sha256$iterations$base64url(salt)$base64url(key)
+```
+
+This keeps the implementation dependency-light for the local Go baseline. A production deployment can migrate to Argon2id / bcrypt by adding verifier support for a new hash prefix without changing service boundaries.
+
+Refresh token rules:
+
+- raw refresh tokens are returned only to the client and are never stored in PostgreSQL;
+- `identity_refresh_tokens.token_hash` stores a SHA-256 hash of the token secret;
+- a successful refresh marks the presented token `USED`, inserts one new `ACTIVE` refresh token and returns a new short-lived gateway token;
+- expired refresh tokens are marked `REVOKED` and rejected;
+- reuse of a `USED` or `REVOKED` refresh token is treated as credential compromise: the session is marked `REVOKED`, active refresh tokens for that session are revoked, and `identity.session.revoked.v1` is written through `identity_outbox`.
 
 ## Gateway Token
 
-The first token format is compatible with push-gateway HMAC mode:
+Gateway tokens are compatible with push-gateway HMAC mode. The legacy token format is:
 
 ```text
 base64url(json claims) + "." + base64url(hmac_sha256(payload, secret))
+```
+
+The current implementation also supports standard three-part JWT HS256 gateway tokens:
+
+```text
+base64url(header) + "." + base64url(claims) + "." + base64url(signature)
 ```
 
 Claims:
@@ -61,10 +99,13 @@ Claims:
 - `device_id`
 - `session_id`
 - `aud`
+- `iss` / `sub` / `iat` for JWT mode
 - `exp`
 - `trace_id`
 
-The default audience is `push-gateway`. Tokens are short-lived. Revocation is enforced at issuance time; already-issued tokens are bounded by TTL until push-gateway supports an async revoke feed or local deny-list projection.
+The default audience is `push-gateway`. Tokens are short-lived. Revocation is enforced at issuance / refresh time and asynchronously projected to push-gateway deny-lists through `im.identity.events`.
+
+The identity debug server can expose `/.well-known/jwks.json` / `/jwks.json` for the current HS256 key. This is internal debug compatibility only because it exposes a symmetric `oct` key; production-grade JWKS should use an asymmetric key ring so gateways only receive public keys.
 
 ## Revoke Events
 
@@ -96,6 +137,15 @@ identity-service IssueGatewayToken
 ```
 
 This proves identity-service can replace runner-side local token signing without adding a synchronous dependency to push-gateway's hot path.
+
+The current Login / Refresh implementation is validated by app tests and PostgreSQL integration tests:
+
+```text
+Login -> ACTIVE refresh token
+RefreshGatewayToken -> old token USED + new token ACTIVE
+Reuse old refresh token -> session REVOKED + identity.session.revoked.v1 outbox
+Expired refresh token -> token REVOKED + stable invalid refresh error
+```
 
 ## Observability
 

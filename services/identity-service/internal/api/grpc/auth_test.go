@@ -49,17 +49,37 @@ func TestVerifiedAdminUnaryInterceptorRequiresAdminMetadataForAdminMethods(t *te
 	}
 }
 
-func TestVerifiedAdminUnaryInterceptorDoesNotRequireMetadataForIssueToken(t *testing.T) {
+func TestVerifiedAdminUnaryInterceptorDoesNotRequireMetadataForPublicTokenMethods(t *testing.T) {
 	interceptor := VerifiedAdminUnaryInterceptor(true)
-	called := false
-	_, err := interceptor(context.Background(), nil, &grpcgo.UnaryServerInfo{FullMethod: "/nexusim.identity.v1.IdentityService/IssueGatewayToken"}, func(ctx context.Context, req any) (any, error) {
-		called = true
-		return nil, nil
-	})
-	if err != nil {
-		t.Fatalf("issue token should not require admin metadata: %v", err)
+	for _, method := range []string{
+		"/nexusim.identity.v1.IdentityService/Login",
+		"/nexusim.identity.v1.IdentityService/RefreshGatewayToken",
+		"/nexusim.identity.v1.IdentityService/IssueGatewayToken",
+	} {
+		t.Run(method, func(t *testing.T) {
+			called := false
+			_, err := interceptor(context.Background(), nil, &grpcgo.UnaryServerInfo{FullMethod: method}, func(ctx context.Context, req any) (any, error) {
+				called = true
+				return nil, nil
+			})
+			if err != nil {
+				t.Fatalf("%s should not require admin metadata: %v", method, err)
+			}
+			if !called {
+				t.Fatal("handler was not called")
+			}
+		})
 	}
-	if !called {
-		t.Fatal("handler was not called")
+}
+
+func TestGRPCErrorMapsCredentialErrors(t *testing.T) {
+	if code := status.Code(grpcError(types.NewInvalidCredentials("bad password"))); code != codes.Unauthenticated {
+		t.Fatalf("expected invalid credentials to map to unauthenticated, got %v", code)
+	}
+	if code := status.Code(grpcError(types.NewInvalidRefreshToken("bad refresh"))); code != codes.Unauthenticated {
+		t.Fatalf("expected invalid refresh token to map to unauthenticated, got %v", code)
+	}
+	if code := status.Code(grpcError(types.NewRefreshTokenReuseDetected("reuse"))); code != codes.PermissionDenied {
+		t.Fatalf("expected refresh token reuse to map to permission denied, got %v", code)
 	}
 }

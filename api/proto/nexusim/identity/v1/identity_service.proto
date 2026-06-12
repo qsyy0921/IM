@@ -5,6 +5,8 @@ package nexusim.identity.v1;
 option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/identity/v1;identityv1";
 
 service IdentityService {
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc RefreshGatewayToken(RefreshGatewayTokenRequest) returns (RefreshGatewayTokenResponse);
   rpc IssueGatewayToken(IssueGatewayTokenRequest) returns (IssueGatewayTokenResponse);
   rpc RevokeDevice(RevokeDeviceRequest) returns (RevokeDeviceResponse);
   rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
@@ -16,6 +18,58 @@ message AdminContext {
   string operator_user_id = 2;
   string trace_id = 3;
   string request_id = 4;
+}
+
+message LoginRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  string password = 3;
+  string device_id = 4;
+  string audience = 5;
+  int64 gateway_ttl_seconds = 6;
+  int64 refresh_ttl_seconds = 7;
+  string trace_id = 8;
+  string request_id = 9;
+}
+
+message LoginResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string audience = 5;
+  string token_type = 6;
+  string gateway_token = 7;
+  string refresh_token = 8;
+  int64 gateway_expires_at_unix_ms = 9;
+  int64 refresh_expires_at_unix_ms = 10;
+  int64 issued_at_unix_ms = 11;
+}
+
+message RefreshGatewayTokenRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string refresh_token = 4;
+  string audience = 5;
+  int64 gateway_ttl_seconds = 6;
+  int64 refresh_ttl_seconds = 7;
+  string trace_id = 8;
+  string request_id = 9;
+}
+
+message RefreshGatewayTokenResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string audience = 5;
+  string token_type = 6;
+  string gateway_token = 7;
+  string refresh_token = 8;
+  int64 gateway_expires_at_unix_ms = 9;
+  int64 refresh_expires_at_unix_ms = 10;
+  int64 issued_at_unix_ms = 11;
 }
 
 message IssueGatewayTokenRequest {

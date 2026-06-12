@@ -18,12 +18,12 @@ type Repository interface {
 	RecordMFALoginFailure(context.Context, types.TenantID, types.UserID, types.MFAFactorID, time.Time, time.Time, int, time.Time) error
 	RecordMFARecoveryLoginFailure(context.Context, types.TenantID, types.UserID, time.Time, time.Time, int, time.Time) error
 	FindActiveMFARecoveryCode(context.Context, types.TenantID, types.UserID, string) (types.MFARecoveryCodeRecord, error)
-	CreateVerificationChallenge(context.Context, types.RequestVerificationChallengeCommand, types.ChallengeType, types.ChallengeRecord, time.Time, time.Time) (types.RequestVerificationChallengeResult, error)
+	CreateVerificationChallenge(context.Context, types.RequestVerificationChallengeCommand, types.ChallengeType, types.ChallengeRecord, types.ChallengeDeliveryRecord, time.Time, time.Time) (types.RequestVerificationChallengeResult, error)
 	ExpireChallenge(context.Context, types.TenantID, types.UserID, types.ChallengeID, time.Time) error
 	RecordChallengeDeliverySuccess(context.Context, types.TenantID, types.UserID, types.ChallengeID, time.Time) error
 	RecordChallengeDeliveryFailure(context.Context, types.TenantID, types.UserID, types.ChallengeID, string, time.Time) error
 	ConfirmVerificationChallenge(context.Context, types.ConfirmVerificationChallengeCommand, string, time.Time) (types.ConfirmVerificationChallengeResult, error)
-	CreatePasswordResetChallenge(context.Context, types.RequestPasswordResetCommand, types.ChallengeRecord, time.Time, time.Time) (types.RequestPasswordResetResult, error)
+	CreatePasswordResetChallenge(context.Context, types.RequestPasswordResetCommand, types.ChallengeRecord, types.ChallengeDeliveryRecord, time.Time, time.Time) (types.RequestPasswordResetResult, error)
 	ConfirmPasswordReset(context.Context, types.ConfirmPasswordResetCommand, string, string, time.Time) (types.ConfirmPasswordResetResult, error)
 	IssueGatewaySession(context.Context, types.IssueGatewayTokenCommand, time.Time, time.Time) (types.IssueGatewayTokenResult, error)
 	RevokeDevice(context.Context, types.RevokeDeviceCommand, time.Time) (types.RevokeDeviceResult, error)
@@ -52,6 +52,10 @@ type RefreshTokenCodec interface {
 type ChallengeTokenCodec interface {
 	NewChallengeToken() (plain string, record types.ChallengeRecord, err error)
 	HashChallengeToken(token string) string
+}
+
+type ChallengeDeliveryTokenCodec interface {
+	SealChallengeToken(token string) (types.EncryptedChallengeToken, error)
 }
 
 type ChallengeNotifier interface {

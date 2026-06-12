@@ -1124,6 +1124,55 @@ func TestRequestVerificationChallengeUseCaseReturnsDeliveryFailure(t *testing.T)
 	}
 }
 
+func TestRequestVerificationChallengeUseCaseEnqueuesDeliveryOutbox(t *testing.T) {
+	repository := &fakeIdentityRepository{
+		credential: types.UserCredential{
+			TenantID:     "tenant-1",
+			UserID:       "user-1",
+			Status:       "ACTIVE",
+			PasswordHash: "expected-hash",
+		},
+	}
+	notifier := &fakeChallengeNotifier{}
+	deliveryTokens := &fakeChallengeDeliveryTokenCodec{
+		encrypted: types.EncryptedChallengeToken{
+			Ciphertext: "encrypted-token",
+			Nonce:      "nonce-value",
+			KeyVersion: "local-v1",
+		},
+	}
+	useCase := NewRequestVerificationChallengeUseCase(
+		repository,
+		fakeChallengeTokenCodec{},
+		&fakePasswordVerifier{ok: true},
+		ChallengeOptions{
+			ReturnDevToken:     true,
+			Notifier:           notifier,
+			DeliveryOutbox:     true,
+			DeliveryTokenCodec: deliveryTokens,
+		},
+	)
+	result, err := useCase.Execute(context.Background(), types.RequestVerificationChallengeCommand{
+		TenantID:    "tenant-1",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "user1@example.com",
+		Password:    "correct horse battery staple",
+	})
+	if err != nil {
+		t.Fatalf("request verification outbox: %v", err)
+	}
+	if !repository.createVerificationCalled || result.DevChallengeToken != "challenge-token" {
+		t.Fatalf("expected challenge creation with dev token, result=%+v called=%v", result, repository.createVerificationCalled)
+	}
+	if notifier.called || repository.deliverySuccessCalled || repository.deliveryFailureCalled {
+		t.Fatalf("outbox mode must not send synchronously or record sync delivery state, notifier=%v success=%v failure=%v", notifier.called, repository.deliverySuccessCalled, repository.deliveryFailureCalled)
+	}
+	if deliveryTokens.token != "challenge-token" || repository.createVerificationDelivery.EncryptedToken.Ciphertext != "encrypted-token" {
+		t.Fatalf("expected encrypted delivery record from raw token, token=%q delivery=%+v", deliveryTokens.token, repository.createVerificationDelivery)
+	}
+}
+
 func TestConfirmPasswordResetUseCaseHashesNewPassword(t *testing.T) {
 	repository := &fakeIdentityRepository{}
 	useCase := NewConfirmPasswordResetUseCase(repository, fakeChallengeTokenCodec{}, fakePasswordHasher{hash: "new-password-hash"})
@@ -1190,6 +1239,42 @@ func TestRequestPasswordResetUseCaseRecordsChallengeDeliveryFailure(t *testing.T
 	}
 	if repository.expireChallengeCalled {
 		t.Fatal("delivery failure should be recorded through the delivery failure path, not bare ExpireChallenge")
+	}
+}
+
+func TestRequestPasswordResetUseCaseEnqueuesDeliveryOutboxWithoutDevToken(t *testing.T) {
+	repository := &fakeIdentityRepository{}
+	notifier := &fakeChallengeNotifier{}
+	deliveryTokens := &fakeChallengeDeliveryTokenCodec{
+		encrypted: types.EncryptedChallengeToken{
+			Ciphertext: "encrypted-reset-token",
+			Nonce:      "reset-nonce",
+			KeyVersion: "local-v1",
+		},
+	}
+	useCase := NewRequestPasswordResetUseCase(repository, fakeChallengeTokenCodec{}, ChallengeOptions{
+		ReturnDevToken:     true,
+		Notifier:           notifier,
+		DeliveryOutbox:     true,
+		DeliveryTokenCodec: deliveryTokens,
+	})
+	result, err := useCase.Execute(context.Background(), types.RequestPasswordResetCommand{
+		TenantID:    "tenant-1",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "user1@example.com",
+	})
+	if err != nil {
+		t.Fatalf("request password reset outbox: %v", err)
+	}
+	if !repository.createPasswordResetCalled || result.DevChallengeToken != "" {
+		t.Fatalf("expected password reset outbox without dev token, result=%+v called=%v", result, repository.createPasswordResetCalled)
+	}
+	if notifier.called || repository.deliverySuccessCalled || repository.deliveryFailureCalled {
+		t.Fatalf("outbox mode must not send synchronously or record sync delivery state, notifier=%v success=%v failure=%v", notifier.called, repository.deliverySuccessCalled, repository.deliveryFailureCalled)
+	}
+	if deliveryTokens.token != "challenge-token" || repository.createPasswordResetDelivery.EncryptedToken.Ciphertext != "encrypted-reset-token" {
+		t.Fatalf("expected encrypted reset delivery record from raw token, token=%q delivery=%+v", deliveryTokens.token, repository.createPasswordResetDelivery)
 	}
 }
 
@@ -1267,7 +1352,9 @@ type fakeIdentityRepository struct {
 	presentedTokenID              types.RefreshTokenID
 	presentedTokenHash            string
 	createVerificationCalled      bool
+	createVerificationDelivery    types.ChallengeDeliveryRecord
 	createPasswordResetCalled     bool
+	createPasswordResetDelivery   types.ChallengeDeliveryRecord
 	createPasswordResetErr        error
 	expireChallengeCalled         bool
 	expiredChallengeID            types.ChallengeID
@@ -1382,8 +1469,9 @@ func (repo *fakeIdentityRepository) RefreshGatewaySession(_ context.Context, com
 	}, nil
 }
 
-func (repo *fakeIdentityRepository) CreateVerificationChallenge(context.Context, types.RequestVerificationChallengeCommand, types.ChallengeType, types.ChallengeRecord, time.Time, time.Time) (types.RequestVerificationChallengeResult, error) {
+func (repo *fakeIdentityRepository) CreateVerificationChallenge(_ context.Context, _ types.RequestVerificationChallengeCommand, _ types.ChallengeType, _ types.ChallengeRecord, delivery types.ChallengeDeliveryRecord, _ time.Time, _ time.Time) (types.RequestVerificationChallengeResult, error) {
 	repo.createVerificationCalled = true
+	repo.createVerificationDelivery = delivery
 	return types.RequestVerificationChallengeResult{TenantID: "tenant-1", UserID: "user-1", ChallengeID: "challenge-1", Channel: types.VerificationChannelEmail, Destination: "user1@example.com"}, nil
 }
 
@@ -1410,8 +1498,9 @@ func (repo *fakeIdentityRepository) RecordChallengeDeliveryFailure(_ context.Con
 	return repo.deliveryFailureErr
 }
 
-func (repo *fakeIdentityRepository) CreatePasswordResetChallenge(_ context.Context, command types.RequestPasswordResetCommand, record types.ChallengeRecord, _ time.Time, expiresAt time.Time) (types.RequestPasswordResetResult, error) {
+func (repo *fakeIdentityRepository) CreatePasswordResetChallenge(_ context.Context, command types.RequestPasswordResetCommand, record types.ChallengeRecord, delivery types.ChallengeDeliveryRecord, _ time.Time, expiresAt time.Time) (types.RequestPasswordResetResult, error) {
 	repo.createPasswordResetCalled = true
+	repo.createPasswordResetDelivery = delivery
 	if repo.createPasswordResetErr != nil {
 		return types.RequestPasswordResetResult{}, repo.createPasswordResetErr
 	}
@@ -1499,6 +1588,20 @@ func (fakeChallengeTokenCodec) NewChallengeToken() (string, types.ChallengeRecor
 
 func (fakeChallengeTokenCodec) HashChallengeToken(token string) string {
 	return "hash-" + token
+}
+
+type fakeChallengeDeliveryTokenCodec struct {
+	token     string
+	encrypted types.EncryptedChallengeToken
+	err       error
+}
+
+func (codec *fakeChallengeDeliveryTokenCodec) SealChallengeToken(token string) (types.EncryptedChallengeToken, error) {
+	codec.token = token
+	if codec.err != nil {
+		return types.EncryptedChallengeToken{}, codec.err
+	}
+	return codec.encrypted, nil
 }
 
 type fakeChallengeNotifier struct {

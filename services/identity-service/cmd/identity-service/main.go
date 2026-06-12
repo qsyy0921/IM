@@ -26,6 +26,7 @@ import (
 	notificationinfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/notification"
 	postgresinfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/postgres"
 	tokeninfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/token"
+	challengedelivery "github.com/qsyy0921/IM/services/identity-service/internal/trigger/challengedelivery"
 	"github.com/qsyy0921/IM/services/identity-service/internal/trigger/outbox"
 	"github.com/qsyy0921/IM/services/identity-service/internal/types"
 	"google.golang.org/grpc"
@@ -46,12 +47,14 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("identity-service runtime wiring is idle; set NEXUSIM_IDENTITY_SERVICE_MODE=grpc or outbox-relay")
+		log.Println("identity-service runtime wiring is idle; set NEXUSIM_IDENTITY_SERVICE_MODE=grpc, outbox-relay, or challenge-delivery-worker")
 		return nil
 	case "grpc":
 		return runGRPC()
 	case "outbox-relay":
 		return runOutboxRelay()
+	case "challenge-delivery-worker":
+		return runChallengeDeliveryWorker()
 	default:
 		return errors.New("unsupported NEXUSIM_IDENTITY_SERVICE_MODE")
 	}
@@ -89,9 +92,22 @@ func runGRPC() error {
 	if err != nil {
 		return err
 	}
+	var challengeDeliveryTokens app.ChallengeDeliveryTokenCodec
+	if challengeDeliveryMode == "outbox" {
+		challengeDeliveryTokens, err = newChallengeDeliveryTokenManager()
+		if err != nil {
+			return err
+		}
+	}
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
 	challengeDeliveryMetrics := monitoringinfra.NewChallengeDeliveryMetrics(challengeDeliveryMode)
 	challengeNotifier = monitoringinfra.NewInstrumentedChallengeNotifier(challengeNotifier, challengeDeliveryMetrics)
+	challengeOptions := app.ChallengeOptions{
+		ReturnDevToken:     envBool("NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN", false),
+		Notifier:           challengeNotifier,
+		DeliveryOutbox:     challengeDeliveryMode == "outbox",
+		DeliveryTokenCodec: challengeDeliveryTokens,
+	}
 	jwkSet, err := gatewayTokenJWKSetWithAdditionalKeys(signer.JWKSet())
 	if err != nil {
 		return err
@@ -148,14 +164,13 @@ func runGRPC() error {
 			app.WithRefreshMFARecoveryCodeManager(mfaRecoveryCodes),
 		),
 		app.NewRequestVerificationChallengeUseCase(repository, challengeTokens, passwords, app.ChallengeOptions{
-			ReturnDevToken: envBool("NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN", false),
-			Notifier:       challengeNotifier,
+			ReturnDevToken:     challengeOptions.ReturnDevToken,
+			Notifier:           challengeOptions.Notifier,
+			DeliveryOutbox:     challengeOptions.DeliveryOutbox,
+			DeliveryTokenCodec: challengeOptions.DeliveryTokenCodec,
 		}),
 		app.NewConfirmVerificationChallengeUseCase(repository, challengeTokens),
-		app.NewRequestPasswordResetUseCase(repository, challengeTokens, app.ChallengeOptions{
-			ReturnDevToken: envBool("NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN", false),
-			Notifier:       challengeNotifier,
-		}),
+		app.NewRequestPasswordResetUseCase(repository, challengeTokens, challengeOptions),
 		app.NewConfirmPasswordResetUseCase(repository, challengeTokens, passwords),
 		app.NewBeginMFAEnrollmentUseCase(repository, passwords, mfaManager),
 		app.NewConfirmMFAEnrollmentUseCase(repository, mfaManager, mfaRecoveryCodes),
@@ -195,16 +210,22 @@ func newChallengeNotifier() (app.ChallengeNotifier, string, error) {
 	switch mode {
 	case "", "noop", "disabled":
 		return notificationinfra.NewNoopChallengeNotifier(), mode, nil
+	case "outbox":
+		return notificationinfra.NewNoopChallengeNotifier(), mode, nil
 	case "webhook":
-		notifier, err := notificationinfra.NewWebhookChallengeNotifier(
-			envString("NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_URL", ""),
-			envString("NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_BEARER_TOKEN", ""),
-			envDuration("NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_TIMEOUT", 5*time.Second),
-		)
+		notifier, err := newChallengeWebhookNotifier()
 		return notifier, mode, err
 	default:
 		return nil, mode, errors.New("unsupported NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MODE")
 	}
+}
+
+func newChallengeWebhookNotifier() (app.ChallengeNotifier, error) {
+	return notificationinfra.NewWebhookChallengeNotifier(
+		envString("NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_URL", ""),
+		envString("NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_BEARER_TOKEN", ""),
+		envDuration("NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_TIMEOUT", 5*time.Second),
+	)
 }
 
 func challengeDeliveryMode() string {
@@ -213,6 +234,13 @@ func challengeDeliveryMode() string {
 		return "noop"
 	}
 	return mode
+}
+
+func newChallengeDeliveryTokenManager() (*tokeninfra.ChallengeDeliveryTokenManager, error) {
+	return tokeninfra.NewChallengeDeliveryTokenManager(envString(
+		"NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY",
+		envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_SECRET", ""),
+	))
 }
 
 func newMFASecretManager() (app.MFASecretManager, error) {
@@ -423,6 +451,48 @@ func runOutboxRelay() error {
 	)
 	log.Printf("identity-service outbox relay started topic=%s", topic)
 	return relay.Run(ctx)
+}
+
+func runChallengeDeliveryWorker() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	challengeDeliveryMetrics := monitoringinfra.NewChallengeDeliveryMetrics("outbox-webhook")
+	stopDebug, err := startDebugServer(ctx, identityDebugAddr(), monitoringinfra.NewHandler(pool).
+		WithChallengeDeliveryMetrics(challengeDeliveryMetrics))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	tokenManager, err := newChallengeDeliveryTokenManager()
+	if err != nil {
+		return err
+	}
+	notifier, err := newChallengeWebhookNotifier()
+	if err != nil {
+		return err
+	}
+	instrumentedNotifier := monitoringinfra.NewInstrumentedChallengeNotifier(notifier, challengeDeliveryMetrics)
+	worker := challengedelivery.NewWorker(
+		postgresinfra.NewChallengeDeliveryStore(pool),
+		instrumentedNotifier,
+		tokenManager,
+		challengedelivery.Config{
+			BatchSize:      envInt("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_BATCH_SIZE", 100),
+			PollInterval:   envDuration("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_POLL_INTERVAL", time.Second),
+			MaxAttempts:    envInt("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MAX_ATTEMPTS", 5),
+			RetryBaseDelay: envDuration("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_RETRY_BASE_DELAY", time.Second),
+		},
+	)
+	log.Println("identity-service challenge delivery worker started")
+	return worker.Run(ctx)
 }
 
 func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {

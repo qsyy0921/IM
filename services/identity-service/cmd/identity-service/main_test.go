@@ -145,3 +145,32 @@ func TestDisabledMFASecretManagerReturnsMFAUnavailable(t *testing.T) {
 		t.Fatalf("expected verify totp to return mfa unavailable, got %v", err)
 	}
 }
+
+func TestChallengeNotifierAcceptsOutboxMode(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MODE", "outbox")
+	notifier, mode, err := newChallengeNotifier()
+	if err != nil {
+		t.Fatalf("new outbox notifier: %v", err)
+	}
+	if notifier == nil || mode != "outbox" {
+		t.Fatalf("expected noop notifier for outbox mode, mode=%q notifier=%T", mode, notifier)
+	}
+}
+
+func TestChallengeDeliveryTokenManagerRequiresDedicatedKey(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY", "")
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_SECRET", "")
+	_, err := newChallengeDeliveryTokenManager()
+	if !errors.Is(err, types.ErrChallengeDeliveryFailed) {
+		t.Fatalf("expected missing challenge delivery key to fail, got %v", err)
+	}
+
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY", "challenge-delivery-key")
+	manager, err := newChallengeDeliveryTokenManager()
+	if err != nil {
+		t.Fatalf("new challenge delivery token manager: %v", err)
+	}
+	if manager == nil {
+		t.Fatal("expected challenge delivery token manager")
+	}
+}

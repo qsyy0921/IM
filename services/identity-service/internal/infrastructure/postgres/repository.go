@@ -535,6 +535,7 @@ func (r *Repository) CreateVerificationChallenge(
 	command types.RequestVerificationChallengeCommand,
 	challengeType types.ChallengeType,
 	challenge types.ChallengeRecord,
+	delivery types.ChallengeDeliveryRecord,
 	issuedAt time.Time,
 	expiresAt time.Time,
 ) (types.RequestVerificationChallengeResult, error) {
@@ -556,6 +557,9 @@ func (r *Repository) CreateVerificationChallenge(
 		return types.RequestVerificationChallengeResult{}, err
 	}
 	if err := insertIdentityChallenge(ctx, tx, command.TenantID, command.UserID, challenge.ChallengeID, challengeType, command.Channel, command.Destination, challenge.TokenHash, issuedAt, expiresAt, command.TraceID, command.RequestID); err != nil {
+		return types.RequestVerificationChallengeResult{}, err
+	}
+	if err := insertChallengeDeliveryOutbox(ctx, tx, command.TenantID, command.UserID, challenge.ChallengeID, challengeType, command.Channel, command.Destination, delivery, issuedAt, expiresAt, command.TraceID, command.RequestID); err != nil {
 		return types.RequestVerificationChallengeResult{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -725,6 +729,7 @@ func (r *Repository) CreatePasswordResetChallenge(
 	ctx context.Context,
 	command types.RequestPasswordResetCommand,
 	challenge types.ChallengeRecord,
+	delivery types.ChallengeDeliveryRecord,
 	issuedAt time.Time,
 	expiresAt time.Time,
 ) (types.RequestPasswordResetResult, error) {
@@ -743,6 +748,9 @@ func (r *Repository) CreatePasswordResetChallenge(
 		return types.RequestPasswordResetResult{}, err
 	}
 	if err := insertIdentityChallenge(ctx, tx, command.TenantID, command.UserID, challenge.ChallengeID, types.ChallengeTypePasswordReset, command.Channel, command.Destination, challenge.TokenHash, issuedAt, expiresAt, command.TraceID, command.RequestID); err != nil {
+		return types.RequestPasswordResetResult{}, err
+	}
+	if err := insertChallengeDeliveryOutbox(ctx, tx, command.TenantID, command.UserID, challenge.ChallengeID, types.ChallengeTypePasswordReset, command.Channel, command.Destination, delivery, issuedAt, expiresAt, command.TraceID, command.RequestID); err != nil {
 		return types.RequestPasswordResetResult{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -1866,6 +1874,55 @@ INSERT INTO identity_challenges (
 `, tenantID, userID, challengeID, challengeType, channel, destination, tokenHash, issuedAt, expiresAt, traceID, requestID)
 	if isUniqueViolation(err) {
 		return types.NewInvalidChallenge("challenge already exists")
+	}
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func insertChallengeDeliveryOutbox(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	userID types.UserID,
+	challengeID types.ChallengeID,
+	challengeType types.ChallengeType,
+	channel types.VerificationChannel,
+	destination string,
+	delivery types.ChallengeDeliveryRecord,
+	availableAt time.Time,
+	expiresAt time.Time,
+	traceID string,
+	requestID string,
+) error {
+	if delivery.EncryptedToken.Ciphertext == "" && delivery.EncryptedToken.Nonce == "" && delivery.EncryptedToken.KeyVersion == "" {
+		return nil
+	}
+	if delivery.EncryptedToken.Ciphertext == "" || delivery.EncryptedToken.Nonce == "" || delivery.EncryptedToken.KeyVersion == "" {
+		return types.NewChallengeDeliveryFailed("challenge delivery encrypted token is incomplete")
+	}
+	_, err := tx.Exec(ctx, `
+INSERT INTO identity_challenge_delivery_outbox (
+    tenant_id,
+    user_id,
+    challenge_id,
+    challenge_type,
+    channel,
+    destination,
+    token_ciphertext,
+    token_nonce,
+    token_key_version,
+    expires_at,
+    trace_id,
+    request_id,
+    available_at,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13, $13)
+`, tenantID, userID, challengeID, challengeType, channel, destination, delivery.EncryptedToken.Ciphertext, delivery.EncryptedToken.Nonce, delivery.EncryptedToken.KeyVersion, expiresAt, traceID, requestID, availableAt)
+	if isUniqueViolation(err) {
+		return types.NewInvalidChallenge("challenge delivery already exists")
 	}
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())

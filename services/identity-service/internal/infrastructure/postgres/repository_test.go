@@ -626,7 +626,7 @@ func TestRepositoryVerificationAndPasswordResetChallengesIntegration(t *testing.
 	}, types.ChallengeTypeEmailVerification, types.ChallengeRecord{
 		ChallengeID: "challenge-email-1",
 		TokenHash:   "verify-hash",
-	}, issuedAt, expiresAt)
+	}, types.ChallengeDeliveryRecord{}, issuedAt, expiresAt)
 	if err != nil {
 		t.Fatalf("create verification challenge: %v", err)
 	}
@@ -662,7 +662,7 @@ func TestRepositoryVerificationAndPasswordResetChallengesIntegration(t *testing.
 	}, types.ChallengeRecord{
 		ChallengeID: "challenge-reset-1",
 		TokenHash:   "reset-hash",
-	}, issuedAt.Add(3*time.Minute), issuedAt.Add(18*time.Minute))
+	}, types.ChallengeDeliveryRecord{}, issuedAt.Add(3*time.Minute), issuedAt.Add(18*time.Minute))
 	if err != nil {
 		t.Fatalf("create password reset challenge: %v", err)
 	}
@@ -720,7 +720,7 @@ func TestRepositoryChallengeDeliveryStatusIntegration(t *testing.T) {
 	}, types.ChallengeTypeEmailVerification, types.ChallengeRecord{
 		ChallengeID: "challenge-delivery-success",
 		TokenHash:   "delivery-success-hash",
-	}, issuedAt, issuedAt.Add(15*time.Minute))
+	}, types.ChallengeDeliveryRecord{}, issuedAt, issuedAt.Add(15*time.Minute))
 	if err != nil {
 		t.Fatalf("create verification challenge: %v", err)
 	}
@@ -746,7 +746,7 @@ func TestRepositoryChallengeDeliveryStatusIntegration(t *testing.T) {
 	}, types.ChallengeRecord{
 		ChallengeID: "challenge-delivery-failed",
 		TokenHash:   "delivery-failed-hash",
-	}, issuedAt.Add(time.Minute), issuedAt.Add(16*time.Minute))
+	}, types.ChallengeDeliveryRecord{}, issuedAt.Add(time.Minute), issuedAt.Add(16*time.Minute))
 	if err != nil {
 		t.Fatalf("create reset challenge: %v", err)
 	}
@@ -768,6 +768,91 @@ func TestRepositoryChallengeDeliveryStatusIntegration(t *testing.T) {
 	}, "delivery-failed-hash", "new-password-hash", issuedAt.Add(3*time.Minute))
 	if !errors.Is(err, types.ErrInvalidChallenge) {
 		t.Fatalf("expected failed delivery challenge to reject confirmation, got %v", err)
+	}
+}
+
+func TestRepositoryChallengeDeliveryOutboxIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	repository := NewRepository(pool)
+	issuedAt := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := repository.RegisterUser(ctx, types.RegisterUserCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+	}, "password-hash", issuedAt); err != nil {
+		t.Fatalf("register user: %v", err)
+	}
+
+	_, err := repository.CreateVerificationChallenge(ctx, types.RequestVerificationChallengeCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "user1@example.com",
+		TraceID:     "trace-outbox",
+		RequestID:   "request-outbox",
+	}, types.ChallengeTypeEmailVerification, types.ChallengeRecord{
+		ChallengeID: "challenge-delivery-outbox",
+		TokenHash:   "hash-raw-token",
+	}, types.ChallengeDeliveryRecord{
+		EncryptedToken: types.EncryptedChallengeToken{
+			Ciphertext: "encrypted-token",
+			Nonce:      "nonce-value",
+			KeyVersion: "local-v1",
+		},
+	}, issuedAt, issuedAt.Add(15*time.Minute))
+	if err != nil {
+		t.Fatalf("create verification challenge with delivery outbox: %v", err)
+	}
+
+	var status, challengeType, channel, destination, ciphertext, nonce, keyVersion, traceID, requestID string
+	var expiresAt time.Time
+	err = pool.QueryRow(ctx, `
+SELECT
+    status,
+    challenge_type,
+    channel,
+    destination,
+    token_ciphertext,
+    token_nonce,
+    token_key_version,
+    expires_at,
+    trace_id,
+    request_id
+FROM identity_challenge_delivery_outbox
+WHERE tenant_id = 'tenant-identity'
+  AND user_id = 'user-1'
+  AND challenge_id = 'challenge-delivery-outbox'
+`).Scan(&status, &challengeType, &channel, &destination, &ciphertext, &nonce, &keyVersion, &expiresAt, &traceID, &requestID)
+	if err != nil {
+		t.Fatalf("read delivery outbox: %v", err)
+	}
+	if status != "PENDING" ||
+		challengeType != string(types.ChallengeTypeEmailVerification) ||
+		channel != string(types.VerificationChannelEmail) ||
+		destination != "user1@example.com" ||
+		ciphertext != "encrypted-token" ||
+		nonce != "nonce-value" ||
+		keyVersion != "local-v1" ||
+		traceID != "trace-outbox" ||
+		requestID != "request-outbox" ||
+		!expiresAt.Equal(issuedAt.Add(15*time.Minute)) {
+		t.Fatalf("unexpected delivery outbox row: status=%s type=%s channel=%s destination=%s ciphertext=%s nonce=%s key=%s expires=%s trace=%s request=%s",
+			status, challengeType, channel, destination, ciphertext, nonce, keyVersion, expiresAt, traceID, requestID)
+	}
+
+	var tokenHash string
+	if err := pool.QueryRow(ctx, `
+SELECT token_hash
+FROM identity_challenges
+WHERE tenant_id = 'tenant-identity'
+  AND user_id = 'user-1'
+  AND challenge_id = 'challenge-delivery-outbox'
+`).Scan(&tokenHash); err != nil {
+		t.Fatalf("read challenge token hash: %v", err)
+	}
+	if tokenHash != "hash-raw-token" || ciphertext == "raw-token" {
+		t.Fatalf("unexpected raw token boundary: hash=%q ciphertext=%q", tokenHash, ciphertext)
 	}
 }
 
@@ -794,7 +879,7 @@ func TestRepositoryPasswordResetChallengeRateLimitIntegration(t *testing.T) {
 		}, types.ChallengeRecord{
 			ChallengeID: types.ChallengeID(fmt.Sprintf("challenge-reset-limit-%d", i)),
 			TokenHash:   fmt.Sprintf("reset-limit-hash-%d", i),
-		}, issuedAt.Add(time.Duration(i)*time.Minute), issuedAt.Add(30*time.Minute)); err != nil {
+		}, types.ChallengeDeliveryRecord{}, issuedAt.Add(time.Duration(i)*time.Minute), issuedAt.Add(30*time.Minute)); err != nil {
 			t.Fatalf("create reset challenge %d: %v", i, err)
 		}
 	}
@@ -806,7 +891,7 @@ func TestRepositoryPasswordResetChallengeRateLimitIntegration(t *testing.T) {
 	}, types.ChallengeRecord{
 		ChallengeID: "challenge-reset-limit-4",
 		TokenHash:   "reset-limit-hash-4",
-	}, issuedAt.Add(4*time.Minute), issuedAt.Add(30*time.Minute))
+	}, types.ChallengeDeliveryRecord{}, issuedAt.Add(4*time.Minute), issuedAt.Add(30*time.Minute))
 	if !errors.Is(err, types.ErrChallengeRateLimited) {
 		t.Fatalf("expected challenge rate limit, got %v", err)
 	}
@@ -829,7 +914,7 @@ func TestRepositoryPasswordResetChallengeRateLimitIntegration(t *testing.T) {
 	}, types.ChallengeRecord{
 		ChallengeID: "challenge-reset-limit-4",
 		TokenHash:   "reset-limit-hash-4",
-	}, issuedAt.Add(6*time.Minute), issuedAt.Add(30*time.Minute)); err != nil {
+	}, types.ChallengeDeliveryRecord{}, issuedAt.Add(6*time.Minute), issuedAt.Add(30*time.Minute)); err != nil {
 		t.Fatalf("create reset challenge after consuming one active challenge: %v", err)
 	}
 }
@@ -1805,6 +1890,7 @@ func resetIdentityTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) 
 	t.Helper()
 	_, err := pool.Exec(ctx, `
 TRUNCATE
+    identity_challenge_delivery_outbox,
     identity_mfa_recovery_codes,
     identity_mfa_factors,
     identity_challenges,

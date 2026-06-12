@@ -17,7 +17,7 @@
 - revoke devices and sessions;
 - keep push-gateway verification local to avoid synchronous auth RPC on every WebSocket handshake.
 
-It is not yet a full OAuth/OIDC identity platform. It does not implement WebAuthn/passkeys, external IdP federation, production-grade account-risk workflows or production-grade asymmetric key management. Email / SMS delivery is limited to a first-stage configurable challenge webhook; provider templates, bounce handling, delivery audit and tenant policy remain future work.
+It is not yet a full OAuth/OIDC identity platform. It does not implement WebAuthn/passkeys, external IdP federation, production-grade account-risk workflows or production-grade asymmetric key management. Email / SMS delivery has a first-stage configurable challenge webhook plus encrypted delivery outbox / worker retry-DLQ; provider-specific templates, bounce handling, DLQ repair audit, tenant policy and KMS/HSM-backed key rotation remain future work.
 
 ## Boundary
 
@@ -225,25 +225,34 @@ Challenge token rules:
 - `RequestPasswordReset` hides invalid credentials and active-challenge throttling behind the same accepted response shape; it does not return raw tokens in that path.
 - Verification challenge creation requires the current password to avoid unauthenticated email / phone takeover.
 - A first-stage durable cap limits active challenges per `tenant_id + user_id + challenge_type + channel + destination`.
-- `identity-service` can call a configured challenge delivery webhook after a challenge row is created. The webhook receives the raw one-time token in memory; PostgreSQL still stores only `token_hash`. Default mode is `noop`, and production deployments must configure the webhook provider and keep development token return disabled.
-- If the webhook returns an error, the RPC returns stable `challenge delivery unavailable` and identity-service immediately marks the newly created challenge `EXPIRED` as compensation, so the unusable token hash does not consume the active challenge cap. Delivery outcome is persisted on `identity_challenges` through `delivery_status`, `delivery_attempt_count`, `delivered_at`, `delivery_failed_at` and a sanitized `delivery_last_error`. If compensation itself fails, the RPC surfaces the storage error because the row may still be active. This is still a first-stage synchronous sender and local delivery audit, not provider-grade outbox / retry / DLQ.
+- `identity-service` supports three challenge delivery modes: `noop`, synchronous `webhook`, and durable `outbox`. In all modes PostgreSQL stores only `identity_challenges.token_hash`, never the raw challenge token.
+- In synchronous `webhook` mode, the webhook receives the raw one-time token in memory after the challenge row is created. If the webhook returns an error, the RPC returns stable `challenge delivery unavailable` and identity-service immediately marks the newly created challenge `EXPIRED` as compensation, so the unusable token hash does not consume the active challenge cap.
+- In durable `outbox` mode, the challenge row and `identity_challenge_delivery_outbox` row are committed in the same PostgreSQL transaction. The delivery row stores the challenge token encrypted with AES-GCM under `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY`; the RPC success means durable enqueue, not provider delivery. A separate `challenge-delivery-worker` locks ready rows with `FOR UPDATE SKIP LOCKED`, rechecks that the challenge is still `ACTIVE` and unexpired, decrypts the token in memory, calls the configured webhook, and marks the delivery `DELIVERED`, retry, `DLQ`, or `CANCELED`. Max-attempt DLQ expires the challenge and records delivery failure, preserving the active-cap safety property.
+- Delivery outcome is persisted on `identity_challenges` through `delivery_status`, `delivery_attempt_count`, `delivered_at`, `delivery_failed_at` and a sanitized `delivery_last_error`. This is a first durable retry / DLQ slice, but still not a full provider platform: provider templates, bounce handling, keyring / KMS rotation, DLQ repair audit and provider-specific alerts remain future work.
 - `/debug/metrics` exposes only aggregate challenge delivery counters: configured mode, total requests, success / failure counts, latency avg / max and last success / failure timestamps. It must not expose raw challenge tokens, user IDs, destinations, template data or provider error bodies.
 
 Known hardening still pending:
 
 - timing- and sender-side account-enumeration resistance;
 - tenant / IP / device rate limits for challenge creation and confirmation;
-- provider-specific email / SMS templates, bounce handling, provider-grade delivery retry / DLQ and alerting;
+- provider-specific email / SMS templates, bounce handling, DLQ repair / redrive audit, keyring / KMS rotation and provider-grade alerting;
 - WebAuthn and OIDC federation;
 - production alerting for repeated challenge failures.
 
 Challenge delivery configuration:
 
 ```text
-NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MODE=noop|webhook
+NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MODE=noop|webhook|outbox
 NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_URL=https://provider.example/send
 NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_BEARER_TOKEN=...
 NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_TIMEOUT=5s
+NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY=...
+
+NEXUSIM_IDENTITY_SERVICE_MODE=challenge-delivery-worker
+NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_BATCH_SIZE=100
+NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MAX_ATTEMPTS=5
+NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_RETRY_BASE_DELAY=1s
+NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_POLL_INTERVAL=1s
 ```
 
 ## Gateway Token

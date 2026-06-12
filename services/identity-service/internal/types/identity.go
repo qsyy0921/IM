@@ -336,6 +336,16 @@ type ChallengeRecord struct {
 	TokenHash   string
 }
 
+type EncryptedChallengeToken struct {
+	Ciphertext string
+	Nonce      string
+	KeyVersion string
+}
+
+type ChallengeDeliveryRecord struct {
+	EncryptedToken EncryptedChallengeToken
+}
+
 type EncryptedMFASecret struct {
 	Ciphertext string
 	Nonce      string

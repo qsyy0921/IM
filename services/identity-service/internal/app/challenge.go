@@ -10,8 +10,10 @@ import (
 )
 
 type ChallengeOptions struct {
-	ReturnDevToken bool
-	Notifier       ChallengeNotifier
+	ReturnDevToken     bool
+	Notifier           ChallengeNotifier
+	DeliveryOutbox     bool
+	DeliveryTokenCodec ChallengeDeliveryTokenCodec
 }
 
 type RequestVerificationChallengeUseCase struct {
@@ -45,9 +47,20 @@ func (uc *RequestVerificationChallengeUseCase) Execute(ctx context.Context, comm
 		return types.RequestVerificationChallengeResult{}, err
 	}
 	issuedAt := uc.now()
-	result, err := uc.repository.CreateVerificationChallenge(ctx, command, domain.ChallengeTypeForVerificationChannel(command.Channel), record, issuedAt, issuedAt.Add(domain.NormalizeChallengeTTL(command.TTLSeconds)))
+	expiresAt := issuedAt.Add(domain.NormalizeChallengeTTL(command.TTLSeconds))
+	deliveryRecord, err := challengeDeliveryRecord(uc.options, plain)
 	if err != nil {
 		return types.RequestVerificationChallengeResult{}, err
+	}
+	result, err := uc.repository.CreateVerificationChallenge(ctx, command, domain.ChallengeTypeForVerificationChannel(command.Channel), record, deliveryRecord, issuedAt, expiresAt)
+	if err != nil {
+		return types.RequestVerificationChallengeResult{}, err
+	}
+	if uc.options.DeliveryOutbox {
+		if uc.options.ReturnDevToken {
+			result.DevChallengeToken = plain
+		}
+		return result, nil
 	}
 	if err := challengeNotifier(uc.options).SendChallenge(ctx, types.ChallengeNotification{
 		TenantID:        command.TenantID,
@@ -115,12 +128,20 @@ func (uc *RequestPasswordResetUseCase) Execute(ctx context.Context, command type
 		return types.RequestPasswordResetResult{}, err
 	}
 	issuedAt := uc.now()
-	result, err := uc.repository.CreatePasswordResetChallenge(ctx, command, record, issuedAt, issuedAt.Add(domain.NormalizeChallengeTTL(command.TTLSeconds)))
+	expiresAt := issuedAt.Add(domain.NormalizeChallengeTTL(command.TTLSeconds))
+	deliveryRecord, err := challengeDeliveryRecord(uc.options, plain)
+	if err != nil {
+		return types.RequestPasswordResetResult{}, err
+	}
+	result, err := uc.repository.CreatePasswordResetChallenge(ctx, command, record, deliveryRecord, issuedAt, expiresAt)
 	if err != nil {
 		if errors.Is(err, types.ErrInvalidCredentials) || errors.Is(err, types.ErrChallengeRateLimited) {
-			return neutralPasswordResetResult(command, record.ChallengeID, issuedAt.Add(domain.NormalizeChallengeTTL(command.TTLSeconds))), nil
+			return neutralPasswordResetResult(command, record.ChallengeID, expiresAt), nil
 		}
 		return types.RequestPasswordResetResult{}, err
+	}
+	if uc.options.DeliveryOutbox {
+		return result, nil
 	}
 	if err := challengeNotifier(uc.options).SendChallenge(ctx, types.ChallengeNotification{
 		TenantID:        command.TenantID,
@@ -147,6 +168,20 @@ func challengeNotifier(options ChallengeOptions) ChallengeNotifier {
 		return options.Notifier
 	}
 	return noopChallengeNotifier{}
+}
+
+func challengeDeliveryRecord(options ChallengeOptions, plainToken string) (types.ChallengeDeliveryRecord, error) {
+	if !options.DeliveryOutbox {
+		return types.ChallengeDeliveryRecord{}, nil
+	}
+	if options.DeliveryTokenCodec == nil {
+		return types.ChallengeDeliveryRecord{}, types.NewChallengeDeliveryFailed("challenge delivery token codec is not configured")
+	}
+	encrypted, err := options.DeliveryTokenCodec.SealChallengeToken(plainToken)
+	if err != nil {
+		return types.ChallengeDeliveryRecord{}, err
+	}
+	return types.ChallengeDeliveryRecord{EncryptedToken: encrypted}, nil
 }
 
 type noopChallengeNotifier struct{}

@@ -96,6 +96,7 @@ Refresh token rules:
 - a successful refresh marks the presented token `USED`, inserts one new `ACTIVE` refresh token and returns a new short-lived gateway token;
 - expired refresh tokens are marked `REVOKED` and rejected;
 - reuse of a `USED` or `REVOKED` refresh token is treated as credential compromise: the session is marked `REVOKED`, active refresh tokens for that session are revoked, and `identity.session.revoked.v1` is written through `identity_outbox`.
+- `identity_sessions.mfa_verified_at`, `mfa_method` and `mfa_factor_id` record whether the session was created after successful TOTP or recovery-code MFA proof. If a user currently has any ACTIVE TOTP factor, `RefreshGatewayToken` requires the existing session to carry that MFA proof; older password-only sessions return stable `MFA_REQUIRED` and must re-login with MFA. This first-stage step-up does not add MFA code submission to the refresh RPC.
 
 Login risk first-stage rules:
 
@@ -104,7 +105,7 @@ Login risk first-stage rules:
 - Failures are counted within `NEXUSIM_IDENTITY_LOGIN_FAILURE_WINDOW`; older failures do not keep accumulating forever.
 - When the configured threshold is reached, password `Login` is temporarily locked and public Login returns stable `account temporarily locked`.
 - A successful Login clears the failure counter and lock fields in the same PostgreSQL transaction that writes session / refresh-token state.
-- The first-stage lock applies only to password Login. A valid refresh token can still rotate through `RefreshGatewayToken`; refresh token theft / reuse is handled by the separate rotation and session-revoke logic. This avoids letting an external password brute-force attempt break an already authenticated client session.
+- The first-stage password lock applies only to password Login. A valid refresh token can still rotate through `RefreshGatewayToken` when the session satisfies the current MFA step-up requirement; refresh token theft / reuse is handled by the separate rotation and session-revoke logic. This avoids letting an external password brute-force attempt break an already authenticated client session.
 - If the user has one or more ACTIVE TOTP MFA factors, `Login` must verify either `mfa_code` or a one-time `mfa_recovery_code` before generating refresh token, session or gateway token state. Missing proof returns stable `MFA_REQUIRED`; invalid proof returns stable `INVALID_MFA`.
 - Invalid TOTP codes are counted on the selected MFA factor, independent from password failure counters. Reaching `NEXUSIM_IDENTITY_MFA_MAX_FAILED_ATTEMPTS` within `NEXUSIM_IDENTITY_MFA_FAILURE_WINDOW` locks that factor for `NEXUSIM_IDENTITY_MFA_LOCK_DURATION` and public Login returns stable `mfa temporarily locked`.
 - Invalid MFA recovery-code attempts are counted on the user row, independent from password and TOTP factor counters. They reuse `NEXUSIM_IDENTITY_MFA_MAX_FAILED_ATTEMPTS`, `NEXUSIM_IDENTITY_MFA_FAILURE_WINDOW` and `NEXUSIM_IDENTITY_MFA_LOCK_DURATION`; a locked recovery-code path returns stable `mfa temporarily locked`.
@@ -114,7 +115,7 @@ Login risk first-stage rules:
 
 ## MFA TOTP Factors
 
-First-stage MFA support is limited to TOTP factors, password Login enforcement and one-time recovery codes generated during TOTP confirmation or regeneration. It does not yet implement refresh-token step-up, WebAuthn/passkeys or tenant-specific factor policy.
+First-stage MFA support is limited to TOTP factors, password Login enforcement, one-time recovery codes generated during TOTP confirmation or regeneration, and refresh-token step-up for password-only sessions after MFA is enabled. It does not yet implement MFA proof submission during refresh, WebAuthn/passkeys or tenant-specific factor policy.
 
 ```text
 BeginMFAEnrollment
@@ -174,7 +175,7 @@ MFA factor rules:
 
 Known MFA hardening still pending:
 
-- Refresh-token step-up enforcement;
+- MFA proof submission during refresh and richer adaptive step-up policy;
 - backup factor handling beyond TOTP recovery codes;
 - WebAuthn / passkeys;
 - richer MFA risk policy beyond the first factor-level failed-code counter and short lockout;

@@ -308,7 +308,7 @@ func (r *Repository) LoginGatewaySession(
 	if err := ensureSessionCanIssue(ctx, tx, command.TenantID, command.UserID, command.DeviceID, sessionID); err != nil {
 		return types.LoginResult{}, err
 	}
-	if err := upsertSession(ctx, tx, issueCommandFromLogin(command, sessionID), sessionID, issuedAt, gatewayExpiresAt); err != nil {
+	if err := upsertSession(ctx, tx, issueCommandFromLogin(command, sessionID), sessionID, issuedAt, gatewayExpiresAt, sessionMFAProofFromLogin(command, issuedAt)); err != nil {
 		return types.LoginResult{}, err
 	}
 	if err := insertRefreshToken(ctx, tx, command.TenantID, command.UserID, command.DeviceID, sessionID, refreshToken, issuedAt, refreshExpiresAt, command.TraceID, command.RequestID); err != nil {
@@ -416,13 +416,21 @@ func (r *Repository) RefreshGatewaySession(
 	if device.Status == types.DeviceStatusRevoked {
 		return types.RefreshGatewayTokenResult{}, types.NewDeviceRevoked("device is revoked")
 	}
-	if err := ensureRefreshSessionActive(ctx, tx, command.TenantID, command.UserID, command.DeviceID, row.SessionID); err != nil {
+	proof, err := lockRefreshSession(ctx, tx, command.TenantID, command.UserID, command.DeviceID, row.SessionID)
+	if err != nil {
 		return types.RefreshGatewayTokenResult{}, err
+	}
+	requiresMFA, err := hasActiveTOTPFactor(ctx, tx, command.TenantID, command.UserID)
+	if err != nil {
+		return types.RefreshGatewayTokenResult{}, err
+	}
+	if requiresMFA && !proof.Verified {
+		return types.RefreshGatewayTokenResult{}, types.NewMFARequired("mfa required")
 	}
 	if err := markRefreshTokenUsed(ctx, tx, row, nextRefreshToken.TokenID, issuedAt); err != nil {
 		return types.RefreshGatewayTokenResult{}, err
 	}
-	if err := upsertSession(ctx, tx, issueCommandFromRefresh(command, row.SessionID), row.SessionID, issuedAt, gatewayExpiresAt); err != nil {
+	if err := upsertSession(ctx, tx, issueCommandFromRefresh(command, row.SessionID), row.SessionID, issuedAt, gatewayExpiresAt, proof); err != nil {
 		return types.RefreshGatewayTokenResult{}, err
 	}
 	if err := insertRefreshToken(ctx, tx, command.TenantID, command.UserID, command.DeviceID, row.SessionID, nextRefreshToken, issuedAt, refreshExpiresAt, command.TraceID, command.RequestID); err != nil {
@@ -1003,7 +1011,7 @@ func (r *Repository) IssueGatewaySession(
 	if err := ensureSessionCanIssue(ctx, tx, command.TenantID, command.UserID, command.DeviceID, sessionID); err != nil {
 		return types.IssueGatewayTokenResult{}, err
 	}
-	if err := upsertSession(ctx, tx, command, sessionID, issuedAt, expiresAt); err != nil {
+	if err := upsertSession(ctx, tx, command, sessionID, issuedAt, expiresAt, sessionMFAProof{}); err != nil {
 		return types.IssueGatewayTokenResult{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -1040,6 +1048,13 @@ type refreshTokenRow struct {
 	TokenHash string
 	Status    string
 	ExpiresAt time.Time
+}
+
+type sessionMFAProof struct {
+	Verified   bool
+	VerifiedAt time.Time
+	Method     string
+	FactorID   types.MFAFactorID
 }
 
 type identityChallengeRow struct {
@@ -2138,7 +2153,30 @@ FOR UPDATE
 	return row, nil
 }
 
-func upsertSession(ctx context.Context, tx pgx.Tx, command types.IssueGatewayTokenCommand, sessionID types.SessionID, issuedAt time.Time, expiresAt time.Time) error {
+func sessionMFAProofFromLogin(command types.LoginCommand, verifiedAt time.Time) sessionMFAProof {
+	if command.VerifiedMFAFactorID != "" {
+		return sessionMFAProof{
+			Verified:   true,
+			VerifiedAt: verifiedAt,
+			Method:     "TOTP",
+			FactorID:   command.VerifiedMFAFactorID,
+		}
+	}
+	if command.UsedMFARecoveryCode.CodeID != "" || command.UsedMFARecoveryCode.CodeHash != "" {
+		return sessionMFAProof{
+			Verified:   true,
+			VerifiedAt: verifiedAt,
+			Method:     "RECOVERY_CODE",
+		}
+	}
+	return sessionMFAProof{}
+}
+
+func upsertSession(ctx context.Context, tx pgx.Tx, command types.IssueGatewayTokenCommand, sessionID types.SessionID, issuedAt time.Time, expiresAt time.Time, proof sessionMFAProof) error {
+	var mfaVerifiedAt any
+	if proof.Verified {
+		mfaVerifiedAt = proof.VerifiedAt
+	}
 	_, err := tx.Exec(ctx, `
 INSERT INTO identity_sessions (
     tenant_id,
@@ -2149,20 +2187,26 @@ INSERT INTO identity_sessions (
     audience,
     issued_at,
     expires_at,
+    mfa_verified_at,
+    mfa_method,
+    mfa_factor_id,
     trace_id,
     request_id
-) VALUES ($1, $2, $3, $4, 'ACTIVE', $5, $6, $7, $8, $9)
+) VALUES ($1, $2, $3, $4, 'ACTIVE', $5, $6, $7, $8, $9, $10, $11, $12)
 ON CONFLICT (tenant_id, user_id, device_id, session_id) DO UPDATE
 SET status = 'ACTIVE',
     audience = EXCLUDED.audience,
     issued_at = EXCLUDED.issued_at,
     expires_at = EXCLUDED.expires_at,
+    mfa_verified_at = EXCLUDED.mfa_verified_at,
+    mfa_method = EXCLUDED.mfa_method,
+    mfa_factor_id = EXCLUDED.mfa_factor_id,
     revoked_at = NULL,
     revoked_by = '',
     revoke_reason = '',
     trace_id = EXCLUDED.trace_id,
     request_id = EXCLUDED.request_id
-`, command.TenantID, command.UserID, command.DeviceID, sessionID, command.Audience, issuedAt, expiresAt, command.TraceID, command.RequestID)
+`, command.TenantID, command.UserID, command.DeviceID, sessionID, command.Audience, issuedAt, expiresAt, mfaVerifiedAt, proof.Method, proof.FactorID, command.TraceID, command.RequestID)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -2213,6 +2257,58 @@ FOR UPDATE
 		return types.NewSessionRevoked("session is revoked")
 	}
 	return nil
+}
+
+func lockRefreshSession(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, deviceID types.DeviceID, sessionID types.SessionID) (sessionMFAProof, error) {
+	var status types.SessionStatus
+	var verifiedAt time.Time
+	var method string
+	var factorID types.MFAFactorID
+	err := tx.QueryRow(ctx, `
+SELECT status, COALESCE(mfa_verified_at, 'epoch'::timestamptz), mfa_method, mfa_factor_id
+FROM identity_sessions
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND device_id = $3
+  AND session_id = $4
+FOR UPDATE
+`, tenantID, userID, deviceID, sessionID).Scan(&status, &verifiedAt, &method, &factorID)
+	if err == pgx.ErrNoRows {
+		return sessionMFAProof{}, types.NewSessionNotFound("session not found")
+	}
+	if err != nil {
+		return sessionMFAProof{}, types.NewDBReadFailed(err.Error())
+	}
+	if status == types.SessionStatusRevoked {
+		return sessionMFAProof{}, types.NewSessionRevoked("session is revoked")
+	}
+	if method == "" {
+		return sessionMFAProof{}, nil
+	}
+	return sessionMFAProof{
+		Verified:   true,
+		VerifiedAt: verifiedAt,
+		Method:     method,
+		FactorID:   factorID,
+	}, nil
+}
+
+func hasActiveTOTPFactor(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID) (bool, error) {
+	var exists bool
+	err := tx.QueryRow(ctx, `
+SELECT EXISTS (
+    SELECT 1
+    FROM identity_mfa_factors
+    WHERE tenant_id = $1
+      AND user_id = $2
+      AND factor_type = 'TOTP'
+      AND status = 'ACTIVE'
+)
+`, tenantID, userID).Scan(&exists)
+	if err != nil {
+		return false, types.NewDBReadFailed(err.Error())
+	}
+	return exists, nil
 }
 
 func updateDeviceRevoked(ctx context.Context, tx pgx.Tx, command types.RevokeDeviceCommand, revokedAt time.Time) (deviceRow, error) {

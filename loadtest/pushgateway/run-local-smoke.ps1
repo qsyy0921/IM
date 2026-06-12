@@ -15,6 +15,8 @@ param(
     [ValidateSet("mock", "hmac")]
     [string]$PushAuthMode = "mock",
     [switch]$UseIdentityServiceToken,
+    [ValidateSet("device", "session")]
+    [string]$IdentityRevokeScope = "device",
     [string]$PushAuthHmacSecret = "local-push-smoke-secret",
     [string]$PushAuthHmacPreviousSecrets = "",
     [string]$PushAuthTokenSigningSecret = "",
@@ -509,6 +511,7 @@ try {
         "--receiver-device-ids", $ReceiverDeviceIds,
         "--scenario", $Scenario,
         "--message-change-action", $MessageChangeAction,
+        "--identity-revoke-scope", $IdentityRevokeScope,
         "--slow-message-count", [string]$SlowMessageCount,
         "--push-metrics-url", "http://127.0.0.1:11598/debug/metrics",
         "--route-backend", $RouteBackend,

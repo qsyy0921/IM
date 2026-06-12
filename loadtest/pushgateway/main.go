@@ -34,8 +34,10 @@ import (
 
 const (
 	opClientHello    = "client.hello"
+	opClientPing     = "client.ping"
 	opDeliveryAck    = "delivery.ack"
 	opServerHello    = "server.hello"
+	opServerPong     = "server.pong"
 	opDeliveryNotify = "delivery.notify"
 	opDeliveryAckOK  = "delivery.ack.ok"
 	opResumeHint     = "server.resume_hint"
@@ -105,6 +107,7 @@ type config struct {
 	pushWSGatewayID                    string
 	pushReconnectGatewayID             string
 	pushConsumerGatewayID              string
+	identityRevokeScope                string
 	messageChangeAction                string
 	redisFaultCommand                  string
 	redisRestoreCommand                string
@@ -223,10 +226,14 @@ type redisFaultSummary struct {
 
 type identityRevokeSummary struct {
 	InitialHello           frameSnapshot `json:"initial_hello"`
+	Scope                  string        `json:"scope"`
 	RevokedDeviceID        string        `json:"revoked_device_id"`
+	RevokedSessionID       string        `json:"revoked_session_id,omitempty"`
 	ActiveCloseHint        frameSnapshot `json:"active_close_hint"`
 	ActiveCloseStatus      string        `json:"active_close_status,omitempty"`
 	ActiveNotifyFramesRead int           `json:"active_notify_frames_read"`
+	SurvivorHello          frameSnapshot `json:"survivor_hello,omitempty"`
+	SurvivorPong           frameSnapshot `json:"survivor_pong,omitempty"`
 	DeniedFrame            frameSnapshot `json:"denied_frame"`
 	ReconnectAttempts      int           `json:"reconnect_attempts"`
 }
@@ -371,6 +378,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.pushWSGatewayID, "push-ws-gateway-id", "", "WebSocket gateway id used by cross-instance route smoke")
 	flag.StringVar(&cfg.pushReconnectGatewayID, "push-reconnect-gateway-id", "", "reconnect WebSocket gateway id used by cross-instance resume smoke")
 	flag.StringVar(&cfg.pushConsumerGatewayID, "push-consumer-gateway-id", "", "delivery consumer gateway id used by cross-instance route smoke")
+	flag.StringVar(&cfg.identityRevokeScope, "identity-revoke-scope", "device", "identity-revoke target scope: device or session")
 	flag.StringVar(&cfg.redisFaultCommand, "redis-fault-command", "", "optional command executed after WebSocket route registration and before SendMessage in redis-fault scenario")
 	flag.StringVar(&cfg.redisRestoreCommand, "redis-restore-command", "", "optional command executed after PullInbox recovery and before reconnect/ACK in redis-fault scenario")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete existing rows for tenant before running")
@@ -384,6 +392,10 @@ func parseConfig() config {
 	cfg.messageChangeAction = strings.ToLower(strings.TrimSpace(cfg.messageChangeAction))
 	if cfg.messageChangeAction == "" {
 		cfg.messageChangeAction = "edit"
+	}
+	cfg.identityRevokeScope = strings.ToLower(strings.TrimSpace(cfg.identityRevokeScope))
+	if cfg.identityRevokeScope == "" {
+		cfg.identityRevokeScope = "device"
 	}
 	if cfg.slowMessageCount <= 0 {
 		cfg.slowMessageCount = 1
@@ -1151,20 +1163,50 @@ func runIdentityRevokeScenario(ctx context.Context, cfg config, result *summary)
 	if strings.TrimSpace(cfg.identityTarget) == "" {
 		return finish(cfg, result, errors.New("identity-revoke scenario requires --identity-target"))
 	}
-	token, err := gatewayToken(ctx, cfg, cfg.receiverDeviceID)
+	if cfg.identityRevokeScope != "device" && cfg.identityRevokeScope != "session" {
+		return finish(cfg, result, fmt.Errorf("unsupported identity-revoke-scope: %s", cfg.identityRevokeScope))
+	}
+	token, err := gatewayTokenDetails(ctx, cfg, cfg.receiverDeviceID)
 	if err != nil {
 		return finish(cfg, result, err)
 	}
-	conn, hello, err := connectWebSocketWithToken(ctx, cfg, cfg.receiverDeviceID, token)
+	if cfg.identityRevokeScope == "session" && token.SessionID == "" {
+		return finish(cfg, result, errors.New("identity-service returned empty session_id for session revoke smoke"))
+	}
+	conn, hello, err := connectWebSocketWithToken(ctx, cfg, cfg.receiverDeviceID, token.Token)
 	if err != nil {
 		return finish(cfg, result, fmt.Errorf("connect websocket before revoke: %w", err))
+	}
+	var (
+		survivorToken gatewayTokenResult
+		survivorConn  *nhooyr.Conn
+		survivorHello serverFrame
+	)
+	if cfg.identityRevokeScope == "session" {
+		survivorToken, err = gatewayTokenDetails(ctx, cfg, cfg.receiverDeviceID)
+		if err != nil {
+			conn.CloseNow()
+			return finish(cfg, result, fmt.Errorf("issue survivor gateway token: %w", err))
+		}
+		survivorConn, survivorHello, err = connectWebSocketWithToken(ctx, cfg, cfg.receiverDeviceID, survivorToken.Token)
+		if err != nil {
+			conn.CloseNow()
+			return finish(cfg, result, fmt.Errorf("connect survivor websocket before revoke: %w", err))
+		}
+		defer survivorConn.Close(nhooyr.StatusNormalClosure, "identity session revoke smoke survivor")
 	}
 	activeClose := make(chan slowReadResult, 1)
 	go func() {
 		activeClose <- readUntilResumeHintOrClose(ctx, cfg, conn)
 	}()
 
-	if err := revokeIdentityDevice(ctx, cfg); err != nil {
+	switch cfg.identityRevokeScope {
+	case "device":
+		err = revokeIdentityDevice(ctx, cfg)
+	case "session":
+		err = revokeIdentitySession(ctx, cfg, token.SessionID)
+	}
+	if err != nil {
 		conn.CloseNow()
 		return finish(cfg, result, err)
 	}
@@ -1173,19 +1215,30 @@ func runIdentityRevokeScenario(ctx context.Context, cfg config, result *summary)
 		conn.CloseNow()
 		return finish(cfg, result, fmt.Errorf("expected identity revoked resume hint, got hint=%+v close=%s", closeResult.resumeHint, closeResult.closeStatus))
 	}
-	denied, attempts, err := waitWebSocketPermissionDenied(ctx, cfg, cfg.receiverDeviceID, token)
+	denied, attempts, err := waitWebSocketPermissionDenied(ctx, cfg, cfg.receiverDeviceID, token.Token)
 	if err != nil {
 		return finish(cfg, result, err)
 	}
-	result.IdentityRevoke = &identityRevokeSummary{
+	identityRevoke := &identityRevokeSummary{
 		InitialHello:           snapshotFrame(hello),
+		Scope:                  cfg.identityRevokeScope,
 		RevokedDeviceID:        cfg.receiverDeviceID,
+		RevokedSessionID:       token.SessionID,
 		ActiveCloseHint:        snapshotFrame(closeResult.resumeHint),
 		ActiveCloseStatus:      closeResult.closeStatus,
 		ActiveNotifyFramesRead: closeResult.notifyFrames,
 		DeniedFrame:            snapshotFrame(denied),
 		ReconnectAttempts:      attempts,
 	}
+	if cfg.identityRevokeScope == "session" {
+		pong, err := pingWebSocket(ctx, cfg, survivorConn, "push-smoke-session-revoke-survivor-ping")
+		if err != nil {
+			return finish(cfg, result, fmt.Errorf("survivor session should remain connected: %w", err))
+		}
+		identityRevoke.SurvivorHello = snapshotFrame(survivorHello)
+		identityRevoke.SurvivorPong = snapshotFrame(pong)
+	}
+	result.IdentityRevoke = identityRevoke
 	result.ServerHello = snapshotFrame(hello)
 	result.Success = true
 	return finish(cfg, result, nil)
@@ -1318,13 +1371,46 @@ func readAuthErrorFrame(ctx context.Context, cfg config, deviceID string, token 
 	return frame, nil
 }
 
+func pingWebSocket(ctx context.Context, cfg config, conn *nhooyr.Conn, requestID string) (serverFrame, error) {
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	if err := wsjson.Write(requestCtx, conn, clientFrame{
+		Op:        opClientPing,
+		RequestID: requestID,
+	}); err != nil {
+		return serverFrame{}, err
+	}
+	for {
+		var frame serverFrame
+		if err := wsjson.Read(requestCtx, conn, &frame); err != nil {
+			return serverFrame{}, err
+		}
+		switch frame.Op {
+		case opServerPong:
+			return frame, nil
+		case opDeliveryNotify, opResumeHint:
+			continue
+		case opError:
+			return frame, fmt.Errorf("unexpected ping error frame: %+v", frame)
+		default:
+			return frame, fmt.Errorf("unexpected ping response frame: %+v", frame)
+		}
+	}
+}
+
 type pushGatewayTokenClaims struct {
-	TenantID string `json:"tenant_id"`
-	UserID   string `json:"user_id"`
-	DeviceID string `json:"device_id,omitempty"`
-	TraceID  string `json:"trace_id,omitempty"`
-	Audience string `json:"aud"`
-	Expires  int64  `json:"exp"`
+	TenantID  string `json:"tenant_id"`
+	UserID    string `json:"user_id"`
+	DeviceID  string `json:"device_id,omitempty"`
+	SessionID string `json:"session_id,omitempty"`
+	TraceID   string `json:"trace_id,omitempty"`
+	Audience  string `json:"aud"`
+	Expires   int64  `json:"exp"`
+}
+
+type gatewayTokenResult struct {
+	Token     string
+	SessionID string
 }
 
 func signPushGatewayToken(cfg config, deviceID string) (string, error) {
@@ -1347,16 +1433,28 @@ func signPushGatewayToken(cfg config, deviceID string) (string, error) {
 }
 
 func gatewayToken(ctx context.Context, cfg config, deviceID string) (string, error) {
+	result, err := gatewayTokenDetails(ctx, cfg, deviceID)
+	if err != nil {
+		return "", err
+	}
+	return result.Token, nil
+}
+
+func gatewayTokenDetails(ctx context.Context, cfg config, deviceID string) (gatewayTokenResult, error) {
 	if strings.TrimSpace(cfg.identityTarget) != "" {
 		return issueGatewayToken(ctx, cfg, deviceID)
 	}
-	return signPushGatewayToken(cfg, deviceID)
+	token, err := signPushGatewayToken(cfg, deviceID)
+	if err != nil {
+		return gatewayTokenResult{}, err
+	}
+	return gatewayTokenResult{Token: token}, nil
 }
 
-func issueGatewayToken(ctx context.Context, cfg config, deviceID string) (string, error) {
+func issueGatewayToken(ctx context.Context, cfg config, deviceID string) (gatewayTokenResult, error) {
 	conn, err := grpc.NewClient(cfg.identityTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return "", fmt.Errorf("dial identity-service: %w", err)
+		return gatewayTokenResult{}, fmt.Errorf("dial identity-service: %w", err)
 	}
 	defer conn.Close()
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
@@ -1371,12 +1469,12 @@ func issueGatewayToken(ctx context.Context, cfg config, deviceID string) (string
 		RequestId:  "push-smoke-identity-token-" + deviceID,
 	})
 	if err != nil {
-		return "", fmt.Errorf("issue gateway token: %w", err)
+		return gatewayTokenResult{}, fmt.Errorf("issue gateway token: %w", err)
 	}
 	if response.GetGatewayToken() == "" {
-		return "", errors.New("identity-service returned empty gateway token")
+		return gatewayTokenResult{}, errors.New("identity-service returned empty gateway token")
 	}
-	return response.GetGatewayToken(), nil
+	return gatewayTokenResult{Token: response.GetGatewayToken(), SessionID: response.GetSessionId()}, nil
 }
 
 func revokeIdentityDevice(ctx context.Context, cfg config) error {
@@ -1407,6 +1505,39 @@ func revokeIdentityDevice(ctx context.Context, cfg config) error {
 	})
 	if err != nil {
 		return fmt.Errorf("revoke identity device: %w", err)
+	}
+	return nil
+}
+
+func revokeIdentitySession(ctx context.Context, cfg config, sessionID string) error {
+	conn, err := grpc.NewClient(cfg.identityTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("dial identity-service: %w", err)
+	}
+	defer conn.Close()
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	requestCtx = metadata.AppendToOutgoingContext(
+		requestCtx,
+		"x-nexusim-tenant-id", cfg.tenantID,
+		"x-nexusim-user-id", cfg.ownerUserID,
+		"x-nexusim-trace-id", "push-smoke-identity-session-revoke",
+		"x-nexusim-request-id", "push-smoke-identity-session-revoke",
+	)
+	_, err = identityv1.NewIdentityServiceClient(conn).RevokeSession(requestCtx, &identityv1.RevokeSessionRequest{
+		AdminContext: &identityv1.AdminContext{
+			TenantId:       cfg.tenantID,
+			OperatorUserId: cfg.ownerUserID,
+			TraceId:        "push-smoke-identity-session-revoke",
+			RequestId:      "push-smoke-identity-session-revoke",
+		},
+		UserId:    cfg.receiverUserID,
+		DeviceId:  cfg.receiverDeviceID,
+		SessionId: sessionID,
+		Reason:    "push gateway identity session revoke smoke",
+	})
+	if err != nil {
+		return fmt.Errorf("revoke identity session: %w", err)
 	}
 	return nil
 }

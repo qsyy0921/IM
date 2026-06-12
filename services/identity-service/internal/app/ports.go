@@ -31,6 +31,13 @@ type Repository interface {
 	GetDeviceState(context.Context, types.GetDeviceStateCommand) (types.GetDeviceStateResult, error)
 }
 
+type PasswordResetRepository interface {
+	RecordPasswordResetRequest(context.Context, types.TenantID, types.UserID, types.VerificationChannel, string, time.Time) error
+	CreatePasswordResetChallenge(context.Context, types.RequestPasswordResetCommand, types.ChallengeRecord, types.ChallengeDeliveryRecord, time.Time, time.Time) (types.RequestPasswordResetResult, error)
+	RecordChallengeDeliverySuccess(context.Context, types.TenantID, types.UserID, types.ChallengeID, time.Time) error
+	RecordChallengeDeliveryFailure(context.Context, types.TenantID, types.UserID, types.ChallengeID, string, time.Time) error
+}
+
 type TokenSigner interface {
 	SignGatewayToken(types.TokenClaims) (string, error)
 }

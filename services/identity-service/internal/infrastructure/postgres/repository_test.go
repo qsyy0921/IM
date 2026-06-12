@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1034,6 +1035,117 @@ func TestRepositoryVerificationChallengeRequestWindowRateLimitIntegration(t *tes
 	}
 }
 
+func TestRepositoryPasswordResetRequestLimiterHashesInvalidTargetIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	repository := NewRepository(
+		pool,
+		WithChallengeRequestLimit(2, 10*time.Minute),
+		WithChallengeRequestLockDuration(20*time.Minute),
+	)
+	requestedAt := time.Unix(1_800_000_000, 0).UTC()
+	command := types.RequestPasswordResetCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "missing-user",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "User1@Example.COM",
+	}
+	targetKey := strings.Repeat("a", 64)
+
+	for i := 0; i < 2; i++ {
+		if err := repository.RecordPasswordResetRequest(ctx, command.TenantID, command.UserID, command.Channel, targetKey, requestedAt.Add(time.Duration(i)*time.Minute)); err != nil {
+			t.Fatalf("record password reset request %d: %v", i, err)
+		}
+	}
+	err := repository.RecordPasswordResetRequest(ctx, command.TenantID, command.UserID, command.Channel, targetKey, requestedAt.Add(2*time.Minute))
+	if !errors.Is(err, types.ErrChallengeRateLimited) {
+		t.Fatalf("expected password reset request limiter, got %v", err)
+	}
+
+	var storedKey string
+	var requestCount int
+	var lockedUntil *time.Time
+	if err := pool.QueryRow(ctx, `
+SELECT target_key, request_count, locked_until
+FROM identity_challenge_request_limits
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND challenge_type = $3
+  AND channel = $4
+`, command.TenantID, command.UserID, types.ChallengeTypePasswordReset, command.Channel).Scan(&storedKey, &requestCount, &lockedUntil); err != nil {
+		t.Fatalf("read password reset request limiter row: %v", err)
+	}
+	if storedKey != targetKey ||
+		requestCount != 3 ||
+		lockedUntil == nil ||
+		!lockedUntil.Equal(requestedAt.Add(22*time.Minute)) {
+		t.Fatalf("unexpected limiter row key=%q count=%d locked=%v", storedKey, requestCount, lockedUntil)
+	}
+	if strings.Contains(storedKey, "User1") || strings.Contains(storedKey, "example.com") {
+		t.Fatalf("limiter stored raw destination in target key: %q", storedKey)
+	}
+
+	err = repository.RecordPasswordResetRequest(ctx, command.TenantID, command.UserID, command.Channel, targetKey, requestedAt.Add(3*time.Minute))
+	if !errors.Is(err, types.ErrChallengeRateLimited) {
+		t.Fatalf("expected locked password reset request limiter, got %v", err)
+	}
+	if err := repository.RecordPasswordResetRequest(ctx, command.TenantID, command.UserID, command.Channel, targetKey, requestedAt.Add(25*time.Minute)); err != nil {
+		t.Fatalf("expected limiter to reset after lock/window expiry: %v", err)
+	}
+}
+
+func TestRepositoryPasswordResetRequestLimiterConcurrentFirstRequestIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	repository := NewRepository(
+		pool,
+		WithChallengeRequestLimit(16, 10*time.Minute),
+		WithChallengeRequestLockDuration(20*time.Minute),
+	)
+	requestedAt := time.Unix(1_800_000_000, 0).UTC()
+	tenantID := types.TenantID("tenant-identity")
+	userID := types.UserID("missing-user")
+	channel := types.VerificationChannelEmail
+	targetKey := strings.Repeat("b", 64)
+
+	const workerCount = 8
+	errCh := make(chan error, workerCount)
+	var wg sync.WaitGroup
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go func(offset int) {
+			defer wg.Done()
+			errCh <- repository.RecordPasswordResetRequest(ctx, tenantID, userID, channel, targetKey, requestedAt.Add(time.Duration(offset)*time.Millisecond))
+		}(i)
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		if err != nil {
+			t.Fatalf("concurrent first request should not fail: %v", err)
+		}
+	}
+
+	var rowCount int
+	var requestCount int
+	if err := pool.QueryRow(ctx, `
+SELECT count(*), COALESCE(MAX(request_count), 0)
+FROM identity_challenge_request_limits
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND challenge_type = $3
+  AND channel = $4
+  AND target_key = $5
+`, tenantID, userID, types.ChallengeTypePasswordReset, channel, targetKey).Scan(&rowCount, &requestCount); err != nil {
+		t.Fatalf("read concurrent limiter row: %v", err)
+	}
+	if rowCount != 1 || requestCount != workerCount {
+		t.Fatalf("unexpected concurrent limiter state rows=%d request_count=%d", rowCount, requestCount)
+	}
+}
+
 func TestRepositoryMFAFactorLifecycleIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -2007,6 +2119,7 @@ func resetIdentityTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) 
 TRUNCATE
     identity_challenge_delivery_repair_audit,
     identity_challenge_delivery_outbox,
+    identity_challenge_request_limits,
     identity_mfa_recovery_codes,
     identity_mfa_factors,
     identity_challenges,

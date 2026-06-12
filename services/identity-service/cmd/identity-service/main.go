@@ -137,10 +137,11 @@ func runGRPC() error {
 	challengeDeliveryMetrics := monitoringinfra.NewChallengeDeliveryMetrics(challengeDeliveryMode)
 	challengeNotifier = monitoringinfra.NewInstrumentedChallengeNotifier(challengeNotifier, challengeDeliveryMetrics)
 	challengeOptions := app.ChallengeOptions{
-		ReturnDevToken:     envBool("NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN", false),
-		Notifier:           challengeNotifier,
-		DeliveryOutbox:     challengeDeliveryMode == "outbox",
-		DeliveryTokenCodec: challengeDeliveryTokens,
+		ReturnDevToken:            envBool("NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN", false),
+		Notifier:                  challengeNotifier,
+		DeliveryOutbox:            challengeDeliveryMode == "outbox",
+		DeliveryTokenCodec:        challengeDeliveryTokens,
+		RequestLimitTargetKeySeed: envString("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_SECRET", ""),
 	}
 	jwkSet, err := gatewayTokenJWKSetWithAdditionalKeys(signer.JWKSet())
 	if err != nil {
@@ -164,6 +165,9 @@ func runGRPC() error {
 		postgresinfra.WithChallengeRequestLimit(
 			envInt("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_MAX_PER_WINDOW", postgresinfra.DefaultChallengeRequestMaxPerWindow),
 			envDuration("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_WINDOW", postgresinfra.DefaultChallengeRequestWindow),
+		),
+		postgresinfra.WithChallengeRequestLockDuration(
+			envDuration("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LOCK_DURATION", postgresinfra.DefaultChallengeRequestLockDuration),
 		),
 	)
 	server, err := newGRPCServer(grpcMetrics)

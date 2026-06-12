@@ -24,12 +24,14 @@ type Repository struct {
 	factorID                     func() (string, error)
 	challengeRequestMaxPerWindow int
 	challengeRequestWindow       time.Duration
+	challengeRequestLockDuration time.Duration
 }
 
 const maxActiveChallengesPerTarget = 3
 const maxEnabledMFAFactorsPerUser = 5
 const DefaultChallengeRequestMaxPerWindow = 5
 const DefaultChallengeRequestWindow = 15 * time.Minute
+const DefaultChallengeRequestLockDuration = 15 * time.Minute
 
 type RepositoryOption func(*Repository)
 
@@ -47,6 +49,7 @@ func NewRepository(pool *pgxpool.Pool, opts ...RepositoryOption) *Repository {
 		},
 		challengeRequestMaxPerWindow: DefaultChallengeRequestMaxPerWindow,
 		challengeRequestWindow:       DefaultChallengeRequestWindow,
+		challengeRequestLockDuration: DefaultChallengeRequestLockDuration,
 	}
 	for _, opt := range opts {
 		opt(repository)
@@ -82,6 +85,12 @@ func WithChallengeRequestLimit(maxPerWindow int, window time.Duration) Repositor
 	return func(repository *Repository) {
 		repository.challengeRequestMaxPerWindow = maxPerWindow
 		repository.challengeRequestWindow = window
+	}
+}
+
+func WithChallengeRequestLockDuration(duration time.Duration) RepositoryOption {
+	return func(repository *Repository) {
+		repository.challengeRequestLockDuration = duration
 	}
 }
 
@@ -736,6 +745,48 @@ WHERE tenant_id = $1
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
+}
+
+func (r *Repository) RecordPasswordResetRequest(
+	ctx context.Context,
+	tenantID types.TenantID,
+	userID types.UserID,
+	channel types.VerificationChannel,
+	targetKey string,
+	requestedAt time.Time,
+) error {
+	if r.pool == nil {
+		return types.NewDBWriteFailed("identity repository is not configured")
+	}
+	targetKey = strings.TrimSpace(targetKey)
+	if targetKey == "" || r.challengeRequestMaxPerWindow <= 0 || r.challengeRequestWindow <= 0 {
+		return nil
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	err = recordChallengeRequestLimit(
+		ctx,
+		tx,
+		tenantID,
+		userID,
+		types.ChallengeTypePasswordReset,
+		channel,
+		targetKey,
+		requestedAt,
+		r.challengeRequestMaxPerWindow,
+		r.challengeRequestWindow,
+		r.challengeRequestLockDuration,
+	)
+	if err != nil && !errors.Is(err, types.ErrChallengeRateLimited) {
+		return err
+	}
+	if commitErr := tx.Commit(ctx); commitErr != nil {
+		return types.NewDBWriteFailed(commitErr.Error())
+	}
+	return err
 }
 
 func (r *Repository) CreatePasswordResetChallenge(
@@ -1992,6 +2043,154 @@ WHERE tenant_id = $1
 		if recentCount >= maxPerWindow {
 			return types.NewChallengeRateLimited("too many recent challenges")
 		}
+	}
+	return nil
+}
+
+func recordChallengeRequestLimit(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	userID types.UserID,
+	challengeType types.ChallengeType,
+	channel types.VerificationChannel,
+	targetKey string,
+	now time.Time,
+	maxPerWindow int,
+	window time.Duration,
+	lockDuration time.Duration,
+) error {
+	if err := lockChallengeRequestLimit(ctx, tx, tenantID, userID, challengeType, channel, targetKey); err != nil {
+		return err
+	}
+	var requestCount int
+	var windowStart time.Time
+	var lockedUntil *time.Time
+	err := tx.QueryRow(ctx, `
+SELECT request_count, window_start, locked_until
+FROM identity_challenge_request_limits
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND challenge_type = $3
+  AND channel = $4
+  AND target_key = $5
+FOR UPDATE
+`, tenantID, userID, challengeType, channel, targetKey).Scan(&requestCount, &windowStart, &lockedUntil)
+	if err == pgx.ErrNoRows {
+		_, err = tx.Exec(ctx, `
+INSERT INTO identity_challenge_request_limits (
+    tenant_id,
+    user_id,
+    challenge_type,
+    channel,
+    target_key,
+    request_count,
+    window_start,
+    last_request_at,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, 1, $6, $6, $6, $6)
+`, tenantID, userID, challengeType, channel, targetKey, now)
+		if err != nil {
+			return types.NewDBWriteFailed(err.Error())
+		}
+		return nil
+	}
+	if err != nil {
+		return types.NewDBReadFailed(err.Error())
+	}
+	if lockedUntil != nil && lockedUntil.After(now) {
+		if err := updateChallengeRequestLimitLastSeen(ctx, tx, tenantID, userID, challengeType, channel, targetKey, now); err != nil {
+			return err
+		}
+		return types.NewChallengeRateLimited("challenge request temporarily limited")
+	}
+	windowStartThreshold := now.Add(-window)
+	if windowStart.Before(windowStartThreshold) {
+		_, err = tx.Exec(ctx, `
+UPDATE identity_challenge_request_limits
+SET request_count = 1,
+    window_start = $6,
+    last_request_at = $6,
+    locked_until = NULL,
+    updated_at = $6
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND challenge_type = $3
+  AND channel = $4
+  AND target_key = $5
+`, tenantID, userID, challengeType, channel, targetKey, now)
+		if err != nil {
+			return types.NewDBWriteFailed(err.Error())
+		}
+		return nil
+	}
+	nextCount := requestCount + 1
+	var nextLockedUntil any
+	rateLimited := nextCount > maxPerWindow
+	if rateLimited && lockDuration > 0 {
+		nextLockedUntil = now.Add(lockDuration)
+	}
+	_, err = tx.Exec(ctx, `
+UPDATE identity_challenge_request_limits
+SET request_count = $6,
+    last_request_at = $7,
+    locked_until = $8,
+    updated_at = $7
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND challenge_type = $3
+  AND channel = $4
+  AND target_key = $5
+`, tenantID, userID, challengeType, channel, targetKey, nextCount, now, nextLockedUntil)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if rateLimited {
+		return types.NewChallengeRateLimited("challenge request temporarily limited")
+	}
+	return nil
+}
+
+func lockChallengeRequestLimit(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	userID types.UserID,
+	challengeType types.ChallengeType,
+	channel types.VerificationChannel,
+	targetKey string,
+) error {
+	key := fmt.Sprintf("%s\x1f%s\x1f%s\x1f%s\x1f%s\x1fidentity_challenge_request_limit", tenantID, userID, challengeType, channel, targetKey)
+	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, key)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func updateChallengeRequestLimitLastSeen(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	userID types.UserID,
+	challengeType types.ChallengeType,
+	channel types.VerificationChannel,
+	targetKey string,
+	now time.Time,
+) error {
+	_, err := tx.Exec(ctx, `
+UPDATE identity_challenge_request_limits
+SET last_request_at = $6,
+    updated_at = $6
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND challenge_type = $3
+  AND channel = $4
+  AND target_key = $5
+`, tenantID, userID, challengeType, channel, targetKey, now)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
 }

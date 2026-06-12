@@ -2,7 +2,11 @@ package app
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/qsyy0921/IM/services/identity-service/internal/domain"
@@ -10,10 +14,11 @@ import (
 )
 
 type ChallengeOptions struct {
-	ReturnDevToken     bool
-	Notifier           ChallengeNotifier
-	DeliveryOutbox     bool
-	DeliveryTokenCodec ChallengeDeliveryTokenCodec
+	ReturnDevToken            bool
+	Notifier                  ChallengeNotifier
+	DeliveryOutbox            bool
+	DeliveryTokenCodec        ChallengeDeliveryTokenCodec
+	RequestLimitTargetKeySeed string
 }
 
 type RequestVerificationChallengeUseCase struct {
@@ -106,13 +111,13 @@ func (uc *ConfirmVerificationChallengeUseCase) Execute(ctx context.Context, comm
 }
 
 type RequestPasswordResetUseCase struct {
-	repository Repository
+	repository PasswordResetRepository
 	tokens     ChallengeTokenCodec
 	now        func() time.Time
 	options    ChallengeOptions
 }
 
-func NewRequestPasswordResetUseCase(repository Repository, tokens ChallengeTokenCodec, options ChallengeOptions) *RequestPasswordResetUseCase {
+func NewRequestPasswordResetUseCase(repository PasswordResetRepository, tokens ChallengeTokenCodec, options ChallengeOptions) *RequestPasswordResetUseCase {
 	return &RequestPasswordResetUseCase{repository: repository, tokens: tokens, now: func() time.Time { return time.Now().UTC() }, options: options}
 }
 
@@ -123,12 +128,19 @@ func (uc *RequestPasswordResetUseCase) Execute(ctx context.Context, command type
 	if uc.repository == nil || uc.tokens == nil {
 		return types.RequestPasswordResetResult{}, types.NewDBWriteFailed("identity challenge dependencies are not configured")
 	}
+	issuedAt := uc.now()
 	plain, record, err := uc.tokens.NewChallengeToken()
 	if err != nil {
 		return types.RequestPasswordResetResult{}, err
 	}
-	issuedAt := uc.now()
 	expiresAt := issuedAt.Add(domain.NormalizeChallengeTTL(command.TTLSeconds))
+	targetKey := passwordResetRequestTargetKey(uc.options, command)
+	if err := uc.repository.RecordPasswordResetRequest(ctx, command.TenantID, command.UserID, command.Channel, targetKey, issuedAt); err != nil {
+		if errors.Is(err, types.ErrChallengeRateLimited) {
+			return neutralPasswordResetResult(command, record.ChallengeID, expiresAt), nil
+		}
+		return types.RequestPasswordResetResult{}, err
+	}
 	deliveryRecord, err := challengeDeliveryRecord(uc.options, plain)
 	if err != nil {
 		return types.RequestPasswordResetResult{}, err
@@ -184,6 +196,34 @@ func challengeDeliveryRecord(options ChallengeOptions, plainToken string) (types
 	return types.ChallengeDeliveryRecord{EncryptedToken: encrypted}, nil
 }
 
+func passwordResetRequestTargetKey(options ChallengeOptions, command types.RequestPasswordResetCommand) string {
+	seed := strings.TrimSpace(options.RequestLimitTargetKeySeed)
+	if seed == "" {
+		return ""
+	}
+	mac := hmac.New(sha256.New, []byte(seed))
+	parts := []string{
+		strings.TrimSpace(string(command.TenantID)),
+		strings.TrimSpace(string(command.UserID)),
+		string(types.ChallengeTypePasswordReset),
+		string(command.Channel),
+		normalizeChallengeRequestDestination(command.Channel, command.Destination),
+	}
+	for _, part := range parts {
+		_, _ = mac.Write([]byte(part))
+		_, _ = mac.Write([]byte{0})
+	}
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func normalizeChallengeRequestDestination(channel types.VerificationChannel, destination string) string {
+	normalized := strings.TrimSpace(destination)
+	if channel == types.VerificationChannelEmail {
+		return strings.ToLower(normalized)
+	}
+	return normalized
+}
+
 type noopChallengeNotifier struct{}
 
 func (noopChallengeNotifier) SendChallenge(context.Context, types.ChallengeNotification) error {
@@ -192,7 +232,9 @@ func (noopChallengeNotifier) SendChallenge(context.Context, types.ChallengeNotif
 
 func recordChallengeDeliveryFailure(
 	ctx context.Context,
-	repository Repository,
+	repository interface {
+		RecordChallengeDeliveryFailure(context.Context, types.TenantID, types.UserID, types.ChallengeID, string, time.Time) error
+	},
 	tenantID types.TenantID,
 	userID types.UserID,
 	challengeID types.ChallengeID,

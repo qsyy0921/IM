@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -1314,62 +1315,125 @@ func TestRequestPasswordResetUseCaseHidesInvalidOrRateLimitedTarget(t *testing.T
 	}
 }
 
+func TestRequestPasswordResetUseCaseHidesRequestLimiterAndSkipsDelivery(t *testing.T) {
+	repository := &fakeIdentityRepository{recordPasswordResetRequestErr: types.NewChallengeRateLimited("challenge request temporarily limited")}
+	notifier := &fakeChallengeNotifier{}
+	useCase := NewRequestPasswordResetUseCase(repository, fakeChallengeTokenCodec{}, ChallengeOptions{
+		ReturnDevToken:            true,
+		Notifier:                  notifier,
+		RequestLimitTargetKeySeed: "request-limit-secret",
+	})
+	useCase.now = func() time.Time { return time.Unix(1_800_000_000, 0).UTC() }
+	result, err := useCase.Execute(context.Background(), types.RequestPasswordResetCommand{
+		TenantID:    "tenant-1",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "User1@Example.COM",
+		TTLSeconds:  600,
+	})
+	if err != nil {
+		t.Fatalf("request password reset should return neutral success: %v", err)
+	}
+	if result.ChallengeID != "challenge-1" ||
+		result.DevChallengeToken != "" ||
+		result.ExpiresAtUnixMS != time.Unix(1_800_000_600, 0).UnixMilli() {
+		t.Fatalf("unexpected neutral result: %+v", result)
+	}
+	if !repository.recordPasswordResetRequestCalled || repository.recordPasswordResetRequestTargetKey == "" {
+		t.Fatalf("expected request limiter target key, called=%v key=%q", repository.recordPasswordResetRequestCalled, repository.recordPasswordResetRequestTargetKey)
+	}
+	if strings.Contains(repository.recordPasswordResetRequestTargetKey, "User1") ||
+		strings.Contains(repository.recordPasswordResetRequestTargetKey, "example.com") {
+		t.Fatalf("target key should not contain raw destination: %q", repository.recordPasswordResetRequestTargetKey)
+	}
+	if repository.createPasswordResetCalled || notifier.called {
+		t.Fatalf("limited neutral response must not create challenge or send notification, created=%v sent=%v", repository.createPasswordResetCalled, notifier.called)
+	}
+}
+
+func TestPasswordResetRequestTargetKeyNormalizesEmailAndHidesDestination(t *testing.T) {
+	options := ChallengeOptions{RequestLimitTargetKeySeed: "request-limit-secret"}
+	base := types.RequestPasswordResetCommand{
+		TenantID:    "tenant-1",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: " User1@Example.COM ",
+	}
+	normalized := base
+	normalized.Destination = "user1@example.com"
+
+	key := passwordResetRequestTargetKey(options, base)
+	normalizedKey := passwordResetRequestTargetKey(options, normalized)
+	if key == "" || key != normalizedKey {
+		t.Fatalf("expected stable normalized target key, got %q and %q", key, normalizedKey)
+	}
+	if strings.Contains(key, "User1") || strings.Contains(key, "example.com") {
+		t.Fatalf("target key should not contain raw destination: %q", key)
+	}
+	if disabled := passwordResetRequestTargetKey(ChallengeOptions{}, base); disabled != "" {
+		t.Fatalf("expected empty key when limiter secret is unset, got %q", disabled)
+	}
+}
+
 type fakeIdentityRepository struct {
-	credential                    types.UserCredential
-	getCredentialErr              error
-	registerCalled                bool
-	registerPasswordHash          string
-	loginCalled                   bool
-	loginCommand                  types.LoginCommand
-	failureRecorded               bool
-	failureAt                     time.Time
-	lockUntil                     time.Time
-	maxFailedAttempts             int
-	failureWindowStart            time.Time
-	recordFailureErr              error
-	mfaFailureRecorded            bool
-	mfaFailureAt                  time.Time
-	mfaLockUntil                  time.Time
-	mfaMaxFailedAttempts          int
-	mfaFailureWindowStart         time.Time
-	mfaFailureFactorID            types.MFAFactorID
-	recordMFAFailureErr           error
-	mfaRecoveryFailureRecorded    bool
-	mfaRecoveryFailureAt          time.Time
-	mfaRecoveryLockUntil          time.Time
-	mfaRecoveryMaxFailedAttempts  int
-	mfaRecoveryFailureWindowStart time.Time
-	recordMFARecoveryFailureErr   error
-	recoveryCodeRecord            types.MFARecoveryCodeRecord
-	recoveryCodeHash              string
-	findRecoveryCodeErr           error
-	validateRefreshCalled         bool
-	validateRefreshErr            error
-	validatePresentedTokenID      types.RefreshTokenID
-	validatePresentedTokenHash    string
-	refreshCalled                 bool
-	refreshCommand                types.RefreshGatewayTokenCommand
-	presentedTokenID              types.RefreshTokenID
-	presentedTokenHash            string
-	createVerificationCalled      bool
-	createVerificationDelivery    types.ChallengeDeliveryRecord
-	createPasswordResetCalled     bool
-	createPasswordResetDelivery   types.ChallengeDeliveryRecord
-	createPasswordResetErr        error
-	expireChallengeCalled         bool
-	expiredChallengeID            types.ChallengeID
-	expireChallengeErr            error
-	deliverySuccessCalled         bool
-	deliverySuccessChallengeID    types.ChallengeID
-	deliverySuccessErr            error
-	deliveryFailureCalled         bool
-	deliveryFailureChallengeID    types.ChallengeID
-	deliveryFailureLastError      string
-	deliveryFailureErr            error
-	confirmPasswordResetCalled    bool
-	resetPasswordHash             string
-	resetTokenHash                string
-	activeMFAFactors              []types.MFAFactorSecret
+	credential                          types.UserCredential
+	getCredentialErr                    error
+	registerCalled                      bool
+	registerPasswordHash                string
+	loginCalled                         bool
+	loginCommand                        types.LoginCommand
+	failureRecorded                     bool
+	failureAt                           time.Time
+	lockUntil                           time.Time
+	maxFailedAttempts                   int
+	failureWindowStart                  time.Time
+	recordFailureErr                    error
+	mfaFailureRecorded                  bool
+	mfaFailureAt                        time.Time
+	mfaLockUntil                        time.Time
+	mfaMaxFailedAttempts                int
+	mfaFailureWindowStart               time.Time
+	mfaFailureFactorID                  types.MFAFactorID
+	recordMFAFailureErr                 error
+	mfaRecoveryFailureRecorded          bool
+	mfaRecoveryFailureAt                time.Time
+	mfaRecoveryLockUntil                time.Time
+	mfaRecoveryMaxFailedAttempts        int
+	mfaRecoveryFailureWindowStart       time.Time
+	recordMFARecoveryFailureErr         error
+	recoveryCodeRecord                  types.MFARecoveryCodeRecord
+	recoveryCodeHash                    string
+	findRecoveryCodeErr                 error
+	validateRefreshCalled               bool
+	validateRefreshErr                  error
+	validatePresentedTokenID            types.RefreshTokenID
+	validatePresentedTokenHash          string
+	refreshCalled                       bool
+	refreshCommand                      types.RefreshGatewayTokenCommand
+	presentedTokenID                    types.RefreshTokenID
+	presentedTokenHash                  string
+	recordPasswordResetRequestCalled    bool
+	recordPasswordResetRequestTargetKey string
+	recordPasswordResetRequestErr       error
+	createVerificationCalled            bool
+	createVerificationDelivery          types.ChallengeDeliveryRecord
+	createPasswordResetCalled           bool
+	createPasswordResetDelivery         types.ChallengeDeliveryRecord
+	createPasswordResetErr              error
+	expireChallengeCalled               bool
+	expiredChallengeID                  types.ChallengeID
+	expireChallengeErr                  error
+	deliverySuccessCalled               bool
+	deliverySuccessChallengeID          types.ChallengeID
+	deliverySuccessErr                  error
+	deliveryFailureCalled               bool
+	deliveryFailureChallengeID          types.ChallengeID
+	deliveryFailureLastError            string
+	deliveryFailureErr                  error
+	confirmPasswordResetCalled          bool
+	resetPasswordHash                   string
+	resetTokenHash                      string
+	activeMFAFactors                    []types.MFAFactorSecret
 }
 
 func (repo *fakeIdentityRepository) RegisterUser(_ context.Context, command types.RegisterUserCommand, passwordHash string, createdAt time.Time) (types.RegisterUserResult, error) {
@@ -1496,6 +1560,12 @@ func (repo *fakeIdentityRepository) RecordChallengeDeliveryFailure(_ context.Con
 	repo.deliveryFailureChallengeID = challengeID
 	repo.deliveryFailureLastError = lastError
 	return repo.deliveryFailureErr
+}
+
+func (repo *fakeIdentityRepository) RecordPasswordResetRequest(_ context.Context, _ types.TenantID, _ types.UserID, _ types.VerificationChannel, targetKey string, _ time.Time) error {
+	repo.recordPasswordResetRequestCalled = true
+	repo.recordPasswordResetRequestTargetKey = targetKey
+	return repo.recordPasswordResetRequestErr
 }
 
 func (repo *fakeIdentityRepository) CreatePasswordResetChallenge(_ context.Context, command types.RequestPasswordResetCommand, record types.ChallengeRecord, delivery types.ChallengeDeliveryRecord, _ time.Time, expiresAt time.Time) (types.RequestPasswordResetResult, error) {

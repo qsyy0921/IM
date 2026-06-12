@@ -226,6 +226,7 @@ Challenge token rules:
 - Verification challenge creation requires the current password to avoid unauthenticated email / phone takeover.
 - A first-stage durable cap limits active challenges per `tenant_id + user_id + challenge_type + channel + destination`.
 - A first-stage request throttle also limits recent challenge creation for the same target. Defaults are `NEXUSIM_IDENTITY_CHALLENGE_REQUEST_MAX_PER_WINDOW=5` and `NEXUSIM_IDENTITY_CHALLENGE_REQUEST_WINDOW=15m`. The check counts recent challenge rows even if they have already been expired by delivery-failure compensation, so provider outages or client retries cannot bypass the request window by repeatedly creating unusable tokens.
+- Password reset can also enable an identity-local hashed-target limiter for invalid or nonexistent targets by setting `NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_SECRET`. The app computes an HMAC key from `tenant_id + user_id + challenge_type + channel + normalized destination`, stores only that key in `identity_challenge_request_limits`, and still returns the same neutral accepted response when limited. This is sender-side abuse protection, not account-existence proof.
 - `identity-service` supports three challenge delivery modes: `noop`, synchronous `webhook`, and durable `outbox`. In all modes PostgreSQL stores only `identity_challenges.token_hash`, never the raw challenge token.
 - In synchronous `webhook` mode, the webhook receives the raw one-time token in memory after the challenge row is created. If the webhook returns an error, the RPC returns stable `challenge delivery unavailable` and identity-service immediately marks the newly created challenge `EXPIRED` as compensation, so the unusable token hash does not consume the active challenge cap.
 - In durable `outbox` mode, the challenge row and `identity_challenge_delivery_outbox` row are committed in the same PostgreSQL transaction. The delivery row stores the challenge token encrypted with AES-GCM under `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY`; the RPC success means durable enqueue, not provider delivery. A separate `challenge-delivery-worker` locks ready rows with `FOR UPDATE SKIP LOCKED`, rechecks that the challenge is still `ACTIVE` and unexpired, decrypts the token in memory, calls the configured webhook, and marks the delivery `DELIVERED`, retry, `DLQ`, or `CANCELED`. Max-attempt DLQ expires the challenge and records delivery failure, preserving the active-cap safety property.
@@ -236,7 +237,7 @@ Challenge token rules:
 Known hardening still pending:
 
 - timing- and sender-side account-enumeration resistance;
-- tenant / IP / device adaptive rate limits for challenge creation and confirmation beyond the first target-level request window;
+- tenant / IP / device adaptive rate limits for challenge creation and confirmation beyond the first target-level and hashed-target windows;
 - provider-specific email / SMS templates, bounce handling, keyring / KMS rotation and provider-grade alerting;
 - WebAuthn and OIDC federation;
 - production alerting for repeated challenge failures.
@@ -249,6 +250,10 @@ NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_URL=https://provider.example/send
 NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_BEARER_TOKEN=...
 NEXUSIM_IDENTITY_CHALLENGE_WEBHOOK_TIMEOUT=5s
 NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY=...
+NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_SECRET=...
+NEXUSIM_IDENTITY_CHALLENGE_REQUEST_MAX_PER_WINDOW=5
+NEXUSIM_IDENTITY_CHALLENGE_REQUEST_WINDOW=15m
+NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LOCK_DURATION=15m
 
 NEXUSIM_IDENTITY_SERVICE_MODE=challenge-delivery-worker
 NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_BATCH_SIZE=100

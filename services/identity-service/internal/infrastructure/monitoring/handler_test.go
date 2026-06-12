@@ -174,6 +174,166 @@ INSERT INTO identity_challenge_request_limits (
 	}
 }
 
+func TestQueryChallengeDeliveryOutboxSnapshotIntegration(t *testing.T) {
+	pool := openMonitoringTestPool(t)
+	ctx := context.Background()
+	resetMonitoringIdentityTables(t, ctx, pool)
+	now := time.Now().UTC()
+	secretCiphertext := "ciphertext-do-not-leak"
+	secretDestination := "user1@example.com"
+	rows := []struct {
+		challengeID string
+		status      string
+		retryCount  int
+		availableAt time.Time
+		nextRetryAt any
+		expiresAt   time.Time
+		deliveredAt any
+		dlqAt       any
+	}{
+		{
+			challengeID: "delivery-ready",
+			status:      "PENDING",
+			retryCount:  2,
+			availableAt: now.Add(-time.Minute),
+			expiresAt:   now.Add(time.Hour),
+		},
+		{
+			challengeID: "delivery-scheduled",
+			status:      "PENDING",
+			retryCount:  3,
+			availableAt: now.Add(-time.Hour),
+			nextRetryAt: now.Add(time.Minute),
+			expiresAt:   now.Add(time.Hour),
+		},
+		{
+			challengeID: "delivery-expired",
+			status:      "PENDING",
+			retryCount:  1,
+			availableAt: now.Add(-time.Hour),
+			expiresAt:   now.Add(-time.Minute),
+		},
+		{
+			challengeID: "delivery-delivered",
+			status:      "DELIVERED",
+			availableAt: now.Add(-time.Hour),
+			expiresAt:   now.Add(time.Hour),
+			deliveredAt: now.Add(-time.Minute),
+		},
+		{
+			challengeID: "delivery-dlq",
+			status:      "DLQ",
+			availableAt: now.Add(-time.Hour),
+			expiresAt:   now.Add(time.Hour),
+			dlqAt:       now.Add(-time.Minute),
+		},
+		{
+			challengeID: "delivery-canceled",
+			status:      "CANCELED",
+			availableAt: now.Add(-time.Hour),
+			expiresAt:   now.Add(time.Hour),
+		},
+	}
+	for _, row := range rows {
+		seedMonitoringChallengeDeliveryOutbox(t, ctx, pool, row.challengeID, secretDestination, secretCiphertext, now, row.expiresAt, row.status, row.retryCount, row.availableAt, row.nextRetryAt, row.deliveredAt, row.dlqAt)
+	}
+
+	snapshot, err := queryChallengeDeliveryOutboxSnapshot(ctx, pool)
+	if err != nil {
+		t.Fatalf("query challenge delivery outbox snapshot: %v", err)
+	}
+	if snapshot.Total != 6 ||
+		snapshot.Pending != 3 ||
+		snapshot.PendingReady != 1 ||
+		snapshot.PendingScheduled != 1 ||
+		snapshot.PendingExpired != 1 ||
+		snapshot.Delivered != 1 ||
+		snapshot.DLQ != 1 ||
+		snapshot.Canceled != 1 ||
+		snapshot.MaxPendingRetry != 3 {
+		t.Fatalf("unexpected challenge delivery outbox snapshot: %+v", snapshot)
+	}
+
+	handler := NewHandler(pool)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/debug/metrics", nil))
+	body := response.Body.String()
+	if strings.Contains(body, secretCiphertext) || strings.Contains(body, secretDestination) {
+		t.Fatalf("challenge delivery outbox metrics leaked delivery payload data: %s", body)
+	}
+	var metrics Snapshot
+	if err := json.Unmarshal([]byte(body), &metrics); err != nil {
+		t.Fatalf("decode metrics: %v", err)
+	}
+	if metrics.ChallengeDeliveryOutbox == nil || metrics.ChallengeDeliveryOutbox.Total != 6 || metrics.ChallengeDeliveryOutbox.DLQ != 1 {
+		t.Fatalf("expected challenge delivery outbox metrics, got %+v", metrics.ChallengeDeliveryOutbox)
+	}
+}
+
+func seedMonitoringChallengeDeliveryOutbox(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	challengeID string,
+	destination string,
+	tokenCiphertext string,
+	now time.Time,
+	expiresAt time.Time,
+	status string,
+	retryCount int,
+	availableAt time.Time,
+	nextRetryAt any,
+	deliveredAt any,
+	dlqAt any,
+) {
+	t.Helper()
+	createdAt := now.Add(-2 * time.Hour)
+	if _, err := pool.Exec(ctx, `
+INSERT INTO identity_challenges (
+    tenant_id,
+    user_id,
+    challenge_id,
+    challenge_type,
+    status,
+    channel,
+    destination,
+    token_hash,
+    issued_at,
+    expires_at,
+    trace_id,
+    request_id,
+    created_at,
+    updated_at
+) VALUES ($1, 'user-1', $2, 'EMAIL_VERIFICATION', 'ACTIVE', 'EMAIL', $3, $4, $5, $6, '', '', $5, $5)
+`, "tenant-identity", challengeID, destination, "hash-"+challengeID, createdAt, expiresAt); err != nil {
+		t.Fatalf("seed identity challenge %s: %v", challengeID, err)
+	}
+	if _, err := pool.Exec(ctx, `
+INSERT INTO identity_challenge_delivery_outbox (
+    tenant_id,
+    user_id,
+    challenge_id,
+    challenge_type,
+    channel,
+    destination,
+    token_ciphertext,
+    token_nonce,
+    token_key_version,
+    expires_at,
+    status,
+    retry_count,
+    available_at,
+    next_retry_at,
+    delivered_at,
+    dead_lettered_at,
+    created_at,
+    updated_at
+) VALUES ($1, 'user-1', $2, 'EMAIL_VERIFICATION', 'EMAIL', $3, $4, 'nonce', 'local-v1', $5, $6, $7, $8, $9, $10, $11, $12, $12)
+`, "tenant-identity", challengeID, destination, tokenCiphertext, expiresAt, status, retryCount, availableAt, nextRetryAt, deliveredAt, dlqAt, createdAt); err != nil {
+		t.Fatalf("seed challenge delivery outbox %s: %v", challengeID, err)
+	}
+}
+
 func openMonitoringTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	dsn := os.Getenv("NEXUSIM_PG_DSN")

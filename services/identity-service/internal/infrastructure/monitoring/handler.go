@@ -107,6 +107,12 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		} else {
 			snapshot.Identity = &identity
 		}
+		challengeDeliveryOutbox, err := queryChallengeDeliveryOutboxSnapshot(ctx, h.pool)
+		if err != nil {
+			snapshot.ChallengeDeliveryOutboxError = "challenge delivery outbox metrics query failed"
+		} else {
+			snapshot.ChallengeDeliveryOutbox = &challengeDeliveryOutbox
+		}
 	}
 	writeJSON(w, http.StatusOK, snapshot)
 }
@@ -118,13 +124,15 @@ type healthResponse struct {
 }
 
 type Snapshot struct {
-	Service           string                     `json:"service"`
-	GeneratedAtMS     int64                      `json:"generated_at_ms"`
-	PGPool            *PGPoolSnapshot            `json:"pg_pool,omitempty"`
-	Identity          *IdentitySnapshot          `json:"identity,omitempty"`
-	IdentityError     string                     `json:"identity_error,omitempty"`
-	GRPC              *GRPCSnapshot              `json:"grpc,omitempty"`
-	ChallengeDelivery *ChallengeDeliverySnapshot `json:"challenge_delivery,omitempty"`
+	Service                      string                           `json:"service"`
+	GeneratedAtMS                int64                            `json:"generated_at_ms"`
+	PGPool                       *PGPoolSnapshot                  `json:"pg_pool,omitempty"`
+	Identity                     *IdentitySnapshot                `json:"identity,omitempty"`
+	IdentityError                string                           `json:"identity_error,omitempty"`
+	ChallengeDeliveryOutbox      *ChallengeDeliveryOutboxSnapshot `json:"challenge_delivery_outbox,omitempty"`
+	ChallengeDeliveryOutboxError string                           `json:"challenge_delivery_outbox_error,omitempty"`
+	GRPC                         *GRPCSnapshot                    `json:"grpc,omitempty"`
+	ChallengeDelivery            *ChallengeDeliverySnapshot       `json:"challenge_delivery,omitempty"`
 }
 
 type PGPoolSnapshot struct {
@@ -155,6 +163,18 @@ type IdentitySnapshot struct {
 	ActiveSessions               int64 `json:"active_sessions"`
 	RevokedSessions              int64 `json:"revoked_sessions"`
 	ExpiredSessions              int64 `json:"expired_sessions"`
+}
+
+type ChallengeDeliveryOutboxSnapshot struct {
+	Total            int64 `json:"total"`
+	Pending          int64 `json:"pending"`
+	PendingReady     int64 `json:"pending_ready"`
+	PendingScheduled int64 `json:"pending_scheduled"`
+	PendingExpired   int64 `json:"pending_expired"`
+	Delivered        int64 `json:"delivered"`
+	DLQ              int64 `json:"dlq"`
+	Canceled         int64 `json:"canceled"`
+	MaxPendingRetry  int64 `json:"max_pending_retry"`
 }
 
 func queryIdentitySnapshot(ctx context.Context, pool *pgxpool.Pool) (IdentitySnapshot, error) {
@@ -195,6 +215,37 @@ SELECT
 	)
 	if err != nil {
 		return IdentitySnapshot{}, err
+	}
+	return snapshot, nil
+}
+
+func queryChallengeDeliveryOutboxSnapshot(ctx context.Context, pool *pgxpool.Pool) (ChallengeDeliveryOutboxSnapshot, error) {
+	var snapshot ChallengeDeliveryOutboxSnapshot
+	err := pool.QueryRow(ctx, `
+SELECT
+    COUNT(*),
+    COUNT(*) FILTER (WHERE status = 'PENDING'),
+    COUNT(*) FILTER (WHERE status = 'PENDING' AND expires_at > now() AND COALESCE(next_retry_at, available_at) <= now()),
+    COUNT(*) FILTER (WHERE status = 'PENDING' AND expires_at > now() AND COALESCE(next_retry_at, available_at) > now()),
+    COUNT(*) FILTER (WHERE status = 'PENDING' AND expires_at <= now()),
+    COUNT(*) FILTER (WHERE status = 'DELIVERED'),
+    COUNT(*) FILTER (WHERE status = 'DLQ'),
+    COUNT(*) FILTER (WHERE status = 'CANCELED'),
+    COALESCE(MAX(retry_count) FILTER (WHERE status = 'PENDING'), 0)
+FROM identity_challenge_delivery_outbox
+`).Scan(
+		&snapshot.Total,
+		&snapshot.Pending,
+		&snapshot.PendingReady,
+		&snapshot.PendingScheduled,
+		&snapshot.PendingExpired,
+		&snapshot.Delivered,
+		&snapshot.DLQ,
+		&snapshot.Canceled,
+		&snapshot.MaxPendingRetry,
+	)
+	if err != nil {
+		return ChallengeDeliveryOutboxSnapshot{}, err
 	}
 	return snapshot, nil
 }

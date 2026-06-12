@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"log"
 	"math/big"
 	"net"
@@ -77,7 +78,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("identity-service runtime wiring is idle; set NEXUSIM_IDENTITY_SERVICE_MODE=grpc, outbox-relay, challenge-delivery-worker, challenge-delivery-repair, or gateway-token-keyring-rotate")
+		log.Println("identity-service runtime wiring is idle; set NEXUSIM_IDENTITY_SERVICE_MODE=grpc, outbox-relay, challenge-delivery-worker, challenge-delivery-repair, challenge-request-limit-cleanup, or gateway-token-keyring-rotate")
 		return nil
 	case "grpc":
 		return runGRPC()
@@ -87,6 +88,8 @@ func run() error {
 		return runChallengeDeliveryWorker()
 	case "challenge-delivery-repair":
 		return runChallengeDeliveryRepair()
+	case "challenge-request-limit-cleanup":
+		return runChallengeRequestLimitCleanup()
 	case "gateway-token-keyring-rotate":
 		return runGatewayTokenKeyRingRotate()
 	default:
@@ -832,6 +835,56 @@ func runChallengeDeliveryRepair() error {
 	return nil
 }
 
+func runChallengeRequestLimitCleanup() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	config, err := challengeRequestLimitCleanupConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	cutoff := time.Now().UTC().Add(-config.Retention)
+	deleted, err := postgresinfra.NewRepository(pool).CleanupChallengeRequestLimits(ctx, cutoff, config.BatchSize)
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"identity-service challenge request limit cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d",
+		deleted,
+		cutoff.Format(time.RFC3339),
+		config.Retention,
+		config.BatchSize,
+	)
+	return nil
+}
+
+type challengeRequestLimitCleanupConfig struct {
+	Retention time.Duration
+	BatchSize int
+}
+
+func challengeRequestLimitCleanupConfigFromEnv() (challengeRequestLimitCleanupConfig, error) {
+	retention, err := envPositiveDuration("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_RETENTION", 24*time.Hour)
+	if err != nil {
+		return challengeRequestLimitCleanupConfig{}, err
+	}
+	batchSize, err := envPositiveInt("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_BATCH_SIZE", 5000)
+	if err != nil {
+		return challengeRequestLimitCleanupConfig{}, err
+	}
+	config := challengeRequestLimitCleanupConfig{
+		Retention: retention,
+		BatchSize: batchSize,
+	}
+	return config, nil
+}
+
 func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {
 	if strings.TrimSpace(addr) == "" {
 		return func() {}, nil
@@ -920,6 +973,18 @@ func envInt(name string, fallback int) int {
 	return parsed
 }
 
+func envPositiveInt(name string, fallback int) (int, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("%s must be a positive integer", name)
+	}
+	return parsed, nil
+}
+
 func envBool(name string, fallback bool) bool {
 	value := strings.TrimSpace(strings.ToLower(os.Getenv(name)))
 	if value == "" {
@@ -945,6 +1010,18 @@ func envDuration(name string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return parsed
+}
+
+func envPositiveDuration(name string, fallback time.Duration) (time.Duration, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("%s must be a positive duration", name)
+	}
+	return parsed, nil
 }
 
 func splitCSV(value string) []string {

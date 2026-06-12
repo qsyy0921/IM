@@ -449,3 +449,36 @@ func TestChallengeDeliveryTokenManagerRequiresDedicatedKey(t *testing.T) {
 		t.Fatal("expected challenge delivery token manager")
 	}
 }
+
+func TestChallengeRequestLimitCleanupConfigFromEnv(t *testing.T) {
+	config, err := challengeRequestLimitCleanupConfigFromEnv()
+	if err != nil {
+		t.Fatalf("default cleanup config: %v", err)
+	}
+	if config.Retention != 24*time.Hour || config.BatchSize != 5000 {
+		t.Fatalf("unexpected default cleanup config: %+v", config)
+	}
+
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_RETENTION", "2h")
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_BATCH_SIZE", "123")
+	config, err = challengeRequestLimitCleanupConfigFromEnv()
+	if err != nil {
+		t.Fatalf("custom cleanup config: %v", err)
+	}
+	if config.Retention != 2*time.Hour || config.BatchSize != 123 {
+		t.Fatalf("unexpected custom cleanup config: %+v", config)
+	}
+}
+
+func TestChallengeRequestLimitCleanupConfigRejectsInvalidValues(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_RETENTION", "0")
+	if _, err := challengeRequestLimitCleanupConfigFromEnv(); err == nil {
+		t.Fatal("expected zero retention to fail")
+	}
+
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_RETENTION", "1h")
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_BATCH_SIZE", "0")
+	if _, err := challengeRequestLimitCleanupConfigFromEnv(); err == nil {
+		t.Fatal("expected zero batch size to fail")
+	}
+}

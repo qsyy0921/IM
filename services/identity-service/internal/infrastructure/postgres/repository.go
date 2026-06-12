@@ -789,6 +789,46 @@ func (r *Repository) RecordPasswordResetRequest(
 	return err
 }
 
+func (r *Repository) CleanupChallengeRequestLimits(ctx context.Context, cutoff time.Time, limit int) (int64, error) {
+	if r.pool == nil {
+		return 0, types.NewDBWriteFailed("identity repository is not configured")
+	}
+	if limit <= 0 {
+		return 0, nil
+	}
+	rows, err := r.pool.Query(ctx, `
+WITH doomed AS (
+    SELECT tenant_id, user_id, challenge_type, channel, target_key
+    FROM identity_challenge_request_limits
+    WHERE last_request_at < $1
+      AND (locked_until IS NULL OR locked_until < $1)
+    ORDER BY last_request_at ASC
+    LIMIT $2
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM identity_challenge_request_limits target
+USING doomed
+WHERE target.tenant_id = doomed.tenant_id
+  AND target.user_id = doomed.user_id
+  AND target.challenge_type = doomed.challenge_type
+  AND target.channel = doomed.channel
+  AND target.target_key = doomed.target_key
+RETURNING 1
+`, cutoff, limit)
+	if err != nil {
+		return 0, types.NewDBWriteFailed(err.Error())
+	}
+	defer rows.Close()
+	var deleted int64
+	for rows.Next() {
+		deleted++
+	}
+	if err := rows.Err(); err != nil {
+		return 0, types.NewDBWriteFailed(err.Error())
+	}
+	return deleted, nil
+}
+
 func (r *Repository) CreatePasswordResetChallenge(
 	ctx context.Context,
 	command types.RequestPasswordResetCommand,

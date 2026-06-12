@@ -1146,6 +1146,78 @@ WHERE tenant_id = $1
 	}
 }
 
+func TestRepositoryCleanupChallengeRequestLimitsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	repository := NewRepository(pool)
+	now := time.Unix(1_800_000_000, 0).UTC()
+	cutoff := now.Add(-24 * time.Hour)
+	rows := []struct {
+		userID        string
+		targetKey     string
+		lastRequestAt time.Time
+		lockedUntil   any
+	}{
+		{userID: "stale-unlocked", targetKey: strings.Repeat("c", 64), lastRequestAt: cutoff.Add(-time.Hour), lockedUntil: nil},
+		{userID: "stale-expired-lock", targetKey: strings.Repeat("d", 64), lastRequestAt: cutoff.Add(-2 * time.Hour), lockedUntil: cutoff.Add(-time.Minute)},
+		{userID: "recent", targetKey: strings.Repeat("e", 64), lastRequestAt: cutoff.Add(time.Minute), lockedUntil: nil},
+		{userID: "active-lock", targetKey: strings.Repeat("f", 64), lastRequestAt: cutoff.Add(-time.Hour), lockedUntil: now.Add(time.Hour)},
+	}
+	for _, row := range rows {
+		if _, err := pool.Exec(ctx, `
+INSERT INTO identity_challenge_request_limits (
+    tenant_id,
+    user_id,
+    challenge_type,
+    channel,
+    target_key,
+    request_count,
+    window_start,
+    last_request_at,
+    locked_until,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, 3, $6, $7, $8, $7, $7)
+`, "tenant-identity", row.userID, types.ChallengeTypePasswordReset, types.VerificationChannelEmail, row.targetKey, row.lastRequestAt.Add(-time.Minute), row.lastRequestAt, row.lockedUntil); err != nil {
+			t.Fatalf("seed limiter row %s: %v", row.userID, err)
+		}
+	}
+
+	deleted, err := repository.CleanupChallengeRequestLimits(ctx, cutoff, 100)
+	if err != nil {
+		t.Fatalf("cleanup challenge request limits: %v", err)
+	}
+	if deleted != 2 {
+		t.Fatalf("expected 2 deleted rows, got %d", deleted)
+	}
+
+	var remaining []string
+	resultRows, err := pool.Query(ctx, `
+SELECT user_id
+FROM identity_challenge_request_limits
+WHERE tenant_id = $1
+ORDER BY user_id
+`, "tenant-identity")
+	if err != nil {
+		t.Fatalf("read remaining limiter rows: %v", err)
+	}
+	defer resultRows.Close()
+	for resultRows.Next() {
+		var userID string
+		if err := resultRows.Scan(&userID); err != nil {
+			t.Fatalf("scan remaining limiter row: %v", err)
+		}
+		remaining = append(remaining, userID)
+	}
+	if err := resultRows.Err(); err != nil {
+		t.Fatalf("iterate remaining limiter rows: %v", err)
+	}
+	if strings.Join(remaining, ",") != "active-lock,recent" {
+		t.Fatalf("unexpected remaining limiter rows: %v", remaining)
+	}
+}
+
 func TestRepositoryMFAFactorLifecycleIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

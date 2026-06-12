@@ -107,6 +107,36 @@ func TestAuthenticatorJWTAcceptsRS256GatewayToken(t *testing.T) {
 	}
 }
 
+func TestAuthenticatorJWTAcceptsOldRS256KeyInJWKSet(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	currentKey := generateTestRSAKey(t)
+	oldKey := generateTestRSAKey(t)
+	authenticator, err := NewAuthenticator(Config{
+		Mode:           ModeJWT,
+		JWKSetJSON:     testRSAJWKSetJSONForKeys(t, map[string]*rsa.PrivateKey{"current": currentKey, "old": oldKey}),
+		TrustedIssuers: []string{"issuer-1"},
+		Now:            func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	token := signTestRS256JWT(t, oldKey, "old", map[string]string{
+		"tenant_id": "tenant-1",
+		"user_id":   "user-1",
+		"device_id": "device-1",
+		"iss":       "issuer-1",
+		"aud":       "push-gateway",
+	}, now.Add(time.Minute))
+
+	auth, err := authenticator.Authenticate(requestWithBearer(token))
+	if err != nil {
+		t.Fatalf("authenticate old key jwt: %v", err)
+	}
+	if auth.TenantID != "tenant-1" || auth.UserID != "user-1" || auth.DeviceID != "device-1" {
+		t.Fatalf("unexpected auth: %+v", auth)
+	}
+}
+
 func TestAuthenticatorJWTRejectsHS256GatewayToken(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	privateKey := generateTestRSAKey(t)
@@ -590,15 +620,23 @@ func generateTestRSAKey(t *testing.T) *rsa.PrivateKey {
 }
 
 func testRSAJWKSetJSON(t *testing.T, privateKey *rsa.PrivateKey, keyID string) string {
+	return testRSAJWKSetJSONForKeys(t, map[string]*rsa.PrivateKey{keyID: privateKey})
+}
+
+func testRSAJWKSetJSONForKeys(t *testing.T, privateKeys map[string]*rsa.PrivateKey) string {
 	t.Helper()
-	raw, err := json.Marshal(jwkSet{Keys: []jwk{{
-		KeyType:   "RSA",
-		KeyUse:    "sig",
-		KeyID:     keyID,
-		Algorithm: "RS256",
-		Modulus:   base64.RawURLEncoding.EncodeToString(privateKey.PublicKey.N.Bytes()),
-		Exponent:  base64.RawURLEncoding.EncodeToString(big.NewInt(int64(privateKey.PublicKey.E)).Bytes()),
-	}}})
+	keys := make([]jwk, 0, len(privateKeys))
+	for keyID, privateKey := range privateKeys {
+		keys = append(keys, jwk{
+			KeyType:   "RSA",
+			KeyUse:    "sig",
+			KeyID:     keyID,
+			Algorithm: "RS256",
+			Modulus:   base64.RawURLEncoding.EncodeToString(privateKey.PublicKey.N.Bytes()),
+			Exponent:  base64.RawURLEncoding.EncodeToString(big.NewInt(int64(privateKey.PublicKey.E)).Bytes()),
+		})
+	}
+	raw, err := json.Marshal(jwkSet{Keys: keys})
 	if err != nil {
 		t.Fatalf("marshal jwks: %v", err)
 	}

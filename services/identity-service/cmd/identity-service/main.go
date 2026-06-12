@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"log"
+	"math/big"
 	"net"
 	"net/http"
 	"os"
@@ -335,6 +337,15 @@ func publicGatewayTokenJWK(key tokeninfra.JWK) (tokeninfra.JWK, bool) {
 		return tokeninfra.JWK{}, false
 	}
 	if publicKey.Modulus == "" || publicKey.Exponent == "" || strings.TrimSpace(key.Key) != "" {
+		return tokeninfra.JWK{}, false
+	}
+	modulus, err := base64.RawURLEncoding.DecodeString(publicKey.Modulus)
+	if err != nil || len(modulus) == 0 || new(big.Int).SetBytes(modulus).BitLen() < 2048 {
+		return tokeninfra.JWK{}, false
+	}
+	exponent, err := base64.RawURLEncoding.DecodeString(publicKey.Exponent)
+	exponentInt := new(big.Int).SetBytes(exponent)
+	if err != nil || len(exponent) == 0 || !exponentInt.IsInt64() || exponentInt.Int64() <= 1 {
 		return tokeninfra.JWK{}, false
 	}
 	return publicKey, true

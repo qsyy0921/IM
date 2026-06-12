@@ -1,7 +1,12 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"math/big"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,16 +17,12 @@ import (
 )
 
 func TestGatewayTokenJWKSetWithAdditionalKeysMergesAndDeduplicates(t *testing.T) {
-	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_JSON", `{"keys":[{"kty":"RSA","use":"sig","kid":"old","alg":"RS256","n":"abc","e":"AQAB"},{"kty":"RSA","use":"sig","kid":"current","alg":"RS256","n":"duplicate","e":"AQAB"}]}`)
+	current := testGatewayRSAJWK(t, generateGatewayTestRSAKey(t), "current")
+	old := testGatewayRSAJWK(t, generateGatewayTestRSAKey(t), "old")
+	duplicateCurrent := testGatewayRSAJWK(t, generateGatewayTestRSAKey(t), "current")
+	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_JSON", testGatewayJWKSetJSON(t, old, duplicateCurrent))
 	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_FILE", "")
-	base := tokeninfra.JWKSet{Keys: []tokeninfra.JWK{{
-		KeyType:   "RSA",
-		KeyUse:    "sig",
-		KeyID:     "current",
-		Algorithm: "RS256",
-		Modulus:   "base",
-		Exponent:  "AQAB",
-	}}}
+	base := tokeninfra.JWKSet{Keys: []tokeninfra.JWK{current}}
 
 	merged, err := gatewayTokenJWKSetWithAdditionalKeys(base)
 	if err != nil {
@@ -30,7 +31,7 @@ func TestGatewayTokenJWKSetWithAdditionalKeysMergesAndDeduplicates(t *testing.T)
 	if len(merged.Keys) != 2 {
 		t.Fatalf("expected current plus one old key, got %+v", merged.Keys)
 	}
-	if merged.Keys[0].KeyID != "current" || merged.Keys[0].Modulus != "base" {
+	if merged.Keys[0].KeyID != "current" || merged.Keys[0].Modulus != current.Modulus {
 		t.Fatalf("expected base current key to stay first and win duplicates, got %+v", merged.Keys[0])
 	}
 	if merged.Keys[1].KeyID != "old" {
@@ -55,6 +56,15 @@ func TestGatewayTokenJWKSetWithAdditionalKeysRejectsSymmetricKeys(t *testing.T) 
 	}
 }
 
+func TestGatewayTokenJWKSetWithAdditionalKeysRejectsWeakRSAKeys(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_JSON", `{"keys":[{"kty":"RSA","use":"sig","kid":"weak","alg":"RS256","n":"abc","e":"AQAB"}]}`)
+	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_FILE", "")
+
+	if _, err := gatewayTokenJWKSetWithAdditionalKeys(tokeninfra.JWKSet{}); err == nil {
+		t.Fatal("expected weak rsa jwk to be rejected")
+	}
+}
+
 func TestGatewayTokenJWKSetWithAdditionalKeysAllowsNoPublicKeys(t *testing.T) {
 	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_JSON", "")
 	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_FILE", "")
@@ -71,7 +81,8 @@ func TestGatewayTokenJWKSetWithAdditionalKeysAllowsNoPublicKeys(t *testing.T) {
 func TestLoadAdditionalGatewayTokenJWKSetReadsFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "jwks.json")
-	if err := os.WriteFile(path, []byte(`{"keys":[{"kty":"RSA","use":"sig","kid":"old","alg":"RS256","n":"abc","e":"AQAB"}]}`), 0o600); err != nil {
+	old := testGatewayRSAJWK(t, generateGatewayTestRSAKey(t), "old")
+	if err := os.WriteFile(path, []byte(testGatewayJWKSetJSON(t, old)), 0o600); err != nil {
 		t.Fatalf("write jwks file: %v", err)
 	}
 	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_JSON", "")
@@ -93,6 +104,36 @@ func TestLoadAdditionalGatewayTokenJWKSetRejectsInvalidJSON(t *testing.T) {
 	if _, err := loadAdditionalGatewayTokenJWKSet(); err == nil {
 		t.Fatalf("expected invalid additional jwks json to fail")
 	}
+}
+
+func generateGatewayTestRSAKey(t *testing.T) *rsa.PrivateKey {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate rsa key: %v", err)
+	}
+	return key
+}
+
+func testGatewayRSAJWK(t *testing.T, privateKey *rsa.PrivateKey, keyID string) tokeninfra.JWK {
+	t.Helper()
+	return tokeninfra.JWK{
+		KeyType:   "RSA",
+		KeyUse:    "sig",
+		KeyID:     keyID,
+		Algorithm: "RS256",
+		Modulus:   base64.RawURLEncoding.EncodeToString(privateKey.PublicKey.N.Bytes()),
+		Exponent:  base64.RawURLEncoding.EncodeToString(big.NewInt(int64(privateKey.PublicKey.E)).Bytes()),
+	}
+}
+
+func testGatewayJWKSetJSON(t *testing.T, keys ...tokeninfra.JWK) string {
+	t.Helper()
+	raw, err := json.Marshal(tokeninfra.JWKSet{Keys: keys})
+	if err != nil {
+		t.Fatalf("marshal jwks: %v", err)
+	}
+	return string(raw)
 }
 
 func TestDisabledMFASecretManagerReturnsMFAUnavailable(t *testing.T) {

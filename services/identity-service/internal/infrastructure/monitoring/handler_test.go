@@ -83,9 +83,11 @@ func TestHandlerMetricsIncludesGRPCSnapshot(t *testing.T) {
 func TestHandlerJWKS(t *testing.T) {
 	handler := NewHandler(nil).WithJWKSet(map[string]any{
 		"keys": []map[string]string{{
-			"kty": "oct",
+			"kty": "RSA",
 			"kid": "kid-1",
-			"alg": "HS256",
+			"alg": "RS256",
+			"n":   "modulus",
+			"e":   "AQAB",
 		}},
 	})
 	response := httptest.NewRecorder()

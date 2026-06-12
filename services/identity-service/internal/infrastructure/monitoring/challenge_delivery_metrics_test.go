@@ -41,6 +41,7 @@ func TestInstrumentedChallengeNotifierRecordsSuccessAndFailure(t *testing.T) {
 		snapshot.TotalRequests != 2 ||
 		snapshot.SuccessCount != 1 ||
 		snapshot.FailureCount != 1 ||
+		snapshot.FailureClasses["delivery_failed"] != 1 ||
 		snapshot.LatencyAvgMS != 37 ||
 		snapshot.LatencyMaxMS != 50 ||
 		snapshot.LastSuccessUnixMS == 0 ||
@@ -74,6 +75,61 @@ func TestHandlerMetricsIncludesChallengeDeliverySnapshot(t *testing.T) {
 		body.ChallengeDelivery.TotalRequests != 1 ||
 		body.ChallengeDelivery.SuccessCount != 1 {
 		t.Fatalf("expected challenge delivery metrics, got %+v", body.ChallengeDelivery)
+	}
+}
+
+func TestChallengeDeliveryFailureClassesAreLowSensitivity(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "configuration",
+			err:  types.NewChallengeDeliveryFailed("identity challenge notifier is not configured"),
+			want: "configuration",
+		},
+		{
+			name: "provider non success",
+			err:  types.NewChallengeDeliveryFailed("identity challenge webhook returned non-success status: provider body secret-token user1@example.com"),
+			want: "provider_non_success",
+		},
+		{
+			name: "timeout",
+			err:  types.NewChallengeDeliveryFailed("Post \"https://provider.example\": context deadline exceeded"),
+			want: "timeout",
+		},
+		{
+			name: "network",
+			err:  types.NewChallengeDeliveryFailed("Post \"https://provider.example\": dial tcp: no such host provider.example"),
+			want: "network",
+		},
+	}
+	metrics := NewChallengeDeliveryMetrics("webhook")
+	now := time.Unix(1_800_000_000, 0).UTC()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := classifyChallengeDeliveryFailure(tc.err); got != tc.want {
+				t.Fatalf("expected class %q, got %q", tc.want, got)
+			}
+			metrics.record(1, tc.err, now)
+		})
+	}
+	snapshot := metrics.Snapshot()
+	for _, tc := range cases {
+		if snapshot.FailureClasses[tc.want] == 0 {
+			t.Fatalf("expected failure class %q in snapshot %+v", tc.want, snapshot.FailureClasses)
+		}
+	}
+	encoded, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatalf("marshal snapshot: %v", err)
+	}
+	body := string(encoded)
+	if strings.Contains(body, "secret-token") ||
+		strings.Contains(body, "user1@example.com") ||
+		strings.Contains(body, "provider.example") {
+		t.Fatalf("failure class metrics leaked raw provider error: %s", body)
 	}
 }
 

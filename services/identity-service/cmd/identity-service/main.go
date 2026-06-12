@@ -159,7 +159,13 @@ func runGRPC() error {
 	if err != nil {
 		return err
 	}
-	repository := postgresinfra.NewRepository(pool)
+	repository := postgresinfra.NewRepository(
+		pool,
+		postgresinfra.WithChallengeRequestLimit(
+			envInt("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_MAX_PER_WINDOW", postgresinfra.DefaultChallengeRequestMaxPerWindow),
+			envDuration("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_WINDOW", postgresinfra.DefaultChallengeRequestWindow),
+		),
+	)
 	server, err := newGRPCServer(grpcMetrics)
 	if err != nil {
 		return err

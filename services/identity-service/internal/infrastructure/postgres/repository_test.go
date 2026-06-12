@@ -919,6 +919,121 @@ func TestRepositoryPasswordResetChallengeRateLimitIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryChallengeRequestWindowRateLimitIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	repository := NewRepository(pool, WithChallengeRequestLimit(5, 15*time.Minute))
+	issuedAt := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := repository.RegisterUser(ctx, types.RegisterUserCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+	}, "password-hash", issuedAt); err != nil {
+		t.Fatalf("register user: %v", err)
+	}
+	seedVerifiedEmail(t, ctx, pool, "user1@example.com", issuedAt)
+
+	for i := 0; i < 5; i++ {
+		challengeID := types.ChallengeID(fmt.Sprintf("challenge-reset-window-%d", i))
+		if _, err := repository.CreatePasswordResetChallenge(ctx, types.RequestPasswordResetCommand{
+			TenantID:    "tenant-identity",
+			UserID:      "user-1",
+			Channel:     types.VerificationChannelEmail,
+			Destination: "user1@example.com",
+		}, types.ChallengeRecord{
+			ChallengeID: challengeID,
+			TokenHash:   fmt.Sprintf("reset-window-hash-%d", i),
+		}, types.ChallengeDeliveryRecord{}, issuedAt.Add(time.Duration(i)*time.Minute), issuedAt.Add(30*time.Minute)); err != nil {
+			t.Fatalf("create reset challenge %d: %v", i, err)
+		}
+		if err := repository.ExpireChallenge(ctx, "tenant-identity", "user-1", challengeID, issuedAt.Add(time.Duration(i)*time.Minute+30*time.Second)); err != nil {
+			t.Fatalf("expire reset challenge %d: %v", i, err)
+		}
+	}
+
+	_, err := repository.CreatePasswordResetChallenge(ctx, types.RequestPasswordResetCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "user1@example.com",
+	}, types.ChallengeRecord{
+		ChallengeID: "challenge-reset-window-limited",
+		TokenHash:   "reset-window-hash-limited",
+	}, types.ChallengeDeliveryRecord{}, issuedAt.Add(6*time.Minute), issuedAt.Add(30*time.Minute))
+	if !errors.Is(err, types.ErrChallengeRateLimited) {
+		t.Fatalf("expected recent challenge rate limit, got %v", err)
+	}
+
+	if _, err := repository.CreatePasswordResetChallenge(ctx, types.RequestPasswordResetCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "user1@example.com",
+	}, types.ChallengeRecord{
+		ChallengeID: "challenge-reset-window-after",
+		TokenHash:   "reset-window-hash-after",
+	}, types.ChallengeDeliveryRecord{}, issuedAt.Add(20*time.Minute), issuedAt.Add(50*time.Minute)); err != nil {
+		t.Fatalf("create reset challenge after request window: %v", err)
+	}
+}
+
+func TestRepositoryVerificationChallengeRequestWindowRateLimitIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	repository := NewRepository(pool, WithChallengeRequestLimit(5, 15*time.Minute))
+	issuedAt := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := repository.RegisterUser(ctx, types.RegisterUserCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+	}, "password-hash", issuedAt); err != nil {
+		t.Fatalf("register user: %v", err)
+	}
+
+	for i := 0; i < 5; i++ {
+		challengeID := types.ChallengeID(fmt.Sprintf("challenge-email-window-%d", i))
+		if _, err := repository.CreateVerificationChallenge(ctx, types.RequestVerificationChallengeCommand{
+			TenantID:    "tenant-identity",
+			UserID:      "user-1",
+			Channel:     types.VerificationChannelEmail,
+			Destination: "user1@example.com",
+		}, types.ChallengeTypeEmailVerification, types.ChallengeRecord{
+			ChallengeID: challengeID,
+			TokenHash:   fmt.Sprintf("email-window-hash-%d", i),
+		}, types.ChallengeDeliveryRecord{}, issuedAt.Add(time.Duration(i)*time.Minute), issuedAt.Add(30*time.Minute)); err != nil {
+			t.Fatalf("create verification challenge %d: %v", i, err)
+		}
+		if err := repository.ExpireChallenge(ctx, "tenant-identity", "user-1", challengeID, issuedAt.Add(time.Duration(i)*time.Minute+30*time.Second)); err != nil {
+			t.Fatalf("expire verification challenge %d: %v", i, err)
+		}
+	}
+
+	_, err := repository.CreateVerificationChallenge(ctx, types.RequestVerificationChallengeCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "user1@example.com",
+	}, types.ChallengeTypeEmailVerification, types.ChallengeRecord{
+		ChallengeID: "challenge-email-window-limited",
+		TokenHash:   "email-window-hash-limited",
+	}, types.ChallengeDeliveryRecord{}, issuedAt.Add(6*time.Minute), issuedAt.Add(30*time.Minute))
+	if !errors.Is(err, types.ErrChallengeRateLimited) {
+		t.Fatalf("expected recent verification challenge rate limit, got %v", err)
+	}
+
+	if _, err := repository.CreateVerificationChallenge(ctx, types.RequestVerificationChallengeCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "user1@example.com",
+	}, types.ChallengeTypeEmailVerification, types.ChallengeRecord{
+		ChallengeID: "challenge-email-window-after",
+		TokenHash:   "email-window-hash-after",
+	}, types.ChallengeDeliveryRecord{}, issuedAt.Add(20*time.Minute), issuedAt.Add(50*time.Minute)); err != nil {
+		t.Fatalf("create verification challenge after request window: %v", err)
+	}
+}
+
 func TestRepositoryMFAFactorLifecycleIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

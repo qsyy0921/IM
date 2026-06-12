@@ -18,14 +18,18 @@ import (
 )
 
 type Repository struct {
-	pool      *pgxpool.Pool
-	sessionID func() (string, error)
-	eventID   func() (string, error)
-	factorID  func() (string, error)
+	pool                         *pgxpool.Pool
+	sessionID                    func() (string, error)
+	eventID                      func() (string, error)
+	factorID                     func() (string, error)
+	challengeRequestMaxPerWindow int
+	challengeRequestWindow       time.Duration
 }
 
 const maxActiveChallengesPerTarget = 3
 const maxEnabledMFAFactorsPerUser = 5
+const DefaultChallengeRequestMaxPerWindow = 5
+const DefaultChallengeRequestWindow = 15 * time.Minute
 
 type RepositoryOption func(*Repository)
 
@@ -41,6 +45,8 @@ func NewRepository(pool *pgxpool.Pool, opts ...RepositoryOption) *Repository {
 		factorID: func() (string, error) {
 			return newID("mfa")
 		},
+		challengeRequestMaxPerWindow: DefaultChallengeRequestMaxPerWindow,
+		challengeRequestWindow:       DefaultChallengeRequestWindow,
 	}
 	for _, opt := range opts {
 		opt(repository)
@@ -69,6 +75,13 @@ func WithMFAFactorIDGenerator(generator func() (string, error)) RepositoryOption
 		if generator != nil {
 			repository.factorID = generator
 		}
+	}
+}
+
+func WithChallengeRequestLimit(maxPerWindow int, window time.Duration) RepositoryOption {
+	return func(repository *Repository) {
+		repository.challengeRequestMaxPerWindow = maxPerWindow
+		repository.challengeRequestWindow = window
 	}
 }
 
@@ -553,7 +566,7 @@ func (r *Repository) CreateVerificationChallenge(
 	if err := upsertChallengeDestination(ctx, tx, command.TenantID, command.UserID, command.Channel, command.Destination, issuedAt); err != nil {
 		return types.RequestVerificationChallengeResult{}, err
 	}
-	if err := ensureChallengeCreationAllowed(ctx, tx, command.TenantID, command.UserID, challengeType, command.Channel, command.Destination, issuedAt); err != nil {
+	if err := ensureChallengeCreationAllowed(ctx, tx, command.TenantID, command.UserID, challengeType, command.Channel, command.Destination, issuedAt, r.challengeRequestMaxPerWindow, r.challengeRequestWindow); err != nil {
 		return types.RequestVerificationChallengeResult{}, err
 	}
 	if err := insertIdentityChallenge(ctx, tx, command.TenantID, command.UserID, challenge.ChallengeID, challengeType, command.Channel, command.Destination, challenge.TokenHash, issuedAt, expiresAt, command.TraceID, command.RequestID); err != nil {
@@ -744,7 +757,7 @@ func (r *Repository) CreatePasswordResetChallenge(
 	if err := lockVerifiedDestination(ctx, tx, command.TenantID, command.UserID, command.Channel, command.Destination); err != nil {
 		return types.RequestPasswordResetResult{}, err
 	}
-	if err := ensureChallengeCreationAllowed(ctx, tx, command.TenantID, command.UserID, types.ChallengeTypePasswordReset, command.Channel, command.Destination, issuedAt); err != nil {
+	if err := ensureChallengeCreationAllowed(ctx, tx, command.TenantID, command.UserID, types.ChallengeTypePasswordReset, command.Channel, command.Destination, issuedAt, r.challengeRequestMaxPerWindow, r.challengeRequestWindow); err != nil {
 		return types.RequestPasswordResetResult{}, err
 	}
 	if err := insertIdentityChallenge(ctx, tx, command.TenantID, command.UserID, challenge.ChallengeID, types.ChallengeTypePasswordReset, command.Channel, command.Destination, challenge.TokenHash, issuedAt, expiresAt, command.TraceID, command.RequestID); err != nil {
@@ -1939,6 +1952,8 @@ func ensureChallengeCreationAllowed(
 	channel types.VerificationChannel,
 	destination string,
 	now time.Time,
+	maxPerWindow int,
+	window time.Duration,
 ) error {
 	var activeCount int
 	err := tx.QueryRow(ctx, `
@@ -1957,6 +1972,26 @@ WHERE tenant_id = $1
 	}
 	if activeCount >= maxActiveChallengesPerTarget {
 		return types.NewChallengeRateLimited("too many active challenges")
+	}
+	if maxPerWindow > 0 && window > 0 {
+		var recentCount int
+		windowStart := now.Add(-window)
+		err = tx.QueryRow(ctx, `
+SELECT count(*)
+FROM identity_challenges
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND challenge_type = $3
+  AND channel = $4
+  AND destination = $5
+  AND issued_at >= $6
+`, tenantID, userID, challengeType, channel, destination, windowStart).Scan(&recentCount)
+		if err != nil {
+			return types.NewDBReadFailed(err.Error())
+		}
+		if recentCount >= maxPerWindow {
+			return types.NewChallengeRateLimited("too many recent challenges")
+		}
 	}
 	return nil
 }

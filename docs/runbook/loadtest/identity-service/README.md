@@ -9,7 +9,7 @@
 - `RegisterUser / Login / RefreshGatewayToken`。
 - gateway token 本地验签链路：HS256 兼容、RS256 static key ring、one-shot keyring rotate operator、JWKS public-only、old public-key overlap。
 - refresh token rotation、reuse detection、device/session revoke event。
-- email/phone verification 与 password reset challenge，数据库只保存 token hash。
+- email/phone verification 与 password reset challenge，数据库只保存 token hash，并有 target-level active cap + request window throttle。
 - challenge webhook sender、delivery failure 过期补偿、debug metrics、持久状态审计。
 - durable challenge delivery outbox：challenge row 与 encrypted delivery row 同事务提交，worker 解密后调用 webhook，支持 retry / DLQ / canceled。
 - challenge delivery repair / audit：一次性 operator mode 支持 `audit`、`redrive-active-pending`、`cancel-inactive`；DLQ row 不会复活旧 challenge token，必须走正常 API 重新申请 challenge。
@@ -37,6 +37,7 @@ RegisterUser
 ## 面试可讲重点
 
 - challenge token 不落库，PostgreSQL 只保存 `token_hash`；delivery outbox 里保存 AES-GCM 加密后的 token。
+- challenge 创建有两层本地防滥用：同一目标最多 3 个 ACTIVE challenge，且默认 15 分钟内最多 5 次创建；password reset 的限流仍返回 neutral accepted，避免暴露账号存在性。
 - RPC 成功表示“durable enqueue”，不是第三方 provider 已送达；真实投递由 worker 异步完成。
 - worker 使用 ready query + row lock 拉取 delivery outbox，成功后标记 `DELIVERED`；失败按 retry / DLQ 处理。
 - repair 工具是 audit-first，不解密 token、不直接标记 `DELIVERED`、不把 `EXPIRED` challenge 复活；这比把 challenge delivery DLQ 当普通 Kafka outbox replay 更安全。

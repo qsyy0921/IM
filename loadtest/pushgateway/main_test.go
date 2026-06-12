@@ -118,6 +118,42 @@ func TestNormalizePushAuthConfigPreservesExplicitSigningSecret(t *testing.T) {
 	}
 }
 
+func TestNormalizeIdentityTokenMethod(t *testing.T) {
+	tests := map[string]string{
+		"":                    "issue_gateway_token",
+		"issue":               "issue_gateway_token",
+		"issue_gateway":       "issue_gateway_token",
+		"issue_gateway_token": "issue_gateway_token",
+		"login":               "login",
+	}
+	for input, want := range tests {
+		if got := normalizeIdentityTokenMethod(input); got != want {
+			t.Fatalf("normalizeIdentityTokenMethod(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestPushAuthTokenSourceMarksIdentityLogin(t *testing.T) {
+	source := pushAuthTokenSource(config{
+		pushAuthMode:        "hmac",
+		identityTarget:      "127.0.0.1:11610",
+		identityTokenMethod: "login",
+	})
+	if source != "identity_service_login" {
+		t.Fatalf("expected identity_service_login, got %q", source)
+	}
+}
+
+func TestSmokePasswordHashUsesPBKDF2Format(t *testing.T) {
+	encoded, err := smokePasswordHash("push-smoke-password")
+	if err != nil {
+		t.Fatalf("smoke password hash: %v", err)
+	}
+	if !strings.HasPrefix(encoded, "pbkdf2-sha256$10000$") {
+		t.Fatalf("unexpected password hash format: %s", encoded)
+	}
+}
+
 func TestSignPushGatewayTokenUsesTokenSigningSecret(t *testing.T) {
 	cfg := config{
 		tenantID:                   "tenant-1",

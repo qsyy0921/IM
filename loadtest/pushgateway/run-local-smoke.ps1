@@ -22,6 +22,9 @@ param(
     [string]$PushAuthTokenSigningSecret = "",
     [ValidateSet("legacy", "jwt")]
     [string]$IdentityGatewayTokenFormat = "legacy",
+    [ValidateSet("issue_gateway_token", "login")]
+    [string]$IdentityTokenMethod = "issue_gateway_token",
+    [string]$IdentityLoginPassword = "push-smoke-password",
     [string]$PushAuthTokenTtl = "10m",
     [ValidateSet("single", "sentinel")]
     [string]$RedisMode = "single",
@@ -342,9 +345,12 @@ try {
         Reset-ConsumerGroupToLatest -Group $pushIdentityConsumerGroup -Topic $identityTopic
     }
     if ($UseIdentityServiceToken) {
-        $identityMigration = Join-Path $repo "migrations\postgres\identity\000001_identity_core.sql"
-        docker cp $identityMigration nexusim-postgres:/tmp/nexusim_identity.sql | Out-Null
-        docker exec nexusim-postgres psql -U nexusim -d nexusim -f /tmp/nexusim_identity.sql | Out-Null
+        $identityMigrations = Get-ChildItem -LiteralPath (Join-Path $repo "migrations\postgres\identity") -Filter "*.sql" | Sort-Object Name
+        foreach ($identityMigration in $identityMigrations) {
+            $target = "/tmp/" + $identityMigration.Name
+            docker cp $identityMigration.FullName "nexusim-postgres:$target" | Out-Null
+            docker exec nexusim-postgres psql -U nexusim -d nexusim -f $target | Out-Null
+        }
     }
 
     $conversationService = Join-Path $repo "bin\conversation-service.exe"
@@ -526,6 +532,8 @@ try {
         "--push-auth-token-signing-secret", $PushAuthTokenSigningSecret,
         "--push-auth-token-ttl", $PushAuthTokenTtl,
         "--identity-gateway-token-format", $IdentityGatewayTokenFormat,
+        "--identity-token-method", $IdentityTokenMethod,
+        "--identity-login-password", $IdentityLoginPassword,
         "--redis-key-prefix", $pushRouteKeyPrefix,
         "--push-ws-gateway-id", $pushWSGatewayID,
         "--push-consumer-gateway-id", $pushConsumerGatewayID,
@@ -584,6 +592,7 @@ if ($PushAuthMode -eq "hmac") {
     Write-Host "push_auth_token_signing_secret_explicit=$([bool]$PushAuthTokenSigningSecret)"
     if ($UseIdentityServiceToken) {
         Write-Host "identity_gateway_token_format=$IdentityGatewayTokenFormat"
+        Write-Host "identity_token_method=$IdentityTokenMethod"
     }
 }
 if ($RouteBackend -eq "redis") {

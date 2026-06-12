@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/hmac"
+	"crypto/pbkdf2"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -104,6 +105,8 @@ type config struct {
 	pushAuthTokenSigningSecretExplicit bool
 	pushAuthTokenTTL                   time.Duration
 	identityGatewayTokenFormat         string
+	identityTokenMethod                string
+	identityLoginPassword              string
 	redisKeyPrefix                     string
 	pushWSGatewayID                    string
 	pushReconnectGatewayID             string
@@ -134,6 +137,7 @@ type summary struct {
 	PushAuthTokenTransport                  string                 `json:"push_auth_token_transport,omitempty"`
 	PushAuthTokenSource                     string                 `json:"push_auth_token_source,omitempty"`
 	IdentityGatewayTokenFormat              string                 `json:"identity_gateway_token_format,omitempty"`
+	IdentityTokenMethod                     string                 `json:"identity_token_method,omitempty"`
 	PushAuthTokenTTLSeconds                 int64                  `json:"push_auth_token_ttl_seconds,omitempty"`
 	PushAuthSecretConfigured                bool                   `json:"push_auth_hmac_secret_configured"`
 	PushAuthPreviousSecretsConfigured       bool                   `json:"push_auth_hmac_previous_secrets_configured"`
@@ -377,6 +381,8 @@ func parseConfig() config {
 	flag.StringVar(&cfg.pushAuthTokenSigningSecret, "push-auth-token-signing-secret", "", "optional HMAC secret used only for signing smoke tokens; defaults to --push-auth-hmac-secret")
 	flag.DurationVar(&cfg.pushAuthTokenTTL, "push-auth-token-ttl", 10*time.Minute, "TTL for generated push gateway HMAC smoke tokens")
 	flag.StringVar(&cfg.identityGatewayTokenFormat, "identity-gateway-token-format", "legacy", "identity-service gateway token format used by smoke environment: legacy or jwt")
+	flag.StringVar(&cfg.identityTokenMethod, "identity-token-method", "issue_gateway_token", "identity-service token method: issue_gateway_token or login")
+	flag.StringVar(&cfg.identityLoginPassword, "identity-login-password", "push-smoke-password", "password used when --identity-token-method=login")
 	flag.StringVar(&cfg.redisKeyPrefix, "redis-key-prefix", "", "Redis route key prefix used by the smoke environment")
 	flag.StringVar(&cfg.pushWSGatewayID, "push-ws-gateway-id", "", "WebSocket gateway id used by cross-instance route smoke")
 	flag.StringVar(&cfg.pushReconnectGatewayID, "push-reconnect-gateway-id", "", "reconnect WebSocket gateway id used by cross-instance resume smoke")
@@ -414,6 +420,7 @@ func parseConfig() config {
 		cfg.pushAuthMode = "mock"
 	}
 	normalizePushAuthConfig(&cfg)
+	cfg.identityTokenMethod = normalizeIdentityTokenMethod(cfg.identityTokenMethod)
 	if cfg.reconnectMetricsURL == "" && cfg.reconnectPushURL != cfg.pushURL {
 		cfg.reconnectMetricsURL = derivePushMetricsURL(cfg.reconnectPushURL)
 	}
@@ -426,6 +433,12 @@ func run(cfg config) error {
 	}
 	if cfg.pushAuthMode == "hmac" && strings.TrimSpace(cfg.pushAuthHMACSecret) == "" {
 		return fmt.Errorf("--push-auth-hmac-secret is required when --push-auth-mode=hmac")
+	}
+	if strings.TrimSpace(cfg.identityTarget) != "" && cfg.identityTokenMethod != "issue_gateway_token" && cfg.identityTokenMethod != "login" {
+		return fmt.Errorf("--identity-token-method must be issue_gateway_token or login")
+	}
+	if strings.TrimSpace(cfg.identityTarget) != "" && cfg.identityTokenMethod == "login" && strings.TrimSpace(cfg.identityLoginPassword) == "" {
+		return fmt.Errorf("--identity-login-password is required when --identity-token-method=login")
 	}
 	if cfg.pushAuthTokenTTL <= 0 {
 		return fmt.Errorf("--push-auth-token-ttl must be positive")
@@ -454,6 +467,11 @@ func run(cfg config) error {
 	}
 	if err := seedConversation(ctx, pool, cfg); err != nil {
 		return err
+	}
+	if strings.TrimSpace(cfg.identityTarget) != "" && cfg.identityTokenMethod == "login" {
+		if err := seedIdentityCredential(ctx, pool, cfg); err != nil {
+			return err
+		}
 	}
 
 	conversationConn, err := grpc.NewClient(cfg.conversationTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -496,6 +514,7 @@ func run(cfg config) error {
 		PushAuthTokenTransport:                  pushAuthTokenTransport(cfg),
 		PushAuthTokenSource:                     pushAuthTokenSource(cfg),
 		IdentityGatewayTokenFormat:              identityGatewayTokenFormat(cfg),
+		IdentityTokenMethod:                     identityTokenMethod(cfg),
 		PushAuthTokenTTLSeconds:                 int64(cfg.pushAuthTokenTTL.Seconds()),
 		PushAuthSecretConfigured:                strings.TrimSpace(cfg.pushAuthHMACSecret) != "",
 		PushAuthPreviousSecretsConfigured:       strings.TrimSpace(cfg.pushAuthHMACPreviousSecrets) != "",
@@ -1446,7 +1465,12 @@ func gatewayToken(ctx context.Context, cfg config, deviceID string) (string, err
 
 func gatewayTokenDetails(ctx context.Context, cfg config, deviceID string) (gatewayTokenResult, error) {
 	if strings.TrimSpace(cfg.identityTarget) != "" {
-		return issueGatewayToken(ctx, cfg, deviceID)
+		switch cfg.identityTokenMethod {
+		case "login":
+			return loginGatewayToken(ctx, cfg, deviceID)
+		default:
+			return issueGatewayToken(ctx, cfg, deviceID)
+		}
 	}
 	token, err := signPushGatewayToken(cfg, deviceID)
 	if err != nil {
@@ -1477,6 +1501,36 @@ func issueGatewayToken(ctx context.Context, cfg config, deviceID string) (gatewa
 	}
 	if response.GetGatewayToken() == "" {
 		return gatewayTokenResult{}, errors.New("identity-service returned empty gateway token")
+	}
+	return gatewayTokenResult{Token: response.GetGatewayToken(), SessionID: response.GetSessionId()}, nil
+}
+
+func loginGatewayToken(ctx context.Context, cfg config, deviceID string) (gatewayTokenResult, error) {
+	conn, err := grpc.NewClient(cfg.identityTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return gatewayTokenResult{}, fmt.Errorf("dial identity-service: %w", err)
+	}
+	defer conn.Close()
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	response, err := identityv1.NewIdentityServiceClient(conn).Login(requestCtx, &identityv1.LoginRequest{
+		TenantId:          cfg.tenantID,
+		UserId:            cfg.receiverUserID,
+		Password:          cfg.identityLoginPassword,
+		DeviceId:          deviceID,
+		Audience:          "push-gateway",
+		GatewayTtlSeconds: int64(cfg.pushAuthTokenTTL.Seconds()),
+		TraceId:           "push-smoke-auth-login",
+		RequestId:         "push-smoke-identity-login-" + deviceID,
+	})
+	if err != nil {
+		return gatewayTokenResult{}, fmt.Errorf("identity login: %w", err)
+	}
+	if response.GetGatewayToken() == "" {
+		return gatewayTokenResult{}, errors.New("identity-service login returned empty gateway token")
+	}
+	if response.GetRefreshToken() == "" {
+		return gatewayTokenResult{}, errors.New("identity-service login returned empty refresh token")
 	}
 	return gatewayTokenResult{Token: response.GetGatewayToken(), SessionID: response.GetSessionId()}, nil
 }
@@ -1558,6 +1612,9 @@ func pushAuthTokenSource(cfg config) string {
 		return "query_identity"
 	}
 	if strings.TrimSpace(cfg.identityTarget) != "" {
+		if cfg.identityTokenMethod == "login" {
+			return "identity_service_login"
+		}
 		return "identity_service"
 	}
 	return "local_hmac"
@@ -1572,6 +1629,25 @@ func identityGatewayTokenFormat(cfg config) string {
 		return "legacy"
 	}
 	return value
+}
+
+func identityTokenMethod(cfg config) string {
+	if strings.TrimSpace(cfg.identityTarget) == "" {
+		return ""
+	}
+	return normalizeIdentityTokenMethod(cfg.identityTokenMethod)
+}
+
+func normalizeIdentityTokenMethod(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	switch value {
+	case "", "issue", "issue_gateway", "issue_gateway_token":
+		return "issue_gateway_token"
+	case "login":
+		return "login"
+	default:
+		return value
+	}
 }
 
 func normalizePushAuthConfig(cfg *config) {
@@ -2082,7 +2158,33 @@ func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string) err
 			return fmt.Errorf("cleanup tenant: %w", err)
 		}
 	}
+	optionalStatements := []string{
+		`DELETE FROM identity_outbox WHERE tenant_id = $1`,
+		`DELETE FROM identity_refresh_tokens WHERE tenant_id = $1`,
+		`DELETE FROM identity_sessions WHERE tenant_id = $1`,
+		`DELETE FROM identity_devices WHERE tenant_id = $1`,
+		`DELETE FROM identity_users WHERE tenant_id = $1`,
+	}
+	for _, statement := range optionalStatements {
+		tableName := strings.Fields(strings.TrimPrefix(statement, "DELETE FROM "))[0]
+		exists, err := tableExists(ctx, pool, tableName)
+		if err != nil {
+			return fmt.Errorf("check optional table %s: %w", tableName, err)
+		}
+		if !exists {
+			continue
+		}
+		if _, err := pool.Exec(ctx, statement, tenantID); err != nil {
+			return fmt.Errorf("cleanup optional tenant table %s: %w", tableName, err)
+		}
+	}
 	return nil
+}
+
+func tableExists(ctx context.Context, pool *pgxpool.Pool, name string) (bool, error) {
+	var exists bool
+	err := pool.QueryRow(ctx, `SELECT to_regclass($1) IS NOT NULL`, name).Scan(&exists)
+	return exists, err
 }
 
 func seedConversation(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
@@ -2104,6 +2206,41 @@ INSERT INTO conversation_members (
 		return fmt.Errorf("seed owner member: %w", err)
 	}
 	return nil
+}
+
+func seedIdentityCredential(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
+	passwordHash, err := smokePasswordHash(cfg.identityLoginPassword)
+	if err != nil {
+		return err
+	}
+	_, err = pool.Exec(ctx, `
+INSERT INTO identity_users (tenant_id, user_id, status, password_hash, password_updated_at, created_at, updated_at)
+VALUES ($1, $2, 'ACTIVE', $3, now(), now(), now())
+ON CONFLICT (tenant_id, user_id) DO UPDATE
+SET status = 'ACTIVE',
+    password_hash = EXCLUDED.password_hash,
+    password_updated_at = EXCLUDED.password_updated_at,
+    updated_at = EXCLUDED.updated_at
+`, cfg.tenantID, cfg.receiverUserID, passwordHash)
+	if err != nil {
+		return fmt.Errorf("seed identity credential: %w", err)
+	}
+	return nil
+}
+
+func smokePasswordHash(password string) (string, error) {
+	const iterations = 10_000
+	salt := []byte("nexusim-push-smoke")
+	key, err := pbkdf2.Key(sha256.New, password, salt, iterations, 32)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf(
+		"pbkdf2-sha256$%d$%s$%s",
+		iterations,
+		base64.RawURLEncoding.EncodeToString(salt),
+		base64.RawURLEncoding.EncodeToString(key),
+	), nil
 }
 
 func fillPostgresStats(ctx context.Context, pool *pgxpool.Pool, cfg config, result *summary) error {

@@ -60,3 +60,15 @@ identity-service IssueGatewayToken
 ```
 
 This proves identity-service can replace runner-side local token signing without adding a synchronous dependency to push-gateway's hot path.
+
+## Observability
+
+`identity-service` exposes first-stage local diagnostics when `NEXUSIM_IDENTITY_DEBUG_ADDR` or shared `NEXUSIM_DEBUG_ADDR` is set:
+
+- `GET /healthz`: process liveness, no dependency check.
+- `GET /readyz`: PostgreSQL ping readiness.
+- `GET /debug/metrics`: pgx pool counters, identity user/device/session counts, and gRPC method/code/latency counters.
+
+The gRPC server also emits one JSON request log per unary RPC with stable fields: `service`, `event`, `method`, `code`, and `latency_ms`.
+
+This is intentionally a lightweight local/debug endpoint. Production tracing, alerting, mTLS, gateway verified metadata and revoke projection/deny-list remain future hardening items.

@@ -5,15 +5,18 @@ import (
 	"errors"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	identitygrpc "github.com/qsyy0921/IM/services/identity-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/identity-service/internal/app"
+	monitoringinfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/monitoring"
 	postgresinfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/postgres"
 	tokeninfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/token"
 	"google.golang.org/grpc"
@@ -47,6 +50,13 @@ func runGRPC() error {
 		return err
 	}
 	defer pool.Close()
+	grpcMetrics := monitoringinfra.NewGRPCMetrics()
+	stopDebug, err := startDebugServer(ctx, identityDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
 	signer, err := tokeninfra.NewHMACSigner(envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_SECRET", envString("NEXUSIM_PUSH_AUTH_HMAC_SECRET", "")))
 	if err != nil {
 		return err
@@ -58,7 +68,7 @@ func runGRPC() error {
 		return err
 	}
 	repository := postgresinfra.NewRepository(pool)
-	server := grpc.NewServer()
+	server := grpc.NewServer(grpc.UnaryInterceptor(grpcMetrics.UnaryServerInterceptor(log.Default())))
 	identitygrpc.Register(server, identitygrpc.NewServer(
 		app.NewIssueGatewayTokenUseCase(repository, signer),
 		app.NewRevokeDeviceUseCase(repository),
@@ -88,6 +98,37 @@ func runGRPC() error {
 	}
 }
 
+func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {
+	if strings.TrimSpace(addr) == "" {
+		return func() {}, nil
+	}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	server := &http.Server{Handler: handler}
+	done := make(chan struct{})
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+	}()
+	go func() {
+		defer close(done)
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("identity-service debug server stopped with error: %v", err)
+		}
+	}()
+	log.Printf("identity-service debug server started on %s", addr)
+	return func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+		<-done
+	}, nil
+}
+
 func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {
 	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
 	if dsn == "" {
@@ -101,6 +142,10 @@ func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {
 		config.MaxConns = int32(maxConns)
 	}
 	return pgxpool.NewWithConfig(ctx, config)
+}
+
+func identityDebugAddr() string {
+	return envString("NEXUSIM_IDENTITY_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
 }
 
 func envString(name string, fallback string) string {

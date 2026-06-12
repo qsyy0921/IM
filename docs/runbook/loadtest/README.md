@@ -6,6 +6,7 @@
 | --- | --- |
 | `message-service` | `message-service/loadtest-report-20260609-message-service-consolidated.md` |
 | `conversation-service` | `conversation-service/loadtest-report-20260609-conversation-service-consolidated.md` |
+| `identity-service` | `identity-service/README.md` |
 
 ## 归档规则
 

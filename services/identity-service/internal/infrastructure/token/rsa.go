@@ -28,6 +28,9 @@ func NewRS256SignerFromPEM(privateKeyPEM string, keyID string, issuer string) (*
 	if err != nil {
 		return nil, types.NewTokenSigningFailed(err.Error())
 	}
+	if privateKey.N == nil || privateKey.N.BitLen() < 2048 {
+		return nil, types.NewTokenSigningFailed("rsa private key must be at least 2048 bits")
+	}
 	keyID = strings.TrimSpace(keyID)
 	if keyID == "" {
 		keyID = defaultRSAKeyID

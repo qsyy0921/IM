@@ -7,7 +7,7 @@
 `identity-service` 已完成真实鉴权第一阶段主线，并补了多个安全 hardening 切片：
 
 - `RegisterUser / Login / RefreshGatewayToken`。
-- gateway token 本地验签链路：HS256 兼容、RS256 JWKS public-only、old public-key overlap。
+- gateway token 本地验签链路：HS256 兼容、RS256 static key ring、JWKS public-only、old public-key overlap。
 - refresh token rotation、reuse detection、device/session revoke event。
 - email/phone verification 与 password reset challenge，数据库只保存 token hash。
 - challenge webhook sender、delivery failure 过期补偿、debug metrics、持久状态审计。
@@ -41,4 +41,4 @@ RegisterUser
 - worker 使用 ready query + row lock 拉取 delivery outbox，成功后标记 `DELIVERED`；失败按 retry / DLQ 处理。
 - repair 工具是 audit-first，不解密 token、不直接标记 `DELIVERED`、不把 `EXPIRED` challenge 复活；这比把 challenge delivery DLQ 当普通 Kafka outbox replay 更安全。
 - 本轮 smoke 没开 `NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN`，Confirm 使用的是 webhook 收到的真实 token，所以能证明 worker 链路生效。
-- 该能力仍不是完整 email/SMS provider 平台；provider 模板、bounce handling、KMS/HSM keyring、统一告警仍是后续项。
+- 该能力仍不是完整 email/SMS provider 或密钥管理平台；provider 模板、bounce handling、自动 key rotation、KMS/HSM keyring、统一告警仍是后续项。

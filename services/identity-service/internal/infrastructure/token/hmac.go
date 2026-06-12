@@ -54,13 +54,20 @@ type JWKSet struct {
 }
 
 type JWK struct {
-	KeyType   string `json:"kty"`
-	KeyUse    string `json:"use,omitempty"`
-	KeyID     string `json:"kid,omitempty"`
-	Algorithm string `json:"alg,omitempty"`
-	Key       string `json:"k,omitempty"`
-	Modulus   string `json:"n,omitempty"`
-	Exponent  string `json:"e,omitempty"`
+	KeyType         string          `json:"kty"`
+	KeyUse          string          `json:"use,omitempty"`
+	KeyID           string          `json:"kid,omitempty"`
+	Algorithm       string          `json:"alg,omitempty"`
+	Key             string          `json:"k,omitempty"`
+	Modulus         string          `json:"n,omitempty"`
+	Exponent        string          `json:"e,omitempty"`
+	PrivateExponent string          `json:"d,omitempty"`
+	Prime1          string          `json:"p,omitempty"`
+	Prime2          string          `json:"q,omitempty"`
+	Exponent1       string          `json:"dp,omitempty"`
+	Exponent2       string          `json:"dq,omitempty"`
+	Coefficient     string          `json:"qi,omitempty"`
+	OtherPrimes     json.RawMessage `json:"oth,omitempty"`
 }
 
 func NewHMACSigner(secret string) (*HMACSigner, error) {

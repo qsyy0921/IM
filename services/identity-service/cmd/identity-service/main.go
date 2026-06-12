@@ -37,6 +37,31 @@ type gatewayTokenSigner interface {
 	JWKSet() tokeninfra.JWKSet
 }
 
+type gatewayTokenKeyRingSigner struct {
+	current gatewayTokenSigner
+	jwkSet  tokeninfra.JWKSet
+}
+
+func (signer gatewayTokenKeyRingSigner) SignGatewayToken(claims types.TokenClaims) (string, error) {
+	return signer.current.SignGatewayToken(claims)
+}
+
+func (signer gatewayTokenKeyRingSigner) JWKSet() tokeninfra.JWKSet {
+	return signer.jwkSet
+}
+
+type gatewayTokenRS256KeyRingConfig struct {
+	Issuer        string                      `json:"issuer,omitempty"`
+	Current       gatewayTokenRS256CurrentKey `json:"current"`
+	OldPublicKeys []tokeninfra.JWK            `json:"old_public_keys,omitempty"`
+}
+
+type gatewayTokenRS256CurrentKey struct {
+	KeyID          string `json:"kid"`
+	PrivateKeyPEM  string `json:"private_key_pem,omitempty"`
+	PrivateKeyFile string `json:"private_key_file,omitempty"`
+}
+
 func main() {
 	if err := run(); err != nil && !errors.Is(err, context.Canceled) {
 		log.Fatal(err)
@@ -303,6 +328,11 @@ func newGatewayTokenSigner() (gatewayTokenSigner, error) {
 			envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ISSUER", ""),
 		)
 	case "jwt-rs256", "rs256":
+		if signer, ok, err := loadRS256KeyRingSigner(); err != nil {
+			return nil, err
+		} else if ok {
+			return signer, nil
+		}
 		privateKeyPEM, err := loadRSAPrivateKeyPEM()
 		if err != nil {
 			return nil, err
@@ -315,6 +345,67 @@ func newGatewayTokenSigner() (gatewayTokenSigner, error) {
 	default:
 		return nil, errors.New("unsupported NEXUSIM_IDENTITY_GATEWAY_TOKEN_FORMAT")
 	}
+}
+
+func loadRS256KeyRingSigner() (gatewayTokenSigner, bool, error) {
+	raw := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_RS256_KEYRING_JSON"))
+	if raw == "" {
+		path := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_RS256_KEYRING_FILE"))
+		if path == "" {
+			return nil, false, nil
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil, true, err
+		}
+		raw = strings.TrimSpace(string(content))
+	}
+	if raw == "" {
+		return nil, false, nil
+	}
+	var config gatewayTokenRS256KeyRingConfig
+	if err := json.Unmarshal([]byte(raw), &config); err != nil {
+		return nil, true, err
+	}
+	keyID := strings.TrimSpace(config.Current.KeyID)
+	if keyID == "" {
+		return nil, true, errors.New("NEXUSIM_IDENTITY_GATEWAY_TOKEN_RS256_KEYRING current.kid is required")
+	}
+	privateKeyPEM, err := loadRS256KeyRingPrivateKeyPEM(config.Current)
+	if err != nil {
+		return nil, true, err
+	}
+	issuer := strings.TrimSpace(config.Issuer)
+	if issuer == "" {
+		issuer = envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ISSUER", "")
+	}
+	current, err := tokeninfra.NewRS256SignerFromPEM(privateKeyPEM, keyID, issuer)
+	if err != nil {
+		return nil, true, err
+	}
+	publicKeys, err := mergeGatewayTokenPublicJWKSets(
+		current.JWKSet(),
+		tokeninfra.JWKSet{Keys: config.OldPublicKeys},
+	)
+	if err != nil {
+		return nil, true, err
+	}
+	return gatewayTokenKeyRingSigner{current: current, jwkSet: publicKeys}, true, nil
+}
+
+func loadRS256KeyRingPrivateKeyPEM(current gatewayTokenRS256CurrentKey) (string, error) {
+	if pemValue := strings.TrimSpace(current.PrivateKeyPEM); pemValue != "" {
+		return pemValue, nil
+	}
+	path := strings.TrimSpace(current.PrivateKeyFile)
+	if path == "" {
+		return "", errors.New("NEXUSIM_IDENTITY_GATEWAY_TOKEN_RS256_KEYRING current.private_key_pem or current.private_key_file is required")
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return string(content), nil
 }
 
 func loadRSAPrivateKeyPEM() (string, error) {
@@ -337,8 +428,16 @@ func gatewayTokenJWKSetWithAdditionalKeys(base tokeninfra.JWKSet) (tokeninfra.JW
 	if err != nil {
 		return tokeninfra.JWKSet{}, err
 	}
-	result := tokeninfra.JWKSet{Keys: make([]tokeninfra.JWK, 0, len(base.Keys)+len(additional.Keys))}
-	seen := make(map[string]struct{}, len(base.Keys)+len(additional.Keys))
+	return mergeGatewayTokenPublicJWKSets(base, additional)
+}
+
+func mergeGatewayTokenPublicJWKSets(sets ...tokeninfra.JWKSet) (tokeninfra.JWKSet, error) {
+	totalKeys := 0
+	for _, set := range sets {
+		totalKeys += len(set.Keys)
+	}
+	result := tokeninfra.JWKSet{Keys: make([]tokeninfra.JWK, 0, totalKeys)}
+	seen := make(map[string]struct{}, totalKeys)
 	appendKey := func(key tokeninfra.JWK) error {
 		publicKey, ok := publicGatewayTokenJWK(key)
 		if !ok {
@@ -351,14 +450,11 @@ func gatewayTokenJWKSetWithAdditionalKeys(base tokeninfra.JWKSet) (tokeninfra.JW
 		result.Keys = append(result.Keys, publicKey)
 		return nil
 	}
-	for _, key := range base.Keys {
-		if err := appendKey(key); err != nil {
-			return tokeninfra.JWKSet{}, err
-		}
-	}
-	for _, key := range additional.Keys {
-		if err := appendKey(key); err != nil {
-			return tokeninfra.JWKSet{}, err
+	for _, set := range sets {
+		for _, key := range set.Keys {
+			if err := appendKey(key); err != nil {
+				return tokeninfra.JWKSet{}, err
+			}
 		}
 	}
 	return result, nil
@@ -379,7 +475,7 @@ func publicGatewayTokenJWK(key tokeninfra.JWK) (tokeninfra.JWK, bool) {
 	if publicKey.KeyUse != "" && publicKey.KeyUse != "sig" {
 		return tokeninfra.JWK{}, false
 	}
-	if publicKey.Modulus == "" || publicKey.Exponent == "" || strings.TrimSpace(key.Key) != "" {
+	if publicKey.Modulus == "" || publicKey.Exponent == "" || hasGatewayTokenPrivateJWKMaterial(key) {
 		return tokeninfra.JWK{}, false
 	}
 	modulus, err := base64.RawURLEncoding.DecodeString(publicKey.Modulus)
@@ -392,6 +488,17 @@ func publicGatewayTokenJWK(key tokeninfra.JWK) (tokeninfra.JWK, bool) {
 		return tokeninfra.JWK{}, false
 	}
 	return publicKey, true
+}
+
+func hasGatewayTokenPrivateJWKMaterial(key tokeninfra.JWK) bool {
+	return strings.TrimSpace(key.Key) != "" ||
+		strings.TrimSpace(key.PrivateExponent) != "" ||
+		strings.TrimSpace(key.Prime1) != "" ||
+		strings.TrimSpace(key.Prime2) != "" ||
+		strings.TrimSpace(key.Exponent1) != "" ||
+		strings.TrimSpace(key.Exponent2) != "" ||
+		strings.TrimSpace(key.Coefficient) != "" ||
+		strings.TrimSpace(string(key.OtherPrimes)) != ""
 }
 
 func loadAdditionalGatewayTokenJWKSet() (tokeninfra.JWKSet, error) {

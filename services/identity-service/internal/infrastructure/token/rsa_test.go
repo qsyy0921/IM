@@ -91,6 +91,16 @@ func TestRS256SignerSignsGatewayJWTAndExposesPublicJWK(t *testing.T) {
 	}
 }
 
+func TestRS256SignerRejectsWeakPrivateKey(t *testing.T) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		t.Fatalf("generate rsa key: %v", err)
+	}
+	if _, err := NewRS256SignerFromPEM(testRSAPrivateKeyPEM(privateKey), "weak", "issuer-1"); err == nil {
+		t.Fatal("expected weak rsa private key to be rejected")
+	}
+}
+
 func testRSAPrivateKeyPEM(privateKey *rsa.PrivateKey) string {
 	return string(pem.EncodeToMemory(&pem.Block{
 		Type:  "RSA PRIVATE KEY",

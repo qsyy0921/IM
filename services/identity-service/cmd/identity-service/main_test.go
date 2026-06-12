@@ -3,12 +3,15 @@ package main
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -42,14 +45,7 @@ func TestGatewayTokenJWKSetWithAdditionalKeysMergesAndDeduplicates(t *testing.T)
 func TestGatewayTokenJWKSetWithAdditionalKeysRejectsSymmetricKeys(t *testing.T) {
 	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_JSON", `{"keys":[{"kty":"oct","use":"sig","kid":"shared","alg":"HS256","k":"secret"}]}`)
 	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_FILE", "")
-	base := tokeninfra.JWKSet{Keys: []tokeninfra.JWK{{
-		KeyType:   "RSA",
-		KeyUse:    "sig",
-		KeyID:     "current",
-		Algorithm: "RS256",
-		Modulus:   "base",
-		Exponent:  "AQAB",
-	}}}
+	base := tokeninfra.JWKSet{Keys: []tokeninfra.JWK{testGatewayRSAJWK(t, generateGatewayTestRSAKey(t), "current")}}
 
 	if _, err := gatewayTokenJWKSetWithAdditionalKeys(base); err == nil {
 		t.Fatal("expected symmetric jwk to be rejected")
@@ -106,6 +102,144 @@ func TestLoadAdditionalGatewayTokenJWKSetRejectsInvalidJSON(t *testing.T) {
 	}
 }
 
+func TestLoadRS256KeyRingSignerSignsWithCurrentAndPublishesOldPublicKeys(t *testing.T) {
+	currentKey := generateGatewayTestRSAKey(t)
+	oldKey := generateGatewayTestRSAKey(t)
+	dir := t.TempDir()
+	currentPath := filepath.Join(dir, "current.pem")
+	if err := os.WriteFile(currentPath, []byte(testGatewayRSAPrivateKeyPEM(currentKey)), 0o600); err != nil {
+		t.Fatalf("write current key: %v", err)
+	}
+	config := gatewayTokenRS256KeyRingConfig{
+		Issuer: "issuer-keyring",
+		Current: gatewayTokenRS256CurrentKey{
+			KeyID:          "current-kid",
+			PrivateKeyFile: currentPath,
+		},
+		OldPublicKeys: []tokeninfra.JWK{
+			testGatewayRSAJWK(t, oldKey, "old-kid"),
+			testGatewayRSAJWK(t, oldKey, "current-kid"),
+		},
+	}
+	raw, err := json.Marshal(config)
+	if err != nil {
+		t.Fatalf("marshal keyring: %v", err)
+	}
+	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_RS256_KEYRING_JSON", string(raw))
+	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_RS256_KEYRING_FILE", "")
+
+	signer, ok, err := loadRS256KeyRingSigner()
+	if err != nil {
+		t.Fatalf("load keyring signer: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected keyring signer to be configured")
+	}
+	token, err := signer.SignGatewayToken(types.TokenClaims{
+		TenantID:  "tenant-1",
+		UserID:    "user-1",
+		DeviceID:  "device-1",
+		Audience:  "push-gateway",
+		IssuedAt:  time.Unix(1_799_999_900, 0).Unix(),
+		ExpiresAt: time.Unix(1_800_000_000, 0).Unix(),
+	})
+	if err != nil {
+		t.Fatalf("sign token: %v", err)
+	}
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		t.Fatalf("unexpected jwt: %s", token)
+	}
+	var header map[string]any
+	headerRaw, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		t.Fatalf("decode header: %v", err)
+	}
+	if err := json.Unmarshal(headerRaw, &header); err != nil {
+		t.Fatalf("unmarshal header: %v", err)
+	}
+	if header["alg"] != "RS256" || header["kid"] != "current-kid" {
+		t.Fatalf("unexpected header: %+v", header)
+	}
+	var claims map[string]any
+	claimsRaw, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("decode claims: %v", err)
+	}
+	if err := json.Unmarshal(claimsRaw, &claims); err != nil {
+		t.Fatalf("unmarshal claims: %v", err)
+	}
+	if claims["iss"] != "issuer-keyring" {
+		t.Fatalf("expected keyring issuer, got %+v", claims)
+	}
+
+	jwks := signer.JWKSet()
+	if len(jwks.Keys) != 2 {
+		t.Fatalf("expected current and old public keys, got %+v", jwks.Keys)
+	}
+	if jwks.Keys[0].KeyID != "current-kid" || jwks.Keys[1].KeyID != "old-kid" {
+		t.Fatalf("unexpected key order: %+v", jwks.Keys)
+	}
+	if jwks.Keys[0].Modulus != testGatewayRSAJWK(t, currentKey, "current-kid").Modulus {
+		t.Fatalf("expected current key to win duplicate old kid, got %+v", jwks.Keys[0])
+	}
+	for _, key := range jwks.Keys {
+		if key.Key != "" {
+			t.Fatalf("jwks must not expose symmetric/private key material: %+v", key)
+		}
+	}
+}
+
+func TestLoadRS256KeyRingSignerRejectsSymmetricOldPublicKey(t *testing.T) {
+	currentKey := generateGatewayTestRSAKey(t)
+	config := gatewayTokenRS256KeyRingConfig{
+		Current: gatewayTokenRS256CurrentKey{
+			KeyID:         "current-kid",
+			PrivateKeyPEM: testGatewayRSAPrivateKeyPEM(currentKey),
+		},
+		OldPublicKeys: []tokeninfra.JWK{{
+			KeyType:   "oct",
+			KeyUse:    "sig",
+			KeyID:     "shared",
+			Algorithm: "HS256",
+			Key:       "secret",
+		}},
+	}
+	raw, err := json.Marshal(config)
+	if err != nil {
+		t.Fatalf("marshal keyring: %v", err)
+	}
+	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_RS256_KEYRING_JSON", string(raw))
+	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_RS256_KEYRING_FILE", "")
+
+	if _, ok, err := loadRS256KeyRingSigner(); err == nil || !ok {
+		t.Fatalf("expected configured keyring with symmetric old key to fail, ok=%v err=%v", ok, err)
+	}
+}
+
+func TestLoadRS256KeyRingSignerRejectsPrivateOldPublicKeyMaterial(t *testing.T) {
+	currentKey := generateGatewayTestRSAKey(t)
+	oldKey := testGatewayRSAJWK(t, generateGatewayTestRSAKey(t), "old-kid")
+	oldKey.PrivateExponent = "private"
+	config := gatewayTokenRS256KeyRingConfig{
+		Current: gatewayTokenRS256CurrentKey{
+			KeyID:         "current-kid",
+			PrivateKeyPEM: testGatewayRSAPrivateKeyPEM(currentKey),
+		},
+		OldPublicKeys: []tokeninfra.JWK{oldKey},
+	}
+	raw, err := json.Marshal(config)
+	if err != nil {
+		t.Fatalf("marshal keyring: %v", err)
+	}
+	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_RS256_KEYRING_JSON", string(raw))
+	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_RS256_KEYRING_FILE", "")
+
+	if _, ok, err := loadRS256KeyRingSigner(); err == nil || !ok {
+		t.Fatalf("expected configured keyring with private jwk material to fail, ok=%v err=%v", ok, err)
+	}
+}
+
 func generateGatewayTestRSAKey(t *testing.T) *rsa.PrivateKey {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -113,6 +247,13 @@ func generateGatewayTestRSAKey(t *testing.T) *rsa.PrivateKey {
 		t.Fatalf("generate rsa key: %v", err)
 	}
 	return key
+}
+
+func testGatewayRSAPrivateKeyPEM(privateKey *rsa.PrivateKey) string {
+	return string(pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	}))
 }
 
 func testGatewayRSAJWK(t *testing.T, privateKey *rsa.PrivateKey, keyID string) tokeninfra.JWK {

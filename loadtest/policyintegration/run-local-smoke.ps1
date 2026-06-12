@@ -2,6 +2,7 @@ param(
     [string]$PgDsn = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
+    [string[]]$Actions = @("send"),
     [switch]$UsePolicyRules,
     [switch]$SkipBuild
 )
@@ -115,6 +116,7 @@ function Stop-Processes {
 
 function Run-Scenario {
     param(
+        [string]$Action,
         [string]$Scenario,
         [string]$ScenarioDir,
         [bool]$Allowed,
@@ -128,12 +130,14 @@ function Run-Scenario {
     $messageAddr = "127.0.0.1:$messagePort"
     $processes = @()
     try {
+        $policyStaticAllowed = if ($UsePolicyRules) { -not $Allowed } else { $Allowed }
+        $policyStaticClassification = if ($UsePolicyRules) { "LOCAL_STATIC_SHOULD_NOT_APPEAR" } else { $Classification }
         $policyEnv = @{
             NEXUSIM_POLICY_SERVICE_MODE = "grpc"
             NEXUSIM_POLICY_GRPC_ADDR = $policyAddr
-            NEXUSIM_POLICY_MESSAGE_ALLOWED = [string]$Allowed
+            NEXUSIM_POLICY_MESSAGE_ALLOWED = [string]$policyStaticAllowed
             NEXUSIM_POLICY_PERMISSION_VERSION = [string]$PermissionVersion
-            NEXUSIM_POLICY_CLASSIFICATION = $Classification
+            NEXUSIM_POLICY_CLASSIFICATION = $policyStaticClassification
             NEXUSIM_POLICY_DENY_REASON = $Reason
         }
         if ($UsePolicyRules) {
@@ -157,10 +161,11 @@ function Run-Scenario {
             "--target", $messageAddr,
             "--pg-dsn", $PgDsn,
             "--scenario", $Scenario,
+            "--action", $Action,
             "--result-dir", $ScenarioDir,
             "--tenant-id", $tenant,
-            "--conversation-id", "policy-message-$Scenario-conversation",
-            "--client-msg-id", "policy-message-$Scenario-client-msg",
+            "--conversation-id", "policy-message-$Action-$Scenario-conversation",
+            "--client-msg-id", "policy-message-$Action-$Scenario-client-msg",
             "--expected-permission-version", $PermissionVersion,
             "--expected-classification", $Classification,
             "--cleanup"
@@ -199,31 +204,56 @@ if ($UsePolicyRules) {
         }
 }
 
-$allowSummary = Run-Scenario `
-    -Scenario "allow" `
-    -ScenarioDir $allowDir `
-    -Allowed $true `
-    -PermissionVersion 41 `
-    -Classification "POLICY_RPC_ALLOWED" `
-    -Reason ""
+$scenarioSummaries = @()
+foreach ($action in $Actions) {
+    $normalizedAction = $action.Trim().ToLowerInvariant()
+    if ($normalizedAction -eq "") {
+        continue
+    }
+    $actionAllowDir = if ($Actions.Count -eq 1 -and $normalizedAction -eq "send") { $allowDir } else { Join-Path $resultDir "$normalizedAction-allow" }
+    $actionDenyDir = if ($Actions.Count -eq 1 -and $normalizedAction -eq "send") { $denyDir } else { Join-Path $resultDir "$normalizedAction-deny" }
+    New-Item -ItemType Directory -Force $actionAllowDir | Out-Null
+    New-Item -ItemType Directory -Force $actionDenyDir | Out-Null
 
-$denySummary = Run-Scenario `
-    -Scenario "deny" `
-    -ScenarioDir $denyDir `
-    -Allowed $false `
-    -PermissionVersion 42 `
-    -Classification "POLICY_RPC_BLOCKED" `
-    -Reason "blocked by policy integration smoke"
+    $allowClassification = "POLICY_RPC_" + $normalizedAction.ToUpperInvariant() + "_ALLOWED"
+    $denyClassification = "POLICY_RPC_" + $normalizedAction.ToUpperInvariant() + "_BLOCKED"
+    $denyReason = "blocked by policy integration smoke $normalizedAction"
 
-$combined = [pscustomobject]@{
+    $scenarioSummaries += Run-Scenario `
+        -Action $normalizedAction `
+        -Scenario "allow" `
+        -ScenarioDir $actionAllowDir `
+        -Allowed $true `
+        -PermissionVersion 41 `
+        -Classification $allowClassification `
+        -Reason ""
+
+    $scenarioSummaries += Run-Scenario `
+        -Action $normalizedAction `
+        -Scenario "deny" `
+        -ScenarioDir $actionDenyDir `
+        -Allowed $false `
+        -PermissionVersion 42 `
+        -Classification $denyClassification `
+        -Reason $denyReason
+}
+
+$combinedFields = [ordered]@{
     success = $true
     result_dir = $resultDir
     policy_rules_enabled = [bool]$UsePolicyRules
-    allow = $allowSummary
-    deny = $denySummary
+    actions = $Actions
 }
+if ($scenarioSummaries.Count -eq 2 -and $scenarioSummaries[0].action -eq "send" -and $scenarioSummaries[1].action -eq "send") {
+    $combinedFields["allow"] = $scenarioSummaries[0]
+    $combinedFields["deny"] = $scenarioSummaries[1]
+}
+$combinedFields["scenarios"] = $scenarioSummaries
+$combined = [pscustomobject]$combinedFields
 $combined | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $resultDir "policy-message-smoke-summary.json") -Encoding UTF8
 
 Write-Host "result_dir=$resultDir"
-Write-Host "allow_message_id=$($allowSummary.send_message.message_id)"
-Write-Host "deny_grpc_code=$($denySummary.send_message.grpc_code)"
+foreach ($summary in $scenarioSummaries) {
+    $code = if ($summary.action -eq "send") { $summary.send_message.grpc_code } else { $summary.change_message.grpc_code }
+    Write-Host "scenario=$($summary.action)/$($summary.scenario) grpc_code=$code"
+}

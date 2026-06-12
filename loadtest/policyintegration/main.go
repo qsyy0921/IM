@@ -25,6 +25,7 @@ type config struct {
 	resultDir              string
 	pgDSN                  string
 	scenario               string
+	action                 string
 	requestTimeout         time.Duration
 	tenantID               string
 	userID                 string
@@ -40,36 +41,49 @@ type config struct {
 }
 
 type summary struct {
-	Commit                 string       `json:"commit"`
-	CommitFull             string       `json:"commit_full"`
-	GitDirty               bool         `json:"git_dirty"`
-	GitStatusShort         string       `json:"git_status_short,omitempty"`
-	Target                 string       `json:"target"`
-	ResultDir              string       `json:"result_dir"`
-	Scenario               string       `json:"scenario"`
-	TenantID               string       `json:"tenant_id"`
-	UserID                 string       `json:"user_id"`
-	ConversationID         string       `json:"conversation_id"`
-	StartedAt              time.Time    `json:"started_at"`
-	FinishedAt             time.Time    `json:"finished_at"`
-	Success                bool         `json:"success"`
-	Error                  string       `json:"error,omitempty"`
-	ExpectedPermissionVer  int64        `json:"expected_permission_version"`
-	ExpectedClassification string       `json:"expected_classification"`
-	ExpectedReason         string       `json:"expected_reason,omitempty"`
-	SendMessage            sendSummary  `json:"send_message"`
-	MessageError           errorSummary `json:"message_error,omitempty"`
-	PolicyRuleSeeded       bool         `json:"policy_rule_seeded"`
-	PolicyRule             policyRule   `json:"policy_rule,omitempty"`
-	DBBefore               dbStats      `json:"db_before"`
-	DBAfter                dbStats      `json:"db_after"`
-	MessageRow             messageRow   `json:"message_row,omitempty"`
-	LatencyMS              float64      `json:"latency_ms"`
+	Commit                 string        `json:"commit"`
+	CommitFull             string        `json:"commit_full"`
+	GitDirty               bool          `json:"git_dirty"`
+	GitStatusShort         string        `json:"git_status_short,omitempty"`
+	Target                 string        `json:"target"`
+	ResultDir              string        `json:"result_dir"`
+	Scenario               string        `json:"scenario"`
+	Action                 string        `json:"action"`
+	TenantID               string        `json:"tenant_id"`
+	UserID                 string        `json:"user_id"`
+	ConversationID         string        `json:"conversation_id"`
+	StartedAt              time.Time     `json:"started_at"`
+	FinishedAt             time.Time     `json:"finished_at"`
+	Success                bool          `json:"success"`
+	Error                  string        `json:"error,omitempty"`
+	ExpectedPermissionVer  int64         `json:"expected_permission_version"`
+	ExpectedClassification string        `json:"expected_classification"`
+	ExpectedReason         string        `json:"expected_reason,omitempty"`
+	SendMessage            sendSummary   `json:"send_message"`
+	ChangeMessage          changeSummary `json:"change_message,omitempty"`
+	MessageError           errorSummary  `json:"message_error,omitempty"`
+	PolicyRuleSeeded       bool          `json:"policy_rule_seeded"`
+	PolicyRule             policyRule    `json:"policy_rule,omitempty"`
+	PolicyRules            []policyRule  `json:"policy_rules,omitempty"`
+	DBBefore               dbStats       `json:"db_before"`
+	DBBeforeAction         dbStats       `json:"db_before_action,omitempty"`
+	DBAfter                dbStats       `json:"db_after"`
+	MessageRow             messageRow    `json:"message_row,omitempty"`
+	ChangeRow              changeRow     `json:"change_row,omitempty"`
+	LatencyMS              float64       `json:"latency_ms"`
 }
 
 type sendSummary struct {
 	MessageID        string `json:"message_id,omitempty"`
 	ConversationSeq  int64  `json:"conversation_seq,omitempty"`
+	IdempotentReplay bool   `json:"idempotent_replay,omitempty"`
+	GRPCCode         string `json:"grpc_code"`
+}
+
+type changeSummary struct {
+	MessageID        string `json:"message_id,omitempty"`
+	ConversationSeq  int64  `json:"conversation_seq,omitempty"`
+	ChangeVersion    int32  `json:"change_version,omitempty"`
 	IdempotentReplay bool   `json:"idempotent_replay,omitempty"`
 	GRPCCode         string `json:"grpc_code"`
 }
@@ -92,9 +106,11 @@ type policyRule struct {
 }
 
 type dbStats struct {
-	MessageLog     int64 `json:"message_log"`
-	TimelineEvents int64 `json:"conversation_timeline_events"`
-	MessageOutbox  int64 `json:"message_outbox"`
+	MessageLog           int64 `json:"message_log"`
+	TimelineEvents       int64 `json:"conversation_timeline_events"`
+	MessageOutbox        int64 `json:"message_outbox"`
+	MessageChangeHistory int64 `json:"message_change_history"`
+	CommandIdempotency   int64 `json:"message_command_idempotency"`
 }
 
 type messageRow struct {
@@ -106,6 +122,17 @@ type messageRow struct {
 	TimelineClassification    string `json:"timeline_classification"`
 	FanoutPolicyVersion       int64  `json:"fanout_policy_version"`
 	OutboxStatus              string `json:"outbox_status"`
+}
+
+type changeRow struct {
+	MessageID                 string `json:"message_id"`
+	MessageStatus             string `json:"message_status"`
+	MessagePayload            string `json:"message_payload,omitempty"`
+	TimelineEventType         string `json:"timeline_event_type"`
+	TimelinePermissionVersion int64  `json:"timeline_permission_version"`
+	TimelineClassification    string `json:"timeline_classification"`
+	OutboxStatus              string `json:"outbox_status"`
+	ChangeHistoryRows         int64  `json:"message_change_history_rows"`
 }
 
 func main() {
@@ -122,6 +149,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.resultDir, "result-dir", "H:\\NexusIM\\loadtest-results\\policy-message-smoke", "result directory")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "", "PostgreSQL DSN")
 	flag.StringVar(&cfg.scenario, "scenario", "allow", "scenario: allow or deny")
+	flag.StringVar(&cfg.action, "action", "send", "message action: send, edit, revoke, or delete")
 	flag.DurationVar(&cfg.requestTimeout, "request-timeout", 5*time.Second, "per-request timeout")
 	flag.StringVar(&cfg.tenantID, "tenant-id", "tenant-policy-message-smoke", "tenant id")
 	flag.StringVar(&cfg.userID, "user-id", "policy-message-user", "user id")
@@ -136,6 +164,7 @@ func parseConfig() config {
 	flag.BoolVar(&cfg.seedPolicyRule, "seed-policy-rule", false, "seed exact policy_message_action_rules row for this scenario")
 	flag.Parse()
 	cfg.scenario = strings.ToLower(strings.TrimSpace(cfg.scenario))
+	cfg.action = strings.ToLower(strings.TrimSpace(cfg.action))
 	if cfg.requestTimeout <= 0 {
 		cfg.requestTimeout = 5 * time.Second
 	}
@@ -145,6 +174,9 @@ func parseConfig() config {
 func run(cfg config) error {
 	if cfg.scenario != "allow" && cfg.scenario != "deny" {
 		return fmt.Errorf("unsupported scenario %q", cfg.scenario)
+	}
+	if !isSupportedAction(cfg.action) {
+		return fmt.Errorf("unsupported action %q", cfg.action)
 	}
 	if cfg.pgDSN == "" {
 		return fmt.Errorf("--pg-dsn is required")
@@ -164,7 +196,7 @@ func run(cfg config) error {
 		}
 	}
 	if cfg.seedPolicyRule {
-		if err := seedPolicyRule(ctx, pool, cfg); err != nil {
+		if err := seedPolicyRules(ctx, pool, cfg); err != nil {
 			return err
 		}
 	}
@@ -177,6 +209,7 @@ func run(cfg config) error {
 		Target:                 cfg.target,
 		ResultDir:              cfg.resultDir,
 		Scenario:               cfg.scenario,
+		Action:                 cfg.action,
 		TenantID:               cfg.tenantID,
 		UserID:                 cfg.userID,
 		ConversationID:         cfg.conversationID,
@@ -187,15 +220,9 @@ func run(cfg config) error {
 		PolicyRuleSeeded:       cfg.seedPolicyRule,
 	}
 	if cfg.seedPolicyRule {
-		s.PolicyRule = policyRule{
-			TenantID:          cfg.tenantID,
-			UserID:            cfg.userID,
-			ConversationID:    cfg.conversationID,
-			Action:            "SEND",
-			Allowed:           cfg.scenario == "allow",
-			PermissionVersion: cfg.expectedPermissionVer,
-			Classification:    cfg.expectedClassification,
-			Reason:            cfg.expectedReason,
+		s.PolicyRules = expectedPolicyRules(cfg)
+		if len(s.PolicyRules) > 0 {
+			s.PolicyRule = s.PolicyRules[len(s.PolicyRules)-1]
 		}
 	}
 	s.GitDirty = strings.TrimSpace(s.GitStatusShort) != ""
@@ -211,11 +238,38 @@ func run(cfg config) error {
 	}
 	s.DBBefore = before
 
+	if cfg.action == "send" {
+		if err := runSendScenario(ctx, pool, cfg, &s); err != nil {
+			s.Error = err.Error()
+			return err
+		}
+	} else {
+		if err := runChangeScenario(ctx, pool, cfg, &s); err != nil {
+			s.Error = err.Error()
+			return err
+		}
+	}
+
+	after, err := readDBStats(ctx, pool, cfg.tenantID)
+	if err != nil {
+		s.Error = err.Error()
+		return err
+	}
+	s.DBAfter = after
+	if cfg.action == "send" && cfg.scenario == "deny" && after != before {
+		err := fmt.Errorf("deny scenario changed DB counts before=%+v after=%+v", before, after)
+		s.Error = err.Error()
+		return err
+	}
+	s.Success = true
+	return nil
+}
+
+func runSendScenario(ctx context.Context, pool *pgxpool.Pool, cfg config, s *summary) error {
 	response, callErr, latencyMS := sendMessage(cfg)
 	s.LatencyMS = latencyMS
 	if cfg.scenario == "allow" {
 		if callErr != nil {
-			s.Error = callErr.Error()
 			return callErr
 		}
 		s.SendMessage = sendSummary{
@@ -226,36 +280,88 @@ func run(cfg config) error {
 		}
 		row, err := readMessageRow(ctx, pool, cfg, response.GetMessageId())
 		if err != nil {
-			s.Error = err.Error()
 			return err
 		}
-		if err := validateAllow(cfg, response, row); err != nil {
-			s.Error = err.Error()
+		if err := validateSendAllow(cfg, response, row); err != nil {
 			return err
 		}
 		s.MessageRow = row
-	} else {
-		errorSummary, err := validateDeny(callErr)
-		if err != nil {
-			s.Error = err.Error()
-			return err
-		}
-		s.SendMessage = sendSummary{GRPCCode: codes.PermissionDenied.String()}
-		s.MessageError = errorSummary
+		return nil
 	}
 
-	after, err := readDBStats(ctx, pool, cfg.tenantID)
+	errorSummary, err := validateDeny(callErr)
 	if err != nil {
-		s.Error = err.Error()
 		return err
 	}
-	s.DBAfter = after
-	if cfg.scenario == "deny" && after != before {
-		err := fmt.Errorf("deny scenario changed DB counts before=%+v after=%+v", before, after)
-		s.Error = err.Error()
+	s.SendMessage = sendSummary{GRPCCode: codes.PermissionDenied.String()}
+	s.MessageError = errorSummary
+	return nil
+}
+
+func runChangeScenario(ctx context.Context, pool *pgxpool.Pool, cfg config, s *summary) error {
+	response, callErr, latencyMS := sendMessage(cfg)
+	s.LatencyMS = latencyMS
+	if callErr != nil {
+		return fmt.Errorf("base SendMessage for %s scenario: %w", cfg.action, callErr)
+	}
+	s.SendMessage = sendSummary{
+		MessageID:        response.GetMessageId(),
+		ConversationSeq:  response.GetConversationSeq(),
+		IdempotentReplay: response.GetIdempotentReplay(),
+		GRPCCode:         codes.OK.String(),
+	}
+	row, err := readMessageRow(ctx, pool, cfg, response.GetMessageId())
+	if err != nil {
 		return err
 	}
-	s.Success = true
+	if err := validateBaseSend(row); err != nil {
+		return err
+	}
+	s.MessageRow = row
+
+	beforeAction, err := readDBStats(ctx, pool, cfg.tenantID)
+	if err != nil {
+		return err
+	}
+	s.DBBeforeAction = beforeAction
+
+	change, callErr, changeLatencyMS := changeMessage(cfg, response.GetMessageId())
+	s.LatencyMS += changeLatencyMS
+	if cfg.scenario == "allow" {
+		if callErr != nil {
+			return callErr
+		}
+		s.ChangeMessage = changeSummary{
+			MessageID:        change.GetMessageId(),
+			ConversationSeq:  change.GetConversationSeq(),
+			ChangeVersion:    change.GetChangeVersion(),
+			IdempotentReplay: change.GetIdempotentReplay(),
+			GRPCCode:         codes.OK.String(),
+		}
+		changeRow, err := readChangeRow(ctx, pool, cfg, response.GetMessageId(), change.GetConversationSeq())
+		if err != nil {
+			return err
+		}
+		if err := validateChangeAllow(cfg, response, change, changeRow); err != nil {
+			return err
+		}
+		s.ChangeRow = changeRow
+		return nil
+	}
+
+	errorSummary, err := validateDeny(callErr)
+	if err != nil {
+		return err
+	}
+	s.ChangeMessage = changeSummary{GRPCCode: codes.PermissionDenied.String()}
+	s.MessageError = errorSummary
+	afterAction, err := readDBStats(ctx, pool, cfg.tenantID)
+	if err != nil {
+		return err
+	}
+	if afterAction != beforeAction {
+		return fmt.Errorf("%s deny changed DB counts before=%+v after=%+v", cfg.action, beforeAction, afterAction)
+	}
 	return nil
 }
 
@@ -290,7 +396,68 @@ func sendMessage(cfg config) (*messagev1.SendMessageResponse, error, float64) {
 	return response, err, float64(time.Since(started).Microseconds()) / 1000.0
 }
 
-func validateAllow(cfg config, response *messagev1.SendMessageResponse, row messageRow) error {
+func changeMessage(cfg config, messageID string) (*messagev1.MessageChangeResponse, error, float64) {
+	conn, err := grpc.NewClient(cfg.target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, fmt.Errorf("dial message-service: %w", err), 0
+	}
+	defer conn.Close()
+	client := messagev1.NewMessageServiceClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
+	defer cancel()
+	started := time.Now()
+	var response *messagev1.MessageChangeResponse
+	switch cfg.action {
+	case "edit":
+		payload, err := structpb.NewStruct(map[string]any{"text": "policy integration smoke edited"})
+		if err != nil {
+			return nil, err, 0
+		}
+		response, err = client.EditMessage(ctx, &messagev1.EditMessageRequest{
+			AuthContext:    authContext(cfg, "policy-message-edit-"+cfg.scenario),
+			ConversationId: cfg.conversationID,
+			MessageId:      messageID,
+			IdempotencyKey: "policy-message-edit-" + cfg.scenario,
+			Payload:        payload,
+			Reason:         "policy integration smoke",
+		})
+		return response, err, float64(time.Since(started).Microseconds()) / 1000.0
+	case "revoke":
+		response, err = client.RevokeMessage(ctx, &messagev1.RevokeMessageRequest{
+			AuthContext:    authContext(cfg, "policy-message-revoke-"+cfg.scenario),
+			ConversationId: cfg.conversationID,
+			MessageId:      messageID,
+			IdempotencyKey: "policy-message-revoke-" + cfg.scenario,
+			Reason:         "policy integration smoke",
+		})
+		return response, err, float64(time.Since(started).Microseconds()) / 1000.0
+	case "delete":
+		response, err = client.DeleteMessage(ctx, &messagev1.DeleteMessageRequest{
+			AuthContext:    authContext(cfg, "policy-message-delete-"+cfg.scenario),
+			ConversationId: cfg.conversationID,
+			MessageId:      messageID,
+			IdempotencyKey: "policy-message-delete-" + cfg.scenario,
+			DeleteScope:    messagev1.DeleteScope_DELETE_SCOPE_CONVERSATION_VIEW,
+			Reason:         "policy integration smoke",
+		})
+		return response, err, float64(time.Since(started).Microseconds()) / 1000.0
+	default:
+		return nil, fmt.Errorf("unsupported change action %q", cfg.action), 0
+	}
+}
+
+func authContext(cfg config, requestID string) *messagev1.AuthContext {
+	return &messagev1.AuthContext{
+		TenantId:  cfg.tenantID,
+		UserId:    cfg.userID,
+		DeviceId:  cfg.deviceID,
+		SessionId: cfg.sessionID,
+		TraceId:   "trace-policy-message-smoke",
+		RequestId: requestID,
+	}
+}
+
+func validateSendAllow(cfg config, response *messagev1.SendMessageResponse, row messageRow) error {
 	if response.GetMessageId() == "" || response.GetConversationSeq() <= 0 {
 		return fmt.Errorf("allow returned invalid response message_id=%q seq=%d", response.GetMessageId(), response.GetConversationSeq())
 	}
@@ -304,6 +471,65 @@ func validateAllow(cfg config, response *messagev1.SendMessageResponse, row mess
 	}
 	if row.OutboxStatus != "PENDING" && row.OutboxStatus != "PUBLISHED" {
 		return fmt.Errorf("unexpected outbox status %q", row.OutboxStatus)
+	}
+	return nil
+}
+
+func validateBaseSend(row messageRow) error {
+	if row.MessageID == "" || row.ConversationSeq <= 0 {
+		return fmt.Errorf("base SendMessage did not persist a message: %+v", row)
+	}
+	if row.OutboxStatus != "PENDING" && row.OutboxStatus != "PUBLISHED" {
+		return fmt.Errorf("unexpected base SendMessage outbox status %q", row.OutboxStatus)
+	}
+	return nil
+}
+
+func validateChangeAllow(
+	cfg config,
+	send *messagev1.SendMessageResponse,
+	change *messagev1.MessageChangeResponse,
+	row changeRow,
+) error {
+	if change.GetMessageId() != send.GetMessageId() {
+		return fmt.Errorf("change message_id=%q expected %q", change.GetMessageId(), send.GetMessageId())
+	}
+	if change.GetConversationSeq() <= send.GetConversationSeq() {
+		return fmt.Errorf("change seq=%d did not advance past send seq=%d", change.GetConversationSeq(), send.GetConversationSeq())
+	}
+	if change.GetChangeVersion() <= 0 {
+		return fmt.Errorf("change version must be positive, got %d", change.GetChangeVersion())
+	}
+	expectedStatus := map[string]string{
+		"edit":   "EDITED",
+		"revoke": "REVOKED",
+		"delete": "DELETED",
+	}[cfg.action]
+	expectedEventType := map[string]string{
+		"edit":   "message.edited.v1",
+		"revoke": "message.revoked.v1",
+		"delete": "message.deleted.v1",
+	}[cfg.action]
+	if row.MessageStatus != expectedStatus {
+		return fmt.Errorf("message status=%s expected %s", row.MessageStatus, expectedStatus)
+	}
+	if row.TimelineEventType != expectedEventType {
+		return fmt.Errorf("timeline event_type=%s expected %s", row.TimelineEventType, expectedEventType)
+	}
+	if row.TimelinePermissionVersion != cfg.expectedPermissionVer {
+		return fmt.Errorf("timeline permission_version=%d expected %d", row.TimelinePermissionVersion, cfg.expectedPermissionVer)
+	}
+	if row.TimelineClassification != cfg.expectedClassification {
+		return fmt.Errorf("timeline classification=%q expected %q", row.TimelineClassification, cfg.expectedClassification)
+	}
+	if row.ChangeHistoryRows <= 0 {
+		return fmt.Errorf("expected change history row, got %d", row.ChangeHistoryRows)
+	}
+	if row.OutboxStatus != "PENDING" && row.OutboxStatus != "PUBLISHED" {
+		return fmt.Errorf("unexpected change outbox status %q", row.OutboxStatus)
+	}
+	if cfg.action == "edit" && !strings.Contains(row.MessagePayload, "policy integration smoke edited") {
+		return fmt.Errorf("edited payload does not contain updated text: %s", row.MessagePayload)
 	}
 	return nil
 }
@@ -353,6 +579,12 @@ func readDBStats(ctx context.Context, pool *pgxpool.Pool, tenantID string) (dbSt
 	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM message_outbox WHERE tenant_id = $1`, tenantID).Scan(&stats.MessageOutbox); err != nil {
 		return stats, err
 	}
+	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM message_change_history WHERE tenant_id = $1`, tenantID).Scan(&stats.MessageChangeHistory); err != nil {
+		return stats, err
+	}
+	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM message_command_idempotency WHERE tenant_id = $1`, tenantID).Scan(&stats.CommandIdempotency); err != nil {
+		return stats, err
+	}
 	return stats, nil
 }
 
@@ -395,6 +627,57 @@ WHERE ml.tenant_id = $1
 	return result, nil
 }
 
+func readChangeRow(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	cfg config,
+	messageID string,
+	conversationSeq int64,
+) (changeRow, error) {
+	row := pool.QueryRow(ctx, `
+SELECT
+    ml.message_id,
+    ml.status,
+    ml.payload_json::text,
+    te.event_type,
+    te.permission_version,
+    COALESCE(te.classification, ''),
+    mo.status,
+    (
+      SELECT COUNT(*)
+      FROM message_change_history mch
+      WHERE mch.tenant_id = ml.tenant_id
+        AND mch.conversation_id = ml.conversation_id
+        AND mch.message_id = ml.message_id
+    )
+FROM message_log ml
+JOIN conversation_timeline_events te
+  ON te.tenant_id = ml.tenant_id
+ AND te.conversation_id = ml.conversation_id
+ AND te.seq = $3
+LEFT JOIN message_outbox mo
+  ON mo.tenant_id = te.tenant_id
+ AND mo.conversation_id = te.conversation_id
+ AND mo.aggregate_version = te.seq
+WHERE ml.tenant_id = $1
+  AND ml.message_id = $2
+`, cfg.tenantID, messageID, conversationSeq)
+	var result changeRow
+	if err := row.Scan(
+		&result.MessageID,
+		&result.MessageStatus,
+		&result.MessagePayload,
+		&result.TimelineEventType,
+		&result.TimelinePermissionVersion,
+		&result.TimelineClassification,
+		&result.OutboxStatus,
+		&result.ChangeHistoryRows,
+	); err != nil {
+		return result, err
+	}
+	return result, nil
+}
+
 func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string) error {
 	for _, statement := range []string{
 		`DELETE FROM message_outbox WHERE tenant_id = $1`,
@@ -413,12 +696,19 @@ func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string) err
 	return nil
 }
 
-func seedPolicyRule(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
-	allowed := cfg.scenario == "allow"
-	reason := cfg.expectedReason
-	if !allowed && strings.TrimSpace(reason) == "" {
-		reason = "policy denied"
+func seedPolicyRules(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
+	if _, err := pool.Exec(ctx, `DELETE FROM policy_message_action_rules WHERE tenant_id = $1`, cfg.tenantID); err != nil {
+		return fmt.Errorf("cleanup policy rules: %w", err)
 	}
+	for _, rule := range expectedPolicyRules(cfg) {
+		if err := seedOnePolicyRule(ctx, pool, rule); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedOnePolicyRule(ctx context.Context, pool *pgxpool.Pool, rule policyRule) error {
 	_, err := pool.Exec(ctx, `
 INSERT INTO policy_message_action_rules (
     tenant_id,
@@ -430,7 +720,7 @@ INSERT INTO policy_message_action_rules (
     classification,
     reason,
     source
-) VALUES ($1, $2, $3, 'SEND', $4, $5, $6, $7, 'loadtest')
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'loadtest')
 ON CONFLICT (tenant_id, user_id, conversation_id, action) DO UPDATE
 SET allowed = EXCLUDED.allowed,
     permission_version = EXCLUDED.permission_version,
@@ -438,11 +728,51 @@ SET allowed = EXCLUDED.allowed,
     reason = EXCLUDED.reason,
     source = EXCLUDED.source,
     updated_at = now()
-`, cfg.tenantID, cfg.userID, cfg.conversationID, allowed, cfg.expectedPermissionVer, cfg.expectedClassification, reason)
+`, rule.TenantID, rule.UserID, rule.ConversationID, rule.Action, rule.Allowed, rule.PermissionVersion, rule.Classification, rule.Reason)
 	if err != nil {
 		return fmt.Errorf("seed policy rule: %w", err)
 	}
 	return nil
+}
+
+func expectedPolicyRules(cfg config) []policyRule {
+	rules := make([]policyRule, 0, 2)
+	if cfg.action != "send" {
+		rules = append(rules, policyRule{
+			TenantID:          cfg.tenantID,
+			UserID:            cfg.userID,
+			ConversationID:    cfg.conversationID,
+			Action:            "SEND",
+			Allowed:           true,
+			PermissionVersion: cfg.expectedPermissionVer,
+			Classification:    "POLICY_SEND_SEED",
+		})
+	}
+	allowed := cfg.scenario == "allow"
+	reason := cfg.expectedReason
+	if !allowed && strings.TrimSpace(reason) == "" {
+		reason = "policy denied"
+	}
+	rules = append(rules, policyRule{
+		TenantID:          cfg.tenantID,
+		UserID:            cfg.userID,
+		ConversationID:    cfg.conversationID,
+		Action:            strings.ToUpper(cfg.action),
+		Allowed:           allowed,
+		PermissionVersion: cfg.expectedPermissionVer,
+		Classification:    cfg.expectedClassification,
+		Reason:            reason,
+	})
+	return rules
+}
+
+func isSupportedAction(action string) bool {
+	switch action {
+	case "send", "edit", "revoke", "delete":
+		return true
+	default:
+		return false
+	}
 }
 
 func writeSummary(resultDir string, s summary) error {

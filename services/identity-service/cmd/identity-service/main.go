@@ -127,6 +127,8 @@ func runGRPC() error {
 		app.NewBeginMFAEnrollmentUseCase(repository, passwords, mfaManager),
 		app.NewConfirmMFAEnrollmentUseCase(repository, mfaManager, mfaRecoveryCodes),
 		app.NewDisableMFAFactorUseCase(repository, passwords),
+		app.NewRegenerateMFARecoveryCodesUseCase(repository, passwords, mfaManager, mfaRecoveryCodes),
+		app.NewRevokeMFARecoveryCodesUseCase(repository, passwords),
 		app.NewIssueGatewayTokenUseCase(repository, signer),
 		app.NewRevokeDeviceUseCase(repository),
 		app.NewRevokeSessionUseCase(repository),

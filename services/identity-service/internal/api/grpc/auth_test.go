@@ -338,6 +338,64 @@ func TestServerDisableMFAFactorMapsResponse(t *testing.T) {
 	}
 }
 
+func TestServerRegenerateMFARecoveryCodesMapsRequestAndResponse(t *testing.T) {
+	executor := &fakeRegenerateMFARecoveryCodesExecutor{
+		result: types.RegenerateMFARecoveryCodesResult{
+			TenantID:          "tenant-1",
+			UserID:            "user-1",
+			RecoveryCodes:     []string{"aaaa-bbbb-cccc-dddd", "eeee-ffff-gggg-hhhh"},
+			GeneratedAtUnixMS: 1_800_000_002_000,
+		},
+	}
+	server := &Server{regenerateMFARecoveryCodes: executor}
+	response, err := server.RegenerateMFARecoveryCodes(context.Background(), &identityv1.RegenerateMFARecoveryCodesRequest{
+		TenantId:  "tenant-1",
+		UserId:    "user-1",
+		FactorId:  "mfa-1",
+		Password:  "correct horse battery staple",
+		Code:      "123456",
+		TraceId:   "trace-1",
+		RequestId: "request-1",
+	})
+	if err != nil {
+		t.Fatalf("regenerate recovery codes: %v", err)
+	}
+	if executor.command.FactorID != "mfa-1" || executor.command.Code != "123456" || executor.command.Password == "" {
+		t.Fatalf("unexpected command: %+v", executor.command)
+	}
+	if len(response.GetRecoveryCodes()) != 2 || response.GetGeneratedAtUnixMs() != 1_800_000_002_000 {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
+func TestServerRevokeMFARecoveryCodesMapsRequestAndResponse(t *testing.T) {
+	executor := &fakeRevokeMFARecoveryCodesExecutor{
+		result: types.RevokeMFARecoveryCodesResult{
+			TenantID:        "tenant-1",
+			UserID:          "user-1",
+			RevokedCount:    2,
+			RevokedAtUnixMS: 1_800_000_003_000,
+		},
+	}
+	server := &Server{revokeMFARecoveryCodes: executor}
+	response, err := server.RevokeMFARecoveryCodes(context.Background(), &identityv1.RevokeMFARecoveryCodesRequest{
+		TenantId:  "tenant-1",
+		UserId:    "user-1",
+		Password:  "correct horse battery staple",
+		TraceId:   "trace-1",
+		RequestId: "request-1",
+	})
+	if err != nil {
+		t.Fatalf("revoke recovery codes: %v", err)
+	}
+	if executor.command.TenantID != "tenant-1" || executor.command.Password == "" {
+		t.Fatalf("unexpected command: %+v", executor.command)
+	}
+	if response.GetRevokedCount() != 2 || response.GetRevokedAtUnixMs() != 1_800_000_003_000 {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
 func TestGRPCErrorMapsCredentialErrors(t *testing.T) {
 	if code := status.Code(grpcError(types.NewUserAlreadyExists("duplicate"))); code != codes.AlreadyExists {
 		t.Fatalf("expected user already exists to map to already exists, got %v", code)
@@ -402,6 +460,18 @@ type fakeDisableMFAFactorExecutor struct {
 	err     error
 }
 
+type fakeRegenerateMFARecoveryCodesExecutor struct {
+	command types.RegenerateMFARecoveryCodesCommand
+	result  types.RegenerateMFARecoveryCodesResult
+	err     error
+}
+
+type fakeRevokeMFARecoveryCodesExecutor struct {
+	command types.RevokeMFARecoveryCodesCommand
+	result  types.RevokeMFARecoveryCodesResult
+	err     error
+}
+
 func (executor *fakeLoginExecutor) Execute(_ context.Context, command types.LoginCommand) (types.LoginResult, error) {
 	executor.command = command
 	if executor.err != nil {
@@ -438,6 +508,22 @@ func (executor *fakeDisableMFAFactorExecutor) Execute(_ context.Context, command
 	executor.command = command
 	if executor.err != nil {
 		return types.DisableMFAFactorResult{}, executor.err
+	}
+	return executor.result, nil
+}
+
+func (executor *fakeRegenerateMFARecoveryCodesExecutor) Execute(_ context.Context, command types.RegenerateMFARecoveryCodesCommand) (types.RegenerateMFARecoveryCodesResult, error) {
+	executor.command = command
+	if executor.err != nil {
+		return types.RegenerateMFARecoveryCodesResult{}, executor.err
+	}
+	return executor.result, nil
+}
+
+func (executor *fakeRevokeMFARecoveryCodesExecutor) Execute(_ context.Context, command types.RevokeMFARecoveryCodesCommand) (types.RevokeMFARecoveryCodesResult, error) {
+	executor.command = command
+	if executor.err != nil {
+		return types.RevokeMFARecoveryCodesResult{}, executor.err
 	}
 	return executor.result, nil
 }

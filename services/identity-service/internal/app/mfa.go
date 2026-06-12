@@ -22,6 +22,8 @@ type MFARepository interface {
 	GetMFAFactorSecret(context.Context, types.TenantID, types.UserID, types.MFAFactorID) (types.MFAFactorSecret, error)
 	ConfirmMFAFactor(context.Context, types.ConfirmMFAEnrollmentCommand, []types.MFARecoveryCodeRecord, time.Time) (types.ConfirmMFAEnrollmentResult, error)
 	DisableMFAFactor(context.Context, types.DisableMFAFactorCommand, time.Time) (types.DisableMFAFactorResult, error)
+	ReplaceMFARecoveryCodes(context.Context, types.RegenerateMFARecoveryCodesCommand, []types.MFARecoveryCodeRecord, time.Time) (types.RegenerateMFARecoveryCodesResult, error)
+	RevokeMFARecoveryCodes(context.Context, types.RevokeMFARecoveryCodesCommand, time.Time) (types.RevokeMFARecoveryCodesResult, error)
 }
 
 func NewBeginMFAEnrollmentUseCase(repository MFARepository, passwords PasswordVerifier, secrets MFASecretManager) *BeginMFAEnrollmentUseCase {
@@ -107,12 +109,7 @@ func (uc *ConfirmMFAEnrollmentUseCase) Execute(ctx context.Context, command type
 	if err != nil {
 		return types.ConfirmMFAEnrollmentResult{}, err
 	}
-	records := make([]types.MFARecoveryCodeRecord, 0, len(recoveryCodes))
-	plainCodes := make([]string, 0, len(recoveryCodes))
-	for _, code := range recoveryCodes {
-		records = append(records, types.MFARecoveryCodeRecord{CodeID: code.CodeID, CodeHash: code.CodeHash})
-		plainCodes = append(plainCodes, code.Code)
-	}
+	records, plainCodes := recoveryCodeRecords(recoveryCodes)
 	result, err := uc.repository.ConfirmMFAFactor(ctx, command, records, now)
 	if err != nil {
 		return types.ConfirmMFAEnrollmentResult{}, err
@@ -146,4 +143,98 @@ func (uc *DisableMFAFactorUseCase) Execute(ctx context.Context, command types.Di
 		return types.DisableMFAFactorResult{}, types.NewInvalidCredentials("invalid credentials")
 	}
 	return uc.repository.DisableMFAFactor(ctx, command, uc.now())
+}
+
+type RegenerateMFARecoveryCodesUseCase struct {
+	repository MFARepository
+	passwords  PasswordVerifier
+	secrets    MFASecretManager
+	recovery   MFARecoveryCodeManager
+	now        func() time.Time
+}
+
+func NewRegenerateMFARecoveryCodesUseCase(repository MFARepository, passwords PasswordVerifier, secrets MFASecretManager, recovery MFARecoveryCodeManager) *RegenerateMFARecoveryCodesUseCase {
+	return &RegenerateMFARecoveryCodesUseCase{repository: repository, passwords: passwords, secrets: secrets, recovery: recovery, now: func() time.Time { return time.Now().UTC() }}
+}
+
+func (uc *RegenerateMFARecoveryCodesUseCase) Execute(ctx context.Context, command types.RegenerateMFARecoveryCodesCommand) (types.RegenerateMFARecoveryCodesResult, error) {
+	if err := domain.ValidateRegenerateMFARecoveryCodes(command); err != nil {
+		return types.RegenerateMFARecoveryCodesResult{}, err
+	}
+	if uc.repository == nil || uc.passwords == nil {
+		return types.RegenerateMFARecoveryCodesResult{}, types.NewDBWriteFailed("identity mfa dependencies are not configured")
+	}
+	if uc.secrets == nil || uc.recovery == nil {
+		return types.RegenerateMFARecoveryCodesResult{}, types.NewMFAUnavailable("mfa dependencies are not configured")
+	}
+	credential, err := uc.repository.GetUserCredential(ctx, command.TenantID, command.UserID)
+	if err != nil {
+		return types.RegenerateMFARecoveryCodesResult{}, err
+	}
+	if !uc.passwords.VerifyPassword(command.Password, credential.PasswordHash) {
+		return types.RegenerateMFARecoveryCodesResult{}, types.NewInvalidCredentials("invalid credentials")
+	}
+	factor, err := uc.repository.GetMFAFactorSecret(ctx, command.TenantID, command.UserID, command.FactorID)
+	if err != nil {
+		return types.RegenerateMFARecoveryCodesResult{}, err
+	}
+	if factor.Type != types.MFAFactorTypeTOTP || factor.Status != types.MFAFactorStatusActive {
+		return types.RegenerateMFARecoveryCodesResult{}, types.NewMFAFactorNotFound("mfa factor not found")
+	}
+	now := uc.now()
+	ok, err := uc.secrets.VerifyTOTP(factor.Secret, command.Code, now)
+	if err != nil {
+		return types.RegenerateMFARecoveryCodesResult{}, err
+	}
+	if !ok {
+		return types.RegenerateMFARecoveryCodesResult{}, types.NewInvalidMFA("invalid mfa code")
+	}
+	recoveryCodes, err := uc.recovery.NewRecoveryCodes(defaultMFARecoveryCodeCount)
+	if err != nil {
+		return types.RegenerateMFARecoveryCodesResult{}, err
+	}
+	records, plainCodes := recoveryCodeRecords(recoveryCodes)
+	result, err := uc.repository.ReplaceMFARecoveryCodes(ctx, command, records, now)
+	if err != nil {
+		return types.RegenerateMFARecoveryCodesResult{}, err
+	}
+	result.RecoveryCodes = plainCodes
+	return result, nil
+}
+
+type RevokeMFARecoveryCodesUseCase struct {
+	repository MFARepository
+	passwords  PasswordVerifier
+	now        func() time.Time
+}
+
+func NewRevokeMFARecoveryCodesUseCase(repository MFARepository, passwords PasswordVerifier) *RevokeMFARecoveryCodesUseCase {
+	return &RevokeMFARecoveryCodesUseCase{repository: repository, passwords: passwords, now: func() time.Time { return time.Now().UTC() }}
+}
+
+func (uc *RevokeMFARecoveryCodesUseCase) Execute(ctx context.Context, command types.RevokeMFARecoveryCodesCommand) (types.RevokeMFARecoveryCodesResult, error) {
+	if err := domain.ValidateRevokeMFARecoveryCodes(command); err != nil {
+		return types.RevokeMFARecoveryCodesResult{}, err
+	}
+	if uc.repository == nil || uc.passwords == nil {
+		return types.RevokeMFARecoveryCodesResult{}, types.NewDBWriteFailed("identity mfa dependencies are not configured")
+	}
+	credential, err := uc.repository.GetUserCredential(ctx, command.TenantID, command.UserID)
+	if err != nil {
+		return types.RevokeMFARecoveryCodesResult{}, err
+	}
+	if !uc.passwords.VerifyPassword(command.Password, credential.PasswordHash) {
+		return types.RevokeMFARecoveryCodesResult{}, types.NewInvalidCredentials("invalid credentials")
+	}
+	return uc.repository.RevokeMFARecoveryCodes(ctx, command, uc.now())
+}
+
+func recoveryCodeRecords(codes []types.MFARecoveryCode) ([]types.MFARecoveryCodeRecord, []string) {
+	records := make([]types.MFARecoveryCodeRecord, 0, len(codes))
+	plainCodes := make([]string, 0, len(codes))
+	for _, code := range codes {
+		records = append(records, types.MFARecoveryCodeRecord{CodeID: code.CodeID, CodeHash: code.CodeHash})
+		plainCodes = append(plainCodes, code.Code)
+	}
+	return records, plainCodes
 }

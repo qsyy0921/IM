@@ -170,6 +170,38 @@ func ValidateDisableMFAFactor(command types.DisableMFAFactorCommand) error {
 	return nil
 }
 
+func ValidateRegenerateMFARecoveryCodes(command types.RegenerateMFARecoveryCodesCommand) error {
+	if command.TenantID == "" {
+		return types.NewInvalidArgument("tenant_id is required")
+	}
+	if command.UserID == "" {
+		return types.NewInvalidArgument("user_id is required")
+	}
+	if command.FactorID == "" {
+		return types.NewInvalidArgument("factor_id is required")
+	}
+	if strings.TrimSpace(command.Password) == "" {
+		return types.NewInvalidArgument("password is required")
+	}
+	if !isSixDigitCode(command.Code) {
+		return types.NewInvalidArgument("mfa code is invalid")
+	}
+	return nil
+}
+
+func ValidateRevokeMFARecoveryCodes(command types.RevokeMFARecoveryCodesCommand) error {
+	if command.TenantID == "" {
+		return types.NewInvalidArgument("tenant_id is required")
+	}
+	if command.UserID == "" {
+		return types.NewInvalidArgument("user_id is required")
+	}
+	if strings.TrimSpace(command.Password) == "" {
+		return types.NewInvalidArgument("password is required")
+	}
+	return nil
+}
+
 func NormalizeAudience(audience string) string {
 	audience = strings.TrimSpace(audience)
 	if audience == "" {

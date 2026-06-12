@@ -2228,6 +2228,310 @@ func (x *DisableMFAFactorResponse) GetDisabledAtUnixMs() int64 {
 	return 0
 }
 
+type RegenerateMFARecoveryCodesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	FactorId      string                 `protobuf:"bytes,3,opt,name=factor_id,json=factorId,proto3" json:"factor_id,omitempty"`
+	Password      string                 `protobuf:"bytes,4,opt,name=password,proto3" json:"password,omitempty"`
+	Code          string                 `protobuf:"bytes,5,opt,name=code,proto3" json:"code,omitempty"`
+	TraceId       string                 `protobuf:"bytes,6,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	RequestId     string                 `protobuf:"bytes,7,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegenerateMFARecoveryCodesRequest) Reset() {
+	*x = RegenerateMFARecoveryCodesRequest{}
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegenerateMFARecoveryCodesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegenerateMFARecoveryCodesRequest) ProtoMessage() {}
+
+func (x *RegenerateMFARecoveryCodesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegenerateMFARecoveryCodesRequest.ProtoReflect.Descriptor instead.
+func (*RegenerateMFARecoveryCodesRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *RegenerateMFARecoveryCodesRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *RegenerateMFARecoveryCodesRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *RegenerateMFARecoveryCodesRequest) GetFactorId() string {
+	if x != nil {
+		return x.FactorId
+	}
+	return ""
+}
+
+func (x *RegenerateMFARecoveryCodesRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+func (x *RegenerateMFARecoveryCodesRequest) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *RegenerateMFARecoveryCodesRequest) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+func (x *RegenerateMFARecoveryCodesRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type RegenerateMFARecoveryCodesResponse struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	TenantId          string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId            string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	RecoveryCodes     []string               `protobuf:"bytes,3,rep,name=recovery_codes,json=recoveryCodes,proto3" json:"recovery_codes,omitempty"`
+	GeneratedAtUnixMs int64                  `protobuf:"varint,4,opt,name=generated_at_unix_ms,json=generatedAtUnixMs,proto3" json:"generated_at_unix_ms,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *RegenerateMFARecoveryCodesResponse) Reset() {
+	*x = RegenerateMFARecoveryCodesResponse{}
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegenerateMFARecoveryCodesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegenerateMFARecoveryCodesResponse) ProtoMessage() {}
+
+func (x *RegenerateMFARecoveryCodesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegenerateMFARecoveryCodesResponse.ProtoReflect.Descriptor instead.
+func (*RegenerateMFARecoveryCodesResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *RegenerateMFARecoveryCodesResponse) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *RegenerateMFARecoveryCodesResponse) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *RegenerateMFARecoveryCodesResponse) GetRecoveryCodes() []string {
+	if x != nil {
+		return x.RecoveryCodes
+	}
+	return nil
+}
+
+func (x *RegenerateMFARecoveryCodesResponse) GetGeneratedAtUnixMs() int64 {
+	if x != nil {
+		return x.GeneratedAtUnixMs
+	}
+	return 0
+}
+
+type RevokeMFARecoveryCodesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Password      string                 `protobuf:"bytes,3,opt,name=password,proto3" json:"password,omitempty"`
+	TraceId       string                 `protobuf:"bytes,4,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	RequestId     string                 `protobuf:"bytes,5,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeMFARecoveryCodesRequest) Reset() {
+	*x = RevokeMFARecoveryCodesRequest{}
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeMFARecoveryCodesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeMFARecoveryCodesRequest) ProtoMessage() {}
+
+func (x *RevokeMFARecoveryCodesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeMFARecoveryCodesRequest.ProtoReflect.Descriptor instead.
+func (*RevokeMFARecoveryCodesRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *RevokeMFARecoveryCodesRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *RevokeMFARecoveryCodesRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *RevokeMFARecoveryCodesRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+func (x *RevokeMFARecoveryCodesRequest) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+func (x *RevokeMFARecoveryCodesRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type RevokeMFARecoveryCodesResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	TenantId        string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId          string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	RevokedCount    int32                  `protobuf:"varint,3,opt,name=revoked_count,json=revokedCount,proto3" json:"revoked_count,omitempty"`
+	RevokedAtUnixMs int64                  `protobuf:"varint,4,opt,name=revoked_at_unix_ms,json=revokedAtUnixMs,proto3" json:"revoked_at_unix_ms,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RevokeMFARecoveryCodesResponse) Reset() {
+	*x = RevokeMFARecoveryCodesResponse{}
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeMFARecoveryCodesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeMFARecoveryCodesResponse) ProtoMessage() {}
+
+func (x *RevokeMFARecoveryCodesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeMFARecoveryCodesResponse.ProtoReflect.Descriptor instead.
+func (*RevokeMFARecoveryCodesResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *RevokeMFARecoveryCodesResponse) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *RevokeMFARecoveryCodesResponse) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *RevokeMFARecoveryCodesResponse) GetRevokedCount() int32 {
+	if x != nil {
+		return x.RevokedCount
+	}
+	return 0
+}
+
+func (x *RevokeMFARecoveryCodesResponse) GetRevokedAtUnixMs() int64 {
+	if x != nil {
+		return x.RevokedAtUnixMs
+	}
+	return 0
+}
+
 type IssueGatewayTokenRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
@@ -2244,7 +2548,7 @@ type IssueGatewayTokenRequest struct {
 
 func (x *IssueGatewayTokenRequest) Reset() {
 	*x = IssueGatewayTokenRequest{}
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[21]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2256,7 +2560,7 @@ func (x *IssueGatewayTokenRequest) String() string {
 func (*IssueGatewayTokenRequest) ProtoMessage() {}
 
 func (x *IssueGatewayTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[21]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2269,7 +2573,7 @@ func (x *IssueGatewayTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IssueGatewayTokenRequest.ProtoReflect.Descriptor instead.
 func (*IssueGatewayTokenRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{21}
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *IssueGatewayTokenRequest) GetTenantId() string {
@@ -2344,7 +2648,7 @@ type IssueGatewayTokenResponse struct {
 
 func (x *IssueGatewayTokenResponse) Reset() {
 	*x = IssueGatewayTokenResponse{}
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[22]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2356,7 +2660,7 @@ func (x *IssueGatewayTokenResponse) String() string {
 func (*IssueGatewayTokenResponse) ProtoMessage() {}
 
 func (x *IssueGatewayTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[22]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2369,7 +2673,7 @@ func (x *IssueGatewayTokenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IssueGatewayTokenResponse.ProtoReflect.Descriptor instead.
 func (*IssueGatewayTokenResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{22}
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *IssueGatewayTokenResponse) GetTenantId() string {
@@ -2440,7 +2744,7 @@ type RevokeDeviceRequest struct {
 
 func (x *RevokeDeviceRequest) Reset() {
 	*x = RevokeDeviceRequest{}
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[23]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2452,7 +2756,7 @@ func (x *RevokeDeviceRequest) String() string {
 func (*RevokeDeviceRequest) ProtoMessage() {}
 
 func (x *RevokeDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[23]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2465,7 +2769,7 @@ func (x *RevokeDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeDeviceRequest.ProtoReflect.Descriptor instead.
 func (*RevokeDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{23}
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *RevokeDeviceRequest) GetAdminContext() *AdminContext {
@@ -2509,7 +2813,7 @@ type RevokeDeviceResponse struct {
 
 func (x *RevokeDeviceResponse) Reset() {
 	*x = RevokeDeviceResponse{}
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[24]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2521,7 +2825,7 @@ func (x *RevokeDeviceResponse) String() string {
 func (*RevokeDeviceResponse) ProtoMessage() {}
 
 func (x *RevokeDeviceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[24]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2534,7 +2838,7 @@ func (x *RevokeDeviceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeDeviceResponse.ProtoReflect.Descriptor instead.
 func (*RevokeDeviceResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{24}
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *RevokeDeviceResponse) GetTenantId() string {
@@ -2585,7 +2889,7 @@ type RevokeSessionRequest struct {
 
 func (x *RevokeSessionRequest) Reset() {
 	*x = RevokeSessionRequest{}
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[25]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2597,7 +2901,7 @@ func (x *RevokeSessionRequest) String() string {
 func (*RevokeSessionRequest) ProtoMessage() {}
 
 func (x *RevokeSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[25]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2610,7 +2914,7 @@ func (x *RevokeSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeSessionRequest.ProtoReflect.Descriptor instead.
 func (*RevokeSessionRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{25}
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *RevokeSessionRequest) GetAdminContext() *AdminContext {
@@ -2662,7 +2966,7 @@ type RevokeSessionResponse struct {
 
 func (x *RevokeSessionResponse) Reset() {
 	*x = RevokeSessionResponse{}
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[26]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2674,7 +2978,7 @@ func (x *RevokeSessionResponse) String() string {
 func (*RevokeSessionResponse) ProtoMessage() {}
 
 func (x *RevokeSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[26]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2687,7 +2991,7 @@ func (x *RevokeSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeSessionResponse.ProtoReflect.Descriptor instead.
 func (*RevokeSessionResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{26}
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *RevokeSessionResponse) GetTenantId() string {
@@ -2743,7 +3047,7 @@ type GetDeviceStateRequest struct {
 
 func (x *GetDeviceStateRequest) Reset() {
 	*x = GetDeviceStateRequest{}
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[27]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2755,7 +3059,7 @@ func (x *GetDeviceStateRequest) String() string {
 func (*GetDeviceStateRequest) ProtoMessage() {}
 
 func (x *GetDeviceStateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[27]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2768,7 +3072,7 @@ func (x *GetDeviceStateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeviceStateRequest.ProtoReflect.Descriptor instead.
 func (*GetDeviceStateRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{27}
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *GetDeviceStateRequest) GetAdminContext() *AdminContext {
@@ -2807,7 +3111,7 @@ type GetDeviceStateResponse struct {
 
 func (x *GetDeviceStateResponse) Reset() {
 	*x = GetDeviceStateResponse{}
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[28]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2819,7 +3123,7 @@ func (x *GetDeviceStateResponse) String() string {
 func (*GetDeviceStateResponse) ProtoMessage() {}
 
 func (x *GetDeviceStateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[28]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2832,7 +3136,7 @@ func (x *GetDeviceStateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeviceStateResponse.ProtoReflect.Descriptor instead.
 func (*GetDeviceStateResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{28}
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *GetDeviceStateResponse) GetTenantId() string {
@@ -3077,7 +3381,33 @@ const file_nexusim_identity_v1_identity_service_proto_rawDesc = "" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +
 	"\tfactor_id\x18\x03 \x01(\tR\bfactorId\x12<\n" +
 	"\x06status\x18\x04 \x01(\x0e2$.nexusim.identity.v1.MFAFactorStatusR\x06status\x12-\n" +
-	"\x13disabled_at_unix_ms\x18\x05 \x01(\x03R\x10disabledAtUnixMs\"\x83\x02\n" +
+	"\x13disabled_at_unix_ms\x18\x05 \x01(\x03R\x10disabledAtUnixMs\"\xe0\x01\n" +
+	"!RegenerateMFARecoveryCodesRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +
+	"\tfactor_id\x18\x03 \x01(\tR\bfactorId\x12\x1a\n" +
+	"\bpassword\x18\x04 \x01(\tR\bpassword\x12\x12\n" +
+	"\x04code\x18\x05 \x01(\tR\x04code\x12\x19\n" +
+	"\btrace_id\x18\x06 \x01(\tR\atraceId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\a \x01(\tR\trequestId\"\xb2\x01\n" +
+	"\"RegenerateMFARecoveryCodesResponse\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12%\n" +
+	"\x0erecovery_codes\x18\x03 \x03(\tR\rrecoveryCodes\x12/\n" +
+	"\x14generated_at_unix_ms\x18\x04 \x01(\x03R\x11generatedAtUnixMs\"\xab\x01\n" +
+	"\x1dRevokeMFARecoveryCodesRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1a\n" +
+	"\bpassword\x18\x03 \x01(\tR\bpassword\x12\x19\n" +
+	"\btrace_id\x18\x04 \x01(\tR\atraceId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x05 \x01(\tR\trequestId\"\xa8\x01\n" +
+	"\x1eRevokeMFARecoveryCodesResponse\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12#\n" +
+	"\rrevoked_count\x18\x03 \x01(\x05R\frevokedCount\x12+\n" +
+	"\x12revoked_at_unix_ms\x18\x04 \x01(\x03R\x0frevokedAtUnixMs\"\x83\x02\n" +
 	"\x18IssueGatewayTokenRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +
@@ -3161,7 +3491,7 @@ const file_nexusim_identity_v1_identity_service_proto_rawDesc = "" +
 	"\rSessionStatus\x12\x1e\n" +
 	"\x1aSESSION_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15SESSION_STATUS_ACTIVE\x10\x01\x12\x1a\n" +
-	"\x16SESSION_STATUS_REVOKED\x10\x022\xf7\f\n" +
+	"\x16SESSION_STATUS_REVOKED\x10\x022\x8b\x0f\n" +
 	"\x0fIdentityService\x12c\n" +
 	"\fRegisterUser\x12(.nexusim.identity.v1.RegisterUserRequest\x1a).nexusim.identity.v1.RegisterUserResponse\x12N\n" +
 	"\x05Login\x12!.nexusim.identity.v1.LoginRequest\x1a\".nexusim.identity.v1.LoginResponse\x12x\n" +
@@ -3172,7 +3502,9 @@ const file_nexusim_identity_v1_identity_service_proto_rawDesc = "" +
 	"\x14ConfirmPasswordReset\x120.nexusim.identity.v1.ConfirmPasswordResetRequest\x1a1.nexusim.identity.v1.ConfirmPasswordResetResponse\x12u\n" +
 	"\x12BeginMFAEnrollment\x12..nexusim.identity.v1.BeginMFAEnrollmentRequest\x1a/.nexusim.identity.v1.BeginMFAEnrollmentResponse\x12{\n" +
 	"\x14ConfirmMFAEnrollment\x120.nexusim.identity.v1.ConfirmMFAEnrollmentRequest\x1a1.nexusim.identity.v1.ConfirmMFAEnrollmentResponse\x12o\n" +
-	"\x10DisableMFAFactor\x12,.nexusim.identity.v1.DisableMFAFactorRequest\x1a-.nexusim.identity.v1.DisableMFAFactorResponse\x12r\n" +
+	"\x10DisableMFAFactor\x12,.nexusim.identity.v1.DisableMFAFactorRequest\x1a-.nexusim.identity.v1.DisableMFAFactorResponse\x12\x8d\x01\n" +
+	"\x1aRegenerateMFARecoveryCodes\x126.nexusim.identity.v1.RegenerateMFARecoveryCodesRequest\x1a7.nexusim.identity.v1.RegenerateMFARecoveryCodesResponse\x12\x81\x01\n" +
+	"\x16RevokeMFARecoveryCodes\x122.nexusim.identity.v1.RevokeMFARecoveryCodesRequest\x1a3.nexusim.identity.v1.RevokeMFARecoveryCodesResponse\x12r\n" +
 	"\x11IssueGatewayToken\x12-.nexusim.identity.v1.IssueGatewayTokenRequest\x1a..nexusim.identity.v1.IssueGatewayTokenResponse\x12c\n" +
 	"\fRevokeDevice\x12(.nexusim.identity.v1.RevokeDeviceRequest\x1a).nexusim.identity.v1.RevokeDeviceResponse\x12f\n" +
 	"\rRevokeSession\x12).nexusim.identity.v1.RevokeSessionRequest\x1a*.nexusim.identity.v1.RevokeSessionResponse\x12i\n" +
@@ -3191,7 +3523,7 @@ func file_nexusim_identity_v1_identity_service_proto_rawDescGZIP() []byte {
 }
 
 var file_nexusim_identity_v1_identity_service_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_nexusim_identity_v1_identity_service_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
+var file_nexusim_identity_v1_identity_service_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
 var file_nexusim_identity_v1_identity_service_proto_goTypes = []any{
 	(DeviceStatus)(0),                            // 0: nexusim.identity.v1.DeviceStatus
 	(UserStatus)(0),                              // 1: nexusim.identity.v1.UserStatus
@@ -3220,14 +3552,18 @@ var file_nexusim_identity_v1_identity_service_proto_goTypes = []any{
 	(*ConfirmMFAEnrollmentResponse)(nil),         // 24: nexusim.identity.v1.ConfirmMFAEnrollmentResponse
 	(*DisableMFAFactorRequest)(nil),              // 25: nexusim.identity.v1.DisableMFAFactorRequest
 	(*DisableMFAFactorResponse)(nil),             // 26: nexusim.identity.v1.DisableMFAFactorResponse
-	(*IssueGatewayTokenRequest)(nil),             // 27: nexusim.identity.v1.IssueGatewayTokenRequest
-	(*IssueGatewayTokenResponse)(nil),            // 28: nexusim.identity.v1.IssueGatewayTokenResponse
-	(*RevokeDeviceRequest)(nil),                  // 29: nexusim.identity.v1.RevokeDeviceRequest
-	(*RevokeDeviceResponse)(nil),                 // 30: nexusim.identity.v1.RevokeDeviceResponse
-	(*RevokeSessionRequest)(nil),                 // 31: nexusim.identity.v1.RevokeSessionRequest
-	(*RevokeSessionResponse)(nil),                // 32: nexusim.identity.v1.RevokeSessionResponse
-	(*GetDeviceStateRequest)(nil),                // 33: nexusim.identity.v1.GetDeviceStateRequest
-	(*GetDeviceStateResponse)(nil),               // 34: nexusim.identity.v1.GetDeviceStateResponse
+	(*RegenerateMFARecoveryCodesRequest)(nil),    // 27: nexusim.identity.v1.RegenerateMFARecoveryCodesRequest
+	(*RegenerateMFARecoveryCodesResponse)(nil),   // 28: nexusim.identity.v1.RegenerateMFARecoveryCodesResponse
+	(*RevokeMFARecoveryCodesRequest)(nil),        // 29: nexusim.identity.v1.RevokeMFARecoveryCodesRequest
+	(*RevokeMFARecoveryCodesResponse)(nil),       // 30: nexusim.identity.v1.RevokeMFARecoveryCodesResponse
+	(*IssueGatewayTokenRequest)(nil),             // 31: nexusim.identity.v1.IssueGatewayTokenRequest
+	(*IssueGatewayTokenResponse)(nil),            // 32: nexusim.identity.v1.IssueGatewayTokenResponse
+	(*RevokeDeviceRequest)(nil),                  // 33: nexusim.identity.v1.RevokeDeviceRequest
+	(*RevokeDeviceResponse)(nil),                 // 34: nexusim.identity.v1.RevokeDeviceResponse
+	(*RevokeSessionRequest)(nil),                 // 35: nexusim.identity.v1.RevokeSessionRequest
+	(*RevokeSessionResponse)(nil),                // 36: nexusim.identity.v1.RevokeSessionResponse
+	(*GetDeviceStateRequest)(nil),                // 37: nexusim.identity.v1.GetDeviceStateRequest
+	(*GetDeviceStateResponse)(nil),               // 38: nexusim.identity.v1.GetDeviceStateResponse
 }
 var file_nexusim_identity_v1_identity_service_proto_depIdxs = []int32{
 	1,  // 0: nexusim.identity.v1.RegisterUserResponse.status:type_name -> nexusim.identity.v1.UserStatus
@@ -3257,26 +3593,30 @@ var file_nexusim_identity_v1_identity_service_proto_depIdxs = []int32{
 	21, // 24: nexusim.identity.v1.IdentityService.BeginMFAEnrollment:input_type -> nexusim.identity.v1.BeginMFAEnrollmentRequest
 	23, // 25: nexusim.identity.v1.IdentityService.ConfirmMFAEnrollment:input_type -> nexusim.identity.v1.ConfirmMFAEnrollmentRequest
 	25, // 26: nexusim.identity.v1.IdentityService.DisableMFAFactor:input_type -> nexusim.identity.v1.DisableMFAFactorRequest
-	27, // 27: nexusim.identity.v1.IdentityService.IssueGatewayToken:input_type -> nexusim.identity.v1.IssueGatewayTokenRequest
-	29, // 28: nexusim.identity.v1.IdentityService.RevokeDevice:input_type -> nexusim.identity.v1.RevokeDeviceRequest
-	31, // 29: nexusim.identity.v1.IdentityService.RevokeSession:input_type -> nexusim.identity.v1.RevokeSessionRequest
-	33, // 30: nexusim.identity.v1.IdentityService.GetDeviceState:input_type -> nexusim.identity.v1.GetDeviceStateRequest
-	8,  // 31: nexusim.identity.v1.IdentityService.RegisterUser:output_type -> nexusim.identity.v1.RegisterUserResponse
-	10, // 32: nexusim.identity.v1.IdentityService.Login:output_type -> nexusim.identity.v1.LoginResponse
-	12, // 33: nexusim.identity.v1.IdentityService.RefreshGatewayToken:output_type -> nexusim.identity.v1.RefreshGatewayTokenResponse
-	14, // 34: nexusim.identity.v1.IdentityService.RequestVerificationChallenge:output_type -> nexusim.identity.v1.RequestVerificationChallengeResponse
-	16, // 35: nexusim.identity.v1.IdentityService.ConfirmVerificationChallenge:output_type -> nexusim.identity.v1.ConfirmVerificationChallengeResponse
-	18, // 36: nexusim.identity.v1.IdentityService.RequestPasswordReset:output_type -> nexusim.identity.v1.RequestPasswordResetResponse
-	20, // 37: nexusim.identity.v1.IdentityService.ConfirmPasswordReset:output_type -> nexusim.identity.v1.ConfirmPasswordResetResponse
-	22, // 38: nexusim.identity.v1.IdentityService.BeginMFAEnrollment:output_type -> nexusim.identity.v1.BeginMFAEnrollmentResponse
-	24, // 39: nexusim.identity.v1.IdentityService.ConfirmMFAEnrollment:output_type -> nexusim.identity.v1.ConfirmMFAEnrollmentResponse
-	26, // 40: nexusim.identity.v1.IdentityService.DisableMFAFactor:output_type -> nexusim.identity.v1.DisableMFAFactorResponse
-	28, // 41: nexusim.identity.v1.IdentityService.IssueGatewayToken:output_type -> nexusim.identity.v1.IssueGatewayTokenResponse
-	30, // 42: nexusim.identity.v1.IdentityService.RevokeDevice:output_type -> nexusim.identity.v1.RevokeDeviceResponse
-	32, // 43: nexusim.identity.v1.IdentityService.RevokeSession:output_type -> nexusim.identity.v1.RevokeSessionResponse
-	34, // 44: nexusim.identity.v1.IdentityService.GetDeviceState:output_type -> nexusim.identity.v1.GetDeviceStateResponse
-	31, // [31:45] is the sub-list for method output_type
-	17, // [17:31] is the sub-list for method input_type
+	27, // 27: nexusim.identity.v1.IdentityService.RegenerateMFARecoveryCodes:input_type -> nexusim.identity.v1.RegenerateMFARecoveryCodesRequest
+	29, // 28: nexusim.identity.v1.IdentityService.RevokeMFARecoveryCodes:input_type -> nexusim.identity.v1.RevokeMFARecoveryCodesRequest
+	31, // 29: nexusim.identity.v1.IdentityService.IssueGatewayToken:input_type -> nexusim.identity.v1.IssueGatewayTokenRequest
+	33, // 30: nexusim.identity.v1.IdentityService.RevokeDevice:input_type -> nexusim.identity.v1.RevokeDeviceRequest
+	35, // 31: nexusim.identity.v1.IdentityService.RevokeSession:input_type -> nexusim.identity.v1.RevokeSessionRequest
+	37, // 32: nexusim.identity.v1.IdentityService.GetDeviceState:input_type -> nexusim.identity.v1.GetDeviceStateRequest
+	8,  // 33: nexusim.identity.v1.IdentityService.RegisterUser:output_type -> nexusim.identity.v1.RegisterUserResponse
+	10, // 34: nexusim.identity.v1.IdentityService.Login:output_type -> nexusim.identity.v1.LoginResponse
+	12, // 35: nexusim.identity.v1.IdentityService.RefreshGatewayToken:output_type -> nexusim.identity.v1.RefreshGatewayTokenResponse
+	14, // 36: nexusim.identity.v1.IdentityService.RequestVerificationChallenge:output_type -> nexusim.identity.v1.RequestVerificationChallengeResponse
+	16, // 37: nexusim.identity.v1.IdentityService.ConfirmVerificationChallenge:output_type -> nexusim.identity.v1.ConfirmVerificationChallengeResponse
+	18, // 38: nexusim.identity.v1.IdentityService.RequestPasswordReset:output_type -> nexusim.identity.v1.RequestPasswordResetResponse
+	20, // 39: nexusim.identity.v1.IdentityService.ConfirmPasswordReset:output_type -> nexusim.identity.v1.ConfirmPasswordResetResponse
+	22, // 40: nexusim.identity.v1.IdentityService.BeginMFAEnrollment:output_type -> nexusim.identity.v1.BeginMFAEnrollmentResponse
+	24, // 41: nexusim.identity.v1.IdentityService.ConfirmMFAEnrollment:output_type -> nexusim.identity.v1.ConfirmMFAEnrollmentResponse
+	26, // 42: nexusim.identity.v1.IdentityService.DisableMFAFactor:output_type -> nexusim.identity.v1.DisableMFAFactorResponse
+	28, // 43: nexusim.identity.v1.IdentityService.RegenerateMFARecoveryCodes:output_type -> nexusim.identity.v1.RegenerateMFARecoveryCodesResponse
+	30, // 44: nexusim.identity.v1.IdentityService.RevokeMFARecoveryCodes:output_type -> nexusim.identity.v1.RevokeMFARecoveryCodesResponse
+	32, // 45: nexusim.identity.v1.IdentityService.IssueGatewayToken:output_type -> nexusim.identity.v1.IssueGatewayTokenResponse
+	34, // 46: nexusim.identity.v1.IdentityService.RevokeDevice:output_type -> nexusim.identity.v1.RevokeDeviceResponse
+	36, // 47: nexusim.identity.v1.IdentityService.RevokeSession:output_type -> nexusim.identity.v1.RevokeSessionResponse
+	38, // 48: nexusim.identity.v1.IdentityService.GetDeviceState:output_type -> nexusim.identity.v1.GetDeviceStateResponse
+	33, // [33:49] is the sub-list for method output_type
+	17, // [17:33] is the sub-list for method input_type
 	17, // [17:17] is the sub-list for extension type_name
 	17, // [17:17] is the sub-list for extension extendee
 	0,  // [0:17] is the sub-list for field type_name
@@ -3293,7 +3633,7 @@ func file_nexusim_identity_v1_identity_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_identity_v1_identity_service_proto_rawDesc), len(file_nexusim_identity_v1_identity_service_proto_rawDesc)),
 			NumEnums:      6,
-			NumMessages:   29,
+			NumMessages:   33,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

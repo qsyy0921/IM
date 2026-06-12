@@ -55,6 +55,14 @@ type DisableMFAFactorExecutor interface {
 	Execute(context.Context, types.DisableMFAFactorCommand) (types.DisableMFAFactorResult, error)
 }
 
+type RegenerateMFARecoveryCodesExecutor interface {
+	Execute(context.Context, types.RegenerateMFARecoveryCodesCommand) (types.RegenerateMFARecoveryCodesResult, error)
+}
+
+type RevokeMFARecoveryCodesExecutor interface {
+	Execute(context.Context, types.RevokeMFARecoveryCodesCommand) (types.RevokeMFARecoveryCodesResult, error)
+}
+
 type RevokeDeviceExecutor interface {
 	Execute(context.Context, types.RevokeDeviceCommand) (types.RevokeDeviceResult, error)
 }
@@ -69,20 +77,22 @@ type GetDeviceStateExecutor interface {
 
 type Server struct {
 	identityv1.UnimplementedIdentityServiceServer
-	registerUser         RegisterUserExecutor
-	login                LoginExecutor
-	refreshGatewayToken  RefreshGatewayTokenExecutor
-	requestVerification  RequestVerificationChallengeExecutor
-	confirmVerification  ConfirmVerificationChallengeExecutor
-	requestPasswordReset RequestPasswordResetExecutor
-	confirmPasswordReset ConfirmPasswordResetExecutor
-	beginMFAEnrollment   BeginMFAEnrollmentExecutor
-	confirmMFAEnrollment ConfirmMFAEnrollmentExecutor
-	disableMFAFactor     DisableMFAFactorExecutor
-	issueGatewayToken    IssueGatewayTokenExecutor
-	revokeDevice         RevokeDeviceExecutor
-	revokeSession        RevokeSessionExecutor
-	getDeviceState       GetDeviceStateExecutor
+	registerUser               RegisterUserExecutor
+	login                      LoginExecutor
+	refreshGatewayToken        RefreshGatewayTokenExecutor
+	requestVerification        RequestVerificationChallengeExecutor
+	confirmVerification        ConfirmVerificationChallengeExecutor
+	requestPasswordReset       RequestPasswordResetExecutor
+	confirmPasswordReset       ConfirmPasswordResetExecutor
+	beginMFAEnrollment         BeginMFAEnrollmentExecutor
+	confirmMFAEnrollment       ConfirmMFAEnrollmentExecutor
+	disableMFAFactor           DisableMFAFactorExecutor
+	regenerateMFARecoveryCodes RegenerateMFARecoveryCodesExecutor
+	revokeMFARecoveryCodes     RevokeMFARecoveryCodesExecutor
+	issueGatewayToken          IssueGatewayTokenExecutor
+	revokeDevice               RevokeDeviceExecutor
+	revokeSession              RevokeSessionExecutor
+	getDeviceState             GetDeviceStateExecutor
 }
 
 func NewServer(
@@ -96,26 +106,30 @@ func NewServer(
 	beginMFAEnrollment BeginMFAEnrollmentExecutor,
 	confirmMFAEnrollment ConfirmMFAEnrollmentExecutor,
 	disableMFAFactor DisableMFAFactorExecutor,
+	regenerateMFARecoveryCodes RegenerateMFARecoveryCodesExecutor,
+	revokeMFARecoveryCodes RevokeMFARecoveryCodesExecutor,
 	issueGatewayToken IssueGatewayTokenExecutor,
 	revokeDevice RevokeDeviceExecutor,
 	revokeSession RevokeSessionExecutor,
 	getDeviceState GetDeviceStateExecutor,
 ) *Server {
 	return &Server{
-		registerUser:         registerUser,
-		login:                login,
-		refreshGatewayToken:  refreshGatewayToken,
-		requestVerification:  requestVerification,
-		confirmVerification:  confirmVerification,
-		requestPasswordReset: requestPasswordReset,
-		confirmPasswordReset: confirmPasswordReset,
-		beginMFAEnrollment:   beginMFAEnrollment,
-		confirmMFAEnrollment: confirmMFAEnrollment,
-		disableMFAFactor:     disableMFAFactor,
-		issueGatewayToken:    issueGatewayToken,
-		revokeDevice:         revokeDevice,
-		revokeSession:        revokeSession,
-		getDeviceState:       getDeviceState,
+		registerUser:               registerUser,
+		login:                      login,
+		refreshGatewayToken:        refreshGatewayToken,
+		requestVerification:        requestVerification,
+		confirmVerification:        confirmVerification,
+		requestPasswordReset:       requestPasswordReset,
+		confirmPasswordReset:       confirmPasswordReset,
+		beginMFAEnrollment:         beginMFAEnrollment,
+		confirmMFAEnrollment:       confirmMFAEnrollment,
+		disableMFAFactor:           disableMFAFactor,
+		regenerateMFARecoveryCodes: regenerateMFARecoveryCodes,
+		revokeMFARecoveryCodes:     revokeMFARecoveryCodes,
+		issueGatewayToken:          issueGatewayToken,
+		revokeDevice:               revokeDevice,
+		revokeSession:              revokeSession,
+		getDeviceState:             getDeviceState,
 	}
 }
 
@@ -421,6 +435,58 @@ func (s *Server) DisableMFAFactor(ctx context.Context, request *identityv1.Disab
 		FactorId:         string(result.FactorID),
 		Status:           mfaFactorStatusToProto(result.Status),
 		DisabledAtUnixMs: result.DisabledAtUnixMS,
+	}, nil
+}
+
+func (s *Server) RegenerateMFARecoveryCodes(ctx context.Context, request *identityv1.RegenerateMFARecoveryCodesRequest) (*identityv1.RegenerateMFARecoveryCodesResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.regenerateMFARecoveryCodes == nil {
+		return nil, status.Error(codes.Unimplemented, "regenerate mfa recovery codes is not configured")
+	}
+	result, err := s.regenerateMFARecoveryCodes.Execute(ctx, types.RegenerateMFARecoveryCodesCommand{
+		TenantID:  types.TenantID(request.GetTenantId()),
+		UserID:    types.UserID(request.GetUserId()),
+		FactorID:  types.MFAFactorID(request.GetFactorId()),
+		Password:  request.GetPassword(),
+		Code:      request.GetCode(),
+		TraceID:   request.GetTraceId(),
+		RequestID: request.GetRequestId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &identityv1.RegenerateMFARecoveryCodesResponse{
+		TenantId:          string(result.TenantID),
+		UserId:            string(result.UserID),
+		RecoveryCodes:     append([]string(nil), result.RecoveryCodes...),
+		GeneratedAtUnixMs: result.GeneratedAtUnixMS,
+	}, nil
+}
+
+func (s *Server) RevokeMFARecoveryCodes(ctx context.Context, request *identityv1.RevokeMFARecoveryCodesRequest) (*identityv1.RevokeMFARecoveryCodesResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.revokeMFARecoveryCodes == nil {
+		return nil, status.Error(codes.Unimplemented, "revoke mfa recovery codes is not configured")
+	}
+	result, err := s.revokeMFARecoveryCodes.Execute(ctx, types.RevokeMFARecoveryCodesCommand{
+		TenantID:  types.TenantID(request.GetTenantId()),
+		UserID:    types.UserID(request.GetUserId()),
+		Password:  request.GetPassword(),
+		TraceID:   request.GetTraceId(),
+		RequestID: request.GetRequestId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &identityv1.RevokeMFARecoveryCodesResponse{
+		TenantId:        string(result.TenantID),
+		UserId:          string(result.UserID),
+		RevokedCount:    int32(result.RevokedCount),
+		RevokedAtUnixMs: result.RevokedAtUnixMS,
 	}, nil
 }
 

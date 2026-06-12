@@ -624,6 +624,88 @@ func TestRepositoryMFARecoveryCodeLoginConsumesCodeIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryMFARecoveryCodeRegenerateAndRevokeIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	repository := NewRepository(
+		pool,
+		WithMFAFactorIDGenerator(func() (string, error) { return "mfa-factor-recovery-manage", nil }),
+	)
+	now := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := repository.RegisterUser(ctx, types.RegisterUserCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+	}, "password-hash", now); err != nil {
+		t.Fatalf("register user: %v", err)
+	}
+	if _, err := repository.CreateMFAFactor(ctx, types.BeginMFAEnrollmentCommand{
+		TenantID:   "tenant-identity",
+		UserID:     "user-1",
+		FactorType: types.MFAFactorTypeTOTP,
+	}, types.EncryptedMFASecret{Ciphertext: "encrypted-secret", Nonce: "nonce-value", KeyVersion: "local-v1"}, now); err != nil {
+		t.Fatalf("create mfa factor: %v", err)
+	}
+	if _, err := repository.ConfirmMFAFactor(ctx, types.ConfirmMFAEnrollmentCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		FactorID: "mfa-factor-recovery-manage",
+	}, []types.MFARecoveryCodeRecord{{CodeID: "recovery-old-1", CodeHash: "recovery-old-hash-1"}}, now.Add(time.Minute)); err != nil {
+		t.Fatalf("confirm mfa factor: %v", err)
+	}
+	if _, err := repository.FindActiveMFARecoveryCode(ctx, "tenant-identity", "user-1", "recovery-old-hash-1"); err != nil {
+		t.Fatalf("expected old recovery code to be active before regenerate: %v", err)
+	}
+	generatedAt := now.Add(2 * time.Minute)
+	result, err := repository.ReplaceMFARecoveryCodes(ctx, types.RegenerateMFARecoveryCodesCommand{
+		TenantID:  "tenant-identity",
+		UserID:    "user-1",
+		TraceID:   "trace-regenerate",
+		RequestID: "request-regenerate",
+	}, []types.MFARecoveryCodeRecord{
+		{CodeID: "recovery-new-1", CodeHash: "recovery-new-hash-1"},
+		{CodeID: "recovery-new-2", CodeHash: "recovery-new-hash-2"},
+	}, generatedAt)
+	if err != nil {
+		t.Fatalf("replace recovery codes: %v", err)
+	}
+	if result.GeneratedAtUnixMS != generatedAt.UnixMilli() {
+		t.Fatalf("unexpected regenerate result: %+v", result)
+	}
+	if _, err := repository.FindActiveMFARecoveryCode(ctx, "tenant-identity", "user-1", "recovery-old-hash-1"); !errors.Is(err, types.ErrInvalidMFA) {
+		t.Fatalf("expected old recovery code to be disabled, got %v", err)
+	}
+	if _, err := repository.FindActiveMFARecoveryCode(ctx, "tenant-identity", "user-1", "recovery-new-hash-1"); err != nil {
+		t.Fatalf("expected new recovery code to be active: %v", err)
+	}
+	revokedAt := now.Add(3 * time.Minute)
+	revokeResult, err := repository.RevokeMFARecoveryCodes(ctx, types.RevokeMFARecoveryCodesCommand{
+		TenantID:  "tenant-identity",
+		UserID:    "user-1",
+		TraceID:   "trace-revoke",
+		RequestID: "request-revoke",
+	}, revokedAt)
+	if err != nil {
+		t.Fatalf("revoke recovery codes: %v", err)
+	}
+	if revokeResult.RevokedCount != 2 || revokeResult.RevokedAtUnixMS != revokedAt.UnixMilli() {
+		t.Fatalf("unexpected revoke result: %+v", revokeResult)
+	}
+	if _, err := repository.FindActiveMFARecoveryCode(ctx, "tenant-identity", "user-1", "recovery-new-hash-1"); !errors.Is(err, types.ErrInvalidMFA) {
+		t.Fatalf("expected new recovery code to be revoked, got %v", err)
+	}
+	replay, err := repository.RevokeMFARecoveryCodes(ctx, types.RevokeMFARecoveryCodesCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+	}, revokedAt.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("revoke recovery codes replay: %v", err)
+	}
+	if replay.RevokedCount != 0 {
+		t.Fatalf("expected idempotent replay to revoke zero codes, got %+v", replay)
+	}
+}
+
 func TestRepositoryLoginFailureLocksAndSuccessClearsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -1070,6 +1152,7 @@ func resetIdentityTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) 
 	t.Helper()
 	_, err := pool.Exec(ctx, `
 TRUNCATE
+    identity_mfa_recovery_codes,
     identity_mfa_factors,
     identity_challenges,
     identity_outbox,

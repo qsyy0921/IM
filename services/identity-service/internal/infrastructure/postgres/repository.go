@@ -781,7 +781,7 @@ RETURNING status
 	if err != nil {
 		return types.ConfirmMFAEnrollmentResult{}, types.NewDBWriteFailed(err.Error())
 	}
-	if err := replaceMFARecoveryCodes(ctx, tx, command, recoveryCodes, verifiedAt); err != nil {
+	if err := replaceMFARecoveryCodes(ctx, tx, command.TenantID, command.UserID, command.TraceID, command.RequestID, recoveryCodes, verifiedAt); err != nil {
 		return types.ConfirmMFAEnrollmentResult{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -847,6 +847,54 @@ RETURNING status
 		FactorID:         command.FactorID,
 		Status:           status,
 		DisabledAtUnixMS: disabledAt.UnixMilli(),
+	}, nil
+}
+
+func (r *Repository) ReplaceMFARecoveryCodes(ctx context.Context, command types.RegenerateMFARecoveryCodesCommand, recoveryCodes []types.MFARecoveryCodeRecord, generatedAt time.Time) (types.RegenerateMFARecoveryCodesResult, error) {
+	if r.pool == nil {
+		return types.RegenerateMFARecoveryCodesResult{}, types.NewDBWriteFailed("identity repository is not configured")
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.RegenerateMFARecoveryCodesResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err := replaceMFARecoveryCodes(ctx, tx, command.TenantID, command.UserID, command.TraceID, command.RequestID, recoveryCodes, generatedAt); err != nil {
+		return types.RegenerateMFARecoveryCodesResult{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.RegenerateMFARecoveryCodesResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.RegenerateMFARecoveryCodesResult{
+		TenantID:          command.TenantID,
+		UserID:            command.UserID,
+		GeneratedAtUnixMS: generatedAt.UnixMilli(),
+	}, nil
+}
+
+func (r *Repository) RevokeMFARecoveryCodes(ctx context.Context, command types.RevokeMFARecoveryCodesCommand, revokedAt time.Time) (types.RevokeMFARecoveryCodesResult, error) {
+	if r.pool == nil {
+		return types.RevokeMFARecoveryCodesResult{}, types.NewDBWriteFailed("identity repository is not configured")
+	}
+	tag, err := r.pool.Exec(ctx, `
+UPDATE identity_mfa_recovery_codes
+SET status = 'DISABLED',
+    disabled_at = $3,
+    updated_at = $3,
+    trace_id = $4,
+    request_id = $5
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND status = 'ACTIVE'
+`, command.TenantID, command.UserID, revokedAt, command.TraceID, command.RequestID)
+	if err != nil {
+		return types.RevokeMFARecoveryCodesResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.RevokeMFARecoveryCodesResult{
+		TenantID:        command.TenantID,
+		UserID:          command.UserID,
+		RevokedCount:    int(tag.RowsAffected()),
+		RevokedAtUnixMS: revokedAt.UnixMilli(),
 	}, nil
 }
 
@@ -1871,7 +1919,7 @@ WHERE tenant_id = $1
 	return nil
 }
 
-func replaceMFARecoveryCodes(ctx context.Context, tx pgx.Tx, command types.ConfirmMFAEnrollmentCommand, recoveryCodes []types.MFARecoveryCodeRecord, now time.Time) error {
+func replaceMFARecoveryCodes(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, traceID string, requestID string, recoveryCodes []types.MFARecoveryCodeRecord, now time.Time) error {
 	if len(recoveryCodes) == 0 {
 		return types.NewMFAUnavailable("mfa recovery codes are not configured")
 	}
@@ -1883,7 +1931,7 @@ SET status = 'DISABLED',
 WHERE tenant_id = $1
   AND user_id = $2
   AND status = 'ACTIVE'
-`, command.TenantID, command.UserID, now); err != nil {
+`, tenantID, userID, now); err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
 	for _, code := range recoveryCodes {
@@ -1902,7 +1950,7 @@ INSERT INTO identity_mfa_recovery_codes (
     request_id,
     updated_at
 ) VALUES ($1, $2, $3, $4, 'ACTIVE', $5, $6, $7, $5)
-`, command.TenantID, command.UserID, code.CodeID, code.CodeHash, now, command.TraceID, command.RequestID); err != nil {
+`, tenantID, userID, code.CodeID, code.CodeHash, now, traceID, requestID); err != nil {
 			return types.NewDBWriteFailed(err.Error())
 		}
 	}

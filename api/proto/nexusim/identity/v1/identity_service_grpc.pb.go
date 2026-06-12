@@ -29,6 +29,8 @@ const (
 	IdentityService_BeginMFAEnrollment_FullMethodName           = "/nexusim.identity.v1.IdentityService/BeginMFAEnrollment"
 	IdentityService_ConfirmMFAEnrollment_FullMethodName         = "/nexusim.identity.v1.IdentityService/ConfirmMFAEnrollment"
 	IdentityService_DisableMFAFactor_FullMethodName             = "/nexusim.identity.v1.IdentityService/DisableMFAFactor"
+	IdentityService_RegenerateMFARecoveryCodes_FullMethodName   = "/nexusim.identity.v1.IdentityService/RegenerateMFARecoveryCodes"
+	IdentityService_RevokeMFARecoveryCodes_FullMethodName       = "/nexusim.identity.v1.IdentityService/RevokeMFARecoveryCodes"
 	IdentityService_IssueGatewayToken_FullMethodName            = "/nexusim.identity.v1.IdentityService/IssueGatewayToken"
 	IdentityService_RevokeDevice_FullMethodName                 = "/nexusim.identity.v1.IdentityService/RevokeDevice"
 	IdentityService_RevokeSession_FullMethodName                = "/nexusim.identity.v1.IdentityService/RevokeSession"
@@ -49,6 +51,8 @@ type IdentityServiceClient interface {
 	BeginMFAEnrollment(ctx context.Context, in *BeginMFAEnrollmentRequest, opts ...grpc.CallOption) (*BeginMFAEnrollmentResponse, error)
 	ConfirmMFAEnrollment(ctx context.Context, in *ConfirmMFAEnrollmentRequest, opts ...grpc.CallOption) (*ConfirmMFAEnrollmentResponse, error)
 	DisableMFAFactor(ctx context.Context, in *DisableMFAFactorRequest, opts ...grpc.CallOption) (*DisableMFAFactorResponse, error)
+	RegenerateMFARecoveryCodes(ctx context.Context, in *RegenerateMFARecoveryCodesRequest, opts ...grpc.CallOption) (*RegenerateMFARecoveryCodesResponse, error)
+	RevokeMFARecoveryCodes(ctx context.Context, in *RevokeMFARecoveryCodesRequest, opts ...grpc.CallOption) (*RevokeMFARecoveryCodesResponse, error)
 	IssueGatewayToken(ctx context.Context, in *IssueGatewayTokenRequest, opts ...grpc.CallOption) (*IssueGatewayTokenResponse, error)
 	RevokeDevice(ctx context.Context, in *RevokeDeviceRequest, opts ...grpc.CallOption) (*RevokeDeviceResponse, error)
 	RevokeSession(ctx context.Context, in *RevokeSessionRequest, opts ...grpc.CallOption) (*RevokeSessionResponse, error)
@@ -163,6 +167,26 @@ func (c *identityServiceClient) DisableMFAFactor(ctx context.Context, in *Disabl
 	return out, nil
 }
 
+func (c *identityServiceClient) RegenerateMFARecoveryCodes(ctx context.Context, in *RegenerateMFARecoveryCodesRequest, opts ...grpc.CallOption) (*RegenerateMFARecoveryCodesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RegenerateMFARecoveryCodesResponse)
+	err := c.cc.Invoke(ctx, IdentityService_RegenerateMFARecoveryCodes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) RevokeMFARecoveryCodes(ctx context.Context, in *RevokeMFARecoveryCodesRequest, opts ...grpc.CallOption) (*RevokeMFARecoveryCodesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeMFARecoveryCodesResponse)
+	err := c.cc.Invoke(ctx, IdentityService_RevokeMFARecoveryCodes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *identityServiceClient) IssueGatewayToken(ctx context.Context, in *IssueGatewayTokenRequest, opts ...grpc.CallOption) (*IssueGatewayTokenResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(IssueGatewayTokenResponse)
@@ -217,6 +241,8 @@ type IdentityServiceServer interface {
 	BeginMFAEnrollment(context.Context, *BeginMFAEnrollmentRequest) (*BeginMFAEnrollmentResponse, error)
 	ConfirmMFAEnrollment(context.Context, *ConfirmMFAEnrollmentRequest) (*ConfirmMFAEnrollmentResponse, error)
 	DisableMFAFactor(context.Context, *DisableMFAFactorRequest) (*DisableMFAFactorResponse, error)
+	RegenerateMFARecoveryCodes(context.Context, *RegenerateMFARecoveryCodesRequest) (*RegenerateMFARecoveryCodesResponse, error)
+	RevokeMFARecoveryCodes(context.Context, *RevokeMFARecoveryCodesRequest) (*RevokeMFARecoveryCodesResponse, error)
 	IssueGatewayToken(context.Context, *IssueGatewayTokenRequest) (*IssueGatewayTokenResponse, error)
 	RevokeDevice(context.Context, *RevokeDeviceRequest) (*RevokeDeviceResponse, error)
 	RevokeSession(context.Context, *RevokeSessionRequest) (*RevokeSessionResponse, error)
@@ -260,6 +286,12 @@ func (UnimplementedIdentityServiceServer) ConfirmMFAEnrollment(context.Context, 
 }
 func (UnimplementedIdentityServiceServer) DisableMFAFactor(context.Context, *DisableMFAFactorRequest) (*DisableMFAFactorResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DisableMFAFactor not implemented")
+}
+func (UnimplementedIdentityServiceServer) RegenerateMFARecoveryCodes(context.Context, *RegenerateMFARecoveryCodesRequest) (*RegenerateMFARecoveryCodesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegenerateMFARecoveryCodes not implemented")
+}
+func (UnimplementedIdentityServiceServer) RevokeMFARecoveryCodes(context.Context, *RevokeMFARecoveryCodesRequest) (*RevokeMFARecoveryCodesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeMFARecoveryCodes not implemented")
 }
 func (UnimplementedIdentityServiceServer) IssueGatewayToken(context.Context, *IssueGatewayTokenRequest) (*IssueGatewayTokenResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method IssueGatewayToken not implemented")
@@ -474,6 +506,42 @@ func _IdentityService_DisableMFAFactor_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _IdentityService_RegenerateMFARecoveryCodes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegenerateMFARecoveryCodesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).RegenerateMFARecoveryCodes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_RegenerateMFARecoveryCodes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).RegenerateMFARecoveryCodes(ctx, req.(*RegenerateMFARecoveryCodesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_RevokeMFARecoveryCodes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeMFARecoveryCodesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).RevokeMFARecoveryCodes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_RevokeMFARecoveryCodes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).RevokeMFARecoveryCodes(ctx, req.(*RevokeMFARecoveryCodesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _IdentityService_IssueGatewayToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(IssueGatewayTokenRequest)
 	if err := dec(in); err != nil {
@@ -592,6 +660,14 @@ var IdentityService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DisableMFAFactor",
 			Handler:    _IdentityService_DisableMFAFactor_Handler,
+		},
+		{
+			MethodName: "RegenerateMFARecoveryCodes",
+			Handler:    _IdentityService_RegenerateMFARecoveryCodes_Handler,
+		},
+		{
+			MethodName: "RevokeMFARecoveryCodes",
+			Handler:    _IdentityService_RevokeMFARecoveryCodes_Handler,
 		},
 		{
 			MethodName: "IssueGatewayToken",

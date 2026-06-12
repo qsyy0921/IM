@@ -12,12 +12,12 @@
 - issue and confirm email / phone verification challenges;
 - issue and confirm password reset challenges;
 - enroll, confirm and disable first-stage TOTP MFA factors;
-- issue one-time MFA recovery codes during factor confirmation;
+- issue, regenerate and revoke one-time MFA recovery codes;
 - persist users, devices and sessions;
 - revoke devices and sessions;
 - keep push-gateway verification local to avoid synchronous auth RPC on every WebSocket handshake.
 
-It is not yet a full OAuth/OIDC identity platform. It does not implement email / SMS sending, recovery-code regeneration / revocation APIs, WebAuthn/passkeys, external IdP federation, production-grade account-risk workflows or production-grade asymmetric key management.
+It is not yet a full OAuth/OIDC identity platform. It does not implement email / SMS sending, WebAuthn/passkeys, external IdP federation, production-grade account-risk workflows or production-grade asymmetric key management.
 
 ## Boundary
 
@@ -61,7 +61,7 @@ In metadata mode, admin/read-state RPCs derive the trusted tenant/operator from 
 - `x-nexusim-trace-id` (optional)
 - `x-nexusim-request-id` (optional)
 
-This mode applies to `RevokeDevice`, `RevokeSession` and `GetDeviceState`. `RegisterUser`, `Login`, `RefreshGatewayToken`, `BeginMFAEnrollment`, `ConfirmMFAEnrollment`, `DisableMFAFactor` and `IssueGatewayToken` intentionally remain outside this admin gate. `RegisterUser` creates a first-stage local credential; `Login` verifies user credentials; `RefreshGatewayToken` verifies an opaque refresh token; MFA factor RPCs are protected by current password and/or one-time TOTP proof; `IssueGatewayToken` is kept as an internal / compatibility signing path for local smoke and gateway-token workflows.
+This mode applies to `RevokeDevice`, `RevokeSession` and `GetDeviceState`. `RegisterUser`, `Login`, `RefreshGatewayToken`, `BeginMFAEnrollment`, `ConfirmMFAEnrollment`, `DisableMFAFactor`, `RegenerateMFARecoveryCodes`, `RevokeMFARecoveryCodes` and `IssueGatewayToken` intentionally remain outside this admin gate. `RegisterUser` creates a first-stage local credential; `Login` verifies user credentials; `RefreshGatewayToken` verifies an opaque refresh token; MFA factor RPCs are protected by current password and/or one-time TOTP proof; `IssueGatewayToken` is kept as an internal / compatibility signing path for local smoke and gateway-token workflows.
 
 ## Register / Login / Refresh
 
@@ -113,7 +113,7 @@ Login risk first-stage rules:
 
 ## MFA TOTP Factors
 
-First-stage MFA support is limited to TOTP factors, password Login enforcement and one-time recovery codes generated during TOTP confirmation. It does not yet implement refresh-token step-up, recovery-code regeneration / revocation APIs, WebAuthn/passkeys or tenant-specific factor policy.
+First-stage MFA support is limited to TOTP factors, password Login enforcement and one-time recovery codes generated during TOTP confirmation or regeneration. It does not yet implement refresh-token step-up, WebAuthn/passkeys or tenant-specific factor policy.
 
 ```text
 BeginMFAEnrollment
@@ -134,6 +134,17 @@ DisableMFAFactor
 -> verify current password
 -> mark PENDING / ACTIVE factor DISABLED
 
+RegenerateMFARecoveryCodes
+-> verify current password
+-> verify ACTIVE TOTP factor code
+-> disable previous ACTIVE recovery-code hashes
+-> insert new ACTIVE recovery-code hashes
+-> return plaintext recovery codes once
+
+RevokeMFARecoveryCodes
+-> verify current password
+-> disable all ACTIVE recovery-code hashes
+
 Login with ACTIVE MFA
 -> verify password_hash
 -> list ACTIVE TOTP factors
@@ -149,6 +160,8 @@ MFA factor rules:
 - `ConfirmMFAEnrollment` accepts only a pending TOTP factor and a six-digit code;
 - `ConfirmMFAEnrollment` returns plaintext recovery codes once; PostgreSQL stores only `identity_mfa_recovery_codes.code_hash`, never raw recovery codes;
 - `DisableMFAFactor` requires the current password and does not delete historical rows;
+- `RegenerateMFARecoveryCodes` requires the current password plus an ACTIVE TOTP factor's six-digit code; it disables previous ACTIVE recovery-code hashes and returns new plaintext recovery codes once;
+- `RevokeMFARecoveryCodes` requires the current password and idempotently disables all ACTIVE recovery-code hashes for that user;
 - `LoginRequest.mfa_factor_id` selects a factor; if omitted and exactly one ACTIVE factor exists, that factor is used;
 - `LoginRequest.mfa_code` must be a six-digit TOTP code; session and refresh-token state are written only after MFA succeeds;
 - `LoginRequest.mfa_recovery_code` is mutually exclusive with `mfa_code` and `mfa_factor_id`; it is normalized, hashed, matched against ACTIVE recovery-code hashes and marked `USED` in the same transaction as session / refresh-token creation;
@@ -160,7 +173,7 @@ MFA factor rules:
 Known MFA hardening still pending:
 
 - Refresh-token step-up enforcement;
-- recovery-code regeneration / revocation API and backup factor handling;
+- backup factor handling beyond TOTP recovery codes;
 - WebAuthn / passkeys;
 - richer MFA risk policy beyond the first factor-level failed-code counter and short lockout;
 - secret key rotation and KMS/HSM-backed envelope encryption;
@@ -213,7 +226,7 @@ Known hardening still pending:
 - timing- and sender-side account-enumeration resistance;
 - tenant / IP / device rate limits for challenge creation and confirmation;
 - email / SMS provider integration and audit;
-- MFA recovery / WebAuthn and OIDC federation;
+- WebAuthn and OIDC federation;
 - production alerting for repeated challenge failures.
 
 ## Gateway Token

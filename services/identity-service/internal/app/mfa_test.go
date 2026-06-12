@@ -282,15 +282,126 @@ func TestDisableMFAFactorUseCaseRequiresCurrentPassword(t *testing.T) {
 	}
 }
 
+func TestRegenerateMFARecoveryCodesUseCaseRequiresPasswordAndTOTP(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0).UTC()
+	secret := types.EncryptedMFASecret{Ciphertext: "ciphertext", Nonce: "nonce", KeyVersion: "local-v1"}
+	repository := &fakeMFARepository{
+		credential: types.UserCredential{
+			TenantID:     "tenant-1",
+			UserID:       "user-1",
+			Status:       "ACTIVE",
+			PasswordHash: "expected-hash",
+		},
+		factorSecret: types.MFAFactorSecret{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			FactorID: "mfa-1",
+			Type:     types.MFAFactorTypeTOTP,
+			Status:   types.MFAFactorStatusActive,
+			Secret:   secret,
+		},
+	}
+	recovery := &fakeMFARecoveryCodeManager{codes: []types.MFARecoveryCode{
+		{CodeID: "recovery-new-1", Code: "aaaa-bbbb-cccc-dddd", CodeHash: "hash-new-1"},
+		{CodeID: "recovery-new-2", Code: "eeee-ffff-gggg-hhhh", CodeHash: "hash-new-2"},
+	}}
+	secrets := &fakeMFASecretManager{verifyOK: true}
+	useCase := NewRegenerateMFARecoveryCodesUseCase(repository, &fakePasswordVerifier{ok: true}, secrets, recovery)
+	useCase.now = func() time.Time { return now }
+
+	result, err := useCase.Execute(context.Background(), types.RegenerateMFARecoveryCodesCommand{
+		TenantID:  "tenant-1",
+		UserID:    "user-1",
+		FactorID:  "mfa-1",
+		Password:  "correct horse battery staple",
+		Code:      "123456",
+		TraceID:   "trace-1",
+		RequestID: "request-1",
+	})
+	if err != nil {
+		t.Fatalf("regenerate recovery codes: %v", err)
+	}
+	if !repository.replaceRecoveryCalled || len(repository.recoveryRecords) != 2 {
+		t.Fatalf("expected repository to receive recovery hashes, called=%v records=%+v", repository.replaceRecoveryCalled, repository.recoveryRecords)
+	}
+	if repository.recoveryRecords[0].CodeHash != "hash-new-1" || result.RecoveryCodes[0] != "aaaa-bbbb-cccc-dddd" {
+		t.Fatalf("expected plaintext returned and hashes stored, result=%+v records=%+v", result, repository.recoveryRecords)
+	}
+	if secrets.verifySecret != secret || secrets.verifyCode != "123456" || !secrets.verifyNow.Equal(now) {
+		t.Fatalf("unexpected TOTP verification input: secret=%+v code=%s now=%s", secrets.verifySecret, secrets.verifyCode, secrets.verifyNow)
+	}
+}
+
+func TestRegenerateMFARecoveryCodesUseCaseRejectsInvalidTOTPBeforeReplacing(t *testing.T) {
+	repository := &fakeMFARepository{
+		credential: types.UserCredential{TenantID: "tenant-1", UserID: "user-1", Status: "ACTIVE", PasswordHash: "expected-hash"},
+		factorSecret: types.MFAFactorSecret{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			FactorID: "mfa-1",
+			Type:     types.MFAFactorTypeTOTP,
+			Status:   types.MFAFactorStatusActive,
+			Secret:   types.EncryptedMFASecret{Ciphertext: "ciphertext", Nonce: "nonce", KeyVersion: "local-v1"},
+		},
+	}
+	useCase := NewRegenerateMFARecoveryCodesUseCase(repository, &fakePasswordVerifier{ok: true}, &fakeMFASecretManager{verifyOK: false}, &fakeMFARecoveryCodeManager{})
+
+	_, err := useCase.Execute(context.Background(), types.RegenerateMFARecoveryCodesCommand{
+		TenantID: "tenant-1",
+		UserID:   "user-1",
+		FactorID: "mfa-1",
+		Password: "correct horse battery staple",
+		Code:     "123456",
+	})
+	if !errors.Is(err, types.ErrInvalidMFA) {
+		t.Fatalf("expected invalid mfa, got %v", err)
+	}
+	if repository.replaceRecoveryCalled {
+		t.Fatal("invalid TOTP must not replace recovery codes")
+	}
+}
+
+func TestRevokeMFARecoveryCodesUseCaseRequiresCurrentPassword(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0).UTC()
+	repository := &fakeMFARepository{
+		credential: types.UserCredential{
+			TenantID:     "tenant-1",
+			UserID:       "user-1",
+			Status:       "ACTIVE",
+			PasswordHash: "expected-hash",
+		},
+		revokedRecoveryCount: 2,
+	}
+	useCase := NewRevokeMFARecoveryCodesUseCase(repository, &fakePasswordVerifier{ok: true})
+	useCase.now = func() time.Time { return now }
+
+	result, err := useCase.Execute(context.Background(), types.RevokeMFARecoveryCodesCommand{
+		TenantID:  "tenant-1",
+		UserID:    "user-1",
+		Password:  "correct horse battery staple",
+		TraceID:   "trace-1",
+		RequestID: "request-1",
+	})
+	if err != nil {
+		t.Fatalf("revoke recovery codes: %v", err)
+	}
+	if !repository.revokeRecoveryCalled || result.RevokedCount != 2 || result.RevokedAtUnixMS != now.UnixMilli() {
+		t.Fatalf("unexpected revoke result: result=%+v called=%v", result, repository.revokeRecoveryCalled)
+	}
+}
+
 type fakeMFARepository struct {
-	credential      types.UserCredential
-	factorSecret    types.MFAFactorSecret
-	createCalled    bool
-	confirmCalled   bool
-	disableCalled   bool
-	createdSecret   types.EncryptedMFASecret
-	createdAt       time.Time
-	recoveryRecords []types.MFARecoveryCodeRecord
+	credential            types.UserCredential
+	factorSecret          types.MFAFactorSecret
+	createCalled          bool
+	confirmCalled         bool
+	disableCalled         bool
+	replaceRecoveryCalled bool
+	revokeRecoveryCalled  bool
+	createdSecret         types.EncryptedMFASecret
+	createdAt             time.Time
+	recoveryRecords       []types.MFARecoveryCodeRecord
+	revokedRecoveryCount  int
 }
 
 func (repo *fakeMFARepository) GetUserCredential(context.Context, types.TenantID, types.UserID) (types.UserCredential, error) {
@@ -335,6 +446,26 @@ func (repo *fakeMFARepository) DisableMFAFactor(_ context.Context, command types
 		FactorID:         command.FactorID,
 		Status:           types.MFAFactorStatusDisabled,
 		DisabledAtUnixMS: disabledAt.UnixMilli(),
+	}, nil
+}
+
+func (repo *fakeMFARepository) ReplaceMFARecoveryCodes(_ context.Context, command types.RegenerateMFARecoveryCodesCommand, recoveryCodes []types.MFARecoveryCodeRecord, generatedAt time.Time) (types.RegenerateMFARecoveryCodesResult, error) {
+	repo.replaceRecoveryCalled = true
+	repo.recoveryRecords = append([]types.MFARecoveryCodeRecord(nil), recoveryCodes...)
+	return types.RegenerateMFARecoveryCodesResult{
+		TenantID:          command.TenantID,
+		UserID:            command.UserID,
+		GeneratedAtUnixMS: generatedAt.UnixMilli(),
+	}, nil
+}
+
+func (repo *fakeMFARepository) RevokeMFARecoveryCodes(_ context.Context, command types.RevokeMFARecoveryCodesCommand, revokedAt time.Time) (types.RevokeMFARecoveryCodesResult, error) {
+	repo.revokeRecoveryCalled = true
+	return types.RevokeMFARecoveryCodesResult{
+		TenantID:        command.TenantID,
+		UserID:          command.UserID,
+		RevokedCount:    repo.revokedRecoveryCount,
+		RevokedAtUnixMS: revokedAt.UnixMilli(),
 	}, nil
 }
 

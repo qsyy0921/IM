@@ -15,6 +15,8 @@ service IdentityService {
   rpc BeginMFAEnrollment(BeginMFAEnrollmentRequest) returns (BeginMFAEnrollmentResponse);
   rpc ConfirmMFAEnrollment(ConfirmMFAEnrollmentRequest) returns (ConfirmMFAEnrollmentResponse);
   rpc DisableMFAFactor(DisableMFAFactorRequest) returns (DisableMFAFactorResponse);
+  rpc RegenerateMFARecoveryCodes(RegenerateMFARecoveryCodesRequest) returns (RegenerateMFARecoveryCodesResponse);
+  rpc RevokeMFARecoveryCodes(RevokeMFARecoveryCodesRequest) returns (RevokeMFARecoveryCodesResponse);
   rpc IssueGatewayToken(IssueGatewayTokenRequest) returns (IssueGatewayTokenResponse);
   rpc RevokeDevice(RevokeDeviceRequest) returns (RevokeDeviceResponse);
   rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
@@ -227,6 +229,38 @@ message DisableMFAFactorResponse {
   string factor_id = 3;
   MFAFactorStatus status = 4;
   int64 disabled_at_unix_ms = 5;
+}
+
+message RegenerateMFARecoveryCodesRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  string factor_id = 3;
+  string password = 4;
+  string code = 5;
+  string trace_id = 6;
+  string request_id = 7;
+}
+
+message RegenerateMFARecoveryCodesResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  repeated string recovery_codes = 3;
+  int64 generated_at_unix_ms = 4;
+}
+
+message RevokeMFARecoveryCodesRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  string password = 3;
+  string trace_id = 4;
+  string request_id = 5;
+}
+
+message RevokeMFARecoveryCodesResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  int32 revoked_count = 3;
+  int64 revoked_at_unix_ms = 4;
 }
 
 message IssueGatewayTokenRequest {

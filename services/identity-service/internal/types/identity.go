@@ -272,6 +272,38 @@ type DisableMFAFactorResult struct {
 	DisabledAtUnixMS int64
 }
 
+type RegenerateMFARecoveryCodesCommand struct {
+	TenantID  TenantID
+	UserID    UserID
+	FactorID  MFAFactorID
+	Password  string
+	Code      string
+	TraceID   string
+	RequestID string
+}
+
+type RegenerateMFARecoveryCodesResult struct {
+	TenantID          TenantID
+	UserID            UserID
+	RecoveryCodes     []string
+	GeneratedAtUnixMS int64
+}
+
+type RevokeMFARecoveryCodesCommand struct {
+	TenantID  TenantID
+	UserID    UserID
+	Password  string
+	TraceID   string
+	RequestID string
+}
+
+type RevokeMFARecoveryCodesResult struct {
+	TenantID        TenantID
+	UserID          UserID
+	RevokedCount    int
+	RevokedAtUnixMS int64
+}
+
 type ChallengeRecord struct {
 	ChallengeID ChallengeID
 	TokenHash   string

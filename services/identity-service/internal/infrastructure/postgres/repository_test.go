@@ -16,7 +16,11 @@ func TestRepositoryIssueGatewaySessionIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
 	resetIdentityTables(t, ctx, pool)
-	repository := NewRepository(pool, WithSessionIDGenerator(func() (string, error) { return "session-1", nil }))
+	repository := NewRepository(
+		pool,
+		WithSessionIDGenerator(func() (string, error) { return "session-1", nil }),
+		WithEventIDGenerator(func() (string, error) { return "event-device-revoked-1", nil }),
+	)
 
 	issuedAt := time.Unix(1_800_000_000, 0).UTC()
 	expiresAt := issuedAt.Add(15 * time.Minute)
@@ -58,6 +62,7 @@ func TestRepositoryRevokeDeviceRejectsFutureIssueIntegration(t *testing.T) {
 	}
 	assertDeviceStatus(t, ctx, pool, "REVOKED")
 	assertSessionStatus(t, ctx, pool, "session-1", "REVOKED")
+	assertOutboxEvent(t, ctx, pool, "identity.device.revoked.v1", "identity_device", "event-device-revoked-1")
 	_, err := repository.IssueGatewaySession(ctx, issueCommand("session-2"), issuedAt.Add(2*time.Minute), expiresAt.Add(2*time.Minute))
 	if !errors.Is(err, types.ErrDeviceRevoked) {
 		t.Fatalf("expected device revoked, got %v", err)
@@ -68,7 +73,7 @@ func TestRepositoryRevokeSessionRejectsSameSessionIDIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
 	resetIdentityTables(t, ctx, pool)
-	repository := NewRepository(pool)
+	repository := NewRepository(pool, WithEventIDGenerator(func() (string, error) { return "event-session-revoked-1", nil }))
 	issuedAt := time.Unix(1_800_000_000, 0).UTC()
 	expiresAt := issuedAt.Add(15 * time.Minute)
 	if _, err := repository.IssueGatewaySession(ctx, issueCommand("session-explicit"), issuedAt, expiresAt); err != nil {
@@ -87,6 +92,7 @@ func TestRepositoryRevokeSessionRejectsSameSessionIDIntegration(t *testing.T) {
 	if !errors.Is(err, types.ErrSessionRevoked) {
 		t.Fatalf("expected session revoked, got %v", err)
 	}
+	assertOutboxEvent(t, ctx, pool, "identity.session.revoked.v1", "identity_session", "event-session-revoked-1")
 }
 
 func issueCommand(sessionID types.SessionID) types.IssueGatewayTokenCommand {
@@ -138,6 +144,41 @@ WHERE tenant_id = 'tenant-identity'
 	}
 }
 
+func assertOutboxEvent(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventType string, aggregateType string, eventID string) {
+	t.Helper()
+	var gotEventID, gotEventType, gotAggregateType, gotStatus string
+	var payloadTenantID, payloadUserID, payloadDeviceID string
+	err := pool.QueryRow(ctx, `
+SELECT
+    event_id,
+    event_type,
+    aggregate_type,
+    status,
+    payload_json->>'tenant_id',
+    payload_json->>'user_id',
+    payload_json->>'device_id'
+FROM identity_outbox
+WHERE event_id = $1
+`, eventID).Scan(
+		&gotEventID,
+		&gotEventType,
+		&gotAggregateType,
+		&gotStatus,
+		&payloadTenantID,
+		&payloadUserID,
+		&payloadDeviceID,
+	)
+	if err != nil {
+		t.Fatalf("read identity outbox event: %v", err)
+	}
+	if gotEventID != eventID || gotEventType != eventType || gotAggregateType != aggregateType || gotStatus != "PENDING" {
+		t.Fatalf("unexpected outbox event: id=%s type=%s aggregate=%s status=%s", gotEventID, gotEventType, gotAggregateType, gotStatus)
+	}
+	if payloadTenantID != "tenant-identity" || payloadUserID != "user-1" || payloadDeviceID != "device-1" {
+		t.Fatalf("unexpected outbox payload tenant=%s user=%s device=%s", payloadTenantID, payloadUserID, payloadDeviceID)
+	}
+}
+
 func openTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	dsn := os.Getenv("NEXUSIM_PG_DSN")
@@ -157,13 +198,18 @@ func openTestPool(t *testing.T) *pgxpool.Pool {
 func applyIdentityMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	root := findRepoRoot(t)
-	migrationPath := filepath.Join(root, "migrations", "postgres", "identity", "000001_identity_core.sql")
-	sqlBytes, err := os.ReadFile(migrationPath)
+	migrationFiles, err := filepath.Glob(filepath.Join(root, "migrations", "postgres", "identity", "*.sql"))
 	if err != nil {
-		t.Fatalf("read migration: %v", err)
+		t.Fatalf("find migrations: %v", err)
 	}
-	if _, err := pool.Exec(ctx, string(sqlBytes)); err != nil {
-		t.Fatalf("apply migration: %v", err)
+	for _, migrationPath := range migrationFiles {
+		sqlBytes, err := os.ReadFile(migrationPath)
+		if err != nil {
+			t.Fatalf("read migration %s: %v", migrationPath, err)
+		}
+		if _, err := pool.Exec(ctx, string(sqlBytes)); err != nil {
+			t.Fatalf("apply migration %s: %v", migrationPath, err)
+		}
 	}
 }
 
@@ -171,6 +217,7 @@ func resetIdentityTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) 
 	t.Helper()
 	_, err := pool.Exec(ctx, `
 TRUNCATE
+    identity_outbox,
     identity_sessions,
     identity_devices,
     identity_users

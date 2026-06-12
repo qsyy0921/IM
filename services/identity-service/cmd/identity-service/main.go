@@ -16,9 +16,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	identitygrpc "github.com/qsyy0921/IM/services/identity-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/identity-service/internal/app"
+	kafkainfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/kafka"
 	monitoringinfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/monitoring"
 	postgresinfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/postgres"
 	tokeninfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/token"
+	"github.com/qsyy0921/IM/services/identity-service/internal/trigger/outbox"
 	"google.golang.org/grpc"
 )
 
@@ -32,10 +34,12 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("identity-service runtime wiring is idle; set NEXUSIM_IDENTITY_SERVICE_MODE=grpc")
+		log.Println("identity-service runtime wiring is idle; set NEXUSIM_IDENTITY_SERVICE_MODE=grpc or outbox-relay")
 		return nil
 	case "grpc":
 		return runGRPC()
+	case "outbox-relay":
+		return runOutboxRelay()
 	default:
 		return errors.New("unsupported NEXUSIM_IDENTITY_SERVICE_MODE")
 	}
@@ -99,6 +103,44 @@ func runGRPC() error {
 		}
 		return context.Canceled
 	}
+}
+
+func runOutboxRelay() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	stopDebug, err := startDebugServer(ctx, identityDebugAddr(), monitoringinfra.NewHandler(pool))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	brokers := splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS"))
+	producer, err := kafkainfra.NewWriterProducer(brokers)
+	if err != nil {
+		return err
+	}
+	defer producer.Close()
+
+	topic := envString("NEXUSIM_IDENTITY_EVENTS_TOPIC", outbox.TopicIdentityEvents)
+	relay := outbox.NewRelay(
+		postgresinfra.NewOutboxStore(pool),
+		producer,
+		outbox.Config{
+			Topic:          topic,
+			BatchSize:      envInt("NEXUSIM_IDENTITY_OUTBOX_BATCH_SIZE", 500),
+			PollInterval:   envDuration("NEXUSIM_IDENTITY_OUTBOX_POLL_INTERVAL", time.Second),
+			MaxAttempts:    envInt("NEXUSIM_IDENTITY_OUTBOX_MAX_ATTEMPTS", 5),
+			RetryBaseDelay: envDuration("NEXUSIM_IDENTITY_OUTBOX_RETRY_BASE_DELAY", time.Second),
+		},
+	)
+	log.Printf("identity-service outbox relay started topic=%s", topic)
+	return relay.Run(ctx)
 }
 
 func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {
@@ -187,4 +229,28 @@ func envInt(name string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func envDuration(name string, fallback time.Duration) time.Duration {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+	return result
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ import (
 type Repository struct {
 	pool      *pgxpool.Pool
 	sessionID func() (string, error)
+	eventID   func() (string, error)
 }
 
 type RepositoryOption func(*Repository)
@@ -26,11 +28,22 @@ func NewRepository(pool *pgxpool.Pool, opts ...RepositoryOption) *Repository {
 		sessionID: func() (string, error) {
 			return newID("sess")
 		},
+		eventID: func() (string, error) {
+			return newID("evt")
+		},
 	}
 	for _, opt := range opts {
 		opt(repository)
 	}
 	return repository
+}
+
+func WithEventIDGenerator(generator func() (string, error)) RepositoryOption {
+	return func(repository *Repository) {
+		if generator != nil {
+			repository.eventID = generator
+		}
+	}
 }
 
 func WithSessionIDGenerator(generator func() (string, error)) RepositoryOption {
@@ -113,6 +126,9 @@ func (r *Repository) RevokeDevice(ctx context.Context, command types.RevokeDevic
 	if err := revokeDeviceSessions(ctx, tx, command, revokedAt); err != nil {
 		return types.RevokeDeviceResult{}, err
 	}
+	if err := r.insertDeviceRevokedOutbox(ctx, tx, row, command, revokedAt); err != nil {
+		return types.RevokeDeviceResult{}, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return types.RevokeDeviceResult{}, types.NewDBWriteFailed(err.Error())
 	}
@@ -129,8 +145,14 @@ func (r *Repository) RevokeSession(ctx context.Context, command types.RevokeSess
 	if r.pool == nil {
 		return types.RevokeSessionResult{}, types.NewDBWriteFailed("identity repository is not configured")
 	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.RevokeSessionResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
 	var row sessionRow
-	err := r.pool.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 UPDATE identity_sessions
 SET status = 'REVOKED',
     revoked_at = $5,
@@ -155,6 +177,12 @@ RETURNING tenant_id, user_id, device_id, session_id, status, revoked_at
 	if err != nil {
 		return types.RevokeSessionResult{}, types.NewDBWriteFailed(err.Error())
 	}
+	if err := r.insertSessionRevokedOutbox(ctx, tx, row, command, revokedAt); err != nil {
+		return types.RevokeSessionResult{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.RevokeSessionResult{}, types.NewDBWriteFailed(err.Error())
+	}
 	return types.RevokeSessionResult{
 		TenantID:        row.TenantID,
 		UserID:          row.UserID,
@@ -163,6 +191,120 @@ RETURNING tenant_id, user_id, device_id, session_id, status, revoked_at
 		Status:          row.Status,
 		RevokedAtUnixMS: row.RevokedAt.UnixMilli(),
 	}, nil
+}
+
+type identityOutboxPayload struct {
+	TenantID  string `json:"tenant_id"`
+	UserID    string `json:"user_id"`
+	DeviceID  string `json:"device_id"`
+	SessionID string `json:"session_id,omitempty"`
+	Status    string `json:"status"`
+	RevokedBy string `json:"revoked_by"`
+	Reason    string `json:"reason"`
+	RevokedAt string `json:"revoked_at"`
+}
+
+func (r *Repository) insertDeviceRevokedOutbox(ctx context.Context, tx pgx.Tx, row deviceRow, command types.RevokeDeviceCommand, revokedAt time.Time) error {
+	payload := identityOutboxPayload{
+		TenantID:  string(row.TenantID),
+		UserID:    string(row.UserID),
+		DeviceID:  string(row.DeviceID),
+		Status:    string(row.Status),
+		RevokedBy: string(command.AdminContext.OperatorUserID),
+		Reason:    command.Reason,
+		RevokedAt: revokedAt.Format(time.RFC3339Nano),
+	}
+	return r.insertOutboxEvent(ctx, tx, outboxEventInput{
+		TenantID:         row.TenantID,
+		AggregateType:    "identity_device",
+		AggregateID:      identityDeviceAggregateID(row.UserID, row.DeviceID),
+		AggregateVersion: revokedAt.UnixMilli(),
+		EventType:        types.IdentityEventDeviceRevoked,
+		PartitionKey:     identityPartitionKey(row.TenantID, row.UserID, row.DeviceID),
+		TraceID:          command.AdminContext.TraceID,
+		CorrelationID:    command.AdminContext.RequestID,
+		Payload:          payload,
+	})
+}
+
+func (r *Repository) insertSessionRevokedOutbox(ctx context.Context, tx pgx.Tx, row sessionRow, command types.RevokeSessionCommand, revokedAt time.Time) error {
+	payload := identityOutboxPayload{
+		TenantID:  string(row.TenantID),
+		UserID:    string(row.UserID),
+		DeviceID:  string(row.DeviceID),
+		SessionID: string(row.SessionID),
+		Status:    string(row.Status),
+		RevokedBy: string(command.AdminContext.OperatorUserID),
+		Reason:    command.Reason,
+		RevokedAt: revokedAt.Format(time.RFC3339Nano),
+	}
+	return r.insertOutboxEvent(ctx, tx, outboxEventInput{
+		TenantID:         row.TenantID,
+		AggregateType:    "identity_session",
+		AggregateID:      identitySessionAggregateID(row.UserID, row.DeviceID, row.SessionID),
+		AggregateVersion: revokedAt.UnixMilli(),
+		EventType:        types.IdentityEventSessionRevoked,
+		PartitionKey:     identityPartitionKey(row.TenantID, row.UserID, row.DeviceID),
+		TraceID:          command.AdminContext.TraceID,
+		CorrelationID:    command.AdminContext.RequestID,
+		Payload:          payload,
+	})
+}
+
+type outboxEventInput struct {
+	TenantID         types.TenantID
+	AggregateType    string
+	AggregateID      string
+	AggregateVersion int64
+	EventType        string
+	PartitionKey     string
+	TraceID          string
+	CorrelationID    string
+	Payload          identityOutboxPayload
+}
+
+func (r *Repository) insertOutboxEvent(ctx context.Context, tx pgx.Tx, input outboxEventInput) error {
+	eventID, err := r.eventID()
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	payloadJSON, err := json.Marshal(input.Payload)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	_, err = tx.Exec(ctx, `
+INSERT INTO identity_outbox (
+    event_id,
+    tenant_id,
+    aggregate_type,
+    aggregate_id,
+    aggregate_version,
+    event_type,
+    event_version,
+    mapping_version,
+    partition_key,
+    producer,
+    correlation_id,
+    trace_id,
+    payload_json
+) VALUES ($1, $2, $3, $4, $5, $6, 'v1', 1, $7, 'identity-service', $8, $9, $10::jsonb)
+`, eventID, input.TenantID, input.AggregateType, input.AggregateID, input.AggregateVersion, input.EventType, input.PartitionKey, input.CorrelationID, input.TraceID, string(payloadJSON))
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func identityPartitionKey(tenantID types.TenantID, userID types.UserID, deviceID types.DeviceID) string {
+	return fmt.Sprintf("%s:%s:%s", tenantID, userID, deviceID)
+}
+
+func identityDeviceAggregateID(userID types.UserID, deviceID types.DeviceID) string {
+	return fmt.Sprintf("%s:%s", userID, deviceID)
+}
+
+func identitySessionAggregateID(userID types.UserID, deviceID types.DeviceID, sessionID types.SessionID) string {
+	return fmt.Sprintf("%s:%s:%s", userID, deviceID, sessionID)
 }
 
 func (r *Repository) GetDeviceState(ctx context.Context, command types.GetDeviceStateCommand) (types.GetDeviceStateResult, error) {

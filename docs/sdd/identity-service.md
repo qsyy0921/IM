@@ -66,6 +66,25 @@ Claims:
 
 The default audience is `push-gateway`. Tokens are short-lived. Revocation is enforced at issuance time; already-issued tokens are bounded by TTL until push-gateway supports an async revoke feed or local deny-list projection.
 
+## Revoke Events
+
+Device and session revoke operations write identity events through the local outbox in the same PostgreSQL transaction:
+
+```text
+RevokeDevice / RevokeSession
+-> identity_devices / identity_sessions
+-> identity_outbox
+-> identity-service outbox-relay
+-> Kafka im.identity.events
+```
+
+Event types:
+
+- `identity.device.revoked.v1`
+- `identity.session.revoked.v1`
+
+These events are designed for push-gateway local deny-list projection and audit consumers. Push-gateway should consume the event stream asynchronously; it should not synchronously call identity-service on each WebSocket handshake.
+
 ## First Smoke Target
 
 ```text

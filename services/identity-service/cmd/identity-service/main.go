@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -36,6 +37,7 @@ import (
 	"github.com/qsyy0921/IM/services/identity-service/internal/trigger/outbox"
 	"github.com/qsyy0921/IM/services/identity-service/internal/types"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 type gatewayTokenSigner interface {
@@ -1008,6 +1010,7 @@ func identityDebugAddr() string {
 }
 
 func newGRPCServer(grpcMetrics *monitoringinfra.GRPCMetrics) (*grpc.Server, error) {
+	options := make([]grpc.ServerOption, 0, 2)
 	interceptors := make([]grpc.UnaryServerInterceptor, 0, 2)
 	if grpcMetrics != nil {
 		interceptors = append(interceptors, grpcMetrics.UnaryServerInterceptor(log.Default()))
@@ -1019,10 +1022,64 @@ func newGRPCServer(grpcMetrics *monitoringinfra.GRPCMetrics) (*grpc.Server, erro
 	default:
 		return nil, errors.New("unsupported NEXUSIM_IDENTITY_ADMIN_AUTH_MODE")
 	}
-	if len(interceptors) == 0 {
-		return grpc.NewServer(), nil
+	if len(interceptors) > 0 {
+		options = append(options, grpc.ChainUnaryInterceptor(interceptors...))
 	}
-	return grpc.NewServer(grpc.ChainUnaryInterceptor(interceptors...)), nil
+	if creds, ok, err := loadIdentityGRPCCredentialsFromEnv(); err != nil {
+		return nil, err
+	} else if ok {
+		options = append(options, grpc.Creds(creds))
+	}
+	return grpc.NewServer(options...), nil
+}
+
+func loadIdentityGRPCCredentialsFromEnv() (credentials.TransportCredentials, bool, error) {
+	tlsConfig, ok, err := identityGRPCTLSConfigFromEnv()
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	return credentials.NewTLS(tlsConfig), true, nil
+}
+
+func identityGRPCTLSConfigFromEnv() (*tls.Config, bool, error) {
+	certFile := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_GRPC_TLS_CERT_FILE"))
+	keyFile := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_GRPC_TLS_KEY_FILE"))
+	clientCAFile := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_CA_FILE"))
+	requireClientCert, requireClientCertConfigured, err := envOptionalBool("NEXUSIM_IDENTITY_GRPC_TLS_REQUIRE_CLIENT_CERT")
+	if err != nil {
+		return nil, true, err
+	}
+	requireClientCert = clientCAFile != "" || (requireClientCertConfigured && requireClientCert)
+	if certFile == "" && keyFile == "" && clientCAFile == "" && !requireClientCert {
+		return nil, false, nil
+	}
+	if certFile == "" || keyFile == "" {
+		return nil, true, errors.New("NEXUSIM_IDENTITY_GRPC_TLS_CERT_FILE and NEXUSIM_IDENTITY_GRPC_TLS_KEY_FILE must be configured together")
+	}
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, true, err
+	}
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12,
+	}
+	if requireClientCert {
+		if clientCAFile == "" {
+			return nil, true, errors.New("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_CA_FILE is required when client certificates are required")
+		}
+		pemBytes, err := os.ReadFile(clientCAFile)
+		if err != nil {
+			return nil, true, err
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(pemBytes) {
+			return nil, true, errors.New("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_CA_FILE does not contain a valid PEM certificate")
+		}
+		tlsConfig.ClientCAs = pool
+		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+	}
+	return tlsConfig, true, nil
 }
 
 func envString(name string, fallback string) string {
@@ -1069,6 +1126,21 @@ func envBool(name string, fallback bool) bool {
 		return false
 	default:
 		return fallback
+	}
+}
+
+func envOptionalBool(name string) (bool, bool, error) {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv(name)))
+	if value == "" {
+		return false, false, nil
+	}
+	switch value {
+	case "1", "true", "yes", "y", "on":
+		return true, true, nil
+	case "0", "false", "no", "n", "off":
+		return false, true, nil
+	default:
+		return false, true, fmt.Errorf("%s must be a boolean", name)
 	}
 }
 

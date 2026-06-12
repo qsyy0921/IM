@@ -3,7 +3,9 @@ package main
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
@@ -411,6 +413,53 @@ func testGatewayJWKSetJSON(t *testing.T, keys ...tokeninfra.JWK) string {
 	return string(raw)
 }
 
+func clearIdentityGRPCTLSConfig(t *testing.T) {
+	t.Helper()
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CERT_FILE", "")
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_KEY_FILE", "")
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_CA_FILE", "")
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_REQUIRE_CLIENT_CERT", "")
+}
+
+func writeIdentityTLSTestCert(t *testing.T, dir string, name string) (string, string) {
+	t.Helper()
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate tls key: %v", err)
+	}
+	serialNumber, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
+	if err != nil {
+		t.Fatalf("generate tls serial: %v", err)
+	}
+	template := x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			CommonName: "identity-" + name,
+		},
+		NotBefore:             time.Now().Add(-time.Minute),
+		NotAfter:              time.Now().Add(time.Hour),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		DNSNames:              []string{"localhost"},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		t.Fatalf("create tls cert: %v", err)
+	}
+	certFile := filepath.Join(dir, name+".crt")
+	keyFile := filepath.Join(dir, name+".key")
+	if err := os.WriteFile(certFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600); err != nil {
+		t.Fatalf("write tls cert: %v", err)
+	}
+	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
+	if err := os.WriteFile(keyFile, pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: privateKeyBytes}), 0o600); err != nil {
+		t.Fatalf("write tls key: %v", err)
+	}
+	return certFile, keyFile
+}
+
 func TestDisabledMFASecretManagerReturnsMFAUnavailable(t *testing.T) {
 	manager := disabledMFASecretManager{}
 	if _, _, err := manager.NewTOTPSecret(); !errors.Is(err, types.ErrMFAUnavailable) {
@@ -495,6 +544,118 @@ func TestLoadSecretKeyRingConfigRejectsTrimmedDuplicateKeyVersion(t *testing.T) 
 	t.Setenv("TEST_SECRET_KEYRING_FILE", "")
 	if _, ok, err := loadSecretKeyRingConfig("TEST_SECRET_KEYRING_JSON", "TEST_SECRET_KEYRING_FILE"); err == nil || !ok {
 		t.Fatalf("expected duplicate key version to fail, ok=%t err=%v", ok, err)
+	}
+}
+
+func TestLoadIdentityGRPCCredentialsFromEnvDisabledByDefault(t *testing.T) {
+	clearIdentityGRPCTLSConfig(t)
+	creds, ok, err := loadIdentityGRPCCredentialsFromEnv()
+	if err != nil {
+		t.Fatalf("load grpc credentials: %v", err)
+	}
+	if ok || creds != nil {
+		t.Fatalf("expected grpc tls to be disabled by default, ok=%t creds=%T", ok, creds)
+	}
+}
+
+func TestLoadIdentityGRPCCredentialsFromEnvRequiresCertKeyPair(t *testing.T) {
+	clearIdentityGRPCTLSConfig(t)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CERT_FILE", "server.crt")
+	if _, ok, err := loadIdentityGRPCCredentialsFromEnv(); err == nil || !ok {
+		t.Fatalf("expected partial grpc tls config to fail, ok=%t err=%v", ok, err)
+	}
+}
+
+func TestLoadIdentityGRPCCredentialsFromEnvLoadsServerTLS(t *testing.T) {
+	clearIdentityGRPCTLSConfig(t)
+	dir := t.TempDir()
+	certFile, keyFile := writeIdentityTLSTestCert(t, dir, "server")
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CERT_FILE", certFile)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_KEY_FILE", keyFile)
+	tlsConfig, ok, err := identityGRPCTLSConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load grpc tls config: %v", err)
+	}
+	if !ok || tlsConfig == nil {
+		t.Fatalf("expected grpc tls config, ok=%t", ok)
+	}
+	if tlsConfig.MinVersion != tls.VersionTLS12 {
+		t.Fatalf("expected TLS 1.2 minimum, got %d", tlsConfig.MinVersion)
+	}
+
+	creds, ok, err := loadIdentityGRPCCredentialsFromEnv()
+	if err != nil {
+		t.Fatalf("load grpc tls credentials: %v", err)
+	}
+	if !ok || creds == nil {
+		t.Fatalf("expected grpc tls credentials, ok=%t creds=%T", ok, creds)
+	}
+}
+
+func TestLoadIdentityGRPCCredentialsFromEnvRejectsInvalidRequireClientCert(t *testing.T) {
+	clearIdentityGRPCTLSConfig(t)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_REQUIRE_CLIENT_CERT", "sometimes")
+	if _, ok, err := loadIdentityGRPCCredentialsFromEnv(); err == nil || !ok {
+		t.Fatalf("expected invalid client-cert bool to fail, ok=%t err=%v", ok, err)
+	}
+}
+
+func TestLoadIdentityGRPCCredentialsFromEnvRequiresClientCAForMTLS(t *testing.T) {
+	clearIdentityGRPCTLSConfig(t)
+	dir := t.TempDir()
+	certFile, keyFile := writeIdentityTLSTestCert(t, dir, "server")
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CERT_FILE", certFile)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_KEY_FILE", keyFile)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_REQUIRE_CLIENT_CERT", "true")
+	if _, ok, err := loadIdentityGRPCCredentialsFromEnv(); err == nil || !ok {
+		t.Fatalf("expected mtls without ca to fail, ok=%t err=%v", ok, err)
+	}
+}
+
+func TestLoadIdentityGRPCCredentialsFromEnvRejectsInvalidClientCAPEM(t *testing.T) {
+	clearIdentityGRPCTLSConfig(t)
+	dir := t.TempDir()
+	certFile, keyFile := writeIdentityTLSTestCert(t, dir, "server")
+	caFile := filepath.Join(dir, "invalid-ca.pem")
+	if err := os.WriteFile(caFile, []byte("not a certificate"), 0o600); err != nil {
+		t.Fatalf("write invalid ca: %v", err)
+	}
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CERT_FILE", certFile)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_KEY_FILE", keyFile)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_CA_FILE", caFile)
+	if _, ok, err := loadIdentityGRPCCredentialsFromEnv(); err == nil || !ok {
+		t.Fatalf("expected invalid ca pem to fail, ok=%t err=%v", ok, err)
+	}
+}
+
+func TestLoadIdentityGRPCCredentialsFromEnvLoadsMTLS(t *testing.T) {
+	clearIdentityGRPCTLSConfig(t)
+	dir := t.TempDir()
+	certFile, keyFile := writeIdentityTLSTestCert(t, dir, "server")
+	caFile, _ := writeIdentityTLSTestCert(t, dir, "ca")
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CERT_FILE", certFile)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_KEY_FILE", keyFile)
+	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_CA_FILE", caFile)
+	tlsConfig, ok, err := identityGRPCTLSConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load grpc mtls config: %v", err)
+	}
+	if !ok || tlsConfig == nil {
+		t.Fatalf("expected grpc mtls config, ok=%t", ok)
+	}
+	if tlsConfig.ClientAuth != tls.RequireAndVerifyClientCert {
+		t.Fatalf("expected client cert verification, got %v", tlsConfig.ClientAuth)
+	}
+	if tlsConfig.ClientCAs == nil {
+		t.Fatalf("expected client CA pool")
+	}
+
+	creds, ok, err := loadIdentityGRPCCredentialsFromEnv()
+	if err != nil {
+		t.Fatalf("load grpc mtls credentials: %v", err)
+	}
+	if !ok || creds == nil {
+		t.Fatalf("expected grpc mtls credentials, ok=%t creds=%T", ok, creds)
 	}
 }
 

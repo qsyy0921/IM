@@ -63,6 +63,22 @@ In metadata mode, admin/read-state RPCs derive the trusted tenant/operator from 
 
 This mode applies to `RevokeDevice`, `RevokeSession` and `GetDeviceState`. `RegisterUser`, `Login`, `RefreshGatewayToken`, `BeginMFAEnrollment`, `ConfirmMFAEnrollment`, `DisableMFAFactor`, `RegenerateMFARecoveryCodes`, `RevokeMFARecoveryCodes` and `IssueGatewayToken` intentionally remain outside this admin gate. `RegisterUser` creates a first-stage local credential; `Login` verifies user credentials; `RefreshGatewayToken` verifies an opaque refresh token; MFA factor RPCs are protected by current password and/or one-time TOTP proof; `IssueGatewayToken` is kept as an internal / compatibility signing path for local smoke and gateway-token workflows.
 
+## gRPC Transport Security
+
+`identity-service` supports optional server-side gRPC TLS / mTLS for production-like local runs. Default local mode stays plaintext for existing smoke scripts. Enabling TLS is fail-fast: a partial certificate/key configuration or invalid CA file stops startup instead of silently downgrading to plaintext.
+
+```text
+NEXUSIM_IDENTITY_GRPC_TLS_CERT_FILE=/path/to/server.crt
+NEXUSIM_IDENTITY_GRPC_TLS_KEY_FILE=/path/to/server.key
+NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_CA_FILE=/path/to/client-ca.crt
+NEXUSIM_IDENTITY_GRPC_TLS_REQUIRE_CLIENT_CERT=true
+```
+
+- `CERT_FILE` and `KEY_FILE` must be configured together.
+- `CLIENT_CA_FILE` enables client certificate verification and is also required when `REQUIRE_CLIENT_CERT=true`.
+- `REQUIRE_CLIENT_CERT` is parsed strictly; invalid boolean values fail startup.
+- The first version only configures the identity-service gRPC server transport. It does not migrate all clients to TLS, does not implement service identity authorization or SAN allowlists, and does not manage certificate issuance, rotation or cross-host distribution.
+
 ## Register / Login / Refresh
 
 First-stage registration creates an ACTIVE `identity_users` credential with a service-local password hash. It is a strict create path: an existing `tenant_id + user_id` returns `ALREADY_EXISTS`, and account claiming / recovery for pre-created users is a later workflow. It does not create contacts, conversation membership, profile state, or any cross-service user projection. Tenant-level rate limiting and external IdP federation are separate future flows.
@@ -375,6 +391,6 @@ ConfirmPasswordReset -> password hash updated + active session / refresh token r
 - `GET /readyz`: PostgreSQL ping readiness.
 - `GET /debug/metrics`: pgx pool counters, identity user/device/session counts, failed password-login user counts, currently password-login-locked user counts, MFA factor counts, MFA factor failed-login counts, currently MFA-login-locked ACTIVE factor counts, and gRPC method/code/latency counters.
 
-The gRPC server also emits one JSON request log per unary RPC with stable fields: `service`, `event`, `method`, `code`, `latency_ms`, and optional `trace_id` / `request_id` from gateway-verified or client-propagated gRPC metadata. These IDs are bounded before logging and the request log intentionally does not include user IDs, device IDs, tokens, challenge destinations or provider error bodies.
+The gRPC server also emits one JSON request log per unary RPC with stable fields: `service`, `event`, `method`, `code`, `latency_ms`, and optional `trace_id` / `request_id` from gateway-verified or client-propagated gRPC metadata. These IDs are bounded before logging and the request log intentionally does not include user IDs, device IDs, tokens, challenge destinations or provider error bodies. The server can optionally run with TLS / mTLS as described above, but this is not yet full service-mesh identity or certificate lifecycle management.
 
-This is intentionally a lightweight local/debug endpoint. Production tracing, alerting, mTLS, external SIEM / audit sinks and adaptive risk analytics remain future hardening items.
+This is intentionally a lightweight local/debug endpoint. Production tracing, alerting, all-service mTLS rollout, certificate governance, external SIEM / audit sinks and adaptive risk analytics remain future hardening items.

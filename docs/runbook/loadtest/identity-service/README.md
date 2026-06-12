@@ -16,6 +16,7 @@
 - challenge delivery repair / audit：一次性 operator mode 支持 `audit`、`redrive-active-pending`、`cancel-inactive`；DLQ row 不会复活旧 challenge token，必须走正常 API 重新申请 challenge。
 - TOTP MFA 生命周期、Login MFA enforcement、MFA lockout、recovery codes、Refresh step-up 和 Refresh 期间直接提交 MFA proof。
 - MFA TOTP secret 和 challenge delivery token 已支持本地版本化 keyring：新写入使用 current key version，旧 `key_version` 在轮换窗口内仍可解密；这不是 KMS/HSM，也不自动分发密钥。
+- identity-service gRPC server 支持可选 TLS / mTLS 配置：`CERT_FILE + KEY_FILE` 必须成对配置，`CLIENT_CA_FILE` 或 `REQUIRE_CLIENT_CERT=true` 启用客户端证书校验；配置错误会 fail-fast，不静默降级 plaintext。当前只覆盖 identity-service server 端，不代表所有客户端、所有服务、证书分发或服务身份授权都已完成。
 
 当前 `challenge delivery outbox` 真实进程 smoke 已证明：
 
@@ -46,4 +47,5 @@ RegisterUser
 - repair 工具是 audit-first，不解密 token、不直接标记 `DELIVERED`、不把 `EXPIRED` challenge 复活；这比把 challenge delivery DLQ 当普通 Kafka outbox replay 更安全。
 - 本轮 smoke 没开 `NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN`，Confirm 使用的是 webhook 收到的真实 token，所以能证明 worker 链路生效。
 - `NEXUSIM_IDENTITY_SERVICE_MODE=gateway-token-keyring-rotate` 可以轮换本地 RS256 keyring 文件：生成新当前私钥，把旧当前 key 降级为 public-only overlap，并按 `NEXUSIM_IDENTITY_GATEWAY_TOKEN_ROTATE_OLD_KEY_LIMIT` 保留旧公钥。它不分发密钥、不接 KMS/HSM，也不是完整自动轮换平台。
-- 该能力仍不是完整 email/SMS provider 或密钥管理平台；provider 模板、bounce handling、KMS/HSM-backed keyring、统一告警仍是后续项。
+- gRPC TLS / mTLS 配置可以作为“服务端传输安全已开始落地”的面试点，但仍要说明没有完成全服务 mTLS、客户端迁移、证书轮换、SAN allowlist 或服务网格治理。
+- 该能力仍不是完整 email/SMS provider、服务网格或密钥管理平台；provider 模板、bounce handling、KMS/HSM-backed keyring、统一告警仍是后续项。

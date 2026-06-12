@@ -32,6 +32,14 @@ message-service
 
 The first slice keeps the legacy message-service `StaticPolicy` fallback for local smoke. When `NEXUSIM_POLICY_SERVICE_ADDR` is set, message-service calls policy-service over gRPC instead.
 
+The second slice adds an optional policy-service owned PostgreSQL rule table. It is exact-match only:
+
+```text
+tenant_id + user_id + conversation_id + action
+```
+
+When `NEXUSIM_POLICY_RULES_ENABLED=true`, policy-service checks `policy_message_action_rules` first. A matching row returns its allow / deny decision, `permission_version`, `classification` and public reason. A clean rule miss falls back to the static policy. PostgreSQL lookup errors do not fall back; they return policy unavailable so a broken rule store cannot silently bypass a deny rule.
+
 Configuration:
 
 ```text
@@ -41,6 +49,9 @@ NEXUSIM_POLICY_MESSAGE_ALLOWED=true
 NEXUSIM_POLICY_PERMISSION_VERSION=1
 NEXUSIM_POLICY_CLASSIFICATION=INTERNAL
 NEXUSIM_POLICY_DENY_REASON=
+NEXUSIM_POLICY_RULES_ENABLED=false
+NEXUSIM_PG_DSN=
+NEXUSIM_POLICY_PG_MAX_CONNS=
 
 NEXUSIM_POLICY_SERVICE_ADDR=127.0.0.1:10800
 NEXUSIM_POLICY_RPC_TIMEOUT=30ms
@@ -73,7 +84,8 @@ The adapter validates that policy-service response tenant, user, conversation, m
 
 ## Limitations
 
-- First implementation is static and environment configured.
+- First implementation still supports static environment configuration.
+- PostgreSQL rule store is exact-match only; no wildcard / priority rule DSL yet.
 - No contacts block projection is consumed yet.
 - No conversation role / owner / admin policy is implemented yet.
 - No tenant policy, content moderation, risk scoring, rate limiting or audit outbox is implemented yet.

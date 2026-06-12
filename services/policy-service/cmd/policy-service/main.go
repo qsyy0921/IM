@@ -11,9 +11,11 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	policygrpc "github.com/qsyy0921/IM/services/policy-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/policy-service/internal/app"
 	"github.com/qsyy0921/IM/services/policy-service/internal/domain"
+	postgresinfra "github.com/qsyy0921/IM/services/policy-service/internal/infrastructure/postgres"
 	"google.golang.org/grpc"
 )
 
@@ -53,8 +55,22 @@ func runGRPC() error {
 		Classification:    envString("NEXUSIM_POLICY_CLASSIFICATION", "INTERNAL"),
 		Reason:            envString("NEXUSIM_POLICY_DENY_REASON", ""),
 	}
+	var evaluator app.MessagePolicyEvaluator = policy
+	if envBool("NEXUSIM_POLICY_RULES_ENABLED", false) {
+		dsn := envString("NEXUSIM_PG_DSN", "")
+		if dsn == "" {
+			return errors.New("NEXUSIM_PG_DSN is required when NEXUSIM_POLICY_RULES_ENABLED=true")
+		}
+		pool, err := openPGPool(ctx, dsn)
+		if err != nil {
+			return err
+		}
+		defer pool.Close()
+		evaluator = postgresinfra.NewMessagePolicyEvaluator(pool, policy)
+		log.Println("policy-service message action rule store enabled")
+	}
 	server := grpc.NewServer()
-	policygrpc.Register(server, policygrpc.NewServer(app.NewCheckMessageActionUseCase(policy)))
+	policygrpc.Register(server, policygrpc.NewServer(app.NewCheckMessageActionUseCase(evaluator)))
 	go func() {
 		<-ctx.Done()
 		server.GracefulStop()
@@ -64,6 +80,17 @@ func runGRPC() error {
 		return err
 	}
 	return ctx.Err()
+}
+
+func openPGPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
+	config, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	if maxConns := envInt("NEXUSIM_POLICY_PG_MAX_CONNS", 0); maxConns > 0 {
+		config.MaxConns = int32(maxConns)
+	}
+	return pgxpool.NewWithConfig(ctx, config)
 }
 
 func envString(name string, fallback string) string {
@@ -87,6 +114,18 @@ func envBool(name string, fallback bool) bool {
 	default:
 		return fallback
 	}
+}
+
+func envInt(name string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
 }
 
 func envInt64(name string, fallback int64) int64 {

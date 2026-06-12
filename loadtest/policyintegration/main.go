@@ -36,6 +36,7 @@ type config struct {
 	expectedClassification string
 	expectedReason         string
 	cleanup                bool
+	seedPolicyRule         bool
 }
 
 type summary struct {
@@ -58,6 +59,8 @@ type summary struct {
 	ExpectedReason         string       `json:"expected_reason,omitempty"`
 	SendMessage            sendSummary  `json:"send_message"`
 	MessageError           errorSummary `json:"message_error,omitempty"`
+	PolicyRuleSeeded       bool         `json:"policy_rule_seeded"`
+	PolicyRule             policyRule   `json:"policy_rule,omitempty"`
 	DBBefore               dbStats      `json:"db_before"`
 	DBAfter                dbStats      `json:"db_after"`
 	MessageRow             messageRow   `json:"message_row,omitempty"`
@@ -75,6 +78,17 @@ type errorSummary struct {
 	Code      string `json:"code"`
 	Message   string `json:"message"`
 	Retryable bool   `json:"retryable"`
+}
+
+type policyRule struct {
+	TenantID          string `json:"tenant_id,omitempty"`
+	UserID            string `json:"user_id,omitempty"`
+	ConversationID    string `json:"conversation_id,omitempty"`
+	Action            string `json:"action,omitempty"`
+	Allowed           bool   `json:"allowed"`
+	PermissionVersion int64  `json:"permission_version,omitempty"`
+	Classification    string `json:"classification,omitempty"`
+	Reason            string `json:"reason,omitempty"`
 }
 
 type dbStats struct {
@@ -119,6 +133,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.expectedClassification, "expected-classification", "INTERNAL", "expected classification")
 	flag.StringVar(&cfg.expectedReason, "expected-reason", "", "expected deny reason")
 	flag.BoolVar(&cfg.cleanup, "cleanup", false, "delete message rows for tenant before running")
+	flag.BoolVar(&cfg.seedPolicyRule, "seed-policy-rule", false, "seed exact policy_message_action_rules row for this scenario")
 	flag.Parse()
 	cfg.scenario = strings.ToLower(strings.TrimSpace(cfg.scenario))
 	if cfg.requestTimeout <= 0 {
@@ -148,6 +163,11 @@ func run(cfg config) error {
 			return err
 		}
 	}
+	if cfg.seedPolicyRule {
+		if err := seedPolicyRule(ctx, pool, cfg); err != nil {
+			return err
+		}
+	}
 
 	started := time.Now().UTC()
 	s := summary{
@@ -164,6 +184,19 @@ func run(cfg config) error {
 		ExpectedPermissionVer:  cfg.expectedPermissionVer,
 		ExpectedClassification: cfg.expectedClassification,
 		ExpectedReason:         cfg.expectedReason,
+		PolicyRuleSeeded:       cfg.seedPolicyRule,
+	}
+	if cfg.seedPolicyRule {
+		s.PolicyRule = policyRule{
+			TenantID:          cfg.tenantID,
+			UserID:            cfg.userID,
+			ConversationID:    cfg.conversationID,
+			Action:            "SEND",
+			Allowed:           cfg.scenario == "allow",
+			PermissionVersion: cfg.expectedPermissionVer,
+			Classification:    cfg.expectedClassification,
+			Reason:            cfg.expectedReason,
+		}
 	}
 	s.GitDirty = strings.TrimSpace(s.GitStatusShort) != ""
 	defer func() {
@@ -376,6 +409,38 @@ func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string) err
 		if _, err := pool.Exec(ctx, statement, tenantID); err != nil {
 			return fmt.Errorf("cleanup tenant: %w", err)
 		}
+	}
+	return nil
+}
+
+func seedPolicyRule(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
+	allowed := cfg.scenario == "allow"
+	reason := cfg.expectedReason
+	if !allowed && strings.TrimSpace(reason) == "" {
+		reason = "policy denied"
+	}
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_message_action_rules (
+    tenant_id,
+    user_id,
+    conversation_id,
+    action,
+    allowed,
+    permission_version,
+    classification,
+    reason,
+    source
+) VALUES ($1, $2, $3, 'SEND', $4, $5, $6, $7, 'loadtest')
+ON CONFLICT (tenant_id, user_id, conversation_id, action) DO UPDATE
+SET allowed = EXCLUDED.allowed,
+    permission_version = EXCLUDED.permission_version,
+    classification = EXCLUDED.classification,
+    reason = EXCLUDED.reason,
+    source = EXCLUDED.source,
+    updated_at = now()
+`, cfg.tenantID, cfg.userID, cfg.conversationID, allowed, cfg.expectedPermissionVer, cfg.expectedClassification, reason)
+	if err != nil {
+		return fmt.Errorf("seed policy rule: %w", err)
 	}
 	return nil
 }

@@ -2,6 +2,7 @@ param(
     [string]$PgDsn = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
+    [switch]$UsePolicyRules,
     [switch]$SkipBuild
 )
 
@@ -127,7 +128,7 @@ function Run-Scenario {
     $messageAddr = "127.0.0.1:$messagePort"
     $processes = @()
     try {
-        $processes += Start-NexusProcess -Name "policy-$Scenario" -FilePath (Join-Path $repo "bin\policy-service.exe") -Port $policyPort -Env @{
+        $policyEnv = @{
             NEXUSIM_POLICY_SERVICE_MODE = "grpc"
             NEXUSIM_POLICY_GRPC_ADDR = $policyAddr
             NEXUSIM_POLICY_MESSAGE_ALLOWED = [string]$Allowed
@@ -135,6 +136,11 @@ function Run-Scenario {
             NEXUSIM_POLICY_CLASSIFICATION = $Classification
             NEXUSIM_POLICY_DENY_REASON = $Reason
         }
+        if ($UsePolicyRules) {
+            $policyEnv["NEXUSIM_POLICY_RULES_ENABLED"] = "true"
+            $policyEnv["NEXUSIM_PG_DSN"] = $PgDsn
+        }
+        $processes += Start-NexusProcess -Name "policy-$Scenario" -FilePath (Join-Path $repo "bin\policy-service.exe") -Port $policyPort -Env $policyEnv
         $processes += Start-NexusProcess -Name "message-$Scenario" -FilePath (Join-Path $repo "bin\message-service.exe") -Port $messagePort -Env @{
             NEXUSIM_MESSAGE_SERVICE_MODE = "grpc"
             NEXUSIM_GRPC_ADDR = $messageAddr
@@ -162,6 +168,9 @@ function Run-Scenario {
         if ($Reason -ne "") {
             $args += @("--expected-reason", $Reason)
         }
+        if ($UsePolicyRules) {
+            $args += "--seed-policy-rule"
+        }
         & $runner @args
         if ($LASTEXITCODE -ne 0) {
             throw "policy message smoke runner failed with exit code $LASTEXITCODE"
@@ -182,6 +191,14 @@ Get-ChildItem -Path "migrations\postgres\message" -Filter "*.sql" |
         Apply-PostgresMigration -Path $_.FullName -Name $_.Name
     }
 
+if ($UsePolicyRules) {
+    Get-ChildItem -Path "migrations\postgres\policy" -Filter "*.sql" |
+        Sort-Object Name |
+        ForEach-Object {
+            Apply-PostgresMigration -Path $_.FullName -Name $_.Name
+        }
+}
+
 $allowSummary = Run-Scenario `
     -Scenario "allow" `
     -ScenarioDir $allowDir `
@@ -201,6 +218,7 @@ $denySummary = Run-Scenario `
 $combined = [pscustomobject]@{
     success = $true
     result_dir = $resultDir
+    policy_rules_enabled = [bool]$UsePolicyRules
     allow = $allowSummary
     deny = $denySummary
 }

@@ -125,16 +125,19 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 			return err
 		}
 		authenticator, err := authinfra.NewAuthenticator(authinfra.Config{
-			Mode:            authinfra.Mode(envString("NEXUSIM_PUSH_AUTH_MODE", "mock")),
-			Secret:          os.Getenv("NEXUSIM_PUSH_AUTH_HMAC_SECRET"),
-			PreviousSecrets: splitCSV(os.Getenv("NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS")),
-			JWKSetJSON:      jwksJSON,
-			TrustedIssuers:  splitCSV(os.Getenv("NEXUSIM_PUSH_AUTH_TRUSTED_ISSUERS")),
-			Revocation:      revocationStore,
+			Mode:               authinfra.Mode(envString("NEXUSIM_PUSH_AUTH_MODE", "mock")),
+			Secret:             os.Getenv("NEXUSIM_PUSH_AUTH_HMAC_SECRET"),
+			PreviousSecrets:    splitCSV(os.Getenv("NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS")),
+			JWKSetJSON:         jwksJSON,
+			JWKSetURL:          os.Getenv("NEXUSIM_PUSH_AUTH_JWKS_URL"),
+			JWKRefreshInterval: envDuration("NEXUSIM_PUSH_AUTH_JWKS_REFRESH_INTERVAL", 5*time.Minute),
+			TrustedIssuers:     splitCSV(os.Getenv("NEXUSIM_PUSH_AUTH_TRUSTED_ISSUERS")),
+			Revocation:         revocationStore,
 		})
 		if err != nil {
 			return err
 		}
+		defer authenticator.Close()
 		server := wsapi.NewServer(
 			app.NewConnectSessionUseCase(registry),
 			app.NewDisconnectSessionUseCase(registry),

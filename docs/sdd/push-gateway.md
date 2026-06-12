@@ -92,9 +92,9 @@ GET /ws?token=...&device_id=...
 
 - `mock`：本地 smoke 使用，允许 query string 中的 `tenant_id/user_id/device_id` 或 `token=tenant:user[:device]` 生成 `AuthContext`。
 - `hmac`：第一版 signed gateway token verifier。当前兼容两种格式：legacy `base64url(json claims).base64url(hmac_sha256(payload, secret))`，以及标准三段 JWT HS256 `base64url(header).base64url(claims).base64url(signature)`。claims 至少包含 `tenant_id/user_id/aud/exp`，JWT 还应包含 `iss/sub/iat/kid`；`aud` 默认必须为 `push-gateway`，可包含 `device_id/session_id/trace_id`；如果 token 中带 `device_id`，必须与 query / `client.hello.device_id` 一致。真实客户端优先用 `Authorization: Bearer <token>`，query token 只作为本地兼容入口。
-- `jwt`：第一版 RS256 gateway JWT verifier。push-gateway 从 `NEXUSIM_PUSH_AUTH_JWKS_JSON` 或 `NEXUSIM_PUSH_AUTH_JWKS_FILE` 读取公钥 JWKS，只接受 `alg=RS256` 和匹配 `kid` 的公钥签名，可用 `NEXUSIM_PUSH_AUTH_TRUSTED_ISSUERS` 限定受信 issuer。
+- `jwt`：第一版 RS256 gateway JWT verifier。push-gateway 从 `NEXUSIM_PUSH_AUTH_JWKS_JSON` / `NEXUSIM_PUSH_AUTH_JWKS_FILE` 读取静态公钥 JWKS，或从 `NEXUSIM_PUSH_AUTH_JWKS_URL` 启动拉取并按 `NEXUSIM_PUSH_AUTH_JWKS_REFRESH_INTERVAL` 定期刷新。它只接受 `alg=RS256` 和匹配 `kid` 的公钥签名，可用 `NEXUSIM_PUSH_AUTH_TRUSTED_ISSUERS` 限定受信 issuer。
 
-`hmac` 模式只证明 gateway 能拒绝伪造 / 过期 / device mismatch 的客户端身份，不等同完整 identity-service。当前已支持最小密钥轮换：`NEXUSIM_PUSH_AUTH_HMAC_SECRET` 是当前签发密钥，`NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS` 是逗号分隔的旧密钥，只用于验证旧 token。当前也支持 `im.identity.events` 异步 revoke projection：`identity.device.revoked.v1` / `identity.session.revoked.v1` 会进入 in-memory 或 Redis deny-list，WebSocket 建连时命中 deny-list 返回 `PERMISSION_DENIED`；已在线 session 会收到 broad `server.resume_hint(reason=identity_revoked)` 并被 active close。RS256 模式把 hot path 仍保持为本地验签，但只是静态 JWKS 切片；远程 JWKS refresh/cache、自动轮换、KMS/HSM、多 issuer 治理和 token exchange 仍属于后续生产化。
+`hmac` 模式只证明 gateway 能拒绝伪造 / 过期 / device mismatch 的客户端身份，不等同完整 identity-service。当前已支持最小密钥轮换：`NEXUSIM_PUSH_AUTH_HMAC_SECRET` 是当前签发密钥，`NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS` 是逗号分隔的旧密钥，只用于验证旧 token。当前也支持 `im.identity.events` 异步 revoke projection：`identity.device.revoked.v1` / `identity.session.revoked.v1` 会进入 in-memory 或 Redis deny-list，WebSocket 建连时命中 deny-list 返回 `PERMISSION_DENIED`；已在线 session 会收到 broad `server.resume_hint(reason=identity_revoked)` 并被 active close。RS256 模式把 hot path 仍保持为本地验签，并已有第一版远程 JWKS cache；自动 key rotation、KMS/HSM、多 issuer 治理和 token exchange 仍属于后续生产化。
 
 ### 5.1 Client -> Server frames
 
@@ -605,10 +605,13 @@ NEXUSIM_PUSH_AUTH_MODE=jwt
 NEXUSIM_PUSH_AUTH_JWKS_JSON=<jwks-json>
 # or
 NEXUSIM_PUSH_AUTH_JWKS_FILE=<path>
+# or
+NEXUSIM_PUSH_AUTH_JWKS_URL=http://identity-service:10601/.well-known/jwks.json
+NEXUSIM_PUSH_AUTH_JWKS_REFRESH_INTERVAL=5m
 NEXUSIM_PUSH_AUTH_TRUSTED_ISSUERS=nexusim-identity
 ```
 
-identity debug server 会暴露 `/.well-known/jwks.json` 和 `/jwks.json`。HS256 JWK 是内部对称 key 发现入口，只能用于本地 smoke / 内部调试；RS256 JWK 只包含公钥 `n/e`，可供 push-gateway 本地验签。当前仍是静态本地 key-ring 切片，不等于生产级远程 JWKS refresh、自动轮换或 KMS/HSM 私钥托管。
+identity debug server 会暴露 `/.well-known/jwks.json` 和 `/jwks.json`。HS256 JWK 是内部对称 key 发现入口，只能用于本地 smoke / 内部调试；RS256 JWK 只包含公钥 `n/e`，可供 push-gateway 本地验签。`NEXUSIM_PUSH_AUTH_JWKS_URL` 会在启动时 fail-closed 拉取一次，之后后台定期刷新；刷新失败时保留上一份可用 key set。当前仍不等于生产级自动轮换、KMS/HSM 私钥托管或完整 issuer federation。
 
 Redis route 可选参数：
 

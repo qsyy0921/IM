@@ -350,7 +350,8 @@ function Add-PushAuthEnv {
     $Env["NEXUSIM_PUSH_AUTH_HMAC_SECRET"] = $PushAuthHmacSecret
     $Env["NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS"] = $PushAuthHmacPreviousSecrets
     if ($rs256SmokeKeyMaterial) {
-        $Env["NEXUSIM_PUSH_AUTH_JWKS_FILE"] = $rs256SmokeKeyMaterial.JwksFile
+        $Env["NEXUSIM_PUSH_AUTH_JWKS_URL"] = "http://127.0.0.1:11611/.well-known/jwks.json"
+        $Env["NEXUSIM_PUSH_AUTH_JWKS_REFRESH_INTERVAL"] = "1s"
         $Env["NEXUSIM_PUSH_AUTH_TRUSTED_ISSUERS"] = "nexusim-identity"
     }
     return $Env
@@ -508,6 +509,7 @@ try {
         }
         if ($rs256SmokeKeyMaterial) {
             $identityEnv["NEXUSIM_IDENTITY_GATEWAY_TOKEN_RSA_PRIVATE_KEY_FILE"] = $rs256SmokeKeyMaterial.PrivateKeyFile
+            $identityEnv["NEXUSIM_IDENTITY_DEBUG_ADDR"] = "127.0.0.1:11611"
         }
         $processes += Start-NexusProcess -Name "identity-grpc" -FilePath $identityService -Port 11610 -Env $identityEnv
         if ($Scenario -eq "identity-revoke") {

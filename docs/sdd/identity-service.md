@@ -114,7 +114,7 @@ Supported signing modes:
 
 - `legacy` / `hmac`: local HMAC compatibility token for old smoke runners.
 - `jwt` / `jwt-hs256`: standard JWT with HS256. This is still local / internal debug compatibility because push-gateway must know the symmetric signing secret.
-- `jwt-rs256` / `rs256`: standard JWT with RS256. `identity-service` loads an RSA private key from `NEXUSIM_IDENTITY_GATEWAY_TOKEN_RSA_PRIVATE_KEY_PEM` or `NEXUSIM_IDENTITY_GATEWAY_TOKEN_RSA_PRIVATE_KEY_FILE`; its debug server exposes only public RSA JWK material through `/.well-known/jwks.json` / `/jwks.json`. `push-gateway` verifies locally with `NEXUSIM_PUSH_AUTH_MODE=jwt` plus `NEXUSIM_PUSH_AUTH_JWKS_JSON` or `NEXUSIM_PUSH_AUTH_JWKS_FILE`, and may restrict `iss` with `NEXUSIM_PUSH_AUTH_TRUSTED_ISSUERS`.
+- `jwt-rs256` / `rs256`: standard JWT with RS256. `identity-service` loads an RSA private key from `NEXUSIM_IDENTITY_GATEWAY_TOKEN_RSA_PRIVATE_KEY_PEM` or `NEXUSIM_IDENTITY_GATEWAY_TOKEN_RSA_PRIVATE_KEY_FILE`; its debug server exposes only public RSA JWK material through `/.well-known/jwks.json` / `/jwks.json`. `push-gateway` verifies locally with `NEXUSIM_PUSH_AUTH_MODE=jwt` plus static `NEXUSIM_PUSH_AUTH_JWKS_JSON` / `NEXUSIM_PUSH_AUTH_JWKS_FILE`, or remote `NEXUSIM_PUSH_AUTH_JWKS_URL` with `NEXUSIM_PUSH_AUTH_JWKS_REFRESH_INTERVAL`; it may restrict `iss` with `NEXUSIM_PUSH_AUTH_TRUSTED_ISSUERS`.
 
 Claims:
 
@@ -129,7 +129,7 @@ Claims:
 
 The default audience is `push-gateway`. Tokens are short-lived. Revocation is enforced at issuance / refresh time and asynchronously projected to push-gateway deny-lists through `im.identity.events`.
 
-The first RS256 implementation is a local static key-ring slice, not a complete production key management system. Production hardening still needs remote JWKS refresh / cache, multiple active RSA or EC keys, overlap windows for rotation, KMS / HSM backed private keys, stronger issuer governance, trace / alert coverage and operational runbooks.
+The first RS256 implementation now supports a static local key-ring slice and a remote JWKS URL cache with periodic refresh. It is still not a complete production key management system. Production hardening still needs automatic key rotation workflows, multiple active RSA or EC keys with overlap windows, KMS / HSM backed private keys, stronger issuer governance, trace / alert coverage and operational runbooks.
 
 ## Revoke Events
 

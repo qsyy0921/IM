@@ -10,8 +10,10 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
+	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -154,6 +156,60 @@ func TestAuthenticatorJWTRejectsUntrustedIssuer(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), types.ErrPermissionDenied.Error()) {
 		t.Fatalf("expected permission denied, got %v", err)
 	}
+}
+
+func TestAuthenticatorJWTRefreshesRemoteJWKSet(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	privateKey1 := generateTestRSAKey(t)
+	privateKey2 := generateTestRSAKey(t)
+	var currentJWKSet atomic.Value
+	currentJWKSet.Store(testRSAJWKSetJSON(t, privateKey1, "rsa-kid-1"))
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(currentJWKSet.Load().(string)))
+	}))
+	defer server.Close()
+	authenticator, err := NewAuthenticator(Config{
+		Mode:               ModeJWT,
+		JWKSetURL:          server.URL,
+		JWKRefreshInterval: 10 * time.Millisecond,
+		TrustedIssuers:     []string{"issuer-1"},
+		Now:                func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	defer authenticator.Close()
+	token1 := signTestRS256JWT(t, privateKey1, "rsa-kid-1", map[string]string{
+		"tenant_id": "tenant-1",
+		"user_id":   "user-1",
+		"device_id": "device-1",
+		"iss":       "issuer-1",
+		"aud":       "push-gateway",
+	}, now.Add(time.Minute))
+	if _, err := authenticator.Authenticate(requestWithBearer(token1)); err != nil {
+		t.Fatalf("authenticate initial remote jwks token: %v", err)
+	}
+
+	token2 := signTestRS256JWT(t, privateKey2, "rsa-kid-2", map[string]string{
+		"tenant_id": "tenant-1",
+		"user_id":   "user-1",
+		"device_id": "device-1",
+		"iss":       "issuer-1",
+		"aud":       "push-gateway",
+	}, now.Add(time.Minute))
+	if _, err := authenticator.Authenticate(requestWithBearer(token2)); err == nil {
+		t.Fatalf("expected token signed by unknown kid to fail before refresh")
+	}
+	currentJWKSet.Store(testRSAJWKSetJSON(t, privateKey2, "rsa-kid-2"))
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if _, err := authenticator.Authenticate(requestWithBearer(token2)); err == nil {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("expected refreshed remote jwks to accept rotated key")
 }
 
 func TestAuthenticatorHMACRejectsJWTWrongAlgorithm(t *testing.T) {
@@ -444,4 +500,10 @@ func signTestRS256JWT(t *testing.T, privateKey *rsa.PrivateKey, keyID string, cl
 		t.Fatalf("sign jwt: %v", err)
 	}
 	return signingInput + "." + base64.RawURLEncoding.EncodeToString(signature)
+}
+
+func requestWithBearer(token string) *http.Request {
+	request := httptest.NewRequest("GET", "/ws?device_id=device-1", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+	return request
 }

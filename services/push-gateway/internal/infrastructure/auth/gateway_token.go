@@ -9,10 +9,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"math/big"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/qsyy0921/IM/services/push-gateway/internal/types"
@@ -27,14 +29,17 @@ const (
 )
 
 type Config struct {
-	Mode            Mode
-	Secret          string
-	PreviousSecrets []string
-	JWKSetJSON      string
-	TrustedIssuers  []string
-	Audience        string
-	Revocation      RevocationChecker
-	Now             func() time.Time
+	Mode               Mode
+	Secret             string
+	PreviousSecrets    []string
+	JWKSetJSON         string
+	JWKSetURL          string
+	JWKHTTPClient      *http.Client
+	JWKRefreshInterval time.Duration
+	TrustedIssuers     []string
+	Audience           string
+	Revocation         RevocationChecker
+	Now                func() time.Time
 }
 
 type RevocationChecker interface {
@@ -42,13 +47,18 @@ type RevocationChecker interface {
 }
 
 type Authenticator struct {
-	mode       Mode
-	secrets    [][]byte
-	publicKeys map[string]*rsa.PublicKey
-	issuers    map[string]struct{}
-	audience   string
-	revocation RevocationChecker
-	now        func() time.Time
+	mode               Mode
+	secrets            [][]byte
+	keysMu             sync.RWMutex
+	publicKeys         map[string]*rsa.PublicKey
+	issuers            map[string]struct{}
+	audience           string
+	revocation         RevocationChecker
+	now                func() time.Time
+	jwkSetURL          string
+	jwkHTTPClient      *http.Client
+	jwkRefreshInterval time.Duration
+	jwkRefreshCancel   context.CancelFunc
 }
 
 type tokenClaims struct {
@@ -119,16 +129,50 @@ func NewAuthenticator(config Config) (*Authenticator, error) {
 		}
 		return authenticator, nil
 	case ModeJWT:
-		keys, err := parseRS256JWKSet(config.JWKSetJSON)
-		if err != nil {
-			return nil, err
-		}
-		authenticator.publicKeys = keys
 		authenticator.issuers = normalizeIssuers(config.TrustedIssuers)
+		if strings.TrimSpace(config.JWKSetJSON) != "" {
+			keys, err := parseRS256JWKSet(config.JWKSetJSON)
+			if err != nil {
+				return nil, err
+			}
+			authenticator.setPublicKeys(keys)
+		}
+		authenticator.jwkSetURL = strings.TrimSpace(config.JWKSetURL)
+		if authenticator.jwkSetURL != "" {
+			authenticator.jwkHTTPClient = config.JWKHTTPClient
+			if authenticator.jwkHTTPClient == nil {
+				authenticator.jwkHTTPClient = &http.Client{Timeout: 5 * time.Second}
+			}
+			authenticator.jwkRefreshInterval = config.JWKRefreshInterval
+			if authenticator.jwkRefreshInterval <= 0 {
+				authenticator.jwkRefreshInterval = 5 * time.Minute
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			keys, err := authenticator.fetchRS256JWKSet(ctx)
+			cancel()
+			if err != nil {
+				if authenticator.publicKeyCount() == 0 {
+					return nil, err
+				}
+			} else {
+				authenticator.setPublicKeys(keys)
+			}
+			authenticator.startJWKRefresh()
+		}
+		if authenticator.publicKeyCount() == 0 {
+			return nil, errors.New("NEXUSIM_PUSH_AUTH_JWKS_JSON, NEXUSIM_PUSH_AUTH_JWKS_FILE, or NEXUSIM_PUSH_AUTH_JWKS_URL is required when NEXUSIM_PUSH_AUTH_MODE=jwt")
+		}
 		return authenticator, nil
 	default:
 		return nil, errors.New("unsupported NEXUSIM_PUSH_AUTH_MODE")
 	}
+}
+
+func (authenticator *Authenticator) Close() {
+	if authenticator == nil || authenticator.jwkRefreshCancel == nil {
+		return
+	}
+	authenticator.jwkRefreshCancel()
 }
 
 func (authenticator *Authenticator) Authenticate(request *http.Request) (types.AuthContext, error) {
@@ -291,12 +335,75 @@ func (authenticator *Authenticator) validRS256Signature(keyID string, payload st
 	if keyID == "" {
 		return false
 	}
-	publicKey := authenticator.publicKeys[keyID]
+	publicKey := authenticator.publicKey(keyID)
 	if publicKey == nil {
 		return false
 	}
 	digest := sha256.Sum256([]byte(payload))
 	return rsa.VerifyPKCS1v15(publicKey, crypto.SHA256, digest[:], signature) == nil
+}
+
+func (authenticator *Authenticator) publicKey(keyID string) *rsa.PublicKey {
+	authenticator.keysMu.RLock()
+	defer authenticator.keysMu.RUnlock()
+	return authenticator.publicKeys[keyID]
+}
+
+func (authenticator *Authenticator) publicKeyCount() int {
+	authenticator.keysMu.RLock()
+	defer authenticator.keysMu.RUnlock()
+	return len(authenticator.publicKeys)
+}
+
+func (authenticator *Authenticator) setPublicKeys(keys map[string]*rsa.PublicKey) {
+	authenticator.keysMu.Lock()
+	defer authenticator.keysMu.Unlock()
+	authenticator.publicKeys = keys
+}
+
+func (authenticator *Authenticator) fetchRS256JWKSet(ctx context.Context) (map[string]*rsa.PublicKey, error) {
+	if authenticator.jwkHTTPClient == nil {
+		authenticator.jwkHTTPClient = &http.Client{Timeout: 5 * time.Second}
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, authenticator.jwkSetURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	response, err := authenticator.jwkHTTPClient.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return nil, errors.New("jwks endpoint returned non-success status")
+	}
+	var set jwkSet
+	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&set); err != nil {
+		return nil, err
+	}
+	return parseRS256JWKSetValue(set)
+}
+
+func (authenticator *Authenticator) startJWKRefresh() {
+	ctx, cancel := context.WithCancel(context.Background())
+	authenticator.jwkRefreshCancel = cancel
+	go func() {
+		ticker := time.NewTicker(authenticator.jwkRefreshInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				refreshCtx, refreshCancel := context.WithTimeout(ctx, 5*time.Second)
+				keys, err := authenticator.fetchRS256JWKSet(refreshCtx)
+				refreshCancel()
+				if err == nil {
+					authenticator.setPublicKeys(keys)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 }
 
 func parseRS256JWKSet(raw string) (map[string]*rsa.PublicKey, error) {
@@ -308,6 +415,10 @@ func parseRS256JWKSet(raw string) (map[string]*rsa.PublicKey, error) {
 	if err := json.Unmarshal([]byte(raw), &set); err != nil {
 		return nil, err
 	}
+	return parseRS256JWKSetValue(set)
+}
+
+func parseRS256JWKSetValue(set jwkSet) (map[string]*rsa.PublicKey, error) {
 	keys := make(map[string]*rsa.PublicKey)
 	for _, key := range set.Keys {
 		if key.KeyType != "RSA" || key.Algorithm != "RS256" || strings.TrimSpace(key.KeyID) == "" {

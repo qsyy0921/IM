@@ -14,6 +14,7 @@
 | conversation-service member_change_saga SDD | `docs/sdd/conversation-service-member-change-saga.md` | 成员变更 Saga、成员边界 timeline event、ACL 投影失败窗口 |
 | delivery-service SDD | `docs/sdd/delivery-service.md` | timeline 投影、user_inbox、离线补拉和设备 ACK |
 | push-gateway SDD | `docs/sdd/push-gateway.md` | WebSocket 在线连接、delivery event 唤醒、PullInbox / AckDelivery 协调 |
+| identity-service SDD | `docs/sdd/identity-service.md` | gateway token 签发、device / session 生命周期和撤销边界 |
 | receipt-service SDD | `docs/sdd/receipt-service.md` | 送达 / 已读回执 read model、MarkRead 和 receipt event 边界 |
 | receipt-service conversation list SDD | `docs/sdd/receipt-service-conversation-list.md` | 会话列表 / 未读数 read model，复用 receipt-service projection |
 | contacts-service SDD | `docs/sdd/contacts-service.md` | 联系人 / 好友关系事实源、好友申请、联系人列表、删除 / 拉黑 / 备注名和 contact outbox 边界 |
@@ -40,6 +41,7 @@
 | `conversation-service / send context` | SDD v0.1 已存在 | 可以实现 `GetSendContext` 读取路径，替换 message-service strict conversation mock |
 | `conversation-service / member_change_saga` | SDD 已冻结 v1.0；proto / schema / migration v2 / relay builder / 最小 `CreateMemberChange` 写路径、saga publish 状态推进、full smoke 和当前 ACTIVE 成员 `ListConversationMembers` 读接口已落地；`LEAVE / REMOVE` 后 roster 过滤和 `ROLE_CHANGED` 后 role 更新 smoke 已覆盖 | 后续补 DLQ repair、admin-only 成员历史查询、更完整权限负例和生产韧性 |
 | `push-gateway` | SDD v0.1 Draft、WebSocket frame、`im.delivery.events` consumer、ACK 转发、HMAC auth、Redis route / resume、slow session close 和多实例 smoke 已落地 | 只做在线唤醒和回源协调；后续补真实 identity、session revoke、Redis route hardening 和生产指标 |
+| `identity-service` | SDD v0.1 Draft、proto / migration / 六层骨架和 gateway token 签发已落地 | 支撑 push-gateway HMAC token 来源；不让 push-gateway 握手同步 RPC 依赖 identity-service |
 | `delivery-service` | SDD v0.1 已存在，最小 projection / PullInbox / AckDelivery / delivery outbox relay 已落地 | 可以支撑 push-gateway 第一阶段，只要 push-gateway 不绕过 durable inbox / ACK |
 | `receipt-service` | SDD v0.1 Draft、proto、Kafka schema、migration、六层骨架、PostgreSQL repository、delivery consumer、MarkRead、receipt outbox relay、`ListReceiptStates`、最小 `ListConversations`、会话未读 read model、`unread_only` 过滤、Archive / Pin / Mute 用户列表偏好已落地 | 后续补真实权限、更多列表筛选和真正通知静音策略；不得直接读取 delivery-service 内部表 |
 | `contacts-service` | SDD v0.1 Draft、proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、contacts outbox relay 和 ACCEPT / DECLINE / Delete / Block / Unblock / Remark / Re-add 真实进程 smoke 已落地 | 继续保持联系人关系独立事实源；不得把好友关系写入 `conversation_members`，也不得自动创建会话或让 message-service 同步依赖 contacts-service |

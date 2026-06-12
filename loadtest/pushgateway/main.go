@@ -22,6 +22,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
+	identityv1 "github.com/qsyy0921/IM/api/proto/nexusim/identity/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -73,6 +74,7 @@ type config struct {
 	conversationTarget                 string
 	messageTarget                      string
 	deliveryTarget                     string
+	identityTarget                     string
 	pushURL                            string
 	reconnectPushURL                   string
 	resultDir                          string
@@ -116,6 +118,7 @@ type summary struct {
 	ConversationTarget                      string               `json:"conversation_target"`
 	MessageTarget                           string               `json:"message_target"`
 	DeliveryTarget                          string               `json:"delivery_target"`
+	IdentityTarget                          string               `json:"identity_target,omitempty"`
 	PushURL                                 string               `json:"push_url"`
 	ReconnectPushURL                        string               `json:"reconnect_push_url,omitempty"`
 	PushMetricsURL                          string               `json:"push_metrics_url,omitempty"`
@@ -124,6 +127,7 @@ type summary struct {
 	RouteBackend                            string               `json:"route_backend,omitempty"`
 	PushAuthMode                            string               `json:"push_auth_mode,omitempty"`
 	PushAuthTokenTransport                  string               `json:"push_auth_token_transport,omitempty"`
+	PushAuthTokenSource                     string               `json:"push_auth_token_source,omitempty"`
 	PushAuthTokenTTLSeconds                 int64                `json:"push_auth_token_ttl_seconds,omitempty"`
 	PushAuthSecretConfigured                bool                 `json:"push_auth_hmac_secret_configured"`
 	PushAuthPreviousSecretsConfigured       bool                 `json:"push_auth_hmac_previous_secrets_configured"`
@@ -322,6 +326,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.conversationTarget, "conversation-target", "127.0.0.1:11596", "conversation-service gRPC target")
 	flag.StringVar(&cfg.messageTarget, "message-target", "127.0.0.1:11595", "message-service gRPC target")
 	flag.StringVar(&cfg.deliveryTarget, "delivery-target", "127.0.0.1:11597", "delivery-service gRPC target")
+	flag.StringVar(&cfg.identityTarget, "identity-target", "", "optional identity-service gRPC target used to issue push gateway HMAC tokens")
 	flag.StringVar(&cfg.pushURL, "push-url", "ws://127.0.0.1:11598", "push-gateway WebSocket URL")
 	flag.StringVar(&cfg.reconnectPushURL, "reconnect-push-url", "", "optional WebSocket URL used for reconnect/resume scenarios")
 	flag.StringVar(&cfg.resultDir, "result-dir", "H:/NexusIM/loadtest-results/push-gateway-smoke", "result directory")
@@ -451,6 +456,7 @@ func run(cfg config) error {
 		ConversationTarget:                      cfg.conversationTarget,
 		MessageTarget:                           cfg.messageTarget,
 		DeliveryTarget:                          cfg.deliveryTarget,
+		IdentityTarget:                          cfg.identityTarget,
 		PushURL:                                 cfg.pushURL,
 		ReconnectPushURL:                        cfg.reconnectPushURL,
 		PushMetricsURL:                          cfg.pushMetricsURL,
@@ -459,6 +465,7 @@ func run(cfg config) error {
 		RouteBackend:                            cfg.routeBackend,
 		PushAuthMode:                            cfg.pushAuthMode,
 		PushAuthTokenTransport:                  pushAuthTokenTransport(cfg),
+		PushAuthTokenSource:                     pushAuthTokenSource(cfg),
 		PushAuthTokenTTLSeconds:                 int64(cfg.pushAuthTokenTTL.Seconds()),
 		PushAuthSecretConfigured:                strings.TrimSpace(cfg.pushAuthHMACSecret) != "",
 		PushAuthPreviousSecretsConfigured:       strings.TrimSpace(cfg.pushAuthHMACPreviousSecrets) != "",
@@ -1144,7 +1151,7 @@ func connectWebSocketWithResume(
 		query.Set("tenant_id", cfg.tenantID)
 		query.Set("user_id", cfg.receiverUserID)
 	case "hmac":
-		token, err := signPushGatewayToken(cfg, deviceID)
+		token, err := gatewayToken(ctx, cfg, deviceID)
 		if err != nil {
 			return nil, serverFrame{}, err
 		}
@@ -1209,11 +1216,54 @@ func signPushGatewayToken(cfg config, deviceID string) (string, error) {
 	return payloadPart + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
 }
 
+func gatewayToken(ctx context.Context, cfg config, deviceID string) (string, error) {
+	if strings.TrimSpace(cfg.identityTarget) != "" {
+		return issueGatewayToken(ctx, cfg, deviceID)
+	}
+	return signPushGatewayToken(cfg, deviceID)
+}
+
+func issueGatewayToken(ctx context.Context, cfg config, deviceID string) (string, error) {
+	conn, err := grpc.NewClient(cfg.identityTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return "", fmt.Errorf("dial identity-service: %w", err)
+	}
+	defer conn.Close()
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	response, err := identityv1.NewIdentityServiceClient(conn).IssueGatewayToken(requestCtx, &identityv1.IssueGatewayTokenRequest{
+		TenantId:   cfg.tenantID,
+		UserId:     cfg.receiverUserID,
+		DeviceId:   deviceID,
+		Audience:   "push-gateway",
+		TtlSeconds: int64(cfg.pushAuthTokenTTL.Seconds()),
+		TraceId:    "push-smoke-auth",
+		RequestId:  "push-smoke-identity-token-" + deviceID,
+	})
+	if err != nil {
+		return "", fmt.Errorf("issue gateway token: %w", err)
+	}
+	if response.GetGatewayToken() == "" {
+		return "", errors.New("identity-service returned empty gateway token")
+	}
+	return response.GetGatewayToken(), nil
+}
+
 func pushAuthTokenTransport(cfg config) string {
 	if cfg.pushAuthMode == "hmac" {
 		return "authorization_header"
 	}
 	return "query"
+}
+
+func pushAuthTokenSource(cfg config) string {
+	if cfg.pushAuthMode != "hmac" {
+		return "query_identity"
+	}
+	if strings.TrimSpace(cfg.identityTarget) != "" {
+		return "identity_service"
+	}
+	return "local_hmac"
 }
 
 func normalizePushAuthConfig(cfg *config) {

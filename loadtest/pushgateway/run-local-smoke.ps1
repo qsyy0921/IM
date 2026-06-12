@@ -14,6 +14,7 @@ param(
     [string]$RouteBackend = "memory",
     [ValidateSet("mock", "hmac")]
     [string]$PushAuthMode = "mock",
+    [switch]$UseIdentityServiceToken,
     [string]$PushAuthHmacSecret = "local-push-smoke-secret",
     [string]$PushAuthHmacPreviousSecrets = "",
     [string]$PushAuthTokenSigningSecret = "",
@@ -220,10 +221,15 @@ Write-Output "sentinel_restored_health=$state"
 
 . .\tools\go-env.ps1
 
+if ($UseIdentityServiceToken -and $PushAuthMode -ne "hmac") {
+    throw "-UseIdentityServiceToken requires -PushAuthMode hmac"
+}
+
 if (-not $SkipBuild) {
     go build -o bin\conversation-service.exe ./services/conversation-service/cmd/conversation-service
     go build -o bin\message-service.exe ./services/message-service/cmd/message-service
     go build -o bin\delivery-service.exe ./services/delivery-service/cmd/delivery-service
+    go build -o bin\identity-service.exe ./services/identity-service/cmd/identity-service
     go build -o bin\push-gateway.exe ./services/push-gateway/cmd/push-gateway
     go build -o bin\pushgateway-smoke.exe ./loadtest/pushgateway
 }
@@ -320,10 +326,16 @@ try {
     Ensure-KafkaTopic -Topic $timelineTopic
     Ensure-KafkaTopic -Topic $deliveryTopic
     Reset-ConsumerGroupToLatest -Group $pushConsumerGroup -Topic $deliveryTopic
+    if ($UseIdentityServiceToken) {
+        $identityMigration = Join-Path $repo "migrations\postgres\identity\000001_identity_core.sql"
+        docker cp $identityMigration nexusim-postgres:/tmp/nexusim_identity.sql | Out-Null
+        docker exec nexusim-postgres psql -U nexusim -d nexusim -f /tmp/nexusim_identity.sql | Out-Null
+    }
 
     $conversationService = Join-Path $repo "bin\conversation-service.exe"
     $messageService = Join-Path $repo "bin\message-service.exe"
     $deliveryService = Join-Path $repo "bin\delivery-service.exe"
+    $identityService = Join-Path $repo "bin\identity-service.exe"
     $pushGateway = Join-Path $repo "bin\push-gateway.exe"
     $runner = Join-Path $repo "bin\pushgateway-smoke.exe"
 
@@ -363,6 +375,15 @@ try {
         NEXUSIM_KAFKA_BROKERS = $KafkaBrokers
         NEXUSIM_DELIVERY_EVENTS_TOPIC = $deliveryTopic
         NEXUSIM_DELIVERY_OUTBOX_POLL_INTERVAL = "200ms"
+    }
+
+    if ($UseIdentityServiceToken) {
+        $processes += Start-NexusProcess -Name "identity-grpc" -FilePath $identityService -Port 11610 -Env @{
+            NEXUSIM_IDENTITY_SERVICE_MODE = "grpc"
+            NEXUSIM_IDENTITY_GRPC_ADDR = "127.0.0.1:11610"
+            NEXUSIM_PG_DSN = $PgDsn
+            NEXUSIM_IDENTITY_GATEWAY_TOKEN_SECRET = $PushAuthHmacSecret
+        }
     }
 
     if ($RouteBackend -eq "redis") {
@@ -468,6 +489,9 @@ try {
         "--wait-timeout", "20s",
         "--request-timeout", $runnerRequestTimeout
     )
+    if ($UseIdentityServiceToken) {
+        $runnerArgs += @("--identity-target", "127.0.0.1:11610")
+    }
     if ($RedisFaultCommand) {
         $runnerArgs += @("--redis-fault-command", $RedisFaultCommand)
     }

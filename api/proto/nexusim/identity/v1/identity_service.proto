@@ -1,0 +1,101 @@
+syntax = "proto3";
+
+package nexusim.identity.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/identity/v1;identityv1";
+
+service IdentityService {
+  rpc IssueGatewayToken(IssueGatewayTokenRequest) returns (IssueGatewayTokenResponse);
+  rpc RevokeDevice(RevokeDeviceRequest) returns (RevokeDeviceResponse);
+  rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
+  rpc GetDeviceState(GetDeviceStateRequest) returns (GetDeviceStateResponse);
+}
+
+message AdminContext {
+  string tenant_id = 1;
+  string operator_user_id = 2;
+  string trace_id = 3;
+  string request_id = 4;
+}
+
+message IssueGatewayTokenRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string audience = 5;
+  int64 ttl_seconds = 6;
+  string trace_id = 7;
+  string request_id = 8;
+}
+
+message IssueGatewayTokenResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string audience = 5;
+  string gateway_token = 6;
+  int64 expires_at_unix_ms = 7;
+  int64 issued_at_unix_ms = 8;
+}
+
+message RevokeDeviceRequest {
+  AdminContext admin_context = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string reason = 4;
+}
+
+message RevokeDeviceResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  DeviceStatus status = 4;
+  int64 revoked_at_unix_ms = 5;
+}
+
+message RevokeSessionRequest {
+  AdminContext admin_context = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string reason = 5;
+}
+
+message RevokeSessionResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  SessionStatus status = 5;
+  int64 revoked_at_unix_ms = 6;
+}
+
+message GetDeviceStateRequest {
+  AdminContext admin_context = 1;
+  string user_id = 2;
+  string device_id = 3;
+}
+
+message GetDeviceStateResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  DeviceStatus status = 4;
+  int64 created_at_unix_ms = 5;
+  int64 updated_at_unix_ms = 6;
+  int64 revoked_at_unix_ms = 7;
+}
+
+enum DeviceStatus {
+  DEVICE_STATUS_UNSPECIFIED = 0;
+  DEVICE_STATUS_ACTIVE = 1;
+  DEVICE_STATUS_REVOKED = 2;
+}
+
+enum SessionStatus {
+  SESSION_STATUS_UNSPECIFIED = 0;
+  SESSION_STATUS_ACTIVE = 1;
+  SESSION_STATUS_REVOKED = 2;
+}

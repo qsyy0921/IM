@@ -54,17 +54,16 @@ func runGRPC() error {
 		return err
 	}
 	defer pool.Close()
+	signer, err := newGatewayTokenSigner()
+	if err != nil {
+		return err
+	}
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
-	stopDebug, err := startDebugServer(ctx, identityDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics))
+	stopDebug, err := startDebugServer(ctx, identityDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics).WithJWKSet(signer.JWKSet()))
 	if err != nil {
 		return err
 	}
 	defer stopDebug()
-
-	signer, err := tokeninfra.NewHMACSigner(envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_SECRET", envString("NEXUSIM_PUSH_AUTH_HMAC_SECRET", "")))
-	if err != nil {
-		return err
-	}
 
 	addr := envString("NEXUSIM_IDENTITY_GRPC_ADDR", "0.0.0.0:10600")
 	listener, err := net.Listen("tcp", addr)
@@ -102,6 +101,22 @@ func runGRPC() error {
 			return err
 		}
 		return context.Canceled
+	}
+}
+
+func newGatewayTokenSigner() (*tokeninfra.HMACSigner, error) {
+	secret := envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_SECRET", envString("NEXUSIM_PUSH_AUTH_HMAC_SECRET", ""))
+	switch strings.ToLower(envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_FORMAT", "legacy")) {
+	case "legacy", "hmac", "custom":
+		return tokeninfra.NewHMACSigner(secret)
+	case "jwt", "jwt-hs256", "hs256":
+		return tokeninfra.NewJWTSigner(
+			secret,
+			envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_KEY_ID", ""),
+			envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ISSUER", ""),
+		)
+	default:
+		return nil, errors.New("unsupported NEXUSIM_IDENTITY_GATEWAY_TOKEN_FORMAT")
 	}
 }
 

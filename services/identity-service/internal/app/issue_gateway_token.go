@@ -42,6 +42,7 @@ func (uc *IssueGatewayTokenUseCase) Execute(ctx context.Context, command types.I
 		SessionID: result.SessionID,
 		Audience:  result.Audience,
 		TraceID:   command.TraceID,
+		IssuedAt:  issuedAt.Unix(),
 		ExpiresAt: expiresAt.Unix(),
 	})
 	if err != nil {

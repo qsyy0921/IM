@@ -20,6 +20,8 @@ param(
     [string]$PushAuthHmacSecret = "local-push-smoke-secret",
     [string]$PushAuthHmacPreviousSecrets = "",
     [string]$PushAuthTokenSigningSecret = "",
+    [ValidateSet("legacy", "jwt")]
+    [string]$IdentityGatewayTokenFormat = "legacy",
     [string]$PushAuthTokenTtl = "10m",
     [ValidateSet("single", "sentinel")]
     [string]$RedisMode = "single",
@@ -396,6 +398,9 @@ try {
             NEXUSIM_IDENTITY_GRPC_ADDR = "127.0.0.1:11610"
             NEXUSIM_PG_DSN = $PgDsn
             NEXUSIM_IDENTITY_GATEWAY_TOKEN_SECRET = $PushAuthHmacSecret
+            NEXUSIM_IDENTITY_GATEWAY_TOKEN_FORMAT = $IdentityGatewayTokenFormat
+            NEXUSIM_IDENTITY_GATEWAY_TOKEN_KEY_ID = "push-smoke-gateway-hs256"
+            NEXUSIM_IDENTITY_GATEWAY_TOKEN_ISSUER = "nexusim-identity"
         }
         if ($Scenario -eq "identity-revoke") {
             $processes += Start-NexusProcess -Name "identity-outbox-relay" -FilePath $identityService -Env @{
@@ -520,6 +525,7 @@ try {
         "--push-auth-hmac-previous-secrets", $PushAuthHmacPreviousSecrets,
         "--push-auth-token-signing-secret", $PushAuthTokenSigningSecret,
         "--push-auth-token-ttl", $PushAuthTokenTtl,
+        "--identity-gateway-token-format", $IdentityGatewayTokenFormat,
         "--redis-key-prefix", $pushRouteKeyPrefix,
         "--push-ws-gateway-id", $pushWSGatewayID,
         "--push-consumer-gateway-id", $pushConsumerGatewayID,
@@ -576,6 +582,9 @@ Write-Host "push_auth_mode=$PushAuthMode"
 if ($PushAuthMode -eq "hmac") {
     Write-Host "push_auth_hmac_previous_secrets_configured=$([bool]$PushAuthHmacPreviousSecrets)"
     Write-Host "push_auth_token_signing_secret_explicit=$([bool]$PushAuthTokenSigningSecret)"
+    if ($UseIdentityServiceToken) {
+        Write-Host "identity_gateway_token_format=$IdentityGatewayTokenFormat"
+    }
 }
 if ($RouteBackend -eq "redis") {
     Write-Host "redis_mode=$RedisMode"

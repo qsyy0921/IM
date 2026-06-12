@@ -79,3 +79,37 @@ func TestHandlerMetricsIncludesGRPCSnapshot(t *testing.T) {
 		t.Fatalf("expected grpc metrics, got %+v", body.GRPC)
 	}
 }
+
+func TestHandlerJWKS(t *testing.T) {
+	handler := NewHandler(nil).WithJWKSet(map[string]any{
+		"keys": []map[string]string{{
+			"kty": "oct",
+			"kid": "kid-1",
+			"alg": "HS256",
+		}},
+	})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/.well-known/jwks.json", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", response.Code)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode jwks: %v", err)
+	}
+	keys, ok := body["keys"].([]any)
+	if !ok || len(keys) != 1 {
+		t.Fatalf("unexpected jwks: %+v", body)
+	}
+}
+
+func TestHandlerJWKSNotConfigured(t *testing.T) {
+	handler := NewHandler(nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/.well-known/jwks.json", nil))
+
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", response.Code)
+	}
+}

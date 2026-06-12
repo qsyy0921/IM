@@ -49,8 +49,17 @@ type tokenClaims struct {
 	DeviceID  string `json:"device_id,omitempty"`
 	SessionID string `json:"session_id,omitempty"`
 	TraceID   string `json:"trace_id,omitempty"`
+	Issuer    string `json:"iss,omitempty"`
+	Subject   string `json:"sub,omitempty"`
 	Audience  string `json:"aud"`
+	IssuedAt  int64  `json:"iat,omitempty"`
 	Expires   int64  `json:"exp"`
+}
+
+type tokenHeader struct {
+	Algorithm string `json:"alg"`
+	Type      string `json:"typ"`
+	KeyID     string `json:"kid,omitempty"`
 }
 
 func NewAuthenticator(config Config) (*Authenticator, error) {
@@ -147,7 +156,18 @@ func (authenticator *Authenticator) authenticateHMAC(request *http.Request) (typ
 
 func (authenticator *Authenticator) parseToken(token string) (tokenClaims, error) {
 	parts := strings.Split(token, ".")
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+	switch len(parts) {
+	case 2:
+		return authenticator.parseLegacyToken(parts)
+	case 3:
+		return authenticator.parseJWT(parts)
+	default:
+		return tokenClaims{}, types.ErrPermissionDenied
+	}
+}
+
+func (authenticator *Authenticator) parseLegacyToken(parts []string) (tokenClaims, error) {
+	if parts[0] == "" || parts[1] == "" {
 		return tokenClaims{}, types.ErrPermissionDenied
 	}
 	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
@@ -161,6 +181,39 @@ func (authenticator *Authenticator) parseToken(token string) (tokenClaims, error
 	if !authenticator.validSignature(parts[0], signature) {
 		return tokenClaims{}, types.ErrPermissionDenied
 	}
+	return authenticator.parseClaims(payloadBytes)
+}
+
+func (authenticator *Authenticator) parseJWT(parts []string) (tokenClaims, error) {
+	if parts[0] == "" || parts[1] == "" || parts[2] == "" {
+		return tokenClaims{}, types.ErrPermissionDenied
+	}
+	headerBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return tokenClaims{}, types.ErrPermissionDenied
+	}
+	var header tokenHeader
+	if err := json.Unmarshal(headerBytes, &header); err != nil {
+		return tokenClaims{}, types.ErrPermissionDenied
+	}
+	if header.Algorithm != "HS256" || header.Type != "JWT" {
+		return tokenClaims{}, types.ErrPermissionDenied
+	}
+	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		return tokenClaims{}, types.ErrPermissionDenied
+	}
+	if !authenticator.validSignature(parts[0]+"."+parts[1], signature) {
+		return tokenClaims{}, types.ErrPermissionDenied
+	}
+	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return tokenClaims{}, types.ErrPermissionDenied
+	}
+	return authenticator.parseClaims(payloadBytes)
+}
+
+func (authenticator *Authenticator) parseClaims(payloadBytes []byte) (tokenClaims, error) {
 	var claims tokenClaims
 	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
 		return tokenClaims{}, types.ErrPermissionDenied
@@ -257,6 +310,44 @@ func SignGatewayToken(secret string, claims map[string]string, expiresAt time.Ti
 	mac := hmac.New(sha256.New, []byte(secret))
 	_, _ = mac.Write([]byte(payloadPart))
 	return payloadPart + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
+}
+
+func SignGatewayJWT(secret string, claims map[string]string, expiresAt time.Time) (string, error) {
+	if strings.TrimSpace(secret) == "" {
+		return "", types.ErrPermissionDenied
+	}
+	payload := tokenClaims{
+		TenantID:  strings.TrimSpace(claims["tenant_id"]),
+		UserID:    strings.TrimSpace(claims["user_id"]),
+		DeviceID:  strings.TrimSpace(claims["device_id"]),
+		SessionID: strings.TrimSpace(claims["session_id"]),
+		TraceID:   strings.TrimSpace(claims["trace_id"]),
+		Issuer:    firstNonEmpty(claims["iss"], "nexusim-identity"),
+		Subject:   firstNonEmpty(claims["sub"], claims["user_id"]),
+		Audience:  firstNonEmpty(claims["aud"], "push-gateway"),
+		IssuedAt:  time.Now().Unix(),
+		Expires:   expiresAt.Unix(),
+	}
+	if payload.TenantID == "" || payload.UserID == "" || payload.Expires <= 0 {
+		return "", types.ErrPermissionDenied
+	}
+	header := tokenHeader{
+		Algorithm: "HS256",
+		Type:      "JWT",
+		KeyID:     firstNonEmpty(claims["kid"], "nexusim-local-gateway-hs256"),
+	}
+	headerBytes, err := json.Marshal(header)
+	if err != nil {
+		return "", err
+	}
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+	signingInput := base64.RawURLEncoding.EncodeToString(headerBytes) + "." + base64.RawURLEncoding.EncodeToString(payloadBytes)
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = mac.Write([]byte(signingInput))
+	return signingInput + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
 }
 
 func ClaimsFromTenantUserDevice(tenantID string, userID string, deviceID string) map[string]string {

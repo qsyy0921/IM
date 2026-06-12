@@ -14,6 +14,7 @@ const serviceName = "identity-service"
 type Handler struct {
 	pool        *pgxpool.Pool
 	grpcMetrics *GRPCMetrics
+	jwkSet      any
 }
 
 func NewHandler(pool *pgxpool.Pool, grpcMetrics ...*GRPCMetrics) *Handler {
@@ -24,17 +25,32 @@ func NewHandler(pool *pgxpool.Pool, grpcMetrics ...*GRPCMetrics) *Handler {
 	return handler
 }
 
+func (h *Handler) WithJWKSet(jwkSet any) *Handler {
+	h.jwkSet = jwkSet
+	return h
+}
+
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/healthz":
 		writeJSON(w, http.StatusOK, healthResponse{Service: serviceName, Status: "ok"})
 	case "/readyz":
 		h.handleReady(w, r)
+	case "/.well-known/jwks.json", "/jwks.json":
+		h.handleJWKS(w, r)
 	case "/debug/metrics":
 		h.handleMetrics(w, r)
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func (h *Handler) handleJWKS(w http.ResponseWriter, r *http.Request) {
+	if h.jwkSet == nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"keys": []any{}})
+		return
+	}
+	writeJSON(w, http.StatusOK, h.jwkSet)
 }
 
 func (h *Handler) handleReady(w http.ResponseWriter, r *http.Request) {

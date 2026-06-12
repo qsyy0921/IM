@@ -109,6 +109,8 @@ type TokenClaims struct {
 	DeviceID  DeviceID
 	SessionID SessionID
 	Audience  string
+	Issuer    string
 	TraceID   string
+	IssuedAt  int64
 	ExpiresAt int64
 }

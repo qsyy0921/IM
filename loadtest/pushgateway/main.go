@@ -103,6 +103,7 @@ type config struct {
 	pushAuthTokenSigningSecret         string
 	pushAuthTokenSigningSecretExplicit bool
 	pushAuthTokenTTL                   time.Duration
+	identityGatewayTokenFormat         string
 	redisKeyPrefix                     string
 	pushWSGatewayID                    string
 	pushReconnectGatewayID             string
@@ -132,6 +133,7 @@ type summary struct {
 	PushAuthMode                            string                 `json:"push_auth_mode,omitempty"`
 	PushAuthTokenTransport                  string                 `json:"push_auth_token_transport,omitempty"`
 	PushAuthTokenSource                     string                 `json:"push_auth_token_source,omitempty"`
+	IdentityGatewayTokenFormat              string                 `json:"identity_gateway_token_format,omitempty"`
 	PushAuthTokenTTLSeconds                 int64                  `json:"push_auth_token_ttl_seconds,omitempty"`
 	PushAuthSecretConfigured                bool                   `json:"push_auth_hmac_secret_configured"`
 	PushAuthPreviousSecretsConfigured       bool                   `json:"push_auth_hmac_previous_secrets_configured"`
@@ -374,6 +376,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.pushAuthHMACPreviousSecrets, "push-auth-hmac-previous-secrets", "", "comma separated previous HMAC secrets configured on push-gateway during rotation smoke; used only for summary evidence")
 	flag.StringVar(&cfg.pushAuthTokenSigningSecret, "push-auth-token-signing-secret", "", "optional HMAC secret used only for signing smoke tokens; defaults to --push-auth-hmac-secret")
 	flag.DurationVar(&cfg.pushAuthTokenTTL, "push-auth-token-ttl", 10*time.Minute, "TTL for generated push gateway HMAC smoke tokens")
+	flag.StringVar(&cfg.identityGatewayTokenFormat, "identity-gateway-token-format", "legacy", "identity-service gateway token format used by smoke environment: legacy or jwt")
 	flag.StringVar(&cfg.redisKeyPrefix, "redis-key-prefix", "", "Redis route key prefix used by the smoke environment")
 	flag.StringVar(&cfg.pushWSGatewayID, "push-ws-gateway-id", "", "WebSocket gateway id used by cross-instance route smoke")
 	flag.StringVar(&cfg.pushReconnectGatewayID, "push-reconnect-gateway-id", "", "reconnect WebSocket gateway id used by cross-instance resume smoke")
@@ -492,6 +495,7 @@ func run(cfg config) error {
 		PushAuthMode:                            cfg.pushAuthMode,
 		PushAuthTokenTransport:                  pushAuthTokenTransport(cfg),
 		PushAuthTokenSource:                     pushAuthTokenSource(cfg),
+		IdentityGatewayTokenFormat:              identityGatewayTokenFormat(cfg),
 		PushAuthTokenTTLSeconds:                 int64(cfg.pushAuthTokenTTL.Seconds()),
 		PushAuthSecretConfigured:                strings.TrimSpace(cfg.pushAuthHMACSecret) != "",
 		PushAuthPreviousSecretsConfigured:       strings.TrimSpace(cfg.pushAuthHMACPreviousSecrets) != "",
@@ -1557,6 +1561,17 @@ func pushAuthTokenSource(cfg config) string {
 		return "identity_service"
 	}
 	return "local_hmac"
+}
+
+func identityGatewayTokenFormat(cfg config) string {
+	if strings.TrimSpace(cfg.identityTarget) == "" {
+		return ""
+	}
+	value := strings.TrimSpace(cfg.identityGatewayTokenFormat)
+	if value == "" {
+		return "legacy"
+	}
+	return value
 }
 
 func normalizePushAuthConfig(cfg *config) {

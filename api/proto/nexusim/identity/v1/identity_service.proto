@@ -84,6 +84,9 @@ message RefreshGatewayTokenRequest {
   int64 refresh_ttl_seconds = 7;
   string trace_id = 8;
   string request_id = 9;
+  string mfa_factor_id = 10;
+  string mfa_code = 11;
+  string mfa_recovery_code = 12;
 }
 
 message RefreshGatewayTokenResponse {

@@ -116,15 +116,20 @@ type LoginResult struct {
 }
 
 type RefreshGatewayTokenCommand struct {
-	TenantID          TenantID
-	UserID            UserID
-	DeviceID          DeviceID
-	RefreshToken      string
-	Audience          string
-	GatewayTTLSeconds int64
-	RefreshTTLSeconds int64
-	TraceID           string
-	RequestID         string
+	TenantID            TenantID
+	UserID              UserID
+	DeviceID            DeviceID
+	RefreshToken        string
+	Audience            string
+	GatewayTTLSeconds   int64
+	RefreshTTLSeconds   int64
+	MFAFactorID         MFAFactorID
+	MFACode             string
+	MFARecoveryCode     string
+	VerifiedMFAFactorID MFAFactorID
+	UsedMFARecoveryCode MFARecoveryCodeRecord
+	TraceID             string
+	RequestID           string
 }
 
 type RefreshGatewayTokenResult struct {

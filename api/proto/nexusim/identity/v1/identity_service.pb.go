@@ -791,6 +791,9 @@ type RefreshGatewayTokenRequest struct {
 	RefreshTtlSeconds int64                  `protobuf:"varint,7,opt,name=refresh_ttl_seconds,json=refreshTtlSeconds,proto3" json:"refresh_ttl_seconds,omitempty"`
 	TraceId           string                 `protobuf:"bytes,8,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
 	RequestId         string                 `protobuf:"bytes,9,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	MfaFactorId       string                 `protobuf:"bytes,10,opt,name=mfa_factor_id,json=mfaFactorId,proto3" json:"mfa_factor_id,omitempty"`
+	MfaCode           string                 `protobuf:"bytes,11,opt,name=mfa_code,json=mfaCode,proto3" json:"mfa_code,omitempty"`
+	MfaRecoveryCode   string                 `protobuf:"bytes,12,opt,name=mfa_recovery_code,json=mfaRecoveryCode,proto3" json:"mfa_recovery_code,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -884,6 +887,27 @@ func (x *RefreshGatewayTokenRequest) GetTraceId() string {
 func (x *RefreshGatewayTokenRequest) GetRequestId() string {
 	if x != nil {
 		return x.RequestId
+	}
+	return ""
+}
+
+func (x *RefreshGatewayTokenRequest) GetMfaFactorId() string {
+	if x != nil {
+		return x.MfaFactorId
+	}
+	return ""
+}
+
+func (x *RefreshGatewayTokenRequest) GetMfaCode() string {
+	if x != nil {
+		return x.MfaCode
+	}
+	return ""
+}
+
+func (x *RefreshGatewayTokenRequest) GetMfaRecoveryCode() string {
+	if x != nil {
+		return x.MfaRecoveryCode
 	}
 	return ""
 }
@@ -3248,7 +3272,7 @@ const file_nexusim_identity_v1_identity_service_proto_rawDesc = "" +
 	"\x1agateway_expires_at_unix_ms\x18\t \x01(\x03R\x16gatewayExpiresAtUnixMs\x12:\n" +
 	"\x1arefresh_expires_at_unix_ms\x18\n" +
 	" \x01(\x03R\x16refreshExpiresAtUnixMs\x12)\n" +
-	"\x11issued_at_unix_ms\x18\v \x01(\x03R\x0eissuedAtUnixMs\"\xca\x02\n" +
+	"\x11issued_at_unix_ms\x18\v \x01(\x03R\x0eissuedAtUnixMs\"\xb5\x03\n" +
 	"\x1aRefreshGatewayTokenRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +
@@ -3259,7 +3283,11 @@ const file_nexusim_identity_v1_identity_service_proto_rawDesc = "" +
 	"\x13refresh_ttl_seconds\x18\a \x01(\x03R\x11refreshTtlSeconds\x12\x19\n" +
 	"\btrace_id\x18\b \x01(\tR\atraceId\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\t \x01(\tR\trequestId\"\xb7\x03\n" +
+	"request_id\x18\t \x01(\tR\trequestId\x12\"\n" +
+	"\rmfa_factor_id\x18\n" +
+	" \x01(\tR\vmfaFactorId\x12\x19\n" +
+	"\bmfa_code\x18\v \x01(\tR\amfaCode\x12*\n" +
+	"\x11mfa_recovery_code\x18\f \x01(\tR\x0fmfaRecoveryCode\"\xb7\x03\n" +
 	"\x1bRefreshGatewayTokenResponse\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +

@@ -192,6 +192,47 @@ func TestServerLoginMapsMFARecoveryCode(t *testing.T) {
 	}
 }
 
+func TestServerRefreshGatewayTokenMapsMFAFields(t *testing.T) {
+	executor := &fakeRefreshGatewayTokenExecutor{
+		result: types.RefreshGatewayTokenResult{
+			TenantID:               "tenant-1",
+			UserID:                 "user-1",
+			DeviceID:               "device-1",
+			SessionID:              "session-1",
+			Audience:               "push-gateway",
+			TokenType:              "Bearer",
+			GatewayToken:           "gateway-token",
+			RefreshToken:           "refresh-token-next",
+			GatewayExpiresAtUnixMS: 1_800_000_900_000,
+			RefreshExpiresAtUnixMS: 1_802_592_000_000,
+			IssuedAtUnixMS:         1_800_000_000_000,
+		},
+	}
+	server := &Server{refreshGatewayToken: executor}
+	_, err := server.RefreshGatewayToken(context.Background(), &identityv1.RefreshGatewayTokenRequest{
+		TenantId:          "tenant-1",
+		UserId:            "user-1",
+		DeviceId:          "device-1",
+		RefreshToken:      "refresh-token-old",
+		MfaFactorId:       "mfa-1",
+		MfaCode:           "123456",
+		MfaRecoveryCode:   "",
+		TraceId:           "trace-1",
+		RequestId:         "request-1",
+		GatewayTtlSeconds: 900,
+		RefreshTtlSeconds: 2_592_000,
+	})
+	if err != nil {
+		t.Fatalf("refresh gateway token: %v", err)
+	}
+	if executor.command.MFAFactorID != "mfa-1" || executor.command.MFACode != "123456" || executor.command.MFARecoveryCode != "" {
+		t.Fatalf("expected refresh mfa fields to map to command, got %+v", executor.command)
+	}
+	if executor.command.TraceID != "trace-1" || executor.command.RequestID != "request-1" {
+		t.Fatalf("expected trace/request to map to command, got %+v", executor.command)
+	}
+}
+
 func TestServerLoginMapsMFARequiredToFailedPrecondition(t *testing.T) {
 	server := &Server{login: &fakeLoginExecutor{err: types.NewMFARequired("mfa required")}}
 	_, err := server.Login(context.Background(), &identityv1.LoginRequest{
@@ -437,6 +478,12 @@ type fakeLoginExecutor struct {
 	err     error
 }
 
+type fakeRefreshGatewayTokenExecutor struct {
+	command types.RefreshGatewayTokenCommand
+	result  types.RefreshGatewayTokenResult
+	err     error
+}
+
 type fakeRequestPasswordResetExecutor struct {
 	command types.RequestPasswordResetCommand
 	result  types.RequestPasswordResetResult
@@ -477,6 +524,14 @@ func (executor *fakeLoginExecutor) Execute(_ context.Context, command types.Logi
 	executor.command = command
 	if executor.err != nil {
 		return types.LoginResult{}, executor.err
+	}
+	return executor.result, nil
+}
+
+func (executor *fakeRefreshGatewayTokenExecutor) Execute(_ context.Context, command types.RefreshGatewayTokenCommand) (types.RefreshGatewayTokenResult, error) {
+	executor.command = command
+	if executor.err != nil {
+		return types.RefreshGatewayTokenResult{}, executor.err
 	}
 	return executor.result, nil
 }

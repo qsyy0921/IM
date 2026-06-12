@@ -216,6 +216,9 @@ func (s *Server) RefreshGatewayToken(ctx context.Context, request *identityv1.Re
 		Audience:          request.GetAudience(),
 		GatewayTTLSeconds: request.GetGatewayTtlSeconds(),
 		RefreshTTLSeconds: request.GetRefreshTtlSeconds(),
+		MFAFactorID:       types.MFAFactorID(request.GetMfaFactorId()),
+		MFACode:           request.GetMfaCode(),
+		MFARecoveryCode:   request.GetMfaRecoveryCode(),
 		TraceID:           request.GetTraceId(),
 		RequestID:         request.GetRequestId(),
 	})

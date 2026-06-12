@@ -96,7 +96,7 @@ Refresh token rules:
 - a successful refresh marks the presented token `USED`, inserts one new `ACTIVE` refresh token and returns a new short-lived gateway token;
 - expired refresh tokens are marked `REVOKED` and rejected;
 - reuse of a `USED` or `REVOKED` refresh token is treated as credential compromise: the session is marked `REVOKED`, active refresh tokens for that session are revoked, and `identity.session.revoked.v1` is written through `identity_outbox`.
-- `identity_sessions.mfa_verified_at`, `mfa_method` and `mfa_factor_id` record whether the session was created after successful TOTP or recovery-code MFA proof. If a user currently has any ACTIVE TOTP factor, `RefreshGatewayToken` requires the existing session to carry that MFA proof; older password-only sessions return stable `MFA_REQUIRED` and must re-login with MFA. This first-stage step-up does not add MFA code submission to the refresh RPC.
+- `identity_sessions.mfa_verified_at`, `mfa_method` and `mfa_factor_id` record whether the session was created or refreshed after successful TOTP or recovery-code MFA proof. If a user currently has any ACTIVE TOTP factor, `RefreshGatewayToken` requires either existing session MFA proof or a freshly submitted `mfa_code` / `mfa_recovery_code`; older password-only sessions return stable `MFA_REQUIRED` when no proof is supplied.
 
 Login risk first-stage rules:
 
@@ -115,7 +115,7 @@ Login risk first-stage rules:
 
 ## MFA TOTP Factors
 
-First-stage MFA support is limited to TOTP factors, password Login enforcement, one-time recovery codes generated during TOTP confirmation or regeneration, and refresh-token step-up for password-only sessions after MFA is enabled. It does not yet implement MFA proof submission during refresh, WebAuthn/passkeys or tenant-specific factor policy.
+First-stage MFA support is limited to TOTP factors, password Login enforcement, one-time recovery codes generated during TOTP confirmation or regeneration, and refresh-token step-up for password-only sessions after MFA is enabled. `RefreshGatewayToken` can now accept TOTP or recovery-code proof and stores the resulting session proof in the same refresh rotation transaction. It does not yet implement WebAuthn/passkeys or tenant-specific factor policy.
 
 ```text
 BeginMFAEnrollment
@@ -176,7 +176,7 @@ MFA factor rules:
 
 Known MFA hardening still pending:
 
-- MFA proof submission during refresh and richer adaptive step-up policy;
+- richer adaptive step-up policy;
 - backup factor handling beyond TOTP recovery codes;
 - WebAuthn / passkeys;
 - richer MFA risk policy beyond the first factor-level failed-code counter and short lockout;
@@ -306,6 +306,7 @@ RegisterUser -> ACTIVE user credential
 Login -> ACTIVE refresh token
 Repeated failed Login -> durable failed_login_count + temporary account lockout
 RefreshGatewayToken -> old token USED + new token ACTIVE
+RefreshGatewayToken + TOTP/recovery-code proof -> session MFA proof stored + old token USED + new token ACTIVE
 Reuse old refresh token -> session REVOKED + identity.session.revoked.v1 outbox
 Expired refresh token -> token REVOKED + stable invalid refresh error
 RequestVerificationChallenge -> identity_challenges ACTIVE with token_hash only

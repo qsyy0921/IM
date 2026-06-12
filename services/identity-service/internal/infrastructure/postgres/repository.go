@@ -420,12 +420,29 @@ func (r *Repository) RefreshGatewaySession(
 	if err != nil {
 		return types.RefreshGatewayTokenResult{}, err
 	}
+	submittedProof := sessionMFAProofFromRefresh(command, issuedAt)
+	if submittedProof.Verified {
+		proof = submittedProof
+	}
 	requiresMFA, err := hasActiveTOTPFactor(ctx, tx, command.TenantID, command.UserID)
 	if err != nil {
 		return types.RefreshGatewayTokenResult{}, err
 	}
 	if requiresMFA && !proof.Verified {
 		return types.RefreshGatewayTokenResult{}, types.NewMFARequired("mfa required")
+	}
+	if command.UsedMFARecoveryCode.CodeID != "" || command.UsedMFARecoveryCode.CodeHash != "" {
+		if err := consumeMFARecoveryCode(ctx, tx, command.TenantID, command.UserID, command.UsedMFARecoveryCode, issuedAt); err != nil {
+			return types.RefreshGatewayTokenResult{}, err
+		}
+		if err := clearMFARecoveryLoginFailures(ctx, tx, command.TenantID, command.UserID, issuedAt); err != nil {
+			return types.RefreshGatewayTokenResult{}, err
+		}
+	}
+	if command.VerifiedMFAFactorID != "" {
+		if err := clearMFALoginFailures(ctx, tx, command.TenantID, command.UserID, command.VerifiedMFAFactorID, issuedAt); err != nil {
+			return types.RefreshGatewayTokenResult{}, err
+		}
 	}
 	if err := markRefreshTokenUsed(ctx, tx, row, nextRefreshToken.TokenID, issuedAt); err != nil {
 		return types.RefreshGatewayTokenResult{}, err
@@ -2154,6 +2171,25 @@ FOR UPDATE
 }
 
 func sessionMFAProofFromLogin(command types.LoginCommand, verifiedAt time.Time) sessionMFAProof {
+	if command.VerifiedMFAFactorID != "" {
+		return sessionMFAProof{
+			Verified:   true,
+			VerifiedAt: verifiedAt,
+			Method:     "TOTP",
+			FactorID:   command.VerifiedMFAFactorID,
+		}
+	}
+	if command.UsedMFARecoveryCode.CodeID != "" || command.UsedMFARecoveryCode.CodeHash != "" {
+		return sessionMFAProof{
+			Verified:   true,
+			VerifiedAt: verifiedAt,
+			Method:     "RECOVERY_CODE",
+		}
+	}
+	return sessionMFAProof{}
+}
+
+func sessionMFAProofFromRefresh(command types.RefreshGatewayTokenCommand, verifiedAt time.Time) sessionMFAProof {
 	if command.VerifiedMFAFactorID != "" {
 		return sessionMFAProof{
 			Verified:   true,

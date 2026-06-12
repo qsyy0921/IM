@@ -47,6 +47,9 @@ func ValidateLogin(command types.LoginCommand) error {
 	if strings.TrimSpace(command.Password) == "" {
 		return types.NewInvalidArgument("password is required")
 	}
+	if strings.TrimSpace(command.MFACode) != "" && !isSixDigitCode(command.MFACode) {
+		return types.NewInvalidArgument("mfa code is invalid")
+	}
 	return nil
 }
 

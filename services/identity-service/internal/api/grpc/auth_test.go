@@ -127,6 +127,52 @@ func TestServerLoginMapsAccountLockedToResourceExhausted(t *testing.T) {
 	}
 }
 
+func TestServerLoginMapsMFAFields(t *testing.T) {
+	executor := &fakeLoginExecutor{
+		result: types.LoginResult{
+			TenantID:               "tenant-1",
+			UserID:                 "user-1",
+			DeviceID:               "device-1",
+			SessionID:              "session-1",
+			Audience:               "push-gateway",
+			TokenType:              "Bearer",
+			GatewayToken:           "gateway-token",
+			RefreshToken:           "refresh-token",
+			GatewayExpiresAtUnixMS: 1_800_000_900_000,
+			RefreshExpiresAtUnixMS: 1_802_592_000_000,
+			IssuedAtUnixMS:         1_800_000_000_000,
+		},
+	}
+	server := &Server{login: executor}
+	_, err := server.Login(context.Background(), &identityv1.LoginRequest{
+		TenantId:    "tenant-1",
+		UserId:      "user-1",
+		Password:    "correct horse battery staple",
+		DeviceId:    "device-1",
+		MfaFactorId: "mfa-1",
+		MfaCode:     "123456",
+	})
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	if executor.command.MFAFactorID != "mfa-1" || executor.command.MFACode != "123456" {
+		t.Fatalf("expected mfa fields to map to command, got %+v", executor.command)
+	}
+}
+
+func TestServerLoginMapsMFARequiredToFailedPrecondition(t *testing.T) {
+	server := &Server{login: &fakeLoginExecutor{err: types.NewMFARequired("mfa required")}}
+	_, err := server.Login(context.Background(), &identityv1.LoginRequest{
+		TenantId: "tenant-1",
+		UserId:   "user-1",
+		Password: "correct horse battery staple",
+		DeviceId: "device-1",
+	})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected mfa required to map to failed precondition, got %v (%v)", status.Code(err), err)
+	}
+}
+
 func TestServerRequestPasswordResetReturnsAcceptedShape(t *testing.T) {
 	executor := &fakeRequestPasswordResetExecutor{
 		result: types.RequestPasswordResetResult{
@@ -259,7 +305,9 @@ type fakeRegisterUserExecutor struct {
 }
 
 type fakeLoginExecutor struct {
-	err error
+	command types.LoginCommand
+	result  types.LoginResult
+	err     error
 }
 
 type fakeRequestPasswordResetExecutor struct {
@@ -286,8 +334,12 @@ type fakeDisableMFAFactorExecutor struct {
 	err     error
 }
 
-func (executor *fakeLoginExecutor) Execute(context.Context, types.LoginCommand) (types.LoginResult, error) {
-	return types.LoginResult{}, executor.err
+func (executor *fakeLoginExecutor) Execute(_ context.Context, command types.LoginCommand) (types.LoginResult, error) {
+	executor.command = command
+	if executor.err != nil {
+		return types.LoginResult{}, executor.err
+	}
+	return executor.result, nil
 }
 
 func (executor *fakeRequestPasswordResetExecutor) Execute(_ context.Context, command types.RequestPasswordResetCommand) (types.RequestPasswordResetResult, error) {

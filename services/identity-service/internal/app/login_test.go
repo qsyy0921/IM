@@ -126,6 +126,212 @@ func TestLoginUseCaseRejectsLockedAccountBeforePasswordVerify(t *testing.T) {
 	}
 }
 
+func TestLoginUseCaseSkipsMFAWhenNoActiveFactorExists(t *testing.T) {
+	repository := &fakeIdentityRepository{
+		credential: types.UserCredential{
+			TenantID:     "tenant-1",
+			UserID:       "user-1",
+			Status:       "ACTIVE",
+			PasswordHash: "expected-hash",
+		},
+	}
+	useCase := NewLoginUseCase(
+		repository,
+		fakeTokenSigner{},
+		&fakePasswordVerifier{ok: true},
+		fakeRefreshTokenCodec{},
+	)
+	result, err := useCase.Execute(context.Background(), types.LoginCommand{
+		TenantID: "tenant-1",
+		UserID:   "user-1",
+		Password: "correct horse battery staple",
+		DeviceID: "device-1",
+	})
+	if err != nil {
+		t.Fatalf("login without active mfa: %v", err)
+	}
+	if !repository.loginCalled || result.GatewayToken != "gateway-token" || result.RefreshToken != "rft_new.secret-new" {
+		t.Fatalf("expected legacy login path to succeed, result=%+v loginCalled=%v", result, repository.loginCalled)
+	}
+}
+
+func TestLoginUseCaseRequiresMFAWhenActiveFactorExists(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0).UTC()
+	repository := &fakeIdentityRepository{
+		credential: types.UserCredential{
+			TenantID:     "tenant-1",
+			UserID:       "user-1",
+			Status:       "ACTIVE",
+			PasswordHash: "expected-hash",
+		},
+		activeMFAFactors: []types.MFAFactorSecret{{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			FactorID: "mfa-1",
+			Type:     types.MFAFactorTypeTOTP,
+			Status:   types.MFAFactorStatusActive,
+			Secret:   types.EncryptedMFASecret{Ciphertext: "ciphertext", Nonce: "nonce", KeyVersion: "local-v1"},
+		}},
+	}
+	useCase := NewLoginUseCase(
+		repository,
+		fakeTokenSigner{},
+		&fakePasswordVerifier{ok: true},
+		fakeRefreshTokenCodec{},
+		WithLoginClock(func() time.Time { return now }),
+		WithLoginMFASecretManager(&fakeMFASecretManager{verifyOK: true}),
+	)
+	_, err := useCase.Execute(context.Background(), types.LoginCommand{
+		TenantID: "tenant-1",
+		UserID:   "user-1",
+		Password: "correct horse battery staple",
+		DeviceID: "device-1",
+	})
+	if !errors.Is(err, types.ErrMFARequired) {
+		t.Fatalf("expected mfa required, got %v", err)
+	}
+	if repository.loginCalled || repository.refreshCalled {
+		t.Fatal("login session and refresh token must not be written before MFA succeeds")
+	}
+}
+
+func TestLoginUseCaseRejectsAmbiguousActiveMFAFactors(t *testing.T) {
+	repository := &fakeIdentityRepository{
+		credential: types.UserCredential{
+			TenantID:     "tenant-1",
+			UserID:       "user-1",
+			Status:       "ACTIVE",
+			PasswordHash: "expected-hash",
+		},
+		activeMFAFactors: []types.MFAFactorSecret{
+			{
+				TenantID: "tenant-1",
+				UserID:   "user-1",
+				FactorID: "mfa-1",
+				Type:     types.MFAFactorTypeTOTP,
+				Status:   types.MFAFactorStatusActive,
+				Secret:   types.EncryptedMFASecret{Ciphertext: "ciphertext-1", Nonce: "nonce-1", KeyVersion: "local-v1"},
+			},
+			{
+				TenantID: "tenant-1",
+				UserID:   "user-1",
+				FactorID: "mfa-2",
+				Type:     types.MFAFactorTypeTOTP,
+				Status:   types.MFAFactorStatusActive,
+				Secret:   types.EncryptedMFASecret{Ciphertext: "ciphertext-2", Nonce: "nonce-2", KeyVersion: "local-v1"},
+			},
+		},
+	}
+	secrets := &fakeMFASecretManager{verifyOK: true}
+	useCase := NewLoginUseCase(
+		repository,
+		fakeTokenSigner{},
+		&fakePasswordVerifier{ok: true},
+		fakeRefreshTokenCodec{},
+		WithLoginMFASecretManager(secrets),
+	)
+	_, err := useCase.Execute(context.Background(), types.LoginCommand{
+		TenantID: "tenant-1",
+		UserID:   "user-1",
+		Password: "correct horse battery staple",
+		DeviceID: "device-1",
+		MFACode:  "123456",
+	})
+	if !errors.Is(err, types.ErrInvalidMFA) {
+		t.Fatalf("expected ambiguous mfa factors to fail with invalid mfa, got %v", err)
+	}
+	if repository.loginCalled || secrets.verifyCode != "" {
+		t.Fatal("ambiguous factor selection must not verify code or write login session")
+	}
+}
+
+func TestLoginUseCaseVerifiesMFABeforeIssuingToken(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0).UTC()
+	secret := types.EncryptedMFASecret{Ciphertext: "ciphertext", Nonce: "nonce", KeyVersion: "local-v1"}
+	repository := &fakeIdentityRepository{
+		credential: types.UserCredential{
+			TenantID:     "tenant-1",
+			UserID:       "user-1",
+			Status:       "ACTIVE",
+			PasswordHash: "expected-hash",
+		},
+		activeMFAFactors: []types.MFAFactorSecret{{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			FactorID: "mfa-1",
+			Type:     types.MFAFactorTypeTOTP,
+			Status:   types.MFAFactorStatusActive,
+			Secret:   secret,
+		}},
+	}
+	secrets := &fakeMFASecretManager{verifyOK: true}
+	useCase := NewLoginUseCase(
+		repository,
+		fakeTokenSigner{},
+		&fakePasswordVerifier{ok: true},
+		fakeRefreshTokenCodec{},
+		WithLoginClock(func() time.Time { return now }),
+		WithLoginMFASecretManager(secrets),
+	)
+	result, err := useCase.Execute(context.Background(), types.LoginCommand{
+		TenantID:    "tenant-1",
+		UserID:      "user-1",
+		Password:    "correct horse battery staple",
+		DeviceID:    "device-1",
+		MFAFactorID: "mfa-1",
+		MFACode:     "123456",
+	})
+	if err != nil {
+		t.Fatalf("login with mfa: %v", err)
+	}
+	if !repository.loginCalled || result.GatewayToken != "gateway-token" || result.RefreshToken != "rft_new.secret-new" {
+		t.Fatalf("expected login token after mfa, result=%+v loginCalled=%v", result, repository.loginCalled)
+	}
+	if secrets.verifySecret != secret || secrets.verifyCode != "123456" || !secrets.verifyNow.Equal(now) {
+		t.Fatalf("unexpected mfa verify input: secret=%+v code=%s now=%s", secrets.verifySecret, secrets.verifyCode, secrets.verifyNow)
+	}
+}
+
+func TestLoginUseCaseRejectsInvalidMFA(t *testing.T) {
+	repository := &fakeIdentityRepository{
+		credential: types.UserCredential{
+			TenantID:     "tenant-1",
+			UserID:       "user-1",
+			Status:       "ACTIVE",
+			PasswordHash: "expected-hash",
+		},
+		activeMFAFactors: []types.MFAFactorSecret{{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			FactorID: "mfa-1",
+			Type:     types.MFAFactorTypeTOTP,
+			Status:   types.MFAFactorStatusActive,
+			Secret:   types.EncryptedMFASecret{Ciphertext: "ciphertext", Nonce: "nonce", KeyVersion: "local-v1"},
+		}},
+	}
+	useCase := NewLoginUseCase(
+		repository,
+		fakeTokenSigner{},
+		&fakePasswordVerifier{ok: true},
+		fakeRefreshTokenCodec{},
+		WithLoginMFASecretManager(&fakeMFASecretManager{verifyOK: false}),
+	)
+	_, err := useCase.Execute(context.Background(), types.LoginCommand{
+		TenantID:    "tenant-1",
+		UserID:      "user-1",
+		Password:    "correct horse battery staple",
+		DeviceID:    "device-1",
+		MFAFactorID: "mfa-1",
+		MFACode:     "123456",
+	})
+	if !errors.Is(err, types.ErrInvalidMFA) {
+		t.Fatalf("expected invalid mfa, got %v", err)
+	}
+	if repository.loginCalled {
+		t.Fatal("invalid mfa must not write login session")
+	}
+}
+
 func TestRefreshGatewayTokenUseCaseRotatesRefreshToken(t *testing.T) {
 	repository := &fakeIdentityRepository{}
 	useCase := NewRefreshGatewayTokenUseCase(repository, fakeTokenSigner{}, fakeRefreshTokenCodec{})
@@ -280,6 +486,7 @@ type fakeIdentityRepository struct {
 	confirmPasswordResetCalled bool
 	resetPasswordHash          string
 	resetTokenHash             string
+	activeMFAFactors           []types.MFAFactorSecret
 }
 
 func (repo *fakeIdentityRepository) RegisterUser(_ context.Context, command types.RegisterUserCommand, passwordHash string, createdAt time.Time) (types.RegisterUserResult, error) {
@@ -318,6 +525,10 @@ func (repo *fakeIdentityRepository) LoginGatewaySession(context.Context, types.L
 		RefreshExpiresAtUnixMS: time.Unix(1_802_592_000, 0).UnixMilli(),
 		IssuedAtUnixMS:         time.Unix(1_800_000_000, 0).UnixMilli(),
 	}, nil
+}
+
+func (repo *fakeIdentityRepository) ListActiveMFAFactorSecrets(context.Context, types.TenantID, types.UserID) ([]types.MFAFactorSecret, error) {
+	return repo.activeMFAFactors, nil
 }
 
 func (repo *fakeIdentityRepository) RefreshGatewaySession(_ context.Context, _ types.RefreshGatewayTokenCommand, tokenID types.RefreshTokenID, tokenHash string, _ types.RefreshTokenRecord, _ time.Time, _ time.Time, _ time.Time) (types.RefreshGatewayTokenResult, error) {

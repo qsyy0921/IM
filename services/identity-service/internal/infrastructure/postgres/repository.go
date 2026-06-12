@@ -618,6 +618,46 @@ WHERE tenant_id = $1
 	return row, nil
 }
 
+func (r *Repository) ListActiveMFAFactorSecrets(ctx context.Context, tenantID types.TenantID, userID types.UserID) ([]types.MFAFactorSecret, error) {
+	if r.pool == nil {
+		return nil, types.NewDBReadFailed("identity repository is not configured")
+	}
+	rows, err := r.pool.Query(ctx, `
+SELECT tenant_id, user_id, factor_id, factor_type, status, secret_ciphertext, secret_nonce, secret_key_version
+FROM identity_mfa_factors
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND factor_type = 'TOTP'
+  AND status = 'ACTIVE'
+ORDER BY verified_at ASC NULLS LAST, created_at ASC, factor_id ASC
+`, tenantID, userID)
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+	factors := make([]types.MFAFactorSecret, 0)
+	for rows.Next() {
+		var row types.MFAFactorSecret
+		if err := rows.Scan(
+			&row.TenantID,
+			&row.UserID,
+			&row.FactorID,
+			&row.Type,
+			&row.Status,
+			&row.Secret.Ciphertext,
+			&row.Secret.Nonce,
+			&row.Secret.KeyVersion,
+		); err != nil {
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		factors = append(factors, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	return factors, nil
+}
+
 func (r *Repository) ConfirmMFAFactor(ctx context.Context, command types.ConfirmMFAEnrollmentCommand, verifiedAt time.Time) (types.ConfirmMFAEnrollmentResult, error) {
 	if r.pool == nil {
 		return types.ConfirmMFAEnrollmentResult{}, types.NewDBWriteFailed("identity repository is not configured")

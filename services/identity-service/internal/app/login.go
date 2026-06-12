@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/qsyy0921/IM/services/identity-service/internal/domain"
@@ -23,15 +24,23 @@ type LoginRiskPolicy struct {
 type LoginUseCaseOption func(*LoginUseCase)
 
 type LoginUseCase struct {
-	repository    Repository
+	repository    LoginRepository
 	signer        TokenSigner
 	passwords     PasswordVerifier
 	refreshTokens RefreshTokenCodec
+	mfaSecrets    MFASecretManager
 	now           func() time.Time
 	risk          LoginRiskPolicy
 }
 
-func NewLoginUseCase(repository Repository, signer TokenSigner, passwords PasswordVerifier, refreshTokens RefreshTokenCodec, opts ...LoginUseCaseOption) *LoginUseCase {
+type LoginRepository interface {
+	GetUserCredential(context.Context, types.TenantID, types.UserID) (types.UserCredential, error)
+	RecordLoginFailure(context.Context, types.TenantID, types.UserID, time.Time, time.Time, int, time.Time) error
+	LoginGatewaySession(context.Context, types.LoginCommand, types.RefreshTokenRecord, time.Time, time.Time, time.Time) (types.LoginResult, error)
+	ListActiveMFAFactorSecrets(context.Context, types.TenantID, types.UserID) ([]types.MFAFactorSecret, error)
+}
+
+func NewLoginUseCase(repository LoginRepository, signer TokenSigner, passwords PasswordVerifier, refreshTokens RefreshTokenCodec, opts ...LoginUseCaseOption) *LoginUseCase {
 	uc := &LoginUseCase{
 		repository:    repository,
 		signer:        signer,
@@ -54,6 +63,12 @@ func NewLoginUseCase(repository Repository, signer TokenSigner, passwords Passwo
 func WithLoginRiskPolicy(policy LoginRiskPolicy) LoginUseCaseOption {
 	return func(uc *LoginUseCase) {
 		uc.risk = policy
+	}
+}
+
+func WithLoginMFASecretManager(manager MFASecretManager) LoginUseCaseOption {
+	return func(uc *LoginUseCase) {
+		uc.mfaSecrets = manager
 	}
 }
 
@@ -107,6 +122,9 @@ func (uc *LoginUseCase) Execute(ctx context.Context, command types.LoginCommand)
 		}
 		return types.LoginResult{}, types.NewInvalidCredentials("invalid credentials")
 	}
+	if err := uc.verifyMFAIfRequired(ctx, command, now); err != nil {
+		return types.LoginResult{}, err
+	}
 
 	command.Audience = domain.NormalizeAudience(command.Audience)
 	issuedAt := now
@@ -138,4 +156,48 @@ func (uc *LoginUseCase) Execute(ctx context.Context, command types.LoginCommand)
 	result.GatewayToken = gatewayToken
 	result.RefreshToken = refreshToken
 	return result, nil
+}
+
+func (uc *LoginUseCase) verifyMFAIfRequired(ctx context.Context, command types.LoginCommand, now time.Time) error {
+	factors, err := uc.repository.ListActiveMFAFactorSecrets(ctx, command.TenantID, command.UserID)
+	if err != nil {
+		return err
+	}
+	if len(factors) == 0 {
+		return nil
+	}
+	code := strings.TrimSpace(command.MFACode)
+	if code == "" {
+		return types.NewMFARequired("mfa required")
+	}
+	if uc.mfaSecrets == nil {
+		return types.NewTokenSigningFailed("mfa secret manager is not configured")
+	}
+	factor, ok := selectMFAFactor(factors, command.MFAFactorID)
+	if !ok {
+		return types.NewInvalidMFA("invalid mfa factor")
+	}
+	verified, err := uc.mfaSecrets.VerifyTOTP(factor.Secret, code, now)
+	if err != nil {
+		return err
+	}
+	if !verified {
+		return types.NewInvalidMFA("invalid mfa code")
+	}
+	return nil
+}
+
+func selectMFAFactor(factors []types.MFAFactorSecret, factorID types.MFAFactorID) (types.MFAFactorSecret, bool) {
+	if factorID == "" {
+		if len(factors) != 1 {
+			return types.MFAFactorSecret{}, false
+		}
+		return factors[0], true
+	}
+	for _, factor := range factors {
+		if factor.FactorID == factorID {
+			return factor, true
+		}
+	}
+	return types.MFAFactorSecret{}, false
 }

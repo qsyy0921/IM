@@ -92,6 +92,8 @@ type LoginCommand struct {
 	Audience          string
 	GatewayTTLSeconds int64
 	RefreshTTLSeconds int64
+	MFAFactorID       MFAFactorID
+	MFACode           string
 	TraceID           string
 	RequestID         string
 }

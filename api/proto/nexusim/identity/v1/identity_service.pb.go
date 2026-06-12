@@ -535,6 +535,8 @@ type LoginRequest struct {
 	RefreshTtlSeconds int64                  `protobuf:"varint,7,opt,name=refresh_ttl_seconds,json=refreshTtlSeconds,proto3" json:"refresh_ttl_seconds,omitempty"`
 	TraceId           string                 `protobuf:"bytes,8,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
 	RequestId         string                 `protobuf:"bytes,9,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	MfaFactorId       string                 `protobuf:"bytes,10,opt,name=mfa_factor_id,json=mfaFactorId,proto3" json:"mfa_factor_id,omitempty"`
+	MfaCode           string                 `protobuf:"bytes,11,opt,name=mfa_code,json=mfaCode,proto3" json:"mfa_code,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -628,6 +630,20 @@ func (x *LoginRequest) GetTraceId() string {
 func (x *LoginRequest) GetRequestId() string {
 	if x != nil {
 		return x.RequestId
+	}
+	return ""
+}
+
+func (x *LoginRequest) GetMfaFactorId() string {
+	if x != nil {
+		return x.MfaFactorId
+	}
+	return ""
+}
+
+func (x *LoginRequest) GetMfaCode() string {
+	if x != nil {
+		return x.MfaCode
 	}
 	return ""
 }
@@ -2874,7 +2890,7 @@ const file_nexusim_identity_v1_identity_service_proto_rawDesc = "" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x127\n" +
 	"\x06status\x18\x03 \x01(\x0e2\x1f.nexusim.identity.v1.UserStatusR\x06status\x12+\n" +
-	"\x12created_at_unix_ms\x18\x04 \x01(\x03R\x0fcreatedAtUnixMs\"\xb3\x02\n" +
+	"\x12created_at_unix_ms\x18\x04 \x01(\x03R\x0fcreatedAtUnixMs\"\xf2\x02\n" +
 	"\fLoginRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1a\n" +
@@ -2885,7 +2901,10 @@ const file_nexusim_identity_v1_identity_service_proto_rawDesc = "" +
 	"\x13refresh_ttl_seconds\x18\a \x01(\x03R\x11refreshTtlSeconds\x12\x19\n" +
 	"\btrace_id\x18\b \x01(\tR\atraceId\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\t \x01(\tR\trequestId\"\xa9\x03\n" +
+	"request_id\x18\t \x01(\tR\trequestId\x12\"\n" +
+	"\rmfa_factor_id\x18\n" +
+	" \x01(\tR\vmfaFactorId\x12\x19\n" +
+	"\bmfa_code\x18\v \x01(\tR\amfaCode\"\xa9\x03\n" +
 	"\rLoginResponse\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +

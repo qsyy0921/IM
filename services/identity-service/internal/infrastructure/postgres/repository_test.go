@@ -435,6 +435,13 @@ func TestRepositoryMFAFactorLifecycleIntegration(t *testing.T) {
 	if confirmResult.Status != types.MFAFactorStatusActive || confirmResult.VerifiedAtUnixMS != confirmedAt.UnixMilli() {
 		t.Fatalf("unexpected confirm result: %+v", confirmResult)
 	}
+	activeFactors, err := repository.ListActiveMFAFactorSecrets(ctx, "tenant-identity", "user-1")
+	if err != nil {
+		t.Fatalf("list active mfa factors: %v", err)
+	}
+	if len(activeFactors) != 1 || activeFactors[0].FactorID != "mfa-factor-1" || activeFactors[0].Secret != secret {
+		t.Fatalf("unexpected active factors after confirm: %+v", activeFactors)
+	}
 	_, err = repository.ConfirmMFAFactor(ctx, types.ConfirmMFAEnrollmentCommand{
 		TenantID: "tenant-identity",
 		UserID:   "user-1",
@@ -455,6 +462,13 @@ func TestRepositoryMFAFactorLifecycleIntegration(t *testing.T) {
 	}
 	if disableResult.Status != types.MFAFactorStatusDisabled || disableResult.DisabledAtUnixMS != disabledAt.UnixMilli() {
 		t.Fatalf("unexpected disable result: %+v", disableResult)
+	}
+	activeFactors, err = repository.ListActiveMFAFactorSecrets(ctx, "tenant-identity", "user-1")
+	if err != nil {
+		t.Fatalf("list active mfa factors after disable: %v", err)
+	}
+	if len(activeFactors) != 0 {
+		t.Fatalf("expected no active factors after disable, got %+v", activeFactors)
 	}
 	_, err = repository.DisableMFAFactor(ctx, types.DisableMFAFactorCommand{
 		TenantID: "tenant-identity",

@@ -16,7 +16,7 @@
 - revoke devices and sessions;
 - keep push-gateway verification local to avoid synchronous auth RPC on every WebSocket handshake.
 
-It is not yet a full OAuth/OIDC identity platform. It does not implement email / SMS sending, MFA enforcement during Login, recovery codes, WebAuthn/passkeys, external IdP federation, production-grade account-risk workflows or production-grade asymmetric key management.
+It is not yet a full OAuth/OIDC identity platform. It does not implement email / SMS sending, recovery codes, WebAuthn/passkeys, external IdP federation, production-grade account-risk workflows or production-grade asymmetric key management.
 
 ## Boundary
 
@@ -72,6 +72,7 @@ RegisterUser
 
 Login
 -> verify password_hash
+-> if ACTIVE TOTP factors exist, require and verify mfa_code
 -> identity_devices / identity_sessions
 -> identity_refresh_tokens ACTIVE
 -> short-lived gateway token + opaque refresh token
@@ -101,12 +102,13 @@ Login risk first-stage rules:
 - When the configured threshold is reached, password `Login` is temporarily locked and public Login returns stable `account temporarily locked`.
 - A successful Login clears the failure counter and lock fields in the same PostgreSQL transaction that writes session / refresh-token state.
 - The first-stage lock applies only to password Login. A valid refresh token can still rotate through `RefreshGatewayToken`; refresh token theft / reuse is handled by the separate rotation and session-revoke logic. This avoids letting an external password brute-force attempt break an already authenticated client session.
+- If the user has one or more ACTIVE TOTP MFA factors, `Login` must verify `mfa_code` before generating refresh token, session or gateway token state. Missing code returns stable `MFA_REQUIRED`; invalid code returns stable `INVALID_MFA`.
 - Defaults are `NEXUSIM_IDENTITY_LOGIN_MAX_FAILED_ATTEMPTS=5`, `NEXUSIM_IDENTITY_LOGIN_FAILURE_WINDOW=15m` and `NEXUSIM_IDENTITY_LOGIN_LOCK_DURATION=15m`; deployments may tune them.
 - This is not a complete fraud/risk engine. IP/device reputation, CAPTCHA, geo-anomaly, tenant policy, alert routing, adaptive throttling and tenant-level rate limits remain future hardening.
 
 ## MFA TOTP Factors
 
-First-stage MFA support is limited to TOTP factor lifecycle. It deliberately does not yet enforce MFA in `Login`; the next slice must add an explicit login challenge / step-up flow before MFA can be considered complete for authentication.
+First-stage MFA support is limited to TOTP factors and password Login enforcement. It does not yet implement refresh-token step-up, recovery codes, WebAuthn/passkeys or tenant-specific factor policy.
 
 ```text
 BeginMFAEnrollment
@@ -124,6 +126,12 @@ ConfirmMFAEnrollment
 DisableMFAFactor
 -> verify current password
 -> mark PENDING / ACTIVE factor DISABLED
+
+Login with ACTIVE MFA
+-> verify password_hash
+-> list ACTIVE TOTP factors
+-> require mfa_code when any ACTIVE factor exists
+-> verify selected factor before session / refresh-token write
 ```
 
 MFA factor rules:
@@ -133,13 +141,16 @@ MFA factor rules:
 - raw TOTP secret is returned only by `BeginMFAEnrollment` and is never persisted as plaintext;
 - `ConfirmMFAEnrollment` accepts only a pending TOTP factor and a six-digit code;
 - `DisableMFAFactor` requires the current password and does not delete historical rows;
+- `LoginRequest.mfa_factor_id` selects a factor; if omitted and exactly one ACTIVE factor exists, that factor is used;
+- `LoginRequest.mfa_code` must be a six-digit TOTP code; session and refresh-token state are written only after MFA succeeds;
 - `NEXUSIM_IDENTITY_MFA_SECRET_KEY` is the local AES-GCM encryption key input; local smoke may fall back to the existing gateway token secret, but production profiles should use a dedicated secret managed by KMS/HSM. If no MFA key is configured, the service still starts and existing Login/JWKS flows are unaffected, but MFA factor RPCs fail until the key is configured.
 
 Known MFA hardening still pending:
 
-- Login / Refresh step-up enforcement and public `MFA_REQUIRED` flow;
+- Refresh-token step-up enforcement;
 - recovery codes and backup factor handling;
 - WebAuthn / passkeys;
+- MFA attempt throttling / lockout separate from password failure counters;
 - secret key rotation and KMS/HSM-backed envelope encryption;
 - per-factor audit events, last-used tracking and risk-based challenge policy.
 
@@ -190,7 +201,7 @@ Known hardening still pending:
 - timing- and sender-side account-enumeration resistance;
 - tenant / IP / device rate limits for challenge creation and confirmation;
 - email / SMS provider integration and audit;
-- MFA login enforcement and OIDC federation;
+- MFA recovery / WebAuthn and OIDC federation;
 - production alerting for repeated challenge failures.
 
 ## Gateway Token

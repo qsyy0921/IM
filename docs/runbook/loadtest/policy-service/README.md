@@ -10,6 +10,7 @@ Implemented:
 - Static first-stage message action decision configured by environment.
 - Optional message-service RPC adapter through `NEXUSIM_POLICY_SERVICE_ADDR`.
 - message-service fallback to legacy `StaticPolicy` when no policy-service address is configured.
+- Direct gRPC allow/deny smoke for `SEND`, `EDIT`, `REVOKE`, and `DELETE`: `loadtest-report-20260613-policy-service-smoke.md`.
 
 Not yet implemented:
 

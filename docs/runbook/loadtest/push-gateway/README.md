@@ -1,6 +1,6 @@
 # push-gateway Loadtest / Smoke Index
 
-本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、`server.pong`、`delivery.notify`、`delivery.ack.ok`、queue-full broad `server.resume_hint` active close、单实例 in-memory resume buffer TTL、Redis route 最小 adapter、Redis-backed cross-instance resume buffer 第一版和 HMAC signed gateway token 第一版；真实进程 full smoke、HMAC auth smoke、同 user 多 device notify smoke、slow-client 负向 smoke、单实例 resume replay smoke、跨进程 Redis route smoke、cross-instance resume smoke、Win-Mac 双机 cross-instance resume smoke，以及 `edit / revoke / delete` 三类 message-change notify smoke 均已通过。
+本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、identity revoke consumer、`server.pong`、`delivery.notify`、`delivery.ack.ok`、queue-full broad `server.resume_hint` active close、单实例 in-memory resume buffer TTL、Redis route 最小 adapter、Redis-backed cross-instance resume buffer 第一版、HMAC signed gateway token 第一版和 Redis deny-list revoke projection；真实进程 full smoke、HMAC auth smoke、identity revoke smoke、同 user 多 device notify smoke、slow-client 负向 smoke、单实例 resume replay smoke、跨进程 Redis route smoke、cross-instance resume smoke、Win-Mac 双机 cross-instance resume smoke，以及 `edit / revoke / delete` 三类 message-change notify smoke 均已通过。
 
 ## 当前验证目标
 
@@ -103,6 +103,7 @@ Sentinel 模式当前已证明三件事：客户端 master discovery 正常路�
 | `loadtest-report-20260609-push-gateway-redis-sentinel-master-stop-smoke.md` | 停止 Sentinel 当前 master 容器，等待 Sentinel 自主选主后继续 route / resume / PullInbox / AckDelivery；不代表 quorum / 网络分区 / Redis Cluster 验收 |
 | `loadtest-report-20260612-win-mac-arm64-distributed-smoke.md` | Mac Docker arm64 WebSocket gateway + Windows core services / Kafka / Redis 的双机 full route 和 cross-instance resume smoke |
 | `loadtest-report-20260612-push-gateway-identity-token-smoke.md` | identity-service 签发短期 gateway token，push-gateway 本地 HMAC 验签后完成 `delivery.notify -> PullInbox -> AckDelivery` |
+| `loadtest-report-20260612-push-gateway-identity-revoke-smoke.md` | `RevokeDevice -> identity_outbox -> im.identity.events -> push-gateway identity-consumer -> Redis deny-list` 后，旧 gateway token 重连返回 `PERMISSION_DENIED` |
 | `loadtest-report-20260610-push-gateway-message-change-notify-smoke.md` | `edit / revoke / delete` 三类消息变更均能触发带正确 `source_event_type` 的 `delivery.notify`，且与 `PullInbox` durable item 一致 |
 
 报告 Markdown 保存在仓库内：
@@ -141,7 +142,7 @@ E:\development\IM\loadtest\results
 
 该 runner 会验证 `delivery.notify.source_event_type` 分别为 `message.edited.v1` / `message.revoked.v1` / `message.deleted.v1`，并继续用 `PullInbox` 精确校验 durable inbox 中的 `event_type + message_id + conversation_seq`。三类真实进程 smoke 已在 clean commit `81fe92c` 归档到 `loadtest-report-20260610-push-gateway-message-change-notify-smoke.md`。
 
-## HMAC Auth Smoke
+## HMAC Auth / Revoke Smoke
 
 `loadtest/pushgateway/run-local-smoke.ps1` 支持在同一条 full smoke 链路中启用 HMAC signed gateway token：
 
@@ -176,6 +177,29 @@ push_auth_query_identity_sent=false
 
 这证明 smoke 没有依赖 WebSocket query 中的裸 `tenant_id/user_id`。报告见 `loadtest-report-20260610-push-gateway-hmac-auth-smoke.md`。
 
+identity-service 参与签发 token 时，runner 使用 `-UseIdentityServiceToken` 调用 `IssueGatewayToken`，push-gateway 本地验签，不在 WebSocket 热路径同步查询 identity-service：
+
+```powershell
+.\loadtest\pushgateway\run-local-smoke.ps1 `
+  -Scenario full `
+  -UseIdentityServiceToken `
+  -PushAuthMode hmac `
+  -PushAuthHmacSecret local-push-smoke-secret
+```
+
+device revoke projection smoke 使用 `identity-revoke` 场景：
+
+```powershell
+.\loadtest\pushgateway\run-local-smoke.ps1 `
+  -Scenario identity-revoke `
+  -UseIdentityServiceToken `
+  -PushAuthMode hmac `
+  -RouteBackend redis `
+  -PushAuthHmacSecret local-push-smoke-secret
+```
+
+该场景验证旧 token 先能建连，随后 `RevokeDevice -> identity_outbox -> im.identity.events -> push-gateway identity-consumer -> Redis deny-list` 生效，同一个旧 token 重连时返回 `PERMISSION_DENIED`。报告见 `loadtest-report-20260612-push-gateway-identity-revoke-smoke.md`。
+
 ## 第一阶段不做
 
 - 不做十万级 WebSocket 长连接压测。
@@ -183,7 +207,7 @@ push_auth_query_identity_sent=false
 - 不重新做 message-service 硬件矩阵。
 - 不把短时 resume buffer 当作 durable inbox。
 - 不把 Redis-backed resume buffer 表述为可靠投递或生产级跨实例恢复。当前第一版只缓存轻量 `delivery.notify`，未知、过期、身份不匹配、Redis miss/error 或 buffer gap 都必须回退 `server.resume_hint + PullInbox`；未知客户端 `resume_token` 必须返回 `buffer_miss` 并由服务端签发新 token。
-- 不把第一版 HMAC gateway token 表述为完整 identity-service。`NEXUSIM_PUSH_AUTH_MODE=hmac` 只校验短期 signed token 的签名、`aud=push-gateway`、过期时间和 device 绑定；当前支持 current + previous secrets 的最小密钥轮换，但设备吊销、session revoke、refresh token、多 issuer 和 JWK/JWT 标准化仍是后续真实鉴权切片。`mock` auth 只用于本地 smoke。
+- 不把第一版 HMAC gateway token 表述为完整 identity-service。`NEXUSIM_PUSH_AUTH_MODE=hmac` 只校验短期 signed token 的签名、`aud=push-gateway`、过期时间、device 绑定和本地/Redis deny-list；当前支持 current + previous secrets 的最小密钥轮换，并已补 device/session revoke event consumer，其中 device revoke 的 Redis deny-list smoke 已通过。`Login`、refresh token、多 issuer、JWK/JWT 标准化、在线旧连接主动踢出和完整 identity federation 仍是后续真实鉴权切片。`mock` auth 只用于本地 smoke。
 - 不把 push smoke 表述为生产容量结论。
 - 不把 queue-full active close 表述为完整慢连接治理；当前 `server.resume_hint` 只是 broad pull fallback，客户端必须用本地 durable cursor 决定 `PullInbox` 起点。已完成单实例 slow-client 真实进程负向 smoke，它验证的是 durable `PullInbox` fallback；已另外完成单实例 resume replay smoke 和 cross-instance resume smoke，分别验证短时 in-memory buffer 命中路径和 Redis-backed 跨 gateway replay 路径；后续还没有多实例慢连接验证。
 - `/debug/metrics` 目前暴露单实例 in-memory registry、Redis route 和 Redis resume 调试指标，用于 smoke 排障；其中 resume token count / expired token count 只说明本进程短时 buffer 状态，`redis_resume_*` 只说明 Redis-backed replay / miss / append 过程；`redis_registry_metrics` 和 `redis_subscriber_metrics` 只说明 online route / PubSub / local fanout 过程，不代表 durable delivery 成功率；该端点不是生产级 Prometheus 指标。WebSocket gateway 可通过 `NEXUSIM_PUSH_WS_ADDR` 暴露该端点，consumer-only gateway 可通过 `NEXUSIM_PUSH_DEBUG_ADDR` 单独暴露只读 debug 端点。

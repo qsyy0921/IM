@@ -40,7 +40,7 @@
 | 上游客户端 | Web / Desktop Client | WebSocket connect、heartbeat、resume、ACK frame |
 | 上游事件 | Kafka `im.delivery.events` | 消费 delivery notification / ack 事件 |
 | 同步依赖 | delivery-service gRPC | `PullInbox`、`AckDelivery` |
-| 同步依赖 | auth / identity provider | 当前已支持本地 mock 和 HMAC signed gateway token；生产仍需接入 identity / device 状态 |
+| 同步依赖 | auth / identity provider | 当前已支持本地 mock、HMAC signed gateway token 和异步 revoke deny-list；生产仍需完整 Login / refresh token / JWK |
 | 临时状态 | Redis route / in-memory registry | 连接路由、在线 session、短时 resume buffer |
 | 下游客户端 | Web / Desktop Client | `delivery.notify`、`server.resume_hint`、错误 frame |
 
@@ -91,9 +91,9 @@ GET /ws?token=...&device_id=...
 当前代码支持两种 auth 模式：
 
 - `mock`：本地 smoke 使用，允许 query string 中的 `tenant_id/user_id/device_id` 或 `token=tenant:user[:device]` 生成 `AuthContext`。
-- `hmac`：第一版 signed gateway token，`token` 为 `base64url(json claims).base64url(hmac_sha256(payload, secret))`。claims 至少包含 `tenant_id/user_id/aud/exp`，`aud` 默认必须为 `push-gateway`，可包含 `device_id/trace_id`；如果 token 中带 `device_id`，必须与 query / `client.hello.device_id` 一致。真实客户端优先用 `Authorization: Bearer <token>`，query token 只作为本地兼容入口。
+- `hmac`：第一版 signed gateway token，`token` 为 `base64url(json claims).base64url(hmac_sha256(payload, secret))`。claims 至少包含 `tenant_id/user_id/aud/exp`，`aud` 默认必须为 `push-gateway`，可包含 `device_id/session_id/trace_id`；如果 token 中带 `device_id`，必须与 query / `client.hello.device_id` 一致。真实客户端优先用 `Authorization: Bearer <token>`，query token 只作为本地兼容入口。
 
-`hmac` 模式只证明 gateway 能拒绝伪造 / 过期 / device mismatch 的客户端身份，不等同完整 identity-service：它暂不做 refresh token、设备吊销、session revoke 或多 issuer。当前已支持最小密钥轮换：`NEXUSIM_PUSH_AUTH_HMAC_SECRET` 是当前签发密钥，`NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS` 是逗号分隔的旧密钥，只用于验证旧 token。后续可以由 api-gateway / identity-service 做登录与 token 交换，push-gateway 只接收已签名的短期 gateway token。
+`hmac` 模式只证明 gateway 能拒绝伪造 / 过期 / device mismatch 的客户端身份，不等同完整 identity-service。当前已支持最小密钥轮换：`NEXUSIM_PUSH_AUTH_HMAC_SECRET` 是当前签发密钥，`NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS` 是逗号分隔的旧密钥，只用于验证旧 token。当前也支持 `im.identity.events` 异步 revoke projection：`identity.device.revoked.v1` / `identity.session.revoked.v1` 会进入 in-memory 或 Redis deny-list，WebSocket 建连时命中 deny-list 返回 `PERMISSION_DENIED`。后续可以由 api-gateway / identity-service 做完整登录、refresh token、JWK/JWT、多 issuer 和 token 交换，push-gateway 只接收已签名的短期 gateway token。
 
 ### 5.1 Client -> Server frames
 
@@ -460,7 +460,7 @@ delivery-service delivery_outbox
 
 - `tenant_id / user_id / device_id / session_id` 必须从认证上下文派生，不信任客户端 frame 裸字段。
 - 本地 smoke 可使用 `NEXUSIM_PUSH_AUTH_MODE=mock`；进入真实客户端或跨机器演示时优先使用 `NEXUSIM_PUSH_AUTH_MODE=hmac` 和短期 signed gateway token。
-- WebSocket 建连必须校验 token。当前 HMAC 模式校验签名、过期时间和 device 绑定；device 状态 / session 吊销仍是后续 identity-service 或 gateway policy 的职责。
+- WebSocket 建连必须校验 token。当前 HMAC 模式校验签名、过期时间、device 绑定和本地 / Redis deny-list；device / session revoke 由 `im.identity.events` 异步投影，热路径不同步 RPC 查询 identity-service。
 - `delivery.notify` 只能发给同 tenant 的目标 user/device session。
 - ACK frame 的 user/device 以 session auth context 为准。
 - error frame 不返回内部 Redis / Kafka / gRPC 错误文本。
@@ -551,7 +551,7 @@ NEXUSIM_PUSH_AUTH_HMAC_SECRET=local-dev-secret
 NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS=old-secret-1,old-secret-2
 ```
 
-`hmac` 模式下，query string 裸 `tenant_id/user_id` 不再被信任；缺失 token、签名错误、audience 不匹配、token 与 device 不匹配会返回 `PERMISSION_DENIED`，过期 token 返回 `AUTH_EXPIRED`。
+`hmac` 模式下，query string 裸 `tenant_id/user_id` 不再被信任；缺失 token、签名错误、audience 不匹配、token 与 device 不匹配、deny-list 命中或 revoke checker 不可用会返回 `PERMISSION_DENIED`，过期 token 返回 `AUTH_EXPIRED`。
 
 本地 smoke 可用：
 
@@ -649,5 +649,6 @@ delivery-service outbox-relay
 - 客户端收到 notify 后通过 `PullInbox` 拉到 durable inbox item。
 - 客户端 ACK frame 通过 push-gateway 转发到 `delivery-service AckDelivery`。
 - push-gateway 离线或重启不造成 durable inbox 丢失；客户端重连后可补拉。
+- HMAC token 可由 identity-service 签发；device / session revoke 事件可异步投影到 gateway deny-list，旧 token 建连返回稳定 `PERMISSION_DENIED`。
 - 小规模 smoke 报告归档到 `docs/runbook/loadtest/push-gateway/`。
 - 不把 smoke 表述为完整生产 WebSocket 平台或容量结论。

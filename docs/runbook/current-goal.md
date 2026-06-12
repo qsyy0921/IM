@@ -80,7 +80,7 @@
 - 编辑 / 撤回 / 删除。
 - 群成员列表、owner transfer、群管理规则。
 - 联系人 / 好友关系 / 申请列表 / 取消申请 / 拉黑 / 删除 / 备注。
-- 真实鉴权、设备绑定、session revoke：当前已完成短期 gateway token、push-gateway 本地验签、legacy HMAC、标准三段 JWT HS256 gateway token 兼容、第一版 RS256 私钥签发 + 公钥 JWKS 本地验签 + issuer allowlist、JWKS URL 启动拉取与定期 refresh/cache、RegisterUser / Login / RefreshGatewayToken 最小实现、Login(jwt) 和 RegisterUser -> Login(jwt) -> push-gateway local verify -> delivery.notify -> PullInbox -> AckDelivery clean smoke、refresh token rotation / reuse detection、第一版密码 Login 失败计数和短时锁定、device/session revoke event consumer、device revoke deny-list smoke、device revoke active close smoke 和 session revoke active close smoke；自动轮换、KMS/HSM、多 issuer 治理、邮箱 / 手机验证、密码重置、MFA、OIDC federation、更完整风控/限流仍是后续项。
+- 真实鉴权、设备绑定、session revoke：当前已完成短期 gateway token、push-gateway 本地验签、legacy HMAC、标准三段 JWT HS256 gateway token 兼容、第一版 RS256 私钥签发 + 公钥 JWKS 本地验签 + issuer allowlist、JWKS URL 启动拉取与定期 refresh/cache、JWKS refresh/cache debug stats、identity-service 额外旧公钥 JWKS overlap、RegisterUser / Login / RefreshGatewayToken 最小实现、Login(jwt) 和 RegisterUser -> Login(jwt) -> push-gateway local verify -> delivery.notify -> PullInbox -> AckDelivery clean smoke、refresh token rotation / reuse detection、第一版密码 Login 失败计数和短时锁定、device/session revoke event consumer、device revoke deny-list smoke、device revoke active close smoke 和 session revoke active close smoke；自动轮换、KMS/HSM、多 issuer 治理、邮箱 / 手机验证、密码重置、MFA、OIDC federation、更完整风控/限流仍是后续项。
 - 客户端 UI 或最小端到端演示。
 
 推进原则：优先选择能复用已有事实流、read model 和 outbox 的小闭环；不要为了产品功能让服务间耦合变高。

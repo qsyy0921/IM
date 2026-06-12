@@ -66,6 +66,7 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 	var redisClient redis.UniversalClient
 	var redisRegistry *redisroute.Registry
 	var redisSubscriber *redisroute.Subscriber
+	var authenticator *authinfra.Authenticator
 	routeBackend := envString("NEXUSIM_PUSH_ROUTE_BACKEND", "memory")
 	if routeBackend == "redis" {
 		gatewayID := envString("NEXUSIM_PUSH_GATEWAY_ID", defaultGatewayID())
@@ -105,6 +106,7 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 			Metrics:              localRegistry.Metrics(),
 			RedisRegistryMetrics: redisRouteRegistryMetrics(redisRegistry),
 			RedisSubscriberStats: redisRouteSubscriberMetrics(redisSubscriber),
+			AuthJWKStats:         authenticatorJWKStats(authenticator),
 		})
 	}
 
@@ -124,7 +126,7 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 		if err != nil {
 			return err
 		}
-		authenticator, err := authinfra.NewAuthenticator(authinfra.Config{
+		authenticator, err = authinfra.NewAuthenticator(authinfra.Config{
 			Mode:               authinfra.Mode(envString("NEXUSIM_PUSH_AUTH_MODE", "mock")),
 			Secret:             os.Getenv("NEXUSIM_PUSH_AUTH_HMAC_SECRET"),
 			PreviousSecrets:    splitCSV(os.Getenv("NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS")),
@@ -299,8 +301,9 @@ func startHTTPServer(ctx context.Context, errs chan<- error, name string, addr s
 
 type pushDebugMetrics struct {
 	memory.Metrics
-	RedisRegistryMetrics redisroute.Metrics `json:"redis_registry_metrics,omitempty"`
-	RedisSubscriberStats redisroute.Metrics `json:"redis_subscriber_metrics,omitempty"`
+	RedisRegistryMetrics redisroute.Metrics  `json:"redis_registry_metrics,omitempty"`
+	RedisSubscriberStats redisroute.Metrics  `json:"redis_subscriber_metrics,omitempty"`
+	AuthJWKStats         *authinfra.JWKStats `json:"auth_jwks,omitempty"`
 }
 
 func redisRouteRegistryMetrics(registry *redisroute.Registry) redisroute.Metrics {
@@ -315,6 +318,14 @@ func redisRouteSubscriberMetrics(subscriber *redisroute.Subscriber) redisroute.M
 		return redisroute.Metrics{}
 	}
 	return subscriber.Metrics()
+}
+
+func authenticatorJWKStats(authenticator *authinfra.Authenticator) *authinfra.JWKStats {
+	stats := authenticator.JWKStats()
+	if !stats.RemoteURLConfigured && stats.CachedKeyCount == 0 && stats.RefreshFailures == 0 {
+		return nil
+	}
+	return &stats
 }
 
 func envString(name string, fallback string) string {

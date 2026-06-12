@@ -212,6 +212,140 @@ func TestAuthenticatorJWTRefreshesRemoteJWKSet(t *testing.T) {
 	t.Fatalf("expected refreshed remote jwks to accept rotated key")
 }
 
+func TestAuthenticatorJWTRejectsUnavailableRemoteJWKSetWithoutStaticFallback(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		http.Error(writer, "unavailable", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	_, err := NewAuthenticator(Config{
+		Mode:      ModeJWT,
+		JWKSetURL: server.URL,
+		Now:       func() time.Time { return time.Unix(1_800_000_000, 0) },
+	})
+	if err == nil {
+		t.Fatalf("expected remote jwks startup failure without static fallback")
+	}
+}
+
+func TestAuthenticatorJWTKeepsStaticJWKSetWhenInitialRemoteFetchFails(t *testing.T) {
+	privateKey := generateTestRSAKey(t)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		http.Error(writer, "unavailable", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	authenticator, err := NewAuthenticator(Config{
+		Mode:           ModeJWT,
+		JWKSetJSON:     testRSAJWKSetJSON(t, privateKey, "rsa-kid-1"),
+		JWKSetURL:      server.URL,
+		TrustedIssuers: []string{"issuer-1"},
+		Now:            func() time.Time { return time.Unix(1_800_000_000, 0) },
+	})
+	if err != nil {
+		t.Fatalf("new authenticator with static fallback: %v", err)
+	}
+	defer authenticator.Close()
+	stats := authenticator.JWKStats()
+	if !stats.RemoteURLConfigured || stats.CachedKeyCount != 1 || stats.RefreshFailures == 0 || stats.LastRefreshFailure == 0 {
+		t.Fatalf("expected remote failure stats with cached static key, got %+v", stats)
+	}
+	token := signTestRS256JWT(t, privateKey, "rsa-kid-1", map[string]string{
+		"tenant_id": "tenant-1",
+		"user_id":   "user-1",
+		"device_id": "device-1",
+		"iss":       "issuer-1",
+		"aud":       "push-gateway",
+	}, time.Unix(1_800_000_000, 0).Add(time.Minute))
+	if _, err := authenticator.Authenticate(requestWithBearer(token)); err != nil {
+		t.Fatalf("expected static key to remain usable: %v", err)
+	}
+}
+
+func TestAuthenticatorJWTRefreshFailureKeepsPreviousRemoteJWKSet(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	privateKey := generateTestRSAKey(t)
+	var failRemote atomic.Bool
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if failRemote.Load() {
+			http.Error(writer, "unavailable", http.StatusInternalServerError)
+			return
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(testRSAJWKSetJSON(t, privateKey, "rsa-kid-1")))
+	}))
+	defer server.Close()
+	authenticator, err := NewAuthenticator(Config{
+		Mode:               ModeJWT,
+		JWKSetURL:          server.URL,
+		JWKRefreshInterval: 10 * time.Millisecond,
+		TrustedIssuers:     []string{"issuer-1"},
+		Now:                func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	defer authenticator.Close()
+	failRemote.Store(true)
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if authenticator.JWKStats().RefreshFailures > 0 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	stats := authenticator.JWKStats()
+	if stats.RefreshFailures == 0 || stats.LastRefreshFailure == 0 || stats.CachedKeyCount != 1 {
+		t.Fatalf("expected refresh failure to be recorded while keeping old key, got %+v", stats)
+	}
+	token := signTestRS256JWT(t, privateKey, "rsa-kid-1", map[string]string{
+		"tenant_id": "tenant-1",
+		"user_id":   "user-1",
+		"device_id": "device-1",
+		"iss":       "issuer-1",
+		"aud":       "push-gateway",
+	}, now.Add(time.Minute))
+	if _, err := authenticator.Authenticate(requestWithBearer(token)); err != nil {
+		t.Fatalf("expected previous remote key to remain usable: %v", err)
+	}
+}
+
+func TestParseRS256JWKSetRejectsNonSigningAndWeakKeys(t *testing.T) {
+	privateKey := generateTestRSAKey(t)
+	nonSigning, err := json.Marshal(jwkSet{Keys: []jwk{{
+		KeyType:   "RSA",
+		KeyUse:    "enc",
+		KeyID:     "enc-key",
+		Algorithm: "RS256",
+		Modulus:   base64.RawURLEncoding.EncodeToString(privateKey.PublicKey.N.Bytes()),
+		Exponent:  base64.RawURLEncoding.EncodeToString(big.NewInt(int64(privateKey.PublicKey.E)).Bytes()),
+	}}})
+	if err != nil {
+		t.Fatalf("marshal non-signing jwks: %v", err)
+	}
+	if _, err := parseRS256JWKSet(string(nonSigning)); err == nil {
+		t.Fatalf("expected non-signing jwk to be rejected")
+	}
+
+	weakKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		t.Fatalf("generate weak rsa key: %v", err)
+	}
+	weak, err := json.Marshal(jwkSet{Keys: []jwk{{
+		KeyType:   "RSA",
+		KeyUse:    "sig",
+		KeyID:     "weak-key",
+		Algorithm: "RS256",
+		Modulus:   base64.RawURLEncoding.EncodeToString(weakKey.PublicKey.N.Bytes()),
+		Exponent:  base64.RawURLEncoding.EncodeToString(big.NewInt(int64(weakKey.PublicKey.E)).Bytes()),
+	}}})
+	if err != nil {
+		t.Fatalf("marshal weak jwks: %v", err)
+	}
+	if _, err := parseRS256JWKSet(string(weak)); err == nil {
+		t.Fatalf("expected weak jwk to be rejected")
+	}
+}
+
 func TestAuthenticatorHMACRejectsJWTWrongAlgorithm(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	authenticator, err := NewAuthenticator(Config{Mode: ModeHMAC, Secret: "secret", Now: func() time.Time { return now }})

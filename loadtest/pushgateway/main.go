@@ -256,6 +256,15 @@ type pushMetrics struct {
 	ResumeBufferExpiredCount    uint64            `json:"resume_buffer_expired_count"`
 	RedisRegistryMetrics        redisRouteMetrics `json:"redis_registry_metrics,omitempty"`
 	RedisSubscriberMetrics      redisRouteMetrics `json:"redis_subscriber_metrics,omitempty"`
+	AuthJWKMetrics              *authJWKMetrics   `json:"auth_jwks,omitempty"`
+}
+
+type authJWKMetrics struct {
+	RemoteURLConfigured bool  `json:"remote_url_configured"`
+	CachedKeyCount      int   `json:"cached_key_count"`
+	LastRefreshSuccess  int64 `json:"last_refresh_success_ms,omitempty"`
+	LastRefreshFailure  int64 `json:"last_refresh_failure_ms,omitempty"`
+	RefreshFailures     int64 `json:"refresh_failure_count"`
 }
 
 type redisRouteMetrics struct {

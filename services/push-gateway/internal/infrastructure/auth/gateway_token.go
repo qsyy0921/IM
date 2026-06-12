@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/qsyy0921/IM/services/push-gateway/internal/types"
@@ -59,6 +60,17 @@ type Authenticator struct {
 	jwkHTTPClient      *http.Client
 	jwkRefreshInterval time.Duration
 	jwkRefreshCancel   context.CancelFunc
+	jwkLastSuccessAtMS atomic.Int64
+	jwkLastFailureAtMS atomic.Int64
+	jwkRefreshFailures atomic.Int64
+}
+
+type JWKStats struct {
+	RemoteURLConfigured bool  `json:"remote_url_configured"`
+	CachedKeyCount      int   `json:"cached_key_count"`
+	LastRefreshSuccess  int64 `json:"last_refresh_success_ms,omitempty"`
+	LastRefreshFailure  int64 `json:"last_refresh_failure_ms,omitempty"`
+	RefreshFailures     int64 `json:"refresh_failure_count"`
 }
 
 type tokenClaims struct {
@@ -151,11 +163,13 @@ func NewAuthenticator(config Config) (*Authenticator, error) {
 			keys, err := authenticator.fetchRS256JWKSet(ctx)
 			cancel()
 			if err != nil {
+				authenticator.recordJWKRefreshFailure()
 				if authenticator.publicKeyCount() == 0 {
 					return nil, err
 				}
 			} else {
 				authenticator.setPublicKeys(keys)
+				authenticator.recordJWKRefreshSuccess()
 			}
 			authenticator.startJWKRefresh()
 		}
@@ -173,6 +187,19 @@ func (authenticator *Authenticator) Close() {
 		return
 	}
 	authenticator.jwkRefreshCancel()
+}
+
+func (authenticator *Authenticator) JWKStats() JWKStats {
+	if authenticator == nil || authenticator.mode != ModeJWT {
+		return JWKStats{}
+	}
+	return JWKStats{
+		RemoteURLConfigured: authenticator.jwkSetURL != "",
+		CachedKeyCount:      authenticator.publicKeyCount(),
+		LastRefreshSuccess:  authenticator.jwkLastSuccessAtMS.Load(),
+		LastRefreshFailure:  authenticator.jwkLastFailureAtMS.Load(),
+		RefreshFailures:     authenticator.jwkRefreshFailures.Load(),
+	}
 }
 
 func (authenticator *Authenticator) Authenticate(request *http.Request) (types.AuthContext, error) {
@@ -398,6 +425,9 @@ func (authenticator *Authenticator) startJWKRefresh() {
 				refreshCancel()
 				if err == nil {
 					authenticator.setPublicKeys(keys)
+					authenticator.recordJWKRefreshSuccess()
+				} else {
+					authenticator.recordJWKRefreshFailure()
 				}
 			case <-ctx.Done():
 				return
@@ -424,8 +454,15 @@ func parseRS256JWKSetValue(set jwkSet) (map[string]*rsa.PublicKey, error) {
 		if key.KeyType != "RSA" || key.Algorithm != "RS256" || strings.TrimSpace(key.KeyID) == "" {
 			continue
 		}
+		if key.KeyUse != "" && key.KeyUse != "sig" {
+			continue
+		}
 		modulus, err := base64.RawURLEncoding.DecodeString(key.Modulus)
 		if err != nil || len(modulus) == 0 {
+			continue
+		}
+		modulusInt := new(big.Int).SetBytes(modulus)
+		if modulusInt.BitLen() < 2048 {
 			continue
 		}
 		exponentBytes, err := base64.RawURLEncoding.DecodeString(key.Exponent)
@@ -436,12 +473,27 @@ func parseRS256JWKSetValue(set jwkSet) (map[string]*rsa.PublicKey, error) {
 		if exponent <= 1 {
 			continue
 		}
-		keys[key.KeyID] = &rsa.PublicKey{N: new(big.Int).SetBytes(modulus), E: exponent}
+		keys[key.KeyID] = &rsa.PublicKey{N: modulusInt, E: exponent}
 	}
 	if len(keys) == 0 {
 		return nil, errors.New("no usable RS256 JWK keys configured")
 	}
 	return keys, nil
+}
+
+func (authenticator *Authenticator) recordJWKRefreshSuccess() {
+	if authenticator == nil {
+		return
+	}
+	authenticator.jwkLastSuccessAtMS.Store(time.Now().UTC().UnixMilli())
+}
+
+func (authenticator *Authenticator) recordJWKRefreshFailure() {
+	if authenticator == nil {
+		return
+	}
+	authenticator.jwkLastFailureAtMS.Store(time.Now().UTC().UnixMilli())
+	authenticator.jwkRefreshFailures.Add(1)
 }
 
 func normalizeIssuers(values []string) map[string]struct{} {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 	"net"
@@ -68,7 +69,11 @@ func runGRPC() error {
 	refreshTokens := tokeninfra.NewRefreshTokenCodec()
 	passwords := credentialinfra.NewPBKDF2Hasher(envInt("NEXUSIM_IDENTITY_PASSWORD_PBKDF2_ITERATIONS", 0))
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
-	stopDebug, err := startDebugServer(ctx, identityDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics).WithJWKSet(signer.JWKSet()))
+	jwkSet, err := gatewayTokenJWKSetWithAdditionalKeys(signer.JWKSet())
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, identityDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics).WithJWKSet(jwkSet))
 	if err != nil {
 		return err
 	}
@@ -165,6 +170,58 @@ func loadRSAPrivateKeyPEM() (string, error) {
 		return "", err
 	}
 	return string(content), nil
+}
+
+func gatewayTokenJWKSetWithAdditionalKeys(base tokeninfra.JWKSet) (tokeninfra.JWKSet, error) {
+	additional, err := loadAdditionalGatewayTokenJWKSet()
+	if err != nil {
+		return tokeninfra.JWKSet{}, err
+	}
+	if len(additional.Keys) == 0 {
+		return base, nil
+	}
+	result := tokeninfra.JWKSet{Keys: make([]tokeninfra.JWK, 0, len(base.Keys)+len(additional.Keys))}
+	seen := make(map[string]struct{}, len(base.Keys)+len(additional.Keys))
+	appendKey := func(key tokeninfra.JWK) {
+		keyID := strings.TrimSpace(key.KeyID)
+		if keyID != "" {
+			if _, ok := seen[keyID]; ok {
+				return
+			}
+			seen[keyID] = struct{}{}
+		}
+		result.Keys = append(result.Keys, key)
+	}
+	for _, key := range base.Keys {
+		appendKey(key)
+	}
+	for _, key := range additional.Keys {
+		appendKey(key)
+	}
+	return result, nil
+}
+
+func loadAdditionalGatewayTokenJWKSet() (tokeninfra.JWKSet, error) {
+	raw := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_JSON"))
+	if raw == "" {
+		path := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_FILE"))
+		if path == "" {
+			return tokeninfra.JWKSet{}, nil
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return tokeninfra.JWKSet{}, err
+		}
+		raw = strings.TrimSpace(string(content))
+	}
+	if raw == "" {
+		return tokeninfra.JWKSet{}, nil
+	}
+	var set tokeninfra.JWKSet
+	if err := json.Unmarshal([]byte(raw), &set); err != nil {
+		return tokeninfra.JWKSet{}, err
+	}
+	return set, nil
 }
 
 func runOutboxRelay() error {

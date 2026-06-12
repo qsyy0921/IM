@@ -140,19 +140,21 @@ type PGPoolSnapshot struct {
 }
 
 type IdentitySnapshot struct {
-	Users                  int64 `json:"users"`
-	UsersWithFailures      int64 `json:"users_with_failures"`
-	PasswordLoginLocked    int64 `json:"password_login_locked"`
-	MFARecoveryFailures    int64 `json:"mfa_recovery_failures"`
-	MFARecoveryLocked      int64 `json:"mfa_recovery_locked"`
-	MFAFactors             int64 `json:"mfa_factors"`
-	MFAFactorsWithFailures int64 `json:"mfa_factors_with_failures"`
-	MFALoginLocked         int64 `json:"mfa_login_locked"`
-	ActiveDevices          int64 `json:"active_devices"`
-	RevokedDevices         int64 `json:"revoked_devices"`
-	ActiveSessions         int64 `json:"active_sessions"`
-	RevokedSessions        int64 `json:"revoked_sessions"`
-	ExpiredSessions        int64 `json:"expired_sessions"`
+	Users                        int64 `json:"users"`
+	UsersWithFailures            int64 `json:"users_with_failures"`
+	PasswordLoginLocked          int64 `json:"password_login_locked"`
+	MFARecoveryFailures          int64 `json:"mfa_recovery_failures"`
+	MFARecoveryLocked            int64 `json:"mfa_recovery_locked"`
+	MFAFactors                   int64 `json:"mfa_factors"`
+	MFAFactorsWithFailures       int64 `json:"mfa_factors_with_failures"`
+	MFALoginLocked               int64 `json:"mfa_login_locked"`
+	ChallengeRequestLimits       int64 `json:"challenge_request_limits"`
+	ChallengeRequestLimitsLocked int64 `json:"challenge_request_limits_locked"`
+	ActiveDevices                int64 `json:"active_devices"`
+	RevokedDevices               int64 `json:"revoked_devices"`
+	ActiveSessions               int64 `json:"active_sessions"`
+	RevokedSessions              int64 `json:"revoked_sessions"`
+	ExpiredSessions              int64 `json:"expired_sessions"`
 }
 
 func queryIdentitySnapshot(ctx context.Context, pool *pgxpool.Pool) (IdentitySnapshot, error) {
@@ -167,6 +169,8 @@ SELECT
     (SELECT COUNT(*) FROM identity_mfa_factors),
     (SELECT COUNT(*) FROM identity_mfa_factors WHERE login_failed_count > 0),
     (SELECT COUNT(*) FROM identity_mfa_factors WHERE status = 'ACTIVE' AND login_locked_until > now()),
+    (SELECT COUNT(*) FROM identity_challenge_request_limits),
+    (SELECT COUNT(*) FROM identity_challenge_request_limits WHERE locked_until > now()),
     (SELECT COUNT(*) FROM identity_devices WHERE status = 'ACTIVE'),
     (SELECT COUNT(*) FROM identity_devices WHERE status = 'REVOKED'),
     (SELECT COUNT(*) FROM identity_sessions WHERE status = 'ACTIVE' AND expires_at > now()),
@@ -181,6 +185,8 @@ SELECT
 		&snapshot.MFAFactors,
 		&snapshot.MFAFactorsWithFailures,
 		&snapshot.MFALoginLocked,
+		&snapshot.ChallengeRequestLimits,
+		&snapshot.ChallengeRequestLimitsLocked,
 		&snapshot.ActiveDevices,
 		&snapshot.RevokedDevices,
 		&snapshot.ActiveSessions,

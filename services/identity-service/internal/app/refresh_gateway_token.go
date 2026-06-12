@@ -88,6 +88,11 @@ func (uc *RefreshGatewayTokenUseCase) Execute(ctx context.Context, command types
 	presentedHash := uc.refreshTokens.HashRefreshTokenSecret(parsed.Secret)
 
 	issuedAt := uc.now()
+	if hasRefreshMFAProof(command) {
+		if err := uc.repository.ValidateRefreshGatewaySession(ctx, command, parsed.TokenID, presentedHash, issuedAt); err != nil {
+			return types.RefreshGatewayTokenResult{}, err
+		}
+	}
 	verifiedMFAFactorID, usedRecoveryCode, err := uc.verifyMFAIfSubmitted(ctx, command, issuedAt)
 	if err != nil {
 		return types.RefreshGatewayTokenResult{}, err
@@ -123,6 +128,10 @@ func (uc *RefreshGatewayTokenUseCase) Execute(ctx context.Context, command types
 	result.GatewayToken = gatewayToken
 	result.RefreshToken = nextRefreshToken
 	return result, nil
+}
+
+func hasRefreshMFAProof(command types.RefreshGatewayTokenCommand) bool {
+	return strings.TrimSpace(command.MFACode) != "" || strings.TrimSpace(command.MFARecoveryCode) != ""
 }
 
 func (uc *RefreshGatewayTokenUseCase) verifyMFAIfSubmitted(ctx context.Context, command types.RefreshGatewayTokenCommand, now time.Time) (types.MFAFactorID, types.MFARecoveryCodeRecord, error) {

@@ -468,6 +468,51 @@ func (r *Repository) RefreshGatewaySession(
 	}, nil
 }
 
+func (r *Repository) ValidateRefreshGatewaySession(
+	ctx context.Context,
+	command types.RefreshGatewayTokenCommand,
+	presentedTokenID types.RefreshTokenID,
+	presentedTokenHash string,
+	now time.Time,
+) error {
+	if r.pool == nil {
+		return types.NewDBReadFailed("identity repository is not configured")
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.NewDBReadFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	row, err := lockRefreshToken(ctx, tx, command, presentedTokenID)
+	if err != nil {
+		return err
+	}
+	if row.TokenHash != presentedTokenHash {
+		return types.NewInvalidRefreshToken("invalid refresh token")
+	}
+	if row.Status != "ACTIVE" {
+		return types.NewRefreshTokenReuseDetected("refresh token was already used")
+	}
+	if !now.Before(row.ExpiresAt) {
+		return types.NewInvalidRefreshToken("refresh token expired")
+	}
+	if err := lockDevice(ctx, tx, command.TenantID, command.UserID, command.DeviceID); err != nil {
+		return err
+	}
+	device, err := getDeviceForUpdate(ctx, tx, command.TenantID, command.UserID, command.DeviceID)
+	if err != nil {
+		return err
+	}
+	if device.Status == types.DeviceStatusRevoked {
+		return types.NewDeviceRevoked("device is revoked")
+	}
+	if _, err := lockRefreshSession(ctx, tx, command.TenantID, command.UserID, command.DeviceID, row.SessionID); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (r *Repository) CreateVerificationChallenge(
 	ctx context.Context,
 	command types.RequestVerificationChallengeCommand,

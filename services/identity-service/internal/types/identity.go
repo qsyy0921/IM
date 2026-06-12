@@ -85,17 +85,21 @@ type IssueGatewayTokenCommand struct {
 }
 
 type LoginCommand struct {
-	TenantID            TenantID
-	UserID              UserID
-	Password            string
-	DeviceID            DeviceID
-	Audience            string
-	GatewayTTLSeconds   int64
-	RefreshTTLSeconds   int64
-	MFAFactorID         MFAFactorID
-	MFACode             string
-	MFARecoveryCode     string
+	TenantID          TenantID
+	UserID            UserID
+	Password          string
+	DeviceID          DeviceID
+	Audience          string
+	GatewayTTLSeconds int64
+	RefreshTTLSeconds int64
+	MFAFactorID       MFAFactorID
+	MFACode           string
+	MFARecoveryCode   string
+	// VerifiedMFAFactorID is set only by LoginUseCase after TOTP verification.
+	// API adapters and repository tests must not use it as caller-supplied proof.
 	VerifiedMFAFactorID MFAFactorID
+	// UsedMFARecoveryCode is set only by LoginUseCase after recovery-code verification.
+	// API adapters and repository tests must not use it as caller-supplied proof.
 	UsedMFARecoveryCode MFARecoveryCodeRecord
 	TraceID             string
 	RequestID           string
@@ -116,17 +120,21 @@ type LoginResult struct {
 }
 
 type RefreshGatewayTokenCommand struct {
-	TenantID            TenantID
-	UserID              UserID
-	DeviceID            DeviceID
-	RefreshToken        string
-	Audience            string
-	GatewayTTLSeconds   int64
-	RefreshTTLSeconds   int64
-	MFAFactorID         MFAFactorID
-	MFACode             string
-	MFARecoveryCode     string
+	TenantID          TenantID
+	UserID            UserID
+	DeviceID          DeviceID
+	RefreshToken      string
+	Audience          string
+	GatewayTTLSeconds int64
+	RefreshTTLSeconds int64
+	MFAFactorID       MFAFactorID
+	MFACode           string
+	MFARecoveryCode   string
+	// VerifiedMFAFactorID is set only by RefreshGatewayTokenUseCase after TOTP verification.
+	// API adapters and repository tests must not use it as caller-supplied proof.
 	VerifiedMFAFactorID MFAFactorID
+	// UsedMFARecoveryCode is set only by RefreshGatewayTokenUseCase after recovery-code verification.
+	// API adapters and repository tests must not use it as caller-supplied proof.
 	UsedMFARecoveryCode MFARecoveryCodeRecord
 	TraceID             string
 	RequestID           string

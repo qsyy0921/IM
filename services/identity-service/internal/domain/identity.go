@@ -53,6 +53,9 @@ func ValidateLogin(command types.LoginCommand) error {
 	if strings.TrimSpace(command.MFACode) != "" && strings.TrimSpace(command.MFARecoveryCode) != "" {
 		return types.NewInvalidArgument("only one mfa credential is allowed")
 	}
+	if strings.TrimSpace(string(command.MFAFactorID)) != "" && strings.TrimSpace(command.MFACode) == "" {
+		return types.NewInvalidArgument("mfa_factor_id requires mfa_code")
+	}
 	if strings.TrimSpace(command.MFARecoveryCode) != "" && strings.TrimSpace(string(command.MFAFactorID)) != "" {
 		return types.NewInvalidArgument("mfa_factor_id is not allowed with recovery code")
 	}
@@ -77,6 +80,9 @@ func ValidateRefreshGatewayToken(command types.RefreshGatewayTokenCommand) error
 	}
 	if strings.TrimSpace(command.MFACode) != "" && strings.TrimSpace(command.MFARecoveryCode) != "" {
 		return types.NewInvalidArgument("only one mfa credential is allowed")
+	}
+	if strings.TrimSpace(string(command.MFAFactorID)) != "" && strings.TrimSpace(command.MFACode) == "" {
+		return types.NewInvalidArgument("mfa_factor_id requires mfa_code")
 	}
 	if strings.TrimSpace(command.MFARecoveryCode) != "" && strings.TrimSpace(string(command.MFAFactorID)) != "" {
 		return types.NewInvalidArgument("mfa_factor_id is not allowed with recovery code")

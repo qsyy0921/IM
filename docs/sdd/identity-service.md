@@ -366,6 +366,6 @@ ConfirmPasswordReset -> password hash updated + active session / refresh token r
 - `GET /readyz`: PostgreSQL ping readiness.
 - `GET /debug/metrics`: pgx pool counters, identity user/device/session counts, failed password-login user counts, currently password-login-locked user counts, MFA factor counts, MFA factor failed-login counts, currently MFA-login-locked ACTIVE factor counts, and gRPC method/code/latency counters.
 
-The gRPC server also emits one JSON request log per unary RPC with stable fields: `service`, `event`, `method`, `code`, and `latency_ms`.
+The gRPC server also emits one JSON request log per unary RPC with stable fields: `service`, `event`, `method`, `code`, `latency_ms`, and optional `trace_id` / `request_id` from gateway-verified or client-propagated gRPC metadata. These IDs are bounded before logging and the request log intentionally does not include user IDs, device IDs, tokens, challenge destinations or provider error bodies.
 
 This is intentionally a lightweight local/debug endpoint. Production tracing, alerting, mTLS, external SIEM / audit sinks and adaptive risk analytics remain future hardening items.

@@ -738,12 +738,16 @@ func TestRepositoryPasswordResetChallengeRateLimitIntegration(t *testing.T) {
 	if !errors.Is(err, types.ErrChallengeRateLimited) {
 		t.Fatalf("expected challenge rate limit, got %v", err)
 	}
-	if _, err := repository.ConfirmPasswordReset(ctx, types.ConfirmPasswordResetCommand{
+	if err := repository.ExpireChallenge(ctx, "tenant-identity", "user-1", "challenge-reset-limit-1", issuedAt.Add(5*time.Minute)); err != nil {
+		t.Fatalf("expire reset challenge after delivery failure: %v", err)
+	}
+	_, err = repository.ConfirmPasswordReset(ctx, types.ConfirmPasswordResetCommand{
 		TenantID:    "tenant-identity",
 		UserID:      "user-1",
 		ChallengeID: "challenge-reset-limit-1",
-	}, "reset-limit-hash-1", "new-password-hash", issuedAt.Add(5*time.Minute)); err != nil {
-		t.Fatalf("consume reset challenge: %v", err)
+	}, "reset-limit-hash-1", "new-password-hash", issuedAt.Add(5*time.Minute))
+	if !errors.Is(err, types.ErrInvalidChallenge) {
+		t.Fatalf("expected expired reset challenge to reject confirmation, got %v", err)
 	}
 	if _, err := repository.CreatePasswordResetChallenge(ctx, types.RequestPasswordResetCommand{
 		TenantID:    "tenant-identity",

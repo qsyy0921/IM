@@ -19,6 +19,7 @@ type Repository interface {
 	RecordMFARecoveryLoginFailure(context.Context, types.TenantID, types.UserID, time.Time, time.Time, int, time.Time) error
 	FindActiveMFARecoveryCode(context.Context, types.TenantID, types.UserID, string) (types.MFARecoveryCodeRecord, error)
 	CreateVerificationChallenge(context.Context, types.RequestVerificationChallengeCommand, types.ChallengeType, types.ChallengeRecord, time.Time, time.Time) (types.RequestVerificationChallengeResult, error)
+	ExpireChallenge(context.Context, types.TenantID, types.UserID, types.ChallengeID, time.Time) error
 	ConfirmVerificationChallenge(context.Context, types.ConfirmVerificationChallengeCommand, string, time.Time) (types.ConfirmVerificationChallengeResult, error)
 	CreatePasswordResetChallenge(context.Context, types.RequestPasswordResetCommand, types.ChallengeRecord, time.Time, time.Time) (types.RequestPasswordResetResult, error)
 	ConfirmPasswordReset(context.Context, types.ConfirmPasswordResetCommand, string, string, time.Time) (types.ConfirmPasswordResetResult, error)

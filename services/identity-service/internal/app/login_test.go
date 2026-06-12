@@ -1113,6 +1113,9 @@ func TestRequestVerificationChallengeUseCaseReturnsDeliveryFailure(t *testing.T)
 	if !repository.createVerificationCalled || !notifier.called {
 		t.Fatalf("expected challenge to be created then sent, created=%v sent=%v", repository.createVerificationCalled, notifier.called)
 	}
+	if !repository.expireChallengeCalled || repository.expiredChallengeID != "challenge-1" {
+		t.Fatalf("expected failed delivery challenge to be expired, called=%v challenge=%q", repository.expireChallengeCalled, repository.expiredChallengeID)
+	}
 }
 
 func TestConfirmPasswordResetUseCaseHashesNewPassword(t *testing.T) {
@@ -1154,6 +1157,27 @@ func TestRequestPasswordResetUseCaseNeverReturnsDevToken(t *testing.T) {
 	}
 	if !notifier.called || notifier.notification.Token != "challenge-token" || notifier.notification.Type != types.ChallengeTypePasswordReset {
 		t.Fatalf("expected password reset notification with challenge token, got called=%v notification=%+v", notifier.called, notifier.notification)
+	}
+}
+
+func TestRequestPasswordResetUseCaseExpiresChallengeOnDeliveryFailure(t *testing.T) {
+	repository := &fakeIdentityRepository{}
+	notifier := &fakeChallengeNotifier{err: types.NewChallengeDeliveryFailed("webhook failed")}
+	useCase := NewRequestPasswordResetUseCase(repository, fakeChallengeTokenCodec{}, ChallengeOptions{Notifier: notifier})
+	_, err := useCase.Execute(context.Background(), types.RequestPasswordResetCommand{
+		TenantID:    "tenant-1",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "user1@example.com",
+	})
+	if !errors.Is(err, types.ErrChallengeDeliveryFailed) {
+		t.Fatalf("expected delivery failure, got %v", err)
+	}
+	if !repository.createPasswordResetCalled || !notifier.called {
+		t.Fatalf("expected reset challenge to be created then sent, created=%v sent=%v", repository.createPasswordResetCalled, notifier.called)
+	}
+	if !repository.expireChallengeCalled || repository.expiredChallengeID != "challenge-1" {
+		t.Fatalf("expected failed delivery reset challenge to be expired, called=%v challenge=%q", repository.expireChallengeCalled, repository.expiredChallengeID)
 	}
 }
 
@@ -1233,6 +1257,9 @@ type fakeIdentityRepository struct {
 	createVerificationCalled      bool
 	createPasswordResetCalled     bool
 	createPasswordResetErr        error
+	expireChallengeCalled         bool
+	expiredChallengeID            types.ChallengeID
+	expireChallengeErr            error
 	confirmPasswordResetCalled    bool
 	resetPasswordHash             string
 	resetTokenHash                string
@@ -1343,6 +1370,12 @@ func (repo *fakeIdentityRepository) CreateVerificationChallenge(context.Context,
 
 func (repo *fakeIdentityRepository) ConfirmVerificationChallenge(context.Context, types.ConfirmVerificationChallengeCommand, string, time.Time) (types.ConfirmVerificationChallengeResult, error) {
 	return types.ConfirmVerificationChallengeResult{}, nil
+}
+
+func (repo *fakeIdentityRepository) ExpireChallenge(_ context.Context, _ types.TenantID, _ types.UserID, challengeID types.ChallengeID, _ time.Time) error {
+	repo.expireChallengeCalled = true
+	repo.expiredChallengeID = challengeID
+	return repo.expireChallengeErr
 }
 
 func (repo *fakeIdentityRepository) CreatePasswordResetChallenge(_ context.Context, command types.RequestPasswordResetCommand, record types.ChallengeRecord, _ time.Time, expiresAt time.Time) (types.RequestPasswordResetResult, error) {

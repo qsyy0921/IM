@@ -61,6 +61,9 @@ func (uc *RequestVerificationChallengeUseCase) Execute(ctx context.Context, comm
 		TraceID:         command.TraceID,
 		RequestID:       command.RequestID,
 	}); err != nil {
+		if expireErr := uc.repository.ExpireChallenge(ctx, result.TenantID, result.UserID, result.ChallengeID, uc.now()); expireErr != nil {
+			return types.RequestVerificationChallengeResult{}, expireErr
+		}
 		return types.RequestVerificationChallengeResult{}, err
 	}
 	if uc.options.ReturnDevToken {
@@ -131,6 +134,9 @@ func (uc *RequestPasswordResetUseCase) Execute(ctx context.Context, command type
 		TraceID:         command.TraceID,
 		RequestID:       command.RequestID,
 	}); err != nil {
+		if expireErr := uc.repository.ExpireChallenge(ctx, result.TenantID, result.UserID, result.ChallengeID, uc.now()); expireErr != nil {
+			return types.RequestPasswordResetResult{}, expireErr
+		}
 		return types.RequestPasswordResetResult{}, err
 	}
 	return result, nil

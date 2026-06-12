@@ -613,6 +613,36 @@ func (r *Repository) ConfirmVerificationChallenge(
 	}, nil
 }
 
+func (r *Repository) ExpireChallenge(
+	ctx context.Context,
+	tenantID types.TenantID,
+	userID types.UserID,
+	challengeID types.ChallengeID,
+	expiredAt time.Time,
+) error {
+	if r.pool == nil {
+		return types.NewDBWriteFailed("identity repository is not configured")
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	challenge, err := lockIdentityChallenge(ctx, tx, tenantID, userID, challengeID)
+	if err != nil {
+		return err
+	}
+	if challenge.Status == "ACTIVE" {
+		if err := expireChallenge(ctx, tx, challenge, expiredAt); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
 func (r *Repository) CreatePasswordResetChallenge(
 	ctx context.Context,
 	command types.RequestPasswordResetCommand,

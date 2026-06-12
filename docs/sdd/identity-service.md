@@ -226,7 +226,7 @@ Challenge token rules:
 - Verification challenge creation requires the current password to avoid unauthenticated email / phone takeover.
 - A first-stage durable cap limits active challenges per `tenant_id + user_id + challenge_type + channel + destination`.
 - `identity-service` can call a configured challenge delivery webhook after a challenge row is created. The webhook receives the raw one-time token in memory; PostgreSQL still stores only `token_hash`. Default mode is `noop`, and production deployments must configure the webhook provider and keep development token return disabled.
-- If the webhook returns an error, the RPC returns stable `challenge delivery unavailable`. The challenge row may already exist, so clients should retry request flows with normal backoff rather than hot-looping.
+- If the webhook returns an error, the RPC returns stable `challenge delivery unavailable` and identity-service immediately marks the newly created challenge `EXPIRED` as compensation, so the unusable token hash does not consume the active challenge cap. If compensation itself fails, the RPC surfaces the storage error because the row may still be active. This is still a first-stage synchronous sender, not provider-grade outbox / retry / delivery audit.
 
 Known hardening still pending:
 

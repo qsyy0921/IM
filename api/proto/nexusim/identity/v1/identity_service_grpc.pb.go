@@ -19,6 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	IdentityService_RegisterUser_FullMethodName        = "/nexusim.identity.v1.IdentityService/RegisterUser"
 	IdentityService_Login_FullMethodName               = "/nexusim.identity.v1.IdentityService/Login"
 	IdentityService_RefreshGatewayToken_FullMethodName = "/nexusim.identity.v1.IdentityService/RefreshGatewayToken"
 	IdentityService_IssueGatewayToken_FullMethodName   = "/nexusim.identity.v1.IdentityService/IssueGatewayToken"
@@ -31,6 +32,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type IdentityServiceClient interface {
+	RegisterUser(ctx context.Context, in *RegisterUserRequest, opts ...grpc.CallOption) (*RegisterUserResponse, error)
 	Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginResponse, error)
 	RefreshGatewayToken(ctx context.Context, in *RefreshGatewayTokenRequest, opts ...grpc.CallOption) (*RefreshGatewayTokenResponse, error)
 	IssueGatewayToken(ctx context.Context, in *IssueGatewayTokenRequest, opts ...grpc.CallOption) (*IssueGatewayTokenResponse, error)
@@ -45,6 +47,16 @@ type identityServiceClient struct {
 
 func NewIdentityServiceClient(cc grpc.ClientConnInterface) IdentityServiceClient {
 	return &identityServiceClient{cc}
+}
+
+func (c *identityServiceClient) RegisterUser(ctx context.Context, in *RegisterUserRequest, opts ...grpc.CallOption) (*RegisterUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RegisterUserResponse)
+	err := c.cc.Invoke(ctx, IdentityService_RegisterUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *identityServiceClient) Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginResponse, error) {
@@ -111,6 +123,7 @@ func (c *identityServiceClient) GetDeviceState(ctx context.Context, in *GetDevic
 // All implementations must embed UnimplementedIdentityServiceServer
 // for forward compatibility.
 type IdentityServiceServer interface {
+	RegisterUser(context.Context, *RegisterUserRequest) (*RegisterUserResponse, error)
 	Login(context.Context, *LoginRequest) (*LoginResponse, error)
 	RefreshGatewayToken(context.Context, *RefreshGatewayTokenRequest) (*RefreshGatewayTokenResponse, error)
 	IssueGatewayToken(context.Context, *IssueGatewayTokenRequest) (*IssueGatewayTokenResponse, error)
@@ -127,6 +140,9 @@ type IdentityServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedIdentityServiceServer struct{}
 
+func (UnimplementedIdentityServiceServer) RegisterUser(context.Context, *RegisterUserRequest) (*RegisterUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegisterUser not implemented")
+}
 func (UnimplementedIdentityServiceServer) Login(context.Context, *LoginRequest) (*LoginResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Login not implemented")
 }
@@ -164,6 +180,24 @@ func RegisterIdentityServiceServer(s grpc.ServiceRegistrar, srv IdentityServiceS
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&IdentityService_ServiceDesc, srv)
+}
+
+func _IdentityService_RegisterUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).RegisterUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_RegisterUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).RegisterUser(ctx, req.(*RegisterUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _IdentityService_Login_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -281,6 +315,10 @@ var IdentityService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "nexusim.identity.v1.IdentityService",
 	HandlerType: (*IdentityServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "RegisterUser",
+			Handler:    _IdentityService_RegisterUser_Handler,
+		},
 		{
 			MethodName: "Login",
 			Handler:    _IdentityService_Login_Handler,

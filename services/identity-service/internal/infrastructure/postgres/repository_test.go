@@ -42,6 +42,42 @@ func TestRepositoryIssueGatewaySessionIntegration(t *testing.T) {
 	assertSessionStatus(t, ctx, pool, "session-1", "ACTIVE")
 }
 
+func TestRepositoryRegisterUserIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	repository := NewRepository(pool)
+	createdAt := time.Unix(1_800_000_000, 0).UTC()
+
+	result, err := repository.RegisterUser(ctx, types.RegisterUserCommand{
+		TenantID:  "tenant-identity",
+		UserID:    "user-1",
+		TraceID:   "trace-register",
+		RequestID: "request-register",
+	}, "password-hash", createdAt)
+	if err != nil {
+		t.Fatalf("register user: %v", err)
+	}
+	if result.Status != types.UserStatusActive || result.CreatedAtUnixMS != createdAt.UnixMilli() {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	credential, err := repository.GetUserCredential(ctx, "tenant-identity", "user-1")
+	if err != nil {
+		t.Fatalf("get credential: %v", err)
+	}
+	if credential.Status != "ACTIVE" || credential.PasswordHash != "password-hash" {
+		t.Fatalf("unexpected credential: %+v", credential)
+	}
+
+	_, err = repository.RegisterUser(ctx, types.RegisterUserCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+	}, "different-password-hash", createdAt.Add(time.Minute))
+	if !errors.Is(err, types.ErrUserAlreadyExists) {
+		t.Fatalf("expected user already exists, got %v", err)
+	}
+}
+
 func TestRepositoryRevokeDeviceRejectsFutureIssueIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

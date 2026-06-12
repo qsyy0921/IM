@@ -125,6 +125,9 @@ func TestNormalizeIdentityTokenMethod(t *testing.T) {
 		"issue_gateway":       "issue_gateway_token",
 		"issue_gateway_token": "issue_gateway_token",
 		"login":               "login",
+		"register":            "register_login",
+		"register_login":      "register_login",
+		"register_then_login": "register_login",
 	}
 	for input, want := range tests {
 		if got := normalizeIdentityTokenMethod(input); got != want {
@@ -134,13 +137,21 @@ func TestNormalizeIdentityTokenMethod(t *testing.T) {
 }
 
 func TestPushAuthTokenSourceMarksIdentityLogin(t *testing.T) {
-	source := pushAuthTokenSource(config{
+	loginSource := pushAuthTokenSource(config{
 		pushAuthMode:        "hmac",
 		identityTarget:      "127.0.0.1:11610",
 		identityTokenMethod: "login",
 	})
-	if source != "identity_service_login" {
-		t.Fatalf("expected identity_service_login, got %q", source)
+	if loginSource != "identity_service_login" {
+		t.Fatalf("expected identity_service_login, got %q", loginSource)
+	}
+	registerSource := pushAuthTokenSource(config{
+		pushAuthMode:        "hmac",
+		identityTarget:      "127.0.0.1:11610",
+		identityTokenMethod: "register_login",
+	})
+	if registerSource != "identity_service_register_login" {
+		t.Fatalf("expected identity_service_register_login, got %q", registerSource)
 	}
 }
 

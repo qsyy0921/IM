@@ -12,6 +12,7 @@ var (
 	ErrDBReadFailed              = errors.New("db read failed")
 	ErrDBWriteFailed             = errors.New("db write failed")
 	ErrTokenSigningFailed        = errors.New("token signing failed")
+	ErrUserAlreadyExists         = errors.New("user already exists")
 	ErrInvalidCredentials        = errors.New("invalid credentials")
 	ErrInvalidRefreshToken       = errors.New("invalid refresh token")
 	ErrRefreshTokenReuseDetected = errors.New("refresh token reuse detected")
@@ -47,6 +48,7 @@ func NewSessionNotFound(message string) error     { return wrap(ErrSessionNotFou
 func NewDBReadFailed(message string) error        { return wrap(ErrDBReadFailed, message) }
 func NewDBWriteFailed(message string) error       { return wrap(ErrDBWriteFailed, message) }
 func NewTokenSigningFailed(message string) error  { return wrap(ErrTokenSigningFailed, message) }
+func NewUserAlreadyExists(message string) error   { return wrap(ErrUserAlreadyExists, message) }
 func NewInvalidCredentials(message string) error  { return wrap(ErrInvalidCredentials, message) }
 func NewInvalidRefreshToken(message string) error { return wrap(ErrInvalidRefreshToken, message) }
 func NewRefreshTokenReuseDetected(message string) error {

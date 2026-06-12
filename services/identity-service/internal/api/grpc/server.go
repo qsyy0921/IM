@@ -15,6 +15,10 @@ type IssueGatewayTokenExecutor interface {
 	Execute(context.Context, types.IssueGatewayTokenCommand) (types.IssueGatewayTokenResult, error)
 }
 
+type RegisterUserExecutor interface {
+	Execute(context.Context, types.RegisterUserCommand) (types.RegisterUserResult, error)
+}
+
 type LoginExecutor interface {
 	Execute(context.Context, types.LoginCommand) (types.LoginResult, error)
 }
@@ -37,6 +41,7 @@ type GetDeviceStateExecutor interface {
 
 type Server struct {
 	identityv1.UnimplementedIdentityServiceServer
+	registerUser        RegisterUserExecutor
 	login               LoginExecutor
 	refreshGatewayToken RefreshGatewayTokenExecutor
 	issueGatewayToken   IssueGatewayTokenExecutor
@@ -46,6 +51,7 @@ type Server struct {
 }
 
 func NewServer(
+	registerUser RegisterUserExecutor,
 	login LoginExecutor,
 	refreshGatewayToken RefreshGatewayTokenExecutor,
 	issueGatewayToken IssueGatewayTokenExecutor,
@@ -54,6 +60,7 @@ func NewServer(
 	getDeviceState GetDeviceStateExecutor,
 ) *Server {
 	return &Server{
+		registerUser:        registerUser,
 		login:               login,
 		refreshGatewayToken: refreshGatewayToken,
 		issueGatewayToken:   issueGatewayToken,
@@ -65,6 +72,31 @@ func NewServer(
 
 func Register(registrar grpcgo.ServiceRegistrar, server *Server) {
 	identityv1.RegisterIdentityServiceServer(registrar, server)
+}
+
+func (s *Server) RegisterUser(ctx context.Context, request *identityv1.RegisterUserRequest) (*identityv1.RegisterUserResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.registerUser == nil {
+		return nil, status.Error(codes.Unimplemented, "register user is not configured")
+	}
+	result, err := s.registerUser.Execute(ctx, types.RegisterUserCommand{
+		TenantID:  types.TenantID(request.GetTenantId()),
+		UserID:    types.UserID(request.GetUserId()),
+		Password:  request.GetPassword(),
+		TraceID:   request.GetTraceId(),
+		RequestID: request.GetRequestId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &identityv1.RegisterUserResponse{
+		TenantId:        string(result.TenantID),
+		UserId:          string(result.UserID),
+		Status:          userStatusToProto(result.Status),
+		CreatedAtUnixMs: result.CreatedAtUnixMS,
+	}, nil
 }
 
 func (s *Server) Login(ctx context.Context, request *identityv1.LoginRequest) (*identityv1.LoginResponse, error) {
@@ -294,6 +326,15 @@ func sessionStatusToProto(status types.SessionStatus) identityv1.SessionStatus {
 	}
 }
 
+func userStatusToProto(status types.UserStatus) identityv1.UserStatus {
+	switch status {
+	case types.UserStatusActive:
+		return identityv1.UserStatus_USER_STATUS_ACTIVE
+	default:
+		return identityv1.UserStatus_USER_STATUS_UNSPECIFIED
+	}
+}
+
 func grpcError(err error) error {
 	switch {
 	case errors.Is(err, types.ErrInvalidArgument):
@@ -312,6 +353,8 @@ func grpcError(err error) error {
 		return status.Error(codes.Unavailable, "identity storage unavailable")
 	case errors.Is(err, types.ErrTokenSigningFailed):
 		return status.Error(codes.Internal, "token signing failed")
+	case errors.Is(err, types.ErrUserAlreadyExists):
+		return status.Error(codes.AlreadyExists, "user already exists")
 	case errors.Is(err, types.ErrInvalidCredentials):
 		return status.Error(codes.Unauthenticated, "invalid credentials")
 	case errors.Is(err, types.ErrInvalidRefreshToken):

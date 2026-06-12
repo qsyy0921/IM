@@ -5,6 +5,7 @@ package nexusim.identity.v1;
 option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/identity/v1;identityv1";
 
 service IdentityService {
+  rpc RegisterUser(RegisterUserRequest) returns (RegisterUserResponse);
   rpc Login(LoginRequest) returns (LoginResponse);
   rpc RefreshGatewayToken(RefreshGatewayTokenRequest) returns (RefreshGatewayTokenResponse);
   rpc IssueGatewayToken(IssueGatewayTokenRequest) returns (IssueGatewayTokenResponse);
@@ -18,6 +19,21 @@ message AdminContext {
   string operator_user_id = 2;
   string trace_id = 3;
   string request_id = 4;
+}
+
+message RegisterUserRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  string password = 3;
+  string trace_id = 4;
+  string request_id = 5;
+}
+
+message RegisterUserResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  UserStatus status = 3;
+  int64 created_at_unix_ms = 4;
 }
 
 message LoginRequest {
@@ -146,6 +162,11 @@ enum DeviceStatus {
   DEVICE_STATUS_UNSPECIFIED = 0;
   DEVICE_STATUS_ACTIVE = 1;
   DEVICE_STATUS_REVOKED = 2;
+}
+
+enum UserStatus {
+  USER_STATUS_UNSPECIFIED = 0;
+  USER_STATUS_ACTIVE = 1;
 }
 
 enum SessionStatus {

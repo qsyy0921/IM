@@ -5,11 +5,13 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/qsyy0921/IM/services/identity-service/internal/types"
 )
@@ -52,6 +54,47 @@ func WithSessionIDGenerator(generator func() (string, error)) RepositoryOption {
 			repository.sessionID = generator
 		}
 	}
+}
+
+func (r *Repository) RegisterUser(ctx context.Context, command types.RegisterUserCommand, passwordHash string, createdAt time.Time) (types.RegisterUserResult, error) {
+	if r.pool == nil {
+		return types.RegisterUserResult{}, types.NewDBWriteFailed("identity repository is not configured")
+	}
+	var row struct {
+		TenantID  types.TenantID
+		UserID    types.UserID
+		Status    types.UserStatus
+		CreatedAt time.Time
+	}
+	err := r.pool.QueryRow(ctx, `
+INSERT INTO identity_users (
+    tenant_id,
+    user_id,
+    status,
+    password_hash,
+    password_updated_at,
+    created_at,
+    updated_at
+) VALUES ($1, $2, 'ACTIVE', $3, $4, $4, $4)
+RETURNING tenant_id, user_id, status, created_at
+`, command.TenantID, command.UserID, passwordHash, createdAt).Scan(
+		&row.TenantID,
+		&row.UserID,
+		&row.Status,
+		&row.CreatedAt,
+	)
+	if isUniqueViolation(err) {
+		return types.RegisterUserResult{}, types.NewUserAlreadyExists("user already exists")
+	}
+	if err != nil {
+		return types.RegisterUserResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.RegisterUserResult{
+		TenantID:        row.TenantID,
+		UserID:          row.UserID,
+		Status:          row.Status,
+		CreatedAtUnixMS: row.CreatedAt.UnixMilli(),
+	}, nil
 }
 
 func (r *Repository) GetUserCredential(ctx context.Context, tenantID types.TenantID, userID types.UserID) (types.UserCredential, error) {
@@ -927,6 +970,11 @@ WHERE tenant_id = $1
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 func lockDevice(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, deviceID types.DeviceID) error {

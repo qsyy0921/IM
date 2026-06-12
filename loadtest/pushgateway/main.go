@@ -381,8 +381,8 @@ func parseConfig() config {
 	flag.StringVar(&cfg.pushAuthTokenSigningSecret, "push-auth-token-signing-secret", "", "optional HMAC secret used only for signing smoke tokens; defaults to --push-auth-hmac-secret")
 	flag.DurationVar(&cfg.pushAuthTokenTTL, "push-auth-token-ttl", 10*time.Minute, "TTL for generated push gateway HMAC smoke tokens")
 	flag.StringVar(&cfg.identityGatewayTokenFormat, "identity-gateway-token-format", "legacy", "identity-service gateway token format used by smoke environment: legacy or jwt")
-	flag.StringVar(&cfg.identityTokenMethod, "identity-token-method", "issue_gateway_token", "identity-service token method: issue_gateway_token or login")
-	flag.StringVar(&cfg.identityLoginPassword, "identity-login-password", "push-smoke-password", "password used when --identity-token-method=login")
+	flag.StringVar(&cfg.identityTokenMethod, "identity-token-method", "issue_gateway_token", "identity-service token method: issue_gateway_token, login, or register_login")
+	flag.StringVar(&cfg.identityLoginPassword, "identity-login-password", "push-smoke-password", "password used when --identity-token-method=login or register_login")
 	flag.StringVar(&cfg.redisKeyPrefix, "redis-key-prefix", "", "Redis route key prefix used by the smoke environment")
 	flag.StringVar(&cfg.pushWSGatewayID, "push-ws-gateway-id", "", "WebSocket gateway id used by cross-instance route smoke")
 	flag.StringVar(&cfg.pushReconnectGatewayID, "push-reconnect-gateway-id", "", "reconnect WebSocket gateway id used by cross-instance resume smoke")
@@ -434,11 +434,11 @@ func run(cfg config) error {
 	if cfg.pushAuthMode == "hmac" && strings.TrimSpace(cfg.pushAuthHMACSecret) == "" {
 		return fmt.Errorf("--push-auth-hmac-secret is required when --push-auth-mode=hmac")
 	}
-	if strings.TrimSpace(cfg.identityTarget) != "" && cfg.identityTokenMethod != "issue_gateway_token" && cfg.identityTokenMethod != "login" {
-		return fmt.Errorf("--identity-token-method must be issue_gateway_token or login")
+	if strings.TrimSpace(cfg.identityTarget) != "" && cfg.identityTokenMethod != "issue_gateway_token" && cfg.identityTokenMethod != "login" && cfg.identityTokenMethod != "register_login" {
+		return fmt.Errorf("--identity-token-method must be issue_gateway_token, login, or register_login")
 	}
-	if strings.TrimSpace(cfg.identityTarget) != "" && cfg.identityTokenMethod == "login" && strings.TrimSpace(cfg.identityLoginPassword) == "" {
-		return fmt.Errorf("--identity-login-password is required when --identity-token-method=login")
+	if strings.TrimSpace(cfg.identityTarget) != "" && (cfg.identityTokenMethod == "login" || cfg.identityTokenMethod == "register_login") && strings.TrimSpace(cfg.identityLoginPassword) == "" {
+		return fmt.Errorf("--identity-login-password is required when --identity-token-method=login or register_login")
 	}
 	if cfg.pushAuthTokenTTL <= 0 {
 		return fmt.Errorf("--push-auth-token-ttl must be positive")
@@ -467,6 +467,11 @@ func run(cfg config) error {
 	}
 	if err := seedConversation(ctx, pool, cfg); err != nil {
 		return err
+	}
+	if strings.TrimSpace(cfg.identityTarget) != "" && cfg.identityTokenMethod == "register_login" {
+		if err := registerIdentityCredential(ctx, cfg); err != nil {
+			return err
+		}
 	}
 	if strings.TrimSpace(cfg.identityTarget) != "" && cfg.identityTokenMethod == "login" {
 		if err := seedIdentityCredential(ctx, pool, cfg); err != nil {
@@ -1466,7 +1471,7 @@ func gatewayToken(ctx context.Context, cfg config, deviceID string) (string, err
 func gatewayTokenDetails(ctx context.Context, cfg config, deviceID string) (gatewayTokenResult, error) {
 	if strings.TrimSpace(cfg.identityTarget) != "" {
 		switch cfg.identityTokenMethod {
-		case "login":
+		case "login", "register_login":
 			return loginGatewayToken(ctx, cfg, deviceID)
 		default:
 			return issueGatewayToken(ctx, cfg, deviceID)
@@ -1533,6 +1538,27 @@ func loginGatewayToken(ctx context.Context, cfg config, deviceID string) (gatewa
 		return gatewayTokenResult{}, errors.New("identity-service login returned empty refresh token")
 	}
 	return gatewayTokenResult{Token: response.GetGatewayToken(), SessionID: response.GetSessionId()}, nil
+}
+
+func registerIdentityCredential(ctx context.Context, cfg config) error {
+	conn, err := grpc.NewClient(cfg.identityTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("dial identity-service: %w", err)
+	}
+	defer conn.Close()
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	_, err = identityv1.NewIdentityServiceClient(conn).RegisterUser(requestCtx, &identityv1.RegisterUserRequest{
+		TenantId:  cfg.tenantID,
+		UserId:    cfg.receiverUserID,
+		Password:  cfg.identityLoginPassword,
+		TraceId:   "push-smoke-auth-register",
+		RequestId: "push-smoke-identity-register",
+	})
+	if err != nil {
+		return fmt.Errorf("identity register user: %w", err)
+	}
+	return nil
 }
 
 func revokeIdentityDevice(ctx context.Context, cfg config) error {
@@ -1612,10 +1638,14 @@ func pushAuthTokenSource(cfg config) string {
 		return "query_identity"
 	}
 	if strings.TrimSpace(cfg.identityTarget) != "" {
-		if cfg.identityTokenMethod == "login" {
+		switch cfg.identityTokenMethod {
+		case "login":
 			return "identity_service_login"
+		case "register_login":
+			return "identity_service_register_login"
+		default:
+			return "identity_service"
 		}
-		return "identity_service"
 	}
 	return "local_hmac"
 }
@@ -1645,6 +1675,8 @@ func normalizeIdentityTokenMethod(value string) string {
 		return "issue_gateway_token"
 	case "login":
 		return "login"
+	case "register", "register_login", "register_then_login":
+		return "register_login"
 	default:
 		return value
 	}

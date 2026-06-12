@@ -22,7 +22,7 @@ param(
     [string]$PushAuthTokenSigningSecret = "",
     [ValidateSet("legacy", "jwt")]
     [string]$IdentityGatewayTokenFormat = "legacy",
-    [ValidateSet("issue_gateway_token", "login")]
+    [ValidateSet("issue_gateway_token", "login", "register_login")]
     [string]$IdentityTokenMethod = "issue_gateway_token",
     [string]$IdentityLoginPassword = "push-smoke-password",
     [string]$PushAuthTokenTtl = "10m",

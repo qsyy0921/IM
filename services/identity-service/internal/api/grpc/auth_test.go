@@ -52,6 +52,7 @@ func TestVerifiedAdminUnaryInterceptorRequiresAdminMetadataForAdminMethods(t *te
 func TestVerifiedAdminUnaryInterceptorDoesNotRequireMetadataForPublicTokenMethods(t *testing.T) {
 	interceptor := VerifiedAdminUnaryInterceptor(true)
 	for _, method := range []string{
+		"/nexusim.identity.v1.IdentityService/RegisterUser",
 		"/nexusim.identity.v1.IdentityService/Login",
 		"/nexusim.identity.v1.IdentityService/RefreshGatewayToken",
 		"/nexusim.identity.v1.IdentityService/IssueGatewayToken",
@@ -73,6 +74,9 @@ func TestVerifiedAdminUnaryInterceptorDoesNotRequireMetadataForPublicTokenMethod
 }
 
 func TestGRPCErrorMapsCredentialErrors(t *testing.T) {
+	if code := status.Code(grpcError(types.NewUserAlreadyExists("duplicate"))); code != codes.AlreadyExists {
+		t.Fatalf("expected user already exists to map to already exists, got %v", code)
+	}
 	if code := status.Code(grpcError(types.NewInvalidCredentials("bad password"))); code != codes.Unauthenticated {
 		t.Fatalf("expected invalid credentials to map to unauthenticated, got %v", code)
 	}

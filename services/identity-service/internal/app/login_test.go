@@ -8,6 +8,45 @@ import (
 	"github.com/qsyy0921/IM/services/identity-service/internal/types"
 )
 
+func TestRegisterUserUseCaseHashesPasswordBeforeWrite(t *testing.T) {
+	repository := &fakeIdentityRepository{}
+	useCase := NewRegisterUserUseCase(repository, fakePasswordHasher{hash: "hashed-password"})
+	result, err := useCase.Execute(context.Background(), types.RegisterUserCommand{
+		TenantID: "tenant-1",
+		UserID:   "user-1",
+		Password: "correct horse battery staple",
+	})
+	if err != nil {
+		t.Fatalf("register user: %v", err)
+	}
+	if !repository.registerCalled {
+		t.Fatal("expected repository register to be called")
+	}
+	if repository.registerPasswordHash != "hashed-password" {
+		t.Fatalf("expected hashed password to be stored, got %q", repository.registerPasswordHash)
+	}
+	if result.Status != types.UserStatusActive {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func TestRegisterUserUseCaseRejectsShortPasswordBeforeHash(t *testing.T) {
+	repository := &fakeIdentityRepository{}
+	hasher := fakePasswordHasher{hash: "hashed-password"}
+	useCase := NewRegisterUserUseCase(repository, hasher)
+	_, err := useCase.Execute(context.Background(), types.RegisterUserCommand{
+		TenantID: "tenant-1",
+		UserID:   "user-1",
+		Password: "short",
+	})
+	if err == nil {
+		t.Fatal("expected short password to fail")
+	}
+	if repository.registerCalled {
+		t.Fatal("register should not be written after validation failure")
+	}
+}
+
 func TestLoginUseCaseRejectsInvalidPasswordBeforeSessionWrite(t *testing.T) {
 	repository := &fakeIdentityRepository{
 		credential: types.UserCredential{
@@ -56,11 +95,24 @@ func TestRefreshGatewayTokenUseCaseRotatesRefreshToken(t *testing.T) {
 }
 
 type fakeIdentityRepository struct {
-	credential         types.UserCredential
-	loginCalled        bool
-	refreshCalled      bool
-	presentedTokenID   types.RefreshTokenID
-	presentedTokenHash string
+	credential           types.UserCredential
+	registerCalled       bool
+	registerPasswordHash string
+	loginCalled          bool
+	refreshCalled        bool
+	presentedTokenID     types.RefreshTokenID
+	presentedTokenHash   string
+}
+
+func (repo *fakeIdentityRepository) RegisterUser(_ context.Context, command types.RegisterUserCommand, passwordHash string, createdAt time.Time) (types.RegisterUserResult, error) {
+	repo.registerCalled = true
+	repo.registerPasswordHash = passwordHash
+	return types.RegisterUserResult{
+		TenantID:        command.TenantID,
+		UserID:          command.UserID,
+		Status:          types.UserStatusActive,
+		CreatedAtUnixMS: createdAt.UnixMilli(),
+	}, nil
 }
 
 func (repo *fakeIdentityRepository) GetUserCredential(context.Context, types.TenantID, types.UserID) (types.UserCredential, error) {
@@ -123,6 +175,12 @@ type fakePasswordVerifier struct{ ok bool }
 
 func (verifier fakePasswordVerifier) VerifyPassword(string, string) bool {
 	return verifier.ok
+}
+
+type fakePasswordHasher struct{ hash string }
+
+func (hasher fakePasswordHasher) HashPassword(string) (string, error) {
+	return hasher.hash, nil
 }
 
 type fakeRefreshTokenCodec struct{}

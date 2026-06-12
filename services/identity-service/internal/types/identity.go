@@ -8,6 +8,7 @@ type RefreshTokenID string
 
 type DeviceStatus string
 type SessionStatus string
+type UserStatus string
 
 const (
 	DeviceStatusActive  DeviceStatus = "ACTIVE"
@@ -15,6 +16,8 @@ const (
 
 	SessionStatusActive  SessionStatus = "ACTIVE"
 	SessionStatusRevoked SessionStatus = "REVOKED"
+
+	UserStatusActive UserStatus = "ACTIVE"
 )
 
 type AdminContext struct {
@@ -32,6 +35,21 @@ func (ctx AdminContext) Validate() error {
 		return NewInvalidArgument("operator_user_id is required")
 	}
 	return nil
+}
+
+type RegisterUserCommand struct {
+	TenantID  TenantID
+	UserID    UserID
+	Password  string
+	TraceID   string
+	RequestID string
+}
+
+type RegisterUserResult struct {
+	TenantID        TenantID
+	UserID          UserID
+	Status          UserStatus
+	CreatedAtUnixMS int64
 }
 
 type IssueGatewayTokenCommand struct {

@@ -79,6 +79,7 @@ func runGRPC() error {
 		return err
 	}
 	identitygrpc.Register(server, identitygrpc.NewServer(
+		app.NewRegisterUserUseCase(repository, passwords),
 		app.NewLoginUseCase(repository, signer, passwords, refreshTokens),
 		app.NewRefreshGatewayTokenUseCase(repository, signer, refreshTokens),
 		app.NewIssueGatewayTokenUseCase(repository, signer),

@@ -8,6 +8,7 @@ import (
 )
 
 type Repository interface {
+	RegisterUser(context.Context, types.RegisterUserCommand, string, time.Time) (types.RegisterUserResult, error)
 	GetUserCredential(context.Context, types.TenantID, types.UserID) (types.UserCredential, error)
 	LoginGatewaySession(context.Context, types.LoginCommand, types.RefreshTokenRecord, time.Time, time.Time, time.Time) (types.LoginResult, error)
 	RefreshGatewaySession(context.Context, types.RefreshGatewayTokenCommand, types.RefreshTokenID, string, types.RefreshTokenRecord, time.Time, time.Time, time.Time) (types.RefreshGatewayTokenResult, error)
@@ -23,6 +24,10 @@ type TokenSigner interface {
 
 type PasswordVerifier interface {
 	VerifyPassword(password string, passwordHash string) bool
+}
+
+type PasswordHasher interface {
+	HashPassword(password string) (string, error)
 }
 
 type RefreshTokenCodec interface {

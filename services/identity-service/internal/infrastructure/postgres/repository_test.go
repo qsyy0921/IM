@@ -319,6 +319,54 @@ func TestRepositoryRefreshAllowsMFAAuthenticatedSessionIntegration(t *testing.T)
 	assertSessionMFAProof(t, ctx, pool, "session-mfa-login", "TOTP", "mfa-factor-refresh")
 }
 
+func TestRepositorySessionMFAProofConstraintsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	now := time.Unix(1_800_000_000, 0).UTC()
+
+	validCases := []struct {
+		name       string
+		sessionID  string
+		method     string
+		factorID   string
+		verifiedAt any
+	}{
+		{name: "empty proof", sessionID: "session-proof-empty", method: "", factorID: "", verifiedAt: nil},
+		{name: "totp proof", sessionID: "session-proof-totp", method: "TOTP", factorID: "mfa-factor-1", verifiedAt: now},
+		{name: "recovery proof", sessionID: "session-proof-recovery", method: "RECOVERY_CODE", factorID: "", verifiedAt: now},
+	}
+	for _, tc := range validCases {
+		t.Run("valid "+tc.name, func(t *testing.T) {
+			if err := insertSessionProof(ctx, pool, tc.sessionID, tc.method, tc.factorID, tc.verifiedAt, now); err != nil {
+				t.Fatalf("insert valid proof %s: %v", tc.name, err)
+			}
+		})
+	}
+
+	invalidCases := []struct {
+		name       string
+		sessionID  string
+		method     string
+		factorID   string
+		verifiedAt any
+	}{
+		{name: "empty method with verified time", sessionID: "session-proof-invalid-empty-time", method: "", factorID: "", verifiedAt: now},
+		{name: "empty method with factor", sessionID: "session-proof-invalid-empty-factor", method: "", factorID: "mfa-factor-1", verifiedAt: nil},
+		{name: "totp without verified time", sessionID: "session-proof-invalid-totp-time", method: "TOTP", factorID: "mfa-factor-1", verifiedAt: nil},
+		{name: "totp without factor", sessionID: "session-proof-invalid-totp-factor", method: "TOTP", factorID: "", verifiedAt: now},
+		{name: "recovery without verified time", sessionID: "session-proof-invalid-recovery-time", method: "RECOVERY_CODE", factorID: "", verifiedAt: nil},
+		{name: "recovery with factor", sessionID: "session-proof-invalid-recovery-factor", method: "RECOVERY_CODE", factorID: "mfa-factor-1", verifiedAt: now},
+	}
+	for _, tc := range invalidCases {
+		t.Run("invalid "+tc.name, func(t *testing.T) {
+			if err := insertSessionProof(ctx, pool, tc.sessionID, tc.method, tc.factorID, tc.verifiedAt, now); err == nil {
+				t.Fatalf("expected invalid proof %s to fail", tc.name)
+			}
+		})
+	}
+}
+
 func TestRepositoryVerificationAndPasswordResetChallengesIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -1211,6 +1259,25 @@ WHERE tenant_id = 'tenant-identity'
 	if wantMethod != "" && verifiedAt.Equal(emptyTime) {
 		t.Fatal("expected mfa verified time to be set")
 	}
+}
+
+func insertSessionProof(ctx context.Context, pool *pgxpool.Pool, sessionID string, method string, factorID string, verifiedAt any, now time.Time) error {
+	_, err := pool.Exec(ctx, `
+INSERT INTO identity_sessions (
+    tenant_id,
+    user_id,
+    device_id,
+    session_id,
+    status,
+    audience,
+    issued_at,
+    expires_at,
+    mfa_verified_at,
+    mfa_method,
+    mfa_factor_id
+) VALUES ('tenant-identity', 'user-1', 'device-1', $1, 'ACTIVE', 'push-gateway', $2, $3, $4, $5, $6)
+`, sessionID, now, now.Add(15*time.Minute), verifiedAt, method, factorID)
+	return err
 }
 
 func assertLoginRisk(t *testing.T, ctx context.Context, pool *pgxpool.Pool, wantFailedCount int, wantLocked bool) {

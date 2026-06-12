@@ -170,6 +170,7 @@ MFA factor rules:
 - `identity_mfa_factors.login_failed_count`, `login_failed_last_at` and `login_locked_until` are factor-level Login risk state, not global account lock state;
 - `identity_users.mfa_recovery_failed_count`, `mfa_recovery_failed_last_at` and `mfa_recovery_locked_until` are user-level MFA recovery-code Login risk state, not password lock state;
 - successful MFA Login clears the selected factor's Login failure state and updates `last_used_at` in the same PostgreSQL transaction that writes session / refresh-token state;
+- session MFA proof fields are protected by database constraints: empty `mfa_method` cannot carry proof data, TOTP proof requires `mfa_verified_at` and `mfa_factor_id`, and recovery-code proof requires `mfa_verified_at` with no TOTP factor id;
 - `NEXUSIM_IDENTITY_MFA_SECRET_KEY` is the local AES-GCM encryption key input; local smoke may fall back to the existing gateway token secret, but production profiles should use a dedicated secret managed by KMS/HSM. If no MFA key is configured, the service still starts and existing Login/JWKS flows are unaffected, but MFA factor RPCs and MFA-protected Login return stable `MFA_UNAVAILABLE` / `mfa temporarily unavailable` until the key is configured.
 - `NEXUSIM_IDENTITY_MFA_RECOVERY_CODE_SECRET` is the preferred HMAC secret for recovery-code hashes. Local smoke may fall back to `NEXUSIM_IDENTITY_MFA_SECRET_KEY`; it does not fall back to gateway / push token secrets.
 

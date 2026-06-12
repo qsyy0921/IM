@@ -2236,29 +2236,6 @@ FOR UPDATE
 	return nil
 }
 
-func ensureRefreshSessionActive(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, deviceID types.DeviceID, sessionID types.SessionID) error {
-	var status types.SessionStatus
-	err := tx.QueryRow(ctx, `
-SELECT status
-FROM identity_sessions
-WHERE tenant_id = $1
-  AND user_id = $2
-  AND device_id = $3
-  AND session_id = $4
-FOR UPDATE
-`, tenantID, userID, deviceID, sessionID).Scan(&status)
-	if err == pgx.ErrNoRows {
-		return types.NewSessionNotFound("session not found")
-	}
-	if err != nil {
-		return types.NewDBReadFailed(err.Error())
-	}
-	if status == types.SessionStatusRevoked {
-		return types.NewSessionRevoked("session is revoked")
-	}
-	return nil
-}
-
 func lockRefreshSession(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, deviceID types.DeviceID, sessionID types.SessionID) (sessionMFAProof, error) {
 	var status types.SessionStatus
 	var verifiedAt time.Time

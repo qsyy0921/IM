@@ -166,15 +166,16 @@ type IdentitySnapshot struct {
 }
 
 type ChallengeDeliveryOutboxSnapshot struct {
-	Total            int64 `json:"total"`
-	Pending          int64 `json:"pending"`
-	PendingReady     int64 `json:"pending_ready"`
-	PendingScheduled int64 `json:"pending_scheduled"`
-	PendingExpired   int64 `json:"pending_expired"`
-	Delivered        int64 `json:"delivered"`
-	DLQ              int64 `json:"dlq"`
-	Canceled         int64 `json:"canceled"`
-	MaxPendingRetry  int64 `json:"max_pending_retry"`
+	Total            int64            `json:"total"`
+	Pending          int64            `json:"pending"`
+	PendingReady     int64            `json:"pending_ready"`
+	PendingScheduled int64            `json:"pending_scheduled"`
+	PendingExpired   int64            `json:"pending_expired"`
+	Delivered        int64            `json:"delivered"`
+	DLQ              int64            `json:"dlq"`
+	Canceled         int64            `json:"canceled"`
+	MaxPendingRetry  int64            `json:"max_pending_retry"`
+	FailureClasses   map[string]int64 `json:"failure_classes,omitempty"`
 }
 
 func queryIdentitySnapshot(ctx context.Context, pool *pgxpool.Pool) (IdentitySnapshot, error) {
@@ -245,6 +246,31 @@ FROM identity_challenge_delivery_outbox
 		&snapshot.MaxPendingRetry,
 	)
 	if err != nil {
+		return ChallengeDeliveryOutboxSnapshot{}, err
+	}
+	rows, err := pool.Query(ctx, `
+SELECT failure_class, COUNT(*)
+FROM identity_challenge_delivery_outbox
+WHERE failure_class <> ''
+GROUP BY failure_class
+ORDER BY failure_class
+`)
+	if err != nil {
+		return ChallengeDeliveryOutboxSnapshot{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var failureClass string
+		var count int64
+		if err := rows.Scan(&failureClass, &count); err != nil {
+			return ChallengeDeliveryOutboxSnapshot{}, err
+		}
+		if snapshot.FailureClasses == nil {
+			snapshot.FailureClasses = make(map[string]int64)
+		}
+		snapshot.FailureClasses[failureClass] = count
+	}
+	if err := rows.Err(); err != nil {
 		return ChallengeDeliveryOutboxSnapshot{}, err
 	}
 	return snapshot, nil

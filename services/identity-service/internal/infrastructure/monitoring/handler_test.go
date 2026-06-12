@@ -182,14 +182,16 @@ func TestQueryChallengeDeliveryOutboxSnapshotIntegration(t *testing.T) {
 	secretCiphertext := "ciphertext-do-not-leak"
 	secretDestination := "user1@example.com"
 	rows := []struct {
-		challengeID string
-		status      string
-		retryCount  int
-		availableAt time.Time
-		nextRetryAt any
-		expiresAt   time.Time
-		deliveredAt any
-		dlqAt       any
+		challengeID  string
+		status       string
+		retryCount   int
+		failureClass string
+		lastError    string
+		availableAt  time.Time
+		nextRetryAt  any
+		expiresAt    time.Time
+		deliveredAt  any
+		dlqAt        any
 	}{
 		{
 			challengeID: "delivery-ready",
@@ -221,21 +223,24 @@ func TestQueryChallengeDeliveryOutboxSnapshotIntegration(t *testing.T) {
 			deliveredAt: now.Add(-time.Minute),
 		},
 		{
-			challengeID: "delivery-dlq",
-			status:      "DLQ",
-			availableAt: now.Add(-time.Hour),
-			expiresAt:   now.Add(time.Hour),
-			dlqAt:       now.Add(-time.Minute),
+			challengeID:  "delivery-dlq",
+			status:       "DLQ",
+			failureClass: "provider_non_success",
+			lastError:    "provider body secret-token provider.example user1@example.com",
+			availableAt:  now.Add(-time.Hour),
+			expiresAt:    now.Add(time.Hour),
+			dlqAt:        now.Add(-time.Minute),
 		},
 		{
-			challengeID: "delivery-canceled",
-			status:      "CANCELED",
-			availableAt: now.Add(-time.Hour),
-			expiresAt:   now.Add(time.Hour),
+			challengeID:  "delivery-canceled",
+			status:       "CANCELED",
+			failureClass: "inactive",
+			availableAt:  now.Add(-time.Hour),
+			expiresAt:    now.Add(time.Hour),
 		},
 	}
 	for _, row := range rows {
-		seedMonitoringChallengeDeliveryOutbox(t, ctx, pool, row.challengeID, secretDestination, secretCiphertext, now, row.expiresAt, row.status, row.retryCount, row.availableAt, row.nextRetryAt, row.deliveredAt, row.dlqAt)
+		seedMonitoringChallengeDeliveryOutbox(t, ctx, pool, row.challengeID, secretDestination, secretCiphertext, now, row.expiresAt, row.status, row.retryCount, row.failureClass, row.lastError, row.availableAt, row.nextRetryAt, row.deliveredAt, row.dlqAt)
 	}
 
 	snapshot, err := queryChallengeDeliveryOutboxSnapshot(ctx, pool)
@@ -250,7 +255,9 @@ func TestQueryChallengeDeliveryOutboxSnapshotIntegration(t *testing.T) {
 		snapshot.Delivered != 1 ||
 		snapshot.DLQ != 1 ||
 		snapshot.Canceled != 1 ||
-		snapshot.MaxPendingRetry != 3 {
+		snapshot.MaxPendingRetry != 3 ||
+		snapshot.FailureClasses["provider_non_success"] != 1 ||
+		snapshot.FailureClasses["inactive"] != 1 {
 		t.Fatalf("unexpected challenge delivery outbox snapshot: %+v", snapshot)
 	}
 
@@ -258,14 +265,20 @@ func TestQueryChallengeDeliveryOutboxSnapshotIntegration(t *testing.T) {
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/debug/metrics", nil))
 	body := response.Body.String()
-	if strings.Contains(body, secretCiphertext) || strings.Contains(body, secretDestination) {
+	if strings.Contains(body, secretCiphertext) ||
+		strings.Contains(body, secretDestination) ||
+		strings.Contains(body, "secret-token") ||
+		strings.Contains(body, "provider.example") {
 		t.Fatalf("challenge delivery outbox metrics leaked delivery payload data: %s", body)
 	}
 	var metrics Snapshot
 	if err := json.Unmarshal([]byte(body), &metrics); err != nil {
 		t.Fatalf("decode metrics: %v", err)
 	}
-	if metrics.ChallengeDeliveryOutbox == nil || metrics.ChallengeDeliveryOutbox.Total != 6 || metrics.ChallengeDeliveryOutbox.DLQ != 1 {
+	if metrics.ChallengeDeliveryOutbox == nil ||
+		metrics.ChallengeDeliveryOutbox.Total != 6 ||
+		metrics.ChallengeDeliveryOutbox.DLQ != 1 ||
+		metrics.ChallengeDeliveryOutbox.FailureClasses["provider_non_success"] != 1 {
 		t.Fatalf("expected challenge delivery outbox metrics, got %+v", metrics.ChallengeDeliveryOutbox)
 	}
 }
@@ -281,6 +294,8 @@ func seedMonitoringChallengeDeliveryOutbox(
 	expiresAt time.Time,
 	status string,
 	retryCount int,
+	failureClass string,
+	lastError string,
 	availableAt time.Time,
 	nextRetryAt any,
 	deliveredAt any,
@@ -322,14 +337,16 @@ INSERT INTO identity_challenge_delivery_outbox (
     expires_at,
     status,
     retry_count,
+    failure_class,
+    last_error,
     available_at,
     next_retry_at,
     delivered_at,
     dead_lettered_at,
     created_at,
     updated_at
-) VALUES ($1, 'user-1', $2, 'EMAIL_VERIFICATION', 'EMAIL', $3, $4, 'nonce', 'local-v1', $5, $6, $7, $8, $9, $10, $11, $12, $12)
-`, "tenant-identity", challengeID, destination, tokenCiphertext, expiresAt, status, retryCount, availableAt, nextRetryAt, deliveredAt, dlqAt, createdAt); err != nil {
+) VALUES ($1, 'user-1', $2, 'EMAIL_VERIFICATION', 'EMAIL', $3, $4, 'nonce', 'local-v1', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14)
+`, "tenant-identity", challengeID, destination, tokenCiphertext, expiresAt, status, retryCount, failureClass, lastError, availableAt, nextRetryAt, deliveredAt, dlqAt, createdAt); err != nil {
 		t.Fatalf("seed challenge delivery outbox %s: %v", challengeID, err)
 	}
 }

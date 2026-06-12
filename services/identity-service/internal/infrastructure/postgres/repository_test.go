@@ -734,7 +734,8 @@ func TestRepositoryChallengeDeliveryStatusIntegration(t *testing.T) {
 		successState.DeliveryAttemptCount != 1 ||
 		successState.DeliveredAt == nil ||
 		successState.DeliveryFailedAt != nil ||
-		successState.DeliveryLastError != "" {
+		successState.DeliveryLastError != "" ||
+		successState.DeliveryFailureClass != "" {
 		t.Fatalf("unexpected delivered challenge state: %+v", successState)
 	}
 
@@ -759,7 +760,8 @@ func TestRepositoryChallengeDeliveryStatusIntegration(t *testing.T) {
 		failedState.DeliveryStatus != "FAILED" ||
 		failedState.DeliveryAttemptCount != 1 ||
 		failedState.DeliveryFailedAt == nil ||
-		len(failedState.DeliveryLastError) != 256 {
+		len(failedState.DeliveryLastError) != 256 ||
+		failedState.DeliveryFailureClass != types.ChallengeDeliveryFailureClassDeliveryFailed {
 		t.Fatalf("unexpected failed challenge state: %+v", failedState)
 	}
 	_, err = repository.ConfirmPasswordReset(ctx, types.ConfirmPasswordResetCommand{
@@ -2010,6 +2012,7 @@ type challengeDeliveryState struct {
 	DeliveredAt          *time.Time
 	DeliveryFailedAt     *time.Time
 	DeliveryLastError    string
+	DeliveryFailureClass string
 }
 
 func readChallengeDeliveryState(t *testing.T, ctx context.Context, pool *pgxpool.Pool, challengeID string) challengeDeliveryState {
@@ -2022,7 +2025,8 @@ SELECT
     delivery_attempt_count,
     delivered_at,
     delivery_failed_at,
-    delivery_last_error
+    delivery_last_error,
+    delivery_failure_class
 FROM identity_challenges
 WHERE tenant_id = 'tenant-identity'
   AND user_id = 'user-1'
@@ -2034,6 +2038,7 @@ WHERE tenant_id = 'tenant-identity'
 		&state.DeliveredAt,
 		&state.DeliveryFailedAt,
 		&state.DeliveryLastError,
+		&state.DeliveryFailureClass,
 	)
 	if err != nil {
 		t.Fatalf("read challenge delivery state: %v", err)

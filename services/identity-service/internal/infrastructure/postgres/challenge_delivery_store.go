@@ -92,14 +92,14 @@ func (store *ChallengeDeliveryStore) ProcessReadyBatch(
 		if err := deliveryErrors[index]; err != nil {
 			attempt := message.RetryCount + 1
 			if attempt >= maxAttempts {
-				if markErr := store.markDeadLettered(ctx, tx, message, attempt, err.Error(), now); markErr != nil {
+				if markErr := store.markDeadLettered(ctx, tx, message, attempt, err, now); markErr != nil {
 					return types.ChallengeDeliveryStats{}, markErr
 				}
 				stats.DeadLettered++
 				continue
 			}
 			nextRetryAt := now.Add(retryDelay(retryBaseDelay, attempt))
-			if markErr := store.markRetry(ctx, tx, message, attempt, err.Error(), nextRetryAt, now); markErr != nil {
+			if markErr := store.markRetry(ctx, tx, message, attempt, err, nextRetryAt, now); markErr != nil {
 				return types.ChallengeDeliveryStats{}, markErr
 			}
 			stats.Retried++
@@ -209,6 +209,7 @@ FOR UPDATE OF current, challenge SKIP LOCKED
 UPDATE identity_challenge_delivery_outbox
 SET status = 'CANCELED',
     last_error = 'challenge no longer active before delivery',
+    failure_class = 'inactive',
     next_retry_at = NULL,
     updated_at = $2
 WHERE id = $1
@@ -221,6 +222,7 @@ SET status = CASE WHEN status = 'ACTIVE' THEN 'EXPIRED' ELSE status END,
     delivery_status = 'FAILED',
     delivery_failed_at = $4,
     delivery_last_error = 'challenge no longer active before delivery',
+    delivery_failure_class = 'inactive',
     updated_at = $4
 WHERE tenant_id = $1
   AND user_id = $2
@@ -305,6 +307,7 @@ UPDATE identity_challenge_delivery_outbox
 SET status = 'DELIVERED',
     delivered_at = $2,
     last_error = '',
+    failure_class = '',
     next_retry_at = NULL,
     updated_at = $2
 WHERE id = $1
@@ -322,6 +325,7 @@ SET delivery_status = 'DELIVERED',
     delivered_at = $4,
     delivery_failed_at = NULL,
     delivery_last_error = '',
+    delivery_failure_class = '',
     updated_at = $4
 WHERE tenant_id = $1
   AND user_id = $2
@@ -333,16 +337,18 @@ WHERE tenant_id = $1
 	return nil
 }
 
-func (store *ChallengeDeliveryStore) markRetry(ctx context.Context, tx pgx.Tx, message types.ChallengeDeliveryMessage, retryCount int, lastError string, nextRetryAt time.Time, failedAt time.Time) error {
-	lastError = sanitizeChallengeDeliveryError(lastError)
+func (store *ChallengeDeliveryStore) markRetry(ctx context.Context, tx pgx.Tx, message types.ChallengeDeliveryMessage, retryCount int, deliveryErr error, nextRetryAt time.Time, failedAt time.Time) error {
+	lastError := sanitizeChallengeDeliveryError(deliveryErr.Error())
+	failureClass := types.ClassifyChallengeDeliveryFailure(deliveryErr)
 	_, err := tx.Exec(ctx, `
 UPDATE identity_challenge_delivery_outbox
 SET retry_count = $2,
     last_error = $3,
     next_retry_at = $4,
-    updated_at = $5
+    updated_at = $5,
+    failure_class = $6
 WHERE id = $1
-`, message.ID, retryCount, lastError, nextRetryAt, failedAt)
+`, message.ID, retryCount, lastError, nextRetryAt, failedAt, failureClass)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -351,29 +357,32 @@ UPDATE identity_challenges
 SET delivery_attempt_count = delivery_attempt_count + 1,
     delivery_failed_at = $4,
     delivery_last_error = $5,
+    delivery_failure_class = $6,
     updated_at = $4
 WHERE tenant_id = $1
   AND user_id = $2
   AND challenge_id = $3
-`, message.TenantID, message.UserID, message.ChallengeID, failedAt, lastError)
+`, message.TenantID, message.UserID, message.ChallengeID, failedAt, lastError, failureClass)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
 }
 
-func (store *ChallengeDeliveryStore) markDeadLettered(ctx context.Context, tx pgx.Tx, message types.ChallengeDeliveryMessage, retryCount int, lastError string, deadLetteredAt time.Time) error {
-	lastError = sanitizeChallengeDeliveryError(lastError)
+func (store *ChallengeDeliveryStore) markDeadLettered(ctx context.Context, tx pgx.Tx, message types.ChallengeDeliveryMessage, retryCount int, deliveryErr error, deadLetteredAt time.Time) error {
+	lastError := sanitizeChallengeDeliveryError(deliveryErr.Error())
+	failureClass := types.ClassifyChallengeDeliveryFailure(deliveryErr)
 	_, err := tx.Exec(ctx, `
 UPDATE identity_challenge_delivery_outbox
 SET status = 'DLQ',
     retry_count = $2,
     last_error = $3,
+    failure_class = $5,
     next_retry_at = NULL,
     dead_lettered_at = $4,
     updated_at = $4
 WHERE id = $1
-`, message.ID, retryCount, lastError, deadLetteredAt)
+`, message.ID, retryCount, lastError, deadLetteredAt, failureClass)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -385,11 +394,12 @@ SET status = CASE WHEN status = 'ACTIVE' THEN 'EXPIRED' ELSE status END,
     delivered_at = NULL,
     delivery_failed_at = $4,
     delivery_last_error = $5,
+    delivery_failure_class = $6,
     updated_at = $4
 WHERE tenant_id = $1
   AND user_id = $2
   AND challenge_id = $3
-`, message.TenantID, message.UserID, message.ChallengeID, deadLetteredAt, lastError)
+`, message.TenantID, message.UserID, message.ChallengeID, deadLetteredAt, lastError, failureClass)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -407,6 +417,7 @@ type challengeDeliveryRepairRow struct {
 	deliveryStatus          string
 	retryCount              int
 	lastError               string
+	failureClass            string
 	deadLetteredAt          *time.Time
 	deliveryExpiresAt       time.Time
 	challengeStatus         string
@@ -460,6 +471,7 @@ type plannedChallengeDeliveryRepair struct {
 	newDeliveryStatus               string
 	newChallengeStatus              string
 	newChallengeDeliveryStatus      string
+	newFailureClass                 string
 	redriveActivePending            bool
 	cancelInactiveChallengeDelivery bool
 }
@@ -470,6 +482,7 @@ func (store *ChallengeDeliveryStore) planChallengeDeliveryRepair(row challengeDe
 		newDeliveryStatus:          row.deliveryStatus,
 		newChallengeStatus:         row.challengeStatus,
 		newChallengeDeliveryStatus: row.challengeDeliveryStatus,
+		newFailureClass:            row.failureClass,
 	}
 	if mode == types.ChallengeDeliveryRepairModeAudit {
 		return planned
@@ -500,6 +513,7 @@ func (store *ChallengeDeliveryStore) planChallengeDeliveryRepair(row challengeDe
 		planned.newDeliveryStatus = types.ChallengeDeliveryStatusPending
 		planned.newChallengeStatus = "ACTIVE"
 		planned.newChallengeDeliveryStatus = "PENDING"
+		planned.newFailureClass = ""
 		planned.redriveActivePending = true
 		return planned
 	case types.ChallengeDeliveryRepairModeCancelInactive:
@@ -515,6 +529,7 @@ func (store *ChallengeDeliveryStore) planChallengeDeliveryRepair(row challengeDe
 			planned.newChallengeStatus = "EXPIRED"
 		}
 		planned.newChallengeDeliveryStatus = "FAILED"
+		planned.newFailureClass = types.ChallengeDeliveryFailureClassInactive
 		planned.cancelInactiveChallengeDelivery = true
 		return planned
 	default:
@@ -538,6 +553,7 @@ SELECT
     current.status,
     current.retry_count,
     current.last_error,
+    current.failure_class,
     current.dead_lettered_at,
     current.expires_at,
     challenge.status,
@@ -561,6 +577,7 @@ FOR UPDATE OF current, challenge
 		&row.deliveryStatus,
 		&row.retryCount,
 		&row.lastError,
+		&row.failureClass,
 		&row.deadLetteredAt,
 		&row.deliveryExpiresAt,
 		&row.challengeStatus,
@@ -591,6 +608,7 @@ func (store *ChallengeDeliveryStore) redriveActivePendingDelivery(ctx context.Co
 	tag, err := tx.Exec(ctx, `
 UPDATE identity_challenge_delivery_outbox
 SET last_error = '',
+    failure_class = '',
     next_retry_at = NULL,
     available_at = $2,
     updated_at = $2
@@ -608,6 +626,7 @@ UPDATE identity_challenges
 SET delivery_status = 'PENDING',
     delivery_failed_at = NULL,
     delivery_last_error = '',
+    delivery_failure_class = '',
     updated_at = $4
 WHERE tenant_id = $1
   AND user_id = $2
@@ -627,6 +646,7 @@ func (store *ChallengeDeliveryStore) cancelSelectedInactiveDelivery(ctx context.
 UPDATE identity_challenge_delivery_outbox
 SET status = 'CANCELED',
     last_error = 'challenge no longer active before delivery',
+    failure_class = 'inactive',
     next_retry_at = NULL,
     updated_at = $2
 WHERE id = $1
@@ -643,6 +663,7 @@ SET status = CASE WHEN status = 'ACTIVE' THEN 'EXPIRED' ELSE status END,
     delivery_status = 'FAILED',
     delivery_failed_at = $4,
     delivery_last_error = 'challenge no longer active before delivery',
+    delivery_failure_class = 'inactive',
     updated_at = $4
 WHERE tenant_id = $1
   AND user_id = $2
@@ -680,10 +701,12 @@ INSERT INTO identity_challenge_delivery_repair_audit (
     previous_challenge_delivery_status,
     previous_retry_count,
     previous_last_error,
+    previous_failure_class,
     previous_dead_lettered_at,
     new_delivery_status,
     new_challenge_status,
     new_challenge_delivery_status,
+    new_failure_class,
     repair_mode,
     repair_outcome,
     skip_reason,
@@ -693,12 +716,13 @@ INSERT INTO identity_challenge_delivery_repair_audit (
     repaired_at
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-    $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+    $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+    $21, $22
 )
 `, row.id, row.tenantID, row.userID, row.challengeID,
 		row.deliveryStatus, row.challengeStatus, row.challengeDeliveryStatus,
-		row.retryCount, row.lastError, row.deadLetteredAt,
-		planned.newDeliveryStatus, planned.newChallengeStatus, planned.newChallengeDeliveryStatus,
+		row.retryCount, row.lastError, row.failureClass, row.deadLetteredAt,
+		planned.newDeliveryStatus, planned.newChallengeStatus, planned.newChallengeDeliveryStatus, planned.newFailureClass,
 		mode, outcome, planned.skipReason, dryRun, operator, reason, now)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())

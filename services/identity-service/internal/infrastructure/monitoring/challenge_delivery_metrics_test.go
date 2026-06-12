@@ -109,7 +109,7 @@ func TestChallengeDeliveryFailureClassesAreLowSensitivity(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0).UTC()
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := classifyChallengeDeliveryFailure(tc.err); got != tc.want {
+			if got := types.ClassifyChallengeDeliveryFailure(tc.err); got != tc.want {
 				t.Fatalf("expected class %q, got %q", tc.want, got)
 			}
 			metrics.record(1, tc.err, now)

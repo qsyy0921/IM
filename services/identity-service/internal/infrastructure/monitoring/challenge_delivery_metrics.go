@@ -2,7 +2,6 @@ package monitoring
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"sync"
 	"time"
@@ -73,7 +72,7 @@ func (metrics *ChallengeDeliveryMetrics) record(latencyMS int64, err error, now 
 		if metrics.failureClasses == nil {
 			metrics.failureClasses = make(map[string]int64)
 		}
-		metrics.failureClasses[classifyChallengeDeliveryFailure(err)]++
+		metrics.failureClasses[types.ClassifyChallengeDeliveryFailure(err)]++
 		metrics.lastFailureMS = now.UTC().UnixMilli()
 		return
 	}
@@ -124,40 +123,4 @@ func (notifier *InstrumentedChallengeNotifier) SendChallenge(ctx context.Context
 	completed := now()
 	notifier.metrics.record(completed.Sub(started).Milliseconds(), err, completed)
 	return err
-}
-
-func classifyChallengeDeliveryFailure(err error) string {
-	if err == nil {
-		return ""
-	}
-	if errors.Is(err, context.Canceled) {
-		return "canceled"
-	}
-	if errors.Is(err, context.DeadlineExceeded) {
-		return "timeout"
-	}
-	message := strings.ToLower(err.Error())
-	switch {
-	case strings.Contains(message, "not configured") ||
-		strings.Contains(message, "url is required") ||
-		strings.Contains(message, "key is required"):
-		return "configuration"
-	case strings.Contains(message, "non-success status"):
-		return "provider_non_success"
-	case strings.Contains(message, "timeout") ||
-		strings.Contains(message, "deadline exceeded"):
-		return "timeout"
-	case strings.Contains(message, "connection refused") ||
-		strings.Contains(message, "no such host") ||
-		strings.Contains(message, "network") ||
-		strings.Contains(message, "temporary failure"):
-		return "network"
-	case strings.Contains(message, "marshal") ||
-		strings.Contains(message, "json"):
-		return "serialization"
-	case errors.Is(err, types.ErrChallengeDeliveryFailed):
-		return "delivery_failed"
-	default:
-		return "unknown"
-	}
 }

@@ -68,9 +68,14 @@ func TestChallengeDeliveryStoreDeadLettersIntegration(t *testing.T) {
 	}
 	assertChallengeDeliveryOutboxStatus(t, ctx, pool, "challenge-dlq", "DLQ", 1)
 	state := readChallengeDeliveryState(t, ctx, pool, "challenge-dlq")
-	if state.Status != "EXPIRED" || state.DeliveryStatus != "FAILED" || state.DeliveryAttemptCount != 1 || state.DeliveryFailedAt == nil {
+	if state.Status != "EXPIRED" ||
+		state.DeliveryStatus != "FAILED" ||
+		state.DeliveryAttemptCount != 1 ||
+		state.DeliveryFailedAt == nil ||
+		state.DeliveryFailureClass != types.ChallengeDeliveryFailureClassDeliveryFailed {
 		t.Fatalf("unexpected dlq challenge state: %+v", state)
 	}
+	assertChallengeDeliveryOutboxFailureClass(t, ctx, pool, "challenge-dlq", types.ChallengeDeliveryFailureClassDeliveryFailed)
 	_, err = repository.ConfirmVerificationChallenge(ctx, types.ConfirmVerificationChallengeCommand{
 		TenantID:    "tenant-identity",
 		UserID:      "user-1",
@@ -106,9 +111,12 @@ func TestChallengeDeliveryStoreCancelsExpiredIntegration(t *testing.T) {
 	}
 	assertChallengeDeliveryOutboxStatus(t, ctx, pool, "challenge-expired", "CANCELED", 0)
 	state := readChallengeDeliveryState(t, ctx, pool, "challenge-expired")
-	if state.Status != "EXPIRED" || state.DeliveryStatus != "FAILED" {
+	if state.Status != "EXPIRED" ||
+		state.DeliveryStatus != "FAILED" ||
+		state.DeliveryFailureClass != types.ChallengeDeliveryFailureClassInactive {
 		t.Fatalf("unexpected canceled challenge state: %+v", state)
 	}
+	assertChallengeDeliveryOutboxFailureClass(t, ctx, pool, "challenge-expired", types.ChallengeDeliveryFailureClassInactive)
 }
 
 func TestChallengeDeliveryStoreRepairAuditsDLQWithoutReactivationIntegration(t *testing.T) {
@@ -148,7 +156,7 @@ func TestChallengeDeliveryStoreRepairAuditsDLQWithoutReactivationIntegration(t *
 	if state.Status != "EXPIRED" || state.DeliveryStatus != "FAILED" {
 		t.Fatalf("audit must not change dlq challenge state: %+v", state)
 	}
-	assertChallengeDeliveryRepairAudit(t, ctx, pool, deliveryID, "audit", "AUDITED", "", "DLQ", "EXPIRED", "FAILED", 1, "challenge delivery failed: provider unavailable", "DLQ", "EXPIRED", "FAILED", "provider recovered")
+	assertChallengeDeliveryRepairAudit(t, ctx, pool, deliveryID, "audit", "AUDITED", "", "DLQ", "EXPIRED", "FAILED", 1, "challenge delivery failed: provider unavailable", types.ChallengeDeliveryFailureClassDeliveryFailed, "DLQ", "EXPIRED", "FAILED", types.ChallengeDeliveryFailureClassDeliveryFailed, "provider recovered")
 
 	repairStats, err = store.RepairDeliveries(ctx, types.ChallengeDeliveryRepairOptions{
 		DeliveryIDs: []int64{deliveryID},
@@ -167,7 +175,7 @@ func TestChallengeDeliveryStoreRepairAuditsDLQWithoutReactivationIntegration(t *
 	if state.Status != "EXPIRED" || state.DeliveryStatus != "FAILED" {
 		t.Fatalf("dlq redrive must not reactivate challenge: %+v", state)
 	}
-	assertChallengeDeliveryRepairAudit(t, ctx, pool, deliveryID, "redrive-active-pending", "SKIPPED", "dlq_requires_new_challenge", "DLQ", "EXPIRED", "FAILED", 1, "challenge delivery failed: provider unavailable", "DLQ", "EXPIRED", "FAILED", "provider recovered")
+	assertChallengeDeliveryRepairAudit(t, ctx, pool, deliveryID, "redrive-active-pending", "SKIPPED", "dlq_requires_new_challenge", "DLQ", "EXPIRED", "FAILED", 1, "challenge delivery failed: provider unavailable", types.ChallengeDeliveryFailureClassDeliveryFailed, "DLQ", "EXPIRED", "FAILED", types.ChallengeDeliveryFailureClassDeliveryFailed, "provider recovered")
 	_, err = repository.ConfirmVerificationChallenge(ctx, types.ConfirmVerificationChallengeCommand{
 		TenantID:    "tenant-identity",
 		UserID:      "user-1",
@@ -198,6 +206,7 @@ func TestChallengeDeliveryStoreRepairRedrivesActivePendingIntegration(t *testing
 	}
 	deliveryID := readChallengeDeliveryOutboxID(t, ctx, pool, "challenge-redrive-pending")
 	assertChallengeDeliveryOutboxStatus(t, ctx, pool, "challenge-redrive-pending", "PENDING", 1)
+	assertChallengeDeliveryOutboxFailureClass(t, ctx, pool, "challenge-redrive-pending", types.ChallengeDeliveryFailureClassDeliveryFailed)
 
 	repairStats, err := store.RepairDeliveries(ctx, types.ChallengeDeliveryRepairOptions{
 		DeliveryIDs: []int64{deliveryID},
@@ -213,10 +222,15 @@ func TestChallengeDeliveryStoreRepairRedrivesActivePendingIntegration(t *testing
 	}
 	assertChallengeDeliveryOutboxStatus(t, ctx, pool, "challenge-redrive-pending", "PENDING", 1)
 	state := readChallengeDeliveryState(t, ctx, pool, "challenge-redrive-pending")
-	if state.Status != "ACTIVE" || state.DeliveryStatus != "PENDING" || state.DeliveryFailedAt != nil || state.DeliveryLastError != "" {
+	if state.Status != "ACTIVE" ||
+		state.DeliveryStatus != "PENDING" ||
+		state.DeliveryFailedAt != nil ||
+		state.DeliveryLastError != "" ||
+		state.DeliveryFailureClass != "" {
 		t.Fatalf("unexpected redriven challenge state: %+v", state)
 	}
-	assertChallengeDeliveryRepairAudit(t, ctx, pool, deliveryID, "redrive-active-pending", "MUTATED", "", "PENDING", "ACTIVE", "PENDING", 1, "challenge delivery failed: provider unavailable", "PENDING", "ACTIVE", "PENDING", "provider recovered")
+	assertChallengeDeliveryOutboxFailureClass(t, ctx, pool, "challenge-redrive-pending", "")
+	assertChallengeDeliveryRepairAudit(t, ctx, pool, deliveryID, "redrive-active-pending", "MUTATED", "", "PENDING", "ACTIVE", "PENDING", 1, "challenge delivery failed: provider unavailable", types.ChallengeDeliveryFailureClassDeliveryFailed, "PENDING", "ACTIVE", "PENDING", "", "provider recovered")
 
 	stats, err = store.ProcessReadyBatch(ctx, 10, 3, time.Second, func(_ context.Context, messages []types.ChallengeDeliveryMessage) []error {
 		if len(messages) != 1 || messages[0].ChallengeID != "challenge-redrive-pending" {
@@ -256,10 +270,13 @@ func TestChallengeDeliveryStoreRepairCancelsInactiveSelectedDeliveryIntegration(
 	}
 	assertChallengeDeliveryOutboxStatus(t, ctx, pool, "challenge-repair-expired", "CANCELED", 0)
 	state := readChallengeDeliveryState(t, ctx, pool, "challenge-repair-expired")
-	if state.Status != "EXPIRED" || state.DeliveryStatus != "FAILED" {
+	if state.Status != "EXPIRED" ||
+		state.DeliveryStatus != "FAILED" ||
+		state.DeliveryFailureClass != types.ChallengeDeliveryFailureClassInactive {
 		t.Fatalf("unexpected canceled challenge state: %+v", state)
 	}
-	assertChallengeDeliveryRepairAudit(t, ctx, pool, deliveryID, "cancel-inactive", "MUTATED", "", "PENDING", "ACTIVE", "PENDING", 0, "", "CANCELED", "EXPIRED", "FAILED", "manual cleanup")
+	assertChallengeDeliveryOutboxFailureClass(t, ctx, pool, "challenge-repair-expired", types.ChallengeDeliveryFailureClassInactive)
+	assertChallengeDeliveryRepairAudit(t, ctx, pool, deliveryID, "cancel-inactive", "MUTATED", "", "PENDING", "ACTIVE", "PENDING", 0, "", "", "CANCELED", "EXPIRED", "FAILED", types.ChallengeDeliveryFailureClassInactive, "manual cleanup")
 }
 
 func seedChallengeDeliveryOutbox(t *testing.T, ctx context.Context, repository *Repository, issuedAt time.Time, challengeID types.ChallengeID, expiresAt time.Time) {
@@ -310,6 +327,24 @@ WHERE tenant_id = 'tenant-identity'
 	}
 }
 
+func assertChallengeDeliveryOutboxFailureClass(t *testing.T, ctx context.Context, pool *pgxpool.Pool, challengeID string, wantFailureClass string) {
+	t.Helper()
+	var gotFailureClass string
+	err := pool.QueryRow(ctx, `
+SELECT failure_class
+FROM identity_challenge_delivery_outbox
+WHERE tenant_id = 'tenant-identity'
+  AND user_id = 'user-1'
+  AND challenge_id = $1
+`, challengeID).Scan(&gotFailureClass)
+	if err != nil {
+		t.Fatalf("read challenge delivery outbox failure class: %v", err)
+	}
+	if gotFailureClass != wantFailureClass {
+		t.Fatalf("expected delivery outbox failure_class=%q, got %q", wantFailureClass, gotFailureClass)
+	}
+}
+
 func readChallengeDeliveryOutboxID(t *testing.T, ctx context.Context, pool *pgxpool.Pool, challengeID string) int64 {
 	t.Helper()
 	var id int64
@@ -339,9 +374,11 @@ func assertChallengeDeliveryRepairAudit(
 	wantPreviousChallengeDeliveryStatus string,
 	wantPreviousRetryCount int,
 	wantPreviousLastError string,
+	wantPreviousFailureClass string,
 	wantNewDeliveryStatus string,
 	wantNewChallengeStatus string,
 	wantNewChallengeDeliveryStatus string,
+	wantNewFailureClass string,
 	wantReason string,
 ) {
 	t.Helper()
@@ -350,9 +387,11 @@ func assertChallengeDeliveryRepairAudit(
 	var previousChallengeDeliveryStatus string
 	var previousRetryCount int
 	var previousLastError string
+	var previousFailureClass string
 	var newDeliveryStatus string
 	var newChallengeStatus string
 	var newChallengeDeliveryStatus string
+	var newFailureClass string
 	var mode string
 	var outcome string
 	var skipReason string
@@ -366,9 +405,11 @@ SELECT
     previous_challenge_delivery_status,
     previous_retry_count,
     previous_last_error,
+    previous_failure_class,
     new_delivery_status,
     new_challenge_status,
     new_challenge_delivery_status,
+    new_failure_class,
     repair_mode,
     repair_outcome,
     skip_reason,
@@ -385,9 +426,11 @@ LIMIT 1
 		&previousChallengeDeliveryStatus,
 		&previousRetryCount,
 		&previousLastError,
+		&previousFailureClass,
 		&newDeliveryStatus,
 		&newChallengeStatus,
 		&newChallengeDeliveryStatus,
+		&newFailureClass,
 		&mode,
 		&outcome,
 		&skipReason,
@@ -403,24 +446,28 @@ LIMIT 1
 		previousChallengeDeliveryStatus != wantPreviousChallengeDeliveryStatus ||
 		previousRetryCount != wantPreviousRetryCount ||
 		previousLastError != wantPreviousLastError ||
+		previousFailureClass != wantPreviousFailureClass ||
 		newDeliveryStatus != wantNewDeliveryStatus ||
 		newChallengeStatus != wantNewChallengeStatus ||
 		newChallengeDeliveryStatus != wantNewChallengeDeliveryStatus ||
+		newFailureClass != wantNewFailureClass ||
 		mode != wantMode ||
 		outcome != wantOutcome ||
 		skipReason != wantSkipReason ||
 		dryRun ||
 		operator != "operator-1" ||
 		reason != wantReason {
-		t.Fatalf("unexpected repair audit: previous_delivery=%s previous_challenge=%s previous_challenge_delivery=%s previous_retry=%d previous_error=%q new_delivery=%s new_challenge=%s new_challenge_delivery=%s mode=%s outcome=%s skip=%q dry_run=%t operator=%q reason=%q",
+		t.Fatalf("unexpected repair audit: previous_delivery=%s previous_challenge=%s previous_challenge_delivery=%s previous_retry=%d previous_error=%q previous_class=%q new_delivery=%s new_challenge=%s new_challenge_delivery=%s new_class=%q mode=%s outcome=%s skip=%q dry_run=%t operator=%q reason=%q",
 			previousDeliveryStatus,
 			previousChallengeStatus,
 			previousChallengeDeliveryStatus,
 			previousRetryCount,
 			previousLastError,
+			previousFailureClass,
 			newDeliveryStatus,
 			newChallengeStatus,
 			newChallengeDeliveryStatus,
+			newFailureClass,
 			mode,
 			outcome,
 			skipReason,

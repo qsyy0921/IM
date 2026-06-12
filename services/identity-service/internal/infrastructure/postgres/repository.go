@@ -694,6 +694,7 @@ SET delivery_status = 'DELIVERED',
     delivered_at = $4,
     delivery_failed_at = NULL,
     delivery_last_error = '',
+    delivery_failure_class = '',
     updated_at = $4
 WHERE tenant_id = $1
   AND user_id = $2
@@ -726,6 +727,8 @@ func (r *Repository) RecordChallengeDeliveryFailure(
 	if _, err := lockIdentityChallenge(ctx, tx, tenantID, userID, challengeID); err != nil {
 		return err
 	}
+	lastError = sanitizeChallengeDeliveryError(lastError)
+	failureClass := types.ClassifyChallengeDeliveryFailureMessage(lastError, true)
 	if _, err := tx.Exec(ctx, `
 UPDATE identity_challenges
 SET status = CASE WHEN status = 'ACTIVE' THEN 'EXPIRED' ELSE status END,
@@ -734,11 +737,12 @@ SET status = CASE WHEN status = 'ACTIVE' THEN 'EXPIRED' ELSE status END,
     delivered_at = NULL,
     delivery_failed_at = $5,
     delivery_last_error = $4,
+    delivery_failure_class = $6,
     updated_at = $5
 WHERE tenant_id = $1
   AND user_id = $2
   AND challenge_id = $3
-`, tenantID, userID, challengeID, sanitizeChallengeDeliveryError(lastError), failedAt); err != nil {
+`, tenantID, userID, challengeID, lastError, failedAt, failureClass); err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
 	if err := tx.Commit(ctx); err != nil {

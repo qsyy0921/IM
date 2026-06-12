@@ -85,17 +85,18 @@ type IssueGatewayTokenCommand struct {
 }
 
 type LoginCommand struct {
-	TenantID          TenantID
-	UserID            UserID
-	Password          string
-	DeviceID          DeviceID
-	Audience          string
-	GatewayTTLSeconds int64
-	RefreshTTLSeconds int64
-	MFAFactorID       MFAFactorID
-	MFACode           string
-	TraceID           string
-	RequestID         string
+	TenantID            TenantID
+	UserID              UserID
+	Password            string
+	DeviceID            DeviceID
+	Audience            string
+	GatewayTTLSeconds   int64
+	RefreshTTLSeconds   int64
+	MFAFactorID         MFAFactorID
+	MFACode             string
+	VerifiedMFAFactorID MFAFactorID
+	TraceID             string
+	RequestID           string
 }
 
 type LoginResult struct {
@@ -280,12 +281,14 @@ type EncryptedMFASecret struct {
 }
 
 type MFAFactorSecret struct {
-	TenantID TenantID
-	UserID   UserID
-	FactorID MFAFactorID
-	Type     MFAFactorType
-	Status   MFAFactorStatus
-	Secret   EncryptedMFASecret
+	TenantID         TenantID
+	UserID           UserID
+	FactorID         MFAFactorID
+	Type             MFAFactorType
+	Status           MFAFactorStatus
+	Secret           EncryptedMFASecret
+	LoginFailedCount int
+	LoginLockedUntil time.Time
 }
 
 type IdentityChallenge struct {

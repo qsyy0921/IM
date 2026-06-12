@@ -287,12 +287,16 @@ func TestLoginUseCaseVerifiesMFABeforeIssuingToken(t *testing.T) {
 	if !repository.loginCalled || result.GatewayToken != "gateway-token" || result.RefreshToken != "rft_new.secret-new" {
 		t.Fatalf("expected login token after mfa, result=%+v loginCalled=%v", result, repository.loginCalled)
 	}
+	if repository.loginCommand.VerifiedMFAFactorID != "mfa-1" {
+		t.Fatalf("expected verified mfa factor to be passed to login transaction, got %+v", repository.loginCommand)
+	}
 	if secrets.verifySecret != secret || secrets.verifyCode != "123456" || !secrets.verifyNow.Equal(now) {
 		t.Fatalf("unexpected mfa verify input: secret=%+v code=%s now=%s", secrets.verifySecret, secrets.verifyCode, secrets.verifyNow)
 	}
 }
 
 func TestLoginUseCaseRejectsInvalidMFA(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0).UTC()
 	repository := &fakeIdentityRepository{
 		credential: types.UserCredential{
 			TenantID:     "tenant-1",
@@ -314,6 +318,8 @@ func TestLoginUseCaseRejectsInvalidMFA(t *testing.T) {
 		fakeTokenSigner{},
 		&fakePasswordVerifier{ok: true},
 		fakeRefreshTokenCodec{},
+		WithLoginClock(func() time.Time { return now }),
+		WithLoginMFARiskPolicy(LoginRiskPolicy{MaxFailedAttempts: 3, FailureWindow: 20 * time.Minute, LockDuration: 10 * time.Minute}),
 		WithLoginMFASecretManager(&fakeMFASecretManager{verifyOK: false}),
 	)
 	_, err := useCase.Execute(context.Background(), types.LoginCommand{
@@ -327,8 +333,107 @@ func TestLoginUseCaseRejectsInvalidMFA(t *testing.T) {
 	if !errors.Is(err, types.ErrInvalidMFA) {
 		t.Fatalf("expected invalid mfa, got %v", err)
 	}
+	if !repository.mfaFailureRecorded || repository.mfaFailureAt != now || repository.mfaLockUntil != now.Add(10*time.Minute) || repository.mfaMaxFailedAttempts != 3 || repository.mfaFailureWindowStart != now.Add(-20*time.Minute) {
+		t.Fatalf("unexpected mfa failure record: recorded=%v factor=%s at=%s lock=%s max=%d window=%s",
+			repository.mfaFailureRecorded,
+			repository.mfaFailureFactorID,
+			repository.mfaFailureAt,
+			repository.mfaLockUntil,
+			repository.mfaMaxFailedAttempts,
+			repository.mfaFailureWindowStart,
+		)
+	}
+	if repository.mfaFailureFactorID != "mfa-1" {
+		t.Fatalf("expected mfa failure to be recorded against selected factor, got %s", repository.mfaFailureFactorID)
+	}
 	if repository.loginCalled {
 		t.Fatal("invalid mfa must not write login session")
+	}
+}
+
+func TestLoginUseCaseReturnsMFALockedWhenFailureThresholdIsReached(t *testing.T) {
+	repository := &fakeIdentityRepository{
+		credential: types.UserCredential{
+			TenantID:     "tenant-1",
+			UserID:       "user-1",
+			Status:       "ACTIVE",
+			PasswordHash: "expected-hash",
+		},
+		activeMFAFactors: []types.MFAFactorSecret{{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			FactorID: "mfa-1",
+			Type:     types.MFAFactorTypeTOTP,
+			Status:   types.MFAFactorStatusActive,
+			Secret:   types.EncryptedMFASecret{Ciphertext: "ciphertext", Nonce: "nonce", KeyVersion: "local-v1"},
+		}},
+		recordMFAFailureErr: types.NewMFALocked("mfa temporarily locked"),
+	}
+	useCase := NewLoginUseCase(
+		repository,
+		fakeTokenSigner{},
+		&fakePasswordVerifier{ok: true},
+		fakeRefreshTokenCodec{},
+		WithLoginMFASecretManager(&fakeMFASecretManager{verifyOK: false}),
+	)
+	_, err := useCase.Execute(context.Background(), types.LoginCommand{
+		TenantID:    "tenant-1",
+		UserID:      "user-1",
+		Password:    "correct horse battery staple",
+		DeviceID:    "device-1",
+		MFAFactorID: "mfa-1",
+		MFACode:     "123456",
+	})
+	if !errors.Is(err, types.ErrMFALocked) {
+		t.Fatalf("expected mfa locked, got %v", err)
+	}
+	if repository.loginCalled {
+		t.Fatal("locked mfa factor must not write login session")
+	}
+}
+
+func TestLoginUseCaseRejectsLockedMFAFactorBeforeVerify(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0).UTC()
+	repository := &fakeIdentityRepository{
+		credential: types.UserCredential{
+			TenantID:     "tenant-1",
+			UserID:       "user-1",
+			Status:       "ACTIVE",
+			PasswordHash: "expected-hash",
+		},
+		activeMFAFactors: []types.MFAFactorSecret{{
+			TenantID:         "tenant-1",
+			UserID:           "user-1",
+			FactorID:         "mfa-1",
+			Type:             types.MFAFactorTypeTOTP,
+			Status:           types.MFAFactorStatusActive,
+			Secret:           types.EncryptedMFASecret{Ciphertext: "ciphertext", Nonce: "nonce", KeyVersion: "local-v1"},
+			LoginLockedUntil: now.Add(time.Minute),
+			LoginFailedCount: 5,
+		}},
+	}
+	secrets := &fakeMFASecretManager{verifyOK: true}
+	useCase := NewLoginUseCase(
+		repository,
+		fakeTokenSigner{},
+		&fakePasswordVerifier{ok: true},
+		fakeRefreshTokenCodec{},
+		WithLoginClock(func() time.Time { return now }),
+		WithLoginMFASecretManager(secrets),
+	)
+	_, err := useCase.Execute(context.Background(), types.LoginCommand{
+		TenantID:    "tenant-1",
+		UserID:      "user-1",
+		Password:    "correct horse battery staple",
+		DeviceID:    "device-1",
+		MFAFactorID: "mfa-1",
+		MFACode:     "123456",
+	})
+	if !errors.Is(err, types.ErrMFALocked) {
+		t.Fatalf("expected mfa locked, got %v", err)
+	}
+	if secrets.verifyCode != "" || repository.mfaFailureRecorded || repository.loginCalled {
+		t.Fatal("locked mfa factor must not verify code, record another failure, or write login session")
 	}
 }
 
@@ -471,12 +576,20 @@ type fakeIdentityRepository struct {
 	registerCalled             bool
 	registerPasswordHash       string
 	loginCalled                bool
+	loginCommand               types.LoginCommand
 	failureRecorded            bool
 	failureAt                  time.Time
 	lockUntil                  time.Time
 	maxFailedAttempts          int
 	failureWindowStart         time.Time
 	recordFailureErr           error
+	mfaFailureRecorded         bool
+	mfaFailureAt               time.Time
+	mfaLockUntil               time.Time
+	mfaMaxFailedAttempts       int
+	mfaFailureWindowStart      time.Time
+	mfaFailureFactorID         types.MFAFactorID
+	recordMFAFailureErr        error
 	refreshCalled              bool
 	presentedTokenID           types.RefreshTokenID
 	presentedTokenHash         string
@@ -513,8 +626,9 @@ func (repo *fakeIdentityRepository) RecordLoginFailure(_ context.Context, _ type
 	return repo.recordFailureErr
 }
 
-func (repo *fakeIdentityRepository) LoginGatewaySession(context.Context, types.LoginCommand, types.RefreshTokenRecord, time.Time, time.Time, time.Time) (types.LoginResult, error) {
+func (repo *fakeIdentityRepository) LoginGatewaySession(_ context.Context, command types.LoginCommand, _ types.RefreshTokenRecord, _ time.Time, _ time.Time, _ time.Time) (types.LoginResult, error) {
 	repo.loginCalled = true
+	repo.loginCommand = command
 	return types.LoginResult{
 		TenantID:               "tenant-1",
 		UserID:                 "user-1",
@@ -529,6 +643,16 @@ func (repo *fakeIdentityRepository) LoginGatewaySession(context.Context, types.L
 
 func (repo *fakeIdentityRepository) ListActiveMFAFactorSecrets(context.Context, types.TenantID, types.UserID) ([]types.MFAFactorSecret, error) {
 	return repo.activeMFAFactors, nil
+}
+
+func (repo *fakeIdentityRepository) RecordMFALoginFailure(_ context.Context, _ types.TenantID, _ types.UserID, factorID types.MFAFactorID, failedAt time.Time, lockUntil time.Time, maxFailedAttempts int, failureWindowStart time.Time) error {
+	repo.mfaFailureRecorded = true
+	repo.mfaFailureFactorID = factorID
+	repo.mfaFailureAt = failedAt
+	repo.mfaLockUntil = lockUntil
+	repo.mfaMaxFailedAttempts = maxFailedAttempts
+	repo.mfaFailureWindowStart = failureWindowStart
+	return repo.recordMFAFailureErr
 }
 
 func (repo *fakeIdentityRepository) RefreshGatewaySession(_ context.Context, _ types.RefreshGatewayTokenCommand, tokenID types.RefreshTokenID, tokenHash string, _ types.RefreshTokenRecord, _ time.Time, _ time.Time, _ time.Time) (types.RefreshGatewayTokenResult, error) {

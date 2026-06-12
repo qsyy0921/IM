@@ -103,6 +103,7 @@ Login risk first-stage rules:
 - A successful Login clears the failure counter and lock fields in the same PostgreSQL transaction that writes session / refresh-token state.
 - The first-stage lock applies only to password Login. A valid refresh token can still rotate through `RefreshGatewayToken`; refresh token theft / reuse is handled by the separate rotation and session-revoke logic. This avoids letting an external password brute-force attempt break an already authenticated client session.
 - If the user has one or more ACTIVE TOTP MFA factors, `Login` must verify `mfa_code` before generating refresh token, session or gateway token state. Missing code returns stable `MFA_REQUIRED`; invalid code returns stable `INVALID_MFA`.
+- Invalid TOTP codes are counted on the selected MFA factor, independent from password failure counters. Reaching `NEXUSIM_IDENTITY_MFA_MAX_FAILED_ATTEMPTS` within `NEXUSIM_IDENTITY_MFA_FAILURE_WINDOW` locks that factor for `NEXUSIM_IDENTITY_MFA_LOCK_DURATION` and public Login returns stable `mfa temporarily locked`.
 - Defaults are `NEXUSIM_IDENTITY_LOGIN_MAX_FAILED_ATTEMPTS=5`, `NEXUSIM_IDENTITY_LOGIN_FAILURE_WINDOW=15m` and `NEXUSIM_IDENTITY_LOGIN_LOCK_DURATION=15m`; deployments may tune them.
 - This is not a complete fraud/risk engine. IP/device reputation, CAPTCHA, geo-anomaly, tenant policy, alert routing, adaptive throttling and tenant-level rate limits remain future hardening.
 
@@ -143,6 +144,8 @@ MFA factor rules:
 - `DisableMFAFactor` requires the current password and does not delete historical rows;
 - `LoginRequest.mfa_factor_id` selects a factor; if omitted and exactly one ACTIVE factor exists, that factor is used;
 - `LoginRequest.mfa_code` must be a six-digit TOTP code; session and refresh-token state are written only after MFA succeeds;
+- `identity_mfa_factors.login_failed_count`, `login_failed_last_at` and `login_locked_until` are factor-level Login risk state, not global account lock state;
+- successful MFA Login clears the selected factor's Login failure state and updates `last_used_at` in the same PostgreSQL transaction that writes session / refresh-token state;
 - `NEXUSIM_IDENTITY_MFA_SECRET_KEY` is the local AES-GCM encryption key input; local smoke may fall back to the existing gateway token secret, but production profiles should use a dedicated secret managed by KMS/HSM. If no MFA key is configured, the service still starts and existing Login/JWKS flows are unaffected, but MFA factor RPCs fail until the key is configured.
 
 Known MFA hardening still pending:
@@ -150,9 +153,9 @@ Known MFA hardening still pending:
 - Refresh-token step-up enforcement;
 - recovery codes and backup factor handling;
 - WebAuthn / passkeys;
-- MFA attempt throttling / lockout separate from password failure counters;
+- richer MFA risk policy beyond the first factor-level failed-code counter and short lockout;
 - secret key rotation and KMS/HSM-backed envelope encryption;
-- per-factor audit events, last-used tracking and risk-based challenge policy.
+- per-factor audit events and risk-based challenge policy.
 
 ## Verification / Password Reset
 
@@ -290,7 +293,7 @@ ConfirmPasswordReset -> password hash updated + active session / refresh token r
 
 - `GET /healthz`: process liveness, no dependency check.
 - `GET /readyz`: PostgreSQL ping readiness.
-- `GET /debug/metrics`: pgx pool counters, identity user/device/session counts, failed password-login user counts, currently password-login-locked user counts, and gRPC method/code/latency counters.
+- `GET /debug/metrics`: pgx pool counters, identity user/device/session counts, failed password-login user counts, currently password-login-locked user counts, and gRPC method/code/latency counters. Dedicated MFA risk counters are still a future observability hardening item.
 
 The gRPC server also emits one JSON request log per unary RPC with stable fields: `service`, `event`, `method`, `code`, and `latency_ms`.
 

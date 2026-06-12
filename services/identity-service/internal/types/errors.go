@@ -23,6 +23,7 @@ var (
 	ErrMFARequired               = errors.New("mfa required")
 	ErrInvalidMFA                = errors.New("invalid mfa")
 	ErrMFAFactorNotFound         = errors.New("mfa factor not found")
+	ErrMFALocked                 = errors.New("mfa locked")
 )
 
 type serviceError struct {
@@ -70,3 +71,4 @@ func NewChallengeRateLimited(message string) error {
 func NewMFARequired(message string) error       { return wrap(ErrMFARequired, message) }
 func NewInvalidMFA(message string) error        { return wrap(ErrInvalidMFA, message) }
 func NewMFAFactorNotFound(message string) error { return wrap(ErrMFAFactorNotFound, message) }
+func NewMFALocked(message string) error         { return wrap(ErrMFALocked, message) }

@@ -296,6 +296,9 @@ func TestGRPCErrorMapsCredentialErrors(t *testing.T) {
 	if code := status.Code(grpcError(types.NewRefreshTokenReuseDetected("reuse"))); code != codes.PermissionDenied {
 		t.Fatalf("expected refresh token reuse to map to permission denied, got %v", code)
 	}
+	if code := status.Code(grpcError(types.NewMFALocked("locked"))); code != codes.ResourceExhausted {
+		t.Fatalf("expected mfa locked to map to resource exhausted, got %v", code)
+	}
 }
 
 type fakeRegisterUserExecutor struct {

@@ -107,6 +107,11 @@ func runGRPC() error {
 				FailureWindow:     envDuration("NEXUSIM_IDENTITY_LOGIN_FAILURE_WINDOW", app.DefaultLoginFailureWindow),
 				LockDuration:      envDuration("NEXUSIM_IDENTITY_LOGIN_LOCK_DURATION", app.DefaultLoginLockDuration),
 			}),
+			app.WithLoginMFARiskPolicy(app.LoginRiskPolicy{
+				MaxFailedAttempts: envInt("NEXUSIM_IDENTITY_MFA_MAX_FAILED_ATTEMPTS", app.DefaultMFAMaxFailedAttempts),
+				FailureWindow:     envDuration("NEXUSIM_IDENTITY_MFA_FAILURE_WINDOW", app.DefaultMFAFailureWindow),
+				LockDuration:      envDuration("NEXUSIM_IDENTITY_MFA_LOCK_DURATION", app.DefaultMFALockDuration),
+			}),
 			app.WithLoginMFASecretManager(mfaManager),
 		),
 		app.NewRefreshGatewayTokenUseCase(repository, signer, refreshTokens),

@@ -13,6 +13,9 @@ const (
 	DefaultLoginMaxFailedAttempts = 5
 	DefaultLoginFailureWindow     = 15 * time.Minute
 	DefaultLoginLockDuration      = 15 * time.Minute
+	DefaultMFAMaxFailedAttempts   = 5
+	DefaultMFAFailureWindow       = 15 * time.Minute
+	DefaultMFALockDuration        = 15 * time.Minute
 )
 
 type LoginRiskPolicy struct {
@@ -31,6 +34,7 @@ type LoginUseCase struct {
 	mfaSecrets    MFASecretManager
 	now           func() time.Time
 	risk          LoginRiskPolicy
+	mfaRisk       LoginRiskPolicy
 }
 
 type LoginRepository interface {
@@ -38,6 +42,7 @@ type LoginRepository interface {
 	RecordLoginFailure(context.Context, types.TenantID, types.UserID, time.Time, time.Time, int, time.Time) error
 	LoginGatewaySession(context.Context, types.LoginCommand, types.RefreshTokenRecord, time.Time, time.Time, time.Time) (types.LoginResult, error)
 	ListActiveMFAFactorSecrets(context.Context, types.TenantID, types.UserID) ([]types.MFAFactorSecret, error)
+	RecordMFALoginFailure(context.Context, types.TenantID, types.UserID, types.MFAFactorID, time.Time, time.Time, int, time.Time) error
 }
 
 func NewLoginUseCase(repository LoginRepository, signer TokenSigner, passwords PasswordVerifier, refreshTokens RefreshTokenCodec, opts ...LoginUseCaseOption) *LoginUseCase {
@@ -52,11 +57,17 @@ func NewLoginUseCase(repository LoginRepository, signer TokenSigner, passwords P
 			FailureWindow:     DefaultLoginFailureWindow,
 			LockDuration:      DefaultLoginLockDuration,
 		},
+		mfaRisk: LoginRiskPolicy{
+			MaxFailedAttempts: DefaultMFAMaxFailedAttempts,
+			FailureWindow:     DefaultMFAFailureWindow,
+			LockDuration:      DefaultMFALockDuration,
+		},
 	}
 	for _, opt := range opts {
 		opt(uc)
 	}
 	uc.risk = normalizeLoginRiskPolicy(uc.risk)
+	uc.mfaRisk = normalizeMFARiskPolicy(uc.mfaRisk)
 	return uc
 }
 
@@ -69,6 +80,12 @@ func WithLoginRiskPolicy(policy LoginRiskPolicy) LoginUseCaseOption {
 func WithLoginMFASecretManager(manager MFASecretManager) LoginUseCaseOption {
 	return func(uc *LoginUseCase) {
 		uc.mfaSecrets = manager
+	}
+}
+
+func WithLoginMFARiskPolicy(policy LoginRiskPolicy) LoginUseCaseOption {
+	return func(uc *LoginUseCase) {
+		uc.mfaRisk = policy
 	}
 }
 
@@ -89,6 +106,19 @@ func normalizeLoginRiskPolicy(policy LoginRiskPolicy) LoginRiskPolicy {
 	}
 	if policy.LockDuration <= 0 {
 		policy.LockDuration = DefaultLoginLockDuration
+	}
+	return policy
+}
+
+func normalizeMFARiskPolicy(policy LoginRiskPolicy) LoginRiskPolicy {
+	if policy.MaxFailedAttempts <= 0 {
+		policy.MaxFailedAttempts = DefaultMFAMaxFailedAttempts
+	}
+	if policy.FailureWindow <= 0 {
+		policy.FailureWindow = DefaultMFAFailureWindow
+	}
+	if policy.LockDuration <= 0 {
+		policy.LockDuration = DefaultMFALockDuration
 	}
 	return policy
 }
@@ -122,9 +152,11 @@ func (uc *LoginUseCase) Execute(ctx context.Context, command types.LoginCommand)
 		}
 		return types.LoginResult{}, types.NewInvalidCredentials("invalid credentials")
 	}
-	if err := uc.verifyMFAIfRequired(ctx, command, now); err != nil {
+	verifiedMFAFactorID, err := uc.verifyMFAIfRequired(ctx, command, now)
+	if err != nil {
 		return types.LoginResult{}, err
 	}
+	command.VerifiedMFAFactorID = verifiedMFAFactorID
 
 	command.Audience = domain.NormalizeAudience(command.Audience)
 	issuedAt := now
@@ -158,33 +190,40 @@ func (uc *LoginUseCase) Execute(ctx context.Context, command types.LoginCommand)
 	return result, nil
 }
 
-func (uc *LoginUseCase) verifyMFAIfRequired(ctx context.Context, command types.LoginCommand, now time.Time) error {
+func (uc *LoginUseCase) verifyMFAIfRequired(ctx context.Context, command types.LoginCommand, now time.Time) (types.MFAFactorID, error) {
 	factors, err := uc.repository.ListActiveMFAFactorSecrets(ctx, command.TenantID, command.UserID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if len(factors) == 0 {
-		return nil
+		return "", nil
 	}
 	code := strings.TrimSpace(command.MFACode)
 	if code == "" {
-		return types.NewMFARequired("mfa required")
+		return "", types.NewMFARequired("mfa required")
 	}
 	if uc.mfaSecrets == nil {
-		return types.NewTokenSigningFailed("mfa secret manager is not configured")
+		return "", types.NewTokenSigningFailed("mfa secret manager is not configured")
 	}
 	factor, ok := selectMFAFactor(factors, command.MFAFactorID)
 	if !ok {
-		return types.NewInvalidMFA("invalid mfa factor")
+		return "", types.NewInvalidMFA("invalid mfa factor")
+	}
+	if factor.LoginLockedUntil.After(now) {
+		return "", types.NewMFALocked("mfa temporarily locked")
 	}
 	verified, err := uc.mfaSecrets.VerifyTOTP(factor.Secret, code, now)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if !verified {
-		return types.NewInvalidMFA("invalid mfa code")
+		lockUntil := now.Add(uc.mfaRisk.LockDuration)
+		if err := uc.repository.RecordMFALoginFailure(ctx, command.TenantID, command.UserID, factor.FactorID, now, lockUntil, uc.mfaRisk.MaxFailedAttempts, now.Add(-uc.mfaRisk.FailureWindow)); err != nil {
+			return "", err
+		}
+		return "", types.NewInvalidMFA("invalid mfa code")
 	}
-	return nil
+	return factor.FactorID, nil
 }
 
 func selectMFAFactor(factors []types.MFAFactorSecret, factorID types.MFAFactorID) (types.MFAFactorSecret, bool) {

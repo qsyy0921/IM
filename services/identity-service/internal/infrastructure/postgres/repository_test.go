@@ -480,6 +480,76 @@ func TestRepositoryMFAFactorLifecycleIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryMFALoginFailureLocksAndSuccessClearsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	repository := NewRepository(
+		pool,
+		WithMFAFactorIDGenerator(func() (string, error) { return "mfa-factor-login", nil }),
+		WithSessionIDGenerator(func() (string, error) { return "session-mfa-login", nil }),
+	)
+	now := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := repository.RegisterUser(ctx, types.RegisterUserCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+	}, "password-hash", now); err != nil {
+		t.Fatalf("register user: %v", err)
+	}
+	secret := types.EncryptedMFASecret{Ciphertext: "encrypted-secret", Nonce: "nonce-value", KeyVersion: "local-v1"}
+	if _, err := repository.CreateMFAFactor(ctx, types.BeginMFAEnrollmentCommand{
+		TenantID:   "tenant-identity",
+		UserID:     "user-1",
+		FactorType: types.MFAFactorTypeTOTP,
+	}, secret, now); err != nil {
+		t.Fatalf("create mfa factor: %v", err)
+	}
+	if _, err := repository.ConfirmMFAFactor(ctx, types.ConfirmMFAEnrollmentCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		FactorID: "mfa-factor-login",
+	}, now.Add(time.Minute)); err != nil {
+		t.Fatalf("confirm mfa factor: %v", err)
+	}
+
+	firstFailureAt := now.Add(2 * time.Minute)
+	lockUntil := firstFailureAt.Add(15 * time.Minute)
+	if err := repository.RecordMFALoginFailure(ctx, "tenant-identity", "user-1", "mfa-factor-login", firstFailureAt, lockUntil, 2, firstFailureAt.Add(-15*time.Minute)); err != nil {
+		t.Fatalf("record first mfa failure: %v", err)
+	}
+	assertMFALoginRisk(t, ctx, pool, "mfa-factor-login", 1, false, false)
+
+	err := repository.RecordMFALoginFailure(ctx, "tenant-identity", "user-1", "mfa-factor-login", firstFailureAt.Add(time.Minute), lockUntil.Add(time.Minute), 2, firstFailureAt.Add(-14*time.Minute))
+	if !errors.Is(err, types.ErrMFALocked) {
+		t.Fatalf("expected mfa locked on threshold, got %v", err)
+	}
+	assertMFALoginRisk(t, ctx, pool, "mfa-factor-login", 2, true, false)
+
+	activeFactors, err := repository.ListActiveMFAFactorSecrets(ctx, "tenant-identity", "user-1")
+	if err != nil {
+		t.Fatalf("list active mfa factors after lock: %v", err)
+	}
+	if len(activeFactors) != 1 || activeFactors[0].LoginFailedCount != 2 || !activeFactors[0].LoginLockedUntil.After(firstFailureAt) {
+		t.Fatalf("expected active factor to carry login risk state, got %+v", activeFactors)
+	}
+
+	loginAt := lockUntil.Add(2 * time.Minute)
+	_, err = repository.LoginGatewaySession(ctx, types.LoginCommand{
+		TenantID:            "tenant-identity",
+		UserID:              "user-1",
+		DeviceID:            "device-1",
+		Audience:            "push-gateway",
+		VerifiedMFAFactorID: "mfa-factor-login",
+	}, types.RefreshTokenRecord{
+		TokenID:   "rft_mfa_login",
+		TokenHash: "hash-mfa-login",
+	}, loginAt, loginAt.Add(15*time.Minute), loginAt.Add(30*24*time.Hour))
+	if err != nil {
+		t.Fatalf("login after mfa lock window: %v", err)
+	}
+	assertMFALoginRisk(t, ctx, pool, "mfa-factor-login", 0, false, true)
+}
+
 func TestRepositoryLoginFailureLocksAndSuccessClearsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -828,6 +898,38 @@ WHERE tenant_id = 'tenant-identity'
 	}
 	if gotEmail != email || verified != wantVerified {
 		t.Fatalf("unexpected email state: email=%s verified=%v", gotEmail, verified)
+	}
+}
+
+func assertMFALoginRisk(t *testing.T, ctx context.Context, pool *pgxpool.Pool, factorID string, wantFailedCount int, wantLocked bool, wantLastUsed bool) {
+	t.Helper()
+	var failedCount int
+	var lockedUntil *time.Time
+	var lastUsedAt *time.Time
+	err := pool.QueryRow(ctx, `
+SELECT login_failed_count, login_locked_until, last_used_at
+FROM identity_mfa_factors
+WHERE tenant_id = 'tenant-identity'
+  AND user_id = 'user-1'
+  AND factor_id = $1
+`, factorID).Scan(&failedCount, &lockedUntil, &lastUsedAt)
+	if err != nil {
+		t.Fatalf("read mfa login risk: %v", err)
+	}
+	if failedCount != wantFailedCount {
+		t.Fatalf("expected mfa failed count %d, got %d", wantFailedCount, failedCount)
+	}
+	if wantLocked && lockedUntil == nil {
+		t.Fatal("expected mfa factor to be locked")
+	}
+	if !wantLocked && lockedUntil != nil {
+		t.Fatalf("expected mfa factor to be unlocked, got login_locked_until=%s", lockedUntil)
+	}
+	if wantLastUsed && lastUsedAt == nil {
+		t.Fatal("expected mfa factor last_used_at to be set")
+	}
+	if !wantLastUsed && lastUsedAt != nil {
+		t.Fatalf("expected mfa factor last_used_at to be empty, got %s", lastUsedAt)
 	}
 }
 

@@ -254,6 +254,11 @@ func (r *Repository) LoginGatewaySession(
 	if err := clearLoginFailures(ctx, tx, command.TenantID, command.UserID, issuedAt); err != nil {
 		return types.LoginResult{}, err
 	}
+	if command.VerifiedMFAFactorID != "" {
+		if err := clearMFALoginFailures(ctx, tx, command.TenantID, command.UserID, command.VerifiedMFAFactorID, issuedAt); err != nil {
+			return types.LoginResult{}, err
+		}
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return types.LoginResult{}, types.NewDBWriteFailed(err.Error())
 	}
@@ -594,7 +599,15 @@ func (r *Repository) GetMFAFactorSecret(ctx context.Context, tenantID types.Tena
 	}
 	var row types.MFAFactorSecret
 	err := r.pool.QueryRow(ctx, `
-SELECT tenant_id, user_id, factor_id, factor_type, status, secret_ciphertext, secret_nonce, secret_key_version
+SELECT
+    tenant_id,
+    user_id,
+    factor_id,
+    factor_type,
+    status,
+    secret_ciphertext,
+    secret_nonce,
+    secret_key_version
 FROM identity_mfa_factors
 WHERE tenant_id = $1
   AND user_id = $2
@@ -623,7 +636,17 @@ func (r *Repository) ListActiveMFAFactorSecrets(ctx context.Context, tenantID ty
 		return nil, types.NewDBReadFailed("identity repository is not configured")
 	}
 	rows, err := r.pool.Query(ctx, `
-SELECT tenant_id, user_id, factor_id, factor_type, status, secret_ciphertext, secret_nonce, secret_key_version
+SELECT
+    tenant_id,
+    user_id,
+    factor_id,
+    factor_type,
+    status,
+    secret_ciphertext,
+    secret_nonce,
+    secret_key_version,
+    login_failed_count,
+    COALESCE(login_locked_until, 'epoch'::timestamptz)
 FROM identity_mfa_factors
 WHERE tenant_id = $1
   AND user_id = $2
@@ -647,6 +670,8 @@ ORDER BY verified_at ASC NULLS LAST, created_at ASC, factor_id ASC
 			&row.Secret.Ciphertext,
 			&row.Secret.Nonce,
 			&row.Secret.KeyVersion,
+			&row.LoginFailedCount,
+			&row.LoginLockedUntil,
 		); err != nil {
 			return nil, types.NewDBReadFailed(err.Error())
 		}
@@ -656,6 +681,71 @@ ORDER BY verified_at ASC NULLS LAST, created_at ASC, factor_id ASC
 		return nil, types.NewDBReadFailed(err.Error())
 	}
 	return factors, nil
+}
+
+func (r *Repository) RecordMFALoginFailure(
+	ctx context.Context,
+	tenantID types.TenantID,
+	userID types.UserID,
+	factorID types.MFAFactorID,
+	failedAt time.Time,
+	lockUntil time.Time,
+	maxFailedAttempts int,
+	failureWindowStart time.Time,
+) error {
+	if r.pool == nil {
+		return types.NewDBWriteFailed("identity repository is not configured")
+	}
+	if maxFailedAttempts <= 0 {
+		return types.NewInvalidArgument("max failed attempts must be positive")
+	}
+	var failedCount int
+	var lockedUntil time.Time
+	err := r.pool.QueryRow(ctx, `
+WITH next_failure AS (
+    SELECT
+        tenant_id,
+        user_id,
+        factor_id,
+        CASE
+            WHEN login_failed_last_at IS NULL
+              OR login_failed_last_at < $7
+              OR (login_failed_count >= $6 AND COALESCE(login_locked_until, 'epoch'::timestamptz) <= $4)
+                THEN 1
+            ELSE login_failed_count + 1
+        END AS next_failed_login_count
+    FROM identity_mfa_factors
+    WHERE tenant_id = $1
+      AND user_id = $2
+      AND factor_id = $3
+      AND factor_type = 'TOTP'
+      AND status = 'ACTIVE'
+    FOR UPDATE
+)
+UPDATE identity_mfa_factors
+SET login_failed_count = next_failure.next_failed_login_count,
+    login_failed_last_at = $4,
+    login_locked_until = CASE
+        WHEN next_failure.next_failed_login_count >= $6 THEN $5::timestamptz
+        ELSE NULL
+    END,
+    updated_at = $4
+FROM next_failure
+WHERE identity_mfa_factors.tenant_id = next_failure.tenant_id
+  AND identity_mfa_factors.user_id = next_failure.user_id
+  AND identity_mfa_factors.factor_id = next_failure.factor_id
+RETURNING login_failed_count, COALESCE(login_locked_until, 'epoch'::timestamptz)
+`, tenantID, userID, factorID, failedAt, lockUntil, maxFailedAttempts, failureWindowStart).Scan(&failedCount, &lockedUntil)
+	if err == pgx.ErrNoRows {
+		return types.NewMFAFactorNotFound("mfa factor not found")
+	}
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if lockedUntil.After(failedAt) {
+		return types.NewMFALocked("mfa temporarily locked")
+	}
+	return nil
 }
 
 func (r *Repository) ConfirmMFAFactor(ctx context.Context, command types.ConfirmMFAEnrollmentCommand, verifiedAt time.Time) (types.ConfirmMFAEnrollmentResult, error) {
@@ -1716,6 +1806,29 @@ WHERE tenant_id = $1
 	}
 	if tag.RowsAffected() == 0 {
 		return types.NewInvalidCredentials("invalid credentials")
+	}
+	return nil
+}
+
+func clearMFALoginFailures(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, factorID types.MFAFactorID, now time.Time) error {
+	tag, err := tx.Exec(ctx, `
+UPDATE identity_mfa_factors
+SET login_failed_count = 0,
+    login_failed_last_at = NULL,
+    login_locked_until = NULL,
+    last_used_at = $4,
+    updated_at = $4
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND factor_id = $3
+  AND factor_type = 'TOTP'
+  AND status = 'ACTIVE'
+`, tenantID, userID, factorID, now)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if tag.RowsAffected() == 0 {
+		return types.NewMFAFactorNotFound("mfa factor not found")
 	}
 	return nil
 }

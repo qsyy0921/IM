@@ -372,25 +372,8 @@ func (r *Repository) RefreshGatewaySession(
 		return types.RefreshGatewayTokenResult{}, types.NewInvalidRefreshToken("invalid refresh token")
 	}
 	if row.Status != "ACTIVE" {
-		revoked, err := r.revokeSessionAfterRefreshReuse(ctx, tx, row, issuedAt)
-		if err != nil {
+		if err := r.handleRefreshTokenReuse(ctx, tx, row, command.TraceID, command.RequestID, issuedAt); err != nil {
 			return types.RefreshGatewayTokenResult{}, err
-		}
-		if revoked != nil {
-			if err := r.insertSessionRevokedOutbox(ctx, tx, *revoked, types.RevokeSessionCommand{
-				AdminContext: types.AdminContext{
-					TenantID:       row.TenantID,
-					OperatorUserID: "identity-service",
-					TraceID:        command.TraceID,
-					RequestID:      command.RequestID,
-				},
-				UserID:    row.UserID,
-				DeviceID:  row.DeviceID,
-				SessionID: row.SessionID,
-				Reason:    "refresh token reuse detected",
-			}, issuedAt); err != nil {
-				return types.RefreshGatewayTokenResult{}, err
-			}
 		}
 		if err := tx.Commit(ctx); err != nil {
 			return types.RefreshGatewayTokenResult{}, types.NewDBWriteFailed(err.Error())
@@ -492,9 +475,21 @@ func (r *Repository) ValidateRefreshGatewaySession(
 		return types.NewInvalidRefreshToken("invalid refresh token")
 	}
 	if row.Status != "ACTIVE" {
+		if err := r.handleRefreshTokenReuse(ctx, tx, row, command.TraceID, command.RequestID, now); err != nil {
+			return err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return types.NewDBWriteFailed(err.Error())
+		}
 		return types.NewRefreshTokenReuseDetected("refresh token was already used")
 	}
 	if !now.Before(row.ExpiresAt) {
+		if err := revokeRefreshToken(ctx, tx, row, now); err != nil {
+			return err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return types.NewDBWriteFailed(err.Error())
+		}
 		return types.NewInvalidRefreshToken("refresh token expired")
 	}
 	if err := lockDevice(ctx, tx, command.TenantID, command.UserID, command.DeviceID); err != nil {
@@ -511,6 +506,28 @@ func (r *Repository) ValidateRefreshGatewaySession(
 		return err
 	}
 	return nil
+}
+
+func (r *Repository) handleRefreshTokenReuse(ctx context.Context, tx pgx.Tx, row refreshTokenRow, traceID string, requestID string, reusedAt time.Time) error {
+	revoked, err := r.revokeSessionAfterRefreshReuse(ctx, tx, row, reusedAt)
+	if err != nil {
+		return err
+	}
+	if revoked == nil {
+		return nil
+	}
+	return r.insertSessionRevokedOutbox(ctx, tx, *revoked, types.RevokeSessionCommand{
+		AdminContext: types.AdminContext{
+			TenantID:       row.TenantID,
+			OperatorUserID: "identity-service",
+			TraceID:        traceID,
+			RequestID:      requestID,
+		},
+		UserID:    row.UserID,
+		DeviceID:  row.DeviceID,
+		SessionID: row.SessionID,
+		Reason:    "refresh token reuse detected",
+	}, reusedAt)
 }
 
 func (r *Repository) CreateVerificationChallenge(

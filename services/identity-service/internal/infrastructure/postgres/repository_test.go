@@ -202,6 +202,91 @@ func TestRepositoryLoginAndRefreshRotationIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryValidateRefreshGatewaySessionReuseRevokesSessionIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	seedUserCredential(t, ctx, pool, "password-hash")
+	repository := NewRepository(
+		pool,
+		WithSessionIDGenerator(func() (string, error) { return "session-refresh-reuse-proof", nil }),
+		WithEventIDGenerator(func() (string, error) { return "event-refresh-reuse-proof-1", nil }),
+	)
+	issuedAt := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := repository.LoginGatewaySession(ctx, types.LoginCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		DeviceID: "device-1",
+		Audience: "push-gateway",
+	}, types.RefreshTokenRecord{
+		TokenID:   "rft_reuse_proof_login",
+		TokenHash: "hash-reuse-proof-login",
+	}, issuedAt, issuedAt.Add(15*time.Minute), issuedAt.Add(30*24*time.Hour)); err != nil {
+		t.Fatalf("login before reuse validation: %v", err)
+	}
+	refreshedAt := issuedAt.Add(time.Minute)
+	if _, err := repository.RefreshGatewaySession(ctx, types.RefreshGatewayTokenCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		DeviceID: "device-1",
+		Audience: "push-gateway",
+	}, "rft_reuse_proof_login", "hash-reuse-proof-login", types.RefreshTokenRecord{
+		TokenID:   "rft_reuse_proof_next",
+		TokenHash: "hash-reuse-proof-next",
+	}, refreshedAt, refreshedAt.Add(15*time.Minute), refreshedAt.Add(30*24*time.Hour)); err != nil {
+		t.Fatalf("first refresh: %v", err)
+	}
+
+	err := repository.ValidateRefreshGatewaySession(ctx, types.RefreshGatewayTokenCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		DeviceID:    "device-1",
+		Audience:    "push-gateway",
+		MFAFactorID: "mfa-factor-reuse-proof",
+		MFACode:     "123456",
+		TraceID:     "trace-reuse-proof",
+		RequestID:   "request-reuse-proof",
+	}, "rft_reuse_proof_login", "hash-reuse-proof-login", refreshedAt.Add(time.Minute))
+	if !errors.Is(err, types.ErrRefreshTokenReuseDetected) {
+		t.Fatalf("expected refresh reuse, got %v", err)
+	}
+	assertSessionStatus(t, ctx, pool, "session-refresh-reuse-proof", "REVOKED")
+	assertOutboxEvent(t, ctx, pool, "identity.session.revoked.v1", "identity_session", "event-refresh-reuse-proof-1")
+}
+
+func TestRepositoryValidateRefreshGatewaySessionExpiresTokenIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	seedUserCredential(t, ctx, pool, "password-hash")
+	repository := NewRepository(pool, WithSessionIDGenerator(func() (string, error) { return "session-refresh-expired-proof", nil }))
+	issuedAt := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := repository.LoginGatewaySession(ctx, types.LoginCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		DeviceID: "device-1",
+		Audience: "push-gateway",
+	}, types.RefreshTokenRecord{
+		TokenID:   "rft_expired_proof_login",
+		TokenHash: "hash-expired-proof-login",
+	}, issuedAt, issuedAt.Add(15*time.Minute), issuedAt.Add(time.Minute)); err != nil {
+		t.Fatalf("login before expired validation: %v", err)
+	}
+	err := repository.ValidateRefreshGatewaySession(ctx, types.RefreshGatewayTokenCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		DeviceID:    "device-1",
+		Audience:    "push-gateway",
+		MFAFactorID: "mfa-factor-expired-proof",
+		MFACode:     "123456",
+	}, "rft_expired_proof_login", "hash-expired-proof-login", issuedAt.Add(2*time.Minute))
+	if !errors.Is(err, types.ErrInvalidRefreshToken) {
+		t.Fatalf("expected invalid refresh token, got %v", err)
+	}
+	assertRefreshTokenStatus(t, ctx, pool, "rft_expired_proof_login", "REVOKED")
+	assertSessionStatus(t, ctx, pool, "session-refresh-expired-proof", "ACTIVE")
+}
+
 func TestRepositoryRefreshRequiresStepUpWhenMFAEnabledAfterLoginIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

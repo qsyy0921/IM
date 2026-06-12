@@ -1890,6 +1890,7 @@ func resetIdentityTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) 
 	t.Helper()
 	_, err := pool.Exec(ctx, `
 TRUNCATE
+    identity_challenge_delivery_repair_audit,
     identity_challenge_delivery_outbox,
     identity_mfa_recovery_codes,
     identity_mfa_factors,

@@ -47,7 +47,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("identity-service runtime wiring is idle; set NEXUSIM_IDENTITY_SERVICE_MODE=grpc, outbox-relay, or challenge-delivery-worker")
+		log.Println("identity-service runtime wiring is idle; set NEXUSIM_IDENTITY_SERVICE_MODE=grpc, outbox-relay, challenge-delivery-worker, or challenge-delivery-repair")
 		return nil
 	case "grpc":
 		return runGRPC()
@@ -55,6 +55,8 @@ func run() error {
 		return runOutboxRelay()
 	case "challenge-delivery-worker":
 		return runChallengeDeliveryWorker()
+	case "challenge-delivery-repair":
+		return runChallengeDeliveryRepair()
 	default:
 		return errors.New("unsupported NEXUSIM_IDENTITY_SERVICE_MODE")
 	}
@@ -495,6 +497,44 @@ func runChallengeDeliveryWorker() error {
 	return worker.Run(ctx)
 }
 
+func runChallengeDeliveryRepair() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	ids, err := parseInt64CSV(os.Getenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_IDS"))
+	if err != nil {
+		return err
+	}
+	stats, err := postgresinfra.NewChallengeDeliveryStore(pool).RepairDeliveries(
+		ctx,
+		types.ChallengeDeliveryRepairOptions{
+			DeliveryIDs: ids,
+			Mode:        envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_MODE", types.ChallengeDeliveryRepairModeAudit),
+			Operator:    envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_OPERATOR", "manual"),
+			Reason:      envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_REASON", "manual identity challenge delivery repair"),
+			DryRun:      envBool("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_DRY_RUN", false),
+		})
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"identity-service challenge delivery repair completed requested=%d audited=%d mutated=%d skipped=%d mode=%s dry_run=%t",
+		stats.Requested,
+		stats.Audited,
+		stats.Mutated,
+		stats.Skipped,
+		envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_MODE", types.ChallengeDeliveryRepairModeAudit),
+		envBool("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_DRY_RUN", false),
+	)
+	return nil
+}
+
 func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {
 	if strings.TrimSpace(addr) == "" {
 		return func() {}, nil
@@ -620,4 +660,21 @@ func splitCSV(value string) []string {
 		}
 	}
 	return result
+}
+
+func parseInt64CSV(value string) ([]int64, error) {
+	parts := strings.Split(value, ",")
+	result := make([]int64, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		parsed, err := strconv.ParseInt(part, 10, 64)
+		if err != nil || parsed <= 0 {
+			return nil, errors.New("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_IDS must contain positive integer ids")
+		}
+		result = append(result, parsed)
+	}
+	return result, nil
 }

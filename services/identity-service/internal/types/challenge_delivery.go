@@ -32,3 +32,24 @@ type ChallengeDeliveryStats struct {
 	DeadLettered int
 	Canceled     int
 }
+
+type ChallengeDeliveryRepairStats struct {
+	Requested int
+	Audited   int
+	Mutated   int
+	Skipped   int
+}
+
+const (
+	ChallengeDeliveryRepairModeAudit                = "audit"
+	ChallengeDeliveryRepairModeRedriveActivePending = "redrive-active-pending"
+	ChallengeDeliveryRepairModeCancelInactive       = "cancel-inactive"
+)
+
+type ChallengeDeliveryRepairOptions struct {
+	DeliveryIDs []int64
+	Mode        string
+	Operator    string
+	Reason      string
+	DryRun      bool
+}

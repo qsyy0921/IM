@@ -228,14 +228,15 @@ Challenge token rules:
 - `identity-service` supports three challenge delivery modes: `noop`, synchronous `webhook`, and durable `outbox`. In all modes PostgreSQL stores only `identity_challenges.token_hash`, never the raw challenge token.
 - In synchronous `webhook` mode, the webhook receives the raw one-time token in memory after the challenge row is created. If the webhook returns an error, the RPC returns stable `challenge delivery unavailable` and identity-service immediately marks the newly created challenge `EXPIRED` as compensation, so the unusable token hash does not consume the active challenge cap.
 - In durable `outbox` mode, the challenge row and `identity_challenge_delivery_outbox` row are committed in the same PostgreSQL transaction. The delivery row stores the challenge token encrypted with AES-GCM under `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY`; the RPC success means durable enqueue, not provider delivery. A separate `challenge-delivery-worker` locks ready rows with `FOR UPDATE SKIP LOCKED`, rechecks that the challenge is still `ACTIVE` and unexpired, decrypts the token in memory, calls the configured webhook, and marks the delivery `DELIVERED`, retry, `DLQ`, or `CANCELED`. Max-attempt DLQ expires the challenge and records delivery failure, preserving the active-cap safety property.
-- Delivery outcome is persisted on `identity_challenges` through `delivery_status`, `delivery_attempt_count`, `delivered_at`, `delivery_failed_at` and a sanitized `delivery_last_error`. This is a first durable retry / DLQ slice, but still not a full provider platform: provider templates, bounce handling, keyring / KMS rotation, DLQ repair audit and provider-specific alerts remain future work.
+- Delivery outcome is persisted on `identity_challenges` through `delivery_status`, `delivery_attempt_count`, `delivered_at`, `delivery_failed_at` and a sanitized `delivery_last_error`. This is a first durable retry / DLQ slice, but still not a full provider platform: provider templates, bounce handling, keyring / KMS rotation and provider-specific alerts remain future work.
+- `NEXUSIM_IDENTITY_SERVICE_MODE=challenge-delivery-repair` is a one-shot operator tool with audit-first semantics. It accepts explicit delivery row IDs and supports `audit`, `redrive-active-pending` and `cancel-inactive`. It never decrypts challenge tokens, never marks delivery `DELIVERED`, and never reactivates `EXPIRED` / `CONSUMED` challenges. DLQ rows are audited/skipped because worker DLQ has already expired the challenge; users must request a fresh challenge through the normal API.
 - `/debug/metrics` exposes only aggregate challenge delivery counters: configured mode, total requests, success / failure counts, latency avg / max and last success / failure timestamps. It must not expose raw challenge tokens, user IDs, destinations, template data or provider error bodies.
 
 Known hardening still pending:
 
 - timing- and sender-side account-enumeration resistance;
 - tenant / IP / device rate limits for challenge creation and confirmation;
-- provider-specific email / SMS templates, bounce handling, DLQ repair / redrive audit, keyring / KMS rotation and provider-grade alerting;
+- provider-specific email / SMS templates, bounce handling, keyring / KMS rotation and provider-grade alerting;
 - WebAuthn and OIDC federation;
 - production alerting for repeated challenge failures.
 

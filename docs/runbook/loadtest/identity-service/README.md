@@ -12,6 +12,7 @@
 - email/phone verification 与 password reset challenge，数据库只保存 token hash。
 - challenge webhook sender、delivery failure 过期补偿、debug metrics、持久状态审计。
 - durable challenge delivery outbox：challenge row 与 encrypted delivery row 同事务提交，worker 解密后调用 webhook，支持 retry / DLQ / canceled。
+- challenge delivery repair / audit：一次性 operator mode 支持 `audit`、`redrive-active-pending`、`cancel-inactive`；DLQ row 不会复活旧 challenge token，必须走正常 API 重新申请 challenge。
 - TOTP MFA 生命周期、Login MFA enforcement、MFA lockout、recovery codes、Refresh step-up 和 Refresh 期间直接提交 MFA proof。
 
 当前 `challenge delivery outbox` 真实进程 smoke 已证明：
@@ -38,5 +39,6 @@ RegisterUser
 - challenge token 不落库，PostgreSQL 只保存 `token_hash`；delivery outbox 里保存 AES-GCM 加密后的 token。
 - RPC 成功表示“durable enqueue”，不是第三方 provider 已送达；真实投递由 worker 异步完成。
 - worker 使用 ready query + row lock 拉取 delivery outbox，成功后标记 `DELIVERED`；失败按 retry / DLQ 处理。
+- repair 工具是 audit-first，不解密 token、不直接标记 `DELIVERED`、不把 `EXPIRED` challenge 复活；这比把 challenge delivery DLQ 当普通 Kafka outbox replay 更安全。
 - 本轮 smoke 没开 `NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN`，Confirm 使用的是 webhook 收到的真实 token，所以能证明 worker 链路生效。
-- 该能力仍不是完整 email/SMS provider 平台；provider 模板、bounce handling、DLQ repair audit、KMS/HSM keyring、统一告警仍是后续项。
+- 该能力仍不是完整 email/SMS provider 平台；provider 模板、bounce handling、KMS/HSM keyring、统一告警仍是后续项。

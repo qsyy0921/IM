@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -112,6 +113,49 @@ func (store *ChallengeDeliveryStore) ProcessReadyBatch(
 
 	if err := tx.Commit(ctx); err != nil {
 		return types.ChallengeDeliveryStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	return stats, nil
+}
+
+func (store *ChallengeDeliveryStore) RepairDeliveries(ctx context.Context, options types.ChallengeDeliveryRepairOptions) (types.ChallengeDeliveryRepairStats, error) {
+	if store == nil || store.pool == nil {
+		return types.ChallengeDeliveryRepairStats{}, errors.New("identity challenge delivery store is not configured")
+	}
+	mode := normalizeChallengeDeliveryRepairMode(options.Mode)
+	if mode == "" {
+		return types.ChallengeDeliveryRepairStats{}, types.NewInvalidArgument("unsupported identity challenge delivery repair mode")
+	}
+	ids := normalizeChallengeDeliveryIDs(options.DeliveryIDs)
+	if len(ids) == 0 {
+		return types.ChallengeDeliveryRepairStats{}, types.NewInvalidArgument("delivery_ids are required")
+	}
+	operator := normalizeChallengeDeliveryRepairText(options.Operator, "manual")
+	reason := normalizeChallengeDeliveryRepairText(options.Reason, "manual identity challenge delivery repair")
+
+	tx, err := store.pool.Begin(ctx)
+	if err != nil {
+		return types.ChallengeDeliveryRepairStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	stats := types.ChallengeDeliveryRepairStats{Requested: len(ids)}
+	now := store.now()
+	for _, id := range ids {
+		result, err := store.repairDeliveryLocked(ctx, tx, id, mode, operator, reason, options.DryRun, now)
+		if err != nil {
+			return types.ChallengeDeliveryRepairStats{}, err
+		}
+		switch result {
+		case challengeDeliveryRepairOutcomeAudited:
+			stats.Audited++
+		case challengeDeliveryRepairOutcomeMutated:
+			stats.Mutated++
+		case challengeDeliveryRepairOutcomeSkipped:
+			stats.Skipped++
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.ChallengeDeliveryRepairStats{}, types.NewDBWriteFailed(err.Error())
 	}
 	return stats, nil
 }
@@ -350,4 +394,356 @@ WHERE tenant_id = $1
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
+}
+
+type challengeDeliveryRepairRow struct {
+	id                      int64
+	tenantID                types.TenantID
+	userID                  types.UserID
+	challengeID             types.ChallengeID
+	challengeType           types.ChallengeType
+	channel                 types.VerificationChannel
+	destination             string
+	deliveryStatus          string
+	retryCount              int
+	lastError               string
+	deadLetteredAt          *time.Time
+	deliveryExpiresAt       time.Time
+	challengeStatus         string
+	challengeDeliveryStatus string
+	challengeExpiresAt      time.Time
+}
+
+const (
+	challengeDeliveryRepairOutcomeAudited = "AUDITED"
+	challengeDeliveryRepairOutcomeMutated = "MUTATED"
+	challengeDeliveryRepairOutcomeSkipped = "SKIPPED"
+)
+
+func (store *ChallengeDeliveryStore) repairDeliveryLocked(
+	ctx context.Context,
+	tx pgx.Tx,
+	id int64,
+	mode string,
+	operator string,
+	reason string,
+	dryRun bool,
+	now time.Time,
+) (string, error) {
+	row, err := store.lockChallengeDeliveryForRepair(ctx, tx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return challengeDeliveryRepairOutcomeSkipped, nil
+	}
+	if err != nil {
+		return "", err
+	}
+
+	planned := store.planChallengeDeliveryRepair(row, mode, now)
+	if planned.outcome == challengeDeliveryRepairOutcomeMutated && !dryRun {
+		if err := store.applyChallengeDeliveryRepair(ctx, tx, row, planned, now); err != nil {
+			return "", err
+		}
+	}
+	auditOutcome := planned.outcome
+	if dryRun && planned.outcome == challengeDeliveryRepairOutcomeMutated {
+		auditOutcome = challengeDeliveryRepairOutcomeAudited
+	}
+	if err := store.insertChallengeDeliveryRepairAudit(ctx, tx, row, planned, mode, auditOutcome, operator, reason, dryRun, now); err != nil {
+		return "", err
+	}
+	return auditOutcome, nil
+}
+
+type plannedChallengeDeliveryRepair struct {
+	outcome                         string
+	skipReason                      string
+	newDeliveryStatus               string
+	newChallengeStatus              string
+	newChallengeDeliveryStatus      string
+	redriveActivePending            bool
+	cancelInactiveChallengeDelivery bool
+}
+
+func (store *ChallengeDeliveryStore) planChallengeDeliveryRepair(row challengeDeliveryRepairRow, mode string, now time.Time) plannedChallengeDeliveryRepair {
+	planned := plannedChallengeDeliveryRepair{
+		outcome:                    challengeDeliveryRepairOutcomeAudited,
+		newDeliveryStatus:          row.deliveryStatus,
+		newChallengeStatus:         row.challengeStatus,
+		newChallengeDeliveryStatus: row.challengeDeliveryStatus,
+	}
+	if mode == types.ChallengeDeliveryRepairModeAudit {
+		return planned
+	}
+	if row.deliveryStatus != types.ChallengeDeliveryStatusPending {
+		planned.outcome = challengeDeliveryRepairOutcomeSkipped
+		if row.deliveryStatus == types.ChallengeDeliveryStatusDLQ {
+			planned.skipReason = "dlq_requires_new_challenge"
+		} else {
+			planned.skipReason = "delivery_status_not_pending"
+		}
+		return planned
+	}
+
+	switch mode {
+	case types.ChallengeDeliveryRepairModeRedriveActivePending:
+		if row.challengeStatus != "ACTIVE" {
+			planned.outcome = challengeDeliveryRepairOutcomeSkipped
+			planned.skipReason = "challenge_not_active"
+			return planned
+		}
+		if !row.deliveryExpiresAt.After(now) || !row.challengeExpiresAt.After(now) {
+			planned.outcome = challengeDeliveryRepairOutcomeSkipped
+			planned.skipReason = "challenge_or_delivery_expired"
+			return planned
+		}
+		planned.outcome = challengeDeliveryRepairOutcomeMutated
+		planned.newDeliveryStatus = types.ChallengeDeliveryStatusPending
+		planned.newChallengeStatus = "ACTIVE"
+		planned.newChallengeDeliveryStatus = "PENDING"
+		planned.redriveActivePending = true
+		return planned
+	case types.ChallengeDeliveryRepairModeCancelInactive:
+		if row.challengeStatus == "ACTIVE" && row.challengeExpiresAt.After(now) && row.deliveryExpiresAt.After(now) {
+			planned.outcome = challengeDeliveryRepairOutcomeSkipped
+			planned.skipReason = "challenge_still_active"
+			return planned
+		}
+		planned.outcome = challengeDeliveryRepairOutcomeMutated
+		planned.newDeliveryStatus = types.ChallengeDeliveryStatusCanceled
+		planned.newChallengeStatus = row.challengeStatus
+		if planned.newChallengeStatus == "ACTIVE" {
+			planned.newChallengeStatus = "EXPIRED"
+		}
+		planned.newChallengeDeliveryStatus = "FAILED"
+		planned.cancelInactiveChallengeDelivery = true
+		return planned
+	default:
+		planned.outcome = challengeDeliveryRepairOutcomeSkipped
+		planned.skipReason = "unsupported_repair_mode"
+		return planned
+	}
+}
+
+func (store *ChallengeDeliveryStore) lockChallengeDeliveryForRepair(ctx context.Context, tx pgx.Tx, id int64) (challengeDeliveryRepairRow, error) {
+	var row challengeDeliveryRepairRow
+	err := tx.QueryRow(ctx, `
+SELECT
+    current.id,
+    current.tenant_id,
+    current.user_id,
+    current.challenge_id,
+    current.challenge_type,
+    current.channel,
+    current.destination,
+    current.status,
+    current.retry_count,
+    current.last_error,
+    current.dead_lettered_at,
+    current.expires_at,
+    challenge.status,
+    challenge.delivery_status,
+    challenge.expires_at
+FROM identity_challenge_delivery_outbox current
+JOIN identity_challenges challenge
+  ON challenge.tenant_id = current.tenant_id
+ AND challenge.user_id = current.user_id
+ AND challenge.challenge_id = current.challenge_id
+WHERE current.id = $1
+FOR UPDATE OF current, challenge
+`, id).Scan(
+		&row.id,
+		&row.tenantID,
+		&row.userID,
+		&row.challengeID,
+		&row.challengeType,
+		&row.channel,
+		&row.destination,
+		&row.deliveryStatus,
+		&row.retryCount,
+		&row.lastError,
+		&row.deadLetteredAt,
+		&row.deliveryExpiresAt,
+		&row.challengeStatus,
+		&row.challengeDeliveryStatus,
+		&row.challengeExpiresAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return challengeDeliveryRepairRow{}, err
+		}
+		return challengeDeliveryRepairRow{}, types.NewDBWriteFailed(err.Error())
+	}
+	return row, nil
+}
+
+func (store *ChallengeDeliveryStore) applyChallengeDeliveryRepair(ctx context.Context, tx pgx.Tx, row challengeDeliveryRepairRow, planned plannedChallengeDeliveryRepair, now time.Time) error {
+	switch {
+	case planned.redriveActivePending:
+		return store.redriveActivePendingDelivery(ctx, tx, row, now)
+	case planned.cancelInactiveChallengeDelivery:
+		return store.cancelSelectedInactiveDelivery(ctx, tx, row, now)
+	default:
+		return nil
+	}
+}
+
+func (store *ChallengeDeliveryStore) redriveActivePendingDelivery(ctx context.Context, tx pgx.Tx, row challengeDeliveryRepairRow, now time.Time) error {
+	tag, err := tx.Exec(ctx, `
+UPDATE identity_challenge_delivery_outbox
+SET last_error = '',
+    next_retry_at = NULL,
+    available_at = $2,
+    updated_at = $2
+WHERE id = $1
+`, row.id, now)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if tag.RowsAffected() != 1 {
+		return types.NewDBWriteFailed("identity challenge delivery redrive row count mismatch")
+	}
+
+	tag, err = tx.Exec(ctx, `
+UPDATE identity_challenges
+SET delivery_status = 'PENDING',
+    delivery_failed_at = NULL,
+    delivery_last_error = '',
+    updated_at = $4
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND challenge_id = $3
+`, row.tenantID, row.userID, row.challengeID, now)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if tag.RowsAffected() != 1 {
+		return types.NewDBWriteFailed("identity challenge redrive row count mismatch")
+	}
+	return nil
+}
+
+func (store *ChallengeDeliveryStore) cancelSelectedInactiveDelivery(ctx context.Context, tx pgx.Tx, row challengeDeliveryRepairRow, now time.Time) error {
+	tag, err := tx.Exec(ctx, `
+UPDATE identity_challenge_delivery_outbox
+SET status = 'CANCELED',
+    last_error = 'challenge no longer active before delivery',
+    next_retry_at = NULL,
+    updated_at = $2
+WHERE id = $1
+`, row.id, now)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if tag.RowsAffected() != 1 {
+		return types.NewDBWriteFailed("identity challenge delivery cancel row count mismatch")
+	}
+	tag, err = tx.Exec(ctx, `
+UPDATE identity_challenges
+SET status = CASE WHEN status = 'ACTIVE' THEN 'EXPIRED' ELSE status END,
+    delivery_status = 'FAILED',
+    delivery_failed_at = $4,
+    delivery_last_error = 'challenge no longer active before delivery',
+    updated_at = $4
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND challenge_id = $3
+`, row.tenantID, row.userID, row.challengeID, now)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if tag.RowsAffected() != 1 {
+		return types.NewDBWriteFailed("identity challenge cancel row count mismatch")
+	}
+	return nil
+}
+
+func (store *ChallengeDeliveryStore) insertChallengeDeliveryRepairAudit(
+	ctx context.Context,
+	tx pgx.Tx,
+	row challengeDeliveryRepairRow,
+	planned plannedChallengeDeliveryRepair,
+	mode string,
+	outcome string,
+	operator string,
+	reason string,
+	dryRun bool,
+	now time.Time,
+) error {
+	_, err := tx.Exec(ctx, `
+INSERT INTO identity_challenge_delivery_repair_audit (
+    delivery_id,
+    tenant_id,
+    user_id,
+    challenge_id,
+    previous_delivery_status,
+    previous_challenge_status,
+    previous_challenge_delivery_status,
+    previous_retry_count,
+    previous_last_error,
+    previous_dead_lettered_at,
+    new_delivery_status,
+    new_challenge_status,
+    new_challenge_delivery_status,
+    repair_mode,
+    repair_outcome,
+    skip_reason,
+    dry_run,
+    repair_operator,
+    repair_reason,
+    repaired_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+    $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+)
+`, row.id, row.tenantID, row.userID, row.challengeID,
+		row.deliveryStatus, row.challengeStatus, row.challengeDeliveryStatus,
+		row.retryCount, row.lastError, row.deadLetteredAt,
+		planned.newDeliveryStatus, planned.newChallengeStatus, planned.newChallengeDeliveryStatus,
+		mode, outcome, planned.skipReason, dryRun, operator, reason, now)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func normalizeChallengeDeliveryRepairMode(mode string) string {
+	mode = strings.ToLower(strings.TrimSpace(mode))
+	if mode == "" {
+		return types.ChallengeDeliveryRepairModeAudit
+	}
+	switch mode {
+	case types.ChallengeDeliveryRepairModeAudit,
+		types.ChallengeDeliveryRepairModeRedriveActivePending,
+		types.ChallengeDeliveryRepairModeCancelInactive:
+		return mode
+	default:
+		return ""
+	}
+}
+
+func normalizeChallengeDeliveryIDs(deliveryIDs []int64) []int64 {
+	seen := make(map[int64]struct{}, len(deliveryIDs))
+	ids := make([]int64, 0, len(deliveryIDs))
+	for _, id := range deliveryIDs {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+func normalizeChallengeDeliveryRepairText(value string, fallback string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		value = fallback
+	}
+	if len(value) > 256 {
+		return value[:256]
+	}
+	return value
 }

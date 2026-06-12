@@ -1,8 +1,8 @@
 # push-gateway identity-service token smoke
 
-本报告记录 `identity-service` 作为 push-gateway HMAC token 签发方的最小真实进程 smoke。
+本报告记录 `identity-service` 作为 push-gateway gateway token 签发方的最小真实进程 smoke。
 
-这不是完整 OAuth / JWK / identity 平台验收；它只证明 push-gateway 可以不再依赖 runner 本地签名，而由独立 identity-service 签发短期 gateway token，同时 push-gateway 握手仍保持本地验签，不同步 RPC 依赖 identity-service。
+这不是完整 OAuth / identity 平台验收；它只证明 push-gateway 可以不再依赖 runner 本地签名，而由独立 identity-service 签发短期 gateway token，同时 push-gateway 握手仍保持本地验签，不同步 RPC 依赖 identity-service。2026-06-12 已补充标准三段 JWT HS256 兼容 smoke；当前 JWKS 是 identity debug server 上的内部对称 key 发现入口，不应作为公网生产 JWKS。
 
 ## Chain
 
@@ -20,6 +20,8 @@ identity-service IssueGatewayToken
 
 ## Command
 
+### Legacy gateway token smoke
+
 ```powershell
 .\tools\local-up.ps1
 .\loadtest\pushgateway\run-local-smoke.ps1 `
@@ -30,7 +32,21 @@ identity-service IssueGatewayToken
   -RunName push-gateway-identity-token-smoke-20260612-identity-v4
 ```
 
+### JWT gateway token smoke
+
+```powershell
+. .\tools\go-env.ps1
+.\loadtest\pushgateway\run-local-smoke.ps1 `
+  -Scenario full `
+  -UseIdentityServiceToken `
+  -PushAuthMode hmac `
+  -IdentityGatewayTokenFormat jwt `
+  -RunName push-gateway-identity-jwt-token-20260612-192547
+```
+
 ## Result
+
+### Legacy gateway token smoke
 
 | Item | Value |
 | --- | --- |
@@ -43,6 +59,26 @@ identity-service IssueGatewayToken
 | `push_auth_mode` | `hmac` |
 | `push_auth_token_source` | `identity_service` |
 | `push_auth_query_identity_sent` | `false` |
+
+### JWT gateway token smoke
+
+| Item | Value |
+| --- | --- |
+| Result dir | `H:\NexusIM\loadtest-results\push-gateway-identity-jwt-token-20260612-192547` |
+| Summary | `H:\NexusIM\loadtest-results\push-gateway-identity-jwt-token-20260612-192547\pushgateway-summary.json` |
+| Commit | `dbca0e66628432b58a2517da23ea9972d34900e2` |
+| Dirty | `false` |
+| Success | `true` |
+| `identity_target` | `127.0.0.1:11610` |
+| `push_auth_mode` | `hmac` |
+| `push_auth_token_source` | `identity_service` |
+| `identity_gateway_token_format` | `jwt` |
+| `push_auth_query_identity_sent` | `false` |
+| server hello | `server.hello`, `session_id=sess_78f4bd94584f677328fe0a20d2e68dfe` |
+| notify | `delivery.notify`, `source_event_type=message.persisted.v1`, `conversation_seq=2` |
+| PullInbox | `item_count=1`, `max_seq=2` |
+| ACK | `delivery.ack.ok last_received_seq=2` |
+| delivery outbox | `PUBLISHED=2`, `PENDING=0`, `DLQ=0` |
 
 Key facts:
 
@@ -70,10 +106,18 @@ NexusIM now has a dedicated identity-service that can issue short-lived push gat
 push-gateway still verifies tokens locally, so identity-service is not on the WebSocket hot path.
 ```
 
+JWT 兼容 smoke 额外支持：
+
+```text
+identity-service can issue a standard three-part JWT gateway token.
+push-gateway can verify that JWT locally with the existing shared-secret verifier path.
+the smoke still uses Authorization: Bearer and does not trust query tenant/user identity.
+```
+
 Remaining production work:
 
 - real login / credential proof;
-- JWT/JWK or gateway-token standardization;
-- device revoke projection or short-TTL-only revoke policy clarification;
-- session revoke propagation to online gateways;
+- refresh token and rotation;
+- asymmetric JWT/JWK key ring and multi issuer support;
+- deny-list TTL / compact / repair policy;
 - mTLS / gateway verified metadata for other gRPC services.

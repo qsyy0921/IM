@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package nexusim.policy.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/policy/v1;policyv1";
+
+service PolicyService {
+  rpc CheckMessageAction(CheckMessageActionRequest) returns (CheckMessageActionResponse);
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+enum MessageAction {
+  MESSAGE_ACTION_UNSPECIFIED = 0;
+  MESSAGE_ACTION_SEND = 1;
+  MESSAGE_ACTION_EDIT = 2;
+  MESSAGE_ACTION_REVOKE = 3;
+  MESSAGE_ACTION_DELETE = 4;
+}
+
+message CheckMessageActionRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  MessageAction action = 3;
+  string message_id = 4;
+}
+
+message CheckMessageActionResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  string conversation_id = 3;
+  MessageAction action = 4;
+  bool allowed = 5;
+  int64 permission_version = 6;
+  string classification = 7;
+  string reason = 8;
+  string message_id = 9;
+}

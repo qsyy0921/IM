@@ -69,10 +69,29 @@ func runGRPCServer() error {
 	}
 	defer stopDebug()
 
-	policy := rpcinfra.NewStaticPolicy()
-	policy.Allowed = envBool("NEXUSIM_MOCK_POLICY_ALLOWED", policy.Allowed)
-	policy.PermissionVersion = envInt64("NEXUSIM_MOCK_PERMISSION_VERSION", policy.PermissionVersion)
-	policy.Classification = envString("NEXUSIM_MOCK_CLASSIFICATION", policy.Classification)
+	staticPolicy := rpcinfra.NewStaticPolicy()
+	staticPolicy.Allowed = envBool("NEXUSIM_MOCK_POLICY_ALLOWED", staticPolicy.Allowed)
+	staticPolicy.PermissionVersion = envInt64("NEXUSIM_MOCK_PERMISSION_VERSION", staticPolicy.PermissionVersion)
+	staticPolicy.Classification = envString("NEXUSIM_MOCK_CLASSIFICATION", staticPolicy.Classification)
+
+	var policy app.PolicyCheckPort = staticPolicy
+	if policyAddr := envString("NEXUSIM_POLICY_SERVICE_ADDR", ""); policyAddr != "" {
+		client, closeClient, err := rpcinfra.DialPolicyClient(
+			ctx,
+			policyAddr,
+			envDuration("NEXUSIM_POLICY_RPC_TIMEOUT", 30*time.Millisecond),
+		)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err := closeClient(); err != nil {
+				log.Printf("close policy-service client: %v", err)
+			}
+		}()
+		policy = client
+		log.Printf("message-service using policy-service at %s", policyAddr)
+	}
 
 	var conversation app.ConversationQueryPort
 	if conversationAddr := envString("NEXUSIM_CONVERSATION_SERVICE_ADDR", ""); conversationAddr != "" {
@@ -94,7 +113,7 @@ func runGRPCServer() error {
 	} else {
 		staticConversation := rpcinfra.NewStaticConversation()
 		staticConversation.MemberVersion = envInt64("NEXUSIM_MOCK_MEMBER_VERSION", staticConversation.MemberVersion)
-		staticConversation.PermissionVersion = policy.PermissionVersion
+		staticConversation.PermissionVersion = staticPolicy.PermissionVersion
 		staticConversation.FanoutPolicyVersion = envInt64("NEXUSIM_MOCK_FANOUT_POLICY_VERSION", staticConversation.FanoutPolicyVersion)
 		conversation = staticConversation
 	}

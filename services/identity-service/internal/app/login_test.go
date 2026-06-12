@@ -149,20 +149,83 @@ func TestRefreshGatewayTokenUseCaseRotatesRefreshToken(t *testing.T) {
 	}
 }
 
+func TestRequestVerificationChallengeUseCaseRequiresCurrentPassword(t *testing.T) {
+	repository := &fakeIdentityRepository{
+		credential: types.UserCredential{
+			TenantID:     "tenant-1",
+			UserID:       "user-1",
+			Status:       "ACTIVE",
+			PasswordHash: "expected-hash",
+		},
+	}
+	verifier := &fakePasswordVerifier{ok: false}
+	useCase := NewRequestVerificationChallengeUseCase(repository, fakeChallengeTokenCodec{}, verifier, ChallengeOptions{ReturnDevToken: true})
+	_, err := useCase.Execute(context.Background(), types.RequestVerificationChallengeCommand{
+		TenantID:    "tenant-1",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "user1@example.com",
+		Password:    "wrong",
+	})
+	if !errors.Is(err, types.ErrInvalidCredentials) {
+		t.Fatalf("expected invalid credentials, got %v", err)
+	}
+	if repository.createVerificationCalled {
+		t.Fatal("verification challenge should not be created after invalid password")
+	}
+
+	verifier.ok = true
+	result, err := useCase.Execute(context.Background(), types.RequestVerificationChallengeCommand{
+		TenantID:    "tenant-1",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "user1@example.com",
+		Password:    "correct horse battery staple",
+	})
+	if err != nil {
+		t.Fatalf("request verification: %v", err)
+	}
+	if !repository.createVerificationCalled || result.DevChallengeToken != "challenge-token" {
+		t.Fatalf("expected challenge creation with dev token, result=%+v called=%v", result, repository.createVerificationCalled)
+	}
+}
+
+func TestConfirmPasswordResetUseCaseHashesNewPassword(t *testing.T) {
+	repository := &fakeIdentityRepository{}
+	useCase := NewConfirmPasswordResetUseCase(repository, fakeChallengeTokenCodec{}, fakePasswordHasher{hash: "new-password-hash"})
+	_, err := useCase.Execute(context.Background(), types.ConfirmPasswordResetCommand{
+		TenantID:       "tenant-1",
+		UserID:         "user-1",
+		ChallengeID:    "challenge-1",
+		ChallengeToken: "challenge-token",
+		NewPassword:    "new correct horse battery staple",
+	})
+	if err != nil {
+		t.Fatalf("confirm password reset: %v", err)
+	}
+	if !repository.confirmPasswordResetCalled || repository.resetPasswordHash != "new-password-hash" || repository.resetTokenHash == "" {
+		t.Fatalf("expected hashed password reset, called=%v password=%q token=%q", repository.confirmPasswordResetCalled, repository.resetPasswordHash, repository.resetTokenHash)
+	}
+}
+
 type fakeIdentityRepository struct {
-	credential           types.UserCredential
-	registerCalled       bool
-	registerPasswordHash string
-	loginCalled          bool
-	failureRecorded      bool
-	failureAt            time.Time
-	lockUntil            time.Time
-	maxFailedAttempts    int
-	failureWindowStart   time.Time
-	recordFailureErr     error
-	refreshCalled        bool
-	presentedTokenID     types.RefreshTokenID
-	presentedTokenHash   string
+	credential                 types.UserCredential
+	registerCalled             bool
+	registerPasswordHash       string
+	loginCalled                bool
+	failureRecorded            bool
+	failureAt                  time.Time
+	lockUntil                  time.Time
+	maxFailedAttempts          int
+	failureWindowStart         time.Time
+	recordFailureErr           error
+	refreshCalled              bool
+	presentedTokenID           types.RefreshTokenID
+	presentedTokenHash         string
+	createVerificationCalled   bool
+	confirmPasswordResetCalled bool
+	resetPasswordHash          string
+	resetTokenHash             string
 }
 
 func (repo *fakeIdentityRepository) RegisterUser(_ context.Context, command types.RegisterUserCommand, passwordHash string, createdAt time.Time) (types.RegisterUserResult, error) {
@@ -219,6 +282,26 @@ func (repo *fakeIdentityRepository) RefreshGatewaySession(_ context.Context, _ t
 	}, nil
 }
 
+func (repo *fakeIdentityRepository) CreateVerificationChallenge(context.Context, types.RequestVerificationChallengeCommand, types.ChallengeType, types.ChallengeRecord, time.Time, time.Time) (types.RequestVerificationChallengeResult, error) {
+	repo.createVerificationCalled = true
+	return types.RequestVerificationChallengeResult{TenantID: "tenant-1", UserID: "user-1", ChallengeID: "challenge-1", Channel: types.VerificationChannelEmail, Destination: "user1@example.com"}, nil
+}
+
+func (repo *fakeIdentityRepository) ConfirmVerificationChallenge(context.Context, types.ConfirmVerificationChallengeCommand, string, time.Time) (types.ConfirmVerificationChallengeResult, error) {
+	return types.ConfirmVerificationChallengeResult{}, nil
+}
+
+func (repo *fakeIdentityRepository) CreatePasswordResetChallenge(context.Context, types.RequestPasswordResetCommand, types.ChallengeRecord, time.Time, time.Time) (types.RequestPasswordResetResult, error) {
+	return types.RequestPasswordResetResult{}, nil
+}
+
+func (repo *fakeIdentityRepository) ConfirmPasswordReset(_ context.Context, _ types.ConfirmPasswordResetCommand, tokenHash string, passwordHash string, _ time.Time) (types.ConfirmPasswordResetResult, error) {
+	repo.confirmPasswordResetCalled = true
+	repo.resetTokenHash = tokenHash
+	repo.resetPasswordHash = passwordHash
+	return types.ConfirmPasswordResetResult{TenantID: "tenant-1", UserID: "user-1"}, nil
+}
+
 func (repo *fakeIdentityRepository) IssueGatewaySession(context.Context, types.IssueGatewayTokenCommand, time.Time, time.Time) (types.IssueGatewayTokenResult, error) {
 	return types.IssueGatewayTokenResult{}, nil
 }
@@ -272,4 +355,14 @@ func (fakeRefreshTokenCodec) ParseRefreshToken(token string) (types.ParsedRefres
 
 func (fakeRefreshTokenCodec) HashRefreshTokenSecret(secret string) string {
 	return "hash-" + secret
+}
+
+type fakeChallengeTokenCodec struct{}
+
+func (fakeChallengeTokenCodec) NewChallengeToken() (string, types.ChallengeRecord, error) {
+	return "challenge-token", types.ChallengeRecord{ChallengeID: "challenge-1", TokenHash: "challenge-hash"}, nil
+}
+
+func (fakeChallengeTokenCodec) HashChallengeToken(token string) string {
+	return "hash-" + token
 }

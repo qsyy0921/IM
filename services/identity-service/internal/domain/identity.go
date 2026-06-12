@@ -13,6 +13,8 @@ const (
 	MaxGatewayTTL          = 24 * time.Hour
 	DefaultRefreshTTL      = 30 * 24 * time.Hour
 	MaxRefreshTTL          = 90 * 24 * time.Hour
+	DefaultChallengeTTL    = 15 * time.Minute
+	MaxChallengeTTL        = 24 * time.Hour
 	MinPasswordLength      = 8
 )
 
@@ -77,6 +79,40 @@ func ValidateIssueGatewayToken(command types.IssueGatewayTokenCommand) error {
 	return nil
 }
 
+func ValidateRequestVerificationChallenge(command types.RequestVerificationChallengeCommand) error {
+	if err := validateChallengeTarget(command.TenantID, command.UserID, command.Channel, command.Destination); err != nil {
+		return err
+	}
+	if strings.TrimSpace(command.Password) == "" {
+		return types.NewInvalidArgument("password is required")
+	}
+	if command.Channel == types.VerificationChannelEmail && !strings.Contains(command.Destination, "@") {
+		return types.NewInvalidArgument("email destination is invalid")
+	}
+	return nil
+}
+
+func ValidateConfirmVerificationChallenge(command types.ConfirmVerificationChallengeCommand) error {
+	return validateChallengeConfirmation(command.TenantID, command.UserID, command.ChallengeID, command.ChallengeToken)
+}
+
+func ValidateRequestPasswordReset(command types.RequestPasswordResetCommand) error {
+	return validateChallengeTarget(command.TenantID, command.UserID, command.Channel, command.Destination)
+}
+
+func ValidateConfirmPasswordReset(command types.ConfirmPasswordResetCommand) error {
+	if err := validateChallengeConfirmation(command.TenantID, command.UserID, command.ChallengeID, command.ChallengeToken); err != nil {
+		return err
+	}
+	if strings.TrimSpace(command.NewPassword) == "" {
+		return types.NewInvalidArgument("new_password is required")
+	}
+	if len(command.NewPassword) < MinPasswordLength {
+		return types.NewInvalidArgument("new_password is too short")
+	}
+	return nil
+}
+
 func NormalizeAudience(audience string) string {
 	audience = strings.TrimSpace(audience)
 	if audience == "" {
@@ -107,6 +143,28 @@ func NormalizeRefreshTTL(seconds int64) time.Duration {
 	return ttl
 }
 
+func NormalizeChallengeTTL(seconds int64) time.Duration {
+	if seconds <= 0 {
+		return DefaultChallengeTTL
+	}
+	ttl := time.Duration(seconds) * time.Second
+	if ttl > MaxChallengeTTL {
+		return MaxChallengeTTL
+	}
+	return ttl
+}
+
+func ChallengeTypeForVerificationChannel(channel types.VerificationChannel) types.ChallengeType {
+	switch channel {
+	case types.VerificationChannelEmail:
+		return types.ChallengeTypeEmailVerification
+	case types.VerificationChannelPhone:
+		return types.ChallengeTypePhoneVerification
+	default:
+		return ""
+	}
+}
+
 func ValidateRevokeTarget(userID types.UserID, deviceID types.DeviceID) error {
 	if userID == "" {
 		return types.NewInvalidArgument("user_id is required")
@@ -120,6 +178,38 @@ func ValidateRevokeTarget(userID types.UserID, deviceID types.DeviceID) error {
 func ValidateSessionID(sessionID types.SessionID) error {
 	if sessionID == "" {
 		return types.NewInvalidArgument("session_id is required")
+	}
+	return nil
+}
+
+func validateChallengeTarget(tenantID types.TenantID, userID types.UserID, channel types.VerificationChannel, destination string) error {
+	if tenantID == "" {
+		return types.NewInvalidArgument("tenant_id is required")
+	}
+	if userID == "" {
+		return types.NewInvalidArgument("user_id is required")
+	}
+	if channel != types.VerificationChannelEmail && channel != types.VerificationChannelPhone {
+		return types.NewInvalidArgument("verification channel is invalid")
+	}
+	if strings.TrimSpace(destination) == "" {
+		return types.NewInvalidArgument("destination is required")
+	}
+	return nil
+}
+
+func validateChallengeConfirmation(tenantID types.TenantID, userID types.UserID, challengeID types.ChallengeID, token string) error {
+	if tenantID == "" {
+		return types.NewInvalidArgument("tenant_id is required")
+	}
+	if userID == "" {
+		return types.NewInvalidArgument("user_id is required")
+	}
+	if challengeID == "" {
+		return types.NewInvalidArgument("challenge_id is required")
+	}
+	if strings.TrimSpace(token) == "" {
+		return types.NewInvalidArgument("challenge_token is required")
 	}
 	return nil
 }

@@ -201,6 +201,123 @@ func TestRepositoryLoginAndRefreshRotationIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryVerificationAndPasswordResetChallengesIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	repository := NewRepository(
+		pool,
+		WithSessionIDGenerator(func() (string, error) { return "session-reset-1", nil }),
+		WithEventIDGenerator(func() (string, error) { return "event-password-reset-session-revoked-1", nil }),
+	)
+	issuedAt := time.Unix(1_800_000_000, 0).UTC()
+	expiresAt := issuedAt.Add(15 * time.Minute)
+	if _, err := repository.RegisterUser(ctx, types.RegisterUserCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+	}, "old-password-hash", issuedAt); err != nil {
+		t.Fatalf("register user: %v", err)
+	}
+	if _, err := repository.LoginGatewaySession(ctx, types.LoginCommand{
+		TenantID:  "tenant-identity",
+		UserID:    "user-1",
+		DeviceID:  "device-1",
+		Audience:  "push-gateway",
+		TraceID:   "trace-login",
+		RequestID: "request-login",
+	}, types.RefreshTokenRecord{
+		TokenID:   "rft_reset",
+		TokenHash: "hash-reset",
+	}, issuedAt.Add(10*time.Second), issuedAt.Add(15*time.Minute), issuedAt.Add(30*24*time.Hour)); err != nil {
+		t.Fatalf("login before reset: %v", err)
+	}
+	assertSessionStatus(t, ctx, pool, "session-reset-1", "ACTIVE")
+	assertRefreshTokenStatus(t, ctx, pool, "rft_reset", "ACTIVE")
+
+	verification, err := repository.CreateVerificationChallenge(ctx, types.RequestVerificationChallengeCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "user1@example.com",
+		TraceID:     "trace-verify",
+		RequestID:   "request-verify",
+	}, types.ChallengeTypeEmailVerification, types.ChallengeRecord{
+		ChallengeID: "challenge-email-1",
+		TokenHash:   "verify-hash",
+	}, issuedAt, expiresAt)
+	if err != nil {
+		t.Fatalf("create verification challenge: %v", err)
+	}
+	if verification.ChallengeID != "challenge-email-1" || verification.ExpiresAtUnixMS != expiresAt.UnixMilli() {
+		t.Fatalf("unexpected verification challenge: %+v", verification)
+	}
+	_, err = repository.ConfirmVerificationChallenge(ctx, types.ConfirmVerificationChallengeCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		ChallengeID: "challenge-email-1",
+	}, "wrong-hash", issuedAt.Add(time.Minute))
+	if !errors.Is(err, types.ErrInvalidChallenge) {
+		t.Fatalf("expected invalid challenge for wrong token, got %v", err)
+	}
+	confirmed, err := repository.ConfirmVerificationChallenge(ctx, types.ConfirmVerificationChallengeCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		ChallengeID: "challenge-email-1",
+	}, "verify-hash", issuedAt.Add(2*time.Minute))
+	if err != nil {
+		t.Fatalf("confirm verification challenge: %v", err)
+	}
+	if confirmed.Channel != types.VerificationChannelEmail || confirmed.Destination != "user1@example.com" {
+		t.Fatalf("unexpected verification confirmation: %+v", confirmed)
+	}
+	assertEmailVerified(t, ctx, pool, "user1@example.com", true)
+
+	reset, err := repository.CreatePasswordResetChallenge(ctx, types.RequestPasswordResetCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		Channel:     types.VerificationChannelEmail,
+		Destination: "user1@example.com",
+	}, types.ChallengeRecord{
+		ChallengeID: "challenge-reset-1",
+		TokenHash:   "reset-hash",
+	}, issuedAt.Add(3*time.Minute), issuedAt.Add(18*time.Minute))
+	if err != nil {
+		t.Fatalf("create password reset challenge: %v", err)
+	}
+	if reset.ChallengeID != "challenge-reset-1" {
+		t.Fatalf("unexpected reset challenge: %+v", reset)
+	}
+	resetResult, err := repository.ConfirmPasswordReset(ctx, types.ConfirmPasswordResetCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		ChallengeID: "challenge-reset-1",
+	}, "reset-hash", "new-password-hash", issuedAt.Add(4*time.Minute))
+	if err != nil {
+		t.Fatalf("confirm password reset: %v", err)
+	}
+	if resetResult.ResetAtUnixMS != issuedAt.Add(4*time.Minute).UnixMilli() {
+		t.Fatalf("unexpected reset result: %+v", resetResult)
+	}
+	credential, err := repository.GetUserCredential(ctx, "tenant-identity", "user-1")
+	if err != nil {
+		t.Fatalf("get credential after reset: %v", err)
+	}
+	if credential.PasswordHash != "new-password-hash" {
+		t.Fatalf("expected reset password hash, got %+v", credential)
+	}
+	assertSessionStatus(t, ctx, pool, "session-reset-1", "REVOKED")
+	assertRefreshTokenStatus(t, ctx, pool, "rft_reset", "REVOKED")
+	assertOutboxEvent(t, ctx, pool, "identity.session.revoked.v1", "identity_session", "event-password-reset-session-revoked-1")
+	_, err = repository.ConfirmPasswordReset(ctx, types.ConfirmPasswordResetCommand{
+		TenantID:    "tenant-identity",
+		UserID:      "user-1",
+		ChallengeID: "challenge-reset-1",
+	}, "reset-hash", "another-password-hash", issuedAt.Add(5*time.Minute))
+	if !errors.Is(err, types.ErrInvalidChallenge) {
+		t.Fatalf("expected consumed reset challenge to reject replay, got %v", err)
+	}
+}
+
 func TestRepositoryLoginFailureLocksAndSuccessClearsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -519,6 +636,24 @@ WHERE event_id = $1
 	}
 }
 
+func assertEmailVerified(t *testing.T, ctx context.Context, pool *pgxpool.Pool, email string, wantVerified bool) {
+	t.Helper()
+	var gotEmail string
+	var verified bool
+	err := pool.QueryRow(ctx, `
+SELECT email, email_verified_at IS NOT NULL
+FROM identity_users
+WHERE tenant_id = 'tenant-identity'
+  AND user_id = 'user-1'
+`).Scan(&gotEmail, &verified)
+	if err != nil {
+		t.Fatalf("read identity user email state: %v", err)
+	}
+	if gotEmail != email || verified != wantVerified {
+		t.Fatalf("unexpected email state: email=%s verified=%v", gotEmail, verified)
+	}
+}
+
 func openTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	dsn := os.Getenv("NEXUSIM_PG_DSN")
@@ -557,6 +692,7 @@ func resetIdentityTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) 
 	t.Helper()
 	_, err := pool.Exec(ctx, `
 TRUNCATE
+    identity_challenges,
     identity_outbox,
     identity_refresh_tokens,
     identity_sessions,

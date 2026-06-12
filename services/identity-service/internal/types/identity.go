@@ -11,6 +11,9 @@ type RefreshTokenID string
 type DeviceStatus string
 type SessionStatus string
 type UserStatus string
+type VerificationChannel string
+type ChallengeType string
+type ChallengeID string
 
 const (
 	DeviceStatusActive  DeviceStatus = "ACTIVE"
@@ -20,6 +23,13 @@ const (
 	SessionStatusRevoked SessionStatus = "REVOKED"
 
 	UserStatusActive UserStatus = "ACTIVE"
+
+	VerificationChannelEmail VerificationChannel = "EMAIL"
+	VerificationChannelPhone VerificationChannel = "PHONE"
+
+	ChallengeTypeEmailVerification ChallengeType = "EMAIL_VERIFICATION"
+	ChallengeTypePhoneVerification ChallengeType = "PHONE_VERIFICATION"
+	ChallengeTypePasswordReset     ChallengeType = "PASSWORD_RESET"
 )
 
 type AdminContext struct {
@@ -115,6 +125,94 @@ type RefreshGatewayTokenResult struct {
 	GatewayExpiresAtUnixMS int64
 	RefreshExpiresAtUnixMS int64
 	IssuedAtUnixMS         int64
+}
+
+type RequestVerificationChallengeCommand struct {
+	TenantID    TenantID
+	UserID      UserID
+	Channel     VerificationChannel
+	Destination string
+	TTLSeconds  int64
+	Password    string
+	TraceID     string
+	RequestID   string
+}
+
+type RequestVerificationChallengeResult struct {
+	TenantID          TenantID
+	UserID            UserID
+	ChallengeID       ChallengeID
+	Channel           VerificationChannel
+	Destination       string
+	ExpiresAtUnixMS   int64
+	DevChallengeToken string
+}
+
+type ConfirmVerificationChallengeCommand struct {
+	TenantID       TenantID
+	UserID         UserID
+	ChallengeID    ChallengeID
+	ChallengeToken string
+	TraceID        string
+	RequestID      string
+}
+
+type ConfirmVerificationChallengeResult struct {
+	TenantID         TenantID
+	UserID           UserID
+	Channel          VerificationChannel
+	Destination      string
+	VerifiedAtUnixMS int64
+}
+
+type RequestPasswordResetCommand struct {
+	TenantID    TenantID
+	UserID      UserID
+	Channel     VerificationChannel
+	Destination string
+	TTLSeconds  int64
+	TraceID     string
+	RequestID   string
+}
+
+type RequestPasswordResetResult struct {
+	TenantID          TenantID
+	UserID            UserID
+	ChallengeID       ChallengeID
+	Channel           VerificationChannel
+	Destination       string
+	ExpiresAtUnixMS   int64
+	DevChallengeToken string
+}
+
+type ConfirmPasswordResetCommand struct {
+	TenantID       TenantID
+	UserID         UserID
+	ChallengeID    ChallengeID
+	ChallengeToken string
+	NewPassword    string
+	TraceID        string
+	RequestID      string
+}
+
+type ConfirmPasswordResetResult struct {
+	TenantID      TenantID
+	UserID        UserID
+	ResetAtUnixMS int64
+}
+
+type ChallengeRecord struct {
+	ChallengeID ChallengeID
+	TokenHash   string
+}
+
+type IdentityChallenge struct {
+	TenantID    TenantID
+	UserID      UserID
+	ChallengeID ChallengeID
+	Type        ChallengeType
+	Channel     VerificationChannel
+	Destination string
 }
 
 type UserCredential struct {

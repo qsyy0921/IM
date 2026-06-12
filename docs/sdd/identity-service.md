@@ -9,11 +9,13 @@
 - apply a small persistent failed-login counter and temporary account lockout;
 - issue short-lived push gateway tokens;
 - rotate opaque refresh tokens;
+- issue and confirm email / phone verification challenges;
+- issue and confirm password reset challenges;
 - persist users, devices and sessions;
 - revoke devices and sessions;
 - keep push-gateway verification local to avoid synchronous auth RPC on every WebSocket handshake.
 
-It is not yet a full OAuth/OIDC identity platform. It does not implement email / phone verification, MFA, external IdP federation, account recovery or production-grade asymmetric key management.
+It is not yet a full OAuth/OIDC identity platform. It does not implement email / SMS sending, MFA, external IdP federation, production-grade account-risk workflows or production-grade asymmetric key management.
 
 ## Boundary
 
@@ -23,7 +25,9 @@ Owns:
 - `identity_devices`
 - `identity_sessions`
 - `identity_refresh_tokens`
+- `identity_challenges`
 - password hash verification for existing users
+- email / phone verification and password reset challenge state
 - gateway token issuance
 - device/session revoke state
 
@@ -33,6 +37,7 @@ Does not own:
 - conversation membership;
 - delivery inbox / ACK cursors;
 - push-gateway online session registry;
+- email / SMS provider delivery;
 - contacts or policy decisions.
 
 ## Admin Auth
@@ -54,7 +59,7 @@ This mode applies to `RevokeDevice`, `RevokeSession` and `GetDeviceState`. `Regi
 
 ## Register / Login / Refresh
 
-First-stage registration creates an ACTIVE `identity_users` credential with a service-local password hash. It is a strict create path: an existing `tenant_id + user_id` returns `ALREADY_EXISTS`, and account claiming / recovery for pre-created users is a later workflow. It does not create contacts, conversation membership, profile state, or any cross-service user projection. Email / phone verification, password reset, MFA, rate limiting and external IdP federation are separate future flows.
+First-stage registration creates an ACTIVE `identity_users` credential with a service-local password hash. It is a strict create path: an existing `tenant_id + user_id` returns `ALREADY_EXISTS`, and account claiming / recovery for pre-created users is a later workflow. It does not create contacts, conversation membership, profile state, or any cross-service user projection. MFA, tenant-level rate limiting and external IdP federation are separate future flows.
 
 ```text
 RegisterUser
@@ -95,6 +100,52 @@ Login risk first-stage rules:
 - The first-stage lock applies only to password Login. A valid refresh token can still rotate through `RefreshGatewayToken`; refresh token theft / reuse is handled by the separate rotation and session-revoke logic. This avoids letting an external password brute-force attempt break an already authenticated client session.
 - Defaults are `NEXUSIM_IDENTITY_LOGIN_MAX_FAILED_ATTEMPTS=5`, `NEXUSIM_IDENTITY_LOGIN_FAILURE_WINDOW=15m` and `NEXUSIM_IDENTITY_LOGIN_LOCK_DURATION=15m`; deployments may tune them.
 - This is not a complete fraud/risk engine. IP/device reputation, CAPTCHA, geo-anomaly, tenant policy, alert routing, adaptive throttling and tenant-level rate limits remain future hardening.
+
+## Verification / Password Reset
+
+First-stage email / phone verification and password reset use service-owned one-time challenges:
+
+```text
+RequestVerificationChallenge
+-> verify current password
+-> upsert pending email / phone destination
+-> identity_challenges ACTIVE
+
+ConfirmVerificationChallenge
+-> lock challenge FOR UPDATE
+-> verify token hash, expiry and max attempts
+-> mark challenge CONSUMED
+-> mark email_verified_at / phone_verified_at
+
+RequestPasswordReset
+-> require already verified email / phone destination
+-> identity_challenges ACTIVE
+
+ConfirmPasswordReset
+-> lock challenge FOR UPDATE
+-> verify token hash, expiry and max attempts
+-> mark challenge CONSUMED
+-> update password_hash
+-> revoke active refresh tokens and sessions
+-> identity.session.revoked.v1 outbox for revoked sessions
+```
+
+Challenge token rules:
+
+- raw challenge tokens are returned only to the caller when `NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN=true`; this is a local smoke / development aid and must stay disabled in production profiles.
+- PostgreSQL stores only `identity_challenges.token_hash`, never the raw token.
+- Invalid token attempts increment `attempt_count`; reaching `max_attempts` expires the challenge.
+- Password reset requires an already verified destination for the same `tenant_id + user_id`.
+- Verification challenge creation requires the current password to avoid unauthenticated email / phone takeover.
+- `identity-service` does not send email or SMS directly in this slice. A sender adapter or notification service can consume an explicit future command/event without changing the challenge table ownership.
+
+Known hardening still pending:
+
+- account-enumeration resistant password reset responses;
+- tenant / IP / device rate limits for challenge creation and confirmation;
+- email / SMS provider integration and audit;
+- MFA and OIDC federation;
+- production alerting for repeated challenge failures.
 
 ## Gateway Token
 
@@ -171,6 +222,9 @@ Repeated failed Login -> durable failed_login_count + temporary account lockout
 RefreshGatewayToken -> old token USED + new token ACTIVE
 Reuse old refresh token -> session REVOKED + identity.session.revoked.v1 outbox
 Expired refresh token -> token REVOKED + stable invalid refresh error
+RequestVerificationChallenge -> identity_challenges ACTIVE with token_hash only
+ConfirmVerificationChallenge -> email_verified_at / phone_verified_at
+ConfirmPasswordReset -> password hash updated + active session / refresh token revoke
 ```
 
 ## Observability

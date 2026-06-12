@@ -27,6 +27,22 @@ type RefreshGatewayTokenExecutor interface {
 	Execute(context.Context, types.RefreshGatewayTokenCommand) (types.RefreshGatewayTokenResult, error)
 }
 
+type RequestVerificationChallengeExecutor interface {
+	Execute(context.Context, types.RequestVerificationChallengeCommand) (types.RequestVerificationChallengeResult, error)
+}
+
+type ConfirmVerificationChallengeExecutor interface {
+	Execute(context.Context, types.ConfirmVerificationChallengeCommand) (types.ConfirmVerificationChallengeResult, error)
+}
+
+type RequestPasswordResetExecutor interface {
+	Execute(context.Context, types.RequestPasswordResetCommand) (types.RequestPasswordResetResult, error)
+}
+
+type ConfirmPasswordResetExecutor interface {
+	Execute(context.Context, types.ConfirmPasswordResetCommand) (types.ConfirmPasswordResetResult, error)
+}
+
 type RevokeDeviceExecutor interface {
 	Execute(context.Context, types.RevokeDeviceCommand) (types.RevokeDeviceResult, error)
 }
@@ -41,32 +57,44 @@ type GetDeviceStateExecutor interface {
 
 type Server struct {
 	identityv1.UnimplementedIdentityServiceServer
-	registerUser        RegisterUserExecutor
-	login               LoginExecutor
-	refreshGatewayToken RefreshGatewayTokenExecutor
-	issueGatewayToken   IssueGatewayTokenExecutor
-	revokeDevice        RevokeDeviceExecutor
-	revokeSession       RevokeSessionExecutor
-	getDeviceState      GetDeviceStateExecutor
+	registerUser         RegisterUserExecutor
+	login                LoginExecutor
+	refreshGatewayToken  RefreshGatewayTokenExecutor
+	requestVerification  RequestVerificationChallengeExecutor
+	confirmVerification  ConfirmVerificationChallengeExecutor
+	requestPasswordReset RequestPasswordResetExecutor
+	confirmPasswordReset ConfirmPasswordResetExecutor
+	issueGatewayToken    IssueGatewayTokenExecutor
+	revokeDevice         RevokeDeviceExecutor
+	revokeSession        RevokeSessionExecutor
+	getDeviceState       GetDeviceStateExecutor
 }
 
 func NewServer(
 	registerUser RegisterUserExecutor,
 	login LoginExecutor,
 	refreshGatewayToken RefreshGatewayTokenExecutor,
+	requestVerification RequestVerificationChallengeExecutor,
+	confirmVerification ConfirmVerificationChallengeExecutor,
+	requestPasswordReset RequestPasswordResetExecutor,
+	confirmPasswordReset ConfirmPasswordResetExecutor,
 	issueGatewayToken IssueGatewayTokenExecutor,
 	revokeDevice RevokeDeviceExecutor,
 	revokeSession RevokeSessionExecutor,
 	getDeviceState GetDeviceStateExecutor,
 ) *Server {
 	return &Server{
-		registerUser:        registerUser,
-		login:               login,
-		refreshGatewayToken: refreshGatewayToken,
-		issueGatewayToken:   issueGatewayToken,
-		revokeDevice:        revokeDevice,
-		revokeSession:       revokeSession,
-		getDeviceState:      getDeviceState,
+		registerUser:         registerUser,
+		login:                login,
+		refreshGatewayToken:  refreshGatewayToken,
+		requestVerification:  requestVerification,
+		confirmVerification:  confirmVerification,
+		requestPasswordReset: requestPasswordReset,
+		confirmPasswordReset: confirmPasswordReset,
+		issueGatewayToken:    issueGatewayToken,
+		revokeDevice:         revokeDevice,
+		revokeSession:        revokeSession,
+		getDeviceState:       getDeviceState,
 	}
 }
 
@@ -168,6 +196,120 @@ func (s *Server) RefreshGatewayToken(ctx context.Context, request *identityv1.Re
 		GatewayExpiresAtUnixMs: result.GatewayExpiresAtUnixMS,
 		RefreshExpiresAtUnixMs: result.RefreshExpiresAtUnixMS,
 		IssuedAtUnixMs:         result.IssuedAtUnixMS,
+	}, nil
+}
+
+func (s *Server) RequestVerificationChallenge(ctx context.Context, request *identityv1.RequestVerificationChallengeRequest) (*identityv1.RequestVerificationChallengeResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.requestVerification == nil {
+		return nil, status.Error(codes.Unimplemented, "request verification challenge is not configured")
+	}
+	result, err := s.requestVerification.Execute(ctx, types.RequestVerificationChallengeCommand{
+		TenantID:    types.TenantID(request.GetTenantId()),
+		UserID:      types.UserID(request.GetUserId()),
+		Channel:     verificationChannelFromProto(request.GetChannel()),
+		Destination: request.GetDestination(),
+		TTLSeconds:  request.GetTtlSeconds(),
+		Password:    request.GetPassword(),
+		TraceID:     request.GetTraceId(),
+		RequestID:   request.GetRequestId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &identityv1.RequestVerificationChallengeResponse{
+		TenantId:          string(result.TenantID),
+		UserId:            string(result.UserID),
+		ChallengeId:       string(result.ChallengeID),
+		Channel:           verificationChannelToProto(result.Channel),
+		Destination:       result.Destination,
+		ExpiresAtUnixMs:   result.ExpiresAtUnixMS,
+		DevChallengeToken: result.DevChallengeToken,
+	}, nil
+}
+
+func (s *Server) ConfirmVerificationChallenge(ctx context.Context, request *identityv1.ConfirmVerificationChallengeRequest) (*identityv1.ConfirmVerificationChallengeResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.confirmVerification == nil {
+		return nil, status.Error(codes.Unimplemented, "confirm verification challenge is not configured")
+	}
+	result, err := s.confirmVerification.Execute(ctx, types.ConfirmVerificationChallengeCommand{
+		TenantID:       types.TenantID(request.GetTenantId()),
+		UserID:         types.UserID(request.GetUserId()),
+		ChallengeID:    types.ChallengeID(request.GetChallengeId()),
+		ChallengeToken: request.GetChallengeToken(),
+		TraceID:        request.GetTraceId(),
+		RequestID:      request.GetRequestId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &identityv1.ConfirmVerificationChallengeResponse{
+		TenantId:         string(result.TenantID),
+		UserId:           string(result.UserID),
+		Channel:          verificationChannelToProto(result.Channel),
+		Destination:      result.Destination,
+		VerifiedAtUnixMs: result.VerifiedAtUnixMS,
+	}, nil
+}
+
+func (s *Server) RequestPasswordReset(ctx context.Context, request *identityv1.RequestPasswordResetRequest) (*identityv1.RequestPasswordResetResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.requestPasswordReset == nil {
+		return nil, status.Error(codes.Unimplemented, "request password reset is not configured")
+	}
+	result, err := s.requestPasswordReset.Execute(ctx, types.RequestPasswordResetCommand{
+		TenantID:    types.TenantID(request.GetTenantId()),
+		UserID:      types.UserID(request.GetUserId()),
+		Channel:     verificationChannelFromProto(request.GetChannel()),
+		Destination: request.GetDestination(),
+		TTLSeconds:  request.GetTtlSeconds(),
+		TraceID:     request.GetTraceId(),
+		RequestID:   request.GetRequestId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &identityv1.RequestPasswordResetResponse{
+		TenantId:          string(result.TenantID),
+		UserId:            string(result.UserID),
+		ChallengeId:       string(result.ChallengeID),
+		Channel:           verificationChannelToProto(result.Channel),
+		Destination:       result.Destination,
+		ExpiresAtUnixMs:   result.ExpiresAtUnixMS,
+		DevChallengeToken: result.DevChallengeToken,
+	}, nil
+}
+
+func (s *Server) ConfirmPasswordReset(ctx context.Context, request *identityv1.ConfirmPasswordResetRequest) (*identityv1.ConfirmPasswordResetResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.confirmPasswordReset == nil {
+		return nil, status.Error(codes.Unimplemented, "confirm password reset is not configured")
+	}
+	result, err := s.confirmPasswordReset.Execute(ctx, types.ConfirmPasswordResetCommand{
+		TenantID:       types.TenantID(request.GetTenantId()),
+		UserID:         types.UserID(request.GetUserId()),
+		ChallengeID:    types.ChallengeID(request.GetChallengeId()),
+		ChallengeToken: request.GetChallengeToken(),
+		NewPassword:    request.GetNewPassword(),
+		TraceID:        request.GetTraceId(),
+		RequestID:      request.GetRequestId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &identityv1.ConfirmPasswordResetResponse{
+		TenantId:      string(result.TenantID),
+		UserId:        string(result.UserID),
+		ResetAtUnixMs: result.ResetAtUnixMS,
 	}, nil
 }
 
@@ -335,6 +477,28 @@ func userStatusToProto(status types.UserStatus) identityv1.UserStatus {
 	}
 }
 
+func verificationChannelFromProto(channel identityv1.VerificationChannel) types.VerificationChannel {
+	switch channel {
+	case identityv1.VerificationChannel_VERIFICATION_CHANNEL_EMAIL:
+		return types.VerificationChannelEmail
+	case identityv1.VerificationChannel_VERIFICATION_CHANNEL_PHONE:
+		return types.VerificationChannelPhone
+	default:
+		return ""
+	}
+}
+
+func verificationChannelToProto(channel types.VerificationChannel) identityv1.VerificationChannel {
+	switch channel {
+	case types.VerificationChannelEmail:
+		return identityv1.VerificationChannel_VERIFICATION_CHANNEL_EMAIL
+	case types.VerificationChannelPhone:
+		return identityv1.VerificationChannel_VERIFICATION_CHANNEL_PHONE
+	default:
+		return identityv1.VerificationChannel_VERIFICATION_CHANNEL_UNSPECIFIED
+	}
+}
+
 func grpcError(err error) error {
 	switch {
 	case errors.Is(err, types.ErrInvalidArgument):
@@ -363,6 +527,10 @@ func grpcError(err error) error {
 		return status.Error(codes.Unauthenticated, "invalid refresh token")
 	case errors.Is(err, types.ErrRefreshTokenReuseDetected):
 		return status.Error(codes.PermissionDenied, "refresh token rejected")
+	case errors.Is(err, types.ErrInvalidChallenge):
+		return status.Error(codes.Unauthenticated, "invalid challenge")
+	case errors.Is(err, types.ErrChallengeExpired):
+		return status.Error(codes.Unauthenticated, "challenge expired")
 	default:
 		return status.Error(codes.Internal, "internal error")
 	}

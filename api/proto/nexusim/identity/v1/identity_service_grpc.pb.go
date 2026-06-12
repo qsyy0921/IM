@@ -19,13 +19,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	IdentityService_RegisterUser_FullMethodName        = "/nexusim.identity.v1.IdentityService/RegisterUser"
-	IdentityService_Login_FullMethodName               = "/nexusim.identity.v1.IdentityService/Login"
-	IdentityService_RefreshGatewayToken_FullMethodName = "/nexusim.identity.v1.IdentityService/RefreshGatewayToken"
-	IdentityService_IssueGatewayToken_FullMethodName   = "/nexusim.identity.v1.IdentityService/IssueGatewayToken"
-	IdentityService_RevokeDevice_FullMethodName        = "/nexusim.identity.v1.IdentityService/RevokeDevice"
-	IdentityService_RevokeSession_FullMethodName       = "/nexusim.identity.v1.IdentityService/RevokeSession"
-	IdentityService_GetDeviceState_FullMethodName      = "/nexusim.identity.v1.IdentityService/GetDeviceState"
+	IdentityService_RegisterUser_FullMethodName                 = "/nexusim.identity.v1.IdentityService/RegisterUser"
+	IdentityService_Login_FullMethodName                        = "/nexusim.identity.v1.IdentityService/Login"
+	IdentityService_RefreshGatewayToken_FullMethodName          = "/nexusim.identity.v1.IdentityService/RefreshGatewayToken"
+	IdentityService_RequestVerificationChallenge_FullMethodName = "/nexusim.identity.v1.IdentityService/RequestVerificationChallenge"
+	IdentityService_ConfirmVerificationChallenge_FullMethodName = "/nexusim.identity.v1.IdentityService/ConfirmVerificationChallenge"
+	IdentityService_RequestPasswordReset_FullMethodName         = "/nexusim.identity.v1.IdentityService/RequestPasswordReset"
+	IdentityService_ConfirmPasswordReset_FullMethodName         = "/nexusim.identity.v1.IdentityService/ConfirmPasswordReset"
+	IdentityService_IssueGatewayToken_FullMethodName            = "/nexusim.identity.v1.IdentityService/IssueGatewayToken"
+	IdentityService_RevokeDevice_FullMethodName                 = "/nexusim.identity.v1.IdentityService/RevokeDevice"
+	IdentityService_RevokeSession_FullMethodName                = "/nexusim.identity.v1.IdentityService/RevokeSession"
+	IdentityService_GetDeviceState_FullMethodName               = "/nexusim.identity.v1.IdentityService/GetDeviceState"
 )
 
 // IdentityServiceClient is the client API for IdentityService service.
@@ -35,6 +39,10 @@ type IdentityServiceClient interface {
 	RegisterUser(ctx context.Context, in *RegisterUserRequest, opts ...grpc.CallOption) (*RegisterUserResponse, error)
 	Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginResponse, error)
 	RefreshGatewayToken(ctx context.Context, in *RefreshGatewayTokenRequest, opts ...grpc.CallOption) (*RefreshGatewayTokenResponse, error)
+	RequestVerificationChallenge(ctx context.Context, in *RequestVerificationChallengeRequest, opts ...grpc.CallOption) (*RequestVerificationChallengeResponse, error)
+	ConfirmVerificationChallenge(ctx context.Context, in *ConfirmVerificationChallengeRequest, opts ...grpc.CallOption) (*ConfirmVerificationChallengeResponse, error)
+	RequestPasswordReset(ctx context.Context, in *RequestPasswordResetRequest, opts ...grpc.CallOption) (*RequestPasswordResetResponse, error)
+	ConfirmPasswordReset(ctx context.Context, in *ConfirmPasswordResetRequest, opts ...grpc.CallOption) (*ConfirmPasswordResetResponse, error)
 	IssueGatewayToken(ctx context.Context, in *IssueGatewayTokenRequest, opts ...grpc.CallOption) (*IssueGatewayTokenResponse, error)
 	RevokeDevice(ctx context.Context, in *RevokeDeviceRequest, opts ...grpc.CallOption) (*RevokeDeviceResponse, error)
 	RevokeSession(ctx context.Context, in *RevokeSessionRequest, opts ...grpc.CallOption) (*RevokeSessionResponse, error)
@@ -73,6 +81,46 @@ func (c *identityServiceClient) RefreshGatewayToken(ctx context.Context, in *Ref
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RefreshGatewayTokenResponse)
 	err := c.cc.Invoke(ctx, IdentityService_RefreshGatewayToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) RequestVerificationChallenge(ctx context.Context, in *RequestVerificationChallengeRequest, opts ...grpc.CallOption) (*RequestVerificationChallengeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RequestVerificationChallengeResponse)
+	err := c.cc.Invoke(ctx, IdentityService_RequestVerificationChallenge_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) ConfirmVerificationChallenge(ctx context.Context, in *ConfirmVerificationChallengeRequest, opts ...grpc.CallOption) (*ConfirmVerificationChallengeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConfirmVerificationChallengeResponse)
+	err := c.cc.Invoke(ctx, IdentityService_ConfirmVerificationChallenge_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) RequestPasswordReset(ctx context.Context, in *RequestPasswordResetRequest, opts ...grpc.CallOption) (*RequestPasswordResetResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RequestPasswordResetResponse)
+	err := c.cc.Invoke(ctx, IdentityService_RequestPasswordReset_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) ConfirmPasswordReset(ctx context.Context, in *ConfirmPasswordResetRequest, opts ...grpc.CallOption) (*ConfirmPasswordResetResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConfirmPasswordResetResponse)
+	err := c.cc.Invoke(ctx, IdentityService_ConfirmPasswordReset_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -126,6 +174,10 @@ type IdentityServiceServer interface {
 	RegisterUser(context.Context, *RegisterUserRequest) (*RegisterUserResponse, error)
 	Login(context.Context, *LoginRequest) (*LoginResponse, error)
 	RefreshGatewayToken(context.Context, *RefreshGatewayTokenRequest) (*RefreshGatewayTokenResponse, error)
+	RequestVerificationChallenge(context.Context, *RequestVerificationChallengeRequest) (*RequestVerificationChallengeResponse, error)
+	ConfirmVerificationChallenge(context.Context, *ConfirmVerificationChallengeRequest) (*ConfirmVerificationChallengeResponse, error)
+	RequestPasswordReset(context.Context, *RequestPasswordResetRequest) (*RequestPasswordResetResponse, error)
+	ConfirmPasswordReset(context.Context, *ConfirmPasswordResetRequest) (*ConfirmPasswordResetResponse, error)
 	IssueGatewayToken(context.Context, *IssueGatewayTokenRequest) (*IssueGatewayTokenResponse, error)
 	RevokeDevice(context.Context, *RevokeDeviceRequest) (*RevokeDeviceResponse, error)
 	RevokeSession(context.Context, *RevokeSessionRequest) (*RevokeSessionResponse, error)
@@ -148,6 +200,18 @@ func (UnimplementedIdentityServiceServer) Login(context.Context, *LoginRequest) 
 }
 func (UnimplementedIdentityServiceServer) RefreshGatewayToken(context.Context, *RefreshGatewayTokenRequest) (*RefreshGatewayTokenResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RefreshGatewayToken not implemented")
+}
+func (UnimplementedIdentityServiceServer) RequestVerificationChallenge(context.Context, *RequestVerificationChallengeRequest) (*RequestVerificationChallengeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequestVerificationChallenge not implemented")
+}
+func (UnimplementedIdentityServiceServer) ConfirmVerificationChallenge(context.Context, *ConfirmVerificationChallengeRequest) (*ConfirmVerificationChallengeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ConfirmVerificationChallenge not implemented")
+}
+func (UnimplementedIdentityServiceServer) RequestPasswordReset(context.Context, *RequestPasswordResetRequest) (*RequestPasswordResetResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequestPasswordReset not implemented")
+}
+func (UnimplementedIdentityServiceServer) ConfirmPasswordReset(context.Context, *ConfirmPasswordResetRequest) (*ConfirmPasswordResetResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ConfirmPasswordReset not implemented")
 }
 func (UnimplementedIdentityServiceServer) IssueGatewayToken(context.Context, *IssueGatewayTokenRequest) (*IssueGatewayTokenResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method IssueGatewayToken not implemented")
@@ -232,6 +296,78 @@ func _IdentityService_RefreshGatewayToken_Handler(srv interface{}, ctx context.C
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(IdentityServiceServer).RefreshGatewayToken(ctx, req.(*RefreshGatewayTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_RequestVerificationChallenge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestVerificationChallengeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).RequestVerificationChallenge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_RequestVerificationChallenge_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).RequestVerificationChallenge(ctx, req.(*RequestVerificationChallengeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_ConfirmVerificationChallenge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConfirmVerificationChallengeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).ConfirmVerificationChallenge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_ConfirmVerificationChallenge_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).ConfirmVerificationChallenge(ctx, req.(*ConfirmVerificationChallengeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_RequestPasswordReset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestPasswordResetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).RequestPasswordReset(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_RequestPasswordReset_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).RequestPasswordReset(ctx, req.(*RequestPasswordResetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_ConfirmPasswordReset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConfirmPasswordResetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).ConfirmPasswordReset(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_ConfirmPasswordReset_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).ConfirmPasswordReset(ctx, req.(*ConfirmPasswordResetRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -326,6 +462,22 @@ var IdentityService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RefreshGatewayToken",
 			Handler:    _IdentityService_RefreshGatewayToken_Handler,
+		},
+		{
+			MethodName: "RequestVerificationChallenge",
+			Handler:    _IdentityService_RequestVerificationChallenge_Handler,
+		},
+		{
+			MethodName: "ConfirmVerificationChallenge",
+			Handler:    _IdentityService_ConfirmVerificationChallenge_Handler,
+		},
+		{
+			MethodName: "RequestPasswordReset",
+			Handler:    _IdentityService_RequestPasswordReset_Handler,
+		},
+		{
+			MethodName: "ConfirmPasswordReset",
+			Handler:    _IdentityService_ConfirmPasswordReset_Handler,
 		},
 		{
 			MethodName: "IssueGatewayToken",

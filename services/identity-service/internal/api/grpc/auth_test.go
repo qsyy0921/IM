@@ -83,7 +83,7 @@ func TestServerRegisterUserMapsRequestAndResponse(t *testing.T) {
 			CreatedAtUnixMS: 1_800_000_000_000,
 		},
 	}
-	server := NewServer(executor, nil, nil, nil, nil, nil, nil)
+	server := NewServer(executor, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	response, err := server.RegisterUser(context.Background(), &identityv1.RegisterUserRequest{
 		TenantId:  "tenant-1",
 		UserId:    "user-1",
@@ -103,7 +103,7 @@ func TestServerRegisterUserMapsRequestAndResponse(t *testing.T) {
 }
 
 func TestServerRegisterUserMapsDuplicateToAlreadyExists(t *testing.T) {
-	server := NewServer(&fakeRegisterUserExecutor{err: types.NewUserAlreadyExists("duplicate")}, nil, nil, nil, nil, nil, nil)
+	server := NewServer(&fakeRegisterUserExecutor{err: types.NewUserAlreadyExists("duplicate")}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	_, err := server.RegisterUser(context.Background(), &identityv1.RegisterUserRequest{
 		TenantId: "tenant-1",
 		UserId:   "user-1",
@@ -115,7 +115,7 @@ func TestServerRegisterUserMapsDuplicateToAlreadyExists(t *testing.T) {
 }
 
 func TestServerLoginMapsAccountLockedToResourceExhausted(t *testing.T) {
-	server := NewServer(nil, &fakeLoginExecutor{err: types.NewAccountLocked("locked")}, nil, nil, nil, nil, nil)
+	server := NewServer(nil, &fakeLoginExecutor{err: types.NewAccountLocked("locked")}, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	_, err := server.Login(context.Background(), &identityv1.LoginRequest{
 		TenantId: "tenant-1",
 		UserId:   "user-1",

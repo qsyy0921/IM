@@ -67,6 +67,7 @@ func runGRPC() error {
 		return err
 	}
 	refreshTokens := tokeninfra.NewRefreshTokenCodec()
+	challengeTokens := tokeninfra.NewChallengeTokenCodec()
 	passwords := credentialinfra.NewPBKDF2Hasher(envInt("NEXUSIM_IDENTITY_PASSWORD_PBKDF2_ITERATIONS", 0))
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
 	jwkSet, err := gatewayTokenJWKSetWithAdditionalKeys(signer.JWKSet())
@@ -103,6 +104,10 @@ func runGRPC() error {
 			}),
 		),
 		app.NewRefreshGatewayTokenUseCase(repository, signer, refreshTokens),
+		app.NewRequestVerificationChallengeUseCase(repository, challengeTokens, passwords, app.ChallengeOptions{ReturnDevToken: envBool("NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN", false)}),
+		app.NewConfirmVerificationChallengeUseCase(repository, challengeTokens),
+		app.NewRequestPasswordResetUseCase(repository, challengeTokens, app.ChallengeOptions{ReturnDevToken: envBool("NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN", false)}),
+		app.NewConfirmPasswordResetUseCase(repository, challengeTokens, passwords),
 		app.NewIssueGatewayTokenUseCase(repository, signer),
 		app.NewRevokeDeviceUseCase(repository),
 		app.NewRevokeSessionUseCase(repository),
@@ -348,6 +353,21 @@ func envInt(name string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func envBool(name string, fallback bool) bool {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv(name)))
+	if value == "" {
+		return fallback
+	}
+	switch value {
+	case "1", "true", "yes", "y", "on":
+		return true
+	case "0", "false", "no", "n", "off":
+		return false
+	default:
+		return fallback
+	}
 }
 
 func envDuration(name string, fallback time.Duration) time.Duration {

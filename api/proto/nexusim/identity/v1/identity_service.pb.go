@@ -116,6 +116,55 @@ func (UserStatus) EnumDescriptor() ([]byte, []int) {
 	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{1}
 }
 
+type VerificationChannel int32
+
+const (
+	VerificationChannel_VERIFICATION_CHANNEL_UNSPECIFIED VerificationChannel = 0
+	VerificationChannel_VERIFICATION_CHANNEL_EMAIL       VerificationChannel = 1
+	VerificationChannel_VERIFICATION_CHANNEL_PHONE       VerificationChannel = 2
+)
+
+// Enum value maps for VerificationChannel.
+var (
+	VerificationChannel_name = map[int32]string{
+		0: "VERIFICATION_CHANNEL_UNSPECIFIED",
+		1: "VERIFICATION_CHANNEL_EMAIL",
+		2: "VERIFICATION_CHANNEL_PHONE",
+	}
+	VerificationChannel_value = map[string]int32{
+		"VERIFICATION_CHANNEL_UNSPECIFIED": 0,
+		"VERIFICATION_CHANNEL_EMAIL":       1,
+		"VERIFICATION_CHANNEL_PHONE":       2,
+	}
+)
+
+func (x VerificationChannel) Enum() *VerificationChannel {
+	p := new(VerificationChannel)
+	*p = x
+	return p
+}
+
+func (x VerificationChannel) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (VerificationChannel) Descriptor() protoreflect.EnumDescriptor {
+	return file_nexusim_identity_v1_identity_service_proto_enumTypes[2].Descriptor()
+}
+
+func (VerificationChannel) Type() protoreflect.EnumType {
+	return &file_nexusim_identity_v1_identity_service_proto_enumTypes[2]
+}
+
+func (x VerificationChannel) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use VerificationChannel.Descriptor instead.
+func (VerificationChannel) EnumDescriptor() ([]byte, []int) {
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{2}
+}
+
 type SessionStatus int32
 
 const (
@@ -149,11 +198,11 @@ func (x SessionStatus) String() string {
 }
 
 func (SessionStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_nexusim_identity_v1_identity_service_proto_enumTypes[2].Descriptor()
+	return file_nexusim_identity_v1_identity_service_proto_enumTypes[3].Descriptor()
 }
 
 func (SessionStatus) Type() protoreflect.EnumType {
-	return &file_nexusim_identity_v1_identity_service_proto_enumTypes[2]
+	return &file_nexusim_identity_v1_identity_service_proto_enumTypes[3]
 }
 
 func (x SessionStatus) Number() protoreflect.EnumNumber {
@@ -162,7 +211,7 @@ func (x SessionStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SessionStatus.Descriptor instead.
 func (SessionStatus) EnumDescriptor() ([]byte, []int) {
-	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{2}
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{3}
 }
 
 type AdminContext struct {
@@ -841,6 +890,694 @@ func (x *RefreshGatewayTokenResponse) GetIssuedAtUnixMs() int64 {
 	return 0
 }
 
+type RequestVerificationChallengeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Channel       VerificationChannel    `protobuf:"varint,3,opt,name=channel,proto3,enum=nexusim.identity.v1.VerificationChannel" json:"channel,omitempty"`
+	Destination   string                 `protobuf:"bytes,4,opt,name=destination,proto3" json:"destination,omitempty"`
+	TtlSeconds    int64                  `protobuf:"varint,5,opt,name=ttl_seconds,json=ttlSeconds,proto3" json:"ttl_seconds,omitempty"`
+	TraceId       string                 `protobuf:"bytes,6,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	RequestId     string                 `protobuf:"bytes,7,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Password      string                 `protobuf:"bytes,8,opt,name=password,proto3" json:"password,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequestVerificationChallengeRequest) Reset() {
+	*x = RequestVerificationChallengeRequest{}
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestVerificationChallengeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestVerificationChallengeRequest) ProtoMessage() {}
+
+func (x *RequestVerificationChallengeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestVerificationChallengeRequest.ProtoReflect.Descriptor instead.
+func (*RequestVerificationChallengeRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *RequestVerificationChallengeRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *RequestVerificationChallengeRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *RequestVerificationChallengeRequest) GetChannel() VerificationChannel {
+	if x != nil {
+		return x.Channel
+	}
+	return VerificationChannel_VERIFICATION_CHANNEL_UNSPECIFIED
+}
+
+func (x *RequestVerificationChallengeRequest) GetDestination() string {
+	if x != nil {
+		return x.Destination
+	}
+	return ""
+}
+
+func (x *RequestVerificationChallengeRequest) GetTtlSeconds() int64 {
+	if x != nil {
+		return x.TtlSeconds
+	}
+	return 0
+}
+
+func (x *RequestVerificationChallengeRequest) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+func (x *RequestVerificationChallengeRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *RequestVerificationChallengeRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+type RequestVerificationChallengeResponse struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	TenantId          string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId            string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ChallengeId       string                 `protobuf:"bytes,3,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
+	Channel           VerificationChannel    `protobuf:"varint,4,opt,name=channel,proto3,enum=nexusim.identity.v1.VerificationChannel" json:"channel,omitempty"`
+	Destination       string                 `protobuf:"bytes,5,opt,name=destination,proto3" json:"destination,omitempty"`
+	ExpiresAtUnixMs   int64                  `protobuf:"varint,6,opt,name=expires_at_unix_ms,json=expiresAtUnixMs,proto3" json:"expires_at_unix_ms,omitempty"`
+	DevChallengeToken string                 `protobuf:"bytes,7,opt,name=dev_challenge_token,json=devChallengeToken,proto3" json:"dev_challenge_token,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *RequestVerificationChallengeResponse) Reset() {
+	*x = RequestVerificationChallengeResponse{}
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestVerificationChallengeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestVerificationChallengeResponse) ProtoMessage() {}
+
+func (x *RequestVerificationChallengeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestVerificationChallengeResponse.ProtoReflect.Descriptor instead.
+func (*RequestVerificationChallengeResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *RequestVerificationChallengeResponse) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *RequestVerificationChallengeResponse) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *RequestVerificationChallengeResponse) GetChallengeId() string {
+	if x != nil {
+		return x.ChallengeId
+	}
+	return ""
+}
+
+func (x *RequestVerificationChallengeResponse) GetChannel() VerificationChannel {
+	if x != nil {
+		return x.Channel
+	}
+	return VerificationChannel_VERIFICATION_CHANNEL_UNSPECIFIED
+}
+
+func (x *RequestVerificationChallengeResponse) GetDestination() string {
+	if x != nil {
+		return x.Destination
+	}
+	return ""
+}
+
+func (x *RequestVerificationChallengeResponse) GetExpiresAtUnixMs() int64 {
+	if x != nil {
+		return x.ExpiresAtUnixMs
+	}
+	return 0
+}
+
+func (x *RequestVerificationChallengeResponse) GetDevChallengeToken() string {
+	if x != nil {
+		return x.DevChallengeToken
+	}
+	return ""
+}
+
+type ConfirmVerificationChallengeRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	TenantId       string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId         string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ChallengeId    string                 `protobuf:"bytes,3,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
+	ChallengeToken string                 `protobuf:"bytes,4,opt,name=challenge_token,json=challengeToken,proto3" json:"challenge_token,omitempty"`
+	TraceId        string                 `protobuf:"bytes,5,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	RequestId      string                 `protobuf:"bytes,6,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ConfirmVerificationChallengeRequest) Reset() {
+	*x = ConfirmVerificationChallengeRequest{}
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfirmVerificationChallengeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfirmVerificationChallengeRequest) ProtoMessage() {}
+
+func (x *ConfirmVerificationChallengeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfirmVerificationChallengeRequest.ProtoReflect.Descriptor instead.
+func (*ConfirmVerificationChallengeRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ConfirmVerificationChallengeRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *ConfirmVerificationChallengeRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ConfirmVerificationChallengeRequest) GetChallengeId() string {
+	if x != nil {
+		return x.ChallengeId
+	}
+	return ""
+}
+
+func (x *ConfirmVerificationChallengeRequest) GetChallengeToken() string {
+	if x != nil {
+		return x.ChallengeToken
+	}
+	return ""
+}
+
+func (x *ConfirmVerificationChallengeRequest) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+func (x *ConfirmVerificationChallengeRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type ConfirmVerificationChallengeResponse struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	TenantId         string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId           string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Channel          VerificationChannel    `protobuf:"varint,3,opt,name=channel,proto3,enum=nexusim.identity.v1.VerificationChannel" json:"channel,omitempty"`
+	Destination      string                 `protobuf:"bytes,4,opt,name=destination,proto3" json:"destination,omitempty"`
+	VerifiedAtUnixMs int64                  `protobuf:"varint,5,opt,name=verified_at_unix_ms,json=verifiedAtUnixMs,proto3" json:"verified_at_unix_ms,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ConfirmVerificationChallengeResponse) Reset() {
+	*x = ConfirmVerificationChallengeResponse{}
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfirmVerificationChallengeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfirmVerificationChallengeResponse) ProtoMessage() {}
+
+func (x *ConfirmVerificationChallengeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfirmVerificationChallengeResponse.ProtoReflect.Descriptor instead.
+func (*ConfirmVerificationChallengeResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ConfirmVerificationChallengeResponse) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *ConfirmVerificationChallengeResponse) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ConfirmVerificationChallengeResponse) GetChannel() VerificationChannel {
+	if x != nil {
+		return x.Channel
+	}
+	return VerificationChannel_VERIFICATION_CHANNEL_UNSPECIFIED
+}
+
+func (x *ConfirmVerificationChallengeResponse) GetDestination() string {
+	if x != nil {
+		return x.Destination
+	}
+	return ""
+}
+
+func (x *ConfirmVerificationChallengeResponse) GetVerifiedAtUnixMs() int64 {
+	if x != nil {
+		return x.VerifiedAtUnixMs
+	}
+	return 0
+}
+
+type RequestPasswordResetRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Channel       VerificationChannel    `protobuf:"varint,3,opt,name=channel,proto3,enum=nexusim.identity.v1.VerificationChannel" json:"channel,omitempty"`
+	Destination   string                 `protobuf:"bytes,4,opt,name=destination,proto3" json:"destination,omitempty"`
+	TtlSeconds    int64                  `protobuf:"varint,5,opt,name=ttl_seconds,json=ttlSeconds,proto3" json:"ttl_seconds,omitempty"`
+	TraceId       string                 `protobuf:"bytes,6,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	RequestId     string                 `protobuf:"bytes,7,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequestPasswordResetRequest) Reset() {
+	*x = RequestPasswordResetRequest{}
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestPasswordResetRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestPasswordResetRequest) ProtoMessage() {}
+
+func (x *RequestPasswordResetRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestPasswordResetRequest.ProtoReflect.Descriptor instead.
+func (*RequestPasswordResetRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *RequestPasswordResetRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *RequestPasswordResetRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *RequestPasswordResetRequest) GetChannel() VerificationChannel {
+	if x != nil {
+		return x.Channel
+	}
+	return VerificationChannel_VERIFICATION_CHANNEL_UNSPECIFIED
+}
+
+func (x *RequestPasswordResetRequest) GetDestination() string {
+	if x != nil {
+		return x.Destination
+	}
+	return ""
+}
+
+func (x *RequestPasswordResetRequest) GetTtlSeconds() int64 {
+	if x != nil {
+		return x.TtlSeconds
+	}
+	return 0
+}
+
+func (x *RequestPasswordResetRequest) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+func (x *RequestPasswordResetRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type RequestPasswordResetResponse struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	TenantId          string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId            string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ChallengeId       string                 `protobuf:"bytes,3,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
+	Channel           VerificationChannel    `protobuf:"varint,4,opt,name=channel,proto3,enum=nexusim.identity.v1.VerificationChannel" json:"channel,omitempty"`
+	Destination       string                 `protobuf:"bytes,5,opt,name=destination,proto3" json:"destination,omitempty"`
+	ExpiresAtUnixMs   int64                  `protobuf:"varint,6,opt,name=expires_at_unix_ms,json=expiresAtUnixMs,proto3" json:"expires_at_unix_ms,omitempty"`
+	DevChallengeToken string                 `protobuf:"bytes,7,opt,name=dev_challenge_token,json=devChallengeToken,proto3" json:"dev_challenge_token,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *RequestPasswordResetResponse) Reset() {
+	*x = RequestPasswordResetResponse{}
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestPasswordResetResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestPasswordResetResponse) ProtoMessage() {}
+
+func (x *RequestPasswordResetResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestPasswordResetResponse.ProtoReflect.Descriptor instead.
+func (*RequestPasswordResetResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *RequestPasswordResetResponse) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *RequestPasswordResetResponse) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *RequestPasswordResetResponse) GetChallengeId() string {
+	if x != nil {
+		return x.ChallengeId
+	}
+	return ""
+}
+
+func (x *RequestPasswordResetResponse) GetChannel() VerificationChannel {
+	if x != nil {
+		return x.Channel
+	}
+	return VerificationChannel_VERIFICATION_CHANNEL_UNSPECIFIED
+}
+
+func (x *RequestPasswordResetResponse) GetDestination() string {
+	if x != nil {
+		return x.Destination
+	}
+	return ""
+}
+
+func (x *RequestPasswordResetResponse) GetExpiresAtUnixMs() int64 {
+	if x != nil {
+		return x.ExpiresAtUnixMs
+	}
+	return 0
+}
+
+func (x *RequestPasswordResetResponse) GetDevChallengeToken() string {
+	if x != nil {
+		return x.DevChallengeToken
+	}
+	return ""
+}
+
+type ConfirmPasswordResetRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	TenantId       string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId         string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ChallengeId    string                 `protobuf:"bytes,3,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
+	ChallengeToken string                 `protobuf:"bytes,4,opt,name=challenge_token,json=challengeToken,proto3" json:"challenge_token,omitempty"`
+	NewPassword    string                 `protobuf:"bytes,5,opt,name=new_password,json=newPassword,proto3" json:"new_password,omitempty"`
+	TraceId        string                 `protobuf:"bytes,6,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	RequestId      string                 `protobuf:"bytes,7,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ConfirmPasswordResetRequest) Reset() {
+	*x = ConfirmPasswordResetRequest{}
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfirmPasswordResetRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfirmPasswordResetRequest) ProtoMessage() {}
+
+func (x *ConfirmPasswordResetRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfirmPasswordResetRequest.ProtoReflect.Descriptor instead.
+func (*ConfirmPasswordResetRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ConfirmPasswordResetRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *ConfirmPasswordResetRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ConfirmPasswordResetRequest) GetChallengeId() string {
+	if x != nil {
+		return x.ChallengeId
+	}
+	return ""
+}
+
+func (x *ConfirmPasswordResetRequest) GetChallengeToken() string {
+	if x != nil {
+		return x.ChallengeToken
+	}
+	return ""
+}
+
+func (x *ConfirmPasswordResetRequest) GetNewPassword() string {
+	if x != nil {
+		return x.NewPassword
+	}
+	return ""
+}
+
+func (x *ConfirmPasswordResetRequest) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+func (x *ConfirmPasswordResetRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type ConfirmPasswordResetResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ResetAtUnixMs int64                  `protobuf:"varint,3,opt,name=reset_at_unix_ms,json=resetAtUnixMs,proto3" json:"reset_at_unix_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConfirmPasswordResetResponse) Reset() {
+	*x = ConfirmPasswordResetResponse{}
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfirmPasswordResetResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfirmPasswordResetResponse) ProtoMessage() {}
+
+func (x *ConfirmPasswordResetResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfirmPasswordResetResponse.ProtoReflect.Descriptor instead.
+func (*ConfirmPasswordResetResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ConfirmPasswordResetResponse) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *ConfirmPasswordResetResponse) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ConfirmPasswordResetResponse) GetResetAtUnixMs() int64 {
+	if x != nil {
+		return x.ResetAtUnixMs
+	}
+	return 0
+}
+
 type IssueGatewayTokenRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
@@ -857,7 +1594,7 @@ type IssueGatewayTokenRequest struct {
 
 func (x *IssueGatewayTokenRequest) Reset() {
 	*x = IssueGatewayTokenRequest{}
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[7]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -869,7 +1606,7 @@ func (x *IssueGatewayTokenRequest) String() string {
 func (*IssueGatewayTokenRequest) ProtoMessage() {}
 
 func (x *IssueGatewayTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[7]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -882,7 +1619,7 @@ func (x *IssueGatewayTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IssueGatewayTokenRequest.ProtoReflect.Descriptor instead.
 func (*IssueGatewayTokenRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{7}
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *IssueGatewayTokenRequest) GetTenantId() string {
@@ -957,7 +1694,7 @@ type IssueGatewayTokenResponse struct {
 
 func (x *IssueGatewayTokenResponse) Reset() {
 	*x = IssueGatewayTokenResponse{}
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[8]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -969,7 +1706,7 @@ func (x *IssueGatewayTokenResponse) String() string {
 func (*IssueGatewayTokenResponse) ProtoMessage() {}
 
 func (x *IssueGatewayTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[8]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -982,7 +1719,7 @@ func (x *IssueGatewayTokenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IssueGatewayTokenResponse.ProtoReflect.Descriptor instead.
 func (*IssueGatewayTokenResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{8}
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *IssueGatewayTokenResponse) GetTenantId() string {
@@ -1053,7 +1790,7 @@ type RevokeDeviceRequest struct {
 
 func (x *RevokeDeviceRequest) Reset() {
 	*x = RevokeDeviceRequest{}
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[9]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1065,7 +1802,7 @@ func (x *RevokeDeviceRequest) String() string {
 func (*RevokeDeviceRequest) ProtoMessage() {}
 
 func (x *RevokeDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[9]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1078,7 +1815,7 @@ func (x *RevokeDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeDeviceRequest.ProtoReflect.Descriptor instead.
 func (*RevokeDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{9}
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *RevokeDeviceRequest) GetAdminContext() *AdminContext {
@@ -1122,7 +1859,7 @@ type RevokeDeviceResponse struct {
 
 func (x *RevokeDeviceResponse) Reset() {
 	*x = RevokeDeviceResponse{}
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[10]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1134,7 +1871,7 @@ func (x *RevokeDeviceResponse) String() string {
 func (*RevokeDeviceResponse) ProtoMessage() {}
 
 func (x *RevokeDeviceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[10]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1147,7 +1884,7 @@ func (x *RevokeDeviceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeDeviceResponse.ProtoReflect.Descriptor instead.
 func (*RevokeDeviceResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{10}
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *RevokeDeviceResponse) GetTenantId() string {
@@ -1198,7 +1935,7 @@ type RevokeSessionRequest struct {
 
 func (x *RevokeSessionRequest) Reset() {
 	*x = RevokeSessionRequest{}
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[11]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1210,7 +1947,7 @@ func (x *RevokeSessionRequest) String() string {
 func (*RevokeSessionRequest) ProtoMessage() {}
 
 func (x *RevokeSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[11]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1223,7 +1960,7 @@ func (x *RevokeSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeSessionRequest.ProtoReflect.Descriptor instead.
 func (*RevokeSessionRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{11}
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *RevokeSessionRequest) GetAdminContext() *AdminContext {
@@ -1275,7 +2012,7 @@ type RevokeSessionResponse struct {
 
 func (x *RevokeSessionResponse) Reset() {
 	*x = RevokeSessionResponse{}
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[12]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1287,7 +2024,7 @@ func (x *RevokeSessionResponse) String() string {
 func (*RevokeSessionResponse) ProtoMessage() {}
 
 func (x *RevokeSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[12]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1300,7 +2037,7 @@ func (x *RevokeSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeSessionResponse.ProtoReflect.Descriptor instead.
 func (*RevokeSessionResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{12}
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *RevokeSessionResponse) GetTenantId() string {
@@ -1356,7 +2093,7 @@ type GetDeviceStateRequest struct {
 
 func (x *GetDeviceStateRequest) Reset() {
 	*x = GetDeviceStateRequest{}
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[13]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1368,7 +2105,7 @@ func (x *GetDeviceStateRequest) String() string {
 func (*GetDeviceStateRequest) ProtoMessage() {}
 
 func (x *GetDeviceStateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[13]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1381,7 +2118,7 @@ func (x *GetDeviceStateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeviceStateRequest.ProtoReflect.Descriptor instead.
 func (*GetDeviceStateRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{13}
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GetDeviceStateRequest) GetAdminContext() *AdminContext {
@@ -1420,7 +2157,7 @@ type GetDeviceStateResponse struct {
 
 func (x *GetDeviceStateResponse) Reset() {
 	*x = GetDeviceStateResponse{}
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[14]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1432,7 +2169,7 @@ func (x *GetDeviceStateResponse) String() string {
 func (*GetDeviceStateResponse) ProtoMessage() {}
 
 func (x *GetDeviceStateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[14]
+	mi := &file_nexusim_identity_v1_identity_service_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1445,7 +2182,7 @@ func (x *GetDeviceStateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeviceStateResponse.ProtoReflect.Descriptor instead.
 func (*GetDeviceStateResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{14}
+	return file_nexusim_identity_v1_identity_service_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *GetDeviceStateResponse) GetTenantId() string {
@@ -1571,7 +2308,71 @@ const file_nexusim_identity_v1_identity_service_proto_rawDesc = "" +
 	"\x1agateway_expires_at_unix_ms\x18\t \x01(\x03R\x16gatewayExpiresAtUnixMs\x12:\n" +
 	"\x1arefresh_expires_at_unix_ms\x18\n" +
 	" \x01(\x03R\x16refreshExpiresAtUnixMs\x12)\n" +
-	"\x11issued_at_unix_ms\x18\v \x01(\x03R\x0eissuedAtUnixMs\"\x83\x02\n" +
+	"\x11issued_at_unix_ms\x18\v \x01(\x03R\x0eissuedAtUnixMs\"\xb8\x02\n" +
+	"#RequestVerificationChallengeRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12B\n" +
+	"\achannel\x18\x03 \x01(\x0e2(.nexusim.identity.v1.VerificationChannelR\achannel\x12 \n" +
+	"\vdestination\x18\x04 \x01(\tR\vdestination\x12\x1f\n" +
+	"\vttl_seconds\x18\x05 \x01(\x03R\n" +
+	"ttlSeconds\x12\x19\n" +
+	"\btrace_id\x18\x06 \x01(\tR\atraceId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\a \x01(\tR\trequestId\x12\x1a\n" +
+	"\bpassword\x18\b \x01(\tR\bpassword\"\xc2\x02\n" +
+	"$RequestVerificationChallengeResponse\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12!\n" +
+	"\fchallenge_id\x18\x03 \x01(\tR\vchallengeId\x12B\n" +
+	"\achannel\x18\x04 \x01(\x0e2(.nexusim.identity.v1.VerificationChannelR\achannel\x12 \n" +
+	"\vdestination\x18\x05 \x01(\tR\vdestination\x12+\n" +
+	"\x12expires_at_unix_ms\x18\x06 \x01(\x03R\x0fexpiresAtUnixMs\x12.\n" +
+	"\x13dev_challenge_token\x18\a \x01(\tR\x11devChallengeToken\"\xe1\x01\n" +
+	"#ConfirmVerificationChallengeRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12!\n" +
+	"\fchallenge_id\x18\x03 \x01(\tR\vchallengeId\x12'\n" +
+	"\x0fchallenge_token\x18\x04 \x01(\tR\x0echallengeToken\x12\x19\n" +
+	"\btrace_id\x18\x05 \x01(\tR\atraceId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x06 \x01(\tR\trequestId\"\xf1\x01\n" +
+	"$ConfirmVerificationChallengeResponse\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12B\n" +
+	"\achannel\x18\x03 \x01(\x0e2(.nexusim.identity.v1.VerificationChannelR\achannel\x12 \n" +
+	"\vdestination\x18\x04 \x01(\tR\vdestination\x12-\n" +
+	"\x13verified_at_unix_ms\x18\x05 \x01(\x03R\x10verifiedAtUnixMs\"\x94\x02\n" +
+	"\x1bRequestPasswordResetRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12B\n" +
+	"\achannel\x18\x03 \x01(\x0e2(.nexusim.identity.v1.VerificationChannelR\achannel\x12 \n" +
+	"\vdestination\x18\x04 \x01(\tR\vdestination\x12\x1f\n" +
+	"\vttl_seconds\x18\x05 \x01(\x03R\n" +
+	"ttlSeconds\x12\x19\n" +
+	"\btrace_id\x18\x06 \x01(\tR\atraceId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\a \x01(\tR\trequestId\"\xba\x02\n" +
+	"\x1cRequestPasswordResetResponse\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12!\n" +
+	"\fchallenge_id\x18\x03 \x01(\tR\vchallengeId\x12B\n" +
+	"\achannel\x18\x04 \x01(\x0e2(.nexusim.identity.v1.VerificationChannelR\achannel\x12 \n" +
+	"\vdestination\x18\x05 \x01(\tR\vdestination\x12+\n" +
+	"\x12expires_at_unix_ms\x18\x06 \x01(\x03R\x0fexpiresAtUnixMs\x12.\n" +
+	"\x13dev_challenge_token\x18\a \x01(\tR\x11devChallengeToken\"\xfc\x01\n" +
+	"\x1bConfirmPasswordResetRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12!\n" +
+	"\fchallenge_id\x18\x03 \x01(\tR\vchallengeId\x12'\n" +
+	"\x0fchallenge_token\x18\x04 \x01(\tR\x0echallengeToken\x12!\n" +
+	"\fnew_password\x18\x05 \x01(\tR\vnewPassword\x12\x19\n" +
+	"\btrace_id\x18\x06 \x01(\tR\atraceId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\a \x01(\tR\trequestId\"}\n" +
+	"\x1cConfirmPasswordResetResponse\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12'\n" +
+	"\x10reset_at_unix_ms\x18\x03 \x01(\x03R\rresetAtUnixMs\"\x83\x02\n" +
 	"\x18IssueGatewayTokenRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +
@@ -1639,15 +2440,24 @@ const file_nexusim_identity_v1_identity_service_proto_rawDesc = "" +
 	"\n" +
 	"UserStatus\x12\x1b\n" +
 	"\x17USER_STATUS_UNSPECIFIED\x10\x00\x12\x16\n" +
-	"\x12USER_STATUS_ACTIVE\x10\x01*f\n" +
+	"\x12USER_STATUS_ACTIVE\x10\x01*{\n" +
+	"\x13VerificationChannel\x12$\n" +
+	" VERIFICATION_CHANNEL_UNSPECIFIED\x10\x00\x12\x1e\n" +
+	"\x1aVERIFICATION_CHANNEL_EMAIL\x10\x01\x12\x1e\n" +
+	"\x1aVERIFICATION_CHANNEL_PHONE\x10\x02*f\n" +
 	"\rSessionStatus\x12\x1e\n" +
 	"\x1aSESSION_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15SESSION_STATUS_ACTIVE\x10\x01\x12\x1a\n" +
-	"\x16SESSION_STATUS_REVOKED\x10\x022\xec\x05\n" +
+	"\x16SESSION_STATUS_REVOKED\x10\x022\x92\n" +
+	"\n" +
 	"\x0fIdentityService\x12c\n" +
 	"\fRegisterUser\x12(.nexusim.identity.v1.RegisterUserRequest\x1a).nexusim.identity.v1.RegisterUserResponse\x12N\n" +
 	"\x05Login\x12!.nexusim.identity.v1.LoginRequest\x1a\".nexusim.identity.v1.LoginResponse\x12x\n" +
-	"\x13RefreshGatewayToken\x12/.nexusim.identity.v1.RefreshGatewayTokenRequest\x1a0.nexusim.identity.v1.RefreshGatewayTokenResponse\x12r\n" +
+	"\x13RefreshGatewayToken\x12/.nexusim.identity.v1.RefreshGatewayTokenRequest\x1a0.nexusim.identity.v1.RefreshGatewayTokenResponse\x12\x93\x01\n" +
+	"\x1cRequestVerificationChallenge\x128.nexusim.identity.v1.RequestVerificationChallengeRequest\x1a9.nexusim.identity.v1.RequestVerificationChallengeResponse\x12\x93\x01\n" +
+	"\x1cConfirmVerificationChallenge\x128.nexusim.identity.v1.ConfirmVerificationChallengeRequest\x1a9.nexusim.identity.v1.ConfirmVerificationChallengeResponse\x12{\n" +
+	"\x14RequestPasswordReset\x120.nexusim.identity.v1.RequestPasswordResetRequest\x1a1.nexusim.identity.v1.RequestPasswordResetResponse\x12{\n" +
+	"\x14ConfirmPasswordReset\x120.nexusim.identity.v1.ConfirmPasswordResetRequest\x1a1.nexusim.identity.v1.ConfirmPasswordResetResponse\x12r\n" +
 	"\x11IssueGatewayToken\x12-.nexusim.identity.v1.IssueGatewayTokenRequest\x1a..nexusim.identity.v1.IssueGatewayTokenResponse\x12c\n" +
 	"\fRevokeDevice\x12(.nexusim.identity.v1.RevokeDeviceRequest\x1a).nexusim.identity.v1.RevokeDeviceResponse\x12f\n" +
 	"\rRevokeSession\x12).nexusim.identity.v1.RevokeSessionRequest\x1a*.nexusim.identity.v1.RevokeSessionResponse\x12i\n" +
@@ -1665,55 +2475,77 @@ func file_nexusim_identity_v1_identity_service_proto_rawDescGZIP() []byte {
 	return file_nexusim_identity_v1_identity_service_proto_rawDescData
 }
 
-var file_nexusim_identity_v1_identity_service_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_nexusim_identity_v1_identity_service_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_nexusim_identity_v1_identity_service_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_nexusim_identity_v1_identity_service_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_nexusim_identity_v1_identity_service_proto_goTypes = []any{
-	(DeviceStatus)(0),                   // 0: nexusim.identity.v1.DeviceStatus
-	(UserStatus)(0),                     // 1: nexusim.identity.v1.UserStatus
-	(SessionStatus)(0),                  // 2: nexusim.identity.v1.SessionStatus
-	(*AdminContext)(nil),                // 3: nexusim.identity.v1.AdminContext
-	(*RegisterUserRequest)(nil),         // 4: nexusim.identity.v1.RegisterUserRequest
-	(*RegisterUserResponse)(nil),        // 5: nexusim.identity.v1.RegisterUserResponse
-	(*LoginRequest)(nil),                // 6: nexusim.identity.v1.LoginRequest
-	(*LoginResponse)(nil),               // 7: nexusim.identity.v1.LoginResponse
-	(*RefreshGatewayTokenRequest)(nil),  // 8: nexusim.identity.v1.RefreshGatewayTokenRequest
-	(*RefreshGatewayTokenResponse)(nil), // 9: nexusim.identity.v1.RefreshGatewayTokenResponse
-	(*IssueGatewayTokenRequest)(nil),    // 10: nexusim.identity.v1.IssueGatewayTokenRequest
-	(*IssueGatewayTokenResponse)(nil),   // 11: nexusim.identity.v1.IssueGatewayTokenResponse
-	(*RevokeDeviceRequest)(nil),         // 12: nexusim.identity.v1.RevokeDeviceRequest
-	(*RevokeDeviceResponse)(nil),        // 13: nexusim.identity.v1.RevokeDeviceResponse
-	(*RevokeSessionRequest)(nil),        // 14: nexusim.identity.v1.RevokeSessionRequest
-	(*RevokeSessionResponse)(nil),       // 15: nexusim.identity.v1.RevokeSessionResponse
-	(*GetDeviceStateRequest)(nil),       // 16: nexusim.identity.v1.GetDeviceStateRequest
-	(*GetDeviceStateResponse)(nil),      // 17: nexusim.identity.v1.GetDeviceStateResponse
+	(DeviceStatus)(0),                            // 0: nexusim.identity.v1.DeviceStatus
+	(UserStatus)(0),                              // 1: nexusim.identity.v1.UserStatus
+	(VerificationChannel)(0),                     // 2: nexusim.identity.v1.VerificationChannel
+	(SessionStatus)(0),                           // 3: nexusim.identity.v1.SessionStatus
+	(*AdminContext)(nil),                         // 4: nexusim.identity.v1.AdminContext
+	(*RegisterUserRequest)(nil),                  // 5: nexusim.identity.v1.RegisterUserRequest
+	(*RegisterUserResponse)(nil),                 // 6: nexusim.identity.v1.RegisterUserResponse
+	(*LoginRequest)(nil),                         // 7: nexusim.identity.v1.LoginRequest
+	(*LoginResponse)(nil),                        // 8: nexusim.identity.v1.LoginResponse
+	(*RefreshGatewayTokenRequest)(nil),           // 9: nexusim.identity.v1.RefreshGatewayTokenRequest
+	(*RefreshGatewayTokenResponse)(nil),          // 10: nexusim.identity.v1.RefreshGatewayTokenResponse
+	(*RequestVerificationChallengeRequest)(nil),  // 11: nexusim.identity.v1.RequestVerificationChallengeRequest
+	(*RequestVerificationChallengeResponse)(nil), // 12: nexusim.identity.v1.RequestVerificationChallengeResponse
+	(*ConfirmVerificationChallengeRequest)(nil),  // 13: nexusim.identity.v1.ConfirmVerificationChallengeRequest
+	(*ConfirmVerificationChallengeResponse)(nil), // 14: nexusim.identity.v1.ConfirmVerificationChallengeResponse
+	(*RequestPasswordResetRequest)(nil),          // 15: nexusim.identity.v1.RequestPasswordResetRequest
+	(*RequestPasswordResetResponse)(nil),         // 16: nexusim.identity.v1.RequestPasswordResetResponse
+	(*ConfirmPasswordResetRequest)(nil),          // 17: nexusim.identity.v1.ConfirmPasswordResetRequest
+	(*ConfirmPasswordResetResponse)(nil),         // 18: nexusim.identity.v1.ConfirmPasswordResetResponse
+	(*IssueGatewayTokenRequest)(nil),             // 19: nexusim.identity.v1.IssueGatewayTokenRequest
+	(*IssueGatewayTokenResponse)(nil),            // 20: nexusim.identity.v1.IssueGatewayTokenResponse
+	(*RevokeDeviceRequest)(nil),                  // 21: nexusim.identity.v1.RevokeDeviceRequest
+	(*RevokeDeviceResponse)(nil),                 // 22: nexusim.identity.v1.RevokeDeviceResponse
+	(*RevokeSessionRequest)(nil),                 // 23: nexusim.identity.v1.RevokeSessionRequest
+	(*RevokeSessionResponse)(nil),                // 24: nexusim.identity.v1.RevokeSessionResponse
+	(*GetDeviceStateRequest)(nil),                // 25: nexusim.identity.v1.GetDeviceStateRequest
+	(*GetDeviceStateResponse)(nil),               // 26: nexusim.identity.v1.GetDeviceStateResponse
 }
 var file_nexusim_identity_v1_identity_service_proto_depIdxs = []int32{
 	1,  // 0: nexusim.identity.v1.RegisterUserResponse.status:type_name -> nexusim.identity.v1.UserStatus
-	3,  // 1: nexusim.identity.v1.RevokeDeviceRequest.admin_context:type_name -> nexusim.identity.v1.AdminContext
-	0,  // 2: nexusim.identity.v1.RevokeDeviceResponse.status:type_name -> nexusim.identity.v1.DeviceStatus
-	3,  // 3: nexusim.identity.v1.RevokeSessionRequest.admin_context:type_name -> nexusim.identity.v1.AdminContext
-	2,  // 4: nexusim.identity.v1.RevokeSessionResponse.status:type_name -> nexusim.identity.v1.SessionStatus
-	3,  // 5: nexusim.identity.v1.GetDeviceStateRequest.admin_context:type_name -> nexusim.identity.v1.AdminContext
-	0,  // 6: nexusim.identity.v1.GetDeviceStateResponse.status:type_name -> nexusim.identity.v1.DeviceStatus
-	4,  // 7: nexusim.identity.v1.IdentityService.RegisterUser:input_type -> nexusim.identity.v1.RegisterUserRequest
-	6,  // 8: nexusim.identity.v1.IdentityService.Login:input_type -> nexusim.identity.v1.LoginRequest
-	8,  // 9: nexusim.identity.v1.IdentityService.RefreshGatewayToken:input_type -> nexusim.identity.v1.RefreshGatewayTokenRequest
-	10, // 10: nexusim.identity.v1.IdentityService.IssueGatewayToken:input_type -> nexusim.identity.v1.IssueGatewayTokenRequest
-	12, // 11: nexusim.identity.v1.IdentityService.RevokeDevice:input_type -> nexusim.identity.v1.RevokeDeviceRequest
-	14, // 12: nexusim.identity.v1.IdentityService.RevokeSession:input_type -> nexusim.identity.v1.RevokeSessionRequest
-	16, // 13: nexusim.identity.v1.IdentityService.GetDeviceState:input_type -> nexusim.identity.v1.GetDeviceStateRequest
-	5,  // 14: nexusim.identity.v1.IdentityService.RegisterUser:output_type -> nexusim.identity.v1.RegisterUserResponse
-	7,  // 15: nexusim.identity.v1.IdentityService.Login:output_type -> nexusim.identity.v1.LoginResponse
-	9,  // 16: nexusim.identity.v1.IdentityService.RefreshGatewayToken:output_type -> nexusim.identity.v1.RefreshGatewayTokenResponse
-	11, // 17: nexusim.identity.v1.IdentityService.IssueGatewayToken:output_type -> nexusim.identity.v1.IssueGatewayTokenResponse
-	13, // 18: nexusim.identity.v1.IdentityService.RevokeDevice:output_type -> nexusim.identity.v1.RevokeDeviceResponse
-	15, // 19: nexusim.identity.v1.IdentityService.RevokeSession:output_type -> nexusim.identity.v1.RevokeSessionResponse
-	17, // 20: nexusim.identity.v1.IdentityService.GetDeviceState:output_type -> nexusim.identity.v1.GetDeviceStateResponse
-	14, // [14:21] is the sub-list for method output_type
-	7,  // [7:14] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	2,  // 1: nexusim.identity.v1.RequestVerificationChallengeRequest.channel:type_name -> nexusim.identity.v1.VerificationChannel
+	2,  // 2: nexusim.identity.v1.RequestVerificationChallengeResponse.channel:type_name -> nexusim.identity.v1.VerificationChannel
+	2,  // 3: nexusim.identity.v1.ConfirmVerificationChallengeResponse.channel:type_name -> nexusim.identity.v1.VerificationChannel
+	2,  // 4: nexusim.identity.v1.RequestPasswordResetRequest.channel:type_name -> nexusim.identity.v1.VerificationChannel
+	2,  // 5: nexusim.identity.v1.RequestPasswordResetResponse.channel:type_name -> nexusim.identity.v1.VerificationChannel
+	4,  // 6: nexusim.identity.v1.RevokeDeviceRequest.admin_context:type_name -> nexusim.identity.v1.AdminContext
+	0,  // 7: nexusim.identity.v1.RevokeDeviceResponse.status:type_name -> nexusim.identity.v1.DeviceStatus
+	4,  // 8: nexusim.identity.v1.RevokeSessionRequest.admin_context:type_name -> nexusim.identity.v1.AdminContext
+	3,  // 9: nexusim.identity.v1.RevokeSessionResponse.status:type_name -> nexusim.identity.v1.SessionStatus
+	4,  // 10: nexusim.identity.v1.GetDeviceStateRequest.admin_context:type_name -> nexusim.identity.v1.AdminContext
+	0,  // 11: nexusim.identity.v1.GetDeviceStateResponse.status:type_name -> nexusim.identity.v1.DeviceStatus
+	5,  // 12: nexusim.identity.v1.IdentityService.RegisterUser:input_type -> nexusim.identity.v1.RegisterUserRequest
+	7,  // 13: nexusim.identity.v1.IdentityService.Login:input_type -> nexusim.identity.v1.LoginRequest
+	9,  // 14: nexusim.identity.v1.IdentityService.RefreshGatewayToken:input_type -> nexusim.identity.v1.RefreshGatewayTokenRequest
+	11, // 15: nexusim.identity.v1.IdentityService.RequestVerificationChallenge:input_type -> nexusim.identity.v1.RequestVerificationChallengeRequest
+	13, // 16: nexusim.identity.v1.IdentityService.ConfirmVerificationChallenge:input_type -> nexusim.identity.v1.ConfirmVerificationChallengeRequest
+	15, // 17: nexusim.identity.v1.IdentityService.RequestPasswordReset:input_type -> nexusim.identity.v1.RequestPasswordResetRequest
+	17, // 18: nexusim.identity.v1.IdentityService.ConfirmPasswordReset:input_type -> nexusim.identity.v1.ConfirmPasswordResetRequest
+	19, // 19: nexusim.identity.v1.IdentityService.IssueGatewayToken:input_type -> nexusim.identity.v1.IssueGatewayTokenRequest
+	21, // 20: nexusim.identity.v1.IdentityService.RevokeDevice:input_type -> nexusim.identity.v1.RevokeDeviceRequest
+	23, // 21: nexusim.identity.v1.IdentityService.RevokeSession:input_type -> nexusim.identity.v1.RevokeSessionRequest
+	25, // 22: nexusim.identity.v1.IdentityService.GetDeviceState:input_type -> nexusim.identity.v1.GetDeviceStateRequest
+	6,  // 23: nexusim.identity.v1.IdentityService.RegisterUser:output_type -> nexusim.identity.v1.RegisterUserResponse
+	8,  // 24: nexusim.identity.v1.IdentityService.Login:output_type -> nexusim.identity.v1.LoginResponse
+	10, // 25: nexusim.identity.v1.IdentityService.RefreshGatewayToken:output_type -> nexusim.identity.v1.RefreshGatewayTokenResponse
+	12, // 26: nexusim.identity.v1.IdentityService.RequestVerificationChallenge:output_type -> nexusim.identity.v1.RequestVerificationChallengeResponse
+	14, // 27: nexusim.identity.v1.IdentityService.ConfirmVerificationChallenge:output_type -> nexusim.identity.v1.ConfirmVerificationChallengeResponse
+	16, // 28: nexusim.identity.v1.IdentityService.RequestPasswordReset:output_type -> nexusim.identity.v1.RequestPasswordResetResponse
+	18, // 29: nexusim.identity.v1.IdentityService.ConfirmPasswordReset:output_type -> nexusim.identity.v1.ConfirmPasswordResetResponse
+	20, // 30: nexusim.identity.v1.IdentityService.IssueGatewayToken:output_type -> nexusim.identity.v1.IssueGatewayTokenResponse
+	22, // 31: nexusim.identity.v1.IdentityService.RevokeDevice:output_type -> nexusim.identity.v1.RevokeDeviceResponse
+	24, // 32: nexusim.identity.v1.IdentityService.RevokeSession:output_type -> nexusim.identity.v1.RevokeSessionResponse
+	26, // 33: nexusim.identity.v1.IdentityService.GetDeviceState:output_type -> nexusim.identity.v1.GetDeviceStateResponse
+	23, // [23:34] is the sub-list for method output_type
+	12, // [12:23] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_identity_v1_identity_service_proto_init() }
@@ -1726,8 +2558,8 @@ func file_nexusim_identity_v1_identity_service_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_identity_v1_identity_service_proto_rawDesc), len(file_nexusim_identity_v1_identity_service_proto_rawDesc)),
-			NumEnums:      3,
-			NumMessages:   15,
+			NumEnums:      4,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

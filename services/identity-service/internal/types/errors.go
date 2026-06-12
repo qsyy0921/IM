@@ -17,6 +17,8 @@ var (
 	ErrAccountLocked             = errors.New("account locked")
 	ErrInvalidRefreshToken       = errors.New("invalid refresh token")
 	ErrRefreshTokenReuseDetected = errors.New("refresh token reuse detected")
+	ErrInvalidChallenge          = errors.New("invalid challenge")
+	ErrChallengeExpired          = errors.New("challenge expired")
 )
 
 type serviceError struct {
@@ -56,3 +58,5 @@ func NewInvalidRefreshToken(message string) error { return wrap(ErrInvalidRefres
 func NewRefreshTokenReuseDetected(message string) error {
 	return wrap(ErrRefreshTokenReuseDetected, message)
 }
+func NewInvalidChallenge(message string) error { return wrap(ErrInvalidChallenge, message) }
+func NewChallengeExpired(message string) error { return wrap(ErrChallengeExpired, message) }

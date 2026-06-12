@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -351,6 +352,164 @@ func (r *Repository) RefreshGatewaySession(
 	}, nil
 }
 
+func (r *Repository) CreateVerificationChallenge(
+	ctx context.Context,
+	command types.RequestVerificationChallengeCommand,
+	challengeType types.ChallengeType,
+	challenge types.ChallengeRecord,
+	issuedAt time.Time,
+	expiresAt time.Time,
+) (types.RequestVerificationChallengeResult, error) {
+	if r.pool == nil {
+		return types.RequestVerificationChallengeResult{}, types.NewDBWriteFailed("identity repository is not configured")
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.RequestVerificationChallengeResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err := lockExistingUser(ctx, tx, command.TenantID, command.UserID); err != nil {
+		return types.RequestVerificationChallengeResult{}, err
+	}
+	if err := upsertChallengeDestination(ctx, tx, command.TenantID, command.UserID, command.Channel, command.Destination, issuedAt); err != nil {
+		return types.RequestVerificationChallengeResult{}, err
+	}
+	if err := insertIdentityChallenge(ctx, tx, command.TenantID, command.UserID, challenge.ChallengeID, challengeType, command.Channel, command.Destination, challenge.TokenHash, issuedAt, expiresAt, command.TraceID, command.RequestID); err != nil {
+		return types.RequestVerificationChallengeResult{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.RequestVerificationChallengeResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.RequestVerificationChallengeResult{
+		TenantID:        command.TenantID,
+		UserID:          command.UserID,
+		ChallengeID:     challenge.ChallengeID,
+		Channel:         command.Channel,
+		Destination:     command.Destination,
+		ExpiresAtUnixMS: expiresAt.UnixMilli(),
+	}, nil
+}
+
+func (r *Repository) ConfirmVerificationChallenge(
+	ctx context.Context,
+	command types.ConfirmVerificationChallengeCommand,
+	tokenHash string,
+	confirmedAt time.Time,
+) (types.ConfirmVerificationChallengeResult, error) {
+	if r.pool == nil {
+		return types.ConfirmVerificationChallengeResult{}, types.NewDBWriteFailed("identity repository is not configured")
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.ConfirmVerificationChallengeResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	challenge, err := lockIdentityChallenge(ctx, tx, command.TenantID, command.UserID, command.ChallengeID)
+	if err != nil {
+		return types.ConfirmVerificationChallengeResult{}, err
+	}
+	if challenge.Type != types.ChallengeTypeEmailVerification && challenge.Type != types.ChallengeTypePhoneVerification {
+		return types.ConfirmVerificationChallengeResult{}, types.NewInvalidChallenge("challenge type mismatch")
+	}
+	if err := verifyChallengeToken(ctx, tx, challenge, tokenHash, confirmedAt); err != nil {
+		return types.ConfirmVerificationChallengeResult{}, err
+	}
+	if err := markChallengeConsumed(ctx, tx, challenge, confirmedAt); err != nil {
+		return types.ConfirmVerificationChallengeResult{}, err
+	}
+	if err := markDestinationVerified(ctx, tx, challenge, confirmedAt); err != nil {
+		return types.ConfirmVerificationChallengeResult{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.ConfirmVerificationChallengeResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.ConfirmVerificationChallengeResult{
+		TenantID:         challenge.TenantID,
+		UserID:           challenge.UserID,
+		Channel:          challenge.Channel,
+		Destination:      challenge.Destination,
+		VerifiedAtUnixMS: confirmedAt.UnixMilli(),
+	}, nil
+}
+
+func (r *Repository) CreatePasswordResetChallenge(
+	ctx context.Context,
+	command types.RequestPasswordResetCommand,
+	challenge types.ChallengeRecord,
+	issuedAt time.Time,
+	expiresAt time.Time,
+) (types.RequestPasswordResetResult, error) {
+	if r.pool == nil {
+		return types.RequestPasswordResetResult{}, types.NewDBWriteFailed("identity repository is not configured")
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.RequestPasswordResetResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err := lockVerifiedDestination(ctx, tx, command.TenantID, command.UserID, command.Channel, command.Destination); err != nil {
+		return types.RequestPasswordResetResult{}, err
+	}
+	if err := insertIdentityChallenge(ctx, tx, command.TenantID, command.UserID, challenge.ChallengeID, types.ChallengeTypePasswordReset, command.Channel, command.Destination, challenge.TokenHash, issuedAt, expiresAt, command.TraceID, command.RequestID); err != nil {
+		return types.RequestPasswordResetResult{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.RequestPasswordResetResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.RequestPasswordResetResult{
+		TenantID:        command.TenantID,
+		UserID:          command.UserID,
+		ChallengeID:     challenge.ChallengeID,
+		Channel:         command.Channel,
+		Destination:     command.Destination,
+		ExpiresAtUnixMS: expiresAt.UnixMilli(),
+	}, nil
+}
+
+func (r *Repository) ConfirmPasswordReset(
+	ctx context.Context,
+	command types.ConfirmPasswordResetCommand,
+	tokenHash string,
+	passwordHash string,
+	resetAt time.Time,
+) (types.ConfirmPasswordResetResult, error) {
+	if r.pool == nil {
+		return types.ConfirmPasswordResetResult{}, types.NewDBWriteFailed("identity repository is not configured")
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.ConfirmPasswordResetResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	challenge, err := lockIdentityChallenge(ctx, tx, command.TenantID, command.UserID, command.ChallengeID)
+	if err != nil {
+		return types.ConfirmPasswordResetResult{}, err
+	}
+	if challenge.Type != types.ChallengeTypePasswordReset {
+		return types.ConfirmPasswordResetResult{}, types.NewInvalidChallenge("challenge type mismatch")
+	}
+	if err := verifyChallengeToken(ctx, tx, challenge, tokenHash, resetAt); err != nil {
+		return types.ConfirmPasswordResetResult{}, err
+	}
+	if err := markChallengeConsumed(ctx, tx, challenge, resetAt); err != nil {
+		return types.ConfirmPasswordResetResult{}, err
+	}
+	if err := updatePasswordAfterReset(ctx, tx, command.TenantID, command.UserID, passwordHash, resetAt); err != nil {
+		return types.ConfirmPasswordResetResult{}, err
+	}
+	if err := r.revokeUserSessionsAfterPasswordReset(ctx, tx, command.TenantID, command.UserID, resetAt, command.TraceID, command.RequestID); err != nil {
+		return types.ConfirmPasswordResetResult{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.ConfirmPasswordResetResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.ConfirmPasswordResetResult{
+		TenantID:      command.TenantID,
+		UserID:        command.UserID,
+		ResetAtUnixMS: resetAt.UnixMilli(),
+	}, nil
+}
+
 func (r *Repository) IssueGatewaySession(
 	ctx context.Context,
 	command types.IssueGatewayTokenCommand,
@@ -423,6 +582,20 @@ type refreshTokenRow struct {
 	TokenHash string
 	Status    string
 	ExpiresAt time.Time
+}
+
+type identityChallengeRow struct {
+	TenantID     types.TenantID
+	UserID       types.UserID
+	ChallengeID  types.ChallengeID
+	Type         types.ChallengeType
+	Status       string
+	Channel      types.VerificationChannel
+	Destination  string
+	TokenHash    string
+	ExpiresAt    time.Time
+	AttemptCount int
+	MaxAttempts  int
 }
 
 func issueCommandFromLogin(command types.LoginCommand, sessionID types.SessionID) types.IssueGatewayTokenCommand {
@@ -596,6 +769,84 @@ RETURNING tenant_id, user_id, device_id, session_id, status, revoked_at
 		return nil, types.NewDBWriteFailed(err.Error())
 	}
 	return &revoked, nil
+}
+
+func (r *Repository) revokeUserSessionsAfterPasswordReset(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	userID types.UserID,
+	revokedAt time.Time,
+	traceID string,
+	requestID string,
+) error {
+	_, err := tx.Exec(ctx, `
+UPDATE identity_refresh_tokens
+SET status = 'REVOKED',
+    revoked_at = $3,
+    updated_at = $3
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND status = 'ACTIVE'
+`, tenantID, userID, revokedAt)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+
+	rows, err := tx.Query(ctx, `
+UPDATE identity_sessions
+SET status = 'REVOKED',
+    revoked_at = $3,
+    revoked_by = 'identity-service',
+    revoke_reason = 'password reset'
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND status = 'ACTIVE'
+RETURNING tenant_id, user_id, device_id, session_id, status, revoked_at
+`, tenantID, userID, revokedAt)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	defer rows.Close()
+
+	var revokedSessions []sessionRow
+	for rows.Next() {
+		var row sessionRow
+		if err := rows.Scan(
+			&row.TenantID,
+			&row.UserID,
+			&row.DeviceID,
+			&row.SessionID,
+			&row.Status,
+			&row.RevokedAt,
+		); err != nil {
+			return types.NewDBWriteFailed(err.Error())
+		}
+		revokedSessions = append(revokedSessions, row)
+	}
+	if err := rows.Err(); err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	rows.Close()
+
+	command := types.RevokeSessionCommand{
+		AdminContext: types.AdminContext{
+			TenantID:       tenantID,
+			OperatorUserID: "identity-service",
+			TraceID:        traceID,
+			RequestID:      requestID,
+		},
+		UserID: userID,
+		Reason: "password reset",
+	}
+	for _, row := range revokedSessions {
+		command.DeviceID = row.DeviceID
+		command.SessionID = row.SessionID
+		if err := r.insertSessionRevokedOutbox(ctx, tx, row, command, revokedAt); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *Repository) RevokeDevice(ctx context.Context, command types.RevokeDeviceCommand, revokedAt time.Time) (types.RevokeDeviceResult, error) {
@@ -865,6 +1116,301 @@ SET updated_at = now()
 `, tenantID, userID)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func lockExistingUser(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID) error {
+	var status string
+	err := tx.QueryRow(ctx, `
+SELECT status
+FROM identity_users
+WHERE tenant_id = $1
+  AND user_id = $2
+FOR UPDATE
+`, tenantID, userID).Scan(&status)
+	if err == pgx.ErrNoRows {
+		return types.NewInvalidCredentials("invalid credentials")
+	}
+	if err != nil {
+		return types.NewDBReadFailed(err.Error())
+	}
+	if status != "ACTIVE" {
+		return types.NewInvalidCredentials("invalid credentials")
+	}
+	return nil
+}
+
+func upsertChallengeDestination(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, channel types.VerificationChannel, destination string, now time.Time) error {
+	var err error
+	switch channel {
+	case types.VerificationChannelEmail:
+		_, err = tx.Exec(ctx, `
+UPDATE identity_users
+SET email = $3,
+    email_verified_at = CASE WHEN email = $3 THEN email_verified_at ELSE NULL END,
+    updated_at = $4
+WHERE tenant_id = $1
+  AND user_id = $2
+`, tenantID, userID, destination, now)
+	case types.VerificationChannelPhone:
+		_, err = tx.Exec(ctx, `
+UPDATE identity_users
+SET phone = $3,
+    phone_verified_at = CASE WHEN phone = $3 THEN phone_verified_at ELSE NULL END,
+    updated_at = $4
+WHERE tenant_id = $1
+  AND user_id = $2
+`, tenantID, userID, destination, now)
+	default:
+		return types.NewInvalidArgument("verification channel is invalid")
+	}
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func insertIdentityChallenge(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	userID types.UserID,
+	challengeID types.ChallengeID,
+	challengeType types.ChallengeType,
+	channel types.VerificationChannel,
+	destination string,
+	tokenHash string,
+	issuedAt time.Time,
+	expiresAt time.Time,
+	traceID string,
+	requestID string,
+) error {
+	_, err := tx.Exec(ctx, `
+INSERT INTO identity_challenges (
+    tenant_id,
+    user_id,
+    challenge_id,
+    challenge_type,
+    status,
+    channel,
+    destination,
+    token_hash,
+    issued_at,
+    expires_at,
+    trace_id,
+    request_id,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, 'ACTIVE', $5, $6, $7, $8, $9, $10, $11, $8, $8)
+`, tenantID, userID, challengeID, challengeType, channel, destination, tokenHash, issuedAt, expiresAt, traceID, requestID)
+	if isUniqueViolation(err) {
+		return types.NewInvalidChallenge("challenge already exists")
+	}
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func lockIdentityChallenge(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, challengeID types.ChallengeID) (identityChallengeRow, error) {
+	var row identityChallengeRow
+	err := tx.QueryRow(ctx, `
+SELECT
+    tenant_id,
+    user_id,
+    challenge_id,
+    challenge_type,
+    status,
+    channel,
+    destination,
+    token_hash,
+    expires_at,
+    attempt_count,
+    max_attempts
+FROM identity_challenges
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND challenge_id = $3
+FOR UPDATE
+`, tenantID, userID, challengeID).Scan(
+		&row.TenantID,
+		&row.UserID,
+		&row.ChallengeID,
+		&row.Type,
+		&row.Status,
+		&row.Channel,
+		&row.Destination,
+		&row.TokenHash,
+		&row.ExpiresAt,
+		&row.AttemptCount,
+		&row.MaxAttempts,
+	)
+	if err == pgx.ErrNoRows {
+		return identityChallengeRow{}, types.NewInvalidChallenge("invalid challenge")
+	}
+	if err != nil {
+		return identityChallengeRow{}, types.NewDBReadFailed(err.Error())
+	}
+	return row, nil
+}
+
+func verifyChallengeToken(ctx context.Context, tx pgx.Tx, challenge identityChallengeRow, tokenHash string, now time.Time) error {
+	if challenge.Status != "ACTIVE" {
+		return types.NewInvalidChallenge("challenge is not active")
+	}
+	if !now.Before(challenge.ExpiresAt) {
+		if err := expireChallenge(ctx, tx, challenge, now); err != nil {
+			return err
+		}
+		return types.NewChallengeExpired("challenge expired")
+	}
+	if subtle.ConstantTimeCompare([]byte(challenge.TokenHash), []byte(tokenHash)) != 1 {
+		if err := recordChallengeAttempt(ctx, tx, challenge, now); err != nil {
+			return err
+		}
+		return types.NewInvalidChallenge("invalid challenge")
+	}
+	return nil
+}
+
+func recordChallengeAttempt(ctx context.Context, tx pgx.Tx, challenge identityChallengeRow, now time.Time) error {
+	nextAttempts := challenge.AttemptCount + 1
+	status := "ACTIVE"
+	if nextAttempts >= challenge.MaxAttempts {
+		status = "EXPIRED"
+	}
+	_, err := tx.Exec(ctx, `
+UPDATE identity_challenges
+SET attempt_count = $4,
+    status = $5,
+    updated_at = $6
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND challenge_id = $3
+`, challenge.TenantID, challenge.UserID, challenge.ChallengeID, nextAttempts, status, now)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func expireChallenge(ctx context.Context, tx pgx.Tx, challenge identityChallengeRow, now time.Time) error {
+	_, err := tx.Exec(ctx, `
+UPDATE identity_challenges
+SET status = 'EXPIRED',
+    updated_at = $4
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND challenge_id = $3
+`, challenge.TenantID, challenge.UserID, challenge.ChallengeID, now)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func markChallengeConsumed(ctx context.Context, tx pgx.Tx, challenge identityChallengeRow, now time.Time) error {
+	_, err := tx.Exec(ctx, `
+UPDATE identity_challenges
+SET status = 'CONSUMED',
+    consumed_at = $4,
+    updated_at = $4
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND challenge_id = $3
+`, challenge.TenantID, challenge.UserID, challenge.ChallengeID, now)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func markDestinationVerified(ctx context.Context, tx pgx.Tx, challenge identityChallengeRow, now time.Time) error {
+	var err error
+	switch challenge.Channel {
+	case types.VerificationChannelEmail:
+		_, err = tx.Exec(ctx, `
+UPDATE identity_users
+SET email = $3,
+    email_verified_at = $4,
+    updated_at = $4
+WHERE tenant_id = $1
+  AND user_id = $2
+`, challenge.TenantID, challenge.UserID, challenge.Destination, now)
+	case types.VerificationChannelPhone:
+		_, err = tx.Exec(ctx, `
+UPDATE identity_users
+SET phone = $3,
+    phone_verified_at = $4,
+    updated_at = $4
+WHERE tenant_id = $1
+  AND user_id = $2
+`, challenge.TenantID, challenge.UserID, challenge.Destination, now)
+	default:
+		return types.NewInvalidChallenge("challenge channel is invalid")
+	}
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func lockVerifiedDestination(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, channel types.VerificationChannel, destination string) error {
+	var matched bool
+	var err error
+	switch channel {
+	case types.VerificationChannelEmail:
+		err = tx.QueryRow(ctx, `
+SELECT email = $3 AND email_verified_at IS NOT NULL
+FROM identity_users
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND status = 'ACTIVE'
+FOR UPDATE
+`, tenantID, userID, destination).Scan(&matched)
+	case types.VerificationChannelPhone:
+		err = tx.QueryRow(ctx, `
+SELECT phone = $3 AND phone_verified_at IS NOT NULL
+FROM identity_users
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND status = 'ACTIVE'
+FOR UPDATE
+`, tenantID, userID, destination).Scan(&matched)
+	default:
+		return types.NewInvalidArgument("verification channel is invalid")
+	}
+	if err == pgx.ErrNoRows {
+		return types.NewInvalidCredentials("invalid credentials")
+	}
+	if err != nil {
+		return types.NewDBReadFailed(err.Error())
+	}
+	if !matched {
+		return types.NewInvalidCredentials("invalid credentials")
+	}
+	return nil
+}
+
+func updatePasswordAfterReset(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, passwordHash string, now time.Time) error {
+	tag, err := tx.Exec(ctx, `
+UPDATE identity_users
+SET password_hash = $3,
+    password_updated_at = $4,
+    failed_login_count = 0,
+    failed_login_last_at = NULL,
+    locked_until = NULL,
+    updated_at = $4
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND status = 'ACTIVE'
+`, tenantID, userID, passwordHash, now)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if tag.RowsAffected() == 0 {
+		return types.NewInvalidCredentials("invalid credentials")
 	}
 	return nil
 }

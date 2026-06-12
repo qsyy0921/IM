@@ -8,6 +8,10 @@ service IdentityService {
   rpc RegisterUser(RegisterUserRequest) returns (RegisterUserResponse);
   rpc Login(LoginRequest) returns (LoginResponse);
   rpc RefreshGatewayToken(RefreshGatewayTokenRequest) returns (RefreshGatewayTokenResponse);
+  rpc RequestVerificationChallenge(RequestVerificationChallengeRequest) returns (RequestVerificationChallengeResponse);
+  rpc ConfirmVerificationChallenge(ConfirmVerificationChallengeRequest) returns (ConfirmVerificationChallengeResponse);
+  rpc RequestPasswordReset(RequestPasswordResetRequest) returns (RequestPasswordResetResponse);
+  rpc ConfirmPasswordReset(ConfirmPasswordResetRequest) returns (ConfirmPasswordResetResponse);
   rpc IssueGatewayToken(IssueGatewayTokenRequest) returns (IssueGatewayTokenResponse);
   rpc RevokeDevice(RevokeDeviceRequest) returns (RevokeDeviceResponse);
   rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
@@ -86,6 +90,80 @@ message RefreshGatewayTokenResponse {
   int64 gateway_expires_at_unix_ms = 9;
   int64 refresh_expires_at_unix_ms = 10;
   int64 issued_at_unix_ms = 11;
+}
+
+message RequestVerificationChallengeRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  VerificationChannel channel = 3;
+  string destination = 4;
+  int64 ttl_seconds = 5;
+  string trace_id = 6;
+  string request_id = 7;
+  string password = 8;
+}
+
+message RequestVerificationChallengeResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  string challenge_id = 3;
+  VerificationChannel channel = 4;
+  string destination = 5;
+  int64 expires_at_unix_ms = 6;
+  string dev_challenge_token = 7;
+}
+
+message ConfirmVerificationChallengeRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  string challenge_id = 3;
+  string challenge_token = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+message ConfirmVerificationChallengeResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  VerificationChannel channel = 3;
+  string destination = 4;
+  int64 verified_at_unix_ms = 5;
+}
+
+message RequestPasswordResetRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  VerificationChannel channel = 3;
+  string destination = 4;
+  int64 ttl_seconds = 5;
+  string trace_id = 6;
+  string request_id = 7;
+}
+
+message RequestPasswordResetResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  string challenge_id = 3;
+  VerificationChannel channel = 4;
+  string destination = 5;
+  int64 expires_at_unix_ms = 6;
+  string dev_challenge_token = 7;
+}
+
+message ConfirmPasswordResetRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  string challenge_id = 3;
+  string challenge_token = 4;
+  string new_password = 5;
+  string trace_id = 6;
+  string request_id = 7;
+}
+
+message ConfirmPasswordResetResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  int64 reset_at_unix_ms = 3;
 }
 
 message IssueGatewayTokenRequest {
@@ -167,6 +245,12 @@ enum DeviceStatus {
 enum UserStatus {
   USER_STATUS_UNSPECIFIED = 0;
   USER_STATUS_ACTIVE = 1;
+}
+
+enum VerificationChannel {
+  VERIFICATION_CHANNEL_UNSPECIFIED = 0;
+  VERIFICATION_CHANNEL_EMAIL = 1;
+  VERIFICATION_CHANNEL_PHONE = 2;
 }
 
 enum SessionStatus {

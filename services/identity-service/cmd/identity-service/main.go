@@ -68,7 +68,10 @@ func runGRPC() error {
 		return err
 	}
 	repository := postgresinfra.NewRepository(pool)
-	server := grpc.NewServer(grpc.UnaryInterceptor(grpcMetrics.UnaryServerInterceptor(log.Default())))
+	server, err := newGRPCServer(grpcMetrics)
+	if err != nil {
+		return err
+	}
 	identitygrpc.Register(server, identitygrpc.NewServer(
 		app.NewIssueGatewayTokenUseCase(repository, signer),
 		app.NewRevokeDeviceUseCase(repository),
@@ -146,6 +149,24 @@ func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {
 
 func identityDebugAddr() string {
 	return envString("NEXUSIM_IDENTITY_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
+}
+
+func newGRPCServer(grpcMetrics *monitoringinfra.GRPCMetrics) (*grpc.Server, error) {
+	interceptors := make([]grpc.UnaryServerInterceptor, 0, 2)
+	if grpcMetrics != nil {
+		interceptors = append(interceptors, grpcMetrics.UnaryServerInterceptor(log.Default()))
+	}
+	switch strings.ToLower(envString("NEXUSIM_IDENTITY_ADMIN_AUTH_MODE", "body")) {
+	case "body", "request", "legacy":
+	case "metadata", "verified-metadata":
+		interceptors = append(interceptors, identitygrpc.VerifiedAdminUnaryInterceptor(true))
+	default:
+		return nil, errors.New("unsupported NEXUSIM_IDENTITY_ADMIN_AUTH_MODE")
+	}
+	if len(interceptors) == 0 {
+		return grpc.NewServer(), nil
+	}
+	return grpc.NewServer(grpc.ChainUnaryInterceptor(interceptors...)), nil
 }
 
 func envString(name string, fallback string) string {

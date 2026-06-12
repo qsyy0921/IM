@@ -93,7 +93,7 @@ func (s *Server) RevokeDevice(ctx context.Context, request *identityv1.RevokeDev
 		return nil, status.Error(codes.Unimplemented, "revoke device is not configured")
 	}
 	result, err := s.revokeDevice.Execute(ctx, types.RevokeDeviceCommand{
-		AdminContext: adminFromProto(request.GetAdminContext()),
+		AdminContext: adminFromProto(ctx, request.GetAdminContext()),
 		UserID:       types.UserID(request.GetUserId()),
 		DeviceID:     types.DeviceID(request.GetDeviceId()),
 		Reason:       request.GetReason(),
@@ -118,7 +118,7 @@ func (s *Server) RevokeSession(ctx context.Context, request *identityv1.RevokeSe
 		return nil, status.Error(codes.Unimplemented, "revoke session is not configured")
 	}
 	result, err := s.revokeSession.Execute(ctx, types.RevokeSessionCommand{
-		AdminContext: adminFromProto(request.GetAdminContext()),
+		AdminContext: adminFromProto(ctx, request.GetAdminContext()),
 		UserID:       types.UserID(request.GetUserId()),
 		DeviceID:     types.DeviceID(request.GetDeviceId()),
 		SessionID:    types.SessionID(request.GetSessionId()),
@@ -145,7 +145,7 @@ func (s *Server) GetDeviceState(ctx context.Context, request *identityv1.GetDevi
 		return nil, status.Error(codes.Unimplemented, "get device state is not configured")
 	}
 	result, err := s.getDeviceState.Execute(ctx, types.GetDeviceStateCommand{
-		AdminContext: adminFromProto(request.GetAdminContext()),
+		AdminContext: adminFromProto(ctx, request.GetAdminContext()),
 		UserID:       types.UserID(request.GetUserId()),
 		DeviceID:     types.DeviceID(request.GetDeviceId()),
 	})
@@ -163,7 +163,18 @@ func (s *Server) GetDeviceState(ctx context.Context, request *identityv1.GetDevi
 	}, nil
 }
 
-func adminFromProto(auth *identityv1.AdminContext) types.AdminContext {
+func adminFromProto(ctx context.Context, auth *identityv1.AdminContext) types.AdminContext {
+	if verified, ok := verifiedAdminFromContext(ctx); ok {
+		if auth != nil {
+			if verified.TraceID == "" {
+				verified.TraceID = auth.GetTraceId()
+			}
+			if verified.RequestID == "" {
+				verified.RequestID = auth.GetRequestId()
+			}
+		}
+		return verified
+	}
 	if auth == nil {
 		return types.AdminContext{}
 	}

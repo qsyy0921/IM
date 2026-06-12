@@ -29,6 +29,23 @@ Does not own:
 - push-gateway online session registry;
 - contacts or policy decisions.
 
+## Admin Auth
+
+The default admin RPC mode is request-body compatible for local smoke and legacy scripts. Production-like local runs can set:
+
+```text
+NEXUSIM_IDENTITY_ADMIN_AUTH_MODE=metadata
+```
+
+In metadata mode, admin/read-state RPCs derive the trusted tenant/operator from gateway-verified gRPC metadata instead of trusting request-body `AdminContext`:
+
+- `x-nexusim-tenant-id`
+- `x-nexusim-user-id`
+- `x-nexusim-trace-id` (optional)
+- `x-nexusim-request-id` (optional)
+
+This mode applies to `RevokeDevice`, `RevokeSession` and `GetDeviceState`. `IssueGatewayToken` intentionally remains outside this admin gate, because token issuance is the identity boundary itself and will later be replaced by a real login / identity provider flow.
+
 ## Gateway Token
 
 The first token format is compatible with push-gateway HMAC mode:

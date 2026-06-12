@@ -293,7 +293,7 @@ ConfirmPasswordReset -> password hash updated + active session / refresh token r
 
 - `GET /healthz`: process liveness, no dependency check.
 - `GET /readyz`: PostgreSQL ping readiness.
-- `GET /debug/metrics`: pgx pool counters, identity user/device/session counts, failed password-login user counts, currently password-login-locked user counts, and gRPC method/code/latency counters. Dedicated MFA risk counters are still a future observability hardening item.
+- `GET /debug/metrics`: pgx pool counters, identity user/device/session counts, failed password-login user counts, currently password-login-locked user counts, MFA factor counts, MFA factor failed-login counts, currently MFA-login-locked factor counts, and gRPC method/code/latency counters.
 
 The gRPC server also emits one JSON request log per unary RPC with stable fields: `service`, `event`, `method`, `code`, and `latency_ms`.
 

@@ -21,6 +21,7 @@ Implemented:
 - policy-service observability smoke for gRPC and decision metrics: `loadtest-report-20260613-policy-service-observability-smoke.md`.
 - policy-service contact projection smoke for accepted / blocked / unblocked contact events: `loadtest-report-20260613-policy-contact-projection-smoke.md`.
 - policy-service contact block decision smoke for direct `SEND` hard-deny through `direct_peer_user_id`: `loadtest-report-20260613-policy-contact-block-decision-smoke.md`.
+- policy-service first-stage decision audit outbox smoke: `loadtest-report-20260613-policy-decision-audit-outbox-smoke.md`.
 
 Not yet implemented:
 
@@ -28,7 +29,7 @@ Not yet implemented:
 - conversation role policy;
 - tenant-level policy;
 - content moderation / risk scoring;
-- policy audit outbox;
+- policy audit Kafka relay / DLQ repair / retention / external sink;
 - policy-service mTLS, OpenTelemetry, Prometheus deployment and production alerting.
 
 ## Local Smoke Shape
@@ -78,6 +79,7 @@ im.contact.events
 -> policy_contact_edges_projection
 -> CheckMessageAction(SEND, direct_peer_user_id)
 -> CONTACT_BLOCKED hard deny / allow after unblock
+-> policy_decision_audit_outbox PENDING rows
 ```
 
 Raw summaries are written under `H:\NexusIM\loadtest-results\<run-name>`:
@@ -106,3 +108,5 @@ The rule-store smoke also sets local static fallback opposite to the seeded Post
 The observability smoke reads `/debug/metrics` after both allow and deny scenarios. Metrics are aggregate debug snapshots only: they do not expose tenant id, user id, conversation id, message id, policy request bodies, rule parameters, deny reason text or classification strings. Trace id and request id are propagated for structured gRPC logs, not as metrics labels.
 
 The contact projection smoke proves that policy-service can consume `im.contact.events` and maintain a policy-owned edge projection. The contact block decision smoke proves that projected `BLOCKED` edges are consumed for direct `SEND` when `direct_peer_user_id` is present. It does not prove group conversation role policy, tenant policy, risk scoring or full ReBAC behavior.
+
+The decision audit outbox smoke proves that public policy decisions are staged as low-sensitive `policy_decision_audit_outbox` rows when PostgreSQL rules mode is enabled. Audit rows store stable object keys, context-present flags, action, allow/deny, permission version, classification, reason code and trace/request ids. They do not store raw session id, raw device id, raw peer id, raw conversation id, raw message content, rule parameters, SQL errors or free-text deny/provider bodies. The outbox is not yet relayed to Kafka.

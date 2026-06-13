@@ -12,6 +12,7 @@ Owns:
 - message action allow / deny decisions;
 - policy version and classification returned to callers;
 - a policy-owned contacts edge projection read model;
+- a policy-owned first-stage decision audit outbox;
 - future adapters for conversation, identity, tenant risk and compliance projections.
 
 Does not own:
@@ -62,6 +63,17 @@ permission_version=<blocked edge_version>
 ```
 
 Policy-service does not guess direct peers and does not synchronously query contacts-service or conversation-service. If no `direct_peer_user_id` is supplied, contacts block enforcement is skipped and the request continues to the exact rule / static decision path.
+
+When PostgreSQL rules mode is enabled, successful `CheckMessageAction` decisions are staged into `policy_decision_audit_outbox` before the response is returned. Audit write failure fails closed as policy unavailable. This outbox is local policy-service audit staging only; it is not yet relayed to Kafka.
+
+Audit rows intentionally store low-sensitive decision metadata:
+
+- stable object keys for actor user, device, conversation, message and direct peer context;
+- context-present booleans such as `message_id_present` and `direct_peer_context_present`;
+- action, allowed, permission version, classification and bounded reason code;
+- trace id and request id for correlation.
+
+Audit rows must not store message content, raw session id, raw device id, raw direct peer id, raw conversation id, raw message id, raw rule parameters, SQL error text, DSNs, tokens, credentials or free-text provider/body data.
 
 Configuration:
 
@@ -125,11 +137,11 @@ When `NEXUSIM_POLICY_DEBUG_ADDR` is set, policy-service exposes:
 /debug/metrics
 ```
 
-The debug metrics include aggregate gRPC request counts and status codes, aggregate policy decision counts, per-action aggregate decision counts, optional PostgreSQL pool stats and optional exact-rule-store row counts. They intentionally do not expose tenant id, user id, conversation id, message id, device id, session id, request / response payloads, raw rule parameters, deny reason text, classification strings, DSNs or SQL error text.
+The debug metrics include aggregate gRPC request counts and status codes, aggregate policy decision counts, per-action aggregate decision counts, optional PostgreSQL pool stats, optional exact-rule-store row counts and optional decision audit outbox status counts. They intentionally do not expose tenant id, user id, conversation id, message id, device id, session id, request / response payloads, raw rule parameters, deny reason text, classification strings, DSNs or SQL error text.
 
 `allowed=false` is counted as a decision deny, while the gRPC method remains `codes.OK`. Transport errors are counted separately.
 
-This is a local debug surface. It is not a replacement for production OpenTelemetry traces, Prometheus deployment, alert rules or durable policy audit.
+This is a local debug surface. It is not a replacement for production OpenTelemetry traces, Prometheus deployment, alert rules or external policy audit.
 
 ## Limitations
 
@@ -137,7 +149,8 @@ This is a local debug surface. It is not a replacement for production OpenTeleme
 - PostgreSQL rule store is exact-match only; no wildcard / priority rule DSL yet.
 - Contacts block / unblock events are consumed only for direct `SEND` when safe `direct_peer_user_id` context is supplied. Group, role and tenant policy remain future work.
 - No conversation role / owner / admin policy is implemented yet.
-- No tenant policy, content moderation, risk scoring, rate limiting or audit outbox is implemented yet.
+- No tenant policy, content moderation, risk scoring or rate limiting is implemented yet.
+- Decision audit outbox rows remain local `PENDING` rows; no Kafka audit schema, relay, retry/DLQ smoke, repair operator, retention policy or external sink is implemented yet.
 - No mTLS client/server config is implemented for policy-service yet.
 - No production OpenTelemetry / Prometheus / alerting rollout is implemented yet.
 

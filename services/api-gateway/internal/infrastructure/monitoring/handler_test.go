@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
+	"github.com/qsyy0921/IM/services/api-gateway/internal/infrastructure/ratelimit"
 )
 
 func TestHandlerHealthReadyAndMetrics(t *testing.T) {
@@ -14,6 +15,8 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 	metrics.record("/nexusim.api/Test", "OK", 7)
 	handler := NewHandler(metrics).WithAuthJWKStats(func() gatewayauth.JWKStats {
 		return gatewayauth.JWKStats{RemoteURLConfigured: true, CachedKeyCount: 2, RefreshFailures: 1}
+	}).WithRateLimitStats(func() ratelimit.Snapshot {
+		return ratelimit.Snapshot{Enabled: true, RatePerSecond: 10, Burst: 20, TotalLimited: 3}
 	})
 
 	for _, path := range []string{"/healthz", "/readyz"} {
@@ -38,5 +41,8 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 	}
 	if snapshot.AuthJWKs == nil || !snapshot.AuthJWKs.RemoteURLConfigured || snapshot.AuthJWKs.CachedKeyCount != 2 {
 		t.Fatalf("unexpected jwk stats: %+v", snapshot.AuthJWKs)
+	}
+	if snapshot.RateLimit == nil || !snapshot.RateLimit.Enabled || snapshot.RateLimit.TotalLimited != 3 {
+		t.Fatalf("unexpected rate limit stats: %+v", snapshot.RateLimit)
 	}
 }

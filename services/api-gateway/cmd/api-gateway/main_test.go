@@ -206,6 +206,42 @@ func TestNewAuthenticatorFromEnvAllowsExplicitLegacyAudience(t *testing.T) {
 	}
 }
 
+func TestNewRateLimiterFromEnvDisabledByDefault(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	limiter, err := newRateLimiterFromEnv()
+	if err != nil {
+		t.Fatalf("new rate limiter: %v", err)
+	}
+	if snapshot := limiter.Snapshot(); snapshot.Enabled || snapshot.TotalLimited != 0 {
+		t.Fatalf("expected disabled limiter, got %+v", snapshot)
+	}
+}
+
+func TestNewRateLimiterFromEnvEnabled(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_ENABLED", "true")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", "12.5")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", "20")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS", "50")
+
+	limiter, err := newRateLimiterFromEnv()
+	if err != nil {
+		t.Fatalf("new rate limiter: %v", err)
+	}
+	snapshot := limiter.Snapshot()
+	if !snapshot.Enabled || snapshot.RatePerSecond != 12.5 || snapshot.Burst != 20 || snapshot.MaxKeys != 50 {
+		t.Fatalf("unexpected limiter snapshot: %+v", snapshot)
+	}
+}
+
+func TestNewRateLimiterFromEnvEnabledRequiresRate(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_ENABLED", "true")
+	if _, err := newRateLimiterFromEnv(); err == nil {
+		t.Fatalf("expected missing rate to fail")
+	}
+}
+
 func clearAPIGatewayTestTLSConfig(t *testing.T, prefix string) {
 	t.Helper()
 	t.Setenv(prefix+"_CA_FILE", "")
@@ -234,6 +270,14 @@ func clearAPIGatewayAuthConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_JWKS_URL", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_TRUSTED_ISSUERS", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_AUDIENCE", "")
+}
+
+func clearAPIGatewayRateLimitConfig(t *testing.T) {
+	t.Helper()
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_ENABLED", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS", "")
 }
 
 func writeAPIGatewayTLSTestCert(t *testing.T, dir string, name string) (string, string) {

@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -22,6 +23,7 @@ import (
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
 	apigrpc "github.com/qsyy0921/IM/services/api-gateway/internal/api/grpc"
 	monitoringinfra "github.com/qsyy0921/IM/services/api-gateway/internal/infrastructure/monitoring"
+	ratelimitinfra "github.com/qsyy0921/IM/services/api-gateway/internal/infrastructure/ratelimit"
 	grpcgo "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -56,7 +58,13 @@ func runGRPC() error {
 	}
 	defer authenticator.Close()
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
-	stopDebug, err := startDebugServer(ctx, apiGatewayDebugAddr(), monitoringinfra.NewHandler(grpcMetrics).WithAuthJWKStats(authenticator.JWKStats))
+	rateLimiter, err := newRateLimiterFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, apiGatewayDebugAddr(), monitoringinfra.NewHandler(grpcMetrics).
+		WithAuthJWKStats(authenticator.JWKStats).
+		WithRateLimitStats(rateLimiter.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -102,7 +110,10 @@ func runGRPC() error {
 		Delivery:      deliveryv1.NewDeliveryServiceClient(deliveryConn),
 		Receipt:       receiptv1.NewReceiptServiceClient(receiptConn),
 	})
-	serverOptions := []grpcgo.ServerOption{grpcgo.UnaryInterceptor(grpcMetrics.UnaryServerInterceptor(log.Default()))}
+	serverOptions := []grpcgo.ServerOption{grpcgo.ChainUnaryInterceptor(
+		grpcMetrics.UnaryServerInterceptor(log.Default()),
+		rateLimiter.UnaryServerInterceptor(),
+	)}
 	if creds, ok, err := loadAPIGatewayGRPCCredentialsFromEnv(); err != nil {
 		return err
 	} else if ok {
@@ -221,6 +232,30 @@ func envDuration(key string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	value, err := time.ParseDuration(raw)
+	if err != nil || value <= 0 {
+		return fallback
+	}
+	return value
+}
+
+func envFloat64(key string, fallback float64) float64 {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil || value <= 0 {
+		return fallback
+	}
+	return value
+}
+
+func envInt(key string, fallback int) int {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
 	if err != nil || value <= 0 {
 		return fallback
 	}
@@ -371,6 +406,20 @@ func envOptionalBool(name string) (bool, bool, error) {
 	default:
 		return false, true, errors.New(name + " must be a boolean")
 	}
+}
+
+func newRateLimiterFromEnv() (*ratelimitinfra.Limiter, error) {
+	enabled, _, err := envOptionalBool("NEXUSIM_API_GATEWAY_RATE_LIMIT_ENABLED")
+	if err != nil {
+		return nil, err
+	}
+	rps := envFloat64("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", 0)
+	return ratelimitinfra.New(ratelimitinfra.Config{
+		Enabled:           enabled,
+		RequestsPerSecond: rps,
+		Burst:             envInt("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", int(rps)),
+		MaxKeys:           envInt("NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS", 10000),
+	})
 }
 
 type grpcClientTLSConfig struct {

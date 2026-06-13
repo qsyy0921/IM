@@ -76,6 +76,19 @@ NEXUSIM_API_GATEWAY_AUTH_AUDIENCE=api-gateway
 
 该配置只接受单个 audience。第一阶段 identity-service / demo runner 均可在签发 gateway token 时指定 `aud=api-gateway`；push-gateway 仍继续使用自身的 `push-gateway` audience。这样 online WebSocket token 和 api-gateway user-facing RPC token 不再默认复用同一个 audience。
 
+First-stage process-local rate limit：
+
+```text
+NEXUSIM_API_GATEWAY_RATE_LIMIT_ENABLED=false
+NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS=100
+NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST=200
+NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS=10000
+```
+
+该限流器默认关闭；启用后按 `gRPC method + token fingerprint` 做本进程 token bucket，缺少 token 时退化到 `gRPC method + peer address`。它不记录 token 原文，也不向业务服务透出限流 key。被限流请求返回 `ResourceExhausted / rate limit exceeded`，并进入 api-gateway gRPC metrics。
+
+这是第一阶段入口保护，不是全局分布式配额：多实例下每个 gateway 进程各自限流，Redis / Envoy / API gateway product 级全局 quota、tenant quota、IP reputation、WAF 和自适应风控仍是后续 production hardening。
+
 入口 gRPC 默认 plaintext；本地 secure smoke 和后续部署可以启用静态 TLS / mTLS：
 
 ```text
@@ -160,3 +173,5 @@ NEXUSIM_API_GATEWAY_RECEIPT_TLS_CLIENT_KEY_FILE
 2026-06-13 补充：api-gateway 已补 first-stage `/healthz`、`/readyz`、`/debug/metrics` 和低敏 gRPC JSON access log；`run-local-secure-demo.ps1` 会启动 `NEXUSIM_API_GATEWAY_DEBUG_ADDR=127.0.0.1:11904` 并把 metrics 保存为 `api-gateway-debug-metrics.json`。
 
 2026-06-13 补充：clean commit `9335bd1` 已把 api-gateway 默认 `NEXUSIM_API_GATEWAY_AUTH_AUDIENCE` 收紧为 `api-gateway`；secure demo runner 生成 `aud=api-gateway` 的 HMAC gateway token，并通过 `e2e-demo-api-gateway-audience-smoke-20260613-clean` 验证真实 api-gateway + 下游 mTLS 链路仍可完成 E2E 主流程。历史 `push-gateway` audience 仍可通过显式 env 配置兼容，但不再是 api-gateway 默认值。
+
+2026-06-13 补充：api-gateway 已补第一阶段进程内 gRPC rate limiter，默认关闭；启用后按 method + token fingerprint / peer address 限流，并在 `/debug/metrics` 输出低敏 `rate_limit` 聚合状态。该能力不是跨实例全局 quota。

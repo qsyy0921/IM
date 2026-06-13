@@ -6,13 +6,15 @@ import (
 	"time"
 
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
+	"github.com/qsyy0921/IM/services/api-gateway/internal/infrastructure/ratelimit"
 )
 
 const serviceName = "api-gateway"
 
 type Handler struct {
-	grpcMetrics  *GRPCMetrics
-	jwkStatsFunc func() gatewayauth.JWKStats
+	grpcMetrics        *GRPCMetrics
+	jwkStatsFunc       func() gatewayauth.JWKStats
+	rateLimitStatsFunc func() ratelimit.Snapshot
 }
 
 func NewHandler(grpcMetrics *GRPCMetrics) *Handler {
@@ -21,6 +23,11 @@ func NewHandler(grpcMetrics *GRPCMetrics) *Handler {
 
 func (h *Handler) WithAuthJWKStats(statsFunc func() gatewayauth.JWKStats) *Handler {
 	h.jwkStatsFunc = statsFunc
+	return h
+}
+
+func (h *Handler) WithRateLimitStats(statsFunc func() ratelimit.Snapshot) *Handler {
+	h.rateLimitStatsFunc = statsFunc
 	return h
 }
 
@@ -50,6 +57,10 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		stats := h.jwkStatsFunc()
 		snapshot.AuthJWKs = &stats
 	}
+	if h.rateLimitStatsFunc != nil {
+		stats := h.rateLimitStatsFunc()
+		snapshot.RateLimit = &stats
+	}
 	writeJSON(w, http.StatusOK, snapshot)
 }
 
@@ -63,6 +74,7 @@ type Snapshot struct {
 	GeneratedAtMS int64                 `json:"generated_at_ms"`
 	GRPC          *GRPCSnapshot         `json:"grpc,omitempty"`
 	AuthJWKs      *gatewayauth.JWKStats `json:"auth_jwks,omitempty"`
+	RateLimit     *ratelimit.Snapshot   `json:"rate_limit,omitempty"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

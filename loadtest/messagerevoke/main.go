@@ -17,8 +17,8 @@ import (
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
+	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -31,6 +31,9 @@ type config struct {
 	conversationTarget string
 	messageTarget      string
 	deliveryTarget     string
+	conversationTLS    grpctls.Config
+	messageTLS         grpctls.Config
+	deliveryTLS        grpctls.Config
 	resultDir          string
 	pgDSN              string
 	requestTimeout     time.Duration
@@ -53,6 +56,9 @@ type summary struct {
 	ConversationTarget      string           `json:"conversation_target"`
 	MessageTarget           string           `json:"message_target"`
 	DeliveryTarget          string           `json:"delivery_target"`
+	ConversationTLSEnabled  bool             `json:"conversation_tls_enabled"`
+	MessageTLSEnabled       bool             `json:"message_tls_enabled"`
+	DeliveryTLSEnabled      bool             `json:"delivery_tls_enabled"`
 	TenantID                string           `json:"tenant_id"`
 	ConversationID          string           `json:"conversation_id"`
 	OwnerUserID             string           `json:"owner_user_id"`
@@ -131,6 +137,9 @@ func parseConfig() config {
 	flag.StringVar(&cfg.conversationTarget, "conversation-target", "127.0.0.1:11596", "conversation-service gRPC target")
 	flag.StringVar(&cfg.messageTarget, "message-target", "127.0.0.1:11595", "message-service gRPC target")
 	flag.StringVar(&cfg.deliveryTarget, "delivery-target", "127.0.0.1:11597", "delivery-service gRPC target")
+	registerTLSFlags("conversation-tls", "NEXUSIM_CONVERSATION_TLS", "conversation-service", &cfg.conversationTLS)
+	registerTLSFlags("message-tls", "NEXUSIM_MESSAGE_TLS", "message-service", &cfg.messageTLS)
+	registerTLSFlags("delivery-tls", "NEXUSIM_DELIVERY_TLS", "delivery-service", &cfg.deliveryTLS)
 	flag.StringVar(&cfg.resultDir, "result-dir", filepath.Join(`H:\NexusIM\loadtest-results`, "message-revoke-smoke-"+now), "result directory")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable", "PostgreSQL DSN")
 	flag.DurationVar(&cfg.requestTimeout, "request-timeout", 3*time.Second, "per-request timeout")
@@ -156,26 +165,36 @@ func parseConfig() config {
 	return cfg
 }
 
+func registerTLSFlags(prefix string, envPrefix string, serviceName string, config *grpctls.Config) {
+	flag.StringVar(&config.CAFile, prefix+"-ca-file", os.Getenv(envPrefix+"_CA_FILE"), "CA PEM for "+serviceName+" gRPC TLS")
+	flag.StringVar(&config.ServerName, prefix+"-server-name", os.Getenv(envPrefix+"_SERVER_NAME"), "override server name for "+serviceName+" gRPC TLS")
+	flag.StringVar(&config.ClientCertFile, prefix+"-client-cert-file", os.Getenv(envPrefix+"_CLIENT_CERT_FILE"), "client certificate PEM for "+serviceName+" gRPC mTLS")
+	flag.StringVar(&config.ClientKeyFile, prefix+"-client-key-file", os.Getenv(envPrefix+"_CLIENT_KEY_FILE"), "client private key PEM for "+serviceName+" gRPC mTLS")
+}
+
 func run(cfg config) error {
 	if err := os.MkdirAll(cfg.resultDir, 0o755); err != nil {
 		return fmt.Errorf("create result dir: %w", err)
 	}
 	ctx := context.Background()
 	result := summary{
-		Commit:                shortCommit(),
-		CommitFull:            fullCommit(),
-		GitDirty:              gitDirty(),
-		GitStatusShort:        gitStatusShort(),
-		ConversationTarget:    cfg.conversationTarget,
-		MessageTarget:         cfg.messageTarget,
-		DeliveryTarget:        cfg.deliveryTarget,
-		TenantID:              cfg.tenantID,
-		ConversationID:        cfg.conversationID,
-		OwnerUserID:           cfg.ownerUserID,
-		ReceiverUserID:        cfg.receiverUserID,
-		ReceiverDeviceID:      cfg.receiverDeviceID,
-		DeliveryConsumerGroup: cfg.deliveryGroup,
-		StartedAt:             time.Now().UTC(),
+		Commit:                 shortCommit(),
+		CommitFull:             fullCommit(),
+		GitDirty:               gitDirty(),
+		GitStatusShort:         gitStatusShort(),
+		ConversationTarget:     cfg.conversationTarget,
+		MessageTarget:          cfg.messageTarget,
+		DeliveryTarget:         cfg.deliveryTarget,
+		ConversationTLSEnabled: cfg.conversationTLS.Enabled(),
+		MessageTLSEnabled:      cfg.messageTLS.Enabled(),
+		DeliveryTLSEnabled:     cfg.deliveryTLS.Enabled(),
+		TenantID:               cfg.tenantID,
+		ConversationID:         cfg.conversationID,
+		OwnerUserID:            cfg.ownerUserID,
+		ReceiverUserID:         cfg.receiverUserID,
+		ReceiverDeviceID:       cfg.receiverDeviceID,
+		DeliveryConsumerGroup:  cfg.deliveryGroup,
+		StartedAt:              time.Now().UTC(),
 	}
 	var runErr error
 	defer func() {
@@ -199,19 +218,34 @@ func run(cfg config) error {
 		}
 	}
 
-	conversationConn, err := grpc.NewClient(cfg.conversationTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conversationDialOption, err := grpctls.DialOption(cfg.conversationTLS, "conversation-tls")
+	if err != nil {
+		runErr = fmt.Errorf("configure conversation-service TLS: %w", err)
+		return runErr
+	}
+	conversationConn, err := grpc.NewClient(cfg.conversationTarget, conversationDialOption)
 	if err != nil {
 		runErr = fmt.Errorf("dial conversation-service: %w", err)
 		return runErr
 	}
 	defer conversationConn.Close()
-	messageConn, err := grpc.NewClient(cfg.messageTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	messageDialOption, err := grpctls.DialOption(cfg.messageTLS, "message-tls")
+	if err != nil {
+		runErr = fmt.Errorf("configure message-service TLS: %w", err)
+		return runErr
+	}
+	messageConn, err := grpc.NewClient(cfg.messageTarget, messageDialOption)
 	if err != nil {
 		runErr = fmt.Errorf("dial message-service: %w", err)
 		return runErr
 	}
 	defer messageConn.Close()
-	deliveryConn, err := grpc.NewClient(cfg.deliveryTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	deliveryDialOption, err := grpctls.DialOption(cfg.deliveryTLS, "delivery-tls")
+	if err != nil {
+		runErr = fmt.Errorf("configure delivery-service TLS: %w", err)
+		return runErr
+	}
+	deliveryConn, err := grpc.NewClient(cfg.deliveryTarget, deliveryDialOption)
 	if err != nil {
 		runErr = fmt.Errorf("dial delivery-service: %w", err)
 		return runErr

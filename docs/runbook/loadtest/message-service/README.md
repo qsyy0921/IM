@@ -75,6 +75,28 @@ NEXUSIM_MESSAGE_TLS_CLIENT_KEY_FILE
 
 这只覆盖压测器到 message-service 的 gRPC transport security，仍不包含证书签发、轮换、分发或动态服务身份治理。
 
+`loadtest/messageedit`、`loadtest/messagerevoke` 和 `loadtest/messagedelete` 三个消息变更 smoke runner 也默认使用 plaintext；如需在本地 TLS / mTLS smoke 中连接对应服务，可使用：
+
+```text
+--conversation-tls-ca-file / NEXUSIM_CONVERSATION_TLS_CA_FILE
+--conversation-tls-server-name / NEXUSIM_CONVERSATION_TLS_SERVER_NAME
+--conversation-tls-client-cert-file / NEXUSIM_CONVERSATION_TLS_CLIENT_CERT_FILE
+--conversation-tls-client-key-file / NEXUSIM_CONVERSATION_TLS_CLIENT_KEY_FILE
+
+--message-tls-ca-file / NEXUSIM_MESSAGE_TLS_CA_FILE
+--message-tls-server-name / NEXUSIM_MESSAGE_TLS_SERVER_NAME
+--message-tls-client-cert-file / NEXUSIM_MESSAGE_TLS_CLIENT_CERT_FILE
+--message-tls-client-key-file / NEXUSIM_MESSAGE_TLS_CLIENT_KEY_FILE
+
+--delivery-tls-ca-file / NEXUSIM_DELIVERY_TLS_CA_FILE
+--delivery-tls-server-name / NEXUSIM_DELIVERY_TLS_SERVER_NAME
+--delivery-tls-client-cert-file / NEXUSIM_DELIVERY_TLS_CLIENT_CERT_FILE
+--delivery-tls-client-key-file / NEXUSIM_DELIVERY_TLS_CLIENT_KEY_FILE
+```
+
+这些参数只覆盖 smoke runner 到 conversation / message / delivery 三个 gRPC server 的 transport security，不改变 outbox / Kafka / PostgreSQL 语义。
+现有 `run-local-smoke.ps1` 仍默认启动 plaintext 本地服务；如果要跑 TLS / mTLS 版本，需要显式配置三个 gRPC server 的证书环境变量，并通过上述 flag 或环境变量配置 runner client。
+
 本阶段没有覆盖：
 
 ```text

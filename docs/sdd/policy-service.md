@@ -2,7 +2,7 @@
 
 `policy-service` owns first-stage policy decisions that must not be hard-coded inside message-service. The initial implementation is intentionally small: it exposes a gRPC `CheckMessageAction` endpoint for message send / edit / revoke / delete decisions, and it returns a stable `permission_version`, `classification`, allow/deny flag and public deny reason.
 
-This service is a boundary extraction step. It is not yet a full ReBAC engine, tenant policy engine, content moderation platform, risk scoring system or complete contacts/conversation policy engine. The contacts projection consumer is ingestion-only in the current slice and is not yet used by `CheckMessageAction`.
+This service is a boundary extraction step. It is not yet a full ReBAC engine, tenant policy engine, content moderation platform, risk scoring system or complete contacts/conversation policy engine. The current contacts projection is consumed only for direct conversation `SEND` hard-deny when the caller supplies safe direct-peer context.
 
 ## Boundary
 
@@ -39,7 +39,7 @@ The second slice adds an optional policy-service owned PostgreSQL rule table. It
 tenant_id + user_id + conversation_id + action
 ```
 
-When `NEXUSIM_POLICY_RULES_ENABLED=true`, policy-service checks `policy_message_action_rules` first. A matching row returns its allow / deny decision, `permission_version`, `classification` and public reason. A clean rule miss falls back to the static policy. PostgreSQL lookup errors do not fall back; they return policy unavailable so a broken rule store cannot silently bypass a deny rule.
+When `NEXUSIM_POLICY_RULES_ENABLED=true`, policy-service first evaluates hard contact-block denies for direct `SEND` requests that include `direct_peer_user_id`, then checks `policy_message_action_rules`. A matching exact rule returns its allow / deny decision, `permission_version`, `classification` and public reason. A clean rule miss falls back to the static policy. PostgreSQL lookup errors do not fall back; they return policy unavailable so a broken rule store cannot silently bypass a deny rule.
 
 The contacts projection slice consumes `im.contact.events` into policy-service owned tables:
 
@@ -52,7 +52,16 @@ im.contact.events
 
 `contact.request.accepted.v1` writes both directed edges as `ACTIVE`. `contact.edge.blocked.v1`, `contact.edge.unblocked.v1`, `contact.edge.deleted.v1` and `contact.edge.remark_updated.v1` update only the owner-scoped directed edge. Updates apply only when the incoming `edge_version` is newer than the stored version, so duplicate or stale contact events are no-ops. This projection does not read contacts-service internal tables and remains rebuildable from `im.contact.events`.
 
-The projection is not consumed by message decisions yet. `CheckMessageAction` currently receives `tenant_id`, `user_id`, `conversation_id`, `action` and optional `message_id`, but it does not receive a direct peer / target user. A block rule that affects SendMessage requires that peer context or a safe conversation projection first; otherwise policy-service would have to guess or synchronously reach into another service.
+For direct conversations, `conversation-service` derives `direct_peer_user_id` from its own membership facts, `message-service` forwards that context to `policy-service`, and `CheckMessageAction(SEND)` checks the contact projection before exact message rules or static fallback. If either directed edge between sender and direct peer is `BLOCKED`, policy-service returns:
+
+```text
+allowed=false
+classification=CONTACT_BLOCKED
+reason=contact blocked
+permission_version=<blocked edge_version>
+```
+
+Policy-service does not guess direct peers and does not synchronously query contacts-service or conversation-service. If no `direct_peer_user_id` is supplied, contacts block enforcement is skipped and the request continues to the exact rule / static decision path.
 
 Configuration:
 
@@ -85,7 +94,8 @@ NEXUSIM_POLICY_RPC_TIMEOUT=30ms
 - `AuthContext`: tenant, user, device, session and trace/request IDs;
 - `conversation_id`;
 - `action`: `SEND`, `EDIT`, `REVOKE`, `DELETE`;
-- `message_id`: required for edit / revoke / delete.
+- `message_id`: required for edit / revoke / delete;
+- `direct_peer_user_id`: optional direct conversation peer context used only for `SEND` contact-block decisions.
 
 `CheckMessageActionResponse` includes:
 
@@ -125,7 +135,7 @@ This is a local debug surface. It is not a replacement for production OpenTeleme
 
 - First implementation still supports static environment configuration.
 - PostgreSQL rule store is exact-match only; no wildcard / priority rule DSL yet.
-- Contacts block / unblock events are projected, but they are not consumed by message decisions until safe peer / target context is available.
+- Contacts block / unblock events are consumed only for direct `SEND` when safe `direct_peer_user_id` context is supplied. Group, role and tenant policy remain future work.
 - No conversation role / owner / admin policy is implemented yet.
 - No tenant policy, content moderation, risk scoring, rate limiting or audit outbox is implemented yet.
 - No mTLS client/server config is implemented for policy-service yet.

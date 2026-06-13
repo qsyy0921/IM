@@ -50,6 +50,8 @@ gateway verified metadata auth 示例：
 
 该模式会启动 `NEXUSIM_CONTACTS_AUTH_MODE=metadata`，并由 runner 通过 gRPC metadata 传递 `tenant_id / user_id / device_id / session_id / trace_id / request_id`；request body auth 字段仍保留用于兼容默认 body 模式。
 
+2026-06-13 补充：`-VerifiedAuthMetadata` 真实进程 smoke 已通过，验证 `SendContactRequest / ListContactRequests / RespondContactRequest / ListContacts / GetContactState` 在 metadata auth 模式下完成 accept-flow、outbox relay 和 Kafka 读回。
+
 ## 报告列表
 
 | 报告 | 内容 |
@@ -61,6 +63,7 @@ gateway verified metadata auth 示例：
 | `loadtest-report-20260611-contacts-edge-management-smoke.md` | `DeleteContact` / `BlockContact` / `UpdateContactRemark` 三条真实进程 smoke，验证 owner 视角联系人边管理、outbox 和 Kafka 读回 |
 | `loadtest-report-20260611-contacts-unblock-smoke.md` | `BlockContact -> UnblockContact` 真实进程 smoke，验证 owner 视角 `BLOCKED -> ACTIVE`、outbox 和 Kafka 读回 |
 | `loadtest-report-20260611-contacts-readd-smoke.md` | `ACCEPT -> DeleteContact -> SendContactRequest -> ACCEPT` 真实进程 smoke，验证删除后重新申请恢复和 contacts outbox 版本单调 |
+| `loadtest-report-20260613-contacts-verified-metadata-smoke.md` | `-VerifiedAuthMetadata` 真实进程 smoke，验证 metadata auth 下的 contacts accept-flow、outbox relay 和 Kafka 读回 |
 
 ## 面试可讲重点
 

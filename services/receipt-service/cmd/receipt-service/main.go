@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -68,9 +69,15 @@ func runGRPCServer() error {
 		return err
 	}
 	defer pool.Close()
+	grpcMetrics := monitoringinfra.NewGRPCMetrics()
+	stopDebug, err := startDebugServer(ctx, receiptDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 
 	listenAddr := envString("NEXUSIM_RECEIPT_GRPC_ADDR", "0.0.0.0:10499")
-	server, err := newGRPCServer()
+	server, err := newGRPCServer(grpcMetrics)
 	if err != nil {
 		return err
 	}
@@ -124,6 +131,11 @@ func runDeliveryConsumer() error {
 		return err
 	}
 	defer pool.Close()
+	stopDebug, err := startDebugServer(ctx, receiptDebugAddr(), monitoringinfra.NewHandler(pool))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 
 	brokers := splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS"))
 	topic := envString("NEXUSIM_DELIVERY_EVENTS_TOPIC", "im.delivery.events")
@@ -157,6 +169,11 @@ func runOutboxRelay() error {
 		return err
 	}
 	defer pool.Close()
+	stopDebug, err := startDebugServer(ctx, receiptDebugAddr(), monitoringinfra.NewHandler(pool))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 
 	brokers := splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS"))
 	producer, err := kafkainfra.NewWriterProducer(brokers)
@@ -351,9 +368,13 @@ func envString(name string, fallback string) string {
 	return value
 }
 
-func newGRPCServer() (*grpc.Server, error) {
+func newGRPCServer(grpcMetrics ...*monitoringinfra.GRPCMetrics) (*grpc.Server, error) {
 	interceptors := make([]grpc.UnaryServerInterceptor, 0, 2)
-	interceptors = append(interceptors, monitoringinfra.UnaryAccessLogInterceptor(log.Default()))
+	if len(grpcMetrics) > 0 && grpcMetrics[0] != nil {
+		interceptors = append(interceptors, grpcMetrics[0].UnaryServerInterceptor(log.Default()))
+	} else {
+		interceptors = append(interceptors, monitoringinfra.UnaryAccessLogInterceptor(log.Default()))
+	}
 	switch strings.ToLower(envString("NEXUSIM_RECEIPT_AUTH_MODE", "body")) {
 	case "body", "request", "legacy":
 	case "metadata", "verified-metadata":
@@ -503,6 +524,41 @@ func envURIStringSet(name string) (map[string]struct{}, error) {
 		values[parsed.String()] = struct{}{}
 	}
 	return values, nil
+}
+
+func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {
+	if strings.TrimSpace(addr) == "" || handler == nil {
+		return func() {}, nil
+	}
+	server := &http.Server{
+		Addr:    addr,
+		Handler: handler,
+	}
+	errCh := make(chan error, 1)
+	go func() {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+	}()
+	select {
+	case err := <-errCh:
+		return nil, err
+	case <-time.After(50 * time.Millisecond):
+	case <-ctx.Done():
+		_ = server.Shutdown(context.Background())
+		return func() {}, ctx.Err()
+	}
+	go func() {
+		<-ctx.Done()
+		_ = server.Shutdown(context.Background())
+	}()
+	return func() {
+		_ = server.Shutdown(context.Background())
+	}, nil
+}
+
+func receiptDebugAddr() string {
+	return envString("NEXUSIM_RECEIPT_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
 }
 
 func envOptionalBool(name string) (bool, bool, error) {

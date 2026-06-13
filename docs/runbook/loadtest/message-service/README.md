@@ -106,6 +106,18 @@ NEXUSIM_SENDMESSAGE_VERIFIED_AUTH_METADATA=true
 这些参数只覆盖 smoke runner 到 conversation / message / delivery 三个 gRPC server 的 transport security，不改变 outbox / Kafka / PostgreSQL 语义。
 现有 `run-local-smoke.ps1` 仍默认启动 plaintext 本地服务；如果要跑 TLS / mTLS 版本，需要显式配置三个 gRPC server 的证书环境变量，并通过上述 flag 或环境变量配置 runner client。
 
+如果 conversation / message / delivery 三个 user-facing gRPC server 以 metadata auth 模式启动，三个消息变更 smoke runner 可用以下开关发送 gateway verified identity metadata：
+
+```text
+--verified-auth-metadata
+NEXUSIM_MESSAGE_MUTATION_VERIFIED_AUTH_METADATA=true
+NEXUSIM_MESSAGE_EDIT_VERIFIED_AUTH_METADATA=true
+NEXUSIM_MESSAGE_REVOKE_VERIFIED_AUTH_METADATA=true
+NEXUSIM_MESSAGE_DELETE_VERIFIED_AUTH_METADATA=true
+```
+
+对应 `run-local-smoke.ps1` 支持 `-VerifiedAuthMetadata`，会把本地 conversation / message / delivery gRPC 进程切到 metadata auth，并让 runner 发送 metadata。默认仍是 body auth 兼容历史 smoke。
+
 本阶段没有覆盖：
 
 ```text

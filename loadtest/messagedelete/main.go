@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -26,27 +28,34 @@ const (
 	eventMessagePersisted = "message.persisted.v1"
 	eventMessageDeleted   = "message.deleted.v1"
 	originalMessageText   = "message delete smoke original"
+	metadataTenantID      = "x-nexusim-tenant-id"
+	metadataUserID        = "x-nexusim-user-id"
+	metadataDeviceID      = "x-nexusim-device-id"
+	metadataSessionID     = "x-nexusim-session-id"
+	metadataTraceID       = "x-nexusim-trace-id"
+	metadataRequestID     = "x-nexusim-request-id"
 )
 
 type config struct {
-	conversationTarget string
-	messageTarget      string
-	deliveryTarget     string
-	conversationTLS    grpctls.Config
-	messageTLS         grpctls.Config
-	deliveryTLS        grpctls.Config
-	resultDir          string
-	pgDSN              string
-	requestTimeout     time.Duration
-	waitTimeout        time.Duration
-	pollInterval       time.Duration
-	tenantID           string
-	conversationID     string
-	ownerUserID        string
-	receiverUserID     string
-	receiverDeviceID   string
-	deliveryGroup      string
-	cleanup            bool
+	conversationTarget   string
+	messageTarget        string
+	deliveryTarget       string
+	conversationTLS      grpctls.Config
+	messageTLS           grpctls.Config
+	deliveryTLS          grpctls.Config
+	resultDir            string
+	pgDSN                string
+	requestTimeout       time.Duration
+	waitTimeout          time.Duration
+	pollInterval         time.Duration
+	tenantID             string
+	conversationID       string
+	ownerUserID          string
+	receiverUserID       string
+	receiverDeviceID     string
+	deliveryGroup        string
+	verifiedAuthMetadata bool
+	cleanup              bool
 }
 
 type summary struct {
@@ -60,6 +69,7 @@ type summary struct {
 	ConversationTLSEnabled  bool             `json:"conversation_tls_enabled"`
 	MessageTLSEnabled       bool             `json:"message_tls_enabled"`
 	DeliveryTLSEnabled      bool             `json:"delivery_tls_enabled"`
+	VerifiedAuthMetadata    bool             `json:"verified_auth_metadata"`
 	TenantID                string           `json:"tenant_id"`
 	ConversationID          string           `json:"conversation_id"`
 	OwnerUserID             string           `json:"owner_user_id"`
@@ -135,6 +145,15 @@ type inboxItem struct {
 	SenderID        string `json:"sender_id"`
 }
 
+type verifiedAuthIdentity struct {
+	tenantID  string
+	userID    string
+	deviceID  string
+	sessionID string
+	traceID   string
+	requestID string
+}
+
 func main() {
 	cfg := parseConfig()
 	if err := run(cfg); err != nil {
@@ -163,6 +182,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.receiverUserID, "receiver-user-id", "delete-user-1", "receiver user id")
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "delete-device-1", "receiver device id")
 	flag.StringVar(&cfg.deliveryGroup, "delivery-consumer-group", "", "optional delivery timeline consumer group for checkpoint stats")
+	flag.BoolVar(&cfg.verifiedAuthMetadata, "verified-auth-metadata", envBool(false, "NEXUSIM_MESSAGE_DELETE_VERIFIED_AUTH_METADATA", "NEXUSIM_MESSAGE_MUTATION_VERIFIED_AUTH_METADATA"), "send gateway verified identity through user-facing gRPC metadata")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete tenant test data and seed a fresh conversation before running")
 	flag.Parse()
 	if cfg.requestTimeout <= 0 {
@@ -200,6 +220,7 @@ func run(cfg config) error {
 		ConversationTLSEnabled: cfg.conversationTLS.Enabled(),
 		MessageTLSEnabled:      cfg.messageTLS.Enabled(),
 		DeliveryTLSEnabled:     cfg.deliveryTLS.Enabled(),
+		VerifiedAuthMetadata:   cfg.verifiedAuthMetadata,
 		TenantID:               cfg.tenantID,
 		ConversationID:         cfg.conversationID,
 		OwnerUserID:            cfg.ownerUserID,
@@ -340,14 +361,23 @@ func run(cfg config) error {
 func createReceiverJoin(ctx context.Context, cfg config, client conversationv1.ConversationServiceClient) (*conversationv1.CreateMemberChangeResponse, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := verifiedAuthIdentity{
+		tenantID:  cfg.tenantID,
+		userID:    cfg.ownerUserID,
+		deviceID:  "message-delete-owner-device",
+		sessionID: "message-delete-owner-session",
+		traceID:   "message-delete-join",
+		requestID: "message-delete-join",
+	}
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	return client.CreateMemberChange(requestCtx, &conversationv1.CreateMemberChangeRequest{
 		AuthContext: &conversationv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.ownerUserID,
-			DeviceId:  "message-delete-owner-device",
-			SessionId: "message-delete-owner-session",
-			TraceId:   "message-delete-join",
-			RequestId: "message-delete-join",
+			TenantId:  auth.tenantID,
+			UserId:    auth.userID,
+			DeviceId:  auth.deviceID,
+			SessionId: auth.sessionID,
+			TraceId:   auth.traceID,
+			RequestId: auth.requestID,
 		},
 		ConversationId:        cfg.conversationID,
 		TargetUserId:          cfg.receiverUserID,
@@ -367,14 +397,23 @@ func sendMessageOnce(ctx context.Context, cfg config, client messagev1.MessageSe
 	}
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := verifiedAuthIdentity{
+		tenantID:  cfg.tenantID,
+		userID:    cfg.ownerUserID,
+		deviceID:  "message-delete-owner-device",
+		sessionID: "message-delete-owner-session",
+		traceID:   "message-delete-send",
+		requestID: "message-delete-send",
+	}
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	return client.SendMessage(requestCtx, &messagev1.SendMessageRequest{
 		AuthContext: &messagev1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.ownerUserID,
-			DeviceId:  "message-delete-owner-device",
-			SessionId: "message-delete-owner-session",
-			TraceId:   "message-delete-send",
-			RequestId: "message-delete-send",
+			TenantId:  auth.tenantID,
+			UserId:    auth.userID,
+			DeviceId:  auth.deviceID,
+			SessionId: auth.sessionID,
+			TraceId:   auth.traceID,
+			RequestId: auth.requestID,
 		},
 		ConversationId: cfg.conversationID,
 		ClientMsgId:    "message-delete-client-message-1",
@@ -386,14 +425,23 @@ func sendMessageOnce(ctx context.Context, cfg config, client messagev1.MessageSe
 func deleteMessageOnce(ctx context.Context, cfg config, client messagev1.MessageServiceClient, messageID string) (*messagev1.MessageChangeResponse, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := verifiedAuthIdentity{
+		tenantID:  cfg.tenantID,
+		userID:    cfg.ownerUserID,
+		deviceID:  "message-delete-owner-device",
+		sessionID: "message-delete-owner-session",
+		traceID:   "message-delete-delete",
+		requestID: "message-delete-delete",
+	}
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	return client.DeleteMessage(requestCtx, &messagev1.DeleteMessageRequest{
 		AuthContext: &messagev1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.ownerUserID,
-			DeviceId:  "message-delete-owner-device",
-			SessionId: "message-delete-owner-session",
-			TraceId:   "message-delete-delete",
-			RequestId: "message-delete-delete",
+			TenantId:  auth.tenantID,
+			UserId:    auth.userID,
+			DeviceId:  auth.deviceID,
+			SessionId: auth.sessionID,
+			TraceId:   auth.traceID,
+			RequestId: auth.requestID,
 		},
 		ConversationId: cfg.conversationID,
 		MessageId:      messageID,
@@ -416,14 +464,23 @@ func pullInboxUntil(
 	var last pullResult
 	for {
 		requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+		auth := verifiedAuthIdentity{
+			tenantID:  cfg.tenantID,
+			userID:    cfg.receiverUserID,
+			deviceID:  cfg.receiverDeviceID,
+			sessionID: "message-delete-pull",
+			traceID:   "message-delete-pull",
+			requestID: "message-delete-pull",
+		}
+		requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 		response, err := client.PullInbox(requestCtx, &deliveryv1.PullInboxRequest{
 			AuthContext: &deliveryv1.AuthContext{
-				TenantId:  cfg.tenantID,
-				UserId:    cfg.receiverUserID,
-				DeviceId:  cfg.receiverDeviceID,
-				SessionId: "message-delete-pull",
-				TraceId:   "message-delete-pull",
-				RequestId: "message-delete-pull",
+				TenantId:  auth.tenantID,
+				UserId:    auth.userID,
+				DeviceId:  auth.deviceID,
+				SessionId: auth.sessionID,
+				TraceId:   auth.traceID,
+				RequestId: auth.requestID,
 			},
 			ConversationId: cfg.conversationID,
 			AfterSeq:       afterSeq,
@@ -476,14 +533,23 @@ func containsInboxItem(items []inboxItem, minSeq int64, eventType string, messag
 func ackDeliveryOnce(ctx context.Context, cfg config, client deliveryv1.DeliveryServiceClient, seq int64) (*deliveryv1.AckDeliveryResponse, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := verifiedAuthIdentity{
+		tenantID:  cfg.tenantID,
+		userID:    cfg.receiverUserID,
+		deviceID:  cfg.receiverDeviceID,
+		sessionID: "message-delete-ack",
+		traceID:   "message-delete-ack",
+		requestID: "message-delete-ack",
+	}
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	return client.AckDelivery(requestCtx, &deliveryv1.AckDeliveryRequest{
 		AuthContext: &deliveryv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.receiverUserID,
-			DeviceId:  cfg.receiverDeviceID,
-			SessionId: "message-delete-ack",
-			TraceId:   "message-delete-ack",
-			RequestId: "message-delete-ack",
+			TenantId:  auth.tenantID,
+			UserId:    auth.userID,
+			DeviceId:  auth.deviceID,
+			SessionId: auth.sessionID,
+			TraceId:   auth.traceID,
+			RequestId: auth.requestID,
 		},
 		ConversationId: cfg.conversationID,
 		ReceivedSeq:    seq,
@@ -743,6 +809,42 @@ func queryCounts(ctx context.Context, pool *pgxpool.Pool, query string, args ...
 		result[key] = value
 	}
 	return result, rows.Err()
+}
+
+func withVerifiedAuthMetadata(ctx context.Context, cfg config, auth verifiedAuthIdentity) context.Context {
+	if !cfg.verifiedAuthMetadata {
+		return ctx
+	}
+	pairs := []string{
+		metadataTenantID, auth.tenantID,
+		metadataUserID, auth.userID,
+		metadataDeviceID, auth.deviceID,
+	}
+	if auth.sessionID != "" {
+		pairs = append(pairs, metadataSessionID, auth.sessionID)
+	}
+	if auth.traceID != "" {
+		pairs = append(pairs, metadataTraceID, auth.traceID)
+	}
+	if auth.requestID != "" {
+		pairs = append(pairs, metadataRequestID, auth.requestID)
+	}
+	return metadata.NewOutgoingContext(ctx, metadata.Pairs(pairs...))
+}
+
+func envBool(fallback bool, names ...string) bool {
+	for _, name := range names {
+		value := strings.TrimSpace(os.Getenv(name))
+		if value == "" {
+			continue
+		}
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return fallback
+		}
+		return parsed
+	}
+	return fallback
 }
 
 func finish(cfg config, result *summary, runErr error) error {

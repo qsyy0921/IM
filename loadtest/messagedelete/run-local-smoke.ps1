@@ -3,6 +3,7 @@
     [string]$KafkaBrokers = "localhost:9092",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
+    [switch]$VerifiedAuthMetadata,
     [switch]$SkipBuild
 )
 
@@ -18,6 +19,7 @@ $logDir = Join-Path $resultDir "logs"
 $timelineTopic = "conversation.timeline.delete." + (Get-Date -Format "yyyyMMdd-HHmmss")
 $deliveryTopic = "im.delivery.events"
 $deliveryConsumerGroup = "nexusim-delivery-delete-smoke-" + (Get-Date -Format "yyyyMMddHHmmss")
+$authMode = if ($VerifiedAuthMetadata) { "metadata" } else { "body" }
 
 New-Item -ItemType Directory -Force $resultDir | Out-Null
 New-Item -ItemType Directory -Force $logDir | Out-Null
@@ -117,6 +119,7 @@ try {
     $processes += Start-NexusProcess -Name "conversation-grpc" -FilePath $conversationService -Port 11596 -Env @{
         NEXUSIM_CONVERSATION_SERVICE_MODE = "grpc"
         NEXUSIM_CONVERSATION_GRPC_ADDR = "127.0.0.1:11596"
+        NEXUSIM_CONVERSATION_AUTH_MODE = $authMode
         NEXUSIM_PG_DSN = $PgDsn
     }
 
@@ -141,6 +144,7 @@ try {
     $processes += Start-NexusProcess -Name "delivery-grpc" -FilePath $deliveryService -Port 11597 -Env @{
         NEXUSIM_DELIVERY_SERVICE_MODE = "grpc"
         NEXUSIM_DELIVERY_GRPC_ADDR = "127.0.0.1:11597"
+        NEXUSIM_DELIVERY_AUTH_MODE = $authMode
         NEXUSIM_PG_DSN = $PgDsn
     }
 
@@ -155,6 +159,7 @@ try {
     $processes += Start-NexusProcess -Name "message-grpc" -FilePath $messageService -Port 11595 -Env @{
         NEXUSIM_MESSAGE_SERVICE_MODE = "grpc"
         NEXUSIM_GRPC_ADDR = "127.0.0.1:11595"
+        NEXUSIM_MESSAGE_AUTH_MODE = $authMode
         NEXUSIM_PG_DSN = $PgDsn
         NEXUSIM_CONVERSATION_SERVICE_ADDR = "127.0.0.1:11596"
         NEXUSIM_CONVERSATION_RPC_TIMEOUT = "500ms"
@@ -174,7 +179,8 @@ try {
         --receiver-device-id "delete-device-1" `
         --delivery-consumer-group $deliveryConsumerGroup `
         --wait-timeout "25s" `
-        --request-timeout "5s"
+        --request-timeout "5s" `
+        --verified-auth-metadata=$VerifiedAuthMetadata
     if ($LASTEXITCODE -ne 0) {
         throw "messagedelete smoke runner failed with exit code $LASTEXITCODE"
     }

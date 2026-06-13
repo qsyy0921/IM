@@ -31,15 +31,21 @@ type config struct {
 	userID                 string
 	deviceID               string
 	sessionID              string
+	changeUserID           string
+	changeDeviceID         string
+	changeSessionID        string
 	conversationID         string
 	clientMsgID            string
 	expectedPermissionVer  int64
 	expectedClassification string
+	expectedBaseClass      string
 	expectedReason         string
 	cleanup                bool
 	seedPolicyRule         bool
 	seedTenantPolicyRule   bool
 	seedConversationRole   bool
+	expectPolicyAudit      bool
+	expectedAuditRows      int64
 }
 
 type summary struct {
@@ -53,6 +59,7 @@ type summary struct {
 	Action                 string        `json:"action"`
 	TenantID               string        `json:"tenant_id"`
 	UserID                 string        `json:"user_id"`
+	ChangeUserID           string        `json:"change_user_id,omitempty"`
 	ConversationID         string        `json:"conversation_id"`
 	StartedAt              time.Time     `json:"started_at"`
 	FinishedAt             time.Time     `json:"finished_at"`
@@ -67,6 +74,8 @@ type summary struct {
 	PolicyRuleSeeded       bool          `json:"policy_rule_seeded"`
 	TenantPolicyRuleSeeded bool          `json:"tenant_policy_rule_seeded"`
 	ConversationRoleSeeded bool          `json:"conversation_role_gate_seeded"`
+	PolicyAuditExpected    bool          `json:"policy_audit_expected"`
+	ExpectedAuditRows      int64         `json:"expected_policy_audit_rows,omitempty"`
 	PolicyRule             policyRule    `json:"policy_rule,omitempty"`
 	PolicyRules            []policyRule  `json:"policy_rules,omitempty"`
 	ConversationRoleRule   roleRule      `json:"conversation_role_rule,omitempty"`
@@ -135,6 +144,8 @@ type policyAudit struct {
 	RowCount          int64  `json:"row_count"`
 	EventID           string `json:"event_id,omitempty"`
 	Action            string `json:"action,omitempty"`
+	MessageIDPresent  bool   `json:"message_id_present,omitempty"`
+	MessageKeyPresent bool   `json:"message_key_present,omitempty"`
 	Allowed           bool   `json:"allowed"`
 	PermissionVersion int64  `json:"permission_version,omitempty"`
 	Classification    string `json:"classification,omitempty"`
@@ -201,18 +212,36 @@ func parseConfig() config {
 	flag.StringVar(&cfg.userID, "user-id", "policy-message-user", "user id")
 	flag.StringVar(&cfg.deviceID, "device-id", "policy-message-device-1", "device id")
 	flag.StringVar(&cfg.sessionID, "session-id", "policy-message-session-1", "session id")
+	flag.StringVar(&cfg.changeUserID, "change-user-id", "", "user id for edit/revoke/delete; defaults to --user-id")
+	flag.StringVar(&cfg.changeDeviceID, "change-device-id", "", "device id for edit/revoke/delete; defaults to --device-id")
+	flag.StringVar(&cfg.changeSessionID, "change-session-id", "", "session id for edit/revoke/delete; defaults to --session-id")
 	flag.StringVar(&cfg.conversationID, "conversation-id", "policy-message-conversation", "conversation id")
 	flag.StringVar(&cfg.clientMsgID, "client-msg-id", "policy-message-client-msg-1", "client message id")
 	flag.Int64Var(&cfg.expectedPermissionVer, "expected-permission-version", 1, "expected permission version")
 	flag.StringVar(&cfg.expectedClassification, "expected-classification", "INTERNAL", "expected classification")
+	flag.StringVar(&cfg.expectedBaseClass, "expected-base-classification", "", "expected base SendMessage classification for mutation scenarios; defaults to --expected-classification or seeded SEND rule")
 	flag.StringVar(&cfg.expectedReason, "expected-reason", "", "expected deny reason")
 	flag.BoolVar(&cfg.cleanup, "cleanup", false, "delete message rows for tenant before running")
 	flag.BoolVar(&cfg.seedPolicyRule, "seed-policy-rule", false, "seed exact policy_message_action_rules row for this scenario")
 	flag.BoolVar(&cfg.seedTenantPolicyRule, "seed-tenant-policy-rule", false, "seed tenant-level policy_tenant_message_action_rules row for this scenario")
 	flag.BoolVar(&cfg.seedConversationRole, "seed-conversation-role-gate", false, "seed policy conversation role gate rule and member projection for this scenario")
+	flag.BoolVar(&cfg.expectPolicyAudit, "expect-policy-audit", false, "validate the latest policy_decision_audit_outbox row")
+	flag.Int64Var(&cfg.expectedAuditRows, "expected-audit-rows", 0, "expected policy_decision_audit_outbox row count when audit validation is enabled")
 	flag.Parse()
 	cfg.scenario = strings.ToLower(strings.TrimSpace(cfg.scenario))
 	cfg.action = strings.ToLower(strings.TrimSpace(cfg.action))
+	cfg.changeUserID = strings.TrimSpace(cfg.changeUserID)
+	cfg.changeDeviceID = strings.TrimSpace(cfg.changeDeviceID)
+	cfg.changeSessionID = strings.TrimSpace(cfg.changeSessionID)
+	if cfg.changeUserID == "" {
+		cfg.changeUserID = cfg.userID
+	}
+	if cfg.changeDeviceID == "" {
+		cfg.changeDeviceID = cfg.deviceID
+	}
+	if cfg.changeSessionID == "" {
+		cfg.changeSessionID = cfg.sessionID
+	}
 	if cfg.requestTimeout <= 0 {
 		cfg.requestTimeout = 5 * time.Second
 	}
@@ -243,6 +272,11 @@ func run(cfg config) error {
 			return err
 		}
 	}
+	if shouldValidatePolicyAudit(cfg) {
+		if err := cleanupPolicyAudit(ctx, pool, cfg.tenantID); err != nil {
+			return err
+		}
+	}
 	if cfg.seedPolicyRule {
 		if err := seedPolicyRules(ctx, pool, cfg); err != nil {
 			return err
@@ -270,6 +304,7 @@ func run(cfg config) error {
 		Action:                 cfg.action,
 		TenantID:               cfg.tenantID,
 		UserID:                 cfg.userID,
+		ChangeUserID:           cfg.changeUserID,
 		ConversationID:         cfg.conversationID,
 		StartedAt:              started,
 		ExpectedPermissionVer:  cfg.expectedPermissionVer,
@@ -278,6 +313,8 @@ func run(cfg config) error {
 		PolicyRuleSeeded:       cfg.seedPolicyRule,
 		TenantPolicyRuleSeeded: cfg.seedTenantPolicyRule,
 		ConversationRoleSeeded: cfg.seedConversationRole,
+		PolicyAuditExpected:    shouldValidatePolicyAudit(cfg),
+		ExpectedAuditRows:      expectedPolicyAuditRows(cfg),
 	}
 	if cfg.seedPolicyRule || cfg.seedTenantPolicyRule {
 		s.PolicyRules = expectedPolicyRules(cfg, cfg.seedPolicyRule, cfg.seedTenantPolicyRule)
@@ -350,7 +387,7 @@ func runSendScenario(ctx context.Context, pool *pgxpool.Pool, cfg config, s *sum
 			return err
 		}
 		s.MessageRow = row
-		if cfg.seedConversationRole {
+		if shouldValidatePolicyAudit(cfg) {
 			audit, err := readPolicyAudit(ctx, pool, cfg)
 			if err != nil {
 				return err
@@ -369,7 +406,7 @@ func runSendScenario(ctx context.Context, pool *pgxpool.Pool, cfg config, s *sum
 	}
 	s.SendMessage = sendSummary{GRPCCode: codes.PermissionDenied.String()}
 	s.MessageError = errorSummary
-	if cfg.seedConversationRole {
+	if shouldValidatePolicyAudit(cfg) {
 		audit, err := readPolicyAudit(ctx, pool, cfg)
 		if err != nil {
 			return err
@@ -430,6 +467,16 @@ func runChangeScenario(ctx context.Context, pool *pgxpool.Pool, cfg config, s *s
 			return err
 		}
 		s.ChangeRow = changeRow
+		if shouldValidatePolicyAudit(cfg) {
+			audit, err := readPolicyAudit(ctx, pool, cfg)
+			if err != nil {
+				return err
+			}
+			if err := validatePolicyAudit(cfg, audit); err != nil {
+				return err
+			}
+			s.PolicyAudit = audit
+		}
 		return nil
 	}
 
@@ -452,6 +499,16 @@ func runChangeScenario(ctx context.Context, pool *pgxpool.Pool, cfg config, s *s
 	}
 	if afterRow != row {
 		return fmt.Errorf("%s deny changed base message row before=%+v after=%+v", cfg.action, row, afterRow)
+	}
+	if shouldValidatePolicyAudit(cfg) {
+		audit, err := readPolicyAudit(ctx, pool, cfg)
+		if err != nil {
+			return err
+		}
+		if err := validatePolicyAudit(cfg, audit); err != nil {
+			return err
+		}
+		s.PolicyAudit = audit
 	}
 	return nil
 }
@@ -540,9 +597,9 @@ func changeMessage(cfg config, messageID string) (*messagev1.MessageChangeRespon
 func authContext(cfg config, requestID string) *messagev1.AuthContext {
 	return &messagev1.AuthContext{
 		TenantId:  cfg.tenantID,
-		UserId:    cfg.userID,
-		DeviceId:  cfg.deviceID,
-		SessionId: cfg.sessionID,
+		UserId:    cfg.changeUserID,
+		DeviceId:  cfg.changeDeviceID,
+		SessionId: cfg.changeSessionID,
 		TraceId:   "trace-policy-message-smoke",
 		RequestId: requestID,
 	}
@@ -606,8 +663,9 @@ func validateBaseSend(cfg config, response *messagev1.SendMessageResponse, row m
 	if row.MessagePermissionVersion != cfg.expectedPermissionVer || row.TimelinePermissionVersion != cfg.expectedPermissionVer {
 		return fmt.Errorf("base SendMessage permission_version mismatch row=%+v expected=%d", row, cfg.expectedPermissionVer)
 	}
-	if row.MessageClassification != "POLICY_SEND_SEED" || row.TimelineClassification != "POLICY_SEND_SEED" {
-		return fmt.Errorf("base SendMessage classification mismatch row=%+v expected POLICY_SEND_SEED", row)
+	expectedClassification := expectedBaseSendClassification(cfg)
+	if row.MessageClassification != expectedClassification || row.TimelineClassification != expectedClassification {
+		return fmt.Errorf("base SendMessage classification mismatch row=%+v expected %s", row, expectedClassification)
 	}
 	if row.OutboxStatus != "PENDING" && row.OutboxStatus != "PUBLISHED" {
 		return fmt.Errorf("unexpected base SendMessage outbox status %q", row.OutboxStatus)
@@ -736,12 +794,24 @@ func validatePolicyAudit(cfg config, audit policyAudit) error {
 	expectedClassification := cfg.expectedClassification
 	expectedReasonCode := ""
 	if !expectedAllowed {
-		expectedClassification = expectedRoleRule(cfg).Classification
+		if cfg.seedConversationRole {
+			expectedClassification = expectedRoleRule(cfg).Classification
+		}
 		expectedReasonCode = expectedClassification
+	}
+	if expectedRows := expectedPolicyAuditRows(cfg); expectedRows > 0 && audit.RowCount != expectedRows {
+		return fmt.Errorf("policy audit row count=%d expected %d", audit.RowCount, expectedRows)
 	}
 	expectedAction := strings.ToUpper(cfg.action)
 	if audit.Action != expectedAction {
 		return fmt.Errorf("policy audit action=%q expected %q", audit.Action, expectedAction)
+	}
+	if cfg.action == "send" {
+		if audit.MessageIDPresent || audit.MessageKeyPresent {
+			return fmt.Errorf("policy audit send message context present=%v key_present=%v expected false", audit.MessageIDPresent, audit.MessageKeyPresent)
+		}
+	} else if !audit.MessageIDPresent || !audit.MessageKeyPresent {
+		return fmt.Errorf("policy audit message context present=%v key_present=%v expected true", audit.MessageIDPresent, audit.MessageKeyPresent)
 	}
 	if audit.Allowed != expectedAllowed {
 		return fmt.Errorf("policy audit allowed=%v expected %v", audit.Allowed, expectedAllowed)
@@ -913,13 +983,15 @@ WHERE tenant_id = $1
 `, cfg.tenantID).Scan(&result.RowCount); err != nil {
 		return result, fmt.Errorf("read policy audit count: %w", err)
 	}
-	if result.RowCount != 1 {
-		return result, fmt.Errorf("policy audit row count=%d expected 1", result.RowCount)
+	if result.RowCount < 1 {
+		return result, fmt.Errorf("policy audit row count=%d expected at least 1", result.RowCount)
 	}
 	if err := pool.QueryRow(ctx, `
 SELECT
     event_id,
     action,
+    message_id_present,
+    message_key <> '',
     allowed,
     permission_version,
     classification,
@@ -932,6 +1004,8 @@ LIMIT 1
 `, cfg.tenantID).Scan(
 		&result.EventID,
 		&result.Action,
+		&result.MessageIDPresent,
+		&result.MessageKeyPresent,
 		&result.Allowed,
 		&result.PermissionVersion,
 		&result.Classification,
@@ -961,9 +1035,16 @@ func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string) err
 	return nil
 }
 
-func seedPolicyRules(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
-	if _, err := pool.Exec(ctx, `DELETE FROM policy_decision_audit_outbox WHERE tenant_id = $1`, cfg.tenantID); err != nil {
+func cleanupPolicyAudit(ctx context.Context, pool *pgxpool.Pool, tenantID string) error {
+	if _, err := pool.Exec(ctx, `DELETE FROM policy_decision_audit_outbox WHERE tenant_id = $1`, tenantID); err != nil {
 		return fmt.Errorf("cleanup policy decision audit outbox: %w", err)
+	}
+	return nil
+}
+
+func seedPolicyRules(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
+	if err := cleanupPolicyAudit(ctx, pool, cfg.tenantID); err != nil {
+		return err
 	}
 	if _, err := pool.Exec(ctx, `DELETE FROM policy_message_action_rules WHERE tenant_id = $1`, cfg.tenantID); err != nil {
 		return fmt.Errorf("cleanup policy rules: %w", err)
@@ -977,8 +1058,8 @@ func seedPolicyRules(ctx context.Context, pool *pgxpool.Pool, cfg config) error 
 }
 
 func seedTenantPolicyRules(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
-	if _, err := pool.Exec(ctx, `DELETE FROM policy_decision_audit_outbox WHERE tenant_id = $1`, cfg.tenantID); err != nil {
-		return fmt.Errorf("cleanup policy decision audit outbox: %w", err)
+	if err := cleanupPolicyAudit(ctx, pool, cfg.tenantID); err != nil {
+		return err
 	}
 	if _, err := pool.Exec(ctx, `DELETE FROM policy_tenant_message_action_rules WHERE tenant_id = $1`, cfg.tenantID); err != nil {
 		return fmt.Errorf("cleanup tenant policy rules: %w", err)
@@ -995,8 +1076,8 @@ func seedConversationRoleGate(ctx context.Context, pool *pgxpool.Pool, cfg confi
 	if cfg.action != "send" {
 		return fmt.Errorf("conversation role gate integration smoke currently supports send only")
 	}
-	if _, err := pool.Exec(ctx, `DELETE FROM policy_decision_audit_outbox WHERE tenant_id = $1`, cfg.tenantID); err != nil {
-		return fmt.Errorf("cleanup policy decision audit outbox: %w", err)
+	if err := cleanupPolicyAudit(ctx, pool, cfg.tenantID); err != nil {
+		return err
 	}
 	if _, err := pool.Exec(ctx, `DELETE FROM policy_conversation_role_action_rules WHERE tenant_id = $1`, cfg.tenantID); err != nil {
 		return fmt.Errorf("cleanup conversation role rules: %w", err)
@@ -1164,6 +1245,9 @@ func expectedConversationMember(cfg config) memberRow {
 func exactPolicyRule(cfg config, action string, allowed bool, classification string, reason string) policyRule {
 	rule := tenantPolicyRule(cfg, action, allowed, classification, reason)
 	rule.UserID = cfg.userID
+	if action != "SEND" {
+		rule.UserID = cfg.changeUserID
+	}
 	rule.ConversationID = cfg.conversationID
 	return rule
 }
@@ -1186,6 +1270,30 @@ func isSupportedAction(action string) bool {
 	default:
 		return false
 	}
+}
+
+func shouldValidatePolicyAudit(cfg config) bool {
+	return cfg.expectPolicyAudit || cfg.seedConversationRole
+}
+
+func expectedPolicyAuditRows(cfg config) int64 {
+	if !shouldValidatePolicyAudit(cfg) {
+		return 0
+	}
+	if cfg.expectedAuditRows > 0 {
+		return cfg.expectedAuditRows
+	}
+	return 1
+}
+
+func expectedBaseSendClassification(cfg config) string {
+	if strings.TrimSpace(cfg.expectedBaseClass) != "" {
+		return strings.TrimSpace(cfg.expectedBaseClass)
+	}
+	if cfg.action != "send" && (cfg.seedPolicyRule || cfg.seedTenantPolicyRule || cfg.seedConversationRole) {
+		return "POLICY_SEND_SEED"
+	}
+	return cfg.expectedClassification
 }
 
 func writeSummary(resultDir string, s summary) error {

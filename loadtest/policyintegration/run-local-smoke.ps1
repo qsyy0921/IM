@@ -6,6 +6,7 @@ param(
     [switch]$UsePolicyRules,
     [switch]$UseTenantPolicyRules,
     [switch]$UseConversationRoleGate,
+    [switch]$UseOwnershipGate,
     [switch]$SkipBuild
 )
 
@@ -129,15 +130,19 @@ function Run-Scenario {
     if ($UseConversationRoleGate -and $Action -ne "send") {
         throw "conversation role gate integration smoke currently supports send only"
     }
+    if ($UseOwnershipGate -and $Action -eq "send") {
+        throw "ownership gate integration smoke supports edit/revoke/delete only"
+    }
     $policyPort = Get-FreeTcpPort
     $messagePort = Get-FreeTcpPort
     $policyAddr = "127.0.0.1:$policyPort"
     $messageAddr = "127.0.0.1:$messagePort"
     $processes = @()
     try {
-        $usesRuleStore = $UsePolicyRules -or $UseTenantPolicyRules -or $UseConversationRoleGate
-        $policyStaticAllowed = if ($usesRuleStore) { -not $Allowed } else { $Allowed }
-        $policyStaticClassification = if ($usesRuleStore) { "LOCAL_STATIC_SHOULD_NOT_APPEAR" } else { $Classification }
+        $usesRuleStore = $UsePolicyRules -or $UseTenantPolicyRules -or $UseConversationRoleGate -or $UseOwnershipGate
+        $policyStaticAllowed = if ($UseOwnershipGate) { $true } elseif ($usesRuleStore) { -not $Allowed } else { $Allowed }
+        $ownershipFallthroughClassification = "POLICY_OWNERSHIP_FALLTHROUGH_ALLOWED"
+        $policyStaticClassification = if ($UseOwnershipGate) { $ownershipFallthroughClassification } elseif ($usesRuleStore) { "LOCAL_STATIC_SHOULD_NOT_APPEAR" } else { $Classification }
         $policyEnv = @{
             NEXUSIM_POLICY_SERVICE_MODE = "grpc"
             NEXUSIM_POLICY_GRPC_ADDR = $policyAddr
@@ -162,7 +167,7 @@ function Run-Scenario {
             NEXUSIM_MOCK_CLASSIFICATION = "LOCAL_STATIC_SHOULD_NOT_APPEAR"
         }
         $runner = Join-Path $repo "bin\policy-message-loadtest.exe"
-        $tenant = "tenant-policy-message-$Scenario-" + (Get-Date -Format "yyyyMMddHHmmss")
+        $tenant = "tenant-policy-message-$Action-$Scenario-" + (Get-Date -Format "yyyyMMddHHmmss")
         $args = @(
             "--target", $messageAddr,
             "--pg-dsn", $PgDsn,
@@ -188,6 +193,16 @@ function Run-Scenario {
         if ($UseConversationRoleGate) {
             $args += "--seed-conversation-role-gate"
         }
+        if ($UseOwnershipGate) {
+            $args += @(
+                "--expect-policy-audit",
+                "--expected-audit-rows", 2,
+                "--expected-base-classification", $ownershipFallthroughClassification
+            )
+            if (-not $Allowed) {
+                $args += @("--change-user-id", "policy-message-non-sender")
+            }
+        }
         & $runner @args
         if ($LASTEXITCODE -ne 0) {
             throw "policy message smoke runner failed with exit code $LASTEXITCODE"
@@ -208,7 +223,7 @@ Get-ChildItem -Path "migrations\postgres\message" -Filter "*.sql" |
         Apply-PostgresMigration -Path $_.FullName -Name $_.Name
     }
 
-if ($UsePolicyRules -or $UseTenantPolicyRules -or $UseConversationRoleGate) {
+if ($UsePolicyRules -or $UseTenantPolicyRules -or $UseConversationRoleGate -or $UseOwnershipGate) {
     Get-ChildItem -Path "migrations\postgres\policy" -Filter "*.sql" |
         Sort-Object Name |
         ForEach-Object {
@@ -234,6 +249,11 @@ foreach ($action in $Actions) {
         $allowClassification = "POLICY_ROLE_GATE_TENANT_ALLOW"
         $denyClassification = "CONVERSATION_ROLE_DENIED"
         $denyReason = "conversation role policy denied"
+    }
+    if ($UseOwnershipGate) {
+        $allowClassification = "POLICY_OWNERSHIP_FALLTHROUGH_ALLOWED"
+        $denyClassification = "MESSAGE_OWNERSHIP_DENIED"
+        $denyReason = "message ownership policy denied"
     }
 
     $scenarioSummaries += Run-Scenario `
@@ -261,6 +281,7 @@ $combinedFields = [ordered]@{
     policy_rules_enabled = [bool]$UsePolicyRules
     tenant_policy_rules_enabled = [bool]$UseTenantPolicyRules
     conversation_role_gate_enabled = [bool]$UseConversationRoleGate
+    ownership_gate_enabled = [bool]$UseOwnershipGate
     actions = $Actions
 }
 if ($scenarioSummaries.Count -eq 2 -and $scenarioSummaries[0].action -eq "send" -and $scenarioSummaries[1].action -eq "send") {

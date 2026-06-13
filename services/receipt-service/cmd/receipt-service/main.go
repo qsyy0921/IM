@@ -155,7 +155,16 @@ func runDeliveryConsumer() error {
 		consumer,
 		app.NewProjectDeliveryEventUseCase(repository),
 		groupID,
+		delivery.Config{
+			ErrorBackoff: envDuration("NEXUSIM_RECEIPT_DELIVERY_CONSUMER_ERROR_BACKOFF", time.Second),
+			Logf:         log.Printf,
+		},
 	)
+	stopDebug, err = startDebugServer(ctx, receiptDebugAddr(), monitoringinfra.NewHandler(pool).WithDeliveryProjectionWorkerStats(worker.Snapshot))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 	log.Printf("receipt-service delivery consumer started topic=%s group=%s", topic, groupID)
 	return worker.Run(ctx)
 }

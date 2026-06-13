@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	grpcapi "github.com/qsyy0921/IM/services/conversation-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/conversation-service/internal/app"
+	monitoringinfra "github.com/qsyy0921/IM/services/conversation-service/internal/infrastructure/monitoring"
 	postgresinfra "github.com/qsyy0921/IM/services/conversation-service/internal/infrastructure/postgres"
 	"github.com/qsyy0921/IM/services/conversation-service/internal/trigger/memberchange"
 	"google.golang.org/grpc"
@@ -103,7 +104,8 @@ func runGRPCServer() error {
 }
 
 func newGRPCServer() (*grpc.Server, error) {
-	interceptors := make([]grpc.UnaryServerInterceptor, 0, 1)
+	interceptors := make([]grpc.UnaryServerInterceptor, 0, 2)
+	interceptors = append(interceptors, monitoringinfra.UnaryAccessLogInterceptor(log.Default()))
 	switch strings.ToLower(envString("NEXUSIM_CONVERSATION_AUTH_MODE", "body")) {
 	case "body", "request", "legacy":
 	case "metadata", "verified-metadata":

@@ -34,6 +34,7 @@ Implemented:
 - message-service `EditMessage` / `RevokeMessage` / `DeleteMessage` sender-only ownership integration smoke through `policy-service CheckMessageAction`: `loadtest-report-20260613-policy-message-ownership-smoke.md`.
 - message-service `EditMessage` / `RevokeMessage` / `DeleteMessage` first-stage ownership override smoke for non-sender `ADMIN` allow and `MEMBER` deny: `loadtest-report-20260613-policy-message-ownership-override-smoke.md`.
 - policy-service gRPC server and direct policy smoke clients support first-stage optional TLS / mTLS static config. `loadtest/policy`, `loadtest/policycontacts` and `loadtest/policyroles` accept optional CA, server name and client cert/key flags; default remains plaintext. The `loadtest/policyintegration` runner also supports optional message-service client TLS / mTLS flags and `--verified-auth-metadata` for the `message-service -> policy-service` integration smoke.
+- policy-service direct mTLS smoke with client DNS SAN allowlist: `loadtest-report-20260613-policy-service-mtls-smoke.md`.
 
 Not yet implemented:
 
@@ -63,13 +64,18 @@ Optional TLS / mTLS client flags are available for direct policy smokes:
 
 ```powershell
 .\loadtest\policy\run-local-smoke.ps1 `
+  -PolicyGrpcTlsCertFile .\certs\policy-server.crt `
+  -PolicyGrpcTlsKeyFile .\certs\policy-server.key `
+  -PolicyGrpcTlsClientCaFile .\certs\ca.pem `
+  -PolicyGrpcTlsRequireClientCert true `
+  -PolicyGrpcTlsClientAllowedDnsNames message-service.nexusim.local `
   -PolicyTlsCaFile .\certs\ca.pem `
   -PolicyTlsServerName policy-service.nexusim.local `
   -PolicyTlsClientCertFile .\certs\loadtest-client.crt `
   -PolicyTlsClientKeyFile .\certs\loadtest-client.key
 ```
 
-The same `-PolicyTls*` parameters are supported by `loadtest\policycontacts\run-local-smoke.ps1` and `loadtest\policyroles\run-local-smoke.ps1`. Server-side TLS still uses `NEXUSIM_POLICY_GRPC_TLS_*`; the runner flags only control the loadtest client connection to policy-service.
+For direct `loadtest\policy\run-local-smoke.ps1`, `PolicyGrpcTls*` parameters are injected into the policy-service process started by the script, while `PolicyTls*` parameters configure the loadtest client connection. The same client-side `-PolicyTls*` parameters are supported by `loadtest\policycontacts\run-local-smoke.ps1` and `loadtest\policyroles\run-local-smoke.ps1`; their server-side TLS still uses `NEXUSIM_POLICY_GRPC_TLS_*`.
 
 Run message-service integration smoke with:
 

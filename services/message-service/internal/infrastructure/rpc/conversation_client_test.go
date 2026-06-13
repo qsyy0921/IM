@@ -12,6 +12,7 @@ import (
 	grpcgo "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 )
@@ -42,6 +43,33 @@ func TestConversationClientGetSendContext(t *testing.T) {
 		result.FanoutPolicyVersion != 3 ||
 		result.CurrentSeqShard != "local" {
 		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func TestConversationClientPropagatesTraceAndRequestMetadata(t *testing.T) {
+	fake := &fakeConversationServer{
+		response: &conversationv1.GetSendContextResponse{
+			TenantId:          "tenant-1",
+			ConversationId:    "conv-1",
+			ConversationMode:  conversationv1.ConversationMode_CONVERSATION_MODE_LOCAL_ROW_LOCK,
+			FanoutMode:        conversationv1.FanoutMode_FANOUT_MODE_WRITE_FANOUT,
+			CurrentSeqShard:   "local",
+			PermissionVersion: 7,
+		},
+	}
+	client, cleanup := newBufconnConversationClient(t, fake)
+	defer cleanup()
+
+	_, err := client.GetSendContext(context.Background(), conversationCommand())
+	if err != nil {
+		t.Fatalf("get send context: %v", err)
+	}
+	if fake.incomingMetadata.Get(conversationMetadataTraceID)[0] != "trace-1" ||
+		fake.incomingMetadata.Get(conversationMetadataRequestID)[0] != "request-1" {
+		t.Fatalf("expected trace/request metadata, got %v", fake.incomingMetadata)
+	}
+	if len(fake.incomingMetadata.Get("authorization")) != 0 {
+		t.Fatalf("unexpected auth metadata leak: %v", fake.incomingMetadata)
 	}
 }
 
@@ -185,9 +213,10 @@ func newBufconnConversationClient(t *testing.T, server conversationv1.Conversati
 func conversationCommand() types.SendMessageCommand {
 	return types.SendMessageCommand{
 		AuthContext: types.AuthContext{
-			TenantID: "tenant-1",
-			UserID:   "user-1",
-			TraceID:  "trace-1",
+			TenantID:  "tenant-1",
+			UserID:    "user-1",
+			TraceID:   "trace-1",
+			RequestID: "request-1",
 		},
 		ConversationID: "conv-1",
 	}
@@ -195,14 +224,16 @@ func conversationCommand() types.SendMessageCommand {
 
 type fakeConversationServer struct {
 	conversationv1.UnimplementedConversationServiceServer
-	response *conversationv1.GetSendContextResponse
-	err      error
+	incomingMetadata metadata.MD
+	response         *conversationv1.GetSendContextResponse
+	err              error
 }
 
 func (f *fakeConversationServer) GetSendContext(
-	context.Context,
-	*conversationv1.GetSendContextRequest,
+	ctx context.Context,
+	_ *conversationv1.GetSendContextRequest,
 ) (*conversationv1.GetSendContextResponse, error) {
+	f.incomingMetadata, _ = metadata.FromIncomingContext(ctx)
 	if f.err != nil {
 		return nil, f.err
 	}

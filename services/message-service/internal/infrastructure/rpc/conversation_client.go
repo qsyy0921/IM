@@ -13,7 +13,13 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+)
+
+const (
+	conversationMetadataTraceID   = "x-nexusim-trace-id"
+	conversationMetadataRequestID = "x-nexusim-request-id"
 )
 
 type ConversationClient struct {
@@ -82,6 +88,7 @@ func (c ConversationClient) GetSendContext(
 ) (types.ConversationSendContext, error) {
 	callCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+	callCtx = conversationOutgoingMetadataContext(callCtx, command.AuthContext)
 
 	response, err := c.client.GetSendContext(callCtx, &conversationv1.GetSendContextRequest{
 		TenantId:       string(command.AuthContext.TenantID),
@@ -104,6 +111,20 @@ func (c ConversationClient) GetSendContext(
 		CurrentSeqShard:     response.GetCurrentSeqShard(),
 		DirectPeerUserID:    types.UserID(response.GetDirectPeerUserId()),
 	}, nil
+}
+
+func conversationOutgoingMetadataContext(ctx context.Context, auth types.AuthContext) context.Context {
+	pairs := make([]string, 0, 4)
+	if auth.TraceID != "" {
+		pairs = append(pairs, conversationMetadataTraceID, auth.TraceID)
+	}
+	if auth.RequestID != "" {
+		pairs = append(pairs, conversationMetadataRequestID, auth.RequestID)
+	}
+	if len(pairs) == 0 {
+		return ctx
+	}
+	return metadata.NewOutgoingContext(ctx, metadata.Pairs(pairs...))
 }
 
 func validateConversationResponse(command types.SendMessageCommand, response *conversationv1.GetSendContextResponse) error {

@@ -547,6 +547,17 @@ NEXUSIM_PUSH_CONSUMER_GROUP=nexusim-push-gateway
 NEXUSIM_PUSH_AUTH_MODE=mock
 ```
 
+默认情况下，push-gateway 调 `delivery-service AckDelivery` 使用 plaintext gRPC，兼容本地 smoke。若 delivery-service gRPC server 开启 TLS / mTLS，可在 push-gateway WebSocket 进程配置第一阶段静态出站 TLS：
+
+```text
+NEXUSIM_DELIVERY_SERVICE_TLS_CA_FILE=...
+NEXUSIM_DELIVERY_SERVICE_TLS_SERVER_NAME=delivery-service.nexusim.local
+NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_CERT_FILE=...
+NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE=...
+```
+
+配置任一 `NEXUSIM_DELIVERY_SERVICE_TLS_*` 后必须提供 CA file，client cert/key 必须成对配置。该能力只覆盖 push-gateway 到 delivery-service 的 ACK RPC client，不代表证书签发 / 轮换 / 分发、动态服务身份治理或全服务 mTLS rollout 已完成。
+
 HMAC gateway token 可选参数：
 
 ```text

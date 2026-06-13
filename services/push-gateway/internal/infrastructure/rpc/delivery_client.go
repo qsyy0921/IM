@@ -3,12 +3,14 @@ package rpc
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	"github.com/qsyy0921/IM/services/push-gateway/internal/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
@@ -18,6 +20,14 @@ type DeliveryClient struct {
 	timeout time.Duration
 }
 
+type DeliveryClientDialConfig struct {
+	Addr    string
+	Timeout time.Duration
+	TLS     DeliveryClientTLSConfig
+}
+
+type DeliveryClientTLSConfig = GRPCClientTLSConfig
+
 func NewDeliveryClient(client deliveryv1.DeliveryServiceClient, timeout time.Duration) DeliveryClient {
 	if timeout <= 0 {
 		timeout = 100 * time.Millisecond
@@ -26,14 +36,39 @@ func NewDeliveryClient(client deliveryv1.DeliveryServiceClient, timeout time.Dur
 }
 
 func DialDeliveryClient(ctx context.Context, addr string, timeout time.Duration) (DeliveryClient, func() error, error) {
+	return DialDeliveryClientWithConfig(ctx, DeliveryClientDialConfig{Addr: addr, Timeout: timeout})
+}
+
+func DialDeliveryClientWithConfig(_ context.Context, config DeliveryClientDialConfig) (DeliveryClient, func() error, error) {
+	addr := strings.TrimSpace(config.Addr)
+	if addr == "" {
+		return DeliveryClient{}, nil, errors.New("delivery service address is required")
+	}
+	transportCredentials := grpc.WithTransportCredentials(insecure.NewCredentials())
+	if config.TLS.Enabled() {
+		creds, err := deliveryClientTLSCredentials(config.TLS)
+		if err != nil {
+			return DeliveryClient{}, nil, err
+		}
+		transportCredentials = grpc.WithTransportCredentials(creds)
+	}
 	conn, err := grpc.NewClient(
 		"passthrough:///"+addr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		transportCredentials,
 	)
 	if err != nil {
 		return DeliveryClient{}, nil, err
 	}
-	return NewDeliveryClient(deliveryv1.NewDeliveryServiceClient(conn), timeout), conn.Close, nil
+	return NewDeliveryClient(deliveryv1.NewDeliveryServiceClient(conn), config.Timeout), conn.Close, nil
+}
+
+func deliveryClientTLSCredentials(config DeliveryClientTLSConfig) (credentials.TransportCredentials, error) {
+	return grpcClientTLSCredentials(
+		config,
+		"NEXUSIM_DELIVERY_SERVICE_TLS_CA_FILE",
+		"NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_CERT_FILE",
+		"NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE",
+	)
 }
 
 func (client DeliveryClient) AckDelivery(

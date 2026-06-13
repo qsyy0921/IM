@@ -479,7 +479,16 @@ NEXUSIM_DELIVERY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES=push-gateway.nexusim.local
 NEXUSIM_DELIVERY_GRPC_TLS_CLIENT_ALLOWED_URIS=spiffe://nexusim/push-gateway
 ```
 
-开启 allowlist 时按客户端证书 DNS SAN 小写 exact-match 或 URI SAN exact-match 校验。该配置只覆盖 delivery gRPC server；push-gateway delivery client 的 TLS 配置迁移、证书签发 / 轮换 / 分发、动态服务身份治理和全服务 mTLS rollout 仍是后续项。
+开启 allowlist 时按客户端证书 DNS SAN 小写 exact-match 或 URI SAN exact-match 校验。push-gateway 调 `AckDelivery` 的 delivery client 已支持第一阶段静态 TLS / mTLS 出站配置：
+
+```text
+NEXUSIM_DELIVERY_SERVICE_TLS_CA_FILE=...
+NEXUSIM_DELIVERY_SERVICE_TLS_SERVER_NAME=delivery-service.nexusim.local
+NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_CERT_FILE=...
+NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE=...
+```
+
+未配置上述 client TLS env 时 push-gateway 仍使用 plaintext，兼容现有本地 smoke。配置任一 client TLS env 后必须提供 CA file，client cert/key 必须成对配置。当前仍不包含证书签发 / 轮换 / 分发、动态服务身份治理和全服务 mTLS rollout。
 
 本地最小 smoke：
 

@@ -39,6 +39,17 @@ NEXUSIM_DELIVERY_EVENTS_TOPIC=im.delivery.events
 NEXUSIM_PUSH_CONSUMER_GROUP=nexusim-push-gateway-smoke
 ```
 
+默认情况下，push-gateway 的 `AckDelivery` RPC client 使用 plaintext gRPC。若 delivery-service gRPC server 在本地或双机 smoke 中开启 TLS / mTLS，WebSocket gateway 进程需要配置对应出站 TLS：
+
+```text
+NEXUSIM_DELIVERY_SERVICE_TLS_CA_FILE=...
+NEXUSIM_DELIVERY_SERVICE_TLS_SERVER_NAME=delivery-service.nexusim.local
+NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_CERT_FILE=...
+NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE=...
+```
+
+配置任一 TLS env 后必须提供 CA file，client cert/key 必须成对配置。现有 smoke 默认不启用这些参数；该配置只验证静态证书下的 RPC 加密 / mTLS 连接，不代表证书签发、轮换、分发或全服务 mTLS rollout。
+
 `all` 模式只用于第一阶段本地 smoke：WebSocket handler 和 `im.delivery.events` consumer 共享同一个进程内 session registry。默认 route backend 仍是 memory；跨实例在线路由需要启用 Redis route。
 
 本地分布式模拟使用两个独立 `push-gateway` 进程：

@@ -113,11 +113,15 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 	var wsAddr string
 	if enableWS {
 		deliveryAddr := envString("NEXUSIM_DELIVERY_GRPC_ADDR", "127.0.0.1:10497")
-		deliveryClient, closeDelivery, err := rpcinfra.DialDeliveryClient(
-			ctx,
-			deliveryAddr,
-			envDuration("NEXUSIM_DELIVERY_GRPC_TIMEOUT", 500*time.Millisecond),
-		)
+		deliveryTLS, err := deliveryClientTLSConfigFromEnv()
+		if err != nil {
+			return err
+		}
+		deliveryClient, closeDelivery, err := rpcinfra.DialDeliveryClientWithConfig(ctx, rpcinfra.DeliveryClientDialConfig{
+			Addr:    deliveryAddr,
+			Timeout: envDuration("NEXUSIM_DELIVERY_GRPC_TIMEOUT", 500*time.Millisecond),
+			TLS:     deliveryTLS,
+		})
 		if err != nil {
 			return err
 		}
@@ -326,6 +330,25 @@ func authenticatorJWKStats(authenticator *authinfra.Authenticator) *authinfra.JW
 		return nil
 	}
 	return &stats
+}
+
+func deliveryClientTLSConfigFromEnv() (rpcinfra.DeliveryClientTLSConfig, error) {
+	config := rpcinfra.DeliveryClientTLSConfig{
+		CAFile:         envString("NEXUSIM_DELIVERY_SERVICE_TLS_CA_FILE", ""),
+		ServerName:     envString("NEXUSIM_DELIVERY_SERVICE_TLS_SERVER_NAME", ""),
+		ClientCertFile: envString("NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_CERT_FILE", ""),
+		ClientKeyFile:  envString("NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE", ""),
+	}
+	if !config.Enabled() {
+		return config, nil
+	}
+	if strings.TrimSpace(config.CAFile) == "" {
+		return config, errors.New("NEXUSIM_DELIVERY_SERVICE_TLS_CA_FILE is required when delivery-service TLS is configured")
+	}
+	if (strings.TrimSpace(config.ClientCertFile) == "") != (strings.TrimSpace(config.ClientKeyFile) == "") {
+		return config, errors.New("NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_CERT_FILE and NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE must be configured together")
+	}
+	return config, nil
 }
 
 func envString(name string, fallback string) string {

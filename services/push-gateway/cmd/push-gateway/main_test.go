@@ -90,6 +90,56 @@ func TestNewRedisUniversalClientRejectsUnsupportedMode(t *testing.T) {
 	}
 }
 
+func TestDeliveryClientTLSConfigFromEnvDisabledByDefault(t *testing.T) {
+	clearDeliveryClientTLSEnv(t)
+
+	config, err := deliveryClientTLSConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load delivery tls config: %v", err)
+	}
+	if config.Enabled() {
+		t.Fatalf("expected delivery tls to be disabled by default")
+	}
+}
+
+func TestDeliveryClientTLSConfigFromEnvRequiresCAFile(t *testing.T) {
+	clearDeliveryClientTLSEnv(t)
+	t.Setenv("NEXUSIM_DELIVERY_SERVICE_TLS_SERVER_NAME", "delivery-service.nexusim.local")
+
+	if _, err := deliveryClientTLSConfigFromEnv(); err == nil {
+		t.Fatalf("expected missing CA file error")
+	}
+}
+
+func TestDeliveryClientTLSConfigFromEnvRequiresClientKeyPair(t *testing.T) {
+	clearDeliveryClientTLSEnv(t)
+	t.Setenv("NEXUSIM_DELIVERY_SERVICE_TLS_CA_FILE", "ca.pem")
+	t.Setenv("NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_CERT_FILE", "client.crt")
+
+	if _, err := deliveryClientTLSConfigFromEnv(); err == nil {
+		t.Fatalf("expected partial client key pair error")
+	}
+}
+
+func TestDeliveryClientTLSConfigFromEnvLoadsCompleteConfig(t *testing.T) {
+	clearDeliveryClientTLSEnv(t)
+	t.Setenv("NEXUSIM_DELIVERY_SERVICE_TLS_CA_FILE", "ca.pem")
+	t.Setenv("NEXUSIM_DELIVERY_SERVICE_TLS_SERVER_NAME", "delivery-service.nexusim.local")
+	t.Setenv("NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_CERT_FILE", "client.crt")
+	t.Setenv("NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE", "client.key")
+
+	config, err := deliveryClientTLSConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load delivery tls config: %v", err)
+	}
+	if config.CAFile != "ca.pem" ||
+		config.ServerName != "delivery-service.nexusim.local" ||
+		config.ClientCertFile != "client.crt" ||
+		config.ClientKeyFile != "client.key" {
+		t.Fatalf("unexpected delivery tls config: %#v", config)
+	}
+}
+
 func TestSplitCSVTrimsAndDropsEmptyValues(t *testing.T) {
 	values := splitCSV(" old-1, ,old-2 , old-1 ")
 	if len(values) != 3 || values[0] != "old-1" || values[1] != "old-2" || values[2] != "old-1" {
@@ -98,4 +148,12 @@ func TestSplitCSVTrimsAndDropsEmptyValues(t *testing.T) {
 	if values := splitCSV(" , , "); len(values) != 0 {
 		t.Fatalf("expected empty values, got %#v", values)
 	}
+}
+
+func clearDeliveryClientTLSEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("NEXUSIM_DELIVERY_SERVICE_TLS_CA_FILE", "")
+	t.Setenv("NEXUSIM_DELIVERY_SERVICE_TLS_SERVER_NAME", "")
+	t.Setenv("NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_CERT_FILE", "")
+	t.Setenv("NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE", "")
 }

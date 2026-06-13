@@ -16,6 +16,7 @@ param(
     [string]$ContactsTlsClientCertFile = "",
     [string]$ContactsTlsClientKeyFile = "",
     [switch]$VerifiedAuthMetadata,
+    [switch]$GatewayFacade,
     [switch]$SkipBuild
 )
 
@@ -23,6 +24,9 @@ $ErrorActionPreference = "Stop"
 
 if (-not $RunName) {
     $RunName = "contacts-$Scenario-smoke-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+}
+if ($GatewayFacade -and $VerifiedAuthMetadata) {
+    throw "-GatewayFacade and -VerifiedAuthMetadata cannot be combined"
 }
 
 $repo = (Get-Location).Path
@@ -34,6 +38,8 @@ $tenantId = "tenant-contacts-$Scenario-smoke-$topicSuffix"
 $senderUserId = "contacts-sender"
 $receiverUserId = "contacts-receiver"
 $contactsGrpcPort = 0
+$apiGatewayGrpcPort = 0
+$gatewayAuthSecret = "nexusim-contacts-facade-smoke-secret"
 
 New-Item -ItemType Directory -Force $resultDir | Out-Null
 New-Item -ItemType Directory -Force $logDir | Out-Null
@@ -42,6 +48,7 @@ New-Item -ItemType Directory -Force $logDir | Out-Null
 
 if (-not $SkipBuild) {
     go build -o bin\contacts-service.exe ./services/contacts-service/cmd/contacts-service
+    go build -o bin\api-gateway.exe ./services/api-gateway/cmd/api-gateway
     go build -o bin\contacts-loadtest.exe ./loadtest/contacts
 }
 
@@ -159,6 +166,12 @@ function Assert-Summary {
     if ($summary.contact_kafka_events.Count -lt 2) {
         throw "expected at least 2 contact Kafka events, got $($summary.contact_kafka_events.Count)"
     }
+    if ($GatewayFacade -and -not $summary.gateway_facade) {
+        throw "expected gateway_facade=true in summary"
+    }
+    if ($GatewayFacade -and $summary.gateway_auth_mode -ne "hmac") {
+        throw "expected gateway_auth_mode=hmac in summary, got $($summary.gateway_auth_mode)"
+    }
 }
 
 $processes = @()
@@ -171,13 +184,16 @@ try {
     Ensure-KafkaTopic -Topic $contactTopic
 
     $contactsService = Join-Path $repo "bin\contacts-service.exe"
+    $apiGateway = Join-Path $repo "bin\api-gateway.exe"
     $runner = Join-Path $repo "bin\contacts-loadtest.exe"
     $contactsGrpcPort = Get-FreeTcpPort
     $contactsGrpcAddr = "127.0.0.1:$contactsGrpcPort"
+    $apiGatewayGrpcPort = Get-FreeTcpPort
+    $apiGatewayGrpcAddr = "127.0.0.1:$apiGatewayGrpcPort"
 
     $processes += Start-NexusProcess -Name "contacts-grpc" -FilePath $contactsService -Port $contactsGrpcPort -Env @{
         NEXUSIM_CONTACTS_SERVICE_MODE = "grpc"
-        NEXUSIM_CONTACTS_AUTH_MODE = $(if ($VerifiedAuthMetadata) { "metadata" } else { "body" })
+        NEXUSIM_CONTACTS_AUTH_MODE = $(if ($VerifiedAuthMetadata -or $GatewayFacade) { "metadata" } else { "body" })
         NEXUSIM_CONTACTS_GRPC_ADDR = $contactsGrpcAddr
         NEXUSIM_PG_DSN = $PgDsn
         NEXUSIM_CONTACTS_GRPC_TLS_CERT_FILE = $ContactsGrpcTlsCertFile
@@ -186,6 +202,22 @@ try {
         NEXUSIM_CONTACTS_GRPC_TLS_REQUIRE_CLIENT_CERT = $ContactsGrpcTlsRequireClientCert
         NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES = $ContactsGrpcTlsClientAllowedDnsNames
         NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_ALLOWED_URIS = $ContactsGrpcTlsClientAllowedUris
+    }
+
+    if ($GatewayFacade) {
+        $processes += Start-NexusProcess -Name "api-gateway-grpc" -FilePath $apiGateway -Port $apiGatewayGrpcPort -Env @{
+            NEXUSIM_API_GATEWAY_MODE = "grpc"
+            NEXUSIM_API_GATEWAY_GRPC_ADDR = $apiGatewayGrpcAddr
+            NEXUSIM_API_GATEWAY_AUTH_MODE = "hmac"
+            NEXUSIM_API_GATEWAY_AUTH_HMAC_SECRET = $gatewayAuthSecret
+            NEXUSIM_API_GATEWAY_AUTH_AUDIENCE = "api-gateway"
+            NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS = "false"
+            NEXUSIM_API_GATEWAY_CONTACTS_ADDR = $contactsGrpcAddr
+            NEXUSIM_API_GATEWAY_CONTACTS_TLS_CA_FILE = $ContactsTlsCaFile
+            NEXUSIM_API_GATEWAY_CONTACTS_TLS_SERVER_NAME = $ContactsTlsServerName
+            NEXUSIM_API_GATEWAY_CONTACTS_TLS_CLIENT_CERT_FILE = $ContactsTlsClientCertFile
+            NEXUSIM_API_GATEWAY_CONTACTS_TLS_CLIENT_KEY_FILE = $ContactsTlsClientKeyFile
+        }
     }
 
     $processes += Start-NexusProcess -Name "contacts-outbox-relay" -FilePath $contactsService -Env @{
@@ -198,7 +230,7 @@ try {
     }
 
     $runnerArgs = @(
-        "--target", $contactsGrpcAddr,
+        "--target", $(if ($GatewayFacade) { $apiGatewayGrpcAddr } else { $contactsGrpcAddr }),
         "--pg-dsn", $PgDsn,
         "--kafka-brokers", $KafkaBrokers,
         "--contact-topic", $contactTopic,
@@ -213,16 +245,24 @@ try {
     if ($VerifiedAuthMetadata) {
         $runnerArgs += @("--verified-auth-metadata")
     }
-    if (-not [string]::IsNullOrWhiteSpace($ContactsTlsCaFile)) {
+    if ($GatewayFacade) {
+        $runnerArgs += @(
+            "--gateway-facade",
+            "--gateway-auth-mode", "hmac",
+            "--gateway-auth-hmac-secret", $gatewayAuthSecret,
+            "--gateway-auth-audience", "api-gateway"
+        )
+    }
+    if ((-not $GatewayFacade) -and -not [string]::IsNullOrWhiteSpace($ContactsTlsCaFile)) {
         $runnerArgs += @("--contacts-tls-ca-file", $ContactsTlsCaFile)
     }
-    if (-not [string]::IsNullOrWhiteSpace($ContactsTlsServerName)) {
+    if ((-not $GatewayFacade) -and -not [string]::IsNullOrWhiteSpace($ContactsTlsServerName)) {
         $runnerArgs += @("--contacts-tls-server-name", $ContactsTlsServerName)
     }
-    if (-not [string]::IsNullOrWhiteSpace($ContactsTlsClientCertFile)) {
+    if ((-not $GatewayFacade) -and -not [string]::IsNullOrWhiteSpace($ContactsTlsClientCertFile)) {
         $runnerArgs += @("--contacts-tls-client-cert-file", $ContactsTlsClientCertFile)
     }
-    if (-not [string]::IsNullOrWhiteSpace($ContactsTlsClientKeyFile)) {
+    if ((-not $GatewayFacade) -and -not [string]::IsNullOrWhiteSpace($ContactsTlsClientKeyFile)) {
         $runnerArgs += @("--contacts-tls-client-key-file", $ContactsTlsClientKeyFile)
     }
 
@@ -243,3 +283,6 @@ try {
 Write-Host "result_dir=$resultDir"
 Write-Host "contact_topic=$contactTopic"
 Write-Host "contacts_grpc_addr=127.0.0.1:$contactsGrpcPort"
+if ($GatewayFacade) {
+    Write-Host "api_gateway_grpc_addr=127.0.0.1:$apiGatewayGrpcPort"
+}

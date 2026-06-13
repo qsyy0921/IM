@@ -13,6 +13,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	contactsv1 "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1"
+	gatewayv1 "github.com/qsyy0921/IM/api/proto/nexusim/gateway/v1"
+	"github.com/qsyy0921/IM/internal/gatewayauth"
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	contacteventsv1 "github.com/qsyy0921/IM/schemas/kafka/contacts/v1"
 	kafkago "github.com/segmentio/kafka-go"
@@ -30,26 +32,32 @@ const (
 	metadataSessionID = "x-nexusim-session-id"
 	metadataTraceID   = "x-nexusim-trace-id"
 	metadataRequestID = "x-nexusim-request-id"
+	metadataToken     = "x-nexusim-gateway-token"
 )
 
 type config struct {
-	target           string
-	tls              grpctls.Config
-	resultDir        string
-	pgDSN            string
-	kafkaBrokers     []string
-	contactTopic     string
-	requestTimeout   time.Duration
-	waitTimeout      time.Duration
-	pollInterval     time.Duration
-	tenantID         string
-	senderUserID     string
-	receiverUserID   string
-	senderDeviceID   string
-	receiverDeviceID string
-	scenario         string
-	cleanup          bool
-	verifiedMetadata bool
+	target                string
+	tls                   grpctls.Config
+	resultDir             string
+	pgDSN                 string
+	kafkaBrokers          []string
+	contactTopic          string
+	requestTimeout        time.Duration
+	waitTimeout           time.Duration
+	pollInterval          time.Duration
+	tenantID              string
+	senderUserID          string
+	receiverUserID        string
+	senderDeviceID        string
+	receiverDeviceID      string
+	scenario              string
+	cleanup               bool
+	verifiedMetadata      bool
+	gatewayFacade         bool
+	gatewayAuthMode       string
+	gatewayAuthHMACSecret string
+	gatewayAuthAudience   string
+	gatewayAuthTokenTTL   time.Duration
 }
 
 type summary struct {
@@ -66,6 +74,9 @@ type summary struct {
 	Scenario                     string              `json:"scenario"`
 	ContactTopic                 string              `json:"contact_topic"`
 	VerifiedAuthMetadata         bool                `json:"verified_auth_metadata"`
+	GatewayFacade                bool                `json:"gateway_facade"`
+	GatewayAuthMode              string              `json:"gateway_auth_mode,omitempty"`
+	GatewayAuthAudience          string              `json:"gateway_auth_audience,omitempty"`
 	StartedAt                    time.Time           `json:"started_at"`
 	FinishedAt                   time.Time           `json:"finished_at"`
 	Success                      bool                `json:"success"`
@@ -191,6 +202,11 @@ func parseConfig() config {
 	flag.StringVar(&cfg.scenario, "scenario", "accept", "scenario: accept, decline, cancel, delete, block, unblock, remark, or readd")
 	flag.BoolVar(&cfg.cleanup, "cleanup", false, "delete tenant contacts rows before running")
 	flag.BoolVar(&cfg.verifiedMetadata, "verified-auth-metadata", envBool("NEXUSIM_CONTACTS_LOADTEST_VERIFIED_AUTH_METADATA", false), "send gateway verified identity through contacts-service gRPC metadata")
+	flag.BoolVar(&cfg.gatewayFacade, "gateway-facade", envBool("NEXUSIM_CONTACTS_LOADTEST_GATEWAY_FACADE", false), "use nexusim.gateway.v1.GatewayService for contacts user-facing RPCs")
+	flag.StringVar(&cfg.gatewayAuthMode, "gateway-auth-mode", os.Getenv("NEXUSIM_CONTACTS_LOADTEST_GATEWAY_AUTH_MODE"), "api-gateway auth mode for contacts facade calls: mock or hmac")
+	flag.StringVar(&cfg.gatewayAuthHMACSecret, "gateway-auth-hmac-secret", os.Getenv("NEXUSIM_CONTACTS_LOADTEST_GATEWAY_AUTH_HMAC_SECRET"), "HMAC secret used to sign api-gateway contacts token when --gateway-auth-mode=hmac")
+	flag.StringVar(&cfg.gatewayAuthAudience, "gateway-auth-audience", envString("NEXUSIM_CONTACTS_LOADTEST_GATEWAY_AUTH_AUDIENCE", "api-gateway"), "audience claim used for generated api-gateway contacts token")
+	flag.DurationVar(&cfg.gatewayAuthTokenTTL, "gateway-auth-token-ttl", 10*time.Minute, "TTL for generated HMAC api-gateway contacts token")
 	flag.Parse()
 	cfg.kafkaBrokers = splitCSV(brokers)
 	cfg.scenario = strings.ToLower(strings.TrimSpace(cfg.scenario))
@@ -210,6 +226,20 @@ func parseConfig() config {
 }
 
 func run(cfg config) error {
+	cfg.gatewayAuthMode = strings.ToLower(strings.TrimSpace(cfg.gatewayAuthMode))
+	cfg.gatewayAuthAudience = normalizedGatewayAuthAudience(cfg.gatewayAuthAudience)
+	if cfg.gatewayFacade && cfg.gatewayAuthMode == "" {
+		return fmt.Errorf("--gateway-facade requires --gateway-auth-mode")
+	}
+	if cfg.gatewayAuthMode != "" && cfg.verifiedMetadata {
+		return fmt.Errorf("--gateway-auth-mode and --verified-auth-metadata cannot be combined")
+	}
+	if cfg.gatewayAuthMode == "hmac" && strings.TrimSpace(cfg.gatewayAuthHMACSecret) == "" {
+		return fmt.Errorf("--gateway-auth-hmac-secret is required when --gateway-auth-mode=hmac")
+	}
+	if cfg.gatewayAuthMode != "" && cfg.gatewayAuthMode != "mock" && cfg.gatewayAuthMode != "hmac" {
+		return fmt.Errorf("unsupported gateway auth mode: %s", cfg.gatewayAuthMode)
+	}
 	if err := os.MkdirAll(cfg.resultDir, 0o755); err != nil {
 		return fmt.Errorf("create result dir: %w", err)
 	}
@@ -227,6 +257,9 @@ func run(cfg config) error {
 		Scenario:             cfg.scenario,
 		ContactTopic:         cfg.contactTopic,
 		VerifiedAuthMetadata: cfg.verifiedMetadata,
+		GatewayFacade:        cfg.gatewayFacade,
+		GatewayAuthMode:      cfg.gatewayAuthMode,
+		GatewayAuthAudience:  gatewayAuthAudienceSummary(cfg.gatewayAuthMode, cfg.gatewayAuthAudience),
 		StartedAt:            startedAt,
 		LatenciesMS:          map[string]float64{},
 	}
@@ -263,6 +296,9 @@ func run(cfg config) error {
 	}
 	defer conn.Close()
 	client := contactsv1.NewContactsServiceClient(conn)
+	if cfg.gatewayFacade {
+		client = gatewayv1.NewGatewayServiceClient(conn)
+	}
 
 	requestIDSuffix := time.Now().UTC().Format("20060102150405")
 	sendResult, elapsed, err := sendContactRequest(cfg, client, requestIDSuffix)
@@ -468,6 +504,14 @@ func envBool(name string, fallback bool) bool {
 	}
 }
 
+func envString(name string, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
 func requestContext(cfg config, userID string, deviceID string, requestID string, traceID string) (context.Context, context.CancelFunc, *contactsv1.AuthContext) {
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
 	auth := &contactsv1.AuthContext{
@@ -488,7 +532,64 @@ func requestContext(cfg config, userID string, deviceID string, requestID string
 			metadataRequestID, auth.GetRequestId(),
 		))
 	}
+	if cfg.gatewayAuthMode != "" {
+		ctx = withGatewayAuthMetadata(ctx, cfg, auth)
+	}
 	return ctx, cancel, auth
+}
+
+func withGatewayAuthMetadata(ctx context.Context, cfg config, auth *contactsv1.AuthContext) context.Context {
+	switch cfg.gatewayAuthMode {
+	case "mock":
+		pairs := []string{
+			metadataToken, auth.GetTenantId() + ":" + auth.GetUserId() + ":" + auth.GetDeviceId(),
+		}
+		if auth.GetTraceId() != "" {
+			pairs = append(pairs, metadataTraceID, auth.GetTraceId())
+		}
+		if auth.GetRequestId() != "" {
+			pairs = append(pairs, metadataRequestID, auth.GetRequestId())
+		}
+		return metadata.NewOutgoingContext(ctx, metadata.Pairs(pairs...))
+	case "hmac":
+		token, err := signGatewayAuthToken(cfg.gatewayAuthHMACSecret, cfg.gatewayAuthTokenTTL, auth, cfg.gatewayAuthAudience)
+		if err != nil {
+			return metadata.NewOutgoingContext(ctx, metadata.Pairs("x-nexusim-loadtest-auth-error", err.Error()))
+		}
+		pairs := []string{"authorization", "Bearer " + token}
+		if auth.GetRequestId() != "" {
+			pairs = append(pairs, metadataRequestID, auth.GetRequestId())
+		}
+		return metadata.NewOutgoingContext(ctx, metadata.Pairs(pairs...))
+	default:
+		return ctx
+	}
+}
+
+func signGatewayAuthToken(secret string, ttl time.Duration, auth *contactsv1.AuthContext, audience string) (string, error) {
+	return gatewayauth.SignGatewayToken(secret, map[string]string{
+		"tenant_id":  auth.GetTenantId(),
+		"user_id":    auth.GetUserId(),
+		"device_id":  auth.GetDeviceId(),
+		"session_id": auth.GetSessionId(),
+		"trace_id":   auth.GetTraceId(),
+		"aud":        strings.TrimSpace(audience),
+	}, time.Now().Add(ttl))
+}
+
+func gatewayAuthAudienceSummary(mode string, audience string) string {
+	if strings.TrimSpace(mode) == "" {
+		return ""
+	}
+	return normalizedGatewayAuthAudience(audience)
+}
+
+func normalizedGatewayAuthAudience(audience string) string {
+	audience = strings.TrimSpace(audience)
+	if audience == "" {
+		return "api-gateway"
+	}
+	return audience
 }
 
 func deviceIDForUser(cfg config, userID string) string {

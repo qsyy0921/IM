@@ -21,6 +21,17 @@ func TestEnvBool(t *testing.T) {
 	}
 }
 
+func TestEnvString(t *testing.T) {
+	t.Setenv("NEXUSIM_TEST_STRING", " value ")
+	if got := envString("NEXUSIM_TEST_STRING", "fallback"); got != "value" {
+		t.Fatalf("envString = %q, want value", got)
+	}
+	t.Setenv("NEXUSIM_TEST_STRING", " ")
+	if got := envString("NEXUSIM_TEST_STRING", "fallback"); got != "fallback" {
+		t.Fatalf("envString fallback = %q, want fallback", got)
+	}
+}
+
 func TestRequestContextWithoutVerifiedMetadata(t *testing.T) {
 	ctx, cancel, auth := requestContext(config{
 		tenantID:       "tenant-1",
@@ -52,6 +63,52 @@ func TestRequestContextWithVerifiedMetadata(t *testing.T) {
 	assertMetadataValue(t, md, metadataSessionID, "contacts-smoke-device-1")
 	assertMetadataValue(t, md, metadataTraceID, "trace-1")
 	assertMetadataValue(t, md, metadataRequestID, "request-1")
+}
+
+func TestRequestContextWithGatewayMockAuth(t *testing.T) {
+	ctx, cancel, auth := requestContext(config{
+		tenantID:        "tenant-1",
+		requestTimeout:  1,
+		gatewayAuthMode: "mock",
+	}, "user-1", "device-1", "request-1", "trace-1")
+	defer cancel()
+	if auth.GetSessionId() != "contacts-smoke-device-1" {
+		t.Fatalf("unexpected session id: %s", auth.GetSessionId())
+	}
+	md, ok := metadata.FromOutgoingContext(ctx)
+	if !ok {
+		t.Fatal("expected outgoing metadata")
+	}
+	assertMetadataValue(t, md, metadataToken, "tenant-1:user-1:device-1")
+	assertMetadataValue(t, md, metadataTraceID, "trace-1")
+	assertMetadataValue(t, md, metadataRequestID, "request-1")
+	if values := md.Get(metadataTenantID); len(values) != 0 {
+		t.Fatalf("did not expect verified tenant metadata with gateway auth, got %v", values)
+	}
+}
+
+func TestRequestContextWithGatewayHMACAuth(t *testing.T) {
+	ctx, cancel, _ := requestContext(config{
+		tenantID:              "tenant-1",
+		requestTimeout:        1,
+		gatewayAuthMode:       "hmac",
+		gatewayAuthHMACSecret: "secret",
+		gatewayAuthAudience:   "api-gateway",
+		gatewayAuthTokenTTL:   1,
+	}, "user-1", "device-1", "request-1", "trace-1")
+	defer cancel()
+	md, ok := metadata.FromOutgoingContext(ctx)
+	if !ok {
+		t.Fatal("expected outgoing metadata")
+	}
+	values := md.Get("authorization")
+	if len(values) != 1 || values[0] == "" {
+		t.Fatalf("expected authorization metadata, got %v", values)
+	}
+	assertMetadataValue(t, md, metadataRequestID, "request-1")
+	if values := md.Get(metadataTenantID); len(values) != 0 {
+		t.Fatalf("did not expect verified tenant metadata with gateway auth, got %v", values)
+	}
 }
 
 func assertMetadataValue(t *testing.T, md metadata.MD, key string, want string) {

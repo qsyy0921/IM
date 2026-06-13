@@ -41,6 +41,7 @@ loadtest-report-20260613-message-mtls-smoke.md
 - 当前已经有 backpressure、RetryInfo、client retry、adaptive admission、MaxInFlight token gate 等容量治理证据，可以在面试中讲清楚“怎么发现瓶颈、怎么验证假设、怎么保护系统”。
 - 用户机器资源有限，后续不再继续做重型硬件矩阵；这些结果已经足够支撑面试叙事，下一阶段应开发 `conversation-service` 等其它真实微服务。
 - 第三层消息变更已开始补齐：`RevokeMessage`、`EditMessage` 和第一阶段 `DeleteMessage` 最小真实进程 smoke 已证明消息变更事件能从 `message-service` 本地事务进入 `conversation.timeline.events`，再由 `delivery-service` 投影成 `PullInbox` 可见的 tombstone / edited / deleted item。
+- `message-service` 还补了只读 `outbox-audit` 运维模式，方便直接列出 `message_outbox` 当前行，并按 outbox/event/tenant/conversation/status/event_type 缩小排障范围；它不会修改 outbox 状态，也不直接 redrive。
 
 ## 2. 覆盖范围
 

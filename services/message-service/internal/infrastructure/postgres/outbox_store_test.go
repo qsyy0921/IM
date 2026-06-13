@@ -148,6 +148,69 @@ func TestOutboxStoreProcessReadyBatchSkipsPublishWhenEmpty(t *testing.T) {
 	}
 }
 
+func TestOutboxStoreAuditOutboxReturnsLatestRowsIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+	resetMessageCoreTables(t, ctx, pool)
+
+	tenantID := types.TenantID(fmt.Sprintf("tenant-outbox-audit-%d", time.Now().UnixNano()))
+	repo := NewMessageRepository(pool)
+	appendConversationMessages(t, ctx, repo, tenantID, "conversation-a", 2)
+	updateMessageOutboxAuditState(t, ctx, pool, tenantID, "conversation-a", 1, types.OutboxStatusPending, 1, "retry pending", false, false)
+	updateMessageOutboxAuditState(t, ctx, pool, tenantID, "conversation-a", 2, types.OutboxStatusPublished, 0, "", true, false)
+
+	rows, err := NewOutboxStore(pool).AuditOutbox(ctx, OutboxAuditOptions{
+		TenantID: string(tenantID),
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("audit message outbox: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 outbox rows, got %d", len(rows))
+	}
+	if rows[0].AggregateVersion != 2 || rows[0].Status != types.OutboxStatusPublished || rows[0].EventID == "" {
+		t.Fatalf("unexpected latest outbox row: %+v", rows[0])
+	}
+	if rows[1].AggregateVersion != 1 || rows[1].Status != types.OutboxStatusPending || rows[1].RetryCount != 1 || rows[1].LastError != "retry pending" {
+		t.Fatalf("unexpected older outbox row: %+v", rows[1])
+	}
+}
+
+func TestOutboxStoreAuditOutboxFiltersStatusAndEventTypeIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+	resetMessageCoreTables(t, ctx, pool)
+
+	tenantID := types.TenantID(fmt.Sprintf("tenant-outbox-audit-filter-%d", time.Now().UnixNano()))
+	repo := NewMessageRepository(pool)
+	appendConversationMessages(t, ctx, repo, tenantID, "conversation-a", 1)
+	appendConversationMessages(t, ctx, repo, tenantID, "conversation-b", 1)
+	updateMessageOutboxAuditState(t, ctx, pool, tenantID, "conversation-a", 1, types.OutboxStatusDLQ, 3, "poison payload", false, true)
+	updateMessageOutboxEventType(t, ctx, pool, tenantID, "conversation-a", 1, "message.deleted.v1")
+	updateMessageOutboxAuditState(t, ctx, pool, tenantID, "conversation-b", 1, types.OutboxStatusPublished, 0, "", true, false)
+
+	rows, err := NewOutboxStore(pool).AuditOutbox(ctx, OutboxAuditOptions{
+		TenantID:  string(tenantID),
+		Status:    "dlq",
+		EventType: "message.deleted.v1",
+		Limit:     10,
+	})
+	if err != nil {
+		t.Fatalf("audit filtered message outbox: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 outbox row, got %d", len(rows))
+	}
+	if rows[0].ConversationID != "conversation-a" || rows[0].Status != types.OutboxStatusDLQ || rows[0].EventType != "message.deleted.v1" {
+		t.Fatalf("unexpected filtered outbox row: %+v", rows[0])
+	}
+}
+
 func TestOutboxStoreProcessReadyBatchDirectlyMarksPublishedAndRetriesFailures(t *testing.T) {
 	ctx := context.Background()
 	pool := openIntegrationPool(t, ctx)
@@ -606,6 +669,72 @@ WHERE tenant_id = $1
 			wantPending,
 			wantDLQ,
 		)
+	}
+}
+
+func updateMessageOutboxAuditState(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	tenantID types.TenantID,
+	conversationID types.ConversationID,
+	aggregateVersion int64,
+	status string,
+	retryCount int,
+	lastError string,
+	published bool,
+	deadLettered bool,
+) {
+	t.Helper()
+	now := time.Date(2026, 6, 14, 13, 0, 0, 0, time.UTC)
+	var publishedAt any
+	var deadLetteredAt any
+	var nextRetryAt any
+	if published {
+		publishedAt = now
+	}
+	if deadLettered {
+		deadLetteredAt = now
+	}
+	if status == types.OutboxStatusPending && retryCount > 0 {
+		nextRetryAt = now.Add(time.Minute)
+	}
+	_, err := pool.Exec(ctx, `
+UPDATE message_outbox
+SET status = $4,
+    retry_count = $5,
+    last_error = $6,
+    next_retry_at = $7,
+    dead_lettered_at = $8,
+    published_at = $9
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND aggregate_version = $3
+`, tenantID, conversationID, aggregateVersion, status, retryCount, lastError, nextRetryAt, deadLetteredAt, publishedAt)
+	if err != nil {
+		t.Fatalf("update message outbox audit state: %v", err)
+	}
+}
+
+func updateMessageOutboxEventType(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	tenantID types.TenantID,
+	conversationID types.ConversationID,
+	aggregateVersion int64,
+	eventType string,
+) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+UPDATE message_outbox
+SET event_type = $4
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND aggregate_version = $3
+`, tenantID, conversationID, aggregateVersion, eventType)
+	if err != nil {
+		t.Fatalf("update message outbox event type: %v", err)
 	}
 }
 

@@ -3,6 +3,8 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -17,6 +19,33 @@ type OutboxStore struct {
 }
 
 type OutboxStoreOption func(*OutboxStore)
+
+type OutboxAuditOptions struct {
+	OutboxID       *int64
+	EventID        string
+	TenantID       string
+	ConversationID string
+	Status         string
+	EventType      string
+	Limit          int
+}
+
+type OutboxAuditRow struct {
+	ID               int64
+	EventID          string
+	TenantID         string
+	ConversationID   string
+	AggregateVersion int64
+	EventType        string
+	Status           string
+	RetryCount       int
+	LastError        string
+	AvailableAt      time.Time
+	NextRetryAt      *time.Time
+	DeadLetteredAt   *time.Time
+	PublishedAt      *time.Time
+	CreatedAt        time.Time
+}
 
 func NewOutboxStore(pool *pgxpool.Pool, opts ...OutboxStoreOption) *OutboxStore {
 	store := &OutboxStore{
@@ -155,6 +184,107 @@ func (s *OutboxStore) ProcessReadyBatch(
 	}
 	s.metrics.ObserveOutboxCommit(time.Since(commitStarted))
 	return stats, nil
+}
+
+func (s *OutboxStore) AuditOutbox(ctx context.Context, options OutboxAuditOptions) ([]OutboxAuditRow, error) {
+	if s.pool == nil {
+		return nil, ErrRepositoryNotConfigured
+	}
+	limit := options.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	var args []any
+	clauses := make([]string, 0, 6)
+	if options.OutboxID != nil {
+		args = append(args, *options.OutboxID)
+		clauses = append(clauses, "id = $"+strconv.Itoa(len(args)))
+	}
+	if eventID := strings.TrimSpace(options.EventID); eventID != "" {
+		args = append(args, eventID)
+		clauses = append(clauses, "event_id = $"+strconv.Itoa(len(args)))
+	}
+	if tenantID := strings.TrimSpace(options.TenantID); tenantID != "" {
+		args = append(args, tenantID)
+		clauses = append(clauses, "tenant_id = $"+strconv.Itoa(len(args)))
+	}
+	if conversationID := strings.TrimSpace(options.ConversationID); conversationID != "" {
+		args = append(args, conversationID)
+		clauses = append(clauses, "conversation_id = $"+strconv.Itoa(len(args)))
+	}
+	if rawStatus := strings.TrimSpace(options.Status); rawStatus != "" {
+		status := normalizeOutboxStatus(rawStatus)
+		if status == "" {
+			return nil, errors.New("unsupported message outbox status")
+		}
+		args = append(args, status)
+		clauses = append(clauses, "status = $"+strconv.Itoa(len(args)))
+	}
+	if eventType := strings.TrimSpace(options.EventType); eventType != "" {
+		args = append(args, eventType)
+		clauses = append(clauses, "event_type = $"+strconv.Itoa(len(args)))
+	}
+	where := ""
+	if len(clauses) > 0 {
+		where = "WHERE " + strings.Join(clauses, " AND ")
+	}
+	args = append(args, limit)
+	rows, err := s.pool.Query(ctx, `
+SELECT
+    id,
+    event_id,
+    tenant_id,
+    conversation_id,
+    aggregate_version,
+    event_type,
+    status,
+    retry_count,
+    COALESCE(last_error, ''),
+    available_at,
+    next_retry_at,
+    dead_lettered_at,
+    published_at,
+    created_at
+FROM message_outbox
+`+where+`
+ORDER BY created_at DESC, id DESC
+LIMIT $`+strconv.Itoa(len(args)), args...)
+	if err != nil {
+		return nil, types.NewDBWriteFailed(err.Error())
+	}
+	defer rows.Close()
+
+	result := make([]OutboxAuditRow, 0, limit)
+	for rows.Next() {
+		var row OutboxAuditRow
+		if err := rows.Scan(
+			&row.ID,
+			&row.EventID,
+			&row.TenantID,
+			&row.ConversationID,
+			&row.AggregateVersion,
+			&row.EventType,
+			&row.Status,
+			&row.RetryCount,
+			&row.LastError,
+			&row.AvailableAt,
+			&row.NextRetryAt,
+			&row.DeadLetteredAt,
+			&row.PublishedAt,
+			&row.CreatedAt,
+		); err != nil {
+			return nil, types.NewDBWriteFailed(err.Error())
+		}
+		result = append(result, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBWriteFailed(err.Error())
+	}
+	return result, nil
 }
 
 func (s *OutboxStore) fetchReadyLocked(ctx context.Context, tx pgx.Tx, limit int) ([]types.OutboxMessage, error) {
@@ -306,4 +436,17 @@ func retryDelay(base time.Duration, attempt int) time.Duration {
 		exponent = 10
 	}
 	return base * time.Duration(1<<exponent)
+}
+
+func normalizeOutboxStatus(status string) string {
+	switch strings.ToUpper(strings.TrimSpace(status)) {
+	case types.OutboxStatusPending:
+		return types.OutboxStatusPending
+	case types.OutboxStatusPublished:
+		return types.OutboxStatusPublished
+	case types.OutboxStatusDLQ:
+		return types.OutboxStatusDLQ
+	default:
+		return ""
+	}
 }

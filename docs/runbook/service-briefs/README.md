@@ -13,6 +13,7 @@
 - [identity-service](identity-service.md)
 - [policy-service](policy-service.md)
 - [api-gateway](api-gateway.md)
+- [search-service](search-service.md)
 
 ## 查询规则
 

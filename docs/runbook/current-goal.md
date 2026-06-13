@@ -26,9 +26,9 @@
 先继续第三层产品能力和身份安全 hardening，把系统做成可面试展示的“本地/双机可运行分布式 IM 后端”。
 
 当前优先级：
-1. identity-service TOTP / recovery-code proof 的最终事务内 lock recheck 已完成，继续按小切片推进安全 hardening。
-2. 保持 api-gateway facade、verified metadata、mTLS、push / delivery / policy / contacts / receipt 已有链路稳定。
-3. 后续再补更完整的产品能力：会话列表完善、群管理、联系人关系、回执扩展、客户端 UI。
+1. 下一步开发 `search-service v0.1`：搜索索引服务；先做 timeline event -> search projection -> `SearchMessages`。
+2. `search-service` 不绑定具体搜索中间件；索引后端必须走 port，第一版可用本地/PG adapter，后续再替换。
+3. 保持 api-gateway、identity、message、delivery、push、receipt、contacts、policy 已有链路稳定。
 4. Kafka HA、PostgreSQL failover、Redis quorum / 网络分区属于生产化后续项，不阻塞当前功能推进。
 
 演进原则：当前 9 个服务够支撑 IM 后端主链路；后续服务和中间件都不写死。只有当能力有独立数据模型、独立伸缩需求、独立故障边界，或会明显降低复杂度时才新增服务；替换中间件必须说明兼容、迁移、回滚和压测证据，并通过 ADR。

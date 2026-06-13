@@ -57,6 +57,14 @@ gateway verified metadata auth 示例：
 
 2026-06-13 补充：`-VerifiedAuthMetadata` 真实进程 smoke 已通过，验证 `SendContactRequest / ListContactRequests / RespondContactRequest / ListContacts / GetContactState` 在 metadata auth 模式下完成 accept-flow、outbox relay 和 Kafka 读回。
 
+api-gateway facade smoke 示例：
+
+```powershell
+.\loadtest\contacts\run-local-smoke.ps1 -GatewayFacade
+```
+
+该模式会启动 api-gateway，runner 通过 `nexusim.gateway.v1.GatewayService` 和 HMAC gateway token 调 contacts user-facing RPC；api-gateway 覆盖 request body `AuthContext`，再向 contacts-service metadata auth 注入 trusted identity。2026-06-14 clean smoke 已通过，summary `git_dirty=false/success=true/gateway_facade=true/gateway_auth_mode=hmac`，contacts outbox `PUBLISHED=2/PENDING=0/DLQ=0`。
+
 ## 报告列表
 
 | 报告 | 内容 |
@@ -70,6 +78,7 @@ gateway verified metadata auth 示例：
 | `loadtest-report-20260611-contacts-readd-smoke.md` | `ACCEPT -> DeleteContact -> SendContactRequest -> ACCEPT` 真实进程 smoke，验证删除后重新申请恢复和 contacts outbox 版本单调 |
 | `loadtest-report-20260613-contacts-verified-metadata-smoke.md` | `-VerifiedAuthMetadata` 真实进程 smoke，验证 metadata auth 下的 contacts accept-flow、outbox relay 和 Kafka 读回 |
 | `loadtest-report-20260613-contacts-mtls-smoke.md` | contacts-service gRPC TLS / mTLS + client DNS SAN allowlist 下的 accept-flow、outbox relay 和 Kafka 读回 |
+| `loadtest-report-20260614-contacts-api-gateway-facade-smoke.md` | api-gateway `GatewayService` facade + HMAC token 下的 contacts accept-flow、outbox relay 和 Kafka 读回 |
 
 ## 面试可讲重点
 
@@ -80,5 +89,6 @@ gateway verified metadata auth 示例：
 - `ListContacts` / `GetContactState` 从 contacts-service 自己的 read model 读取，不跨服务读其它内部表。
 - `ListContactRequests` 从 `contact_requests` 读取当前用户收到 / 发出的申请，cursor 绑定 tenant、user、direction、status 和 page size，避免跨条件串页。
 - 当前 smoke 已验证 ACCEPT 后双向 ACTIVE edge、DECLINE / CANCEL 后不创建 edge、Delete/Block/Unblock/Remark 只修改当前 owner 视角 edge、删除后重新申请可以恢复联系人关系、outbox 清空、Kafka 读回对应 contact event。
+- api-gateway facade smoke 已验证 contacts user-facing RPC 可以收敛到统一入口，客户端不需要直连 contacts-service；contacts-service 仍是事实源，api-gateway 只做鉴权、身份覆盖和转发。
 - gRPC TLS / mTLS 可以作为“服务端和 smoke 客户端的第一阶段传输安全已接通”来讲，但必须说明还没有做证书生命周期治理、动态服务身份或服务网格。
 - 后续如果要“接受好友后自动创建单聊”，应通过显式 saga / app port 编排，而不是在 contacts-service 事务里写 conversation-service 表。

@@ -44,6 +44,16 @@ gateway verified metadata auth 示例：
 
 该模式会把 demo 请求身份同时写入 user-facing gRPC metadata，用于验证 conversation / message / delivery / receipt 的 `metadata` / `verified-metadata` auth mode；request body 仍保留兼容字段。
 
+api-gateway token auth 示例：
+
+```powershell
+.\loadtest\demo\run-local-demo.ps1 `
+  -GatewayAuthMode hmac `
+  -GatewayAuthHmacSecret "local-gateway-secret"
+```
+
+该模式用于 demo runner 指向 api-gateway 时提交 gateway token，由 api-gateway 验证 token、重写下游 request `AuthContext` 并注入 trusted metadata。不要和 `-VerifiedAuthMetadata` 同时使用；前者模拟客户端经 gateway，后者只用于直接打后端服务的 smoke。
+
 gRPC mTLS + WebSocket WSS/mTLS 示例：
 
 ```powershell
@@ -73,6 +83,8 @@ gRPC mTLS + WebSocket WSS/mTLS 示例：
 ```
 
 这些参数只验证本地静态证书下的 gRPC TLS/mTLS 和 push-gateway WSS/mTLS 连接；证书签发、轮换、分发、撤销和动态服务身份治理不在 demo runner 范围内。
+
+`run-local-secure-demo.ps1` 会启动真实 api-gateway，把 conversation / message / delivery / receipt 四个 gRPC target 指向 api-gateway，并用 `GatewayAuthMode=hmac` 验证 token -> trusted metadata -> 下游 mTLS metadata auth 链路。
 
 边界：
 

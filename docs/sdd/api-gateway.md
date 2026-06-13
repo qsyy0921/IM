@@ -68,6 +68,19 @@ NEXUSIM_API_GATEWAY_MODE=grpc
 NEXUSIM_API_GATEWAY_GRPC_ADDR=0.0.0.0:12000
 ```
 
+入口 gRPC 默认 plaintext；本地 secure smoke 和后续部署可以启用静态 TLS / mTLS：
+
+```text
+NEXUSIM_API_GATEWAY_GRPC_TLS_CERT_FILE
+NEXUSIM_API_GATEWAY_GRPC_TLS_KEY_FILE
+NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_CA_FILE
+NEXUSIM_API_GATEWAY_GRPC_TLS_REQUIRE_CLIENT_CERT
+NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES
+NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_ALLOWED_URIS
+```
+
+如果启用 client cert 校验，allowlist 使用 exact-match DNS / URI SAN；这仍是第一阶段静态配置，不是证书签发、轮换、撤销或动态服务身份治理。
+
 下游地址：
 
 ```text
@@ -115,7 +128,9 @@ NEXUSIM_API_GATEWAY_RECEIPT_TLS_CLIENT_KEY_FILE
 
 后续优先级：
 
-1. 让 secure demo 的 conversation / message / delivery / receipt gRPC target 指向 api-gateway，证明真实 token -> trusted metadata -> 下游 mTLS metadata auth 链路。
-2. 增加低敏 gRPC metrics 和结构化 access log。
-3. 在 identity-service 支持 `api-gateway` audience 后收紧默认 audience。
-4. 后续拆 public facade proto，把 `GetSendContext` 从 user-facing service descriptor 中彻底移出。
+1. 增加低敏 gRPC metrics 和结构化 access log。
+2. 在 identity-service 支持 `api-gateway` audience 后收紧默认 audience。
+3. 后续拆 public facade proto，把 `GetSendContext` 从 user-facing service descriptor 中彻底移出。
+4. 继续把限流、配额、审计采样和 tracing 作为独立 production hardening，不塞进当前 proxy skeleton。
+
+2026-06-13 补充：clean commit `cff1668` 已跑通 `loadtest/demo/run-local-secure-demo.ps1` 经真实 api-gateway 的 secure E2E smoke。demo runner 对 conversation / message / delivery / receipt 的 gRPC target 均指向 api-gateway，使用 HMAC gateway token 和 desktop-client mTLS；api-gateway 再通过 mTLS 调下游，并向下游注入 trusted metadata。报告见 `docs/runbook/loadtest/demo/loadtest-report-20260613-e2e-demo-api-gateway-secure-smoke.md`，原始结果在 `H:\NexusIM\loadtest-results\e2e-demo-api-gateway-secure-smoke-20260613-clean`。

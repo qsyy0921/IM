@@ -22,6 +22,7 @@ CreateMemberChange(JOIN)
 | `loadtest-report-20260613-e2e-demo-verified-metadata-smoke.md` | 本地多进程 E2E demo smoke，验证 metadata auth 下的 notify、PullInbox、ACK、MarkRead 和未读数归零 |
 | `loadtest-report-20260613-e2e-demo-secure-mtls-wss-smoke.md` | 本地多进程 secure E2E demo smoke，验证四段 gRPC mTLS、push WSS/mTLS、push->delivery mTLS、metadata auth 和 unread 归零 |
 | `loadtest-report-20260613-e2e-demo-secure-policy-mtls-wss-smoke.md` | 本地多进程 secure E2E demo smoke，额外验证 message-service 通过 mTLS 调真实 policy-service，并发布和读回 policy decision audit Kafka event |
+| `loadtest-report-20260613-e2e-demo-api-gateway-secure-smoke.md` | 本地多进程 secure E2E demo smoke，验证 conversation / message / delivery / receipt user-facing gRPC 均经 api-gateway 入口、HMAC gateway token、gateway inbound mTLS 和下游 mTLS 后完成 unread 归零 |
 
 ## TLS / mTLS 参数
 
@@ -80,7 +81,7 @@ CreateMemberChange(JOIN)
 .\loadtest\demo\run-local-secure-demo.ps1
 ```
 
-该脚本会在 `H:\NexusIM\loadtest-results\<run>\certs` 生成短期本地 CA 和证书，启动 conversation / message / policy / delivery / receipt / push-gateway 真实进程，并运行：
+该脚本会在 `H:\NexusIM\loadtest-results\<run>\certs` 生成短期本地 CA 和证书，启动 api-gateway、conversation / message / policy / delivery / receipt / push-gateway 真实进程，并运行：
 
 ```text
 CreateMemberChange(JOIN)
@@ -92,4 +93,4 @@ CreateMemberChange(JOIN)
 -> ListConversations
 ```
 
-覆盖范围包括 conversation / message / policy / delivery / receipt gRPC mTLS、message-service -> conversation-service mTLS、message-service -> policy-service mTLS、policy decision audit outbox relay、policy audit Kafka typed read-back、push-gateway WebSocket WSS/mTLS、push-gateway -> delivery-service mTLS，以及 gateway verified metadata。它仍是本地 smoke，不是生产证书签发、轮换、分发或动态服务身份治理。
+覆盖范围包括 demo runner -> api-gateway gRPC mTLS、HMAC gateway token、api-gateway -> conversation / message / delivery / receipt 下游 gRPC mTLS、message-service -> conversation-service mTLS、message-service -> policy-service mTLS、policy decision audit outbox relay、policy audit Kafka typed read-back、push-gateway WebSocket WSS/mTLS、push-gateway -> delivery-service mTLS，以及 gateway trusted metadata 注入。它仍是本地 smoke，不是生产证书签发、轮换、分发、动态服务身份治理、限流或完整 API gateway 生产部署。

@@ -8,7 +8,7 @@
 
 ## 第一阶段范围
 
-第一阶段只代理已经存在的公开 gRPC proto service：
+第一阶段新增 `nexusim.gateway.v1.GatewayService` 作为 public facade proto，复用已有服务的 request / response message，先暴露客户端需要的公开 RPC：
 
 - `ConversationService`
 - `MessageService`
@@ -25,7 +25,7 @@ CreateMemberChange
 -> ListConversations
 ```
 
-为了复用现有 proto，gateway 直接注册这些 service 的 server interface，并调用对应下游 service client。
+为了兼容已有 smoke 和过渡期客户端，gateway 当前仍同时注册 conversation / message / delivery / receipt 的 legacy service descriptor；后续客户端应优先切到 `GatewayService`，再逐步收敛 legacy descriptor 暴露面。gateway 内部仍调用对应下游 service client。
 
 ## 鉴权与身份传播
 
@@ -55,7 +55,7 @@ gateway 会重写 request body 里的 `AuthContext`，以已验证 token 身份�
 
 ## 不暴露的接口
 
-`ConversationService/GetSendContext` 是 message-service 的服务间 read path，不作为 user-facing API 暴露。api-gateway 对该方法返回 `Unimplemented`。
+`ConversationService/GetSendContext` 是 message-service 的服务间 read path，不包含在 `GatewayService` public facade 中。兼容期 legacy `ConversationService` descriptor 仍会注册该 method，但 api-gateway 对它返回 `Unimplemented`。
 
 `PolicyService/CheckMessageAction` 也是内部策略判定面，不通过 api-gateway 暴露给客户端。
 
@@ -179,7 +179,7 @@ NEXUSIM_API_GATEWAY_RECEIPT_TLS_CLIENT_KEY_FILE
 
 后续优先级：
 
-1. 后续拆 public facade proto，把 `GetSendContext` 从 user-facing service descriptor 中彻底移出。
+1. 把 demo runner / 客户端逐步切到 `nexusim.gateway.v1.GatewayService`，再评估是否禁用 legacy service descriptor。
 2. 继续把限流、配额、审计采样和 tracing 作为独立 production hardening，不塞进当前 proxy skeleton。
 
 2026-06-13 补充：clean commit `cff1668` 已跑通 `loadtest/demo/run-local-secure-demo.ps1` 经真实 api-gateway 的 secure E2E smoke。demo runner 对 conversation / message / delivery / receipt 的 gRPC target 均指向 api-gateway，使用 HMAC gateway token 和 desktop-client mTLS；api-gateway 再通过 mTLS 调下游，并向下游注入 trusted metadata。报告见 `docs/runbook/loadtest/demo/loadtest-report-20260613-e2e-demo-api-gateway-secure-smoke.md`，原始结果在 `H:\NexusIM\loadtest-results\e2e-demo-api-gateway-secure-smoke-20260613-clean`。
@@ -189,3 +189,5 @@ NEXUSIM_API_GATEWAY_RECEIPT_TLS_CLIENT_KEY_FILE
 2026-06-13 补充：clean commit `9335bd1` 已把 api-gateway 默认 `NEXUSIM_API_GATEWAY_AUTH_AUDIENCE` 收紧为 `api-gateway`；secure demo runner 生成 `aud=api-gateway` 的 HMAC gateway token，并通过 `e2e-demo-api-gateway-audience-smoke-20260613-clean` 验证真实 api-gateway + 下游 mTLS 链路仍可完成 E2E 主流程。历史 `push-gateway` audience 仍可通过显式 env 配置兼容，但不再是 api-gateway 默认值。
 
 2026-06-13 补充：api-gateway 已补第一阶段 gRPC rate limiter，默认关闭；`local` backend 为进程内 token bucket，`redis` backend 为跨实例 fixed-window counter，并在 `/debug/metrics` 输出低敏 `rate_limit` 聚合状态。该能力不是完整产品级 quota / WAF / 风控系统。
+
+2026-06-13 补充：api-gateway 已新增第一阶段 `nexusim.gateway.v1.GatewayService` public facade proto，覆盖 conversation / message / delivery / receipt 的 user-facing RPC，并明确不包含服务间 `GetSendContext`。legacy service descriptor 暂时保留用于兼容；下一步是让 demo runner / 客户端切到 facade 后再收敛旧 descriptor。

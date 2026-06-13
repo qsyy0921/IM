@@ -13,6 +13,7 @@ protoc `
     --go-grpc_opt=paths=source_relative `
     "$ApiProtoDir/nexusim/contacts/v1/contacts_service.proto" `
     "$ApiProtoDir/nexusim/delivery/v1/delivery_service.proto" `
+    "$ApiProtoDir/nexusim/gateway/v1/gateway_service.proto" `
     "$ApiProtoDir/nexusim/identity/v1/identity_service.proto" `
     "$ApiProtoDir/nexusim/policy/v1/policy_service.proto" `
     "$ApiProtoDir/nexusim/receipt/v1/receipt_service.proto" `

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
+	gatewayv1 "github.com/qsyy0921/IM/api/proto/nexusim/gateway/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
@@ -14,6 +15,8 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
+
+var _ gatewayv1.GatewayServiceServer = (*Server)(nil)
 
 func TestSendMessageInjectsVerifiedAuthAndOverridesBody(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
@@ -177,6 +180,25 @@ func TestGatewayDoesNotExposeGetSendContext(t *testing.T) {
 	_, err := server.GetSendContext(context.Background(), &conversationv1.GetSendContextRequest{})
 	if status.Code(err) != codes.Unimplemented {
 		t.Fatalf("expected unimplemented, got %v", err)
+	}
+}
+
+func TestGatewayFacadeRegistrationExcludesInternalMethods(t *testing.T) {
+	grpcServer := grpc.NewServer()
+	Register(grpcServer, NewServer(Config{}))
+
+	info := grpcServer.GetServiceInfo()
+	facade, ok := info["nexusim.gateway.v1.GatewayService"]
+	if !ok {
+		t.Fatalf("expected gateway facade service to be registered")
+	}
+	if _, ok := info["nexusim.conversation.v1.ConversationService"]; !ok {
+		t.Fatalf("expected legacy conversation service descriptor to remain registered")
+	}
+	for _, method := range facade.Methods {
+		if method.Name == "GetSendContext" {
+			t.Fatalf("gateway facade must not expose internal GetSendContext method")
+		}
 	}
 }
 

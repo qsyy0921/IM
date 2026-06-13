@@ -9,6 +9,7 @@ import (
 
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
+	gatewayv1 "github.com/qsyy0921/IM/api/proto/nexusim/gateway/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
@@ -34,6 +35,7 @@ type Authenticator interface {
 }
 
 type Server struct {
+	gatewayv1.UnimplementedGatewayServiceServer
 	conversationv1.UnimplementedConversationServiceServer
 	messagev1.UnimplementedMessageServiceServer
 	deliveryv1.UnimplementedDeliveryServiceServer
@@ -65,6 +67,7 @@ func NewServer(config Config) *Server {
 }
 
 func Register(server grpcgo.ServiceRegistrar, gateway *Server) {
+	gatewayv1.RegisterGatewayServiceServer(server, gateway)
 	conversationv1.RegisterConversationServiceServer(server, gateway)
 	messagev1.RegisterMessageServiceServer(server, gateway)
 	deliveryv1.RegisterDeliveryServiceServer(server, gateway)

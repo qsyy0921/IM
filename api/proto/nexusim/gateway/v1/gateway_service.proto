@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package nexusim.gateway.v1;
+
+import "nexusim/conversation/v1/conversation_service.proto";
+import "nexusim/delivery/v1/delivery_service.proto";
+import "nexusim/message/v1/message_service.proto";
+import "nexusim/receipt/v1/receipt_service.proto";
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/gateway/v1;gatewayv1";
+
+// GatewayService is the first-stage public client facade.
+// It intentionally excludes service-internal RPCs such as ConversationService.GetSendContext.
+service GatewayService {
+  rpc CreateMemberChange(nexusim.conversation.v1.CreateMemberChangeRequest) returns (nexusim.conversation.v1.CreateMemberChangeResponse);
+  rpc GetMemberChange(nexusim.conversation.v1.GetMemberChangeRequest) returns (nexusim.conversation.v1.GetMemberChangeResponse);
+  rpc ListConversationMembers(nexusim.conversation.v1.ListConversationMembersRequest) returns (nexusim.conversation.v1.ListConversationMembersResponse);
+  rpc TransferConversationOwner(nexusim.conversation.v1.TransferConversationOwnerRequest) returns (nexusim.conversation.v1.TransferConversationOwnerResponse);
+
+  rpc SendMessage(nexusim.message.v1.SendMessageRequest) returns (nexusim.message.v1.SendMessageResponse);
+  rpc EditMessage(nexusim.message.v1.EditMessageRequest) returns (nexusim.message.v1.MessageChangeResponse);
+  rpc RevokeMessage(nexusim.message.v1.RevokeMessageRequest) returns (nexusim.message.v1.MessageChangeResponse);
+  rpc DeleteMessage(nexusim.message.v1.DeleteMessageRequest) returns (nexusim.message.v1.MessageChangeResponse);
+
+  rpc PullInbox(nexusim.delivery.v1.PullInboxRequest) returns (nexusim.delivery.v1.PullInboxResponse);
+  rpc AckDelivery(nexusim.delivery.v1.AckDeliveryRequest) returns (nexusim.delivery.v1.AckDeliveryResponse);
+
+  rpc MarkRead(nexusim.receipt.v1.MarkReadRequest) returns (nexusim.receipt.v1.MarkReadResponse);
+  rpc GetReceiptState(nexusim.receipt.v1.GetReceiptStateRequest) returns (nexusim.receipt.v1.GetReceiptStateResponse);
+  rpc ListReceiptStates(nexusim.receipt.v1.ListReceiptStatesRequest) returns (nexusim.receipt.v1.ListReceiptStatesResponse);
+  rpc ListConversations(nexusim.receipt.v1.ListConversationsRequest) returns (nexusim.receipt.v1.ListConversationsResponse);
+  rpc ArchiveConversation(nexusim.receipt.v1.ArchiveConversationRequest) returns (nexusim.receipt.v1.ArchiveConversationResponse);
+  rpc PinConversation(nexusim.receipt.v1.PinConversationRequest) returns (nexusim.receipt.v1.PinConversationResponse);
+  rpc MuteConversation(nexusim.receipt.v1.MuteConversationRequest) returns (nexusim.receipt.v1.MuteConversationResponse);
+}

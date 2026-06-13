@@ -5,6 +5,12 @@ param(
     [string]$RunName = "",
     [ValidateSet("accept", "decline", "cancel", "delete", "block", "unblock", "remark", "readd")]
     [string]$Scenario = "accept",
+    [string]$ContactsGrpcTlsCertFile = "",
+    [string]$ContactsGrpcTlsKeyFile = "",
+    [string]$ContactsGrpcTlsClientCaFile = "",
+    [string]$ContactsGrpcTlsRequireClientCert = "",
+    [string]$ContactsGrpcTlsClientAllowedDnsNames = "",
+    [string]$ContactsGrpcTlsClientAllowedUris = "",
     [string]$ContactsTlsCaFile = "",
     [string]$ContactsTlsServerName = "",
     [string]$ContactsTlsClientCertFile = "",
@@ -174,6 +180,12 @@ try {
         NEXUSIM_CONTACTS_AUTH_MODE = $(if ($VerifiedAuthMetadata) { "metadata" } else { "body" })
         NEXUSIM_CONTACTS_GRPC_ADDR = $contactsGrpcAddr
         NEXUSIM_PG_DSN = $PgDsn
+        NEXUSIM_CONTACTS_GRPC_TLS_CERT_FILE = $ContactsGrpcTlsCertFile
+        NEXUSIM_CONTACTS_GRPC_TLS_KEY_FILE = $ContactsGrpcTlsKeyFile
+        NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_CA_FILE = $ContactsGrpcTlsClientCaFile
+        NEXUSIM_CONTACTS_GRPC_TLS_REQUIRE_CLIENT_CERT = $ContactsGrpcTlsRequireClientCert
+        NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES = $ContactsGrpcTlsClientAllowedDnsNames
+        NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_ALLOWED_URIS = $ContactsGrpcTlsClientAllowedUris
     }
 
     $processes += Start-NexusProcess -Name "contacts-outbox-relay" -FilePath $contactsService -Env @{

@@ -2,6 +2,12 @@ param(
     [string]$PgDsn = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
+    [string]$IdentityGrpcTlsCertFile = "",
+    [string]$IdentityGrpcTlsKeyFile = "",
+    [string]$IdentityGrpcTlsClientCaFile = "",
+    [string]$IdentityGrpcTlsRequireClientCert = "",
+    [string]$IdentityGrpcTlsClientAllowedDnsNames = "",
+    [string]$IdentityGrpcTlsClientAllowedUris = "",
     [string]$IdentityTlsCaFile = "",
     [string]$IdentityTlsServerName = "",
     [string]$IdentityTlsClientCertFile = "",
@@ -122,6 +128,17 @@ function Start-NexusProcess {
     return $proc
 }
 
+function Add-OptionalEnv {
+    param(
+        [hashtable]$Env,
+        [string]$Name,
+        [string]$Value
+    )
+    if (-not [string]::IsNullOrWhiteSpace($Value)) {
+        $Env[$Name] = $Value
+    }
+}
+
 function Assert-Summary {
     param([string]$Path)
     $summary = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
@@ -160,15 +177,7 @@ try {
     $identityGrpcAddr = "127.0.0.1:$identityGrpcPort"
     $webhookAddr = "127.0.0.1:$webhookPort"
     $webhookURL = "http://$webhookAddr/challenge"
-
-    $processes += Start-NexusProcess -Name "identity-webhook" -FilePath $runner -Port $webhookPort -ArgumentList @(
-        "--mode", "webhook",
-        "--webhook-listen", $webhookAddr,
-        "--webhook-file", $webhookFile,
-        "--webhook-bearer-token", $webhookBearerToken
-    ) -Env @{}
-
-    $processes += Start-NexusProcess -Name "identity-grpc" -FilePath $identityService -Port $identityGrpcPort -Env @{
+    $identityGrpcEnv = @{
         NEXUSIM_IDENTITY_SERVICE_MODE = "grpc"
         NEXUSIM_IDENTITY_GRPC_ADDR = $identityGrpcAddr
         NEXUSIM_IDENTITY_DEBUG_ADDR = ""
@@ -178,6 +187,21 @@ try {
         NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY = $deliveryTokenKey
         NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN = "false"
     }
+    Add-OptionalEnv -Env $identityGrpcEnv -Name "NEXUSIM_IDENTITY_GRPC_TLS_CERT_FILE" -Value $IdentityGrpcTlsCertFile
+    Add-OptionalEnv -Env $identityGrpcEnv -Name "NEXUSIM_IDENTITY_GRPC_TLS_KEY_FILE" -Value $IdentityGrpcTlsKeyFile
+    Add-OptionalEnv -Env $identityGrpcEnv -Name "NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_CA_FILE" -Value $IdentityGrpcTlsClientCaFile
+    Add-OptionalEnv -Env $identityGrpcEnv -Name "NEXUSIM_IDENTITY_GRPC_TLS_REQUIRE_CLIENT_CERT" -Value $IdentityGrpcTlsRequireClientCert
+    Add-OptionalEnv -Env $identityGrpcEnv -Name "NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES" -Value $IdentityGrpcTlsClientAllowedDnsNames
+    Add-OptionalEnv -Env $identityGrpcEnv -Name "NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_ALLOWED_URIS" -Value $IdentityGrpcTlsClientAllowedUris
+
+    $processes += Start-NexusProcess -Name "identity-webhook" -FilePath $runner -Port $webhookPort -ArgumentList @(
+        "--mode", "webhook",
+        "--webhook-listen", $webhookAddr,
+        "--webhook-file", $webhookFile,
+        "--webhook-bearer-token", $webhookBearerToken
+    ) -Env @{}
+
+    $processes += Start-NexusProcess -Name "identity-grpc" -FilePath $identityService -Port $identityGrpcPort -Env $identityGrpcEnv
 
     $processes += Start-NexusProcess -Name "identity-challenge-delivery-worker" -FilePath $identityService -Env @{
         NEXUSIM_IDENTITY_SERVICE_MODE = "challenge-delivery-worker"

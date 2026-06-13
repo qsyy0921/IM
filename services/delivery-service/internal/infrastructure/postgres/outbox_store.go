@@ -16,6 +16,41 @@ type OutboxStore struct {
 	now  func() time.Time
 }
 
+type OutboxRepairAuditOptions struct {
+	OutboxID       *int64
+	EventID        string
+	TenantID       string
+	ConversationID string
+	Mode           string
+	Outcome        string
+	Limit          int
+}
+
+type OutboxRepairAuditRow struct {
+	OutboxID             int64
+	EventID              string
+	TenantID             string
+	ConversationID       string
+	AggregateVersion     int64
+	Mode                 string
+	Outcome              string
+	SkipReason           string
+	Operator             string
+	Reason               string
+	DryRun               bool
+	BeforeStatus         string
+	BeforeRetryCount     int
+	BeforeLastError      string
+	BeforeNextRetryAt    *time.Time
+	BeforeDeadLetteredAt *time.Time
+	AfterStatus          string
+	AfterRetryCount      int
+	AfterLastError       string
+	AfterNextRetryAt     *time.Time
+	AfterDeadLetteredAt  *time.Time
+	CreatedAt            time.Time
+}
+
 type OutboxStoreOption func(*OutboxStore)
 
 func NewOutboxStore(pool *pgxpool.Pool, opts ...OutboxStoreOption) *OutboxStore {
@@ -254,6 +289,127 @@ func retryDelay(base time.Duration, attempt int) time.Duration {
 	return base * time.Duration(1<<exponent)
 }
 
+func (store *OutboxStore) AuditOutboxRepairs(ctx context.Context, options OutboxRepairAuditOptions) ([]OutboxRepairAuditRow, error) {
+	if store == nil || store.pool == nil {
+		return nil, errors.New("delivery outbox store is not configured")
+	}
+	limit := options.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	var args []any
+	clauses := make([]string, 0, 6)
+	if options.OutboxID != nil {
+		args = append(args, *options.OutboxID)
+		clauses = append(clauses, "outbox_id = $"+itoa(len(args)))
+	}
+	if eventID := strings.TrimSpace(options.EventID); eventID != "" {
+		args = append(args, eventID)
+		clauses = append(clauses, "event_id = $"+itoa(len(args)))
+	}
+	if tenantID := strings.TrimSpace(options.TenantID); tenantID != "" {
+		args = append(args, tenantID)
+		clauses = append(clauses, "tenant_id = $"+itoa(len(args)))
+	}
+	if conversationID := strings.TrimSpace(options.ConversationID); conversationID != "" {
+		args = append(args, conversationID)
+		clauses = append(clauses, "conversation_id = $"+itoa(len(args)))
+	}
+	if rawMode := strings.TrimSpace(options.Mode); rawMode != "" {
+		mode := normalizeOutboxRepairMode(rawMode)
+		if mode == "" {
+			return nil, types.NewInvalidArgument("unsupported delivery outbox repair mode")
+		}
+		args = append(args, mode)
+		clauses = append(clauses, "mode = $"+itoa(len(args)))
+	}
+	if rawOutcome := strings.TrimSpace(options.Outcome); rawOutcome != "" {
+		outcome := normalizeOutboxRepairOutcome(rawOutcome)
+		if outcome == "" {
+			return nil, types.NewInvalidArgument("unsupported delivery outbox repair outcome")
+		}
+		args = append(args, outcome)
+		clauses = append(clauses, "outcome = $"+itoa(len(args)))
+	}
+	where := ""
+	if len(clauses) > 0 {
+		where = "WHERE " + strings.Join(clauses, " AND ")
+	}
+	args = append(args, limit)
+	rows, err := store.pool.Query(ctx, `
+SELECT
+    outbox_id,
+    event_id,
+    tenant_id,
+    conversation_id,
+    aggregate_version,
+    mode,
+    outcome,
+    skip_reason,
+    operator,
+    reason,
+    dry_run,
+    before_status,
+    before_retry_count,
+    before_last_error,
+    before_next_retry_at,
+    before_dead_lettered_at,
+    after_status,
+    after_retry_count,
+    after_last_error,
+    after_next_retry_at,
+    after_dead_lettered_at,
+    created_at
+FROM delivery_outbox_repair_audit
+`+where+`
+ORDER BY created_at DESC, outbox_id, id DESC
+LIMIT $`+itoa(len(args)), args...)
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	result := make([]OutboxRepairAuditRow, 0, limit)
+	for rows.Next() {
+		var row OutboxRepairAuditRow
+		if err := rows.Scan(
+			&row.OutboxID,
+			&row.EventID,
+			&row.TenantID,
+			&row.ConversationID,
+			&row.AggregateVersion,
+			&row.Mode,
+			&row.Outcome,
+			&row.SkipReason,
+			&row.Operator,
+			&row.Reason,
+			&row.DryRun,
+			&row.BeforeStatus,
+			&row.BeforeRetryCount,
+			&row.BeforeLastError,
+			&row.BeforeNextRetryAt,
+			&row.BeforeDeadLetteredAt,
+			&row.AfterStatus,
+			&row.AfterRetryCount,
+			&row.AfterLastError,
+			&row.AfterNextRetryAt,
+			&row.AfterDeadLetteredAt,
+			&row.CreatedAt,
+		); err != nil {
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		result = append(result, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	return result, nil
+}
+
 func (store *OutboxStore) RepairOutbox(ctx context.Context, options types.OutboxRepairOptions) (types.OutboxRepairStats, error) {
 	if store == nil || store.pool == nil {
 		return types.OutboxRepairStats{}, errors.New("delivery outbox store is not configured")
@@ -469,6 +625,21 @@ func normalizeOutboxRepairMode(mode string) string {
 		return types.OutboxRepairModeAudit
 	case types.OutboxRepairModeRedriveDLQPending:
 		return types.OutboxRepairModeRedriveDLQPending
+	default:
+		return ""
+	}
+}
+
+func normalizeOutboxRepairOutcome(outcome string) string {
+	switch strings.ToUpper(strings.TrimSpace(outcome)) {
+	case "":
+		return ""
+	case outboxRepairOutcomeAudited:
+		return outboxRepairOutcomeAudited
+	case outboxRepairOutcomeMutated:
+		return outboxRepairOutcomeMutated
+	case outboxRepairOutcomeSkipped:
+		return outboxRepairOutcomeSkipped
 	default:
 		return ""
 	}

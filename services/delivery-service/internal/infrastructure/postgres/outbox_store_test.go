@@ -170,6 +170,87 @@ func TestOutboxStoreRepairSkipsNonDLQIntegration(t *testing.T) {
 	assertDeliveryOutboxRepairAudit(t, ctx, pool, outboxID, types.OutboxRepairModeRedriveDLQPending, outboxRepairOutcomeSkipped, outboxRepairSkipStatusNotDLQ, types.OutboxStatusPending, 0, "", types.OutboxStatusPending, 0, "", "manual retry")
 }
 
+func TestOutboxStoreAuditOutboxRepairsReturnsLatestRowsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_outbox_repair_audit (
+    outbox_id, event_id, tenant_id, conversation_id, aggregate_version, mode, outcome, skip_reason, operator, reason, dry_run,
+    before_status, before_retry_count, before_last_error, before_next_retry_at, before_dead_lettered_at,
+    after_status, after_retry_count, after_last_error, after_next_retry_at, after_dead_lettered_at, created_at
+) VALUES
+    (11, 'event-11', 'tenant-a', 'conversation-a', 1, 'audit', 'AUDITED', '', 'operator-a', 'manual audit', true,
+     'DLQ', 1, 'malformed payload', NULL, now() - interval '1 minute',
+     'DLQ', 1, 'malformed payload', NULL, now() - interval '1 minute', now() - interval '1 minute'),
+    (12, 'event-12', 'tenant-a', 'conversation-b', 2, 'redrive-dlq-pending', 'MUTATED', '', 'operator-b', 'provider recovered', false,
+     'DLQ', 2, 'provider down', NULL, now() - interval '2 minutes',
+     'PENDING', 0, '', NULL, NULL, now())
+`)
+	if err != nil {
+		t.Fatalf("seed outbox repair audit: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	rows, err := store.AuditOutboxRepairs(ctx, OutboxRepairAuditOptions{
+		TenantID: "tenant-a",
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("audit outbox repairs: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected two rows, got %d", len(rows))
+	}
+	if rows[0].OutboxID != 12 || rows[0].Mode != types.OutboxRepairModeRedriveDLQPending || rows[0].Outcome != outboxRepairOutcomeMutated {
+		t.Fatalf("unexpected latest outbox repair audit row: %+v", rows[0])
+	}
+	if rows[1].OutboxID != 11 || rows[1].Mode != types.OutboxRepairModeAudit || rows[1].Outcome != outboxRepairOutcomeAudited || !rows[1].DryRun {
+		t.Fatalf("unexpected older outbox repair audit row: %+v", rows[1])
+	}
+}
+
+func TestOutboxStoreAuditOutboxRepairsFiltersModeAndOutcomeIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_outbox_repair_audit (
+    outbox_id, event_id, tenant_id, conversation_id, aggregate_version, mode, outcome, skip_reason, operator, reason, dry_run,
+    before_status, before_retry_count, before_last_error, before_next_retry_at, before_dead_lettered_at,
+    after_status, after_retry_count, after_last_error, after_next_retry_at, after_dead_lettered_at, created_at
+) VALUES
+    (21, 'event-21', 'tenant-b', 'conversation-a', 1, 'audit', 'AUDITED', '', 'operator-a', 'manual audit', true,
+     'DLQ', 1, 'malformed payload', NULL, NULL,
+     'DLQ', 1, 'malformed payload', NULL, NULL, now()),
+    (22, 'event-22', 'tenant-b', 'conversation-a', 2, 'redrive-dlq-pending', 'MUTATED', '', 'operator-b', 'provider recovered', false,
+     'DLQ', 2, 'provider down', NULL, NULL,
+     'PENDING', 0, '', NULL, NULL, now() - interval '1 minute')
+`)
+	if err != nil {
+		t.Fatalf("seed outbox repair audit: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	rows, err := store.AuditOutboxRepairs(ctx, OutboxRepairAuditOptions{
+		TenantID: "tenant-b",
+		Mode:     types.OutboxRepairModeAudit,
+		Outcome:  outboxRepairOutcomeAudited,
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("audit outbox repairs with filters: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one row, got %d", len(rows))
+	}
+	if rows[0].OutboxID != 21 || rows[0].Mode != types.OutboxRepairModeAudit || rows[0].Outcome != outboxRepairOutcomeAudited {
+		t.Fatalf("unexpected filtered outbox repair audit row: %+v", rows[0])
+	}
+}
+
 func seedDeliveryOutbox(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventID string, conversationID string, version int64, eventType string) {
 	t.Helper()
 	payload := fmt.Sprintf(`{"tenant_id":"tenant-delivery","user_id":"user-1","device_id":"device-1","conversation_id":%q,"conversation_seq":%d,"source_event_id":%q,"message_id":%q,"last_received_seq":%d}`, conversationID, version, "source-"+eventID, "message-"+eventID, version)

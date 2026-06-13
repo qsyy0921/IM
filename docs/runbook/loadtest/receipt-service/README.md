@@ -25,6 +25,8 @@ im.delivery.events
 
 本阶段重点不是容量，而是证明送达 / 已读回执不直接读取 `delivery-service` 内部表，而是基于 `im.delivery.events` 重建自己的 read model。
 
+2026-06-13 补充：`-VerifiedAuthMetadata` 真实进程 smoke 已通过，验证 conversation / message / delivery / receipt 四个 user-facing gRPC server 在 metadata auth 模式下完成投递、回执、会话列表、未读、归档、置顶和静音链路。
+
 ## 报告列表
 
 | 报告 | 内容 |
@@ -36,6 +38,7 @@ im.delivery.events
 | `loadtest-report-20260610-receipt-pin-smoke.md` | `PinConversation` 真实进程 smoke，验证当前用户置顶 / 取消置顶标志；PostgreSQL integration 覆盖 pinned-first 排序和 cursor |
 | `loadtest-report-20260611-receipt-mute-smoke.md` | `MuteConversation` 真实进程 smoke，验证当前用户静音 / 取消静音标志；静音不改变 unread、read cursor、delivery、push 或消息事实 |
 | `loadtest-report-20260611-receipt-unread-filter-smoke.md` | `ListConversations(unread_only=true)` 真实进程 smoke，验证投递后未读列表可见、`MarkRead` 后未读列表为空 |
+| `loadtest-report-20260613-receipt-verified-metadata-smoke.md` | `-VerifiedAuthMetadata` 真实进程 smoke，验证 metadata auth 下的 delivery / receipt / list / preference 链路 |
 
 ## TLS / mTLS smoke 参数
 

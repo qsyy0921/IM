@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -21,6 +20,7 @@ import (
 	authinfra "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/auth"
 	kafkainfra "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/kafka"
 	"github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/memory"
+	monitoringinfra "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/monitoring"
 	redisroute "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/redisroute"
 	revocationinfra "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/revocation"
 	rpcinfra "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/rpc"
@@ -103,15 +103,17 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 		return errors.New("unsupported NEXUSIM_PUSH_ROUTE_BACKEND")
 	}
 
-	metricsHandler := func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(writer).Encode(pushDebugMetrics{
-			Metrics:              localRegistry.Metrics(),
-			RedisRegistryMetrics: redisRouteRegistryMetrics(redisRegistry),
-			RedisSubscriberStats: redisRouteSubscriberMetrics(redisSubscriber),
-			AuthJWKStats:         authenticatorJWKStats(authenticator),
+	monitoringHandler := monitoringinfra.NewHandler().
+		WithMemoryMetrics(localRegistry.Metrics).
+		WithRedisRegistryMetrics(func() redisroute.Metrics {
+			return redisRouteRegistryMetrics(redisRegistry)
+		}).
+		WithRedisSubscriberMetrics(func() redisroute.Metrics {
+			return redisRouteSubscriberMetrics(redisSubscriber)
+		}).
+		WithAuthJWKStats(func() *authinfra.JWKStats {
+			return authenticatorJWKStats(authenticator)
 		})
-	}
 
 	var wsAddr string
 	if enableWS {
@@ -160,7 +162,9 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 			},
 		)
 		mux := http.NewServeMux()
-		mux.HandleFunc("/debug/metrics", metricsHandler)
+		mux.Handle("/healthz", monitoringHandler)
+		mux.Handle("/readyz", monitoringHandler)
+		mux.Handle("/debug/metrics", monitoringHandler)
 		mux.Handle("/", server)
 		wsAddr = envString("NEXUSIM_PUSH_WS_ADDR", "0.0.0.0:10496")
 		wsTLSConfig, _, err := pushWSTLSConfigFromEnv()
@@ -172,7 +176,9 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 
 	if debugAddr := envString("NEXUSIM_PUSH_DEBUG_ADDR", ""); debugAddr != "" && debugAddr != wsAddr {
 		mux := http.NewServeMux()
-		mux.HandleFunc("/debug/metrics", metricsHandler)
+		mux.Handle("/healthz", monitoringHandler)
+		mux.Handle("/readyz", monitoringHandler)
+		mux.Handle("/debug/metrics", monitoringHandler)
 		startHTTPServer(ctx, errs, "debug metrics", debugAddr, mux, nil)
 	}
 
@@ -314,13 +320,6 @@ func startHTTPServer(ctx context.Context, errs chan<- error, name string, addr s
 		defer cancel()
 		_ = httpServer.Shutdown(shutdownCtx)
 	}()
-}
-
-type pushDebugMetrics struct {
-	memory.Metrics
-	RedisRegistryMetrics redisroute.Metrics  `json:"redis_registry_metrics,omitempty"`
-	RedisSubscriberStats redisroute.Metrics  `json:"redis_subscriber_metrics,omitempty"`
-	AuthJWKStats         *authinfra.JWKStats `json:"auth_jwks,omitempty"`
 }
 
 func redisRouteRegistryMetrics(registry *redisroute.Registry) redisroute.Metrics {

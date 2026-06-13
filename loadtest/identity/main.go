@@ -79,6 +79,8 @@ type summary struct {
 	PostResetLogin             tokenSummary         `json:"post_reset_login"`
 	BeginMFAEnrollment         mfaBeginSummary      `json:"begin_mfa_enrollment"`
 	ConfirmMFAEnrollment       mfaConfirmSummary    `json:"confirm_mfa_enrollment"`
+	RefreshWithoutMFA          expectedErrorSummary `json:"refresh_without_mfa"`
+	RefreshWithMFA             tokenSummary         `json:"refresh_with_mfa"`
 	LoginWithoutMFA            expectedErrorSummary `json:"login_without_mfa"`
 	MFALogin                   tokenSummary         `json:"mfa_login"`
 	RegenerateMFARecoveryCodes mfaRegenerateSummary `json:"regenerate_mfa_recovery_codes"`
@@ -643,7 +645,7 @@ func runClientScenario(cfg config, result *summary) error {
 		return errors.New("post-reset login did not return gateway token, refresh token, and session id")
 	}
 
-	if err := runMFAScenario(ctx, cfg, client, result); err != nil {
+	if err := runMFAScenario(ctx, cfg, client, postResetLogin.GetRefreshToken(), result); err != nil {
 		return err
 	}
 
@@ -669,7 +671,7 @@ func runClientScenario(cfg config, result *summary) error {
 	return nil
 }
 
-func runMFAScenario(ctx context.Context, cfg config, client identityChallengeClient, result *summary) error {
+func runMFAScenario(ctx context.Context, cfg config, client identityChallengeClient, preMFARefreshToken string, result *summary) error {
 	beginStarted := time.Now()
 	beginCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	begin, err := client.BeginMFAEnrollment(beginCtx, &identityv1.BeginMFAEnrollmentRequest{
@@ -726,6 +728,74 @@ func runMFAScenario(ctx context.Context, cfg config, client identityChallengeCli
 	}
 	if confirm.GetStatus() != identityv1.MFAFactorStatus_MFA_FACTOR_STATUS_ACTIVE || confirm.GetVerifiedAtUnixMs() == 0 || len(confirm.GetRecoveryCodes()) == 0 {
 		return fmt.Errorf("unexpected confirm mfa response: status=%s verified_at=%d recovery_count=%d", confirm.GetStatus(), confirm.GetVerifiedAtUnixMs(), len(confirm.GetRecoveryCodes()))
+	}
+	if strings.TrimSpace(preMFARefreshToken) == "" {
+		return errors.New("pre-MFA refresh token is required for refresh step-up smoke")
+	}
+
+	refreshWithoutMFAStarted := time.Now()
+	refreshWithoutMFACtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	_, err = client.RefreshGatewayToken(refreshWithoutMFACtx, &identityv1.RefreshGatewayTokenRequest{
+		TenantId:          cfg.tenantID,
+		UserId:            cfg.userID,
+		DeviceId:          cfg.deviceID,
+		RefreshToken:      preMFARefreshToken,
+		Audience:          cfg.audience,
+		GatewayTtlSeconds: 900,
+		RefreshTtlSeconds: 3600,
+		TraceId:           "identity-challenge-delivery-outbox-smoke",
+		RequestId:         "identity-smoke-refresh-without-mfa",
+	})
+	cancel()
+	result.LatenciesMS["refresh_without_mfa"] = elapsedMS(refreshWithoutMFAStarted)
+	if err == nil {
+		return errors.New("refresh without mfa unexpectedly succeeded after factor activation")
+	}
+	result.RefreshWithoutMFA = expectedErrorSummary{Occurred: true, Code: status.Code(err).String()}
+	if status.Code(err) != codes.FailedPrecondition {
+		return fmt.Errorf("refresh without mfa returned %s, want %s: %w", status.Code(err), codes.FailedPrecondition, err)
+	}
+
+	refreshWithMFACode := generateTOTPCode(begin.GetSecret(), time.Now().UTC())
+	if refreshWithMFACode == "" {
+		return errors.New("failed to generate totp code for refresh step-up")
+	}
+	refreshWithMFAStarted := time.Now()
+	refreshWithMFACtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	refreshWithMFA, err := client.RefreshGatewayToken(refreshWithMFACtx, &identityv1.RefreshGatewayTokenRequest{
+		TenantId:          cfg.tenantID,
+		UserId:            cfg.userID,
+		DeviceId:          cfg.deviceID,
+		RefreshToken:      preMFARefreshToken,
+		Audience:          cfg.audience,
+		GatewayTtlSeconds: 900,
+		RefreshTtlSeconds: 3600,
+		TraceId:           "identity-challenge-delivery-outbox-smoke",
+		RequestId:         "identity-smoke-refresh-with-mfa",
+		MfaFactorId:       begin.GetFactorId(),
+		MfaCode:           refreshWithMFACode,
+	})
+	cancel()
+	result.LatenciesMS["refresh_with_mfa"] = elapsedMS(refreshWithMFAStarted)
+	if err != nil {
+		return fmt.Errorf("refresh with mfa: %w", err)
+	}
+	result.RefreshWithMFA = tokenSummary{
+		Audience:               refreshWithMFA.GetAudience(),
+		TokenType:              refreshWithMFA.GetTokenType(),
+		SessionIDSet:           refreshWithMFA.GetSessionId() != "",
+		GatewayTokenSet:        refreshWithMFA.GetGatewayToken() != "",
+		RefreshTokenSet:        refreshWithMFA.GetRefreshToken() != "",
+		RefreshTokenRotated:    refreshWithMFA.GetRefreshToken() != "" && refreshWithMFA.GetRefreshToken() != preMFARefreshToken,
+		GatewayExpiresAtUnixMS: refreshWithMFA.GetGatewayExpiresAtUnixMs(),
+		RefreshExpiresAtUnixMS: refreshWithMFA.GetRefreshExpiresAtUnixMs(),
+		IssuedAtUnixMS:         refreshWithMFA.GetIssuedAtUnixMs(),
+	}
+	if refreshWithMFA.GetGatewayToken() == "" || refreshWithMFA.GetRefreshToken() == "" || refreshWithMFA.GetSessionId() == "" {
+		return errors.New("refresh with mfa did not return gateway token, refresh token, and session id")
+	}
+	if refreshWithMFA.GetRefreshToken() == preMFARefreshToken {
+		return errors.New("refresh with mfa did not rotate refresh token")
 	}
 
 	loginWithoutMFAStarted := time.Now()

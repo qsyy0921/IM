@@ -54,6 +54,8 @@ func run() error {
 		return runProjectionCheckpointRepair()
 	case "projection-checkpoint-repair-audit":
 		return runProjectionCheckpointRepairAudit()
+	case "projection-checkpoint-repair-cleanup":
+		return runProjectionCheckpointRepairCleanup()
 	case "projection-failure-audit":
 		return runProjectionFailureAudit()
 	case "projection-failure-cleanup":
@@ -459,7 +461,53 @@ func runProjectionFailureCleanup() error {
 	return nil
 }
 
+func runProjectionCheckpointRepairCleanup() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	config, err := projectionCheckpointRepairCleanupConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	cutoff := time.Now().UTC().Add(-config.Retention)
+	stats, err := postgresinfra.NewProjectionRepairStore(pool).CleanupCheckpointRepairs(ctx, postgresinfra.ProjectionRepairCleanupOptions{
+		ConsumerGroup: envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_CONSUMER_GROUP", ""),
+		Topic:         envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_TOPIC", "conversation.timeline.events"),
+		PartitionID:   projectionCheckpointRepairCleanupPartitionID(),
+		Mode:          envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_MODE", ""),
+		Outcome:       envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_OUTCOME", ""),
+		Cutoff:        cutoff,
+		Limit:         config.BatchSize,
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"delivery-service projection checkpoint repair cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d",
+		stats.Deleted,
+		cutoff.Format(time.RFC3339),
+		config.Retention,
+		config.BatchSize,
+	)
+	return nil
+}
+
 type projectionFailureCleanupConfig struct {
+	Retention time.Duration
+	BatchSize int
+}
+
+type projectionCheckpointRepairCleanupConfig struct {
 	Retention time.Duration
 	BatchSize int
 }
@@ -479,12 +527,36 @@ func projectionFailureCleanupConfigFromEnv() (projectionFailureCleanupConfig, er
 	}, nil
 }
 
+func projectionCheckpointRepairCleanupConfigFromEnv() (projectionCheckpointRepairCleanupConfig, error) {
+	retention, err := envPositiveDuration("NEXUSIM_DELIVERY_PROJECTION_REPAIR_RETENTION", 7*24*time.Hour)
+	if err != nil {
+		return projectionCheckpointRepairCleanupConfig{}, err
+	}
+	batchSize, err := envPositiveInt("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_BATCH_SIZE", 5000)
+	if err != nil {
+		return projectionCheckpointRepairCleanupConfig{}, err
+	}
+	return projectionCheckpointRepairCleanupConfig{
+		Retention: retention,
+		BatchSize: batchSize,
+	}, nil
+}
+
 func projectionFailureCleanupPartitionID() *int32 {
 	value := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_PARTITION_ID"))
 	if value == "" {
 		return nil
 	}
 	parsed := int32(envIntAllowZero("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_PARTITION_ID", 0))
+	return &parsed
+}
+
+func projectionCheckpointRepairCleanupPartitionID() *int32 {
+	value := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_PARTITION_ID"))
+	if value == "" {
+		return nil
+	}
+	parsed := int32(envIntAllowZero("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_PARTITION_ID", 0))
 	return &parsed
 }
 

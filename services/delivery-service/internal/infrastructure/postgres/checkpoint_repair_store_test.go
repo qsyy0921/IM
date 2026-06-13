@@ -262,6 +262,118 @@ INSERT INTO delivery_projection_checkpoint_repair_audit (
 	}
 }
 
+func TestProjectionRepairStoreCleanupCheckpointRepairsDeletesOnlyExpiredRowsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_checkpoint_repair_audit (
+    consumer_group, topic, partition_id, mode, outcome, skip_reason, operator, reason, dry_run, before_offset_value, after_offset_value, failure_offset_value, failure_event_id, failure_class, created_at
+) VALUES
+    ('group-c', 'conversation.timeline.events', 0, 'audit', 'AUDITED', '', 'operator-a', 'repair-a', true, 42, 42, NULL, '', '', now() - interval '10 days'),
+    ('group-c', 'conversation.timeline.events', 0, 'rewind-next-offset', 'MUTATED', '', 'operator-b', 'repair-b', false, 42, 21, NULL, '', '', now() - interval '1 day')
+`)
+	if err != nil {
+		t.Fatalf("seed checkpoint repair audit: %v", err)
+	}
+
+	store := NewProjectionRepairStore(pool)
+	stats, err := store.CleanupCheckpointRepairs(ctx, ProjectionRepairCleanupOptions{
+		ConsumerGroup: "group-c",
+		Topic:         "conversation.timeline.events",
+		Cutoff:        time.Now().UTC().Add(-7 * 24 * time.Hour),
+		Limit:         10,
+	})
+	if err != nil {
+		t.Fatalf("cleanup checkpoint repairs: %v", err)
+	}
+	if stats.Deleted != 1 {
+		t.Fatalf("unexpected deleted count: %+v", stats)
+	}
+	assertCheckpointRepairAuditCount(t, ctx, pool, "group-c", "conversation.timeline.events", 0, 1)
+}
+
+func TestProjectionRepairStoreCleanupCheckpointRepairsHonorsBatchLimitIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_checkpoint_repair_audit (
+    consumer_group, topic, partition_id, mode, outcome, skip_reason, operator, reason, dry_run, before_offset_value, after_offset_value, failure_offset_value, failure_event_id, failure_class, created_at
+) VALUES
+    ('group-d', 'conversation.timeline.events', 0, 'audit', 'AUDITED', '', 'operator-a', 'repair-a', true, 42, 42, NULL, '', '', now() - interval '10 days'),
+    ('group-d', 'conversation.timeline.events', 0, 'rewind-next-offset', 'MUTATED', '', 'operator-b', 'repair-b', false, 42, 21, NULL, '', '', now() - interval '9 days')
+`)
+	if err != nil {
+		t.Fatalf("seed checkpoint repair audit: %v", err)
+	}
+
+	store := NewProjectionRepairStore(pool)
+	stats, err := store.CleanupCheckpointRepairs(ctx, ProjectionRepairCleanupOptions{
+		ConsumerGroup: "group-d",
+		Topic:         "conversation.timeline.events",
+		Cutoff:        time.Now().UTC().Add(-7 * 24 * time.Hour),
+		Limit:         1,
+	})
+	if err != nil {
+		t.Fatalf("cleanup checkpoint repairs: %v", err)
+	}
+	if stats.Deleted != 1 {
+		t.Fatalf("unexpected deleted count: %+v", stats)
+	}
+	assertCheckpointRepairAuditCount(t, ctx, pool, "group-d", "conversation.timeline.events", 0, 1)
+}
+
+func TestProjectionRepairStoreCleanupCheckpointRepairsFiltersModeAndOutcomeIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_checkpoint_repair_audit (
+    consumer_group, topic, partition_id, mode, outcome, skip_reason, operator, reason, dry_run, before_offset_value, after_offset_value, failure_offset_value, failure_event_id, failure_class, created_at
+) VALUES
+    ('group-e', 'conversation.timeline.events', 0, 'audit', 'AUDITED', '', 'operator-a', 'repair-a', true, 42, 42, NULL, '', '', now() - interval '10 days'),
+    ('group-e', 'conversation.timeline.events', 0, 'rewind-next-offset', 'MUTATED', '', 'operator-b', 'repair-b', false, 42, 21, NULL, '', '', now() - interval '10 days')
+`)
+	if err != nil {
+		t.Fatalf("seed checkpoint repair audit: %v", err)
+	}
+
+	store := NewProjectionRepairStore(pool)
+	stats, err := store.CleanupCheckpointRepairs(ctx, ProjectionRepairCleanupOptions{
+		ConsumerGroup: "group-e",
+		Topic:         "conversation.timeline.events",
+		Mode:          types.ProjectionCheckpointRepairModeAudit,
+		Outcome:       checkpointRepairOutcomeAudited,
+		Cutoff:        time.Now().UTC().Add(-7 * 24 * time.Hour),
+		Limit:         10,
+	})
+	if err != nil {
+		t.Fatalf("cleanup checkpoint repairs with filters: %v", err)
+	}
+	if stats.Deleted != 1 {
+		t.Fatalf("unexpected deleted count: %+v", stats)
+	}
+
+	rows, err := store.AuditCheckpointRepairs(ctx, ProjectionRepairAuditOptions{
+		ConsumerGroup: "group-e",
+		Topic:         "conversation.timeline.events",
+		Limit:         10,
+	})
+	if err != nil {
+		t.Fatalf("audit checkpoint repairs after cleanup: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one row after cleanup, got %d", len(rows))
+	}
+	if rows[0].Mode != types.ProjectionCheckpointRepairModeRewindNextOffset || rows[0].Outcome != checkpointRepairOutcomeMutated {
+		t.Fatalf("unexpected remaining repair audit row: %+v", rows[0])
+	}
+}
+
 func seedDeliveryCheckpoint(t *testing.T, ctx context.Context, pool *pgxpool.Pool, consumerGroup string, topic string, partitionID int32, offsetValue int64) {
 	t.Helper()
 	if _, err := pool.Exec(ctx, `
@@ -359,5 +471,22 @@ LIMIT 1
 	}
 	if gotFailureOffset == nil || *gotFailureOffset != failureOffset || gotFailureEventID != failureEventID || gotFailureClass != failureClass {
 		t.Fatalf("unexpected failure audit fields: offset=%v event=%s class=%s", gotFailureOffset, gotFailureEventID, gotFailureClass)
+	}
+}
+
+func assertCheckpointRepairAuditCount(t *testing.T, ctx context.Context, pool *pgxpool.Pool, consumerGroup string, topic string, partitionID int32, wantCount int64) {
+	t.Helper()
+	var gotCount int64
+	if err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM delivery_projection_checkpoint_repair_audit
+WHERE consumer_group = $1
+  AND topic = $2
+  AND partition_id = $3
+`, consumerGroup, topic, partitionID).Scan(&gotCount); err != nil {
+		t.Fatalf("count checkpoint repair audit rows: %v", err)
+	}
+	if gotCount != wantCount {
+		t.Fatalf("unexpected checkpoint repair audit count: got=%d want=%d", gotCount, wantCount)
 	}
 }

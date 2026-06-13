@@ -25,6 +25,20 @@ type ProjectionRepairAuditOptions struct {
 	Limit         int
 }
 
+type ProjectionRepairCleanupOptions struct {
+	ConsumerGroup string
+	Topic         string
+	PartitionID   *int32
+	Mode          string
+	Outcome       string
+	Cutoff        time.Time
+	Limit         int
+}
+
+type ProjectionRepairCleanupStats struct {
+	Deleted int64
+}
+
 type ProjectionRepairAuditRow struct {
 	ConsumerGroup string
 	Topic         string
@@ -288,6 +302,75 @@ LIMIT $`+itoa(len(args)), args...)
 		return nil, types.NewDBReadFailed(err.Error())
 	}
 	return result, nil
+}
+
+func (store *ProjectionRepairStore) CleanupCheckpointRepairs(ctx context.Context, options ProjectionRepairCleanupOptions) (ProjectionRepairCleanupStats, error) {
+	if store == nil || store.pool == nil {
+		return ProjectionRepairCleanupStats{}, errors.New("delivery projection repair store is not configured")
+	}
+	if options.Limit <= 0 {
+		return ProjectionRepairCleanupStats{}, nil
+	}
+	topic := strings.TrimSpace(options.Topic)
+	if topic == "" {
+		topic = "conversation.timeline.events"
+	}
+
+	var args []any
+	clauses := []string{"topic = $1", "created_at < $2"}
+	args = append(args, topic, options.Cutoff)
+	if consumerGroup := strings.TrimSpace(options.ConsumerGroup); consumerGroup != "" {
+		args = append(args, consumerGroup)
+		clauses = append(clauses, "consumer_group = $"+itoa(len(args)))
+	}
+	if options.PartitionID != nil {
+		args = append(args, *options.PartitionID)
+		clauses = append(clauses, "partition_id = $"+itoa(len(args)))
+	}
+	if rawMode := strings.TrimSpace(options.Mode); rawMode != "" {
+		mode := normalizeProjectionRepairMode(rawMode)
+		if mode == "" {
+			return ProjectionRepairCleanupStats{}, types.NewInvalidArgument("unsupported delivery projection repair mode")
+		}
+		args = append(args, mode)
+		clauses = append(clauses, "mode = $"+itoa(len(args)))
+	}
+	if rawOutcome := strings.TrimSpace(options.Outcome); rawOutcome != "" {
+		outcome := normalizeProjectionRepairOutcome(rawOutcome)
+		if outcome == "" {
+			return ProjectionRepairCleanupStats{}, types.NewInvalidArgument("unsupported delivery projection repair outcome")
+		}
+		args = append(args, outcome)
+		clauses = append(clauses, "outcome = $"+itoa(len(args)))
+	}
+	args = append(args, options.Limit)
+	rows, err := store.pool.Query(ctx, `
+WITH doomed AS (
+    SELECT id
+    FROM delivery_projection_checkpoint_repair_audit
+    WHERE `+strings.Join(clauses, " AND ")+`
+    ORDER BY created_at ASC, consumer_group, topic, partition_id, id ASC
+    LIMIT $`+itoa(len(args))+`
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM delivery_projection_checkpoint_repair_audit target
+USING doomed
+WHERE target.id = doomed.id
+RETURNING 1
+`, args...)
+	if err != nil {
+		return ProjectionRepairCleanupStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer rows.Close()
+
+	var stats ProjectionRepairCleanupStats
+	for rows.Next() {
+		stats.Deleted++
+	}
+	if err := rows.Err(); err != nil {
+		return ProjectionRepairCleanupStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	return stats, nil
 }
 
 type checkpointRepairRow struct {

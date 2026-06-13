@@ -59,6 +59,22 @@ loadtest runner
 debug metrics
 ```
 
+`loadtest/sendmessage` 压测器默认仍使用 plaintext gRPC；如果 message-service gRPC server 开启第一阶段静态 TLS / mTLS，可通过以下参数或对应环境变量切到 TLS：
+
+```text
+--message-tls-ca-file
+--message-tls-server-name
+--message-tls-client-cert-file
+--message-tls-client-key-file
+
+NEXUSIM_MESSAGE_TLS_CA_FILE
+NEXUSIM_MESSAGE_TLS_SERVER_NAME
+NEXUSIM_MESSAGE_TLS_CLIENT_CERT_FILE
+NEXUSIM_MESSAGE_TLS_CLIENT_KEY_FILE
+```
+
+这只覆盖压测器到 message-service 的 gRPC transport security，仍不包含证书签发、轮换、分发或动态服务身份治理。
+
 本阶段没有覆盖：
 
 ```text

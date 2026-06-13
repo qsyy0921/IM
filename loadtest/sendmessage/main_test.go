@@ -363,16 +363,20 @@ func TestCommitInfoFromEnv(t *testing.T) {
 
 func TestParseConfigUsesEnvironment(t *testing.T) {
 	env := map[string]string{
-		"NEXUSIM_TARGET":              "127.0.0.1:10495,127.0.0.1:10501",
-		"NEXUSIM_VUS":                 "3",
-		"NEXUSIM_DURATION":            "5s",
-		"NEXUSIM_RESULT_DIR":          "loadtest/results/test",
-		"NEXUSIM_CONVERSATION_COUNT":  "2",
-		"NEXUSIM_SERVICE_METRICS_URL": "127.0.0.1:10498",
-		"NEXUSIM_RELAY_METRICS_URL":   "127.0.0.1:10499",
-		"NEXUSIM_RETRY_OVERLOADED":    "true",
-		"NEXUSIM_MAX_RETRIES":         "2",
-		"NEXUSIM_RETRY_JITTER":        "25ms",
+		"NEXUSIM_TARGET":                       "127.0.0.1:10495,127.0.0.1:10501",
+		"NEXUSIM_VUS":                          "3",
+		"NEXUSIM_DURATION":                     "5s",
+		"NEXUSIM_RESULT_DIR":                   "loadtest/results/test",
+		"NEXUSIM_CONVERSATION_COUNT":           "2",
+		"NEXUSIM_SERVICE_METRICS_URL":          "127.0.0.1:10498",
+		"NEXUSIM_RELAY_METRICS_URL":            "127.0.0.1:10499",
+		"NEXUSIM_RETRY_OVERLOADED":             "true",
+		"NEXUSIM_MAX_RETRIES":                  "2",
+		"NEXUSIM_RETRY_JITTER":                 "25ms",
+		"NEXUSIM_MESSAGE_TLS_CA_FILE":          "certs/ca.crt",
+		"NEXUSIM_MESSAGE_TLS_SERVER_NAME":      "message-service.nexusim.local",
+		"NEXUSIM_MESSAGE_TLS_CLIENT_CERT_FILE": "certs/client.crt",
+		"NEXUSIM_MESSAGE_TLS_CLIENT_KEY_FILE":  "certs/client.key",
 	}
 	cfg, err := parseConfig(nil, func(name string) string { return env[name] })
 	if err != nil {
@@ -387,7 +391,11 @@ func TestParseConfigUsesEnvironment(t *testing.T) {
 		cfg.RelayMetricsURL != "127.0.0.1:10499" ||
 		!cfg.RetryOverloaded ||
 		cfg.MaxRetries != 2 ||
-		cfg.RetryJitter != 25*time.Millisecond {
+		cfg.RetryJitter != 25*time.Millisecond ||
+		cfg.MessageTLS.CAFile != "certs/ca.crt" ||
+		cfg.MessageTLS.ServerName != "message-service.nexusim.local" ||
+		cfg.MessageTLS.ClientCertFile != "certs/client.crt" ||
+		cfg.MessageTLS.ClientKeyFile != "certs/client.key" {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 }

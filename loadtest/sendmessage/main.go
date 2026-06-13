@@ -21,9 +21,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
+	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -44,6 +44,7 @@ type config struct {
 	RetryOverloaded    bool
 	MaxRetries         int
 	RetryJitter        time.Duration
+	MessageTLS         grpctls.Config
 }
 
 type sample struct {
@@ -69,6 +70,7 @@ type summary struct {
 	GitStatusShort                        string                     `json:"git_status_short"`
 	Target                                string                     `json:"target"`
 	Targets                               []string                   `json:"targets,omitempty"`
+	MessageTLSEnabled                     bool                       `json:"message_tls_enabled"`
 	TenantID                              string                     `json:"tenant_id"`
 	VUs                                   int                        `json:"vus"`
 	Duration                              string                     `json:"duration"`
@@ -241,11 +243,15 @@ func run(args []string, getenv func(string) string) error {
 	if err != nil {
 		return err
 	}
+	dialOption, err := grpctls.DialOption(cfg.MessageTLS, "message-tls")
+	if err != nil {
+		return err
+	}
 
 	clients := make([]loadClient, 0, len(grpcTargets))
 	conns := make([]*grpc.ClientConn, 0, len(grpcTargets))
 	for _, grpcTarget := range grpcTargets {
-		conn, err := grpc.NewClient(grpcTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		conn, err := grpc.NewClient(grpcTarget, dialOption)
 		if err != nil {
 			for _, existing := range conns {
 				_ = existing.Close()
@@ -467,6 +473,10 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	flags.BoolVar(&cfg.RetryOverloaded, "retry-overloaded", envBool(getenv, "NEXUSIM_RETRY_OVERLOADED", false), "retry SERVICE_OVERLOADED using gRPC RetryInfo")
 	flags.IntVar(&cfg.MaxRetries, "max-retries", envInt(getenv, "NEXUSIM_MAX_RETRIES", 0), "max retry attempts for one logical request when --retry-overloaded is enabled")
 	flags.DurationVar(&cfg.RetryJitter, "retry-jitter", envDurationAllowZero(getenv, "NEXUSIM_RETRY_JITTER", 0), "max deterministic jitter added to overload retry delay")
+	flags.StringVar(&cfg.MessageTLS.CAFile, "message-tls-ca-file", envString(getenv, "NEXUSIM_MESSAGE_TLS_CA_FILE", ""), "CA PEM for message-service gRPC TLS")
+	flags.StringVar(&cfg.MessageTLS.ServerName, "message-tls-server-name", envString(getenv, "NEXUSIM_MESSAGE_TLS_SERVER_NAME", ""), "override server name for message-service gRPC TLS")
+	flags.StringVar(&cfg.MessageTLS.ClientCertFile, "message-tls-client-cert-file", envString(getenv, "NEXUSIM_MESSAGE_TLS_CLIENT_CERT_FILE", ""), "client certificate PEM for message-service gRPC mTLS")
+	flags.StringVar(&cfg.MessageTLS.ClientKeyFile, "message-tls-client-key-file", envString(getenv, "NEXUSIM_MESSAGE_TLS_CLIENT_KEY_FILE", ""), "client private key PEM for message-service gRPC mTLS")
 	if err := flags.Parse(args); err != nil {
 		return config{}, err
 	}
@@ -692,6 +702,7 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 		GitStatusShort:                  commit.StatusShort,
 		Target:                          cfg.Target,
 		Targets:                         clientTargets(clients),
+		MessageTLSEnabled:               cfg.MessageTLS.Enabled(),
 		TenantID:                        cfg.TenantID,
 		VUs:                             cfg.VUs,
 		Duration:                        cfg.Duration.String(),

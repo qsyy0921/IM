@@ -29,6 +29,7 @@ Implemented:
 - policy-service decision audit DLQ repair smoke for explicit event-id redrive: `loadtest-report-20260613-policy-decision-audit-repair-smoke.md`.
 - policy-service decision audit repair validation smoke after preflight gate: `loadtest-report-20260613-policy-decision-audit-repair-validated-smoke.md`.
 - policy-service 还补了只读 `outbox-repair-audit` 运维模式，方便直接审计 decision audit outbox repair 历史；它不直接 redrive，也不会修改当前 outbox 状态。
+- policy-service 还补了 `outbox-repair-cleanup` 运维模式，方便按 retention / scope 清理 `policy_decision_audit_outbox_repair_audit` 历史；它只删除 repair audit 记录，不修改当前 outbox 状态。
 - policy-service tenant-level message action rule smoke for `tenant_id + action` defaults across `SEND`, `EDIT`, `REVOKE`, and `DELETE`: `loadtest-report-20260613-policy-message-tenant-rule-smoke.md`.
 - policy-service conversation role gate Kafka smoke for `conversation.timeline.events -> policy_conversation_members_projection -> CheckMessageAction`: `loadtest-report-20260613-policy-conversation-role-smoke.md`.
 - message-service `SendMessage` role gate integration smoke through `policy-service CheckMessageAction`: `loadtest-report-20260613-policy-message-role-gate-smoke.md`.
@@ -202,3 +203,5 @@ The decision audit repair smoke proves the first-stage operator path for explici
 ```
 
 `NEXUSIM_POLICY_SERVICE_MODE=outbox-repair` only resets explicitly supplied DLQ rows back to `PENDING`, clears retry state, and writes `policy_decision_audit_outbox_repair_audit`. Before redrive, it validates the event through the same policy-event builder used by the relay. Invalid envelope or payload rows stay in `DLQ`, get a `SKIPPED / validation_failed` repair audit row, and make the operator exit non-zero. The repair mode does not publish Kafka directly, skip ordered blockers, rewrite payloads, repair all DLQ rows, implement retention, or send audit data to an external sink. After repair, the normal outbox relay remains responsible for publishing to `im.policy.events`.
+
+`NEXUSIM_POLICY_SERVICE_MODE=outbox-repair-cleanup` is the local retention operator for `policy_decision_audit_outbox_repair_audit`. It deletes oldest repair audit rows before `now - retention`, supports optional `event_id / tenant_id / repair_operator / repair_outcome` filters for scoped cleanup, and never mutates live `policy_decision_audit_outbox` rows.

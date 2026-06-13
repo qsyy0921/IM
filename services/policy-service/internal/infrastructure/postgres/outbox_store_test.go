@@ -458,6 +458,131 @@ INSERT INTO policy_decision_audit_outbox_repair_audit (
 	}
 }
 
+func TestOutboxStoreCleanupOutboxRepairsDeletesOnlyExpiredRowsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_decision_audit_outbox_repair_audit (
+    event_id, tenant_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at,
+    repair_operator, repair_reason, repair_outcome, skip_reason, repaired_at
+) VALUES
+    ('cleanup-policy-event-old-1', 'tenant-cleanup', 'DLQ', 1, 'publish failed', now() - interval '2 hours', 'operator-a', 'manual repair', 'REPAIRED', '', now() - interval '2 hours'),
+    ('cleanup-policy-event-old-2', 'tenant-cleanup', 'DLQ', 2, 'validation failed', now() - interval '90 minutes', 'operator-b', 'manual validation', 'SKIPPED', 'validation_failed', now() - interval '90 minutes'),
+    ('cleanup-policy-event-fresh', 'tenant-cleanup', 'DLQ', 1, 'recent failure', now() - interval '10 minutes', 'operator-a', 'manual repair', 'REPAIRED', '', now() - interval '10 minutes')
+`)
+	if err != nil {
+		t.Fatalf("seed cleanup policy outbox repair audit: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	stats, err := store.CleanupOutboxRepairs(ctx, OutboxRepairCleanupOptions{
+		TenantID: "tenant-cleanup",
+		Cutoff:   time.Now().UTC().Add(-30 * time.Minute),
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("cleanup policy outbox repairs: %v", err)
+	}
+	if stats.Deleted != 2 {
+		t.Fatalf("expected 2 deleted rows, got %+v", stats)
+	}
+	assertPolicyAuditOutboxRepairAuditCount(t, ctx, pool, "tenant-cleanup", 1)
+}
+
+func TestOutboxStoreCleanupOutboxRepairsHonorsBatchLimitIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_decision_audit_outbox_repair_audit (
+    event_id, tenant_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at,
+    repair_operator, repair_reason, repair_outcome, skip_reason, repaired_at
+) VALUES
+    ('cleanup-policy-batch-1', 'tenant-batch', 'DLQ', 1, 'error 1', now() - interval '4 hours', 'operator-a', 'manual repair', 'REPAIRED', '', now() - interval '4 hours'),
+    ('cleanup-policy-batch-2', 'tenant-batch', 'DLQ', 1, 'error 2', now() - interval '3 hours', 'operator-a', 'manual repair', 'REPAIRED', '', now() - interval '3 hours'),
+    ('cleanup-policy-batch-3', 'tenant-batch', 'DLQ', 1, 'error 3', now() - interval '2 hours', 'operator-a', 'manual repair', 'REPAIRED', '', now() - interval '2 hours')
+`)
+	if err != nil {
+		t.Fatalf("seed batch cleanup policy outbox repair audit: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	stats, err := store.CleanupOutboxRepairs(ctx, OutboxRepairCleanupOptions{
+		TenantID: "tenant-batch",
+		Cutoff:   time.Now().UTC().Add(-30 * time.Minute),
+		Limit:    2,
+	})
+	if err != nil {
+		t.Fatalf("cleanup policy outbox repairs with limit: %v", err)
+	}
+	if stats.Deleted != 2 {
+		t.Fatalf("expected 2 deleted rows, got %+v", stats)
+	}
+	assertPolicyAuditOutboxRepairAuditCount(t, ctx, pool, "tenant-batch", 1)
+}
+
+func TestOutboxStoreCleanupOutboxRepairsFiltersOperatorAndOutcomeIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_decision_audit_outbox_repair_audit (
+    event_id, tenant_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at,
+    repair_operator, repair_reason, repair_outcome, skip_reason, repaired_at
+) VALUES
+    ('cleanup-policy-filter-match', 'tenant-filter', 'DLQ', 1, 'publish failed', now() - interval '2 hours', 'operator-match', 'manual repair', 'SKIPPED', 'validation_failed', now() - interval '2 hours'),
+    ('cleanup-policy-filter-operator', 'tenant-filter', 'DLQ', 1, 'publish failed', now() - interval '2 hours', 'operator-other', 'manual repair', 'SKIPPED', 'validation_failed', now() - interval '2 hours'),
+    ('cleanup-policy-filter-outcome', 'tenant-filter', 'DLQ', 1, 'publish failed', now() - interval '2 hours', 'operator-match', 'manual repair', 'REPAIRED', '', now() - interval '2 hours')
+`)
+	if err != nil {
+		t.Fatalf("seed filtered cleanup policy outbox repair audit: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	stats, err := store.CleanupOutboxRepairs(ctx, OutboxRepairCleanupOptions{
+		TenantID: "tenant-filter",
+		Operator: "operator-match",
+		Outcome:  "skipped",
+		Cutoff:   time.Now().UTC().Add(-30 * time.Minute),
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("cleanup policy outbox repairs with filters: %v", err)
+	}
+	if stats.Deleted != 1 {
+		t.Fatalf("expected 1 deleted row, got %+v", stats)
+	}
+
+	var remaining []string
+	rows, err := pool.Query(ctx, `
+SELECT event_id
+FROM policy_decision_audit_outbox_repair_audit
+WHERE tenant_id = 'tenant-filter'
+ORDER BY event_id
+`)
+	if err != nil {
+		t.Fatalf("query remaining cleanup rows: %v", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var eventID string
+		if err := rows.Scan(&eventID); err != nil {
+			t.Fatalf("scan remaining cleanup row: %v", err)
+		}
+		remaining = append(remaining, eventID)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate remaining cleanup rows: %v", err)
+	}
+	if len(remaining) != 2 || remaining[0] != "cleanup-policy-filter-operator" || remaining[1] != "cleanup-policy-filter-outcome" {
+		t.Fatalf("unexpected remaining cleanup rows: %v", remaining)
+	}
+}
+
 func assertPolicyAuditOutboxStatusCount(t *testing.T, ctx context.Context, pool *pgxpool.Pool, status string, want int) {
 	t.Helper()
 	var got int
@@ -472,6 +597,22 @@ WHERE tenant_id = 'tenant-policy'
 	}
 	if got != want {
 		t.Fatalf("expected %d policy audit outbox rows with status %s, got %d", want, status, got)
+	}
+}
+
+func assertPolicyAuditOutboxRepairAuditCount(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID string, want int) {
+	t.Helper()
+	var got int
+	err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM policy_decision_audit_outbox_repair_audit
+WHERE tenant_id = $1
+`, tenantID).Scan(&got)
+	if err != nil {
+		t.Fatalf("count policy outbox repair audit: %v", err)
+	}
+	if got != want {
+		t.Fatalf("expected %d policy outbox repair audit rows, got %d", want, got)
 	}
 }
 

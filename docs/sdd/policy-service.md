@@ -102,6 +102,8 @@ When PostgreSQL rules mode is enabled, successful `CheckMessageAction` decisions
 
 `NEXUSIM_POLICY_SERVICE_MODE=outbox-repair-audit` is a read-only operator view over `policy_decision_audit_outbox_repair_audit`. It supports `event_id / tenant_id / repair_operator / repair_outcome` filters, returns newest rows first, and never mutates outbox state.
 
+`NEXUSIM_POLICY_SERVICE_MODE=outbox-repair-cleanup` is a retention operator for `policy_decision_audit_outbox_repair_audit`. It deletes oldest repair audit rows before `now - retention`, supports optional `event_id / tenant_id / repair_operator / repair_outcome` filters for scoped cleanup, and never mutates the live outbox rows themselves.
+
 Audit rows intentionally store low-sensitive decision metadata:
 
 - stable object keys for actor user, device, conversation, message and direct peer context;
@@ -156,6 +158,21 @@ NEXUSIM_POLICY_SERVICE_MODE=outbox-repair
 NEXUSIM_POLICY_OUTBOX_REPAIR_EVENT_IDS=
 NEXUSIM_POLICY_OUTBOX_REPAIR_OPERATOR=local-operator
 NEXUSIM_POLICY_OUTBOX_REPAIR_REASON=manual policy audit outbox repair
+
+NEXUSIM_POLICY_SERVICE_MODE=outbox-repair-audit
+NEXUSIM_POLICY_OUTBOX_REPAIR_AUDIT_EVENT_ID=
+NEXUSIM_POLICY_OUTBOX_REPAIR_AUDIT_TENANT_ID=
+NEXUSIM_POLICY_OUTBOX_REPAIR_AUDIT_OPERATOR=
+NEXUSIM_POLICY_OUTBOX_REPAIR_AUDIT_OUTCOME=
+NEXUSIM_POLICY_OUTBOX_REPAIR_AUDIT_LIMIT=20
+
+NEXUSIM_POLICY_SERVICE_MODE=outbox-repair-cleanup
+NEXUSIM_POLICY_OUTBOX_REPAIR_RETENTION=168h
+NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_BATCH_SIZE=5000
+NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_EVENT_ID=
+NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_TENANT_ID=
+NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OPERATOR=
+NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OUTCOME=
 
 NEXUSIM_POLICY_SERVICE_ADDR=127.0.0.1:10800
 NEXUSIM_POLICY_RPC_TIMEOUT=30ms

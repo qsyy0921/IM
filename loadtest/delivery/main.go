@@ -15,12 +15,13 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
+	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type config struct {
 	target         string
+	tls            grpctls.Config
 	resultDir      string
 	requestTimeout time.Duration
 	waitTimeout    time.Duration
@@ -43,6 +44,7 @@ type summary struct {
 	GitDirty              bool         `json:"git_dirty"`
 	GitStatusShort        string       `json:"git_status_short,omitempty"`
 	Target                string       `json:"target"`
+	TLSEnabled            bool         `json:"tls_enabled"`
 	TenantID              string       `json:"tenant_id"`
 	UserID                string       `json:"user_id"`
 	DeviceID              string       `json:"device_id"`
@@ -96,6 +98,7 @@ func parseConfig() config {
 	var cfg config
 	var limit int
 	flag.StringVar(&cfg.target, "target", "127.0.0.1:10497", "delivery-service gRPC target")
+	registerTLSFlags("delivery-tls", "NEXUSIM_DELIVERY_TLS", "delivery-service", &cfg.tls)
 	flag.StringVar(&cfg.resultDir, "result-dir", "loadtest/results/delivery-smoke", "result directory")
 	flag.DurationVar(&cfg.requestTimeout, "request-timeout", 2*time.Second, "per-request timeout")
 	flag.DurationVar(&cfg.waitTimeout, "wait-timeout", 10*time.Second, "max wait for expected inbox items")
@@ -127,11 +130,22 @@ func parseConfig() config {
 	return cfg
 }
 
+func registerTLSFlags(prefix string, envPrefix string, serviceName string, config *grpctls.Config) {
+	flag.StringVar(&config.CAFile, prefix+"-ca-file", os.Getenv(envPrefix+"_CA_FILE"), "CA PEM for "+serviceName+" gRPC TLS")
+	flag.StringVar(&config.ServerName, prefix+"-server-name", os.Getenv(envPrefix+"_SERVER_NAME"), "override server name for "+serviceName+" gRPC TLS")
+	flag.StringVar(&config.ClientCertFile, prefix+"-client-cert-file", os.Getenv(envPrefix+"_CLIENT_CERT_FILE"), "client certificate PEM for "+serviceName+" gRPC mTLS")
+	flag.StringVar(&config.ClientKeyFile, prefix+"-client-key-file", os.Getenv(envPrefix+"_CLIENT_KEY_FILE"), "client private key PEM for "+serviceName+" gRPC mTLS")
+}
+
 func run(cfg config) error {
 	if err := os.MkdirAll(cfg.resultDir, 0o755); err != nil {
 		return fmt.Errorf("create result dir: %w", err)
 	}
-	conn, err := grpc.NewClient(cfg.target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	dialOption, err := grpctls.DialOption(cfg.tls, "delivery-tls")
+	if err != nil {
+		return fmt.Errorf("configure delivery-service TLS: %w", err)
+	}
+	conn, err := grpc.NewClient(cfg.target, dialOption)
 	if err != nil {
 		return fmt.Errorf("dial target: %w", err)
 	}
@@ -144,6 +158,7 @@ func run(cfg config) error {
 		GitDirty:       gitDirty(),
 		GitStatusShort: gitStatusShort(),
 		Target:         cfg.target,
+		TLSEnabled:     cfg.tls.Enabled(),
 		TenantID:       cfg.tenantID,
 		UserID:         cfg.userID,
 		DeviceID:       cfg.deviceID,

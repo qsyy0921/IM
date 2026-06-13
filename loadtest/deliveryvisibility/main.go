@@ -17,10 +17,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
+	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	conversationtimelinev1 "github.com/qsyy0921/IM/schemas/kafka"
 	kafkago "github.com/segmentio/kafka-go"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -29,6 +29,8 @@ import (
 type config struct {
 	conversationTarget string
 	deliveryTarget     string
+	conversationTLS    grpctls.Config
+	deliveryTLS        grpctls.Config
 	kafkaBrokers       string
 	timelineTopic      string
 	resultDir          string
@@ -48,19 +50,23 @@ type config struct {
 }
 
 type summary struct {
-	Commit         string           `json:"commit"`
-	CommitFull     string           `json:"commit_full"`
-	GitDirty       bool             `json:"git_dirty"`
-	GitStatusShort string           `json:"git_status_short,omitempty"`
-	TenantID       string           `json:"tenant_id"`
-	ConsumerGroup  string           `json:"consumer_group"`
-	TimelineTopic  string           `json:"timeline_topic"`
-	KafkaBrokers   []string         `json:"kafka_brokers"`
-	StartedAt      time.Time        `json:"started_at"`
-	FinishedAt     time.Time        `json:"finished_at"`
-	Success        bool             `json:"success"`
-	Error          string           `json:"error,omitempty"`
-	Scenarios      []scenarioResult `json:"scenarios"`
+	Commit                 string           `json:"commit"`
+	CommitFull             string           `json:"commit_full"`
+	GitDirty               bool             `json:"git_dirty"`
+	GitStatusShort         string           `json:"git_status_short,omitempty"`
+	ConversationTarget     string           `json:"conversation_target"`
+	DeliveryTarget         string           `json:"delivery_target"`
+	ConversationTLSEnabled bool             `json:"conversation_tls_enabled"`
+	DeliveryTLSEnabled     bool             `json:"delivery_tls_enabled"`
+	TenantID               string           `json:"tenant_id"`
+	ConsumerGroup          string           `json:"consumer_group"`
+	TimelineTopic          string           `json:"timeline_topic"`
+	KafkaBrokers           []string         `json:"kafka_brokers"`
+	StartedAt              time.Time        `json:"started_at"`
+	FinishedAt             time.Time        `json:"finished_at"`
+	Success                bool             `json:"success"`
+	Error                  string           `json:"error,omitempty"`
+	Scenarios              []scenarioResult `json:"scenarios"`
 }
 
 type scenarioResult struct {
@@ -108,6 +114,8 @@ func parseConfig() config {
 	var cfg config
 	flag.StringVar(&cfg.conversationTarget, "conversation-target", "127.0.0.1:10496", "conversation-service gRPC target")
 	flag.StringVar(&cfg.deliveryTarget, "delivery-target", "127.0.0.1:10497", "delivery-service gRPC target")
+	registerTLSFlags("conversation-tls", "NEXUSIM_CONVERSATION_TLS", "conversation-service", &cfg.conversationTLS)
+	registerTLSFlags("delivery-tls", "NEXUSIM_DELIVERY_TLS", "delivery-service", &cfg.deliveryTLS)
 	flag.StringVar(&cfg.kafkaBrokers, "kafka-brokers", "localhost:9092", "comma-separated Kafka brokers")
 	flag.StringVar(&cfg.timelineTopic, "timeline-topic", "conversation.timeline.events", "conversation timeline Kafka topic")
 	flag.StringVar(&cfg.resultDir, "result-dir", "loadtest/results/delivery-visibility-smoke", "result directory")
@@ -126,6 +134,13 @@ func parseConfig() config {
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete existing rows for tenant before running")
 	flag.Parse()
 	return cfg
+}
+
+func registerTLSFlags(prefix string, envPrefix string, serviceName string, config *grpctls.Config) {
+	flag.StringVar(&config.CAFile, prefix+"-ca-file", os.Getenv(envPrefix+"_CA_FILE"), "CA PEM for "+serviceName+" gRPC TLS")
+	flag.StringVar(&config.ServerName, prefix+"-server-name", os.Getenv(envPrefix+"_SERVER_NAME"), "override server name for "+serviceName+" gRPC TLS")
+	flag.StringVar(&config.ClientCertFile, prefix+"-client-cert-file", os.Getenv(envPrefix+"_CLIENT_CERT_FILE"), "client certificate PEM for "+serviceName+" gRPC mTLS")
+	flag.StringVar(&config.ClientKeyFile, prefix+"-client-key-file", os.Getenv(envPrefix+"_CLIENT_KEY_FILE"), "client private key PEM for "+serviceName+" gRPC mTLS")
 }
 
 func run(cfg config) error {
@@ -147,14 +162,22 @@ func run(cfg config) error {
 		}
 	}
 
-	conversationConn, err := grpc.NewClient(cfg.conversationTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conversationDialOption, err := grpctls.DialOption(cfg.conversationTLS, "conversation-tls")
+	if err != nil {
+		return fmt.Errorf("configure conversation-service TLS: %w", err)
+	}
+	conversationConn, err := grpc.NewClient(cfg.conversationTarget, conversationDialOption)
 	if err != nil {
 		return fmt.Errorf("dial conversation-service: %w", err)
 	}
 	defer conversationConn.Close()
 	conversationClient := conversationv1.NewConversationServiceClient(conversationConn)
 
-	deliveryConn, err := grpc.NewClient(cfg.deliveryTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	deliveryDialOption, err := grpctls.DialOption(cfg.deliveryTLS, "delivery-tls")
+	if err != nil {
+		return fmt.Errorf("configure delivery-service TLS: %w", err)
+	}
+	deliveryConn, err := grpc.NewClient(cfg.deliveryTarget, deliveryDialOption)
 	if err != nil {
 		return fmt.Errorf("dial delivery-service: %w", err)
 	}
@@ -175,16 +198,20 @@ func run(cfg config) error {
 	defer writer.Close()
 
 	result := summary{
-		Commit:         shortCommit(),
-		CommitFull:     fullCommit(),
-		GitDirty:       gitDirty(),
-		GitStatusShort: gitStatusShort(),
-		TenantID:       cfg.tenantID,
-		ConsumerGroup:  cfg.consumerGroup,
-		TimelineTopic:  cfg.timelineTopic,
-		KafkaBrokers:   brokers,
-		StartedAt:      time.Now().UTC(),
-		Success:        true,
+		Commit:                 shortCommit(),
+		CommitFull:             fullCommit(),
+		GitDirty:               gitDirty(),
+		GitStatusShort:         gitStatusShort(),
+		ConversationTarget:     cfg.conversationTarget,
+		DeliveryTarget:         cfg.deliveryTarget,
+		ConversationTLSEnabled: cfg.conversationTLS.Enabled(),
+		DeliveryTLSEnabled:     cfg.deliveryTLS.Enabled(),
+		TenantID:               cfg.tenantID,
+		ConsumerGroup:          cfg.consumerGroup,
+		TimelineTopic:          cfg.timelineTopic,
+		KafkaBrokers:           brokers,
+		StartedAt:              time.Now().UTC(),
+		Success:                true,
 	}
 	for _, scenario := range splitCSV(cfg.scenarios) {
 		scenario = strings.ToUpper(strings.TrimSpace(scenario))

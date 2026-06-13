@@ -17,12 +17,13 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
+	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type config struct {
 	target            string
+	tls               grpctls.Config
 	vus               int
 	duration          time.Duration
 	requestTimeout    time.Duration
@@ -48,6 +49,7 @@ type summary struct {
 	GitDirty                          bool              `json:"git_dirty"`
 	GitStatusShort                    string            `json:"git_status_short,omitempty"`
 	Target                            string            `json:"target"`
+	TLSEnabled                        bool              `json:"tls_enabled"`
 	VUs                               int               `json:"vus"`
 	Duration                          string            `json:"duration"`
 	RequestCount                      int64             `json:"request_count"`
@@ -115,6 +117,7 @@ func main() {
 func parseConfig() config {
 	var cfg config
 	flag.StringVar(&cfg.target, "target", "127.0.0.1:10496", "conversation-service gRPC target")
+	registerTLSFlags("conversation-tls", "NEXUSIM_CONVERSATION_TLS", "conversation-service", &cfg.tls)
 	flag.IntVar(&cfg.vus, "vus", 1, "concurrent workers")
 	flag.DurationVar(&cfg.duration, "duration", 3*time.Second, "test duration")
 	flag.DurationVar(&cfg.requestTimeout, "request-timeout", 2*time.Second, "per-request timeout")
@@ -134,6 +137,13 @@ func parseConfig() config {
 	flag.Int64Var(&cfg.expectedVersion, "expected-member-version", 0, "expected member version, 0 disables optimistic check")
 	flag.Parse()
 	return normalizeConfigDefaults(cfg)
+}
+
+func registerTLSFlags(prefix string, envPrefix string, serviceName string, config *grpctls.Config) {
+	flag.StringVar(&config.CAFile, prefix+"-ca-file", os.Getenv(envPrefix+"_CA_FILE"), "CA PEM for "+serviceName+" gRPC TLS")
+	flag.StringVar(&config.ServerName, prefix+"-server-name", os.Getenv(envPrefix+"_SERVER_NAME"), "override server name for "+serviceName+" gRPC TLS")
+	flag.StringVar(&config.ClientCertFile, prefix+"-client-cert-file", os.Getenv(envPrefix+"_CLIENT_CERT_FILE"), "client certificate PEM for "+serviceName+" gRPC mTLS")
+	flag.StringVar(&config.ClientKeyFile, prefix+"-client-key-file", os.Getenv(envPrefix+"_CLIENT_KEY_FILE"), "client private key PEM for "+serviceName+" gRPC mTLS")
 }
 
 func normalizeConfigDefaults(cfg config) config {
@@ -172,7 +182,11 @@ func run(cfg config) error {
 	if err != nil {
 		return err
 	}
-	conn, err := grpc.NewClient(cfg.target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	dialOption, err := grpctls.DialOption(cfg.tls, "conversation-tls")
+	if err != nil {
+		return fmt.Errorf("configure conversation-service TLS: %w", err)
+	}
+	conn, err := grpc.NewClient(cfg.target, dialOption)
 	if err != nil {
 		return fmt.Errorf("dial target: %w", err)
 	}
@@ -296,6 +310,7 @@ func run(cfg config) error {
 		GitDirty:       gitDirty(),
 		GitStatusShort: gitStatusShort(),
 		Target:         cfg.target,
+		TLSEnabled:     cfg.tls.Enabled(),
 		VUs:            cfg.vus,
 		Duration:       cfg.duration.String(),
 		RequestCount:   atomic.LoadInt64(&sequence),

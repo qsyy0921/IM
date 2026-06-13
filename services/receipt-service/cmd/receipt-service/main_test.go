@@ -26,6 +26,30 @@ func TestLoadReceiptGRPCCredentialsFromEnvDisabledByDefault(t *testing.T) {
 	}
 }
 
+func TestNewGRPCServerAcceptsMetadataAuthMode(t *testing.T) {
+	clearReceiptGRPCTLSConfig(t)
+	t.Setenv("NEXUSIM_RECEIPT_AUTH_MODE", "metadata")
+
+	server, err := newGRPCServer()
+	if err != nil {
+		t.Fatalf("new grpc server: %v", err)
+	}
+	server.Stop()
+}
+
+func TestNewGRPCServerRejectsUnsupportedAuthMode(t *testing.T) {
+	clearReceiptGRPCTLSConfig(t)
+	t.Setenv("NEXUSIM_RECEIPT_AUTH_MODE", "unknown")
+
+	server, err := newGRPCServer()
+	if err == nil {
+		if server != nil {
+			server.Stop()
+		}
+		t.Fatalf("expected unsupported receipt auth mode to fail")
+	}
+}
+
 func TestLoadReceiptGRPCCredentialsFromEnvRequiresCertKeyPair(t *testing.T) {
 	clearReceiptGRPCTLSConfig(t)
 	t.Setenv("NEXUSIM_RECEIPT_GRPC_TLS_CERT_FILE", "server.crt")

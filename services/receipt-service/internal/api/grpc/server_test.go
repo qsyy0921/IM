@@ -7,7 +7,9 @@ import (
 
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
 	"github.com/qsyy0921/IM/services/receipt-service/internal/types"
+	grpcgo "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -43,6 +45,137 @@ func TestListConversationsMapsValidationError(t *testing.T) {
 	_, err := server.ListConversations(context.Background(), &receiptv1.ListConversationsRequest{})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", status.Code(err))
+	}
+}
+
+func TestReceiptAuthMetadataOverridesBodyForAllUserCommands(t *testing.T) {
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		metadataTenantID, "trusted-tenant",
+		metadataUserID, "trusted-user",
+		metadataDeviceID, "trusted-device",
+		metadataSessionID, "trusted-session",
+	))
+	interceptor := VerifiedAuthUnaryInterceptor(true)
+	_, err := interceptor(ctx, nil, &grpcgo.UnaryServerInfo{}, func(ctx context.Context, request any) (any, error) {
+		mark := &fakeMarkReadCapture{result: types.MarkReadResult{
+			TenantID:       "trusted-tenant",
+			UserID:         "trusted-user",
+			ConversationID: "conversation-1",
+			LastReadSeq:    10,
+		}}
+		get := &fakeGetReceiptStateCapture{result: types.GetReceiptStateResult{
+			ConversationID:  "conversation-1",
+			ConversationSeq: 10,
+			MessageID:       "message-10",
+		}}
+		listStates := &fakeListReceiptStatesCapture{}
+		listConversations := &fakeListConversationsCapture{}
+		archive := &fakeArchiveConversationCapture{}
+		pin := &fakePinConversationCapture{}
+		mute := &fakeMuteConversationCapture{}
+		server := NewServer(mark, get, listStates, listConversations, archive, pin, mute)
+
+		if _, err := server.MarkRead(ctx, &receiptv1.MarkReadRequest{
+			AuthContext:    testSpoofedAuthContext(),
+			ConversationId: "conversation-1",
+			ReadSeq:        10,
+		}); err != nil {
+			t.Fatalf("mark read: %v", err)
+		}
+		if _, err := server.GetReceiptState(ctx, &receiptv1.GetReceiptStateRequest{
+			AuthContext:    testSpoofedAuthContext(),
+			ConversationId: "conversation-1",
+			MessageId:      "message-10",
+		}); err != nil {
+			t.Fatalf("get receipt state: %v", err)
+		}
+		if _, err := server.ListReceiptStates(ctx, &receiptv1.ListReceiptStatesRequest{
+			AuthContext:    testSpoofedAuthContext(),
+			ConversationId: "conversation-1",
+			Items:          []*receiptv1.ReceiptStateQuery{{MessageId: "message-10"}},
+		}); err != nil {
+			t.Fatalf("list receipt states: %v", err)
+		}
+		if _, err := server.ListConversations(ctx, &receiptv1.ListConversationsRequest{
+			AuthContext: testSpoofedAuthContext(),
+			Limit:       20,
+		}); err != nil {
+			t.Fatalf("list conversations: %v", err)
+		}
+		if _, err := server.ArchiveConversation(ctx, &receiptv1.ArchiveConversationRequest{
+			AuthContext:    testSpoofedAuthContext(),
+			ConversationId: "conversation-1",
+			Archived:       true,
+		}); err != nil {
+			t.Fatalf("archive conversation: %v", err)
+		}
+		if _, err := server.PinConversation(ctx, &receiptv1.PinConversationRequest{
+			AuthContext:    testSpoofedAuthContext(),
+			ConversationId: "conversation-1",
+			Pinned:         true,
+		}); err != nil {
+			t.Fatalf("pin conversation: %v", err)
+		}
+		if _, err := server.MuteConversation(ctx, &receiptv1.MuteConversationRequest{
+			AuthContext:    testSpoofedAuthContext(),
+			ConversationId: "conversation-1",
+			Muted:          true,
+		}); err != nil {
+			t.Fatalf("mute conversation: %v", err)
+		}
+
+		assertTrustedMetadataAuth(t, mark.command.AuthContext)
+		assertTrustedMetadataAuth(t, get.command.AuthContext)
+		assertTrustedMetadataAuth(t, listStates.command.AuthContext)
+		assertTrustedMetadataAuth(t, listConversations.command.AuthContext)
+		assertTrustedMetadataAuth(t, archive.command.AuthContext)
+		assertTrustedMetadataAuth(t, pin.command.AuthContext)
+		assertTrustedMetadataAuth(t, mute.command.AuthContext)
+		return nil, nil
+	})
+	if err != nil {
+		t.Fatalf("interceptor returned error: %v", err)
+	}
+}
+
+func TestReceiptAuthMetadataDoesNotRequireBodyAuthContext(t *testing.T) {
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		metadataTenantID, "trusted-tenant",
+		metadataUserID, "trusted-user",
+		metadataDeviceID, "trusted-device",
+		metadataTraceID, "trusted-trace",
+		metadataRequestID, "trusted-request",
+	))
+	interceptor := VerifiedAuthUnaryInterceptor(true)
+	_, err := interceptor(ctx, nil, &grpcgo.UnaryServerInfo{}, func(ctx context.Context, request any) (any, error) {
+		list := &fakeListConversationsCapture{}
+		server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, list, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{})
+		if _, err := server.ListConversations(ctx, &receiptv1.ListConversationsRequest{Limit: 10}); err != nil {
+			t.Fatalf("list conversations: %v", err)
+		}
+		auth := list.command.AuthContext
+		if auth.TenantID != "trusted-tenant" ||
+			auth.UserID != "trusted-user" ||
+			auth.DeviceID != "trusted-device" ||
+			auth.TraceID != "trusted-trace" ||
+			auth.RequestID != "trusted-request" {
+			t.Fatalf("unexpected verified auth without body auth: %+v", auth)
+		}
+		return nil, nil
+	})
+	if err != nil {
+		t.Fatalf("interceptor returned error: %v", err)
+	}
+}
+
+func TestVerifiedAuthUnaryInterceptorRequiresTrustedIdentity(t *testing.T) {
+	interceptor := VerifiedAuthUnaryInterceptor(true)
+	_, err := interceptor(context.Background(), nil, &grpcgo.UnaryServerInfo{}, func(ctx context.Context, request any) (any, error) {
+		t.Fatal("handler should not be called without verified auth")
+		return nil, nil
+	})
+	if status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("expected unauthenticated, got %v (%v)", status.Code(err), err)
 	}
 }
 
@@ -251,10 +384,30 @@ func (fake fakeMarkRead) Execute(context.Context, types.MarkReadCommand) (types.
 	return types.MarkReadResult{}, nil
 }
 
+type fakeMarkReadCapture struct {
+	command types.MarkReadCommand
+	result  types.MarkReadResult
+}
+
+func (fake *fakeMarkReadCapture) Execute(_ context.Context, command types.MarkReadCommand) (types.MarkReadResult, error) {
+	fake.command = command
+	return fake.result, nil
+}
+
 type fakeGetReceiptState struct{}
 
 func (fakeGetReceiptState) Execute(context.Context, types.GetReceiptStateCommand) (types.GetReceiptStateResult, error) {
 	return types.GetReceiptStateResult{}, nil
+}
+
+type fakeGetReceiptStateCapture struct {
+	command types.GetReceiptStateCommand
+	result  types.GetReceiptStateResult
+}
+
+func (fake *fakeGetReceiptStateCapture) Execute(_ context.Context, command types.GetReceiptStateCommand) (types.GetReceiptStateResult, error) {
+	fake.command = command
+	return fake.result, nil
 }
 
 type fakeListReceiptStates struct{}
@@ -340,4 +493,27 @@ type fakeMuteConversationCapture struct {
 func (fake *fakeMuteConversationCapture) Execute(_ context.Context, command types.MuteConversationCommand) (types.MuteConversationResult, error) {
 	fake.command = command
 	return fake.result, nil
+}
+
+func testSpoofedAuthContext() *receiptv1.AuthContext {
+	return &receiptv1.AuthContext{
+		TenantId:  "spoofed-tenant",
+		UserId:    "spoofed-user",
+		DeviceId:  "spoofed-device",
+		SessionId: "spoofed-session",
+		TraceId:   "body-trace",
+		RequestId: "body-request",
+	}
+}
+
+func assertTrustedMetadataAuth(t *testing.T, auth types.AuthContext) {
+	t.Helper()
+	if auth.TenantID != "trusted-tenant" ||
+		auth.UserID != "trusted-user" ||
+		auth.DeviceID != "trusted-device" ||
+		auth.SessionID != "trusted-session" ||
+		auth.TraceID != "body-trace" ||
+		auth.RequestID != "body-request" {
+		t.Fatalf("unexpected verified auth: %+v", auth)
+	}
 }

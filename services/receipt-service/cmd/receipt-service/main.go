@@ -196,7 +196,18 @@ func envString(name string, fallback string) string {
 }
 
 func newGRPCServer() (*grpc.Server, error) {
-	serverOptions := make([]grpc.ServerOption, 0, 1)
+	interceptors := make([]grpc.UnaryServerInterceptor, 0, 1)
+	switch strings.ToLower(envString("NEXUSIM_RECEIPT_AUTH_MODE", "body")) {
+	case "body", "request", "legacy":
+	case "metadata", "verified-metadata":
+		interceptors = append(interceptors, grpcapi.VerifiedAuthUnaryInterceptor(true))
+	default:
+		return nil, errors.New("unsupported NEXUSIM_RECEIPT_AUTH_MODE")
+	}
+	serverOptions := make([]grpc.ServerOption, 0, 2)
+	if len(interceptors) > 0 {
+		serverOptions = append(serverOptions, grpc.ChainUnaryInterceptor(interceptors...))
+	}
 	if creds, ok, err := loadReceiptGRPCCredentialsFromEnv(); err != nil {
 		return nil, err
 	} else if ok {

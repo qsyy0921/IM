@@ -81,16 +81,12 @@ func (server *Server) MarkRead(
 	if request == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
 	}
-	auth := request.GetAuthContext()
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
 	result, err := server.markRead.Execute(ctx, types.MarkReadCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  auth.GetDeviceId(),
-			SessionID: auth.GetSessionId(),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:    auth,
 		ConversationID: types.ConversationID(request.GetConversationId()),
 		ReadSeq:        request.GetReadSeq(),
 	})
@@ -112,16 +108,12 @@ func (server *Server) GetReceiptState(
 	if request == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
 	}
-	auth := request.GetAuthContext()
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
 	result, err := server.getReceiptState.Execute(ctx, types.GetReceiptStateCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  auth.GetDeviceId(),
-			SessionID: auth.GetSessionId(),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:     auth,
 		ConversationID:  types.ConversationID(request.GetConversationId()),
 		MessageID:       request.GetMessageId(),
 		ConversationSeq: request.GetConversationSeq(),
@@ -139,7 +131,10 @@ func (server *Server) ListReceiptStates(
 	if request == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
 	}
-	auth := request.GetAuthContext()
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
 	items := make([]types.ReceiptStateQuery, 0, len(request.GetItems()))
 	for _, item := range request.GetItems() {
 		items = append(items, types.ReceiptStateQuery{
@@ -148,14 +143,7 @@ func (server *Server) ListReceiptStates(
 		})
 	}
 	result, err := server.listReceiptStates.Execute(ctx, types.ListReceiptStatesCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  auth.GetDeviceId(),
-			SessionID: auth.GetSessionId(),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:    auth,
 		ConversationID: types.ConversationID(request.GetConversationId()),
 		Items:          items,
 	})
@@ -200,16 +188,12 @@ func (server *Server) ListConversations(
 	if request == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
 	}
-	auth := request.GetAuthContext()
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
 	result, err := server.listConversations.Execute(ctx, types.ListConversationsCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  auth.GetDeviceId(),
-			SessionID: auth.GetSessionId(),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:     auth,
 		Limit:           int(request.GetLimit()),
 		PageCursor:      request.GetPageCursor(),
 		Sort:            conversationListSortFromProto(request.GetSort()),
@@ -253,16 +237,12 @@ func (server *Server) ArchiveConversation(
 	if request == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
 	}
-	auth := request.GetAuthContext()
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
 	result, err := server.archiveConversation.Execute(ctx, types.ArchiveConversationCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  auth.GetDeviceId(),
-			SessionID: auth.GetSessionId(),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:    auth,
 		ConversationID: types.ConversationID(request.GetConversationId()),
 		Archived:       request.GetArchived(),
 	})
@@ -281,16 +261,12 @@ func (server *Server) PinConversation(
 	if request == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
 	}
-	auth := request.GetAuthContext()
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
 	result, err := server.pinConversation.Execute(ctx, types.PinConversationCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  auth.GetDeviceId(),
-			SessionID: auth.GetSessionId(),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:    auth,
 		ConversationID: types.ConversationID(request.GetConversationId()),
 		Pinned:         request.GetPinned(),
 	})
@@ -309,16 +285,12 @@ func (server *Server) MuteConversation(
 	if request == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
 	}
-	auth := request.GetAuthContext()
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
 	result, err := server.muteConversation.Execute(ctx, types.MuteConversationCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  auth.GetDeviceId(),
-			SessionID: auth.GetSessionId(),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:    auth,
 		ConversationID: types.ConversationID(request.GetConversationId()),
 		Muted:          request.GetMuted(),
 	})
@@ -384,6 +356,31 @@ func grpcError(err error) error {
 	default:
 		return status.Error(codes.Internal, "receipt service internal error")
 	}
+}
+
+func authFromProto(ctx context.Context, auth *receiptv1.AuthContext) (types.AuthContext, bool) {
+	if verified, ok := verifiedAuthFromContext(ctx); ok {
+		if auth != nil {
+			if verified.TraceID == "" {
+				verified.TraceID = auth.GetTraceId()
+			}
+			if verified.RequestID == "" {
+				verified.RequestID = auth.GetRequestId()
+			}
+		}
+		return verified, true
+	}
+	if auth == nil {
+		return types.AuthContext{}, false
+	}
+	return types.AuthContext{
+		TenantID:  types.TenantID(auth.GetTenantId()),
+		UserID:    types.UserID(auth.GetUserId()),
+		DeviceID:  auth.GetDeviceId(),
+		SessionID: auth.GetSessionId(),
+		TraceID:   auth.GetTraceId(),
+		RequestID: auth.GetRequestId(),
+	}, true
 }
 
 func toProtoVisibility(mode string) receiptv1.ReceiptVisibilityMode {

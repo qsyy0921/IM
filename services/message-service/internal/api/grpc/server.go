@@ -98,7 +98,7 @@ func (s *Server) SendMessage(ctx context.Context, req *messagev1.SendMessageRequ
 		s.metrics.ObserveSendMessage(time.Since(started))
 	}()
 
-	command, err := s.toSendMessageCommand(req)
+	command, err := s.toSendMessageCommand(ctx, req)
 	if err != nil {
 		return nil, grpcError(err, reqCorrelationID(req))
 	}
@@ -118,7 +118,7 @@ func (s *Server) SendMessage(ctx context.Context, req *messagev1.SendMessageRequ
 }
 
 func (s *Server) EditMessage(ctx context.Context, req *messagev1.EditMessageRequest) (*messagev1.MessageChangeResponse, error) {
-	command, err := s.toEditMessageCommand(req)
+	command, err := s.toEditMessageCommand(ctx, req)
 	if err != nil {
 		return nil, grpcError(err, editReqCorrelationID(req))
 	}
@@ -139,7 +139,7 @@ func (s *Server) EditMessage(ctx context.Context, req *messagev1.EditMessageRequ
 }
 
 func (s *Server) RevokeMessage(ctx context.Context, req *messagev1.RevokeMessageRequest) (*messagev1.MessageChangeResponse, error) {
-	command, err := s.toRevokeMessageCommand(req)
+	command, err := s.toRevokeMessageCommand(ctx, req)
 	if err != nil {
 		return nil, grpcError(err, revokeReqCorrelationID(req))
 	}
@@ -160,7 +160,7 @@ func (s *Server) RevokeMessage(ctx context.Context, req *messagev1.RevokeMessage
 }
 
 func (s *Server) DeleteMessage(ctx context.Context, req *messagev1.DeleteMessageRequest) (*messagev1.MessageChangeResponse, error) {
-	command, err := s.toDeleteMessageCommand(req)
+	command, err := s.toDeleteMessageCommand(ctx, req)
 	if err != nil {
 		return nil, grpcError(err, deleteReqCorrelationID(req))
 	}
@@ -180,15 +180,15 @@ func (s *Server) DeleteMessage(ctx context.Context, req *messagev1.DeleteMessage
 	}, nil
 }
 
-func (s *Server) toSendMessageCommand(req *messagev1.SendMessageRequest) (types.SendMessageCommand, error) {
+func (s *Server) toSendMessageCommand(ctx context.Context, req *messagev1.SendMessageRequest) (types.SendMessageCommand, error) {
 	if s.sendMessage == nil {
 		return types.SendMessageCommand{}, errors.New("send message use case is not configured")
 	}
 	if req == nil {
 		return types.SendMessageCommand{}, newInvalidArgument("request is required")
 	}
-	auth := req.GetAuthContext()
-	if auth == nil {
+	auth, ok := authFromProto(ctx, req.GetAuthContext())
+	if !ok {
 		return types.SendMessageCommand{}, newInvalidArgument("auth_context is required")
 	}
 
@@ -198,14 +198,7 @@ func (s *Server) toSendMessageCommand(req *messagev1.SendMessageRequest) (types.
 	}
 
 	command := types.SendMessageCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  types.DeviceID(auth.GetDeviceId()),
-			SessionID: types.SessionID(auth.GetSessionId()),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:    auth,
 		ConversationID: types.ConversationID(req.GetConversationId()),
 		ClientMsgID:    types.ClientMsgID(req.GetClientMsgId()),
 		MessageType:    types.MessageType(req.GetMessageType()),
@@ -222,26 +215,19 @@ func (s *Server) toSendMessageCommand(req *messagev1.SendMessageRequest) (types.
 	return command, nil
 }
 
-func (s *Server) toRevokeMessageCommand(req *messagev1.RevokeMessageRequest) (types.RevokeMessageCommand, error) {
+func (s *Server) toRevokeMessageCommand(ctx context.Context, req *messagev1.RevokeMessageRequest) (types.RevokeMessageCommand, error) {
 	if s.revokeMessage == nil {
 		return types.RevokeMessageCommand{}, errors.New("revoke message use case is not configured")
 	}
 	if req == nil {
 		return types.RevokeMessageCommand{}, newInvalidArgument("request is required")
 	}
-	auth := req.GetAuthContext()
-	if auth == nil {
+	auth, ok := authFromProto(ctx, req.GetAuthContext())
+	if !ok {
 		return types.RevokeMessageCommand{}, newInvalidArgument("auth_context is required")
 	}
 	command := types.RevokeMessageCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  types.DeviceID(auth.GetDeviceId()),
-			SessionID: types.SessionID(auth.GetSessionId()),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:    auth,
 		ConversationID: types.ConversationID(req.GetConversationId()),
 		MessageID:      types.MessageID(req.GetMessageId()),
 		IdempotencyKey: req.GetIdempotencyKey(),
@@ -254,15 +240,15 @@ func (s *Server) toRevokeMessageCommand(req *messagev1.RevokeMessageRequest) (ty
 	return command, nil
 }
 
-func (s *Server) toEditMessageCommand(req *messagev1.EditMessageRequest) (types.EditMessageCommand, error) {
+func (s *Server) toEditMessageCommand(ctx context.Context, req *messagev1.EditMessageRequest) (types.EditMessageCommand, error) {
 	if s.editMessage == nil {
 		return types.EditMessageCommand{}, errors.New("edit message use case is not configured")
 	}
 	if req == nil {
 		return types.EditMessageCommand{}, newInvalidArgument("request is required")
 	}
-	auth := req.GetAuthContext()
-	if auth == nil {
+	auth, ok := authFromProto(ctx, req.GetAuthContext())
+	if !ok {
 		return types.EditMessageCommand{}, newInvalidArgument("auth_context is required")
 	}
 	payloadJSON, err := payloadToJSON(req.GetPayload())
@@ -270,14 +256,7 @@ func (s *Server) toEditMessageCommand(req *messagev1.EditMessageRequest) (types.
 		return types.EditMessageCommand{}, newInvalidArgument(err.Error())
 	}
 	command := types.EditMessageCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  types.DeviceID(auth.GetDeviceId()),
-			SessionID: types.SessionID(auth.GetSessionId()),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:    auth,
 		ConversationID: types.ConversationID(req.GetConversationId()),
 		MessageID:      types.MessageID(req.GetMessageId()),
 		IdempotencyKey: req.GetIdempotencyKey(),
@@ -291,15 +270,15 @@ func (s *Server) toEditMessageCommand(req *messagev1.EditMessageRequest) (types.
 	return command, nil
 }
 
-func (s *Server) toDeleteMessageCommand(req *messagev1.DeleteMessageRequest) (types.DeleteMessageCommand, error) {
+func (s *Server) toDeleteMessageCommand(ctx context.Context, req *messagev1.DeleteMessageRequest) (types.DeleteMessageCommand, error) {
 	if s.deleteMessage == nil {
 		return types.DeleteMessageCommand{}, errors.New("delete message use case is not configured")
 	}
 	if req == nil {
 		return types.DeleteMessageCommand{}, newInvalidArgument("request is required")
 	}
-	auth := req.GetAuthContext()
-	if auth == nil {
+	auth, ok := authFromProto(ctx, req.GetAuthContext())
+	if !ok {
 		return types.DeleteMessageCommand{}, newInvalidArgument("auth_context is required")
 	}
 	scope, err := deleteScopeFromProto(req.GetDeleteScope())
@@ -307,14 +286,7 @@ func (s *Server) toDeleteMessageCommand(req *messagev1.DeleteMessageRequest) (ty
 		return types.DeleteMessageCommand{}, newInvalidArgument(err.Error())
 	}
 	command := types.DeleteMessageCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  types.DeviceID(auth.GetDeviceId()),
-			SessionID: types.SessionID(auth.GetSessionId()),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:    auth,
 		ConversationID: types.ConversationID(req.GetConversationId()),
 		MessageID:      types.MessageID(req.GetMessageId()),
 		IdempotencyKey: req.GetIdempotencyKey(),
@@ -348,6 +320,31 @@ func payloadToJSON(payload *structpb.Struct) ([]byte, error) {
 		return nil, err
 	}
 	return encoded, nil
+}
+
+func authFromProto(ctx context.Context, auth *messagev1.AuthContext) (types.AuthContext, bool) {
+	if verified, ok := verifiedAuthFromContext(ctx); ok {
+		if auth != nil {
+			if verified.TraceID == "" {
+				verified.TraceID = auth.GetTraceId()
+			}
+			if verified.RequestID == "" {
+				verified.RequestID = auth.GetRequestId()
+			}
+		}
+		return verified, true
+	}
+	if auth == nil {
+		return types.AuthContext{}, false
+	}
+	return types.AuthContext{
+		TenantID:  types.TenantID(auth.GetTenantId()),
+		UserID:    types.UserID(auth.GetUserId()),
+		DeviceID:  types.DeviceID(auth.GetDeviceId()),
+		SessionID: types.SessionID(auth.GetSessionId()),
+		TraceID:   auth.GetTraceId(),
+		RequestID: auth.GetRequestId(),
+	}, true
 }
 
 func reqCorrelationID(req *messagev1.SendMessageRequest) string {

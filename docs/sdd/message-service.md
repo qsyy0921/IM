@@ -827,6 +827,26 @@ outbox_publish_duplicate_rate 可观测但不作为错误
 
 ## 14. Runbook
 
+gRPC API auth mode 支持第一阶段 gateway verified metadata：
+
+```text
+NEXUSIM_MESSAGE_AUTH_MODE=body
+NEXUSIM_MESSAGE_AUTH_MODE=metadata
+```
+
+默认 `body` / `request` / `legacy` 模式继续兼容历史 smoke，从 request `auth_context` 读取 `tenant_id / user_id / device_id / session_id`。`metadata` / `verified-metadata` 模式要求上游 gateway 已完成 token 校验，并通过 gRPC metadata 传入可信身份：
+
+```text
+x-nexusim-tenant-id
+x-nexusim-user-id
+x-nexusim-device-id
+x-nexusim-session-id
+x-nexusim-trace-id
+x-nexusim-request-id
+```
+
+metadata 模式下 `SendMessage / EditMessage / RevokeMessage / DeleteMessage` 的 `tenant_id / user_id / device_id / session_id` 只来自 verified metadata，不信任 request body 中可伪造的身份字段；`trace_id / request_id` 可以在 metadata 缺失时从 body 兜底用于排障相关性。该模式只定义 message-service 对 gateway verified metadata 的消费边界，不等同于完整 API gateway、token exchange、服务发现或全服务统一身份治理。
+
 gRPC server 支持第一阶段静态 TLS / mTLS 配置：
 
 ```text

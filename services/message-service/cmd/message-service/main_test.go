@@ -107,6 +107,24 @@ func TestConversationClientTLSConfigFromEnvLoadsTLS(t *testing.T) {
 	}
 }
 
+func TestNewGRPCServerAcceptsMetadataAuthMode(t *testing.T) {
+	clearMessageGRPCTLSConfig(t)
+	t.Setenv("NEXUSIM_MESSAGE_AUTH_MODE", "metadata")
+	server, err := newGRPCServer()
+	if err != nil {
+		t.Fatalf("new grpc server: %v", err)
+	}
+	server.Stop()
+}
+
+func TestNewGRPCServerRejectsUnsupportedAuthMode(t *testing.T) {
+	clearMessageGRPCTLSConfig(t)
+	t.Setenv("NEXUSIM_MESSAGE_AUTH_MODE", "side-channel")
+	if _, err := newGRPCServer(); err == nil {
+		t.Fatalf("expected unsupported auth mode to fail")
+	}
+}
+
 func TestLoadMessageGRPCCredentialsFromEnvDisabledByDefault(t *testing.T) {
 	clearMessageGRPCTLSConfig(t)
 	creds, ok, err := loadMessageGRPCCredentialsFromEnv()

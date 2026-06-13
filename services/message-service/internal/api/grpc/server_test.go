@@ -13,6 +13,7 @@ import (
 	grpcgo "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -104,6 +105,95 @@ func TestMessageServiceClientSendMessageThroughGRPC(t *testing.T) {
 	}
 	if response.GetMessageId() != "msg-1" || response.GetConversationSeq() != 9 {
 		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
+func TestMessageAuthMetadataOverridesBodyForAllCommands(t *testing.T) {
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		metadataTenantID, "trusted-tenant",
+		metadataUserID, "trusted-user",
+		metadataDeviceID, "trusted-device",
+		metadataSessionID, "trusted-session",
+	))
+	interceptor := VerifiedAuthUnaryInterceptor(true)
+	_, err := interceptor(ctx, nil, &grpcgo.UnaryServerInfo{}, func(ctx context.Context, req any) (any, error) {
+		sendExecutor := &fakeSendMessageExecutor{result: types.SendMessageResult{MessageID: "msg-1", ConversationID: "conv-1"}}
+		editExecutor := &fakeEditMessageExecutor{result: types.MessageChangeResult{MessageID: "msg-1", ConversationID: "conv-1"}}
+		revokeExecutor := &fakeRevokeMessageExecutor{result: types.MessageChangeResult{MessageID: "msg-1", ConversationID: "conv-1"}}
+		deleteExecutor := &fakeDeleteMessageExecutor{result: types.MessageChangeResult{MessageID: "msg-1", ConversationID: "conv-1"}}
+		server := NewServer(
+			sendExecutor,
+			WithEditMessage(editExecutor),
+			WithRevokeMessage(revokeExecutor),
+			WithDeleteMessage(deleteExecutor),
+		)
+
+		sendRequest := testSendMessageRequest()
+		sendRequest.AuthContext = testSpoofedAuthContext()
+		if _, err := server.SendMessage(ctx, sendRequest); err != nil {
+			t.Fatalf("send message: %v", err)
+		}
+		if _, err := server.EditMessage(ctx, testEditMessageRequest()); err != nil {
+			t.Fatalf("edit message: %v", err)
+		}
+		if _, err := server.RevokeMessage(ctx, testRevokeMessageRequest()); err != nil {
+			t.Fatalf("revoke message: %v", err)
+		}
+		if _, err := server.DeleteMessage(ctx, testDeleteMessageRequest()); err != nil {
+			t.Fatalf("delete message: %v", err)
+		}
+
+		assertTrustedMetadataAuth(t, sendExecutor.command.AuthContext)
+		assertTrustedMetadataAuth(t, editExecutor.command.AuthContext)
+		assertTrustedMetadataAuth(t, revokeExecutor.command.AuthContext)
+		assertTrustedMetadataAuth(t, deleteExecutor.command.AuthContext)
+		return nil, nil
+	})
+	if err != nil {
+		t.Fatalf("interceptor returned error: %v", err)
+	}
+}
+
+func TestMessageAuthMetadataDoesNotRequireBodyAuthContext(t *testing.T) {
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		metadataTenantID, "trusted-tenant",
+		metadataUserID, "trusted-user",
+		metadataDeviceID, "trusted-device",
+		metadataTraceID, "trusted-trace",
+		metadataRequestID, "trusted-request",
+	))
+	interceptor := VerifiedAuthUnaryInterceptor(true)
+	_, err := interceptor(ctx, nil, &grpcgo.UnaryServerInfo{}, func(ctx context.Context, req any) (any, error) {
+		executor := &fakeSendMessageExecutor{result: types.SendMessageResult{MessageID: "msg-1", ConversationID: "conv-1"}}
+		server := NewServer(executor)
+		request := testSendMessageRequest()
+		request.AuthContext = nil
+		if _, err := server.SendMessage(ctx, request); err != nil {
+			t.Fatalf("send message: %v", err)
+		}
+		command := executor.command
+		if command.AuthContext.TenantID != "trusted-tenant" ||
+			command.AuthContext.UserID != "trusted-user" ||
+			command.AuthContext.DeviceID != "trusted-device" ||
+			command.AuthContext.TraceID != "trusted-trace" ||
+			command.AuthContext.RequestID != "trusted-request" {
+			t.Fatalf("unexpected verified auth without body auth: %+v", command.AuthContext)
+		}
+		return nil, nil
+	})
+	if err != nil {
+		t.Fatalf("interceptor returned error: %v", err)
+	}
+}
+
+func TestVerifiedAuthUnaryInterceptorRequiresTrustedIdentity(t *testing.T) {
+	interceptor := VerifiedAuthUnaryInterceptor(true)
+	_, err := interceptor(context.Background(), nil, &grpcgo.UnaryServerInfo{}, func(ctx context.Context, req any) (any, error) {
+		t.Fatal("handler should not be called without verified auth")
+		return nil, nil
+	})
+	if status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("expected unauthenticated, got %v (%v)", status.Code(err), err)
 	}
 }
 
@@ -323,6 +413,65 @@ func testSendMessageRequest() *messagev1.SendMessageRequest {
 	}
 }
 
+func testEditMessageRequest() *messagev1.EditMessageRequest {
+	payload, err := structpb.NewStruct(map[string]any{"text": "edited"})
+	if err != nil {
+		panic(err)
+	}
+	return &messagev1.EditMessageRequest{
+		AuthContext:    testSpoofedAuthContext(),
+		ConversationId: "conv-1",
+		MessageId:      "msg-1",
+		IdempotencyKey: "edit-1",
+		Payload:        payload,
+		Reason:         "fix typo",
+	}
+}
+
+func testRevokeMessageRequest() *messagev1.RevokeMessageRequest {
+	return &messagev1.RevokeMessageRequest{
+		AuthContext:    testSpoofedAuthContext(),
+		ConversationId: "conv-1",
+		MessageId:      "msg-1",
+		IdempotencyKey: "revoke-1",
+		Reason:         "sender revoke",
+	}
+}
+
+func testDeleteMessageRequest() *messagev1.DeleteMessageRequest {
+	return &messagev1.DeleteMessageRequest{
+		AuthContext:    testSpoofedAuthContext(),
+		ConversationId: "conv-1",
+		MessageId:      "msg-1",
+		IdempotencyKey: "delete-1",
+		DeleteScope:    messagev1.DeleteScope_DELETE_SCOPE_CONVERSATION_VIEW,
+		Reason:         "delete message",
+	}
+}
+
+func testSpoofedAuthContext() *messagev1.AuthContext {
+	return &messagev1.AuthContext{
+		TenantId:  "spoofed-tenant",
+		UserId:    "spoofed-user",
+		DeviceId:  "spoofed-device",
+		SessionId: "spoofed-session",
+		TraceId:   "body-trace",
+		RequestId: "body-request",
+	}
+}
+
+func assertTrustedMetadataAuth(t *testing.T, auth types.AuthContext) {
+	t.Helper()
+	if auth.TenantID != "trusted-tenant" ||
+		auth.UserID != "trusted-user" ||
+		auth.DeviceID != "trusted-device" ||
+		auth.SessionID != "trusted-session" ||
+		auth.TraceID != "body-trace" ||
+		auth.RequestID != "body-request" {
+		t.Fatalf("unexpected verified auth: %+v", auth)
+	}
+}
+
 func assertStatusDetail(
 	t *testing.T,
 	err error,
@@ -366,6 +515,39 @@ type fakeSendMessageExecutor struct {
 
 func (f *fakeSendMessageExecutor) Execute(_ context.Context, command types.SendMessageCommand) (types.SendMessageResult, error) {
 	f.calls++
+	f.command = command
+	return f.result, f.err
+}
+
+type fakeEditMessageExecutor struct {
+	result  types.MessageChangeResult
+	err     error
+	command types.EditMessageCommand
+}
+
+func (f *fakeEditMessageExecutor) Execute(_ context.Context, command types.EditMessageCommand) (types.MessageChangeResult, error) {
+	f.command = command
+	return f.result, f.err
+}
+
+type fakeRevokeMessageExecutor struct {
+	result  types.MessageChangeResult
+	err     error
+	command types.RevokeMessageCommand
+}
+
+func (f *fakeRevokeMessageExecutor) Execute(_ context.Context, command types.RevokeMessageCommand) (types.MessageChangeResult, error) {
+	f.command = command
+	return f.result, f.err
+}
+
+type fakeDeleteMessageExecutor struct {
+	result  types.MessageChangeResult
+	err     error
+	command types.DeleteMessageCommand
+}
+
+func (f *fakeDeleteMessageExecutor) Execute(_ context.Context, command types.DeleteMessageCommand) (types.MessageChangeResult, error) {
 	f.command = command
 	return f.result, f.err
 }

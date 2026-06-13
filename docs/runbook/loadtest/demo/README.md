@@ -19,6 +19,7 @@ CreateMemberChange(JOIN)
 | 报告 | 说明 |
 | --- | --- |
 | `loadtest-report-20260612-e2e-demo-smoke.md` | 本地多进程 E2E demo smoke，验证投递后未读数为 1，ACK + MarkRead 后未读数为 0 |
+| `loadtest-report-20260613-e2e-demo-verified-metadata-smoke.md` | 本地多进程 E2E demo smoke，验证 metadata auth 下的 notify、PullInbox、ACK、MarkRead 和未读数归零 |
 
 ## TLS / mTLS 参数
 
@@ -45,3 +46,15 @@ CreateMemberChange(JOIN)
 ```
 
 这些参数只覆盖 demo runner 到四个 gRPC server 的静态 TLS / mTLS 连接。未配置时保持 plaintext，兼容现有本地演示；证书生命周期和全服务 mTLS rollout 不在 demo runner 范围内。
+
+## Gateway verified metadata auth
+
+如果 conversation / message / delivery / receipt 四个 user-facing gRPC server 以 metadata auth 模式启动，demo runner 可用以下开关发送 gateway verified identity metadata：
+
+```powershell
+.\loadtest\demo\run-local-demo.ps1 -VerifiedAuthMetadata
+```
+
+该模式会把 demo 请求身份同时写入 user-facing gRPC metadata，用于验证 conversation / message / delivery / receipt 的 `metadata` / `verified-metadata` auth mode；request body 仍保留兼容字段。
+
+2026-06-13 补充：`-VerifiedAuthMetadata` 真实进程 demo smoke 已通过，验证 receiver JOIN、SendMessage、`delivery.notify`、`PullInbox`、WebSocket ACK、`MarkRead` 和 `ListConversations` unread `1 -> 0` 全链路。

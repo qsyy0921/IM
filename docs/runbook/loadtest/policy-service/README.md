@@ -28,11 +28,11 @@ Implemented:
 - policy-service decision audit DLQ repair smoke for explicit event-id redrive: `loadtest-report-20260613-policy-decision-audit-repair-smoke.md`.
 - policy-service decision audit repair validation smoke after preflight gate: `loadtest-report-20260613-policy-decision-audit-repair-validated-smoke.md`.
 - policy-service tenant-level message action rule smoke for `tenant_id + action` defaults across `SEND`, `EDIT`, `REVOKE`, and `DELETE`: `loadtest-report-20260613-policy-message-tenant-rule-smoke.md`.
+- policy-service conversation role gate Kafka smoke for `conversation.timeline.events -> policy_conversation_members_projection -> CheckMessageAction`: `loadtest-report-20260613-policy-conversation-role-smoke.md`.
 
 Not yet implemented:
 
 - full ReBAC / message ownership policy;
-- real Kafka smoke for the conversation role gate;
 - tenant-level policy DSL / quota / risk policy beyond first-stage action defaults;
 - content moderation / risk scoring;
 - policy audit retention, external sink, poison-payload classification and broad repair workflow;
@@ -84,6 +84,12 @@ Run contact projection smoke with:
 .\loadtest\policycontacts\run-local-smoke.ps1
 ```
 
+Run conversation role gate projection smoke with:
+
+```powershell
+.\loadtest\policyroles\run-local-smoke.ps1
+```
+
 The same runner now also starts `policy-service grpc` and validates direct conversation block enforcement when policy receives `direct_peer_user_id`:
 
 ```text
@@ -104,6 +110,7 @@ allow\policy-summary.json
 deny\policy-summary.json
 policy-smoke-summary.json
 policy-contact-summary.json
+policy-role-summary.json
 ```
 
 The message mutation integration shape is:
@@ -122,7 +129,7 @@ The rule-store smoke also sets local static fallback opposite to the seeded Post
 
 The observability smoke reads `/debug/metrics` after both allow and deny scenarios. Metrics are aggregate debug snapshots only: they do not expose tenant id, user id, conversation id, message id, policy request bodies, rule parameters, deny reason text or classification strings. Trace id and request id are propagated for structured gRPC logs, not as metrics labels.
 
-The contact projection smoke proves that policy-service can consume `im.contact.events` and maintain a policy-owned edge projection. The contact block decision smoke proves that projected `BLOCKED` edges are consumed for direct `SEND` when `direct_peer_user_id` is present. The tenant-rule smoke proves only first-stage tenant action defaults. The conversation role gate currently has code-level and PostgreSQL/trigger test coverage, but no full real-process Kafka smoke yet. It is an action-level freshness / role gate, not full ReBAC, message ownership policy, tenant policy DSL, tenant quota/risk policy or risk scoring.
+The contact projection smoke proves that policy-service can consume `im.contact.events` and maintain a policy-owned edge projection. The contact block decision smoke proves that projected `BLOCKED` edges are consumed for direct `SEND` when `direct_peer_user_id` is present. The tenant-rule smoke proves only first-stage tenant action defaults. The conversation role gate smoke proves that policy-service can consume `conversation.timeline.events`, maintain member role/status projection, pass sufficient active roles through to tenant allow, deny insufficient/inactive roles, and fail closed when `conversation_permission_version` is stale. It is an action-level freshness / role gate, not full ReBAC, message ownership policy, tenant policy DSL, tenant quota/risk policy or risk scoring.
 
 The decision audit outbox smoke proves that public policy decisions are staged as low-sensitive `policy_decision_audit_outbox` rows when PostgreSQL rules mode is enabled. The decision audit relay smoke proves those rows can be published to `im.policy.events` as protobuf `PolicyEvent` records and marked `PUBLISHED`. Audit rows and Kafka events store stable object keys, context-present flags, action, allow/deny, permission version, classification, reason code and trace/request ids. They do not store raw session id, raw device id, raw peer id, raw conversation id, raw message content, rule parameters, SQL errors or free-text deny/provider bodies. Explicit DLQ event-id repair is available; broad repair workflow, poison-payload classification, retention and external audit sinks remain future work.
 The decision audit repair smoke proves the first-stage operator path for explicit DLQ event IDs:

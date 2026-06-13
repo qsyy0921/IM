@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +15,23 @@ import (
 type OutboxStore struct {
 	pool *pgxpool.Pool
 	now  func() time.Time
+}
+
+type OutboxRepairAuditOptions struct {
+	EventID  string
+	TenantID string
+	Limit    int
+}
+
+type OutboxRepairAuditRow struct {
+	EventID                string
+	TenantID               string
+	Reason                 string
+	PreviousStatus         string
+	PreviousRetryCount     int
+	PreviousLastError      string
+	PreviousDeadLetteredAt *time.Time
+	RepairedAt             time.Time
 }
 
 type OutboxStoreOption func(*OutboxStore)
@@ -208,6 +226,75 @@ SELECT
 		return types.OutboxRepairStats{}, types.NewDBWriteFailed(err.Error())
 	}
 	return stats, nil
+}
+
+func (store *OutboxStore) AuditOutboxRepairs(ctx context.Context, options OutboxRepairAuditOptions) ([]OutboxRepairAuditRow, error) {
+	if store == nil || store.pool == nil {
+		return nil, errors.New("contacts outbox store is not configured")
+	}
+	limit := options.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	var args []any
+	clauses := make([]string, 0, 4)
+	if eventID := strings.TrimSpace(options.EventID); eventID != "" {
+		args = append(args, eventID)
+		clauses = append(clauses, "event_id = $"+strconv.Itoa(len(args)))
+	}
+	if tenantID := strings.TrimSpace(options.TenantID); tenantID != "" {
+		args = append(args, tenantID)
+		clauses = append(clauses, "tenant_id = $"+strconv.Itoa(len(args)))
+	}
+	where := ""
+	if len(clauses) > 0 {
+		where = "WHERE " + strings.Join(clauses, " AND ")
+	}
+	args = append(args, limit)
+	rows, err := store.pool.Query(ctx, `
+SELECT
+    event_id,
+    tenant_id,
+    previous_status,
+    previous_retry_count,
+    previous_last_error,
+    previous_dead_lettered_at,
+    repair_reason,
+    repaired_at
+FROM contacts_outbox_repair_audit
+`+where+`
+ORDER BY repaired_at DESC, event_id, id DESC
+LIMIT $`+strconv.Itoa(len(args)), args...)
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	result := make([]OutboxRepairAuditRow, 0, limit)
+	for rows.Next() {
+		var row OutboxRepairAuditRow
+		if err := rows.Scan(
+			&row.EventID,
+			&row.TenantID,
+			&row.PreviousStatus,
+			&row.PreviousRetryCount,
+			&row.PreviousLastError,
+			&row.PreviousDeadLetteredAt,
+			&row.Reason,
+			&row.RepairedAt,
+		); err != nil {
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		result = append(result, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	return result, nil
 }
 
 func (store *OutboxStore) fetchReadyLocked(ctx context.Context, tx pgx.Tx, limit int) ([]types.OutboxMessage, error) {

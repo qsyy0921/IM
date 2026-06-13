@@ -41,6 +41,7 @@ param(
     [string]$IdentityTlsServerName = "",
     [string]$IdentityTlsClientCertFile = "",
     [string]$IdentityTlsClientKeyFile = "",
+    [switch]$VerifiedAuthMetadata,
     [string]$PushWsTlsCertFile = "",
     [string]$PushWsTlsKeyFile = "",
     [string]$PushWsTlsClientCaFile = "",
@@ -121,6 +122,7 @@ if ($Scenario -eq "redis-sentinel-failover") {
 if ($Scenario -eq "redis-sentinel-master-stop") {
     $runnerRequestTimeout = "90s"
 }
+$userFacingAuthMode = if ($VerifiedAuthMetadata) { "metadata" } else { "body" }
 
 New-Item -ItemType Directory -Force $resultDir | Out-Null
 New-Item -ItemType Directory -Force $logDir | Out-Null
@@ -523,6 +525,7 @@ try {
     $processes += Start-NexusProcess -Name "conversation-grpc" -FilePath $conversationService -Port 11596 -Env @{
         NEXUSIM_CONVERSATION_SERVICE_MODE = "grpc"
         NEXUSIM_CONVERSATION_GRPC_ADDR = "127.0.0.1:11596"
+        NEXUSIM_CONVERSATION_AUTH_MODE = $userFacingAuthMode
         NEXUSIM_PG_DSN = $PgDsn
     }
 
@@ -547,6 +550,7 @@ try {
     $processes += Start-NexusProcess -Name "delivery-grpc" -FilePath $deliveryService -Port 11597 -Env @{
         NEXUSIM_DELIVERY_SERVICE_MODE = "grpc"
         NEXUSIM_DELIVERY_GRPC_ADDR = "127.0.0.1:11597"
+        NEXUSIM_DELIVERY_AUTH_MODE = $userFacingAuthMode
         NEXUSIM_PG_DSN = $PgDsn
     }
 
@@ -653,6 +657,7 @@ try {
     $processes += Start-NexusProcess -Name "message-grpc" -FilePath $messageService -Port 11595 -Env @{
         NEXUSIM_MESSAGE_SERVICE_MODE = "grpc"
         NEXUSIM_GRPC_ADDR = "127.0.0.1:11595"
+        NEXUSIM_MESSAGE_AUTH_MODE = $userFacingAuthMode
         NEXUSIM_PG_DSN = $PgDsn
         NEXUSIM_CONVERSATION_SERVICE_ADDR = "127.0.0.1:11596"
         NEXUSIM_CONVERSATION_RPC_TIMEOUT = "500ms"
@@ -693,6 +698,7 @@ try {
         "--redis-key-prefix", $pushRouteKeyPrefix,
         "--push-ws-gateway-id", $pushWSGatewayID,
         "--push-consumer-gateway-id", $pushConsumerGatewayID,
+        "--verified-auth-metadata=$VerifiedAuthMetadata",
         "--wait-timeout", "20s",
         "--request-timeout", $runnerRequestTimeout
     )

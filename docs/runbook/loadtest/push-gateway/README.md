@@ -48,7 +48,7 @@ NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_CERT_FILE=...
 NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE=...
 ```
 
-配置任一 TLS env 后必须提供 CA file，client cert/key 必须成对配置。现有 smoke 默认不启用这些参数；该配置只验证静态证书下的 RPC 加密 / mTLS 连接，不代表证书签发、轮换、分发或全服务 mTLS rollout。
+配置任一 TLS env 后必须提供 CA file，client cert/key 必须成对配置。push-gateway 转发 `delivery.ack` 时会把 WebSocket auth 派生出的 `tenant_id / user_id / device_id / session_id` 同时放入 delivery-service gRPC metadata，因而可兼容 delivery-service 的 `NEXUSIM_DELIVERY_AUTH_MODE=metadata`；默认 body auth 仍兼容历史 smoke。现有 smoke 默认不启用这些 TLS 参数；该配置只验证静态证书下的 RPC 加密 / mTLS 连接，不代表证书签发、轮换、分发或全服务 mTLS rollout。
 
 push-gateway WebSocket 入口默认仍使用 plaintext `ws://`，兼容本地 smoke。若需要第一阶段静态 WSS / mTLS，可配置：
 
@@ -84,6 +84,8 @@ NEXUSIM_PUSH_WS_TLS_CLIENT_ALLOWED_URIS=spiffe://nexusim/desktop-client
   -IdentityTlsClientCertFile .\certs\loadtest-client.crt `
   -IdentityTlsClientKeyFile .\certs\loadtest-client.key
 ```
+
+如需验证 conversation / message / delivery 三个 user-facing gRPC API 的 gateway verified metadata auth，可给脚本加 `-VerifiedAuthMetadata`，脚本会启动 `NEXUSIM_CONVERSATION_AUTH_MODE=metadata`、`NEXUSIM_MESSAGE_AUTH_MODE=metadata`、`NEXUSIM_DELIVERY_AUTH_MODE=metadata`，并让 runner 对 `CreateMemberChange`、`SendMessage / EditMessage / RevokeMessage / DeleteMessage`、`PullInbox` 发送 `x-nexusim-*` metadata。ACK 仍通过 WebSocket 进入 push-gateway，再由 push-gateway 转发到 delivery-service；该开关不改变 `delivery.notify` / durable inbox / cursor 语义，也不是完整 API gateway。
 
 若本地 push-gateway WebSocket 进程启用 WSS，runner 也支持对应 client 参数：
 

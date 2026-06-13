@@ -19,6 +19,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,6 +46,15 @@ const (
 	opDeliveryAckOK  = "delivery.ack.ok"
 	opResumeHint     = "server.resume_hint"
 	opError          = "error"
+)
+
+const (
+	metadataTenantID  = "x-nexusim-tenant-id"
+	metadataUserID    = "x-nexusim-user-id"
+	metadataDeviceID  = "x-nexusim-device-id"
+	metadataSessionID = "x-nexusim-session-id"
+	metadataTraceID   = "x-nexusim-trace-id"
+	metadataRequestID = "x-nexusim-request-id"
 )
 
 type clientFrame struct {
@@ -122,6 +132,7 @@ type config struct {
 	messageChangeAction                string
 	redisFaultCommand                  string
 	redisRestoreCommand                string
+	verifiedAuthMetadata               bool
 	cleanup                            bool
 }
 
@@ -139,6 +150,7 @@ type summary struct {
 	DeliveryTLSEnabled                      bool                   `json:"delivery_tls_enabled"`
 	IdentityTLSEnabled                      bool                   `json:"identity_tls_enabled"`
 	PushTLSEnabled                          bool                   `json:"push_tls_enabled"`
+	VerifiedAuthMetadata                    bool                   `json:"verified_auth_metadata"`
 	PushURL                                 string                 `json:"push_url"`
 	ReconnectPushURL                        string                 `json:"reconnect_push_url,omitempty"`
 	PushMetricsURL                          string                 `json:"push_metrics_url,omitempty"`
@@ -361,6 +373,15 @@ type cursor struct {
 	Seq            int64  `json:"seq"`
 }
 
+type verifiedAuthIdentity struct {
+	tenantID  string
+	userID    string
+	deviceID  string
+	sessionID string
+	traceID   string
+	requestID string
+}
+
 func main() {
 	cfg := parseConfig()
 	if err := run(cfg); err != nil {
@@ -416,6 +437,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.identityRevokeScope, "identity-revoke-scope", "device", "identity-revoke target scope: device or session")
 	flag.StringVar(&cfg.redisFaultCommand, "redis-fault-command", "", "optional command executed after WebSocket route registration and before SendMessage in redis-fault scenario")
 	flag.StringVar(&cfg.redisRestoreCommand, "redis-restore-command", "", "optional command executed after PullInbox recovery and before reconnect/ACK in redis-fault scenario")
+	flag.BoolVar(&cfg.verifiedAuthMetadata, "verified-auth-metadata", envBool(false, "NEXUSIM_PUSHGATEWAY_LOADTEST_VERIFIED_AUTH_METADATA", "NEXUSIM_CONVERSATION_LOADTEST_VERIFIED_AUTH_METADATA", "NEXUSIM_MESSAGE_LOADTEST_VERIFIED_AUTH_METADATA", "NEXUSIM_DELIVERY_LOADTEST_VERIFIED_AUTH_METADATA"), "send gateway verified identity through user-facing gRPC metadata")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete existing rows for tenant before running")
 	flag.Parse()
 	cfg.receiverDeviceIDs = parseDeviceIDs(receiverDeviceIDs, cfg.receiverDeviceID)
@@ -451,6 +473,85 @@ func parseConfig() config {
 		cfg.reconnectMetricsURL = derivePushMetricsURL(cfg.reconnectPushURL)
 	}
 	return cfg
+}
+
+func ownerAuth(cfg config, traceID string, requestID string) verifiedAuthIdentity {
+	return verifiedAuthIdentity{
+		tenantID:  cfg.tenantID,
+		userID:    cfg.ownerUserID,
+		deviceID:  "push-smoke-owner-device",
+		sessionID: "push-smoke-owner-session",
+		traceID:   traceID,
+		requestID: requestID,
+	}
+}
+
+func receiverAuth(cfg config, deviceID string, traceID string, requestID string) verifiedAuthIdentity {
+	if deviceID == "" {
+		deviceID = cfg.receiverDeviceID
+	}
+	return verifiedAuthIdentity{
+		tenantID:  cfg.tenantID,
+		userID:    cfg.receiverUserID,
+		deviceID:  deviceID,
+		sessionID: "push-smoke",
+		traceID:   traceID,
+		requestID: requestID,
+	}
+}
+
+func withVerifiedAuthMetadata(ctx context.Context, cfg config, auth verifiedAuthIdentity) context.Context {
+	if !cfg.verifiedAuthMetadata {
+		return ctx
+	}
+	pairs := []string{
+		metadataTenantID, auth.tenantID,
+		metadataUserID, auth.userID,
+		metadataDeviceID, auth.deviceID,
+	}
+	if auth.sessionID != "" {
+		pairs = append(pairs, metadataSessionID, auth.sessionID)
+	}
+	if auth.traceID != "" {
+		pairs = append(pairs, metadataTraceID, auth.traceID)
+	}
+	if auth.requestID != "" {
+		pairs = append(pairs, metadataRequestID, auth.requestID)
+	}
+	return metadata.NewOutgoingContext(ctx, metadata.Pairs(pairs...))
+}
+
+func conversationAuth(auth verifiedAuthIdentity) *conversationv1.AuthContext {
+	return &conversationv1.AuthContext{
+		TenantId:  auth.tenantID,
+		UserId:    auth.userID,
+		DeviceId:  auth.deviceID,
+		SessionId: auth.sessionID,
+		TraceId:   auth.traceID,
+		RequestId: auth.requestID,
+	}
+}
+
+func messageAuth(auth verifiedAuthIdentity) *messagev1.AuthContext {
+	return &messagev1.AuthContext{
+		TenantId:  auth.tenantID,
+		UserId:    auth.userID,
+		DeviceId:  auth.deviceID,
+		SessionId: auth.sessionID,
+		TraceId:   auth.traceID,
+		RequestId: auth.requestID,
+	}
+}
+
+func deliveryAuth(auth verifiedAuthIdentity) *deliveryv1.AuthContext {
+	return &deliveryv1.AuthContext{
+		TenantId:  auth.tenantID,
+		UserId:    auth.userID,
+		DeviceId:  auth.deviceID,
+		SessionId: auth.sessionID,
+		TraceId:   auth.traceID,
+		RequestId: auth.requestID,
+	}
 }
 
 func registerTLSFlags(prefix string, envPrefix string, serviceName string, config *grpctls.Config) {
@@ -622,6 +723,7 @@ func run(cfg config) error {
 		DeliveryTLSEnabled:                      cfg.deliveryTLS.Enabled(),
 		IdentityTLSEnabled:                      cfg.identityTLS.Enabled(),
 		PushTLSEnabled:                          cfg.pushTLS.Enabled(),
+		VerifiedAuthMetadata:                    cfg.verifiedAuthMetadata,
 		PushURL:                                 cfg.pushURL,
 		ReconnectPushURL:                        cfg.reconnectPushURL,
 		PushMetricsURL:                          cfg.pushMetricsURL,
@@ -1838,15 +1940,10 @@ func createReceiverJoin(
 ) (*conversationv1.CreateMemberChangeResponse, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := ownerAuth(cfg, "push-smoke-join", "push-smoke-join")
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	return client.CreateMemberChange(requestCtx, &conversationv1.CreateMemberChangeRequest{
-		AuthContext: &conversationv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.ownerUserID,
-			DeviceId:  "push-smoke-owner-device",
-			SessionId: "push-smoke-owner-session",
-			TraceId:   "push-smoke-join",
-			RequestId: "push-smoke-join",
-		},
+		AuthContext:           conversationAuth(auth),
 		ConversationId:        cfg.conversationID,
 		TargetUserId:          cfg.receiverUserID,
 		ChangeType:            conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_JOIN,
@@ -1870,15 +1967,10 @@ func sendMessage(
 	}
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := ownerAuth(cfg, "push-smoke-send", "push-smoke-send")
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	return client.SendMessage(requestCtx, &messagev1.SendMessageRequest{
-		AuthContext: &messagev1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.ownerUserID,
-			DeviceId:  "push-smoke-owner-device",
-			SessionId: "push-smoke-owner-session",
-			TraceId:   "push-smoke-send",
-			RequestId: "push-smoke-send",
-		},
+		AuthContext:    messageAuth(auth),
 		ConversationId: cfg.conversationID,
 		ClientMsgId:    fmt.Sprintf("push-smoke-client-message-%d", index),
 		MessageType:    "TEXT",
@@ -1894,14 +1986,8 @@ func changeMessage(
 ) (*messagev1.MessageChangeResponse, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
-	auth := &messagev1.AuthContext{
-		TenantId:  cfg.tenantID,
-		UserId:    cfg.ownerUserID,
-		DeviceId:  "push-smoke-owner-device",
-		SessionId: "push-smoke-owner-session",
-		TraceId:   "push-smoke-message-change",
-		RequestId: "push-smoke-message-change",
-	}
+	auth := ownerAuth(cfg, "push-smoke-message-change", "push-smoke-message-change")
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	switch cfg.messageChangeAction {
 	case "edit":
 		payload, err := structpb.NewStruct(map[string]any{"text": "push gateway edited message"})
@@ -1909,7 +1995,7 @@ func changeMessage(
 			return nil, err
 		}
 		return client.EditMessage(requestCtx, &messagev1.EditMessageRequest{
-			AuthContext:    auth,
+			AuthContext:    messageAuth(auth),
 			ConversationId: cfg.conversationID,
 			MessageId:      messageID,
 			IdempotencyKey: "push-smoke-edit-1",
@@ -1918,7 +2004,7 @@ func changeMessage(
 		})
 	case "revoke":
 		return client.RevokeMessage(requestCtx, &messagev1.RevokeMessageRequest{
-			AuthContext:    auth,
+			AuthContext:    messageAuth(auth),
 			ConversationId: cfg.conversationID,
 			MessageId:      messageID,
 			IdempotencyKey: "push-smoke-revoke-1",
@@ -1926,7 +2012,7 @@ func changeMessage(
 		})
 	case "delete":
 		return client.DeleteMessage(requestCtx, &messagev1.DeleteMessageRequest{
-			AuthContext:    auth,
+			AuthContext:    messageAuth(auth),
 			ConversationId: cfg.conversationID,
 			MessageId:      messageID,
 			IdempotencyKey: "push-smoke-delete-1",
@@ -2054,15 +2140,10 @@ func pullInboxAtLeast(
 	for {
 		requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 		begin := time.Now()
+		auth := receiverAuth(cfg, cfg.receiverDeviceID, "push-smoke-pull", "push-smoke-pull")
+		requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 		response, err := client.PullInbox(requestCtx, &deliveryv1.PullInboxRequest{
-			AuthContext: &deliveryv1.AuthContext{
-				TenantId:  cfg.tenantID,
-				UserId:    cfg.receiverUserID,
-				DeviceId:  cfg.receiverDeviceID,
-				SessionId: "push-smoke",
-				TraceId:   "push-smoke-pull",
-				RequestId: "push-smoke-pull",
-			},
+			AuthContext:    deliveryAuth(auth),
 			ConversationId: cfg.conversationID,
 			AfterSeq:       afterSeq,
 			Limit:          int32(limit),
@@ -2591,4 +2672,19 @@ func gitStatusShort() string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
+}
+
+func envBool(fallback bool, names ...string) bool {
+	for _, name := range names {
+		value := strings.TrimSpace(os.Getenv(name))
+		if value == "" {
+			continue
+		}
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return fallback
+		}
+		return parsed
+	}
+	return fallback
 }

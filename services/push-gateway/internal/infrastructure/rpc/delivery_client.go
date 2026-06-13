@@ -12,7 +12,17 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+)
+
+const (
+	deliveryMetadataTenantID  = "x-nexusim-tenant-id"
+	deliveryMetadataUserID    = "x-nexusim-user-id"
+	deliveryMetadataDeviceID  = "x-nexusim-device-id"
+	deliveryMetadataSessionID = "x-nexusim-session-id"
+	deliveryMetadataTraceID   = "x-nexusim-trace-id"
+	deliveryMetadataRequestID = "x-nexusim-request-id"
 )
 
 type DeliveryClient struct {
@@ -77,6 +87,7 @@ func (client DeliveryClient) AckDelivery(
 ) (types.AckDeliveryResult, error) {
 	callCtx, cancel := context.WithTimeout(ctx, client.timeout)
 	defer cancel()
+	callCtx = deliveryOutgoingMetadataContext(callCtx, command.AuthContext)
 
 	response, err := client.client.AckDelivery(callCtx, &deliveryv1.AckDeliveryRequest{
 		AuthContext: &deliveryv1.AuthContext{
@@ -128,4 +139,22 @@ func mapDeliveryError(err error) error {
 	default:
 		return types.NewDeliveryUnavailable("delivery service error")
 	}
+}
+
+func deliveryOutgoingMetadataContext(ctx context.Context, auth types.AuthContext) context.Context {
+	pairs := []string{
+		deliveryMetadataTenantID, auth.TenantID,
+		deliveryMetadataUserID, auth.UserID,
+		deliveryMetadataDeviceID, auth.DeviceID,
+	}
+	if auth.SessionID != "" {
+		pairs = append(pairs, deliveryMetadataSessionID, auth.SessionID)
+	}
+	if auth.TraceID != "" {
+		pairs = append(pairs, deliveryMetadataTraceID, auth.TraceID)
+	}
+	if auth.RequestID != "" {
+		pairs = append(pairs, deliveryMetadataRequestID, auth.RequestID)
+	}
+	return metadata.AppendToOutgoingContext(ctx, pairs...)
 }

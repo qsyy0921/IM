@@ -14,6 +14,7 @@ loadtest-report-20260609-message-service-consolidated.md
 loadtest-report-20260610-delete-message-smoke.md
 loadtest-report-20260610-edit-message-smoke.md
 loadtest-report-20260610-revoke-message-smoke.md
+loadtest-report-20260613-message-mutation-verified-metadata-smoke.md
 ```
 
 ## 1. 一句话结论
@@ -117,6 +118,8 @@ NEXUSIM_MESSAGE_DELETE_VERIFIED_AUTH_METADATA=true
 ```
 
 对应 `run-local-smoke.ps1` 支持 `-VerifiedAuthMetadata`，会把本地 conversation / message / delivery gRPC 进程切到 metadata auth，并让 runner 发送 metadata。默认仍是 body auth 兼容历史 smoke。
+
+2026-06-13 补充：`messageedit / messagerevoke / messagedelete -VerifiedAuthMetadata` 三条真实进程 smoke 已通过，验证 `EditMessage / RevokeMessage / DeleteMessage` 在 metadata auth 模式下分别产生 `message.edited.v1 / message.revoked.v1 / message.deleted.v1`，并由 delivery-service 投影到 `PullInbox` 后完成 `AckDelivery`。报告见 `loadtest-report-20260613-message-mutation-verified-metadata-smoke.md`。
 
 本阶段没有覆盖：
 

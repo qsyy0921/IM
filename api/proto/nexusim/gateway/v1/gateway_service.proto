@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package nexusim.gateway.v1;
 
+import "nexusim/contacts/v1/contacts_service.proto";
 import "nexusim/conversation/v1/conversation_service.proto";
 import "nexusim/delivery/v1/delivery_service.proto";
 import "nexusim/message/v1/message_service.proto";
@@ -32,4 +33,15 @@ service GatewayService {
   rpc ArchiveConversation(nexusim.receipt.v1.ArchiveConversationRequest) returns (nexusim.receipt.v1.ArchiveConversationResponse);
   rpc PinConversation(nexusim.receipt.v1.PinConversationRequest) returns (nexusim.receipt.v1.PinConversationResponse);
   rpc MuteConversation(nexusim.receipt.v1.MuteConversationRequest) returns (nexusim.receipt.v1.MuteConversationResponse);
+
+  rpc SendContactRequest(nexusim.contacts.v1.SendContactRequestRequest) returns (nexusim.contacts.v1.SendContactRequestResponse);
+  rpc RespondContactRequest(nexusim.contacts.v1.RespondContactRequestRequest) returns (nexusim.contacts.v1.RespondContactRequestResponse);
+  rpc CancelContactRequest(nexusim.contacts.v1.CancelContactRequestRequest) returns (nexusim.contacts.v1.CancelContactRequestResponse);
+  rpc ListContactRequests(nexusim.contacts.v1.ListContactRequestsRequest) returns (nexusim.contacts.v1.ListContactRequestsResponse);
+  rpc ListContacts(nexusim.contacts.v1.ListContactsRequest) returns (nexusim.contacts.v1.ListContactsResponse);
+  rpc GetContactState(nexusim.contacts.v1.GetContactStateRequest) returns (nexusim.contacts.v1.GetContactStateResponse);
+  rpc DeleteContact(nexusim.contacts.v1.DeleteContactRequest) returns (nexusim.contacts.v1.DeleteContactResponse);
+  rpc BlockContact(nexusim.contacts.v1.BlockContactRequest) returns (nexusim.contacts.v1.BlockContactResponse);
+  rpc UnblockContact(nexusim.contacts.v1.UnblockContactRequest) returns (nexusim.contacts.v1.UnblockContactResponse);
+  rpc UpdateContactRemark(nexusim.contacts.v1.UpdateContactRemarkRequest) returns (nexusim.contacts.v1.UpdateContactRemarkResponse);
 }

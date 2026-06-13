@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	contactsv1 "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1"
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	gatewayv1 "github.com/qsyy0921/IM/api/proto/nexusim/gateway/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
@@ -128,6 +129,69 @@ func TestListConversationsInjectsVerifiedAuth(t *testing.T) {
 	})
 }
 
+func TestSendContactRequestInjectsVerifiedAuthAndOverridesBody(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	authenticator, err := gatewayauth.NewAuthenticator(gatewayauth.Config{
+		Mode:     gatewayauth.ModeHMAC,
+		Secret:   "secret",
+		Audience: "api-gateway",
+		Now:      func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	token, err := gatewayauth.SignGatewayToken("secret", map[string]string{
+		"tenant_id":  "tenant-token",
+		"user_id":    "user-token",
+		"device_id":  "device-token",
+		"session_id": "session-token",
+		"trace_id":   "trace-token",
+		"aud":        "api-gateway",
+	}, now.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("sign gateway token: %v", err)
+	}
+	fake := &fakeContactsClient{}
+	server := NewServer(Config{Authenticator: authenticator, Contacts: fake})
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		"authorization", "Bearer "+token,
+		metadataDeviceID, "device-token",
+		metadataRequestID, "request-contacts-1",
+	))
+
+	_, err = server.SendContactRequest(ctx, &contactsv1.SendContactRequestRequest{
+		AuthContext: &contactsv1.AuthContext{
+			TenantId:  "tenant-body",
+			UserId:    "user-body",
+			DeviceId:  "device-body",
+			SessionId: "session-body",
+			TraceId:   "trace-body",
+			RequestId: "request-body",
+		},
+		TargetUserId:   "target-user",
+		IdempotencyKey: "idem-1",
+	})
+	if err != nil {
+		t.Fatalf("send contact request: %v", err)
+	}
+	if fake.sendRequest.GetAuthContext().GetTenantId() != "tenant-token" ||
+		fake.sendRequest.GetAuthContext().GetUserId() != "user-token" ||
+		fake.sendRequest.GetAuthContext().GetDeviceId() != "device-token" ||
+		fake.sendRequest.GetAuthContext().GetSessionId() != "session-token" ||
+		fake.sendRequest.GetAuthContext().GetTraceId() != "trace-token" ||
+		fake.sendRequest.GetAuthContext().GetRequestId() != "request-contacts-1" {
+		t.Fatalf("expected contacts auth to be overwritten, got %+v", fake.sendRequest.GetAuthContext())
+	}
+	assertOutgoingMetadata(t, fake.ctx, map[string]string{
+		metadataTenantID:  "tenant-token",
+		metadataUserID:    "user-token",
+		metadataDeviceID:  "device-token",
+		metadataSessionID: "session-token",
+		metadataTraceID:   "trace-token",
+		metadataRequestID: "request-contacts-1",
+	})
+}
+
 func TestGatewayRejectsMissingToken(t *testing.T) {
 	authenticator, err := gatewayauth.NewAuthenticator(gatewayauth.Config{
 		Mode:     gatewayauth.ModeHMAC,
@@ -189,6 +253,7 @@ func TestGatewayDefaultRegistrationKeepsLegacyDescriptors(t *testing.T) {
 
 	info := grpcServer.GetServiceInfo()
 	assertServiceRegistered(t, info, "nexusim.gateway.v1.GatewayService")
+	assertServiceRegistered(t, info, "nexusim.contacts.v1.ContactsService")
 	assertServiceRegistered(t, info, "nexusim.conversation.v1.ConversationService")
 	assertServiceRegistered(t, info, "nexusim.message.v1.MessageService")
 	assertServiceRegistered(t, info, "nexusim.delivery.v1.DeliveryService")
@@ -202,6 +267,7 @@ func TestGatewayCanDisableLegacyDescriptors(t *testing.T) {
 
 	info := grpcServer.GetServiceInfo()
 	assertServiceRegistered(t, info, "nexusim.gateway.v1.GatewayService")
+	assertServiceNotRegistered(t, info, "nexusim.contacts.v1.ContactsService")
 	assertServiceNotRegistered(t, info, "nexusim.conversation.v1.ConversationService")
 	assertServiceNotRegistered(t, info, "nexusim.message.v1.MessageService")
 	assertServiceNotRegistered(t, info, "nexusim.delivery.v1.DeliveryService")
@@ -270,6 +336,59 @@ func (client *fakeMessageClient) RevokeMessage(context.Context, *messagev1.Revok
 }
 
 func (client *fakeMessageClient) DeleteMessage(context.Context, *messagev1.DeleteMessageRequest, ...grpc.CallOption) (*messagev1.MessageChangeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+type fakeContactsClient struct {
+	ctx         context.Context
+	sendRequest *contactsv1.SendContactRequestRequest
+}
+
+func (client *fakeContactsClient) SendContactRequest(ctx context.Context, in *contactsv1.SendContactRequestRequest, opts ...grpc.CallOption) (*contactsv1.SendContactRequestResponse, error) {
+	client.ctx = ctx
+	client.sendRequest = in
+	return &contactsv1.SendContactRequestResponse{
+		RequestId:      "contact-request-1",
+		TenantId:       in.GetAuthContext().GetTenantId(),
+		SenderUserId:   in.GetAuthContext().GetUserId(),
+		ReceiverUserId: in.GetTargetUserId(),
+		Status:         contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_PENDING,
+	}, nil
+}
+
+func (client *fakeContactsClient) RespondContactRequest(context.Context, *contactsv1.RespondContactRequestRequest, ...grpc.CallOption) (*contactsv1.RespondContactRequestResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeContactsClient) CancelContactRequest(context.Context, *contactsv1.CancelContactRequestRequest, ...grpc.CallOption) (*contactsv1.CancelContactRequestResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeContactsClient) ListContactRequests(context.Context, *contactsv1.ListContactRequestsRequest, ...grpc.CallOption) (*contactsv1.ListContactRequestsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeContactsClient) ListContacts(context.Context, *contactsv1.ListContactsRequest, ...grpc.CallOption) (*contactsv1.ListContactsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeContactsClient) GetContactState(context.Context, *contactsv1.GetContactStateRequest, ...grpc.CallOption) (*contactsv1.GetContactStateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeContactsClient) DeleteContact(context.Context, *contactsv1.DeleteContactRequest, ...grpc.CallOption) (*contactsv1.DeleteContactResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeContactsClient) BlockContact(context.Context, *contactsv1.BlockContactRequest, ...grpc.CallOption) (*contactsv1.BlockContactResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeContactsClient) UnblockContact(context.Context, *contactsv1.UnblockContactRequest, ...grpc.CallOption) (*contactsv1.UnblockContactResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeContactsClient) UpdateContactRemark(context.Context, *contactsv1.UpdateContactRemarkRequest, ...grpc.CallOption) (*contactsv1.UpdateContactRemarkResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "not implemented")
 }
 

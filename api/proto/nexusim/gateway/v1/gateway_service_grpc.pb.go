@@ -8,6 +8,7 @@ package gatewayv1
 
 import (
 	context "context"
+	v14 "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1"
 	v1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	v12 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	v11 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
@@ -40,6 +41,16 @@ const (
 	GatewayService_ArchiveConversation_FullMethodName       = "/nexusim.gateway.v1.GatewayService/ArchiveConversation"
 	GatewayService_PinConversation_FullMethodName           = "/nexusim.gateway.v1.GatewayService/PinConversation"
 	GatewayService_MuteConversation_FullMethodName          = "/nexusim.gateway.v1.GatewayService/MuteConversation"
+	GatewayService_SendContactRequest_FullMethodName        = "/nexusim.gateway.v1.GatewayService/SendContactRequest"
+	GatewayService_RespondContactRequest_FullMethodName     = "/nexusim.gateway.v1.GatewayService/RespondContactRequest"
+	GatewayService_CancelContactRequest_FullMethodName      = "/nexusim.gateway.v1.GatewayService/CancelContactRequest"
+	GatewayService_ListContactRequests_FullMethodName       = "/nexusim.gateway.v1.GatewayService/ListContactRequests"
+	GatewayService_ListContacts_FullMethodName              = "/nexusim.gateway.v1.GatewayService/ListContacts"
+	GatewayService_GetContactState_FullMethodName           = "/nexusim.gateway.v1.GatewayService/GetContactState"
+	GatewayService_DeleteContact_FullMethodName             = "/nexusim.gateway.v1.GatewayService/DeleteContact"
+	GatewayService_BlockContact_FullMethodName              = "/nexusim.gateway.v1.GatewayService/BlockContact"
+	GatewayService_UnblockContact_FullMethodName            = "/nexusim.gateway.v1.GatewayService/UnblockContact"
+	GatewayService_UpdateContactRemark_FullMethodName       = "/nexusim.gateway.v1.GatewayService/UpdateContactRemark"
 )
 
 // GatewayServiceClient is the client API for GatewayService service.
@@ -66,6 +77,16 @@ type GatewayServiceClient interface {
 	ArchiveConversation(ctx context.Context, in *v13.ArchiveConversationRequest, opts ...grpc.CallOption) (*v13.ArchiveConversationResponse, error)
 	PinConversation(ctx context.Context, in *v13.PinConversationRequest, opts ...grpc.CallOption) (*v13.PinConversationResponse, error)
 	MuteConversation(ctx context.Context, in *v13.MuteConversationRequest, opts ...grpc.CallOption) (*v13.MuteConversationResponse, error)
+	SendContactRequest(ctx context.Context, in *v14.SendContactRequestRequest, opts ...grpc.CallOption) (*v14.SendContactRequestResponse, error)
+	RespondContactRequest(ctx context.Context, in *v14.RespondContactRequestRequest, opts ...grpc.CallOption) (*v14.RespondContactRequestResponse, error)
+	CancelContactRequest(ctx context.Context, in *v14.CancelContactRequestRequest, opts ...grpc.CallOption) (*v14.CancelContactRequestResponse, error)
+	ListContactRequests(ctx context.Context, in *v14.ListContactRequestsRequest, opts ...grpc.CallOption) (*v14.ListContactRequestsResponse, error)
+	ListContacts(ctx context.Context, in *v14.ListContactsRequest, opts ...grpc.CallOption) (*v14.ListContactsResponse, error)
+	GetContactState(ctx context.Context, in *v14.GetContactStateRequest, opts ...grpc.CallOption) (*v14.GetContactStateResponse, error)
+	DeleteContact(ctx context.Context, in *v14.DeleteContactRequest, opts ...grpc.CallOption) (*v14.DeleteContactResponse, error)
+	BlockContact(ctx context.Context, in *v14.BlockContactRequest, opts ...grpc.CallOption) (*v14.BlockContactResponse, error)
+	UnblockContact(ctx context.Context, in *v14.UnblockContactRequest, opts ...grpc.CallOption) (*v14.UnblockContactResponse, error)
+	UpdateContactRemark(ctx context.Context, in *v14.UpdateContactRemarkRequest, opts ...grpc.CallOption) (*v14.UpdateContactRemarkResponse, error)
 }
 
 type gatewayServiceClient struct {
@@ -246,6 +267,106 @@ func (c *gatewayServiceClient) MuteConversation(ctx context.Context, in *v13.Mut
 	return out, nil
 }
 
+func (c *gatewayServiceClient) SendContactRequest(ctx context.Context, in *v14.SendContactRequestRequest, opts ...grpc.CallOption) (*v14.SendContactRequestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v14.SendContactRequestResponse)
+	err := c.cc.Invoke(ctx, GatewayService_SendContactRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) RespondContactRequest(ctx context.Context, in *v14.RespondContactRequestRequest, opts ...grpc.CallOption) (*v14.RespondContactRequestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v14.RespondContactRequestResponse)
+	err := c.cc.Invoke(ctx, GatewayService_RespondContactRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) CancelContactRequest(ctx context.Context, in *v14.CancelContactRequestRequest, opts ...grpc.CallOption) (*v14.CancelContactRequestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v14.CancelContactRequestResponse)
+	err := c.cc.Invoke(ctx, GatewayService_CancelContactRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) ListContactRequests(ctx context.Context, in *v14.ListContactRequestsRequest, opts ...grpc.CallOption) (*v14.ListContactRequestsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v14.ListContactRequestsResponse)
+	err := c.cc.Invoke(ctx, GatewayService_ListContactRequests_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) ListContacts(ctx context.Context, in *v14.ListContactsRequest, opts ...grpc.CallOption) (*v14.ListContactsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v14.ListContactsResponse)
+	err := c.cc.Invoke(ctx, GatewayService_ListContacts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) GetContactState(ctx context.Context, in *v14.GetContactStateRequest, opts ...grpc.CallOption) (*v14.GetContactStateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v14.GetContactStateResponse)
+	err := c.cc.Invoke(ctx, GatewayService_GetContactState_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) DeleteContact(ctx context.Context, in *v14.DeleteContactRequest, opts ...grpc.CallOption) (*v14.DeleteContactResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v14.DeleteContactResponse)
+	err := c.cc.Invoke(ctx, GatewayService_DeleteContact_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) BlockContact(ctx context.Context, in *v14.BlockContactRequest, opts ...grpc.CallOption) (*v14.BlockContactResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v14.BlockContactResponse)
+	err := c.cc.Invoke(ctx, GatewayService_BlockContact_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) UnblockContact(ctx context.Context, in *v14.UnblockContactRequest, opts ...grpc.CallOption) (*v14.UnblockContactResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v14.UnblockContactResponse)
+	err := c.cc.Invoke(ctx, GatewayService_UnblockContact_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) UpdateContactRemark(ctx context.Context, in *v14.UpdateContactRemarkRequest, opts ...grpc.CallOption) (*v14.UpdateContactRemarkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v14.UpdateContactRemarkResponse)
+	err := c.cc.Invoke(ctx, GatewayService_UpdateContactRemark_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GatewayServiceServer is the server API for GatewayService service.
 // All implementations must embed UnimplementedGatewayServiceServer
 // for forward compatibility.
@@ -270,6 +391,16 @@ type GatewayServiceServer interface {
 	ArchiveConversation(context.Context, *v13.ArchiveConversationRequest) (*v13.ArchiveConversationResponse, error)
 	PinConversation(context.Context, *v13.PinConversationRequest) (*v13.PinConversationResponse, error)
 	MuteConversation(context.Context, *v13.MuteConversationRequest) (*v13.MuteConversationResponse, error)
+	SendContactRequest(context.Context, *v14.SendContactRequestRequest) (*v14.SendContactRequestResponse, error)
+	RespondContactRequest(context.Context, *v14.RespondContactRequestRequest) (*v14.RespondContactRequestResponse, error)
+	CancelContactRequest(context.Context, *v14.CancelContactRequestRequest) (*v14.CancelContactRequestResponse, error)
+	ListContactRequests(context.Context, *v14.ListContactRequestsRequest) (*v14.ListContactRequestsResponse, error)
+	ListContacts(context.Context, *v14.ListContactsRequest) (*v14.ListContactsResponse, error)
+	GetContactState(context.Context, *v14.GetContactStateRequest) (*v14.GetContactStateResponse, error)
+	DeleteContact(context.Context, *v14.DeleteContactRequest) (*v14.DeleteContactResponse, error)
+	BlockContact(context.Context, *v14.BlockContactRequest) (*v14.BlockContactResponse, error)
+	UnblockContact(context.Context, *v14.UnblockContactRequest) (*v14.UnblockContactResponse, error)
+	UpdateContactRemark(context.Context, *v14.UpdateContactRemarkRequest) (*v14.UpdateContactRemarkResponse, error)
 	mustEmbedUnimplementedGatewayServiceServer()
 }
 
@@ -330,6 +461,36 @@ func (UnimplementedGatewayServiceServer) PinConversation(context.Context, *v13.P
 }
 func (UnimplementedGatewayServiceServer) MuteConversation(context.Context, *v13.MuteConversationRequest) (*v13.MuteConversationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method MuteConversation not implemented")
+}
+func (UnimplementedGatewayServiceServer) SendContactRequest(context.Context, *v14.SendContactRequestRequest) (*v14.SendContactRequestResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SendContactRequest not implemented")
+}
+func (UnimplementedGatewayServiceServer) RespondContactRequest(context.Context, *v14.RespondContactRequestRequest) (*v14.RespondContactRequestResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RespondContactRequest not implemented")
+}
+func (UnimplementedGatewayServiceServer) CancelContactRequest(context.Context, *v14.CancelContactRequestRequest) (*v14.CancelContactRequestResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CancelContactRequest not implemented")
+}
+func (UnimplementedGatewayServiceServer) ListContactRequests(context.Context, *v14.ListContactRequestsRequest) (*v14.ListContactRequestsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListContactRequests not implemented")
+}
+func (UnimplementedGatewayServiceServer) ListContacts(context.Context, *v14.ListContactsRequest) (*v14.ListContactsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListContacts not implemented")
+}
+func (UnimplementedGatewayServiceServer) GetContactState(context.Context, *v14.GetContactStateRequest) (*v14.GetContactStateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetContactState not implemented")
+}
+func (UnimplementedGatewayServiceServer) DeleteContact(context.Context, *v14.DeleteContactRequest) (*v14.DeleteContactResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteContact not implemented")
+}
+func (UnimplementedGatewayServiceServer) BlockContact(context.Context, *v14.BlockContactRequest) (*v14.BlockContactResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BlockContact not implemented")
+}
+func (UnimplementedGatewayServiceServer) UnblockContact(context.Context, *v14.UnblockContactRequest) (*v14.UnblockContactResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UnblockContact not implemented")
+}
+func (UnimplementedGatewayServiceServer) UpdateContactRemark(context.Context, *v14.UpdateContactRemarkRequest) (*v14.UpdateContactRemarkResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateContactRemark not implemented")
 }
 func (UnimplementedGatewayServiceServer) mustEmbedUnimplementedGatewayServiceServer() {}
 func (UnimplementedGatewayServiceServer) testEmbeddedByValue()                        {}
@@ -658,6 +819,186 @@ func _GatewayService_MuteConversation_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GatewayService_SendContactRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v14.SendContactRequestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).SendContactRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_SendContactRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).SendContactRequest(ctx, req.(*v14.SendContactRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_RespondContactRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v14.RespondContactRequestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).RespondContactRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_RespondContactRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).RespondContactRequest(ctx, req.(*v14.RespondContactRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_CancelContactRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v14.CancelContactRequestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).CancelContactRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_CancelContactRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).CancelContactRequest(ctx, req.(*v14.CancelContactRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_ListContactRequests_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v14.ListContactRequestsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).ListContactRequests(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_ListContactRequests_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).ListContactRequests(ctx, req.(*v14.ListContactRequestsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_ListContacts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v14.ListContactsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).ListContacts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_ListContacts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).ListContacts(ctx, req.(*v14.ListContactsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_GetContactState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v14.GetContactStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).GetContactState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_GetContactState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).GetContactState(ctx, req.(*v14.GetContactStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_DeleteContact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v14.DeleteContactRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).DeleteContact(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_DeleteContact_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).DeleteContact(ctx, req.(*v14.DeleteContactRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_BlockContact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v14.BlockContactRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).BlockContact(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_BlockContact_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).BlockContact(ctx, req.(*v14.BlockContactRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_UnblockContact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v14.UnblockContactRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).UnblockContact(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_UnblockContact_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).UnblockContact(ctx, req.(*v14.UnblockContactRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_UpdateContactRemark_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v14.UpdateContactRemarkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).UpdateContactRemark(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_UpdateContactRemark_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).UpdateContactRemark(ctx, req.(*v14.UpdateContactRemarkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // GatewayService_ServiceDesc is the grpc.ServiceDesc for GatewayService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -732,6 +1073,46 @@ var GatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "MuteConversation",
 			Handler:    _GatewayService_MuteConversation_Handler,
+		},
+		{
+			MethodName: "SendContactRequest",
+			Handler:    _GatewayService_SendContactRequest_Handler,
+		},
+		{
+			MethodName: "RespondContactRequest",
+			Handler:    _GatewayService_RespondContactRequest_Handler,
+		},
+		{
+			MethodName: "CancelContactRequest",
+			Handler:    _GatewayService_CancelContactRequest_Handler,
+		},
+		{
+			MethodName: "ListContactRequests",
+			Handler:    _GatewayService_ListContactRequests_Handler,
+		},
+		{
+			MethodName: "ListContacts",
+			Handler:    _GatewayService_ListContacts_Handler,
+		},
+		{
+			MethodName: "GetContactState",
+			Handler:    _GatewayService_GetContactState_Handler,
+		},
+		{
+			MethodName: "DeleteContact",
+			Handler:    _GatewayService_DeleteContact_Handler,
+		},
+		{
+			MethodName: "BlockContact",
+			Handler:    _GatewayService_BlockContact_Handler,
+		},
+		{
+			MethodName: "UnblockContact",
+			Handler:    _GatewayService_UnblockContact_Handler,
+		},
+		{
+			MethodName: "UpdateContactRemark",
+			Handler:    _GatewayService_UpdateContactRemark_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

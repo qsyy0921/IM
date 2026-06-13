@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 
+	contactsv1 "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1"
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	gatewayv1 "github.com/qsyy0921/IM/api/proto/nexusim/gateway/v1"
@@ -36,12 +37,14 @@ type Authenticator interface {
 
 type Server struct {
 	gatewayv1.UnimplementedGatewayServiceServer
+	contactsv1.UnimplementedContactsServiceServer
 	conversationv1.UnimplementedConversationServiceServer
 	messagev1.UnimplementedMessageServiceServer
 	deliveryv1.UnimplementedDeliveryServiceServer
 	receiptv1.UnimplementedReceiptServiceServer
 
 	auth         Authenticator
+	contacts     contactsv1.ContactsServiceClient
 	conversation conversationv1.ConversationServiceClient
 	message      messagev1.MessageServiceClient
 	delivery     deliveryv1.DeliveryServiceClient
@@ -50,6 +53,7 @@ type Server struct {
 
 type Config struct {
 	Authenticator Authenticator
+	Contacts      contactsv1.ContactsServiceClient
 	Conversation  conversationv1.ConversationServiceClient
 	Message       messagev1.MessageServiceClient
 	Delivery      deliveryv1.DeliveryServiceClient
@@ -63,6 +67,7 @@ type RegisterConfig struct {
 func NewServer(config Config) *Server {
 	return &Server{
 		auth:         config.Authenticator,
+		contacts:     config.Contacts,
 		conversation: config.Conversation,
 		message:      config.Message,
 		delivery:     config.Delivery,
@@ -79,6 +84,7 @@ func RegisterWithConfig(server grpcgo.ServiceRegistrar, gateway *Server, config 
 	if !config.RegisterLegacyDescriptors {
 		return
 	}
+	contactsv1.RegisterContactsServiceServer(server, gateway)
 	conversationv1.RegisterConversationServiceServer(server, gateway)
 	messagev1.RegisterMessageServiceServer(server, gateway)
 	deliveryv1.RegisterDeliveryServiceServer(server, gateway)
@@ -259,6 +265,106 @@ func (server *Server) MuteConversation(ctx context.Context, request *receiptv1.M
 	return server.receipt.MuteConversation(outgoing, cloned)
 }
 
+func (server *Server) SendContactRequest(ctx context.Context, request *contactsv1.SendContactRequestRequest) (*contactsv1.SendContactRequestResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*contactsv1.SendContactRequestRequest)
+	cloned.AuthContext = contactsAuth(auth)
+	return server.contacts.SendContactRequest(outgoing, cloned)
+}
+
+func (server *Server) RespondContactRequest(ctx context.Context, request *contactsv1.RespondContactRequestRequest) (*contactsv1.RespondContactRequestResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*contactsv1.RespondContactRequestRequest)
+	cloned.AuthContext = contactsAuth(auth)
+	return server.contacts.RespondContactRequest(outgoing, cloned)
+}
+
+func (server *Server) CancelContactRequest(ctx context.Context, request *contactsv1.CancelContactRequestRequest) (*contactsv1.CancelContactRequestResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*contactsv1.CancelContactRequestRequest)
+	cloned.AuthContext = contactsAuth(auth)
+	return server.contacts.CancelContactRequest(outgoing, cloned)
+}
+
+func (server *Server) ListContactRequests(ctx context.Context, request *contactsv1.ListContactRequestsRequest) (*contactsv1.ListContactRequestsResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*contactsv1.ListContactRequestsRequest)
+	cloned.AuthContext = contactsAuth(auth)
+	return server.contacts.ListContactRequests(outgoing, cloned)
+}
+
+func (server *Server) ListContacts(ctx context.Context, request *contactsv1.ListContactsRequest) (*contactsv1.ListContactsResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*contactsv1.ListContactsRequest)
+	cloned.AuthContext = contactsAuth(auth)
+	return server.contacts.ListContacts(outgoing, cloned)
+}
+
+func (server *Server) GetContactState(ctx context.Context, request *contactsv1.GetContactStateRequest) (*contactsv1.GetContactStateResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*contactsv1.GetContactStateRequest)
+	cloned.AuthContext = contactsAuth(auth)
+	return server.contacts.GetContactState(outgoing, cloned)
+}
+
+func (server *Server) DeleteContact(ctx context.Context, request *contactsv1.DeleteContactRequest) (*contactsv1.DeleteContactResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*contactsv1.DeleteContactRequest)
+	cloned.AuthContext = contactsAuth(auth)
+	return server.contacts.DeleteContact(outgoing, cloned)
+}
+
+func (server *Server) BlockContact(ctx context.Context, request *contactsv1.BlockContactRequest) (*contactsv1.BlockContactResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*contactsv1.BlockContactRequest)
+	cloned.AuthContext = contactsAuth(auth)
+	return server.contacts.BlockContact(outgoing, cloned)
+}
+
+func (server *Server) UnblockContact(ctx context.Context, request *contactsv1.UnblockContactRequest) (*contactsv1.UnblockContactResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*contactsv1.UnblockContactRequest)
+	cloned.AuthContext = contactsAuth(auth)
+	return server.contacts.UnblockContact(outgoing, cloned)
+}
+
+func (server *Server) UpdateContactRemark(ctx context.Context, request *contactsv1.UpdateContactRemarkRequest) (*contactsv1.UpdateContactRemarkResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*contactsv1.UpdateContactRemarkRequest)
+	cloned.AuthContext = contactsAuth(auth)
+	return server.contacts.UpdateContactRemark(outgoing, cloned)
+}
+
 func (server *Server) authenticate(ctx context.Context) (gatewayauth.AuthContext, context.Context, error) {
 	if server.auth == nil {
 		return gatewayauth.AuthContext{}, nil, status.Error(codes.Internal, "gateway auth is not configured")
@@ -338,6 +444,17 @@ func publicAuthError(err error) error {
 		return status.Error(codes.Unauthenticated, "gateway auth failed")
 	default:
 		return status.Error(codes.Unauthenticated, "gateway auth failed")
+	}
+}
+
+func contactsAuth(auth gatewayauth.AuthContext) *contactsv1.AuthContext {
+	return &contactsv1.AuthContext{
+		TenantId:  auth.TenantID,
+		UserId:    auth.UserID,
+		DeviceId:  auth.DeviceID,
+		SessionId: auth.SessionID,
+		TraceId:   auth.TraceID,
+		RequestId: auth.RequestID,
 	}
 }
 

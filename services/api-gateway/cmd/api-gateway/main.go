@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	contactsv1 "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1"
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
@@ -104,9 +105,18 @@ func runGRPC() error {
 		return err
 	}
 	defer receiptConn.Close()
+	contactsConn, err := dialBackend(
+		envString("NEXUSIM_API_GATEWAY_CONTACTS_ADDR", "127.0.0.1:10500"),
+		grpcClientTLSConfigFromEnv("NEXUSIM_API_GATEWAY_CONTACTS_TLS"),
+	)
+	if err != nil {
+		return err
+	}
+	defer contactsConn.Close()
 
 	gateway := apigrpc.NewServer(apigrpc.Config{
 		Authenticator: authenticator,
+		Contacts:      contactsv1.NewContactsServiceClient(contactsConn),
 		Conversation:  conversationv1.NewConversationServiceClient(conversationConn),
 		Message:       messagev1.NewMessageServiceClient(messageConn),
 		Delivery:      deliveryv1.NewDeliveryServiceClient(deliveryConn),

@@ -14,6 +14,7 @@
 - `MessageService`
 - `DeliveryService`
 - `ReceiptService`
+- `ContactsService`
 
 覆盖 demo 主链路：
 
@@ -25,7 +26,7 @@ CreateMemberChange
 -> ListConversations
 ```
 
-为了兼容已有 smoke 和过渡期客户端，gateway 默认仍同时注册 conversation / message / delivery / receipt 的 legacy service descriptor；`NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS=false` 时只注册 `GatewayService` public facade。新客户端应优先切到 `GatewayService`，再逐步关闭 legacy descriptor 暴露面。gateway 内部仍调用对应下游 service client。
+为了兼容已有 smoke 和过渡期客户端，gateway 默认仍同时注册 contacts / conversation / message / delivery / receipt 的 legacy service descriptor；`NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS=false` 时只注册 `GatewayService` public facade。新客户端应优先切到 `GatewayService`，再逐步关闭 legacy descriptor 暴露面。gateway 内部仍调用对应下游 service client。
 
 ## 鉴权与身份传播
 
@@ -142,6 +143,7 @@ NEXUSIM_API_GATEWAY_CONVERSATION_ADDR=127.0.0.1:10496
 NEXUSIM_API_GATEWAY_MESSAGE_ADDR=127.0.0.1:10495
 NEXUSIM_API_GATEWAY_DELIVERY_ADDR=127.0.0.1:10497
 NEXUSIM_API_GATEWAY_RECEIPT_ADDR=127.0.0.1:10499
+NEXUSIM_API_GATEWAY_CONTACTS_ADDR=127.0.0.1:10500
 ```
 
 下游 client 默认 plaintext，但已支持与现有 smoke client 相同的静态 TLS / mTLS 配置：
@@ -166,6 +168,11 @@ NEXUSIM_API_GATEWAY_RECEIPT_TLS_CA_FILE
 NEXUSIM_API_GATEWAY_RECEIPT_TLS_SERVER_NAME
 NEXUSIM_API_GATEWAY_RECEIPT_TLS_CLIENT_CERT_FILE
 NEXUSIM_API_GATEWAY_RECEIPT_TLS_CLIENT_KEY_FILE
+
+NEXUSIM_API_GATEWAY_CONTACTS_TLS_CA_FILE
+NEXUSIM_API_GATEWAY_CONTACTS_TLS_SERVER_NAME
+NEXUSIM_API_GATEWAY_CONTACTS_TLS_CLIENT_CERT_FILE
+NEXUSIM_API_GATEWAY_CONTACTS_TLS_CLIENT_KEY_FILE
 ```
 
 启用下游服务 `metadata` / `verified-metadata` auth 时，不能只依赖 metadata 字段本身。后端必须只暴露在可信内网 / loopback，或者启用 gRPC mTLS 并把 client DNS / URI SAN allowlist 收敛到 `api-gateway.nexusim.local` / `spiffe://nexusim/api-gateway` 一类明确服务身份；否则客户端直连后端仍可伪造 metadata。
@@ -198,3 +205,5 @@ NEXUSIM_API_GATEWAY_RECEIPT_TLS_CLIENT_KEY_FILE
 2026-06-13 补充：clean commit `bb13300` 已跑通 `run-local-secure-demo.ps1` 的 `--gateway-facade` 真实进程 smoke。summary `git_dirty=false/success=true/gateway_facade=true/gateway_auth_mode=hmac/gateway_auth_audience=api-gateway`，api-gateway debug metrics 显示本轮 user-facing gRPC calls 均走 `/nexusim.gateway.v1.GatewayService/...`，报告见 `docs/runbook/loadtest/demo/loadtest-report-20260613-e2e-demo-api-gateway-facade-smoke.md`，原始结果在 `H:\NexusIM\loadtest-results\e2e-demo-api-gateway-facade-smoke-20260613-clean`。
 
 2026-06-14 补充：api-gateway 注册层已支持 `NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS=false`，默认仍为 `true` 保持兼容。clean commit `c1328ca` 已跑通 facade-only 真实进程 smoke：`run-local-secure-demo.ps1` 启动 api-gateway 时关闭 legacy descriptor，summary `git_dirty=false/success=true/gateway_facade=true`，api-gateway metrics 只出现 `/nexusim.gateway.v1.GatewayService/...` user-facing method；报告见 `docs/runbook/loadtest/demo/loadtest-report-20260614-e2e-demo-api-gateway-facade-only-smoke.md`，原始结果在 `H:\NexusIM\loadtest-results\e2e-demo-api-gateway-facade-only-smoke-20260614-clean`。
+
+2026-06-14 补充：`GatewayService` public facade 已扩展 contacts-service 的 user-facing RPC：`SendContactRequest / RespondContactRequest / CancelContactRequest / ListContactRequests / ListContacts / GetContactState / DeleteContact / BlockContact / UnblockContact / UpdateContactRemark`。api-gateway 仍只做身份验证、`AuthContext` 重写和转发，不拥有联系人事实源，也不让 message-service 同步依赖 contacts-service。

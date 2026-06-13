@@ -17,13 +17,14 @@
 3. 单个切片保持小闭环：契约 / migration / 本地事务 / consumer 或 relay / smoke 分阶段推进。
 4. 只在有价值时使用 sub-agent，专项结束后及时关闭。
 5. 压测原始数据放 `H:\NexusIM\loadtest-results`；E 盘仓库只放报告和文档。
+6. 每轮结束运行 `.\tools\check-runbook-entrypoints.ps1`，避免入口文档重新变长。
 
 ## 当前主线
 
 先继续第三层产品能力和身份安全 hardening，把系统做成可面试展示的“本地/双机可运行分布式 IM 后端”。
 
 当前优先级：
-1. identity-service 安全 hardening 小切片继续收口，当前正在做 TOTP proof 在最终 Login / Refresh 事务内重新检查 factor lock。
+1. identity-service TOTP / recovery-code proof 的最终事务内 lock recheck 已完成，继续按小切片推进安全 hardening。
 2. 保持 api-gateway facade、verified metadata、mTLS、push / delivery / policy / contacts / receipt 已有链路稳定。
 3. 后续再补更完整的产品能力：会话列表完善、群管理、联系人关系、回执扩展、客户端 UI。
 4. Kafka HA、PostgreSQL failover、Redis quorum / 网络分区属于生产化后续项，不阻塞当前功能推进。

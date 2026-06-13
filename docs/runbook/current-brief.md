@@ -18,9 +18,9 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 
 ## 当前优先级
 
-1. 当前切片：identity-service TOTP proof 在最终 Login / Refresh PostgreSQL 事务中重新锁定 ACTIVE factor 并检查 `login_locked_until`，避免 app 层验证后 factor 被锁仍写 session / refresh token。
-2. 继续做小而完整的生产级 hardening，不一次性横跨多个服务。
-3. 文档维护目标：入口短、状态拆分、按需查询，减少每轮 token 浪费。
+1. 当前已完成：identity-service TOTP proof 在最终 Login / Refresh PostgreSQL 事务中重新锁定 ACTIVE factor 并检查 `login_locked_until`。
+2. 当前已完成：短入口文档和服务索引已拆分，并新增 `.\tools\check-runbook-entrypoints.ps1` 防止入口文档重新变长。
+3. 下一步继续做小而完整的生产级 hardening，不一次性横跨多个服务。
 
 ## 已知硬约束
 
@@ -35,4 +35,5 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 1. 更新本文件的“当前优先级”。
 2. 若服务状态变化，更新 `docs/runbook/service-briefs/README.md`。
 3. 需要历史归档时只追加或拆分，不把长历史重新塞回入口文档。
-4. 运行必要检查，提交并推送有意义的切片。
+4. 运行 `.\tools\check-runbook-entrypoints.ps1`，保证下一轮入口仍然短。
+5. 运行必要检查，提交并推送有意义的切片。

@@ -36,7 +36,7 @@
 
 ### identity-service
 - 已有 RegisterUser、Login、RefreshGatewayToken、JWKS / RS256 keyring、device/session revoke、verification/password reset challenge、challenge delivery outbox、MFA TOTP、recovery codes、Refresh step-up、mTLS。
-- 当前切片：TOTP proof 在最终 Login / Refresh 事务内重新检查 factor lock。
+- 已完成 TOTP / recovery-code proof 在最终 Login / Refresh 事务内重新检查 lock，锁定期间不消费 proof、不写 session、不轮换 refresh token。
 - 后续：WebAuthn/passkeys、OIDC federation、KMS/HSM、完整风控、生产级 email/SMS provider。
 
 ### policy-service

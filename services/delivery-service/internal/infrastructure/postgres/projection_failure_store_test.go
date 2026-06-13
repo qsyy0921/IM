@@ -145,6 +145,93 @@ INSERT INTO delivery_projection_failures (
 	}
 }
 
+func TestProjectionFailureStoreCleanupResolvedFailuresDeletesOnlyExpiredResolvedRowsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_failures (
+    consumer_group, topic, partition_id, offset_value, event_id, event_type, tenant_id, conversation_id, aggregate_version, trace_id, failure_class, last_error, failure_count, first_seen_at, last_seen_at, resolved_at, resolved_checkpoint_offset
+) VALUES
+    ('group-1', 'conversation.timeline.events', 0, 41, 'event-1', 'message.revoked.v1', 'tenant-1', 'conv-1', 7, 'trace-1', 'projection_dependency', 'old resolved', 2, now(), now(), now() - interval '2 days', 42),
+    ('group-1', 'conversation.timeline.events', 0, 42, 'event-2', 'message.edited.v1', 'tenant-1', 'conv-1', 8, 'trace-2', 'db_write_failed', 'recent resolved', 1, now(), now(), now() - interval '1 hour', 43),
+    ('group-1', 'conversation.timeline.events', 0, 43, 'event-3', 'message.deleted.v1', 'tenant-1', 'conv-1', 9, 'trace-3', 'decode_failed', 'still unresolved', 1, now(), now(), NULL, NULL)
+`)
+	if err != nil {
+		t.Fatalf("seed projection failures: %v", err)
+	}
+
+	store := NewProjectionFailureStore(pool)
+	stats, err := store.CleanupResolvedFailures(ctx, time.Now().UTC().Add(-24*time.Hour), 10)
+	if err != nil {
+		t.Fatalf("cleanup resolved projection failures: %v", err)
+	}
+	if stats.Deleted != 1 {
+		t.Fatalf("expected one deleted row, got %d", stats.Deleted)
+	}
+
+	assertProjectionFailureMissing(t, ctx, pool, "group-1", "conversation.timeline.events", 0, 41)
+	assertProjectionFailureRow(t, ctx, pool, "group-1", "conversation.timeline.events", 0, 42, types.ProjectionFailureClassDBWrite, "recent resolved", 1, true, 43)
+	assertProjectionFailureRow(t, ctx, pool, "group-1", "conversation.timeline.events", 0, 43, types.ProjectionFailureClassDecode, "still unresolved", 1, false, 0)
+}
+
+func TestProjectionFailureStoreCleanupResolvedFailuresHonorsBatchLimitIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_failures (
+    consumer_group, topic, partition_id, offset_value, event_id, event_type, tenant_id, conversation_id, aggregate_version, trace_id, failure_class, last_error, failure_count, first_seen_at, last_seen_at, resolved_at, resolved_checkpoint_offset
+) VALUES
+    ('group-2', 'conversation.timeline.events', 0, 51, 'event-1', 'message.revoked.v1', 'tenant-1', 'conv-1', 7, 'trace-1', 'projection_dependency', 'resolved 1', 2, now(), now(), now() - interval '3 days', 52),
+    ('group-2', 'conversation.timeline.events', 0, 52, 'event-2', 'message.edited.v1', 'tenant-1', 'conv-1', 8, 'trace-2', 'db_write_failed', 'resolved 2', 1, now(), now(), now() - interval '2 days', 53)
+`)
+	if err != nil {
+		t.Fatalf("seed projection failures: %v", err)
+	}
+
+	store := NewProjectionFailureStore(pool)
+	stats, err := store.CleanupResolvedFailures(ctx, time.Now().UTC().Add(-24*time.Hour), 1)
+	if err != nil {
+		t.Fatalf("cleanup resolved projection failures with limit: %v", err)
+	}
+	if stats.Deleted != 1 {
+		t.Fatalf("expected one deleted row, got %d", stats.Deleted)
+	}
+
+	var remaining int
+	if err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM delivery_projection_failures
+WHERE consumer_group = 'group-2'
+`).Scan(&remaining); err != nil {
+		t.Fatalf("count remaining projection failures: %v", err)
+	}
+	if remaining != 1 {
+		t.Fatalf("expected one remaining row after limited cleanup, got %d", remaining)
+	}
+}
+
+func assertProjectionFailureMissing(t *testing.T, ctx context.Context, pool *pgxpool.Pool, consumerGroup string, topic string, partitionID int32, offsetValue int64) {
+	t.Helper()
+	var count int
+	if err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM delivery_projection_failures
+WHERE consumer_group = $1
+  AND topic = $2
+  AND partition_id = $3
+  AND offset_value = $4
+`, consumerGroup, topic, partitionID, offsetValue).Scan(&count); err != nil {
+		t.Fatalf("count projection failure row: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected projection failure row to be deleted, count=%d", count)
+	}
+}
+
 func assertProjectionFailureRow(t *testing.T, ctx context.Context, pool *pgxpool.Pool, consumerGroup string, topic string, partitionID int32, offsetValue int64, failureClass string, lastError string, failureCount int64, resolved bool, resolvedCheckpointOffset int64) {
 	t.Helper()
 	var gotFailureClass string

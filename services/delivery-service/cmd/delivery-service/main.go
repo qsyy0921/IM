@@ -54,6 +54,8 @@ func run() error {
 		return runProjectionCheckpointRepair()
 	case "projection-failure-audit":
 		return runProjectionFailureAudit()
+	case "projection-failure-cleanup":
+		return runProjectionFailureCleanup()
 	default:
 		return errors.New("unsupported NEXUSIM_DELIVERY_SERVICE_MODE")
 	}
@@ -356,6 +358,59 @@ func runProjectionFailureAudit() error {
 	return nil
 }
 
+func runProjectionFailureCleanup() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	config, err := projectionFailureCleanupConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	cutoff := time.Now().UTC().Add(-config.Retention)
+	stats, err := postgresinfra.NewProjectionFailureStore(pool).CleanupResolvedFailures(ctx, cutoff, config.BatchSize)
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"delivery-service projection failure cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d",
+		stats.Deleted,
+		cutoff.Format(time.RFC3339),
+		config.Retention,
+		config.BatchSize,
+	)
+	return nil
+}
+
+type projectionFailureCleanupConfig struct {
+	Retention time.Duration
+	BatchSize int
+}
+
+func projectionFailureCleanupConfigFromEnv() (projectionFailureCleanupConfig, error) {
+	retention, err := envPositiveDuration("NEXUSIM_DELIVERY_PROJECTION_FAILURE_RETENTION", 7*24*time.Hour)
+	if err != nil {
+		return projectionFailureCleanupConfig{}, err
+	}
+	batchSize, err := envPositiveInt("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_BATCH_SIZE", 5000)
+	if err != nil {
+		return projectionFailureCleanupConfig{}, err
+	}
+	return projectionFailureCleanupConfig{
+		Retention: retention,
+		BatchSize: batchSize,
+	}, nil
+}
+
 func openPGPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
@@ -632,6 +687,30 @@ func envDuration(name string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return parsed
+}
+
+func envPositiveDuration(name string, fallback time.Duration) (time.Duration, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("%s must be a positive duration", name)
+	}
+	return parsed, nil
+}
+
+func envPositiveInt(name string, fallback int) (int, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("%s must be a positive integer", name)
+	}
+	return parsed, nil
 }
 
 func splitCSV(value string) []string {

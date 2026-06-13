@@ -199,6 +199,31 @@ func TestDeliveryGRPCTLSConfigRejectsUnlistedClientIdentity(t *testing.T) {
 	}
 }
 
+func TestProjectionFailureCleanupConfigFromEnvDefaults(t *testing.T) {
+	t.Setenv("NEXUSIM_DELIVERY_PROJECTION_FAILURE_RETENTION", "")
+	t.Setenv("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_BATCH_SIZE", "")
+
+	config, err := projectionFailureCleanupConfigFromEnv()
+	if err != nil {
+		t.Fatalf("projection failure cleanup config: %v", err)
+	}
+	if config.Retention != 7*24*time.Hour {
+		t.Fatalf("expected default retention, got %s", config.Retention)
+	}
+	if config.BatchSize != 5000 {
+		t.Fatalf("expected default batch size, got %d", config.BatchSize)
+	}
+}
+
+func TestProjectionFailureCleanupConfigFromEnvRejectsInvalidValues(t *testing.T) {
+	t.Setenv("NEXUSIM_DELIVERY_PROJECTION_FAILURE_RETENTION", "0")
+	t.Setenv("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_BATCH_SIZE", "0")
+
+	if _, err := projectionFailureCleanupConfigFromEnv(); err == nil {
+		t.Fatalf("expected invalid projection failure cleanup config to fail")
+	}
+}
+
 func clearDeliveryGRPCTLSConfig(t *testing.T) {
 	t.Helper()
 	t.Setenv("NEXUSIM_DELIVERY_GRPC_TLS_CERT_FILE", "")

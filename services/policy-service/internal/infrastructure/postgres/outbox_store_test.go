@@ -387,6 +387,77 @@ WHERE tenant_id = 'tenant-policy'
 	}
 }
 
+func TestOutboxStoreAuditOutboxRepairsReturnsLatestRowsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_decision_audit_outbox_repair_audit (
+    event_id, tenant_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at,
+    repair_operator, repair_reason, repair_outcome, skip_reason, repaired_at
+) VALUES
+    ('event-11', 'tenant-a', 'DLQ', 1, 'publish failed', now() - interval '1 minute', 'operator-a', 'manual audit', 'REPAIRED', '', now() - interval '1 minute'),
+    ('event-12', 'tenant-a', 'DLQ', 2, 'validation failed', now() - interval '2 minutes', 'operator-b', 'manual validation', 'SKIPPED', 'validation_failed', now())
+`)
+	if err != nil {
+		t.Fatalf("seed policy outbox repair audit: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	rows, err := store.AuditOutboxRepairs(ctx, OutboxRepairAuditOptions{
+		TenantID: "tenant-a",
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("audit policy outbox repairs: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected two rows, got %d", len(rows))
+	}
+	if rows[0].EventID != "event-12" || rows[0].Operator != "operator-b" || rows[0].Outcome != "SKIPPED" {
+		t.Fatalf("unexpected latest policy outbox repair row: %+v", rows[0])
+	}
+	if rows[1].EventID != "event-11" || rows[1].Operator != "operator-a" || rows[1].Outcome != "REPAIRED" {
+		t.Fatalf("unexpected older policy outbox repair row: %+v", rows[1])
+	}
+}
+
+func TestOutboxStoreAuditOutboxRepairsFiltersOperatorAndOutcomeIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_decision_audit_outbox_repair_audit (
+    event_id, tenant_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at,
+    repair_operator, repair_reason, repair_outcome, skip_reason, repaired_at
+) VALUES
+    ('event-21', 'tenant-b', 'DLQ', 1, 'publish failed', now() - interval '1 minute', 'operator-a', 'manual audit', 'REPAIRED', '', now()),
+    ('event-22', 'tenant-b', 'DLQ', 2, 'validation failed', now() - interval '2 minutes', 'operator-b', 'manual validation', 'SKIPPED', 'validation_failed', now() - interval '1 minute')
+`)
+	if err != nil {
+		t.Fatalf("seed policy outbox repair audit: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	rows, err := store.AuditOutboxRepairs(ctx, OutboxRepairAuditOptions{
+		TenantID: "tenant-b",
+		Operator: "operator-b",
+		Outcome:  "SKIPPED",
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("audit policy outbox repairs with filters: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one row, got %d", len(rows))
+	}
+	if rows[0].EventID != "event-22" || rows[0].Operator != "operator-b" || rows[0].Outcome != "SKIPPED" {
+		t.Fatalf("unexpected filtered policy outbox repair row: %+v", rows[0])
+	}
+}
+
 func assertPolicyAuditOutboxStatusCount(t *testing.T, ctx context.Context, pool *pgxpool.Pool, status string, want int) {
 	t.Helper()
 	var got int

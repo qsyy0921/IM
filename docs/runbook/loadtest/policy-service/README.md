@@ -28,6 +28,7 @@ Implemented:
 - policy-service decision audit relay smoke for `policy_decision_audit_outbox -> im.policy.events`: `loadtest-report-20260613-policy-decision-audit-relay-smoke.md`.
 - policy-service decision audit DLQ repair smoke for explicit event-id redrive: `loadtest-report-20260613-policy-decision-audit-repair-smoke.md`.
 - policy-service decision audit repair validation smoke after preflight gate: `loadtest-report-20260613-policy-decision-audit-repair-validated-smoke.md`.
+- policy-service 还补了只读 `outbox-repair-audit` 运维模式，方便直接审计 decision audit outbox repair 历史；它不直接 redrive，也不会修改当前 outbox 状态。
 - policy-service tenant-level message action rule smoke for `tenant_id + action` defaults across `SEND`, `EDIT`, `REVOKE`, and `DELETE`: `loadtest-report-20260613-policy-message-tenant-rule-smoke.md`.
 - policy-service conversation role gate Kafka smoke for `conversation.timeline.events -> policy_conversation_members_projection -> CheckMessageAction`: `loadtest-report-20260613-policy-conversation-role-smoke.md`.
 - message-service `SendMessage` role gate integration smoke through `policy-service CheckMessageAction`: `loadtest-report-20260613-policy-message-role-gate-smoke.md`.

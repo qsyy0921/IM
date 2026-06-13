@@ -100,6 +100,8 @@ When PostgreSQL rules mode is enabled, successful `CheckMessageAction` decisions
 
 `NEXUSIM_POLICY_SERVICE_MODE=outbox-repair` is the first-stage repair operator for policy decision audit rows. It accepts an explicit comma-separated list of DLQ `event_id` values, validates each DLQ row through the same policy-event builder used by the relay, resets only valid rows to `PENDING`, clears retry state, and writes `policy_decision_audit_outbox_repair_audit`. Invalid envelope or payload rows stay in `DLQ`, write a `SKIPPED / validation_failed` audit row, and make the operator return a non-zero error so automation cannot mistake a poison row for a clean repair. It does not publish Kafka directly, skip ordered blockers, rewrite payloads, repair all rows, implement retention or export audit data to an external sink. After repair, the normal outbox relay is still responsible for publishing to `im.policy.events`.
 
+`NEXUSIM_POLICY_SERVICE_MODE=outbox-repair-audit` is a read-only operator view over `policy_decision_audit_outbox_repair_audit`. It supports `event_id / tenant_id / repair_operator / repair_outcome` filters, returns newest rows first, and never mutates outbox state.
+
 Audit rows intentionally store low-sensitive decision metadata:
 
 - stable object keys for actor user, device, conversation, message and direct peer context;

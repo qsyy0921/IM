@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +20,28 @@ type OutboxStore struct {
 type OutboxStoreOption func(*OutboxStore)
 
 type OutboxRepairValidator func(types.OutboxMessage) error
+
+type OutboxRepairAuditOptions struct {
+	EventID  string
+	TenantID string
+	Operator string
+	Outcome  string
+	Limit    int
+}
+
+type OutboxRepairAuditRow struct {
+	EventID                string
+	TenantID               string
+	Operator               string
+	Reason                 string
+	PreviousStatus         string
+	PreviousRetryCount     int
+	PreviousLastError      string
+	PreviousDeadLetteredAt *time.Time
+	Outcome                string
+	SkipReason             string
+	RepairedAt             time.Time
+}
 
 func NewOutboxStore(pool *pgxpool.Pool, opts ...OutboxStoreOption) *OutboxStore {
 	store := &OutboxStore{
@@ -176,6 +199,93 @@ func (store *OutboxStore) RepairDLQEvents(ctx context.Context, eventIDs []string
 		return types.OutboxRepairStats{}, types.NewDBWriteFailed(err.Error())
 	}
 	return stats, nil
+}
+
+func (store *OutboxStore) AuditOutboxRepairs(ctx context.Context, options OutboxRepairAuditOptions) ([]OutboxRepairAuditRow, error) {
+	if store == nil || store.pool == nil {
+		return nil, errors.New("policy audit outbox store is not configured")
+	}
+	limit := options.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	var args []any
+	clauses := make([]string, 0, 4)
+	if eventID := strings.TrimSpace(options.EventID); eventID != "" {
+		args = append(args, eventID)
+		clauses = append(clauses, "event_id = $"+strconv.Itoa(len(args)))
+	}
+	if tenantID := strings.TrimSpace(options.TenantID); tenantID != "" {
+		args = append(args, tenantID)
+		clauses = append(clauses, "tenant_id = $"+strconv.Itoa(len(args)))
+	}
+	if operator := strings.TrimSpace(options.Operator); operator != "" {
+		args = append(args, operator)
+		clauses = append(clauses, "repair_operator = $"+strconv.Itoa(len(args)))
+	}
+	if rawOutcome := strings.TrimSpace(options.Outcome); rawOutcome != "" {
+		outcome := normalizePolicyOutboxRepairOutcome(rawOutcome)
+		if outcome == "" {
+			return nil, types.NewInvalidArgument("unsupported policy outbox repair outcome")
+		}
+		args = append(args, outcome)
+		clauses = append(clauses, "repair_outcome = $"+strconv.Itoa(len(args)))
+	}
+	where := ""
+	if len(clauses) > 0 {
+		where = "WHERE " + strings.Join(clauses, " AND ")
+	}
+	args = append(args, limit)
+	rows, err := store.pool.Query(ctx, `
+SELECT
+    event_id,
+    tenant_id,
+    previous_status,
+    previous_retry_count,
+    previous_last_error,
+    previous_dead_lettered_at,
+    repair_operator,
+    repair_reason,
+    repair_outcome,
+    skip_reason,
+    repaired_at
+FROM policy_decision_audit_outbox_repair_audit
+`+where+`
+ORDER BY repaired_at DESC, event_id, id DESC
+LIMIT $`+strconv.Itoa(len(args)), args...)
+	if err != nil {
+		return nil, types.NewDBWriteFailed(err.Error())
+	}
+	defer rows.Close()
+
+	result := make([]OutboxRepairAuditRow, 0, limit)
+	for rows.Next() {
+		var row OutboxRepairAuditRow
+		if err := rows.Scan(
+			&row.EventID,
+			&row.TenantID,
+			&row.PreviousStatus,
+			&row.PreviousRetryCount,
+			&row.PreviousLastError,
+			&row.PreviousDeadLetteredAt,
+			&row.Operator,
+			&row.Reason,
+			&row.Outcome,
+			&row.SkipReason,
+			&row.RepairedAt,
+		); err != nil {
+			return nil, types.NewDBWriteFailed(err.Error())
+		}
+		result = append(result, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBWriteFailed(err.Error())
+	}
+	return result, nil
 }
 
 type outboxRepairTarget struct {
@@ -463,6 +573,15 @@ func normalizeEventIDs(eventIDs []string) []string {
 		ids = append(ids, eventID)
 	}
 	return ids
+}
+
+func normalizePolicyOutboxRepairOutcome(outcome string) string {
+	switch strings.ToUpper(strings.TrimSpace(outcome)) {
+	case "REPAIRED", "SKIPPED":
+		return strings.ToUpper(strings.TrimSpace(outcome))
+	default:
+		return ""
+	}
 }
 
 func truncateRepairField(value string, max int) string {

@@ -2,7 +2,7 @@
 
 `policy-service` owns first-stage policy decisions that must not be hard-coded inside message-service. The initial implementation is intentionally small: it exposes a gRPC `CheckMessageAction` endpoint for message send / edit / revoke / delete decisions, and it returns a stable `permission_version`, `classification`, allow/deny flag and public deny reason.
 
-This service is a boundary extraction step. It is not yet a full ReBAC engine, tenant policy engine, content moderation platform, risk scoring system or contacts/conversation projection consumer.
+This service is a boundary extraction step. It is not yet a full ReBAC engine, tenant policy engine, content moderation platform, risk scoring system or complete contacts/conversation policy engine. The contacts projection consumer is ingestion-only in the current slice and is not yet used by `CheckMessageAction`.
 
 ## Boundary
 
@@ -11,7 +11,8 @@ Owns:
 - policy decision API contracts;
 - message action allow / deny decisions;
 - policy version and classification returned to callers;
-- future adapters for contacts, conversation, identity, tenant risk and compliance projections.
+- a policy-owned contacts edge projection read model;
+- future adapters for conversation, identity, tenant risk and compliance projections.
 
 Does not own:
 
@@ -40,6 +41,19 @@ tenant_id + user_id + conversation_id + action
 
 When `NEXUSIM_POLICY_RULES_ENABLED=true`, policy-service checks `policy_message_action_rules` first. A matching row returns its allow / deny decision, `permission_version`, `classification` and public reason. A clean rule miss falls back to the static policy. PostgreSQL lookup errors do not fall back; they return policy unavailable so a broken rule store cannot silently bypass a deny rule.
 
+The contacts projection slice consumes `im.contact.events` into policy-service owned tables:
+
+```text
+im.contact.events
+-> policy-service contact-consumer
+-> policy_contact_edges_projection
+-> policy_kafka_checkpoints
+```
+
+`contact.request.accepted.v1` writes both directed edges as `ACTIVE`. `contact.edge.blocked.v1`, `contact.edge.unblocked.v1`, `contact.edge.deleted.v1` and `contact.edge.remark_updated.v1` update only the owner-scoped directed edge. Updates apply only when the incoming `edge_version` is newer than the stored version, so duplicate or stale contact events are no-ops. This projection does not read contacts-service internal tables and remains rebuildable from `im.contact.events`.
+
+The projection is not consumed by message decisions yet. `CheckMessageAction` currently receives `tenant_id`, `user_id`, `conversation_id`, `action` and optional `message_id`, but it does not receive a direct peer / target user. A block rule that affects SendMessage requires that peer context or a safe conversation projection first; otherwise policy-service would have to guess or synchronously reach into another service.
+
 Configuration:
 
 ```text
@@ -54,6 +68,11 @@ NEXUSIM_PG_DSN=
 NEXUSIM_POLICY_PG_MAX_CONNS=
 NEXUSIM_POLICY_DEBUG_ADDR=
 NEXUSIM_DEBUG_ADDR=
+
+NEXUSIM_POLICY_SERVICE_MODE=contact-consumer
+NEXUSIM_KAFKA_BROKERS=localhost:9092
+NEXUSIM_CONTACT_EVENTS_TOPIC=im.contact.events
+NEXUSIM_POLICY_CONTACT_CONSUMER_GROUP=nexusim-policy-contacts
 
 NEXUSIM_POLICY_SERVICE_ADDR=127.0.0.1:10800
 NEXUSIM_POLICY_RPC_TIMEOUT=30ms
@@ -106,7 +125,7 @@ This is a local debug surface. It is not a replacement for production OpenTeleme
 
 - First implementation still supports static environment configuration.
 - PostgreSQL rule store is exact-match only; no wildcard / priority rule DSL yet.
-- No contacts block projection is consumed yet.
+- Contacts block / unblock events are projected, but they are not consumed by message decisions until safe peer / target context is available.
 - No conversation role / owner / admin policy is implemented yet.
 - No tenant policy, content moderation, risk scoring, rate limiting or audit outbox is implemented yet.
 - No mTLS client/server config is implemented for policy-service yet.

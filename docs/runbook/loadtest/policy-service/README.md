@@ -13,15 +13,17 @@ Implemented:
 - message-service fallback to legacy `StaticPolicy` when no policy-service address is configured.
 - Optional debug server through `NEXUSIM_POLICY_DEBUG_ADDR` with `/healthz`, `/readyz`, `/debug/metrics`, aggregate gRPC metrics, aggregate decision metrics and PostgreSQL rule-store summaries.
 - message-service policy RPC trace / request metadata propagation for policy-service structured gRPC logs.
+- Contacts event projection consumer through `NEXUSIM_POLICY_SERVICE_MODE=contact-consumer`, storing directed contact edges in `policy_contact_edges_projection`.
 - Direct gRPC allow/deny smoke for `SEND`, `EDIT`, `REVOKE`, and `DELETE`: `loadtest-report-20260613-policy-service-smoke.md`.
 - message-service `SendMessage` allow/deny integration smoke through `NEXUSIM_POLICY_SERVICE_ADDR`: `loadtest-report-20260613-policy-message-integration-smoke.md`.
 - message-service `SendMessage` allow/deny integration smoke through PostgreSQL-backed exact policy rules: `loadtest-report-20260613-policy-message-rule-store-smoke.md`.
 - message-service `EditMessage` / `RevokeMessage` / `DeleteMessage` allow/deny integration smoke through PostgreSQL-backed exact policy rules: `loadtest-report-20260613-policy-message-actions-rule-store-smoke.md`.
 - policy-service observability smoke for gRPC and decision metrics: `loadtest-report-20260613-policy-service-observability-smoke.md`.
+- policy-service contact projection smoke for accepted / blocked / unblocked contact events: `loadtest-report-20260613-policy-contact-projection-smoke.md`.
 
 Not yet implemented:
 
-- contacts block / unblock projection;
+- contacts projection consumption inside `CheckMessageAction`;
 - conversation role policy;
 - tenant-level policy;
 - content moderation / risk scoring;
@@ -62,12 +64,19 @@ Run exact-rule mutation action coverage with:
 .\loadtest\policyintegration\run-local-smoke.ps1 -UsePolicyRules -Actions edit,revoke,delete
 ```
 
+Run contact projection smoke with:
+
+```powershell
+.\loadtest\policycontacts\run-local-smoke.ps1
+```
+
 Raw summaries are written under `H:\NexusIM\loadtest-results\<run-name>`:
 
 ```text
 allow\policy-summary.json
 deny\policy-summary.json
 policy-smoke-summary.json
+policy-contact-summary.json
 ```
 
 The message mutation integration shape is:
@@ -85,3 +94,5 @@ When testing through `message-service`, keep the policy permission version align
 The rule-store smoke also sets local static fallback opposite to the seeded PostgreSQL rule. That makes a rule miss visible: allow would become deny, and deny would become an unexpected write.
 
 The observability smoke reads `/debug/metrics` after both allow and deny scenarios. Metrics are aggregate debug snapshots only: they do not expose tenant id, user id, conversation id, message id, policy request bodies, rule parameters, deny reason text or classification strings. Trace id and request id are propagated for structured gRPC logs, not as metrics labels.
+
+The contact projection smoke proves that policy-service can consume `im.contact.events` and maintain a policy-owned edge projection. It does not prove SendMessage block enforcement yet. The current policy request contract lacks direct peer / target-user context, so contacts projection remains an input read model for a later decision slice.

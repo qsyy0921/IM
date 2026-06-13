@@ -38,6 +38,7 @@ type config struct {
 	expectedReason         string
 	cleanup                bool
 	seedPolicyRule         bool
+	seedTenantPolicyRule   bool
 }
 
 type summary struct {
@@ -63,6 +64,7 @@ type summary struct {
 	ChangeMessage          changeSummary `json:"change_message,omitempty"`
 	MessageError           errorSummary  `json:"message_error,omitempty"`
 	PolicyRuleSeeded       bool          `json:"policy_rule_seeded"`
+	TenantPolicyRuleSeeded bool          `json:"tenant_policy_rule_seeded"`
 	PolicyRule             policyRule    `json:"policy_rule,omitempty"`
 	PolicyRules            []policyRule  `json:"policy_rules,omitempty"`
 	DBBefore               dbStats       `json:"db_before"`
@@ -171,6 +173,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.expectedReason, "expected-reason", "", "expected deny reason")
 	flag.BoolVar(&cfg.cleanup, "cleanup", false, "delete message rows for tenant before running")
 	flag.BoolVar(&cfg.seedPolicyRule, "seed-policy-rule", false, "seed exact policy_message_action_rules row for this scenario")
+	flag.BoolVar(&cfg.seedTenantPolicyRule, "seed-tenant-policy-rule", false, "seed tenant-level policy_tenant_message_action_rules row for this scenario")
 	flag.Parse()
 	cfg.scenario = strings.ToLower(strings.TrimSpace(cfg.scenario))
 	cfg.action = strings.ToLower(strings.TrimSpace(cfg.action))
@@ -209,6 +212,11 @@ func run(cfg config) error {
 			return err
 		}
 	}
+	if cfg.seedTenantPolicyRule {
+		if err := seedTenantPolicyRules(ctx, pool, cfg); err != nil {
+			return err
+		}
+	}
 
 	started := time.Now().UTC()
 	s := summary{
@@ -227,9 +235,10 @@ func run(cfg config) error {
 		ExpectedClassification: cfg.expectedClassification,
 		ExpectedReason:         cfg.expectedReason,
 		PolicyRuleSeeded:       cfg.seedPolicyRule,
+		TenantPolicyRuleSeeded: cfg.seedTenantPolicyRule,
 	}
-	if cfg.seedPolicyRule {
-		s.PolicyRules = expectedPolicyRules(cfg)
+	if cfg.seedPolicyRule || cfg.seedTenantPolicyRule {
+		s.PolicyRules = expectedPolicyRules(cfg, cfg.seedPolicyRule, cfg.seedTenantPolicyRule)
 		if len(s.PolicyRules) > 0 {
 			s.PolicyRule = s.PolicyRules[len(s.PolicyRules)-1]
 		}
@@ -824,8 +833,23 @@ func seedPolicyRules(ctx context.Context, pool *pgxpool.Pool, cfg config) error 
 	if _, err := pool.Exec(ctx, `DELETE FROM policy_message_action_rules WHERE tenant_id = $1`, cfg.tenantID); err != nil {
 		return fmt.Errorf("cleanup policy rules: %w", err)
 	}
-	for _, rule := range expectedPolicyRules(cfg) {
+	for _, rule := range expectedPolicyRules(cfg, true, false) {
 		if err := seedOnePolicyRule(ctx, pool, rule); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedTenantPolicyRules(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
+	if _, err := pool.Exec(ctx, `DELETE FROM policy_decision_audit_outbox WHERE tenant_id = $1`, cfg.tenantID); err != nil {
+		return fmt.Errorf("cleanup policy decision audit outbox: %w", err)
+	}
+	if _, err := pool.Exec(ctx, `DELETE FROM policy_tenant_message_action_rules WHERE tenant_id = $1`, cfg.tenantID); err != nil {
+		return fmt.Errorf("cleanup tenant policy rules: %w", err)
+	}
+	for _, rule := range expectedPolicyRules(cfg, false, true) {
+		if err := seedOneTenantPolicyRule(ctx, pool, rule); err != nil {
 			return err
 		}
 	}
@@ -859,35 +883,70 @@ SET allowed = EXCLUDED.allowed,
 	return nil
 }
 
-func expectedPolicyRules(cfg config) []policyRule {
-	rules := make([]policyRule, 0, 2)
-	if cfg.action != "send" {
-		rules = append(rules, policyRule{
-			TenantID:          cfg.tenantID,
-			UserID:            cfg.userID,
-			ConversationID:    cfg.conversationID,
-			Action:            "SEND",
-			Allowed:           true,
-			PermissionVersion: cfg.expectedPermissionVer,
-			Classification:    "POLICY_SEND_SEED",
-		})
+func seedOneTenantPolicyRule(ctx context.Context, pool *pgxpool.Pool, rule policyRule) error {
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_tenant_message_action_rules (
+    tenant_id,
+    action,
+    allowed,
+    permission_version,
+    classification,
+    reason,
+    source
+) VALUES ($1, $2, $3, $4, $5, $6, 'loadtest')
+ON CONFLICT (tenant_id, action) DO UPDATE
+SET allowed = EXCLUDED.allowed,
+    permission_version = EXCLUDED.permission_version,
+    classification = EXCLUDED.classification,
+    reason = EXCLUDED.reason,
+    source = EXCLUDED.source,
+    updated_at = now()
+`, rule.TenantID, rule.Action, rule.Allowed, rule.PermissionVersion, rule.Classification, rule.Reason)
+	if err != nil {
+		return fmt.Errorf("seed tenant policy rule: %w", err)
+	}
+	return nil
+}
+
+func expectedPolicyRules(cfg config, includeExact bool, includeTenant bool) []policyRule {
+	rules := make([]policyRule, 0, 4)
+	if includeTenant && cfg.action != "send" {
+		rules = append(rules, tenantPolicyRule(cfg, "SEND", true, "POLICY_SEND_SEED", ""))
+	}
+	if includeExact && cfg.action != "send" {
+		rules = append(rules, exactPolicyRule(cfg, "SEND", true, "POLICY_SEND_SEED", ""))
 	}
 	allowed := cfg.scenario == "allow"
 	reason := cfg.expectedReason
 	if !allowed && strings.TrimSpace(reason) == "" {
 		reason = "policy denied"
 	}
-	rules = append(rules, policyRule{
+	action := strings.ToUpper(cfg.action)
+	if includeTenant {
+		rules = append(rules, tenantPolicyRule(cfg, action, allowed, cfg.expectedClassification, reason))
+	}
+	if includeExact {
+		rules = append(rules, exactPolicyRule(cfg, action, allowed, cfg.expectedClassification, reason))
+	}
+	return rules
+}
+
+func exactPolicyRule(cfg config, action string, allowed bool, classification string, reason string) policyRule {
+	rule := tenantPolicyRule(cfg, action, allowed, classification, reason)
+	rule.UserID = cfg.userID
+	rule.ConversationID = cfg.conversationID
+	return rule
+}
+
+func tenantPolicyRule(cfg config, action string, allowed bool, classification string, reason string) policyRule {
+	return policyRule{
 		TenantID:          cfg.tenantID,
-		UserID:            cfg.userID,
-		ConversationID:    cfg.conversationID,
-		Action:            strings.ToUpper(cfg.action),
+		Action:            action,
 		Allowed:           allowed,
 		PermissionVersion: cfg.expectedPermissionVer,
-		Classification:    cfg.expectedClassification,
+		Classification:    classification,
 		Reason:            reason,
-	})
-	return rules
+	}
 }
 
 func isSupportedAction(action string) bool {

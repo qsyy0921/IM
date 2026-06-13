@@ -4,6 +4,7 @@ param(
     [string]$RunName = "",
     [string[]]$Actions = @("send"),
     [switch]$UsePolicyRules,
+    [switch]$UseTenantPolicyRules,
     [switch]$SkipBuild
 )
 
@@ -130,8 +131,9 @@ function Run-Scenario {
     $messageAddr = "127.0.0.1:$messagePort"
     $processes = @()
     try {
-        $policyStaticAllowed = if ($UsePolicyRules) { -not $Allowed } else { $Allowed }
-        $policyStaticClassification = if ($UsePolicyRules) { "LOCAL_STATIC_SHOULD_NOT_APPEAR" } else { $Classification }
+        $usesRuleStore = $UsePolicyRules -or $UseTenantPolicyRules
+        $policyStaticAllowed = if ($usesRuleStore) { -not $Allowed } else { $Allowed }
+        $policyStaticClassification = if ($usesRuleStore) { "LOCAL_STATIC_SHOULD_NOT_APPEAR" } else { $Classification }
         $policyEnv = @{
             NEXUSIM_POLICY_SERVICE_MODE = "grpc"
             NEXUSIM_POLICY_GRPC_ADDR = $policyAddr
@@ -140,7 +142,7 @@ function Run-Scenario {
             NEXUSIM_POLICY_CLASSIFICATION = $policyStaticClassification
             NEXUSIM_POLICY_DENY_REASON = $Reason
         }
-        if ($UsePolicyRules) {
+        if ($usesRuleStore) {
             $policyEnv["NEXUSIM_POLICY_RULES_ENABLED"] = "true"
             $policyEnv["NEXUSIM_PG_DSN"] = $PgDsn
         }
@@ -176,6 +178,9 @@ function Run-Scenario {
         if ($UsePolicyRules) {
             $args += "--seed-policy-rule"
         }
+        if ($UseTenantPolicyRules) {
+            $args += "--seed-tenant-policy-rule"
+        }
         & $runner @args
         if ($LASTEXITCODE -ne 0) {
             throw "policy message smoke runner failed with exit code $LASTEXITCODE"
@@ -196,7 +201,7 @@ Get-ChildItem -Path "migrations\postgres\message" -Filter "*.sql" |
         Apply-PostgresMigration -Path $_.FullName -Name $_.Name
     }
 
-if ($UsePolicyRules) {
+if ($UsePolicyRules -or $UseTenantPolicyRules) {
     Get-ChildItem -Path "migrations\postgres\policy" -Filter "*.sql" |
         Sort-Object Name |
         ForEach-Object {
@@ -242,6 +247,7 @@ $combinedFields = [ordered]@{
     success = $true
     result_dir = $resultDir
     policy_rules_enabled = [bool]$UsePolicyRules
+    tenant_policy_rules_enabled = [bool]$UseTenantPolicyRules
     actions = $Actions
 }
 if ($scenarioSummaries.Count -eq 2 -and $scenarioSummaries[0].action -eq "send" -and $scenarioSummaries[1].action -eq "send") {

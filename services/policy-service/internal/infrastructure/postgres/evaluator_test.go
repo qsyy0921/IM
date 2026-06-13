@@ -8,6 +8,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/qsyy0921/IM/services/policy-service/internal/domain"
 	"github.com/qsyy0921/IM/services/policy-service/internal/types"
@@ -79,6 +80,125 @@ func TestMessagePolicyEvaluatorFallsBackWhenNoRuleIntegration(t *testing.T) {
 	}
 	if !decision.Allowed || decision.PermissionVersion != 9 || decision.Classification != "STATIC_ALLOW" {
 		t.Fatalf("expected static fallback decision, got %+v", decision)
+	}
+}
+
+func TestMessagePolicyEvaluatorUsesTenantRuleIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           false,
+		PermissionVersion: 1,
+		Classification:    "STATIC_DENY",
+		Reason:            "static deny",
+	})
+	command := testPolicyCommand(types.MessageActionSend)
+	seedTenantPolicyRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, true, 88, "TENANT_ALLOW", "")
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if !decision.Allowed ||
+		decision.PermissionVersion != 88 ||
+		decision.Classification != "TENANT_ALLOW" ||
+		decision.TenantID != command.AuthContext.TenantID ||
+		decision.UserID != command.AuthContext.UserID ||
+		decision.ConversationID != command.ConversationID ||
+		decision.Action != command.Action {
+		t.Fatalf("expected tenant allow rule, got %+v", decision)
+	}
+}
+
+func TestMessagePolicyEvaluatorUsesTenantDenyDefaultReasonIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           true,
+		PermissionVersion: 1,
+		Classification:    "STATIC_ALLOW",
+	})
+	command := testPolicyCommand(types.MessageActionDelete)
+	seedTenantPolicyRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, false, 89, "TENANT_DENY", "")
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if decision.Allowed || decision.PermissionVersion != 89 || decision.Classification != "TENANT_DENY" || decision.Reason != "policy denied" {
+		t.Fatalf("expected tenant deny default reason, got %+v", decision)
+	}
+}
+
+func TestMessagePolicyEvaluatorExactRuleOverridesTenantRuleIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           true,
+		PermissionVersion: 1,
+		Classification:    "STATIC_ALLOW",
+	})
+	command := testPolicyCommand(types.MessageActionSend)
+	seedTenantPolicyRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, false, 88, "TENANT_DENY", "tenant default deny")
+	seedPolicyRule(t, ctx, pool, command, true, 99, "EXACT_ALLOW", "")
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if !decision.Allowed || decision.PermissionVersion != 99 || decision.Classification != "EXACT_ALLOW" || decision.Reason != "" {
+		t.Fatalf("expected exact rule to override tenant rule, got %+v", decision)
+	}
+}
+
+func TestMessagePolicyEvaluatorExactDenyOverridesTenantAllowIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           true,
+		PermissionVersion: 1,
+		Classification:    "STATIC_ALLOW",
+	})
+	command := testPolicyCommand(types.MessageActionRevoke)
+	seedTenantPolicyRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, true, 88, "TENANT_ALLOW", "")
+	seedPolicyRule(t, ctx, pool, command, false, 99, "EXACT_DENY", "moderator only")
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if decision.Allowed || decision.PermissionVersion != 99 || decision.Classification != "EXACT_DENY" || decision.Reason != "moderator only" {
+		t.Fatalf("expected exact deny to override tenant allow, got %+v", decision)
+	}
+}
+
+func TestMessagePolicyEvaluatorContactBlockOverridesTenantRuleIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           true,
+		PermissionVersion: 9,
+		Classification:    "STATIC_ALLOW",
+	})
+	command := testPolicyCommand(types.MessageActionSend)
+	command.DirectPeerUserID = "peer-policy"
+	seedContactEdge(t, ctx, pool, "peer-policy", string(command.AuthContext.UserID), types.ContactEdgeStatusBlocked, 12)
+	seedTenantPolicyRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, true, 88, "TENANT_ALLOW", "")
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if decision.Allowed ||
+		decision.PermissionVersion != 12 ||
+		decision.Classification != "CONTACT_BLOCKED" ||
+		decision.Reason != "contact blocked" {
+		t.Fatalf("expected contact block to override tenant allow, got %+v", decision)
 	}
 }
 
@@ -169,6 +289,18 @@ func TestMessagePolicyEvaluatorDoesNotFallbackOnDatabaseErrorIntegration(t *test
 	}
 }
 
+func TestIsUndefinedTable(t *testing.T) {
+	if !isUndefinedTable(&pgconn.PgError{Code: "42P01"}) {
+		t.Fatalf("expected undefined table error to match")
+	}
+	if isUndefinedTable(&pgconn.PgError{Code: "42703"}) {
+		t.Fatalf("did not expect undefined column error to match")
+	}
+	if isUndefinedTable(errors.New("plain error")) {
+		t.Fatalf("did not expect plain error to match")
+	}
+}
+
 func openTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	dsn := os.Getenv("NEXUSIM_PG_DSN")
@@ -212,7 +344,7 @@ func applyPolicyMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool)
 
 func resetPolicyTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	if _, err := pool.Exec(ctx, `TRUNCATE policy_decision_audit_outbox_repair_audit, policy_decision_audit_outbox, policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
+	if _, err := pool.Exec(ctx, `TRUNCATE policy_decision_audit_outbox_repair_audit, policy_decision_audit_outbox, policy_tenant_message_action_rules, policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
 		t.Fatalf("reset policy tables: %v", err)
 	}
 }
@@ -242,6 +374,33 @@ INSERT INTO policy_message_action_rules (
 `, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.Action, allowed, permissionVersion, classification, reason)
 	if err != nil {
 		t.Fatalf("seed policy rule: %v", err)
+	}
+}
+
+func seedTenantPolicyRule(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	tenantID types.TenantID,
+	action types.MessageAction,
+	allowed bool,
+	permissionVersion int64,
+	classification string,
+	reason string,
+) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_tenant_message_action_rules (
+    tenant_id,
+    action,
+    allowed,
+    permission_version,
+    classification,
+    reason
+) VALUES ($1, $2, $3, $4, $5, $6)
+`, tenantID, action, allowed, permissionVersion, classification, reason)
+	if err != nil {
+		t.Fatalf("seed tenant policy rule: %v", err)
 	}
 }
 

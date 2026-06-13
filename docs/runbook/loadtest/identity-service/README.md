@@ -54,6 +54,7 @@ RegisterUser
 | --- | --- |
 | `loadtest-report-20260613-identity-challenge-delivery-outbox-smoke.md` | `RequestVerificationChallenge(outbox)` -> `challenge-delivery-worker` -> webhook token -> `ConfirmVerificationChallenge` 真实进程 smoke |
 | `loadtest-report-20260613-identity-mtls-smoke.md` | identity-service gRPC TLS / mTLS + client DNS SAN allowlist 下的 challenge delivery outbox 真实进程 smoke |
+| `loadtest-report-20260614-identity-api-gateway-facade-smoke.md` | `RegisterUser -> RequestVerificationChallenge(outbox) -> ConfirmVerificationChallenge` 经 api-gateway `GatewayService` facade 的真实进程 smoke |
 
 ## 面试可讲重点
 

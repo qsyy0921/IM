@@ -16,6 +16,33 @@ type ProjectionRepairStore struct {
 	now  func() time.Time
 }
 
+type ProjectionRepairAuditOptions struct {
+	ConsumerGroup string
+	Topic         string
+	PartitionID   *int32
+	Mode          string
+	Outcome       string
+	Limit         int
+}
+
+type ProjectionRepairAuditRow struct {
+	ConsumerGroup string
+	Topic         string
+	PartitionID   int32
+	Mode          string
+	Outcome       string
+	SkipReason    string
+	Operator      string
+	Reason        string
+	DryRun        bool
+	BeforeOffset  int64
+	AfterOffset   int64
+	FailureOffset *int64
+	FailureEvent  string
+	FailureClass  string
+	CreatedAt     time.Time
+}
+
 type ProjectionRepairStoreOption func(*ProjectionRepairStore)
 
 func NewProjectionRepairStore(pool *pgxpool.Pool, opts ...ProjectionRepairStoreOption) *ProjectionRepairStore {
@@ -161,6 +188,106 @@ WHERE consumer_group = $1
 		stats.Skipped = 1
 	}
 	return stats, nil
+}
+
+func (store *ProjectionRepairStore) AuditCheckpointRepairs(ctx context.Context, options ProjectionRepairAuditOptions) ([]ProjectionRepairAuditRow, error) {
+	if store == nil || store.pool == nil {
+		return nil, errors.New("delivery projection repair store is not configured")
+	}
+	limit := options.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	topic := strings.TrimSpace(options.Topic)
+	if topic == "" {
+		topic = "conversation.timeline.events"
+	}
+
+	var args []any
+	clauses := []string{"topic = $1"}
+	args = append(args, topic)
+	if consumerGroup := strings.TrimSpace(options.ConsumerGroup); consumerGroup != "" {
+		args = append(args, consumerGroup)
+		clauses = append(clauses, "consumer_group = $"+itoa(len(args)))
+	}
+	if options.PartitionID != nil {
+		args = append(args, *options.PartitionID)
+		clauses = append(clauses, "partition_id = $"+itoa(len(args)))
+	}
+	if rawMode := strings.TrimSpace(options.Mode); rawMode != "" {
+		mode := normalizeProjectionRepairMode(rawMode)
+		if mode == "" {
+			return nil, types.NewInvalidArgument("unsupported delivery projection repair mode")
+		}
+		args = append(args, mode)
+		clauses = append(clauses, "mode = $"+itoa(len(args)))
+	}
+	if rawOutcome := strings.TrimSpace(options.Outcome); rawOutcome != "" {
+		outcome := normalizeProjectionRepairOutcome(rawOutcome)
+		if outcome == "" {
+			return nil, types.NewInvalidArgument("unsupported delivery projection repair outcome")
+		}
+		args = append(args, outcome)
+		clauses = append(clauses, "outcome = $"+itoa(len(args)))
+	}
+	args = append(args, limit)
+	rows, err := store.pool.Query(ctx, `
+SELECT
+    consumer_group,
+    topic,
+    partition_id,
+    mode,
+    outcome,
+    skip_reason,
+    operator,
+    reason,
+    dry_run,
+    before_offset_value,
+    after_offset_value,
+    failure_offset_value,
+    failure_event_id,
+    failure_class,
+    created_at
+FROM delivery_projection_checkpoint_repair_audit
+WHERE `+strings.Join(clauses, " AND ")+`
+ORDER BY created_at DESC, consumer_group, partition_id, id DESC
+LIMIT $`+itoa(len(args)), args...)
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	result := make([]ProjectionRepairAuditRow, 0, limit)
+	for rows.Next() {
+		var row ProjectionRepairAuditRow
+		if err := rows.Scan(
+			&row.ConsumerGroup,
+			&row.Topic,
+			&row.PartitionID,
+			&row.Mode,
+			&row.Outcome,
+			&row.SkipReason,
+			&row.Operator,
+			&row.Reason,
+			&row.DryRun,
+			&row.BeforeOffset,
+			&row.AfterOffset,
+			&row.FailureOffset,
+			&row.FailureEvent,
+			&row.FailureClass,
+			&row.CreatedAt,
+		); err != nil {
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		result = append(result, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	return result, nil
 }
 
 type checkpointRepairRow struct {
@@ -314,6 +441,21 @@ func normalizeProjectionRepairMode(mode string) string {
 		return types.ProjectionCheckpointRepairModeRewindFailure
 	case types.ProjectionCheckpointRepairModeRewindEarliest:
 		return types.ProjectionCheckpointRepairModeRewindEarliest
+	default:
+		return ""
+	}
+}
+
+func normalizeProjectionRepairOutcome(outcome string) string {
+	switch strings.ToUpper(strings.TrimSpace(outcome)) {
+	case "":
+		return ""
+	case checkpointRepairOutcomeAudited:
+		return checkpointRepairOutcomeAudited
+	case checkpointRepairOutcomeMutated:
+		return checkpointRepairOutcomeMutated
+	case checkpointRepairOutcomeSkipped:
+		return checkpointRepairOutcomeSkipped
 	default:
 		return ""
 	}

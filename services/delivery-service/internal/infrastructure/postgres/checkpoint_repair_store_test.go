@@ -191,6 +191,77 @@ func TestProjectionRepairStoreRejectsMissingEarliestUnresolvedFailureIntegration
 	}
 }
 
+func TestProjectionRepairStoreAuditCheckpointRepairsReturnsLatestRowsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_checkpoint_repair_audit (
+    consumer_group, topic, partition_id, mode, outcome, skip_reason, operator, reason, dry_run, before_offset_value, after_offset_value, failure_offset_value, failure_event_id, failure_class, created_at
+) VALUES
+    ('group-a', 'conversation.timeline.events', 0, 'rewind-unresolved-failure', 'MUTATED', '', 'operator-a', 'repair-a', false, 42, 21, 21, 'event-21', 'projection_dependency', now() - interval '1 minute'),
+    ('group-a', 'conversation.timeline.events', 0, 'audit', 'AUDITED', '', 'operator-b', 'repair-b', true, 42, 42, NULL, '', '', now())
+`)
+	if err != nil {
+		t.Fatalf("seed checkpoint repair audit: %v", err)
+	}
+
+	store := NewProjectionRepairStore(pool)
+	rows, err := store.AuditCheckpointRepairs(ctx, ProjectionRepairAuditOptions{
+		ConsumerGroup: "group-a",
+		Topic:         "conversation.timeline.events",
+		Limit:         10,
+	})
+	if err != nil {
+		t.Fatalf("audit checkpoint repairs: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected two rows, got %d", len(rows))
+	}
+	if rows[0].Mode != types.ProjectionCheckpointRepairModeAudit || rows[0].Outcome != checkpointRepairOutcomeAudited || !rows[0].DryRun {
+		t.Fatalf("unexpected latest repair audit row: %+v", rows[0])
+	}
+	if rows[1].Mode != types.ProjectionCheckpointRepairModeRewindFailure || rows[1].Outcome != checkpointRepairOutcomeMutated || rows[1].FailureOffset == nil || *rows[1].FailureOffset != 21 {
+		t.Fatalf("unexpected older repair audit row: %+v", rows[1])
+	}
+}
+
+func TestProjectionRepairStoreAuditCheckpointRepairsFiltersModeAndOutcomeIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_checkpoint_repair_audit (
+    consumer_group, topic, partition_id, mode, outcome, skip_reason, operator, reason, dry_run, before_offset_value, after_offset_value, failure_offset_value, failure_event_id, failure_class, created_at
+) VALUES
+    ('group-b', 'conversation.timeline.events', 0, 'rewind-earliest-unresolved-failure', 'MUTATED', '', 'operator-a', 'repair-a', false, 42, 21, 21, 'event-21', 'projection_dependency', now()),
+    ('group-b', 'conversation.timeline.events', 0, 'rewind-next-offset', 'SKIPPED', 'target_offset_is_not_lower', 'operator-b', 'repair-b', false, 42, 42, NULL, '', '', now() - interval '1 minute')
+`)
+	if err != nil {
+		t.Fatalf("seed checkpoint repair audit: %v", err)
+	}
+
+	store := NewProjectionRepairStore(pool)
+	rows, err := store.AuditCheckpointRepairs(ctx, ProjectionRepairAuditOptions{
+		ConsumerGroup: "group-b",
+		Topic:         "conversation.timeline.events",
+		Mode:          types.ProjectionCheckpointRepairModeRewindEarliest,
+		Outcome:       checkpointRepairOutcomeMutated,
+		Limit:         10,
+	})
+	if err != nil {
+		t.Fatalf("audit checkpoint repairs by mode/outcome: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one row, got %d", len(rows))
+	}
+	if rows[0].Mode != types.ProjectionCheckpointRepairModeRewindEarliest || rows[0].Outcome != checkpointRepairOutcomeMutated {
+		t.Fatalf("unexpected filtered repair audit row: %+v", rows[0])
+	}
+}
+
 func seedDeliveryCheckpoint(t *testing.T, ctx context.Context, pool *pgxpool.Pool, consumerGroup string, topic string, partitionID int32, offsetValue int64) {
 	t.Helper()
 	if _, err := pool.Exec(ctx, `

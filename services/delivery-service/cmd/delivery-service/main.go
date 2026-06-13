@@ -52,6 +52,8 @@ func run() error {
 		return runOutboxRepair()
 	case "projection-checkpoint-repair":
 		return runProjectionCheckpointRepair()
+	case "projection-checkpoint-repair-audit":
+		return runProjectionCheckpointRepairAudit()
 	case "projection-failure-audit":
 		return runProjectionFailureAudit()
 	case "projection-failure-cleanup":
@@ -355,6 +357,64 @@ func runProjectionFailureAudit() error {
 	}
 	if !includeResolved && len(rows) > 0 {
 		return fmt.Errorf("delivery projection failure audit found %d unresolved rows", len(rows))
+	}
+	return nil
+}
+
+func runProjectionCheckpointRepairAudit() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	var partitionID *int32
+	if value := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_PROJECTION_REPAIR_AUDIT_PARTITION_ID")); value != "" {
+		parsed := int32(envIntAllowZero("NEXUSIM_DELIVERY_PROJECTION_REPAIR_AUDIT_PARTITION_ID", 0))
+		partitionID = &parsed
+	}
+	rows, err := postgresinfra.NewProjectionRepairStore(pool).AuditCheckpointRepairs(ctx, postgresinfra.ProjectionRepairAuditOptions{
+		ConsumerGroup: envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_AUDIT_CONSUMER_GROUP", ""),
+		Topic:         envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_AUDIT_TOPIC", "conversation.timeline.events"),
+		PartitionID:   partitionID,
+		Mode:          envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_AUDIT_MODE", ""),
+		Outcome:       envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_AUDIT_OUTCOME", ""),
+		Limit:         envInt("NEXUSIM_DELIVERY_PROJECTION_REPAIR_AUDIT_LIMIT", 20),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("delivery-service projection checkpoint repair audit completed rows=%d", len(rows))
+	for _, row := range rows {
+		failureOffset := int64(-1)
+		if row.FailureOffset != nil {
+			failureOffset = *row.FailureOffset
+		}
+		log.Printf(
+			"projection_checkpoint_repair consumer_group=%s topic=%s partition_id=%d mode=%s outcome=%s skip_reason=%s dry_run=%t before_offset=%d after_offset=%d failure_offset=%d failure_event_id=%s failure_class=%s operator=%s created_at=%s reason=%q",
+			row.ConsumerGroup,
+			row.Topic,
+			row.PartitionID,
+			row.Mode,
+			row.Outcome,
+			row.SkipReason,
+			row.DryRun,
+			row.BeforeOffset,
+			row.AfterOffset,
+			failureOffset,
+			row.FailureEvent,
+			row.FailureClass,
+			row.Operator,
+			row.CreatedAt.Format(time.RFC3339),
+			row.Reason,
+		)
 	}
 	return nil
 }

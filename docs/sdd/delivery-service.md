@@ -475,6 +475,8 @@ NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay
 - `rewind-unresolved-failure`：显式指定 unresolved projection failure 的 Kafka raw offset，先锁定该 failure row，再把 checkpoint 回调到同一 offset 做 replay。
 - `rewind-earliest-unresolved-failure`：不要求手填 offset，直接锁定当前最早 unresolved projection failure，再把 checkpoint 回调到该 offset 做 replay。
 
+另有只读 `projection-checkpoint-repair-audit` 运维模式，可直接列出 checkpoint repair audit 历史，并按 `mode / outcome / consumer_group / topic / partition_id` 缩小排障范围；它不执行 replay，也不修改 checkpoint。
+
 另有只读 `projection-failure-audit` 运维模式，用于直接列出 unresolved projection failure，并可按 `failure_class` 缩小排障范围；第一阶段它只做只读排障，不负责自动 repair / retry。
 
 `projection-failure-cleanup` 只删除超过 retention 的 resolved failure 审计行，不允许触碰 unresolved blocker；operator 可按 `consumer_group / topic / partition_id / failure_class` 缩小 cleanup 范围，避免跨 consumer 误清历史证据。

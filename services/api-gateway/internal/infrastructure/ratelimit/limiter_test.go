@@ -7,6 +7,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	grpcgo "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -36,6 +37,8 @@ func TestLimiterAllowsBurstThenRejects(t *testing.T) {
 	}
 	if _, err := interceptor(ctx, nil, info, handler); status.Code(err) != codes.ResourceExhausted {
 		t.Fatalf("expected third request to be rate limited, got %v", err)
+	} else if retryDelay := retryDelayFromError(t, err); retryDelay != time.Second {
+		t.Fatalf("unexpected retry delay: %s", retryDelay)
 	}
 	snapshot := limiter.Snapshot()
 	if snapshot.TotalAccepted != 2 || snapshot.TotalLimited != 1 || snapshot.TrackedKeys != 1 {
@@ -55,21 +58,24 @@ func TestLimiterRefillsOverTime(t *testing.T) {
 		t.Fatalf("new limiter: %v", err)
 	}
 	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("x-nexusim-gateway-token", "token-1"))
-	allowed, err := limiter.allow(ctx, "/method")
-	if err != nil || !allowed {
-		t.Fatalf("first request should pass, allowed=%v err=%v", allowed, err)
+	allowed, retryDelay, err := limiter.allow(ctx, "/method")
+	if err != nil || !allowed || retryDelay != 0 {
+		t.Fatalf("first request should pass, allowed=%v retryDelay=%s err=%v", allowed, retryDelay, err)
 	}
-	allowed, err = limiter.allow(ctx, "/method")
+	allowed, retryDelay, err = limiter.allow(ctx, "/method")
 	if err != nil {
 		t.Fatalf("second request returned error: %v", err)
 	}
 	if allowed {
 		t.Fatalf("second immediate request should be limited")
 	}
+	if retryDelay != 500*time.Millisecond {
+		t.Fatalf("unexpected retry delay: %s", retryDelay)
+	}
 	now = now.Add(500 * time.Millisecond)
-	allowed, err = limiter.allow(ctx, "/method")
-	if err != nil || !allowed {
-		t.Fatalf("request after refill should pass, allowed=%v err=%v", allowed, err)
+	allowed, retryDelay, err = limiter.allow(ctx, "/method")
+	if err != nil || !allowed || retryDelay != 0 {
+		t.Fatalf("request after refill should pass, allowed=%v retryDelay=%s err=%v", allowed, retryDelay, err)
 	}
 }
 
@@ -86,9 +92,9 @@ func TestLimiterKeysByMethodAndToken(t *testing.T) {
 	}
 	ctx1 := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer token-1"))
 	ctx2 := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer token-2"))
-	allowed1, err1 := limiter.allow(ctx1, "/method")
-	allowed2, err2 := limiter.allow(ctx2, "/method")
-	allowed3, err3 := limiter.allow(ctx1, "/other")
+	allowed1, _, err1 := limiter.allow(ctx1, "/method")
+	allowed2, _, err2 := limiter.allow(ctx2, "/method")
+	allowed3, _, err3 := limiter.allow(ctx1, "/other")
 	if err1 != nil || err2 != nil || err3 != nil || !allowed1 || !allowed2 || !allowed3 {
 		t.Fatalf("different token or method should use separate buckets")
 	}
@@ -144,17 +150,20 @@ func TestRedisLimiterSharesLimitAcrossInstances(t *testing.T) {
 	}
 	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer token-1"))
 	for i, limiter := range []*Limiter{limiterA, limiterB} {
-		allowed, err := limiter.allow(ctx, "/method")
-		if err != nil || !allowed {
-			t.Fatalf("request %d should pass, allowed=%v err=%v", i, allowed, err)
+		allowed, retryDelay, err := limiter.allow(ctx, "/method")
+		if err != nil || !allowed || retryDelay != 0 {
+			t.Fatalf("request %d should pass, allowed=%v retryDelay=%s err=%v", i, allowed, retryDelay, err)
 		}
 	}
-	allowed, err := limiterA.allow(ctx, "/method")
+	allowed, retryDelay, err := limiterA.allow(ctx, "/method")
 	if err != nil {
 		t.Fatalf("third request returned error: %v", err)
 	}
 	if allowed {
 		t.Fatalf("third request should be limited across instances")
+	}
+	if retryDelay != time.Second {
+		t.Fatalf("unexpected retry delay: %s", retryDelay)
 	}
 	if limiterA.Snapshot().TotalLimited != 1 {
 		t.Fatalf("expected limiter a to record limited request, got %+v", limiterA.Snapshot())
@@ -179,18 +188,21 @@ func TestRedisLimiterAllowsNewWindow(t *testing.T) {
 		t.Fatalf("new limiter: %v", err)
 	}
 	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer token-1"))
-	allowed, err := limiter.allow(ctx, "/method")
-	if err != nil || !allowed {
+	allowed, retryDelay, err := limiter.allow(ctx, "/method")
+	if err != nil || !allowed || retryDelay != 0 {
 		t.Fatalf("first request should pass")
 	}
-	allowed, err = limiter.allow(ctx, "/method")
+	allowed, retryDelay, err = limiter.allow(ctx, "/method")
 	if err != nil || allowed {
 		t.Fatalf("second same-window request should be limited, allowed=%v err=%v", allowed, err)
 	}
+	if retryDelay != time.Second {
+		t.Fatalf("unexpected retry delay: %s", retryDelay)
+	}
 	now = now.Add(time.Second)
-	allowed, err = limiter.allow(ctx, "/method")
-	if err != nil || !allowed {
-		t.Fatalf("new window request should pass, allowed=%v err=%v", allowed, err)
+	allowed, retryDelay, err = limiter.allow(ctx, "/method")
+	if err != nil || !allowed || retryDelay != 0 {
+		t.Fatalf("new window request should pass, allowed=%v retryDelay=%s err=%v", allowed, retryDelay, err)
 	}
 }
 
@@ -210,9 +222,9 @@ func TestRedisLimiterFailOpenOnRedisError(t *testing.T) {
 		t.Fatalf("new limiter: %v", err)
 	}
 	server.Close()
-	allowed, err := limiter.allow(context.Background(), "/method")
-	if err != nil || !allowed {
-		t.Fatalf("fail-open limiter should allow on redis error, allowed=%v err=%v", allowed, err)
+	allowed, retryDelay, err := limiter.allow(context.Background(), "/method")
+	if err != nil || !allowed || retryDelay != 0 {
+		t.Fatalf("fail-open limiter should allow on redis error, allowed=%v retryDelay=%s err=%v", allowed, retryDelay, err)
 	}
 	snapshot := limiter.Snapshot()
 	if snapshot.RedisErrors == 0 || snapshot.TotalAccepted != 1 {
@@ -235,8 +247,23 @@ func TestRedisLimiterFailClosedOnRedisError(t *testing.T) {
 		t.Fatalf("new limiter: %v", err)
 	}
 	server.Close()
-	allowed, err := limiter.allow(context.Background(), "/method")
+	allowed, _, err := limiter.allow(context.Background(), "/method")
 	if err == nil || allowed {
 		t.Fatalf("fail-closed limiter should reject redis error, allowed=%v err=%v", allowed, err)
 	}
+}
+
+func retryDelayFromError(t *testing.T, err error) time.Duration {
+	t.Helper()
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	for _, detail := range st.Details() {
+		if retryInfo, ok := detail.(*errdetails.RetryInfo); ok {
+			return retryInfo.GetRetryDelay().AsDuration()
+		}
+	}
+	t.Fatalf("expected RetryInfo detail in %v", st.Details())
+	return 0
 }

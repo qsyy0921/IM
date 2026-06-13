@@ -13,11 +13,13 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	grpcgo "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 const (
@@ -141,12 +143,12 @@ func (limiter *Limiter) UnaryServerInterceptor() grpcgo.UnaryServerInterceptor {
 		}
 	}
 	return func(ctx context.Context, request any, info *grpcgo.UnaryServerInfo, handler grpcgo.UnaryHandler) (any, error) {
-		allowed, err := limiter.allow(ctx, info.FullMethod)
+		allowed, retryDelay, err := limiter.allow(ctx, info.FullMethod)
 		if err != nil && !limiter.failOpen {
 			return nil, status.Error(codes.Unavailable, "rate limiter unavailable")
 		}
 		if !allowed {
-			return nil, status.Error(codes.ResourceExhausted, "rate limit exceeded")
+			return nil, rateLimitExceededError(retryDelay)
 		}
 		return handler(ctx, request)
 	}
@@ -174,14 +176,15 @@ func (limiter *Limiter) Snapshot() Snapshot {
 	}
 }
 
-func (limiter *Limiter) allow(ctx context.Context, method string) (bool, error) {
+func (limiter *Limiter) allow(ctx context.Context, method string) (bool, time.Duration, error) {
 	if limiter.backend == backendRedis {
 		return limiter.allowRedis(ctx, method)
 	}
-	return limiter.allowLocal(ctx, method), nil
+	allowed, retryDelay := limiter.allowLocal(ctx, method)
+	return allowed, retryDelay, nil
 }
 
-func (limiter *Limiter) allowLocal(ctx context.Context, method string) bool {
+func (limiter *Limiter) allowLocal(ctx context.Context, method string) (bool, time.Duration) {
 	now := limiter.now()
 	key := requestKey(ctx, method)
 
@@ -202,17 +205,18 @@ func (limiter *Limiter) allowLocal(ctx context.Context, method string) bool {
 	}
 	entry.lastSeen = now
 	if entry.tokens < 1 {
+		retryDelay := localRetryDelay(1-entry.tokens, limiter.rate)
 		entry.limited++
 		limiter.totalLimited++
-		return false
+		return false, retryDelay
 	}
 	entry.tokens--
 	entry.accepted++
 	limiter.totalAccepted++
-	return true
+	return true, 0
 }
 
-func (limiter *Limiter) allowRedis(ctx context.Context, method string) (bool, error) {
+func (limiter *Limiter) allowRedis(ctx context.Context, method string) (bool, time.Duration, error) {
 	now := limiter.now()
 	window := limiter.window
 	if window <= 0 {
@@ -228,31 +232,70 @@ func (limiter *Limiter) allowRedis(ctx context.Context, method string) (bool, er
 		limiter.redisErrors.Add(1)
 		if limiter.failOpen {
 			limiter.recordAccepted()
-			return true, nil
+			return true, 0, nil
 		}
-		return false, err
+		return false, 0, err
 	}
 	if count == 1 {
 		if err := limiter.redis.PExpire(ctx, key, window*2).Err(); err != nil {
 			limiter.redisErrors.Add(1)
 			if limiter.failOpen {
 				limiter.recordAccepted()
-				return true, nil
+				return true, 0, nil
 			}
-			return false, err
+			return false, 0, err
 		}
 	}
 	if count > int64(limiter.burst) {
 		limiter.recordLimited()
-		return false, nil
+		return false, redisRetryDelay(now, window), nil
 	}
 	limiter.recordAccepted()
-	return true, nil
+	return true, 0, nil
 }
 
 func (limiter *Limiter) redisKey(rawKey string, windowID int64) string {
 	digest := sha256.Sum256([]byte(rawKey))
 	return limiter.prefix + ":rate:" + hex.EncodeToString(digest[:12]) + ":" + strconv.FormatInt(windowID, 10)
+}
+
+func localRetryDelay(missingTokens float64, rate float64) time.Duration {
+	if missingTokens <= 0 || rate <= 0 {
+		return time.Second
+	}
+	delay := time.Duration(math.Ceil((missingTokens / rate) * float64(time.Second)))
+	if delay < time.Millisecond {
+		return time.Millisecond
+	}
+	return delay
+}
+
+func redisRetryDelay(now time.Time, window time.Duration) time.Duration {
+	if window <= 0 {
+		return time.Second
+	}
+	windowMillis := window.Milliseconds()
+	if windowMillis <= 0 {
+		return time.Millisecond
+	}
+	nextWindowMillis := ((now.UnixMilli() / windowMillis) + 1) * windowMillis
+	delay := time.Duration(nextWindowMillis-now.UnixMilli()) * time.Millisecond
+	if delay < time.Millisecond {
+		return time.Millisecond
+	}
+	return delay
+}
+
+func rateLimitExceededError(retryDelay time.Duration) error {
+	if retryDelay <= 0 {
+		retryDelay = time.Second
+	}
+	st := status.New(codes.ResourceExhausted, "rate limit exceeded")
+	st, err := st.WithDetails(&errdetails.RetryInfo{RetryDelay: durationpb.New(retryDelay)})
+	if err != nil {
+		return status.Error(codes.ResourceExhausted, "rate limit exceeded")
+	}
+	return st.Err()
 }
 
 func (limiter *Limiter) recordAccepted() {

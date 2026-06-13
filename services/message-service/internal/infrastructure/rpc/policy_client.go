@@ -2,11 +2,8 @@ package rpc
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -36,19 +33,7 @@ type PolicyClientDialConfig struct {
 	TLS     PolicyClientTLSConfig
 }
 
-type PolicyClientTLSConfig struct {
-	CAFile         string
-	ServerName     string
-	ClientCertFile string
-	ClientKeyFile  string
-}
-
-func (config PolicyClientTLSConfig) Enabled() bool {
-	return strings.TrimSpace(config.CAFile) != "" ||
-		strings.TrimSpace(config.ServerName) != "" ||
-		strings.TrimSpace(config.ClientCertFile) != "" ||
-		strings.TrimSpace(config.ClientKeyFile) != ""
-}
+type PolicyClientTLSConfig = GRPCClientTLSConfig
 
 func NewPolicyClient(client policyv1.PolicyServiceClient, timeout time.Duration) PolicyClient {
 	if timeout <= 0 {
@@ -85,36 +70,12 @@ func DialPolicyClientWithConfig(_ context.Context, config PolicyClientDialConfig
 }
 
 func policyClientTLSCredentials(config PolicyClientTLSConfig) (credentials.TransportCredentials, error) {
-	caFile := strings.TrimSpace(config.CAFile)
-	if caFile == "" {
-		return nil, errors.New("NEXUSIM_POLICY_SERVICE_TLS_CA_FILE is required when policy-service TLS is configured")
-	}
-	clientCertFile := strings.TrimSpace(config.ClientCertFile)
-	clientKeyFile := strings.TrimSpace(config.ClientKeyFile)
-	if (clientCertFile == "") != (clientKeyFile == "") {
-		return nil, errors.New("NEXUSIM_POLICY_SERVICE_TLS_CLIENT_CERT_FILE and NEXUSIM_POLICY_SERVICE_TLS_CLIENT_KEY_FILE must be configured together")
-	}
-	pemBytes, err := os.ReadFile(caFile)
-	if err != nil {
-		return nil, err
-	}
-	roots := x509.NewCertPool()
-	if !roots.AppendCertsFromPEM(pemBytes) {
-		return nil, errors.New("NEXUSIM_POLICY_SERVICE_TLS_CA_FILE does not contain a valid PEM certificate")
-	}
-	tlsConfig := &tls.Config{
-		RootCAs:    roots,
-		ServerName: strings.TrimSpace(config.ServerName),
-		MinVersion: tls.VersionTLS12,
-	}
-	if clientCertFile != "" {
-		cert, err := tls.LoadX509KeyPair(clientCertFile, clientKeyFile)
-		if err != nil {
-			return nil, err
-		}
-		tlsConfig.Certificates = []tls.Certificate{cert}
-	}
-	return credentials.NewTLS(tlsConfig), nil
+	return grpcClientTLSCredentials(
+		config,
+		"NEXUSIM_POLICY_SERVICE_TLS_CA_FILE",
+		"NEXUSIM_POLICY_SERVICE_TLS_CLIENT_CERT_FILE",
+		"NEXUSIM_POLICY_SERVICE_TLS_CLIENT_KEY_FILE",
+	)
 }
 
 func (c PolicyClient) CheckSendPermission(

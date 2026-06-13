@@ -110,6 +110,26 @@ migrations/postgres/conversation/000001_conversation_core.sql
 
 这样可以逐步替换 mock，同时不破坏已有 message-service smoke 和压测入口。
 
+第一阶段 transport hardening 保持可选静态配置，默认 plaintext：
+
+```text
+NEXUSIM_CONVERSATION_GRPC_TLS_CERT_FILE=
+NEXUSIM_CONVERSATION_GRPC_TLS_KEY_FILE=
+NEXUSIM_CONVERSATION_GRPC_TLS_CLIENT_CA_FILE=
+NEXUSIM_CONVERSATION_GRPC_TLS_REQUIRE_CLIENT_CERT=false
+NEXUSIM_CONVERSATION_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES=
+NEXUSIM_CONVERSATION_GRPC_TLS_CLIENT_ALLOWED_URIS=
+
+NEXUSIM_CONVERSATION_SERVICE_TLS_CA_FILE=
+NEXUSIM_CONVERSATION_SERVICE_TLS_SERVER_NAME=
+NEXUSIM_CONVERSATION_SERVICE_TLS_CLIENT_CERT_FILE=
+NEXUSIM_CONVERSATION_SERVICE_TLS_CLIENT_KEY_FILE=
+```
+
+`conversation-service` server TLS requires cert/key together and uses TLS 1.2 or newer. Supplying a client CA, requiring client certs or configuring client DNS / URI SAN allowlists enables mTLS. message-service only enables TLS for the conversation RPC when `NEXUSIM_CONVERSATION_SERVICE_TLS_CA_FILE` is configured, and client cert/key must be configured together. Partial TLS configuration fails startup rather than silently falling back to plaintext.
+
+This is not a full service-mesh identity layer. Certificate issuance, rotation, dynamic service identity registry and all-service mTLS rollout remain future hardening.
+
 ## 7. 本阶段验收
 
 - `conversation_service.proto` 已生成 Go 代码。

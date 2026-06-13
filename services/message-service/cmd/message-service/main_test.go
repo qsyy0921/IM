@@ -48,10 +48,64 @@ func TestPolicyClientTLSConfigFromEnvLoadsTLS(t *testing.T) {
 	}
 }
 
+func TestConversationClientTLSConfigFromEnvDisabledByDefault(t *testing.T) {
+	clearConversationClientTLSConfig(t)
+	config, err := conversationClientTLSConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load conversation client tls config: %v", err)
+	}
+	if config.Enabled() {
+		t.Fatalf("expected conversation client tls to be disabled by default: %+v", config)
+	}
+}
+
+func TestConversationClientTLSConfigFromEnvRequiresCAFile(t *testing.T) {
+	clearConversationClientTLSConfig(t)
+	t.Setenv("NEXUSIM_CONVERSATION_SERVICE_TLS_SERVER_NAME", "conversation-service.nexusim.local")
+	if _, err := conversationClientTLSConfigFromEnv(); err == nil {
+		t.Fatalf("expected conversation client tls without CA file to fail")
+	}
+}
+
+func TestConversationClientTLSConfigFromEnvRequiresClientKeyPair(t *testing.T) {
+	clearConversationClientTLSConfig(t)
+	t.Setenv("NEXUSIM_CONVERSATION_SERVICE_TLS_CA_FILE", "ca.pem")
+	t.Setenv("NEXUSIM_CONVERSATION_SERVICE_TLS_CLIENT_CERT_FILE", "client.crt")
+	if _, err := conversationClientTLSConfigFromEnv(); err == nil {
+		t.Fatalf("expected partial conversation client certificate config to fail")
+	}
+}
+
+func TestConversationClientTLSConfigFromEnvLoadsTLS(t *testing.T) {
+	clearConversationClientTLSConfig(t)
+	t.Setenv("NEXUSIM_CONVERSATION_SERVICE_TLS_CA_FILE", "ca.pem")
+	t.Setenv("NEXUSIM_CONVERSATION_SERVICE_TLS_SERVER_NAME", "conversation-service.nexusim.local")
+	t.Setenv("NEXUSIM_CONVERSATION_SERVICE_TLS_CLIENT_CERT_FILE", "client.crt")
+	t.Setenv("NEXUSIM_CONVERSATION_SERVICE_TLS_CLIENT_KEY_FILE", "client.key")
+	config, err := conversationClientTLSConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load conversation client tls config: %v", err)
+	}
+	if config.CAFile != "ca.pem" ||
+		config.ServerName != "conversation-service.nexusim.local" ||
+		config.ClientCertFile != "client.crt" ||
+		config.ClientKeyFile != "client.key" {
+		t.Fatalf("unexpected conversation client tls config: %+v", config)
+	}
+}
+
 func clearPolicyClientTLSConfig(t *testing.T) {
 	t.Helper()
 	t.Setenv("NEXUSIM_POLICY_SERVICE_TLS_CA_FILE", "")
 	t.Setenv("NEXUSIM_POLICY_SERVICE_TLS_SERVER_NAME", "")
 	t.Setenv("NEXUSIM_POLICY_SERVICE_TLS_CLIENT_CERT_FILE", "")
 	t.Setenv("NEXUSIM_POLICY_SERVICE_TLS_CLIENT_KEY_FILE", "")
+}
+
+func clearConversationClientTLSConfig(t *testing.T) {
+	t.Helper()
+	t.Setenv("NEXUSIM_CONVERSATION_SERVICE_TLS_CA_FILE", "")
+	t.Setenv("NEXUSIM_CONVERSATION_SERVICE_TLS_SERVER_NAME", "")
+	t.Setenv("NEXUSIM_CONVERSATION_SERVICE_TLS_CLIENT_CERT_FILE", "")
+	t.Setenv("NEXUSIM_CONVERSATION_SERVICE_TLS_CLIENT_KEY_FILE", "")
 }

@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	"github.com/qsyy0921/IM/services/message-service/internal/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
@@ -18,6 +20,14 @@ type ConversationClient struct {
 	client  conversationv1.ConversationServiceClient
 	timeout time.Duration
 }
+
+type ConversationClientDialConfig struct {
+	Addr    string
+	Timeout time.Duration
+	TLS     ConversationClientTLSConfig
+}
+
+type ConversationClientTLSConfig = GRPCClientTLSConfig
 
 func NewConversationClient(client conversationv1.ConversationServiceClient, timeout time.Duration) ConversationClient {
 	if timeout <= 0 {
@@ -31,14 +41,39 @@ func DialConversationClient(
 	addr string,
 	timeout time.Duration,
 ) (ConversationClient, func() error, error) {
+	return DialConversationClientWithConfig(ctx, ConversationClientDialConfig{Addr: addr, Timeout: timeout})
+}
+
+func DialConversationClientWithConfig(_ context.Context, config ConversationClientDialConfig) (ConversationClient, func() error, error) {
+	addr := strings.TrimSpace(config.Addr)
+	if addr == "" {
+		return ConversationClient{}, nil, errors.New("conversation service address is required")
+	}
+	transportCredentials := grpc.WithTransportCredentials(insecure.NewCredentials())
+	if config.TLS.Enabled() {
+		creds, err := conversationClientTLSCredentials(config.TLS)
+		if err != nil {
+			return ConversationClient{}, nil, err
+		}
+		transportCredentials = grpc.WithTransportCredentials(creds)
+	}
 	conn, err := grpc.NewClient(
 		"passthrough:///"+addr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		transportCredentials,
 	)
 	if err != nil {
 		return ConversationClient{}, nil, err
 	}
-	return NewConversationClient(conversationv1.NewConversationServiceClient(conn), timeout), conn.Close, nil
+	return NewConversationClient(conversationv1.NewConversationServiceClient(conn), config.Timeout), conn.Close, nil
+}
+
+func conversationClientTLSCredentials(config ConversationClientTLSConfig) (credentials.TransportCredentials, error) {
+	return grpcClientTLSCredentials(
+		config,
+		"NEXUSIM_CONVERSATION_SERVICE_TLS_CA_FILE",
+		"NEXUSIM_CONVERSATION_SERVICE_TLS_CLIENT_CERT_FILE",
+		"NEXUSIM_CONVERSATION_SERVICE_TLS_CLIENT_KEY_FILE",
+	)
 }
 
 func (c ConversationClient) GetSendContext(

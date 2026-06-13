@@ -62,6 +62,43 @@ func TestPolicyClientTLSCredentialsLoadCAAndClientCert(t *testing.T) {
 	}
 }
 
+func TestConversationClientTLSCredentialsRequireCAFile(t *testing.T) {
+	_, err := conversationClientTLSCredentials(ConversationClientTLSConfig{ServerName: "conversation-service.nexusim.local"})
+	if err == nil {
+		t.Fatalf("expected conversation tls without CA file to fail")
+	}
+}
+
+func TestConversationClientTLSCredentialsRequireClientKeyPair(t *testing.T) {
+	dir := t.TempDir()
+	caFile, _ := writePolicyClientTLSTestCert(t, dir, "ca")
+	_, err := conversationClientTLSCredentials(ConversationClientTLSConfig{
+		CAFile:         caFile,
+		ClientCertFile: "client.crt",
+	})
+	if err == nil {
+		t.Fatalf("expected partial conversation client key pair to fail")
+	}
+}
+
+func TestConversationClientTLSCredentialsLoadCAAndClientCert(t *testing.T) {
+	dir := t.TempDir()
+	caFile, _ := writePolicyClientTLSTestCert(t, dir, "ca")
+	clientCertFile, clientKeyFile := writePolicyClientTLSTestCert(t, dir, "client")
+	creds, err := conversationClientTLSCredentials(ConversationClientTLSConfig{
+		CAFile:         caFile,
+		ServerName:     "conversation-service.nexusim.local",
+		ClientCertFile: clientCertFile,
+		ClientKeyFile:  clientKeyFile,
+	})
+	if err != nil {
+		t.Fatalf("load conversation tls credentials: %v", err)
+	}
+	if creds == nil {
+		t.Fatalf("expected conversation tls credentials")
+	}
+}
+
 func writePolicyClientTLSTestCert(t *testing.T, dir string, name string) (string, string) {
 	t.Helper()
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)

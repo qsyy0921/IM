@@ -5,6 +5,7 @@ param(
     [string[]]$Actions = @("send"),
     [switch]$UsePolicyRules,
     [switch]$UseTenantPolicyRules,
+    [switch]$UseConversationRoleGate,
     [switch]$SkipBuild
 )
 
@@ -125,13 +126,16 @@ function Run-Scenario {
         [string]$Classification,
         [string]$Reason
     )
+    if ($UseConversationRoleGate -and $Action -ne "send") {
+        throw "conversation role gate integration smoke currently supports send only"
+    }
     $policyPort = Get-FreeTcpPort
     $messagePort = Get-FreeTcpPort
     $policyAddr = "127.0.0.1:$policyPort"
     $messageAddr = "127.0.0.1:$messagePort"
     $processes = @()
     try {
-        $usesRuleStore = $UsePolicyRules -or $UseTenantPolicyRules
+        $usesRuleStore = $UsePolicyRules -or $UseTenantPolicyRules -or $UseConversationRoleGate
         $policyStaticAllowed = if ($usesRuleStore) { -not $Allowed } else { $Allowed }
         $policyStaticClassification = if ($usesRuleStore) { "LOCAL_STATIC_SHOULD_NOT_APPEAR" } else { $Classification }
         $policyEnv = @{
@@ -181,6 +185,9 @@ function Run-Scenario {
         if ($UseTenantPolicyRules) {
             $args += "--seed-tenant-policy-rule"
         }
+        if ($UseConversationRoleGate) {
+            $args += "--seed-conversation-role-gate"
+        }
         & $runner @args
         if ($LASTEXITCODE -ne 0) {
             throw "policy message smoke runner failed with exit code $LASTEXITCODE"
@@ -201,7 +208,7 @@ Get-ChildItem -Path "migrations\postgres\message" -Filter "*.sql" |
         Apply-PostgresMigration -Path $_.FullName -Name $_.Name
     }
 
-if ($UsePolicyRules -or $UseTenantPolicyRules) {
+if ($UsePolicyRules -or $UseTenantPolicyRules -or $UseConversationRoleGate) {
     Get-ChildItem -Path "migrations\postgres\policy" -Filter "*.sql" |
         Sort-Object Name |
         ForEach-Object {
@@ -223,6 +230,11 @@ foreach ($action in $Actions) {
     $allowClassification = "POLICY_RPC_" + $normalizedAction.ToUpperInvariant() + "_ALLOWED"
     $denyClassification = "POLICY_RPC_" + $normalizedAction.ToUpperInvariant() + "_BLOCKED"
     $denyReason = "blocked by policy integration smoke $normalizedAction"
+    if ($UseConversationRoleGate) {
+        $allowClassification = "POLICY_ROLE_GATE_TENANT_ALLOW"
+        $denyClassification = "CONVERSATION_ROLE_DENIED"
+        $denyReason = "conversation role policy denied"
+    }
 
     $scenarioSummaries += Run-Scenario `
         -Action $normalizedAction `
@@ -248,6 +260,7 @@ $combinedFields = [ordered]@{
     result_dir = $resultDir
     policy_rules_enabled = [bool]$UsePolicyRules
     tenant_policy_rules_enabled = [bool]$UseTenantPolicyRules
+    conversation_role_gate_enabled = [bool]$UseConversationRoleGate
     actions = $Actions
 }
 if ($scenarioSummaries.Count -eq 2 -and $scenarioSummaries[0].action -eq "send" -and $scenarioSummaries[1].action -eq "send") {

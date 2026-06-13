@@ -330,6 +330,11 @@ func (r *Repository) LoginGatewaySession(
 	if err := ensureSessionCanIssue(ctx, tx, command.TenantID, command.UserID, command.DeviceID, sessionID); err != nil {
 		return types.LoginResult{}, err
 	}
+	if command.UsedMFARecoveryCode.CodeID != "" || command.UsedMFARecoveryCode.CodeHash != "" {
+		if err := ensureMFARecoveryLoginNotLocked(ctx, tx, command.TenantID, command.UserID, issuedAt); err != nil {
+			return types.LoginResult{}, err
+		}
+	}
 	if err := upsertSession(ctx, tx, issueCommandFromLogin(command, sessionID), sessionID, issuedAt, gatewayExpiresAt, sessionMFAProofFromLogin(command, issuedAt)); err != nil {
 		return types.LoginResult{}, err
 	}
@@ -437,6 +442,9 @@ func (r *Repository) RefreshGatewaySession(
 		return types.RefreshGatewayTokenResult{}, types.NewMFARequired("mfa required")
 	}
 	if command.UsedMFARecoveryCode.CodeID != "" || command.UsedMFARecoveryCode.CodeHash != "" {
+		if err := ensureMFARecoveryLoginNotLocked(ctx, tx, command.TenantID, command.UserID, issuedAt); err != nil {
+			return types.RefreshGatewayTokenResult{}, err
+		}
 		if err := consumeMFARecoveryCode(ctx, tx, command.TenantID, command.UserID, command.UsedMFARecoveryCode, issuedAt); err != nil {
 			return types.RefreshGatewayTokenResult{}, err
 		}
@@ -2529,6 +2537,27 @@ WHERE tenant_id = $1
 	}
 	if tag.RowsAffected() == 0 {
 		return types.NewInvalidCredentials("invalid credentials")
+	}
+	return nil
+}
+
+func ensureMFARecoveryLoginNotLocked(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, now time.Time) error {
+	var lockedUntil time.Time
+	err := tx.QueryRow(ctx, `
+SELECT COALESCE(mfa_recovery_locked_until, 'epoch'::timestamptz)
+FROM identity_users
+WHERE tenant_id = $1
+  AND user_id = $2
+FOR UPDATE
+`, tenantID, userID).Scan(&lockedUntil)
+	if err == pgx.ErrNoRows {
+		return types.NewInvalidCredentials("invalid credentials")
+	}
+	if err != nil {
+		return types.NewDBReadFailed(err.Error())
+	}
+	if lockedUntil.After(now) {
+		return types.NewMFALocked("mfa temporarily locked")
 	}
 	return nil
 }

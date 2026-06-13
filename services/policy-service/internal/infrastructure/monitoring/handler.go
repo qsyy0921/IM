@@ -92,6 +92,12 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		} else {
 			snapshot.RuleStore = &rules
 		}
+		auditOutbox, err := queryAuditOutboxSnapshot(ctx, h.pool)
+		if err != nil {
+			snapshot.AuditOutboxError = "policy audit outbox metrics query failed"
+		} else {
+			snapshot.AuditOutbox = &auditOutbox
+		}
 	}
 	writeJSON(w, http.StatusOK, snapshot)
 }
@@ -103,13 +109,15 @@ type healthResponse struct {
 }
 
 type Snapshot struct {
-	Service        string            `json:"service"`
-	GeneratedAtMS  int64             `json:"generated_at_ms"`
-	PGPool         *PGPoolSnapshot   `json:"pg_pool,omitempty"`
-	RuleStore      *RuleSnapshot     `json:"policy_rule_store,omitempty"`
-	RuleStoreError string            `json:"policy_rule_store_error,omitempty"`
-	GRPC           *GRPCSnapshot     `json:"grpc,omitempty"`
-	Decisions      *DecisionSnapshot `json:"decisions,omitempty"`
+	Service          string               `json:"service"`
+	GeneratedAtMS    int64                `json:"generated_at_ms"`
+	PGPool           *PGPoolSnapshot      `json:"pg_pool,omitempty"`
+	RuleStore        *RuleSnapshot        `json:"policy_rule_store,omitempty"`
+	RuleStoreError   string               `json:"policy_rule_store_error,omitempty"`
+	AuditOutbox      *AuditOutboxSnapshot `json:"policy_decision_audit_outbox,omitempty"`
+	AuditOutboxError string               `json:"policy_decision_audit_outbox_error,omitempty"`
+	GRPC             *GRPCSnapshot        `json:"grpc,omitempty"`
+	Decisions        *DecisionSnapshot    `json:"decisions,omitempty"`
 }
 
 type PGPoolSnapshot struct {
@@ -136,6 +144,13 @@ type RuleActionSnapshot struct {
 	Total  int64  `json:"total"`
 	Allow  int64  `json:"allow"`
 	Deny   int64  `json:"deny"`
+}
+
+type AuditOutboxSnapshot struct {
+	Total     int64 `json:"total"`
+	Pending   int64 `json:"pending"`
+	Published int64 `json:"published"`
+	DLQ       int64 `json:"dlq"`
 }
 
 func queryRuleSnapshot(ctx context.Context, pool *pgxpool.Pool) (RuleSnapshot, error) {
@@ -172,6 +187,21 @@ ORDER BY action
 	}
 	if err := rows.Err(); err != nil {
 		return RuleSnapshot{}, err
+	}
+	return snapshot, nil
+}
+
+func queryAuditOutboxSnapshot(ctx context.Context, pool *pgxpool.Pool) (AuditOutboxSnapshot, error) {
+	var snapshot AuditOutboxSnapshot
+	if err := pool.QueryRow(ctx, `
+SELECT
+    COUNT(*),
+    COUNT(*) FILTER (WHERE status = 'PENDING'),
+    COUNT(*) FILTER (WHERE status = 'PUBLISHED'),
+    COUNT(*) FILTER (WHERE status = 'DLQ')
+FROM policy_decision_audit_outbox
+`).Scan(&snapshot.Total, &snapshot.Pending, &snapshot.Published, &snapshot.DLQ); err != nil {
+		return AuditOutboxSnapshot{}, err
 	}
 	return snapshot, nil
 }

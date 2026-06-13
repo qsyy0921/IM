@@ -111,6 +111,8 @@ func grpcError(err error) error {
 		return status.Error(codes.InvalidArgument, "invalid policy request")
 	case errors.Is(err, types.ErrDependencyUnavailable):
 		return status.Error(codes.Unavailable, "policy unavailable")
+	case errors.Is(err, types.ErrDBWriteFailed):
+		return status.Error(codes.Unavailable, "policy unavailable")
 	default:
 		return status.Error(codes.Internal, "internal error")
 	}

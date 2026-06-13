@@ -818,6 +818,9 @@ func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string) err
 }
 
 func seedPolicyRules(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
+	if _, err := pool.Exec(ctx, `DELETE FROM policy_decision_audit_outbox WHERE tenant_id = $1`, cfg.tenantID); err != nil {
+		return fmt.Errorf("cleanup policy decision audit outbox: %w", err)
+	}
 	if _, err := pool.Exec(ctx, `DELETE FROM policy_message_action_rules WHERE tenant_id = $1`, cfg.tenantID); err != nil {
 		return fmt.Errorf("cleanup policy rules: %w", err)
 	}

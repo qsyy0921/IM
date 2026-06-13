@@ -74,6 +74,7 @@ type summary struct {
 	AfterBlockedDecision   policyDecisionSnapshot `json:"after_blocked_policy_decision"`
 	AfterUnblockedDecision policyDecisionSnapshot `json:"after_unblocked_policy_decision"`
 	CheckpointOffset       int64                  `json:"checkpoint_offset_value"`
+	AuditOutboxCount       int64                  `json:"policy_decision_audit_outbox_count"`
 	Events                 []string               `json:"events"`
 }
 
@@ -252,6 +253,13 @@ func run(cfg config) error {
 		s.Error = err.Error()
 		return err
 	}
+	if policyClient != nil {
+		s.AuditOutboxCount, err = waitAuditOutboxCount(ctx, pool, cfg, 3)
+		if err != nil {
+			s.Error = err.Error()
+			return err
+		}
+	}
 	s.Success = true
 	return nil
 }
@@ -402,6 +410,30 @@ WHERE consumer_group = $1
 	}
 }
 
+func waitAuditOutboxCount(ctx context.Context, pool *pgxpool.Pool, cfg config, minCount int64) (int64, error) {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		var count int64
+		err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM policy_decision_audit_outbox
+WHERE tenant_id = $1
+`, cfg.tenantID).Scan(&count)
+		if err != nil {
+			return 0, fmt.Errorf("read policy decision audit outbox count: %w", err)
+		}
+		if count >= minCount {
+			return count, nil
+		}
+		select {
+		case <-ctx.Done():
+			return 0, fmt.Errorf("timed out waiting for policy decision audit outbox count >= %d, got %d", minCount, count)
+		case <-ticker.C:
+		}
+	}
+}
+
 func waitPolicyDecision(
 	ctx context.Context,
 	client policyv1.PolicyServiceClient,
@@ -463,6 +495,9 @@ func readPolicyDecision(ctx context.Context, client policyv1.PolicyServiceClient
 }
 
 func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
+	if _, err := pool.Exec(ctx, `DELETE FROM policy_decision_audit_outbox WHERE tenant_id = $1`, cfg.tenantID); err != nil {
+		return fmt.Errorf("cleanup policy decision audit outbox: %w", err)
+	}
 	if _, err := pool.Exec(ctx, `DELETE FROM policy_contact_edges_projection WHERE tenant_id = $1`, cfg.tenantID); err != nil {
 		return fmt.Errorf("cleanup policy contact projection: %w", err)
 	}

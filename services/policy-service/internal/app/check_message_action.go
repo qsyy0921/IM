@@ -10,12 +10,29 @@ type MessagePolicyEvaluator interface {
 	DecideMessageAction(context.Context, types.CheckMessageActionCommand) (types.MessageActionDecision, error)
 }
 
-type CheckMessageActionUseCase struct {
-	evaluator MessagePolicyEvaluator
+type PolicyDecisionAuditor interface {
+	RecordPolicyDecision(context.Context, types.CheckMessageActionCommand, types.MessageActionDecision) error
 }
 
-func NewCheckMessageActionUseCase(evaluator MessagePolicyEvaluator) CheckMessageActionUseCase {
-	return CheckMessageActionUseCase{evaluator: evaluator}
+type CheckMessageActionUseCase struct {
+	evaluator MessagePolicyEvaluator
+	auditor   PolicyDecisionAuditor
+}
+
+type CheckMessageActionOption func(*CheckMessageActionUseCase)
+
+func NewCheckMessageActionUseCase(evaluator MessagePolicyEvaluator, opts ...CheckMessageActionOption) CheckMessageActionUseCase {
+	useCase := CheckMessageActionUseCase{evaluator: evaluator}
+	for _, opt := range opts {
+		opt(&useCase)
+	}
+	return useCase
+}
+
+func WithPolicyDecisionAuditor(auditor PolicyDecisionAuditor) CheckMessageActionOption {
+	return func(useCase *CheckMessageActionUseCase) {
+		useCase.auditor = auditor
+	}
 }
 
 func (u CheckMessageActionUseCase) Execute(
@@ -28,5 +45,14 @@ func (u CheckMessageActionUseCase) Execute(
 	if u.evaluator == nil {
 		return types.MessageActionDecision{}, types.NewDependencyUnavailable("policy evaluator is not configured")
 	}
-	return u.evaluator.DecideMessageAction(ctx, command)
+	decision, err := u.evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		return types.MessageActionDecision{}, err
+	}
+	if u.auditor != nil {
+		if err := u.auditor.RecordPolicyDecision(ctx, command, decision); err != nil {
+			return types.MessageActionDecision{}, err
+		}
+	}
+	return decision, nil
 }

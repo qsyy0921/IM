@@ -40,6 +40,47 @@ func TestCheckMessageActionUseCaseDeniesStaticDecision(t *testing.T) {
 	}
 }
 
+func TestCheckMessageActionUseCaseRecordsAudit(t *testing.T) {
+	auditor := &fakePolicyDecisionAuditor{}
+	useCase := NewCheckMessageActionUseCase(domain.StaticMessagePolicy{
+		Allowed:           false,
+		PermissionVersion: 3,
+		Classification:    "BLOCKED",
+		Reason:            "blocked by contact policy",
+	}, WithPolicyDecisionAuditor(auditor))
+	command := testPolicyCommand(types.MessageActionSend)
+	command.DirectPeerUserID = "peer-1"
+
+	result, err := useCase.Execute(context.Background(), command)
+	if err != nil {
+		t.Fatalf("check message action: %v", err)
+	}
+	if !auditor.called {
+		t.Fatal("expected audit call")
+	}
+	if auditor.command.DirectPeerUserID != "peer-1" ||
+		auditor.decision.Allowed ||
+		auditor.decision.PermissionVersion != result.PermissionVersion ||
+		auditor.decision.Classification != "BLOCKED" {
+		t.Fatalf("unexpected audit payload: command=%+v decision=%+v", auditor.command, auditor.decision)
+	}
+}
+
+func TestCheckMessageActionUseCaseFailsClosedOnAuditError(t *testing.T) {
+	useCase := NewCheckMessageActionUseCase(domain.StaticMessagePolicy{
+		Allowed:           true,
+		PermissionVersion: 7,
+		Classification:    "CONTACT",
+	}, WithPolicyDecisionAuditor(&fakePolicyDecisionAuditor{
+		err: types.NewDependencyUnavailable("policy decision audit failed"),
+	}))
+
+	_, err := useCase.Execute(context.Background(), testPolicyCommand(types.MessageActionSend))
+	if !errors.Is(err, types.ErrDependencyUnavailable) {
+		t.Fatalf("expected dependency unavailable, got %v", err)
+	}
+}
+
 func TestCheckMessageActionUseCaseValidatesCommand(t *testing.T) {
 	useCase := NewCheckMessageActionUseCase(domain.StaticMessagePolicy{Allowed: true})
 	_, err := useCase.Execute(context.Background(), types.CheckMessageActionCommand{})
@@ -62,4 +103,22 @@ func testPolicyCommand(action types.MessageAction) types.CheckMessageActionComma
 		command.MessageID = "msg-1"
 	}
 	return command
+}
+
+type fakePolicyDecisionAuditor struct {
+	called   bool
+	command  types.CheckMessageActionCommand
+	decision types.MessageActionDecision
+	err      error
+}
+
+func (f *fakePolicyDecisionAuditor) RecordPolicyDecision(
+	_ context.Context,
+	command types.CheckMessageActionCommand,
+	decision types.MessageActionDecision,
+) error {
+	f.called = true
+	f.command = command
+	f.decision = decision
+	return f.err
 }

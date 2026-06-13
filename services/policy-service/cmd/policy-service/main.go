@@ -96,6 +96,7 @@ func runGRPC() error {
 		Reason:            envString("NEXUSIM_POLICY_DENY_REASON", ""),
 	}
 	var evaluator app.MessagePolicyEvaluator = policy
+	var useCaseOptions []app.CheckMessageActionOption
 	var pool *pgxpool.Pool
 	rulesEnabled := envBool("NEXUSIM_POLICY_RULES_ENABLED", false)
 	if rulesEnabled {
@@ -110,7 +111,9 @@ func runGRPC() error {
 		}
 		defer pool.Close()
 		evaluator = postgresinfra.NewMessagePolicyEvaluator(pool, policy)
+		useCaseOptions = append(useCaseOptions, app.WithPolicyDecisionAuditor(postgresinfra.NewDecisionAuditOutbox(pool)))
 		log.Println("policy-service message action rule store enabled")
+		log.Println("policy-service decision audit outbox enabled")
 	}
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
 	decisionMetrics := monitoringinfra.NewDecisionMetrics()
@@ -122,7 +125,7 @@ func runGRPC() error {
 	defer stopDebug()
 
 	server := grpc.NewServer(grpc.UnaryInterceptor(grpcMetrics.UnaryServerInterceptor(log.Default())))
-	policygrpc.Register(server, policygrpc.NewServer(app.NewCheckMessageActionUseCase(evaluator)))
+	policygrpc.Register(server, policygrpc.NewServer(app.NewCheckMessageActionUseCase(evaluator, useCaseOptions...)))
 	go func() {
 		<-ctx.Done()
 		server.GracefulStop()

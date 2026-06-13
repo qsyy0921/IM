@@ -44,6 +44,23 @@ type OutboxAuditRow struct {
 	CreatedAt        time.Time
 }
 
+type OutboxRepairAuditOptions struct {
+	EventID  string
+	TenantID string
+	Limit    int
+}
+
+type OutboxRepairAuditRow struct {
+	EventID                string
+	TenantID               string
+	Reason                 string
+	PreviousStatus         string
+	PreviousRetryCount     int
+	PreviousLastError      string
+	PreviousDeadLetteredAt *time.Time
+	RepairedAt             time.Time
+}
+
 type OutboxStoreOption func(*OutboxStore)
 
 func NewOutboxStore(pool *pgxpool.Pool, opts ...OutboxStoreOption) *OutboxStore {
@@ -375,6 +392,165 @@ LIMIT $`+itoa(len(args)), args...)
 	return result, nil
 }
 
+func (store *OutboxStore) RepairDLQEvents(ctx context.Context, eventIDs []string, reason string) (types.OutboxRepairStats, error) {
+	if store == nil || store.pool == nil {
+		return types.OutboxRepairStats{}, errors.New("receipt outbox store is not configured")
+	}
+	ids := normalizeEventIDs(eventIDs)
+	if len(ids) == 0 {
+		return types.OutboxRepairStats{}, types.NewInvalidArgument("event_ids are required")
+	}
+	if strings.TrimSpace(reason) == "" {
+		reason = "manual receipt outbox repair"
+	}
+
+	tx, err := store.pool.Begin(ctx)
+	if err != nil {
+		return types.OutboxRepairStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	var stats types.OutboxRepairStats
+	err = tx.QueryRow(ctx, `
+WITH requested AS (
+    SELECT DISTINCT unnest($1::text[]) AS event_id
+),
+target AS (
+    SELECT
+        ro.id,
+        ro.event_id,
+        ro.tenant_id,
+        ro.status,
+        ro.retry_count,
+        ro.last_error,
+        ro.dead_lettered_at
+    FROM receipt_outbox ro
+    JOIN requested r ON r.event_id = ro.event_id
+    WHERE ro.status = $3
+    FOR UPDATE OF ro
+),
+updated AS (
+    UPDATE receipt_outbox ro
+    SET status = $2,
+        retry_count = 0,
+        last_error = '',
+        next_retry_at = NULL,
+        dead_lettered_at = NULL,
+        available_at = now(),
+        updated_at = now()
+    FROM target t
+    WHERE ro.id = t.id
+    RETURNING ro.event_id
+),
+audit AS (
+    INSERT INTO receipt_outbox_repair_audit (
+        event_id,
+        tenant_id,
+        previous_status,
+        previous_retry_count,
+        previous_last_error,
+        previous_dead_lettered_at,
+        repair_reason
+    )
+    SELECT
+        event_id,
+        tenant_id,
+        status,
+        retry_count,
+        last_error,
+        dead_lettered_at,
+        $4
+    FROM target
+    RETURNING event_id
+)
+SELECT
+    (SELECT COUNT(*) FROM requested) AS requested,
+    (SELECT COUNT(*) FROM updated) AS repaired
+`, ids, types.OutboxStatusPending, types.OutboxStatusDLQ, reason).Scan(&stats.Requested, &stats.Repaired)
+	if err != nil {
+		return types.OutboxRepairStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	stats.Skipped = stats.Requested - stats.Repaired
+	if stats.Skipped < 0 {
+		stats.Skipped = 0
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.OutboxRepairStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	return stats, nil
+}
+
+func (store *OutboxStore) AuditOutboxRepairs(ctx context.Context, options OutboxRepairAuditOptions) ([]OutboxRepairAuditRow, error) {
+	if store == nil || store.pool == nil {
+		return nil, errors.New("receipt outbox store is not configured")
+	}
+	limit := options.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	var args []any
+	clauses := make([]string, 0, 4)
+	if eventID := strings.TrimSpace(options.EventID); eventID != "" {
+		args = append(args, eventID)
+		clauses = append(clauses, "event_id = $"+itoa(len(args)))
+	}
+	if tenantID := strings.TrimSpace(options.TenantID); tenantID != "" {
+		args = append(args, tenantID)
+		clauses = append(clauses, "tenant_id = $"+itoa(len(args)))
+	}
+	where := ""
+	if len(clauses) > 0 {
+		where = "WHERE " + strings.Join(clauses, " AND ")
+	}
+	args = append(args, limit)
+	rows, err := store.pool.Query(ctx, `
+SELECT
+    event_id,
+    tenant_id,
+    previous_status,
+    previous_retry_count,
+    previous_last_error,
+    previous_dead_lettered_at,
+    repair_reason,
+    repaired_at
+FROM receipt_outbox_repair_audit
+`+where+`
+ORDER BY repaired_at DESC, event_id, id DESC
+LIMIT $`+itoa(len(args)), args...)
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	result := make([]OutboxRepairAuditRow, 0, limit)
+	for rows.Next() {
+		var row OutboxRepairAuditRow
+		if err := rows.Scan(
+			&row.EventID,
+			&row.TenantID,
+			&row.PreviousStatus,
+			&row.PreviousRetryCount,
+			&row.PreviousLastError,
+			&row.PreviousDeadLetteredAt,
+			&row.Reason,
+			&row.RepairedAt,
+		); err != nil {
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		result = append(result, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	return result, nil
+}
+
 func normalizeOutboxStatus(status string) string {
 	switch strings.ToUpper(strings.TrimSpace(status)) {
 	case "":
@@ -392,4 +568,21 @@ func normalizeOutboxStatus(status string) string {
 
 func itoa(value int) string {
 	return strconv.Itoa(value)
+}
+
+func normalizeEventIDs(eventIDs []string) []string {
+	seen := make(map[string]struct{}, len(eventIDs))
+	result := make([]string, 0, len(eventIDs))
+	for _, eventID := range eventIDs {
+		normalized := strings.TrimSpace(eventID)
+		if normalized == "" {
+			continue
+		}
+		if _, exists := seen[normalized]; exists {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		result = append(result, normalized)
+	}
+	return result
 }

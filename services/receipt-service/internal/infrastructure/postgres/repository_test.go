@@ -880,6 +880,9 @@ func applyReceiptMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool
 		"000004_conversation_summary_source_event_type.sql",
 		"000005_conversation_archive.sql",
 		"000006_conversation_pin.sql",
+		"000007_conversation_mute.sql",
+		"000008_conversation_unread_filter.sql",
+		"000009_receipt_outbox_repair_audit.sql",
 	} {
 		migrationPath := filepath.Join(root, "migrations", "postgres", "receipt", name)
 		sqlBytes, err := os.ReadFile(migrationPath)
@@ -898,6 +901,7 @@ func resetReceiptTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 TRUNCATE
     conversation_summary_checkpoints,
     user_conversation_summaries,
+    receipt_outbox_repair_audit,
     receipt_outbox,
     receipt_kafka_checkpoints,
     message_receipt_states,

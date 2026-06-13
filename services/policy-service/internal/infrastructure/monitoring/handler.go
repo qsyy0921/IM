@@ -3,9 +3,11 @@ package monitoring
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -133,6 +135,17 @@ type PGPoolSnapshot struct {
 }
 
 type RuleSnapshot struct {
+	Total                   int64                 `json:"total"`
+	Allow                   int64                 `json:"allow"`
+	Deny                    int64                 `json:"deny"`
+	Actions                 []RuleActionSnapshot  `json:"actions"`
+	ExactMessageActions     *RuleDecisionSnapshot `json:"exact_message_action_rules,omitempty"`
+	TenantMessageActions    *RuleDecisionSnapshot `json:"tenant_message_action_rules,omitempty"`
+	ConversationRoleActions *RuleRoleSnapshot     `json:"conversation_role_action_rules,omitempty"`
+	OwnershipOverrides      *RuleRoleSnapshot     `json:"message_ownership_override_rules,omitempty"`
+}
+
+type RuleDecisionSnapshot struct {
 	Total   int64                `json:"total"`
 	Allow   int64                `json:"allow"`
 	Deny    int64                `json:"deny"`
@@ -146,6 +159,17 @@ type RuleActionSnapshot struct {
 	Deny   int64  `json:"deny"`
 }
 
+type RuleRoleSnapshot struct {
+	Total   int64                    `json:"total"`
+	Actions []RuleRoleActionSnapshot `json:"actions"`
+}
+
+type RuleRoleActionSnapshot struct {
+	Action  string `json:"action"`
+	MinRole string `json:"min_role"`
+	Total   int64  `json:"total"`
+}
+
 type AuditOutboxSnapshot struct {
 	Total     int64 `json:"total"`
 	Pending   int64 `json:"pending"`
@@ -155,16 +179,54 @@ type AuditOutboxSnapshot struct {
 
 func queryRuleSnapshot(ctx context.Context, pool *pgxpool.Pool) (RuleSnapshot, error) {
 	var snapshot RuleSnapshot
-	if err := pool.QueryRow(ctx, `
+	exact, err := queryExactMessageActionRules(ctx, pool)
+	if err != nil {
+		return RuleSnapshot{}, err
+	}
+	snapshot.Total = exact.Total
+	snapshot.Allow = exact.Allow
+	snapshot.Deny = exact.Deny
+	snapshot.Actions = exact.Actions
+	snapshot.ExactMessageActions = &exact
+
+	tenant, err := queryTenantMessageActionRules(ctx, pool)
+	if err != nil {
+		if !isUndefinedTable(err) {
+			return RuleSnapshot{}, err
+		}
+	} else {
+		snapshot.TenantMessageActions = &tenant
+	}
+
+	role, err := queryConversationRoleRules(ctx, pool)
+	if err != nil {
+		if !isUndefinedTable(err) {
+			return RuleSnapshot{}, err
+		}
+	} else {
+		snapshot.ConversationRoleActions = &role
+	}
+
+	ownership, err := queryOwnershipOverrideRules(ctx, pool)
+	if err != nil {
+		if !isUndefinedTable(err) {
+			return RuleSnapshot{}, err
+		}
+	} else {
+		snapshot.OwnershipOverrides = &ownership
+	}
+
+	return snapshot, nil
+}
+
+func queryExactMessageActionRules(ctx context.Context, pool *pgxpool.Pool) (RuleDecisionSnapshot, error) {
+	return queryDecisionRuleSnapshot(ctx, pool, `
 SELECT
     COUNT(*),
     COUNT(*) FILTER (WHERE allowed),
     COUNT(*) FILTER (WHERE NOT allowed)
 FROM policy_message_action_rules
-`).Scan(&snapshot.Total, &snapshot.Allow, &snapshot.Deny); err != nil {
-		return RuleSnapshot{}, err
-	}
-	rows, err := pool.Query(ctx, `
+`, `
 SELECT
     action,
     COUNT(*),
@@ -174,21 +236,100 @@ FROM policy_message_action_rules
 GROUP BY action
 ORDER BY action
 `)
+}
+
+func queryTenantMessageActionRules(ctx context.Context, pool *pgxpool.Pool) (RuleDecisionSnapshot, error) {
+	return queryDecisionRuleSnapshot(ctx, pool, `
+SELECT
+    COUNT(*),
+    COUNT(*) FILTER (WHERE allowed),
+    COUNT(*) FILTER (WHERE NOT allowed)
+FROM policy_tenant_message_action_rules
+`, `
+SELECT
+    action,
+    COUNT(*),
+    COUNT(*) FILTER (WHERE allowed),
+    COUNT(*) FILTER (WHERE NOT allowed)
+FROM policy_tenant_message_action_rules
+GROUP BY action
+ORDER BY action
+`)
+}
+
+func queryDecisionRuleSnapshot(ctx context.Context, pool *pgxpool.Pool, totalQuery string, actionQuery string) (RuleDecisionSnapshot, error) {
+	var snapshot RuleDecisionSnapshot
+	if err := pool.QueryRow(ctx, totalQuery).Scan(&snapshot.Total, &snapshot.Allow, &snapshot.Deny); err != nil {
+		return RuleDecisionSnapshot{}, err
+	}
+	rows, err := pool.Query(ctx, actionQuery)
 	if err != nil {
-		return RuleSnapshot{}, err
+		return RuleDecisionSnapshot{}, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var action RuleActionSnapshot
 		if err := rows.Scan(&action.Action, &action.Total, &action.Allow, &action.Deny); err != nil {
-			return RuleSnapshot{}, err
+			return RuleDecisionSnapshot{}, err
 		}
 		snapshot.Actions = append(snapshot.Actions, action)
 	}
 	if err := rows.Err(); err != nil {
-		return RuleSnapshot{}, err
+		return RuleDecisionSnapshot{}, err
 	}
 	return snapshot, nil
+}
+
+func queryConversationRoleRules(ctx context.Context, pool *pgxpool.Pool) (RuleRoleSnapshot, error) {
+	return queryRoleRuleSnapshot(ctx, pool, `
+SELECT COUNT(*)
+FROM policy_conversation_role_action_rules
+`, `
+SELECT action, min_role, COUNT(*)
+FROM policy_conversation_role_action_rules
+GROUP BY action, min_role
+ORDER BY action, min_role
+`)
+}
+
+func queryOwnershipOverrideRules(ctx context.Context, pool *pgxpool.Pool) (RuleRoleSnapshot, error) {
+	return queryRoleRuleSnapshot(ctx, pool, `
+SELECT COUNT(*)
+FROM policy_message_ownership_override_rules
+`, `
+SELECT action, min_role, COUNT(*)
+FROM policy_message_ownership_override_rules
+GROUP BY action, min_role
+ORDER BY action, min_role
+`)
+}
+
+func queryRoleRuleSnapshot(ctx context.Context, pool *pgxpool.Pool, totalQuery string, actionQuery string) (RuleRoleSnapshot, error) {
+	var snapshot RuleRoleSnapshot
+	if err := pool.QueryRow(ctx, totalQuery).Scan(&snapshot.Total); err != nil {
+		return RuleRoleSnapshot{}, err
+	}
+	rows, err := pool.Query(ctx, actionQuery)
+	if err != nil {
+		return RuleRoleSnapshot{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var action RuleRoleActionSnapshot
+		if err := rows.Scan(&action.Action, &action.MinRole, &action.Total); err != nil {
+			return RuleRoleSnapshot{}, err
+		}
+		snapshot.Actions = append(snapshot.Actions, action)
+	}
+	if err := rows.Err(); err != nil {
+		return RuleRoleSnapshot{}, err
+	}
+	return snapshot, nil
+}
+
+func isUndefinedTable(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "42P01"
 }
 
 func queryAuditOutboxSnapshot(ctx context.Context, pool *pgxpool.Pool) (AuditOutboxSnapshot, error) {

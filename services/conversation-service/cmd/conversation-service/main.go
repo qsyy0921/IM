@@ -149,11 +149,6 @@ func runMemberChangeWorker() error {
 		return err
 	}
 	defer pool.Close()
-	stopDebug, err := startDebugServer(ctx, conversationDebugAddr(), monitoringinfra.NewHandler(pool))
-	if err != nil {
-		return err
-	}
-	defer stopDebug()
 
 	repository := postgresinfra.NewRepository(pool)
 	useCase := app.NewMarkPublishedMemberChangesUseCase(
@@ -170,6 +165,15 @@ func runMemberChangeWorker() error {
 			Logf:         log.Printf,
 		},
 	)
+	stopDebug, err := startDebugServer(
+		ctx,
+		conversationDebugAddr(),
+		monitoringinfra.NewHandler(pool).WithMemberChangeWorkerStats(worker.Snapshot),
+	)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 	log.Printf(
 		"conversation-service member change progress worker started batch_size=%d poll_interval=%s error_backoff=%s",
 		envInt("NEXUSIM_MEMBER_CHANGE_PROGRESS_BATCH_SIZE", 100),

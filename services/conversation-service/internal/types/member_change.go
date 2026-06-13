@@ -155,6 +155,17 @@ type MemberChangePublishProgressStats struct {
 	Advanced int
 }
 
+type MemberChangeWorkerSnapshot struct {
+	TotalErrors        uint64 `json:"total_errors"`
+	ConsecutiveErrors  uint64 `json:"consecutive_errors"`
+	LastErrorAtMS      int64  `json:"last_error_at_ms,omitempty"`
+	LastSuccessAtMS    int64  `json:"last_success_at_ms,omitempty"`
+	LastAdvancedAtMS   int64  `json:"last_advanced_at_ms,omitempty"`
+	LastAdvancedCount  int64  `json:"last_advanced_count,omitempty"`
+	LastErrorBackoffMS int64  `json:"last_error_backoff_ms,omitempty"`
+	LastPollIntervalMS int64  `json:"last_poll_interval_ms,omitempty"`
+}
+
 func isValidMemberChangeType(value MemberChangeType) bool {
 	switch value {
 	case MemberChangeTypeJoin, MemberChangeTypeLeave, MemberChangeTypeRemove, MemberChangeTypeRoleChanged:

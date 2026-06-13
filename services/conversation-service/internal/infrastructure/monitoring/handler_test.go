@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/qsyy0921/IM/services/conversation-service/internal/types"
 )
 
 func TestHandlerHealthz(t *testing.T) {
@@ -48,7 +49,13 @@ func TestHandlerReadyzWithoutPool(t *testing.T) {
 func TestHandlerMetricsIncludesGRPCSnapshot(t *testing.T) {
 	grpcMetrics := NewGRPCMetrics()
 	grpcMetrics.record("/nexusim.conversation.v1.ConversationService/GetSendContext", "OK", 11)
-	handler := NewHandler(nil, grpcMetrics)
+	handler := NewHandler(nil, grpcMetrics).WithMemberChangeWorkerStats(func() types.MemberChangeWorkerSnapshot {
+		return types.MemberChangeWorkerSnapshot{
+			TotalErrors:       2,
+			ConsecutiveErrors: 1,
+			LastErrorAtMS:     123,
+		}
+	})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/debug/metrics", nil))
 
@@ -61,6 +68,9 @@ func TestHandlerMetricsIncludesGRPCSnapshot(t *testing.T) {
 	}
 	if body.GRPC == nil || body.GRPC.TotalRequests != 1 || body.GRPC.TotalErrors != 0 {
 		t.Fatalf("unexpected grpc snapshot: %+v", body.GRPC)
+	}
+	if body.MemberChangeWorker == nil || body.MemberChangeWorker.TotalErrors != 2 || body.MemberChangeWorker.ConsecutiveErrors != 1 {
+		t.Fatalf("unexpected worker snapshot: %+v", body.MemberChangeWorker)
 	}
 }
 

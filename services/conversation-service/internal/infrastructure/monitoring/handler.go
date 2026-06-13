@@ -7,11 +7,13 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/qsyy0921/IM/services/conversation-service/internal/types"
 )
 
 type Handler struct {
-	pool        *pgxpool.Pool
-	grpcMetrics *GRPCMetrics
+	pool                   *pgxpool.Pool
+	grpcMetrics            *GRPCMetrics
+	memberChangeWorkerFunc func() types.MemberChangeWorkerSnapshot
 }
 
 func NewHandler(pool *pgxpool.Pool, grpcMetrics ...*GRPCMetrics) *Handler {
@@ -20,6 +22,11 @@ func NewHandler(pool *pgxpool.Pool, grpcMetrics ...*GRPCMetrics) *Handler {
 		handler.grpcMetrics = grpcMetrics[0]
 	}
 	return handler
+}
+
+func (h *Handler) WithMemberChangeWorkerStats(snapshotFunc func() types.MemberChangeWorkerSnapshot) *Handler {
+	h.memberChangeWorkerFunc = snapshotFunc
+	return h
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -58,6 +65,10 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		grpcSnapshot := h.grpcMetrics.Snapshot()
 		snapshot.GRPC = &grpcSnapshot
 	}
+	if h.memberChangeWorkerFunc != nil {
+		workerSnapshot := h.memberChangeWorkerFunc()
+		snapshot.MemberChangeWorker = &workerSnapshot
+	}
 	if h.pool != nil {
 		stats := h.pool.Stat()
 		snapshot.PGPool = &PGPoolSnapshot{
@@ -90,12 +101,13 @@ type healthResponse struct {
 }
 
 type Snapshot struct {
-	Service           string                `json:"service"`
-	GeneratedAtMS     int64                 `json:"generated_at_ms"`
-	PGPool            *PGPoolSnapshot       `json:"pg_pool,omitempty"`
-	Conversation      *ConversationSnapshot `json:"conversation,omitempty"`
-	ConversationError string                `json:"conversation_error,omitempty"`
-	GRPC              *GRPCSnapshot         `json:"grpc,omitempty"`
+	Service            string                            `json:"service"`
+	GeneratedAtMS      int64                             `json:"generated_at_ms"`
+	PGPool             *PGPoolSnapshot                   `json:"pg_pool,omitempty"`
+	Conversation       *ConversationSnapshot             `json:"conversation,omitempty"`
+	ConversationError  string                            `json:"conversation_error,omitempty"`
+	GRPC               *GRPCSnapshot                     `json:"grpc,omitempty"`
+	MemberChangeWorker *types.MemberChangeWorkerSnapshot `json:"member_change_worker,omitempty"`
 }
 
 type PGPoolSnapshot struct {

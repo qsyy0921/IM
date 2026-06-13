@@ -91,6 +91,29 @@ func TestProgressWorkerRunRetriesAfterError(t *testing.T) {
 	if executor.calls < 2 {
 		t.Fatalf("expected retry after error, got %d calls", executor.calls)
 	}
+	snapshot := worker.Snapshot()
+	if snapshot.TotalErrors != 1 || snapshot.ConsecutiveErrors != 0 {
+		t.Fatalf("unexpected worker snapshot after retry: %+v", snapshot)
+	}
+	if snapshot.LastErrorBackoffMS != time.Millisecond.Milliseconds() {
+		t.Fatalf("unexpected error backoff snapshot: %+v", snapshot)
+	}
+}
+
+func TestProgressWorkerSnapshotTracksAdvancedRuns(t *testing.T) {
+	worker := NewProgressWorker(&fakeProgressExecutor{
+		stats: types.MemberChangePublishProgressStats{Advanced: 3},
+	}, ProgressConfig{})
+
+	if _, err := worker.RunOnce(context.Background()); err != nil {
+		t.Fatalf("run once: %v", err)
+	}
+	worker.recordSuccess(types.MemberChangePublishProgressStats{Advanced: 3})
+
+	snapshot := worker.Snapshot()
+	if snapshot.LastSuccessAtMS == 0 || snapshot.LastAdvancedAtMS == 0 || snapshot.LastAdvancedCount != 3 {
+		t.Fatalf("unexpected worker snapshot: %+v", snapshot)
+	}
 }
 
 type fakeProgressExecutor struct {

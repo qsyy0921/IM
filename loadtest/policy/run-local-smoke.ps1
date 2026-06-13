@@ -1,6 +1,12 @@
 param(
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
+    [string]$PolicyGrpcTlsCertFile = "",
+    [string]$PolicyGrpcTlsKeyFile = "",
+    [string]$PolicyGrpcTlsClientCaFile = "",
+    [string]$PolicyGrpcTlsRequireClientCert = "",
+    [string]$PolicyGrpcTlsClientAllowedDnsNames = "",
+    [string]$PolicyGrpcTlsClientAllowedUris = "",
     [string]$PolicyTlsCaFile = "",
     [string]$PolicyTlsServerName = "",
     [string]$PolicyTlsClientCertFile = "",
@@ -65,6 +71,14 @@ function Wait-Tcp {
     throw "Timed out waiting for ${HostName}:${Port}"
 }
 
+function Set-PolicyProcessEnv {
+    param(
+        [string]$Name,
+        [string]$Value
+    )
+    [Environment]::SetEnvironmentVariable($Name, [string]$Value, "Process")
+}
+
 function Start-PolicyService {
     param(
         [string]$Name,
@@ -84,6 +98,12 @@ function Start-PolicyService {
     [Environment]::SetEnvironmentVariable("NEXUSIM_POLICY_PERMISSION_VERSION", [string]$PermissionVersion, "Process")
     [Environment]::SetEnvironmentVariable("NEXUSIM_POLICY_CLASSIFICATION", $Classification, "Process")
     [Environment]::SetEnvironmentVariable("NEXUSIM_POLICY_DENY_REASON", $Reason, "Process")
+    Set-PolicyProcessEnv -Name "NEXUSIM_POLICY_GRPC_TLS_CERT_FILE" -Value $PolicyGrpcTlsCertFile
+    Set-PolicyProcessEnv -Name "NEXUSIM_POLICY_GRPC_TLS_KEY_FILE" -Value $PolicyGrpcTlsKeyFile
+    Set-PolicyProcessEnv -Name "NEXUSIM_POLICY_GRPC_TLS_CLIENT_CA_FILE" -Value $PolicyGrpcTlsClientCaFile
+    Set-PolicyProcessEnv -Name "NEXUSIM_POLICY_GRPC_TLS_REQUIRE_CLIENT_CERT" -Value $PolicyGrpcTlsRequireClientCert
+    Set-PolicyProcessEnv -Name "NEXUSIM_POLICY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES" -Value $PolicyGrpcTlsClientAllowedDnsNames
+    Set-PolicyProcessEnv -Name "NEXUSIM_POLICY_GRPC_TLS_CLIENT_ALLOWED_URIS" -Value $PolicyGrpcTlsClientAllowedUris
 
     $service = Join-Path $repo "bin\policy-service.exe"
     $out = Join-Path $logDir "$Name.out.log"

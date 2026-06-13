@@ -43,6 +43,8 @@ func run() error {
 		return runContactConsumer()
 	case "outbox-relay":
 		return runOutboxRelay()
+	case "outbox-repair":
+		return runOutboxRepair()
 	default:
 		return errors.New("unsupported NEXUSIM_POLICY_SERVICE_MODE")
 	}
@@ -81,6 +83,36 @@ func runOutboxRelay() error {
 	)
 	log.Println("policy-service decision audit outbox relay started")
 	return relay.Run(ctx)
+}
+
+func runOutboxRepair() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := envString("NEXUSIM_PG_DSN", "")
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required for policy outbox repair")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	eventIDs := splitCSV(os.Getenv("NEXUSIM_POLICY_OUTBOX_REPAIR_EVENT_IDS"))
+	operator := envString("NEXUSIM_POLICY_OUTBOX_REPAIR_OPERATOR", "local-operator")
+	reason := envString("NEXUSIM_POLICY_OUTBOX_REPAIR_REASON", "manual policy audit outbox repair")
+	stats, err := postgresinfra.NewOutboxStore(pool).RepairDLQEvents(ctx, eventIDs, operator, reason)
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"policy-service outbox repair completed requested=%d repaired=%d skipped=%d",
+		stats.Requested,
+		stats.Repaired,
+		stats.Skipped,
+	)
+	return nil
 }
 
 func runContactConsumer() error {

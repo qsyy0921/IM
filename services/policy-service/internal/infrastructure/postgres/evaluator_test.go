@@ -212,7 +212,7 @@ func applyPolicyMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool)
 
 func resetPolicyTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	if _, err := pool.Exec(ctx, `TRUNCATE policy_decision_audit_outbox, policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
+	if _, err := pool.Exec(ctx, `TRUNCATE policy_decision_audit_outbox_repair_audit, policy_decision_audit_outbox, policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
 		t.Fatalf("reset policy tables: %v", err)
 	}
 }

@@ -620,6 +620,9 @@ func readPolicyDecision(ctx context.Context, client policyv1.PolicyServiceClient
 }
 
 func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
+	if _, err := pool.Exec(ctx, `DELETE FROM policy_decision_audit_outbox_repair_audit WHERE tenant_id = $1`, cfg.tenantID); err != nil {
+		return fmt.Errorf("cleanup policy decision audit outbox repair audit: %w", err)
+	}
 	if _, err := pool.Exec(ctx, `DELETE FROM policy_decision_audit_outbox WHERE tenant_id = $1`, cfg.tenantID); err != nil {
 		return fmt.Errorf("cleanup policy decision audit outbox: %w", err)
 	}

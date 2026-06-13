@@ -108,6 +108,76 @@ func TestOutboxStoreDLQBlocksHigherVersionPolicyAuditIntegration(t *testing.T) {
 	}
 }
 
+func TestOutboxStoreRepairDLQPolicyAuditIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	store := NewOutboxStore(pool)
+	partitionKey := "tenant-policy:conversation-key"
+	lowID, _ := insertPolicyAuditOutboxRow(t, ctx, pool, "policy-audit-store-repair-low", partitionKey, types.OutboxStatusDLQ, 3)
+	insertPolicyAuditOutboxRow(t, ctx, pool, "policy-audit-store-repair-high", partitionKey, types.OutboxStatusPending, 0)
+	if _, err := pool.Exec(ctx, `
+UPDATE policy_decision_audit_outbox
+SET last_error = 'publish failed',
+    dead_lettered_at = now()
+WHERE id = $1
+`, lowID); err != nil {
+		t.Fatalf("mark repair target dlq detail: %v", err)
+	}
+
+	stats, err := store.ProcessReadyBatch(ctx, 10, 3, time.Millisecond, func(ctx context.Context, messages []types.OutboxMessage) []error {
+		t.Fatalf("publish must not be called while lower DLQ row blocks partition")
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("process blocked ready: %v", err)
+	}
+	if stats.Fetched != 0 {
+		t.Fatalf("expected no fetched messages before repair, got %+v", stats)
+	}
+
+	repairStats, err := store.RepairDLQEvents(ctx, []string{"policy-audit-store-repair-low", "policy-audit-store-repair-low", "missing-event"}, "policy-operator", "operator retried after kafka recovery")
+	if err != nil {
+		t.Fatalf("repair dlq: %v", err)
+	}
+	if repairStats.Requested != 2 || repairStats.Repaired != 1 || repairStats.Skipped != 1 {
+		t.Fatalf("unexpected repair stats: %+v", repairStats)
+	}
+	assertPolicyAuditOutboxState(t, ctx, pool, lowID, types.OutboxStatusPending, 0)
+	assertPolicyAuditOutboxRepairAudit(t, ctx, pool, "policy-audit-store-repair-low", "policy-operator", "operator retried after kafka recovery", "publish failed")
+
+	var published []string
+	stats, err = store.ProcessReadyBatch(ctx, 10, 3, time.Millisecond, func(ctx context.Context, messages []types.OutboxMessage) []error {
+		errs := make([]error, len(messages))
+		for index, message := range messages {
+			published = append(published, message.EventID)
+			errs[index] = nil
+		}
+		return errs
+	})
+	if err != nil {
+		t.Fatalf("process repaired ready: %v", err)
+	}
+	if stats.Fetched != 1 || stats.Published != 1 || len(published) != 1 || published[0] != "policy-audit-store-repair-low" {
+		t.Fatalf("unexpected first publish after repair stats=%+v published=%v", stats, published)
+	}
+	stats, err = store.ProcessReadyBatch(ctx, 10, 3, time.Millisecond, func(ctx context.Context, messages []types.OutboxMessage) []error {
+		errs := make([]error, len(messages))
+		for index, message := range messages {
+			published = append(published, message.EventID)
+			errs[index] = nil
+		}
+		return errs
+	})
+	if err != nil {
+		t.Fatalf("process unblocked ready: %v", err)
+	}
+	if stats.Fetched != 1 || stats.Published != 1 || len(published) != 2 || published[1] != "policy-audit-store-repair-high" {
+		t.Fatalf("unexpected second publish after repair stats=%+v published=%v", stats, published)
+	}
+	assertPolicyAuditOutboxStatusCount(t, ctx, pool, types.OutboxStatusPublished, 2)
+}
+
 func insertPolicyAuditOutboxRow(
 	t *testing.T,
 	ctx context.Context,
@@ -211,5 +281,50 @@ WHERE id = $1
 	}
 	if status != wantStatus || retryCount != wantRetryCount {
 		t.Fatalf("unexpected outbox state: status=%s retry_count=%d want status=%s retry_count=%d", status, retryCount, wantStatus, wantRetryCount)
+	}
+}
+
+func assertPolicyAuditOutboxRepairAudit(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventID string, wantOperator string, wantReason string, wantPreviousError string) {
+	t.Helper()
+	var operator string
+	var reason string
+	var previousStatus string
+	var previousRetryCount int
+	var previousError string
+	err := pool.QueryRow(ctx, `
+SELECT repair_operator, repair_reason, previous_status, previous_retry_count, previous_last_error
+FROM policy_decision_audit_outbox_repair_audit
+WHERE tenant_id = 'tenant-policy'
+  AND event_id = $1
+`, eventID).Scan(&operator, &reason, &previousStatus, &previousRetryCount, &previousError)
+	if err != nil {
+		t.Fatalf("query policy audit outbox repair audit: %v", err)
+	}
+	if operator != wantOperator || reason != wantReason || previousStatus != types.OutboxStatusDLQ || previousRetryCount != 3 || previousError != wantPreviousError {
+		t.Fatalf(
+			"unexpected repair audit operator=%q reason=%q previous_status=%q previous_retry_count=%d previous_error=%q",
+			operator,
+			reason,
+			previousStatus,
+			previousRetryCount,
+			previousError,
+		)
+	}
+}
+
+func assertPolicyAuditOutboxStatusCount(t *testing.T, ctx context.Context, pool *pgxpool.Pool, status string, want int) {
+	t.Helper()
+	var got int
+	err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM policy_decision_audit_outbox
+WHERE tenant_id = 'tenant-policy'
+  AND status = $1
+`, status).Scan(&got)
+	if err != nil {
+		t.Fatalf("count policy audit outbox status: %v", err)
+	}
+	if got != want {
+		t.Fatalf("expected %d policy audit outbox rows with status %s, got %d", want, status, got)
 	}
 }

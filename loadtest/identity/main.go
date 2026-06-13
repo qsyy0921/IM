@@ -40,36 +40,41 @@ type config struct {
 	deviceID           string
 	audience           string
 	password           string
+	newPassword        string
 	destination        string
 	cleanup            bool
 }
 
 type summary struct {
-	Commit                     string             `json:"commit"`
-	CommitFull                 string             `json:"commit_full"`
-	GitDirty                   bool               `json:"git_dirty"`
-	GitStatusShort             string             `json:"git_status_short,omitempty"`
-	Target                     string             `json:"target"`
-	GatewayFacade              bool               `json:"gateway_facade"`
-	TLSEnabled                 bool               `json:"tls_enabled"`
-	ResultDir                  string             `json:"result_dir"`
-	TenantID                   string             `json:"tenant_id"`
-	UserID                     string             `json:"user_id"`
-	Destination                string             `json:"destination"`
-	StartedAt                  time.Time          `json:"started_at"`
-	FinishedAt                 time.Time          `json:"finished_at"`
-	Success                    bool               `json:"success"`
-	Error                      string             `json:"error,omitempty"`
-	RegisterUser               registerSummary    `json:"register_user"`
-	RequestChallenge           challengeSummary   `json:"request_verification_challenge"`
-	Webhook                    webhookSummary     `json:"webhook"`
-	ConfirmChallenge           confirmSummary     `json:"confirm_verification_challenge"`
-	Login                      tokenSummary       `json:"login"`
-	Refresh                    tokenSummary       `json:"refresh_gateway_token"`
-	ChallengeDeliveryOutbox    outboxStats        `json:"challenge_delivery_outbox"`
-	ChallengeDeliveryOutboxRow deliveryOutboxRow  `json:"challenge_delivery_outbox_row"`
-	ChallengeRow               challengeRow       `json:"challenge_row"`
-	LatenciesMS                map[string]float64 `json:"latencies_ms"`
+	Commit                     string               `json:"commit"`
+	CommitFull                 string               `json:"commit_full"`
+	GitDirty                   bool                 `json:"git_dirty"`
+	GitStatusShort             string               `json:"git_status_short,omitempty"`
+	Target                     string               `json:"target"`
+	GatewayFacade              bool                 `json:"gateway_facade"`
+	TLSEnabled                 bool                 `json:"tls_enabled"`
+	ResultDir                  string               `json:"result_dir"`
+	TenantID                   string               `json:"tenant_id"`
+	UserID                     string               `json:"user_id"`
+	Destination                string               `json:"destination"`
+	StartedAt                  time.Time            `json:"started_at"`
+	FinishedAt                 time.Time            `json:"finished_at"`
+	Success                    bool                 `json:"success"`
+	Error                      string               `json:"error,omitempty"`
+	RegisterUser               registerSummary      `json:"register_user"`
+	RequestChallenge           challengeSummary     `json:"request_verification_challenge"`
+	Webhook                    webhookSummary       `json:"webhook"`
+	ConfirmChallenge           confirmSummary       `json:"confirm_verification_challenge"`
+	Login                      tokenSummary         `json:"login"`
+	Refresh                    tokenSummary         `json:"refresh_gateway_token"`
+	RequestPasswordReset       challengeSummary     `json:"request_password_reset"`
+	PasswordResetWebhook       webhookSummary       `json:"password_reset_webhook"`
+	ConfirmPasswordReset       passwordResetSummary `json:"confirm_password_reset"`
+	PostResetLogin             tokenSummary         `json:"post_reset_login"`
+	ChallengeDeliveryOutbox    outboxStats          `json:"challenge_delivery_outbox"`
+	ChallengeDeliveryOutboxRow deliveryOutboxRow    `json:"challenge_delivery_outbox_row"`
+	ChallengeRow               challengeRow         `json:"challenge_row"`
+	LatenciesMS                map[string]float64   `json:"latencies_ms"`
 }
 
 type identityChallengeClient interface {
@@ -78,6 +83,8 @@ type identityChallengeClient interface {
 	RefreshGatewayToken(context.Context, *identityv1.RefreshGatewayTokenRequest, ...grpc.CallOption) (*identityv1.RefreshGatewayTokenResponse, error)
 	RequestVerificationChallenge(context.Context, *identityv1.RequestVerificationChallengeRequest, ...grpc.CallOption) (*identityv1.RequestVerificationChallengeResponse, error)
 	ConfirmVerificationChallenge(context.Context, *identityv1.ConfirmVerificationChallengeRequest, ...grpc.CallOption) (*identityv1.ConfirmVerificationChallengeResponse, error)
+	RequestPasswordReset(context.Context, *identityv1.RequestPasswordResetRequest, ...grpc.CallOption) (*identityv1.RequestPasswordResetResponse, error)
+	ConfirmPasswordReset(context.Context, *identityv1.ConfirmPasswordResetRequest, ...grpc.CallOption) (*identityv1.ConfirmPasswordResetResponse, error)
 }
 
 type registerSummary struct {
@@ -120,6 +127,10 @@ type tokenSummary struct {
 	GatewayExpiresAtUnixMS int64  `json:"gateway_expires_at_unix_ms"`
 	RefreshExpiresAtUnixMS int64  `json:"refresh_expires_at_unix_ms"`
 	IssuedAtUnixMS         int64  `json:"issued_at_unix_ms"`
+}
+
+type passwordResetSummary struct {
+	ResetAtUnixMS int64 `json:"reset_at_unix_ms"`
 }
 
 type outboxStats struct {
@@ -198,6 +209,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.deviceID, "device-id", "identity-device", "device id for Login and RefreshGatewayToken")
 	flag.StringVar(&cfg.audience, "audience", "api-gateway", "gateway token audience for Login and RefreshGatewayToken")
 	flag.StringVar(&cfg.password, "password", "IdentitySmokePassw0rd!", "user password")
+	flag.StringVar(&cfg.newPassword, "new-password", "IdentitySmokeResetPassw0rd!", "new password used by ConfirmPasswordReset")
 	flag.StringVar(&cfg.destination, "destination", "identity-user@example.com", "verification destination")
 	flag.BoolVar(&cfg.cleanup, "cleanup", false, "delete identity rows for this tenant before running")
 	flag.Parse()
@@ -469,6 +481,112 @@ func runClientScenario(cfg config, result *summary) error {
 		return errors.New("refresh did not rotate refresh token")
 	}
 
+	passwordResetStarted := time.Now()
+	passwordResetCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	passwordReset, err := client.RequestPasswordReset(passwordResetCtx, &identityv1.RequestPasswordResetRequest{
+		TenantId:    cfg.tenantID,
+		UserId:      cfg.userID,
+		Channel:     identityv1.VerificationChannel_VERIFICATION_CHANNEL_EMAIL,
+		Destination: cfg.destination,
+		TtlSeconds:  300,
+		TraceId:     "identity-challenge-delivery-outbox-smoke",
+		RequestId:   "identity-smoke-request-password-reset",
+	})
+	cancel()
+	result.LatenciesMS["request_password_reset"] = elapsedMS(passwordResetStarted)
+	if err != nil {
+		return fmt.Errorf("request password reset: %w", err)
+	}
+	result.RequestPasswordReset = challengeSummary{
+		ChallengeID:          passwordReset.GetChallengeId(),
+		Channel:              passwordReset.GetChannel().String(),
+		Destination:          passwordReset.GetDestination(),
+		ExpiresAtUnixMS:      passwordReset.GetExpiresAtUnixMs(),
+		DevChallengeTokenSet: passwordReset.GetDevChallengeToken() != "",
+	}
+	if passwordReset.GetDevChallengeToken() != "" {
+		return errors.New("identity-service returned dev password reset token; smoke must prove worker webhook delivery")
+	}
+
+	resetNotification, err := waitWebhookNotification(cfg, passwordReset.GetChallengeId())
+	if err != nil {
+		return err
+	}
+	result.PasswordResetWebhook = webhookSummary{
+		Received:        true,
+		ChallengeID:     resetNotification.ChallengeID,
+		ChallengeType:   resetNotification.ChallengeType,
+		Channel:         resetNotification.Channel,
+		Destination:     resetNotification.Destination,
+		TokenSet:        resetNotification.Token != "",
+		RequestID:       resetNotification.RequestID,
+		AuthorizationOK: cfg.webhookBearerToken == "" || resetNotification.Authorization == "Bearer "+cfg.webhookBearerToken,
+	}
+	if resetNotification.Token == "" {
+		return errors.New("password reset webhook notification did not include token")
+	}
+	if resetNotification.TenantID != cfg.tenantID || resetNotification.UserID != cfg.userID {
+		return fmt.Errorf("password reset webhook notification identity mismatch: %+v", resetNotification)
+	}
+	if resetNotification.ChallengeID != passwordReset.GetChallengeId() {
+		return fmt.Errorf("password reset challenge id mismatch: webhook=%s response=%s", resetNotification.ChallengeID, passwordReset.GetChallengeId())
+	}
+
+	confirmResetStarted := time.Now()
+	confirmResetCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	confirmReset, err := client.ConfirmPasswordReset(confirmResetCtx, &identityv1.ConfirmPasswordResetRequest{
+		TenantId:       cfg.tenantID,
+		UserId:         cfg.userID,
+		ChallengeId:    passwordReset.GetChallengeId(),
+		ChallengeToken: resetNotification.Token,
+		NewPassword:    cfg.newPassword,
+		TraceId:        "identity-challenge-delivery-outbox-smoke",
+		RequestId:      "identity-smoke-confirm-password-reset",
+	})
+	cancel()
+	result.LatenciesMS["confirm_password_reset"] = elapsedMS(confirmResetStarted)
+	if err != nil {
+		return fmt.Errorf("confirm password reset: %w", err)
+	}
+	result.ConfirmPasswordReset = passwordResetSummary{
+		ResetAtUnixMS: confirmReset.GetResetAtUnixMs(),
+	}
+	if confirmReset.GetResetAtUnixMs() == 0 {
+		return errors.New("confirm password reset did not return reset timestamp")
+	}
+
+	postResetLoginStarted := time.Now()
+	postResetLoginCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	postResetLogin, err := client.Login(postResetLoginCtx, &identityv1.LoginRequest{
+		TenantId:          cfg.tenantID,
+		UserId:            cfg.userID,
+		Password:          cfg.newPassword,
+		DeviceId:          cfg.deviceID,
+		Audience:          cfg.audience,
+		GatewayTtlSeconds: 900,
+		RefreshTtlSeconds: 3600,
+		TraceId:           "identity-challenge-delivery-outbox-smoke",
+		RequestId:         "identity-smoke-post-reset-login",
+	})
+	cancel()
+	result.LatenciesMS["post_reset_login"] = elapsedMS(postResetLoginStarted)
+	if err != nil {
+		return fmt.Errorf("post-reset login: %w", err)
+	}
+	result.PostResetLogin = tokenSummary{
+		Audience:               postResetLogin.GetAudience(),
+		TokenType:              postResetLogin.GetTokenType(),
+		SessionIDSet:           postResetLogin.GetSessionId() != "",
+		GatewayTokenSet:        postResetLogin.GetGatewayToken() != "",
+		RefreshTokenSet:        postResetLogin.GetRefreshToken() != "",
+		GatewayExpiresAtUnixMS: postResetLogin.GetGatewayExpiresAtUnixMs(),
+		RefreshExpiresAtUnixMS: postResetLogin.GetRefreshExpiresAtUnixMs(),
+		IssuedAtUnixMS:         postResetLogin.GetIssuedAtUnixMs(),
+	}
+	if postResetLogin.GetGatewayToken() == "" || postResetLogin.GetRefreshToken() == "" || postResetLogin.GetSessionId() == "" {
+		return errors.New("post-reset login did not return gateway token, refresh token, and session id")
+	}
+
 	if pool != nil {
 		if err := fillPostgresStats(ctx, pool, cfg, challenge.GetChallengeId(), result); err != nil {
 			return err
@@ -476,7 +594,11 @@ func runClientScenario(cfg config, result *summary) error {
 		if result.ChallengeDeliveryOutbox.Pending != 0 || result.ChallengeDeliveryOutbox.DLQ != 0 {
 			return fmt.Errorf("challenge delivery outbox did not drain: %+v", result.ChallengeDeliveryOutbox)
 		}
-		if result.ChallengeDeliveryOutbox.Delivered < 1 {
+		expectedDelivered := int64(1)
+		if result.RequestPasswordReset.ChallengeID != "" {
+			expectedDelivered = 2
+		}
+		if result.ChallengeDeliveryOutbox.Delivered < expectedDelivered {
 			return fmt.Errorf("challenge delivery outbox was not delivered: %+v", result.ChallengeDeliveryOutbox)
 		}
 		if result.ChallengeRow.Status != "CONSUMED" || result.ChallengeRow.DeliveryStatus != "DELIVERED" {

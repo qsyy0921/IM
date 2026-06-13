@@ -37,7 +37,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_CONTACTS_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("contacts-service runtime wiring is idle; set NEXUSIM_CONTACTS_SERVICE_MODE=grpc, outbox-relay, outbox-repair, or outbox-repair-audit")
+		log.Println("contacts-service runtime wiring is idle; set NEXUSIM_CONTACTS_SERVICE_MODE=grpc, outbox-relay, outbox-repair, outbox-repair-audit, or outbox-repair-cleanup")
 		return nil
 	case "grpc":
 		return runGRPC()
@@ -47,6 +47,8 @@ func run() error {
 		return runOutboxRepair()
 	case "outbox-repair-audit":
 		return runOutboxRepairAudit()
+	case "outbox-repair-cleanup":
+		return runOutboxRepairCleanup()
 	default:
 		return errors.New("unsupported NEXUSIM_CONTACTS_SERVICE_MODE")
 	}
@@ -208,6 +210,45 @@ func runOutboxRepairAudit() error {
 			row.PreviousLastError,
 		)
 	}
+	return nil
+}
+
+type outboxRepairCleanupConfig struct {
+	Retention time.Duration
+	BatchSize int
+}
+
+func runOutboxRepairCleanup() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	config, err := outboxRepairCleanupConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	cutoff := time.Now().UTC().Add(-config.Retention)
+	stats, err := postgresinfra.NewOutboxStore(pool).CleanupOutboxRepairs(ctx, postgresinfra.OutboxRepairCleanupOptions{
+		EventID:  envString("NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_EVENT_ID", ""),
+		TenantID: envString("NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_TENANT_ID", ""),
+		Cutoff:   cutoff,
+		Limit:    config.BatchSize,
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"contacts-service outbox repair cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d",
+		stats.Deleted,
+		cutoff.Format(time.RFC3339),
+		config.Retention,
+		config.BatchSize,
+	)
 	return nil
 }
 
@@ -398,6 +439,18 @@ func envDuration(name string, fallback time.Duration) time.Duration {
 	return parsed
 }
 
+func envPositiveDuration(name string, fallback time.Duration) (time.Duration, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed <= 0 {
+		return 0, errors.New(name + " must be a positive duration")
+	}
+	return parsed, nil
+}
+
 func envStringSet(name string, normalize func(string) string) map[string]struct{} {
 	values := make(map[string]struct{})
 	raw := strings.TrimSpace(os.Getenv(name))
@@ -469,4 +522,31 @@ func formatOptionalTime(value *time.Time) string {
 		return ""
 	}
 	return value.Format(time.RFC3339)
+}
+
+func envPositiveInt(name string, fallback int) (int, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return 0, errors.New(name + " must be a positive integer")
+	}
+	return parsed, nil
+}
+
+func outboxRepairCleanupConfigFromEnv() (outboxRepairCleanupConfig, error) {
+	retention, err := envPositiveDuration("NEXUSIM_CONTACTS_OUTBOX_REPAIR_RETENTION", 7*24*time.Hour)
+	if err != nil {
+		return outboxRepairCleanupConfig{}, err
+	}
+	batchSize, err := envPositiveInt("NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_BATCH_SIZE", 5000)
+	if err != nil {
+		return outboxRepairCleanupConfig{}, err
+	}
+	return outboxRepairCleanupConfig{
+		Retention: retention,
+		BatchSize: batchSize,
+	}, nil
 }

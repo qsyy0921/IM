@@ -89,7 +89,7 @@ api-gateway facade smoke 示例：
 - `ListContacts` / `GetContactState` 从 contacts-service 自己的 read model 读取，不跨服务读其它内部表。
 - `ListContactRequests` 从 `contact_requests` 读取当前用户收到 / 发出的申请，cursor 绑定 tenant、user、direction、status 和 page size，避免跨条件串页。
 - 当前 smoke 已验证 ACCEPT 后双向 ACTIVE edge、DECLINE / CANCEL 后不创建 edge、Delete/Block/Unblock/Remark 只修改当前 owner 视角 edge、删除后重新申请可以恢复联系人关系、outbox 清空、Kafka 读回对应 contact event。
-- contacts-service 还补了只读 `outbox-repair-audit` 运维模式，方便直接审计 DLQ repair 历史；它不直接 redrive，不会修改当前 outbox 状态。
+- contacts-service 还补了只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运维模式，方便直接审计并按 retention 清理 DLQ repair 历史；它们不直接 publish Kafka，也不会改写当前 outbox 事实状态。
 - api-gateway facade smoke 已验证 contacts user-facing RPC 可以收敛到统一入口，客户端不需要直连 contacts-service；contacts-service 仍是事实源，api-gateway 只做鉴权、身份覆盖和转发。
 - gRPC TLS / mTLS 可以作为“服务端和 smoke 客户端的第一阶段传输安全已接通”来讲，但必须说明还没有做证书生命周期治理、动态服务身份或服务网格。
 - 后续如果要“接受好友后自动创建单聊”，应通过显式 saga / app port 编排，而不是在 contacts-service 事务里写 conversation-service 表。

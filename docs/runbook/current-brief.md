@@ -20,7 +20,7 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 
 ## 当前优先级
 
-1. 当前已完成：identity-service 已补只读 `session-mfa-proof-audit`、只读 `challenge-delivery-repair-audit` 和 `challenge-delivery-repair-cleanup` operator；contacts-service 和 policy-service 已分别补只读 `outbox-repair-audit` 运维模式；receipt-service 已补只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运维模式，用于直接审计、redrive 和按 retention 清理 `receipt_outbox` repair 历史。
+1. 当前已完成：identity-service 已补只读 `session-mfa-proof-audit`、只读 `challenge-delivery-repair-audit` 和 `challenge-delivery-repair-cleanup` operator；contacts-service 已补只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运维模式；policy-service 已补只读 `outbox-repair-audit` 运维模式；receipt-service 已补只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运维模式，用于直接审计、redrive 和按 retention 清理 `receipt_outbox` repair 历史。
 2. 当前已完成：服务状态已拆成 `docs/runbook/service-briefs/<service>.md`，并由 `.\tools\check-local.ps1` 防止入口和单服务 brief 重新变长。
 3. 当前已完成：`docs/README.md` 和 `docs/sdd/README.md` 也纳入短入口检查；旧长 SDD 索引已归档。
 4. 当前先治理已有 9 个微服务；identity repository、repository test、`loadtest/pushgateway/main.go` 和长目标架构文档已完成拆分，delivery-service 已补 `/debug/metrics`、只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit`、按 retention/scope 清理 outbox repair audit 历史、`projection-checkpoint-repair`、只读 `projection-checkpoint-repair-audit`、按 retention/class/scope 清理 repair audit 历史、projection failure audit、resolved 标记、按 unresolved failure 定点 replay、按最早 unresolved failure 自动 rewind、只读 `projection-failure-audit` 及其按 offset/event/class 的定点过滤、以及按 class/scope 过滤的 resolved failure cleanup operator，后续继续处理各服务 P2 hardening。

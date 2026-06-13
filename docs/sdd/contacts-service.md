@@ -671,7 +671,7 @@ $env:NEXUSIM_CONTACTS_OUTBOX_REPAIR_REASON='operator retried after kafka recover
 
 `outbox-repair` 只处理明确列出的 `contacts_outbox.status='DLQ'` 事件，把它们重置为 `PENDING`、清理 retry / error / DLQ 时间字段，并写入 `contacts_outbox_repair_audit` 保存原状态、原 retry/error 和 repair reason。随后事件交回普通 outbox relay 按 `partition_key + aggregate_version` 顺序发布；不会直接 publish Kafka，也不会跳过低版本阻塞。`PUBLISHED`、仍在 `PENDING` 或不存在的 event 会计入 skipped。
 
-另有只读 `outbox-repair-audit` 运维模式，可直接查询 `contacts_outbox_repair_audit` 历史，并按 `event_id / tenant_id` 缩小排障范围；它不 redrive，也不修改 `contacts_outbox` 当前状态。
+另有只读 `outbox-repair-audit` 运维模式，可直接查询 `contacts_outbox_repair_audit` 历史，并按 `event_id / tenant_id` 缩小排障范围；它不 redrive，也不修改 `contacts_outbox` 当前状态。`outbox-repair-cleanup` 则按 `retention + batch_size` 清理过期 `contacts_outbox_repair_audit` 行，并支持 `event_id / tenant_id` 范围收窄；它只删除 repair 历史，不改写当前 outbox 状态。
 
 本地容器编排：
 

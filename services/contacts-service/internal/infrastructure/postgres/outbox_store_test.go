@@ -283,6 +283,103 @@ INSERT INTO contacts_outbox_repair_audit (
 	}
 }
 
+func TestOutboxStoreCleanupOutboxRepairsDeletesOnlyExpiredRowsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO contacts_outbox_repair_audit (
+    event_id, tenant_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at, repair_reason, repaired_at
+) VALUES
+    ('cleanup-event-1', 'tenant-cleanup', 'DLQ', 1, 'publish failed', now() - interval '1 minute', 'manual audit', now() - interval '10 days'),
+    ('cleanup-event-2', 'tenant-cleanup', 'DLQ', 2, 'provider unavailable', now() - interval '2 minutes', 'provider recovered', now() - interval '1 day')
+`)
+	if err != nil {
+		t.Fatalf("seed contacts outbox cleanup rows: %v", err)
+	}
+
+	stats, err := NewOutboxStore(pool).CleanupOutboxRepairs(ctx, OutboxRepairCleanupOptions{
+		TenantID: "tenant-cleanup",
+		Cutoff:   time.Now().UTC().Add(-7 * 24 * time.Hour),
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("cleanup contacts outbox repairs: %v", err)
+	}
+	if stats.Deleted != 1 {
+		t.Fatalf("unexpected deleted count: %+v", stats)
+	}
+	assertContactsOutboxRepairAuditCount(t, ctx, pool, "tenant-cleanup", 1)
+}
+
+func TestOutboxStoreCleanupOutboxRepairsHonorsBatchLimitIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO contacts_outbox_repair_audit (
+    event_id, tenant_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at, repair_reason, repaired_at
+) VALUES
+    ('cleanup-event-11', 'tenant-limit', 'DLQ', 1, 'publish failed', now() - interval '1 minute', 'manual audit', now() - interval '10 days'),
+    ('cleanup-event-12', 'tenant-limit', 'DLQ', 2, 'provider unavailable', now() - interval '2 minutes', 'provider recovered', now() - interval '9 days')
+`)
+	if err != nil {
+		t.Fatalf("seed contacts outbox cleanup rows: %v", err)
+	}
+
+	stats, err := NewOutboxStore(pool).CleanupOutboxRepairs(ctx, OutboxRepairCleanupOptions{
+		TenantID: "tenant-limit",
+		Cutoff:   time.Now().UTC().Add(-7 * 24 * time.Hour),
+		Limit:    1,
+	})
+	if err != nil {
+		t.Fatalf("cleanup contacts outbox repairs with batch limit: %v", err)
+	}
+	if stats.Deleted != 1 {
+		t.Fatalf("unexpected deleted count: %+v", stats)
+	}
+	assertContactsOutboxRepairAuditCount(t, ctx, pool, "tenant-limit", 1)
+}
+
+func TestOutboxStoreCleanupOutboxRepairsFiltersEventAndTenantIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO contacts_outbox_repair_audit (
+    event_id, tenant_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at, repair_reason, repaired_at
+) VALUES
+    ('cleanup-event-21', 'tenant-filter', 'DLQ', 1, 'publish failed', now() - interval '1 minute', 'manual audit', now() - interval '10 days'),
+    ('cleanup-event-22', 'tenant-other', 'DLQ', 2, 'provider unavailable', now() - interval '2 minutes', 'provider recovered', now() - interval '10 days')
+`)
+	if err != nil {
+		t.Fatalf("seed contacts outbox cleanup rows: %v", err)
+	}
+
+	stats, err := NewOutboxStore(pool).CleanupOutboxRepairs(ctx, OutboxRepairCleanupOptions{
+		EventID:  "cleanup-event-21",
+		TenantID: "tenant-filter",
+		Cutoff:   time.Now().UTC().Add(-7 * 24 * time.Hour),
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("cleanup contacts outbox repairs with filters: %v", err)
+	}
+	if stats.Deleted != 1 {
+		t.Fatalf("unexpected deleted count: %+v", stats)
+	}
+	rows, err := NewOutboxStore(pool).AuditOutboxRepairs(ctx, OutboxRepairAuditOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("audit contacts outbox repairs after cleanup: %v", err)
+	}
+	if len(rows) != 1 || rows[0].EventID != "cleanup-event-22" || rows[0].TenantID != "tenant-other" {
+		t.Fatalf("unexpected remaining contacts outbox repair audit rows: %+v", rows)
+	}
+}
+
 func assertContactsOutboxRepairAudit(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventID string, wantReason string, wantPreviousError string) {
 	t.Helper()
 	var reason string
@@ -306,6 +403,22 @@ WHERE tenant_id = 'tenant-contacts'
 			previousRetryCount,
 			previousError,
 		)
+	}
+}
+
+func assertContactsOutboxRepairAuditCount(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID string, want int) {
+	t.Helper()
+	var got int
+	err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM contacts_outbox_repair_audit
+WHERE tenant_id = $1
+`, tenantID).Scan(&got)
+	if err != nil {
+		t.Fatalf("count contacts outbox repair audit: %v", err)
+	}
+	if got != want {
+		t.Fatalf("expected %d contacts outbox repair audit rows, got %d", want, got)
 	}
 }
 

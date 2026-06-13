@@ -12,6 +12,7 @@ param(
     [string]$IdentityTlsServerName = "",
     [string]$IdentityTlsClientCertFile = "",
     [string]$IdentityTlsClientKeyFile = "",
+    [switch]$GatewayFacade,
     [switch]$SkipBuild
 )
 
@@ -45,6 +46,9 @@ if (Test-Path -LiteralPath $webhookFile) {
 if (-not $SkipBuild) {
     go build -o bin\identity-service.exe ./services/identity-service/cmd/identity-service
     go build -o bin\identity-loadtest.exe ./loadtest/identity
+    if ($GatewayFacade) {
+        go build -o bin\api-gateway.exe ./services/api-gateway/cmd/api-gateway
+    }
 }
 
 function Apply-PostgresMigration {
@@ -171,10 +175,13 @@ try {
         }
 
     $identityService = Join-Path $repo "bin\identity-service.exe"
+    $apiGatewayService = Join-Path $repo "bin\api-gateway.exe"
     $runner = Join-Path $repo "bin\identity-loadtest.exe"
     $identityGrpcPort = Get-FreeTcpPort
+    $apiGatewayPort = Get-FreeTcpPort
     $webhookPort = Get-FreeTcpPort
     $identityGrpcAddr = "127.0.0.1:$identityGrpcPort"
+    $apiGatewayAddr = "127.0.0.1:$apiGatewayPort"
     $webhookAddr = "127.0.0.1:$webhookPort"
     $webhookURL = "http://$webhookAddr/challenge"
     $identityGrpcEnv = @{
@@ -203,6 +210,19 @@ try {
 
     $processes += Start-NexusProcess -Name "identity-grpc" -FilePath $identityService -Port $identityGrpcPort -Env $identityGrpcEnv
 
+    if ($GatewayFacade) {
+        $processes += Start-NexusProcess -Name "api-gateway" -FilePath $apiGatewayService -Port $apiGatewayPort -Env @{
+            NEXUSIM_API_GATEWAY_MODE = "grpc"
+            NEXUSIM_API_GATEWAY_GRPC_ADDR = $apiGatewayAddr
+            NEXUSIM_API_GATEWAY_DEBUG_ADDR = ""
+            NEXUSIM_API_GATEWAY_IDENTITY_ADDR = $identityGrpcAddr
+            NEXUSIM_API_GATEWAY_AUTH_MODE = "hmac"
+            NEXUSIM_API_GATEWAY_AUTH_HMAC_SECRET = $gatewayTokenSecret
+            NEXUSIM_API_GATEWAY_AUTH_AUDIENCE = "api-gateway"
+            NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS = "false"
+        }
+    }
+
     $processes += Start-NexusProcess -Name "identity-challenge-delivery-worker" -FilePath $identityService -Env @{
         NEXUSIM_IDENTITY_SERVICE_MODE = "challenge-delivery-worker"
         NEXUSIM_IDENTITY_DEBUG_ADDR = ""
@@ -217,9 +237,13 @@ try {
         NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MAX_ATTEMPTS = "3"
     }
 
+    $runnerTarget = $identityGrpcAddr
+    if ($GatewayFacade) {
+        $runnerTarget = $apiGatewayAddr
+    }
     $runnerArgs = @(
         "--mode", "client",
-        "--target", $identityGrpcAddr,
+        "--target", $runnerTarget,
         "--pg-dsn", $PgDsn,
         "--tenant-id", $tenantId,
         "--user-id", $userId,
@@ -231,6 +255,9 @@ try {
         "--wait-timeout", "20s",
         "--result-dir", $resultDir
     )
+    if ($GatewayFacade) {
+        $runnerArgs += @("--gateway-facade")
+    }
     if (-not [string]::IsNullOrWhiteSpace($IdentityTlsCaFile)) {
         $runnerArgs += @("--identity-tls-ca-file", $IdentityTlsCaFile)
     }
@@ -260,4 +287,8 @@ try {
 
 Write-Host "result_dir=$resultDir"
 Write-Host "identity_grpc_addr=127.0.0.1:$identityGrpcPort"
+if ($GatewayFacade) {
+    Write-Host "api_gateway_addr=127.0.0.1:$apiGatewayPort"
+    Write-Host "gateway_facade=true"
+}
 Write-Host "identity_webhook_url=http://127.0.0.1:$webhookPort/challenge"

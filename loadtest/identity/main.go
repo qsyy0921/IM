@@ -16,6 +16,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	gatewayv1 "github.com/qsyy0921/IM/api/proto/nexusim/gateway/v1"
 	identityv1 "github.com/qsyy0921/IM/api/proto/nexusim/identity/v1"
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc"
@@ -24,6 +25,7 @@ import (
 type config struct {
 	mode               string
 	target             string
+	gatewayFacade      bool
 	tls                grpctls.Config
 	resultDir          string
 	pgDSN              string
@@ -46,6 +48,7 @@ type summary struct {
 	GitDirty                   bool               `json:"git_dirty"`
 	GitStatusShort             string             `json:"git_status_short,omitempty"`
 	Target                     string             `json:"target"`
+	GatewayFacade              bool               `json:"gateway_facade"`
 	TLSEnabled                 bool               `json:"tls_enabled"`
 	ResultDir                  string             `json:"result_dir"`
 	TenantID                   string             `json:"tenant_id"`
@@ -63,6 +66,12 @@ type summary struct {
 	ChallengeDeliveryOutboxRow deliveryOutboxRow  `json:"challenge_delivery_outbox_row"`
 	ChallengeRow               challengeRow       `json:"challenge_row"`
 	LatenciesMS                map[string]float64 `json:"latencies_ms"`
+}
+
+type identityChallengeClient interface {
+	RegisterUser(context.Context, *identityv1.RegisterUserRequest, ...grpc.CallOption) (*identityv1.RegisterUserResponse, error)
+	RequestVerificationChallenge(context.Context, *identityv1.RequestVerificationChallengeRequest, ...grpc.CallOption) (*identityv1.RequestVerificationChallengeResponse, error)
+	ConfirmVerificationChallenge(context.Context, *identityv1.ConfirmVerificationChallengeRequest, ...grpc.CallOption) (*identityv1.ConfirmVerificationChallengeResponse, error)
 }
 
 type registerSummary struct {
@@ -152,11 +161,12 @@ func main() {
 func parseConfig() config {
 	var cfg config
 	flag.StringVar(&cfg.mode, "mode", "client", "mode: client or webhook")
-	flag.StringVar(&cfg.target, "target", "127.0.0.1:10600", "identity-service gRPC target")
-	flag.StringVar(&cfg.tls.CAFile, "identity-tls-ca-file", "", "CA PEM for identity-service gRPC TLS")
-	flag.StringVar(&cfg.tls.ServerName, "identity-tls-server-name", "", "server name for identity-service gRPC TLS")
-	flag.StringVar(&cfg.tls.ClientCertFile, "identity-tls-client-cert-file", "", "client certificate PEM for identity-service mTLS")
-	flag.StringVar(&cfg.tls.ClientKeyFile, "identity-tls-client-key-file", "", "client private key PEM for identity-service mTLS")
+	flag.StringVar(&cfg.target, "target", "127.0.0.1:10600", "identity-service or api-gateway gRPC target")
+	flag.BoolVar(&cfg.gatewayFacade, "gateway-facade", false, "call identity RPCs through nexusim.gateway.v1.GatewayService facade")
+	flag.StringVar(&cfg.tls.CAFile, "identity-tls-ca-file", "", "CA PEM for target gRPC TLS")
+	flag.StringVar(&cfg.tls.ServerName, "identity-tls-server-name", "", "server name for target gRPC TLS")
+	flag.StringVar(&cfg.tls.ClientCertFile, "identity-tls-client-cert-file", "", "client certificate PEM for target mTLS")
+	flag.StringVar(&cfg.tls.ClientKeyFile, "identity-tls-client-key-file", "", "client private key PEM for target mTLS")
 	flag.StringVar(&cfg.resultDir, "result-dir", "H:\\NexusIM\\loadtest-results\\identity-challenge-delivery-outbox-smoke", "result directory")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "", "PostgreSQL DSN")
 	flag.StringVar(&cfg.webhookListen, "webhook-listen", "127.0.0.1:0", "webhook listen address for webhook mode")
@@ -225,17 +235,18 @@ func runWebhook(cfg config) error {
 func runClient(cfg config) error {
 	started := time.Now().UTC()
 	result := summary{
-		Commit:      gitOutput("rev-parse", "--short", "HEAD"),
-		CommitFull:  gitOutput("rev-parse", "HEAD"),
-		GitDirty:    gitDirty(),
-		Target:      cfg.target,
-		TLSEnabled:  cfg.tls.Enabled(),
-		ResultDir:   cfg.resultDir,
-		TenantID:    cfg.tenantID,
-		UserID:      cfg.userID,
-		Destination: cfg.destination,
-		StartedAt:   started,
-		LatenciesMS: map[string]float64{},
+		Commit:        gitOutput("rev-parse", "--short", "HEAD"),
+		CommitFull:    gitOutput("rev-parse", "HEAD"),
+		GitDirty:      gitDirty(),
+		Target:        cfg.target,
+		GatewayFacade: cfg.gatewayFacade,
+		TLSEnabled:    cfg.tls.Enabled(),
+		ResultDir:     cfg.resultDir,
+		TenantID:      cfg.tenantID,
+		UserID:        cfg.userID,
+		Destination:   cfg.destination,
+		StartedAt:     started,
+		LatenciesMS:   map[string]float64{},
 	}
 	if status := gitOutput("status", "--short"); strings.TrimSpace(status) != "" {
 		result.GitStatusShort = status
@@ -266,14 +277,17 @@ func runClientScenario(cfg config, result *summary) error {
 
 	dialOption, err := grpctls.DialOption(cfg.tls, "identity-tls")
 	if err != nil {
-		return fmt.Errorf("configure identity-service TLS: %w", err)
+		return fmt.Errorf("configure identity smoke target TLS: %w", err)
 	}
 	conn, err := grpc.NewClient(cfg.target, dialOption)
 	if err != nil {
-		return fmt.Errorf("connect identity-service: %w", err)
+		return fmt.Errorf("connect identity smoke target: %w", err)
 	}
 	defer conn.Close()
-	client := identityv1.NewIdentityServiceClient(conn)
+	var client identityChallengeClient = identityv1.NewIdentityServiceClient(conn)
+	if cfg.gatewayFacade {
+		client = gatewayv1.NewGatewayServiceClient(conn)
+	}
 
 	registerStarted := time.Now()
 	registerCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)

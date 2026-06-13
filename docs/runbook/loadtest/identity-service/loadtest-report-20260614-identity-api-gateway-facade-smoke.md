@@ -25,6 +25,8 @@ loadtest/identity
 -> Login with new password via GatewayService facade
 -> BeginMFAEnrollment via GatewayService facade
 -> ConfirmMFAEnrollment via GatewayService facade
+-> RefreshGatewayToken without MFA rejected with MFA_REQUIRED / FailedPrecondition
+-> RefreshGatewayToken with TOTP via GatewayService facade
 -> Login without MFA rejected with MFA_REQUIRED / FailedPrecondition
 -> Login with TOTP via GatewayService facade
 -> RegenerateMFARecoveryCodes via GatewayService facade
@@ -32,15 +34,15 @@ loadtest/identity
 -> DisableMFAFactor via GatewayService facade
 ```
 
-这仍是本地小规模 smoke，不是容量测试，也不是完整生产 API gateway 部署。传输层本轮使用 plaintext；验证重点是 identity public facade、correlation 透传、challenge delivery outbox、worker webhook delivery、Login token issuing、refresh token rotation、password reset 后重新登录和 MFA lifecycle facade。
+这仍是本地小规模 smoke，不是容量测试，也不是完整生产 API gateway 部署。传输层本轮使用 plaintext；验证重点是 identity public facade、correlation 透传、challenge delivery outbox、worker webhook delivery、Login token issuing、refresh token rotation、password reset 后重新登录、MFA lifecycle facade 和 Refresh step-up。
 
 ## 原始结果
 
-- Result dir: `H:\NexusIM\loadtest-results\identity-api-gateway-mfa-facade-smoke-20260614-clean`
-- Summary: `H:\NexusIM\loadtest-results\identity-api-gateway-mfa-facade-smoke-20260614-clean\identity-summary.json`
-- Code commit in summary: `5fbc622`
+- Result dir: `H:\NexusIM\loadtest-results\identity-api-gateway-refresh-stepup-smoke-20260614-clean`
+- Summary: `H:\NexusIM\loadtest-results\identity-api-gateway-refresh-stepup-smoke-20260614-clean\identity-summary.json`
+- Code commit in summary: `e464209`
 - `git_dirty`: `false`
-- Target: `127.0.0.1:60290` (api-gateway)
+- Target: `127.0.0.1:63063` (api-gateway)
 - `gateway_facade`: `true`
 
 ## 关键证据
@@ -88,6 +90,14 @@ begin_mfa_enrollment.otpauth_uri_set=true
 confirm_mfa_enrollment.factor_id_set=true
 confirm_mfa_enrollment.status=MFA_FACTOR_STATUS_ACTIVE
 confirm_mfa_enrollment.recovery_code_count=10
+refresh_without_mfa.occurred=true
+refresh_without_mfa.code=FailedPrecondition
+refresh_with_mfa.audience=api-gateway
+refresh_with_mfa.token_type=Bearer
+refresh_with_mfa.session_id_set=true
+refresh_with_mfa.gateway_token_set=true
+refresh_with_mfa.refresh_token_set=true
+refresh_with_mfa.refresh_token_rotated=true
 login_without_mfa.occurred=true
 login_without_mfa.code=FailedPrecondition
 mfa_login.audience=api-gateway
@@ -124,6 +134,8 @@ api-gateway access log shows the client-facing identity calls used the facade de
 /nexusim.gateway.v1.GatewayService/Login OK trace_id=identity-challenge-delivery-outbox-smoke request_id=identity-smoke-post-reset-login
 /nexusim.gateway.v1.GatewayService/BeginMFAEnrollment OK trace_id=identity-challenge-delivery-outbox-smoke request_id=identity-smoke-begin-mfa
 /nexusim.gateway.v1.GatewayService/ConfirmMFAEnrollment OK trace_id=identity-challenge-delivery-outbox-smoke request_id=identity-smoke-confirm-mfa
+/nexusim.gateway.v1.GatewayService/RefreshGatewayToken FailedPrecondition trace_id=identity-challenge-delivery-outbox-smoke request_id=identity-smoke-refresh-without-mfa
+/nexusim.gateway.v1.GatewayService/RefreshGatewayToken OK trace_id=identity-challenge-delivery-outbox-smoke request_id=identity-smoke-refresh-with-mfa
 /nexusim.gateway.v1.GatewayService/Login FailedPrecondition trace_id=identity-challenge-delivery-outbox-smoke request_id=identity-smoke-login-without-mfa
 /nexusim.gateway.v1.GatewayService/Login OK trace_id=identity-challenge-delivery-outbox-smoke request_id=identity-smoke-mfa-login
 /nexusim.gateway.v1.GatewayService/RegenerateMFARecoveryCodes OK trace_id=identity-challenge-delivery-outbox-smoke request_id=identity-smoke-regenerate-mfa-recovery
@@ -134,7 +146,7 @@ api-gateway access log shows the client-facing identity calls used the facade de
 ## 边界
 
 - api-gateway 不拥有 identity facts，不写 `identity_users / identity_challenges / identity_challenge_delivery_outbox`。
-- 本轮覆盖 `RegisterUser -> RequestVerificationChallenge -> ConfirmVerificationChallenge -> Login -> RefreshGatewayToken -> RequestPasswordReset -> ConfirmPasswordReset -> post-reset Login -> BeginMFAEnrollment -> ConfirmMFAEnrollment -> MFA-required Login rejection -> MFA Login -> RegenerateMFARecoveryCodes -> RevokeMFARecoveryCodes -> DisableMFAFactor`。
+- 本轮覆盖 `RegisterUser -> RequestVerificationChallenge -> ConfirmVerificationChallenge -> Login -> RefreshGatewayToken -> RequestPasswordReset -> ConfirmPasswordReset -> post-reset Login -> BeginMFAEnrollment -> ConfirmMFAEnrollment -> MFA-required Refresh rejection -> Refresh with MFA proof -> MFA-required Login rejection -> MFA Login -> RegenerateMFARecoveryCodes -> RevokeMFARecoveryCodes -> DisableMFAFactor`。
 - identity facade 是 pre-auth public / self-service 转发入口，不暴露 `IssueGatewayToken / RevokeDevice / RevokeSession / GetDeviceState`。
 - 本轮没有覆盖 api-gateway 到 identity-service 的 TLS / mTLS；下游 TLS 配置能力仍保留在 api-gateway 和 identity-service。
 - challenge token 仍不落库；Confirm 使用的是 webhook worker 收到的 token，不是 dev token。

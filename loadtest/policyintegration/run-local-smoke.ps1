@@ -12,6 +12,7 @@ param(
     [string]$MessageTlsServerName = "",
     [string]$MessageTlsClientCertFile = "",
     [string]$MessageTlsClientKeyFile = "",
+    [switch]$VerifiedAuthMetadata,
     [switch]$SkipBuild
 )
 
@@ -26,6 +27,7 @@ $resultDir = Join-Path $ResultRoot $RunName
 $allowDir = Join-Path $resultDir "allow"
 $denyDir = Join-Path $resultDir "deny"
 $logDir = Join-Path $resultDir "logs"
+$authMode = if ($VerifiedAuthMetadata) { "metadata" } else { "body" }
 
 New-Item -ItemType Directory -Force $allowDir | Out-Null
 New-Item -ItemType Directory -Force $denyDir | Out-Null
@@ -168,6 +170,7 @@ function Run-Scenario {
             NEXUSIM_MESSAGE_SERVICE_MODE = "grpc"
             NEXUSIM_GRPC_ADDR = $messageAddr
             NEXUSIM_PG_DSN = $PgDsn
+            NEXUSIM_MESSAGE_AUTH_MODE = $authMode
             NEXUSIM_POLICY_SERVICE_ADDR = $policyAddr
             NEXUSIM_POLICY_RPC_TIMEOUT = "2s"
             NEXUSIM_MOCK_POLICY_ALLOWED = [string](-not $Allowed)
@@ -231,6 +234,9 @@ function Run-Scenario {
         }
         if (-not [string]::IsNullOrWhiteSpace($MessageTlsClientKeyFile)) {
             $args += @("--message-tls-client-key-file", $MessageTlsClientKeyFile)
+        }
+        if ($VerifiedAuthMetadata) {
+            $args += @("--verified-auth-metadata")
         }
         & $runner @args
         if ($LASTEXITCODE -ne 0) {

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,8 +17,18 @@ import (
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
+)
+
+const (
+	metadataTenantID  = "x-nexusim-tenant-id"
+	metadataUserID    = "x-nexusim-user-id"
+	metadataDeviceID  = "x-nexusim-device-id"
+	metadataSessionID = "x-nexusim-session-id"
+	metadataTraceID   = "x-nexusim-trace-id"
+	metadataRequestID = "x-nexusim-request-id"
 )
 
 type config struct {
@@ -41,6 +52,7 @@ type config struct {
 	expectedBaseClass      string
 	expectedReason         string
 	messageTLS             grpctls.Config
+	verifiedMetadata       bool
 	cleanup                bool
 	seedPolicyRule         bool
 	seedTenantPolicyRule   bool
@@ -57,6 +69,7 @@ type summary struct {
 	GitStatusShort          string        `json:"git_status_short,omitempty"`
 	Target                  string        `json:"target"`
 	MessageTLSEnabled       bool          `json:"message_tls_enabled"`
+	VerifiedAuthMetadata    bool          `json:"verified_auth_metadata"`
 	ResultDir               string        `json:"result_dir"`
 	Scenario                string        `json:"scenario"`
 	Action                  string        `json:"action"`
@@ -227,6 +240,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.expectedClassification, "expected-classification", "INTERNAL", "expected classification")
 	flag.StringVar(&cfg.expectedBaseClass, "expected-base-classification", "", "expected base SendMessage classification for mutation scenarios; defaults to --expected-classification or seeded SEND rule")
 	flag.StringVar(&cfg.expectedReason, "expected-reason", "", "expected deny reason")
+	flag.BoolVar(&cfg.verifiedMetadata, "verified-auth-metadata", envBool(false, "NEXUSIM_POLICY_INTEGRATION_VERIFIED_AUTH_METADATA", "NEXUSIM_MESSAGE_LOADTEST_VERIFIED_AUTH_METADATA"), "send gateway verified identity through message-service gRPC metadata")
 	flag.BoolVar(&cfg.cleanup, "cleanup", false, "delete message rows for tenant before running")
 	flag.BoolVar(&cfg.seedPolicyRule, "seed-policy-rule", false, "seed exact policy_message_action_rules row for this scenario")
 	flag.BoolVar(&cfg.seedTenantPolicyRule, "seed-tenant-policy-rule", false, "seed tenant-level policy_tenant_message_action_rules row for this scenario")
@@ -260,6 +274,69 @@ func registerTLSFlags(prefix, envPrefix, serviceName string, config *grpctls.Con
 	flag.StringVar(&config.ServerName, prefix+"-server-name", os.Getenv(envPrefix+"_SERVER_NAME"), serviceName+" gRPC TLS server name")
 	flag.StringVar(&config.ClientCertFile, prefix+"-client-cert-file", os.Getenv(envPrefix+"_CLIENT_CERT_FILE"), serviceName+" gRPC TLS client certificate file")
 	flag.StringVar(&config.ClientKeyFile, prefix+"-client-key-file", os.Getenv(envPrefix+"_CLIENT_KEY_FILE"), serviceName+" gRPC TLS client key file")
+}
+
+type verifiedAuthIdentity struct {
+	tenantID  string
+	userID    string
+	deviceID  string
+	sessionID string
+	traceID   string
+	requestID string
+}
+
+func withVerifiedAuthMetadata(ctx context.Context, cfg config, auth verifiedAuthIdentity) context.Context {
+	if !cfg.verifiedMetadata {
+		return ctx
+	}
+	pairs := []string{
+		metadataTenantID, auth.tenantID,
+		metadataUserID, auth.userID,
+		metadataDeviceID, auth.deviceID,
+	}
+	if auth.sessionID != "" {
+		pairs = append(pairs, metadataSessionID, auth.sessionID)
+	}
+	if auth.traceID != "" {
+		pairs = append(pairs, metadataTraceID, auth.traceID)
+	}
+	if auth.requestID != "" {
+		pairs = append(pairs, metadataRequestID, auth.requestID)
+	}
+	return metadata.NewOutgoingContext(ctx, metadata.Pairs(pairs...))
+}
+
+func sendAuth(cfg config, requestID string) verifiedAuthIdentity {
+	return verifiedAuthIdentity{
+		tenantID:  cfg.tenantID,
+		userID:    cfg.userID,
+		deviceID:  cfg.deviceID,
+		sessionID: cfg.sessionID,
+		traceID:   "trace-policy-message-smoke",
+		requestID: requestID,
+	}
+}
+
+func changeAuth(cfg config, requestID string) verifiedAuthIdentity {
+	return verifiedAuthIdentity{
+		tenantID:  cfg.tenantID,
+		userID:    cfg.changeUserID,
+		deviceID:  cfg.changeDeviceID,
+		sessionID: cfg.changeSessionID,
+		traceID:   "trace-policy-message-smoke",
+		requestID: requestID,
+	}
+}
+
+func messageAuth(auth verifiedAuthIdentity) *messagev1.AuthContext {
+	return &messagev1.AuthContext{
+		TenantId:  auth.tenantID,
+		UserId:    auth.userID,
+		DeviceId:  auth.deviceID,
+		SessionId: auth.sessionID,
+		TraceId:   auth.traceID,
+		RequestId: auth.requestID,
+	}
 }
 
 func run(cfg config) error {
@@ -319,6 +396,7 @@ func run(cfg config) error {
 		GitStatusShort:          gitOutput("status", "--short"),
 		Target:                  cfg.target,
 		MessageTLSEnabled:       cfg.messageTLS.Enabled(),
+		VerifiedAuthMetadata:    cfg.verifiedMetadata,
 		ResultDir:               cfg.resultDir,
 		Scenario:                cfg.scenario,
 		Action:                  cfg.action,
@@ -551,16 +629,11 @@ func sendMessage(cfg config) (*messagev1.SendMessageResponse, error, float64) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
 	defer cancel()
+	auth := sendAuth(cfg, "policy-message-smoke-"+cfg.scenario)
+	ctx = withVerifiedAuthMetadata(ctx, cfg, auth)
 	started := time.Now()
 	response, err := messagev1.NewMessageServiceClient(conn).SendMessage(ctx, &messagev1.SendMessageRequest{
-		AuthContext: &messagev1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.userID,
-			DeviceId:  cfg.deviceID,
-			SessionId: cfg.sessionID,
-			TraceId:   "trace-policy-message-smoke",
-			RequestId: "policy-message-smoke-" + cfg.scenario,
-		},
+		AuthContext:    messageAuth(auth),
 		ConversationId: cfg.conversationID,
 		ClientMsgId:    cfg.clientMsgID,
 		MessageType:    "TEXT",
@@ -586,8 +659,10 @@ func changeMessage(cfg config, messageID string) (*messagev1.MessageChangeRespon
 		if err != nil {
 			return nil, err, 0
 		}
-		response, err = client.EditMessage(ctx, &messagev1.EditMessageRequest{
-			AuthContext:    authContext(cfg, "policy-message-edit-"+cfg.scenario),
+		auth := changeAuth(cfg, "policy-message-edit-"+cfg.scenario)
+		callCtx := withVerifiedAuthMetadata(ctx, cfg, auth)
+		response, err = client.EditMessage(callCtx, &messagev1.EditMessageRequest{
+			AuthContext:    messageAuth(auth),
 			ConversationId: cfg.conversationID,
 			MessageId:      messageID,
 			IdempotencyKey: "policy-message-edit-" + cfg.scenario,
@@ -596,8 +671,10 @@ func changeMessage(cfg config, messageID string) (*messagev1.MessageChangeRespon
 		})
 		return response, err, float64(time.Since(started).Microseconds()) / 1000.0
 	case "revoke":
-		response, err = client.RevokeMessage(ctx, &messagev1.RevokeMessageRequest{
-			AuthContext:    authContext(cfg, "policy-message-revoke-"+cfg.scenario),
+		auth := changeAuth(cfg, "policy-message-revoke-"+cfg.scenario)
+		callCtx := withVerifiedAuthMetadata(ctx, cfg, auth)
+		response, err = client.RevokeMessage(callCtx, &messagev1.RevokeMessageRequest{
+			AuthContext:    messageAuth(auth),
 			ConversationId: cfg.conversationID,
 			MessageId:      messageID,
 			IdempotencyKey: "policy-message-revoke-" + cfg.scenario,
@@ -605,8 +682,10 @@ func changeMessage(cfg config, messageID string) (*messagev1.MessageChangeRespon
 		})
 		return response, err, float64(time.Since(started).Microseconds()) / 1000.0
 	case "delete":
-		response, err = client.DeleteMessage(ctx, &messagev1.DeleteMessageRequest{
-			AuthContext:    authContext(cfg, "policy-message-delete-"+cfg.scenario),
+		auth := changeAuth(cfg, "policy-message-delete-"+cfg.scenario)
+		callCtx := withVerifiedAuthMetadata(ctx, cfg, auth)
+		response, err = client.DeleteMessage(callCtx, &messagev1.DeleteMessageRequest{
+			AuthContext:    messageAuth(auth),
 			ConversationId: cfg.conversationID,
 			MessageId:      messageID,
 			IdempotencyKey: "policy-message-delete-" + cfg.scenario,
@@ -632,14 +711,7 @@ func dialMessageService(cfg config) (*grpc.ClientConn, error) {
 }
 
 func authContext(cfg config, requestID string) *messagev1.AuthContext {
-	return &messagev1.AuthContext{
-		TenantId:  cfg.tenantID,
-		UserId:    cfg.changeUserID,
-		DeviceId:  cfg.changeDeviceID,
-		SessionId: cfg.changeSessionID,
-		TraceId:   "trace-policy-message-smoke",
-		RequestId: requestID,
-	}
+	return messageAuth(changeAuth(cfg, requestID))
 }
 
 func validateSendAllow(cfg config, response *messagev1.SendMessageResponse, row messageRow) error {
@@ -1428,6 +1500,21 @@ func writeSummary(resultDir string, s summary) error {
 		return err
 	}
 	return os.WriteFile(path, append(bytes, '\n'), 0o644)
+}
+
+func envBool(fallback bool, names ...string) bool {
+	for _, name := range names {
+		value := strings.TrimSpace(os.Getenv(name))
+		if value == "" {
+			continue
+		}
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return fallback
+		}
+		return parsed
+	}
+	return fallback
 }
 
 func gitOutput(args ...string) string {

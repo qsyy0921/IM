@@ -33,7 +33,7 @@ Implemented:
 - message-service `SendMessage` role gate integration smoke through `policy-service CheckMessageAction`: `loadtest-report-20260613-policy-message-role-gate-smoke.md`.
 - message-service `EditMessage` / `RevokeMessage` / `DeleteMessage` sender-only ownership integration smoke through `policy-service CheckMessageAction`: `loadtest-report-20260613-policy-message-ownership-smoke.md`.
 - message-service `EditMessage` / `RevokeMessage` / `DeleteMessage` first-stage ownership override smoke for non-sender `ADMIN` allow and `MEMBER` deny: `loadtest-report-20260613-policy-message-ownership-override-smoke.md`.
-- policy-service gRPC server and direct policy smoke clients support first-stage optional TLS / mTLS static config. `loadtest/policy`, `loadtest/policycontacts` and `loadtest/policyroles` accept optional CA, server name and client cert/key flags; default remains plaintext. The `loadtest/policyintegration` runner also supports optional message-service client TLS / mTLS flags for the `message-service -> policy-service` integration smoke.
+- policy-service gRPC server and direct policy smoke clients support first-stage optional TLS / mTLS static config. `loadtest/policy`, `loadtest/policycontacts` and `loadtest/policyroles` accept optional CA, server name and client cert/key flags; default remains plaintext. The `loadtest/policyintegration` runner also supports optional message-service client TLS / mTLS flags and `--verified-auth-metadata` for the `message-service -> policy-service` integration smoke.
 
 Not yet implemented:
 
@@ -88,6 +88,14 @@ Optional message-service client TLS / mTLS flags are available for the integrati
 ```
 
 These flags only control the loadtest runner connection to message-service. Server-side message-service TLS still uses `NEXUSIM_MESSAGE_GRPC_TLS_*`.
+
+To verify message-service gateway verified metadata auth while running the policy integration smoke:
+
+```powershell
+.\loadtest\policyintegration\run-local-smoke.ps1 -VerifiedAuthMetadata
+```
+
+The script starts message-service with `NEXUSIM_MESSAGE_AUTH_MODE=metadata` and passes `--verified-auth-metadata` to the runner. This validates the message-service public entrypoint identity path; direct policy-service smokes remain service-level contract checks and do not use gateway auth mode.
 
 Run the PostgreSQL exact-rule integration smoke with:
 

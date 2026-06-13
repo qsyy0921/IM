@@ -11,12 +11,15 @@ import (
 )
 
 const (
-	DefaultLoginMaxFailedAttempts = 5
-	DefaultLoginFailureWindow     = 15 * time.Minute
-	DefaultLoginLockDuration      = 15 * time.Minute
-	DefaultMFAMaxFailedAttempts   = 5
-	DefaultMFAFailureWindow       = 15 * time.Minute
-	DefaultMFALockDuration        = 15 * time.Minute
+	DefaultLoginMaxFailedAttempts       = 5
+	DefaultLoginFailureWindow           = 15 * time.Minute
+	DefaultLoginLockDuration            = 15 * time.Minute
+	DefaultMFAMaxFailedAttempts         = 5
+	DefaultMFAFailureWindow             = 15 * time.Minute
+	DefaultMFALockDuration              = 15 * time.Minute
+	DefaultMFARecoveryMaxFailedAttempts = DefaultMFAMaxFailedAttempts
+	DefaultMFARecoveryFailureWindow     = DefaultMFAFailureWindow
+	DefaultMFARecoveryLockDuration      = DefaultMFALockDuration
 )
 
 type LoginRiskPolicy struct {
@@ -28,16 +31,17 @@ type LoginRiskPolicy struct {
 type LoginUseCaseOption func(*LoginUseCase)
 
 type LoginUseCase struct {
-	repository    LoginRepository
-	signer        TokenSigner
-	passwords     PasswordVerifier
-	refreshTokens RefreshTokenCodec
-	dummyHash     string
-	mfaSecrets    MFASecretManager
-	recoveryCodes MFARecoveryCodeManager
-	now           func() time.Time
-	risk          LoginRiskPolicy
-	mfaRisk       LoginRiskPolicy
+	repository      LoginRepository
+	signer          TokenSigner
+	passwords       PasswordVerifier
+	refreshTokens   RefreshTokenCodec
+	dummyHash       string
+	mfaSecrets      MFASecretManager
+	recoveryCodes   MFARecoveryCodeManager
+	now             func() time.Time
+	risk            LoginRiskPolicy
+	mfaRisk         LoginRiskPolicy
+	mfaRecoveryRisk LoginRiskPolicy
 }
 
 type LoginRepository interface {
@@ -67,12 +71,18 @@ func NewLoginUseCase(repository LoginRepository, signer TokenSigner, passwords P
 			FailureWindow:     DefaultMFAFailureWindow,
 			LockDuration:      DefaultMFALockDuration,
 		},
+		mfaRecoveryRisk: LoginRiskPolicy{
+			MaxFailedAttempts: DefaultMFARecoveryMaxFailedAttempts,
+			FailureWindow:     DefaultMFARecoveryFailureWindow,
+			LockDuration:      DefaultMFARecoveryLockDuration,
+		},
 	}
 	for _, opt := range opts {
 		opt(uc)
 	}
 	uc.risk = normalizeLoginRiskPolicy(uc.risk)
 	uc.mfaRisk = normalizeMFARiskPolicy(uc.mfaRisk)
+	uc.mfaRecoveryRisk = normalizeMFARecoveryRiskPolicy(uc.mfaRecoveryRisk)
 	return uc
 }
 
@@ -106,6 +116,12 @@ func WithLoginMFARiskPolicy(policy LoginRiskPolicy) LoginUseCaseOption {
 	}
 }
 
+func WithLoginMFARecoveryRiskPolicy(policy LoginRiskPolicy) LoginUseCaseOption {
+	return func(uc *LoginUseCase) {
+		uc.mfaRecoveryRisk = policy
+	}
+}
+
 func WithLoginClock(clock func() time.Time) LoginUseCaseOption {
 	return func(uc *LoginUseCase) {
 		if clock != nil {
@@ -136,6 +152,19 @@ func normalizeMFARiskPolicy(policy LoginRiskPolicy) LoginRiskPolicy {
 	}
 	if policy.LockDuration <= 0 {
 		policy.LockDuration = DefaultMFALockDuration
+	}
+	return policy
+}
+
+func normalizeMFARecoveryRiskPolicy(policy LoginRiskPolicy) LoginRiskPolicy {
+	if policy.MaxFailedAttempts <= 0 {
+		policy.MaxFailedAttempts = DefaultMFARecoveryMaxFailedAttempts
+	}
+	if policy.FailureWindow <= 0 {
+		policy.FailureWindow = DefaultMFARecoveryFailureWindow
+	}
+	if policy.LockDuration <= 0 {
+		policy.LockDuration = DefaultMFARecoveryLockDuration
 	}
 	return policy
 }
@@ -243,8 +272,8 @@ func (uc *LoginUseCase) verifyMFAIfRequired(ctx context.Context, command types.L
 		record, err := uc.repository.FindActiveMFARecoveryCode(ctx, command.TenantID, command.UserID, codeHash)
 		if err != nil {
 			if errors.Is(err, types.ErrInvalidMFA) {
-				lockUntil := now.Add(uc.mfaRisk.LockDuration)
-				if recordErr := uc.repository.RecordMFARecoveryLoginFailure(ctx, command.TenantID, command.UserID, now, lockUntil, uc.mfaRisk.MaxFailedAttempts, now.Add(-uc.mfaRisk.FailureWindow)); recordErr != nil {
+				lockUntil := now.Add(uc.mfaRecoveryRisk.LockDuration)
+				if recordErr := uc.repository.RecordMFARecoveryLoginFailure(ctx, command.TenantID, command.UserID, now, lockUntil, uc.mfaRecoveryRisk.MaxFailedAttempts, now.Add(-uc.mfaRecoveryRisk.FailureWindow)); recordErr != nil {
 					return "", types.MFARecoveryCodeRecord{}, recordErr
 				}
 			}

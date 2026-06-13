@@ -55,6 +55,41 @@ func TestGatewayTokenJWKSetWithAdditionalKeysRejectsSymmetricKeys(t *testing.T) 
 	}
 }
 
+func TestIdentityMFARecoveryRiskPolicyDefaultsToMFAEnv(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_MFA_MAX_FAILED_ATTEMPTS", "7")
+	t.Setenv("NEXUSIM_IDENTITY_MFA_FAILURE_WINDOW", "21m")
+	t.Setenv("NEXUSIM_IDENTITY_MFA_LOCK_DURATION", "22m")
+	t.Setenv("NEXUSIM_IDENTITY_MFA_RECOVERY_MAX_FAILED_ATTEMPTS", "")
+	t.Setenv("NEXUSIM_IDENTITY_MFA_RECOVERY_FAILURE_WINDOW", "")
+	t.Setenv("NEXUSIM_IDENTITY_MFA_RECOVERY_LOCK_DURATION", "")
+
+	mfa := identityMFARiskPolicyFromEnv()
+	recovery := identityMFARecoveryRiskPolicyFromEnv(mfa)
+
+	if recovery.MaxFailedAttempts != 7 || recovery.FailureWindow != 21*time.Minute || recovery.LockDuration != 22*time.Minute {
+		t.Fatalf("expected recovery risk to inherit MFA env policy, got %+v", recovery)
+	}
+}
+
+func TestIdentityMFARecoveryRiskPolicyOverridesMFAEnv(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_MFA_MAX_FAILED_ATTEMPTS", "7")
+	t.Setenv("NEXUSIM_IDENTITY_MFA_FAILURE_WINDOW", "21m")
+	t.Setenv("NEXUSIM_IDENTITY_MFA_LOCK_DURATION", "22m")
+	t.Setenv("NEXUSIM_IDENTITY_MFA_RECOVERY_MAX_FAILED_ATTEMPTS", "2")
+	t.Setenv("NEXUSIM_IDENTITY_MFA_RECOVERY_FAILURE_WINDOW", "3m")
+	t.Setenv("NEXUSIM_IDENTITY_MFA_RECOVERY_LOCK_DURATION", "4m")
+
+	mfa := identityMFARiskPolicyFromEnv()
+	recovery := identityMFARecoveryRiskPolicyFromEnv(mfa)
+
+	if recovery.MaxFailedAttempts != 2 || recovery.FailureWindow != 3*time.Minute || recovery.LockDuration != 4*time.Minute {
+		t.Fatalf("expected recovery risk to use dedicated env policy, got %+v", recovery)
+	}
+	if mfa.MaxFailedAttempts != 7 || mfa.FailureWindow != 21*time.Minute || mfa.LockDuration != 22*time.Minute {
+		t.Fatalf("expected MFA risk policy to remain independent, got %+v", mfa)
+	}
+}
+
 func TestGatewayTokenJWKSetWithAdditionalKeysRejectsWeakRSAKeys(t *testing.T) {
 	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_JSON", `{"keys":[{"kty":"RSA","use":"sig","kid":"weak","alg":"RS256","n":"abc","e":"AQAB"}]}`)
 	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_FILE", "")

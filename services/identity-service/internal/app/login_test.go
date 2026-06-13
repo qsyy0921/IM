@@ -472,7 +472,7 @@ func TestLoginUseCaseRejectsInvalidRecoveryCodeBeforeSessionWrite(t *testing.T) 
 		&fakePasswordVerifier{ok: true},
 		fakeRefreshTokenCodec{},
 		WithLoginClock(func() time.Time { return now }),
-		WithLoginMFARiskPolicy(LoginRiskPolicy{MaxFailedAttempts: 3, FailureWindow: 20 * time.Minute, LockDuration: 10 * time.Minute}),
+		WithLoginMFARecoveryRiskPolicy(LoginRiskPolicy{MaxFailedAttempts: 3, FailureWindow: 20 * time.Minute, LockDuration: 10 * time.Minute}),
 		WithLoginMFARecoveryCodeManager(&fakeRecoveryCodeManager{hash: "hash-missing"}),
 	)
 	_, err := useCase.Execute(context.Background(), types.LoginCommand{
@@ -969,7 +969,7 @@ func TestRefreshGatewayTokenUseCaseRecordsInvalidRecoveryCodeBeforeRotation(t *t
 		fakeTokenSigner{},
 		fakeRefreshTokenCodec{},
 		WithRefreshClock(func() time.Time { return now }),
-		WithRefreshMFARiskPolicy(LoginRiskPolicy{MaxFailedAttempts: 3, FailureWindow: 20 * time.Minute, LockDuration: 10 * time.Minute}),
+		WithRefreshMFARecoveryRiskPolicy(LoginRiskPolicy{MaxFailedAttempts: 3, FailureWindow: 20 * time.Minute, LockDuration: 10 * time.Minute}),
 		WithRefreshMFARecoveryCodeManager(&fakeRecoveryCodeManager{hash: "hash-missing"}),
 	)
 	_, err := useCase.Execute(context.Background(), types.RefreshGatewayTokenCommand{

@@ -11,13 +11,14 @@ import (
 )
 
 type RefreshGatewayTokenUseCase struct {
-	repository    Repository
-	signer        TokenSigner
-	refreshTokens RefreshTokenCodec
-	mfaSecrets    MFASecretManager
-	recoveryCodes MFARecoveryCodeManager
-	now           func() time.Time
-	mfaRisk       LoginRiskPolicy
+	repository      Repository
+	signer          TokenSigner
+	refreshTokens   RefreshTokenCodec
+	mfaSecrets      MFASecretManager
+	recoveryCodes   MFARecoveryCodeManager
+	now             func() time.Time
+	mfaRisk         LoginRiskPolicy
+	mfaRecoveryRisk LoginRiskPolicy
 }
 
 type RefreshGatewayTokenUseCaseOption func(*RefreshGatewayTokenUseCase)
@@ -33,11 +34,17 @@ func NewRefreshGatewayTokenUseCase(repository Repository, signer TokenSigner, re
 			FailureWindow:     DefaultMFAFailureWindow,
 			LockDuration:      DefaultMFALockDuration,
 		},
+		mfaRecoveryRisk: LoginRiskPolicy{
+			MaxFailedAttempts: DefaultMFARecoveryMaxFailedAttempts,
+			FailureWindow:     DefaultMFARecoveryFailureWindow,
+			LockDuration:      DefaultMFARecoveryLockDuration,
+		},
 	}
 	for _, opt := range opts {
 		opt(uc)
 	}
 	uc.mfaRisk = normalizeMFARiskPolicy(uc.mfaRisk)
+	uc.mfaRecoveryRisk = normalizeMFARecoveryRiskPolicy(uc.mfaRecoveryRisk)
 	return uc
 }
 
@@ -56,6 +63,12 @@ func WithRefreshMFARecoveryCodeManager(manager MFARecoveryCodeManager) RefreshGa
 func WithRefreshMFARiskPolicy(policy LoginRiskPolicy) RefreshGatewayTokenUseCaseOption {
 	return func(uc *RefreshGatewayTokenUseCase) {
 		uc.mfaRisk = policy
+	}
+}
+
+func WithRefreshMFARecoveryRiskPolicy(policy LoginRiskPolicy) RefreshGatewayTokenUseCaseOption {
+	return func(uc *RefreshGatewayTokenUseCase) {
+		uc.mfaRecoveryRisk = policy
 	}
 }
 
@@ -163,8 +176,8 @@ func (uc *RefreshGatewayTokenUseCase) verifyMFAIfSubmitted(ctx context.Context, 
 		record, err := uc.repository.FindActiveMFARecoveryCode(ctx, command.TenantID, command.UserID, codeHash)
 		if err != nil {
 			if errors.Is(err, types.ErrInvalidMFA) {
-				lockUntil := now.Add(uc.mfaRisk.LockDuration)
-				if recordErr := uc.repository.RecordMFARecoveryLoginFailure(ctx, command.TenantID, command.UserID, now, lockUntil, uc.mfaRisk.MaxFailedAttempts, now.Add(-uc.mfaRisk.FailureWindow)); recordErr != nil {
+				lockUntil := now.Add(uc.mfaRecoveryRisk.LockDuration)
+				if recordErr := uc.repository.RecordMFARecoveryLoginFailure(ctx, command.TenantID, command.UserID, now, lockUntil, uc.mfaRecoveryRisk.MaxFailedAttempts, now.Add(-uc.mfaRecoveryRisk.FailureWindow)); recordErr != nil {
 					return "", types.MFARecoveryCodeRecord{}, recordErr
 				}
 			}

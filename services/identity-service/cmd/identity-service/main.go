@@ -180,6 +180,8 @@ func runGRPC() error {
 	if err != nil {
 		return err
 	}
+	mfaRiskPolicy := identityMFARiskPolicyFromEnv()
+	mfaRecoveryRiskPolicy := identityMFARecoveryRiskPolicyFromEnv(mfaRiskPolicy)
 	identitygrpc.Register(server, identitygrpc.NewServer(
 		app.NewRegisterUserUseCase(repository, passwords),
 		app.NewLoginUseCase(
@@ -192,11 +194,8 @@ func runGRPC() error {
 				FailureWindow:     envDuration("NEXUSIM_IDENTITY_LOGIN_FAILURE_WINDOW", app.DefaultLoginFailureWindow),
 				LockDuration:      envDuration("NEXUSIM_IDENTITY_LOGIN_LOCK_DURATION", app.DefaultLoginLockDuration),
 			}),
-			app.WithLoginMFARiskPolicy(app.LoginRiskPolicy{
-				MaxFailedAttempts: envInt("NEXUSIM_IDENTITY_MFA_MAX_FAILED_ATTEMPTS", app.DefaultMFAMaxFailedAttempts),
-				FailureWindow:     envDuration("NEXUSIM_IDENTITY_MFA_FAILURE_WINDOW", app.DefaultMFAFailureWindow),
-				LockDuration:      envDuration("NEXUSIM_IDENTITY_MFA_LOCK_DURATION", app.DefaultMFALockDuration),
-			}),
+			app.WithLoginMFARiskPolicy(mfaRiskPolicy),
+			app.WithLoginMFARecoveryRiskPolicy(mfaRecoveryRiskPolicy),
 			app.WithLoginDummyPasswordHash(dummyPasswordHash),
 			app.WithLoginMFASecretManager(mfaManager),
 			app.WithLoginMFARecoveryCodeManager(mfaRecoveryCodes),
@@ -205,11 +204,8 @@ func runGRPC() error {
 			repository,
 			signer,
 			refreshTokens,
-			app.WithRefreshMFARiskPolicy(app.LoginRiskPolicy{
-				MaxFailedAttempts: envInt("NEXUSIM_IDENTITY_MFA_MAX_FAILED_ATTEMPTS", app.DefaultMFAMaxFailedAttempts),
-				FailureWindow:     envDuration("NEXUSIM_IDENTITY_MFA_FAILURE_WINDOW", app.DefaultMFAFailureWindow),
-				LockDuration:      envDuration("NEXUSIM_IDENTITY_MFA_LOCK_DURATION", app.DefaultMFALockDuration),
-			}),
+			app.WithRefreshMFARiskPolicy(mfaRiskPolicy),
+			app.WithRefreshMFARecoveryRiskPolicy(mfaRecoveryRiskPolicy),
 			app.WithRefreshMFASecretManager(mfaManager),
 			app.WithRefreshMFARecoveryCodeManager(mfaRecoveryCodes),
 		),
@@ -385,6 +381,22 @@ func newMFARecoveryCodeManager() (app.MFARecoveryCodeManager, error) {
 		return disabledMFARecoveryCodeManager{}, nil
 	}
 	return mfainfra.NewRecoveryCodeManager(secret)
+}
+
+func identityMFARiskPolicyFromEnv() app.LoginRiskPolicy {
+	return app.LoginRiskPolicy{
+		MaxFailedAttempts: envInt("NEXUSIM_IDENTITY_MFA_MAX_FAILED_ATTEMPTS", app.DefaultMFAMaxFailedAttempts),
+		FailureWindow:     envDuration("NEXUSIM_IDENTITY_MFA_FAILURE_WINDOW", app.DefaultMFAFailureWindow),
+		LockDuration:      envDuration("NEXUSIM_IDENTITY_MFA_LOCK_DURATION", app.DefaultMFALockDuration),
+	}
+}
+
+func identityMFARecoveryRiskPolicyFromEnv(fallback app.LoginRiskPolicy) app.LoginRiskPolicy {
+	return app.LoginRiskPolicy{
+		MaxFailedAttempts: envInt("NEXUSIM_IDENTITY_MFA_RECOVERY_MAX_FAILED_ATTEMPTS", fallback.MaxFailedAttempts),
+		FailureWindow:     envDuration("NEXUSIM_IDENTITY_MFA_RECOVERY_FAILURE_WINDOW", fallback.FailureWindow),
+		LockDuration:      envDuration("NEXUSIM_IDENTITY_MFA_RECOVERY_LOCK_DURATION", fallback.LockDuration),
+	}
 }
 
 type disabledMFASecretManager struct{}

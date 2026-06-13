@@ -29,6 +29,23 @@ type ChallengeDeliveryRepairAuditOptions struct {
 	Limit                int
 }
 
+type ChallengeDeliveryRepairCleanupOptions struct {
+	DeliveryID           *int64
+	TenantID             string
+	UserID               string
+	ChallengeID          string
+	Mode                 string
+	Outcome              string
+	PreviousFailureClass string
+	NewFailureClass      string
+	Cutoff               time.Time
+	Limit                int
+}
+
+type ChallengeDeliveryRepairCleanupStats struct {
+	Deleted int64
+}
+
 type ChallengeDeliveryRepairAuditRow struct {
 	DeliveryID                      int64
 	TenantID                        string
@@ -334,6 +351,95 @@ LIMIT $`+strconv.Itoa(len(args)), args...)
 		return nil, types.NewDBReadFailed(err.Error())
 	}
 	return result, nil
+}
+
+func (store *ChallengeDeliveryStore) CleanupDeliveryRepairs(ctx context.Context, options ChallengeDeliveryRepairCleanupOptions) (ChallengeDeliveryRepairCleanupStats, error) {
+	if store == nil || store.pool == nil {
+		return ChallengeDeliveryRepairCleanupStats{}, errors.New("identity challenge delivery store is not configured")
+	}
+	if options.Limit <= 0 {
+		return ChallengeDeliveryRepairCleanupStats{}, nil
+	}
+
+	var args []any
+	clauses := []string{"repaired_at < $1"}
+	args = append(args, options.Cutoff)
+	if options.DeliveryID != nil {
+		args = append(args, *options.DeliveryID)
+		clauses = append(clauses, "delivery_id = $"+strconv.Itoa(len(args)))
+	}
+	if tenantID := strings.TrimSpace(options.TenantID); tenantID != "" {
+		args = append(args, tenantID)
+		clauses = append(clauses, "tenant_id = $"+strconv.Itoa(len(args)))
+	}
+	if userID := strings.TrimSpace(options.UserID); userID != "" {
+		args = append(args, userID)
+		clauses = append(clauses, "user_id = $"+strconv.Itoa(len(args)))
+	}
+	if challengeID := strings.TrimSpace(options.ChallengeID); challengeID != "" {
+		args = append(args, challengeID)
+		clauses = append(clauses, "challenge_id = $"+strconv.Itoa(len(args)))
+	}
+	if rawMode := strings.TrimSpace(options.Mode); rawMode != "" {
+		mode := normalizeChallengeDeliveryRepairMode(rawMode)
+		if mode == "" {
+			return ChallengeDeliveryRepairCleanupStats{}, types.NewInvalidArgument("unsupported identity challenge delivery repair mode")
+		}
+		args = append(args, mode)
+		clauses = append(clauses, "repair_mode = $"+strconv.Itoa(len(args)))
+	}
+	if rawOutcome := strings.TrimSpace(options.Outcome); rawOutcome != "" {
+		outcome := normalizeChallengeDeliveryRepairOutcome(rawOutcome)
+		if outcome == "" {
+			return ChallengeDeliveryRepairCleanupStats{}, types.NewInvalidArgument("unsupported identity challenge delivery repair outcome")
+		}
+		args = append(args, outcome)
+		clauses = append(clauses, "repair_outcome = $"+strconv.Itoa(len(args)))
+	}
+	if rawFailureClass := strings.TrimSpace(options.PreviousFailureClass); rawFailureClass != "" {
+		failureClass := normalizeChallengeDeliveryFailureClass(rawFailureClass)
+		if failureClass == "" {
+			return ChallengeDeliveryRepairCleanupStats{}, types.NewInvalidArgument("unsupported identity challenge delivery previous failure class")
+		}
+		args = append(args, failureClass)
+		clauses = append(clauses, "previous_failure_class = $"+strconv.Itoa(len(args)))
+	}
+	if rawFailureClass := strings.TrimSpace(options.NewFailureClass); rawFailureClass != "" {
+		failureClass := normalizeChallengeDeliveryFailureClass(rawFailureClass)
+		if failureClass == "" {
+			return ChallengeDeliveryRepairCleanupStats{}, types.NewInvalidArgument("unsupported identity challenge delivery new failure class")
+		}
+		args = append(args, failureClass)
+		clauses = append(clauses, "new_failure_class = $"+strconv.Itoa(len(args)))
+	}
+	args = append(args, options.Limit)
+	rows, err := store.pool.Query(ctx, `
+WITH doomed AS (
+    SELECT id
+    FROM identity_challenge_delivery_repair_audit
+    WHERE `+strings.Join(clauses, " AND ")+`
+    ORDER BY repaired_at ASC, delivery_id ASC, id ASC
+    LIMIT $`+strconv.Itoa(len(args))+`
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM identity_challenge_delivery_repair_audit target
+USING doomed
+WHERE target.id = doomed.id
+RETURNING 1
+`, args...)
+	if err != nil {
+		return ChallengeDeliveryRepairCleanupStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer rows.Close()
+
+	var stats ChallengeDeliveryRepairCleanupStats
+	for rows.Next() {
+		stats.Deleted++
+	}
+	if err := rows.Err(); err != nil {
+		return ChallengeDeliveryRepairCleanupStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	return stats, nil
 }
 
 func (store *ChallengeDeliveryStore) cancelInactiveLocked(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {

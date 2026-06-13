@@ -81,7 +81,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("identity-service runtime wiring is idle; set NEXUSIM_IDENTITY_SERVICE_MODE=grpc, outbox-relay, challenge-delivery-worker, challenge-delivery-repair, challenge-delivery-repair-audit, challenge-request-limit-cleanup, session-mfa-proof-audit, or gateway-token-keyring-rotate")
+		log.Println("identity-service runtime wiring is idle; set NEXUSIM_IDENTITY_SERVICE_MODE=grpc, outbox-relay, challenge-delivery-worker, challenge-delivery-repair, challenge-delivery-repair-audit, challenge-delivery-repair-cleanup, challenge-request-limit-cleanup, session-mfa-proof-audit, or gateway-token-keyring-rotate")
 		return nil
 	case "grpc":
 		return runGRPC()
@@ -93,6 +93,8 @@ func run() error {
 		return runChallengeDeliveryRepair()
 	case "challenge-delivery-repair-audit":
 		return runChallengeDeliveryRepairAudit()
+	case "challenge-delivery-repair-cleanup":
+		return runChallengeDeliveryRepairCleanup()
 	case "challenge-request-limit-cleanup":
 		return runChallengeRequestLimitCleanup()
 	case "session-mfa-proof-audit":
@@ -984,6 +986,50 @@ func runChallengeDeliveryRepairAudit() error {
 	return nil
 }
 
+func runChallengeDeliveryRepairCleanup() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	config, err := challengeDeliveryRepairCleanupConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	deliveryID, err := optionalPositiveInt64Env("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_DELIVERY_ID")
+	if err != nil {
+		return err
+	}
+	cutoff := time.Now().UTC().Add(-config.Retention)
+	stats, err := postgresinfra.NewChallengeDeliveryStore(pool).CleanupDeliveryRepairs(ctx, postgresinfra.ChallengeDeliveryRepairCleanupOptions{
+		DeliveryID:           deliveryID,
+		TenantID:             envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_TENANT_ID", ""),
+		UserID:               envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_USER_ID", ""),
+		ChallengeID:          envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_CHALLENGE_ID", ""),
+		Mode:                 envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_MODE", ""),
+		Outcome:              envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_OUTCOME", ""),
+		PreviousFailureClass: envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_PREVIOUS_FAILURE_CLASS", ""),
+		NewFailureClass:      envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_NEW_FAILURE_CLASS", ""),
+		Cutoff:               cutoff,
+		Limit:                config.BatchSize,
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"identity-service challenge delivery repair cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d",
+		stats.Deleted,
+		cutoff.Format(time.RFC3339),
+		config.Retention,
+		config.BatchSize,
+	)
+	return nil
+}
+
 func runChallengeRequestLimitCleanup() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -1044,6 +1090,26 @@ func runSessionMFAProofAudit() error {
 type challengeRequestLimitCleanupConfig struct {
 	Retention time.Duration
 	BatchSize int
+}
+
+type challengeDeliveryRepairCleanupConfig struct {
+	Retention time.Duration
+	BatchSize int
+}
+
+func challengeDeliveryRepairCleanupConfigFromEnv() (challengeDeliveryRepairCleanupConfig, error) {
+	retention, err := envPositiveDuration("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_RETENTION", 7*24*time.Hour)
+	if err != nil {
+		return challengeDeliveryRepairCleanupConfig{}, err
+	}
+	batchSize, err := envPositiveInt("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_BATCH_SIZE", 5000)
+	if err != nil {
+		return challengeDeliveryRepairCleanupConfig{}, err
+	}
+	return challengeDeliveryRepairCleanupConfig{
+		Retention: retention,
+		BatchSize: batchSize,
+	}, nil
 }
 
 func challengeRequestLimitCleanupConfigFromEnv() (challengeRequestLimitCleanupConfig, error) {

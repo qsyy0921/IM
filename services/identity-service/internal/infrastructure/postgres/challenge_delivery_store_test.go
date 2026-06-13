@@ -399,6 +399,131 @@ INSERT INTO identity_challenge_delivery_repair_audit (
 	}
 }
 
+func TestChallengeDeliveryStoreCleanupDeliveryRepairsDeletesOnlyExpiredRowsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO identity_challenge_delivery_repair_audit (
+    delivery_id, tenant_id, user_id, challenge_id, previous_delivery_status, previous_challenge_status,
+    previous_challenge_delivery_status, previous_retry_count, previous_last_error, previous_failure_class,
+    new_delivery_status, new_challenge_status, new_challenge_delivery_status, new_failure_class,
+    repair_mode, repair_outcome, skip_reason, dry_run, repair_operator, repair_reason, repaired_at
+) VALUES
+    (301, 'tenant-3', 'user-1', 'challenge-a', 'DLQ', 'EXPIRED', 'FAILED', 1, 'provider unavailable', 'delivery_failed',
+     'DLQ', 'EXPIRED', 'FAILED', 'delivery_failed', 'audit', 'AUDITED', '', true, 'operator-a', 'manual audit', now() - interval '10 days'),
+    (302, 'tenant-3', 'user-1', 'challenge-b', 'PENDING', 'ACTIVE', 'PENDING', 0, '', '',
+     'PENDING', 'ACTIVE', 'PENDING', '', 'redrive-active-pending', 'MUTATED', '', false, 'operator-b', 'provider recovered', now() - interval '1 day')
+`)
+	if err != nil {
+		t.Fatalf("seed challenge delivery repair audit: %v", err)
+	}
+
+	store := NewChallengeDeliveryStore(pool)
+	stats, err := store.CleanupDeliveryRepairs(ctx, ChallengeDeliveryRepairCleanupOptions{
+		TenantID: "tenant-3",
+		Cutoff:   time.Now().UTC().Add(-7 * 24 * time.Hour),
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("cleanup challenge delivery repairs: %v", err)
+	}
+	if stats.Deleted != 1 {
+		t.Fatalf("unexpected deleted count: %+v", stats)
+	}
+	assertChallengeDeliveryRepairAuditCount(t, ctx, pool, "tenant-3", 1)
+}
+
+func TestChallengeDeliveryStoreCleanupDeliveryRepairsHonorsBatchLimitIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO identity_challenge_delivery_repair_audit (
+    delivery_id, tenant_id, user_id, challenge_id, previous_delivery_status, previous_challenge_status,
+    previous_challenge_delivery_status, previous_retry_count, previous_last_error, previous_failure_class,
+    new_delivery_status, new_challenge_status, new_challenge_delivery_status, new_failure_class,
+    repair_mode, repair_outcome, skip_reason, dry_run, repair_operator, repair_reason, repaired_at
+) VALUES
+    (311, 'tenant-4', 'user-1', 'challenge-a', 'DLQ', 'EXPIRED', 'FAILED', 1, 'provider unavailable', 'delivery_failed',
+     'DLQ', 'EXPIRED', 'FAILED', 'delivery_failed', 'audit', 'AUDITED', '', true, 'operator-a', 'manual audit', now() - interval '10 days'),
+    (312, 'tenant-4', 'user-1', 'challenge-b', 'PENDING', 'ACTIVE', 'PENDING', 0, '', '',
+     'CANCELED', 'EXPIRED', 'FAILED', 'inactive', 'cancel-inactive', 'MUTATED', '', false, 'operator-b', 'manual cleanup', now() - interval '9 days')
+`)
+	if err != nil {
+		t.Fatalf("seed challenge delivery repair audit: %v", err)
+	}
+
+	store := NewChallengeDeliveryStore(pool)
+	stats, err := store.CleanupDeliveryRepairs(ctx, ChallengeDeliveryRepairCleanupOptions{
+		TenantID: "tenant-4",
+		Cutoff:   time.Now().UTC().Add(-7 * 24 * time.Hour),
+		Limit:    1,
+	})
+	if err != nil {
+		t.Fatalf("cleanup challenge delivery repairs: %v", err)
+	}
+	if stats.Deleted != 1 {
+		t.Fatalf("unexpected deleted count: %+v", stats)
+	}
+	assertChallengeDeliveryRepairAuditCount(t, ctx, pool, "tenant-4", 1)
+}
+
+func TestChallengeDeliveryStoreCleanupDeliveryRepairsFiltersModeOutcomeAndFailureClassIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO identity_challenge_delivery_repair_audit (
+    delivery_id, tenant_id, user_id, challenge_id, previous_delivery_status, previous_challenge_status,
+    previous_challenge_delivery_status, previous_retry_count, previous_last_error, previous_failure_class,
+    new_delivery_status, new_challenge_status, new_challenge_delivery_status, new_failure_class,
+    repair_mode, repair_outcome, skip_reason, dry_run, repair_operator, repair_reason, repaired_at
+) VALUES
+    (321, 'tenant-5', 'user-1', 'challenge-a', 'DLQ', 'EXPIRED', 'FAILED', 1, 'provider unavailable', 'delivery_failed',
+     'DLQ', 'EXPIRED', 'FAILED', 'delivery_failed', 'audit', 'AUDITED', '', true, 'operator-a', 'manual audit', now() - interval '10 days'),
+    (322, 'tenant-5', 'user-1', 'challenge-b', 'PENDING', 'ACTIVE', 'PENDING', 0, '', '',
+     'CANCELED', 'EXPIRED', 'FAILED', 'inactive', 'cancel-inactive', 'MUTATED', '', false, 'operator-b', 'manual cleanup', now() - interval '10 days')
+`)
+	if err != nil {
+		t.Fatalf("seed challenge delivery repair audit: %v", err)
+	}
+
+	store := NewChallengeDeliveryStore(pool)
+	stats, err := store.CleanupDeliveryRepairs(ctx, ChallengeDeliveryRepairCleanupOptions{
+		TenantID:             "tenant-5",
+		Mode:                 types.ChallengeDeliveryRepairModeAudit,
+		Outcome:              challengeDeliveryRepairOutcomeAudited,
+		PreviousFailureClass: types.ChallengeDeliveryFailureClassDeliveryFailed,
+		NewFailureClass:      types.ChallengeDeliveryFailureClassDeliveryFailed,
+		Cutoff:               time.Now().UTC().Add(-7 * 24 * time.Hour),
+		Limit:                10,
+	})
+	if err != nil {
+		t.Fatalf("cleanup challenge delivery repairs with filters: %v", err)
+	}
+	if stats.Deleted != 1 {
+		t.Fatalf("unexpected deleted count: %+v", stats)
+	}
+
+	rows, err := store.AuditDeliveryRepairs(ctx, ChallengeDeliveryRepairAuditOptions{
+		TenantID: "tenant-5",
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("audit challenge delivery repairs after cleanup: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one row after cleanup, got %d", len(rows))
+	}
+	if rows[0].DeliveryID != 322 || rows[0].Mode != types.ChallengeDeliveryRepairModeCancelInactive || rows[0].Outcome != challengeDeliveryRepairOutcomeMutated {
+		t.Fatalf("unexpected remaining challenge delivery repair row: %+v", rows[0])
+	}
+}
+
 func seedChallengeDeliveryOutbox(t *testing.T, ctx context.Context, repository *Repository, issuedAt time.Time, challengeID types.ChallengeID, expiresAt time.Time) {
 	t.Helper()
 	if _, err := repository.RegisterUser(ctx, types.RegisterUserCommand{
@@ -595,5 +720,21 @@ LIMIT 1
 			operator,
 			reason,
 		)
+	}
+}
+
+func assertChallengeDeliveryRepairAuditCount(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID string, wantCount int64) {
+	t.Helper()
+	var gotCount int64
+	err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM identity_challenge_delivery_repair_audit
+WHERE tenant_id = $1
+`, tenantID).Scan(&gotCount)
+	if err != nil {
+		t.Fatalf("count challenge delivery repair audit rows: %v", err)
+	}
+	if gotCount != wantCount {
+		t.Fatalf("expected %d challenge delivery repair audit rows, got %d", wantCount, gotCount)
 	}
 }

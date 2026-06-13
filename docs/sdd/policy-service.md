@@ -64,7 +64,7 @@ permission_version=<blocked edge_version>
 
 Policy-service does not guess direct peers and does not synchronously query contacts-service or conversation-service. If no `direct_peer_user_id` is supplied, contacts block enforcement is skipped and the request continues to the exact rule / static decision path.
 
-When PostgreSQL rules mode is enabled, successful `CheckMessageAction` decisions are staged into `policy_decision_audit_outbox` before the response is returned. Audit write failure fails closed as policy unavailable. This outbox is local policy-service audit staging only; it is not yet relayed to Kafka.
+When PostgreSQL rules mode is enabled, successful `CheckMessageAction` decisions are staged into `policy_decision_audit_outbox` before the response is returned. Audit write failure fails closed as policy unavailable. `NEXUSIM_POLICY_SERVICE_MODE=outbox-relay` publishes these rows to `im.policy.events` as protobuf `PolicyEvent` records and marks successful rows `PUBLISHED`.
 
 Audit rows intentionally store low-sensitive decision metadata:
 
@@ -94,6 +94,14 @@ NEXUSIM_POLICY_SERVICE_MODE=contact-consumer
 NEXUSIM_KAFKA_BROKERS=localhost:9092
 NEXUSIM_CONTACT_EVENTS_TOPIC=im.contact.events
 NEXUSIM_POLICY_CONTACT_CONSUMER_GROUP=nexusim-policy-contacts
+
+NEXUSIM_POLICY_SERVICE_MODE=outbox-relay
+NEXUSIM_KAFKA_BROKERS=localhost:9092
+NEXUSIM_POLICY_AUDIT_EVENTS_TOPIC=im.policy.events
+NEXUSIM_POLICY_OUTBOX_BATCH_SIZE=500
+NEXUSIM_POLICY_OUTBOX_POLL_INTERVAL=1s
+NEXUSIM_POLICY_OUTBOX_MAX_ATTEMPTS=5
+NEXUSIM_POLICY_OUTBOX_RETRY_BASE_DELAY=1s
 
 NEXUSIM_POLICY_SERVICE_ADDR=127.0.0.1:10800
 NEXUSIM_POLICY_RPC_TIMEOUT=30ms
@@ -150,7 +158,7 @@ This is a local debug surface. It is not a replacement for production OpenTeleme
 - Contacts block / unblock events are consumed only for direct `SEND` when safe `direct_peer_user_id` context is supplied. Group, role and tenant policy remain future work.
 - No conversation role / owner / admin policy is implemented yet.
 - No tenant policy, content moderation, risk scoring or rate limiting is implemented yet.
-- Decision audit outbox rows remain local `PENDING` rows; no Kafka audit schema, relay, retry/DLQ smoke, repair operator, retention policy or external sink is implemented yet.
+- Decision audit outbox rows can be relayed to `im.policy.events`, but no repair operator, retention policy or external sink is implemented yet.
 - No mTLS client/server config is implemented for policy-service yet.
 - No production OpenTelemetry / Prometheus / alerting rollout is implemented yet.
 

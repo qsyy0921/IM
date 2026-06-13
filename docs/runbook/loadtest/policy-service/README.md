@@ -22,6 +22,7 @@ Implemented:
 - policy-service contact projection smoke for accepted / blocked / unblocked contact events: `loadtest-report-20260613-policy-contact-projection-smoke.md`.
 - policy-service contact block decision smoke for direct `SEND` hard-deny through `direct_peer_user_id`: `loadtest-report-20260613-policy-contact-block-decision-smoke.md`.
 - policy-service first-stage decision audit outbox smoke: `loadtest-report-20260613-policy-decision-audit-outbox-smoke.md`.
+- policy-service decision audit relay smoke for `policy_decision_audit_outbox -> im.policy.events`: `loadtest-report-20260613-policy-decision-audit-relay-smoke.md`.
 
 Not yet implemented:
 
@@ -29,7 +30,7 @@ Not yet implemented:
 - conversation role policy;
 - tenant-level policy;
 - content moderation / risk scoring;
-- policy audit Kafka relay / DLQ repair / retention / external sink;
+- policy audit DLQ repair / retention / external sink;
 - policy-service mTLS, OpenTelemetry, Prometheus deployment and production alerting.
 
 ## Local Smoke Shape
@@ -80,6 +81,8 @@ im.contact.events
 -> CheckMessageAction(SEND, direct_peer_user_id)
 -> CONTACT_BLOCKED hard deny / allow after unblock
 -> policy_decision_audit_outbox PENDING rows
+-> policy decision audit outbox relay
+-> im.policy.events readback
 ```
 
 Raw summaries are written under `H:\NexusIM\loadtest-results\<run-name>`:
@@ -109,4 +112,4 @@ The observability smoke reads `/debug/metrics` after both allow and deny scenari
 
 The contact projection smoke proves that policy-service can consume `im.contact.events` and maintain a policy-owned edge projection. The contact block decision smoke proves that projected `BLOCKED` edges are consumed for direct `SEND` when `direct_peer_user_id` is present. It does not prove group conversation role policy, tenant policy, risk scoring or full ReBAC behavior.
 
-The decision audit outbox smoke proves that public policy decisions are staged as low-sensitive `policy_decision_audit_outbox` rows when PostgreSQL rules mode is enabled. Audit rows store stable object keys, context-present flags, action, allow/deny, permission version, classification, reason code and trace/request ids. They do not store raw session id, raw device id, raw peer id, raw conversation id, raw message content, rule parameters, SQL errors or free-text deny/provider bodies. The outbox is not yet relayed to Kafka.
+The decision audit outbox smoke proves that public policy decisions are staged as low-sensitive `policy_decision_audit_outbox` rows when PostgreSQL rules mode is enabled. The decision audit relay smoke proves those rows can be published to `im.policy.events` as protobuf `PolicyEvent` records and marked `PUBLISHED`. Audit rows and Kafka events store stable object keys, context-present flags, action, allow/deny, permission version, classification, reason code and trace/request ids. They do not store raw session id, raw device id, raw peer id, raw conversation id, raw message content, rule parameters, SQL errors or free-text deny/provider bodies. DLQ repair, retention and external audit sinks remain future work.

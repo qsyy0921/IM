@@ -161,14 +161,20 @@ func runMemberChangeWorker() error {
 		envInt("NEXUSIM_MEMBER_CHANGE_PROGRESS_BATCH_SIZE", 100),
 	)
 	pollInterval := envDuration("NEXUSIM_MEMBER_CHANGE_PROGRESS_POLL_INTERVAL", time.Second)
+	errorBackoff := envDuration("NEXUSIM_MEMBER_CHANGE_PROGRESS_ERROR_BACKOFF", pollInterval)
 	worker := memberchange.NewProgressWorker(
 		useCase,
-		memberchange.ProgressConfig{PollInterval: pollInterval},
+		memberchange.ProgressConfig{
+			PollInterval: pollInterval,
+			ErrorBackoff: errorBackoff,
+			Logf:         log.Printf,
+		},
 	)
 	log.Printf(
-		"conversation-service member change progress worker started batch_size=%d poll_interval=%s",
+		"conversation-service member change progress worker started batch_size=%d poll_interval=%s error_backoff=%s",
 		envInt("NEXUSIM_MEMBER_CHANGE_PROGRESS_BATCH_SIZE", 100),
 		pollInterval,
+		errorBackoff,
 	)
 	return worker.Run(ctx)
 }

@@ -21,6 +21,10 @@ param(
     [string]$ReceiptTlsClientCertFile = "",
     [string]$ReceiptTlsClientKeyFile = "",
     [string]$PushUrl = "ws://127.0.0.1:10498",
+    [string]$PushTlsCaFile = "",
+    [string]$PushTlsServerName = "",
+    [string]$PushTlsClientCertFile = "",
+    [string]$PushTlsClientKeyFile = "",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
     [string]$TenantId = "",
@@ -132,6 +136,18 @@ if (-not [string]::IsNullOrWhiteSpace($ReceiptTlsClientCertFile)) {
 }
 if (-not [string]::IsNullOrWhiteSpace($ReceiptTlsClientKeyFile)) {
     $args += @("--receipt-tls-client-key-file", $ReceiptTlsClientKeyFile)
+}
+if (-not [string]::IsNullOrWhiteSpace($PushTlsCaFile)) {
+    $args += @("--push-tls-ca-file", $PushTlsCaFile)
+}
+if (-not [string]::IsNullOrWhiteSpace($PushTlsServerName)) {
+    $args += @("--push-tls-server-name", $PushTlsServerName)
+}
+if (-not [string]::IsNullOrWhiteSpace($PushTlsClientCertFile)) {
+    $args += @("--push-tls-client-cert-file", $PushTlsClientCertFile)
+}
+if (-not [string]::IsNullOrWhiteSpace($PushTlsClientKeyFile)) {
+    $args += @("--push-tls-client-key-file", $PushTlsClientKeyFile)
 }
 if ($NoCleanup) {
     $args += @("--cleanup=false")

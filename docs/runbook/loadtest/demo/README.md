@@ -23,7 +23,7 @@ CreateMemberChange(JOIN)
 
 ## TLS / mTLS 参数
 
-`loadtest/demo` 和 `loadtest/demo/run-local-demo.ps1` 默认仍使用 plaintext gRPC。若外部启动的 conversation-service / message-service / delivery-service / receipt-service 已开启 gRPC TLS 或 mTLS，可给 demo runner 传入对应 client 参数：
+`loadtest/demo` 和 `loadtest/demo/run-local-demo.ps1` 默认仍使用 plaintext gRPC 和 plaintext WebSocket。若外部启动的 conversation-service / message-service / delivery-service / receipt-service 已开启 gRPC TLS 或 mTLS，可给 demo runner 传入对应 client 参数：
 
 ```powershell
 .\loadtest\demo\run-local-demo.ps1 `
@@ -45,7 +45,18 @@ CreateMemberChange(JOIN)
   -ReceiptTlsClientKeyFile .\certs\loadtest-client.key
 ```
 
-这些参数只覆盖 demo runner 到四个 gRPC server 的静态 TLS / mTLS 连接。未配置时保持 plaintext，兼容现有本地演示；证书生命周期和全服务 mTLS rollout 不在 demo runner 范围内。
+若 push-gateway WebSocket 入口以 WSS / mTLS 启动，可同时传入 push client TLS 参数：
+
+```powershell
+.\loadtest\demo\run-local-demo.ps1 `
+  -PushUrl wss://127.0.0.1:10498 `
+  -PushTlsCaFile .\certs\ca.pem `
+  -PushTlsServerName push-gateway.nexusim.local `
+  -PushTlsClientCertFile .\certs\desktop-client.crt `
+  -PushTlsClientKeyFile .\certs\desktop-client.key
+```
+
+这些参数只覆盖 demo runner 到四个 gRPC server 的静态 TLS / mTLS 连接，以及 demo runner 到 push-gateway WebSocket 入口的 WSS / mTLS 连接。未配置时保持 plaintext，兼容现有本地演示；证书生命周期和全服务 mTLS rollout 不在 demo runner 范围内。
 
 ## Gateway verified metadata auth
 

@@ -44,6 +44,36 @@ gateway verified metadata auth 示例：
 
 该模式会把 demo 请求身份同时写入 user-facing gRPC metadata，用于验证 conversation / message / delivery / receipt 的 `metadata` / `verified-metadata` auth mode；request body 仍保留兼容字段。
 
+gRPC mTLS + WebSocket WSS/mTLS 示例：
+
+```powershell
+.\loadtest\demo\run-local-demo.ps1 `
+  -VerifiedAuthMetadata `
+  -ConversationTlsCaFile .\certs\ca.crt `
+  -ConversationTlsServerName conversation-service.nexusim.local `
+  -ConversationTlsClientCertFile .\certs\api-gateway.crt `
+  -ConversationTlsClientKeyFile .\certs\api-gateway.key `
+  -MessageTlsCaFile .\certs\ca.crt `
+  -MessageTlsServerName message-service.nexusim.local `
+  -MessageTlsClientCertFile .\certs\api-gateway.crt `
+  -MessageTlsClientKeyFile .\certs\api-gateway.key `
+  -DeliveryTlsCaFile .\certs\ca.crt `
+  -DeliveryTlsServerName delivery-service.nexusim.local `
+  -DeliveryTlsClientCertFile .\certs\api-gateway.crt `
+  -DeliveryTlsClientKeyFile .\certs\api-gateway.key `
+  -ReceiptTlsCaFile .\certs\ca.crt `
+  -ReceiptTlsServerName receipt-service.nexusim.local `
+  -ReceiptTlsClientCertFile .\certs\api-gateway.crt `
+  -ReceiptTlsClientKeyFile .\certs\api-gateway.key `
+  -PushUrl wss://127.0.0.1:10498 `
+  -PushTlsCaFile .\certs\ca.crt `
+  -PushTlsServerName push-gateway.nexusim.local `
+  -PushTlsClientCertFile .\certs\desktop-client.crt `
+  -PushTlsClientKeyFile .\certs\desktop-client.key
+```
+
+这些参数只验证本地静态证书下的 gRPC TLS/mTLS 和 push-gateway WSS/mTLS 连接；证书签发、轮换、分发、撤销和动态服务身份治理不在 demo runner 范围内。
+
 边界：
 
 - 不自动创建会话产品流程，只 seed 本地 demo conversation。

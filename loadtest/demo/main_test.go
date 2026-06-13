@@ -2,8 +2,19 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
+	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -54,10 +65,85 @@ func TestWithVerifiedAuthMetadataAddsOutgoingMetadata(t *testing.T) {
 	assertMetadataValue(t, md, metadataRequestID, "request-1")
 }
 
+func TestWebSocketDialOptionsCombinesHeaderAndTLS(t *testing.T) {
+	caFile := writeTestCACert(t)
+	options, err := webSocketDialOptions(config{
+		pushTLS: grpctls.Config{
+			CAFile:     caFile,
+			ServerName: "push-gateway.nexusim.local",
+		},
+	}, http.Header{"Authorization": []string{"Bearer token-1"}})
+	if err != nil {
+		t.Fatalf("webSocketDialOptions returned error: %v", err)
+	}
+	if options == nil {
+		t.Fatal("expected dial options")
+	}
+	if got := options.HTTPHeader.Get("Authorization"); got != "Bearer token-1" {
+		t.Fatalf("Authorization header = %q", got)
+	}
+	if options.HTTPClient == nil {
+		t.Fatal("expected HTTP client for WSS TLS")
+	}
+}
+
+func TestWebSocketTLSConfigRequiresCAFile(t *testing.T) {
+	_, err := webSocketTLSConfig(grpctls.Config{ServerName: "push-gateway.nexusim.local"}, "push-tls")
+	if err == nil {
+		t.Fatal("expected missing CA file error")
+	}
+}
+
+func TestWebSocketTLSConfigRequiresClientCertPair(t *testing.T) {
+	caFile := writeTestCACert(t)
+	_, err := webSocketTLSConfig(grpctls.Config{
+		CAFile:         caFile,
+		ClientCertFile: filepath.Join(t.TempDir(), "client.crt"),
+	}, "push-tls")
+	if err == nil {
+		t.Fatal("expected client cert/key pair error")
+	}
+}
+
 func assertMetadataValue(t *testing.T, md metadata.MD, key string, want string) {
 	t.Helper()
 	values := md.Get(key)
 	if len(values) != 1 || values[0] != want {
 		t.Fatalf("metadata %s = %v, want [%s]", key, values, want)
 	}
+}
+
+func writeTestCACert(t *testing.T) string {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	serial, err := rand.Int(rand.Reader, big.NewInt(1<<62))
+	if err != nil {
+		t.Fatalf("generate serial: %v", err)
+	}
+	template := &x509.Certificate{
+		SerialNumber:          serial,
+		Subject:               pkix.Name{CommonName: "test-ca"},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatalf("create certificate: %v", err)
+	}
+	path := filepath.Join(t.TempDir(), "ca.crt")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("create CA file: %v", err)
+	}
+	defer file.Close()
+	if err := pem.Encode(file, &pem.Block{Type: "CERTIFICATE", Bytes: der}); err != nil {
+		t.Fatalf("write CA file: %v", err)
+	}
+	return path
 }

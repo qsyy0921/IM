@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -57,6 +59,7 @@ type config struct {
 	messageTLS         grpctls.Config
 	deliveryTLS        grpctls.Config
 	receiptTLS         grpctls.Config
+	pushTLS            grpctls.Config
 	pushURL            string
 	resultDir          string
 	pgDSN              string
@@ -92,6 +95,7 @@ type summary struct {
 	MessageTLSEnabled      bool                    `json:"message_tls_enabled"`
 	DeliveryTLSEnabled     bool                    `json:"delivery_tls_enabled"`
 	ReceiptTLSEnabled      bool                    `json:"receipt_tls_enabled"`
+	PushTLSEnabled         bool                    `json:"push_tls_enabled"`
 	VerifiedAuthMetadata   bool                    `json:"verified_auth_metadata"`
 	StartedAt              time.Time               `json:"started_at"`
 	FinishedAt             time.Time               `json:"finished_at"`
@@ -205,6 +209,7 @@ func main() {
 	registerTLSFlags("message-tls", "NEXUSIM_MESSAGE_TLS", "message-service", &cfg.messageTLS)
 	registerTLSFlags("delivery-tls", "NEXUSIM_DELIVERY_TLS", "delivery-service", &cfg.deliveryTLS)
 	registerTLSFlags("receipt-tls", "NEXUSIM_RECEIPT_TLS", "receipt-service", &cfg.receiptTLS)
+	registerTLSFlags("push-tls", "NEXUSIM_PUSH_WS_TLS", "push-gateway WebSocket", &cfg.pushTLS)
 	flag.StringVar(&cfg.pushURL, "push-url", "ws://127.0.0.1:10498", "push-gateway WebSocket URL")
 	flag.StringVar(&cfg.resultDir, "result-dir", `H:\NexusIM\loadtest-results\e2e-demo`, "result directory")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "", "PostgreSQL DSN used only for local demo seed/cleanup/statistics")
@@ -301,6 +306,7 @@ func run(ctx context.Context, cfg config) error {
 		MessageTLSEnabled:      cfg.messageTLS.Enabled(),
 		DeliveryTLSEnabled:     cfg.deliveryTLS.Enabled(),
 		ReceiptTLSEnabled:      cfg.receiptTLS.Enabled(),
+		PushTLSEnabled:         cfg.pushTLS.Enabled(),
 		VerifiedAuthMetadata:   cfg.verifiedAuthMetadata,
 		StartedAt:              started,
 	}
@@ -669,7 +675,7 @@ func connectWebSocket(ctx context.Context, cfg config) (*nhooyr.Conn, serverFram
 	}
 	query := u.Query()
 	query.Set("device_id", cfg.receiverDevice)
-	var dialOptions *nhooyr.DialOptions
+	var header http.Header
 	switch cfg.pushAuthMode {
 	case "", "mock":
 		query.Set("tenant_id", cfg.tenantID)
@@ -679,9 +685,13 @@ func connectWebSocket(ctx context.Context, cfg config) (*nhooyr.Conn, serverFram
 		if err != nil {
 			return nil, serverFrame{}, err
 		}
-		dialOptions = &nhooyr.DialOptions{HTTPHeader: http.Header{"Authorization": []string{"Bearer " + token}}}
+		header = http.Header{"Authorization": []string{"Bearer " + token}}
 	default:
 		return nil, serverFrame{}, fmt.Errorf("unsupported push auth mode: %s", cfg.pushAuthMode)
+	}
+	dialOptions, err := webSocketDialOptions(cfg, header)
+	if err != nil {
+		return nil, serverFrame{}, err
 	}
 	u.RawQuery = query.Encode()
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
@@ -708,6 +718,62 @@ func connectWebSocket(ctx context.Context, cfg config) (*nhooyr.Conn, serverFram
 		return nil, serverFrame{}, fmt.Errorf("unexpected hello frame: %+v", hello)
 	}
 	return conn, hello, nil
+}
+
+func webSocketDialOptions(cfg config, header http.Header) (*nhooyr.DialOptions, error) {
+	options := &nhooyr.DialOptions{}
+	if header != nil {
+		options.HTTPHeader = header
+	}
+	tlsConfig, err := webSocketTLSConfig(cfg.pushTLS, "push-tls")
+	if err != nil {
+		return nil, err
+	}
+	if tlsConfig != nil {
+		options.HTTPClient = &http.Client{
+			Transport: &http.Transport{TLSClientConfig: tlsConfig},
+		}
+	}
+	if options.HTTPHeader == nil && options.HTTPClient == nil {
+		return nil, nil
+	}
+	return options, nil
+}
+
+func webSocketTLSConfig(config grpctls.Config, flagPrefix string) (*tls.Config, error) {
+	if !config.Enabled() {
+		return nil, nil
+	}
+	caFile := strings.TrimSpace(config.CAFile)
+	if caFile == "" {
+		return nil, errors.New("--" + flagPrefix + "-ca-file is required when push WebSocket TLS is configured")
+	}
+	clientCertFile := strings.TrimSpace(config.ClientCertFile)
+	clientKeyFile := strings.TrimSpace(config.ClientKeyFile)
+	if (clientCertFile == "") != (clientKeyFile == "") {
+		return nil, errors.New("--" + flagPrefix + "-client-cert-file and --" + flagPrefix + "-client-key-file must be configured together")
+	}
+	pemBytes, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, err
+	}
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(pemBytes) {
+		return nil, errors.New("--" + flagPrefix + "-ca-file does not contain a valid PEM certificate")
+	}
+	tlsConfig := &tls.Config{
+		RootCAs:    roots,
+		ServerName: strings.TrimSpace(config.ServerName),
+		MinVersion: tls.VersionTLS12,
+	}
+	if clientCertFile != "" {
+		cert, err := tls.LoadX509KeyPair(clientCertFile, clientKeyFile)
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+	return tlsConfig, nil
 }
 
 func waitNotify(ctx context.Context, cfg config, conn *nhooyr.Conn, seq int64, messageID string) (serverFrame, error) {

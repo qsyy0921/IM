@@ -68,6 +68,35 @@ func TestMessageRepositoryAppendMessageIntegration(t *testing.T) {
 	assertPersistedFacts(t, ctx, pool, input, result)
 }
 
+func TestMessageRepositoryGetMessagePolicyContextIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	runID := time.Now().UnixNano()
+	repo := NewMessageRepository(pool)
+	tenantID := types.TenantID(fmt.Sprintf("tenant-policy-context-%d", runID))
+	input := testAppendInput(tenantID, "client-policy-context", []byte(`{"text":"hello"}`))
+	result, err := repo.AppendMessage(ctx, input)
+	if err != nil {
+		t.Fatalf("append message: %v", err)
+	}
+
+	policyContext, err := repo.GetMessagePolicyContext(ctx, tenantID, input.Command.ConversationID, result.MessageID)
+	if err != nil {
+		t.Fatalf("get message policy context: %v", err)
+	}
+	if policyContext.SenderUserID != input.Command.AuthContext.UserID {
+		t.Fatalf("unexpected sender context: %+v", policyContext)
+	}
+
+	_, err = repo.GetMessagePolicyContext(ctx, tenantID, input.Command.ConversationID, "missing-message")
+	if !errors.Is(err, types.ErrMessageNotFound) {
+		t.Fatalf("expected message not found, got %v", err)
+	}
+}
+
 func TestMessageRepositoryAppendMessageConcurrentReplayDoesNotAdvanceSeq(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

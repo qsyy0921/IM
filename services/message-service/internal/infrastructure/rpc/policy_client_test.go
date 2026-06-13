@@ -64,11 +64,13 @@ func TestPolicyClientCheckEditPermissionIncludesMessageID(t *testing.T) {
 		AuthContext:    testPolicyClientAuth(),
 		ConversationID: "conv-1",
 		MessageID:      "msg-1",
-	}, testPolicyClientConversation())
+	}, testPolicyClientConversation(), types.MessagePolicyContext{SenderUserID: "sender-1"})
 	if err != nil {
 		t.Fatalf("check edit permission: %v", err)
 	}
-	if fake.request.GetMessageId() != "msg-1" || fake.request.GetAction() != policyv1.MessageAction_MESSAGE_ACTION_EDIT {
+	if fake.request.GetMessageId() != "msg-1" ||
+		fake.request.GetAction() != policyv1.MessageAction_MESSAGE_ACTION_EDIT ||
+		fake.request.GetMessageSenderUserId() != "sender-1" {
 		t.Fatalf("unexpected request: %+v", fake.request)
 	}
 }

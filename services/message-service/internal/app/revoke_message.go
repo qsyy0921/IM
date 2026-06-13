@@ -68,13 +68,18 @@ func (u *RevokeMessageUseCase) readConsistentRevokeDependencies(
 ) (types.ConversationSendContext, types.PermissionDecision, error) {
 	var conversation types.ConversationSendContext
 	var permission types.PermissionDecision
+	var message types.MessagePolicyContext
 	for attempt := 0; attempt < 2; attempt++ {
 		var err error
 		conversation, err = u.conversation.GetSendContext(ctx, sendContextCommandFromRevoke(command))
 		if err != nil {
 			return types.ConversationSendContext{}, types.PermissionDecision{}, err
 		}
-		permission, err = u.policy.CheckRevokePermission(ctx, command, conversation)
+		message, err = u.messageRepo.GetMessagePolicyContext(ctx, command.AuthContext.TenantID, command.ConversationID, command.MessageID)
+		if err != nil {
+			return types.ConversationSendContext{}, types.PermissionDecision{}, err
+		}
+		permission, err = u.policy.CheckRevokePermission(ctx, command, conversation, message)
 		if err != nil {
 			return types.ConversationSendContext{}, types.PermissionDecision{}, err
 		}

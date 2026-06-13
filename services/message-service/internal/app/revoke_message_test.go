@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 
 func TestRevokeMessageUseCase(t *testing.T) {
 	repo := &fakeMessageRepository{
+		messagePolicyContext: types.MessagePolicyContext{SenderUserID: "user-1"},
 		revokeResult: domain.MessageChangeResult{
 			MessageID:        "msg-1",
 			ConversationSeq:  2,
@@ -44,13 +46,44 @@ func TestRevokeMessageUseCase(t *testing.T) {
 		result.IdempotentReplay {
 		t.Fatalf("unexpected result: %+v", result)
 	}
-	if conversation.calls != 1 || policy.calls != 1 || repo.revokeCalls != 1 {
-		t.Fatalf("unexpected call counts conversation=%d policy=%d repo=%d", conversation.calls, policy.calls, repo.revokeCalls)
+	if conversation.calls != 1 || policy.calls != 1 || repo.messagePolicyCalls != 1 || repo.revokeCalls != 1 {
+		t.Fatalf("unexpected call counts conversation=%d policy=%d message_context=%d repo=%d", conversation.calls, policy.calls, repo.messagePolicyCalls, repo.revokeCalls)
+	}
+	if policy.lastMessage.SenderUserID != "user-1" {
+		t.Fatalf("policy did not receive message sender context: %+v", policy.lastMessage)
 	}
 	if repo.revokeInput.Command.MessageID != "msg-1" ||
 		repo.revokeInput.Permission.PermissionVersion != 7 ||
 		repo.revokeInput.Conversation.FanoutPolicyVersion != 3 {
 		t.Fatalf("unexpected repository input: %+v", repo.revokeInput)
+	}
+}
+
+func TestRevokeMessageUseCaseStopsAfterPolicyOwnershipDeny(t *testing.T) {
+	repo := &fakeMessageRepository{
+		messagePolicyContext: types.MessagePolicyContext{SenderUserID: "user-1"},
+	}
+	deny := allowedDecision()
+	deny.Allowed = false
+	deny.Reason = "message ownership policy denied"
+	policy := &fakePolicy{decision: deny}
+	conversation := &fakeConversation{context: localConversation()}
+	command := testRevokeCommand()
+	command.AuthContext.UserID = "user-2"
+	useCase := NewRevokeMessageUseCase(policy, conversation, repo)
+
+	_, err := useCase.Execute(context.Background(), command)
+	if !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected permission denied, got %v", err)
+	}
+	if repo.messagePolicyCalls != 1 || policy.calls != 1 {
+		t.Fatalf("expected dependency reads before deny, message_context=%d policy=%d", repo.messagePolicyCalls, policy.calls)
+	}
+	if policy.lastMessage.SenderUserID != "user-1" {
+		t.Fatalf("policy did not receive sender context: %+v", policy.lastMessage)
+	}
+	if repo.revokeCalls != 0 {
+		t.Fatalf("revoke repository should not be called")
 	}
 }
 

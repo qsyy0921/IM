@@ -9,9 +9,9 @@ import (
 
 type PolicyCheckPort interface {
 	CheckSendPermission(ctx context.Context, command types.SendMessageCommand, conversation types.ConversationSendContext) (types.PermissionDecision, error)
-	CheckEditPermission(ctx context.Context, command types.EditMessageCommand, conversation types.ConversationSendContext) (types.PermissionDecision, error)
-	CheckRevokePermission(ctx context.Context, command types.RevokeMessageCommand, conversation types.ConversationSendContext) (types.PermissionDecision, error)
-	CheckDeletePermission(ctx context.Context, command types.DeleteMessageCommand, conversation types.ConversationSendContext) (types.PermissionDecision, error)
+	CheckEditPermission(ctx context.Context, command types.EditMessageCommand, conversation types.ConversationSendContext, message types.MessagePolicyContext) (types.PermissionDecision, error)
+	CheckRevokePermission(ctx context.Context, command types.RevokeMessageCommand, conversation types.ConversationSendContext, message types.MessagePolicyContext) (types.PermissionDecision, error)
+	CheckDeletePermission(ctx context.Context, command types.DeleteMessageCommand, conversation types.ConversationSendContext, message types.MessagePolicyContext) (types.PermissionDecision, error)
 }
 
 type ConversationQueryPort interface {
@@ -24,6 +24,7 @@ type SequencerPort interface {
 
 type MessageRepository interface {
 	AppendMessage(ctx context.Context, input domain.AppendMessageInput) (domain.AppendMessageResult, error)
+	GetMessagePolicyContext(ctx context.Context, tenantID types.TenantID, conversationID types.ConversationID, messageID types.MessageID) (types.MessagePolicyContext, error)
 	EditMessage(ctx context.Context, input domain.EditMessageInput) (domain.MessageChangeResult, error)
 	RevokeMessage(ctx context.Context, input domain.RevokeMessageInput) (domain.MessageChangeResult, error)
 	DeleteMessage(ctx context.Context, input domain.DeleteMessageInput) (domain.MessageChangeResult, error)

@@ -45,6 +45,16 @@ func (u CheckMessageActionUseCase) Execute(
 	if u.evaluator == nil {
 		return types.MessageActionDecision{}, types.NewDependencyUnavailable("policy evaluator is not configured")
 	}
+	if decision, denied, err := messageOwnershipDecision(command); err != nil {
+		return types.MessageActionDecision{}, err
+	} else if denied {
+		if u.auditor != nil {
+			if err := u.auditor.RecordPolicyDecision(ctx, command, decision); err != nil {
+				return types.MessageActionDecision{}, err
+			}
+		}
+		return decision, nil
+	}
 	decision, err := u.evaluator.DecideMessageAction(ctx, command)
 	if err != nil {
 		return types.MessageActionDecision{}, err
@@ -55,4 +65,29 @@ func (u CheckMessageActionUseCase) Execute(
 		}
 	}
 	return decision, nil
+}
+
+func messageOwnershipDecision(command types.CheckMessageActionCommand) (types.MessageActionDecision, bool, error) {
+	switch command.Action {
+	case types.MessageActionEdit, types.MessageActionRevoke, types.MessageActionDelete:
+	default:
+		return types.MessageActionDecision{}, false, nil
+	}
+	if command.MessageSenderUserID == "" || command.MessageSenderUserID == command.AuthContext.UserID {
+		return types.MessageActionDecision{}, false, nil
+	}
+	if command.ConversationPermissionVersion <= 0 {
+		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy conversation permission version is required")
+	}
+	return types.MessageActionDecision{
+		TenantID:          command.AuthContext.TenantID,
+		UserID:            command.AuthContext.UserID,
+		ConversationID:    command.ConversationID,
+		MessageID:         command.MessageID,
+		Action:            command.Action,
+		Allowed:           false,
+		PermissionVersion: command.ConversationPermissionVersion,
+		Classification:    "MESSAGE_OWNERSHIP_DENIED",
+		Reason:            "message ownership policy denied",
+	}, true, nil
 }

@@ -331,6 +331,7 @@ type fakePolicy struct {
 	err              error
 	calls            int
 	lastConversation types.ConversationSendContext
+	lastMessage      types.MessagePolicyContext
 }
 
 func (f *fakePolicy) CheckSendPermission(_ context.Context, _ types.SendMessageCommand, conversation types.ConversationSendContext) (types.PermissionDecision, error) {
@@ -349,8 +350,10 @@ func (f *fakePolicy) CheckSendPermission(_ context.Context, _ types.SendMessageC
 	return f.decision, f.err
 }
 
-func (f *fakePolicy) CheckEditPermission(context.Context, types.EditMessageCommand, types.ConversationSendContext) (types.PermissionDecision, error) {
+func (f *fakePolicy) CheckEditPermission(_ context.Context, _ types.EditMessageCommand, conversation types.ConversationSendContext, message types.MessagePolicyContext) (types.PermissionDecision, error) {
 	f.calls++
+	f.lastConversation = conversation
+	f.lastMessage = message
 	if f.err != nil {
 		return types.PermissionDecision{}, f.err
 	}
@@ -364,8 +367,10 @@ func (f *fakePolicy) CheckEditPermission(context.Context, types.EditMessageComma
 	return f.decision, nil
 }
 
-func (f *fakePolicy) CheckRevokePermission(context.Context, types.RevokeMessageCommand, types.ConversationSendContext) (types.PermissionDecision, error) {
+func (f *fakePolicy) CheckRevokePermission(_ context.Context, _ types.RevokeMessageCommand, conversation types.ConversationSendContext, message types.MessagePolicyContext) (types.PermissionDecision, error) {
 	f.calls++
+	f.lastConversation = conversation
+	f.lastMessage = message
 	if f.err != nil {
 		return types.PermissionDecision{}, f.err
 	}
@@ -379,8 +384,10 @@ func (f *fakePolicy) CheckRevokePermission(context.Context, types.RevokeMessageC
 	return f.decision, nil
 }
 
-func (f *fakePolicy) CheckDeletePermission(context.Context, types.DeleteMessageCommand, types.ConversationSendContext) (types.PermissionDecision, error) {
+func (f *fakePolicy) CheckDeletePermission(_ context.Context, _ types.DeleteMessageCommand, conversation types.ConversationSendContext, message types.MessagePolicyContext) (types.PermissionDecision, error) {
 	f.calls++
+	f.lastConversation = conversation
+	f.lastMessage = message
 	if f.err != nil {
 		return types.PermissionDecision{}, f.err
 	}
@@ -438,6 +445,10 @@ type fakeMessageRepository struct {
 	calls  int
 	input  domain.AppendMessageInput
 
+	messagePolicyContext types.MessagePolicyContext
+	messagePolicyErr     error
+	messagePolicyCalls   int
+
 	revokeResult domain.MessageChangeResult
 	revokeErr    error
 	revokeCalls  int
@@ -458,6 +469,14 @@ func (f *fakeMessageRepository) AppendMessage(_ context.Context, input domain.Ap
 	f.calls++
 	f.input = input
 	return f.result, f.err
+}
+
+func (f *fakeMessageRepository) GetMessagePolicyContext(context.Context, types.TenantID, types.ConversationID, types.MessageID) (types.MessagePolicyContext, error) {
+	f.messagePolicyCalls++
+	if f.messagePolicyErr != nil {
+		return types.MessagePolicyContext{}, f.messagePolicyErr
+	}
+	return f.messagePolicyContext, nil
 }
 
 func (f *fakeMessageRepository) RevokeMessage(_ context.Context, input domain.RevokeMessageInput) (domain.MessageChangeResult, error) {

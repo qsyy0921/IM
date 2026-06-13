@@ -10,14 +10,14 @@ import (
 	"github.com/qsyy0921/IM/services/message-service/internal/types"
 )
 
-func TestEditMessageUseCase(t *testing.T) {
+func TestDeleteMessageUseCase(t *testing.T) {
 	repo := &fakeMessageRepository{
 		messagePolicyContext: types.MessagePolicyContext{SenderUserID: "user-1"},
-		editResult: domain.MessageChangeResult{
+		deleteResult: domain.MessageChangeResult{
 			MessageID:        "msg-1",
 			ConversationSeq:  2,
 			ChangeVersion:    1,
-			AcceptedAt:       time.Date(2026, 6, 10, 1, 0, 0, 0, time.UTC),
+			AcceptedAt:       time.Date(2026, 6, 10, 3, 0, 0, 0, time.UTC),
 			IdempotentReplay: false,
 		},
 	}
@@ -33,11 +33,11 @@ func TestEditMessageUseCase(t *testing.T) {
 		FanoutPolicyVersion: 3,
 		CurrentSeqShard:     "local",
 	}}
-	useCase := NewEditMessageUseCase(policy, conversation, repo)
+	useCase := NewDeleteMessageUseCase(policy, conversation, repo)
 
-	result, err := useCase.Execute(context.Background(), testEditCommand())
+	result, err := useCase.Execute(context.Background(), testDeleteCommand())
 	if err != nil {
-		t.Fatalf("edit message: %v", err)
+		t.Fatalf("delete message: %v", err)
 	}
 	if result.MessageID != "msg-1" ||
 		result.ConversationID != "conv-1" ||
@@ -46,21 +46,20 @@ func TestEditMessageUseCase(t *testing.T) {
 		result.IdempotentReplay {
 		t.Fatalf("unexpected result: %+v", result)
 	}
-	if conversation.calls != 1 || policy.calls != 1 || repo.messagePolicyCalls != 1 || repo.editCalls != 1 {
-		t.Fatalf("unexpected call counts conversation=%d policy=%d message_context=%d repo=%d", conversation.calls, policy.calls, repo.messagePolicyCalls, repo.editCalls)
+	if conversation.calls != 1 || policy.calls != 1 || repo.messagePolicyCalls != 1 || repo.deleteCalls != 1 {
+		t.Fatalf("unexpected call counts conversation=%d policy=%d message_context=%d repo=%d", conversation.calls, policy.calls, repo.messagePolicyCalls, repo.deleteCalls)
 	}
 	if policy.lastMessage.SenderUserID != "user-1" {
 		t.Fatalf("policy did not receive message sender context: %+v", policy.lastMessage)
 	}
-	if repo.editInput.Command.MessageID != "msg-1" ||
-		string(repo.editInput.Command.PayloadJSON) != `{"text":"updated"}` ||
-		repo.editInput.Permission.PermissionVersion != 7 ||
-		repo.editInput.Conversation.FanoutPolicyVersion != 3 {
-		t.Fatalf("unexpected repository input: %+v", repo.editInput)
+	if repo.deleteInput.Command.MessageID != "msg-1" ||
+		repo.deleteInput.Permission.PermissionVersion != 7 ||
+		repo.deleteInput.Conversation.FanoutPolicyVersion != 3 {
+		t.Fatalf("unexpected repository input: %+v", repo.deleteInput)
 	}
 }
 
-func TestEditMessageUseCaseStopsAfterPolicyOwnershipDeny(t *testing.T) {
+func TestDeleteMessageUseCaseStopsAfterPolicyOwnershipDeny(t *testing.T) {
 	repo := &fakeMessageRepository{
 		messagePolicyContext: types.MessagePolicyContext{SenderUserID: "user-1"},
 	}
@@ -69,9 +68,9 @@ func TestEditMessageUseCaseStopsAfterPolicyOwnershipDeny(t *testing.T) {
 	deny.Reason = "message ownership policy denied"
 	policy := &fakePolicy{decision: deny}
 	conversation := &fakeConversation{context: localConversation()}
-	command := testEditCommand()
+	command := testDeleteCommand()
 	command.AuthContext.UserID = "user-2"
-	useCase := NewEditMessageUseCase(policy, conversation, repo)
+	useCase := NewDeleteMessageUseCase(policy, conversation, repo)
 
 	_, err := useCase.Execute(context.Background(), command)
 	if !errors.Is(err, types.ErrPermissionDenied) {
@@ -83,13 +82,13 @@ func TestEditMessageUseCaseStopsAfterPolicyOwnershipDeny(t *testing.T) {
 	if policy.lastMessage.SenderUserID != "user-1" {
 		t.Fatalf("policy did not receive sender context: %+v", policy.lastMessage)
 	}
-	if repo.editCalls != 0 {
-		t.Fatalf("edit repository should not be called")
+	if repo.deleteCalls != 0 {
+		t.Fatalf("delete repository should not be called")
 	}
 }
 
-func testEditCommand() types.EditMessageCommand {
-	return types.EditMessageCommand{
+func testDeleteCommand() types.DeleteMessageCommand {
+	return types.DeleteMessageCommand{
 		AuthContext: types.AuthContext{
 			TenantID:  "tenant-1",
 			UserID:    "user-1",
@@ -98,9 +97,9 @@ func testEditCommand() types.EditMessageCommand {
 		},
 		ConversationID: "conv-1",
 		MessageID:      "msg-1",
-		IdempotencyKey: "edit-1",
-		PayloadJSON:    []byte(`{"text":"updated"}`),
-		Reason:         "typo",
-		ReceivedAt:     time.Date(2026, 6, 10, 1, 0, 0, 0, time.UTC),
+		IdempotencyKey: "delete-1",
+		DeleteScope:    types.DeleteScopeConversationView,
+		Reason:         "cleanup",
+		ReceivedAt:     time.Date(2026, 6, 10, 3, 0, 0, 0, time.UTC),
 	}
 }

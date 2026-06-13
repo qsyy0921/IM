@@ -38,7 +38,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_RECEIPT_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("receipt-service runtime wiring is idle; set NEXUSIM_RECEIPT_SERVICE_MODE=grpc or delivery-consumer")
+		log.Println("receipt-service runtime wiring is idle; set NEXUSIM_RECEIPT_SERVICE_MODE=grpc, delivery-consumer, outbox-relay, or outbox-audit")
 		return nil
 	case "grpc":
 		return runGRPCServer()
@@ -46,6 +46,8 @@ func run() error {
 		return runDeliveryConsumer()
 	case "outbox-relay":
 		return runOutboxRelay()
+	case "outbox-audit":
+		return runOutboxAudit()
 	default:
 		return errors.New("unsupported NEXUSIM_RECEIPT_SERVICE_MODE")
 	}
@@ -171,6 +173,54 @@ func runOutboxRelay() error {
 	)
 	log.Printf("receipt-service outbox relay started topic=%s", topic)
 	return relay.Run(ctx)
+}
+
+func runOutboxAudit() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	var outboxID *int64
+	if value := strings.TrimSpace(os.Getenv("NEXUSIM_RECEIPT_OUTBOX_AUDIT_OUTBOX_ID")); value != "" {
+		parsed := envInt64AllowZero("NEXUSIM_RECEIPT_OUTBOX_AUDIT_OUTBOX_ID", 0)
+		outboxID = &parsed
+	}
+	rows, err := postgresinfra.NewOutboxStore(pool).AuditOutbox(ctx, postgresinfra.OutboxAuditOptions{
+		OutboxID:       outboxID,
+		EventID:        envString("NEXUSIM_RECEIPT_OUTBOX_AUDIT_EVENT_ID", ""),
+		TenantID:       envString("NEXUSIM_RECEIPT_OUTBOX_AUDIT_TENANT_ID", ""),
+		ConversationID: envString("NEXUSIM_RECEIPT_OUTBOX_AUDIT_CONVERSATION_ID", ""),
+		Status:         envString("NEXUSIM_RECEIPT_OUTBOX_AUDIT_STATUS", ""),
+		EventType:      envString("NEXUSIM_RECEIPT_OUTBOX_AUDIT_EVENT_TYPE", ""),
+		Limit:          envInt("NEXUSIM_RECEIPT_OUTBOX_AUDIT_LIMIT", 20),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("receipt-service outbox audit completed rows=%d", len(rows))
+	for _, row := range rows {
+		log.Printf(
+			"receipt_outbox id=%d event_id=%s tenant_id=%s conversation_id=%s aggregate_version=%d event_type=%s status=%s retry_count=%d available_at=%s published_at=%s dead_lettered_at=%s last_error=%q",
+			row.ID,
+			row.EventID,
+			row.TenantID,
+			row.ConversationID,
+			row.AggregateVersion,
+			row.EventType,
+			row.Status,
+			row.RetryCount,
+			row.AvailableAt.Format(time.RFC3339),
+			formatOptionalTime(row.PublishedAt),
+			formatOptionalTime(row.DeadLetteredAt),
+			row.LastError,
+		)
+	}
+	return nil
 }
 
 func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {
@@ -387,4 +437,23 @@ func splitCSV(value string) []string {
 		}
 	}
 	return result
+}
+
+func envInt64AllowZero(name string, fallback int64) int64 {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed < 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func formatOptionalTime(value *time.Time) string {
+	if value == nil {
+		return ""
+	}
+	return value.Format(time.RFC3339)
 }

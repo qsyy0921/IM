@@ -14,6 +14,7 @@ import (
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	gatewayv1 "github.com/qsyy0921/IM/api/proto/nexusim/gateway/v1"
+	identityv1 "github.com/qsyy0921/IM/api/proto/nexusim/identity/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
@@ -51,6 +52,7 @@ type Server struct {
 	auth         Authenticator
 	contacts     contactsv1.ContactsServiceClient
 	conversation conversationv1.ConversationServiceClient
+	identity     identityv1.IdentityServiceClient
 	message      messagev1.MessageServiceClient
 	delivery     deliveryv1.DeliveryServiceClient
 	receipt      receiptv1.ReceiptServiceClient
@@ -62,6 +64,7 @@ type Config struct {
 	Authenticator Authenticator
 	Contacts      contactsv1.ContactsServiceClient
 	Conversation  conversationv1.ConversationServiceClient
+	Identity      identityv1.IdentityServiceClient
 	Message       messagev1.MessageServiceClient
 	Delivery      deliveryv1.DeliveryServiceClient
 	Receipt       receiptv1.ReceiptServiceClient
@@ -78,6 +81,7 @@ func NewServer(config Config) *Server {
 		auth:         config.Authenticator,
 		contacts:     config.Contacts,
 		conversation: config.Conversation,
+		identity:     config.Identity,
 		message:      config.Message,
 		delivery:     config.Delivery,
 		receipt:      config.Receipt,
@@ -113,6 +117,102 @@ func RegisterWithConfig(server grpcgo.ServiceRegistrar, gateway *Server, config 
 
 func (server *Server) GetSendContext(context.Context, *conversationv1.GetSendContextRequest) (*conversationv1.GetSendContextResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "GetSendContext is service-internal")
+}
+
+func (server *Server) RegisterUser(ctx context.Context, request *identityv1.RegisterUserRequest) (*identityv1.RegisterUserResponse, error) {
+	outgoing, traceID, requestID := server.publicIdentityContext(ctx, request.GetTraceId(), request.GetRequestId())
+	cloned := proto.Clone(request).(*identityv1.RegisterUserRequest)
+	cloned.TraceId = traceID
+	cloned.RequestId = requestID
+	return server.identity.RegisterUser(outgoing, cloned)
+}
+
+func (server *Server) Login(ctx context.Context, request *identityv1.LoginRequest) (*identityv1.LoginResponse, error) {
+	outgoing, traceID, requestID := server.publicIdentityContext(ctx, request.GetTraceId(), request.GetRequestId())
+	cloned := proto.Clone(request).(*identityv1.LoginRequest)
+	cloned.TraceId = traceID
+	cloned.RequestId = requestID
+	return server.identity.Login(outgoing, cloned)
+}
+
+func (server *Server) RefreshGatewayToken(ctx context.Context, request *identityv1.RefreshGatewayTokenRequest) (*identityv1.RefreshGatewayTokenResponse, error) {
+	outgoing, traceID, requestID := server.publicIdentityContext(ctx, request.GetTraceId(), request.GetRequestId())
+	cloned := proto.Clone(request).(*identityv1.RefreshGatewayTokenRequest)
+	cloned.TraceId = traceID
+	cloned.RequestId = requestID
+	return server.identity.RefreshGatewayToken(outgoing, cloned)
+}
+
+func (server *Server) RequestVerificationChallenge(ctx context.Context, request *identityv1.RequestVerificationChallengeRequest) (*identityv1.RequestVerificationChallengeResponse, error) {
+	outgoing, traceID, requestID := server.publicIdentityContext(ctx, request.GetTraceId(), request.GetRequestId())
+	cloned := proto.Clone(request).(*identityv1.RequestVerificationChallengeRequest)
+	cloned.TraceId = traceID
+	cloned.RequestId = requestID
+	return server.identity.RequestVerificationChallenge(outgoing, cloned)
+}
+
+func (server *Server) ConfirmVerificationChallenge(ctx context.Context, request *identityv1.ConfirmVerificationChallengeRequest) (*identityv1.ConfirmVerificationChallengeResponse, error) {
+	outgoing, traceID, requestID := server.publicIdentityContext(ctx, request.GetTraceId(), request.GetRequestId())
+	cloned := proto.Clone(request).(*identityv1.ConfirmVerificationChallengeRequest)
+	cloned.TraceId = traceID
+	cloned.RequestId = requestID
+	return server.identity.ConfirmVerificationChallenge(outgoing, cloned)
+}
+
+func (server *Server) RequestPasswordReset(ctx context.Context, request *identityv1.RequestPasswordResetRequest) (*identityv1.RequestPasswordResetResponse, error) {
+	outgoing, traceID, requestID := server.publicIdentityContext(ctx, request.GetTraceId(), request.GetRequestId())
+	cloned := proto.Clone(request).(*identityv1.RequestPasswordResetRequest)
+	cloned.TraceId = traceID
+	cloned.RequestId = requestID
+	return server.identity.RequestPasswordReset(outgoing, cloned)
+}
+
+func (server *Server) ConfirmPasswordReset(ctx context.Context, request *identityv1.ConfirmPasswordResetRequest) (*identityv1.ConfirmPasswordResetResponse, error) {
+	outgoing, traceID, requestID := server.publicIdentityContext(ctx, request.GetTraceId(), request.GetRequestId())
+	cloned := proto.Clone(request).(*identityv1.ConfirmPasswordResetRequest)
+	cloned.TraceId = traceID
+	cloned.RequestId = requestID
+	return server.identity.ConfirmPasswordReset(outgoing, cloned)
+}
+
+func (server *Server) BeginMFAEnrollment(ctx context.Context, request *identityv1.BeginMFAEnrollmentRequest) (*identityv1.BeginMFAEnrollmentResponse, error) {
+	outgoing, traceID, requestID := server.publicIdentityContext(ctx, request.GetTraceId(), request.GetRequestId())
+	cloned := proto.Clone(request).(*identityv1.BeginMFAEnrollmentRequest)
+	cloned.TraceId = traceID
+	cloned.RequestId = requestID
+	return server.identity.BeginMFAEnrollment(outgoing, cloned)
+}
+
+func (server *Server) ConfirmMFAEnrollment(ctx context.Context, request *identityv1.ConfirmMFAEnrollmentRequest) (*identityv1.ConfirmMFAEnrollmentResponse, error) {
+	outgoing, traceID, requestID := server.publicIdentityContext(ctx, request.GetTraceId(), request.GetRequestId())
+	cloned := proto.Clone(request).(*identityv1.ConfirmMFAEnrollmentRequest)
+	cloned.TraceId = traceID
+	cloned.RequestId = requestID
+	return server.identity.ConfirmMFAEnrollment(outgoing, cloned)
+}
+
+func (server *Server) DisableMFAFactor(ctx context.Context, request *identityv1.DisableMFAFactorRequest) (*identityv1.DisableMFAFactorResponse, error) {
+	outgoing, traceID, requestID := server.publicIdentityContext(ctx, request.GetTraceId(), request.GetRequestId())
+	cloned := proto.Clone(request).(*identityv1.DisableMFAFactorRequest)
+	cloned.TraceId = traceID
+	cloned.RequestId = requestID
+	return server.identity.DisableMFAFactor(outgoing, cloned)
+}
+
+func (server *Server) RegenerateMFARecoveryCodes(ctx context.Context, request *identityv1.RegenerateMFARecoveryCodesRequest) (*identityv1.RegenerateMFARecoveryCodesResponse, error) {
+	outgoing, traceID, requestID := server.publicIdentityContext(ctx, request.GetTraceId(), request.GetRequestId())
+	cloned := proto.Clone(request).(*identityv1.RegenerateMFARecoveryCodesRequest)
+	cloned.TraceId = traceID
+	cloned.RequestId = requestID
+	return server.identity.RegenerateMFARecoveryCodes(outgoing, cloned)
+}
+
+func (server *Server) RevokeMFARecoveryCodes(ctx context.Context, request *identityv1.RevokeMFARecoveryCodesRequest) (*identityv1.RevokeMFARecoveryCodesResponse, error) {
+	outgoing, traceID, requestID := server.publicIdentityContext(ctx, request.GetTraceId(), request.GetRequestId())
+	cloned := proto.Clone(request).(*identityv1.RevokeMFARecoveryCodesRequest)
+	cloned.TraceId = traceID
+	cloned.RequestId = requestID
+	return server.identity.RevokeMFARecoveryCodes(outgoing, cloned)
 }
 
 func (server *Server) CreateMemberChange(ctx context.Context, request *conversationv1.CreateMemberChangeRequest) (*conversationv1.CreateMemberChangeResponse, error) {
@@ -419,6 +519,34 @@ func (server *Server) authenticate(ctx context.Context) (gatewayauth.AuthContext
 	return auth, outgoingVerifiedContext(ctx, auth), nil
 }
 
+func (server *Server) publicIdentityContext(ctx context.Context, traceID string, requestID string) (context.Context, string, string) {
+	traceID = strings.TrimSpace(traceID)
+	requestID = strings.TrimSpace(requestID)
+	if traceID == "" {
+		traceID = firstIncomingMetadata(ctx, metadataTraceID)
+	}
+	if traceID == "" {
+		traceID = traceIDFromTraceparent(firstIncomingMetadata(ctx, metadataTraceparent))
+	}
+	if traceID == "" && server.newTraceID != nil {
+		traceID = strings.TrimSpace(server.newTraceID())
+	}
+	if requestID == "" {
+		requestID = firstIncomingMetadata(ctx, metadataRequestID)
+	}
+	if requestID == "" && server.newRequestID != nil {
+		requestID = strings.TrimSpace(server.newRequestID())
+	}
+	if traceID != "" || requestID != "" {
+		gatewaytypes.PublishCorrelation(ctx, traceID, requestID)
+		_ = grpcgo.SetHeader(ctx, responseCorrelationMetadata(gatewayauth.AuthContext{
+			TraceID:   traceID,
+			RequestID: requestID,
+		}))
+	}
+	return outgoingCorrelationContext(ctx, traceID, requestID), traceID, requestID
+}
+
 func responseCorrelationMetadata(auth gatewayauth.AuthContext) metadata.MD {
 	pairs := make([]string, 0, 4)
 	if auth.TraceID != "" {
@@ -428,6 +556,20 @@ func responseCorrelationMetadata(auth gatewayauth.AuthContext) metadata.MD {
 		pairs = append(pairs, metadataRequestID, auth.RequestID)
 	}
 	return metadata.Pairs(pairs...)
+}
+
+func outgoingCorrelationContext(ctx context.Context, traceID string, requestID string) context.Context {
+	pairs := make([]string, 0, 4)
+	if traceID != "" {
+		pairs = append(pairs, metadataTraceID, traceID)
+	}
+	if requestID != "" {
+		pairs = append(pairs, metadataRequestID, requestID)
+	}
+	if len(pairs) == 0 {
+		return ctx
+	}
+	return metadata.AppendToOutgoingContext(ctx, pairs...)
 }
 
 func authRequestFromMetadata(ctx context.Context) (*http.Request, string) {

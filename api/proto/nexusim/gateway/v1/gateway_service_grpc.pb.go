@@ -8,11 +8,12 @@ package gatewayv1
 
 import (
 	context "context"
-	v14 "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1"
-	v1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
-	v12 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
-	v11 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
-	v13 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
+	v15 "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1"
+	v11 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
+	v13 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
+	v1 "github.com/qsyy0921/IM/api/proto/nexusim/identity/v1"
+	v12 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
+	v14 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -24,33 +25,45 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	GatewayService_CreateMemberChange_FullMethodName        = "/nexusim.gateway.v1.GatewayService/CreateMemberChange"
-	GatewayService_GetMemberChange_FullMethodName           = "/nexusim.gateway.v1.GatewayService/GetMemberChange"
-	GatewayService_ListConversationMembers_FullMethodName   = "/nexusim.gateway.v1.GatewayService/ListConversationMembers"
-	GatewayService_TransferConversationOwner_FullMethodName = "/nexusim.gateway.v1.GatewayService/TransferConversationOwner"
-	GatewayService_SendMessage_FullMethodName               = "/nexusim.gateway.v1.GatewayService/SendMessage"
-	GatewayService_EditMessage_FullMethodName               = "/nexusim.gateway.v1.GatewayService/EditMessage"
-	GatewayService_RevokeMessage_FullMethodName             = "/nexusim.gateway.v1.GatewayService/RevokeMessage"
-	GatewayService_DeleteMessage_FullMethodName             = "/nexusim.gateway.v1.GatewayService/DeleteMessage"
-	GatewayService_PullInbox_FullMethodName                 = "/nexusim.gateway.v1.GatewayService/PullInbox"
-	GatewayService_AckDelivery_FullMethodName               = "/nexusim.gateway.v1.GatewayService/AckDelivery"
-	GatewayService_MarkRead_FullMethodName                  = "/nexusim.gateway.v1.GatewayService/MarkRead"
-	GatewayService_GetReceiptState_FullMethodName           = "/nexusim.gateway.v1.GatewayService/GetReceiptState"
-	GatewayService_ListReceiptStates_FullMethodName         = "/nexusim.gateway.v1.GatewayService/ListReceiptStates"
-	GatewayService_ListConversations_FullMethodName         = "/nexusim.gateway.v1.GatewayService/ListConversations"
-	GatewayService_ArchiveConversation_FullMethodName       = "/nexusim.gateway.v1.GatewayService/ArchiveConversation"
-	GatewayService_PinConversation_FullMethodName           = "/nexusim.gateway.v1.GatewayService/PinConversation"
-	GatewayService_MuteConversation_FullMethodName          = "/nexusim.gateway.v1.GatewayService/MuteConversation"
-	GatewayService_SendContactRequest_FullMethodName        = "/nexusim.gateway.v1.GatewayService/SendContactRequest"
-	GatewayService_RespondContactRequest_FullMethodName     = "/nexusim.gateway.v1.GatewayService/RespondContactRequest"
-	GatewayService_CancelContactRequest_FullMethodName      = "/nexusim.gateway.v1.GatewayService/CancelContactRequest"
-	GatewayService_ListContactRequests_FullMethodName       = "/nexusim.gateway.v1.GatewayService/ListContactRequests"
-	GatewayService_ListContacts_FullMethodName              = "/nexusim.gateway.v1.GatewayService/ListContacts"
-	GatewayService_GetContactState_FullMethodName           = "/nexusim.gateway.v1.GatewayService/GetContactState"
-	GatewayService_DeleteContact_FullMethodName             = "/nexusim.gateway.v1.GatewayService/DeleteContact"
-	GatewayService_BlockContact_FullMethodName              = "/nexusim.gateway.v1.GatewayService/BlockContact"
-	GatewayService_UnblockContact_FullMethodName            = "/nexusim.gateway.v1.GatewayService/UnblockContact"
-	GatewayService_UpdateContactRemark_FullMethodName       = "/nexusim.gateway.v1.GatewayService/UpdateContactRemark"
+	GatewayService_RegisterUser_FullMethodName                 = "/nexusim.gateway.v1.GatewayService/RegisterUser"
+	GatewayService_Login_FullMethodName                        = "/nexusim.gateway.v1.GatewayService/Login"
+	GatewayService_RefreshGatewayToken_FullMethodName          = "/nexusim.gateway.v1.GatewayService/RefreshGatewayToken"
+	GatewayService_RequestVerificationChallenge_FullMethodName = "/nexusim.gateway.v1.GatewayService/RequestVerificationChallenge"
+	GatewayService_ConfirmVerificationChallenge_FullMethodName = "/nexusim.gateway.v1.GatewayService/ConfirmVerificationChallenge"
+	GatewayService_RequestPasswordReset_FullMethodName         = "/nexusim.gateway.v1.GatewayService/RequestPasswordReset"
+	GatewayService_ConfirmPasswordReset_FullMethodName         = "/nexusim.gateway.v1.GatewayService/ConfirmPasswordReset"
+	GatewayService_BeginMFAEnrollment_FullMethodName           = "/nexusim.gateway.v1.GatewayService/BeginMFAEnrollment"
+	GatewayService_ConfirmMFAEnrollment_FullMethodName         = "/nexusim.gateway.v1.GatewayService/ConfirmMFAEnrollment"
+	GatewayService_DisableMFAFactor_FullMethodName             = "/nexusim.gateway.v1.GatewayService/DisableMFAFactor"
+	GatewayService_RegenerateMFARecoveryCodes_FullMethodName   = "/nexusim.gateway.v1.GatewayService/RegenerateMFARecoveryCodes"
+	GatewayService_RevokeMFARecoveryCodes_FullMethodName       = "/nexusim.gateway.v1.GatewayService/RevokeMFARecoveryCodes"
+	GatewayService_CreateMemberChange_FullMethodName           = "/nexusim.gateway.v1.GatewayService/CreateMemberChange"
+	GatewayService_GetMemberChange_FullMethodName              = "/nexusim.gateway.v1.GatewayService/GetMemberChange"
+	GatewayService_ListConversationMembers_FullMethodName      = "/nexusim.gateway.v1.GatewayService/ListConversationMembers"
+	GatewayService_TransferConversationOwner_FullMethodName    = "/nexusim.gateway.v1.GatewayService/TransferConversationOwner"
+	GatewayService_SendMessage_FullMethodName                  = "/nexusim.gateway.v1.GatewayService/SendMessage"
+	GatewayService_EditMessage_FullMethodName                  = "/nexusim.gateway.v1.GatewayService/EditMessage"
+	GatewayService_RevokeMessage_FullMethodName                = "/nexusim.gateway.v1.GatewayService/RevokeMessage"
+	GatewayService_DeleteMessage_FullMethodName                = "/nexusim.gateway.v1.GatewayService/DeleteMessage"
+	GatewayService_PullInbox_FullMethodName                    = "/nexusim.gateway.v1.GatewayService/PullInbox"
+	GatewayService_AckDelivery_FullMethodName                  = "/nexusim.gateway.v1.GatewayService/AckDelivery"
+	GatewayService_MarkRead_FullMethodName                     = "/nexusim.gateway.v1.GatewayService/MarkRead"
+	GatewayService_GetReceiptState_FullMethodName              = "/nexusim.gateway.v1.GatewayService/GetReceiptState"
+	GatewayService_ListReceiptStates_FullMethodName            = "/nexusim.gateway.v1.GatewayService/ListReceiptStates"
+	GatewayService_ListConversations_FullMethodName            = "/nexusim.gateway.v1.GatewayService/ListConversations"
+	GatewayService_ArchiveConversation_FullMethodName          = "/nexusim.gateway.v1.GatewayService/ArchiveConversation"
+	GatewayService_PinConversation_FullMethodName              = "/nexusim.gateway.v1.GatewayService/PinConversation"
+	GatewayService_MuteConversation_FullMethodName             = "/nexusim.gateway.v1.GatewayService/MuteConversation"
+	GatewayService_SendContactRequest_FullMethodName           = "/nexusim.gateway.v1.GatewayService/SendContactRequest"
+	GatewayService_RespondContactRequest_FullMethodName        = "/nexusim.gateway.v1.GatewayService/RespondContactRequest"
+	GatewayService_CancelContactRequest_FullMethodName         = "/nexusim.gateway.v1.GatewayService/CancelContactRequest"
+	GatewayService_ListContactRequests_FullMethodName          = "/nexusim.gateway.v1.GatewayService/ListContactRequests"
+	GatewayService_ListContacts_FullMethodName                 = "/nexusim.gateway.v1.GatewayService/ListContacts"
+	GatewayService_GetContactState_FullMethodName              = "/nexusim.gateway.v1.GatewayService/GetContactState"
+	GatewayService_DeleteContact_FullMethodName                = "/nexusim.gateway.v1.GatewayService/DeleteContact"
+	GatewayService_BlockContact_FullMethodName                 = "/nexusim.gateway.v1.GatewayService/BlockContact"
+	GatewayService_UnblockContact_FullMethodName               = "/nexusim.gateway.v1.GatewayService/UnblockContact"
+	GatewayService_UpdateContactRemark_FullMethodName          = "/nexusim.gateway.v1.GatewayService/UpdateContactRemark"
 )
 
 // GatewayServiceClient is the client API for GatewayService service.
@@ -60,33 +73,45 @@ const (
 // GatewayService is the first-stage public client facade.
 // It intentionally excludes service-internal RPCs such as ConversationService.GetSendContext.
 type GatewayServiceClient interface {
-	CreateMemberChange(ctx context.Context, in *v1.CreateMemberChangeRequest, opts ...grpc.CallOption) (*v1.CreateMemberChangeResponse, error)
-	GetMemberChange(ctx context.Context, in *v1.GetMemberChangeRequest, opts ...grpc.CallOption) (*v1.GetMemberChangeResponse, error)
-	ListConversationMembers(ctx context.Context, in *v1.ListConversationMembersRequest, opts ...grpc.CallOption) (*v1.ListConversationMembersResponse, error)
-	TransferConversationOwner(ctx context.Context, in *v1.TransferConversationOwnerRequest, opts ...grpc.CallOption) (*v1.TransferConversationOwnerResponse, error)
-	SendMessage(ctx context.Context, in *v11.SendMessageRequest, opts ...grpc.CallOption) (*v11.SendMessageResponse, error)
-	EditMessage(ctx context.Context, in *v11.EditMessageRequest, opts ...grpc.CallOption) (*v11.MessageChangeResponse, error)
-	RevokeMessage(ctx context.Context, in *v11.RevokeMessageRequest, opts ...grpc.CallOption) (*v11.MessageChangeResponse, error)
-	DeleteMessage(ctx context.Context, in *v11.DeleteMessageRequest, opts ...grpc.CallOption) (*v11.MessageChangeResponse, error)
-	PullInbox(ctx context.Context, in *v12.PullInboxRequest, opts ...grpc.CallOption) (*v12.PullInboxResponse, error)
-	AckDelivery(ctx context.Context, in *v12.AckDeliveryRequest, opts ...grpc.CallOption) (*v12.AckDeliveryResponse, error)
-	MarkRead(ctx context.Context, in *v13.MarkReadRequest, opts ...grpc.CallOption) (*v13.MarkReadResponse, error)
-	GetReceiptState(ctx context.Context, in *v13.GetReceiptStateRequest, opts ...grpc.CallOption) (*v13.GetReceiptStateResponse, error)
-	ListReceiptStates(ctx context.Context, in *v13.ListReceiptStatesRequest, opts ...grpc.CallOption) (*v13.ListReceiptStatesResponse, error)
-	ListConversations(ctx context.Context, in *v13.ListConversationsRequest, opts ...grpc.CallOption) (*v13.ListConversationsResponse, error)
-	ArchiveConversation(ctx context.Context, in *v13.ArchiveConversationRequest, opts ...grpc.CallOption) (*v13.ArchiveConversationResponse, error)
-	PinConversation(ctx context.Context, in *v13.PinConversationRequest, opts ...grpc.CallOption) (*v13.PinConversationResponse, error)
-	MuteConversation(ctx context.Context, in *v13.MuteConversationRequest, opts ...grpc.CallOption) (*v13.MuteConversationResponse, error)
-	SendContactRequest(ctx context.Context, in *v14.SendContactRequestRequest, opts ...grpc.CallOption) (*v14.SendContactRequestResponse, error)
-	RespondContactRequest(ctx context.Context, in *v14.RespondContactRequestRequest, opts ...grpc.CallOption) (*v14.RespondContactRequestResponse, error)
-	CancelContactRequest(ctx context.Context, in *v14.CancelContactRequestRequest, opts ...grpc.CallOption) (*v14.CancelContactRequestResponse, error)
-	ListContactRequests(ctx context.Context, in *v14.ListContactRequestsRequest, opts ...grpc.CallOption) (*v14.ListContactRequestsResponse, error)
-	ListContacts(ctx context.Context, in *v14.ListContactsRequest, opts ...grpc.CallOption) (*v14.ListContactsResponse, error)
-	GetContactState(ctx context.Context, in *v14.GetContactStateRequest, opts ...grpc.CallOption) (*v14.GetContactStateResponse, error)
-	DeleteContact(ctx context.Context, in *v14.DeleteContactRequest, opts ...grpc.CallOption) (*v14.DeleteContactResponse, error)
-	BlockContact(ctx context.Context, in *v14.BlockContactRequest, opts ...grpc.CallOption) (*v14.BlockContactResponse, error)
-	UnblockContact(ctx context.Context, in *v14.UnblockContactRequest, opts ...grpc.CallOption) (*v14.UnblockContactResponse, error)
-	UpdateContactRemark(ctx context.Context, in *v14.UpdateContactRemarkRequest, opts ...grpc.CallOption) (*v14.UpdateContactRemarkResponse, error)
+	RegisterUser(ctx context.Context, in *v1.RegisterUserRequest, opts ...grpc.CallOption) (*v1.RegisterUserResponse, error)
+	Login(ctx context.Context, in *v1.LoginRequest, opts ...grpc.CallOption) (*v1.LoginResponse, error)
+	RefreshGatewayToken(ctx context.Context, in *v1.RefreshGatewayTokenRequest, opts ...grpc.CallOption) (*v1.RefreshGatewayTokenResponse, error)
+	RequestVerificationChallenge(ctx context.Context, in *v1.RequestVerificationChallengeRequest, opts ...grpc.CallOption) (*v1.RequestVerificationChallengeResponse, error)
+	ConfirmVerificationChallenge(ctx context.Context, in *v1.ConfirmVerificationChallengeRequest, opts ...grpc.CallOption) (*v1.ConfirmVerificationChallengeResponse, error)
+	RequestPasswordReset(ctx context.Context, in *v1.RequestPasswordResetRequest, opts ...grpc.CallOption) (*v1.RequestPasswordResetResponse, error)
+	ConfirmPasswordReset(ctx context.Context, in *v1.ConfirmPasswordResetRequest, opts ...grpc.CallOption) (*v1.ConfirmPasswordResetResponse, error)
+	BeginMFAEnrollment(ctx context.Context, in *v1.BeginMFAEnrollmentRequest, opts ...grpc.CallOption) (*v1.BeginMFAEnrollmentResponse, error)
+	ConfirmMFAEnrollment(ctx context.Context, in *v1.ConfirmMFAEnrollmentRequest, opts ...grpc.CallOption) (*v1.ConfirmMFAEnrollmentResponse, error)
+	DisableMFAFactor(ctx context.Context, in *v1.DisableMFAFactorRequest, opts ...grpc.CallOption) (*v1.DisableMFAFactorResponse, error)
+	RegenerateMFARecoveryCodes(ctx context.Context, in *v1.RegenerateMFARecoveryCodesRequest, opts ...grpc.CallOption) (*v1.RegenerateMFARecoveryCodesResponse, error)
+	RevokeMFARecoveryCodes(ctx context.Context, in *v1.RevokeMFARecoveryCodesRequest, opts ...grpc.CallOption) (*v1.RevokeMFARecoveryCodesResponse, error)
+	CreateMemberChange(ctx context.Context, in *v11.CreateMemberChangeRequest, opts ...grpc.CallOption) (*v11.CreateMemberChangeResponse, error)
+	GetMemberChange(ctx context.Context, in *v11.GetMemberChangeRequest, opts ...grpc.CallOption) (*v11.GetMemberChangeResponse, error)
+	ListConversationMembers(ctx context.Context, in *v11.ListConversationMembersRequest, opts ...grpc.CallOption) (*v11.ListConversationMembersResponse, error)
+	TransferConversationOwner(ctx context.Context, in *v11.TransferConversationOwnerRequest, opts ...grpc.CallOption) (*v11.TransferConversationOwnerResponse, error)
+	SendMessage(ctx context.Context, in *v12.SendMessageRequest, opts ...grpc.CallOption) (*v12.SendMessageResponse, error)
+	EditMessage(ctx context.Context, in *v12.EditMessageRequest, opts ...grpc.CallOption) (*v12.MessageChangeResponse, error)
+	RevokeMessage(ctx context.Context, in *v12.RevokeMessageRequest, opts ...grpc.CallOption) (*v12.MessageChangeResponse, error)
+	DeleteMessage(ctx context.Context, in *v12.DeleteMessageRequest, opts ...grpc.CallOption) (*v12.MessageChangeResponse, error)
+	PullInbox(ctx context.Context, in *v13.PullInboxRequest, opts ...grpc.CallOption) (*v13.PullInboxResponse, error)
+	AckDelivery(ctx context.Context, in *v13.AckDeliveryRequest, opts ...grpc.CallOption) (*v13.AckDeliveryResponse, error)
+	MarkRead(ctx context.Context, in *v14.MarkReadRequest, opts ...grpc.CallOption) (*v14.MarkReadResponse, error)
+	GetReceiptState(ctx context.Context, in *v14.GetReceiptStateRequest, opts ...grpc.CallOption) (*v14.GetReceiptStateResponse, error)
+	ListReceiptStates(ctx context.Context, in *v14.ListReceiptStatesRequest, opts ...grpc.CallOption) (*v14.ListReceiptStatesResponse, error)
+	ListConversations(ctx context.Context, in *v14.ListConversationsRequest, opts ...grpc.CallOption) (*v14.ListConversationsResponse, error)
+	ArchiveConversation(ctx context.Context, in *v14.ArchiveConversationRequest, opts ...grpc.CallOption) (*v14.ArchiveConversationResponse, error)
+	PinConversation(ctx context.Context, in *v14.PinConversationRequest, opts ...grpc.CallOption) (*v14.PinConversationResponse, error)
+	MuteConversation(ctx context.Context, in *v14.MuteConversationRequest, opts ...grpc.CallOption) (*v14.MuteConversationResponse, error)
+	SendContactRequest(ctx context.Context, in *v15.SendContactRequestRequest, opts ...grpc.CallOption) (*v15.SendContactRequestResponse, error)
+	RespondContactRequest(ctx context.Context, in *v15.RespondContactRequestRequest, opts ...grpc.CallOption) (*v15.RespondContactRequestResponse, error)
+	CancelContactRequest(ctx context.Context, in *v15.CancelContactRequestRequest, opts ...grpc.CallOption) (*v15.CancelContactRequestResponse, error)
+	ListContactRequests(ctx context.Context, in *v15.ListContactRequestsRequest, opts ...grpc.CallOption) (*v15.ListContactRequestsResponse, error)
+	ListContacts(ctx context.Context, in *v15.ListContactsRequest, opts ...grpc.CallOption) (*v15.ListContactsResponse, error)
+	GetContactState(ctx context.Context, in *v15.GetContactStateRequest, opts ...grpc.CallOption) (*v15.GetContactStateResponse, error)
+	DeleteContact(ctx context.Context, in *v15.DeleteContactRequest, opts ...grpc.CallOption) (*v15.DeleteContactResponse, error)
+	BlockContact(ctx context.Context, in *v15.BlockContactRequest, opts ...grpc.CallOption) (*v15.BlockContactResponse, error)
+	UnblockContact(ctx context.Context, in *v15.UnblockContactRequest, opts ...grpc.CallOption) (*v15.UnblockContactResponse, error)
+	UpdateContactRemark(ctx context.Context, in *v15.UpdateContactRemarkRequest, opts ...grpc.CallOption) (*v15.UpdateContactRemarkResponse, error)
 }
 
 type gatewayServiceClient struct {
@@ -97,9 +122,129 @@ func NewGatewayServiceClient(cc grpc.ClientConnInterface) GatewayServiceClient {
 	return &gatewayServiceClient{cc}
 }
 
-func (c *gatewayServiceClient) CreateMemberChange(ctx context.Context, in *v1.CreateMemberChangeRequest, opts ...grpc.CallOption) (*v1.CreateMemberChangeResponse, error) {
+func (c *gatewayServiceClient) RegisterUser(ctx context.Context, in *v1.RegisterUserRequest, opts ...grpc.CallOption) (*v1.RegisterUserResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v1.CreateMemberChangeResponse)
+	out := new(v1.RegisterUserResponse)
+	err := c.cc.Invoke(ctx, GatewayService_RegisterUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) Login(ctx context.Context, in *v1.LoginRequest, opts ...grpc.CallOption) (*v1.LoginResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.LoginResponse)
+	err := c.cc.Invoke(ctx, GatewayService_Login_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) RefreshGatewayToken(ctx context.Context, in *v1.RefreshGatewayTokenRequest, opts ...grpc.CallOption) (*v1.RefreshGatewayTokenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.RefreshGatewayTokenResponse)
+	err := c.cc.Invoke(ctx, GatewayService_RefreshGatewayToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) RequestVerificationChallenge(ctx context.Context, in *v1.RequestVerificationChallengeRequest, opts ...grpc.CallOption) (*v1.RequestVerificationChallengeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.RequestVerificationChallengeResponse)
+	err := c.cc.Invoke(ctx, GatewayService_RequestVerificationChallenge_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) ConfirmVerificationChallenge(ctx context.Context, in *v1.ConfirmVerificationChallengeRequest, opts ...grpc.CallOption) (*v1.ConfirmVerificationChallengeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.ConfirmVerificationChallengeResponse)
+	err := c.cc.Invoke(ctx, GatewayService_ConfirmVerificationChallenge_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) RequestPasswordReset(ctx context.Context, in *v1.RequestPasswordResetRequest, opts ...grpc.CallOption) (*v1.RequestPasswordResetResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.RequestPasswordResetResponse)
+	err := c.cc.Invoke(ctx, GatewayService_RequestPasswordReset_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) ConfirmPasswordReset(ctx context.Context, in *v1.ConfirmPasswordResetRequest, opts ...grpc.CallOption) (*v1.ConfirmPasswordResetResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.ConfirmPasswordResetResponse)
+	err := c.cc.Invoke(ctx, GatewayService_ConfirmPasswordReset_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) BeginMFAEnrollment(ctx context.Context, in *v1.BeginMFAEnrollmentRequest, opts ...grpc.CallOption) (*v1.BeginMFAEnrollmentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.BeginMFAEnrollmentResponse)
+	err := c.cc.Invoke(ctx, GatewayService_BeginMFAEnrollment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) ConfirmMFAEnrollment(ctx context.Context, in *v1.ConfirmMFAEnrollmentRequest, opts ...grpc.CallOption) (*v1.ConfirmMFAEnrollmentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.ConfirmMFAEnrollmentResponse)
+	err := c.cc.Invoke(ctx, GatewayService_ConfirmMFAEnrollment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) DisableMFAFactor(ctx context.Context, in *v1.DisableMFAFactorRequest, opts ...grpc.CallOption) (*v1.DisableMFAFactorResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.DisableMFAFactorResponse)
+	err := c.cc.Invoke(ctx, GatewayService_DisableMFAFactor_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) RegenerateMFARecoveryCodes(ctx context.Context, in *v1.RegenerateMFARecoveryCodesRequest, opts ...grpc.CallOption) (*v1.RegenerateMFARecoveryCodesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.RegenerateMFARecoveryCodesResponse)
+	err := c.cc.Invoke(ctx, GatewayService_RegenerateMFARecoveryCodes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) RevokeMFARecoveryCodes(ctx context.Context, in *v1.RevokeMFARecoveryCodesRequest, opts ...grpc.CallOption) (*v1.RevokeMFARecoveryCodesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.RevokeMFARecoveryCodesResponse)
+	err := c.cc.Invoke(ctx, GatewayService_RevokeMFARecoveryCodes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) CreateMemberChange(ctx context.Context, in *v11.CreateMemberChangeRequest, opts ...grpc.CallOption) (*v11.CreateMemberChangeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v11.CreateMemberChangeResponse)
 	err := c.cc.Invoke(ctx, GatewayService_CreateMemberChange_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -107,9 +252,9 @@ func (c *gatewayServiceClient) CreateMemberChange(ctx context.Context, in *v1.Cr
 	return out, nil
 }
 
-func (c *gatewayServiceClient) GetMemberChange(ctx context.Context, in *v1.GetMemberChangeRequest, opts ...grpc.CallOption) (*v1.GetMemberChangeResponse, error) {
+func (c *gatewayServiceClient) GetMemberChange(ctx context.Context, in *v11.GetMemberChangeRequest, opts ...grpc.CallOption) (*v11.GetMemberChangeResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v1.GetMemberChangeResponse)
+	out := new(v11.GetMemberChangeResponse)
 	err := c.cc.Invoke(ctx, GatewayService_GetMemberChange_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -117,9 +262,9 @@ func (c *gatewayServiceClient) GetMemberChange(ctx context.Context, in *v1.GetMe
 	return out, nil
 }
 
-func (c *gatewayServiceClient) ListConversationMembers(ctx context.Context, in *v1.ListConversationMembersRequest, opts ...grpc.CallOption) (*v1.ListConversationMembersResponse, error) {
+func (c *gatewayServiceClient) ListConversationMembers(ctx context.Context, in *v11.ListConversationMembersRequest, opts ...grpc.CallOption) (*v11.ListConversationMembersResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v1.ListConversationMembersResponse)
+	out := new(v11.ListConversationMembersResponse)
 	err := c.cc.Invoke(ctx, GatewayService_ListConversationMembers_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -127,9 +272,9 @@ func (c *gatewayServiceClient) ListConversationMembers(ctx context.Context, in *
 	return out, nil
 }
 
-func (c *gatewayServiceClient) TransferConversationOwner(ctx context.Context, in *v1.TransferConversationOwnerRequest, opts ...grpc.CallOption) (*v1.TransferConversationOwnerResponse, error) {
+func (c *gatewayServiceClient) TransferConversationOwner(ctx context.Context, in *v11.TransferConversationOwnerRequest, opts ...grpc.CallOption) (*v11.TransferConversationOwnerResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v1.TransferConversationOwnerResponse)
+	out := new(v11.TransferConversationOwnerResponse)
 	err := c.cc.Invoke(ctx, GatewayService_TransferConversationOwner_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -137,9 +282,9 @@ func (c *gatewayServiceClient) TransferConversationOwner(ctx context.Context, in
 	return out, nil
 }
 
-func (c *gatewayServiceClient) SendMessage(ctx context.Context, in *v11.SendMessageRequest, opts ...grpc.CallOption) (*v11.SendMessageResponse, error) {
+func (c *gatewayServiceClient) SendMessage(ctx context.Context, in *v12.SendMessageRequest, opts ...grpc.CallOption) (*v12.SendMessageResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v11.SendMessageResponse)
+	out := new(v12.SendMessageResponse)
 	err := c.cc.Invoke(ctx, GatewayService_SendMessage_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -147,9 +292,9 @@ func (c *gatewayServiceClient) SendMessage(ctx context.Context, in *v11.SendMess
 	return out, nil
 }
 
-func (c *gatewayServiceClient) EditMessage(ctx context.Context, in *v11.EditMessageRequest, opts ...grpc.CallOption) (*v11.MessageChangeResponse, error) {
+func (c *gatewayServiceClient) EditMessage(ctx context.Context, in *v12.EditMessageRequest, opts ...grpc.CallOption) (*v12.MessageChangeResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v11.MessageChangeResponse)
+	out := new(v12.MessageChangeResponse)
 	err := c.cc.Invoke(ctx, GatewayService_EditMessage_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -157,9 +302,9 @@ func (c *gatewayServiceClient) EditMessage(ctx context.Context, in *v11.EditMess
 	return out, nil
 }
 
-func (c *gatewayServiceClient) RevokeMessage(ctx context.Context, in *v11.RevokeMessageRequest, opts ...grpc.CallOption) (*v11.MessageChangeResponse, error) {
+func (c *gatewayServiceClient) RevokeMessage(ctx context.Context, in *v12.RevokeMessageRequest, opts ...grpc.CallOption) (*v12.MessageChangeResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v11.MessageChangeResponse)
+	out := new(v12.MessageChangeResponse)
 	err := c.cc.Invoke(ctx, GatewayService_RevokeMessage_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -167,9 +312,9 @@ func (c *gatewayServiceClient) RevokeMessage(ctx context.Context, in *v11.Revoke
 	return out, nil
 }
 
-func (c *gatewayServiceClient) DeleteMessage(ctx context.Context, in *v11.DeleteMessageRequest, opts ...grpc.CallOption) (*v11.MessageChangeResponse, error) {
+func (c *gatewayServiceClient) DeleteMessage(ctx context.Context, in *v12.DeleteMessageRequest, opts ...grpc.CallOption) (*v12.MessageChangeResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v11.MessageChangeResponse)
+	out := new(v12.MessageChangeResponse)
 	err := c.cc.Invoke(ctx, GatewayService_DeleteMessage_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -177,9 +322,9 @@ func (c *gatewayServiceClient) DeleteMessage(ctx context.Context, in *v11.Delete
 	return out, nil
 }
 
-func (c *gatewayServiceClient) PullInbox(ctx context.Context, in *v12.PullInboxRequest, opts ...grpc.CallOption) (*v12.PullInboxResponse, error) {
+func (c *gatewayServiceClient) PullInbox(ctx context.Context, in *v13.PullInboxRequest, opts ...grpc.CallOption) (*v13.PullInboxResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v12.PullInboxResponse)
+	out := new(v13.PullInboxResponse)
 	err := c.cc.Invoke(ctx, GatewayService_PullInbox_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -187,9 +332,9 @@ func (c *gatewayServiceClient) PullInbox(ctx context.Context, in *v12.PullInboxR
 	return out, nil
 }
 
-func (c *gatewayServiceClient) AckDelivery(ctx context.Context, in *v12.AckDeliveryRequest, opts ...grpc.CallOption) (*v12.AckDeliveryResponse, error) {
+func (c *gatewayServiceClient) AckDelivery(ctx context.Context, in *v13.AckDeliveryRequest, opts ...grpc.CallOption) (*v13.AckDeliveryResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v12.AckDeliveryResponse)
+	out := new(v13.AckDeliveryResponse)
 	err := c.cc.Invoke(ctx, GatewayService_AckDelivery_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -197,9 +342,9 @@ func (c *gatewayServiceClient) AckDelivery(ctx context.Context, in *v12.AckDeliv
 	return out, nil
 }
 
-func (c *gatewayServiceClient) MarkRead(ctx context.Context, in *v13.MarkReadRequest, opts ...grpc.CallOption) (*v13.MarkReadResponse, error) {
+func (c *gatewayServiceClient) MarkRead(ctx context.Context, in *v14.MarkReadRequest, opts ...grpc.CallOption) (*v14.MarkReadResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v13.MarkReadResponse)
+	out := new(v14.MarkReadResponse)
 	err := c.cc.Invoke(ctx, GatewayService_MarkRead_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -207,9 +352,9 @@ func (c *gatewayServiceClient) MarkRead(ctx context.Context, in *v13.MarkReadReq
 	return out, nil
 }
 
-func (c *gatewayServiceClient) GetReceiptState(ctx context.Context, in *v13.GetReceiptStateRequest, opts ...grpc.CallOption) (*v13.GetReceiptStateResponse, error) {
+func (c *gatewayServiceClient) GetReceiptState(ctx context.Context, in *v14.GetReceiptStateRequest, opts ...grpc.CallOption) (*v14.GetReceiptStateResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v13.GetReceiptStateResponse)
+	out := new(v14.GetReceiptStateResponse)
 	err := c.cc.Invoke(ctx, GatewayService_GetReceiptState_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -217,9 +362,9 @@ func (c *gatewayServiceClient) GetReceiptState(ctx context.Context, in *v13.GetR
 	return out, nil
 }
 
-func (c *gatewayServiceClient) ListReceiptStates(ctx context.Context, in *v13.ListReceiptStatesRequest, opts ...grpc.CallOption) (*v13.ListReceiptStatesResponse, error) {
+func (c *gatewayServiceClient) ListReceiptStates(ctx context.Context, in *v14.ListReceiptStatesRequest, opts ...grpc.CallOption) (*v14.ListReceiptStatesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v13.ListReceiptStatesResponse)
+	out := new(v14.ListReceiptStatesResponse)
 	err := c.cc.Invoke(ctx, GatewayService_ListReceiptStates_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -227,9 +372,9 @@ func (c *gatewayServiceClient) ListReceiptStates(ctx context.Context, in *v13.Li
 	return out, nil
 }
 
-func (c *gatewayServiceClient) ListConversations(ctx context.Context, in *v13.ListConversationsRequest, opts ...grpc.CallOption) (*v13.ListConversationsResponse, error) {
+func (c *gatewayServiceClient) ListConversations(ctx context.Context, in *v14.ListConversationsRequest, opts ...grpc.CallOption) (*v14.ListConversationsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v13.ListConversationsResponse)
+	out := new(v14.ListConversationsResponse)
 	err := c.cc.Invoke(ctx, GatewayService_ListConversations_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -237,9 +382,9 @@ func (c *gatewayServiceClient) ListConversations(ctx context.Context, in *v13.Li
 	return out, nil
 }
 
-func (c *gatewayServiceClient) ArchiveConversation(ctx context.Context, in *v13.ArchiveConversationRequest, opts ...grpc.CallOption) (*v13.ArchiveConversationResponse, error) {
+func (c *gatewayServiceClient) ArchiveConversation(ctx context.Context, in *v14.ArchiveConversationRequest, opts ...grpc.CallOption) (*v14.ArchiveConversationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v13.ArchiveConversationResponse)
+	out := new(v14.ArchiveConversationResponse)
 	err := c.cc.Invoke(ctx, GatewayService_ArchiveConversation_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -247,9 +392,9 @@ func (c *gatewayServiceClient) ArchiveConversation(ctx context.Context, in *v13.
 	return out, nil
 }
 
-func (c *gatewayServiceClient) PinConversation(ctx context.Context, in *v13.PinConversationRequest, opts ...grpc.CallOption) (*v13.PinConversationResponse, error) {
+func (c *gatewayServiceClient) PinConversation(ctx context.Context, in *v14.PinConversationRequest, opts ...grpc.CallOption) (*v14.PinConversationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v13.PinConversationResponse)
+	out := new(v14.PinConversationResponse)
 	err := c.cc.Invoke(ctx, GatewayService_PinConversation_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -257,9 +402,9 @@ func (c *gatewayServiceClient) PinConversation(ctx context.Context, in *v13.PinC
 	return out, nil
 }
 
-func (c *gatewayServiceClient) MuteConversation(ctx context.Context, in *v13.MuteConversationRequest, opts ...grpc.CallOption) (*v13.MuteConversationResponse, error) {
+func (c *gatewayServiceClient) MuteConversation(ctx context.Context, in *v14.MuteConversationRequest, opts ...grpc.CallOption) (*v14.MuteConversationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v13.MuteConversationResponse)
+	out := new(v14.MuteConversationResponse)
 	err := c.cc.Invoke(ctx, GatewayService_MuteConversation_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -267,9 +412,9 @@ func (c *gatewayServiceClient) MuteConversation(ctx context.Context, in *v13.Mut
 	return out, nil
 }
 
-func (c *gatewayServiceClient) SendContactRequest(ctx context.Context, in *v14.SendContactRequestRequest, opts ...grpc.CallOption) (*v14.SendContactRequestResponse, error) {
+func (c *gatewayServiceClient) SendContactRequest(ctx context.Context, in *v15.SendContactRequestRequest, opts ...grpc.CallOption) (*v15.SendContactRequestResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v14.SendContactRequestResponse)
+	out := new(v15.SendContactRequestResponse)
 	err := c.cc.Invoke(ctx, GatewayService_SendContactRequest_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -277,9 +422,9 @@ func (c *gatewayServiceClient) SendContactRequest(ctx context.Context, in *v14.S
 	return out, nil
 }
 
-func (c *gatewayServiceClient) RespondContactRequest(ctx context.Context, in *v14.RespondContactRequestRequest, opts ...grpc.CallOption) (*v14.RespondContactRequestResponse, error) {
+func (c *gatewayServiceClient) RespondContactRequest(ctx context.Context, in *v15.RespondContactRequestRequest, opts ...grpc.CallOption) (*v15.RespondContactRequestResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v14.RespondContactRequestResponse)
+	out := new(v15.RespondContactRequestResponse)
 	err := c.cc.Invoke(ctx, GatewayService_RespondContactRequest_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -287,9 +432,9 @@ func (c *gatewayServiceClient) RespondContactRequest(ctx context.Context, in *v1
 	return out, nil
 }
 
-func (c *gatewayServiceClient) CancelContactRequest(ctx context.Context, in *v14.CancelContactRequestRequest, opts ...grpc.CallOption) (*v14.CancelContactRequestResponse, error) {
+func (c *gatewayServiceClient) CancelContactRequest(ctx context.Context, in *v15.CancelContactRequestRequest, opts ...grpc.CallOption) (*v15.CancelContactRequestResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v14.CancelContactRequestResponse)
+	out := new(v15.CancelContactRequestResponse)
 	err := c.cc.Invoke(ctx, GatewayService_CancelContactRequest_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -297,9 +442,9 @@ func (c *gatewayServiceClient) CancelContactRequest(ctx context.Context, in *v14
 	return out, nil
 }
 
-func (c *gatewayServiceClient) ListContactRequests(ctx context.Context, in *v14.ListContactRequestsRequest, opts ...grpc.CallOption) (*v14.ListContactRequestsResponse, error) {
+func (c *gatewayServiceClient) ListContactRequests(ctx context.Context, in *v15.ListContactRequestsRequest, opts ...grpc.CallOption) (*v15.ListContactRequestsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v14.ListContactRequestsResponse)
+	out := new(v15.ListContactRequestsResponse)
 	err := c.cc.Invoke(ctx, GatewayService_ListContactRequests_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -307,9 +452,9 @@ func (c *gatewayServiceClient) ListContactRequests(ctx context.Context, in *v14.
 	return out, nil
 }
 
-func (c *gatewayServiceClient) ListContacts(ctx context.Context, in *v14.ListContactsRequest, opts ...grpc.CallOption) (*v14.ListContactsResponse, error) {
+func (c *gatewayServiceClient) ListContacts(ctx context.Context, in *v15.ListContactsRequest, opts ...grpc.CallOption) (*v15.ListContactsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v14.ListContactsResponse)
+	out := new(v15.ListContactsResponse)
 	err := c.cc.Invoke(ctx, GatewayService_ListContacts_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -317,9 +462,9 @@ func (c *gatewayServiceClient) ListContacts(ctx context.Context, in *v14.ListCon
 	return out, nil
 }
 
-func (c *gatewayServiceClient) GetContactState(ctx context.Context, in *v14.GetContactStateRequest, opts ...grpc.CallOption) (*v14.GetContactStateResponse, error) {
+func (c *gatewayServiceClient) GetContactState(ctx context.Context, in *v15.GetContactStateRequest, opts ...grpc.CallOption) (*v15.GetContactStateResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v14.GetContactStateResponse)
+	out := new(v15.GetContactStateResponse)
 	err := c.cc.Invoke(ctx, GatewayService_GetContactState_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -327,9 +472,9 @@ func (c *gatewayServiceClient) GetContactState(ctx context.Context, in *v14.GetC
 	return out, nil
 }
 
-func (c *gatewayServiceClient) DeleteContact(ctx context.Context, in *v14.DeleteContactRequest, opts ...grpc.CallOption) (*v14.DeleteContactResponse, error) {
+func (c *gatewayServiceClient) DeleteContact(ctx context.Context, in *v15.DeleteContactRequest, opts ...grpc.CallOption) (*v15.DeleteContactResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v14.DeleteContactResponse)
+	out := new(v15.DeleteContactResponse)
 	err := c.cc.Invoke(ctx, GatewayService_DeleteContact_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -337,9 +482,9 @@ func (c *gatewayServiceClient) DeleteContact(ctx context.Context, in *v14.Delete
 	return out, nil
 }
 
-func (c *gatewayServiceClient) BlockContact(ctx context.Context, in *v14.BlockContactRequest, opts ...grpc.CallOption) (*v14.BlockContactResponse, error) {
+func (c *gatewayServiceClient) BlockContact(ctx context.Context, in *v15.BlockContactRequest, opts ...grpc.CallOption) (*v15.BlockContactResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v14.BlockContactResponse)
+	out := new(v15.BlockContactResponse)
 	err := c.cc.Invoke(ctx, GatewayService_BlockContact_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -347,9 +492,9 @@ func (c *gatewayServiceClient) BlockContact(ctx context.Context, in *v14.BlockCo
 	return out, nil
 }
 
-func (c *gatewayServiceClient) UnblockContact(ctx context.Context, in *v14.UnblockContactRequest, opts ...grpc.CallOption) (*v14.UnblockContactResponse, error) {
+func (c *gatewayServiceClient) UnblockContact(ctx context.Context, in *v15.UnblockContactRequest, opts ...grpc.CallOption) (*v15.UnblockContactResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v14.UnblockContactResponse)
+	out := new(v15.UnblockContactResponse)
 	err := c.cc.Invoke(ctx, GatewayService_UnblockContact_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -357,9 +502,9 @@ func (c *gatewayServiceClient) UnblockContact(ctx context.Context, in *v14.Unblo
 	return out, nil
 }
 
-func (c *gatewayServiceClient) UpdateContactRemark(ctx context.Context, in *v14.UpdateContactRemarkRequest, opts ...grpc.CallOption) (*v14.UpdateContactRemarkResponse, error) {
+func (c *gatewayServiceClient) UpdateContactRemark(ctx context.Context, in *v15.UpdateContactRemarkRequest, opts ...grpc.CallOption) (*v15.UpdateContactRemarkResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(v14.UpdateContactRemarkResponse)
+	out := new(v15.UpdateContactRemarkResponse)
 	err := c.cc.Invoke(ctx, GatewayService_UpdateContactRemark_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -374,33 +519,45 @@ func (c *gatewayServiceClient) UpdateContactRemark(ctx context.Context, in *v14.
 // GatewayService is the first-stage public client facade.
 // It intentionally excludes service-internal RPCs such as ConversationService.GetSendContext.
 type GatewayServiceServer interface {
-	CreateMemberChange(context.Context, *v1.CreateMemberChangeRequest) (*v1.CreateMemberChangeResponse, error)
-	GetMemberChange(context.Context, *v1.GetMemberChangeRequest) (*v1.GetMemberChangeResponse, error)
-	ListConversationMembers(context.Context, *v1.ListConversationMembersRequest) (*v1.ListConversationMembersResponse, error)
-	TransferConversationOwner(context.Context, *v1.TransferConversationOwnerRequest) (*v1.TransferConversationOwnerResponse, error)
-	SendMessage(context.Context, *v11.SendMessageRequest) (*v11.SendMessageResponse, error)
-	EditMessage(context.Context, *v11.EditMessageRequest) (*v11.MessageChangeResponse, error)
-	RevokeMessage(context.Context, *v11.RevokeMessageRequest) (*v11.MessageChangeResponse, error)
-	DeleteMessage(context.Context, *v11.DeleteMessageRequest) (*v11.MessageChangeResponse, error)
-	PullInbox(context.Context, *v12.PullInboxRequest) (*v12.PullInboxResponse, error)
-	AckDelivery(context.Context, *v12.AckDeliveryRequest) (*v12.AckDeliveryResponse, error)
-	MarkRead(context.Context, *v13.MarkReadRequest) (*v13.MarkReadResponse, error)
-	GetReceiptState(context.Context, *v13.GetReceiptStateRequest) (*v13.GetReceiptStateResponse, error)
-	ListReceiptStates(context.Context, *v13.ListReceiptStatesRequest) (*v13.ListReceiptStatesResponse, error)
-	ListConversations(context.Context, *v13.ListConversationsRequest) (*v13.ListConversationsResponse, error)
-	ArchiveConversation(context.Context, *v13.ArchiveConversationRequest) (*v13.ArchiveConversationResponse, error)
-	PinConversation(context.Context, *v13.PinConversationRequest) (*v13.PinConversationResponse, error)
-	MuteConversation(context.Context, *v13.MuteConversationRequest) (*v13.MuteConversationResponse, error)
-	SendContactRequest(context.Context, *v14.SendContactRequestRequest) (*v14.SendContactRequestResponse, error)
-	RespondContactRequest(context.Context, *v14.RespondContactRequestRequest) (*v14.RespondContactRequestResponse, error)
-	CancelContactRequest(context.Context, *v14.CancelContactRequestRequest) (*v14.CancelContactRequestResponse, error)
-	ListContactRequests(context.Context, *v14.ListContactRequestsRequest) (*v14.ListContactRequestsResponse, error)
-	ListContacts(context.Context, *v14.ListContactsRequest) (*v14.ListContactsResponse, error)
-	GetContactState(context.Context, *v14.GetContactStateRequest) (*v14.GetContactStateResponse, error)
-	DeleteContact(context.Context, *v14.DeleteContactRequest) (*v14.DeleteContactResponse, error)
-	BlockContact(context.Context, *v14.BlockContactRequest) (*v14.BlockContactResponse, error)
-	UnblockContact(context.Context, *v14.UnblockContactRequest) (*v14.UnblockContactResponse, error)
-	UpdateContactRemark(context.Context, *v14.UpdateContactRemarkRequest) (*v14.UpdateContactRemarkResponse, error)
+	RegisterUser(context.Context, *v1.RegisterUserRequest) (*v1.RegisterUserResponse, error)
+	Login(context.Context, *v1.LoginRequest) (*v1.LoginResponse, error)
+	RefreshGatewayToken(context.Context, *v1.RefreshGatewayTokenRequest) (*v1.RefreshGatewayTokenResponse, error)
+	RequestVerificationChallenge(context.Context, *v1.RequestVerificationChallengeRequest) (*v1.RequestVerificationChallengeResponse, error)
+	ConfirmVerificationChallenge(context.Context, *v1.ConfirmVerificationChallengeRequest) (*v1.ConfirmVerificationChallengeResponse, error)
+	RequestPasswordReset(context.Context, *v1.RequestPasswordResetRequest) (*v1.RequestPasswordResetResponse, error)
+	ConfirmPasswordReset(context.Context, *v1.ConfirmPasswordResetRequest) (*v1.ConfirmPasswordResetResponse, error)
+	BeginMFAEnrollment(context.Context, *v1.BeginMFAEnrollmentRequest) (*v1.BeginMFAEnrollmentResponse, error)
+	ConfirmMFAEnrollment(context.Context, *v1.ConfirmMFAEnrollmentRequest) (*v1.ConfirmMFAEnrollmentResponse, error)
+	DisableMFAFactor(context.Context, *v1.DisableMFAFactorRequest) (*v1.DisableMFAFactorResponse, error)
+	RegenerateMFARecoveryCodes(context.Context, *v1.RegenerateMFARecoveryCodesRequest) (*v1.RegenerateMFARecoveryCodesResponse, error)
+	RevokeMFARecoveryCodes(context.Context, *v1.RevokeMFARecoveryCodesRequest) (*v1.RevokeMFARecoveryCodesResponse, error)
+	CreateMemberChange(context.Context, *v11.CreateMemberChangeRequest) (*v11.CreateMemberChangeResponse, error)
+	GetMemberChange(context.Context, *v11.GetMemberChangeRequest) (*v11.GetMemberChangeResponse, error)
+	ListConversationMembers(context.Context, *v11.ListConversationMembersRequest) (*v11.ListConversationMembersResponse, error)
+	TransferConversationOwner(context.Context, *v11.TransferConversationOwnerRequest) (*v11.TransferConversationOwnerResponse, error)
+	SendMessage(context.Context, *v12.SendMessageRequest) (*v12.SendMessageResponse, error)
+	EditMessage(context.Context, *v12.EditMessageRequest) (*v12.MessageChangeResponse, error)
+	RevokeMessage(context.Context, *v12.RevokeMessageRequest) (*v12.MessageChangeResponse, error)
+	DeleteMessage(context.Context, *v12.DeleteMessageRequest) (*v12.MessageChangeResponse, error)
+	PullInbox(context.Context, *v13.PullInboxRequest) (*v13.PullInboxResponse, error)
+	AckDelivery(context.Context, *v13.AckDeliveryRequest) (*v13.AckDeliveryResponse, error)
+	MarkRead(context.Context, *v14.MarkReadRequest) (*v14.MarkReadResponse, error)
+	GetReceiptState(context.Context, *v14.GetReceiptStateRequest) (*v14.GetReceiptStateResponse, error)
+	ListReceiptStates(context.Context, *v14.ListReceiptStatesRequest) (*v14.ListReceiptStatesResponse, error)
+	ListConversations(context.Context, *v14.ListConversationsRequest) (*v14.ListConversationsResponse, error)
+	ArchiveConversation(context.Context, *v14.ArchiveConversationRequest) (*v14.ArchiveConversationResponse, error)
+	PinConversation(context.Context, *v14.PinConversationRequest) (*v14.PinConversationResponse, error)
+	MuteConversation(context.Context, *v14.MuteConversationRequest) (*v14.MuteConversationResponse, error)
+	SendContactRequest(context.Context, *v15.SendContactRequestRequest) (*v15.SendContactRequestResponse, error)
+	RespondContactRequest(context.Context, *v15.RespondContactRequestRequest) (*v15.RespondContactRequestResponse, error)
+	CancelContactRequest(context.Context, *v15.CancelContactRequestRequest) (*v15.CancelContactRequestResponse, error)
+	ListContactRequests(context.Context, *v15.ListContactRequestsRequest) (*v15.ListContactRequestsResponse, error)
+	ListContacts(context.Context, *v15.ListContactsRequest) (*v15.ListContactsResponse, error)
+	GetContactState(context.Context, *v15.GetContactStateRequest) (*v15.GetContactStateResponse, error)
+	DeleteContact(context.Context, *v15.DeleteContactRequest) (*v15.DeleteContactResponse, error)
+	BlockContact(context.Context, *v15.BlockContactRequest) (*v15.BlockContactResponse, error)
+	UnblockContact(context.Context, *v15.UnblockContactRequest) (*v15.UnblockContactResponse, error)
+	UpdateContactRemark(context.Context, *v15.UpdateContactRemarkRequest) (*v15.UpdateContactRemarkResponse, error)
 	mustEmbedUnimplementedGatewayServiceServer()
 }
 
@@ -411,85 +568,121 @@ type GatewayServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedGatewayServiceServer struct{}
 
-func (UnimplementedGatewayServiceServer) CreateMemberChange(context.Context, *v1.CreateMemberChangeRequest) (*v1.CreateMemberChangeResponse, error) {
+func (UnimplementedGatewayServiceServer) RegisterUser(context.Context, *v1.RegisterUserRequest) (*v1.RegisterUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegisterUser not implemented")
+}
+func (UnimplementedGatewayServiceServer) Login(context.Context, *v1.LoginRequest) (*v1.LoginResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Login not implemented")
+}
+func (UnimplementedGatewayServiceServer) RefreshGatewayToken(context.Context, *v1.RefreshGatewayTokenRequest) (*v1.RefreshGatewayTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RefreshGatewayToken not implemented")
+}
+func (UnimplementedGatewayServiceServer) RequestVerificationChallenge(context.Context, *v1.RequestVerificationChallengeRequest) (*v1.RequestVerificationChallengeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequestVerificationChallenge not implemented")
+}
+func (UnimplementedGatewayServiceServer) ConfirmVerificationChallenge(context.Context, *v1.ConfirmVerificationChallengeRequest) (*v1.ConfirmVerificationChallengeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ConfirmVerificationChallenge not implemented")
+}
+func (UnimplementedGatewayServiceServer) RequestPasswordReset(context.Context, *v1.RequestPasswordResetRequest) (*v1.RequestPasswordResetResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequestPasswordReset not implemented")
+}
+func (UnimplementedGatewayServiceServer) ConfirmPasswordReset(context.Context, *v1.ConfirmPasswordResetRequest) (*v1.ConfirmPasswordResetResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ConfirmPasswordReset not implemented")
+}
+func (UnimplementedGatewayServiceServer) BeginMFAEnrollment(context.Context, *v1.BeginMFAEnrollmentRequest) (*v1.BeginMFAEnrollmentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BeginMFAEnrollment not implemented")
+}
+func (UnimplementedGatewayServiceServer) ConfirmMFAEnrollment(context.Context, *v1.ConfirmMFAEnrollmentRequest) (*v1.ConfirmMFAEnrollmentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ConfirmMFAEnrollment not implemented")
+}
+func (UnimplementedGatewayServiceServer) DisableMFAFactor(context.Context, *v1.DisableMFAFactorRequest) (*v1.DisableMFAFactorResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DisableMFAFactor not implemented")
+}
+func (UnimplementedGatewayServiceServer) RegenerateMFARecoveryCodes(context.Context, *v1.RegenerateMFARecoveryCodesRequest) (*v1.RegenerateMFARecoveryCodesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegenerateMFARecoveryCodes not implemented")
+}
+func (UnimplementedGatewayServiceServer) RevokeMFARecoveryCodes(context.Context, *v1.RevokeMFARecoveryCodesRequest) (*v1.RevokeMFARecoveryCodesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeMFARecoveryCodes not implemented")
+}
+func (UnimplementedGatewayServiceServer) CreateMemberChange(context.Context, *v11.CreateMemberChangeRequest) (*v11.CreateMemberChangeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateMemberChange not implemented")
 }
-func (UnimplementedGatewayServiceServer) GetMemberChange(context.Context, *v1.GetMemberChangeRequest) (*v1.GetMemberChangeResponse, error) {
+func (UnimplementedGatewayServiceServer) GetMemberChange(context.Context, *v11.GetMemberChangeRequest) (*v11.GetMemberChangeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMemberChange not implemented")
 }
-func (UnimplementedGatewayServiceServer) ListConversationMembers(context.Context, *v1.ListConversationMembersRequest) (*v1.ListConversationMembersResponse, error) {
+func (UnimplementedGatewayServiceServer) ListConversationMembers(context.Context, *v11.ListConversationMembersRequest) (*v11.ListConversationMembersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListConversationMembers not implemented")
 }
-func (UnimplementedGatewayServiceServer) TransferConversationOwner(context.Context, *v1.TransferConversationOwnerRequest) (*v1.TransferConversationOwnerResponse, error) {
+func (UnimplementedGatewayServiceServer) TransferConversationOwner(context.Context, *v11.TransferConversationOwnerRequest) (*v11.TransferConversationOwnerResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method TransferConversationOwner not implemented")
 }
-func (UnimplementedGatewayServiceServer) SendMessage(context.Context, *v11.SendMessageRequest) (*v11.SendMessageResponse, error) {
+func (UnimplementedGatewayServiceServer) SendMessage(context.Context, *v12.SendMessageRequest) (*v12.SendMessageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SendMessage not implemented")
 }
-func (UnimplementedGatewayServiceServer) EditMessage(context.Context, *v11.EditMessageRequest) (*v11.MessageChangeResponse, error) {
+func (UnimplementedGatewayServiceServer) EditMessage(context.Context, *v12.EditMessageRequest) (*v12.MessageChangeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method EditMessage not implemented")
 }
-func (UnimplementedGatewayServiceServer) RevokeMessage(context.Context, *v11.RevokeMessageRequest) (*v11.MessageChangeResponse, error) {
+func (UnimplementedGatewayServiceServer) RevokeMessage(context.Context, *v12.RevokeMessageRequest) (*v12.MessageChangeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RevokeMessage not implemented")
 }
-func (UnimplementedGatewayServiceServer) DeleteMessage(context.Context, *v11.DeleteMessageRequest) (*v11.MessageChangeResponse, error) {
+func (UnimplementedGatewayServiceServer) DeleteMessage(context.Context, *v12.DeleteMessageRequest) (*v12.MessageChangeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteMessage not implemented")
 }
-func (UnimplementedGatewayServiceServer) PullInbox(context.Context, *v12.PullInboxRequest) (*v12.PullInboxResponse, error) {
+func (UnimplementedGatewayServiceServer) PullInbox(context.Context, *v13.PullInboxRequest) (*v13.PullInboxResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PullInbox not implemented")
 }
-func (UnimplementedGatewayServiceServer) AckDelivery(context.Context, *v12.AckDeliveryRequest) (*v12.AckDeliveryResponse, error) {
+func (UnimplementedGatewayServiceServer) AckDelivery(context.Context, *v13.AckDeliveryRequest) (*v13.AckDeliveryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AckDelivery not implemented")
 }
-func (UnimplementedGatewayServiceServer) MarkRead(context.Context, *v13.MarkReadRequest) (*v13.MarkReadResponse, error) {
+func (UnimplementedGatewayServiceServer) MarkRead(context.Context, *v14.MarkReadRequest) (*v14.MarkReadResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method MarkRead not implemented")
 }
-func (UnimplementedGatewayServiceServer) GetReceiptState(context.Context, *v13.GetReceiptStateRequest) (*v13.GetReceiptStateResponse, error) {
+func (UnimplementedGatewayServiceServer) GetReceiptState(context.Context, *v14.GetReceiptStateRequest) (*v14.GetReceiptStateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetReceiptState not implemented")
 }
-func (UnimplementedGatewayServiceServer) ListReceiptStates(context.Context, *v13.ListReceiptStatesRequest) (*v13.ListReceiptStatesResponse, error) {
+func (UnimplementedGatewayServiceServer) ListReceiptStates(context.Context, *v14.ListReceiptStatesRequest) (*v14.ListReceiptStatesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListReceiptStates not implemented")
 }
-func (UnimplementedGatewayServiceServer) ListConversations(context.Context, *v13.ListConversationsRequest) (*v13.ListConversationsResponse, error) {
+func (UnimplementedGatewayServiceServer) ListConversations(context.Context, *v14.ListConversationsRequest) (*v14.ListConversationsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListConversations not implemented")
 }
-func (UnimplementedGatewayServiceServer) ArchiveConversation(context.Context, *v13.ArchiveConversationRequest) (*v13.ArchiveConversationResponse, error) {
+func (UnimplementedGatewayServiceServer) ArchiveConversation(context.Context, *v14.ArchiveConversationRequest) (*v14.ArchiveConversationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ArchiveConversation not implemented")
 }
-func (UnimplementedGatewayServiceServer) PinConversation(context.Context, *v13.PinConversationRequest) (*v13.PinConversationResponse, error) {
+func (UnimplementedGatewayServiceServer) PinConversation(context.Context, *v14.PinConversationRequest) (*v14.PinConversationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PinConversation not implemented")
 }
-func (UnimplementedGatewayServiceServer) MuteConversation(context.Context, *v13.MuteConversationRequest) (*v13.MuteConversationResponse, error) {
+func (UnimplementedGatewayServiceServer) MuteConversation(context.Context, *v14.MuteConversationRequest) (*v14.MuteConversationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method MuteConversation not implemented")
 }
-func (UnimplementedGatewayServiceServer) SendContactRequest(context.Context, *v14.SendContactRequestRequest) (*v14.SendContactRequestResponse, error) {
+func (UnimplementedGatewayServiceServer) SendContactRequest(context.Context, *v15.SendContactRequestRequest) (*v15.SendContactRequestResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SendContactRequest not implemented")
 }
-func (UnimplementedGatewayServiceServer) RespondContactRequest(context.Context, *v14.RespondContactRequestRequest) (*v14.RespondContactRequestResponse, error) {
+func (UnimplementedGatewayServiceServer) RespondContactRequest(context.Context, *v15.RespondContactRequestRequest) (*v15.RespondContactRequestResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RespondContactRequest not implemented")
 }
-func (UnimplementedGatewayServiceServer) CancelContactRequest(context.Context, *v14.CancelContactRequestRequest) (*v14.CancelContactRequestResponse, error) {
+func (UnimplementedGatewayServiceServer) CancelContactRequest(context.Context, *v15.CancelContactRequestRequest) (*v15.CancelContactRequestResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CancelContactRequest not implemented")
 }
-func (UnimplementedGatewayServiceServer) ListContactRequests(context.Context, *v14.ListContactRequestsRequest) (*v14.ListContactRequestsResponse, error) {
+func (UnimplementedGatewayServiceServer) ListContactRequests(context.Context, *v15.ListContactRequestsRequest) (*v15.ListContactRequestsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListContactRequests not implemented")
 }
-func (UnimplementedGatewayServiceServer) ListContacts(context.Context, *v14.ListContactsRequest) (*v14.ListContactsResponse, error) {
+func (UnimplementedGatewayServiceServer) ListContacts(context.Context, *v15.ListContactsRequest) (*v15.ListContactsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListContacts not implemented")
 }
-func (UnimplementedGatewayServiceServer) GetContactState(context.Context, *v14.GetContactStateRequest) (*v14.GetContactStateResponse, error) {
+func (UnimplementedGatewayServiceServer) GetContactState(context.Context, *v15.GetContactStateRequest) (*v15.GetContactStateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetContactState not implemented")
 }
-func (UnimplementedGatewayServiceServer) DeleteContact(context.Context, *v14.DeleteContactRequest) (*v14.DeleteContactResponse, error) {
+func (UnimplementedGatewayServiceServer) DeleteContact(context.Context, *v15.DeleteContactRequest) (*v15.DeleteContactResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteContact not implemented")
 }
-func (UnimplementedGatewayServiceServer) BlockContact(context.Context, *v14.BlockContactRequest) (*v14.BlockContactResponse, error) {
+func (UnimplementedGatewayServiceServer) BlockContact(context.Context, *v15.BlockContactRequest) (*v15.BlockContactResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method BlockContact not implemented")
 }
-func (UnimplementedGatewayServiceServer) UnblockContact(context.Context, *v14.UnblockContactRequest) (*v14.UnblockContactResponse, error) {
+func (UnimplementedGatewayServiceServer) UnblockContact(context.Context, *v15.UnblockContactRequest) (*v15.UnblockContactResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UnblockContact not implemented")
 }
-func (UnimplementedGatewayServiceServer) UpdateContactRemark(context.Context, *v14.UpdateContactRemarkRequest) (*v14.UpdateContactRemarkResponse, error) {
+func (UnimplementedGatewayServiceServer) UpdateContactRemark(context.Context, *v15.UpdateContactRemarkRequest) (*v15.UpdateContactRemarkResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateContactRemark not implemented")
 }
 func (UnimplementedGatewayServiceServer) mustEmbedUnimplementedGatewayServiceServer() {}
@@ -513,8 +706,224 @@ func RegisterGatewayServiceServer(s grpc.ServiceRegistrar, srv GatewayServiceSer
 	s.RegisterService(&GatewayService_ServiceDesc, srv)
 }
 
+func _GatewayService_RegisterUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.RegisterUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).RegisterUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_RegisterUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).RegisterUser(ctx, req.(*v1.RegisterUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_Login_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.LoginRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).Login(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_Login_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).Login(ctx, req.(*v1.LoginRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_RefreshGatewayToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.RefreshGatewayTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).RefreshGatewayToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_RefreshGatewayToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).RefreshGatewayToken(ctx, req.(*v1.RefreshGatewayTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_RequestVerificationChallenge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.RequestVerificationChallengeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).RequestVerificationChallenge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_RequestVerificationChallenge_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).RequestVerificationChallenge(ctx, req.(*v1.RequestVerificationChallengeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_ConfirmVerificationChallenge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.ConfirmVerificationChallengeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).ConfirmVerificationChallenge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_ConfirmVerificationChallenge_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).ConfirmVerificationChallenge(ctx, req.(*v1.ConfirmVerificationChallengeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_RequestPasswordReset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.RequestPasswordResetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).RequestPasswordReset(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_RequestPasswordReset_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).RequestPasswordReset(ctx, req.(*v1.RequestPasswordResetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_ConfirmPasswordReset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.ConfirmPasswordResetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).ConfirmPasswordReset(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_ConfirmPasswordReset_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).ConfirmPasswordReset(ctx, req.(*v1.ConfirmPasswordResetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_BeginMFAEnrollment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.BeginMFAEnrollmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).BeginMFAEnrollment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_BeginMFAEnrollment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).BeginMFAEnrollment(ctx, req.(*v1.BeginMFAEnrollmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_ConfirmMFAEnrollment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.ConfirmMFAEnrollmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).ConfirmMFAEnrollment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_ConfirmMFAEnrollment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).ConfirmMFAEnrollment(ctx, req.(*v1.ConfirmMFAEnrollmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_DisableMFAFactor_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.DisableMFAFactorRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).DisableMFAFactor(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_DisableMFAFactor_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).DisableMFAFactor(ctx, req.(*v1.DisableMFAFactorRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_RegenerateMFARecoveryCodes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.RegenerateMFARecoveryCodesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).RegenerateMFARecoveryCodes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_RegenerateMFARecoveryCodes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).RegenerateMFARecoveryCodes(ctx, req.(*v1.RegenerateMFARecoveryCodesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_RevokeMFARecoveryCodes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.RevokeMFARecoveryCodesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).RevokeMFARecoveryCodes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_RevokeMFARecoveryCodes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).RevokeMFARecoveryCodes(ctx, req.(*v1.RevokeMFARecoveryCodesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GatewayService_CreateMemberChange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v1.CreateMemberChangeRequest)
+	in := new(v11.CreateMemberChangeRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -526,13 +935,13 @@ func _GatewayService_CreateMemberChange_Handler(srv interface{}, ctx context.Con
 		FullMethod: GatewayService_CreateMemberChange_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).CreateMemberChange(ctx, req.(*v1.CreateMemberChangeRequest))
+		return srv.(GatewayServiceServer).CreateMemberChange(ctx, req.(*v11.CreateMemberChangeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_GetMemberChange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v1.GetMemberChangeRequest)
+	in := new(v11.GetMemberChangeRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -544,13 +953,13 @@ func _GatewayService_GetMemberChange_Handler(srv interface{}, ctx context.Contex
 		FullMethod: GatewayService_GetMemberChange_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).GetMemberChange(ctx, req.(*v1.GetMemberChangeRequest))
+		return srv.(GatewayServiceServer).GetMemberChange(ctx, req.(*v11.GetMemberChangeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_ListConversationMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v1.ListConversationMembersRequest)
+	in := new(v11.ListConversationMembersRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -562,13 +971,13 @@ func _GatewayService_ListConversationMembers_Handler(srv interface{}, ctx contex
 		FullMethod: GatewayService_ListConversationMembers_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).ListConversationMembers(ctx, req.(*v1.ListConversationMembersRequest))
+		return srv.(GatewayServiceServer).ListConversationMembers(ctx, req.(*v11.ListConversationMembersRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_TransferConversationOwner_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v1.TransferConversationOwnerRequest)
+	in := new(v11.TransferConversationOwnerRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -580,13 +989,13 @@ func _GatewayService_TransferConversationOwner_Handler(srv interface{}, ctx cont
 		FullMethod: GatewayService_TransferConversationOwner_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).TransferConversationOwner(ctx, req.(*v1.TransferConversationOwnerRequest))
+		return srv.(GatewayServiceServer).TransferConversationOwner(ctx, req.(*v11.TransferConversationOwnerRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_SendMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v11.SendMessageRequest)
+	in := new(v12.SendMessageRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -598,13 +1007,13 @@ func _GatewayService_SendMessage_Handler(srv interface{}, ctx context.Context, d
 		FullMethod: GatewayService_SendMessage_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).SendMessage(ctx, req.(*v11.SendMessageRequest))
+		return srv.(GatewayServiceServer).SendMessage(ctx, req.(*v12.SendMessageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_EditMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v11.EditMessageRequest)
+	in := new(v12.EditMessageRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -616,13 +1025,13 @@ func _GatewayService_EditMessage_Handler(srv interface{}, ctx context.Context, d
 		FullMethod: GatewayService_EditMessage_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).EditMessage(ctx, req.(*v11.EditMessageRequest))
+		return srv.(GatewayServiceServer).EditMessage(ctx, req.(*v12.EditMessageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_RevokeMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v11.RevokeMessageRequest)
+	in := new(v12.RevokeMessageRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -634,13 +1043,13 @@ func _GatewayService_RevokeMessage_Handler(srv interface{}, ctx context.Context,
 		FullMethod: GatewayService_RevokeMessage_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).RevokeMessage(ctx, req.(*v11.RevokeMessageRequest))
+		return srv.(GatewayServiceServer).RevokeMessage(ctx, req.(*v12.RevokeMessageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_DeleteMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v11.DeleteMessageRequest)
+	in := new(v12.DeleteMessageRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -652,13 +1061,13 @@ func _GatewayService_DeleteMessage_Handler(srv interface{}, ctx context.Context,
 		FullMethod: GatewayService_DeleteMessage_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).DeleteMessage(ctx, req.(*v11.DeleteMessageRequest))
+		return srv.(GatewayServiceServer).DeleteMessage(ctx, req.(*v12.DeleteMessageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_PullInbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v12.PullInboxRequest)
+	in := new(v13.PullInboxRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -670,13 +1079,13 @@ func _GatewayService_PullInbox_Handler(srv interface{}, ctx context.Context, dec
 		FullMethod: GatewayService_PullInbox_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).PullInbox(ctx, req.(*v12.PullInboxRequest))
+		return srv.(GatewayServiceServer).PullInbox(ctx, req.(*v13.PullInboxRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_AckDelivery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v12.AckDeliveryRequest)
+	in := new(v13.AckDeliveryRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -688,13 +1097,13 @@ func _GatewayService_AckDelivery_Handler(srv interface{}, ctx context.Context, d
 		FullMethod: GatewayService_AckDelivery_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).AckDelivery(ctx, req.(*v12.AckDeliveryRequest))
+		return srv.(GatewayServiceServer).AckDelivery(ctx, req.(*v13.AckDeliveryRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_MarkRead_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v13.MarkReadRequest)
+	in := new(v14.MarkReadRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -706,13 +1115,13 @@ func _GatewayService_MarkRead_Handler(srv interface{}, ctx context.Context, dec 
 		FullMethod: GatewayService_MarkRead_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).MarkRead(ctx, req.(*v13.MarkReadRequest))
+		return srv.(GatewayServiceServer).MarkRead(ctx, req.(*v14.MarkReadRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_GetReceiptState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v13.GetReceiptStateRequest)
+	in := new(v14.GetReceiptStateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -724,13 +1133,13 @@ func _GatewayService_GetReceiptState_Handler(srv interface{}, ctx context.Contex
 		FullMethod: GatewayService_GetReceiptState_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).GetReceiptState(ctx, req.(*v13.GetReceiptStateRequest))
+		return srv.(GatewayServiceServer).GetReceiptState(ctx, req.(*v14.GetReceiptStateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_ListReceiptStates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v13.ListReceiptStatesRequest)
+	in := new(v14.ListReceiptStatesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -742,13 +1151,13 @@ func _GatewayService_ListReceiptStates_Handler(srv interface{}, ctx context.Cont
 		FullMethod: GatewayService_ListReceiptStates_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).ListReceiptStates(ctx, req.(*v13.ListReceiptStatesRequest))
+		return srv.(GatewayServiceServer).ListReceiptStates(ctx, req.(*v14.ListReceiptStatesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_ListConversations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v13.ListConversationsRequest)
+	in := new(v14.ListConversationsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -760,13 +1169,13 @@ func _GatewayService_ListConversations_Handler(srv interface{}, ctx context.Cont
 		FullMethod: GatewayService_ListConversations_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).ListConversations(ctx, req.(*v13.ListConversationsRequest))
+		return srv.(GatewayServiceServer).ListConversations(ctx, req.(*v14.ListConversationsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_ArchiveConversation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v13.ArchiveConversationRequest)
+	in := new(v14.ArchiveConversationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -778,13 +1187,13 @@ func _GatewayService_ArchiveConversation_Handler(srv interface{}, ctx context.Co
 		FullMethod: GatewayService_ArchiveConversation_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).ArchiveConversation(ctx, req.(*v13.ArchiveConversationRequest))
+		return srv.(GatewayServiceServer).ArchiveConversation(ctx, req.(*v14.ArchiveConversationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_PinConversation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v13.PinConversationRequest)
+	in := new(v14.PinConversationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -796,13 +1205,13 @@ func _GatewayService_PinConversation_Handler(srv interface{}, ctx context.Contex
 		FullMethod: GatewayService_PinConversation_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).PinConversation(ctx, req.(*v13.PinConversationRequest))
+		return srv.(GatewayServiceServer).PinConversation(ctx, req.(*v14.PinConversationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_MuteConversation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v13.MuteConversationRequest)
+	in := new(v14.MuteConversationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -814,13 +1223,13 @@ func _GatewayService_MuteConversation_Handler(srv interface{}, ctx context.Conte
 		FullMethod: GatewayService_MuteConversation_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).MuteConversation(ctx, req.(*v13.MuteConversationRequest))
+		return srv.(GatewayServiceServer).MuteConversation(ctx, req.(*v14.MuteConversationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_SendContactRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v14.SendContactRequestRequest)
+	in := new(v15.SendContactRequestRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -832,13 +1241,13 @@ func _GatewayService_SendContactRequest_Handler(srv interface{}, ctx context.Con
 		FullMethod: GatewayService_SendContactRequest_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).SendContactRequest(ctx, req.(*v14.SendContactRequestRequest))
+		return srv.(GatewayServiceServer).SendContactRequest(ctx, req.(*v15.SendContactRequestRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_RespondContactRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v14.RespondContactRequestRequest)
+	in := new(v15.RespondContactRequestRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -850,13 +1259,13 @@ func _GatewayService_RespondContactRequest_Handler(srv interface{}, ctx context.
 		FullMethod: GatewayService_RespondContactRequest_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).RespondContactRequest(ctx, req.(*v14.RespondContactRequestRequest))
+		return srv.(GatewayServiceServer).RespondContactRequest(ctx, req.(*v15.RespondContactRequestRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_CancelContactRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v14.CancelContactRequestRequest)
+	in := new(v15.CancelContactRequestRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -868,13 +1277,13 @@ func _GatewayService_CancelContactRequest_Handler(srv interface{}, ctx context.C
 		FullMethod: GatewayService_CancelContactRequest_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).CancelContactRequest(ctx, req.(*v14.CancelContactRequestRequest))
+		return srv.(GatewayServiceServer).CancelContactRequest(ctx, req.(*v15.CancelContactRequestRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_ListContactRequests_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v14.ListContactRequestsRequest)
+	in := new(v15.ListContactRequestsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -886,13 +1295,13 @@ func _GatewayService_ListContactRequests_Handler(srv interface{}, ctx context.Co
 		FullMethod: GatewayService_ListContactRequests_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).ListContactRequests(ctx, req.(*v14.ListContactRequestsRequest))
+		return srv.(GatewayServiceServer).ListContactRequests(ctx, req.(*v15.ListContactRequestsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_ListContacts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v14.ListContactsRequest)
+	in := new(v15.ListContactsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -904,13 +1313,13 @@ func _GatewayService_ListContacts_Handler(srv interface{}, ctx context.Context, 
 		FullMethod: GatewayService_ListContacts_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).ListContacts(ctx, req.(*v14.ListContactsRequest))
+		return srv.(GatewayServiceServer).ListContacts(ctx, req.(*v15.ListContactsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_GetContactState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v14.GetContactStateRequest)
+	in := new(v15.GetContactStateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -922,13 +1331,13 @@ func _GatewayService_GetContactState_Handler(srv interface{}, ctx context.Contex
 		FullMethod: GatewayService_GetContactState_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).GetContactState(ctx, req.(*v14.GetContactStateRequest))
+		return srv.(GatewayServiceServer).GetContactState(ctx, req.(*v15.GetContactStateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_DeleteContact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v14.DeleteContactRequest)
+	in := new(v15.DeleteContactRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -940,13 +1349,13 @@ func _GatewayService_DeleteContact_Handler(srv interface{}, ctx context.Context,
 		FullMethod: GatewayService_DeleteContact_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).DeleteContact(ctx, req.(*v14.DeleteContactRequest))
+		return srv.(GatewayServiceServer).DeleteContact(ctx, req.(*v15.DeleteContactRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_BlockContact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v14.BlockContactRequest)
+	in := new(v15.BlockContactRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -958,13 +1367,13 @@ func _GatewayService_BlockContact_Handler(srv interface{}, ctx context.Context, 
 		FullMethod: GatewayService_BlockContact_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).BlockContact(ctx, req.(*v14.BlockContactRequest))
+		return srv.(GatewayServiceServer).BlockContact(ctx, req.(*v15.BlockContactRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_UnblockContact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v14.UnblockContactRequest)
+	in := new(v15.UnblockContactRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -976,13 +1385,13 @@ func _GatewayService_UnblockContact_Handler(srv interface{}, ctx context.Context
 		FullMethod: GatewayService_UnblockContact_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).UnblockContact(ctx, req.(*v14.UnblockContactRequest))
+		return srv.(GatewayServiceServer).UnblockContact(ctx, req.(*v15.UnblockContactRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _GatewayService_UpdateContactRemark_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(v14.UpdateContactRemarkRequest)
+	in := new(v15.UpdateContactRemarkRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -994,7 +1403,7 @@ func _GatewayService_UpdateContactRemark_Handler(srv interface{}, ctx context.Co
 		FullMethod: GatewayService_UpdateContactRemark_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GatewayServiceServer).UpdateContactRemark(ctx, req.(*v14.UpdateContactRemarkRequest))
+		return srv.(GatewayServiceServer).UpdateContactRemark(ctx, req.(*v15.UpdateContactRemarkRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1006,6 +1415,54 @@ var GatewayService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "nexusim.gateway.v1.GatewayService",
 	HandlerType: (*GatewayServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "RegisterUser",
+			Handler:    _GatewayService_RegisterUser_Handler,
+		},
+		{
+			MethodName: "Login",
+			Handler:    _GatewayService_Login_Handler,
+		},
+		{
+			MethodName: "RefreshGatewayToken",
+			Handler:    _GatewayService_RefreshGatewayToken_Handler,
+		},
+		{
+			MethodName: "RequestVerificationChallenge",
+			Handler:    _GatewayService_RequestVerificationChallenge_Handler,
+		},
+		{
+			MethodName: "ConfirmVerificationChallenge",
+			Handler:    _GatewayService_ConfirmVerificationChallenge_Handler,
+		},
+		{
+			MethodName: "RequestPasswordReset",
+			Handler:    _GatewayService_RequestPasswordReset_Handler,
+		},
+		{
+			MethodName: "ConfirmPasswordReset",
+			Handler:    _GatewayService_ConfirmPasswordReset_Handler,
+		},
+		{
+			MethodName: "BeginMFAEnrollment",
+			Handler:    _GatewayService_BeginMFAEnrollment_Handler,
+		},
+		{
+			MethodName: "ConfirmMFAEnrollment",
+			Handler:    _GatewayService_ConfirmMFAEnrollment_Handler,
+		},
+		{
+			MethodName: "DisableMFAFactor",
+			Handler:    _GatewayService_DisableMFAFactor_Handler,
+		},
+		{
+			MethodName: "RegenerateMFARecoveryCodes",
+			Handler:    _GatewayService_RegenerateMFARecoveryCodes_Handler,
+		},
+		{
+			MethodName: "RevokeMFARecoveryCodes",
+			Handler:    _GatewayService_RevokeMFARecoveryCodes_Handler,
+		},
 		{
 			MethodName: "CreateMemberChange",
 			Handler:    _GatewayService_CreateMemberChange_Handler,

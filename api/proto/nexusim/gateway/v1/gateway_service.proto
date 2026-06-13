@@ -5,6 +5,7 @@ package nexusim.gateway.v1;
 import "nexusim/contacts/v1/contacts_service.proto";
 import "nexusim/conversation/v1/conversation_service.proto";
 import "nexusim/delivery/v1/delivery_service.proto";
+import "nexusim/identity/v1/identity_service.proto";
 import "nexusim/message/v1/message_service.proto";
 import "nexusim/receipt/v1/receipt_service.proto";
 
@@ -13,6 +14,19 @@ option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/gateway/v1;gateway
 // GatewayService is the first-stage public client facade.
 // It intentionally excludes service-internal RPCs such as ConversationService.GetSendContext.
 service GatewayService {
+  rpc RegisterUser(nexusim.identity.v1.RegisterUserRequest) returns (nexusim.identity.v1.RegisterUserResponse);
+  rpc Login(nexusim.identity.v1.LoginRequest) returns (nexusim.identity.v1.LoginResponse);
+  rpc RefreshGatewayToken(nexusim.identity.v1.RefreshGatewayTokenRequest) returns (nexusim.identity.v1.RefreshGatewayTokenResponse);
+  rpc RequestVerificationChallenge(nexusim.identity.v1.RequestVerificationChallengeRequest) returns (nexusim.identity.v1.RequestVerificationChallengeResponse);
+  rpc ConfirmVerificationChallenge(nexusim.identity.v1.ConfirmVerificationChallengeRequest) returns (nexusim.identity.v1.ConfirmVerificationChallengeResponse);
+  rpc RequestPasswordReset(nexusim.identity.v1.RequestPasswordResetRequest) returns (nexusim.identity.v1.RequestPasswordResetResponse);
+  rpc ConfirmPasswordReset(nexusim.identity.v1.ConfirmPasswordResetRequest) returns (nexusim.identity.v1.ConfirmPasswordResetResponse);
+  rpc BeginMFAEnrollment(nexusim.identity.v1.BeginMFAEnrollmentRequest) returns (nexusim.identity.v1.BeginMFAEnrollmentResponse);
+  rpc ConfirmMFAEnrollment(nexusim.identity.v1.ConfirmMFAEnrollmentRequest) returns (nexusim.identity.v1.ConfirmMFAEnrollmentResponse);
+  rpc DisableMFAFactor(nexusim.identity.v1.DisableMFAFactorRequest) returns (nexusim.identity.v1.DisableMFAFactorResponse);
+  rpc RegenerateMFARecoveryCodes(nexusim.identity.v1.RegenerateMFARecoveryCodesRequest) returns (nexusim.identity.v1.RegenerateMFARecoveryCodesResponse);
+  rpc RevokeMFARecoveryCodes(nexusim.identity.v1.RevokeMFARecoveryCodesRequest) returns (nexusim.identity.v1.RevokeMFARecoveryCodesResponse);
+
   rpc CreateMemberChange(nexusim.conversation.v1.CreateMemberChangeRequest) returns (nexusim.conversation.v1.CreateMemberChangeResponse);
   rpc GetMemberChange(nexusim.conversation.v1.GetMemberChangeRequest) returns (nexusim.conversation.v1.GetMemberChangeResponse);
   rpc ListConversationMembers(nexusim.conversation.v1.ListConversationMembersRequest) returns (nexusim.conversation.v1.ListConversationMembersResponse);

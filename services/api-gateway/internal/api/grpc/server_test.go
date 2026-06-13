@@ -9,6 +9,7 @@ import (
 	contactsv1 "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1"
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	gatewayv1 "github.com/qsyy0921/IM/api/proto/nexusim/gateway/v1"
+	identityv1 "github.com/qsyy0921/IM/api/proto/nexusim/identity/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
@@ -278,6 +279,71 @@ func TestTraceIDFromTraceparent(t *testing.T) {
 	}
 }
 
+func TestGatewayIdentityLoginDoesNotRequireGatewayToken(t *testing.T) {
+	fake := &fakeIdentityClient{}
+	server := NewServer(Config{
+		Identity:     fake,
+		NewTraceID:   func() string { return "trace-generated" },
+		NewRequestID: func() string { return "request-generated" },
+	})
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		metadataTraceparent, "00-4BF92F3577B34DA6A3CE929D0E0E4736-00f067aa0ba902b7-01",
+		metadataRequestID, "request-identity-1",
+	))
+
+	response, err := server.Login(ctx, &identityv1.LoginRequest{
+		TenantId: "tenant-1",
+		UserId:   "user-1",
+		Password: "password",
+		DeviceId: "device-1",
+	})
+	if err != nil {
+		t.Fatalf("login through gateway: %v", err)
+	}
+	if response.GetGatewayToken() != "gateway-token" {
+		t.Fatalf("expected fake login response, got %+v", response)
+	}
+	if fake.loginRequest.GetTraceId() != "4bf92f3577b34da6a3ce929d0e0e4736" ||
+		fake.loginRequest.GetRequestId() != "request-identity-1" {
+		t.Fatalf("expected gateway to inject public correlation, got %+v", fake.loginRequest)
+	}
+	assertOutgoingMetadata(t, fake.ctx, map[string]string{
+		metadataTraceID:   "4bf92f3577b34da6a3ce929d0e0e4736",
+		metadataRequestID: "request-identity-1",
+	})
+}
+
+func TestGatewayIdentityRequestCorrelationTakesPrecedence(t *testing.T) {
+	fake := &fakeIdentityClient{}
+	server := NewServer(Config{
+		Identity:     fake,
+		NewTraceID:   func() string { return "trace-generated" },
+		NewRequestID: func() string { return "request-generated" },
+	})
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		metadataTraceID, "trace-metadata",
+		metadataRequestID, "request-metadata",
+	))
+
+	_, err := server.RequestVerificationChallenge(ctx, &identityv1.RequestVerificationChallengeRequest{
+		TenantId:  "tenant-1",
+		UserId:    "user-1",
+		TraceId:   "trace-body",
+		RequestId: "request-body",
+	})
+	if err != nil {
+		t.Fatalf("request verification through gateway: %v", err)
+	}
+	if fake.requestVerification.GetTraceId() != "trace-body" ||
+		fake.requestVerification.GetRequestId() != "request-body" {
+		t.Fatalf("expected request correlation to be preserved, got %+v", fake.requestVerification)
+	}
+	assertOutgoingMetadata(t, fake.ctx, map[string]string{
+		metadataTraceID:   "trace-body",
+		metadataRequestID: "request-body",
+	})
+}
+
 func TestGatewayReturnsGeneratedCorrelationHeaders(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	authenticator, err := gatewayauth.NewAuthenticator(gatewayauth.Config{
@@ -466,6 +532,7 @@ func TestGatewayDefaultRegistrationKeepsLegacyDescriptors(t *testing.T) {
 	assertServiceRegistered(t, info, "nexusim.message.v1.MessageService")
 	assertServiceRegistered(t, info, "nexusim.delivery.v1.DeliveryService")
 	assertServiceRegistered(t, info, "nexusim.receipt.v1.ReceiptService")
+	assertServiceNotRegistered(t, info, "nexusim.identity.v1.IdentityService")
 	assertGatewayFacadeExcludesInternalMethods(t, info)
 }
 
@@ -512,8 +579,9 @@ func assertGatewayFacadeExcludesInternalMethods(t *testing.T, info map[string]gr
 		t.Fatalf("expected gateway facade service to be registered")
 	}
 	for _, method := range facade.Methods {
-		if method.Name == "GetSendContext" {
-			t.Fatalf("gateway facade must not expose internal GetSendContext method")
+		switch method.Name {
+		case "GetSendContext", "IssueGatewayToken", "RevokeDevice", "RevokeSession", "GetDeviceState":
+			t.Fatalf("gateway facade must not expose internal/admin method %s", method.Name)
 		}
 	}
 }
@@ -552,6 +620,96 @@ func (client *fakeMessageClient) RevokeMessage(context.Context, *messagev1.Revok
 }
 
 func (client *fakeMessageClient) DeleteMessage(context.Context, *messagev1.DeleteMessageRequest, ...grpc.CallOption) (*messagev1.MessageChangeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+type fakeIdentityClient struct {
+	ctx                 context.Context
+	loginRequest        *identityv1.LoginRequest
+	requestVerification *identityv1.RequestVerificationChallengeRequest
+}
+
+func (client *fakeIdentityClient) RegisterUser(context.Context, *identityv1.RegisterUserRequest, ...grpc.CallOption) (*identityv1.RegisterUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeIdentityClient) Login(ctx context.Context, in *identityv1.LoginRequest, opts ...grpc.CallOption) (*identityv1.LoginResponse, error) {
+	client.ctx = ctx
+	client.loginRequest = in
+	return &identityv1.LoginResponse{
+		TenantId:       in.GetTenantId(),
+		UserId:         in.GetUserId(),
+		DeviceId:       in.GetDeviceId(),
+		SessionId:      "session-1",
+		Audience:       in.GetAudience(),
+		TokenType:      "Bearer",
+		GatewayToken:   "gateway-token",
+		RefreshToken:   "refresh-token",
+		IssuedAtUnixMs: 1,
+	}, nil
+}
+
+func (client *fakeIdentityClient) RefreshGatewayToken(context.Context, *identityv1.RefreshGatewayTokenRequest, ...grpc.CallOption) (*identityv1.RefreshGatewayTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeIdentityClient) RequestVerificationChallenge(ctx context.Context, in *identityv1.RequestVerificationChallengeRequest, opts ...grpc.CallOption) (*identityv1.RequestVerificationChallengeResponse, error) {
+	client.ctx = ctx
+	client.requestVerification = in
+	return &identityv1.RequestVerificationChallengeResponse{
+		TenantId:    in.GetTenantId(),
+		UserId:      in.GetUserId(),
+		ChallengeId: "challenge-1",
+		Channel:     in.GetChannel(),
+		Destination: in.GetDestination(),
+	}, nil
+}
+
+func (client *fakeIdentityClient) ConfirmVerificationChallenge(context.Context, *identityv1.ConfirmVerificationChallengeRequest, ...grpc.CallOption) (*identityv1.ConfirmVerificationChallengeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeIdentityClient) RequestPasswordReset(context.Context, *identityv1.RequestPasswordResetRequest, ...grpc.CallOption) (*identityv1.RequestPasswordResetResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeIdentityClient) ConfirmPasswordReset(context.Context, *identityv1.ConfirmPasswordResetRequest, ...grpc.CallOption) (*identityv1.ConfirmPasswordResetResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeIdentityClient) BeginMFAEnrollment(context.Context, *identityv1.BeginMFAEnrollmentRequest, ...grpc.CallOption) (*identityv1.BeginMFAEnrollmentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeIdentityClient) ConfirmMFAEnrollment(context.Context, *identityv1.ConfirmMFAEnrollmentRequest, ...grpc.CallOption) (*identityv1.ConfirmMFAEnrollmentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeIdentityClient) DisableMFAFactor(context.Context, *identityv1.DisableMFAFactorRequest, ...grpc.CallOption) (*identityv1.DisableMFAFactorResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeIdentityClient) RegenerateMFARecoveryCodes(context.Context, *identityv1.RegenerateMFARecoveryCodesRequest, ...grpc.CallOption) (*identityv1.RegenerateMFARecoveryCodesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeIdentityClient) RevokeMFARecoveryCodes(context.Context, *identityv1.RevokeMFARecoveryCodesRequest, ...grpc.CallOption) (*identityv1.RevokeMFARecoveryCodesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeIdentityClient) IssueGatewayToken(context.Context, *identityv1.IssueGatewayTokenRequest, ...grpc.CallOption) (*identityv1.IssueGatewayTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeIdentityClient) RevokeDevice(context.Context, *identityv1.RevokeDeviceRequest, ...grpc.CallOption) (*identityv1.RevokeDeviceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeIdentityClient) RevokeSession(context.Context, *identityv1.RevokeSessionRequest, ...grpc.CallOption) (*identityv1.RevokeSessionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeIdentityClient) GetDeviceState(context.Context, *identityv1.GetDeviceStateRequest, ...grpc.CallOption) (*identityv1.GetDeviceStateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "not implemented")
 }
 

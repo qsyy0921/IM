@@ -2,6 +2,8 @@
 
 本文是 `push-gateway` 验证报告入口。当前已完成六层骨架、WebSocket frame codec、in-memory session registry、delivery event consumer、identity revoke consumer、`server.pong`、`delivery.notify`、`delivery.ack.ok`、queue-full broad `server.resume_hint` active close、单实例 in-memory resume buffer TTL、Redis route 最小 adapter、Redis-backed cross-instance resume buffer 第一版、HMAC signed gateway token 第一版、标准三段 JWT HS256 gateway token 兼容、RS256 JWKS URL refresh/cache + debug stats、identity-service Login / RegisterUser 签发 JWT gateway token smoke、Redis deny-list revoke projection 和 device / session revoke active close；真实进程 full smoke、HMAC/JWT auth smoke、identity revoke deny-list / active-close smoke、同 user 多 device notify smoke、slow-client 负向 smoke、单实例 resume replay smoke、跨进程 Redis route smoke、cross-instance resume smoke、Win-Mac 双机 cross-instance resume smoke，以及 `edit / revoke / delete` 三类 message-change notify smoke 均已通过。
 
+2026-06-13 补充：`full + -VerifiedAuthMetadata` 真实进程 smoke 已通过，验证 conversation / message / delivery 三个 user-facing RPC 在 metadata auth 模式下完成最小链路，且 push-gateway 将 WebSocket auth 派生身份转发为 delivery-service `AckDelivery` metadata。
+
 ## 当前验证目标
 
 第一阶段只验证在线通知链路，不做 WebSocket 容量极限：
@@ -167,6 +169,7 @@ Sentinel 模式当前已证明三件事：客户端 master discovery 正常路�
 | `loadtest-report-20260612-push-gateway-identity-token-smoke.md` | identity-service 签发短期 gateway token；legacy 自定义 HMAC token、`IssueGatewayToken(jwt)`、`Login(jwt)` 和 `RegisterUser -> Login(jwt)` 均已通过 push-gateway 本地验签并完成 `delivery.notify -> PullInbox -> AckDelivery` |
 | `loadtest-report-20260612-push-gateway-identity-revoke-smoke.md` | `RevokeDevice/RevokeSession -> identity_outbox -> im.identity.events -> push-gateway identity-consumer -> Redis deny-list / Redis route eviction` 后，旧在线连接收到 `server.resume_hint(reason=identity_revoked)` 并被主动关闭，旧 gateway token 重连返回 `PERMISSION_DENIED`；session revoke smoke 额外验证 same-device survivor session 仍可 `server.pong` |
 | `loadtest-report-20260610-push-gateway-message-change-notify-smoke.md` | `edit / revoke / delete` 三类消息变更均能触发带正确 `source_event_type` 的 `delivery.notify`，且与 `PullInbox` durable item 一致 |
+| `loadtest-report-20260613-push-gateway-verified-metadata-smoke.md` | `full + -VerifiedAuthMetadata` 真实进程 smoke，验证 metadata auth 下的 `CreateMemberChange / SendMessage / PullInbox` 和 push-gateway `delivery.ack -> AckDelivery` metadata 转发 |
 
 报告 Markdown 保存在仓库内：
 

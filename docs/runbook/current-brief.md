@@ -19,7 +19,7 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 
 ## 当前优先级
 
-1. 当前已完成：identity-service TOTP proof 在最终 Login / Refresh PostgreSQL 事务中重新锁定 ACTIVE factor 并检查 `login_locked_until`。
+1. 当前已完成：identity-service 已补只读 `session-mfa-proof-audit` 运维模式，用于发现历史 session MFA proof 脏数据。
 2. 当前已完成：服务状态已拆成 `docs/runbook/service-briefs/<service>.md`，并由 `.\tools\check-local.ps1` 防止入口和单服务 brief 重新变长。
 3. 当前已完成：`docs/README.md` 和 `docs/sdd/README.md` 也纳入短入口检查；旧长 SDD 索引已归档。
 4. 下一步继续做小而完整的生产级 hardening，不一次性横跨多个服务。

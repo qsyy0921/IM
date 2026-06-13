@@ -81,7 +81,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("identity-service runtime wiring is idle; set NEXUSIM_IDENTITY_SERVICE_MODE=grpc, outbox-relay, challenge-delivery-worker, challenge-delivery-repair, challenge-request-limit-cleanup, or gateway-token-keyring-rotate")
+		log.Println("identity-service runtime wiring is idle; set NEXUSIM_IDENTITY_SERVICE_MODE=grpc, outbox-relay, challenge-delivery-worker, challenge-delivery-repair, challenge-request-limit-cleanup, session-mfa-proof-audit, or gateway-token-keyring-rotate")
 		return nil
 	case "grpc":
 		return runGRPC()
@@ -93,6 +93,8 @@ func run() error {
 		return runChallengeDeliveryRepair()
 	case "challenge-request-limit-cleanup":
 		return runChallengeRequestLimitCleanup()
+	case "session-mfa-proof-audit":
+		return runSessionMFAProofAudit()
 	case "gateway-token-keyring-rotate":
 		return runGatewayTokenKeyRingRotate()
 	default:
@@ -948,6 +950,34 @@ func runChallengeRequestLimitCleanup() error {
 		config.Retention,
 		config.BatchSize,
 	)
+	return nil
+}
+
+func runSessionMFAProofAudit() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	stats, err := postgresinfra.NewRepository(pool).AuditSessionMFAProofConstraints(ctx)
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"identity-service session mfa proof audit completed invalid_total=%d unknown_method=%d empty_method_with_proof=%d totp_missing_proof=%d recovery_invalid_proof=%d",
+		stats.InvalidTotal,
+		stats.UnknownMethod,
+		stats.EmptyMethodWithProof,
+		stats.TOTPMissingProof,
+		stats.RecoveryInvalidProof,
+	)
+	if stats.InvalidTotal > 0 {
+		return fmt.Errorf("identity session mfa proof audit found %d invalid rows", stats.InvalidTotal)
+	}
 	return nil
 }
 

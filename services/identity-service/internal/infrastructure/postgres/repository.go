@@ -27,6 +27,14 @@ type Repository struct {
 	challengeRequestLockDuration time.Duration
 }
 
+type SessionMFAProofAuditStats struct {
+	InvalidTotal         int64
+	UnknownMethod        int64
+	EmptyMethodWithProof int64
+	TOTPMissingProof     int64
+	RecoveryInvalidProof int64
+}
+
 const maxActiveChallengesPerTarget = 3
 const maxEnabledMFAFactorsPerUser = 5
 const DefaultChallengeRequestMaxPerWindow = 5
@@ -133,6 +141,42 @@ RETURNING tenant_id, user_id, status, created_at
 		Status:          row.Status,
 		CreatedAtUnixMS: row.CreatedAt.UnixMilli(),
 	}, nil
+}
+
+func (r *Repository) AuditSessionMFAProofConstraints(ctx context.Context) (SessionMFAProofAuditStats, error) {
+	if r.pool == nil {
+		return SessionMFAProofAuditStats{}, types.NewDBReadFailed("identity repository is not configured")
+	}
+	var stats SessionMFAProofAuditStats
+	err := r.pool.QueryRow(ctx, `
+SELECT
+    COUNT(*) FILTER (
+        WHERE mfa_method NOT IN ('', 'TOTP', 'RECOVERY_CODE')
+    ) AS unknown_method,
+    COUNT(*) FILTER (
+        WHERE mfa_method = ''
+          AND (mfa_verified_at IS NOT NULL OR mfa_factor_id <> '')
+    ) AS empty_method_with_proof,
+    COUNT(*) FILTER (
+        WHERE mfa_method = 'TOTP'
+          AND (mfa_verified_at IS NULL OR mfa_factor_id = '')
+    ) AS totp_missing_proof,
+    COUNT(*) FILTER (
+        WHERE mfa_method = 'RECOVERY_CODE'
+          AND (mfa_verified_at IS NULL OR mfa_factor_id <> '')
+    ) AS recovery_invalid_proof
+FROM identity_sessions
+`).Scan(
+		&stats.UnknownMethod,
+		&stats.EmptyMethodWithProof,
+		&stats.TOTPMissingProof,
+		&stats.RecoveryInvalidProof,
+	)
+	if err != nil {
+		return SessionMFAProofAuditStats{}, types.NewDBReadFailed(err.Error())
+	}
+	stats.InvalidTotal = stats.UnknownMethod + stats.EmptyMethodWithProof + stats.TOTPMissingProof + stats.RecoveryInvalidProof
+	return stats, nil
 }
 
 func (r *Repository) GetUserCredential(ctx context.Context, tenantID types.TenantID, userID types.UserID) (types.UserCredential, error) {

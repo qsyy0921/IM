@@ -780,6 +780,13 @@ func TestRepositorySessionMFAProofConstraintsIntegration(t *testing.T) {
 			}
 		})
 	}
+	stats, err := NewRepository(pool).AuditSessionMFAProofConstraints(ctx)
+	if err != nil {
+		t.Fatalf("audit session mfa proof constraints: %v", err)
+	}
+	if stats.InvalidTotal != 0 || stats.UnknownMethod != 0 || stats.EmptyMethodWithProof != 0 || stats.TOTPMissingProof != 0 || stats.RecoveryInvalidProof != 0 {
+		t.Fatalf("expected valid session proof rows to pass audit, got %+v", stats)
+	}
 }
 
 func TestRepositoryVerificationAndPasswordResetChallengesIntegration(t *testing.T) {

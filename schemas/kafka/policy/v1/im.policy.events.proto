@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package nexusim.policy.events.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/qsyy0921/IM/schemas/kafka/policy/v1;policyeventsv1";
+
+// Topic: im.policy.events
+// Partition key: tenant_id + ":" + stable conversation key.
+// Producer: policy-service decision audit outbox relay.
+message PolicyEvent {
+  string event_id = 1;
+  string event_type = 2;
+  string event_version = 3;
+
+  string tenant_id = 4;
+  string aggregate_type = 5;
+  string aggregate_id = 6;
+  int64 aggregate_version = 7;
+
+  string partition_key = 8;
+  int64 mapping_version = 9;
+  string trace_id = 10;
+  string correlation_id = 11;
+  string causation_id = 12;
+  string producer = 13;
+  google.protobuf.Timestamp occurred_at = 14;
+
+  oneof payload {
+    PolicyMessageActionDecisionV1 message_action_decision = 20;
+  }
+}
+
+message PolicyMessageActionDecisionV1 {
+  string tenant_id = 1;
+  string actor_user_key = 2;
+  string device_key = 3;
+  string conversation_key = 4;
+  string message_key = 5;
+  string action = 6;
+  bool message_id_present = 7;
+  bool direct_peer_context_present = 8;
+  string direct_peer_key = 9;
+  bool allowed = 10;
+  int64 permission_version = 11;
+  string classification = 12;
+  string reason_code = 13;
+  google.protobuf.Timestamp decided_at = 14;
+}

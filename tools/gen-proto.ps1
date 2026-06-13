@@ -49,3 +49,9 @@ protoc `
     --go_out=$KafkaSchemaDir `
     --go_opt=paths=source_relative `
     "$KafkaSchemaDir/identity/v1/im.identity.events.proto"
+
+protoc `
+    -I $KafkaSchemaDir `
+    --go_out=$KafkaSchemaDir `
+    --go_opt=paths=source_relative `
+    "$KafkaSchemaDir/policy/v1/im.policy.events.proto"

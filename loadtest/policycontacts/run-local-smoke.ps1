@@ -17,6 +17,7 @@ $resultDir = Join-Path $ResultRoot $RunName
 $logDir = Join-Path $resultDir "logs"
 $topicSuffix = $RunName -replace '[^A-Za-z0-9._-]', '-'
 $topic = "im.contact.events.$topicSuffix"
+$auditTopic = "im.policy.events.$topicSuffix"
 $consumerGroup = "nexusim-policy-contact-$topicSuffix"
 
 New-Item -ItemType Directory -Force $logDir | Out-Null
@@ -97,6 +98,7 @@ Get-ChildItem -Path "migrations\postgres\policy" -Filter "*.sql" |
         Apply-PostgresMigration -Path $_.FullName -Name $_.Name
     }
 Ensure-KafkaTopic -Topic $topic
+Ensure-KafkaTopic -Topic $auditTopic
 $policyGrpcPort = Get-FreeTcpPort
 $policyGrpcAddr = "127.0.0.1:$policyGrpcPort"
 
@@ -118,6 +120,13 @@ try {
         NEXUSIM_POLICY_PERMISSION_VERSION = "1"
         NEXUSIM_POLICY_CLASSIFICATION = "POLICY_STATIC_ALLOW"
     }
+    $processes += Start-NexusProcess -Name "policy-outbox-relay" -FilePath (Join-Path $repo "bin\policy-service.exe") -Env @{
+        NEXUSIM_POLICY_SERVICE_MODE = "outbox-relay"
+        NEXUSIM_PG_DSN = $PgDsn
+        NEXUSIM_KAFKA_BROKERS = $KafkaBrokers
+        NEXUSIM_POLICY_AUDIT_EVENTS_TOPIC = $auditTopic
+        NEXUSIM_POLICY_OUTBOX_POLL_INTERVAL = "100ms"
+    }
 
     Start-Sleep -Milliseconds 1000
 
@@ -126,6 +135,7 @@ try {
         --brokers $KafkaBrokers `
         --topic $topic `
         --consumer-group $consumerGroup `
+        --audit-topic $auditTopic `
         --policy-grpc-addr $policyGrpcAddr `
         --pg-dsn $PgDsn `
         --result-dir $resultDir `
@@ -144,5 +154,8 @@ if (-not $summary.success) {
 
 Write-Host "result_dir=$resultDir"
 Write-Host "topic=$topic"
+Write-Host "audit_topic=$auditTopic"
 Write-Host "after_blocked=$($summary.after_blocked.status)/$($summary.after_blocked.edge_version)"
 Write-Host "after_unblocked=$($summary.after_unblocked.status)/$($summary.after_unblocked.edge_version)"
+Write-Host "audit_outbox_published=$($summary.policy_decision_audit_outbox_status.published)"
+Write-Host "audit_kafka_event_count=$($summary.policy_audit_kafka_event_count)"

@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	policyv1 "github.com/qsyy0921/IM/api/proto/nexusim/policy/v1"
 	contacteventsv1 "github.com/qsyy0921/IM/schemas/kafka/contacts/v1"
+	policyeventsv1 "github.com/qsyy0921/IM/schemas/kafka/policy/v1"
 	kafkago "github.com/segmentio/kafka-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -40,6 +41,7 @@ const (
 type config struct {
 	brokers        []string
 	topic          string
+	auditTopic     string
 	consumerGroup  string
 	policyGRPCAddr string
 	pgDSN          string
@@ -58,6 +60,7 @@ type summary struct {
 	GitStatusShort         string                 `json:"git_status_short,omitempty"`
 	ResultDir              string                 `json:"result_dir"`
 	Topic                  string                 `json:"topic"`
+	AuditTopic             string                 `json:"policy_audit_topic,omitempty"`
 	ConsumerGroup          string                 `json:"consumer_group"`
 	TenantID               string                 `json:"tenant_id"`
 	OwnerUserID            string                 `json:"owner_user_id"`
@@ -75,7 +78,16 @@ type summary struct {
 	AfterUnblockedDecision policyDecisionSnapshot `json:"after_unblocked_policy_decision"`
 	CheckpointOffset       int64                  `json:"checkpoint_offset_value"`
 	AuditOutboxCount       int64                  `json:"policy_decision_audit_outbox_count"`
+	AuditOutboxStatus      auditOutboxStatus      `json:"policy_decision_audit_outbox_status"`
+	AuditKafkaEventCount   int64                  `json:"policy_audit_kafka_event_count,omitempty"`
 	Events                 []string               `json:"events"`
+}
+
+type auditOutboxStatus struct {
+	Total     int64 `json:"total"`
+	Pending   int64 `json:"pending"`
+	Published int64 `json:"published"`
+	DLQ       int64 `json:"dlq"`
 }
 
 type edgeSnapshot struct {
@@ -108,6 +120,7 @@ func parseConfig() config {
 	var brokers string
 	flag.StringVar(&brokers, "brokers", "localhost:9092", "comma-separated Kafka brokers")
 	flag.StringVar(&cfg.topic, "topic", topicContactEvents, "contact events topic")
+	flag.StringVar(&cfg.auditTopic, "audit-topic", "", "optional policy audit events topic for relay verification")
 	flag.StringVar(&cfg.consumerGroup, "consumer-group", "nexusim-policy-contact-smoke", "policy contact consumer group")
 	flag.StringVar(&cfg.policyGRPCAddr, "policy-grpc-addr", "", "optional policy-service gRPC address for direct contact-block decision checks")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable", "PostgreSQL DSN")
@@ -136,6 +149,7 @@ func run(cfg config) error {
 		GitStatusShort: gitOutput("status", "--short"),
 		ResultDir:      cfg.resultDir,
 		Topic:          cfg.topic,
+		AuditTopic:     cfg.auditTopic,
 		ConsumerGroup:  cfg.consumerGroup,
 		TenantID:       cfg.tenantID,
 		OwnerUserID:    cfg.ownerUserID,
@@ -166,6 +180,12 @@ func run(cfg config) error {
 	if err := ensureTopic(ctx, cfg.brokers, cfg.topic); err != nil {
 		s.Error = fmt.Sprintf("ensure topic: %v", err)
 		return fmt.Errorf("ensure topic: %w", err)
+	}
+	if cfg.auditTopic != "" {
+		if err := ensureTopic(ctx, cfg.brokers, cfg.auditTopic); err != nil {
+			s.Error = fmt.Sprintf("ensure audit topic: %v", err)
+			return fmt.Errorf("ensure audit topic: %w", err)
+		}
 	}
 
 	writer := &kafkago.Writer{
@@ -258,6 +278,21 @@ func run(cfg config) error {
 		if err != nil {
 			s.Error = err.Error()
 			return err
+		}
+		if cfg.auditTopic != "" {
+			s.AuditOutboxStatus, err = waitAuditOutboxStatus(ctx, pool, cfg, auditOutboxStatus{
+				Total:     3,
+				Published: 3,
+			})
+			if err != nil {
+				s.Error = err.Error()
+				return err
+			}
+			s.AuditKafkaEventCount, err = waitPolicyAuditKafkaEvents(ctx, cfg, 3)
+			if err != nil {
+				s.Error = err.Error()
+				return err
+			}
 		}
 	}
 	s.Success = true
@@ -432,6 +467,96 @@ WHERE tenant_id = $1
 		case <-ticker.C:
 		}
 	}
+}
+
+func waitAuditOutboxStatus(ctx context.Context, pool *pgxpool.Pool, cfg config, want auditOutboxStatus) (auditOutboxStatus, error) {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	var last auditOutboxStatus
+	for {
+		status, err := readAuditOutboxStatus(ctx, pool, cfg)
+		if err != nil {
+			return auditOutboxStatus{}, err
+		}
+		last = status
+		if status.Total >= want.Total &&
+			status.Published >= want.Published &&
+			status.Pending == want.Pending &&
+			status.DLQ == want.DLQ {
+			return status, nil
+		}
+		select {
+		case <-ctx.Done():
+			return auditOutboxStatus{}, fmt.Errorf("timed out waiting for policy audit outbox status: last=%+v want=%+v", last, want)
+		case <-ticker.C:
+		}
+	}
+}
+
+func readAuditOutboxStatus(ctx context.Context, pool *pgxpool.Pool, cfg config) (auditOutboxStatus, error) {
+	var status auditOutboxStatus
+	rows, err := pool.Query(ctx, `
+SELECT status, COUNT(*)
+FROM policy_decision_audit_outbox
+WHERE tenant_id = $1
+GROUP BY status
+`, cfg.tenantID)
+	if err != nil {
+		return auditOutboxStatus{}, fmt.Errorf("read policy audit outbox status: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var rowStatus string
+		var count int64
+		if err := rows.Scan(&rowStatus, &count); err != nil {
+			return auditOutboxStatus{}, fmt.Errorf("scan policy audit outbox status: %w", err)
+		}
+		status.Total += count
+		switch rowStatus {
+		case "PENDING":
+			status.Pending = count
+		case "PUBLISHED":
+			status.Published = count
+		case "DLQ":
+			status.DLQ = count
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return auditOutboxStatus{}, fmt.Errorf("read policy audit outbox status rows: %w", err)
+	}
+	return status, nil
+}
+
+func waitPolicyAuditKafkaEvents(ctx context.Context, cfg config, minCount int64) (int64, error) {
+	reader := kafkago.NewReader(kafkago.ReaderConfig{
+		Brokers:     cfg.brokers,
+		Topic:       cfg.auditTopic,
+		Partition:   0,
+		MinBytes:    1,
+		MaxBytes:    1 << 20,
+		MaxWait:     100 * time.Millisecond,
+		StartOffset: kafkago.FirstOffset,
+	})
+	defer reader.Close()
+	var count int64
+	for count < minCount {
+		message, err := reader.ReadMessage(ctx)
+		if err != nil {
+			return count, fmt.Errorf("read policy audit kafka event: %w", err)
+		}
+		var event policyeventsv1.PolicyEvent
+		if err := proto.Unmarshal(message.Value, &event); err != nil {
+			return count, fmt.Errorf("decode policy audit kafka event: %w", err)
+		}
+		if event.GetTenantId() != cfg.tenantID {
+			continue
+		}
+		if event.GetMessageActionDecision() == nil {
+			return count, fmt.Errorf("policy audit kafka event missing message_action_decision payload")
+		}
+		count++
+	}
+	return count, nil
 }
 
 func waitPolicyDecision(

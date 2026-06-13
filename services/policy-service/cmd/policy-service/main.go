@@ -21,6 +21,7 @@ import (
 	monitoringinfra "github.com/qsyy0921/IM/services/policy-service/internal/infrastructure/monitoring"
 	postgresinfra "github.com/qsyy0921/IM/services/policy-service/internal/infrastructure/postgres"
 	contacttrigger "github.com/qsyy0921/IM/services/policy-service/internal/trigger/contact"
+	outboxtrigger "github.com/qsyy0921/IM/services/policy-service/internal/trigger/outbox"
 	"google.golang.org/grpc"
 )
 
@@ -34,15 +35,52 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("policy-service runtime wiring is idle; set NEXUSIM_POLICY_SERVICE_MODE=grpc or contact-consumer")
+		log.Println("policy-service runtime wiring is idle; set NEXUSIM_POLICY_SERVICE_MODE=grpc, contact-consumer, or outbox-relay")
 		return nil
 	case "grpc":
 		return runGRPC()
 	case "contact-consumer":
 		return runContactConsumer()
+	case "outbox-relay":
+		return runOutboxRelay()
 	default:
 		return errors.New("unsupported NEXUSIM_POLICY_SERVICE_MODE")
 	}
+}
+
+func runOutboxRelay() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := envString("NEXUSIM_PG_DSN", "")
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required for policy outbox relay")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	producer, err := kafkainfra.NewWriterProducer(splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS")))
+	if err != nil {
+		return err
+	}
+	defer producer.Close()
+
+	relay := outboxtrigger.NewRelay(
+		postgresinfra.NewOutboxStore(pool),
+		producer,
+		outboxtrigger.Config{
+			Topic:          envString("NEXUSIM_POLICY_AUDIT_EVENTS_TOPIC", outboxtrigger.TopicPolicyEvents),
+			BatchSize:      envInt("NEXUSIM_POLICY_OUTBOX_BATCH_SIZE", 500),
+			PollInterval:   envDuration("NEXUSIM_POLICY_OUTBOX_POLL_INTERVAL", time.Second),
+			MaxAttempts:    envInt("NEXUSIM_POLICY_OUTBOX_MAX_ATTEMPTS", 5),
+			RetryBaseDelay: envDuration("NEXUSIM_POLICY_OUTBOX_RETRY_BASE_DELAY", time.Second),
+		},
+	)
+	log.Println("policy-service decision audit outbox relay started")
+	return relay.Run(ctx)
 }
 
 func runContactConsumer() error {
@@ -208,6 +246,18 @@ func envInt(name string, fallback int) int {
 		return fallback
 	}
 	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func envDuration(name string, fallback time.Duration) time.Duration {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
 	if err != nil || parsed <= 0 {
 		return fallback
 	}

@@ -112,6 +112,9 @@ func (outbox *DecisionAuditOutbox) RecordPolicyDecision(
 INSERT INTO policy_decision_audit_outbox (
     event_id,
     tenant_id,
+    aggregate_type,
+    aggregate_id,
+    mapping_version,
     actor_user_key,
     device_key,
     conversation_key,
@@ -126,14 +129,18 @@ INSERT INTO policy_decision_audit_outbox (
     reason_code,
     partition_key,
     correlation_id,
+    causation_id,
     trace_id,
     payload_json,
     created_at,
     available_at,
     updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::jsonb, $19, $19, $19)
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22::jsonb, $23, $23, $23)
 `, eventID,
 		decision.TenantID,
+		"policy_decision",
+		policyDecisionPartitionKey(decision.TenantID, conversationKey),
+		int64(1),
 		actorUserKey,
 		deviceKey,
 		conversationKey,
@@ -147,6 +154,7 @@ INSERT INTO policy_decision_audit_outbox (
 		classification,
 		reasonCode,
 		policyDecisionPartitionKey(decision.TenantID, conversationKey),
+		requestID,
 		requestID,
 		traceID,
 		string(payloadJSON),

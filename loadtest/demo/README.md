@@ -36,6 +36,14 @@ HMAC push auth 示例：
   -PushAuthHmacSecret "local-demo-secret"
 ```
 
+gateway verified metadata auth 示例：
+
+```powershell
+.\loadtest\demo\run-local-demo.ps1 -VerifiedAuthMetadata
+```
+
+该模式会把 demo 请求身份同时写入 user-facing gRPC metadata，用于验证 conversation / message / delivery / receipt 的 `metadata` / `verified-metadata` auth mode；request body 仍保留兼容字段。
+
 边界：
 
 - 不自动创建会话产品流程，只 seed 本地 demo conversation。

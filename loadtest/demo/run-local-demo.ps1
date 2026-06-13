@@ -31,6 +31,7 @@ param(
     [ValidateSet("mock", "hmac")]
     [string]$PushAuthMode = "mock",
     [string]$PushAuthHmacSecret = "",
+    [switch]$VerifiedAuthMetadata,
     [switch]$NoCleanup,
     [switch]$SkipBuild
 )
@@ -80,6 +81,9 @@ if ($PushAuthMode -eq "hmac") {
         throw "-PushAuthHmacSecret is required when -PushAuthMode hmac"
     }
     $args += @("--push-auth-hmac-secret", $PushAuthHmacSecret)
+}
+if ($VerifiedAuthMetadata) {
+    $args += @("--verified-auth-metadata")
 }
 if (-not [string]::IsNullOrWhiteSpace($ConversationTlsCaFile)) {
     $args += @("--conversation-tls-ca-file", $ConversationTlsCaFile)

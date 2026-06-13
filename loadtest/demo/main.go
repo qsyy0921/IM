@@ -25,6 +25,7 @@ import (
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	nhooyr "nhooyr.io/websocket"
@@ -38,6 +39,13 @@ const (
 	opDeliveryNotify = "delivery.notify"
 	opDeliveryAckOK  = "delivery.ack.ok"
 	opResumeHint     = "server.resume_hint"
+
+	metadataTenantID  = "x-nexusim-tenant-id"
+	metadataUserID    = "x-nexusim-user-id"
+	metadataDeviceID  = "x-nexusim-device-id"
+	metadataSessionID = "x-nexusim-session-id"
+	metadataTraceID   = "x-nexusim-trace-id"
+	metadataRequestID = "x-nexusim-request-id"
 )
 
 type config struct {
@@ -64,9 +72,10 @@ type config struct {
 	pollInterval   time.Duration
 	cleanup        bool
 
-	pushAuthMode       string
-	pushAuthHMACSecret string
-	pushAuthTokenTTL   time.Duration
+	verifiedAuthMetadata bool
+	pushAuthMode         string
+	pushAuthHMACSecret   string
+	pushAuthTokenTTL     time.Duration
 }
 
 type summary struct {
@@ -83,6 +92,7 @@ type summary struct {
 	MessageTLSEnabled      bool                    `json:"message_tls_enabled"`
 	DeliveryTLSEnabled     bool                    `json:"delivery_tls_enabled"`
 	ReceiptTLSEnabled      bool                    `json:"receipt_tls_enabled"`
+	VerifiedAuthMetadata   bool                    `json:"verified_auth_metadata"`
 	StartedAt              time.Time               `json:"started_at"`
 	FinishedAt             time.Time               `json:"finished_at"`
 	Success                bool                    `json:"success"`
@@ -207,6 +217,7 @@ func main() {
 	flag.DurationVar(&cfg.waitTimeout, "wait-timeout", 20*time.Second, "async wait timeout")
 	flag.DurationVar(&cfg.pollInterval, "poll-interval", 200*time.Millisecond, "poll interval")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete existing rows for tenant before local demo")
+	flag.BoolVar(&cfg.verifiedAuthMetadata, "verified-auth-metadata", envBool("NEXUSIM_DEMO_VERIFIED_AUTH_METADATA", false), "send gateway verified identity through gRPC metadata for user-facing service RPCs")
 	flag.StringVar(&cfg.pushAuthMode, "push-auth-mode", "mock", "push-gateway auth mode: mock or hmac")
 	flag.StringVar(&cfg.pushAuthHMACSecret, "push-auth-hmac-secret", "", "HMAC secret used to sign push gateway demo token when --push-auth-mode=hmac")
 	flag.DurationVar(&cfg.pushAuthTokenTTL, "push-auth-token-ttl", 10*time.Minute, "TTL for generated HMAC push token")
@@ -223,6 +234,49 @@ func registerTLSFlags(prefix string, envPrefix string, serviceName string, confi
 	flag.StringVar(&config.ServerName, prefix+"-server-name", os.Getenv(envPrefix+"_SERVER_NAME"), "override server name for "+serviceName+" gRPC TLS")
 	flag.StringVar(&config.ClientCertFile, prefix+"-client-cert-file", os.Getenv(envPrefix+"_CLIENT_CERT_FILE"), "client certificate PEM for "+serviceName+" gRPC mTLS")
 	flag.StringVar(&config.ClientKeyFile, prefix+"-client-key-file", os.Getenv(envPrefix+"_CLIENT_KEY_FILE"), "client private key PEM for "+serviceName+" gRPC mTLS")
+}
+
+func envBool(name string, fallback bool) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(name))) {
+	case "":
+		return fallback
+	case "1", "true", "yes", "y", "on":
+		return true
+	case "0", "false", "no", "n", "off":
+		return false
+	default:
+		return fallback
+	}
+}
+
+type demoAuth struct {
+	tenantID  string
+	userID    string
+	deviceID  string
+	sessionID string
+	traceID   string
+	requestID string
+}
+
+func withVerifiedAuthMetadata(ctx context.Context, cfg config, auth demoAuth) context.Context {
+	if !cfg.verifiedAuthMetadata {
+		return ctx
+	}
+	pairs := []string{
+		metadataTenantID, auth.tenantID,
+		metadataUserID, auth.userID,
+		metadataDeviceID, auth.deviceID,
+	}
+	if auth.sessionID != "" {
+		pairs = append(pairs, metadataSessionID, auth.sessionID)
+	}
+	if auth.traceID != "" {
+		pairs = append(pairs, metadataTraceID, auth.traceID)
+	}
+	if auth.requestID != "" {
+		pairs = append(pairs, metadataRequestID, auth.requestID)
+	}
+	return metadata.NewOutgoingContext(ctx, metadata.Pairs(pairs...))
 }
 
 func run(ctx context.Context, cfg config) error {
@@ -247,6 +301,7 @@ func run(ctx context.Context, cfg config) error {
 		MessageTLSEnabled:      cfg.messageTLS.Enabled(),
 		DeliveryTLSEnabled:     cfg.deliveryTLS.Enabled(),
 		ReceiptTLSEnabled:      cfg.receiptTLS.Enabled(),
+		VerifiedAuthMetadata:   cfg.verifiedAuthMetadata,
 		StartedAt:              started,
 	}
 
@@ -378,14 +433,23 @@ func run(ctx context.Context, cfg config) error {
 func createReceiverJoin(ctx context.Context, cfg config, client conversationv1.ConversationServiceClient) (*conversationv1.CreateMemberChangeResponse, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := demoAuth{
+		tenantID:  cfg.tenantID,
+		userID:    cfg.senderUserID,
+		deviceID:  "demo-sender-device",
+		sessionID: "demo-sender-session",
+		traceID:   "e2e-demo-join",
+		requestID: "e2e-demo-join",
+	}
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	return client.CreateMemberChange(requestCtx, &conversationv1.CreateMemberChangeRequest{
 		AuthContext: &conversationv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.senderUserID,
-			DeviceId:  "demo-sender-device",
-			SessionId: "demo-sender-session",
-			TraceId:   "e2e-demo-join",
-			RequestId: "e2e-demo-join",
+			TenantId:  auth.tenantID,
+			UserId:    auth.userID,
+			DeviceId:  auth.deviceID,
+			SessionId: auth.sessionID,
+			TraceId:   auth.traceID,
+			RequestId: auth.requestID,
 		},
 		ConversationId:        cfg.conversationID,
 		TargetUserId:          cfg.receiverUserID,
@@ -405,14 +469,23 @@ func sendMessage(ctx context.Context, cfg config, client messagev1.MessageServic
 	}
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := demoAuth{
+		tenantID:  cfg.tenantID,
+		userID:    cfg.senderUserID,
+		deviceID:  "demo-sender-device",
+		sessionID: "demo-sender-session",
+		traceID:   "e2e-demo-send",
+		requestID: "e2e-demo-send",
+	}
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	return client.SendMessage(requestCtx, &messagev1.SendMessageRequest{
 		AuthContext: &messagev1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.senderUserID,
-			DeviceId:  "demo-sender-device",
-			SessionId: "demo-sender-session",
-			TraceId:   "e2e-demo-send",
-			RequestId: "e2e-demo-send",
+			TenantId:  auth.tenantID,
+			UserId:    auth.userID,
+			DeviceId:  auth.deviceID,
+			SessionId: auth.sessionID,
+			TraceId:   auth.traceID,
+			RequestId: auth.requestID,
 		},
 		ConversationId: cfg.conversationID,
 		ClientMsgId:    "e2e-demo-message-1",
@@ -425,14 +498,23 @@ func pullInboxAtLeast(ctx context.Context, cfg config, client deliveryv1.Deliver
 	deadline := time.Now().Add(cfg.waitTimeout)
 	for {
 		requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+		auth := demoAuth{
+			tenantID:  cfg.tenantID,
+			userID:    cfg.receiverUserID,
+			deviceID:  cfg.receiverDevice,
+			sessionID: "e2e-demo-receiver",
+			traceID:   "e2e-demo-pull",
+			requestID: "e2e-demo-pull",
+		}
+		requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 		response, err := client.PullInbox(requestCtx, &deliveryv1.PullInboxRequest{
 			AuthContext: &deliveryv1.AuthContext{
-				TenantId:  cfg.tenantID,
-				UserId:    cfg.receiverUserID,
-				DeviceId:  cfg.receiverDevice,
-				SessionId: "e2e-demo-receiver",
-				TraceId:   "e2e-demo-pull",
-				RequestId: "e2e-demo-pull",
+				TenantId:  auth.tenantID,
+				UserId:    auth.userID,
+				DeviceId:  auth.deviceID,
+				SessionId: auth.sessionID,
+				TraceId:   auth.traceID,
+				RequestId: auth.requestID,
 			},
 			ConversationId: cfg.conversationID,
 			AfterSeq:       0,
@@ -473,14 +555,23 @@ func summarizePull(response *deliveryv1.PullInboxResponse) pullSummary {
 func markRead(ctx context.Context, cfg config, client receiptv1.ReceiptServiceClient, seq int64) (*receiptv1.MarkReadResponse, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := demoAuth{
+		tenantID:  cfg.tenantID,
+		userID:    cfg.receiverUserID,
+		deviceID:  cfg.receiverDevice,
+		sessionID: "e2e-demo-receiver",
+		traceID:   "e2e-demo-mark-read",
+		requestID: "e2e-demo-mark-read",
+	}
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	return client.MarkRead(requestCtx, &receiptv1.MarkReadRequest{
 		AuthContext: &receiptv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.receiverUserID,
-			DeviceId:  cfg.receiverDevice,
-			SessionId: "e2e-demo-receiver",
-			TraceId:   "e2e-demo-mark-read",
-			RequestId: "e2e-demo-mark-read",
+			TenantId:  auth.tenantID,
+			UserId:    auth.userID,
+			DeviceId:  auth.deviceID,
+			SessionId: auth.sessionID,
+			TraceId:   auth.traceID,
+			RequestId: auth.requestID,
 		},
 		ConversationId: cfg.conversationID,
 		ReadSeq:        seq,
@@ -504,14 +595,23 @@ func waitMarkRead(ctx context.Context, cfg config, client receiptv1.ReceiptServi
 func listConversations(ctx context.Context, cfg config, client receiptv1.ReceiptServiceClient) (conversationListSummary, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := demoAuth{
+		tenantID:  cfg.tenantID,
+		userID:    cfg.receiverUserID,
+		deviceID:  cfg.receiverDevice,
+		sessionID: "e2e-demo-receiver",
+		traceID:   "e2e-demo-list",
+		requestID: "e2e-demo-list",
+	}
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	response, err := client.ListConversations(requestCtx, &receiptv1.ListConversationsRequest{
 		AuthContext: &receiptv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.receiverUserID,
-			DeviceId:  cfg.receiverDevice,
-			SessionId: "e2e-demo-receiver",
-			TraceId:   "e2e-demo-list",
-			RequestId: "e2e-demo-list",
+			TenantId:  auth.tenantID,
+			UserId:    auth.userID,
+			DeviceId:  auth.deviceID,
+			SessionId: auth.sessionID,
+			TraceId:   auth.traceID,
+			RequestId: auth.requestID,
 		},
 		Limit: 10,
 	})

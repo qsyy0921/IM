@@ -1,0 +1,63 @@
+package main
+
+import (
+	"context"
+	"testing"
+
+	"google.golang.org/grpc/metadata"
+)
+
+func TestEnvBool(t *testing.T) {
+	t.Setenv("NEXUSIM_TEST_BOOL", "true")
+	if !envBool("NEXUSIM_TEST_BOOL", false) {
+		t.Fatal("expected true env bool")
+	}
+	t.Setenv("NEXUSIM_TEST_BOOL", "off")
+	if envBool("NEXUSIM_TEST_BOOL", true) {
+		t.Fatal("expected false env bool")
+	}
+	t.Setenv("NEXUSIM_TEST_BOOL", "invalid")
+	if !envBool("NEXUSIM_TEST_BOOL", true) {
+		t.Fatal("expected invalid env bool to keep fallback")
+	}
+}
+
+func TestWithVerifiedAuthMetadataDisabled(t *testing.T) {
+	ctx := withVerifiedAuthMetadata(context.Background(), config{}, demoAuth{
+		tenantID: "tenant-1",
+		userID:   "user-1",
+		deviceID: "device-1",
+	})
+	if _, ok := metadata.FromOutgoingContext(ctx); ok {
+		t.Fatal("did not expect outgoing metadata when disabled")
+	}
+}
+
+func TestWithVerifiedAuthMetadataAddsOutgoingMetadata(t *testing.T) {
+	ctx := withVerifiedAuthMetadata(context.Background(), config{verifiedAuthMetadata: true}, demoAuth{
+		tenantID:  "tenant-1",
+		userID:    "user-1",
+		deviceID:  "device-1",
+		sessionID: "session-1",
+		traceID:   "trace-1",
+		requestID: "request-1",
+	})
+	md, ok := metadata.FromOutgoingContext(ctx)
+	if !ok {
+		t.Fatal("expected outgoing metadata")
+	}
+	assertMetadataValue(t, md, metadataTenantID, "tenant-1")
+	assertMetadataValue(t, md, metadataUserID, "user-1")
+	assertMetadataValue(t, md, metadataDeviceID, "device-1")
+	assertMetadataValue(t, md, metadataSessionID, "session-1")
+	assertMetadataValue(t, md, metadataTraceID, "trace-1")
+	assertMetadataValue(t, md, metadataRequestID, "request-1")
+}
+
+func assertMetadataValue(t *testing.T, md metadata.MD, key string, want string) {
+	t.Helper()
+	values := md.Get(key)
+	if len(values) != 1 || values[0] != want {
+		t.Fatalf("metadata %s = %v, want [%s]", key, values, want)
+	}
+}

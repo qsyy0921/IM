@@ -80,7 +80,7 @@
 - 编辑 / 撤回 / 删除。
 - message-service 补充：gRPC server 已补第一阶段静态 TLS / mTLS 配置，支持 client DNS / URI SAN exact-match allowlist；作为 client 调 policy-service / conversation-service 的 TLS 配置也已存在；`loadtest/sendmessage` 压测器已支持可选 CA、server name 和 client cert/key，`loadtest/messageedit`、`loadtest/messagerevoke`、`loadtest/messagedelete` 已支持 conversation / message / delivery 三段可选 CA、server name 和 client cert/key。默认仍是 plaintext，当前不包含证书签发 / 轮换 / 分发、动态服务身份治理或全服务 mTLS rollout。
 - delivery-service 补充：gRPC server 已补第一阶段静态 TLS / mTLS 配置，支持 client DNS / URI SAN exact-match allowlist；push-gateway delivery RPC client 已支持可选 CA、server name 和 client cert/key；`loadtest/delivery` 和 `loadtest/deliveryvisibility` 已支持可选 delivery client CA、server name 和 client cert/key，`deliveryvisibility` 同时支持 conversation client TLS。默认仍是 plaintext，当前不包含证书签发 / 轮换 / 分发、动态服务身份治理或全服务 mTLS rollout。
-- receipt-service 补充：gRPC server 已补第一阶段静态 TLS / mTLS 配置，支持 client DNS / URI SAN exact-match allowlist；`loadtest/receipt` 和 `loadtest/demo` 调 delivery / receipt gRPC 的 client 已支持可选 CA、server name 和 client cert/key。默认仍是 plaintext，当前不包含证书签发 / 轮换 / 分发、动态服务身份治理或全服务 mTLS rollout。
+- receipt-service 补充：gRPC server 已补第一阶段静态 TLS / mTLS 配置，支持 client DNS / URI SAN exact-match allowlist；`loadtest/receipt` 和 `loadtest/demo` 调 conversation / message / delivery / receipt gRPC 的 client 已支持可选 CA、server name 和 client cert/key。默认仍是 plaintext，当前不包含证书签发 / 轮换 / 分发、动态服务身份治理或全服务 mTLS rollout。
 - 群成员列表、owner transfer、群管理规则。
 - 联系人 / 好友关系 / 申请列表 / 取消申请 / 拉黑 / 删除 / 备注。
 - contacts-service 补充：gRPC server 已补第一阶段静态 TLS / mTLS 配置，支持 client DNS / URI SAN exact-match allowlist；`loadtest/contacts` smoke runner 已支持可选 CA、server name 和 client cert/key。默认仍是 plaintext，当前不包含证书签发 / 轮换 / 分发、动态服务身份治理或全服务 mTLS rollout。

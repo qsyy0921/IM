@@ -25,7 +25,6 @@ import (
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	nhooyr "nhooyr.io/websocket"
@@ -46,6 +45,8 @@ type config struct {
 	messageTarget      string
 	deliveryTarget     string
 	receiptTarget      string
+	conversationTLS    grpctls.Config
+	messageTLS         grpctls.Config
 	deliveryTLS        grpctls.Config
 	receiptTLS         grpctls.Config
 	pushURL            string
@@ -69,31 +70,33 @@ type config struct {
 }
 
 type summary struct {
-	Commit             string                  `json:"commit"`
-	CommitFull         string                  `json:"commit_full"`
-	GitDirty           bool                    `json:"git_dirty"`
-	ResultDir          string                  `json:"result_dir"`
-	TenantID           string                  `json:"tenant_id"`
-	ConversationID     string                  `json:"conversation_id"`
-	SenderUserID       string                  `json:"sender_user_id"`
-	ReceiverUserID     string                  `json:"receiver_user_id"`
-	ReceiverDeviceID   string                  `json:"receiver_device_id"`
-	DeliveryTLSEnabled bool                    `json:"delivery_tls_enabled"`
-	ReceiptTLSEnabled  bool                    `json:"receipt_tls_enabled"`
-	StartedAt          time.Time               `json:"started_at"`
-	FinishedAt         time.Time               `json:"finished_at"`
-	Success            bool                    `json:"success"`
-	Error              string                  `json:"error,omitempty"`
-	ServerHello        serverFrame             `json:"server_hello"`
-	MemberJoin         memberJoinSummary       `json:"member_join"`
-	SendMessage        sendSummary             `json:"send_message"`
-	Notify             serverFrame             `json:"delivery_notify"`
-	PullInbox          pullSummary             `json:"pull_inbox"`
-	WebSocketAck       serverFrame             `json:"websocket_ack"`
-	MarkRead           markReadSummary         `json:"mark_read"`
-	ListBeforeRead     conversationListSummary `json:"list_conversations_before_read"`
-	ListAfterRead      conversationListSummary `json:"list_conversations_after_read"`
-	Postgres           postgresSummary         `json:"postgres"`
+	Commit                 string                  `json:"commit"`
+	CommitFull             string                  `json:"commit_full"`
+	GitDirty               bool                    `json:"git_dirty"`
+	ResultDir              string                  `json:"result_dir"`
+	TenantID               string                  `json:"tenant_id"`
+	ConversationID         string                  `json:"conversation_id"`
+	SenderUserID           string                  `json:"sender_user_id"`
+	ReceiverUserID         string                  `json:"receiver_user_id"`
+	ReceiverDeviceID       string                  `json:"receiver_device_id"`
+	ConversationTLSEnabled bool                    `json:"conversation_tls_enabled"`
+	MessageTLSEnabled      bool                    `json:"message_tls_enabled"`
+	DeliveryTLSEnabled     bool                    `json:"delivery_tls_enabled"`
+	ReceiptTLSEnabled      bool                    `json:"receipt_tls_enabled"`
+	StartedAt              time.Time               `json:"started_at"`
+	FinishedAt             time.Time               `json:"finished_at"`
+	Success                bool                    `json:"success"`
+	Error                  string                  `json:"error,omitempty"`
+	ServerHello            serverFrame             `json:"server_hello"`
+	MemberJoin             memberJoinSummary       `json:"member_join"`
+	SendMessage            sendSummary             `json:"send_message"`
+	Notify                 serverFrame             `json:"delivery_notify"`
+	PullInbox              pullSummary             `json:"pull_inbox"`
+	WebSocketAck           serverFrame             `json:"websocket_ack"`
+	MarkRead               markReadSummary         `json:"mark_read"`
+	ListBeforeRead         conversationListSummary `json:"list_conversations_before_read"`
+	ListAfterRead          conversationListSummary `json:"list_conversations_after_read"`
+	Postgres               postgresSummary         `json:"postgres"`
 }
 
 type memberJoinSummary struct {
@@ -188,14 +191,10 @@ func main() {
 	flag.StringVar(&cfg.messageTarget, "message-target", "127.0.0.1:10495", "message-service gRPC target")
 	flag.StringVar(&cfg.deliveryTarget, "delivery-target", "127.0.0.1:10497", "delivery-service gRPC target")
 	flag.StringVar(&cfg.receiptTarget, "receipt-target", "127.0.0.1:10499", "receipt-service gRPC target")
-	flag.StringVar(&cfg.deliveryTLS.CAFile, "delivery-tls-ca-file", "", "CA PEM for delivery-service gRPC TLS")
-	flag.StringVar(&cfg.deliveryTLS.ServerName, "delivery-tls-server-name", "", "server name for delivery-service gRPC TLS")
-	flag.StringVar(&cfg.deliveryTLS.ClientCertFile, "delivery-tls-client-cert-file", "", "client certificate PEM for delivery-service mTLS")
-	flag.StringVar(&cfg.deliveryTLS.ClientKeyFile, "delivery-tls-client-key-file", "", "client private key PEM for delivery-service mTLS")
-	flag.StringVar(&cfg.receiptTLS.CAFile, "receipt-tls-ca-file", "", "CA PEM for receipt-service gRPC TLS")
-	flag.StringVar(&cfg.receiptTLS.ServerName, "receipt-tls-server-name", "", "server name for receipt-service gRPC TLS")
-	flag.StringVar(&cfg.receiptTLS.ClientCertFile, "receipt-tls-client-cert-file", "", "client certificate PEM for receipt-service mTLS")
-	flag.StringVar(&cfg.receiptTLS.ClientKeyFile, "receipt-tls-client-key-file", "", "client private key PEM for receipt-service mTLS")
+	registerTLSFlags("conversation-tls", "NEXUSIM_CONVERSATION_TLS", "conversation-service", &cfg.conversationTLS)
+	registerTLSFlags("message-tls", "NEXUSIM_MESSAGE_TLS", "message-service", &cfg.messageTLS)
+	registerTLSFlags("delivery-tls", "NEXUSIM_DELIVERY_TLS", "delivery-service", &cfg.deliveryTLS)
+	registerTLSFlags("receipt-tls", "NEXUSIM_RECEIPT_TLS", "receipt-service", &cfg.receiptTLS)
 	flag.StringVar(&cfg.pushURL, "push-url", "ws://127.0.0.1:10498", "push-gateway WebSocket URL")
 	flag.StringVar(&cfg.resultDir, "result-dir", `H:\NexusIM\loadtest-results\e2e-demo`, "result directory")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "", "PostgreSQL DSN used only for local demo seed/cleanup/statistics")
@@ -219,6 +218,13 @@ func main() {
 	}
 }
 
+func registerTLSFlags(prefix string, envPrefix string, serviceName string, config *grpctls.Config) {
+	flag.StringVar(&config.CAFile, prefix+"-ca-file", os.Getenv(envPrefix+"_CA_FILE"), "CA PEM for "+serviceName+" gRPC TLS")
+	flag.StringVar(&config.ServerName, prefix+"-server-name", os.Getenv(envPrefix+"_SERVER_NAME"), "override server name for "+serviceName+" gRPC TLS")
+	flag.StringVar(&config.ClientCertFile, prefix+"-client-cert-file", os.Getenv(envPrefix+"_CLIENT_CERT_FILE"), "client certificate PEM for "+serviceName+" gRPC mTLS")
+	flag.StringVar(&config.ClientKeyFile, prefix+"-client-key-file", os.Getenv(envPrefix+"_CLIENT_KEY_FILE"), "client private key PEM for "+serviceName+" gRPC mTLS")
+}
+
 func run(ctx context.Context, cfg config) error {
 	if strings.TrimSpace(cfg.pgDSN) == "" {
 		return fmt.Errorf("--pg-dsn is required for local demo seed and evidence collection")
@@ -228,18 +234,20 @@ func run(ctx context.Context, cfg config) error {
 	}
 	started := time.Now().UTC()
 	result := summary{
-		Commit:             gitOutput("rev-parse", "--short", "HEAD"),
-		CommitFull:         gitOutput("rev-parse", "HEAD"),
-		GitDirty:           strings.TrimSpace(gitOutput("status", "--short")) != "",
-		ResultDir:          cfg.resultDir,
-		TenantID:           cfg.tenantID,
-		ConversationID:     cfg.conversationID,
-		SenderUserID:       cfg.senderUserID,
-		ReceiverUserID:     cfg.receiverUserID,
-		ReceiverDeviceID:   cfg.receiverDevice,
-		DeliveryTLSEnabled: cfg.deliveryTLS.Enabled(),
-		ReceiptTLSEnabled:  cfg.receiptTLS.Enabled(),
-		StartedAt:          started,
+		Commit:                 gitOutput("rev-parse", "--short", "HEAD"),
+		CommitFull:             gitOutput("rev-parse", "HEAD"),
+		GitDirty:               strings.TrimSpace(gitOutput("status", "--short")) != "",
+		ResultDir:              cfg.resultDir,
+		TenantID:               cfg.tenantID,
+		ConversationID:         cfg.conversationID,
+		SenderUserID:           cfg.senderUserID,
+		ReceiverUserID:         cfg.receiverUserID,
+		ReceiverDeviceID:       cfg.receiverDevice,
+		ConversationTLSEnabled: cfg.conversationTLS.Enabled(),
+		MessageTLSEnabled:      cfg.messageTLS.Enabled(),
+		DeliveryTLSEnabled:     cfg.deliveryTLS.Enabled(),
+		ReceiptTLSEnabled:      cfg.receiptTLS.Enabled(),
+		StartedAt:              started,
 	}
 
 	pool, err := pgxpool.New(ctx, cfg.pgDSN)
@@ -256,12 +264,20 @@ func run(ctx context.Context, cfg config) error {
 		return finish(cfg, &result, err)
 	}
 
-	conversationConn, err := grpc.NewClient(cfg.conversationTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conversationDialOption, err := grpctls.DialOption(cfg.conversationTLS, "conversation-tls")
+	if err != nil {
+		return finish(cfg, &result, fmt.Errorf("configure conversation-service TLS: %w", err))
+	}
+	conversationConn, err := grpc.NewClient(cfg.conversationTarget, conversationDialOption)
 	if err != nil {
 		return finish(cfg, &result, fmt.Errorf("connect conversation-service: %w", err))
 	}
 	defer conversationConn.Close()
-	messageConn, err := grpc.NewClient(cfg.messageTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	messageDialOption, err := grpctls.DialOption(cfg.messageTLS, "message-tls")
+	if err != nil {
+		return finish(cfg, &result, fmt.Errorf("configure message-service TLS: %w", err))
+	}
+	messageConn, err := grpc.NewClient(cfg.messageTarget, messageDialOption)
 	if err != nil {
 		return finish(cfg, &result, fmt.Errorf("connect message-service: %w", err))
 	}

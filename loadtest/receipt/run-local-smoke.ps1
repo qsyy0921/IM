@@ -3,6 +3,18 @@ param(
     [string]$KafkaBrokers = "localhost:9092",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
+    [string]$ConversationTarget = "127.0.0.1:11696",
+    [string]$MessageTarget = "127.0.0.1:11695",
+    [string]$DeliveryTarget = "127.0.0.1:11697",
+    [string]$ReceiptTarget = "127.0.0.1:11699",
+    [string]$ConversationTlsCaFile = "",
+    [string]$ConversationTlsServerName = "",
+    [string]$ConversationTlsClientCertFile = "",
+    [string]$ConversationTlsClientKeyFile = "",
+    [string]$MessageTlsCaFile = "",
+    [string]$MessageTlsServerName = "",
+    [string]$MessageTlsClientCertFile = "",
+    [string]$MessageTlsClientKeyFile = "",
     [string]$DeliveryTlsCaFile = "",
     [string]$DeliveryTlsServerName = "",
     [string]$DeliveryTlsClientCertFile = "",
@@ -231,10 +243,10 @@ try {
     }
 
     $runnerArgs = @(
-        "--conversation-target", "127.0.0.1:11696",
-        "--message-target", "127.0.0.1:11695",
-        "--delivery-target", "127.0.0.1:11697",
-        "--receipt-target", "127.0.0.1:11699",
+        "--conversation-target", $ConversationTarget,
+        "--message-target", $MessageTarget,
+        "--delivery-target", $DeliveryTarget,
+        "--receipt-target", $ReceiptTarget,
         "--pg-dsn", $PgDsn,
         "--result-dir", $resultDir,
         "--tenant-id", "tenant-receipt-smoke",
@@ -250,6 +262,30 @@ try {
         "--wait-timeout", "30s",
         "--request-timeout", "5s"
     )
+    if (-not [string]::IsNullOrWhiteSpace($ConversationTlsCaFile)) {
+        $runnerArgs += @("--conversation-tls-ca-file", $ConversationTlsCaFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ConversationTlsServerName)) {
+        $runnerArgs += @("--conversation-tls-server-name", $ConversationTlsServerName)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ConversationTlsClientCertFile)) {
+        $runnerArgs += @("--conversation-tls-client-cert-file", $ConversationTlsClientCertFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ConversationTlsClientKeyFile)) {
+        $runnerArgs += @("--conversation-tls-client-key-file", $ConversationTlsClientKeyFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($MessageTlsCaFile)) {
+        $runnerArgs += @("--message-tls-ca-file", $MessageTlsCaFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($MessageTlsServerName)) {
+        $runnerArgs += @("--message-tls-server-name", $MessageTlsServerName)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($MessageTlsClientCertFile)) {
+        $runnerArgs += @("--message-tls-client-cert-file", $MessageTlsClientCertFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($MessageTlsClientKeyFile)) {
+        $runnerArgs += @("--message-tls-client-key-file", $MessageTlsClientKeyFile)
+    }
     if (-not [string]::IsNullOrWhiteSpace($DeliveryTlsCaFile)) {
         $runnerArgs += @("--delivery-tls-ca-file", $DeliveryTlsCaFile)
     }

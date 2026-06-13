@@ -39,10 +39,18 @@ im.delivery.events
 
 ## TLS / mTLS smoke 参数
 
-`loadtest/receipt` 和 `loadtest/receipt/run-local-smoke.ps1` 默认仍使用 plaintext gRPC。若本地已通过 `NEXUSIM_DELIVERY_GRPC_TLS_*` 或 `NEXUSIM_RECEIPT_GRPC_TLS_*` 开启 delivery / receipt gRPC server TLS，可给 runner 增加对应 client 参数：
+`loadtest/receipt` 和 `loadtest/receipt/run-local-smoke.ps1` 默认仍使用 plaintext gRPC。若本地已通过对应 `NEXUSIM_*_GRPC_TLS_*` 配置开启 conversation / message / delivery / receipt gRPC server TLS，可给 runner 增加对应 client 参数：
 
 ```powershell
 .\loadtest\receipt\run-local-smoke.ps1 `
+  -ConversationTlsCaFile .\certs\ca.pem `
+  -ConversationTlsServerName conversation-service.nexusim.local `
+  -ConversationTlsClientCertFile .\certs\loadtest-client.crt `
+  -ConversationTlsClientKeyFile .\certs\loadtest-client.key `
+  -MessageTlsCaFile .\certs\ca.pem `
+  -MessageTlsServerName message-service.nexusim.local `
+  -MessageTlsClientCertFile .\certs\loadtest-client.crt `
+  -MessageTlsClientKeyFile .\certs\loadtest-client.key `
   -DeliveryTlsCaFile .\certs\ca.pem `
   -DeliveryTlsServerName delivery-service.nexusim.local `
   -DeliveryTlsClientCertFile .\certs\loadtest-client.crt `
@@ -53,7 +61,7 @@ im.delivery.events
   -ReceiptTlsClientKeyFile .\certs\loadtest-client.key
 ```
 
-配置任一 `*-tls-*` 参数后必须提供对应 CA file，client cert/key 必须成对配置。该能力只验证 smoke runner 到 delivery / receipt gRPC server 的静态 TLS / mTLS 连接；证书签发、轮换、分发和全服务 mTLS rollout 仍是后续项。
+配置任一 `*-tls-*` 参数后必须提供对应 CA file，client cert/key 必须成对配置。该能力只验证 smoke runner 到 conversation / message / delivery / receipt gRPC server 的静态 TLS / mTLS 连接；证书签发、轮换、分发和全服务 mTLS rollout 仍是后续项。
 
 ## 面试可讲重点
 

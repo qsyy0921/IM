@@ -4,6 +4,14 @@ param(
     [string]$MessageTarget = "127.0.0.1:10495",
     [string]$DeliveryTarget = "127.0.0.1:10497",
     [string]$ReceiptTarget = "127.0.0.1:10499",
+    [string]$ConversationTlsCaFile = "",
+    [string]$ConversationTlsServerName = "",
+    [string]$ConversationTlsClientCertFile = "",
+    [string]$ConversationTlsClientKeyFile = "",
+    [string]$MessageTlsCaFile = "",
+    [string]$MessageTlsServerName = "",
+    [string]$MessageTlsClientCertFile = "",
+    [string]$MessageTlsClientKeyFile = "",
     [string]$DeliveryTlsCaFile = "",
     [string]$DeliveryTlsServerName = "",
     [string]$DeliveryTlsClientCertFile = "",
@@ -72,6 +80,30 @@ if ($PushAuthMode -eq "hmac") {
         throw "-PushAuthHmacSecret is required when -PushAuthMode hmac"
     }
     $args += @("--push-auth-hmac-secret", $PushAuthHmacSecret)
+}
+if (-not [string]::IsNullOrWhiteSpace($ConversationTlsCaFile)) {
+    $args += @("--conversation-tls-ca-file", $ConversationTlsCaFile)
+}
+if (-not [string]::IsNullOrWhiteSpace($ConversationTlsServerName)) {
+    $args += @("--conversation-tls-server-name", $ConversationTlsServerName)
+}
+if (-not [string]::IsNullOrWhiteSpace($ConversationTlsClientCertFile)) {
+    $args += @("--conversation-tls-client-cert-file", $ConversationTlsClientCertFile)
+}
+if (-not [string]::IsNullOrWhiteSpace($ConversationTlsClientKeyFile)) {
+    $args += @("--conversation-tls-client-key-file", $ConversationTlsClientKeyFile)
+}
+if (-not [string]::IsNullOrWhiteSpace($MessageTlsCaFile)) {
+    $args += @("--message-tls-ca-file", $MessageTlsCaFile)
+}
+if (-not [string]::IsNullOrWhiteSpace($MessageTlsServerName)) {
+    $args += @("--message-tls-server-name", $MessageTlsServerName)
+}
+if (-not [string]::IsNullOrWhiteSpace($MessageTlsClientCertFile)) {
+    $args += @("--message-tls-client-cert-file", $MessageTlsClientCertFile)
+}
+if (-not [string]::IsNullOrWhiteSpace($MessageTlsClientKeyFile)) {
+    $args += @("--message-tls-client-key-file", $MessageTlsClientKeyFile)
 }
 if (-not [string]::IsNullOrWhiteSpace($DeliveryTlsCaFile)) {
     $args += @("--delivery-tls-ca-file", $DeliveryTlsCaFile)

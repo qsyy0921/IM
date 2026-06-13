@@ -2,11 +2,8 @@ package main
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -24,6 +21,7 @@ import (
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
+	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	policyeventsv1 "github.com/qsyy0921/IM/schemas/kafka/policy/v1"
 	kafkago "github.com/segmentio/kafka-go"
@@ -51,6 +49,7 @@ const (
 	metadataSessionID = "x-nexusim-session-id"
 	metadataTraceID   = "x-nexusim-trace-id"
 	metadataRequestID = "x-nexusim-request-id"
+	metadataToken     = "x-nexusim-gateway-token"
 )
 
 type config struct {
@@ -81,10 +80,13 @@ type config struct {
 	pollInterval   time.Duration
 	cleanup        bool
 
-	verifiedAuthMetadata bool
-	pushAuthMode         string
-	pushAuthHMACSecret   string
-	pushAuthTokenTTL     time.Duration
+	verifiedAuthMetadata  bool
+	gatewayAuthMode       string
+	gatewayAuthHMACSecret string
+	gatewayAuthTokenTTL   time.Duration
+	pushAuthMode          string
+	pushAuthHMACSecret    string
+	pushAuthTokenTTL      time.Duration
 }
 
 type summary struct {
@@ -103,6 +105,7 @@ type summary struct {
 	ReceiptTLSEnabled      bool                     `json:"receipt_tls_enabled"`
 	PushTLSEnabled         bool                     `json:"push_tls_enabled"`
 	VerifiedAuthMetadata   bool                     `json:"verified_auth_metadata"`
+	GatewayAuthMode        string                   `json:"gateway_auth_mode,omitempty"`
 	StartedAt              time.Time                `json:"started_at"`
 	FinishedAt             time.Time                `json:"finished_at"`
 	Success                bool                     `json:"success"`
@@ -244,6 +247,9 @@ func main() {
 	flag.DurationVar(&cfg.pollInterval, "poll-interval", 200*time.Millisecond, "poll interval")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete existing rows for tenant before local demo")
 	flag.BoolVar(&cfg.verifiedAuthMetadata, "verified-auth-metadata", envBool("NEXUSIM_DEMO_VERIFIED_AUTH_METADATA", false), "send gateway verified identity through gRPC metadata for user-facing service RPCs")
+	flag.StringVar(&cfg.gatewayAuthMode, "gateway-auth-mode", os.Getenv("NEXUSIM_DEMO_GATEWAY_AUTH_MODE"), "api-gateway auth mode for user-facing gRPC calls: empty, mock, or hmac")
+	flag.StringVar(&cfg.gatewayAuthHMACSecret, "gateway-auth-hmac-secret", os.Getenv("NEXUSIM_DEMO_GATEWAY_AUTH_HMAC_SECRET"), "HMAC secret used to sign api-gateway demo token when --gateway-auth-mode=hmac")
+	flag.DurationVar(&cfg.gatewayAuthTokenTTL, "gateway-auth-token-ttl", 10*time.Minute, "TTL for generated HMAC api-gateway token")
 	flag.StringVar(&cfg.pushAuthMode, "push-auth-mode", "mock", "push-gateway auth mode: mock or hmac")
 	flag.StringVar(&cfg.pushAuthHMACSecret, "push-auth-hmac-secret", "", "HMAC secret used to sign push gateway demo token when --push-auth-mode=hmac")
 	flag.DurationVar(&cfg.pushAuthTokenTTL, "push-auth-token-ttl", 10*time.Minute, "TTL for generated HMAC push token")
@@ -306,12 +312,56 @@ func withVerifiedAuthMetadata(ctx context.Context, cfg config, auth demoAuth) co
 	return metadata.NewOutgoingContext(ctx, metadata.Pairs(pairs...))
 }
 
+func withUserFacingAuthMetadata(ctx context.Context, cfg config, auth demoAuth) (context.Context, error) {
+	switch strings.ToLower(strings.TrimSpace(cfg.gatewayAuthMode)) {
+	case "":
+		return withVerifiedAuthMetadata(ctx, cfg, auth), nil
+	case "mock":
+		pairs := []string{
+			metadataToken, auth.tenantID + ":" + auth.userID + ":" + auth.deviceID,
+		}
+		if auth.traceID != "" {
+			pairs = append(pairs, metadataTraceID, auth.traceID)
+		}
+		if auth.requestID != "" {
+			pairs = append(pairs, metadataRequestID, auth.requestID)
+		}
+		return metadata.NewOutgoingContext(ctx, metadata.Pairs(pairs...)), nil
+	case "hmac":
+		token, err := signGatewayAuthToken(cfg.gatewayAuthHMACSecret, cfg.gatewayAuthTokenTTL, auth)
+		if err != nil {
+			return nil, err
+		}
+		pairs := []string{"authorization", "Bearer " + token}
+		if auth.requestID != "" {
+			pairs = append(pairs, metadataRequestID, auth.requestID)
+		}
+		return metadata.NewOutgoingContext(ctx, metadata.Pairs(pairs...)), nil
+	default:
+		return nil, fmt.Errorf("unsupported gateway auth mode: %s", cfg.gatewayAuthMode)
+	}
+}
+
 func run(ctx context.Context, cfg config) error {
+	cfg.gatewayAuthMode = strings.ToLower(strings.TrimSpace(cfg.gatewayAuthMode))
+	cfg.pushAuthMode = strings.ToLower(strings.TrimSpace(cfg.pushAuthMode))
 	if strings.TrimSpace(cfg.pgDSN) == "" {
 		return fmt.Errorf("--pg-dsn is required for local demo seed and evidence collection")
 	}
+	if cfg.gatewayAuthMode != "" && cfg.verifiedAuthMetadata {
+		return fmt.Errorf("--gateway-auth-mode and --verified-auth-metadata cannot be combined")
+	}
+	if cfg.gatewayAuthMode == "hmac" && strings.TrimSpace(cfg.gatewayAuthHMACSecret) == "" {
+		return fmt.Errorf("--gateway-auth-hmac-secret is required when --gateway-auth-mode=hmac")
+	}
+	if cfg.gatewayAuthMode != "" && cfg.gatewayAuthMode != "mock" && cfg.gatewayAuthMode != "hmac" {
+		return fmt.Errorf("unsupported gateway auth mode: %s", cfg.gatewayAuthMode)
+	}
 	if cfg.pushAuthMode == "hmac" && strings.TrimSpace(cfg.pushAuthHMACSecret) == "" {
 		return fmt.Errorf("--push-auth-hmac-secret is required when --push-auth-mode=hmac")
+	}
+	if cfg.pushAuthMode != "" && cfg.pushAuthMode != "mock" && cfg.pushAuthMode != "hmac" {
+		return fmt.Errorf("unsupported push auth mode: %s", cfg.pushAuthMode)
 	}
 	started := time.Now().UTC()
 	result := summary{
@@ -330,6 +380,7 @@ func run(ctx context.Context, cfg config) error {
 		ReceiptTLSEnabled:      cfg.receiptTLS.Enabled(),
 		PushTLSEnabled:         cfg.pushTLS.Enabled(),
 		VerifiedAuthMetadata:   cfg.verifiedAuthMetadata,
+		GatewayAuthMode:        cfg.gatewayAuthMode,
 		StartedAt:              started,
 	}
 
@@ -476,7 +527,10 @@ func createReceiverJoin(ctx context.Context, cfg config, client conversationv1.C
 		traceID:   "e2e-demo-join",
 		requestID: "e2e-demo-join",
 	}
-	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
+	requestCtx, err := withUserFacingAuthMetadata(requestCtx, cfg, auth)
+	if err != nil {
+		return nil, err
+	}
 	return client.CreateMemberChange(requestCtx, &conversationv1.CreateMemberChangeRequest{
 		AuthContext: &conversationv1.AuthContext{
 			TenantId:  auth.tenantID,
@@ -512,7 +566,10 @@ func sendMessage(ctx context.Context, cfg config, client messagev1.MessageServic
 		traceID:   "e2e-demo-send",
 		requestID: "e2e-demo-send",
 	}
-	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
+	requestCtx, err = withUserFacingAuthMetadata(requestCtx, cfg, auth)
+	if err != nil {
+		return nil, err
+	}
 	return client.SendMessage(requestCtx, &messagev1.SendMessageRequest{
 		AuthContext: &messagev1.AuthContext{
 			TenantId:  auth.tenantID,
@@ -541,7 +598,11 @@ func pullInboxAtLeast(ctx context.Context, cfg config, client deliveryv1.Deliver
 			traceID:   "e2e-demo-pull",
 			requestID: "e2e-demo-pull",
 		}
-		requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
+		requestCtx, err := withUserFacingAuthMetadata(requestCtx, cfg, auth)
+		if err != nil {
+			cancel()
+			return pullSummary{}, err
+		}
 		response, err := client.PullInbox(requestCtx, &deliveryv1.PullInboxRequest{
 			AuthContext: &deliveryv1.AuthContext{
 				TenantId:  auth.tenantID,
@@ -598,7 +659,10 @@ func markRead(ctx context.Context, cfg config, client receiptv1.ReceiptServiceCl
 		traceID:   "e2e-demo-mark-read",
 		requestID: "e2e-demo-mark-read",
 	}
-	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
+	requestCtx, err := withUserFacingAuthMetadata(requestCtx, cfg, auth)
+	if err != nil {
+		return nil, err
+	}
 	return client.MarkRead(requestCtx, &receiptv1.MarkReadRequest{
 		AuthContext: &receiptv1.AuthContext{
 			TenantId:  auth.tenantID,
@@ -638,7 +702,10 @@ func listConversations(ctx context.Context, cfg config, client receiptv1.Receipt
 		traceID:   "e2e-demo-list",
 		requestID: "e2e-demo-list",
 	}
-	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
+	requestCtx, err := withUserFacingAuthMetadata(requestCtx, cfg, auth)
+	if err != nil {
+		return conversationListSummary{}, err
+	}
 	response, err := client.ListConversations(requestCtx, &receiptv1.ListConversationsRequest{
 		AuthContext: &receiptv1.AuthContext{
 			TenantId:  auth.tenantID,
@@ -851,32 +918,25 @@ func ackViaWebSocket(ctx context.Context, cfg config, conn *nhooyr.Conn, seq int
 	}
 }
 
-type pushGatewayTokenClaims struct {
-	TenantID string `json:"tenant_id"`
-	UserID   string `json:"user_id"`
-	DeviceID string `json:"device_id,omitempty"`
-	TraceID  string `json:"trace_id,omitempty"`
-	Audience string `json:"aud"`
-	Expires  int64  `json:"exp"`
+func signPushGatewayToken(cfg config) (string, error) {
+	return signGatewayAuthToken(cfg.pushAuthHMACSecret, cfg.pushAuthTokenTTL, demoAuth{
+		tenantID:  cfg.tenantID,
+		userID:    cfg.receiverUserID,
+		deviceID:  cfg.receiverDevice,
+		sessionID: "e2e-demo-receiver",
+		traceID:   "e2e-demo-auth",
+	})
 }
 
-func signPushGatewayToken(cfg config) (string, error) {
-	claims := pushGatewayTokenClaims{
-		TenantID: cfg.tenantID,
-		UserID:   cfg.receiverUserID,
-		DeviceID: cfg.receiverDevice,
-		TraceID:  "e2e-demo-auth",
-		Audience: "push-gateway",
-		Expires:  time.Now().Add(cfg.pushAuthTokenTTL).Unix(),
-	}
-	payload, err := json.Marshal(claims)
-	if err != nil {
-		return "", err
-	}
-	payloadPart := base64.RawURLEncoding.EncodeToString(payload)
-	mac := hmac.New(sha256.New, []byte(cfg.pushAuthHMACSecret))
-	_, _ = mac.Write([]byte(payloadPart))
-	return payloadPart + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
+func signGatewayAuthToken(secret string, ttl time.Duration, auth demoAuth) (string, error) {
+	return gatewayauth.SignGatewayToken(secret, map[string]string{
+		"tenant_id":  auth.tenantID,
+		"user_id":    auth.userID,
+		"device_id":  auth.deviceID,
+		"session_id": auth.sessionID,
+		"trace_id":   auth.traceID,
+		"aud":        "push-gateway",
+	}, time.Now().Add(ttl))
 }
 
 func seedConversation(ctx context.Context, pool *pgxpool.Pool, cfg config) error {

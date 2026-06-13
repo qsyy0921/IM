@@ -65,6 +65,55 @@ func TestWithVerifiedAuthMetadataAddsOutgoingMetadata(t *testing.T) {
 	assertMetadataValue(t, md, metadataRequestID, "request-1")
 }
 
+func TestWithUserFacingAuthMetadataUsesGatewayHMACToken(t *testing.T) {
+	ctx, err := withUserFacingAuthMetadata(context.Background(), config{
+		gatewayAuthMode:       "hmac",
+		gatewayAuthHMACSecret: "gateway-secret",
+		gatewayAuthTokenTTL:   time.Minute,
+	}, demoAuth{
+		tenantID:  "tenant-1",
+		userID:    "user-1",
+		deviceID:  "device-1",
+		sessionID: "session-1",
+		traceID:   "trace-1",
+		requestID: "request-1",
+	})
+	if err != nil {
+		t.Fatalf("withUserFacingAuthMetadata returned error: %v", err)
+	}
+	md, ok := metadata.FromOutgoingContext(ctx)
+	if !ok {
+		t.Fatal("expected outgoing metadata")
+	}
+	if got := md.Get("authorization"); len(got) != 1 || got[0] == "" {
+		t.Fatalf("expected authorization bearer metadata, got %v", got)
+	}
+	assertMetadataValue(t, md, metadataRequestID, "request-1")
+	if values := md.Get(metadataTenantID); len(values) != 0 {
+		t.Fatalf("did not expect trusted metadata when using api-gateway auth, got %v", values)
+	}
+}
+
+func TestWithUserFacingAuthMetadataUsesGatewayMockToken(t *testing.T) {
+	ctx, err := withUserFacingAuthMetadata(context.Background(), config{gatewayAuthMode: "mock"}, demoAuth{
+		tenantID:  "tenant-1",
+		userID:    "user-1",
+		deviceID:  "device-1",
+		traceID:   "trace-1",
+		requestID: "request-1",
+	})
+	if err != nil {
+		t.Fatalf("withUserFacingAuthMetadata returned error: %v", err)
+	}
+	md, ok := metadata.FromOutgoingContext(ctx)
+	if !ok {
+		t.Fatal("expected outgoing metadata")
+	}
+	assertMetadataValue(t, md, metadataToken, "tenant-1:user-1:device-1")
+	assertMetadataValue(t, md, metadataTraceID, "trace-1")
+	assertMetadataValue(t, md, metadataRequestID, "request-1")
+}
+
 func TestWebSocketDialOptionsCombinesHeaderAndTLS(t *testing.T) {
 	caFile := writeTestCACert(t)
 	options, err := webSocketDialOptions(config{

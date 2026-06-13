@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -78,12 +79,80 @@ func TestGRPCClientTLSConfigFromEnvLoadsValues(t *testing.T) {
 	}
 }
 
+func TestAPIGatewayGRPCTLSConfigFromEnvDisabledByDefault(t *testing.T) {
+	clearAPIGatewayServerTLSConfig(t)
+	_, ok, err := apiGatewayGRPCTLSConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load api-gateway grpc tls config: %v", err)
+	}
+	if ok {
+		t.Fatalf("expected api-gateway grpc tls config to be disabled")
+	}
+}
+
+func TestAPIGatewayGRPCTLSConfigRequiresCertKeyPair(t *testing.T) {
+	clearAPIGatewayServerTLSConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_CERT_FILE", "server.crt")
+	_, ok, err := apiGatewayGRPCTLSConfigFromEnv()
+	if err == nil || !ok {
+		t.Fatalf("expected partial server cert config to fail, ok=%t err=%v", ok, err)
+	}
+}
+
+func TestAPIGatewayGRPCTLSConfigRequiresClientCAWhenClientCertsRequired(t *testing.T) {
+	dir := t.TempDir()
+	serverCertFile, serverKeyFile := writeAPIGatewayTLSTestCert(t, dir, "api-gateway")
+	clearAPIGatewayServerTLSConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_CERT_FILE", serverCertFile)
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_KEY_FILE", serverKeyFile)
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_REQUIRE_CLIENT_CERT", "true")
+	_, ok, err := apiGatewayGRPCTLSConfigFromEnv()
+	if err == nil || !ok {
+		t.Fatalf("expected missing client CA to fail, ok=%t err=%v", ok, err)
+	}
+}
+
+func TestAPIGatewayGRPCTLSConfigLoadsMutualTLSAllowlist(t *testing.T) {
+	dir := t.TempDir()
+	serverCertFile, serverKeyFile := writeAPIGatewayTLSTestCert(t, dir, "api-gateway")
+	caFile, _ := writeAPIGatewayTLSTestCert(t, dir, "ca")
+	clearAPIGatewayServerTLSConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_CERT_FILE", serverCertFile)
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_KEY_FILE", serverKeyFile)
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_CA_FILE", caFile)
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES", "desktop-client.nexusim.local")
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_ALLOWED_URIS", "spiffe://nexusim/desktop-client")
+	tlsConfig, ok, err := apiGatewayGRPCTLSConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load api-gateway grpc tls config: %v", err)
+	}
+	if !ok || tlsConfig == nil {
+		t.Fatalf("expected api-gateway grpc tls config")
+	}
+	if tlsConfig.ClientAuth != tls.RequireAndVerifyClientCert {
+		t.Fatalf("expected RequireAndVerifyClientCert, got %v", tlsConfig.ClientAuth)
+	}
+	if tlsConfig.VerifyConnection == nil {
+		t.Fatalf("expected client certificate allowlist verifier")
+	}
+}
+
 func clearAPIGatewayTestTLSConfig(t *testing.T, prefix string) {
 	t.Helper()
 	t.Setenv(prefix+"_CA_FILE", "")
 	t.Setenv(prefix+"_SERVER_NAME", "")
 	t.Setenv(prefix+"_CLIENT_CERT_FILE", "")
 	t.Setenv(prefix+"_CLIENT_KEY_FILE", "")
+}
+
+func clearAPIGatewayServerTLSConfig(t *testing.T) {
+	t.Helper()
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_CERT_FILE", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_KEY_FILE", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_CA_FILE", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_REQUIRE_CLIENT_CERT", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_ALLOWED_URIS", "")
 }
 
 func writeAPIGatewayTLSTestCert(t *testing.T, dir string, name string) (string, string) {

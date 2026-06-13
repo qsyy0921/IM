@@ -48,7 +48,9 @@ $policyTarget = "127.0.0.1:11900"
 $deliveryTarget = "127.0.0.1:11897"
 $pushTarget = "127.0.0.1:11898"
 $receiptTarget = "127.0.0.1:11899"
+$apiGatewayTarget = "127.0.0.1:11903"
 $pushURL = "wss://$pushTarget"
+$gatewayAuthSecret = "nexusim-secure-demo-gateway-secret"
 
 New-Item -ItemType Directory -Force $resultDir | Out-Null
 New-Item -ItemType Directory -Force $logDir | Out-Null
@@ -61,6 +63,7 @@ if (-not $SkipBuild) {
     go build -o bin\delivery-service.exe ./services/delivery-service/cmd/delivery-service
     go build -o bin\receipt-service.exe ./services/receipt-service/cmd/receipt-service
     go build -o bin\push-gateway.exe ./services/push-gateway/cmd/push-gateway
+    go build -o bin\api-gateway.exe ./services/api-gateway/cmd/api-gateway
     go build -o bin\nexusim-e2e-demo.exe ./loadtest/demo
 }
 
@@ -385,6 +388,7 @@ $policyServer = New-SmokeCert -Directory $certDir -Name "policy-service" -Common
 $deliveryServer = New-SmokeCert -Directory $certDir -Name "delivery-service" -CommonName "delivery-service.nexusim.local" -DnsNames @("delivery-service.nexusim.local", "localhost") -IpAddresses @("127.0.0.1") -Uris @() -Kind server -CAKey $ca.Key -CACert $ca.Cert
 $receiptServer = New-SmokeCert -Directory $certDir -Name "receipt-service" -CommonName "receipt-service.nexusim.local" -DnsNames @("receipt-service.nexusim.local", "localhost") -IpAddresses @("127.0.0.1") -Uris @() -Kind server -CAKey $ca.Key -CACert $ca.Cert
 $pushServer = New-SmokeCert -Directory $certDir -Name "push-gateway" -CommonName "push-gateway.nexusim.local" -DnsNames @("push-gateway.nexusim.local", "localhost") -IpAddresses @("127.0.0.1") -Uris @() -Kind server -CAKey $ca.Key -CACert $ca.Cert
+$apiGatewayServer = New-SmokeCert -Directory $certDir -Name "api-gateway" -CommonName "api-gateway.nexusim.local" -DnsNames @("api-gateway.nexusim.local", "localhost") -IpAddresses @("127.0.0.1") -Uris @() -Kind server -CAKey $ca.Key -CACert $ca.Cert
 
 $apiGatewayClient = New-SmokeCert -Directory $certDir -Name "api-gateway-client" -CommonName "api-gateway.nexusim.local" -DnsNames @("api-gateway.nexusim.local") -IpAddresses @() -Uris @("spiffe://nexusim/api-gateway") -Kind client -CAKey $ca.Key -CACert $ca.Cert
 $messageClient = New-SmokeCert -Directory $certDir -Name "message-service-client" -CommonName "message-service.nexusim.local" -DnsNames @("message-service.nexusim.local") -IpAddresses @() -Uris @("spiffe://nexusim/message-service") -Kind client -CAKey $ca.Key -CACert $ca.Cert
@@ -393,7 +397,7 @@ $desktopClient = New-SmokeCert -Directory $certDir -Name "desktop-client" -Commo
 
 $processes = @()
 try {
-    foreach ($port in @(11895, 11896, 11897, 11898, 11899, 11900, 11901, 11902)) {
+    foreach ($port in @(11895, 11896, 11897, 11898, 11899, 11900, 11901, 11902, 11903)) {
         Assert-TcpPortAvailable -HostName "127.0.0.1" -Port $port
     }
 
@@ -432,6 +436,7 @@ try {
     $deliveryService = Join-Path $repo "bin\delivery-service.exe"
     $receiptService = Join-Path $repo "bin\receipt-service.exe"
     $pushGateway = Join-Path $repo "bin\push-gateway.exe"
+    $apiGateway = Join-Path $repo "bin\api-gateway.exe"
     $runner = Join-Path $repo "bin\nexusim-e2e-demo.exe"
 
     $processes += Start-NexusProcess -Name "conversation-grpc" -FilePath $conversationService -Port 11896 -Env @{
@@ -588,12 +593,46 @@ try {
         NEXUSIM_MESSAGE_GRPC_TLS_CLIENT_ALLOWED_URIS = "spiffe://nexusim/api-gateway"
     }
 
+    $processes += Start-NexusProcess -Name "api-gateway-grpc" -FilePath $apiGateway -Port 11903 -Env @{
+        NEXUSIM_API_GATEWAY_MODE = "grpc"
+        NEXUSIM_API_GATEWAY_GRPC_ADDR = $apiGatewayTarget
+        NEXUSIM_API_GATEWAY_AUTH_MODE = "hmac"
+        NEXUSIM_API_GATEWAY_AUTH_HMAC_SECRET = $gatewayAuthSecret
+        NEXUSIM_API_GATEWAY_AUTH_AUDIENCE = "push-gateway"
+        NEXUSIM_API_GATEWAY_CONVERSATION_ADDR = $conversationTarget
+        NEXUSIM_API_GATEWAY_CONVERSATION_TLS_CA_FILE = $ca.Cert
+        NEXUSIM_API_GATEWAY_CONVERSATION_TLS_SERVER_NAME = "conversation-service.nexusim.local"
+        NEXUSIM_API_GATEWAY_CONVERSATION_TLS_CLIENT_CERT_FILE = $apiGatewayClient.Cert
+        NEXUSIM_API_GATEWAY_CONVERSATION_TLS_CLIENT_KEY_FILE = $apiGatewayClient.Key
+        NEXUSIM_API_GATEWAY_MESSAGE_ADDR = $messageTarget
+        NEXUSIM_API_GATEWAY_MESSAGE_TLS_CA_FILE = $ca.Cert
+        NEXUSIM_API_GATEWAY_MESSAGE_TLS_SERVER_NAME = "message-service.nexusim.local"
+        NEXUSIM_API_GATEWAY_MESSAGE_TLS_CLIENT_CERT_FILE = $apiGatewayClient.Cert
+        NEXUSIM_API_GATEWAY_MESSAGE_TLS_CLIENT_KEY_FILE = $apiGatewayClient.Key
+        NEXUSIM_API_GATEWAY_DELIVERY_ADDR = $deliveryTarget
+        NEXUSIM_API_GATEWAY_DELIVERY_TLS_CA_FILE = $ca.Cert
+        NEXUSIM_API_GATEWAY_DELIVERY_TLS_SERVER_NAME = "delivery-service.nexusim.local"
+        NEXUSIM_API_GATEWAY_DELIVERY_TLS_CLIENT_CERT_FILE = $apiGatewayClient.Cert
+        NEXUSIM_API_GATEWAY_DELIVERY_TLS_CLIENT_KEY_FILE = $apiGatewayClient.Key
+        NEXUSIM_API_GATEWAY_RECEIPT_ADDR = $receiptTarget
+        NEXUSIM_API_GATEWAY_RECEIPT_TLS_CA_FILE = $ca.Cert
+        NEXUSIM_API_GATEWAY_RECEIPT_TLS_SERVER_NAME = "receipt-service.nexusim.local"
+        NEXUSIM_API_GATEWAY_RECEIPT_TLS_CLIENT_CERT_FILE = $apiGatewayClient.Cert
+        NEXUSIM_API_GATEWAY_RECEIPT_TLS_CLIENT_KEY_FILE = $apiGatewayClient.Key
+        NEXUSIM_API_GATEWAY_GRPC_TLS_CERT_FILE = $apiGatewayServer.Cert
+        NEXUSIM_API_GATEWAY_GRPC_TLS_KEY_FILE = $apiGatewayServer.Key
+        NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_CA_FILE = $ca.Cert
+        NEXUSIM_API_GATEWAY_GRPC_TLS_REQUIRE_CLIENT_CERT = "true"
+        NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES = "desktop-client.nexusim.local"
+        NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_ALLOWED_URIS = "spiffe://nexusim/desktop-client"
+    }
+
     $runnerArgs = @(
         "--pg-dsn", $PgDsn,
-        "--conversation-target", $conversationTarget,
-        "--message-target", $messageTarget,
-        "--delivery-target", $deliveryTarget,
-        "--receipt-target", $receiptTarget,
+        "--conversation-target", $apiGatewayTarget,
+        "--message-target", $apiGatewayTarget,
+        "--delivery-target", $apiGatewayTarget,
+        "--receipt-target", $apiGatewayTarget,
         "--push-url", $pushURL,
         "--result-dir", $resultDir,
         "--tenant-id", $TenantId,
@@ -601,23 +640,24 @@ try {
         "--sender-user-id", $SenderUserId,
         "--receiver-user-id", $ReceiverUserId,
         "--receiver-device-id", $ReceiverDeviceId,
-        "--verified-auth-metadata",
+        "--gateway-auth-mode", "hmac",
+        "--gateway-auth-hmac-secret", $gatewayAuthSecret,
         "--conversation-tls-ca-file", $ca.Cert,
-        "--conversation-tls-server-name", "conversation-service.nexusim.local",
-        "--conversation-tls-client-cert-file", $apiGatewayClient.Cert,
-        "--conversation-tls-client-key-file", $apiGatewayClient.Key,
+        "--conversation-tls-server-name", "api-gateway.nexusim.local",
+        "--conversation-tls-client-cert-file", $desktopClient.Cert,
+        "--conversation-tls-client-key-file", $desktopClient.Key,
         "--message-tls-ca-file", $ca.Cert,
-        "--message-tls-server-name", "message-service.nexusim.local",
-        "--message-tls-client-cert-file", $apiGatewayClient.Cert,
-        "--message-tls-client-key-file", $apiGatewayClient.Key,
+        "--message-tls-server-name", "api-gateway.nexusim.local",
+        "--message-tls-client-cert-file", $desktopClient.Cert,
+        "--message-tls-client-key-file", $desktopClient.Key,
         "--delivery-tls-ca-file", $ca.Cert,
-        "--delivery-tls-server-name", "delivery-service.nexusim.local",
-        "--delivery-tls-client-cert-file", $apiGatewayClient.Cert,
-        "--delivery-tls-client-key-file", $apiGatewayClient.Key,
+        "--delivery-tls-server-name", "api-gateway.nexusim.local",
+        "--delivery-tls-client-cert-file", $desktopClient.Cert,
+        "--delivery-tls-client-key-file", $desktopClient.Key,
         "--receipt-tls-ca-file", $ca.Cert,
-        "--receipt-tls-server-name", "receipt-service.nexusim.local",
-        "--receipt-tls-client-cert-file", $apiGatewayClient.Cert,
-        "--receipt-tls-client-key-file", $apiGatewayClient.Key,
+        "--receipt-tls-server-name", "api-gateway.nexusim.local",
+        "--receipt-tls-client-cert-file", $desktopClient.Cert,
+        "--receipt-tls-client-key-file", $desktopClient.Key,
         "--push-tls-ca-file", $ca.Cert,
         "--push-tls-server-name", "push-gateway.nexusim.local",
         "--push-tls-client-cert-file", $desktopClient.Cert,
@@ -655,4 +695,5 @@ Write-Host "delivery_consumer_group=$deliveryConsumerGroup"
 Write-Host "receipt_consumer_group=$receiptConsumerGroup"
 Write-Host "push_consumer_group=$pushConsumerGroup"
 Write-Host "push_identity_consumer_group=$pushIdentityConsumerGroup"
+Write-Host "api_gateway_target=$apiGatewayTarget"
 Write-Host "push_url=$pushURL"

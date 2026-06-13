@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	deliveryeventsv1 "github.com/qsyy0921/IM/schemas/kafka/delivery/v1"
 	"github.com/qsyy0921/IM/services/push-gateway/internal/types"
@@ -167,6 +168,56 @@ func TestWorkerFailClosedForEventTypeMismatch(t *testing.T) {
 	}
 }
 
+func TestWorkerRetriesTransientNotifierError(t *testing.T) {
+	event := &deliveryeventsv1.DeliveryEvent{
+		EventId:      "delivery-event-1",
+		EventType:    EventInboxItemCreatedV1,
+		EventVersion: "1.0.0",
+		TenantId:     "tenant-1",
+		AggregateId:  "conversation-1",
+		PartitionKey: "tenant-1:conversation-1",
+		Payload: &deliveryeventsv1.DeliveryEvent_InboxItemCreated{
+			InboxItemCreated: &deliveryeventsv1.DeliveryInboxItemCreatedV1{
+				TenantId:        "tenant-1",
+				UserId:          "user-1",
+				ConversationId:  "conversation-1",
+				ConversationSeq: 7,
+				SourceEventId:   "timeline-event-1",
+				MessageId:       "message-1",
+			},
+		},
+	}
+	value, _ := proto.Marshal(event)
+	consumer := &fakeConsumer{messages: []types.DeliveryEventMessage{
+		{Value: value},
+		{Value: value},
+	}}
+	notifier := &recordingNotifier{errs: []error{types.NewDeliveryUnavailable("temporary"), nil}}
+	worker := NewWorker(consumer, notifier, Config{ErrorBackoff: time.Millisecond})
+
+	if err := worker.Run(context.Background()); !errors.Is(err, context.Canceled) {
+		t.Fatalf("run: %v", err)
+	}
+	if notifier.calls != 2 {
+		t.Fatalf("expected retry notifier calls, got %d", notifier.calls)
+	}
+	if consumer.commits != 1 {
+		t.Fatalf("expected single commit after retry, got %d", consumer.commits)
+	}
+	snapshot := worker.Snapshot()
+	if snapshot.TotalErrors != 1 || snapshot.ConsecutiveErrors != 0 || snapshot.LastErrorBackoffMS != time.Millisecond.Milliseconds() {
+		t.Fatalf("unexpected snapshot: %+v", snapshot)
+	}
+}
+
+func TestWorkerFailsFastWhenNotifierMissing(t *testing.T) {
+	worker := NewWorker(&fakeConsumer{}, nil)
+	err := worker.Run(context.Background())
+	if err == nil || err.Error() != "push delivery notifier is not configured" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 type fakeConsumer struct {
 	messages []types.DeliveryEventMessage
 	commits  int
@@ -189,10 +240,14 @@ func (consumer *fakeConsumer) Commit(ctx context.Context, message types.Delivery
 type recordingNotifier struct {
 	calls   int
 	command types.NotifyDeliveryCommand
+	errs    []error
 }
 
 func (notifier *recordingNotifier) Execute(ctx context.Context, command types.NotifyDeliveryCommand) (types.NotifyDeliveryResult, error) {
 	notifier.calls++
 	notifier.command = command
+	if notifier.calls <= len(notifier.errs) {
+		return types.NotifyDeliveryResult{}, notifier.errs[notifier.calls-1]
+	}
 	return types.NotifyDeliveryResult{MatchedSessions: 1, Enqueued: 1}, nil
 }

@@ -8,6 +8,7 @@ import (
 	authinfra "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/auth"
 	"github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/memory"
 	redisroute "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/redisroute"
+	"github.com/qsyy0921/IM/services/push-gateway/internal/types"
 )
 
 const serviceName = "push-gateway"
@@ -17,6 +18,8 @@ type Handler struct {
 	redisRegistryMetricsFunc   func() redisroute.Metrics
 	redisSubscriberMetricsFunc func() redisroute.Metrics
 	authJWKStatsFunc           func() *authinfra.JWKStats
+	deliveryWorkerStatsFunc    func() types.ConsumerWorkerSnapshot
+	identityWorkerStatsFunc    func() types.ConsumerWorkerSnapshot
 }
 
 func NewHandler() *Handler {
@@ -40,6 +43,16 @@ func (h *Handler) WithRedisSubscriberMetrics(metricsFunc func() redisroute.Metri
 
 func (h *Handler) WithAuthJWKStats(statsFunc func() *authinfra.JWKStats) *Handler {
 	h.authJWKStatsFunc = statsFunc
+	return h
+}
+
+func (h *Handler) WithDeliveryConsumerStats(statsFunc func() types.ConsumerWorkerSnapshot) *Handler {
+	h.deliveryWorkerStatsFunc = statsFunc
+	return h
+}
+
+func (h *Handler) WithIdentityConsumerStats(statsFunc func() types.ConsumerWorkerSnapshot) *Handler {
+	h.identityWorkerStatsFunc = statsFunc
 	return h
 }
 
@@ -76,6 +89,14 @@ func (h *Handler) handleMetrics(w http.ResponseWriter) {
 	if h.authJWKStatsFunc != nil {
 		snapshot.AuthJWKStats = h.authJWKStatsFunc()
 	}
+	if h.deliveryWorkerStatsFunc != nil {
+		stats := h.deliveryWorkerStatsFunc()
+		snapshot.DeliveryConsumer = &stats
+	}
+	if h.identityWorkerStatsFunc != nil {
+		stats := h.identityWorkerStatsFunc()
+		snapshot.IdentityConsumer = &stats
+	}
 	writeJSON(w, http.StatusOK, snapshot)
 }
 
@@ -85,12 +106,14 @@ type healthResponse struct {
 }
 
 type Snapshot struct {
-	Service              string              `json:"service"`
-	GeneratedAtMS        int64               `json:"generated_at_ms"`
-	Memory               *memory.Metrics     `json:"memory,omitempty"`
-	RedisRegistryMetrics *redisroute.Metrics `json:"redis_registry_metrics,omitempty"`
-	RedisSubscriberStats *redisroute.Metrics `json:"redis_subscriber_metrics,omitempty"`
-	AuthJWKStats         *authinfra.JWKStats `json:"auth_jwks,omitempty"`
+	Service              string                        `json:"service"`
+	GeneratedAtMS        int64                         `json:"generated_at_ms"`
+	Memory               *memory.Metrics               `json:"memory,omitempty"`
+	RedisRegistryMetrics *redisroute.Metrics           `json:"redis_registry_metrics,omitempty"`
+	RedisSubscriberStats *redisroute.Metrics           `json:"redis_subscriber_metrics,omitempty"`
+	AuthJWKStats         *authinfra.JWKStats           `json:"auth_jwks,omitempty"`
+	DeliveryConsumer     *types.ConsumerWorkerSnapshot `json:"delivery_consumer,omitempty"`
+	IdentityConsumer     *types.ConsumerWorkerSnapshot `json:"identity_consumer,omitempty"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

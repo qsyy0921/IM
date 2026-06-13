@@ -196,7 +196,11 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 			return err
 		}
 		closers = append(closers, consumer.Close)
-		worker := delivery.NewWorker(consumer, app.NewNotifyDeliveryUseCase(registry))
+		worker := delivery.NewWorker(consumer, app.NewNotifyDeliveryUseCase(registry), delivery.Config{
+			ErrorBackoff: envDuration("NEXUSIM_PUSH_DELIVERY_CONSUMER_ERROR_BACKOFF", time.Second),
+			Logf:         log.Printf,
+		})
+		monitoringHandler.WithDeliveryConsumerStats(worker.Snapshot)
 		go func() {
 			log.Printf("push-gateway delivery consumer started")
 			errs <- worker.Run(ctx)
@@ -216,7 +220,11 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 			return err
 		}
 		closers = append(closers, consumer.Close)
-		worker := identitytrigger.NewWorker(consumer, revocationinfra.NewRecorder(revocationStore, registry))
+		worker := identitytrigger.NewWorker(consumer, revocationinfra.NewRecorder(revocationStore, registry), identitytrigger.Config{
+			ErrorBackoff: envDuration("NEXUSIM_PUSH_IDENTITY_CONSUMER_ERROR_BACKOFF", time.Second),
+			Logf:         log.Printf,
+		})
+		monitoringHandler.WithIdentityConsumerStats(worker.Snapshot)
 		go func() {
 			log.Printf("push-gateway identity consumer started")
 			errs <- worker.Run(ctx)

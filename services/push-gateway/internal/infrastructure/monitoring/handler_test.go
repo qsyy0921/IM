@@ -9,6 +9,7 @@ import (
 	authinfra "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/auth"
 	"github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/memory"
 	redisroute "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/redisroute"
+	"github.com/qsyy0921/IM/services/push-gateway/internal/types"
 )
 
 func TestHandlerHealthReadyAndMetrics(t *testing.T) {
@@ -44,6 +45,26 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 				CachedKeyCount:      2,
 				RefreshFailures:     1,
 			}
+		}).
+		WithDeliveryConsumerStats(func() types.ConsumerWorkerSnapshot {
+			return types.ConsumerWorkerSnapshot{
+				TotalErrors:        2,
+				ConsecutiveErrors:  1,
+				LastErrorAtMS:      100,
+				LastSuccessAtMS:    90,
+				LastCommitAtMS:     90,
+				LastErrorBackoffMS: 1000,
+			}
+		}).
+		WithIdentityConsumerStats(func() types.ConsumerWorkerSnapshot {
+			return types.ConsumerWorkerSnapshot{
+				TotalErrors:        3,
+				ConsecutiveErrors:  0,
+				LastErrorAtMS:      80,
+				LastSuccessAtMS:    110,
+				LastCommitAtMS:     110,
+				LastErrorBackoffMS: 500,
+			}
 		})
 
 	for _, path := range []string{"/healthz", "/readyz"} {
@@ -75,6 +96,12 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 	}
 	if snapshot.AuthJWKStats == nil || !snapshot.AuthJWKStats.RemoteURLConfigured || snapshot.AuthJWKStats.CachedKeyCount != 2 {
 		t.Fatalf("unexpected auth jwk stats: %+v", snapshot.AuthJWKStats)
+	}
+	if snapshot.DeliveryConsumer == nil || snapshot.DeliveryConsumer.TotalErrors != 2 {
+		t.Fatalf("unexpected delivery consumer stats: %+v", snapshot.DeliveryConsumer)
+	}
+	if snapshot.IdentityConsumer == nil || snapshot.IdentityConsumer.TotalErrors != 3 {
+		t.Fatalf("unexpected identity consumer stats: %+v", snapshot.IdentityConsumer)
 	}
 }
 

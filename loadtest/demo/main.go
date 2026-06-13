@@ -25,10 +25,13 @@ import (
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
+	policyeventsv1 "github.com/qsyy0921/IM/schemas/kafka/policy/v1"
+	kafkago "github.com/segmentio/kafka-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 	nhooyr "nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
@@ -63,6 +66,9 @@ type config struct {
 	pushURL            string
 	resultDir          string
 	pgDSN              string
+	policyKafkaBrokers []string
+	policyTopic        string
+	policyReadbackMin  int64
 
 	tenantID       string
 	conversationID string
@@ -82,35 +88,36 @@ type config struct {
 }
 
 type summary struct {
-	Commit                 string                  `json:"commit"`
-	CommitFull             string                  `json:"commit_full"`
-	GitDirty               bool                    `json:"git_dirty"`
-	ResultDir              string                  `json:"result_dir"`
-	TenantID               string                  `json:"tenant_id"`
-	ConversationID         string                  `json:"conversation_id"`
-	SenderUserID           string                  `json:"sender_user_id"`
-	ReceiverUserID         string                  `json:"receiver_user_id"`
-	ReceiverDeviceID       string                  `json:"receiver_device_id"`
-	ConversationTLSEnabled bool                    `json:"conversation_tls_enabled"`
-	MessageTLSEnabled      bool                    `json:"message_tls_enabled"`
-	DeliveryTLSEnabled     bool                    `json:"delivery_tls_enabled"`
-	ReceiptTLSEnabled      bool                    `json:"receipt_tls_enabled"`
-	PushTLSEnabled         bool                    `json:"push_tls_enabled"`
-	VerifiedAuthMetadata   bool                    `json:"verified_auth_metadata"`
-	StartedAt              time.Time               `json:"started_at"`
-	FinishedAt             time.Time               `json:"finished_at"`
-	Success                bool                    `json:"success"`
-	Error                  string                  `json:"error,omitempty"`
-	ServerHello            serverFrame             `json:"server_hello"`
-	MemberJoin             memberJoinSummary       `json:"member_join"`
-	SendMessage            sendSummary             `json:"send_message"`
-	Notify                 serverFrame             `json:"delivery_notify"`
-	PullInbox              pullSummary             `json:"pull_inbox"`
-	WebSocketAck           serverFrame             `json:"websocket_ack"`
-	MarkRead               markReadSummary         `json:"mark_read"`
-	ListBeforeRead         conversationListSummary `json:"list_conversations_before_read"`
-	ListAfterRead          conversationListSummary `json:"list_conversations_after_read"`
-	Postgres               postgresSummary         `json:"postgres"`
+	Commit                 string                   `json:"commit"`
+	CommitFull             string                   `json:"commit_full"`
+	GitDirty               bool                     `json:"git_dirty"`
+	ResultDir              string                   `json:"result_dir"`
+	TenantID               string                   `json:"tenant_id"`
+	ConversationID         string                   `json:"conversation_id"`
+	SenderUserID           string                   `json:"sender_user_id"`
+	ReceiverUserID         string                   `json:"receiver_user_id"`
+	ReceiverDeviceID       string                   `json:"receiver_device_id"`
+	ConversationTLSEnabled bool                     `json:"conversation_tls_enabled"`
+	MessageTLSEnabled      bool                     `json:"message_tls_enabled"`
+	DeliveryTLSEnabled     bool                     `json:"delivery_tls_enabled"`
+	ReceiptTLSEnabled      bool                     `json:"receipt_tls_enabled"`
+	PushTLSEnabled         bool                     `json:"push_tls_enabled"`
+	VerifiedAuthMetadata   bool                     `json:"verified_auth_metadata"`
+	StartedAt              time.Time                `json:"started_at"`
+	FinishedAt             time.Time                `json:"finished_at"`
+	Success                bool                     `json:"success"`
+	Error                  string                   `json:"error,omitempty"`
+	ServerHello            serverFrame              `json:"server_hello"`
+	MemberJoin             memberJoinSummary        `json:"member_join"`
+	SendMessage            sendSummary              `json:"send_message"`
+	Notify                 serverFrame              `json:"delivery_notify"`
+	PullInbox              pullSummary              `json:"pull_inbox"`
+	WebSocketAck           serverFrame              `json:"websocket_ack"`
+	MarkRead               markReadSummary          `json:"mark_read"`
+	ListBeforeRead         conversationListSummary  `json:"list_conversations_before_read"`
+	ListAfterRead          conversationListSummary  `json:"list_conversations_after_read"`
+	Postgres               postgresSummary          `json:"postgres"`
+	PolicyAuditKafka       *policyAuditKafkaSummary `json:"policy_audit_kafka,omitempty"`
 }
 
 type memberJoinSummary struct {
@@ -160,6 +167,17 @@ type postgresSummary struct {
 	DeviceDeliveryCursorSeq   int64 `json:"device_delivery_cursor_seq"`
 	UserReadCursorSeq         int64 `json:"user_read_cursor_seq"`
 	UserConversationSummaries int64 `json:"user_conversation_summaries"`
+}
+
+type policyAuditKafkaSummary struct {
+	Topic             string `json:"topic"`
+	EventCount        int64  `json:"event_count"`
+	EventID           string `json:"event_id"`
+	EventType         string `json:"event_type"`
+	Producer          string `json:"producer"`
+	Allowed           bool   `json:"allowed"`
+	PermissionVersion int64  `json:"permission_version"`
+	Classification    string `json:"classification"`
 }
 
 type clientFrame struct {
@@ -213,6 +231,9 @@ func main() {
 	flag.StringVar(&cfg.pushURL, "push-url", "ws://127.0.0.1:10498", "push-gateway WebSocket URL")
 	flag.StringVar(&cfg.resultDir, "result-dir", `H:\NexusIM\loadtest-results\e2e-demo`, "result directory")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "", "PostgreSQL DSN used only for local demo seed/cleanup/statistics")
+	policyKafkaBrokers := flag.String("policy-kafka-brokers", "", "comma-separated Kafka brokers for optional policy audit event readback")
+	flag.StringVar(&cfg.policyTopic, "policy-topic", "", "Kafka topic for optional policy audit event readback")
+	flag.Int64Var(&cfg.policyReadbackMin, "policy-readback-min", 0, "minimum policy audit Kafka events to read back for this tenant")
 	flag.StringVar(&cfg.tenantID, "tenant-id", "tenant-e2e-demo", "tenant id")
 	flag.StringVar(&cfg.conversationID, "conversation-id", "conv-e2e-demo", "conversation id")
 	flag.StringVar(&cfg.senderUserID, "sender-user-id", "demo-sender", "sender user id")
@@ -227,6 +248,7 @@ func main() {
 	flag.StringVar(&cfg.pushAuthHMACSecret, "push-auth-hmac-secret", "", "HMAC secret used to sign push gateway demo token when --push-auth-mode=hmac")
 	flag.DurationVar(&cfg.pushAuthTokenTTL, "push-auth-token-ttl", 10*time.Minute, "TTL for generated HMAC push token")
 	flag.Parse()
+	cfg.policyKafkaBrokers = splitCSV(*policyKafkaBrokers)
 
 	if err := run(context.Background(), cfg); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -430,6 +452,13 @@ func run(ctx context.Context, cfg config) error {
 	}
 	if err := fillPostgresStats(ctx, pool, cfg, &result); err != nil {
 		return finish(cfg, &result, err)
+	}
+	if cfg.policyReadbackMin > 0 {
+		readback, err := waitPolicyAuditKafkaReadback(ctx, cfg)
+		if err != nil {
+			return finish(cfg, &result, err)
+		}
+		result.PolicyAuditKafka = &readback
 	}
 
 	result.Success = true
@@ -973,6 +1002,82 @@ WHERE tenant_id = $1 AND conversation_id = $2 AND user_id = $3
 		return fmt.Errorf("query conversation summaries: %w", err)
 	}
 	return nil
+}
+
+func waitPolicyAuditKafkaReadback(ctx context.Context, cfg config) (policyAuditKafkaSummary, error) {
+	if len(cfg.policyKafkaBrokers) == 0 {
+		return policyAuditKafkaSummary{}, fmt.Errorf("--policy-kafka-brokers is required when --policy-readback-min > 0")
+	}
+	if strings.TrimSpace(cfg.policyTopic) == "" {
+		return policyAuditKafkaSummary{}, fmt.Errorf("--policy-topic is required when --policy-readback-min > 0")
+	}
+	groupID := "nexusim-e2e-demo-policy-readback-" + sanitizeID(cfg.tenantID) + "-" + time.Now().UTC().Format("20060102150405")
+	reader := kafkago.NewReader(kafkago.ReaderConfig{
+		Brokers:     cfg.policyKafkaBrokers,
+		Topic:       cfg.policyTopic,
+		GroupID:     groupID,
+		MinBytes:    1,
+		MaxBytes:    1 << 20,
+		MaxWait:     100 * time.Millisecond,
+		StartOffset: kafkago.FirstOffset,
+	})
+	defer reader.Close()
+	readCtx, cancel := context.WithTimeout(ctx, cfg.waitTimeout)
+	defer cancel()
+	summary := policyAuditKafkaSummary{Topic: cfg.policyTopic}
+	for summary.EventCount < cfg.policyReadbackMin {
+		message, err := reader.ReadMessage(readCtx)
+		if err != nil {
+			return summary, fmt.Errorf("read policy audit kafka event: %w", err)
+		}
+		var event policyeventsv1.PolicyEvent
+		if err := proto.Unmarshal(message.Value, &event); err != nil {
+			return summary, fmt.Errorf("decode policy audit kafka event: %w", err)
+		}
+		if event.GetTenantId() != cfg.tenantID {
+			continue
+		}
+		decision := event.GetMessageActionDecision()
+		if decision == nil {
+			return summary, fmt.Errorf("policy audit kafka event %s missing message_action_decision payload", event.GetEventId())
+		}
+		summary.EventCount++
+		summary.EventID = event.GetEventId()
+		summary.EventType = event.GetEventType()
+		summary.Producer = event.GetProducer()
+		summary.Allowed = decision.GetAllowed()
+		summary.PermissionVersion = decision.GetPermissionVersion()
+		summary.Classification = decision.GetClassification()
+	}
+	return summary, nil
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+	return result
+}
+
+func sanitizeID(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "run"
+	}
+	var builder strings.Builder
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			builder.WriteRune(r)
+			continue
+		}
+		builder.WriteByte('-')
+	}
+	return builder.String()
 }
 
 func finish(cfg config, result *summary, runErr error) error {

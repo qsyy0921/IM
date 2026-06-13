@@ -36,7 +36,7 @@ $timelineTopic = "conversation.timeline.demo.secure." + (Get-Date -Format "yyyyM
 $deliveryTopic = "im.delivery.events"
 $receiptTopic = "im.receipt.events"
 $identityTopic = "im.identity.events"
-$policyTopic = "im.policy.events"
+$policyTopic = "im.policy.events.demo.secure." + (Get-Date -Format "yyyyMMdd-HHmmss")
 $deliveryConsumerGroup = "nexusim-delivery-demo-secure-" + (Get-Date -Format "yyyyMMddHHmmss")
 $receiptConsumerGroup = "nexusim-receipt-demo-secure-" + (Get-Date -Format "yyyyMMddHHmmss")
 $pushConsumerGroup = "nexusim-push-demo-secure-" + (Get-Date -Format "yyyyMMddHHmmss")
@@ -622,6 +622,9 @@ try {
         "--push-tls-server-name", "push-gateway.nexusim.local",
         "--push-tls-client-cert-file", $desktopClient.Cert,
         "--push-tls-client-key-file", $desktopClient.Key,
+        "--policy-kafka-brokers", $KafkaBrokers,
+        "--policy-topic", $policyTopic,
+        "--policy-readback-min", "1",
         "--wait-timeout", "30s",
         "--request-timeout", "5s"
     )

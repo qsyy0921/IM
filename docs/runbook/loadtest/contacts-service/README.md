@@ -34,13 +34,18 @@ SendContactRequest
 
 ```powershell
 .\loadtest\contacts\run-local-smoke.ps1 `
+  -ContactsGrpcTlsCertFile .\certs\contacts-server.crt `
+  -ContactsGrpcTlsKeyFile .\certs\contacts-server.key `
+  -ContactsGrpcTlsClientCaFile .\certs\ca.pem `
+  -ContactsGrpcTlsRequireClientCert true `
+  -ContactsGrpcTlsClientAllowedDnsNames api-gateway.nexusim.local `
   -ContactsTlsCaFile .\certs\ca.pem `
   -ContactsTlsServerName contacts-service.nexusim.local `
   -ContactsTlsClientCertFile .\certs\loadtest-client.crt `
   -ContactsTlsClientKeyFile .\certs\loadtest-client.key
 ```
 
-服务端 TLS 仍通过 `NEXUSIM_CONTACTS_GRPC_TLS_*` 环境变量配置；runner 参数只控制 loadtest client 如何连接 contacts-service。
+服务端 TLS 可通过 `NEXUSIM_CONTACTS_GRPC_TLS_*` 环境变量配置，也可在本地 smoke 中用上面的 `ContactsGrpcTls*` 参数注入到脚本启动的 contacts-service 进程；`ContactsTls*` 参数只控制 loadtest client 如何连接 contacts-service。
 
 gateway verified metadata auth 示例：
 
@@ -64,6 +69,7 @@ gateway verified metadata auth 示例：
 | `loadtest-report-20260611-contacts-unblock-smoke.md` | `BlockContact -> UnblockContact` 真实进程 smoke，验证 owner 视角 `BLOCKED -> ACTIVE`、outbox 和 Kafka 读回 |
 | `loadtest-report-20260611-contacts-readd-smoke.md` | `ACCEPT -> DeleteContact -> SendContactRequest -> ACCEPT` 真实进程 smoke，验证删除后重新申请恢复和 contacts outbox 版本单调 |
 | `loadtest-report-20260613-contacts-verified-metadata-smoke.md` | `-VerifiedAuthMetadata` 真实进程 smoke，验证 metadata auth 下的 contacts accept-flow、outbox relay 和 Kafka 读回 |
+| `loadtest-report-20260613-contacts-mtls-smoke.md` | contacts-service gRPC TLS / mTLS + client DNS SAN allowlist 下的 accept-flow、outbox relay 和 Kafka 读回 |
 
 ## 面试可讲重点
 

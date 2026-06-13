@@ -15,6 +15,7 @@ loadtest-report-20260610-delete-message-smoke.md
 loadtest-report-20260610-edit-message-smoke.md
 loadtest-report-20260610-revoke-message-smoke.md
 loadtest-report-20260613-message-mutation-verified-metadata-smoke.md
+loadtest-report-20260613-message-mtls-smoke.md
 ```
 
 ## 1. 一句话结论
@@ -75,6 +76,8 @@ NEXUSIM_MESSAGE_TLS_CLIENT_KEY_FILE
 ```
 
 这只覆盖压测器到 message-service 的 gRPC transport security，仍不包含证书签发、轮换、分发或动态服务身份治理。
+
+2026-06-13 补充：`message-service` gRPC mTLS 真实进程 smoke 已通过，验证 server 端启用 TLS、require client cert、client DNS SAN allowlist=`api-gateway.nexusim.local`，client 端使用 CA/server name/client cert/key 完成 `SendMessage -> message_log / conversation_timeline_events / message_outbox -> outbox relay -> Kafka`，最终 `PENDING=0/PUBLISHED=143/DLQ=0`。报告见 `loadtest-report-20260613-message-mtls-smoke.md`。
 
 如果 message-service 以 `NEXUSIM_MESSAGE_AUTH_MODE=metadata` / `verified-metadata` 启动，`loadtest/sendmessage` 可用以下开关让压测请求携带 gateway verified identity metadata：
 
@@ -456,6 +459,7 @@ AdaptiveMaxInFlight=64
 | Backpressure / client retry | `loadtest-report-20260609-backpressure*.md`、`loadtest-report-20260609-client-retry.md` |
 | Outbox relay / PublishBatch | `loadtest-report-20260609-outbox-*.md`、`loadtest-report-20260609-publishbatch-*.md`、`loadtest-report-20260609-relay-metrics-smoke.md` |
 | Adaptive admission | `loadtest-report-20260609-adaptive-*.md`、`loadtest-report-20260609-recent-metrics-smoke.md`、`loadtest-report-20260609-logical-latency-smoke.md` |
+| message-service gRPC mTLS smoke | `loadtest-report-20260613-message-mtls-smoke.md` |
 
 ## 8. 后续策略
 

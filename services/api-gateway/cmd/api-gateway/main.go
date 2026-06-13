@@ -465,8 +465,11 @@ func newRateLimiterFromEnv(ctx context.Context) (*ratelimitinfra.Limiter, func()
 		pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 		if err := client.Ping(pingCtx).Err(); err != nil {
-			_ = client.Close()
-			return nil, nil, err
+			if !failOpen {
+				_ = client.Close()
+				return nil, nil, err
+			}
+			log.Printf("api-gateway redis rate limiter ping failed; continuing because fail-open is enabled: %v", err)
 		}
 		config.RedisClient = client
 		config.RedisKeyPrefix = envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_KEY_PREFIX", "nexusim:api-gateway")

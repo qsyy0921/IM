@@ -17,6 +17,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
+	grpcgo "google.golang.org/grpc"
 )
 
 func TestGRPCClientTLSConfigFromEnvDisabledByDefault(t *testing.T) {
@@ -266,6 +267,48 @@ func TestNewRateLimiterFromEnvRedisBackend(t *testing.T) {
 	snapshot := limiter.Snapshot()
 	if !snapshot.Enabled || snapshot.Backend != "redis" || snapshot.Burst != 8 || snapshot.RedisWindowMS != 2000 || snapshot.RedisFailOpen {
 		t.Fatalf("unexpected redis limiter snapshot: %+v", snapshot)
+	}
+}
+
+func TestNewRateLimiterFromEnvRedisFailOpenAllowsStartupWhenRedisUnavailable(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_ENABLED", "true")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BACKEND", "redis")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", "5")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", "8")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_ADDR", "127.0.0.1:1")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_FAIL_OPEN", "true")
+
+	limiter, closeFn, err := newRateLimiterFromEnv(context.Background())
+	if err != nil {
+		t.Fatalf("fail-open redis limiter should start when redis is unavailable: %v", err)
+	}
+	defer closeFn()
+	interceptor := limiter.UnaryServerInterceptor()
+	called := false
+	_, err = interceptor(context.Background(), nil, &grpcgo.UnaryServerInfo{FullMethod: "/nexusim.gateway.v1.GatewayService/SendMessage"}, func(context.Context, any) (any, error) {
+		called = true
+		return nil, nil
+	})
+	if err != nil || !called {
+		t.Fatalf("fail-open redis limiter should allow request on redis error, called=%v err=%v", called, err)
+	}
+	snapshot := limiter.Snapshot()
+	if !snapshot.RedisFailOpen || snapshot.RedisErrors == 0 || snapshot.TotalAccepted != 1 {
+		t.Fatalf("expected fail-open redis error accounting, got %+v", snapshot)
+	}
+}
+
+func TestNewRateLimiterFromEnvRedisFailClosedRejectsStartupWhenRedisUnavailable(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_ENABLED", "true")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BACKEND", "redis")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", "5")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_ADDR", "127.0.0.1:1")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_FAIL_OPEN", "false")
+
+	if _, _, err := newRateLimiterFromEnv(context.Background()); err == nil {
+		t.Fatalf("fail-closed redis limiter should fail startup when redis is unavailable")
 	}
 }
 

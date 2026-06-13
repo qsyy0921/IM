@@ -37,12 +37,14 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_CONTACTS_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("contacts-service runtime wiring is idle; set NEXUSIM_CONTACTS_SERVICE_MODE=grpc, outbox-relay, outbox-repair, outbox-repair-audit, or outbox-repair-cleanup")
+		log.Println("contacts-service runtime wiring is idle; set NEXUSIM_CONTACTS_SERVICE_MODE=grpc, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, or outbox-repair-cleanup")
 		return nil
 	case "grpc":
 		return runGRPC()
 	case "outbox-relay":
 		return runOutboxRelay()
+	case "outbox-audit":
+		return runOutboxAudit()
 	case "outbox-repair":
 		return runOutboxRepair()
 	case "outbox-repair-audit":
@@ -175,6 +177,56 @@ func runOutboxRepair() error {
 		stats.Repaired,
 		stats.Skipped,
 	)
+	return nil
+}
+
+func runOutboxAudit() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	var outboxID *int64
+	if value := strings.TrimSpace(os.Getenv("NEXUSIM_CONTACTS_OUTBOX_AUDIT_OUTBOX_ID")); value != "" {
+		parsed := envInt64AllowZero("NEXUSIM_CONTACTS_OUTBOX_AUDIT_OUTBOX_ID", 0)
+		outboxID = &parsed
+	}
+	rows, err := postgresinfra.NewOutboxStore(pool).AuditOutbox(ctx, postgresinfra.OutboxAuditOptions{
+		OutboxID:    outboxID,
+		EventID:     envString("NEXUSIM_CONTACTS_OUTBOX_AUDIT_EVENT_ID", ""),
+		TenantID:    envString("NEXUSIM_CONTACTS_OUTBOX_AUDIT_TENANT_ID", ""),
+		AggregateID: envString("NEXUSIM_CONTACTS_OUTBOX_AUDIT_AGGREGATE_ID", ""),
+		Status:      envString("NEXUSIM_CONTACTS_OUTBOX_AUDIT_STATUS", ""),
+		EventType:   envString("NEXUSIM_CONTACTS_OUTBOX_AUDIT_EVENT_TYPE", ""),
+		Limit:       envInt("NEXUSIM_CONTACTS_OUTBOX_AUDIT_LIMIT", 20),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("contacts-service outbox audit completed rows=%d", len(rows))
+	for _, row := range rows {
+		log.Printf(
+			"contacts_outbox id=%d event_id=%s tenant_id=%s aggregate_type=%s aggregate_id=%s aggregate_version=%d event_type=%s status=%s retry_count=%d available_at=%s next_retry_at=%s published_at=%s dead_lettered_at=%s last_error=%q",
+			row.ID,
+			row.EventID,
+			row.TenantID,
+			row.AggregateType,
+			row.AggregateID,
+			row.AggregateVersion,
+			row.EventType,
+			row.Status,
+			row.RetryCount,
+			row.AvailableAt.Format(time.RFC3339),
+			formatOptionalTime(row.NextRetryAt),
+			formatOptionalTime(row.PublishedAt),
+			formatOptionalTime(row.DeadLetteredAt),
+			row.LastError,
+		)
+	}
 	return nil
 }
 
@@ -515,6 +567,18 @@ func splitCSV(value string) []string {
 		}
 	}
 	return result
+}
+
+func envInt64AllowZero(name string, fallback int64) int64 {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed < 0 {
+		return fallback
+	}
+	return parsed
 }
 
 func formatOptionalTime(value *time.Time) string {

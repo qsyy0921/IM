@@ -215,6 +215,83 @@ WHERE event_id = $1
 	assertContactsOutboxStatusCount(t, ctx, pool, types.OutboxStatusPublished, 2)
 }
 
+func TestOutboxStoreAuditOutboxReturnsLatestRowsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	if _, err := repository.SendContactRequest(ctx, sendCommand("alice", "bob", "send-1", "hello")); err != nil {
+		t.Fatalf("send contact request: %v", err)
+	}
+	if _, err := repository.SendContactRequest(ctx, sendCommand("carol", "dave", "send-2", "hi")); err != nil {
+		t.Fatalf("send second contact request: %v", err)
+	}
+
+	rows, err := NewOutboxStore(pool).AuditOutbox(ctx, OutboxAuditOptions{
+		TenantID: "tenant-contacts",
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("audit contacts outbox: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected two rows, got %d", len(rows))
+	}
+	if rows[0].EventType != types.ContactEventRequestCreated || rows[0].AggregateVersion != 1 || rows[0].Status != types.OutboxStatusPending {
+		t.Fatalf("unexpected latest contacts outbox row: %+v", rows[0])
+	}
+	if rows[1].EventType != types.ContactEventRequestCreated || rows[1].AggregateVersion != 1 || rows[1].Status != types.OutboxStatusPending {
+		t.Fatalf("unexpected older contacts outbox row: %+v", rows[1])
+	}
+	if !rows[0].CreatedAt.After(rows[1].CreatedAt) && rows[0].ID <= rows[1].ID {
+		t.Fatalf("expected latest row first, got row0=%+v row1=%+v", rows[0], rows[1])
+	}
+}
+
+func TestOutboxStoreAuditOutboxFiltersStatusAndEventTypeIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	sendResult, err := repository.SendContactRequest(ctx, sendCommand("alice", "bob", "send-1", "hello"))
+	if err != nil {
+		t.Fatalf("send contact request: %v", err)
+	}
+	if _, err := repository.RespondContactRequest(ctx, respondCommand("bob", sendResult.RequestID, "respond-1", types.ContactDecisionAccept)); err != nil {
+		t.Fatalf("accept contact request: %v", err)
+	}
+	createdEventID := contactsOutboxEventID(t, ctx, pool, types.ContactEventRequestCreated)
+	_, err = pool.Exec(ctx, `
+UPDATE contacts_outbox
+SET status = 'DLQ',
+    retry_count = 2,
+    last_error = 'publish failed',
+    dead_lettered_at = now()
+WHERE event_id = $1
+`, createdEventID)
+	if err != nil {
+		t.Fatalf("mark outbox dlq: %v", err)
+	}
+
+	rows, err := NewOutboxStore(pool).AuditOutbox(ctx, OutboxAuditOptions{
+		TenantID:  "tenant-contacts",
+		Status:    types.OutboxStatusDLQ,
+		EventType: types.ContactEventRequestCreated,
+		Limit:     10,
+	})
+	if err != nil {
+		t.Fatalf("audit filtered contacts outbox: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one row, got %d", len(rows))
+	}
+	if rows[0].EventID != createdEventID || rows[0].Status != types.OutboxStatusDLQ || rows[0].LastError != "publish failed" {
+		t.Fatalf("unexpected filtered contacts outbox row: %+v", rows[0])
+	}
+}
+
 func TestOutboxStoreAuditOutboxRepairsReturnsLatestRowsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

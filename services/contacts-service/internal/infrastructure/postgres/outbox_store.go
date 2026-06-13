@@ -17,6 +17,34 @@ type OutboxStore struct {
 	now  func() time.Time
 }
 
+type OutboxAuditOptions struct {
+	OutboxID    *int64
+	EventID     string
+	TenantID    string
+	AggregateID string
+	Status      string
+	EventType   string
+	Limit       int
+}
+
+type OutboxAuditRow struct {
+	ID               int64
+	EventID          string
+	TenantID         string
+	AggregateType    string
+	AggregateID      string
+	AggregateVersion int64
+	EventType        string
+	Status           string
+	RetryCount       int
+	LastError        string
+	AvailableAt      time.Time
+	NextRetryAt      *time.Time
+	DeadLetteredAt   *time.Time
+	PublishedAt      *time.Time
+	CreatedAt        time.Time
+}
+
 type OutboxRepairAuditOptions struct {
 	EventID  string
 	TenantID string
@@ -237,6 +265,109 @@ SELECT
 		return types.OutboxRepairStats{}, types.NewDBWriteFailed(err.Error())
 	}
 	return stats, nil
+}
+
+func (store *OutboxStore) AuditOutbox(ctx context.Context, options OutboxAuditOptions) ([]OutboxAuditRow, error) {
+	if store == nil || store.pool == nil {
+		return nil, errors.New("contacts outbox store is not configured")
+	}
+	limit := options.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	var args []any
+	clauses := make([]string, 0, 6)
+	if options.OutboxID != nil {
+		args = append(args, *options.OutboxID)
+		clauses = append(clauses, "id = $"+strconv.Itoa(len(args)))
+	}
+	if eventID := strings.TrimSpace(options.EventID); eventID != "" {
+		args = append(args, eventID)
+		clauses = append(clauses, "event_id = $"+strconv.Itoa(len(args)))
+	}
+	if tenantID := strings.TrimSpace(options.TenantID); tenantID != "" {
+		args = append(args, tenantID)
+		clauses = append(clauses, "tenant_id = $"+strconv.Itoa(len(args)))
+	}
+	if aggregateID := strings.TrimSpace(options.AggregateID); aggregateID != "" {
+		args = append(args, aggregateID)
+		clauses = append(clauses, "aggregate_id = $"+strconv.Itoa(len(args)))
+	}
+	if rawStatus := strings.TrimSpace(options.Status); rawStatus != "" {
+		status := normalizeOutboxStatus(rawStatus)
+		if status == "" {
+			return nil, types.NewInvalidArgument("unsupported contacts outbox status")
+		}
+		args = append(args, status)
+		clauses = append(clauses, "status = $"+strconv.Itoa(len(args)))
+	}
+	if eventType := strings.TrimSpace(options.EventType); eventType != "" {
+		args = append(args, eventType)
+		clauses = append(clauses, "event_type = $"+strconv.Itoa(len(args)))
+	}
+	where := ""
+	if len(clauses) > 0 {
+		where = "WHERE " + strings.Join(clauses, " AND ")
+	}
+	args = append(args, limit)
+	rows, err := store.pool.Query(ctx, `
+SELECT
+    id,
+    event_id,
+    tenant_id,
+    aggregate_type,
+    aggregate_id,
+    aggregate_version,
+    event_type,
+    status,
+    retry_count,
+    last_error,
+    available_at,
+    next_retry_at,
+    dead_lettered_at,
+    published_at,
+    created_at
+FROM contacts_outbox
+`+where+`
+ORDER BY created_at DESC, id DESC
+LIMIT $`+strconv.Itoa(len(args)), args...)
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	result := make([]OutboxAuditRow, 0, limit)
+	for rows.Next() {
+		var row OutboxAuditRow
+		if err := rows.Scan(
+			&row.ID,
+			&row.EventID,
+			&row.TenantID,
+			&row.AggregateType,
+			&row.AggregateID,
+			&row.AggregateVersion,
+			&row.EventType,
+			&row.Status,
+			&row.RetryCount,
+			&row.LastError,
+			&row.AvailableAt,
+			&row.NextRetryAt,
+			&row.DeadLetteredAt,
+			&row.PublishedAt,
+			&row.CreatedAt,
+		); err != nil {
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		result = append(result, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	return result, nil
 }
 
 func (store *OutboxStore) AuditOutboxRepairs(ctx context.Context, options OutboxRepairAuditOptions) ([]OutboxRepairAuditRow, error) {
@@ -508,4 +639,17 @@ func retryDelay(base time.Duration, attempt int) time.Duration {
 		exponent = 10
 	}
 	return base * time.Duration(1<<exponent)
+}
+
+func normalizeOutboxStatus(raw string) string {
+	switch strings.ToUpper(strings.TrimSpace(raw)) {
+	case types.OutboxStatusPending:
+		return types.OutboxStatusPending
+	case types.OutboxStatusPublished:
+		return types.OutboxStatusPublished
+	case types.OutboxStatusDLQ:
+		return types.OutboxStatusDLQ
+	default:
+		return ""
+	}
 }

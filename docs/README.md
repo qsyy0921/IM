@@ -4,7 +4,7 @@
 
 | 目录 / 文档 | 说明 |
 | --- | --- |
-| `architecture/` | 总架构和架构补充文档。主文档是 `architecture/target-architecture.md`。 |
+| `architecture/` | 总架构和架构补充文档。入口是 `architecture/target-architecture.md`，细节分卷在 `target-architecture-*.md`。 |
 | `sdd/` | 服务级软件设计文档。当前已落地 `message-service`、`conversation-service`、`delivery-service`、`push-gateway`、`identity-service`、`policy-service`、`receipt-service`、`contacts-service` 和第一版 `api-gateway` 的设计入口。 |
 | `runbook/` | 本地运行、压测、故障处理和演练说明。压测报告按微服务归档到 `runbook/loadtest/<service>/`。 |
 
@@ -15,7 +15,7 @@
 1. `runbook/current-brief.md`：低 token 当前入口，确认当前优先级、硬边界和下一步。
 2. `runbook/README.md`：runbook 短路由页。
 3. `runbook/current-goal.md`：长期目标摘要；只按需查询。
-3. `architecture/target-architecture.md`：确认目标态、技术栈和不可退让项。
+3. `architecture/target-architecture.md`：总架构短入口，按需跳转到 foundation / timeline / platform 分卷。
 4. `sdd/api-gateway.md`：确认统一 user-facing gRPC 入口、gateway token 验证和 trusted metadata 传播边界。
 5. `sdd/receipt-service.md`：确认当前第三层产品能力切片，送达 / 已读回执边界。
 6. `sdd/delivery-service.md`：确认 durable inbox、AckDelivery 和 delivery event 边界。

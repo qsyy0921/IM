@@ -25,8 +25,8 @@ import (
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	identityv1 "github.com/qsyy0921/IM/api/proto/nexusim/identity/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
+	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/structpb"
 	nhooyr "nhooyr.io/websocket"
@@ -79,6 +79,10 @@ type config struct {
 	messageTarget                      string
 	deliveryTarget                     string
 	identityTarget                     string
+	conversationTLS                    grpctls.Config
+	messageTLS                         grpctls.Config
+	deliveryTLS                        grpctls.Config
+	identityTLS                        grpctls.Config
 	pushURL                            string
 	reconnectPushURL                   string
 	resultDir                          string
@@ -127,6 +131,10 @@ type summary struct {
 	MessageTarget                           string                 `json:"message_target"`
 	DeliveryTarget                          string                 `json:"delivery_target"`
 	IdentityTarget                          string                 `json:"identity_target,omitempty"`
+	ConversationTLSEnabled                  bool                   `json:"conversation_tls_enabled"`
+	MessageTLSEnabled                       bool                   `json:"message_tls_enabled"`
+	DeliveryTLSEnabled                      bool                   `json:"delivery_tls_enabled"`
+	IdentityTLSEnabled                      bool                   `json:"identity_tls_enabled"`
 	PushURL                                 string                 `json:"push_url"`
 	ReconnectPushURL                        string                 `json:"reconnect_push_url,omitempty"`
 	PushMetricsURL                          string                 `json:"push_metrics_url,omitempty"`
@@ -363,6 +371,10 @@ func parseConfig() config {
 	flag.StringVar(&cfg.messageTarget, "message-target", "127.0.0.1:11595", "message-service gRPC target")
 	flag.StringVar(&cfg.deliveryTarget, "delivery-target", "127.0.0.1:11597", "delivery-service gRPC target")
 	flag.StringVar(&cfg.identityTarget, "identity-target", "", "optional identity-service gRPC target used to issue push gateway HMAC tokens")
+	registerTLSFlags("conversation-tls", "NEXUSIM_CONVERSATION_TLS", "conversation-service", &cfg.conversationTLS)
+	registerTLSFlags("message-tls", "NEXUSIM_MESSAGE_TLS", "message-service", &cfg.messageTLS)
+	registerTLSFlags("delivery-tls", "NEXUSIM_DELIVERY_TLS", "delivery-service", &cfg.deliveryTLS)
+	registerTLSFlags("identity-tls", "NEXUSIM_IDENTITY_TLS", "identity-service", &cfg.identityTLS)
 	flag.StringVar(&cfg.pushURL, "push-url", "ws://127.0.0.1:11598", "push-gateway WebSocket URL")
 	flag.StringVar(&cfg.reconnectPushURL, "reconnect-push-url", "", "optional WebSocket URL used for reconnect/resume scenarios")
 	flag.StringVar(&cfg.resultDir, "result-dir", "H:/NexusIM/loadtest-results/push-gateway-smoke", "result directory")
@@ -436,6 +448,29 @@ func parseConfig() config {
 	return cfg
 }
 
+func registerTLSFlags(prefix string, envPrefix string, serviceName string, config *grpctls.Config) {
+	flag.StringVar(&config.CAFile, prefix+"-ca-file", os.Getenv(envPrefix+"_CA_FILE"), "CA PEM for "+serviceName+" gRPC TLS")
+	flag.StringVar(&config.ServerName, prefix+"-server-name", os.Getenv(envPrefix+"_SERVER_NAME"), "override server name for "+serviceName+" gRPC TLS")
+	flag.StringVar(&config.ClientCertFile, prefix+"-client-cert-file", os.Getenv(envPrefix+"_CLIENT_CERT_FILE"), "client certificate PEM for "+serviceName+" gRPC mTLS")
+	flag.StringVar(&config.ClientKeyFile, prefix+"-client-key-file", os.Getenv(envPrefix+"_CLIENT_KEY_FILE"), "client private key PEM for "+serviceName+" gRPC mTLS")
+}
+
+func dialGRPCService(target string, tlsConfig grpctls.Config, tlsFlagPrefix string, serviceName string) (*grpc.ClientConn, error) {
+	dialOption, err := grpctls.DialOption(tlsConfig, tlsFlagPrefix)
+	if err != nil {
+		return nil, fmt.Errorf("configure %s TLS: %w", serviceName, err)
+	}
+	conn, err := grpc.NewClient(target, dialOption)
+	if err != nil {
+		return nil, fmt.Errorf("dial %s: %w", serviceName, err)
+	}
+	return conn, nil
+}
+
+func dialIdentityService(cfg config) (*grpc.ClientConn, error) {
+	return dialGRPCService(cfg.identityTarget, cfg.identityTLS, "identity-tls", "identity-service")
+}
+
 func run(cfg config) error {
 	if cfg.pgDSN == "" {
 		return errors.New("pg-dsn is required")
@@ -491,23 +526,23 @@ func run(cfg config) error {
 		}
 	}
 
-	conversationConn, err := grpc.NewClient(cfg.conversationTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conversationConn, err := dialGRPCService(cfg.conversationTarget, cfg.conversationTLS, "conversation-tls", "conversation-service")
 	if err != nil {
-		return fmt.Errorf("dial conversation-service: %w", err)
+		return err
 	}
 	defer conversationConn.Close()
 	conversationClient := conversationv1.NewConversationServiceClient(conversationConn)
 
-	messageConn, err := grpc.NewClient(cfg.messageTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	messageConn, err := dialGRPCService(cfg.messageTarget, cfg.messageTLS, "message-tls", "message-service")
 	if err != nil {
-		return fmt.Errorf("dial message-service: %w", err)
+		return err
 	}
 	defer messageConn.Close()
 	messageClient := messagev1.NewMessageServiceClient(messageConn)
 
-	deliveryConn, err := grpc.NewClient(cfg.deliveryTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	deliveryConn, err := dialGRPCService(cfg.deliveryTarget, cfg.deliveryTLS, "delivery-tls", "delivery-service")
 	if err != nil {
-		return fmt.Errorf("dial delivery-service: %w", err)
+		return err
 	}
 	defer deliveryConn.Close()
 	deliveryClient := deliveryv1.NewDeliveryServiceClient(deliveryConn)
@@ -521,6 +556,10 @@ func run(cfg config) error {
 		MessageTarget:                           cfg.messageTarget,
 		DeliveryTarget:                          cfg.deliveryTarget,
 		IdentityTarget:                          cfg.identityTarget,
+		ConversationTLSEnabled:                  cfg.conversationTLS.Enabled(),
+		MessageTLSEnabled:                       cfg.messageTLS.Enabled(),
+		DeliveryTLSEnabled:                      cfg.deliveryTLS.Enabled(),
+		IdentityTLSEnabled:                      cfg.identityTLS.Enabled(),
 		PushURL:                                 cfg.pushURL,
 		ReconnectPushURL:                        cfg.reconnectPushURL,
 		PushMetricsURL:                          cfg.pushMetricsURL,
@@ -1497,9 +1536,9 @@ func gatewayTokenDetails(ctx context.Context, cfg config, deviceID string) (gate
 }
 
 func issueGatewayToken(ctx context.Context, cfg config, deviceID string) (gatewayTokenResult, error) {
-	conn, err := grpc.NewClient(cfg.identityTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := dialIdentityService(cfg)
 	if err != nil {
-		return gatewayTokenResult{}, fmt.Errorf("dial identity-service: %w", err)
+		return gatewayTokenResult{}, err
 	}
 	defer conn.Close()
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
@@ -1523,9 +1562,9 @@ func issueGatewayToken(ctx context.Context, cfg config, deviceID string) (gatewa
 }
 
 func loginGatewayToken(ctx context.Context, cfg config, deviceID string) (gatewayTokenResult, error) {
-	conn, err := grpc.NewClient(cfg.identityTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := dialIdentityService(cfg)
 	if err != nil {
-		return gatewayTokenResult{}, fmt.Errorf("dial identity-service: %w", err)
+		return gatewayTokenResult{}, err
 	}
 	defer conn.Close()
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
@@ -1553,9 +1592,9 @@ func loginGatewayToken(ctx context.Context, cfg config, deviceID string) (gatewa
 }
 
 func registerIdentityCredential(ctx context.Context, cfg config) error {
-	conn, err := grpc.NewClient(cfg.identityTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := dialIdentityService(cfg)
 	if err != nil {
-		return fmt.Errorf("dial identity-service: %w", err)
+		return err
 	}
 	defer conn.Close()
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
@@ -1574,9 +1613,9 @@ func registerIdentityCredential(ctx context.Context, cfg config) error {
 }
 
 func revokeIdentityDevice(ctx context.Context, cfg config) error {
-	conn, err := grpc.NewClient(cfg.identityTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := dialIdentityService(cfg)
 	if err != nil {
-		return fmt.Errorf("dial identity-service: %w", err)
+		return err
 	}
 	defer conn.Close()
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
@@ -1606,9 +1645,9 @@ func revokeIdentityDevice(ctx context.Context, cfg config) error {
 }
 
 func revokeIdentitySession(ctx context.Context, cfg config, sessionID string) error {
-	conn, err := grpc.NewClient(cfg.identityTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := dialIdentityService(cfg)
 	if err != nil {
-		return fmt.Errorf("dial identity-service: %w", err)
+		return err
 	}
 	defer conn.Close()
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)

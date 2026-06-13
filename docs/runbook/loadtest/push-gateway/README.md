@@ -50,6 +50,30 @@ NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE=...
 
 配置任一 TLS env 后必须提供 CA file，client cert/key 必须成对配置。现有 smoke 默认不启用这些参数；该配置只验证静态证书下的 RPC 加密 / mTLS 连接，不代表证书签发、轮换、分发或全服务 mTLS rollout。
 
+`loadtest/pushgateway` 自身调用 conversation / message / delivery / identity gRPC 时也默认 plaintext。若这些服务端在外部或双机 smoke 中启用 TLS / mTLS，可给 smoke runner 传入对应 client 参数：
+
+```powershell
+.\loadtest\pushgateway\run-local-smoke.ps1 `
+  -ConversationTlsCaFile .\certs\ca.pem `
+  -ConversationTlsServerName conversation-service.nexusim.local `
+  -ConversationTlsClientCertFile .\certs\loadtest-client.crt `
+  -ConversationTlsClientKeyFile .\certs\loadtest-client.key `
+  -MessageTlsCaFile .\certs\ca.pem `
+  -MessageTlsServerName message-service.nexusim.local `
+  -MessageTlsClientCertFile .\certs\loadtest-client.crt `
+  -MessageTlsClientKeyFile .\certs\loadtest-client.key `
+  -DeliveryTlsCaFile .\certs\ca.pem `
+  -DeliveryTlsServerName delivery-service.nexusim.local `
+  -DeliveryTlsClientCertFile .\certs\loadtest-client.crt `
+  -DeliveryTlsClientKeyFile .\certs\loadtest-client.key `
+  -IdentityTlsCaFile .\certs\ca.pem `
+  -IdentityTlsServerName identity-service.nexusim.local `
+  -IdentityTlsClientCertFile .\certs\loadtest-client.crt `
+  -IdentityTlsClientKeyFile .\certs\loadtest-client.key
+```
+
+这些参数只覆盖 smoke runner 到四个 gRPC server 的静态 TLS / mTLS 连接，不覆盖 WebSocket TLS，也不改变 push-gateway 进程自身的 `AckDelivery` 出站 TLS env。
+
 `all` 模式只用于第一阶段本地 smoke：WebSocket handler 和 `im.delivery.events` consumer 共享同一个进程内 session registry。默认 route backend 仍是 memory；跨实例在线路由需要启用 Redis route。
 
 本地分布式模拟使用两个独立 `push-gateway` 进程：

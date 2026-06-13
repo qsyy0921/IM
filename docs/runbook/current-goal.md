@@ -64,6 +64,7 @@
 - delivery read model。
 - Redis route。
 - 多实例 push-gateway。
+  补充：`loadtest/pushgateway` 和 `run-local-smoke.ps1` 调 conversation / message / delivery / identity gRPC 的 client 已支持可选 CA、server name 和 client cert/key；默认仍是 plaintext。push-gateway 进程自身的 delivery RPC client TLS 仍使用 `NEXUSIM_DELIVERY_SERVICE_TLS_*` env；WebSocket TLS、证书签发 / 轮换 / 分发、动态服务身份治理和全服务 mTLS rollout 仍是后续项。
 - Win/Mac 双机 smoke。
 - Redis Sentinel discovery / failover smoke。
 - 基础观测和 smoke 报告。

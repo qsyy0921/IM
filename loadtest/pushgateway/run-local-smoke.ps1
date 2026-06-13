@@ -25,6 +25,22 @@ param(
     [ValidateSet("issue_gateway_token", "login", "register_login")]
     [string]$IdentityTokenMethod = "issue_gateway_token",
     [string]$IdentityLoginPassword = "push-smoke-password",
+    [string]$ConversationTlsCaFile = "",
+    [string]$ConversationTlsServerName = "",
+    [string]$ConversationTlsClientCertFile = "",
+    [string]$ConversationTlsClientKeyFile = "",
+    [string]$MessageTlsCaFile = "",
+    [string]$MessageTlsServerName = "",
+    [string]$MessageTlsClientCertFile = "",
+    [string]$MessageTlsClientKeyFile = "",
+    [string]$DeliveryTlsCaFile = "",
+    [string]$DeliveryTlsServerName = "",
+    [string]$DeliveryTlsClientCertFile = "",
+    [string]$DeliveryTlsClientKeyFile = "",
+    [string]$IdentityTlsCaFile = "",
+    [string]$IdentityTlsServerName = "",
+    [string]$IdentityTlsClientCertFile = "",
+    [string]$IdentityTlsClientKeyFile = "",
     [string]$PushAuthTokenTtl = "10m",
     [ValidateSet("single", "sentinel")]
     [string]$RedisMode = "single",
@@ -637,6 +653,54 @@ try {
     )
     if ($UseIdentityServiceToken) {
         $runnerArgs += @("--identity-target", "127.0.0.1:11610")
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ConversationTlsCaFile)) {
+        $runnerArgs += @("--conversation-tls-ca-file", $ConversationTlsCaFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ConversationTlsServerName)) {
+        $runnerArgs += @("--conversation-tls-server-name", $ConversationTlsServerName)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ConversationTlsClientCertFile)) {
+        $runnerArgs += @("--conversation-tls-client-cert-file", $ConversationTlsClientCertFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ConversationTlsClientKeyFile)) {
+        $runnerArgs += @("--conversation-tls-client-key-file", $ConversationTlsClientKeyFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($MessageTlsCaFile)) {
+        $runnerArgs += @("--message-tls-ca-file", $MessageTlsCaFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($MessageTlsServerName)) {
+        $runnerArgs += @("--message-tls-server-name", $MessageTlsServerName)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($MessageTlsClientCertFile)) {
+        $runnerArgs += @("--message-tls-client-cert-file", $MessageTlsClientCertFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($MessageTlsClientKeyFile)) {
+        $runnerArgs += @("--message-tls-client-key-file", $MessageTlsClientKeyFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($DeliveryTlsCaFile)) {
+        $runnerArgs += @("--delivery-tls-ca-file", $DeliveryTlsCaFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($DeliveryTlsServerName)) {
+        $runnerArgs += @("--delivery-tls-server-name", $DeliveryTlsServerName)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($DeliveryTlsClientCertFile)) {
+        $runnerArgs += @("--delivery-tls-client-cert-file", $DeliveryTlsClientCertFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($DeliveryTlsClientKeyFile)) {
+        $runnerArgs += @("--delivery-tls-client-key-file", $DeliveryTlsClientKeyFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($IdentityTlsCaFile)) {
+        $runnerArgs += @("--identity-tls-ca-file", $IdentityTlsCaFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($IdentityTlsServerName)) {
+        $runnerArgs += @("--identity-tls-server-name", $IdentityTlsServerName)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($IdentityTlsClientCertFile)) {
+        $runnerArgs += @("--identity-tls-client-cert-file", $IdentityTlsClientCertFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($IdentityTlsClientKeyFile)) {
+        $runnerArgs += @("--identity-tls-client-key-file", $IdentityTlsClientKeyFile)
     }
     if ($RedisFaultCommand) {
         $runnerArgs += @("--redis-fault-command", $RedisFaultCommand)

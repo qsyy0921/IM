@@ -31,6 +31,8 @@
 3. 后续再补更完整的产品能力：会话列表完善、群管理、联系人关系、回执扩展、客户端 UI。
 4. Kafka HA、PostgreSQL failover、Redis quorum / 网络分区属于生产化后续项，不阻塞当前功能推进。
 
+服务拆分原则：当前 9 个服务够支撑 IM 后端主链路；只有当能力有独立数据模型、独立伸缩需求、独立故障边界，或会明显拖垮现有服务复杂度时才新增服务。后续候选顺序是 chat-search、media、notification，再到 audit/admin、RAG/summary/agent、presence/config。
+
 ## 分层路线
 
 第一层：最小 IM 主链路

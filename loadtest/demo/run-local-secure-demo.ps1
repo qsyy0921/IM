@@ -397,7 +397,7 @@ $desktopClient = New-SmokeCert -Directory $certDir -Name "desktop-client" -Commo
 
 $processes = @()
 try {
-    foreach ($port in @(11895, 11896, 11897, 11898, 11899, 11900, 11901, 11902, 11903)) {
+    foreach ($port in @(11895, 11896, 11897, 11898, 11899, 11900, 11901, 11902, 11903, 11904)) {
         Assert-TcpPortAvailable -HostName "127.0.0.1" -Port $port
     }
 
@@ -625,6 +625,7 @@ try {
         NEXUSIM_API_GATEWAY_GRPC_TLS_REQUIRE_CLIENT_CERT = "true"
         NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES = "desktop-client.nexusim.local"
         NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_ALLOWED_URIS = "spiffe://nexusim/desktop-client"
+        NEXUSIM_API_GATEWAY_DEBUG_ADDR = "127.0.0.1:11904"
     }
 
     $runnerArgs = @(
@@ -677,6 +678,8 @@ try {
     Assert-TenantOutboxPublishedCount -TableName "policy_decision_audit_outbox" -TenantID $TenantId -MinCount 1
     Wait-TenantOutboxSettled -TableName "delivery_outbox" -TenantID $TenantId
     Wait-TenantOutboxSettled -TableName "receipt_outbox" -TenantID $TenantId
+    $apiGatewayMetricsPath = Join-Path $resultDir "api-gateway-debug-metrics.json"
+    Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:11904/debug/metrics" -OutFile $apiGatewayMetricsPath | Out-Null
 } finally {
     foreach ($proc in $processes) {
         if ($null -ne $proc -and -not $proc.HasExited) {
@@ -696,4 +699,5 @@ Write-Host "receipt_consumer_group=$receiptConsumerGroup"
 Write-Host "push_consumer_group=$pushConsumerGroup"
 Write-Host "push_identity_consumer_group=$pushIdentityConsumerGroup"
 Write-Host "api_gateway_target=$apiGatewayTarget"
+Write-Host "api_gateway_debug_metrics=$apiGatewayMetricsPath"
 Write-Host "push_url=$pushURL"

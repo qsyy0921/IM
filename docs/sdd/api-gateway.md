@@ -81,6 +81,22 @@ NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_ALLOWED_URIS
 
 如果启用 client cert 校验，allowlist 使用 exact-match DNS / URI SAN；这仍是第一阶段静态配置，不是证书签发、轮换、撤销或动态服务身份治理。
 
+Debug endpoint：
+
+```text
+NEXUSIM_API_GATEWAY_DEBUG_ADDR=127.0.0.1:12001
+```
+
+启用后暴露：
+
+```text
+/healthz
+/readyz
+/debug/metrics
+```
+
+`/debug/metrics` 只输出进程内聚合指标：gRPC method/code/count/error_count/latency 和 JWT/JWKS 缓存刷新状态。gRPC access log 只记录 service/event/method/code/latency_ms/request_id/trace_id，不记录 gateway token、tenant_id、user_id、device_id、session_id 或 request body。该 endpoint 是 first-stage local/debug observability，不是 Prometheus 指标规范、统一 trace 或生产审计日志。
+
 下游地址：
 
 ```text
@@ -128,9 +144,10 @@ NEXUSIM_API_GATEWAY_RECEIPT_TLS_CLIENT_KEY_FILE
 
 后续优先级：
 
-1. 增加低敏 gRPC metrics 和结构化 access log。
-2. 在 identity-service 支持 `api-gateway` audience 后收紧默认 audience。
-3. 后续拆 public facade proto，把 `GetSendContext` 从 user-facing service descriptor 中彻底移出。
-4. 继续把限流、配额、审计采样和 tracing 作为独立 production hardening，不塞进当前 proxy skeleton。
+1. 在 identity-service 支持 `api-gateway` audience 后收紧默认 audience。
+2. 后续拆 public facade proto，把 `GetSendContext` 从 user-facing service descriptor 中彻底移出。
+3. 继续把限流、配额、审计采样和 tracing 作为独立 production hardening，不塞进当前 proxy skeleton。
 
 2026-06-13 补充：clean commit `cff1668` 已跑通 `loadtest/demo/run-local-secure-demo.ps1` 经真实 api-gateway 的 secure E2E smoke。demo runner 对 conversation / message / delivery / receipt 的 gRPC target 均指向 api-gateway，使用 HMAC gateway token 和 desktop-client mTLS；api-gateway 再通过 mTLS 调下游，并向下游注入 trusted metadata。报告见 `docs/runbook/loadtest/demo/loadtest-report-20260613-e2e-demo-api-gateway-secure-smoke.md`，原始结果在 `H:\NexusIM\loadtest-results\e2e-demo-api-gateway-secure-smoke-20260613-clean`。
+
+2026-06-13 补充：api-gateway 已补 first-stage `/healthz`、`/readyz`、`/debug/metrics` 和低敏 gRPC JSON access log；`run-local-secure-demo.ps1` 会启动 `NEXUSIM_API_GATEWAY_DEBUG_ADDR=127.0.0.1:11904` 并把 metrics 保存为 `api-gateway-debug-metrics.json`。

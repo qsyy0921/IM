@@ -85,6 +85,7 @@ gRPC mTLS + WebSocket WSS/mTLS 示例：
 这些参数只验证本地静态证书下的 gRPC TLS/mTLS 和 push-gateway WSS/mTLS 连接；证书签发、轮换、分发、撤销和动态服务身份治理不在 demo runner 范围内。
 
 `run-local-secure-demo.ps1` 会启动真实 api-gateway，把 conversation / message / delivery / receipt 四个 gRPC target 指向 api-gateway，并用 `GatewayAuthMode=hmac` 验证 token -> trusted metadata -> 下游 mTLS metadata auth 链路。
+该脚本同时启用 api-gateway `/debug/metrics`，并把低敏进程内指标保存为结果目录下的 `api-gateway-debug-metrics.json`。
 
 边界：
 

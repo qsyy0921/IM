@@ -93,4 +93,4 @@ CreateMemberChange(JOIN)
 -> ListConversations
 ```
 
-覆盖范围包括 demo runner -> api-gateway gRPC mTLS、HMAC gateway token、api-gateway -> conversation / message / delivery / receipt 下游 gRPC mTLS、message-service -> conversation-service mTLS、message-service -> policy-service mTLS、policy decision audit outbox relay、policy audit Kafka typed read-back、push-gateway WebSocket WSS/mTLS、push-gateway -> delivery-service mTLS，以及 gateway trusted metadata 注入。它仍是本地 smoke，不是生产证书签发、轮换、分发、动态服务身份治理、限流或完整 API gateway 生产部署。
+覆盖范围包括 demo runner -> api-gateway gRPC mTLS、HMAC gateway token、api-gateway -> conversation / message / delivery / receipt 下游 gRPC mTLS、message-service -> conversation-service mTLS、message-service -> policy-service mTLS、policy decision audit outbox relay、policy audit Kafka typed read-back、push-gateway WebSocket WSS/mTLS、push-gateway -> delivery-service mTLS，以及 gateway trusted metadata 注入。脚本也会启动 api-gateway debug endpoint，并把 `api-gateway-debug-metrics.json` 写入本次结果目录。它仍是本地 smoke，不是生产证书签发、轮换、分发、动态服务身份治理、限流、统一 trace 或完整 API gateway 生产部署。

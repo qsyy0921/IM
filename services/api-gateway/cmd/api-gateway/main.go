@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -20,6 +21,7 @@ import (
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
 	apigrpc "github.com/qsyy0921/IM/services/api-gateway/internal/api/grpc"
+	monitoringinfra "github.com/qsyy0921/IM/services/api-gateway/internal/infrastructure/monitoring"
 	grpcgo "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -53,6 +55,12 @@ func runGRPC() error {
 		return err
 	}
 	defer authenticator.Close()
+	grpcMetrics := monitoringinfra.NewGRPCMetrics()
+	stopDebug, err := startDebugServer(ctx, apiGatewayDebugAddr(), monitoringinfra.NewHandler(grpcMetrics).WithAuthJWKStats(authenticator.JWKStats))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 
 	conversationConn, err := dialBackend(
 		envString("NEXUSIM_API_GATEWAY_CONVERSATION_ADDR", "127.0.0.1:10496"),
@@ -94,7 +102,7 @@ func runGRPC() error {
 		Delivery:      deliveryv1.NewDeliveryServiceClient(deliveryConn),
 		Receipt:       receiptv1.NewReceiptServiceClient(receiptConn),
 	})
-	serverOptions := make([]grpcgo.ServerOption, 0, 1)
+	serverOptions := []grpcgo.ServerOption{grpcgo.UnaryInterceptor(grpcMetrics.UnaryServerInterceptor(log.Default()))}
 	if creds, ok, err := loadAPIGatewayGRPCCredentialsFromEnv(); err != nil {
 		return err
 	} else if ok {
@@ -117,6 +125,42 @@ func runGRPC() error {
 		return err
 	}
 	return ctx.Err()
+}
+
+func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {
+	if strings.TrimSpace(addr) == "" {
+		return func() {}, nil
+	}
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("api-gateway debug server stopped with error: %v", err)
+		}
+	}()
+	log.Printf("api-gateway debug server started on %s", addr)
+	return func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+		select {
+		case <-done:
+		case <-ctx.Done():
+		}
+	}, nil
+}
+
+func apiGatewayDebugAddr() string {
+	return envString("NEXUSIM_API_GATEWAY_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
 }
 
 func dialBackend(addr string, tlsConfig grpcClientTLSConfig) (*grpcgo.ClientConn, error) {

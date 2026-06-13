@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	contacteventsv1 "github.com/qsyy0921/IM/schemas/kafka/contacts/v1"
@@ -32,6 +33,7 @@ type Relay struct {
 	store     Store
 	publisher Publisher
 	config    Config
+	metrics   relayMetrics
 }
 
 type Config struct {
@@ -40,6 +42,17 @@ type Config struct {
 	PollInterval   time.Duration
 	MaxAttempts    int
 	RetryBaseDelay time.Duration
+	ErrorBackoff   time.Duration
+	Logf           func(format string, args ...any)
+}
+
+type relayMetrics struct {
+	totalErrors        atomic.Uint64
+	consecutiveErrors  atomic.Uint64
+	lastErrorAtMS      atomic.Int64
+	lastSuccessAtMS    atomic.Int64
+	lastPublishedAtMS  atomic.Int64
+	lastErrorBackoffMS atomic.Int64
 }
 
 func NewRelay(store Store, publisher Publisher, config Config) *Relay {
@@ -52,20 +65,44 @@ func NewRelay(store Store, publisher Publisher, config Config) *Relay {
 
 func (relay *Relay) Run(ctx context.Context) error {
 	for {
-		stats, err := relay.RunOnce(ctx)
-		if err != nil && !errors.Is(err, context.Canceled) {
-			return err
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
 		}
+		stats, err := relay.RunOnce(ctx)
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return context.Canceled
+			}
+			if relay.config.Logf != nil {
+				relay.config.Logf("contacts-service outbox relay retrying after runtime error: %v", err)
+			}
+			relay.recordError()
+			relay.metrics.lastErrorBackoffMS.Store(relay.config.ErrorBackoff.Milliseconds())
+			if err := waitForInterval(ctx, relay.config.ErrorBackoff); err != nil {
+				return err
+			}
+			continue
+		}
+		relay.recordSuccess(stats)
 		if stats.Published > 0 {
 			continue
 		}
-		timer := time.NewTimer(relay.config.PollInterval)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return ctx.Err()
-		case <-timer.C:
+		if err := waitForInterval(ctx, relay.config.PollInterval); err != nil {
+			return err
 		}
+	}
+}
+
+func (relay *Relay) Snapshot() types.OutboxRelayWorkerSnapshot {
+	return types.OutboxRelayWorkerSnapshot{
+		TotalErrors:        relay.metrics.totalErrors.Load(),
+		ConsecutiveErrors:  relay.metrics.consecutiveErrors.Load(),
+		LastErrorAtMS:      relay.metrics.lastErrorAtMS.Load(),
+		LastSuccessAtMS:    relay.metrics.lastSuccessAtMS.Load(),
+		LastPublishedAtMS:  relay.metrics.lastPublishedAtMS.Load(),
+		LastErrorBackoffMS: relay.metrics.lastErrorBackoffMS.Load(),
 	}
 }
 
@@ -379,5 +416,34 @@ func normalizeConfig(config Config) Config {
 	if config.RetryBaseDelay <= 0 {
 		config.RetryBaseDelay = time.Second
 	}
+	if config.ErrorBackoff <= 0 {
+		config.ErrorBackoff = time.Second
+	}
 	return config
+}
+
+func (relay *Relay) recordError() {
+	relay.metrics.totalErrors.Add(1)
+	relay.metrics.consecutiveErrors.Add(1)
+	relay.metrics.lastErrorAtMS.Store(time.Now().UnixMilli())
+}
+
+func (relay *Relay) recordSuccess(stats types.OutboxRelayStats) {
+	relay.metrics.consecutiveErrors.Store(0)
+	now := time.Now().UnixMilli()
+	relay.metrics.lastSuccessAtMS.Store(now)
+	if stats.Published > 0 {
+		relay.metrics.lastPublishedAtMS.Store(now)
+	}
+}
+
+func waitForInterval(ctx context.Context, interval time.Duration) error {
+	timer := time.NewTimer(interval)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }

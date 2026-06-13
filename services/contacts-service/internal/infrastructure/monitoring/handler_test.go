@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/qsyy0921/IM/services/contacts-service/internal/types"
 )
 
 func TestHandlerHealthz(t *testing.T) {
@@ -81,6 +82,32 @@ func TestHandlerMetricsIncludesGRPCSnapshot(t *testing.T) {
 	}
 	if body.GRPC == nil || body.GRPC.TotalRequests != 1 || len(body.GRPC.Methods) != 1 {
 		t.Fatalf("expected grpc metrics, got %+v", body.GRPC)
+	}
+}
+
+func TestHandlerMetricsIncludesOutboxRelaySnapshot(t *testing.T) {
+	handler := NewHandler(nil).WithOutboxRelayStats(func() types.OutboxRelayWorkerSnapshot {
+		return types.OutboxRelayWorkerSnapshot{
+			TotalErrors:        2,
+			ConsecutiveErrors:  1,
+			LastErrorAtMS:      100,
+			LastSuccessAtMS:    90,
+			LastPublishedAtMS:  90,
+			LastErrorBackoffMS: 1000,
+		}
+	})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/debug/metrics", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", response.Code)
+	}
+	var body Snapshot
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode metrics response: %v", err)
+	}
+	if body.OutboxRelay == nil || body.OutboxRelay.TotalErrors != 2 {
+		t.Fatalf("expected outbox relay snapshot, got %+v", body.OutboxRelay)
 	}
 }
 

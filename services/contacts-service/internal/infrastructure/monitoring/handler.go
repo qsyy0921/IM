@@ -7,13 +7,15 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/qsyy0921/IM/services/contacts-service/internal/types"
 )
 
 const serviceName = "contacts-service"
 
 type Handler struct {
-	pool        *pgxpool.Pool
-	grpcMetrics *GRPCMetrics
+	pool                 *pgxpool.Pool
+	grpcMetrics          *GRPCMetrics
+	outboxRelayStatsFunc func() types.OutboxRelayWorkerSnapshot
 }
 
 func NewHandler(pool *pgxpool.Pool, grpcMetrics ...*GRPCMetrics) *Handler {
@@ -22,6 +24,11 @@ func NewHandler(pool *pgxpool.Pool, grpcMetrics ...*GRPCMetrics) *Handler {
 		handler.grpcMetrics = grpcMetrics[0]
 	}
 	return handler
+}
+
+func (h *Handler) WithOutboxRelayStats(statsFunc func() types.OutboxRelayWorkerSnapshot) *Handler {
+	h.outboxRelayStatsFunc = statsFunc
+	return h
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -59,6 +66,10 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	if h.grpcMetrics != nil {
 		grpcSnapshot := h.grpcMetrics.Snapshot()
 		snapshot.GRPC = &grpcSnapshot
+	}
+	if h.outboxRelayStatsFunc != nil {
+		relaySnapshot := h.outboxRelayStatsFunc()
+		snapshot.OutboxRelay = &relaySnapshot
 	}
 	if h.pool != nil {
 		stats := h.pool.Stat()
@@ -98,14 +109,15 @@ type healthResponse struct {
 }
 
 type Snapshot struct {
-	Service       string            `json:"service"`
-	GeneratedAtMS int64             `json:"generated_at_ms"`
-	PGPool        *PGPoolSnapshot   `json:"pg_pool,omitempty"`
-	Contacts      *ContactsSnapshot `json:"contacts,omitempty"`
-	ContactsError string            `json:"contacts_error,omitempty"`
-	Outbox        *OutboxSnapshot   `json:"contacts_outbox,omitempty"`
-	OutboxError   string            `json:"contacts_outbox_error,omitempty"`
-	GRPC          *GRPCSnapshot     `json:"grpc,omitempty"`
+	Service       string                           `json:"service"`
+	GeneratedAtMS int64                            `json:"generated_at_ms"`
+	PGPool        *PGPoolSnapshot                  `json:"pg_pool,omitempty"`
+	Contacts      *ContactsSnapshot                `json:"contacts,omitempty"`
+	ContactsError string                           `json:"contacts_error,omitempty"`
+	Outbox        *OutboxSnapshot                  `json:"contacts_outbox,omitempty"`
+	OutboxError   string                           `json:"contacts_outbox_error,omitempty"`
+	GRPC          *GRPCSnapshot                    `json:"grpc,omitempty"`
+	OutboxRelay   *types.OutboxRelayWorkerSnapshot `json:"outbox_relay,omitempty"`
 }
 
 type PGPoolSnapshot struct {

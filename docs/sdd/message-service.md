@@ -1,6 +1,6 @@
 # message-service SDD v1.0
 
-状态：冻结，可进入 Proto / PostgreSQL migration / Kafka schema / 集成测试阶段。
+状态：冻结；主链路、`outbox-audit` / `outbox-repair` / `outbox-repair-audit` / `outbox-repair-cleanup` operator，以及 `/healthz` / `/readyz` / `/debug/metrics` 低敏观测入口已落地，可继续做后续集成测试和 hardening。
 
 ## 1. 服务定位
 

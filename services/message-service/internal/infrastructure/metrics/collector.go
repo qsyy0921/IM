@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"sort"
@@ -302,7 +303,15 @@ func NewHandler(collector *Collector, pool *pgxpool.Pool) *Handler {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/debug/metrics" {
+	switch r.URL.Path {
+	case "/healthz":
+		writeJSON(w, http.StatusOK, healthResponse{Service: "message-service", Status: "ok"})
+		return
+	case "/readyz":
+		h.handleReady(w, r)
+		return
+	case "/debug/metrics":
+	default:
 		http.NotFound(w, r)
 		return
 	}
@@ -321,8 +330,27 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			TotalConns:           stats.TotalConns(),
 		}
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(snapshot)
+	writeJSON(w, http.StatusOK, snapshot)
+}
+
+func (h *Handler) handleReady(w http.ResponseWriter, r *http.Request) {
+	if h.pool == nil {
+		writeJSON(w, http.StatusServiceUnavailable, healthResponse{Service: "message-service", Status: "unready", Error: "postgres pool is not configured"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), time.Second)
+	defer cancel()
+	if err := h.pool.Ping(ctx); err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, healthResponse{Service: "message-service", Status: "unready", Error: "postgres ping failed"})
+		return
+	}
+	writeJSON(w, http.StatusOK, healthResponse{Service: "message-service", Status: "ready"})
+}
+
+type healthResponse struct {
+	Service string `json:"service"`
+	Status  string `json:"status"`
+	Error   string `json:"error,omitempty"`
 }
 
 type LatencySnapshot struct {
@@ -341,6 +369,12 @@ type ValueSnapshot struct {
 	P95   float64 `json:"p95"`
 	P99   float64 `json:"p99"`
 	Max   float64 `json:"max"`
+}
+
+func writeJSON(w http.ResponseWriter, status int, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(value)
 }
 
 type latencySamples struct {

@@ -136,3 +136,41 @@ func TestCollectorServeHTTP(t *testing.T) {
 		t.Fatalf("unexpected snapshot: %+v", snapshot)
 	}
 }
+
+func TestHandlerHealthz(t *testing.T) {
+	handler := NewHandler(NewCollector(), nil)
+	request := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d", response.Code)
+	}
+	var body healthResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode health response: %v", err)
+	}
+	if body.Service != "message-service" || body.Status != "ok" {
+		t.Fatalf("unexpected health response: %+v", body)
+	}
+}
+
+func TestHandlerReadyzWithoutPool(t *testing.T) {
+	handler := NewHandler(NewCollector(), nil)
+	request := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("unexpected status: %d", response.Code)
+	}
+	var body healthResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode ready response: %v", err)
+	}
+	if body.Status != "unready" || body.Error == "" {
+		t.Fatalf("unexpected ready response: %+v", body)
+	}
+}

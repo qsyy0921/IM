@@ -594,6 +594,7 @@ Command hash 规则：
 - `BLOCKED` 不直接等同于消息发送权限拒绝；其它服务必须通过正式 policy / projection 使用该事实，不能同步读 contacts-service 内部表。
 - 不在事件 payload 里暴露私密用户资料，只放 user id 和关系状态。
 - 用户存在性、封禁状态、组织策略后续通过 identity/policy port 接入；第一阶段先保留端口边界或 strict mock。
+- gRPC server 支持第一阶段静态 TLS / mTLS 配置：`NEXUSIM_CONTACTS_GRPC_TLS_CERT_FILE`、`NEXUSIM_CONTACTS_GRPC_TLS_KEY_FILE` 启用 server TLS；`NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_CA_FILE` 或 `NEXUSIM_CONTACTS_GRPC_TLS_REQUIRE_CLIENT_CERT=true` 启用客户端证书校验；`NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES` / `NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_ALLOWED_URIS` 可做 client certificate DNS / URI SAN exact-match allowlist。默认仍是 plaintext，方便本地 smoke；这不是证书签发、轮换、分发、动态 SPIFFE 身份或全服务 mTLS rollout。
 
 ## 12. SLO 和指标
 
@@ -651,6 +652,12 @@ NEXUSIM_CONTACTS_SERVICE_MODE=outbox-repair
 NEXUSIM_CONTACTS_AUTH_MODE=metadata   # production / gateway verified identity
 NEXUSIM_CONTACTS_AUTH_MODE=body       # local smoke compatibility only
 NEXUSIM_CONTACTS_DEBUG_ADDR=0.0.0.0:10501
+NEXUSIM_CONTACTS_GRPC_TLS_CERT_FILE=certs/contacts-server.crt
+NEXUSIM_CONTACTS_GRPC_TLS_KEY_FILE=certs/contacts-server.key
+NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_CA_FILE=certs/gateway-client-ca.crt
+NEXUSIM_CONTACTS_GRPC_TLS_REQUIRE_CLIENT_CERT=true
+NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES=api-gateway.nexusim.local
+NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_ALLOWED_URIS=spiffe://nexusim/api-gateway
 ```
 
 受控 outbox repair：

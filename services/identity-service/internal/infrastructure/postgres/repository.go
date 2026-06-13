@@ -335,6 +335,11 @@ func (r *Repository) LoginGatewaySession(
 			return types.LoginResult{}, err
 		}
 	}
+	if command.VerifiedMFAFactorID != "" {
+		if err := ensureMFALoginNotLocked(ctx, tx, command.TenantID, command.UserID, command.VerifiedMFAFactorID, issuedAt); err != nil {
+			return types.LoginResult{}, err
+		}
+	}
 	if err := upsertSession(ctx, tx, issueCommandFromLogin(command, sessionID), sessionID, issuedAt, gatewayExpiresAt, sessionMFAProofFromLogin(command, issuedAt)); err != nil {
 		return types.LoginResult{}, err
 	}
@@ -451,6 +456,9 @@ func (r *Repository) RefreshGatewaySession(
 		}
 	}
 	if command.VerifiedMFAFactorID != "" {
+		if err := ensureMFALoginNotLocked(ctx, tx, command.TenantID, command.UserID, command.VerifiedMFAFactorID, issuedAt); err != nil {
+			return types.RefreshGatewayTokenResult{}, err
+		}
 		if err := clearMFALoginFailures(ctx, tx, command.TenantID, command.UserID, command.VerifiedMFAFactorID, issuedAt); err != nil {
 			return types.RefreshGatewayTokenResult{}, err
 		}
@@ -2550,6 +2558,30 @@ FOR UPDATE
 `, tenantID, userID).Scan(&lockedUntil)
 	if err == pgx.ErrNoRows {
 		return types.NewInvalidCredentials("invalid credentials")
+	}
+	if err != nil {
+		return types.NewDBReadFailed(err.Error())
+	}
+	if lockedUntil.After(now) {
+		return types.NewMFALocked("mfa temporarily locked")
+	}
+	return nil
+}
+
+func ensureMFALoginNotLocked(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, factorID types.MFAFactorID, now time.Time) error {
+	var lockedUntil time.Time
+	err := tx.QueryRow(ctx, `
+SELECT COALESCE(login_locked_until, 'epoch'::timestamptz)
+FROM identity_mfa_factors
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND factor_id = $3
+  AND factor_type = 'TOTP'
+  AND status = 'ACTIVE'
+FOR UPDATE
+`, tenantID, userID, factorID).Scan(&lockedUntil)
+	if err == pgx.ErrNoRows {
+		return types.NewMFAFactorNotFound("mfa factor not found")
 	}
 	if err != nil {
 		return types.NewDBReadFailed(err.Error())

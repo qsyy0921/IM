@@ -2,7 +2,7 @@
 
 ## Conclusion
 
-This smoke passed. It extends the secure local E2E demo by replacing message-service's local policy mock with a real `policy-service` gRPC process over mTLS.
+This smoke passed. It extends the secure local E2E demo by replacing message-service's local policy mock with a real `policy-service` gRPC process over mTLS, then verifies the policy audit event is published to Kafka and can be decoded as a typed `PolicyEvent`.
 
 Covered chain:
 
@@ -11,7 +11,8 @@ CreateMemberChange(JOIN)
 -> SendMessage
    -> message-service -> conversation-service over mTLS
    -> message-service -> policy-service over mTLS
-   -> policy_decision_audit_outbox -> im.policy.events
+   -> policy_decision_audit_outbox -> per-run im.policy.events demo topic
+   -> typed Kafka read-back of policy.message_action_decision.v1
 -> delivery.notify over WSS/mTLS
 -> PullInbox
 -> delivery.ack
@@ -27,34 +28,32 @@ Command:
 
 ```powershell
 . .\tools\go-env.ps1
-.\loadtest\demo\run-local-secure-demo.ps1 -SkipBuild -RunName e2e-demo-secure-policy-mtls-wss-20260613-final
+.\loadtest\demo\run-local-secure-demo.ps1 -SkipBuild -RunName e2e-demo-secure-policy-readback-20260613-final
 ```
 
 Raw result:
 
 ```text
-H:\NexusIM\loadtest-results\e2e-demo-secure-policy-mtls-wss-20260613-final
+H:\NexusIM\loadtest-results\e2e-demo-secure-policy-readback-20260613-final
 ```
 
 Commit under test:
 
 ```text
-e721e003c7e0bdba70dae92dbae1cbba7b5a323f
+6b525e91152233b8e795b723fafa8f35b1ccdfd0
 git_dirty=false
 ```
 
-Topics and groups:
+Policy Kafka read-back:
 
 ```text
-timeline_topic=conversation.timeline.demo.secure.20260613-211505
-delivery_topic=im.delivery.events
-receipt_topic=im.receipt.events
-identity_topic=im.identity.events
-policy_topic=im.policy.events
-delivery_consumer_group=nexusim-delivery-demo-secure-20260613211505
-receipt_consumer_group=nexusim-receipt-demo-secure-20260613211505
-push_consumer_group=nexusim-push-demo-secure-20260613211505
-push_identity_consumer_group=nexusim-push-identity-demo-secure-20260613211505
+policy_topic=im.policy.events.demo.secure.20260613-212756
+policy_audit_kafka.event_count=1
+policy_audit_kafka.event_type=policy.message_action_decision.v1
+policy_audit_kafka.producer=policy-service
+policy_audit_kafka.allowed=true
+policy_audit_kafka.permission_version=2
+policy_audit_kafka.classification=POLICY_DEMO_ALLOWED
 push_url=wss://127.0.0.1:11898
 ```
 
@@ -64,7 +63,7 @@ push_url=wss://127.0.0.1:11898
 
 ```json
 {
-  "commit": "e721e00",
+  "commit": "6b525e9",
   "git_dirty": false,
   "conversation_tls_enabled": true,
   "message_tls_enabled": true,
@@ -72,6 +71,16 @@ push_url=wss://127.0.0.1:11898
   "receipt_tls_enabled": true,
   "push_tls_enabled": true,
   "verified_auth_metadata": true,
+  "policy_audit_kafka": {
+    "topic": "im.policy.events.demo.secure.20260613-212756",
+    "event_count": 1,
+    "event_id": "8a34a06c-da68-4bd1-9061-673dcd67c7db",
+    "event_type": "policy.message_action_decision.v1",
+    "producer": "policy-service",
+    "allowed": true,
+    "permission_version": 2,
+    "classification": "POLICY_DEMO_ALLOWED"
+  },
   "success": true
 }
 ```
@@ -93,6 +102,9 @@ Policy-service evidence for the smoke tenant:
 
 ```text
 policy_decision_audit_outbox PUBLISHED=1
+Kafka read-back event_count=1
+event_type=policy.message_action_decision.v1
+producer=policy-service
 allowed=true
 permission_version=2
 classification=POLICY_DEMO_ALLOWED
@@ -123,11 +135,12 @@ user_conversation_summaries=1
 
 - builds and starts `policy-service`;
 - applies all PostgreSQL policy migrations;
-- creates `im.policy.events`;
+- creates a per-run `im.policy.events.demo.secure.*` topic;
 - starts `policy-service` gRPC with server TLS, required client cert, and message-service client SAN allowlist;
 - starts `policy-service` audit outbox relay;
 - configures message-service to call policy-service over mTLS;
-- asserts the smoke tenant has at least one `policy_decision_audit_outbox` row published.
+- asserts the smoke tenant has at least one `policy_decision_audit_outbox` row published;
+- reads back at least one Kafka policy audit event and decodes it as `policy.message_action_decision.v1`.
 
 ## Limits
 
@@ -138,8 +151,9 @@ This smoke does not prove:
 - dynamic SPIFFE/SPIRE or service mesh identity;
 - product-grade policy authoring or ReBAC;
 - policy audit retention or external audit sink;
+- broad policy audit replay or repair workflows;
 - multi-host mTLS;
 - Kafka/PostgreSQL HA;
 - capacity under load.
 
-It is a stronger local secure E2E demonstration path: the send path now includes a real policy-service dependency instead of a local policy mock.
+It is a stronger local secure E2E demonstration path: the send path now includes a real policy-service dependency instead of a local policy mock, and the policy audit decision is verified through both PostgreSQL outbox state and typed Kafka read-back.

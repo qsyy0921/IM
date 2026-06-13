@@ -21,7 +21,7 @@ CreateMemberChange(JOIN)
 | `loadtest-report-20260612-e2e-demo-smoke.md` | 本地多进程 E2E demo smoke，验证投递后未读数为 1，ACK + MarkRead 后未读数为 0 |
 | `loadtest-report-20260613-e2e-demo-verified-metadata-smoke.md` | 本地多进程 E2E demo smoke，验证 metadata auth 下的 notify、PullInbox、ACK、MarkRead 和未读数归零 |
 | `loadtest-report-20260613-e2e-demo-secure-mtls-wss-smoke.md` | 本地多进程 secure E2E demo smoke，验证四段 gRPC mTLS、push WSS/mTLS、push->delivery mTLS、metadata auth 和 unread 归零 |
-| `loadtest-report-20260613-e2e-demo-secure-policy-mtls-wss-smoke.md` | 本地多进程 secure E2E demo smoke，额外验证 message-service 通过 mTLS 调真实 policy-service，并发布 policy decision audit outbox |
+| `loadtest-report-20260613-e2e-demo-secure-policy-mtls-wss-smoke.md` | 本地多进程 secure E2E demo smoke，额外验证 message-service 通过 mTLS 调真实 policy-service，并发布和读回 policy decision audit Kafka event |
 
 ## TLS / mTLS 参数
 
@@ -92,4 +92,4 @@ CreateMemberChange(JOIN)
 -> ListConversations
 ```
 
-覆盖范围包括 conversation / message / policy / delivery / receipt gRPC mTLS、message-service -> conversation-service mTLS、message-service -> policy-service mTLS、policy decision audit outbox relay、push-gateway WebSocket WSS/mTLS、push-gateway -> delivery-service mTLS，以及 gateway verified metadata。它仍是本地 smoke，不是生产证书签发、轮换、分发或动态服务身份治理。
+覆盖范围包括 conversation / message / policy / delivery / receipt gRPC mTLS、message-service -> conversation-service mTLS、message-service -> policy-service mTLS、policy decision audit outbox relay、policy audit Kafka typed read-back、push-gateway WebSocket WSS/mTLS、push-gateway -> delivery-service mTLS，以及 gateway verified metadata。它仍是本地 smoke，不是生产证书签发、轮换、分发或动态服务身份治理。

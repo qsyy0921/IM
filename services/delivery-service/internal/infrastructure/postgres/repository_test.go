@@ -303,6 +303,47 @@ WHERE consumer_group = 'delivery-owner-transfer-test'
 	}
 }
 
+func TestRepositoryProjectTimelineEventResolvesProjectionFailureIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_failures (
+    consumer_group, topic, partition_id, offset_value, event_id, event_type, tenant_id, conversation_id, aggregate_version, trace_id, failure_class, last_error, failure_count, resolved_at, resolved_checkpoint_offset
+) VALUES (
+    'delivery-test', 'conversation.timeline.events', 2, 10, 'member-joined-1', $1, 'tenant-delivery', 'conv-delivery', 1, 'trace-1', 'decode_failed', 'proto: cannot parse invalid wire-format data', 1, NULL, NULL
+)
+`, types.TimelineEventConversationMemberJoined)
+	if err != nil {
+		t.Fatalf("seed projection failure: %v", err)
+	}
+
+	_, err = repository.ProjectTimelineEvent(ctx, types.ProjectTimelineEventCommand{
+		TenantID:          "tenant-delivery",
+		EventID:           "member-joined-1",
+		EventType:         types.TimelineEventConversationMemberJoined,
+		ConversationID:    "conv-delivery",
+		ConversationSeq:   1,
+		MemberUserID:      "user-1",
+		MemberRole:        "MEMBER",
+		MemberStatus:      types.DeliveryMemberStatusActive,
+		MemberVersion:     1,
+		PermissionVersion: 1,
+		ConsumerGroup:     "delivery-test",
+		Topic:             "conversation.timeline.events",
+		PartitionID:       2,
+		OffsetValue:       11,
+		TraceID:           "trace-1",
+	})
+	if err != nil {
+		t.Fatalf("project timeline event: %v", err)
+	}
+
+	assertProjectionFailureRow(t, ctx, pool, "delivery-test", "conversation.timeline.events", 2, 10, types.ProjectionFailureClassDecode, "proto: cannot parse invalid wire-format data", 1, true, 11)
+}
+
 func TestRepositoryProjectMessageRevokedOnlyTargetsOriginalVisibleUsersIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

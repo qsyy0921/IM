@@ -157,6 +157,7 @@ type ProjectionFailureSnapshot struct {
 	DBWriteFailed        int64 `json:"db_write_failed"`
 	Unknown              int64 `json:"unknown"`
 	MaxFailureCount      int64 `json:"max_failure_count"`
+	ResolvedTotal        int64 `json:"resolved_total"`
 }
 
 func queryDeliverySnapshot(ctx context.Context, pool *pgxpool.Pool) (DeliverySnapshot, error) {
@@ -220,14 +221,15 @@ func queryProjectionFailureSnapshot(ctx context.Context, pool *pgxpool.Pool) (Pr
 	var snapshot ProjectionFailureSnapshot
 	err := pool.QueryRow(ctx, `
 SELECT
-    COUNT(*),
-    COUNT(*) FILTER (WHERE failure_class = 'decode_failed'),
-    COUNT(*) FILTER (WHERE failure_class = 'invalid_argument'),
-    COUNT(*) FILTER (WHERE failure_class = 'projection_dependency'),
-    COUNT(*) FILTER (WHERE failure_class = 'db_read_failed'),
-    COUNT(*) FILTER (WHERE failure_class = 'db_write_failed'),
-    COUNT(*) FILTER (WHERE failure_class = 'unknown'),
-    COALESCE(MAX(failure_count), 0)
+    COUNT(*) FILTER (WHERE resolved_at IS NULL),
+    COUNT(*) FILTER (WHERE resolved_at IS NULL AND failure_class = 'decode_failed'),
+    COUNT(*) FILTER (WHERE resolved_at IS NULL AND failure_class = 'invalid_argument'),
+    COUNT(*) FILTER (WHERE resolved_at IS NULL AND failure_class = 'projection_dependency'),
+    COUNT(*) FILTER (WHERE resolved_at IS NULL AND failure_class = 'db_read_failed'),
+    COUNT(*) FILTER (WHERE resolved_at IS NULL AND failure_class = 'db_write_failed'),
+    COUNT(*) FILTER (WHERE resolved_at IS NULL AND failure_class = 'unknown'),
+    COALESCE(MAX(failure_count) FILTER (WHERE resolved_at IS NULL), 0),
+    COUNT(*) FILTER (WHERE resolved_at IS NOT NULL)
 FROM delivery_projection_failures
 `).Scan(
 		&snapshot.Total,
@@ -238,6 +240,7 @@ FROM delivery_projection_failures
 		&snapshot.DBWriteFailed,
 		&snapshot.Unknown,
 		&snapshot.MaxFailureCount,
+		&snapshot.ResolvedTotal,
 	)
 	if err != nil {
 		return ProjectionFailureSnapshot{}, err

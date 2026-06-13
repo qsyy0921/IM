@@ -82,6 +82,9 @@ func (repository *Repository) ProjectTimelineEvent(
 		if err := upsertKafkaCheckpoint(ctx, tx, command); err != nil {
 			return types.ProjectTimelineEventResult{}, err
 		}
+		if err := resolveProjectionFailure(ctx, tx, command); err != nil {
+			return types.ProjectTimelineEventResult{}, err
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return types.ProjectTimelineEventResult{}, types.NewDBWriteFailed(err.Error())
@@ -382,6 +385,30 @@ ON CONFLICT (consumer_group, topic, partition_id) DO UPDATE
 SET offset_value = GREATEST(delivery_kafka_checkpoints.offset_value, EXCLUDED.offset_value),
     updated_at = now()
 `, command.ConsumerGroup, command.Topic, command.PartitionID, command.OffsetValue)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func resolveProjectionFailure(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.ProjectTimelineEventCommand,
+) error {
+	if !command.ShouldCheckpoint() || command.OffsetValue <= 0 {
+		return nil
+	}
+	_, err := tx.Exec(ctx, `
+UPDATE delivery_projection_failures
+SET resolved_at = now(),
+    resolved_checkpoint_offset = $5
+WHERE consumer_group = $1
+  AND topic = $2
+  AND partition_id = $3
+  AND offset_value = $4
+  AND resolved_at IS NULL
+`, command.ConsumerGroup, command.Topic, command.PartitionID, command.OffsetValue-1, command.OffsetValue)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}

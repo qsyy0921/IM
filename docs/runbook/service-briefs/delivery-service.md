@@ -9,6 +9,7 @@
 - 已补 `outbox-repair` 运维模式，支持 `audit` 和 `redrive-dlq-pending`，并持久记录 repair audit。
 - 已补 `projection-checkpoint-repair` 运维模式，当前只允许带审计地回调 checkpoint 做 replay，不允许前跳跳过事件。
 - 已补 projection fail-closed 持久审计：timeline consumer 在 malformed / projection failure 停下前会写低敏失败记录，但仍不会提交 checkpoint。
+- 已补 projection failure resolved 标记：同一 offset 成功重放后会保留失败记录但标记 `resolved`，`/debug/metrics` 只聚合未解决 blocker。
 
 ## 后续
 

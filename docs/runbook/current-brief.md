@@ -23,7 +23,7 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 1. 当前已完成：identity-service 已补只读 `session-mfa-proof-audit` 运维模式，用于发现历史 session MFA proof 脏数据。
 2. 当前已完成：服务状态已拆成 `docs/runbook/service-briefs/<service>.md`，并由 `.\tools\check-local.ps1` 防止入口和单服务 brief 重新变长。
 3. 当前已完成：`docs/README.md` 和 `docs/sdd/README.md` 也纳入短入口检查；旧长 SDD 索引已归档。
-4. 当前先治理已有 9 个微服务；identity repository、repository test、`loadtest/pushgateway/main.go` 和长目标架构文档已完成拆分，delivery-service 已补 `/debug/metrics`、`outbox-repair`、`projection-checkpoint-repair` 和 projection failure audit，后续继续处理各服务 P2 hardening。
+4. 当前先治理已有 9 个微服务；identity repository、repository test、`loadtest/pushgateway/main.go` 和长目标架构文档已完成拆分，delivery-service 已补 `/debug/metrics`、`outbox-repair`、`projection-checkpoint-repair`、projection failure audit 和 resolved 标记，后续继续处理各服务 P2 hardening。
 
 ## 已知硬约束
 

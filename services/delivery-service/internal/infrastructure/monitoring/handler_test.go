@@ -106,7 +106,8 @@ func TestHandlerMetricsIncludesDeliverySnapshotsIntegration(t *testing.T) {
 	if body.ProjectionFailures.Total != 2 ||
 		body.ProjectionFailures.DecodeFailed != 1 ||
 		body.ProjectionFailures.ProjectionDependency != 1 ||
-		body.ProjectionFailures.MaxFailureCount != 3 {
+		body.ProjectionFailures.MaxFailureCount != 3 ||
+		body.ProjectionFailures.ResolvedTotal != 1 {
 		t.Fatalf("unexpected projection failure snapshot: %+v", *body.ProjectionFailures)
 	}
 }
@@ -222,10 +223,11 @@ INSERT INTO delivery_outbox (
 	}
 	if _, err := pool.Exec(ctx, `
 INSERT INTO delivery_projection_failures (
-    consumer_group, topic, partition_id, offset_value, event_id, event_type, tenant_id, conversation_id, aggregate_version, trace_id, failure_class, last_error, failure_count
+    consumer_group, topic, partition_id, offset_value, event_id, event_type, tenant_id, conversation_id, aggregate_version, trace_id, failure_class, last_error, failure_count, resolved_at, resolved_checkpoint_offset
 ) VALUES
-    ('group-1', 'conversation.timeline.events', 0, 41, '', '', '', '', 0, '', 'decode_failed', 'proto: cannot parse invalid wire-format data', 1),
-    ('group-1', 'conversation.timeline.events', 0, 42, 'event-2', 'message.revoked.v1', 'tenant-a', 'conv-1', 4, 'trace-2', 'projection_dependency', 'message revoke has no projected original message', 3)
+    ('group-1', 'conversation.timeline.events', 0, 41, '', '', '', '', 0, '', 'decode_failed', 'proto: cannot parse invalid wire-format data', 1, NULL, NULL),
+    ('group-1', 'conversation.timeline.events', 0, 42, 'event-2', 'message.revoked.v1', 'tenant-a', 'conv-1', 4, 'trace-2', 'projection_dependency', 'message revoke has no projected original message', 3, NULL, NULL),
+    ('group-1', 'conversation.timeline.events', 0, 43, 'event-3', 'message.edited.v1', 'tenant-a', 'conv-1', 5, 'trace-3', 'db_write_failed', 'write timeout', 2, now(), 44)
 `); err != nil {
 		t.Fatalf("seed delivery_projection_failures: %v", err)
 	}

@@ -53,9 +53,11 @@ INSERT INTO delivery_projection_failures (
     last_error,
     first_seen_at,
     last_seen_at,
-    failure_count
+    failure_count,
+    resolved_at,
+    resolved_checkpoint_offset
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now(), now(), 1
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now(), now(), 1, NULL, NULL
 )
 ON CONFLICT (consumer_group, topic, partition_id, offset_value) DO UPDATE
 SET event_id = EXCLUDED.event_id,
@@ -67,7 +69,9 @@ SET event_id = EXCLUDED.event_id,
     failure_class = EXCLUDED.failure_class,
     last_error = EXCLUDED.last_error,
     last_seen_at = now(),
-    failure_count = delivery_projection_failures.failure_count + 1
+    failure_count = delivery_projection_failures.failure_count + 1,
+    resolved_at = NULL,
+    resolved_checkpoint_offset = NULL
 `, record.ConsumerGroup, record.Topic, record.PartitionID, record.OffsetValue, record.EventID, record.EventType, record.TenantID, record.ConversationID, record.AggregateVersion, record.TraceID, record.FailureClass, record.LastError)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())

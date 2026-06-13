@@ -26,9 +26,9 @@
 先继续第三层产品能力和身份安全 hardening，把系统做成可面试展示的“本地/双机可运行分布式 IM 后端”。
 
 当前优先级：
-1. 当前已完成 `search-service` SDD v0.1 draft：搜索索引服务，先做 timeline event -> search projection -> `SearchMessages`。
-2. 下一步再进入 `search_service.proto`、migration、六层 skeleton；索引后端必须走 port，不绑定具体搜索中间件。
-3. 保持 api-gateway、identity、message、delivery、push、receipt、contacts、policy 已有链路稳定。
+1. 先治理已有 9 个微服务，新增服务后置；`search-service` 只保留 SDD draft，不进入 proto / migration / skeleton。
+2. 当前已开始治理代码复杂度：identity PostgreSQL repository 已拆出 challenge helpers；继续清理测试/runner 大文件、观测、repair、故障语义和测试缺口。
+3. 保持 api-gateway、identity、message、conversation、delivery、push、receipt、contacts、policy 已有链路稳定。
 4. Kafka HA、PostgreSQL failover、Redis quorum / 网络分区属于生产化后续项，不阻塞当前功能推进。
 
 演进原则：当前 9 个服务够支撑 IM 后端主链路；后续服务和中间件都不写死。只有当能力有独立数据模型、独立伸缩需求、独立故障边界，或会明显降低复杂度时才新增服务；替换中间件必须说明兼容、迁移、回滚和压测证据，并通过 ADR。

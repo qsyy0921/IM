@@ -9,6 +9,7 @@ param(
     [string]$ContactsTlsServerName = "",
     [string]$ContactsTlsClientCertFile = "",
     [string]$ContactsTlsClientKeyFile = "",
+    [switch]$VerifiedAuthMetadata,
     [switch]$SkipBuild
 )
 
@@ -170,6 +171,7 @@ try {
 
     $processes += Start-NexusProcess -Name "contacts-grpc" -FilePath $contactsService -Port $contactsGrpcPort -Env @{
         NEXUSIM_CONTACTS_SERVICE_MODE = "grpc"
+        NEXUSIM_CONTACTS_AUTH_MODE = $(if ($VerifiedAuthMetadata) { "metadata" } else { "body" })
         NEXUSIM_CONTACTS_GRPC_ADDR = $contactsGrpcAddr
         NEXUSIM_PG_DSN = $PgDsn
     }
@@ -196,6 +198,9 @@ try {
         "--wait-timeout", "15s",
         "--result-dir", $resultDir
     )
+    if ($VerifiedAuthMetadata) {
+        $runnerArgs += @("--verified-auth-metadata")
+    }
     if (-not [string]::IsNullOrWhiteSpace($ContactsTlsCaFile)) {
         $runnerArgs += @("--contacts-tls-ca-file", $ContactsTlsCaFile)
     }

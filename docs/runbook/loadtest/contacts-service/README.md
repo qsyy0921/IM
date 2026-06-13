@@ -42,6 +42,14 @@ SendContactRequest
 
 服务端 TLS 仍通过 `NEXUSIM_CONTACTS_GRPC_TLS_*` 环境变量配置；runner 参数只控制 loadtest client 如何连接 contacts-service。
 
+gateway verified metadata auth 示例：
+
+```powershell
+.\loadtest\contacts\run-local-smoke.ps1 -VerifiedAuthMetadata
+```
+
+该模式会启动 `NEXUSIM_CONTACTS_AUTH_MODE=metadata`，并由 runner 通过 gRPC metadata 传递 `tenant_id / user_id / device_id / session_id / trace_id / request_id`；request body auth 字段仍保留用于兼容默认 body 模式。
+
 ## 报告列表
 
 | 报告 | 内容 |

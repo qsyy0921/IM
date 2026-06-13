@@ -18,8 +18,18 @@ import (
 	kafkago "github.com/segmentio/kafka-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+)
+
+const (
+	metadataTenantID  = "x-nexusim-tenant-id"
+	metadataUserID    = "x-nexusim-user-id"
+	metadataDeviceID  = "x-nexusim-device-id"
+	metadataSessionID = "x-nexusim-session-id"
+	metadataTraceID   = "x-nexusim-trace-id"
+	metadataRequestID = "x-nexusim-request-id"
 )
 
 type config struct {
@@ -39,6 +49,7 @@ type config struct {
 	receiverDeviceID string
 	scenario         string
 	cleanup          bool
+	verifiedMetadata bool
 }
 
 type summary struct {
@@ -54,6 +65,7 @@ type summary struct {
 	ReceiverUserID               string              `json:"receiver_user_id"`
 	Scenario                     string              `json:"scenario"`
 	ContactTopic                 string              `json:"contact_topic"`
+	VerifiedAuthMetadata         bool                `json:"verified_auth_metadata"`
 	StartedAt                    time.Time           `json:"started_at"`
 	FinishedAt                   time.Time           `json:"finished_at"`
 	Success                      bool                `json:"success"`
@@ -178,6 +190,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "receiver-device-1", "receiver device id")
 	flag.StringVar(&cfg.scenario, "scenario", "accept", "scenario: accept, decline, cancel, delete, block, unblock, remark, or readd")
 	flag.BoolVar(&cfg.cleanup, "cleanup", false, "delete tenant contacts rows before running")
+	flag.BoolVar(&cfg.verifiedMetadata, "verified-auth-metadata", envBool("NEXUSIM_CONTACTS_LOADTEST_VERIFIED_AUTH_METADATA", false), "send gateway verified identity through contacts-service gRPC metadata")
 	flag.Parse()
 	cfg.kafkaBrokers = splitCSV(brokers)
 	cfg.scenario = strings.ToLower(strings.TrimSpace(cfg.scenario))
@@ -202,19 +215,20 @@ func run(cfg config) error {
 	}
 	startedAt := time.Now().UTC()
 	s := summary{
-		Commit:         gitOutput("rev-parse", "--short", "HEAD"),
-		CommitFull:     gitOutput("rev-parse", "HEAD"),
-		GitStatusShort: gitOutput("status", "--short"),
-		Target:         cfg.target,
-		TLSEnabled:     cfg.tls.Enabled(),
-		ResultDir:      cfg.resultDir,
-		TenantID:       cfg.tenantID,
-		SenderUserID:   cfg.senderUserID,
-		ReceiverUserID: cfg.receiverUserID,
-		Scenario:       cfg.scenario,
-		ContactTopic:   cfg.contactTopic,
-		StartedAt:      startedAt,
-		LatenciesMS:    map[string]float64{},
+		Commit:               gitOutput("rev-parse", "--short", "HEAD"),
+		CommitFull:           gitOutput("rev-parse", "HEAD"),
+		GitStatusShort:       gitOutput("status", "--short"),
+		Target:               cfg.target,
+		TLSEnabled:           cfg.tls.Enabled(),
+		ResultDir:            cfg.resultDir,
+		TenantID:             cfg.tenantID,
+		SenderUserID:         cfg.senderUserID,
+		ReceiverUserID:       cfg.receiverUserID,
+		Scenario:             cfg.scenario,
+		ContactTopic:         cfg.contactTopic,
+		VerifiedAuthMetadata: cfg.verifiedMetadata,
+		StartedAt:            startedAt,
+		LatenciesMS:          map[string]float64{},
 	}
 	s.GitDirty = strings.TrimSpace(s.GitStatusShort) != ""
 	defer func() {
@@ -441,18 +455,62 @@ func run(cfg config) error {
 	return nil
 }
 
-func sendContactRequest(cfg config, client contactsv1.ContactsServiceClient, suffix string) (sendSummary, float64, error) {
+func envBool(name string, fallback bool) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(name))) {
+	case "":
+		return fallback
+	case "1", "true", "yes", "y", "on":
+		return true
+	case "0", "false", "no", "n", "off":
+		return false
+	default:
+		return fallback
+	}
+}
+
+func requestContext(cfg config, userID string, deviceID string, requestID string, traceID string) (context.Context, context.CancelFunc, *contactsv1.AuthContext) {
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
+	auth := &contactsv1.AuthContext{
+		TenantId:  cfg.tenantID,
+		UserId:    userID,
+		DeviceId:  deviceID,
+		SessionId: sessionIDForDevice(deviceID),
+		RequestId: requestID,
+		TraceId:   traceID,
+	}
+	if cfg.verifiedMetadata {
+		ctx = metadata.NewOutgoingContext(ctx, metadata.Pairs(
+			metadataTenantID, auth.GetTenantId(),
+			metadataUserID, auth.GetUserId(),
+			metadataDeviceID, auth.GetDeviceId(),
+			metadataSessionID, auth.GetSessionId(),
+			metadataTraceID, auth.GetTraceId(),
+			metadataRequestID, auth.GetRequestId(),
+		))
+	}
+	return ctx, cancel, auth
+}
+
+func deviceIDForUser(cfg config, userID string) string {
+	if userID == cfg.receiverUserID {
+		return cfg.receiverDeviceID
+	}
+	return cfg.senderDeviceID
+}
+
+func sessionIDForDevice(deviceID string) string {
+	if strings.TrimSpace(deviceID) == "" {
+		return ""
+	}
+	return "contacts-smoke-" + deviceID
+}
+
+func sendContactRequest(cfg config, client contactsv1.ContactsServiceClient, suffix string) (sendSummary, float64, error) {
+	ctx, cancel, auth := requestContext(cfg, cfg.senderUserID, cfg.senderDeviceID, "contact-send-"+suffix, "trace-contact-"+suffix)
 	defer cancel()
 	begin := time.Now()
 	resp, err := client.SendContactRequest(ctx, &contactsv1.SendContactRequestRequest{
-		AuthContext: &contactsv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.senderUserID,
-			DeviceId:  cfg.senderDeviceID,
-			RequestId: "contact-send-" + suffix,
-			TraceId:   "trace-contact-" + suffix,
-		},
+		AuthContext:    auth,
 		TargetUserId:   cfg.receiverUserID,
 		IdempotencyKey: "send-" + suffix,
 		Message:        "hello from contacts smoke",
@@ -469,7 +527,7 @@ func sendContactRequest(cfg config, client contactsv1.ContactsServiceClient, suf
 }
 
 func respondContactRequest(cfg config, client contactsv1.ContactsServiceClient, requestID string, suffix string) (respondSummary, float64, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
+	ctx, cancel, auth := requestContext(cfg, cfg.receiverUserID, cfg.receiverDeviceID, "contact-respond-"+suffix, "trace-contact-"+suffix)
 	defer cancel()
 	begin := time.Now()
 	decision := contactsv1.ContactDecision_CONTACT_DECISION_ACCEPT
@@ -477,13 +535,7 @@ func respondContactRequest(cfg config, client contactsv1.ContactsServiceClient, 
 		decision = contactsv1.ContactDecision_CONTACT_DECISION_DECLINE
 	}
 	resp, err := client.RespondContactRequest(ctx, &contactsv1.RespondContactRequestRequest{
-		AuthContext: &contactsv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.receiverUserID,
-			DeviceId:  cfg.receiverDeviceID,
-			RequestId: "contact-respond-" + suffix,
-			TraceId:   "trace-contact-" + suffix,
-		},
+		AuthContext:    auth,
 		RequestId:      requestID,
 		Decision:       decision,
 		IdempotencyKey: "respond-" + suffix,
@@ -500,17 +552,11 @@ func respondContactRequest(cfg config, client contactsv1.ContactsServiceClient, 
 }
 
 func cancelContactRequest(cfg config, client contactsv1.ContactsServiceClient, requestID string, suffix string) (respondSummary, float64, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
+	ctx, cancel, auth := requestContext(cfg, cfg.senderUserID, cfg.senderDeviceID, "contact-cancel-"+suffix, "trace-contact-"+suffix)
 	defer cancel()
 	begin := time.Now()
 	resp, err := client.CancelContactRequest(ctx, &contactsv1.CancelContactRequestRequest{
-		AuthContext: &contactsv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.senderUserID,
-			DeviceId:  cfg.senderDeviceID,
-			RequestId: "contact-cancel-" + suffix,
-			TraceId:   "trace-contact-" + suffix,
-		},
+		AuthContext:    auth,
 		RequestId:      requestID,
 		IdempotencyKey: "cancel-" + suffix,
 	})
@@ -526,17 +572,11 @@ func cancelContactRequest(cfg config, client contactsv1.ContactsServiceClient, r
 }
 
 func deleteContact(cfg config, client contactsv1.ContactsServiceClient, suffix string) (edgeActionSummary, float64, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
+	ctx, cancel, auth := requestContext(cfg, cfg.senderUserID, cfg.senderDeviceID, "contact-delete-"+suffix, "trace-contact-"+suffix)
 	defer cancel()
 	begin := time.Now()
 	resp, err := client.DeleteContact(ctx, &contactsv1.DeleteContactRequest{
-		AuthContext: &contactsv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.senderUserID,
-			DeviceId:  cfg.senderDeviceID,
-			RequestId: "contact-delete-" + suffix,
-			TraceId:   "trace-contact-" + suffix,
-		},
+		AuthContext:    auth,
 		ContactUserId:  cfg.receiverUserID,
 		IdempotencyKey: "delete-" + suffix,
 	})
@@ -552,17 +592,11 @@ func deleteContact(cfg config, client contactsv1.ContactsServiceClient, suffix s
 }
 
 func blockContact(cfg config, client contactsv1.ContactsServiceClient, suffix string) (edgeActionSummary, float64, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
+	ctx, cancel, auth := requestContext(cfg, cfg.senderUserID, cfg.senderDeviceID, "contact-block-"+suffix, "trace-contact-"+suffix)
 	defer cancel()
 	begin := time.Now()
 	resp, err := client.BlockContact(ctx, &contactsv1.BlockContactRequest{
-		AuthContext: &contactsv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.senderUserID,
-			DeviceId:  cfg.senderDeviceID,
-			RequestId: "contact-block-" + suffix,
-			TraceId:   "trace-contact-" + suffix,
-		},
+		AuthContext:    auth,
 		ContactUserId:  cfg.receiverUserID,
 		IdempotencyKey: "block-" + suffix,
 		Reason:         "contacts smoke block",
@@ -579,17 +613,11 @@ func blockContact(cfg config, client contactsv1.ContactsServiceClient, suffix st
 }
 
 func unblockContact(cfg config, client contactsv1.ContactsServiceClient, suffix string) (edgeActionSummary, float64, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
+	ctx, cancel, auth := requestContext(cfg, cfg.senderUserID, cfg.senderDeviceID, "contact-unblock-"+suffix, "trace-contact-"+suffix)
 	defer cancel()
 	begin := time.Now()
 	resp, err := client.UnblockContact(ctx, &contactsv1.UnblockContactRequest{
-		AuthContext: &contactsv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.senderUserID,
-			DeviceId:  cfg.senderDeviceID,
-			RequestId: "contact-unblock-" + suffix,
-			TraceId:   "trace-contact-" + suffix,
-		},
+		AuthContext:    auth,
 		ContactUserId:  cfg.receiverUserID,
 		IdempotencyKey: "unblock-" + suffix,
 	})
@@ -605,17 +633,11 @@ func unblockContact(cfg config, client contactsv1.ContactsServiceClient, suffix 
 }
 
 func updateContactRemark(cfg config, client contactsv1.ContactsServiceClient, suffix string) (edgeActionSummary, float64, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
+	ctx, cancel, auth := requestContext(cfg, cfg.senderUserID, cfg.senderDeviceID, "contact-remark-"+suffix, "trace-contact-"+suffix)
 	defer cancel()
 	begin := time.Now()
 	resp, err := client.UpdateContactRemark(ctx, &contactsv1.UpdateContactRemarkRequest{
-		AuthContext: &contactsv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.senderUserID,
-			DeviceId:  cfg.senderDeviceID,
-			RequestId: "contact-remark-" + suffix,
-			TraceId:   "trace-contact-" + suffix,
-		},
+		AuthContext:    auth,
 		ContactUserId:  cfg.receiverUserID,
 		Remark:         "smoke remark",
 		IdempotencyKey: "remark-" + suffix,
@@ -633,15 +655,12 @@ func updateContactRemark(cfg config, client contactsv1.ContactsServiceClient, su
 }
 
 func listContacts(cfg config, client contactsv1.ContactsServiceClient, userID string) (listSummary, float64, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
+	ctx, cancel, auth := requestContext(cfg, userID, deviceIDForUser(cfg, userID), "contact-list-"+userID, "trace-contact-list")
 	defer cancel()
 	begin := time.Now()
 	resp, err := client.ListContacts(ctx, &contactsv1.ListContactsRequest{
-		AuthContext: &contactsv1.AuthContext{
-			TenantId: cfg.tenantID,
-			UserId:   userID,
-		},
-		PageSize: 10,
+		AuthContext: auth,
+		PageSize:    10,
 	})
 	elapsed := elapsedMS(begin)
 	if err != nil {
@@ -665,17 +684,14 @@ func listContactRequests(
 	direction contactsv1.ContactRequestListDirection,
 	statusValue contactsv1.ContactRequestStatus,
 ) (requestListSummary, float64, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
+	ctx, cancel, auth := requestContext(cfg, userID, deviceIDForUser(cfg, userID), "contact-request-list-"+userID, "trace-contact-request-list")
 	defer cancel()
 	begin := time.Now()
 	resp, err := client.ListContactRequests(ctx, &contactsv1.ListContactRequestsRequest{
-		AuthContext: &contactsv1.AuthContext{
-			TenantId: cfg.tenantID,
-			UserId:   userID,
-		},
-		Direction: direction,
-		Status:    statusValue,
-		PageSize:  10,
+		AuthContext: auth,
+		Direction:   direction,
+		Status:      statusValue,
+		PageSize:    10,
 	})
 	elapsed := elapsedMS(begin)
 	if err != nil {
@@ -699,14 +715,11 @@ func listContactRequests(
 }
 
 func getContactState(cfg config, client contactsv1.ContactsServiceClient, userID string, otherUserID string) (stateSummary, float64, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
+	ctx, cancel, auth := requestContext(cfg, userID, deviceIDForUser(cfg, userID), "contact-state-"+userID, "trace-contact-state")
 	defer cancel()
 	begin := time.Now()
 	resp, err := client.GetContactState(ctx, &contactsv1.GetContactStateRequest{
-		AuthContext: &contactsv1.AuthContext{
-			TenantId: cfg.tenantID,
-			UserId:   userID,
-		},
+		AuthContext: auth,
 		OtherUserId: otherUserID,
 	})
 	elapsed := elapsedMS(begin)

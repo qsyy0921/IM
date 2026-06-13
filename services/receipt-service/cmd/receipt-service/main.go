@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"log"
 	"net"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -21,6 +24,7 @@ import (
 	"github.com/qsyy0921/IM/services/receipt-service/internal/trigger/delivery"
 	"github.com/qsyy0921/IM/services/receipt-service/internal/trigger/outbox"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 func main() {
@@ -57,11 +61,14 @@ func runGRPCServer() error {
 	defer pool.Close()
 
 	listenAddr := envString("NEXUSIM_RECEIPT_GRPC_ADDR", "0.0.0.0:10499")
+	server, err := newGRPCServer()
+	if err != nil {
+		return err
+	}
 	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		return err
 	}
-	server := grpc.NewServer()
 	repository := postgresinfra.NewRepository(pool)
 	access := accessinfra.NewStaticAllowAccess()
 	grpcapi.Register(
@@ -188,6 +195,97 @@ func envString(name string, fallback string) string {
 	return value
 }
 
+func newGRPCServer() (*grpc.Server, error) {
+	serverOptions := make([]grpc.ServerOption, 0, 1)
+	if creds, ok, err := loadReceiptGRPCCredentialsFromEnv(); err != nil {
+		return nil, err
+	} else if ok {
+		serverOptions = append(serverOptions, grpc.Creds(creds))
+	}
+	return grpc.NewServer(serverOptions...), nil
+}
+
+func loadReceiptGRPCCredentialsFromEnv() (credentials.TransportCredentials, bool, error) {
+	tlsConfig, ok, err := receiptGRPCTLSConfigFromEnv()
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	return credentials.NewTLS(tlsConfig), true, nil
+}
+
+func receiptGRPCTLSConfigFromEnv() (*tls.Config, bool, error) {
+	certFile := strings.TrimSpace(os.Getenv("NEXUSIM_RECEIPT_GRPC_TLS_CERT_FILE"))
+	keyFile := strings.TrimSpace(os.Getenv("NEXUSIM_RECEIPT_GRPC_TLS_KEY_FILE"))
+	clientCAFile := strings.TrimSpace(os.Getenv("NEXUSIM_RECEIPT_GRPC_TLS_CLIENT_CA_FILE"))
+	allowedClientDNSNames := envStringSet("NEXUSIM_RECEIPT_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES", strings.ToLower)
+	allowedClientURIs, err := envURIStringSet("NEXUSIM_RECEIPT_GRPC_TLS_CLIENT_ALLOWED_URIS")
+	if err != nil {
+		return nil, true, err
+	}
+	requireClientCert, requireClientCertConfigured, err := envOptionalBool("NEXUSIM_RECEIPT_GRPC_TLS_REQUIRE_CLIENT_CERT")
+	if err != nil {
+		return nil, true, err
+	}
+	hasClientAllowlist := len(allowedClientDNSNames) > 0 || len(allowedClientURIs) > 0
+	requireClientCert = clientCAFile != "" || hasClientAllowlist || (requireClientCertConfigured && requireClientCert)
+	if certFile == "" && keyFile == "" && clientCAFile == "" && !requireClientCert && !hasClientAllowlist {
+		return nil, false, nil
+	}
+	if certFile == "" || keyFile == "" {
+		return nil, true, errors.New("NEXUSIM_RECEIPT_GRPC_TLS_CERT_FILE and NEXUSIM_RECEIPT_GRPC_TLS_KEY_FILE must be configured together")
+	}
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, true, err
+	}
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12,
+	}
+	if requireClientCert {
+		if clientCAFile == "" {
+			return nil, true, errors.New("NEXUSIM_RECEIPT_GRPC_TLS_CLIENT_CA_FILE is required when client certificates are required")
+		}
+		pemBytes, err := os.ReadFile(clientCAFile)
+		if err != nil {
+			return nil, true, err
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(pemBytes) {
+			return nil, true, errors.New("NEXUSIM_RECEIPT_GRPC_TLS_CLIENT_CA_FILE does not contain a valid PEM certificate")
+		}
+		tlsConfig.ClientCAs = pool
+		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+		if hasClientAllowlist {
+			tlsConfig.VerifyConnection = verifyAllowedReceiptGRPCClient(allowedClientDNSNames, allowedClientURIs)
+		}
+	}
+	return tlsConfig, true, nil
+}
+
+func verifyAllowedReceiptGRPCClient(allowedDNSNames map[string]struct{}, allowedURIs map[string]struct{}) func(tls.ConnectionState) error {
+	return func(state tls.ConnectionState) error {
+		if len(state.PeerCertificates) == 0 {
+			return errors.New("receipt grpc client certificate is required")
+		}
+		cert := state.PeerCertificates[0]
+		for _, dnsName := range cert.DNSNames {
+			if _, ok := allowedDNSNames[strings.ToLower(strings.TrimSpace(dnsName))]; ok {
+				return nil
+			}
+		}
+		for _, uri := range cert.URIs {
+			if uri == nil {
+				continue
+			}
+			if _, ok := allowedURIs[uri.String()]; ok {
+				return nil
+			}
+		}
+		return errors.New("receipt grpc client certificate identity is not allowed")
+	}
+}
+
 func envInt(name string, fallback int) int {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
@@ -198,6 +296,60 @@ func envInt(name string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func envStringSet(name string, normalize func(string) string) map[string]struct{} {
+	values := make(map[string]struct{})
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return values
+	}
+	for _, item := range strings.Split(raw, ",") {
+		value := strings.TrimSpace(item)
+		if value == "" {
+			continue
+		}
+		if normalize != nil {
+			value = normalize(value)
+		}
+		values[value] = struct{}{}
+	}
+	return values
+}
+
+func envURIStringSet(name string) (map[string]struct{}, error) {
+	values := make(map[string]struct{})
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return values, nil
+	}
+	for _, item := range strings.Split(raw, ",") {
+		value := strings.TrimSpace(item)
+		if value == "" {
+			continue
+		}
+		parsed, err := url.Parse(value)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			return nil, errors.New(name + " contains an invalid URI")
+		}
+		values[parsed.String()] = struct{}{}
+	}
+	return values, nil
+}
+
+func envOptionalBool(name string) (bool, bool, error) {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv(name)))
+	if value == "" {
+		return false, false, nil
+	}
+	switch value {
+	case "1", "true", "yes", "y", "on":
+		return true, true, nil
+	case "0", "false", "no", "n", "off":
+		return false, true, nil
+	default:
+		return false, true, errors.New(name + " must be a boolean")
+	}
 }
 
 func envDuration(name string, fallback time.Duration) time.Duration {

@@ -1,6 +1,6 @@
 # NexusIM receipt-service SDD v0.1 Draft
 
-状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务、`ListReceiptStates` 薄批量查询、receipt outbox relay、最小 `ListConversations`、`unread_only` 未读过滤以及 Archive / Pin / Mute 用户列表偏好已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events` 和会话列表偏好链路。
+状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务、`ListReceiptStates` 薄批量查询、receipt outbox relay、最小 `ListConversations`、`unread_only` 未读过滤、Archive / Pin / Mute 用户列表偏好和第一阶段 gRPC server TLS / mTLS 配置已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events` 和会话列表偏好链路。
 
 本文定义 `receipt-service` 的第一条可编码切片：基于 `delivery-service` 已经产生的 durable delivery 事件，构建消息送达 / 已读回执 read model，并提供最小查询和 `MarkRead` 写入入口。
 
@@ -45,6 +45,19 @@
 `receipt-service` 不读取 `delivery-service` 内部表。它通过 `im.delivery.events` 重建必要投影；如果 projection lag 或数据缺失，API 必须返回可解释错误或要求客户端回源 `PullInbox`，不能直接跨服务读内部表补洞。
 
 权限来源必须显式化：app 层通过 `ReceiptAccessPort` 调用 conversation / policy 能力，第一阶段可以用本地 mock，但接口必须表达 `CanMarkRead` 和 `CanViewReceiptState` 两种语义。该端口返回 visibility mode、permission version 和必要的 membership window；无权限返回 `PERMISSION_DENIED`。不能用 receipt projection 的存在性替代权限判断。
+
+`receipt-service grpc` 默认仍以 plaintext 启动，兼容现有 receipt smoke、demo 和内部客户端。第一阶段可选开启静态 TLS / mTLS：
+
+```text
+NEXUSIM_RECEIPT_GRPC_TLS_CERT_FILE=...
+NEXUSIM_RECEIPT_GRPC_TLS_KEY_FILE=...
+NEXUSIM_RECEIPT_GRPC_TLS_CLIENT_CA_FILE=...
+NEXUSIM_RECEIPT_GRPC_TLS_REQUIRE_CLIENT_CERT=true
+NEXUSIM_RECEIPT_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES=api-gateway.nexusim.local
+NEXUSIM_RECEIPT_GRPC_TLS_CLIENT_ALLOWED_URIS=spiffe://nexusim/api-gateway
+```
+
+开启 allowlist 时按客户端证书 DNS SAN 小写 exact-match 或 URI SAN exact-match 校验。该配置只覆盖 receipt gRPC server；客户端 TLS 迁移、证书签发 / 轮换 / 分发、动态服务身份治理和全服务 mTLS rollout 仍是后续项。
 
 ## 3. 六层 DDD 包结构
 
@@ -370,6 +383,7 @@ CREATE TABLE message_receipt_states (
 - `services/receipt-service/internal/infrastructure/postgres`：receipt projection、received/read cursor、receipt outbox 写入。
 - `services/receipt-service/internal/trigger/delivery`：消费 `im.delivery.events` 并在 PostgreSQL 事务提交后 commit Kafka offset。
 - `services/receipt-service/internal/trigger/outbox`：发布 `receipt.message.received.v1` / `receipt.message.read.v1` 到 `im.receipt.events`。
+- `services/receipt-service/cmd/receipt-service`：gRPC server 第一阶段可选 TLS / mTLS env 配置和 cmd 层配置测试。
 
 下一步按下面顺序推进：
 
@@ -405,11 +419,13 @@ SendMessage
 - 不把 `AckDelivery` 自动视为 read。
 - 不允许 receipt-service 直接读取 delivery-service 内部表绕过事件投影。
 - 不把 first-slice 的 per-message 明细投影表述为大群生产模型。
+- 不把第一阶段静态 TLS / mTLS 配置表述为证书生命周期、服务身份治理或全服务 mTLS rollout。
 
 ## 11. 风险和门禁
 
 - `delivery.ack.recorded.v1` 只有 cursor，没有 message_id；receipt-service 必须先投影 `delivery.inbox_item.created.v1` 建立 seq 到 message 的映射。
 - 如果 ack event 先于 inbox projection 到达，必须可重试或 fail-closed，不能丢 ack。
 - read cursor 必须同时受 visible seq 和 received seq 限制，防止客户端把未投递消息标成已读。
+- gRPC TLS / mTLS 必须保持 opt-in；无 TLS env 时仍为 plaintext，避免破坏现有 receipt smoke 和 demo。cert/key 必须成对配置，mTLS 或 client allowlist 开启时必须配置 client CA，并 fail fast。
 - 未来撤回 / 删除上线后，receipt query 必须遵守 message visibility，不得展示已删除消息的回执详情给无权用户。
 - 未来 RAG / search 使用 receipt 信息时，必须先通过 conversation membership / ACL 过滤。

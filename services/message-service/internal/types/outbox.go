@@ -38,6 +38,12 @@ type OutboxRelayStats struct {
 	DeadLettered int
 }
 
+type OutboxRepairStats struct {
+	Requested int
+	Repaired  int
+	Skipped   int
+}
+
 type KafkaPublishRecord struct {
 	Key   []byte
 	Value []byte

@@ -167,6 +167,12 @@ accepted_at
 
 `NEXUSIM_MESSAGE_SERVICE_MODE=outbox-audit` is a read-only operator view over `message_outbox`. It supports `outbox_id / event_id / tenant_id / conversation_id / status / event_type` filters, returns newest rows first, and never mutates outbox state.
 
+`NEXUSIM_MESSAGE_SERVICE_MODE=outbox-repair` is a first-stage operator that only requeues explicitly listed DLQ events by `event_id`, resets them to `PENDING`, and records a repair audit row. It does not skip events, does not mutate message facts, and does not broaden into batch tenant replay.
+
+`NEXUSIM_MESSAGE_SERVICE_MODE=outbox-repair-audit` is a read-only view over `message_outbox_repair_audit`, with `event_id / tenant_id / conversation_id` filters for local debugging and operator traceability.
+
+`NEXUSIM_MESSAGE_SERVICE_MODE=outbox-repair-cleanup` only deletes old repair audit history older than a retention cutoff, with optional `event_id / tenant_id / conversation_id` narrowing. It never mutates current `message_outbox` state.
+
 约束：
 
 - 写请求不做透明服务端重试，避免放大重试风暴。

@@ -40,7 +40,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_MESSAGE_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("message-service runtime wiring is idle; set NEXUSIM_MESSAGE_SERVICE_MODE=grpc, outbox-relay, or outbox-audit")
+		log.Println("message-service runtime wiring is idle; set NEXUSIM_MESSAGE_SERVICE_MODE=grpc, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, or outbox-repair-cleanup")
 		return nil
 	case "grpc":
 		return runGRPCServer()
@@ -48,6 +48,12 @@ func run() error {
 		return runOutboxRelay()
 	case "outbox-audit":
 		return runOutboxAudit()
+	case "outbox-repair":
+		return runOutboxRepair()
+	case "outbox-repair-audit":
+		return runOutboxRepairAudit()
+	case "outbox-repair-cleanup":
+		return runOutboxRepairCleanup()
 	default:
 		return errors.New("unsupported NEXUSIM_MESSAGE_SERVICE_MODE")
 	}
@@ -345,6 +351,120 @@ func runOutboxAudit() error {
 	return nil
 }
 
+func runOutboxRepair() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	eventIDs := splitCSV(os.Getenv("NEXUSIM_MESSAGE_OUTBOX_REPAIR_EVENT_IDS"))
+	reason := envString("NEXUSIM_MESSAGE_OUTBOX_REPAIR_REASON", "manual message outbox repair")
+	stats, err := postgresinfra.NewOutboxStore(pool).RepairDLQEvents(ctx, eventIDs, reason)
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"message-service outbox repair completed requested=%d repaired=%d skipped=%d",
+		stats.Requested,
+		stats.Repaired,
+		stats.Skipped,
+	)
+	return nil
+}
+
+func runOutboxRepairAudit() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	rows, err := postgresinfra.NewOutboxStore(pool).AuditOutboxRepairs(ctx, postgresinfra.OutboxRepairAuditOptions{
+		EventID:        envString("NEXUSIM_MESSAGE_OUTBOX_REPAIR_AUDIT_EVENT_ID", ""),
+		TenantID:       envString("NEXUSIM_MESSAGE_OUTBOX_REPAIR_AUDIT_TENANT_ID", ""),
+		ConversationID: envString("NEXUSIM_MESSAGE_OUTBOX_REPAIR_AUDIT_CONVERSATION_ID", ""),
+		Limit:          envInt("NEXUSIM_MESSAGE_OUTBOX_REPAIR_AUDIT_LIMIT", 20),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("message-service outbox repair audit completed rows=%d", len(rows))
+	for _, row := range rows {
+		log.Printf(
+			"message_outbox_repair event_id=%s tenant_id=%s conversation_id=%s previous_status=%s previous_retry_count=%d previous_dead_lettered_at=%s repaired_at=%s reason=%q previous_last_error=%q",
+			row.EventID,
+			row.TenantID,
+			row.ConversationID,
+			row.PreviousStatus,
+			row.PreviousRetryCount,
+			formatOptionalTime(row.PreviousDeadLetteredAt),
+			row.RepairedAt.Format(time.RFC3339),
+			row.Reason,
+			row.PreviousLastError,
+		)
+	}
+	return nil
+}
+
+type outboxRepairCleanupConfig struct {
+	Retention time.Duration
+	BatchSize int
+}
+
+func runOutboxRepairCleanup() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	config, err := outboxRepairCleanupConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	cutoff := time.Now().UTC().Add(-config.Retention)
+	stats, err := postgresinfra.NewOutboxStore(pool).CleanupOutboxRepairs(ctx, postgresinfra.OutboxRepairCleanupOptions{
+		EventID:        envString("NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_EVENT_ID", ""),
+		TenantID:       envString("NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_TENANT_ID", ""),
+		ConversationID: envString("NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_CONVERSATION_ID", ""),
+		Cutoff:         cutoff,
+		Limit:          config.BatchSize,
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"message-service outbox repair cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d",
+		stats.Deleted,
+		cutoff.Format(time.RFC3339),
+		config.Retention,
+		config.BatchSize,
+	)
+	return nil
+}
+
 func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {
 	if strings.TrimSpace(addr) == "" {
 		return func() {}, nil
@@ -575,6 +695,21 @@ func envInt64AllowZero(name string, fallback int64) int64 {
 	return parsed
 }
 
+func outboxRepairCleanupConfigFromEnv() (outboxRepairCleanupConfig, error) {
+	retention, err := envPositiveDuration("NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_RETENTION", 7*24*time.Hour)
+	if err != nil {
+		return outboxRepairCleanupConfig{}, err
+	}
+	batchSize := envInt("NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_BATCH_SIZE", 200)
+	if batchSize <= 0 {
+		return outboxRepairCleanupConfig{}, errors.New("NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_BATCH_SIZE must be positive")
+	}
+	return outboxRepairCleanupConfig{
+		Retention: retention,
+		BatchSize: batchSize,
+	}, nil
+}
+
 func envFloat(name string, fallback float64) float64 {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
@@ -663,6 +798,18 @@ func envDuration(name string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return parsed
+}
+
+func envPositiveDuration(name string, fallback time.Duration) (time.Duration, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed <= 0 {
+		return 0, errors.New(name + " must be a positive duration")
+	}
+	return parsed, nil
 }
 
 func splitCSV(value string) []string {

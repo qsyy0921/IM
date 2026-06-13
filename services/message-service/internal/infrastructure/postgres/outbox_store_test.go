@@ -211,6 +211,145 @@ func TestOutboxStoreAuditOutboxFiltersStatusAndEventTypeIntegration(t *testing.T
 	}
 }
 
+func TestOutboxStoreRepairDLQEventsResetsMessageOutboxStateIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+	resetMessageCoreTables(t, ctx, pool)
+
+	tenantID := types.TenantID(fmt.Sprintf("tenant-outbox-repair-%d", time.Now().UnixNano()))
+	repo := NewMessageRepository(pool)
+	appendConversationMessages(t, ctx, repo, tenantID, "conversation-a", 1)
+	appendConversationMessages(t, ctx, repo, tenantID, "conversation-b", 1)
+	updateMessageOutboxAuditState(t, ctx, pool, tenantID, "conversation-a", 1, types.OutboxStatusDLQ, 3, "poison payload", false, true)
+	updateMessageOutboxAuditState(t, ctx, pool, tenantID, "conversation-b", 1, types.OutboxStatusPublished, 0, "", true, false)
+
+	stats, err := NewOutboxStore(pool).RepairDLQEvents(ctx, []string{"", "missing-event", readMessageOutboxEventID(t, ctx, pool, tenantID, "conversation-a", 1)}, "manual repair")
+	if err != nil {
+		t.Fatalf("repair message outbox dlq: %v", err)
+	}
+	if stats.Requested != 2 || stats.Repaired != 1 || stats.Skipped != 1 {
+		t.Fatalf("unexpected repair stats: %+v", stats)
+	}
+	assertMessageOutboxState(t, ctx, pool, tenantID, "conversation-a", 1, types.OutboxStatusPending, 0, "")
+	rows, err := NewOutboxStore(pool).AuditOutboxRepairs(ctx, OutboxRepairAuditOptions{
+		TenantID: string(tenantID),
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("audit message outbox repairs: %v", err)
+	}
+	if len(rows) != 1 || rows[0].ConversationID != "conversation-a" || rows[0].Reason != "manual repair" || rows[0].PreviousStatus != types.OutboxStatusDLQ {
+		t.Fatalf("unexpected message outbox repair audit rows: %+v", rows)
+	}
+}
+
+func TestOutboxStoreAuditOutboxRepairsFiltersConversationIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+	resetMessageCoreTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO message_outbox_repair_audit (
+    event_id, tenant_id, conversation_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at, repair_reason, repaired_at
+) VALUES
+    ('repair-event-1', 'tenant-a', 'conversation-a', 'DLQ', 2, 'publish failed', now() - interval '1 minute', 'manual audit', now() - interval '2 minutes'),
+    ('repair-event-2', 'tenant-a', 'conversation-b', 'DLQ', 1, 'provider unavailable', now() - interval '3 minutes', 'operator replay', now() - interval '1 minute')
+`)
+	if err != nil {
+		t.Fatalf("seed message outbox repair audit rows: %v", err)
+	}
+
+	rows, err := NewOutboxStore(pool).AuditOutboxRepairs(ctx, OutboxRepairAuditOptions{
+		TenantID:       "tenant-a",
+		ConversationID: "conversation-a",
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit filtered message outbox repairs: %v", err)
+	}
+	if len(rows) != 1 || rows[0].EventID != "repair-event-1" || rows[0].ConversationID != "conversation-a" || rows[0].Reason != "manual audit" {
+		t.Fatalf("unexpected filtered message outbox repair rows: %+v", rows)
+	}
+}
+
+func TestOutboxStoreCleanupOutboxRepairsDeletesOnlyExpiredRowsIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+	resetMessageCoreTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO message_outbox_repair_audit (
+    event_id, tenant_id, conversation_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at, repair_reason, repaired_at
+) VALUES
+    ('cleanup-event-1', 'tenant-cleanup', 'conversation-a', 'DLQ', 1, 'publish failed', now() - interval '1 minute', 'manual audit', now() - interval '10 days'),
+    ('cleanup-event-2', 'tenant-cleanup', 'conversation-a', 'DLQ', 2, 'provider unavailable', now() - interval '2 minutes', 'provider recovered', now() - interval '1 day')
+`)
+	if err != nil {
+		t.Fatalf("seed message outbox cleanup rows: %v", err)
+	}
+
+	stats, err := NewOutboxStore(pool).CleanupOutboxRepairs(ctx, OutboxRepairCleanupOptions{
+		TenantID: "tenant-cleanup",
+		Cutoff:   time.Now().UTC().Add(-7 * 24 * time.Hour),
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("cleanup message outbox repairs: %v", err)
+	}
+	if stats.Deleted != 1 {
+		t.Fatalf("unexpected deleted count: %+v", stats)
+	}
+	assertMessageOutboxRepairAuditCount(t, ctx, pool, "tenant-cleanup", "", 1)
+}
+
+func TestOutboxStoreCleanupOutboxRepairsFiltersConversationIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+	resetMessageCoreTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO message_outbox_repair_audit (
+    event_id, tenant_id, conversation_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at, repair_reason, repaired_at
+) VALUES
+    ('cleanup-event-21', 'tenant-filter', 'conversation-a', 'DLQ', 1, 'publish failed', now() - interval '1 minute', 'manual audit', now() - interval '10 days'),
+    ('cleanup-event-22', 'tenant-filter', 'conversation-b', 'DLQ', 2, 'provider unavailable', now() - interval '2 minutes', 'provider recovered', now() - interval '10 days')
+`)
+	if err != nil {
+		t.Fatalf("seed message outbox cleanup rows: %v", err)
+	}
+
+	stats, err := NewOutboxStore(pool).CleanupOutboxRepairs(ctx, OutboxRepairCleanupOptions{
+		TenantID:       "tenant-filter",
+		ConversationID: "conversation-a",
+		Cutoff:         time.Now().UTC().Add(-7 * 24 * time.Hour),
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("cleanup message outbox repairs with conversation filter: %v", err)
+	}
+	if stats.Deleted != 1 {
+		t.Fatalf("unexpected deleted count: %+v", stats)
+	}
+	rows, err := NewOutboxStore(pool).AuditOutboxRepairs(ctx, OutboxRepairAuditOptions{
+		TenantID: "tenant-filter",
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("audit message outbox repairs after cleanup: %v", err)
+	}
+	if len(rows) != 1 || rows[0].EventID != "cleanup-event-22" || rows[0].ConversationID != "conversation-b" {
+		t.Fatalf("unexpected remaining message outbox repair rows: %+v", rows)
+	}
+}
+
 func TestOutboxStoreProcessReadyBatchDirectlyMarksPublishedAndRetriesFailures(t *testing.T) {
 	ctx := context.Background()
 	pool := openIntegrationPool(t, ctx)
@@ -738,10 +877,98 @@ WHERE tenant_id = $1
 	}
 }
 
+func readMessageOutboxEventID(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	tenantID types.TenantID,
+	conversationID types.ConversationID,
+	aggregateVersion int64,
+) string {
+	t.Helper()
+	var eventID string
+	if err := pool.QueryRow(ctx, `
+SELECT event_id
+FROM message_outbox
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND aggregate_version = $3
+`, tenantID, conversationID, aggregateVersion).Scan(&eventID); err != nil {
+		t.Fatalf("read message outbox event id: %v", err)
+	}
+	return eventID
+}
+
+func assertMessageOutboxState(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	tenantID types.TenantID,
+	conversationID types.ConversationID,
+	aggregateVersion int64,
+	wantStatus string,
+	wantRetryCount int,
+	wantLastError string,
+) {
+	t.Helper()
+	var status string
+	var retryCount int
+	var lastError string
+	if err := pool.QueryRow(ctx, `
+SELECT status, retry_count, COALESCE(last_error, '')
+FROM message_outbox
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND aggregate_version = $3
+`, tenantID, conversationID, aggregateVersion).Scan(&status, &retryCount, &lastError); err != nil {
+		t.Fatalf("read message outbox state: %v", err)
+	}
+	if status != wantStatus || retryCount != wantRetryCount || lastError != wantLastError {
+		t.Fatalf(
+			"unexpected message outbox state: status=%s retry=%d last_error=%q want status=%s retry=%d last_error=%q",
+			status,
+			retryCount,
+			lastError,
+			wantStatus,
+			wantRetryCount,
+			wantLastError,
+		)
+	}
+}
+
+func assertMessageOutboxRepairAuditCount(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	tenantID string,
+	conversationID string,
+	want int64,
+) {
+	t.Helper()
+	query := `
+SELECT COUNT(*)
+FROM message_outbox_repair_audit
+WHERE tenant_id = $1
+`
+	args := []any{tenantID}
+	if conversationID != "" {
+		query += " AND conversation_id = $2"
+		args = append(args, conversationID)
+	}
+	var got int64
+	if err := pool.QueryRow(ctx, query, args...).Scan(&got); err != nil {
+		t.Fatalf("count message outbox repair audit: %v", err)
+	}
+	if got != want {
+		t.Fatalf("unexpected message outbox repair audit count: got %d want %d", got, want)
+	}
+}
+
 func resetMessageCoreTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	_, err := pool.Exec(ctx, `
 TRUNCATE
+    message_outbox_repair_audit,
     message_outbox,
     conversation_timeline_events,
     message_log,

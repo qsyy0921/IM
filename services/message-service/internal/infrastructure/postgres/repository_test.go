@@ -680,13 +680,22 @@ func openIntegrationPool(t *testing.T, ctx context.Context) *pgxpool.Pool {
 
 func applyMessageMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	migrationPath := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "message", "000001_message_core.sql")
-	migrationSQL, err := os.ReadFile(migrationPath)
+	migrationDir := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "message")
+	entries, err := os.ReadDir(migrationDir)
 	if err != nil {
-		t.Fatalf("read migration: %v", err)
+		t.Fatalf("read migration dir: %v", err)
 	}
-	if _, err := pool.Exec(ctx, string(migrationSQL)); err != nil {
-		t.Fatalf("apply migration: %v", err)
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".sql" {
+			continue
+		}
+		migrationSQL, err := os.ReadFile(filepath.Join(migrationDir, entry.Name()))
+		if err != nil {
+			t.Fatalf("read migration %s: %v", entry.Name(), err)
+		}
+		if _, err := pool.Exec(ctx, string(migrationSQL)); err != nil {
+			t.Fatalf("apply migration %s: %v", entry.Name(), err)
+		}
 	}
 }
 

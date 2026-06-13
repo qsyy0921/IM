@@ -47,6 +47,7 @@ RAG、Agent、聊天记录搜索、智能总结、群聊问答、客服机器人
 ## 文档路由
 
 - 当前入口：`docs/runbook/current-brief.md`
+- 文档总入口：`docs/README.md`
 - runbook 路由：`docs/runbook/README.md`
 - 服务状态索引：`docs/runbook/service-briefs/README.md`
 - 单服务短状态：`docs/runbook/service-briefs/<service>.md`

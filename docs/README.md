@@ -1,6 +1,6 @@
 # NexusIM 文档索引
 
-本文只做文档入口索引，具体设计以各文档正文为准。
+本文只做短入口索引，具体设计以各文档正文为准。
 
 | 目录 / 文档 | 说明 |
 | --- | --- |
@@ -10,10 +10,11 @@
 
 ## 当前阅读路径
 
-每轮 Codex 工作必须先读 `runbook/current-brief.md`。只有需要细节、历史证据或风险上下文时，再按关键词查询 `runbook/current-goal.md`，不要每轮全文读取长文档。
+每轮 Codex 工作必须先读 `runbook/current-brief.md`。需要找文档时先读 `runbook/README.md`，再按需进入短索引或具体服务文档。
 
 1. `runbook/current-brief.md`：低 token 当前入口，确认当前优先级、硬边界和下一步。
-2. `runbook/current-goal.md`：完整历史、风险、评审要求和报告索引；只按需查询。
+2. `runbook/README.md`：runbook 短路由页。
+3. `runbook/current-goal.md`：长期目标摘要；只按需查询。
 3. `architecture/target-architecture.md`：确认目标态、技术栈和不可退让项。
 4. `sdd/api-gateway.md`：确认统一 user-facing gRPC 入口、gateway token 验证和 trusted metadata 传播边界。
 5. `sdd/receipt-service.md`：确认当前第三层产品能力切片，送达 / 已读回执边界。

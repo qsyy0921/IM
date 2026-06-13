@@ -10,6 +10,9 @@ try {
     Write-Host "== runbook entrypoints =="
     & (Join-Path $PSScriptRoot "check-runbook-entrypoints.ps1")
 
+    Write-Host "== docs entrypoints =="
+    & (Join-Path $PSScriptRoot "check-doc-entrypoints.ps1")
+
     Write-Host "== git whitespace =="
     git diff --check
     git diff --cached --check

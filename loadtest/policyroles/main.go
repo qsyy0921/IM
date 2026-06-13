@@ -18,11 +18,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	policyv1 "github.com/qsyy0921/IM/api/proto/nexusim/policy/v1"
+	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	conversationtimelinev1 "github.com/qsyy0921/IM/schemas/kafka"
 	kafkago "github.com/segmentio/kafka-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -53,6 +53,7 @@ type config struct {
 	topic          string
 	consumerGroup  string
 	policyGRPCAddr string
+	policyTLS      grpctls.Config
 	pgDSN          string
 	resultDir      string
 	tenantID       string
@@ -70,6 +71,8 @@ type summary struct {
 	ResultDir              string                 `json:"result_dir"`
 	Topic                  string                 `json:"topic"`
 	ConsumerGroup          string                 `json:"consumer_group"`
+	PolicyGRPCAddr         string                 `json:"policy_grpc_addr"`
+	PolicyTLSEnabled       bool                   `json:"policy_tls_enabled"`
 	TenantID               string                 `json:"tenant_id"`
 	ConversationID         string                 `json:"conversation_id"`
 	UserID                 string                 `json:"user_id"`
@@ -124,6 +127,10 @@ func parseConfig() config {
 	flag.StringVar(&cfg.topic, "topic", topicConversationTimelineEvents, "conversation timeline events topic")
 	flag.StringVar(&cfg.consumerGroup, "consumer-group", "nexusim-policy-role-smoke", "policy timeline consumer group")
 	flag.StringVar(&cfg.policyGRPCAddr, "policy-grpc-addr", "127.0.0.1:10800", "policy-service gRPC address")
+	flag.StringVar(&cfg.policyTLS.CAFile, "policy-tls-ca-file", "", "CA PEM for policy-service gRPC TLS")
+	flag.StringVar(&cfg.policyTLS.ServerName, "policy-tls-server-name", "", "server name for policy-service gRPC TLS")
+	flag.StringVar(&cfg.policyTLS.ClientCertFile, "policy-tls-client-cert-file", "", "client certificate PEM for policy-service mTLS")
+	flag.StringVar(&cfg.policyTLS.ClientKeyFile, "policy-tls-client-key-file", "", "client private key PEM for policy-service mTLS")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable", "PostgreSQL DSN")
 	flag.StringVar(&cfg.resultDir, "result-dir", "H:\\NexusIM\\loadtest-results\\policy-role-smoke", "result directory")
 	flag.StringVar(&cfg.tenantID, "tenant-id", "tenant-policy-role-smoke", "tenant id")
@@ -145,16 +152,18 @@ func run(cfg config) error {
 	}
 	started := time.Now().UTC()
 	s := summary{
-		Commit:         gitOutput("rev-parse", "--short", "HEAD"),
-		CommitFull:     gitOutput("rev-parse", "HEAD"),
-		GitStatusShort: gitOutput("status", "--short"),
-		ResultDir:      cfg.resultDir,
-		Topic:          cfg.topic,
-		ConsumerGroup:  cfg.consumerGroup,
-		TenantID:       cfg.tenantID,
-		ConversationID: cfg.conversationID,
-		UserID:         cfg.userID,
-		StartedAt:      started,
+		Commit:           gitOutput("rev-parse", "--short", "HEAD"),
+		CommitFull:       gitOutput("rev-parse", "HEAD"),
+		GitStatusShort:   gitOutput("status", "--short"),
+		ResultDir:        cfg.resultDir,
+		Topic:            cfg.topic,
+		ConsumerGroup:    cfg.consumerGroup,
+		PolicyGRPCAddr:   cfg.policyGRPCAddr,
+		PolicyTLSEnabled: cfg.policyTLS.Enabled(),
+		TenantID:         cfg.tenantID,
+		ConversationID:   cfg.conversationID,
+		UserID:           cfg.userID,
+		StartedAt:        started,
 	}
 	s.GitDirty = strings.TrimSpace(s.GitStatusShort) != ""
 	defer func() {
@@ -197,7 +206,12 @@ func run(cfg config) error {
 	}
 	defer writer.Close()
 
-	conn, err := grpc.NewClient("passthrough:///"+cfg.policyGRPCAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	dialOption, err := grpctls.DialOption(cfg.policyTLS, "policy-tls")
+	if err != nil {
+		s.Error = fmt.Sprintf("configure policy-service TLS: %v", err)
+		return fmt.Errorf("configure policy-service TLS: %w", err)
+	}
+	conn, err := grpc.NewClient("passthrough:///"+cfg.policyGRPCAddr, dialOption)
 	if err != nil {
 		s.Error = fmt.Sprintf("dial policy service: %v", err)
 		return fmt.Errorf("dial policy service: %w", err)

@@ -1,6 +1,10 @@
 param(
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
+    [string]$PolicyTlsCaFile = "",
+    [string]$PolicyTlsServerName = "",
+    [string]$PolicyTlsClientCertFile = "",
+    [string]$PolicyTlsClientKeyFile = "",
     [switch]$SkipBuild
 )
 
@@ -124,6 +128,18 @@ function Run-PolicyProbe {
     )
     if ($ExpectedReason -ne "") {
         $args += @("--expected-reason", $ExpectedReason)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PolicyTlsCaFile)) {
+        $args += @("--policy-tls-ca-file", $PolicyTlsCaFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PolicyTlsServerName)) {
+        $args += @("--policy-tls-server-name", $PolicyTlsServerName)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PolicyTlsClientCertFile)) {
+        $args += @("--policy-tls-client-cert-file", $PolicyTlsClientCertFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PolicyTlsClientKeyFile)) {
+        $args += @("--policy-tls-client-key-file", $PolicyTlsClientKeyFile)
     }
     & $runner @args
     if ($LASTEXITCODE -ne 0) {

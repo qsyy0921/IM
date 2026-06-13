@@ -12,12 +12,13 @@ import (
 	"time"
 
 	policyv1 "github.com/qsyy0921/IM/api/proto/nexusim/policy/v1"
+	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type config struct {
 	target                 string
+	policyTLS              grpctls.Config
 	resultDir              string
 	requestTimeout         time.Duration
 	tenantID               string
@@ -38,6 +39,7 @@ type summary struct {
 	GitDirty               bool               `json:"git_dirty"`
 	GitStatusShort         string             `json:"git_status_short,omitempty"`
 	Target                 string             `json:"target"`
+	PolicyTLSEnabled       bool               `json:"policy_tls_enabled"`
 	ResultDir              string             `json:"result_dir"`
 	TenantID               string             `json:"tenant_id"`
 	UserID                 string             `json:"user_id"`
@@ -75,6 +77,10 @@ func main() {
 func parseConfig() config {
 	var cfg config
 	flag.StringVar(&cfg.target, "target", "127.0.0.1:10800", "policy-service gRPC target")
+	flag.StringVar(&cfg.policyTLS.CAFile, "policy-tls-ca-file", "", "CA PEM for policy-service gRPC TLS")
+	flag.StringVar(&cfg.policyTLS.ServerName, "policy-tls-server-name", "", "server name for policy-service gRPC TLS")
+	flag.StringVar(&cfg.policyTLS.ClientCertFile, "policy-tls-client-cert-file", "", "client certificate PEM for policy-service mTLS")
+	flag.StringVar(&cfg.policyTLS.ClientKeyFile, "policy-tls-client-key-file", "", "client private key PEM for policy-service mTLS")
 	flag.StringVar(&cfg.resultDir, "result-dir", "H:\\NexusIM\\loadtest-results\\policy-smoke", "result directory")
 	flag.DurationVar(&cfg.requestTimeout, "request-timeout", 5*time.Second, "per-request timeout")
 	flag.StringVar(&cfg.tenantID, "tenant-id", "tenant-policy-smoke", "tenant id")
@@ -104,6 +110,7 @@ func run(cfg config) error {
 		CommitFull:             gitOutput("rev-parse", "HEAD"),
 		GitStatusShort:         gitOutput("status", "--short"),
 		Target:                 cfg.target,
+		PolicyTLSEnabled:       cfg.policyTLS.Enabled(),
 		ResultDir:              cfg.resultDir,
 		TenantID:               cfg.tenantID,
 		UserID:                 cfg.userID,
@@ -121,7 +128,12 @@ func run(cfg config) error {
 		_ = writeSummary(cfg.resultDir, s)
 	}()
 
-	conn, err := grpc.NewClient(cfg.target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	dialOption, err := grpctls.DialOption(cfg.policyTLS, "policy-tls")
+	if err != nil {
+		s.Error = fmt.Sprintf("configure policy-service TLS: %v", err)
+		return fmt.Errorf("configure policy-service TLS: %w", err)
+	}
+	conn, err := grpc.NewClient(cfg.target, dialOption)
 	if err != nil {
 		s.Error = fmt.Sprintf("dial policy-service: %v", err)
 		return fmt.Errorf("dial policy-service: %w", err)

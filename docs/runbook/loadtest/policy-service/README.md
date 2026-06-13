@@ -33,6 +33,7 @@ Implemented:
 - message-service `SendMessage` role gate integration smoke through `policy-service CheckMessageAction`: `loadtest-report-20260613-policy-message-role-gate-smoke.md`.
 - message-service `EditMessage` / `RevokeMessage` / `DeleteMessage` sender-only ownership integration smoke through `policy-service CheckMessageAction`: `loadtest-report-20260613-policy-message-ownership-smoke.md`.
 - message-service `EditMessage` / `RevokeMessage` / `DeleteMessage` first-stage ownership override smoke for non-sender `ADMIN` allow and `MEMBER` deny: `loadtest-report-20260613-policy-message-ownership-override-smoke.md`.
+- policy-service gRPC server and direct policy smoke clients support first-stage optional TLS / mTLS static config. `loadtest/policy`, `loadtest/policycontacts` and `loadtest/policyroles` accept optional CA, server name and client cert/key flags; default remains plaintext.
 
 Not yet implemented:
 
@@ -40,7 +41,7 @@ Not yet implemented:
 - tenant-level policy DSL / quota / risk policy beyond first-stage action defaults;
 - content moderation / risk scoring;
 - policy audit retention, external sink, poison-payload classification and broad repair workflow;
-- policy-service mTLS, OpenTelemetry, Prometheus deployment and production alerting.
+- certificate issuance / rotation / distribution, dynamic service identity, service mesh rollout, OpenTelemetry, Prometheus deployment and production alerting.
 
 ## Local Smoke Shape
 
@@ -57,6 +58,18 @@ Run direct policy-service gRPC smoke with:
 ```powershell
 .\loadtest\policy\run-local-smoke.ps1
 ```
+
+Optional TLS / mTLS client flags are available for direct policy smokes:
+
+```powershell
+.\loadtest\policy\run-local-smoke.ps1 `
+  -PolicyTlsCaFile .\certs\ca.pem `
+  -PolicyTlsServerName policy-service.nexusim.local `
+  -PolicyTlsClientCertFile .\certs\loadtest-client.crt `
+  -PolicyTlsClientKeyFile .\certs\loadtest-client.key
+```
+
+The same `-PolicyTls*` parameters are supported by `loadtest\policycontacts\run-local-smoke.ps1` and `loadtest\policyroles\run-local-smoke.ps1`. Server-side TLS still uses `NEXUSIM_POLICY_GRPC_TLS_*`; the runner flags only control the loadtest client connection to policy-service.
 
 Run message-service integration smoke with:
 

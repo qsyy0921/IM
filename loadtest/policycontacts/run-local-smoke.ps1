@@ -4,6 +4,10 @@ param(
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
     [switch]$ExerciseAuditRepair,
+    [string]$PolicyTlsCaFile = "",
+    [string]$PolicyTlsServerName = "",
+    [string]$PolicyTlsClientCertFile = "",
+    [string]$PolicyTlsClientKeyFile = "",
     [switch]$SkipBuild
 )
 
@@ -198,15 +202,29 @@ try {
     Start-Sleep -Milliseconds 1000
 
     $runner = Join-Path $repo "bin\policy-contact-loadtest.exe"
-    & $runner `
-        --brokers $KafkaBrokers `
-        --topic $topic `
-        --consumer-group $consumerGroup `
-        --audit-topic $auditTopic `
-        --policy-grpc-addr $policyGrpcAddr `
-        --pg-dsn $PgDsn `
-        --result-dir $resultDir `
-        --cleanup=true
+    $runnerArgs = @(
+        "--brokers", $KafkaBrokers,
+        "--topic", $topic,
+        "--consumer-group", $consumerGroup,
+        "--audit-topic", $auditTopic,
+        "--policy-grpc-addr", $policyGrpcAddr,
+        "--pg-dsn", $PgDsn,
+        "--result-dir", $resultDir,
+        "--cleanup=true"
+    )
+    if (-not [string]::IsNullOrWhiteSpace($PolicyTlsCaFile)) {
+        $runnerArgs += @("--policy-tls-ca-file", $PolicyTlsCaFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PolicyTlsServerName)) {
+        $runnerArgs += @("--policy-tls-server-name", $PolicyTlsServerName)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PolicyTlsClientCertFile)) {
+        $runnerArgs += @("--policy-tls-client-cert-file", $PolicyTlsClientCertFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PolicyTlsClientKeyFile)) {
+        $runnerArgs += @("--policy-tls-client-key-file", $PolicyTlsClientKeyFile)
+    }
+    & $runner @runnerArgs
     if ($LASTEXITCODE -ne 0) {
         throw "policy contact projection smoke failed with exit code $LASTEXITCODE"
     }

@@ -167,6 +167,17 @@ NEXUSIM_POLICY_SERVICE_TLS_CLIENT_KEY_FILE=
 
 message-service only enables TLS for policy RPC when `NEXUSIM_POLICY_SERVICE_TLS_CA_FILE` is configured. `NEXUSIM_POLICY_SERVICE_TLS_SERVER_NAME` is optional and overrides certificate hostname verification. Client certificate and key must be configured together for mTLS. A partial TLS configuration fails fast instead of silently falling back to plaintext.
 
+Direct policy smoke clients use the same static transport model through runner flags:
+
+```text
+--policy-tls-ca-file
+--policy-tls-server-name
+--policy-tls-client-cert-file
+--policy-tls-client-key-file
+```
+
+These flags are available in `loadtest/policy`, `loadtest/policycontacts`, and `loadtest/policyroles`. They only control the loadtest client connection to `policy-service`; server-side TLS remains configured through `NEXUSIM_POLICY_GRPC_TLS_*`.
+
 ## Contracts
 
 `CheckMessageActionRequest` includes:
@@ -227,7 +238,7 @@ This is a local debug surface. It is not a replacement for production OpenTeleme
 - Message ownership policy supports sender mutation and first-stage `ADMIN` / `OWNER` override for edit / revoke / delete when message-service supplies sender context. It does not implement a separate `MODERATOR` role, full ReBAC, owner transfer semantics, retention policy, compliance delete or user-private delete.
 - No tenant policy DSL, tenant quota / risk policy, content moderation, risk scoring or rate limiting is implemented yet.
 - Decision audit outbox rows can be relayed to `im.policy.events`, and explicit DLQ event IDs can be redriven through the repair operator after relay-equivalent validation. Broad repair workflow, poison-payload classification beyond fail-closed validation, retention policy and external sink remain future work.
-- First-stage static TLS / mTLS config exists for policy-service and the message-service policy RPC client, but there is no certificate issuance, rotation, dynamic service identity registry, service mesh policy, or all-service mTLS rollout yet.
+- First-stage static TLS / mTLS config exists for policy-service, the message-service policy RPC client and direct policy smoke clients, but there is no certificate issuance, rotation, dynamic service identity registry, service mesh policy, or all-service mTLS rollout yet.
 - No production OpenTelemetry / Prometheus / alerting rollout is implemented yet.
 
 These are future production hardening steps; the current value is extracting the policy boundary and replacing message-service internal policy rules with an optional real service dependency.

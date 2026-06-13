@@ -2,7 +2,7 @@
 
 `policy-service` owns first-stage policy decisions that must not be hard-coded inside message-service. The initial implementation is intentionally small: it exposes a gRPC `CheckMessageAction` endpoint for message send / edit / revoke / delete decisions, and it returns a stable `permission_version`, `classification`, allow/deny flag and public deny reason.
 
-This service is a boundary extraction step. It is not yet a full ReBAC engine, tenant policy engine, content moderation platform, risk scoring system or complete contacts/conversation policy engine. The current contacts projection is consumed only for direct conversation `SEND` hard-deny when the caller supplies safe direct-peer context.
+This service is a boundary extraction step. It is not yet a full ReBAC engine, tenant policy DSL / quota / risk engine, content moderation platform, risk scoring system or complete contacts/conversation policy engine. The current contacts projection is consumed only for direct conversation `SEND` hard-deny when the caller supplies safe direct-peer context, and the current tenant rule store only supports first-stage `tenant_id + action` defaults.
 
 ## Boundary
 
@@ -34,13 +34,19 @@ message-service
 
 The first slice keeps the legacy message-service `StaticPolicy` fallback for local smoke. When `NEXUSIM_POLICY_SERVICE_ADDR` is set, message-service calls policy-service over gRPC instead.
 
-The second slice adds an optional policy-service owned PostgreSQL rule table. It is exact-match only:
+The second slice adds an optional policy-service owned PostgreSQL rule table. The first table is exact-match only:
 
 ```text
 tenant_id + user_id + conversation_id + action
 ```
 
-When `NEXUSIM_POLICY_RULES_ENABLED=true`, policy-service first evaluates hard contact-block denies for direct `SEND` requests that include `direct_peer_user_id`, then checks `policy_message_action_rules`. A matching exact rule returns its allow / deny decision, `permission_version`, `classification` and public reason. A clean rule miss falls back to the static policy. PostgreSQL lookup errors do not fall back; they return policy unavailable so a broken rule store cannot silently bypass a deny rule.
+The next table adds a tenant action default:
+
+```text
+tenant_id + action
+```
+
+When `NEXUSIM_POLICY_RULES_ENABLED=true`, policy-service first evaluates hard contact-block denies for direct `SEND` requests that include `direct_peer_user_id`, then checks `policy_message_action_rules`, then checks `policy_tenant_message_action_rules`, and finally falls back to the static policy. A matching exact or tenant rule returns its allow / deny decision, `permission_version`, `classification` and public reason. Exact user/conversation rules intentionally override tenant defaults. PostgreSQL lookup errors do not fall back; they return policy unavailable so a broken rule store cannot silently bypass a deny rule. The tenant rule table is backward-compatible during rollout: if the table has not been migrated yet, a tenant-rule lookup miss due to the missing relation is treated as no tenant rule and the request continues to static fallback.
 
 The contacts projection slice consumes `im.contact.events` into policy-service owned tables:
 
@@ -53,7 +59,7 @@ im.contact.events
 
 `contact.request.accepted.v1` writes both directed edges as `ACTIVE`. `contact.edge.blocked.v1`, `contact.edge.unblocked.v1`, `contact.edge.deleted.v1` and `contact.edge.remark_updated.v1` update only the owner-scoped directed edge. Updates apply only when the incoming `edge_version` is newer than the stored version, so duplicate or stale contact events are no-ops. This projection does not read contacts-service internal tables and remains rebuildable from `im.contact.events`.
 
-For direct conversations, `conversation-service` derives `direct_peer_user_id` from its own membership facts, `message-service` forwards that context to `policy-service`, and `CheckMessageAction(SEND)` checks the contact projection before exact message rules or static fallback. If either directed edge between sender and direct peer is `BLOCKED`, policy-service returns:
+For direct conversations, `conversation-service` derives `direct_peer_user_id` from its own membership facts, `message-service` forwards that context to `policy-service`, and `CheckMessageAction(SEND)` checks the contact projection before exact message rules, tenant action defaults or static fallback. If either directed edge between sender and direct peer is `BLOCKED`, policy-service returns:
 
 ```text
 allowed=false
@@ -62,7 +68,7 @@ reason=contact blocked
 permission_version=<blocked edge_version>
 ```
 
-Policy-service does not guess direct peers and does not synchronously query contacts-service or conversation-service. If no `direct_peer_user_id` is supplied, contacts block enforcement is skipped and the request continues to the exact rule / static decision path.
+Policy-service does not guess direct peers and does not synchronously query contacts-service or conversation-service. If no `direct_peer_user_id` is supplied, contacts block enforcement is skipped and the request continues to the exact rule / tenant rule / static decision path.
 
 When PostgreSQL rules mode is enabled, successful `CheckMessageAction` decisions are staged into `policy_decision_audit_outbox` before the response is returned. Audit write failure fails closed as policy unavailable. `NEXUSIM_POLICY_SERVICE_MODE=outbox-relay` publishes these rows to `im.policy.events` as protobuf `PolicyEvent` records and marks successful rows `PUBLISHED`.
 
@@ -152,7 +158,7 @@ When `NEXUSIM_POLICY_DEBUG_ADDR` is set, policy-service exposes:
 /debug/metrics
 ```
 
-The debug metrics include aggregate gRPC request counts and status codes, aggregate policy decision counts, per-action aggregate decision counts, optional PostgreSQL pool stats, optional exact-rule-store row counts and optional decision audit outbox status counts. They intentionally do not expose tenant id, user id, conversation id, message id, device id, session id, request / response payloads, raw rule parameters, deny reason text, classification strings, DSNs or SQL error text.
+The debug metrics include aggregate gRPC request counts and status codes, aggregate policy decision counts, per-action aggregate decision counts, optional PostgreSQL pool stats, optional rule-store row counts and optional decision audit outbox status counts. They intentionally do not expose tenant id, user id, conversation id, message id, device id, session id, request / response payloads, raw rule parameters, deny reason text, classification strings, DSNs or SQL error text.
 
 `allowed=false` is counted as a decision deny, while the gRPC method remains `codes.OK`. Transport errors are counted separately.
 
@@ -161,10 +167,10 @@ This is a local debug surface. It is not a replacement for production OpenTeleme
 ## Limitations
 
 - First implementation still supports static environment configuration.
-- PostgreSQL rule store is exact-match only; no wildcard / priority rule DSL yet.
-- Contacts block / unblock events are consumed only for direct `SEND` when safe `direct_peer_user_id` context is supplied. Group, role and tenant policy remain future work.
+- PostgreSQL rule store supports exact user/conversation rules and first-stage tenant action defaults only; no wildcard / priority rule DSL yet.
+- Contacts block / unblock events are consumed only for direct `SEND` when safe `direct_peer_user_id` context is supplied. Group and role policy remain future work.
 - No conversation role / owner / admin policy is implemented yet.
-- No tenant policy, content moderation, risk scoring or rate limiting is implemented yet.
+- No tenant policy DSL, tenant quota / risk policy, content moderation, risk scoring or rate limiting is implemented yet.
 - Decision audit outbox rows can be relayed to `im.policy.events`, and explicit DLQ event IDs can be redriven through the repair operator after relay-equivalent validation. Broad repair workflow, poison-payload classification beyond fail-closed validation, retention policy and external sink remain future work.
 - No mTLS client/server config is implemented for policy-service yet.
 - No production OpenTelemetry / Prometheus / alerting rollout is implemented yet.

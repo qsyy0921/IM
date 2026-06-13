@@ -25,12 +25,13 @@ Implemented:
 - policy-service decision audit relay smoke for `policy_decision_audit_outbox -> im.policy.events`: `loadtest-report-20260613-policy-decision-audit-relay-smoke.md`.
 - policy-service decision audit DLQ repair smoke for explicit event-id redrive: `loadtest-report-20260613-policy-decision-audit-repair-smoke.md`.
 - policy-service decision audit repair validation smoke after preflight gate: `loadtest-report-20260613-policy-decision-audit-repair-validated-smoke.md`.
+- policy-service tenant-level message action rule smoke for `tenant_id + action` defaults across `SEND`, `EDIT`, `REVOKE`, and `DELETE`: `loadtest-report-20260613-policy-message-tenant-rule-smoke.md`.
 
 Not yet implemented:
 
 - group / role policy based on contacts or conversation membership;
 - conversation role policy;
-- tenant-level policy;
+- tenant-level policy DSL / quota / risk policy beyond first-stage action defaults;
 - content moderation / risk scoring;
 - policy audit retention, external sink, poison-payload classification and broad repair workflow;
 - policy-service mTLS, OpenTelemetry, Prometheus deployment and production alerting.
@@ -67,6 +68,12 @@ Run exact-rule mutation action coverage with:
 
 ```powershell
 .\loadtest\policyintegration\run-local-smoke.ps1 -UsePolicyRules -Actions edit,revoke,delete
+```
+
+Run tenant-level action default coverage with:
+
+```powershell
+.\loadtest\policyintegration\run-local-smoke.ps1 -UseTenantPolicyRules -Actions send,edit,revoke,delete
 ```
 
 Run contact projection smoke with:
@@ -109,11 +116,11 @@ policy-service grpc
 
 When testing through `message-service`, keep the policy permission version aligned with conversation permission version to avoid expected dependency-version mismatch. The integration smoke intentionally sets local mock policy opposite to remote policy decision so fallback cannot produce a false positive. Do not treat these smokes as proof of contacts / role / tenant / risk policy behavior.
 
-The rule-store smoke also sets local static fallback opposite to the seeded PostgreSQL rule. That makes a rule miss visible: allow would become deny, and deny would become an unexpected write.
+The rule-store smoke also sets local static fallback opposite to the seeded PostgreSQL rule. That makes a rule miss visible: allow would become deny, and deny would become an unexpected write. The tenant-rule smoke uses the same guard but seeds tenant-scoped `tenant_id + action` defaults. For mutation actions, it also seeds a tenant-level `SEND / POLICY_SEND_SEED` allow rule so the baseline message can be created before `EDIT` / `REVOKE` / `DELETE` is tested.
 
 The observability smoke reads `/debug/metrics` after both allow and deny scenarios. Metrics are aggregate debug snapshots only: they do not expose tenant id, user id, conversation id, message id, policy request bodies, rule parameters, deny reason text or classification strings. Trace id and request id are propagated for structured gRPC logs, not as metrics labels.
 
-The contact projection smoke proves that policy-service can consume `im.contact.events` and maintain a policy-owned edge projection. The contact block decision smoke proves that projected `BLOCKED` edges are consumed for direct `SEND` when `direct_peer_user_id` is present. It does not prove group conversation role policy, tenant policy, risk scoring or full ReBAC behavior.
+The contact projection smoke proves that policy-service can consume `im.contact.events` and maintain a policy-owned edge projection. The contact block decision smoke proves that projected `BLOCKED` edges are consumed for direct `SEND` when `direct_peer_user_id` is present. The tenant-rule smoke proves only first-stage tenant action defaults; it does not prove group conversation role policy, tenant policy DSL, tenant quota/risk policy, risk scoring or full ReBAC behavior.
 
 The decision audit outbox smoke proves that public policy decisions are staged as low-sensitive `policy_decision_audit_outbox` rows when PostgreSQL rules mode is enabled. The decision audit relay smoke proves those rows can be published to `im.policy.events` as protobuf `PolicyEvent` records and marked `PUBLISHED`. Audit rows and Kafka events store stable object keys, context-present flags, action, allow/deny, permission version, classification, reason code and trace/request ids. They do not store raw session id, raw device id, raw peer id, raw conversation id, raw message content, rule parameters, SQL errors or free-text deny/provider bodies. Explicit DLQ event-id repair is available; broad repair workflow, poison-payload classification, retention and external audit sinks remain future work.
 The decision audit repair smoke proves the first-stage operator path for explicit DLQ event IDs:

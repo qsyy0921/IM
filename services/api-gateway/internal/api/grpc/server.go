@@ -26,13 +26,14 @@ import (
 )
 
 const (
-	metadataTenantID  = "x-nexusim-tenant-id"
-	metadataUserID    = "x-nexusim-user-id"
-	metadataDeviceID  = "x-nexusim-device-id"
-	metadataSessionID = "x-nexusim-session-id"
-	metadataTraceID   = "x-nexusim-trace-id"
-	metadataRequestID = "x-nexusim-request-id"
-	metadataToken     = "x-nexusim-gateway-token"
+	metadataTenantID    = "x-nexusim-tenant-id"
+	metadataUserID      = "x-nexusim-user-id"
+	metadataDeviceID    = "x-nexusim-device-id"
+	metadataSessionID   = "x-nexusim-session-id"
+	metadataTraceID     = "x-nexusim-trace-id"
+	metadataRequestID   = "x-nexusim-request-id"
+	metadataToken       = "x-nexusim-gateway-token"
+	metadataTraceparent = "traceparent"
 )
 
 type Authenticator interface {
@@ -402,6 +403,9 @@ func (server *Server) authenticate(ctx context.Context) (gatewayauth.AuthContext
 	if auth.TraceID == "" {
 		auth.TraceID = firstIncomingMetadata(ctx, metadataTraceID)
 	}
+	if auth.TraceID == "" {
+		auth.TraceID = traceIDFromTraceparent(firstIncomingMetadata(ctx, metadataTraceparent))
+	}
 	if auth.TraceID == "" && server.newTraceID != nil {
 		auth.TraceID = strings.TrimSpace(server.newTraceID())
 	}
@@ -474,6 +478,49 @@ func firstIncomingMetadata(ctx context.Context, key string) string {
 		return ""
 	}
 	return strings.TrimSpace(values[0])
+}
+
+func traceIDFromTraceparent(value string) string {
+	parts := strings.Split(strings.TrimSpace(value), "-")
+	if len(parts) != 4 {
+		return ""
+	}
+	version, traceID, spanID, flags := parts[0], parts[1], parts[2], parts[3]
+	if len(version) != 2 || strings.EqualFold(version, "ff") || !isHex(version) {
+		return ""
+	}
+	if len(traceID) != 32 || isAllZero(traceID) || !isHex(traceID) {
+		return ""
+	}
+	if len(spanID) != 16 || isAllZero(spanID) || !isHex(spanID) {
+		return ""
+	}
+	if len(flags) != 2 || !isHex(flags) {
+		return ""
+	}
+	return strings.ToLower(traceID)
+}
+
+func isHex(value string) bool {
+	for _, char := range value {
+		switch {
+		case char >= '0' && char <= '9':
+		case char >= 'a' && char <= 'f':
+		case char >= 'A' && char <= 'F':
+		default:
+			return false
+		}
+	}
+	return value != ""
+}
+
+func isAllZero(value string) bool {
+	for _, char := range value {
+		if char != '0' {
+			return false
+		}
+	}
+	return value != ""
 }
 
 func newCorrelationID(prefix string) string {

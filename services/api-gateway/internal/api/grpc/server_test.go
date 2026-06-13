@@ -182,6 +182,102 @@ func TestGatewayGeneratesMissingCorrelationIDsForDownstream(t *testing.T) {
 	})
 }
 
+func TestGatewayUsesTraceparentWhenTraceIDMissing(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	authenticator, err := gatewayauth.NewAuthenticator(gatewayauth.Config{
+		Mode:     gatewayauth.ModeHMAC,
+		Secret:   "secret",
+		Audience: "api-gateway",
+		Now:      func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	token, err := gatewayauth.SignGatewayToken("secret", map[string]string{
+		"tenant_id": "tenant-token",
+		"user_id":   "user-token",
+		"device_id": "device-token",
+		"aud":       "api-gateway",
+	}, now.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("sign gateway token: %v", err)
+	}
+	fake := &fakeMessageClient{}
+	server := NewServer(Config{
+		Authenticator: authenticator,
+		Message:       fake,
+		NewTraceID:    func() string { return "trace-generated" },
+		NewRequestID:  func() string { return "request-generated" },
+	})
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		"authorization", "Bearer "+token,
+		metadataTraceparent, "00-4BF92F3577B34DA6A3CE929D0E0E4736-00f067aa0ba902b7-01",
+	))
+
+	_, err = server.SendMessage(ctx, &messagev1.SendMessageRequest{
+		ConversationId: "conv-1",
+		ClientMsgId:    "client-msg-1",
+		MessageType:    "TEXT",
+	})
+	if err != nil {
+		t.Fatalf("send message: %v", err)
+	}
+	if fake.request.GetAuthContext().GetTraceId() != "4bf92f3577b34da6a3ce929d0e0e4736" ||
+		fake.request.GetAuthContext().GetRequestId() != "request-generated" {
+		t.Fatalf("expected traceparent trace id and generated request id, got %+v", fake.request.GetAuthContext())
+	}
+	assertOutgoingMetadata(t, fake.ctx, map[string]string{
+		metadataTraceID:   "4bf92f3577b34da6a3ce929d0e0e4736",
+		metadataRequestID: "request-generated",
+	})
+}
+
+func TestTraceIDFromTraceparent(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    string
+		expected string
+	}{
+		{
+			name:     "valid",
+			value:    "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+			expected: "4bf92f3577b34da6a3ce929d0e0e4736",
+		},
+		{
+			name:     "uppercase canonicalized",
+			value:    "00-4BF92F3577B34DA6A3CE929D0E0E4736-00F067AA0BA902B7-01",
+			expected: "4bf92f3577b34da6a3ce929d0e0e4736",
+		},
+		{
+			name:  "zero trace id",
+			value: "00-00000000000000000000000000000000-00f067aa0ba902b7-01",
+		},
+		{
+			name:  "zero span id",
+			value: "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000000-01",
+		},
+		{
+			name:  "invalid version",
+			value: "ff-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+		},
+		{
+			name:  "invalid hex",
+			value: "00-4bf92f3577b34da6a3ce929d0e0e473x-00f067aa0ba902b7-01",
+		},
+		{
+			name:  "wrong parts",
+			value: "4bf92f3577b34da6a3ce929d0e0e4736",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := traceIDFromTraceparent(test.value); got != test.expected {
+				t.Fatalf("expected %q, got %q", test.expected, got)
+			}
+		})
+	}
+}
+
 func TestGatewayReturnsGeneratedCorrelationHeaders(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	authenticator, err := gatewayauth.NewAuthenticator(gatewayauth.Config{

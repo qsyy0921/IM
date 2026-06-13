@@ -23,6 +23,7 @@ param(
     [string]$ReceiptTlsServerName = "",
     [string]$ReceiptTlsClientCertFile = "",
     [string]$ReceiptTlsClientKeyFile = "",
+    [switch]$VerifiedAuthMetadata,
     [switch]$SkipBuild
 )
 
@@ -41,6 +42,7 @@ $receiptTopic = "im.receipt.events"
 $deliveryConsumerGroup = "nexusim-delivery-receipt-smoke-" + (Get-Date -Format "yyyyMMddHHmmss")
 $receiptConsumerGroup = "nexusim-receipt-smoke-" + (Get-Date -Format "yyyyMMddHHmmss")
 $receiptEventsConsumerGroup = "nexusim-receipt-events-smoke-" + (Get-Date -Format "yyyyMMddHHmmss")
+$authMode = if ($VerifiedAuthMetadata) { "metadata" } else { "body" }
 
 New-Item -ItemType Directory -Force $resultDir | Out-Null
 New-Item -ItemType Directory -Force $logDir | Out-Null
@@ -176,6 +178,7 @@ try {
     $processes += Start-NexusProcess -Name "conversation-grpc" -FilePath $conversationService -Port 11696 -Env @{
         NEXUSIM_CONVERSATION_SERVICE_MODE = "grpc"
         NEXUSIM_CONVERSATION_GRPC_ADDR = "127.0.0.1:11696"
+        NEXUSIM_CONVERSATION_AUTH_MODE = $authMode
         NEXUSIM_PG_DSN = $PgDsn
     }
 
@@ -200,6 +203,7 @@ try {
     $processes += Start-NexusProcess -Name "delivery-grpc" -FilePath $deliveryService -Port 11697 -Env @{
         NEXUSIM_DELIVERY_SERVICE_MODE = "grpc"
         NEXUSIM_DELIVERY_GRPC_ADDR = "127.0.0.1:11697"
+        NEXUSIM_DELIVERY_AUTH_MODE = $authMode
         NEXUSIM_PG_DSN = $PgDsn
     }
 
@@ -230,12 +234,14 @@ try {
     $processes += Start-NexusProcess -Name "receipt-grpc" -FilePath $receiptService -Port 11699 -Env @{
         NEXUSIM_RECEIPT_SERVICE_MODE = "grpc"
         NEXUSIM_RECEIPT_GRPC_ADDR = "127.0.0.1:11699"
+        NEXUSIM_RECEIPT_AUTH_MODE = $authMode
         NEXUSIM_PG_DSN = $PgDsn
     }
 
     $processes += Start-NexusProcess -Name "message-grpc" -FilePath $messageService -Port 11695 -Env @{
         NEXUSIM_MESSAGE_SERVICE_MODE = "grpc"
         NEXUSIM_GRPC_ADDR = "127.0.0.1:11695"
+        NEXUSIM_MESSAGE_AUTH_MODE = $authMode
         NEXUSIM_PG_DSN = $PgDsn
         NEXUSIM_CONVERSATION_SERVICE_ADDR = "127.0.0.1:11696"
         NEXUSIM_CONVERSATION_RPC_TIMEOUT = "500ms"
@@ -260,7 +266,8 @@ try {
         "--receipt-events-topic", $receiptTopic,
         "--receipt-events-consumer-group", $receiptEventsConsumerGroup,
         "--wait-timeout", "30s",
-        "--request-timeout", "5s"
+        "--request-timeout", "5s",
+        "--verified-auth-metadata=$VerifiedAuthMetadata"
     )
     if (-not [string]::IsNullOrWhiteSpace($ConversationTlsCaFile)) {
         $runnerArgs += @("--conversation-tls-ca-file", $ConversationTlsCaFile)

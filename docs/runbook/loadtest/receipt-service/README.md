@@ -63,6 +63,15 @@ im.delivery.events
 
 配置任一 `*-tls-*` 参数后必须提供对应 CA file，client cert/key 必须成对配置。该能力只验证 smoke runner 到 conversation / message / delivery / receipt gRPC server 的静态 TLS / mTLS 连接；证书签发、轮换、分发和全服务 mTLS rollout 仍是后续项。
 
+如果 conversation / message / delivery / receipt 四个 user-facing gRPC server 以 metadata auth 模式启动，`loadtest/receipt` 可用以下开关发送 gateway verified identity metadata：
+
+```text
+--verified-auth-metadata
+NEXUSIM_RECEIPT_LOADTEST_VERIFIED_AUTH_METADATA=true
+```
+
+对应 `run-local-smoke.ps1` 支持 `-VerifiedAuthMetadata`，会把本地 conversation / message / delivery / receipt gRPC 进程切到 metadata auth，并让 runner 发送 metadata。默认仍是 body auth 兼容历史 smoke；这不是完整 API gateway。
+
 ## 面试可讲重点
 
 - `receipt-service` 是第三层 IM 产品能力，不是消息事实源；它只消费 `im.delivery.events`，重建送达 / 已读回执 read model。

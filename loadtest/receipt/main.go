@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,36 +25,47 @@ import (
 	kafkago "github.com/segmentio/kafka-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+const (
+	metadataTenantID  = "x-nexusim-tenant-id"
+	metadataUserID    = "x-nexusim-user-id"
+	metadataDeviceID  = "x-nexusim-device-id"
+	metadataSessionID = "x-nexusim-session-id"
+	metadataTraceID   = "x-nexusim-trace-id"
+	metadataRequestID = "x-nexusim-request-id"
+)
+
 type config struct {
-	conversationTarget string
-	messageTarget      string
-	deliveryTarget     string
-	receiptTarget      string
-	conversationTLS    grpctls.Config
-	messageTLS         grpctls.Config
-	deliveryTLS        grpctls.Config
-	receiptTLS         grpctls.Config
-	resultDir          string
-	pgDSN              string
-	requestTimeout     time.Duration
-	waitTimeout        time.Duration
-	pollInterval       time.Duration
-	tenantID           string
-	conversationID     string
-	ownerUserID        string
-	receiverUserID     string
-	receiverDeviceID   string
-	deliveryGroup      string
-	receiptGroup       string
-	kafkaBrokers       []string
-	receiptEventsTopic string
-	receiptEventsGroup string
-	cleanup            bool
+	conversationTarget   string
+	messageTarget        string
+	deliveryTarget       string
+	receiptTarget        string
+	conversationTLS      grpctls.Config
+	messageTLS           grpctls.Config
+	deliveryTLS          grpctls.Config
+	receiptTLS           grpctls.Config
+	resultDir            string
+	pgDSN                string
+	requestTimeout       time.Duration
+	waitTimeout          time.Duration
+	pollInterval         time.Duration
+	tenantID             string
+	conversationID       string
+	ownerUserID          string
+	receiverUserID       string
+	receiverDeviceID     string
+	deliveryGroup        string
+	receiptGroup         string
+	kafkaBrokers         []string
+	receiptEventsTopic   string
+	receiptEventsGroup   string
+	verifiedAuthMetadata bool
+	cleanup              bool
 }
 
 type summary struct {
@@ -69,6 +81,7 @@ type summary struct {
 	MessageTLSEnabled                        bool                    `json:"message_tls_enabled"`
 	DeliveryTLSEnabled                       bool                    `json:"delivery_tls_enabled"`
 	ReceiptTLSEnabled                        bool                    `json:"receipt_tls_enabled"`
+	VerifiedAuthMetadata                     bool                    `json:"verified_auth_metadata"`
 	ResultDir                                string                  `json:"result_dir"`
 	TenantID                                 string                  `json:"tenant_id"`
 	ConversationID                           string                  `json:"conversation_id"`
@@ -267,6 +280,15 @@ type outboxStats struct {
 	DLQ       int64 `json:"dlq"`
 }
 
+type verifiedAuthIdentity struct {
+	tenantID  string
+	userID    string
+	deviceID  string
+	sessionID string
+	traceID   string
+	requestID string
+}
+
 func main() {
 	cfg := parseConfig()
 	if err := run(cfg); err != nil {
@@ -301,6 +323,7 @@ func parseConfig() config {
 	flag.StringVar(&kafkaBrokers, "kafka-brokers", "localhost:9092", "Kafka brokers for receipt event readback")
 	flag.StringVar(&cfg.receiptEventsTopic, "receipt-events-topic", "im.receipt.events", "receipt events topic")
 	flag.StringVar(&cfg.receiptEventsGroup, "receipt-events-consumer-group", "", "receipt event readback consumer group")
+	flag.BoolVar(&cfg.verifiedAuthMetadata, "verified-auth-metadata", envBool(false, "NEXUSIM_RECEIPT_LOADTEST_VERIFIED_AUTH_METADATA"), "send gateway verified identity through user-facing gRPC metadata")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete existing rows for tenant before smoke")
 	flag.Parse()
 	if cfg.requestTimeout <= 0 {
@@ -321,6 +344,93 @@ func registerTLSFlags(prefix string, envPrefix string, serviceName string, confi
 	flag.StringVar(&config.ServerName, prefix+"-server-name", os.Getenv(envPrefix+"_SERVER_NAME"), "override server name for "+serviceName+" gRPC TLS")
 	flag.StringVar(&config.ClientCertFile, prefix+"-client-cert-file", os.Getenv(envPrefix+"_CLIENT_CERT_FILE"), "client certificate PEM for "+serviceName+" gRPC mTLS")
 	flag.StringVar(&config.ClientKeyFile, prefix+"-client-key-file", os.Getenv(envPrefix+"_CLIENT_KEY_FILE"), "client private key PEM for "+serviceName+" gRPC mTLS")
+}
+
+func ownerAuth(cfg config, traceID string, requestID string) verifiedAuthIdentity {
+	return verifiedAuthIdentity{
+		tenantID:  cfg.tenantID,
+		userID:    cfg.ownerUserID,
+		deviceID:  "receipt-smoke-owner-device",
+		sessionID: "receipt-smoke-owner-session",
+		traceID:   traceID,
+		requestID: requestID,
+	}
+}
+
+func receiverAuth(cfg config, traceID string, requestID string) verifiedAuthIdentity {
+	return verifiedAuthIdentity{
+		tenantID:  cfg.tenantID,
+		userID:    cfg.receiverUserID,
+		deviceID:  cfg.receiverDeviceID,
+		sessionID: "receipt-smoke",
+		traceID:   traceID,
+		requestID: requestID,
+	}
+}
+
+func withVerifiedAuthMetadata(ctx context.Context, cfg config, auth verifiedAuthIdentity) context.Context {
+	if !cfg.verifiedAuthMetadata {
+		return ctx
+	}
+	pairs := []string{
+		metadataTenantID, auth.tenantID,
+		metadataUserID, auth.userID,
+		metadataDeviceID, auth.deviceID,
+	}
+	if auth.sessionID != "" {
+		pairs = append(pairs, metadataSessionID, auth.sessionID)
+	}
+	if auth.traceID != "" {
+		pairs = append(pairs, metadataTraceID, auth.traceID)
+	}
+	if auth.requestID != "" {
+		pairs = append(pairs, metadataRequestID, auth.requestID)
+	}
+	return metadata.NewOutgoingContext(ctx, metadata.Pairs(pairs...))
+}
+
+func conversationAuth(auth verifiedAuthIdentity) *conversationv1.AuthContext {
+	return &conversationv1.AuthContext{
+		TenantId:  auth.tenantID,
+		UserId:    auth.userID,
+		DeviceId:  auth.deviceID,
+		SessionId: auth.sessionID,
+		TraceId:   auth.traceID,
+		RequestId: auth.requestID,
+	}
+}
+
+func messageAuth(auth verifiedAuthIdentity) *messagev1.AuthContext {
+	return &messagev1.AuthContext{
+		TenantId:  auth.tenantID,
+		UserId:    auth.userID,
+		DeviceId:  auth.deviceID,
+		SessionId: auth.sessionID,
+		TraceId:   auth.traceID,
+		RequestId: auth.requestID,
+	}
+}
+
+func deliveryAuth(auth verifiedAuthIdentity) *deliveryv1.AuthContext {
+	return &deliveryv1.AuthContext{
+		TenantId:  auth.tenantID,
+		UserId:    auth.userID,
+		DeviceId:  auth.deviceID,
+		SessionId: auth.sessionID,
+		TraceId:   auth.traceID,
+		RequestId: auth.requestID,
+	}
+}
+
+func receiptAuth(auth verifiedAuthIdentity) *receiptv1.AuthContext {
+	return &receiptv1.AuthContext{
+		TenantId:  auth.tenantID,
+		UserId:    auth.userID,
+		DeviceId:  auth.deviceID,
+		SessionId: auth.sessionID,
+		TraceId:   auth.traceID,
+		RequestId: auth.requestID,
+	}
 }
 
 func run(cfg config) error {
@@ -400,6 +510,7 @@ func run(cfg config) error {
 		MessageTLSEnabled:      cfg.messageTLS.Enabled(),
 		DeliveryTLSEnabled:     cfg.deliveryTLS.Enabled(),
 		ReceiptTLSEnabled:      cfg.receiptTLS.Enabled(),
+		VerifiedAuthMetadata:   cfg.verifiedAuthMetadata,
 		ResultDir:              cfg.resultDir,
 		TenantID:               cfg.tenantID,
 		ConversationID:         cfg.conversationID,
@@ -803,15 +914,10 @@ func createReceiverJoin(
 ) (*conversationv1.CreateMemberChangeResponse, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := ownerAuth(cfg, "receipt-smoke-join", "receipt-smoke-join")
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	return client.CreateMemberChange(requestCtx, &conversationv1.CreateMemberChangeRequest{
-		AuthContext: &conversationv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.ownerUserID,
-			DeviceId:  "receipt-smoke-owner-device",
-			SessionId: "receipt-smoke-owner-session",
-			TraceId:   "receipt-smoke-join",
-			RequestId: "receipt-smoke-join",
-		},
+		AuthContext:           conversationAuth(auth),
 		ConversationId:        cfg.conversationID,
 		TargetUserId:          cfg.receiverUserID,
 		ChangeType:            conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_JOIN,
@@ -830,15 +936,10 @@ func sendMessage(ctx context.Context, cfg config, client messagev1.MessageServic
 	}
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := ownerAuth(cfg, "receipt-smoke-send", fmt.Sprintf("receipt-smoke-send-%d", index))
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	return client.SendMessage(requestCtx, &messagev1.SendMessageRequest{
-		AuthContext: &messagev1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.ownerUserID,
-			DeviceId:  "receipt-smoke-owner-device",
-			SessionId: "receipt-smoke-owner-session",
-			TraceId:   "receipt-smoke-send",
-			RequestId: fmt.Sprintf("receipt-smoke-send-%d", index),
-		},
+		AuthContext:    messageAuth(auth),
 		ConversationId: cfg.conversationID,
 		ClientMsgId:    fmt.Sprintf("receipt-smoke-client-message-%d", index),
 		MessageType:    "TEXT",
@@ -856,16 +957,11 @@ func pullInboxAtLeast(
 	latencies := make([]float64, 0, 8)
 	for {
 		requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+		auth := receiverAuth(cfg, "receipt-smoke-pull", "receipt-smoke-pull")
+		requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 		begin := time.Now()
 		response, err := client.PullInbox(requestCtx, &deliveryv1.PullInboxRequest{
-			AuthContext: &deliveryv1.AuthContext{
-				TenantId:  cfg.tenantID,
-				UserId:    cfg.receiverUserID,
-				DeviceId:  cfg.receiverDeviceID,
-				SessionId: "receipt-smoke",
-				TraceId:   "receipt-smoke-pull",
-				RequestId: "receipt-smoke-pull",
-			},
+			AuthContext:    deliveryAuth(auth),
 			ConversationId: cfg.conversationID,
 			AfterSeq:       0,
 			Limit:          100,
@@ -910,15 +1006,10 @@ func ackDelivery(
 ) (*deliveryv1.AckDeliveryResponse, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := receiverAuth(cfg, "receipt-smoke-ack", "receipt-smoke-ack")
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	return client.AckDelivery(requestCtx, &deliveryv1.AckDeliveryRequest{
-		AuthContext: &deliveryv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.receiverUserID,
-			DeviceId:  cfg.receiverDeviceID,
-			SessionId: "receipt-smoke",
-			TraceId:   "receipt-smoke-ack",
-			RequestId: "receipt-smoke-ack",
-		},
+		AuthContext:    deliveryAuth(auth),
 		ConversationId: cfg.conversationID,
 		ReceivedSeq:    seq,
 	})
@@ -959,15 +1050,10 @@ func getReceipt(
 ) (*receiptv1.GetReceiptStateResponse, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := ownerAuth(cfg, "receipt-smoke-get", "receipt-smoke-get")
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	return client.GetReceiptState(requestCtx, &receiptv1.GetReceiptStateRequest{
-		AuthContext: &receiptv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.ownerUserID,
-			DeviceId:  "receipt-smoke-owner-device",
-			SessionId: "receipt-smoke-owner-session",
-			TraceId:   "receipt-smoke-get",
-			RequestId: "receipt-smoke-get",
-		},
+		AuthContext:     receiptAuth(auth),
 		ConversationId:  cfg.conversationID,
 		MessageId:       messageID,
 		ConversationSeq: seq,
@@ -983,15 +1069,10 @@ func listConversations(
 ) (conversationListSummary, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := receiverAuth(cfg, "receipt-smoke-list", "receipt-smoke-list")
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	response, err := client.ListConversations(requestCtx, &receiptv1.ListConversationsRequest{
-		AuthContext: &receiptv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.receiverUserID,
-			DeviceId:  cfg.receiverDeviceID,
-			SessionId: "receipt-smoke",
-			TraceId:   "receipt-smoke-list",
-			RequestId: "receipt-smoke-list",
-		},
+		AuthContext:     receiptAuth(auth),
 		Limit:           10,
 		IncludeArchived: includeArchived,
 		UnreadOnly:      unreadOnly,
@@ -1010,15 +1091,10 @@ func archiveConversation(
 ) (*receiptv1.ArchiveConversationResponse, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := receiverAuth(cfg, "receipt-smoke-archive", fmt.Sprintf("receipt-smoke-archive-%v", archived))
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	return client.ArchiveConversation(requestCtx, &receiptv1.ArchiveConversationRequest{
-		AuthContext: &receiptv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.receiverUserID,
-			DeviceId:  cfg.receiverDeviceID,
-			SessionId: "receipt-smoke",
-			TraceId:   "receipt-smoke-archive",
-			RequestId: fmt.Sprintf("receipt-smoke-archive-%v", archived),
-		},
+		AuthContext:    receiptAuth(auth),
 		ConversationId: cfg.conversationID,
 		Archived:       archived,
 	})
@@ -1032,15 +1108,10 @@ func pinConversation(
 ) (*receiptv1.PinConversationResponse, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := receiverAuth(cfg, "receipt-smoke-pin", fmt.Sprintf("receipt-smoke-pin-%v", pinned))
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	return client.PinConversation(requestCtx, &receiptv1.PinConversationRequest{
-		AuthContext: &receiptv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.receiverUserID,
-			DeviceId:  cfg.receiverDeviceID,
-			SessionId: "receipt-smoke",
-			TraceId:   "receipt-smoke-pin",
-			RequestId: fmt.Sprintf("receipt-smoke-pin-%v", pinned),
-		},
+		AuthContext:    receiptAuth(auth),
 		ConversationId: cfg.conversationID,
 		Pinned:         pinned,
 	})
@@ -1054,15 +1125,10 @@ func muteConversation(
 ) (*receiptv1.MuteConversationResponse, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := receiverAuth(cfg, "receipt-smoke-mute", fmt.Sprintf("receipt-smoke-mute-%v", muted))
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	return client.MuteConversation(requestCtx, &receiptv1.MuteConversationRequest{
-		AuthContext: &receiptv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.receiverUserID,
-			DeviceId:  cfg.receiverDeviceID,
-			SessionId: "receipt-smoke",
-			TraceId:   "receipt-smoke-mute",
-			RequestId: fmt.Sprintf("receipt-smoke-mute-%v", muted),
-		},
+		AuthContext:    receiptAuth(auth),
 		ConversationId: cfg.conversationID,
 		Muted:          muted,
 	})
@@ -1076,15 +1142,10 @@ func markRead(
 ) (*receiptv1.MarkReadResponse, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := receiverAuth(cfg, "receipt-smoke-mark-read", fmt.Sprintf("receipt-smoke-mark-read-%d", seq))
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	return client.MarkRead(requestCtx, &receiptv1.MarkReadRequest{
-		AuthContext: &receiptv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    cfg.receiverUserID,
-			DeviceId:  cfg.receiverDeviceID,
-			SessionId: "receipt-smoke",
-			TraceId:   "receipt-smoke-mark-read",
-			RequestId: fmt.Sprintf("receipt-smoke-mark-read-%d", seq),
-		},
+		AuthContext:    receiptAuth(auth),
 		ConversationId: cfg.conversationID,
 		ReadSeq:        seq,
 	})
@@ -1652,6 +1713,21 @@ func gitStatusShort() string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
+}
+
+func envBool(fallback bool, names ...string) bool {
+	for _, name := range names {
+		value := strings.TrimSpace(os.Getenv(name))
+		if value == "" {
+			continue
+		}
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return fallback
+		}
+		return parsed
+	}
+	return fallback
 }
 
 func splitCSV(value string) []string {

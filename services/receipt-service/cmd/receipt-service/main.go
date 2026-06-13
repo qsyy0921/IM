@@ -52,6 +52,8 @@ func run() error {
 		return runOutboxRepair()
 	case "outbox-repair-audit":
 		return runOutboxRepairAudit()
+	case "outbox-repair-cleanup":
+		return runOutboxRepairCleanup()
 	default:
 		return errors.New("unsupported NEXUSIM_RECEIPT_SERVICE_MODE")
 	}
@@ -287,6 +289,45 @@ func runOutboxRepairAudit() error {
 	return nil
 }
 
+type outboxRepairCleanupConfig struct {
+	Retention time.Duration
+	BatchSize int
+}
+
+func runOutboxRepairCleanup() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	config, err := outboxRepairCleanupConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	cutoff := time.Now().UTC().Add(-config.Retention)
+	stats, err := postgresinfra.NewOutboxStore(pool).CleanupOutboxRepairs(ctx, postgresinfra.OutboxRepairCleanupOptions{
+		EventID:  envString("NEXUSIM_RECEIPT_OUTBOX_REPAIR_CLEANUP_EVENT_ID", ""),
+		TenantID: envString("NEXUSIM_RECEIPT_OUTBOX_REPAIR_CLEANUP_TENANT_ID", ""),
+		Cutoff:   cutoff,
+		Limit:    config.BatchSize,
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"receipt-service outbox repair cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d",
+		stats.Deleted,
+		cutoff.Format(time.RFC3339),
+		config.Retention,
+		config.BatchSize,
+	)
+	return nil
+}
+
 func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {
 	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
 	if dsn == "" {
@@ -491,6 +532,18 @@ func envDuration(name string, fallback time.Duration) time.Duration {
 	return parsed
 }
 
+func envPositiveDuration(name string, fallback time.Duration) (time.Duration, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed <= 0 {
+		return 0, errors.New(name + " must be a positive duration")
+	}
+	return parsed, nil
+}
+
 func splitCSV(value string) []string {
 	parts := strings.Split(value, ",")
 	result := make([]string, 0, len(parts))
@@ -515,9 +568,36 @@ func envInt64AllowZero(name string, fallback int64) int64 {
 	return parsed
 }
 
+func envPositiveInt(name string, fallback int) (int, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return 0, errors.New(name + " must be a positive integer")
+	}
+	return parsed, nil
+}
+
 func formatOptionalTime(value *time.Time) string {
 	if value == nil {
 		return ""
 	}
 	return value.Format(time.RFC3339)
+}
+
+func outboxRepairCleanupConfigFromEnv() (outboxRepairCleanupConfig, error) {
+	retention, err := envPositiveDuration("NEXUSIM_RECEIPT_OUTBOX_REPAIR_RETENTION", 7*24*time.Hour)
+	if err != nil {
+		return outboxRepairCleanupConfig{}, err
+	}
+	batchSize, err := envPositiveInt("NEXUSIM_RECEIPT_OUTBOX_REPAIR_CLEANUP_BATCH_SIZE", 5000)
+	if err != nil {
+		return outboxRepairCleanupConfig{}, err
+	}
+	return outboxRepairCleanupConfig{
+		Retention: retention,
+		BatchSize: batchSize,
+	}, nil
 }

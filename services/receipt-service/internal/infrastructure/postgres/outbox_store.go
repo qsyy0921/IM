@@ -50,6 +50,17 @@ type OutboxRepairAuditOptions struct {
 	Limit    int
 }
 
+type OutboxRepairCleanupOptions struct {
+	EventID  string
+	TenantID string
+	Cutoff   time.Time
+	Limit    int
+}
+
+type OutboxRepairCleanupStats struct {
+	Deleted int64
+}
+
 type OutboxRepairAuditRow struct {
 	EventID                string
 	TenantID               string
@@ -549,6 +560,55 @@ LIMIT $`+itoa(len(args)), args...)
 		return nil, types.NewDBReadFailed(err.Error())
 	}
 	return result, nil
+}
+
+func (store *OutboxStore) CleanupOutboxRepairs(ctx context.Context, options OutboxRepairCleanupOptions) (OutboxRepairCleanupStats, error) {
+	if store == nil || store.pool == nil {
+		return OutboxRepairCleanupStats{}, errors.New("receipt outbox store is not configured")
+	}
+	if options.Limit <= 0 {
+		return OutboxRepairCleanupStats{}, nil
+	}
+
+	var args []any
+	clauses := []string{"repaired_at < $1"}
+	args = append(args, options.Cutoff)
+	if eventID := strings.TrimSpace(options.EventID); eventID != "" {
+		args = append(args, eventID)
+		clauses = append(clauses, "event_id = $"+itoa(len(args)))
+	}
+	if tenantID := strings.TrimSpace(options.TenantID); tenantID != "" {
+		args = append(args, tenantID)
+		clauses = append(clauses, "tenant_id = $"+itoa(len(args)))
+	}
+	args = append(args, options.Limit)
+	rows, err := store.pool.Query(ctx, `
+WITH doomed AS (
+    SELECT id
+    FROM receipt_outbox_repair_audit
+    WHERE `+strings.Join(clauses, " AND ")+`
+    ORDER BY repaired_at ASC, event_id ASC, id ASC
+    LIMIT $`+itoa(len(args))+`
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM receipt_outbox_repair_audit target
+USING doomed
+WHERE target.id = doomed.id
+RETURNING 1
+`, args...)
+	if err != nil {
+		return OutboxRepairCleanupStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer rows.Close()
+
+	var stats OutboxRepairCleanupStats
+	for rows.Next() {
+		stats.Deleted++
+	}
+	if err := rows.Err(); err != nil {
+		return OutboxRepairCleanupStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	return stats, nil
 }
 
 func normalizeOutboxStatus(status string) string {

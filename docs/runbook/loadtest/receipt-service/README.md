@@ -83,7 +83,7 @@ NEXUSIM_RECEIPT_LOADTEST_VERIFIED_AUTH_METADATA=true
 - `MarkRead` 是显式读操作，会受可见最大 seq 和已送达最大 seq 双重约束，不能把未投递消息标已读。
 - `GetReceiptState` 支持按 `conversation_seq` 或 `message_id` 查询，当前 smoke 已覆盖两种入口。
 - `receipt_outbox` 已通过 relay 发布 `receipt.message.received.v1` / `receipt.message.read.v1` 到 `im.receipt.events`；当前还没有下游真实消费者。
-- 已补只读 `NEXUSIM_RECEIPT_SERVICE_MODE=outbox-audit`、`outbox-repair` 和只读 `outbox-repair-audit`，可直接审计 `receipt_outbox` 当前状态，并把指定 `DLQ` event redrive 回 `PENDING`；当前 repair audit 是第一阶段轻量历史，不含 cleanup。
+- 已补只读 `NEXUSIM_RECEIPT_SERVICE_MODE=outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit` 和 `outbox-repair-cleanup`，可直接审计 `receipt_outbox` 当前状态、把指定 `DLQ` event redrive 回 `PENDING`，并按 retention 清理 repair audit 历史；当前 repair audit 仍是第一阶段轻量历史。
 - 已补 receipt-service gRPC mTLS smoke：server 端启用 TLS、require client cert、client DNS SAN allowlist=`api-gateway.nexusim.local`、client URI SAN allowlist=`spiffe://nexusim/api-gateway`，client 端使用 CA/server name/client cert/key，并通过 gateway verified metadata 完成 `GetReceiptState / MarkRead / ListConversations / Archive / Pin / Mute`。
 - receipt outbox 的 `aggregate_version` 是 cursor seq，不是 conversation 全局顺序轴，所以 relay 不用低版本 PENDING/DLQ 阻塞同会话更高版本回执事件，避免某个用户回执阻塞其它用户。
 - 会话列表 / 未读数放在 `receipt-service` 内扩展，不新增 `conversation-list-service`，降低服务间耦合和部署复杂度。

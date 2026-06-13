@@ -1,6 +1,6 @@
 # NexusIM receipt-service SDD v0.1 Draft
 
-状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务、`ListReceiptStates` 薄批量查询、receipt outbox relay、只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit` operator、最小 `ListConversations`、`unread_only` 未读过滤、Archive / Pin / Mute 用户列表偏好、第一阶段 gRPC server TLS / mTLS 配置，以及 receipt / demo smoke runner 的 delivery / receipt client TLS 配置已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events` 和会话列表偏好链路。
+状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务、`ListReceiptStates` 薄批量查询、receipt outbox relay、只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit`、`outbox-repair-cleanup` operator、最小 `ListConversations`、`unread_only` 未读过滤、Archive / Pin / Mute 用户列表偏好、第一阶段 gRPC server TLS / mTLS 配置，以及 receipt / demo smoke runner 的 delivery / receipt client TLS 配置已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events` 和会话列表偏好链路。
 
 本文定义 `receipt-service` 的第一条可编码切片：基于 `delivery-service` 已经产生的 durable delivery 事件，构建消息送达 / 已读回执 read model，并提供最小查询和 `MarkRead` 写入入口。
 
@@ -84,7 +84,7 @@ services/receipt-service/
 | `types` | Command、DTO、错误 sentinel、枚举 |
 | `trigger` | Kafka consumer worker、receipt outbox relay、repair worker |
 
-第一阶段运维面补充：`receipt-service` 提供只读 `outbox-audit`、`outbox-repair` 和只读 `outbox-repair-audit` 运行模式，用于直接按 `outbox_id / event_id / tenant_id / conversation_id / status / event_type` 审计 `receipt_outbox` 当前状态，并把指定 `DLQ` event redrive 回 `PENDING`。当前 repair audit 只记录 `previous_status / previous_retry_count / previous_last_error / previous_dead_lettered_at / repair_reason / repaired_at`，后续再补 cleanup 和更细 operator / outcome 语义。
+第一阶段运维面补充：`receipt-service` 提供只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运行模式，用于直接按 `outbox_id / event_id / tenant_id / conversation_id / status / event_type` 审计 `receipt_outbox` 当前状态，把指定 `DLQ` event redrive 回 `PENDING`，并按 retention / scope 清理 repair audit 历史。当前 repair audit 仍是轻量历史，只记录 `previous_status / previous_retry_count / previous_last_error / previous_dead_lettered_at / repair_reason / repaired_at`，更细 operator / outcome 语义后续再补。
 
 ## 4. 领域模型
 

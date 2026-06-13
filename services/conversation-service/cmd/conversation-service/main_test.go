@@ -26,6 +26,30 @@ func TestLoadConversationGRPCCredentialsFromEnvDisabledByDefault(t *testing.T) {
 	}
 }
 
+func TestNewGRPCServerAcceptsMetadataAuthMode(t *testing.T) {
+	clearConversationGRPCTLSConfig(t)
+	t.Setenv("NEXUSIM_CONVERSATION_AUTH_MODE", "metadata")
+
+	server, err := newGRPCServer()
+	if err != nil {
+		t.Fatalf("new grpc server: %v", err)
+	}
+	server.Stop()
+}
+
+func TestNewGRPCServerRejectsUnsupportedAuthMode(t *testing.T) {
+	clearConversationGRPCTLSConfig(t)
+	t.Setenv("NEXUSIM_CONVERSATION_AUTH_MODE", "unknown")
+
+	server, err := newGRPCServer()
+	if err == nil {
+		if server != nil {
+			server.Stop()
+		}
+		t.Fatalf("expected unsupported conversation auth mode to fail")
+	}
+}
+
 func TestLoadConversationGRPCCredentialsFromEnvRequiresCertKeyPair(t *testing.T) {
 	clearConversationGRPCTLSConfig(t)
 	t.Setenv("NEXUSIM_CONVERSATION_GRPC_TLS_CERT_FILE", "server.crt")

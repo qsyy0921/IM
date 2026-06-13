@@ -64,13 +64,10 @@ func runGRPCServer() error {
 	if err != nil {
 		return err
 	}
-	serverOptions := make([]grpc.ServerOption, 0, 1)
-	if creds, ok, err := loadConversationGRPCCredentialsFromEnv(); err != nil {
+	server, err := newGRPCServer()
+	if err != nil {
 		return err
-	} else if ok {
-		serverOptions = append(serverOptions, grpc.Creds(creds))
 	}
-	server := grpc.NewServer(serverOptions...)
 	repository := postgresinfra.NewRepository(pool)
 	grpcapi.Register(
 		server,
@@ -103,6 +100,27 @@ func runGRPCServer() error {
 		}
 		return context.Canceled
 	}
+}
+
+func newGRPCServer() (*grpc.Server, error) {
+	interceptors := make([]grpc.UnaryServerInterceptor, 0, 1)
+	switch strings.ToLower(envString("NEXUSIM_CONVERSATION_AUTH_MODE", "body")) {
+	case "body", "request", "legacy":
+	case "metadata", "verified-metadata":
+		interceptors = append(interceptors, grpcapi.VerifiedAuthUnaryInterceptor(true))
+	default:
+		return nil, errors.New("unsupported NEXUSIM_CONVERSATION_AUTH_MODE")
+	}
+	serverOptions := make([]grpc.ServerOption, 0, 2)
+	if len(interceptors) > 0 {
+		serverOptions = append(serverOptions, grpc.ChainUnaryInterceptor(interceptors...))
+	}
+	if creds, ok, err := loadConversationGRPCCredentialsFromEnv(); err != nil {
+		return nil, err
+	} else if ok {
+		serverOptions = append(serverOptions, grpc.Creds(creds))
+	}
+	return grpc.NewServer(serverOptions...), nil
 }
 
 func runMemberChangeWorker() error {

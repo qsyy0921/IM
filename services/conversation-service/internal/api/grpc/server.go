@@ -117,16 +117,12 @@ func (s *Server) CreateMemberChange(
 	if s.createMemberChange == nil {
 		return nil, status.Error(codes.Unimplemented, "create member change is not configured")
 	}
-	auth := request.GetAuthContext()
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
 	result, err := s.createMemberChange.Execute(ctx, types.CreateMemberChangeCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  auth.GetDeviceId(),
-			SessionID: auth.GetSessionId(),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:           auth,
 		ConversationID:        types.ConversationID(request.GetConversationId()),
 		TargetUserID:          types.UserID(request.GetTargetUserId()),
 		ChangeType:            fromProtoMemberChangeType(request.GetChangeType()),
@@ -163,16 +159,12 @@ func (s *Server) TransferConversationOwner(
 	if s.transferOwner == nil {
 		return nil, status.Error(codes.Unimplemented, "transfer conversation owner is not configured")
 	}
-	auth := request.GetAuthContext()
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
 	result, err := s.transferOwner.Execute(ctx, types.TransferConversationOwnerCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  auth.GetDeviceId(),
-			SessionID: auth.GetSessionId(),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:           auth,
 		ConversationID:        types.ConversationID(request.GetConversationId()),
 		NewOwnerUserID:        types.UserID(request.GetNewOwnerUserId()),
 		ExpectedMemberVersion: request.GetExpectedMemberVersion(),
@@ -206,16 +198,12 @@ func (s *Server) GetMemberChange(
 	if s.getMemberChange == nil {
 		return nil, status.Error(codes.Unimplemented, "get member change is not configured")
 	}
-	auth := request.GetAuthContext()
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
 	result, err := s.getMemberChange.Execute(ctx, types.GetMemberChangeCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  auth.GetDeviceId(),
-			SessionID: auth.GetSessionId(),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:    auth,
 		ConversationID: types.ConversationID(request.GetConversationId()),
 		ChangeID:       types.ChangeID(request.GetChangeId()),
 	})
@@ -250,16 +238,12 @@ func (s *Server) ListConversationMembers(
 	if s.listConversationMember == nil {
 		return nil, status.Error(codes.Unimplemented, "list conversation members is not configured")
 	}
-	auth := request.GetAuthContext()
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
 	result, err := s.listConversationMember.Execute(ctx, types.ListConversationMembersCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  auth.GetDeviceId(),
-			SessionID: auth.GetSessionId(),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:    auth,
 		ConversationID: types.ConversationID(request.GetConversationId()),
 		PageSize:       int(request.GetPageSize()),
 		PageToken:      request.GetPageToken(),
@@ -288,6 +272,31 @@ func (s *Server) ListConversationMembers(
 		Members:           members,
 		NextPageToken:     result.NextPageToken,
 	}, nil
+}
+
+func authFromProto(ctx context.Context, auth *conversationv1.AuthContext) (types.AuthContext, bool) {
+	if verified, ok := verifiedAuthFromContext(ctx); ok {
+		if auth != nil {
+			if verified.TraceID == "" {
+				verified.TraceID = auth.GetTraceId()
+			}
+			if verified.RequestID == "" {
+				verified.RequestID = auth.GetRequestId()
+			}
+		}
+		return verified, true
+	}
+	if auth == nil {
+		return types.AuthContext{}, false
+	}
+	return types.AuthContext{
+		TenantID:  types.TenantID(auth.GetTenantId()),
+		UserID:    types.UserID(auth.GetUserId()),
+		DeviceID:  auth.GetDeviceId(),
+		SessionID: auth.GetSessionId(),
+		TraceID:   auth.GetTraceId(),
+		RequestID: auth.GetRequestId(),
+	}, true
 }
 
 func grpcError(err error) error {

@@ -130,6 +130,16 @@ NEXUSIM_CONVERSATION_SERVICE_TLS_CLIENT_KEY_FILE=
 
 This is not a full service-mesh identity layer. Certificate issuance, rotation, dynamic service identity registry and all-service mTLS rollout remain future hardening.
 
+Gateway verified identity hardening is opt-in for user-facing conversation RPCs:
+
+```text
+NEXUSIM_CONVERSATION_AUTH_MODE=body              # default, legacy request AuthContext
+NEXUSIM_CONVERSATION_AUTH_MODE=metadata          # read tenant/user/device/session from verified gRPC metadata
+NEXUSIM_CONVERSATION_AUTH_MODE=verified-metadata # alias of metadata
+```
+
+In `metadata` / `verified-metadata` mode, `CreateMemberChange`, `GetMemberChange`, `TransferConversationOwner`, and `ListConversationMembers` ignore caller-supplied `AuthContext.tenant_id/user_id/device_id/session_id` and use gateway-injected metadata keys instead. `trace_id/request_id` may still fall back to the request body for observability. `GetSendContext` remains the message-service service-to-service read path and keeps its request contract. This is not a full API gateway or centralized identity-governance implementation.
+
 ## 7. 本阶段验收
 
 - `conversation_service.proto` 已生成 Go 代码。

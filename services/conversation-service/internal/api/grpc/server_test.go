@@ -9,7 +9,9 @@ import (
 
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	"github.com/qsyy0921/IM/services/conversation-service/internal/types"
+	grpcgo "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -157,6 +159,134 @@ func TestGetSendContextRejectsNilRequest(t *testing.T) {
 	}
 }
 
+func TestConversationAuthMetadataOverridesBodyForMemberCommands(t *testing.T) {
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		metadataTenantID, "trusted-tenant",
+		metadataUserID, "trusted-user",
+		metadataDeviceID, "trusted-device",
+		metadataSessionID, "trusted-session",
+	))
+	interceptor := VerifiedAuthUnaryInterceptor(true)
+	_, err := interceptor(ctx, nil, &grpcgo.UnaryServerInfo{}, func(ctx context.Context, request any) (any, error) {
+		create := &fakeCreateMemberChangeExecutor{}
+		transfer := &fakeTransferConversationOwnerExecutor{}
+		get := &fakeGetMemberChangeExecutor{}
+		list := &fakeListConversationMembersExecutor{}
+		server := NewServer(
+			&fakeGetSendContextExecutor{},
+			WithCreateMemberChange(create),
+			WithTransferConversationOwner(transfer),
+			WithGetMemberChange(get),
+			WithListConversationMembers(list),
+		)
+
+		if _, err := server.CreateMemberChange(ctx, &conversationv1.CreateMemberChangeRequest{
+			AuthContext:    testSpoofedAuthContext(),
+			ConversationId: "conv-1",
+			TargetUserId:   "target-1",
+		}); err != nil {
+			t.Fatalf("create member change: %v", err)
+		}
+		if _, err := server.TransferConversationOwner(ctx, &conversationv1.TransferConversationOwnerRequest{
+			AuthContext:    testSpoofedAuthContext(),
+			ConversationId: "conv-1",
+			NewOwnerUserId: "target-1",
+		}); err != nil {
+			t.Fatalf("transfer owner: %v", err)
+		}
+		if _, err := server.GetMemberChange(ctx, &conversationv1.GetMemberChangeRequest{
+			AuthContext:    testSpoofedAuthContext(),
+			ConversationId: "conv-1",
+			ChangeId:       "change-1",
+		}); err != nil {
+			t.Fatalf("get member change: %v", err)
+		}
+		if _, err := server.ListConversationMembers(ctx, &conversationv1.ListConversationMembersRequest{
+			AuthContext:    testSpoofedAuthContext(),
+			ConversationId: "conv-1",
+			PageSize:       20,
+		}); err != nil {
+			t.Fatalf("list conversation members: %v", err)
+		}
+
+		assertTrustedMetadataAuth(t, create.command.AuthContext)
+		assertTrustedMetadataAuth(t, transfer.command.AuthContext)
+		assertTrustedMetadataAuth(t, get.command.AuthContext)
+		assertTrustedMetadataAuth(t, list.command.AuthContext)
+		return nil, nil
+	})
+	if err != nil {
+		t.Fatalf("interceptor returned error: %v", err)
+	}
+}
+
+func TestConversationAuthMetadataDoesNotRequireBodyAuthContext(t *testing.T) {
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		metadataTenantID, "trusted-tenant",
+		metadataUserID, "trusted-user",
+		metadataDeviceID, "trusted-device",
+		metadataTraceID, "trusted-trace",
+		metadataRequestID, "trusted-request",
+	))
+	interceptor := VerifiedAuthUnaryInterceptor(true)
+	_, err := interceptor(ctx, nil, &grpcgo.UnaryServerInfo{}, func(ctx context.Context, request any) (any, error) {
+		list := &fakeListConversationMembersExecutor{}
+		server := NewServer(
+			&fakeGetSendContextExecutor{},
+			WithListConversationMembers(list),
+		)
+		if _, err := server.ListConversationMembers(ctx, &conversationv1.ListConversationMembersRequest{
+			ConversationId: "conv-1",
+			PageSize:       20,
+		}); err != nil {
+			t.Fatalf("list conversation members: %v", err)
+		}
+		auth := list.command.AuthContext
+		if auth.TenantID != "trusted-tenant" ||
+			auth.UserID != "trusted-user" ||
+			auth.DeviceID != "trusted-device" ||
+			auth.TraceID != "trusted-trace" ||
+			auth.RequestID != "trusted-request" {
+			t.Fatalf("unexpected verified auth: %+v", auth)
+		}
+		return nil, nil
+	})
+	if err != nil {
+		t.Fatalf("interceptor returned error: %v", err)
+	}
+}
+
+func TestVerifiedAuthUnaryInterceptorRequiresTrustedIdentity(t *testing.T) {
+	interceptor := VerifiedAuthUnaryInterceptor(true)
+	_, err := interceptor(context.Background(), nil, &grpcgo.UnaryServerInfo{}, func(ctx context.Context, request any) (any, error) {
+		t.Fatal("handler should not be called without verified auth")
+		return nil, nil
+	})
+	if status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("expected unauthenticated, got %v (%v)", status.Code(err), err)
+	}
+}
+
+func TestVerifiedAuthUnaryInterceptorAllowsGetSendContextWithoutMetadata(t *testing.T) {
+	interceptor := VerifiedAuthUnaryInterceptor(true)
+	called := false
+	_, err := interceptor(
+		context.Background(),
+		nil,
+		&grpcgo.UnaryServerInfo{FullMethod: conversationv1.ConversationService_GetSendContext_FullMethodName},
+		func(ctx context.Context, request any) (any, error) {
+			called = true
+			return nil, nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("expected get send context to bypass verified user auth metadata: %v", err)
+	}
+	if !called {
+		t.Fatalf("handler was not called")
+	}
+}
+
 func TestCreateMemberChangeConvertsRequestAndResponse(t *testing.T) {
 	executor := &fakeCreateMemberChangeExecutor{
 		result: types.MemberChangeResult{
@@ -232,8 +362,8 @@ func TestCreateMemberChangeMapsValidationErrors(t *testing.T) {
 		WithCreateMemberChange(&fakeCreateMemberChangeExecutor{validate: true}),
 	)
 	_, err := server.CreateMemberChange(context.Background(), &conversationv1.CreateMemberChangeRequest{
+		AuthContext:    validProtoAuthContext(),
 		ConversationId: "conv-1",
-		TargetUserId:   "target-1",
 		ChangeType:     conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_JOIN,
 		TargetRole:     conversationv1.MemberRole_MEMBER_ROLE_MEMBER,
 		ConflictPolicy: conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT,
@@ -348,6 +478,7 @@ func TestTransferConversationOwnerMapsValidationErrors(t *testing.T) {
 		WithTransferConversationOwner(&fakeTransferConversationOwnerExecutor{validate: true}),
 	)
 	_, err := server.TransferConversationOwner(context.Background(), &conversationv1.TransferConversationOwnerRequest{
+		AuthContext:    validProtoAuthContext(),
 		ConversationId: "conv-1",
 	})
 	st, ok := status.FromError(err)
@@ -457,8 +588,8 @@ func TestGetMemberChangeMapsValidationErrors(t *testing.T) {
 		WithGetMemberChange(&fakeGetMemberChangeExecutor{validate: true}),
 	)
 	_, err := server.GetMemberChange(context.Background(), &conversationv1.GetMemberChangeRequest{
+		AuthContext:    validProtoAuthContext(),
 		ConversationId: "conv-1",
-		ChangeId:       "change-1",
 	})
 	st, ok := status.FromError(err)
 	if !ok {
@@ -563,7 +694,9 @@ func TestListConversationMembersMapsValidationErrors(t *testing.T) {
 		WithListConversationMembers(&fakeListConversationMembersExecutor{validate: true}),
 	)
 	_, err := server.ListConversationMembers(context.Background(), &conversationv1.ListConversationMembersRequest{
+		AuthContext:    validProtoAuthContext(),
 		ConversationId: "conv-1",
+		PageSize:       -1,
 	})
 	st, ok := status.FromError(err)
 	if !ok {
@@ -585,6 +718,40 @@ func TestListConversationMembersRequiresExecutor(t *testing.T) {
 	}
 	if st.Code() != codes.Unimplemented {
 		t.Fatalf("expected unimplemented, got %s", st.Code())
+	}
+}
+
+func testSpoofedAuthContext() *conversationv1.AuthContext {
+	return &conversationv1.AuthContext{
+		TenantId:  "spoofed-tenant",
+		UserId:    "spoofed-user",
+		DeviceId:  "spoofed-device",
+		SessionId: "spoofed-session",
+		TraceId:   "body-trace",
+		RequestId: "body-request",
+	}
+}
+
+func validProtoAuthContext() *conversationv1.AuthContext {
+	return &conversationv1.AuthContext{
+		TenantId:  "tenant-1",
+		UserId:    "user-1",
+		DeviceId:  "device-1",
+		SessionId: "session-1",
+		TraceId:   "trace-1",
+		RequestId: "request-1",
+	}
+}
+
+func assertTrustedMetadataAuth(t *testing.T, auth types.AuthContext) {
+	t.Helper()
+	if auth.TenantID != "trusted-tenant" ||
+		auth.UserID != "trusted-user" ||
+		auth.DeviceID != "trusted-device" ||
+		auth.SessionID != "trusted-session" ||
+		auth.TraceID != "body-trace" ||
+		auth.RequestID != "body-request" {
+		t.Fatalf("unexpected verified auth: %+v", auth)
 	}
 }
 

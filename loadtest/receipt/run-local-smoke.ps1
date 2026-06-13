@@ -3,6 +3,14 @@ param(
     [string]$KafkaBrokers = "localhost:9092",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
+    [string]$DeliveryTlsCaFile = "",
+    [string]$DeliveryTlsServerName = "",
+    [string]$DeliveryTlsClientCertFile = "",
+    [string]$DeliveryTlsClientKeyFile = "",
+    [string]$ReceiptTlsCaFile = "",
+    [string]$ReceiptTlsServerName = "",
+    [string]$ReceiptTlsClientCertFile = "",
+    [string]$ReceiptTlsClientKeyFile = "",
     [switch]$SkipBuild
 )
 
@@ -222,25 +230,52 @@ try {
         NEXUSIM_MOCK_PERMISSION_VERSION = "2"
     }
 
-    & $runner `
-        --conversation-target "127.0.0.1:11696" `
-        --message-target "127.0.0.1:11695" `
-        --delivery-target "127.0.0.1:11697" `
-        --receipt-target "127.0.0.1:11699" `
-        --pg-dsn $PgDsn `
-        --result-dir $resultDir `
-        --tenant-id "tenant-receipt-smoke" `
-        --conversation-id "conv-receipt-smoke" `
-        --owner-user-id "owner-1" `
-        --receiver-user-id "receipt-user-1" `
-        --receiver-device-id "receipt-device-1" `
-        --delivery-consumer-group $deliveryConsumerGroup `
-        --receipt-consumer-group $receiptConsumerGroup `
-        --kafka-brokers $KafkaBrokers `
-        --receipt-events-topic $receiptTopic `
-        --receipt-events-consumer-group $receiptEventsConsumerGroup `
-        --wait-timeout "30s" `
-        --request-timeout "5s"
+    $runnerArgs = @(
+        "--conversation-target", "127.0.0.1:11696",
+        "--message-target", "127.0.0.1:11695",
+        "--delivery-target", "127.0.0.1:11697",
+        "--receipt-target", "127.0.0.1:11699",
+        "--pg-dsn", $PgDsn,
+        "--result-dir", $resultDir,
+        "--tenant-id", "tenant-receipt-smoke",
+        "--conversation-id", "conv-receipt-smoke",
+        "--owner-user-id", "owner-1",
+        "--receiver-user-id", "receipt-user-1",
+        "--receiver-device-id", "receipt-device-1",
+        "--delivery-consumer-group", $deliveryConsumerGroup,
+        "--receipt-consumer-group", $receiptConsumerGroup,
+        "--kafka-brokers", $KafkaBrokers,
+        "--receipt-events-topic", $receiptTopic,
+        "--receipt-events-consumer-group", $receiptEventsConsumerGroup,
+        "--wait-timeout", "30s",
+        "--request-timeout", "5s"
+    )
+    if (-not [string]::IsNullOrWhiteSpace($DeliveryTlsCaFile)) {
+        $runnerArgs += @("--delivery-tls-ca-file", $DeliveryTlsCaFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($DeliveryTlsServerName)) {
+        $runnerArgs += @("--delivery-tls-server-name", $DeliveryTlsServerName)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($DeliveryTlsClientCertFile)) {
+        $runnerArgs += @("--delivery-tls-client-cert-file", $DeliveryTlsClientCertFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($DeliveryTlsClientKeyFile)) {
+        $runnerArgs += @("--delivery-tls-client-key-file", $DeliveryTlsClientKeyFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ReceiptTlsCaFile)) {
+        $runnerArgs += @("--receipt-tls-ca-file", $ReceiptTlsCaFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ReceiptTlsServerName)) {
+        $runnerArgs += @("--receipt-tls-server-name", $ReceiptTlsServerName)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ReceiptTlsClientCertFile)) {
+        $runnerArgs += @("--receipt-tls-client-cert-file", $ReceiptTlsClientCertFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ReceiptTlsClientKeyFile)) {
+        $runnerArgs += @("--receipt-tls-client-key-file", $ReceiptTlsClientKeyFile)
+    }
+
+    & $runner @runnerArgs
     if ($LASTEXITCODE -ne 0) {
         throw "receipt smoke runner failed with exit code $LASTEXITCODE"
     }

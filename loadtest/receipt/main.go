@@ -19,6 +19,7 @@ import (
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
+	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	receipteventsv1 "github.com/qsyy0921/IM/schemas/kafka/receipt/v1"
 	kafkago "github.com/segmentio/kafka-go"
 	"google.golang.org/grpc"
@@ -34,6 +35,8 @@ type config struct {
 	messageTarget      string
 	deliveryTarget     string
 	receiptTarget      string
+	deliveryTLS        grpctls.Config
+	receiptTLS         grpctls.Config
 	resultDir          string
 	pgDSN              string
 	requestTimeout     time.Duration
@@ -61,6 +64,8 @@ type summary struct {
 	MessageTarget                            string                  `json:"message_target"`
 	DeliveryTarget                           string                  `json:"delivery_target"`
 	ReceiptTarget                            string                  `json:"receipt_target"`
+	DeliveryTLSEnabled                       bool                    `json:"delivery_tls_enabled"`
+	ReceiptTLSEnabled                        bool                    `json:"receipt_tls_enabled"`
 	ResultDir                                string                  `json:"result_dir"`
 	TenantID                                 string                  `json:"tenant_id"`
 	ConversationID                           string                  `json:"conversation_id"`
@@ -273,6 +278,14 @@ func parseConfig() config {
 	flag.StringVar(&cfg.messageTarget, "message-target", "127.0.0.1:10495", "message-service gRPC target")
 	flag.StringVar(&cfg.deliveryTarget, "delivery-target", "127.0.0.1:10497", "delivery-service gRPC target")
 	flag.StringVar(&cfg.receiptTarget, "receipt-target", "127.0.0.1:10499", "receipt-service gRPC target")
+	flag.StringVar(&cfg.deliveryTLS.CAFile, "delivery-tls-ca-file", "", "CA PEM for delivery-service gRPC TLS")
+	flag.StringVar(&cfg.deliveryTLS.ServerName, "delivery-tls-server-name", "", "server name for delivery-service gRPC TLS")
+	flag.StringVar(&cfg.deliveryTLS.ClientCertFile, "delivery-tls-client-cert-file", "", "client certificate PEM for delivery-service mTLS")
+	flag.StringVar(&cfg.deliveryTLS.ClientKeyFile, "delivery-tls-client-key-file", "", "client private key PEM for delivery-service mTLS")
+	flag.StringVar(&cfg.receiptTLS.CAFile, "receipt-tls-ca-file", "", "CA PEM for receipt-service gRPC TLS")
+	flag.StringVar(&cfg.receiptTLS.ServerName, "receipt-tls-server-name", "", "server name for receipt-service gRPC TLS")
+	flag.StringVar(&cfg.receiptTLS.ClientCertFile, "receipt-tls-client-cert-file", "", "client certificate PEM for receipt-service mTLS")
+	flag.StringVar(&cfg.receiptTLS.ClientKeyFile, "receipt-tls-client-key-file", "", "client private key PEM for receipt-service mTLS")
 	flag.StringVar(&cfg.resultDir, "result-dir", `H:\NexusIM\loadtest-results\receipt-smoke`, "result directory")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "", "PostgreSQL DSN")
 	flag.DurationVar(&cfg.requestTimeout, "request-timeout", 3*time.Second, "per-request timeout")
@@ -336,12 +349,20 @@ func run(cfg config) error {
 		return fmt.Errorf("dial message-service: %w", err)
 	}
 	defer messageConn.Close()
-	deliveryConn, err := grpc.NewClient(cfg.deliveryTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	deliveryDialOption, err := grpctls.DialOption(cfg.deliveryTLS, "delivery-tls")
+	if err != nil {
+		return fmt.Errorf("configure delivery-service TLS: %w", err)
+	}
+	deliveryConn, err := grpc.NewClient(cfg.deliveryTarget, deliveryDialOption)
 	if err != nil {
 		return fmt.Errorf("dial delivery-service: %w", err)
 	}
 	defer deliveryConn.Close()
-	receiptConn, err := grpc.NewClient(cfg.receiptTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	receiptDialOption, err := grpctls.DialOption(cfg.receiptTLS, "receipt-tls")
+	if err != nil {
+		return fmt.Errorf("configure receipt-service TLS: %w", err)
+	}
+	receiptConn, err := grpc.NewClient(cfg.receiptTarget, receiptDialOption)
 	if err != nil {
 		return fmt.Errorf("dial receipt-service: %w", err)
 	}
@@ -361,6 +382,8 @@ func run(cfg config) error {
 		MessageTarget:         cfg.messageTarget,
 		DeliveryTarget:        cfg.deliveryTarget,
 		ReceiptTarget:         cfg.receiptTarget,
+		DeliveryTLSEnabled:    cfg.deliveryTLS.Enabled(),
+		ReceiptTLSEnabled:     cfg.receiptTLS.Enabled(),
 		ResultDir:             cfg.resultDir,
 		TenantID:              cfg.tenantID,
 		ConversationID:        cfg.conversationID,

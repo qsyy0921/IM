@@ -37,6 +37,24 @@ im.delivery.events
 | `loadtest-report-20260611-receipt-mute-smoke.md` | `MuteConversation` 真实进程 smoke，验证当前用户静音 / 取消静音标志；静音不改变 unread、read cursor、delivery、push 或消息事实 |
 | `loadtest-report-20260611-receipt-unread-filter-smoke.md` | `ListConversations(unread_only=true)` 真实进程 smoke，验证投递后未读列表可见、`MarkRead` 后未读列表为空 |
 
+## TLS / mTLS smoke 参数
+
+`loadtest/receipt` 和 `loadtest/receipt/run-local-smoke.ps1` 默认仍使用 plaintext gRPC。若本地已通过 `NEXUSIM_DELIVERY_GRPC_TLS_*` 或 `NEXUSIM_RECEIPT_GRPC_TLS_*` 开启 delivery / receipt gRPC server TLS，可给 runner 增加对应 client 参数：
+
+```powershell
+.\loadtest\receipt\run-local-smoke.ps1 `
+  -DeliveryTlsCaFile .\certs\ca.pem `
+  -DeliveryTlsServerName delivery-service.nexusim.local `
+  -DeliveryTlsClientCertFile .\certs\loadtest-client.crt `
+  -DeliveryTlsClientKeyFile .\certs\loadtest-client.key `
+  -ReceiptTlsCaFile .\certs\ca.pem `
+  -ReceiptTlsServerName receipt-service.nexusim.local `
+  -ReceiptTlsClientCertFile .\certs\loadtest-client.crt `
+  -ReceiptTlsClientKeyFile .\certs\loadtest-client.key
+```
+
+配置任一 `*-tls-*` 参数后必须提供对应 CA file，client cert/key 必须成对配置。该能力只验证 smoke runner 到 delivery / receipt gRPC server 的静态 TLS / mTLS 连接；证书签发、轮换、分发和全服务 mTLS rollout 仍是后续项。
+
 ## 面试可讲重点
 
 - `receipt-service` 是第三层 IM 产品能力，不是消息事实源；它只消费 `im.delivery.events`，重建送达 / 已读回执 read model。

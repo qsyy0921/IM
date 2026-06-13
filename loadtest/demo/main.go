@@ -22,6 +22,7 @@ import (
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
+	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -45,6 +46,8 @@ type config struct {
 	messageTarget      string
 	deliveryTarget     string
 	receiptTarget      string
+	deliveryTLS        grpctls.Config
+	receiptTLS         grpctls.Config
 	pushURL            string
 	resultDir          string
 	pgDSN              string
@@ -66,29 +69,31 @@ type config struct {
 }
 
 type summary struct {
-	Commit           string                  `json:"commit"`
-	CommitFull       string                  `json:"commit_full"`
-	GitDirty         bool                    `json:"git_dirty"`
-	ResultDir        string                  `json:"result_dir"`
-	TenantID         string                  `json:"tenant_id"`
-	ConversationID   string                  `json:"conversation_id"`
-	SenderUserID     string                  `json:"sender_user_id"`
-	ReceiverUserID   string                  `json:"receiver_user_id"`
-	ReceiverDeviceID string                  `json:"receiver_device_id"`
-	StartedAt        time.Time               `json:"started_at"`
-	FinishedAt       time.Time               `json:"finished_at"`
-	Success          bool                    `json:"success"`
-	Error            string                  `json:"error,omitempty"`
-	ServerHello      serverFrame             `json:"server_hello"`
-	MemberJoin       memberJoinSummary       `json:"member_join"`
-	SendMessage      sendSummary             `json:"send_message"`
-	Notify           serverFrame             `json:"delivery_notify"`
-	PullInbox        pullSummary             `json:"pull_inbox"`
-	WebSocketAck     serverFrame             `json:"websocket_ack"`
-	MarkRead         markReadSummary         `json:"mark_read"`
-	ListBeforeRead   conversationListSummary `json:"list_conversations_before_read"`
-	ListAfterRead    conversationListSummary `json:"list_conversations_after_read"`
-	Postgres         postgresSummary         `json:"postgres"`
+	Commit             string                  `json:"commit"`
+	CommitFull         string                  `json:"commit_full"`
+	GitDirty           bool                    `json:"git_dirty"`
+	ResultDir          string                  `json:"result_dir"`
+	TenantID           string                  `json:"tenant_id"`
+	ConversationID     string                  `json:"conversation_id"`
+	SenderUserID       string                  `json:"sender_user_id"`
+	ReceiverUserID     string                  `json:"receiver_user_id"`
+	ReceiverDeviceID   string                  `json:"receiver_device_id"`
+	DeliveryTLSEnabled bool                    `json:"delivery_tls_enabled"`
+	ReceiptTLSEnabled  bool                    `json:"receipt_tls_enabled"`
+	StartedAt          time.Time               `json:"started_at"`
+	FinishedAt         time.Time               `json:"finished_at"`
+	Success            bool                    `json:"success"`
+	Error              string                  `json:"error,omitempty"`
+	ServerHello        serverFrame             `json:"server_hello"`
+	MemberJoin         memberJoinSummary       `json:"member_join"`
+	SendMessage        sendSummary             `json:"send_message"`
+	Notify             serverFrame             `json:"delivery_notify"`
+	PullInbox          pullSummary             `json:"pull_inbox"`
+	WebSocketAck       serverFrame             `json:"websocket_ack"`
+	MarkRead           markReadSummary         `json:"mark_read"`
+	ListBeforeRead     conversationListSummary `json:"list_conversations_before_read"`
+	ListAfterRead      conversationListSummary `json:"list_conversations_after_read"`
+	Postgres           postgresSummary         `json:"postgres"`
 }
 
 type memberJoinSummary struct {
@@ -183,6 +188,14 @@ func main() {
 	flag.StringVar(&cfg.messageTarget, "message-target", "127.0.0.1:10495", "message-service gRPC target")
 	flag.StringVar(&cfg.deliveryTarget, "delivery-target", "127.0.0.1:10497", "delivery-service gRPC target")
 	flag.StringVar(&cfg.receiptTarget, "receipt-target", "127.0.0.1:10499", "receipt-service gRPC target")
+	flag.StringVar(&cfg.deliveryTLS.CAFile, "delivery-tls-ca-file", "", "CA PEM for delivery-service gRPC TLS")
+	flag.StringVar(&cfg.deliveryTLS.ServerName, "delivery-tls-server-name", "", "server name for delivery-service gRPC TLS")
+	flag.StringVar(&cfg.deliveryTLS.ClientCertFile, "delivery-tls-client-cert-file", "", "client certificate PEM for delivery-service mTLS")
+	flag.StringVar(&cfg.deliveryTLS.ClientKeyFile, "delivery-tls-client-key-file", "", "client private key PEM for delivery-service mTLS")
+	flag.StringVar(&cfg.receiptTLS.CAFile, "receipt-tls-ca-file", "", "CA PEM for receipt-service gRPC TLS")
+	flag.StringVar(&cfg.receiptTLS.ServerName, "receipt-tls-server-name", "", "server name for receipt-service gRPC TLS")
+	flag.StringVar(&cfg.receiptTLS.ClientCertFile, "receipt-tls-client-cert-file", "", "client certificate PEM for receipt-service mTLS")
+	flag.StringVar(&cfg.receiptTLS.ClientKeyFile, "receipt-tls-client-key-file", "", "client private key PEM for receipt-service mTLS")
 	flag.StringVar(&cfg.pushURL, "push-url", "ws://127.0.0.1:10498", "push-gateway WebSocket URL")
 	flag.StringVar(&cfg.resultDir, "result-dir", `H:\NexusIM\loadtest-results\e2e-demo`, "result directory")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "", "PostgreSQL DSN used only for local demo seed/cleanup/statistics")
@@ -215,16 +228,18 @@ func run(ctx context.Context, cfg config) error {
 	}
 	started := time.Now().UTC()
 	result := summary{
-		Commit:           gitOutput("rev-parse", "--short", "HEAD"),
-		CommitFull:       gitOutput("rev-parse", "HEAD"),
-		GitDirty:         strings.TrimSpace(gitOutput("status", "--short")) != "",
-		ResultDir:        cfg.resultDir,
-		TenantID:         cfg.tenantID,
-		ConversationID:   cfg.conversationID,
-		SenderUserID:     cfg.senderUserID,
-		ReceiverUserID:   cfg.receiverUserID,
-		ReceiverDeviceID: cfg.receiverDevice,
-		StartedAt:        started,
+		Commit:             gitOutput("rev-parse", "--short", "HEAD"),
+		CommitFull:         gitOutput("rev-parse", "HEAD"),
+		GitDirty:           strings.TrimSpace(gitOutput("status", "--short")) != "",
+		ResultDir:          cfg.resultDir,
+		TenantID:           cfg.tenantID,
+		ConversationID:     cfg.conversationID,
+		SenderUserID:       cfg.senderUserID,
+		ReceiverUserID:     cfg.receiverUserID,
+		ReceiverDeviceID:   cfg.receiverDevice,
+		DeliveryTLSEnabled: cfg.deliveryTLS.Enabled(),
+		ReceiptTLSEnabled:  cfg.receiptTLS.Enabled(),
+		StartedAt:          started,
 	}
 
 	pool, err := pgxpool.New(ctx, cfg.pgDSN)
@@ -251,12 +266,20 @@ func run(ctx context.Context, cfg config) error {
 		return finish(cfg, &result, fmt.Errorf("connect message-service: %w", err))
 	}
 	defer messageConn.Close()
-	deliveryConn, err := grpc.NewClient(cfg.deliveryTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	deliveryDialOption, err := grpctls.DialOption(cfg.deliveryTLS, "delivery-tls")
+	if err != nil {
+		return finish(cfg, &result, fmt.Errorf("configure delivery-service TLS: %w", err))
+	}
+	deliveryConn, err := grpc.NewClient(cfg.deliveryTarget, deliveryDialOption)
 	if err != nil {
 		return finish(cfg, &result, fmt.Errorf("connect delivery-service: %w", err))
 	}
 	defer deliveryConn.Close()
-	receiptConn, err := grpc.NewClient(cfg.receiptTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	receiptDialOption, err := grpctls.DialOption(cfg.receiptTLS, "receipt-tls")
+	if err != nil {
+		return finish(cfg, &result, fmt.Errorf("configure receipt-service TLS: %w", err))
+	}
+	receiptConn, err := grpc.NewClient(cfg.receiptTarget, receiptDialOption)
 	if err != nil {
 		return finish(cfg, &result, fmt.Errorf("connect receipt-service: %w", err))
 	}

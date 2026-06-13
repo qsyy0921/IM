@@ -4,6 +4,14 @@ param(
     [string]$MessageTarget = "127.0.0.1:10495",
     [string]$DeliveryTarget = "127.0.0.1:10497",
     [string]$ReceiptTarget = "127.0.0.1:10499",
+    [string]$DeliveryTlsCaFile = "",
+    [string]$DeliveryTlsServerName = "",
+    [string]$DeliveryTlsClientCertFile = "",
+    [string]$DeliveryTlsClientKeyFile = "",
+    [string]$ReceiptTlsCaFile = "",
+    [string]$ReceiptTlsServerName = "",
+    [string]$ReceiptTlsClientCertFile = "",
+    [string]$ReceiptTlsClientKeyFile = "",
     [string]$PushUrl = "ws://127.0.0.1:10498",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
@@ -64,6 +72,30 @@ if ($PushAuthMode -eq "hmac") {
         throw "-PushAuthHmacSecret is required when -PushAuthMode hmac"
     }
     $args += @("--push-auth-hmac-secret", $PushAuthHmacSecret)
+}
+if (-not [string]::IsNullOrWhiteSpace($DeliveryTlsCaFile)) {
+    $args += @("--delivery-tls-ca-file", $DeliveryTlsCaFile)
+}
+if (-not [string]::IsNullOrWhiteSpace($DeliveryTlsServerName)) {
+    $args += @("--delivery-tls-server-name", $DeliveryTlsServerName)
+}
+if (-not [string]::IsNullOrWhiteSpace($DeliveryTlsClientCertFile)) {
+    $args += @("--delivery-tls-client-cert-file", $DeliveryTlsClientCertFile)
+}
+if (-not [string]::IsNullOrWhiteSpace($DeliveryTlsClientKeyFile)) {
+    $args += @("--delivery-tls-client-key-file", $DeliveryTlsClientKeyFile)
+}
+if (-not [string]::IsNullOrWhiteSpace($ReceiptTlsCaFile)) {
+    $args += @("--receipt-tls-ca-file", $ReceiptTlsCaFile)
+}
+if (-not [string]::IsNullOrWhiteSpace($ReceiptTlsServerName)) {
+    $args += @("--receipt-tls-server-name", $ReceiptTlsServerName)
+}
+if (-not [string]::IsNullOrWhiteSpace($ReceiptTlsClientCertFile)) {
+    $args += @("--receipt-tls-client-cert-file", $ReceiptTlsClientCertFile)
+}
+if (-not [string]::IsNullOrWhiteSpace($ReceiptTlsClientKeyFile)) {
+    $args += @("--receipt-tls-client-key-file", $ReceiptTlsClientKeyFile)
 }
 if ($NoCleanup) {
     $args += @("--cleanup=false")

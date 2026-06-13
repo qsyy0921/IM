@@ -19,6 +19,9 @@ type ProjectionFailureAuditOptions struct {
 	ConsumerGroup  string
 	Topic          string
 	PartitionID    *int32
+	OffsetValue    *int64
+	EventID        string
+	EventType      string
 	FailureClass   string
 	UnresolvedOnly bool
 	Limit          int
@@ -144,6 +147,18 @@ func (store *ProjectionFailureStore) AuditFailures(ctx context.Context, options 
 	if options.PartitionID != nil {
 		args = append(args, *options.PartitionID)
 		clauses = append(clauses, "partition_id = $"+itoa(len(args)))
+	}
+	if options.OffsetValue != nil {
+		args = append(args, *options.OffsetValue)
+		clauses = append(clauses, "offset_value = $"+itoa(len(args)))
+	}
+	if eventID := strings.TrimSpace(options.EventID); eventID != "" {
+		args = append(args, eventID)
+		clauses = append(clauses, "event_id = $"+itoa(len(args)))
+	}
+	if eventType := strings.TrimSpace(options.EventType); eventType != "" {
+		args = append(args, eventType)
+		clauses = append(clauses, "event_type = $"+itoa(len(args)))
 	}
 	if failureClass := strings.TrimSpace(options.FailureClass); failureClass != "" {
 		args = append(args, failureClass)

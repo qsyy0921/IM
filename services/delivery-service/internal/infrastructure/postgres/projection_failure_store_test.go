@@ -177,6 +177,72 @@ INSERT INTO delivery_projection_failures (
 	}
 }
 
+func TestProjectionFailureStoreAuditFiltersByOffsetIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_failures (
+    consumer_group, topic, partition_id, offset_value, event_id, event_type, tenant_id, conversation_id, aggregate_version, trace_id, failure_class, last_error, failure_count, first_seen_at, last_seen_at, resolved_at, resolved_checkpoint_offset
+) VALUES
+    ('group-5', 'conversation.timeline.events', 0, 81, 'event-1', 'message.edited.v1', 'tenant-1', 'conv-1', 7, 'trace-1', 'db_write_failed', 'write failed', 1, now(), now(), NULL, NULL),
+    ('group-5', 'conversation.timeline.events', 0, 82, 'event-2', 'message.deleted.v1', 'tenant-1', 'conv-1', 8, 'trace-2', 'decode_failed', 'decode failed', 1, now(), now(), NULL, NULL)
+`)
+	if err != nil {
+		t.Fatalf("seed projection failures: %v", err)
+	}
+
+	targetOffset := int64(82)
+	store := NewProjectionFailureStore(pool)
+	rows, err := store.AuditFailures(ctx, ProjectionFailureAuditOptions{
+		ConsumerGroup:  "group-5",
+		Topic:          "conversation.timeline.events",
+		OffsetValue:    &targetOffset,
+		UnresolvedOnly: true,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit projection failures by offset: %v", err)
+	}
+	if len(rows) != 1 || rows[0].OffsetValue != 82 || rows[0].EventID != "event-2" {
+		t.Fatalf("unexpected filtered audit rows: %+v", rows)
+	}
+}
+
+func TestProjectionFailureStoreAuditFiltersByEventIDAndTypeIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_failures (
+    consumer_group, topic, partition_id, offset_value, event_id, event_type, tenant_id, conversation_id, aggregate_version, trace_id, failure_class, last_error, failure_count, first_seen_at, last_seen_at, resolved_at, resolved_checkpoint_offset
+) VALUES
+    ('group-6', 'conversation.timeline.events', 0, 91, 'event-a', 'message.edited.v1', 'tenant-1', 'conv-1', 7, 'trace-1', 'db_write_failed', 'write failed', 1, now(), now(), NULL, NULL),
+    ('group-6', 'conversation.timeline.events', 0, 92, 'event-b', 'message.deleted.v1', 'tenant-1', 'conv-1', 8, 'trace-2', 'decode_failed', 'decode failed', 1, now(), now(), NULL, NULL)
+`)
+	if err != nil {
+		t.Fatalf("seed projection failures: %v", err)
+	}
+
+	store := NewProjectionFailureStore(pool)
+	rows, err := store.AuditFailures(ctx, ProjectionFailureAuditOptions{
+		ConsumerGroup:  "group-6",
+		Topic:          "conversation.timeline.events",
+		EventID:        "event-a",
+		EventType:      types.TimelineEventMessageEdited,
+		UnresolvedOnly: true,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit projection failures by event id and type: %v", err)
+	}
+	if len(rows) != 1 || rows[0].OffsetValue != 91 || rows[0].EventID != "event-a" || rows[0].EventType != types.TimelineEventMessageEdited {
+		t.Fatalf("unexpected filtered audit rows: %+v", rows)
+	}
+}
+
 func TestProjectionFailureStoreCleanupResolvedFailuresDeletesOnlyExpiredResolvedRowsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

@@ -479,11 +479,19 @@ func runProjectionFailureAudit() error {
 		parsed := int32(envIntAllowZero("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_PARTITION_ID", 0))
 		partitionID = &parsed
 	}
+	var offsetValue *int64
+	if value := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_OFFSET_VALUE")); value != "" {
+		parsed := envInt64AllowZero("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_OFFSET_VALUE", 0)
+		offsetValue = &parsed
+	}
 	includeResolved := envBool("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_INCLUDE_RESOLVED", false)
 	rows, err := postgresinfra.NewProjectionFailureStore(pool).AuditFailures(ctx, postgresinfra.ProjectionFailureAuditOptions{
 		ConsumerGroup:  envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_CONSUMER_GROUP", ""),
 		Topic:          envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_TOPIC", "conversation.timeline.events"),
 		PartitionID:    partitionID,
+		OffsetValue:    offsetValue,
+		EventID:        envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_EVENT_ID", ""),
+		EventType:      envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_EVENT_TYPE", ""),
 		FailureClass:   envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_FAILURE_CLASS", ""),
 		UnresolvedOnly: !includeResolved,
 		Limit:          envInt("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_LIMIT", 20),

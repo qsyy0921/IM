@@ -66,6 +66,8 @@ Policy-service does not guess direct peers and does not synchronously query cont
 
 When PostgreSQL rules mode is enabled, successful `CheckMessageAction` decisions are staged into `policy_decision_audit_outbox` before the response is returned. Audit write failure fails closed as policy unavailable. `NEXUSIM_POLICY_SERVICE_MODE=outbox-relay` publishes these rows to `im.policy.events` as protobuf `PolicyEvent` records and marks successful rows `PUBLISHED`.
 
+`NEXUSIM_POLICY_SERVICE_MODE=outbox-repair` is the first-stage repair operator for policy decision audit rows. It accepts an explicit comma-separated list of DLQ `event_id` values, resets only those rows to `PENDING`, clears retry state, and writes `policy_decision_audit_outbox_repair_audit`. It does not publish Kafka directly, skip ordered blockers, rewrite payloads, repair all rows, classify poison payloads, implement retention or export audit data to an external sink. After repair, the normal outbox relay is still responsible for publishing to `im.policy.events`.
+
 Audit rows intentionally store low-sensitive decision metadata:
 
 - stable object keys for actor user, device, conversation, message and direct peer context;
@@ -102,6 +104,11 @@ NEXUSIM_POLICY_OUTBOX_BATCH_SIZE=500
 NEXUSIM_POLICY_OUTBOX_POLL_INTERVAL=1s
 NEXUSIM_POLICY_OUTBOX_MAX_ATTEMPTS=5
 NEXUSIM_POLICY_OUTBOX_RETRY_BASE_DELAY=1s
+
+NEXUSIM_POLICY_SERVICE_MODE=outbox-repair
+NEXUSIM_POLICY_OUTBOX_REPAIR_EVENT_IDS=
+NEXUSIM_POLICY_OUTBOX_REPAIR_OPERATOR=local-operator
+NEXUSIM_POLICY_OUTBOX_REPAIR_REASON=manual policy audit outbox repair
 
 NEXUSIM_POLICY_SERVICE_ADDR=127.0.0.1:10800
 NEXUSIM_POLICY_RPC_TIMEOUT=30ms
@@ -158,7 +165,7 @@ This is a local debug surface. It is not a replacement for production OpenTeleme
 - Contacts block / unblock events are consumed only for direct `SEND` when safe `direct_peer_user_id` context is supplied. Group, role and tenant policy remain future work.
 - No conversation role / owner / admin policy is implemented yet.
 - No tenant policy, content moderation, risk scoring or rate limiting is implemented yet.
-- Decision audit outbox rows can be relayed to `im.policy.events`, but no repair operator, retention policy or external sink is implemented yet.
+- Decision audit outbox rows can be relayed to `im.policy.events`, and explicit DLQ event IDs can be redriven through the repair operator. Broad repair workflow, poison-payload classification, retention policy and external sink remain future work.
 - No mTLS client/server config is implemented for policy-service yet.
 - No production OpenTelemetry / Prometheus / alerting rollout is implemented yet.
 

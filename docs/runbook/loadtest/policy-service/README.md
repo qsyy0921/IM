@@ -23,6 +23,7 @@ Implemented:
 - policy-service contact block decision smoke for direct `SEND` hard-deny through `direct_peer_user_id`: `loadtest-report-20260613-policy-contact-block-decision-smoke.md`.
 - policy-service first-stage decision audit outbox smoke: `loadtest-report-20260613-policy-decision-audit-outbox-smoke.md`.
 - policy-service decision audit relay smoke for `policy_decision_audit_outbox -> im.policy.events`: `loadtest-report-20260613-policy-decision-audit-relay-smoke.md`.
+- policy-service decision audit DLQ repair smoke for explicit event-id redrive: `loadtest-report-20260613-policy-decision-audit-repair-smoke.md`.
 
 Not yet implemented:
 
@@ -30,7 +31,7 @@ Not yet implemented:
 - conversation role policy;
 - tenant-level policy;
 - content moderation / risk scoring;
-- policy audit DLQ repair / retention / external sink;
+- policy audit retention, external sink, poison-payload classification and broad repair workflow;
 - policy-service mTLS, OpenTelemetry, Prometheus deployment and production alerting.
 
 ## Local Smoke Shape
@@ -83,6 +84,7 @@ im.contact.events
 -> policy_decision_audit_outbox PENDING rows
 -> policy decision audit outbox relay
 -> im.policy.events readback
+-> optional explicit DLQ event repair
 ```
 
 Raw summaries are written under `H:\NexusIM\loadtest-results\<run-name>`:
@@ -112,4 +114,11 @@ The observability smoke reads `/debug/metrics` after both allow and deny scenari
 
 The contact projection smoke proves that policy-service can consume `im.contact.events` and maintain a policy-owned edge projection. The contact block decision smoke proves that projected `BLOCKED` edges are consumed for direct `SEND` when `direct_peer_user_id` is present. It does not prove group conversation role policy, tenant policy, risk scoring or full ReBAC behavior.
 
-The decision audit outbox smoke proves that public policy decisions are staged as low-sensitive `policy_decision_audit_outbox` rows when PostgreSQL rules mode is enabled. The decision audit relay smoke proves those rows can be published to `im.policy.events` as protobuf `PolicyEvent` records and marked `PUBLISHED`. Audit rows and Kafka events store stable object keys, context-present flags, action, allow/deny, permission version, classification, reason code and trace/request ids. They do not store raw session id, raw device id, raw peer id, raw conversation id, raw message content, rule parameters, SQL errors or free-text deny/provider bodies. DLQ repair, retention and external audit sinks remain future work.
+The decision audit outbox smoke proves that public policy decisions are staged as low-sensitive `policy_decision_audit_outbox` rows when PostgreSQL rules mode is enabled. The decision audit relay smoke proves those rows can be published to `im.policy.events` as protobuf `PolicyEvent` records and marked `PUBLISHED`. Audit rows and Kafka events store stable object keys, context-present flags, action, allow/deny, permission version, classification, reason code and trace/request ids. They do not store raw session id, raw device id, raw peer id, raw conversation id, raw message content, rule parameters, SQL errors or free-text deny/provider bodies. Explicit DLQ event-id repair is available; broad repair workflow, poison-payload classification, retention and external audit sinks remain future work.
+The decision audit repair smoke proves the first-stage operator path for explicit DLQ event IDs:
+
+```powershell
+.\loadtest\policycontacts\run-local-smoke.ps1 -RunName policy-decision-audit-repair-smoke-20260613-clean -ExerciseAuditRepair
+```
+
+`NEXUSIM_POLICY_SERVICE_MODE=outbox-repair` only resets explicitly supplied DLQ rows back to `PENDING`, clears retry state, and writes `policy_decision_audit_outbox_repair_audit`. It does not publish Kafka directly, skip ordered blockers, inspect or rewrite payloads, repair all DLQ rows, classify poison payloads, implement retention, or send audit data to an external sink. After repair, the normal outbox relay remains responsible for publishing to `im.policy.events`.

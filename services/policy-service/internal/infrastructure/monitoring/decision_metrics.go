@@ -1,11 +1,8 @@
 package monitoring
 
 import (
-	"context"
 	"sync"
-	"time"
 
-	"github.com/qsyy0921/IM/services/policy-service/internal/app"
 	"github.com/qsyy0921/IM/services/policy-service/internal/types"
 )
 
@@ -27,26 +24,8 @@ func NewDecisionMetrics() *DecisionMetrics {
 	return &DecisionMetrics{actions: make(map[string]*decisionActionMetrics)}
 }
 
-func NewInstrumentedEvaluator(next app.MessagePolicyEvaluator, metrics *DecisionMetrics) app.MessagePolicyEvaluator {
-	return instrumentedEvaluator{next: next, metrics: metrics}
-}
-
-type instrumentedEvaluator struct {
-	next    app.MessagePolicyEvaluator
-	metrics *DecisionMetrics
-}
-
-func (e instrumentedEvaluator) DecideMessageAction(
-	ctx context.Context,
-	command types.CheckMessageActionCommand,
-) (types.MessageActionDecision, error) {
-	started := time.Now()
-	decision, err := e.next.DecideMessageAction(ctx, command)
-	latencyMS := time.Since(started).Milliseconds()
-	if e.metrics != nil {
-		e.metrics.Record(string(command.Action), decision.Allowed, err != nil, latencyMS)
-	}
-	return decision, err
+func (metrics *DecisionMetrics) RecordPolicyDecisionMetric(action types.MessageAction, allowed bool, failed bool, latencyMS int64) {
+	metrics.Record(string(action), allowed, failed, latencyMS)
 }
 
 func (metrics *DecisionMetrics) Record(action string, allowed bool, failed bool, latencyMS int64) {

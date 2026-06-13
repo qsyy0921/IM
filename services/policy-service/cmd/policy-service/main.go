@@ -236,7 +236,7 @@ func runGRPC() error {
 	}
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
 	decisionMetrics := monitoringinfra.NewDecisionMetrics()
-	evaluator = monitoringinfra.NewInstrumentedEvaluator(evaluator, decisionMetrics)
+	useCaseOptions = append(useCaseOptions, app.WithPolicyDecisionObserver(decisionMetrics))
 	stopDebug, err := startDebugServer(ctx, policyDebugAddr(), monitoringinfra.NewHandler(pool, rulesEnabled, grpcMetrics, decisionMetrics))
 	if err != nil {
 		return err

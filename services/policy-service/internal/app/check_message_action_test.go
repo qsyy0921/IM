@@ -40,6 +40,44 @@ func TestCheckMessageActionUseCaseDeniesStaticDecision(t *testing.T) {
 	}
 }
 
+func TestCheckMessageActionUseCaseObservesEvaluatorDecisionsOnce(t *testing.T) {
+	observer := &fakePolicyDecisionObserver{}
+	evaluator := &countingEvaluator{
+		decision: types.MessageActionDecision{
+			TenantID:          "tenant-1",
+			UserID:            "user-1",
+			ConversationID:    "conv-1",
+			Action:            types.MessageActionSend,
+			Allowed:           true,
+			PermissionVersion: 7,
+			Classification:    "STATIC_ALLOW",
+		},
+	}
+	useCase := NewCheckMessageActionUseCase(evaluator, WithPolicyDecisionObserver(observer))
+
+	result, err := useCase.Execute(context.Background(), testPolicyCommand(types.MessageActionSend))
+	if err != nil {
+		t.Fatalf("check message action: %v", err)
+	}
+	if !result.Allowed || evaluator.calls != 1 {
+		t.Fatalf("expected evaluator allow once, result=%+v calls=%d", result, evaluator.calls)
+	}
+	if observer.calls != 1 || observer.action != types.MessageActionSend || !observer.allowed || observer.failed {
+		t.Fatalf("unexpected observer state: %+v", observer)
+	}
+
+	evaluator.decision.Allowed = false
+	evaluator.decision.Action = types.MessageActionDelete
+	evaluator.decision.Classification = "STATIC_DENY"
+	command := testPolicyCommand(types.MessageActionDelete)
+	if _, err := useCase.Execute(context.Background(), command); err != nil {
+		t.Fatalf("check deny action: %v", err)
+	}
+	if evaluator.calls != 2 || observer.calls != 2 || observer.action != types.MessageActionDelete || observer.allowed || observer.failed {
+		t.Fatalf("expected one deny metric for second decision, evaluator=%d observer=%+v", evaluator.calls, observer)
+	}
+}
+
 func TestCheckMessageActionUseCaseRecordsAudit(t *testing.T) {
 	auditor := &fakePolicyDecisionAuditor{}
 	useCase := NewCheckMessageActionUseCase(domain.StaticMessagePolicy{
@@ -68,6 +106,7 @@ func TestCheckMessageActionUseCaseRecordsAudit(t *testing.T) {
 
 func TestCheckMessageActionUseCaseDeniesNonSenderMutationBeforeEvaluator(t *testing.T) {
 	auditor := &fakePolicyDecisionAuditor{}
+	observer := &fakePolicyDecisionObserver{}
 	evaluator := &countingEvaluator{
 		decision: types.MessageActionDecision{
 			TenantID:          "tenant-1",
@@ -80,7 +119,7 @@ func TestCheckMessageActionUseCaseDeniesNonSenderMutationBeforeEvaluator(t *test
 			Classification:    "STATIC_ALLOW",
 		},
 	}
-	useCase := NewCheckMessageActionUseCase(evaluator, WithPolicyDecisionAuditor(auditor))
+	useCase := NewCheckMessageActionUseCase(evaluator, WithPolicyDecisionAuditor(auditor), WithPolicyDecisionObserver(observer))
 	command := testPolicyCommand(types.MessageActionEdit)
 	command.AuthContext.UserID = "user-2"
 	command.MessageSenderUserID = "user-1"
@@ -102,10 +141,14 @@ func TestCheckMessageActionUseCaseDeniesNonSenderMutationBeforeEvaluator(t *test
 	if !auditor.called || auditor.decision.Classification != "MESSAGE_OWNERSHIP_DENIED" {
 		t.Fatalf("expected ownership deny audit, got %+v", auditor.decision)
 	}
+	if observer.calls != 1 || observer.action != types.MessageActionEdit || observer.allowed || observer.failed {
+		t.Fatalf("expected one ownership deny metric, got %+v", observer)
+	}
 }
 
 func TestCheckMessageActionUseCaseAllowsNonSenderMutationWithOwnershipOverride(t *testing.T) {
 	auditor := &fakePolicyDecisionAuditor{}
+	observer := &fakePolicyDecisionObserver{}
 	evaluator := &countingEvaluator{
 		decision: types.MessageActionDecision{
 			TenantID:          "tenant-1",
@@ -136,6 +179,7 @@ func TestCheckMessageActionUseCaseAllowsNonSenderMutationWithOwnershipOverride(t
 		evaluator,
 		WithMessageOwnershipOverrideChecker(checker),
 		WithPolicyDecisionAuditor(auditor),
+		WithPolicyDecisionObserver(observer),
 	)
 	command := testPolicyCommand(types.MessageActionRevoke)
 	command.AuthContext.UserID = "user-2"
@@ -157,6 +201,9 @@ func TestCheckMessageActionUseCaseAllowsNonSenderMutationWithOwnershipOverride(t
 	}
 	if !auditor.called || auditor.decision.Classification != "MESSAGE_OWNERSHIP_ROLE_OVERRIDE" {
 		t.Fatalf("expected ownership override audit, got %+v", auditor.decision)
+	}
+	if observer.calls != 1 || observer.action != types.MessageActionRevoke || !observer.allowed || observer.failed {
+		t.Fatalf("expected one ownership override allow metric, got %+v", observer)
 	}
 }
 
@@ -185,9 +232,11 @@ func TestCheckMessageActionUseCaseDeniesNonSenderMutationWhenOwnershipOverrideDo
 
 func TestCheckMessageActionUseCaseOwnershipOverrideFailsClosed(t *testing.T) {
 	checker := &fakeOwnershipOverrideChecker{err: types.NewDependencyUnavailable("policy ownership override failed")}
+	observer := &fakePolicyDecisionObserver{}
 	useCase := NewCheckMessageActionUseCase(
 		&countingEvaluator{},
 		WithMessageOwnershipOverrideChecker(checker),
+		WithPolicyDecisionObserver(observer),
 	)
 	command := testPolicyCommand(types.MessageActionEdit)
 	command.AuthContext.UserID = "user-2"
@@ -197,6 +246,9 @@ func TestCheckMessageActionUseCaseOwnershipOverrideFailsClosed(t *testing.T) {
 	_, err := useCase.Execute(context.Background(), command)
 	if !errors.Is(err, types.ErrDependencyUnavailable) {
 		t.Fatalf("expected dependency unavailable, got %v", err)
+	}
+	if observer.calls != 1 || observer.action != types.MessageActionEdit || observer.allowed || !observer.failed {
+		t.Fatalf("expected one ownership override error metric, got %+v", observer)
 	}
 }
 
@@ -294,6 +346,22 @@ func (f *fakePolicyDecisionAuditor) RecordPolicyDecision(
 	f.command = command
 	f.decision = decision
 	return f.err
+}
+
+type fakePolicyDecisionObserver struct {
+	calls     int
+	action    types.MessageAction
+	allowed   bool
+	failed    bool
+	latencyMS int64
+}
+
+func (f *fakePolicyDecisionObserver) RecordPolicyDecisionMetric(action types.MessageAction, allowed bool, failed bool, latencyMS int64) {
+	f.calls++
+	f.action = action
+	f.allowed = allowed
+	f.failed = failed
+	f.latencyMS = latencyMS
 }
 
 type countingEvaluator struct {

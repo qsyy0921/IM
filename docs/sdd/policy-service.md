@@ -196,7 +196,7 @@ When `NEXUSIM_POLICY_DEBUG_ADDR` is set, policy-service exposes:
 /debug/metrics
 ```
 
-The debug metrics include aggregate gRPC request counts and status codes, aggregate policy decision counts, per-action aggregate decision counts, optional PostgreSQL pool stats, optional rule-store row counts and optional decision audit outbox status counts. They intentionally do not expose tenant id, user id, conversation id, message id, device id, session id, request / response payloads, raw rule parameters, deny reason text, classification strings, DSNs or SQL error text.
+The debug metrics include aggregate gRPC request counts and status codes, aggregate final `CheckMessageAction` decision counts, per-action aggregate decision counts, optional PostgreSQL pool stats, optional rule-store row counts and optional decision audit outbox status counts. Decision metrics are recorded at the use-case boundary, so they include static / exact / tenant / role decisions as well as first-stage ownership denies and `ownership_override=true` allows. They intentionally do not expose tenant id, user id, conversation id, message id, device id, session id, request / response payloads, raw rule parameters, deny reason text, classification strings, DSNs or SQL error text.
 
 `allowed=false` is counted as a decision deny, while the gRPC method remains `codes.OK`. Transport errors are counted separately.
 

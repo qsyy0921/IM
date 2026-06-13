@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"github.com/qsyy0921/IM/services/policy-service/internal/types"
 )
@@ -21,10 +22,15 @@ type MessageOwnershipOverrideChecker interface {
 	) (types.MessageActionDecision, bool, error)
 }
 
+type PolicyDecisionObserver interface {
+	RecordPolicyDecisionMetric(action types.MessageAction, allowed bool, failed bool, latencyMS int64)
+}
+
 type CheckMessageActionUseCase struct {
 	evaluator        MessagePolicyEvaluator
 	auditor          PolicyDecisionAuditor
 	ownershipChecker MessageOwnershipOverrideChecker
+	observer         PolicyDecisionObserver
 }
 
 type CheckMessageActionOption func(*CheckMessageActionUseCase)
@@ -49,19 +55,32 @@ func WithMessageOwnershipOverrideChecker(checker MessageOwnershipOverrideChecker
 	}
 }
 
+func WithPolicyDecisionObserver(observer PolicyDecisionObserver) CheckMessageActionOption {
+	return func(useCase *CheckMessageActionUseCase) {
+		useCase.observer = observer
+	}
+}
+
 func (u CheckMessageActionUseCase) Execute(
 	ctx context.Context,
 	command types.CheckMessageActionCommand,
-) (types.MessageActionDecision, error) {
-	if err := command.Validate(); err != nil {
+) (decision types.MessageActionDecision, err error) {
+	if err = command.Validate(); err != nil {
 		return types.MessageActionDecision{}, err
 	}
+	started := time.Now()
+	defer func() {
+		if u.observer != nil {
+			u.observer.RecordPolicyDecisionMetric(command.Action, decision.Allowed, err != nil, time.Since(started).Milliseconds())
+		}
+	}()
 	if u.evaluator == nil {
 		return types.MessageActionDecision{}, types.NewDependencyUnavailable("policy evaluator is not configured")
 	}
-	if decision, handled, err := u.messageOwnershipDecision(ctx, command); err != nil {
+	if ownershipDecision, handled, err := u.messageOwnershipDecision(ctx, command); err != nil {
 		return types.MessageActionDecision{}, err
 	} else if handled {
+		decision = ownershipDecision
 		if u.auditor != nil {
 			if err := u.auditor.RecordPolicyDecision(ctx, command, decision); err != nil {
 				return types.MessageActionDecision{}, err
@@ -69,7 +88,7 @@ func (u CheckMessageActionUseCase) Execute(
 		}
 		return decision, nil
 	}
-	decision, err := u.evaluator.DecideMessageAction(ctx, command)
+	decision, err = u.evaluator.DecideMessageAction(ctx, command)
 	if err != nil {
 		return types.MessageActionDecision{}, err
 	}

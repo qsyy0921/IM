@@ -26,6 +26,7 @@ conversation-service CreateMemberChange
 - `conversation-service` 已有独立六层 DDD 骨架。
 - `GetSendContext` 已经能从 PostgreSQL 读取会话状态、成员状态、版本号、会话模式和 fanout 策略。
 - `message-service` 已支持通过 `NEXUSIM_CONVERSATION_SERVICE_ADDR` 切到真实 conversation-service，不再只能依赖 strict mock。
+- `conversation-service` 已补第一阶段本地观测：`/healthz`、`/readyz`、`/debug/metrics`，便于在后续群管理和成员窗口 repair 开发前先看 gRPC / PG / member-change 聚合状态。
 - 第一轮真实进程 smoke 结果：`725 / 725` 成功，p95 `10.36ms`，p99 `13.26ms`。
 - 本轮 smoke 没启动 outbox relay，因此 summary 中 `outbox_pending_count=725` 是预期现象；测试结束后已删除本次 tenant 数据，避免污染后续压测。
 - `CreateMemberChange` 最小写路径已完成真实进程 smoke：`279 / 279` 成功，p99 `24.95ms`，`outbox_published_count=279`，`outbox_pending_count=0`。

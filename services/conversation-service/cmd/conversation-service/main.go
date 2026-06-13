@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -59,13 +60,19 @@ func runGRPCServer() error {
 		return err
 	}
 	defer pool.Close()
+	grpcMetrics := monitoringinfra.NewGRPCMetrics()
+	stopDebug, err := startDebugServer(ctx, conversationDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 
 	listenAddr := envString("NEXUSIM_CONVERSATION_GRPC_ADDR", "0.0.0.0:10496")
 	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		return err
 	}
-	server, err := newGRPCServer()
+	server, err := newGRPCServer(grpcMetrics)
 	if err != nil {
 		return err
 	}
@@ -103,9 +110,13 @@ func runGRPCServer() error {
 	}
 }
 
-func newGRPCServer() (*grpc.Server, error) {
+func newGRPCServer(grpcMetrics ...*monitoringinfra.GRPCMetrics) (*grpc.Server, error) {
 	interceptors := make([]grpc.UnaryServerInterceptor, 0, 2)
-	interceptors = append(interceptors, monitoringinfra.UnaryAccessLogInterceptor(log.Default()))
+	metrics := monitoringinfra.NewGRPCMetrics()
+	if len(grpcMetrics) > 0 && grpcMetrics[0] != nil {
+		metrics = grpcMetrics[0]
+	}
+	interceptors = append(interceptors, metrics.UnaryServerInterceptor(log.Default()))
 	switch strings.ToLower(envString("NEXUSIM_CONVERSATION_AUTH_MODE", "body")) {
 	case "body", "request", "legacy":
 	case "metadata", "verified-metadata":
@@ -138,6 +149,11 @@ func runMemberChangeWorker() error {
 		return err
 	}
 	defer pool.Close()
+	stopDebug, err := startDebugServer(ctx, conversationDebugAddr(), monitoringinfra.NewHandler(pool))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 
 	repository := postgresinfra.NewRepository(pool)
 	useCase := app.NewMarkPublishedMemberChangesUseCase(
@@ -157,6 +173,37 @@ func runMemberChangeWorker() error {
 	return worker.Run(ctx)
 }
 
+func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {
+	if strings.TrimSpace(addr) == "" {
+		return func() {}, nil
+	}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	server := &http.Server{Handler: handler}
+	done := make(chan struct{})
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+	}()
+	go func() {
+		defer close(done)
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("conversation-service debug server stopped with error: %v", err)
+		}
+	}()
+	log.Printf("conversation-service debug server started on %s", addr)
+	return func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+		<-done
+	}, nil
+}
+
 func openPGPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
@@ -174,6 +221,10 @@ func envString(name string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func conversationDebugAddr() string {
+	return envString("NEXUSIM_CONVERSATION_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
 }
 
 func loadConversationGRPCCredentialsFromEnv() (credentials.TransportCredentials, bool, error) {

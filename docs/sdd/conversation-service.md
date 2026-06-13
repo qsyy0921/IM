@@ -140,12 +140,27 @@ NEXUSIM_CONVERSATION_AUTH_MODE=verified-metadata # alias of metadata
 
 In `metadata` / `verified-metadata` mode, `CreateMemberChange`, `GetMemberChange`, `TransferConversationOwner`, and `ListConversationMembers` ignore caller-supplied `AuthContext.tenant_id/user_id/device_id/session_id` and use gateway-injected metadata keys instead. `trace_id/request_id` may still fall back to the request body for observability. `GetSendContext` remains the message-service service-to-service read path and keeps its request contract. This is not a full API gateway or centralized identity-governance implementation.
 
+第一阶段本地运维观测保持低敏：
+
+```text
+NEXUSIM_CONVERSATION_DEBUG_ADDR=
+```
+
+配置后暴露：
+
+- `/healthz`
+- `/readyz`
+- `/debug/metrics`
+
+`/debug/metrics` 只返回低敏聚合快照：gRPC 请求统计、PostgreSQL pool、`conversations` / `conversation_members` / `member_change_saga` 的总量和状态分布，不返回成员标识、会话标题、target user 明细或 raw error 文本。
+
 ## 7. 本阶段验收
 
 - `conversation_service.proto` 已生成 Go 代码。
 - `conversation-service` 具备六层目录和 `cmd/conversation-service`。
 - `GetSendContext` gRPC handler 有单元测试。
 - PostgreSQL repository 有可选集成测试。
+- `conversation-service` 已有 `/healthz`、`/readyz`、`/debug/metrics` 和 gRPC metrics。
 - `message-service` 可以通过 gRPC client 替换 strict conversation mock。
 - `go test ./...` 通过。
 

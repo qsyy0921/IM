@@ -24,6 +24,7 @@ Implemented:
 - policy-service first-stage decision audit outbox smoke: `loadtest-report-20260613-policy-decision-audit-outbox-smoke.md`.
 - policy-service decision audit relay smoke for `policy_decision_audit_outbox -> im.policy.events`: `loadtest-report-20260613-policy-decision-audit-relay-smoke.md`.
 - policy-service decision audit DLQ repair smoke for explicit event-id redrive: `loadtest-report-20260613-policy-decision-audit-repair-smoke.md`.
+- policy-service decision audit repair validation smoke after preflight gate: `loadtest-report-20260613-policy-decision-audit-repair-validated-smoke.md`.
 
 Not yet implemented:
 
@@ -121,4 +122,4 @@ The decision audit repair smoke proves the first-stage operator path for explici
 .\loadtest\policycontacts\run-local-smoke.ps1 -RunName policy-decision-audit-repair-smoke-20260613-clean -ExerciseAuditRepair
 ```
 
-`NEXUSIM_POLICY_SERVICE_MODE=outbox-repair` only resets explicitly supplied DLQ rows back to `PENDING`, clears retry state, and writes `policy_decision_audit_outbox_repair_audit`. It does not publish Kafka directly, skip ordered blockers, inspect or rewrite payloads, repair all DLQ rows, classify poison payloads, implement retention, or send audit data to an external sink. After repair, the normal outbox relay remains responsible for publishing to `im.policy.events`.
+`NEXUSIM_POLICY_SERVICE_MODE=outbox-repair` only resets explicitly supplied DLQ rows back to `PENDING`, clears retry state, and writes `policy_decision_audit_outbox_repair_audit`. Before redrive, it validates the event through the same policy-event builder used by the relay. Invalid envelope or payload rows stay in `DLQ`, get a `SKIPPED / validation_failed` repair audit row, and make the operator exit non-zero. The repair mode does not publish Kafka directly, skip ordered blockers, rewrite payloads, repair all DLQ rows, implement retention, or send audit data to an external sink. After repair, the normal outbox relay remains responsible for publishing to `im.policy.events`.

@@ -38,6 +38,7 @@ param(
     [string]$GatewayAuthMode = "",
     [string]$GatewayAuthHmacSecret = "",
     [string]$GatewayAuthAudience = "api-gateway",
+    [switch]$GatewayFacade,
     [switch]$VerifiedAuthMetadata,
     [switch]$NoCleanup,
     [switch]$SkipBuild
@@ -100,6 +101,9 @@ if (-not [string]::IsNullOrWhiteSpace($GatewayAuthMode)) {
 }
 if ($VerifiedAuthMetadata) {
     $args += @("--verified-auth-metadata")
+}
+if ($GatewayFacade) {
+    $args += @("--gateway-facade")
 }
 if (-not [string]::IsNullOrWhiteSpace($ConversationTlsCaFile)) {
     $args += @("--conversation-tls-ca-file", $ConversationTlsCaFile)

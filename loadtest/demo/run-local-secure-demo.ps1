@@ -19,7 +19,7 @@ Set-Location $repo
 . .\tools\go-env.ps1
 
 if ([string]::IsNullOrWhiteSpace($RunName)) {
-    $RunName = "e2e-demo-secure-mtls-wss-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+    $RunName = "e2e-demo-api-gateway-facade-secure-" + (Get-Date -Format "yyyyMMdd-HHmmss")
 }
 $safeRunName = $RunName -replace '[^a-zA-Z0-9_-]', '-'
 if ([string]::IsNullOrWhiteSpace($TenantId)) {
@@ -634,6 +634,7 @@ try {
         "--message-target", $apiGatewayTarget,
         "--delivery-target", $apiGatewayTarget,
         "--receipt-target", $apiGatewayTarget,
+        "--gateway-facade",
         "--push-url", $pushURL,
         "--result-dir", $resultDir,
         "--tenant-id", $TenantId,

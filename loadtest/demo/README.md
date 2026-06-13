@@ -55,6 +55,18 @@ api-gateway token auth 示例：
 
 该模式用于 demo runner 指向 api-gateway 时提交 gateway token，由 api-gateway 验证 token、重写下游 request `AuthContext` 并注入 trusted metadata。默认 audience 是 `api-gateway`；如需兼容历史 token，可显式覆盖，但不要把 `push-gateway` audience 作为新的 api-gateway 默认口径。不要和 `-VerifiedAuthMetadata` 同时使用；前者模拟客户端经 gateway，后者只用于直接打后端服务的 smoke。
 
+api-gateway public facade 示例：
+
+```powershell
+.\loadtest\demo\run-local-demo.ps1 `
+  -GatewayAuthMode hmac `
+  -GatewayAuthHmacSecret "local-gateway-secret" `
+  -GatewayAuthAudience api-gateway `
+  -GatewayFacade
+```
+
+该模式使用 `nexusim.gateway.v1.GatewayService` 调 conversation / message / delivery / receipt 的 user-facing RPC，不再依赖 api-gateway 兼容保留的 legacy service descriptor。facade 不包含服务间 `GetSendContext`。
+
 gRPC mTLS + WebSocket WSS/mTLS 示例：
 
 ```powershell
@@ -85,7 +97,7 @@ gRPC mTLS + WebSocket WSS/mTLS 示例：
 
 这些参数只验证本地静态证书下的 gRPC TLS/mTLS 和 push-gateway WSS/mTLS 连接；证书签发、轮换、分发、撤销和动态服务身份治理不在 demo runner 范围内。
 
-`run-local-secure-demo.ps1` 会启动真实 api-gateway，把 conversation / message / delivery / receipt 四个 gRPC target 指向 api-gateway，并用 `GatewayAuthMode=hmac` 验证 token -> trusted metadata -> 下游 mTLS metadata auth 链路。
+`run-local-secure-demo.ps1` 会启动真实 api-gateway，把 conversation / message / delivery / receipt 四个 gRPC target 指向 api-gateway，并默认启用 `--gateway-facade`，用 `GatewayAuthMode=hmac` 验证 token -> `GatewayService` facade -> trusted metadata -> 下游 mTLS metadata auth 链路。
 该脚本同时启用 api-gateway `/debug/metrics`，并把低敏进程内指标保存为结果目录下的 `api-gateway-debug-metrics.json`。
 
 边界：

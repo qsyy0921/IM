@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
+	gatewayv1 "github.com/qsyy0921/IM/api/proto/nexusim/gateway/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
@@ -81,6 +82,7 @@ type config struct {
 	cleanup        bool
 
 	verifiedAuthMetadata  bool
+	gatewayFacade         bool
 	gatewayAuthMode       string
 	gatewayAuthHMACSecret string
 	gatewayAuthAudience   string
@@ -106,6 +108,7 @@ type summary struct {
 	ReceiptTLSEnabled      bool                     `json:"receipt_tls_enabled"`
 	PushTLSEnabled         bool                     `json:"push_tls_enabled"`
 	VerifiedAuthMetadata   bool                     `json:"verified_auth_metadata"`
+	GatewayFacade          bool                     `json:"gateway_facade"`
 	GatewayAuthMode        string                   `json:"gateway_auth_mode,omitempty"`
 	GatewayAuthAudience    string                   `json:"gateway_auth_audience,omitempty"`
 	StartedAt              time.Time                `json:"started_at"`
@@ -249,6 +252,7 @@ func main() {
 	flag.DurationVar(&cfg.pollInterval, "poll-interval", 200*time.Millisecond, "poll interval")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete existing rows for tenant before local demo")
 	flag.BoolVar(&cfg.verifiedAuthMetadata, "verified-auth-metadata", envBool("NEXUSIM_DEMO_VERIFIED_AUTH_METADATA", false), "send gateway verified identity through gRPC metadata for user-facing service RPCs")
+	flag.BoolVar(&cfg.gatewayFacade, "gateway-facade", envBool("NEXUSIM_DEMO_GATEWAY_FACADE", false), "use nexusim.gateway.v1.GatewayService for conversation/message/delivery/receipt user-facing RPCs")
 	flag.StringVar(&cfg.gatewayAuthMode, "gateway-auth-mode", os.Getenv("NEXUSIM_DEMO_GATEWAY_AUTH_MODE"), "api-gateway auth mode for user-facing gRPC calls: empty, mock, or hmac")
 	flag.StringVar(&cfg.gatewayAuthHMACSecret, "gateway-auth-hmac-secret", os.Getenv("NEXUSIM_DEMO_GATEWAY_AUTH_HMAC_SECRET"), "HMAC secret used to sign api-gateway demo token when --gateway-auth-mode=hmac")
 	flag.StringVar(&cfg.gatewayAuthAudience, "gateway-auth-audience", envString("NEXUSIM_DEMO_GATEWAY_AUTH_AUDIENCE", "api-gateway"), "audience claim used for generated api-gateway demo token")
@@ -392,6 +396,7 @@ func run(ctx context.Context, cfg config) error {
 		ReceiptTLSEnabled:      cfg.receiptTLS.Enabled(),
 		PushTLSEnabled:         cfg.pushTLS.Enabled(),
 		VerifiedAuthMetadata:   cfg.verifiedAuthMetadata,
+		GatewayFacade:          cfg.gatewayFacade,
 		GatewayAuthMode:        cfg.gatewayAuthMode,
 		GatewayAuthAudience:    gatewayAuthAudienceSummary(cfg.gatewayAuthMode, cfg.gatewayAuthAudience),
 		StartedAt:              started,
@@ -448,7 +453,22 @@ func run(ctx context.Context, cfg config) error {
 	}
 	defer receiptConn.Close()
 
-	join, err := createReceiverJoin(ctx, cfg, conversationv1.NewConversationServiceClient(conversationConn))
+	conversationClient := conversationv1.NewConversationServiceClient(conversationConn)
+	messageClient := messagev1.NewMessageServiceClient(messageConn)
+	deliveryClient := deliveryv1.NewDeliveryServiceClient(deliveryConn)
+	receiptClient := receiptv1.NewReceiptServiceClient(receiptConn)
+	if cfg.gatewayFacade {
+		if cfg.messageTarget != cfg.conversationTarget || cfg.deliveryTarget != cfg.conversationTarget || cfg.receiptTarget != cfg.conversationTarget {
+			return finish(cfg, &result, fmt.Errorf("--gateway-facade requires conversation/message/delivery/receipt targets to point at the same api-gateway endpoint"))
+		}
+		facadeClient := gatewayv1.NewGatewayServiceClient(conversationConn)
+		conversationClient = gatewayConversationClient{GatewayServiceClient: facadeClient}
+		messageClient = facadeClient
+		deliveryClient = facadeClient
+		receiptClient = facadeClient
+	}
+
+	join, err := createReceiverJoin(ctx, cfg, conversationClient)
 	if err != nil {
 		return finish(cfg, &result, fmt.Errorf("create receiver join: %w", err))
 	}
@@ -468,7 +488,7 @@ func run(ctx context.Context, cfg config) error {
 	defer conn.CloseNow()
 	result.ServerHello = hello
 
-	sent, err := sendMessage(ctx, cfg, messagev1.NewMessageServiceClient(messageConn))
+	sent, err := sendMessage(ctx, cfg, messageClient)
 	if err != nil {
 		return finish(cfg, &result, fmt.Errorf("send message: %w", err))
 	}
@@ -480,14 +500,12 @@ func run(ctx context.Context, cfg config) error {
 	}
 	result.Notify = notify
 
-	deliveryClient := deliveryv1.NewDeliveryServiceClient(deliveryConn)
 	pull, err := pullInboxAtLeast(ctx, cfg, deliveryClient, sent.GetConversationSeq())
 	if err != nil {
 		return finish(cfg, &result, fmt.Errorf("pull inbox: %w", err))
 	}
 	result.PullInbox = pull
 
-	receiptClient := receiptv1.NewReceiptServiceClient(receiptConn)
 	beforeRead, err := waitConversationSummary(ctx, cfg, receiptClient, pull.MaxSeq, 1, false)
 	if err != nil {
 		return finish(cfg, &result, fmt.Errorf("wait list conversations before read: %w", err))
@@ -527,6 +545,14 @@ func run(ctx context.Context, cfg config) error {
 
 	result.Success = true
 	return finish(cfg, &result, nil)
+}
+
+type gatewayConversationClient struct {
+	gatewayv1.GatewayServiceClient
+}
+
+func (client gatewayConversationClient) GetSendContext(context.Context, *conversationv1.GetSendContextRequest, ...grpc.CallOption) (*conversationv1.GetSendContextResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "GetSendContext is service-internal")
 }
 
 func createReceiverJoin(ctx context.Context, cfg config, client conversationv1.ConversationServiceClient) (*conversationv1.CreateMemberChangeResponse, error) {

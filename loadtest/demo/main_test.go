@@ -16,10 +16,20 @@ import (
 	"testing"
 	"time"
 
+	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
+	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
+	gatewayv1 "github.com/qsyy0921/IM/api/proto/nexusim/gateway/v1"
+	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
+	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc/metadata"
 )
+
+var _ conversationv1.ConversationServiceClient = gatewayConversationClient{}
+var _ messagev1.MessageServiceClient = (gatewayv1.GatewayServiceClient)(nil)
+var _ deliveryv1.DeliveryServiceClient = (gatewayv1.GatewayServiceClient)(nil)
+var _ receiptv1.ReceiptServiceClient = (gatewayv1.GatewayServiceClient)(nil)
 
 func TestEnvBool(t *testing.T) {
 	t.Setenv("NEXUSIM_TEST_BOOL", "true")

@@ -108,7 +108,8 @@ This is a targeted integration smoke, not a capacity result. It uses seeded memb
 
 Remaining future work:
 
-- full ReBAC and message ownership policy;
+- full ReBAC and admin / moderator mutation override;
+- sender-only ownership is covered separately by `loadtest-report-20260613-policy-message-ownership-smoke.md`;
 - tenant policy DSL / quota / risk policy;
 - broader audit retention and external sink;
 - broader poison-payload repair classification.

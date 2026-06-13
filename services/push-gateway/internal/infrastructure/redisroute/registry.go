@@ -49,6 +49,7 @@ type Metrics struct {
 	RedisRouteRemoteMatchedSessions    uint64 `json:"redis_route_remote_matched_sessions"`
 	RedisRouteRemotePublishCallCount   uint64 `json:"redis_route_remote_publish_call_count"`
 	RedisRouteRemotePublishErrorCount  uint64 `json:"redis_route_remote_publish_error_count"`
+	RedisRouteRemoteNoSubscriberCount  uint64 `json:"redis_route_remote_no_subscriber_count"`
 	RedisRouteRemoteEnqueuedSessions   uint64 `json:"redis_route_remote_enqueued_sessions"`
 	RedisRouteStaleRemovedCount        uint64 `json:"redis_route_stale_removed_count"`
 	RedisRouteCleanupErrorCount        uint64 `json:"redis_route_cleanup_error_count"`
@@ -71,6 +72,7 @@ type registryMetrics struct {
 	remoteMatchedSessions   atomic.Uint64
 	remotePublishCallCount  atomic.Uint64
 	remotePublishErrorCount atomic.Uint64
+	remoteNoSubscriberCount atomic.Uint64
 	remoteEnqueuedSessions  atomic.Uint64
 	staleRemovedCount       atomic.Uint64
 	cleanupErrorCount       atomic.Uint64
@@ -300,9 +302,15 @@ func (registry *Registry) EnqueueNotification(
 			continue
 		}
 		registry.metrics.remotePublishCallCount.Add(1)
-		if err := registry.publishRemote(ctx, gatewayID, notification); err != nil {
+		subscriberCount, err := registry.publishRemote(ctx, gatewayID, notification)
+		if err != nil {
 			result.Dropped += sessionCount
 			registry.metrics.remotePublishErrorCount.Add(1)
+			continue
+		}
+		if subscriberCount == 0 {
+			result.Dropped += sessionCount
+			registry.metrics.remoteNoSubscriberCount.Add(uint64(sessionCount))
 			continue
 		}
 		publishedGateways[gatewayID] = struct{}{}
@@ -332,13 +340,18 @@ func (registry *Registry) EvictDevice(ctx context.Context, tenantID string, user
 		result.MatchedSessions++
 	}
 	for gatewayID, sessionCount := range remoteSessionsByGateway {
-		if err := registry.publishRemoteEviction(ctx, gatewayID, evictionMessage{
+		subscriberCount, err := registry.publishRemoteEviction(ctx, gatewayID, evictionMessage{
 			TenantID: tenantID,
 			UserID:   userID,
 			DeviceID: deviceID,
 			Reason:   firstNonEmpty(reason, "identity_revoked"),
-		}); err != nil {
+		})
+		if err != nil {
 			registry.metrics.remotePublishErrorCount.Add(1)
+			continue
+		}
+		if subscriberCount == 0 {
+			registry.metrics.remoteNoSubscriberCount.Add(uint64(sessionCount))
 			continue
 		}
 		result.Evicted += sessionCount
@@ -369,14 +382,19 @@ func (registry *Registry) EvictSession(ctx context.Context, tenantID string, use
 		if _, ok := publishedGateways[route.GatewayID]; ok {
 			continue
 		}
-		if err := registry.publishRemoteEviction(ctx, route.GatewayID, evictionMessage{
+		subscriberCount, err := registry.publishRemoteEviction(ctx, route.GatewayID, evictionMessage{
 			TenantID:  tenantID,
 			UserID:    userID,
 			DeviceID:  deviceID,
 			SessionID: sessionID,
 			Reason:    firstNonEmpty(reason, "identity_revoked"),
-		}); err != nil {
+		})
+		if err != nil {
 			registry.metrics.remotePublishErrorCount.Add(1)
+			continue
+		}
+		if subscriberCount == 0 {
+			registry.metrics.remoteNoSubscriberCount.Add(1)
 			continue
 		}
 		publishedGateways[route.GatewayID] = struct{}{}
@@ -393,6 +411,7 @@ func (registry *Registry) Metrics() Metrics {
 		RedisRouteRemoteMatchedSessions:   registry.metrics.remoteMatchedSessions.Load(),
 		RedisRouteRemotePublishCallCount:  registry.metrics.remotePublishCallCount.Load(),
 		RedisRouteRemotePublishErrorCount: registry.metrics.remotePublishErrorCount.Load(),
+		RedisRouteRemoteNoSubscriberCount: registry.metrics.remoteNoSubscriberCount.Load(),
 		RedisRouteRemoteEnqueuedSessions:  registry.metrics.remoteEnqueuedSessions.Load(),
 		RedisRouteStaleRemovedCount:       registry.metrics.staleRemovedCount.Load(),
 		RedisRouteCleanupErrorCount:       registry.metrics.cleanupErrorCount.Load(),
@@ -532,24 +551,24 @@ func (registry *Registry) publishRemote(
 	ctx context.Context,
 	gatewayID string,
 	notification types.DeliveryNotification,
-) error {
+) (int64, error) {
 	payload, err := json.Marshal(notification)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return registry.client.Publish(ctx, registry.gatewayChannel(gatewayID), payload).Err()
+	return registry.client.Publish(ctx, registry.gatewayChannel(gatewayID), payload).Result()
 }
 
 func (registry *Registry) publishRemoteEviction(
 	ctx context.Context,
 	gatewayID string,
 	eviction evictionMessage,
-) error {
+) (int64, error) {
 	payload, err := json.Marshal(eviction)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return registry.client.Publish(ctx, registry.gatewayEvictionChannel(gatewayID), payload).Err()
+	return registry.client.Publish(ctx, registry.gatewayEvictionChannel(gatewayID), payload).Result()
 }
 
 func (registry *Registry) sessionKey(sessionID string) string {

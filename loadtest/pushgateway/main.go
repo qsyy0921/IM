@@ -292,6 +292,7 @@ type redisRouteMetrics struct {
 	RedisRouteRemoteMatchedSessions    uint64 `json:"redis_route_remote_matched_sessions"`
 	RedisRouteRemotePublishCallCount   uint64 `json:"redis_route_remote_publish_call_count"`
 	RedisRouteRemotePublishErrorCount  uint64 `json:"redis_route_remote_publish_error_count"`
+	RedisRouteRemoteNoSubscriberCount  uint64 `json:"redis_route_remote_no_subscriber_count"`
 	RedisRouteRemoteEnqueuedSessions   uint64 `json:"redis_route_remote_enqueued_sessions"`
 	RedisRouteStaleRemovedCount        uint64 `json:"redis_route_stale_removed_count"`
 	RedisRouteCleanupErrorCount        uint64 `json:"redis_route_cleanup_error_count"`

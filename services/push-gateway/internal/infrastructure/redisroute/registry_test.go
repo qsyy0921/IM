@@ -94,6 +94,7 @@ func TestRegistryPublishesRemoteRouteAndEnqueuesLocal(t *testing.T) {
 	if metrics.RedisRouteRemoteMatchedSessions != 2 ||
 		metrics.RedisRouteRemotePublishCallCount != 1 ||
 		metrics.RedisRouteRemoteEnqueuedSessions != 2 ||
+		metrics.RedisRouteRemoteNoSubscriberCount != 0 ||
 		metrics.RedisRouteRemotePublishErrorCount != 0 {
 		t.Fatalf("unexpected redis route metrics: %+v", metrics)
 	}
@@ -373,6 +374,37 @@ func TestRegistryFailsOpenWhenRedisLookupUnavailable(t *testing.T) {
 	}
 }
 
+func TestRegistryRemoteNotificationWithoutSubscriberCountsDropped(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	registry := NewRegistry(memory.NewRegistry(), client, Config{GatewayID: "gateway-a", RouteTTL: time.Minute})
+
+	if err := registry.writeRoute(context.Background(), routeEntry{
+		TenantID:  "tenant-1",
+		UserID:    "user-1",
+		DeviceID:  "device-remote",
+		SessionID: "remote-session",
+		GatewayID: "gateway-b",
+	}); err != nil {
+		t.Fatalf("write remote route: %v", err)
+	}
+
+	result, err := registry.EnqueueNotification(context.Background(), testNotification())
+	if err != nil {
+		t.Fatalf("enqueue: %v", err)
+	}
+	if result.MatchedSessions != 1 || result.Enqueued != 0 || result.Dropped != 1 {
+		t.Fatalf("unexpected no-subscriber notify result: %+v", result)
+	}
+	metrics := registry.Metrics()
+	if metrics.RedisRouteRemotePublishCallCount != 1 ||
+		metrics.RedisRouteRemotePublishErrorCount != 0 ||
+		metrics.RedisRouteRemoteNoSubscriberCount != 1 ||
+		metrics.RedisRouteRemoteEnqueuedSessions != 0 {
+		t.Fatalf("unexpected no-subscriber metrics: %+v", metrics)
+	}
+}
+
 func TestRegistryRegisterFailsClosedWhenRedisUnavailable(t *testing.T) {
 	server := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
@@ -390,6 +422,35 @@ func TestRegistryRegisterFailsClosedWhenRedisUnavailable(t *testing.T) {
 	}
 	if metrics := local.Metrics(); metrics.ConnectedSessions != 0 {
 		t.Fatalf("local session should be rolled back after redis write failure: %+v", metrics)
+	}
+}
+
+func TestRegistryRemoteEvictionWithoutSubscriberDoesNotCountEvicted(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	ctx := context.Background()
+	registry := NewRegistry(memory.NewRegistry(), client, Config{GatewayID: "gateway-a", RouteTTL: time.Minute})
+
+	if err := registry.writeRoute(ctx, routeEntry{
+		TenantID:  "tenant-1",
+		UserID:    "user-1",
+		DeviceID:  "device-1",
+		SessionID: "session-b",
+		GatewayID: "gateway-b",
+	}); err != nil {
+		t.Fatalf("write remote route: %v", err)
+	}
+
+	result, err := registry.EvictDevice(ctx, "tenant-1", "user-1", "device-1", "identity_revoked")
+	if err != nil {
+		t.Fatalf("evict remote device: %v", err)
+	}
+	if result.MatchedSessions != 1 || result.Evicted != 0 {
+		t.Fatalf("unexpected no-subscriber eviction result: %+v", result)
+	}
+	metrics := registry.Metrics()
+	if metrics.RedisRouteRemoteNoSubscriberCount != 1 || metrics.RedisRouteRemotePublishErrorCount != 0 {
+		t.Fatalf("unexpected no-subscriber eviction metrics: %+v", metrics)
 	}
 }
 
@@ -417,10 +478,10 @@ func TestRegistryReplaysRedisResumeAcrossGateways(t *testing.T) {
 	if err != nil {
 		t.Fatalf("enqueue from gateway B: %v", err)
 	}
-	if result.MatchedSessions != 1 || result.Enqueued != 1 {
+	if result.MatchedSessions != 1 || result.Enqueued != 0 || result.Dropped != 1 {
 		t.Fatalf("unexpected enqueue result: %+v", result)
 	}
-	if metrics := gatewayB.Metrics(); metrics.RedisResumeAppendCount != 1 {
+	if metrics := gatewayB.Metrics(); metrics.RedisResumeAppendCount != 1 || metrics.RedisRouteRemoteNoSubscriberCount != 1 {
 		t.Fatalf("expected redis resume append metric, got %+v", metrics)
 	}
 

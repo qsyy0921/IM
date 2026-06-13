@@ -300,7 +300,7 @@ Redis 约束：
 - 同一远端 gateway 上有多个 session 时，只向该 gateway Pub/Sub channel 发布一次，远端本地 registry 再 fanout 到本机 session。
 - identity revoke 也复用同一套 Redis route 控制面：identity-consumer 写入 deny-list 后，可按 `tenant/user/device/session` 查 route，并向持有 WebSocket 的 gateway 发布 eviction 控制消息；远端 gateway 本地 registry 再发送 `server.resume_hint(reason=identity_revoked)` 并关闭对应 session。
 - lookup 时如果发现 session key 已过期、route JSON 损坏或 route tenant/user 与当前通知不匹配，必须把该 session 从 user route set 中移除，避免 stale route 长期放大。
-- 当前最小策略采用在线通知 fail-open：Redis lookup / publish 返回错误时，不阻塞 delivery consumer 提交当前 Kafka event；该 notify 视为在线唤醒失败，客户端通过 durable `PullInbox` 恢复。connect 写 route 失败仍采用 fail-closed，避免把只有本地可见、跨实例不可路由的 session 伪装为在线。
+- 当前最小策略采用在线通知 fail-open：Redis lookup / publish 返回错误时，不阻塞 delivery consumer 提交当前 Kafka event；该 notify 视为在线唤醒失败，客户端通过 durable `PullInbox` 恢复。对于 Redis `Publish` 成功但 subscriber 数为 0 的情况，也必须按在线唤醒失败处理，不能把 stale route 或已掉线 gateway 误记为远端已入队。connect 写 route 失败仍采用 fail-closed，避免把只有本地可见、跨实例不可路由的 session 伪装为在线。
 - Redis route eviction 是 online control，不是安全事实源。Pub/Sub publish 成功不代表远端 session 一定关闭；deny-list 才是 revoke 后拒绝新建连的安全线。
 
 Resume buffer：
@@ -383,8 +383,9 @@ Redis route debug metrics 已提供第一版跨实例在线路由计数：
 | --- | --- |
 | `redis_route_remote_matched_sessions` | 当前 gateway 在 Redis route 中命中的远端 session 数，按 session 计 |
 | `redis_route_remote_publish_call_count` | 当前 gateway 向远端 gateway Pub/Sub channel 发布通知的次数，按 gateway 去重 |
-| `redis_route_remote_enqueued_sessions` | 当前 gateway 估算已转交远端 gateway 的 session 数，不代表远端 WebSocket 已成功写出 |
+| `redis_route_remote_enqueued_sessions` | 当前 gateway 估算已转交远端 gateway 的 session 数；仅在 publish 成功且存在 subscriber 时递增，不代表远端 WebSocket 已成功写出 |
 | `redis_route_remote_publish_error_count` | Redis Publish 调用失败次数 |
+| `redis_route_remote_no_subscriber_count` | Redis Publish 成功但 subscriber 数为 0 的远端 session 数；通常表示 stale route 或远端 subscriber 已不在线 |
 | `redis_route_lookup_error_count` | Redis route lookup 失败次数；当前策略 fail-open，delivery consumer 不因在线通知失败而阻塞 |
 | `redis_route_stale_removed_count` | lookup 或 cleanup 移除的 stale session route 成员数 |
 | `redis_route_subscriber_message_count` | 当前 gateway 从自身 Pub/Sub channel 收到的远端通知数 |

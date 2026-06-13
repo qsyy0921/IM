@@ -37,6 +37,8 @@ type config struct {
 	pollInterval       time.Duration
 	tenantID           string
 	userID             string
+	deviceID           string
+	audience           string
 	password           string
 	destination        string
 	cleanup            bool
@@ -62,6 +64,8 @@ type summary struct {
 	RequestChallenge           challengeSummary   `json:"request_verification_challenge"`
 	Webhook                    webhookSummary     `json:"webhook"`
 	ConfirmChallenge           confirmSummary     `json:"confirm_verification_challenge"`
+	Login                      tokenSummary       `json:"login"`
+	Refresh                    tokenSummary       `json:"refresh_gateway_token"`
 	ChallengeDeliveryOutbox    outboxStats        `json:"challenge_delivery_outbox"`
 	ChallengeDeliveryOutboxRow deliveryOutboxRow  `json:"challenge_delivery_outbox_row"`
 	ChallengeRow               challengeRow       `json:"challenge_row"`
@@ -70,6 +74,8 @@ type summary struct {
 
 type identityChallengeClient interface {
 	RegisterUser(context.Context, *identityv1.RegisterUserRequest, ...grpc.CallOption) (*identityv1.RegisterUserResponse, error)
+	Login(context.Context, *identityv1.LoginRequest, ...grpc.CallOption) (*identityv1.LoginResponse, error)
+	RefreshGatewayToken(context.Context, *identityv1.RefreshGatewayTokenRequest, ...grpc.CallOption) (*identityv1.RefreshGatewayTokenResponse, error)
 	RequestVerificationChallenge(context.Context, *identityv1.RequestVerificationChallengeRequest, ...grpc.CallOption) (*identityv1.RequestVerificationChallengeResponse, error)
 	ConfirmVerificationChallenge(context.Context, *identityv1.ConfirmVerificationChallengeRequest, ...grpc.CallOption) (*identityv1.ConfirmVerificationChallengeResponse, error)
 }
@@ -102,6 +108,18 @@ type confirmSummary struct {
 	Channel          string `json:"channel"`
 	Destination      string `json:"destination"`
 	VerifiedAtUnixMS int64  `json:"verified_at_unix_ms"`
+}
+
+type tokenSummary struct {
+	Audience               string `json:"audience"`
+	TokenType              string `json:"token_type"`
+	SessionIDSet           bool   `json:"session_id_set"`
+	GatewayTokenSet        bool   `json:"gateway_token_set"`
+	RefreshTokenSet        bool   `json:"refresh_token_set"`
+	RefreshTokenRotated    bool   `json:"refresh_token_rotated,omitempty"`
+	GatewayExpiresAtUnixMS int64  `json:"gateway_expires_at_unix_ms"`
+	RefreshExpiresAtUnixMS int64  `json:"refresh_expires_at_unix_ms"`
+	IssuedAtUnixMS         int64  `json:"issued_at_unix_ms"`
 }
 
 type outboxStats struct {
@@ -177,6 +195,8 @@ func parseConfig() config {
 	flag.DurationVar(&cfg.pollInterval, "poll-interval", 200*time.Millisecond, "poll interval")
 	flag.StringVar(&cfg.tenantID, "tenant-id", "tenant-identity-smoke", "tenant id")
 	flag.StringVar(&cfg.userID, "user-id", "identity-user", "user id")
+	flag.StringVar(&cfg.deviceID, "device-id", "identity-device", "device id for Login and RefreshGatewayToken")
+	flag.StringVar(&cfg.audience, "audience", "api-gateway", "gateway token audience for Login and RefreshGatewayToken")
 	flag.StringVar(&cfg.password, "password", "IdentitySmokePassw0rd!", "user password")
 	flag.StringVar(&cfg.destination, "destination", "identity-user@example.com", "verification destination")
 	flag.BoolVar(&cfg.cleanup, "cleanup", false, "delete identity rows for this tenant before running")
@@ -379,6 +399,74 @@ func runClientScenario(cfg config, result *summary) error {
 		Channel:          confirm.GetChannel().String(),
 		Destination:      confirm.GetDestination(),
 		VerifiedAtUnixMS: confirm.GetVerifiedAtUnixMs(),
+	}
+
+	loginStarted := time.Now()
+	loginCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	login, err := client.Login(loginCtx, &identityv1.LoginRequest{
+		TenantId:          cfg.tenantID,
+		UserId:            cfg.userID,
+		Password:          cfg.password,
+		DeviceId:          cfg.deviceID,
+		Audience:          cfg.audience,
+		GatewayTtlSeconds: 900,
+		RefreshTtlSeconds: 3600,
+		TraceId:           "identity-challenge-delivery-outbox-smoke",
+		RequestId:         "identity-smoke-login",
+	})
+	cancel()
+	result.LatenciesMS["login"] = elapsedMS(loginStarted)
+	if err != nil {
+		return fmt.Errorf("login: %w", err)
+	}
+	result.Login = tokenSummary{
+		Audience:               login.GetAudience(),
+		TokenType:              login.GetTokenType(),
+		SessionIDSet:           login.GetSessionId() != "",
+		GatewayTokenSet:        login.GetGatewayToken() != "",
+		RefreshTokenSet:        login.GetRefreshToken() != "",
+		GatewayExpiresAtUnixMS: login.GetGatewayExpiresAtUnixMs(),
+		RefreshExpiresAtUnixMS: login.GetRefreshExpiresAtUnixMs(),
+		IssuedAtUnixMS:         login.GetIssuedAtUnixMs(),
+	}
+	if login.GetGatewayToken() == "" || login.GetRefreshToken() == "" || login.GetSessionId() == "" {
+		return errors.New("login did not return gateway token, refresh token, and session id")
+	}
+
+	refreshStarted := time.Now()
+	refreshCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	refresh, err := client.RefreshGatewayToken(refreshCtx, &identityv1.RefreshGatewayTokenRequest{
+		TenantId:          cfg.tenantID,
+		UserId:            cfg.userID,
+		DeviceId:          cfg.deviceID,
+		RefreshToken:      login.GetRefreshToken(),
+		Audience:          cfg.audience,
+		GatewayTtlSeconds: 900,
+		RefreshTtlSeconds: 3600,
+		TraceId:           "identity-challenge-delivery-outbox-smoke",
+		RequestId:         "identity-smoke-refresh",
+	})
+	cancel()
+	result.LatenciesMS["refresh_gateway_token"] = elapsedMS(refreshStarted)
+	if err != nil {
+		return fmt.Errorf("refresh gateway token: %w", err)
+	}
+	result.Refresh = tokenSummary{
+		Audience:               refresh.GetAudience(),
+		TokenType:              refresh.GetTokenType(),
+		SessionIDSet:           refresh.GetSessionId() != "",
+		GatewayTokenSet:        refresh.GetGatewayToken() != "",
+		RefreshTokenSet:        refresh.GetRefreshToken() != "",
+		RefreshTokenRotated:    refresh.GetRefreshToken() != "" && refresh.GetRefreshToken() != login.GetRefreshToken(),
+		GatewayExpiresAtUnixMS: refresh.GetGatewayExpiresAtUnixMs(),
+		RefreshExpiresAtUnixMS: refresh.GetRefreshExpiresAtUnixMs(),
+		IssuedAtUnixMS:         refresh.GetIssuedAtUnixMs(),
+	}
+	if refresh.GetGatewayToken() == "" || refresh.GetRefreshToken() == "" || refresh.GetSessionId() == "" {
+		return errors.New("refresh did not return gateway token, refresh token, and session id")
+	}
+	if refresh.GetRefreshToken() == login.GetRefreshToken() {
+		return errors.New("refresh did not rotate refresh token")
 	}
 
 	if pool != nil {

@@ -227,8 +227,10 @@ func runGRPC() error {
 			return err
 		}
 		defer pool.Close()
-		evaluator = postgresinfra.NewMessagePolicyEvaluator(pool, policy)
+		postgresEvaluator := postgresinfra.NewMessagePolicyEvaluator(pool, policy)
+		evaluator = postgresEvaluator
 		useCaseOptions = append(useCaseOptions, app.WithPolicyDecisionAuditor(postgresinfra.NewDecisionAuditOutbox(pool)))
+		useCaseOptions = append(useCaseOptions, app.WithMessageOwnershipOverrideChecker(postgresEvaluator))
 		log.Println("policy-service message action rule store enabled")
 		log.Println("policy-service decision audit outbox enabled")
 	}

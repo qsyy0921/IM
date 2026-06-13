@@ -398,6 +398,58 @@ WHERE tenant_id = $1
 	}
 }
 
+func TestMessageRepositoryEditMessageAllowsNonSenderOwnershipOverrideIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	now := time.Date(2026, 6, 10, 2, 30, 0, 0, time.UTC)
+	runID := time.Now().UnixNano()
+	messageCounter := 0
+	eventCounter := 0
+	repo := NewMessageRepository(
+		pool,
+		WithClock(func() time.Time { return now }),
+		WithIDGenerators(
+			func() (types.MessageID, error) {
+				messageCounter++
+				return types.MessageID(fmt.Sprintf("msg-edit-override-%d-%d", runID, messageCounter)), nil
+			},
+			func() (types.EventID, error) {
+				eventCounter++
+				return types.EventID(fmt.Sprintf("event-edit-override-%d-%d", runID, eventCounter)), nil
+			},
+		),
+	)
+	tenantID := types.TenantID(fmt.Sprintf("tenant-it-edit-override-%d", runID))
+	appendInput := testAppendInput(tenantID, "client-edit-override", []byte(`{"text":"hello"}`))
+	appendResult, err := repo.AppendMessage(ctx, appendInput)
+	if err != nil {
+		t.Fatalf("append source message: %v", err)
+	}
+
+	editInput := testEditInput(appendInput, appendResult.MessageID, "edit-override-key", []byte(`{"text":"hello edited"}`), "moderation")
+	editInput.Command.AuthContext.UserID = "admin-user"
+	editInput.Permission.Classification = "MESSAGE_OWNERSHIP_ROLE_OVERRIDE"
+	editInput.Permission.OwnershipOverride = true
+	result, err := repo.EditMessage(ctx, editInput)
+	if err != nil {
+		t.Fatalf("edit message with ownership override: %v", err)
+	}
+	if result.MessageID != appendResult.MessageID ||
+		result.ConversationSeq != 2 ||
+		result.ChangeVersion != 1 ||
+		result.IdempotentReplay {
+		t.Fatalf("unexpected edit override result: %+v", result)
+	}
+	assertCount(t, ctx, pool, "message_change_history", tenantID, 1)
+	assertCount(t, ctx, pool, "conversation_timeline_events", tenantID, 2)
+	assertCount(t, ctx, pool, "message_outbox", tenantID, 2)
+	assertCurrentSeq(t, ctx, pool, tenantID, appendInput.Command.ConversationID, 2)
+	assertEditedFacts(t, ctx, pool, editInput, result)
+}
+
 func TestMessageRepositoryDeleteMessageIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openIntegrationPool(t, ctx)

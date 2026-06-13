@@ -14,9 +14,17 @@ type PolicyDecisionAuditor interface {
 	RecordPolicyDecision(context.Context, types.CheckMessageActionCommand, types.MessageActionDecision) error
 }
 
+type MessageOwnershipOverrideChecker interface {
+	DecideMessageOwnershipOverride(
+		context.Context,
+		types.CheckMessageActionCommand,
+	) (types.MessageActionDecision, bool, error)
+}
+
 type CheckMessageActionUseCase struct {
-	evaluator MessagePolicyEvaluator
-	auditor   PolicyDecisionAuditor
+	evaluator        MessagePolicyEvaluator
+	auditor          PolicyDecisionAuditor
+	ownershipChecker MessageOwnershipOverrideChecker
 }
 
 type CheckMessageActionOption func(*CheckMessageActionUseCase)
@@ -35,6 +43,12 @@ func WithPolicyDecisionAuditor(auditor PolicyDecisionAuditor) CheckMessageAction
 	}
 }
 
+func WithMessageOwnershipOverrideChecker(checker MessageOwnershipOverrideChecker) CheckMessageActionOption {
+	return func(useCase *CheckMessageActionUseCase) {
+		useCase.ownershipChecker = checker
+	}
+}
+
 func (u CheckMessageActionUseCase) Execute(
 	ctx context.Context,
 	command types.CheckMessageActionCommand,
@@ -45,9 +59,9 @@ func (u CheckMessageActionUseCase) Execute(
 	if u.evaluator == nil {
 		return types.MessageActionDecision{}, types.NewDependencyUnavailable("policy evaluator is not configured")
 	}
-	if decision, denied, err := messageOwnershipDecision(command); err != nil {
+	if decision, handled, err := u.messageOwnershipDecision(ctx, command); err != nil {
 		return types.MessageActionDecision{}, err
-	} else if denied {
+	} else if handled {
 		if u.auditor != nil {
 			if err := u.auditor.RecordPolicyDecision(ctx, command, decision); err != nil {
 				return types.MessageActionDecision{}, err
@@ -67,7 +81,10 @@ func (u CheckMessageActionUseCase) Execute(
 	return decision, nil
 }
 
-func messageOwnershipDecision(command types.CheckMessageActionCommand) (types.MessageActionDecision, bool, error) {
+func (u CheckMessageActionUseCase) messageOwnershipDecision(
+	ctx context.Context,
+	command types.CheckMessageActionCommand,
+) (types.MessageActionDecision, bool, error) {
 	switch command.Action {
 	case types.MessageActionEdit, types.MessageActionRevoke, types.MessageActionDelete:
 	default:
@@ -78,6 +95,15 @@ func messageOwnershipDecision(command types.CheckMessageActionCommand) (types.Me
 	}
 	if command.ConversationPermissionVersion <= 0 {
 		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy conversation permission version is required")
+	}
+	if u.ownershipChecker != nil {
+		decision, allowed, err := u.ownershipChecker.DecideMessageOwnershipOverride(ctx, command)
+		if err != nil {
+			return types.MessageActionDecision{}, false, err
+		}
+		if allowed {
+			return decision, true, nil
+		}
 	}
 	return types.MessageActionDecision{
 		TenantID:          command.AuthContext.TenantID,

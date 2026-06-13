@@ -5,6 +5,7 @@ type PermissionDecision struct {
 	PermissionVersion int64
 	Classification    string
 	Reason            string
+	OwnershipOverride bool
 }
 
 type ConversationSendContext struct {

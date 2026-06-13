@@ -60,6 +60,7 @@ func (s *Server) CheckMessageAction(
 		PermissionVersion: decision.PermissionVersion,
 		Classification:    decision.Classification,
 		Reason:            decision.Reason,
+		OwnershipOverride: decision.OwnershipOverride,
 	}, nil
 }
 

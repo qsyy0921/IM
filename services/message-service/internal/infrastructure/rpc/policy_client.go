@@ -104,6 +104,7 @@ func (c PolicyClient) checkMessageAction(
 		PermissionVersion: response.GetPermissionVersion(),
 		Classification:    response.GetClassification(),
 		Reason:            response.GetReason(),
+		OwnershipOverride: response.GetOwnershipOverride(),
 	}, nil
 }
 
@@ -143,6 +144,18 @@ func validatePolicyResponse(
 	}
 	if response.GetClassification() == "" {
 		return types.NewDependencyUnavailable("policy service returned empty classification")
+	}
+	if response.GetOwnershipOverride() {
+		if !response.GetAllowed() {
+			return types.NewDependencyUnavailable("policy service returned denied ownership override")
+		}
+		switch action {
+		case policyv1.MessageAction_MESSAGE_ACTION_EDIT,
+			policyv1.MessageAction_MESSAGE_ACTION_REVOKE,
+			policyv1.MessageAction_MESSAGE_ACTION_DELETE:
+		default:
+			return types.NewDependencyUnavailable("policy service returned invalid ownership override")
+		}
 	}
 	return nil
 }

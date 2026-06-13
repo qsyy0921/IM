@@ -64,7 +64,7 @@ func (r *MessageRepository) DeleteMessage(
 	if err != nil {
 		return domain.MessageChangeResult{}, err
 	}
-	if message.SenderID != input.Command.AuthContext.UserID {
+	if !canMutateMessageOwnership(message, input.Command.AuthContext.UserID, input.Permission) {
 		return domain.MessageChangeResult{}, types.NewPermissionDenied("only the original sender can delete this message in phase 1")
 	}
 	if !message.CanDelete() {

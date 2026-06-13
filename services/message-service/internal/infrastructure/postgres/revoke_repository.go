@@ -64,7 +64,7 @@ func (r *MessageRepository) RevokeMessage(
 	if err != nil {
 		return domain.MessageChangeResult{}, err
 	}
-	if message.SenderID != input.Command.AuthContext.UserID {
+	if !canMutateMessageOwnership(message, input.Command.AuthContext.UserID, input.Permission) {
 		return domain.MessageChangeResult{}, types.NewPermissionDenied("only the original sender can revoke this message in phase 1")
 	}
 	if !message.CanRevoke() {

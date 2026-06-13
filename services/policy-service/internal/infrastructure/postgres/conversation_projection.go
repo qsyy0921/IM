@@ -99,7 +99,7 @@ SET role = EXCLUDED.role,
     permission_version = EXCLUDED.permission_version,
     updated_by_event_id = EXCLUDED.updated_by_event_id,
     updated_at = now()
-WHERE policy_conversation_members_projection.member_version <= EXCLUDED.member_version
+WHERE policy_conversation_members_projection.member_version < EXCLUDED.member_version
 `, tenantID, conversationID, userID, role, status, memberVersion, permissionVersion, eventID)
 	if err != nil {
 		return false, types.NewDBWriteFailed(err.Error())

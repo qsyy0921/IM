@@ -2,7 +2,7 @@
 
 `policy-service` owns first-stage policy decisions that must not be hard-coded inside message-service. The initial implementation is intentionally small: it exposes a gRPC `CheckMessageAction` endpoint for message send / edit / revoke / delete decisions, and it returns a stable `permission_version`, `classification`, allow/deny flag and public deny reason.
 
-This service is a boundary extraction step. It is not yet a full ReBAC engine, tenant policy DSL / quota / risk engine, content moderation platform, risk scoring system or complete contacts/conversation policy engine. The current contacts projection is consumed only for direct conversation `SEND` hard-deny when the caller supplies safe direct-peer context. The current conversation member projection is consumed only as a first-stage role gate with a permission-version fence. Message ownership is first-stage sender-only for `EDIT` / `REVOKE` / `DELETE` when message-service supplies message sender context; admin / moderator override remains future work.
+This service is a boundary extraction step. It is not yet a full ReBAC engine, tenant policy DSL / quota / risk engine, content moderation platform or complete contacts/conversation policy engine. The current contacts projection is consumed only for direct conversation `SEND` hard-deny when the caller supplies safe direct-peer context. The current conversation member projection is consumed only as a first-stage role gate with a permission-version fence and as a narrow `ADMIN` / `OWNER` message ownership override for mutations. A separate `MODERATOR` role, full ReBAC and product-level moderation policy remain future work.
 
 ## Boundary
 
@@ -46,11 +46,11 @@ The next table adds a tenant action default:
 tenant_id + action
 ```
 
-When `NEXUSIM_POLICY_RULES_ENABLED=true`, policy-service first evaluates hard contact-block denies for direct `SEND` requests that include `direct_peer_user_id`, then applies the sender-only message ownership gate for mutation requests that include `message_sender_user_id`, then applies the conversation role gate, then checks `policy_message_action_rules`, then checks `policy_tenant_message_action_rules`, and finally falls back to the static policy. A matching exact or tenant rule returns its allow / deny decision, `permission_version`, `classification` and public reason. Exact user/conversation rules intentionally override tenant defaults after the hard gates have passed.
+When `NEXUSIM_POLICY_RULES_ENABLED=true`, policy-service first evaluates hard contact-block denies for direct `SEND` requests that include `direct_peer_user_id`, then applies the message ownership gate for mutation requests that include `message_sender_user_id`. Non-sender mutations can pass only through an explicit `policy_message_ownership_override_rules` row backed by a fresh `policy_conversation_members_projection` `ADMIN` / `OWNER` row. After ownership has passed, policy-service applies the conversation role gate, then checks `policy_message_action_rules`, then checks `policy_tenant_message_action_rules`, and finally falls back to the static policy. A matching exact or tenant rule returns its allow / deny decision, `permission_version`, `classification` and public reason. Exact user/conversation rules intentionally override tenant defaults only after the hard gates have passed.
 
 The conversation role gate is a hard deny / freshness gate, not a complete role allow engine. `policy-service` consumes member boundary events from `conversation.timeline.events` into `policy_conversation_members_projection`. `message-service` forwards `conversation_permission_version` from the `ConversationSendContext` it already read from conversation-service. If a role gate rule exists in `policy_conversation_role_action_rules`, the caller's projected member row must exist, be at the same `permission_version`, be `ACTIVE`, and have a role rank greater than or equal to `min_role`. Missing projection, stale version or PostgreSQL lookup failure returns policy unavailable; insufficient role returns business deny with the projected `permission_version`. If the role gate passes, the request continues to exact / tenant / static decision logic.
 
-The message ownership gate is a hard deny for first-stage mutation safety, not a complete moderation model. For `EDIT`, `REVOKE` and `DELETE`, message-service reads the message sender from its own message repository and forwards `message_sender_user_id` to policy-service. policy-service does not read message-service tables or synchronously query message-service. If sender context is present and differs from the actor, policy-service returns:
+The message ownership gate is a hard deny for first-stage mutation safety, with one narrow role override. It is not a complete moderation model. For `EDIT`, `REVOKE` and `DELETE`, message-service reads the message sender from its own message repository and forwards `message_sender_user_id` to policy-service. policy-service does not read message-service tables or synchronously query message-service. If sender context is present and differs from the actor, policy-service first checks `policy_message_ownership_override_rules`. If no matching override rule exists, the caller's member projection is missing / stale / inactive, or the caller role rank is below the rule `min_role`, policy-service returns:
 
 ```text
 allowed=false
@@ -60,6 +60,17 @@ permission_version=<conversation_permission_version>
 ```
 
 If sender context is absent, policy-service treats the call as legacy-compatible and continues to the role / exact / tenant / static decision path. If sender context is present and the actor is not the sender, `conversation_permission_version` is required; missing version returns policy unavailable so audit outbox rows cannot be written with invalid metadata. message-service still keeps the transactional sender check in its mutation repositories as the final defense.
+
+If an ownership override rule exists for the tenant/action, the caller's projected member row must exist, match `conversation_permission_version`, be `ACTIVE`, and have role `ADMIN` or `OWNER` at or above the configured `min_role`. A successful override returns:
+
+```text
+allowed=true
+classification=MESSAGE_OWNERSHIP_ROLE_OVERRIDE
+ownership_override=true
+permission_version=<conversation_permission_version>
+```
+
+The `ownership_override` response field is a typed internal proof from policy-service to message-service. message-service rejects ownership override on `SEND`, on denied decisions, or on mismatched responses; mutation repositories use this boolean, not the classification string, to allow a non-sender transaction. Static fallback, exact rules and tenant rules cannot by themselves override message ownership.
 
 PostgreSQL lookup errors do not fall back; they return policy unavailable so a broken rule store cannot silently bypass a deny rule. The tenant rule table and role rule table are backward-compatible during rollout: if a table has not been migrated yet, a lookup miss due to the missing relation is treated as no rule and the request continues to the next decision step.
 
@@ -98,7 +109,7 @@ Audit rows intentionally store low-sensitive decision metadata:
 
 Audit rows must not store message content, raw session id, raw device id, raw direct peer id, raw conversation id, raw message id, raw rule parameters, SQL error text, DSNs, tokens, credentials or free-text provider/body data.
 
-For the first-stage ownership gate, audit rows identify ownership denies by `classification=MESSAGE_OWNERSHIP_DENIED` / `reason_code=MESSAGE_OWNERSHIP_DENIED` and the stable `message_key`. They intentionally do not store raw message sender id in this slice. A future audit schema can add a low-sensitive `message_sender_context_present` flag or sender stable key if operations needs more ownership-specific attribution.
+For the first-stage ownership gate, audit rows identify ownership denies by `classification=MESSAGE_OWNERSHIP_DENIED` / `reason_code=MESSAGE_OWNERSHIP_DENIED` and ownership overrides by `classification=MESSAGE_OWNERSHIP_ROLE_OVERRIDE`. Audit rows keep the stable `message_key` and intentionally do not store raw message sender id in this slice. A future audit schema can add a low-sensitive `message_sender_context_present` flag, ownership override flag or sender stable key if operations needs more ownership-specific attribution.
 
 Configuration:
 
@@ -160,7 +171,8 @@ NEXUSIM_POLICY_RPC_TIMEOUT=30ms
 - `permission_version`;
 - `classification`;
 - `reason`;
-- `message_id` echo for edit / revoke / delete.
+- `message_id` echo for edit / revoke / delete;
+- `ownership_override`: true only when policy-service explicitly authorizes a non-sender `EDIT` / `REVOKE` / `DELETE` via the ownership override rule and fresh member projection.
 
 The response is a decision record. `allowed=false` is returned as a successful gRPC response so callers can preserve public deny semantics and use `reason` without relying on transport errors. Transport errors are reserved for invalid request, unavailable policy dependency or implementation failures.
 
@@ -170,7 +182,7 @@ message-service continues to call only its `PolicyCheckPort`. It does not import
 
 For message mutations, message-service reads the sender from its own `message_log` through the message repository before calling policy-service. This keeps ownership evidence in the service that owns message facts, while moving the policy decision and audit surface to policy-service. The mutation repositories still validate original sender inside the write transaction, so a bypassed or stale policy call cannot mutate another user's message.
 
-The adapter validates that policy-service response tenant, user, conversation, message id and action match the request, and rejects empty `classification` or non-positive `permission_version` as dependency errors. This prevents a mixed-version or buggy policy-service from silently corrupting message timeline metadata. Transport-level `PermissionDenied` from the policy RPC is treated as dependency failure; business deny must use gRPC OK with `allowed=false`.
+The adapter validates that policy-service response tenant, user, conversation, message id and action match the request, and rejects empty `classification` or non-positive `permission_version` as dependency errors. It also rejects `ownership_override=true` unless the decision is allowed and the action is `EDIT`, `REVOKE` or `DELETE`. This prevents a mixed-version or buggy policy-service from silently corrupting message timeline metadata or widening mutation ownership. Transport-level `PermissionDenied` from the policy RPC is treated as dependency failure; business deny must use gRPC OK with `allowed=false`.
 
 The adapter forwards trace id and request id as gRPC metadata when they are present in the message-service auth context. policy-service uses them only for structured request logs. They are not metrics labels and are not part of the policy decision contract.
 
@@ -196,7 +208,7 @@ This is a local debug surface. It is not a replacement for production OpenTeleme
 - PostgreSQL rule store supports exact user/conversation rules, first-stage tenant action defaults and a first-stage conversation role gate; no wildcard / priority rule DSL yet.
 - Contacts block / unblock events are consumed only for direct `SEND` when safe `direct_peer_user_id` context is supplied.
 - Conversation role policy is only an action-level role gate backed by a local projection and permission-version fence. It is not complete ReBAC and does not synchronously query conversation-service.
-- Message ownership policy is only sender-only for edit / revoke / delete when message-service supplies sender context. It does not implement admin / moderator override, owner transfer semantics, retention policy, compliance delete or user-private delete.
+- Message ownership policy supports sender mutation and first-stage `ADMIN` / `OWNER` override for edit / revoke / delete when message-service supplies sender context. It does not implement a separate `MODERATOR` role, full ReBAC, owner transfer semantics, retention policy, compliance delete or user-private delete.
 - No tenant policy DSL, tenant quota / risk policy, content moderation, risk scoring or rate limiting is implemented yet.
 - Decision audit outbox rows can be relayed to `im.policy.events`, and explicit DLQ event IDs can be redriven through the repair operator after relay-equivalent validation. Broad repair workflow, poison-payload classification beyond fail-closed validation, retention policy and external sink remain future work.
 - No mTLS client/server config is implemented for policy-service yet.

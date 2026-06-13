@@ -45,4 +45,5 @@ message CheckMessageActionResponse {
   string classification = 7;
   string reason = 8;
   string message_id = 9;
+  bool ownership_override = 10;
 }

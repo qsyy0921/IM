@@ -57,16 +57,20 @@ func TestPolicyClientCheckEditPermissionIncludesMessageID(t *testing.T) {
 			Allowed:           true,
 			PermissionVersion: 7,
 			Classification:    "CONTACT",
+			OwnershipOverride: true,
 		},
 	}
 	client := NewPolicyClient(fake, 0)
-	_, err := client.CheckEditPermission(context.Background(), types.EditMessageCommand{
+	decision, err := client.CheckEditPermission(context.Background(), types.EditMessageCommand{
 		AuthContext:    testPolicyClientAuth(),
 		ConversationID: "conv-1",
 		MessageID:      "msg-1",
 	}, testPolicyClientConversation(), types.MessagePolicyContext{SenderUserID: "sender-1"})
 	if err != nil {
 		t.Fatalf("check edit permission: %v", err)
+	}
+	if !decision.OwnershipOverride {
+		t.Fatalf("expected ownership override to be propagated: %+v", decision)
 	}
 	if fake.request.GetMessageId() != "msg-1" ||
 		fake.request.GetAction() != policyv1.MessageAction_MESSAGE_ACTION_EDIT ||
@@ -101,6 +105,25 @@ func TestPolicyClientRejectsInvalidDecisionFields(t *testing.T) {
 			ConversationId: "conv-1",
 			Action:         policyv1.MessageAction_MESSAGE_ACTION_SEND,
 			Allowed:        true,
+		},
+	}, 0)
+	_, err := client.CheckSendPermission(context.Background(), testPolicyClientSendCommand(), testPolicyClientConversation())
+	if !errors.Is(err, types.ErrDependencyUnavailable) {
+		t.Fatalf("expected dependency unavailable, got %v", err)
+	}
+}
+
+func TestPolicyClientRejectsInvalidOwnershipOverride(t *testing.T) {
+	client := NewPolicyClient(&fakePolicyServiceClient{
+		response: &policyv1.CheckMessageActionResponse{
+			TenantId:          "tenant-1",
+			UserId:            "user-1",
+			ConversationId:    "conv-1",
+			Action:            policyv1.MessageAction_MESSAGE_ACTION_SEND,
+			Allowed:           true,
+			PermissionVersion: 7,
+			Classification:    "CONTACT",
+			OwnershipOverride: true,
 		},
 	}, 0)
 	_, err := client.CheckSendPermission(context.Background(), testPolicyClientSendCommand(), testPolicyClientConversation())

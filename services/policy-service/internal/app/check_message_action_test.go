@@ -104,6 +104,102 @@ func TestCheckMessageActionUseCaseDeniesNonSenderMutationBeforeEvaluator(t *test
 	}
 }
 
+func TestCheckMessageActionUseCaseAllowsNonSenderMutationWithOwnershipOverride(t *testing.T) {
+	auditor := &fakePolicyDecisionAuditor{}
+	evaluator := &countingEvaluator{
+		decision: types.MessageActionDecision{
+			TenantID:          "tenant-1",
+			UserID:            "user-2",
+			ConversationID:    "conv-1",
+			MessageID:         "msg-1",
+			Action:            types.MessageActionRevoke,
+			Allowed:           false,
+			PermissionVersion: 7,
+			Classification:    "STATIC_SHOULD_NOT_APPEAR",
+		},
+	}
+	checker := &fakeOwnershipOverrideChecker{
+		allowed: true,
+		decision: types.MessageActionDecision{
+			TenantID:          "tenant-1",
+			UserID:            "user-2",
+			ConversationID:    "conv-1",
+			MessageID:         "msg-1",
+			Action:            types.MessageActionRevoke,
+			Allowed:           true,
+			PermissionVersion: 7,
+			Classification:    "MESSAGE_OWNERSHIP_ROLE_OVERRIDE",
+			OwnershipOverride: true,
+		},
+	}
+	useCase := NewCheckMessageActionUseCase(
+		evaluator,
+		WithMessageOwnershipOverrideChecker(checker),
+		WithPolicyDecisionAuditor(auditor),
+	)
+	command := testPolicyCommand(types.MessageActionRevoke)
+	command.AuthContext.UserID = "user-2"
+	command.MessageSenderUserID = "user-1"
+	command.ConversationPermissionVersion = 7
+
+	result, err := useCase.Execute(context.Background(), command)
+	if err != nil {
+		t.Fatalf("check message action: %v", err)
+	}
+	if !result.Allowed || !result.OwnershipOverride || result.Classification != "MESSAGE_OWNERSHIP_ROLE_OVERRIDE" || result.PermissionVersion != 7 {
+		t.Fatalf("unexpected ownership override decision: %+v", result)
+	}
+	if evaluator.calls != 0 {
+		t.Fatalf("ownership override should not call evaluator, got %d", evaluator.calls)
+	}
+	if checker.calls != 1 || checker.command.AuthContext.UserID != "user-2" {
+		t.Fatalf("expected override checker call, got calls=%d command=%+v", checker.calls, checker.command)
+	}
+	if !auditor.called || auditor.decision.Classification != "MESSAGE_OWNERSHIP_ROLE_OVERRIDE" {
+		t.Fatalf("expected ownership override audit, got %+v", auditor.decision)
+	}
+}
+
+func TestCheckMessageActionUseCaseDeniesNonSenderMutationWhenOwnershipOverrideDoesNotMatch(t *testing.T) {
+	checker := &fakeOwnershipOverrideChecker{}
+	useCase := NewCheckMessageActionUseCase(
+		&countingEvaluator{},
+		WithMessageOwnershipOverrideChecker(checker),
+	)
+	command := testPolicyCommand(types.MessageActionDelete)
+	command.AuthContext.UserID = "user-2"
+	command.MessageSenderUserID = "user-1"
+	command.ConversationPermissionVersion = 7
+
+	result, err := useCase.Execute(context.Background(), command)
+	if err != nil {
+		t.Fatalf("check message action: %v", err)
+	}
+	if result.Allowed || result.Classification != "MESSAGE_OWNERSHIP_DENIED" {
+		t.Fatalf("expected sender-only deny after no override, got %+v", result)
+	}
+	if checker.calls != 1 {
+		t.Fatalf("expected override checker call, got %d", checker.calls)
+	}
+}
+
+func TestCheckMessageActionUseCaseOwnershipOverrideFailsClosed(t *testing.T) {
+	checker := &fakeOwnershipOverrideChecker{err: types.NewDependencyUnavailable("policy ownership override failed")}
+	useCase := NewCheckMessageActionUseCase(
+		&countingEvaluator{},
+		WithMessageOwnershipOverrideChecker(checker),
+	)
+	command := testPolicyCommand(types.MessageActionEdit)
+	command.AuthContext.UserID = "user-2"
+	command.MessageSenderUserID = "user-1"
+	command.ConversationPermissionVersion = 7
+
+	_, err := useCase.Execute(context.Background(), command)
+	if !errors.Is(err, types.ErrDependencyUnavailable) {
+		t.Fatalf("expected dependency unavailable, got %v", err)
+	}
+}
+
 func TestCheckMessageActionUseCaseAllowsSenderMutationToEvaluator(t *testing.T) {
 	evaluator := &countingEvaluator{
 		decision: types.MessageActionDecision{
@@ -212,4 +308,24 @@ func (f *countingEvaluator) DecideMessageAction(context.Context, types.CheckMess
 		return types.MessageActionDecision{}, f.err
 	}
 	return f.decision, nil
+}
+
+type fakeOwnershipOverrideChecker struct {
+	calls    int
+	command  types.CheckMessageActionCommand
+	decision types.MessageActionDecision
+	allowed  bool
+	err      error
+}
+
+func (f *fakeOwnershipOverrideChecker) DecideMessageOwnershipOverride(
+	_ context.Context,
+	command types.CheckMessageActionCommand,
+) (types.MessageActionDecision, bool, error) {
+	f.calls++
+	f.command = command
+	if f.err != nil {
+		return types.MessageActionDecision{}, false, f.err
+	}
+	return f.decision, f.allowed, nil
 }

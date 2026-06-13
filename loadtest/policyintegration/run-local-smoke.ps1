@@ -7,6 +7,7 @@ param(
     [switch]$UseTenantPolicyRules,
     [switch]$UseConversationRoleGate,
     [switch]$UseOwnershipGate,
+    [switch]$UseOwnershipOverride,
     [switch]$SkipBuild
 )
 
@@ -133,16 +134,19 @@ function Run-Scenario {
     if ($UseOwnershipGate -and $Action -eq "send") {
         throw "ownership gate integration smoke supports edit/revoke/delete only"
     }
+    if ($UseOwnershipOverride -and $Action -eq "send") {
+        throw "ownership override integration smoke supports edit/revoke/delete only"
+    }
     $policyPort = Get-FreeTcpPort
     $messagePort = Get-FreeTcpPort
     $policyAddr = "127.0.0.1:$policyPort"
     $messageAddr = "127.0.0.1:$messagePort"
     $processes = @()
     try {
-        $usesRuleStore = $UsePolicyRules -or $UseTenantPolicyRules -or $UseConversationRoleGate -or $UseOwnershipGate
-        $policyStaticAllowed = if ($UseOwnershipGate) { $true } elseif ($usesRuleStore) { -not $Allowed } else { $Allowed }
+        $usesRuleStore = $UsePolicyRules -or $UseTenantPolicyRules -or $UseConversationRoleGate -or $UseOwnershipGate -or $UseOwnershipOverride
+        $policyStaticAllowed = if ($UseOwnershipGate -or $UseOwnershipOverride) { $true } elseif ($usesRuleStore) { -not $Allowed } else { $Allowed }
         $ownershipFallthroughClassification = "POLICY_OWNERSHIP_FALLTHROUGH_ALLOWED"
-        $policyStaticClassification = if ($UseOwnershipGate) { $ownershipFallthroughClassification } elseif ($usesRuleStore) { "LOCAL_STATIC_SHOULD_NOT_APPEAR" } else { $Classification }
+        $policyStaticClassification = if ($UseOwnershipGate -or $UseOwnershipOverride) { $ownershipFallthroughClassification } elseif ($usesRuleStore) { "LOCAL_STATIC_SHOULD_NOT_APPEAR" } else { $Classification }
         $policyEnv = @{
             NEXUSIM_POLICY_SERVICE_MODE = "grpc"
             NEXUSIM_POLICY_GRPC_ADDR = $policyAddr
@@ -203,6 +207,15 @@ function Run-Scenario {
                 $args += @("--change-user-id", "policy-message-non-sender")
             }
         }
+        if ($UseOwnershipOverride) {
+            $args += @(
+                "--seed-ownership-override-rule",
+                "--expect-policy-audit",
+                "--expected-audit-rows", 2,
+                "--expected-base-classification", "POLICY_SEND_SEED",
+                "--change-user-id", "policy-message-admin-override"
+            )
+        }
         & $runner @args
         if ($LASTEXITCODE -ne 0) {
             throw "policy message smoke runner failed with exit code $LASTEXITCODE"
@@ -223,7 +236,7 @@ Get-ChildItem -Path "migrations\postgres\message" -Filter "*.sql" |
         Apply-PostgresMigration -Path $_.FullName -Name $_.Name
     }
 
-if ($UsePolicyRules -or $UseTenantPolicyRules -or $UseConversationRoleGate -or $UseOwnershipGate) {
+if ($UsePolicyRules -or $UseTenantPolicyRules -or $UseConversationRoleGate -or $UseOwnershipGate -or $UseOwnershipOverride) {
     Get-ChildItem -Path "migrations\postgres\policy" -Filter "*.sql" |
         Sort-Object Name |
         ForEach-Object {
@@ -255,6 +268,11 @@ foreach ($action in $Actions) {
         $denyClassification = "MESSAGE_OWNERSHIP_DENIED"
         $denyReason = "message ownership policy denied"
     }
+    if ($UseOwnershipOverride) {
+        $allowClassification = "MESSAGE_OWNERSHIP_ROLE_OVERRIDE"
+        $denyClassification = "MESSAGE_OWNERSHIP_DENIED"
+        $denyReason = "message ownership policy denied"
+    }
 
     $scenarioSummaries += Run-Scenario `
         -Action $normalizedAction `
@@ -282,6 +300,7 @@ $combinedFields = [ordered]@{
     tenant_policy_rules_enabled = [bool]$UseTenantPolicyRules
     conversation_role_gate_enabled = [bool]$UseConversationRoleGate
     ownership_gate_enabled = [bool]$UseOwnershipGate
+    ownership_override_enabled = [bool]$UseOwnershipOverride
     actions = $Actions
 }
 if ($scenarioSummaries.Count -eq 2 -and $scenarioSummaries[0].action -eq "send" -and $scenarioSummaries[1].action -eq "send") {

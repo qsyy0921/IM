@@ -16,7 +16,7 @@ Implemented:
 - Contacts event projection consumer through `NEXUSIM_POLICY_SERVICE_MODE=contact-consumer`, storing directed contact edges in `policy_contact_edges_projection`.
 - Conversation timeline projection consumer through `NEXUSIM_POLICY_SERVICE_MODE=timeline-consumer`, storing member role/status rows in `policy_conversation_members_projection`.
 - First-stage conversation role gate through `policy_conversation_role_action_rules`, guarded by `conversation_permission_version` so stale projections fail closed as policy unavailable.
-- First-stage sender-only message ownership gate for `EDIT` / `REVOKE` / `DELETE` when message-service supplies `message_sender_user_id`; non-sender mutations return `MESSAGE_OWNERSHIP_DENIED` before role / rule / static fallback.
+- First-stage message ownership gate for `EDIT` / `REVOKE` / `DELETE` when message-service supplies `message_sender_user_id`; non-sender mutations return `MESSAGE_OWNERSHIP_DENIED` unless an explicit `ADMIN` / `OWNER` ownership override rule and fresh conversation member projection produce typed `ownership_override=true`.
 - Direct gRPC allow/deny smoke for `SEND`, `EDIT`, `REVOKE`, and `DELETE`: `loadtest-report-20260613-policy-service-smoke.md`.
 - message-service `SendMessage` allow/deny integration smoke through `NEXUSIM_POLICY_SERVICE_ADDR`: `loadtest-report-20260613-policy-message-integration-smoke.md`.
 - message-service `SendMessage` allow/deny integration smoke through PostgreSQL-backed exact policy rules: `loadtest-report-20260613-policy-message-rule-store-smoke.md`.
@@ -32,10 +32,11 @@ Implemented:
 - policy-service conversation role gate Kafka smoke for `conversation.timeline.events -> policy_conversation_members_projection -> CheckMessageAction`: `loadtest-report-20260613-policy-conversation-role-smoke.md`.
 - message-service `SendMessage` role gate integration smoke through `policy-service CheckMessageAction`: `loadtest-report-20260613-policy-message-role-gate-smoke.md`.
 - message-service `EditMessage` / `RevokeMessage` / `DeleteMessage` sender-only ownership integration smoke through `policy-service CheckMessageAction`: `loadtest-report-20260613-policy-message-ownership-smoke.md`.
+- message-service `EditMessage` / `RevokeMessage` / `DeleteMessage` first-stage ownership override smoke for non-sender `ADMIN` allow and `MEMBER` deny: `loadtest-report-20260613-policy-message-ownership-override-smoke.md`.
 
 Not yet implemented:
 
-- full ReBAC and admin / moderator mutation override;
+- full ReBAC, a separate `MODERATOR` role and product-grade moderation policy;
 - tenant-level policy DSL / quota / risk policy beyond first-stage action defaults;
 - content moderation / risk scoring;
 - policy audit retention, external sink, poison-payload classification and broad repair workflow;
@@ -105,6 +106,12 @@ Run message-service sender-only ownership integration smoke with:
 .\loadtest\policyintegration\run-local-smoke.ps1 -UseOwnershipGate -Actions edit,revoke,delete
 ```
 
+Run message-service ownership override integration smoke with:
+
+```powershell
+.\loadtest\policyintegration\run-local-smoke.ps1 -UseOwnershipOverride -Actions edit,revoke,delete
+```
+
 The same runner now also starts `policy-service grpc` and validates direct conversation block enforcement when policy receives `direct_peer_user_id`:
 
 ```text
@@ -145,7 +152,7 @@ The rule-store smoke also sets local static fallback opposite to the seeded Post
 
 The observability smoke reads `/debug/metrics` after both allow and deny scenarios. Metrics are aggregate debug snapshots only: they do not expose tenant id, user id, conversation id, message id, policy request bodies, rule parameters, deny reason text or classification strings. Trace id and request id are propagated for structured gRPC logs, not as metrics labels.
 
-The contact projection smoke proves that policy-service can consume `im.contact.events` and maintain a policy-owned edge projection. The contact block decision smoke proves that projected `BLOCKED` edges are consumed for direct `SEND` when `direct_peer_user_id` is present. The tenant-rule smoke proves only first-stage tenant action defaults. The conversation role gate projection smoke proves that policy-service can consume `conversation.timeline.events`, maintain member role/status projection, pass sufficient active roles through to tenant allow, deny insufficient/inactive roles, and fail closed when `conversation_permission_version` is stale. The message role gate integration smoke proves that message-service forwards the conversation permission version to policy-service, accepts `ADMIN/ACTIVE` projections, rejects insufficient `MEMBER/ACTIVE` projections, writes no message/timeline/outbox rows on deny, and records the expected `policy_decision_audit_outbox` decision. The ownership smoke proves that message-service forwards original sender context for `EDIT` / `REVOKE` / `DELETE`, sender mutations fall through to allow, non-sender mutations are rejected as `MESSAGE_OWNERSHIP_DENIED`, and the target mutation audit row carries message context. Admin / moderator override, full ReBAC, tenant policy DSL, tenant quota/risk policy and risk scoring remain future work.
+The contact projection smoke proves that policy-service can consume `im.contact.events` and maintain a policy-owned edge projection. The contact block decision smoke proves that projected `BLOCKED` edges are consumed for direct `SEND` when `direct_peer_user_id` is present. The tenant-rule smoke proves only first-stage tenant action defaults. The conversation role gate projection smoke proves that policy-service can consume `conversation.timeline.events`, maintain member role/status projection, pass sufficient active roles through to tenant allow, deny insufficient/inactive roles, and fail closed when `conversation_permission_version` is stale. The message role gate integration smoke proves that message-service forwards the conversation permission version to policy-service, accepts `ADMIN/ACTIVE` projections, rejects insufficient `MEMBER/ACTIVE` projections, writes no message/timeline/outbox rows on deny, and records the expected `policy_decision_audit_outbox` decision. The sender-only ownership smoke proves that message-service forwards original sender context for `EDIT` / `REVOKE` / `DELETE`, sender mutations fall through to allow, non-sender mutations are rejected as `MESSAGE_OWNERSHIP_DENIED`, and the target mutation audit row carries message context. The ownership override smoke proves only the first-stage role override shape: non-sender `ADMIN/ACTIVE` with fresh `conversation_permission_version` can mutate through typed `ownership_override=true`, while `MEMBER/ACTIVE` remains denied. Full ReBAC, a separate `MODERATOR` role, tenant policy DSL, tenant quota/risk policy and risk scoring remain future work.
 
 The decision audit outbox smoke proves that public policy decisions are staged as low-sensitive `policy_decision_audit_outbox` rows when PostgreSQL rules mode is enabled. The decision audit relay smoke proves those rows can be published to `im.policy.events` as protobuf `PolicyEvent` records and marked `PUBLISHED`. Audit rows and Kafka events store stable object keys, context-present flags, action, allow/deny, permission version, classification, reason code and trace/request ids. They do not store raw session id, raw device id, raw peer id, raw conversation id, raw message content, rule parameters, SQL errors or free-text deny/provider bodies. Explicit DLQ event-id repair is available; broad repair workflow, poison-payload classification, retention and external audit sinks remain future work.
 The decision audit repair smoke proves the first-stage operator path for explicit DLQ event IDs:

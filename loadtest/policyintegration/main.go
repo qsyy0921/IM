@@ -44,49 +44,52 @@ type config struct {
 	seedPolicyRule         bool
 	seedTenantPolicyRule   bool
 	seedConversationRole   bool
+	seedOwnershipOverride  bool
 	expectPolicyAudit      bool
 	expectedAuditRows      int64
 }
 
 type summary struct {
-	Commit                 string        `json:"commit"`
-	CommitFull             string        `json:"commit_full"`
-	GitDirty               bool          `json:"git_dirty"`
-	GitStatusShort         string        `json:"git_status_short,omitempty"`
-	Target                 string        `json:"target"`
-	ResultDir              string        `json:"result_dir"`
-	Scenario               string        `json:"scenario"`
-	Action                 string        `json:"action"`
-	TenantID               string        `json:"tenant_id"`
-	UserID                 string        `json:"user_id"`
-	ChangeUserID           string        `json:"change_user_id,omitempty"`
-	ConversationID         string        `json:"conversation_id"`
-	StartedAt              time.Time     `json:"started_at"`
-	FinishedAt             time.Time     `json:"finished_at"`
-	Success                bool          `json:"success"`
-	Error                  string        `json:"error,omitempty"`
-	ExpectedPermissionVer  int64         `json:"expected_permission_version"`
-	ExpectedClassification string        `json:"expected_classification"`
-	ExpectedReason         string        `json:"expected_reason,omitempty"`
-	SendMessage            sendSummary   `json:"send_message"`
-	ChangeMessage          changeSummary `json:"change_message,omitempty"`
-	MessageError           errorSummary  `json:"message_error,omitempty"`
-	PolicyRuleSeeded       bool          `json:"policy_rule_seeded"`
-	TenantPolicyRuleSeeded bool          `json:"tenant_policy_rule_seeded"`
-	ConversationRoleSeeded bool          `json:"conversation_role_gate_seeded"`
-	PolicyAuditExpected    bool          `json:"policy_audit_expected"`
-	ExpectedAuditRows      int64         `json:"expected_policy_audit_rows,omitempty"`
-	PolicyRule             policyRule    `json:"policy_rule,omitempty"`
-	PolicyRules            []policyRule  `json:"policy_rules,omitempty"`
-	ConversationRoleRule   roleRule      `json:"conversation_role_rule,omitempty"`
-	ConversationMember     memberRow     `json:"conversation_member_projection,omitempty"`
-	DBBefore               dbStats       `json:"db_before"`
-	DBBeforeAction         dbStats       `json:"db_before_action,omitempty"`
-	DBAfter                dbStats       `json:"db_after"`
-	MessageRow             messageRow    `json:"message_row,omitempty"`
-	ChangeRow              changeRow     `json:"change_row,omitempty"`
-	PolicyAudit            policyAudit   `json:"policy_decision_audit,omitempty"`
-	LatencyMS              float64       `json:"latency_ms"`
+	Commit                  string        `json:"commit"`
+	CommitFull              string        `json:"commit_full"`
+	GitDirty                bool          `json:"git_dirty"`
+	GitStatusShort          string        `json:"git_status_short,omitempty"`
+	Target                  string        `json:"target"`
+	ResultDir               string        `json:"result_dir"`
+	Scenario                string        `json:"scenario"`
+	Action                  string        `json:"action"`
+	TenantID                string        `json:"tenant_id"`
+	UserID                  string        `json:"user_id"`
+	ChangeUserID            string        `json:"change_user_id,omitempty"`
+	ConversationID          string        `json:"conversation_id"`
+	StartedAt               time.Time     `json:"started_at"`
+	FinishedAt              time.Time     `json:"finished_at"`
+	Success                 bool          `json:"success"`
+	Error                   string        `json:"error,omitempty"`
+	ExpectedPermissionVer   int64         `json:"expected_permission_version"`
+	ExpectedClassification  string        `json:"expected_classification"`
+	ExpectedReason          string        `json:"expected_reason,omitempty"`
+	SendMessage             sendSummary   `json:"send_message"`
+	ChangeMessage           changeSummary `json:"change_message,omitempty"`
+	MessageError            errorSummary  `json:"message_error,omitempty"`
+	PolicyRuleSeeded        bool          `json:"policy_rule_seeded"`
+	TenantPolicyRuleSeeded  bool          `json:"tenant_policy_rule_seeded"`
+	ConversationRoleSeeded  bool          `json:"conversation_role_gate_seeded"`
+	OwnershipOverrideSeeded bool          `json:"ownership_override_rule_seeded"`
+	PolicyAuditExpected     bool          `json:"policy_audit_expected"`
+	ExpectedAuditRows       int64         `json:"expected_policy_audit_rows,omitempty"`
+	PolicyRule              policyRule    `json:"policy_rule,omitempty"`
+	PolicyRules             []policyRule  `json:"policy_rules,omitempty"`
+	ConversationRoleRule    roleRule      `json:"conversation_role_rule,omitempty"`
+	OwnershipOverrideRule   roleRule      `json:"ownership_override_rule,omitempty"`
+	ConversationMember      memberRow     `json:"conversation_member_projection,omitempty"`
+	DBBefore                dbStats       `json:"db_before"`
+	DBBeforeAction          dbStats       `json:"db_before_action,omitempty"`
+	DBAfter                 dbStats       `json:"db_after"`
+	MessageRow              messageRow    `json:"message_row,omitempty"`
+	ChangeRow               changeRow     `json:"change_row,omitempty"`
+	PolicyAudit             policyAudit   `json:"policy_decision_audit,omitempty"`
+	LatencyMS               float64       `json:"latency_ms"`
 }
 
 type sendSummary struct {
@@ -225,6 +228,7 @@ func parseConfig() config {
 	flag.BoolVar(&cfg.seedPolicyRule, "seed-policy-rule", false, "seed exact policy_message_action_rules row for this scenario")
 	flag.BoolVar(&cfg.seedTenantPolicyRule, "seed-tenant-policy-rule", false, "seed tenant-level policy_tenant_message_action_rules row for this scenario")
 	flag.BoolVar(&cfg.seedConversationRole, "seed-conversation-role-gate", false, "seed policy conversation role gate rule and member projection for this scenario")
+	flag.BoolVar(&cfg.seedOwnershipOverride, "seed-ownership-override-rule", false, "seed policy message ownership override rule and member projection for this scenario")
 	flag.BoolVar(&cfg.expectPolicyAudit, "expect-policy-audit", false, "validate the latest policy_decision_audit_outbox row")
 	flag.Int64Var(&cfg.expectedAuditRows, "expected-audit-rows", 0, "expected policy_decision_audit_outbox row count when audit validation is enabled")
 	flag.Parse()
@@ -292,29 +296,35 @@ func run(cfg config) error {
 			return err
 		}
 	}
+	if cfg.seedOwnershipOverride {
+		if err := seedOwnershipOverrideRule(ctx, pool, cfg); err != nil {
+			return err
+		}
+	}
 
 	started := time.Now().UTC()
 	s := summary{
-		Commit:                 gitOutput("rev-parse", "--short", "HEAD"),
-		CommitFull:             gitOutput("rev-parse", "HEAD"),
-		GitStatusShort:         gitOutput("status", "--short"),
-		Target:                 cfg.target,
-		ResultDir:              cfg.resultDir,
-		Scenario:               cfg.scenario,
-		Action:                 cfg.action,
-		TenantID:               cfg.tenantID,
-		UserID:                 cfg.userID,
-		ChangeUserID:           cfg.changeUserID,
-		ConversationID:         cfg.conversationID,
-		StartedAt:              started,
-		ExpectedPermissionVer:  cfg.expectedPermissionVer,
-		ExpectedClassification: cfg.expectedClassification,
-		ExpectedReason:         cfg.expectedReason,
-		PolicyRuleSeeded:       cfg.seedPolicyRule,
-		TenantPolicyRuleSeeded: cfg.seedTenantPolicyRule,
-		ConversationRoleSeeded: cfg.seedConversationRole,
-		PolicyAuditExpected:    shouldValidatePolicyAudit(cfg),
-		ExpectedAuditRows:      expectedPolicyAuditRows(cfg),
+		Commit:                  gitOutput("rev-parse", "--short", "HEAD"),
+		CommitFull:              gitOutput("rev-parse", "HEAD"),
+		GitStatusShort:          gitOutput("status", "--short"),
+		Target:                  cfg.target,
+		ResultDir:               cfg.resultDir,
+		Scenario:                cfg.scenario,
+		Action:                  cfg.action,
+		TenantID:                cfg.tenantID,
+		UserID:                  cfg.userID,
+		ChangeUserID:            cfg.changeUserID,
+		ConversationID:          cfg.conversationID,
+		StartedAt:               started,
+		ExpectedPermissionVer:   cfg.expectedPermissionVer,
+		ExpectedClassification:  cfg.expectedClassification,
+		ExpectedReason:          cfg.expectedReason,
+		PolicyRuleSeeded:        cfg.seedPolicyRule,
+		TenantPolicyRuleSeeded:  cfg.seedTenantPolicyRule,
+		ConversationRoleSeeded:  cfg.seedConversationRole,
+		OwnershipOverrideSeeded: cfg.seedOwnershipOverride,
+		PolicyAuditExpected:     shouldValidatePolicyAudit(cfg),
+		ExpectedAuditRows:       expectedPolicyAuditRows(cfg),
 	}
 	if cfg.seedPolicyRule || cfg.seedTenantPolicyRule {
 		s.PolicyRules = expectedPolicyRules(cfg, cfg.seedPolicyRule, cfg.seedTenantPolicyRule)
@@ -324,6 +334,10 @@ func run(cfg config) error {
 	}
 	if cfg.seedConversationRole {
 		s.ConversationRoleRule = expectedRoleRule(cfg)
+		s.ConversationMember = expectedConversationMember(cfg)
+	}
+	if cfg.seedOwnershipOverride {
+		s.OwnershipOverrideRule = expectedOwnershipOverrideRule(cfg)
 		s.ConversationMember = expectedConversationMember(cfg)
 	}
 	s.GitDirty = strings.TrimSpace(s.GitStatusShort) != ""
@@ -1140,6 +1154,70 @@ SET role = EXCLUDED.role,
 	return nil
 }
 
+func seedOwnershipOverrideRule(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
+	if cfg.action == "send" {
+		return fmt.Errorf("ownership override integration smoke supports edit/revoke/delete only")
+	}
+	if err := cleanupPolicyAudit(ctx, pool, cfg.tenantID); err != nil {
+		return err
+	}
+	if _, err := pool.Exec(ctx, `DELETE FROM policy_message_ownership_override_rules WHERE tenant_id = $1`, cfg.tenantID); err != nil {
+		return fmt.Errorf("cleanup ownership override rules: %w", err)
+	}
+	if _, err := pool.Exec(ctx, `DELETE FROM policy_conversation_members_projection WHERE tenant_id = $1`, cfg.tenantID); err != nil {
+		return fmt.Errorf("cleanup conversation member projection: %w", err)
+	}
+	if _, err := pool.Exec(ctx, `DELETE FROM policy_tenant_message_action_rules WHERE tenant_id = $1`, cfg.tenantID); err != nil {
+		return fmt.Errorf("cleanup tenant policy rules: %w", err)
+	}
+	rule := expectedOwnershipOverrideRule(cfg)
+	if _, err := pool.Exec(ctx, `
+INSERT INTO policy_message_ownership_override_rules (
+    tenant_id,
+    action,
+    min_role,
+    classification,
+    reason,
+    source
+) VALUES ($1, $2, $3, $4, $5, 'policy-message-ownership-override-smoke')
+ON CONFLICT (tenant_id, action) DO UPDATE
+SET min_role = EXCLUDED.min_role,
+    classification = EXCLUDED.classification,
+    reason = EXCLUDED.reason,
+    source = EXCLUDED.source,
+    updated_at = now()
+`, rule.TenantID, rule.Action, rule.MinRole, rule.Classification, rule.Reason); err != nil {
+		return fmt.Errorf("seed ownership override rule: %w", err)
+	}
+	member := expectedConversationMember(cfg)
+	if _, err := pool.Exec(ctx, `
+INSERT INTO policy_conversation_members_projection (
+    tenant_id,
+    conversation_id,
+    user_id,
+    role,
+    status,
+    member_version,
+    permission_version,
+    updated_by_event_id
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (tenant_id, conversation_id, user_id) DO UPDATE
+SET role = EXCLUDED.role,
+    status = EXCLUDED.status,
+    member_version = EXCLUDED.member_version,
+    permission_version = EXCLUDED.permission_version,
+    updated_by_event_id = EXCLUDED.updated_by_event_id,
+    updated_at = now()
+`, member.TenantID, member.ConversationID, member.UserID, member.Role, member.Status, member.MemberVersion, member.PermissionVersion, member.UpdatedByEventID); err != nil {
+		return fmt.Errorf("seed conversation member projection: %w", err)
+	}
+	allowRule := tenantPolicyRule(cfg, "SEND", true, "POLICY_SEND_SEED", "")
+	if err := seedOneTenantPolicyRule(ctx, pool, allowRule); err != nil {
+		return err
+	}
+	return nil
+}
+
 func seedOnePolicyRule(ctx context.Context, pool *pgxpool.Pool, rule policyRule) error {
 	_, err := pool.Exec(ctx, `
 INSERT INTO policy_message_action_rules (
@@ -1225,6 +1303,16 @@ func expectedRoleRule(cfg config) roleRule {
 	}
 }
 
+func expectedOwnershipOverrideRule(cfg config) roleRule {
+	return roleRule{
+		TenantID:       cfg.tenantID,
+		Action:         strings.ToUpper(cfg.action),
+		MinRole:        "ADMIN",
+		Classification: "MESSAGE_OWNERSHIP_ROLE_OVERRIDE",
+		Reason:         "",
+	}
+}
+
 func expectedConversationMember(cfg config) memberRow {
 	role := "ADMIN"
 	if cfg.scenario == "deny" {
@@ -1233,13 +1321,27 @@ func expectedConversationMember(cfg config) memberRow {
 	return memberRow{
 		TenantID:          cfg.tenantID,
 		ConversationID:    cfg.conversationID,
-		UserID:            cfg.userID,
+		UserID:            expectedConversationMemberUserID(cfg),
 		Role:              role,
 		Status:            "ACTIVE",
 		MemberVersion:     cfg.expectedPermissionVer,
 		PermissionVersion: cfg.expectedPermissionVer,
-		UpdatedByEventID:  "policy-message-role-smoke-" + cfg.scenario,
+		UpdatedByEventID:  expectedConversationMemberEventID(cfg),
 	}
+}
+
+func expectedConversationMemberUserID(cfg config) string {
+	if cfg.seedOwnershipOverride {
+		return cfg.changeUserID
+	}
+	return cfg.userID
+}
+
+func expectedConversationMemberEventID(cfg config) string {
+	if cfg.seedOwnershipOverride {
+		return "policy-message-ownership-override-smoke-" + cfg.scenario
+	}
+	return "policy-message-role-smoke-" + cfg.scenario
 }
 
 func exactPolicyRule(cfg config, action string, allowed bool, classification string, reason string) policyRule {
@@ -1273,7 +1375,7 @@ func isSupportedAction(action string) bool {
 }
 
 func shouldValidatePolicyAudit(cfg config) bool {
-	return cfg.expectPolicyAudit || cfg.seedConversationRole
+	return cfg.expectPolicyAudit || cfg.seedConversationRole || cfg.seedOwnershipOverride
 }
 
 func expectedPolicyAuditRows(cfg config) int64 {
@@ -1290,7 +1392,7 @@ func expectedBaseSendClassification(cfg config) string {
 	if strings.TrimSpace(cfg.expectedBaseClass) != "" {
 		return strings.TrimSpace(cfg.expectedBaseClass)
 	}
-	if cfg.action != "send" && (cfg.seedPolicyRule || cfg.seedTenantPolicyRule || cfg.seedConversationRole) {
+	if cfg.action != "send" && (cfg.seedPolicyRule || cfg.seedTenantPolicyRule || cfg.seedConversationRole || cfg.seedOwnershipOverride) {
 		return "POLICY_SEND_SEED"
 	}
 	return cfg.expectedClassification

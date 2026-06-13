@@ -309,6 +309,103 @@ func TestMessagePolicyEvaluatorConversationRoleRuleOverridesTenantRuleIntegratio
 	}
 }
 
+func TestMessagePolicyEvaluatorAllowsMessageOwnershipOverrideIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           false,
+		PermissionVersion: 1,
+		Classification:    "STATIC_DENY",
+	})
+	command := testPolicyCommand(types.MessageActionDelete)
+	command.AuthContext.UserID = "admin-policy"
+	command.MessageSenderUserID = "sender-policy"
+	seedOwnershipOverrideRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, types.ConversationMemberRoleAdmin, "MESSAGE_OWNERSHIP_ROLE_OVERRIDE", "")
+	seedConversationMember(t, ctx, pool, command.ConversationID, command.AuthContext.UserID, types.ConversationMemberRoleAdmin, types.ConversationMemberStatusActive, 8, command.ConversationPermissionVersion)
+
+	decision, allowed, err := evaluator.DecideMessageOwnershipOverride(ctx, command)
+	if err != nil {
+		t.Fatalf("decide ownership override: %v", err)
+	}
+	if !allowed ||
+		!decision.Allowed ||
+		decision.PermissionVersion != command.ConversationPermissionVersion ||
+		decision.Classification != "MESSAGE_OWNERSHIP_ROLE_OVERRIDE" ||
+		decision.UserID != command.AuthContext.UserID ||
+		decision.MessageID != command.MessageID {
+		t.Fatalf("expected ownership override allow, allowed=%v decision=%+v", allowed, decision)
+	}
+}
+
+func TestMessagePolicyEvaluatorMessageOwnershipOverrideIgnoresLowRoleIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           false,
+		PermissionVersion: 1,
+		Classification:    "STATIC_DENY",
+	})
+	command := testPolicyCommand(types.MessageActionRevoke)
+	command.AuthContext.UserID = "member-policy"
+	command.MessageSenderUserID = "sender-policy"
+	seedOwnershipOverrideRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, types.ConversationMemberRoleAdmin, "MESSAGE_OWNERSHIP_ROLE_OVERRIDE", "")
+	seedConversationMember(t, ctx, pool, command.ConversationID, command.AuthContext.UserID, types.ConversationMemberRoleMember, types.ConversationMemberStatusActive, 8, command.ConversationPermissionVersion)
+
+	decision, allowed, err := evaluator.DecideMessageOwnershipOverride(ctx, command)
+	if err != nil {
+		t.Fatalf("decide ownership override: %v", err)
+	}
+	if allowed || decision.Allowed || decision.Classification != "" {
+		t.Fatalf("expected low role to skip override, allowed=%v decision=%+v", allowed, decision)
+	}
+}
+
+func TestMessagePolicyEvaluatorMessageOwnershipOverrideRequiresFreshProjectionIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           false,
+		PermissionVersion: 1,
+		Classification:    "STATIC_DENY",
+	})
+	command := testPolicyCommand(types.MessageActionEdit)
+	command.AuthContext.UserID = "admin-policy"
+	command.MessageSenderUserID = "sender-policy"
+	seedOwnershipOverrideRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, types.ConversationMemberRoleAdmin, "MESSAGE_OWNERSHIP_ROLE_OVERRIDE", "")
+	seedConversationMember(t, ctx, pool, command.ConversationID, command.AuthContext.UserID, types.ConversationMemberRoleAdmin, types.ConversationMemberStatusActive, 8, command.ConversationPermissionVersion-1)
+
+	_, _, err := evaluator.DecideMessageOwnershipOverride(ctx, command)
+	if !errors.Is(err, types.ErrDependencyUnavailable) {
+		t.Fatalf("expected stale ownership override projection to fail closed, got %v", err)
+	}
+}
+
+func TestMessagePolicyEvaluatorMessageOwnershipOverrideFallsThroughWithoutRuleIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           false,
+		PermissionVersion: 1,
+		Classification:    "STATIC_DENY",
+	})
+	command := testPolicyCommand(types.MessageActionDelete)
+	command.AuthContext.UserID = "admin-policy"
+	command.MessageSenderUserID = "sender-policy"
+	seedConversationMember(t, ctx, pool, command.ConversationID, command.AuthContext.UserID, types.ConversationMemberRoleOwner, types.ConversationMemberStatusActive, 8, command.ConversationPermissionVersion)
+
+	decision, allowed, err := evaluator.DecideMessageOwnershipOverride(ctx, command)
+	if err != nil {
+		t.Fatalf("decide ownership override: %v", err)
+	}
+	if allowed || decision.Allowed {
+		t.Fatalf("expected missing rule to skip override, allowed=%v decision=%+v", allowed, decision)
+	}
+}
+
 func TestMessagePolicyEvaluatorContactBlockOverridesTenantRuleIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -477,7 +574,7 @@ func applyPolicyMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool)
 
 func resetPolicyTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	if _, err := pool.Exec(ctx, `TRUNCATE policy_decision_audit_outbox_repair_audit, policy_decision_audit_outbox, policy_conversation_role_action_rules, policy_conversation_members_projection, policy_tenant_message_action_rules, policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
+	if _, err := pool.Exec(ctx, `TRUNCATE policy_decision_audit_outbox_repair_audit, policy_decision_audit_outbox, policy_message_ownership_override_rules, policy_conversation_role_action_rules, policy_conversation_members_projection, policy_tenant_message_action_rules, policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
 		t.Fatalf("reset policy tables: %v", err)
 	}
 }
@@ -559,6 +656,31 @@ INSERT INTO policy_conversation_role_action_rules (
 `, tenantID, action, minRole, classification, reason)
 	if err != nil {
 		t.Fatalf("seed conversation role rule: %v", err)
+	}
+}
+
+func seedOwnershipOverrideRule(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	tenantID types.TenantID,
+	action types.MessageAction,
+	minRole string,
+	classification string,
+	reason string,
+) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_message_ownership_override_rules (
+    tenant_id,
+    action,
+    min_role,
+    classification,
+    reason
+) VALUES ($1, $2, $3, $4, $5)
+`, tenantID, action, minRole, classification, reason)
+	if err != nil {
+		t.Fatalf("seed ownership override rule: %v", err)
 	}
 }
 

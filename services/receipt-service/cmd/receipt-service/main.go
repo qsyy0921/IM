@@ -20,6 +20,7 @@ import (
 	"github.com/qsyy0921/IM/services/receipt-service/internal/app"
 	accessinfra "github.com/qsyy0921/IM/services/receipt-service/internal/infrastructure/access"
 	kafkainfra "github.com/qsyy0921/IM/services/receipt-service/internal/infrastructure/kafka"
+	monitoringinfra "github.com/qsyy0921/IM/services/receipt-service/internal/infrastructure/monitoring"
 	postgresinfra "github.com/qsyy0921/IM/services/receipt-service/internal/infrastructure/postgres"
 	"github.com/qsyy0921/IM/services/receipt-service/internal/trigger/delivery"
 	"github.com/qsyy0921/IM/services/receipt-service/internal/trigger/outbox"
@@ -196,7 +197,8 @@ func envString(name string, fallback string) string {
 }
 
 func newGRPCServer() (*grpc.Server, error) {
-	interceptors := make([]grpc.UnaryServerInterceptor, 0, 1)
+	interceptors := make([]grpc.UnaryServerInterceptor, 0, 2)
+	interceptors = append(interceptors, monitoringinfra.UnaryAccessLogInterceptor(log.Default()))
 	switch strings.ToLower(envString("NEXUSIM_RECEIPT_AUTH_MODE", "body")) {
 	case "body", "request", "legacy":
 	case "metadata", "verified-metadata":

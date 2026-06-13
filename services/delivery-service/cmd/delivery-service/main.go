@@ -19,6 +19,7 @@ import (
 	grpcapi "github.com/qsyy0921/IM/services/delivery-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/delivery-service/internal/app"
 	kafkainfra "github.com/qsyy0921/IM/services/delivery-service/internal/infrastructure/kafka"
+	monitoringinfra "github.com/qsyy0921/IM/services/delivery-service/internal/infrastructure/monitoring"
 	postgresinfra "github.com/qsyy0921/IM/services/delivery-service/internal/infrastructure/postgres"
 	"github.com/qsyy0921/IM/services/delivery-service/internal/trigger/outbox"
 	"github.com/qsyy0921/IM/services/delivery-service/internal/trigger/timeline"
@@ -197,7 +198,8 @@ func envString(name string, fallback string) string {
 }
 
 func newGRPCServer() (*grpc.Server, error) {
-	interceptors := make([]grpc.UnaryServerInterceptor, 0, 1)
+	interceptors := make([]grpc.UnaryServerInterceptor, 0, 2)
+	interceptors = append(interceptors, monitoringinfra.UnaryAccessLogInterceptor(log.Default()))
 	switch strings.ToLower(envString("NEXUSIM_DELIVERY_AUTH_MODE", "body")) {
 	case "body", "request", "legacy":
 	case "metadata", "verified-metadata":

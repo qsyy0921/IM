@@ -413,6 +413,7 @@ message-service / conversation-service 发布 timeline event
 ## 11. 权限和安全
 
 - `PullInbox` 和 `AckDelivery` 必须使用 authenticated `tenant_id/user_id/device_id`，不信任请求体裸 user。
+- gRPC API 支持第一阶段 gateway verified metadata auth mode：`NEXUSIM_DELIVERY_AUTH_MODE=metadata` / `verified-metadata` 时，`PullInbox` 和 `AckDelivery` 的 `tenant_id / user_id / device_id / session_id` 只来自 gRPC metadata，不信任 request body 中可伪造的身份字段；`trace_id / request_id` 可在 metadata 缺失时从 body 兜底用于排障相关性。默认 `body` 模式仅用于兼容历史 smoke。
 - 第一阶段可以通过 `user_inbox` 是否存在判断可见性；没有 inbox item 不等于 conversation 不存在。
 - 成员边界事件决定投递可见窗口，不能用当前成员表回写历史可见性。
 - `delivery_membership_projection` 只能由 Kafka timeline event 重建；manual repair 必须留审计。
@@ -467,6 +468,16 @@ NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay
 ```
 
 当前 delivery-service 已具备 `delivery_outbox -> Kafka im.delivery.events` 最小 relay 链路；push-gateway 已完成单实例最小在线通知 smoke，可以消费 `im.delivery.events` 并把在线唤醒交给 WebSocket 客户端。后续多实例在线路由仍需要 Redis route / resume buffer / slow session active close。
+
+`delivery-service grpc` 的身份来源模式：
+
+```text
+NEXUSIM_DELIVERY_AUTH_MODE=body
+NEXUSIM_DELIVERY_AUTH_MODE=metadata
+NEXUSIM_DELIVERY_AUTH_MODE=verified-metadata
+```
+
+`body` 是本地 smoke 兼容模式；`metadata` / `verified-metadata` 要求上游 gateway / trusted proxy 注入 `x-nexusim-tenant-id`、`x-nexusim-user-id`、`x-nexusim-device-id` 等 verified gRPC metadata，并忽略请求体里的身份字段。该模式只定义 delivery-service 如何消费已验证身份，不等同完整 API gateway、token exchange、服务发现或全服务统一身份治理。
 
 `delivery-service grpc` 默认仍以 plaintext 启动，兼容本地 smoke 和现有 push-gateway ACK 转发。第一阶段可选开启静态 TLS / mTLS：
 

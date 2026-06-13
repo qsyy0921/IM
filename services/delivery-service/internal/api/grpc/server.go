@@ -40,16 +40,12 @@ func (s *Server) PullInbox(
 	if request == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
 	}
-	auth := request.GetAuthContext()
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
 	result, err := s.pullInbox.Execute(ctx, types.PullInboxCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  auth.GetDeviceId(),
-			SessionID: auth.GetSessionId(),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:    auth,
 		ConversationID: types.ConversationID(request.GetConversationId()),
 		AfterSeq:       request.GetAfterSeq(),
 		Limit:          int(request.GetLimit()),
@@ -84,16 +80,12 @@ func (s *Server) AckDelivery(
 	if request == nil {
 		return nil, status.Error(codes.InvalidArgument, "request is required")
 	}
-	auth := request.GetAuthContext()
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
 	result, err := s.ackDelivery.Execute(ctx, types.AckDeliveryCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  types.TenantID(auth.GetTenantId()),
-			UserID:    types.UserID(auth.GetUserId()),
-			DeviceID:  auth.GetDeviceId(),
-			SessionID: auth.GetSessionId(),
-			TraceID:   auth.GetTraceId(),
-			RequestID: auth.GetRequestId(),
-		},
+		AuthContext:    auth,
 		ConversationID: types.ConversationID(request.GetConversationId()),
 		ReceivedSeq:    request.GetReceivedSeq(),
 	})
@@ -128,4 +120,29 @@ func grpcError(err error) error {
 	default:
 		return status.Error(codes.Internal, "delivery service internal error")
 	}
+}
+
+func authFromProto(ctx context.Context, auth *deliveryv1.AuthContext) (types.AuthContext, bool) {
+	if verified, ok := verifiedAuthFromContext(ctx); ok {
+		if auth != nil {
+			if verified.TraceID == "" {
+				verified.TraceID = auth.GetTraceId()
+			}
+			if verified.RequestID == "" {
+				verified.RequestID = auth.GetRequestId()
+			}
+		}
+		return verified, true
+	}
+	if auth == nil {
+		return types.AuthContext{}, false
+	}
+	return types.AuthContext{
+		TenantID:  types.TenantID(auth.GetTenantId()),
+		UserID:    types.UserID(auth.GetUserId()),
+		DeviceID:  auth.GetDeviceId(),
+		SessionID: auth.GetSessionId(),
+		TraceID:   auth.GetTraceId(),
+		RequestID: auth.GetRequestId(),
+	}, true
 }

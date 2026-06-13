@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -51,6 +52,8 @@ func run() error {
 		return runOutboxRepair()
 	case "projection-checkpoint-repair":
 		return runProjectionCheckpointRepair()
+	case "projection-failure-audit":
+		return runProjectionFailureAudit()
 	default:
 		return errors.New("unsupported NEXUSIM_DELIVERY_SERVICE_MODE")
 	}
@@ -292,6 +295,64 @@ func runProjectionCheckpointRepair() error {
 		failureOffset,
 		dryRun,
 	)
+	return nil
+}
+
+func runProjectionFailureAudit() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	var partitionID *int32
+	if value := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_PARTITION_ID")); value != "" {
+		parsed := int32(envIntAllowZero("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_PARTITION_ID", 0))
+		partitionID = &parsed
+	}
+	includeResolved := envBool("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_INCLUDE_RESOLVED", false)
+	rows, err := postgresinfra.NewProjectionFailureStore(pool).AuditFailures(ctx, postgresinfra.ProjectionFailureAuditOptions{
+		ConsumerGroup:  envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_CONSUMER_GROUP", ""),
+		Topic:          envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_TOPIC", "conversation.timeline.events"),
+		PartitionID:    partitionID,
+		UnresolvedOnly: !includeResolved,
+		Limit:          envInt("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_LIMIT", 20),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"delivery-service projection failure audit completed rows=%d include_resolved=%t",
+		len(rows),
+		includeResolved,
+	)
+	for _, row := range rows {
+		resolved := row.ResolvedAt != nil
+		log.Printf(
+			"projection_failure consumer_group=%s topic=%s partition_id=%d offset=%d event_id=%s event_type=%s class=%s failure_count=%d resolved=%t last_seen=%s error=%q",
+			row.ConsumerGroup,
+			row.Topic,
+			row.PartitionID,
+			row.OffsetValue,
+			row.EventID,
+			row.EventType,
+			row.FailureClass,
+			row.FailureCount,
+			resolved,
+			row.LastSeenAt.Format(time.RFC3339),
+			row.LastError,
+		)
+	}
+	if !includeResolved && len(rows) > 0 {
+		return fmt.Errorf("delivery projection failure audit found %d unresolved rows", len(rows))
+	}
 	return nil
 }
 

@@ -75,6 +75,76 @@ INSERT INTO delivery_projection_failures (
 	assertProjectionFailureRow(t, ctx, pool, record.ConsumerGroup, record.Topic, record.PartitionID, record.OffsetValue, record.FailureClass, record.LastError, 3, false, 0)
 }
 
+func TestProjectionFailureStoreAuditReturnsUnresolvedRowsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_failures (
+    consumer_group, topic, partition_id, offset_value, event_id, event_type, tenant_id, conversation_id, aggregate_version, trace_id, failure_class, last_error, failure_count, first_seen_at, last_seen_at, resolved_at, resolved_checkpoint_offset
+) VALUES
+    ('group-1', 'conversation.timeline.events', 0, 41, 'event-1', 'message.revoked.v1', 'tenant-1', 'conv-1', 7, 'trace-1', 'projection_dependency', 'message revoke has no projected original message', 2, now(), now() - interval '1 minute', NULL, NULL),
+    ('group-1', 'conversation.timeline.events', 1, 42, 'event-2', 'message.edited.v1', 'tenant-1', 'conv-1', 8, 'trace-2', 'db_write_failed', 'write timeout', 1, now(), now(), now(), 43)
+`)
+	if err != nil {
+		t.Fatalf("seed projection failures: %v", err)
+	}
+
+	store := NewProjectionFailureStore(pool)
+	rows, err := store.AuditFailures(ctx, ProjectionFailureAuditOptions{
+		Topic:          "conversation.timeline.events",
+		UnresolvedOnly: true,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit projection failures: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one unresolved row, got %d", len(rows))
+	}
+	if rows[0].OffsetValue != 41 || rows[0].ResolvedAt != nil || rows[0].FailureClass != types.ProjectionFailureClassProjectionDependency {
+		t.Fatalf("unexpected unresolved row: %+v", rows[0])
+	}
+}
+
+func TestProjectionFailureStoreAuditIncludesResolvedWhenRequestedIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_failures (
+    consumer_group, topic, partition_id, offset_value, event_id, event_type, tenant_id, conversation_id, aggregate_version, trace_id, failure_class, last_error, failure_count, first_seen_at, last_seen_at, resolved_at, resolved_checkpoint_offset
+) VALUES
+    ('group-2', 'conversation.timeline.events', 0, 51, 'event-3', 'message.deleted.v1', 'tenant-1', 'conv-1', 9, 'trace-3', 'decode_failed', 'decode failed', 1, now(), now(), NULL, NULL),
+    ('group-2', 'conversation.timeline.events', 0, 52, 'event-4', 'message.edited.v1', 'tenant-1', 'conv-1', 10, 'trace-4', 'db_write_failed', 'write timeout', 3, now(), now() + interval '1 second', now(), 53)
+`)
+	if err != nil {
+		t.Fatalf("seed projection failures: %v", err)
+	}
+
+	store := NewProjectionFailureStore(pool)
+	rows, err := store.AuditFailures(ctx, ProjectionFailureAuditOptions{
+		ConsumerGroup:  "group-2",
+		Topic:          "conversation.timeline.events",
+		UnresolvedOnly: false,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit projection failures with resolved rows: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected two rows, got %d", len(rows))
+	}
+	if rows[0].OffsetValue != 52 || rows[0].ResolvedAt == nil {
+		t.Fatalf("expected resolved row first by last_seen_at, got %+v", rows[0])
+	}
+	if rows[1].OffsetValue != 51 || rows[1].ResolvedAt != nil {
+		t.Fatalf("expected unresolved row second, got %+v", rows[1])
+	}
+}
+
 func assertProjectionFailureRow(t *testing.T, ctx context.Context, pool *pgxpool.Pool, consumerGroup string, topic string, partitionID int32, offsetValue int64, failureClass string, lastError string, failureCount int64, resolved bool, resolvedCheckpointOffset int64) {
 	t.Helper()
 	var gotFailureClass string

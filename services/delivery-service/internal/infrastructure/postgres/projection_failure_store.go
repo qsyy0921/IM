@@ -3,7 +3,9 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/qsyy0921/IM/services/delivery-service/internal/types"
@@ -11,6 +13,29 @@ import (
 
 type ProjectionFailureStore struct {
 	pool *pgxpool.Pool
+}
+
+type ProjectionFailureAuditOptions struct {
+	ConsumerGroup  string
+	Topic          string
+	PartitionID    *int32
+	UnresolvedOnly bool
+	Limit          int
+}
+
+type ProjectionFailureAuditRow struct {
+	ConsumerGroup            string
+	Topic                    string
+	PartitionID              int32
+	OffsetValue              int64
+	EventID                  string
+	EventType                string
+	FailureClass             string
+	FailureCount             int64
+	LastError                string
+	LastSeenAt               time.Time
+	ResolvedAt               *time.Time
+	ResolvedCheckpointOffset *int64
 }
 
 func NewProjectionFailureStore(pool *pgxpool.Pool) *ProjectionFailureStore {
@@ -79,10 +104,96 @@ SET event_id = EXCLUDED.event_id,
 	return nil
 }
 
+func (store *ProjectionFailureStore) AuditFailures(ctx context.Context, options ProjectionFailureAuditOptions) ([]ProjectionFailureAuditRow, error) {
+	if store == nil || store.pool == nil {
+		return nil, errors.New("delivery projection failure store is not configured")
+	}
+	limit := options.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	topic := strings.TrimSpace(options.Topic)
+	if topic == "" {
+		topic = "conversation.timeline.events"
+	}
+
+	var args []any
+	clauses := []string{"topic = $1"}
+	args = append(args, topic)
+	if consumerGroup := strings.TrimSpace(options.ConsumerGroup); consumerGroup != "" {
+		args = append(args, consumerGroup)
+		clauses = append(clauses, "consumer_group = $"+itoa(len(args)))
+	}
+	if options.PartitionID != nil {
+		args = append(args, *options.PartitionID)
+		clauses = append(clauses, "partition_id = $"+itoa(len(args)))
+	}
+	if options.UnresolvedOnly {
+		clauses = append(clauses, "resolved_at IS NULL")
+	}
+	args = append(args, limit)
+	query := `
+SELECT
+    consumer_group,
+    topic,
+    partition_id,
+    offset_value,
+    event_id,
+    event_type,
+    failure_class,
+    failure_count,
+    last_error,
+    last_seen_at,
+    resolved_at,
+    resolved_checkpoint_offset
+FROM delivery_projection_failures
+WHERE ` + strings.Join(clauses, " AND ") + `
+ORDER BY last_seen_at DESC, consumer_group, partition_id, offset_value
+LIMIT $` + itoa(len(args))
+	rows, err := store.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	result := make([]ProjectionFailureAuditRow, 0, limit)
+	for rows.Next() {
+		var row ProjectionFailureAuditRow
+		if err := rows.Scan(
+			&row.ConsumerGroup,
+			&row.Topic,
+			&row.PartitionID,
+			&row.OffsetValue,
+			&row.EventID,
+			&row.EventType,
+			&row.FailureClass,
+			&row.FailureCount,
+			&row.LastError,
+			&row.LastSeenAt,
+			&row.ResolvedAt,
+			&row.ResolvedCheckpointOffset,
+		); err != nil {
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		result = append(result, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	return result, nil
+}
+
 func sanitizeProjectionFailureError(value string) string {
 	value = strings.TrimSpace(value)
 	if len(value) <= 256 {
 		return value
 	}
 	return value[:256]
+}
+
+func itoa(value int) string {
+	return strconv.Itoa(value)
 }

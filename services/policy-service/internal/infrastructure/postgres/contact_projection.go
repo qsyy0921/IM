@@ -121,6 +121,17 @@ func upsertPolicyKafkaCheckpoint(
 	tx pgx.Tx,
 	command types.ProjectContactEventCommand,
 ) error {
+	return upsertPolicyKafkaCheckpointValues(ctx, tx, command.ConsumerGroup, command.Topic, command.PartitionID, command.OffsetValue)
+}
+
+func upsertPolicyKafkaCheckpointValues(
+	ctx context.Context,
+	tx pgx.Tx,
+	consumerGroup string,
+	topic string,
+	partitionID int32,
+	offsetValue int64,
+) error {
 	_, err := tx.Exec(ctx, `
 INSERT INTO policy_kafka_checkpoints (
     consumer_group,
@@ -132,7 +143,7 @@ INSERT INTO policy_kafka_checkpoints (
 ON CONFLICT (consumer_group, topic, partition_id) DO UPDATE
 SET offset_value = GREATEST(policy_kafka_checkpoints.offset_value, EXCLUDED.offset_value),
     updated_at = now()
-`, command.ConsumerGroup, command.Topic, command.PartitionID, command.OffsetValue)
+`, consumerGroup, topic, partitionID, offsetValue)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}

@@ -36,7 +36,8 @@ func TestPolicyClientCheckSendPermission(t *testing.T) {
 	if fake.request.GetAction() != policyv1.MessageAction_MESSAGE_ACTION_SEND ||
 		fake.request.GetConversationId() != "conv-1" ||
 		fake.request.GetAuthContext().GetDeviceId() != "device-1" ||
-		fake.request.GetDirectPeerUserId() != "user-2" {
+		fake.request.GetDirectPeerUserId() != "user-2" ||
+		fake.request.GetConversationPermissionVersion() != 7 {
 		t.Fatalf("unexpected request: %+v", fake.request)
 	}
 	if fake.outgoingMetadata.Get(policyMetadataTraceID)[0] != "trace-1" ||
@@ -63,7 +64,7 @@ func TestPolicyClientCheckEditPermissionIncludesMessageID(t *testing.T) {
 		AuthContext:    testPolicyClientAuth(),
 		ConversationID: "conv-1",
 		MessageID:      "msg-1",
-	})
+	}, testPolicyClientConversation())
 	if err != nil {
 		t.Fatalf("check edit permission: %v", err)
 	}
@@ -154,7 +155,7 @@ func testPolicyClientSendCommand() types.SendMessageCommand {
 }
 
 func testPolicyClientConversation() types.ConversationSendContext {
-	return types.ConversationSendContext{DirectPeerUserID: "user-2"}
+	return types.ConversationSendContext{DirectPeerUserID: "user-2", PermissionVersion: 7}
 }
 
 func testPolicyClientAuth() types.AuthContext {

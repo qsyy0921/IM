@@ -74,7 +74,7 @@ func (u *EditMessageUseCase) readConsistentEditDependencies(
 		if err != nil {
 			return types.ConversationSendContext{}, types.PermissionDecision{}, err
 		}
-		permission, err = u.policy.CheckEditPermission(ctx, command)
+		permission, err = u.policy.CheckEditPermission(ctx, command, conversation)
 		if err != nil {
 			return types.ConversationSendContext{}, types.PermissionDecision{}, err
 		}

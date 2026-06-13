@@ -77,7 +77,7 @@ func (u *DeleteMessageUseCase) readConsistentDeleteDependencies(
 		if err != nil {
 			return types.ConversationSendContext{}, types.PermissionDecision{}, err
 		}
-		permission, err = u.policy.CheckDeletePermission(ctx, command)
+		permission, err = u.policy.CheckDeletePermission(ctx, command, conversation)
 		if err != nil {
 			return types.ConversationSendContext{}, types.PermissionDecision{}, err
 		}

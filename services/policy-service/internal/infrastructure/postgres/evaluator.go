@@ -50,6 +50,14 @@ func (e MessagePolicyEvaluator) DecideMessageAction(
 		}, nil
 	}
 
+	decision, denied, err := e.applyRoleGate(ctx, command)
+	if err != nil {
+		return types.MessageActionDecision{}, err
+	}
+	if denied {
+		return decision, nil
+	}
+
 	decision, found, err := e.lookupRule(ctx, command)
 	if err != nil {
 		return types.MessageActionDecision{}, err
@@ -158,6 +166,120 @@ WHERE tenant_id = $1
 		decision.Reason = "policy denied"
 	}
 	return decision, true, nil
+}
+
+type rolePolicyRule struct {
+	MinRole        string
+	Classification string
+	Reason         string
+}
+
+func (e MessagePolicyEvaluator) applyRoleGate(
+	ctx context.Context,
+	command types.CheckMessageActionCommand,
+) (types.MessageActionDecision, bool, error) {
+	var rule rolePolicyRule
+	err := e.pool.QueryRow(ctx, `
+SELECT min_role, classification, reason
+FROM policy_conversation_role_action_rules
+WHERE tenant_id = $1
+  AND action = $2
+`, command.AuthContext.TenantID, command.Action).Scan(
+		&rule.MinRole,
+		&rule.Classification,
+		&rule.Reason,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return types.MessageActionDecision{}, false, nil
+	}
+	if isUndefinedTable(err) {
+		return types.MessageActionDecision{}, false, nil
+	}
+	if err != nil {
+		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy role rule lookup failed")
+	}
+	rule.MinRole = strings.TrimSpace(rule.MinRole)
+	rule.Classification = strings.TrimSpace(rule.Classification)
+	rule.Reason = strings.TrimSpace(rule.Reason)
+	if rule.Classification == "" || roleRank(rule.MinRole) == 0 {
+		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy role rule is invalid")
+	}
+	if command.ConversationPermissionVersion <= 0 {
+		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy conversation permission version is required")
+	}
+
+	decision := types.MessageActionDecision{
+		TenantID:       command.AuthContext.TenantID,
+		UserID:         command.AuthContext.UserID,
+		ConversationID: command.ConversationID,
+		MessageID:      command.MessageID,
+		Action:         command.Action,
+		Classification: rule.Classification,
+		Reason:         rule.Reason,
+	}
+	memberRole, memberStatus, permissionVersion, found, err := e.lookupProjectedMember(ctx, command)
+	if err != nil {
+		return types.MessageActionDecision{}, false, err
+	}
+	if !found {
+		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy conversation member projection is missing")
+	}
+	if permissionVersion != command.ConversationPermissionVersion {
+		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy conversation member projection is stale")
+	}
+	decision.PermissionVersion = permissionVersion
+	if memberStatus == types.ConversationMemberStatusActive && roleRank(memberRole) >= roleRank(rule.MinRole) {
+		return types.MessageActionDecision{}, false, nil
+	}
+	decision.Allowed = false
+	if decision.Reason == "" {
+		decision.Reason = "conversation role policy denied"
+	}
+	return decision, true, nil
+}
+
+func (e MessagePolicyEvaluator) lookupProjectedMember(
+	ctx context.Context,
+	command types.CheckMessageActionCommand,
+) (string, string, int64, bool, error) {
+	var role string
+	var status string
+	var permissionVersion int64
+	err := e.pool.QueryRow(ctx, `
+SELECT role, status, permission_version
+FROM policy_conversation_members_projection
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND user_id = $3
+`, command.AuthContext.TenantID, command.ConversationID, command.AuthContext.UserID).Scan(&role, &status, &permissionVersion)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", 0, false, nil
+	}
+	if isUndefinedTable(err) {
+		return "", "", 0, false, nil
+	}
+	if err != nil {
+		return "", "", 0, false, types.NewDependencyUnavailable("policy conversation member lookup failed")
+	}
+	role = strings.TrimSpace(role)
+	status = strings.TrimSpace(status)
+	if roleRank(role) == 0 || status == "" || permissionVersion <= 0 {
+		return "", "", 0, false, types.NewDependencyUnavailable("policy conversation member projection is invalid")
+	}
+	return role, status, permissionVersion, true, nil
+}
+
+func roleRank(role string) int {
+	switch role {
+	case types.ConversationMemberRoleOwner:
+		return 3
+	case types.ConversationMemberRoleAdmin:
+		return 2
+	case types.ConversationMemberRoleMember:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func isUndefinedTable(err error) bool {

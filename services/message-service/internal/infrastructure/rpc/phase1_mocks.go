@@ -30,7 +30,7 @@ func (p StaticPolicy) CheckSendPermission(context.Context, types.SendMessageComm
 	}, nil
 }
 
-func (p StaticPolicy) CheckEditPermission(context.Context, types.EditMessageCommand) (types.PermissionDecision, error) {
+func (p StaticPolicy) CheckEditPermission(context.Context, types.EditMessageCommand, types.ConversationSendContext) (types.PermissionDecision, error) {
 	return types.PermissionDecision{
 		Allowed:           p.Allowed,
 		Reason:            p.Reason,
@@ -39,7 +39,7 @@ func (p StaticPolicy) CheckEditPermission(context.Context, types.EditMessageComm
 	}, nil
 }
 
-func (p StaticPolicy) CheckRevokePermission(context.Context, types.RevokeMessageCommand) (types.PermissionDecision, error) {
+func (p StaticPolicy) CheckRevokePermission(context.Context, types.RevokeMessageCommand, types.ConversationSendContext) (types.PermissionDecision, error) {
 	return types.PermissionDecision{
 		Allowed:           p.Allowed,
 		Reason:            p.Reason,
@@ -48,7 +48,7 @@ func (p StaticPolicy) CheckRevokePermission(context.Context, types.RevokeMessage
 	}, nil
 }
 
-func (p StaticPolicy) CheckDeletePermission(context.Context, types.DeleteMessageCommand) (types.PermissionDecision, error) {
+func (p StaticPolicy) CheckDeletePermission(context.Context, types.DeleteMessageCommand, types.ConversationSendContext) (types.PermissionDecision, error) {
 	return types.PermissionDecision{
 		Allowed:           p.Allowed,
 		Reason:            p.Reason,

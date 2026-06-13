@@ -176,6 +176,139 @@ func TestMessagePolicyEvaluatorExactDenyOverridesTenantAllowIntegration(t *testi
 	}
 }
 
+func TestMessagePolicyEvaluatorUsesConversationRoleRuleIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           false,
+		PermissionVersion: 1,
+		Classification:    "STATIC_DENY",
+		Reason:            "static deny",
+	})
+	command := testPolicyCommand(types.MessageActionSend)
+	seedConversationRoleRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, types.ConversationMemberRoleAdmin, "ROLE_ADMIN", "")
+	seedConversationMember(t, ctx, pool, command.ConversationID, command.AuthContext.UserID, types.ConversationMemberRoleAdmin, types.ConversationMemberStatusActive, 3, command.ConversationPermissionVersion)
+	seedTenantPolicyRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, true, command.ConversationPermissionVersion, "TENANT_ALLOW", "")
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if !decision.Allowed || decision.PermissionVersion != command.ConversationPermissionVersion || decision.Classification != "TENANT_ALLOW" || decision.Reason != "" {
+		t.Fatalf("expected role gate to allow tenant decision, got %+v", decision)
+	}
+}
+
+func TestMessagePolicyEvaluatorConversationRoleRuleDeniesLowRoleIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           true,
+		PermissionVersion: 1,
+		Classification:    "STATIC_ALLOW",
+	})
+	command := testPolicyCommand(types.MessageActionDelete)
+	seedConversationRoleRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, types.ConversationMemberRoleAdmin, "ROLE_ADMIN", "")
+	seedConversationMember(t, ctx, pool, command.ConversationID, command.AuthContext.UserID, types.ConversationMemberRoleMember, types.ConversationMemberStatusActive, 4, command.ConversationPermissionVersion)
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if decision.Allowed || decision.PermissionVersion != command.ConversationPermissionVersion || decision.Classification != "ROLE_ADMIN" || decision.Reason != "conversation role policy denied" {
+		t.Fatalf("expected role deny decision, got %+v", decision)
+	}
+}
+
+func TestMessagePolicyEvaluatorConversationRoleRuleDeniesInactiveMemberIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           true,
+		PermissionVersion: 1,
+		Classification:    "STATIC_ALLOW",
+	})
+	command := testPolicyCommand(types.MessageActionEdit)
+	seedConversationRoleRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, types.ConversationMemberRoleMember, "ROLE_MEMBER", "active member required")
+	seedConversationMember(t, ctx, pool, command.ConversationID, command.AuthContext.UserID, types.ConversationMemberRoleOwner, types.ConversationMemberStatusLeft, 5, command.ConversationPermissionVersion)
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if decision.Allowed || decision.PermissionVersion != command.ConversationPermissionVersion || decision.Classification != "ROLE_MEMBER" || decision.Reason != "active member required" {
+		t.Fatalf("expected inactive role deny decision, got %+v", decision)
+	}
+}
+
+func TestMessagePolicyEvaluatorConversationRoleRuleRequiresFreshProjectionIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           true,
+		PermissionVersion: 1,
+		Classification:    "STATIC_ALLOW",
+	})
+	command := testPolicyCommand(types.MessageActionSend)
+	seedConversationRoleRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, types.ConversationMemberRoleMember, "ROLE_MEMBER", "")
+	seedConversationMember(t, ctx, pool, command.ConversationID, command.AuthContext.UserID, types.ConversationMemberRoleMember, types.ConversationMemberStatusActive, 3, command.ConversationPermissionVersion-1)
+
+	_, err := evaluator.DecideMessageAction(ctx, command)
+	if !errors.Is(err, types.ErrDependencyUnavailable) {
+		t.Fatalf("expected stale role projection to fail closed, got %v", err)
+	}
+}
+
+func TestMessagePolicyEvaluatorExactRuleOverridesConversationRoleRuleIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           true,
+		PermissionVersion: 1,
+		Classification:    "STATIC_ALLOW",
+	})
+	command := testPolicyCommand(types.MessageActionRevoke)
+	seedConversationRoleRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, types.ConversationMemberRoleMember, "ROLE_MEMBER", "member required")
+	seedConversationMember(t, ctx, pool, command.ConversationID, command.AuthContext.UserID, types.ConversationMemberRoleMember, types.ConversationMemberStatusActive, 3, command.ConversationPermissionVersion)
+	seedPolicyRule(t, ctx, pool, command, true, 99, "EXACT_ALLOW", "")
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if !decision.Allowed || decision.PermissionVersion != 99 || decision.Classification != "EXACT_ALLOW" {
+		t.Fatalf("expected exact rule to override role rule, got %+v", decision)
+	}
+}
+
+func TestMessagePolicyEvaluatorConversationRoleRuleOverridesTenantRuleIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           true,
+		PermissionVersion: 1,
+		Classification:    "STATIC_ALLOW",
+	})
+	command := testPolicyCommand(types.MessageActionSend)
+	seedTenantPolicyRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, true, 88, "TENANT_ALLOW", "")
+	seedConversationRoleRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, types.ConversationMemberRoleAdmin, "ROLE_ADMIN", "admin only")
+	seedConversationMember(t, ctx, pool, command.ConversationID, command.AuthContext.UserID, types.ConversationMemberRoleMember, types.ConversationMemberStatusActive, 3, command.ConversationPermissionVersion)
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if decision.Allowed || decision.PermissionVersion != command.ConversationPermissionVersion || decision.Classification != "ROLE_ADMIN" || decision.Reason != "admin only" {
+		t.Fatalf("expected role gate to deny before tenant allow, got %+v", decision)
+	}
+}
+
 func TestMessagePolicyEvaluatorContactBlockOverridesTenantRuleIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -344,7 +477,7 @@ func applyPolicyMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool)
 
 func resetPolicyTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	if _, err := pool.Exec(ctx, `TRUNCATE policy_decision_audit_outbox_repair_audit, policy_decision_audit_outbox, policy_tenant_message_action_rules, policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
+	if _, err := pool.Exec(ctx, `TRUNCATE policy_decision_audit_outbox_repair_audit, policy_decision_audit_outbox, policy_conversation_role_action_rules, policy_conversation_members_projection, policy_tenant_message_action_rules, policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
 		t.Fatalf("reset policy tables: %v", err)
 	}
 }
@@ -404,6 +537,60 @@ INSERT INTO policy_tenant_message_action_rules (
 	}
 }
 
+func seedConversationRoleRule(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	tenantID types.TenantID,
+	action types.MessageAction,
+	minRole string,
+	classification string,
+	reason string,
+) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_conversation_role_action_rules (
+    tenant_id,
+    action,
+    min_role,
+    classification,
+    reason
+) VALUES ($1, $2, $3, $4, $5)
+`, tenantID, action, minRole, classification, reason)
+	if err != nil {
+		t.Fatalf("seed conversation role rule: %v", err)
+	}
+}
+
+func seedConversationMember(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	conversationID types.ConversationID,
+	userID types.UserID,
+	role string,
+	status string,
+	memberVersion int64,
+	permissionVersion int64,
+) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_conversation_members_projection (
+    tenant_id,
+    conversation_id,
+    user_id,
+    role,
+    status,
+    member_version,
+    permission_version,
+    updated_by_event_id
+) VALUES ('tenant-policy', $1, $2, $3, $4, $5, $6, 'member-projection-test-event')
+`, conversationID, userID, role, status, memberVersion, permissionVersion)
+	if err != nil {
+		t.Fatalf("seed conversation member projection: %v", err)
+	}
+}
+
 func seedContactEdge(
 	t *testing.T,
 	ctx context.Context,
@@ -436,8 +623,9 @@ func testPolicyCommand(action types.MessageAction) types.CheckMessageActionComma
 			UserID:   "user-policy",
 			DeviceID: "device-policy",
 		},
-		ConversationID: "conv-policy",
-		Action:         action,
+		ConversationID:                "conv-policy",
+		Action:                        action,
+		ConversationPermissionVersion: 7,
 	}
 	if action != types.MessageActionSend {
 		command.MessageID = "msg-policy"

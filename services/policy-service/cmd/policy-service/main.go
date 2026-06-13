@@ -22,6 +22,7 @@ import (
 	postgresinfra "github.com/qsyy0921/IM/services/policy-service/internal/infrastructure/postgres"
 	contacttrigger "github.com/qsyy0921/IM/services/policy-service/internal/trigger/contact"
 	outboxtrigger "github.com/qsyy0921/IM/services/policy-service/internal/trigger/outbox"
+	timelinetrigger "github.com/qsyy0921/IM/services/policy-service/internal/trigger/timeline"
 	"github.com/qsyy0921/IM/services/policy-service/internal/types"
 	"google.golang.org/grpc"
 )
@@ -36,12 +37,14 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("policy-service runtime wiring is idle; set NEXUSIM_POLICY_SERVICE_MODE=grpc, contact-consumer, or outbox-relay")
+		log.Println("policy-service runtime wiring is idle; set NEXUSIM_POLICY_SERVICE_MODE=grpc, contact-consumer, timeline-consumer, outbox-relay, or outbox-repair")
 		return nil
 	case "grpc":
 		return runGRPC()
 	case "contact-consumer":
 		return runContactConsumer()
+	case "timeline-consumer":
+		return runTimelineConsumer()
 	case "outbox-relay":
 		return runOutboxRelay()
 	case "outbox-repair":
@@ -155,6 +158,40 @@ func runContactConsumer() error {
 		envString("NEXUSIM_POLICY_CONTACT_CONSUMER_GROUP", "nexusim-policy-contacts"),
 	)
 	log.Println("policy-service contact projection consumer started")
+	return worker.Run(ctx)
+}
+
+func runTimelineConsumer() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := envString("NEXUSIM_PG_DSN", "")
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required for policy timeline consumer")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	groupID := envString("NEXUSIM_POLICY_TIMELINE_CONSUMER_GROUP", "nexusim-policy-timeline")
+	consumer, err := kafkainfra.NewReaderConsumer(kafkainfra.ReaderConfig{
+		Brokers: splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS")),
+		Topic:   envString("NEXUSIM_CONVERSATION_TIMELINE_TOPIC", timelinetrigger.TopicConversationTimelineEvents),
+		GroupID: groupID,
+	})
+	if err != nil {
+		return err
+	}
+	defer consumer.Close()
+
+	worker := timelinetrigger.NewWorker(
+		consumer,
+		app.NewProjectConversationMemberEventUseCase(postgresinfra.NewProjectionRepository(pool)),
+		groupID,
+	)
+	log.Println("policy-service conversation timeline projection consumer started")
 	return worker.Run(ctx)
 }
 

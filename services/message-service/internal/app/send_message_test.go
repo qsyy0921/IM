@@ -349,7 +349,7 @@ func (f *fakePolicy) CheckSendPermission(_ context.Context, _ types.SendMessageC
 	return f.decision, f.err
 }
 
-func (f *fakePolicy) CheckEditPermission(context.Context, types.EditMessageCommand) (types.PermissionDecision, error) {
+func (f *fakePolicy) CheckEditPermission(context.Context, types.EditMessageCommand, types.ConversationSendContext) (types.PermissionDecision, error) {
 	f.calls++
 	if f.err != nil {
 		return types.PermissionDecision{}, f.err
@@ -364,7 +364,7 @@ func (f *fakePolicy) CheckEditPermission(context.Context, types.EditMessageComma
 	return f.decision, nil
 }
 
-func (f *fakePolicy) CheckRevokePermission(context.Context, types.RevokeMessageCommand) (types.PermissionDecision, error) {
+func (f *fakePolicy) CheckRevokePermission(context.Context, types.RevokeMessageCommand, types.ConversationSendContext) (types.PermissionDecision, error) {
 	f.calls++
 	if f.err != nil {
 		return types.PermissionDecision{}, f.err
@@ -379,7 +379,7 @@ func (f *fakePolicy) CheckRevokePermission(context.Context, types.RevokeMessageC
 	return f.decision, nil
 }
 
-func (f *fakePolicy) CheckDeletePermission(context.Context, types.DeleteMessageCommand) (types.PermissionDecision, error) {
+func (f *fakePolicy) CheckDeletePermission(context.Context, types.DeleteMessageCommand, types.ConversationSendContext) (types.PermissionDecision, error) {
 	f.calls++
 	if f.err != nil {
 		return types.PermissionDecision{}, f.err

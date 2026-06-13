@@ -2,7 +2,7 @@
 
 `policy-service` owns first-stage policy decisions that must not be hard-coded inside message-service. The initial implementation is intentionally small: it exposes a gRPC `CheckMessageAction` endpoint for message send / edit / revoke / delete decisions, and it returns a stable `permission_version`, `classification`, allow/deny flag and public deny reason.
 
-This service is a boundary extraction step. It is not yet a full ReBAC engine, tenant policy DSL / quota / risk engine, content moderation platform, risk scoring system or complete contacts/conversation policy engine. The current contacts projection is consumed only for direct conversation `SEND` hard-deny when the caller supplies safe direct-peer context, and the current tenant rule store only supports first-stage `tenant_id + action` defaults.
+This service is a boundary extraction step. It is not yet a full ReBAC engine, tenant policy DSL / quota / risk engine, content moderation platform, risk scoring system or complete contacts/conversation policy engine. The current contacts projection is consumed only for direct conversation `SEND` hard-deny when the caller supplies safe direct-peer context. The current conversation member projection is consumed only as a first-stage role gate with a permission-version fence.
 
 ## Boundary
 
@@ -11,7 +11,7 @@ Owns:
 - policy decision API contracts;
 - message action allow / deny decisions;
 - policy version and classification returned to callers;
-- a policy-owned contacts edge projection read model;
+- policy-owned contacts edge and conversation member projection read models;
 - a policy-owned first-stage decision audit outbox;
 - future adapters for conversation, identity, tenant risk and compliance projections.
 
@@ -46,7 +46,11 @@ The next table adds a tenant action default:
 tenant_id + action
 ```
 
-When `NEXUSIM_POLICY_RULES_ENABLED=true`, policy-service first evaluates hard contact-block denies for direct `SEND` requests that include `direct_peer_user_id`, then checks `policy_message_action_rules`, then checks `policy_tenant_message_action_rules`, and finally falls back to the static policy. A matching exact or tenant rule returns its allow / deny decision, `permission_version`, `classification` and public reason. Exact user/conversation rules intentionally override tenant defaults. PostgreSQL lookup errors do not fall back; they return policy unavailable so a broken rule store cannot silently bypass a deny rule. The tenant rule table is backward-compatible during rollout: if the table has not been migrated yet, a tenant-rule lookup miss due to the missing relation is treated as no tenant rule and the request continues to static fallback.
+When `NEXUSIM_POLICY_RULES_ENABLED=true`, policy-service first evaluates hard contact-block denies for direct `SEND` requests that include `direct_peer_user_id`, then applies the conversation role gate, then checks `policy_message_action_rules`, then checks `policy_tenant_message_action_rules`, and finally falls back to the static policy. A matching exact or tenant rule returns its allow / deny decision, `permission_version`, `classification` and public reason. Exact user/conversation rules intentionally override tenant defaults after the role gate has passed.
+
+The conversation role gate is a hard deny / freshness gate, not a complete role allow engine. `policy-service` consumes member boundary events from `conversation.timeline.events` into `policy_conversation_members_projection`. `message-service` forwards `conversation_permission_version` from the `ConversationSendContext` it already read from conversation-service. If a role gate rule exists in `policy_conversation_role_action_rules`, the caller's projected member row must exist, be at the same `permission_version`, be `ACTIVE`, and have a role rank greater than or equal to `min_role`. Missing projection, stale version or PostgreSQL lookup failure returns policy unavailable; insufficient role returns business deny with the projected `permission_version`. If the role gate passes, the request continues to exact / tenant / static decision logic.
+
+PostgreSQL lookup errors do not fall back; they return policy unavailable so a broken rule store cannot silently bypass a deny rule. The tenant rule table and role rule table are backward-compatible during rollout: if a table has not been migrated yet, a lookup miss due to the missing relation is treated as no rule and the request continues to the next decision step.
 
 The contacts projection slice consumes `im.contact.events` into policy-service owned tables:
 
@@ -103,6 +107,11 @@ NEXUSIM_KAFKA_BROKERS=localhost:9092
 NEXUSIM_CONTACT_EVENTS_TOPIC=im.contact.events
 NEXUSIM_POLICY_CONTACT_CONSUMER_GROUP=nexusim-policy-contacts
 
+NEXUSIM_POLICY_SERVICE_MODE=timeline-consumer
+NEXUSIM_KAFKA_BROKERS=localhost:9092
+NEXUSIM_CONVERSATION_TIMELINE_TOPIC=conversation.timeline.events
+NEXUSIM_POLICY_TIMELINE_CONSUMER_GROUP=nexusim-policy-timeline
+
 NEXUSIM_POLICY_SERVICE_MODE=outbox-relay
 NEXUSIM_KAFKA_BROKERS=localhost:9092
 NEXUSIM_POLICY_AUDIT_EVENTS_TOPIC=im.policy.events
@@ -128,7 +137,8 @@ NEXUSIM_POLICY_RPC_TIMEOUT=30ms
 - `conversation_id`;
 - `action`: `SEND`, `EDIT`, `REVOKE`, `DELETE`;
 - `message_id`: required for edit / revoke / delete;
-- `direct_peer_user_id`: optional direct conversation peer context used only for `SEND` contact-block decisions.
+- `direct_peer_user_id`: optional direct conversation peer context used only for `SEND` contact-block decisions;
+- `conversation_permission_version`: optional for legacy exact / tenant / static policy, required when a conversation role gate rule is configured.
 
 `CheckMessageActionResponse` includes:
 
@@ -167,9 +177,9 @@ This is a local debug surface. It is not a replacement for production OpenTeleme
 ## Limitations
 
 - First implementation still supports static environment configuration.
-- PostgreSQL rule store supports exact user/conversation rules and first-stage tenant action defaults only; no wildcard / priority rule DSL yet.
-- Contacts block / unblock events are consumed only for direct `SEND` when safe `direct_peer_user_id` context is supplied. Group and role policy remain future work.
-- No conversation role / owner / admin policy is implemented yet.
+- PostgreSQL rule store supports exact user/conversation rules, first-stage tenant action defaults and a first-stage conversation role gate; no wildcard / priority rule DSL yet.
+- Contacts block / unblock events are consumed only for direct `SEND` when safe `direct_peer_user_id` context is supplied.
+- Conversation role policy is only an action-level role gate backed by a local projection and permission-version fence. It is not complete ReBAC, does not inspect message ownership, and does not synchronously query conversation-service.
 - No tenant policy DSL, tenant quota / risk policy, content moderation, risk scoring or rate limiting is implemented yet.
 - Decision audit outbox rows can be relayed to `im.policy.events`, and explicit DLQ event IDs can be redriven through the repair operator after relay-equivalent validation. Broad repair workflow, poison-payload classification beyond fail-closed validation, retention policy and external sink remain future work.
 - No mTLS client/server config is implemented for policy-service yet.

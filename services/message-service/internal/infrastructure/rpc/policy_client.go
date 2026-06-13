@@ -48,19 +48,19 @@ func (c PolicyClient) CheckSendPermission(
 	command types.SendMessageCommand,
 	conversation types.ConversationSendContext,
 ) (types.PermissionDecision, error) {
-	return c.checkMessageAction(ctx, command.AuthContext, command.ConversationID, "", policyv1.MessageAction_MESSAGE_ACTION_SEND, conversation.DirectPeerUserID)
+	return c.checkMessageAction(ctx, command.AuthContext, command.ConversationID, "", policyv1.MessageAction_MESSAGE_ACTION_SEND, conversation.DirectPeerUserID, conversation.PermissionVersion)
 }
 
-func (c PolicyClient) CheckEditPermission(ctx context.Context, command types.EditMessageCommand) (types.PermissionDecision, error) {
-	return c.checkMessageAction(ctx, command.AuthContext, command.ConversationID, types.MessageID(command.MessageID), policyv1.MessageAction_MESSAGE_ACTION_EDIT, "")
+func (c PolicyClient) CheckEditPermission(ctx context.Context, command types.EditMessageCommand, conversation types.ConversationSendContext) (types.PermissionDecision, error) {
+	return c.checkMessageAction(ctx, command.AuthContext, command.ConversationID, types.MessageID(command.MessageID), policyv1.MessageAction_MESSAGE_ACTION_EDIT, "", conversation.PermissionVersion)
 }
 
-func (c PolicyClient) CheckRevokePermission(ctx context.Context, command types.RevokeMessageCommand) (types.PermissionDecision, error) {
-	return c.checkMessageAction(ctx, command.AuthContext, command.ConversationID, command.MessageID, policyv1.MessageAction_MESSAGE_ACTION_REVOKE, "")
+func (c PolicyClient) CheckRevokePermission(ctx context.Context, command types.RevokeMessageCommand, conversation types.ConversationSendContext) (types.PermissionDecision, error) {
+	return c.checkMessageAction(ctx, command.AuthContext, command.ConversationID, command.MessageID, policyv1.MessageAction_MESSAGE_ACTION_REVOKE, "", conversation.PermissionVersion)
 }
 
-func (c PolicyClient) CheckDeletePermission(ctx context.Context, command types.DeleteMessageCommand) (types.PermissionDecision, error) {
-	return c.checkMessageAction(ctx, command.AuthContext, command.ConversationID, command.MessageID, policyv1.MessageAction_MESSAGE_ACTION_DELETE, "")
+func (c PolicyClient) CheckDeletePermission(ctx context.Context, command types.DeleteMessageCommand, conversation types.ConversationSendContext) (types.PermissionDecision, error) {
+	return c.checkMessageAction(ctx, command.AuthContext, command.ConversationID, command.MessageID, policyv1.MessageAction_MESSAGE_ACTION_DELETE, "", conversation.PermissionVersion)
 }
 
 func (c PolicyClient) checkMessageAction(
@@ -70,6 +70,7 @@ func (c PolicyClient) checkMessageAction(
 	messageID types.MessageID,
 	action policyv1.MessageAction,
 	directPeerUserID types.UserID,
+	conversationPermissionVersion int64,
 ) (types.PermissionDecision, error) {
 	callCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
@@ -84,10 +85,11 @@ func (c PolicyClient) checkMessageAction(
 			TraceId:   auth.TraceID,
 			RequestId: auth.RequestID,
 		},
-		ConversationId:   string(conversationID),
-		Action:           action,
-		MessageId:        string(messageID),
-		DirectPeerUserId: string(directPeerUserID),
+		ConversationId:                string(conversationID),
+		Action:                        action,
+		MessageId:                     string(messageID),
+		DirectPeerUserId:              string(directPeerUserID),
+		ConversationPermissionVersion: conversationPermissionVersion,
 	})
 	if err != nil {
 		return types.PermissionDecision{}, mapPolicyError(err)

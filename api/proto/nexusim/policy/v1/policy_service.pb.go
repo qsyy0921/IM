@@ -161,14 +161,15 @@ func (x *AuthContext) GetRequestId() string {
 }
 
 type CheckMessageActionRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	AuthContext      *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
-	ConversationId   string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	Action           MessageAction          `protobuf:"varint,3,opt,name=action,proto3,enum=nexusim.policy.v1.MessageAction" json:"action,omitempty"`
-	MessageId        string                 `protobuf:"bytes,4,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	DirectPeerUserId string                 `protobuf:"bytes,5,opt,name=direct_peer_user_id,json=directPeerUserId,proto3" json:"direct_peer_user_id,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                         protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext                   *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	ConversationId                string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	Action                        MessageAction          `protobuf:"varint,3,opt,name=action,proto3,enum=nexusim.policy.v1.MessageAction" json:"action,omitempty"`
+	MessageId                     string                 `protobuf:"bytes,4,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	DirectPeerUserId              string                 `protobuf:"bytes,5,opt,name=direct_peer_user_id,json=directPeerUserId,proto3" json:"direct_peer_user_id,omitempty"`
+	ConversationPermissionVersion int64                  `protobuf:"varint,6,opt,name=conversation_permission_version,json=conversationPermissionVersion,proto3" json:"conversation_permission_version,omitempty"`
+	unknownFields                 protoimpl.UnknownFields
+	sizeCache                     protoimpl.SizeCache
 }
 
 func (x *CheckMessageActionRequest) Reset() {
@@ -234,6 +235,13 @@ func (x *CheckMessageActionRequest) GetDirectPeerUserId() string {
 		return x.DirectPeerUserId
 	}
 	return ""
+}
+
+func (x *CheckMessageActionRequest) GetConversationPermissionVersion() int64 {
+	if x != nil {
+		return x.ConversationPermissionVersion
+	}
+	return 0
 }
 
 type CheckMessageActionResponse struct {
@@ -357,14 +365,15 @@ const file_nexusim_policy_v1_policy_service_proto_rawDesc = "" +
 	"session_id\x18\x04 \x01(\tR\tsessionId\x12\x19\n" +
 	"\btrace_id\x18\x05 \x01(\tR\atraceId\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x06 \x01(\tR\trequestId\"\x8f\x02\n" +
+	"request_id\x18\x06 \x01(\tR\trequestId\"\xd7\x02\n" +
 	"\x19CheckMessageActionRequest\x12A\n" +
 	"\fauth_context\x18\x01 \x01(\v2\x1e.nexusim.policy.v1.AuthContextR\vauthContext\x12'\n" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x128\n" +
 	"\x06action\x18\x03 \x01(\x0e2 .nexusim.policy.v1.MessageActionR\x06action\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x04 \x01(\tR\tmessageId\x12-\n" +
-	"\x13direct_peer_user_id\x18\x05 \x01(\tR\x10directPeerUserId\"\xdd\x02\n" +
+	"\x13direct_peer_user_id\x18\x05 \x01(\tR\x10directPeerUserId\x12F\n" +
+	"\x1fconversation_permission_version\x18\x06 \x01(\x03R\x1dconversationPermissionVersion\"\xdd\x02\n" +
 	"\x1aCheckMessageActionResponse\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12'\n" +

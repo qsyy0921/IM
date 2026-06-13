@@ -39,11 +39,12 @@ func (s *Server) CheckMessageAction(
 		return nil, status.Error(codes.Unimplemented, "check message action is not configured")
 	}
 	decision, err := s.checkMessageAction.Execute(ctx, types.CheckMessageActionCommand{
-		AuthContext:      authFromProto(request.GetAuthContext()),
-		ConversationID:   types.ConversationID(request.GetConversationId()),
-		Action:           actionFromProto(request.GetAction()),
-		MessageID:        types.MessageID(request.GetMessageId()),
-		DirectPeerUserID: types.UserID(request.GetDirectPeerUserId()),
+		AuthContext:                   authFromProto(request.GetAuthContext()),
+		ConversationID:                types.ConversationID(request.GetConversationId()),
+		Action:                        actionFromProto(request.GetAction()),
+		MessageID:                     types.MessageID(request.GetMessageId()),
+		DirectPeerUserID:              types.UserID(request.GetDirectPeerUserId()),
+		ConversationPermissionVersion: request.GetConversationPermissionVersion(),
 	})
 	if err != nil {
 		return nil, grpcError(err)

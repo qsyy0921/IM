@@ -74,7 +74,7 @@ func (u *RevokeMessageUseCase) readConsistentRevokeDependencies(
 		if err != nil {
 			return types.ConversationSendContext{}, types.PermissionDecision{}, err
 		}
-		permission, err = u.policy.CheckRevokePermission(ctx, command)
+		permission, err = u.policy.CheckRevokePermission(ctx, command, conversation)
 		if err != nil {
 			return types.ConversationSendContext{}, types.PermissionDecision{}, err
 		}

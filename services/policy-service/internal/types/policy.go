@@ -19,11 +19,12 @@ const (
 )
 
 type CheckMessageActionCommand struct {
-	AuthContext      AuthContext
-	ConversationID   ConversationID
-	Action           MessageAction
-	MessageID        MessageID
-	DirectPeerUserID UserID
+	AuthContext                   AuthContext
+	ConversationID                ConversationID
+	Action                        MessageAction
+	MessageID                     MessageID
+	DirectPeerUserID              UserID
+	ConversationPermissionVersion int64
 }
 
 func (c CheckMessageActionCommand) Validate() error {

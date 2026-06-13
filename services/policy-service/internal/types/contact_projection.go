@@ -15,13 +15,6 @@ const (
 	ContactEdgeStatusBlocked = "BLOCKED"
 )
 
-type ContactMessage struct {
-	Topic     string
-	Partition int
-	Offset    int64
-	Value     []byte
-}
-
 type ProjectContactEventCommand struct {
 	TenantID       TenantID
 	EventID        string

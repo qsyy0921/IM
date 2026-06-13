@@ -6,6 +6,16 @@ param(
     [ValidateSet("owner-transfer")]
     [string]$Scenario = "owner-transfer",
     [switch]$VerifiedAuthMetadata,
+    [string]$ConversationGrpcTlsCertFile = "",
+    [string]$ConversationGrpcTlsKeyFile = "",
+    [string]$ConversationGrpcTlsClientCaFile = "",
+    [string]$ConversationGrpcTlsRequireClientCert = "",
+    [string]$ConversationGrpcTlsClientAllowedDnsNames = "",
+    [string]$ConversationGrpcTlsClientAllowedUris = "",
+    [string]$ConversationTlsCaFile = "",
+    [string]$ConversationTlsServerName = "",
+    [string]$ConversationTlsClientCertFile = "",
+    [string]$ConversationTlsClientKeyFile = "",
     [switch]$SkipBuild
 )
 
@@ -233,6 +243,12 @@ COMMIT;
         NEXUSIM_CONVERSATION_GRPC_ADDR = $conversationGrpcAddr
         NEXUSIM_PG_DSN = $PgDsn
         NEXUSIM_CONVERSATION_AUTH_MODE = $authMode
+        NEXUSIM_CONVERSATION_GRPC_TLS_CERT_FILE = $ConversationGrpcTlsCertFile
+        NEXUSIM_CONVERSATION_GRPC_TLS_KEY_FILE = $ConversationGrpcTlsKeyFile
+        NEXUSIM_CONVERSATION_GRPC_TLS_CLIENT_CA_FILE = $ConversationGrpcTlsClientCaFile
+        NEXUSIM_CONVERSATION_GRPC_TLS_REQUIRE_CLIENT_CERT = $ConversationGrpcTlsRequireClientCert
+        NEXUSIM_CONVERSATION_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES = $ConversationGrpcTlsClientAllowedDnsNames
+        NEXUSIM_CONVERSATION_GRPC_TLS_CLIENT_ALLOWED_URIS = $ConversationGrpcTlsClientAllowedUris
     }
 
     $processes += Start-NexusProcess -Name "message-relay" -FilePath $messageService -Env @{
@@ -267,6 +283,10 @@ COMMIT;
         --idempotency-prefix $idempotencyPrefix `
         --expected-member-version 10 `
         --verified-auth-metadata=$VerifiedAuthMetadata `
+        --conversation-tls-ca-file $ConversationTlsCaFile `
+        --conversation-tls-server-name $ConversationTlsServerName `
+        --conversation-tls-client-cert-file $ConversationTlsClientCertFile `
+        --conversation-tls-client-key-file $ConversationTlsClientKeyFile `
         --stats-wait 5s `
         --pg-dsn $PgDsn `
         --result-dir $resultDir

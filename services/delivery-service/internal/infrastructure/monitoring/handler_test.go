@@ -100,6 +100,15 @@ func TestHandlerMetricsIncludesDeliverySnapshotsIntegration(t *testing.T) {
 		body.DeliveryOutbox.MaxPendingRetry != 2 {
 		t.Fatalf("unexpected delivery outbox snapshot: %+v", *body.DeliveryOutbox)
 	}
+	if body.ProjectionFailures == nil {
+		t.Fatalf("expected projection failure snapshot")
+	}
+	if body.ProjectionFailures.Total != 2 ||
+		body.ProjectionFailures.DecodeFailed != 1 ||
+		body.ProjectionFailures.ProjectionDependency != 1 ||
+		body.ProjectionFailures.MaxFailureCount != 3 {
+		t.Fatalf("unexpected projection failure snapshot: %+v", *body.ProjectionFailures)
+	}
 }
 
 func openMonitoringTestPool(t *testing.T) *pgxpool.Pool {
@@ -149,6 +158,7 @@ func resetDeliveryTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) 
 	t.Helper()
 	_, err := pool.Exec(ctx, `
 TRUNCATE
+    delivery_projection_failures,
     delivery_projection_checkpoint_repair_audit,
     delivery_outbox_repair_audit,
     delivery_outbox,
@@ -207,8 +217,17 @@ INSERT INTO delivery_outbox (
     ('outbox-1', 'tenant-a', 'conv-1', 2, 'delivery.inbox_item.created.v1', 'v1', 'tenant-a:conv-1', 1, 'delivery-service', '{}'::jsonb, 'PENDING', 2, now() - interval '1 minute', NULL),
     ('outbox-2', 'tenant-a', 'conv-1', 3, 'delivery.ack.recorded.v1', 'v1', 'tenant-a:conv-1', 1, 'delivery-service', '{}'::jsonb, 'PENDING', 1, now() - interval '1 minute', now() + interval '5 minutes'),
     ('outbox-3', 'tenant-a', 'conv-1', 4, 'delivery.inbox_item.created.v1', 'v1', 'tenant-a:conv-1', 1, 'delivery-service', '{}'::jsonb, 'DLQ', 4, now() - interval '1 minute', NULL)
-`); err != nil {
+	`); err != nil {
 		t.Fatalf("seed delivery_outbox: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_failures (
+    consumer_group, topic, partition_id, offset_value, event_id, event_type, tenant_id, conversation_id, aggregate_version, trace_id, failure_class, last_error, failure_count
+) VALUES
+    ('group-1', 'conversation.timeline.events', 0, 41, '', '', '', '', 0, '', 'decode_failed', 'proto: cannot parse invalid wire-format data', 1),
+    ('group-1', 'conversation.timeline.events', 0, 42, 'event-2', 'message.revoked.v1', 'tenant-a', 'conv-1', 4, 'trace-2', 'projection_dependency', 'message revoke has no projected original message', 3)
+`); err != nil {
+		t.Fatalf("seed delivery_projection_failures: %v", err)
 	}
 }
 

@@ -85,6 +85,12 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		} else {
 			snapshot.DeliveryOutbox = &deliveryOutbox
 		}
+		projectionFailures, err := queryProjectionFailureSnapshot(ctx, h.pool)
+		if err != nil {
+			snapshot.ProjectionFailuresError = "delivery projection failure metrics query failed"
+		} else {
+			snapshot.ProjectionFailures = &projectionFailures
+		}
 	}
 	writeJSON(w, http.StatusOK, snapshot)
 }
@@ -96,14 +102,16 @@ type healthResponse struct {
 }
 
 type Snapshot struct {
-	Service             string                  `json:"service"`
-	GeneratedAtMS       int64                   `json:"generated_at_ms"`
-	PGPool              *PGPoolSnapshot         `json:"pg_pool,omitempty"`
-	Delivery            *DeliverySnapshot       `json:"delivery,omitempty"`
-	DeliveryError       string                  `json:"delivery_error,omitempty"`
-	DeliveryOutbox      *DeliveryOutboxSnapshot `json:"delivery_outbox,omitempty"`
-	DeliveryOutboxError string                  `json:"delivery_outbox_error,omitempty"`
-	GRPC                *GRPCSnapshot           `json:"grpc,omitempty"`
+	Service                 string                     `json:"service"`
+	GeneratedAtMS           int64                      `json:"generated_at_ms"`
+	PGPool                  *PGPoolSnapshot            `json:"pg_pool,omitempty"`
+	Delivery                *DeliverySnapshot          `json:"delivery,omitempty"`
+	DeliveryError           string                     `json:"delivery_error,omitempty"`
+	DeliveryOutbox          *DeliveryOutboxSnapshot    `json:"delivery_outbox,omitempty"`
+	DeliveryOutboxError     string                     `json:"delivery_outbox_error,omitempty"`
+	ProjectionFailures      *ProjectionFailureSnapshot `json:"projection_failures,omitempty"`
+	ProjectionFailuresError string                     `json:"projection_failures_error,omitempty"`
+	GRPC                    *GRPCSnapshot              `json:"grpc,omitempty"`
 }
 
 type PGPoolSnapshot struct {
@@ -138,6 +146,17 @@ type DeliveryOutboxSnapshot struct {
 	Published        int64 `json:"published"`
 	DLQ              int64 `json:"dlq"`
 	MaxPendingRetry  int64 `json:"max_pending_retry"`
+}
+
+type ProjectionFailureSnapshot struct {
+	Total                int64 `json:"total"`
+	DecodeFailed         int64 `json:"decode_failed"`
+	InvalidArgument      int64 `json:"invalid_argument"`
+	ProjectionDependency int64 `json:"projection_dependency"`
+	DBReadFailed         int64 `json:"db_read_failed"`
+	DBWriteFailed        int64 `json:"db_write_failed"`
+	Unknown              int64 `json:"unknown"`
+	MaxFailureCount      int64 `json:"max_failure_count"`
 }
 
 func queryDeliverySnapshot(ctx context.Context, pool *pgxpool.Pool) (DeliverySnapshot, error) {
@@ -193,6 +212,35 @@ FROM delivery_outbox
 	)
 	if err != nil {
 		return DeliveryOutboxSnapshot{}, err
+	}
+	return snapshot, nil
+}
+
+func queryProjectionFailureSnapshot(ctx context.Context, pool *pgxpool.Pool) (ProjectionFailureSnapshot, error) {
+	var snapshot ProjectionFailureSnapshot
+	err := pool.QueryRow(ctx, `
+SELECT
+    COUNT(*),
+    COUNT(*) FILTER (WHERE failure_class = 'decode_failed'),
+    COUNT(*) FILTER (WHERE failure_class = 'invalid_argument'),
+    COUNT(*) FILTER (WHERE failure_class = 'projection_dependency'),
+    COUNT(*) FILTER (WHERE failure_class = 'db_read_failed'),
+    COUNT(*) FILTER (WHERE failure_class = 'db_write_failed'),
+    COUNT(*) FILTER (WHERE failure_class = 'unknown'),
+    COALESCE(MAX(failure_count), 0)
+FROM delivery_projection_failures
+`).Scan(
+		&snapshot.Total,
+		&snapshot.DecodeFailed,
+		&snapshot.InvalidArgument,
+		&snapshot.ProjectionDependency,
+		&snapshot.DBReadFailed,
+		&snapshot.DBWriteFailed,
+		&snapshot.Unknown,
+		&snapshot.MaxFailureCount,
+	)
+	if err != nil {
+		return ProjectionFailureSnapshot{}, err
 	}
 	return snapshot, nil
 }

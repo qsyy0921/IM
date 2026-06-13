@@ -31,12 +31,22 @@ type fakeProjector struct {
 	err     error
 }
 
+type fakeFailureRecorder struct {
+	recorded []types.ProjectionFailureRecord
+	err      error
+}
+
 func (projector *fakeProjector) Execute(
 	_ context.Context,
 	command types.ProjectTimelineEventCommand,
 ) (types.ProjectTimelineEventResult, error) {
 	projector.command = command
 	return types.ProjectTimelineEventResult{ProjectedInboxCount: 1}, projector.err
+}
+
+func (recorder *fakeFailureRecorder) RecordFailure(_ context.Context, record types.ProjectionFailureRecord) error {
+	recorder.recorded = append(recorder.recorded, record)
+	return recorder.err
 }
 
 func TestWorkerProjectsAndCommitsMessagePersisted(t *testing.T) {
@@ -276,24 +286,41 @@ func TestWorkerDoesNotCommitWhenProjectionFails(t *testing.T) {
 	})
 	consumer := &fakeConsumer{message: types.TimelineMessage{Topic: "conversation.timeline.events", Value: value}}
 	projector := &fakeProjector{err: types.NewDBWriteFailed("boom")}
-	err := NewWorker(consumer, projector, "delivery-test").Run(context.Background())
+	recorder := &fakeFailureRecorder{}
+	err := NewWorker(consumer, projector, "delivery-test", recorder).Run(context.Background())
 	if !errors.Is(err, types.ErrDBWriteFailed) {
 		t.Fatalf("expected projection error, got %v", err)
 	}
 	if consumer.committed {
 		t.Fatal("did not expect commit")
 	}
+	if len(recorder.recorded) != 1 {
+		t.Fatalf("expected one recorded failure, got %d", len(recorder.recorded))
+	}
+	if recorder.recorded[0].FailureClass != types.ProjectionFailureClassDBWrite ||
+		recorder.recorded[0].EventID != "event-1" ||
+		recorder.recorded[0].OffsetValue != 0 {
+		t.Fatalf("unexpected recorded failure: %+v", recorder.recorded[0])
+	}
 }
 
 func TestWorkerRejectsMalformedEvent(t *testing.T) {
 	consumer := &fakeConsumer{message: types.TimelineMessage{Value: []byte("bad")}}
 	projector := &fakeProjector{}
-	err := NewWorker(consumer, projector, "delivery-test").Run(context.Background())
+	recorder := &fakeFailureRecorder{}
+	err := NewWorker(consumer, projector, "delivery-test", recorder).Run(context.Background())
 	if err == nil {
 		t.Fatal("expected malformed event error")
 	}
 	if consumer.committed {
 		t.Fatal("did not expect commit")
+	}
+	if len(recorder.recorded) != 1 {
+		t.Fatalf("expected one recorded failure, got %d", len(recorder.recorded))
+	}
+	if recorder.recorded[0].FailureClass != types.ProjectionFailureClassDecode ||
+		recorder.recorded[0].EventID != "" {
+		t.Fatalf("unexpected malformed recorded failure: %+v", recorder.recorded[0])
 	}
 }
 

@@ -27,7 +27,7 @@
 
 当前优先级：
 1. 先治理已有 9 个微服务，新增服务后置；`search-service` 只保留 SDD draft，不进入 proto / migration / skeleton。
-2. 当前已开始治理代码复杂度：identity PostgreSQL repository、repository test、`loadtest/pushgateway/main.go` 与目标架构长文档已完成拆分；delivery-service 已补 `/debug/metrics`、`outbox-repair` 和 `projection-checkpoint-repair` 基础运维入口，后续继续清理更完整的 projection repair、故障语义和测试缺口。
+2. 当前已开始治理代码复杂度：identity PostgreSQL repository、repository test、`loadtest/pushgateway/main.go` 与目标架构长文档已完成拆分；delivery-service 已补 `/debug/metrics`、`outbox-repair`、`projection-checkpoint-repair` 和 projection failure audit，后续继续清理更完整的 projection repair、故障语义和测试缺口。
 3. 保持 api-gateway、identity、message、conversation、delivery、push、receipt、contacts、policy 已有链路稳定。
 4. Kafka HA、PostgreSQL failover、Redis quorum / 网络分区属于生产化后续项，不阻塞当前功能推进。
 

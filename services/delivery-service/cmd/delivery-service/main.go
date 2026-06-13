@@ -153,6 +153,7 @@ func runTimelineConsumer() error {
 		consumer,
 		app.NewProjectTimelineEventUseCase(repository),
 		groupID,
+		postgresinfra.NewProjectionFailureStore(pool),
 	)
 	log.Printf("delivery-service timeline consumer started topic=%s group=%s", topic, groupID)
 	return worker.Run(ctx)

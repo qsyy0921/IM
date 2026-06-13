@@ -23,10 +23,15 @@ type Worker struct {
 	consumer      Consumer
 	projector     Projector
 	consumerGroup string
+	recorder      FailureRecorder
 }
 
-func NewWorker(consumer Consumer, projector Projector, consumerGroup string) *Worker {
-	return &Worker{consumer: consumer, projector: projector, consumerGroup: consumerGroup}
+func NewWorker(consumer Consumer, projector Projector, consumerGroup string, recorder ...FailureRecorder) *Worker {
+	worker := &Worker{consumer: consumer, projector: projector, consumerGroup: consumerGroup}
+	if len(recorder) > 0 {
+		worker.recorder = recorder[0]
+	}
+	return worker
 }
 
 func (worker *Worker) Run(ctx context.Context) error {
@@ -40,15 +45,26 @@ func (worker *Worker) Run(ctx context.Context) error {
 		}
 		command, err := buildCommand(worker.consumerGroup, message)
 		if err != nil {
-			return err
+			return worker.recordAndReturn(ctx, message, err)
 		}
 		if _, err := worker.projector.Execute(ctx, command); err != nil {
-			return err
+			return worker.recordAndReturn(ctx, message, err)
 		}
 		if err := worker.consumer.Commit(ctx, message); err != nil {
 			return err
 		}
 	}
+}
+
+func (worker *Worker) recordAndReturn(ctx context.Context, message types.TimelineMessage, err error) error {
+	if worker.recorder == nil {
+		return err
+	}
+	recordErr := worker.recorder.RecordFailure(ctx, bestEffortProjectionFailureRecord(worker.consumerGroup, message, err))
+	if recordErr != nil {
+		return errors.Join(err, recordErr)
+	}
+	return err
 }
 
 func buildCommand(consumerGroup string, message types.TimelineMessage) (types.ProjectTimelineEventCommand, error) {

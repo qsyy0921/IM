@@ -62,6 +62,7 @@ conversation-service
    补充：clean commit `4ecb05b` 已补 message-service -> conversation-service `GetSendContext` 服务间 correlation 透传，secure E2E facade smoke 显示 api-gateway `SendMessage`、message-service `SendMessage` 和 conversation-service `GetSendContext` 均带 `trace_id=e2e-demo-send/request_id=e2e-demo-send`；报告见 `docs/runbook/loadtest/api-gateway/loadtest-report-20260614-message-conversation-correlation-smoke.md`，原始结果在 `H:\NexusIM\loadtest-results\e2e-demo-message-conversation-correlation-smoke-20260614-clean`。这仍不是全服务 OpenTelemetry。
    补充：clean commit `ee4461e` 已补 api-gateway rate-limit 拒绝响应的 gRPC `RetryInfo`：local token bucket 按下一枚 token 可用时间估算，Redis fixed-window 按下一窗口剩余时间估算。该能力帮助客户端退避，但仍不是完整 tenant quota / WAF / 风控系统。
    补充：clean commit `9b16b8c` 已修正 api-gateway Redis rate-limit fail-open 启动语义：`FAIL_OPEN=true` 时 Redis 启动探测失败不会阻止 api-gateway 启动，运行时 Redis 错误仍进入 `redis_error_count` 并放行；`FAIL_OPEN=false` 仍 fail-closed。
+   补充：clean commit `b4b3714` 已补 api-gateway 第一阶段 W3C `traceparent` 输入桥接：当 gateway token 和 `x-nexusim-trace-id` 都未提供 trace id 时，api-gateway 会从合法 `traceparent` 提取 trace id，规范化后继续写入下游 `x-nexusim-trace-id`、response header 和 access log；非法 `traceparent` 被忽略并回退到本地生成。这仍不是完整 OpenTelemetry span / collector / exporter。
 17. RAG / Agent / 智能总结属于第四层，必须等消息事实、权限边界、撤回/编辑/删除语义更稳定后再做。
 18. Kafka HA、PostgreSQL failover、Redis quorum / 网络分区可作为后续生产化项，不作为当前主线阻塞。
 

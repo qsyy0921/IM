@@ -204,6 +204,8 @@ NEXUSIM_API_GATEWAY_CONTACTS_TLS_CLIENT_KEY_FILE
 
 2026-06-14 补充：clean commit `9b16b8c` 已修正 Redis rate-limit fail-open 启动语义：`NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_FAIL_OPEN=true` 时 Redis `PING` 失败只记录启动日志并继续启动，首个请求上的 Redis 错误仍进入 `redis_error_count` 并放行；`FAIL_OPEN=false` 仍 fail-closed 拒绝启动。
 
+2026-06-14 补充：clean commit `b4b3714` 已补 api-gateway 第一阶段 W3C `traceparent` 输入桥接：当 gateway token 和 `x-nexusim-trace-id` 都没有提供 trace id 时，api-gateway 会从合法 `traceparent` 提取 32 hex trace id，规范化为小写后写入下游 `x-nexusim-trace-id`、gRPC response header 和低敏 access log；非法 `traceparent` 会被忽略并回退到本地 `trace_*` 生成。这只是外部 trace 入口兼容，不是完整 OpenTelemetry span、collector 或 exporter。
+
 2026-06-13 补充：api-gateway 已新增第一阶段 `nexusim.gateway.v1.GatewayService` public facade proto，覆盖 conversation / message / delivery / receipt 的 user-facing RPC，并明确不包含服务间 `GetSendContext`。legacy service descriptor 暂时保留用于兼容；下一步是让 demo runner / 客户端切到 facade 后再收敛旧 descriptor。
 
 2026-06-13 补充：clean commit `bb13300` 已跑通 `run-local-secure-demo.ps1` 的 `--gateway-facade` 真实进程 smoke。summary `git_dirty=false/success=true/gateway_facade=true/gateway_auth_mode=hmac/gateway_auth_audience=api-gateway`，api-gateway debug metrics 显示本轮 user-facing gRPC calls 均走 `/nexusim.gateway.v1.GatewayService/...`，报告见 `docs/runbook/loadtest/demo/loadtest-report-20260613-e2e-demo-api-gateway-facade-smoke.md`，原始结果在 `H:\NexusIM\loadtest-results\e2e-demo-api-gateway-facade-smoke-20260613-clean`。

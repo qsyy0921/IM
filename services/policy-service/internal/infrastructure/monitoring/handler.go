@@ -9,15 +9,18 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/qsyy0921/IM/services/policy-service/internal/types"
 )
 
 const serviceName = "policy-service"
 
 type Handler struct {
-	pool            *pgxpool.Pool
-	requirePostgres bool
-	grpcMetrics     *GRPCMetrics
-	decisionMetrics *DecisionMetrics
+	pool                   *pgxpool.Pool
+	requirePostgres        bool
+	grpcMetrics            *GRPCMetrics
+	decisionMetrics        *DecisionMetrics
+	contactWorkerSnapshot  func() types.ProjectionWorkerSnapshot
+	timelineWorkerSnapshot func() types.ProjectionWorkerSnapshot
 }
 
 func NewHandler(pool *pgxpool.Pool, requirePostgres bool, grpcMetrics *GRPCMetrics, decisionMetrics *DecisionMetrics) *Handler {
@@ -27,6 +30,16 @@ func NewHandler(pool *pgxpool.Pool, requirePostgres bool, grpcMetrics *GRPCMetri
 		grpcMetrics:     grpcMetrics,
 		decisionMetrics: decisionMetrics,
 	}
+}
+
+func (h *Handler) WithContactProjectionWorkerStats(snapshotFunc func() types.ProjectionWorkerSnapshot) *Handler {
+	h.contactWorkerSnapshot = snapshotFunc
+	return h
+}
+
+func (h *Handler) WithTimelineProjectionWorkerStats(snapshotFunc func() types.ProjectionWorkerSnapshot) *Handler {
+	h.timelineWorkerSnapshot = snapshotFunc
+	return h
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +86,14 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		decisionSnapshot := h.decisionMetrics.Snapshot()
 		snapshot.Decisions = &decisionSnapshot
 	}
+	if h.contactWorkerSnapshot != nil {
+		workerSnapshot := h.contactWorkerSnapshot()
+		snapshot.ContactProjectionWorker = &workerSnapshot
+	}
+	if h.timelineWorkerSnapshot != nil {
+		workerSnapshot := h.timelineWorkerSnapshot()
+		snapshot.TimelineProjectionWorker = &workerSnapshot
+	}
 	if h.pool != nil {
 		stats := h.pool.Stat()
 		snapshot.PGPool = &PGPoolSnapshot{
@@ -117,17 +138,19 @@ type healthResponse struct {
 }
 
 type Snapshot struct {
-	Service          string               `json:"service"`
-	GeneratedAtMS    int64                `json:"generated_at_ms"`
-	PGPool           *PGPoolSnapshot      `json:"pg_pool,omitempty"`
-	RuleStore        *RuleSnapshot        `json:"policy_rule_store,omitempty"`
-	RuleStoreError   string               `json:"policy_rule_store_error,omitempty"`
-	Projection       *ProjectionSnapshot  `json:"policy_projection,omitempty"`
-	ProjectionError  string               `json:"policy_projection_error,omitempty"`
-	AuditOutbox      *AuditOutboxSnapshot `json:"policy_decision_audit_outbox,omitempty"`
-	AuditOutboxError string               `json:"policy_decision_audit_outbox_error,omitempty"`
-	GRPC             *GRPCSnapshot        `json:"grpc,omitempty"`
-	Decisions        *DecisionSnapshot    `json:"decisions,omitempty"`
+	Service                  string                          `json:"service"`
+	GeneratedAtMS            int64                           `json:"generated_at_ms"`
+	PGPool                   *PGPoolSnapshot                 `json:"pg_pool,omitempty"`
+	RuleStore                *RuleSnapshot                   `json:"policy_rule_store,omitempty"`
+	RuleStoreError           string                          `json:"policy_rule_store_error,omitempty"`
+	Projection               *ProjectionSnapshot             `json:"policy_projection,omitempty"`
+	ProjectionError          string                          `json:"policy_projection_error,omitempty"`
+	AuditOutbox              *AuditOutboxSnapshot            `json:"policy_decision_audit_outbox,omitempty"`
+	AuditOutboxError         string                          `json:"policy_decision_audit_outbox_error,omitempty"`
+	GRPC                     *GRPCSnapshot                   `json:"grpc,omitempty"`
+	Decisions                *DecisionSnapshot               `json:"decisions,omitempty"`
+	ContactProjectionWorker  *types.ProjectionWorkerSnapshot `json:"contact_projection_worker,omitempty"`
+	TimelineProjectionWorker *types.ProjectionWorkerSnapshot `json:"timeline_projection_worker,omitempty"`
 }
 
 type PGPoolSnapshot struct {

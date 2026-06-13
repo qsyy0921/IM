@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/qsyy0921/IM/services/policy-service/internal/types"
 )
 
 func TestHandlerHealthz(t *testing.T) {
@@ -93,6 +94,47 @@ func TestHandlerMetricsIncludesGRPCAndDecisionSnapshots(t *testing.T) {
 	}
 	if body.Decisions == nil || body.Decisions.Total != 2 || body.Decisions.Allowed != 1 || body.Decisions.Denied != 1 {
 		t.Fatalf("expected decision metrics, got %+v", body.Decisions)
+	}
+}
+
+func TestHandlerMetricsIncludesProjectionWorkerSnapshots(t *testing.T) {
+	handler := NewHandler(nil, false, nil, nil).
+		WithContactProjectionWorkerStats(func() types.ProjectionWorkerSnapshot {
+			return types.ProjectionWorkerSnapshot{
+				TotalErrors:        2,
+				ConsecutiveErrors:  1,
+				LastErrorAtMS:      100,
+				LastSuccessAtMS:    90,
+				LastCommitAtMS:     90,
+				LastErrorBackoffMS: 1000,
+			}
+		}).
+		WithTimelineProjectionWorkerStats(func() types.ProjectionWorkerSnapshot {
+			return types.ProjectionWorkerSnapshot{
+				TotalErrors:        3,
+				ConsecutiveErrors:  0,
+				LastErrorAtMS:      80,
+				LastSuccessAtMS:    110,
+				LastCommitAtMS:     110,
+				LastErrorBackoffMS: 500,
+			}
+		})
+
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/debug/metrics", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", response.Code)
+	}
+	var body Snapshot
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode metrics response: %v", err)
+	}
+	if body.ContactProjectionWorker == nil || body.ContactProjectionWorker.TotalErrors != 2 {
+		t.Fatalf("expected contact worker metrics, got %+v", body.ContactProjectionWorker)
+	}
+	if body.TimelineProjectionWorker == nil || body.TimelineProjectionWorker.TotalErrors != 3 {
+		t.Fatalf("expected timeline worker metrics, got %+v", body.TimelineProjectionWorker)
 	}
 }
 

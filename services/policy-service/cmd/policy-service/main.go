@@ -307,7 +307,16 @@ func runContactConsumer() error {
 		consumer,
 		app.NewProjectContactEventUseCase(postgresinfra.NewProjectionRepository(pool)),
 		envString("NEXUSIM_POLICY_CONTACT_CONSUMER_GROUP", "nexusim-policy-contacts"),
+		contacttrigger.Config{
+			ErrorBackoff: envDuration("NEXUSIM_POLICY_CONTACT_CONSUMER_ERROR_BACKOFF", time.Second),
+			Logf:         log.Printf,
+		},
 	)
+	stopDebug, err := startDebugServer(ctx, policyDebugAddr(), monitoringinfra.NewHandler(pool, true, nil, nil).WithContactProjectionWorkerStats(worker.Snapshot))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 	log.Println("policy-service contact projection consumer started")
 	return worker.Run(ctx)
 }
@@ -341,7 +350,16 @@ func runTimelineConsumer() error {
 		consumer,
 		app.NewProjectConversationMemberEventUseCase(postgresinfra.NewProjectionRepository(pool)),
 		groupID,
+		timelinetrigger.Config{
+			ErrorBackoff: envDuration("NEXUSIM_POLICY_TIMELINE_CONSUMER_ERROR_BACKOFF", time.Second),
+			Logf:         log.Printf,
+		},
 	)
+	stopDebug, err := startDebugServer(ctx, policyDebugAddr(), monitoringinfra.NewHandler(pool, true, nil, nil).WithTimelineProjectionWorkerStats(worker.Snapshot))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 	log.Println("policy-service conversation timeline projection consumer started")
 	return worker.Run(ctx)
 }

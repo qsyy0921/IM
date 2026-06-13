@@ -49,6 +49,8 @@ func run() error {
 		return runOutboxRelay()
 	case "outbox-repair":
 		return runOutboxRepair()
+	case "projection-checkpoint-repair":
+		return runProjectionCheckpointRepair()
 	default:
 		return errors.New("unsupported NEXUSIM_DELIVERY_SERVICE_MODE")
 	}
@@ -243,6 +245,52 @@ func runOutboxRepair() error {
 	return nil
 }
 
+func runProjectionCheckpointRepair() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	mode := envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_MODE", types.ProjectionCheckpointRepairModeAudit)
+	dryRun := envBool("NEXUSIM_DELIVERY_PROJECTION_REPAIR_DRY_RUN", false)
+	targetOffset := envInt64AllowZero("NEXUSIM_DELIVERY_PROJECTION_REPAIR_TARGET_OFFSET", 0)
+	stats, err := postgresinfra.NewProjectionRepairStore(pool).RepairCheckpoint(
+		ctx,
+		types.ProjectionCheckpointRepairOptions{
+			ConsumerGroup: envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CONSUMER_GROUP", ""),
+			Topic:         envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_TOPIC", "conversation.timeline.events"),
+			PartitionID:   int32(envIntAllowZero("NEXUSIM_DELIVERY_PROJECTION_REPAIR_PARTITION_ID", 0)),
+			TargetOffset:  targetOffset,
+			Mode:          mode,
+			Operator:      envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_OPERATOR", "manual"),
+			Reason:        envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON", "manual delivery projection checkpoint repair"),
+			DryRun:        dryRun,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"delivery-service projection checkpoint repair completed requested=%d audited=%d mutated=%d skipped=%d mode=%s target_offset=%d dry_run=%t",
+		stats.Requested,
+		stats.Audited,
+		stats.Mutated,
+		stats.Skipped,
+		mode,
+		targetOffset,
+		dryRun,
+	)
+	return nil
+}
+
 func openPGPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
@@ -411,6 +459,30 @@ func envInt(name string, fallback int) int {
 	}
 	parsed, err := strconv.Atoi(value)
 	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func envIntAllowZero(name string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func envInt64AllowZero(name string, fallback int64) int64 {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed < 0 {
 		return fallback
 	}
 	return parsed

@@ -81,7 +81,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("identity-service runtime wiring is idle; set NEXUSIM_IDENTITY_SERVICE_MODE=grpc, outbox-relay, challenge-delivery-worker, challenge-delivery-repair, challenge-request-limit-cleanup, session-mfa-proof-audit, or gateway-token-keyring-rotate")
+		log.Println("identity-service runtime wiring is idle; set NEXUSIM_IDENTITY_SERVICE_MODE=grpc, outbox-relay, challenge-delivery-worker, challenge-delivery-repair, challenge-delivery-repair-audit, challenge-request-limit-cleanup, session-mfa-proof-audit, or gateway-token-keyring-rotate")
 		return nil
 	case "grpc":
 		return runGRPC()
@@ -91,6 +91,8 @@ func run() error {
 		return runChallengeDeliveryWorker()
 	case "challenge-delivery-repair":
 		return runChallengeDeliveryRepair()
+	case "challenge-delivery-repair-audit":
+		return runChallengeDeliveryRepairAudit()
 	case "challenge-request-limit-cleanup":
 		return runChallengeRequestLimitCleanup()
 	case "session-mfa-proof-audit":
@@ -924,6 +926,64 @@ func runChallengeDeliveryRepair() error {
 	return nil
 }
 
+func runChallengeDeliveryRepairAudit() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	deliveryID, err := optionalPositiveInt64Env("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_DELIVERY_ID")
+	if err != nil {
+		return err
+	}
+	rows, err := postgresinfra.NewChallengeDeliveryStore(pool).AuditDeliveryRepairs(ctx, postgresinfra.ChallengeDeliveryRepairAuditOptions{
+		DeliveryID:           deliveryID,
+		TenantID:             envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_TENANT_ID", ""),
+		UserID:               envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_USER_ID", ""),
+		ChallengeID:          envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_CHALLENGE_ID", ""),
+		Mode:                 envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_MODE", ""),
+		Outcome:              envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_OUTCOME", ""),
+		PreviousFailureClass: envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_PREVIOUS_FAILURE_CLASS", ""),
+		NewFailureClass:      envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_NEW_FAILURE_CLASS", ""),
+		Limit:                envInt("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_LIMIT", 20),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("identity-service challenge delivery repair audit completed rows=%d", len(rows))
+	for _, row := range rows {
+		log.Printf(
+			"identity_challenge_delivery_repair delivery_id=%d tenant_id=%s user_id=%s challenge_id=%s mode=%s outcome=%s skip_reason=%s dry_run=%t previous_delivery_status=%s previous_challenge_status=%s previous_challenge_delivery_status=%s previous_retry_count=%d previous_failure_class=%s new_delivery_status=%s new_challenge_status=%s new_challenge_delivery_status=%s new_failure_class=%s operator=%s repaired_at=%s reason=%q previous_dead_lettered_at=%s",
+			row.DeliveryID,
+			row.TenantID,
+			row.UserID,
+			row.ChallengeID,
+			row.Mode,
+			row.Outcome,
+			row.SkipReason,
+			row.DryRun,
+			row.PreviousDeliveryStatus,
+			row.PreviousChallengeStatus,
+			row.PreviousChallengeDeliveryStatus,
+			row.PreviousRetryCount,
+			row.PreviousFailureClass,
+			row.NewDeliveryStatus,
+			row.NewChallengeStatus,
+			row.NewChallengeDeliveryStatus,
+			row.NewFailureClass,
+			row.Operator,
+			row.RepairedAt.Format(time.RFC3339),
+			row.Reason,
+			formatOptionalTime(row.PreviousDeadLetteredAt),
+		)
+	}
+	return nil
+}
+
 func runChallengeRequestLimitCleanup() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -1309,4 +1369,23 @@ func parseInt64CSV(value string) ([]int64, error) {
 		result = append(result, parsed)
 	}
 	return result, nil
+}
+
+func optionalPositiveInt64Env(name string) (*int64, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed <= 0 {
+		return nil, fmt.Errorf("%s must be a positive integer", name)
+	}
+	return &parsed, nil
+}
+
+func formatOptionalTime(value *time.Time) string {
+	if value == nil {
+		return ""
+	}
+	return value.Format(time.RFC3339)
 }

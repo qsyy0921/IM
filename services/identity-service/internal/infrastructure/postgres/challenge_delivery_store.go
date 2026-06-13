@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +15,43 @@ import (
 type ChallengeDeliveryStore struct {
 	pool *pgxpool.Pool
 	now  func() time.Time
+}
+
+type ChallengeDeliveryRepairAuditOptions struct {
+	DeliveryID           *int64
+	TenantID             string
+	UserID               string
+	ChallengeID          string
+	Mode                 string
+	Outcome              string
+	PreviousFailureClass string
+	NewFailureClass      string
+	Limit                int
+}
+
+type ChallengeDeliveryRepairAuditRow struct {
+	DeliveryID                      int64
+	TenantID                        string
+	UserID                          string
+	ChallengeID                     string
+	Mode                            string
+	Outcome                         string
+	SkipReason                      string
+	Operator                        string
+	Reason                          string
+	DryRun                          bool
+	PreviousDeliveryStatus          string
+	PreviousChallengeStatus         string
+	PreviousChallengeDeliveryStatus string
+	PreviousRetryCount              int
+	PreviousLastError               string
+	PreviousFailureClass            string
+	PreviousDeadLetteredAt          *time.Time
+	NewDeliveryStatus               string
+	NewChallengeStatus              string
+	NewChallengeDeliveryStatus      string
+	NewFailureClass                 string
+	RepairedAt                      time.Time
 }
 
 type ChallengeDeliveryStoreOption func(*ChallengeDeliveryStore)
@@ -158,6 +196,144 @@ func (store *ChallengeDeliveryStore) RepairDeliveries(ctx context.Context, optio
 		return types.ChallengeDeliveryRepairStats{}, types.NewDBWriteFailed(err.Error())
 	}
 	return stats, nil
+}
+
+func (store *ChallengeDeliveryStore) AuditDeliveryRepairs(ctx context.Context, options ChallengeDeliveryRepairAuditOptions) ([]ChallengeDeliveryRepairAuditRow, error) {
+	if store == nil || store.pool == nil {
+		return nil, errors.New("identity challenge delivery store is not configured")
+	}
+	limit := options.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	var args []any
+	clauses := make([]string, 0, 8)
+	if options.DeliveryID != nil {
+		args = append(args, *options.DeliveryID)
+		clauses = append(clauses, "delivery_id = $"+strconv.Itoa(len(args)))
+	}
+	if tenantID := strings.TrimSpace(options.TenantID); tenantID != "" {
+		args = append(args, tenantID)
+		clauses = append(clauses, "tenant_id = $"+strconv.Itoa(len(args)))
+	}
+	if userID := strings.TrimSpace(options.UserID); userID != "" {
+		args = append(args, userID)
+		clauses = append(clauses, "user_id = $"+strconv.Itoa(len(args)))
+	}
+	if challengeID := strings.TrimSpace(options.ChallengeID); challengeID != "" {
+		args = append(args, challengeID)
+		clauses = append(clauses, "challenge_id = $"+strconv.Itoa(len(args)))
+	}
+	if rawMode := strings.TrimSpace(options.Mode); rawMode != "" {
+		mode := normalizeChallengeDeliveryRepairMode(rawMode)
+		if mode == "" {
+			return nil, types.NewInvalidArgument("unsupported identity challenge delivery repair mode")
+		}
+		args = append(args, mode)
+		clauses = append(clauses, "repair_mode = $"+strconv.Itoa(len(args)))
+	}
+	if rawOutcome := strings.TrimSpace(options.Outcome); rawOutcome != "" {
+		outcome := normalizeChallengeDeliveryRepairOutcome(rawOutcome)
+		if outcome == "" {
+			return nil, types.NewInvalidArgument("unsupported identity challenge delivery repair outcome")
+		}
+		args = append(args, outcome)
+		clauses = append(clauses, "repair_outcome = $"+strconv.Itoa(len(args)))
+	}
+	if rawFailureClass := strings.TrimSpace(options.PreviousFailureClass); rawFailureClass != "" {
+		failureClass := normalizeChallengeDeliveryFailureClass(rawFailureClass)
+		if failureClass == "" {
+			return nil, types.NewInvalidArgument("unsupported identity challenge delivery previous failure class")
+		}
+		args = append(args, failureClass)
+		clauses = append(clauses, "previous_failure_class = $"+strconv.Itoa(len(args)))
+	}
+	if rawFailureClass := strings.TrimSpace(options.NewFailureClass); rawFailureClass != "" {
+		failureClass := normalizeChallengeDeliveryFailureClass(rawFailureClass)
+		if failureClass == "" {
+			return nil, types.NewInvalidArgument("unsupported identity challenge delivery new failure class")
+		}
+		args = append(args, failureClass)
+		clauses = append(clauses, "new_failure_class = $"+strconv.Itoa(len(args)))
+	}
+
+	where := ""
+	if len(clauses) > 0 {
+		where = "WHERE " + strings.Join(clauses, " AND ")
+	}
+	args = append(args, limit)
+	rows, err := store.pool.Query(ctx, `
+SELECT
+    delivery_id,
+    tenant_id,
+    user_id,
+    challenge_id,
+    previous_delivery_status,
+    previous_challenge_status,
+    previous_challenge_delivery_status,
+    previous_retry_count,
+    previous_last_error,
+    previous_failure_class,
+    previous_dead_lettered_at,
+    new_delivery_status,
+    new_challenge_status,
+    new_challenge_delivery_status,
+    new_failure_class,
+    repair_mode,
+    repair_outcome,
+    skip_reason,
+    dry_run,
+    repair_operator,
+    repair_reason,
+    repaired_at
+FROM identity_challenge_delivery_repair_audit
+`+where+`
+ORDER BY repaired_at DESC, delivery_id, id DESC
+LIMIT $`+strconv.Itoa(len(args)), args...)
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	result := make([]ChallengeDeliveryRepairAuditRow, 0, limit)
+	for rows.Next() {
+		var row ChallengeDeliveryRepairAuditRow
+		if err := rows.Scan(
+			&row.DeliveryID,
+			&row.TenantID,
+			&row.UserID,
+			&row.ChallengeID,
+			&row.PreviousDeliveryStatus,
+			&row.PreviousChallengeStatus,
+			&row.PreviousChallengeDeliveryStatus,
+			&row.PreviousRetryCount,
+			&row.PreviousLastError,
+			&row.PreviousFailureClass,
+			&row.PreviousDeadLetteredAt,
+			&row.NewDeliveryStatus,
+			&row.NewChallengeStatus,
+			&row.NewChallengeDeliveryStatus,
+			&row.NewFailureClass,
+			&row.Mode,
+			&row.Outcome,
+			&row.SkipReason,
+			&row.DryRun,
+			&row.Operator,
+			&row.Reason,
+			&row.RepairedAt,
+		); err != nil {
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		result = append(result, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	return result, nil
 }
 
 func (store *ChallengeDeliveryStore) cancelInactiveLocked(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
@@ -740,6 +916,35 @@ func normalizeChallengeDeliveryRepairMode(mode string) string {
 		types.ChallengeDeliveryRepairModeRedriveActivePending,
 		types.ChallengeDeliveryRepairModeCancelInactive:
 		return mode
+	default:
+		return ""
+	}
+}
+
+func normalizeChallengeDeliveryRepairOutcome(outcome string) string {
+	switch strings.ToUpper(strings.TrimSpace(outcome)) {
+	case challengeDeliveryRepairOutcomeAudited,
+		challengeDeliveryRepairOutcomeMutated,
+		challengeDeliveryRepairOutcomeSkipped:
+		return strings.ToUpper(strings.TrimSpace(outcome))
+	default:
+		return ""
+	}
+}
+
+func normalizeChallengeDeliveryFailureClass(value string) string {
+	switch strings.TrimSpace(value) {
+	case types.ChallengeDeliveryFailureClassConfiguration,
+		types.ChallengeDeliveryFailureClassProviderNonSuccess,
+		types.ChallengeDeliveryFailureClassTimeout,
+		types.ChallengeDeliveryFailureClassNetwork,
+		types.ChallengeDeliveryFailureClassSerialization,
+		types.ChallengeDeliveryFailureClassTokenCrypto,
+		types.ChallengeDeliveryFailureClassDeliveryFailed,
+		types.ChallengeDeliveryFailureClassCanceled,
+		types.ChallengeDeliveryFailureClassInactive,
+		types.ChallengeDeliveryFailureClassUnknown:
+		return strings.TrimSpace(value)
 	default:
 		return ""
 	}

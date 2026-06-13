@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -114,19 +115,32 @@ func openTestPool(t *testing.T) *pgxpool.Pool {
 
 func applyPolicyMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	path := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "policy", "000001_policy_core.sql")
-	migration, err := os.ReadFile(path)
+	dir := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "policy")
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		t.Fatalf("read policy migration: %v", err)
+		t.Fatalf("read policy migrations: %v", err)
 	}
-	if _, err := pool.Exec(ctx, string(migration)); err != nil {
-		t.Fatalf("apply policy migration: %v", err)
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".sql" {
+			names = append(names, entry.Name())
+		}
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		migration, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatalf("read policy migration %s: %v", name, err)
+		}
+		if _, err := pool.Exec(ctx, string(migration)); err != nil {
+			t.Fatalf("apply policy migration %s: %v", name, err)
+		}
 	}
 }
 
 func resetPolicyTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	if _, err := pool.Exec(ctx, `TRUNCATE policy_message_action_rules`); err != nil {
+	if _, err := pool.Exec(ctx, `TRUNCATE policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
 		t.Fatalf("reset policy tables: %v", err)
 	}
 }

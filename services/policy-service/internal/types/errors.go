@@ -8,6 +8,7 @@ import (
 var (
 	ErrInvalidArgument       = errors.New("invalid argument")
 	ErrDependencyUnavailable = errors.New("dependency unavailable")
+	ErrDBWriteFailed         = errors.New("db write failed")
 )
 
 func NewInvalidArgument(reason string) error {
@@ -22,4 +23,11 @@ func NewDependencyUnavailable(reason string) error {
 		return ErrDependencyUnavailable
 	}
 	return fmt.Errorf("%w: %s", ErrDependencyUnavailable, reason)
+}
+
+func NewDBWriteFailed(reason string) error {
+	if reason == "" {
+		return ErrDBWriteFailed
+	}
+	return fmt.Errorf("%w: %s", ErrDBWriteFailed, reason)
 }

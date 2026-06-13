@@ -17,8 +17,10 @@ import (
 	policygrpc "github.com/qsyy0921/IM/services/policy-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/policy-service/internal/app"
 	"github.com/qsyy0921/IM/services/policy-service/internal/domain"
+	kafkainfra "github.com/qsyy0921/IM/services/policy-service/internal/infrastructure/kafka"
 	monitoringinfra "github.com/qsyy0921/IM/services/policy-service/internal/infrastructure/monitoring"
 	postgresinfra "github.com/qsyy0921/IM/services/policy-service/internal/infrastructure/postgres"
+	contacttrigger "github.com/qsyy0921/IM/services/policy-service/internal/trigger/contact"
 	"google.golang.org/grpc"
 )
 
@@ -32,13 +34,48 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("policy-service runtime wiring is idle; set NEXUSIM_POLICY_SERVICE_MODE=grpc")
+		log.Println("policy-service runtime wiring is idle; set NEXUSIM_POLICY_SERVICE_MODE=grpc or contact-consumer")
 		return nil
 	case "grpc":
 		return runGRPC()
+	case "contact-consumer":
+		return runContactConsumer()
 	default:
 		return errors.New("unsupported NEXUSIM_POLICY_SERVICE_MODE")
 	}
+}
+
+func runContactConsumer() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := envString("NEXUSIM_PG_DSN", "")
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required for policy contact consumer")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	consumer, err := kafkainfra.NewReaderConsumer(kafkainfra.ReaderConfig{
+		Brokers: splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS")),
+		Topic:   envString("NEXUSIM_CONTACT_EVENTS_TOPIC", contacttrigger.TopicContactEvents),
+		GroupID: envString("NEXUSIM_POLICY_CONTACT_CONSUMER_GROUP", "nexusim-policy-contacts"),
+	})
+	if err != nil {
+		return err
+	}
+	defer consumer.Close()
+
+	worker := contacttrigger.NewWorker(
+		consumer,
+		app.NewProjectContactEventUseCase(postgresinfra.NewProjectionRepository(pool)),
+		envString("NEXUSIM_POLICY_CONTACT_CONSUMER_GROUP", "nexusim-policy-contacts"),
+	)
+	log.Println("policy-service contact projection consumer started")
+	return worker.Run(ctx)
 }
 
 func runGRPC() error {
@@ -188,4 +225,16 @@ func envInt64(name string, fallback int64) int64 {
 		return fallback
 	}
 	return parsed
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	values := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			values = append(values, trimmed)
+		}
+	}
+	return values
 }

@@ -2,12 +2,22 @@ package main
 
 import (
 	"crypto/hmac"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/base64"
+	"encoding/pem"
+	"math/big"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 )
 
 func TestParseDeviceIDs(t *testing.T) {
@@ -69,6 +79,46 @@ func TestDerivePushMetricsURL(t *testing.T) {
 				t.Fatalf("derivePushMetricsURL(%q) = %q, want %q", test.in, got, test.want)
 			}
 		})
+	}
+}
+
+func TestWebSocketDialOptionsDefaultNil(t *testing.T) {
+	options, err := webSocketDialOptions(config{}, nil)
+	if err != nil {
+		t.Fatalf("websocket dial options: %v", err)
+	}
+	if options != nil {
+		t.Fatalf("expected nil options by default")
+	}
+}
+
+func TestWebSocketTLSConfigRequiresCAFile(t *testing.T) {
+	_, err := webSocketTLSConfig(grpctls.Config{ServerName: "push-gateway.nexusim.local"}, "push-tls")
+	if err == nil {
+		t.Fatalf("expected missing CA file error")
+	}
+}
+
+func TestWebSocketDialOptionsLoadsTLSAndHeader(t *testing.T) {
+	dir := t.TempDir()
+	caFile, _ := writePushGatewayLoadtestCert(t, dir, "ca")
+	clientCertFile, clientKeyFile := writePushGatewayLoadtestCert(t, dir, "client")
+	options, err := webSocketDialOptions(config{
+		pushTLS: grpctls.Config{
+			CAFile:         caFile,
+			ServerName:     "push-gateway.nexusim.local",
+			ClientCertFile: clientCertFile,
+			ClientKeyFile:  clientKeyFile,
+		},
+	}, map[string][]string{"Authorization": []string{"Bearer token"}})
+	if err != nil {
+		t.Fatalf("websocket dial options: %v", err)
+	}
+	if options == nil || options.HTTPClient == nil {
+		t.Fatalf("expected websocket HTTP client with TLS")
+	}
+	if got := options.HTTPHeader.Get("Authorization"); got != "Bearer token" {
+		t.Fatalf("expected authorization header, got %q", got)
 	}
 }
 
@@ -227,4 +277,39 @@ func validHMAC(payload string, signature []byte, secret string) bool {
 	mac := hmac.New(sha256.New, []byte(secret))
 	_, _ = mac.Write([]byte(payload))
 	return hmac.Equal(signature, mac.Sum(nil))
+}
+
+func writePushGatewayLoadtestCert(t *testing.T, dir string, name string) (string, string) {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate tls key: %v", err)
+	}
+	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		t.Fatalf("generate tls serial: %v", err)
+	}
+	template := x509.Certificate{
+		SerialNumber:          serial,
+		Subject:               pkix.Name{CommonName: name},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment | x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		DNSNames:              []string{name + ".nexusim.local"},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatalf("create tls cert: %v", err)
+	}
+	certFile := filepath.Join(dir, name+".crt")
+	keyFile := filepath.Join(dir, name+".key")
+	if err := os.WriteFile(certFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600); err != nil {
+		t.Fatalf("write tls cert: %v", err)
+	}
+	if err := os.WriteFile(keyFile, pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}), 0o600); err != nil {
+		t.Fatalf("write tls key: %v", err)
+	}
+	return certFile, keyFile
 }

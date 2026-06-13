@@ -5,6 +5,8 @@ import (
 	"crypto/hmac"
 	"crypto/pbkdf2"
 	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -83,6 +85,7 @@ type config struct {
 	messageTLS                         grpctls.Config
 	deliveryTLS                        grpctls.Config
 	identityTLS                        grpctls.Config
+	pushTLS                            grpctls.Config
 	pushURL                            string
 	reconnectPushURL                   string
 	resultDir                          string
@@ -135,6 +138,7 @@ type summary struct {
 	MessageTLSEnabled                       bool                   `json:"message_tls_enabled"`
 	DeliveryTLSEnabled                      bool                   `json:"delivery_tls_enabled"`
 	IdentityTLSEnabled                      bool                   `json:"identity_tls_enabled"`
+	PushTLSEnabled                          bool                   `json:"push_tls_enabled"`
 	PushURL                                 string                 `json:"push_url"`
 	ReconnectPushURL                        string                 `json:"reconnect_push_url,omitempty"`
 	PushMetricsURL                          string                 `json:"push_metrics_url,omitempty"`
@@ -375,6 +379,7 @@ func parseConfig() config {
 	registerTLSFlags("message-tls", "NEXUSIM_MESSAGE_TLS", "message-service", &cfg.messageTLS)
 	registerTLSFlags("delivery-tls", "NEXUSIM_DELIVERY_TLS", "delivery-service", &cfg.deliveryTLS)
 	registerTLSFlags("identity-tls", "NEXUSIM_IDENTITY_TLS", "identity-service", &cfg.identityTLS)
+	registerTLSFlags("push-tls", "NEXUSIM_PUSH_WS_TLS", "push-gateway WebSocket", &cfg.pushTLS)
 	flag.StringVar(&cfg.pushURL, "push-url", "ws://127.0.0.1:11598", "push-gateway WebSocket URL")
 	flag.StringVar(&cfg.reconnectPushURL, "reconnect-push-url", "", "optional WebSocket URL used for reconnect/resume scenarios")
 	flag.StringVar(&cfg.resultDir, "result-dir", "H:/NexusIM/loadtest-results/push-gateway-smoke", "result directory")
@@ -465,6 +470,62 @@ func dialGRPCService(target string, tlsConfig grpctls.Config, tlsFlagPrefix stri
 		return nil, fmt.Errorf("dial %s: %w", serviceName, err)
 	}
 	return conn, nil
+}
+
+func webSocketDialOptions(cfg config, header http.Header) (*nhooyr.DialOptions, error) {
+	options := &nhooyr.DialOptions{}
+	if header != nil {
+		options.HTTPHeader = header
+	}
+	tlsConfig, err := webSocketTLSConfig(cfg.pushTLS, "push-tls")
+	if err != nil {
+		return nil, err
+	}
+	if tlsConfig != nil {
+		options.HTTPClient = &http.Client{
+			Transport: &http.Transport{TLSClientConfig: tlsConfig},
+		}
+	}
+	if options.HTTPHeader == nil && options.HTTPClient == nil {
+		return nil, nil
+	}
+	return options, nil
+}
+
+func webSocketTLSConfig(config grpctls.Config, flagPrefix string) (*tls.Config, error) {
+	if !config.Enabled() {
+		return nil, nil
+	}
+	caFile := strings.TrimSpace(config.CAFile)
+	if caFile == "" {
+		return nil, errors.New("--" + flagPrefix + "-ca-file is required when push WebSocket TLS is configured")
+	}
+	clientCertFile := strings.TrimSpace(config.ClientCertFile)
+	clientKeyFile := strings.TrimSpace(config.ClientKeyFile)
+	if (clientCertFile == "") != (clientKeyFile == "") {
+		return nil, errors.New("--" + flagPrefix + "-client-cert-file and --" + flagPrefix + "-client-key-file must be configured together")
+	}
+	pemBytes, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, err
+	}
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(pemBytes) {
+		return nil, errors.New("--" + flagPrefix + "-ca-file does not contain a valid PEM certificate")
+	}
+	tlsConfig := &tls.Config{
+		RootCAs:    roots,
+		ServerName: strings.TrimSpace(config.ServerName),
+		MinVersion: tls.VersionTLS12,
+	}
+	if clientCertFile != "" {
+		cert, err := tls.LoadX509KeyPair(clientCertFile, clientKeyFile)
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+	return tlsConfig, nil
 }
 
 func dialIdentityService(cfg config) (*grpc.ClientConn, error) {
@@ -560,6 +621,7 @@ func run(cfg config) error {
 		MessageTLSEnabled:                       cfg.messageTLS.Enabled(),
 		DeliveryTLSEnabled:                      cfg.deliveryTLS.Enabled(),
 		IdentityTLSEnabled:                      cfg.identityTLS.Enabled(),
+		PushTLSEnabled:                          cfg.pushTLS.Enabled(),
 		PushURL:                                 cfg.pushURL,
 		ReconnectPushURL:                        cfg.reconnectPushURL,
 		PushMetricsURL:                          cfg.pushMetricsURL,
@@ -1355,7 +1417,7 @@ func connectWebSocketWithTokenAndResume(
 	}
 	query := u.Query()
 	query.Set("device_id", deviceID)
-	var dialOptions *nhooyr.DialOptions
+	var header http.Header
 	switch cfg.pushAuthMode {
 	case "", "mock":
 		query.Set("tenant_id", cfg.tenantID)
@@ -1367,11 +1429,15 @@ func connectWebSocketWithTokenAndResume(
 				return nil, serverFrame{}, err
 			}
 		}
-		dialOptions = &nhooyr.DialOptions{HTTPHeader: http.Header{"Authorization": []string{"Bearer " + token}}}
+		header = http.Header{"Authorization": []string{"Bearer " + token}}
 	default:
 		return nil, serverFrame{}, fmt.Errorf("unsupported push auth mode: %s", cfg.pushAuthMode)
 	}
 	u.RawQuery = query.Encode()
+	dialOptions, err := webSocketDialOptions(cfg, header)
+	if err != nil {
+		return nil, serverFrame{}, fmt.Errorf("configure push WebSocket TLS: %w", err)
+	}
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
 	conn, _, err := nhooyr.Dial(requestCtx, u.String(), dialOptions)
@@ -1434,11 +1500,13 @@ func readAuthErrorFrame(ctx context.Context, cfg config, deviceID string, token 
 	query := u.Query()
 	query.Set("device_id", deviceID)
 	u.RawQuery = query.Encode()
+	dialOptions, err := webSocketDialOptions(cfg, http.Header{"Authorization": []string{"Bearer " + token}})
+	if err != nil {
+		return serverFrame{}, fmt.Errorf("configure push WebSocket TLS: %w", err)
+	}
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
-	conn, _, err := nhooyr.Dial(requestCtx, u.String(), &nhooyr.DialOptions{
-		HTTPHeader: http.Header{"Authorization": []string{"Bearer " + token}},
-	})
+	conn, _, err := nhooyr.Dial(requestCtx, u.String(), dialOptions)
 	if err != nil {
 		return serverFrame{}, err
 	}

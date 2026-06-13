@@ -41,6 +41,16 @@ param(
     [string]$IdentityTlsServerName = "",
     [string]$IdentityTlsClientCertFile = "",
     [string]$IdentityTlsClientKeyFile = "",
+    [string]$PushWsTlsCertFile = "",
+    [string]$PushWsTlsKeyFile = "",
+    [string]$PushWsTlsClientCaFile = "",
+    [string]$PushWsTlsRequireClientCert = "",
+    [string]$PushWsTlsClientAllowedDnsNames = "",
+    [string]$PushWsTlsClientAllowedUris = "",
+    [string]$PushTlsCaFile = "",
+    [string]$PushTlsServerName = "",
+    [string]$PushTlsClientCertFile = "",
+    [string]$PushTlsClientKeyFile = "",
     [string]$PushAuthTokenTtl = "10m",
     [ValidateSet("single", "sentinel")]
     [string]$RedisMode = "single",
@@ -87,6 +97,12 @@ $pushConsumerGatewayID = "push-consumer-$safeRunName"
 $pushSessionQueueSize = "32"
 $pushWriteTimeout = "2s"
 $pushTestWriteDelay = "0s"
+$pushWsTlsEnabled = -not [string]::IsNullOrWhiteSpace($PushWsTlsCertFile)
+$pushScheme = if ($pushWsTlsEnabled) { "wss" } else { "ws" }
+$pushURL = "${pushScheme}://127.0.0.1:11598"
+$pushReconnectURL = "${pushScheme}://127.0.0.1:11599"
+$pushMetricsURL = if ($pushWsTlsEnabled) { "http://127.0.0.1:11602/debug/metrics" } else { "http://127.0.0.1:11598/debug/metrics" }
+$pushReconnectMetricsURL = if ($pushWsTlsEnabled) { "http://127.0.0.1:11603/debug/metrics" } else { "http://127.0.0.1:11599/debug/metrics" }
 if ($Scenario -eq "slow-client") {
     $pushSessionQueueSize = "1"
     $pushWriteTimeout = "1ms"
@@ -373,6 +389,35 @@ function Add-PushAuthEnv {
     return $Env
 }
 
+function Add-PushWSTLSEnv {
+    param(
+        [hashtable]$Env,
+        [string]$DebugAddr = ""
+    )
+    if (-not [string]::IsNullOrWhiteSpace($PushWsTlsCertFile)) {
+        $Env["NEXUSIM_PUSH_WS_TLS_CERT_FILE"] = $PushWsTlsCertFile
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PushWsTlsKeyFile)) {
+        $Env["NEXUSIM_PUSH_WS_TLS_KEY_FILE"] = $PushWsTlsKeyFile
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PushWsTlsClientCaFile)) {
+        $Env["NEXUSIM_PUSH_WS_TLS_CLIENT_CA_FILE"] = $PushWsTlsClientCaFile
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PushWsTlsRequireClientCert)) {
+        $Env["NEXUSIM_PUSH_WS_TLS_REQUIRE_CLIENT_CERT"] = $PushWsTlsRequireClientCert
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PushWsTlsClientAllowedDnsNames)) {
+        $Env["NEXUSIM_PUSH_WS_TLS_CLIENT_ALLOWED_DNS_NAMES"] = $PushWsTlsClientAllowedDnsNames
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PushWsTlsClientAllowedUris)) {
+        $Env["NEXUSIM_PUSH_WS_TLS_CLIENT_ALLOWED_URIS"] = $PushWsTlsClientAllowedUris
+    }
+    if (-not [string]::IsNullOrWhiteSpace($DebugAddr)) {
+        $Env["NEXUSIM_PUSH_DEBUG_ADDR"] = $DebugAddr
+    }
+    return $Env
+}
+
 function New-RS256SmokeKeyMaterial {
     param(
         [string]$Directory,
@@ -540,7 +585,7 @@ try {
     }
 
     if ($RouteBackend -eq "redis") {
-        $processes += Start-NexusProcess -Name "push-gateway-ws" -FilePath $pushGateway -Port 11598 -Env (Add-PushRedisEnv (Add-PushAuthEnv @{
+        $processes += Start-NexusProcess -Name "push-gateway-ws" -FilePath $pushGateway -Port 11598 -Env (Add-PushWSTLSEnv -Env (Add-PushRedisEnv (Add-PushAuthEnv @{
             NEXUSIM_PUSH_GATEWAY_MODE = "ws"
             NEXUSIM_PUSH_WS_ADDR = "127.0.0.1:11598"
             NEXUSIM_DELIVERY_GRPC_ADDR = "127.0.0.1:11597"
@@ -551,9 +596,9 @@ try {
             NEXUSIM_PUSH_ROUTE_BACKEND = "redis"
             NEXUSIM_PUSH_GATEWAY_ID = $pushWSGatewayID
             NEXUSIM_PUSH_ROUTE_TTL = "90s"
-        }))
+        })) -DebugAddr $(if ($pushWsTlsEnabled) { "127.0.0.1:11602" } else { "" }))
         if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover" -or $Scenario -eq "redis-sentinel-master-stop") {
-            $processes += Start-NexusProcess -Name "push-gateway-ws-reconnect" -FilePath $pushGateway -Port 11599 -Env (Add-PushRedisEnv (Add-PushAuthEnv @{
+            $processes += Start-NexusProcess -Name "push-gateway-ws-reconnect" -FilePath $pushGateway -Port 11599 -Env (Add-PushWSTLSEnv -Env (Add-PushRedisEnv (Add-PushAuthEnv @{
                 NEXUSIM_PUSH_GATEWAY_MODE = "ws"
                 NEXUSIM_PUSH_WS_ADDR = "127.0.0.1:11599"
                 NEXUSIM_DELIVERY_GRPC_ADDR = "127.0.0.1:11597"
@@ -564,7 +609,7 @@ try {
                 NEXUSIM_PUSH_ROUTE_BACKEND = "redis"
                 NEXUSIM_PUSH_GATEWAY_ID = $pushReconnectGatewayID
                 NEXUSIM_PUSH_ROUTE_TTL = "90s"
-            }))
+            })) -DebugAddr $(if ($pushWsTlsEnabled) { "127.0.0.1:11603" } else { "" }))
         }
         $processes += Start-NexusProcess -Name "push-gateway-consumer" -FilePath $pushGateway -Env (Add-PushRedisEnv @{
             NEXUSIM_PUSH_GATEWAY_MODE = "delivery-consumer"
@@ -589,7 +634,7 @@ try {
             })
         }
     } else {
-        $processes += Start-NexusProcess -Name "push-gateway" -FilePath $pushGateway -Port 11598 -Env (Add-PushAuthEnv @{
+        $processes += Start-NexusProcess -Name "push-gateway" -FilePath $pushGateway -Port 11598 -Env (Add-PushWSTLSEnv -Env (Add-PushAuthEnv @{
             NEXUSIM_PUSH_GATEWAY_MODE = "all"
             NEXUSIM_PUSH_WS_ADDR = "127.0.0.1:11598"
             NEXUSIM_DELIVERY_GRPC_ADDR = "127.0.0.1:11597"
@@ -602,7 +647,7 @@ try {
             NEXUSIM_PUSH_SESSION_QUEUE_SIZE = $pushSessionQueueSize
             NEXUSIM_PUSH_WRITE_TIMEOUT = $pushWriteTimeout
             NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
-        })
+        }) -DebugAddr $(if ($pushWsTlsEnabled) { "127.0.0.1:11602" } else { "" }))
     }
 
     $processes += Start-NexusProcess -Name "message-grpc" -FilePath $messageService -Port 11595 -Env @{
@@ -614,14 +659,14 @@ try {
         NEXUSIM_MOCK_PERMISSION_VERSION = "2"
     }
 
-    $reconnectPushURL = if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover" -or $Scenario -eq "redis-sentinel-master-stop") { "ws://127.0.0.1:11599" } else { "ws://127.0.0.1:11598" }
-    $reconnectMetricsURL = if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover" -or $Scenario -eq "redis-sentinel-master-stop") { "http://127.0.0.1:11599/debug/metrics" } else { "" }
+    $reconnectPushURL = if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover" -or $Scenario -eq "redis-sentinel-master-stop") { $pushReconnectURL } else { $pushURL }
+    $reconnectMetricsURL = if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover" -or $Scenario -eq "redis-sentinel-master-stop") { $pushReconnectMetricsURL } else { "" }
     $consumerMetricsURL = if ($RouteBackend -eq "redis") { "http://127.0.0.1:11600/debug/metrics" } else { "" }
     $runnerArgs = @(
         "--conversation-target", "127.0.0.1:11596",
         "--message-target", "127.0.0.1:11595",
         "--delivery-target", "127.0.0.1:11597",
-        "--push-url", "ws://127.0.0.1:11598",
+        "--push-url", $pushURL,
         "--reconnect-push-url", $reconnectPushURL,
         "--pg-dsn", $PgDsn,
         "--result-dir", $resultDir,
@@ -635,7 +680,7 @@ try {
         "--message-change-action", $MessageChangeAction,
         "--identity-revoke-scope", $IdentityRevokeScope,
         "--slow-message-count", [string]$SlowMessageCount,
-        "--push-metrics-url", "http://127.0.0.1:11598/debug/metrics",
+        "--push-metrics-url", $pushMetricsURL,
         "--route-backend", $RouteBackend,
         "--push-auth-mode", $PushAuthMode,
         "--push-auth-hmac-secret", $PushAuthHmacSecret,
@@ -701,6 +746,18 @@ try {
     }
     if (-not [string]::IsNullOrWhiteSpace($IdentityTlsClientKeyFile)) {
         $runnerArgs += @("--identity-tls-client-key-file", $IdentityTlsClientKeyFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PushTlsCaFile)) {
+        $runnerArgs += @("--push-tls-ca-file", $PushTlsCaFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PushTlsServerName)) {
+        $runnerArgs += @("--push-tls-server-name", $PushTlsServerName)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PushTlsClientCertFile)) {
+        $runnerArgs += @("--push-tls-client-cert-file", $PushTlsClientCertFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PushTlsClientKeyFile)) {
+        $runnerArgs += @("--push-tls-client-key-file", $PushTlsClientKeyFile)
     }
     if ($RedisFaultCommand) {
         $runnerArgs += @("--redis-fault-command", $RedisFaultCommand)

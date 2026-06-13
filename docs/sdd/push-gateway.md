@@ -558,6 +558,19 @@ NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE=...
 
 配置任一 `NEXUSIM_DELIVERY_SERVICE_TLS_*` 后必须提供 CA file，client cert/key 必须成对配置。该能力只覆盖 push-gateway 到 delivery-service 的 ACK RPC client，不代表证书签发 / 轮换 / 分发、动态服务身份治理或全服务 mTLS rollout 已完成。
 
+默认情况下，push-gateway WebSocket listener 使用 plaintext `ws://`。若需要第一阶段静态 WSS / mTLS，可配置：
+
+```text
+NEXUSIM_PUSH_WS_TLS_CERT_FILE=...
+NEXUSIM_PUSH_WS_TLS_KEY_FILE=...
+NEXUSIM_PUSH_WS_TLS_CLIENT_CA_FILE=...
+NEXUSIM_PUSH_WS_TLS_REQUIRE_CLIENT_CERT=true
+NEXUSIM_PUSH_WS_TLS_CLIENT_ALLOWED_DNS_NAMES=desktop-client.nexusim.local
+NEXUSIM_PUSH_WS_TLS_CLIENT_ALLOWED_URIS=spiffe://nexusim/desktop-client
+```
+
+配置 cert/key 后 WebSocket server 使用 `ListenAndServeTLS`；配置 client CA、显式 require client cert 或客户端身份 allowlist 后启用 mTLS。allowlist 只做 exact-match DNS SAN / URI SAN，不做动态服务身份发现、证书签发、轮换、分发或浏览器证书 UX。
+
 HMAC gateway token 可选参数：
 
 ```text

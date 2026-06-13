@@ -50,6 +50,19 @@ NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE=...
 
 配置任一 TLS env 后必须提供 CA file，client cert/key 必须成对配置。现有 smoke 默认不启用这些参数；该配置只验证静态证书下的 RPC 加密 / mTLS 连接，不代表证书签发、轮换、分发或全服务 mTLS rollout。
 
+push-gateway WebSocket 入口默认仍使用 plaintext `ws://`，兼容本地 smoke。若需要第一阶段静态 WSS / mTLS，可配置：
+
+```text
+NEXUSIM_PUSH_WS_TLS_CERT_FILE=...
+NEXUSIM_PUSH_WS_TLS_KEY_FILE=...
+NEXUSIM_PUSH_WS_TLS_CLIENT_CA_FILE=...
+NEXUSIM_PUSH_WS_TLS_REQUIRE_CLIENT_CERT=true
+NEXUSIM_PUSH_WS_TLS_CLIENT_ALLOWED_DNS_NAMES=desktop-client.nexusim.local
+NEXUSIM_PUSH_WS_TLS_CLIENT_ALLOWED_URIS=spiffe://nexusim/desktop-client
+```
+
+配置 cert/key 后 WebSocket listener 使用 `ListenAndServeTLS`。配置 client CA、`REQUIRE_CLIENT_CERT=true` 或 client identity allowlist 后要求并校验客户端证书；allowlist 只做 exact-match DNS SAN / URI SAN。该能力不包含证书签发、轮换、分发、浏览器证书 UX 或动态服务身份治理。
+
 `loadtest/pushgateway` 自身调用 conversation / message / delivery / identity gRPC 时也默认 plaintext。若这些服务端在外部或双机 smoke 中启用 TLS / mTLS，可给 smoke runner 传入对应 client 参数：
 
 ```powershell
@@ -72,7 +85,19 @@ NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE=...
   -IdentityTlsClientKeyFile .\certs\loadtest-client.key
 ```
 
-这些参数只覆盖 smoke runner 到四个 gRPC server 的静态 TLS / mTLS 连接，不覆盖 WebSocket TLS，也不改变 push-gateway 进程自身的 `AckDelivery` 出站 TLS env。
+若本地 push-gateway WebSocket 进程启用 WSS，runner 也支持对应 client 参数：
+
+```powershell
+.\loadtest\pushgateway\run-local-smoke.ps1 `
+  -PushWsTlsCertFile .\certs\push-ws.crt `
+  -PushWsTlsKeyFile .\certs\push-ws.key `
+  -PushTlsCaFile .\certs\ca.pem `
+  -PushTlsServerName push-gateway.nexusim.local `
+  -PushTlsClientCertFile .\certs\desktop-client.crt `
+  -PushTlsClientKeyFile .\certs\desktop-client.key
+```
+
+`-PushWsTls*` 参数控制 push-gateway WebSocket server；`-PushTls*` 参数控制 smoke runner WebSocket client。启用 WSS 时，脚本会给 push-gateway 额外开一个 plaintext debug metrics listener，避免自签 WSS 影响 `/debug/metrics` 读取。上述参数不改变 push-gateway 进程自身的 `AckDelivery` 出站 TLS env。
 
 `all` 模式只用于第一阶段本地 smoke：WebSocket handler 和 `im.delivery.events` consumer 共享同一个进程内 session registry。默认 route backend 仍是 memory；跨实例在线路由需要启用 Redis route。
 

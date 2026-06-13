@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -160,13 +163,17 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 		mux.HandleFunc("/debug/metrics", metricsHandler)
 		mux.Handle("/", server)
 		wsAddr = envString("NEXUSIM_PUSH_WS_ADDR", "0.0.0.0:10496")
-		startHTTPServer(ctx, errs, "websocket", wsAddr, mux)
+		wsTLSConfig, _, err := pushWSTLSConfigFromEnv()
+		if err != nil {
+			return err
+		}
+		startHTTPServer(ctx, errs, "websocket", wsAddr, mux, wsTLSConfig)
 	}
 
 	if debugAddr := envString("NEXUSIM_PUSH_DEBUG_ADDR", ""); debugAddr != "" && debugAddr != wsAddr {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/debug/metrics", metricsHandler)
-		startHTTPServer(ctx, errs, "debug metrics", debugAddr, mux)
+		startHTTPServer(ctx, errs, "debug metrics", debugAddr, mux, nil)
 	}
 
 	if enableDeliveryConsumer {
@@ -281,15 +288,21 @@ func newRedisUniversalClient(config redisClientConfig) (redis.UniversalClient, e
 	}
 }
 
-func startHTTPServer(ctx context.Context, errs chan<- error, name string, addr string, handler http.Handler) {
+func startHTTPServer(ctx context.Context, errs chan<- error, name string, addr string, handler http.Handler, tlsConfig *tls.Config) {
 	httpServer := &http.Server{
 		Addr:              addr,
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
+		TLSConfig:         tlsConfig,
 	}
 	go func() {
 		log.Printf("push-gateway %s started on %s", name, httpServer.Addr)
-		err := httpServer.ListenAndServe()
+		var err error
+		if tlsConfig != nil {
+			err = httpServer.ListenAndServeTLS("", "")
+		} else {
+			err = httpServer.ListenAndServe()
+		}
 		if errors.Is(err, http.ErrServerClosed) {
 			err = context.Canceled
 		}
@@ -330,6 +343,79 @@ func authenticatorJWKStats(authenticator *authinfra.Authenticator) *authinfra.JW
 		return nil
 	}
 	return &stats
+}
+
+func pushWSTLSConfigFromEnv() (*tls.Config, bool, error) {
+	certFile := strings.TrimSpace(os.Getenv("NEXUSIM_PUSH_WS_TLS_CERT_FILE"))
+	keyFile := strings.TrimSpace(os.Getenv("NEXUSIM_PUSH_WS_TLS_KEY_FILE"))
+	clientCAFile := strings.TrimSpace(os.Getenv("NEXUSIM_PUSH_WS_TLS_CLIENT_CA_FILE"))
+	allowedClientDNSNames := envStringSet("NEXUSIM_PUSH_WS_TLS_CLIENT_ALLOWED_DNS_NAMES", strings.ToLower)
+	allowedClientURIs, err := envURIStringSet("NEXUSIM_PUSH_WS_TLS_CLIENT_ALLOWED_URIS")
+	if err != nil {
+		return nil, true, err
+	}
+	requireClientCert, requireClientCertConfigured, err := envOptionalBool("NEXUSIM_PUSH_WS_TLS_REQUIRE_CLIENT_CERT")
+	if err != nil {
+		return nil, true, err
+	}
+	hasClientAllowlist := len(allowedClientDNSNames) > 0 || len(allowedClientURIs) > 0
+	requireClientCert = clientCAFile != "" || hasClientAllowlist || (requireClientCertConfigured && requireClientCert)
+	if certFile == "" && keyFile == "" && clientCAFile == "" && !requireClientCert && !hasClientAllowlist {
+		return nil, false, nil
+	}
+	if certFile == "" || keyFile == "" {
+		return nil, true, errors.New("NEXUSIM_PUSH_WS_TLS_CERT_FILE and NEXUSIM_PUSH_WS_TLS_KEY_FILE must be configured together")
+	}
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, true, err
+	}
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12,
+	}
+	if requireClientCert {
+		if clientCAFile == "" {
+			return nil, true, errors.New("NEXUSIM_PUSH_WS_TLS_CLIENT_CA_FILE is required when client certificates are required")
+		}
+		pemBytes, err := os.ReadFile(clientCAFile)
+		if err != nil {
+			return nil, true, err
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(pemBytes) {
+			return nil, true, errors.New("NEXUSIM_PUSH_WS_TLS_CLIENT_CA_FILE does not contain a valid PEM certificate")
+		}
+		tlsConfig.ClientCAs = pool
+		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+		if hasClientAllowlist {
+			tlsConfig.VerifyConnection = verifyAllowedPushWSClient(allowedClientDNSNames, allowedClientURIs)
+		}
+	}
+	return tlsConfig, true, nil
+}
+
+func verifyAllowedPushWSClient(allowedDNSNames map[string]struct{}, allowedURIs map[string]struct{}) func(tls.ConnectionState) error {
+	return func(state tls.ConnectionState) error {
+		if len(state.PeerCertificates) == 0 {
+			return errors.New("push websocket client certificate is required")
+		}
+		cert := state.PeerCertificates[0]
+		for _, dnsName := range cert.DNSNames {
+			if _, ok := allowedDNSNames[strings.ToLower(strings.TrimSpace(dnsName))]; ok {
+				return nil
+			}
+		}
+		for _, uri := range cert.URIs {
+			if uri == nil {
+				continue
+			}
+			if _, ok := allowedURIs[uri.String()]; ok {
+				return nil
+			}
+		}
+		return errors.New("push websocket client certificate identity is not allowed")
+	}
 }
 
 func deliveryClientTLSConfigFromEnv() (rpcinfra.DeliveryClientTLSConfig, error) {
@@ -381,6 +467,60 @@ func envIntAllowZero(name string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func envStringSet(name string, normalize func(string) string) map[string]struct{} {
+	values := make(map[string]struct{})
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return values
+	}
+	for _, item := range strings.Split(raw, ",") {
+		value := strings.TrimSpace(item)
+		if value == "" {
+			continue
+		}
+		if normalize != nil {
+			value = normalize(value)
+		}
+		values[value] = struct{}{}
+	}
+	return values
+}
+
+func envURIStringSet(name string) (map[string]struct{}, error) {
+	values := make(map[string]struct{})
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return values, nil
+	}
+	for _, item := range strings.Split(raw, ",") {
+		value := strings.TrimSpace(item)
+		if value == "" {
+			continue
+		}
+		parsed, err := url.Parse(value)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			return nil, errors.New(name + " contains an invalid URI")
+		}
+		values[parsed.String()] = struct{}{}
+	}
+	return values, nil
+}
+
+func envOptionalBool(name string) (bool, bool, error) {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv(name)))
+	if value == "" {
+		return false, false, nil
+	}
+	switch value {
+	case "1", "true", "yes", "y", "on":
+		return true, true, nil
+	case "0", "false", "no", "n", "off":
+		return false, true, nil
+	default:
+		return false, true, errors.New(name + " must be a boolean")
+	}
 }
 
 func envDuration(name string, fallback time.Duration) time.Duration {

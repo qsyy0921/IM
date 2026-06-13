@@ -183,23 +183,30 @@ func TestGatewayDoesNotExposeGetSendContext(t *testing.T) {
 	}
 }
 
-func TestGatewayFacadeRegistrationExcludesInternalMethods(t *testing.T) {
+func TestGatewayDefaultRegistrationKeepsLegacyDescriptors(t *testing.T) {
 	grpcServer := grpc.NewServer()
 	Register(grpcServer, NewServer(Config{}))
 
 	info := grpcServer.GetServiceInfo()
-	facade, ok := info["nexusim.gateway.v1.GatewayService"]
-	if !ok {
-		t.Fatalf("expected gateway facade service to be registered")
-	}
-	if _, ok := info["nexusim.conversation.v1.ConversationService"]; !ok {
-		t.Fatalf("expected legacy conversation service descriptor to remain registered")
-	}
-	for _, method := range facade.Methods {
-		if method.Name == "GetSendContext" {
-			t.Fatalf("gateway facade must not expose internal GetSendContext method")
-		}
-	}
+	assertServiceRegistered(t, info, "nexusim.gateway.v1.GatewayService")
+	assertServiceRegistered(t, info, "nexusim.conversation.v1.ConversationService")
+	assertServiceRegistered(t, info, "nexusim.message.v1.MessageService")
+	assertServiceRegistered(t, info, "nexusim.delivery.v1.DeliveryService")
+	assertServiceRegistered(t, info, "nexusim.receipt.v1.ReceiptService")
+	assertGatewayFacadeExcludesInternalMethods(t, info)
+}
+
+func TestGatewayCanDisableLegacyDescriptors(t *testing.T) {
+	grpcServer := grpc.NewServer()
+	RegisterWithConfig(grpcServer, NewServer(Config{}), RegisterConfig{RegisterLegacyDescriptors: false})
+
+	info := grpcServer.GetServiceInfo()
+	assertServiceRegistered(t, info, "nexusim.gateway.v1.GatewayService")
+	assertServiceNotRegistered(t, info, "nexusim.conversation.v1.ConversationService")
+	assertServiceNotRegistered(t, info, "nexusim.message.v1.MessageService")
+	assertServiceNotRegistered(t, info, "nexusim.delivery.v1.DeliveryService")
+	assertServiceNotRegistered(t, info, "nexusim.receipt.v1.ReceiptService")
+	assertGatewayFacadeExcludesInternalMethods(t, info)
 }
 
 func assertOutgoingMetadata(t *testing.T, ctx context.Context, expected map[string]string) {
@@ -213,6 +220,33 @@ func assertOutgoingMetadata(t *testing.T, ctx context.Context, expected map[stri
 		if len(values) == 0 || values[0] != value {
 			t.Fatalf("expected metadata %s=%q, got %v", key, value, values)
 		}
+	}
+}
+
+func assertGatewayFacadeExcludesInternalMethods(t *testing.T, info map[string]grpc.ServiceInfo) {
+	t.Helper()
+	facade, ok := info["nexusim.gateway.v1.GatewayService"]
+	if !ok {
+		t.Fatalf("expected gateway facade service to be registered")
+	}
+	for _, method := range facade.Methods {
+		if method.Name == "GetSendContext" {
+			t.Fatalf("gateway facade must not expose internal GetSendContext method")
+		}
+	}
+}
+
+func assertServiceRegistered(t *testing.T, info map[string]grpc.ServiceInfo, service string) {
+	t.Helper()
+	if _, ok := info[service]; !ok {
+		t.Fatalf("expected %s to be registered", service)
+	}
+}
+
+func assertServiceNotRegistered(t *testing.T, info map[string]grpc.ServiceInfo, service string) {
+	t.Helper()
+	if _, ok := info[service]; ok {
+		t.Fatalf("expected %s not to be registered", service)
 	}
 }
 

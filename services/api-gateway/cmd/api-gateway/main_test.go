@@ -269,6 +269,35 @@ func TestNewRateLimiterFromEnvRedisBackend(t *testing.T) {
 	}
 }
 
+func TestAPIGatewayRegisterLegacyDescriptorsDefaultsToTrue(t *testing.T) {
+	t.Setenv("NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS", "")
+	enabled, err := apiGatewayRegisterLegacyDescriptors()
+	if err != nil {
+		t.Fatalf("load register legacy descriptors config: %v", err)
+	}
+	if !enabled {
+		t.Fatalf("expected legacy descriptor registration to default to true")
+	}
+}
+
+func TestAPIGatewayRegisterLegacyDescriptorsCanBeDisabled(t *testing.T) {
+	t.Setenv("NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS", "false")
+	enabled, err := apiGatewayRegisterLegacyDescriptors()
+	if err != nil {
+		t.Fatalf("load register legacy descriptors config: %v", err)
+	}
+	if enabled {
+		t.Fatalf("expected legacy descriptor registration to be disabled")
+	}
+}
+
+func TestAPIGatewayRegisterLegacyDescriptorsRejectsInvalidValue(t *testing.T) {
+	t.Setenv("NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS", "sometimes")
+	if _, err := apiGatewayRegisterLegacyDescriptors(); err == nil {
+		t.Fatalf("expected invalid legacy descriptor registration config to fail")
+	}
+}
+
 func TestNewRedisUniversalClientRequiresSentinelConfig(t *testing.T) {
 	if _, err := newRedisUniversalClient(redisClientConfig{Mode: "sentinel"}); err == nil {
 		t.Fatalf("expected sentinel mode without master name to fail")

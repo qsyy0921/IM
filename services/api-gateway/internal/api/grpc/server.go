@@ -56,6 +56,10 @@ type Config struct {
 	Receipt       receiptv1.ReceiptServiceClient
 }
 
+type RegisterConfig struct {
+	RegisterLegacyDescriptors bool
+}
+
 func NewServer(config Config) *Server {
 	return &Server{
 		auth:         config.Authenticator,
@@ -67,7 +71,14 @@ func NewServer(config Config) *Server {
 }
 
 func Register(server grpcgo.ServiceRegistrar, gateway *Server) {
+	RegisterWithConfig(server, gateway, RegisterConfig{RegisterLegacyDescriptors: true})
+}
+
+func RegisterWithConfig(server grpcgo.ServiceRegistrar, gateway *Server, config RegisterConfig) {
 	gatewayv1.RegisterGatewayServiceServer(server, gateway)
+	if !config.RegisterLegacyDescriptors {
+		return
+	}
 	conversationv1.RegisterConversationServiceServer(server, gateway)
 	messagev1.RegisterMessageServiceServer(server, gateway)
 	deliveryv1.RegisterDeliveryServiceServer(server, gateway)

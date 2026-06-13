@@ -19,7 +19,7 @@ Set-Location $repo
 . .\tools\go-env.ps1
 
 if ([string]::IsNullOrWhiteSpace($RunName)) {
-    $RunName = "e2e-demo-api-gateway-facade-secure-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+    $RunName = "e2e-demo-api-gateway-facade-only-secure-" + (Get-Date -Format "yyyyMMdd-HHmmss")
 }
 $safeRunName = $RunName -replace '[^a-zA-Z0-9_-]', '-'
 if ([string]::IsNullOrWhiteSpace($TenantId)) {
@@ -599,6 +599,7 @@ try {
         NEXUSIM_API_GATEWAY_AUTH_MODE = "hmac"
         NEXUSIM_API_GATEWAY_AUTH_HMAC_SECRET = $gatewayAuthSecret
         NEXUSIM_API_GATEWAY_AUTH_AUDIENCE = "api-gateway"
+        NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS = "false"
         NEXUSIM_API_GATEWAY_CONVERSATION_ADDR = $conversationTarget
         NEXUSIM_API_GATEWAY_CONVERSATION_TLS_CA_FILE = $ca.Cert
         NEXUSIM_API_GATEWAY_CONVERSATION_TLS_SERVER_NAME = "conversation-service.nexusim.local"

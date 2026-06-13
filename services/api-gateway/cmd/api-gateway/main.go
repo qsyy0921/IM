@@ -122,7 +122,13 @@ func runGRPC() error {
 		serverOptions = append(serverOptions, grpcgo.Creds(creds))
 	}
 	server := grpcgo.NewServer(serverOptions...)
-	apigrpc.Register(server, gateway)
+	registerLegacyDescriptors, err := apiGatewayRegisterLegacyDescriptors()
+	if err != nil {
+		return err
+	}
+	apigrpc.RegisterWithConfig(server, gateway, apigrpc.RegisterConfig{
+		RegisterLegacyDescriptors: registerLegacyDescriptors,
+	})
 
 	addr := envString("NEXUSIM_API_GATEWAY_GRPC_ADDR", "0.0.0.0:12000")
 	listener, err := net.Listen("tcp", addr)
@@ -174,6 +180,17 @@ func startDebugServer(ctx context.Context, addr string, handler http.Handler) (f
 
 func apiGatewayDebugAddr() string {
 	return envString("NEXUSIM_API_GATEWAY_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
+}
+
+func apiGatewayRegisterLegacyDescriptors() (bool, error) {
+	value, configured, err := envOptionalBool("NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS")
+	if err != nil {
+		return false, err
+	}
+	if !configured {
+		return true, nil
+	}
+	return value, nil
 }
 
 func dialBackend(addr string, tlsConfig grpcClientTLSConfig) (*grpcgo.ClientConn, error) {

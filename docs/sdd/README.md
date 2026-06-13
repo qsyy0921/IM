@@ -37,7 +37,7 @@
 
 | 服务 / 设计 | 状态 | 对编码的影响 |
 | --- | --- | --- |
-| `message-service` | SDD 已冻结 v1.0 | 可以开始 `SendMessage` 普通会话写入链路 |
+| `message-service` | SDD 已冻结 v1.0；Send/Edit/Revoke/Delete、adaptive admission、policy/conversation RPC adapter、outbox relay 和第一阶段 gRPC TLS / mTLS server config 已落地 | 继续保持消息事实源边界；server TLS 默认 plaintext，证书签发 / 轮换 / 分发、动态服务身份和全服务 mTLS rollout 仍是后续项 |
 | `timeline-service / sequencer` | SDD 未完成 | 不阻塞 `LOCAL_ROW_LOCK`；阻塞热点会话生产实现 |
 | `conversation-service / send context` | SDD v0.1 已存在 | 可以实现 `GetSendContext` 读取路径，替换 message-service strict conversation mock |
 | `conversation-service / member_change_saga` | SDD 已冻结 v1.0；proto / schema / migration v2 / relay builder / 最小 `CreateMemberChange` 写路径、saga publish 状态推进、full smoke 和当前 ACTIVE 成员 `ListConversationMembers` 读接口已落地；`LEAVE / REMOVE` 后 roster 过滤和 `ROLE_CHANGED` 后 role 更新 smoke 已覆盖 | 后续补 DLQ repair、admin-only 成员历史查询、更完整权限负例和生产韧性 |

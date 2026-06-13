@@ -78,6 +78,7 @@
 - 送达 / 已读回执。
 - 会话列表 / 未读数 / 置顶 / 归档 / 静音。
 - 编辑 / 撤回 / 删除。
+- message-service 补充：gRPC server 已补第一阶段静态 TLS / mTLS 配置，支持 client DNS / URI SAN exact-match allowlist；作为 client 调 policy-service / conversation-service 的 TLS 配置也已存在。默认仍是 plaintext，当前不包含证书签发 / 轮换 / 分发、动态服务身份治理或全服务 mTLS rollout。
 - 群成员列表、owner transfer、群管理规则。
 - 联系人 / 好友关系 / 申请列表 / 取消申请 / 拉黑 / 删除 / 备注。
 - contacts-service 补充：gRPC server 已补第一阶段静态 TLS / mTLS 配置，支持 client DNS / URI SAN exact-match allowlist；默认仍是 plaintext，当前不包含证书签发 / 轮换 / 分发、动态服务身份治理或全服务 mTLS rollout。

@@ -827,6 +827,19 @@ outbox_publish_duplicate_rate 可观测但不作为错误
 
 ## 14. Runbook
 
+gRPC server 支持第一阶段静态 TLS / mTLS 配置：
+
+```text
+NEXUSIM_MESSAGE_GRPC_TLS_CERT_FILE=certs/message-server.crt
+NEXUSIM_MESSAGE_GRPC_TLS_KEY_FILE=certs/message-server.key
+NEXUSIM_MESSAGE_GRPC_TLS_CLIENT_CA_FILE=certs/api-gateway-client-ca.crt
+NEXUSIM_MESSAGE_GRPC_TLS_REQUIRE_CLIENT_CERT=true
+NEXUSIM_MESSAGE_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES=api-gateway.nexusim.local
+NEXUSIM_MESSAGE_GRPC_TLS_CLIENT_ALLOWED_URIS=spiffe://nexusim/api-gateway
+```
+
+默认仍是 plaintext，兼容本地压测和旧 runner。该配置只覆盖 message-service server transport security，不负责证书签发、轮换、跨主机分发、动态 SPIFFE 身份治理或全服务 mTLS rollout。
+
 | 告警 | 排查顺序 | 修复 |
 | --- | --- | --- |
 | `SendMessage p99` 升高 | PG lock -> seq alloc -> outbox insert -> policy latency | 扩容、限流、热点升级 |

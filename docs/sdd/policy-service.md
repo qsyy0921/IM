@@ -52,6 +52,8 @@ NEXUSIM_POLICY_DENY_REASON=
 NEXUSIM_POLICY_RULES_ENABLED=false
 NEXUSIM_PG_DSN=
 NEXUSIM_POLICY_PG_MAX_CONNS=
+NEXUSIM_POLICY_DEBUG_ADDR=
+NEXUSIM_DEBUG_ADDR=
 
 NEXUSIM_POLICY_SERVICE_ADDR=127.0.0.1:10800
 NEXUSIM_POLICY_RPC_TIMEOUT=30ms
@@ -82,6 +84,24 @@ message-service continues to call only its `PolicyCheckPort`. It does not import
 
 The adapter validates that policy-service response tenant, user, conversation, message id and action match the request, and rejects empty `classification` or non-positive `permission_version` as dependency errors. This prevents a mixed-version or buggy policy-service from silently corrupting message timeline metadata. Transport-level `PermissionDenied` from the policy RPC is treated as dependency failure; business deny must use gRPC OK with `allowed=false`.
 
+The adapter forwards trace id and request id as gRPC metadata when they are present in the message-service auth context. policy-service uses them only for structured request logs. They are not metrics labels and are not part of the policy decision contract.
+
+## Observability
+
+When `NEXUSIM_POLICY_DEBUG_ADDR` is set, policy-service exposes:
+
+```text
+/healthz
+/readyz
+/debug/metrics
+```
+
+The debug metrics include aggregate gRPC request counts and status codes, aggregate policy decision counts, per-action aggregate decision counts, optional PostgreSQL pool stats and optional exact-rule-store row counts. They intentionally do not expose tenant id, user id, conversation id, message id, device id, session id, request / response payloads, raw rule parameters, deny reason text, classification strings, DSNs or SQL error text.
+
+`allowed=false` is counted as a decision deny, while the gRPC method remains `codes.OK`. Transport errors are counted separately.
+
+This is a local debug surface. It is not a replacement for production OpenTelemetry traces, Prometheus deployment, alert rules or durable policy audit.
+
 ## Limitations
 
 - First implementation still supports static environment configuration.
@@ -90,5 +110,6 @@ The adapter validates that policy-service response tenant, user, conversation, m
 - No conversation role / owner / admin policy is implemented yet.
 - No tenant policy, content moderation, risk scoring, rate limiting or audit outbox is implemented yet.
 - No mTLS client/server config is implemented for policy-service yet.
+- No production OpenTelemetry / Prometheus / alerting rollout is implemented yet.
 
 These are future production hardening steps; the current value is extracting the policy boundary and replacing message-service internal policy rules with an optional real service dependency.

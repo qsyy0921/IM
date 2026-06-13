@@ -11,10 +11,13 @@ Implemented:
 - Optional exact-match PostgreSQL message action rule store through `NEXUSIM_POLICY_RULES_ENABLED=true`.
 - Optional message-service RPC adapter through `NEXUSIM_POLICY_SERVICE_ADDR`.
 - message-service fallback to legacy `StaticPolicy` when no policy-service address is configured.
+- Optional debug server through `NEXUSIM_POLICY_DEBUG_ADDR` with `/healthz`, `/readyz`, `/debug/metrics`, aggregate gRPC metrics, aggregate decision metrics and PostgreSQL rule-store summaries.
+- message-service policy RPC trace / request metadata propagation for policy-service structured gRPC logs.
 - Direct gRPC allow/deny smoke for `SEND`, `EDIT`, `REVOKE`, and `DELETE`: `loadtest-report-20260613-policy-service-smoke.md`.
 - message-service `SendMessage` allow/deny integration smoke through `NEXUSIM_POLICY_SERVICE_ADDR`: `loadtest-report-20260613-policy-message-integration-smoke.md`.
 - message-service `SendMessage` allow/deny integration smoke through PostgreSQL-backed exact policy rules: `loadtest-report-20260613-policy-message-rule-store-smoke.md`.
 - message-service `EditMessage` / `RevokeMessage` / `DeleteMessage` allow/deny integration smoke through PostgreSQL-backed exact policy rules: `loadtest-report-20260613-policy-message-actions-rule-store-smoke.md`.
+- policy-service observability smoke for gRPC and decision metrics: `loadtest-report-20260613-policy-service-observability-smoke.md`.
 
 Not yet implemented:
 
@@ -23,7 +26,7 @@ Not yet implemented:
 - tenant-level policy;
 - content moderation / risk scoring;
 - policy audit outbox;
-- policy-service mTLS and production observability.
+- policy-service mTLS, OpenTelemetry, Prometheus deployment and production alerting.
 
 ## Local Smoke Shape
 
@@ -80,3 +83,5 @@ policy-service grpc
 When testing through `message-service`, keep the policy permission version aligned with conversation permission version to avoid expected dependency-version mismatch. The integration smoke intentionally sets local mock policy opposite to remote policy decision so fallback cannot produce a false positive. Do not treat these smokes as proof of contacts / role / tenant / risk policy behavior.
 
 The rule-store smoke also sets local static fallback opposite to the seeded PostgreSQL rule. That makes a rule miss visible: allow would become deny, and deny would become an unexpected write.
+
+The observability smoke reads `/debug/metrics` after both allow and deny scenarios. Metrics are aggregate debug snapshots only: they do not expose tenant id, user id, conversation id, message id, policy request bodies, rule parameters, deny reason text or classification strings. Trace id and request id are propagated for structured gRPC logs, not as metrics labels.

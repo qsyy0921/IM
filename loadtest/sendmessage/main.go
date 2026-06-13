@@ -24,27 +24,38 @@ import (
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+const (
+	metadataTenantID  = "x-nexusim-tenant-id"
+	metadataUserID    = "x-nexusim-user-id"
+	metadataDeviceID  = "x-nexusim-device-id"
+	metadataSessionID = "x-nexusim-session-id"
+	metadataTraceID   = "x-nexusim-trace-id"
+	metadataRequestID = "x-nexusim-request-id"
+)
+
 type config struct {
-	Target             string
-	VUs                int
-	Duration           time.Duration
-	ResultDir          string
-	RequestTimeout     time.Duration
-	StatsWait          time.Duration
-	TenantID           string
-	ConversationPrefix string
-	ConversationCount  int
-	PGDSN              string
-	ServiceMetricsURL  string
-	RelayMetricsURL    string
-	RetryOverloaded    bool
-	MaxRetries         int
-	RetryJitter        time.Duration
-	MessageTLS         grpctls.Config
+	Target               string
+	VUs                  int
+	Duration             time.Duration
+	ResultDir            string
+	RequestTimeout       time.Duration
+	StatsWait            time.Duration
+	TenantID             string
+	ConversationPrefix   string
+	ConversationCount    int
+	PGDSN                string
+	ServiceMetricsURL    string
+	RelayMetricsURL      string
+	RetryOverloaded      bool
+	MaxRetries           int
+	RetryJitter          time.Duration
+	MessageTLS           grpctls.Config
+	VerifiedAuthMetadata bool
 }
 
 type sample struct {
@@ -71,6 +82,7 @@ type summary struct {
 	Target                                string                     `json:"target"`
 	Targets                               []string                   `json:"targets,omitempty"`
 	MessageTLSEnabled                     bool                       `json:"message_tls_enabled"`
+	VerifiedAuthMetadata                  bool                       `json:"verified_auth_metadata"`
 	TenantID                              string                     `json:"tenant_id"`
 	VUs                                   int                        `json:"vus"`
 	Duration                              string                     `json:"duration"`
@@ -473,6 +485,7 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	flags.BoolVar(&cfg.RetryOverloaded, "retry-overloaded", envBool(getenv, "NEXUSIM_RETRY_OVERLOADED", false), "retry SERVICE_OVERLOADED using gRPC RetryInfo")
 	flags.IntVar(&cfg.MaxRetries, "max-retries", envInt(getenv, "NEXUSIM_MAX_RETRIES", 0), "max retry attempts for one logical request when --retry-overloaded is enabled")
 	flags.DurationVar(&cfg.RetryJitter, "retry-jitter", envDurationAllowZero(getenv, "NEXUSIM_RETRY_JITTER", 0), "max deterministic jitter added to overload retry delay")
+	flags.BoolVar(&cfg.VerifiedAuthMetadata, "verified-auth-metadata", envBool(getenv, "NEXUSIM_SENDMESSAGE_VERIFIED_AUTH_METADATA", false), "send gateway verified identity through message-service gRPC metadata")
 	flags.StringVar(&cfg.MessageTLS.CAFile, "message-tls-ca-file", envString(getenv, "NEXUSIM_MESSAGE_TLS_CA_FILE", ""), "CA PEM for message-service gRPC TLS")
 	flags.StringVar(&cfg.MessageTLS.ServerName, "message-tls-server-name", envString(getenv, "NEXUSIM_MESSAGE_TLS_SERVER_NAME", ""), "override server name for message-service gRPC TLS")
 	flags.StringVar(&cfg.MessageTLS.ClientCertFile, "message-tls-client-cert-file", envString(getenv, "NEXUSIM_MESSAGE_TLS_CLIENT_CERT_FILE", ""), "client certificate PEM for message-service gRPC mTLS")
@@ -536,6 +549,7 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 				retried := false
 				for attempt := 0; ; attempt++ {
 					requestCtx, requestCancel := context.WithTimeout(ctx, cfg.RequestTimeout)
+					requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, request.GetAuthContext())
 					before := time.Now()
 					_, err := targetClient.Client.SendMessage(requestCtx, request)
 					latency := time.Since(before)
@@ -703,6 +717,7 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 		Target:                          cfg.Target,
 		Targets:                         clientTargets(clients),
 		MessageTLSEnabled:               cfg.MessageTLS.Enabled(),
+		VerifiedAuthMetadata:            cfg.VerifiedAuthMetadata,
 		TenantID:                        cfg.TenantID,
 		VUs:                             cfg.VUs,
 		Duration:                        cfg.Duration.String(),
@@ -797,6 +812,27 @@ func executeLoad(ctx context.Context, cfg config, clients []loadClient) (summary
 		OutboxCommitP95MS:               nil,
 		OutboxCommitP99MS:               nil,
 	}, nil
+}
+
+func withVerifiedAuthMetadata(ctx context.Context, cfg config, auth *messagev1.AuthContext) context.Context {
+	if !cfg.VerifiedAuthMetadata || auth == nil {
+		return ctx
+	}
+	pairs := []string{
+		metadataTenantID, auth.GetTenantId(),
+		metadataUserID, auth.GetUserId(),
+		metadataDeviceID, auth.GetDeviceId(),
+	}
+	if auth.GetSessionId() != "" {
+		pairs = append(pairs, metadataSessionID, auth.GetSessionId())
+	}
+	if auth.GetTraceId() != "" {
+		pairs = append(pairs, metadataTraceID, auth.GetTraceId())
+	}
+	if auth.GetRequestId() != "" {
+		pairs = append(pairs, metadataRequestID, auth.GetRequestId())
+	}
+	return metadata.NewOutgoingContext(ctx, metadata.Pairs(pairs...))
 }
 
 func buildRequest(cfg config, runID string, vu int, seq uint64) *messagev1.SendMessageRequest {

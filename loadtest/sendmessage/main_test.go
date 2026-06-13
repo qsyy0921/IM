@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"math"
 	"testing"
 	"time"
@@ -8,6 +9,7 @@ import (
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
@@ -363,20 +365,21 @@ func TestCommitInfoFromEnv(t *testing.T) {
 
 func TestParseConfigUsesEnvironment(t *testing.T) {
 	env := map[string]string{
-		"NEXUSIM_TARGET":                       "127.0.0.1:10495,127.0.0.1:10501",
-		"NEXUSIM_VUS":                          "3",
-		"NEXUSIM_DURATION":                     "5s",
-		"NEXUSIM_RESULT_DIR":                   "loadtest/results/test",
-		"NEXUSIM_CONVERSATION_COUNT":           "2",
-		"NEXUSIM_SERVICE_METRICS_URL":          "127.0.0.1:10498",
-		"NEXUSIM_RELAY_METRICS_URL":            "127.0.0.1:10499",
-		"NEXUSIM_RETRY_OVERLOADED":             "true",
-		"NEXUSIM_MAX_RETRIES":                  "2",
-		"NEXUSIM_RETRY_JITTER":                 "25ms",
-		"NEXUSIM_MESSAGE_TLS_CA_FILE":          "certs/ca.crt",
-		"NEXUSIM_MESSAGE_TLS_SERVER_NAME":      "message-service.nexusim.local",
-		"NEXUSIM_MESSAGE_TLS_CLIENT_CERT_FILE": "certs/client.crt",
-		"NEXUSIM_MESSAGE_TLS_CLIENT_KEY_FILE":  "certs/client.key",
+		"NEXUSIM_TARGET":                             "127.0.0.1:10495,127.0.0.1:10501",
+		"NEXUSIM_VUS":                                "3",
+		"NEXUSIM_DURATION":                           "5s",
+		"NEXUSIM_RESULT_DIR":                         "loadtest/results/test",
+		"NEXUSIM_CONVERSATION_COUNT":                 "2",
+		"NEXUSIM_SERVICE_METRICS_URL":                "127.0.0.1:10498",
+		"NEXUSIM_RELAY_METRICS_URL":                  "127.0.0.1:10499",
+		"NEXUSIM_RETRY_OVERLOADED":                   "true",
+		"NEXUSIM_MAX_RETRIES":                        "2",
+		"NEXUSIM_RETRY_JITTER":                       "25ms",
+		"NEXUSIM_SENDMESSAGE_VERIFIED_AUTH_METADATA": "true",
+		"NEXUSIM_MESSAGE_TLS_CA_FILE":                "certs/ca.crt",
+		"NEXUSIM_MESSAGE_TLS_SERVER_NAME":            "message-service.nexusim.local",
+		"NEXUSIM_MESSAGE_TLS_CLIENT_CERT_FILE":       "certs/client.crt",
+		"NEXUSIM_MESSAGE_TLS_CLIENT_KEY_FILE":        "certs/client.key",
 	}
 	cfg, err := parseConfig(nil, func(name string) string { return env[name] })
 	if err != nil {
@@ -392,11 +395,52 @@ func TestParseConfigUsesEnvironment(t *testing.T) {
 		!cfg.RetryOverloaded ||
 		cfg.MaxRetries != 2 ||
 		cfg.RetryJitter != 25*time.Millisecond ||
+		!cfg.VerifiedAuthMetadata ||
 		cfg.MessageTLS.CAFile != "certs/ca.crt" ||
 		cfg.MessageTLS.ServerName != "message-service.nexusim.local" ||
 		cfg.MessageTLS.ClientCertFile != "certs/client.crt" ||
 		cfg.MessageTLS.ClientKeyFile != "certs/client.key" {
 		t.Fatalf("unexpected config: %+v", cfg)
+	}
+}
+
+func TestWithVerifiedAuthMetadataDisabled(t *testing.T) {
+	ctx := withVerifiedAuthMetadata(context.Background(), config{}, &messagev1.AuthContext{
+		TenantId: "tenant-1",
+		UserId:   "user-1",
+		DeviceId: "device-1",
+	})
+	if _, ok := metadata.FromOutgoingContext(ctx); ok {
+		t.Fatal("did not expect outgoing metadata when disabled")
+	}
+}
+
+func TestWithVerifiedAuthMetadataAddsOutgoingMetadata(t *testing.T) {
+	ctx := withVerifiedAuthMetadata(context.Background(), config{VerifiedAuthMetadata: true}, &messagev1.AuthContext{
+		TenantId:  "tenant-1",
+		UserId:    "user-1",
+		DeviceId:  "device-1",
+		SessionId: "session-1",
+		TraceId:   "trace-1",
+		RequestId: "request-1",
+	})
+	md, ok := metadata.FromOutgoingContext(ctx)
+	if !ok {
+		t.Fatal("expected outgoing metadata")
+	}
+	assertMetadataValue(t, md, metadataTenantID, "tenant-1")
+	assertMetadataValue(t, md, metadataUserID, "user-1")
+	assertMetadataValue(t, md, metadataDeviceID, "device-1")
+	assertMetadataValue(t, md, metadataSessionID, "session-1")
+	assertMetadataValue(t, md, metadataTraceID, "trace-1")
+	assertMetadataValue(t, md, metadataRequestID, "request-1")
+}
+
+func assertMetadataValue(t *testing.T, md metadata.MD, key string, want string) {
+	t.Helper()
+	values := md.Get(key)
+	if len(values) != 1 || values[0] != want {
+		t.Fatalf("metadata %s = %v, want [%s]", key, values, want)
 	}
 }
 

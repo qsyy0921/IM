@@ -75,6 +75,15 @@ NEXUSIM_MESSAGE_TLS_CLIENT_KEY_FILE
 
 这只覆盖压测器到 message-service 的 gRPC transport security，仍不包含证书签发、轮换、分发或动态服务身份治理。
 
+如果 message-service 以 `NEXUSIM_MESSAGE_AUTH_MODE=metadata` / `verified-metadata` 启动，`loadtest/sendmessage` 可用以下开关让压测请求携带 gateway verified identity metadata：
+
+```text
+--verified-auth-metadata
+NEXUSIM_SENDMESSAGE_VERIFIED_AUTH_METADATA=true
+```
+
+该模式只改变压测器传递身份的位置；request body 中的 `AuthContext` 仍保留用于默认 body auth 兼容。
+
 `loadtest/messageedit`、`loadtest/messagerevoke` 和 `loadtest/messagedelete` 三个消息变更 smoke runner 也默认使用 plaintext；如需在本地 TLS / mTLS smoke 中连接对应服务，可使用：
 
 ```text

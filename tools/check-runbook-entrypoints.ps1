@@ -1,4 +1,5 @@
 param(
+    [int]$RunbookIndexMaxLines = 40,
     [int]$CurrentBriefMaxLines = 60,
     [int]$CurrentGoalMaxLines = 80,
     [int]$ServiceBriefIndexMaxLines = 40,
@@ -9,6 +10,11 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $checks = @(
+    @{
+        Path = Join-Path $repoRoot "docs\runbook\README.md"
+        MaxLines = $RunbookIndexMaxLines
+        Purpose = "runbook index"
+    },
     @{
         Path = Join-Path $repoRoot "docs\runbook\current-brief.md"
         MaxLines = $CurrentBriefMaxLines

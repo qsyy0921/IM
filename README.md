@@ -1,6 +1,6 @@
 # NexusIM
 
-NexusIM 是面向企业协同的 IM + 智能协作平台。当前仓库处于第一阶段工程落地：优先实现 `message-service` 的普通会话 `SendMessage` 主写链路，并验证 PostgreSQL 本地事务、message outbox 和 Kafka 事件发布。
+NexusIM 是面向企业协同的 IM + 智能协作平台。当前仓库已进入本地 / 双机可运行分布式 IM 后端阶段；最新工作入口以 `docs/runbook/current-brief.md` 和 `docs/runbook/README.md` 为准。
 
 ## 目录结构
 
@@ -23,7 +23,8 @@ NexusIM 是面向企业协同的 IM + 智能协作平台。当前仓库处于第
 | `docs/architecture/add.md` | 业务架构补充文档，描述系统范围、服务边界和核心业务流。 |
 | `docs/architecture/tadd.md` | 技术架构补充文档，描述技术栈、工程目录、中间件、观测和编码门禁。 |
 | `docs/sdd/README.md` | 服务级 SDD 索引和编码门禁。 |
-| `docs/sdd/message-service.md` | 第一份服务级 SDD，指导 `message-service` 第一条代码切片。 |
+| `docs/runbook/README.md` | Runbook 短路由页。先读它，再按需进入服务 brief、SDD 或 smoke 报告。 |
+| `docs/runbook/current-brief.md` | 每轮默认短入口，避免读取长历史文档。 |
 | `docs/runbook/local-loadtest.md` | 本地和双机压测 Runbook。 |
 
 ## 当前实现范围

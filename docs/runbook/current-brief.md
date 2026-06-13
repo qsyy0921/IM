@@ -4,9 +4,10 @@
 
 1. 先运行 `git status --short --branch`。
 2. 本文件是默认入口，保持短。
-3. 需要服务状态先看 `docs/runbook/service-briefs/README.md` 索引，再只读相关服务文件。
-4. 需要历史证据再按关键词查 `docs/runbook/archive/` 或 `docs/runbook/loadtest/<service>/`。
-5. 不要为了“了解项目”全文读取长文档。
+3. 需要找文档先看 `docs/runbook/README.md`，再只读相关短索引或服务文件。
+4. 需要服务状态先看 `docs/runbook/service-briefs/README.md` 索引，再只读相关服务文件。
+5. 需要历史证据再按关键词查 `docs/runbook/archive/` 或 `docs/runbook/loadtest/<service>/`。
+6. 不要为了“了解项目”全文读取长文档。
 
 ## 当前状态
 

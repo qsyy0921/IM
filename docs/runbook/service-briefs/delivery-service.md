@@ -8,6 +8,7 @@
 - 已补 `/healthz`、`/readyz`、`/debug/metrics` 基础观测入口，可在 gRPC / timeline-consumer / outbox-relay 模式下独立挂载。
 - 已补 `outbox-repair` 运维模式，支持 `audit` 和 `redrive-dlq-pending`，并持久记录 repair audit。
 - 已补 `outbox-repair-audit` 只读模式：可直接列出 outbox repair audit 历史，并按 outbox/event/tenant/conversation/mode/outcome 缩小排障范围。
+- 已补 `outbox-repair-cleanup` operator：只删除超过保留期的 outbox repair audit 历史，并支持按 outbox/event/tenant/conversation/mode/outcome 缩小范围。
 - 已补 `projection-checkpoint-repair` 运维模式，当前只允许带审计地回调 checkpoint 做 replay，不允许前跳跳过事件。
 - 已补 `projection-checkpoint-repair-audit` 只读模式：可直接列出 repair audit 历史，并按 mode/outcome 缩小排障范围。
 - 已补 `projection-checkpoint-repair-cleanup` operator：只删除超过保留期的 repair audit 历史，并支持按 consumer/topic/partition/mode/outcome 缩小范围。

@@ -251,6 +251,132 @@ INSERT INTO delivery_outbox_repair_audit (
 	}
 }
 
+func TestOutboxStoreCleanupOutboxRepairsDeletesOnlyExpiredRowsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_outbox_repair_audit (
+    outbox_id, event_id, tenant_id, conversation_id, aggregate_version, mode, outcome, skip_reason, operator, reason, dry_run,
+    before_status, before_retry_count, before_last_error, before_next_retry_at, before_dead_lettered_at,
+    after_status, after_retry_count, after_last_error, after_next_retry_at, after_dead_lettered_at, created_at
+) VALUES
+    (31, 'event-31', 'tenant-c', 'conversation-a', 1, 'audit', 'AUDITED', '', 'operator-a', 'manual audit', true,
+     'DLQ', 1, 'malformed payload', NULL, NULL,
+     'DLQ', 1, 'malformed payload', NULL, NULL, now() - interval '10 days'),
+    (32, 'event-32', 'tenant-c', 'conversation-b', 2, 'redrive-dlq-pending', 'MUTATED', '', 'operator-b', 'provider recovered', false,
+     'DLQ', 2, 'provider down', NULL, NULL,
+     'PENDING', 0, '', NULL, NULL, now() - interval '1 day')
+`)
+	if err != nil {
+		t.Fatalf("seed outbox repair audit: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	stats, err := store.CleanupOutboxRepairs(ctx, OutboxRepairCleanupOptions{
+		TenantID: "tenant-c",
+		Cutoff:   time.Now().UTC().Add(-7 * 24 * time.Hour),
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("cleanup outbox repairs: %v", err)
+	}
+	if stats.Deleted != 1 {
+		t.Fatalf("unexpected deleted count: %+v", stats)
+	}
+	assertDeliveryOutboxRepairAuditCount(t, ctx, pool, "tenant-c", 1)
+}
+
+func TestOutboxStoreCleanupOutboxRepairsHonorsBatchLimitIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_outbox_repair_audit (
+    outbox_id, event_id, tenant_id, conversation_id, aggregate_version, mode, outcome, skip_reason, operator, reason, dry_run,
+    before_status, before_retry_count, before_last_error, before_next_retry_at, before_dead_lettered_at,
+    after_status, after_retry_count, after_last_error, after_next_retry_at, after_dead_lettered_at, created_at
+) VALUES
+    (41, 'event-41', 'tenant-d', 'conversation-a', 1, 'audit', 'AUDITED', '', 'operator-a', 'manual audit', true,
+     'DLQ', 1, 'malformed payload', NULL, NULL,
+     'DLQ', 1, 'malformed payload', NULL, NULL, now() - interval '10 days'),
+    (42, 'event-42', 'tenant-d', 'conversation-b', 2, 'redrive-dlq-pending', 'MUTATED', '', 'operator-b', 'provider recovered', false,
+     'DLQ', 2, 'provider down', NULL, NULL,
+     'PENDING', 0, '', NULL, NULL, now() - interval '9 days')
+`)
+	if err != nil {
+		t.Fatalf("seed outbox repair audit: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	stats, err := store.CleanupOutboxRepairs(ctx, OutboxRepairCleanupOptions{
+		TenantID: "tenant-d",
+		Cutoff:   time.Now().UTC().Add(-7 * 24 * time.Hour),
+		Limit:    1,
+	})
+	if err != nil {
+		t.Fatalf("cleanup outbox repairs: %v", err)
+	}
+	if stats.Deleted != 1 {
+		t.Fatalf("unexpected deleted count: %+v", stats)
+	}
+	assertDeliveryOutboxRepairAuditCount(t, ctx, pool, "tenant-d", 1)
+}
+
+func TestOutboxStoreCleanupOutboxRepairsFiltersModeAndOutcomeIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_outbox_repair_audit (
+    outbox_id, event_id, tenant_id, conversation_id, aggregate_version, mode, outcome, skip_reason, operator, reason, dry_run,
+    before_status, before_retry_count, before_last_error, before_next_retry_at, before_dead_lettered_at,
+    after_status, after_retry_count, after_last_error, after_next_retry_at, after_dead_lettered_at, created_at
+) VALUES
+    (51, 'event-51', 'tenant-e', 'conversation-a', 1, 'audit', 'AUDITED', '', 'operator-a', 'manual audit', true,
+     'DLQ', 1, 'malformed payload', NULL, NULL,
+     'DLQ', 1, 'malformed payload', NULL, NULL, now() - interval '10 days'),
+    (52, 'event-52', 'tenant-e', 'conversation-a', 2, 'redrive-dlq-pending', 'MUTATED', '', 'operator-b', 'provider recovered', false,
+     'DLQ', 2, 'provider down', NULL, NULL,
+     'PENDING', 0, '', NULL, NULL, now() - interval '10 days')
+`)
+	if err != nil {
+		t.Fatalf("seed outbox repair audit: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	stats, err := store.CleanupOutboxRepairs(ctx, OutboxRepairCleanupOptions{
+		TenantID: "tenant-e",
+		Mode:     types.OutboxRepairModeAudit,
+		Outcome:  outboxRepairOutcomeAudited,
+		Cutoff:   time.Now().UTC().Add(-7 * 24 * time.Hour),
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("cleanup outbox repairs with filters: %v", err)
+	}
+	if stats.Deleted != 1 {
+		t.Fatalf("unexpected deleted count: %+v", stats)
+	}
+
+	rows, err := store.AuditOutboxRepairs(ctx, OutboxRepairAuditOptions{
+		TenantID: "tenant-e",
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("audit outbox repairs after cleanup: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one row after cleanup, got %d", len(rows))
+	}
+	if rows[0].OutboxID != 52 || rows[0].Mode != types.OutboxRepairModeRedriveDLQPending || rows[0].Outcome != outboxRepairOutcomeMutated {
+		t.Fatalf("unexpected remaining outbox repair audit row: %+v", rows[0])
+	}
+}
+
 func seedDeliveryOutbox(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventID string, conversationID string, version int64, eventType string) {
 	t.Helper()
 	payload := fmt.Sprintf(`{"tenant_id":"tenant-delivery","user_id":"user-1","device_id":"device-1","conversation_id":%q,"conversation_seq":%d,"source_event_id":%q,"message_id":%q,"last_received_seq":%d}`, conversationID, version, "source-"+eventID, "message-"+eventID, version)
@@ -362,5 +488,20 @@ LIMIT 1
 		gotReason != reason {
 		t.Fatalf("unexpected repair audit row: mode=%s outcome=%s skip=%s before=(%s,%d,%s) after=(%s,%d,%s) reason=%s",
 			gotMode, gotOutcome, gotSkipReason, gotBeforeStatus, gotBeforeRetry, gotBeforeLastError, gotAfterStatus, gotAfterRetry, gotAfterLastError, gotReason)
+	}
+}
+
+func assertDeliveryOutboxRepairAuditCount(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID string, wantCount int64) {
+	t.Helper()
+	var gotCount int64
+	if err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM delivery_outbox_repair_audit
+WHERE tenant_id = $1
+`, tenantID).Scan(&gotCount); err != nil {
+		t.Fatalf("count delivery outbox repair audit rows: %v", err)
+	}
+	if gotCount != wantCount {
+		t.Fatalf("unexpected delivery outbox repair audit count: got=%d want=%d", gotCount, wantCount)
 	}
 }

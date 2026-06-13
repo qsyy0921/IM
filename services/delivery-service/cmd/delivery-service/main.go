@@ -52,6 +52,8 @@ func run() error {
 		return runOutboxRepair()
 	case "outbox-repair-audit":
 		return runOutboxRepairAudit()
+	case "outbox-repair-cleanup":
+		return runOutboxRepairCleanup()
 	case "projection-checkpoint-repair":
 		return runProjectionCheckpointRepair()
 	case "projection-checkpoint-repair-audit":
@@ -313,6 +315,48 @@ func runOutboxRepairAudit() error {
 	return nil
 }
 
+func runOutboxRepairCleanup() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	config, err := outboxRepairCleanupConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	cutoff := time.Now().UTC().Add(-config.Retention)
+	stats, err := postgresinfra.NewOutboxStore(pool).CleanupOutboxRepairs(ctx, postgresinfra.OutboxRepairCleanupOptions{
+		OutboxID:       outboxRepairCleanupOutboxID(),
+		EventID:        envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_EVENT_ID", ""),
+		TenantID:       envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_TENANT_ID", ""),
+		ConversationID: envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_CONVERSATION_ID", ""),
+		Mode:           envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_MODE", ""),
+		Outcome:        envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_OUTCOME", ""),
+		Cutoff:         cutoff,
+		Limit:          config.BatchSize,
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"delivery-service outbox repair cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d",
+		stats.Deleted,
+		cutoff.Format(time.RFC3339),
+		config.Retention,
+		config.BatchSize,
+	)
+	return nil
+}
+
 func runProjectionCheckpointRepair() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -565,6 +609,11 @@ type projectionFailureCleanupConfig struct {
 	BatchSize int
 }
 
+type outboxRepairCleanupConfig struct {
+	Retention time.Duration
+	BatchSize int
+}
+
 type projectionCheckpointRepairCleanupConfig struct {
 	Retention time.Duration
 	BatchSize int
@@ -580,6 +629,21 @@ func projectionFailureCleanupConfigFromEnv() (projectionFailureCleanupConfig, er
 		return projectionFailureCleanupConfig{}, err
 	}
 	return projectionFailureCleanupConfig{
+		Retention: retention,
+		BatchSize: batchSize,
+	}, nil
+}
+
+func outboxRepairCleanupConfigFromEnv() (outboxRepairCleanupConfig, error) {
+	retention, err := envPositiveDuration("NEXUSIM_DELIVERY_OUTBOX_REPAIR_RETENTION", 7*24*time.Hour)
+	if err != nil {
+		return outboxRepairCleanupConfig{}, err
+	}
+	batchSize, err := envPositiveInt("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_BATCH_SIZE", 5000)
+	if err != nil {
+		return outboxRepairCleanupConfig{}, err
+	}
+	return outboxRepairCleanupConfig{
 		Retention: retention,
 		BatchSize: batchSize,
 	}, nil
@@ -606,6 +670,15 @@ func projectionFailureCleanupPartitionID() *int32 {
 		return nil
 	}
 	parsed := int32(envIntAllowZero("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_PARTITION_ID", 0))
+	return &parsed
+}
+
+func outboxRepairCleanupOutboxID() *int64 {
+	value := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_OUTBOX_ID"))
+	if value == "" {
+		return nil
+	}
+	parsed := envInt64AllowZero("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_OUTBOX_ID", 0)
 	return &parsed
 }
 

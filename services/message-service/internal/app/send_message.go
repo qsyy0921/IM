@@ -100,7 +100,7 @@ func (u *SendMessageUseCase) readConsistentSendDependencies(
 			return types.ConversationSendContext{}, types.PermissionDecision{}, err
 		}
 
-		permission, err = u.policy.CheckSendPermission(ctx, command)
+		permission, err = u.policy.CheckSendPermission(ctx, command, conversation)
 		if err != nil {
 			return types.ConversationSendContext{}, types.PermissionDecision{}, err
 		}

@@ -79,12 +79,14 @@ func (r *Repository) GetSendContext(
 	row := r.pool.QueryRow(ctx, `
 SELECT
     c.status,
+    c.conversation_type,
     c.conversation_mode,
     c.fanout_mode,
     c.fanout_policy_version,
     c.member_version,
     c.permission_version,
     c.current_seq_shard,
+    COALESCE(peer.direct_peer_user_id, ''),
     COALESCE(m.status, ''),
     COALESCE(m.member_version, 0),
     COALESCE(m.permission_version, 0)
@@ -93,6 +95,14 @@ LEFT JOIN conversation_members m
   ON m.tenant_id = c.tenant_id
  AND m.conversation_id = c.conversation_id
  AND m.user_id = $3
+LEFT JOIN LATERAL (
+    SELECT CASE WHEN COUNT(*) = 1 THEN MAX(peer.user_id) ELSE '' END AS direct_peer_user_id
+    FROM conversation_members peer
+    WHERE peer.tenant_id = c.tenant_id
+      AND peer.conversation_id = c.conversation_id
+      AND peer.user_id <> $3
+      AND peer.status = 'ACTIVE'
+) peer ON c.conversation_type = 'DIRECT'
 WHERE c.tenant_id = $1
   AND c.conversation_id = $2
 `, command.TenantID, command.ConversationID, command.UserID)
@@ -104,12 +114,14 @@ WHERE c.tenant_id = $1
 	member.UserID = command.UserID
 	if err := row.Scan(
 		&conversation.Status,
+		&conversation.ConversationType,
 		&conversation.ConversationMode,
 		&conversation.FanoutMode,
 		&conversation.FanoutPolicyVersion,
 		&conversation.MemberVersion,
 		&conversation.PermissionVersion,
 		&conversation.CurrentSeqShard,
+		&conversation.DirectPeerUserID,
 		&member.Status,
 		&member.MemberVersion,
 		&member.PermissionVersion,

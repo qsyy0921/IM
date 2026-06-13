@@ -14,6 +14,7 @@ type ConversationSendContext struct {
 	FanoutMode          FanoutMode
 	FanoutPolicyVersion int64
 	CurrentSeqShard     string
+	DirectPeerUserID    UserID
 }
 
 type SeqBlock struct {

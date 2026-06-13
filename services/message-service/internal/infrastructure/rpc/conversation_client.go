@@ -67,6 +67,7 @@ func (c ConversationClient) GetSendContext(
 		FanoutMode:          fromProtoFanoutMode(response.GetFanoutMode()),
 		FanoutPolicyVersion: response.GetFanoutPolicyVersion(),
 		CurrentSeqShard:     response.GetCurrentSeqShard(),
+		DirectPeerUserID:    types.UserID(response.GetDirectPeerUserId()),
 	}, nil
 }
 

@@ -55,6 +55,33 @@ func TestSendMessageUseCasePermissionDenied(t *testing.T) {
 	}
 }
 
+func TestSendMessageUseCasePassesConversationContextToPolicy(t *testing.T) {
+	repo := &fakeMessageRepository{
+		result: domain.AppendMessageResult{
+			MessageID:       "msg-1",
+			ConversationSeq: 1,
+			AcceptedAt:      time.Unix(100, 0).UTC(),
+		},
+	}
+	conversationContext := localConversation()
+	conversationContext.DirectPeerUserID = "user-2"
+	policy := &fakePolicy{decision: allowedDecision()}
+	useCase := NewSendMessageUseCase(
+		policy,
+		&fakeConversation{context: conversationContext},
+		fakeSequencer{},
+		repo,
+	)
+
+	_, err := useCase.Execute(context.Background(), testCommand())
+	if err != nil {
+		t.Fatalf("execute send message: %v", err)
+	}
+	if policy.lastConversation.DirectPeerUserID != "user-2" {
+		t.Fatalf("policy did not receive direct peer context: %+v", policy.lastConversation)
+	}
+}
+
 func TestSendMessageUseCaseAdmissionRejectsBeforeDependencyReads(t *testing.T) {
 	repo := &fakeMessageRepository{}
 	policy := &fakePolicy{decision: allowedDecision()}
@@ -299,14 +326,16 @@ func localConversation() types.ConversationSendContext {
 }
 
 type fakePolicy struct {
-	decision  types.PermissionDecision
-	decisions []types.PermissionDecision
-	err       error
-	calls     int
+	decision         types.PermissionDecision
+	decisions        []types.PermissionDecision
+	err              error
+	calls            int
+	lastConversation types.ConversationSendContext
 }
 
-func (f *fakePolicy) CheckSendPermission(context.Context, types.SendMessageCommand) (types.PermissionDecision, error) {
+func (f *fakePolicy) CheckSendPermission(_ context.Context, _ types.SendMessageCommand, conversation types.ConversationSendContext) (types.PermissionDecision, error) {
 	f.calls++
+	f.lastConversation = conversation
 	if f.err != nil {
 		return types.PermissionDecision{}, f.err
 	}

@@ -24,6 +24,29 @@ func TestBuildSendContext(t *testing.T) {
 	}
 }
 
+func TestBuildSendContextReturnsDirectPeerOnlyForDirectConversation(t *testing.T) {
+	conversation := activeConversation()
+	conversation.ConversationType = types.ConversationTypeDirect
+	conversation.DirectPeerUserID = "user-2"
+
+	result, err := BuildSendContext(conversation, activeMember())
+	if err != nil {
+		t.Fatalf("build direct send context: %v", err)
+	}
+	if result.DirectPeerUserID != "user-2" {
+		t.Fatalf("expected direct peer user, got %+v", result)
+	}
+
+	conversation.ConversationType = types.ConversationTypeGroup
+	result, err = BuildSendContext(conversation, activeMember())
+	if err != nil {
+		t.Fatalf("build group send context: %v", err)
+	}
+	if result.DirectPeerUserID != "" {
+		t.Fatalf("group context should not expose direct peer, got %+v", result)
+	}
+}
+
 func TestBuildSendContextRejectsInactiveConversation(t *testing.T) {
 	for _, status := range []types.ConversationStatus{
 		types.ConversationStatusArchived,
@@ -60,10 +83,21 @@ func TestBuildSendContextRejectsInactiveMember(t *testing.T) {
 	}
 }
 
+func TestBuildSendContextRejectsDirectConversationWithoutPeer(t *testing.T) {
+	conversation := activeConversation()
+	conversation.ConversationType = types.ConversationTypeDirect
+
+	_, err := BuildSendContext(conversation, activeMember())
+	if !errors.Is(err, types.ErrMemberNotActive) {
+		t.Fatalf("expected member not active for missing direct peer, got %v", err)
+	}
+}
+
 func activeConversation() Conversation {
 	return Conversation{
 		TenantID:            "tenant-1",
 		ConversationID:      "conv-1",
+		ConversationType:    types.ConversationTypeGroup,
 		Status:              types.ConversationStatusActive,
 		ConversationMode:    types.ConversationModeLocalRowLock,
 		FanoutMode:          types.FanoutModeWriteFanout,

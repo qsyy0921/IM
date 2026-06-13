@@ -54,6 +54,16 @@ function Ensure-KafkaTopic {
         --replication-factor 1 | Out-Null
 }
 
+function Get-FreeTcpPort {
+    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+    $listener.Start()
+    try {
+        return $listener.LocalEndpoint.Port
+    } finally {
+        $listener.Stop()
+    }
+}
+
 function Start-NexusProcess {
     param(
         [string]$Name,
@@ -87,6 +97,8 @@ Get-ChildItem -Path "migrations\postgres\policy" -Filter "*.sql" |
         Apply-PostgresMigration -Path $_.FullName -Name $_.Name
     }
 Ensure-KafkaTopic -Topic $topic
+$policyGrpcPort = Get-FreeTcpPort
+$policyGrpcAddr = "127.0.0.1:$policyGrpcPort"
 
 $processes = @()
 try {
@@ -97,6 +109,15 @@ try {
         NEXUSIM_CONTACT_EVENTS_TOPIC = $topic
         NEXUSIM_POLICY_CONTACT_CONSUMER_GROUP = $consumerGroup
     }
+    $processes += Start-NexusProcess -Name "policy-grpc" -FilePath (Join-Path $repo "bin\policy-service.exe") -Env @{
+        NEXUSIM_POLICY_SERVICE_MODE = "grpc"
+        NEXUSIM_POLICY_GRPC_ADDR = $policyGrpcAddr
+        NEXUSIM_PG_DSN = $PgDsn
+        NEXUSIM_POLICY_RULES_ENABLED = "true"
+        NEXUSIM_POLICY_MESSAGE_ALLOWED = "true"
+        NEXUSIM_POLICY_PERMISSION_VERSION = "1"
+        NEXUSIM_POLICY_CLASSIFICATION = "POLICY_STATIC_ALLOW"
+    }
 
     Start-Sleep -Milliseconds 1000
 
@@ -105,6 +126,7 @@ try {
         --brokers $KafkaBrokers `
         --topic $topic `
         --consumer-group $consumerGroup `
+        --policy-grpc-addr $policyGrpcAddr `
         --pg-dsn $PgDsn `
         --result-dir $resultDir `
         --cleanup=true

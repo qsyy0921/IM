@@ -82,6 +82,78 @@ func TestMessagePolicyEvaluatorFallsBackWhenNoRuleIntegration(t *testing.T) {
 	}
 }
 
+func TestMessagePolicyEvaluatorDeniesBlockedDirectPeerIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           true,
+		PermissionVersion: 9,
+		Classification:    "STATIC_ALLOW",
+	})
+	command := testPolicyCommand(types.MessageActionSend)
+	command.DirectPeerUserID = "peer-policy"
+	seedContactEdge(t, ctx, pool, "peer-policy", string(command.AuthContext.UserID), types.ContactEdgeStatusBlocked, 12)
+	seedPolicyRule(t, ctx, pool, command, true, 42, "PG_ALLOW", "")
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if decision.Allowed ||
+		decision.PermissionVersion != 12 ||
+		decision.Classification != "CONTACT_BLOCKED" ||
+		decision.Reason != "contact blocked" {
+		t.Fatalf("expected contact blocked deny, got %+v", decision)
+	}
+}
+
+func TestMessagePolicyEvaluatorDeniesSenderBlockedPeerIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           true,
+		PermissionVersion: 9,
+		Classification:    "STATIC_ALLOW",
+	})
+	command := testPolicyCommand(types.MessageActionSend)
+	command.DirectPeerUserID = "peer-policy"
+	seedContactEdge(t, ctx, pool, string(command.AuthContext.UserID), "peer-policy", types.ContactEdgeStatusBlocked, 13)
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if decision.Allowed ||
+		decision.PermissionVersion != 13 ||
+		decision.Classification != "CONTACT_BLOCKED" ||
+		decision.Reason != "contact blocked" {
+		t.Fatalf("expected sender contact block deny, got %+v", decision)
+	}
+}
+
+func TestMessagePolicyEvaluatorIgnoresContactProjectionWithoutDirectPeerIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           true,
+		PermissionVersion: 9,
+		Classification:    "STATIC_ALLOW",
+	})
+	command := testPolicyCommand(types.MessageActionSend)
+	seedContactEdge(t, ctx, pool, "peer-policy", string(command.AuthContext.UserID), types.ContactEdgeStatusBlocked, 12)
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if !decision.Allowed || decision.PermissionVersion != 9 || decision.Classification != "STATIC_ALLOW" {
+		t.Fatalf("expected fallback allow without direct peer, got %+v", decision)
+	}
+}
+
 func TestMessagePolicyEvaluatorDoesNotFallbackOnDatabaseErrorIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	pool.Close()
@@ -170,6 +242,31 @@ INSERT INTO policy_message_action_rules (
 `, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.Action, allowed, permissionVersion, classification, reason)
 	if err != nil {
 		t.Fatalf("seed policy rule: %v", err)
+	}
+}
+
+func seedContactEdge(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	owner string,
+	contact string,
+	status string,
+	edgeVersion int64,
+) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_contact_edges_projection (
+    tenant_id,
+    owner_user_id,
+    contact_user_id,
+    status,
+    edge_version,
+    updated_by_event_id
+) VALUES ('tenant-policy', $1, $2, $3, $4, 'contact-edge-test-event')
+`, owner, contact, status, edgeVersion)
+	if err != nil {
+		t.Fatalf("seed contact edge: %v", err)
 	}
 }
 

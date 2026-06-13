@@ -481,6 +481,7 @@ type GetSendContextResponse struct {
 	FanoutMode          FanoutMode             `protobuf:"varint,6,opt,name=fanout_mode,json=fanoutMode,proto3,enum=nexusim.conversation.v1.FanoutMode" json:"fanout_mode,omitempty"`
 	FanoutPolicyVersion int64                  `protobuf:"varint,7,opt,name=fanout_policy_version,json=fanoutPolicyVersion,proto3" json:"fanout_policy_version,omitempty"`
 	CurrentSeqShard     string                 `protobuf:"bytes,8,opt,name=current_seq_shard,json=currentSeqShard,proto3" json:"current_seq_shard,omitempty"`
+	DirectPeerUserId    string                 `protobuf:"bytes,9,opt,name=direct_peer_user_id,json=directPeerUserId,proto3" json:"direct_peer_user_id,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -567,6 +568,13 @@ func (x *GetSendContextResponse) GetFanoutPolicyVersion() int64 {
 func (x *GetSendContextResponse) GetCurrentSeqShard() string {
 	if x != nil {
 		return x.CurrentSeqShard
+	}
+	return ""
+}
+
+func (x *GetSendContextResponse) GetDirectPeerUserId() string {
+	if x != nil {
+		return x.DirectPeerUserId
 	}
 	return ""
 }
@@ -1548,7 +1556,7 @@ const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12'\n" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x17\n" +
 	"\auser_id\x18\x03 \x01(\tR\x06userId\x12\x19\n" +
-	"\btrace_id\x18\x04 \x01(\tR\atraceId\"\xb2\x03\n" +
+	"\btrace_id\x18\x04 \x01(\tR\atraceId\"\xe1\x03\n" +
 	"\x16GetSendContextResponse\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12'\n" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12%\n" +
@@ -1558,7 +1566,8 @@ const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
 	"\vfanout_mode\x18\x06 \x01(\x0e2#.nexusim.conversation.v1.FanoutModeR\n" +
 	"fanoutMode\x122\n" +
 	"\x15fanout_policy_version\x18\a \x01(\x03R\x13fanoutPolicyVersion\x12*\n" +
-	"\x11current_seq_shard\x18\b \x01(\tR\x0fcurrentSeqShard\"\xb9\x01\n" +
+	"\x11current_seq_shard\x18\b \x01(\tR\x0fcurrentSeqShard\x12-\n" +
+	"\x13direct_peer_user_id\x18\t \x01(\tR\x10directPeerUserId\"\xb9\x01\n" +
 	"\vAuthContext\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +

@@ -8,7 +8,7 @@ import (
 )
 
 type PolicyCheckPort interface {
-	CheckSendPermission(ctx context.Context, command types.SendMessageCommand) (types.PermissionDecision, error)
+	CheckSendPermission(ctx context.Context, command types.SendMessageCommand, conversation types.ConversationSendContext) (types.PermissionDecision, error)
 	CheckEditPermission(ctx context.Context, command types.EditMessageCommand) (types.PermissionDecision, error)
 	CheckRevokePermission(ctx context.Context, command types.RevokeMessageCommand) (types.PermissionDecision, error)
 	CheckDeletePermission(ctx context.Context, command types.DeleteMessageCommand) (types.PermissionDecision, error)

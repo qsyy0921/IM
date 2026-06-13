@@ -5,6 +5,7 @@ import "github.com/qsyy0921/IM/services/conversation-service/internal/types"
 type Conversation struct {
 	TenantID            types.TenantID
 	ConversationID      types.ConversationID
+	ConversationType    types.ConversationType
 	Status              types.ConversationStatus
 	ConversationMode    types.ConversationMode
 	FanoutMode          types.FanoutMode
@@ -12,6 +13,7 @@ type Conversation struct {
 	MemberVersion       int64
 	PermissionVersion   int64
 	CurrentSeqShard     string
+	DirectPeerUserID    types.UserID
 }
 
 type Member struct {
@@ -29,6 +31,9 @@ func BuildSendContext(conversation Conversation, member Member) (types.Conversat
 	if member.Status != types.MemberStatusActive {
 		return types.ConversationSendContext{}, types.NewMemberNotActive("member is not active")
 	}
+	if conversation.ConversationType == types.ConversationTypeDirect && conversation.DirectPeerUserID == "" {
+		return types.ConversationSendContext{}, types.NewMemberNotActive("direct peer is not active")
+	}
 	return types.ConversationSendContext{
 		TenantID:            conversation.TenantID,
 		ConversationID:      conversation.ConversationID,
@@ -38,5 +43,13 @@ func BuildSendContext(conversation Conversation, member Member) (types.Conversat
 		FanoutMode:          conversation.FanoutMode,
 		FanoutPolicyVersion: conversation.FanoutPolicyVersion,
 		CurrentSeqShard:     conversation.CurrentSeqShard,
+		DirectPeerUserID:    conversation.directPeerUserID(),
 	}, nil
+}
+
+func (conversation Conversation) directPeerUserID() types.UserID {
+	if conversation.ConversationType != types.ConversationTypeDirect {
+		return ""
+	}
+	return conversation.DirectPeerUserID
 }

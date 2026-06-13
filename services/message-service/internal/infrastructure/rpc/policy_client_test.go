@@ -26,7 +26,7 @@ func TestPolicyClientCheckSendPermission(t *testing.T) {
 		},
 	}
 	client := NewPolicyClient(fake, 0)
-	decision, err := client.CheckSendPermission(context.Background(), testPolicyClientSendCommand())
+	decision, err := client.CheckSendPermission(context.Background(), testPolicyClientSendCommand(), testPolicyClientConversation())
 	if err != nil {
 		t.Fatalf("check send permission: %v", err)
 	}
@@ -35,7 +35,8 @@ func TestPolicyClientCheckSendPermission(t *testing.T) {
 	}
 	if fake.request.GetAction() != policyv1.MessageAction_MESSAGE_ACTION_SEND ||
 		fake.request.GetConversationId() != "conv-1" ||
-		fake.request.GetAuthContext().GetDeviceId() != "device-1" {
+		fake.request.GetAuthContext().GetDeviceId() != "device-1" ||
+		fake.request.GetDirectPeerUserId() != "user-2" {
 		t.Fatalf("unexpected request: %+v", fake.request)
 	}
 	if fake.outgoingMetadata.Get(policyMetadataTraceID)[0] != "trace-1" ||
@@ -83,7 +84,7 @@ func TestPolicyClientRejectsMismatchedResponse(t *testing.T) {
 			Classification:    "CONTACT",
 		},
 	}, 0)
-	_, err := client.CheckSendPermission(context.Background(), testPolicyClientSendCommand())
+	_, err := client.CheckSendPermission(context.Background(), testPolicyClientSendCommand(), testPolicyClientConversation())
 	if !errors.Is(err, types.ErrDependencyUnavailable) {
 		t.Fatalf("expected dependency unavailable, got %v", err)
 	}
@@ -99,7 +100,7 @@ func TestPolicyClientRejectsInvalidDecisionFields(t *testing.T) {
 			Allowed:        true,
 		},
 	}, 0)
-	_, err := client.CheckSendPermission(context.Background(), testPolicyClientSendCommand())
+	_, err := client.CheckSendPermission(context.Background(), testPolicyClientSendCommand(), testPolicyClientConversation())
 	if !errors.Is(err, types.ErrDependencyUnavailable) {
 		t.Fatalf("expected dependency unavailable, got %v", err)
 	}
@@ -109,7 +110,7 @@ func TestPolicyClientMapsUnavailable(t *testing.T) {
 	client := NewPolicyClient(&fakePolicyServiceClient{
 		err: status.Error(codes.Unavailable, "down"),
 	}, 0)
-	_, err := client.CheckSendPermission(context.Background(), testPolicyClientSendCommand())
+	_, err := client.CheckSendPermission(context.Background(), testPolicyClientSendCommand(), testPolicyClientConversation())
 	if !errors.Is(err, types.ErrDependencyUnavailable) {
 		t.Fatalf("expected dependency unavailable, got %v", err)
 	}
@@ -119,7 +120,7 @@ func TestPolicyClientMapsTransportPermissionDeniedAsDependencyUnavailable(t *tes
 	client := NewPolicyClient(&fakePolicyServiceClient{
 		err: status.Error(codes.PermissionDenied, "mtls peer is not allowed"),
 	}, 0)
-	_, err := client.CheckSendPermission(context.Background(), testPolicyClientSendCommand())
+	_, err := client.CheckSendPermission(context.Background(), testPolicyClientSendCommand(), testPolicyClientConversation())
 	if !errors.Is(err, types.ErrDependencyUnavailable) {
 		t.Fatalf("expected dependency unavailable, got %v", err)
 	}
@@ -150,6 +151,10 @@ func testPolicyClientSendCommand() types.SendMessageCommand {
 		AuthContext:    testPolicyClientAuth(),
 		ConversationID: "conv-1",
 	}
+}
+
+func testPolicyClientConversation() types.ConversationSendContext {
+	return types.ConversationSendContext{DirectPeerUserID: "user-2"}
 }
 
 func testPolicyClientAuth() types.AuthContext {

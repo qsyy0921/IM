@@ -31,6 +31,24 @@ func (e MessagePolicyEvaluator) DecideMessageAction(
 		return e.fallbackDecision(ctx, command)
 	}
 
+	blocked, edgeVersion, err := e.lookupContactBlock(ctx, command)
+	if err != nil {
+		return types.MessageActionDecision{}, err
+	}
+	if blocked {
+		return types.MessageActionDecision{
+			TenantID:          command.AuthContext.TenantID,
+			UserID:            command.AuthContext.UserID,
+			ConversationID:    command.ConversationID,
+			MessageID:         command.MessageID,
+			Action:            command.Action,
+			Allowed:           false,
+			PermissionVersion: edgeVersion,
+			Classification:    "CONTACT_BLOCKED",
+			Reason:            "contact blocked",
+		}, nil
+	}
+
 	decision, found, err := e.lookupRule(ctx, command)
 	if err != nil {
 		return types.MessageActionDecision{}, err
@@ -90,4 +108,43 @@ WHERE tenant_id = $1
 		decision.Reason = "policy denied"
 	}
 	return decision, true, nil
+}
+
+func (e MessagePolicyEvaluator) lookupContactBlock(
+	ctx context.Context,
+	command types.CheckMessageActionCommand,
+) (bool, int64, error) {
+	if command.Action != types.MessageActionSend || command.DirectPeerUserID == "" {
+		return false, 0, nil
+	}
+	var status string
+	var edgeVersion int64
+	err := e.pool.QueryRow(ctx, `
+SELECT status, edge_version
+FROM policy_contact_edges_projection
+WHERE tenant_id = $1
+  AND status = $2
+  AND (
+      (owner_user_id = $3 AND contact_user_id = $4)
+      OR (owner_user_id = $4 AND contact_user_id = $3)
+  )
+ORDER BY edge_version DESC
+LIMIT 1
+`, command.AuthContext.TenantID, types.ContactEdgeStatusBlocked, command.DirectPeerUserID, command.AuthContext.UserID).Scan(
+		&status,
+		&edgeVersion,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, 0, nil
+	}
+	if err != nil {
+		return false, 0, types.NewDependencyUnavailable("contact policy lookup failed")
+	}
+	if status != types.ContactEdgeStatusBlocked {
+		return false, 0, nil
+	}
+	if edgeVersion <= 0 {
+		return false, 0, types.NewDependencyUnavailable("contact policy projection is invalid")
+	}
+	return true, edgeVersion, nil
 }

@@ -103,6 +103,7 @@ func (s *Server) GetSendContext(
 		FanoutMode:          toProtoFanoutMode(result.FanoutMode),
 		FanoutPolicyVersion: result.FanoutPolicyVersion,
 		CurrentSeqShard:     result.CurrentSeqShard,
+		DirectPeerUserId:    string(result.DirectPeerUserID),
 	}, nil
 }
 

@@ -21,7 +21,7 @@ func NewStaticPolicy() StaticPolicy {
 	}
 }
 
-func (p StaticPolicy) CheckSendPermission(context.Context, types.SendMessageCommand) (types.PermissionDecision, error) {
+func (p StaticPolicy) CheckSendPermission(context.Context, types.SendMessageCommand, types.ConversationSendContext) (types.PermissionDecision, error) {
 	return types.PermissionDecision{
 		Allowed:           p.Allowed,
 		Reason:            p.Reason,
@@ -64,6 +64,7 @@ type StaticConversation struct {
 	FanoutMode          types.FanoutMode
 	FanoutPolicyVersion int64
 	CurrentSeqShard     string
+	DirectPeerUserID    types.UserID
 }
 
 func NewStaticConversation() StaticConversation {
@@ -85,6 +86,7 @@ func (c StaticConversation) GetSendContext(context.Context, types.SendMessageCom
 		FanoutMode:          c.FanoutMode,
 		FanoutPolicyVersion: c.FanoutPolicyVersion,
 		CurrentSeqShard:     c.CurrentSeqShard,
+		DirectPeerUserID:    c.DirectPeerUserID,
 	}, nil
 }
 

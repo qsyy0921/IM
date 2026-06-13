@@ -30,6 +30,7 @@ message CheckMessageActionRequest {
   string conversation_id = 2;
   MessageAction action = 3;
   string message_id = 4;
+  string direct_peer_user_id = 5;
 }
 
 message CheckMessageActionResponse {

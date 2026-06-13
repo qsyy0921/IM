@@ -19,10 +19,11 @@ const (
 )
 
 type CheckMessageActionCommand struct {
-	AuthContext    AuthContext
-	ConversationID ConversationID
-	Action         MessageAction
-	MessageID      MessageID
+	AuthContext      AuthContext
+	ConversationID   ConversationID
+	Action           MessageAction
+	MessageID        MessageID
+	DirectPeerUserID UserID
 }
 
 func (c CheckMessageActionCommand) Validate() error {
@@ -40,6 +41,9 @@ func (c CheckMessageActionCommand) Validate() error {
 		}
 	default:
 		return NewInvalidArgument("message action is required")
+	}
+	if c.DirectPeerUserID != "" && c.DirectPeerUserID == c.AuthContext.UserID {
+		return NewInvalidArgument("direct_peer_user_id must not equal auth user")
 	}
 	return nil
 }

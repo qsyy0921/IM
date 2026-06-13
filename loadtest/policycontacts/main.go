@@ -17,8 +17,11 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	policyv1 "github.com/qsyy0921/IM/api/proto/nexusim/policy/v1"
 	contacteventsv1 "github.com/qsyy0921/IM/schemas/kafka/contacts/v1"
 	kafkago "github.com/segmentio/kafka-go"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -35,39 +38,43 @@ const (
 )
 
 type config struct {
-	brokers       []string
-	topic         string
-	consumerGroup string
-	pgDSN         string
-	resultDir     string
-	tenantID      string
-	ownerUserID   string
-	contactUserID string
-	timeout       time.Duration
-	cleanup       bool
+	brokers        []string
+	topic          string
+	consumerGroup  string
+	policyGRPCAddr string
+	pgDSN          string
+	resultDir      string
+	tenantID       string
+	ownerUserID    string
+	contactUserID  string
+	timeout        time.Duration
+	cleanup        bool
 }
 
 type summary struct {
-	Commit           string       `json:"commit"`
-	CommitFull       string       `json:"commit_full"`
-	GitDirty         bool         `json:"git_dirty"`
-	GitStatusShort   string       `json:"git_status_short,omitempty"`
-	ResultDir        string       `json:"result_dir"`
-	Topic            string       `json:"topic"`
-	ConsumerGroup    string       `json:"consumer_group"`
-	TenantID         string       `json:"tenant_id"`
-	OwnerUserID      string       `json:"owner_user_id"`
-	ContactUserID    string       `json:"contact_user_id"`
-	StartedAt        time.Time    `json:"started_at"`
-	FinishedAt       time.Time    `json:"finished_at"`
-	Success          bool         `json:"success"`
-	Error            string       `json:"error,omitempty"`
-	AfterAccepted    edgeSnapshot `json:"after_accepted"`
-	AfterBlocked     edgeSnapshot `json:"after_blocked"`
-	AfterUnblocked   edgeSnapshot `json:"after_unblocked"`
-	ReverseEdge      edgeSnapshot `json:"reverse_edge"`
-	CheckpointOffset int64        `json:"checkpoint_offset_value"`
-	Events           []string     `json:"events"`
+	Commit                 string                 `json:"commit"`
+	CommitFull             string                 `json:"commit_full"`
+	GitDirty               bool                   `json:"git_dirty"`
+	GitStatusShort         string                 `json:"git_status_short,omitempty"`
+	ResultDir              string                 `json:"result_dir"`
+	Topic                  string                 `json:"topic"`
+	ConsumerGroup          string                 `json:"consumer_group"`
+	TenantID               string                 `json:"tenant_id"`
+	OwnerUserID            string                 `json:"owner_user_id"`
+	ContactUserID          string                 `json:"contact_user_id"`
+	StartedAt              time.Time              `json:"started_at"`
+	FinishedAt             time.Time              `json:"finished_at"`
+	Success                bool                   `json:"success"`
+	Error                  string                 `json:"error,omitempty"`
+	AfterAccepted          edgeSnapshot           `json:"after_accepted"`
+	AfterBlocked           edgeSnapshot           `json:"after_blocked"`
+	AfterUnblocked         edgeSnapshot           `json:"after_unblocked"`
+	ReverseEdge            edgeSnapshot           `json:"reverse_edge"`
+	AfterAcceptedDecision  policyDecisionSnapshot `json:"after_accepted_policy_decision"`
+	AfterBlockedDecision   policyDecisionSnapshot `json:"after_blocked_policy_decision"`
+	AfterUnblockedDecision policyDecisionSnapshot `json:"after_unblocked_policy_decision"`
+	CheckpointOffset       int64                  `json:"checkpoint_offset_value"`
+	Events                 []string               `json:"events"`
 }
 
 type edgeSnapshot struct {
@@ -76,6 +83,15 @@ type edgeSnapshot struct {
 	Status           string `json:"status"`
 	EdgeVersion      int64  `json:"edge_version"`
 	UpdatedByEventID string `json:"updated_by_event_id"`
+}
+
+type policyDecisionSnapshot struct {
+	Checked           bool   `json:"checked"`
+	Allowed           bool   `json:"allowed"`
+	PermissionVersion int64  `json:"permission_version"`
+	Classification    string `json:"classification"`
+	Reason            string `json:"reason"`
+	DirectPeerUserID  string `json:"direct_peer_user_id"`
 }
 
 func main() {
@@ -92,6 +108,7 @@ func parseConfig() config {
 	flag.StringVar(&brokers, "brokers", "localhost:9092", "comma-separated Kafka brokers")
 	flag.StringVar(&cfg.topic, "topic", topicContactEvents, "contact events topic")
 	flag.StringVar(&cfg.consumerGroup, "consumer-group", "nexusim-policy-contact-smoke", "policy contact consumer group")
+	flag.StringVar(&cfg.policyGRPCAddr, "policy-grpc-addr", "", "optional policy-service gRPC address for direct contact-block decision checks")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable", "PostgreSQL DSN")
 	flag.StringVar(&cfg.resultDir, "result-dir", "H:\\NexusIM\\loadtest-results\\policy-contact-smoke", "result directory")
 	flag.StringVar(&cfg.tenantID, "tenant-id", "tenant-policy-contact-smoke", "tenant id")
@@ -161,6 +178,18 @@ func run(cfg config) error {
 	}
 	defer writer.Close()
 
+	var policyClient policyv1.PolicyServiceClient
+	var policyConn *grpc.ClientConn
+	if cfg.policyGRPCAddr != "" {
+		policyConn, err = grpc.NewClient("passthrough:///"+cfg.policyGRPCAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			s.Error = fmt.Sprintf("dial policy service: %v", err)
+			return fmt.Errorf("dial policy service: %w", err)
+		}
+		defer policyConn.Close()
+		policyClient = policyv1.NewPolicyServiceClient(policyConn)
+	}
+
 	runID := randomSuffix()
 	acceptedID := "policy-contact-accepted-" + runID
 	blockedID := "policy-contact-blocked-" + runID
@@ -181,6 +210,11 @@ func run(cfg config) error {
 		s.Error = err.Error()
 		return err
 	}
+	s.AfterAcceptedDecision, err = waitPolicyDecision(ctx, policyClient, cfg, true, "")
+	if err != nil {
+		s.Error = err.Error()
+		return err
+	}
 
 	if err := writer.WriteMessages(ctx, contactMessage(blockedID, cfg, blockedEvent(blockedID, cfg, 2))); err != nil {
 		s.Error = fmt.Sprintf("write blocked contact event: %v", err)
@@ -192,6 +226,11 @@ func run(cfg config) error {
 		s.Error = err.Error()
 		return err
 	}
+	s.AfterBlockedDecision, err = waitPolicyDecision(ctx, policyClient, cfg, false, "CONTACT_BLOCKED")
+	if err != nil {
+		s.Error = err.Error()
+		return err
+	}
 
 	if err := writer.WriteMessages(ctx, contactMessage(unblockedID, cfg, unblockedEvent(unblockedID, cfg, 3))); err != nil {
 		s.Error = fmt.Sprintf("write unblocked contact event: %v", err)
@@ -199,6 +238,11 @@ func run(cfg config) error {
 	}
 	s.Events = append(s.Events, unblockedID)
 	s.AfterUnblocked, err = waitEdge(ctx, pool, cfg, cfg.ownerUserID, cfg.contactUserID, contactEdgeStatusActive, 3, unblockedID)
+	if err != nil {
+		s.Error = err.Error()
+		return err
+	}
+	s.AfterUnblockedDecision, err = waitPolicyDecision(ctx, policyClient, cfg, true, "")
 	if err != nil {
 		s.Error = err.Error()
 		return err
@@ -356,6 +400,66 @@ WHERE consumer_group = $1
 		case <-ticker.C:
 		}
 	}
+}
+
+func waitPolicyDecision(
+	ctx context.Context,
+	client policyv1.PolicyServiceClient,
+	cfg config,
+	wantAllowed bool,
+	wantClassification string,
+) (policyDecisionSnapshot, error) {
+	if client == nil {
+		return policyDecisionSnapshot{}, nil
+	}
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	var lastErr error
+	for {
+		decision, err := readPolicyDecision(ctx, client, cfg)
+		if err == nil &&
+			decision.Allowed == wantAllowed &&
+			(wantClassification == "" || decision.Classification == wantClassification) {
+			return decision, nil
+		}
+		if err != nil {
+			lastErr = err
+		} else {
+			lastErr = fmt.Errorf("unexpected policy decision: got allowed=%v classification=%s want allowed=%v classification=%s", decision.Allowed, decision.Classification, wantAllowed, wantClassification)
+		}
+		select {
+		case <-ctx.Done():
+			return policyDecisionSnapshot{}, fmt.Errorf("timed out waiting for policy decision: %w", lastErr)
+		case <-ticker.C:
+		}
+	}
+}
+
+func readPolicyDecision(ctx context.Context, client policyv1.PolicyServiceClient, cfg config) (policyDecisionSnapshot, error) {
+	response, err := client.CheckMessageAction(ctx, &policyv1.CheckMessageActionRequest{
+		AuthContext: &policyv1.AuthContext{
+			TenantId:  cfg.tenantID,
+			UserId:    cfg.ownerUserID,
+			DeviceId:  "policy-contact-smoke-device",
+			SessionId: "policy-contact-smoke-session",
+			TraceId:   "trace-policy-contact-smoke",
+			RequestId: "request-policy-contact-smoke",
+		},
+		ConversationId:   "conv-policy-contact-smoke",
+		Action:           policyv1.MessageAction_MESSAGE_ACTION_SEND,
+		DirectPeerUserId: cfg.contactUserID,
+	})
+	if err != nil {
+		return policyDecisionSnapshot{}, err
+	}
+	return policyDecisionSnapshot{
+		Checked:           true,
+		Allowed:           response.GetAllowed(),
+		PermissionVersion: response.GetPermissionVersion(),
+		Classification:    response.GetClassification(),
+		Reason:            response.GetReason(),
+		DirectPeerUserID:  cfg.contactUserID,
+	}, nil
 }
 
 func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, cfg config) error {

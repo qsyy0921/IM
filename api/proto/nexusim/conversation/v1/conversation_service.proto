@@ -83,6 +83,7 @@ message GetSendContextResponse {
   FanoutMode fanout_mode = 6;
   int64 fanout_policy_version = 7;
   string current_seq_shard = 8;
+  string direct_peer_user_id = 9;
 }
 
 message AuthContext {

@@ -2,6 +2,13 @@ package types
 
 type ConversationMode string
 
+type ConversationType string
+
+const (
+	ConversationTypeDirect ConversationType = "DIRECT"
+	ConversationTypeGroup  ConversationType = "GROUP"
+)
+
 const (
 	ConversationModeLocalRowLock   ConversationMode = "LOCAL_ROW_LOCK"
 	ConversationModeSequencerBlock ConversationMode = "SEQUENCER_BLOCK"

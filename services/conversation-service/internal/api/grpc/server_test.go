@@ -24,6 +24,7 @@ func TestGetSendContextConvertsResponse(t *testing.T) {
 			FanoutMode:          types.FanoutModeWriteFanout,
 			FanoutPolicyVersion: 3,
 			CurrentSeqShard:     "local",
+			DirectPeerUserID:    "user-2",
 		},
 	}
 	server := NewServer(executor)
@@ -48,7 +49,8 @@ func TestGetSendContextConvertsResponse(t *testing.T) {
 		response.GetMemberVersion() != 5 ||
 		response.GetPermissionVersion() != 7 ||
 		response.GetFanoutPolicyVersion() != 3 ||
-		response.GetCurrentSeqShard() != "local" {
+		response.GetCurrentSeqShard() != "local" ||
+		response.GetDirectPeerUserId() != "user-2" {
 		t.Fatalf("unexpected response: %+v", response)
 	}
 }

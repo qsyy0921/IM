@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -65,7 +66,13 @@ func runGRPCServer() error {
 	defer pool.Close()
 
 	listenAddr := envString("NEXUSIM_DELIVERY_GRPC_ADDR", "0.0.0.0:10497")
-	server, err := newGRPCServer()
+	grpcMetrics := monitoringinfra.NewGRPCMetrics()
+	stopDebug, err := startDebugServer(ctx, deliveryDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+	server, err := newGRPCServer(grpcMetrics)
 	if err != nil {
 		return err
 	}
@@ -117,6 +124,11 @@ func runTimelineConsumer() error {
 		return err
 	}
 	defer pool.Close()
+	stopDebug, err := startDebugServer(ctx, deliveryDebugAddr(), monitoringinfra.NewHandler(pool))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 
 	brokers := splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS"))
 	topic := envString("NEXUSIM_TIMELINE_TOPIC", "conversation.timeline.events")
@@ -154,6 +166,11 @@ func runOutboxRelay() error {
 		return err
 	}
 	defer pool.Close()
+	stopDebug, err := startDebugServer(ctx, deliveryDebugAddr(), monitoringinfra.NewHandler(pool))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 
 	brokers := splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS"))
 	producer, err := kafkainfra.NewWriterProducer(brokers)
@@ -197,9 +214,13 @@ func envString(name string, fallback string) string {
 	return value
 }
 
-func newGRPCServer() (*grpc.Server, error) {
+func newGRPCServer(grpcMetrics *monitoringinfra.GRPCMetrics) (*grpc.Server, error) {
 	interceptors := make([]grpc.UnaryServerInterceptor, 0, 2)
-	interceptors = append(interceptors, monitoringinfra.UnaryAccessLogInterceptor(log.Default()))
+	if grpcMetrics != nil {
+		interceptors = append(interceptors, grpcMetrics.UnaryServerInterceptor(log.Default()))
+	} else {
+		interceptors = append(interceptors, monitoringinfra.UnaryAccessLogInterceptor(log.Default()))
+	}
 	switch strings.ToLower(envString("NEXUSIM_DELIVERY_AUTH_MODE", "body")) {
 	case "body", "request", "legacy":
 	case "metadata", "verified-metadata":
@@ -217,6 +238,41 @@ func newGRPCServer() (*grpc.Server, error) {
 		serverOptions = append(serverOptions, grpc.Creds(creds))
 	}
 	return grpc.NewServer(serverOptions...), nil
+}
+
+func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {
+	if strings.TrimSpace(addr) == "" {
+		return func() {}, nil
+	}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	server := &http.Server{Handler: handler}
+	done := make(chan struct{})
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+	}()
+	go func() {
+		defer close(done)
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("delivery-service debug server stopped with error: %v", err)
+		}
+	}()
+	log.Printf("delivery-service debug server started on %s", addr)
+	return func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+		<-done
+	}, nil
+}
+
+func deliveryDebugAddr() string {
+	return envString("NEXUSIM_DELIVERY_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
 }
 
 func loadDeliveryGRPCCredentialsFromEnv() (credentials.TransportCredentials, bool, error) {

@@ -30,7 +30,7 @@ func TestNewGRPCServerAcceptsMetadataAuthMode(t *testing.T) {
 	clearDeliveryGRPCTLSConfig(t)
 	t.Setenv("NEXUSIM_DELIVERY_AUTH_MODE", "metadata")
 
-	server, err := newGRPCServer()
+	server, err := newGRPCServer(nil)
 	if err != nil {
 		t.Fatalf("new grpc server: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestNewGRPCServerRejectsUnsupportedAuthMode(t *testing.T) {
 	clearDeliveryGRPCTLSConfig(t)
 	t.Setenv("NEXUSIM_DELIVERY_AUTH_MODE", "unknown")
 
-	server, err := newGRPCServer()
+	server, err := newGRPCServer(nil)
 	if err == nil {
 		if server != nil {
 			server.Stop()

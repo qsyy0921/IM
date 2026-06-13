@@ -22,13 +22,18 @@
 
 ```powershell
 .\loadtest\identity\run-local-smoke.ps1 `
+  -IdentityGrpcTlsCertFile .\certs\identity-server.crt `
+  -IdentityGrpcTlsKeyFile .\certs\identity-server.key `
+  -IdentityGrpcTlsClientCaFile .\certs\ca.pem `
+  -IdentityGrpcTlsRequireClientCert true `
+  -IdentityGrpcTlsClientAllowedDnsNames push-gateway.nexusim.local `
   -IdentityTlsCaFile .\certs\ca.pem `
   -IdentityTlsServerName identity-service.nexusim.local `
   -IdentityTlsClientCertFile .\certs\loadtest-client.crt `
   -IdentityTlsClientKeyFile .\certs\loadtest-client.key
 ```
 
-服务端 TLS 仍通过 `NEXUSIM_IDENTITY_GRPC_TLS_*` 环境变量配置；runner 参数只控制 loadtest client 如何连接 identity-service。
+服务端 TLS 可通过 `NEXUSIM_IDENTITY_GRPC_TLS_*` 环境变量配置，也可在本地 smoke 中用上面的 `IdentityGrpcTls*` 参数注入到脚本启动的 identity-service 进程；`IdentityTls*` 参数只控制 loadtest client 如何连接 identity-service。
 
 当前 `challenge delivery outbox` 真实进程 smoke 已证明：
 
@@ -48,6 +53,7 @@ RegisterUser
 | 报告 | 内容 |
 | --- | --- |
 | `loadtest-report-20260613-identity-challenge-delivery-outbox-smoke.md` | `RequestVerificationChallenge(outbox)` -> `challenge-delivery-worker` -> webhook token -> `ConfirmVerificationChallenge` 真实进程 smoke |
+| `loadtest-report-20260613-identity-mtls-smoke.md` | identity-service gRPC TLS / mTLS + client DNS SAN allowlist 下的 challenge delivery outbox 真实进程 smoke |
 
 ## 面试可讲重点
 

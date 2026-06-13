@@ -3,6 +3,8 @@ package timeline
 import (
 	"context"
 	"errors"
+	"sync/atomic"
+	"time"
 
 	conversationtimelinev1 "github.com/qsyy0921/IM/schemas/kafka"
 	"github.com/qsyy0921/IM/services/delivery-service/internal/types"
@@ -24,36 +26,101 @@ type Worker struct {
 	projector     Projector
 	consumerGroup string
 	recorder      FailureRecorder
+	config        Config
+	metrics       workerMetrics
 }
 
-func NewWorker(consumer Consumer, projector Projector, consumerGroup string, recorder ...FailureRecorder) *Worker {
-	worker := &Worker{consumer: consumer, projector: projector, consumerGroup: consumerGroup}
-	if len(recorder) > 0 {
-		worker.recorder = recorder[0]
+type Config struct {
+	ErrorBackoff time.Duration
+	Logf         func(format string, args ...any)
+}
+
+type workerMetrics struct {
+	totalErrors        atomic.Uint64
+	consecutiveErrors  atomic.Uint64
+	lastErrorAtMS      atomic.Int64
+	lastSuccessAtMS    atomic.Int64
+	lastCommitAtMS     atomic.Int64
+	lastErrorBackoffMS atomic.Int64
+}
+
+func NewWorker(consumer Consumer, projector Projector, consumerGroup string, recorder FailureRecorder, configs ...Config) *Worker {
+	var config Config
+	if len(configs) > 0 {
+		config = configs[0]
 	}
-	return worker
+	return &Worker{
+		consumer:      consumer,
+		projector:     projector,
+		consumerGroup: consumerGroup,
+		recorder:      recorder,
+		config:        normalizeConfig(config),
+	}
 }
 
 func (worker *Worker) Run(ctx context.Context) error {
+	if worker.consumer == nil {
+		return errors.New("delivery timeline consumer is not configured")
+	}
+	if worker.projector == nil {
+		return errors.New("delivery timeline projector is not configured")
+	}
 	for {
-		message, err := worker.consumer.Fetch(ctx)
+		retryable, err := worker.runOnce(ctx)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				return context.Canceled
 			}
-			return err
+			if !retryable {
+				return err
+			}
+			if worker.config.Logf != nil {
+				worker.config.Logf("delivery-service timeline projection worker retrying after runtime error: %v", err)
+			}
+			worker.recordError()
+			worker.metrics.lastErrorBackoffMS.Store(worker.config.ErrorBackoff.Milliseconds())
+			if err := waitForInterval(ctx, worker.config.ErrorBackoff); err != nil {
+				return err
+			}
+			continue
 		}
-		command, err := buildCommand(worker.consumerGroup, message)
-		if err != nil {
-			return worker.recordAndReturn(ctx, message, err)
-		}
-		if _, err := worker.projector.Execute(ctx, command); err != nil {
-			return worker.recordAndReturn(ctx, message, err)
-		}
-		if err := worker.consumer.Commit(ctx, message); err != nil {
-			return err
-		}
+		worker.recordSuccess()
 	}
+}
+
+func (worker *Worker) Snapshot() types.ProjectionWorkerSnapshot {
+	return types.ProjectionWorkerSnapshot{
+		TotalErrors:        worker.metrics.totalErrors.Load(),
+		ConsecutiveErrors:  worker.metrics.consecutiveErrors.Load(),
+		LastErrorAtMS:      worker.metrics.lastErrorAtMS.Load(),
+		LastSuccessAtMS:    worker.metrics.lastSuccessAtMS.Load(),
+		LastCommitAtMS:     worker.metrics.lastCommitAtMS.Load(),
+		LastErrorBackoffMS: worker.metrics.lastErrorBackoffMS.Load(),
+	}
+}
+
+func (worker *Worker) runOnce(ctx context.Context) (bool, error) {
+	message, err := worker.consumer.Fetch(ctx)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return false, context.Canceled
+		}
+		return true, err
+	}
+	command, err := buildCommand(worker.consumerGroup, message)
+	if err != nil {
+		return false, worker.recordAndReturn(ctx, message, err)
+	}
+	if _, err := worker.projector.Execute(ctx, command); err != nil {
+		return false, worker.recordAndReturn(ctx, message, err)
+	}
+	if err := worker.consumer.Commit(ctx, message); err != nil {
+		if errors.Is(err, context.Canceled) {
+			return false, context.Canceled
+		}
+		return true, err
+	}
+	return false, nil
 }
 
 func (worker *Worker) recordAndReturn(ctx context.Context, message types.TimelineMessage, err error) error {
@@ -65,6 +132,37 @@ func (worker *Worker) recordAndReturn(ctx context.Context, message types.Timelin
 		return errors.Join(err, recordErr)
 	}
 	return err
+}
+
+func normalizeConfig(config Config) Config {
+	if config.ErrorBackoff <= 0 {
+		config.ErrorBackoff = time.Second
+	}
+	return config
+}
+
+func (worker *Worker) recordError() {
+	worker.metrics.totalErrors.Add(1)
+	worker.metrics.consecutiveErrors.Add(1)
+	worker.metrics.lastErrorAtMS.Store(time.Now().UnixMilli())
+}
+
+func (worker *Worker) recordSuccess() {
+	worker.metrics.consecutiveErrors.Store(0)
+	now := time.Now().UnixMilli()
+	worker.metrics.lastSuccessAtMS.Store(now)
+	worker.metrics.lastCommitAtMS.Store(now)
+}
+
+func waitForInterval(ctx context.Context, interval time.Duration) error {
+	timer := time.NewTimer(interval)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func buildCommand(consumerGroup string, message types.TimelineMessage) (types.ProjectTimelineEventCommand, error) {

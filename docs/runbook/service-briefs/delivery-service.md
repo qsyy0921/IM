@@ -19,6 +19,7 @@
 - 已补按最早 unresolved failure 自动回调 checkpoint：repair 不再必须手填 offset，也能安全 rewind 到当前最早 blocker。
 - 已补 `projection-failure-audit` 只读模式：可直接列出 unresolved projection failure，并支持按 offset / event / failure class 过滤，减少手写 SQL 排障。
 - 已补 `projection-failure-cleanup` operator：只删除超过保留期的 resolved failure 审计行，不会碰 unresolved blocker，并支持按 consumer/topic/partition/class 缩小范围。
+- `timeline-consumer` 现已对运行时 `Fetch` / `Commit` 错误做退避重试，并在 worker 模式通过 `/debug/metrics` 暴露低敏 retry 快照；malformed event、projection failure、failure recorder 异常仍保持持久审计 + fail-closed，不会自动越过 blocker。
 
 ## 后续
 

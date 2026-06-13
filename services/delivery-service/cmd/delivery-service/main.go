@@ -144,11 +144,6 @@ func runTimelineConsumer() error {
 		return err
 	}
 	defer pool.Close()
-	stopDebug, err := startDebugServer(ctx, deliveryDebugAddr(), monitoringinfra.NewHandler(pool))
-	if err != nil {
-		return err
-	}
-	defer stopDebug()
 
 	brokers := splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS"))
 	topic := envString("NEXUSIM_TIMELINE_TOPIC", "conversation.timeline.events")
@@ -169,7 +164,16 @@ func runTimelineConsumer() error {
 		app.NewProjectTimelineEventUseCase(repository),
 		groupID,
 		postgresinfra.NewProjectionFailureStore(pool),
+		timeline.Config{
+			ErrorBackoff: envDuration("NEXUSIM_DELIVERY_TIMELINE_CONSUMER_ERROR_BACKOFF", time.Second),
+			Logf:         log.Printf,
+		},
 	)
+	stopDebug, err := startDebugServer(ctx, deliveryDebugAddr(), monitoringinfra.NewHandler(pool).WithTimelineProjectionWorkerStats(worker.Snapshot))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 	log.Printf("delivery-service timeline consumer started topic=%s group=%s", topic, groupID)
 	return worker.Run(ctx)
 }

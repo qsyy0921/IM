@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/qsyy0921/IM/services/delivery-service/internal/types"
 )
 
 func TestHandlerHealthz(t *testing.T) {
@@ -53,6 +54,34 @@ func TestHandlerMetricsIncludesGRPCSnapshot(t *testing.T) {
 	}
 	if body.GRPC == nil || body.GRPC.TotalRequests != 1 || len(body.GRPC.Methods) != 1 {
 		t.Fatalf("unexpected grpc metrics snapshot: %+v", body.GRPC)
+	}
+}
+
+func TestHandlerMetricsIncludesTimelineProjectionWorkerSnapshot(t *testing.T) {
+	handler := NewHandler(nil).WithTimelineProjectionWorkerStats(func() types.ProjectionWorkerSnapshot {
+		return types.ProjectionWorkerSnapshot{
+			TotalErrors:        2,
+			ConsecutiveErrors:  1,
+			LastErrorAtMS:      100,
+			LastSuccessAtMS:    90,
+			LastCommitAtMS:     90,
+			LastErrorBackoffMS: 1000,
+		}
+	})
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/debug/metrics", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+
+	var body Snapshot
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode metrics response: %v", err)
+	}
+	if body.TimelineProjectionWorker == nil || body.TimelineProjectionWorker.TotalErrors != 2 {
+		t.Fatalf("expected timeline worker metrics, got %+v", body.TimelineProjectionWorker)
 	}
 }
 

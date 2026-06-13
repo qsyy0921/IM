@@ -3,7 +3,9 @@ package timeline
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
+	"time"
 
 	conversationtimelinev1 "github.com/qsyy0921/IM/schemas/kafka"
 	"github.com/qsyy0921/IM/services/delivery-service/internal/types"
@@ -31,6 +33,15 @@ type fakeProjector struct {
 	err     error
 }
 
+type scriptedConsumer struct {
+	message     types.TimelineMessage
+	fetchErrs   []error
+	commitErrs  []error
+	fetchCalls  int
+	commitCalls int
+	committed   bool
+}
+
 type fakeFailureRecorder struct {
 	recorded []types.ProjectionFailureRecord
 	err      error
@@ -47,6 +58,34 @@ func (projector *fakeProjector) Execute(
 func (recorder *fakeFailureRecorder) RecordFailure(_ context.Context, record types.ProjectionFailureRecord) error {
 	recorder.recorded = append(recorder.recorded, record)
 	return recorder.err
+}
+
+func (consumer *scriptedConsumer) Fetch(context.Context) (types.TimelineMessage, error) {
+	var err error
+	if consumer.fetchCalls < len(consumer.fetchErrs) {
+		err = consumer.fetchErrs[consumer.fetchCalls]
+	}
+	consumer.fetchCalls++
+	if err != nil {
+		return types.TimelineMessage{}, err
+	}
+	return consumer.message, nil
+}
+
+func (consumer *scriptedConsumer) Commit(context.Context, types.TimelineMessage) error {
+	consumer.committed = true
+	var err error
+	if consumer.commitCalls < len(consumer.commitErrs) {
+		err = consumer.commitErrs[consumer.commitCalls]
+	}
+	consumer.commitCalls++
+	if err != nil {
+		return err
+	}
+	if len(consumer.commitErrs) > 0 {
+		return nil
+	}
+	return context.Canceled
 }
 
 func TestWorkerProjectsAndCommitsMessagePersisted(t *testing.T) {
@@ -75,7 +114,7 @@ func TestWorkerProjectsAndCommitsMessagePersisted(t *testing.T) {
 	})
 	consumer := &fakeConsumer{message: types.TimelineMessage{Topic: "conversation.timeline.events", Partition: 3, Offset: 41, Value: value}}
 	projector := &fakeProjector{}
-	err = NewWorker(consumer, projector, "delivery-test").Run(context.Background())
+	err = NewWorker(consumer, projector, "delivery-test", nil).Run(context.Background())
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected stop after fake commit, got %v", err)
 	}
@@ -113,7 +152,7 @@ func TestWorkerProjectsAndCommitsMessageRevoked(t *testing.T) {
 	})
 	consumer := &fakeConsumer{message: types.TimelineMessage{Topic: "conversation.timeline.events", Partition: 3, Offset: 42, Value: value}}
 	projector := &fakeProjector{}
-	err := NewWorker(consumer, projector, "delivery-test").Run(context.Background())
+	err := NewWorker(consumer, projector, "delivery-test", nil).Run(context.Background())
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected stop after fake commit, got %v", err)
 	}
@@ -162,7 +201,7 @@ func TestWorkerProjectsAndCommitsMessageEdited(t *testing.T) {
 	})
 	consumer := &fakeConsumer{message: types.TimelineMessage{Topic: "conversation.timeline.events", Partition: 3, Offset: 42, Value: value}}
 	projector := &fakeProjector{}
-	err = NewWorker(consumer, projector, "delivery-test").Run(context.Background())
+	err = NewWorker(consumer, projector, "delivery-test", nil).Run(context.Background())
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected stop after fake commit, got %v", err)
 	}
@@ -202,7 +241,7 @@ func TestWorkerProjectsAndCommitsMessageDeleted(t *testing.T) {
 	})
 	consumer := &fakeConsumer{message: types.TimelineMessage{Topic: "conversation.timeline.events", Partition: 3, Offset: 42, Value: value}}
 	projector := &fakeProjector{}
-	err := NewWorker(consumer, projector, "delivery-test").Run(context.Background())
+	err := NewWorker(consumer, projector, "delivery-test", nil).Run(context.Background())
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected stop after fake commit, got %v", err)
 	}
@@ -245,7 +284,7 @@ func TestWorkerProjectsAndCommitsOwnerTransferred(t *testing.T) {
 	})
 	consumer := &fakeConsumer{message: types.TimelineMessage{Topic: "conversation.timeline.events", Partition: 3, Offset: 42, Value: value}}
 	projector := &fakeProjector{}
-	err := NewWorker(consumer, projector, "delivery-test").Run(context.Background())
+	err := NewWorker(consumer, projector, "delivery-test", nil).Run(context.Background())
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected stop after fake commit, got %v", err)
 	}
@@ -331,4 +370,59 @@ func mustMarshalTimelineEvent(t *testing.T, event *conversationtimelinev1.Conver
 		t.Fatalf("marshal event: %v", err)
 	}
 	return value
+}
+
+func TestWorkerRetriesTransientFetchErrorAndExposesSnapshot(t *testing.T) {
+	consumer := &scriptedConsumer{
+		message:    types.TimelineMessage{Topic: "conversation.timeline.events", Partition: 1, Offset: 10, Value: mustMarshalTimelineEvent(t, &conversationtimelinev1.ConversationTimelineEvent{EventId: "event-1", EventType: types.TimelineEventConversationMemberBoundaryCancelled, TenantId: "tenant-1", AggregateId: "conv-1", AggregateVersion: 10, Payload: &conversationtimelinev1.ConversationTimelineEvent_ConversationMemberBoundaryCancelled{ConversationMemberBoundaryCancelled: &conversationtimelinev1.ConversationMemberBoundaryCancelledV1{TargetUserId: "user-1", NewRole: conversationtimelinev1.ConversationMemberRole_CONVERSATION_MEMBER_ROLE_MEMBER, NewStatus: conversationtimelinev1.ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_ACTIVE, MemberVersion: 2, PermissionVersion: 3}}})},
+		fetchErrs:  []error{fmt.Errorf("temporary fetch failure"), nil, context.Canceled},
+		commitErrs: []error{nil},
+	}
+	projector := &fakeProjector{}
+	worker := NewWorker(consumer, projector, "delivery-test", nil, Config{ErrorBackoff: time.Millisecond})
+
+	err := worker.Run(context.Background())
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected worker stop after successful retry, got %v", err)
+	}
+	if consumer.fetchCalls != 3 {
+		t.Fatalf("expected 3 fetch calls, got %d", consumer.fetchCalls)
+	}
+	if !consumer.committed {
+		t.Fatal("expected commit after retry")
+	}
+	snapshot := worker.Snapshot()
+	if snapshot.TotalErrors != 1 || snapshot.ConsecutiveErrors != 0 {
+		t.Fatalf("unexpected retry snapshot: %+v", snapshot)
+	}
+	if snapshot.LastErrorAtMS == 0 || snapshot.LastSuccessAtMS == 0 || snapshot.LastCommitAtMS == 0 {
+		t.Fatalf("expected error/success timestamps, got %+v", snapshot)
+	}
+	if snapshot.LastErrorBackoffMS != time.Millisecond.Milliseconds() {
+		t.Fatalf("expected backoff %d, got %+v", time.Millisecond.Milliseconds(), snapshot)
+	}
+}
+
+func TestWorkerRetriesTransientCommitError(t *testing.T) {
+	consumer := &scriptedConsumer{
+		message:    types.TimelineMessage{Topic: "conversation.timeline.events", Partition: 1, Offset: 10, Value: mustMarshalTimelineEvent(t, &conversationtimelinev1.ConversationTimelineEvent{EventId: "event-1", EventType: types.TimelineEventConversationMemberBoundaryCancelled, TenantId: "tenant-1", AggregateId: "conv-1", AggregateVersion: 10, Payload: &conversationtimelinev1.ConversationTimelineEvent_ConversationMemberBoundaryCancelled{ConversationMemberBoundaryCancelled: &conversationtimelinev1.ConversationMemberBoundaryCancelledV1{TargetUserId: "user-1", NewRole: conversationtimelinev1.ConversationMemberRole_CONVERSATION_MEMBER_ROLE_MEMBER, NewStatus: conversationtimelinev1.ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_ACTIVE, MemberVersion: 2, PermissionVersion: 3}}})},
+		fetchErrs:  []error{nil, nil, context.Canceled},
+		commitErrs: []error{fmt.Errorf("temporary commit failure"), nil},
+	}
+	projector := &fakeProjector{}
+	worker := NewWorker(consumer, projector, "delivery-test", nil, Config{ErrorBackoff: time.Millisecond})
+
+	err := worker.Run(context.Background())
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected worker stop after successful retry, got %v", err)
+	}
+	if consumer.commitCalls != 2 {
+		t.Fatalf("expected 2 commit calls, got %d", consumer.commitCalls)
+	}
+	if consumer.fetchCalls != 3 {
+		t.Fatalf("expected retry plus terminal cancel fetch, got %d fetch calls", consumer.fetchCalls)
+	}
+	if projector.command.EventID != "event-1" {
+		t.Fatalf("expected successful projection after retry, got %+v", projector.command)
+	}
 }

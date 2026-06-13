@@ -41,6 +41,7 @@ type OutboxRepairStats struct {
 	Requested int
 	Repaired  int
 	Skipped   int
+	Invalid   int
 }
 
 type KafkaPublishRecord struct {

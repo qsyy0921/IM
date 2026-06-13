@@ -22,6 +22,7 @@ import (
 	postgresinfra "github.com/qsyy0921/IM/services/policy-service/internal/infrastructure/postgres"
 	contacttrigger "github.com/qsyy0921/IM/services/policy-service/internal/trigger/contact"
 	outboxtrigger "github.com/qsyy0921/IM/services/policy-service/internal/trigger/outbox"
+	"github.com/qsyy0921/IM/services/policy-service/internal/types"
 	"google.golang.org/grpc"
 )
 
@@ -102,17 +103,26 @@ func runOutboxRepair() error {
 	eventIDs := splitCSV(os.Getenv("NEXUSIM_POLICY_OUTBOX_REPAIR_EVENT_IDS"))
 	operator := envString("NEXUSIM_POLICY_OUTBOX_REPAIR_OPERATOR", "local-operator")
 	reason := envString("NEXUSIM_POLICY_OUTBOX_REPAIR_REASON", "manual policy audit outbox repair")
-	stats, err := postgresinfra.NewOutboxStore(pool).RepairDLQEvents(ctx, eventIDs, operator, reason)
+	stats, err := postgresinfra.NewOutboxStore(pool).RepairDLQEvents(ctx, eventIDs, operator, reason, validatePolicyAuditOutboxMessage)
 	if err != nil {
 		return err
 	}
 	log.Printf(
-		"policy-service outbox repair completed requested=%d repaired=%d skipped=%d",
+		"policy-service outbox repair completed requested=%d repaired=%d skipped=%d invalid=%d",
 		stats.Requested,
 		stats.Repaired,
 		stats.Skipped,
+		stats.Invalid,
 	)
+	if stats.Invalid > 0 {
+		return errors.New("policy audit outbox repair skipped invalid events")
+	}
 	return nil
+}
+
+func validatePolicyAuditOutboxMessage(message types.OutboxMessage) error {
+	_, err := outboxtrigger.BuildPolicyEvent(message)
+	return err
 }
 
 func runContactConsumer() error {

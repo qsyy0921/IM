@@ -18,6 +18,8 @@ type OutboxStore struct {
 
 type OutboxStoreOption func(*OutboxStore)
 
+type OutboxRepairValidator func(types.OutboxMessage) error
+
 func NewOutboxStore(pool *pgxpool.Pool, opts ...OutboxStoreOption) *OutboxStore {
 	store := &OutboxStore{
 		pool: pool,
@@ -120,9 +122,12 @@ func (store *OutboxStore) ProcessReadyBatch(
 	return stats, nil
 }
 
-func (store *OutboxStore) RepairDLQEvents(ctx context.Context, eventIDs []string, operator string, reason string) (types.OutboxRepairStats, error) {
+func (store *OutboxStore) RepairDLQEvents(ctx context.Context, eventIDs []string, operator string, reason string, validate OutboxRepairValidator) (types.OutboxRepairStats, error) {
 	if store == nil || store.pool == nil {
 		return types.OutboxRepairStats{}, errors.New("policy audit outbox store is not configured")
+	}
+	if validate == nil {
+		return types.OutboxRepairStats{}, types.NewInvalidArgument("policy audit outbox repair validator is required")
 	}
 	ids := normalizeEventIDs(eventIDs)
 	if len(ids) == 0 {
@@ -142,76 +147,180 @@ func (store *OutboxStore) RepairDLQEvents(ctx context.Context, eventIDs []string
 		_ = tx.Rollback(ctx)
 	}()
 
-	var stats types.OutboxRepairStats
-	err = tx.QueryRow(ctx, `
-WITH requested AS (
-    SELECT DISTINCT unnest($1::text[]) AS event_id
-),
-target AS (
-    SELECT
-        pao.id,
-        pao.event_id,
-        pao.tenant_id,
-        pao.status,
-        pao.retry_count,
-        pao.last_error,
-        pao.dead_lettered_at
-    FROM policy_decision_audit_outbox pao
-    JOIN requested r ON r.event_id = pao.event_id
-    WHERE pao.status = $3
-    FOR UPDATE OF pao
-),
-updated AS (
-    UPDATE policy_decision_audit_outbox pao
-    SET status = $2,
-        retry_count = 0,
-        last_error = '',
-        next_retry_at = NULL,
-        dead_lettered_at = NULL,
-        available_at = now(),
-        updated_at = now()
-    FROM target t
-    WHERE pao.id = t.id
-    RETURNING pao.event_id
-),
-audit AS (
-    INSERT INTO policy_decision_audit_outbox_repair_audit (
-        event_id,
-        tenant_id,
-        previous_status,
-        previous_retry_count,
-        previous_last_error,
-        previous_dead_lettered_at,
-        repair_operator,
-        repair_reason
-    )
-    SELECT
-        event_id,
-        tenant_id,
-        status,
-        retry_count,
-        last_error,
-        dead_lettered_at,
-        $4,
-        $5
-    FROM target
-    RETURNING event_id
-)
-SELECT
-    (SELECT COUNT(*) FROM requested) AS requested,
-    (SELECT COUNT(*) FROM updated) AS repaired
-`, ids, types.OutboxStatusPending, types.OutboxStatusDLQ, operator, reason).Scan(&stats.Requested, &stats.Repaired)
+	targets, err := fetchRepairTargetsLocked(ctx, tx, ids)
 	if err != nil {
-		return types.OutboxRepairStats{}, types.NewDBWriteFailed(err.Error())
+		return types.OutboxRepairStats{}, err
 	}
-	stats.Skipped = stats.Requested - stats.Repaired
-	if stats.Skipped < 0 {
-		stats.Skipped = 0
+	stats := types.OutboxRepairStats{
+		Requested: len(ids),
+		Skipped:   len(ids) - len(targets),
+	}
+	for _, target := range targets {
+		if err := validate(target.message); err != nil {
+			if err := insertRepairAudit(ctx, tx, target, operator, reason, "SKIPPED", "validation_failed"); err != nil {
+				return types.OutboxRepairStats{}, err
+			}
+			stats.Skipped++
+			stats.Invalid++
+			continue
+		}
+		if err := repairOutboxRow(ctx, tx, target.message.ID); err != nil {
+			return types.OutboxRepairStats{}, err
+		}
+		if err := insertRepairAudit(ctx, tx, target, operator, reason, "REPAIRED", ""); err != nil {
+			return types.OutboxRepairStats{}, err
+		}
+		stats.Repaired++
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return types.OutboxRepairStats{}, types.NewDBWriteFailed(err.Error())
 	}
 	return stats, nil
+}
+
+type outboxRepairTarget struct {
+	message                types.OutboxMessage
+	previousStatus         string
+	previousRetryCount     int
+	previousLastError      string
+	previousDeadLetteredAt *time.Time
+}
+
+func fetchRepairTargetsLocked(ctx context.Context, tx pgx.Tx, eventIDs []string) ([]outboxRepairTarget, error) {
+	rows, err := tx.Query(ctx, `
+WITH requested AS (
+    SELECT DISTINCT unnest($1::text[]) AS event_id
+)
+SELECT
+    pao.id,
+    pao.event_id,
+    pao.tenant_id,
+    pao.aggregate_type,
+    pao.aggregate_id,
+    pao.aggregate_version,
+    pao.event_type,
+    pao.event_version,
+    pao.partition_key,
+    pao.mapping_version,
+    pao.correlation_id,
+    pao.causation_id,
+    pao.producer,
+    pao.payload_json,
+    pao.trace_id,
+    pao.retry_count,
+    pao.created_at,
+    pao.status,
+    pao.last_error,
+    pao.dead_lettered_at
+FROM policy_decision_audit_outbox pao
+JOIN requested r ON r.event_id = pao.event_id
+WHERE pao.status = $2
+ORDER BY pao.id
+FOR UPDATE OF pao
+`, eventIDs, types.OutboxStatusDLQ)
+	if err != nil {
+		return nil, types.NewDBWriteFailed(err.Error())
+	}
+	defer rows.Close()
+
+	targets := make([]outboxRepairTarget, 0, len(eventIDs))
+	for rows.Next() {
+		var target outboxRepairTarget
+		if err := rows.Scan(
+			&target.message.ID,
+			&target.message.EventID,
+			&target.message.TenantID,
+			&target.message.AggregateType,
+			&target.message.AggregateID,
+			&target.message.AggregateVersion,
+			&target.message.EventType,
+			&target.message.EventVersion,
+			&target.message.PartitionKey,
+			&target.message.MappingVersion,
+			&target.message.CorrelationID,
+			&target.message.CausationID,
+			&target.message.Producer,
+			&target.message.PayloadJSON,
+			&target.message.TraceID,
+			&target.message.RetryCount,
+			&target.message.OccurredAt,
+			&target.previousStatus,
+			&target.previousLastError,
+			&target.previousDeadLetteredAt,
+		); err != nil {
+			return nil, types.NewDBWriteFailed(err.Error())
+		}
+		target.previousRetryCount = target.message.RetryCount
+		targets = append(targets, target)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBWriteFailed(err.Error())
+	}
+	return targets, nil
+}
+
+func repairOutboxRow(ctx context.Context, tx pgx.Tx, id int64) error {
+	tag, err := tx.Exec(ctx, `
+UPDATE policy_decision_audit_outbox
+SET status = $2,
+    retry_count = 0,
+    last_error = '',
+    next_retry_at = NULL,
+    dead_lettered_at = NULL,
+    available_at = now(),
+    updated_at = now()
+WHERE id = $1
+`, id, types.OutboxStatusPending)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if tag.RowsAffected() != 1 {
+		return types.NewDBWriteFailed("policy audit outbox repair row count mismatch")
+	}
+	return nil
+}
+
+func insertRepairAudit(ctx context.Context, tx pgx.Tx, target outboxRepairTarget, operator string, reason string, outcome string, skipReason string) error {
+	_, err := tx.Exec(ctx, `
+INSERT INTO policy_decision_audit_outbox_repair_audit (
+    event_id,
+    tenant_id,
+    previous_status,
+    previous_retry_count,
+    previous_last_error,
+    previous_dead_lettered_at,
+    repair_operator,
+    repair_reason,
+    repair_outcome,
+    skip_reason
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10
+)
+`,
+		target.message.EventID,
+		target.message.TenantID,
+		target.previousStatus,
+		target.previousRetryCount,
+		target.previousLastError,
+		target.previousDeadLetteredAt,
+		operator,
+		reason,
+		outcome,
+		truncateRepairField(strings.TrimSpace(skipReason), 128),
+	)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
 }
 
 func (store *OutboxStore) fetchReadyLocked(ctx context.Context, tx pgx.Tx, limit int) ([]types.OutboxMessage, error) {

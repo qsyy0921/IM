@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/base32"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -20,6 +24,8 @@ import (
 	identityv1 "github.com/qsyy0921/IM/api/proto/nexusim/identity/v1"
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type config struct {
@@ -71,6 +77,13 @@ type summary struct {
 	PasswordResetWebhook       webhookSummary       `json:"password_reset_webhook"`
 	ConfirmPasswordReset       passwordResetSummary `json:"confirm_password_reset"`
 	PostResetLogin             tokenSummary         `json:"post_reset_login"`
+	BeginMFAEnrollment         mfaBeginSummary      `json:"begin_mfa_enrollment"`
+	ConfirmMFAEnrollment       mfaConfirmSummary    `json:"confirm_mfa_enrollment"`
+	LoginWithoutMFA            expectedErrorSummary `json:"login_without_mfa"`
+	MFALogin                   tokenSummary         `json:"mfa_login"`
+	RegenerateMFARecoveryCodes mfaRegenerateSummary `json:"regenerate_mfa_recovery_codes"`
+	RevokeMFARecoveryCodes     mfaRevokeSummary     `json:"revoke_mfa_recovery_codes"`
+	DisableMFAFactor           mfaDisableSummary    `json:"disable_mfa_factor"`
 	ChallengeDeliveryOutbox    outboxStats          `json:"challenge_delivery_outbox"`
 	ChallengeDeliveryOutboxRow deliveryOutboxRow    `json:"challenge_delivery_outbox_row"`
 	ChallengeRow               challengeRow         `json:"challenge_row"`
@@ -85,6 +98,11 @@ type identityChallengeClient interface {
 	ConfirmVerificationChallenge(context.Context, *identityv1.ConfirmVerificationChallengeRequest, ...grpc.CallOption) (*identityv1.ConfirmVerificationChallengeResponse, error)
 	RequestPasswordReset(context.Context, *identityv1.RequestPasswordResetRequest, ...grpc.CallOption) (*identityv1.RequestPasswordResetResponse, error)
 	ConfirmPasswordReset(context.Context, *identityv1.ConfirmPasswordResetRequest, ...grpc.CallOption) (*identityv1.ConfirmPasswordResetResponse, error)
+	BeginMFAEnrollment(context.Context, *identityv1.BeginMFAEnrollmentRequest, ...grpc.CallOption) (*identityv1.BeginMFAEnrollmentResponse, error)
+	ConfirmMFAEnrollment(context.Context, *identityv1.ConfirmMFAEnrollmentRequest, ...grpc.CallOption) (*identityv1.ConfirmMFAEnrollmentResponse, error)
+	DisableMFAFactor(context.Context, *identityv1.DisableMFAFactorRequest, ...grpc.CallOption) (*identityv1.DisableMFAFactorResponse, error)
+	RegenerateMFARecoveryCodes(context.Context, *identityv1.RegenerateMFARecoveryCodesRequest, ...grpc.CallOption) (*identityv1.RegenerateMFARecoveryCodesResponse, error)
+	RevokeMFARecoveryCodes(context.Context, *identityv1.RevokeMFARecoveryCodesRequest, ...grpc.CallOption) (*identityv1.RevokeMFARecoveryCodesResponse, error)
 }
 
 type registerSummary struct {
@@ -131,6 +149,44 @@ type tokenSummary struct {
 
 type passwordResetSummary struct {
 	ResetAtUnixMS int64 `json:"reset_at_unix_ms"`
+}
+
+type mfaBeginSummary struct {
+	FactorIDSet     bool   `json:"factor_id_set"`
+	FactorType      string `json:"factor_type"`
+	Status          string `json:"status"`
+	SecretSet       bool   `json:"secret_set"`
+	OTPAuthURISet   bool   `json:"otpauth_uri_set"`
+	CreatedAtUnixMS int64  `json:"created_at_unix_ms"`
+}
+
+type mfaConfirmSummary struct {
+	FactorIDSet       bool   `json:"factor_id_set"`
+	Status            string `json:"status"`
+	VerifiedAtUnixMS  int64  `json:"verified_at_unix_ms"`
+	RecoveryCodeCount int    `json:"recovery_code_count"`
+}
+
+type mfaRegenerateSummary struct {
+	FactorIDSet       bool  `json:"factor_id_set"`
+	RecoveryCodeCount int   `json:"recovery_code_count"`
+	GeneratedAtUnixMS int64 `json:"generated_at_unix_ms"`
+}
+
+type mfaRevokeSummary struct {
+	RevokedCount    int32 `json:"revoked_count"`
+	RevokedAtUnixMS int64 `json:"revoked_at_unix_ms"`
+}
+
+type mfaDisableSummary struct {
+	FactorIDSet      bool   `json:"factor_id_set"`
+	Status           string `json:"status"`
+	DisabledAtUnixMS int64  `json:"disabled_at_unix_ms"`
+}
+
+type expectedErrorSummary struct {
+	Occurred bool   `json:"occurred"`
+	Code     string `json:"code,omitempty"`
 }
 
 type outboxStats struct {
@@ -587,6 +643,10 @@ func runClientScenario(cfg config, result *summary) error {
 		return errors.New("post-reset login did not return gateway token, refresh token, and session id")
 	}
 
+	if err := runMFAScenario(ctx, cfg, client, result); err != nil {
+		return err
+	}
+
 	if pool != nil {
 		if err := fillPostgresStats(ctx, pool, cfg, challenge.GetChallengeId(), result); err != nil {
 			return err
@@ -606,6 +666,203 @@ func runClientScenario(cfg config, result *summary) error {
 		}
 	}
 
+	return nil
+}
+
+func runMFAScenario(ctx context.Context, cfg config, client identityChallengeClient, result *summary) error {
+	beginStarted := time.Now()
+	beginCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	begin, err := client.BeginMFAEnrollment(beginCtx, &identityv1.BeginMFAEnrollmentRequest{
+		TenantId:    cfg.tenantID,
+		UserId:      cfg.userID,
+		FactorType:  identityv1.MFAFactorType_MFA_FACTOR_TYPE_TOTP,
+		Password:    cfg.newPassword,
+		DisplayName: "identity facade smoke",
+		Issuer:      "NexusIM",
+		TraceId:     "identity-challenge-delivery-outbox-smoke",
+		RequestId:   "identity-smoke-begin-mfa",
+	})
+	cancel()
+	result.LatenciesMS["begin_mfa_enrollment"] = elapsedMS(beginStarted)
+	if err != nil {
+		return fmt.Errorf("begin mfa enrollment: %w", err)
+	}
+	result.BeginMFAEnrollment = mfaBeginSummary{
+		FactorIDSet:     begin.GetFactorId() != "",
+		FactorType:      begin.GetFactorType().String(),
+		Status:          begin.GetStatus().String(),
+		SecretSet:       begin.GetSecret() != "",
+		OTPAuthURISet:   begin.GetOtpauthUri() != "",
+		CreatedAtUnixMS: begin.GetCreatedAtUnixMs(),
+	}
+	if begin.GetFactorId() == "" || begin.GetSecret() == "" || begin.GetStatus() != identityv1.MFAFactorStatus_MFA_FACTOR_STATUS_PENDING {
+		return fmt.Errorf("unexpected begin mfa response: factor_id_set=%t secret_set=%t status=%s", begin.GetFactorId() != "", begin.GetSecret() != "", begin.GetStatus())
+	}
+
+	code := generateTOTPCode(begin.GetSecret(), time.Now().UTC())
+	if code == "" {
+		return errors.New("failed to generate totp code for mfa enrollment")
+	}
+	confirmStarted := time.Now()
+	confirmCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	confirm, err := client.ConfirmMFAEnrollment(confirmCtx, &identityv1.ConfirmMFAEnrollmentRequest{
+		TenantId:  cfg.tenantID,
+		UserId:    cfg.userID,
+		FactorId:  begin.GetFactorId(),
+		Code:      code,
+		TraceId:   "identity-challenge-delivery-outbox-smoke",
+		RequestId: "identity-smoke-confirm-mfa",
+	})
+	cancel()
+	result.LatenciesMS["confirm_mfa_enrollment"] = elapsedMS(confirmStarted)
+	if err != nil {
+		return fmt.Errorf("confirm mfa enrollment: %w", err)
+	}
+	result.ConfirmMFAEnrollment = mfaConfirmSummary{
+		FactorIDSet:       confirm.GetFactorId() != "",
+		Status:            confirm.GetStatus().String(),
+		VerifiedAtUnixMS:  confirm.GetVerifiedAtUnixMs(),
+		RecoveryCodeCount: len(confirm.GetRecoveryCodes()),
+	}
+	if confirm.GetStatus() != identityv1.MFAFactorStatus_MFA_FACTOR_STATUS_ACTIVE || confirm.GetVerifiedAtUnixMs() == 0 || len(confirm.GetRecoveryCodes()) == 0 {
+		return fmt.Errorf("unexpected confirm mfa response: status=%s verified_at=%d recovery_count=%d", confirm.GetStatus(), confirm.GetVerifiedAtUnixMs(), len(confirm.GetRecoveryCodes()))
+	}
+
+	loginWithoutMFAStarted := time.Now()
+	loginWithoutMFACtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	_, err = client.Login(loginWithoutMFACtx, &identityv1.LoginRequest{
+		TenantId:          cfg.tenantID,
+		UserId:            cfg.userID,
+		Password:          cfg.newPassword,
+		DeviceId:          cfg.deviceID,
+		Audience:          cfg.audience,
+		GatewayTtlSeconds: 900,
+		RefreshTtlSeconds: 3600,
+		TraceId:           "identity-challenge-delivery-outbox-smoke",
+		RequestId:         "identity-smoke-login-without-mfa",
+	})
+	cancel()
+	result.LatenciesMS["login_without_mfa"] = elapsedMS(loginWithoutMFAStarted)
+	if err == nil {
+		return errors.New("login without mfa unexpectedly succeeded after factor activation")
+	}
+	result.LoginWithoutMFA = expectedErrorSummary{Occurred: true, Code: status.Code(err).String()}
+	if status.Code(err) != codes.FailedPrecondition {
+		return fmt.Errorf("login without mfa returned %s, want %s: %w", status.Code(err), codes.FailedPrecondition, err)
+	}
+
+	mfaLoginCode := generateTOTPCode(begin.GetSecret(), time.Now().UTC())
+	if mfaLoginCode == "" {
+		return errors.New("failed to generate totp code for mfa login")
+	}
+	mfaLoginStarted := time.Now()
+	mfaLoginCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	mfaLogin, err := client.Login(mfaLoginCtx, &identityv1.LoginRequest{
+		TenantId:          cfg.tenantID,
+		UserId:            cfg.userID,
+		Password:          cfg.newPassword,
+		DeviceId:          cfg.deviceID,
+		Audience:          cfg.audience,
+		GatewayTtlSeconds: 900,
+		RefreshTtlSeconds: 3600,
+		TraceId:           "identity-challenge-delivery-outbox-smoke",
+		RequestId:         "identity-smoke-mfa-login",
+		MfaFactorId:       begin.GetFactorId(),
+		MfaCode:           mfaLoginCode,
+	})
+	cancel()
+	result.LatenciesMS["mfa_login"] = elapsedMS(mfaLoginStarted)
+	if err != nil {
+		return fmt.Errorf("mfa login: %w", err)
+	}
+	result.MFALogin = tokenSummary{
+		Audience:               mfaLogin.GetAudience(),
+		TokenType:              mfaLogin.GetTokenType(),
+		SessionIDSet:           mfaLogin.GetSessionId() != "",
+		GatewayTokenSet:        mfaLogin.GetGatewayToken() != "",
+		RefreshTokenSet:        mfaLogin.GetRefreshToken() != "",
+		GatewayExpiresAtUnixMS: mfaLogin.GetGatewayExpiresAtUnixMs(),
+		RefreshExpiresAtUnixMS: mfaLogin.GetRefreshExpiresAtUnixMs(),
+		IssuedAtUnixMS:         mfaLogin.GetIssuedAtUnixMs(),
+	}
+	if mfaLogin.GetGatewayToken() == "" || mfaLogin.GetRefreshToken() == "" || mfaLogin.GetSessionId() == "" {
+		return errors.New("mfa login did not return gateway token, refresh token, and session id")
+	}
+
+	regenerateCode := generateTOTPCode(begin.GetSecret(), time.Now().UTC())
+	if regenerateCode == "" {
+		return errors.New("failed to generate totp code for recovery code regeneration")
+	}
+	regenerateStarted := time.Now()
+	regenerateCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	regenerate, err := client.RegenerateMFARecoveryCodes(regenerateCtx, &identityv1.RegenerateMFARecoveryCodesRequest{
+		TenantId:  cfg.tenantID,
+		UserId:    cfg.userID,
+		FactorId:  begin.GetFactorId(),
+		Password:  cfg.newPassword,
+		Code:      regenerateCode,
+		TraceId:   "identity-challenge-delivery-outbox-smoke",
+		RequestId: "identity-smoke-regenerate-mfa-recovery",
+	})
+	cancel()
+	result.LatenciesMS["regenerate_mfa_recovery_codes"] = elapsedMS(regenerateStarted)
+	if err != nil {
+		return fmt.Errorf("regenerate mfa recovery codes: %w", err)
+	}
+	result.RegenerateMFARecoveryCodes = mfaRegenerateSummary{
+		FactorIDSet:       regenerate.GetFactorId() != "",
+		RecoveryCodeCount: len(regenerate.GetRecoveryCodes()),
+		GeneratedAtUnixMS: regenerate.GetGeneratedAtUnixMs(),
+	}
+	if regenerate.GetFactorId() != begin.GetFactorId() || regenerate.GetGeneratedAtUnixMs() == 0 || len(regenerate.GetRecoveryCodes()) == 0 {
+		return fmt.Errorf("unexpected regenerate recovery response: factor_id_match=%t generated_at=%d recovery_count=%d", regenerate.GetFactorId() == begin.GetFactorId(), regenerate.GetGeneratedAtUnixMs(), len(regenerate.GetRecoveryCodes()))
+	}
+
+	revokeStarted := time.Now()
+	revokeCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	revoke, err := client.RevokeMFARecoveryCodes(revokeCtx, &identityv1.RevokeMFARecoveryCodesRequest{
+		TenantId:  cfg.tenantID,
+		UserId:    cfg.userID,
+		Password:  cfg.newPassword,
+		TraceId:   "identity-challenge-delivery-outbox-smoke",
+		RequestId: "identity-smoke-revoke-mfa-recovery",
+	})
+	cancel()
+	result.LatenciesMS["revoke_mfa_recovery_codes"] = elapsedMS(revokeStarted)
+	if err != nil {
+		return fmt.Errorf("revoke mfa recovery codes: %w", err)
+	}
+	result.RevokeMFARecoveryCodes = mfaRevokeSummary{
+		RevokedCount:    revoke.GetRevokedCount(),
+		RevokedAtUnixMS: revoke.GetRevokedAtUnixMs(),
+	}
+	if revoke.GetRevokedCount() <= 0 || revoke.GetRevokedAtUnixMs() == 0 {
+		return fmt.Errorf("unexpected revoke recovery response: revoked=%d revoked_at=%d", revoke.GetRevokedCount(), revoke.GetRevokedAtUnixMs())
+	}
+
+	disableStarted := time.Now()
+	disableCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	disable, err := client.DisableMFAFactor(disableCtx, &identityv1.DisableMFAFactorRequest{
+		TenantId:  cfg.tenantID,
+		UserId:    cfg.userID,
+		FactorId:  begin.GetFactorId(),
+		Password:  cfg.newPassword,
+		TraceId:   "identity-challenge-delivery-outbox-smoke",
+		RequestId: "identity-smoke-disable-mfa",
+	})
+	cancel()
+	result.LatenciesMS["disable_mfa_factor"] = elapsedMS(disableStarted)
+	if err != nil {
+		return fmt.Errorf("disable mfa factor: %w", err)
+	}
+	result.DisableMFAFactor = mfaDisableSummary{
+		FactorIDSet:      disable.GetFactorId() != "",
+		Status:           disable.GetStatus().String(),
+		DisabledAtUnixMS: disable.GetDisabledAtUnixMs(),
+	}
+	if disable.GetFactorId() != begin.GetFactorId() || disable.GetStatus() != identityv1.MFAFactorStatus_MFA_FACTOR_STATUS_DISABLED || disable.GetDisabledAtUnixMs() == 0 {
+		return fmt.Errorf("unexpected disable mfa response: factor_id_match=%t status=%s disabled_at=%d", disable.GetFactorId() == begin.GetFactorId(), disable.GetStatus(), disable.GetDisabledAtUnixMs())
+	}
 	return nil
 }
 
@@ -747,6 +1004,25 @@ func finish(cfg config, result *summary, runErr error) error {
 
 func elapsedMS(start time.Time) float64 {
 	return float64(time.Since(start).Microseconds()) / 1000.0
+}
+
+func generateTOTPCode(secret string, now time.Time) string {
+	key, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(strings.TrimSpace(secret)))
+	if err != nil {
+		return ""
+	}
+	counter := uint64(now.Unix() / 30)
+	var counterBytes [8]byte
+	binary.BigEndian.PutUint64(counterBytes[:], counter)
+	mac := hmac.New(sha1.New, key)
+	_, _ = mac.Write(counterBytes[:])
+	sum := mac.Sum(nil)
+	offset := sum[len(sum)-1] & 0x0f
+	value := (int(sum[offset])&0x7f)<<24 |
+		(int(sum[offset+1])&0xff)<<16 |
+		(int(sum[offset+2])&0xff)<<8 |
+		(int(sum[offset+3]) & 0xff)
+	return fmt.Sprintf("%06d", value%1_000_000)
 }
 
 func gitOutput(args ...string) string {

@@ -33,6 +33,8 @@ $password = "IdentitySmokePassw0rd!"
 $destination = "identity-user-$topicSuffix@example.com"
 $gatewayTokenSecret = "identity-smoke-gateway-secret-$topicSuffix"
 $deliveryTokenKey = "identity-smoke-delivery-token-key-$topicSuffix"
+$mfaSecretKey = "identity-smoke-mfa-secret-key-$topicSuffix"
+$mfaRecoveryCodeSecret = "identity-smoke-mfa-recovery-code-secret-$topicSuffix"
 $webhookBearerToken = "identity-smoke-webhook-token-$topicSuffix"
 
 New-Item -ItemType Directory -Force $resultDir | Out-Null
@@ -190,6 +192,8 @@ try {
         NEXUSIM_IDENTITY_DEBUG_ADDR = ""
         NEXUSIM_PG_DSN = $PgDsn
         NEXUSIM_IDENTITY_GATEWAY_TOKEN_SECRET = $gatewayTokenSecret
+        NEXUSIM_IDENTITY_MFA_SECRET_KEY = $mfaSecretKey
+        NEXUSIM_IDENTITY_MFA_RECOVERY_CODE_SECRET = $mfaRecoveryCodeSecret
         NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MODE = "outbox"
         NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY = $deliveryTokenKey
         NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN = "false"

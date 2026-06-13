@@ -20,6 +20,7 @@ CreateMemberChange(JOIN)
 | --- | --- |
 | `loadtest-report-20260612-e2e-demo-smoke.md` | 本地多进程 E2E demo smoke，验证投递后未读数为 1，ACK + MarkRead 后未读数为 0 |
 | `loadtest-report-20260613-e2e-demo-verified-metadata-smoke.md` | 本地多进程 E2E demo smoke，验证 metadata auth 下的 notify、PullInbox、ACK、MarkRead 和未读数归零 |
+| `loadtest-report-20260613-e2e-demo-secure-mtls-wss-smoke.md` | 本地多进程 secure E2E demo smoke，验证四段 gRPC mTLS、push WSS/mTLS、push->delivery mTLS、metadata auth 和 unread 归零 |
 
 ## TLS / mTLS 参数
 
@@ -69,3 +70,25 @@ CreateMemberChange(JOIN)
 该模式会把 demo 请求身份同时写入 user-facing gRPC metadata，用于验证 conversation / message / delivery / receipt 的 `metadata` / `verified-metadata` auth mode；request body 仍保留兼容字段。
 
 2026-06-13 补充：`-VerifiedAuthMetadata` 真实进程 demo smoke 已通过，验证 receiver JOIN、SendMessage、`delivery.notify`、`PullInbox`、WebSocket ACK、`MarkRead` 和 `ListConversations` unread `1 -> 0` 全链路。
+
+## Secure local demo
+
+如果要一键启动本地 secure demo，可用：
+
+```powershell
+.\loadtest\demo\run-local-secure-demo.ps1
+```
+
+该脚本会在 `H:\NexusIM\loadtest-results\<run>\certs` 生成短期本地 CA 和证书，启动 conversation / message / delivery / receipt / push-gateway 真实进程，并运行：
+
+```text
+CreateMemberChange(JOIN)
+-> SendMessage
+-> delivery.notify over WSS
+-> PullInbox
+-> delivery.ack
+-> MarkRead
+-> ListConversations
+```
+
+覆盖范围包括 conversation / message / delivery / receipt gRPC mTLS、message-service -> conversation-service mTLS、push-gateway WebSocket WSS/mTLS、push-gateway -> delivery-service mTLS，以及 gateway verified metadata。它仍是本地 smoke，不是生产证书签发、轮换、分发或动态服务身份治理。

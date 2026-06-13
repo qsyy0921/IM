@@ -2,14 +2,19 @@ package rpc
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	policyv1 "github.com/qsyy0921/IM/api/proto/nexusim/policy/v1"
 	"github.com/qsyy0921/IM/services/message-service/internal/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -25,6 +30,26 @@ type PolicyClient struct {
 	timeout time.Duration
 }
 
+type PolicyClientDialConfig struct {
+	Addr    string
+	Timeout time.Duration
+	TLS     PolicyClientTLSConfig
+}
+
+type PolicyClientTLSConfig struct {
+	CAFile         string
+	ServerName     string
+	ClientCertFile string
+	ClientKeyFile  string
+}
+
+func (config PolicyClientTLSConfig) Enabled() bool {
+	return strings.TrimSpace(config.CAFile) != "" ||
+		strings.TrimSpace(config.ServerName) != "" ||
+		strings.TrimSpace(config.ClientCertFile) != "" ||
+		strings.TrimSpace(config.ClientKeyFile) != ""
+}
+
 func NewPolicyClient(client policyv1.PolicyServiceClient, timeout time.Duration) PolicyClient {
 	if timeout <= 0 {
 		timeout = 30 * time.Millisecond
@@ -33,14 +58,63 @@ func NewPolicyClient(client policyv1.PolicyServiceClient, timeout time.Duration)
 }
 
 func DialPolicyClient(ctx context.Context, addr string, timeout time.Duration) (PolicyClient, func() error, error) {
+	return DialPolicyClientWithConfig(ctx, PolicyClientDialConfig{Addr: addr, Timeout: timeout})
+}
+
+func DialPolicyClientWithConfig(_ context.Context, config PolicyClientDialConfig) (PolicyClient, func() error, error) {
+	addr := strings.TrimSpace(config.Addr)
+	if addr == "" {
+		return PolicyClient{}, nil, errors.New("policy service address is required")
+	}
+	transportCredentials := grpc.WithTransportCredentials(insecure.NewCredentials())
+	if config.TLS.Enabled() {
+		creds, err := policyClientTLSCredentials(config.TLS)
+		if err != nil {
+			return PolicyClient{}, nil, err
+		}
+		transportCredentials = grpc.WithTransportCredentials(creds)
+	}
 	conn, err := grpc.NewClient(
 		"passthrough:///"+addr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		transportCredentials,
 	)
 	if err != nil {
 		return PolicyClient{}, nil, err
 	}
-	return NewPolicyClient(policyv1.NewPolicyServiceClient(conn), timeout), conn.Close, nil
+	return NewPolicyClient(policyv1.NewPolicyServiceClient(conn), config.Timeout), conn.Close, nil
+}
+
+func policyClientTLSCredentials(config PolicyClientTLSConfig) (credentials.TransportCredentials, error) {
+	caFile := strings.TrimSpace(config.CAFile)
+	if caFile == "" {
+		return nil, errors.New("NEXUSIM_POLICY_SERVICE_TLS_CA_FILE is required when policy-service TLS is configured")
+	}
+	clientCertFile := strings.TrimSpace(config.ClientCertFile)
+	clientKeyFile := strings.TrimSpace(config.ClientKeyFile)
+	if (clientCertFile == "") != (clientKeyFile == "") {
+		return nil, errors.New("NEXUSIM_POLICY_SERVICE_TLS_CLIENT_CERT_FILE and NEXUSIM_POLICY_SERVICE_TLS_CLIENT_KEY_FILE must be configured together")
+	}
+	pemBytes, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, err
+	}
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(pemBytes) {
+		return nil, errors.New("NEXUSIM_POLICY_SERVICE_TLS_CA_FILE does not contain a valid PEM certificate")
+	}
+	tlsConfig := &tls.Config{
+		RootCAs:    roots,
+		ServerName: strings.TrimSpace(config.ServerName),
+		MinVersion: tls.VersionTLS12,
+	}
+	if clientCertFile != "" {
+		cert, err := tls.LoadX509KeyPair(clientCertFile, clientKeyFile)
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+	return credentials.NewTLS(tlsConfig), nil
 }
 
 func (c PolicyClient) CheckSendPermission(

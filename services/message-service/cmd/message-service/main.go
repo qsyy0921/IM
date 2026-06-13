@@ -76,11 +76,15 @@ func runGRPCServer() error {
 
 	var policy app.PolicyCheckPort = staticPolicy
 	if policyAddr := envString("NEXUSIM_POLICY_SERVICE_ADDR", ""); policyAddr != "" {
-		client, closeClient, err := rpcinfra.DialPolicyClient(
-			ctx,
-			policyAddr,
-			envDuration("NEXUSIM_POLICY_RPC_TIMEOUT", 30*time.Millisecond),
-		)
+		policyTLS, err := policyClientTLSConfigFromEnv()
+		if err != nil {
+			return err
+		}
+		client, closeClient, err := rpcinfra.DialPolicyClientWithConfig(ctx, rpcinfra.PolicyClientDialConfig{
+			Addr:    policyAddr,
+			Timeout: envDuration("NEXUSIM_POLICY_RPC_TIMEOUT", 30*time.Millisecond),
+			TLS:     policyTLS,
+		})
 		if err != nil {
 			return err
 		}
@@ -326,6 +330,25 @@ func envString(name string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func policyClientTLSConfigFromEnv() (rpcinfra.PolicyClientTLSConfig, error) {
+	config := rpcinfra.PolicyClientTLSConfig{
+		CAFile:         envString("NEXUSIM_POLICY_SERVICE_TLS_CA_FILE", ""),
+		ServerName:     envString("NEXUSIM_POLICY_SERVICE_TLS_SERVER_NAME", ""),
+		ClientCertFile: envString("NEXUSIM_POLICY_SERVICE_TLS_CLIENT_CERT_FILE", ""),
+		ClientKeyFile:  envString("NEXUSIM_POLICY_SERVICE_TLS_CLIENT_KEY_FILE", ""),
+	}
+	if !config.Enabled() {
+		return config, nil
+	}
+	if config.CAFile == "" {
+		return config, errors.New("NEXUSIM_POLICY_SERVICE_TLS_CA_FILE is required when policy-service TLS is configured")
+	}
+	if (config.ClientCertFile == "") != (config.ClientKeyFile == "") {
+		return config, errors.New("NEXUSIM_POLICY_SERVICE_TLS_CLIENT_CERT_FILE and NEXUSIM_POLICY_SERVICE_TLS_CLIENT_KEY_FILE must be configured together")
+	}
+	return config, nil
 }
 
 func envInt(name string, fallback int) int {

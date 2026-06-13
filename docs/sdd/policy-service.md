@@ -116,6 +116,12 @@ Configuration:
 ```text
 NEXUSIM_POLICY_SERVICE_MODE=grpc
 NEXUSIM_POLICY_GRPC_ADDR=0.0.0.0:10800
+NEXUSIM_POLICY_GRPC_TLS_CERT_FILE=
+NEXUSIM_POLICY_GRPC_TLS_KEY_FILE=
+NEXUSIM_POLICY_GRPC_TLS_CLIENT_CA_FILE=
+NEXUSIM_POLICY_GRPC_TLS_REQUIRE_CLIENT_CERT=false
+NEXUSIM_POLICY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES=
+NEXUSIM_POLICY_GRPC_TLS_CLIENT_ALLOWED_URIS=
 NEXUSIM_POLICY_MESSAGE_ALLOWED=true
 NEXUSIM_POLICY_PERMISSION_VERSION=1
 NEXUSIM_POLICY_CLASSIFICATION=INTERNAL
@@ -151,7 +157,15 @@ NEXUSIM_POLICY_OUTBOX_REPAIR_REASON=manual policy audit outbox repair
 
 NEXUSIM_POLICY_SERVICE_ADDR=127.0.0.1:10800
 NEXUSIM_POLICY_RPC_TIMEOUT=30ms
+NEXUSIM_POLICY_SERVICE_TLS_CA_FILE=
+NEXUSIM_POLICY_SERVICE_TLS_SERVER_NAME=
+NEXUSIM_POLICY_SERVICE_TLS_CLIENT_CERT_FILE=
+NEXUSIM_POLICY_SERVICE_TLS_CLIENT_KEY_FILE=
 ```
+
+`policy-service` defaults to plaintext for existing local smoke. If `NEXUSIM_POLICY_GRPC_TLS_CERT_FILE` or `NEXUSIM_POLICY_GRPC_TLS_KEY_FILE` is configured, both must be present and the gRPC server uses TLS 1.2 or newer. Supplying `NEXUSIM_POLICY_GRPC_TLS_CLIENT_CA_FILE`, `NEXUSIM_POLICY_GRPC_TLS_REQUIRE_CLIENT_CERT=true`, or a client DNS / URI allowlist enables mTLS. The allowlists are exact-match checks against verified client certificate SANs, intended for static local profiles such as `message-service.nexusim.local` or `spiffe://nexusim/message-service`.
+
+message-service only enables TLS for policy RPC when `NEXUSIM_POLICY_SERVICE_TLS_CA_FILE` is configured. `NEXUSIM_POLICY_SERVICE_TLS_SERVER_NAME` is optional and overrides certificate hostname verification. Client certificate and key must be configured together for mTLS. A partial TLS configuration fails fast instead of silently falling back to plaintext.
 
 ## Contracts
 
@@ -186,6 +200,8 @@ The adapter validates that policy-service response tenant, user, conversation, m
 
 The adapter forwards trace id and request id as gRPC metadata when they are present in the message-service auth context. policy-service uses them only for structured request logs. They are not metrics labels and are not part of the policy decision contract.
 
+The policy RPC adapter can use static TLS / mTLS credentials configured by the message-service process. This is transport hardening only: the business decision contract remains the same, and transport-level `PermissionDenied` from mTLS or server policy is still mapped to dependency unavailable rather than a business deny.
+
 ## Observability
 
 When `NEXUSIM_POLICY_DEBUG_ADDR` is set, policy-service exposes:
@@ -211,7 +227,7 @@ This is a local debug surface. It is not a replacement for production OpenTeleme
 - Message ownership policy supports sender mutation and first-stage `ADMIN` / `OWNER` override for edit / revoke / delete when message-service supplies sender context. It does not implement a separate `MODERATOR` role, full ReBAC, owner transfer semantics, retention policy, compliance delete or user-private delete.
 - No tenant policy DSL, tenant quota / risk policy, content moderation, risk scoring or rate limiting is implemented yet.
 - Decision audit outbox rows can be relayed to `im.policy.events`, and explicit DLQ event IDs can be redriven through the repair operator after relay-equivalent validation. Broad repair workflow, poison-payload classification beyond fail-closed validation, retention policy and external sink remain future work.
-- No mTLS client/server config is implemented for policy-service yet.
+- First-stage static TLS / mTLS config exists for policy-service and the message-service policy RPC client, but there is no certificate issuance, rotation, dynamic service identity registry, service mesh policy, or all-service mTLS rollout yet.
 - No production OpenTelemetry / Prometheus / alerting rollout is implemented yet.
 
 These are future production hardening steps; the current value is extracting the policy boundary and replacing message-service internal policy rules with an optional real service dependency.

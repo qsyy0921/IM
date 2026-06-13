@@ -5,16 +5,19 @@ import (
 	"errors"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	policygrpc "github.com/qsyy0921/IM/services/policy-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/policy-service/internal/app"
 	"github.com/qsyy0921/IM/services/policy-service/internal/domain"
+	monitoringinfra "github.com/qsyy0921/IM/services/policy-service/internal/infrastructure/monitoring"
 	postgresinfra "github.com/qsyy0921/IM/services/policy-service/internal/infrastructure/postgres"
 	"google.golang.org/grpc"
 )
@@ -56,12 +59,15 @@ func runGRPC() error {
 		Reason:            envString("NEXUSIM_POLICY_DENY_REASON", ""),
 	}
 	var evaluator app.MessagePolicyEvaluator = policy
-	if envBool("NEXUSIM_POLICY_RULES_ENABLED", false) {
+	var pool *pgxpool.Pool
+	rulesEnabled := envBool("NEXUSIM_POLICY_RULES_ENABLED", false)
+	if rulesEnabled {
 		dsn := envString("NEXUSIM_PG_DSN", "")
 		if dsn == "" {
 			return errors.New("NEXUSIM_PG_DSN is required when NEXUSIM_POLICY_RULES_ENABLED=true")
 		}
-		pool, err := openPGPool(ctx, dsn)
+		var err error
+		pool, err = openPGPool(ctx, dsn)
 		if err != nil {
 			return err
 		}
@@ -69,7 +75,16 @@ func runGRPC() error {
 		evaluator = postgresinfra.NewMessagePolicyEvaluator(pool, policy)
 		log.Println("policy-service message action rule store enabled")
 	}
-	server := grpc.NewServer()
+	grpcMetrics := monitoringinfra.NewGRPCMetrics()
+	decisionMetrics := monitoringinfra.NewDecisionMetrics()
+	evaluator = monitoringinfra.NewInstrumentedEvaluator(evaluator, decisionMetrics)
+	stopDebug, err := startDebugServer(ctx, policyDebugAddr(), monitoringinfra.NewHandler(pool, rulesEnabled, grpcMetrics, decisionMetrics))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	server := grpc.NewServer(grpc.UnaryInterceptor(grpcMetrics.UnaryServerInterceptor(log.Default())))
 	policygrpc.Register(server, policygrpc.NewServer(app.NewCheckMessageActionUseCase(evaluator)))
 	go func() {
 		<-ctx.Done()
@@ -80,6 +95,37 @@ func runGRPC() error {
 		return err
 	}
 	return ctx.Err()
+}
+
+func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {
+	if strings.TrimSpace(addr) == "" {
+		return func() {}, nil
+	}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	server := &http.Server{Handler: handler}
+	done := make(chan struct{})
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+	}()
+	go func() {
+		defer close(done)
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("policy-service debug server stopped with error: %v", err)
+		}
+	}()
+	log.Printf("policy-service debug server started on %s", addr)
+	return func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+		<-done
+	}, nil
 }
 
 func openPGPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
@@ -126,6 +172,10 @@ func envInt(name string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func policyDebugAddr() string {
+	return envString("NEXUSIM_POLICY_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
 }
 
 func envInt64(name string, fallback int64) int64 {

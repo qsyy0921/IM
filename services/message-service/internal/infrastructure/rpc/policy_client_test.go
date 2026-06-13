@@ -9,6 +9,7 @@ import (
 	"github.com/qsyy0921/IM/services/message-service/internal/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -36,6 +37,10 @@ func TestPolicyClientCheckSendPermission(t *testing.T) {
 		fake.request.GetConversationId() != "conv-1" ||
 		fake.request.GetAuthContext().GetDeviceId() != "device-1" {
 		t.Fatalf("unexpected request: %+v", fake.request)
+	}
+	if fake.outgoingMetadata.Get(policyMetadataTraceID)[0] != "trace-1" ||
+		fake.outgoingMetadata.Get(policyMetadataRequestID)[0] != "request-1" {
+		t.Fatalf("expected trace/request metadata, got %v", fake.outgoingMetadata)
 	}
 }
 
@@ -121,17 +126,19 @@ func TestPolicyClientMapsTransportPermissionDeniedAsDependencyUnavailable(t *tes
 }
 
 type fakePolicyServiceClient struct {
-	request  *policyv1.CheckMessageActionRequest
-	response *policyv1.CheckMessageActionResponse
-	err      error
+	request          *policyv1.CheckMessageActionRequest
+	outgoingMetadata metadata.MD
+	response         *policyv1.CheckMessageActionResponse
+	err              error
 }
 
 func (f *fakePolicyServiceClient) CheckMessageAction(
-	_ context.Context,
+	ctx context.Context,
 	request *policyv1.CheckMessageActionRequest,
 	_ ...grpc.CallOption,
 ) (*policyv1.CheckMessageActionResponse, error) {
 	f.request = request
+	f.outgoingMetadata, _ = metadata.FromOutgoingContext(ctx)
 	if f.err != nil {
 		return nil, f.err
 	}

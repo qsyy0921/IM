@@ -11,7 +11,13 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+)
+
+const (
+	policyMetadataTraceID   = "x-nexusim-trace-id"
+	policyMetadataRequestID = "x-nexusim-request-id"
 )
 
 type PolicyClient struct {
@@ -62,6 +68,7 @@ func (c PolicyClient) checkMessageAction(
 ) (types.PermissionDecision, error) {
 	callCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+	callCtx = policyOutgoingMetadataContext(callCtx, auth)
 
 	response, err := c.client.CheckMessageAction(callCtx, &policyv1.CheckMessageActionRequest{
 		AuthContext: &policyv1.AuthContext{
@@ -88,6 +95,20 @@ func (c PolicyClient) checkMessageAction(
 		Classification:    response.GetClassification(),
 		Reason:            response.GetReason(),
 	}, nil
+}
+
+func policyOutgoingMetadataContext(ctx context.Context, auth types.AuthContext) context.Context {
+	pairs := make([]string, 0, 4)
+	if auth.TraceID != "" {
+		pairs = append(pairs, policyMetadataTraceID, auth.TraceID)
+	}
+	if auth.RequestID != "" {
+		pairs = append(pairs, policyMetadataRequestID, auth.RequestID)
+	}
+	if len(pairs) == 0 {
+		return ctx
+	}
+	return metadata.NewOutgoingContext(ctx, metadata.Pairs(pairs...))
 }
 
 func validatePolicyResponse(

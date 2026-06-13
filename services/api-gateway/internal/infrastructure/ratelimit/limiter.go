@@ -6,10 +6,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"math"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	grpcgo "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -20,27 +23,40 @@ import (
 const (
 	metadataToken = "x-nexusim-gateway-token"
 	maxKeyLength  = 96
+	backendLocal  = "local"
+	backendRedis  = "redis"
 )
 
 type Config struct {
 	Enabled           bool
+	Backend           string
 	RequestsPerSecond float64
 	Burst             int
 	MaxKeys           int
+	RedisClient       redis.UniversalClient
+	RedisKeyPrefix    string
+	RedisWindow       time.Duration
+	RedisFailOpen     bool
 	Now               func() time.Time
 }
 
 type Limiter struct {
-	enabled bool
-	rate    float64
-	burst   float64
-	maxKeys int
-	now     func() time.Time
+	enabled  bool
+	backend  string
+	rate     float64
+	burst    float64
+	maxKeys  int
+	redis    redis.UniversalClient
+	prefix   string
+	window   time.Duration
+	failOpen bool
+	now      func() time.Time
 
 	mu            sync.Mutex
 	buckets       map[string]*bucket
 	totalLimited  int64
 	totalAccepted int64
+	redisErrors   atomic.Int64
 }
 
 type bucket struct {
@@ -52,22 +68,35 @@ type bucket struct {
 
 type Snapshot struct {
 	Enabled       bool    `json:"enabled"`
+	Backend       string  `json:"backend,omitempty"`
 	RatePerSecond float64 `json:"rate_per_second,omitempty"`
 	Burst         int     `json:"burst,omitempty"`
 	TrackedKeys   int     `json:"tracked_keys,omitempty"`
 	MaxKeys       int     `json:"max_keys,omitempty"`
+	RedisWindowMS int64   `json:"redis_window_ms,omitempty"`
+	RedisFailOpen bool    `json:"redis_fail_open,omitempty"`
+	RedisErrors   int64   `json:"redis_error_count,omitempty"`
 	TotalAccepted int64   `json:"total_accepted"`
 	TotalLimited  int64   `json:"total_limited"`
 }
 
 func New(config Config) (*Limiter, error) {
+	backend := strings.ToLower(strings.TrimSpace(config.Backend))
+	if backend == "" {
+		backend = backendLocal
+	}
 	limiter := &Limiter{
-		enabled: config.Enabled,
-		rate:    config.RequestsPerSecond,
-		burst:   float64(config.Burst),
-		maxKeys: config.MaxKeys,
-		now:     config.Now,
-		buckets: make(map[string]*bucket),
+		enabled:  config.Enabled,
+		backend:  backend,
+		rate:     config.RequestsPerSecond,
+		burst:    float64(config.Burst),
+		maxKeys:  config.MaxKeys,
+		redis:    config.RedisClient,
+		prefix:   strings.Trim(strings.TrimSpace(config.RedisKeyPrefix), ":"),
+		window:   config.RedisWindow,
+		failOpen: config.RedisFailOpen,
+		now:      config.Now,
+		buckets:  make(map[string]*bucket),
 	}
 	if limiter.now == nil {
 		limiter.now = time.Now
@@ -77,6 +106,24 @@ func New(config Config) (*Limiter, error) {
 	}
 	if limiter.rate <= 0 {
 		return nil, errors.New("api-gateway rate limit rps must be greater than 0 when enabled")
+	}
+	switch limiter.backend {
+	case backendLocal:
+	case backendRedis:
+		if limiter.redis == nil {
+			return nil, errors.New("api-gateway redis rate limit requires a Redis client")
+		}
+		if limiter.prefix == "" {
+			limiter.prefix = "nexusim:api-gateway"
+		}
+		if limiter.window <= 0 {
+			limiter.window = time.Second
+		}
+		if limiter.window < time.Millisecond {
+			limiter.window = time.Millisecond
+		}
+	default:
+		return nil, errors.New("unsupported api-gateway rate limit backend")
 	}
 	if limiter.burst <= 0 {
 		limiter.burst = math.Ceil(limiter.rate)
@@ -94,7 +141,11 @@ func (limiter *Limiter) UnaryServerInterceptor() grpcgo.UnaryServerInterceptor {
 		}
 	}
 	return func(ctx context.Context, request any, info *grpcgo.UnaryServerInfo, handler grpcgo.UnaryHandler) (any, error) {
-		if !limiter.allow(ctx, info.FullMethod) {
+		allowed, err := limiter.allow(ctx, info.FullMethod)
+		if err != nil && !limiter.failOpen {
+			return nil, status.Error(codes.Unavailable, "rate limiter unavailable")
+		}
+		if !allowed {
 			return nil, status.Error(codes.ResourceExhausted, "rate limit exceeded")
 		}
 		return handler(ctx, request)
@@ -110,16 +161,27 @@ func (limiter *Limiter) Snapshot() Snapshot {
 
 	return Snapshot{
 		Enabled:       limiter.enabled,
+		Backend:       limiter.backend,
 		RatePerSecond: limiter.rate,
 		Burst:         int(limiter.burst),
 		TrackedKeys:   len(limiter.buckets),
 		MaxKeys:       limiter.maxKeys,
+		RedisWindowMS: limiter.window.Milliseconds(),
+		RedisFailOpen: limiter.failOpen,
+		RedisErrors:   limiter.redisErrors.Load(),
 		TotalAccepted: limiter.totalAccepted,
 		TotalLimited:  limiter.totalLimited,
 	}
 }
 
-func (limiter *Limiter) allow(ctx context.Context, method string) bool {
+func (limiter *Limiter) allow(ctx context.Context, method string) (bool, error) {
+	if limiter.backend == backendRedis {
+		return limiter.allowRedis(ctx, method)
+	}
+	return limiter.allowLocal(ctx, method), nil
+}
+
+func (limiter *Limiter) allowLocal(ctx context.Context, method string) bool {
 	now := limiter.now()
 	key := requestKey(ctx, method)
 
@@ -148,6 +210,61 @@ func (limiter *Limiter) allow(ctx context.Context, method string) bool {
 	entry.accepted++
 	limiter.totalAccepted++
 	return true
+}
+
+func (limiter *Limiter) allowRedis(ctx context.Context, method string) (bool, error) {
+	now := limiter.now()
+	window := limiter.window
+	if window <= 0 {
+		window = time.Second
+	}
+	if window < time.Millisecond {
+		window = time.Millisecond
+	}
+	windowID := now.UnixMilli() / window.Milliseconds()
+	key := limiter.redisKey(requestKey(ctx, method), windowID)
+	count, err := limiter.redis.Incr(ctx, key).Result()
+	if err != nil {
+		limiter.redisErrors.Add(1)
+		if limiter.failOpen {
+			limiter.recordAccepted()
+			return true, nil
+		}
+		return false, err
+	}
+	if count == 1 {
+		if err := limiter.redis.PExpire(ctx, key, window*2).Err(); err != nil {
+			limiter.redisErrors.Add(1)
+			if limiter.failOpen {
+				limiter.recordAccepted()
+				return true, nil
+			}
+			return false, err
+		}
+	}
+	if count > int64(limiter.burst) {
+		limiter.recordLimited()
+		return false, nil
+	}
+	limiter.recordAccepted()
+	return true, nil
+}
+
+func (limiter *Limiter) redisKey(rawKey string, windowID int64) string {
+	digest := sha256.Sum256([]byte(rawKey))
+	return limiter.prefix + ":rate:" + hex.EncodeToString(digest[:12]) + ":" + strconv.FormatInt(windowID, 10)
+}
+
+func (limiter *Limiter) recordAccepted() {
+	limiter.mu.Lock()
+	defer limiter.mu.Unlock()
+	limiter.totalAccepted++
+}
+
+func (limiter *Limiter) recordLimited() {
+	limiter.mu.Lock()
+	defer limiter.mu.Unlock()
+	limiter.totalLimited++
 }
 
 func (limiter *Limiter) evictOldestLocked() {

@@ -24,6 +24,7 @@ import (
 	apigrpc "github.com/qsyy0921/IM/services/api-gateway/internal/api/grpc"
 	monitoringinfra "github.com/qsyy0921/IM/services/api-gateway/internal/infrastructure/monitoring"
 	ratelimitinfra "github.com/qsyy0921/IM/services/api-gateway/internal/infrastructure/ratelimit"
+	"github.com/redis/go-redis/v9"
 	grpcgo "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -58,10 +59,11 @@ func runGRPC() error {
 	}
 	defer authenticator.Close()
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
-	rateLimiter, err := newRateLimiterFromEnv()
+	rateLimiter, closeRateLimiter, err := newRateLimiterFromEnv(ctx)
 	if err != nil {
 		return err
 	}
+	defer closeRateLimiter()
 	stopDebug, err := startDebugServer(ctx, apiGatewayDebugAddr(), monitoringinfra.NewHandler(grpcMetrics).
 		WithAuthJWKStats(authenticator.JWKStats).
 		WithRateLimitStats(rateLimiter.Snapshot))
@@ -408,18 +410,53 @@ func envOptionalBool(name string) (bool, bool, error) {
 	}
 }
 
-func newRateLimiterFromEnv() (*ratelimitinfra.Limiter, error) {
+func newRateLimiterFromEnv(ctx context.Context) (*ratelimitinfra.Limiter, func() error, error) {
 	enabled, _, err := envOptionalBool("NEXUSIM_API_GATEWAY_RATE_LIMIT_ENABLED")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	rps := envFloat64("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", 0)
-	return ratelimitinfra.New(ratelimitinfra.Config{
+	backend := strings.ToLower(strings.TrimSpace(envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_BACKEND", "local")))
+	config := ratelimitinfra.Config{
 		Enabled:           enabled,
+		Backend:           backend,
 		RequestsPerSecond: rps,
 		Burst:             envInt("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", int(rps)),
 		MaxKeys:           envInt("NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS", 10000),
-	})
+	}
+	if enabled && backend == "redis" {
+		failOpen := true
+		if value, configured, err := envOptionalBool("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_FAIL_OPEN"); err != nil {
+			return nil, nil, err
+		} else if configured {
+			failOpen = value
+		}
+		client, err := newRedisUniversalClient(loadRateLimitRedisClientConfigFromEnv())
+		if err != nil {
+			return nil, nil, err
+		}
+		pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		if err := client.Ping(pingCtx).Err(); err != nil {
+			_ = client.Close()
+			return nil, nil, err
+		}
+		config.RedisClient = client
+		config.RedisKeyPrefix = envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_KEY_PREFIX", "nexusim:api-gateway")
+		config.RedisWindow = envDuration("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_WINDOW", time.Second)
+		config.RedisFailOpen = failOpen
+		limiter, err := ratelimitinfra.New(config)
+		if err != nil {
+			_ = client.Close()
+			return nil, nil, err
+		}
+		return limiter, client.Close, nil
+	}
+	limiter, err := ratelimitinfra.New(config)
+	if err != nil {
+		return nil, nil, err
+	}
+	return limiter, func() error { return nil }, nil
 }
 
 type grpcClientTLSConfig struct {
@@ -428,6 +465,62 @@ type grpcClientTLSConfig struct {
 	ServerName     string
 	ClientCertFile string
 	ClientKeyFile  string
+}
+
+type redisClientConfig struct {
+	Mode               string
+	Addr               string
+	SentinelAddrs      []string
+	SentinelMasterName string
+	Username           string
+	Password           string
+	DB                 int
+	SentinelUsername   string
+	SentinelPassword   string
+}
+
+func loadRateLimitRedisClientConfigFromEnv() redisClientConfig {
+	return redisClientConfig{
+		Mode:               envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_MODE", "single"),
+		Addr:               envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_ADDR", "127.0.0.1:6379"),
+		SentinelAddrs:      splitCSV(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_SENTINEL_ADDRS")),
+		SentinelMasterName: envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_SENTINEL_MASTER_NAME", ""),
+		Username:           os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_USERNAME"),
+		Password:           os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_PASSWORD"),
+		DB:                 envInt("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_DB", 0),
+		SentinelUsername:   os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_SENTINEL_USERNAME"),
+		SentinelPassword:   os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_SENTINEL_PASSWORD"),
+	}
+}
+
+func newRedisUniversalClient(config redisClientConfig) (redis.UniversalClient, error) {
+	switch strings.ToLower(strings.TrimSpace(config.Mode)) {
+	case "", "single":
+		return redis.NewClient(&redis.Options{
+			Addr:     config.Addr,
+			Username: config.Username,
+			Password: config.Password,
+			DB:       config.DB,
+		}), nil
+	case "sentinel":
+		if strings.TrimSpace(config.SentinelMasterName) == "" {
+			return nil, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_SENTINEL_MASTER_NAME is required when redis sentinel mode is enabled")
+		}
+		if len(config.SentinelAddrs) == 0 {
+			return nil, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_SENTINEL_ADDRS is required when redis sentinel mode is enabled")
+		}
+		return redis.NewFailoverClient(&redis.FailoverOptions{
+			MasterName:       config.SentinelMasterName,
+			SentinelAddrs:    config.SentinelAddrs,
+			Username:         config.Username,
+			Password:         config.Password,
+			DB:               config.DB,
+			SentinelUsername: config.SentinelUsername,
+			SentinelPassword: config.SentinelPassword,
+		}), nil
+	default:
+		return nil, errors.New("unsupported NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_MODE=" + config.Mode)
+	}
 }
 
 func grpcClientTLSConfigFromEnv(envPrefix string) grpcClientTLSConfig {

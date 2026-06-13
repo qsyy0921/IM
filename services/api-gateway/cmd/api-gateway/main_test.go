@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -14,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
 )
 
@@ -208,10 +210,11 @@ func TestNewAuthenticatorFromEnvAllowsExplicitLegacyAudience(t *testing.T) {
 
 func TestNewRateLimiterFromEnvDisabledByDefault(t *testing.T) {
 	clearAPIGatewayRateLimitConfig(t)
-	limiter, err := newRateLimiterFromEnv()
+	limiter, closeFn, err := newRateLimiterFromEnv(context.Background())
 	if err != nil {
 		t.Fatalf("new rate limiter: %v", err)
 	}
+	defer closeFn()
 	if snapshot := limiter.Snapshot(); snapshot.Enabled || snapshot.TotalLimited != 0 {
 		t.Fatalf("expected disabled limiter, got %+v", snapshot)
 	}
@@ -224,10 +227,11 @@ func TestNewRateLimiterFromEnvEnabled(t *testing.T) {
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", "20")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS", "50")
 
-	limiter, err := newRateLimiterFromEnv()
+	limiter, closeFn, err := newRateLimiterFromEnv(context.Background())
 	if err != nil {
 		t.Fatalf("new rate limiter: %v", err)
 	}
+	defer closeFn()
 	snapshot := limiter.Snapshot()
 	if !snapshot.Enabled || snapshot.RatePerSecond != 12.5 || snapshot.Burst != 20 || snapshot.MaxKeys != 50 {
 		t.Fatalf("unexpected limiter snapshot: %+v", snapshot)
@@ -237,8 +241,40 @@ func TestNewRateLimiterFromEnvEnabled(t *testing.T) {
 func TestNewRateLimiterFromEnvEnabledRequiresRate(t *testing.T) {
 	clearAPIGatewayRateLimitConfig(t)
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_ENABLED", "true")
-	if _, err := newRateLimiterFromEnv(); err == nil {
+	if _, _, err := newRateLimiterFromEnv(context.Background()); err == nil {
 		t.Fatalf("expected missing rate to fail")
+	}
+}
+
+func TestNewRateLimiterFromEnvRedisBackend(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	redisServer := miniredis.RunT(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_ENABLED", "true")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BACKEND", "redis")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", "5")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", "8")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_ADDR", redisServer.Addr())
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_KEY_PREFIX", "nexusim:test:api-gateway")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_WINDOW", "2s")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_FAIL_OPEN", "false")
+
+	limiter, closeFn, err := newRateLimiterFromEnv(context.Background())
+	if err != nil {
+		t.Fatalf("new redis rate limiter: %v", err)
+	}
+	defer closeFn()
+	snapshot := limiter.Snapshot()
+	if !snapshot.Enabled || snapshot.Backend != "redis" || snapshot.Burst != 8 || snapshot.RedisWindowMS != 2000 || snapshot.RedisFailOpen {
+		t.Fatalf("unexpected redis limiter snapshot: %+v", snapshot)
+	}
+}
+
+func TestNewRedisUniversalClientRequiresSentinelConfig(t *testing.T) {
+	if _, err := newRedisUniversalClient(redisClientConfig{Mode: "sentinel"}); err == nil {
+		t.Fatalf("expected sentinel mode without master name to fail")
+	}
+	if _, err := newRedisUniversalClient(redisClientConfig{Mode: "cluster"}); err == nil {
+		t.Fatalf("expected unsupported redis mode to fail")
 	}
 }
 
@@ -278,6 +314,19 @@ func clearAPIGatewayRateLimitConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BACKEND", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_MODE", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_ADDR", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_SENTINEL_ADDRS", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_SENTINEL_MASTER_NAME", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_USERNAME", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_PASSWORD", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_DB", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_SENTINEL_USERNAME", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_SENTINEL_PASSWORD", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_KEY_PREFIX", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_WINDOW", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_FAIL_OPEN", "")
 }
 
 func writeAPIGatewayTLSTestCert(t *testing.T, dir string, name string) (string, string) {

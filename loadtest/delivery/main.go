@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,25 +18,36 @@ import (
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+)
+
+const (
+	metadataTenantID  = "x-nexusim-tenant-id"
+	metadataUserID    = "x-nexusim-user-id"
+	metadataDeviceID  = "x-nexusim-device-id"
+	metadataSessionID = "x-nexusim-session-id"
+	metadataTraceID   = "x-nexusim-trace-id"
+	metadataRequestID = "x-nexusim-request-id"
 )
 
 type config struct {
-	target         string
-	tls            grpctls.Config
-	resultDir      string
-	requestTimeout time.Duration
-	waitTimeout    time.Duration
-	pollInterval   time.Duration
-	tenantID       string
-	userID         string
-	deviceID       string
-	conversationID string
-	afterSeq       int64
-	limit          int32
-	expectedCount  int
-	pgDSN          string
-	consumerGroup  string
-	ack            bool
+	target               string
+	tls                  grpctls.Config
+	resultDir            string
+	requestTimeout       time.Duration
+	waitTimeout          time.Duration
+	pollInterval         time.Duration
+	tenantID             string
+	userID               string
+	deviceID             string
+	conversationID       string
+	afterSeq             int64
+	limit                int32
+	expectedCount        int
+	pgDSN                string
+	consumerGroup        string
+	ack                  bool
+	verifiedAuthMetadata bool
 }
 
 type summary struct {
@@ -45,6 +57,7 @@ type summary struct {
 	GitStatusShort        string       `json:"git_status_short,omitempty"`
 	Target                string       `json:"target"`
 	TLSEnabled            bool         `json:"tls_enabled"`
+	VerifiedAuthMetadata  bool         `json:"verified_auth_metadata"`
 	TenantID              string       `json:"tenant_id"`
 	UserID                string       `json:"user_id"`
 	DeviceID              string       `json:"device_id"`
@@ -86,6 +99,15 @@ type pulledItem struct {
 	SenderID        string `json:"sender_id"`
 }
 
+type verifiedAuthIdentity struct {
+	tenantID  string
+	userID    string
+	deviceID  string
+	sessionID string
+	traceID   string
+	requestID string
+}
+
 func main() {
 	cfg := parseConfig()
 	if err := run(cfg); err != nil {
@@ -113,6 +135,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "", "optional PostgreSQL DSN for stats")
 	flag.StringVar(&cfg.consumerGroup, "consumer-group", "", "optional delivery timeline consumer group for checkpoint stats")
 	flag.BoolVar(&cfg.ack, "ack", true, "ack max pulled conversation seq")
+	flag.BoolVar(&cfg.verifiedAuthMetadata, "verified-auth-metadata", envBool(false, "NEXUSIM_DELIVERY_LOADTEST_VERIFIED_AUTH_METADATA"), "send gateway verified identity through delivery gRPC metadata")
 	flag.Parse()
 	if cfg.requestTimeout <= 0 {
 		cfg.requestTimeout = 2 * time.Second
@@ -137,6 +160,49 @@ func registerTLSFlags(prefix string, envPrefix string, serviceName string, confi
 	flag.StringVar(&config.ClientKeyFile, prefix+"-client-key-file", os.Getenv(envPrefix+"_CLIENT_KEY_FILE"), "client private key PEM for "+serviceName+" gRPC mTLS")
 }
 
+func deliverySmokeAuth(cfg config, traceID string, requestID string) verifiedAuthIdentity {
+	return verifiedAuthIdentity{
+		tenantID:  cfg.tenantID,
+		userID:    cfg.userID,
+		deviceID:  cfg.deviceID,
+		sessionID: "delivery-smoke",
+		traceID:   traceID,
+		requestID: requestID,
+	}
+}
+
+func withVerifiedAuthMetadata(ctx context.Context, cfg config, auth verifiedAuthIdentity) context.Context {
+	if !cfg.verifiedAuthMetadata {
+		return ctx
+	}
+	pairs := []string{
+		metadataTenantID, auth.tenantID,
+		metadataUserID, auth.userID,
+		metadataDeviceID, auth.deviceID,
+	}
+	if auth.sessionID != "" {
+		pairs = append(pairs, metadataSessionID, auth.sessionID)
+	}
+	if auth.traceID != "" {
+		pairs = append(pairs, metadataTraceID, auth.traceID)
+	}
+	if auth.requestID != "" {
+		pairs = append(pairs, metadataRequestID, auth.requestID)
+	}
+	return metadata.NewOutgoingContext(ctx, metadata.Pairs(pairs...))
+}
+
+func deliveryAuth(auth verifiedAuthIdentity) *deliveryv1.AuthContext {
+	return &deliveryv1.AuthContext{
+		TenantId:  auth.tenantID,
+		UserId:    auth.userID,
+		DeviceId:  auth.deviceID,
+		SessionId: auth.sessionID,
+		TraceId:   auth.traceID,
+		RequestId: auth.requestID,
+	}
+}
+
 func run(cfg config) error {
 	if err := os.MkdirAll(cfg.resultDir, 0o755); err != nil {
 		return fmt.Errorf("create result dir: %w", err)
@@ -153,24 +219,25 @@ func run(cfg config) error {
 	client := deliveryv1.NewDeliveryServiceClient(conn)
 
 	result := summary{
-		Commit:         shortCommit(),
-		CommitFull:     fullCommit(),
-		GitDirty:       gitDirty(),
-		GitStatusShort: gitStatusShort(),
-		Target:         cfg.target,
-		TLSEnabled:     cfg.tls.Enabled(),
-		TenantID:       cfg.tenantID,
-		UserID:         cfg.userID,
-		DeviceID:       cfg.deviceID,
-		ConversationID: cfg.conversationID,
-		AfterSeq:       cfg.afterSeq,
-		Limit:          cfg.limit,
-		ExpectedCount:  cfg.expectedCount,
-		ConsumerGroup:  cfg.consumerGroup,
-		AckEnabled:     cfg.ack,
-		WaitTimeout:    cfg.waitTimeout.String(),
-		PollInterval:   cfg.pollInterval.String(),
-		StartedAt:      time.Now().UTC(),
+		Commit:               shortCommit(),
+		CommitFull:           fullCommit(),
+		GitDirty:             gitDirty(),
+		GitStatusShort:       gitStatusShort(),
+		Target:               cfg.target,
+		TLSEnabled:           cfg.tls.Enabled(),
+		VerifiedAuthMetadata: cfg.verifiedAuthMetadata,
+		TenantID:             cfg.tenantID,
+		UserID:               cfg.userID,
+		DeviceID:             cfg.deviceID,
+		ConversationID:       cfg.conversationID,
+		AfterSeq:             cfg.afterSeq,
+		Limit:                cfg.limit,
+		ExpectedCount:        cfg.expectedCount,
+		ConsumerGroup:        cfg.consumerGroup,
+		AckEnabled:           cfg.ack,
+		WaitTimeout:          cfg.waitTimeout.String(),
+		PollInterval:         cfg.pollInterval.String(),
+		StartedAt:            time.Now().UTC(),
 	}
 
 	deadline := time.Now().Add(cfg.waitTimeout)
@@ -179,15 +246,11 @@ func run(cfg config) error {
 	for {
 		pullCtx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
 		begin := time.Now()
+		requestID := fmt.Sprintf("delivery-pull-%d", result.PollCount+1)
+		auth := deliverySmokeAuth(cfg, requestID, requestID)
+		pullCtx = withVerifiedAuthMetadata(pullCtx, cfg, auth)
 		response, err := client.PullInbox(pullCtx, &deliveryv1.PullInboxRequest{
-			AuthContext: &deliveryv1.AuthContext{
-				TenantId:  cfg.tenantID,
-				UserId:    cfg.userID,
-				DeviceId:  cfg.deviceID,
-				SessionId: "delivery-smoke",
-				TraceId:   fmt.Sprintf("delivery-pull-%d", result.PollCount+1),
-				RequestId: fmt.Sprintf("delivery-pull-%d", result.PollCount+1),
-			},
+			AuthContext:    deliveryAuth(auth),
 			ConversationId: cfg.conversationID,
 			AfterSeq:       cfg.afterSeq,
 			Limit:          cfg.limit,
@@ -228,15 +291,10 @@ func run(cfg config) error {
 	if result.Success && cfg.ack && result.MaxSeq > 0 {
 		ackCtx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
 		begin := time.Now()
+		auth := deliverySmokeAuth(cfg, "delivery-ack", "delivery-ack")
+		ackCtx = withVerifiedAuthMetadata(ackCtx, cfg, auth)
 		response, err := client.AckDelivery(ackCtx, &deliveryv1.AckDeliveryRequest{
-			AuthContext: &deliveryv1.AuthContext{
-				TenantId:  cfg.tenantID,
-				UserId:    cfg.userID,
-				DeviceId:  cfg.deviceID,
-				SessionId: "delivery-smoke",
-				TraceId:   "delivery-ack",
-				RequestId: "delivery-ack",
-			},
+			AuthContext:    deliveryAuth(auth),
 			ConversationId: cfg.conversationID,
 			ReceivedSeq:    result.MaxSeq,
 		})
@@ -404,4 +462,19 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func envBool(fallback bool, names ...string) bool {
+	for _, name := range names {
+		value := strings.TrimSpace(os.Getenv(name))
+		if value == "" {
+			continue
+		}
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return fallback
+		}
+		return parsed
+	}
+	return fallback
 }

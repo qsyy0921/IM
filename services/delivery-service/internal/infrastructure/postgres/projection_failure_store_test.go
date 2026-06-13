@@ -145,6 +145,38 @@ INSERT INTO delivery_projection_failures (
 	}
 }
 
+func TestProjectionFailureStoreAuditFiltersByFailureClassIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_failures (
+    consumer_group, topic, partition_id, offset_value, event_id, event_type, tenant_id, conversation_id, aggregate_version, trace_id, failure_class, last_error, failure_count, first_seen_at, last_seen_at, resolved_at, resolved_checkpoint_offset
+) VALUES
+    ('group-3', 'conversation.timeline.events', 0, 61, 'event-1', 'message.edited.v1', 'tenant-1', 'conv-1', 7, 'trace-1', 'db_write_failed', 'write failed', 1, now(), now(), NULL, NULL),
+    ('group-3', 'conversation.timeline.events', 0, 62, 'event-2', 'message.deleted.v1', 'tenant-1', 'conv-1', 8, 'trace-2', 'decode_failed', 'decode failed', 1, now(), now(), NULL, NULL)
+`)
+	if err != nil {
+		t.Fatalf("seed projection failures: %v", err)
+	}
+
+	store := NewProjectionFailureStore(pool)
+	rows, err := store.AuditFailures(ctx, ProjectionFailureAuditOptions{
+		ConsumerGroup:  "group-3",
+		Topic:          "conversation.timeline.events",
+		FailureClass:   types.ProjectionFailureClassDBWrite,
+		UnresolvedOnly: true,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit projection failures by class: %v", err)
+	}
+	if len(rows) != 1 || rows[0].OffsetValue != 61 || rows[0].FailureClass != types.ProjectionFailureClassDBWrite {
+		t.Fatalf("unexpected filtered audit rows: %+v", rows)
+	}
+}
+
 func TestProjectionFailureStoreCleanupResolvedFailuresDeletesOnlyExpiredResolvedRowsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -163,7 +195,11 @@ INSERT INTO delivery_projection_failures (
 	}
 
 	store := NewProjectionFailureStore(pool)
-	stats, err := store.CleanupResolvedFailures(ctx, time.Now().UTC().Add(-24*time.Hour), 10)
+	stats, err := store.CleanupResolvedFailures(ctx, ProjectionFailureCleanupOptions{
+		Topic:  "conversation.timeline.events",
+		Cutoff: time.Now().UTC().Add(-24 * time.Hour),
+		Limit:  10,
+	})
 	if err != nil {
 		t.Fatalf("cleanup resolved projection failures: %v", err)
 	}
@@ -193,7 +229,11 @@ INSERT INTO delivery_projection_failures (
 	}
 
 	store := NewProjectionFailureStore(pool)
-	stats, err := store.CleanupResolvedFailures(ctx, time.Now().UTC().Add(-24*time.Hour), 1)
+	stats, err := store.CleanupResolvedFailures(ctx, ProjectionFailureCleanupOptions{
+		Topic:  "conversation.timeline.events",
+		Cutoff: time.Now().UTC().Add(-24 * time.Hour),
+		Limit:  1,
+	})
 	if err != nil {
 		t.Fatalf("cleanup resolved projection failures with limit: %v", err)
 	}
@@ -212,6 +252,41 @@ WHERE consumer_group = 'group-2'
 	if remaining != 1 {
 		t.Fatalf("expected one remaining row after limited cleanup, got %d", remaining)
 	}
+}
+
+func TestProjectionFailureStoreCleanupResolvedFailuresFiltersByFailureClassIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_failures (
+    consumer_group, topic, partition_id, offset_value, event_id, event_type, tenant_id, conversation_id, aggregate_version, trace_id, failure_class, last_error, failure_count, first_seen_at, last_seen_at, resolved_at, resolved_checkpoint_offset
+) VALUES
+    ('group-4', 'conversation.timeline.events', 0, 71, 'event-1', 'message.edited.v1', 'tenant-1', 'conv-1', 7, 'trace-1', 'db_write_failed', 'resolved db write', 1, now(), now(), now() - interval '2 days', 72),
+    ('group-4', 'conversation.timeline.events', 0, 72, 'event-2', 'message.deleted.v1', 'tenant-1', 'conv-1', 8, 'trace-2', 'decode_failed', 'resolved decode', 1, now(), now(), now() - interval '2 days', 73)
+`)
+	if err != nil {
+		t.Fatalf("seed projection failures: %v", err)
+	}
+
+	store := NewProjectionFailureStore(pool)
+	stats, err := store.CleanupResolvedFailures(ctx, ProjectionFailureCleanupOptions{
+		ConsumerGroup: "group-4",
+		Topic:         "conversation.timeline.events",
+		FailureClass:  types.ProjectionFailureClassDBWrite,
+		Cutoff:        time.Now().UTC().Add(-24 * time.Hour),
+		Limit:         10,
+	})
+	if err != nil {
+		t.Fatalf("cleanup resolved projection failures by class: %v", err)
+	}
+	if stats.Deleted != 1 {
+		t.Fatalf("expected one deleted row, got %d", stats.Deleted)
+	}
+
+	assertProjectionFailureMissing(t, ctx, pool, "group-4", "conversation.timeline.events", 0, 71)
+	assertProjectionFailureRow(t, ctx, pool, "group-4", "conversation.timeline.events", 0, 72, types.ProjectionFailureClassDecode, "resolved decode", 1, true, 73)
 }
 
 func assertProjectionFailureMissing(t *testing.T, ctx context.Context, pool *pgxpool.Pool, consumerGroup string, topic string, partitionID int32, offsetValue int64) {

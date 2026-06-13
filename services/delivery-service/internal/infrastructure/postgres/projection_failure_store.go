@@ -19,6 +19,7 @@ type ProjectionFailureAuditOptions struct {
 	ConsumerGroup  string
 	Topic          string
 	PartitionID    *int32
+	FailureClass   string
 	UnresolvedOnly bool
 	Limit          int
 }
@@ -40,6 +41,15 @@ type ProjectionFailureAuditRow struct {
 
 type ProjectionFailureCleanupStats struct {
 	Deleted int64
+}
+
+type ProjectionFailureCleanupOptions struct {
+	ConsumerGroup string
+	Topic         string
+	PartitionID   *int32
+	FailureClass  string
+	Cutoff        time.Time
+	Limit         int
 }
 
 func NewProjectionFailureStore(pool *pgxpool.Pool) *ProjectionFailureStore {
@@ -135,6 +145,10 @@ func (store *ProjectionFailureStore) AuditFailures(ctx context.Context, options 
 		args = append(args, *options.PartitionID)
 		clauses = append(clauses, "partition_id = $"+itoa(len(args)))
 	}
+	if failureClass := strings.TrimSpace(options.FailureClass); failureClass != "" {
+		args = append(args, failureClass)
+		clauses = append(clauses, "failure_class = $"+itoa(len(args)))
+	}
 	if options.UnresolvedOnly {
 		clauses = append(clauses, "resolved_at IS NULL")
 	}
@@ -190,21 +204,40 @@ LIMIT $` + itoa(len(args))
 	return result, nil
 }
 
-func (store *ProjectionFailureStore) CleanupResolvedFailures(ctx context.Context, cutoff time.Time, limit int) (ProjectionFailureCleanupStats, error) {
+func (store *ProjectionFailureStore) CleanupResolvedFailures(ctx context.Context, options ProjectionFailureCleanupOptions) (ProjectionFailureCleanupStats, error) {
 	if store == nil || store.pool == nil {
 		return ProjectionFailureCleanupStats{}, errors.New("delivery projection failure store is not configured")
 	}
-	if limit <= 0 {
+	if options.Limit <= 0 {
 		return ProjectionFailureCleanupStats{}, nil
 	}
+	topic := strings.TrimSpace(options.Topic)
+	if topic == "" {
+		topic = "conversation.timeline.events"
+	}
+	var args []any
+	clauses := []string{"topic = $1", "resolved_at IS NOT NULL", "resolved_at < $2"}
+	args = append(args, topic, options.Cutoff)
+	if consumerGroup := strings.TrimSpace(options.ConsumerGroup); consumerGroup != "" {
+		args = append(args, consumerGroup)
+		clauses = append(clauses, "consumer_group = $"+itoa(len(args)))
+	}
+	if options.PartitionID != nil {
+		args = append(args, *options.PartitionID)
+		clauses = append(clauses, "partition_id = $"+itoa(len(args)))
+	}
+	if failureClass := strings.TrimSpace(options.FailureClass); failureClass != "" {
+		args = append(args, failureClass)
+		clauses = append(clauses, "failure_class = $"+itoa(len(args)))
+	}
+	args = append(args, options.Limit)
 	rows, err := store.pool.Query(ctx, `
 WITH doomed AS (
     SELECT consumer_group, topic, partition_id, offset_value
     FROM delivery_projection_failures
-    WHERE resolved_at IS NOT NULL
-      AND resolved_at < $1
+    WHERE `+strings.Join(clauses, " AND ")+`
     ORDER BY resolved_at ASC, consumer_group, topic, partition_id, offset_value
-    LIMIT $2
+    LIMIT $`+itoa(len(args))+`
     FOR UPDATE SKIP LOCKED
 )
 DELETE FROM delivery_projection_failures target
@@ -214,7 +247,7 @@ WHERE target.consumer_group = doomed.consumer_group
   AND target.partition_id = doomed.partition_id
   AND target.offset_value = doomed.offset_value
 RETURNING 1
-`, cutoff, limit)
+`, args...)
 	if err != nil {
 		return ProjectionFailureCleanupStats{}, types.NewDBWriteFailed(err.Error())
 	}

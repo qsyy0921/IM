@@ -324,6 +324,7 @@ func runProjectionFailureAudit() error {
 		ConsumerGroup:  envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_CONSUMER_GROUP", ""),
 		Topic:          envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_TOPIC", "conversation.timeline.events"),
 		PartitionID:    partitionID,
+		FailureClass:   envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_FAILURE_CLASS", ""),
 		UnresolvedOnly: !includeResolved,
 		Limit:          envInt("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_LIMIT", 20),
 	})
@@ -377,7 +378,14 @@ func runProjectionFailureCleanup() error {
 		return err
 	}
 	cutoff := time.Now().UTC().Add(-config.Retention)
-	stats, err := postgresinfra.NewProjectionFailureStore(pool).CleanupResolvedFailures(ctx, cutoff, config.BatchSize)
+	stats, err := postgresinfra.NewProjectionFailureStore(pool).CleanupResolvedFailures(ctx, postgresinfra.ProjectionFailureCleanupOptions{
+		ConsumerGroup: envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_CONSUMER_GROUP", ""),
+		Topic:         envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_TOPIC", "conversation.timeline.events"),
+		PartitionID:   projectionFailureCleanupPartitionID(),
+		FailureClass:  envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_FAILURE_CLASS", ""),
+		Cutoff:        cutoff,
+		Limit:         config.BatchSize,
+	})
 	if err != nil {
 		return err
 	}
@@ -409,6 +417,15 @@ func projectionFailureCleanupConfigFromEnv() (projectionFailureCleanupConfig, er
 		Retention: retention,
 		BatchSize: batchSize,
 	}, nil
+}
+
+func projectionFailureCleanupPartitionID() *int32 {
+	value := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_PARTITION_ID"))
+	if value == "" {
+		return nil
+	}
+	parsed := int32(envIntAllowZero("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_PARTITION_ID", 0))
+	return &parsed
 }
 
 func openPGPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {

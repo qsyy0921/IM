@@ -249,6 +249,93 @@ func TestOutboxStoreRepairDLQRequiresValidatorIntegration(t *testing.T) {
 	}
 }
 
+func TestOutboxStoreAuditOutboxReturnsLatestRowsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+
+	oldID, oldVersion := insertPolicyAuditOutboxRow(t, ctx, pool, "policy-audit-outbox-old", "tenant-policy:conversation-old", types.OutboxStatusPublished, 0)
+	newID, newVersion := insertPolicyAuditOutboxRow(t, ctx, pool, "policy-audit-outbox-new", "tenant-policy:conversation-new", types.OutboxStatusDLQ, 3)
+	if _, err := pool.Exec(ctx, `
+UPDATE policy_decision_audit_outbox
+SET created_at = now() - interval '2 minutes',
+    published_at = now() - interval '90 seconds'
+WHERE id = $1
+`, oldID); err != nil {
+		t.Fatalf("age old policy outbox row: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+UPDATE policy_decision_audit_outbox
+SET last_error = 'relay failed',
+    dead_lettered_at = now() - interval '30 seconds'
+WHERE id = $1
+`, newID); err != nil {
+		t.Fatalf("mark new policy outbox row dlq detail: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	rows, err := store.AuditOutbox(ctx, OutboxAuditOptions{
+		TenantID: "tenant-policy",
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("audit policy outbox: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected two rows, got %d", len(rows))
+	}
+	if rows[0].ID != newID || rows[0].EventID != "policy-audit-outbox-new" || rows[0].AggregateVersion != newVersion || rows[0].Status != types.OutboxStatusDLQ || rows[0].RetryCount != 3 || rows[0].LastError != "relay failed" || rows[0].DeadLetteredAt == nil {
+		t.Fatalf("unexpected latest policy outbox audit row: %+v", rows[0])
+	}
+	if rows[1].ID != oldID || rows[1].EventID != "policy-audit-outbox-old" || rows[1].AggregateVersion != oldVersion || rows[1].Status != types.OutboxStatusPublished || rows[1].PublishedAt == nil {
+		t.Fatalf("unexpected older policy outbox audit row: %+v", rows[1])
+	}
+}
+
+func TestOutboxStoreAuditOutboxFiltersStatusAndEventTypeIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+
+	matchedID, matchedVersion := insertPolicyAuditOutboxRow(t, ctx, pool, "policy-audit-outbox-match", "tenant-policy:conversation-match", types.OutboxStatusDLQ, 2)
+	insertPolicyAuditOutboxRow(t, ctx, pool, "policy-audit-outbox-pending", "tenant-policy:conversation-pending", types.OutboxStatusPending, 0)
+	insertPolicyAuditOutboxRow(t, ctx, pool, "policy-audit-outbox-other-type", "tenant-policy:conversation-other-type", types.OutboxStatusDLQ, 1)
+	if _, err := pool.Exec(ctx, `
+UPDATE policy_decision_audit_outbox
+SET event_type = 'policy.other_event.v1',
+    last_error = 'other event failed',
+    dead_lettered_at = now()
+WHERE event_id = 'policy-audit-outbox-other-type'
+`); err != nil {
+		t.Fatalf("change policy outbox event type: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+UPDATE policy_decision_audit_outbox
+SET last_error = 'decision relay failed',
+    dead_lettered_at = now()
+WHERE id = $1
+`, matchedID); err != nil {
+		t.Fatalf("mark matched policy outbox dlq detail: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	rows, err := store.AuditOutbox(ctx, OutboxAuditOptions{
+		TenantID:  "tenant-policy",
+		Status:    "dlq",
+		EventType: types.PolicyEventMessageActionDecision,
+		Limit:     10,
+	})
+	if err != nil {
+		t.Fatalf("audit filtered policy outbox: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one filtered row, got %d", len(rows))
+	}
+	if rows[0].ID != matchedID || rows[0].EventID != "policy-audit-outbox-match" || rows[0].AggregateVersion != matchedVersion || rows[0].Status != types.OutboxStatusDLQ || rows[0].EventType != types.PolicyEventMessageActionDecision {
+		t.Fatalf("unexpected filtered policy outbox row: %+v", rows[0])
+	}
+}
+
 func insertPolicyAuditOutboxRow(
 	t *testing.T,
 	ctx context.Context,

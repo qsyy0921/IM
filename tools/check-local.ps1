@@ -13,6 +13,9 @@ try {
     Write-Host "== docs entrypoints =="
     & (Join-Path $PSScriptRoot "check-doc-entrypoints.ps1")
 
+    Write-Host "== file size budgets =="
+    & (Join-Path $PSScriptRoot "check-file-size-budget.ps1")
+
     Write-Host "== git whitespace =="
     git diff --check
     git diff --cached --check

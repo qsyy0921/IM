@@ -13,17 +13,18 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	contactsv1 "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1"
+	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	contacteventsv1 "github.com/qsyy0921/IM/schemas/kafka/contacts/v1"
 	kafkago "github.com/segmentio/kafka-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
 type config struct {
 	target           string
+	tls              grpctls.Config
 	resultDir        string
 	pgDSN            string
 	kafkaBrokers     []string
@@ -46,6 +47,7 @@ type summary struct {
 	GitDirty                     bool                `json:"git_dirty"`
 	GitStatusShort               string              `json:"git_status_short,omitempty"`
 	Target                       string              `json:"target"`
+	TLSEnabled                   bool                `json:"tls_enabled"`
 	ResultDir                    string              `json:"result_dir"`
 	TenantID                     string              `json:"tenant_id"`
 	SenderUserID                 string              `json:"sender_user_id"`
@@ -158,6 +160,10 @@ func parseConfig() config {
 	var cfg config
 	var brokers string
 	flag.StringVar(&cfg.target, "target", "127.0.0.1:10500", "contacts-service gRPC target")
+	flag.StringVar(&cfg.tls.CAFile, "contacts-tls-ca-file", "", "CA PEM for contacts-service gRPC TLS")
+	flag.StringVar(&cfg.tls.ServerName, "contacts-tls-server-name", "", "server name for contacts-service gRPC TLS")
+	flag.StringVar(&cfg.tls.ClientCertFile, "contacts-tls-client-cert-file", "", "client certificate PEM for contacts-service mTLS")
+	flag.StringVar(&cfg.tls.ClientKeyFile, "contacts-tls-client-key-file", "", "client private key PEM for contacts-service mTLS")
 	flag.StringVar(&cfg.resultDir, "result-dir", "H:\\NexusIM\\loadtest-results\\contacts-smoke", "result directory")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "", "PostgreSQL DSN")
 	flag.StringVar(&brokers, "kafka-brokers", "localhost:9092", "comma-separated Kafka brokers")
@@ -200,6 +206,7 @@ func run(cfg config) error {
 		CommitFull:     gitOutput("rev-parse", "HEAD"),
 		GitStatusShort: gitOutput("status", "--short"),
 		Target:         cfg.target,
+		TLSEnabled:     cfg.tls.Enabled(),
 		ResultDir:      cfg.resultDir,
 		TenantID:       cfg.tenantID,
 		SenderUserID:   cfg.senderUserID,
@@ -230,7 +237,12 @@ func run(cfg config) error {
 		}
 	}
 
-	conn, err := grpc.NewClient(cfg.target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	dialOption, err := grpctls.DialOption(cfg.tls, "contacts-tls")
+	if err != nil {
+		s.Error = err.Error()
+		return fmt.Errorf("configure contacts-service TLS: %w", err)
+	}
+	conn, err := grpc.NewClient(cfg.target, dialOption)
 	if err != nil {
 		s.Error = err.Error()
 		return fmt.Errorf("dial contacts service: %w", err)

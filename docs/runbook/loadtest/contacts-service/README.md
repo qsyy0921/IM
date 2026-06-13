@@ -28,6 +28,19 @@ SendContactRequest
 - 不自动创建会话。
 - 不让 `message-service` 同步依赖 `contacts-service`。
 - Kafka 事件仍通过 outbox relay 发布，业务事务不直接 publish Kafka。
+- gRPC server 和 `loadtest/contacts` smoke runner 都支持第一阶段可选 TLS / mTLS 静态配置；默认仍是 plaintext，不代表证书签发、轮换、分发或全服务 mTLS rollout 已完成。
+
+可选 TLS / mTLS smoke 参数示例：
+
+```powershell
+.\loadtest\contacts\run-local-smoke.ps1 `
+  -ContactsTlsCaFile .\certs\ca.pem `
+  -ContactsTlsServerName contacts-service.nexusim.local `
+  -ContactsTlsClientCertFile .\certs\loadtest-client.crt `
+  -ContactsTlsClientKeyFile .\certs\loadtest-client.key
+```
+
+服务端 TLS 仍通过 `NEXUSIM_CONTACTS_GRPC_TLS_*` 环境变量配置；runner 参数只控制 loadtest client 如何连接 contacts-service。
 
 ## 报告列表
 
@@ -50,4 +63,5 @@ SendContactRequest
 - `ListContacts` / `GetContactState` 从 contacts-service 自己的 read model 读取，不跨服务读其它内部表。
 - `ListContactRequests` 从 `contact_requests` 读取当前用户收到 / 发出的申请，cursor 绑定 tenant、user、direction、status 和 page size，避免跨条件串页。
 - 当前 smoke 已验证 ACCEPT 后双向 ACTIVE edge、DECLINE / CANCEL 后不创建 edge、Delete/Block/Unblock/Remark 只修改当前 owner 视角 edge、删除后重新申请可以恢复联系人关系、outbox 清空、Kafka 读回对应 contact event。
+- gRPC TLS / mTLS 可以作为“服务端和 smoke 客户端的第一阶段传输安全已接通”来讲，但必须说明还没有做证书生命周期治理、动态服务身份或服务网格。
 - 后续如果要“接受好友后自动创建单聊”，应通过显式 saga / app port 编排，而不是在 contacts-service 事务里写 conversation-service 表。

@@ -2,6 +2,10 @@ param(
     [string]$PgDsn = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
+    [string]$IdentityTlsCaFile = "",
+    [string]$IdentityTlsServerName = "",
+    [string]$IdentityTlsClientCertFile = "",
+    [string]$IdentityTlsClientKeyFile = "",
     [switch]$SkipBuild
 )
 
@@ -189,19 +193,34 @@ try {
         NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MAX_ATTEMPTS = "3"
     }
 
-    & $runner `
-        --mode client `
-        --target $identityGrpcAddr `
-        --pg-dsn $PgDsn `
-        --tenant-id $tenantId `
-        --user-id $userId `
-        --password $password `
-        --destination $destination `
-        --webhook-file $webhookFile `
-        --webhook-bearer-token $webhookBearerToken `
-        --cleanup `
-        --wait-timeout 20s `
-        --result-dir $resultDir
+    $runnerArgs = @(
+        "--mode", "client",
+        "--target", $identityGrpcAddr,
+        "--pg-dsn", $PgDsn,
+        "--tenant-id", $tenantId,
+        "--user-id", $userId,
+        "--password", $password,
+        "--destination", $destination,
+        "--webhook-file", $webhookFile,
+        "--webhook-bearer-token", $webhookBearerToken,
+        "--cleanup",
+        "--wait-timeout", "20s",
+        "--result-dir", $resultDir
+    )
+    if (-not [string]::IsNullOrWhiteSpace($IdentityTlsCaFile)) {
+        $runnerArgs += @("--identity-tls-ca-file", $IdentityTlsCaFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($IdentityTlsServerName)) {
+        $runnerArgs += @("--identity-tls-server-name", $IdentityTlsServerName)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($IdentityTlsClientCertFile)) {
+        $runnerArgs += @("--identity-tls-client-cert-file", $IdentityTlsClientCertFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($IdentityTlsClientKeyFile)) {
+        $runnerArgs += @("--identity-tls-client-key-file", $IdentityTlsClientKeyFile)
+    }
+
+    & $runner @runnerArgs
     if ($LASTEXITCODE -ne 0) {
         throw "identity smoke runner failed with exit code $LASTEXITCODE"
     }

@@ -5,6 +5,10 @@ param(
     [string]$RunName = "",
     [ValidateSet("accept", "decline", "cancel", "delete", "block", "unblock", "remark", "readd")]
     [string]$Scenario = "accept",
+    [string]$ContactsTlsCaFile = "",
+    [string]$ContactsTlsServerName = "",
+    [string]$ContactsTlsClientCertFile = "",
+    [string]$ContactsTlsClientKeyFile = "",
     [switch]$SkipBuild
 )
 
@@ -179,18 +183,33 @@ try {
         NEXUSIM_CONTACTS_OUTBOX_POLL_INTERVAL = "200ms"
     }
 
-    & $runner `
-        --target $contactsGrpcAddr `
-        --pg-dsn $PgDsn `
-        --kafka-brokers $KafkaBrokers `
-        --contact-topic $contactTopic `
-        --tenant-id $tenantId `
-        --sender-user-id $senderUserId `
-        --receiver-user-id $receiverUserId `
-        --scenario $Scenario `
-        --cleanup `
-        --wait-timeout 15s `
-        --result-dir $resultDir
+    $runnerArgs = @(
+        "--target", $contactsGrpcAddr,
+        "--pg-dsn", $PgDsn,
+        "--kafka-brokers", $KafkaBrokers,
+        "--contact-topic", $contactTopic,
+        "--tenant-id", $tenantId,
+        "--sender-user-id", $senderUserId,
+        "--receiver-user-id", $receiverUserId,
+        "--scenario", $Scenario,
+        "--cleanup",
+        "--wait-timeout", "15s",
+        "--result-dir", $resultDir
+    )
+    if (-not [string]::IsNullOrWhiteSpace($ContactsTlsCaFile)) {
+        $runnerArgs += @("--contacts-tls-ca-file", $ContactsTlsCaFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ContactsTlsServerName)) {
+        $runnerArgs += @("--contacts-tls-server-name", $ContactsTlsServerName)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ContactsTlsClientCertFile)) {
+        $runnerArgs += @("--contacts-tls-client-cert-file", $ContactsTlsClientCertFile)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ContactsTlsClientKeyFile)) {
+        $runnerArgs += @("--contacts-tls-client-key-file", $ContactsTlsClientKeyFile)
+    }
+
+    & $runner @runnerArgs
     if ($LASTEXITCODE -ne 0) {
         throw "contacts smoke runner failed with exit code $LASTEXITCODE"
     }

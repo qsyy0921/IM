@@ -263,6 +263,7 @@ func runProjectionCheckpointRepair() error {
 	mode := envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_MODE", types.ProjectionCheckpointRepairModeAudit)
 	dryRun := envBool("NEXUSIM_DELIVERY_PROJECTION_REPAIR_DRY_RUN", false)
 	targetOffset := envInt64AllowZero("NEXUSIM_DELIVERY_PROJECTION_REPAIR_TARGET_OFFSET", 0)
+	failureOffset := envInt64AllowZero("NEXUSIM_DELIVERY_PROJECTION_REPAIR_FAILURE_OFFSET", 0)
 	stats, err := postgresinfra.NewProjectionRepairStore(pool).RepairCheckpoint(
 		ctx,
 		types.ProjectionCheckpointRepairOptions{
@@ -270,6 +271,7 @@ func runProjectionCheckpointRepair() error {
 			Topic:         envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_TOPIC", "conversation.timeline.events"),
 			PartitionID:   int32(envIntAllowZero("NEXUSIM_DELIVERY_PROJECTION_REPAIR_PARTITION_ID", 0)),
 			TargetOffset:  targetOffset,
+			FailureOffset: failureOffset,
 			Mode:          mode,
 			Operator:      envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_OPERATOR", "manual"),
 			Reason:        envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON", "manual delivery projection checkpoint repair"),
@@ -280,13 +282,14 @@ func runProjectionCheckpointRepair() error {
 		return err
 	}
 	log.Printf(
-		"delivery-service projection checkpoint repair completed requested=%d audited=%d mutated=%d skipped=%d mode=%s target_offset=%d dry_run=%t",
+		"delivery-service projection checkpoint repair completed requested=%d audited=%d mutated=%d skipped=%d mode=%s target_offset=%d failure_offset=%d dry_run=%t",
 		stats.Requested,
 		stats.Audited,
 		stats.Mutated,
 		stats.Skipped,
 		mode,
 		targetOffset,
+		failureOffset,
 		dryRun,
 	)
 	return nil

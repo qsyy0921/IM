@@ -469,6 +469,11 @@ NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay
 
 当前 delivery-service 已具备 `delivery_outbox -> Kafka im.delivery.events` 最小 relay 链路；push-gateway 已完成单实例最小在线通知 smoke，可以消费 `im.delivery.events` 并把在线唤醒交给 WebSocket 客户端。后续多实例在线路由仍需要 Redis route / resume buffer / slow session active close。
 
+`projection-checkpoint-repair` 当前支持两类安全入口：
+
+- `audit` / `rewind-next-offset`：显式指定 target checkpoint。
+- `rewind-unresolved-failure`：显式指定 unresolved projection failure 的 Kafka raw offset，先锁定该 failure row，再把 checkpoint 回调到同一 offset 做 replay。
+
 `delivery-service grpc` 的身份来源模式：
 
 ```text

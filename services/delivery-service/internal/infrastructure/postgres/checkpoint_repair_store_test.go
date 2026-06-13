@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -33,7 +34,7 @@ func TestProjectionRepairStoreAuditsCheckpointIntegration(t *testing.T) {
 		t.Fatalf("unexpected checkpoint repair stats: %+v", stats)
 	}
 	assertCheckpointOffset(t, ctx, pool, "group-1", "conversation.timeline.events", 0, 42)
-	assertCheckpointRepairAudit(t, ctx, pool, "group-1", "conversation.timeline.events", 0, types.ProjectionCheckpointRepairModeAudit, checkpointRepairOutcomeAudited, "", 42, 42, "manual audit")
+	assertCheckpointRepairAudit(t, ctx, pool, "group-1", "conversation.timeline.events", 0, types.ProjectionCheckpointRepairModeAudit, checkpointRepairOutcomeAudited, "", 42, 42, "manual audit", 0, "", "")
 }
 
 func TestProjectionRepairStoreRewindsCheckpointIntegration(t *testing.T) {
@@ -61,7 +62,7 @@ func TestProjectionRepairStoreRewindsCheckpointIntegration(t *testing.T) {
 		t.Fatalf("unexpected checkpoint repair stats: %+v", stats)
 	}
 	assertCheckpointOffset(t, ctx, pool, "group-1", "conversation.timeline.events", 0, 21)
-	assertCheckpointRepairAudit(t, ctx, pool, "group-1", "conversation.timeline.events", 0, types.ProjectionCheckpointRepairModeRewindNextOffset, checkpointRepairOutcomeMutated, "", 42, 21, "replay after projection fix")
+	assertCheckpointRepairAudit(t, ctx, pool, "group-1", "conversation.timeline.events", 0, types.ProjectionCheckpointRepairModeRewindNextOffset, checkpointRepairOutcomeMutated, "", 42, 21, "replay after projection fix", 0, "", "")
 }
 
 func TestProjectionRepairStoreSkipsWhenTargetIsNotLowerIntegration(t *testing.T) {
@@ -87,7 +88,57 @@ func TestProjectionRepairStoreSkipsWhenTargetIsNotLowerIntegration(t *testing.T)
 		t.Fatalf("unexpected checkpoint repair stats: %+v", stats)
 	}
 	assertCheckpointOffset(t, ctx, pool, "group-1", "conversation.timeline.events", 0, 42)
-	assertCheckpointRepairAudit(t, ctx, pool, "group-1", "conversation.timeline.events", 0, types.ProjectionCheckpointRepairModeRewindNextOffset, checkpointRepairOutcomeSkipped, checkpointRepairSkipTargetNotLower, 42, 42, "noop repair")
+	assertCheckpointRepairAudit(t, ctx, pool, "group-1", "conversation.timeline.events", 0, types.ProjectionCheckpointRepairModeRewindNextOffset, checkpointRepairOutcomeSkipped, checkpointRepairSkipTargetNotLower, 42, 42, "noop repair", 0, "", "")
+}
+
+func TestProjectionRepairStoreRewindsCheckpointFromUnresolvedFailureIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+	seedDeliveryCheckpoint(t, ctx, pool, "group-1", "conversation.timeline.events", 0, 42)
+	seedProjectionFailure(t, ctx, pool, "group-1", "conversation.timeline.events", 0, 21, "event-21", types.ProjectionFailureClassProjectionDependency, false)
+
+	store := NewProjectionRepairStore(pool, WithProjectionRepairClock(func() time.Time {
+		return time.Date(2026, 6, 14, 12, 0, 0, 0, time.UTC)
+	}))
+	stats, err := store.RepairCheckpoint(ctx, types.ProjectionCheckpointRepairOptions{
+		ConsumerGroup: "group-1",
+		Topic:         "conversation.timeline.events",
+		PartitionID:   0,
+		FailureOffset: 21,
+		Mode:          types.ProjectionCheckpointRepairModeRewindFailure,
+		Operator:      "operator-1",
+		Reason:        "replay unresolved projection failure",
+	})
+	if err != nil {
+		t.Fatalf("rewind checkpoint from failure: %v", err)
+	}
+	if stats.Requested != 1 || stats.Audited != 0 || stats.Mutated != 1 || stats.Skipped != 0 {
+		t.Fatalf("unexpected checkpoint repair stats: %+v", stats)
+	}
+	assertCheckpointOffset(t, ctx, pool, "group-1", "conversation.timeline.events", 0, 21)
+	assertCheckpointRepairAudit(t, ctx, pool, "group-1", "conversation.timeline.events", 0, types.ProjectionCheckpointRepairModeRewindFailure, checkpointRepairOutcomeMutated, "", 42, 21, "replay unresolved projection failure", 21, "event-21", types.ProjectionFailureClassProjectionDependency)
+}
+
+func TestProjectionRepairStoreRejectsMissingUnresolvedFailureIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+	seedDeliveryCheckpoint(t, ctx, pool, "group-1", "conversation.timeline.events", 0, 42)
+
+	store := NewProjectionRepairStore(pool)
+	_, err := store.RepairCheckpoint(ctx, types.ProjectionCheckpointRepairOptions{
+		ConsumerGroup: "group-1",
+		Topic:         "conversation.timeline.events",
+		PartitionID:   0,
+		FailureOffset: 21,
+		Mode:          types.ProjectionCheckpointRepairModeRewindFailure,
+		Operator:      "operator-1",
+		Reason:        "missing unresolved failure",
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
 }
 
 func seedDeliveryCheckpoint(t *testing.T, ctx context.Context, pool *pgxpool.Pool, consumerGroup string, topic string, partitionID int32, offsetValue int64) {
@@ -98,6 +149,23 @@ INSERT INTO delivery_kafka_checkpoints (
 ) VALUES ($1, $2, $3, $4)
 `, consumerGroup, topic, partitionID, offsetValue); err != nil {
 		t.Fatalf("seed delivery checkpoint: %v", err)
+	}
+}
+
+func seedProjectionFailure(t *testing.T, ctx context.Context, pool *pgxpool.Pool, consumerGroup string, topic string, partitionID int32, offsetValue int64, eventID string, failureClass string, resolved bool) {
+	t.Helper()
+	var resolvedAt any
+	var resolvedCheckpointOffset any
+	if resolved {
+		resolvedAt = time.Date(2026, 6, 14, 11, 0, 0, 0, time.UTC)
+		resolvedCheckpointOffset = offsetValue + 1
+	}
+	if _, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_failures (
+    consumer_group, topic, partition_id, offset_value, event_id, event_type, tenant_id, conversation_id, aggregate_version, trace_id, failure_class, last_error, failure_count, resolved_at, resolved_checkpoint_offset
+) VALUES ($1, $2, $3, $4, $5, 'message.revoked.v1', 'tenant-1', 'conv-1', 7, 'trace-1', $6, 'projection failure', 1, $7, $8)
+`, consumerGroup, topic, partitionID, offsetValue, eventID, failureClass, resolvedAt, resolvedCheckpointOffset); err != nil {
+		t.Fatalf("seed projection failure: %v", err)
 	}
 }
 
@@ -118,7 +186,7 @@ WHERE consumer_group = $1
 	}
 }
 
-func assertCheckpointRepairAudit(t *testing.T, ctx context.Context, pool *pgxpool.Pool, consumerGroup string, topic string, partitionID int32, mode string, outcome string, skipReason string, beforeOffset int64, afterOffset int64, reason string) {
+func assertCheckpointRepairAudit(t *testing.T, ctx context.Context, pool *pgxpool.Pool, consumerGroup string, topic string, partitionID int32, mode string, outcome string, skipReason string, beforeOffset int64, afterOffset int64, reason string, failureOffset int64, failureEventID string, failureClass string) {
 	t.Helper()
 	var gotMode string
 	var gotOutcome string
@@ -126,6 +194,9 @@ func assertCheckpointRepairAudit(t *testing.T, ctx context.Context, pool *pgxpoo
 	var gotBeforeOffset int64
 	var gotAfterOffset int64
 	var gotReason string
+	var gotFailureOffset *int64
+	var gotFailureEventID string
+	var gotFailureClass string
 	if err := pool.QueryRow(ctx, `
 SELECT
     mode,
@@ -133,24 +204,39 @@ SELECT
     skip_reason,
     before_offset_value,
     after_offset_value,
-    reason
+    reason,
+    failure_offset_value,
+    failure_event_id,
+    failure_class
 FROM delivery_projection_checkpoint_repair_audit
 WHERE consumer_group = $1
   AND topic = $2
   AND partition_id = $3
 ORDER BY id DESC
 LIMIT 1
-`, consumerGroup, topic, partitionID).Scan(
+	`, consumerGroup, topic, partitionID).Scan(
 		&gotMode,
 		&gotOutcome,
 		&gotSkipReason,
 		&gotBeforeOffset,
 		&gotAfterOffset,
 		&gotReason,
+		&gotFailureOffset,
+		&gotFailureEventID,
+		&gotFailureClass,
 	); err != nil {
 		t.Fatalf("read checkpoint repair audit: %v", err)
 	}
 	if gotMode != mode || gotOutcome != outcome || gotSkipReason != skipReason || gotBeforeOffset != beforeOffset || gotAfterOffset != afterOffset || gotReason != reason {
 		t.Fatalf("unexpected checkpoint repair audit row: mode=%s outcome=%s skip=%s before=%d after=%d reason=%s", gotMode, gotOutcome, gotSkipReason, gotBeforeOffset, gotAfterOffset, gotReason)
+	}
+	if failureEventID == "" && failureClass == "" {
+		if gotFailureOffset != nil || gotFailureEventID != "" || gotFailureClass != "" {
+			t.Fatalf("expected empty failure audit fields, got offset=%v event=%s class=%s", gotFailureOffset, gotFailureEventID, gotFailureClass)
+		}
+		return
+	}
+	if gotFailureOffset == nil || *gotFailureOffset != failureOffset || gotFailureEventID != failureEventID || gotFailureClass != failureClass {
+		t.Fatalf("unexpected failure audit fields: offset=%v event=%s class=%s", gotFailureOffset, gotFailureEventID, gotFailureClass)
 	}
 }

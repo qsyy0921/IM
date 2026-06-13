@@ -10,6 +10,7 @@ type ProjectionCheckpointRepairStats struct {
 const (
 	ProjectionCheckpointRepairModeAudit            = "audit"
 	ProjectionCheckpointRepairModeRewindNextOffset = "rewind-next-offset"
+	ProjectionCheckpointRepairModeRewindFailure    = "rewind-unresolved-failure"
 )
 
 type ProjectionCheckpointRepairOptions struct {
@@ -17,6 +18,7 @@ type ProjectionCheckpointRepairOptions struct {
 	Topic         string
 	PartitionID   int32
 	TargetOffset  int64
+	FailureOffset int64
 	Mode          string
 	Operator      string
 	Reason        string

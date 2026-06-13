@@ -21,6 +21,7 @@
 - `identity-service.md`
 - `policy-service.md`
 - `api-gateway.md`
+- `search-service.md`
 
 ## 通用约束
 

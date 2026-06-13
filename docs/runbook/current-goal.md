@@ -26,8 +26,8 @@
 先继续第三层产品能力和身份安全 hardening，把系统做成可面试展示的“本地/双机可运行分布式 IM 后端”。
 
 当前优先级：
-1. 下一步开发 `search-service v0.1`：搜索索引服务；先做 timeline event -> search projection -> `SearchMessages`。
-2. `search-service` 不绑定具体搜索中间件；索引后端必须走 port，第一版可用本地/PG adapter，后续再替换。
+1. 当前已完成 `search-service` SDD v0.1 draft：搜索索引服务，先做 timeline event -> search projection -> `SearchMessages`。
+2. 下一步再进入 `search_service.proto`、migration、六层 skeleton；索引后端必须走 port，不绑定具体搜索中间件。
 3. 保持 api-gateway、identity、message、delivery、push、receipt、contacts、policy 已有链路稳定。
 4. Kafka HA、PostgreSQL failover、Redis quorum / 网络分区属于生产化后续项，不阻塞当前功能推进。
 

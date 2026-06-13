@@ -4,6 +4,8 @@
 
 2026-06-13 补充：`full + -VerifiedAuthMetadata` 真实进程 smoke 已通过，验证 conversation / message / delivery 三个 user-facing RPC 在 metadata auth 模式下完成最小链路，且 push-gateway 将 WebSocket auth 派生身份转发为 delivery-service `AckDelivery` metadata。
 
+2026-06-13 补充：`full + WSS/mTLS + -VerifiedAuthMetadata` 真实进程 smoke 已通过，验证 push-gateway WebSocket 入口在 `NEXUSIM_PUSH_WS_TLS_REQUIRE_CLIENT_CERT=true`、client DNS / URI SAN allowlist 下完成 `delivery.notify -> PullInbox -> delivery.ack.ok`。该 run 只验证 WebSocket 入口静态 WSS / mTLS，不代表全服务 mTLS rollout 或证书生命周期治理。
+
 ## 当前验证目标
 
 第一阶段只验证在线通知链路，不做 WebSocket 容量极限：
@@ -170,6 +172,7 @@ Sentinel 模式当前已证明三件事：客户端 master discovery 正常路�
 | `loadtest-report-20260612-push-gateway-identity-revoke-smoke.md` | `RevokeDevice/RevokeSession -> identity_outbox -> im.identity.events -> push-gateway identity-consumer -> Redis deny-list / Redis route eviction` 后，旧在线连接收到 `server.resume_hint(reason=identity_revoked)` 并被主动关闭，旧 gateway token 重连返回 `PERMISSION_DENIED`；session revoke smoke 额外验证 same-device survivor session 仍可 `server.pong` |
 | `loadtest-report-20260610-push-gateway-message-change-notify-smoke.md` | `edit / revoke / delete` 三类消息变更均能触发带正确 `source_event_type` 的 `delivery.notify`，且与 `PullInbox` durable item 一致 |
 | `loadtest-report-20260613-push-gateway-verified-metadata-smoke.md` | `full + -VerifiedAuthMetadata` 真实进程 smoke，验证 metadata auth 下的 `CreateMemberChange / SendMessage / PullInbox` 和 push-gateway `delivery.ack -> AckDelivery` metadata 转发 |
+| `loadtest-report-20260613-push-gateway-wss-mtls-smoke.md` | `full + WSS/mTLS + -VerifiedAuthMetadata` 真实进程 smoke，验证 WebSocket 入口 require client cert、client DNS / URI SAN allowlist 和 `delivery.notify -> PullInbox -> delivery.ack.ok` |
 
 报告 Markdown 保存在仓库内：
 
@@ -332,6 +335,17 @@ message-service 写消息事实
 ```
 
 这样断线、重连、成员边界、ACK 丢失和服务重启都可以由 `delivery-service` 的 durable inbox / cursor 兜底。
+
+安全入口可讲点：
+
+```text
+push-gateway WebSocket 入口可以切到 WSS
+服务端 require client cert
+并用客户端证书的 DNS SAN / URI SAN 做 exact-match allowlist
+客户端仍通过 PullInbox / AckDelivery 完成可靠投递闭环
+```
+
+这说明当前在线入口已经具备第一阶段静态传输加密和客户端证书校验能力，但证书签发、轮换、撤销、分发和动态服务身份治理仍是后续生产化切片。
 
 分布式可讲点：
 

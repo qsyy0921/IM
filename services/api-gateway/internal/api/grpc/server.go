@@ -2,10 +2,13 @@ package grpc
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	contactsv1 "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1"
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
@@ -14,6 +17,7 @@ import (
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
+	gatewaytypes "github.com/qsyy0921/IM/services/api-gateway/internal/types"
 	grpcgo "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -49,6 +53,8 @@ type Server struct {
 	message      messagev1.MessageServiceClient
 	delivery     deliveryv1.DeliveryServiceClient
 	receipt      receiptv1.ReceiptServiceClient
+	newTraceID   func() string
+	newRequestID func() string
 }
 
 type Config struct {
@@ -58,6 +64,8 @@ type Config struct {
 	Message       messagev1.MessageServiceClient
 	Delivery      deliveryv1.DeliveryServiceClient
 	Receipt       receiptv1.ReceiptServiceClient
+	NewTraceID    func() string
+	NewRequestID  func() string
 }
 
 type RegisterConfig struct {
@@ -65,7 +73,7 @@ type RegisterConfig struct {
 }
 
 func NewServer(config Config) *Server {
-	return &Server{
+	server := &Server{
 		auth:         config.Authenticator,
 		contacts:     config.Contacts,
 		conversation: config.Conversation,
@@ -73,6 +81,17 @@ func NewServer(config Config) *Server {
 		delivery:     config.Delivery,
 		receipt:      config.Receipt,
 	}
+	if config.NewTraceID != nil {
+		server.newTraceID = config.NewTraceID
+	} else {
+		server.newTraceID = func() string { return newCorrelationID("trace") }
+	}
+	if config.NewRequestID != nil {
+		server.newRequestID = config.NewRequestID
+	} else {
+		server.newRequestID = func() string { return newCorrelationID("request") }
+	}
+	return server
 }
 
 func Register(server grpcgo.ServiceRegistrar, gateway *Server) {
@@ -383,7 +402,28 @@ func (server *Server) authenticate(ctx context.Context) (gatewayauth.AuthContext
 	if auth.TraceID == "" {
 		auth.TraceID = firstIncomingMetadata(ctx, metadataTraceID)
 	}
+	if auth.TraceID == "" && server.newTraceID != nil {
+		auth.TraceID = strings.TrimSpace(server.newTraceID())
+	}
+	if auth.RequestID == "" && server.newRequestID != nil {
+		auth.RequestID = strings.TrimSpace(server.newRequestID())
+	}
+	if auth.TraceID != "" || auth.RequestID != "" {
+		gatewaytypes.PublishCorrelation(ctx, auth.TraceID, auth.RequestID)
+		_ = grpcgo.SetHeader(ctx, responseCorrelationMetadata(auth))
+	}
 	return auth, outgoingVerifiedContext(ctx, auth), nil
+}
+
+func responseCorrelationMetadata(auth gatewayauth.AuthContext) metadata.MD {
+	pairs := make([]string, 0, 4)
+	if auth.TraceID != "" {
+		pairs = append(pairs, metadataTraceID, auth.TraceID)
+	}
+	if auth.RequestID != "" {
+		pairs = append(pairs, metadataRequestID, auth.RequestID)
+	}
+	return metadata.Pairs(pairs...)
 }
 
 func authRequestFromMetadata(ctx context.Context) (*http.Request, string) {
@@ -434,6 +474,14 @@ func firstIncomingMetadata(ctx context.Context, key string) string {
 		return ""
 	}
 	return strings.TrimSpace(values[0])
+}
+
+func newCorrelationID(prefix string) string {
+	var raw [16]byte
+	if _, err := rand.Read(raw[:]); err == nil {
+		return prefix + "_" + hex.EncodeToString(raw[:])
+	}
+	return prefix + "_" + strings.ReplaceAll(time.Now().UTC().Format("20060102T150405.000000000Z"), ".", "")
 }
 
 func publicAuthError(err error) error {

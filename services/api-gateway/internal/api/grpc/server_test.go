@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"net"
 	"testing"
 	"time"
 
@@ -13,8 +14,10 @@ import (
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/grpc/test/bufconn"
 )
 
 var _ gatewayv1.GatewayServiceServer = (*Server)(nil)
@@ -127,6 +130,115 @@ func TestListConversationsInjectsVerifiedAuth(t *testing.T) {
 		metadataUserID:   "user-token",
 		metadataDeviceID: "device-token",
 	})
+}
+
+func TestGatewayGeneratesMissingCorrelationIDsForDownstream(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	authenticator, err := gatewayauth.NewAuthenticator(gatewayauth.Config{
+		Mode:     gatewayauth.ModeHMAC,
+		Secret:   "secret",
+		Audience: "api-gateway",
+		Now:      func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	token, err := gatewayauth.SignGatewayToken("secret", map[string]string{
+		"tenant_id": "tenant-token",
+		"user_id":   "user-token",
+		"device_id": "device-token",
+		"aud":       "api-gateway",
+	}, now.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("sign gateway token: %v", err)
+	}
+	fake := &fakeMessageClient{}
+	server := NewServer(Config{
+		Authenticator: authenticator,
+		Message:       fake,
+		NewTraceID:    func() string { return "trace-generated" },
+		NewRequestID:  func() string { return "request-generated" },
+	})
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		"authorization", "Bearer "+token,
+	))
+
+	_, err = server.SendMessage(ctx, &messagev1.SendMessageRequest{
+		AuthContext:    &messagev1.AuthContext{TraceId: "trace-body", RequestId: "request-body"},
+		ConversationId: "conv-1",
+		ClientMsgId:    "client-msg-1",
+		MessageType:    "TEXT",
+	})
+	if err != nil {
+		t.Fatalf("send message: %v", err)
+	}
+	if fake.request.GetAuthContext().GetTraceId() != "trace-generated" ||
+		fake.request.GetAuthContext().GetRequestId() != "request-generated" {
+		t.Fatalf("expected generated correlation ids in auth context, got %+v", fake.request.GetAuthContext())
+	}
+	assertOutgoingMetadata(t, fake.ctx, map[string]string{
+		metadataTraceID:   "trace-generated",
+		metadataRequestID: "request-generated",
+	})
+}
+
+func TestGatewayReturnsGeneratedCorrelationHeaders(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	authenticator, err := gatewayauth.NewAuthenticator(gatewayauth.Config{
+		Mode:     gatewayauth.ModeHMAC,
+		Secret:   "secret",
+		Audience: "api-gateway",
+		Now:      func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	token, err := gatewayauth.SignGatewayToken("secret", map[string]string{
+		"tenant_id": "tenant-token",
+		"user_id":   "user-token",
+		"device_id": "device-token",
+		"aud":       "api-gateway",
+	}, now.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("sign gateway token: %v", err)
+	}
+	listener := bufconn.Listen(1024 * 1024)
+	grpcServer := grpc.NewServer()
+	RegisterWithConfig(grpcServer, NewServer(Config{
+		Authenticator: authenticator,
+		Message:       &fakeMessageClient{},
+		NewTraceID:    func() string { return "trace-generated" },
+		NewRequestID:  func() string { return "request-generated" },
+	}), RegisterConfig{RegisterLegacyDescriptors: false})
+	go func() {
+		_ = grpcServer.Serve(listener)
+	}()
+	defer grpcServer.Stop()
+
+	ctx := context.Background()
+	conn, err := grpc.DialContext(ctx, "bufnet",
+		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+			return listener.Dial()
+		}),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		t.Fatalf("dial bufconn: %v", err)
+	}
+	defer conn.Close()
+	client := gatewayv1.NewGatewayServiceClient(conn)
+	callCtx := metadata.NewOutgoingContext(context.Background(), metadata.Pairs("authorization", "Bearer "+token))
+	var header metadata.MD
+	_, err = client.SendMessage(callCtx, &messagev1.SendMessageRequest{
+		ConversationId: "conv-1",
+		ClientMsgId:    "client-msg-1",
+		MessageType:    "TEXT",
+	}, grpc.Header(&header))
+	if err != nil {
+		t.Fatalf("send message: %v", err)
+	}
+	assertMetadataValue(t, header, metadataTraceID, "trace-generated")
+	assertMetadataValue(t, header, metadataRequestID, "request-generated")
 }
 
 func TestSendContactRequestInjectsVerifiedAuthAndOverridesBody(t *testing.T) {
@@ -286,6 +398,14 @@ func assertOutgoingMetadata(t *testing.T, ctx context.Context, expected map[stri
 		if len(values) == 0 || values[0] != value {
 			t.Fatalf("expected metadata %s=%q, got %v", key, value, values)
 		}
+	}
+}
+
+func assertMetadataValue(t *testing.T, md metadata.MD, key string, expected string) {
+	t.Helper()
+	values := md.Get(key)
+	if len(values) == 0 || values[0] != expected {
+		t.Fatalf("expected metadata %s=%q, got %v", key, expected, values)
 	}
 }
 

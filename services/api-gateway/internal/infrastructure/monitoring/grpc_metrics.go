@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	gatewaytypes "github.com/qsyy0921/IM/services/api-gateway/internal/types"
 	grpcgo "google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -45,11 +46,18 @@ func (metrics *GRPCMetrics) UnaryServerInterceptor(logger *log.Logger) grpcgo.Un
 	}
 	return func(ctx context.Context, request any, info *grpcgo.UnaryServerInfo, handler grpcgo.UnaryHandler) (any, error) {
 		started := time.Now()
+		ctx, correlation := gatewaytypes.ContextWithCorrelation(ctx)
 		response, err := handler(ctx, request)
 		code := status.Code(err).String()
 		latencyMS := time.Since(started).Milliseconds()
 		metrics.record(info.FullMethod, code, latencyMS)
 		traceID, requestID := grpcLogMetadata(ctx)
+		if correlation.TraceID != "" {
+			traceID = correlation.TraceID
+		}
+		if correlation.RequestID != "" {
+			requestID = correlation.RequestID
+		}
 		writeGRPCRequestLog(logger, info.FullMethod, code, latencyMS, traceID, requestID)
 		return response, err
 	}

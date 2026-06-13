@@ -8,6 +8,10 @@ param(
     [switch]$UseConversationRoleGate,
     [switch]$UseOwnershipGate,
     [switch]$UseOwnershipOverride,
+    [string]$MessageTlsCaFile = "",
+    [string]$MessageTlsServerName = "",
+    [string]$MessageTlsClientCertFile = "",
+    [string]$MessageTlsClientKeyFile = "",
     [switch]$SkipBuild
 )
 
@@ -215,6 +219,18 @@ function Run-Scenario {
                 "--expected-base-classification", "POLICY_SEND_SEED",
                 "--change-user-id", "policy-message-admin-override"
             )
+        }
+        if (-not [string]::IsNullOrWhiteSpace($MessageTlsCaFile)) {
+            $args += @("--message-tls-ca-file", $MessageTlsCaFile)
+        }
+        if (-not [string]::IsNullOrWhiteSpace($MessageTlsServerName)) {
+            $args += @("--message-tls-server-name", $MessageTlsServerName)
+        }
+        if (-not [string]::IsNullOrWhiteSpace($MessageTlsClientCertFile)) {
+            $args += @("--message-tls-client-cert-file", $MessageTlsClientCertFile)
+        }
+        if (-not [string]::IsNullOrWhiteSpace($MessageTlsClientKeyFile)) {
+            $args += @("--message-tls-client-key-file", $MessageTlsClientKeyFile)
         }
         & $runner @args
         if ($LASTEXITCODE -ne 0) {

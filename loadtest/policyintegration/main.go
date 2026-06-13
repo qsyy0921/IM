@@ -13,9 +13,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
+	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -40,6 +40,7 @@ type config struct {
 	expectedClassification string
 	expectedBaseClass      string
 	expectedReason         string
+	messageTLS             grpctls.Config
 	cleanup                bool
 	seedPolicyRule         bool
 	seedTenantPolicyRule   bool
@@ -55,6 +56,7 @@ type summary struct {
 	GitDirty                bool          `json:"git_dirty"`
 	GitStatusShort          string        `json:"git_status_short,omitempty"`
 	Target                  string        `json:"target"`
+	MessageTLSEnabled       bool          `json:"message_tls_enabled"`
 	ResultDir               string        `json:"result_dir"`
 	Scenario                string        `json:"scenario"`
 	Action                  string        `json:"action"`
@@ -206,6 +208,7 @@ func main() {
 func parseConfig() config {
 	var cfg config
 	flag.StringVar(&cfg.target, "target", "127.0.0.1:10495", "message-service gRPC target")
+	registerTLSFlags("message-tls", "NEXUSIM_MESSAGE_TLS", "message-service", &cfg.messageTLS)
 	flag.StringVar(&cfg.resultDir, "result-dir", "H:\\NexusIM\\loadtest-results\\policy-message-smoke", "result directory")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "", "PostgreSQL DSN")
 	flag.StringVar(&cfg.scenario, "scenario", "allow", "scenario: allow or deny")
@@ -250,6 +253,13 @@ func parseConfig() config {
 		cfg.requestTimeout = 5 * time.Second
 	}
 	return cfg
+}
+
+func registerTLSFlags(prefix, envPrefix, serviceName string, config *grpctls.Config) {
+	flag.StringVar(&config.CAFile, prefix+"-ca-file", os.Getenv(envPrefix+"_CA_FILE"), serviceName+" gRPC TLS CA file")
+	flag.StringVar(&config.ServerName, prefix+"-server-name", os.Getenv(envPrefix+"_SERVER_NAME"), serviceName+" gRPC TLS server name")
+	flag.StringVar(&config.ClientCertFile, prefix+"-client-cert-file", os.Getenv(envPrefix+"_CLIENT_CERT_FILE"), serviceName+" gRPC TLS client certificate file")
+	flag.StringVar(&config.ClientKeyFile, prefix+"-client-key-file", os.Getenv(envPrefix+"_CLIENT_KEY_FILE"), serviceName+" gRPC TLS client key file")
 }
 
 func run(cfg config) error {
@@ -308,6 +318,7 @@ func run(cfg config) error {
 		CommitFull:              gitOutput("rev-parse", "HEAD"),
 		GitStatusShort:          gitOutput("status", "--short"),
 		Target:                  cfg.target,
+		MessageTLSEnabled:       cfg.messageTLS.Enabled(),
 		ResultDir:               cfg.resultDir,
 		Scenario:                cfg.scenario,
 		Action:                  cfg.action,
@@ -528,9 +539,9 @@ func runChangeScenario(ctx context.Context, pool *pgxpool.Pool, cfg config, s *s
 }
 
 func sendMessage(cfg config) (*messagev1.SendMessageResponse, error, float64) {
-	conn, err := grpc.NewClient(cfg.target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := dialMessageService(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("dial message-service: %w", err), 0
+		return nil, err, 0
 	}
 	defer conn.Close()
 
@@ -559,9 +570,9 @@ func sendMessage(cfg config) (*messagev1.SendMessageResponse, error, float64) {
 }
 
 func changeMessage(cfg config, messageID string) (*messagev1.MessageChangeResponse, error, float64) {
-	conn, err := grpc.NewClient(cfg.target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := dialMessageService(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("dial message-service: %w", err), 0
+		return nil, err, 0
 	}
 	defer conn.Close()
 	client := messagev1.NewMessageServiceClient(conn)
@@ -606,6 +617,18 @@ func changeMessage(cfg config, messageID string) (*messagev1.MessageChangeRespon
 	default:
 		return nil, fmt.Errorf("unsupported change action %q", cfg.action), 0
 	}
+}
+
+func dialMessageService(cfg config) (*grpc.ClientConn, error) {
+	dialOption, err := grpctls.DialOption(cfg.messageTLS, "message-tls")
+	if err != nil {
+		return nil, fmt.Errorf("configure message-service TLS: %w", err)
+	}
+	conn, err := grpc.NewClient(cfg.target, dialOption)
+	if err != nil {
+		return nil, fmt.Errorf("dial message-service: %w", err)
+	}
+	return conn, nil
 }
 
 func authContext(cfg config, requestID string) *messagev1.AuthContext {

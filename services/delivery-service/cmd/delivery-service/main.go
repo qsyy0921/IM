@@ -50,6 +50,8 @@ func run() error {
 		return runOutboxRelay()
 	case "outbox-repair":
 		return runOutboxRepair()
+	case "outbox-audit":
+		return runOutboxAudit()
 	case "outbox-repair-audit":
 		return runOutboxRepairAudit()
 	case "outbox-repair-cleanup":
@@ -256,6 +258,58 @@ func runOutboxRepair() error {
 		mode,
 		dryRun,
 	)
+	return nil
+}
+
+func runOutboxAudit() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	var outboxID *int64
+	if value := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_OUTBOX_AUDIT_OUTBOX_ID")); value != "" {
+		parsed := envInt64AllowZero("NEXUSIM_DELIVERY_OUTBOX_AUDIT_OUTBOX_ID", 0)
+		outboxID = &parsed
+	}
+	rows, err := postgresinfra.NewOutboxStore(pool).AuditOutbox(ctx, postgresinfra.OutboxAuditOptions{
+		OutboxID:       outboxID,
+		EventID:        envString("NEXUSIM_DELIVERY_OUTBOX_AUDIT_EVENT_ID", ""),
+		TenantID:       envString("NEXUSIM_DELIVERY_OUTBOX_AUDIT_TENANT_ID", ""),
+		ConversationID: envString("NEXUSIM_DELIVERY_OUTBOX_AUDIT_CONVERSATION_ID", ""),
+		Status:         envString("NEXUSIM_DELIVERY_OUTBOX_AUDIT_STATUS", ""),
+		EventType:      envString("NEXUSIM_DELIVERY_OUTBOX_AUDIT_EVENT_TYPE", ""),
+		Limit:          envInt("NEXUSIM_DELIVERY_OUTBOX_AUDIT_LIMIT", 20),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("delivery-service outbox audit completed rows=%d", len(rows))
+	for _, row := range rows {
+		log.Printf(
+			"delivery_outbox id=%d event_id=%s tenant_id=%s conversation_id=%s aggregate_version=%d event_type=%s status=%s retry_count=%d available_at=%s published_at=%s dead_lettered_at=%s last_error=%q",
+			row.ID,
+			row.EventID,
+			row.TenantID,
+			row.ConversationID,
+			row.AggregateVersion,
+			row.EventType,
+			row.Status,
+			row.RetryCount,
+			row.AvailableAt.Format(time.RFC3339),
+			formatOptionalTime(row.PublishedAt),
+			formatOptionalTime(row.DeadLetteredAt),
+			row.LastError,
+		)
+	}
 	return nil
 }
 
@@ -680,6 +734,13 @@ func outboxRepairCleanupOutboxID() *int64 {
 	}
 	parsed := envInt64AllowZero("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_OUTBOX_ID", 0)
 	return &parsed
+}
+
+func formatOptionalTime(value *time.Time) string {
+	if value == nil {
+		return ""
+	}
+	return value.Format(time.RFC3339)
 }
 
 func projectionCheckpointRepairCleanupPartitionID() *int32 {

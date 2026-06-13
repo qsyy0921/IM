@@ -6,6 +6,7 @@
 - 是 push-gateway 的可靠事实源。
 - 不要求 push-gateway 持久化消息或 ACK cursor。
 - 已补 `/healthz`、`/readyz`、`/debug/metrics` 基础观测入口，可在 gRPC / timeline-consumer / outbox-relay 模式下独立挂载。
+- 已补 `outbox-audit` 只读模式：可直接列出当前 `delivery_outbox` 行，并按 outbox/event/tenant/conversation/status/event_type 缩小排障范围。
 - 已补 `outbox-repair` 运维模式，支持 `audit` 和 `redrive-dlq-pending`，并持久记录 repair audit。
 - 已补 `outbox-repair-audit` 只读模式：可直接列出 outbox repair audit 历史，并按 outbox/event/tenant/conversation/mode/outcome 缩小排障范围。
 - 已补 `outbox-repair-cleanup` operator：只删除超过保留期的 outbox repair audit 历史，并支持按 outbox/event/tenant/conversation/mode/outcome 缩小范围。

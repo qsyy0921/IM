@@ -170,6 +170,59 @@ func TestOutboxStoreRepairSkipsNonDLQIntegration(t *testing.T) {
 	assertDeliveryOutboxRepairAudit(t, ctx, pool, outboxID, types.OutboxRepairModeRedriveDLQPending, outboxRepairOutcomeSkipped, outboxRepairSkipStatusNotDLQ, types.OutboxStatusPending, 0, "", types.OutboxStatusPending, 0, "", "manual retry")
 }
 
+func TestOutboxStoreAuditOutboxReturnsLatestRowsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	seedDeliveryOutboxWithStatus(t, ctx, pool, "event-61", "tenant-f", "conversation-a", 1, types.DeliveryEventInboxItemCreated, types.OutboxStatusPending, 2, "retry later")
+	seedDeliveryOutboxWithStatus(t, ctx, pool, "event-62", "tenant-f", "conversation-a", 2, types.DeliveryEventAckRecorded, types.OutboxStatusDLQ, 4, "malformed payload")
+
+	store := NewOutboxStore(pool)
+	rows, err := store.AuditOutbox(ctx, OutboxAuditOptions{
+		TenantID: "tenant-f",
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("audit outbox: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected two rows, got %d", len(rows))
+	}
+	if rows[0].EventID != "event-62" || rows[0].Status != types.OutboxStatusDLQ || rows[0].RetryCount != 4 {
+		t.Fatalf("unexpected latest outbox audit row: %+v", rows[0])
+	}
+	if rows[1].EventID != "event-61" || rows[1].Status != types.OutboxStatusPending || rows[1].RetryCount != 2 {
+		t.Fatalf("unexpected older outbox audit row: %+v", rows[1])
+	}
+}
+
+func TestOutboxStoreAuditOutboxFiltersStatusIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	seedDeliveryOutboxWithStatus(t, ctx, pool, "event-71", "tenant-g", "conversation-a", 1, types.DeliveryEventInboxItemCreated, types.OutboxStatusPending, 1, "retry later")
+	seedDeliveryOutboxWithStatus(t, ctx, pool, "event-72", "tenant-g", "conversation-a", 2, types.DeliveryEventAckRecorded, types.OutboxStatusPublished, 0, "")
+	seedDeliveryOutboxWithStatus(t, ctx, pool, "event-73", "tenant-g", "conversation-a", 3, types.DeliveryEventInboxItemCreated, types.OutboxStatusDLQ, 3, "decode failed")
+
+	store := NewOutboxStore(pool)
+	rows, err := store.AuditOutbox(ctx, OutboxAuditOptions{
+		TenantID: "tenant-g",
+		Status:   types.OutboxStatusDLQ,
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("audit outbox by status: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one row, got %d", len(rows))
+	}
+	if rows[0].EventID != "event-73" || rows[0].Status != types.OutboxStatusDLQ {
+		t.Fatalf("unexpected filtered outbox audit row: %+v", rows[0])
+	}
+}
+
 func TestOutboxStoreAuditOutboxRepairsReturnsLatestRowsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -401,6 +454,49 @@ INSERT INTO delivery_outbox (
 `, eventID, conversationID, version, eventType, payload)
 	if err != nil {
 		t.Fatalf("seed delivery outbox: %v", err)
+	}
+}
+
+func seedDeliveryOutboxWithStatus(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventID string, tenantID string, conversationID string, version int64, eventType string, status string, retryCount int, lastError string) {
+	t.Helper()
+	payload := fmt.Sprintf(`{"tenant_id":%q,"user_id":"user-1","device_id":"device-1","conversation_id":%q,"conversation_seq":%d,"source_event_id":%q,"message_id":%q,"last_received_seq":%d}`, tenantID, conversationID, version, "source-"+eventID, "message-"+eventID, version)
+	var nextRetryAt any
+	var deadLetteredAt any
+	var publishedAt any
+	switch status {
+	case types.OutboxStatusPending:
+		nextRetryAt = time.Now().UTC().Add(5 * time.Minute)
+	case types.OutboxStatusDLQ:
+		deadLetteredAt = time.Now().UTC().Add(-time.Minute)
+	case types.OutboxStatusPublished:
+		publishedAt = time.Now().UTC().Add(-time.Minute)
+	}
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_outbox (
+    event_id,
+    tenant_id,
+    conversation_id,
+    aggregate_version,
+    event_type,
+    event_version,
+    partition_key,
+    mapping_version,
+    correlation_id,
+    causation_id,
+    producer,
+    trace_id,
+    payload_json,
+    status,
+    retry_count,
+    last_error,
+    available_at,
+    next_retry_at,
+    dead_lettered_at,
+    published_at
+) VALUES ($1, $2, $3, $4, $5, '1.0.0', $2 || ':' || $3, 1, 'request-1', 'source-' || $1, 'delivery-service', 'trace-1', $6::jsonb, $7, $8, $9, now(), $10, $11, $12)
+`, eventID, tenantID, conversationID, version, eventType, payload, status, retryCount, lastError, nextRetryAt, deadLetteredAt, publishedAt)
+	if err != nil {
+		t.Fatalf("seed delivery outbox with status: %v", err)
 	}
 }
 

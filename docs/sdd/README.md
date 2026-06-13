@@ -19,6 +19,7 @@
 | receipt-service SDD | `docs/sdd/receipt-service.md` | 送达 / 已读回执 read model、MarkRead 和 receipt event 边界 |
 | receipt-service conversation list SDD | `docs/sdd/receipt-service-conversation-list.md` | 会话列表 / 未读数 read model，复用 receipt-service projection |
 | contacts-service SDD | `docs/sdd/contacts-service.md` | 联系人 / 好友关系事实源、好友申请、联系人列表、删除 / 拉黑 / 备注名和 contact outbox 边界 |
+| api-gateway SDD | `docs/sdd/api-gateway.md` | 统一 user-facing gRPC 入口、gateway token 验证和 trusted metadata 传播 |
 
 ## 六层 DDD 约定
 
@@ -47,6 +48,7 @@
 | `delivery-service` | SDD v0.1 已存在，最小 projection / PullInbox / AckDelivery / delivery outbox relay、gateway verified metadata auth mode、第一阶段 gRPC TLS / mTLS server config、`loadtest/delivery` 和 `loadtest/deliveryvisibility` client TLS config 已落地，二者均支持 verified metadata auth smoke 开关 | 可以支撑 push-gateway 第一阶段，只要 push-gateway 不绕过 durable inbox / ACK；auth mode 默认 body 兼容历史 smoke，metadata 模式只消费 gateway verified gRPC metadata；server / loadtest client TLS 和 push-gateway delivery client TLS 均默认 plaintext、可静态配置，证书治理和全服务 mTLS rollout 仍是后续项 |
 | `receipt-service` | SDD v0.1 Draft、proto、Kafka schema、migration、六层骨架、PostgreSQL repository、delivery consumer、MarkRead、receipt outbox relay、`ListReceiptStates`、最小 `ListConversations`、会话未读 read model、`unread_only` 过滤、Archive / Pin / Mute 用户列表偏好、gateway verified metadata auth mode 和第一阶段 gRPC TLS / mTLS server config 已落地 | 后续补真实权限、更多列表筛选和真正通知静音策略；不得直接读取 delivery-service 内部表；auth mode 默认 body 兼容历史 smoke，metadata 模式只消费 gateway verified gRPC metadata；server TLS 默认 plaintext，receipt/demo smoke runner 已支持 conversation/message/delivery/receipt client TLS，证书治理和全服务 mTLS rollout 仍是后续项 |
 | `contacts-service` | SDD v0.1 Draft、proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、contacts outbox relay、ACCEPT / DECLINE / Delete / Block / Unblock / Remark / Re-add 真实进程 smoke 和第一阶段 gRPC TLS / mTLS server + smoke client config 已落地 | 继续保持联系人关系独立事实源；不得把好友关系写入 `conversation_members`，也不得自动创建会话或让 message-service 同步依赖 contacts-service；全服务 mTLS rollout 仍是后续项 |
+| `api-gateway` | SDD v0.1 Draft、第一版 gRPC proxy skeleton、gateway token 验证、trusted metadata 注入、`AuthContext` 重写和下游静态 TLS / mTLS client 配置已落地 | 只做 user-facing 入口鉴权与转发，不拥有业务事实；启用后端 verified-metadata auth 时必须配合 loopback / 内网隔离或 mTLS peer allowlist，后续补真实 secure demo smoke |
 | `retrieval-gateway` | SDD 未完成 | 不进入第一条代码切片 |
 
 ## 已完成的 message-service 切片

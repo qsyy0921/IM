@@ -103,7 +103,7 @@ NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_WINDOW=1s
 NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_FAIL_OPEN=true
 ```
 
-Redis backend 使用 fixed-window counter，把同一 token/method 在多个 api-gateway 实例上的请求合并计数。`FAIL_OPEN=true` 时 Redis 短故障只记录 `redis_error_count` 并放行请求；`FAIL_OPEN=false` 时返回 `Unavailable / rate limiter unavailable`。
+Redis backend 使用 fixed-window counter，把同一 token/method 在多个 api-gateway 实例上的请求合并计数。`FAIL_OPEN=true` 时 Redis 短故障只记录 `redis_error_count` 并放行请求；启动阶段 Redis `PING` 失败也不会阻止 api-gateway 启动，后续请求仍会按运行时 Redis 错误计数并放行。`FAIL_OPEN=false` 时启动探测失败会阻止进程启动，运行时 Redis 错误返回 `Unavailable / rate limiter unavailable`。
 
 这是第一阶段分布式入口保护，不是完整产品级配额系统：tenant quota、IP reputation、WAF、自适应风控、跨区域一致性、Redis 限流故障演练和统一告警仍是后续 production hardening。
 
@@ -201,6 +201,8 @@ NEXUSIM_API_GATEWAY_CONTACTS_TLS_CLIENT_KEY_FILE
 2026-06-13 补充：api-gateway 已补第一阶段 gRPC rate limiter，默认关闭；`local` backend 为进程内 token bucket，`redis` backend 为跨实例 fixed-window counter，并在 `/debug/metrics` 输出低敏 `rate_limit` 聚合状态。该能力不是完整产品级 quota / WAF / 风控系统。
 
 2026-06-14 补充：clean commit `ee4461e` 已给 api-gateway rate-limit 拒绝响应补 gRPC `RetryInfo`，让客户端在 `ResourceExhausted / rate limit exceeded` 时获得保守重试等待时间；单元测试覆盖 local token bucket 与 Redis fixed-window 两种后端。这仍不是完整客户端退避策略或 tenant quota。
+
+2026-06-14 补充：clean commit `9b16b8c` 已修正 Redis rate-limit fail-open 启动语义：`NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_FAIL_OPEN=true` 时 Redis `PING` 失败只记录启动日志并继续启动，首个请求上的 Redis 错误仍进入 `redis_error_count` 并放行；`FAIL_OPEN=false` 仍 fail-closed 拒绝启动。
 
 2026-06-13 补充：api-gateway 已新增第一阶段 `nexusim.gateway.v1.GatewayService` public facade proto，覆盖 conversation / message / delivery / receipt 的 user-facing RPC，并明确不包含服务间 `GetSendContext`。legacy service descriptor 暂时保留用于兼容；下一步是让 demo runner / 客户端切到 facade 后再收敛旧 descriptor。
 

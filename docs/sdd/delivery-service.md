@@ -451,6 +451,7 @@ delivery_cursor_regression_count
 | unit | fanout decision、ACK 单调性、权限错误映射 |
 | integration | PostgreSQL 写 user_inbox / cursor / delivery_outbox 同事务 |
 | contract | Proto request/response 和错误码 |
+| server security | gRPC server TLS / mTLS env config、cert/key 成对校验、client DNS / URI SAN allowlist |
 | consumer smoke | 构造 timeline event，投影到 user_inbox |
 | full smoke | `SendMessage -> Kafka timeline -> delivery-service projection -> PullInbox -> AckDelivery` |
 | loadtest | 小规模 `PullInbox/AckDelivery`，不做硬件极限矩阵 |
@@ -466,6 +467,19 @@ NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay
 ```
 
 当前 delivery-service 已具备 `delivery_outbox -> Kafka im.delivery.events` 最小 relay 链路；push-gateway 已完成单实例最小在线通知 smoke，可以消费 `im.delivery.events` 并把在线唤醒交给 WebSocket 客户端。后续多实例在线路由仍需要 Redis route / resume buffer / slow session active close。
+
+`delivery-service grpc` 默认仍以 plaintext 启动，兼容本地 smoke 和现有 push-gateway ACK 转发。第一阶段可选开启静态 TLS / mTLS：
+
+```text
+NEXUSIM_DELIVERY_GRPC_TLS_CERT_FILE=...
+NEXUSIM_DELIVERY_GRPC_TLS_KEY_FILE=...
+NEXUSIM_DELIVERY_GRPC_TLS_CLIENT_CA_FILE=...
+NEXUSIM_DELIVERY_GRPC_TLS_REQUIRE_CLIENT_CERT=true
+NEXUSIM_DELIVERY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES=push-gateway.nexusim.local
+NEXUSIM_DELIVERY_GRPC_TLS_CLIENT_ALLOWED_URIS=spiffe://nexusim/push-gateway
+```
+
+开启 allowlist 时按客户端证书 DNS SAN 小写 exact-match 或 URI SAN exact-match 校验。该配置只覆盖 delivery gRPC server；push-gateway delivery client 的 TLS 配置迁移、证书签发 / 轮换 / 分发、动态服务身份治理和全服务 mTLS rollout 仍是后续项。
 
 本地最小 smoke：
 

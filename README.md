@@ -28,26 +28,23 @@ NexusIM 是面向企业协同的 IM + 智能协作平台。当前仓库处于第
 
 ## 当前实现范围
 
-第一条代码切片只实现：
+当前主链路已扩展为本地 / 双机可运行的最小 IM 后端：
 
 ```text
-message-service SendMessage
--> PostgreSQL local transaction
--> conversation_seq
--> message_log
--> conversation_timeline_events
--> message_outbox
--> outbox relay
--> Kafka publish path
+conversation-service
+-> message-service
+-> delivery-service
+-> push-gateway
 ```
 
-第一阶段暂不实现：
+已覆盖发送消息、会话上下文、outbox / Kafka timeline、durable inbox、PullInbox / AckDelivery、WebSocket notify、Redis route、基础回执 / 会话列表、联系人、policy-service 和 identity-service 的第一阶段能力。当前低 token 入口和最新边界以 `docs/runbook/current-brief.md` 为准。
+
+仍不作为当前主线完成项：
 
 ```text
-EditMessage / RevokeMessage / DeleteMessage 业务实现
 热点 sequencer 生产逻辑
-delivery-service
-push-gateway
+生产级 Kafka / PostgreSQL HA
+全服务 mTLS rollout 和证书治理
 RAG
 Agent workflow
 ```

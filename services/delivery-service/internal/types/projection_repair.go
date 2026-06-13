@@ -11,6 +11,7 @@ const (
 	ProjectionCheckpointRepairModeAudit            = "audit"
 	ProjectionCheckpointRepairModeRewindNextOffset = "rewind-next-offset"
 	ProjectionCheckpointRepairModeRewindFailure    = "rewind-unresolved-failure"
+	ProjectionCheckpointRepairModeRewindEarliest   = "rewind-earliest-unresolved-failure"
 )
 
 type ProjectionCheckpointRepairOptions struct {

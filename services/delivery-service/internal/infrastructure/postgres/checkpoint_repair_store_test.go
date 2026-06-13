@@ -141,6 +141,56 @@ func TestProjectionRepairStoreRejectsMissingUnresolvedFailureIntegration(t *test
 	}
 }
 
+func TestProjectionRepairStoreRewindsCheckpointFromEarliestUnresolvedFailureIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+	seedDeliveryCheckpoint(t, ctx, pool, "group-2", "conversation.timeline.events", 0, 42)
+	seedProjectionFailure(t, ctx, pool, "group-2", "conversation.timeline.events", 0, 31, "event-31", types.ProjectionFailureClassDBWrite, false)
+	seedProjectionFailure(t, ctx, pool, "group-2", "conversation.timeline.events", 0, 21, "event-21", types.ProjectionFailureClassProjectionDependency, false)
+	seedProjectionFailure(t, ctx, pool, "group-2", "conversation.timeline.events", 0, 11, "event-11", types.ProjectionFailureClassDecode, true)
+
+	store := NewProjectionRepairStore(pool, WithProjectionRepairClock(func() time.Time {
+		return time.Date(2026, 6, 14, 12, 0, 0, 0, time.UTC)
+	}))
+	stats, err := store.RepairCheckpoint(ctx, types.ProjectionCheckpointRepairOptions{
+		ConsumerGroup: "group-2",
+		Topic:         "conversation.timeline.events",
+		PartitionID:   0,
+		Mode:          types.ProjectionCheckpointRepairModeRewindEarliest,
+		Operator:      "operator-1",
+		Reason:        "replay earliest unresolved projection failure",
+	})
+	if err != nil {
+		t.Fatalf("rewind checkpoint from earliest unresolved failure: %v", err)
+	}
+	if stats.Requested != 1 || stats.Audited != 0 || stats.Mutated != 1 || stats.Skipped != 0 {
+		t.Fatalf("unexpected checkpoint repair stats: %+v", stats)
+	}
+	assertCheckpointOffset(t, ctx, pool, "group-2", "conversation.timeline.events", 0, 21)
+	assertCheckpointRepairAudit(t, ctx, pool, "group-2", "conversation.timeline.events", 0, types.ProjectionCheckpointRepairModeRewindEarliest, checkpointRepairOutcomeMutated, "", 42, 21, "replay earliest unresolved projection failure", 21, "event-21", types.ProjectionFailureClassProjectionDependency)
+}
+
+func TestProjectionRepairStoreRejectsMissingEarliestUnresolvedFailureIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+	seedDeliveryCheckpoint(t, ctx, pool, "group-3", "conversation.timeline.events", 0, 42)
+
+	store := NewProjectionRepairStore(pool)
+	_, err := store.RepairCheckpoint(ctx, types.ProjectionCheckpointRepairOptions{
+		ConsumerGroup: "group-3",
+		Topic:         "conversation.timeline.events",
+		PartitionID:   0,
+		Mode:          types.ProjectionCheckpointRepairModeRewindEarliest,
+		Operator:      "operator-1",
+		Reason:        "missing earliest unresolved failure",
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+}
+
 func seedDeliveryCheckpoint(t *testing.T, ctx context.Context, pool *pgxpool.Pool, consumerGroup string, topic string, partitionID int32, offsetValue int64) {
 	t.Helper()
 	if _, err := pool.Exec(ctx, `

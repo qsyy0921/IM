@@ -120,6 +120,28 @@ WHERE consumer_group = $1
 			after.OffsetValue = failure.OffsetValue
 			outcome = checkpointRepairOutcomeMutated
 		}
+	} else if mode == types.ProjectionCheckpointRepairModeRewindEarliest {
+		failure, err = store.readEarliestUnresolvedFailureLocked(ctx, tx, options.ConsumerGroup, options.Topic, options.PartitionID)
+		if err != nil {
+			return types.ProjectionCheckpointRepairStats{}, err
+		}
+		if failure.OffsetValue >= before.OffsetValue {
+			outcome = checkpointRepairOutcomeSkipped
+			skipReason = checkpointRepairSkipTargetNotLower
+		} else if !options.DryRun {
+			if _, err := tx.Exec(ctx, `
+UPDATE delivery_kafka_checkpoints
+SET offset_value = $4,
+    updated_at = now()
+WHERE consumer_group = $1
+  AND topic = $2
+  AND partition_id = $3
+`, before.ConsumerGroup, before.Topic, before.PartitionID, failure.OffsetValue); err != nil {
+				return types.ProjectionCheckpointRepairStats{}, types.NewDBWriteFailed(err.Error())
+			}
+			after.OffsetValue = failure.OffsetValue
+			outcome = checkpointRepairOutcomeMutated
+		}
 	}
 
 	if err := store.insertCheckpointRepairAudit(ctx, tx, before, after, failure, mode, outcome, skipReason, operator, reason, options.DryRun, store.now()); err != nil {
@@ -211,7 +233,34 @@ FOR UPDATE
 	return row, nil
 }
 
+func (store *ProjectionRepairStore) readEarliestUnresolvedFailureLocked(ctx context.Context, tx pgx.Tx, consumerGroup string, topic string, partitionID int32) (projectionFailureRepairRow, error) {
+	var row projectionFailureRepairRow
+	err := tx.QueryRow(ctx, `
+SELECT offset_value, event_id, failure_class
+FROM delivery_projection_failures
+WHERE consumer_group = $1
+  AND topic = $2
+  AND partition_id = $3
+  AND resolved_at IS NULL
+ORDER BY offset_value ASC
+LIMIT 1
+FOR UPDATE
+`, consumerGroup, topic, partitionID).Scan(
+		&row.OffsetValue,
+		&row.EventID,
+		&row.FailureClass,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return projectionFailureRepairRow{}, types.NewInvalidArgument("unresolved delivery projection failure not found")
+		}
+		return projectionFailureRepairRow{}, types.NewDBReadFailed(err.Error())
+	}
+	return row, nil
+}
+
 func (store *ProjectionRepairStore) insertCheckpointRepairAudit(ctx context.Context, tx pgx.Tx, before checkpointRepairRow, after checkpointRepairRow, failure projectionFailureRepairRow, mode string, outcome string, skipReason string, operator string, reason string, dryRun bool, now time.Time) error {
+	hasFailureContext := mode == types.ProjectionCheckpointRepairModeRewindFailure || mode == types.ProjectionCheckpointRepairModeRewindEarliest
 	_, err := tx.Exec(ctx, `
 INSERT INTO delivery_projection_checkpoint_repair_audit (
     consumer_group,
@@ -242,7 +291,7 @@ INSERT INTO delivery_projection_checkpoint_repair_audit (
 		dryRun,
 		before.OffsetValue,
 		after.OffsetValue,
-		nullableInt64(failure.OffsetValue, mode == types.ProjectionCheckpointRepairModeRewindFailure),
+		nullableInt64(failure.OffsetValue, hasFailureContext),
 		failure.EventID,
 		failure.FailureClass,
 		now,
@@ -263,6 +312,8 @@ func normalizeProjectionRepairMode(mode string) string {
 		return types.ProjectionCheckpointRepairModeRewindNextOffset
 	case types.ProjectionCheckpointRepairModeRewindFailure:
 		return types.ProjectionCheckpointRepairModeRewindFailure
+	case types.ProjectionCheckpointRepairModeRewindEarliest:
+		return types.ProjectionCheckpointRepairModeRewindEarliest
 	default:
 		return ""
 	}

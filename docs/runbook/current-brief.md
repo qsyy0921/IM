@@ -35,5 +35,5 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 1. 更新本文件的“当前优先级”。
 2. 若服务状态变化，更新 `docs/runbook/service-briefs/README.md`。
 3. 需要历史归档时只追加或拆分，不把长历史重新塞回入口文档。
-4. 运行 `.\tools\check-runbook-entrypoints.ps1`，保证下一轮入口仍然短。
-5. 运行必要检查，提交并推送有意义的切片。
+4. 运行 `.\tools\check-local.ps1`，保证下一轮入口仍然短，并捕获基础 whitespace / PowerShell 语法问题。
+5. 按切片风险追加必要测试，提交并推送有意义的切片。

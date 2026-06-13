@@ -17,7 +17,7 @@
 3. 单个切片保持小闭环：契约 / migration / 本地事务 / consumer 或 relay / smoke 分阶段推进。
 4. 只在有价值时使用 sub-agent，专项结束后及时关闭。
 5. 压测原始数据放 `H:\NexusIM\loadtest-results`；E 盘仓库只放报告和文档。
-6. 每轮结束运行 `.\tools\check-runbook-entrypoints.ps1`，避免入口文档重新变长。
+6. 每轮结束运行 `.\tools\check-local.ps1`，避免入口文档重新变长，并捕获基础 whitespace / PowerShell 语法问题。
 
 ## 当前主线
 

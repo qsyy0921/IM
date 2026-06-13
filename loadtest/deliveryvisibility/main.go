@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,9 +22,19 @@ import (
 	conversationtimelinev1 "github.com/qsyy0921/IM/schemas/kafka"
 	kafkago "github.com/segmentio/kafka-go"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+const (
+	metadataTenantID  = "x-nexusim-tenant-id"
+	metadataUserID    = "x-nexusim-user-id"
+	metadataDeviceID  = "x-nexusim-device-id"
+	metadataSessionID = "x-nexusim-session-id"
+	metadataTraceID   = "x-nexusim-trace-id"
+	metadataRequestID = "x-nexusim-request-id"
 )
 
 type config struct {
@@ -46,6 +57,7 @@ type config struct {
 	targetUserID       string
 	targetDeviceID     string
 	scenarios          string
+	verifiedMetadata   bool
 	cleanup            bool
 }
 
@@ -58,6 +70,7 @@ type summary struct {
 	DeliveryTarget         string           `json:"delivery_target"`
 	ConversationTLSEnabled bool             `json:"conversation_tls_enabled"`
 	DeliveryTLSEnabled     bool             `json:"delivery_tls_enabled"`
+	VerifiedAuthMetadata   bool             `json:"verified_auth_metadata"`
 	TenantID               string           `json:"tenant_id"`
 	ConsumerGroup          string           `json:"consumer_group"`
 	TimelineTopic          string           `json:"timeline_topic"`
@@ -131,6 +144,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.targetUserID, "target-user-id", "delivery-user-1", "target user id")
 	flag.StringVar(&cfg.targetDeviceID, "target-device-id", "delivery-device-1", "target device id for PullInbox")
 	flag.StringVar(&cfg.scenarios, "scenarios", "LEAVE,REMOVE", "comma-separated scenarios: LEAVE,REMOVE")
+	flag.BoolVar(&cfg.verifiedMetadata, "verified-auth-metadata", envBool(false, "NEXUSIM_DELIVERY_VISIBILITY_VERIFIED_AUTH_METADATA", "NEXUSIM_CONVERSATION_LOADTEST_VERIFIED_AUTH_METADATA", "NEXUSIM_DELIVERY_LOADTEST_VERIFIED_AUTH_METADATA"), "send gateway verified identity through conversation/delivery gRPC metadata")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete existing rows for tenant before running")
 	flag.Parse()
 	return cfg
@@ -141,6 +155,58 @@ func registerTLSFlags(prefix string, envPrefix string, serviceName string, confi
 	flag.StringVar(&config.ServerName, prefix+"-server-name", os.Getenv(envPrefix+"_SERVER_NAME"), "override server name for "+serviceName+" gRPC TLS")
 	flag.StringVar(&config.ClientCertFile, prefix+"-client-cert-file", os.Getenv(envPrefix+"_CLIENT_CERT_FILE"), "client certificate PEM for "+serviceName+" gRPC mTLS")
 	flag.StringVar(&config.ClientKeyFile, prefix+"-client-key-file", os.Getenv(envPrefix+"_CLIENT_KEY_FILE"), "client private key PEM for "+serviceName+" gRPC mTLS")
+}
+
+type verifiedAuthIdentity struct {
+	tenantID  string
+	userID    string
+	deviceID  string
+	sessionID string
+	traceID   string
+	requestID string
+}
+
+func withVerifiedAuthMetadata(ctx context.Context, cfg config, auth verifiedAuthIdentity) context.Context {
+	if !cfg.verifiedMetadata {
+		return ctx
+	}
+	pairs := []string{
+		metadataTenantID, auth.tenantID,
+		metadataUserID, auth.userID,
+		metadataDeviceID, auth.deviceID,
+	}
+	if auth.sessionID != "" {
+		pairs = append(pairs, metadataSessionID, auth.sessionID)
+	}
+	if auth.traceID != "" {
+		pairs = append(pairs, metadataTraceID, auth.traceID)
+	}
+	if auth.requestID != "" {
+		pairs = append(pairs, metadataRequestID, auth.requestID)
+	}
+	return metadata.NewOutgoingContext(ctx, metadata.Pairs(pairs...))
+}
+
+func conversationAuth(auth verifiedAuthIdentity) *conversationv1.AuthContext {
+	return &conversationv1.AuthContext{
+		TenantId:  auth.tenantID,
+		UserId:    auth.userID,
+		DeviceId:  auth.deviceID,
+		SessionId: auth.sessionID,
+		TraceId:   auth.traceID,
+		RequestId: auth.requestID,
+	}
+}
+
+func deliveryAuth(auth verifiedAuthIdentity) *deliveryv1.AuthContext {
+	return &deliveryv1.AuthContext{
+		TenantId:  auth.tenantID,
+		UserId:    auth.userID,
+		DeviceId:  auth.deviceID,
+		SessionId: auth.sessionID,
+		TraceId:   auth.traceID,
+		RequestId: auth.requestID,
+	}
 }
 
 func run(cfg config) error {
@@ -206,6 +272,7 @@ func run(cfg config) error {
 		DeliveryTarget:         cfg.deliveryTarget,
 		ConversationTLSEnabled: cfg.conversationTLS.Enabled(),
 		DeliveryTLSEnabled:     cfg.deliveryTLS.Enabled(),
+		VerifiedAuthMetadata:   cfg.verifiedMetadata,
 		TenantID:               cfg.tenantID,
 		ConsumerGroup:          cfg.consumerGroup,
 		TimelineTopic:          cfg.timelineTopic,
@@ -441,15 +508,17 @@ func createMemberChange(
 ) (*conversationv1.CreateMemberChangeResponse, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := verifiedAuthIdentity{
+		tenantID:  cfg.tenantID,
+		userID:    operatorUserID,
+		deviceID:  "delivery-visibility",
+		sessionID: "delivery-visibility",
+		traceID:   "delivery-visibility-" + strings.ToLower(changeType),
+		requestID: "delivery-visibility-" + idempotencyKey,
+	}
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	response, err := client.CreateMemberChange(requestCtx, &conversationv1.CreateMemberChangeRequest{
-		AuthContext: &conversationv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    operatorUserID,
-			DeviceId:  "delivery-visibility",
-			SessionId: "delivery-visibility",
-			TraceId:   "delivery-visibility-" + strings.ToLower(changeType),
-			RequestId: "delivery-visibility-" + idempotencyKey,
-		},
+		AuthContext:           conversationAuth(auth),
 		ConversationId:        conversationID,
 		TargetUserId:          targetUserID,
 		ChangeType:            memberChangeType(changeType),
@@ -657,15 +726,17 @@ func pullAfterBoundary(
 ) (int, []string, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := verifiedAuthIdentity{
+		tenantID:  cfg.tenantID,
+		userID:    userID,
+		deviceID:  cfg.targetDeviceID,
+		sessionID: "delivery-visibility",
+		traceID:   "delivery-visibility-pull",
+		requestID: "delivery-visibility-pull",
+	}
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	response, err := client.PullInbox(requestCtx, &deliveryv1.PullInboxRequest{
-		AuthContext: &deliveryv1.AuthContext{
-			TenantId:  cfg.tenantID,
-			UserId:    userID,
-			DeviceId:  cfg.targetDeviceID,
-			SessionId: "delivery-visibility",
-			TraceId:   "delivery-visibility-pull",
-			RequestId: "delivery-visibility-pull",
-		},
+		AuthContext:    deliveryAuth(auth),
 		ConversationId: conversationID,
 		AfterSeq:       boundarySeq,
 		Limit:          100,
@@ -693,6 +764,21 @@ func writeSummary(resultDir string, result summary) error {
 	fmt.Println(string(encoded))
 	fmt.Printf("summary: %s\n", path)
 	return nil
+}
+
+func envBool(fallback bool, names ...string) bool {
+	for _, name := range names {
+		value := strings.TrimSpace(os.Getenv(name))
+		if value == "" {
+			continue
+		}
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return fallback
+		}
+		return parsed
+	}
+	return fallback
 }
 
 func splitCSV(value string) []string {

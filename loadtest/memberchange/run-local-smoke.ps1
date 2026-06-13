@@ -5,6 +5,7 @@ param(
     [string]$RunName = "",
     [ValidateSet("owner-transfer")]
     [string]$Scenario = "owner-transfer",
+    [switch]$VerifiedAuthMetadata,
     [switch]$SkipBuild
 )
 
@@ -24,6 +25,7 @@ $conversationId = "conv-owner-transfer-smoke"
 $previousOwnerId = "owner-1"
 $newOwnerId = "owner-transfer-user"
 $idempotencyPrefix = "owner-transfer-" + (Get-Date -Format "yyyyMMddHHmmss")
+$authMode = if ($VerifiedAuthMetadata) { "metadata" } else { "body" }
 
 New-Item -ItemType Directory -Force $resultDir | Out-Null
 New-Item -ItemType Directory -Force $logDir | Out-Null
@@ -230,6 +232,7 @@ COMMIT;
         NEXUSIM_CONVERSATION_SERVICE_MODE = "grpc"
         NEXUSIM_CONVERSATION_GRPC_ADDR = $conversationGrpcAddr
         NEXUSIM_PG_DSN = $PgDsn
+        NEXUSIM_CONVERSATION_AUTH_MODE = $authMode
     }
 
     $processes += Start-NexusProcess -Name "message-relay" -FilePath $messageService -Env @{
@@ -263,6 +266,7 @@ COMMIT;
         --change-type owner-transfer `
         --idempotency-prefix $idempotencyPrefix `
         --expected-member-version 10 `
+        --verified-auth-metadata=$VerifiedAuthMetadata `
         --stats-wait 5s `
         --pg-dsn $PgDsn `
         --result-dir $resultDir

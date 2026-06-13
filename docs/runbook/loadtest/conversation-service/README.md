@@ -32,7 +32,7 @@ conversation-service CreateMemberChange
 - `CreateMemberChange -> outbox relay -> member-change-worker -> GetMemberChange(DONE)` 完整 smoke 已通过：`350 / 350` 成功，p99 `40.90ms`，`saga_done_count=350`，`sample_get_status=MEMBER_CHANGE_STATUS_DONE`。
 - `ListConversationMembers` 最小 roster smoke 已通过：3 条 `JOIN` 后，真实 gRPC 读取到 `member_list_count=4`，成员为 seed owner + 3 个 active target；`LEAVE` / `REMOVE` 后 roster smoke 也已通过，目标成员变为 `LEFT` 后不再出现在普通 ACTIVE roster；`ROLE_CHANGED` 后 roster smoke 已通过，目标成员仍为 ACTIVE 且 role 更新为 `ADMIN`；该接口只返回当前 ACTIVE 成员和当前角色，不承担成员历史 / 审计视图。
 - `TransferConversationOwner` 最小真实进程 smoke 已通过：1 次 owner transfer 成功，旧 owner 仍为 ACTIVE 但降级为 `ADMIN`，新 owner 为唯一 ACTIVE `OWNER`，`saga_done_count=1`，`outbox_pending_count=0`，`outbox_published_count=1`。
-- `loadtest/memberchange` smoke runner 默认仍使用 plaintext；如 conversation-service gRPC server 开启第一阶段静态 TLS / mTLS，可通过 `--conversation-tls-ca-file`、`--conversation-tls-server-name`、`--conversation-tls-client-cert-file`、`--conversation-tls-client-key-file`，或对应 `NEXUSIM_CONVERSATION_TLS_*` 环境变量配置 client 侧 TLS。该能力只覆盖 runner 到 conversation-service 的 gRPC transport security，不包含证书签发、轮换、分发或动态服务身份治理。
+- `loadtest/memberchange` smoke runner 默认仍使用 plaintext 和 body auth；如 conversation-service gRPC server 开启第一阶段静态 TLS / mTLS，可通过 `--conversation-tls-ca-file`、`--conversation-tls-server-name`、`--conversation-tls-client-cert-file`、`--conversation-tls-client-key-file`，或对应 `NEXUSIM_CONVERSATION_TLS_*` 环境变量配置 client 侧 TLS。如需验证 gateway verified metadata auth，可用 `--verified-auth-metadata` 或 `run-local-smoke.ps1 -VerifiedAuthMetadata`，脚本会同时把 conversation-service 切到 `NEXUSIM_CONVERSATION_AUTH_MODE=metadata`。这些能力只覆盖 runner 到 conversation-service 的 gRPC transport / auth smoke，不包含证书签发、轮换、分发或完整 API gateway。
 
 ## 报告列表
 

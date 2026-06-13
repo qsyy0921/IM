@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,6 +20,16 @@ import (
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+)
+
+const (
+	metadataTenantID  = "x-nexusim-tenant-id"
+	metadataUserID    = "x-nexusim-user-id"
+	metadataDeviceID  = "x-nexusim-device-id"
+	metadataSessionID = "x-nexusim-session-id"
+	metadataTraceID   = "x-nexusim-trace-id"
+	metadataRequestID = "x-nexusim-request-id"
 )
 
 type config struct {
@@ -41,6 +52,7 @@ type config struct {
 	pgDSN             string
 	statsWait         time.Duration
 	expectedVersion   int64
+	verifiedMetadata  bool
 }
 
 type summary struct {
@@ -50,6 +62,7 @@ type summary struct {
 	GitStatusShort                    string            `json:"git_status_short,omitempty"`
 	Target                            string            `json:"target"`
 	TLSEnabled                        bool              `json:"tls_enabled"`
+	VerifiedAuthMetadata              bool              `json:"verified_auth_metadata"`
 	VUs                               int               `json:"vus"`
 	Duration                          string            `json:"duration"`
 	RequestCount                      int64             `json:"request_count"`
@@ -135,6 +148,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "", "optional PostgreSQL DSN for post-run stats")
 	flag.DurationVar(&cfg.statsWait, "stats-wait", 0, "wait before querying PostgreSQL stats")
 	flag.Int64Var(&cfg.expectedVersion, "expected-member-version", 0, "expected member version, 0 disables optimistic check")
+	flag.BoolVar(&cfg.verifiedMetadata, "verified-auth-metadata", envBool(false, "NEXUSIM_MEMBERCHANGE_VERIFIED_AUTH_METADATA", "NEXUSIM_CONVERSATION_LOADTEST_VERIFIED_AUTH_METADATA"), "send gateway verified identity through conversation-service gRPC metadata")
 	flag.Parse()
 	return normalizeConfigDefaults(cfg)
 }
@@ -160,6 +174,47 @@ func normalizeConfigDefaults(cfg config) config {
 		cfg.listUserID = cfg.operatorUserID
 	}
 	return cfg
+}
+
+type verifiedAuthIdentity struct {
+	tenantID  string
+	userID    string
+	deviceID  string
+	sessionID string
+	traceID   string
+	requestID string
+}
+
+func withVerifiedAuthMetadata(ctx context.Context, cfg config, auth verifiedAuthIdentity) context.Context {
+	if !cfg.verifiedMetadata {
+		return ctx
+	}
+	pairs := []string{
+		metadataTenantID, auth.tenantID,
+		metadataUserID, auth.userID,
+		metadataDeviceID, auth.deviceID,
+	}
+	if auth.sessionID != "" {
+		pairs = append(pairs, metadataSessionID, auth.sessionID)
+	}
+	if auth.traceID != "" {
+		pairs = append(pairs, metadataTraceID, auth.traceID)
+	}
+	if auth.requestID != "" {
+		pairs = append(pairs, metadataRequestID, auth.requestID)
+	}
+	return metadata.NewOutgoingContext(ctx, metadata.Pairs(pairs...))
+}
+
+func conversationAuth(auth verifiedAuthIdentity) *conversationv1.AuthContext {
+	return &conversationv1.AuthContext{
+		TenantId:  auth.tenantID,
+		UserId:    auth.userID,
+		DeviceId:  auth.deviceID,
+		SessionId: auth.sessionID,
+		TraceId:   auth.traceID,
+		RequestId: auth.requestID,
+	}
 }
 
 func run(cfg config) error {
@@ -229,14 +284,15 @@ func run(cfg config) error {
 				}
 				requestCtx, requestCancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
 				begin := time.Now()
-				auth := &conversationv1.AuthContext{
-					TenantId:  cfg.tenantID,
-					UserId:    cfg.operatorUserID,
-					DeviceId:  fmt.Sprintf("vu-%d", vu),
-					SessionId: fmt.Sprintf("session-%d", vu),
-					TraceId:   fmt.Sprintf("trace-%d", seq),
-					RequestId: fmt.Sprintf("memberchange-%d", seq),
+				auth := verifiedAuthIdentity{
+					tenantID:  cfg.tenantID,
+					userID:    cfg.operatorUserID,
+					deviceID:  fmt.Sprintf("vu-%d", vu),
+					sessionID: fmt.Sprintf("session-%d", vu),
+					traceID:   fmt.Sprintf("trace-%d", seq),
+					requestID: fmt.Sprintf("memberchange-%d", seq),
 				}
+				requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 				var changeID string
 				var previousOwnerUserID string
 				var newOwnerUserID string
@@ -244,7 +300,7 @@ func run(cfg config) error {
 				if ownerTransfer {
 					var response *conversationv1.TransferConversationOwnerResponse
 					response, err = client.TransferConversationOwner(requestCtx, &conversationv1.TransferConversationOwnerRequest{
-						AuthContext:           auth,
+						AuthContext:           conversationAuth(auth),
 						ConversationId:        cfg.conversationID,
 						NewOwnerUserId:        targetUserID,
 						ExpectedMemberVersion: cfg.expectedVersion,
@@ -259,7 +315,7 @@ func run(cfg config) error {
 				} else {
 					var response *conversationv1.CreateMemberChangeResponse
 					response, err = client.CreateMemberChange(requestCtx, &conversationv1.CreateMemberChangeRequest{
-						AuthContext:           auth,
+						AuthContext:           conversationAuth(auth),
 						ConversationId:        cfg.conversationID,
 						TargetUserId:          targetUserID,
 						ChangeType:            changeType,
@@ -305,26 +361,27 @@ func run(cfg config) error {
 		time.Sleep(cfg.statsWait)
 	}
 	result := summary{
-		Commit:         shortCommit(),
-		CommitFull:     fullCommit(),
-		GitDirty:       gitDirty(),
-		GitStatusShort: gitStatusShort(),
-		Target:         cfg.target,
-		TLSEnabled:     cfg.tls.Enabled(),
-		VUs:            cfg.vus,
-		Duration:       cfg.duration.String(),
-		RequestCount:   atomic.LoadInt64(&sequence),
-		SuccessCount:   atomic.LoadInt64(&successCount),
-		ErrorCount:     atomic.LoadInt64(&errorCountTotal),
-		TenantID:       cfg.tenantID,
-		ConversationID: cfg.conversationID,
-		OperatorUserID: cfg.operatorUserID,
-		ListUserID:     cfg.listUserID,
-		ChangeType:     changeTypeName,
-		TargetRole:     targetRoleName,
-		TargetUserID:   cfg.targetUserID,
-		StartedAt:      startedAt,
-		FinishedAt:     finishedAt,
+		Commit:               shortCommit(),
+		CommitFull:           fullCommit(),
+		GitDirty:             gitDirty(),
+		GitStatusShort:       gitStatusShort(),
+		Target:               cfg.target,
+		TLSEnabled:           cfg.tls.Enabled(),
+		VerifiedAuthMetadata: cfg.verifiedMetadata,
+		VUs:                  cfg.vus,
+		Duration:             cfg.duration.String(),
+		RequestCount:         atomic.LoadInt64(&sequence),
+		SuccessCount:         atomic.LoadInt64(&successCount),
+		ErrorCount:           atomic.LoadInt64(&errorCountTotal),
+		TenantID:             cfg.tenantID,
+		ConversationID:       cfg.conversationID,
+		OperatorUserID:       cfg.operatorUserID,
+		ListUserID:           cfg.listUserID,
+		ChangeType:           changeTypeName,
+		TargetRole:           targetRoleName,
+		TargetUserID:         cfg.targetUserID,
+		StartedAt:            startedAt,
+		FinishedAt:           finishedAt,
 	}
 	if ownerTransfer {
 		result.TargetRole = ""
@@ -552,11 +609,17 @@ func getMemberChangeStatus(
 ) (string, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	auth := verifiedAuthIdentity{
+		tenantID:  cfg.tenantID,
+		userID:    cfg.listUserID,
+		deviceID:  "memberchange-list",
+		sessionID: "memberchange-list",
+		traceID:   "memberchange-get",
+		requestID: "memberchange-get-" + changeID,
+	}
+	requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 	response, err := client.GetMemberChange(requestCtx, &conversationv1.GetMemberChangeRequest{
-		AuthContext: &conversationv1.AuthContext{
-			TenantId: cfg.tenantID,
-			UserId:   cfg.listUserID,
-		},
+		AuthContext:    conversationAuth(auth),
 		ConversationId: cfg.conversationID,
 		ChangeId:       changeID,
 	})
@@ -579,11 +642,17 @@ func fillMemberListSample(
 	targetPresent := false
 	result.MemberListSampleUsers = make([]string, 0, 10)
 	for {
-		response, err := client.ListConversationMembers(requestCtx, &conversationv1.ListConversationMembersRequest{
-			AuthContext: &conversationv1.AuthContext{
-				TenantId: cfg.tenantID,
-				UserId:   cfg.listUserID,
-			},
+		auth := verifiedAuthIdentity{
+			tenantID:  cfg.tenantID,
+			userID:    cfg.listUserID,
+			deviceID:  "memberchange-list",
+			sessionID: "memberchange-list",
+			traceID:   "memberchange-list",
+			requestID: fmt.Sprintf("memberchange-list-%d", count),
+		}
+		callCtx := withVerifiedAuthMetadata(requestCtx, cfg, auth)
+		response, err := client.ListConversationMembers(callCtx, &conversationv1.ListConversationMembersRequest{
+			AuthContext:    conversationAuth(auth),
 			ConversationId: cfg.conversationID,
 			PageSize:       10,
 			PageToken:      pageToken,
@@ -655,4 +724,19 @@ func gitStatusShort() string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
+}
+
+func envBool(fallback bool, names ...string) bool {
+	for _, name := range names {
+		value := strings.TrimSpace(os.Getenv(name))
+		if value == "" {
+			continue
+		}
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return fallback
+		}
+		return parsed
+	}
+	return fallback
 }

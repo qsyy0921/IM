@@ -316,6 +316,30 @@ function Reset-ConsumerGroupToLatest {
         --execute | Out-Null
 }
 
+function Clear-LocalMessageOutboxSmokeResiduals {
+    $cleanupSQL = @'
+DELETE FROM message_outbox
+WHERE status <> 'PUBLISHED'
+  AND (
+    tenant_id LIKE 'tenant-it-%'
+    OR tenant_id LIKE 'tenant-outbox-concurrent-%'
+    OR tenant_id LIKE 'tenant-policy-context-%'
+    OR tenant_id LIKE 'tenant-push-%'
+    OR tenant_id LIKE 'tenant-push-gateway-%'
+  );
+'@
+    $cleanupFile = Join-Path $resultDir "cleanup-message-outbox-residuals.sql"
+    $cleanupLog = Join-Path $logDir "preflight-cleanup.out.log"
+    Set-Content -LiteralPath $cleanupFile -Value $cleanupSQL -Encoding ASCII
+    docker cp $cleanupFile "nexusim-postgres:/tmp/cleanup-message-outbox-residuals.sql" | Out-Null
+    docker exec nexusim-postgres psql `
+        -U nexusim `
+        -d nexusim `
+        -v ON_ERROR_STOP=1 `
+        -f /tmp/cleanup-message-outbox-residuals.sql |
+        Tee-Object -FilePath $cleanupLog | Out-Null
+}
+
 function Wait-Tcp {
     param(
         [string]$HostName,
@@ -506,6 +530,7 @@ try {
     if ($Scenario -eq "identity-revoke") {
         Reset-ConsumerGroupToLatest -Group $pushIdentityConsumerGroup -Topic $identityTopic
     }
+    Clear-LocalMessageOutboxSmokeResiduals
     if ($UseIdentityServiceToken) {
         $identityMigrations = Get-ChildItem -LiteralPath (Join-Path $repo "migrations\postgres\identity") -Filter "*.sql" | Sort-Object Name
         foreach ($identityMigration in $identityMigrations) {

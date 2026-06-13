@@ -75,6 +75,12 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
+		contacts, err := queryContactsSnapshot(ctx, h.pool)
+		if err != nil {
+			snapshot.ContactsError = "contacts metrics query failed"
+		} else {
+			snapshot.Contacts = &contacts
+		}
 		outbox, err := queryOutboxSnapshot(ctx, h.pool)
 		if err != nil {
 			snapshot.OutboxError = "contacts outbox metrics query failed"
@@ -92,12 +98,14 @@ type healthResponse struct {
 }
 
 type Snapshot struct {
-	Service       string          `json:"service"`
-	GeneratedAtMS int64           `json:"generated_at_ms"`
-	PGPool        *PGPoolSnapshot `json:"pg_pool,omitempty"`
-	Outbox        *OutboxSnapshot `json:"contacts_outbox,omitempty"`
-	OutboxError   string          `json:"contacts_outbox_error,omitempty"`
-	GRPC          *GRPCSnapshot   `json:"grpc,omitempty"`
+	Service       string            `json:"service"`
+	GeneratedAtMS int64             `json:"generated_at_ms"`
+	PGPool        *PGPoolSnapshot   `json:"pg_pool,omitempty"`
+	Contacts      *ContactsSnapshot `json:"contacts,omitempty"`
+	ContactsError string            `json:"contacts_error,omitempty"`
+	Outbox        *OutboxSnapshot   `json:"contacts_outbox,omitempty"`
+	OutboxError   string            `json:"contacts_outbox_error,omitempty"`
+	GRPC          *GRPCSnapshot     `json:"grpc,omitempty"`
 }
 
 type PGPoolSnapshot struct {
@@ -120,6 +128,36 @@ type OutboxSnapshot struct {
 	ReadyPending       int64  `json:"ready_pending"`
 	OldestPendingAgeMS *int64 `json:"oldest_pending_age_ms,omitempty"`
 	OldestDLQAgeMS     *int64 `json:"oldest_dlq_age_ms,omitempty"`
+}
+
+type ContactsSnapshot struct {
+	Requests                *ContactRequestSnapshot `json:"requests,omitempty"`
+	Edges                   *ContactEdgeSnapshot    `json:"edges,omitempty"`
+	CommandIdempotencyTotal int64                   `json:"command_idempotency_total"`
+}
+
+type ContactRequestSnapshot struct {
+	Total    int64                `json:"total"`
+	Pending  int64                `json:"pending"`
+	Accepted int64                `json:"accepted"`
+	Declined int64                `json:"declined"`
+	Canceled int64                `json:"canceled"`
+	Expired  int64                `json:"expired"`
+	ByStatus []GroupCountSnapshot `json:"by_status"`
+}
+
+type ContactEdgeSnapshot struct {
+	Total      int64                `json:"total"`
+	Active     int64                `json:"active"`
+	Deleted    int64                `json:"deleted"`
+	Blocked    int64                `json:"blocked"`
+	WithRemark int64                `json:"with_remark"`
+	ByStatus   []GroupCountSnapshot `json:"by_status"`
+}
+
+type GroupCountSnapshot struct {
+	Value string `json:"value"`
+	Total int64  `json:"total"`
 }
 
 func queryOutboxSnapshot(ctx context.Context, pool *pgxpool.Pool) (OutboxSnapshot, error) {
@@ -155,6 +193,118 @@ FROM contacts_outbox
 	snapshot.OldestPendingAgeMS = floatMillisToIntPtr(oldestPendingAge)
 	snapshot.OldestDLQAgeMS = floatMillisToIntPtr(oldestDLQAge)
 	return snapshot, nil
+}
+
+func queryContactsSnapshot(ctx context.Context, pool *pgxpool.Pool) (ContactsSnapshot, error) {
+	var snapshot ContactsSnapshot
+
+	requests, err := queryContactRequestSnapshot(ctx, pool)
+	if err != nil {
+		return ContactsSnapshot{}, err
+	}
+	snapshot.Requests = &requests
+
+	edges, err := queryContactEdgeSnapshot(ctx, pool)
+	if err != nil {
+		return ContactsSnapshot{}, err
+	}
+	snapshot.Edges = &edges
+
+	if err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM contact_command_idempotency
+`).Scan(&snapshot.CommandIdempotencyTotal); err != nil {
+		return ContactsSnapshot{}, err
+	}
+
+	return snapshot, nil
+}
+
+func queryContactRequestSnapshot(ctx context.Context, pool *pgxpool.Pool) (ContactRequestSnapshot, error) {
+	var snapshot ContactRequestSnapshot
+	if err := pool.QueryRow(ctx, `
+SELECT
+    COUNT(*),
+    COUNT(*) FILTER (WHERE status = 'PENDING'),
+    COUNT(*) FILTER (WHERE status = 'ACCEPTED'),
+    COUNT(*) FILTER (WHERE status = 'DECLINED'),
+    COUNT(*) FILTER (WHERE status = 'CANCELED'),
+    COUNT(*) FILTER (WHERE status = 'EXPIRED')
+FROM contact_requests
+`).Scan(
+		&snapshot.Total,
+		&snapshot.Pending,
+		&snapshot.Accepted,
+		&snapshot.Declined,
+		&snapshot.Canceled,
+		&snapshot.Expired,
+	); err != nil {
+		return ContactRequestSnapshot{}, err
+	}
+	byStatus, err := queryGroupCounts(ctx, pool, `
+SELECT status, COUNT(*)
+FROM contact_requests
+GROUP BY status
+ORDER BY status
+`)
+	if err != nil {
+		return ContactRequestSnapshot{}, err
+	}
+	snapshot.ByStatus = byStatus
+	return snapshot, nil
+}
+
+func queryContactEdgeSnapshot(ctx context.Context, pool *pgxpool.Pool) (ContactEdgeSnapshot, error) {
+	var snapshot ContactEdgeSnapshot
+	if err := pool.QueryRow(ctx, `
+SELECT
+    COUNT(*),
+    COUNT(*) FILTER (WHERE status = 'ACTIVE'),
+    COUNT(*) FILTER (WHERE status = 'DELETED'),
+    COUNT(*) FILTER (WHERE status = 'BLOCKED'),
+    COUNT(*) FILTER (WHERE remark <> '')
+FROM contact_edges
+`).Scan(
+		&snapshot.Total,
+		&snapshot.Active,
+		&snapshot.Deleted,
+		&snapshot.Blocked,
+		&snapshot.WithRemark,
+	); err != nil {
+		return ContactEdgeSnapshot{}, err
+	}
+	byStatus, err := queryGroupCounts(ctx, pool, `
+SELECT status, COUNT(*)
+FROM contact_edges
+GROUP BY status
+ORDER BY status
+`)
+	if err != nil {
+		return ContactEdgeSnapshot{}, err
+	}
+	snapshot.ByStatus = byStatus
+	return snapshot, nil
+}
+
+func queryGroupCounts(ctx context.Context, pool *pgxpool.Pool, query string) ([]GroupCountSnapshot, error) {
+	rows, err := pool.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	values := make([]GroupCountSnapshot, 0)
+	for rows.Next() {
+		var entry GroupCountSnapshot
+		if err := rows.Scan(&entry.Value, &entry.Total); err != nil {
+			return nil, err
+		}
+		values = append(values, entry)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return values, nil
 }
 
 func floatMillisToIntPtr(value *float64) *int64 {

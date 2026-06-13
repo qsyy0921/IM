@@ -25,7 +25,7 @@ im.delivery.events
 
 本阶段重点不是容量，而是证明送达 / 已读回执不直接读取 `delivery-service` 内部表，而是基于 `im.delivery.events` 重建自己的 read model。
 
-2026-06-13 补充：`-VerifiedAuthMetadata` 真实进程 smoke 已通过，验证 conversation / message / delivery / receipt 四个 user-facing gRPC server 在 metadata auth 模式下完成投递、回执、会话列表、未读、归档、置顶和静音链路。
+2026-06-13 补充：`-VerifiedAuthMetadata` 真实进程 smoke 已通过，验证 conversation / message / delivery / receipt 四个 user-facing gRPC server 在 metadata auth 模式下完成投递、回执、会话列表、未读、归档、置顶和静音链路。receipt-service gRPC mTLS 真实进程 smoke 也已通过，验证 receipt server 端 TLS、require client cert、client DNS / URI SAN allowlist 以及 metadata auth 下的回执 / 列表偏好链路。
 
 ## 报告列表
 
@@ -39,6 +39,7 @@ im.delivery.events
 | `loadtest-report-20260611-receipt-mute-smoke.md` | `MuteConversation` 真实进程 smoke，验证当前用户静音 / 取消静音标志；静音不改变 unread、read cursor、delivery、push 或消息事实 |
 | `loadtest-report-20260611-receipt-unread-filter-smoke.md` | `ListConversations(unread_only=true)` 真实进程 smoke，验证投递后未读列表可见、`MarkRead` 后未读列表为空 |
 | `loadtest-report-20260613-receipt-verified-metadata-smoke.md` | `-VerifiedAuthMetadata` 真实进程 smoke，验证 metadata auth 下的 delivery / receipt / list / preference 链路 |
+| `loadtest-report-20260613-receipt-mtls-smoke.md` | receipt-service gRPC server 开启 mTLS + client identity allowlist，并用 gateway verified metadata 完成回执 / 会话列表偏好链路 |
 
 ## TLS / mTLS smoke 参数
 
@@ -82,6 +83,7 @@ NEXUSIM_RECEIPT_LOADTEST_VERIFIED_AUTH_METADATA=true
 - `MarkRead` 是显式读操作，会受可见最大 seq 和已送达最大 seq 双重约束，不能把未投递消息标已读。
 - `GetReceiptState` 支持按 `conversation_seq` 或 `message_id` 查询，当前 smoke 已覆盖两种入口。
 - `receipt_outbox` 已通过 relay 发布 `receipt.message.received.v1` / `receipt.message.read.v1` 到 `im.receipt.events`；当前还没有下游真实消费者。
+- 已补 receipt-service gRPC mTLS smoke：server 端启用 TLS、require client cert、client DNS SAN allowlist=`api-gateway.nexusim.local`、client URI SAN allowlist=`spiffe://nexusim/api-gateway`，client 端使用 CA/server name/client cert/key，并通过 gateway verified metadata 完成 `GetReceiptState / MarkRead / ListConversations / Archive / Pin / Mute`。
 - receipt outbox 的 `aggregate_version` 是 cursor seq，不是 conversation 全局顺序轴，所以 relay 不用低版本 PENDING/DLQ 阻塞同会话更高版本回执事件，避免某个用户回执阻塞其它用户。
 - 会话列表 / 未读数放在 `receipt-service` 内扩展，不新增 `conversation-list-service`，降低服务间耦合和部署复杂度。
 - `ListConversations` 的 unread 由 `receipt_inbox_projection` 中 `source_event_type=message.persisted.v1` 的可见消息行数减去 read cursor 得出，不把 conversation seq 差值当成未读数，也不把 edit/revoke/delete tombstone 当新未读消息。

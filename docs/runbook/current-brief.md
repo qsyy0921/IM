@@ -16,7 +16,7 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 - message-service、conversation-service、delivery-service、push-gateway、receipt-service、contacts-service、identity-service、policy-service、api-gateway 均已有真实链路或最小闭环。
 - Win/Mac Docker 分布式 smoke 已证明跨实例 route / resume / PullInbox fallback 等关键路径。
 - 当前不是生产级 HA：Kafka HA、PostgreSQL failover、Redis quorum / 网络分区、服务发现、统一观测和部署编排仍是后续。
-- 当前 9 个服务足够支撑 IM 主链路；搜索、媒体、完整通知、审计/admin、RAG/summary/agent、presence/config 后续再按独立模型和伸缩边界拆服务。
+- 当前 9 个服务足够支撑 IM 主链路；后续服务和中间件不写死，新增或替换必须满足拆分 / 演进准则并通过 ADR。
 
 ## 当前优先级
 

@@ -1,65 +1,73 @@
-# NexusIM 目标态技术架构冻结稿 v1.0
+# NexusIM 目标态技术架构 v1.1
 
 ## 1. 架构定位
 
-NexusIM 是面向大规模企业协同的 IM + 智能协作平台。核心原则是：IM 写入强一致，投递、搜索、RAG、Agent、审计全部异步化；PostgreSQL 是交易事实源，Kafka 是事件传播面，OpenSearch/Milvus 是检索投影面，Temporal 承接审批、补偿和 Agent 长事务。
+NexusIM 是面向大规模企业协同的 IM + 智能协作平台。核心原则是：IM 写入强一致，投递、搜索、RAG、Agent、审计全部异步化；当前以 PostgreSQL 承载交易事实源，以 Kafka 承载事件传播面，以 OpenSearch/Milvus 作为检索投影候选，以工作流引擎承接审批、补偿和 Agent 长事务。
 
 不可退让项：
 
 - `seq + message + timeline + outbox` 在普通会话中本地事务提交。
-- Kafka 是唯一核心事件流平台，事件契约进入 Schema Registry。
+- 核心事实事件必须走契约化事件平台和 outbox relay；当前实现使用 Kafka。
 - Redis 只保存热状态和路由，不作为消息、ACK、权限事实源。
 - push-gateway 只维护连接和推送，不写消息事实源。
-- search-service 是 OpenSearch 唯一写入口。
-- retrieval-gateway 是搜索和向量检索唯一入口。
+- search-service 是搜索索引唯一写入口；具体搜索中间件可按 ADR 替换。
+- retrieval-gateway 是全文/向量检索唯一入口；具体检索后端可按 ADR 替换。
 - Agent 写动作必须 `Proposal -> Approval -> Executor -> Audit`。
 - API、事件、DB schema 必须向后兼容，数据库变更走 `expand -> migrate -> contract`。
 
-冻结边界：
+演进边界：
 
 - 本文只维护目标态总架构和关键技术决策。
 - 服务级 SDD、Proto/OpenAPI/AsyncAPI、PostgreSQL migration、Kafka schema、压测脚本进入下一阶段工程契约，不继续并入本文。
-- v1.0 冻结后不再新增总架构章节；后续变更只允许修正文档错误或补充已冻结决策的歧义。
+- 核心目标态按 ADR 治理，不把快速演进中的当前实现写死成不可变终局。
 
-## 2. 冻结技术栈
+## 2. 技术栈口径
 
-| 模块 | 技术方案 | 约束 |
+技术栈按落地状态分层描述，任何中间件和框架都不是永久锁死；替换时必须说明兼容性、迁移、回滚和压测证据。
+
+```text
+当前已落地：Go、gRPC + Protobuf、pgx、PostgreSQL、Kafka、Redis、Docker、本地 outbox / projection / smoke 工具。
+目标态推荐：Schema Registry、OpenTelemetry、mTLS、Kubernetes/GitOps、OpenSearch、S3-compatible Object Storage。
+后续可替换候选：Kratos、wire、sqlc、Temporal、OpenFGA-compatible backend、Milvus 等，落地前必须通过 ADR 或服务级 SDD。
+```
+
+| 模块 | 当前推荐 / 当前实现 | 演进约束 |
 | --- | --- | --- |
 | 语言 | Go 1.26.4 | 业务服务和网关统一 Go |
-| 微服务框架 | Kratos | 业务微服务统一 Kratos |
+| 微服务框架 | 当前手写 gRPC/cmd wiring，Kratos 可作为候选 | 引入框架必须减少重复 wiring，不得污染 app/domain |
 | 内部通信 | gRPC + Protobuf | 服务间同步接口统一 deadline、错误码、幂等语义 |
 | 外部 API | HTTP + OpenAPI | 面向客户端和开放平台 |
 | WebSocket | 独立 Go push-gateway | 可用 `gobwas/ws` 或 `nhooyr.io/websocket`，不依赖重框架 |
-| 数据访问 | pgx + sqlc | 消息热路径不用 ORM |
-| DI | wire | 编译期依赖注入 |
+| 数据访问 | pgx；sqlc 可作为候选 | 消息热路径不用重 ORM，SQL 契约必须可测试 |
+| DI | 手写 composition root；wire 可作为候选 | 引入 DI 不能隐藏依赖方向 |
 | 日志 | zap / zerolog | JSON 结构化日志 |
-| 事件流 | Kafka KRaft | 使用 KRaft 元数据模式 |
-| 事件契约 | Confluent Schema Registry | Protobuf 优先，外围系统可用 JSON Schema |
-| 事实源 | PostgreSQL 分区/分片集群 | PITR、主从、分区裁剪、热点分片 |
-| 缓存 | Redis route/counter/cache 三类集群 | 连接路由、计数聚合、普通缓存隔离 |
-| 搜索 | OpenSearch | 全文、混合检索、冷热索引 |
-| 向量 | Milvus | 大规模 ANN、metadata filtering、多租户隔离 |
-| 权限 | policy-service + OpenFGA-compatible ReBAC | 业务服务不直接依赖 OpenFGA SDK |
+| 事件流 | Kafka KRaft 当前推荐 | 替换事件平台必须保持分区保序、重放和契约治理 |
+| 事件契约 | Schema Registry 当前推荐 | Protobuf 优先，外围系统可用 JSON Schema |
+| 事实源 | PostgreSQL 当前事实源 | 替换事实源必须证明事务、PITR、分片和回滚能力 |
+| 缓存 | Redis route/counter/cache 当前推荐 | 热状态不能升级为消息、ACK、权限事实源 |
+| 搜索 | OpenSearch 当前候选 | 只允许 search-service 写索引 |
+| 向量 | Milvus 当前候选 | 必须支持 metadata filtering、多租户隔离和删除证明 |
+| 权限 | policy-service + OpenFGA-compatible ReBAC 候选 | 业务服务不直接依赖底层授权 SDK |
 | 对象存储 | S3-compatible Object Storage | 元数据在 PostgreSQL，内容在对象存储 |
-| 长事务 | Temporal | 审批、补偿、Retention、Agent 写动作 |
+| 长事务 | Temporal / workflow engine 候选 | 审批、补偿、Retention、Agent 写动作不能进入 IM 热路径 |
 | 可观测性 | OpenTelemetry + Prometheus + Grafana + Tempo/Jaeger + Loki | trace/metric/log 统一 |
 | 发布 | Kubernetes + GitOps + Argo Rollouts | canary、判稳、回滚 |
 | 安全 | mTLS + NetworkPolicy + service identity | 内部 token 校验 audience |
 
-### 2.1 分层冻结策略
+### 2.1 分层演进策略
 
-技术栈冻结采用分层策略：冻结方向和第一阶段必需技术，不冻结所有容量参数、部署规模和后期服务内部细节。
+技术栈采用分层演进策略：稳定不变量和第一阶段必需能力，不锁死所有中间件、容量参数、部署规模和后期服务内部细节。
 
 | 层级 | 状态 | 内容 | 变更规则 |
 | --- | --- | --- | --- |
-| Level 1 | 硬冻结 | Go、Kratos、六层 DDD、gRPC + Protobuf、HTTP/OpenAPI gateway 适配、pgx + sqlc、PostgreSQL 事实源、Kafka + Schema Registry、Transactional Outbox、`message-service SendMessage` 第一阶段主链路、Go module 和工程目录 | 变更必须走 ADR |
-| Level 2 | 软冻结 | Redis route/counter/cache 拆分、OpenSearch、Milvus、Temporal、Kubernetes + GitOps + Argo Rollouts、OpenTelemetry 体系、S3-compatible Object Storage | 方向冻结；服务级 SDD、压测和 ADR 可以细化实现 |
-| Level 3 | 暂不冻结 | Kafka partition 数、PostgreSQL shard 数、Redis shard 数、具体版本小号、HPA 参数、服务副本数、机器规格、OpenSearch mapping 细节、Milvus index 类型、RAG chunk 策略、embedding/rerank model | 由服务级 SDD、压测结果和发布评审决定 |
+| Level 1 | 核心不变量 | 六层 DDD、gRPC + Protobuf、HTTP/OpenAPI gateway 适配、Transactional Outbox、`message-service SendMessage` 第一阶段主链路、Go module 和工程目录 | 变更必须走 ADR |
+| Level 2 | 当前推荐方向 | PostgreSQL、Kafka、Redis、Schema Registry、OpenSearch、Kubernetes/GitOps、OpenTelemetry、S3-compatible Object Storage、mTLS | 可替换，但必须有迁移、回滚和压测证据 |
+| Level 3 | 候选/待验证 | Kratos、wire、sqlc、Temporal、OpenFGA-compatible backend、Milvus、分片/副本/版本小号、HPA 参数、机器规格、RAG chunk 策略、embedding/rerank model | 由服务级 SDD、压测结果和发布评审决定 |
 
 ADR 触发条件：
 
 ```text
-替换 Level 1 技术
+改变 Level 1 不变量
 改变事实源或事件平台
 改变服务分层和目录约束
 改变 message-service 第一阶段主链路
@@ -177,12 +185,12 @@ flowchart TB
 
 ## 4. 服务边界
 
-目标态服务 / 网关组件冻结为 20 个，不继续新增服务；后续只做服务级 SDD、契约、Schema 和压测落地。
+目标态核心服务清单是当前架构快照，不是服务数量上限。新增服务不写死，必须满足独立数据模型、独立伸缩需求、独立故障边界，或能显著降低现有服务复杂度，并通过 ADR。当前已独立实现的 `contacts-service` 正式纳入核心服务，不再把它隐含到 conversation-service。
 
 | 层级 | 组件 |
 | --- | --- |
 | 接入层 | `api-gateway`、`route-service`、`push-gateway` |
-| IM 核心 | `identity-service`、`policy-service`、`control-plane-service`、`conversation-service`、`message-service`、`timeline-service`、`delivery-service`、`receipt-service`、`media-service`、`audit-service` |
+| IM 核心 | `identity-service`、`policy-service`、`control-plane-service`、`conversation-service`、`contacts-service`、`message-service`、`timeline-service`、`delivery-service`、`receipt-service`、`media-service`、`audit-service` |
 | 检索与 Agent 智能层 | `search-service`、`rag-ingest-service`、`retrieval-gateway`、`agent-service`、`tool-service`、`approval-service`、`action-executor` |
 
 | 服务 | 数据归属 | 核心职责 | 禁止事项 |
@@ -194,12 +202,13 @@ flowchart TB
 | policy-service | relation tuples、授权模型 | ReBAC 判定、权限缓存、strict check | 业务服务不直连底层 OpenFGA |
 | control-plane-service | 策略配置、版本、rollout、审批记录 | sequencer、fanout、partition mapping、预算、降级、feature flag | 不允许人工改 DB 绕过控制面 |
 | conversation-service | 会话、成员、策略、成员变更 Saga | 成员事实、权限版本、成员边界命令 | 不写消息正文 |
+| contacts-service | contacts、blocks、relationship projection | 联系人、黑名单、关系事件 | 不做会话成员事实、不绕过 policy-service |
 | message-service | message_log、timeline、message_outbox | 普通会话单事务写 `seq + message + timeline + outbox` | 不做投递、搜索、RAG |
 | timeline-service | sequencer state、seq block、gap marker | 热点会话 seq block、leader fencing、gap marker | 普通会话不拆散 message 本地事务 |
 | delivery-service | user_inbox、delivery task | fanout、离线补拉、在线推送触发 | 不推进 read cursor |
 | receipt-service | delivery ACK、read cursor、unread projection | ACK、已读、未读聚合 | 不改消息事实 |
 | media-service | media_objects、scan_jobs | 上传、扫描、短期 URL | 不绕过权限下载 |
-| search-service | OpenSearch index | 产品搜索索引唯一写入口 | 其他服务不直写 OpenSearch |
+| search-service | search index | 产品搜索索引唯一写入口 | 其他服务不直写搜索后端 |
 | rag-ingest-service | rag_sources、rag_chunks、embedding_jobs | chunk、embedding、删除同步 | 不参与消息热路径 |
 | retrieval-gateway | evidence_pack、retrieval audit | 权限过滤、混合检索、rerank、EvidencePack | Agent/前端不直连索引 |
 | agent-service | agent_runs、proposals | 只读问答、写动作提案 | 不直接写业务库 |
@@ -208,7 +217,15 @@ flowchart TB
 | action-executor | action_execution_attempts、Temporal workflow state | 执行已审批动作、调用工具或内部 API、写执行结果 | 不接收未审批写动作、不绕过业务 API |
 | audit-service | audit_logs、audit_manifest | 不可变审计、导出、修复留痕 | 不作为业务状态源 |
 
-工程分层固定为：
+当前态 vs 目标态：
+
+| 范围 | 当前状态 | 后续差距 |
+| --- | --- | --- |
+| 9 个主链路服务 | `api-gateway`、`identity`、`message`、`conversation`、`delivery`、`push`、`receipt`、`contacts`、`policy` 已有真实链路或最小闭环 | 继续补生产级治理、故障验证和容量基线 |
+| 本地/双机分布式 | Win/Mac Docker smoke 已验证跨实例 route、resume、PullInbox fallback | Kafka HA、PostgreSQL failover、Redis quorum / 网络分区、K8s rollout 未验证 |
+| 后续新增服务 | search、media、notification、audit/admin、AI、presence/config 等示例方向 | 不预设最终数量；满足拆分准则后再立项，不一次性拆碎 |
+
+工程分层约定为：
 
 ```text
 api -> app -> domain
@@ -217,18 +234,18 @@ app -> infrastructure
 app/domain/api/trigger -> types
 ```
 
-六层职责固定为：
+六层职责基线：
 
 | 层 | 职责 | 示例 |
 | --- | --- | --- |
 | `api` | 对外接口适配层 | gRPC handler、HTTP handler、request/response 转换 |
 | `app` | 应用用例层 | `SendMessageUseCase`、事务编排、调用 domain 和 infrastructure |
 | `domain` | 领域规则层 | `Message`、`TimelineEvent`、`OutboxEvent`、幂等规则、状态流转 |
-| `infrastructure` | 基础设施实现层 | PostgreSQL、Kafka、Redis、外部 RPC client、sqlc repo |
+| `infrastructure` | 基础设施实现层 | PostgreSQL、Kafka、Redis、外部 RPC client、SQL repository |
 | `types` | 类型定义层 | Command、DTO、枚举、错误码、常量、跨层轻量类型 |
 | `trigger` | 触发器 / 后台任务层 | Outbox Relay、Kafka consumer、定时巡检、补偿任务 |
 
-依赖方向固定为：
+依赖方向基线：
 
 ```text
 api -> app
@@ -383,7 +400,7 @@ timeline-service 不接管普通消息事务，只负责：
 - gap marker；
 - owner 切换审计。
 
-Sequencer 实现固定为：
+Sequencer 当前目标实现：
 
 | 能力 | 技术 |
 | --- | --- |
@@ -883,6 +900,8 @@ Retrieval 权限规则：
 - retrieval-gateway 必须支持 `strict_acl_mode`。
 - `acl_version` 过期、缺失或投影延迟超阈值时，必须回源 policy-service。
 - 用户退群后，`leave_seq` 之后的 chunk 不能被召回。
+- 成员 join/leave 的可见窗口必须进入搜索和向量检索过滤，不能只看当前成员状态。
+- 消息撤回、删除、保留期清理必须产生 tombstone / delete event，搜索和 RAG 在投影完成前进入 strict fallback 或冻结相关结果。
 - Agent 继承用户权限，并叠加 `agent_delegate` 与 tool policy。
 
 强一致授权矩阵：
@@ -948,6 +967,7 @@ chunk_id
 source_id
 conversation_id
 source_seq
+source_message_id
 snippet
 score.recall
 score.rerank
@@ -956,7 +976,9 @@ classification
 trace_id
 ```
 
-### 10.3 Agent 与 Temporal
+EvidencePack 必须能追溯到 source message id / seq / event id；AI 回答不得只给模型生成文本而没有可审计证据。
+
+### 10.3 Agent 与工作流引擎
 
 Agent 写动作固定流程：
 
@@ -964,12 +986,18 @@ Agent 写动作固定流程：
 agent detects write intent
 -> create Action Proposal
 -> approval-service checks policy and risk
--> Temporal workflow waits approval
+-> workflow waits approval
 -> action-executor calls tool-service / internal API
 -> audit-service appends result
 ```
 
-Temporal 只用于长事务：
+Agent 边界不变量：
+
+- Agent 不直接读 PostgreSQL、OpenSearch 或 Milvus，只能通过 retrieval-gateway、tool-service 或公开业务 API。
+- Agent 不直接写业务库；所有写动作必须进入 proposal / approval / executor / audit。
+- Agent 输出必须携带 evidence pack id 或明确标记无证据回答，并被 AI eval / safety gate 覆盖。
+
+工作流引擎只用于长事务：
 
 - 审批等待；
 - Agent 写动作；
@@ -1205,21 +1233,21 @@ RAG/Agent 发布必须跑安全评测：
 
 | 编号 | 决策 | 原因 |
 | --- | --- | --- |
-| ADR-001 | Go + Kratos 作为业务微服务栈 | 统一 HTTP/gRPC/middleware/metrics/tracing，减少框架混用 |
+| ADR-001 | Go + 六层 DDD + gRPC/Protobuf 作为业务服务基线 | 统一服务边界、接口契约和工程目录，框架可按 ADR 渐进引入 |
 | ADR-002 | push-gateway 独立实现 | 长连接对性能、慢连接、背压、连接生命周期要求独立 |
 | ADR-003 | PostgreSQL 是交易事实源 | 支持事务、分区、PITR、强一致写入 |
 | ADR-004 | 普通消息由 message-service 单事务写 `seq + message + timeline + outbox` | 避免 timeline-service 与 message-service 跨服务事务冲突 |
 | ADR-005 | timeline-service 只做 sequencer control-plane 和热点 seq authority | 保留热点扩展能力，同时不破坏普通会话本地事务 |
 | ADR-006 | Sequencer 使用 Kubernetes Lease + PostgreSQL epoch fencing | Lease 负责选主，epoch 防止旧 leader 写入 |
 | ADR-007 | 成员变更必须使用 member_change_saga | 显式管理成员事实和 timeline boundary 的失败窗口 |
-| ADR-008 | Kafka KRaft + Schema Registry 是唯一事件平台 | 支持高吞吐、分区保序、长保留、重放和契约治理 |
+| ADR-008 | 事实事件通过契约化事件平台传播，当前推荐 Kafka KRaft + Schema Registry | 支持高吞吐、分区保序、长保留、重放和契约治理 |
 | ADR-009 | Timeline topic 使用自定义 virtual partitioner | 避免扩分区导致同会话事件分区不稳定 |
 | ADR-010 | Redis 拆 route/counter/cache 三类集群 | 避免连接路由被计数和缓存热点拖垮 |
-| ADR-011 | policy-service 封装 OpenFGA-compatible ReBAC | 统一权限模型，避免业务服务依赖底层授权 SDK |
-| ADR-012 | search-service 是 OpenSearch 唯一写入口 | 避免索引多写源造成不可控不一致 |
+| ADR-011 | policy-service 封装 ReBAC / ABAC 授权后端 | 统一权限模型，避免业务服务依赖底层授权 SDK |
+| ADR-012 | search-service 是搜索索引唯一写入口 | 避免索引多写源造成不可控不一致，具体搜索后端可替换 |
 | ADR-013 | retrieval-gateway 是唯一检索入口 | 集中权限过滤、召回、rerank 和 EvidencePack 审计 |
-| ADR-014 | Milvus 是目标向量检索层 | 支持大规模 ANN、metadata filtering 和水平扩展 |
-| ADR-015 | Temporal 只承接长事务 | 避免 IM 热路径依赖工作流引擎 |
+| ADR-014 | 向量检索后端通过 retrieval-gateway 封装 | 支持大规模 ANN、metadata filtering 和水平扩展，后端可替换 |
+| ADR-015 | 工作流引擎只承接长事务 | 避免 IM 热路径依赖工作流引擎 |
 | ADR-016 | Agent 写动作必须审批和审计 | 防止模型越权和不可追踪副作用 |
 | ADR-017 | Region 策略为事实源主备、接入多活 | 保证消息一致性，同时提升接入可用性 |
 | ADR-018 | 审计采用 hash chain + WORM manifest | 证明审计未删除、未篡改、导出可校验 |
@@ -1238,15 +1266,15 @@ RAG/Agent 发布必须跑安全评测：
 | ADR-031 | 授权按场景区分强校验和投影校验 | 在主链路、下载、Agent 写动作等高风险路径避免投影延迟误判 |
 | ADR-032 | push-gateway 支持短断线 resume buffer | 提升移动端短断线体验，同时不改变 delivery 补拉事实源 |
 
-## 16. 冻结结论与下一阶段
+## 16. 演进结论与下一阶段
 
-本文到 v1.0 为止冻结。后续不再继续堆总架构点，直接进入服务级设计、接口契约、数据库 schema、Kafka schema 和压测验证。
+本文是目标态架构基线，不是终局服务数量或中间件清单。后续优先进入服务级设计、接口契约、数据库 schema、Kafka schema 和压测验证；新增总架构点必须通过 ADR，并说明为什么不能在现有服务或中间件边界内解决。
 
 优先交付：
 
 | 优先级 | 交付物 | 范围 |
 | --- | --- | --- |
-| P0 | `message-service SDD` | 已冻结 v1.0；发送、编辑、撤回、删除、本地事务、outbox、幂等、Runbook |
+| P0 | `message-service SDD` | 已形成基线；发送、编辑、撤回、删除、本地事务、outbox、幂等、Runbook |
 | P0 | `timeline-service / sequencer SDD` | seq block、epoch fencing、journal、gap marker、模式切换 |
 | P0 | `conversation-service / member_change_saga SDD` | 成员事实、边界 seq、Saga、并发冲突、ACL 投影 |
 | P0 | `Proto / OpenAPI / AsyncAPI` | `SendMessage`、`AllocateSeqBlock`、`CreateMemberChange`、`AckDelivery`、`PullOfflineMessages`、`RetrieveEvidence` |
@@ -1263,13 +1291,19 @@ RAG/Agent 发布必须跑安全评测：
 | --- | --- | --- |
 | `timeline-service / sequencer SDD` 未完成 | 不阻塞普通会话 `SendMessage`；阻塞热点会话生产实现 | 第一阶段只实现 `LOCAL_ROW_LOCK`，`SEQUENCER_BLOCK` 只定义 port 和 mock |
 | `conversation-service / member_change_saga SDD` 未完成 | 不阻塞 `GetSendContext` 会话发送上下文 read path；阻塞真实成员变更、群主/管理员规则和 ACL 投影 | message-service 只能依赖 `ConversationQueryPort`，并从 port 读取 `fanout_mode`、`fanout_policy_version`，不能写成员事实、角色规则或硬编码 fanout 策略 |
-| Proto / OpenAPI / AsyncAPI 未落文件 | 阻塞正式业务代码 | 先冻结 `message_service.proto`、错误码和事件契约，再创建 service skeleton |
+| Proto / OpenAPI / AsyncAPI 未落文件 | 阻塞正式业务代码 | 先确定 `message_service.proto`、错误码和事件契约，再创建 service skeleton |
 | PostgreSQL migration 未落文件 | 阻塞本地事务代码 | 先落 `conversation_seq + message_log + timeline + outbox` 同分片约束 |
 | Kafka schema 未落文件 | 阻塞 outbox relay 对外发布 | 先落 `message.persisted.v1` 和 envelope，再实现 producer |
 | Outbox DLQ repair 契约文件未落地 | 不阻塞第一阶段 `SendMessage`，但阻塞后续运维闭环 | SDD 已定义 replay/skip 语义；后续必须落 Proto/AsyncAPI 和 `audit.repair.events` schema |
 | 跨服务 timeline append / publish ordering 未落地 | 不阻塞第一阶段只有 message event 的 `SendMessage`；阻塞成员边界、gap marker、repair event 生产化 | `conversation-service / member_change_saga SDD` 必须选择统一 timeline append / publish 机制 |
 
 本地开发和双机压测配置属于运行手册，不固化在目标态架构正文中。当前机器 IP、端口、防火墙和代理约定见 `docs/runbook/local-loadtest.md`。
+
+本地/双机分布式 smoke 与生产 HA 的区别：
+
+| 已验证 | 未宣称 |
+| --- | --- |
+| 双机 Docker、多实例 push route、durable PullInbox fallback、基础 Redis route smoke | Kafka 多 broker HA、PostgreSQL 主从/failover、Redis Sentinel quorum/网络分区、Kubernetes 灰度和自动恢复 |
 
 工程落地基线：
 
@@ -1287,15 +1321,21 @@ RAG/Agent 发布必须跑安全评测：
 
 代码依赖规则：
 
-- Go module 固定为 `github.com/qsyy0921/IM`。
+- 当前 Go module 为 `github.com/qsyy0921/IM`。
 - 服务之间不能直接 import 对方的 `internal` 或业务实现，只能通过 Protobuf 契约、事件契约或明确的 port interface 交互。
 - `domain` 层不依赖 SQL、Kafka、Redis、OpenSearch、Milvus、Temporal、Kratos SDK。
 - `app` 层只编排 use case、事务和 port interface，不写协议解析和具体存储细节。
-- `infrastructure` 层承接 pgx/sqlc、Kafka producer/consumer、Redis、OpenTelemetry exporter。
+- `infrastructure` 层承接 pgx/SQL repository、Kafka producer/consumer、Redis、OpenTelemetry exporter。
 - `api` 层只做对外接口适配和 request/response 转换，不写业务规则。
 - `trigger` 层只做后台触发、消费、巡检和补偿任务，不写业务规则。
 - `types` 层只放稳定基础类型，不允许变成全局工具箱或业务模型包。
 - 第一阶段允许 `policy-service`、`conversation-service`、`timeline-service` 使用 strict mock，但 mock 必须实现同名 port，不能把权限、成员、seq 逻辑硬编码进 message-service。
+
+代码复杂度治理：
+
+- 生产手写文件接近 2500 行必须优先同 package 拆分；测试和 runner 接近 3000 行必须拆 helper。
+- 公共包至少需要两个以上真实调用方；禁止为了架构好看提前抽象。
+- 优先按已有端口、事实流、projection 和 read model 扩展；新抽象必须降低实际复杂度或隔离故障边界。
 
 第一条代码切片：
 
@@ -1362,17 +1402,17 @@ small smoke load
 -> short duration stability test
 ```
 
-不要等 20 个目标态服务全部部署后再压测；每完成一条真实链路就记录容量基线和瓶颈。
+不要等所有目标态服务全部部署后再压测；每完成一条真实链路就记录容量基线和瓶颈。
 
 进入编码前的门禁：
 
-- `message-service.proto` 必须先冻结 `SendMessage`、`EditMessage`、`RevokeMessage`、`DeleteMessage` 和错误码。
+- `message-service.proto` 必须先确定 `SendMessage`、`EditMessage`、`RevokeMessage`、`DeleteMessage` 和错误码。
 - `EditMessage`、`RevokeMessage`、`DeleteMessage` request 必须携带 `conversation_id`，不能只靠 `message_id` 路由分片。
 - `SendMessage` 必须明确 `command_hash` canonical 规则和 `client_msg_id` device scope。
 - `SendMessage` 外部依赖读取必须在 DB transaction 外完成，事务内只做本地事实写入。
 - PostgreSQL migration 必须覆盖 message-service SDD 中的核心表和唯一约束，尤其是 `conversation_seq` DDL、`message_log.command_hash` 和同分片事务约束。
 - Kafka schema 必须覆盖 `message.persisted.v1`、`message.edited.v1`、`message.revoked.v1`、`message.deleted.v1`。
-- `conversation.timeline.events` 的跨服务 append / publish 顺序机制必须在成员边界生产化前冻结。
+- `conversation.timeline.events` 的跨服务 append / publish 顺序机制必须在成员边界生产化前确定。
 - 本地集成测试必须能一键启动依赖并清理数据。
 - 第一轮压测只接受真实服务进程，不接受仅返回固定字符串的 toy endpoint。
 

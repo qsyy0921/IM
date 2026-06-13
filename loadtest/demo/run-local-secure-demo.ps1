@@ -36,6 +36,7 @@ $timelineTopic = "conversation.timeline.demo.secure." + (Get-Date -Format "yyyyM
 $deliveryTopic = "im.delivery.events"
 $receiptTopic = "im.receipt.events"
 $identityTopic = "im.identity.events"
+$policyTopic = "im.policy.events"
 $deliveryConsumerGroup = "nexusim-delivery-demo-secure-" + (Get-Date -Format "yyyyMMddHHmmss")
 $receiptConsumerGroup = "nexusim-receipt-demo-secure-" + (Get-Date -Format "yyyyMMddHHmmss")
 $pushConsumerGroup = "nexusim-push-demo-secure-" + (Get-Date -Format "yyyyMMddHHmmss")
@@ -43,6 +44,7 @@ $pushIdentityConsumerGroup = "nexusim-push-identity-demo-secure-" + (Get-Date -F
 
 $conversationTarget = "127.0.0.1:11896"
 $messageTarget = "127.0.0.1:11895"
+$policyTarget = "127.0.0.1:11900"
 $deliveryTarget = "127.0.0.1:11897"
 $pushTarget = "127.0.0.1:11898"
 $receiptTarget = "127.0.0.1:11899"
@@ -55,6 +57,7 @@ New-Item -ItemType Directory -Force $certDir | Out-Null
 if (-not $SkipBuild) {
     go build -o bin\conversation-service.exe ./services/conversation-service/cmd/conversation-service
     go build -o bin\message-service.exe ./services/message-service/cmd/message-service
+    go build -o bin\policy-service.exe ./services/policy-service/cmd/policy-service
     go build -o bin\delivery-service.exe ./services/delivery-service/cmd/delivery-service
     go build -o bin\receipt-service.exe ./services/receipt-service/cmd/receipt-service
     go build -o bin\push-gateway.exe ./services/push-gateway/cmd/push-gateway
@@ -260,6 +263,19 @@ function Wait-TenantOutboxSettled {
     throw "$TableName did not settle for tenant $TenantID before timeout; status=$lastStatus"
 }
 
+function Assert-TenantOutboxPublishedCount {
+    param(
+        [string]$TableName,
+        [string]$TenantID,
+        [int]$MinCount = 1
+    )
+    $safeTenantID = $TenantID.Replace("'", "''")
+    $published = Invoke-PostgresScalar -Sql "SELECT COUNT(*) FROM $TableName WHERE tenant_id='$safeTenantID' AND status = 'PUBLISHED';"
+    if ([int64]$published -lt $MinCount) {
+        throw "$TableName published count for tenant $TenantID is $published, expected at least $MinCount"
+    }
+}
+
 function Clear-LocalMessageOutboxSmokeResiduals {
     $cleanupSQL = @'
 DELETE FROM message_outbox
@@ -365,6 +381,7 @@ function Start-NexusProcess {
 $ca = New-SmokeCA -Directory $certDir
 $conversationServer = New-SmokeCert -Directory $certDir -Name "conversation-service" -CommonName "conversation-service.nexusim.local" -DnsNames @("conversation-service.nexusim.local", "localhost") -IpAddresses @("127.0.0.1") -Uris @() -Kind server -CAKey $ca.Key -CACert $ca.Cert
 $messageServer = New-SmokeCert -Directory $certDir -Name "message-service" -CommonName "message-service.nexusim.local" -DnsNames @("message-service.nexusim.local", "localhost") -IpAddresses @("127.0.0.1") -Uris @() -Kind server -CAKey $ca.Key -CACert $ca.Cert
+$policyServer = New-SmokeCert -Directory $certDir -Name "policy-service" -CommonName "policy-service.nexusim.local" -DnsNames @("policy-service.nexusim.local", "localhost") -IpAddresses @("127.0.0.1") -Uris @() -Kind server -CAKey $ca.Key -CACert $ca.Cert
 $deliveryServer = New-SmokeCert -Directory $certDir -Name "delivery-service" -CommonName "delivery-service.nexusim.local" -DnsNames @("delivery-service.nexusim.local", "localhost") -IpAddresses @("127.0.0.1") -Uris @() -Kind server -CAKey $ca.Key -CACert $ca.Cert
 $receiptServer = New-SmokeCert -Directory $certDir -Name "receipt-service" -CommonName "receipt-service.nexusim.local" -DnsNames @("receipt-service.nexusim.local", "localhost") -IpAddresses @("127.0.0.1") -Uris @() -Kind server -CAKey $ca.Key -CACert $ca.Cert
 $pushServer = New-SmokeCert -Directory $certDir -Name "push-gateway" -CommonName "push-gateway.nexusim.local" -DnsNames @("push-gateway.nexusim.local", "localhost") -IpAddresses @("127.0.0.1") -Uris @() -Kind server -CAKey $ca.Key -CACert $ca.Cert
@@ -376,7 +393,7 @@ $desktopClient = New-SmokeCert -Directory $certDir -Name "desktop-client" -Commo
 
 $processes = @()
 try {
-    foreach ($port in @(11895, 11896, 11897, 11898, 11899, 11902)) {
+    foreach ($port in @(11895, 11896, 11897, 11898, 11899, 11900, 11901, 11902)) {
         Assert-TcpPortAvailable -HostName "127.0.0.1" -Port $port
     }
 
@@ -394,11 +411,15 @@ try {
     Apply-PostgresMigration -Path "migrations\postgres\receipt\000006_conversation_pin.sql" -Name "nexusim_receipt_conversation_pin.sql"
     Apply-PostgresMigration -Path "migrations\postgres\receipt\000007_conversation_mute.sql" -Name "nexusim_receipt_conversation_mute.sql"
     Apply-PostgresMigration -Path "migrations\postgres\receipt\000008_conversation_unread_filter.sql" -Name "nexusim_receipt_conversation_unread_filter.sql"
+    foreach ($policyMigration in Get-ChildItem -Path "migrations\postgres\policy" -Filter "*.sql" | Sort-Object Name) {
+        Apply-PostgresMigration -Path $policyMigration.FullName -Name ("nexusim_policy_" + $policyMigration.Name)
+    }
 
     Ensure-KafkaTopic -Topic $timelineTopic
     Ensure-KafkaTopic -Topic $deliveryTopic
     Ensure-KafkaTopic -Topic $receiptTopic
     Ensure-KafkaTopic -Topic $identityTopic
+    Ensure-KafkaTopic -Topic $policyTopic
     Reset-ConsumerGroupToLatest -Group $deliveryConsumerGroup -Topic $timelineTopic
     Reset-ConsumerGroupToLatest -Group $receiptConsumerGroup -Topic $deliveryTopic
     Reset-ConsumerGroupToLatest -Group $pushConsumerGroup -Topic $deliveryTopic
@@ -407,6 +428,7 @@ try {
 
     $conversationService = Join-Path $repo "bin\conversation-service.exe"
     $messageService = Join-Path $repo "bin\message-service.exe"
+    $policyService = Join-Path $repo "bin\policy-service.exe"
     $deliveryService = Join-Path $repo "bin\delivery-service.exe"
     $receiptService = Join-Path $repo "bin\receipt-service.exe"
     $pushGateway = Join-Path $repo "bin\push-gateway.exe"
@@ -433,6 +455,31 @@ try {
         NEXUSIM_OUTBOX_WORKERS = "1"
         NEXUSIM_OUTBOX_BATCH_SIZE = "100"
         NEXUSIM_OUTBOX_POLL_INTERVAL = "200ms"
+    }
+
+    $processes += Start-NexusProcess -Name "policy-grpc" -FilePath $policyService -Port 11900 -Env @{
+        NEXUSIM_POLICY_SERVICE_MODE = "grpc"
+        NEXUSIM_POLICY_GRPC_ADDR = $policyTarget
+        NEXUSIM_POLICY_MESSAGE_ALLOWED = "true"
+        NEXUSIM_POLICY_PERMISSION_VERSION = "2"
+        NEXUSIM_POLICY_CLASSIFICATION = "POLICY_DEMO_ALLOWED"
+        NEXUSIM_POLICY_RULES_ENABLED = "true"
+        NEXUSIM_PG_DSN = $PgDsn
+        NEXUSIM_POLICY_DEBUG_ADDR = "127.0.0.1:11901"
+        NEXUSIM_POLICY_GRPC_TLS_CERT_FILE = $policyServer.Cert
+        NEXUSIM_POLICY_GRPC_TLS_KEY_FILE = $policyServer.Key
+        NEXUSIM_POLICY_GRPC_TLS_CLIENT_CA_FILE = $ca.Cert
+        NEXUSIM_POLICY_GRPC_TLS_REQUIRE_CLIENT_CERT = "true"
+        NEXUSIM_POLICY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES = "message-service.nexusim.local"
+        NEXUSIM_POLICY_GRPC_TLS_CLIENT_ALLOWED_URIS = "spiffe://nexusim/message-service"
+    }
+
+    $processes += Start-NexusProcess -Name "policy-outbox-relay" -FilePath $policyService -Env @{
+        NEXUSIM_POLICY_SERVICE_MODE = "outbox-relay"
+        NEXUSIM_PG_DSN = $PgDsn
+        NEXUSIM_KAFKA_BROKERS = $KafkaBrokers
+        NEXUSIM_POLICY_AUDIT_EVENTS_TOPIC = $policyTopic
+        NEXUSIM_POLICY_OUTBOX_POLL_INTERVAL = "200ms"
     }
 
     $processes += Start-NexusProcess -Name "delivery-timeline-consumer" -FilePath $deliveryService -Env @{
@@ -527,13 +574,18 @@ try {
         NEXUSIM_CONVERSATION_SERVICE_TLS_SERVER_NAME = "conversation-service.nexusim.local"
         NEXUSIM_CONVERSATION_SERVICE_TLS_CLIENT_CERT_FILE = $messageClient.Cert
         NEXUSIM_CONVERSATION_SERVICE_TLS_CLIENT_KEY_FILE = $messageClient.Key
+        NEXUSIM_POLICY_SERVICE_ADDR = $policyTarget
+        NEXUSIM_POLICY_RPC_TIMEOUT = "2s"
+        NEXUSIM_POLICY_SERVICE_TLS_CA_FILE = $ca.Cert
+        NEXUSIM_POLICY_SERVICE_TLS_SERVER_NAME = "policy-service.nexusim.local"
+        NEXUSIM_POLICY_SERVICE_TLS_CLIENT_CERT_FILE = $messageClient.Cert
+        NEXUSIM_POLICY_SERVICE_TLS_CLIENT_KEY_FILE = $messageClient.Key
         NEXUSIM_MESSAGE_GRPC_TLS_CERT_FILE = $messageServer.Cert
         NEXUSIM_MESSAGE_GRPC_TLS_KEY_FILE = $messageServer.Key
         NEXUSIM_MESSAGE_GRPC_TLS_CLIENT_CA_FILE = $ca.Cert
         NEXUSIM_MESSAGE_GRPC_TLS_REQUIRE_CLIENT_CERT = "true"
         NEXUSIM_MESSAGE_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES = "api-gateway.nexusim.local"
         NEXUSIM_MESSAGE_GRPC_TLS_CLIENT_ALLOWED_URIS = "spiffe://nexusim/api-gateway"
-        NEXUSIM_MOCK_PERMISSION_VERSION = "2"
     }
 
     $runnerArgs = @(
@@ -578,6 +630,8 @@ try {
         throw "secure e2e demo runner failed with exit code $LASTEXITCODE"
     }
     Wait-TenantOutboxSettled -TableName "message_outbox" -TenantID $TenantId
+    Wait-TenantOutboxSettled -TableName "policy_decision_audit_outbox" -TenantID $TenantId
+    Assert-TenantOutboxPublishedCount -TableName "policy_decision_audit_outbox" -TenantID $TenantId -MinCount 1
     Wait-TenantOutboxSettled -TableName "delivery_outbox" -TenantID $TenantId
     Wait-TenantOutboxSettled -TableName "receipt_outbox" -TenantID $TenantId
 } finally {
@@ -593,6 +647,7 @@ Write-Host "timeline_topic=$timelineTopic"
 Write-Host "delivery_topic=$deliveryTopic"
 Write-Host "receipt_topic=$receiptTopic"
 Write-Host "identity_topic=$identityTopic"
+Write-Host "policy_topic=$policyTopic"
 Write-Host "delivery_consumer_group=$deliveryConsumerGroup"
 Write-Host "receipt_consumer_group=$receiptConsumerGroup"
 Write-Host "push_consumer_group=$pushConsumerGroup"

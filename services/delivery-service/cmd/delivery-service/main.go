@@ -24,6 +24,7 @@ import (
 	postgresinfra "github.com/qsyy0921/IM/services/delivery-service/internal/infrastructure/postgres"
 	"github.com/qsyy0921/IM/services/delivery-service/internal/trigger/outbox"
 	"github.com/qsyy0921/IM/services/delivery-service/internal/trigger/timeline"
+	"github.com/qsyy0921/IM/services/delivery-service/internal/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -46,6 +47,8 @@ func run() error {
 		return runTimelineConsumer()
 	case "outbox-relay":
 		return runOutboxRelay()
+	case "outbox-repair":
+		return runOutboxRepair()
 	default:
 		return errors.New("unsupported NEXUSIM_DELIVERY_SERVICE_MODE")
 	}
@@ -193,6 +196,51 @@ func runOutboxRelay() error {
 	)
 	log.Printf("delivery-service outbox relay started topic=%s", topic)
 	return relay.Run(ctx)
+}
+
+func runOutboxRepair() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	ids, err := parseInt64CSV(os.Getenv("NEXUSIM_DELIVERY_OUTBOX_REPAIR_IDS"))
+	if err != nil {
+		return err
+	}
+	mode := envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_MODE", types.OutboxRepairModeAudit)
+	dryRun := envBool("NEXUSIM_DELIVERY_OUTBOX_REPAIR_DRY_RUN", false)
+	stats, err := postgresinfra.NewOutboxStore(pool).RepairOutbox(
+		ctx,
+		types.OutboxRepairOptions{
+			OutboxIDs: ids,
+			Mode:      mode,
+			Operator:  envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_OPERATOR", "manual"),
+			Reason:    envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_REASON", "manual delivery outbox repair"),
+			DryRun:    dryRun,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"delivery-service outbox repair completed requested=%d audited=%d mutated=%d skipped=%d mode=%s dry_run=%t",
+		stats.Requested,
+		stats.Audited,
+		stats.Mutated,
+		stats.Skipped,
+		mode,
+		dryRun,
+	)
+	return nil
 }
 
 func openPGPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
@@ -422,6 +470,21 @@ func envOptionalBool(name string) (bool, bool, error) {
 	}
 }
 
+func envBool(name string, fallback bool) bool {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv(name)))
+	if value == "" {
+		return fallback
+	}
+	switch value {
+	case "1", "true", "yes", "y", "on":
+		return true
+	case "0", "false", "no", "n", "off":
+		return false
+	default:
+		return fallback
+	}
+}
+
 func envDuration(name string, fallback time.Duration) time.Duration {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
@@ -444,4 +507,21 @@ func splitCSV(value string) []string {
 		}
 	}
 	return result
+}
+
+func parseInt64CSV(value string) ([]int64, error) {
+	parts := strings.Split(value, ",")
+	result := make([]int64, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		parsed, err := strconv.ParseInt(part, 10, 64)
+		if err != nil || parsed <= 0 {
+			return nil, errors.New("NEXUSIM_DELIVERY_OUTBOX_REPAIR_IDS must contain positive integer ids")
+		}
+		result = append(result, parsed)
+	}
+	return result, nil
 }

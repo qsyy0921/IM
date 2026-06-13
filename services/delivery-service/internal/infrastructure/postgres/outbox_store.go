@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -251,4 +252,248 @@ func retryDelay(base time.Duration, attempt int) time.Duration {
 		exponent = 10
 	}
 	return base * time.Duration(1<<exponent)
+}
+
+func (store *OutboxStore) RepairOutbox(ctx context.Context, options types.OutboxRepairOptions) (types.OutboxRepairStats, error) {
+	if store == nil || store.pool == nil {
+		return types.OutboxRepairStats{}, errors.New("delivery outbox store is not configured")
+	}
+	mode := normalizeOutboxRepairMode(options.Mode)
+	if mode == "" {
+		return types.OutboxRepairStats{}, types.NewInvalidArgument("unsupported delivery outbox repair mode")
+	}
+	ids := normalizeOutboxIDs(options.OutboxIDs)
+	if len(ids) == 0 {
+		return types.OutboxRepairStats{}, types.NewInvalidArgument("outbox_ids are required")
+	}
+	operator := normalizeOutboxRepairText(options.Operator, "manual")
+	reason := normalizeOutboxRepairText(options.Reason, "manual delivery outbox repair")
+
+	tx, err := store.pool.Begin(ctx)
+	if err != nil {
+		return types.OutboxRepairStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	stats := types.OutboxRepairStats{Requested: len(ids)}
+	now := store.now()
+	for _, id := range ids {
+		outcome, err := store.repairOutboxLocked(ctx, tx, id, mode, operator, reason, options.DryRun, now)
+		if err != nil {
+			return types.OutboxRepairStats{}, err
+		}
+		switch outcome {
+		case outboxRepairOutcomeAudited:
+			stats.Audited++
+		case outboxRepairOutcomeMutated:
+			stats.Mutated++
+		case outboxRepairOutcomeSkipped:
+			stats.Skipped++
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.OutboxRepairStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	return stats, nil
+}
+
+type outboxRepairRow struct {
+	ID               int64
+	EventID          string
+	TenantID         string
+	ConversationID   string
+	AggregateVersion int64
+	Status           string
+	RetryCount       int
+	LastError        string
+	NextRetryAt      *time.Time
+	DeadLetteredAt   *time.Time
+}
+
+const (
+	outboxRepairOutcomeAudited = "AUDITED"
+	outboxRepairOutcomeMutated = "MUTATED"
+	outboxRepairOutcomeSkipped = "SKIPPED"
+
+	outboxRepairSkipStatusNotDLQ = "status_is_not_dlq"
+)
+
+func (store *OutboxStore) repairOutboxLocked(ctx context.Context, tx pgx.Tx, id int64, mode string, operator string, reason string, dryRun bool, now time.Time) (string, error) {
+	row, err := store.readRepairRowLocked(ctx, tx, id)
+	if err != nil {
+		return "", err
+	}
+	outcome := outboxRepairOutcomeAudited
+	skipReason := ""
+	after := row
+
+	if mode == types.OutboxRepairModeRedriveDLQPending {
+		if row.Status != types.OutboxStatusDLQ {
+			outcome = outboxRepairOutcomeSkipped
+			skipReason = outboxRepairSkipStatusNotDLQ
+		} else if !dryRun {
+			if _, err := tx.Exec(ctx, `
+UPDATE delivery_outbox
+SET status = $2,
+    retry_count = 0,
+    last_error = '',
+    available_at = $3,
+    next_retry_at = NULL,
+    dead_lettered_at = NULL,
+    updated_at = now()
+WHERE id = $1
+`, row.ID, types.OutboxStatusPending, now); err != nil {
+				return "", types.NewDBWriteFailed(err.Error())
+			}
+			after.Status = types.OutboxStatusPending
+			after.RetryCount = 0
+			after.LastError = ""
+			after.NextRetryAt = nil
+			after.DeadLetteredAt = nil
+			outcome = outboxRepairOutcomeMutated
+		}
+	}
+
+	if err := store.insertOutboxRepairAudit(ctx, tx, row, after, mode, outcome, skipReason, operator, reason, dryRun, now); err != nil {
+		return "", err
+	}
+	return outcome, nil
+}
+
+func (store *OutboxStore) readRepairRowLocked(ctx context.Context, tx pgx.Tx, id int64) (outboxRepairRow, error) {
+	var row outboxRepairRow
+	err := tx.QueryRow(ctx, `
+SELECT
+    id,
+    event_id,
+    tenant_id,
+    conversation_id,
+    aggregate_version,
+    status,
+    retry_count,
+    last_error,
+    next_retry_at,
+    dead_lettered_at
+FROM delivery_outbox
+WHERE id = $1
+FOR UPDATE
+`, id).Scan(
+		&row.ID,
+		&row.EventID,
+		&row.TenantID,
+		&row.ConversationID,
+		&row.AggregateVersion,
+		&row.Status,
+		&row.RetryCount,
+		&row.LastError,
+		&row.NextRetryAt,
+		&row.DeadLetteredAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return outboxRepairRow{}, types.NewInvalidArgument("delivery outbox row not found")
+		}
+		return outboxRepairRow{}, types.NewDBReadFailed(err.Error())
+	}
+	return row, nil
+}
+
+func (store *OutboxStore) insertOutboxRepairAudit(ctx context.Context, tx pgx.Tx, before outboxRepairRow, after outboxRepairRow, mode string, outcome string, skipReason string, operator string, reason string, dryRun bool, now time.Time) error {
+	_, err := tx.Exec(ctx, `
+INSERT INTO delivery_outbox_repair_audit (
+    outbox_id,
+    event_id,
+    tenant_id,
+    conversation_id,
+    aggregate_version,
+    mode,
+    outcome,
+    skip_reason,
+    operator,
+    reason,
+    dry_run,
+    before_status,
+    before_retry_count,
+    before_last_error,
+    before_next_retry_at,
+    before_dead_lettered_at,
+    after_status,
+    after_retry_count,
+    after_last_error,
+    after_next_retry_at,
+    after_dead_lettered_at,
+    created_at
+) VALUES (
+    $1, $2, $3, $4, $5,
+    $6, $7, $8, $9, $10, $11,
+    $12, $13, $14, $15, $16,
+    $17, $18, $19, $20, $21, $22
+)
+`,
+		before.ID,
+		before.EventID,
+		before.TenantID,
+		before.ConversationID,
+		before.AggregateVersion,
+		mode,
+		outcome,
+		skipReason,
+		operator,
+		reason,
+		dryRun,
+		before.Status,
+		before.RetryCount,
+		before.LastError,
+		before.NextRetryAt,
+		before.DeadLetteredAt,
+		after.Status,
+		after.RetryCount,
+		after.LastError,
+		after.NextRetryAt,
+		after.DeadLetteredAt,
+		now,
+	)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func normalizeOutboxRepairMode(mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "":
+		return types.OutboxRepairModeAudit
+	case types.OutboxRepairModeAudit:
+		return types.OutboxRepairModeAudit
+	case types.OutboxRepairModeRedriveDLQPending:
+		return types.OutboxRepairModeRedriveDLQPending
+	default:
+		return ""
+	}
+}
+
+func normalizeOutboxIDs(ids []int64) []int64 {
+	seen := make(map[int64]struct{}, len(ids))
+	result := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		result = append(result, id)
+	}
+	return result
+}
+
+func normalizeOutboxRepairText(value string, fallback string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	return value
 }

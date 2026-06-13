@@ -77,6 +77,99 @@ func TestOutboxStoreProcessReadyBatchDeadLettersAndBlocksLaterVersionIntegration
 	assertDeliveryOutboxStatus(t, ctx, pool, "event-2", types.OutboxStatusPending, 0)
 }
 
+func TestOutboxStoreRepairAuditsDLQIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+	seedDeliveryOutbox(t, ctx, pool, "event-1", "conversation-a", 1, types.DeliveryEventInboxItemCreated)
+
+	store := NewOutboxStore(pool, WithOutboxClock(func() time.Time {
+		return time.Date(2026, 6, 14, 10, 0, 0, 0, time.UTC)
+	}))
+	stats, err := store.ProcessReadyBatch(ctx, 10, 1, time.Millisecond, func(ctx context.Context, messages []types.OutboxMessage) []error {
+		return []error{errors.New("malformed payload")}
+	})
+	if err != nil {
+		t.Fatalf("process outbox: %v", err)
+	}
+	if stats.DeadLettered != 1 {
+		t.Fatalf("expected one dead-lettered outbox row, got %+v", stats)
+	}
+	outboxID := readDeliveryOutboxID(t, ctx, pool, "event-1")
+
+	repairStats, err := store.RepairOutbox(ctx, types.OutboxRepairOptions{
+		OutboxIDs: []int64{outboxID, outboxID, 0},
+		Mode:      types.OutboxRepairModeAudit,
+		Operator:  "operator-1",
+		Reason:    "manual audit",
+	})
+	if err != nil {
+		t.Fatalf("audit outbox: %v", err)
+	}
+	if repairStats.Requested != 1 || repairStats.Audited != 1 || repairStats.Mutated != 0 || repairStats.Skipped != 0 {
+		t.Fatalf("unexpected repair stats: %+v", repairStats)
+	}
+	assertDeliveryOutboxStatus(t, ctx, pool, "event-1", types.OutboxStatusDLQ, 1)
+	assertDeliveryOutboxRepairAudit(t, ctx, pool, outboxID, types.OutboxRepairModeAudit, outboxRepairOutcomeAudited, "", types.OutboxStatusDLQ, 1, "malformed payload", types.OutboxStatusDLQ, 1, "malformed payload", "manual audit")
+}
+
+func TestOutboxStoreRepairRedrivesDLQIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+	seedDeliveryOutbox(t, ctx, pool, "event-1", "conversation-a", 1, types.DeliveryEventInboxItemCreated)
+
+	store := NewOutboxStore(pool, WithOutboxClock(func() time.Time {
+		return time.Date(2026, 6, 14, 10, 0, 0, 0, time.UTC)
+	}))
+	_, err := store.ProcessReadyBatch(ctx, 10, 1, time.Millisecond, func(ctx context.Context, messages []types.OutboxMessage) []error {
+		return []error{errors.New("malformed payload")}
+	})
+	if err != nil {
+		t.Fatalf("process outbox: %v", err)
+	}
+	outboxID := readDeliveryOutboxID(t, ctx, pool, "event-1")
+
+	repairStats, err := store.RepairOutbox(ctx, types.OutboxRepairOptions{
+		OutboxIDs: []int64{outboxID},
+		Mode:      types.OutboxRepairModeRedriveDLQPending,
+		Operator:  "operator-1",
+		Reason:    "provider recovered",
+	})
+	if err != nil {
+		t.Fatalf("redrive outbox: %v", err)
+	}
+	if repairStats.Requested != 1 || repairStats.Audited != 0 || repairStats.Mutated != 1 || repairStats.Skipped != 0 {
+		t.Fatalf("unexpected repair stats: %+v", repairStats)
+	}
+	assertDeliveryOutboxStatus(t, ctx, pool, "event-1", types.OutboxStatusPending, 0)
+	assertDeliveryOutboxRepairAudit(t, ctx, pool, outboxID, types.OutboxRepairModeRedriveDLQPending, outboxRepairOutcomeMutated, "", types.OutboxStatusDLQ, 1, "malformed payload", types.OutboxStatusPending, 0, "", "provider recovered")
+}
+
+func TestOutboxStoreRepairSkipsNonDLQIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+	seedDeliveryOutbox(t, ctx, pool, "event-1", "conversation-a", 1, types.DeliveryEventInboxItemCreated)
+	outboxID := readDeliveryOutboxID(t, ctx, pool, "event-1")
+
+	store := NewOutboxStore(pool)
+	repairStats, err := store.RepairOutbox(ctx, types.OutboxRepairOptions{
+		OutboxIDs: []int64{outboxID},
+		Mode:      types.OutboxRepairModeRedriveDLQPending,
+		Operator:  "operator-1",
+		Reason:    "manual retry",
+	})
+	if err != nil {
+		t.Fatalf("repair pending outbox: %v", err)
+	}
+	if repairStats.Requested != 1 || repairStats.Audited != 0 || repairStats.Mutated != 0 || repairStats.Skipped != 1 {
+		t.Fatalf("unexpected repair stats: %+v", repairStats)
+	}
+	assertDeliveryOutboxStatus(t, ctx, pool, "event-1", types.OutboxStatusPending, 0)
+	assertDeliveryOutboxRepairAudit(t, ctx, pool, outboxID, types.OutboxRepairModeRedriveDLQPending, outboxRepairOutcomeSkipped, outboxRepairSkipStatusNotDLQ, types.OutboxStatusPending, 0, "", types.OutboxStatusPending, 0, "", "manual retry")
+}
+
 func seedDeliveryOutbox(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventID string, conversationID string, version int64, eventType string) {
 	t.Helper()
 	payload := fmt.Sprintf(`{"tenant_id":"tenant-delivery","user_id":"user-1","device_id":"device-1","conversation_id":%q,"conversation_seq":%d,"source_event_id":%q,"message_id":%q,"last_received_seq":%d}`, conversationID, version, "source-"+eventID, "message-"+eventID, version)
@@ -118,5 +211,75 @@ WHERE event_id = $1
 	}
 	if status != wantStatus || retryCount != wantRetry {
 		t.Fatalf("unexpected status for %s: status=%s retry=%d want status=%s retry=%d", eventID, status, retryCount, wantStatus, wantRetry)
+	}
+}
+
+func readDeliveryOutboxID(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventID string) int64 {
+	t.Helper()
+	var id int64
+	if err := pool.QueryRow(ctx, `
+SELECT id
+FROM delivery_outbox
+WHERE event_id = $1
+`, eventID).Scan(&id); err != nil {
+		t.Fatalf("read delivery outbox id: %v", err)
+	}
+	return id
+}
+
+func assertDeliveryOutboxRepairAudit(t *testing.T, ctx context.Context, pool *pgxpool.Pool, outboxID int64, mode string, outcome string, skipReason string, beforeStatus string, beforeRetry int, beforeLastError string, afterStatus string, afterRetry int, afterLastError string, reason string) {
+	t.Helper()
+	var gotMode string
+	var gotOutcome string
+	var gotSkipReason string
+	var gotBeforeStatus string
+	var gotBeforeRetry int
+	var gotBeforeLastError string
+	var gotAfterStatus string
+	var gotAfterRetry int
+	var gotAfterLastError string
+	var gotReason string
+	if err := pool.QueryRow(ctx, `
+SELECT
+    mode,
+    outcome,
+    skip_reason,
+    before_status,
+    before_retry_count,
+    before_last_error,
+    after_status,
+    after_retry_count,
+    after_last_error,
+    reason
+FROM delivery_outbox_repair_audit
+WHERE outbox_id = $1
+ORDER BY id DESC
+LIMIT 1
+`, outboxID).Scan(
+		&gotMode,
+		&gotOutcome,
+		&gotSkipReason,
+		&gotBeforeStatus,
+		&gotBeforeRetry,
+		&gotBeforeLastError,
+		&gotAfterStatus,
+		&gotAfterRetry,
+		&gotAfterLastError,
+		&gotReason,
+	); err != nil {
+		t.Fatalf("read delivery outbox repair audit: %v", err)
+	}
+	if gotMode != mode ||
+		gotOutcome != outcome ||
+		gotSkipReason != skipReason ||
+		gotBeforeStatus != beforeStatus ||
+		gotBeforeRetry != beforeRetry ||
+		gotBeforeLastError != beforeLastError ||
+		gotAfterStatus != afterStatus ||
+		gotAfterRetry != afterRetry ||
+		gotAfterLastError != afterLastError ||
+		gotReason != reason {
+		t.Fatalf("unexpected repair audit row: mode=%s outcome=%s skip=%s before=(%s,%d,%s) after=(%s,%d,%s) reason=%s",
+			gotMode, gotOutcome, gotSkipReason, gotBeforeStatus, gotBeforeRetry, gotBeforeLastError, gotAfterStatus, gotAfterRetry, gotAfterLastError, gotReason)
 	}
 }

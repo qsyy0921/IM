@@ -37,6 +37,26 @@ type OutboxRelayStats struct {
 	DeadLettered int
 }
 
+type OutboxRepairStats struct {
+	Requested int
+	Audited   int
+	Mutated   int
+	Skipped   int
+}
+
+const (
+	OutboxRepairModeAudit             = "audit"
+	OutboxRepairModeRedriveDLQPending = "redrive-dlq-pending"
+)
+
+type OutboxRepairOptions struct {
+	OutboxIDs []int64
+	Mode      string
+	Operator  string
+	Reason    string
+	DryRun    bool
+}
+
 type KafkaPublishRecord struct {
 	Key   []byte
 	Value []byte

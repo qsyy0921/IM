@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -120,13 +121,27 @@ func openMonitoringTestPool(t *testing.T) *pgxpool.Pool {
 func applyDeliveryMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	root := findRepoRoot(t)
-	migrationPath := filepath.Join(root, "migrations", "postgres", "delivery", "000001_delivery_core.sql")
-	sqlBytes, err := os.ReadFile(migrationPath)
+	migrationDir := filepath.Join(root, "migrations", "postgres", "delivery")
+	entries, err := os.ReadDir(migrationDir)
 	if err != nil {
-		t.Fatalf("read migration: %v", err)
+		t.Fatalf("read migration dir: %v", err)
 	}
-	if _, err := pool.Exec(ctx, string(sqlBytes)); err != nil {
-		t.Fatalf("apply migration: %v", err)
+	files := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".sql" {
+			continue
+		}
+		files = append(files, entry.Name())
+	}
+	slices.Sort(files)
+	for _, file := range files {
+		sqlBytes, err := os.ReadFile(filepath.Join(migrationDir, file))
+		if err != nil {
+			t.Fatalf("read migration %s: %v", file, err)
+		}
+		if _, err := pool.Exec(ctx, string(sqlBytes)); err != nil {
+			t.Fatalf("apply migration %s: %v", file, err)
+		}
 	}
 }
 
@@ -134,6 +149,7 @@ func resetDeliveryTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) 
 	t.Helper()
 	_, err := pool.Exec(ctx, `
 TRUNCATE
+    delivery_outbox_repair_audit,
     delivery_outbox,
     device_delivery_cursors,
     user_inbox,

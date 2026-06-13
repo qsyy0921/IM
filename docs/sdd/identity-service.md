@@ -116,7 +116,7 @@ Refresh token rules:
 - expired refresh tokens are marked `REVOKED` and rejected;
 - reuse of a `USED` or `REVOKED` refresh token is treated as credential compromise: the session is marked `REVOKED`, active refresh tokens for that session are revoked, and `identity.session.revoked.v1` is written through `identity_outbox`.
 - `identity_sessions.mfa_verified_at`, `mfa_method` and `mfa_factor_id` record whether the session was created or refreshed after successful TOTP or recovery-code MFA proof. If a user currently has any ACTIVE TOTP factor, `RefreshGatewayToken` requires either existing session MFA proof or a freshly submitted `mfa_code` / `mfa_recovery_code`; older password-only sessions return stable `MFA_REQUIRED` when no proof is supplied.
-- When `RefreshGatewayToken` receives submitted MFA proof, it first validates the presented refresh token, device and session before recording any invalid-MFA failure counter. A successful submitted proof is then consumed in the refresh rotation transaction and becomes the session's latest MFA proof method; this first-stage policy treats TOTP and recovery-code proof as equivalent step-up proof for refresh.
+- When `RefreshGatewayToken` receives submitted MFA proof, it first validates the presented refresh token, device and session before recording any invalid-MFA failure counter. A successful submitted proof is then consumed in the refresh rotation transaction. TOTP proof becomes the session's latest MFA proof method; recovery-code proof fills missing session proof but does not downgrade an existing TOTP session proof.
 
 Login risk first-stage rules:
 

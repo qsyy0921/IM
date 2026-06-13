@@ -541,6 +541,71 @@ func TestRepositoryRefreshRejectsSubmittedRecoveryCodeProofWhenRecoveryPathLocke
 	assertMFARecoveryLoginRisk(t, ctx, pool, 1, true)
 }
 
+func TestRepositoryRefreshRecoveryCodeProofDoesNotDowngradeExistingTOTPProofIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	seedUserCredential(t, ctx, pool, "password-hash")
+	repository := NewRepository(
+		pool,
+		WithSessionIDGenerator(func() (string, error) { return "session-refresh-totp-preserved", nil }),
+		WithMFAFactorIDGenerator(func() (string, error) { return "mfa-factor-refresh-totp-preserved", nil }),
+	)
+	issuedAt := time.Unix(1_800_000_000, 0).UTC()
+	if _, err := repository.CreateMFAFactor(ctx, types.BeginMFAEnrollmentCommand{
+		TenantID:   "tenant-identity",
+		UserID:     "user-1",
+		FactorType: types.MFAFactorTypeTOTP,
+	}, types.EncryptedMFASecret{Ciphertext: "encrypted-secret", Nonce: "nonce-value", KeyVersion: "local-v1"}, issuedAt); err != nil {
+		t.Fatalf("create mfa factor: %v", err)
+	}
+	if _, err := repository.ConfirmMFAFactor(ctx, types.ConfirmMFAEnrollmentCommand{
+		TenantID: "tenant-identity",
+		UserID:   "user-1",
+		FactorID: "mfa-factor-refresh-totp-preserved",
+	}, []types.MFARecoveryCodeRecord{{CodeID: "recovery-refresh-preserve", CodeHash: "recovery-refresh-preserve-hash"}}, issuedAt.Add(time.Minute)); err != nil {
+		t.Fatalf("confirm mfa factor: %v", err)
+	}
+	recovery, err := repository.FindActiveMFARecoveryCode(ctx, "tenant-identity", "user-1", "recovery-refresh-preserve-hash")
+	if err != nil {
+		t.Fatalf("find active recovery code: %v", err)
+	}
+	if _, err := repository.LoginGatewaySession(ctx, types.LoginCommand{
+		TenantID:            "tenant-identity",
+		UserID:              "user-1",
+		DeviceID:            "device-1",
+		Audience:            "push-gateway",
+		VerifiedMFAFactorID: "mfa-factor-refresh-totp-preserved",
+	}, types.RefreshTokenRecord{
+		TokenID:   "rft_refresh_totp_preserved_login",
+		TokenHash: "hash-refresh-totp-preserved-login",
+	}, issuedAt.Add(2*time.Minute), issuedAt.Add(17*time.Minute), issuedAt.Add(30*24*time.Hour)); err != nil {
+		t.Fatalf("login with totp proof: %v", err)
+	}
+	assertSessionMFAProof(t, ctx, pool, "session-refresh-totp-preserved", "TOTP", "mfa-factor-refresh-totp-preserved")
+
+	refreshAt := issuedAt.Add(3 * time.Minute)
+	_, err = repository.RefreshGatewaySession(ctx, types.RefreshGatewayTokenCommand{
+		TenantID:            "tenant-identity",
+		UserID:              "user-1",
+		DeviceID:            "device-1",
+		Audience:            "push-gateway",
+		UsedMFARecoveryCode: recovery,
+	}, "rft_refresh_totp_preserved_login", "hash-refresh-totp-preserved-login", types.RefreshTokenRecord{
+		TokenID:   "rft_refresh_totp_preserved_next",
+		TokenHash: "hash-refresh-totp-preserved-next",
+	}, refreshAt, refreshAt.Add(15*time.Minute), refreshAt.Add(30*24*time.Hour))
+	if err != nil {
+		t.Fatalf("refresh with submitted recovery proof on totp session: %v", err)
+	}
+	assertRefreshTokenStatus(t, ctx, pool, "rft_refresh_totp_preserved_login", "USED")
+	assertRefreshTokenStatus(t, ctx, pool, "rft_refresh_totp_preserved_next", "ACTIVE")
+	assertSessionMFAProof(t, ctx, pool, "session-refresh-totp-preserved", "TOTP", "mfa-factor-refresh-totp-preserved")
+	if _, err := repository.FindActiveMFARecoveryCode(ctx, "tenant-identity", "user-1", "recovery-refresh-preserve-hash"); !errors.Is(err, types.ErrInvalidMFA) {
+		t.Fatalf("expected submitted recovery code to be consumed, got %v", err)
+	}
+}
+
 func TestRepositoryRefreshAllowsMFAAuthenticatedSessionIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

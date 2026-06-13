@@ -431,9 +431,7 @@ func (r *Repository) RefreshGatewaySession(
 		return types.RefreshGatewayTokenResult{}, err
 	}
 	submittedProof := sessionMFAProofFromRefresh(command, issuedAt)
-	if submittedProof.Verified {
-		proof = submittedProof
-	}
+	proof = mergeRefreshMFAProof(proof, submittedProof)
 	requiresMFA, err := hasActiveTOTPFactor(ctx, tx, command.TenantID, command.UserID)
 	if err != nil {
 		return types.RefreshGatewayTokenResult{}, err
@@ -2751,6 +2749,19 @@ func sessionMFAProofFromRefresh(command types.RefreshGatewayTokenCommand, verifi
 		}
 	}
 	return sessionMFAProof{}
+}
+
+func mergeRefreshMFAProof(existing sessionMFAProof, submitted sessionMFAProof) sessionMFAProof {
+	if !submitted.Verified {
+		return existing
+	}
+	if submitted.Method == "TOTP" {
+		return submitted
+	}
+	if !existing.Verified {
+		return submitted
+	}
+	return existing
 }
 
 func upsertSession(ctx context.Context, tx pgx.Tx, command types.IssueGatewayTokenCommand, sessionID types.SessionID, issuedAt time.Time, expiresAt time.Time, proof sessionMFAProof) error {

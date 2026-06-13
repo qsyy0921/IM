@@ -35,6 +35,9 @@ param(
     [ValidateSet("mock", "hmac")]
     [string]$PushAuthMode = "mock",
     [string]$PushAuthHmacSecret = "",
+    [string]$GatewayAuthMode = "",
+    [string]$GatewayAuthHmacSecret = "",
+    [string]$GatewayAuthAudience = "api-gateway",
     [switch]$VerifiedAuthMetadata,
     [switch]$NoCleanup,
     [switch]$SkipBuild
@@ -85,6 +88,15 @@ if ($PushAuthMode -eq "hmac") {
         throw "-PushAuthHmacSecret is required when -PushAuthMode hmac"
     }
     $args += @("--push-auth-hmac-secret", $PushAuthHmacSecret)
+}
+if (-not [string]::IsNullOrWhiteSpace($GatewayAuthMode)) {
+    $args += @("--gateway-auth-mode", $GatewayAuthMode)
+    if (-not [string]::IsNullOrWhiteSpace($GatewayAuthHmacSecret)) {
+        $args += @("--gateway-auth-hmac-secret", $GatewayAuthHmacSecret)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($GatewayAuthAudience)) {
+        $args += @("--gateway-auth-audience", $GatewayAuthAudience)
+    }
 }
 if ($VerifiedAuthMetadata) {
     $args += @("--verified-auth-metadata")

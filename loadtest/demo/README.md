@@ -49,10 +49,11 @@ api-gateway token auth 示例：
 ```powershell
 .\loadtest\demo\run-local-demo.ps1 `
   -GatewayAuthMode hmac `
-  -GatewayAuthHmacSecret "local-gateway-secret"
+  -GatewayAuthHmacSecret "local-gateway-secret" `
+  -GatewayAuthAudience api-gateway
 ```
 
-该模式用于 demo runner 指向 api-gateway 时提交 gateway token，由 api-gateway 验证 token、重写下游 request `AuthContext` 并注入 trusted metadata。不要和 `-VerifiedAuthMetadata` 同时使用；前者模拟客户端经 gateway，后者只用于直接打后端服务的 smoke。
+该模式用于 demo runner 指向 api-gateway 时提交 gateway token，由 api-gateway 验证 token、重写下游 request `AuthContext` 并注入 trusted metadata。默认 audience 是 `api-gateway`；如需兼容历史 token，可显式覆盖，但不要把 `push-gateway` audience 作为新的 api-gateway 默认口径。不要和 `-VerifiedAuthMetadata` 同时使用；前者模拟客户端经 gateway，后者只用于直接打后端服务的 smoke。
 
 gRPC mTLS + WebSocket WSS/mTLS 示例：
 

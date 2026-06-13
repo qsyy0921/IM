@@ -8,10 +8,13 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"math/big"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
 )
 
 func TestGRPCClientTLSConfigFromEnvDisabledByDefault(t *testing.T) {
@@ -137,6 +140,72 @@ func TestAPIGatewayGRPCTLSConfigLoadsMutualTLSAllowlist(t *testing.T) {
 	}
 }
 
+func TestNewAuthenticatorFromEnvDefaultsToAPIGatewayAudience(t *testing.T) {
+	clearAPIGatewayAuthConfig(t)
+	expiresAt := time.Now().Add(time.Minute)
+	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_MODE", "hmac")
+	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_HMAC_SECRET", "gateway-secret")
+
+	authenticator, err := newAuthenticatorFromEnv()
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	t.Cleanup(authenticator.Close)
+
+	apiGatewayToken, err := gatewayauth.SignGatewayToken("gateway-secret", map[string]string{
+		"tenant_id": "tenant-1",
+		"user_id":   "user-1",
+		"device_id": "device-1",
+		"aud":       "api-gateway",
+	}, expiresAt)
+	if err != nil {
+		t.Fatalf("sign api-gateway token: %v", err)
+	}
+	if _, err := authenticator.Authenticate(httptest.NewRequest("GET", "/?token="+apiGatewayToken, nil)); err != nil {
+		t.Fatalf("authenticate api-gateway token: %v", err)
+	}
+
+	pushToken, err := gatewayauth.SignGatewayToken("gateway-secret", map[string]string{
+		"tenant_id": "tenant-1",
+		"user_id":   "user-1",
+		"device_id": "device-1",
+		"aud":       "push-gateway",
+	}, expiresAt)
+	if err != nil {
+		t.Fatalf("sign push token: %v", err)
+	}
+	if _, err := authenticator.Authenticate(httptest.NewRequest("GET", "/?token="+pushToken, nil)); err == nil {
+		t.Fatalf("expected push-gateway token to be rejected by default api-gateway audience")
+	}
+}
+
+func TestNewAuthenticatorFromEnvAllowsExplicitLegacyAudience(t *testing.T) {
+	clearAPIGatewayAuthConfig(t)
+	expiresAt := time.Now().Add(time.Minute)
+	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_MODE", "hmac")
+	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_HMAC_SECRET", "gateway-secret")
+	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_AUDIENCE", "push-gateway")
+
+	authenticator, err := newAuthenticatorFromEnv()
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	t.Cleanup(authenticator.Close)
+
+	token, err := gatewayauth.SignGatewayToken("gateway-secret", map[string]string{
+		"tenant_id": "tenant-1",
+		"user_id":   "user-1",
+		"device_id": "device-1",
+		"aud":       "push-gateway",
+	}, expiresAt)
+	if err != nil {
+		t.Fatalf("sign push token: %v", err)
+	}
+	if _, err := authenticator.Authenticate(httptest.NewRequest("GET", "/?token="+token, nil)); err != nil {
+		t.Fatalf("authenticate explicit legacy audience: %v", err)
+	}
+}
+
 func clearAPIGatewayTestTLSConfig(t *testing.T, prefix string) {
 	t.Helper()
 	t.Setenv(prefix+"_CA_FILE", "")
@@ -153,6 +222,18 @@ func clearAPIGatewayServerTLSConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_REQUIRE_CLIENT_CERT", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_ALLOWED_URIS", "")
+}
+
+func clearAPIGatewayAuthConfig(t *testing.T) {
+	t.Helper()
+	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_MODE", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_HMAC_SECRET", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_HMAC_PREVIOUS_SECRETS", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_JWKS_JSON", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_JWKS_FILE", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_JWKS_URL", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_TRUSTED_ISSUERS", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_AUDIENCE", "")
 }
 
 func writeAPIGatewayTLSTestCert(t *testing.T, dir string, name string) (string, string) {

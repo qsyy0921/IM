@@ -9,11 +9,14 @@ import (
 	"encoding/pem"
 	"math/big"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc/metadata"
 )
@@ -87,6 +90,18 @@ func TestWithUserFacingAuthMetadataUsesGatewayHMACToken(t *testing.T) {
 	}
 	if got := md.Get("authorization"); len(got) != 1 || got[0] == "" {
 		t.Fatalf("expected authorization bearer metadata, got %v", got)
+	}
+	authenticator, err := gatewayauth.NewAuthenticator(gatewayauth.Config{
+		Mode:     gatewayauth.ModeHMAC,
+		Secret:   "gateway-secret",
+		Audience: "api-gateway",
+	})
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	token := strings.TrimPrefix(md.Get("authorization")[0], "Bearer ")
+	if _, err := authenticator.Authenticate(httptest.NewRequest(http.MethodGet, "/?token="+token, nil)); err != nil {
+		t.Fatalf("expected generated token to use api-gateway audience: %v", err)
 	}
 	assertMetadataValue(t, md, metadataRequestID, "request-1")
 	if values := md.Get(metadataTenantID); len(values) != 0 {

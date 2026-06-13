@@ -598,7 +598,7 @@ try {
         NEXUSIM_API_GATEWAY_GRPC_ADDR = $apiGatewayTarget
         NEXUSIM_API_GATEWAY_AUTH_MODE = "hmac"
         NEXUSIM_API_GATEWAY_AUTH_HMAC_SECRET = $gatewayAuthSecret
-        NEXUSIM_API_GATEWAY_AUTH_AUDIENCE = "push-gateway"
+        NEXUSIM_API_GATEWAY_AUTH_AUDIENCE = "api-gateway"
         NEXUSIM_API_GATEWAY_CONVERSATION_ADDR = $conversationTarget
         NEXUSIM_API_GATEWAY_CONVERSATION_TLS_CA_FILE = $ca.Cert
         NEXUSIM_API_GATEWAY_CONVERSATION_TLS_SERVER_NAME = "conversation-service.nexusim.local"
@@ -643,6 +643,7 @@ try {
         "--receiver-device-id", $ReceiverDeviceId,
         "--gateway-auth-mode", "hmac",
         "--gateway-auth-hmac-secret", $gatewayAuthSecret,
+        "--gateway-auth-audience", "api-gateway",
         "--conversation-tls-ca-file", $ca.Cert,
         "--conversation-tls-server-name", "api-gateway.nexusim.local",
         "--conversation-tls-client-cert-file", $desktopClient.Cert,

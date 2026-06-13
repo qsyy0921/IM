@@ -23,6 +23,7 @@ CreateMemberChange(JOIN)
 | `loadtest-report-20260613-e2e-demo-secure-mtls-wss-smoke.md` | 本地多进程 secure E2E demo smoke，验证四段 gRPC mTLS、push WSS/mTLS、push->delivery mTLS、metadata auth 和 unread 归零 |
 | `loadtest-report-20260613-e2e-demo-secure-policy-mtls-wss-smoke.md` | 本地多进程 secure E2E demo smoke，额外验证 message-service 通过 mTLS 调真实 policy-service，并发布和读回 policy decision audit Kafka event |
 | `loadtest-report-20260613-e2e-demo-api-gateway-secure-smoke.md` | 本地多进程 secure E2E demo smoke，验证 conversation / message / delivery / receipt user-facing gRPC 均经 api-gateway 入口、HMAC gateway token、gateway inbound mTLS 和下游 mTLS 后完成 unread 归零 |
+| `loadtest-report-20260613-e2e-demo-api-gateway-audience-smoke.md` | 本地多进程 secure E2E demo smoke，验证 api-gateway 默认 `api-gateway` audience、HMAC gateway token、debug metrics 和下游 mTLS metadata auth 不破坏 E2E 主链路 |
 
 ## TLS / mTLS 参数
 
@@ -93,4 +94,4 @@ CreateMemberChange(JOIN)
 -> ListConversations
 ```
 
-覆盖范围包括 demo runner -> api-gateway gRPC mTLS、HMAC gateway token、api-gateway -> conversation / message / delivery / receipt 下游 gRPC mTLS、message-service -> conversation-service mTLS、message-service -> policy-service mTLS、policy decision audit outbox relay、policy audit Kafka typed read-back、push-gateway WebSocket WSS/mTLS、push-gateway -> delivery-service mTLS，以及 gateway trusted metadata 注入。脚本也会启动 api-gateway debug endpoint，并把 `api-gateway-debug-metrics.json` 写入本次结果目录。它仍是本地 smoke，不是生产证书签发、轮换、分发、动态服务身份治理、限流、统一 trace 或完整 API gateway 生产部署。
+覆盖范围包括 demo runner -> api-gateway gRPC mTLS、`aud=api-gateway` HMAC gateway token、api-gateway -> conversation / message / delivery / receipt 下游 gRPC mTLS、message-service -> conversation-service mTLS、message-service -> policy-service mTLS、policy decision audit outbox relay、policy audit Kafka typed read-back、push-gateway WebSocket WSS/mTLS、push-gateway -> delivery-service mTLS，以及 gateway trusted metadata 注入。脚本也会启动 api-gateway debug endpoint，并把 `api-gateway-debug-metrics.json` 写入本次结果目录。它仍是本地 smoke，不是生产证书签发、轮换、分发、动态服务身份治理、限流、统一 trace 或完整 API gateway 生产部署。

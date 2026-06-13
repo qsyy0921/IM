@@ -188,7 +188,7 @@ func newAuthenticatorFromEnv() (*gatewayauth.Authenticator, error) {
 		JWKSetURL:          os.Getenv("NEXUSIM_API_GATEWAY_AUTH_JWKS_URL"),
 		JWKRefreshInterval: envDuration("NEXUSIM_API_GATEWAY_AUTH_JWKS_REFRESH_INTERVAL", 5*time.Minute),
 		TrustedIssuers:     splitCSV(os.Getenv("NEXUSIM_API_GATEWAY_AUTH_TRUSTED_ISSUERS")),
-		Audience:           envString("NEXUSIM_API_GATEWAY_AUTH_AUDIENCE", "push-gateway"),
+		Audience:           envString("NEXUSIM_API_GATEWAY_AUTH_AUDIENCE", "api-gateway"),
 	})
 }
 

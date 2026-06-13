@@ -38,7 +38,7 @@ CreateMemberChange
 
 - HMAC legacy token / HS256 JWT。
 - RS256 JWT + JWKS / issuer allowlist。
-- 默认 audience 仍是 `push-gateway`，用于兼容当前 identity-service 已签发的 gateway token；后续 identity-service 支持明确 `api-gateway` audience 后再收紧。
+- 默认 audience 为 `api-gateway`；如需兼容历史 `push-gateway` token，必须显式配置 `NEXUSIM_API_GATEWAY_AUTH_AUDIENCE=push-gateway`，不能作为默认生产口径。
 
 gateway 验证 token 后向下游注入：
 
@@ -67,6 +67,14 @@ gateway 会重写 request body 里的 `AuthContext`，以已验证 token 身份�
 NEXUSIM_API_GATEWAY_MODE=grpc
 NEXUSIM_API_GATEWAY_GRPC_ADDR=0.0.0.0:12000
 ```
+
+Auth audience：
+
+```text
+NEXUSIM_API_GATEWAY_AUTH_AUDIENCE=api-gateway
+```
+
+该配置只接受单个 audience。第一阶段 identity-service / demo runner 均可在签发 gateway token 时指定 `aud=api-gateway`；push-gateway 仍继续使用自身的 `push-gateway` audience。这样 online WebSocket token 和 api-gateway user-facing RPC token 不再默认复用同一个 audience。
 
 入口 gRPC 默认 plaintext；本地 secure smoke 和后续部署可以启用静态 TLS / mTLS：
 
@@ -144,10 +152,11 @@ NEXUSIM_API_GATEWAY_RECEIPT_TLS_CLIENT_KEY_FILE
 
 后续优先级：
 
-1. 在 identity-service 支持 `api-gateway` audience 后收紧默认 audience。
-2. 后续拆 public facade proto，把 `GetSendContext` 从 user-facing service descriptor 中彻底移出。
-3. 继续把限流、配额、审计采样和 tracing 作为独立 production hardening，不塞进当前 proxy skeleton。
+1. 后续拆 public facade proto，把 `GetSendContext` 从 user-facing service descriptor 中彻底移出。
+2. 继续把限流、配额、审计采样和 tracing 作为独立 production hardening，不塞进当前 proxy skeleton。
 
 2026-06-13 补充：clean commit `cff1668` 已跑通 `loadtest/demo/run-local-secure-demo.ps1` 经真实 api-gateway 的 secure E2E smoke。demo runner 对 conversation / message / delivery / receipt 的 gRPC target 均指向 api-gateway，使用 HMAC gateway token 和 desktop-client mTLS；api-gateway 再通过 mTLS 调下游，并向下游注入 trusted metadata。报告见 `docs/runbook/loadtest/demo/loadtest-report-20260613-e2e-demo-api-gateway-secure-smoke.md`，原始结果在 `H:\NexusIM\loadtest-results\e2e-demo-api-gateway-secure-smoke-20260613-clean`。
 
 2026-06-13 补充：api-gateway 已补 first-stage `/healthz`、`/readyz`、`/debug/metrics` 和低敏 gRPC JSON access log；`run-local-secure-demo.ps1` 会启动 `NEXUSIM_API_GATEWAY_DEBUG_ADDR=127.0.0.1:11904` 并把 metrics 保存为 `api-gateway-debug-metrics.json`。
+
+2026-06-13 补充：api-gateway 默认 `NEXUSIM_API_GATEWAY_AUTH_AUDIENCE` 已收紧为 `api-gateway`；secure demo runner 生成 `aud=api-gateway` 的 HMAC gateway token。历史 `push-gateway` audience 仍可通过显式 env 配置兼容，但不再是 api-gateway 默认值。

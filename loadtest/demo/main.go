@@ -83,6 +83,7 @@ type config struct {
 	verifiedAuthMetadata  bool
 	gatewayAuthMode       string
 	gatewayAuthHMACSecret string
+	gatewayAuthAudience   string
 	gatewayAuthTokenTTL   time.Duration
 	pushAuthMode          string
 	pushAuthHMACSecret    string
@@ -106,6 +107,7 @@ type summary struct {
 	PushTLSEnabled         bool                     `json:"push_tls_enabled"`
 	VerifiedAuthMetadata   bool                     `json:"verified_auth_metadata"`
 	GatewayAuthMode        string                   `json:"gateway_auth_mode,omitempty"`
+	GatewayAuthAudience    string                   `json:"gateway_auth_audience,omitempty"`
 	StartedAt              time.Time                `json:"started_at"`
 	FinishedAt             time.Time                `json:"finished_at"`
 	Success                bool                     `json:"success"`
@@ -249,6 +251,7 @@ func main() {
 	flag.BoolVar(&cfg.verifiedAuthMetadata, "verified-auth-metadata", envBool("NEXUSIM_DEMO_VERIFIED_AUTH_METADATA", false), "send gateway verified identity through gRPC metadata for user-facing service RPCs")
 	flag.StringVar(&cfg.gatewayAuthMode, "gateway-auth-mode", os.Getenv("NEXUSIM_DEMO_GATEWAY_AUTH_MODE"), "api-gateway auth mode for user-facing gRPC calls: empty, mock, or hmac")
 	flag.StringVar(&cfg.gatewayAuthHMACSecret, "gateway-auth-hmac-secret", os.Getenv("NEXUSIM_DEMO_GATEWAY_AUTH_HMAC_SECRET"), "HMAC secret used to sign api-gateway demo token when --gateway-auth-mode=hmac")
+	flag.StringVar(&cfg.gatewayAuthAudience, "gateway-auth-audience", envString("NEXUSIM_DEMO_GATEWAY_AUTH_AUDIENCE", "api-gateway"), "audience claim used for generated api-gateway demo token")
 	flag.DurationVar(&cfg.gatewayAuthTokenTTL, "gateway-auth-token-ttl", 10*time.Minute, "TTL for generated HMAC api-gateway token")
 	flag.StringVar(&cfg.pushAuthMode, "push-auth-mode", "mock", "push-gateway auth mode: mock or hmac")
 	flag.StringVar(&cfg.pushAuthHMACSecret, "push-auth-hmac-secret", "", "HMAC secret used to sign push gateway demo token when --push-auth-mode=hmac")
@@ -280,6 +283,14 @@ func envBool(name string, fallback bool) bool {
 	default:
 		return fallback
 	}
+}
+
+func envString(name string, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
 type demoAuth struct {
@@ -328,7 +339,7 @@ func withUserFacingAuthMetadata(ctx context.Context, cfg config, auth demoAuth) 
 		}
 		return metadata.NewOutgoingContext(ctx, metadata.Pairs(pairs...)), nil
 	case "hmac":
-		token, err := signGatewayAuthToken(cfg.gatewayAuthHMACSecret, cfg.gatewayAuthTokenTTL, auth)
+		token, err := signGatewayAuthToken(cfg.gatewayAuthHMACSecret, cfg.gatewayAuthTokenTTL, auth, normalizedGatewayAuthAudience(cfg.gatewayAuthAudience))
 		if err != nil {
 			return nil, err
 		}
@@ -344,6 +355,7 @@ func withUserFacingAuthMetadata(ctx context.Context, cfg config, auth demoAuth) 
 
 func run(ctx context.Context, cfg config) error {
 	cfg.gatewayAuthMode = strings.ToLower(strings.TrimSpace(cfg.gatewayAuthMode))
+	cfg.gatewayAuthAudience = normalizedGatewayAuthAudience(cfg.gatewayAuthAudience)
 	cfg.pushAuthMode = strings.ToLower(strings.TrimSpace(cfg.pushAuthMode))
 	if strings.TrimSpace(cfg.pgDSN) == "" {
 		return fmt.Errorf("--pg-dsn is required for local demo seed and evidence collection")
@@ -381,6 +393,7 @@ func run(ctx context.Context, cfg config) error {
 		PushTLSEnabled:         cfg.pushTLS.Enabled(),
 		VerifiedAuthMetadata:   cfg.verifiedAuthMetadata,
 		GatewayAuthMode:        cfg.gatewayAuthMode,
+		GatewayAuthAudience:    gatewayAuthAudienceSummary(cfg.gatewayAuthMode, cfg.gatewayAuthAudience),
 		StartedAt:              started,
 	}
 
@@ -925,18 +938,33 @@ func signPushGatewayToken(cfg config) (string, error) {
 		deviceID:  cfg.receiverDevice,
 		sessionID: "e2e-demo-receiver",
 		traceID:   "e2e-demo-auth",
-	})
+	}, "push-gateway")
 }
 
-func signGatewayAuthToken(secret string, ttl time.Duration, auth demoAuth) (string, error) {
+func signGatewayAuthToken(secret string, ttl time.Duration, auth demoAuth, audience string) (string, error) {
 	return gatewayauth.SignGatewayToken(secret, map[string]string{
 		"tenant_id":  auth.tenantID,
 		"user_id":    auth.userID,
 		"device_id":  auth.deviceID,
 		"session_id": auth.sessionID,
 		"trace_id":   auth.traceID,
-		"aud":        "push-gateway",
+		"aud":        strings.TrimSpace(audience),
 	}, time.Now().Add(ttl))
+}
+
+func gatewayAuthAudienceSummary(mode string, audience string) string {
+	if strings.TrimSpace(mode) == "" {
+		return ""
+	}
+	return normalizedGatewayAuthAudience(audience)
+}
+
+func normalizedGatewayAuthAudience(audience string) string {
+	audience = strings.TrimSpace(audience)
+	if audience == "" {
+		return "api-gateway"
+	}
+	return audience
 }
 
 func seedConversation(ctx context.Context, pool *pgxpool.Pool, cfg config) error {

@@ -94,6 +94,12 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		} else {
 			snapshot.RuleStore = &rules
 		}
+		projection, err := queryProjectionSnapshot(ctx, h.pool)
+		if err != nil {
+			snapshot.ProjectionError = "policy projection metrics query failed"
+		} else {
+			snapshot.Projection = &projection
+		}
 		auditOutbox, err := queryAuditOutboxSnapshot(ctx, h.pool)
 		if err != nil {
 			snapshot.AuditOutboxError = "policy audit outbox metrics query failed"
@@ -116,6 +122,8 @@ type Snapshot struct {
 	PGPool           *PGPoolSnapshot      `json:"pg_pool,omitempty"`
 	RuleStore        *RuleSnapshot        `json:"policy_rule_store,omitempty"`
 	RuleStoreError   string               `json:"policy_rule_store_error,omitempty"`
+	Projection       *ProjectionSnapshot  `json:"policy_projection,omitempty"`
+	ProjectionError  string               `json:"policy_projection_error,omitempty"`
 	AuditOutbox      *AuditOutboxSnapshot `json:"policy_decision_audit_outbox,omitempty"`
 	AuditOutboxError string               `json:"policy_decision_audit_outbox_error,omitempty"`
 	GRPC             *GRPCSnapshot        `json:"grpc,omitempty"`
@@ -175,6 +183,54 @@ type AuditOutboxSnapshot struct {
 	Pending   int64 `json:"pending"`
 	Published int64 `json:"published"`
 	DLQ       int64 `json:"dlq"`
+}
+
+type ProjectionSnapshot struct {
+	ContactEdges        *ContactEdgeProjectionSnapshot        `json:"contact_edges,omitempty"`
+	ConversationMembers *ConversationMemberProjectionSnapshot `json:"conversation_members,omitempty"`
+	KafkaCheckpoints    *KafkaCheckpointSnapshot              `json:"kafka_checkpoints,omitempty"`
+}
+
+type ContactEdgeProjectionSnapshot struct {
+	Total   int64 `json:"total"`
+	Active  int64 `json:"active"`
+	Blocked int64 `json:"blocked"`
+	Deleted int64 `json:"deleted"`
+}
+
+type ConversationMemberProjectionSnapshot struct {
+	Total    int64                          `json:"total"`
+	Active   int64                          `json:"active"`
+	Left     int64                          `json:"left"`
+	Banned   int64                          `json:"banned"`
+	ByRole   []ProjectionGroupCountSnapshot `json:"by_role"`
+	ByStatus []ProjectionGroupCountSnapshot `json:"by_status"`
+	ByPair   []ProjectionRoleStatusCount    `json:"by_role_status"`
+}
+
+type ProjectionGroupCountSnapshot struct {
+	Value string `json:"value"`
+	Total int64  `json:"total"`
+}
+
+type ProjectionRoleStatusCount struct {
+	Role   string `json:"role"`
+	Status string `json:"status"`
+	Total  int64  `json:"total"`
+}
+
+type KafkaCheckpointSnapshot struct {
+	Total  int64                          `json:"total"`
+	Topics []KafkaCheckpointTopicSnapshot `json:"topics"`
+}
+
+type KafkaCheckpointTopicSnapshot struct {
+	Topic          string `json:"topic"`
+	Rows           int64  `json:"rows"`
+	ConsumerGroups int64  `json:"consumer_groups"`
+	Partitions     int64  `json:"partitions"`
+	MinOffsetValue int64  `json:"min_offset_value"`
+	MaxOffsetValue int64  `json:"max_offset_value"`
 }
 
 func queryRuleSnapshot(ctx context.Context, pool *pgxpool.Pool) (RuleSnapshot, error) {
@@ -330,6 +386,174 @@ func queryRoleRuleSnapshot(ctx context.Context, pool *pgxpool.Pool, totalQuery s
 func isUndefinedTable(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "42P01"
+}
+
+func queryProjectionSnapshot(ctx context.Context, pool *pgxpool.Pool) (ProjectionSnapshot, error) {
+	var snapshot ProjectionSnapshot
+	contactEdges, err := queryContactEdgeProjectionSnapshot(ctx, pool)
+	if err != nil {
+		if !isUndefinedTable(err) {
+			return ProjectionSnapshot{}, err
+		}
+	} else {
+		snapshot.ContactEdges = &contactEdges
+	}
+
+	conversationMembers, err := queryConversationMemberProjectionSnapshot(ctx, pool)
+	if err != nil {
+		if !isUndefinedTable(err) {
+			return ProjectionSnapshot{}, err
+		}
+	} else {
+		snapshot.ConversationMembers = &conversationMembers
+	}
+
+	checkpoints, err := queryKafkaCheckpointSnapshot(ctx, pool)
+	if err != nil {
+		if !isUndefinedTable(err) {
+			return ProjectionSnapshot{}, err
+		}
+	} else {
+		snapshot.KafkaCheckpoints = &checkpoints
+	}
+	return snapshot, nil
+}
+
+func queryContactEdgeProjectionSnapshot(ctx context.Context, pool *pgxpool.Pool) (ContactEdgeProjectionSnapshot, error) {
+	var snapshot ContactEdgeProjectionSnapshot
+	if err := pool.QueryRow(ctx, `
+SELECT
+    COUNT(*),
+    COUNT(*) FILTER (WHERE status = 'ACTIVE'),
+    COUNT(*) FILTER (WHERE status = 'BLOCKED'),
+    COUNT(*) FILTER (WHERE status = 'DELETED')
+FROM policy_contact_edges_projection
+`).Scan(&snapshot.Total, &snapshot.Active, &snapshot.Blocked, &snapshot.Deleted); err != nil {
+		return ContactEdgeProjectionSnapshot{}, err
+	}
+	return snapshot, nil
+}
+
+func queryConversationMemberProjectionSnapshot(ctx context.Context, pool *pgxpool.Pool) (ConversationMemberProjectionSnapshot, error) {
+	var snapshot ConversationMemberProjectionSnapshot
+	if err := pool.QueryRow(ctx, `
+SELECT
+    COUNT(*),
+    COUNT(*) FILTER (WHERE status = 'ACTIVE'),
+    COUNT(*) FILTER (WHERE status = 'LEFT'),
+    COUNT(*) FILTER (WHERE status = 'BANNED')
+FROM policy_conversation_members_projection
+`).Scan(&snapshot.Total, &snapshot.Active, &snapshot.Left, &snapshot.Banned); err != nil {
+		return ConversationMemberProjectionSnapshot{}, err
+	}
+
+	byRole, err := queryProjectionGroupCounts(ctx, pool, `
+SELECT role, COUNT(*)
+FROM policy_conversation_members_projection
+GROUP BY role
+ORDER BY role
+`)
+	if err != nil {
+		return ConversationMemberProjectionSnapshot{}, err
+	}
+	snapshot.ByRole = byRole
+
+	byStatus, err := queryProjectionGroupCounts(ctx, pool, `
+SELECT status, COUNT(*)
+FROM policy_conversation_members_projection
+GROUP BY status
+ORDER BY status
+`)
+	if err != nil {
+		return ConversationMemberProjectionSnapshot{}, err
+	}
+	snapshot.ByStatus = byStatus
+
+	rows, err := pool.Query(ctx, `
+SELECT role, status, COUNT(*)
+FROM policy_conversation_members_projection
+GROUP BY role, status
+ORDER BY role, status
+`)
+	if err != nil {
+		return ConversationMemberProjectionSnapshot{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var count ProjectionRoleStatusCount
+		if err := rows.Scan(&count.Role, &count.Status, &count.Total); err != nil {
+			return ConversationMemberProjectionSnapshot{}, err
+		}
+		snapshot.ByPair = append(snapshot.ByPair, count)
+	}
+	if err := rows.Err(); err != nil {
+		return ConversationMemberProjectionSnapshot{}, err
+	}
+	return snapshot, nil
+}
+
+func queryProjectionGroupCounts(ctx context.Context, pool *pgxpool.Pool, query string) ([]ProjectionGroupCountSnapshot, error) {
+	rows, err := pool.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var counts []ProjectionGroupCountSnapshot
+	for rows.Next() {
+		var count ProjectionGroupCountSnapshot
+		if err := rows.Scan(&count.Value, &count.Total); err != nil {
+			return nil, err
+		}
+		counts = append(counts, count)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return counts, nil
+}
+
+func queryKafkaCheckpointSnapshot(ctx context.Context, pool *pgxpool.Pool) (KafkaCheckpointSnapshot, error) {
+	var snapshot KafkaCheckpointSnapshot
+	if err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM policy_kafka_checkpoints
+`).Scan(&snapshot.Total); err != nil {
+		return KafkaCheckpointSnapshot{}, err
+	}
+	rows, err := pool.Query(ctx, `
+SELECT
+    topic,
+    COUNT(*),
+    COUNT(DISTINCT consumer_group),
+    COUNT(DISTINCT partition_id),
+    COALESCE(MIN(offset_value), 0),
+    COALESCE(MAX(offset_value), 0)
+FROM policy_kafka_checkpoints
+GROUP BY topic
+ORDER BY topic
+`)
+	if err != nil {
+		return KafkaCheckpointSnapshot{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var topic KafkaCheckpointTopicSnapshot
+		if err := rows.Scan(
+			&topic.Topic,
+			&topic.Rows,
+			&topic.ConsumerGroups,
+			&topic.Partitions,
+			&topic.MinOffsetValue,
+			&topic.MaxOffsetValue,
+		); err != nil {
+			return KafkaCheckpointSnapshot{}, err
+		}
+		snapshot.Topics = append(snapshot.Topics, topic)
+	}
+	if err := rows.Err(); err != nil {
+		return KafkaCheckpointSnapshot{}, err
+	}
+	return snapshot, nil
 }
 
 func queryAuditOutboxSnapshot(ctx context.Context, pool *pgxpool.Pool) (AuditOutboxSnapshot, error) {

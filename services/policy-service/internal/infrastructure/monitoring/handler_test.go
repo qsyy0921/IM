@@ -163,10 +163,85 @@ INSERT INTO policy_message_ownership_override_rules (
 	}
 }
 
+func TestQueryProjectionSnapshotIncludesContactMemberAndCheckpointIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pg pool: %v", err)
+	}
+	defer pool.Close()
+	applyPolicyMonitoringMigrations(t, ctx, pool)
+	if _, err := pool.Exec(ctx, `
+TRUNCATE
+    policy_conversation_members_projection,
+    policy_contact_edges_projection,
+    policy_kafka_checkpoints
+`); err != nil {
+		t.Fatalf("truncate policy projection tables: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+INSERT INTO policy_contact_edges_projection (
+    tenant_id, owner_user_id, contact_user_id, status, edge_version, updated_by_event_id
+) VALUES
+    ('tenant-metrics', 'alice', 'bob', 'ACTIVE', 1, 'contact-event-1'),
+    ('tenant-metrics', 'bob', 'alice', 'BLOCKED', 2, 'contact-event-2'),
+    ('tenant-metrics', 'carol', 'dave', 'DELETED', 3, 'contact-event-3');
+INSERT INTO policy_conversation_members_projection (
+    tenant_id, conversation_id, user_id, role, status, member_version, permission_version, updated_by_event_id
+) VALUES
+    ('tenant-metrics', 'conv-1', 'alice', 'OWNER', 'ACTIVE', 1, 7, 'member-event-1'),
+    ('tenant-metrics', 'conv-1', 'bob', 'ADMIN', 'ACTIVE', 2, 8, 'member-event-2'),
+    ('tenant-metrics', 'conv-2', 'carol', 'MEMBER', 'LEFT', 3, 9, 'member-event-3'),
+    ('tenant-metrics', 'conv-3', 'dave', 'MEMBER', 'BANNED', 4, 10, 'member-event-4');
+INSERT INTO policy_kafka_checkpoints (
+    consumer_group, topic, partition_id, offset_value
+) VALUES
+    ('policy-contact-group', 'im.contact.events', 0, 11),
+    ('policy-contact-group', 'im.contact.events', 1, 15),
+    ('policy-timeline-group', 'conversation.timeline.events', 0, 21);
+`); err != nil {
+		t.Fatalf("seed policy projection tables: %v", err)
+	}
+
+	snapshot, err := queryProjectionSnapshot(ctx, pool)
+	if err != nil {
+		t.Fatalf("query projection snapshot: %v", err)
+	}
+	if snapshot.ContactEdges == nil ||
+		snapshot.ContactEdges.Total != 3 ||
+		snapshot.ContactEdges.Active != 1 ||
+		snapshot.ContactEdges.Blocked != 1 ||
+		snapshot.ContactEdges.Deleted != 1 {
+		t.Fatalf("unexpected contact projection snapshot: %+v", snapshot.ContactEdges)
+	}
+	if snapshot.ConversationMembers == nil ||
+		snapshot.ConversationMembers.Total != 4 ||
+		snapshot.ConversationMembers.Active != 2 ||
+		snapshot.ConversationMembers.Left != 1 ||
+		snapshot.ConversationMembers.Banned != 1 ||
+		len(snapshot.ConversationMembers.ByRole) != 3 ||
+		len(snapshot.ConversationMembers.ByStatus) != 3 ||
+		len(snapshot.ConversationMembers.ByPair) != 4 {
+		t.Fatalf("unexpected conversation member projection snapshot: %+v", snapshot.ConversationMembers)
+	}
+	if snapshot.KafkaCheckpoints == nil ||
+		snapshot.KafkaCheckpoints.Total != 3 ||
+		len(snapshot.KafkaCheckpoints.Topics) != 2 {
+		t.Fatalf("unexpected checkpoint snapshot: %+v", snapshot.KafkaCheckpoints)
+	}
+	assertCheckpointTopic(t, snapshot.KafkaCheckpoints, "im.contact.events", 2, 1, 2, 11, 15)
+	assertCheckpointTopic(t, snapshot.KafkaCheckpoints, "conversation.timeline.events", 1, 1, 1, 21, 21)
+}
+
 func applyPolicyMonitoringMigrations(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	for _, name := range []string{
 		"000001_policy_core.sql",
+		"000002_policy_contacts_projection.sql",
 		"000007_policy_tenant_message_action_rules.sql",
 		"000008_policy_conversation_role_rules.sql",
 		"000009_policy_message_ownership_override_rules.sql",
@@ -180,4 +255,31 @@ func applyPolicyMonitoringMigrations(t *testing.T, ctx context.Context, pool *pg
 			t.Fatalf("apply migration %s: %v", name, err)
 		}
 	}
+}
+
+func assertCheckpointTopic(
+	t *testing.T,
+	snapshot *KafkaCheckpointSnapshot,
+	topic string,
+	rows int64,
+	consumerGroups int64,
+	partitions int64,
+	minOffset int64,
+	maxOffset int64,
+) {
+	t.Helper()
+	for _, item := range snapshot.Topics {
+		if item.Topic != topic {
+			continue
+		}
+		if item.Rows != rows ||
+			item.ConsumerGroups != consumerGroups ||
+			item.Partitions != partitions ||
+			item.MinOffsetValue != minOffset ||
+			item.MaxOffsetValue != maxOffset {
+			t.Fatalf("unexpected checkpoint topic %s: %+v", topic, item)
+		}
+		return
+	}
+	t.Fatalf("checkpoint topic %s not found in %+v", topic, snapshot.Topics)
 }

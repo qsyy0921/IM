@@ -7,7 +7,7 @@
 每轮开始：
 1. 运行 `git status --short --branch`。
 2. 读取 `docs/runbook/current-brief.md`。
-3. 需要服务状态时读取 `docs/runbook/service-briefs/README.md` 的相关服务段落。
+3. 需要服务状态时先读 `docs/runbook/service-briefs/README.md` 索引，再只读相关服务文件。
 4. 不要全文读取长历史文档；只用 `Select-String` / `rg` 按关键词读取相关片段。
 5. 不回滚用户已有修改。
 
@@ -47,6 +47,7 @@ RAG、Agent、聊天记录搜索、智能总结、群聊问答、客服机器人
 
 - 当前入口：`docs/runbook/current-brief.md`
 - 服务状态索引：`docs/runbook/service-briefs/README.md`
+- 单服务短状态：`docs/runbook/service-briefs/<service>.md`
 - 历史长目标：`docs/runbook/archive/current-goal-20260614-long.md`
 - 历史长 brief：`docs/runbook/archive/current-brief-20260614-long.md`
 - 服务设计：`docs/sdd/<service>.md`

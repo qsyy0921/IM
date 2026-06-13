@@ -4,7 +4,7 @@
 
 1. 先运行 `git status --short --branch`。
 2. 本文件是默认入口，保持短。
-3. 需要服务状态再读 `docs/runbook/service-briefs/README.md` 的相关段落。
+3. 需要服务状态先看 `docs/runbook/service-briefs/README.md` 索引，再只读相关服务文件。
 4. 需要历史证据再按关键词查 `docs/runbook/archive/` 或 `docs/runbook/loadtest/<service>/`。
 5. 不要为了“了解项目”全文读取长文档。
 
@@ -19,7 +19,7 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 ## 当前优先级
 
 1. 当前已完成：identity-service TOTP proof 在最终 Login / Refresh PostgreSQL 事务中重新锁定 ACTIVE factor 并检查 `login_locked_until`。
-2. 当前已完成：短入口文档和服务索引已拆分，并新增 `.\tools\check-runbook-entrypoints.ps1` 防止入口文档重新变长。
+2. 当前已完成：服务状态已拆成 `docs/runbook/service-briefs/<service>.md`，并由 `.\tools\check-local.ps1` 防止入口和单服务 brief 重新变长。
 3. 下一步继续做小而完整的生产级 hardening，不一次性横跨多个服务。
 
 ## 已知硬约束
@@ -33,7 +33,7 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 ## 每轮结束
 
 1. 更新本文件的“当前优先级”。
-2. 若服务状态变化，更新 `docs/runbook/service-briefs/README.md`。
+2. 若服务状态变化，更新 `docs/runbook/service-briefs/<service>.md`。
 3. 需要历史归档时只追加或拆分，不把长历史重新塞回入口文档。
 4. 运行 `.\tools\check-local.ps1`，保证下一轮入口仍然短，并捕获基础 whitespace / PowerShell 语法问题。
 5. 按切片风险追加必要测试，提交并推送有意义的切片。

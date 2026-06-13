@@ -1,7 +1,8 @@
 param(
     [int]$CurrentBriefMaxLines = 60,
     [int]$CurrentGoalMaxLines = 80,
-    [int]$ServiceBriefMaxLines = 90
+    [int]$ServiceBriefIndexMaxLines = 40,
+    [int]$ServiceBriefMaxLines = 30
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,10 +21,24 @@ $checks = @(
     },
     @{
         Path = Join-Path $repoRoot "docs\runbook\service-briefs\README.md"
-        MaxLines = $ServiceBriefMaxLines
+        MaxLines = $ServiceBriefIndexMaxLines
         Purpose = "service status index"
     }
 )
+
+$serviceBriefDir = Join-Path $repoRoot "docs\runbook\service-briefs"
+if (Test-Path -LiteralPath $serviceBriefDir) {
+    $serviceBriefFiles = Get-ChildItem -LiteralPath $serviceBriefDir -Filter "*.md" -File |
+        Where-Object { $_.Name -ne "README.md" } |
+        Sort-Object Name
+    foreach ($serviceBrief in $serviceBriefFiles) {
+        $checks += @{
+            Path = $serviceBrief.FullName
+            MaxLines = $ServiceBriefMaxLines
+            Purpose = "single-service brief"
+        }
+    }
+}
 
 $failed = $false
 foreach ($check in $checks) {

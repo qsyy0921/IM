@@ -22,6 +22,7 @@ import (
 	admissioninfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/admission"
 	kafkainfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/kafka"
 	metricsinfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/metrics"
+	monitoringinfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/monitoring"
 	postgresinfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/postgres"
 	rpcinfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/rpc"
 	"github.com/qsyy0921/IM/services/message-service/internal/trigger/outbox"
@@ -382,7 +383,8 @@ func conversationClientTLSConfigFromEnv() (rpcinfra.ConversationClientTLSConfig,
 }
 
 func newGRPCServer() (*grpc.Server, error) {
-	interceptors := make([]grpc.UnaryServerInterceptor, 0, 1)
+	interceptors := make([]grpc.UnaryServerInterceptor, 0, 2)
+	interceptors = append(interceptors, monitoringinfra.UnaryAccessLogInterceptor(log.Default()))
 	switch strings.ToLower(envString("NEXUSIM_MESSAGE_AUTH_MODE", "body")) {
 	case "body", "request", "legacy":
 	case "metadata", "verified-metadata":

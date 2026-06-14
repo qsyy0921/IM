@@ -134,6 +134,68 @@ func TestWebSocketPingAndAck(t *testing.T) {
 	}
 }
 
+func TestWebSocketTraceRecorderReceivesLowSensitiveContext(t *testing.T) {
+	registry := memory.NewRegistry()
+	traceRecorder := newFakeTraceRecorder()
+	server := NewServer(
+		app.NewConnectSessionUseCase(registry),
+		app.NewDisconnectSessionUseCase(registry),
+		app.NewHandleClientFrameUseCase(&fakeDeliveryClient{}),
+		Config{
+			QueueSize:         8,
+			HeartbeatInterval: time.Second,
+			AuthMode:          "mock",
+			RouteBackend:      "redis",
+			GatewayID:         "gateway-test",
+			TraceRecorder:     traceRecorder,
+		},
+	)
+	httpServer := httptest.NewServer(server)
+	defer httpServer.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, _, err := nhooyr.Dial(ctx, "ws"+httpServer.URL[len("http"):]+"/ws?tenant_id=tenant-1&user_id=user-1&device_id=device-1", nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	if err := wsjson.Write(ctx, conn, types.ClientFrame{
+		Op:        types.OpClientHello,
+		RequestID: "hello-1",
+		DeviceID:  "device-1",
+	}); err != nil {
+		t.Fatalf("write hello: %v", err)
+	}
+	var hello types.ServerFrame
+	if err := wsjson.Read(ctx, conn, &hello); err != nil {
+		t.Fatalf("read hello: %v", err)
+	}
+	if err := conn.Close(nhooyr.StatusNormalClosure, "done"); err != nil {
+		t.Fatalf("close websocket: %v", err)
+	}
+
+	select {
+	case trace := <-traceRecorder.started:
+		if trace.AuthMode != "mock" ||
+			trace.RouteBackend != "redis" ||
+			trace.GatewayID != "gateway-test" ||
+			trace.TLSEnabled {
+			t.Fatalf("unexpected trace context: %+v", trace)
+		}
+	case <-ctx.Done():
+		t.Fatalf("trace recorder was not started")
+	}
+
+	select {
+	case err := <-traceRecorder.ended:
+		if err != nil {
+			t.Fatalf("expected normal close to end trace without error, got %v", err)
+		}
+	case <-ctx.Done():
+		t.Fatalf("trace recorder was not ended")
+	}
+}
+
 func TestErrorFrameIncludesRetryableFalse(t *testing.T) {
 	encoded, err := json.Marshal(app.PublicErrorFrame("r1", types.NewInvalidFrame("bad")))
 	if err != nil {
@@ -170,6 +232,25 @@ func (client *fakeDeliveryClient) AckDelivery(ctx context.Context, command types
 		ConversationID:  command.ConversationID,
 		LastReceivedSeq: command.ReceivedSeq,
 	}, nil
+}
+
+type fakeTraceRecorder struct {
+	started chan types.WebSocketTraceContext
+	ended   chan error
+}
+
+func newFakeTraceRecorder() *fakeTraceRecorder {
+	return &fakeTraceRecorder{
+		started: make(chan types.WebSocketTraceContext, 1),
+		ended:   make(chan error, 1),
+	}
+}
+
+func (recorder *fakeTraceRecorder) StartWebSocketConnection(ctx context.Context, _ http.Header, trace types.WebSocketTraceContext) (context.Context, func(error)) {
+	recorder.started <- trace
+	return ctx, func(err error) {
+		recorder.ended <- err
+	}
 }
 
 func TestWebSocketAckPermissionDeniedIsNotRetryable(t *testing.T) {

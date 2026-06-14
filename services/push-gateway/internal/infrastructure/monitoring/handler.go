@@ -21,6 +21,7 @@ type Handler struct {
 	authJWKStatsFunc           func() *authinfra.JWKStats
 	deliveryWorkerStatsFunc    func() types.ConsumerWorkerSnapshot
 	identityWorkerStatsFunc    func() types.ConsumerWorkerSnapshot
+	traceStatsFunc             func() TraceSnapshot
 }
 
 func NewHandler() *Handler {
@@ -59,6 +60,11 @@ func (h *Handler) WithDeliveryConsumerStats(statsFunc func() types.ConsumerWorke
 
 func (h *Handler) WithIdentityConsumerStats(statsFunc func() types.ConsumerWorkerSnapshot) *Handler {
 	h.identityWorkerStatsFunc = statsFunc
+	return h
+}
+
+func (h *Handler) WithTraceStats(statsFunc func() TraceSnapshot) *Handler {
+	h.traceStatsFunc = statsFunc
 	return h
 }
 
@@ -107,6 +113,10 @@ func (h *Handler) handleMetrics(w http.ResponseWriter) {
 		stats := h.identityWorkerStatsFunc()
 		snapshot.IdentityConsumer = &stats
 	}
+	if h.traceStatsFunc != nil {
+		stats := h.traceStatsFunc()
+		snapshot.Trace = &stats
+	}
 	writeJSON(w, http.StatusOK, snapshot)
 }
 
@@ -125,6 +135,7 @@ type Snapshot struct {
 	AuthJWKStats          *authinfra.JWKStats                  `json:"auth_jwks,omitempty"`
 	DeliveryConsumer      *types.ConsumerWorkerSnapshot        `json:"delivery_consumer,omitempty"`
 	IdentityConsumer      *types.ConsumerWorkerSnapshot        `json:"identity_consumer,omitempty"`
+	Trace                 *TraceSnapshot                       `json:"trace,omitempty"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

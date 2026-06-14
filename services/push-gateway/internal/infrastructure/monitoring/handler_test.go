@@ -74,6 +74,14 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 				LastCommitAtMS:     110,
 				LastErrorBackoffMS: 500,
 			}
+		}).
+		WithTraceStats(func() TraceSnapshot {
+			return TraceSnapshot{
+				Enabled:       true,
+				ServiceName:   "push-gateway-test",
+				Exporter:      "stdout",
+				SamplingRatio: 0.25,
+			}
 		})
 
 	for _, path := range []string{"/healthz", "/readyz"} {
@@ -114,6 +122,13 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 	}
 	if snapshot.IdentityConsumer == nil || snapshot.IdentityConsumer.TotalErrors != 3 {
 		t.Fatalf("unexpected identity consumer stats: %+v", snapshot.IdentityConsumer)
+	}
+	if snapshot.Trace == nil ||
+		!snapshot.Trace.Enabled ||
+		snapshot.Trace.ServiceName != "push-gateway-test" ||
+		snapshot.Trace.Exporter != "stdout" ||
+		snapshot.Trace.SamplingRatio != 0.25 {
+		t.Fatalf("unexpected trace stats: %+v", snapshot.Trace)
 	}
 }
 

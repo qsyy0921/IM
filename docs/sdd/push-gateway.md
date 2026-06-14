@@ -536,7 +536,9 @@ NEXUSIM_PUSH_GATEWAY_MODE=all
 
 本地分布式模拟使用 `NEXUSIM_PUSH_GATEWAY_MODE=ws` 和 `NEXUSIM_PUSH_GATEWAY_MODE=delivery-consumer` 启动两个独立 `push-gateway` 进程：WebSocket 连接只落在 ws 进程，Kafka `im.delivery.events` 只由 consumer 进程消费，在线通知必须经过 Redis route / PubSub 才能到达客户端。该模式用于验证分布式路由边界，不作为生产容量结论。
 
-当 WebSocket HTTP server 启动时，`GET /healthz` 返回 `{"service":"push-gateway","status":"ok"}`，`GET /readyz` 返回 `{"service":"push-gateway","status":"ready"}`，`GET /debug/metrics` 返回当前单实例 registry 调试指标，包括 connected sessions、queue-full eviction、resume replay / buffer miss、resume buffer stored frames、resume token count 和 expired token count。启用 Redis route 时还会返回 `redis_registry_metrics` 和 `redis_subscriber_metrics`，用于区分远端 route 命中、Pub/Sub publish、subscriber 入站 fanout 和 stale cleanup。启用 JWT remote JWKS 时还会返回 `auth_jwks`，包含是否配置远程 URL、当前缓存 key 数、最近 refresh 成功 / 失败时间和失败计数。该端点只用于本地 smoke 排障，尚不是生产 Prometheus 指标。
+当 WebSocket HTTP server 启动时，`GET /healthz` 返回 `{"service":"push-gateway","status":"ok"}`，`GET /readyz` 返回 `{"service":"push-gateway","status":"ready"}`，`GET /debug/metrics` 返回当前单实例 registry 调试指标，包括 connected sessions、queue-full eviction、resume replay / buffer miss、resume buffer stored frames、resume token count 和 expired token count。启用 Redis route 时还会返回 `redis_registry_metrics` 和 `redis_subscriber_metrics`，用于区分远端 route 命中、Pub/Sub publish、subscriber 入站 fanout 和 stale cleanup。启用 JWT remote JWKS 时还会返回 `auth_jwks`，包含是否配置远程 URL、当前缓存 key 数、最近 refresh 成功 / 失败时间和失败计数。启用 first-stage OpenTelemetry 时还会返回 `trace` 配置快照。该端点只用于本地 smoke 排障，尚不是生产 Prometheus 指标。
+
+first-stage OpenTelemetry 通过 `NEXUSIM_PUSH_OTEL_*` 显式启用，默认关闭。当前只覆盖 WebSocket connection span，用于观察在线入口连接生命周期；span 只允许记录 auth mode、route backend、TLS 是否启用、gateway id 是否配置等低敏连接形态字段，不记录 token、tenant_id、user_id、device_id、session_id、conversation_id、message_id、payload 或 Redis / Kafka / gRPC 内部错误文本。生产化前仍需要统一采样、trace retention、告警和高基数属性审计。
 
 最小本地启动参数：
 

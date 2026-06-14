@@ -148,7 +148,7 @@ production_starting_point = 0.05
 high_volume_starting_point = 0.01
 ```
 
-`api-gateway`、`message-service`、`delivery-service` 这类高吞吐入口 / 主链路默认使用 `high_volume_starting_point`；其它已接入 OTel server span 的后端服务默认使用 `production_starting_point`。本地 smoke 可以显式使用 `local_smoke=1.0`，但生产 full sampling 必须是有过期时间的临时排障动作，不能作为常态配置。
+`api-gateway`、`message-service`、`delivery-service`、`push-gateway` 这类高吞吐入口 / 主链路默认使用 `high_volume_starting_point`；其它已接入 OTel server span 的后端服务默认使用 `production_starting_point`。本地 smoke 可以显式使用 `local_smoke=1.0`，但生产 full sampling 必须是有过期时间的临时排障动作，不能作为常态配置。
 
 该策略文件不自动改任何服务环境变量；它用于 review、runbook 和 `.\tools\check-local.ps1` 的静态门禁。生产化前仍需要集中配置、动态采样、trace retention、PII / 高基数属性审计和 collector 侧治理。
 
@@ -180,6 +180,14 @@ api-gateway 还支持入口 server span 和下游 gRPC client span：
 ```text
 NEXUSIM_API_GATEWAY_OTEL_*
 ```
+
+push-gateway 支持第一阶段 WebSocket connection span：
+
+```text
+NEXUSIM_PUSH_OTEL_*
+```
+
+该 span 只记录低敏连接形态字段，例如 auth mode、route backend、TLS 是否启用和 gateway id 是否配置；不记录 tenant / user / device / session id、token、payload、conversation id 或 message id。
 
 ## 边界
 

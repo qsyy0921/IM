@@ -25,12 +25,20 @@ type Authenticator interface {
 	Authenticate(request *http.Request) (types.AuthContext, error)
 }
 
+type TraceRecorder interface {
+	StartWebSocketConnection(ctx context.Context, header http.Header, trace types.WebSocketTraceContext) (context.Context, func(error))
+}
+
 type Config struct {
 	QueueSize         int
 	HeartbeatInterval time.Duration
 	WriteTimeout      time.Duration
 	WriteDelay        time.Duration
 	Authenticator     Authenticator
+	AuthMode          string
+	RouteBackend      string
+	GatewayID         string
+	TraceRecorder     TraceRecorder
 }
 
 func NewServer(
@@ -58,31 +66,51 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	}
 	defer conn.Close(nhooyr.StatusNormalClosure, "")
 
+	var traceErr error
+	if server.config.TraceRecorder != nil {
+		ctx, endTrace := server.config.TraceRecorder.StartWebSocketConnection(request.Context(), request.Header, types.WebSocketTraceContext{
+			AuthMode:     server.config.AuthMode,
+			RouteBackend: server.config.RouteBackend,
+			GatewayID:    server.config.GatewayID,
+			TLSEnabled:   request.TLS != nil,
+		})
+		request = request.WithContext(ctx)
+		defer func() {
+			endTrace(traceErr)
+		}()
+	}
+
 	auth, err := server.authFromRequest(request)
 	if err != nil {
+		traceErr = err
 		_ = wsjson.Write(request.Context(), conn, app.PublicErrorFrame("", err))
 		return
 	}
 	var rawHello json.RawMessage
 	if err := wsjson.Read(request.Context(), conn, &rawHello); err != nil {
+		traceErr = err
 		return
 	}
 	helloFrame, requestID, err := DecodeClientFrame(rawHello)
 	if err != nil {
+		traceErr = err
 		_ = wsjson.Write(request.Context(), conn, app.PublicErrorFrame(requestID, err))
 		return
 	}
 	if helloFrame.Op != types.OpClientHello {
-		_ = wsjson.Write(request.Context(), conn, app.PublicErrorFrame(helloFrame.RequestID, types.NewInvalidFrame("client.hello is required")))
+		traceErr = types.NewInvalidFrame("client.hello is required")
+		_ = wsjson.Write(request.Context(), conn, app.PublicErrorFrame(helloFrame.RequestID, traceErr))
 		return
 	}
 	if auth.DeviceID == "" {
 		auth.DeviceID = helloFrame.DeviceID
 	} else if helloFrame.DeviceID != "" && auth.DeviceID != helloFrame.DeviceID {
-		_ = wsjson.Write(request.Context(), conn, app.PublicErrorFrame(helloFrame.RequestID, types.NewInvalidFrame("device_id mismatch")))
+		traceErr = types.NewInvalidFrame("device_id mismatch")
+		_ = wsjson.Write(request.Context(), conn, app.PublicErrorFrame(helloFrame.RequestID, traceErr))
 		return
 	}
 	if err := auth.Validate(); err != nil {
+		traceErr = err
 		_ = wsjson.Write(request.Context(), conn, app.PublicErrorFrame(helloFrame.RequestID, err))
 		return
 	}
@@ -97,6 +125,7 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 		HeartbeatInterval: server.config.HeartbeatInterval,
 	}, outbound, evicted)
 	if err != nil {
+		traceErr = err
 		_ = wsjson.Write(request.Context(), conn, app.PublicErrorFrame("", err))
 		return
 	}
@@ -112,6 +141,7 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 
 	auth.SessionID = result.SessionID
 	if err := writeFrame(request.Context(), conn, domain.ServerHello(helloFrame.RequestID, result), server.config.WriteTimeout); err != nil {
+		traceErr = err
 		return
 	}
 
@@ -130,9 +160,11 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	disconnect()
 	writeErr := <-writeDone
 	if readErr != nil && !isNormalClose(readErr) {
+		traceErr = readErr
 		return
 	}
 	if writeErr != nil && !isNormalClose(writeErr) {
+		traceErr = writeErr
 		return
 	}
 }

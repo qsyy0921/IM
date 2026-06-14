@@ -51,7 +51,8 @@ $requiredServices = @(
     "conversation-service",
     "delivery-service",
     "receipt-service",
-    "policy-service"
+    "policy-service",
+    "push-gateway"
 )
 
 $services = @{}

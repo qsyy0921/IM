@@ -101,6 +101,71 @@ func TestNewRedisUniversalClientRejectsUnsupportedMode(t *testing.T) {
 	}
 }
 
+func TestPushTraceConfigDefaultsToDisabled(t *testing.T) {
+	clearPushTraceConfig(t)
+	config, err := pushTraceConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load push trace config: %v", err)
+	}
+	if config.Enabled ||
+		config.ServiceName != "push-gateway" ||
+		config.Exporter != "stdout" ||
+		config.OTLPEndpoint != "" ||
+		config.OTLPInsecure ||
+		config.SamplingRatio != 1 {
+		t.Fatalf("unexpected default trace config: %+v", config)
+	}
+}
+
+func TestPushTraceConfigLoadsOTLPGRPC(t *testing.T) {
+	clearPushTraceConfig(t)
+	t.Setenv("NEXUSIM_PUSH_OTEL_TRACES_ENABLED", "true")
+	t.Setenv("NEXUSIM_PUSH_OTEL_SERVICE_NAME", "push-gateway-test")
+	t.Setenv("NEXUSIM_PUSH_OTEL_TRACES_EXPORTER", "otlp-grpc")
+	t.Setenv("NEXUSIM_PUSH_OTEL_TRACES_OTLP_ENDPOINT", "127.0.0.1:4317")
+	t.Setenv("NEXUSIM_PUSH_OTEL_TRACES_OTLP_INSECURE", "true")
+	t.Setenv("NEXUSIM_PUSH_OTEL_TRACES_SAMPLING_RATIO", "0.5")
+
+	config, err := pushTraceConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load push trace config: %v", err)
+	}
+	if !config.Enabled ||
+		config.ServiceName != "push-gateway-test" ||
+		config.Exporter != "otlp-grpc" ||
+		config.OTLPEndpoint != "127.0.0.1:4317" ||
+		!config.OTLPInsecure ||
+		config.SamplingRatio != 0.5 {
+		t.Fatalf("unexpected otlp trace config: %+v", config)
+	}
+}
+
+func TestPushTraceConfigRejectsInvalidValues(t *testing.T) {
+	clearPushTraceConfig(t)
+	t.Setenv("NEXUSIM_PUSH_OTEL_TRACES_ENABLED", "sometimes")
+	if _, err := pushTraceConfigFromEnv(); err == nil {
+		t.Fatalf("expected invalid enabled value to fail")
+	}
+
+	clearPushTraceConfig(t)
+	t.Setenv("NEXUSIM_PUSH_OTEL_TRACES_SAMPLING_RATIO", "2")
+	if _, err := pushTraceConfigFromEnv(); err == nil {
+		t.Fatalf("expected invalid sampling ratio to fail")
+	}
+
+	clearPushTraceConfig(t)
+	t.Setenv("NEXUSIM_PUSH_OTEL_TRACES_OTLP_INSECURE", "sometimes")
+	if _, err := pushTraceConfigFromEnv(); err == nil {
+		t.Fatalf("expected invalid otlp insecure value to fail")
+	}
+}
+
+func TestAuthenticatorJWKStatsHandlesNilAuthenticator(t *testing.T) {
+	if stats := authenticatorJWKStats(nil); stats != nil {
+		t.Fatalf("expected nil stats for nil authenticator, got %+v", stats)
+	}
+}
+
 func TestDeliveryClientTLSConfigFromEnvDisabledByDefault(t *testing.T) {
 	clearDeliveryClientTLSEnv(t)
 
@@ -293,6 +358,16 @@ func clearDeliveryClientTLSEnv(t *testing.T) {
 	t.Setenv("NEXUSIM_DELIVERY_SERVICE_TLS_SERVER_NAME", "")
 	t.Setenv("NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_CERT_FILE", "")
 	t.Setenv("NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE", "")
+}
+
+func clearPushTraceConfig(t *testing.T) {
+	t.Helper()
+	t.Setenv("NEXUSIM_PUSH_OTEL_TRACES_ENABLED", "")
+	t.Setenv("NEXUSIM_PUSH_OTEL_SERVICE_NAME", "")
+	t.Setenv("NEXUSIM_PUSH_OTEL_TRACES_EXPORTER", "")
+	t.Setenv("NEXUSIM_PUSH_OTEL_TRACES_OTLP_ENDPOINT", "")
+	t.Setenv("NEXUSIM_PUSH_OTEL_TRACES_OTLP_INSECURE", "")
+	t.Setenv("NEXUSIM_PUSH_OTEL_TRACES_SAMPLING_RATIO", "")
 }
 
 func clearPushWSTLSEnv(t *testing.T) {

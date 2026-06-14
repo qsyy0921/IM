@@ -59,6 +59,22 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	traceConfig, err := pushTraceConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	traceRuntime, err := monitoringinfra.NewTraceRuntime(ctx, traceConfig)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := traceRuntime.Shutdown(shutdownCtx); err != nil {
+			log.Printf("push-gateway OpenTelemetry trace shutdown failed: %v", err)
+		}
+	}()
+
 	localRegistry := memory.NewRegistryWithConfig(memory.Config{
 		ResumeBufferTTL: envDuration("NEXUSIM_PUSH_RESUME_BUFFER_TTL", 10*time.Minute),
 	})
@@ -72,8 +88,8 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 	var redisSubscriber *redisroute.Subscriber
 	var authenticator *authinfra.Authenticator
 	routeBackend := envString("NEXUSIM_PUSH_ROUTE_BACKEND", "memory")
+	gatewayID := envString("NEXUSIM_PUSH_GATEWAY_ID", defaultGatewayID())
 	if routeBackend == "redis" {
-		gatewayID := envString("NEXUSIM_PUSH_GATEWAY_ID", defaultGatewayID())
 		var err error
 		redisClient, err = newRedisUniversalClient(loadRedisClientConfigFromEnv())
 		if err != nil {
@@ -120,13 +136,15 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 		}).
 		WithAuthJWKStats(func() *authinfra.JWKStats {
 			return authenticatorJWKStats(authenticator)
-		})
+		}).
+		WithTraceStats(traceRuntime.Snapshot)
 	if redisSubscriber != nil {
 		monitoringHandler.WithRedisSubscriberWorkerStats(redisSubscriber.Snapshot)
 	}
 
 	var wsAddr string
 	if enableWS {
+		pushAuthMode := envString("NEXUSIM_PUSH_AUTH_MODE", "mock")
 		deliveryAddr := envString("NEXUSIM_DELIVERY_GRPC_ADDR", "127.0.0.1:10497")
 		deliveryTLS, err := deliveryClientTLSConfigFromEnv()
 		if err != nil {
@@ -146,7 +164,7 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 			return err
 		}
 		authenticator, err = authinfra.NewAuthenticator(authinfra.Config{
-			Mode:               authinfra.Mode(envString("NEXUSIM_PUSH_AUTH_MODE", "mock")),
+			Mode:               authinfra.Mode(pushAuthMode),
 			Secret:             os.Getenv("NEXUSIM_PUSH_AUTH_HMAC_SECRET"),
 			PreviousSecrets:    splitCSV(os.Getenv("NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS")),
 			JWKSetJSON:         jwksJSON,
@@ -169,6 +187,10 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 				WriteTimeout:      envDuration("NEXUSIM_PUSH_WRITE_TIMEOUT", 2*time.Second),
 				WriteDelay:        envDuration("NEXUSIM_PUSH_TEST_WRITE_DELAY", 0),
 				Authenticator:     authenticator,
+				AuthMode:          pushAuthMode,
+				RouteBackend:      routeBackend,
+				GatewayID:         gatewayID,
+				TraceRecorder:     traceRuntime,
 			},
 		)
 		mux := http.NewServeMux()
@@ -181,7 +203,7 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 		if err != nil {
 			return err
 		}
-		if err := validatePushAuthListenerConfig(wsAddr, envString("NEXUSIM_PUSH_AUTH_MODE", "mock"), wsTLSEnabled); err != nil {
+		if err := validatePushAuthListenerConfig(wsAddr, pushAuthMode, wsTLSEnabled); err != nil {
 			return err
 		}
 		startHTTPServer(ctx, errs, "websocket", wsAddr, mux, wsTLSConfig)
@@ -244,19 +266,19 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 		}()
 	}
 
-	var err error
+	var runtimeErr error
 	select {
-	case err = <-errs:
+	case runtimeErr = <-errs:
 	case <-ctx.Done():
-		err = context.Canceled
+		runtimeErr = context.Canceled
 	}
 	stop()
 	for _, closeFn := range closers {
-		if closeErr := closeFn(); closeErr != nil && err == nil {
-			err = closeErr
+		if closeErr := closeFn(); closeErr != nil && runtimeErr == nil {
+			runtimeErr = closeErr
 		}
 	}
-	return err
+	return runtimeErr
 }
 
 type redisClientConfig struct {
@@ -358,6 +380,9 @@ func redisRouteSubscriberMetrics(subscriber *redisroute.Subscriber) redisroute.M
 }
 
 func authenticatorJWKStats(authenticator *authinfra.Authenticator) *authinfra.JWKStats {
+	if authenticator == nil {
+		return nil
+	}
 	stats := authenticator.JWKStats()
 	if !stats.RemoteURLConfigured && stats.CachedKeyCount == 0 && stats.RefreshFailures == 0 {
 		return nil
@@ -455,6 +480,41 @@ func deliveryClientTLSConfigFromEnv() (rpcinfra.DeliveryClientTLSConfig, error) 
 		return config, errors.New("NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_CERT_FILE and NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE must be configured together")
 	}
 	return config, nil
+}
+
+func pushTraceConfigFromEnv() (monitoringinfra.TraceConfig, error) {
+	enabled, _, err := envOptionalBool("NEXUSIM_PUSH_OTEL_TRACES_ENABLED")
+	if err != nil {
+		return monitoringinfra.TraceConfig{}, err
+	}
+	otlpInsecure, _, err := envOptionalBool("NEXUSIM_PUSH_OTEL_TRACES_OTLP_INSECURE")
+	if err != nil {
+		return monitoringinfra.TraceConfig{}, err
+	}
+	samplingRatio, err := pushTraceSamplingRatioFromEnv()
+	if err != nil {
+		return monitoringinfra.TraceConfig{}, err
+	}
+	return monitoringinfra.TraceConfig{
+		Enabled:       enabled,
+		ServiceName:   envString("NEXUSIM_PUSH_OTEL_SERVICE_NAME", "push-gateway"),
+		Exporter:      envString("NEXUSIM_PUSH_OTEL_TRACES_EXPORTER", "stdout"),
+		OTLPEndpoint:  envString("NEXUSIM_PUSH_OTEL_TRACES_OTLP_ENDPOINT", ""),
+		OTLPInsecure:  otlpInsecure,
+		SamplingRatio: samplingRatio,
+	}, nil
+}
+
+func pushTraceSamplingRatioFromEnv() (float64, error) {
+	raw := strings.TrimSpace(os.Getenv("NEXUSIM_PUSH_OTEL_TRACES_SAMPLING_RATIO"))
+	if raw == "" {
+		return 1, nil
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil || value <= 0 || value > 1 {
+		return 0, errors.New("NEXUSIM_PUSH_OTEL_TRACES_SAMPLING_RATIO must be > 0 and <= 1")
+	}
+	return value, nil
 }
 
 func envString(name string, fallback string) string {

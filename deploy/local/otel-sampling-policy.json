@@ -66,6 +66,12 @@
       "env_prefix": "NEXUSIM_POLICY_OTEL",
       "default_profile": "production_starting_point",
       "high_volume": false
+    },
+    {
+      "service": "push-gateway",
+      "env_prefix": "NEXUSIM_PUSH_OTEL",
+      "default_profile": "high_volume_starting_point",
+      "high_volume": true
     }
   ],
   "guardrails": {

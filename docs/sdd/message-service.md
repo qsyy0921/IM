@@ -868,6 +868,8 @@ NEXUSIM_MESSAGE_GRPC_TLS_CLIENT_ALLOWED_URIS=spiffe://nexusim/api-gateway
 
 默认仍是 plaintext，兼容本地压测和旧 runner。该配置只覆盖 message-service server transport security，不负责证书签发、轮换、跨主机分发、动态 SPIFFE 身份治理或全服务 mTLS rollout。
 
+当 `NEXUSIM_MESSAGE_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端没有启用 mTLS client cert 校验，message-service 必须在启动前直接失败，避免把第一阶段 trusted metadata 模式暴露到公网监听面。
+
 | 告警 | 排查顺序 | 修复 |
 | --- | --- | --- |
 | `SendMessage p99` 升高 | PG lock -> seq alloc -> outbox insert -> policy latency | 扩容、限流、热点升级 |

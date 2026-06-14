@@ -25,10 +25,11 @@ type LocalRegistry interface {
 }
 
 type Config struct {
-	GatewayID string
-	KeyPrefix string
-	RouteTTL  time.Duration
-	ResumeTTL time.Duration
+	GatewayID             string
+	KeyPrefix             string
+	RouteTTL              time.Duration
+	ResumeTTL             time.Duration
+	RenewFailureThreshold int
 }
 
 type Registry struct {
@@ -45,6 +46,7 @@ type Registry struct {
 type Metrics struct {
 	RedisRouteRegisterErrorCount       uint64 `json:"redis_route_register_error_count"`
 	RedisRouteRenewErrorCount          uint64 `json:"redis_route_renew_error_count"`
+	RedisRouteRenewSessionEvictedCount uint64 `json:"redis_route_renew_session_evicted_count"`
 	RedisRouteLookupErrorCount         uint64 `json:"redis_route_lookup_error_count"`
 	RedisRouteRemoteMatchedSessions    uint64 `json:"redis_route_remote_matched_sessions"`
 	RedisRouteRemotePublishCallCount   uint64 `json:"redis_route_remote_publish_call_count"`
@@ -68,6 +70,7 @@ type Metrics struct {
 type registryMetrics struct {
 	registerErrorCount      atomic.Uint64
 	renewErrorCount         atomic.Uint64
+	renewSessionEvicted     atomic.Uint64
 	lookupErrorCount        atomic.Uint64
 	remoteMatchedSessions   atomic.Uint64
 	remotePublishCallCount  atomic.Uint64
@@ -125,6 +128,9 @@ func NewRegistry(local LocalRegistry, client redis.UniversalClient, config Confi
 	}
 	if config.ResumeTTL <= 0 {
 		config.ResumeTTL = types.DefaultResumeBufferTTL
+	}
+	if config.RenewFailureThreshold < 0 {
+		config.RenewFailureThreshold = 0
 	}
 	return &Registry{
 		local:  local,
@@ -405,21 +411,22 @@ func (registry *Registry) EvictSession(ctx context.Context, tenantID string, use
 
 func (registry *Registry) Metrics() Metrics {
 	return Metrics{
-		RedisRouteRegisterErrorCount:      registry.metrics.registerErrorCount.Load(),
-		RedisRouteRenewErrorCount:         registry.metrics.renewErrorCount.Load(),
-		RedisRouteLookupErrorCount:        registry.metrics.lookupErrorCount.Load(),
-		RedisRouteRemoteMatchedSessions:   registry.metrics.remoteMatchedSessions.Load(),
-		RedisRouteRemotePublishCallCount:  registry.metrics.remotePublishCallCount.Load(),
-		RedisRouteRemotePublishErrorCount: registry.metrics.remotePublishErrorCount.Load(),
-		RedisRouteRemoteNoSubscriberCount: registry.metrics.remoteNoSubscriberCount.Load(),
-		RedisRouteRemoteEnqueuedSessions:  registry.metrics.remoteEnqueuedSessions.Load(),
-		RedisRouteStaleRemovedCount:       registry.metrics.staleRemovedCount.Load(),
-		RedisRouteCleanupErrorCount:       registry.metrics.cleanupErrorCount.Load(),
-		RedisResumeReplayCount:            registry.metrics.resumeReplayCount.Load(),
-		RedisResumeMissCount:              registry.metrics.resumeMissCount.Load(),
-		RedisResumeAppendCount:            registry.metrics.resumeAppendCount.Load(),
-		RedisResumeAppendErrorCount:       registry.metrics.resumeAppendErrorCount.Load(),
-		RedisResumePermissionDeniedCount:  registry.metrics.resumePermissionDenied.Load(),
+		RedisRouteRegisterErrorCount:       registry.metrics.registerErrorCount.Load(),
+		RedisRouteRenewErrorCount:          registry.metrics.renewErrorCount.Load(),
+		RedisRouteRenewSessionEvictedCount: registry.metrics.renewSessionEvicted.Load(),
+		RedisRouteLookupErrorCount:         registry.metrics.lookupErrorCount.Load(),
+		RedisRouteRemoteMatchedSessions:    registry.metrics.remoteMatchedSessions.Load(),
+		RedisRouteRemotePublishCallCount:   registry.metrics.remotePublishCallCount.Load(),
+		RedisRouteRemotePublishErrorCount:  registry.metrics.remotePublishErrorCount.Load(),
+		RedisRouteRemoteNoSubscriberCount:  registry.metrics.remoteNoSubscriberCount.Load(),
+		RedisRouteRemoteEnqueuedSessions:   registry.metrics.remoteEnqueuedSessions.Load(),
+		RedisRouteStaleRemovedCount:        registry.metrics.staleRemovedCount.Load(),
+		RedisRouteCleanupErrorCount:        registry.metrics.cleanupErrorCount.Load(),
+		RedisResumeReplayCount:             registry.metrics.resumeReplayCount.Load(),
+		RedisResumeMissCount:               registry.metrics.resumeMissCount.Load(),
+		RedisResumeAppendCount:             registry.metrics.resumeAppendCount.Load(),
+		RedisResumeAppendErrorCount:        registry.metrics.resumeAppendErrorCount.Load(),
+		RedisResumePermissionDeniedCount:   registry.metrics.resumePermissionDenied.Load(),
 	}
 }
 
@@ -448,14 +455,17 @@ func (registry *Registry) renewRouteLoop(ctx context.Context, entry routeEntry) 
 	}
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+	consecutiveFailures := 0
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
 			refreshCtx, cancel := context.WithTimeout(ctx, time.Second)
+			tickFailed := false
 			if err := registry.writeRoute(refreshCtx, entry); err != nil {
 				registry.metrics.renewErrorCount.Add(1)
+				tickFailed = true
 			}
 			if err := registry.writeResumeMeta(refreshCtx, entry.ResumeToken, types.AuthContext{
 				TenantID: entry.TenantID,
@@ -463,8 +473,31 @@ func (registry *Registry) renewRouteLoop(ctx context.Context, entry routeEntry) 
 				DeviceID: entry.DeviceID,
 			}); err != nil {
 				registry.metrics.renewErrorCount.Add(1)
+				tickFailed = true
 			}
 			cancel()
+			if tickFailed {
+				consecutiveFailures++
+				if registry.config.RenewFailureThreshold > 0 &&
+					consecutiveFailures >= registry.config.RenewFailureThreshold {
+					evictCtx, evictCancel := context.WithTimeout(context.Background(), time.Second)
+					result, err := registry.local.EvictSession(
+						evictCtx,
+						entry.TenantID,
+						entry.UserID,
+						entry.DeviceID,
+						entry.SessionID,
+						"redis_route_unavailable",
+					)
+					evictCancel()
+					if err == nil && result.Evicted > 0 {
+						registry.metrics.renewSessionEvicted.Add(uint64(result.Evicted))
+					}
+					return
+				}
+				continue
+			}
+			consecutiveFailures = 0
 		}
 	}
 }

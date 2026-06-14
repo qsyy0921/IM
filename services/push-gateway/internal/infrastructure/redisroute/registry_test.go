@@ -250,6 +250,48 @@ func TestRegistryRenewsRouteTTLUntilUnregister(t *testing.T) {
 	}
 }
 
+func TestRegistryEvictsSessionAfterRepeatedRenewFailures(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	local := memory.NewRegistry()
+	registry := NewRegistry(local, client, Config{
+		GatewayID:             "gateway-a",
+		RouteTTL:              150 * time.Millisecond,
+		RenewFailureThreshold: 2,
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	evicted := make(chan types.SessionEviction, 1)
+	if _, err := registry.Register(ctx, types.SessionRegistration{
+		AuthContext: types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"},
+		SessionID:   "session-1",
+		Outbound:    make(chan types.ServerFrame, 1),
+		Evicted:     evicted,
+	}); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	server.Close()
+
+	select {
+	case eviction := <-evicted:
+		if eviction.Reason != "redis_route_unavailable" {
+			t.Fatalf("unexpected eviction: %+v", eviction)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatalf("timed out waiting for renew-failure eviction")
+	}
+
+	metrics := registry.Metrics()
+	if metrics.RedisRouteRenewErrorCount == 0 {
+		t.Fatalf("expected renew error count, got %+v", metrics)
+	}
+	if metrics.RedisRouteRenewSessionEvictedCount != 1 {
+		t.Fatalf("expected one renew-failure eviction, got %+v", metrics)
+	}
+}
+
 func TestRegistryCleansStaleRoutesDuringLookup(t *testing.T) {
 	server := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: server.Addr()})

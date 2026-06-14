@@ -229,6 +229,8 @@ func closeReason(reason string) string {
 	switch reason {
 	case "identity_revoked":
 		return "identity revoked"
+	case "redis_route_unavailable":
+		return "redis route unavailable"
 	case "slow_session":
 		return "slow session"
 	default:

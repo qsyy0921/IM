@@ -63,6 +63,8 @@ NEXUSIM_RECEIPT_GRPC_TLS_CLIENT_ALLOWED_URIS=spiffe://nexusim/api-gateway
 
 当 `NEXUSIM_RECEIPT_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端没有启用 mTLS client cert 校验，receipt-service 必须在启动前直接失败，避免把第一阶段 trusted metadata 模式暴露到公网监听面。
 
+`receipt-service` 的 `/healthz` / `/readyz` / `/debug/metrics` 仅用于本地 smoke 和低敏排障。debug HTTP 监听地址来自 `NEXUSIM_RECEIPT_DEBUG_ADDR`，未配置时可回退 `NEXUSIM_DEBUG_ADDR`；默认只允许 loopback / RFC1918 私网地址。若确需绑定公网或 unspecified 地址，必须显式设置 `NEXUSIM_RECEIPT_DEBUG_ALLOW_PUBLIC=true`，避免未认证 debug endpoint 被误暴露。
+
 `receipt-service grpc` 已支持第一阶段 OpenTelemetry gRPC server span，默认关闭。开启后只记录低敏低基数服务侧属性：gRPC full method、status code、latency，并从 `traceparent` 继承 W3C trace context；不得写入 token、tenant/user/device/session id、trace_id、request_id、conversation id、message id、payload 或回执状态详情。`x-nexusim-trace-id` / `x-nexusim-request-id` 仍用于 metadata / access log correlation，但不作为 span attribute 导出。
 
 ```text

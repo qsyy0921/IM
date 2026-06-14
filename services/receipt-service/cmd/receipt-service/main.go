@@ -85,7 +85,11 @@ func runGRPCServer() error {
 			log.Printf("receipt-service OpenTelemetry trace shutdown failed: %v", err)
 		}
 	}()
-	stopDebug, err := startDebugServer(ctx, receiptDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics).WithTraceStats(traceRuntime.Snapshot))
+	debugAddr, err := receiptDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool, grpcMetrics).WithTraceStats(traceRuntime.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -154,11 +158,6 @@ func runDeliveryConsumer() error {
 		return err
 	}
 	defer pool.Close()
-	stopDebug, err := startDebugServer(ctx, receiptDebugAddr(), monitoringinfra.NewHandler(pool))
-	if err != nil {
-		return err
-	}
-	defer stopDebug()
 
 	brokers := splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS"))
 	topic := envString("NEXUSIM_DELIVERY_EVENTS_TOPIC", "im.delivery.events")
@@ -183,7 +182,11 @@ func runDeliveryConsumer() error {
 			Logf:         log.Printf,
 		},
 	)
-	stopDebug, err = startDebugServer(ctx, receiptDebugAddr(), monitoringinfra.NewHandler(pool).WithDeliveryProjectionWorkerStats(worker.Snapshot))
+	debugAddr, err := receiptDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool).WithDeliveryProjectionWorkerStats(worker.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -223,7 +226,11 @@ func runOutboxRelay() error {
 			Logf:           log.Printf,
 		},
 	)
-	stopDebug, err := startDebugServer(ctx, receiptDebugAddr(), monitoringinfra.NewHandler(pool).WithOutboxRelayStats(relay.Snapshot))
+	debugAddr, err := receiptDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool).WithOutboxRelayStats(relay.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -682,6 +689,28 @@ func startDebugServer(ctx context.Context, addr string, handler http.Handler) (f
 
 func receiptDebugAddr() string {
 	return envString("NEXUSIM_RECEIPT_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
+}
+
+func receiptDebugAddrFromEnv() (string, error) {
+	addr := receiptDebugAddr()
+	allowPublic, _, err := envOptionalBool("NEXUSIM_RECEIPT_DEBUG_ALLOW_PUBLIC")
+	if err != nil {
+		return "", err
+	}
+	return addr, validateReceiptDebugListenerConfig(addr, allowPublic)
+}
+
+func validateReceiptDebugListenerConfig(addr string, allowPublic bool) error {
+	if strings.TrimSpace(addr) == "" {
+		return nil
+	}
+	if listenerAddrTrustedWithoutMTLS(addr) {
+		return nil
+	}
+	if allowPublic {
+		return nil
+	}
+	return errors.New("receipt-service debug listener address is non-private; set NEXUSIM_RECEIPT_DEBUG_ALLOW_PUBLIC=true to allow")
 }
 
 func envOptionalBool(name string) (bool, bool, error) {

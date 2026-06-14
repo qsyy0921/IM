@@ -151,6 +151,37 @@ func TestValidateTrustedMetadataListenerConfigIgnoresBodyAuth(t *testing.T) {
 	}
 }
 
+func TestReceiptDebugAddrPrefersServiceSpecificEnv(t *testing.T) {
+	t.Setenv("NEXUSIM_DEBUG_ADDR", "127.0.0.1:19200")
+	t.Setenv("NEXUSIM_RECEIPT_DEBUG_ADDR", "127.0.0.1:19201")
+
+	if addr := receiptDebugAddr(); addr != "127.0.0.1:19201" {
+		t.Fatalf("expected service-specific debug addr to win, got %q", addr)
+	}
+}
+
+func TestValidateReceiptDebugListenerConfigAllowsEmptyOrPrivateAddress(t *testing.T) {
+	for _, addr := range []string{"", "127.0.0.1:11909", "localhost:11909", "172.31.50.10:11909"} {
+		if err := validateReceiptDebugListenerConfig(addr, false); err != nil {
+			t.Fatalf("expected receipt debug listener %q to be allowed: %v", addr, err)
+		}
+	}
+}
+
+func TestValidateReceiptDebugListenerConfigRejectsPublicAddressByDefault(t *testing.T) {
+	for _, addr := range []string{"0.0.0.0:11909", ":11909", "8.8.8.8:11909"} {
+		if err := validateReceiptDebugListenerConfig(addr, false); err == nil {
+			t.Fatalf("expected receipt debug listener %q to be rejected by default", addr)
+		}
+	}
+}
+
+func TestValidateReceiptDebugListenerConfigAllowsExplicitPublicOptIn(t *testing.T) {
+	if err := validateReceiptDebugListenerConfig("0.0.0.0:11909", true); err != nil {
+		t.Fatalf("expected explicit public receipt debug listener opt-in to be allowed: %v", err)
+	}
+}
+
 func TestLoadReceiptGRPCCredentialsFromEnvRequiresCertKeyPair(t *testing.T) {
 	clearReceiptGRPCTLSConfig(t)
 	t.Setenv("NEXUSIM_RECEIPT_GRPC_TLS_CERT_FILE", "server.crt")

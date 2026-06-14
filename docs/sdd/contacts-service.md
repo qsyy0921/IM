@@ -595,6 +595,7 @@ Command hash 规则：
 - 不在事件 payload 里暴露私密用户资料，只放 user id 和关系状态。
 - 用户存在性、封禁状态、组织策略后续通过 identity/policy port 接入；第一阶段先保留端口边界或 strict mock。
 - gRPC server 支持第一阶段静态 TLS / mTLS 配置：`NEXUSIM_CONTACTS_GRPC_TLS_CERT_FILE`、`NEXUSIM_CONTACTS_GRPC_TLS_KEY_FILE` 启用 server TLS；`NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_CA_FILE` 或 `NEXUSIM_CONTACTS_GRPC_TLS_REQUIRE_CLIENT_CERT=true` 启用客户端证书校验；`NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES` / `NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_ALLOWED_URIS` 可做 client certificate DNS / URI SAN exact-match allowlist。默认仍是 plaintext，方便本地 smoke；这不是证书签发、轮换、分发、动态 SPIFFE 身份或全服务 mTLS rollout。
+- 当 `NEXUSIM_CONTACTS_AUTH_MODE=metadata|verified-metadata` 时，非 loopback / 非 RFC1918 的 gRPC 监听地址若没有启用 mTLS client-certificate verification，必须在启动前直接失败；第一阶段 trusted metadata 只允许私网 listener 在无 mTLS 下运行。
 
 ## 12. SLO 和指标
 

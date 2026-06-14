@@ -59,6 +59,15 @@ func run() error {
 func runGRPC() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	addr := envString("NEXUSIM_CONTACTS_GRPC_ADDR", "0.0.0.0:10500")
+	authMode := envString("NEXUSIM_CONTACTS_AUTH_MODE", "body")
+	serverTLSConfig, serverTLSEnabled, err := contactsGRPCTLSConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	if err := validateTrustedMetadataListenerConfig(addr, authMode, serverTLSConfig); err != nil {
+		return err
+	}
 
 	pool, err := openPGPool(ctx)
 	if err != nil {
@@ -72,13 +81,12 @@ func runGRPC() error {
 	}
 	defer stopDebug()
 
-	addr := envString("NEXUSIM_CONTACTS_GRPC_ADDR", "0.0.0.0:10500")
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
 	repository := postgresinfra.NewRepository(pool)
-	server, err := newGRPCServer(grpcMetrics)
+	server, err := newGRPCServerWithConfig(grpcMetrics, authMode, serverTLSConfig, serverTLSEnabled)
 	if err != nil {
 		return err
 	}
@@ -357,11 +365,20 @@ func contactsDebugAddr() string {
 }
 
 func newGRPCServer(grpcMetrics *monitoringinfra.GRPCMetrics) (*grpc.Server, error) {
+	authMode := envString("NEXUSIM_CONTACTS_AUTH_MODE", "body")
+	tlsConfig, tlsEnabled, err := contactsGRPCTLSConfigFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	return newGRPCServerWithConfig(grpcMetrics, authMode, tlsConfig, tlsEnabled)
+}
+
+func newGRPCServerWithConfig(grpcMetrics *monitoringinfra.GRPCMetrics, authMode string, tlsConfig *tls.Config, tlsEnabled bool) (*grpc.Server, error) {
 	interceptors := make([]grpc.UnaryServerInterceptor, 0, 2)
 	if grpcMetrics != nil {
 		interceptors = append(interceptors, grpcMetrics.UnaryServerInterceptor(log.Default()))
 	}
-	switch strings.ToLower(envString("NEXUSIM_CONTACTS_AUTH_MODE", "body")) {
+	switch strings.ToLower(strings.TrimSpace(authMode)) {
 	case "body", "request", "legacy":
 	case "metadata", "verified-metadata":
 		interceptors = append(interceptors, contactsgrpc.VerifiedAuthUnaryInterceptor(true))
@@ -372,12 +389,48 @@ func newGRPCServer(grpcMetrics *monitoringinfra.GRPCMetrics) (*grpc.Server, erro
 	if len(interceptors) > 0 {
 		serverOptions = append(serverOptions, grpc.ChainUnaryInterceptor(interceptors...))
 	}
-	if creds, ok, err := loadContactsGRPCCredentialsFromEnv(); err != nil {
-		return nil, err
-	} else if ok {
-		serverOptions = append(serverOptions, grpc.Creds(creds))
+	if tlsEnabled {
+		serverOptions = append(serverOptions, grpc.Creds(credentials.NewTLS(tlsConfig)))
 	}
 	return grpc.NewServer(serverOptions...), nil
+}
+
+func validateTrustedMetadataListenerConfig(listenAddr string, authMode string, tlsConfig *tls.Config) error {
+	if !usesTrustedMetadataAuth(authMode) {
+		return nil
+	}
+	if listenerAddrTrustedWithoutMTLS(listenAddr) {
+		return nil
+	}
+	if tlsConfig != nil && tlsConfig.ClientAuth == tls.RequireAndVerifyClientCert {
+		return nil
+	}
+	return errors.New("contacts-service uses verified metadata auth on non-private address without gRPC mTLS client certificate")
+}
+
+func usesTrustedMetadataAuth(authMode string) bool {
+	switch strings.ToLower(strings.TrimSpace(authMode)) {
+	case "metadata", "verified-metadata":
+		return true
+	default:
+		return false
+	}
+}
+
+func listenerAddrTrustedWithoutMTLS(addr string) bool {
+	host := strings.TrimSpace(addr)
+	if splitHost, _, err := net.SplitHostPort(host); err == nil {
+		host = splitHost
+	}
+	host = strings.TrimSpace(strings.Trim(host, "[]"))
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate()
 }
 
 func loadContactsGRPCCredentialsFromEnv() (credentials.TransportCredentials, bool, error) {

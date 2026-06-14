@@ -31,6 +31,9 @@ try {
     Write-Host "== otel sampling policy =="
     & (Join-Path $PSScriptRoot "check-otel-sampling-policy.ps1")
 
+    Write-Host "== otel service wiring =="
+    & (Join-Path $PSScriptRoot "check-otel-service-wiring.ps1")
+
     Write-Host "== otel span attributes =="
     & (Join-Path $PSScriptRoot "check-otel-span-attributes.ps1")
 

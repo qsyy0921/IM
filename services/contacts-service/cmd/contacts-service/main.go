@@ -90,7 +90,11 @@ func runGRPC() error {
 			log.Printf("contacts-service OpenTelemetry trace shutdown failed: %v", err)
 		}
 	}()
-	stopDebug, err := startDebugServer(ctx, contactsDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics).WithTraceStats(traceRuntime.Snapshot))
+	debugAddr, err := contactsDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool, grpcMetrics).WithTraceStats(traceRuntime.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -171,7 +175,11 @@ func runOutboxRelay() error {
 			Logf:           log.Printf,
 		},
 	)
-	stopDebug, err := startDebugServer(ctx, contactsDebugAddr(), monitoringinfra.NewHandler(pool).WithOutboxRelayStats(relay.Snapshot))
+	debugAddr, err := contactsDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool).WithOutboxRelayStats(relay.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -377,6 +385,28 @@ func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {
 
 func contactsDebugAddr() string {
 	return envString("NEXUSIM_CONTACTS_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
+}
+
+func contactsDebugAddrFromEnv() (string, error) {
+	addr := contactsDebugAddr()
+	allowPublic, _, err := envOptionalBool("NEXUSIM_CONTACTS_DEBUG_ALLOW_PUBLIC")
+	if err != nil {
+		return "", err
+	}
+	return addr, validateContactsDebugListenerConfig(addr, allowPublic)
+}
+
+func validateContactsDebugListenerConfig(addr string, allowPublic bool) error {
+	if strings.TrimSpace(addr) == "" {
+		return nil
+	}
+	if listenerAddrTrustedWithoutMTLS(addr) {
+		return nil
+	}
+	if allowPublic {
+		return nil
+	}
+	return errors.New("contacts-service debug listener address is non-private; set NEXUSIM_CONTACTS_DEBUG_ALLOW_PUBLIC=true to allow")
 }
 
 func newGRPCServer(grpcMetrics *monitoringinfra.GRPCMetrics) (*grpc.Server, error) {

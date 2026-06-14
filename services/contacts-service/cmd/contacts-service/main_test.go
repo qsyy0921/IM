@@ -128,6 +128,37 @@ func TestValidateTrustedMetadataListenerConfigIgnoresBodyAuth(t *testing.T) {
 	}
 }
 
+func TestContactsDebugAddrPrefersServiceSpecificEnv(t *testing.T) {
+	t.Setenv("NEXUSIM_DEBUG_ADDR", "127.0.0.1:19200")
+	t.Setenv("NEXUSIM_CONTACTS_DEBUG_ADDR", "127.0.0.1:19202")
+
+	if addr := contactsDebugAddr(); addr != "127.0.0.1:19202" {
+		t.Fatalf("expected service-specific debug addr to win, got %q", addr)
+	}
+}
+
+func TestValidateContactsDebugListenerConfigAllowsEmptyOrPrivateAddress(t *testing.T) {
+	for _, addr := range []string{"", "127.0.0.1:11910", "localhost:11910", "172.31.50.10:11910"} {
+		if err := validateContactsDebugListenerConfig(addr, false); err != nil {
+			t.Fatalf("expected contacts debug listener %q to be allowed: %v", addr, err)
+		}
+	}
+}
+
+func TestValidateContactsDebugListenerConfigRejectsPublicAddressByDefault(t *testing.T) {
+	for _, addr := range []string{"0.0.0.0:11910", ":11910", "8.8.8.8:11910"} {
+		if err := validateContactsDebugListenerConfig(addr, false); err == nil {
+			t.Fatalf("expected contacts debug listener %q to be rejected by default", addr)
+		}
+	}
+}
+
+func TestValidateContactsDebugListenerConfigAllowsExplicitPublicOptIn(t *testing.T) {
+	if err := validateContactsDebugListenerConfig("0.0.0.0:11910", true); err != nil {
+		t.Fatalf("expected explicit public contacts debug listener opt-in to be allowed: %v", err)
+	}
+}
+
 func TestLoadContactsGRPCCredentialsFromEnvRequiresCertKeyPair(t *testing.T) {
 	clearContactsGRPCTLSConfig(t)
 	t.Setenv("NEXUSIM_CONTACTS_GRPC_TLS_CERT_FILE", "server.crt")

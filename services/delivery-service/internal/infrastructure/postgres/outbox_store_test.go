@@ -179,7 +179,7 @@ func TestOutboxStoreAuditOutboxReturnsLatestRowsIntegration(t *testing.T) {
 	resetDeliveryTables(t, ctx, pool)
 
 	seedDeliveryOutboxWithStatus(t, ctx, pool, "event-61", "tenant-f", "conversation-a", 1, types.DeliveryEventInboxItemCreated, types.OutboxStatusPending, 2, "retry later")
-	seedDeliveryOutboxWithStatus(t, ctx, pool, "event-62", "tenant-f", "conversation-a", 2, types.DeliveryEventAckRecorded, types.OutboxStatusDLQ, 4, "malformed payload")
+	seedDeliveryOutboxWithStatus(t, ctx, pool, "event-62", "tenant-f", "conversation-a", 2, types.DeliveryEventAckRecorded, types.OutboxStatusDLQ, 4, "kafka unavailable: broker body user=user1@example.com token=secret-token")
 
 	store := NewOutboxStore(pool)
 	rows, err := store.AuditOutbox(ctx, OutboxAuditOptions{
@@ -192,9 +192,10 @@ func TestOutboxStoreAuditOutboxReturnsLatestRowsIntegration(t *testing.T) {
 	if len(rows) != 2 {
 		t.Fatalf("expected two rows, got %d", len(rows))
 	}
-	if rows[0].EventID != "event-62" || rows[0].Status != types.OutboxStatusDLQ || rows[0].RetryCount != 4 {
+	if rows[0].EventID != "event-62" || rows[0].Status != types.OutboxStatusDLQ || rows[0].RetryCount != 4 || rows[0].LastError != "delivery outbox publish broker unavailable" {
 		t.Fatalf("unexpected latest outbox audit row: %+v", rows[0])
 	}
+	assertNoDeliveryOutboxErrorLeak(t, rows[0].LastError, "user1@example.com", "secret-token", "broker body")
 	if rows[1].EventID != "event-61" || rows[1].Status != types.OutboxStatusPending || rows[1].RetryCount != 2 {
 		t.Fatalf("unexpected older outbox audit row: %+v", rows[1])
 	}
@@ -238,10 +239,10 @@ INSERT INTO delivery_outbox_repair_audit (
     after_status, after_retry_count, after_last_error, after_next_retry_at, after_dead_lettered_at, created_at
 ) VALUES
     (11, 'event-11', 'tenant-a', 'conversation-a', 1, 'audit', 'AUDITED', '', 'operator-a', 'manual audit', true,
-     'DLQ', 1, 'malformed payload', NULL, now() - interval '1 minute',
-     'DLQ', 1, 'malformed payload', NULL, now() - interval '1 minute', now() - interval '1 minute'),
+     'DLQ', 1, 'malformed payload user=user1@example.com', NULL, now() - interval '1 minute',
+     'DLQ', 1, 'malformed payload user=user1@example.com', NULL, now() - interval '1 minute', now() - interval '1 minute'),
     (12, 'event-12', 'tenant-a', 'conversation-b', 2, 'redrive-dlq-pending', 'MUTATED', '', 'operator-b', 'provider recovered', false,
-     'DLQ', 2, 'provider down', NULL, now() - interval '2 minutes',
+     'DLQ', 2, 'kafka unavailable: broker body token=secret-token', NULL, now() - interval '2 minutes',
      'PENDING', 0, '', NULL, NULL, now())
 `)
 	if err != nil {
@@ -262,9 +263,40 @@ INSERT INTO delivery_outbox_repair_audit (
 	if rows[0].OutboxID != 12 || rows[0].Mode != types.OutboxRepairModeRedriveDLQPending || rows[0].Outcome != outboxRepairOutcomeMutated {
 		t.Fatalf("unexpected latest outbox repair audit row: %+v", rows[0])
 	}
+	if rows[0].BeforeLastError != "delivery outbox publish broker unavailable" || rows[0].AfterLastError != "" {
+		t.Fatalf("unexpected sanitized latest repair errors: before=%q after=%q", rows[0].BeforeLastError, rows[0].AfterLastError)
+	}
+	assertNoDeliveryOutboxErrorLeak(t, rows[0].BeforeLastError, "secret-token", "broker body")
 	if rows[1].OutboxID != 11 || rows[1].Mode != types.OutboxRepairModeAudit || rows[1].Outcome != outboxRepairOutcomeAudited || !rows[1].DryRun {
 		t.Fatalf("unexpected older outbox repair audit row: %+v", rows[1])
 	}
+	if rows[1].BeforeLastError != "delivery outbox publish invalid payload" || rows[1].AfterLastError != "delivery outbox publish invalid payload" {
+		t.Fatalf("unexpected sanitized older repair errors: before=%q after=%q", rows[1].BeforeLastError, rows[1].AfterLastError)
+	}
+	assertNoDeliveryOutboxErrorLeak(t, rows[1].BeforeLastError, "user1@example.com")
+}
+
+func TestOutboxStoreRepairAuditSanitizesStoredLastErrorIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+	seedDeliveryOutboxWithStatus(t, ctx, pool, "event-91", "tenant-i", "conversation-a", 1, types.DeliveryEventInboxItemCreated, types.OutboxStatusDLQ, 3, "kafka unavailable: broker body user=user1@example.com token=secret-token")
+	outboxID := readDeliveryOutboxID(t, ctx, pool, "event-91")
+
+	store := NewOutboxStore(pool)
+	repairStats, err := store.RepairOutbox(ctx, types.OutboxRepairOptions{
+		OutboxIDs: []int64{outboxID},
+		Mode:      types.OutboxRepairModeAudit,
+		Operator:  "operator-1",
+		Reason:    "inspect dlq",
+	})
+	if err != nil {
+		t.Fatalf("audit outbox with raw stored last_error: %v", err)
+	}
+	if repairStats.Requested != 1 || repairStats.Audited != 1 {
+		t.Fatalf("unexpected repair stats: %+v", repairStats)
+	}
+	assertDeliveryOutboxRepairAudit(t, ctx, pool, outboxID, types.OutboxRepairModeAudit, outboxRepairOutcomeAudited, "", types.OutboxStatusDLQ, 3, "delivery outbox publish broker unavailable", types.OutboxStatusDLQ, 3, "delivery outbox publish broker unavailable", "inspect dlq", "user1@example.com", "secret-token", "broker body")
 }
 
 func TestOutboxStoreAuditOutboxRepairsFiltersModeAndOutcomeIntegration(t *testing.T) {
@@ -553,7 +585,7 @@ WHERE event_id = $1
 	return id
 }
 
-func assertDeliveryOutboxRepairAudit(t *testing.T, ctx context.Context, pool *pgxpool.Pool, outboxID int64, mode string, outcome string, skipReason string, beforeStatus string, beforeRetry int, beforeLastError string, afterStatus string, afterRetry int, afterLastError string, reason string) {
+func assertDeliveryOutboxRepairAudit(t *testing.T, ctx context.Context, pool *pgxpool.Pool, outboxID int64, mode string, outcome string, skipReason string, beforeStatus string, beforeRetry int, beforeLastError string, afterStatus string, afterRetry int, afterLastError string, reason string, forbidden ...string) {
 	t.Helper()
 	var gotMode string
 	var gotOutcome string
@@ -607,6 +639,17 @@ LIMIT 1
 		gotReason != reason {
 		t.Fatalf("unexpected repair audit row: mode=%s outcome=%s skip=%s before=(%s,%d,%s) after=(%s,%d,%s) reason=%s",
 			gotMode, gotOutcome, gotSkipReason, gotBeforeStatus, gotBeforeRetry, gotBeforeLastError, gotAfterStatus, gotAfterRetry, gotAfterLastError, gotReason)
+	}
+	assertNoDeliveryOutboxErrorLeak(t, gotBeforeLastError, forbidden...)
+	assertNoDeliveryOutboxErrorLeak(t, gotAfterLastError, forbidden...)
+}
+
+func assertNoDeliveryOutboxErrorLeak(t *testing.T, got string, forbidden ...string) {
+	t.Helper()
+	for _, text := range forbidden {
+		if text != "" && strings.Contains(got, text) {
+			t.Fatalf("delivery outbox error leaked %q: %q", text, got)
+		}
 	}
 }
 

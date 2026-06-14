@@ -342,10 +342,23 @@ func sanitizeDeliveryOutboxPublishError(err error) string {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return "delivery outbox publish timeout"
 	}
-	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	return sanitizeDeliveryOutboxPublishErrorText(err.Error())
+}
+
+func sanitizeDeliveryOutboxStoredError(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return ""
+	}
+	return sanitizeDeliveryOutboxPublishErrorText(value)
+}
+
+func sanitizeDeliveryOutboxPublishErrorText(value string) string {
+	message := strings.ToLower(strings.TrimSpace(value))
 	switch {
 	case message == "":
 		return "delivery outbox publish failed"
+	case strings.Contains(message, "cancel"):
+		return "delivery outbox publish canceled"
 	case strings.Contains(message, "timeout") || strings.Contains(message, "deadline exceeded"):
 		return "delivery outbox publish timeout"
 	case strings.Contains(message, "unsupported"):
@@ -461,6 +474,7 @@ LIMIT $`+itoa(len(args)), args...)
 		); err != nil {
 			return nil, types.NewDBReadFailed(err.Error())
 		}
+		row.LastError = sanitizeDeliveryOutboxStoredError(row.LastError)
 		result = append(result, row)
 	}
 	if err := rows.Err(); err != nil {
@@ -582,6 +596,8 @@ LIMIT $`+itoa(len(args)), args...)
 		); err != nil {
 			return nil, types.NewDBReadFailed(err.Error())
 		}
+		row.BeforeLastError = sanitizeDeliveryOutboxStoredError(row.BeforeLastError)
+		row.AfterLastError = sanitizeDeliveryOutboxStoredError(row.AfterLastError)
 		result = append(result, row)
 	}
 	if err := rows.Err(); err != nil {
@@ -806,10 +822,13 @@ FOR UPDATE
 		}
 		return outboxRepairRow{}, types.NewDBReadFailed(err.Error())
 	}
+	row.LastError = sanitizeDeliveryOutboxStoredError(row.LastError)
 	return row, nil
 }
 
 func (store *OutboxStore) insertOutboxRepairAudit(ctx context.Context, tx pgx.Tx, before outboxRepairRow, after outboxRepairRow, mode string, outcome string, skipReason string, operator string, reason string, dryRun bool, now time.Time) error {
+	before.LastError = sanitizeDeliveryOutboxStoredError(before.LastError)
+	after.LastError = sanitizeDeliveryOutboxStoredError(after.LastError)
 	_, err := tx.Exec(ctx, `
 INSERT INTO delivery_outbox_repair_audit (
     outbox_id,

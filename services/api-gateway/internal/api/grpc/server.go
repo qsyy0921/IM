@@ -100,7 +100,7 @@ func NewServer(config Config) *Server {
 }
 
 func Register(server grpcgo.ServiceRegistrar, gateway *Server) {
-	RegisterWithConfig(server, gateway, RegisterConfig{RegisterLegacyDescriptors: true})
+	RegisterWithConfig(server, gateway, RegisterConfig{})
 }
 
 func RegisterWithConfig(server grpcgo.ServiceRegistrar, gateway *Server, config RegisterConfig) {

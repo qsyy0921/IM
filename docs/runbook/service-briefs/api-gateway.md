@@ -3,6 +3,7 @@
 ## 当前状态
 
 - 已有 `GatewayService` facade、gateway token 验证、verified metadata 注入和下游代理。
+- 默认只注册 `nexusim.gateway.v1.GatewayService` facade；legacy contacts / conversation / message / delivery / receipt descriptors 需要显式 `NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS=true` 才会注册。
 - 已有 health / ready / metrics、correlation propagation、rate limiter、RetryInfo 和 W3C `traceparent` 输入桥接。
 - rate limiter 已支持 token scope、tenant scope 和静态 tenant plan override；tenant scope 使用已验证 gateway token 的 `tenant_id` 做 per-method quota key。
 - `/debug/metrics` 已暴露低敏 gRPC、auth JWK、rate-limit key scope / tenant plan count / identity error count 和 runtime config 快照，其中包含 legacy descriptor 是否仍注册。
@@ -12,4 +13,4 @@
 
 ## 后续
 
-- 统一 OpenTelemetry、运行时动态 quota 配置、逐步把 legacy descriptors 从兼容默认迁移到显式 opt-in。
+- 统一 OpenTelemetry、运行时动态 quota 配置、legacy descriptor opt-in 使用面的后续迁移审计。

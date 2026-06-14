@@ -521,9 +521,24 @@ func TestGatewayDoesNotExposeGetSendContext(t *testing.T) {
 	}
 }
 
-func TestGatewayDefaultRegistrationKeepsLegacyDescriptors(t *testing.T) {
+func TestGatewayDefaultRegistrationUsesFacadeOnly(t *testing.T) {
 	grpcServer := grpc.NewServer()
 	Register(grpcServer, NewServer(Config{}))
+
+	info := grpcServer.GetServiceInfo()
+	assertServiceRegistered(t, info, "nexusim.gateway.v1.GatewayService")
+	assertServiceNotRegistered(t, info, "nexusim.contacts.v1.ContactsService")
+	assertServiceNotRegistered(t, info, "nexusim.conversation.v1.ConversationService")
+	assertServiceNotRegistered(t, info, "nexusim.message.v1.MessageService")
+	assertServiceNotRegistered(t, info, "nexusim.delivery.v1.DeliveryService")
+	assertServiceNotRegistered(t, info, "nexusim.receipt.v1.ReceiptService")
+	assertServiceNotRegistered(t, info, "nexusim.identity.v1.IdentityService")
+	assertGatewayFacadeExcludesInternalMethods(t, info)
+}
+
+func TestGatewayCanOptInLegacyDescriptors(t *testing.T) {
+	grpcServer := grpc.NewServer()
+	RegisterWithConfig(grpcServer, NewServer(Config{}), RegisterConfig{RegisterLegacyDescriptors: true})
 
 	info := grpcServer.GetServiceInfo()
 	assertServiceRegistered(t, info, "nexusim.gateway.v1.GatewayService")

@@ -509,25 +509,25 @@ func TestValidateTrustedMetadataBackendConfigCoversIdentityService(t *testing.T)
 	}
 }
 
-func TestAPIGatewayRegisterLegacyDescriptorsDefaultsToTrue(t *testing.T) {
+func TestAPIGatewayRegisterLegacyDescriptorsDefaultsToFalse(t *testing.T) {
 	t.Setenv("NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS", "")
 	enabled, err := apiGatewayRegisterLegacyDescriptors()
 	if err != nil {
 		t.Fatalf("load register legacy descriptors config: %v", err)
 	}
-	if !enabled {
-		t.Fatalf("expected legacy descriptor registration to default to true")
+	if enabled {
+		t.Fatalf("expected legacy descriptor registration to default to false")
 	}
 }
 
-func TestAPIGatewayRegisterLegacyDescriptorsCanBeDisabled(t *testing.T) {
-	t.Setenv("NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS", "false")
+func TestAPIGatewayRegisterLegacyDescriptorsCanBeEnabled(t *testing.T) {
+	t.Setenv("NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS", "true")
 	enabled, err := apiGatewayRegisterLegacyDescriptors()
 	if err != nil {
 		t.Fatalf("load register legacy descriptors config: %v", err)
 	}
-	if enabled {
-		t.Fatalf("expected legacy descriptor registration to be disabled")
+	if !enabled {
+		t.Fatalf("expected legacy descriptor registration to be enabled")
 	}
 }
 

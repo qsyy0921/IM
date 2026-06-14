@@ -251,7 +251,7 @@ func apiGatewayRegisterLegacyDescriptors() (bool, error) {
 		return false, err
 	}
 	if !configured {
-		return true, nil
+		return false, nil
 	}
 	return value, nil
 }

@@ -363,6 +363,25 @@ func TestValidateTrustedMetadataBackendConfigIgnoresBodyAuth(t *testing.T) {
 	}
 }
 
+func TestValidateAPIGatewayAuthListenerConfigAllowsPrivateAddressForMock(t *testing.T) {
+	if err := validateAPIGatewayAuthListenerConfig("172.31.50.10:12000", "mock"); err != nil {
+		t.Fatalf("expected private listener mock auth to be allowed: %v", err)
+	}
+}
+
+func TestValidateAPIGatewayAuthListenerConfigRejectsPublicAddressForMock(t *testing.T) {
+	err := validateAPIGatewayAuthListenerConfig("8.8.8.8:12000", "mock")
+	if err == nil {
+		t.Fatalf("expected public listener mock auth to be rejected")
+	}
+}
+
+func TestValidateAPIGatewayAuthListenerConfigAllowsPublicAddressForHMAC(t *testing.T) {
+	if err := validateAPIGatewayAuthListenerConfig("8.8.8.8:12000", "hmac"); err != nil {
+		t.Fatalf("expected signed auth to be allowed on public listener: %v", err)
+	}
+}
+
 func TestValidateTrustedMetadataBackendConfigCoversIdentityService(t *testing.T) {
 	err := validateTrustedMetadataBackendConfig(
 		"identity-service",

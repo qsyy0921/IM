@@ -55,6 +55,11 @@ func runGRPC() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	listenAddr := envString("NEXUSIM_API_GATEWAY_GRPC_ADDR", "0.0.0.0:12000")
+	if err := validateAPIGatewayAuthListenerConfig(listenAddr, envString("NEXUSIM_API_GATEWAY_AUTH_MODE", "hmac")); err != nil {
+		return err
+	}
+
 	authenticator, err := newAuthenticatorFromEnv()
 	if err != nil {
 		return err
@@ -182,8 +187,7 @@ func runGRPC() error {
 		RegisterLegacyDescriptors: registerLegacyDescriptors,
 	})
 
-	addr := envString("NEXUSIM_API_GATEWAY_GRPC_ADDR", "0.0.0.0:12000")
-	listener, err := net.Listen("tcp", addr)
+	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		return err
 	}
@@ -191,7 +195,7 @@ func runGRPC() error {
 		<-ctx.Done()
 		server.GracefulStop()
 	}()
-	log.Printf("api-gateway gRPC listening on %s", addr)
+	log.Printf("api-gateway gRPC listening on %s", listenAddr)
 	if err := server.Serve(listener); err != nil && !errors.Is(err, grpcgo.ErrServerStopped) {
 		return err
 	}
@@ -268,6 +272,20 @@ func validateTrustedMetadataBackendConfig(serviceName string, addr string, authM
 		return nil
 	}
 	return errors.New(serviceName + " uses verified metadata auth on non-private address without gateway mTLS client certificate")
+}
+
+func validateAPIGatewayAuthListenerConfig(listenAddr string, authMode string) error {
+	if !usesMockGatewayAuth(authMode) {
+		return nil
+	}
+	if backendAddrTrustedWithoutMTLS(listenAddr) {
+		return nil
+	}
+	return errors.New("api-gateway uses mock auth on non-private listener address")
+}
+
+func usesMockGatewayAuth(authMode string) bool {
+	return strings.EqualFold(strings.TrimSpace(authMode), string(gatewayauth.ModeMock))
 }
 
 func usesTrustedMetadataAuth(authMode string) bool {

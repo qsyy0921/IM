@@ -50,6 +50,50 @@ func TestNewGRPCServerRejectsUnsupportedAuthMode(t *testing.T) {
 	}
 }
 
+func TestValidateTrustedMetadataListenerConfigAllowsPrivateAddressWithoutMTLS(t *testing.T) {
+	err := validateTrustedMetadataListenerConfig(
+		"172.31.50.10:10497",
+		"metadata",
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("expected private address to be allowed without mTLS, got %v", err)
+	}
+}
+
+func TestValidateTrustedMetadataListenerConfigRequiresMTLSForPublicAddress(t *testing.T) {
+	err := validateTrustedMetadataListenerConfig(
+		"8.8.8.8:10497",
+		"verified-metadata",
+		nil,
+	)
+	if err == nil {
+		t.Fatalf("expected public address without mTLS client cert to fail")
+	}
+}
+
+func TestValidateTrustedMetadataListenerConfigAllowsMTLSForPublicAddress(t *testing.T) {
+	err := validateTrustedMetadataListenerConfig(
+		"8.8.8.8:10497",
+		"verified-metadata",
+		&tls.Config{ClientAuth: tls.RequireAndVerifyClientCert},
+	)
+	if err != nil {
+		t.Fatalf("expected public address with mTLS client cert to be allowed, got %v", err)
+	}
+}
+
+func TestValidateTrustedMetadataListenerConfigIgnoresBodyAuth(t *testing.T) {
+	err := validateTrustedMetadataListenerConfig(
+		"8.8.8.8:10497",
+		"body",
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("expected body auth to skip trusted metadata guard, got %v", err)
+	}
+}
+
 func TestLoadDeliveryGRPCCredentialsFromEnvRequiresCertKeyPair(t *testing.T) {
 	clearDeliveryGRPCTLSConfig(t)
 	t.Setenv("NEXUSIM_DELIVERY_GRPC_TLS_CERT_FILE", "server.crt")

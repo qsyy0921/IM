@@ -521,6 +521,8 @@ NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE=...
 
 未配置上述 client TLS env 时 push-gateway 仍使用 plaintext，兼容现有本地 smoke。配置任一 client TLS env 后必须提供 CA file，client cert/key 必须成对配置。当前仍不包含证书签发 / 轮换 / 分发、动态服务身份治理和全服务 mTLS rollout。
 
+当 `NEXUSIM_DELIVERY_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端没有启用 mTLS client cert 校验，delivery-service 必须在启动前直接失败，避免把第一阶段 trusted metadata 模式暴露到公网监听面。
+
 本地最小 smoke：
 
 ```text

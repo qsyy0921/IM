@@ -28,7 +28,7 @@
 
 - 运行时动态 tenant quota 文件热更新已进入第一阶段，后续只做配置中心 / DB-backed quota hardening；
 - OTel collector / alerting / 跨服务 rollout 的后续收敛；
-- legacy descriptor opt-in 使用面的后续迁移审计；
+- legacy descriptor opt-in 使用面已有 first-stage metrics 计数，后续继续迁移观察和移除计划；
 - 必要单测 / 集成测试；
 - 同步相关 service brief、SDD 或进度文档。
 

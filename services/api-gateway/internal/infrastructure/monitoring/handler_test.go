@@ -43,6 +43,9 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 	if snapshot.Service != serviceName || snapshot.GRPC == nil || snapshot.GRPC.TotalRequests != 1 {
 		t.Fatalf("unexpected metrics snapshot: %+v", snapshot)
 	}
+	if snapshot.GRPC.FacadeRequests != 0 || snapshot.GRPC.OtherRequests != 1 {
+		t.Fatalf("unexpected grpc exposure counters: %+v", snapshot.GRPC)
+	}
 	if snapshot.AuthJWKs == nil || !snapshot.AuthJWKs.RemoteURLConfigured || snapshot.AuthJWKs.CachedKeyCount != 2 {
 		t.Fatalf("unexpected jwk stats: %+v", snapshot.AuthJWKs)
 	}

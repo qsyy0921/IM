@@ -92,3 +92,19 @@ func TestGRPCMetricsLogsPublishedCorrelation(t *testing.T) {
 		t.Fatalf("log leaked auth metadata: %s", line)
 	}
 }
+
+func TestGRPCMetricsClassifiesFacadeAndLegacyDescriptorTraffic(t *testing.T) {
+	metrics := NewGRPCMetrics()
+	metrics.record("/nexusim.gateway.v1.GatewayService/SendMessage", "OK", 3)
+	metrics.record("/nexusim.message.v1.MessageService/SendMessage", "OK", 4)
+	metrics.record("/nexusim.internal.v1.AdminService/Debug", "PermissionDenied", 5)
+
+	snapshot := metrics.Snapshot()
+	if snapshot.TotalRequests != 3 ||
+		snapshot.FacadeRequests != 1 ||
+		snapshot.LegacyDescriptorRequests != 1 ||
+		snapshot.OtherRequests != 1 ||
+		snapshot.TotalErrors != 1 {
+		t.Fatalf("unexpected classified grpc snapshot: %+v", snapshot)
+	}
+}

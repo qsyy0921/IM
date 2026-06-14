@@ -18,7 +18,16 @@ const (
 	metadataTraceID          = "x-nexusim-trace-id"
 	metadataRequestID        = "x-nexusim-request-id"
 	maxGRPCLogMetadataLength = 128
+	facadeMethodPrefix       = "/nexusim.gateway.v1.GatewayService/"
 )
+
+var legacyDescriptorMethodPrefixes = []string{
+	"/nexusim.contacts.v1.ContactsService/",
+	"/nexusim.conversation.v1.ConversationService/",
+	"/nexusim.message.v1.MessageService/",
+	"/nexusim.delivery.v1.DeliveryService/",
+	"/nexusim.receipt.v1.ReceiptService/",
+}
 
 type GRPCMetrics struct {
 	mu      sync.Mutex
@@ -86,6 +95,14 @@ func (metrics *GRPCMetrics) Snapshot() GRPCSnapshot {
 		}
 		snapshot.TotalRequests += methodMetrics.count
 		snapshot.TotalErrors += methodMetrics.errorCount
+		switch grpcMethodExposure(method) {
+		case "facade":
+			snapshot.FacadeRequests += methodMetrics.count
+		case "legacy_descriptor":
+			snapshot.LegacyDescriptorRequests += methodMetrics.count
+		default:
+			snapshot.OtherRequests += methodMetrics.count
+		}
 		snapshot.Methods = append(snapshot.Methods, methodSnapshot)
 	}
 	return snapshot
@@ -112,9 +129,12 @@ func (metrics *GRPCMetrics) record(method string, code string, latencyMS int64) 
 }
 
 type GRPCSnapshot struct {
-	TotalRequests int64                `json:"total_requests"`
-	TotalErrors   int64                `json:"total_errors"`
-	Methods       []GRPCMethodSnapshot `json:"methods"`
+	TotalRequests            int64                `json:"total_requests"`
+	TotalErrors              int64                `json:"total_errors"`
+	FacadeRequests           int64                `json:"facade_requests,omitempty"`
+	LegacyDescriptorRequests int64                `json:"legacy_descriptor_requests,omitempty"`
+	OtherRequests            int64                `json:"other_requests,omitempty"`
+	Methods                  []GRPCMethodSnapshot `json:"methods"`
 }
 
 type GRPCMethodSnapshot struct {
@@ -176,6 +196,19 @@ func trimGRPCLogMetadata(value string) string {
 		return value
 	}
 	return string(runes[:maxGRPCLogMetadataLength])
+}
+
+func grpcMethodExposure(method string) string {
+	method = strings.TrimSpace(method)
+	if strings.HasPrefix(method, facadeMethodPrefix) {
+		return "facade"
+	}
+	for _, prefix := range legacyDescriptorMethodPrefixes {
+		if strings.HasPrefix(method, prefix) {
+			return "legacy_descriptor"
+		}
+	}
+	return "other"
 }
 
 func averageLatency(total int64, count int64) int64 {

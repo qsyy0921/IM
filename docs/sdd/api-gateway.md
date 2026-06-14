@@ -166,6 +166,10 @@ NEXUSIM_API_GATEWAY_OTEL_TRACES_SAMPLING_RATIO=1
 
 启用后，api-gateway 为入口 gRPC unary 请求创建 server span，继承合法 W3C `traceparent`，并记录低敏属性：`rpc.system`、`rpc.method`、`rpc.grpc.status_code`、`nexusim.grpc.latency_ms`、最终 `nexusim.trace_id` / `nexusim.request_id`。span 不记录 gateway token、tenant_id、user_id、device_id、session_id 或 request body。第一版 exporter 支持 `stdout` 和 `otlp-grpc`；使用 `otlp-grpc` 时必须显式配置 endpoint，是否 plaintext 由 `..._OTLP_INSECURE` 明确控制。`/debug/metrics` 只暴露 trace 是否启用、service name、exporter、endpoint 是否配置和 sampling ratio，不输出 collector endpoint 明文。
 
+Legacy descriptor migration audit：
+
+`/debug/metrics` 的 gRPC snapshot 会按 method 前缀聚合 `facade_requests`、`legacy_descriptor_requests` 和 `other_requests`。这些字段只用于观察旧 descriptor 是否仍有流量，不输出 tenant、user、token 或 request body。只要 `legacy_descriptor_requests` 在真实环境里仍持续增长，就不能把 legacy descriptor 移除计划标记为完成。
+
 下游地址：
 
 ```text
@@ -263,6 +267,8 @@ NEXUSIM_API_GATEWAY_CONTACTS_TLS_CLIENT_KEY_FILE
 2026-06-14 补充：api-gateway 注册层已支持 `NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS=false`，当时默认仍为 `true` 保持兼容。clean commit `c1328ca` 已跑通 facade-only 真实进程 smoke：`run-local-secure-demo.ps1` 启动 api-gateway 时关闭 legacy descriptor，summary `git_dirty=false/success=true/gateway_facade=true`，api-gateway metrics 只出现 `/nexusim.gateway.v1.GatewayService/...` user-facing method；报告见 `docs/runbook/loadtest/demo/loadtest-report-20260614-e2e-demo-api-gateway-facade-only-smoke.md`，原始结果在 `H:\NexusIM\loadtest-results\e2e-demo-api-gateway-facade-only-smoke-20260614-clean`。
 
 2026-06-14 补充：api-gateway legacy descriptor 已收敛为显式 opt-in。未配置 `NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS` 时只注册 `GatewayService` facade；只有显式设置为 `true` 才额外注册 contacts / conversation / message / delivery / receipt 的 legacy descriptors。`Register()` helper 也改为 facade-only 默认，避免新代码无意暴露旧 descriptor。
+
+2026-06-14 补充：api-gateway 已新增 first-stage legacy descriptor migration audit metrics。`/debug/metrics.grpc` 会输出 `facade_requests`、`legacy_descriptor_requests` 和 `other_requests`，按 gRPC method 前缀区分 `GatewayService` facade、显式 opt-in 的 legacy service descriptors 和其它入口，用于后续观察旧客户端迁移是否完成；该指标不包含 token、tenant_id、user_id 或请求体。
 
 2026-06-14 补充：api-gateway 已新增第一阶段 OpenTelemetry trace runtime。默认关闭；启用后会为入口 gRPC unary 请求创建 server span，支持 W3C `traceparent` parent extraction、`stdout` exporter 和 `otlp-grpc` exporter，并在 `/debug/metrics` 暴露低敏 trace config snapshot。span 只记录 method、status、latency、最终 trace/request correlation，不记录 token、tenant_id、user_id、device_id、session_id 或 request body。这仍不是全服务 trace rollout、collector / alerting 或跨 Kafka envelope trace。
 

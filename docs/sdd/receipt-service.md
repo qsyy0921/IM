@@ -315,6 +315,7 @@ source_event_type
 
 - `MarkRead` 和 receipt projection 只写 `receipt_outbox`，不得直接 publish Kafka。
 - outbox relay 保持 at-least-once，下游按 `event_id` 幂等。
+- publish 失败只允许写入稳定低敏 `last_error`，不得持久化 broker / provider raw error。
 - 第一阶段 `receipt_outbox.aggregate_version` 使用 cursor seq，表达“该用户推进到的 conversation seq”，不承诺同 conversation 所有用户回执事件形成全局严格递增版本。下游不得依赖该字段做唯一排序；如需生产级全序，后续引入独立 receipt event sequence。
 - `receipt.message.read.v1.device_id` 表示触发 `MarkRead` 的设备，不表示 read cursor 是设备维度；权威 read cursor 仍是用户维度。
 - `receipt.message.read.v1` 优先按 cursor 范围或 seq 区间合并，避免每条消息 x 每个成员的事件爆炸；第一阶段 smoke 可以按单条 message / seq 粒度发布，但报告必须说明这不是大群生产模型。

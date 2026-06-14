@@ -145,16 +145,17 @@ func (store *OutboxStore) ProcessReadyBatch(
 	publishedIDs := make([]int64, 0, len(messages))
 	for index, message := range messages {
 		if err := publishErrors[index]; err != nil {
+			lastError := sanitizeReceiptOutboxPublishError(err)
 			attempt := message.RetryCount + 1
 			if attempt >= maxAttempts {
-				if markErr := store.markDeadLettered(ctx, tx, message.ID, attempt, err.Error(), now); markErr != nil {
+				if markErr := store.markDeadLettered(ctx, tx, message.ID, attempt, lastError, now); markErr != nil {
 					return types.OutboxRelayStats{}, markErr
 				}
 				stats.DeadLettered++
 				continue
 			}
 			nextRetryAt := now.Add(retryDelay(retryBaseDelay, attempt))
-			if markErr := store.markRetry(ctx, tx, message.ID, attempt, err.Error(), nextRetryAt); markErr != nil {
+			if markErr := store.markRetry(ctx, tx, message.ID, attempt, lastError, nextRetryAt); markErr != nil {
 				return types.OutboxRelayStats{}, markErr
 			}
 			stats.Retried++
@@ -300,6 +301,42 @@ func retryDelay(base time.Duration, attempt int) time.Duration {
 		exponent = 10
 	}
 	return base * time.Duration(1<<exponent)
+}
+
+func sanitizeReceiptOutboxPublishError(err error) string {
+	if err == nil {
+		return ""
+	}
+	if errors.Is(err, context.Canceled) {
+		return "receipt outbox publish canceled"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "receipt outbox publish timeout"
+	}
+	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	switch {
+	case message == "":
+		return "receipt outbox publish failed"
+	case strings.Contains(message, "timeout") || strings.Contains(message, "deadline exceeded"):
+		return "receipt outbox publish timeout"
+	case strings.Contains(message, "unsupported"):
+		return "receipt outbox publish unsupported event"
+	case strings.Contains(message, "malformed") ||
+		strings.Contains(message, "invalid") ||
+		strings.Contains(message, "json") ||
+		strings.Contains(message, "decode") ||
+		strings.Contains(message, "payload"):
+		return "receipt outbox publish invalid payload"
+	case strings.Contains(message, "kafka") ||
+		strings.Contains(message, "broker") ||
+		strings.Contains(message, "leader") ||
+		strings.Contains(message, "connection refused") ||
+		strings.Contains(message, "no such host") ||
+		strings.Contains(message, "network"):
+		return "receipt outbox publish broker unavailable"
+	default:
+		return "receipt outbox publish failed"
+	}
 }
 
 func (store *OutboxStore) AuditOutbox(ctx context.Context, options OutboxAuditOptions) ([]OutboxAuditRow, error) {

@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -59,6 +61,42 @@ func TestOutboxStoreAuditOutboxFiltersStatusAndEventTypeIntegration(t *testing.T
 	if rows[0].EventID != "receipt-event-213" || rows[0].Status != types.OutboxStatusDLQ || rows[0].EventType != types.ReceiptEventMessageRead {
 		t.Fatalf("unexpected filtered outbox audit row: %+v", rows[0])
 	}
+}
+
+func TestOutboxStoreProcessReadyBatchSanitizesPublishErrorsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	store := NewOutboxStore(pool, WithOutboxClock(func() time.Time {
+		return time.Date(2026, 6, 14, 12, 0, 0, 0, time.UTC)
+	}))
+
+	seedReceiptOutboxWithStatus(t, ctx, pool, "receipt-event-retry", "tenant-outbox", "conversation-a", 31, types.ReceiptEventMessageReceived, types.OutboxStatusPending, 0, "")
+	stats, err := store.ProcessReadyBatch(ctx, 10, 3, time.Millisecond, func(ctx context.Context, messages []types.OutboxMessage) []error {
+		return []error{errors.New("kafka unavailable: broker body user=user1@example.com token=secret-token")}
+	})
+	if err != nil {
+		t.Fatalf("process retry outbox: %v", err)
+	}
+	if stats.Fetched != 1 || stats.Retried != 1 || stats.DeadLettered != 0 {
+		t.Fatalf("unexpected retry stats: %+v", stats)
+	}
+	assertReceiptOutboxState(t, ctx, pool, "receipt-event-retry", types.OutboxStatusPending, 1, "receipt outbox publish broker unavailable")
+	assertReceiptOutboxLastErrorDoesNotContain(t, ctx, pool, "receipt-event-retry", "user1@example.com", "secret-token")
+
+	resetReceiptTables(t, ctx, pool)
+	seedReceiptOutboxWithStatus(t, ctx, pool, "receipt-event-dlq", "tenant-outbox", "conversation-b", 32, types.ReceiptEventMessageRead, types.OutboxStatusPending, 0, "")
+	stats, err = store.ProcessReadyBatch(ctx, 10, 1, time.Millisecond, func(ctx context.Context, messages []types.OutboxMessage) []error {
+		return []error{errors.New("malformed payload: provider body token=secret-token")}
+	})
+	if err != nil {
+		t.Fatalf("process dlq outbox: %v", err)
+	}
+	if stats.Fetched != 1 || stats.DeadLettered != 1 {
+		t.Fatalf("unexpected dlq stats: %+v", stats)
+	}
+	assertReceiptOutboxState(t, ctx, pool, "receipt-event-dlq", types.OutboxStatusDLQ, 1, "receipt outbox publish invalid payload")
+	assertReceiptOutboxLastErrorDoesNotContain(t, ctx, pool, "receipt-event-dlq", "malformed payload", "secret-token")
 }
 
 func TestOutboxStoreRepairDLQEventResetsStatusAndWritesAuditIntegration(t *testing.T) {
@@ -265,14 +303,15 @@ INSERT INTO receipt_outbox (
     payload_json,
     status,
     retry_count,
+    last_error,
     available_at,
     next_retry_at,
     dead_lettered_at,
     published_at
 ) VALUES (
-    $1, $2, '1.0.0', $3, $4, $5, $6, 1, 'corr-'+$1, 'cause-'+$1, 'receipt-service', 'trace-'+$1,
+    $1, $2, '1.0.0', $3, $4, $5, $6, 1, 'corr-' || $1, 'cause-' || $1, 'receipt-service', 'trace-' || $1,
     '{"conversation_id":"`+conversationID+`"}'::jsonb,
-    $7, $8, $9, $10, $11, $12
+    $7, $8, $9, $10, $11, $12, $13
 )
 `,
 		eventID,
@@ -283,6 +322,7 @@ INSERT INTO receipt_outbox (
 		tenantID+":"+conversationID,
 		status,
 		retryCount,
+		lastError,
 		now.Add(-time.Minute),
 		now,
 		deadLetteredAt,
@@ -308,6 +348,23 @@ WHERE event_id = $1
 	}
 	if status != wantStatus || retryCount != wantRetryCount || lastError != wantLastError {
 		t.Fatalf("unexpected receipt outbox state status=%q retry_count=%d last_error=%q", status, retryCount, lastError)
+	}
+}
+
+func assertReceiptOutboxLastErrorDoesNotContain(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventID string, forbidden ...string) {
+	t.Helper()
+	var lastError string
+	if err := pool.QueryRow(ctx, `
+SELECT last_error
+FROM receipt_outbox
+WHERE event_id = $1
+`, eventID).Scan(&lastError); err != nil {
+		t.Fatalf("query receipt outbox last_error: %v", err)
+	}
+	for _, text := range forbidden {
+		if text != "" && strings.Contains(lastError, text) {
+			t.Fatalf("receipt outbox last_error for %s leaked %q: %q", eventID, text, lastError)
+		}
 	}
 }
 

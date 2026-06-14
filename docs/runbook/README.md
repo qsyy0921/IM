@@ -11,6 +11,8 @@
 ## 按需读取
 
 - 单服务状态：`service-briefs/<service>.md`
+- 开发进度总览：`development-progress.md`
+- 开发过程与阶段顺序：`development-process.md`
 - 服务设计：`../sdd/<service>.md`
 - smoke / 压测证据：`loadtest/<service>/`
 - 本地分布式和 Docker：`distributed-local.md`、`mac-arm64-docker-images.md`

@@ -98,8 +98,15 @@ func runOutboxRelay() error {
 			PollInterval:   envDuration("NEXUSIM_POLICY_OUTBOX_POLL_INTERVAL", time.Second),
 			MaxAttempts:    envInt("NEXUSIM_POLICY_OUTBOX_MAX_ATTEMPTS", 5),
 			RetryBaseDelay: envDuration("NEXUSIM_POLICY_OUTBOX_RETRY_BASE_DELAY", time.Second),
+			ErrorBackoff:   envDuration("NEXUSIM_POLICY_OUTBOX_RELAY_ERROR_BACKOFF", time.Second),
+			Logf:           log.Printf,
 		},
 	)
+	stopDebug, err := startDebugServer(ctx, policyDebugAddr(), monitoringinfra.NewHandler(pool, true, nil, nil).WithOutboxRelayStats(relay.Snapshot))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 	log.Println("policy-service decision audit outbox relay started")
 	return relay.Run(ctx)
 }

@@ -19,6 +19,7 @@ type Handler struct {
 	requirePostgres        bool
 	grpcMetrics            *GRPCMetrics
 	decisionMetrics        *DecisionMetrics
+	outboxRelaySnapshot    func() types.OutboxRelayWorkerSnapshot
 	contactWorkerSnapshot  func() types.ProjectionWorkerSnapshot
 	timelineWorkerSnapshot func() types.ProjectionWorkerSnapshot
 }
@@ -34,6 +35,11 @@ func NewHandler(pool *pgxpool.Pool, requirePostgres bool, grpcMetrics *GRPCMetri
 
 func (h *Handler) WithContactProjectionWorkerStats(snapshotFunc func() types.ProjectionWorkerSnapshot) *Handler {
 	h.contactWorkerSnapshot = snapshotFunc
+	return h
+}
+
+func (h *Handler) WithOutboxRelayStats(snapshotFunc func() types.OutboxRelayWorkerSnapshot) *Handler {
+	h.outboxRelaySnapshot = snapshotFunc
 	return h
 }
 
@@ -85,6 +91,10 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	if h.decisionMetrics != nil {
 		decisionSnapshot := h.decisionMetrics.Snapshot()
 		snapshot.Decisions = &decisionSnapshot
+	}
+	if h.outboxRelaySnapshot != nil {
+		relaySnapshot := h.outboxRelaySnapshot()
+		snapshot.OutboxRelay = &relaySnapshot
 	}
 	if h.contactWorkerSnapshot != nil {
 		workerSnapshot := h.contactWorkerSnapshot()
@@ -138,19 +148,20 @@ type healthResponse struct {
 }
 
 type Snapshot struct {
-	Service                  string                          `json:"service"`
-	GeneratedAtMS            int64                           `json:"generated_at_ms"`
-	PGPool                   *PGPoolSnapshot                 `json:"pg_pool,omitempty"`
-	RuleStore                *RuleSnapshot                   `json:"policy_rule_store,omitempty"`
-	RuleStoreError           string                          `json:"policy_rule_store_error,omitempty"`
-	Projection               *ProjectionSnapshot             `json:"policy_projection,omitempty"`
-	ProjectionError          string                          `json:"policy_projection_error,omitempty"`
-	AuditOutbox              *AuditOutboxSnapshot            `json:"policy_decision_audit_outbox,omitempty"`
-	AuditOutboxError         string                          `json:"policy_decision_audit_outbox_error,omitempty"`
-	GRPC                     *GRPCSnapshot                   `json:"grpc,omitempty"`
-	Decisions                *DecisionSnapshot               `json:"decisions,omitempty"`
-	ContactProjectionWorker  *types.ProjectionWorkerSnapshot `json:"contact_projection_worker,omitempty"`
-	TimelineProjectionWorker *types.ProjectionWorkerSnapshot `json:"timeline_projection_worker,omitempty"`
+	Service                  string                           `json:"service"`
+	GeneratedAtMS            int64                            `json:"generated_at_ms"`
+	PGPool                   *PGPoolSnapshot                  `json:"pg_pool,omitempty"`
+	RuleStore                *RuleSnapshot                    `json:"policy_rule_store,omitempty"`
+	RuleStoreError           string                           `json:"policy_rule_store_error,omitempty"`
+	Projection               *ProjectionSnapshot              `json:"policy_projection,omitempty"`
+	ProjectionError          string                           `json:"policy_projection_error,omitempty"`
+	AuditOutbox              *AuditOutboxSnapshot             `json:"policy_decision_audit_outbox,omitempty"`
+	AuditOutboxError         string                           `json:"policy_decision_audit_outbox_error,omitempty"`
+	GRPC                     *GRPCSnapshot                    `json:"grpc,omitempty"`
+	Decisions                *DecisionSnapshot                `json:"decisions,omitempty"`
+	OutboxRelay              *types.OutboxRelayWorkerSnapshot `json:"outbox_relay,omitempty"`
+	ContactProjectionWorker  *types.ProjectionWorkerSnapshot  `json:"contact_projection_worker,omitempty"`
+	TimelineProjectionWorker *types.ProjectionWorkerSnapshot  `json:"timeline_projection_worker,omitempty"`
 }
 
 type PGPoolSnapshot struct {

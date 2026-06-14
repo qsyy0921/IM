@@ -121,8 +121,51 @@ func TestRelayRunOncePublishesPolicyEvent(t *testing.T) {
 	}
 }
 
+func TestRelayRetriesTransientRunOnceErrorAndExposesSnapshot(t *testing.T) {
+	store := &fakeStore{
+		errs: []error{errors.New("temporary store error"), nil},
+		messages: []types.OutboxMessage{
+			testPolicyOutboxMessage(t),
+		},
+	}
+	publisher := &fakePublisher{}
+	relay := NewRelay(store, publisher, Config{
+		Topic:        "im.policy.events.test",
+		PollInterval: time.Millisecond,
+		ErrorBackoff: time.Millisecond,
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		for publisher.calls == 0 {
+			time.Sleep(time.Millisecond)
+		}
+		cancel()
+	}()
+
+	err := relay.Run(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected canceled after successful retry, got %v", err)
+	}
+	if store.calls < 2 {
+		t.Fatalf("expected retry after transient error, calls=%d", store.calls)
+	}
+	snapshot := relay.Snapshot()
+	if snapshot.TotalErrors != 1 || snapshot.ConsecutiveErrors != 0 {
+		t.Fatalf("unexpected relay snapshot: %+v", snapshot)
+	}
+	if snapshot.LastErrorAtMS == 0 || snapshot.LastSuccessAtMS == 0 || snapshot.LastPublishedAtMS == 0 {
+		t.Fatalf("expected timestamps in relay snapshot: %+v", snapshot)
+	}
+	if snapshot.LastErrorBackoffMS != time.Millisecond.Milliseconds() {
+		t.Fatalf("expected backoff %d, got %+v", time.Millisecond.Milliseconds(), snapshot)
+	}
+}
+
 type fakeStore struct {
 	messages []types.OutboxMessage
+	errs     []error
+	calls    int
 }
 
 func (store *fakeStore) ProcessReadyBatch(
@@ -132,6 +175,18 @@ func (store *fakeStore) ProcessReadyBatch(
 	retryBaseDelay time.Duration,
 	publish func(context.Context, []types.OutboxMessage) []error,
 ) (types.OutboxRelayStats, error) {
+	if err := ctx.Err(); err != nil {
+		return types.OutboxRelayStats{}, err
+	}
+	if store.calls < len(store.errs) {
+		err := store.errs[store.calls]
+		store.calls++
+		if err != nil {
+			return types.OutboxRelayStats{}, err
+		}
+	} else {
+		store.calls++
+	}
 	errs := publish(ctx, store.messages)
 	if len(errs) != len(store.messages) {
 		return types.OutboxRelayStats{}, errors.New("publish result count mismatch")

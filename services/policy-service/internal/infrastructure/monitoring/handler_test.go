@@ -138,6 +138,33 @@ func TestHandlerMetricsIncludesProjectionWorkerSnapshots(t *testing.T) {
 	}
 }
 
+func TestHandlerMetricsIncludesOutboxRelaySnapshot(t *testing.T) {
+	handler := NewHandler(nil, false, nil, nil).WithOutboxRelayStats(func() types.OutboxRelayWorkerSnapshot {
+		return types.OutboxRelayWorkerSnapshot{
+			TotalErrors:        2,
+			ConsecutiveErrors:  1,
+			LastErrorAtMS:      100,
+			LastSuccessAtMS:    90,
+			LastPublishedAtMS:  90,
+			LastErrorBackoffMS: 1000,
+		}
+	})
+
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/debug/metrics", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", response.Code)
+	}
+	var body Snapshot
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode metrics response: %v", err)
+	}
+	if body.OutboxRelay == nil || body.OutboxRelay.TotalErrors != 2 {
+		t.Fatalf("expected outbox relay snapshot, got %+v", body.OutboxRelay)
+	}
+}
+
 func TestQueryRuleSnapshotIncludesAllPolicyRuleStoresIntegration(t *testing.T) {
 	dsn := os.Getenv("NEXUSIM_PG_DSN")
 	if dsn == "" {

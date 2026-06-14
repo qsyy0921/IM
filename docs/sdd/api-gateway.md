@@ -177,6 +177,8 @@ NEXUSIM_API_GATEWAY_CONTACTS_TLS_CLIENT_KEY_FILE
 
 启用下游服务 `metadata` / `verified-metadata` auth 时，不能只依赖 metadata 字段本身。后端必须只暴露在可信内网 / loopback，或者启用 gRPC mTLS 并把 client DNS / URI SAN allowlist 收敛到 `api-gateway.nexusim.local` / `spiffe://nexusim/api-gateway` 一类明确服务身份；否则客户端直连后端仍可伪造 metadata。
 
+2026-06-14 补充：api-gateway 当前已在启动阶段执行第一版 trusted-metadata guard。若下游 `*_AUTH_MODE` 配为 `metadata` / `verified-metadata`，且下游地址不是 loopback / RFC1918 私网地址，同时 gateway 侧没有配置下游 gRPC client certificate，则进程会直接启动失败，避免把 trusted metadata 注入到明显不受保护的公网直连链路上。这仍不是完整零信任网络治理；真正的生产边界仍应依赖 mTLS + 服务身份 allowlist。
+
 ## 边界与后续
 
 第一阶段不是完整 API gateway / BFF：

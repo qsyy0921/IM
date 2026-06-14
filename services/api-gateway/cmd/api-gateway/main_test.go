@@ -312,6 +312,57 @@ func TestNewRateLimiterFromEnvRedisFailClosedRejectsStartupWhenRedisUnavailable(
 	}
 }
 
+func TestValidateTrustedMetadataBackendConfigAllowsPrivateAddressWithoutMTLS(t *testing.T) {
+	err := validateTrustedMetadataBackendConfig(
+		"message-service",
+		"172.31.50.10:10495",
+		"metadata",
+		grpcClientTLSConfig{},
+	)
+	if err != nil {
+		t.Fatalf("expected private address to be allowed without mTLS, got %v", err)
+	}
+}
+
+func TestValidateTrustedMetadataBackendConfigRequiresMTLSForPublicAddress(t *testing.T) {
+	err := validateTrustedMetadataBackendConfig(
+		"message-service",
+		"8.8.8.8:10495",
+		"verified-metadata",
+		grpcClientTLSConfig{},
+	)
+	if err == nil {
+		t.Fatalf("expected public address without mTLS client cert to fail")
+	}
+}
+
+func TestValidateTrustedMetadataBackendConfigAllowsMTLSForPublicAddress(t *testing.T) {
+	err := validateTrustedMetadataBackendConfig(
+		"message-service",
+		"8.8.8.8:10495",
+		"verified-metadata",
+		grpcClientTLSConfig{
+			ClientCertFile: "client.crt",
+			ClientKeyFile:  "client.key",
+		},
+	)
+	if err != nil {
+		t.Fatalf("expected public address with mTLS client cert to be allowed, got %v", err)
+	}
+}
+
+func TestValidateTrustedMetadataBackendConfigIgnoresBodyAuth(t *testing.T) {
+	err := validateTrustedMetadataBackendConfig(
+		"message-service",
+		"8.8.8.8:10495",
+		"body",
+		grpcClientTLSConfig{},
+	)
+	if err != nil {
+		t.Fatalf("expected body auth to skip trusted metadata guard, got %v", err)
+	}
+}
+
 func TestAPIGatewayRegisterLegacyDescriptorsDefaultsToTrue(t *testing.T) {
 	t.Setenv("NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS", "")
 	enabled, err := apiGatewayRegisterLegacyDescriptors()

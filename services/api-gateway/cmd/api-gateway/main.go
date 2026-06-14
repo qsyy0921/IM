@@ -74,49 +74,78 @@ func runGRPC() error {
 	}
 	defer stopDebug()
 
+	conversationAddr := envString("NEXUSIM_API_GATEWAY_CONVERSATION_ADDR", "127.0.0.1:10496")
+	conversationTLS := grpcClientTLSConfigFromEnv("NEXUSIM_API_GATEWAY_CONVERSATION_TLS")
+	messageAddr := envString("NEXUSIM_API_GATEWAY_MESSAGE_ADDR", "127.0.0.1:10495")
+	messageTLS := grpcClientTLSConfigFromEnv("NEXUSIM_API_GATEWAY_MESSAGE_TLS")
+	deliveryAddr := envString("NEXUSIM_API_GATEWAY_DELIVERY_ADDR", "127.0.0.1:10497")
+	deliveryTLS := grpcClientTLSConfigFromEnv("NEXUSIM_API_GATEWAY_DELIVERY_TLS")
+	receiptAddr := envString("NEXUSIM_API_GATEWAY_RECEIPT_ADDR", "127.0.0.1:10499")
+	receiptTLS := grpcClientTLSConfigFromEnv("NEXUSIM_API_GATEWAY_RECEIPT_TLS")
+	contactsAddr := envString("NEXUSIM_API_GATEWAY_CONTACTS_ADDR", "127.0.0.1:10500")
+	contactsTLS := grpcClientTLSConfigFromEnv("NEXUSIM_API_GATEWAY_CONTACTS_TLS")
+	identityAddr := envString("NEXUSIM_API_GATEWAY_IDENTITY_ADDR", "127.0.0.1:10501")
+	identityTLS := grpcClientTLSConfigFromEnv("NEXUSIM_API_GATEWAY_IDENTITY_TLS")
+
+	if err := validateTrustedMetadataBackendConfig("conversation-service", conversationAddr, envString("NEXUSIM_CONVERSATION_AUTH_MODE", "body"), conversationTLS); err != nil {
+		return err
+	}
+	if err := validateTrustedMetadataBackendConfig("message-service", messageAddr, envString("NEXUSIM_MESSAGE_AUTH_MODE", "body"), messageTLS); err != nil {
+		return err
+	}
+	if err := validateTrustedMetadataBackendConfig("delivery-service", deliveryAddr, envString("NEXUSIM_DELIVERY_AUTH_MODE", "body"), deliveryTLS); err != nil {
+		return err
+	}
+	if err := validateTrustedMetadataBackendConfig("receipt-service", receiptAddr, envString("NEXUSIM_RECEIPT_AUTH_MODE", "body"), receiptTLS); err != nil {
+		return err
+	}
+	if err := validateTrustedMetadataBackendConfig("contacts-service", contactsAddr, envString("NEXUSIM_CONTACTS_AUTH_MODE", "body"), contactsTLS); err != nil {
+		return err
+	}
+
 	conversationConn, err := dialBackend(
-		envString("NEXUSIM_API_GATEWAY_CONVERSATION_ADDR", "127.0.0.1:10496"),
-		grpcClientTLSConfigFromEnv("NEXUSIM_API_GATEWAY_CONVERSATION_TLS"),
+		conversationAddr,
+		conversationTLS,
 	)
 	if err != nil {
 		return err
 	}
 	defer conversationConn.Close()
 	messageConn, err := dialBackend(
-		envString("NEXUSIM_API_GATEWAY_MESSAGE_ADDR", "127.0.0.1:10495"),
-		grpcClientTLSConfigFromEnv("NEXUSIM_API_GATEWAY_MESSAGE_TLS"),
+		messageAddr,
+		messageTLS,
 	)
 	if err != nil {
 		return err
 	}
 	defer messageConn.Close()
 	deliveryConn, err := dialBackend(
-		envString("NEXUSIM_API_GATEWAY_DELIVERY_ADDR", "127.0.0.1:10497"),
-		grpcClientTLSConfigFromEnv("NEXUSIM_API_GATEWAY_DELIVERY_TLS"),
+		deliveryAddr,
+		deliveryTLS,
 	)
 	if err != nil {
 		return err
 	}
 	defer deliveryConn.Close()
 	receiptConn, err := dialBackend(
-		envString("NEXUSIM_API_GATEWAY_RECEIPT_ADDR", "127.0.0.1:10499"),
-		grpcClientTLSConfigFromEnv("NEXUSIM_API_GATEWAY_RECEIPT_TLS"),
+		receiptAddr,
+		receiptTLS,
 	)
 	if err != nil {
 		return err
 	}
 	defer receiptConn.Close()
 	contactsConn, err := dialBackend(
-		envString("NEXUSIM_API_GATEWAY_CONTACTS_ADDR", "127.0.0.1:10500"),
-		grpcClientTLSConfigFromEnv("NEXUSIM_API_GATEWAY_CONTACTS_TLS"),
+		contactsAddr,
+		contactsTLS,
 	)
 	if err != nil {
 		return err
 	}
 	defer contactsConn.Close()
 	identityConn, err := dialBackend(
-		envString("NEXUSIM_API_GATEWAY_IDENTITY_ADDR", "127.0.0.1:10501"),
-		grpcClientTLSConfigFromEnv("NEXUSIM_API_GATEWAY_IDENTITY_TLS"),
+		identityAddr,
+		identityTLS,
 	)
 	if err != nil {
 		return err
@@ -223,6 +252,44 @@ func dialBackend(addr string, tlsConfig grpcClientTLSConfig) (*grpcgo.ClientConn
 		transportCredentials = grpcgo.WithTransportCredentials(creds)
 	}
 	return grpcgo.NewClient("passthrough:///"+addr, transportCredentials)
+}
+
+func validateTrustedMetadataBackendConfig(serviceName string, addr string, authMode string, tlsConfig grpcClientTLSConfig) error {
+	if !usesTrustedMetadataAuth(authMode) {
+		return nil
+	}
+	if backendAddrTrustedWithoutMTLS(addr) {
+		return nil
+	}
+	if tlsConfig.ClientCertConfigured() {
+		return nil
+	}
+	return errors.New(serviceName + " uses verified metadata auth on non-private address without gateway mTLS client certificate")
+}
+
+func usesTrustedMetadataAuth(authMode string) bool {
+	switch strings.ToLower(strings.TrimSpace(authMode)) {
+	case "metadata", "verified-metadata":
+		return true
+	default:
+		return false
+	}
+}
+
+func backendAddrTrustedWithoutMTLS(addr string) bool {
+	host := strings.TrimSpace(addr)
+	if splitHost, _, err := net.SplitHostPort(host); err == nil {
+		host = splitHost
+	}
+	host = strings.TrimSpace(strings.Trim(host, "[]"))
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate()
 }
 
 func newAuthenticatorFromEnv() (*gatewayauth.Authenticator, error) {
@@ -579,6 +646,10 @@ func (config grpcClientTLSConfig) Enabled() bool {
 		strings.TrimSpace(config.ServerName) != "" ||
 		strings.TrimSpace(config.ClientCertFile) != "" ||
 		strings.TrimSpace(config.ClientKeyFile) != ""
+}
+
+func (config grpcClientTLSConfig) ClientCertConfigured() bool {
+	return strings.TrimSpace(config.ClientCertFile) != "" && strings.TrimSpace(config.ClientKeyFile) != ""
 }
 
 func grpcClientTLSCredentials(config grpcClientTLSConfig) (credentials.TransportCredentials, error) {

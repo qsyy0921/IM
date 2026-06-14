@@ -13,6 +13,9 @@ try {
     Write-Host "== docs entrypoints =="
     & (Join-Path $PSScriptRoot "check-doc-entrypoints.ps1")
 
+    Write-Host "== project naming =="
+    & (Join-Path $PSScriptRoot "check-project-naming.ps1")
+
     Write-Host "== file size budgets =="
     & (Join-Path $PSScriptRoot "check-file-size-budget.ps1")
 

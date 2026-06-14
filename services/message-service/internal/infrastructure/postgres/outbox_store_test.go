@@ -158,7 +158,7 @@ func TestOutboxStoreAuditOutboxReturnsLatestRowsIntegration(t *testing.T) {
 	tenantID := types.TenantID(fmt.Sprintf("tenant-outbox-audit-%d", time.Now().UnixNano()))
 	repo := NewMessageRepository(pool)
 	appendConversationMessages(t, ctx, repo, tenantID, "conversation-a", 2)
-	updateMessageOutboxAuditState(t, ctx, pool, tenantID, "conversation-a", 1, types.OutboxStatusPending, 1, "retry pending", false, false)
+	updateMessageOutboxAuditState(t, ctx, pool, tenantID, "conversation-a", 1, types.OutboxStatusPending, 1, "kafka unavailable: broker body user=user1@example.com token=secret-token", false, false)
 	updateMessageOutboxAuditState(t, ctx, pool, tenantID, "conversation-a", 2, types.OutboxStatusPublished, 0, "", true, false)
 
 	rows, err := NewOutboxStore(pool).AuditOutbox(ctx, OutboxAuditOptions{
@@ -174,8 +174,13 @@ func TestOutboxStoreAuditOutboxReturnsLatestRowsIntegration(t *testing.T) {
 	if rows[0].AggregateVersion != 2 || rows[0].Status != types.OutboxStatusPublished || rows[0].EventID == "" {
 		t.Fatalf("unexpected latest outbox row: %+v", rows[0])
 	}
-	if rows[1].AggregateVersion != 1 || rows[1].Status != types.OutboxStatusPending || rows[1].RetryCount != 1 || rows[1].LastError != "retry pending" {
+	if rows[1].AggregateVersion != 1 || rows[1].Status != types.OutboxStatusPending || rows[1].RetryCount != 1 || rows[1].LastError != "outbox publish broker unavailable" {
 		t.Fatalf("unexpected older outbox row: %+v", rows[1])
+	}
+	if strings.Contains(rows[1].LastError, "user1@example.com") ||
+		strings.Contains(rows[1].LastError, "secret-token") ||
+		strings.Contains(rows[1].LastError, "broker body") {
+		t.Fatalf("message outbox audit leaked raw last_error: %q", rows[1].LastError)
 	}
 }
 
@@ -190,7 +195,7 @@ func TestOutboxStoreAuditOutboxFiltersStatusAndEventTypeIntegration(t *testing.T
 	repo := NewMessageRepository(pool)
 	appendConversationMessages(t, ctx, repo, tenantID, "conversation-a", 1)
 	appendConversationMessages(t, ctx, repo, tenantID, "conversation-b", 1)
-	updateMessageOutboxAuditState(t, ctx, pool, tenantID, "conversation-a", 1, types.OutboxStatusDLQ, 3, "poison payload", false, true)
+	updateMessageOutboxAuditState(t, ctx, pool, tenantID, "conversation-a", 1, types.OutboxStatusDLQ, 3, "invalid json payload with token=secret-token", false, true)
 	updateMessageOutboxEventType(t, ctx, pool, tenantID, "conversation-a", 1, "message.deleted.v1")
 	updateMessageOutboxAuditState(t, ctx, pool, tenantID, "conversation-b", 1, types.OutboxStatusPublished, 0, "", true, false)
 
@@ -222,7 +227,7 @@ func TestOutboxStoreRepairDLQEventsResetsMessageOutboxStateIntegration(t *testin
 	repo := NewMessageRepository(pool)
 	appendConversationMessages(t, ctx, repo, tenantID, "conversation-a", 1)
 	appendConversationMessages(t, ctx, repo, tenantID, "conversation-b", 1)
-	updateMessageOutboxAuditState(t, ctx, pool, tenantID, "conversation-a", 1, types.OutboxStatusDLQ, 3, "poison payload", false, true)
+	updateMessageOutboxAuditState(t, ctx, pool, tenantID, "conversation-a", 1, types.OutboxStatusDLQ, 3, "kafka unavailable: broker body user=user1@example.com token=secret-token", false, true)
 	updateMessageOutboxAuditState(t, ctx, pool, tenantID, "conversation-b", 1, types.OutboxStatusPublished, 0, "", true, false)
 
 	stats, err := NewOutboxStore(pool).RepairDLQEvents(ctx, []string{"", "missing-event", readMessageOutboxEventID(t, ctx, pool, tenantID, "conversation-a", 1)}, "manual repair")
@@ -240,8 +245,17 @@ func TestOutboxStoreRepairDLQEventsResetsMessageOutboxStateIntegration(t *testin
 	if err != nil {
 		t.Fatalf("audit message outbox repairs: %v", err)
 	}
-	if len(rows) != 1 || rows[0].ConversationID != "conversation-a" || rows[0].Reason != "manual repair" || rows[0].PreviousStatus != types.OutboxStatusDLQ {
+	if len(rows) != 1 ||
+		rows[0].ConversationID != "conversation-a" ||
+		rows[0].Reason != "manual repair" ||
+		rows[0].PreviousStatus != types.OutboxStatusDLQ ||
+		rows[0].PreviousLastError != "outbox publish broker unavailable" {
 		t.Fatalf("unexpected message outbox repair audit rows: %+v", rows)
+	}
+	if strings.Contains(rows[0].PreviousLastError, "user1@example.com") ||
+		strings.Contains(rows[0].PreviousLastError, "secret-token") ||
+		strings.Contains(rows[0].PreviousLastError, "broker body") {
+		t.Fatalf("message outbox repair audit leaked raw previous_last_error: %q", rows[0].PreviousLastError)
 	}
 }
 

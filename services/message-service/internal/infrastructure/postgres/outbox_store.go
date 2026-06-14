@@ -311,6 +311,7 @@ LIMIT $`+strconv.Itoa(len(args)), args...)
 		); err != nil {
 			return nil, types.NewDBWriteFailed(err.Error())
 		}
+		row.LastError = sanitizeOutboxStoredError(row.LastError)
 		result = append(result, row)
 	}
 	if err := rows.Err(); err != nil {
@@ -364,7 +365,23 @@ target AS (
         mo.conversation_id,
         mo.status,
         mo.retry_count,
-        COALESCE(mo.last_error, '') AS last_error,
+        CASE
+            WHEN COALESCE(BTRIM(mo.last_error), '') = '' THEN ''
+            WHEN LOWER(mo.last_error) LIKE '%cancel%' THEN 'outbox publish canceled'
+            WHEN LOWER(mo.last_error) LIKE '%timeout%' OR LOWER(mo.last_error) LIKE '%deadline exceeded%' THEN 'outbox publish timeout'
+            WHEN LOWER(mo.last_error) LIKE '%unsupported%' THEN 'outbox publish unsupported event'
+            WHEN LOWER(mo.last_error) LIKE '%malformed%'
+              OR LOWER(mo.last_error) LIKE '%invalid%'
+              OR LOWER(mo.last_error) LIKE '%json%'
+              OR LOWER(mo.last_error) LIKE '%decode%' THEN 'outbox publish invalid event'
+            WHEN LOWER(mo.last_error) LIKE '%kafka%'
+              OR LOWER(mo.last_error) LIKE '%broker%'
+              OR LOWER(mo.last_error) LIKE '%leader%'
+              OR LOWER(mo.last_error) LIKE '%connection refused%'
+              OR LOWER(mo.last_error) LIKE '%no such host%'
+              OR LOWER(mo.last_error) LIKE '%network%' THEN 'outbox publish broker unavailable'
+            ELSE 'outbox publish failed'
+        END AS last_error,
         mo.dead_lettered_at
     FROM message_outbox mo
     JOIN requested r ON r.event_id = mo.event_id
@@ -490,6 +507,7 @@ LIMIT $`+strconv.Itoa(len(args)), args...)
 		); err != nil {
 			return nil, types.NewDBWriteFailed(err.Error())
 		}
+		row.PreviousLastError = sanitizeOutboxStoredError(row.PreviousLastError)
 		result = append(result, row)
 	}
 	if err := rows.Err(); err != nil {
@@ -701,10 +719,23 @@ func sanitizeOutboxPublishError(err error) string {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return "outbox publish timeout"
 	}
-	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	return sanitizeOutboxPublishErrorText(err.Error())
+}
+
+func sanitizeOutboxStoredError(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return ""
+	}
+	return sanitizeOutboxPublishErrorText(value)
+}
+
+func sanitizeOutboxPublishErrorText(value string) string {
+	message := strings.ToLower(strings.TrimSpace(value))
 	switch {
 	case message == "":
 		return "outbox publish failed"
+	case strings.Contains(message, "cancel"):
+		return "outbox publish canceled"
 	case strings.Contains(message, "timeout") || strings.Contains(message, "deadline exceeded"):
 		return "outbox publish timeout"
 	case strings.Contains(message, "unsupported"):

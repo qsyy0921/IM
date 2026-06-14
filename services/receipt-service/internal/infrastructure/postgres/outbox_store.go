@@ -313,10 +313,23 @@ func sanitizeReceiptOutboxPublishError(err error) string {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return "receipt outbox publish timeout"
 	}
-	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	return sanitizeReceiptOutboxPublishErrorText(err.Error())
+}
+
+func sanitizeReceiptOutboxStoredError(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return ""
+	}
+	return sanitizeReceiptOutboxPublishErrorText(value)
+}
+
+func sanitizeReceiptOutboxPublishErrorText(value string) string {
+	message := strings.ToLower(strings.TrimSpace(value))
 	switch {
 	case message == "":
 		return "receipt outbox publish failed"
+	case strings.Contains(message, "cancel"):
+		return "receipt outbox publish canceled"
 	case strings.Contains(message, "timeout") || strings.Contains(message, "deadline exceeded"):
 		return "receipt outbox publish timeout"
 	case strings.Contains(message, "unsupported"):
@@ -432,6 +445,7 @@ LIMIT $`+itoa(len(args)), args...)
 		); err != nil {
 			return nil, types.NewDBReadFailed(err.Error())
 		}
+		row.LastError = sanitizeReceiptOutboxStoredError(row.LastError)
 		result = append(result, row)
 	}
 	if err := rows.Err(); err != nil {
@@ -460,65 +474,19 @@ func (store *OutboxStore) RepairDLQEvents(ctx context.Context, eventIDs []string
 		_ = tx.Rollback(ctx)
 	}()
 
-	var stats types.OutboxRepairStats
-	err = tx.QueryRow(ctx, `
-WITH requested AS (
-    SELECT DISTINCT unnest($1::text[]) AS event_id
-),
-target AS (
-    SELECT
-        ro.id,
-        ro.event_id,
-        ro.tenant_id,
-        ro.status,
-        ro.retry_count,
-        ro.last_error,
-        ro.dead_lettered_at
-    FROM receipt_outbox ro
-    JOIN requested r ON r.event_id = ro.event_id
-    WHERE ro.status = $3
-    FOR UPDATE OF ro
-),
-updated AS (
-    UPDATE receipt_outbox ro
-    SET status = $2,
-        retry_count = 0,
-        last_error = '',
-        next_retry_at = NULL,
-        dead_lettered_at = NULL,
-        available_at = now(),
-        updated_at = now()
-    FROM target t
-    WHERE ro.id = t.id
-    RETURNING ro.event_id
-),
-audit AS (
-    INSERT INTO receipt_outbox_repair_audit (
-        event_id,
-        tenant_id,
-        previous_status,
-        previous_retry_count,
-        previous_last_error,
-        previous_dead_lettered_at,
-        repair_reason
-    )
-    SELECT
-        event_id,
-        tenant_id,
-        status,
-        retry_count,
-        last_error,
-        dead_lettered_at,
-        $4
-    FROM target
-    RETURNING event_id
-)
-SELECT
-    (SELECT COUNT(*) FROM requested) AS requested,
-    (SELECT COUNT(*) FROM updated) AS repaired
-`, ids, types.OutboxStatusPending, types.OutboxStatusDLQ, reason).Scan(&stats.Requested, &stats.Repaired)
+	targets, err := store.lockReceiptOutboxRepairTargets(ctx, tx, ids)
 	if err != nil {
-		return types.OutboxRepairStats{}, types.NewDBWriteFailed(err.Error())
+		return types.OutboxRepairStats{}, err
+	}
+	for _, target := range targets {
+		if err := store.redriveReceiptOutboxTarget(ctx, tx, target, reason); err != nil {
+			return types.OutboxRepairStats{}, err
+		}
+	}
+
+	stats := types.OutboxRepairStats{
+		Requested: len(ids),
+		Repaired:  len(targets),
 	}
 	stats.Skipped = stats.Requested - stats.Repaired
 	if stats.Skipped < 0 {
@@ -528,6 +496,92 @@ SELECT
 		return types.OutboxRepairStats{}, types.NewDBWriteFailed(err.Error())
 	}
 	return stats, nil
+}
+
+type receiptOutboxRepairTarget struct {
+	ID                 int64
+	EventID            string
+	TenantID           string
+	Status             string
+	RetryCount         int
+	LastError          string
+	DeadLetteredAt     *time.Time
+	PreviousLastError  string
+	PreviousRetryCount int
+}
+
+func (store *OutboxStore) lockReceiptOutboxRepairTargets(ctx context.Context, tx pgx.Tx, eventIDs []string) ([]receiptOutboxRepairTarget, error) {
+	rows, err := tx.Query(ctx, `
+SELECT
+    ro.id,
+    ro.event_id,
+    ro.tenant_id,
+    ro.status,
+    ro.retry_count,
+    ro.last_error,
+    ro.dead_lettered_at
+FROM receipt_outbox ro
+JOIN (SELECT DISTINCT unnest($1::text[]) AS event_id) requested ON requested.event_id = ro.event_id
+WHERE ro.status = $2
+FOR UPDATE OF ro
+`, eventIDs, types.OutboxStatusDLQ)
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	targets := make([]receiptOutboxRepairTarget, 0, len(eventIDs))
+	for rows.Next() {
+		var target receiptOutboxRepairTarget
+		if err := rows.Scan(
+			&target.ID,
+			&target.EventID,
+			&target.TenantID,
+			&target.Status,
+			&target.RetryCount,
+			&target.LastError,
+			&target.DeadLetteredAt,
+		); err != nil {
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		target.PreviousRetryCount = target.RetryCount
+		target.PreviousLastError = sanitizeReceiptOutboxStoredError(target.LastError)
+		targets = append(targets, target)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	return targets, nil
+}
+
+func (store *OutboxStore) redriveReceiptOutboxTarget(ctx context.Context, tx pgx.Tx, target receiptOutboxRepairTarget, reason string) error {
+	if _, err := tx.Exec(ctx, `
+UPDATE receipt_outbox
+SET status = $2,
+    retry_count = 0,
+    last_error = '',
+    next_retry_at = NULL,
+    dead_lettered_at = NULL,
+    available_at = now(),
+    updated_at = now()
+WHERE id = $1
+`, target.ID, types.OutboxStatusPending); err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO receipt_outbox_repair_audit (
+    event_id,
+    tenant_id,
+    previous_status,
+    previous_retry_count,
+    previous_last_error,
+    previous_dead_lettered_at,
+    repair_reason
+) VALUES ($1, $2, $3, $4, $5, $6, $7)
+`, target.EventID, target.TenantID, target.Status, target.PreviousRetryCount, target.PreviousLastError, target.DeadLetteredAt, reason); err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
 }
 
 func (store *OutboxStore) AuditOutboxRepairs(ctx context.Context, options OutboxRepairAuditOptions) ([]OutboxRepairAuditRow, error) {
@@ -591,6 +645,7 @@ LIMIT $`+itoa(len(args)), args...)
 		); err != nil {
 			return nil, types.NewDBReadFailed(err.Error())
 		}
+		row.PreviousLastError = sanitizeReceiptOutboxStoredError(row.PreviousLastError)
 		result = append(result, row)
 	}
 	if err := rows.Err(); err != nil {

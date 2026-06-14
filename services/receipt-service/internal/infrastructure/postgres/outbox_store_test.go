@@ -17,7 +17,7 @@ func TestOutboxStoreAuditOutboxReturnsLatestRowsIntegration(t *testing.T) {
 	resetReceiptTables(t, ctx, pool)
 
 	seedReceiptOutboxWithStatus(t, ctx, pool, "receipt-event-201", "tenant-a", "conversation-a", 11, types.ReceiptEventMessageReceived, types.OutboxStatusPending, 2, "retry later")
-	seedReceiptOutboxWithStatus(t, ctx, pool, "receipt-event-202", "tenant-a", "conversation-a", 12, types.ReceiptEventMessageRead, types.OutboxStatusDLQ, 4, "malformed payload")
+	seedReceiptOutboxWithStatus(t, ctx, pool, "receipt-event-202", "tenant-a", "conversation-a", 12, types.ReceiptEventMessageRead, types.OutboxStatusDLQ, 4, "kafka unavailable: broker body user=user1@example.com token=secret-token")
 
 	rows, err := NewOutboxStore(pool).AuditOutbox(ctx, OutboxAuditOptions{
 		TenantID: "tenant-a",
@@ -29,9 +29,10 @@ func TestOutboxStoreAuditOutboxReturnsLatestRowsIntegration(t *testing.T) {
 	if len(rows) != 2 {
 		t.Fatalf("expected two rows, got %d", len(rows))
 	}
-	if rows[0].EventID != "receipt-event-202" || rows[0].Status != types.OutboxStatusDLQ || rows[0].RetryCount != 4 {
+	if rows[0].EventID != "receipt-event-202" || rows[0].Status != types.OutboxStatusDLQ || rows[0].RetryCount != 4 || rows[0].LastError != "receipt outbox publish broker unavailable" {
 		t.Fatalf("unexpected latest outbox audit row: %+v", rows[0])
 	}
+	assertReceiptOutboxErrorDoesNotContain(t, rows[0].LastError, "user1@example.com", "secret-token", "broker body")
 	if rows[1].EventID != "receipt-event-201" || rows[1].Status != types.OutboxStatusPending || rows[1].RetryCount != 2 {
 		t.Fatalf("unexpected older outbox audit row: %+v", rows[1])
 	}
@@ -105,7 +106,7 @@ func TestOutboxStoreRepairDLQEventResetsStatusAndWritesAuditIntegration(t *testi
 	resetReceiptTables(t, ctx, pool)
 	store := NewOutboxStore(pool)
 
-	seedReceiptOutboxWithStatus(t, ctx, pool, "receipt-event-221", "tenant-repair", "conversation-a", 31, types.ReceiptEventMessageRead, types.OutboxStatusDLQ, 3, "publish failed")
+	seedReceiptOutboxWithStatus(t, ctx, pool, "receipt-event-221", "tenant-repair", "conversation-a", 31, types.ReceiptEventMessageRead, types.OutboxStatusDLQ, 3, "kafka unavailable: broker body user=user1@example.com token=secret-token")
 
 	stats, err := store.RepairDLQEvents(ctx, []string{"receipt-event-221", "receipt-event-221", "missing-event"}, "operator retried after kafka recovery")
 	if err != nil {
@@ -115,7 +116,7 @@ func TestOutboxStoreRepairDLQEventResetsStatusAndWritesAuditIntegration(t *testi
 		t.Fatalf("unexpected repair stats: %+v", stats)
 	}
 	assertReceiptOutboxState(t, ctx, pool, "receipt-event-221", types.OutboxStatusPending, 0, "")
-	assertReceiptOutboxRepairAudit(t, ctx, pool, "receipt-event-221", "operator retried after kafka recovery", "publish failed")
+	assertReceiptOutboxRepairAudit(t, ctx, pool, "receipt-event-221", "operator retried after kafka recovery", "receipt outbox publish broker unavailable", "user1@example.com", "secret-token", "broker body")
 
 	publisherCalled := false
 	relayStats, err := store.ProcessReadyBatch(ctx, 10, 5, time.Millisecond, func(ctx context.Context, messages []types.OutboxMessage) []error {
@@ -142,8 +143,8 @@ func TestOutboxStoreAuditOutboxRepairsFiltersEventAndTenantIntegration(t *testin
 INSERT INTO receipt_outbox_repair_audit (
     event_id, tenant_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at, repair_reason, repaired_at
 ) VALUES
-    ('repair-event-1', 'tenant-a', 'DLQ', 1, 'publish failed', now() - interval '1 minute', 'manual audit', now()),
-    ('repair-event-2', 'tenant-b', 'DLQ', 2, 'provider unavailable', now() - interval '2 minutes', 'provider recovered', now() - interval '1 minute')
+    ('repair-event-1', 'tenant-a', 'DLQ', 1, 'malformed payload user=user1@example.com', now() - interval '1 minute', 'manual audit', now()),
+    ('repair-event-2', 'tenant-b', 'DLQ', 2, 'kafka unavailable token=secret-token', now() - interval '2 minutes', 'provider recovered', now() - interval '1 minute')
 `)
 	if err != nil {
 		t.Fatalf("seed receipt outbox repair audit: %v", err)
@@ -163,6 +164,10 @@ INSERT INTO receipt_outbox_repair_audit (
 	if rows[0].EventID != "repair-event-1" || rows[0].TenantID != "tenant-a" || rows[0].Reason != "manual audit" {
 		t.Fatalf("unexpected filtered receipt outbox repair audit row: %+v", rows[0])
 	}
+	if rows[0].PreviousLastError != "receipt outbox publish invalid payload" {
+		t.Fatalf("unexpected sanitized previous error: %q", rows[0].PreviousLastError)
+	}
+	assertReceiptOutboxErrorDoesNotContain(t, rows[0].PreviousLastError, "user1@example.com")
 }
 
 func TestOutboxStoreCleanupOutboxRepairsDeletesOnlyExpiredRowsIntegration(t *testing.T) {
@@ -368,7 +373,7 @@ WHERE event_id = $1
 	}
 }
 
-func assertReceiptOutboxRepairAudit(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventID string, wantReason string, wantPreviousError string) {
+func assertReceiptOutboxRepairAudit(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventID string, wantReason string, wantPreviousError string, forbidden ...string) {
 	t.Helper()
 	var reason string
 	var previousStatus string
@@ -390,6 +395,16 @@ WHERE event_id = $1
 			previousRetryCount,
 			previousError,
 		)
+	}
+	assertReceiptOutboxErrorDoesNotContain(t, previousError, forbidden...)
+}
+
+func assertReceiptOutboxErrorDoesNotContain(t *testing.T, lastError string, forbidden ...string) {
+	t.Helper()
+	for _, text := range forbidden {
+		if text != "" && strings.Contains(lastError, text) {
+			t.Fatalf("receipt outbox error leaked %q: %q", text, lastError)
+		}
 	}
 }
 

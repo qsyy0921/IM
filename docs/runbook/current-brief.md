@@ -15,7 +15,7 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 
 - message-service、conversation-service、delivery-service、push-gateway、receipt-service、contacts-service、identity-service、policy-service、api-gateway 均已有真实链路或最小闭环。
 - Win/Mac Docker 分布式 smoke 已证明跨实例 route / resume / PullInbox fallback 等关键路径。
-- 当前不是生产级 HA：本地 PostgreSQL `repmgr + pgpool` failover smoke 和本地 Kafka KRaft 三 broker failover smoke 已补齐，但 Redis quorum / 网络分区、服务发现、统一观测和部署编排仍是后续。
+- 当前不是生产级 HA：本地 PostgreSQL `repmgr + pgpool` failover smoke、本地 Kafka KRaft 三 broker failover smoke、以及本地 Redis Sentinel quorum-loss fallback smoke 已补齐；完整 Redis 网络分区、服务发现、统一观测和部署编排仍是后续。
 - 当前 9 个服务足够支撑 IM 主链路；后续服务和中间件不写死，新增或替换必须满足拆分 / 演进准则并通过 ADR。
 
 ## 当前优先级

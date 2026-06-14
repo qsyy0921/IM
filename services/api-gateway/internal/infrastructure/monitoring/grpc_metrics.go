@@ -169,8 +169,8 @@ func writeGRPCRequestLog(logger *log.Logger, method string, code string, latency
 		Method:    method,
 		Code:      code,
 		LatencyMS: latencyMS,
-		TraceID:   traceID,
-		RequestID: requestID,
+		TraceID:   sanitizeGRPCLogMetadata(traceID),
+		RequestID: sanitizeGRPCLogMetadata(requestID),
 	})
 	if err != nil {
 		logger.Printf("api-gateway grpc_request method=%s code=%s latency_ms=%d", method, code, latencyMS)
@@ -192,16 +192,35 @@ func firstGRPCLogMetadataValue(md metadata.MD, key string) string {
 	if len(values) == 0 {
 		return ""
 	}
-	return trimGRPCLogMetadata(values[0])
+	return sanitizeGRPCLogMetadata(values[0])
 }
 
-func trimGRPCLogMetadata(value string) string {
+func sanitizeGRPCLogMetadata(value string) string {
 	value = strings.TrimSpace(value)
-	runes := []rune(value)
-	if len(runes) <= maxGRPCLogMetadataLength {
-		return value
+	if value == "" {
+		return ""
 	}
-	return string(runes[:maxGRPCLogMetadataLength])
+	runes := []rune(value)
+	if len(runes) > maxGRPCLogMetadataLength {
+		runes = runes[:maxGRPCLogMetadataLength]
+	}
+	for _, r := range runes {
+		if isGRPCLogMetadataRune(r) {
+			continue
+		}
+		return ""
+	}
+	return string(runes)
+}
+
+func isGRPCLogMetadataRune(r rune) bool {
+	return (r >= 'a' && r <= 'z') ||
+		(r >= 'A' && r <= 'Z') ||
+		(r >= '0' && r <= '9') ||
+		r == '-' ||
+		r == '_' ||
+		r == '.' ||
+		r == ':'
 }
 
 func grpcMethodExposure(method string) string {

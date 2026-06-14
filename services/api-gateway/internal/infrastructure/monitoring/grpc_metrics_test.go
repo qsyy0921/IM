@@ -93,6 +93,40 @@ func TestGRPCMetricsLogsPublishedCorrelation(t *testing.T) {
 	}
 }
 
+func TestGRPCMetricsDropsUnsafeCorrelationLogMetadata(t *testing.T) {
+	metrics := NewGRPCMetrics()
+	var logs bytes.Buffer
+	logger := log.New(&logs, "", 0)
+	interceptor := metrics.UnaryServerInterceptor(logger)
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		metadataTraceID, "trace user=user1@example.com",
+		metadataRequestID, "request-token=secret-token",
+		"authorization", "Bearer should-not-be-logged",
+	))
+
+	_, err := interceptor(ctx, nil, &grpcgo.UnaryServerInfo{FullMethod: "/nexusim.api/Test"}, func(ctx context.Context, _ any) (any, error) {
+		gatewaytypes.PublishCorrelation(ctx, "trace-final user=user1@example.com", "request-final token=secret-token")
+		return "ok", nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	line := logs.String()
+	for _, leaked := range []string{
+		"user1@example.com",
+		"secret-token",
+		"should-not-be-logged",
+		"authorization",
+		`"trace_id"`,
+		`"request_id"`,
+	} {
+		if strings.Contains(line, leaked) {
+			t.Fatalf("log leaked unsafe correlation metadata %q: %s", leaked, line)
+		}
+	}
+}
+
 func TestGRPCMetricsClassifiesFacadeAndLegacyDescriptorTraffic(t *testing.T) {
 	metrics := NewGRPCMetrics()
 	metrics.record("/nexusim.gateway.v1.GatewayService/SendMessage", "OK", 3)

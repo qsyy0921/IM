@@ -157,7 +157,7 @@ func TestChallengeDeliveryStoreRepairAuditsDLQWithoutReactivationIntegration(t *
 	if state.Status != "EXPIRED" || state.DeliveryStatus != "FAILED" {
 		t.Fatalf("audit must not change dlq challenge state: %+v", state)
 	}
-	assertChallengeDeliveryRepairAudit(t, ctx, pool, deliveryID, "audit", "AUDITED", "", "DLQ", "EXPIRED", "FAILED", 1, "challenge delivery failed: provider unavailable", types.ChallengeDeliveryFailureClassDeliveryFailed, "DLQ", "EXPIRED", "FAILED", types.ChallengeDeliveryFailureClassDeliveryFailed, "provider recovered")
+	assertChallengeDeliveryRepairAudit(t, ctx, pool, deliveryID, "audit", "AUDITED", "", "DLQ", "EXPIRED", "FAILED", 1, "challenge delivery unavailable", types.ChallengeDeliveryFailureClassDeliveryFailed, "DLQ", "EXPIRED", "FAILED", types.ChallengeDeliveryFailureClassDeliveryFailed, "provider recovered")
 
 	repairStats, err = store.RepairDeliveries(ctx, types.ChallengeDeliveryRepairOptions{
 		DeliveryIDs: []int64{deliveryID},
@@ -176,7 +176,7 @@ func TestChallengeDeliveryStoreRepairAuditsDLQWithoutReactivationIntegration(t *
 	if state.Status != "EXPIRED" || state.DeliveryStatus != "FAILED" {
 		t.Fatalf("dlq redrive must not reactivate challenge: %+v", state)
 	}
-	assertChallengeDeliveryRepairAudit(t, ctx, pool, deliveryID, "redrive-active-pending", "SKIPPED", "dlq_requires_new_challenge", "DLQ", "EXPIRED", "FAILED", 1, "challenge delivery failed: provider unavailable", types.ChallengeDeliveryFailureClassDeliveryFailed, "DLQ", "EXPIRED", "FAILED", types.ChallengeDeliveryFailureClassDeliveryFailed, "provider recovered")
+	assertChallengeDeliveryRepairAudit(t, ctx, pool, deliveryID, "redrive-active-pending", "SKIPPED", "dlq_requires_new_challenge", "DLQ", "EXPIRED", "FAILED", 1, "challenge delivery unavailable", types.ChallengeDeliveryFailureClassDeliveryFailed, "DLQ", "EXPIRED", "FAILED", types.ChallengeDeliveryFailureClassDeliveryFailed, "provider recovered")
 	_, err = repository.ConfirmVerificationChallenge(ctx, types.ConfirmVerificationChallengeCommand{
 		TenantID:    "tenant-identity",
 		UserID:      "user-1",
@@ -231,7 +231,7 @@ func TestChallengeDeliveryStoreRepairRedrivesActivePendingIntegration(t *testing
 		t.Fatalf("unexpected redriven challenge state: %+v", state)
 	}
 	assertChallengeDeliveryOutboxFailureClass(t, ctx, pool, "challenge-redrive-pending", "")
-	assertChallengeDeliveryRepairAudit(t, ctx, pool, deliveryID, "redrive-active-pending", "MUTATED", "", "PENDING", "ACTIVE", "PENDING", 1, "challenge delivery failed: provider unavailable", types.ChallengeDeliveryFailureClassDeliveryFailed, "PENDING", "ACTIVE", "PENDING", "", "provider recovered")
+	assertChallengeDeliveryRepairAudit(t, ctx, pool, deliveryID, "redrive-active-pending", "MUTATED", "", "PENDING", "ACTIVE", "PENDING", 1, "challenge delivery unavailable", types.ChallengeDeliveryFailureClassDeliveryFailed, "PENDING", "ACTIVE", "PENDING", "", "provider recovered")
 
 	stats, err = store.ProcessReadyBatch(ctx, 10, 3, time.Second, func(_ context.Context, messages []types.ChallengeDeliveryMessage) []error {
 		if len(messages) != 1 || messages[0].ChallengeID != "challenge-redrive-pending" {

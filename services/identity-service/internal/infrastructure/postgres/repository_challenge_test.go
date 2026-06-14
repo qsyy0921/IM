@@ -180,7 +180,8 @@ func TestRepositoryChallengeDeliveryStatusIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create reset challenge: %v", err)
 	}
-	if err := repository.RecordChallengeDeliveryFailure(ctx, reset.TenantID, reset.UserID, reset.ChallengeID, strings.Repeat("x", 300), issuedAt.Add(2*time.Minute)); err != nil {
+	rawProviderError := "provider unavailable: smtp body user=user1@example.com token=secret-token"
+	if err := repository.RecordChallengeDeliveryFailure(ctx, reset.TenantID, reset.UserID, reset.ChallengeID, rawProviderError, issuedAt.Add(2*time.Minute)); err != nil {
 		t.Fatalf("record delivery failure: %v", err)
 	}
 	failedState := readChallengeDeliveryState(t, ctx, pool, "challenge-delivery-failed")
@@ -188,9 +189,14 @@ func TestRepositoryChallengeDeliveryStatusIntegration(t *testing.T) {
 		failedState.DeliveryStatus != "FAILED" ||
 		failedState.DeliveryAttemptCount != 1 ||
 		failedState.DeliveryFailedAt == nil ||
-		len(failedState.DeliveryLastError) != 256 ||
+		failedState.DeliveryLastError != "challenge delivery unavailable" ||
 		failedState.DeliveryFailureClass != types.ChallengeDeliveryFailureClassDeliveryFailed {
 		t.Fatalf("unexpected failed challenge state: %+v", failedState)
+	}
+	if strings.Contains(failedState.DeliveryLastError, "user1@example.com") ||
+		strings.Contains(failedState.DeliveryLastError, "secret-token") ||
+		strings.Contains(failedState.DeliveryLastError, "smtp body") {
+		t.Fatalf("delivery last error leaked provider text: %q", failedState.DeliveryLastError)
 	}
 	_, err = repository.ConfirmPasswordReset(ctx, types.ConfirmPasswordResetCommand{
 		TenantID:    "tenant-identity",

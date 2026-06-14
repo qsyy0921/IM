@@ -448,13 +448,29 @@ WHERE tenant_id = $1
 
 func sanitizeChallengeDeliveryError(lastError string) string {
 	lastError = strings.TrimSpace(lastError)
-	if lastError == "" {
+	failureClass := types.ClassifyChallengeDeliveryFailureMessage(lastError, true)
+	switch failureClass {
+	case types.ChallengeDeliveryFailureClassInactive:
+		return "challenge no longer active before delivery"
+	case types.ChallengeDeliveryFailureClassConfiguration:
+		return "challenge delivery not configured"
+	case types.ChallengeDeliveryFailureClassProviderNonSuccess:
+		return "challenge delivery provider returned non-success status"
+	case types.ChallengeDeliveryFailureClassTimeout:
+		return "challenge delivery timeout"
+	case types.ChallengeDeliveryFailureClassNetwork:
+		return "challenge delivery network failed"
+	case types.ChallengeDeliveryFailureClassSerialization:
+		return "challenge delivery json serialization failed"
+	case types.ChallengeDeliveryFailureClassTokenCrypto:
+		return "challenge delivery token decrypt failed"
+	case types.ChallengeDeliveryFailureClassCanceled:
+		return "challenge delivery canceled"
+	case types.ChallengeDeliveryFailureClassDeliveryFailed, types.ChallengeDeliveryFailureClassUnknown:
+		return "challenge delivery unavailable"
+	default:
 		return "challenge delivery unavailable"
 	}
-	if len(lastError) > 256 {
-		return lastError[:256]
-	}
-	return lastError
 }
 
 func markDestinationVerified(ctx context.Context, tx pgx.Tx, challenge identityChallengeRow, now time.Time) error {

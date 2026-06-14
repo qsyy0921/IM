@@ -62,6 +62,10 @@ func ClassifyChallengeDeliveryFailureMessage(message string, isChallengeDelivery
 		strings.Contains(message, "ciphertext") ||
 		strings.Contains(message, "nonce"):
 		return ChallengeDeliveryFailureClassTokenCrypto
+	case strings.Contains(message, "context canceled") ||
+		strings.Contains(message, "cancelled") ||
+		strings.Contains(message, "canceled"):
+		return ChallengeDeliveryFailureClassCanceled
 	case isChallengeDeliveryFailure:
 		return ChallengeDeliveryFailureClassDeliveryFailed
 	default:

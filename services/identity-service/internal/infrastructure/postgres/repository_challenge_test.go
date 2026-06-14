@@ -208,6 +208,54 @@ func TestRepositoryChallengeDeliveryStatusIntegration(t *testing.T) {
 	}
 }
 
+func TestSanitizeChallengeDeliveryErrorUsesStablePublicMessages(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{
+			name: "provider body",
+			raw:  "provider returned non-success status 500 body=user1@example.com token=secret-token",
+			want: "challenge delivery provider returned non-success status",
+		},
+		{
+			name: "network details",
+			raw:  "dial tcp 10.0.0.8:25: connection refused for user1@example.com",
+			want: "challenge delivery network failed",
+		},
+		{
+			name: "serialization details",
+			raw:  "json marshal failed for template user=user1@example.com",
+			want: "challenge delivery json serialization failed",
+		},
+		{
+			name: "crypto details",
+			raw:  "decrypt token ciphertext failed nonce=secret-nonce",
+			want: "challenge delivery token decrypt failed",
+		},
+		{
+			name: "unknown raw provider text",
+			raw:  "smtp provider said raw body user=user1@example.com token=secret-token",
+			want: "challenge delivery unavailable",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := sanitizeChallengeDeliveryError(tc.raw)
+			if got != tc.want {
+				t.Fatalf("sanitizeChallengeDeliveryError(%q) = %q, want %q", tc.raw, got, tc.want)
+			}
+			for _, leaked := range []string{"user1@example.com", "secret-token", "secret-nonce", "10.0.0.8"} {
+				if strings.Contains(got, leaked) {
+					t.Fatalf("sanitized challenge delivery error leaked %q in %q", leaked, got)
+				}
+			}
+		})
+	}
+}
+
 func TestRepositoryChallengeDeliveryOutboxIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

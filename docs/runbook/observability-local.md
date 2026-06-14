@@ -47,6 +47,30 @@ api-gateway scrape target from container: host.docker.internal:11904
 
 注意：启动脚本不会预检镜像是否已存在；如果本机没有 `NEXUSIM_PROMETHEUS_IMAGE` 指定的镜像或默认 `prom/prometheus:v2.54.1`，Docker 会按自身配置尝试拉取镜像。
 
+## Legacy Descriptor Migration Gate
+
+移除 api-gateway legacy service descriptor 前，先对目标环境的 `/debug/metrics` 运行：
+
+```powershell
+.\tools\check-api-gateway-legacy-descriptor-migration.ps1 -MetricsUrl http://127.0.0.1:11904/debug/metrics
+```
+
+如果只想验证已保存的 JSON snapshot：
+
+```powershell
+.\tools\check-api-gateway-legacy-descriptor-migration.ps1 -SnapshotPath H:\NexusIM\loadtest-results\<run>\api-gateway-metrics.json
+```
+
+默认 gate 要求：
+
+```text
+runtime.register_legacy_descriptors = false
+grpc.legacy_descriptor_requests = 0
+grpc.legacy_descriptor_last_seen_unix_ms = 0
+```
+
+这只能证明本次 snapshot 没有 legacy descriptor 暴露 / 流量；正式移除前仍需要在目标环境持续观察 Prometheus alert / dashboard，并确认历史客户端迁移完成。
+
 ## Local Grafana
 
 api-gateway 的第一阶段 Grafana dashboard provisioning 位于：

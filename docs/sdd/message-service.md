@@ -870,6 +870,19 @@ NEXUSIM_MESSAGE_GRPC_TLS_CLIENT_ALLOWED_URIS=spiffe://nexusim/api-gateway
 
 当 `NEXUSIM_MESSAGE_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端没有启用 mTLS client cert 校验，message-service 必须在启动前直接失败，避免把第一阶段 trusted metadata 模式暴露到公网监听面。
 
+first-stage OpenTelemetry trace 默认关闭，仅覆盖 message-service gRPC server span。启用后从 incoming metadata 提取 W3C `traceparent`，只记录 service / method / gRPC status / latency / trace_id / request_id 等低敏属性，不记录 token、tenant/user/device/session id、消息正文、metadata payload 或 command hash。支持 exporter：
+
+```text
+NEXUSIM_MESSAGE_OTEL_TRACES_ENABLED=true
+NEXUSIM_MESSAGE_OTEL_SERVICE_NAME=message-service
+NEXUSIM_MESSAGE_OTEL_TRACES_EXPORTER=stdout|otlp-grpc
+NEXUSIM_MESSAGE_OTEL_TRACES_OTLP_ENDPOINT=otel-collector:4317
+NEXUSIM_MESSAGE_OTEL_TRACES_OTLP_INSECURE=true
+NEXUSIM_MESSAGE_OTEL_TRACES_SAMPLING_RATIO=1
+```
+
+`/debug/metrics` 会暴露低敏 trace runtime snapshot，便于确认 message-service 是否启用 trace、使用哪个 exporter 和采样率。当前仍是本地 debug/运维入口，不等同于完整 Prometheus / OpenTelemetry collector / alertmanager 生产栈。
+
 | 告警 | 排查顺序 | 修复 |
 | --- | --- | --- |
 | `SendMessage p99` 升高 | PG lock -> seq alloc -> outbox insert -> policy latency | 扩容、限流、热点升级 |

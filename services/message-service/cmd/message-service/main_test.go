@@ -125,6 +125,63 @@ func TestNewGRPCServerRejectsUnsupportedAuthMode(t *testing.T) {
 	}
 }
 
+func TestMessageTraceConfigDefaultsToDisabled(t *testing.T) {
+	clearMessageTraceConfig(t)
+	config, err := messageTraceConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load message trace config: %v", err)
+	}
+	if config.Enabled ||
+		config.ServiceName != "message-service" ||
+		config.Exporter != "stdout" ||
+		config.SamplingRatio != 1 {
+		t.Fatalf("unexpected default trace config: %+v", config)
+	}
+}
+
+func TestMessageTraceConfigLoadsOTLPGRPC(t *testing.T) {
+	clearMessageTraceConfig(t)
+	t.Setenv("NEXUSIM_MESSAGE_OTEL_TRACES_ENABLED", "true")
+	t.Setenv("NEXUSIM_MESSAGE_OTEL_SERVICE_NAME", "message-service-test")
+	t.Setenv("NEXUSIM_MESSAGE_OTEL_TRACES_EXPORTER", "otlp-grpc")
+	t.Setenv("NEXUSIM_MESSAGE_OTEL_TRACES_OTLP_ENDPOINT", "127.0.0.1:4317")
+	t.Setenv("NEXUSIM_MESSAGE_OTEL_TRACES_OTLP_INSECURE", "true")
+	t.Setenv("NEXUSIM_MESSAGE_OTEL_TRACES_SAMPLING_RATIO", "0.5")
+
+	config, err := messageTraceConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load message trace config: %v", err)
+	}
+	if !config.Enabled ||
+		config.ServiceName != "message-service-test" ||
+		config.Exporter != "otlp-grpc" ||
+		config.OTLPEndpoint != "127.0.0.1:4317" ||
+		!config.OTLPInsecure ||
+		config.SamplingRatio != 0.5 {
+		t.Fatalf("unexpected otlp trace config: %+v", config)
+	}
+}
+
+func TestMessageTraceConfigRejectsInvalidValues(t *testing.T) {
+	clearMessageTraceConfig(t)
+	t.Setenv("NEXUSIM_MESSAGE_OTEL_TRACES_ENABLED", "sometimes")
+	if _, err := messageTraceConfigFromEnv(); err == nil {
+		t.Fatalf("expected invalid enabled bool to fail")
+	}
+
+	clearMessageTraceConfig(t)
+	t.Setenv("NEXUSIM_MESSAGE_OTEL_TRACES_SAMPLING_RATIO", "2")
+	if _, err := messageTraceConfigFromEnv(); err == nil {
+		t.Fatalf("expected invalid sampling ratio to fail")
+	}
+
+	clearMessageTraceConfig(t)
+	t.Setenv("NEXUSIM_MESSAGE_OTEL_TRACES_OTLP_INSECURE", "sometimes")
+	if _, err := messageTraceConfigFromEnv(); err == nil {
+		t.Fatalf("expected invalid otlp insecure bool to fail")
+	}
+}
+
 func TestValidateTrustedMetadataListenerConfigAllowsPrivateAddressWithoutMTLS(t *testing.T) {
 	err := validateTrustedMetadataListenerConfig(
 		"172.31.50.10:10495",
@@ -330,6 +387,16 @@ func clearMessageGRPCTLSConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_MESSAGE_GRPC_TLS_REQUIRE_CLIENT_CERT", "")
 	t.Setenv("NEXUSIM_MESSAGE_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES", "")
 	t.Setenv("NEXUSIM_MESSAGE_GRPC_TLS_CLIENT_ALLOWED_URIS", "")
+}
+
+func clearMessageTraceConfig(t *testing.T) {
+	t.Helper()
+	t.Setenv("NEXUSIM_MESSAGE_OTEL_TRACES_ENABLED", "")
+	t.Setenv("NEXUSIM_MESSAGE_OTEL_SERVICE_NAME", "")
+	t.Setenv("NEXUSIM_MESSAGE_OTEL_TRACES_EXPORTER", "")
+	t.Setenv("NEXUSIM_MESSAGE_OTEL_TRACES_OTLP_ENDPOINT", "")
+	t.Setenv("NEXUSIM_MESSAGE_OTEL_TRACES_OTLP_INSECURE", "")
+	t.Setenv("NEXUSIM_MESSAGE_OTEL_TRACES_SAMPLING_RATIO", "")
 }
 
 func writeMessageTLSTestCert(t *testing.T, dir string, name string) (string, string) {

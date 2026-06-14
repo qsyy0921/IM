@@ -57,7 +57,7 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override 和 tenant plan 文件热更新；
 api-gateway 已补 legacy/facade traffic metrics，用于旧 descriptor 迁移观察；
 legacy descriptor 已收敛为显式 opt-in 默认；
-api-gateway 已补 first-stage OpenTelemetry 入口 server span 和下游 gRPC client span，contacts-service 已开始后端服务 gRPC server span rollout；
+api-gateway 已补 first-stage OpenTelemetry 入口 server span 和下游 gRPC client span，contacts-service、message-service 已开始后端服务 gRPC server span rollout；
 search-service 和 AI 应用后端后置；
 客户端暂不纳入当前面试主线。
 ```
@@ -70,7 +70,7 @@ search-service 和 AI 应用后端后置；
 | --- | --- | --- |
 | `api-gateway` | 统一 user-facing gRPC 入口，gateway token 验证，verified metadata 注入，下游代理，token / tenant scope rate limit，静态 tenant plan override，tenant plan 文件热更新，legacy descriptor 显式 opt-in 默认，legacy/facade traffic metrics，first-stage OTel 入口 server span 和下游 gRPC client span，debug metrics | 统一入口、安全边界、correlation / trace 传播、facade-only 默认暴露面 |
 | `identity-service` | 注册、登录、Refresh Token、MFA TOTP、recovery codes、JWKS、session/device revoke、verification/password reset challenge、webhook / SMTP email challenge sender | 身份认证、MFA、token 轮换、JWKS、公私钥边界、通知投递可靠性 |
-| `message-service` | `SendMessage`、编辑、撤回、删除，message log，outbox，Kafka timeline event | 业务事务不直接 publish Kafka，使用 outbox 保证事件传播 |
+| `message-service` | `SendMessage`、编辑、撤回、删除，message log，outbox，Kafka timeline event，first-stage OTel gRPC server span | 业务事务不直接 publish Kafka，使用 outbox 保证事件传播，核心写服务已进入 trace rollout |
 | `conversation-service` | 会话成员事实源，`GetSendContext`，成员变更 saga，owner transfer | 会话成员事实边界、成员事件和消息事件共享 timeline seq |
 | `delivery-service` | timeline projection，durable `user_inbox`，`PullInbox`，`AckDelivery`，delivery outbox | 断线可恢复，push-gateway 不拥有 durable inbox |
 | `push-gateway` | WebSocket 在线通知，ACK 转发，resume buffer，Redis route，跨实例在线路由 | 在线唤醒层和可靠投递层解耦，Redis 故障时 PullInbox 兜底 |

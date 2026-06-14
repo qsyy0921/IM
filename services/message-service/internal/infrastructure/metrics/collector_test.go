@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	monitoringinfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/monitoring"
 	"github.com/qsyy0921/IM/services/message-service/internal/types"
 )
 
@@ -202,5 +203,31 @@ func TestHandlerMetricsIncludesOutboxRelaySnapshot(t *testing.T) {
 	}
 	if snapshot.OutboxRelay == nil || snapshot.OutboxRelay.TotalErrors != 2 {
 		t.Fatalf("unexpected outbox relay snapshot: %+v", snapshot.OutboxRelay)
+	}
+}
+
+func TestHandlerMetricsIncludesTraceSnapshot(t *testing.T) {
+	handler := NewHandler(NewCollector(), nil).WithTraceStats(func() monitoringinfra.TraceSnapshot {
+		return monitoringinfra.TraceSnapshot{
+			Enabled:       true,
+			ServiceName:   "message-service",
+			Exporter:      "stdout",
+			SamplingRatio: 1,
+		}
+	})
+	request := httptest.NewRequest(http.MethodGet, "/debug/metrics", nil)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d", response.Code)
+	}
+	var snapshot Snapshot
+	if err := json.Unmarshal(response.Body.Bytes(), &snapshot); err != nil {
+		t.Fatalf("decode metrics: %v", err)
+	}
+	if snapshot.Trace == nil || !snapshot.Trace.Enabled || snapshot.Trace.ServiceName != "message-service" {
+		t.Fatalf("unexpected trace snapshot: %+v", snapshot.Trace)
 	}
 }

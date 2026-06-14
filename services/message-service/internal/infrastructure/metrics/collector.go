@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	monitoringinfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/monitoring"
 	"github.com/qsyy0921/IM/services/message-service/internal/types"
 )
 
@@ -281,6 +282,7 @@ type Snapshot struct {
 	OutboxCommitLatencyMS                   LatencySnapshot                  `json:"outbox_commit_latency_ms"`
 	PGPool                                  *PGPoolSnapshot                  `json:"pg_pool,omitempty"`
 	OutboxRelay                             *types.OutboxRelayWorkerSnapshot `json:"outbox_relay,omitempty"`
+	Trace                                   *monitoringinfra.TraceSnapshot   `json:"trace,omitempty"`
 }
 
 type PGPoolSnapshot struct {
@@ -299,6 +301,7 @@ type Handler struct {
 	collector        *Collector
 	pool             *pgxpool.Pool
 	outboxRelayStats func() types.OutboxRelayWorkerSnapshot
+	traceStats       func() monitoringinfra.TraceSnapshot
 }
 
 func NewHandler(collector *Collector, pool *pgxpool.Pool) *Handler {
@@ -307,6 +310,11 @@ func NewHandler(collector *Collector, pool *pgxpool.Pool) *Handler {
 
 func (h *Handler) WithOutboxRelayStats(statsFunc func() types.OutboxRelayWorkerSnapshot) *Handler {
 	h.outboxRelayStats = statsFunc
+	return h
+}
+
+func (h *Handler) WithTraceStats(statsFunc func() monitoringinfra.TraceSnapshot) *Handler {
+	h.traceStats = statsFunc
 	return h
 }
 
@@ -341,6 +349,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h.outboxRelayStats != nil {
 		relaySnapshot := h.outboxRelayStats()
 		snapshot.OutboxRelay = &relaySnapshot
+	}
+	if h.traceStats != nil {
+		traceSnapshot := h.traceStats()
+		snapshot.Trace = &traceSnapshot
 	}
 	writeJSON(w, http.StatusOK, snapshot)
 }

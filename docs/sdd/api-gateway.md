@@ -194,7 +194,7 @@ NEXUSIM_API_GATEWAY_OTEL_TRACES_SAMPLING_RATIO=1
 
 Legacy descriptor migration audit：
 
-`/debug/metrics` 的 gRPC snapshot 会按 method 前缀聚合 `facade_requests`、`legacy_descriptor_requests` 和 `other_requests`，runtime snapshot 会暴露 `register_legacy_descriptors` 与 `legacy_descriptors_allowed_until_unix_ms`。这些字段只用于观察旧 descriptor 是否仍有流量和 opt-in 是否仍在迁移窗口内，不输出 tenant、user、token 或 request body。只要 `legacy_descriptor_requests` 在真实环境里仍持续增长，或 legacy opt-in 已超过配置 deadline，就不能把 legacy descriptor 移除计划标记为完成。`tools/check-api-gateway-legacy-descriptor-migration.ps1` 可基于 live `/debug/metrics` 或离线 JSON snapshot 执行移除门禁；默认任何历史 legacy traffic 都会失败，也可以显式设置 `-RequiredQuietDuration 7d` 这类静默窗口，让累计请求数存在但 `legacy_descriptor_last_seen_unix_ms` 已足够久远的环境通过。脚本还会检查 legacy opt-in deadline，避免用过期 snapshot 误判迁移状态。
+`/debug/metrics` 的 gRPC snapshot 会按 method 前缀聚合 `facade_requests`、`legacy_descriptor_requests` 和 `other_requests`，runtime snapshot 会暴露 `register_legacy_descriptors` 与 `legacy_descriptors_allowed_until_unix_ms`。这些字段只用于观察旧 descriptor 是否仍有流量和 opt-in 是否仍在迁移窗口内，不输出 tenant、user、token 或 request body。只要 `legacy_descriptor_requests` 在真实环境里仍持续增长，或 legacy opt-in 已超过配置 deadline，就不能把 legacy descriptor 移除计划标记为完成。`tools/check-api-gateway-legacy-descriptor-migration.ps1` 可基于 live `/debug/metrics` 或离线 JSON snapshot 执行移除门禁；默认任何历史 legacy traffic 都会失败，也可以显式设置 `-RequiredQuietDuration 7d` 这类静默窗口，让累计请求数存在但 `legacy_descriptor_last_seen_unix_ms` 已足够久远的环境通过。删除前建议同时设置 `-RequireFacadeTraffic`、`-DisallowOtherTraffic` 和 `-MaxSnapshotAge`，证明目标环境已有 facade 流量、无未知 exposure，且使用的是足够新的 snapshot。脚本还会检查 legacy opt-in deadline，避免用过期 snapshot 误判迁移状态。
 
 下游地址：
 

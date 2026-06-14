@@ -61,6 +61,17 @@ api-gateway scrape target from container: host.docker.internal:11904
 .\tools\check-api-gateway-legacy-descriptor-migration.ps1 -SnapshotPath H:\NexusIM\loadtest-results\<run>\api-gateway-metrics.json
 ```
 
+删除 legacy descriptor 前建议使用更强门禁，要求 snapshot 足够新、facade 已有真实流量、无未知 exposure，并满足 quiet window：
+
+```powershell
+.\tools\check-api-gateway-legacy-descriptor-migration.ps1 `
+  -SnapshotPath H:\NexusIM\loadtest-results\<run>\api-gateway-metrics.json `
+  -MaxSnapshotAge 30m `
+  -RequireFacadeTraffic `
+  -DisallowOtherTraffic `
+  -RequiredQuietDuration 7d
+```
+
 默认 gate 要求：
 
 ```text
@@ -69,7 +80,7 @@ grpc.legacy_descriptor_requests = 0
 grpc.legacy_descriptor_last_seen_unix_ms = 0
 ```
 
-这只能证明本次 snapshot 没有 legacy descriptor 暴露 / 流量；正式移除前仍需要在目标环境持续观察 Prometheus alert / dashboard，并确认历史客户端迁移完成。
+这只能证明本次 snapshot 没有 legacy descriptor 暴露 / 流量；正式移除前应使用强门禁和目标环境持续 Prometheus alert / dashboard 观察，确认历史客户端已经切到 `GatewayService` facade。
 
 ## Local Grafana
 

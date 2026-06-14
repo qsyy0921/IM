@@ -2,9 +2,12 @@ param(
     [string]$MetricsUrl = "http://127.0.0.1:11904/debug/metrics",
     [string]$SnapshotPath = "",
     [string]$RequiredQuietDuration = "",
+    [string]$MaxSnapshotAge = "",
     [int64]$NowUnixMS = 0,
     [switch]$AllowRegisteredLegacyDescriptors,
-    [switch]$AllowObservedLegacyTraffic
+    [switch]$AllowObservedLegacyTraffic,
+    [switch]$RequireFacadeTraffic,
+    [switch]$DisallowOtherTraffic
 )
 
 $ErrorActionPreference = "Stop"
@@ -54,6 +57,11 @@ function Convert-DurationToMilliseconds {
 }
 
 $snapshot = Read-MetricsSnapshot
+$snapshotGeneratedAtMS = [int64]0
+if ($null -ne $snapshot.generated_at_ms) {
+    $snapshotGeneratedAtMS = Get-Int64OrZero $snapshot.generated_at_ms
+}
+
 $registered = $false
 if ($null -ne $snapshot.runtime -and $null -ne $snapshot.runtime.register_legacy_descriptors) {
     $registered = [bool]$snapshot.runtime.register_legacy_descriptors
@@ -66,12 +74,17 @@ if ($null -ne $snapshot.runtime -and $null -ne $snapshot.runtime.legacy_descript
 
 $legacyRequests = [int64]0
 $legacyLastSeenMS = [int64]0
+$facadeRequests = [int64]0
+$otherRequests = [int64]0
 if ($null -ne $snapshot.grpc) {
+    $facadeRequests = Get-Int64OrZero $snapshot.grpc.facade_requests
     $legacyRequests = Get-Int64OrZero $snapshot.grpc.legacy_descriptor_requests
     $legacyLastSeenMS = Get-Int64OrZero $snapshot.grpc.legacy_descriptor_last_seen_unix_ms
+    $otherRequests = Get-Int64OrZero $snapshot.grpc.other_requests
 }
 
 $quietMS = Convert-DurationToMilliseconds $RequiredQuietDuration
+$maxSnapshotAgeMS = Convert-DurationToMilliseconds $MaxSnapshotAge
 $nowMS = $NowUnixMS
 if ($nowMS -le 0) {
     $nowMS = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
@@ -85,6 +98,27 @@ if ($registered -and -not $AllowRegisteredLegacyDescriptors) {
 
 if ($registered -and $legacyAllowedUntilMS -gt 0 -and $legacyAllowedUntilMS -le $nowMS) {
     Write-Host "FAIL api-gateway legacy descriptor opt-in deadline has expired: allowed_until_unix_ms=$legacyAllowedUntilMS now_unix_ms=$nowMS." -ForegroundColor Red
+    $failed = $true
+}
+
+if ($maxSnapshotAgeMS -gt 0) {
+    if ($snapshotGeneratedAtMS -le 0) {
+        Write-Host "FAIL api-gateway metrics snapshot has no generated_at_ms; cannot prove max snapshot age." -ForegroundColor Red
+        $failed = $true
+    } else {
+        $snapshotAgeMS = $nowMS - $snapshotGeneratedAtMS
+        if ($snapshotAgeMS -lt 0) {
+            Write-Host "FAIL api-gateway metrics snapshot is from the future: generated_at_ms=$snapshotGeneratedAtMS now_unix_ms=$nowMS." -ForegroundColor Red
+            $failed = $true
+        } elseif ($snapshotAgeMS -gt $maxSnapshotAgeMS) {
+            Write-Host "FAIL api-gateway metrics snapshot is too old: max_snapshot_age_ms=$maxSnapshotAgeMS actual_snapshot_age_ms=$snapshotAgeMS generated_at_ms=$snapshotGeneratedAtMS." -ForegroundColor Red
+            $failed = $true
+        }
+    }
+}
+
+if ($RequireFacadeTraffic -and $facadeRequests -le 0) {
+    Write-Host "FAIL api-gateway facade traffic has not been observed; cannot prove clients migrated to GatewayService." -ForegroundColor Red
     $failed = $true
 }
 
@@ -106,9 +140,14 @@ if (($legacyRequests -gt 0 -or $legacyLastSeenMS -gt 0) -and -not $AllowObserved
     }
 }
 
+if ($DisallowOtherTraffic -and $otherRequests -gt 0) {
+    Write-Host "FAIL api-gateway observed non-facade/non-legacy gRPC traffic: other_requests=$otherRequests." -ForegroundColor Red
+    $failed = $true
+}
+
 if ($failed) {
     exit 1
 }
 
 Write-Host "OK   api-gateway legacy descriptor migration gate"
-Write-Host "     registered=$registered legacy_requests=$legacyRequests legacy_last_seen_unix_ms=$legacyLastSeenMS legacy_allowed_until_unix_ms=$legacyAllowedUntilMS required_quiet_ms=$quietMS now_unix_ms=$nowMS"
+Write-Host "     registered=$registered facade_requests=$facadeRequests legacy_requests=$legacyRequests other_requests=$otherRequests legacy_last_seen_unix_ms=$legacyLastSeenMS legacy_allowed_until_unix_ms=$legacyAllowedUntilMS required_quiet_ms=$quietMS max_snapshot_age_ms=$maxSnapshotAgeMS snapshot_generated_at_ms=$snapshotGeneratedAtMS now_unix_ms=$nowMS"

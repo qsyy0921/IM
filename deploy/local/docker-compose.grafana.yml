@@ -1,0 +1,19 @@
+name: nexusim-grafana
+
+services:
+  grafana:
+    image: ${NEXUSIM_GRAFANA_IMAGE:-grafana/grafana-oss:11.2.0}
+    container_name: nexusim-grafana
+    ports:
+      - "13000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: nexusim
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+    volumes:
+      - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/nexusim.yml:ro
+      - ./grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/nexusim.yml:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro

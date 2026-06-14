@@ -47,6 +47,41 @@ api-gateway scrape target from container: host.docker.internal:11904
 
 注意：启动脚本不会预检镜像是否已存在；如果本机没有 `NEXUSIM_PROMETHEUS_IMAGE` 指定的镜像或默认 `prom/prometheus:v2.54.1`，Docker 会按自身配置尝试拉取镜像。
 
+## Local Grafana
+
+api-gateway 的第一阶段 Grafana dashboard provisioning 位于：
+
+```text
+deploy/local/docker-compose.grafana.yml
+deploy/local/grafana-datasources.yml
+deploy/local/grafana-dashboards.yml
+deploy/local/grafana/dashboards/api-gateway-observability.json
+```
+
+启动：
+
+```powershell
+.\tools\local-up-grafana.ps1
+```
+
+停止：
+
+```powershell
+.\tools\local-down-grafana.ps1
+```
+
+本地端点：
+
+```text
+Grafana UI: http://127.0.0.1:13000
+login:      admin / nexusim
+datasource: http://host.docker.internal:19090
+```
+
+当前 dashboard 只覆盖 api-gateway 的本地 Prometheus 指标：request rate、error rate、facade / legacy descriptor / other exposure、latency、rate-limit decisions、JWKS refresh failures 和 OTel enabled。它用于本地开发和面试演示，不是生产 Grafana 部署；生产化前还需要多服务 dashboard、权限、datasource secret 管理、retention、SLO 阈值和告警路由。
+
+注意：启动脚本不会预检镜像是否已存在；如果本机没有 `NEXUSIM_GRAFANA_IMAGE` 指定的镜像或默认 `grafana/grafana-oss:11.2.0`，Docker 会按自身配置尝试拉取镜像。
+
 ## OpenTelemetry Collector
 
 默认本地基础设施不会启动 collector。需要验证 OTLP trace exporter 时单独启动：

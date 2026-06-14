@@ -19,6 +19,9 @@ try {
     Write-Host "== local prometheus config =="
     & (Join-Path $PSScriptRoot "check-local-prometheus-config.ps1")
 
+    Write-Host "== local grafana config =="
+    & (Join-Path $PSScriptRoot "check-local-grafana-config.ps1")
+
     Write-Host "== git whitespace =="
     git diff --check
     git diff --cached --check

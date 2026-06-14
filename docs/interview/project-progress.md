@@ -125,7 +125,7 @@ search-service 和 AI 应用后端后置；
 
 当前已经落地：
 
-- 各核心服务的 `/healthz`、`/readyz`、`/debug/metrics`，以及 api-gateway 第一阶段 Prometheus text `/metrics` 和本地 scrape / alert rules 原型；
+- 各核心服务的 `/healthz`、`/readyz`、`/debug/metrics`，以及 api-gateway 第一阶段 Prometheus text `/metrics`、本地 scrape / alert rules 原型和本地 Grafana dashboard 原型；
 - gRPC / WebSocket 公网监听下的弱鉴权 / 明文入口启动门禁；
 - trusted metadata 和 mTLS 边界的第一阶段收口；
 - gateway token、JWKS、RS256 key overlap；
@@ -144,7 +144,7 @@ search-service 和 AI 应用后端后置；
 
 | 服务 | 待开发 / 待完善功能 |
 | --- | --- |
-| `api-gateway` | dashboard / 生产采样治理、后端服务 server span rollout、legacy opt-in 实际迁移观察和移除计划、配置中心 / DB-backed quota hardening、生产部署治理；当前已有第一阶段 Prometheus text `/metrics` 和本地 alert rules，但还不是生产告警平台 |
+| `api-gateway` | 生产采样治理、后端服务 server span rollout、legacy opt-in 实际迁移观察和移除计划、配置中心 / DB-backed quota hardening、生产部署治理；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules 和本地 Grafana dashboard，但还不是生产观测平台 |
 | `identity-service` | WebAuthn / passkeys、OIDC federation、多 issuer、KMS / HSM key management、完整登录风控、SMS provider、bounce handling、多租户通知模板 |
 | `message-service` | 更多消息类型、私有删除、合规删除、容量压测、生产级发送链路观测 |
 | `conversation-service` | 更完整群管理、owner transfer 策略细化、成员可见窗口历史 repair |

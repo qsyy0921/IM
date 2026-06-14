@@ -27,7 +27,7 @@
 继续做入口治理和后端服务观测 rollout：
 
 - 运行时动态 tenant quota 文件热更新已进入第一阶段，后续只做配置中心 / DB-backed quota hardening；
-- api-gateway 已有入口 server span、下游 gRPC client span、第一阶段 Prometheus text `/metrics` 和本地 Prometheus scrape / alert rules 原型；
+- api-gateway 已有入口 server span、下游 gRPC client span、第一阶段 Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型和本地 Grafana dashboard 原型；
 - contacts-service、identity-service、message-service、conversation-service、delivery-service、receipt-service、policy-service 已开始后端服务 gRPC server span rollout；本地 OTel collector debug 入口和 policy OTLP smoke 脚本已补；后续继续补 alerting / dashboard / 生产采样治理；
 - legacy descriptor opt-in 使用面已有 first-stage metrics 计数，后续继续迁移观察和移除计划；
 - 必要单测 / 集成测试；

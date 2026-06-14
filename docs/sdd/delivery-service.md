@@ -523,6 +523,19 @@ NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE=...
 
 当 `NEXUSIM_DELIVERY_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端没有启用 mTLS client cert 校验，delivery-service 必须在启动前直接失败，避免把第一阶段 trusted metadata 模式暴露到公网监听面。
 
+delivery-service `grpc` 模式已支持第一阶段 OpenTelemetry gRPC server span，默认关闭。开启后只记录低敏服务侧属性：gRPC full method、status code、latency、`x-nexusim-trace-id`、`x-nexusim-request-id`，并从 `traceparent` 继承 W3C trace context；不得写入 token、tenant/user/device/session id、conversation id、message id 或 payload。
+
+```text
+NEXUSIM_DELIVERY_OTEL_TRACES_ENABLED=true
+NEXUSIM_DELIVERY_OTEL_SERVICE_NAME=delivery-service
+NEXUSIM_DELIVERY_OTEL_TRACES_EXPORTER=stdout|otlp-grpc
+NEXUSIM_DELIVERY_OTEL_TRACES_OTLP_ENDPOINT=otel-collector:4317
+NEXUSIM_DELIVERY_OTEL_TRACES_OTLP_INSECURE=true
+NEXUSIM_DELIVERY_OTEL_TRACES_SAMPLING_RATIO=1
+```
+
+`stdout` 适合本地 smoke；`otlp-grpc` 必须显式配置 endpoint。OTel collector、采样策略治理、alerting 和 dashboard 仍属于后续统一观测治理，不在本切片内宣称完成。
+
 本地最小 smoke：
 
 ```text

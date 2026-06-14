@@ -15,6 +15,7 @@ type Handler struct {
 	grpcMetrics              *GRPCMetrics
 	timelineWorkerSnapshotFn func() types.ProjectionWorkerSnapshot
 	outboxRelaySnapshotFn    func() types.OutboxRelayWorkerSnapshot
+	traceStatsFunc           func() TraceSnapshot
 }
 
 func NewHandler(pool *pgxpool.Pool, grpcMetrics ...*GRPCMetrics) *Handler {
@@ -32,6 +33,11 @@ func (h *Handler) WithTimelineProjectionWorkerStats(snapshotFunc func() types.Pr
 
 func (h *Handler) WithOutboxRelayStats(snapshotFunc func() types.OutboxRelayWorkerSnapshot) *Handler {
 	h.outboxRelaySnapshotFn = snapshotFunc
+	return h
+}
+
+func (h *Handler) WithTraceStats(statsFunc func() TraceSnapshot) *Handler {
+	h.traceStatsFunc = statsFunc
 	return h
 }
 
@@ -78,6 +84,10 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	if h.outboxRelaySnapshotFn != nil {
 		relaySnapshot := h.outboxRelaySnapshotFn()
 		snapshot.OutboxRelay = &relaySnapshot
+	}
+	if h.traceStatsFunc != nil {
+		traceSnapshot := h.traceStatsFunc()
+		snapshot.Trace = &traceSnapshot
 	}
 	if h.pool != nil {
 		stats := h.pool.Stat()
@@ -135,6 +145,7 @@ type Snapshot struct {
 	GRPC                     *GRPCSnapshot                    `json:"grpc,omitempty"`
 	TimelineProjectionWorker *types.ProjectionWorkerSnapshot  `json:"timeline_projection_worker,omitempty"`
 	OutboxRelay              *types.OutboxRelayWorkerSnapshot `json:"outbox_relay,omitempty"`
+	Trace                    *TraceSnapshot                   `json:"trace,omitempty"`
 }
 
 type PGPoolSnapshot struct {

@@ -113,6 +113,27 @@ func TestHandlerMetricsIncludesOutboxRelaySnapshot(t *testing.T) {
 	}
 }
 
+func TestHandlerMetricsIncludesTraceSnapshot(t *testing.T) {
+	handler := NewHandler(nil).WithTraceStats(func() TraceSnapshot {
+		return TraceSnapshot{Enabled: true, ServiceName: serviceName, Exporter: "stdout", SamplingRatio: 1}
+	})
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/debug/metrics", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+
+	var body Snapshot
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode metrics response: %v", err)
+	}
+	if body.Trace == nil || !body.Trace.Enabled || body.Trace.ServiceName != serviceName {
+		t.Fatalf("expected trace metrics, got %+v", body.Trace)
+	}
+}
+
 func TestHandlerMetricsIncludesDeliverySnapshotsIntegration(t *testing.T) {
 	pool := openMonitoringTestPool(t)
 	ctx := context.Background()

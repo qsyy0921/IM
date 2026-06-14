@@ -685,6 +685,10 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 	if err != nil {
 		return nil, nil, err
 	}
+	tenantPlanRequireChecksum, err := tenantPlanRequireChecksumFromEnv()
+	if err != nil {
+		return nil, nil, err
+	}
 	if tenantPlanReloadInterval > 0 && tenantPlanSnapshot.Source != "file" && tenantPlanSnapshot.Source != "url" {
 		return nil, nil, errors.New("api-gateway tenant plan reload requires NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE=file or url")
 	}
@@ -734,7 +738,7 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 		}
 		closeFn := func() error { return client.Close() }
 		if tenantPlanReloadInterval > 0 {
-			stopReloader, err := startTenantPlanReloader(ctx, limiter, tenantPlanSnapshot.Source, tenantPlanReloadLocationFromEnv(tenantPlanSnapshot.Source), tenantPlanMaxAge, tenantPlanReloadInterval)
+			stopReloader, err := startTenantPlanReloader(ctx, limiter, tenantPlanSnapshot.Source, tenantPlanReloadLocationFromEnv(tenantPlanSnapshot.Source), tenantPlanMaxAge, tenantPlanRequireChecksum, tenantPlanReloadInterval)
 			if err != nil {
 				_ = closeFn()
 				return nil, nil, err
@@ -749,7 +753,7 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 	}
 	closeFn := func() error { return nil }
 	if tenantPlanReloadInterval > 0 {
-		stopReloader, err := startTenantPlanReloader(ctx, limiter, tenantPlanSnapshot.Source, tenantPlanReloadLocationFromEnv(tenantPlanSnapshot.Source), tenantPlanMaxAge, tenantPlanReloadInterval)
+		stopReloader, err := startTenantPlanReloader(ctx, limiter, tenantPlanSnapshot.Source, tenantPlanReloadLocationFromEnv(tenantPlanSnapshot.Source), tenantPlanMaxAge, tenantPlanRequireChecksum, tenantPlanReloadInterval)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -793,6 +797,10 @@ func tenantRateLimitPlansFromEnv(ctx context.Context) (tenantRateLimitPlanSnapsh
 	if err != nil {
 		return tenantRateLimitPlanSnapshot{}, err
 	}
+	requireChecksum, err := tenantPlanRequireChecksumFromEnv()
+	if err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
+	}
 	if source == "" || source == "auto" {
 		switch {
 		case raw != "":
@@ -830,7 +838,7 @@ func tenantRateLimitPlansFromEnv(ctx context.Context) (tenantRateLimitPlanSnapsh
 			return tenantRateLimitPlanSnapshot{}, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL is required when tenant plan source is url")
 		}
 		source = "url"
-		snapshot, err := tenantRateLimitPlansFromURL(ctx, endpoint, maxAge)
+		snapshot, err := tenantRateLimitPlansFromURL(ctx, endpoint, maxAge, requireChecksum)
 		if err != nil {
 			return tenantRateLimitPlanSnapshot{}, err
 		}
@@ -846,13 +854,13 @@ func tenantRateLimitPlansFromEnv(ctx context.Context) (tenantRateLimitPlanSnapsh
 		return tenantRateLimitPlanSnapshot{}, err
 	}
 	snapshot.Source = source
-	if err := validateTenantPlanMaxAge(snapshot, maxAge); err != nil {
+	if err := validateTenantPlanSnapshotPolicy(snapshot, maxAge, requireChecksum); err != nil {
 		return tenantRateLimitPlanSnapshot{}, err
 	}
 	return snapshot, nil
 }
 
-func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge time.Duration) (tenantRateLimitPlanSnapshot, error) {
+func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge time.Duration, requireChecksum bool) (tenantRateLimitPlanSnapshot, error) {
 	endpoint = strings.TrimSpace(endpoint)
 	if endpoint == "" {
 		return tenantRateLimitPlanSnapshot{}, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL is required when tenant plan source is url")
@@ -916,7 +924,7 @@ func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge ti
 	if snapshot.Version == "" {
 		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL source requires a versioned snapshot")
 	}
-	if err := validateTenantPlanMaxAge(snapshot, maxAge); err != nil {
+	if err := validateTenantPlanSnapshotPolicy(snapshot, maxAge, requireChecksum); err != nil {
 		return tenantRateLimitPlanSnapshot{}, err
 	}
 	snapshot.Source = "url"
@@ -1129,6 +1137,21 @@ func tenantPlanMaxAgeFromEnv() (time.Duration, error) {
 	return maxAge, nil
 }
 
+func tenantPlanRequireChecksumFromEnv() (bool, error) {
+	value, _, err := envOptionalBool("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_REQUIRE_CHECKSUM")
+	return value, err
+}
+
+func validateTenantPlanSnapshotPolicy(snapshot tenantRateLimitPlanSnapshot, maxAge time.Duration, requireChecksum bool) error {
+	if err := validateTenantPlanMaxAge(snapshot, maxAge); err != nil {
+		return err
+	}
+	if requireChecksum && !snapshot.ChecksumPresent {
+		return errors.New("api-gateway tenant plan snapshot checksum is required")
+	}
+	return nil
+}
+
 func validateTenantPlanMaxAge(snapshot tenantRateLimitPlanSnapshot, maxAge time.Duration) error {
 	if maxAge <= 0 || snapshot.GeneratedAtUnixMS <= 0 {
 		return nil
@@ -1151,7 +1174,7 @@ func tenantPlanReloadLocationFromEnv(source string) string {
 	}
 }
 
-func startTenantPlanReloader(ctx context.Context, limiter *ratelimitinfra.Limiter, source string, location string, maxAge time.Duration, interval time.Duration) (func() error, error) {
+func startTenantPlanReloader(ctx context.Context, limiter *ratelimitinfra.Limiter, source string, location string, maxAge time.Duration, requireChecksum bool, interval time.Duration) (func() error, error) {
 	source = strings.TrimSpace(source)
 	location = strings.TrimSpace(location)
 	if location == "" {
@@ -1178,7 +1201,7 @@ func startTenantPlanReloader(ctx context.Context, limiter *ratelimitinfra.Limite
 			case <-reloadCtx.Done():
 				return
 			case <-ticker.C:
-				snapshot, err := tenantRateLimitPlansFromSource(reloadCtx, source, location, maxAge)
+				snapshot, err := tenantRateLimitPlansFromSource(reloadCtx, source, location, maxAge, requireChecksum)
 				if err != nil {
 					limiter.RecordTenantPlanReloadError()
 					log.Printf("api-gateway tenant rate limit plan reload failed: %v", err)
@@ -1197,19 +1220,19 @@ func startTenantPlanReloader(ctx context.Context, limiter *ratelimitinfra.Limite
 	}, nil
 }
 
-func tenantRateLimitPlansFromSource(ctx context.Context, source string, location string, maxAge time.Duration) (tenantRateLimitPlanSnapshot, error) {
+func tenantRateLimitPlansFromSource(ctx context.Context, source string, location string, maxAge time.Duration, requireChecksum bool) (tenantRateLimitPlanSnapshot, error) {
 	switch source {
 	case "file":
 		snapshot, err := tenantRateLimitPlansFromFile(location)
 		if err != nil {
 			return tenantRateLimitPlanSnapshot{}, err
 		}
-		if err := validateTenantPlanMaxAge(snapshot, maxAge); err != nil {
+		if err := validateTenantPlanSnapshotPolicy(snapshot, maxAge, requireChecksum); err != nil {
 			return tenantRateLimitPlanSnapshot{}, err
 		}
 		return snapshot, nil
 	case "url":
-		return tenantRateLimitPlansFromURL(ctx, location, maxAge)
+		return tenantRateLimitPlansFromURL(ctx, location, maxAge, requireChecksum)
 	default:
 		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan reload requires file or url source")
 	}

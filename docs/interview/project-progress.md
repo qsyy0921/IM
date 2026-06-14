@@ -54,7 +54,7 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 ```text
 9 个后端服务已经能跑通主链路；
 现在先继续做 9 服务 hardening；
-api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、applied quota snapshot stale 观测和 quota snapshot gate；
+api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、可选 checksum-required gate、applied quota snapshot stale 观测和 quota snapshot gate；
 api-gateway 已补 legacy/facade traffic metrics，用于旧 descriptor 迁移观察；
 legacy descriptor 已收敛为显式 opt-in 默认；
 api-gateway 已补 first-stage OpenTelemetry 入口 server span 和下游 gRPC client span，contacts-service、identity-service、message-service、conversation-service、delivery-service、receipt-service、policy-service 已开始后端服务 gRPC server span rollout；
@@ -69,7 +69,7 @@ search-service 和 AI 应用后端后置；
 
 | 服务 | 已完成能力 | 面试可讲重点 |
 | --- | --- | --- |
-| `api-gateway` | 统一 user-facing gRPC 入口，gateway token 验证，verified metadata 注入，下游代理，token / tenant scope rate limit，静态 tenant plan override，tenant plan 文件热更新，版本化 quota URL source，URL bearer token / HTTPS guard，URL source CA / client cert TLS 边界，applied quota snapshot stale 观测，quota snapshot gate，legacy descriptor 显式 opt-in 默认，legacy/facade traffic metrics，first-stage OTel 入口 server span 和下游 gRPC client span，debug metrics | 统一入口、安全边界、correlation / trace 传播、facade-only 默认暴露面 |
+| `api-gateway` | 统一 user-facing gRPC 入口，gateway token 验证，verified metadata 注入，下游代理，token / tenant scope rate limit，静态 tenant plan override，tenant plan 文件热更新，版本化 quota URL source，URL bearer token / HTTPS guard，URL source CA / client cert TLS 边界，可选 checksum-required gate，applied quota snapshot stale 观测，quota snapshot gate，legacy descriptor 显式 opt-in 默认，legacy/facade traffic metrics，first-stage OTel 入口 server span 和下游 gRPC client span，debug metrics | 统一入口、安全边界、correlation / trace 传播、facade-only 默认暴露面 |
 | `identity-service` | 注册、登录、Refresh Token、MFA TOTP、recovery codes、JWKS、session/device revoke、verification/password reset challenge、webhook / SMTP email challenge sender，first-stage OTel gRPC server span | 身份认证、MFA、token 轮换、JWKS、公私钥边界、通知投递可靠性，身份服务已进入 trace rollout |
 | `message-service` | `SendMessage`、编辑、撤回、删除，message log，outbox，Kafka timeline event，first-stage OTel gRPC server span | 业务事务不直接 publish Kafka，使用 outbox 保证事件传播，核心写服务已进入 trace rollout |
 | `conversation-service` | 会话成员事实源，`GetSendContext`，成员变更 saga，owner transfer，first-stage OTel gRPC server span | 会话成员事实边界、成员事件和消息事件共享 timeline seq，成员事实服务已进入 trace rollout |

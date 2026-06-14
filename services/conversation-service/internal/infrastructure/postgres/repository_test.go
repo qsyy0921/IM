@@ -1006,6 +1006,55 @@ INSERT INTO message_outbox (
 	}
 }
 
+func TestRepositoryMarkPublishedMemberChangesRejectsMismatchedOutboxRows(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pg pool: %v", err)
+	}
+	defer pool.Close()
+
+	resetMemberChangeTables(t, ctx, pool)
+	if _, err := pool.Exec(ctx, `
+INSERT INTO member_change_saga (
+    change_id, tenant_id, conversation_id, user_id, change_type, status,
+    idempotency_key, command_hash, operator_id, conflict_policy,
+    outbox_event_id, timeline_event_id
+) VALUES
+    ('change-bad-producer', 'tenant-member', 'conv-member', 'target-1', 'JOIN', 'OUTBOX_ENQUEUED', 'idem-bad-producer', 'hash-bad-producer', 'owner-1', 'REJECT', 'event-bad-producer', 'event-bad-producer'),
+    ('change-bad-type', 'tenant-member', 'conv-member', 'target-2', 'JOIN', 'OUTBOX_ENQUEUED', 'idem-bad-type', 'hash-bad-type', 'owner-1', 'REJECT', 'event-bad-type', 'event-bad-type'),
+    ('change-bad-conversation', 'tenant-member', 'conv-member', 'target-3', 'JOIN', 'OUTBOX_ENQUEUED', 'idem-bad-conversation', 'hash-bad-conversation', 'owner-1', 'REJECT', 'event-bad-conversation', 'event-bad-conversation'),
+    ('change-good', 'tenant-member', 'conv-member', 'target-4', 'JOIN', 'OUTBOX_ENQUEUED', 'idem-good', 'hash-good', 'owner-1', 'REJECT', 'event-good', 'event-good');
+INSERT INTO message_outbox (
+    event_id, tenant_id, conversation_id, aggregate_version, event_type,
+    event_version, partition_key, mapping_version, correlation_id, causation_id,
+    producer, payload_json, trace_id, status, published_at
+) VALUES
+    ('event-bad-producer', 'tenant-member', 'conv-member', 1, 'conversation.member.joined.v1', '1', 'tenant-member:conv-member', '1', 'c1', 'c1', 'message-service', '{}'::jsonb, 'trace-1', 'PUBLISHED', now()),
+    ('event-bad-type', 'tenant-member', 'conv-member', 2, 'message.persisted.v1', '1', 'tenant-member:conv-member', '1', 'c2', 'c2', 'conversation-service', '{}'::jsonb, 'trace-2', 'PUBLISHED', now()),
+    ('event-bad-conversation', 'tenant-member', 'conv-other', 3, 'conversation.member.joined.v1', '1', 'tenant-member:conv-other', '1', 'c3', 'c3', 'conversation-service', '{}'::jsonb, 'trace-3', 'PUBLISHED', now()),
+    ('event-good', 'tenant-member', 'conv-member', 4, 'conversation.member.joined.v1', '1', 'tenant-member:conv-member', '1', 'c4', 'c4', 'conversation-service', '{}'::jsonb, 'trace-4', 'PUBLISHED', now());
+`); err != nil {
+		t.Fatalf("seed mismatched published outbox rows: %v", err)
+	}
+
+	stats, err := NewRepository(pool).MarkPublishedMemberChanges(ctx, 100)
+	if err != nil {
+		t.Fatalf("mark with mismatched outbox rows: %v", err)
+	}
+	if stats.Advanced != 1 {
+		t.Fatalf("expected only valid outbox row to advance, got %+v", stats)
+	}
+	assertMemberChangeStatus(t, ctx, pool, "change-bad-producer", types.MemberChangeStatusOutboxEnqueued, false)
+	assertMemberChangeStatus(t, ctx, pool, "change-bad-type", types.MemberChangeStatusOutboxEnqueued, false)
+	assertMemberChangeStatus(t, ctx, pool, "change-bad-conversation", types.MemberChangeStatusOutboxEnqueued, false)
+	assertMemberChangeStatus(t, ctx, pool, "change-good", types.MemberChangeStatusDone, true)
+}
+
 func resetConversationTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	if _, err := pool.Exec(ctx, `

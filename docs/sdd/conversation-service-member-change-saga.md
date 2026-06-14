@@ -108,6 +108,7 @@ any state -> FAILED_COMPENSATED
 
 - `OUTBOX_ENQUEUED` 表示本地事务已经写入 `conversation_timeline_events` 和 `message_outbox`。
 - `EVENT_PUBLISHED` 表示 relay 已经把 outbox 事件发布到 Kafka 并标记 `PUBLISHED`。
+- `EVENT_PUBLISHED / DONE` 推进必须 fail-closed：trigger worker 只能观察同 tenant / conversation、`producer='conversation-service'`、event_type 属于 `conversation.member.*` 且 `PUBLISHED + published_at IS NOT NULL` 的 outbox 行；手工 repair、错误 producer 或错误 event type 不得推进成员 saga。
 - migration v2 已补齐 `OUTBOX_ENQUEUED` 状态，避免把“已入 outbox”误写成“已发布 Kafka”。
 
 ## 5. 同步 API 契约

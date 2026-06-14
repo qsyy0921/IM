@@ -166,10 +166,11 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 
 - `api-gateway`：入口配额、tenant quota 文件热更新、OTel server/client trace、legacy/facade traffic metrics 和 legacy opt-in 迁移观察；
 - `contacts-service`：first-stage OTel gRPC server span，作为后端服务 server span rollout 的首个样例；
+- `identity-service`：first-stage OTel gRPC server span，覆盖登录 / Refresh / challenge / MFA 管理服务侧请求；
 - `message-service`：first-stage OTel gRPC server span，开始覆盖核心写链路服务侧请求；
 - `conversation-service`：first-stage OTel gRPC server span，覆盖会话成员事实服务侧请求；
 - `delivery-service`：first-stage OTel gRPC server span，覆盖 durable inbox / ACK 服务侧请求；
-- `identity-service`：身份安全、通知投递、key / issuer 治理；
+- `identity-service`：身份安全、通知投递、key / issuer 治理继续 hardening；
 - `message / conversation / delivery / push / receipt / contacts / policy`：继续清 repair、观测、故障语义和容量边界。
 
 ## 5. 第五阶段：搜索服务

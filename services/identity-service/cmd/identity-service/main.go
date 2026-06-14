@@ -155,6 +155,21 @@ func runGRPC() error {
 		}
 	}
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
+	traceConfig, err := identityTraceConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	traceRuntime, err := monitoringinfra.NewTraceRuntime(ctx, traceConfig)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := traceRuntime.Shutdown(shutdownCtx); err != nil {
+			log.Printf("identity-service OpenTelemetry trace shutdown failed: %v", err)
+		}
+	}()
 	challengeDeliveryMetrics := monitoringinfra.NewChallengeDeliveryMetrics(challengeDeliveryMode)
 	challengeNotifier = monitoringinfra.NewInstrumentedChallengeNotifier(challengeNotifier, challengeDeliveryMetrics)
 	challengeOptions := app.ChallengeOptions{
@@ -170,7 +185,8 @@ func runGRPC() error {
 	}
 	stopDebug, err := startDebugServer(ctx, identityDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics).
 		WithJWKSet(jwkSet).
-		WithChallengeDeliveryMetrics(challengeDeliveryMetrics))
+		WithChallengeDeliveryMetrics(challengeDeliveryMetrics).
+		WithTraceStats(traceRuntime.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -190,7 +206,7 @@ func runGRPC() error {
 			envDuration("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LOCK_DURATION", postgresinfra.DefaultChallengeRequestLockDuration),
 		),
 	)
-	server, err := newGRPCServerWithConfig(grpcMetrics, authMode, serverTLSConfig, serverTLSEnabled)
+	server, err := newGRPCServerWithConfig(grpcMetrics, authMode, serverTLSConfig, serverTLSEnabled, traceRuntime.UnaryServerInterceptor())
 	if err != nil {
 		return err
 	}
@@ -1230,11 +1246,16 @@ func newGRPCServer(grpcMetrics *monitoringinfra.GRPCMetrics) (*grpc.Server, erro
 	return newGRPCServerWithConfig(grpcMetrics, authMode, tlsConfig, tlsEnabled)
 }
 
-func newGRPCServerWithConfig(grpcMetrics *monitoringinfra.GRPCMetrics, authMode string, tlsConfig *tls.Config, tlsEnabled bool) (*grpc.Server, error) {
+func newGRPCServerWithConfig(grpcMetrics *monitoringinfra.GRPCMetrics, authMode string, tlsConfig *tls.Config, tlsEnabled bool, traceInterceptors ...grpc.UnaryServerInterceptor) (*grpc.Server, error) {
 	options := make([]grpc.ServerOption, 0, 2)
-	interceptors := make([]grpc.UnaryServerInterceptor, 0, 2)
+	interceptors := make([]grpc.UnaryServerInterceptor, 0, 3)
 	if grpcMetrics != nil {
 		interceptors = append(interceptors, grpcMetrics.UnaryServerInterceptor(log.Default()))
+	}
+	for _, interceptor := range traceInterceptors {
+		if interceptor != nil {
+			interceptors = append(interceptors, interceptor)
+		}
 	}
 	switch strings.ToLower(strings.TrimSpace(authMode)) {
 	case "body", "request", "legacy":
@@ -1250,6 +1271,41 @@ func newGRPCServerWithConfig(grpcMetrics *monitoringinfra.GRPCMetrics, authMode 
 		options = append(options, grpc.Creds(credentials.NewTLS(tlsConfig)))
 	}
 	return grpc.NewServer(options...), nil
+}
+
+func identityTraceConfigFromEnv() (monitoringinfra.TraceConfig, error) {
+	enabled, _, err := envOptionalBool("NEXUSIM_IDENTITY_OTEL_TRACES_ENABLED")
+	if err != nil {
+		return monitoringinfra.TraceConfig{}, err
+	}
+	otlpInsecure, _, err := envOptionalBool("NEXUSIM_IDENTITY_OTEL_TRACES_OTLP_INSECURE")
+	if err != nil {
+		return monitoringinfra.TraceConfig{}, err
+	}
+	samplingRatio, err := identityTraceSamplingRatioFromEnv()
+	if err != nil {
+		return monitoringinfra.TraceConfig{}, err
+	}
+	return monitoringinfra.TraceConfig{
+		Enabled:       enabled,
+		ServiceName:   envString("NEXUSIM_IDENTITY_OTEL_SERVICE_NAME", "identity-service"),
+		Exporter:      envString("NEXUSIM_IDENTITY_OTEL_TRACES_EXPORTER", "stdout"),
+		OTLPEndpoint:  envString("NEXUSIM_IDENTITY_OTEL_TRACES_OTLP_ENDPOINT", ""),
+		OTLPInsecure:  otlpInsecure,
+		SamplingRatio: samplingRatio,
+	}, nil
+}
+
+func identityTraceSamplingRatioFromEnv() (float64, error) {
+	raw := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_OTEL_TRACES_SAMPLING_RATIO"))
+	if raw == "" {
+		return 1, nil
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil || value <= 0 || value > 1 {
+		return 0, errors.New("NEXUSIM_IDENTITY_OTEL_TRACES_SAMPLING_RATIO must be > 0 and <= 1")
+	}
+	return value, nil
 }
 
 func validateTrustedMetadataListenerConfig(listenAddr string, authMode string, tlsConfig *tls.Config) error {

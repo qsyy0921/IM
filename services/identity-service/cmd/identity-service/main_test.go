@@ -91,6 +91,63 @@ func TestIdentityMFARecoveryRiskPolicyOverridesMFAEnv(t *testing.T) {
 	}
 }
 
+func TestIdentityTraceConfigDefaultsToDisabled(t *testing.T) {
+	clearIdentityTraceConfig(t)
+	config, err := identityTraceConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load identity trace config: %v", err)
+	}
+	if config.Enabled ||
+		config.ServiceName != "identity-service" ||
+		config.Exporter != "stdout" ||
+		config.SamplingRatio != 1 {
+		t.Fatalf("unexpected default trace config: %+v", config)
+	}
+}
+
+func TestIdentityTraceConfigLoadsOTLPGRPC(t *testing.T) {
+	clearIdentityTraceConfig(t)
+	t.Setenv("NEXUSIM_IDENTITY_OTEL_TRACES_ENABLED", "true")
+	t.Setenv("NEXUSIM_IDENTITY_OTEL_SERVICE_NAME", "identity-service-test")
+	t.Setenv("NEXUSIM_IDENTITY_OTEL_TRACES_EXPORTER", "otlp-grpc")
+	t.Setenv("NEXUSIM_IDENTITY_OTEL_TRACES_OTLP_ENDPOINT", "127.0.0.1:4317")
+	t.Setenv("NEXUSIM_IDENTITY_OTEL_TRACES_OTLP_INSECURE", "true")
+	t.Setenv("NEXUSIM_IDENTITY_OTEL_TRACES_SAMPLING_RATIO", "0.5")
+
+	config, err := identityTraceConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load identity trace config: %v", err)
+	}
+	if !config.Enabled ||
+		config.ServiceName != "identity-service-test" ||
+		config.Exporter != "otlp-grpc" ||
+		config.OTLPEndpoint != "127.0.0.1:4317" ||
+		!config.OTLPInsecure ||
+		config.SamplingRatio != 0.5 {
+		t.Fatalf("unexpected otlp trace config: %+v", config)
+	}
+}
+
+func TestIdentityTraceConfigRejectsInvalidValues(t *testing.T) {
+	clearIdentityTraceConfig(t)
+	t.Setenv("NEXUSIM_IDENTITY_OTEL_TRACES_ENABLED", "sometimes")
+	if _, err := identityTraceConfigFromEnv(); err == nil {
+		t.Fatalf("expected invalid enabled bool to fail")
+	}
+
+	clearIdentityTraceConfig(t)
+	t.Setenv("NEXUSIM_IDENTITY_OTEL_TRACES_SAMPLING_RATIO", "2")
+	if _, err := identityTraceConfigFromEnv(); err == nil {
+		t.Fatalf("expected invalid sampling ratio to fail")
+	}
+
+	clearIdentityTraceConfig(t)
+	t.Setenv("NEXUSIM_IDENTITY_OTEL_TRACES_OTLP_INSECURE", "sometimes")
+	if _, err := identityTraceConfigFromEnv(); err == nil {
+		t.Fatalf("expected invalid otlp insecure bool to fail")
+	}
+}
+
 func TestGatewayTokenJWKSetWithAdditionalKeysRejectsWeakRSAKeys(t *testing.T) {
 	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_JSON", `{"keys":[{"kty":"RSA","use":"sig","kid":"weak","alg":"RS256","n":"abc","e":"AQAB"}]}`)
 	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_FILE", "")
@@ -458,6 +515,16 @@ func clearIdentityGRPCTLSConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_REQUIRE_CLIENT_CERT", "")
 	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES", "")
 	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CLIENT_ALLOWED_URIS", "")
+}
+
+func clearIdentityTraceConfig(t *testing.T) {
+	t.Helper()
+	t.Setenv("NEXUSIM_IDENTITY_OTEL_TRACES_ENABLED", "")
+	t.Setenv("NEXUSIM_IDENTITY_OTEL_SERVICE_NAME", "")
+	t.Setenv("NEXUSIM_IDENTITY_OTEL_TRACES_EXPORTER", "")
+	t.Setenv("NEXUSIM_IDENTITY_OTEL_TRACES_OTLP_ENDPOINT", "")
+	t.Setenv("NEXUSIM_IDENTITY_OTEL_TRACES_OTLP_INSECURE", "")
+	t.Setenv("NEXUSIM_IDENTITY_OTEL_TRACES_SAMPLING_RATIO", "")
 }
 
 func writeIdentityTLSTestCert(t *testing.T, dir string, name string) (string, string) {

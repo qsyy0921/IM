@@ -18,6 +18,7 @@ type Handler struct {
 	challengeDeliveryMetrics *ChallengeDeliveryMetrics
 	challengeDeliveryWorker  func() types.ChallengeDeliveryWorkerSnapshot
 	outboxRelaySnapshotFn    func() types.OutboxRelayWorkerSnapshot
+	traceStatsFunc           func() TraceSnapshot
 	jwkSet                   any
 }
 
@@ -46,6 +47,11 @@ func (h *Handler) WithChallengeDeliveryWorkerStats(snapshotFunc func() types.Cha
 
 func (h *Handler) WithOutboxRelayStats(snapshotFunc func() types.OutboxRelayWorkerSnapshot) *Handler {
 	h.outboxRelaySnapshotFn = snapshotFunc
+	return h
+}
+
+func (h *Handler) WithTraceStats(statsFunc func() TraceSnapshot) *Handler {
+	h.traceStatsFunc = statsFunc
 	return h
 }
 
@@ -107,6 +113,10 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		relaySnapshot := h.outboxRelaySnapshotFn()
 		snapshot.OutboxRelay = &relaySnapshot
 	}
+	if h.traceStatsFunc != nil {
+		traceSnapshot := h.traceStatsFunc()
+		snapshot.Trace = &traceSnapshot
+	}
 	if h.pool != nil {
 		stats := h.pool.Stat()
 		snapshot.PGPool = &PGPoolSnapshot{
@@ -156,6 +166,7 @@ type Snapshot struct {
 	ChallengeDelivery            *ChallengeDeliverySnapshot             `json:"challenge_delivery,omitempty"`
 	ChallengeDeliveryWorker      *types.ChallengeDeliveryWorkerSnapshot `json:"challenge_delivery_worker,omitempty"`
 	OutboxRelay                  *types.OutboxRelayWorkerSnapshot       `json:"outbox_relay,omitempty"`
+	Trace                        *TraceSnapshot                         `json:"trace,omitempty"`
 }
 
 type PGPoolSnapshot struct {

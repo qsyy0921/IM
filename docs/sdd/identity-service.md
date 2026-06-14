@@ -409,4 +409,17 @@ ConfirmPasswordReset -> password hash updated + active session / refresh token r
 
 The gRPC server also emits one JSON request log per unary RPC with stable fields: `service`, `event`, `method`, `code`, `latency_ms`, and optional `trace_id` / `request_id` from gateway-verified or client-propagated gRPC metadata. These IDs are bounded before logging and the request log intentionally does not include user IDs, device IDs, tokens, challenge destinations or provider error bodies. The server can optionally run with TLS / mTLS as described above, but this is not yet full service-mesh identity or certificate lifecycle management.
 
+The `grpc` mode also supports first-stage OpenTelemetry gRPC server spans, disabled by default. When enabled, spans inherit W3C `traceparent` from incoming gRPC metadata and only record low-sensitive attributes: gRPC full method, status code, latency, `x-nexusim-trace-id`, and `x-nexusim-request-id`. Spans must not include tokens, passwords, TOTP / recovery codes, user IDs, device IDs, session IDs, challenge destinations, provider URLs, provider error bodies, or payloads.
+
+```text
+NEXUSIM_IDENTITY_OTEL_TRACES_ENABLED=true
+NEXUSIM_IDENTITY_OTEL_SERVICE_NAME=identity-service
+NEXUSIM_IDENTITY_OTEL_TRACES_EXPORTER=stdout|otlp-grpc
+NEXUSIM_IDENTITY_OTEL_TRACES_OTLP_ENDPOINT=otel-collector:4317
+NEXUSIM_IDENTITY_OTEL_TRACES_OTLP_INSECURE=true
+NEXUSIM_IDENTITY_OTEL_TRACES_SAMPLING_RATIO=1
+```
+
+`stdout` is for local smoke; `otlp-grpc` requires an explicit endpoint. OTel collector deployment, alerting, sampling governance and dashboards remain future observability hardening.
+
 This is intentionally a lightweight local/debug endpoint. Production tracing, alerting, all-service mTLS rollout, certificate governance, external SIEM / audit sinks and adaptive risk analytics remain future hardening items.

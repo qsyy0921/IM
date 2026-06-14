@@ -45,6 +45,31 @@ func TestDeliveryClientAckDeliverySendsVerifiedMetadata(t *testing.T) {
 	}
 }
 
+func TestDeliveryClientAckDeliveryDropsUnsafeCorrelationMetadata(t *testing.T) {
+	fake := &fakeDeliveryServiceClient{}
+	client := NewDeliveryClient(fake, time.Second)
+	if _, err := client.AckDelivery(context.Background(), types.AckDeliveryCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  "tenant-1",
+			UserID:    "user-1",
+			DeviceID:  "device-1",
+			SessionID: "session-1",
+			TraceID:   "trace user=user1@example.com",
+			RequestID: "request-token=secret-token",
+		},
+		ConversationID: "conv-1",
+		ReceivedSeq:    42,
+	}); err != nil {
+		t.Fatalf("ack delivery: %v", err)
+	}
+	assertDeliveryMetadataMissing(t, fake.outgoingMetadata, deliveryMetadataTraceID)
+	assertDeliveryMetadataMissing(t, fake.outgoingMetadata, deliveryMetadataRequestID)
+	if fake.request.GetAuthContext().GetTraceId() != "" ||
+		fake.request.GetAuthContext().GetRequestId() != "" {
+		t.Fatalf("unsafe correlation fields must not be forwarded: %+v", fake.request.GetAuthContext())
+	}
+}
+
 type fakeDeliveryServiceClient struct {
 	outgoingMetadata metadata.MD
 	request          *deliveryv1.AckDeliveryRequest
@@ -79,5 +104,12 @@ func assertDeliveryMetadataValue(t *testing.T, md metadata.MD, key string, want 
 	values := md.Get(key)
 	if len(values) != 1 || values[0] != want {
 		t.Fatalf("metadata %s = %v, want [%s]", key, values, want)
+	}
+}
+
+func assertDeliveryMetadataMissing(t *testing.T, md metadata.MD, key string) {
+	t.Helper()
+	if values := md.Get(key); len(values) != 0 {
+		t.Fatalf("metadata %s = %v, want missing", key, values)
 	}
 }

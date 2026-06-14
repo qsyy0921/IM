@@ -23,6 +23,8 @@ const (
 	deliveryMetadataSessionID = "x-nexusim-session-id"
 	deliveryMetadataTraceID   = "x-nexusim-trace-id"
 	deliveryMetadataRequestID = "x-nexusim-request-id"
+
+	maxDeliveryCorrelationMetadataLength = 128
 )
 
 type DeliveryClient struct {
@@ -87,16 +89,17 @@ func (client DeliveryClient) AckDelivery(
 ) (types.AckDeliveryResult, error) {
 	callCtx, cancel := context.WithTimeout(ctx, client.timeout)
 	defer cancel()
-	callCtx = deliveryOutgoingMetadataContext(callCtx, command.AuthContext)
+	auth := sanitizeDeliveryCorrelation(command.AuthContext)
+	callCtx = deliveryOutgoingMetadataContext(callCtx, auth)
 
 	response, err := client.client.AckDelivery(callCtx, &deliveryv1.AckDeliveryRequest{
 		AuthContext: &deliveryv1.AuthContext{
-			TenantId:  command.AuthContext.TenantID,
-			UserId:    command.AuthContext.UserID,
-			DeviceId:  command.AuthContext.DeviceID,
-			SessionId: command.AuthContext.SessionID,
-			TraceId:   command.AuthContext.TraceID,
-			RequestId: command.AuthContext.RequestID,
+			TenantId:  auth.TenantID,
+			UserId:    auth.UserID,
+			DeviceId:  auth.DeviceID,
+			SessionId: auth.SessionID,
+			TraceId:   auth.TraceID,
+			RequestId: auth.RequestID,
 		},
 		ConversationId: command.ConversationID,
 		ReceivedSeq:    command.ReceivedSeq,
@@ -157,4 +160,38 @@ func deliveryOutgoingMetadataContext(ctx context.Context, auth types.AuthContext
 		pairs = append(pairs, deliveryMetadataRequestID, auth.RequestID)
 	}
 	return metadata.AppendToOutgoingContext(ctx, pairs...)
+}
+
+func sanitizeDeliveryCorrelation(auth types.AuthContext) types.AuthContext {
+	auth.TraceID = sanitizeDeliveryCorrelationValue(auth.TraceID)
+	auth.RequestID = sanitizeDeliveryCorrelationValue(auth.RequestID)
+	return auth
+}
+
+func sanitizeDeliveryCorrelationValue(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	runes := []rune(value)
+	if len(runes) > maxDeliveryCorrelationMetadataLength {
+		runes = runes[:maxDeliveryCorrelationMetadataLength]
+	}
+	for _, r := range runes {
+		if isDeliveryCorrelationRune(r) {
+			continue
+		}
+		return ""
+	}
+	return string(runes)
+}
+
+func isDeliveryCorrelationRune(r rune) bool {
+	return (r >= 'a' && r <= 'z') ||
+		(r >= 'A' && r <= 'Z') ||
+		(r >= '0' && r <= '9') ||
+		r == '-' ||
+		r == '_' ||
+		r == '.' ||
+		r == ':'
 }

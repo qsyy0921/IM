@@ -890,7 +890,11 @@ func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge ti
 	if bearerToken != "" {
 		request.Header.Set("Authorization", "Bearer "+bearerToken)
 	}
-	response, err := http.DefaultClient.Do(request)
+	client, err := tenantPlanURLHTTPClient(parsed)
+	if err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
+	}
+	response, err := client.Do(request)
 	if err != nil {
 		return tenantRateLimitPlanSnapshot{}, err
 	}
@@ -917,6 +921,75 @@ func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge ti
 	}
 	snapshot.Source = "url"
 	return snapshot, nil
+}
+
+type tenantPlanURLTLSConfig struct {
+	CAFile         string
+	ServerName     string
+	ClientCertFile string
+	ClientKeyFile  string
+}
+
+func tenantPlanURLTLSConfigFromEnv() tenantPlanURLTLSConfig {
+	return tenantPlanURLTLSConfig{
+		CAFile:         envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_CA_FILE", ""),
+		ServerName:     envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_SERVER_NAME", ""),
+		ClientCertFile: envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_CLIENT_CERT_FILE", ""),
+		ClientKeyFile:  envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_CLIENT_KEY_FILE", ""),
+	}
+}
+
+func (config tenantPlanURLTLSConfig) Enabled() bool {
+	return strings.TrimSpace(config.CAFile) != "" ||
+		strings.TrimSpace(config.ServerName) != "" ||
+		strings.TrimSpace(config.ClientCertFile) != "" ||
+		strings.TrimSpace(config.ClientKeyFile) != ""
+}
+
+func tenantPlanURLHTTPClient(parsed *url.URL) (*http.Client, error) {
+	config := tenantPlanURLTLSConfigFromEnv()
+	if !config.Enabled() {
+		return http.DefaultClient, nil
+	}
+	if parsed == nil || parsed.Scheme != "https" {
+		return nil, errors.New("api-gateway tenant plan URL TLS config requires https")
+	}
+
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		ServerName: strings.TrimSpace(config.ServerName),
+	}
+	if caFile := strings.TrimSpace(config.CAFile); caFile != "" {
+		pemBytes, err := os.ReadFile(caFile)
+		if err != nil {
+			return nil, err
+		}
+		roots := x509.NewCertPool()
+		if !roots.AppendCertsFromPEM(pemBytes) {
+			return nil, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_CA_FILE does not contain a valid PEM certificate")
+		}
+		tlsConfig.RootCAs = roots
+	}
+
+	clientCertFile := strings.TrimSpace(config.ClientCertFile)
+	clientKeyFile := strings.TrimSpace(config.ClientKeyFile)
+	if (clientCertFile == "") != (clientKeyFile == "") {
+		return nil, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_CLIENT_CERT_FILE and NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_CLIENT_KEY_FILE must be configured together")
+	}
+	if clientCertFile != "" {
+		cert, err := tls.LoadX509KeyPair(clientCertFile, clientKeyFile)
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+
+	if transport, ok := http.DefaultTransport.(*http.Transport); ok {
+		clone := transport.Clone()
+		clone.TLSClientConfig = tlsConfig
+		return &http.Client{Transport: clone}, nil
+	}
+	return &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}, nil
 }
 
 func parseTenantRateLimitPlans(raw string) (map[string]ratelimitinfra.Plan, error) {

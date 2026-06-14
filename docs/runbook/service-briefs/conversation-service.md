@@ -5,7 +5,7 @@
 - 已有 `GetSendContext`、`CreateMemberChange`、`GetMemberChange`、`ListConversationMembers`、owner transfer。
 - 成员变更走 shared timeline/outbox，保持 `conversation_seq` 顺序。
 - 是会话成员事实源，其它服务不要跨表读取 `conversation_members`。
-- 已补第一阶段本地观测：`/healthz`、`/readyz`、`/debug/metrics`，包含低敏 gRPC、PG pool、`conversations` / `conversation_members` / `member_change_saga` 聚合快照。
+- 已补第一阶段本地观测：`/healthz`、`/readyz`、`/debug/metrics`，包含低敏 gRPC、PG pool、`conversations` / `conversation_members` / `member_change_saga` 聚合快照；debug HTTP 监听默认只允许 loopback / 私网，公网或未指定地址必须显式 `NEXUSIM_CONVERSATION_DEBUG_ALLOW_PUBLIC=true`。
 - 已补 first-stage OpenTelemetry gRPC server span，默认关闭；启用后可输出 stdout 或 OTLP gRPC trace，并从入口 metadata 提取 W3C `traceparent`。
 - gRPC access log 只记录低敏 `trace_id/request_id`，并对入口 metadata 做 trim、长度上限和字符白名单过滤，避免把 token / 邮箱 / 原始认证头写入结构化日志。
 - `member-change-worker` 遇到非取消错误不再直接退出；当前会按 `error_backoff` 退避重试，且进度 batch size 会归一化到安全上限，避免 PostgreSQL 瞬时失败或误配置超大批次把 worker 打死。

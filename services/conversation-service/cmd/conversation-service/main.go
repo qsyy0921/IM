@@ -86,7 +86,11 @@ func runGRPCServer() error {
 			log.Printf("conversation-service OpenTelemetry trace shutdown failed: %v", err)
 		}
 	}()
-	stopDebug, err := startDebugServer(ctx, conversationDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics).WithTraceStats(traceRuntime.Snapshot))
+	debugAddr, err := conversationDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool, grpcMetrics).WithTraceStats(traceRuntime.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -281,11 +285,11 @@ func runMemberChangeWorker() error {
 			Logf:         log.Printf,
 		},
 	)
-	stopDebug, err := startDebugServer(
-		ctx,
-		conversationDebugAddr(),
-		monitoringinfra.NewHandler(pool).WithMemberChangeWorkerStats(worker.Snapshot),
-	)
+	debugAddr, err := conversationDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool).WithMemberChangeWorkerStats(worker.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -351,6 +355,28 @@ func envString(name string, fallback string) string {
 
 func conversationDebugAddr() string {
 	return envString("NEXUSIM_CONVERSATION_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
+}
+
+func conversationDebugAddrFromEnv() (string, error) {
+	addr := conversationDebugAddr()
+	allowPublic, _, err := envOptionalBool("NEXUSIM_CONVERSATION_DEBUG_ALLOW_PUBLIC")
+	if err != nil {
+		return "", err
+	}
+	return addr, validateConversationDebugListenerConfig(addr, allowPublic)
+}
+
+func validateConversationDebugListenerConfig(addr string, allowPublic bool) error {
+	if strings.TrimSpace(addr) == "" {
+		return nil
+	}
+	if listenerAddrTrustedWithoutMTLS(addr) {
+		return nil
+	}
+	if allowPublic {
+		return nil
+	}
+	return errors.New("conversation-service debug listener address is non-private; set NEXUSIM_CONVERSATION_DEBUG_ALLOW_PUBLIC=true to allow")
 }
 
 func loadConversationGRPCCredentialsFromEnv() (credentials.TransportCredentials, bool, error) {

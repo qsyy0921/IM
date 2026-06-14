@@ -118,7 +118,7 @@ func TestOutboxStoreProcessReadyBatchMarksPublishedAndRetriesFailures(t *testing
 		retried.Published ||
 		retried.RetryCount != 1 ||
 		!retried.NextRetry ||
-		!strings.Contains(retried.LastError, "kafka unavailable") {
+		retried.LastError != "outbox publish broker unavailable" {
 		t.Fatalf("expected conversation-b retried, got %+v", retried)
 	}
 	assertOutboxStatusCounts(t, ctx, pool, tenantID, 1, 1, 0)
@@ -390,7 +390,7 @@ func TestOutboxStoreProcessReadyBatchDirectlyMarksPublishedAndRetriesFailures(t 
 		retried.Published ||
 		retried.RetryCount != 1 ||
 		!retried.NextRetry ||
-		!strings.Contains(retried.LastError, "kafka unavailable") {
+		retried.LastError != "outbox publish broker unavailable" {
 		t.Fatalf("expected conversation-b retried, got %+v", retried)
 	}
 	assertOutboxStatusCounts(t, ctx, pool, tenantID, 1, 1, 0)
@@ -413,7 +413,7 @@ func TestOutboxStoreProcessReadyRetriesOnPublishFailure(t *testing.T) {
 		return time.Date(2026, 6, 8, 12, 1, 0, 0, time.UTC)
 	}))
 	stats, err := store.ProcessReady(ctx, 10, 3, time.Millisecond, func(context.Context, types.OutboxMessage) error {
-		return errors.New("kafka unavailable")
+		return errors.New("kafka unavailable: broker body user=user1@example.com token=secret-token")
 	})
 	if err != nil {
 		t.Fatalf("process outbox: %v", err)
@@ -427,8 +427,13 @@ func TestOutboxStoreProcessReadyRetriesOnPublishFailure(t *testing.T) {
 		status.RetryCount != 1 ||
 		!status.NextRetry ||
 		status.Published ||
-		!strings.Contains(status.LastError, "kafka unavailable") {
+		status.LastError != "outbox publish broker unavailable" {
 		t.Fatalf("unexpected outbox status: %+v", status)
+	}
+	if strings.Contains(status.LastError, "user1@example.com") ||
+		strings.Contains(status.LastError, "secret-token") ||
+		strings.Contains(status.LastError, "broker body") {
+		t.Fatalf("outbox last_error leaked publisher text: %q", status.LastError)
 	}
 }
 
@@ -463,7 +468,7 @@ func TestOutboxStoreProcessReadyDeadLettersAfterMaxAttempts(t *testing.T) {
 		status.RetryCount != 1 ||
 		!status.DeadLettered ||
 		status.NextRetry ||
-		!strings.Contains(status.LastError, "kafka unavailable") {
+		status.LastError != "outbox publish broker unavailable" {
 		t.Fatalf("unexpected outbox status: %+v", status)
 	}
 }

@@ -183,15 +183,16 @@ func (s *OutboxStore) ProcessReadyBatch(
 	for index, message := range messages {
 		if err := publishErrors[index]; err != nil {
 			attempt := message.RetryCount + 1
+			lastError := sanitizeOutboxPublishError(err)
 			if attempt >= maxAttempts {
-				if markErr := s.markDeadLettered(ctx, tx, message.ID, attempt, err.Error(), now); markErr != nil {
+				if markErr := s.markDeadLettered(ctx, tx, message.ID, attempt, lastError, now); markErr != nil {
 					return types.OutboxRelayStats{}, markErr
 				}
 				stats.DeadLettered++
 				continue
 			}
 			nextRetryAt := now.Add(retryDelay(retryBaseDelay, attempt))
-			if markErr := s.markRetry(ctx, tx, message.ID, attempt, err.Error(), nextRetryAt); markErr != nil {
+			if markErr := s.markRetry(ctx, tx, message.ID, attempt, lastError, nextRetryAt); markErr != nil {
 				return types.OutboxRelayStats{}, markErr
 			}
 			stats.Retried++
@@ -688,6 +689,41 @@ WHERE id = $1
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
+}
+
+func sanitizeOutboxPublishError(err error) string {
+	if err == nil {
+		return ""
+	}
+	if errors.Is(err, context.Canceled) {
+		return "outbox publish canceled"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "outbox publish timeout"
+	}
+	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	switch {
+	case message == "":
+		return "outbox publish failed"
+	case strings.Contains(message, "timeout") || strings.Contains(message, "deadline exceeded"):
+		return "outbox publish timeout"
+	case strings.Contains(message, "unsupported"):
+		return "outbox publish unsupported event"
+	case strings.Contains(message, "malformed") ||
+		strings.Contains(message, "invalid") ||
+		strings.Contains(message, "json") ||
+		strings.Contains(message, "decode"):
+		return "outbox publish invalid event"
+	case strings.Contains(message, "kafka") ||
+		strings.Contains(message, "broker") ||
+		strings.Contains(message, "leader") ||
+		strings.Contains(message, "connection refused") ||
+		strings.Contains(message, "no such host") ||
+		strings.Contains(message, "network"):
+		return "outbox publish broker unavailable"
+	default:
+		return "outbox publish failed"
+	}
 }
 
 func retryDelay(base time.Duration, attempt int) time.Duration {

@@ -163,7 +163,7 @@ accepted_at
 | message-service -> policy-service | 30ms | 短重试 1 次，仅限幂等读取 | fail closed，返回 `PERMISSION_DENIED` 或 retryable policy error |
 | message-service -> conversation-service | 30ms | 短重试 1 次，仅限会话/成员版本读取 | 返回 `CONVERSATION_NOT_FOUND` 或 retryable dependency error |
 | message-service -> timeline-service | 20ms | 仅热点会话可重试 | 返回 `SEQUENCER_UNAVAILABLE` |
-| outbox-relay -> Kafka | producer config | 指数退避，更新 `retry_count`、`last_error`、`next_retry_at` | 留在 outbox；超过上限进入 `DLQ` |
+| outbox-relay -> Kafka | producer config | 指数退避，更新 `retry_count`、稳定公开 `last_error`、`next_retry_at` | 留在 outbox；超过上限进入 `DLQ` |
 
 `NEXUSIM_MESSAGE_SERVICE_MODE=outbox-audit` is a read-only operator view over `message_outbox`. It supports `outbox_id / event_id / tenant_id / conversation_id / status / event_type` filters, returns newest rows first, and never mutates outbox state.
 

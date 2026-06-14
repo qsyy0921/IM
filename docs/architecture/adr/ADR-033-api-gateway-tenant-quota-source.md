@@ -29,7 +29,7 @@ file
 url
 ```
 
-`url` is a narrow HTTP(S) snapshot adapter: it consumes the same versioned quota snapshot contract used by file reload and applies it through the same atomic in-memory plan swap. It does not query tenant, billing or business storage.
+`url` is a narrow HTTP(S) snapshot adapter: it consumes the same versioned quota snapshot contract used by file reload and applies it through the same atomic in-memory plan swap. It does not query tenant, billing or business storage. A first-stage authenticated config-source shape is allowed through an optional bearer token header, but bearer-token mode must use HTTPS and secrets must not be exposed through metrics, logs or labels. Operators may also force HTTPS for unauthenticated URL snapshots.
 
 `db`, `database`, `config`, `config-center` and unknown source values must fail closed until a separate control-plane/config service source is implemented and accepted.
 
@@ -51,6 +51,7 @@ Any future implementation must include:
 
 - a service-owned schema or API contract for tenant quota snapshots;
 - version, checksum and generated-at metadata;
+- an explicit transport/auth boundary for HTTP(S) snapshot sources;
 - fail-closed behavior for malformed or unsupported config versions;
 - rollback to the last valid applied snapshot;
 - low-sensitive metrics for source, applied version, reload success and reload failure;

@@ -481,6 +481,63 @@ func TestTenantRateLimitPlansFromEnvLoadsURLSnapshot(t *testing.T) {
 	}
 }
 
+func TestTenantRateLimitPlansFromEnvLoadsURLSnapshotWithBearerToken(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	plans := map[string]ratelimitinfra.Plan{"tenant-url": {RequestsPerSecond: 9, Burst: 10}}
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Authorization") != "Bearer quota-config-token" {
+			t.Fatalf("expected bearer token auth header, got %q", request.Header.Get("Authorization"))
+		}
+		_, _ = writer.Write([]byte(versionedTenantPlanSnapshotJSON(t, plans, "quota-v1.url-auth", time.Now().UnixMilli())))
+	}))
+	defer server.Close()
+	previousTransport := http.DefaultTransport
+	http.DefaultTransport = server.Client().Transport
+	t.Cleanup(func() { http.DefaultTransport = previousTransport })
+
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE", "url")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL", server.URL)
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_BEARER_TOKEN", "quota-config-token")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_MAX_AGE", "1h")
+	snapshot, err := tenantRateLimitPlansFromEnv(context.Background())
+	if err != nil {
+		t.Fatalf("load authenticated url tenant plans: %v", err)
+	}
+	if snapshot.Source != "url" || snapshot.Version != "quota-v1.url-auth" || !snapshot.ChecksumPresent {
+		t.Fatalf("unexpected authenticated url tenant plan snapshot: %+v", snapshot)
+	}
+}
+
+func TestTenantRateLimitPlansFromEnvRejectsURLBearerTokenWithoutHTTPS(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		t.Fatalf("tenant plan URL source should reject before sending bearer token over HTTP")
+	}))
+	defer server.Close()
+
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE", "url")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL", server.URL)
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_BEARER_TOKEN", "quota-config-token")
+	if _, err := tenantRateLimitPlansFromEnv(context.Background()); err == nil {
+		t.Fatalf("expected bearer token over HTTP to fail")
+	}
+}
+
+func TestTenantRateLimitPlansFromEnvRejectsHTTPWhenURLRequiresHTTPS(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		t.Fatalf("tenant plan URL source should reject HTTP before request")
+	}))
+	defer server.Close()
+
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE", "url")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL", server.URL)
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_REQUIRE_HTTPS", "true")
+	if _, err := tenantRateLimitPlansFromEnv(context.Background()); err == nil {
+		t.Fatalf("expected HTTP url source to fail when HTTPS is required")
+	}
+}
+
 func TestTenantRateLimitPlansFromEnvRejectsUnsupportedSnapshotVersion(t *testing.T) {
 	clearAPIGatewayRateLimitConfig(t)
 	path := filepath.Join(t.TempDir(), "tenant-plans.json")
@@ -956,6 +1013,8 @@ func clearAPIGatewayRateLimitConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_BEARER_TOKEN", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_REQUIRE_HTTPS", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_MAX_AGE", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_RELOAD_INTERVAL", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS", "")

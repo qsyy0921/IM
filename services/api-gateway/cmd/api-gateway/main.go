@@ -863,6 +863,22 @@ func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge ti
 	if parsed.Scheme != "https" && parsed.Scheme != "http" {
 		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL source requires http or https")
 	}
+	requireHTTPS, _, err := envOptionalBool("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_REQUIRE_HTTPS")
+	if err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
+	}
+	if requireHTTPS && parsed.Scheme != "https" {
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL source requires https")
+	}
+	bearerToken := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_BEARER_TOKEN"))
+	if bearerToken != "" {
+		if parsed.Scheme != "https" {
+			return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL bearer token requires https")
+		}
+		if strings.ContainsAny(bearerToken, "\r\n") {
+			return tenantRateLimitPlanSnapshot{}, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_BEARER_TOKEN must not contain line breaks")
+		}
+	}
 	requestCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	request, err := http.NewRequestWithContext(requestCtx, http.MethodGet, endpoint, nil)
@@ -870,6 +886,9 @@ func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge ti
 		return tenantRateLimitPlanSnapshot{}, err
 	}
 	request.Header.Set("Accept", "application/json")
+	if bearerToken != "" {
+		request.Header.Set("Authorization", "Bearer "+bearerToken)
+	}
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return tenantRateLimitPlanSnapshot{}, err

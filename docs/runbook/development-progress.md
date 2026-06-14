@@ -115,7 +115,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 
 | 服务 | 当前状态 | 已有证据 | 主要剩余工作 |
 | --- | --- | --- | --- |
-| `api-gateway` | 已落地、已接主链路 | gateway auth / downstream trusted metadata smoke、token / tenant scope rate limit、静态 tenant plan override、tenant plan 文件热更新、legacy descriptor 显式 opt-in 默认、legacy/facade traffic metrics、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel 入口 server span 和下游 gRPC client span、first-stage trace sampling policy / check | 后端服务 server span rollout、采样治理 hardening、legacy opt-in 实际迁移观察和移除计划、配置中心 / DB-backed quota hardening、生产部署治理 |
+| `api-gateway` | 已落地、已接主链路 | gateway auth / downstream trusted metadata smoke、token / tenant scope rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、URL bearer token / HTTPS guard、legacy descriptor 显式 opt-in 默认、legacy/facade traffic metrics、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel 入口 server span 和下游 gRPC client span、first-stage trace sampling policy / check | 后端服务 server span rollout、采样治理 hardening、legacy opt-in 实际迁移观察和移除计划、完整配置中心 / DB-backed quota hardening、生产部署治理 |
 | `identity-service` | 已落地、已接登录主链路 | login / refresh / MFA / recovery code / JWKS / challenge delivery、first-stage OTel gRPC server span | WebAuthn/passkeys、OIDC、多 issuer、KMS/HSM、完整风控、生产级 email/SMS provider、OTel collector / alerting |
 | `message-service` | 已落地、已接主链路 | `SendMessage` / outbox / Kafka timeline、first-stage OTel gRPC server span | 更多消息类型、私有删除、合规删除、容量和生产观测、OTel collector / alerting |
 | `conversation-service` | 已落地、已接主链路 | `GetSendContext` / member change / saga / worker、first-stage OTel gRPC server span | 更完整群管理、owner transfer 策略、成员窗口历史 repair、OTel collector / alerting |
@@ -130,7 +130,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 
 当前 9 个服务没有已知 P0/P1 阻塞。后续按小切片逐个清 P2，默认顺序如下：
 
-1. `api-gateway` / 后端观测：first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、legacy descriptor 显式 opt-in 默认、legacy/facade traffic metrics、Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、api-gateway OTel 入口 server span 和下游 gRPC client span、first-stage trace sampling policy / check 已补；contacts-service、identity-service、message-service、conversation-service、delivery-service、receipt-service、policy-service 已开始后端服务 gRPC server span rollout；本地 OTel collector debug 入口和 policy OTLP smoke 脚本已补；下一步继续其它后端服务 server span rollout、采样治理 hardening、legacy opt-in 实际迁移观察和移除计划，以及配置中心 / DB-backed quota hardening，不先扩新 facade。
+1. `api-gateway` / 后端观测：first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、URL bearer token / HTTPS guard、legacy descriptor 显式 opt-in 默认、legacy/facade traffic metrics、Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、api-gateway OTel 入口 server span 和下游 gRPC client span、first-stage trace sampling policy / check 已补；contacts-service、identity-service、message-service、conversation-service、delivery-service、receipt-service、policy-service 已开始后端服务 gRPC server span rollout；本地 OTel collector debug 入口和 policy OTLP smoke 脚本已补；下一步继续其它后端服务 server span rollout、采样治理 hardening、legacy opt-in 实际迁移观察和移除计划，以及完整配置中心 / DB-backed quota hardening，不先扩新 facade。
 2. `identity-service`：继续身份安全 hardening，优先真实通知 / issuer / key 管理边界。
 3. `message-service`：补消息类型和删除语义前，先守住 outbox / policy /容量观测。
 4. `conversation-service`：补群管理前，先收 owner transfer 和成员窗口 repair。

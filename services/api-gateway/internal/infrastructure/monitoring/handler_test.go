@@ -84,7 +84,7 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 			TotalLimited:     7,
 		}
 	}).WithRuntimeStats(func() RuntimeSnapshot {
-		return RuntimeSnapshot{RegisterLegacyDescriptors: true}
+		return RuntimeSnapshot{RegisterLegacyDescriptors: true, LegacyDescriptorsAllowedUntilMS: 1_800_000_000_000}
 	}).WithTraceStats(func() TraceSnapshot {
 		return TraceSnapshot{Enabled: true, Exporter: "otlp-grpc", OTLPEndpointSet: true, SamplingRatio: 0.5}
 	})
@@ -109,6 +109,7 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 	assertContains(t, body, `nexusim_api_gateway_rate_limit_enabled{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1`)
 	assertContains(t, body, `nexusim_api_gateway_auth_jwks_refresh_failures_total 1`)
 	assertContains(t, body, `nexusim_api_gateway_legacy_descriptors_registered 1`)
+	assertContains(t, body, `nexusim_api_gateway_legacy_descriptors_allowed_until_unix_milliseconds 1800000000000`)
 	assertContains(t, body, `nexusim_api_gateway_otel_traces_enabled{exporter="otlp-grpc"} 1`)
 	for _, leaked := range []string{"tenant_a", "user_a", "gateway-token", "request_id", "trace_id"} {
 		if strings.Contains(body, leaked) {

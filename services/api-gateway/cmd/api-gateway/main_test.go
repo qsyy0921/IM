@@ -797,6 +797,7 @@ func TestValidateTrustedMetadataBackendConfigCoversIdentityService(t *testing.T)
 
 func TestAPIGatewayRegisterLegacyDescriptorsDefaultsToFalse(t *testing.T) {
 	t.Setenv("NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_LEGACY_DESCRIPTORS_ALLOWED_UNTIL", "")
 	enabled, err := apiGatewayRegisterLegacyDescriptors()
 	if err != nil {
 		t.Fatalf("load register legacy descriptors config: %v", err)
@@ -808,6 +809,7 @@ func TestAPIGatewayRegisterLegacyDescriptorsDefaultsToFalse(t *testing.T) {
 
 func TestAPIGatewayRegisterLegacyDescriptorsCanBeEnabled(t *testing.T) {
 	t.Setenv("NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS", "true")
+	t.Setenv("NEXUSIM_API_GATEWAY_LEGACY_DESCRIPTORS_ALLOWED_UNTIL", "")
 	enabled, err := apiGatewayRegisterLegacyDescriptors()
 	if err != nil {
 		t.Fatalf("load register legacy descriptors config: %v", err)
@@ -819,8 +821,41 @@ func TestAPIGatewayRegisterLegacyDescriptorsCanBeEnabled(t *testing.T) {
 
 func TestAPIGatewayRegisterLegacyDescriptorsRejectsInvalidValue(t *testing.T) {
 	t.Setenv("NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS", "sometimes")
+	t.Setenv("NEXUSIM_API_GATEWAY_LEGACY_DESCRIPTORS_ALLOWED_UNTIL", "")
 	if _, err := apiGatewayRegisterLegacyDescriptors(); err == nil {
 		t.Fatalf("expected invalid legacy descriptor registration config to fail")
+	}
+}
+
+func TestAPIGatewayLegacyDescriptorConfigAllowsFutureDeadline(t *testing.T) {
+	t.Setenv("NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS", "true")
+	t.Setenv("NEXUSIM_API_GATEWAY_LEGACY_DESCRIPTORS_ALLOWED_UNTIL", "2026-06-15T00:00:00Z")
+	config, err := apiGatewayLegacyDescriptorConfigFromEnv(func() time.Time {
+		return time.Date(2026, 6, 14, 0, 0, 0, 0, time.UTC)
+	})
+	if err != nil {
+		t.Fatalf("load legacy descriptor config: %v", err)
+	}
+	if !config.Register || config.AllowedUntilUnixMS != time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC).UnixMilli() {
+		t.Fatalf("unexpected legacy descriptor config: %+v", config)
+	}
+}
+
+func TestAPIGatewayLegacyDescriptorConfigRejectsExpiredDeadline(t *testing.T) {
+	t.Setenv("NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS", "true")
+	t.Setenv("NEXUSIM_API_GATEWAY_LEGACY_DESCRIPTORS_ALLOWED_UNTIL", "2026-06-13T00:00:00Z")
+	if _, err := apiGatewayLegacyDescriptorConfigFromEnv(func() time.Time {
+		return time.Date(2026, 6, 14, 0, 0, 0, 0, time.UTC)
+	}); err == nil {
+		t.Fatalf("expected expired legacy descriptor opt-in to fail")
+	}
+}
+
+func TestAPIGatewayLegacyDescriptorConfigRejectsInvalidDeadline(t *testing.T) {
+	t.Setenv("NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS", "false")
+	t.Setenv("NEXUSIM_API_GATEWAY_LEGACY_DESCRIPTORS_ALLOWED_UNTIL", "tomorrow")
+	if _, err := apiGatewayLegacyDescriptorConfigFromEnv(func() time.Time { return time.Now() }); err == nil {
+		t.Fatalf("expected invalid legacy descriptor deadline to fail")
 	}
 }
 

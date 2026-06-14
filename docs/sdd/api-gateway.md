@@ -70,9 +70,10 @@ gateway 会重写 request body 里的 `AuthContext`，以已验证 token 身份�
 NEXUSIM_API_GATEWAY_MODE=grpc
 NEXUSIM_API_GATEWAY_GRPC_ADDR=0.0.0.0:12000
 NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS=false
+NEXUSIM_API_GATEWAY_LEGACY_DESCRIPTORS_ALLOWED_UNTIL=
 ```
 
-`NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS` 默认 `false`。历史客户端如果仍直连旧 service descriptor，需要显式设置为 `true`；该开关只改变 api-gateway 对外注册的 gRPC service descriptor，不改变下游后端连接和转发逻辑。
+`NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS` 默认 `false`。历史客户端如果仍直连旧 service descriptor，需要显式设置为 `true`；该开关只改变 api-gateway 对外注册的 gRPC service descriptor，不改变下游后端连接和转发逻辑。`NEXUSIM_API_GATEWAY_LEGACY_DESCRIPTORS_ALLOWED_UNTIL` 可选设置为 RFC3339 或 `YYYY-MM-DD`，用于给显式 legacy opt-in 加迁移截止时间；超过该时间后如果仍启用 legacy descriptor，api-gateway 启动阶段会 fail-closed。默认 facade-only 模式不受该 deadline 影响。
 
 Auth audience：
 
@@ -186,7 +187,7 @@ NEXUSIM_API_GATEWAY_OTEL_TRACES_SAMPLING_RATIO=1
 
 Legacy descriptor migration audit：
 
-`/debug/metrics` 的 gRPC snapshot 会按 method 前缀聚合 `facade_requests`、`legacy_descriptor_requests` 和 `other_requests`。这些字段只用于观察旧 descriptor 是否仍有流量，不输出 tenant、user、token 或 request body。只要 `legacy_descriptor_requests` 在真实环境里仍持续增长，就不能把 legacy descriptor 移除计划标记为完成。
+`/debug/metrics` 的 gRPC snapshot 会按 method 前缀聚合 `facade_requests`、`legacy_descriptor_requests` 和 `other_requests`，runtime snapshot 会暴露 `register_legacy_descriptors` 与 `legacy_descriptors_allowed_until_unix_ms`。这些字段只用于观察旧 descriptor 是否仍有流量和 opt-in 是否仍在迁移窗口内，不输出 tenant、user、token 或 request body。只要 `legacy_descriptor_requests` 在真实环境里仍持续增长，或 legacy opt-in 已超过配置 deadline，就不能把 legacy descriptor 移除计划标记为完成。
 
 下游地址：
 
@@ -291,6 +292,8 @@ NEXUSIM_API_GATEWAY_CONTACTS_TLS_CLIENT_KEY_FILE
 2026-06-14 补充：api-gateway legacy descriptor 已收敛为显式 opt-in。未配置 `NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS` 时只注册 `GatewayService` facade；只有显式设置为 `true` 才额外注册 contacts / conversation / message / delivery / receipt 的 legacy descriptors。`Register()` helper 也改为 facade-only 默认，避免新代码无意暴露旧 descriptor。
 
 2026-06-14 补充：api-gateway 已新增 first-stage legacy descriptor migration audit metrics。`/debug/metrics.grpc` 会输出 `facade_requests`、`legacy_descriptor_requests` 和 `other_requests`，按 gRPC method 前缀区分 `GatewayService` facade、显式 opt-in 的 legacy service descriptors 和其它入口，用于后续观察旧客户端迁移是否完成；该指标不包含 token、tenant_id、user_id 或请求体。
+
+2026-06-14 补充：api-gateway legacy descriptor 显式 opt-in 已新增可选截止时间 `NEXUSIM_API_GATEWAY_LEGACY_DESCRIPTORS_ALLOWED_UNTIL`。当 legacy descriptor 开关为 `true` 且当前时间超过该截止时间时，进程启动 fail-closed；runtime / Prometheus metrics 只暴露低敏 deadline timestamp。这是迁移计划门禁，不是删除 legacy descriptor 代码本身。
 
 2026-06-14 补充：api-gateway 已新增第一阶段 OpenTelemetry trace runtime。默认关闭；启用后会为入口 gRPC unary 请求创建 server span，支持 W3C `traceparent` parent extraction、`stdout` exporter 和 `otlp-grpc` exporter，并在 `/debug/metrics` 暴露低敏 trace config snapshot。span 只记录 method、status、latency 等低基数属性，不记录 token、tenant_id、user_id、device_id、session_id、trace_id、request_id 或 request body；最终 trace/request correlation 仍通过 metadata、response header 和 access log 传播。这仍不是全服务 trace rollout、collector / alerting 或跨 Kafka envelope trace。
 

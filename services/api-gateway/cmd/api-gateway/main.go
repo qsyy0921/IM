@@ -96,7 +96,7 @@ func runGRPC() error {
 		return err
 	}
 	defer closeRateLimiter()
-	registerLegacyDescriptors, err := apiGatewayRegisterLegacyDescriptors()
+	legacyDescriptorConfig, err := apiGatewayLegacyDescriptorConfigFromEnv(time.Now)
 	if err != nil {
 		return err
 	}
@@ -104,7 +104,10 @@ func runGRPC() error {
 		WithAuthJWKStats(authenticator.JWKStats).
 		WithRateLimitStats(rateLimiter.Snapshot).
 		WithRuntimeStats(func() monitoringinfra.RuntimeSnapshot {
-			return monitoringinfra.RuntimeSnapshot{RegisterLegacyDescriptors: registerLegacyDescriptors}
+			return monitoringinfra.RuntimeSnapshot{
+				RegisterLegacyDescriptors:       legacyDescriptorConfig.Register,
+				LegacyDescriptorsAllowedUntilMS: legacyDescriptorConfig.AllowedUntilUnixMS,
+			}
 		}).
 		WithTraceStats(traceRuntime.Snapshot))
 	if err != nil {
@@ -218,7 +221,7 @@ func runGRPC() error {
 	}
 	server := grpcgo.NewServer(serverOptions...)
 	apigrpc.RegisterWithConfig(server, gateway, apigrpc.RegisterConfig{
-		RegisterLegacyDescriptors: registerLegacyDescriptors,
+		RegisterLegacyDescriptors: legacyDescriptorConfig.Register,
 	})
 
 	listener, err := net.Listen("tcp", listenAddr)
@@ -272,15 +275,58 @@ func apiGatewayDebugAddr() string {
 	return envString("NEXUSIM_API_GATEWAY_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
 }
 
+type apiGatewayLegacyDescriptorConfig struct {
+	Register           bool
+	AllowedUntilUnixMS int64
+}
+
 func apiGatewayRegisterLegacyDescriptors() (bool, error) {
-	value, configured, err := envOptionalBool("NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS")
+	config, err := apiGatewayLegacyDescriptorConfigFromEnv(time.Now)
 	if err != nil {
 		return false, err
 	}
-	if !configured {
-		return false, nil
+	return config.Register, nil
+}
+
+func apiGatewayLegacyDescriptorConfigFromEnv(now func() time.Time) (apiGatewayLegacyDescriptorConfig, error) {
+	value, configured, err := envOptionalBool("NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS")
+	if err != nil {
+		return apiGatewayLegacyDescriptorConfig{}, err
 	}
-	return value, nil
+	allowedUntilMS, err := apiGatewayLegacyDescriptorsAllowedUntilFromEnv()
+	if err != nil {
+		return apiGatewayLegacyDescriptorConfig{}, err
+	}
+	config := apiGatewayLegacyDescriptorConfig{
+		Register:           configured && value,
+		AllowedUntilUnixMS: allowedUntilMS,
+	}
+	if !configured {
+		return config, nil
+	}
+	if config.Register && allowedUntilMS > 0 {
+		if now == nil {
+			now = time.Now
+		}
+		if !time.UnixMilli(allowedUntilMS).After(now()) {
+			return apiGatewayLegacyDescriptorConfig{}, errors.New("api-gateway legacy descriptor opt-in has expired")
+		}
+	}
+	return config, nil
+}
+
+func apiGatewayLegacyDescriptorsAllowedUntilFromEnv() (int64, error) {
+	raw := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_LEGACY_DESCRIPTORS_ALLOWED_UNTIL"))
+	if raw == "" {
+		return 0, nil
+	}
+	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+		return parsed.UnixMilli(), nil
+	}
+	if parsed, err := time.Parse("2006-01-02", raw); err == nil {
+		return parsed.UnixMilli(), nil
+	}
+	return 0, errors.New("NEXUSIM_API_GATEWAY_LEGACY_DESCRIPTORS_ALLOWED_UNTIL must be RFC3339 or YYYY-MM-DD")
 }
 
 func apiGatewayTraceConfigFromEnv() (monitoringinfra.TraceConfig, error) {

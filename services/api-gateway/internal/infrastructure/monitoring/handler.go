@@ -112,7 +112,8 @@ type Snapshot struct {
 }
 
 type RuntimeSnapshot struct {
-	RegisterLegacyDescriptors bool `json:"register_legacy_descriptors"`
+	RegisterLegacyDescriptors       bool  `json:"register_legacy_descriptors"`
+	LegacyDescriptorsAllowedUntilMS int64 `json:"legacy_descriptors_allowed_until_unix_ms,omitempty"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

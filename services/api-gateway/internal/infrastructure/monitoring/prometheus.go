@@ -118,6 +118,8 @@ func writeRateLimitPrometheus(builder *strings.Builder, snapshot ratelimit.Snaps
 func writeRuntimePrometheus(builder *strings.Builder, snapshot RuntimeSnapshot) {
 	writePrometheusHeader(builder, "nexusim_api_gateway_legacy_descriptors_registered", "Gauge", "Whether api-gateway legacy descriptors are registered.")
 	writePrometheusSample(builder, "nexusim_api_gateway_legacy_descriptors_registered", nil, prometheusBool(snapshot.RegisterLegacyDescriptors))
+	writePrometheusHeader(builder, "nexusim_api_gateway_legacy_descriptors_allowed_until_unix_milliseconds", "Gauge", "Configured expiration time for api-gateway legacy descriptor opt-in in milliseconds; 0 means unset.")
+	writePrometheusSample(builder, "nexusim_api_gateway_legacy_descriptors_allowed_until_unix_milliseconds", nil, strconv.FormatInt(snapshot.LegacyDescriptorsAllowedUntilMS, 10))
 }
 
 func writeTracePrometheus(builder *strings.Builder, snapshot TraceSnapshot) {

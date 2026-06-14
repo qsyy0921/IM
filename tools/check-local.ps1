@@ -22,6 +22,9 @@ try {
     Write-Host "== local grafana config =="
     & (Join-Path $PSScriptRoot "check-local-grafana-config.ps1")
 
+    Write-Host "== api-gateway gates =="
+    & (Join-Path $PSScriptRoot "check-api-gateway-gates.ps1")
+
     Write-Host "== otel sampling policy =="
     & (Join-Path $PSScriptRoot "check-otel-sampling-policy.ps1")
 

@@ -13,6 +13,70 @@ import (
 	"github.com/qsyy0921/IM/services/message-service/internal/types"
 )
 
+func TestSanitizeOutboxPublishErrorUsesStablePublicMessages(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		text string
+		want string
+	}{
+		{
+			name: "context canceled",
+			err:  context.Canceled,
+			text: "context canceled for user=user1@example.com token=secret-token",
+			want: "outbox publish canceled",
+		},
+		{
+			name: "deadline exceeded",
+			err:  context.DeadlineExceeded,
+			text: "deadline exceeded while publishing request-token=secret-token",
+			want: "outbox publish timeout",
+		},
+		{
+			name: "unsupported event",
+			err:  errors.New("unsupported event_type=message.future.v9 user=user1@example.com"),
+			text: "unsupported event_type=message.future.v9 user=user1@example.com",
+			want: "outbox publish unsupported event",
+		},
+		{
+			name: "invalid event",
+			err:  errors.New("malformed json payload for user=user1@example.com token=secret-token"),
+			text: "malformed json payload for user=user1@example.com token=secret-token",
+			want: "outbox publish invalid event",
+		},
+		{
+			name: "broker unavailable",
+			err:  errors.New("kafka broker connection refused at 10.0.0.8 token=secret-token"),
+			text: "kafka broker connection refused at 10.0.0.8 token=secret-token",
+			want: "outbox publish broker unavailable",
+		},
+		{
+			name: "unknown raw error",
+			err:  errors.New("provider body user=user1@example.com token=secret-token nonce=secret-nonce"),
+			text: "provider body user=user1@example.com token=secret-token nonce=secret-nonce",
+			want: "outbox publish failed",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := sanitizeOutboxPublishError(tt.err); got != tt.want {
+				t.Fatalf("sanitize publish error = %q, want %q", got, tt.want)
+			}
+			if got := sanitizeOutboxStoredError(tt.text); got != tt.want {
+				t.Fatalf("sanitize stored error = %q, want %q", got, tt.want)
+			}
+			for _, forbidden := range []string{"user1@example.com", "secret-token", "secret-nonce", "10.0.0.8"} {
+				if strings.Contains(tt.want, forbidden) {
+					t.Fatalf("stable outbox error leaked sensitive text %q in %q", forbidden, tt.want)
+				}
+			}
+		})
+	}
+	if got := sanitizeOutboxStoredError("   "); got != "" {
+		t.Fatalf("blank stored error = %q, want empty", got)
+	}
+}
+
 func TestOutboxStoreProcessReadyPublishesAndMarksPublished(t *testing.T) {
 	ctx := context.Background()
 	pool := openIntegrationPool(t, ctx)

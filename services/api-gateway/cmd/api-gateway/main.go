@@ -143,6 +143,7 @@ func runGRPC() error {
 	conversationConn, err := dialBackend(
 		conversationAddr,
 		conversationTLS,
+		traceRuntime.UnaryClientInterceptor(),
 	)
 	if err != nil {
 		return err
@@ -151,6 +152,7 @@ func runGRPC() error {
 	messageConn, err := dialBackend(
 		messageAddr,
 		messageTLS,
+		traceRuntime.UnaryClientInterceptor(),
 	)
 	if err != nil {
 		return err
@@ -159,6 +161,7 @@ func runGRPC() error {
 	deliveryConn, err := dialBackend(
 		deliveryAddr,
 		deliveryTLS,
+		traceRuntime.UnaryClientInterceptor(),
 	)
 	if err != nil {
 		return err
@@ -167,6 +170,7 @@ func runGRPC() error {
 	receiptConn, err := dialBackend(
 		receiptAddr,
 		receiptTLS,
+		traceRuntime.UnaryClientInterceptor(),
 	)
 	if err != nil {
 		return err
@@ -175,6 +179,7 @@ func runGRPC() error {
 	contactsConn, err := dialBackend(
 		contactsAddr,
 		contactsTLS,
+		traceRuntime.UnaryClientInterceptor(),
 	)
 	if err != nil {
 		return err
@@ -183,6 +188,7 @@ func runGRPC() error {
 	identityConn, err := dialBackend(
 		identityAddr,
 		identityTLS,
+		traceRuntime.UnaryClientInterceptor(),
 	)
 	if err != nil {
 		return err
@@ -308,16 +314,25 @@ func apiGatewayTraceSamplingRatioFromEnv() (float64, error) {
 	return value, nil
 }
 
-func dialBackend(addr string, tlsConfig grpcClientTLSConfig) (*grpcgo.ClientConn, error) {
-	transportCredentials := grpcgo.WithTransportCredentials(insecure.NewCredentials())
+func dialBackend(addr string, tlsConfig grpcClientTLSConfig, unaryInterceptors ...grpcgo.UnaryClientInterceptor) (*grpcgo.ClientConn, error) {
+	options := []grpcgo.DialOption{grpcgo.WithTransportCredentials(insecure.NewCredentials())}
 	if tlsConfig.Enabled() {
 		creds, err := grpcClientTLSCredentials(tlsConfig)
 		if err != nil {
 			return nil, err
 		}
-		transportCredentials = grpcgo.WithTransportCredentials(creds)
+		options[0] = grpcgo.WithTransportCredentials(creds)
 	}
-	return grpcgo.NewClient("passthrough:///"+addr, transportCredentials)
+	var chain []grpcgo.UnaryClientInterceptor
+	for _, interceptor := range unaryInterceptors {
+		if interceptor != nil {
+			chain = append(chain, interceptor)
+		}
+	}
+	if len(chain) > 0 {
+		options = append(options, grpcgo.WithChainUnaryInterceptor(chain...))
+	}
+	return grpcgo.NewClient("passthrough:///"+addr, options...)
 }
 
 func validateTrustedMetadataBackendConfig(serviceName string, addr string, authMode string, tlsConfig grpcClientTLSConfig) error {

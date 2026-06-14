@@ -164,7 +164,7 @@ NEXUSIM_API_GATEWAY_OTEL_TRACES_OTLP_INSECURE=false
 NEXUSIM_API_GATEWAY_OTEL_TRACES_SAMPLING_RATIO=1
 ```
 
-启用后，api-gateway 为入口 gRPC unary 请求创建 server span，继承合法 W3C `traceparent`，并记录低敏属性：`rpc.system`、`rpc.method`、`rpc.grpc.status_code`、`nexusim.grpc.latency_ms`、最终 `nexusim.trace_id` / `nexusim.request_id`。span 不记录 gateway token、tenant_id、user_id、device_id、session_id 或 request body。第一版 exporter 支持 `stdout` 和 `otlp-grpc`；使用 `otlp-grpc` 时必须显式配置 endpoint，是否 plaintext 由 `..._OTLP_INSECURE` 明确控制。`/debug/metrics` 只暴露 trace 是否启用、service name、exporter、endpoint 是否配置和 sampling ratio，不输出 collector endpoint 明文。
+启用后，api-gateway 为入口 gRPC unary 请求创建 server span，并为下游 gRPC unary 调用创建 client span。server span 会继承合法 W3C `traceparent`，client span 会向下游 outgoing metadata 注入 `traceparent`。span 只记录低敏属性：`rpc.system`、`rpc.method`、`rpc.grpc.status_code`、`nexusim.grpc.latency_ms`、最终 `nexusim.trace_id` / `nexusim.request_id`。span 不记录 gateway token、tenant_id、user_id、device_id、session_id 或 request body。第一版 exporter 支持 `stdout` 和 `otlp-grpc`；使用 `otlp-grpc` 时必须显式配置 endpoint，是否 plaintext 由 `..._OTLP_INSECURE` 明确控制。`/debug/metrics` 只暴露 trace 是否启用、service name、exporter、endpoint 是否配置和 sampling ratio，不输出 collector endpoint 明文。
 
 Legacy descriptor migration audit：
 
@@ -271,6 +271,8 @@ NEXUSIM_API_GATEWAY_CONTACTS_TLS_CLIENT_KEY_FILE
 2026-06-14 补充：api-gateway 已新增 first-stage legacy descriptor migration audit metrics。`/debug/metrics.grpc` 会输出 `facade_requests`、`legacy_descriptor_requests` 和 `other_requests`，按 gRPC method 前缀区分 `GatewayService` facade、显式 opt-in 的 legacy service descriptors 和其它入口，用于后续观察旧客户端迁移是否完成；该指标不包含 token、tenant_id、user_id 或请求体。
 
 2026-06-14 补充：api-gateway 已新增第一阶段 OpenTelemetry trace runtime。默认关闭；启用后会为入口 gRPC unary 请求创建 server span，支持 W3C `traceparent` parent extraction、`stdout` exporter 和 `otlp-grpc` exporter，并在 `/debug/metrics` 暴露低敏 trace config snapshot。span 只记录 method、status、latency、最终 trace/request correlation，不记录 token、tenant_id、user_id、device_id、session_id 或 request body。这仍不是全服务 trace rollout、collector / alerting 或跨 Kafka envelope trace。
+
+2026-06-14 补充：api-gateway trace runtime 已扩展到下游 gRPC client span。启用 OTel trace 后，api-gateway 调 conversation / message / delivery / receipt / contacts / identity 的 unary client 会生成 client span，并把 W3C `traceparent` 注入 outgoing metadata；client span 仍只记录 method、status、latency 和最终 correlation，不记录 token、tenant_id、user_id 或 request body。当前只是 gateway 内 server -> client span 链路，后端服务自身 OTel server span、collector / alerting 和 Kafka envelope trace 仍是后续项。
 
 2026-06-14 补充：`GatewayService` public facade 已扩展 contacts-service 的 user-facing RPC：`SendContactRequest / RespondContactRequest / CancelContactRequest / ListContactRequests / ListContacts / GetContactState / DeleteContact / BlockContact / UnblockContact / UpdateContactRemark`。api-gateway 仍只做身份验证、`AuthContext` 重写和转发，不拥有联系人事实源，也不让 message-service 同步依赖 contacts-service。
 

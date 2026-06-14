@@ -27,7 +27,7 @@
 继续做 `api-gateway` 入口治理：
 
 - 运行时动态 tenant quota 文件热更新已进入第一阶段，后续只做配置中心 / DB-backed quota hardening；
-- OTel collector / alerting / 跨服务 rollout 的后续收敛；
+- api-gateway 已有入口 server span 和下游 gRPC client span；后续继续 OTel collector / alerting / 后端服务 server span rollout；
 - legacy descriptor opt-in 使用面已有 first-stage metrics 计数，后续继续迁移观察和移除计划；
 - 必要单测 / 集成测试；
 - 同步相关 service brief、SDD 或进度文档。

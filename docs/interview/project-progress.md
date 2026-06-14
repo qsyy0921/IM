@@ -57,7 +57,7 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override 和 tenant plan 文件热更新；
 api-gateway 已补 legacy/facade traffic metrics，用于旧 descriptor 迁移观察；
 legacy descriptor 已收敛为显式 opt-in 默认；
-api-gateway 已补 first-stage OpenTelemetry gRPC server span；
+api-gateway 已补 first-stage OpenTelemetry 入口 server span 和下游 gRPC client span；
 search-service 和 AI 应用后端后置；
 客户端暂不纳入当前面试主线。
 ```
@@ -68,7 +68,7 @@ search-service 和 AI 应用后端后置；
 
 | 服务 | 已完成能力 | 面试可讲重点 |
 | --- | --- | --- |
-| `api-gateway` | 统一 user-facing gRPC 入口，gateway token 验证，verified metadata 注入，下游代理，token / tenant scope rate limit，静态 tenant plan override，tenant plan 文件热更新，legacy descriptor 显式 opt-in 默认，legacy/facade traffic metrics，first-stage OTel gRPC server span，debug metrics | 统一入口、安全边界、correlation / trace 传播、facade-only 默认暴露面 |
+| `api-gateway` | 统一 user-facing gRPC 入口，gateway token 验证，verified metadata 注入，下游代理，token / tenant scope rate limit，静态 tenant plan override，tenant plan 文件热更新，legacy descriptor 显式 opt-in 默认，legacy/facade traffic metrics，first-stage OTel 入口 server span 和下游 gRPC client span，debug metrics | 统一入口、安全边界、correlation / trace 传播、facade-only 默认暴露面 |
 | `identity-service` | 注册、登录、Refresh Token、MFA TOTP、recovery codes、JWKS、session/device revoke、verification/password reset challenge、webhook / SMTP email challenge sender | 身份认证、MFA、token 轮换、JWKS、公私钥边界、通知投递可靠性 |
 | `message-service` | `SendMessage`、编辑、撤回、删除，message log，outbox，Kafka timeline event | 业务事务不直接 publish Kafka，使用 outbox 保证事件传播 |
 | `conversation-service` | 会话成员事实源，`GetSendContext`，成员变更 saga，owner transfer | 会话成员事实边界、成员事件和消息事件共享 timeline seq |
@@ -143,7 +143,7 @@ search-service 和 AI 应用后端后置；
 
 | 服务 | 待开发 / 待完善功能 |
 | --- | --- |
-| `api-gateway` | OTel collector / alerting / 跨服务 rollout、legacy opt-in 实际迁移观察和移除计划、配置中心 / DB-backed quota hardening、生产部署治理 |
+| `api-gateway` | OTel collector / alerting / 后端服务 server span rollout、legacy opt-in 实际迁移观察和移除计划、配置中心 / DB-backed quota hardening、生产部署治理 |
 | `identity-service` | WebAuthn / passkeys、OIDC federation、多 issuer、KMS / HSM key management、完整登录风控、SMS provider、bounce handling、多租户通知模板 |
 | `message-service` | 更多消息类型、私有删除、合规删除、容量压测、生产级发送链路观测 |
 | `conversation-service` | 更完整群管理、owner transfer 策略细化、成员可见窗口历史 repair |
@@ -218,7 +218,7 @@ search / RAG / Agent 后端能力。
 短期优先级：
 
 1. 清已有 9 个服务的 P2 hardening；
-2. 继续做 `api-gateway` OTel collector / 跨服务 rollout、legacy opt-in 实际迁移观察和移除计划，以及配置中心 / DB-backed quota hardening；
+2. 继续做 `api-gateway` OTel collector / 后端服务 server span rollout、legacy opt-in 实际迁移观察和移除计划，以及配置中心 / DB-backed quota hardening；
 3. 补更完整的故障恢复 smoke；
 4. 收敛观测、repair、audit、TLS / mTLS 和 trusted metadata 边界；
 5. 控制代码复杂度，避免核心文件继续变大；

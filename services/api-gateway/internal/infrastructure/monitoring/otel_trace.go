@@ -124,6 +124,52 @@ func (runtime *TraceRuntime) UnaryServerInterceptor() grpcgo.UnaryServerIntercep
 	}
 }
 
+func (runtime *TraceRuntime) UnaryClientInterceptor() grpcgo.UnaryClientInterceptor {
+	if runtime == nil || !runtime.config.Enabled || runtime.tracer == nil {
+		return func(ctx context.Context, method string, request any, reply any, conn *grpcgo.ClientConn, invoker grpcgo.UnaryInvoker, options ...grpcgo.CallOption) error {
+			return invoker(ctx, method, request, reply, conn, options...)
+		}
+	}
+	propagator := propagation.TraceContext{}
+	return func(ctx context.Context, method string, request any, reply any, conn *grpcgo.ClientConn, invoker grpcgo.UnaryInvoker, options ...grpcgo.CallOption) error {
+		started := time.Now()
+		ctx, span := runtime.tracer.Start(
+			ctx,
+			method,
+			oteltrace.WithSpanKind(oteltrace.SpanKindClient),
+			oteltrace.WithAttributes(
+				attribute.String("rpc.system", "grpc"),
+				attribute.String("rpc.method", method),
+			),
+		)
+		defer span.End()
+
+		outgoing := metadataFromOutgoingContext(ctx)
+		propagator.Inject(ctx, grpcMetadataCarrier{outgoing})
+		ctx = metadata.NewOutgoingContext(ctx, outgoing)
+
+		err := invoker(ctx, method, request, reply, conn, options...)
+		code := status.Code(err).String()
+		span.SetAttributes(
+			attribute.String("rpc.grpc.status_code", code),
+			attribute.Int64("nexusim.grpc.latency_ms", time.Since(started).Milliseconds()),
+		)
+		if correlation, ok := gatewaytypes.CorrelationFromContext(ctx); ok {
+			if correlation.TraceID != "" {
+				span.SetAttributes(attribute.String("nexusim.trace_id", correlation.TraceID))
+			}
+			if correlation.RequestID != "" {
+				span.SetAttributes(attribute.String("nexusim.request_id", correlation.RequestID))
+			}
+		}
+		if err != nil {
+			span.SetStatus(codes.Error, code)
+			span.RecordError(err)
+		}
+		return err
+	}
+}
+
 func (runtime *TraceRuntime) Shutdown(ctx context.Context) error {
 	if runtime == nil || runtime.provider == nil {
 		return nil
@@ -185,6 +231,14 @@ func metadataFromIncomingContext(ctx context.Context) metadata.MD {
 		return metadata.MD{}
 	}
 	return md
+}
+
+func metadataFromOutgoingContext(ctx context.Context) metadata.MD {
+	md, ok := metadata.FromOutgoingContext(ctx)
+	if !ok {
+		return metadata.MD{}
+	}
+	return md.Copy()
 }
 
 type grpcMetadataCarrier struct {

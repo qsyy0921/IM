@@ -95,6 +95,79 @@ func TestTraceRuntimeRecordsServerSpanWithTraceparent(t *testing.T) {
 	}
 }
 
+func TestTraceRuntimeRecordsClientSpanAndInjectsTraceparent(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	runtime := &TraceRuntime{
+		config: TraceConfig{
+			Enabled:       true,
+			ServiceName:   serviceName,
+			Exporter:      "test",
+			SamplingRatio: 1,
+		},
+		provider: provider,
+		tracer:   provider.Tracer(serviceName),
+	}
+	defer func() {
+		if err := provider.Shutdown(context.Background()); err != nil {
+			t.Fatalf("shutdown test tracer provider: %v", err)
+		}
+	}()
+
+	ctx, _ := gatewaytypes.ContextWithCorrelation(metadata.NewOutgoingContext(context.Background(), metadata.Pairs(
+		metadataRequestID, "request-outgoing",
+		"authorization", "Bearer should-not-be-exported",
+	)))
+	var injectedTraceparent string
+	err := runtime.UnaryClientInterceptor()(ctx, "/nexusim.message.v1.MessageService/SendMessage", nil, nil, nil, func(ctx context.Context, _ string, _ any, _ any, _ *grpcgo.ClientConn, _ ...grpcgo.CallOption) error {
+		md, ok := metadata.FromOutgoingContext(ctx)
+		if !ok {
+			t.Fatalf("expected outgoing metadata")
+		}
+		values := md.Get("traceparent")
+		if len(values) != 1 || values[0] == "" {
+			t.Fatalf("expected injected traceparent metadata, got %v", values)
+		}
+		injectedTraceparent = values[0]
+		gatewaytypes.PublishCorrelation(ctx, "trace-client-final", "request-client-final")
+		return status.Error(codes.Unavailable, "backend unavailable")
+	})
+	if status.Code(err) != codes.Unavailable {
+		t.Fatalf("expected unavailable, got %v", err)
+	}
+	if injectedTraceparent == "" {
+		t.Fatalf("expected traceparent to be captured")
+	}
+	if err := provider.ForceFlush(context.Background()); err != nil {
+		t.Fatalf("flush spans: %v", err)
+	}
+	spans := exporter.GetSpans()
+	if len(spans) != 1 {
+		t.Fatalf("expected one span, got %d", len(spans))
+	}
+	span := spans[0]
+	if span.Name != "/nexusim.message.v1.MessageService/SendMessage" {
+		t.Fatalf("unexpected span name: %s", span.Name)
+	}
+	if got := spanAttributeString(span.Attributes, "rpc.system"); got != "grpc" {
+		t.Fatalf("expected rpc.system=grpc, got %q", got)
+	}
+	if got := spanAttributeString(span.Attributes, "rpc.grpc.status_code"); got != "Unavailable" {
+		t.Fatalf("expected grpc status Unavailable, got %q", got)
+	}
+	if got := spanAttributeString(span.Attributes, "nexusim.trace_id"); got != "trace-client-final" {
+		t.Fatalf("expected final trace id attribute, got %q", got)
+	}
+	if got := spanAttributeString(span.Attributes, "nexusim.request_id"); got != "request-client-final" {
+		t.Fatalf("expected final request id attribute, got %q", got)
+	}
+	for _, attribute := range span.Attributes {
+		if attribute.Value.AsString() == "should-not-be-exported" || string(attribute.Key) == "authorization" {
+			t.Fatalf("span leaked auth metadata: %+v", span.Attributes)
+		}
+	}
+}
+
 func TestTraceRuntimeRejectsOTLPExporterWithoutEndpoint(t *testing.T) {
 	_, err := NewTraceRuntime(context.Background(), TraceConfig{
 		Enabled:       true,

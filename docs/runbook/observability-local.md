@@ -10,7 +10,7 @@
 GET http://<NEXUSIM_API_GATEWAY_DEBUG_ADDR>/metrics
 ```
 
-`/metrics` 复用 `/debug/metrics` 的低敏 snapshot，当前覆盖 gRPC request / error / latency、facade / legacy descriptor / other request exposure、auth JWK、rate-limit、runtime 和 OTel trace config 聚合指标。labels 只允许 method、code、exposure、backend、key_scope、exporter 等低基数字段；不得输出 token、tenant_id、user_id、device_id、session_id、request_id、trace_id、conversation_id、message_id 或 payload。
+`/metrics` 复用 `/debug/metrics` 的低敏 snapshot，当前覆盖 gRPC request / error / latency、facade / legacy descriptor / other request exposure、legacy descriptor last-seen、auth JWK、rate-limit、runtime 和 OTel trace config 聚合指标。labels 只允许 method、code、exposure、backend、key_scope、tenant_plan_source、exporter 等低基数字段；不得输出 token、tenant_id、user_id、device_id、session_id、request_id、trace_id、conversation_id、message_id 或 payload。
 
 这个 endpoint 只用于本地 scrape / dashboard 原型，不代表生产 Prometheus、Alertmanager、指标保留策略或 SLO 告警已经完成。
 
@@ -78,7 +78,7 @@ login:      admin / nexusim
 datasource: http://host.docker.internal:19090
 ```
 
-当前 dashboard 只覆盖 api-gateway 的本地 Prometheus 指标：request rate、error rate、facade / legacy descriptor / other exposure、latency、rate-limit decisions、JWKS refresh failures 和 OTel enabled。它用于本地开发和面试演示，不是生产 Grafana 部署；生产化前还需要多服务 dashboard、权限、datasource secret 管理、retention、SLO 阈值和告警路由。
+当前 dashboard 只覆盖 api-gateway 的本地 Prometheus 指标：request rate、error rate、facade / legacy descriptor / other exposure、legacy descriptor last-seen、latency、rate-limit decisions、JWKS refresh failures 和 OTel enabled。它用于本地开发和面试演示，不是生产 Grafana 部署；生产化前还需要多服务 dashboard、权限、datasource secret 管理、retention、SLO 阈值和告警路由。
 
 注意：启动脚本不会预检镜像是否已存在；如果本机没有 `NEXUSIM_GRAFANA_IMAGE` 指定的镜像或默认 `grafana/grafana-oss:11.2.0`，Docker 会按自身配置尝试拉取镜像。
 

@@ -3,6 +3,7 @@ package outbox
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -85,7 +86,7 @@ func TestRelayRunOnceFailClosedForMalformedPayload(t *testing.T) {
 	if stats.Fetched != 1 || stats.Published != 0 || stats.Retried != 1 {
 		t.Fatalf("unexpected stats: %+v", stats)
 	}
-	if publisher.calls != 0 {
+	if publisher.Calls() != 0 {
 		t.Fatalf("malformed payload must not be published")
 	}
 }
@@ -111,8 +112,54 @@ func TestRelayRunOnceMapsBatchPublishErrorToRetry(t *testing.T) {
 	if stats.Fetched != 1 || stats.Published != 0 || stats.Retried != 1 {
 		t.Fatalf("unexpected stats: %+v", stats)
 	}
-	if publisher.calls != 1 {
-		t.Fatalf("expected one publish call, got %d", publisher.calls)
+	if publisher.Calls() != 1 {
+		t.Fatalf("expected one publish call, got %d", publisher.Calls())
+	}
+}
+
+func TestRelayRetriesTransientRunOnceErrorAndExposesSnapshot(t *testing.T) {
+	store := &transientErrorStore{
+		messages: []types.OutboxMessage{
+			testOutboxMessage(types.DeliveryEventAckRecorded, []byte(`{
+				"tenant_id":"tenant-1",
+				"user_id":"user-1",
+				"device_id":"device-1",
+				"conversation_id":"conversation-1",
+				"last_received_seq":12
+			}`)),
+		},
+	}
+	publisher := &recordingPublisher{}
+	relay := NewRelay(store, publisher, Config{
+		BatchSize:    10,
+		PollInterval: time.Hour,
+		ErrorBackoff: time.Millisecond,
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	publisher.onPublish = cancel
+	done := make(chan error, 1)
+	go func() {
+		done <- relay.Run(ctx)
+	}()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected canceled run, got %v", err)
+	}
+	cancel()
+	if publisher.Calls() != 1 {
+		t.Fatalf("expected relay to publish after transient error, got %d calls", publisher.Calls())
+	}
+	if store.calls.Load() < 2 {
+		t.Fatalf("expected relay to retry after transient error")
+	}
+	snapshot := relay.Snapshot()
+	if snapshot.TotalErrors == 0 || snapshot.ConsecutiveErrors != 0 {
+		t.Fatalf("unexpected snapshot after recovery: %+v", snapshot)
+	}
+	if snapshot.LastSuccessAtMS == 0 || snapshot.LastPublishedAtMS == 0 {
+		t.Fatalf("expected success/published timestamps in snapshot: %+v", snapshot)
+	}
+	if snapshot.LastErrorBackoffMS != time.Millisecond.Milliseconds() {
+		t.Fatalf("unexpected error backoff snapshot: %+v", snapshot)
 	}
 }
 
@@ -140,13 +187,48 @@ func (store *fakeStore) ProcessReadyBatch(
 }
 
 type recordingPublisher struct {
-	calls int
-	err   error
+	calls     atomic.Int32
+	err       error
+	onPublish func()
 }
 
 func (publisher *recordingPublisher) PublishBatch(ctx context.Context, topic string, records []types.KafkaPublishRecord) error {
-	publisher.calls++
+	publisher.calls.Add(1)
+	if publisher.onPublish != nil {
+		publisher.onPublish()
+	}
 	return publisher.err
+}
+
+func (publisher *recordingPublisher) Calls() int {
+	return int(publisher.calls.Load())
+}
+
+type transientErrorStore struct {
+	calls    atomic.Int32
+	messages []types.OutboxMessage
+}
+
+func (store *transientErrorStore) ProcessReadyBatch(
+	ctx context.Context,
+	limit int,
+	maxAttempts int,
+	retryBaseDelay time.Duration,
+	publish func(context.Context, []types.OutboxMessage) []error,
+) (types.OutboxRelayStats, error) {
+	if store.calls.Add(1) == 1 {
+		return types.OutboxRelayStats{}, errors.New("temporary store failure")
+	}
+	errs := publish(ctx, store.messages)
+	stats := types.OutboxRelayStats{Fetched: len(store.messages)}
+	for _, err := range errs {
+		if err != nil {
+			stats.Retried++
+		} else {
+			stats.Published++
+		}
+	}
+	return stats, nil
 }
 
 func testOutboxMessage(eventType string, payload []byte) types.OutboxMessage {

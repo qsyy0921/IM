@@ -20,6 +20,7 @@
 - 已补 `projection-failure-audit` 只读模式：可直接列出 unresolved projection failure，并支持按 offset / event / failure class 过滤，减少手写 SQL 排障。
 - 已补 `projection-failure-cleanup` operator：只删除超过保留期的 resolved failure 审计行，不会碰 unresolved blocker，并支持按 consumer/topic/partition/class 缩小范围。
 - `timeline-consumer` 现已对运行时 `Fetch` / `Commit` 错误做退避重试，并在 worker 模式通过 `/debug/metrics` 暴露低敏 retry 快照；malformed event、projection failure、failure recorder 异常仍保持持久审计 + fail-closed，不会自动越过 blocker。
+- `outbox-relay` 现已对非取消运行时错误做退避重试，并在 relay 模式通过 `/debug/metrics` 暴露低敏 retry 快照；malformed payload / unsupported event 仍保持 fail-closed，交给 outbox retry / DLQ 语义处理。
 
 ## 后续
 

@@ -898,6 +898,7 @@ func resetContactsTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) 
 	t.Helper()
 	_, err := pool.Exec(ctx, `
 TRUNCATE
+    contacts_outbox_repair_audit,
     contacts_outbox,
     contact_command_idempotency,
     contact_edges,

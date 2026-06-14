@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -71,7 +72,7 @@ func TestOutboxStoreRetriesAndDLQIntegration(t *testing.T) {
 		t.Fatalf("send contact request: %v", err)
 	}
 	stats, err := store.ProcessReadyBatch(ctx, 10, 3, time.Millisecond, func(ctx context.Context, messages []types.OutboxMessage) []error {
-		return []error{errors.New("publish failed")}
+		return []error{errors.New("kafka unavailable: broker body user=user1@example.com token=secret-token")}
 	})
 	if err != nil {
 		t.Fatalf("process retry: %v", err)
@@ -80,6 +81,7 @@ func TestOutboxStoreRetriesAndDLQIntegration(t *testing.T) {
 		t.Fatalf("expected retry stats, got %+v", stats)
 	}
 	assertContactsOutboxStatusCount(t, ctx, pool, types.OutboxStatusPending, 1)
+	assertContactsOutboxLastError(t, ctx, pool, types.OutboxStatusPending, "contacts outbox publish broker unavailable", "user1@example.com", "secret-token", "broker body")
 
 	_, err = pool.Exec(ctx, `
 UPDATE contacts_outbox
@@ -91,7 +93,7 @@ WHERE tenant_id = 'tenant-contacts'
 		t.Fatalf("make outbox ready for dlq: %v", err)
 	}
 	stats, err = store.ProcessReadyBatch(ctx, 10, 3, time.Millisecond, func(ctx context.Context, messages []types.OutboxMessage) []error {
-		return []error{errors.New("publish failed again")}
+		return []error{errors.New("malformed payload: provider body token=secret-token")}
 	})
 	if err != nil {
 		t.Fatalf("process dlq: %v", err)
@@ -100,6 +102,7 @@ WHERE tenant_id = 'tenant-contacts'
 		t.Fatalf("expected dlq stats, got %+v", stats)
 	}
 	assertContactsOutboxStatusCount(t, ctx, pool, types.OutboxStatusDLQ, 1)
+	assertContactsOutboxLastError(t, ctx, pool, types.OutboxStatusDLQ, "contacts outbox publish invalid payload", "malformed payload", "secret-token")
 }
 
 func TestOutboxStoreBlocksHigherVersionByPartitionKeyIntegration(t *testing.T) {
@@ -155,7 +158,7 @@ func TestOutboxStoreRepairDLQEventUnblocksPartitionIntegration(t *testing.T) {
 UPDATE contacts_outbox
 SET status = 'DLQ',
     retry_count = 3,
-    last_error = 'publish failed',
+    last_error = 'kafka unavailable: broker body user=user1@example.com token=secret-token',
     dead_lettered_at = now()
 WHERE event_id = $1
 `, createdEventID)
@@ -181,7 +184,7 @@ WHERE event_id = $1
 	if repairStats.Requested != 2 || repairStats.Repaired != 1 || repairStats.Skipped != 1 {
 		t.Fatalf("unexpected repair stats: %+v", repairStats)
 	}
-	assertContactsOutboxRepairAudit(t, ctx, pool, createdEventID, "operator retried after kafka recovery", "publish failed")
+	assertContactsOutboxRepairAudit(t, ctx, pool, createdEventID, "operator retried after kafka recovery", "contacts outbox publish broker unavailable", "user1@example.com", "secret-token", "broker body")
 
 	var published []string
 	stats, err = store.ProcessReadyBatch(ctx, 10, 3, time.Millisecond, func(ctx context.Context, messages []types.OutboxMessage) []error {
@@ -267,7 +270,7 @@ func TestOutboxStoreAuditOutboxFiltersStatusAndEventTypeIntegration(t *testing.T
 UPDATE contacts_outbox
 SET status = 'DLQ',
     retry_count = 2,
-    last_error = 'publish failed',
+    last_error = 'kafka unavailable: broker body user=user1@example.com token=secret-token',
     dead_lettered_at = now()
 WHERE event_id = $1
 `, createdEventID)
@@ -287,9 +290,10 @@ WHERE event_id = $1
 	if len(rows) != 1 {
 		t.Fatalf("expected one row, got %d", len(rows))
 	}
-	if rows[0].EventID != createdEventID || rows[0].Status != types.OutboxStatusDLQ || rows[0].LastError != "publish failed" {
+	if rows[0].EventID != createdEventID || rows[0].Status != types.OutboxStatusDLQ || rows[0].LastError != "contacts outbox publish broker unavailable" {
 		t.Fatalf("unexpected filtered contacts outbox row: %+v", rows[0])
 	}
+	assertContactsOutboxErrorDoesNotContain(t, rows[0].LastError, "user1@example.com", "secret-token", "broker body")
 }
 
 func TestOutboxStoreAuditOutboxRepairsReturnsLatestRowsIntegration(t *testing.T) {
@@ -301,8 +305,8 @@ func TestOutboxStoreAuditOutboxRepairsReturnsLatestRowsIntegration(t *testing.T)
 INSERT INTO contacts_outbox_repair_audit (
     event_id, tenant_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at, repair_reason, repaired_at
 ) VALUES
-    ('event-11', 'tenant-a', 'DLQ', 1, 'publish failed', now() - interval '1 minute', 'manual audit', now() - interval '1 minute'),
-    ('event-12', 'tenant-a', 'DLQ', 2, 'provider unavailable', now() - interval '2 minutes', 'provider recovered', now())
+    ('event-11', 'tenant-a', 'DLQ', 1, 'malformed payload user=user1@example.com', now() - interval '1 minute', 'manual audit', now() - interval '1 minute'),
+    ('event-12', 'tenant-a', 'DLQ', 2, 'kafka unavailable token=secret-token', now() - interval '2 minutes', 'provider recovered', now())
 `)
 	if err != nil {
 		t.Fatalf("seed contacts outbox repair audit: %v", err)
@@ -322,9 +326,17 @@ INSERT INTO contacts_outbox_repair_audit (
 	if rows[0].EventID != "event-12" || rows[0].Reason != "provider recovered" || rows[0].PreviousRetryCount != 2 {
 		t.Fatalf("unexpected latest contacts outbox repair audit row: %+v", rows[0])
 	}
+	if rows[0].PreviousLastError != "contacts outbox publish broker unavailable" {
+		t.Fatalf("unexpected latest sanitized repair error: %q", rows[0].PreviousLastError)
+	}
+	assertContactsOutboxErrorDoesNotContain(t, rows[0].PreviousLastError, "secret-token")
 	if rows[1].EventID != "event-11" || rows[1].Reason != "manual audit" || rows[1].PreviousRetryCount != 1 {
 		t.Fatalf("unexpected older contacts outbox repair audit row: %+v", rows[1])
 	}
+	if rows[1].PreviousLastError != "contacts outbox publish invalid payload" {
+		t.Fatalf("unexpected older sanitized repair error: %q", rows[1].PreviousLastError)
+	}
+	assertContactsOutboxErrorDoesNotContain(t, rows[1].PreviousLastError, "user1@example.com")
 }
 
 func TestOutboxStoreAuditOutboxRepairsFiltersEventAndTenantIntegration(t *testing.T) {
@@ -336,7 +348,7 @@ func TestOutboxStoreAuditOutboxRepairsFiltersEventAndTenantIntegration(t *testin
 INSERT INTO contacts_outbox_repair_audit (
     event_id, tenant_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at, repair_reason, repaired_at
 ) VALUES
-    ('event-21', 'tenant-b', 'DLQ', 1, 'publish failed', now() - interval '1 minute', 'manual audit', now()),
+    ('event-21', 'tenant-b', 'DLQ', 1, 'malformed payload user=user1@example.com', now() - interval '1 minute', 'manual audit', now()),
     ('event-22', 'tenant-c', 'DLQ', 2, 'provider unavailable', now() - interval '2 minutes', 'provider recovered', now() - interval '1 minute')
 `)
 	if err != nil {
@@ -358,6 +370,10 @@ INSERT INTO contacts_outbox_repair_audit (
 	if rows[0].EventID != "event-21" || rows[0].TenantID != "tenant-b" {
 		t.Fatalf("unexpected filtered contacts outbox repair audit row: %+v", rows[0])
 	}
+	if rows[0].PreviousLastError != "contacts outbox publish invalid payload" {
+		t.Fatalf("unexpected sanitized filtered repair error: %q", rows[0].PreviousLastError)
+	}
+	assertContactsOutboxErrorDoesNotContain(t, rows[0].PreviousLastError, "user1@example.com")
 }
 
 func TestOutboxStoreCleanupOutboxRepairsDeletesOnlyExpiredRowsIntegration(t *testing.T) {
@@ -457,7 +473,7 @@ INSERT INTO contacts_outbox_repair_audit (
 	}
 }
 
-func assertContactsOutboxRepairAudit(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventID string, wantReason string, wantPreviousError string) {
+func assertContactsOutboxRepairAudit(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventID string, wantReason string, wantPreviousError string, forbidden ...string) {
 	t.Helper()
 	var reason string
 	var previousStatus string
@@ -480,6 +496,35 @@ WHERE tenant_id = 'tenant-contacts'
 			previousRetryCount,
 			previousError,
 		)
+	}
+	assertContactsOutboxErrorDoesNotContain(t, previousError, forbidden...)
+}
+
+func assertContactsOutboxLastError(t *testing.T, ctx context.Context, pool *pgxpool.Pool, status string, want string, forbidden ...string) {
+	t.Helper()
+	var lastError string
+	err := pool.QueryRow(ctx, `
+SELECT last_error
+FROM contacts_outbox
+WHERE tenant_id = 'tenant-contacts'
+  AND status = $1
+LIMIT 1
+`, status).Scan(&lastError)
+	if err != nil {
+		t.Fatalf("query contacts outbox last_error: %v", err)
+	}
+	if lastError != want {
+		t.Fatalf("unexpected contacts outbox last_error: got %q want %q", lastError, want)
+	}
+	assertContactsOutboxErrorDoesNotContain(t, lastError, forbidden...)
+}
+
+func assertContactsOutboxErrorDoesNotContain(t *testing.T, lastError string, forbidden ...string) {
+	t.Helper()
+	for _, text := range forbidden {
+		if text != "" && strings.Contains(lastError, text) {
+			t.Fatalf("contacts outbox error leaked %q: %q", text, lastError)
+		}
 	}
 }
 

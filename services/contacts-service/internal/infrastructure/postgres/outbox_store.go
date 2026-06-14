@@ -147,15 +147,16 @@ func (store *OutboxStore) ProcessReadyBatch(
 	for index, message := range messages {
 		if err := publishErrors[index]; err != nil {
 			attempt := message.RetryCount + 1
+			lastError := sanitizeContactsOutboxPublishError(err)
 			if attempt >= maxAttempts {
-				if markErr := store.markDeadLettered(ctx, tx, message.ID, attempt, err.Error(), now); markErr != nil {
+				if markErr := store.markDeadLettered(ctx, tx, message.ID, attempt, lastError, now); markErr != nil {
 					return types.OutboxRelayStats{}, markErr
 				}
 				stats.DeadLettered++
 				continue
 			}
 			nextRetryAt := now.Add(retryDelay(retryBaseDelay, attempt))
-			if markErr := store.markRetry(ctx, tx, message.ID, attempt, err.Error(), nextRetryAt); markErr != nil {
+			if markErr := store.markRetry(ctx, tx, message.ID, attempt, lastError, nextRetryAt); markErr != nil {
 				return types.OutboxRelayStats{}, markErr
 			}
 			stats.Retried++
@@ -197,65 +198,19 @@ func (store *OutboxStore) RepairDLQEvents(ctx context.Context, eventIDs []string
 		_ = tx.Rollback(ctx)
 	}()
 
-	var stats types.OutboxRepairStats
-	err = tx.QueryRow(ctx, `
-WITH requested AS (
-    SELECT DISTINCT unnest($1::text[]) AS event_id
-),
-target AS (
-    SELECT
-        co.id,
-        co.event_id,
-        co.tenant_id,
-        co.status,
-        co.retry_count,
-        co.last_error,
-        co.dead_lettered_at
-    FROM contacts_outbox co
-    JOIN requested r ON r.event_id = co.event_id
-    WHERE co.status = $3
-    FOR UPDATE OF co
-),
-updated AS (
-    UPDATE contacts_outbox co
-    SET status = $2,
-        retry_count = 0,
-        last_error = '',
-        next_retry_at = NULL,
-        dead_lettered_at = NULL,
-        available_at = now(),
-        updated_at = now()
-    FROM target t
-    WHERE co.id = t.id
-    RETURNING co.event_id
-),
-audit AS (
-    INSERT INTO contacts_outbox_repair_audit (
-        event_id,
-        tenant_id,
-        previous_status,
-        previous_retry_count,
-        previous_last_error,
-        previous_dead_lettered_at,
-        repair_reason
-    )
-    SELECT
-        event_id,
-        tenant_id,
-        status,
-        retry_count,
-        last_error,
-        dead_lettered_at,
-        $4
-    FROM target
-    RETURNING event_id
-)
-SELECT
-    (SELECT COUNT(*) FROM requested) AS requested,
-    (SELECT COUNT(*) FROM updated) AS repaired
-`, ids, types.OutboxStatusPending, types.OutboxStatusDLQ, reason).Scan(&stats.Requested, &stats.Repaired)
+	targets, err := store.lockContactsOutboxRepairTargets(ctx, tx, ids)
 	if err != nil {
-		return types.OutboxRepairStats{}, types.NewDBWriteFailed(err.Error())
+		return types.OutboxRepairStats{}, err
+	}
+	for _, target := range targets {
+		if err := store.redriveContactsOutboxTarget(ctx, tx, target, reason); err != nil {
+			return types.OutboxRepairStats{}, err
+		}
+	}
+
+	stats := types.OutboxRepairStats{
+		Requested: len(ids),
+		Repaired:  len(targets),
 	}
 	stats.Skipped = stats.Requested - stats.Repaired
 	if stats.Skipped < 0 {
@@ -265,6 +220,92 @@ SELECT
 		return types.OutboxRepairStats{}, types.NewDBWriteFailed(err.Error())
 	}
 	return stats, nil
+}
+
+type contactsOutboxRepairTarget struct {
+	ID                 int64
+	EventID            string
+	TenantID           string
+	Status             string
+	RetryCount         int
+	LastError          string
+	DeadLetteredAt     *time.Time
+	PreviousLastError  string
+	PreviousRetryCount int
+}
+
+func (store *OutboxStore) lockContactsOutboxRepairTargets(ctx context.Context, tx pgx.Tx, eventIDs []string) ([]contactsOutboxRepairTarget, error) {
+	rows, err := tx.Query(ctx, `
+SELECT
+    co.id,
+    co.event_id,
+    co.tenant_id,
+    co.status,
+    co.retry_count,
+    COALESCE(co.last_error, ''),
+    co.dead_lettered_at
+FROM contacts_outbox co
+JOIN (SELECT DISTINCT unnest($1::text[]) AS event_id) requested ON requested.event_id = co.event_id
+WHERE co.status = $2
+FOR UPDATE OF co
+`, eventIDs, types.OutboxStatusDLQ)
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	targets := make([]contactsOutboxRepairTarget, 0, len(eventIDs))
+	for rows.Next() {
+		var target contactsOutboxRepairTarget
+		if err := rows.Scan(
+			&target.ID,
+			&target.EventID,
+			&target.TenantID,
+			&target.Status,
+			&target.RetryCount,
+			&target.LastError,
+			&target.DeadLetteredAt,
+		); err != nil {
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		target.PreviousRetryCount = target.RetryCount
+		target.PreviousLastError = sanitizeContactsOutboxStoredError(target.LastError)
+		targets = append(targets, target)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	return targets, nil
+}
+
+func (store *OutboxStore) redriveContactsOutboxTarget(ctx context.Context, tx pgx.Tx, target contactsOutboxRepairTarget, reason string) error {
+	if _, err := tx.Exec(ctx, `
+UPDATE contacts_outbox
+SET status = $2,
+    retry_count = 0,
+    last_error = '',
+    next_retry_at = NULL,
+    dead_lettered_at = NULL,
+    available_at = now(),
+    updated_at = now()
+WHERE id = $1
+`, target.ID, types.OutboxStatusPending); err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO contacts_outbox_repair_audit (
+    event_id,
+    tenant_id,
+    previous_status,
+    previous_retry_count,
+    previous_last_error,
+    previous_dead_lettered_at,
+    repair_reason
+) VALUES ($1, $2, $3, $4, $5, $6, $7)
+`, target.EventID, target.TenantID, target.Status, target.PreviousRetryCount, target.PreviousLastError, target.DeadLetteredAt, reason); err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
 }
 
 func (store *OutboxStore) AuditOutbox(ctx context.Context, options OutboxAuditOptions) ([]OutboxAuditRow, error) {
@@ -325,7 +366,7 @@ SELECT
     event_type,
     status,
     retry_count,
-    last_error,
+    COALESCE(last_error, ''),
     available_at,
     next_retry_at,
     dead_lettered_at,
@@ -362,6 +403,7 @@ LIMIT $`+strconv.Itoa(len(args)), args...)
 		); err != nil {
 			return nil, types.NewDBReadFailed(err.Error())
 		}
+		row.LastError = sanitizeContactsOutboxStoredError(row.LastError)
 		result = append(result, row)
 	}
 	if err := rows.Err(); err != nil {
@@ -403,7 +445,7 @@ SELECT
     tenant_id,
     previous_status,
     previous_retry_count,
-    previous_last_error,
+    COALESCE(previous_last_error, ''),
     previous_dead_lettered_at,
     repair_reason,
     repaired_at
@@ -431,6 +473,7 @@ LIMIT $`+strconv.Itoa(len(args)), args...)
 		); err != nil {
 			return nil, types.NewDBReadFailed(err.Error())
 		}
+		row.PreviousLastError = sanitizeContactsOutboxStoredError(row.PreviousLastError)
 		result = append(result, row)
 	}
 	if err := rows.Err(); err != nil {
@@ -639,6 +682,55 @@ func retryDelay(base time.Duration, attempt int) time.Duration {
 		exponent = 10
 	}
 	return base * time.Duration(1<<exponent)
+}
+
+func sanitizeContactsOutboxStoredError(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return ""
+	}
+	return sanitizeContactsOutboxErrorText(value)
+}
+
+func sanitizeContactsOutboxPublishError(err error) string {
+	if err == nil {
+		return ""
+	}
+	if errors.Is(err, context.Canceled) {
+		return "contacts outbox publish canceled"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "contacts outbox publish timeout"
+	}
+	return sanitizeContactsOutboxErrorText(err.Error())
+}
+
+func sanitizeContactsOutboxErrorText(value string) string {
+	message := strings.ToLower(strings.TrimSpace(value))
+	switch {
+	case message == "":
+		return "contacts outbox publish failed"
+	case strings.Contains(message, "cancel"):
+		return "contacts outbox publish canceled"
+	case strings.Contains(message, "timeout") || strings.Contains(message, "deadline exceeded"):
+		return "contacts outbox publish timeout"
+	case strings.Contains(message, "unsupported"):
+		return "contacts outbox publish unsupported event"
+	case strings.Contains(message, "malformed") ||
+		strings.Contains(message, "invalid") ||
+		strings.Contains(message, "json") ||
+		strings.Contains(message, "decode") ||
+		strings.Contains(message, "payload"):
+		return "contacts outbox publish invalid payload"
+	case strings.Contains(message, "kafka") ||
+		strings.Contains(message, "broker") ||
+		strings.Contains(message, "leader") ||
+		strings.Contains(message, "connection refused") ||
+		strings.Contains(message, "no such host") ||
+		strings.Contains(message, "network"):
+		return "contacts outbox publish broker unavailable"
+	default:
+		return "contacts outbox publish failed"
+	}
 }
 
 func normalizeOutboxStatus(raw string) string {

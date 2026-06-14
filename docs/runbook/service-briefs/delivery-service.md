@@ -13,7 +13,7 @@
 - 已补 `projection-checkpoint-repair` 运维模式，当前只允许带审计地回调 checkpoint 做 replay，不允许前跳跳过事件。
 - 已补 `projection-checkpoint-repair-audit` 只读模式：可直接列出 repair audit 历史，并按 mode/outcome 缩小排障范围。
 - 已补 `projection-checkpoint-repair-cleanup` operator：只删除超过保留期的 repair audit 历史，并支持按 consumer/topic/partition/mode/outcome 缩小范围。
-- 已补 projection fail-closed 持久审计：timeline consumer 在 malformed / projection failure 停下前会写低敏失败记录，但仍不会提交 checkpoint。
+- 已补 projection fail-closed 持久审计：timeline consumer 在 malformed / projection failure 停下前会写低敏失败记录，`last_error` 只保存稳定分类文案，且仍不会提交 checkpoint。
 - 已补 projection failure resolved 标记：同一 offset 成功重放后会保留失败记录但标记 `resolved`，`/debug/metrics` 只聚合未解决 blocker。
 - 已补按 unresolved failure 定点回调 checkpoint：repair 可直接指定 failure offset，先锁定未解决 failure，再带审计回调到该 offset。
 - 已补按最早 unresolved failure 自动回调 checkpoint：repair 不再必须手填 offset，也能安全 rewind 到当前最早 blocker。

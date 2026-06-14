@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,7 +36,52 @@ func TestProjectionFailureStoreRecordsAndIncrementsIntegration(t *testing.T) {
 	if err := store.RecordFailure(ctx, record); err != nil {
 		t.Fatalf("record projection failure second time: %v", err)
 	}
-	assertProjectionFailureRow(t, ctx, pool, record.ConsumerGroup, record.Topic, record.PartitionID, record.OffsetValue, record.FailureClass, record.LastError, 2, false, 0)
+	assertProjectionFailureRow(t, ctx, pool, record.ConsumerGroup, record.Topic, record.PartitionID, record.OffsetValue, record.FailureClass, types.ProjectionFailurePublicMessage(record.FailureClass), 2, false, 0)
+}
+
+func TestProjectionFailureStoreSanitizesLastErrorIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	store := NewProjectionFailureStore(pool)
+	record := types.ProjectionFailureRecord{
+		ConsumerGroup:    "group-sensitive",
+		Topic:            "conversation.timeline.events",
+		PartitionID:      0,
+		OffsetValue:      44,
+		EventID:          "event-sensitive",
+		EventType:        types.TimelineEventMessagePersisted,
+		TenantID:         "tenant-1",
+		ConversationID:   "conv-1",
+		AggregateVersion: 8,
+		TraceID:          "trace-1",
+		FailureClass:     types.ProjectionFailureClassDBWrite,
+		LastError:        "pq: duplicate key for user=user1@example.com token=secret-token detail=internal-table",
+	}
+	if err := store.RecordFailure(ctx, record); err != nil {
+		t.Fatalf("record projection failure with sensitive error: %v", err)
+	}
+	assertProjectionFailureRow(t, ctx, pool, record.ConsumerGroup, record.Topic, record.PartitionID, record.OffsetValue, record.FailureClass, "delivery projection write failed", 1, false, 0)
+	assertProjectionFailureErrorDoesNotLeak(t, ctx, pool, record.ConsumerGroup, record.Topic, record.PartitionID, record.OffsetValue, "user1@example.com", "secret-token", "internal-table")
+
+	rows, err := store.AuditFailures(ctx, ProjectionFailureAuditOptions{
+		ConsumerGroup:  record.ConsumerGroup,
+		Topic:          record.Topic,
+		UnresolvedOnly: true,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit sanitized projection failure: %v", err)
+	}
+	if len(rows) != 1 || rows[0].LastError != "delivery projection write failed" {
+		t.Fatalf("unexpected sanitized audit row: %+v", rows)
+	}
+	for _, forbidden := range []string{"user1@example.com", "secret-token", "internal-table"} {
+		if strings.Contains(rows[0].LastError, forbidden) {
+			t.Fatalf("projection failure audit leaked %q: %q", forbidden, rows[0].LastError)
+		}
+	}
 }
 
 func TestProjectionFailureStoreReopensResolvedFailureIntegration(t *testing.T) {
@@ -72,7 +118,7 @@ INSERT INTO delivery_projection_failures (
 	if err := store.RecordFailure(ctx, record); err != nil {
 		t.Fatalf("re-record resolved projection failure: %v", err)
 	}
-	assertProjectionFailureRow(t, ctx, pool, record.ConsumerGroup, record.Topic, record.PartitionID, record.OffsetValue, record.FailureClass, record.LastError, 3, false, 0)
+	assertProjectionFailureRow(t, ctx, pool, record.ConsumerGroup, record.Topic, record.PartitionID, record.OffsetValue, record.FailureClass, types.ProjectionFailurePublicMessage(record.FailureClass), 3, false, 0)
 }
 
 func TestProjectionFailureStoreAuditReturnsUnresolvedRowsIntegration(t *testing.T) {
@@ -405,5 +451,25 @@ WHERE consumer_group = $1
 		}
 	} else if gotResolvedCheckpointOffset != nil {
 		t.Fatalf("expected nil resolved checkpoint offset, got %v", gotResolvedCheckpointOffset)
+	}
+}
+
+func assertProjectionFailureErrorDoesNotLeak(t *testing.T, ctx context.Context, pool *pgxpool.Pool, consumerGroup string, topic string, partitionID int32, offsetValue int64, forbidden ...string) {
+	t.Helper()
+	var lastError string
+	if err := pool.QueryRow(ctx, `
+SELECT last_error
+FROM delivery_projection_failures
+WHERE consumer_group = $1
+  AND topic = $2
+  AND partition_id = $3
+  AND offset_value = $4
+`, consumerGroup, topic, partitionID, offsetValue).Scan(&lastError); err != nil {
+		t.Fatalf("read projection failure last_error: %v", err)
+	}
+	for _, text := range forbidden {
+		if strings.Contains(lastError, text) {
+			t.Fatalf("projection failure last_error leaked %q: %q", text, lastError)
+		}
 	}
 }

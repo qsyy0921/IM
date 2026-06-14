@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -338,8 +339,41 @@ func TestWorkerDoesNotCommitWhenProjectionFails(t *testing.T) {
 	}
 	if recorder.recorded[0].FailureClass != types.ProjectionFailureClassDBWrite ||
 		recorder.recorded[0].EventID != "event-1" ||
-		recorder.recorded[0].OffsetValue != 0 {
+		recorder.recorded[0].OffsetValue != 0 ||
+		recorder.recorded[0].LastError != "delivery projection write failed" {
 		t.Fatalf("unexpected recorded failure: %+v", recorder.recorded[0])
+	}
+}
+
+func TestBestEffortProjectionFailureRecordUsesStableLastError(t *testing.T) {
+	value := mustMarshalTimelineEvent(t, &conversationtimelinev1.ConversationTimelineEvent{
+		EventId:          "event-sensitive",
+		EventType:        types.TimelineEventConversationMemberJoined,
+		TenantId:         "tenant-1",
+		AggregateId:      "conv-1",
+		AggregateVersion: 10,
+		Payload: &conversationtimelinev1.ConversationTimelineEvent_ConversationMemberJoined{
+			ConversationMemberJoined: &conversationtimelinev1.ConversationMemberJoinedV1{
+				TargetUserId:      "user-1",
+				NewRole:           conversationtimelinev1.ConversationMemberRole_CONVERSATION_MEMBER_ROLE_MEMBER,
+				NewStatus:         conversationtimelinev1.ConversationMemberStatus_CONVERSATION_MEMBER_STATUS_ACTIVE,
+				MemberVersion:     2,
+				PermissionVersion: 3,
+			},
+		},
+	})
+	record := bestEffortProjectionFailureRecord(
+		"delivery-test",
+		types.TimelineMessage{Topic: "conversation.timeline.events", Partition: 1, Offset: 42, Value: value},
+		types.NewDBWriteFailed("pq duplicate key user=user1@example.com token=secret-token internal-table"),
+	)
+	if record.FailureClass != types.ProjectionFailureClassDBWrite || record.LastError != "delivery projection write failed" {
+		t.Fatalf("unexpected projection failure record: %+v", record)
+	}
+	for _, forbidden := range []string{"user1@example.com", "secret-token", "internal-table", "duplicate key"} {
+		if strings.Contains(record.LastError, forbidden) {
+			t.Fatalf("projection failure record leaked %q: %q", forbidden, record.LastError)
+		}
 	}
 }
 
@@ -358,7 +392,8 @@ func TestWorkerRejectsMalformedEvent(t *testing.T) {
 		t.Fatalf("expected one recorded failure, got %d", len(recorder.recorded))
 	}
 	if recorder.recorded[0].FailureClass != types.ProjectionFailureClassDecode ||
-		recorder.recorded[0].EventID != "" {
+		recorder.recorded[0].EventID != "" ||
+		recorder.recorded[0].LastError != "delivery projection decode failed" {
 		t.Fatalf("unexpected malformed recorded failure: %+v", recorder.recorded[0])
 	}
 }

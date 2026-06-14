@@ -78,7 +78,7 @@ func (store *ProjectionFailureStore) RecordFailure(ctx context.Context, record t
 	if strings.TrimSpace(record.FailureClass) == "" {
 		record.FailureClass = types.ProjectionFailureClassUnknown
 	}
-	record.LastError = sanitizeProjectionFailureError(record.LastError)
+	record.LastError = sanitizeProjectionFailureError(record.FailureClass, record.LastError)
 	_, err := store.pool.Exec(ctx, `
 INSERT INTO delivery_projection_failures (
     consumer_group,
@@ -211,6 +211,7 @@ LIMIT $` + itoa(len(args))
 		); err != nil {
 			return nil, types.NewDBReadFailed(err.Error())
 		}
+		row.LastError = sanitizeProjectionFailureError(row.FailureClass, row.LastError)
 		result = append(result, row)
 	}
 	if err := rows.Err(); err != nil {
@@ -278,12 +279,8 @@ RETURNING 1
 	return stats, nil
 }
 
-func sanitizeProjectionFailureError(value string) string {
-	value = strings.TrimSpace(value)
-	if len(value) <= 256 {
-		return value
-	}
-	return value[:256]
+func sanitizeProjectionFailureError(failureClass string, _ string) string {
+	return types.ProjectionFailurePublicMessage(failureClass)
 }
 
 func itoa(value int) string {

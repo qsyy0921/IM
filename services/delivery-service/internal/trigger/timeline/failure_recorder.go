@@ -29,18 +29,20 @@ func classifyProjectionFailure(err error) string {
 }
 
 func bestEffortProjectionFailureRecord(consumerGroup string, message types.TimelineMessage, err error) types.ProjectionFailureRecord {
+	failureClass := classifyProjectionFailure(err)
 	record := types.ProjectionFailureRecord{
 		ConsumerGroup: consumerGroup,
 		Topic:         message.Topic,
 		PartitionID:   int32(message.Partition),
 		OffsetValue:   message.Offset,
-		FailureClass:  classifyProjectionFailure(err),
-		LastError:     err.Error(),
+		FailureClass:  failureClass,
+		LastError:     types.ProjectionFailurePublicMessage(failureClass),
 	}
 
 	var event conversationtimelinev1.ConversationTimelineEvent
 	if unmarshalErr := proto.Unmarshal(message.Value, &event); unmarshalErr != nil {
 		record.FailureClass = types.ProjectionFailureClassDecode
+		record.LastError = types.ProjectionFailurePublicMessage(record.FailureClass)
 		return record
 	}
 	record.EventID = event.GetEventId()

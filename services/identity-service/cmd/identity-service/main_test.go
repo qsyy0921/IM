@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	notificationinfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/notification"
 	tokeninfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/token"
 	"github.com/qsyy0921/IM/services/identity-service/internal/types"
 )
@@ -865,6 +866,45 @@ func TestChallengeNotifierAcceptsOutboxMode(t *testing.T) {
 	}
 	if notifier == nil || mode != "outbox" {
 		t.Fatalf("expected noop notifier for outbox mode, mode=%q notifier=%T", mode, notifier)
+	}
+}
+
+func TestChallengeNotifierAcceptsSMTPMode(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MODE", "smtp")
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_SMTP_ADDR", "smtp.example.com:587")
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_SMTP_FROM", "NexusIM <no-reply@example.com>")
+	notifier, mode, err := newChallengeNotifier()
+	if err != nil {
+		t.Fatalf("new smtp notifier: %v", err)
+	}
+	if mode != "smtp" {
+		t.Fatalf("expected smtp mode, got %q", mode)
+	}
+	if _, ok := notifier.(*notificationinfra.SMTPChallengeNotifier); !ok {
+		t.Fatalf("expected smtp notifier, got %T", notifier)
+	}
+}
+
+func TestChallengeDeliveryWorkerNotifierAcceptsSMTPProvider(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_WORKER_PROVIDER", "smtp")
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_SMTP_ADDR", "smtp.example.com:587")
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_SMTP_FROM", "no-reply@example.com")
+	notifier, provider, err := newChallengeDeliveryWorkerNotifier()
+	if err != nil {
+		t.Fatalf("new smtp worker notifier: %v", err)
+	}
+	if provider != "smtp" {
+		t.Fatalf("expected smtp provider, got %q", provider)
+	}
+	if _, ok := notifier.(*notificationinfra.SMTPChallengeNotifier); !ok {
+		t.Fatalf("expected smtp notifier, got %T", notifier)
+	}
+}
+
+func TestChallengeDeliveryWorkerNotifierRejectsUnsupportedProvider(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_WORKER_PROVIDER", "sms")
+	if _, _, err := newChallengeDeliveryWorkerNotifier(); err == nil {
+		t.Fatalf("expected unsupported worker provider to fail")
 	}
 }
 

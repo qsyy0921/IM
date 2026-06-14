@@ -275,6 +275,9 @@ func newChallengeNotifier() (app.ChallengeNotifier, string, error) {
 	case "webhook":
 		notifier, err := newChallengeWebhookNotifier()
 		return notifier, mode, err
+	case "smtp":
+		notifier, err := newChallengeSMTPNotifier()
+		return notifier, mode, err
 	default:
 		return nil, mode, errors.New("unsupported NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MODE")
 	}
@@ -288,12 +291,39 @@ func newChallengeWebhookNotifier() (app.ChallengeNotifier, error) {
 	)
 }
 
+func newChallengeSMTPNotifier() (app.ChallengeNotifier, error) {
+	return notificationinfra.NewSMTPChallengeNotifier(notificationinfra.SMTPChallengeNotifierConfig{
+		Addr:          envString("NEXUSIM_IDENTITY_CHALLENGE_SMTP_ADDR", ""),
+		From:          envString("NEXUSIM_IDENTITY_CHALLENGE_SMTP_FROM", ""),
+		Username:      os.Getenv("NEXUSIM_IDENTITY_CHALLENGE_SMTP_USERNAME"),
+		Password:      os.Getenv("NEXUSIM_IDENTITY_CHALLENGE_SMTP_PASSWORD"),
+		ServerName:    envString("NEXUSIM_IDENTITY_CHALLENGE_SMTP_SERVER_NAME", ""),
+		TLSMode:       envString("NEXUSIM_IDENTITY_CHALLENGE_SMTP_TLS_MODE", "starttls"),
+		SubjectPrefix: envString("NEXUSIM_IDENTITY_CHALLENGE_SMTP_SUBJECT_PREFIX", "NexusIM"),
+		Timeout:       envDuration("NEXUSIM_IDENTITY_CHALLENGE_SMTP_TIMEOUT", 10*time.Second),
+	})
+}
+
 func challengeDeliveryMode() string {
 	mode := strings.ToLower(strings.TrimSpace(envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MODE", "noop")))
 	if mode == "" {
 		return "noop"
 	}
 	return mode
+}
+
+func newChallengeDeliveryWorkerNotifier() (app.ChallengeNotifier, string, error) {
+	provider := strings.ToLower(strings.TrimSpace(envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_WORKER_PROVIDER", "webhook")))
+	switch provider {
+	case "webhook":
+		notifier, err := newChallengeWebhookNotifier()
+		return notifier, provider, err
+	case "smtp":
+		notifier, err := newChallengeSMTPNotifier()
+		return notifier, provider, err
+	default:
+		return nil, provider, errors.New("unsupported NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_WORKER_PROVIDER")
+	}
 }
 
 func newChallengeDeliveryTokenManager() (*tokeninfra.ChallengeDeliveryTokenManager, error) {
@@ -868,13 +898,13 @@ func runChallengeDeliveryWorker() error {
 	}
 	defer pool.Close()
 
-	challengeDeliveryMetrics := monitoringinfra.NewChallengeDeliveryMetrics("outbox-webhook")
-
-	tokenManager, err := newChallengeDeliveryTokenManager()
+	notifier, providerMode, err := newChallengeDeliveryWorkerNotifier()
 	if err != nil {
 		return err
 	}
-	notifier, err := newChallengeWebhookNotifier()
+	challengeDeliveryMetrics := monitoringinfra.NewChallengeDeliveryMetrics("outbox-" + providerMode)
+
+	tokenManager, err := newChallengeDeliveryTokenManager()
 	if err != nil {
 		return err
 	}
@@ -899,7 +929,7 @@ func runChallengeDeliveryWorker() error {
 		return err
 	}
 	defer stopDebug()
-	log.Println("identity-service challenge delivery worker started")
+	log.Printf("identity-service challenge delivery worker started provider=%s", providerMode)
 	return worker.Run(ctx)
 }
 

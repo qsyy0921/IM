@@ -3,7 +3,7 @@
 ## 当前状态
 
 - 已有 `RegisterUser`、`Login`、`RefreshGatewayToken`、JWKS / RS256 keyring、device/session revoke。
-- 已有 verification / password reset challenge、challenge delivery outbox、MFA TOTP、recovery codes、Refresh step-up、mTLS。
+- 已有 verification / password reset challenge、challenge delivery outbox、webhook / SMTP email challenge sender、MFA TOTP、recovery codes、Refresh step-up、mTLS。
 - 已补 `/healthz`、`/readyz`、`/debug/metrics` 和 `/.well-known/jwks.json` / `/jwks.json`，可观察低敏 identity、MFA、challenge delivery outbox 和 challenge delivery debug 聚合状态。
 - `outbox-relay` 对非取消运行时错误已改为退避重试，并在 relay 模式暴露低敏 retry 快照；malformed payload / unsupported event 仍保持 fail-closed。
 - `challenge-delivery-worker` 对非取消运行时错误已改为退避重试，并在 worker 模式暴露低敏 retry 快照；decrypt failure / incomplete message / notifier error 仍保持 store 驱动的 retry / expire / DLQ 语义。
@@ -14,4 +14,4 @@
 
 ## 后续
 
-- WebAuthn/passkeys、OIDC federation、KMS/HSM、完整风控、生产级 email/SMS provider。
+- WebAuthn/passkeys、OIDC federation、KMS/HSM、完整风控、SMS provider、bounce handling、多租户通知模板。

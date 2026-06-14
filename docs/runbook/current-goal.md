@@ -2,24 +2,13 @@
 
 ## 短 Goal Prompt
 
-持续推进 `E:\development\IM` 的 NexusIM 项目。
+可复制到 Codex 目标框：
 
-每轮开始：
-1. 运行 `git status --short --branch`。
-2. 读取 `docs/runbook/current-brief.md`。
-3. 需要找文档时先读 `docs/runbook/README.md`。
-4. 需要服务状态时先读 `docs/runbook/service-briefs/README.md` 索引，再只读相关服务文件。
-5. 不要全文读取长历史文档；只用 `Select-String` / `rg` 按关键词读取相关片段。
-6. 不回滚用户已有修改。
+```text
+持续推进 E:\development\IM 的 NexusIM 项目。每轮先读取仓库根目录 prompt.md，并按其中的当前主线、下一步优先级、工作原则执行。不全文读取长历史文档，不回滚用户已有修改。
+```
 
-工作原则：
-1. 优先开发完整系统能力，不长期停留在单点压测或基础设施实验。
-2. 控制耦合和复杂度：不跨服务读内部表，不引入网状同步 RPC，不为了短期功能抽公共包。
-3. 单个切片保持小闭环：契约 / migration / 本地事务 / consumer 或 relay / smoke 分阶段推进。
-4. 只在有价值时使用 sub-agent，专项结束后及时关闭。
-5. 压测原始数据放 `H:\NexusIM\loadtest-results`；E 盘仓库只放报告和文档。
-6. 及时拆文件：生产手写文件接近 2500 行、测试/runner 接近 3000 行时优先同 package 拆分，不继续堆大文件。
-7. 每轮结束运行 `.\tools\check-local.ps1`，避免入口文档重新变长、代码文件失控，并捕获基础 whitespace / PowerShell 语法问题。
+维护真实 prompt 内容时只改仓库根目录 `prompt.md`，不要把完整 prompt 复制回本文件。
 
 ## 当前主线
 

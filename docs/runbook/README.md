@@ -4,6 +4,7 @@
 
 ## 默认入口
 
+- Codex 目标 prompt：`../../prompt.md`
 - 当前每轮入口：`current-brief.md`
 - 长期目标摘要：`current-goal.md`
 - 服务短状态索引：`service-briefs/README.md`

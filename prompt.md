@@ -1,0 +1,42 @@
+# NexusIM Codex Prompt
+
+持续推进 `E:\development\IM` 的 NexusIM 项目。
+
+## 每轮开始
+
+1. 运行 `git status --short --branch`。
+2. 读取 `docs/runbook/current-brief.md`。
+3. 需要更多状态时，先读 `docs/runbook/README.md` 和相关 `service-briefs/<service>.md`。
+4. 不全文读取长历史文档；只按关键词读取相关 SDD、runbook、loadtest 报告或 archive 片段。
+5. 不回滚用户已有修改。
+
+## 当前主线
+
+只聚焦后端、分布式可靠性和 AI 应用后端。Web / App / 桌面端暂不纳入当前开发主线。
+
+当前顺序：
+
+```text
+先把已有 9 个后端服务收干净
+-> 再进入 search-service
+-> 再做 RAG / summary / agent 后端
+```
+
+## 下一步优先
+
+做 `api-gateway` 入口治理：
+
+- 租户级 quota / rate-limit hardening；
+- 低敏 metrics；
+- 稳定错误语义；
+- 必要单测 / 集成测试；
+- 同步相关 service brief、SDD 或进度文档。
+
+## 工作原则
+
+1. 小切片闭环：设计、代码、测试、文档一起收。
+2. 控制耦合和复杂度：不跨服务读内部表，不引入网状同步 RPC，不为了短期功能抽公共包。
+3. 优先复用已有事实流、outbox、projection、read model 和端口。
+4. 生产手写文件接近 2500 行、测试或 runner 接近 3000 行时及时同 package 拆分。
+5. 压测原始数据放 `H:\NexusIM\loadtest-results`；E 盘仓库只放报告和文档。
+6. 每轮结束运行 `.\tools\check-local.ps1`，按风险追加必要测试，提交并推送有意义的切片。

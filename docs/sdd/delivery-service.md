@@ -536,6 +536,8 @@ NEXUSIM_DELIVERY_OTEL_TRACES_SAMPLING_RATIO=1
 
 `stdout` 适合本地 smoke；`otlp-grpc` 必须显式配置 endpoint。OTel collector、采样策略治理、alerting 和 dashboard 仍属于后续统一观测治理，不在本切片内宣称完成。
 
+`/healthz`、`/readyz` 和 `/debug/metrics` 使用 `NEXUSIM_DELIVERY_DEBUG_ADDR` 或共享 `NEXUSIM_DEBUG_ADDR` 暴露。该 debug HTTP listener 未做认证，只面向本地或私网观测；绑定到非私网或未指定地址时默认启动失败，显式公网绑定必须设置 `NEXUSIM_DELIVERY_DEBUG_ALLOW_PUBLIC=true`。
+
 本地最小 smoke：
 
 ```text

@@ -151,6 +151,37 @@ func TestValidateTrustedMetadataListenerConfigIgnoresBodyAuth(t *testing.T) {
 	}
 }
 
+func TestDeliveryDebugAddrPrefersServiceSpecificEnv(t *testing.T) {
+	t.Setenv("NEXUSIM_DEBUG_ADDR", "127.0.0.1:19200")
+	t.Setenv("NEXUSIM_DELIVERY_DEBUG_ADDR", "127.0.0.1:19201")
+
+	if addr := deliveryDebugAddr(); addr != "127.0.0.1:19201" {
+		t.Fatalf("expected service-specific debug addr to win, got %q", addr)
+	}
+}
+
+func TestValidateDeliveryDebugListenerConfigAllowsEmptyOrPrivateAddress(t *testing.T) {
+	for _, addr := range []string{"", "127.0.0.1:11907", "localhost:11907", "172.31.50.10:11907"} {
+		if err := validateDeliveryDebugListenerConfig(addr, false); err != nil {
+			t.Fatalf("expected delivery debug listener %q to be allowed: %v", addr, err)
+		}
+	}
+}
+
+func TestValidateDeliveryDebugListenerConfigRejectsPublicAddressByDefault(t *testing.T) {
+	for _, addr := range []string{"0.0.0.0:11907", ":11907", "8.8.8.8:11907"} {
+		if err := validateDeliveryDebugListenerConfig(addr, false); err == nil {
+			t.Fatalf("expected delivery debug listener %q to be rejected by default", addr)
+		}
+	}
+}
+
+func TestValidateDeliveryDebugListenerConfigAllowsExplicitPublicOptIn(t *testing.T) {
+	if err := validateDeliveryDebugListenerConfig("0.0.0.0:11907", true); err != nil {
+		t.Fatalf("expected explicit public delivery debug listener opt-in to be allowed: %v", err)
+	}
+}
+
 func TestLoadDeliveryGRPCCredentialsFromEnvRequiresCertKeyPair(t *testing.T) {
 	clearDeliveryGRPCTLSConfig(t)
 	t.Setenv("NEXUSIM_DELIVERY_GRPC_TLS_CERT_FILE", "server.crt")

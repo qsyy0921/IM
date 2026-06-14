@@ -110,7 +110,11 @@ func runGRPCServer() error {
 			log.Printf("delivery-service OpenTelemetry trace shutdown failed: %v", err)
 		}
 	}()
-	stopDebug, err := startDebugServer(ctx, deliveryDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics).WithTraceStats(traceRuntime.Snapshot))
+	debugAddr, err := deliveryDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool, grpcMetrics).WithTraceStats(traceRuntime.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -192,7 +196,11 @@ func runTimelineConsumer() error {
 			Logf:         log.Printf,
 		},
 	)
-	stopDebug, err := startDebugServer(ctx, deliveryDebugAddr(), monitoringinfra.NewHandler(pool).WithTimelineProjectionWorkerStats(worker.Snapshot))
+	debugAddr, err := deliveryDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool).WithTimelineProjectionWorkerStats(worker.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -236,7 +244,11 @@ func runOutboxRelay() error {
 			Logf:           log.Printf,
 		},
 	)
-	stopDebug, err := startDebugServer(ctx, deliveryDebugAddr(), monitoringinfra.NewHandler(pool).WithOutboxRelayStats(relay.Snapshot))
+	debugAddr, err := deliveryDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool).WithOutboxRelayStats(relay.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -952,6 +964,28 @@ func startDebugServer(ctx context.Context, addr string, handler http.Handler) (f
 
 func deliveryDebugAddr() string {
 	return envString("NEXUSIM_DELIVERY_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
+}
+
+func deliveryDebugAddrFromEnv() (string, error) {
+	addr := deliveryDebugAddr()
+	allowPublic, _, err := envOptionalBool("NEXUSIM_DELIVERY_DEBUG_ALLOW_PUBLIC")
+	if err != nil {
+		return "", err
+	}
+	return addr, validateDeliveryDebugListenerConfig(addr, allowPublic)
+}
+
+func validateDeliveryDebugListenerConfig(addr string, allowPublic bool) error {
+	if strings.TrimSpace(addr) == "" {
+		return nil
+	}
+	if listenerAddrTrustedWithoutMTLS(addr) {
+		return nil
+	}
+	if allowPublic {
+		return nil
+	}
+	return errors.New("delivery-service debug listener address is non-private; set NEXUSIM_DELIVERY_DEBUG_ALLOW_PUBLIC=true to allow")
 }
 
 func loadDeliveryGRPCCredentialsFromEnv() (credentials.TransportCredentials, bool, error) {

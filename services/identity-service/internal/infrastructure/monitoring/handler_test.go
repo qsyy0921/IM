@@ -116,6 +116,33 @@ func TestHandlerMetricsIncludesOutboxRelaySnapshot(t *testing.T) {
 	}
 }
 
+func TestHandlerMetricsIncludesChallengeDeliveryWorkerSnapshot(t *testing.T) {
+	handler := NewHandler(nil).WithChallengeDeliveryWorkerStats(func() types.ChallengeDeliveryWorkerSnapshot {
+		return types.ChallengeDeliveryWorkerSnapshot{
+			TotalErrors:        3,
+			ConsecutiveErrors:  1,
+			LastErrorAtMS:      100,
+			LastSuccessAtMS:    200,
+			LastErrorBackoffMS: 1500,
+		}
+	})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/debug/metrics", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", response.Code)
+	}
+	var body Snapshot
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode metrics response: %v", err)
+	}
+	if body.ChallengeDeliveryWorker == nil ||
+		body.ChallengeDeliveryWorker.TotalErrors != 3 ||
+		body.ChallengeDeliveryWorker.LastErrorBackoffMS != 1500 {
+		t.Fatalf("expected challenge delivery worker metrics, got %+v", body.ChallengeDeliveryWorker)
+	}
+}
+
 func TestHandlerJWKS(t *testing.T) {
 	handler := NewHandler(nil).WithJWKSet(map[string]any{
 		"keys": []map[string]string{{

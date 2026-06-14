@@ -3,6 +3,7 @@ package challengedelivery
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	"github.com/qsyy0921/IM/services/identity-service/internal/types"
@@ -31,6 +32,7 @@ type Worker struct {
 	notifier Notifier
 	tokens   TokenOpener
 	config   Config
+	metrics  workerMetrics
 }
 
 type Config struct {
@@ -38,6 +40,16 @@ type Config struct {
 	PollInterval   time.Duration
 	MaxAttempts    int
 	RetryBaseDelay time.Duration
+	ErrorBackoff   time.Duration
+	Logf           func(format string, args ...any)
+}
+
+type workerMetrics struct {
+	totalErrors        atomic.Uint64
+	consecutiveErrors  atomic.Uint64
+	lastErrorAtMS      atomic.Int64
+	lastSuccessAtMS    atomic.Int64
+	lastErrorBackoffMS atomic.Int64
 }
 
 func NewWorker(store Store, notifier Notifier, tokens TokenOpener, config Config) *Worker {
@@ -51,20 +63,43 @@ func NewWorker(store Store, notifier Notifier, tokens TokenOpener, config Config
 
 func (worker *Worker) Run(ctx context.Context) error {
 	for {
-		stats, err := worker.RunOnce(ctx)
-		if err != nil && !errors.Is(err, context.Canceled) {
-			return err
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
 		}
+		stats, err := worker.RunOnce(ctx)
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return context.Canceled
+			}
+			if worker.config.Logf != nil {
+				worker.config.Logf("identity-service challenge delivery worker retrying after runtime error: %v", err)
+			}
+			worker.recordError()
+			worker.metrics.lastErrorBackoffMS.Store(worker.config.ErrorBackoff.Milliseconds())
+			if err := waitForInterval(ctx, worker.config.ErrorBackoff); err != nil {
+				return err
+			}
+			continue
+		}
+		worker.recordSuccess()
 		if stats.Fetched > 0 || stats.Canceled > 0 {
 			continue
 		}
-		timer := time.NewTimer(worker.config.PollInterval)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return ctx.Err()
-		case <-timer.C:
+		if err := waitForInterval(ctx, worker.config.PollInterval); err != nil {
+			return err
 		}
+	}
+}
+
+func (worker *Worker) Snapshot() types.ChallengeDeliveryWorkerSnapshot {
+	return types.ChallengeDeliveryWorkerSnapshot{
+		TotalErrors:        worker.metrics.totalErrors.Load(),
+		ConsecutiveErrors:  worker.metrics.consecutiveErrors.Load(),
+		LastErrorAtMS:      worker.metrics.lastErrorAtMS.Load(),
+		LastSuccessAtMS:    worker.metrics.lastSuccessAtMS.Load(),
+		LastErrorBackoffMS: worker.metrics.lastErrorBackoffMS.Load(),
 	}
 }
 
@@ -135,5 +170,30 @@ func normalizeConfig(config Config) Config {
 	if config.RetryBaseDelay <= 0 {
 		config.RetryBaseDelay = time.Second
 	}
+	if config.ErrorBackoff <= 0 {
+		config.ErrorBackoff = time.Second
+	}
 	return config
+}
+
+func (worker *Worker) recordError() {
+	worker.metrics.totalErrors.Add(1)
+	worker.metrics.consecutiveErrors.Add(1)
+	worker.metrics.lastErrorAtMS.Store(time.Now().UnixMilli())
+}
+
+func (worker *Worker) recordSuccess() {
+	worker.metrics.consecutiveErrors.Store(0)
+	worker.metrics.lastSuccessAtMS.Store(time.Now().UnixMilli())
+}
+
+func waitForInterval(ctx context.Context, interval time.Duration) error {
+	timer := time.NewTimer(interval)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }

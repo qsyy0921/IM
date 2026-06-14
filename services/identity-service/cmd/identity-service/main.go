@@ -861,12 +861,6 @@ func runChallengeDeliveryWorker() error {
 	defer pool.Close()
 
 	challengeDeliveryMetrics := monitoringinfra.NewChallengeDeliveryMetrics("outbox-webhook")
-	stopDebug, err := startDebugServer(ctx, identityDebugAddr(), monitoringinfra.NewHandler(pool).
-		WithChallengeDeliveryMetrics(challengeDeliveryMetrics))
-	if err != nil {
-		return err
-	}
-	defer stopDebug()
 
 	tokenManager, err := newChallengeDeliveryTokenManager()
 	if err != nil {
@@ -886,8 +880,17 @@ func runChallengeDeliveryWorker() error {
 			PollInterval:   envDuration("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_POLL_INTERVAL", time.Second),
 			MaxAttempts:    envInt("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MAX_ATTEMPTS", 5),
 			RetryBaseDelay: envDuration("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_RETRY_BASE_DELAY", time.Second),
+			ErrorBackoff:   envDuration("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_ERROR_BACKOFF", time.Second),
+			Logf:           log.Printf,
 		},
 	)
+	stopDebug, err := startDebugServer(ctx, identityDebugAddr(), monitoringinfra.NewHandler(pool).
+		WithChallengeDeliveryMetrics(challengeDeliveryMetrics).
+		WithChallengeDeliveryWorkerStats(worker.Snapshot))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 	log.Println("identity-service challenge delivery worker started")
 	return worker.Run(ctx)
 }

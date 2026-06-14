@@ -16,6 +16,7 @@ type Handler struct {
 	pool                     *pgxpool.Pool
 	grpcMetrics              *GRPCMetrics
 	challengeDeliveryMetrics *ChallengeDeliveryMetrics
+	challengeDeliveryWorker  func() types.ChallengeDeliveryWorkerSnapshot
 	outboxRelaySnapshotFn    func() types.OutboxRelayWorkerSnapshot
 	jwkSet                   any
 }
@@ -35,6 +36,11 @@ func (h *Handler) WithJWKSet(jwkSet any) *Handler {
 
 func (h *Handler) WithChallengeDeliveryMetrics(metrics *ChallengeDeliveryMetrics) *Handler {
 	h.challengeDeliveryMetrics = metrics
+	return h
+}
+
+func (h *Handler) WithChallengeDeliveryWorkerStats(snapshotFunc func() types.ChallengeDeliveryWorkerSnapshot) *Handler {
+	h.challengeDeliveryWorker = snapshotFunc
 	return h
 }
 
@@ -93,6 +99,10 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		challengeDeliverySnapshot := h.challengeDeliveryMetrics.Snapshot()
 		snapshot.ChallengeDelivery = &challengeDeliverySnapshot
 	}
+	if h.challengeDeliveryWorker != nil {
+		workerSnapshot := h.challengeDeliveryWorker()
+		snapshot.ChallengeDeliveryWorker = &workerSnapshot
+	}
 	if h.outboxRelaySnapshotFn != nil {
 		relaySnapshot := h.outboxRelaySnapshotFn()
 		snapshot.OutboxRelay = &relaySnapshot
@@ -135,16 +145,17 @@ type healthResponse struct {
 }
 
 type Snapshot struct {
-	Service                      string                           `json:"service"`
-	GeneratedAtMS                int64                            `json:"generated_at_ms"`
-	PGPool                       *PGPoolSnapshot                  `json:"pg_pool,omitempty"`
-	Identity                     *IdentitySnapshot                `json:"identity,omitempty"`
-	IdentityError                string                           `json:"identity_error,omitempty"`
-	ChallengeDeliveryOutbox      *ChallengeDeliveryOutboxSnapshot `json:"challenge_delivery_outbox,omitempty"`
-	ChallengeDeliveryOutboxError string                           `json:"challenge_delivery_outbox_error,omitempty"`
-	GRPC                         *GRPCSnapshot                    `json:"grpc,omitempty"`
-	ChallengeDelivery            *ChallengeDeliverySnapshot       `json:"challenge_delivery,omitempty"`
-	OutboxRelay                  *types.OutboxRelayWorkerSnapshot `json:"outbox_relay,omitempty"`
+	Service                      string                                 `json:"service"`
+	GeneratedAtMS                int64                                  `json:"generated_at_ms"`
+	PGPool                       *PGPoolSnapshot                        `json:"pg_pool,omitempty"`
+	Identity                     *IdentitySnapshot                      `json:"identity,omitempty"`
+	IdentityError                string                                 `json:"identity_error,omitempty"`
+	ChallengeDeliveryOutbox      *ChallengeDeliveryOutboxSnapshot       `json:"challenge_delivery_outbox,omitempty"`
+	ChallengeDeliveryOutboxError string                                 `json:"challenge_delivery_outbox_error,omitempty"`
+	GRPC                         *GRPCSnapshot                          `json:"grpc,omitempty"`
+	ChallengeDelivery            *ChallengeDeliverySnapshot             `json:"challenge_delivery,omitempty"`
+	ChallengeDeliveryWorker      *types.ChallengeDeliveryWorkerSnapshot `json:"challenge_delivery_worker,omitempty"`
+	OutboxRelay                  *types.OutboxRelayWorkerSnapshot       `json:"outbox_relay,omitempty"`
 }
 
 type PGPoolSnapshot struct {

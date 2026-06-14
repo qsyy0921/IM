@@ -155,6 +155,21 @@ type MemberChangePublishProgressStats struct {
 	Advanced int
 }
 
+const (
+	DefaultMemberChangeProgressLimit = 100
+	MaxMemberChangeProgressLimit     = 1000
+)
+
+func NormalizeMemberChangeProgressLimit(limit int) int {
+	if limit <= 0 {
+		return DefaultMemberChangeProgressLimit
+	}
+	if limit > MaxMemberChangeProgressLimit {
+		return MaxMemberChangeProgressLimit
+	}
+	return limit
+}
+
 type MemberChangeWorkerSnapshot struct {
 	TotalErrors        uint64 `json:"total_errors"`
 	ConsecutiveErrors  uint64 `json:"consecutive_errors"`

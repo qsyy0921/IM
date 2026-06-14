@@ -15,12 +15,9 @@ func NewMarkPublishedMemberChangesUseCase(
 	repository MemberChangeProgressRepository,
 	limit int,
 ) *MarkPublishedMemberChangesUseCase {
-	if limit <= 0 {
-		limit = 100
-	}
 	return &MarkPublishedMemberChangesUseCase{
 		repository: repository,
-		limit:      limit,
+		limit:      types.NormalizeMemberChangeProgressLimit(limit),
 	}
 }
 

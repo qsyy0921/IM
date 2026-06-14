@@ -30,8 +30,20 @@ func TestMarkPublishedMemberChangesUseCaseDefaultsLimit(t *testing.T) {
 	if _, err := useCase.Execute(context.Background()); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	if repository.limit != 100 {
+	if repository.limit != types.DefaultMemberChangeProgressLimit {
 		t.Fatalf("expected default limit 100, got %d", repository.limit)
+	}
+}
+
+func TestMarkPublishedMemberChangesUseCaseCapsLimit(t *testing.T) {
+	repository := &fakeMemberChangeProgressRepository{}
+	useCase := NewMarkPublishedMemberChangesUseCase(repository, types.MaxMemberChangeProgressLimit+1)
+
+	if _, err := useCase.Execute(context.Background()); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if repository.limit != types.MaxMemberChangeProgressLimit {
+		t.Fatalf("expected capped limit %d, got %d", types.MaxMemberChangeProgressLimit, repository.limit)
 	}
 }
 

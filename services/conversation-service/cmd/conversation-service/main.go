@@ -22,6 +22,7 @@ import (
 	monitoringinfra "github.com/qsyy0921/IM/services/conversation-service/internal/infrastructure/monitoring"
 	postgresinfra "github.com/qsyy0921/IM/services/conversation-service/internal/infrastructure/postgres"
 	"github.com/qsyy0921/IM/services/conversation-service/internal/trigger/memberchange"
+	"github.com/qsyy0921/IM/services/conversation-service/internal/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -263,9 +264,12 @@ func runMemberChangeWorker() error {
 	defer pool.Close()
 
 	repository := postgresinfra.NewRepository(pool)
+	batchSize := types.NormalizeMemberChangeProgressLimit(
+		envInt("NEXUSIM_MEMBER_CHANGE_PROGRESS_BATCH_SIZE", types.DefaultMemberChangeProgressLimit),
+	)
 	useCase := app.NewMarkPublishedMemberChangesUseCase(
 		repository,
-		envInt("NEXUSIM_MEMBER_CHANGE_PROGRESS_BATCH_SIZE", 100),
+		batchSize,
 	)
 	pollInterval := envDuration("NEXUSIM_MEMBER_CHANGE_PROGRESS_POLL_INTERVAL", time.Second)
 	errorBackoff := envDuration("NEXUSIM_MEMBER_CHANGE_PROGRESS_ERROR_BACKOFF", pollInterval)
@@ -288,7 +292,7 @@ func runMemberChangeWorker() error {
 	defer stopDebug()
 	log.Printf(
 		"conversation-service member change progress worker started batch_size=%d poll_interval=%s error_backoff=%s",
-		envInt("NEXUSIM_MEMBER_CHANGE_PROGRESS_BATCH_SIZE", 100),
+		batchSize,
 		pollInterval,
 		errorBackoff,
 	)

@@ -556,9 +556,7 @@ func (r *Repository) MarkPublishedMemberChanges(
 	if r.pool == nil {
 		return types.MemberChangePublishProgressStats{}, types.NewDBWriteFailed("repository is not configured")
 	}
-	if limit <= 0 {
-		limit = 100
-	}
+	limit = types.NormalizeMemberChangeProgressLimit(limit)
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return types.MemberChangePublishProgressStats{}, types.NewDBWriteFailed(err.Error())

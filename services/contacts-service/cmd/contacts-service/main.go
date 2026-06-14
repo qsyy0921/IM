@@ -75,7 +75,22 @@ func runGRPC() error {
 	}
 	defer pool.Close()
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
-	stopDebug, err := startDebugServer(ctx, contactsDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics))
+	traceConfig, err := contactsTraceConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	traceRuntime, err := monitoringinfra.NewTraceRuntime(ctx, traceConfig)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := traceRuntime.Shutdown(shutdownCtx); err != nil {
+			log.Printf("contacts-service OpenTelemetry trace shutdown failed: %v", err)
+		}
+	}()
+	stopDebug, err := startDebugServer(ctx, contactsDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics).WithTraceStats(traceRuntime.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -86,7 +101,7 @@ func runGRPC() error {
 		return err
 	}
 	repository := postgresinfra.NewRepository(pool)
-	server, err := newGRPCServerWithConfig(grpcMetrics, authMode, serverTLSConfig, serverTLSEnabled)
+	server, err := newGRPCServerWithConfig(grpcMetrics, authMode, serverTLSConfig, serverTLSEnabled, traceRuntime.UnaryServerInterceptor())
 	if err != nil {
 		return err
 	}
@@ -373,10 +388,15 @@ func newGRPCServer(grpcMetrics *monitoringinfra.GRPCMetrics) (*grpc.Server, erro
 	return newGRPCServerWithConfig(grpcMetrics, authMode, tlsConfig, tlsEnabled)
 }
 
-func newGRPCServerWithConfig(grpcMetrics *monitoringinfra.GRPCMetrics, authMode string, tlsConfig *tls.Config, tlsEnabled bool) (*grpc.Server, error) {
-	interceptors := make([]grpc.UnaryServerInterceptor, 0, 2)
+func newGRPCServerWithConfig(grpcMetrics *monitoringinfra.GRPCMetrics, authMode string, tlsConfig *tls.Config, tlsEnabled bool, traceInterceptors ...grpc.UnaryServerInterceptor) (*grpc.Server, error) {
+	interceptors := make([]grpc.UnaryServerInterceptor, 0, 3)
 	if grpcMetrics != nil {
 		interceptors = append(interceptors, grpcMetrics.UnaryServerInterceptor(log.Default()))
+	}
+	for _, interceptor := range traceInterceptors {
+		if interceptor != nil {
+			interceptors = append(interceptors, interceptor)
+		}
 	}
 	switch strings.ToLower(strings.TrimSpace(authMode)) {
 	case "body", "request", "legacy":
@@ -393,6 +413,41 @@ func newGRPCServerWithConfig(grpcMetrics *monitoringinfra.GRPCMetrics, authMode 
 		serverOptions = append(serverOptions, grpc.Creds(credentials.NewTLS(tlsConfig)))
 	}
 	return grpc.NewServer(serverOptions...), nil
+}
+
+func contactsTraceConfigFromEnv() (monitoringinfra.TraceConfig, error) {
+	enabled, _, err := envOptionalBool("NEXUSIM_CONTACTS_OTEL_TRACES_ENABLED")
+	if err != nil {
+		return monitoringinfra.TraceConfig{}, err
+	}
+	otlpInsecure, _, err := envOptionalBool("NEXUSIM_CONTACTS_OTEL_TRACES_OTLP_INSECURE")
+	if err != nil {
+		return monitoringinfra.TraceConfig{}, err
+	}
+	samplingRatio, err := contactsTraceSamplingRatioFromEnv()
+	if err != nil {
+		return monitoringinfra.TraceConfig{}, err
+	}
+	return monitoringinfra.TraceConfig{
+		Enabled:       enabled,
+		ServiceName:   envString("NEXUSIM_CONTACTS_OTEL_SERVICE_NAME", "contacts-service"),
+		Exporter:      envString("NEXUSIM_CONTACTS_OTEL_TRACES_EXPORTER", "stdout"),
+		OTLPEndpoint:  envString("NEXUSIM_CONTACTS_OTEL_TRACES_OTLP_ENDPOINT", ""),
+		OTLPInsecure:  otlpInsecure,
+		SamplingRatio: samplingRatio,
+	}, nil
+}
+
+func contactsTraceSamplingRatioFromEnv() (float64, error) {
+	raw := strings.TrimSpace(os.Getenv("NEXUSIM_CONTACTS_OTEL_TRACES_SAMPLING_RATIO"))
+	if raw == "" {
+		return 1, nil
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil || value <= 0 || value > 1 {
+		return 0, errors.New("NEXUSIM_CONTACTS_OTEL_TRACES_SAMPLING_RATIO must be > 0 and <= 1")
+	}
+	return value, nil
 }
 
 func validateTrustedMetadataListenerConfig(listenAddr string, authMode string, tlsConfig *tls.Config) error {

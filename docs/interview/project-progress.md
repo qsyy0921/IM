@@ -57,7 +57,7 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override 和 tenant plan 文件热更新；
 api-gateway 已补 legacy/facade traffic metrics，用于旧 descriptor 迁移观察；
 legacy descriptor 已收敛为显式 opt-in 默认；
-api-gateway 已补 first-stage OpenTelemetry 入口 server span 和下游 gRPC client span；
+api-gateway 已补 first-stage OpenTelemetry 入口 server span 和下游 gRPC client span，contacts-service 已开始后端服务 gRPC server span rollout；
 search-service 和 AI 应用后端后置；
 客户端暂不纳入当前面试主线。
 ```
@@ -75,7 +75,7 @@ search-service 和 AI 应用后端后置；
 | `delivery-service` | timeline projection，durable `user_inbox`，`PullInbox`，`AckDelivery`，delivery outbox | 断线可恢复，push-gateway 不拥有 durable inbox |
 | `push-gateway` | WebSocket 在线通知，ACK 转发，resume buffer，Redis route，跨实例在线路由 | 在线唤醒层和可靠投递层解耦，Redis 故障时 PullInbox 兜底 |
 | `receipt-service` | 已读 / 未读，会话列表，archive / pin / mute，receipt projection，receipt outbox | 会话列表和回执从投递事件投影，不跨服务读内部表 |
-| `contacts-service` | 好友申请、接受、拒绝、取消、删除、拉黑、备注，contacts outbox | 联系人事实源，策略服务通过事件投影使用联系人关系 |
+| `contacts-service` | 好友申请、接受、拒绝、取消、删除、拉黑、备注，contacts outbox，first-stage OTel gRPC server span | 联系人事实源，策略服务通过事件投影使用联系人关系，后端服务观测 rollout 的首个服务侧样例 |
 | `policy-service` | 权限决策、规则存储、conversation role gate、contacts projection、decision audit outbox | 策略权限独立服务化，不在 message-service 复制权限逻辑 |
 
 ## 已完成的主链路

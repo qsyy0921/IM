@@ -122,7 +122,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 | `delivery-service` | 已落地、已接主链路 | projection / `PullInbox` / `AckDelivery` / delivery outbox | Projection DLQ / repair 深化、更多 delivery event 消费方 |
 | `push-gateway` | 已落地、已接主链路 | notify / ACK / resume / Redis route / Win-Mac / Sentinel / TLS smoke | Redis 网络分区、跨实例 resume 强化、容量测试 |
 | `receipt-service` | 已落地、已接主链路 | receipt projection / outbox / audit / repair | 送达回执扩展、批量接口优化、会话列表产品化 |
-| `contacts-service` | 已落地、已接主链路 | contacts grpc / outbox / audit / repair | 联系人分组、联系人搜索、更多隐私策略 |
+| `contacts-service` | 已落地、已接主链路 | contacts grpc / outbox / audit / repair、first-stage OTel gRPC server span | 联系人分组、联系人搜索、更多隐私策略、OTel collector / alerting |
 | `policy-service` | 已落地、已接主链路 | decision / projection / outbox / audit / repair | 完整 ReBAC、moderation policy、tenant DSL / quota、外部 audit sink |
 | `search-service` | 仅保留占位和 brief | 无真实实现主线 | 等前 9 个服务收干净后再进入 |
 
@@ -130,7 +130,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 
 当前 9 个服务没有已知 P0/P1 阻塞。后续按小切片逐个清 P2，默认顺序如下：
 
-1. `api-gateway`：first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、legacy descriptor 显式 opt-in 默认、legacy/facade traffic metrics、first-stage OTel 入口 server span 和下游 gRPC client span 已补；下一步继续 OTel collector / alerting / 后端服务 server span rollout、legacy opt-in 实际迁移观察和移除计划，以及配置中心 / DB-backed quota hardening，不先扩新 facade。
+1. `api-gateway` / 后端观测：first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、legacy descriptor 显式 opt-in 默认、legacy/facade traffic metrics、api-gateway OTel 入口 server span 和下游 gRPC client span 已补；contacts-service 已开始后端服务 gRPC server span rollout；下一步继续 OTel collector / alerting / 其它后端服务 server span rollout、legacy opt-in 实际迁移观察和移除计划，以及配置中心 / DB-backed quota hardening，不先扩新 facade。
 2. `identity-service`：继续身份安全 hardening，优先真实通知 / issuer / key 管理边界。
 3. `message-service`：补消息类型和删除语义前，先守住 outbox / policy /容量观测。
 4. `conversation-service`：补群管理前，先收 owner transfer 和成员窗口 repair。

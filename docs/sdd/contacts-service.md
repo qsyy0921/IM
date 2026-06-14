@@ -627,7 +627,20 @@ GET /readyz
 GET /debug/metrics
 ```
 
-`/readyz` 会检查 PostgreSQL ping；`/debug/metrics` 第一版输出 pgx pool 状态、低敏联系人聚合快照，以及 `contacts_outbox` 的 total / pending / published / DLQ / ready_pending / oldest age。联系人聚合只包含 `contact_requests` 的总量和各状态计数、`contact_edges` 的总量和 `ACTIVE / DELETED / BLOCKED / with_remark` 聚合计数，以及 `contact_command_idempotency` 总行数；不暴露 user_id、request_id、remark 内容、message 内容或 command hash。gRPC interceptor 会输出 JSON 结构化请求日志，包含 service、method、code、latency_ms。该入口只暴露本服务自己的健康、关系聚合与 outbox 状态，不读取其它服务内部表。当前仍是本地 debug/运维入口，不等同于完整 Prometheus / OpenTelemetry / alertmanager 生产栈。
+`/readyz` 会检查 PostgreSQL ping；`/debug/metrics` 第一版输出 pgx pool 状态、低敏联系人聚合快照，以及 `contacts_outbox` 的 total / pending / published / DLQ / ready_pending / oldest age。联系人聚合只包含 `contact_requests` 的总量和各状态计数、`contact_edges` 的总量和 `ACTIVE / DELETED / BLOCKED / with_remark` 聚合计数，以及 `contact_command_idempotency` 总行数；不暴露 user_id、request_id、remark 内容、message 内容或 command hash。gRPC interceptor 会输出 JSON 结构化请求日志，包含 service、method、code、latency_ms。该入口只暴露本服务自己的健康、关系聚合与 outbox 状态，不读取其它服务内部表。
+
+first-stage OpenTelemetry trace 默认关闭，仅覆盖 contacts-service gRPC server span。启用后从 incoming metadata 提取 W3C `traceparent`，只记录 service / method / gRPC status / latency / trace_id / request_id 等低敏属性，不记录 token、tenant/user/device/session id、remark、payload 或 command hash。支持 exporter：
+
+```text
+NEXUSIM_CONTACTS_OTEL_TRACES_ENABLED=true
+NEXUSIM_CONTACTS_OTEL_SERVICE_NAME=contacts-service
+NEXUSIM_CONTACTS_OTEL_TRACES_EXPORTER=stdout|otlp-grpc
+NEXUSIM_CONTACTS_OTEL_TRACES_OTLP_ENDPOINT=otel-collector:4317
+NEXUSIM_CONTACTS_OTEL_TRACES_OTLP_INSECURE=true
+NEXUSIM_CONTACTS_OTEL_TRACES_SAMPLING_RATIO=1
+```
+
+`/debug/metrics` 会暴露低敏 trace runtime snapshot，便于确认 contacts-service 是否启用 trace、使用哪个 exporter 和采样率。当前仍是本地 debug/运维入口，不等同于完整 Prometheus / OpenTelemetry collector / alertmanager 生产栈。
 
 ## 13. 测试方案
 

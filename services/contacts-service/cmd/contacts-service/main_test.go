@@ -254,6 +254,54 @@ func TestContactsGRPCTLSConfigRejectsUnlistedClientIdentity(t *testing.T) {
 	}
 }
 
+func TestContactsTraceConfigDefaultsToDisabled(t *testing.T) {
+	clearContactsTraceConfig(t)
+	config, err := contactsTraceConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load contacts trace config: %v", err)
+	}
+	if config.Enabled || config.ServiceName != "contacts-service" || config.Exporter != "stdout" || config.SamplingRatio != 1 {
+		t.Fatalf("unexpected default trace config: %+v", config)
+	}
+}
+
+func TestContactsTraceConfigLoadsOTLPGRPC(t *testing.T) {
+	clearContactsTraceConfig(t)
+	t.Setenv("NEXUSIM_CONTACTS_OTEL_TRACES_ENABLED", "true")
+	t.Setenv("NEXUSIM_CONTACTS_OTEL_SERVICE_NAME", "contacts-service-test")
+	t.Setenv("NEXUSIM_CONTACTS_OTEL_TRACES_EXPORTER", "otlp-grpc")
+	t.Setenv("NEXUSIM_CONTACTS_OTEL_TRACES_OTLP_ENDPOINT", "127.0.0.1:4317")
+	t.Setenv("NEXUSIM_CONTACTS_OTEL_TRACES_OTLP_INSECURE", "true")
+	t.Setenv("NEXUSIM_CONTACTS_OTEL_TRACES_SAMPLING_RATIO", "0.5")
+
+	config, err := contactsTraceConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load contacts trace config: %v", err)
+	}
+	if !config.Enabled ||
+		config.ServiceName != "contacts-service-test" ||
+		config.Exporter != "otlp-grpc" ||
+		config.OTLPEndpoint != "127.0.0.1:4317" ||
+		!config.OTLPInsecure ||
+		config.SamplingRatio != 0.5 {
+		t.Fatalf("unexpected trace config: %+v", config)
+	}
+}
+
+func TestContactsTraceConfigRejectsInvalidValues(t *testing.T) {
+	clearContactsTraceConfig(t)
+	t.Setenv("NEXUSIM_CONTACTS_OTEL_TRACES_ENABLED", "sometimes")
+	if _, err := contactsTraceConfigFromEnv(); err == nil {
+		t.Fatalf("expected invalid trace enabled bool to fail")
+	}
+
+	clearContactsTraceConfig(t)
+	t.Setenv("NEXUSIM_CONTACTS_OTEL_TRACES_SAMPLING_RATIO", "2")
+	if _, err := contactsTraceConfigFromEnv(); err == nil {
+		t.Fatalf("expected invalid trace sampling ratio to fail")
+	}
+}
+
 func clearContactsGRPCTLSConfig(t *testing.T) {
 	t.Helper()
 	t.Setenv("NEXUSIM_CONTACTS_GRPC_TLS_CERT_FILE", "")
@@ -262,6 +310,16 @@ func clearContactsGRPCTLSConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_CONTACTS_GRPC_TLS_REQUIRE_CLIENT_CERT", "")
 	t.Setenv("NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES", "")
 	t.Setenv("NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_ALLOWED_URIS", "")
+}
+
+func clearContactsTraceConfig(t *testing.T) {
+	t.Helper()
+	t.Setenv("NEXUSIM_CONTACTS_OTEL_TRACES_ENABLED", "")
+	t.Setenv("NEXUSIM_CONTACTS_OTEL_SERVICE_NAME", "")
+	t.Setenv("NEXUSIM_CONTACTS_OTEL_TRACES_EXPORTER", "")
+	t.Setenv("NEXUSIM_CONTACTS_OTEL_TRACES_OTLP_ENDPOINT", "")
+	t.Setenv("NEXUSIM_CONTACTS_OTEL_TRACES_OTLP_INSECURE", "")
+	t.Setenv("NEXUSIM_CONTACTS_OTEL_TRACES_SAMPLING_RATIO", "")
 }
 
 func writeContactsTLSTestCert(t *testing.T, dir string, name string) (string, string) {

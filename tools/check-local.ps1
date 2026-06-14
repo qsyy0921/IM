@@ -31,6 +31,9 @@ try {
     Write-Host "== otel span attributes =="
     & (Join-Path $PSScriptRoot "check-otel-span-attributes.ps1")
 
+    Write-Host "== grpc correlation logs =="
+    & (Join-Path $PSScriptRoot "check-grpc-correlation-logs.ps1")
+
     Write-Host "== git whitespace =="
     git diff --check
     git diff --cached --check

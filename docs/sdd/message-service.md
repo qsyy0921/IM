@@ -883,6 +883,8 @@ NEXUSIM_MESSAGE_OTEL_TRACES_SAMPLING_RATIO=1
 
 `/debug/metrics` 会暴露低敏 trace runtime snapshot，便于确认 message-service 是否启用 trace、使用哪个 exporter 和采样率。当前仍是本地 debug/运维入口，不等同于完整 Prometheus / OpenTelemetry collector / alertmanager 生产栈。
 
+The debug HTTP listener uses `NEXUSIM_MESSAGE_DEBUG_ADDR` or shared `NEXUSIM_DEBUG_ADDR`. It is unauthenticated and intended for local or private observability. Startup fails by default when the listener is bound to a non-private or unspecified address; explicit public binding requires `NEXUSIM_MESSAGE_DEBUG_ALLOW_PUBLIC=true`.
+
 | 告警 | 排查顺序 | 修复 |
 | --- | --- | --- |
 | `SendMessage p99` 升高 | PG lock -> seq alloc -> outbox insert -> policy latency | 扩容、限流、热点升级 |

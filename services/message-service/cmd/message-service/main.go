@@ -99,7 +99,11 @@ func runGRPCServer() error {
 			log.Printf("message-service OpenTelemetry trace shutdown failed: %v", err)
 		}
 	}()
-	stopDebug, err := startDebugServer(ctx, envString("NEXUSIM_DEBUG_ADDR", ""), metricsinfra.NewHandler(metrics, pool).WithTraceStats(traceRuntime.Snapshot))
+	debugAddr, err := messageDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, metricsinfra.NewHandler(metrics, pool).WithTraceStats(traceRuntime.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -308,7 +312,11 @@ func runOutboxRelay() error {
 			Logf:                log.Printf,
 		},
 	)
-	stopDebug, err := startDebugServer(ctx, envString("NEXUSIM_DEBUG_ADDR", ""), metricsinfra.NewHandler(metrics, pool).WithOutboxRelayStats(relay.Snapshot))
+	debugAddr, err := messageDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, metricsinfra.NewHandler(metrics, pool).WithOutboxRelayStats(relay.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -519,6 +527,32 @@ func startDebugServer(ctx context.Context, addr string, handler http.Handler) (f
 		_ = server.Shutdown(shutdownCtx)
 		<-done
 	}, nil
+}
+
+func messageDebugAddr() string {
+	return envString("NEXUSIM_MESSAGE_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
+}
+
+func messageDebugAddrFromEnv() (string, error) {
+	addr := messageDebugAddr()
+	allowPublic, _, err := envOptionalBool("NEXUSIM_MESSAGE_DEBUG_ALLOW_PUBLIC")
+	if err != nil {
+		return "", err
+	}
+	return addr, validateMessageDebugListenerConfig(addr, allowPublic)
+}
+
+func validateMessageDebugListenerConfig(addr string, allowPublic bool) error {
+	if strings.TrimSpace(addr) == "" {
+		return nil
+	}
+	if listenerAddrTrustedWithoutMTLS(addr) {
+		return nil
+	}
+	if allowPublic {
+		return nil
+	}
+	return errors.New("message-service debug listener address is non-private; set NEXUSIM_MESSAGE_DEBUG_ALLOW_PUBLIC=true to allow")
 }
 
 func openPGPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {

@@ -226,6 +226,37 @@ func TestValidateTrustedMetadataListenerConfigIgnoresBodyAuth(t *testing.T) {
 	}
 }
 
+func TestMessageDebugAddrPrefersServiceSpecificEnv(t *testing.T) {
+	t.Setenv("NEXUSIM_DEBUG_ADDR", "127.0.0.1:19000")
+	t.Setenv("NEXUSIM_MESSAGE_DEBUG_ADDR", "127.0.0.1:19001")
+
+	if addr := messageDebugAddr(); addr != "127.0.0.1:19001" {
+		t.Fatalf("expected service-specific debug addr to win, got %q", addr)
+	}
+}
+
+func TestValidateMessageDebugListenerConfigAllowsEmptyOrPrivateAddress(t *testing.T) {
+	for _, addr := range []string{"", "127.0.0.1:11904", "localhost:11904", "172.31.50.10:11904"} {
+		if err := validateMessageDebugListenerConfig(addr, false); err != nil {
+			t.Fatalf("expected message debug listener %q to be allowed: %v", addr, err)
+		}
+	}
+}
+
+func TestValidateMessageDebugListenerConfigRejectsPublicAddressByDefault(t *testing.T) {
+	for _, addr := range []string{"0.0.0.0:11904", ":11904", "8.8.8.8:11904"} {
+		if err := validateMessageDebugListenerConfig(addr, false); err == nil {
+			t.Fatalf("expected message debug listener %q to be rejected by default", addr)
+		}
+	}
+}
+
+func TestValidateMessageDebugListenerConfigAllowsExplicitPublicOptIn(t *testing.T) {
+	if err := validateMessageDebugListenerConfig("0.0.0.0:11904", true); err != nil {
+		t.Fatalf("expected explicit public message debug listener opt-in to be allowed: %v", err)
+	}
+}
+
 func TestLoadMessageGRPCCredentialsFromEnvDisabledByDefault(t *testing.T) {
 	clearMessageGRPCTLSConfig(t)
 	creds, ok, err := loadMessageGRPCCredentialsFromEnv()

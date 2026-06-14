@@ -50,6 +50,63 @@ func TestNewGRPCServerRejectsUnsupportedAuthMode(t *testing.T) {
 	}
 }
 
+func TestReceiptTraceConfigDefaultsToDisabled(t *testing.T) {
+	clearReceiptTraceConfig(t)
+	config, err := receiptTraceConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load receipt trace config: %v", err)
+	}
+	if config.Enabled ||
+		config.ServiceName != "receipt-service" ||
+		config.Exporter != "stdout" ||
+		config.SamplingRatio != 1 {
+		t.Fatalf("unexpected default trace config: %+v", config)
+	}
+}
+
+func TestReceiptTraceConfigLoadsOTLPGRPC(t *testing.T) {
+	clearReceiptTraceConfig(t)
+	t.Setenv("NEXUSIM_RECEIPT_OTEL_TRACES_ENABLED", "true")
+	t.Setenv("NEXUSIM_RECEIPT_OTEL_SERVICE_NAME", "receipt-service-test")
+	t.Setenv("NEXUSIM_RECEIPT_OTEL_TRACES_EXPORTER", "otlp-grpc")
+	t.Setenv("NEXUSIM_RECEIPT_OTEL_TRACES_OTLP_ENDPOINT", "127.0.0.1:4317")
+	t.Setenv("NEXUSIM_RECEIPT_OTEL_TRACES_OTLP_INSECURE", "true")
+	t.Setenv("NEXUSIM_RECEIPT_OTEL_TRACES_SAMPLING_RATIO", "0.5")
+
+	config, err := receiptTraceConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load receipt trace config: %v", err)
+	}
+	if !config.Enabled ||
+		config.ServiceName != "receipt-service-test" ||
+		config.Exporter != "otlp-grpc" ||
+		config.OTLPEndpoint != "127.0.0.1:4317" ||
+		!config.OTLPInsecure ||
+		config.SamplingRatio != 0.5 {
+		t.Fatalf("unexpected otlp trace config: %+v", config)
+	}
+}
+
+func TestReceiptTraceConfigRejectsInvalidValues(t *testing.T) {
+	clearReceiptTraceConfig(t)
+	t.Setenv("NEXUSIM_RECEIPT_OTEL_TRACES_ENABLED", "sometimes")
+	if _, err := receiptTraceConfigFromEnv(); err == nil {
+		t.Fatalf("expected invalid enabled bool to fail")
+	}
+
+	clearReceiptTraceConfig(t)
+	t.Setenv("NEXUSIM_RECEIPT_OTEL_TRACES_SAMPLING_RATIO", "2")
+	if _, err := receiptTraceConfigFromEnv(); err == nil {
+		t.Fatalf("expected invalid sampling ratio to fail")
+	}
+
+	clearReceiptTraceConfig(t)
+	t.Setenv("NEXUSIM_RECEIPT_OTEL_TRACES_OTLP_INSECURE", "sometimes")
+	if _, err := receiptTraceConfigFromEnv(); err == nil {
+		t.Fatalf("expected invalid otlp insecure bool to fail")
+	}
+}
+
 func TestValidateTrustedMetadataListenerConfigAllowsPrivateAddressWithoutMTLS(t *testing.T) {
 	err := validateTrustedMetadataListenerConfig(
 		"172.31.50.10:10499",
@@ -251,6 +308,16 @@ func clearReceiptGRPCTLSConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_RECEIPT_GRPC_TLS_REQUIRE_CLIENT_CERT", "")
 	t.Setenv("NEXUSIM_RECEIPT_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES", "")
 	t.Setenv("NEXUSIM_RECEIPT_GRPC_TLS_CLIENT_ALLOWED_URIS", "")
+}
+
+func clearReceiptTraceConfig(t *testing.T) {
+	t.Helper()
+	t.Setenv("NEXUSIM_RECEIPT_OTEL_TRACES_ENABLED", "")
+	t.Setenv("NEXUSIM_RECEIPT_OTEL_SERVICE_NAME", "")
+	t.Setenv("NEXUSIM_RECEIPT_OTEL_TRACES_EXPORTER", "")
+	t.Setenv("NEXUSIM_RECEIPT_OTEL_TRACES_OTLP_ENDPOINT", "")
+	t.Setenv("NEXUSIM_RECEIPT_OTEL_TRACES_OTLP_INSECURE", "")
+	t.Setenv("NEXUSIM_RECEIPT_OTEL_TRACES_SAMPLING_RATIO", "")
 }
 
 func writeReceiptTLSTestCert(t *testing.T, dir string, name string) (string, string) {

@@ -1,6 +1,6 @@
 # NexusIM receipt-service SDD v0.1 Draft
 
-状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务、`ListReceiptStates` 薄批量查询、receipt outbox relay、只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit`、`outbox-repair-cleanup` operator、最小 `ListConversations`、`unread_only` 未读过滤、Archive / Pin / Mute 用户列表偏好、第一阶段 gRPC server TLS / mTLS 配置、`/healthz` / `/readyz` / `/debug/metrics` 低敏观测入口，以及 receipt / demo smoke runner 的 delivery / receipt client TLS 配置已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events` 和会话列表偏好链路。
+状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务、`ListReceiptStates` 薄批量查询、receipt outbox relay、只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit`、`outbox-repair-cleanup` operator、最小 `ListConversations`、`unread_only` 未读过滤、Archive / Pin / Mute 用户列表偏好、第一阶段 gRPC server TLS / mTLS 配置、`/healthz` / `/readyz` / `/debug/metrics` 低敏观测入口、first-stage OpenTelemetry gRPC server span，以及 receipt / demo smoke runner 的 delivery / receipt client TLS 配置已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events` 和会话列表偏好链路。
 
 本文定义 `receipt-service` 的第一条可编码切片：基于 `delivery-service` 已经产生的 durable delivery 事件，构建消息送达 / 已读回执 read model，并提供最小查询和 `MarkRead` 写入入口。
 
@@ -62,6 +62,19 @@ NEXUSIM_RECEIPT_GRPC_TLS_CLIENT_ALLOWED_URIS=spiffe://nexusim/api-gateway
 开启 allowlist 时按客户端证书 DNS SAN 小写 exact-match 或 URI SAN exact-match 校验。`loadtest/receipt` 和 `loadtest/demo` 已支持对 delivery / receipt gRPC client 配置 CA、server name 和 client cert/key，用于本地 smoke 验证。其它客户端 TLS 迁移、证书签发 / 轮换 / 分发、动态服务身份治理和全服务 mTLS rollout 仍是后续项。
 
 当 `NEXUSIM_RECEIPT_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端没有启用 mTLS client cert 校验，receipt-service 必须在启动前直接失败，避免把第一阶段 trusted metadata 模式暴露到公网监听面。
+
+`receipt-service grpc` 已支持第一阶段 OpenTelemetry gRPC server span，默认关闭。开启后只记录低敏服务侧属性：gRPC full method、status code、latency、`x-nexusim-trace-id`、`x-nexusim-request-id`，并从 `traceparent` 继承 W3C trace context；不得写入 token、tenant/user/device/session id、conversation id、message id、payload 或回执状态详情。
+
+```text
+NEXUSIM_RECEIPT_OTEL_TRACES_ENABLED=true
+NEXUSIM_RECEIPT_OTEL_SERVICE_NAME=receipt-service
+NEXUSIM_RECEIPT_OTEL_TRACES_EXPORTER=stdout|otlp-grpc
+NEXUSIM_RECEIPT_OTEL_TRACES_OTLP_ENDPOINT=otel-collector:4317
+NEXUSIM_RECEIPT_OTEL_TRACES_OTLP_INSECURE=true
+NEXUSIM_RECEIPT_OTEL_TRACES_SAMPLING_RATIO=1
+```
+
+`stdout` 适合本地 smoke；`otlp-grpc` 必须显式配置 endpoint。OTel collector、采样策略治理、alerting 和 dashboard 仍属于后续统一观测治理，不在本切片内宣称完成。
 
 ## 3. 六层 DDD 包结构
 

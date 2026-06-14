@@ -28,7 +28,7 @@
 
 - 运行时动态 tenant quota 文件热更新已进入第一阶段，后续只做配置中心 / DB-backed quota hardening；
 - api-gateway 已有入口 server span 和下游 gRPC client span；
-- contacts-service、identity-service、message-service、conversation-service、delivery-service 已开始后端服务 gRPC server span rollout；后续继续推广到其它后端服务，并补 OTel collector / alerting；
+- contacts-service、identity-service、message-service、conversation-service、delivery-service、receipt-service 已开始后端服务 gRPC server span rollout；后续继续推广到其它后端服务，并补 OTel collector / alerting；
 - legacy descriptor opt-in 使用面已有 first-stage metrics 计数，后续继续迁移观察和移除计划；
 - 必要单测 / 集成测试；
 - 同步相关 service brief、SDD 或进度文档。

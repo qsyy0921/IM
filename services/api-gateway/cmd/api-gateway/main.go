@@ -100,7 +100,15 @@ func runGRPC() error {
 	if err != nil {
 		return err
 	}
-	stopDebug, err := startDebugServer(ctx, apiGatewayDebugAddr(), monitoringinfra.NewHandler(grpcMetrics).
+	debugAddr := apiGatewayDebugAddr()
+	debugAllowPublic, _, err := envOptionalBool("NEXUSIM_API_GATEWAY_DEBUG_ALLOW_PUBLIC")
+	if err != nil {
+		return err
+	}
+	if err := validateAPIGatewayDebugListenerConfig(debugAddr, debugAllowPublic); err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(grpcMetrics).
 		WithAuthJWKStats(authenticator.JWKStats).
 		WithRateLimitStats(rateLimiter.Snapshot).
 		WithRuntimeStats(func() monitoringinfra.RuntimeSnapshot {
@@ -273,6 +281,19 @@ func startDebugServer(ctx context.Context, addr string, handler http.Handler) (f
 
 func apiGatewayDebugAddr() string {
 	return envString("NEXUSIM_API_GATEWAY_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
+}
+
+func validateAPIGatewayDebugListenerConfig(addr string, allowPublic bool) error {
+	if strings.TrimSpace(addr) == "" {
+		return nil
+	}
+	if backendAddrTrustedWithoutMTLS(addr) {
+		return nil
+	}
+	if allowPublic {
+		return nil
+	}
+	return errors.New("api-gateway debug listener address is non-private; set NEXUSIM_API_GATEWAY_DEBUG_ALLOW_PUBLIC=true to allow")
 }
 
 type apiGatewayLegacyDescriptorConfig struct {

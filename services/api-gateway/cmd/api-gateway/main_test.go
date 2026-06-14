@@ -1051,6 +1051,28 @@ func TestValidateAPIGatewayAuthListenerConfigAllowsPublicAddressForSignedAuthWit
 	}
 }
 
+func TestValidateAPIGatewayDebugListenerConfigAllowsEmptyOrPrivateAddress(t *testing.T) {
+	for _, addr := range []string{"", "127.0.0.1:11904", "172.31.50.10:11904"} {
+		if err := validateAPIGatewayDebugListenerConfig(addr, false); err != nil {
+			t.Fatalf("expected debug listener %q to be allowed: %v", addr, err)
+		}
+	}
+}
+
+func TestValidateAPIGatewayDebugListenerConfigRejectsPublicAddressByDefault(t *testing.T) {
+	for _, addr := range []string{"0.0.0.0:11904", ":11904", "8.8.8.8:11904"} {
+		if err := validateAPIGatewayDebugListenerConfig(addr, false); err == nil {
+			t.Fatalf("expected debug listener %q to be rejected by default", addr)
+		}
+	}
+}
+
+func TestValidateAPIGatewayDebugListenerConfigAllowsExplicitPublicOptIn(t *testing.T) {
+	if err := validateAPIGatewayDebugListenerConfig("0.0.0.0:11904", true); err != nil {
+		t.Fatalf("expected explicit public debug listener opt-in to be allowed: %v", err)
+	}
+}
+
 func TestValidateTrustedMetadataBackendConfigCoversIdentityService(t *testing.T) {
 	err := validateTrustedMetadataBackendConfig(
 		"identity-service",

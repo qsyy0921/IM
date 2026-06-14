@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/qsyy0921/IM/services/identity-service/internal/types"
 )
 
 const serviceName = "identity-service"
@@ -15,6 +16,7 @@ type Handler struct {
 	pool                     *pgxpool.Pool
 	grpcMetrics              *GRPCMetrics
 	challengeDeliveryMetrics *ChallengeDeliveryMetrics
+	outboxRelaySnapshotFn    func() types.OutboxRelayWorkerSnapshot
 	jwkSet                   any
 }
 
@@ -33,6 +35,11 @@ func (h *Handler) WithJWKSet(jwkSet any) *Handler {
 
 func (h *Handler) WithChallengeDeliveryMetrics(metrics *ChallengeDeliveryMetrics) *Handler {
 	h.challengeDeliveryMetrics = metrics
+	return h
+}
+
+func (h *Handler) WithOutboxRelayStats(snapshotFunc func() types.OutboxRelayWorkerSnapshot) *Handler {
+	h.outboxRelaySnapshotFn = snapshotFunc
 	return h
 }
 
@@ -86,6 +93,10 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		challengeDeliverySnapshot := h.challengeDeliveryMetrics.Snapshot()
 		snapshot.ChallengeDelivery = &challengeDeliverySnapshot
 	}
+	if h.outboxRelaySnapshotFn != nil {
+		relaySnapshot := h.outboxRelaySnapshotFn()
+		snapshot.OutboxRelay = &relaySnapshot
+	}
 	if h.pool != nil {
 		stats := h.pool.Stat()
 		snapshot.PGPool = &PGPoolSnapshot{
@@ -133,6 +144,7 @@ type Snapshot struct {
 	ChallengeDeliveryOutboxError string                           `json:"challenge_delivery_outbox_error,omitempty"`
 	GRPC                         *GRPCSnapshot                    `json:"grpc,omitempty"`
 	ChallengeDelivery            *ChallengeDeliverySnapshot       `json:"challenge_delivery,omitempty"`
+	OutboxRelay                  *types.OutboxRelayWorkerSnapshot `json:"outbox_relay,omitempty"`
 }
 
 type PGPoolSnapshot struct {

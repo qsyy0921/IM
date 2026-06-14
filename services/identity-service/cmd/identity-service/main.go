@@ -819,11 +819,6 @@ func runOutboxRelay() error {
 		return err
 	}
 	defer pool.Close()
-	stopDebug, err := startDebugServer(ctx, identityDebugAddr(), monitoringinfra.NewHandler(pool))
-	if err != nil {
-		return err
-	}
-	defer stopDebug()
 
 	brokers := splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS"))
 	producer, err := kafkainfra.NewWriterProducer(brokers)
@@ -842,8 +837,15 @@ func runOutboxRelay() error {
 			PollInterval:   envDuration("NEXUSIM_IDENTITY_OUTBOX_POLL_INTERVAL", time.Second),
 			MaxAttempts:    envInt("NEXUSIM_IDENTITY_OUTBOX_MAX_ATTEMPTS", 5),
 			RetryBaseDelay: envDuration("NEXUSIM_IDENTITY_OUTBOX_RETRY_BASE_DELAY", time.Second),
+			ErrorBackoff:   envDuration("NEXUSIM_IDENTITY_OUTBOX_RELAY_ERROR_BACKOFF", time.Second),
+			Logf:           log.Printf,
 		},
 	)
+	stopDebug, err := startDebugServer(ctx, identityDebugAddr(), monitoringinfra.NewHandler(pool).WithOutboxRelayStats(relay.Snapshot))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 	log.Printf("identity-service outbox relay started topic=%s", topic)
 	return relay.Run(ctx)
 }

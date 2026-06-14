@@ -85,3 +85,34 @@ func TestGRPCLogMetadataTrimsAndBoundsValues(t *testing.T) {
 		t.Fatalf("unexpected request id %q", requestID)
 	}
 }
+
+func TestUnaryAccessLogInterceptorDropsUnsafeCorrelationMetadata(t *testing.T) {
+	var logs bytes.Buffer
+	interceptor := UnaryAccessLogInterceptor(log.New(&logs, "", 0))
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		metadataTraceID, "trace user=user1@example.com",
+		metadataRequestID, "request-token=secret-token",
+		"authorization", "Bearer should-not-be-logged",
+	))
+
+	_, err := interceptor(ctx, nil, &grpcgo.UnaryServerInfo{FullMethod: "/nexusim.message.v1.MessageService/SendMessage"}, func(context.Context, any) (any, error) {
+		return "ok", nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	line := logs.String()
+	for _, leaked := range []string{
+		"user1@example.com",
+		"secret-token",
+		"should-not-be-logged",
+		"authorization",
+		`"trace_id"`,
+		`"request_id"`,
+	} {
+		if strings.Contains(line, leaked) {
+			t.Fatalf("log leaked unsafe correlation metadata %q: %s", leaked, line)
+		}
+	}
+}

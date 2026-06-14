@@ -40,6 +40,9 @@ try {
     Write-Host "== debug listener exposure =="
     & (Join-Path $PSScriptRoot "check-debug-listener-exposure.ps1")
 
+    Write-Host "== public listener auth boundaries =="
+    & (Join-Path $PSScriptRoot "check-public-listener-auth-guards.ps1")
+
     Write-Host "== git whitespace =="
     git diff --check
     git diff --cached --check

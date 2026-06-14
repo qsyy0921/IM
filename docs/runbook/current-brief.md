@@ -18,6 +18,7 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 - 当前不是生产级 HA：本地 PostgreSQL `repmgr + pgpool` failover smoke、本地 Kafka KRaft 三 broker failover smoke、以及本地 Redis Sentinel quorum-loss fallback smoke 已补齐；完整 Redis 网络分区、服务发现、统一观测和部署编排仍是后续。
 - 当前 9 个服务足够支撑 IM 主链路；后续服务和中间件不写死，新增或替换必须满足拆分 / 演进准则并通过 ADR。
 - 服务 debug endpoint 公网暴露保护已纳入 `.\tools\check-local.ps1`，后续新增 `NEXUSIM_*_DEBUG_ADDR` 必须同步提供显式 public opt-in guard。
+- 服务 public listener / trusted metadata 边界已纳入 `.\tools\check-local.ps1`，后续新增 metadata auth、gateway auth 或 public gRPC / WebSocket listener 必须同步提供 TLS / mTLS guard 和回归测试。
 
 ## 当前优先级
 

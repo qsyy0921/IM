@@ -31,6 +31,16 @@ groups:
           summary: api-gateway rate limiter saw Redis errors
           description: Redis-backed rate limiting has backend errors. Check whether fail-open is enabled and whether tenant quota enforcement is degraded.
 
+      - alert: NexusIMApiGatewayTenantQuotaSnapshotStale
+        expr: nexusim_api_gateway_rate_limit_tenant_plan_stale == 1
+        for: 1m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: api-gateway tenant quota snapshot is stale
+          description: The applied tenant quota snapshot is older than its configured max age. Check the quota config source and reload errors before treating tenant limits as current.
+
       - alert: NexusIMApiGatewayJwksRefreshFailures
         expr: increase(nexusim_api_gateway_auth_jwks_refresh_failures_total[10m]) > 0
         for: 1m

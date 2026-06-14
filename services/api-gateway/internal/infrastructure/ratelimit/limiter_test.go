@@ -273,6 +273,36 @@ func TestLimiterUpdateTenantPlanSnapshotTracksMetadata(t *testing.T) {
 	}
 }
 
+func TestLimiterSnapshotTracksStaleTenantPlan(t *testing.T) {
+	now := time.UnixMilli(1_800_000_100_000)
+	limiter, err := New(Config{
+		Enabled:           true,
+		KeyScope:          "tenant",
+		RequestsPerSecond: 1,
+		Burst:             1,
+		TenantPlanMaxAge:  time.Minute,
+		Now:               func() time.Time { return now },
+		IdentityFunc: func(ctx context.Context) (Identity, error) {
+			md, _ := metadata.FromIncomingContext(ctx)
+			return Identity{TenantID: md.Get("tenant")[0]}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("new limiter: %v", err)
+	}
+	if err := limiter.UpdateTenantPlanSnapshot(map[string]Plan{
+		"tenant-vip": {RequestsPerSecond: 10, Burst: 2},
+	}, "quota-v1.test", 1_800_000_000_000, true); err != nil {
+		t.Fatalf("update tenant plan snapshot: %v", err)
+	}
+	snapshot := limiter.Snapshot()
+	if snapshot.TenantPlanMaxAgeMS != int64(time.Minute/time.Millisecond) ||
+		snapshot.TenantPlanAgeMS != 100_000 ||
+		!snapshot.TenantPlanStale {
+		t.Fatalf("expected stale tenant plan snapshot: %+v", snapshot)
+	}
+}
+
 func TestLimiterUpdateTenantPlansRejectsInvalidPlanWithoutReplacingOldPlan(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	limiter, err := New(Config{

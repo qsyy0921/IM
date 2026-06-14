@@ -29,6 +29,7 @@ $requiredAlerts = @(
     "NexusIMApiGatewayGrpcErrors",
     "NexusIMApiGatewayLegacyDescriptorTraffic",
     "NexusIMApiGatewayRateLimitRedisErrors",
+    "NexusIMApiGatewayTenantQuotaSnapshotStale",
     "NexusIMApiGatewayJwksRefreshFailures",
     "NexusIMApiGatewayOtlpEndpointMissing"
 )

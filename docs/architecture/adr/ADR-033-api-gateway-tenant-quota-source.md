@@ -54,6 +54,7 @@ Any future implementation must include:
 - an explicit transport/auth boundary for HTTP(S) snapshot sources;
 - fail-closed behavior for malformed or unsupported config versions;
 - rollback to the last valid applied snapshot;
+- low-sensitive stale-applied-snapshot detection when a max age policy is configured;
 - low-sensitive metrics for source, applied version, reload success and reload failure;
 - no tenant id, user id, token or plan detail in public metrics labels;
 - unit tests for invalid versions, stale snapshots and rollback;

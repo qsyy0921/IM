@@ -699,6 +699,7 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 		TenantPlanVersion:           tenantPlanSnapshot.Version,
 		TenantPlanGeneratedAtUnixMS: tenantPlanSnapshot.GeneratedAtUnixMS,
 		TenantPlanChecksumPresent:   tenantPlanSnapshot.ChecksumPresent,
+		TenantPlanMaxAge:            tenantPlanMaxAge,
 		MaxKeys:                     envInt("NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS", 10000),
 		IdentityFunc:                rateLimitIdentityFunc(authenticator),
 	}

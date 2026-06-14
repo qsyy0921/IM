@@ -42,6 +42,7 @@ type Config struct {
 	TenantPlanVersion           string
 	TenantPlanGeneratedAtUnixMS int64
 	TenantPlanChecksumPresent   bool
+	TenantPlanMaxAge            time.Duration
 	MaxKeys                     int
 	RedisClient                 redis.UniversalClient
 	RedisKeyPrefix              string
@@ -73,6 +74,7 @@ type Limiter struct {
 	planVersion       string
 	planGeneratedAtMS int64
 	planChecksum      bool
+	planMaxAge        time.Duration
 	plansMu           sync.RWMutex
 	plans             map[string]quotaPlan
 	maxKeys           int
@@ -123,6 +125,9 @@ type Snapshot struct {
 	TenantPlanVersion         string  `json:"tenant_plan_version,omitempty"`
 	TenantPlanGeneratedAt     int64   `json:"tenant_plan_generated_at_unix_ms,omitempty"`
 	TenantPlanChecksumPresent bool    `json:"tenant_plan_checksum_present,omitempty"`
+	TenantPlanMaxAgeMS        int64   `json:"tenant_plan_max_age_ms,omitempty"`
+	TenantPlanAgeMS           int64   `json:"tenant_plan_age_ms,omitempty"`
+	TenantPlanStale           bool    `json:"tenant_plan_stale"`
 	TenantReloads             int64   `json:"tenant_plan_reload_count,omitempty"`
 	TenantReloadAt            int64   `json:"tenant_plan_reloaded_at_unix_ms,omitempty"`
 	TenantErrors              int64   `json:"tenant_plan_reload_error_count,omitempty"`
@@ -155,6 +160,7 @@ func New(config Config) (*Limiter, error) {
 		planVersion:       strings.TrimSpace(config.TenantPlanVersion),
 		planGeneratedAtMS: config.TenantPlanGeneratedAtUnixMS,
 		planChecksum:      config.TenantPlanChecksumPresent,
+		planMaxAge:        config.TenantPlanMaxAge,
 		maxKeys:           config.MaxKeys,
 		redis:             config.RedisClient,
 		prefix:            strings.Trim(strings.TrimSpace(config.RedisKeyPrefix), ":"),
@@ -250,6 +256,16 @@ func (limiter *Limiter) Snapshot() Snapshot {
 	tenantPlanGeneratedAtMS := limiter.planGeneratedAtMS
 	tenantPlanChecksumPresent := limiter.planChecksum
 	limiter.plansMu.RUnlock()
+	tenantPlanMaxAgeMS := limiter.planMaxAge.Milliseconds()
+	tenantPlanAgeMS := int64(0)
+	tenantPlanStale := false
+	if tenantPlanGeneratedAtMS > 0 {
+		tenantPlanAgeMS = limiter.now().UnixMilli() - tenantPlanGeneratedAtMS
+		if tenantPlanAgeMS < 0 {
+			tenantPlanAgeMS = 0
+		}
+		tenantPlanStale = tenantPlanMaxAgeMS > 0 && tenantPlanAgeMS > tenantPlanMaxAgeMS
+	}
 
 	return Snapshot{
 		Enabled:                   limiter.enabled,
@@ -262,6 +278,9 @@ func (limiter *Limiter) Snapshot() Snapshot {
 		TenantPlanVersion:         tenantPlanVersion,
 		TenantPlanGeneratedAt:     tenantPlanGeneratedAtMS,
 		TenantPlanChecksumPresent: tenantPlanChecksumPresent,
+		TenantPlanMaxAgeMS:        tenantPlanMaxAgeMS,
+		TenantPlanAgeMS:           tenantPlanAgeMS,
+		TenantPlanStale:           tenantPlanStale,
 		TenantReloads:             limiter.planReloads.Load(),
 		TenantReloadAt:            limiter.planReloadAtMS.Load(),
 		TenantErrors:              limiter.planReloadErrs.Load(),

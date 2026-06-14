@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -535,6 +536,27 @@ func TestTenantRateLimitPlansFromEnvLoadsURLSnapshot(t *testing.T) {
 	}
 	if snapshot.Plans["tenant-url"].RequestsPerSecond != 9 || snapshot.Plans["tenant-url"].Burst != 10 {
 		t.Fatalf("unexpected tenant plan from url source: %+v", snapshot.Plans["tenant-url"])
+	}
+}
+
+func TestTenantRateLimitPlansFromURLSanitizesTransportErrors(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		t.Fatalf("closed tenant plan URL server should not receive requests")
+	}))
+	endpoint := server.URL + "/quota?token=secret-token&user=user1@example.com"
+	server.Close()
+
+	_, err := tenantRateLimitPlansFromURL(context.Background(), endpoint, 0, false)
+	if err == nil {
+		t.Fatalf("expected URL transport error")
+	}
+	if got, want := err.Error(), "api-gateway tenant plan URL source request failed"; got != want {
+		t.Fatalf("unexpected sanitized URL transport error: %q", got)
+	}
+	for _, leaked := range []string{"secret-token", "user1@example.com", endpoint, "127.0.0.1"} {
+		if strings.Contains(err.Error(), leaked) {
+			t.Fatalf("tenant plan URL transport error leaked %q: %q", leaked, err.Error())
+		}
 	}
 }
 

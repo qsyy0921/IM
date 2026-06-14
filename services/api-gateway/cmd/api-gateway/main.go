@@ -882,7 +882,7 @@ func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge ti
 	}
 	parsed, err := url.Parse(endpoint)
 	if err != nil {
-		return tenantRateLimitPlanSnapshot{}, err
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL source is invalid")
 	}
 	if parsed.Scheme != "https" && parsed.Scheme != "http" {
 		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL source requires http or https")
@@ -907,7 +907,7 @@ func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge ti
 	defer cancel()
 	request, err := http.NewRequestWithContext(requestCtx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return tenantRateLimitPlanSnapshot{}, err
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL source request is invalid")
 	}
 	request.Header.Set("Accept", "application/json")
 	if bearerToken != "" {
@@ -919,7 +919,7 @@ func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge ti
 	}
 	response, err := client.Do(request)
 	if err != nil {
-		return tenantRateLimitPlanSnapshot{}, err
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL source request failed")
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
@@ -927,7 +927,7 @@ func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge ti
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, tenantPlanSnapshotMaxBytes+1))
 	if err != nil {
-		return tenantRateLimitPlanSnapshot{}, err
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL source response read failed")
 	}
 	if len(data) > tenantPlanSnapshotMaxBytes {
 		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL source response is too large")

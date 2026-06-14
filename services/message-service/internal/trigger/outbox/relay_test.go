@@ -557,6 +557,44 @@ func TestRelayRunOnceRecordsKafkaPublishLatency(t *testing.T) {
 	}
 }
 
+func TestRelayRetriesTransientRunOnceErrorAndExposesSnapshot(t *testing.T) {
+	store := &fakeStore{
+		errs:     []error{errors.New("temporary store error"), nil},
+		messages: []types.OutboxMessage{testOutboxMessage()},
+	}
+	publisher := &fakePublisher{}
+	relay := NewRelay(store, publisher, Config{
+		PollInterval: time.Millisecond,
+		ErrorBackoff: time.Millisecond,
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		for len(publisher.messages) == 0 && len(publisher.batches) == 0 {
+			time.Sleep(time.Millisecond)
+		}
+		cancel()
+	}()
+
+	err := relay.Run(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected canceled after successful retry, got %v", err)
+	}
+	if store.calls < 2 {
+		t.Fatalf("expected retry after transient error, calls=%d", store.calls)
+	}
+	snapshot := relay.Snapshot()
+	if snapshot.TotalErrors != 1 || snapshot.ConsecutiveErrors != 0 {
+		t.Fatalf("unexpected relay snapshot: %+v", snapshot)
+	}
+	if snapshot.LastErrorAtMS == 0 || snapshot.LastSuccessAtMS == 0 || snapshot.LastPublishedAtMS == 0 {
+		t.Fatalf("expected timestamps in relay snapshot: %+v", snapshot)
+	}
+	if snapshot.LastErrorBackoffMS != time.Millisecond.Milliseconds() {
+		t.Fatalf("expected backoff %d, got %+v", time.Millisecond.Milliseconds(), snapshot)
+	}
+}
+
 func TestRelayRunContinuesImmediatelyWhenWorkWasPublished(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	store := &countingStore{
@@ -772,6 +810,8 @@ func (m *fakeMetrics) ObserveOutboxCommit(time.Duration) {
 
 type fakeStore struct {
 	messages []types.OutboxMessage
+	errs     []error
+	calls    int
 }
 
 func (s *fakeStore) ProcessReady(
@@ -781,6 +821,18 @@ func (s *fakeStore) ProcessReady(
 	_ time.Duration,
 	publish func(context.Context, types.OutboxMessage) error,
 ) (types.OutboxRelayStats, error) {
+	if err := ctx.Err(); err != nil {
+		return types.OutboxRelayStats{}, err
+	}
+	if s.calls < len(s.errs) {
+		err := s.errs[s.calls]
+		s.calls++
+		if err != nil {
+			return types.OutboxRelayStats{}, err
+		}
+	} else {
+		s.calls++
+	}
 	stats := types.OutboxRelayStats{Fetched: len(s.messages)}
 	for _, message := range s.messages {
 		if err := publish(ctx, message); err != nil {

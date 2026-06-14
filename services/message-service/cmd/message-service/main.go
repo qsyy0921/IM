@@ -255,11 +255,6 @@ func runOutboxRelay() error {
 	defer pool.Close()
 
 	metrics := metricsinfra.NewCollector()
-	stopDebug, err := startDebugServer(ctx, envString("NEXUSIM_DEBUG_ADDR", ""), metricsinfra.NewHandler(metrics, pool))
-	if err != nil {
-		return err
-	}
-	defer stopDebug()
 
 	producer, err := kafkainfra.NewWriterProducer(brokers)
 	if err != nil {
@@ -283,11 +278,18 @@ func runOutboxRelay() error {
 			DisablePublishBatch: !publishBatchEnabled,
 			PollInterval:        pollInterval,
 			FailureBackoff:      envDuration("NEXUSIM_OUTBOX_FAILURE_BACKOFF", pollInterval),
+			ErrorBackoff:        envDuration("NEXUSIM_OUTBOX_RELAY_ERROR_BACKOFF", time.Second),
 			MaxAttempts:         envInt("NEXUSIM_OUTBOX_MAX_ATTEMPTS", 5),
 			RetryBaseDelay:      envDuration("NEXUSIM_OUTBOX_RETRY_BASE_DELAY", time.Second),
 			Metrics:             metrics,
+			Logf:                log.Printf,
 		},
 	)
+	stopDebug, err := startDebugServer(ctx, envString("NEXUSIM_DEBUG_ADDR", ""), metricsinfra.NewHandler(metrics, pool).WithOutboxRelayStats(relay.Snapshot))
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 	log.Printf(
 		"message-service outbox relay started workers=%d batch_size=%d publish_batch_enabled=%t poll_interval=%s failure_backoff=%s",
 		envInt("NEXUSIM_OUTBOX_WORKERS", 1),

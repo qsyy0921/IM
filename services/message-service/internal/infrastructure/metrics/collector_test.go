@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/qsyy0921/IM/services/message-service/internal/types"
 )
 
 func TestCollectorSnapshot(t *testing.T) {
@@ -172,5 +174,33 @@ func TestHandlerReadyzWithoutPool(t *testing.T) {
 	}
 	if body.Status != "unready" || body.Error == "" {
 		t.Fatalf("unexpected ready response: %+v", body)
+	}
+}
+
+func TestHandlerMetricsIncludesOutboxRelaySnapshot(t *testing.T) {
+	handler := NewHandler(NewCollector(), nil).WithOutboxRelayStats(func() types.OutboxRelayWorkerSnapshot {
+		return types.OutboxRelayWorkerSnapshot{
+			TotalErrors:        2,
+			ConsecutiveErrors:  1,
+			LastErrorAtMS:      100,
+			LastSuccessAtMS:    90,
+			LastPublishedAtMS:  90,
+			LastErrorBackoffMS: 1000,
+		}
+	})
+	request := httptest.NewRequest(http.MethodGet, "/debug/metrics", nil)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d", response.Code)
+	}
+	var snapshot Snapshot
+	if err := json.Unmarshal(response.Body.Bytes(), &snapshot); err != nil {
+		t.Fatalf("decode metrics: %v", err)
+	}
+	if snapshot.OutboxRelay == nil || snapshot.OutboxRelay.TotalErrors != 2 {
+		t.Fatalf("unexpected outbox relay snapshot: %+v", snapshot.OutboxRelay)
 	}
 }

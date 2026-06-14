@@ -10,6 +10,9 @@ try {
     Write-Host "== runbook entrypoints =="
     & (Join-Path $PSScriptRoot "check-runbook-entrypoints.ps1")
 
+    Write-Host "== service brief sync =="
+    & (Join-Path $PSScriptRoot "check-service-brief-sync.ps1")
+
     Write-Host "== docs entrypoints =="
     & (Join-Path $PSScriptRoot "check-doc-entrypoints.ps1")
 

@@ -20,6 +20,7 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 - 服务 debug endpoint 公网暴露保护已纳入 `.\tools\check-local.ps1`，后续新增 `NEXUSIM_*_DEBUG_ADDR` 必须同步提供显式 public opt-in guard。
 - 服务 public listener / trusted metadata 边界已纳入 `.\tools\check-local.ps1`，后续新增 metadata auth、gateway auth 或 public gRPC / WebSocket listener 必须同步提供 TLS / mTLS guard 和回归测试。
 - OTel 采样策略与服务 trace runtime wiring 已纳入 `.\tools\check-local.ps1`，后续服务进入采样策略时必须同步 cmd env、debug trace snapshot 和低敏 span 测试。
+- `docs/runbook/service-briefs/` 与真实 `services/` 目录同步已纳入 `.\tools\check-local.ps1`；未实现服务 brief 必须显式标为 draft / 尚未实现并有对应 SDD。
 
 ## 当前优先级
 

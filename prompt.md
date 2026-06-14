@@ -24,11 +24,11 @@
 
 ## 下一步优先
 
-做 `api-gateway` 入口治理：
+继续做 `api-gateway` 入口治理：
 
-- 租户级 quota / rate-limit hardening；
-- 低敏 metrics；
-- 稳定错误语义；
+- 动态 tenant plan / quota；
+- legacy descriptor 显式 opt-in 收敛；
+- OpenTelemetry trace；
 - 必要单测 / 集成测试；
 - 同步相关 service brief、SDD 或进度文档。
 

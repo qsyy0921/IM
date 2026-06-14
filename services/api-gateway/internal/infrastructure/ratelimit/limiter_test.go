@@ -103,6 +103,82 @@ func TestLimiterKeysByMethodAndToken(t *testing.T) {
 	}
 }
 
+func TestLimiterTenantScopeSharesQuotaAcrossTokensInTenant(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	tenantByToken := map[string]string{
+		"token-1": "tenant-a",
+		"token-2": "tenant-a",
+		"token-3": "tenant-b",
+	}
+	limiter, err := New(Config{
+		Enabled:           true,
+		KeyScope:          "tenant",
+		RequestsPerSecond: 1,
+		Burst:             1,
+		Now:               func() time.Time { return now },
+		IdentityFunc: func(ctx context.Context) (Identity, error) {
+			md, _ := metadata.FromIncomingContext(ctx)
+			values := md.Get("authorization")
+			if len(values) == 0 {
+				return Identity{}, context.Canceled
+			}
+			token := bearerToken(values[0])
+			return Identity{TenantID: tenantByToken[token]}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("new limiter: %v", err)
+	}
+	ctx1 := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer token-1"))
+	ctx2 := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer token-2"))
+	ctx3 := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer token-3"))
+
+	allowed, _, err := limiter.allow(ctx1, "/method")
+	if err != nil || !allowed {
+		t.Fatalf("first tenant-a request should pass, allowed=%v err=%v", allowed, err)
+	}
+	allowed, _, err = limiter.allow(ctx2, "/method")
+	if err != nil {
+		t.Fatalf("second tenant-a request returned error: %v", err)
+	}
+	if allowed {
+		t.Fatalf("second tenant-a request with different token should share tenant quota")
+	}
+	allowed, _, err = limiter.allow(ctx3, "/method")
+	if err != nil || !allowed {
+		t.Fatalf("tenant-b request should use separate quota, allowed=%v err=%v", allowed, err)
+	}
+	if snapshot := limiter.Snapshot(); snapshot.KeyScope != "tenant" || snapshot.TrackedKeys != 2 || snapshot.TotalLimited != 1 {
+		t.Fatalf("unexpected tenant scope snapshot: %+v", snapshot)
+	}
+}
+
+func TestLimiterTenantScopeFallbackDoesNotChargeTenantOnIdentityError(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	limiter, err := New(Config{
+		Enabled:           true,
+		KeyScope:          "tenant",
+		RequestsPerSecond: 1,
+		Burst:             1,
+		Now:               func() time.Time { return now },
+		IdentityFunc: func(context.Context) (Identity, error) {
+			return Identity{}, context.Canceled
+		},
+	})
+	if err != nil {
+		t.Fatalf("new limiter: %v", err)
+	}
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer token-1"))
+	allowed, _, err := limiter.allow(ctx, "/method")
+	if err != nil || !allowed {
+		t.Fatalf("fallback request should pass, allowed=%v err=%v", allowed, err)
+	}
+	snapshot := limiter.Snapshot()
+	if snapshot.IdentityErrors != 1 || snapshot.TrackedKeys != 1 || snapshot.TotalAccepted != 1 {
+		t.Fatalf("unexpected fallback snapshot: %+v", snapshot)
+	}
+}
+
 func TestLimiterDisabledIsNoop(t *testing.T) {
 	limiter, err := New(Config{})
 	if err != nil {
@@ -122,6 +198,18 @@ func TestLimiterDisabledIsNoop(t *testing.T) {
 func TestLimiterRequiresPositiveRateWhenEnabled(t *testing.T) {
 	if _, err := New(Config{Enabled: true}); err == nil {
 		t.Fatalf("expected enabled limiter without rate to fail")
+	}
+}
+
+func TestLimiterTenantScopeRequiresIdentityResolver(t *testing.T) {
+	if _, err := New(Config{Enabled: true, KeyScope: "tenant", RequestsPerSecond: 1}); err == nil {
+		t.Fatalf("expected tenant scope without identity resolver to fail")
+	}
+}
+
+func TestLimiterRejectsUnsupportedScope(t *testing.T) {
+	if _, err := New(Config{Enabled: true, KeyScope: "global", RequestsPerSecond: 1}); err == nil {
+		t.Fatalf("expected unsupported scope to fail")
 	}
 }
 

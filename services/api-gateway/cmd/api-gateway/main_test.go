@@ -18,6 +18,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
 	grpcgo "google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 func TestGRPCClientTLSConfigFromEnvDisabledByDefault(t *testing.T) {
@@ -211,7 +212,7 @@ func TestNewAuthenticatorFromEnvAllowsExplicitLegacyAudience(t *testing.T) {
 
 func TestNewRateLimiterFromEnvDisabledByDefault(t *testing.T) {
 	clearAPIGatewayRateLimitConfig(t)
-	limiter, closeFn, err := newRateLimiterFromEnv(context.Background())
+	limiter, closeFn, err := newRateLimiterFromEnv(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("new rate limiter: %v", err)
 	}
@@ -228,7 +229,7 @@ func TestNewRateLimiterFromEnvEnabled(t *testing.T) {
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", "20")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS", "50")
 
-	limiter, closeFn, err := newRateLimiterFromEnv(context.Background())
+	limiter, closeFn, err := newRateLimiterFromEnv(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("new rate limiter: %v", err)
 	}
@@ -242,7 +243,7 @@ func TestNewRateLimiterFromEnvEnabled(t *testing.T) {
 func TestNewRateLimiterFromEnvEnabledRequiresRate(t *testing.T) {
 	clearAPIGatewayRateLimitConfig(t)
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_ENABLED", "true")
-	if _, _, err := newRateLimiterFromEnv(context.Background()); err == nil {
+	if _, _, err := newRateLimiterFromEnv(context.Background(), nil); err == nil {
 		t.Fatalf("expected missing rate to fail")
 	}
 }
@@ -259,7 +260,7 @@ func TestNewRateLimiterFromEnvRedisBackend(t *testing.T) {
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_WINDOW", "2s")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_FAIL_OPEN", "false")
 
-	limiter, closeFn, err := newRateLimiterFromEnv(context.Background())
+	limiter, closeFn, err := newRateLimiterFromEnv(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("new redis rate limiter: %v", err)
 	}
@@ -279,7 +280,7 @@ func TestNewRateLimiterFromEnvRedisFailOpenAllowsStartupWhenRedisUnavailable(t *
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_ADDR", "127.0.0.1:1")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_FAIL_OPEN", "true")
 
-	limiter, closeFn, err := newRateLimiterFromEnv(context.Background())
+	limiter, closeFn, err := newRateLimiterFromEnv(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("fail-open redis limiter should start when redis is unavailable: %v", err)
 	}
@@ -307,8 +308,54 @@ func TestNewRateLimiterFromEnvRedisFailClosedRejectsStartupWhenRedisUnavailable(
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_ADDR", "127.0.0.1:1")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_FAIL_OPEN", "false")
 
-	if _, _, err := newRateLimiterFromEnv(context.Background()); err == nil {
+	if _, _, err := newRateLimiterFromEnv(context.Background(), nil); err == nil {
 		t.Fatalf("fail-closed redis limiter should fail startup when redis is unavailable")
+	}
+}
+
+func TestNewRateLimiterFromEnvTenantScopeUsesAuthenticatedTenant(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	clearAPIGatewayAuthConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_MODE", "hmac")
+	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_HMAC_SECRET", "gateway-secret")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_ENABLED", "true")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_SCOPE", "tenant")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", "1")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", "1")
+
+	authenticator, err := newAuthenticatorFromEnv()
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	t.Cleanup(authenticator.Close)
+	limiter, closeFn, err := newRateLimiterFromEnv(context.Background(), authenticator)
+	if err != nil {
+		t.Fatalf("new tenant rate limiter: %v", err)
+	}
+	defer closeFn()
+
+	tokenA1 := signAPIGatewayTestToken(t, "tenant-a", "user-1")
+	tokenA2 := signAPIGatewayTestToken(t, "tenant-a", "user-2")
+	tokenB := signAPIGatewayTestToken(t, "tenant-b", "user-3")
+	ctxA1 := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer "+tokenA1))
+	ctxA2 := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer "+tokenA2))
+	ctxB := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer "+tokenB))
+	interceptor := limiter.UnaryServerInterceptor()
+	info := &grpcgo.UnaryServerInfo{FullMethod: "/nexusim.gateway.v1.GatewayService/SendMessage"}
+	handler := func(context.Context, any) (any, error) { return "ok", nil }
+
+	if _, err := interceptor(ctxA1, nil, info, handler); err != nil {
+		t.Fatalf("first tenant-a request should pass: %v", err)
+	}
+	if _, err := interceptor(ctxA2, nil, info, handler); err == nil {
+		t.Fatalf("second tenant-a request should be limited")
+	}
+	if _, err := interceptor(ctxB, nil, info, handler); err != nil {
+		t.Fatalf("tenant-b request should pass: %v", err)
+	}
+	snapshot := limiter.Snapshot()
+	if snapshot.KeyScope != "tenant" || snapshot.TotalAccepted != 2 || snapshot.TotalLimited != 1 {
+		t.Fatalf("unexpected tenant limiter snapshot: %+v", snapshot)
 	}
 }
 
@@ -472,6 +519,7 @@ func clearAPIGatewayAuthConfig(t *testing.T) {
 func clearAPIGatewayRateLimitConfig(t *testing.T) {
 	t.Helper()
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_ENABLED", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_SCOPE", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS", "")
@@ -488,6 +536,20 @@ func clearAPIGatewayRateLimitConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_KEY_PREFIX", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_WINDOW", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_FAIL_OPEN", "")
+}
+
+func signAPIGatewayTestToken(t *testing.T, tenantID string, userID string) string {
+	t.Helper()
+	token, err := gatewayauth.SignGatewayToken("gateway-secret", map[string]string{
+		"tenant_id": tenantID,
+		"user_id":   userID,
+		"device_id": "device-1",
+		"aud":       "api-gateway",
+	}, time.Now().Add(time.Minute))
+	if err != nil {
+		t.Fatalf("sign api-gateway token: %v", err)
+	}
+	return token
 }
 
 func writeAPIGatewayTLSTestCert(t *testing.T, dir string, name string) (string, string) {

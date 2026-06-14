@@ -30,6 +30,7 @@ import (
 	grpcgo "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 func main() {
@@ -70,7 +71,7 @@ func runGRPC() error {
 	}
 	defer authenticator.Close()
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
-	rateLimiter, closeRateLimiter, err := newRateLimiterFromEnv(ctx)
+	rateLimiter, closeRateLimiter, err := newRateLimiterFromEnv(ctx, authenticator)
 	if err != nil {
 		return err
 	}
@@ -546,19 +547,22 @@ func envOptionalBool(name string) (bool, bool, error) {
 	}
 }
 
-func newRateLimiterFromEnv(ctx context.Context) (*ratelimitinfra.Limiter, func() error, error) {
+func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authenticator) (*ratelimitinfra.Limiter, func() error, error) {
 	enabled, _, err := envOptionalBool("NEXUSIM_API_GATEWAY_RATE_LIMIT_ENABLED")
 	if err != nil {
 		return nil, nil, err
 	}
 	rps := envFloat64("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", 0)
 	backend := strings.ToLower(strings.TrimSpace(envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_BACKEND", "local")))
+	scope := strings.ToLower(strings.TrimSpace(envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_SCOPE", "token")))
 	config := ratelimitinfra.Config{
 		Enabled:           enabled,
 		Backend:           backend,
+		KeyScope:          scope,
 		RequestsPerSecond: rps,
 		Burst:             envInt("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", int(rps)),
 		MaxKeys:           envInt("NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS", 10000),
+		IdentityFunc:      rateLimitIdentityFunc(authenticator),
 	}
 	if enabled && backend == "redis" {
 		failOpen := true
@@ -596,6 +600,55 @@ func newRateLimiterFromEnv(ctx context.Context) (*ratelimitinfra.Limiter, func()
 		return nil, nil, err
 	}
 	return limiter, func() error { return nil }, nil
+}
+
+func rateLimitIdentityFunc(authenticator *gatewayauth.Authenticator) ratelimitinfra.IdentityFunc {
+	return func(ctx context.Context) (ratelimitinfra.Identity, error) {
+		if authenticator == nil {
+			return ratelimitinfra.Identity{}, errors.New("api-gateway authenticator is not configured")
+		}
+		auth, err := authenticator.Authenticate(rateLimitAuthRequestFromMetadata(ctx))
+		if err != nil {
+			return ratelimitinfra.Identity{}, err
+		}
+		return ratelimitinfra.Identity{TenantID: auth.TenantID, UserID: auth.UserID}, nil
+	}
+}
+
+func rateLimitAuthRequestFromMetadata(ctx context.Context) *http.Request {
+	query := url.Values{}
+	if value := firstIncomingMetadata(ctx, "x-nexusim-gateway-token"); value != "" {
+		query.Set("token", value)
+	}
+	if value := firstIncomingMetadata(ctx, "x-nexusim-tenant-id"); value != "" {
+		query.Set("tenant_id", value)
+	}
+	if value := firstIncomingMetadata(ctx, "x-nexusim-user-id"); value != "" {
+		query.Set("user_id", value)
+	}
+	if value := firstIncomingMetadata(ctx, "x-nexusim-device-id"); value != "" {
+		query.Set("device_id", value)
+	}
+	if value := firstIncomingMetadata(ctx, "x-nexusim-trace-id"); value != "" {
+		query.Set("trace_id", value)
+	}
+	request, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://api-gateway/rate-limit-auth?"+query.Encode(), nil)
+	if authorization := firstIncomingMetadata(ctx, "authorization"); authorization != "" {
+		request.Header.Set("Authorization", authorization)
+	}
+	return request
+}
+
+func firstIncomingMetadata(ctx context.Context, key string) string {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return ""
+	}
+	values := md.Get(key)
+	if len(values) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(values[0])
 }
 
 type grpcClientTLSConfig struct {

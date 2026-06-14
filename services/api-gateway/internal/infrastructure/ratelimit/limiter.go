@@ -27,11 +27,14 @@ const (
 	maxKeyLength  = 96
 	backendLocal  = "local"
 	backendRedis  = "redis"
+	scopeToken    = "token"
+	scopeTenant   = "tenant"
 )
 
 type Config struct {
 	Enabled           bool
 	Backend           string
+	KeyScope          string
 	RequestsPerSecond float64
 	Burst             int
 	MaxKeys           int
@@ -39,12 +42,21 @@ type Config struct {
 	RedisKeyPrefix    string
 	RedisWindow       time.Duration
 	RedisFailOpen     bool
+	IdentityFunc      IdentityFunc
 	Now               func() time.Time
 }
+
+type Identity struct {
+	TenantID string
+	UserID   string
+}
+
+type IdentityFunc func(context.Context) (Identity, error)
 
 type Limiter struct {
 	enabled  bool
 	backend  string
+	scope    string
 	rate     float64
 	burst    float64
 	maxKeys  int
@@ -52,13 +64,15 @@ type Limiter struct {
 	prefix   string
 	window   time.Duration
 	failOpen bool
+	identity IdentityFunc
 	now      func() time.Time
 
-	mu            sync.Mutex
-	buckets       map[string]*bucket
-	totalLimited  int64
-	totalAccepted int64
-	redisErrors   atomic.Int64
+	mu             sync.Mutex
+	buckets        map[string]*bucket
+	totalLimited   int64
+	totalAccepted  int64
+	redisErrors    atomic.Int64
+	identityErrors atomic.Int64
 }
 
 type bucket struct {
@@ -69,17 +83,19 @@ type bucket struct {
 }
 
 type Snapshot struct {
-	Enabled       bool    `json:"enabled"`
-	Backend       string  `json:"backend,omitempty"`
-	RatePerSecond float64 `json:"rate_per_second,omitempty"`
-	Burst         int     `json:"burst,omitempty"`
-	TrackedKeys   int     `json:"tracked_keys,omitempty"`
-	MaxKeys       int     `json:"max_keys,omitempty"`
-	RedisWindowMS int64   `json:"redis_window_ms,omitempty"`
-	RedisFailOpen bool    `json:"redis_fail_open,omitempty"`
-	RedisErrors   int64   `json:"redis_error_count,omitempty"`
-	TotalAccepted int64   `json:"total_accepted"`
-	TotalLimited  int64   `json:"total_limited"`
+	Enabled        bool    `json:"enabled"`
+	Backend        string  `json:"backend,omitempty"`
+	KeyScope       string  `json:"key_scope,omitempty"`
+	RatePerSecond  float64 `json:"rate_per_second,omitempty"`
+	Burst          int     `json:"burst,omitempty"`
+	TrackedKeys    int     `json:"tracked_keys,omitempty"`
+	MaxKeys        int     `json:"max_keys,omitempty"`
+	RedisWindowMS  int64   `json:"redis_window_ms,omitempty"`
+	RedisFailOpen  bool    `json:"redis_fail_open,omitempty"`
+	RedisErrors    int64   `json:"redis_error_count,omitempty"`
+	IdentityErrors int64   `json:"identity_error_count,omitempty"`
+	TotalAccepted  int64   `json:"total_accepted"`
+	TotalLimited   int64   `json:"total_limited"`
 }
 
 func New(config Config) (*Limiter, error) {
@@ -87,9 +103,14 @@ func New(config Config) (*Limiter, error) {
 	if backend == "" {
 		backend = backendLocal
 	}
+	scope := strings.ToLower(strings.TrimSpace(config.KeyScope))
+	if scope == "" {
+		scope = scopeToken
+	}
 	limiter := &Limiter{
 		enabled:  config.Enabled,
 		backend:  backend,
+		scope:    scope,
 		rate:     config.RequestsPerSecond,
 		burst:    float64(config.Burst),
 		maxKeys:  config.MaxKeys,
@@ -97,6 +118,7 @@ func New(config Config) (*Limiter, error) {
 		prefix:   strings.Trim(strings.TrimSpace(config.RedisKeyPrefix), ":"),
 		window:   config.RedisWindow,
 		failOpen: config.RedisFailOpen,
+		identity: config.IdentityFunc,
 		now:      config.Now,
 		buckets:  make(map[string]*bucket),
 	}
@@ -108,6 +130,14 @@ func New(config Config) (*Limiter, error) {
 	}
 	if limiter.rate <= 0 {
 		return nil, errors.New("api-gateway rate limit rps must be greater than 0 when enabled")
+	}
+	switch limiter.scope {
+	case scopeToken, scopeTenant:
+	default:
+		return nil, errors.New("unsupported api-gateway rate limit scope")
+	}
+	if limiter.scope == scopeTenant && limiter.identity == nil {
+		return nil, errors.New("api-gateway tenant rate limit scope requires an identity resolver")
 	}
 	switch limiter.backend {
 	case backendLocal:
@@ -162,17 +192,19 @@ func (limiter *Limiter) Snapshot() Snapshot {
 	defer limiter.mu.Unlock()
 
 	return Snapshot{
-		Enabled:       limiter.enabled,
-		Backend:       limiter.backend,
-		RatePerSecond: limiter.rate,
-		Burst:         int(limiter.burst),
-		TrackedKeys:   len(limiter.buckets),
-		MaxKeys:       limiter.maxKeys,
-		RedisWindowMS: limiter.window.Milliseconds(),
-		RedisFailOpen: limiter.failOpen,
-		RedisErrors:   limiter.redisErrors.Load(),
-		TotalAccepted: limiter.totalAccepted,
-		TotalLimited:  limiter.totalLimited,
+		Enabled:        limiter.enabled,
+		Backend:        limiter.backend,
+		KeyScope:       limiter.scope,
+		RatePerSecond:  limiter.rate,
+		Burst:          int(limiter.burst),
+		TrackedKeys:    len(limiter.buckets),
+		MaxKeys:        limiter.maxKeys,
+		RedisWindowMS:  limiter.window.Milliseconds(),
+		RedisFailOpen:  limiter.failOpen,
+		RedisErrors:    limiter.redisErrors.Load(),
+		IdentityErrors: limiter.identityErrors.Load(),
+		TotalAccepted:  limiter.totalAccepted,
+		TotalLimited:   limiter.totalLimited,
 	}
 }
 
@@ -186,7 +218,7 @@ func (limiter *Limiter) allow(ctx context.Context, method string) (bool, time.Du
 
 func (limiter *Limiter) allowLocal(ctx context.Context, method string) (bool, time.Duration) {
 	now := limiter.now()
-	key := requestKey(ctx, method)
+	key := limiter.requestKey(ctx, method)
 
 	limiter.mu.Lock()
 	defer limiter.mu.Unlock()
@@ -226,7 +258,7 @@ func (limiter *Limiter) allowRedis(ctx context.Context, method string) (bool, ti
 		window = time.Millisecond
 	}
 	windowID := now.UnixMilli() / window.Milliseconds()
-	key := limiter.redisKey(requestKey(ctx, method), windowID)
+	key := limiter.redisKey(limiter.requestKey(ctx, method), windowID)
 	count, err := limiter.redis.Incr(ctx, key).Result()
 	if err != nil {
 		limiter.redisErrors.Add(1)
@@ -324,8 +356,15 @@ func (limiter *Limiter) evictOldestLocked() {
 	}
 }
 
-func requestKey(ctx context.Context, method string) string {
+func (limiter *Limiter) requestKey(ctx context.Context, method string) string {
 	method = trimKeyPart(method)
+	if limiter != nil && limiter.scope == scopeTenant {
+		identity, err := limiter.identity(ctx)
+		if err == nil && strings.TrimSpace(identity.TenantID) != "" {
+			return method + "|tenant:" + trimKeyPart(identity.TenantID)
+		}
+		limiter.identityErrors.Add(1)
+	}
 	if token := bearerOrGatewayToken(ctx); token != "" {
 		digest := sha256.Sum256([]byte(token))
 		return method + "|token:" + hex.EncodeToString(digest[:12])

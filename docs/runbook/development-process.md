@@ -275,7 +275,7 @@ Web / App / 桌面端是后续产品化展示层，
 
 ```text
 继续收干净当前 9 个核心服务
--> 先做 api-gateway 入口配额 / rate-limit hardening
+-> 继续做 api-gateway 动态 tenant plan / quota、legacy descriptor 和 trace hardening
 -> 继续补分布式故障恢复 smoke 和服务级 P2 hardening
 -> 再进入 search-service
 -> 再进入 rag-service / summary-service / agent-service

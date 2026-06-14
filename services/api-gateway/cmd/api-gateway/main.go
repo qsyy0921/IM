@@ -102,6 +102,9 @@ func runGRPC() error {
 	if err := validateTrustedMetadataBackendConfig("contacts-service", contactsAddr, envString("NEXUSIM_CONTACTS_AUTH_MODE", "body"), contactsTLS); err != nil {
 		return err
 	}
+	if err := validateTrustedMetadataBackendConfig("identity-service", identityAddr, envString("NEXUSIM_IDENTITY_ADMIN_AUTH_MODE", "body"), identityTLS); err != nil {
+		return err
+	}
 
 	conversationConn, err := dialBackend(
 		conversationAddr,

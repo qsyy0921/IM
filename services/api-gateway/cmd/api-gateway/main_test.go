@@ -363,6 +363,18 @@ func TestValidateTrustedMetadataBackendConfigIgnoresBodyAuth(t *testing.T) {
 	}
 }
 
+func TestValidateTrustedMetadataBackendConfigCoversIdentityService(t *testing.T) {
+	err := validateTrustedMetadataBackendConfig(
+		"identity-service",
+		"8.8.8.8:10501",
+		"verified-metadata",
+		grpcClientTLSConfig{},
+	)
+	if err == nil {
+		t.Fatalf("expected identity-service public address without mTLS client cert to fail")
+	}
+}
+
 func TestAPIGatewayRegisterLegacyDescriptorsDefaultsToTrue(t *testing.T) {
 	t.Setenv("NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS", "")
 	enabled, err := apiGatewayRegisterLegacyDescriptors()

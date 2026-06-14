@@ -10,6 +10,7 @@
 | `target-architecture-foundation.md` | 架构定位、技术栈口径、总体拓扑、服务边界、Control Plane。 |
 | `target-architecture-timeline.md` | 消息写入、成员边界、Fanout、数据模型、Kafka、Redis 与长连接。 |
 | `target-architecture-platform.md` | 权限、搜索、RAG、Agent、多 Region、审计、观测、ADR、演进结论。 |
+| `adr/` | 已接受的关键架构决策记录。 |
 | `add.md` | 业务架构补充。描述系统范围、参与方、服务边界、核心业务流和阶段路线。 |
 | `tadd.md` | 技术架构补充。描述六层 DDD、工程目录、中间件、本地环境、观测、测试和编码门禁。 |
 

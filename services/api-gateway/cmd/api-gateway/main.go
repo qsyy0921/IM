@@ -75,9 +75,16 @@ func runGRPC() error {
 		return err
 	}
 	defer closeRateLimiter()
+	registerLegacyDescriptors, err := apiGatewayRegisterLegacyDescriptors()
+	if err != nil {
+		return err
+	}
 	stopDebug, err := startDebugServer(ctx, apiGatewayDebugAddr(), monitoringinfra.NewHandler(grpcMetrics).
 		WithAuthJWKStats(authenticator.JWKStats).
-		WithRateLimitStats(rateLimiter.Snapshot))
+		WithRateLimitStats(rateLimiter.Snapshot).
+		WithRuntimeStats(func() monitoringinfra.RuntimeSnapshot {
+			return monitoringinfra.RuntimeSnapshot{RegisterLegacyDescriptors: registerLegacyDescriptors}
+		}))
 	if err != nil {
 		return err
 	}
@@ -181,10 +188,6 @@ func runGRPC() error {
 		serverOptions = append(serverOptions, grpcgo.Creds(credentials.NewTLS(serverTLSConfig)))
 	}
 	server := grpcgo.NewServer(serverOptions...)
-	registerLegacyDescriptors, err := apiGatewayRegisterLegacyDescriptors()
-	if err != nil {
-		return err
-	}
 	apigrpc.RegisterWithConfig(server, gateway, apigrpc.RegisterConfig{
 		RegisterLegacyDescriptors: registerLegacyDescriptors,
 	})

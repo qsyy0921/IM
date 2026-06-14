@@ -15,6 +15,7 @@ type Handler struct {
 	grpcMetrics        *GRPCMetrics
 	jwkStatsFunc       func() gatewayauth.JWKStats
 	rateLimitStatsFunc func() ratelimit.Snapshot
+	runtimeStatsFunc   func() RuntimeSnapshot
 }
 
 func NewHandler(grpcMetrics *GRPCMetrics) *Handler {
@@ -28,6 +29,11 @@ func (h *Handler) WithAuthJWKStats(statsFunc func() gatewayauth.JWKStats) *Handl
 
 func (h *Handler) WithRateLimitStats(statsFunc func() ratelimit.Snapshot) *Handler {
 	h.rateLimitStatsFunc = statsFunc
+	return h
+}
+
+func (h *Handler) WithRuntimeStats(statsFunc func() RuntimeSnapshot) *Handler {
+	h.runtimeStatsFunc = statsFunc
 	return h
 }
 
@@ -61,6 +67,10 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		stats := h.rateLimitStatsFunc()
 		snapshot.RateLimit = &stats
 	}
+	if h.runtimeStatsFunc != nil {
+		stats := h.runtimeStatsFunc()
+		snapshot.Runtime = &stats
+	}
 	writeJSON(w, http.StatusOK, snapshot)
 }
 
@@ -75,6 +85,11 @@ type Snapshot struct {
 	GRPC          *GRPCSnapshot         `json:"grpc,omitempty"`
 	AuthJWKs      *gatewayauth.JWKStats `json:"auth_jwks,omitempty"`
 	RateLimit     *ratelimit.Snapshot   `json:"rate_limit,omitempty"`
+	Runtime       *RuntimeSnapshot      `json:"runtime,omitempty"`
+}
+
+type RuntimeSnapshot struct {
+	RegisterLegacyDescriptors bool `json:"register_legacy_descriptors"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

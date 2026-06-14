@@ -17,6 +17,8 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 		return gatewayauth.JWKStats{RemoteURLConfigured: true, CachedKeyCount: 2, RefreshFailures: 1}
 	}).WithRateLimitStats(func() ratelimit.Snapshot {
 		return ratelimit.Snapshot{Enabled: true, RatePerSecond: 10, Burst: 20, TotalLimited: 3}
+	}).WithRuntimeStats(func() RuntimeSnapshot {
+		return RuntimeSnapshot{RegisterLegacyDescriptors: false}
 	})
 
 	for _, path := range []string{"/healthz", "/readyz"} {
@@ -44,5 +46,8 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 	}
 	if snapshot.RateLimit == nil || !snapshot.RateLimit.Enabled || snapshot.RateLimit.TotalLimited != 3 {
 		t.Fatalf("unexpected rate limit stats: %+v", snapshot.RateLimit)
+	}
+	if snapshot.Runtime == nil || snapshot.Runtime.RegisterLegacyDescriptors {
+		t.Fatalf("unexpected runtime stats: %+v", snapshot.Runtime)
 	}
 }

@@ -21,17 +21,19 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 ```text
 先把主链路做对
 -> 再把分布式和可靠性做稳
--> 再把产品能力做完整
--> 最后再扩搜索、媒体、AI、平台能力
+-> 再把已有后端服务收干净
+-> 再扩搜索和 AI 应用后端
+-> 最后按需要做客户端和产品化展示
 ```
 
 核心原则：
 
 1. 不为了“微服务数量”而拆服务。
 2. 不为了“架构好看”提前抽象。
-3. 不在基础链路没收稳前同时铺太多客户端和新服务。
+3. 不在基础链路没收稳前同时铺太多新服务。
 4. 功能能跑不等于阶段完成，必须有 smoke / audit / repair / hardening 证据。
 5. 代码复杂度要持续治理，不能把单个核心文件继续堆成大文件。
+6. 当前面试主线只覆盖后端、分布式可靠性和 AI 应用后端；客户端暂不作为当前开发主线。
 
 ## 1. 第一阶段：最小 IM 主链路
 
@@ -134,7 +136,7 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 - 本地 failover smoke 不等于生产 HA
 - 单 broker / 单 primary 切换成功，不等于多故障场景完成
 
-这一阶段目前已经完成一部分，但还没完全收口。
+这一阶段已经有可面试讲述的最小证据，但还没到生产级 HA。
 
 ## 4. 第四阶段：完整产品能力
 
@@ -160,84 +162,98 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 - 继续保证分布式边界不被打穿
 - 不把新能力直接塞回已有大文件
 
-## 5. 第五阶段：客户端
+当前已有 9 个服务已经覆盖这阶段的一部分能力。现在的重点不是继续铺更多功能，而是把这些能力做干净：
+
+- `api-gateway`：入口配额、trace、legacy descriptor 收敛；
+- `identity-service`：身份安全、通知投递、key / issuer 治理；
+- `message / conversation / delivery / push / receipt / contacts / policy`：继续清 repair、观测、故障语义和容量边界。
+
+## 5. 第五阶段：搜索服务
 
 目标：
 
 ```text
-把后端能力变成真实可用产品，
-至少要有 Web、App、桌面端三类客户端。
+为聊天记录搜索和 RAG 建立可控的检索事实层。
 ```
 
-更合理的顺序是：
+进入这一阶段前，前 9 个服务要先稳定，尤其是 message / conversation / policy / delivery 的事实边界要清楚。
 
-1. Web 端
-2. App 端
-3. 桌面端
+`search-service` 第一阶段应该只做后端：
 
-原因：
+- 消费 message / member / revoke / delete 事件；
+- 维护 search index projection；
+- 强制 tenant / conversation / member visibility 过滤；
+- 支持撤回 / 删除 tombstone；
+- 不让 RAG 或 Agent 直接读业务库。
 
-- Web 端最适合先验证协议和产品流
-- App 端最能验证弱网、前后台、通知
-- 桌面端适合在协议和产品边界稳定后再做
-
-进入客户端主线前，后端至少要做到：
-
-- 主链路稳定
-- 鉴权边界稳定
-- 投递 / ACK / notify 契约稳定
-- 不再频繁改核心 API 语义
-
-## 6. 第六阶段：新增服务
+## 6. 第六阶段：AI 应用后端
 
 目标：
 
 ```text
-只有当前 9 个核心服务足够稳定后，
-才开始进入新的独立服务。
+在 search-service 和权限过滤稳定后，
+再开发 RAG、summary、agent 等智能化后端能力。
 ```
 
-后续更合理的新服务顺序：
+这一阶段更合理的顺序：
 
-1. `search-service`
-2. `media-service`
-3. `notification-service`
-4. `audit-service` / `admin-service`
-5. `rag-service` / `summary-service` / `agent-service`
+1. `rag-service`
+2. `summary-service`
+3. `agent-service`
+4. evidence pack / source citation
+5. proposal / approval / executor / audit
 
-新增服务必须满足至少一个条件：
+必须遵守的边界：
 
-- 有独立数据模型
-- 有独立伸缩需求
-- 有独立故障边界
-- 能明显降低现有服务复杂度
+- AI 不直接读业务库；
+- 检索必须带权限过滤；
+- 撤回 / 删除 / 成员可见窗口必须影响搜索和 RAG；
+- AI 输出必须带 source message id、conversation seq 和 evidence pack；
+- Agent 写动作必须可审计、可审批、可回放。
+
+## 7. 第七阶段：其它产品后端服务
+
+目标：
+
+```text
+在核心后端和 AI 主线稳定后，
+按真实边界继续拆 media、notification、audit、admin、config 等服务。
+```
+
+新增服务不写死，必须满足至少一个条件：
+
+- 有独立数据模型；
+- 有独立伸缩需求；
+- 有独立故障边界；
+- 能明显降低现有服务复杂度。
 
 否则优先留在原服务里。
 
-## 7. 第七阶段：智能化扩展
+候选服务包括：
 
-目标：
+- `media-service`
+- `notification-service`
+- `audit-service`
+- `admin-service`
+- `tenant/config-service`
+- `presence-service`
 
-```text
-在已经稳定的 IM 底座上，
-继续长出搜索、RAG、summary、agent 等能力。
-```
-
-这一阶段必须遵守的边界：
-
-- AI 不直接读业务库
-- 检索必须带权限过滤
-- 撤回 / 删除 / 成员可见窗口必须影响搜索和 RAG
-- Agent 写动作必须可审计、可审批、可回放
-
-也就是说：
+## 8. 暂不纳入当前面试主线：客户端
 
 ```text
-AI 是建立在稳定 IM 平台上的扩展层，
-不是替代主链路工程质量的捷径。
+Web / App / 桌面端是后续产品化展示层，
+不是当前后端开发和面试主线。
 ```
 
-## 8. 阶段切换规则
+进入客户端主线前，后端至少要做到：
+
+- 主链路稳定；
+- 鉴权边界稳定；
+- 投递 / ACK / notify 契约稳定；
+- search / RAG 后端边界清楚；
+- 不再频繁改核心 API 语义。
+
+## 9. 阶段切换规则
 
 什么时候可以切下一阶段：
 
@@ -253,17 +269,17 @@ AI 是建立在稳定 IM 平台上的扩展层，
 - 当前服务还在频繁返工，契约不稳定
 - 文件复杂度已经明显失控，却还在继续堆功能
 
-## 9. 当前实际顺序
+## 10. 当前实际顺序
 
 按目前项目状态，最合理的顺序仍然是：
 
 ```text
 继续收干净当前 9 个核心服务
--> 继续补分布式故障恢复 smoke
--> 清掉主要 P2 hardening
+-> 先做 api-gateway 入口配额 / rate-limit hardening
+-> 继续补分布式故障恢复 smoke 和服务级 P2 hardening
 -> 再进入 search-service
--> 再进入 Web / App / Desktop
--> 再继续扩 search / media / notification / AI
+-> 再进入 rag-service / summary-service / agent-service
+-> 后续再按需要补 media / notification / audit / admin / 客户端
 ```
 
 这条顺序的关键点只有一个：

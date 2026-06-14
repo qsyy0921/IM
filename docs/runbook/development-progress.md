@@ -32,6 +32,17 @@
 - `admin-service`
 - `rag / summary / agent` 等智能化扩展
 
+当前面试主线只覆盖：
+
+```text
+后端微服务主链路
+-> 分布式可靠性
+-> 安全 / 观测 / repair / 运维 hardening
+-> search / RAG / Agent 应用后端
+```
+
+Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发主线。
+
 ## 总体进度
 
 ### 1. IM 主链路
@@ -119,7 +130,7 @@
 
 当前 9 个服务没有已知 P0/P1 阻塞。后续按小切片逐个清 P2，默认顺序如下：
 
-1. `api-gateway`：先补可观测和配额治理，不先扩新 facade。
+1. `api-gateway`：下一步先做租户级 quota / rate-limit hardening、低敏 metrics 和稳定错误语义，不先扩新 facade。
 2. `identity-service`：继续身份安全 hardening，优先真实通知 / issuer / key 管理边界。
 3. `message-service`：补消息类型和删除语义前，先守住 outbox / policy /容量观测。
 4. `conversation-service`：补群管理前，先收 owner transfer 和成员窗口 repair。
@@ -148,10 +159,12 @@
 
 所以接下来的优先级是：
 
-1. 继续把现有 9 个服务做干净。
-2. 继续补分布式故障恢复 smoke。
-3. 清各服务剩余 P2 hardening。
-4. 等这批收口后，再进入 `search-service`。
+1. 先做 `api-gateway` 入口配额 / rate-limit hardening。
+2. 继续把现有 9 个服务做干净。
+3. 继续补分布式故障恢复 smoke。
+4. 清各服务剩余 P2 hardening。
+5. 等这批收口后，再进入 `search-service`。
+6. `search-service` 稳定后，再做 `rag-service` / `summary-service` / `agent-service`。
 
 ## 维护规则
 

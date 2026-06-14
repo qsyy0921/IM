@@ -36,6 +36,29 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 生产级完整分布式 IM 平台。
 ```
 
+## 开发过程主线
+
+面试时建议按阶段讲，而不是按提交流水账讲：
+
+```text
+第一阶段：先做 message-service，验证 SendMessage + outbox + Kafka 的最小写入链路。
+第二阶段：补 conversation-service，把发送上下文、成员事实和成员事件边界拆出来。
+第三阶段：补 delivery-service 和 push-gateway，把 durable inbox、PullInbox、AckDelivery、在线通知和跨实例 route 串起来。
+第四阶段：补 receipt-service、contacts-service、policy-service 和 api-gateway，把已读/未读、联系人、权限决策和统一入口补齐。
+第五阶段：集中治理分布式可靠性、安全启动门禁、trusted metadata / TLS 边界、repair / audit / cleanup、debug metrics 和代码复杂度。
+第六阶段：收干净现有 9 个服务后，再进入 search-service，并在搜索和权限边界上继续做 RAG / summary / agent 后端。
+```
+
+当前项目处在第五阶段到第六阶段之间：
+
+```text
+9 个后端服务已经能跑通主链路；
+现在先继续做 9 服务 hardening；
+下一步优先 api-gateway 入口配额 / rate-limit 治理；
+search-service 和 AI 应用后端后置；
+客户端暂不纳入当前面试主线。
+```
+
 ## 已完成的后端服务
 
 当前已有 9 个真实后端微服务：
@@ -117,7 +140,7 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 
 | 服务 | 待开发 / 待完善功能 |
 | --- | --- |
-| `api-gateway` | 统一 OpenTelemetry trace、租户级配额、legacy descriptor 从默认兼容迁移到显式 opt-in、生产部署治理 |
+| `api-gateway` | 租户级 quota / rate-limit hardening、低敏 metrics、稳定错误语义、统一 OpenTelemetry trace、legacy descriptor 从默认兼容迁移到显式 opt-in、生产部署治理 |
 | `identity-service` | WebAuthn / passkeys、OIDC federation、多 issuer、KMS / HSM key management、完整登录风控、SMS provider、bounce handling、多租户通知模板 |
 | `message-service` | 更多消息类型、私有删除、合规删除、容量压测、生产级发送链路观测 |
 | `conversation-service` | 更完整群管理、owner transfer 策略细化、成员可见窗口历史 repair |
@@ -192,10 +215,11 @@ search / RAG / Agent 后端能力。
 短期优先级：
 
 1. 清已有 9 个服务的 P2 hardening；
-2. 补更完整的故障恢复 smoke；
-3. 收敛观测、repair、audit、TLS / mTLS 和 trusted metadata 边界；
-4. 控制代码复杂度，避免核心文件继续变大；
-5. 等 9 个服务稳定后，再进入 `search-service`。
+2. 先做 `api-gateway` 入口配额 / rate-limit hardening；
+3. 补更完整的故障恢复 smoke；
+4. 收敛观测、repair、audit、TLS / mTLS 和 trusted metadata 边界；
+5. 控制代码复杂度，避免核心文件继续变大；
+6. 等 9 个服务稳定后，再进入 `search-service`。
 
 ## 面试讲述线
 

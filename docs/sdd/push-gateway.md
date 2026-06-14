@@ -94,6 +94,8 @@ GET /ws?token=...&device_id=...
 - `hmac`：第一版 signed gateway token verifier。当前兼容两种格式：legacy `base64url(json claims).base64url(hmac_sha256(payload, secret))`，以及标准三段 JWT HS256 `base64url(header).base64url(claims).base64url(signature)`。claims 至少包含 `tenant_id/user_id/aud/exp`，JWT 还应包含 `iss/sub/iat/kid`；`aud` 默认必须为 `push-gateway`，可包含 `device_id/session_id/trace_id`；如果 token 中带 `device_id`，必须与 query / `client.hello.device_id` 一致。真实客户端优先用 `Authorization: Bearer <token>`，query token 只作为本地兼容入口。
 - `jwt`：第一版 RS256 gateway JWT verifier。push-gateway 从 `NEXUSIM_PUSH_AUTH_JWKS_JSON` / `NEXUSIM_PUSH_AUTH_JWKS_FILE` 读取静态公钥 JWKS，或从 `NEXUSIM_PUSH_AUTH_JWKS_URL` 启动拉取并按 `NEXUSIM_PUSH_AUTH_JWKS_REFRESH_INTERVAL` 定期刷新。它只接受 `alg=RS256`、`use=sig` 或空 use、2048-bit 以上 RSA modulus 和匹配 `kid` 的公钥签名，可用 `NEXUSIM_PUSH_AUTH_TRUSTED_ISSUERS` 限定受信 issuer。
 
+当 `NEXUSIM_PUSH_AUTH_MODE=mock` 时，WebSocket 监听地址必须是 loopback 或 RFC1918 私网；非私网监听地址应在启动前直接失败，避免把本地 smoke 身份模式暴露到公网。
+
 `hmac` 模式只证明 gateway 能拒绝伪造 / 过期 / device mismatch 的客户端身份，不等同完整 identity-service。当前已支持最小密钥轮换：`NEXUSIM_PUSH_AUTH_HMAC_SECRET` 是当前签发密钥，`NEXUSIM_PUSH_AUTH_HMAC_PREVIOUS_SECRETS` 是逗号分隔的旧密钥，只用于验证旧 token。当前也支持 `im.identity.events` 异步 revoke projection：`identity.device.revoked.v1` / `identity.session.revoked.v1` 会进入 in-memory 或 Redis deny-list，WebSocket 建连时命中 deny-list 返回 `PERMISSION_DENIED`；已在线 session 会收到 broad `server.resume_hint(reason=identity_revoked)` 并被 active close。RS256 模式把 hot path 仍保持为本地验签，并已有第一版远程 JWKS cache、refresh 失败保留旧 key set、`/debug/metrics.auth_jwks` 观测和 identity-service 旧公钥 overlap；自动 key rotation、KMS/HSM、多 issuer 治理和 token exchange 仍属于后续生产化。
 
 ### 5.1 Client -> Server frames

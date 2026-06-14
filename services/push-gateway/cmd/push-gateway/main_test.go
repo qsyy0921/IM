@@ -258,6 +258,28 @@ func TestSplitCSVTrimsAndDropsEmptyValues(t *testing.T) {
 	}
 }
 
+func TestValidatePushAuthListenerConfigAllowsPrivateAddressForMock(t *testing.T) {
+	if err := validatePushAuthListenerConfig("172.31.50.10:10496", "mock"); err != nil {
+		t.Fatalf("expected private address mock auth to be allowed: %v", err)
+	}
+}
+
+func TestValidatePushAuthListenerConfigRejectsPublicAddressForMock(t *testing.T) {
+	err := validatePushAuthListenerConfig("8.8.8.8:10496", "mock")
+	if err == nil {
+		t.Fatalf("expected public address mock auth to be rejected")
+	}
+	if !strings.Contains(err.Error(), "mock auth") {
+		t.Fatalf("expected mock auth error, got %v", err)
+	}
+}
+
+func TestValidatePushAuthListenerConfigAllowsPublicAddressForJWT(t *testing.T) {
+	if err := validatePushAuthListenerConfig("8.8.8.8:10496", "jwt"); err != nil {
+		t.Fatalf("expected jwt auth to be allowed on public address: %v", err)
+	}
+}
+
 func clearDeliveryClientTLSEnv(t *testing.T) {
 	t.Helper()
 	t.Setenv("NEXUSIM_DELIVERY_SERVICE_TLS_CA_FILE", "")

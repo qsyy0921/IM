@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -176,6 +177,9 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 		mux.Handle("/debug/metrics", monitoringHandler)
 		mux.Handle("/", server)
 		wsAddr = envString("NEXUSIM_PUSH_WS_ADDR", "0.0.0.0:10496")
+		if err := validatePushAuthListenerConfig(wsAddr, envString("NEXUSIM_PUSH_AUTH_MODE", "mock")); err != nil {
+			return err
+		}
 		wsTLSConfig, _, err := pushWSTLSConfigFromEnv()
 		if err != nil {
 			return err
@@ -587,6 +591,36 @@ func loadPushAuthJWKSetJSON() (string, error) {
 		return "", err
 	}
 	return string(content), nil
+}
+
+func validatePushAuthListenerConfig(listenAddr string, authMode string) error {
+	if !usesMockPushAuth(authMode) {
+		return nil
+	}
+	if listenerAddrTrustedWithoutMTLS(listenAddr) {
+		return nil
+	}
+	return errors.New("push-gateway uses mock auth on non-private websocket address")
+}
+
+func usesMockPushAuth(authMode string) bool {
+	return strings.EqualFold(strings.TrimSpace(authMode), "mock")
+}
+
+func listenerAddrTrustedWithoutMTLS(addr string) bool {
+	host := strings.TrimSpace(addr)
+	if splitHost, _, err := net.SplitHostPort(host); err == nil {
+		host = splitHost
+	}
+	host = strings.TrimSpace(strings.Trim(host, "[]"))
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate()
 }
 
 func splitCSV(value string) []string {

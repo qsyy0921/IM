@@ -142,6 +142,10 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 		monitoringHandler.WithRedisSubscriberWorkerStats(redisSubscriber.Snapshot)
 	}
 
+	allowPublicDebug, _, err := envOptionalBool("NEXUSIM_PUSH_DEBUG_ALLOW_PUBLIC")
+	if err != nil {
+		return err
+	}
 	var wsAddr string
 	if enableWS {
 		pushAuthMode := envString("NEXUSIM_PUSH_AUTH_MODE", "mock")
@@ -196,9 +200,11 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 		mux := http.NewServeMux()
 		mux.Handle("/healthz", monitoringHandler)
 		mux.Handle("/readyz", monitoringHandler)
-		mux.Handle("/debug/metrics", monitoringHandler)
 		mux.Handle("/", server)
 		wsAddr = envString("NEXUSIM_PUSH_WS_ADDR", "0.0.0.0:10496")
+		if pushDebugListenerAllowed(wsAddr, allowPublicDebug) {
+			mux.Handle("/debug/metrics", monitoringHandler)
+		}
 		wsTLSConfig, wsTLSEnabled, err := pushWSTLSConfigFromEnv()
 		if err != nil {
 			return err
@@ -209,7 +215,10 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 		startHTTPServer(ctx, errs, "websocket", wsAddr, mux, wsTLSConfig)
 	}
 
-	if debugAddr := envString("NEXUSIM_PUSH_DEBUG_ADDR", ""); debugAddr != "" && debugAddr != wsAddr {
+	if debugAddr := pushDebugAddr(); debugAddr != "" && debugAddr != wsAddr {
+		if err := validatePushDebugListenerConfig(debugAddr, allowPublicDebug); err != nil {
+			return err
+		}
 		mux := http.NewServeMux()
 		mux.Handle("/healthz", monitoringHandler)
 		mux.Handle("/readyz", monitoringHandler)
@@ -670,6 +679,27 @@ func validatePushAuthListenerConfig(listenAddr string, authMode string, tlsEnabl
 		return nil
 	}
 	return errors.New("push-gateway uses signed auth on non-private websocket address without TLS")
+}
+
+func pushDebugAddr() string {
+	return envString("NEXUSIM_PUSH_DEBUG_ADDR", "")
+}
+
+func validatePushDebugListenerConfig(addr string, allowPublic bool) error {
+	if pushDebugListenerAllowed(addr, allowPublic) {
+		return nil
+	}
+	return errors.New("push-gateway debug listener address is non-private; set NEXUSIM_PUSH_DEBUG_ALLOW_PUBLIC=true to allow")
+}
+
+func pushDebugListenerAllowed(addr string, allowPublic bool) bool {
+	if strings.TrimSpace(addr) == "" {
+		return true
+	}
+	if listenerAddrTrustedWithoutMTLS(addr) {
+		return true
+	}
+	return allowPublic
 }
 
 func usesMockPushAuth(authMode string) bool {

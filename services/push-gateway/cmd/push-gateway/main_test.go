@@ -352,6 +352,48 @@ func TestValidatePushAuthListenerConfigAllowsPublicAddressForSignedAuthWithTLS(t
 	}
 }
 
+func TestPushDebugAddrReadsServiceSpecificEnv(t *testing.T) {
+	t.Setenv("NEXUSIM_PUSH_DEBUG_ADDR", "127.0.0.1:19301")
+
+	if addr := pushDebugAddr(); addr != "127.0.0.1:19301" {
+		t.Fatalf("expected push debug addr from env, got %q", addr)
+	}
+}
+
+func TestValidatePushDebugListenerConfigAllowsEmptyOrPrivateAddress(t *testing.T) {
+	for _, addr := range []string{"", "127.0.0.1:11908", "localhost:11908", "172.31.50.10:11908"} {
+		if err := validatePushDebugListenerConfig(addr, false); err != nil {
+			t.Fatalf("expected push debug listener %q to be allowed: %v", addr, err)
+		}
+	}
+}
+
+func TestValidatePushDebugListenerConfigRejectsPublicAddressByDefault(t *testing.T) {
+	for _, addr := range []string{"0.0.0.0:11908", ":11908", "8.8.8.8:11908"} {
+		if err := validatePushDebugListenerConfig(addr, false); err == nil {
+			t.Fatalf("expected push debug listener %q to be rejected by default", addr)
+		}
+	}
+}
+
+func TestValidatePushDebugListenerConfigAllowsExplicitPublicOptIn(t *testing.T) {
+	if err := validatePushDebugListenerConfig("0.0.0.0:11908", true); err != nil {
+		t.Fatalf("expected explicit public push debug listener opt-in to be allowed: %v", err)
+	}
+}
+
+func TestPushDebugListenerAllowedControlsWebSocketMetricsMount(t *testing.T) {
+	if !pushDebugListenerAllowed("172.31.50.10:10496", false) {
+		t.Fatalf("expected private websocket listener to expose debug metrics")
+	}
+	if pushDebugListenerAllowed("8.8.8.8:10496", false) {
+		t.Fatalf("expected public websocket listener to hide debug metrics by default")
+	}
+	if !pushDebugListenerAllowed("8.8.8.8:10496", true) {
+		t.Fatalf("expected explicit public opt-in to expose debug metrics")
+	}
+}
+
 func clearDeliveryClientTLSEnv(t *testing.T) {
 	t.Helper()
 	t.Setenv("NEXUSIM_DELIVERY_SERVICE_TLS_CA_FILE", "")

@@ -17,6 +17,7 @@
 - 服务设计：`../sdd/<service>.md`
 - smoke / 压测证据：`loadtest/<service>/`
 - 本地分布式和 Docker：`distributed-local.md`、`mac-arm64-docker-images.md`
+- 本地观测：`observability-local.md`
 - 本地压测操作：`local-loadtest.md`
 - 历史长文档：`archive/`、`history/`
 

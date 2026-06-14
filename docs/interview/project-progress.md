@@ -58,6 +58,7 @@ api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan ove
 api-gateway 已补 legacy/facade traffic metrics，用于旧 descriptor 迁移观察；
 legacy descriptor 已收敛为显式 opt-in 默认；
 api-gateway 已补 first-stage OpenTelemetry 入口 server span 和下游 gRPC client span，contacts-service、identity-service、message-service、conversation-service、delivery-service、receipt-service、policy-service 已开始后端服务 gRPC server span rollout；
+本地 OTel collector debug 入口已补，可用于面试演示 OTLP trace 链路，但还不是生产告警平台；
 search-service 和 AI 应用后端后置；
 客户端暂不纳入当前面试主线。
 ```
@@ -143,7 +144,7 @@ search-service 和 AI 应用后端后置；
 
 | 服务 | 待开发 / 待完善功能 |
 | --- | --- |
-| `api-gateway` | OTel collector / alerting / 后端服务 server span rollout、legacy opt-in 实际迁移观察和移除计划、配置中心 / DB-backed quota hardening、生产部署治理 |
+| `api-gateway` | alerting / dashboard / 生产采样治理、后端服务 server span rollout、legacy opt-in 实际迁移观察和移除计划、配置中心 / DB-backed quota hardening、生产部署治理 |
 | `identity-service` | WebAuthn / passkeys、OIDC federation、多 issuer、KMS / HSM key management、完整登录风控、SMS provider、bounce handling、多租户通知模板 |
 | `message-service` | 更多消息类型、私有删除、合规删除、容量压测、生产级发送链路观测 |
 | `conversation-service` | 更完整群管理、owner transfer 策略细化、成员可见窗口历史 repair |

@@ -1,0 +1,13 @@
+name: nexusim-otel
+
+services:
+  otel-collector:
+    image: ${NEXUSIM_OTEL_COLLECTOR_IMAGE:-otel/opentelemetry-collector-contrib:latest}
+    container_name: nexusim-otel-collector
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "13133:13133"
+    volumes:
+      - ./otel-collector.yml:/etc/otelcol-contrib/config.yaml:ro

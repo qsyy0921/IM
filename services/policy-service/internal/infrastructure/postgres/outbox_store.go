@@ -156,15 +156,16 @@ func (store *OutboxStore) ProcessReadyBatch(
 	for index, message := range messages {
 		if err := publishErrors[index]; err != nil {
 			attempt := message.RetryCount + 1
+			lastError := sanitizePolicyOutboxPublishError(err)
 			if attempt >= maxAttempts {
-				if markErr := store.markDeadLettered(ctx, tx, message.ID, attempt, err.Error(), now); markErr != nil {
+				if markErr := store.markDeadLettered(ctx, tx, message.ID, attempt, lastError, now); markErr != nil {
 					return types.OutboxRelayStats{}, markErr
 				}
 				stats.DeadLettered++
 				continue
 			}
 			nextRetryAt := now.Add(retryDelay(retryBaseDelay, attempt))
-			if markErr := store.markRetry(ctx, tx, message.ID, attempt, err.Error(), nextRetryAt); markErr != nil {
+			if markErr := store.markRetry(ctx, tx, message.ID, attempt, lastError, nextRetryAt); markErr != nil {
 				return types.OutboxRelayStats{}, markErr
 			}
 			stats.Retried++
@@ -300,7 +301,7 @@ SELECT
     event_type,
     status,
     retry_count,
-    last_error,
+    COALESCE(last_error, ''),
     available_at,
     next_retry_at,
     dead_lettered_at,
@@ -337,6 +338,7 @@ LIMIT $`+strconv.Itoa(len(args)), args...)
 		); err != nil {
 			return nil, types.NewDBWriteFailed(err.Error())
 		}
+		row.LastError = sanitizePolicyOutboxStoredError(row.LastError)
 		result = append(result, row)
 	}
 	if err := rows.Err(); err != nil {
@@ -390,7 +392,7 @@ SELECT
     tenant_id,
     previous_status,
     previous_retry_count,
-    previous_last_error,
+    COALESCE(previous_last_error, ''),
     previous_dead_lettered_at,
     repair_operator,
     repair_reason,
@@ -424,6 +426,7 @@ LIMIT $`+strconv.Itoa(len(args)), args...)
 		); err != nil {
 			return nil, types.NewDBWriteFailed(err.Error())
 		}
+		row.PreviousLastError = sanitizePolicyOutboxStoredError(row.PreviousLastError)
 		result = append(result, row)
 	}
 	if err := rows.Err(); err != nil {
@@ -525,7 +528,7 @@ SELECT
     pao.retry_count,
     pao.created_at,
     pao.status,
-    pao.last_error,
+    COALESCE(pao.last_error, ''),
     pao.dead_lettered_at
 FROM policy_decision_audit_outbox pao
 JOIN requested r ON r.event_id = pao.event_id
@@ -566,6 +569,7 @@ FOR UPDATE OF pao
 			return nil, types.NewDBWriteFailed(err.Error())
 		}
 		target.previousRetryCount = target.message.RetryCount
+		target.previousLastError = sanitizePolicyOutboxStoredError(target.previousLastError)
 		targets = append(targets, target)
 	}
 	if err := rows.Err(); err != nil {
@@ -818,4 +822,53 @@ func retryDelay(base time.Duration, attempt int) time.Duration {
 		exponent = 10
 	}
 	return base * time.Duration(1<<exponent)
+}
+
+func sanitizePolicyOutboxStoredError(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return ""
+	}
+	return sanitizePolicyOutboxErrorText(value)
+}
+
+func sanitizePolicyOutboxPublishError(err error) string {
+	if err == nil {
+		return ""
+	}
+	if errors.Is(err, context.Canceled) {
+		return "policy audit outbox publish canceled"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "policy audit outbox publish timeout"
+	}
+	return sanitizePolicyOutboxErrorText(err.Error())
+}
+
+func sanitizePolicyOutboxErrorText(value string) string {
+	message := strings.ToLower(strings.TrimSpace(value))
+	switch {
+	case message == "":
+		return "policy audit outbox publish failed"
+	case strings.Contains(message, "cancel"):
+		return "policy audit outbox publish canceled"
+	case strings.Contains(message, "timeout") || strings.Contains(message, "deadline exceeded"):
+		return "policy audit outbox publish timeout"
+	case strings.Contains(message, "unsupported"):
+		return "policy audit outbox publish unsupported event"
+	case strings.Contains(message, "malformed") ||
+		strings.Contains(message, "invalid") ||
+		strings.Contains(message, "json") ||
+		strings.Contains(message, "decode") ||
+		strings.Contains(message, "payload"):
+		return "policy audit outbox publish invalid payload"
+	case strings.Contains(message, "kafka") ||
+		strings.Contains(message, "broker") ||
+		strings.Contains(message, "leader") ||
+		strings.Contains(message, "connection refused") ||
+		strings.Contains(message, "no such host") ||
+		strings.Contains(message, "network"):
+		return "policy audit outbox publish broker unavailable"
+	default:
+		return "policy audit outbox publish failed"
+	}
 }

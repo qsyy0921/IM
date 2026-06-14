@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -53,7 +54,7 @@ func TestOutboxStoreRetriesAndDeadLettersPolicyAuditIntegration(t *testing.T) {
 	id, _ := insertPolicyAuditOutboxRow(t, ctx, pool, "policy-audit-store-retry", "tenant-policy:conversation-key", types.OutboxStatusPending, 0)
 
 	store := NewOutboxStore(pool)
-	publishErr := errors.New("kafka write failed")
+	publishErr := errors.New("kafka write failed: broker body user=user1@example.com token=secret-token")
 	stats, err := store.ProcessReadyBatch(ctx, 10, 2, time.Millisecond, func(ctx context.Context, messages []types.OutboxMessage) []error {
 		errs := make([]error, len(messages))
 		for i := range errs {
@@ -68,6 +69,7 @@ func TestOutboxStoreRetriesAndDeadLettersPolicyAuditIntegration(t *testing.T) {
 		t.Fatalf("unexpected retry stats: %+v", stats)
 	}
 	assertPolicyAuditOutboxState(t, ctx, pool, id, types.OutboxStatusPending, 1)
+	assertPolicyAuditOutboxLastError(t, ctx, pool, id, "policy audit outbox publish broker unavailable", "user1@example.com", "secret-token", "broker body")
 	if _, err := pool.Exec(ctx, `UPDATE policy_decision_audit_outbox SET next_retry_at = now() WHERE id = $1`, id); err != nil {
 		t.Fatalf("make retry ready: %v", err)
 	}
@@ -86,6 +88,7 @@ func TestOutboxStoreRetriesAndDeadLettersPolicyAuditIntegration(t *testing.T) {
 		t.Fatalf("unexpected dlq stats: %+v", stats)
 	}
 	assertPolicyAuditOutboxState(t, ctx, pool, id, types.OutboxStatusDLQ, 2)
+	assertPolicyAuditOutboxLastError(t, ctx, pool, id, "policy audit outbox publish broker unavailable", "user1@example.com", "secret-token", "broker body")
 }
 
 func TestOutboxStoreDLQBlocksHigherVersionPolicyAuditIntegration(t *testing.T) {
@@ -119,7 +122,7 @@ func TestOutboxStoreRepairDLQPolicyAuditIntegration(t *testing.T) {
 	insertPolicyAuditOutboxRow(t, ctx, pool, "policy-audit-store-repair-high", partitionKey, types.OutboxStatusPending, 0)
 	if _, err := pool.Exec(ctx, `
 UPDATE policy_decision_audit_outbox
-SET last_error = 'publish failed',
+SET last_error = 'kafka unavailable: broker body user=user1@example.com token=secret-token',
     dead_lettered_at = now()
 WHERE id = $1
 `, lowID); err != nil {
@@ -145,7 +148,7 @@ WHERE id = $1
 		t.Fatalf("unexpected repair stats: %+v", repairStats)
 	}
 	assertPolicyAuditOutboxState(t, ctx, pool, lowID, types.OutboxStatusPending, 0)
-	assertPolicyAuditOutboxRepairAudit(t, ctx, pool, "policy-audit-store-repair-low", "policy-operator", "operator retried after kafka recovery", "publish failed", 3, "REPAIRED", "")
+	assertPolicyAuditOutboxRepairAudit(t, ctx, pool, "policy-audit-store-repair-low", "policy-operator", "operator retried after kafka recovery", "policy audit outbox publish broker unavailable", 3, "REPAIRED", "", "user1@example.com", "secret-token", "broker body")
 
 	var published []string
 	stats, err = store.ProcessReadyBatch(ctx, 10, 3, time.Millisecond, func(ctx context.Context, messages []types.OutboxMessage) []error {
@@ -191,7 +194,7 @@ func TestOutboxStoreRepairDLQSkipsInvalidPolicyAuditIntegration(t *testing.T) {
 	if _, err := pool.Exec(ctx, `
 UPDATE policy_decision_audit_outbox
 SET payload_json = '{"event_id":"policy-audit-store-invalid-low","unexpected":true}'::jsonb,
-    last_error = 'unsupported payload field',
+    last_error = 'unsupported payload field user=user1@example.com token=secret-token',
     dead_lettered_at = now()
 WHERE id = $1
 `, lowID); err != nil {
@@ -207,7 +210,7 @@ WHERE id = $1
 	}
 	assertPolicyAuditOutboxState(t, ctx, pool, lowID, types.OutboxStatusDLQ, 4)
 	assertPolicyAuditOutboxState(t, ctx, pool, validID, types.OutboxStatusPending, 0)
-	assertPolicyAuditOutboxRepairAudit(t, ctx, pool, "policy-audit-store-invalid-low", "policy-operator", "operator requested validation", "unsupported payload field", 4, "SKIPPED", "validation_failed")
+	assertPolicyAuditOutboxRepairAudit(t, ctx, pool, "policy-audit-store-invalid-low", "policy-operator", "operator requested validation", "policy audit outbox publish unsupported event", 4, "SKIPPED", "validation_failed", "user1@example.com", "secret-token")
 	assertPolicyAuditOutboxRepairAudit(t, ctx, pool, "policy-audit-store-invalid-mixed-valid", "policy-operator", "operator requested validation", "", 2, "REPAIRED", "")
 
 	published := make(map[string]bool)
@@ -266,7 +269,7 @@ WHERE id = $1
 	}
 	if _, err := pool.Exec(ctx, `
 UPDATE policy_decision_audit_outbox
-SET last_error = 'relay failed',
+SET last_error = 'relay failed: broker body user=user1@example.com token=secret-token',
     dead_lettered_at = now() - interval '30 seconds'
 WHERE id = $1
 `, newID); err != nil {
@@ -284,9 +287,10 @@ WHERE id = $1
 	if len(rows) != 2 {
 		t.Fatalf("expected two rows, got %d", len(rows))
 	}
-	if rows[0].ID != newID || rows[0].EventID != "policy-audit-outbox-new" || rows[0].AggregateVersion != newVersion || rows[0].Status != types.OutboxStatusDLQ || rows[0].RetryCount != 3 || rows[0].LastError != "relay failed" || rows[0].DeadLetteredAt == nil {
+	if rows[0].ID != newID || rows[0].EventID != "policy-audit-outbox-new" || rows[0].AggregateVersion != newVersion || rows[0].Status != types.OutboxStatusDLQ || rows[0].RetryCount != 3 || rows[0].LastError != "policy audit outbox publish broker unavailable" || rows[0].DeadLetteredAt == nil {
 		t.Fatalf("unexpected latest policy outbox audit row: %+v", rows[0])
 	}
+	assertPolicyAuditOutboxErrorDoesNotContain(t, rows[0].LastError, "user1@example.com", "secret-token", "broker body")
 	if rows[1].ID != oldID || rows[1].EventID != "policy-audit-outbox-old" || rows[1].AggregateVersion != oldVersion || rows[1].Status != types.OutboxStatusPublished || rows[1].PublishedAt == nil {
 		t.Fatalf("unexpected older policy outbox audit row: %+v", rows[1])
 	}
@@ -311,7 +315,7 @@ WHERE event_id = 'policy-audit-outbox-other-type'
 	}
 	if _, err := pool.Exec(ctx, `
 UPDATE policy_decision_audit_outbox
-SET last_error = 'decision relay failed',
+SET last_error = 'malformed payload user=user1@example.com token=secret-token',
     dead_lettered_at = now()
 WHERE id = $1
 `, matchedID); err != nil {
@@ -331,9 +335,10 @@ WHERE id = $1
 	if len(rows) != 1 {
 		t.Fatalf("expected one filtered row, got %d", len(rows))
 	}
-	if rows[0].ID != matchedID || rows[0].EventID != "policy-audit-outbox-match" || rows[0].AggregateVersion != matchedVersion || rows[0].Status != types.OutboxStatusDLQ || rows[0].EventType != types.PolicyEventMessageActionDecision {
+	if rows[0].ID != matchedID || rows[0].EventID != "policy-audit-outbox-match" || rows[0].AggregateVersion != matchedVersion || rows[0].Status != types.OutboxStatusDLQ || rows[0].EventType != types.PolicyEventMessageActionDecision || rows[0].LastError != "policy audit outbox publish invalid payload" {
 		t.Fatalf("unexpected filtered policy outbox row: %+v", rows[0])
 	}
+	assertPolicyAuditOutboxErrorDoesNotContain(t, rows[0].LastError, "user1@example.com", "secret-token")
 }
 
 func insertPolicyAuditOutboxRow(
@@ -442,7 +447,36 @@ WHERE id = $1
 	}
 }
 
-func assertPolicyAuditOutboxRepairAudit(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventID string, wantOperator string, wantReason string, wantPreviousError string, wantPreviousRetryCount int, wantOutcome string, wantSkipReason string) {
+func assertPolicyAuditOutboxLastError(t *testing.T, ctx context.Context, pool *pgxpool.Pool, id int64, want string, forbidden ...string) {
+	t.Helper()
+	var got string
+	err := pool.QueryRow(ctx, `
+SELECT last_error
+FROM policy_decision_audit_outbox
+WHERE id = $1
+`, id).Scan(&got)
+	if err != nil {
+		t.Fatalf("read policy audit outbox last_error: %v", err)
+	}
+	if got != want {
+		t.Fatalf("expected policy audit outbox last_error %q, got %q", want, got)
+	}
+	assertPolicyAuditOutboxErrorDoesNotContain(t, got, forbidden...)
+}
+
+func assertPolicyAuditOutboxErrorDoesNotContain(t *testing.T, value string, forbidden ...string) {
+	t.Helper()
+	for _, fragment := range forbidden {
+		if fragment == "" {
+			continue
+		}
+		if strings.Contains(value, fragment) {
+			t.Fatalf("policy audit outbox error %q contains sensitive fragment %q", value, fragment)
+		}
+	}
+}
+
+func assertPolicyAuditOutboxRepairAudit(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventID string, wantOperator string, wantReason string, wantPreviousError string, wantPreviousRetryCount int, wantOutcome string, wantSkipReason string, forbidden ...string) {
 	t.Helper()
 	var operator string
 	var reason string
@@ -472,6 +506,7 @@ WHERE tenant_id = 'tenant-policy'
 			skipReason,
 		)
 	}
+	assertPolicyAuditOutboxErrorDoesNotContain(t, previousError, forbidden...)
 }
 
 func TestOutboxStoreAuditOutboxRepairsReturnsLatestRowsIntegration(t *testing.T) {
@@ -484,8 +519,8 @@ INSERT INTO policy_decision_audit_outbox_repair_audit (
     event_id, tenant_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at,
     repair_operator, repair_reason, repair_outcome, skip_reason, repaired_at
 ) VALUES
-    ('event-11', 'tenant-a', 'DLQ', 1, 'publish failed', now() - interval '1 minute', 'operator-a', 'manual audit', 'REPAIRED', '', now() - interval '1 minute'),
-    ('event-12', 'tenant-a', 'DLQ', 2, 'validation failed', now() - interval '2 minutes', 'operator-b', 'manual validation', 'SKIPPED', 'validation_failed', now())
+    ('event-11', 'tenant-a', 'DLQ', 1, 'malformed payload user=user1@example.com', now() - interval '1 minute', 'operator-a', 'manual audit', 'REPAIRED', '', now() - interval '1 minute'),
+    ('event-12', 'tenant-a', 'DLQ', 2, 'kafka unavailable token=secret-token broker body', now() - interval '2 minutes', 'operator-b', 'manual validation', 'SKIPPED', 'validation_failed', now())
 `)
 	if err != nil {
 		t.Fatalf("seed policy outbox repair audit: %v", err)
@@ -502,12 +537,14 @@ INSERT INTO policy_decision_audit_outbox_repair_audit (
 	if len(rows) != 2 {
 		t.Fatalf("expected two rows, got %d", len(rows))
 	}
-	if rows[0].EventID != "event-12" || rows[0].Operator != "operator-b" || rows[0].Outcome != "SKIPPED" {
+	if rows[0].EventID != "event-12" || rows[0].Operator != "operator-b" || rows[0].Outcome != "SKIPPED" || rows[0].PreviousLastError != "policy audit outbox publish broker unavailable" {
 		t.Fatalf("unexpected latest policy outbox repair row: %+v", rows[0])
 	}
-	if rows[1].EventID != "event-11" || rows[1].Operator != "operator-a" || rows[1].Outcome != "REPAIRED" {
+	assertPolicyAuditOutboxErrorDoesNotContain(t, rows[0].PreviousLastError, "secret-token", "broker body")
+	if rows[1].EventID != "event-11" || rows[1].Operator != "operator-a" || rows[1].Outcome != "REPAIRED" || rows[1].PreviousLastError != "policy audit outbox publish invalid payload" {
 		t.Fatalf("unexpected older policy outbox repair row: %+v", rows[1])
 	}
+	assertPolicyAuditOutboxErrorDoesNotContain(t, rows[1].PreviousLastError, "user1@example.com")
 }
 
 func TestOutboxStoreAuditOutboxRepairsFiltersOperatorAndOutcomeIntegration(t *testing.T) {
@@ -521,7 +558,7 @@ INSERT INTO policy_decision_audit_outbox_repair_audit (
     repair_operator, repair_reason, repair_outcome, skip_reason, repaired_at
 ) VALUES
     ('event-21', 'tenant-b', 'DLQ', 1, 'publish failed', now() - interval '1 minute', 'operator-a', 'manual audit', 'REPAIRED', '', now()),
-    ('event-22', 'tenant-b', 'DLQ', 2, 'validation failed', now() - interval '2 minutes', 'operator-b', 'manual validation', 'SKIPPED', 'validation_failed', now() - interval '1 minute')
+    ('event-22', 'tenant-b', 'DLQ', 2, 'unsupported payload user=user1@example.com token=secret-token', now() - interval '2 minutes', 'operator-b', 'manual validation', 'SKIPPED', 'validation_failed', now() - interval '1 minute')
 `)
 	if err != nil {
 		t.Fatalf("seed policy outbox repair audit: %v", err)
@@ -540,9 +577,10 @@ INSERT INTO policy_decision_audit_outbox_repair_audit (
 	if len(rows) != 1 {
 		t.Fatalf("expected one row, got %d", len(rows))
 	}
-	if rows[0].EventID != "event-22" || rows[0].Operator != "operator-b" || rows[0].Outcome != "SKIPPED" {
+	if rows[0].EventID != "event-22" || rows[0].Operator != "operator-b" || rows[0].Outcome != "SKIPPED" || rows[0].PreviousLastError != "policy audit outbox publish unsupported event" {
 		t.Fatalf("unexpected filtered policy outbox repair row: %+v", rows[0])
 	}
+	assertPolicyAuditOutboxErrorDoesNotContain(t, rows[0].PreviousLastError, "user1@example.com", "secret-token")
 }
 
 func TestOutboxStoreCleanupOutboxRepairsDeletesOnlyExpiredRowsIntegration(t *testing.T) {

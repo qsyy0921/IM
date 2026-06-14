@@ -61,6 +61,8 @@ In metadata mode, admin/read-state RPCs derive the trusted tenant/operator from 
 - `x-nexusim-trace-id` (optional)
 - `x-nexusim-request-id` (optional)
 
+When `NEXUSIM_IDENTITY_ADMIN_AUTH_MODE=metadata|verified-metadata`, a non-loopback / non-RFC1918 gRPC listen address without mTLS client-certificate verification must fail startup; first-stage trusted admin metadata is only allowed on private listeners unless transport auth is enabled.
+
 This mode applies to `RevokeDevice`, `RevokeSession` and `GetDeviceState`. `RegisterUser`, `Login`, `RefreshGatewayToken`, `BeginMFAEnrollment`, `ConfirmMFAEnrollment`, `DisableMFAFactor`, `RegenerateMFARecoveryCodes`, `RevokeMFARecoveryCodes` and `IssueGatewayToken` intentionally remain outside this admin gate. `RegisterUser` creates a first-stage local credential; `Login` verifies user credentials; `RefreshGatewayToken` verifies an opaque refresh token; MFA factor RPCs are protected by current password and/or one-time TOTP proof; `IssueGatewayToken` is kept as an internal / compatibility signing path for local smoke and gateway-token workflows.
 
 ## gRPC Transport Security

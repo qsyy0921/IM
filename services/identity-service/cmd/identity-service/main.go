@@ -109,6 +109,15 @@ func run() error {
 func runGRPC() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	addr := envString("NEXUSIM_IDENTITY_GRPC_ADDR", "0.0.0.0:10600")
+	authMode := envString("NEXUSIM_IDENTITY_ADMIN_AUTH_MODE", "body")
+	serverTLSConfig, serverTLSEnabled, err := identityGRPCTLSConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	if err := validateTrustedMetadataListenerConfig(addr, authMode, serverTLSConfig); err != nil {
+		return err
+	}
 
 	pool, err := openPGPool(ctx)
 	if err != nil {
@@ -167,7 +176,6 @@ func runGRPC() error {
 	}
 	defer stopDebug()
 
-	addr := envString("NEXUSIM_IDENTITY_GRPC_ADDR", "0.0.0.0:10600")
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
@@ -182,7 +190,7 @@ func runGRPC() error {
 			envDuration("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LOCK_DURATION", postgresinfra.DefaultChallengeRequestLockDuration),
 		),
 	)
-	server, err := newGRPCServer(grpcMetrics)
+	server, err := newGRPCServerWithConfig(grpcMetrics, authMode, serverTLSConfig, serverTLSEnabled)
 	if err != nil {
 		return err
 	}
@@ -1184,12 +1192,21 @@ func identityDebugAddr() string {
 }
 
 func newGRPCServer(grpcMetrics *monitoringinfra.GRPCMetrics) (*grpc.Server, error) {
+	authMode := envString("NEXUSIM_IDENTITY_ADMIN_AUTH_MODE", "body")
+	tlsConfig, tlsEnabled, err := identityGRPCTLSConfigFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	return newGRPCServerWithConfig(grpcMetrics, authMode, tlsConfig, tlsEnabled)
+}
+
+func newGRPCServerWithConfig(grpcMetrics *monitoringinfra.GRPCMetrics, authMode string, tlsConfig *tls.Config, tlsEnabled bool) (*grpc.Server, error) {
 	options := make([]grpc.ServerOption, 0, 2)
 	interceptors := make([]grpc.UnaryServerInterceptor, 0, 2)
 	if grpcMetrics != nil {
 		interceptors = append(interceptors, grpcMetrics.UnaryServerInterceptor(log.Default()))
 	}
-	switch strings.ToLower(envString("NEXUSIM_IDENTITY_ADMIN_AUTH_MODE", "body")) {
+	switch strings.ToLower(strings.TrimSpace(authMode)) {
 	case "body", "request", "legacy":
 	case "metadata", "verified-metadata":
 		interceptors = append(interceptors, identitygrpc.VerifiedAdminUnaryInterceptor(true))
@@ -1199,12 +1216,48 @@ func newGRPCServer(grpcMetrics *monitoringinfra.GRPCMetrics) (*grpc.Server, erro
 	if len(interceptors) > 0 {
 		options = append(options, grpc.ChainUnaryInterceptor(interceptors...))
 	}
-	if creds, ok, err := loadIdentityGRPCCredentialsFromEnv(); err != nil {
-		return nil, err
-	} else if ok {
-		options = append(options, grpc.Creds(creds))
+	if tlsEnabled {
+		options = append(options, grpc.Creds(credentials.NewTLS(tlsConfig)))
 	}
 	return grpc.NewServer(options...), nil
+}
+
+func validateTrustedMetadataListenerConfig(listenAddr string, authMode string, tlsConfig *tls.Config) error {
+	if !usesTrustedMetadataAuth(authMode) {
+		return nil
+	}
+	if listenerAddrTrustedWithoutMTLS(listenAddr) {
+		return nil
+	}
+	if tlsConfig != nil && tlsConfig.ClientAuth == tls.RequireAndVerifyClientCert {
+		return nil
+	}
+	return errors.New("identity-service uses verified metadata auth on non-private address without gRPC mTLS client certificate")
+}
+
+func usesTrustedMetadataAuth(authMode string) bool {
+	switch strings.ToLower(strings.TrimSpace(authMode)) {
+	case "metadata", "verified-metadata":
+		return true
+	default:
+		return false
+	}
+}
+
+func listenerAddrTrustedWithoutMTLS(addr string) bool {
+	host := strings.TrimSpace(addr)
+	if splitHost, _, err := net.SplitHostPort(host); err == nil {
+		host = splitHost
+	}
+	host = strings.TrimSpace(strings.Trim(host, "[]"))
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate()
 }
 
 func loadIdentityGRPCCredentialsFromEnv() (credentials.TransportCredentials, bool, error) {

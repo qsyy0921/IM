@@ -612,6 +612,10 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 	if err != nil {
 		return nil, nil, err
 	}
+	tenantPlanReloadInterval, err := tenantPlanReloadIntervalFromEnv()
+	if err != nil {
+		return nil, nil, err
+	}
 	config := ratelimitinfra.Config{
 		Enabled:           enabled,
 		Backend:           backend,
@@ -651,13 +655,30 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 			_ = client.Close()
 			return nil, nil, err
 		}
-		return limiter, client.Close, nil
+		closeFn := func() error { return client.Close() }
+		if tenantPlanReloadInterval > 0 {
+			stopReloader, err := startTenantPlanReloader(ctx, limiter, strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE")), tenantPlanReloadInterval)
+			if err != nil {
+				_ = closeFn()
+				return nil, nil, err
+			}
+			closeFn = combineCloseFuncs(stopReloader, closeFn)
+		}
+		return limiter, closeFn, nil
 	}
 	limiter, err := ratelimitinfra.New(config)
 	if err != nil {
 		return nil, nil, err
 	}
-	return limiter, func() error { return nil }, nil
+	closeFn := func() error { return nil }
+	if tenantPlanReloadInterval > 0 {
+		stopReloader, err := startTenantPlanReloader(ctx, limiter, strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE")), tenantPlanReloadInterval)
+		if err != nil {
+			return nil, nil, err
+		}
+		closeFn = stopReloader
+	}
+	return limiter, closeFn, nil
 }
 
 func tenantRateLimitPlansFromEnv() (map[string]ratelimitinfra.Plan, error) {
@@ -702,6 +723,79 @@ func parseTenantRateLimitPlans(raw string) (map[string]ratelimitinfra.Plan, erro
 		plans[tenantID] = ratelimitinfra.Plan{RequestsPerSecond: rps, Burst: item.Burst}
 	}
 	return plans, nil
+}
+
+func tenantPlanReloadIntervalFromEnv() (time.Duration, error) {
+	raw := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_RELOAD_INTERVAL"))
+	if raw == "" || raw == "0" {
+		return 0, nil
+	}
+	interval, err := time.ParseDuration(raw)
+	if err != nil || interval <= 0 {
+		return 0, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_RELOAD_INTERVAL must be a positive duration")
+	}
+	return interval, nil
+}
+
+func startTenantPlanReloader(ctx context.Context, limiter *ratelimitinfra.Limiter, path string, interval time.Duration) (func() error, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE is required when tenant plan reload is enabled")
+	}
+	if interval <= 0 {
+		return func() error { return nil }, nil
+	}
+	reloadCtx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-reloadCtx.Done():
+				return
+			case <-ticker.C:
+				plans, err := tenantRateLimitPlansFromFile(path)
+				if err != nil {
+					limiter.RecordTenantPlanReloadError()
+					log.Printf("api-gateway tenant rate limit plan reload failed: %v", err)
+					continue
+				}
+				if err := limiter.UpdateTenantPlans(plans); err != nil {
+					log.Printf("api-gateway tenant rate limit plan reload rejected: %v", err)
+				}
+			}
+		}
+	}()
+	return func() error {
+		cancel()
+		<-done
+		return nil
+	}, nil
+}
+
+func tenantRateLimitPlansFromFile(path string) (map[string]ratelimitinfra.Plan, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return parseTenantRateLimitPlans(string(data))
+}
+
+func combineCloseFuncs(functions ...func() error) func() error {
+	return func() error {
+		var combined error
+		for _, fn := range functions {
+			if fn == nil {
+				continue
+			}
+			if err := fn(); err != nil {
+				combined = errors.Join(combined, err)
+			}
+		}
+		return combined
+	}
 }
 
 func rateLimitIdentityFunc(authenticator *gatewayauth.Authenticator) ratelimitinfra.IdentityFunc {

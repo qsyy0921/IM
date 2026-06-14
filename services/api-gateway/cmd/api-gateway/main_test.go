@@ -17,8 +17,11 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
+	ratelimitinfra "github.com/qsyy0921/IM/services/api-gateway/internal/infrastructure/ratelimit"
 	grpcgo "google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 func TestGRPCClientTLSConfigFromEnvDisabledByDefault(t *testing.T) {
@@ -420,6 +423,102 @@ func TestTenantRateLimitPlansFromEnvRejectsInvalidJSON(t *testing.T) {
 	}
 }
 
+func TestTenantPlanReloadIntervalFromEnv(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	if interval, err := tenantPlanReloadIntervalFromEnv(); err != nil || interval != 0 {
+		t.Fatalf("expected empty reload interval to be disabled, interval=%s err=%v", interval, err)
+	}
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_RELOAD_INTERVAL", "250ms")
+	if interval, err := tenantPlanReloadIntervalFromEnv(); err != nil || interval != 250*time.Millisecond {
+		t.Fatalf("expected reload interval to parse, interval=%s err=%v", interval, err)
+	}
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_RELOAD_INTERVAL", "-1s")
+	if _, err := tenantPlanReloadIntervalFromEnv(); err == nil {
+		t.Fatalf("expected negative reload interval to fail")
+	}
+}
+
+func TestStartTenantPlanReloaderRequiresFile(t *testing.T) {
+	limiter, err := ratelimitinfra.New(ratelimitinfra.Config{
+		Enabled:           true,
+		RequestsPerSecond: 1,
+		Burst:             1,
+	})
+	if err != nil {
+		t.Fatalf("new limiter: %v", err)
+	}
+	if _, err := startTenantPlanReloader(context.Background(), limiter, "", time.Millisecond); err == nil {
+		t.Fatalf("expected missing tenant plan reload file to fail")
+	}
+}
+
+func TestStartTenantPlanReloaderUpdatesLimiter(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tenant-plans.json")
+	if err := os.WriteFile(path, []byte(`{"tenant-vip":{"requests_per_second":10,"burst":2}}`), 0o600); err != nil {
+		t.Fatalf("write tenant plans: %v", err)
+	}
+	limiter, err := ratelimitinfra.New(ratelimitinfra.Config{
+		Enabled:           true,
+		KeyScope:          "tenant",
+		RequestsPerSecond: 1,
+		Burst:             1,
+		IdentityFunc: func(ctx context.Context) (ratelimitinfra.Identity, error) {
+			md, _ := metadata.FromIncomingContext(ctx)
+			return ratelimitinfra.Identity{TenantID: md.Get("tenant")[0]}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("new tenant limiter: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	stop, err := startTenantPlanReloader(ctx, limiter, path, 5*time.Millisecond)
+	if err != nil {
+		t.Fatalf("start tenant plan reloader: %v", err)
+	}
+	defer stop()
+
+	waitForAPIGatewayTestCondition(t, time.Second, func() bool {
+		snapshot := limiter.Snapshot()
+		return snapshot.TenantPlans == 1 && snapshot.TenantReloads > 0 && snapshot.TenantReloadAt > 0
+	})
+
+	interceptor := limiter.UnaryServerInterceptor()
+	requestCtx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("tenant", "tenant-vip"))
+	info := &grpcgo.UnaryServerInfo{FullMethod: "/nexusim.gateway.v1.GatewayService/SendMessage"}
+	handler := func(context.Context, any) (any, error) { return "ok", nil }
+	for i := 0; i < 2; i++ {
+		if _, err := interceptor(requestCtx, nil, info, handler); err != nil {
+			t.Fatalf("request %d should pass with reloaded tenant plan: %v", i, err)
+		}
+	}
+	if _, err := interceptor(requestCtx, nil, info, handler); status.Code(err) != codes.ResourceExhausted {
+		t.Fatalf("expected third request to use reloaded burst and be limited, got %v", err)
+	}
+}
+
+func TestStartTenantPlanReloaderRecordsLoadErrors(t *testing.T) {
+	limiter, err := ratelimitinfra.New(ratelimitinfra.Config{
+		Enabled:           true,
+		RequestsPerSecond: 1,
+		Burst:             1,
+	})
+	if err != nil {
+		t.Fatalf("new limiter: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	stop, err := startTenantPlanReloader(ctx, limiter, filepath.Join(t.TempDir(), "missing.json"), 5*time.Millisecond)
+	if err != nil {
+		t.Fatalf("start tenant plan reloader: %v", err)
+	}
+	defer stop()
+
+	waitForAPIGatewayTestCondition(t, time.Second, func() bool {
+		return limiter.Snapshot().TenantErrors > 0
+	})
+}
+
 func TestValidateTrustedMetadataBackendConfigAllowsPrivateAddressWithoutMTLS(t *testing.T) {
 	err := validateTrustedMetadataBackendConfig(
 		"message-service",
@@ -633,6 +732,7 @@ func clearAPIGatewayRateLimitConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_RELOAD_INTERVAL", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BACKEND", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_MODE", "")
@@ -713,4 +813,18 @@ func newSerialNumber(t *testing.T) *big.Int {
 		t.Fatalf("generate tls serial: %v", err)
 	}
 	return serial
+}
+
+func waitForAPIGatewayTestCondition(t *testing.T, timeout time.Duration, condition func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if !condition() {
+		t.Fatalf("condition was not met within %s", timeout)
+	}
 }

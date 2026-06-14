@@ -93,6 +93,7 @@ NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST=200
 NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS=10000
 NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON=
 NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE=
+NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_RELOAD_INTERVAL=0
 ```
 
 该限流器默认关闭；启用后默认按 `gRPC method + token fingerprint` 限流，缺少 token 时退化到 `gRPC method + peer address`。`NEXUSIM_API_GATEWAY_RATE_LIMIT_SCOPE=tenant` 时，api-gateway 会先用已有 gateway authenticator 验证 token，再按 `gRPC method + tenant_id` 做 first-stage 租户级 quota；无效 token 不会计入某个租户，而是回退到 token / peer key，并由后续鉴权返回稳定错误。`TENANT_PLANS_JSON` / `TENANT_PLANS_FILE` 可以为指定 tenant 配置静态 quota override：
@@ -105,6 +106,8 @@ NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE=
 ```
 
 未配置 override 的 tenant 使用全局 `RPS / BURST`。它不记录 token 原文、tenant_id 或 user_id，也不向业务服务透出限流 key。被限流请求返回 `ResourceExhausted / rate limit exceeded`，并携带 gRPC `RetryInfo`：local backend 使用 token bucket 补齐下一枚 token的估算等待时间，Redis backend 使用 fixed-window 下一窗口剩余时间。该请求也会进入 api-gateway gRPC metrics。
+
+当 `NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_RELOAD_INTERVAL` 配置为正 duration 时，api-gateway 会定期从 `NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE` 重新读取 tenant plan，并原子替换内存中的 plan map。reload 失败、JSON 解析失败或 plan 校验失败时保留上一版有效配置，不把错误 plan 发布到限流路径；`/debug/metrics` 只暴露 `tenant_plan_reload_count`、`tenant_plan_reloaded_at_unix_ms` 和 `tenant_plan_reload_error_count` 这类低敏聚合字段，不输出 tenant id 或 plan 明细。第一版文件热更新仍不是配置中心；`TENANT_PLANS_JSON` 仍是启动期输入，不参与运行时 reload。
 
 `local` backend 是本进程 token bucket。需要跨实例共享入口预算时启用 Redis backend：
 
@@ -119,7 +122,7 @@ NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_FAIL_OPEN=true
 
 Redis backend 使用 fixed-window counter，把同一 token/method 或 tenant/method 在多个 api-gateway 实例上的请求合并计数。`FAIL_OPEN=true` 时 Redis 短故障只记录 `redis_error_count` 并放行请求；启动阶段 Redis `PING` 失败也不会阻止 api-gateway 启动，后续请求仍会按运行时 Redis 错误计数并放行。`FAIL_OPEN=false` 时启动探测失败会阻止进程启动，运行时 Redis 错误返回 `Unavailable / rate limiter unavailable`。
 
-这是第一阶段分布式入口保护，不是完整产品级配额系统：运行时热更新、tenant plan 生命周期、外部配置中心、IP reputation、WAF、自适应风控、跨区域一致性、Redis 限流故障演练和统一告警仍是后续 production hardening。
+这是第一阶段分布式入口保护，不是完整产品级配额系统：tenant plan 生命周期、外部配置中心 / DB-backed quota、IP reputation、WAF、自适应风控、跨区域一致性、Redis 限流故障演练和统一告警仍是后续 production hardening。
 
 入口 gRPC 默认 plaintext；本地 secure smoke 和后续部署可以启用静态 TLS / mTLS：
 
@@ -213,12 +216,12 @@ NEXUSIM_API_GATEWAY_CONTACTS_TLS_CLIENT_KEY_FILE
 - 不做 HTTP / REST / GraphQL 转换。
 - 不做 OIDC federation。
 - 不做全服务 mTLS rollout 或证书生命周期治理。
-- 不做完整 WAF、运行时动态 quota 配置、全服务 OpenTelemetry rollout、collector / alerting 或跨 Kafka envelope trace。
+- 不做完整 WAF、配置中心 / DB-backed quota、全服务 OpenTelemetry rollout、collector / alerting 或跨 Kafka envelope trace。
 - 不替代 push-gateway 的 WebSocket online notify / ACK 转发职责。
 
 后续优先级：
 
-1. 继续把运行时动态配额、审计采样、统一 collector / alerting 和跨服务 tracing 作为独立 production hardening，不塞进当前 proxy skeleton。
+1. 继续把配置中心 / DB-backed quota、审计采样、统一 collector / alerting 和跨服务 tracing 作为独立 production hardening，不塞进当前 proxy skeleton。
 2. 历史客户端确需 legacy descriptor 时，必须显式 opt-in，并在迁移计划中移除。
 
 2026-06-13 补充：clean commit `cff1668` 已跑通 `loadtest/demo/run-local-secure-demo.ps1` 经真实 api-gateway 的 secure E2E smoke。demo runner 对 conversation / message / delivery / receipt 的 gRPC target 均指向 api-gateway，使用 HMAC gateway token 和 desktop-client mTLS；api-gateway 再通过 mTLS 调下游，并向下游注入 trusted metadata。报告见 `docs/runbook/loadtest/demo/loadtest-report-20260613-e2e-demo-api-gateway-secure-smoke.md`，原始结果在 `H:\NexusIM\loadtest-results\e2e-demo-api-gateway-secure-smoke-20260613-clean`。
@@ -234,6 +237,8 @@ NEXUSIM_API_GATEWAY_CONTACTS_TLS_CLIENT_KEY_FILE
 2026-06-14 补充：api-gateway rate limiter 已新增 `NEXUSIM_API_GATEWAY_RATE_LIMIT_SCOPE=tenant`，在启用时使用已验证 gateway token 的 `tenant_id` 作为 low-sensitive per-method quota key；`/debug/metrics` 输出 `key_scope` 和 `identity_error_count`，不输出 token、tenant_id 或 user_id。无效 token 不会污染租户预算，会回退到 token / peer key 并继续由鉴权层返回稳定错误。这仍不是完整 WAF / 风控系统。
 
 2026-06-14 补充：api-gateway rate limiter 已新增静态 tenant plan override，支持 `NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON` 或 `..._FILE`。指定 tenant 可以覆盖全局 RPS / burst，local 和 Redis backend 都会按该 tenant plan 判定限流；`/debug/metrics` 只输出 `tenant_plan_count`，不输出 tenant id 或 plan 明细。该能力仍不是运行时动态配置中心或完整计费套餐系统。
+
+2026-06-14 补充：api-gateway tenant plan override 已新增第一阶段文件热更新。配置 `NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_RELOAD_INTERVAL` 后，进程会按周期重读 `NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE` 并原子替换有效 plan；reload / parse / validation 失败时保留上一版有效配置并只在 `/debug/metrics` 记录低敏 reload count / error count。这仍不是完整配置中心、套餐生命周期或 DB-backed quota 系统。
 
 2026-06-14 补充：clean commit `9b16b8c` 已修正 Redis rate-limit fail-open 启动语义：`NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_FAIL_OPEN=true` 时 Redis `PING` 失败只记录启动日志并继续启动，首个请求上的 Redis 错误仍进入 `redis_error_count` 并放行；`FAIL_OPEN=false` 仍 fail-closed 拒绝启动。
 

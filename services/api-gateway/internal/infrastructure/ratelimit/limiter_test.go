@@ -195,6 +195,91 @@ func TestLimiterTenantPlanOverridesDefaultQuota(t *testing.T) {
 	}
 }
 
+func TestLimiterUpdateTenantPlansChangesQuotaAtRuntime(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	limiter, err := New(Config{
+		Enabled:           true,
+		KeyScope:          "tenant",
+		RequestsPerSecond: 1,
+		Burst:             1,
+		TenantPlans: map[string]Plan{
+			"tenant-vip": {RequestsPerSecond: 1, Burst: 1},
+		},
+		Now: func() time.Time { return now },
+		IdentityFunc: func(ctx context.Context) (Identity, error) {
+			md, _ := metadata.FromIncomingContext(ctx)
+			return Identity{TenantID: md.Get("tenant")[0]}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("new limiter: %v", err)
+	}
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("tenant", "tenant-vip"))
+	if allowed, _, err := limiter.allow(ctx, "/method"); err != nil || !allowed {
+		t.Fatalf("first request should pass before update, allowed=%v err=%v", allowed, err)
+	}
+	if allowed, _, err := limiter.allow(ctx, "/method"); err != nil || allowed {
+		t.Fatalf("second request should be limited before update, allowed=%v err=%v", allowed, err)
+	}
+
+	now = now.Add(2 * time.Second)
+	if err := limiter.UpdateTenantPlans(map[string]Plan{
+		"tenant-vip": {RequestsPerSecond: 10, Burst: 2},
+	}); err != nil {
+		t.Fatalf("update tenant plans: %v", err)
+	}
+	for i := 0; i < 2; i++ {
+		allowed, _, err := limiter.allow(ctx, "/method")
+		if err != nil || !allowed {
+			t.Fatalf("request %d should pass after update, allowed=%v err=%v", i, allowed, err)
+		}
+	}
+	if allowed, _, err := limiter.allow(ctx, "/method"); err != nil || allowed {
+		t.Fatalf("third request should use updated burst and be limited, allowed=%v err=%v", allowed, err)
+	}
+	snapshot := limiter.Snapshot()
+	if snapshot.TenantPlans != 1 || snapshot.TenantReloads != 1 || snapshot.TenantReloadAt == 0 || snapshot.TenantErrors != 0 {
+		t.Fatalf("unexpected updated tenant plan snapshot: %+v", snapshot)
+	}
+}
+
+func TestLimiterUpdateTenantPlansRejectsInvalidPlanWithoutReplacingOldPlan(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	limiter, err := New(Config{
+		Enabled:           true,
+		KeyScope:          "tenant",
+		RequestsPerSecond: 1,
+		Burst:             1,
+		TenantPlans: map[string]Plan{
+			"tenant-vip": {RequestsPerSecond: 10, Burst: 2},
+		},
+		Now: func() time.Time { return now },
+		IdentityFunc: func(ctx context.Context) (Identity, error) {
+			md, _ := metadata.FromIncomingContext(ctx)
+			return Identity{TenantID: md.Get("tenant")[0]}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("new limiter: %v", err)
+	}
+	if err := limiter.UpdateTenantPlans(map[string]Plan{"tenant-vip": {RequestsPerSecond: 0}}); err == nil {
+		t.Fatalf("expected invalid tenant plan update to fail")
+	}
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("tenant", "tenant-vip"))
+	for i := 0; i < 2; i++ {
+		allowed, _, err := limiter.allow(ctx, "/method")
+		if err != nil || !allowed {
+			t.Fatalf("request %d should still use old valid plan, allowed=%v err=%v", i, allowed, err)
+		}
+	}
+	if allowed, _, err := limiter.allow(ctx, "/method"); err != nil || allowed {
+		t.Fatalf("third request should still be limited by old plan, allowed=%v err=%v", allowed, err)
+	}
+	if snapshot := limiter.Snapshot(); snapshot.TenantPlans != 1 || snapshot.TenantReloads != 0 || snapshot.TenantErrors != 1 {
+		t.Fatalf("unexpected invalid update snapshot: %+v", snapshot)
+	}
+}
+
 func TestLimiterTenantScopeFallbackDoesNotChargeTenantOnIdentityError(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	limiter, err := New(Config{

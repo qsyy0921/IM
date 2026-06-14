@@ -26,7 +26,7 @@
 
 继续做 `api-gateway` 入口治理：
 
-- 运行时动态 quota 配置；
+- 运行时动态 tenant quota 文件热更新已进入第一阶段，后续只做配置中心 / DB-backed quota hardening；
 - OTel collector / alerting / 跨服务 rollout 的后续收敛；
 - legacy descriptor opt-in 使用面的后续迁移审计；
 - 必要单测 / 集成测试；

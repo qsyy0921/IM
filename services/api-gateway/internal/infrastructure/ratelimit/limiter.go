@@ -65,6 +65,7 @@ type Limiter struct {
 	scope    string
 	rate     float64
 	burst    float64
+	plansMu  sync.RWMutex
 	plans    map[string]quotaPlan
 	maxKeys  int
 	redis    redis.UniversalClient
@@ -80,6 +81,9 @@ type Limiter struct {
 	totalAccepted  int64
 	redisErrors    atomic.Int64
 	identityErrors atomic.Int64
+	planReloads    atomic.Int64
+	planReloadAtMS atomic.Int64
+	planReloadErrs atomic.Int64
 }
 
 type bucket struct {
@@ -107,6 +111,9 @@ type Snapshot struct {
 	RatePerSecond  float64 `json:"rate_per_second,omitempty"`
 	Burst          int     `json:"burst,omitempty"`
 	TenantPlans    int     `json:"tenant_plan_count,omitempty"`
+	TenantReloads  int64   `json:"tenant_plan_reload_count,omitempty"`
+	TenantReloadAt int64   `json:"tenant_plan_reloaded_at_unix_ms,omitempty"`
+	TenantErrors   int64   `json:"tenant_plan_reload_error_count,omitempty"`
 	TrackedKeys    int     `json:"tracked_keys,omitempty"`
 	MaxKeys        int     `json:"max_keys,omitempty"`
 	RedisWindowMS  int64   `json:"redis_window_ms,omitempty"`
@@ -213,7 +220,14 @@ func (limiter *Limiter) Snapshot() Snapshot {
 		return Snapshot{}
 	}
 	limiter.mu.Lock()
-	defer limiter.mu.Unlock()
+	trackedKeys := len(limiter.buckets)
+	totalAccepted := limiter.totalAccepted
+	totalLimited := limiter.totalLimited
+	limiter.mu.Unlock()
+
+	limiter.plansMu.RLock()
+	tenantPlanCount := len(limiter.plans)
+	limiter.plansMu.RUnlock()
 
 	return Snapshot{
 		Enabled:        limiter.enabled,
@@ -221,16 +235,47 @@ func (limiter *Limiter) Snapshot() Snapshot {
 		KeyScope:       limiter.scope,
 		RatePerSecond:  limiter.rate,
 		Burst:          int(limiter.burst),
-		TenantPlans:    len(limiter.plans),
-		TrackedKeys:    len(limiter.buckets),
+		TenantPlans:    tenantPlanCount,
+		TenantReloads:  limiter.planReloads.Load(),
+		TenantReloadAt: limiter.planReloadAtMS.Load(),
+		TenantErrors:   limiter.planReloadErrs.Load(),
+		TrackedKeys:    trackedKeys,
 		MaxKeys:        limiter.maxKeys,
 		RedisWindowMS:  limiter.window.Milliseconds(),
 		RedisFailOpen:  limiter.failOpen,
 		RedisErrors:    limiter.redisErrors.Load(),
 		IdentityErrors: limiter.identityErrors.Load(),
-		TotalAccepted:  limiter.totalAccepted,
-		TotalLimited:   limiter.totalLimited,
+		TotalAccepted:  totalAccepted,
+		TotalLimited:   totalLimited,
 	}
+}
+
+func (limiter *Limiter) UpdateTenantPlans(plans map[string]Plan) error {
+	if limiter == nil {
+		return nil
+	}
+	normalized, err := normalizeTenantPlans(plans)
+	if err != nil {
+		limiter.planReloadErrs.Add(1)
+		return err
+	}
+	limiter.plansMu.Lock()
+	limiter.plans = normalized
+	limiter.plansMu.Unlock()
+	limiter.planReloads.Add(1)
+	now := time.Now
+	if limiter.now != nil {
+		now = limiter.now
+	}
+	limiter.planReloadAtMS.Store(now().UnixMilli())
+	return nil
+}
+
+func (limiter *Limiter) RecordTenantPlanReloadError() {
+	if limiter == nil {
+		return
+	}
+	limiter.planReloadErrs.Add(1)
 }
 
 func (limiter *Limiter) allow(ctx context.Context, method string) (bool, time.Duration, error) {
@@ -259,6 +304,9 @@ func (limiter *Limiter) allowLocal(ctx context.Context, method string) (bool, ti
 	elapsed := now.Sub(entry.lastSeen).Seconds()
 	if elapsed > 0 {
 		entry.tokens = math.Min(quota.burst, entry.tokens+elapsed*quota.rate)
+	}
+	if entry.tokens > quota.burst {
+		entry.tokens = quota.burst
 	}
 	entry.lastSeen = now
 	if entry.tokens < 1 {
@@ -409,6 +457,8 @@ func (limiter *Limiter) defaultQuota(key string) requestQuota {
 
 func (limiter *Limiter) planForTenant(tenantID string) quotaPlan {
 	if limiter != nil {
+		limiter.plansMu.RLock()
+		defer limiter.plansMu.RUnlock()
 		if plan, ok := limiter.plans[tenantID]; ok {
 			return plan
 		}

@@ -263,7 +263,7 @@ The debug metrics include aggregate gRPC request counts and status codes, aggreg
 
 `allowed=false` is counted as a decision deny, while the gRPC method remains `codes.OK`. Transport errors are counted separately.
 
-First-stage OpenTelemetry gRPC server spans are available in `grpc` mode and are disabled by default. When enabled, policy-service can export spans to stdout or an OTLP gRPC endpoint and extracts W3C `traceparent` from incoming gRPC metadata. Spans record only low-sensitive transport fields: full gRPC method name, gRPC status code, latency, optional trace id and optional request id. They must not record tokens, tenant id, user id, device id, session id, conversation id, message id, direct peer id, sender id, payloads, rule parameters, classification, deny reason or SQL/provider error text.
+First-stage OpenTelemetry gRPC server spans are available in `grpc` mode and are disabled by default. When enabled, policy-service can export spans to stdout or an OTLP gRPC endpoint and extracts W3C `traceparent` from incoming gRPC metadata. Spans record only low-sensitive, low-cardinality transport fields: full gRPC method name, gRPC status code and latency. They must not record tokens, tenant id, user id, device id, session id, trace id, request id, conversation id, message id, direct peer id, sender id, payloads, rule parameters, classification, deny reason or SQL/provider error text. `x-nexusim-trace-id` / `x-nexusim-request-id` remain available for metadata / access-log correlation, but are not exported as span attributes.
 
 This is a local debug surface plus first-stage trace emission. It is not a replacement for production Prometheus deployment, collector-managed sampling, alert rules or external policy audit.
 

@@ -523,7 +523,7 @@ NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE=...
 
 当 `NEXUSIM_DELIVERY_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端没有启用 mTLS client cert 校验，delivery-service 必须在启动前直接失败，避免把第一阶段 trusted metadata 模式暴露到公网监听面。
 
-delivery-service `grpc` 模式已支持第一阶段 OpenTelemetry gRPC server span，默认关闭。开启后只记录低敏服务侧属性：gRPC full method、status code、latency、`x-nexusim-trace-id`、`x-nexusim-request-id`，并从 `traceparent` 继承 W3C trace context；不得写入 token、tenant/user/device/session id、conversation id、message id 或 payload。
+delivery-service `grpc` 模式已支持第一阶段 OpenTelemetry gRPC server span，默认关闭。开启后只记录低敏低基数服务侧属性：gRPC full method、status code、latency，并从 `traceparent` 继承 W3C trace context；不得写入 token、tenant/user/device/session id、trace_id、request_id、conversation id、message id 或 payload。`x-nexusim-trace-id` / `x-nexusim-request-id` 仍用于 metadata / access log correlation，但不作为 span attribute 导出。
 
 ```text
 NEXUSIM_DELIVERY_OTEL_TRACES_ENABLED=true

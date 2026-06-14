@@ -137,6 +137,7 @@ collector 配置位于 `deploy/local/otel-collector.yml`，当前只把 traces /
 ```text
 deploy/local/otel-sampling-policy.json
 tools/check-otel-sampling-policy.ps1
+tools/check-otel-span-attributes.ps1
 ```
 
 默认 profile：
@@ -150,7 +151,7 @@ high_volume_starting_point = 0.01
 
 `api-gateway`、`message-service`、`delivery-service`、`push-gateway` 这类高吞吐入口 / 主链路默认使用 `high_volume_starting_point`；其它已接入 OTel server span 的后端服务默认使用 `production_starting_point`。本地 smoke 可以显式使用 `local_smoke=1.0`，但生产 full sampling 必须是有过期时间的临时排障动作，不能作为常态配置。
 
-该策略文件不自动改任何服务环境变量；它用于 review、runbook 和 `.\tools\check-local.ps1` 的静态门禁。生产化前仍需要集中配置、动态采样、trace retention、PII / 高基数属性审计和 collector 侧治理。
+该策略文件不自动改任何服务环境变量；它用于 review、runbook 和 `.\tools\check-local.ps1` 的静态门禁。`check-otel-span-attributes.ps1` 会扫描生产 Go 代码，禁止把 `trace_id`、`request_id`、tenant / user / device / session / conversation / message id 这类高基数字段写成 OTel span attributes。生产化前仍需要集中配置、动态采样、trace retention、PII / 高基数属性审计和 collector 侧治理。
 
 ## 服务端启用方式
 

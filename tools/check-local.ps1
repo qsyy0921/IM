@@ -25,6 +25,9 @@ try {
     Write-Host "== otel sampling policy =="
     & (Join-Path $PSScriptRoot "check-otel-sampling-policy.ps1")
 
+    Write-Host "== otel span attributes =="
+    & (Join-Path $PSScriptRoot "check-otel-span-attributes.ps1")
+
     Write-Host "== git whitespace =="
     git diff --check
     git diff --cached --check

@@ -28,7 +28,7 @@
 
 - 运行时动态 tenant quota 文件热更新已进入第一阶段，后续只做配置中心 / DB-backed quota hardening；
 - api-gateway 已有入口 server span、下游 gRPC client span、第一阶段 Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型和本地 Grafana dashboard 原型；
-- contacts-service、identity-service、message-service、conversation-service、delivery-service、receipt-service、policy-service 已开始后端服务 gRPC server span rollout，push-gateway 已补 first-stage WebSocket connection span；本地 OTel collector debug 入口、policy OTLP smoke 脚本和 first-stage trace sampling policy / check 已补；后续继续做采样治理 hardening；
+- contacts-service、identity-service、message-service、conversation-service、delivery-service、receipt-service、policy-service 已开始后端服务 gRPC server span rollout，push-gateway 已补 first-stage WebSocket connection span；本地 OTel collector debug 入口、policy OTLP smoke 脚本、first-stage trace sampling policy / check 和 span attribute guardrail 已补；后续继续做 legacy opt-in 实际迁移观察和配置中心 / DB-backed quota hardening；
 - legacy descriptor opt-in 使用面已有 first-stage metrics 计数，后续继续迁移观察和移除计划；
 - 必要单测 / 集成测试；
 - 同步相关 service brief、SDD 或进度文档。

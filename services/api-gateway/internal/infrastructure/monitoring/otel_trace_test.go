@@ -81,11 +81,14 @@ func TestTraceRuntimeRecordsServerSpanWithTraceparent(t *testing.T) {
 		"rpc.system":           "grpc",
 		"rpc.method":           "/nexusim.gateway.v1.GatewayService/SendMessage",
 		"rpc.grpc.status_code": "PermissionDenied",
-		"nexusim.trace_id":     "trace-final",
-		"nexusim.request_id":   "request-final",
 	} {
 		if got := spanAttributeString(span.Attributes, key); got != want {
 			t.Fatalf("expected span attribute %s=%q, got %q", key, want, got)
+		}
+	}
+	for _, forbidden := range []attribute.Key{"nexusim.trace_id", "nexusim.request_id"} {
+		if got := spanAttributeString(span.Attributes, forbidden); got != "" {
+			t.Fatalf("span must not export high-cardinality correlation attribute %s=%q", forbidden, got)
 		}
 	}
 	for _, attribute := range span.Attributes {
@@ -155,11 +158,10 @@ func TestTraceRuntimeRecordsClientSpanAndInjectsTraceparent(t *testing.T) {
 	if got := spanAttributeString(span.Attributes, "rpc.grpc.status_code"); got != "Unavailable" {
 		t.Fatalf("expected grpc status Unavailable, got %q", got)
 	}
-	if got := spanAttributeString(span.Attributes, "nexusim.trace_id"); got != "trace-client-final" {
-		t.Fatalf("expected final trace id attribute, got %q", got)
-	}
-	if got := spanAttributeString(span.Attributes, "nexusim.request_id"); got != "request-client-final" {
-		t.Fatalf("expected final request id attribute, got %q", got)
+	for _, forbidden := range []attribute.Key{"nexusim.trace_id", "nexusim.request_id"} {
+		if got := spanAttributeString(span.Attributes, forbidden); got != "" {
+			t.Fatalf("span must not export high-cardinality correlation attribute %s=%q", forbidden, got)
+		}
 	}
 	for _, attribute := range span.Attributes {
 		if attribute.Value.AsString() == "should-not-be-exported" || string(attribute.Key) == "authorization" {

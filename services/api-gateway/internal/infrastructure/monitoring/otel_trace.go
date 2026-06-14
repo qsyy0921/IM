@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	gatewaytypes "github.com/qsyy0921/IM/services/api-gateway/internal/types"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -99,23 +98,6 @@ func (runtime *TraceRuntime) UnaryServerInterceptor() grpcgo.UnaryServerIntercep
 			attribute.String("rpc.grpc.status_code", code),
 			attribute.Int64("nexusim.grpc.latency_ms", time.Since(started).Milliseconds()),
 		)
-		traceID, requestID := grpcLogMetadata(ctx)
-		if correlation, ok := gatewaytypes.CorrelationFromContext(ctx); ok {
-			if correlation.TraceID != "" {
-				traceID = correlation.TraceID
-			}
-			if correlation.RequestID != "" {
-				requestID = correlation.RequestID
-			}
-		}
-		if traceID != "" || requestID != "" {
-			if traceID != "" {
-				span.SetAttributes(attribute.String("nexusim.trace_id", traceID))
-			}
-			if requestID != "" {
-				span.SetAttributes(attribute.String("nexusim.request_id", requestID))
-			}
-		}
 		if err != nil {
 			span.SetStatus(codes.Error, code)
 			span.RecordError(err)
@@ -154,14 +136,6 @@ func (runtime *TraceRuntime) UnaryClientInterceptor() grpcgo.UnaryClientIntercep
 			attribute.String("rpc.grpc.status_code", code),
 			attribute.Int64("nexusim.grpc.latency_ms", time.Since(started).Milliseconds()),
 		)
-		if correlation, ok := gatewaytypes.CorrelationFromContext(ctx); ok {
-			if correlation.TraceID != "" {
-				span.SetAttributes(attribute.String("nexusim.trace_id", correlation.TraceID))
-			}
-			if correlation.RequestID != "" {
-				span.SetAttributes(attribute.String("nexusim.request_id", correlation.RequestID))
-			}
-		}
 		if err != nil {
 			span.SetStatus(codes.Error, code)
 			span.RecordError(err)

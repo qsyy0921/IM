@@ -154,7 +154,7 @@ NEXUSIM_CONVERSATION_DEBUG_ADDR=
 
 `/debug/metrics` 只返回低敏聚合快照：gRPC 请求统计、PostgreSQL pool、`conversations` / `conversation_members` / `member_change_saga` 的总量和状态分布，不返回成员标识、会话标题、target user 明细或 raw error 文本。
 
-first-stage OpenTelemetry trace 默认关闭，仅覆盖 conversation-service gRPC server span。启用后从 incoming metadata 提取 W3C `traceparent`，只记录 service / method / gRPC status / latency / trace_id / request_id 等低敏属性，不记录 token、tenant/user/device/session id、conversation_id、target_user_id、成员变更 reason、payload 或 command hash。支持 exporter：
+first-stage OpenTelemetry trace 默认关闭，仅覆盖 conversation-service gRPC server span。启用后从 incoming metadata 提取 W3C `traceparent`，只记录 service / method / gRPC status / latency 等低敏低基数属性，不记录 token、tenant/user/device/session id、trace_id、request_id、conversation_id、target_user_id、成员变更 reason、payload 或 command hash。`x-nexusim-trace-id` / `x-nexusim-request-id` 仍用于 metadata / access log correlation，但不作为 span attribute 导出。支持 exporter：
 
 ```text
 NEXUSIM_CONVERSATION_OTEL_TRACES_ENABLED=true

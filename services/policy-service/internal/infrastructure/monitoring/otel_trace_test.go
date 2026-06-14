@@ -80,11 +80,14 @@ func TestTraceRuntimeRecordsServerSpanWithTraceparent(t *testing.T) {
 		"rpc.system":           "grpc",
 		"rpc.method":           "/nexusim.policy.v1.PolicyService/CheckMessageAction",
 		"rpc.grpc.status_code": "PermissionDenied",
-		"nexusim.trace_id":     "trace-policy",
-		"nexusim.request_id":   "request-policy",
 	} {
 		if got := spanAttributeString(span.Attributes, key); got != want {
 			t.Fatalf("expected span attribute %s=%q, got %q", key, want, got)
+		}
+	}
+	for _, forbidden := range []attribute.Key{"nexusim.trace_id", "nexusim.request_id"} {
+		if got := spanAttributeString(span.Attributes, forbidden); got != "" {
+			t.Fatalf("span must not export high-cardinality correlation attribute %s=%q", forbidden, got)
 		}
 	}
 	for _, attribute := range span.Attributes {

@@ -54,6 +54,18 @@ type DeliveryNotification struct {
 	CorrelationID   string
 }
 
+func (notification DeliveryNotification) Validate() error {
+	if notification.TenantID == "" ||
+		notification.UserID == "" ||
+		notification.ConversationID == "" ||
+		notification.ConversationSeq <= 0 ||
+		notification.EventID == "" ||
+		notification.SourceEventType == "" {
+		return NewInvalidFrame("delivery notification is incomplete")
+	}
+	return nil
+}
+
 type NotifyDeliveryCommand struct {
 	Notification DeliveryNotification
 }

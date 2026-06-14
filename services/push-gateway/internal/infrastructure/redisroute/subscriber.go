@@ -139,6 +139,10 @@ func (subscriber *Subscriber) handleNotification(ctx context.Context, payload []
 		subscriber.metrics.malformedCount.Add(1)
 		return
 	}
+	if err := notification.Validate(); err != nil {
+		subscriber.metrics.malformedCount.Add(1)
+		return
+	}
 	subscriber.metrics.messageCount.Add(1)
 	result, err := subscriber.local.EnqueueNotification(ctx, notification)
 	if err != nil {

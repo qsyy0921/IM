@@ -778,14 +778,26 @@ func TestSubscriberSkipsMalformedPayloadAndContinues(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan error, 1)
+	subscriber := NewSubscriber(local, client, SubscriberConfig{GatewayID: "gateway-a"})
 	go func() {
-		done <- NewSubscriber(local, client, SubscriberConfig{GatewayID: "gateway-a"}).Run(ctx)
+		done <- subscriber.Run(ctx)
 	}()
 	time.Sleep(50 * time.Millisecond)
 
 	channel := GatewayChannel(defaultKeyPrefix, "gateway-a")
 	if err := client.Publish(ctx, channel, "{").Err(); err != nil {
 		t.Fatalf("publish malformed payload: %v", err)
+	}
+	incompletePayload, err := json.Marshal(types.DeliveryNotification{
+		EventID:  "delivery-event-incomplete",
+		TenantID: "tenant-1",
+		UserID:   "user-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Publish(ctx, channel, incompletePayload).Err(); err != nil {
+		t.Fatalf("publish incomplete payload: %v", err)
 	}
 	time.Sleep(50 * time.Millisecond)
 	payload, err := json.Marshal(testNotification())
@@ -800,6 +812,12 @@ func TestSubscriberSkipsMalformedPayloadAndContinues(t *testing.T) {
 	case frame := <-outbound:
 		if frame.Op != types.OpDeliveryNotify || frame.EventID != "delivery-event-1" {
 			t.Fatalf("unexpected frame: %+v", frame)
+		}
+		metrics := subscriber.Metrics()
+		if metrics.RedisRouteSubscriberMessageCount != 1 ||
+			metrics.RedisRouteSubscriberEnqueuedCount != 1 ||
+			metrics.RedisRouteSubscriberMalformedCount != 2 {
+			t.Fatalf("unexpected subscriber metrics: %+v", metrics)
 		}
 	case err := <-done:
 		t.Fatalf("subscriber exited after malformed payload: %v", err)

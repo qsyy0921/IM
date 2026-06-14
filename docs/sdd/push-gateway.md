@@ -393,7 +393,7 @@ Redis route debug metrics 已提供第一版跨实例在线路由计数：
 | `redis_route_subscriber_message_count` | 当前 gateway 从自身 Pub/Sub channel 收到的远端通知数 |
 | `redis_route_subscriber_enqueued_count` | 远端通知进入当前 gateway 本机 session registry 的数量 |
 | `redis_route_subscriber_evicted_count` | 远端 revoke eviction 控制消息导致当前 gateway 本机 session 被关闭的数量 |
-| `redis_route_subscriber_malformed_count` | Pub/Sub 收到 malformed payload 并跳过的次数 |
+| `redis_route_subscriber_malformed_count` | Pub/Sub 收到 malformed / incomplete payload 并跳过的次数 |
 | `redis_resume_append_count` | 当前 gateway 写入 Redis-backed resume buffer 的 delivery.notify frame 数 |
 | `redis_resume_append_error_count` | 写入 Redis-backed resume buffer 失败次数；失败只降级 resume，不改变 durable inbox |
 | `redis_resume_replay_count` | 从 Redis-backed resume buffer replay 的 delivery.notify frame 数 |

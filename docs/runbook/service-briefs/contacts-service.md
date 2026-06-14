@@ -6,7 +6,7 @@
 - contacts-service 是联系人事实源。
 - policy-service 通过 contacts event projection 做 direct block 决策。
 - 已补 `/healthz`、`/readyz`、`/debug/metrics`，可观察低敏 PG pool、联系人申请 / 联系人边状态聚合和 `contacts_outbox` 聚合状态。
-- 已补 first-stage OpenTelemetry gRPC server span，默认关闭；启用后可输出 stdout 或 OTLP gRPC trace，并从入口 metadata 提取 W3C `traceparent`。
+- 已补 first-stage OpenTelemetry gRPC server span；gRPC access log 只记录低敏 `trace_id/request_id`，并对白名单外入口 metadata 直接丢弃。
 - `outbox-relay` 现已对非取消运行时错误做退避重试，并在 relay 模式通过 `/debug/metrics` 暴露低敏 retry 快照；现有 outbox / retry / DLQ 业务语义不变。
 - 已补只读 `outbox-audit`、只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运维模式，可直接审计当前 `contacts_outbox`，并按 retention 清理 contacts outbox repair 历史。
 - 已补 contacts outbox publish / audit / repair audit 错误脱敏：`last_error`、`previous_last_error` 只保留稳定低敏分类，不暴露 broker body、账号、token 或 provider 原文。

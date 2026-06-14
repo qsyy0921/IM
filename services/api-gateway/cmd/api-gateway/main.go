@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -626,7 +627,7 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 	rps := envFloat64("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", 0)
 	backend := strings.ToLower(strings.TrimSpace(envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_BACKEND", "local")))
 	scope := strings.ToLower(strings.TrimSpace(envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_SCOPE", "token")))
-	tenantPlanSnapshot, err := tenantRateLimitPlansFromEnv()
+	tenantPlanSnapshot, err := tenantRateLimitPlansFromEnv(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -634,8 +635,12 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 	if err != nil {
 		return nil, nil, err
 	}
-	if tenantPlanReloadInterval > 0 && tenantPlanSnapshot.Source != "file" {
-		return nil, nil, errors.New("api-gateway tenant plan reload requires NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE=file")
+	tenantPlanMaxAge, err := tenantPlanMaxAgeFromEnv()
+	if err != nil {
+		return nil, nil, err
+	}
+	if tenantPlanReloadInterval > 0 && tenantPlanSnapshot.Source != "file" && tenantPlanSnapshot.Source != "url" {
+		return nil, nil, errors.New("api-gateway tenant plan reload requires NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE=file or url")
 	}
 	config := ratelimitinfra.Config{
 		Enabled:                     enabled,
@@ -682,7 +687,7 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 		}
 		closeFn := func() error { return client.Close() }
 		if tenantPlanReloadInterval > 0 {
-			stopReloader, err := startTenantPlanReloader(ctx, limiter, strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE")), tenantPlanReloadInterval)
+			stopReloader, err := startTenantPlanReloader(ctx, limiter, tenantPlanSnapshot.Source, tenantPlanReloadLocationFromEnv(tenantPlanSnapshot.Source), tenantPlanMaxAge, tenantPlanReloadInterval)
 			if err != nil {
 				_ = closeFn()
 				return nil, nil, err
@@ -697,7 +702,7 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 	}
 	closeFn := func() error { return nil }
 	if tenantPlanReloadInterval > 0 {
-		stopReloader, err := startTenantPlanReloader(ctx, limiter, strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE")), tenantPlanReloadInterval)
+		stopReloader, err := startTenantPlanReloader(ctx, limiter, tenantPlanSnapshot.Source, tenantPlanReloadLocationFromEnv(tenantPlanSnapshot.Source), tenantPlanMaxAge, tenantPlanReloadInterval)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -727,24 +732,36 @@ type tenantRateLimitPlanSnapshotPayload struct {
 	Plans             map[string]tenantRateLimitPlanPayload `json:"plans"`
 }
 
-func tenantRateLimitPlansFromEnv() (tenantRateLimitPlanSnapshot, error) {
+const (
+	tenantPlanSnapshotMaxBytes      = 1 << 20
+	tenantPlanSnapshotVersionPrefix = "quota-v1"
+)
+
+func tenantRateLimitPlansFromEnv(ctx context.Context) (tenantRateLimitPlanSnapshot, error) {
 	source := strings.ToLower(strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE")))
 	raw := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON"))
 	path := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE"))
+	endpoint := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL"))
+	maxAge, err := tenantPlanMaxAgeFromEnv()
+	if err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
+	}
 	if source == "" || source == "auto" {
 		switch {
 		case raw != "":
 			source = "inline"
 		case path != "":
 			source = "file"
+		case endpoint != "":
+			source = "url"
 		default:
 			source = "none"
 		}
 	}
 	switch source {
 	case "none":
-		if raw != "" || path != "" {
-			return tenantRateLimitPlanSnapshot{}, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE=none cannot be used with tenant plan JSON or file")
+		if raw != "" || path != "" || endpoint != "" {
+			return tenantRateLimitPlanSnapshot{}, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE=none cannot be used with tenant plan JSON, file or URL")
 		}
 		return tenantRateLimitPlanSnapshot{Source: source}, nil
 	case "inline", "json":
@@ -761,8 +778,19 @@ func tenantRateLimitPlansFromEnv() (tenantRateLimitPlanSnapshot, error) {
 			return tenantRateLimitPlanSnapshot{}, err
 		}
 		raw = string(data)
+	case "url", "http", "https", "config-url", "config_url":
+		if endpoint == "" {
+			return tenantRateLimitPlanSnapshot{}, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL is required when tenant plan source is url")
+		}
+		source = "url"
+		snapshot, err := tenantRateLimitPlansFromURL(ctx, endpoint, maxAge)
+		if err != nil {
+			return tenantRateLimitPlanSnapshot{}, err
+		}
+		snapshot.Source = source
+		return snapshot, nil
 	case "db", "database", "config", "config-center", "config_center":
-		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan source " + source + " is not supported yet; use inline or file")
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan source " + source + " is not supported yet; use inline, file or url")
 	default:
 		return tenantRateLimitPlanSnapshot{}, errors.New("unsupported api-gateway tenant plan source")
 	}
@@ -771,6 +799,57 @@ func tenantRateLimitPlansFromEnv() (tenantRateLimitPlanSnapshot, error) {
 		return tenantRateLimitPlanSnapshot{}, err
 	}
 	snapshot.Source = source
+	if err := validateTenantPlanMaxAge(snapshot, maxAge); err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
+	}
+	return snapshot, nil
+}
+
+func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge time.Duration) (tenantRateLimitPlanSnapshot, error) {
+	endpoint = strings.TrimSpace(endpoint)
+	if endpoint == "" {
+		return tenantRateLimitPlanSnapshot{}, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL is required when tenant plan source is url")
+	}
+	parsed, err := url.Parse(endpoint)
+	if err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
+	}
+	if parsed.Scheme != "https" && parsed.Scheme != "http" {
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL source requires http or https")
+	}
+	requestCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	request, err := http.NewRequestWithContext(requestCtx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
+	}
+	request.Header.Set("Accept", "application/json")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL source returned non-200 status")
+	}
+	data, err := io.ReadAll(io.LimitReader(response.Body, tenantPlanSnapshotMaxBytes+1))
+	if err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
+	}
+	if len(data) > tenantPlanSnapshotMaxBytes {
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL source response is too large")
+	}
+	snapshot, err := parseTenantRateLimitPlanSnapshot(string(data))
+	if err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
+	}
+	if snapshot.Version == "" {
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL source requires a versioned snapshot")
+	}
+	if err := validateTenantPlanMaxAge(snapshot, maxAge); err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
+	}
+	snapshot.Source = "url"
 	return snapshot, nil
 }
 
@@ -809,6 +888,9 @@ func parseVersionedTenantRateLimitPlanSnapshot(raw string) (tenantRateLimitPlanS
 	payload.Version = strings.TrimSpace(payload.Version)
 	if payload.Version == "" {
 		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan snapshot version is required")
+	}
+	if payload.Version != tenantPlanSnapshotVersionPrefix && !strings.HasPrefix(payload.Version, tenantPlanSnapshotVersionPrefix+".") {
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan snapshot version is not supported")
 	}
 	if payload.GeneratedAtUnixMS <= 0 {
 		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan snapshot generated_at_unix_ms must be greater than 0")
@@ -896,10 +978,52 @@ func tenantPlanReloadIntervalFromEnv() (time.Duration, error) {
 	return interval, nil
 }
 
-func startTenantPlanReloader(ctx context.Context, limiter *ratelimitinfra.Limiter, path string, interval time.Duration) (func() error, error) {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return nil, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE is required when tenant plan reload is enabled")
+func tenantPlanMaxAgeFromEnv() (time.Duration, error) {
+	raw := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_MAX_AGE"))
+	if raw == "" || raw == "0" {
+		return 0, nil
+	}
+	maxAge, err := time.ParseDuration(raw)
+	if err != nil || maxAge <= 0 {
+		return 0, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_MAX_AGE must be a positive duration")
+	}
+	return maxAge, nil
+}
+
+func validateTenantPlanMaxAge(snapshot tenantRateLimitPlanSnapshot, maxAge time.Duration) error {
+	if maxAge <= 0 || snapshot.GeneratedAtUnixMS <= 0 {
+		return nil
+	}
+	generatedAt := time.UnixMilli(snapshot.GeneratedAtUnixMS)
+	if time.Since(generatedAt) > maxAge {
+		return errors.New("api-gateway tenant plan snapshot is stale")
+	}
+	return nil
+}
+
+func tenantPlanReloadLocationFromEnv(source string) string {
+	switch source {
+	case "file":
+		return strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE"))
+	case "url":
+		return strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL"))
+	default:
+		return ""
+	}
+}
+
+func startTenantPlanReloader(ctx context.Context, limiter *ratelimitinfra.Limiter, source string, location string, maxAge time.Duration, interval time.Duration) (func() error, error) {
+	source = strings.TrimSpace(source)
+	location = strings.TrimSpace(location)
+	if location == "" {
+		switch source {
+		case "file":
+			return nil, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE is required when tenant plan reload is enabled")
+		case "url":
+			return nil, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL is required when tenant plan reload is enabled")
+		default:
+			return nil, errors.New("api-gateway tenant plan reload requires file or url source")
+		}
 	}
 	if interval <= 0 {
 		return func() error { return nil }, nil
@@ -915,7 +1039,7 @@ func startTenantPlanReloader(ctx context.Context, limiter *ratelimitinfra.Limite
 			case <-reloadCtx.Done():
 				return
 			case <-ticker.C:
-				snapshot, err := tenantRateLimitPlansFromFile(path)
+				snapshot, err := tenantRateLimitPlansFromSource(reloadCtx, source, location, maxAge)
 				if err != nil {
 					limiter.RecordTenantPlanReloadError()
 					log.Printf("api-gateway tenant rate limit plan reload failed: %v", err)
@@ -932,6 +1056,24 @@ func startTenantPlanReloader(ctx context.Context, limiter *ratelimitinfra.Limite
 		<-done
 		return nil
 	}, nil
+}
+
+func tenantRateLimitPlansFromSource(ctx context.Context, source string, location string, maxAge time.Duration) (tenantRateLimitPlanSnapshot, error) {
+	switch source {
+	case "file":
+		snapshot, err := tenantRateLimitPlansFromFile(location)
+		if err != nil {
+			return tenantRateLimitPlanSnapshot{}, err
+		}
+		if err := validateTenantPlanMaxAge(snapshot, maxAge); err != nil {
+			return tenantRateLimitPlanSnapshot{}, err
+		}
+		return snapshot, nil
+	case "url":
+		return tenantRateLimitPlansFromURL(ctx, location, maxAge)
+	default:
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan reload requires file or url source")
+	}
 }
 
 func tenantRateLimitPlansFromFile(path string) (tenantRateLimitPlanSnapshot, error) {

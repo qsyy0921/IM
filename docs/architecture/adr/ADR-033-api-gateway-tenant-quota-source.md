@@ -20,15 +20,18 @@ It must not become the owner of tenant billing, plan lifecycle, risk policy or b
 
 ## Decision
 
-`api-gateway` must not directly read or write business-service internal tables for tenant quota. The current supported tenant plan sources remain:
+`api-gateway` must not directly read or write business-service internal tables for tenant quota. The current supported tenant plan sources are:
 
 ```text
 none
 inline/json
 file
+url
 ```
 
-`db`, `database`, `config`, `config-center` and unknown source values must fail closed until a separate control-plane/config source is implemented and accepted.
+`url` is a narrow HTTP(S) snapshot adapter: it consumes the same versioned quota snapshot contract used by file reload and applies it through the same atomic in-memory plan swap. It does not query tenant, billing or business storage.
+
+`db`, `database`, `config`, `config-center` and unknown source values must fail closed until a separate control-plane/config service source is implemented and accepted.
 
 The target quota source is a versioned control-plane/config-service contract:
 

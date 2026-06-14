@@ -2,6 +2,18 @@
 
 本文件只记录本地开发 / smoke 用的第一阶段观测入口。它不是生产 Prometheus、Tempo、Jaeger、Loki、Alertmanager 或 SIEM 部署手册。
 
+## Debug Metrics / Prometheus Text
+
+各服务的 `/debug/metrics` 仍是本地 JSON 快照入口。api-gateway 额外提供第一阶段 Prometheus text endpoint：
+
+```text
+GET http://<NEXUSIM_API_GATEWAY_DEBUG_ADDR>/metrics
+```
+
+`/metrics` 复用 `/debug/metrics` 的低敏 snapshot，当前覆盖 gRPC request / error / latency、facade / legacy descriptor / other request exposure、auth JWK、rate-limit、runtime 和 OTel trace config 聚合指标。labels 只允许 method、code、exposure、backend、key_scope、exporter 等低基数字段；不得输出 token、tenant_id、user_id、device_id、session_id、request_id、trace_id、conversation_id、message_id 或 payload。
+
+这个 endpoint 只用于本地 scrape / dashboard 原型，不代表生产 Prometheus、Alertmanager、指标保留策略或 SLO 告警已经完成。
+
 ## OpenTelemetry Collector
 
 默认本地基础设施不会启动 collector。需要验证 OTLP trace exporter 时单独启动：

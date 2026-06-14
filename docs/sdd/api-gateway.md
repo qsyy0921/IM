@@ -149,9 +149,10 @@ NEXUSIM_API_GATEWAY_DEBUG_ADDR=127.0.0.1:12001
 /healthz
 /readyz
 /debug/metrics
+/metrics
 ```
 
-`/debug/metrics` 只输出进程内聚合指标：gRPC method/code/count/error_count/latency 和 JWT/JWKS 缓存刷新状态。gRPC access log 只记录 service/event/method/code/latency_ms/request_id/trace_id，不记录 gateway token、tenant_id、user_id、device_id、session_id 或 request body。该 endpoint 是 first-stage local/debug observability，不是 Prometheus 指标规范、统一 trace 或生产审计日志。
+`/debug/metrics` 只输出进程内 JSON 聚合指标：gRPC method/code/count/error_count/latency 和 JWT/JWKS 缓存刷新状态。`/metrics` 复用同一份低敏 snapshot，输出第一阶段 Prometheus text exposition，用于本地 scrape / dashboard 原型；标签只允许 method、code、exposure、backend、key_scope、exporter 等低基数字段，不输出 gateway token、tenant_id、user_id、device_id、session_id、request_id、trace_id 或 request body。gRPC access log 只记录 service/event/method/code/latency_ms/request_id/trace_id，不记录 gateway token、tenant_id、user_id、device_id、session_id 或 request body。两个 endpoint 都属于 first-stage local/debug observability，不是完整 Prometheus 部署、统一 trace、告警系统或生产审计日志。
 
 First-stage OpenTelemetry trace 默认关闭：
 
@@ -273,6 +274,8 @@ NEXUSIM_API_GATEWAY_CONTACTS_TLS_CLIENT_KEY_FILE
 2026-06-14 补充：api-gateway 已新增第一阶段 OpenTelemetry trace runtime。默认关闭；启用后会为入口 gRPC unary 请求创建 server span，支持 W3C `traceparent` parent extraction、`stdout` exporter 和 `otlp-grpc` exporter，并在 `/debug/metrics` 暴露低敏 trace config snapshot。span 只记录 method、status、latency、最终 trace/request correlation，不记录 token、tenant_id、user_id、device_id、session_id 或 request body。这仍不是全服务 trace rollout、collector / alerting 或跨 Kafka envelope trace。
 
 2026-06-14 补充：api-gateway trace runtime 已扩展到下游 gRPC client span。启用 OTel trace 后，api-gateway 调 conversation / message / delivery / receipt / contacts / identity 的 unary client 会生成 client span，并把 W3C `traceparent` 注入 outgoing metadata；client span 仍只记录 method、status、latency 和最终 correlation，不记录 token、tenant_id、user_id 或 request body。当前只是 gateway 内 server -> client span 链路，后端服务自身 OTel server span、collector / alerting 和 Kafka envelope trace 仍是后续项。
+
+2026-06-14 补充：api-gateway debug server 已新增第一阶段 Prometheus text `/metrics`。该 endpoint 复用 `/debug/metrics` 的低敏 snapshot，暴露 gRPC method/code/error/latency、facade/legacy/other exposure、auth JWK、rate-limit、runtime 和 OTel trace config 聚合指标；不把 tenant、user、token、request id、trace id 或 payload 放入 labels / samples。它只是本地 scrape / dashboard 基础，不代表生产 Prometheus、Alertmanager 或统一观测平台已完成。
 
 2026-06-14 补充：`GatewayService` public facade 已扩展 contacts-service 的 user-facing RPC：`SendContactRequest / RespondContactRequest / CancelContactRequest / ListContactRequests / ListContacts / GetContactState / DeleteContact / BlockContact / UnblockContact / UpdateContactRemark`。api-gateway 仍只做身份验证、`AuthContext` 重写和转发，不拥有联系人事实源，也不让 message-service 同步依赖 contacts-service。
 

@@ -51,12 +51,24 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, healthResponse{Service: serviceName, Status: "ready"})
 	case "/debug/metrics":
 		h.handleMetrics(w, r)
+	case "/metrics":
+		h.handlePrometheusMetrics(w, r)
 	default:
 		http.NotFound(w, r)
 	}
 }
 
 func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, h.snapshot())
+}
+
+func (h *Handler) handlePrometheusMetrics(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(renderPrometheus(h.snapshot())))
+}
+
+func (h *Handler) snapshot() Snapshot {
 	snapshot := Snapshot{
 		Service:       serviceName,
 		GeneratedAtMS: time.Now().UnixMilli(),
@@ -81,7 +93,7 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		stats := h.traceStatsFunc()
 		snapshot.Trace = &stats
 	}
-	writeJSON(w, http.StatusOK, snapshot)
+	return snapshot
 }
 
 type healthResponse struct {

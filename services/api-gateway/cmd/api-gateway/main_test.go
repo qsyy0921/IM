@@ -364,21 +364,28 @@ func TestValidateTrustedMetadataBackendConfigIgnoresBodyAuth(t *testing.T) {
 }
 
 func TestValidateAPIGatewayAuthListenerConfigAllowsPrivateAddressForMock(t *testing.T) {
-	if err := validateAPIGatewayAuthListenerConfig("172.31.50.10:12000", "mock"); err != nil {
+	if err := validateAPIGatewayAuthListenerConfig("172.31.50.10:12000", "mock", false); err != nil {
 		t.Fatalf("expected private listener mock auth to be allowed: %v", err)
 	}
 }
 
 func TestValidateAPIGatewayAuthListenerConfigRejectsPublicAddressForMock(t *testing.T) {
-	err := validateAPIGatewayAuthListenerConfig("8.8.8.8:12000", "mock")
+	err := validateAPIGatewayAuthListenerConfig("8.8.8.8:12000", "mock", false)
 	if err == nil {
 		t.Fatalf("expected public listener mock auth to be rejected")
 	}
 }
 
-func TestValidateAPIGatewayAuthListenerConfigAllowsPublicAddressForHMAC(t *testing.T) {
-	if err := validateAPIGatewayAuthListenerConfig("8.8.8.8:12000", "hmac"); err != nil {
-		t.Fatalf("expected signed auth to be allowed on public listener: %v", err)
+func TestValidateAPIGatewayAuthListenerConfigRejectsPublicAddressForSignedAuthWithoutTLS(t *testing.T) {
+	err := validateAPIGatewayAuthListenerConfig("8.8.8.8:12000", "hmac", false)
+	if err == nil {
+		t.Fatalf("expected signed auth without TLS on public listener to be rejected")
+	}
+}
+
+func TestValidateAPIGatewayAuthListenerConfigAllowsPublicAddressForSignedAuthWithTLS(t *testing.T) {
+	if err := validateAPIGatewayAuthListenerConfig("8.8.8.8:12000", "jwt", true); err != nil {
+		t.Fatalf("expected signed auth with TLS to be allowed on public listener: %v", err)
 	}
 }
 

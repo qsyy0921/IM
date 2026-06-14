@@ -41,7 +41,7 @@ CreateMemberChange
 - RS256 JWT + JWKS / issuer allowlist。
 - 默认 audience 为 `api-gateway`；如需兼容历史 `push-gateway` token，必须显式配置 `NEXUSIM_API_GATEWAY_AUTH_AUDIENCE=push-gateway`，不能作为默认生产口径。
 
-`NEXUSIM_API_GATEWAY_AUTH_MODE=mock` 只允许本地 smoke 使用。若 gateway gRPC 监听地址不是 loopback 或 RFC1918 私网地址，进程应在启动前直接失败，避免把裸 query 身份模式暴露到公网。
+`NEXUSIM_API_GATEWAY_AUTH_MODE=mock` 只允许本地 smoke 使用。若 gateway gRPC 监听地址不是 loopback 或 RFC1918 私网地址，进程应在启动前直接失败，避免把裸 query 身份模式暴露到公网。`hmac` / `jwt` 模式若用于非私网监听地址，也必须同时启用入口 gRPC TLS；否则进程应在启动前直接失败，避免把签名 token 暴露到 plaintext 公网入口。
 
 gateway 验证 token 后向下游注入：
 

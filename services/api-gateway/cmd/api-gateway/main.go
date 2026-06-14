@@ -56,7 +56,11 @@ func runGRPC() error {
 	defer stop()
 
 	listenAddr := envString("NEXUSIM_API_GATEWAY_GRPC_ADDR", "0.0.0.0:12000")
-	if err := validateAPIGatewayAuthListenerConfig(listenAddr, envString("NEXUSIM_API_GATEWAY_AUTH_MODE", "hmac")); err != nil {
+	serverTLSConfig, serverTLSEnabled, err := apiGatewayGRPCTLSConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	if err := validateAPIGatewayAuthListenerConfig(listenAddr, envString("NEXUSIM_API_GATEWAY_AUTH_MODE", "hmac"), serverTLSEnabled); err != nil {
 		return err
 	}
 
@@ -173,10 +177,8 @@ func runGRPC() error {
 		grpcMetrics.UnaryServerInterceptor(log.Default()),
 		rateLimiter.UnaryServerInterceptor(),
 	)}
-	if creds, ok, err := loadAPIGatewayGRPCCredentialsFromEnv(); err != nil {
-		return err
-	} else if ok {
-		serverOptions = append(serverOptions, grpcgo.Creds(creds))
+	if serverTLSEnabled {
+		serverOptions = append(serverOptions, grpcgo.Creds(credentials.NewTLS(serverTLSConfig)))
 	}
 	server := grpcgo.NewServer(serverOptions...)
 	registerLegacyDescriptors, err := apiGatewayRegisterLegacyDescriptors()
@@ -274,18 +276,32 @@ func validateTrustedMetadataBackendConfig(serviceName string, addr string, authM
 	return errors.New(serviceName + " uses verified metadata auth on non-private address without gateway mTLS client certificate")
 }
 
-func validateAPIGatewayAuthListenerConfig(listenAddr string, authMode string) error {
-	if !usesMockGatewayAuth(authMode) {
-		return nil
+func validateAPIGatewayAuthListenerConfig(listenAddr string, authMode string, tlsEnabled bool) error {
+	if usesMockGatewayAuth(authMode) {
+		if backendAddrTrustedWithoutMTLS(listenAddr) {
+			return nil
+		}
+		return errors.New("api-gateway uses mock auth on non-private listener address")
 	}
 	if backendAddrTrustedWithoutMTLS(listenAddr) {
 		return nil
 	}
-	return errors.New("api-gateway uses mock auth on non-private listener address")
+	if !usesSignedGatewayAuth(authMode) {
+		return nil
+	}
+	if tlsEnabled {
+		return nil
+	}
+	return errors.New("api-gateway uses signed auth on non-private listener address without gRPC TLS")
 }
 
 func usesMockGatewayAuth(authMode string) bool {
 	return strings.EqualFold(strings.TrimSpace(authMode), string(gatewayauth.ModeMock))
+}
+
+func usesSignedGatewayAuth(authMode string) bool {
+	mode := strings.TrimSpace(strings.ToLower(authMode))
+	return mode == string(gatewayauth.ModeHMAC) || mode == string(gatewayauth.ModeJWT)
 }
 
 func usesTrustedMetadataAuth(authMode string) bool {
@@ -398,14 +414,6 @@ func splitCSV(value string) []string {
 		}
 	}
 	return result
-}
-
-func loadAPIGatewayGRPCCredentialsFromEnv() (credentials.TransportCredentials, bool, error) {
-	tlsConfig, ok, err := apiGatewayGRPCTLSConfigFromEnv()
-	if err != nil || !ok {
-		return nil, ok, err
-	}
-	return credentials.NewTLS(tlsConfig), true, nil
 }
 
 func apiGatewayGRPCTLSConfigFromEnv() (*tls.Config, bool, error) {

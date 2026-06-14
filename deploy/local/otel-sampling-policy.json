@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "profiles": {
+    "local_smoke": {
+      "sampling_ratio": 1.0,
+      "purpose": "Short local smoke runs where complete trace visibility is useful."
+    },
+    "dev_interactive": {
+      "sampling_ratio": 0.25,
+      "purpose": "Interactive local development when request volume is moderate."
+    },
+    "production_starting_point": {
+      "sampling_ratio": 0.05,
+      "purpose": "Initial production-like baseline before traffic-specific tuning."
+    },
+    "high_volume_starting_point": {
+      "sampling_ratio": 0.01,
+      "purpose": "Initial baseline for high-throughput ingress, message, delivery, and push paths."
+    }
+  },
+  "services": [
+    {
+      "service": "api-gateway",
+      "env_prefix": "NEXUSIM_API_GATEWAY_OTEL",
+      "default_profile": "high_volume_starting_point",
+      "high_volume": true
+    },
+    {
+      "service": "contacts-service",
+      "env_prefix": "NEXUSIM_CONTACTS_OTEL",
+      "default_profile": "production_starting_point",
+      "high_volume": false
+    },
+    {
+      "service": "identity-service",
+      "env_prefix": "NEXUSIM_IDENTITY_OTEL",
+      "default_profile": "production_starting_point",
+      "high_volume": false
+    },
+    {
+      "service": "message-service",
+      "env_prefix": "NEXUSIM_MESSAGE_OTEL",
+      "default_profile": "high_volume_starting_point",
+      "high_volume": true
+    },
+    {
+      "service": "conversation-service",
+      "env_prefix": "NEXUSIM_CONVERSATION_OTEL",
+      "default_profile": "production_starting_point",
+      "high_volume": false
+    },
+    {
+      "service": "delivery-service",
+      "env_prefix": "NEXUSIM_DELIVERY_OTEL",
+      "default_profile": "high_volume_starting_point",
+      "high_volume": true
+    },
+    {
+      "service": "receipt-service",
+      "env_prefix": "NEXUSIM_RECEIPT_OTEL",
+      "default_profile": "production_starting_point",
+      "high_volume": false
+    },
+    {
+      "service": "policy-service",
+      "env_prefix": "NEXUSIM_POLICY_OTEL",
+      "default_profile": "production_starting_point",
+      "high_volume": false
+    }
+  ],
+  "guardrails": {
+    "production_full_sampling_requires_time_box": true,
+    "forbid_sensitive_span_attributes": true,
+    "forbid_high_cardinality_metric_labels": true
+  }
+}

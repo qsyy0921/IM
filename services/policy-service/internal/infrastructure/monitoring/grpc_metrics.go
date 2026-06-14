@@ -158,16 +158,35 @@ func firstGRPCLogMetadataValue(md metadata.MD, key string) string {
 	if len(values) == 0 {
 		return ""
 	}
-	return trimGRPCLogMetadata(values[0])
+	return sanitizeGRPCLogMetadata(values[0])
 }
 
-func trimGRPCLogMetadata(value string) string {
+func sanitizeGRPCLogMetadata(value string) string {
 	value = strings.TrimSpace(value)
-	runes := []rune(value)
-	if len(runes) <= maxGRPCLogMetadataLength {
-		return value
+	if value == "" {
+		return ""
 	}
-	return string(runes[:maxGRPCLogMetadataLength])
+	runes := []rune(value)
+	if len(runes) > maxGRPCLogMetadataLength {
+		runes = runes[:maxGRPCLogMetadataLength]
+	}
+	for _, r := range runes {
+		if isGRPCLogMetadataRune(r) {
+			continue
+		}
+		return ""
+	}
+	return string(runes)
+}
+
+func isGRPCLogMetadataRune(r rune) bool {
+	return (r >= 'a' && r <= 'z') ||
+		(r >= 'A' && r <= 'Z') ||
+		(r >= '0' && r <= '9') ||
+		r == '-' ||
+		r == '_' ||
+		r == '.' ||
+		r == ':'
 }
 
 func averageLatency(total int64, count int64) int64 {

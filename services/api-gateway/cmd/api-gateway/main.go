@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"log"
@@ -623,7 +626,7 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 	rps := envFloat64("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", 0)
 	backend := strings.ToLower(strings.TrimSpace(envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_BACKEND", "local")))
 	scope := strings.ToLower(strings.TrimSpace(envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_SCOPE", "token")))
-	tenantPlans, tenantPlanSource, err := tenantRateLimitPlansFromEnv()
+	tenantPlanSnapshot, err := tenantRateLimitPlansFromEnv()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -631,19 +634,22 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 	if err != nil {
 		return nil, nil, err
 	}
-	if tenantPlanReloadInterval > 0 && tenantPlanSource != "file" {
+	if tenantPlanReloadInterval > 0 && tenantPlanSnapshot.Source != "file" {
 		return nil, nil, errors.New("api-gateway tenant plan reload requires NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE=file")
 	}
 	config := ratelimitinfra.Config{
-		Enabled:           enabled,
-		Backend:           backend,
-		KeyScope:          scope,
-		RequestsPerSecond: rps,
-		Burst:             envInt("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", int(rps)),
-		TenantPlans:       tenantPlans,
-		TenantPlanSource:  tenantPlanSource,
-		MaxKeys:           envInt("NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS", 10000),
-		IdentityFunc:      rateLimitIdentityFunc(authenticator),
+		Enabled:                     enabled,
+		Backend:                     backend,
+		KeyScope:                    scope,
+		RequestsPerSecond:           rps,
+		Burst:                       envInt("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", int(rps)),
+		TenantPlans:                 tenantPlanSnapshot.Plans,
+		TenantPlanSource:            tenantPlanSnapshot.Source,
+		TenantPlanVersion:           tenantPlanSnapshot.Version,
+		TenantPlanGeneratedAtUnixMS: tenantPlanSnapshot.GeneratedAtUnixMS,
+		TenantPlanChecksumPresent:   tenantPlanSnapshot.ChecksumPresent,
+		MaxKeys:                     envInt("NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS", 10000),
+		IdentityFunc:                rateLimitIdentityFunc(authenticator),
 	}
 	if enabled && backend == "redis" {
 		failOpen := true
@@ -700,7 +706,28 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 	return limiter, closeFn, nil
 }
 
-func tenantRateLimitPlansFromEnv() (map[string]ratelimitinfra.Plan, string, error) {
+type tenantRateLimitPlanSnapshot struct {
+	Plans             map[string]ratelimitinfra.Plan
+	Source            string
+	Version           string
+	GeneratedAtUnixMS int64
+	ChecksumPresent   bool
+}
+
+type tenantRateLimitPlanPayload struct {
+	RequestsPerSecond float64 `json:"requests_per_second"`
+	RPS               float64 `json:"rps"`
+	Burst             int     `json:"burst"`
+}
+
+type tenantRateLimitPlanSnapshotPayload struct {
+	Version           string                                `json:"version"`
+	GeneratedAtUnixMS int64                                 `json:"generated_at_unix_ms"`
+	Checksum          string                                `json:"checksum"`
+	Plans             map[string]tenantRateLimitPlanPayload `json:"plans"`
+}
+
+func tenantRateLimitPlansFromEnv() (tenantRateLimitPlanSnapshot, error) {
 	source := strings.ToLower(strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE")))
 	raw := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON"))
 	path := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE"))
@@ -717,48 +744,100 @@ func tenantRateLimitPlansFromEnv() (map[string]ratelimitinfra.Plan, string, erro
 	switch source {
 	case "none":
 		if raw != "" || path != "" {
-			return nil, "", errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE=none cannot be used with tenant plan JSON or file")
+			return tenantRateLimitPlanSnapshot{}, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE=none cannot be used with tenant plan JSON or file")
 		}
-		return nil, source, nil
+		return tenantRateLimitPlanSnapshot{Source: source}, nil
 	case "inline", "json":
 		if raw == "" {
-			return nil, "", errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON is required when tenant plan source is inline")
+			return tenantRateLimitPlanSnapshot{}, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON is required when tenant plan source is inline")
 		}
 		source = "inline"
 	case "file":
 		if path == "" {
-			return nil, "", errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE is required when tenant plan source is file")
+			return tenantRateLimitPlanSnapshot{}, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE is required when tenant plan source is file")
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return nil, "", err
+			return tenantRateLimitPlanSnapshot{}, err
 		}
 		raw = string(data)
 	case "db", "database", "config", "config-center", "config_center":
-		return nil, "", errors.New("api-gateway tenant plan source " + source + " is not supported yet; use inline or file")
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan source " + source + " is not supported yet; use inline or file")
 	default:
-		return nil, "", errors.New("unsupported api-gateway tenant plan source")
+		return tenantRateLimitPlanSnapshot{}, errors.New("unsupported api-gateway tenant plan source")
 	}
-	plans, err := parseTenantRateLimitPlans(raw)
+	snapshot, err := parseTenantRateLimitPlanSnapshot(raw)
 	if err != nil {
-		return nil, "", err
+		return tenantRateLimitPlanSnapshot{}, err
 	}
-	return plans, source, nil
+	snapshot.Source = source
+	return snapshot, nil
 }
 
 func parseTenantRateLimitPlans(raw string) (map[string]ratelimitinfra.Plan, error) {
+	snapshot, err := parseTenantRateLimitPlanSnapshot(raw)
+	if err != nil {
+		return nil, err
+	}
+	return snapshot.Plans, nil
+}
+
+func parseTenantRateLimitPlanSnapshot(raw string) (tenantRateLimitPlanSnapshot, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return nil, nil
+		return tenantRateLimitPlanSnapshot{}, nil
 	}
-	var payload map[string]struct {
-		RequestsPerSecond float64 `json:"requests_per_second"`
-		RPS               float64 `json:"rps"`
-		Burst             int     `json:"burst"`
+	var probe map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &probe); err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
 	}
+	if _, hasVersion := probe["version"]; hasVersion || probe["checksum"] != nil || probe["generated_at_unix_ms"] != nil {
+		return parseVersionedTenantRateLimitPlanSnapshot(raw)
+	}
+	plans, err := parseTenantRateLimitPlanPayloads(raw)
+	if err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
+	}
+	return tenantRateLimitPlanSnapshot{Plans: plans}, nil
+}
+
+func parseVersionedTenantRateLimitPlanSnapshot(raw string) (tenantRateLimitPlanSnapshot, error) {
+	var payload tenantRateLimitPlanSnapshotPayload
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
+	}
+	payload.Version = strings.TrimSpace(payload.Version)
+	if payload.Version == "" {
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan snapshot version is required")
+	}
+	if payload.GeneratedAtUnixMS <= 0 {
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan snapshot generated_at_unix_ms must be greater than 0")
+	}
+	if payload.Plans == nil {
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan snapshot plans is required")
+	}
+	plans := tenantRateLimitPlansFromPayload(payload.Plans)
+	checksumPresent, err := validateTenantPlanSnapshotChecksum(payload.Checksum, plans)
+	if err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
+	}
+	return tenantRateLimitPlanSnapshot{
+		Plans:             plans,
+		Version:           payload.Version,
+		GeneratedAtUnixMS: payload.GeneratedAtUnixMS,
+		ChecksumPresent:   checksumPresent,
+	}, nil
+}
+
+func parseTenantRateLimitPlanPayloads(raw string) (map[string]ratelimitinfra.Plan, error) {
+	var payload map[string]tenantRateLimitPlanPayload
 	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
 		return nil, err
 	}
+	return tenantRateLimitPlansFromPayload(payload), nil
+}
+
+func tenantRateLimitPlansFromPayload(payload map[string]tenantRateLimitPlanPayload) map[string]ratelimitinfra.Plan {
 	plans := make(map[string]ratelimitinfra.Plan, len(payload))
 	for tenantID, item := range payload {
 		rps := item.RequestsPerSecond
@@ -767,7 +846,42 @@ func parseTenantRateLimitPlans(raw string) (map[string]ratelimitinfra.Plan, erro
 		}
 		plans[tenantID] = ratelimitinfra.Plan{RequestsPerSecond: rps, Burst: item.Burst}
 	}
-	return plans, nil
+	return plans
+}
+
+func validateTenantPlanSnapshotChecksum(expected string, plans map[string]ratelimitinfra.Plan) (bool, error) {
+	expected = strings.TrimSpace(strings.ToLower(expected))
+	if expected == "" {
+		return false, nil
+	}
+	if !strings.HasPrefix(expected, "sha256:") {
+		return true, errors.New("api-gateway tenant plan snapshot checksum must use sha256:<hex>")
+	}
+	actual, err := tenantPlanSnapshotChecksum(plans)
+	if err != nil {
+		return true, err
+	}
+	if subtle.ConstantTimeCompare([]byte(expected), []byte(actual)) != 1 {
+		return true, errors.New("api-gateway tenant plan snapshot checksum mismatch")
+	}
+	return true, nil
+}
+
+func tenantPlanSnapshotChecksum(plans map[string]ratelimitinfra.Plan) (string, error) {
+	type normalizedPlan struct {
+		RequestsPerSecond float64 `json:"requests_per_second"`
+		Burst             int     `json:"burst,omitempty"`
+	}
+	normalized := make(map[string]normalizedPlan, len(plans))
+	for tenantID, plan := range plans {
+		normalized[tenantID] = normalizedPlan{RequestsPerSecond: plan.RequestsPerSecond, Burst: plan.Burst}
+	}
+	data, err := json.Marshal(normalized)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(data)
+	return "sha256:" + hex.EncodeToString(sum[:]), nil
 }
 
 func tenantPlanReloadIntervalFromEnv() (time.Duration, error) {
@@ -801,13 +915,13 @@ func startTenantPlanReloader(ctx context.Context, limiter *ratelimitinfra.Limite
 			case <-reloadCtx.Done():
 				return
 			case <-ticker.C:
-				plans, err := tenantRateLimitPlansFromFile(path)
+				snapshot, err := tenantRateLimitPlansFromFile(path)
 				if err != nil {
 					limiter.RecordTenantPlanReloadError()
 					log.Printf("api-gateway tenant rate limit plan reload failed: %v", err)
 					continue
 				}
-				if err := limiter.UpdateTenantPlans(plans); err != nil {
+				if err := limiter.UpdateTenantPlanSnapshot(snapshot.Plans, snapshot.Version, snapshot.GeneratedAtUnixMS, snapshot.ChecksumPresent); err != nil {
 					log.Printf("api-gateway tenant rate limit plan reload rejected: %v", err)
 				}
 			}
@@ -820,12 +934,17 @@ func startTenantPlanReloader(ctx context.Context, limiter *ratelimitinfra.Limite
 	}, nil
 }
 
-func tenantRateLimitPlansFromFile(path string) (map[string]ratelimitinfra.Plan, error) {
+func tenantRateLimitPlansFromFile(path string) (tenantRateLimitPlanSnapshot, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return tenantRateLimitPlanSnapshot{}, err
 	}
-	return parseTenantRateLimitPlans(string(data))
+	snapshot, err := parseTenantRateLimitPlanSnapshot(string(data))
+	if err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
+	}
+	snapshot.Source = "file"
+	return snapshot, nil
 }
 
 func combineCloseFuncs(functions ...func() error) func() error {

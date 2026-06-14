@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"math/big"
 	"net/http/httptest"
@@ -406,15 +407,48 @@ func TestTenantRateLimitPlansFromEnvLoadsFile(t *testing.T) {
 		t.Fatalf("write tenant plans file: %v", err)
 	}
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE", path)
-	plans, source, err := tenantRateLimitPlansFromEnv()
+	snapshot, err := tenantRateLimitPlansFromEnv()
 	if err != nil {
 		t.Fatalf("load tenant plans file: %v", err)
 	}
-	if source != "file" {
-		t.Fatalf("expected file tenant plan source, got %q", source)
+	if snapshot.Source != "file" {
+		t.Fatalf("expected file tenant plan source, got %q", snapshot.Source)
 	}
-	if plans["tenant-a"].RequestsPerSecond != 5 || plans["tenant-a"].Burst != 6 {
-		t.Fatalf("unexpected tenant plan from file: %+v", plans["tenant-a"])
+	if snapshot.Plans["tenant-a"].RequestsPerSecond != 5 || snapshot.Plans["tenant-a"].Burst != 6 {
+		t.Fatalf("unexpected tenant plan from file: %+v", snapshot.Plans["tenant-a"])
+	}
+}
+
+func TestTenantRateLimitPlansFromEnvLoadsVersionedFileSnapshot(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	path := filepath.Join(t.TempDir(), "tenant-plans.json")
+	plans := map[string]ratelimitinfra.Plan{"tenant-a": {RequestsPerSecond: 5, Burst: 6}}
+	if err := os.WriteFile(path, []byte(versionedTenantPlanSnapshotJSON(t, plans, "quota-v1.20260614", 1_800_000_000_000)), 0o600); err != nil {
+		t.Fatalf("write tenant plans file: %v", err)
+	}
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE", path)
+	snapshot, err := tenantRateLimitPlansFromEnv()
+	if err != nil {
+		t.Fatalf("load versioned tenant plans file: %v", err)
+	}
+	if snapshot.Source != "file" || snapshot.Version != "quota-v1.20260614" || snapshot.GeneratedAtUnixMS != 1_800_000_000_000 || !snapshot.ChecksumPresent {
+		t.Fatalf("unexpected versioned tenant plan snapshot: %+v", snapshot)
+	}
+	if snapshot.Plans["tenant-a"].RequestsPerSecond != 5 || snapshot.Plans["tenant-a"].Burst != 6 {
+		t.Fatalf("unexpected tenant plan from versioned file: %+v", snapshot.Plans["tenant-a"])
+	}
+}
+
+func TestTenantRateLimitPlansFromEnvRejectsVersionedFileChecksumMismatch(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	path := filepath.Join(t.TempDir(), "tenant-plans.json")
+	payload := `{"version":"quota-v1.20260614","generated_at_unix_ms":1800000000000,"checksum":"sha256:0000000000000000000000000000000000000000000000000000000000000000","plans":{"tenant-a":{"requests_per_second":5,"burst":6}}}`
+	if err := os.WriteFile(path, []byte(payload), 0o600); err != nil {
+		t.Fatalf("write tenant plans file: %v", err)
+	}
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE", path)
+	if _, err := tenantRateLimitPlansFromEnv(); err == nil {
+		t.Fatalf("expected checksum mismatch to fail")
 	}
 }
 
@@ -422,22 +456,22 @@ func TestTenantRateLimitPlansFromEnvLoadsExplicitInlineSource(t *testing.T) {
 	clearAPIGatewayRateLimitConfig(t)
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE", "inline")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON", `{"tenant-a":{"requests_per_second":7,"burst":8}}`)
-	plans, source, err := tenantRateLimitPlansFromEnv()
+	snapshot, err := tenantRateLimitPlansFromEnv()
 	if err != nil {
 		t.Fatalf("load inline tenant plans: %v", err)
 	}
-	if source != "inline" {
-		t.Fatalf("expected inline tenant plan source, got %q", source)
+	if snapshot.Source != "inline" {
+		t.Fatalf("expected inline tenant plan source, got %q", snapshot.Source)
 	}
-	if plans["tenant-a"].RequestsPerSecond != 7 || plans["tenant-a"].Burst != 8 {
-		t.Fatalf("unexpected tenant plan from inline source: %+v", plans["tenant-a"])
+	if snapshot.Plans["tenant-a"].RequestsPerSecond != 7 || snapshot.Plans["tenant-a"].Burst != 8 {
+		t.Fatalf("unexpected tenant plan from inline source: %+v", snapshot.Plans["tenant-a"])
 	}
 }
 
 func TestTenantRateLimitPlansFromEnvRejectsInvalidJSON(t *testing.T) {
 	clearAPIGatewayRateLimitConfig(t)
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON", "{")
-	if _, _, err := tenantRateLimitPlansFromEnv(); err == nil {
+	if _, err := tenantRateLimitPlansFromEnv(); err == nil {
 		t.Fatalf("expected invalid tenant plans JSON to fail")
 	}
 }
@@ -445,7 +479,7 @@ func TestTenantRateLimitPlansFromEnvRejectsInvalidJSON(t *testing.T) {
 func TestTenantRateLimitPlansFromEnvRejectsUnsupportedSource(t *testing.T) {
 	clearAPIGatewayRateLimitConfig(t)
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE", "db")
-	if _, _, err := tenantRateLimitPlansFromEnv(); err == nil {
+	if _, err := tenantRateLimitPlansFromEnv(); err == nil {
 		t.Fatalf("expected unsupported tenant plan source to fail closed")
 	}
 }
@@ -493,7 +527,8 @@ func TestStartTenantPlanReloaderRequiresFile(t *testing.T) {
 
 func TestStartTenantPlanReloaderUpdatesLimiter(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tenant-plans.json")
-	if err := os.WriteFile(path, []byte(`{"tenant-vip":{"requests_per_second":10,"burst":2}}`), 0o600); err != nil {
+	plans := map[string]ratelimitinfra.Plan{"tenant-vip": {RequestsPerSecond: 10, Burst: 2}}
+	if err := os.WriteFile(path, []byte(versionedTenantPlanSnapshotJSON(t, plans, "quota-v1.reload", 1_800_000_000_100)), 0o600); err != nil {
 		t.Fatalf("write tenant plans: %v", err)
 	}
 	limiter, err := ratelimitinfra.New(ratelimitinfra.Config{
@@ -519,7 +554,7 @@ func TestStartTenantPlanReloaderUpdatesLimiter(t *testing.T) {
 
 	waitForAPIGatewayTestCondition(t, time.Second, func() bool {
 		snapshot := limiter.Snapshot()
-		return snapshot.TenantPlans == 1 && snapshot.TenantReloads > 0 && snapshot.TenantReloadAt > 0
+		return snapshot.TenantPlans == 1 && snapshot.TenantReloads > 0 && snapshot.TenantReloadAt > 0 && snapshot.TenantPlanVersion == "quota-v1.reload"
 	})
 
 	interceptor := limiter.UnaryServerInterceptor()
@@ -811,6 +846,33 @@ func signAPIGatewayTestToken(t *testing.T, tenantID string, userID string) strin
 		t.Fatalf("sign api-gateway token: %v", err)
 	}
 	return token
+}
+
+func versionedTenantPlanSnapshotJSON(t *testing.T, plans map[string]ratelimitinfra.Plan, version string, generatedAtUnixMS int64) string {
+	t.Helper()
+	checksum, err := tenantPlanSnapshotChecksum(plans)
+	if err != nil {
+		t.Fatalf("calculate tenant plan checksum: %v", err)
+	}
+	type planPayload struct {
+		RequestsPerSecond float64 `json:"requests_per_second"`
+		Burst             int     `json:"burst"`
+	}
+	payloadPlans := make(map[string]planPayload, len(plans))
+	for tenantID, plan := range plans {
+		payloadPlans[tenantID] = planPayload{RequestsPerSecond: plan.RequestsPerSecond, Burst: plan.Burst}
+	}
+	payload := map[string]any{
+		"version":              version,
+		"generated_at_unix_ms": generatedAtUnixMS,
+		"checksum":             checksum,
+		"plans":                payloadPlans,
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal tenant plan snapshot: %v", err)
+	}
+	return string(data)
 }
 
 func writeAPIGatewayTLSTestCert(t *testing.T, dir string, name string) (string, string) {

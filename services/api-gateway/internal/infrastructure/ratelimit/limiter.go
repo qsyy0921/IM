@@ -32,20 +32,23 @@ const (
 )
 
 type Config struct {
-	Enabled           bool
-	Backend           string
-	KeyScope          string
-	RequestsPerSecond float64
-	Burst             int
-	TenantPlans       map[string]Plan
-	TenantPlanSource  string
-	MaxKeys           int
-	RedisClient       redis.UniversalClient
-	RedisKeyPrefix    string
-	RedisWindow       time.Duration
-	RedisFailOpen     bool
-	IdentityFunc      IdentityFunc
-	Now               func() time.Time
+	Enabled                     bool
+	Backend                     string
+	KeyScope                    string
+	RequestsPerSecond           float64
+	Burst                       int
+	TenantPlans                 map[string]Plan
+	TenantPlanSource            string
+	TenantPlanVersion           string
+	TenantPlanGeneratedAtUnixMS int64
+	TenantPlanChecksumPresent   bool
+	MaxKeys                     int
+	RedisClient                 redis.UniversalClient
+	RedisKeyPrefix              string
+	RedisWindow                 time.Duration
+	RedisFailOpen               bool
+	IdentityFunc                IdentityFunc
+	Now                         func() time.Time
 }
 
 type Identity struct {
@@ -61,21 +64,24 @@ type Plan struct {
 }
 
 type Limiter struct {
-	enabled  bool
-	backend  string
-	scope    string
-	rate     float64
-	burst    float64
-	source   string
-	plansMu  sync.RWMutex
-	plans    map[string]quotaPlan
-	maxKeys  int
-	redis    redis.UniversalClient
-	prefix   string
-	window   time.Duration
-	failOpen bool
-	identity IdentityFunc
-	now      func() time.Time
+	enabled           bool
+	backend           string
+	scope             string
+	rate              float64
+	burst             float64
+	source            string
+	planVersion       string
+	planGeneratedAtMS int64
+	planChecksum      bool
+	plansMu           sync.RWMutex
+	plans             map[string]quotaPlan
+	maxKeys           int
+	redis             redis.UniversalClient
+	prefix            string
+	window            time.Duration
+	failOpen          bool
+	identity          IdentityFunc
+	now               func() time.Time
 
 	mu             sync.Mutex
 	buckets        map[string]*bucket
@@ -107,24 +113,27 @@ type requestQuota struct {
 }
 
 type Snapshot struct {
-	Enabled          bool    `json:"enabled"`
-	Backend          string  `json:"backend,omitempty"`
-	KeyScope         string  `json:"key_scope,omitempty"`
-	RatePerSecond    float64 `json:"rate_per_second,omitempty"`
-	Burst            int     `json:"burst,omitempty"`
-	TenantPlans      int     `json:"tenant_plan_count,omitempty"`
-	TenantPlanSource string  `json:"tenant_plan_source,omitempty"`
-	TenantReloads    int64   `json:"tenant_plan_reload_count,omitempty"`
-	TenantReloadAt   int64   `json:"tenant_plan_reloaded_at_unix_ms,omitempty"`
-	TenantErrors     int64   `json:"tenant_plan_reload_error_count,omitempty"`
-	TrackedKeys      int     `json:"tracked_keys,omitempty"`
-	MaxKeys          int     `json:"max_keys,omitempty"`
-	RedisWindowMS    int64   `json:"redis_window_ms,omitempty"`
-	RedisFailOpen    bool    `json:"redis_fail_open,omitempty"`
-	RedisErrors      int64   `json:"redis_error_count,omitempty"`
-	IdentityErrors   int64   `json:"identity_error_count,omitempty"`
-	TotalAccepted    int64   `json:"total_accepted"`
-	TotalLimited     int64   `json:"total_limited"`
+	Enabled                   bool    `json:"enabled"`
+	Backend                   string  `json:"backend,omitempty"`
+	KeyScope                  string  `json:"key_scope,omitempty"`
+	RatePerSecond             float64 `json:"rate_per_second,omitempty"`
+	Burst                     int     `json:"burst,omitempty"`
+	TenantPlans               int     `json:"tenant_plan_count,omitempty"`
+	TenantPlanSource          string  `json:"tenant_plan_source,omitempty"`
+	TenantPlanVersion         string  `json:"tenant_plan_version,omitempty"`
+	TenantPlanGeneratedAt     int64   `json:"tenant_plan_generated_at_unix_ms,omitempty"`
+	TenantPlanChecksumPresent bool    `json:"tenant_plan_checksum_present,omitempty"`
+	TenantReloads             int64   `json:"tenant_plan_reload_count,omitempty"`
+	TenantReloadAt            int64   `json:"tenant_plan_reloaded_at_unix_ms,omitempty"`
+	TenantErrors              int64   `json:"tenant_plan_reload_error_count,omitempty"`
+	TrackedKeys               int     `json:"tracked_keys,omitempty"`
+	MaxKeys                   int     `json:"max_keys,omitempty"`
+	RedisWindowMS             int64   `json:"redis_window_ms,omitempty"`
+	RedisFailOpen             bool    `json:"redis_fail_open,omitempty"`
+	RedisErrors               int64   `json:"redis_error_count,omitempty"`
+	IdentityErrors            int64   `json:"identity_error_count,omitempty"`
+	TotalAccepted             int64   `json:"total_accepted"`
+	TotalLimited              int64   `json:"total_limited"`
 }
 
 func New(config Config) (*Limiter, error) {
@@ -137,20 +146,23 @@ func New(config Config) (*Limiter, error) {
 		scope = scopeToken
 	}
 	limiter := &Limiter{
-		enabled:  config.Enabled,
-		backend:  backend,
-		scope:    scope,
-		rate:     config.RequestsPerSecond,
-		burst:    float64(config.Burst),
-		source:   strings.TrimSpace(config.TenantPlanSource),
-		maxKeys:  config.MaxKeys,
-		redis:    config.RedisClient,
-		prefix:   strings.Trim(strings.TrimSpace(config.RedisKeyPrefix), ":"),
-		window:   config.RedisWindow,
-		failOpen: config.RedisFailOpen,
-		identity: config.IdentityFunc,
-		now:      config.Now,
-		buckets:  make(map[string]*bucket),
+		enabled:           config.Enabled,
+		backend:           backend,
+		scope:             scope,
+		rate:              config.RequestsPerSecond,
+		burst:             float64(config.Burst),
+		source:            strings.TrimSpace(config.TenantPlanSource),
+		planVersion:       strings.TrimSpace(config.TenantPlanVersion),
+		planGeneratedAtMS: config.TenantPlanGeneratedAtUnixMS,
+		planChecksum:      config.TenantPlanChecksumPresent,
+		maxKeys:           config.MaxKeys,
+		redis:             config.RedisClient,
+		prefix:            strings.Trim(strings.TrimSpace(config.RedisKeyPrefix), ":"),
+		window:            config.RedisWindow,
+		failOpen:          config.RedisFailOpen,
+		identity:          config.IdentityFunc,
+		now:               config.Now,
+		buckets:           make(map[string]*bucket),
 	}
 	if limiter.now == nil {
 		limiter.now = time.Now
@@ -234,31 +246,41 @@ func (limiter *Limiter) Snapshot() Snapshot {
 
 	limiter.plansMu.RLock()
 	tenantPlanCount := len(limiter.plans)
+	tenantPlanVersion := limiter.planVersion
+	tenantPlanGeneratedAtMS := limiter.planGeneratedAtMS
+	tenantPlanChecksumPresent := limiter.planChecksum
 	limiter.plansMu.RUnlock()
 
 	return Snapshot{
-		Enabled:          limiter.enabled,
-		Backend:          limiter.backend,
-		KeyScope:         limiter.scope,
-		RatePerSecond:    limiter.rate,
-		Burst:            int(limiter.burst),
-		TenantPlans:      tenantPlanCount,
-		TenantPlanSource: limiter.source,
-		TenantReloads:    limiter.planReloads.Load(),
-		TenantReloadAt:   limiter.planReloadAtMS.Load(),
-		TenantErrors:     limiter.planReloadErrs.Load(),
-		TrackedKeys:      trackedKeys,
-		MaxKeys:          limiter.maxKeys,
-		RedisWindowMS:    limiter.window.Milliseconds(),
-		RedisFailOpen:    limiter.failOpen,
-		RedisErrors:      limiter.redisErrors.Load(),
-		IdentityErrors:   limiter.identityErrors.Load(),
-		TotalAccepted:    totalAccepted,
-		TotalLimited:     totalLimited,
+		Enabled:                   limiter.enabled,
+		Backend:                   limiter.backend,
+		KeyScope:                  limiter.scope,
+		RatePerSecond:             limiter.rate,
+		Burst:                     int(limiter.burst),
+		TenantPlans:               tenantPlanCount,
+		TenantPlanSource:          limiter.source,
+		TenantPlanVersion:         tenantPlanVersion,
+		TenantPlanGeneratedAt:     tenantPlanGeneratedAtMS,
+		TenantPlanChecksumPresent: tenantPlanChecksumPresent,
+		TenantReloads:             limiter.planReloads.Load(),
+		TenantReloadAt:            limiter.planReloadAtMS.Load(),
+		TenantErrors:              limiter.planReloadErrs.Load(),
+		TrackedKeys:               trackedKeys,
+		MaxKeys:                   limiter.maxKeys,
+		RedisWindowMS:             limiter.window.Milliseconds(),
+		RedisFailOpen:             limiter.failOpen,
+		RedisErrors:               limiter.redisErrors.Load(),
+		IdentityErrors:            limiter.identityErrors.Load(),
+		TotalAccepted:             totalAccepted,
+		TotalLimited:              totalLimited,
 	}
 }
 
 func (limiter *Limiter) UpdateTenantPlans(plans map[string]Plan) error {
+	return limiter.UpdateTenantPlanSnapshot(plans, "", 0, false)
+}
+
+func (limiter *Limiter) UpdateTenantPlanSnapshot(plans map[string]Plan, version string, generatedAtUnixMS int64, checksumPresent bool) error {
 	if limiter == nil {
 		return nil
 	}
@@ -269,6 +291,9 @@ func (limiter *Limiter) UpdateTenantPlans(plans map[string]Plan) error {
 	}
 	limiter.plansMu.Lock()
 	limiter.plans = normalized
+	limiter.planVersion = strings.TrimSpace(version)
+	limiter.planGeneratedAtMS = generatedAtUnixMS
+	limiter.planChecksum = checksumPresent
 	limiter.plansMu.Unlock()
 	limiter.planReloads.Add(1)
 	now := time.Now

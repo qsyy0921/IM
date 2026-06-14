@@ -738,6 +738,28 @@ func TestValidateTrustedMetadataListenerConfigIgnoresBodyAuth(t *testing.T) {
 	}
 }
 
+func TestValidateIdentityDebugListenerConfigAllowsEmptyOrPrivateAddress(t *testing.T) {
+	for _, addr := range []string{"", "127.0.0.1:11905", "localhost:11905", "172.31.50.10:11905"} {
+		if err := validateIdentityDebugListenerConfig(addr, false); err != nil {
+			t.Fatalf("expected identity debug listener %q to be allowed: %v", addr, err)
+		}
+	}
+}
+
+func TestValidateIdentityDebugListenerConfigRejectsPublicAddressByDefault(t *testing.T) {
+	for _, addr := range []string{"0.0.0.0:11905", ":11905", "8.8.8.8:11905"} {
+		if err := validateIdentityDebugListenerConfig(addr, false); err == nil {
+			t.Fatalf("expected identity debug listener %q to be rejected by default", addr)
+		}
+	}
+}
+
+func TestValidateIdentityDebugListenerConfigAllowsExplicitPublicOptIn(t *testing.T) {
+	if err := validateIdentityDebugListenerConfig("0.0.0.0:11905", true); err != nil {
+		t.Fatalf("expected explicit public identity debug listener opt-in to be allowed: %v", err)
+	}
+}
+
 func TestLoadIdentityGRPCCredentialsFromEnvRequiresCertKeyPair(t *testing.T) {
 	clearIdentityGRPCTLSConfig(t)
 	t.Setenv("NEXUSIM_IDENTITY_GRPC_TLS_CERT_FILE", "server.crt")

@@ -183,7 +183,11 @@ func runGRPC() error {
 	if err != nil {
 		return err
 	}
-	stopDebug, err := startDebugServer(ctx, identityDebugAddr(), monitoringinfra.NewHandler(pool, grpcMetrics).
+	debugAddr, err := identityDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool, grpcMetrics).
 		WithJWKSet(jwkSet).
 		WithChallengeDeliveryMetrics(challengeDeliveryMetrics).
 		WithTraceStats(traceRuntime.Snapshot))
@@ -895,7 +899,11 @@ func runOutboxRelay() error {
 			Logf:           log.Printf,
 		},
 	)
-	stopDebug, err := startDebugServer(ctx, identityDebugAddr(), monitoringinfra.NewHandler(pool).WithOutboxRelayStats(relay.Snapshot))
+	debugAddr, err := identityDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool).WithOutboxRelayStats(relay.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -938,7 +946,11 @@ func runChallengeDeliveryWorker() error {
 			Logf:           log.Printf,
 		},
 	)
-	stopDebug, err := startDebugServer(ctx, identityDebugAddr(), monitoringinfra.NewHandler(pool).
+	debugAddr, err := identityDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool).
 		WithChallengeDeliveryMetrics(challengeDeliveryMetrics).
 		WithChallengeDeliveryWorkerStats(worker.Snapshot))
 	if err != nil {
@@ -1235,6 +1247,28 @@ func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {
 
 func identityDebugAddr() string {
 	return envString("NEXUSIM_IDENTITY_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
+}
+
+func identityDebugAddrFromEnv() (string, error) {
+	addr := identityDebugAddr()
+	allowPublic, _, err := envOptionalBool("NEXUSIM_IDENTITY_DEBUG_ALLOW_PUBLIC")
+	if err != nil {
+		return "", err
+	}
+	return addr, validateIdentityDebugListenerConfig(addr, allowPublic)
+}
+
+func validateIdentityDebugListenerConfig(addr string, allowPublic bool) error {
+	if strings.TrimSpace(addr) == "" {
+		return nil
+	}
+	if listenerAddrTrustedWithoutMTLS(addr) {
+		return nil
+	}
+	if allowPublic {
+		return nil
+	}
+	return errors.New("identity-service debug listener address is non-private; set NEXUSIM_IDENTITY_DEBUG_ALLOW_PUBLIC=true to allow")
 }
 
 func newGRPCServer(grpcMetrics *monitoringinfra.GRPCMetrics) (*grpc.Server, error) {

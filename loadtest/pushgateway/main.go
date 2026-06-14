@@ -410,7 +410,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "push-device-1", "online receiver device id")
 	var receiverDeviceIDs string
 	flag.StringVar(&receiverDeviceIDs, "receiver-device-ids", "", "comma separated online receiver device ids; overrides receiver-device-id when set")
-	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, message-change-notify, resume-replay, cross-instance-resume, slow-client, redis-fault, redis-sentinel-failover, redis-sentinel-master-stop, or identity-revoke")
+	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, message-change-notify, resume-replay, cross-instance-resume, slow-client, redis-fault, redis-sentinel-failover, redis-sentinel-master-stop, redis-sentinel-quorum-loss, or identity-revoke")
 	flag.IntVar(&cfg.slowMessageCount, "slow-message-count", 128, "number of messages sent while slow client does not read")
 	flag.StringVar(&cfg.messageChangeAction, "message-change-action", "edit", "message-change-notify action: edit, revoke, or delete")
 	flag.StringVar(&cfg.pushMetricsURL, "push-metrics-url", "", "push-gateway debug metrics URL")
@@ -609,6 +609,8 @@ func run(cfg config) error {
 		return runResumeReplayScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "redis-sentinel-master-stop":
 		return runResumeReplayScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
+	case "redis-sentinel-quorum-loss":
+		return runRedisFaultScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "slow-client":
 		return runSlowClientScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "redis-fault":
@@ -1169,8 +1171,15 @@ func runRedisFaultScenario(
 	result.SendMessage = sendSummary{MessageID: send.GetMessageId(), ConversationSeq: send.GetConversationSeq()}
 
 	fault := &redisFaultSummary{FaultCommand: cfg.redisFaultCommand, CommandOutput: output}
-	fault.NotifyReceived = false
-	fault.NotifyWaitError = "not attempted; redis-fault scenario validates durable PullInbox fallback without blocking the WebSocket read path"
+	notify, notifyErr := waitNotifyFor(ctx, cfg, conn, time.Second)
+	if notifyErr == nil {
+		fault.NotifyReceived = true
+		fault.UnexpectedNotify = snapshotFrame(notify)
+		fault.NotifyWaitError = "online notify still arrived within 1s during redis-fault observation window"
+	} else {
+		fault.NotifyReceived = false
+		fault.NotifyWaitError = notifyErr.Error()
+	}
 
 	pull, err := pullInboxAtLeast(ctx, cfg, deliveryClient, 0, 100, 1, send.GetConversationSeq())
 	if err != nil {

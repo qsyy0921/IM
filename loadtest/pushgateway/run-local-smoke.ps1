@@ -10,7 +10,7 @@ param(
     [string]$TenantId = "",
     [string]$ConversationId = "",
     [string]$ReceiverDeviceIds = "push-device-1",
-    [ValidateSet("full", "message-change-notify", "resume-replay", "cross-instance-resume", "slow-client", "redis-fault", "redis-sentinel-failover", "redis-sentinel-master-stop", "identity-revoke")]
+    [ValidateSet("full", "message-change-notify", "resume-replay", "cross-instance-resume", "slow-client", "redis-fault", "redis-sentinel-failover", "redis-sentinel-master-stop", "redis-sentinel-quorum-loss", "identity-revoke")]
     [string]$Scenario = "full",
     [ValidateSet("edit", "revoke", "delete")]
     [string]$MessageChangeAction = "edit",
@@ -126,6 +126,9 @@ if ($Scenario -eq "redis-sentinel-failover") {
 if ($Scenario -eq "redis-sentinel-master-stop") {
     $runnerRequestTimeout = "90s"
 }
+if ($Scenario -eq "redis-sentinel-quorum-loss") {
+    $runnerRequestTimeout = "90s"
+}
 $userFacingAuthMode = if ($VerifiedAuthMetadata) { "metadata" } else { "body" }
 
 New-Item -ItemType Directory -Force $resultDir | Out-Null
@@ -178,6 +181,96 @@ if ($role.Count -lt 1 -or $role[0].Trim() -ne "master") {
 Write-Output "sentinel_master_after=$afterAddr"
 '@ | Set-Content -LiteralPath $failoverScript -Encoding UTF8
         $RedisFaultCommand = "& '$failoverScript'"
+    }
+}
+if ($Scenario -eq "redis-sentinel-quorum-loss") {
+    if ($RouteBackend -ne "redis") {
+        throw "redis-sentinel-quorum-loss requires -RouteBackend redis"
+    }
+    if ($RedisMode -ne "sentinel") {
+        throw "redis-sentinel-quorum-loss requires -RedisMode sentinel"
+    }
+    if (-not $RedisFaultCommand) {
+        $faultScript = Join-Path $resultDir "redis-sentinel-quorum-loss.ps1"
+        @'
+$ErrorActionPreference = "Stop"
+$portToContainer = @{
+    "6380" = "nexusim-redis-ha-master"
+    "6381" = "nexusim-redis-ha-replica-1"
+    "6382" = "nexusim-redis-ha-replica-2"
+}
+$before = @(docker exec nexusim-redis-sentinel-1 redis-cli -p 26379 SENTINEL get-master-addr-by-name mymaster)
+if ($before.Count -lt 2) {
+    throw "Sentinel did not return a current master before quorum-loss fault."
+}
+$beforeHost = $before[0].Trim()
+$beforePort = $before[1].Trim()
+$beforeAddr = "${beforeHost}:${beforePort}"
+if (-not $portToContainer.ContainsKey($beforePort)) {
+    throw "No local Redis container mapping for Sentinel master port $beforePort"
+}
+$masterContainer = $portToContainer[$beforePort]
+$stoppedSentinels = @("nexusim-redis-sentinel-2", "nexusim-redis-sentinel-3")
+$allStopped = @($masterContainer) + $stoppedSentinels
+Set-Content -LiteralPath (Join-Path $PSScriptRoot "redis-sentinel-quorum-loss-stopped.txt") -Value ($allStopped -join "`n") -Encoding ASCII
+Write-Output "sentinel_master_before=$beforeAddr"
+Write-Output "stopped_master_container=$masterContainer"
+Write-Output "stopped_sentinels=$($stoppedSentinels -join ',')"
+foreach ($container in $stoppedSentinels) {
+    docker stop $container | Out-Null
+}
+docker stop $masterContainer | Out-Null
+$post = @(docker exec nexusim-redis-sentinel-1 redis-cli -p 26379 SENTINEL get-master-addr-by-name mymaster 2>$null)
+if ($post.Count -ge 2) {
+    Write-Output ("sentinel_master_after_fault=" + $post[0].Trim() + ":" + $post[1].Trim())
+} else {
+    Write-Output "sentinel_master_after_fault=unavailable"
+}
+'@ | Set-Content -LiteralPath $faultScript -Encoding UTF8
+        $RedisFaultCommand = "& '$faultScript'"
+    }
+    if (-not $RedisRestoreCommand) {
+        $restoreScript = Join-Path $resultDir "redis-sentinel-quorum-restore.ps1"
+        @'
+$ErrorActionPreference = "Stop"
+$stoppedFile = Join-Path $PSScriptRoot "redis-sentinel-quorum-loss-stopped.txt"
+if (-not (Test-Path -LiteralPath $stoppedFile)) {
+    Write-Output "sentinel_restore=skipped_no_stopped_file"
+    return
+}
+$containers = @(
+    Get-Content -LiteralPath $stoppedFile |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_ -ne "" }
+)
+if ($containers.Count -eq 0) {
+    Write-Output "sentinel_restore=skipped_empty_stopped_list"
+    return
+}
+foreach ($container in $containers) {
+    docker start $container | Out-Null
+}
+$deadline = (Get-Date).AddSeconds(90)
+$ready = $false
+do {
+    Start-Sleep -Seconds 2
+    $sentinelState = docker inspect -f "{{.State.Health.Status}}" nexusim-redis-sentinel-1 2>$null
+    $sentinelMaster = @(docker exec nexusim-redis-sentinel-1 redis-cli -p 26379 SENTINEL get-master-addr-by-name mymaster 2>$null)
+    $ready = $sentinelState -eq "healthy" -and $sentinelMaster.Count -ge 2
+} while (-not $ready -and (Get-Date) -lt $deadline)
+if (-not $ready) {
+    throw "Redis Sentinel quorum restore did not recover before timeout."
+}
+$masterHost = $sentinelMaster[0].Trim()
+$masterPort = $sentinelMaster[1].Trim()
+$ping = @(docker exec nexusim-redis-sentinel-1 redis-cli -h $masterHost -p $masterPort ping)
+if ($ping.Count -lt 1 -or $ping[0].Trim() -ne "PONG") {
+    throw "Recovered Sentinel master did not respond to PING: $($ping -join ',')"
+}
+Write-Output "sentinel_restored_containers=$($containers -join ',')"
+Write-Output "sentinel_master_after_restore=${masterHost}:${masterPort}"
+'@ | Set-Content -LiteralPath $restoreScript -Encoding UTF8
+        $RedisRestoreCommand = "& '$restoreScript'"
     }
 }
 if ($Scenario -eq "redis-sentinel-master-stop") {
@@ -824,6 +917,9 @@ try {
         Wait-Tcp -HostName "127.0.0.1" -Port 6379 -TimeoutSeconds 20
     }
     if ($Scenario -eq "redis-sentinel-master-stop" -and $RedisRestoreCommand) {
+        Invoke-Expression $RedisRestoreCommand
+    }
+    if ($Scenario -eq "redis-sentinel-quorum-loss" -and $RedisRestoreCommand) {
         Invoke-Expression $RedisRestoreCommand
     }
 }

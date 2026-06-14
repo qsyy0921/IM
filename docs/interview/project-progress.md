@@ -5,7 +5,7 @@
 - 已经开发了哪些后端能力；
 - 当前系统能证明什么；
 - 还差哪些生产化和产品化能力；
-- 后续为什么先做后端，再做客户端和 AI 扩展。
+- 后续如何从后端主链路推进到分布式可靠性和 AI 应用后端。
 
 它不是每轮 Codex 工作入口；每轮工作仍先看 `docs/runbook/current-brief.md`。
 
@@ -107,11 +107,43 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 - outbox / projection repair 和 cleanup operator；
 - 低敏 debug metrics，不暴露 token、secret、TOTP、recovery code、用户敏感标识。
 
-## 还没有完成的后端能力
+## 待开发功能清单
 
-### 生产级分布式平台能力
+这里按面试表达分层。当前没有已知 P0 / P1 阻塞；下面主要是还没完成的产品能力、生产化能力和大模型应用能力。
 
-仍未完整证明：
+### 短期：继续把 9 个核心服务做干净
+
+短期不急着新开服务，先把已有 9 个服务收口：
+
+| 服务 | 待开发 / 待完善功能 |
+| --- | --- |
+| `api-gateway` | 统一 OpenTelemetry trace、租户级配额、legacy descriptor 从默认兼容迁移到显式 opt-in、生产部署治理 |
+| `identity-service` | WebAuthn / passkeys、OIDC federation、多 issuer、KMS / HSM key management、完整登录风控、SMS provider、bounce handling、多租户通知模板 |
+| `message-service` | 更多消息类型、私有删除、合规删除、容量压测、生产级发送链路观测 |
+| `conversation-service` | 更完整群管理、owner transfer 策略细化、成员可见窗口历史 repair |
+| `delivery-service` | Projection DLQ / repair 深化、更多 delivery event 消费方、投递容量压测 |
+| `push-gateway` | Redis 网络分区 smoke、跨实例 resume 强化、在线连接容量测试、慢连接组合故障验证 |
+| `receipt-service` | 送达回执扩展、批量接口优化、会话列表产品化 |
+| `contacts-service` | 联系人分组、联系人搜索、更多隐私策略 |
+| `policy-service` | 完整 ReBAC、moderation policy、tenant DSL / quota、外部 audit sink |
+
+### 中期：完整 IM 产品后端
+
+等 9 个服务稳定后，再补产品级后端服务。服务数量不写死，只有满足独立数据模型、独立伸缩需求、独立故障边界或能明显降低现有服务复杂度时才拆。
+
+| 待开发服务 / 能力 | 目标 |
+| --- | --- |
+| `search-service` | 聊天记录搜索、索引、权限过滤、撤回 / 删除 tombstone |
+| `media-service` | 图片、语音、视频、文件上传下载、对象存储、缩略图、病毒扫描 |
+| `notification-service` | 邮件、短信、APNs / FCM、系统通知、模板、bounce handling |
+| `audit-service` | 登录审计、安全审计、管理操作审计、策略决策归档 |
+| `admin-service` | 租户管理、封禁、配置、运维操作、repair 工作台 |
+| `tenant/config-service` | 多租户配置、功能开关、限流策略、灰度配置；是否独立成服务后续用 ADR 决定 |
+| `presence-service` | 在线状态、输入中、最后在线时间；当前 push-gateway session registry 还不是完整 presence 服务 |
+
+### 中期：生产级分布式平台能力
+
+当前已经做了本地 / 双机 smoke，但还没完整证明生产级 HA。后续待开发 / 待验证：
 
 - 真实 Redis 网络分区；
 - 生产级 Redis HA / Redis Cluster；
@@ -119,42 +151,34 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 - Kafka multi-failure / controller failover / ISR 抖动；
 - 完整服务发现；
 - 统一 OpenTelemetry trace / alert / dashboard；
-- 灰度发布和部署编排。
+- 结构化日志和统一告警；
+- 灰度发布、部署编排、配置治理；
+- 运维 UI / repair approval workflow。
 
-### 完整 IM 产品后端
+### 后期：大模型应用后端
 
-后续还需要：
+大模型能力必须建立在搜索、权限和审计边界之上，不能让模型直接读业务库。
 
-- `search-service`：聊天记录搜索、索引、权限过滤；
-- `media-service`：图片、语音、视频、文件、对象存储、缩略图；
-- `notification-service`：邮件、短信、APNs / FCM、系统通知；
-- `audit-service`：安全审计、管理操作审计、策略决策归档；
-- `admin-service`：租户管理、封禁、配置、运维操作；
-- 更完整的群管理、联系人分组、隐私策略、会话列表产品化。
+| 待开发服务 / 能力 | 目标 |
+| --- | --- |
+| `rag-service` | 基于聊天记录的权限安全问答 |
+| `summary-service` | 会话总结、未读摘要、日报 |
+| `agent-service` | 客服机器人、群助手、任务 Agent |
+| retrieval gateway | 统一检索入口，强制 policy check 和成员可见窗口过滤 |
+| evidence pack | AI 输出必须携带 source message id、conversation seq、conversation id |
+| Agent 写动作链路 | Proposal -> Approval -> Executor -> Audit，避免 Agent 直接改业务事实 |
 
-### 大模型应用后端
+## 当前不纳入面试主线
 
-后续计划：
+Web / App / 桌面端属于后续产品化展示层，不作为当前面试文档重点。
 
-- `rag-service`：基于聊天记录的权限安全问答；
-- `summary-service`：会话总结、未读摘要、日报；
-- `agent-service`：客服机器人、群助手、任务 Agent；
-- retrieval gateway / evidence pack / source message id / seq；
-- Agent 写操作必须走 proposal / approval / executor / audit。
-
-## 客户端状态
-
-当前重点仍是后端。客户端后续再做：
-
-1. Web demo：用于展示登录、聊天、搜索、RAG 问答；
-2. 移动 App：验证弱网、通知、前后台和本地缓存；
-3. 桌面端：复用 Web 能力做产品化延展。
-
-面试时应明确：
+面试时只讲下面四类能力：
 
 ```text
-前端不是当前项目的主战场。
-当前核心价值是后端微服务、事件驱动、分布式可靠性和大模型应用后端边界。
+后端微服务主链路；
+分布式可靠性；
+安全、观测、repair 和运维 hardening；
+search / RAG / Agent 后端能力。
 ```
 
 ## 当前开发阶段

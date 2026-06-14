@@ -538,6 +538,54 @@ func TestAPIGatewayRegisterLegacyDescriptorsRejectsInvalidValue(t *testing.T) {
 	}
 }
 
+func TestAPIGatewayTraceConfigDefaultsToDisabled(t *testing.T) {
+	clearAPIGatewayTraceConfig(t)
+	config, err := apiGatewayTraceConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load trace config: %v", err)
+	}
+	if config.Enabled || config.ServiceName != "api-gateway" || config.Exporter != "stdout" || config.SamplingRatio != 1 {
+		t.Fatalf("unexpected default trace config: %+v", config)
+	}
+}
+
+func TestAPIGatewayTraceConfigLoadsOTLPGRPC(t *testing.T) {
+	clearAPIGatewayTraceConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_OTEL_TRACES_ENABLED", "true")
+	t.Setenv("NEXUSIM_API_GATEWAY_OTEL_SERVICE_NAME", "api-gateway-test")
+	t.Setenv("NEXUSIM_API_GATEWAY_OTEL_TRACES_EXPORTER", "otlp-grpc")
+	t.Setenv("NEXUSIM_API_GATEWAY_OTEL_TRACES_OTLP_ENDPOINT", "127.0.0.1:4317")
+	t.Setenv("NEXUSIM_API_GATEWAY_OTEL_TRACES_OTLP_INSECURE", "true")
+	t.Setenv("NEXUSIM_API_GATEWAY_OTEL_TRACES_SAMPLING_RATIO", "0.25")
+
+	config, err := apiGatewayTraceConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load trace config: %v", err)
+	}
+	if !config.Enabled ||
+		config.ServiceName != "api-gateway-test" ||
+		config.Exporter != "otlp-grpc" ||
+		config.OTLPEndpoint != "127.0.0.1:4317" ||
+		!config.OTLPInsecure ||
+		config.SamplingRatio != 0.25 {
+		t.Fatalf("unexpected otlp trace config: %+v", config)
+	}
+}
+
+func TestAPIGatewayTraceConfigRejectsInvalidValues(t *testing.T) {
+	clearAPIGatewayTraceConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_OTEL_TRACES_ENABLED", "sometimes")
+	if _, err := apiGatewayTraceConfigFromEnv(); err == nil {
+		t.Fatalf("expected invalid trace enabled bool to fail")
+	}
+
+	clearAPIGatewayTraceConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_OTEL_TRACES_SAMPLING_RATIO", "2")
+	if _, err := apiGatewayTraceConfigFromEnv(); err == nil {
+		t.Fatalf("expected invalid trace sampling ratio to fail")
+	}
+}
+
 func TestNewRedisUniversalClientRequiresSentinelConfig(t *testing.T) {
 	if _, err := newRedisUniversalClient(redisClientConfig{Mode: "sentinel"}); err == nil {
 		t.Fatalf("expected sentinel mode without master name to fail")
@@ -599,6 +647,16 @@ func clearAPIGatewayRateLimitConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_KEY_PREFIX", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_WINDOW", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_FAIL_OPEN", "")
+}
+
+func clearAPIGatewayTraceConfig(t *testing.T) {
+	t.Helper()
+	t.Setenv("NEXUSIM_API_GATEWAY_OTEL_TRACES_ENABLED", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_OTEL_SERVICE_NAME", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_OTEL_TRACES_EXPORTER", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_OTEL_TRACES_OTLP_ENDPOINT", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_OTEL_TRACES_OTLP_INSECURE", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_OTEL_TRACES_SAMPLING_RATIO", "")
 }
 
 func signAPIGatewayTestToken(t *testing.T, tenantID string, userID string) string {

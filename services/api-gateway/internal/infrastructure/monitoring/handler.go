@@ -16,6 +16,7 @@ type Handler struct {
 	jwkStatsFunc       func() gatewayauth.JWKStats
 	rateLimitStatsFunc func() ratelimit.Snapshot
 	runtimeStatsFunc   func() RuntimeSnapshot
+	traceStatsFunc     func() TraceSnapshot
 }
 
 func NewHandler(grpcMetrics *GRPCMetrics) *Handler {
@@ -34,6 +35,11 @@ func (h *Handler) WithRateLimitStats(statsFunc func() ratelimit.Snapshot) *Handl
 
 func (h *Handler) WithRuntimeStats(statsFunc func() RuntimeSnapshot) *Handler {
 	h.runtimeStatsFunc = statsFunc
+	return h
+}
+
+func (h *Handler) WithTraceStats(statsFunc func() TraceSnapshot) *Handler {
+	h.traceStatsFunc = statsFunc
 	return h
 }
 
@@ -71,6 +77,10 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		stats := h.runtimeStatsFunc()
 		snapshot.Runtime = &stats
 	}
+	if h.traceStatsFunc != nil {
+		stats := h.traceStatsFunc()
+		snapshot.Trace = &stats
+	}
 	writeJSON(w, http.StatusOK, snapshot)
 }
 
@@ -86,6 +96,7 @@ type Snapshot struct {
 	AuthJWKs      *gatewayauth.JWKStats `json:"auth_jwks,omitempty"`
 	RateLimit     *ratelimit.Snapshot   `json:"rate_limit,omitempty"`
 	Runtime       *RuntimeSnapshot      `json:"runtime,omitempty"`
+	Trace         *TraceSnapshot        `json:"trace,omitempty"`
 }
 
 type RuntimeSnapshot struct {

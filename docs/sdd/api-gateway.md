@@ -150,6 +150,19 @@ NEXUSIM_API_GATEWAY_DEBUG_ADDR=127.0.0.1:12001
 
 `/debug/metrics` 只输出进程内聚合指标：gRPC method/code/count/error_count/latency 和 JWT/JWKS 缓存刷新状态。gRPC access log 只记录 service/event/method/code/latency_ms/request_id/trace_id，不记录 gateway token、tenant_id、user_id、device_id、session_id 或 request body。该 endpoint 是 first-stage local/debug observability，不是 Prometheus 指标规范、统一 trace 或生产审计日志。
 
+First-stage OpenTelemetry trace 默认关闭：
+
+```text
+NEXUSIM_API_GATEWAY_OTEL_TRACES_ENABLED=false
+NEXUSIM_API_GATEWAY_OTEL_SERVICE_NAME=api-gateway
+NEXUSIM_API_GATEWAY_OTEL_TRACES_EXPORTER=stdout
+NEXUSIM_API_GATEWAY_OTEL_TRACES_OTLP_ENDPOINT=
+NEXUSIM_API_GATEWAY_OTEL_TRACES_OTLP_INSECURE=false
+NEXUSIM_API_GATEWAY_OTEL_TRACES_SAMPLING_RATIO=1
+```
+
+启用后，api-gateway 为入口 gRPC unary 请求创建 server span，继承合法 W3C `traceparent`，并记录低敏属性：`rpc.system`、`rpc.method`、`rpc.grpc.status_code`、`nexusim.grpc.latency_ms`、最终 `nexusim.trace_id` / `nexusim.request_id`。span 不记录 gateway token、tenant_id、user_id、device_id、session_id 或 request body。第一版 exporter 支持 `stdout` 和 `otlp-grpc`；使用 `otlp-grpc` 时必须显式配置 endpoint，是否 plaintext 由 `..._OTLP_INSECURE` 明确控制。`/debug/metrics` 只暴露 trace 是否启用、service name、exporter、endpoint 是否配置和 sampling ratio，不输出 collector endpoint 明文。
+
 下游地址：
 
 ```text
@@ -200,12 +213,12 @@ NEXUSIM_API_GATEWAY_CONTACTS_TLS_CLIENT_KEY_FILE
 - 不做 HTTP / REST / GraphQL 转换。
 - 不做 OIDC federation。
 - 不做全服务 mTLS rollout 或证书生命周期治理。
-- 不做限流、配额、WAF、OpenTelemetry 全链路 trace。
+- 不做完整 WAF、运行时动态 quota 配置、全服务 OpenTelemetry rollout、collector / alerting 或跨 Kafka envelope trace。
 - 不替代 push-gateway 的 WebSocket online notify / ACK 转发职责。
 
 后续优先级：
 
-1. 继续把限流、配额、审计采样和 tracing 作为独立 production hardening，不塞进当前 proxy skeleton。
+1. 继续把运行时动态配额、审计采样、统一 collector / alerting 和跨服务 tracing 作为独立 production hardening，不塞进当前 proxy skeleton。
 2. 历史客户端确需 legacy descriptor 时，必须显式 opt-in，并在迁移计划中移除。
 
 2026-06-13 补充：clean commit `cff1668` 已跑通 `loadtest/demo/run-local-secure-demo.ps1` 经真实 api-gateway 的 secure E2E smoke。demo runner 对 conversation / message / delivery / receipt 的 gRPC target 均指向 api-gateway，使用 HMAC gateway token 和 desktop-client mTLS；api-gateway 再通过 mTLS 调下游，并向下游注入 trusted metadata。报告见 `docs/runbook/loadtest/demo/loadtest-report-20260613-e2e-demo-api-gateway-secure-smoke.md`，原始结果在 `H:\NexusIM\loadtest-results\e2e-demo-api-gateway-secure-smoke-20260613-clean`。
@@ -245,6 +258,8 @@ NEXUSIM_API_GATEWAY_CONTACTS_TLS_CLIENT_KEY_FILE
 2026-06-14 补充：api-gateway 注册层已支持 `NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS=false`，当时默认仍为 `true` 保持兼容。clean commit `c1328ca` 已跑通 facade-only 真实进程 smoke：`run-local-secure-demo.ps1` 启动 api-gateway 时关闭 legacy descriptor，summary `git_dirty=false/success=true/gateway_facade=true`，api-gateway metrics 只出现 `/nexusim.gateway.v1.GatewayService/...` user-facing method；报告见 `docs/runbook/loadtest/demo/loadtest-report-20260614-e2e-demo-api-gateway-facade-only-smoke.md`，原始结果在 `H:\NexusIM\loadtest-results\e2e-demo-api-gateway-facade-only-smoke-20260614-clean`。
 
 2026-06-14 补充：api-gateway legacy descriptor 已收敛为显式 opt-in。未配置 `NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS` 时只注册 `GatewayService` facade；只有显式设置为 `true` 才额外注册 contacts / conversation / message / delivery / receipt 的 legacy descriptors。`Register()` helper 也改为 facade-only 默认，避免新代码无意暴露旧 descriptor。
+
+2026-06-14 补充：api-gateway 已新增第一阶段 OpenTelemetry trace runtime。默认关闭；启用后会为入口 gRPC unary 请求创建 server span，支持 W3C `traceparent` parent extraction、`stdout` exporter 和 `otlp-grpc` exporter，并在 `/debug/metrics` 暴露低敏 trace config snapshot。span 只记录 method、status、latency、最终 trace/request correlation，不记录 token、tenant_id、user_id、device_id、session_id 或 request body。这仍不是全服务 trace rollout、collector / alerting 或跨 Kafka envelope trace。
 
 2026-06-14 补充：`GatewayService` public facade 已扩展 contacts-service 的 user-facing RPC：`SendContactRequest / RespondContactRequest / CancelContactRequest / ListContactRequests / ListContacts / GetContactState / DeleteContact / BlockContact / UnblockContact / UpdateContactRemark`。api-gateway 仍只做身份验证、`AuthContext` 重写和转发，不拥有联系人事实源，也不让 message-service 同步依赖 contacts-service。
 

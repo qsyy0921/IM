@@ -19,6 +19,8 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 		return ratelimit.Snapshot{Enabled: true, RatePerSecond: 10, Burst: 20, TotalLimited: 3}
 	}).WithRuntimeStats(func() RuntimeSnapshot {
 		return RuntimeSnapshot{RegisterLegacyDescriptors: false}
+	}).WithTraceStats(func() TraceSnapshot {
+		return TraceSnapshot{Enabled: true, ServiceName: serviceName, Exporter: "stdout", SamplingRatio: 1}
 	})
 
 	for _, path := range []string{"/healthz", "/readyz"} {
@@ -49,5 +51,8 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 	}
 	if snapshot.Runtime == nil || snapshot.Runtime.RegisterLegacyDescriptors {
 		t.Fatalf("unexpected runtime stats: %+v", snapshot.Runtime)
+	}
+	if snapshot.Trace == nil || !snapshot.Trace.Enabled || snapshot.Trace.Exporter != "stdout" {
+		t.Fatalf("unexpected trace stats: %+v", snapshot.Trace)
 	}
 }

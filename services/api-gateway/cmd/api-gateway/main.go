@@ -72,6 +72,21 @@ func runGRPC() error {
 	}
 	defer authenticator.Close()
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
+	traceConfig, err := apiGatewayTraceConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	traceRuntime, err := monitoringinfra.NewTraceRuntime(ctx, traceConfig)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := traceRuntime.Shutdown(shutdownCtx); err != nil {
+			log.Printf("api-gateway OpenTelemetry trace shutdown failed: %v", err)
+		}
+	}()
 	rateLimiter, closeRateLimiter, err := newRateLimiterFromEnv(ctx, authenticator)
 	if err != nil {
 		return err
@@ -86,7 +101,8 @@ func runGRPC() error {
 		WithRateLimitStats(rateLimiter.Snapshot).
 		WithRuntimeStats(func() monitoringinfra.RuntimeSnapshot {
 			return monitoringinfra.RuntimeSnapshot{RegisterLegacyDescriptors: registerLegacyDescriptors}
-		}))
+		}).
+		WithTraceStats(traceRuntime.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -184,6 +200,7 @@ func runGRPC() error {
 	})
 	serverOptions := []grpcgo.ServerOption{grpcgo.ChainUnaryInterceptor(
 		grpcMetrics.UnaryServerInterceptor(log.Default()),
+		traceRuntime.UnaryServerInterceptor(),
 		rateLimiter.UnaryServerInterceptor(),
 	)}
 	if serverTLSEnabled {
@@ -252,6 +269,41 @@ func apiGatewayRegisterLegacyDescriptors() (bool, error) {
 	}
 	if !configured {
 		return false, nil
+	}
+	return value, nil
+}
+
+func apiGatewayTraceConfigFromEnv() (monitoringinfra.TraceConfig, error) {
+	enabled, _, err := envOptionalBool("NEXUSIM_API_GATEWAY_OTEL_TRACES_ENABLED")
+	if err != nil {
+		return monitoringinfra.TraceConfig{}, err
+	}
+	otlpInsecure, _, err := envOptionalBool("NEXUSIM_API_GATEWAY_OTEL_TRACES_OTLP_INSECURE")
+	if err != nil {
+		return monitoringinfra.TraceConfig{}, err
+	}
+	samplingRatio, err := apiGatewayTraceSamplingRatioFromEnv()
+	if err != nil {
+		return monitoringinfra.TraceConfig{}, err
+	}
+	return monitoringinfra.TraceConfig{
+		Enabled:       enabled,
+		ServiceName:   envString("NEXUSIM_API_GATEWAY_OTEL_SERVICE_NAME", "api-gateway"),
+		Exporter:      envString("NEXUSIM_API_GATEWAY_OTEL_TRACES_EXPORTER", "stdout"),
+		OTLPEndpoint:  envString("NEXUSIM_API_GATEWAY_OTEL_TRACES_OTLP_ENDPOINT", ""),
+		OTLPInsecure:  otlpInsecure,
+		SamplingRatio: samplingRatio,
+	}, nil
+}
+
+func apiGatewayTraceSamplingRatioFromEnv() (float64, error) {
+	raw := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_OTEL_TRACES_SAMPLING_RATIO"))
+	if raw == "" {
+		return 1, nil
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil || value <= 0 || value > 1 {
+		return 0, errors.New("NEXUSIM_API_GATEWAY_OTEL_TRACES_SAMPLING_RATIO must be > 0 and <= 1")
 	}
 	return value, nil
 }

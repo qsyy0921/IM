@@ -1,0 +1,16 @@
+name: nexusim-prometheus
+
+services:
+  prometheus:
+    image: ${NEXUSIM_PROMETHEUS_IMAGE:-prom/prometheus:v2.54.1}
+    container_name: nexusim-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--web.listen-address=0.0.0.0:9090"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=24h"
+    ports:
+      - "19090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus-api-gateway-alerts.yml:/etc/prometheus/rules/api-gateway.yml:ro

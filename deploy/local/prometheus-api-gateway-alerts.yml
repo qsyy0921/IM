@@ -1,0 +1,52 @@
+groups:
+  - name: nexusim-api-gateway-first-stage
+    rules:
+      - alert: NexusIMApiGatewayGrpcErrors
+        expr: increase(nexusim_api_gateway_grpc_errors_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: api-gateway returned gRPC errors
+          description: api-gateway has non-OK gRPC responses in the last five minutes. Inspect /debug/metrics and service logs before treating this as a production SLO alert.
+
+      - alert: NexusIMApiGatewayLegacyDescriptorTraffic
+        expr: increase(nexusim_api_gateway_grpc_exposure_requests_total{exposure="legacy_descriptor"}[10m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: api-gateway legacy descriptor traffic observed
+          description: legacy descriptor traffic is still present. Keep legacy descriptor removal blocked until this remains zero in the target environment.
+
+      - alert: NexusIMApiGatewayRateLimitRedisErrors
+        expr: increase(nexusim_api_gateway_rate_limit_redis_errors_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: api-gateway rate limiter saw Redis errors
+          description: Redis-backed rate limiting has backend errors. Check whether fail-open is enabled and whether tenant quota enforcement is degraded.
+
+      - alert: NexusIMApiGatewayJwksRefreshFailures
+        expr: increase(nexusim_api_gateway_auth_jwks_refresh_failures_total[10m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: api-gateway JWKS refresh failed
+          description: api-gateway could not refresh JWT verification keys. Existing cached keys may still work, but key rotation may be delayed.
+
+      - alert: NexusIMApiGatewayOtlpEndpointMissing
+        expr: nexusim_api_gateway_otel_traces_enabled{exporter="otlp-grpc"} == 1 and on(exporter) nexusim_api_gateway_otel_traces_otlp_endpoint_configured{exporter="otlp-grpc"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: api-gateway OTLP traces enabled without endpoint
+          description: api-gateway is configured for otlp-grpc tracing but has no OTLP endpoint configured.

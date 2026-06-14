@@ -14,6 +14,39 @@ GET http://<NEXUSIM_API_GATEWAY_DEBUG_ADDR>/metrics
 
 这个 endpoint 只用于本地 scrape / dashboard 原型，不代表生产 Prometheus、Alertmanager、指标保留策略或 SLO 告警已经完成。
 
+## Local Prometheus
+
+api-gateway `/metrics` 的本地 scrape / alert rule 原型位于：
+
+```text
+deploy/local/docker-compose.prometheus.yml
+deploy/local/prometheus.yml
+deploy/local/prometheus-api-gateway-alerts.yml
+```
+
+启动：
+
+```powershell
+.\tools\local-up-prometheus.ps1
+```
+
+停止：
+
+```powershell
+.\tools\local-down-prometheus.ps1
+```
+
+本地端点：
+
+```text
+Prometheus UI: http://127.0.0.1:19090
+api-gateway scrape target from container: host.docker.internal:11904
+```
+
+当前 first-stage alert rules 只覆盖 api-gateway：gRPC errors、legacy descriptor traffic、rate-limit Redis errors、JWKS refresh failures、OTLP endpoint missing。它们用于本地开发和面试演示，不是生产 SLO 阈值；生产化前还需要多服务 scrape、Alertmanager route、retention、dashboard、sampling / label governance 和容量验证。
+
+注意：启动脚本不会预检镜像是否已存在；如果本机没有 `NEXUSIM_PROMETHEUS_IMAGE` 指定的镜像或默认 `prom/prometheus:v2.54.1`，Docker 会按自身配置尝试拉取镜像。
+
 ## OpenTelemetry Collector
 
 默认本地基础设施不会启动 collector。需要验证 OTLP trace exporter 时单独启动：

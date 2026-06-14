@@ -2,6 +2,9 @@ param(
     [string]$PgDsn = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
     [string]$PostgresExecContainer = "nexusim-postgres",
     [string]$KafkaBrokers = "localhost:9092",
+    [string]$KafkaExecContainer = "nexusim-kafka",
+    [string]$KafkaAdminBootstrap = "localhost:9092",
+    [int]$KafkaTopicReplicationFactor = 1,
     [ValidateSet("single", "sentinel")]
     [string]$RedisMode = "single",
     [string]$RedisAddr = "127.0.0.1:6379",
@@ -24,6 +27,9 @@ $scriptArgs = @{
     PgDsn = $PgDsn
     PostgresExecContainer = $PostgresExecContainer
     KafkaBrokers = $KafkaBrokers
+    KafkaExecContainer = $KafkaExecContainer
+    KafkaAdminBootstrap = $KafkaAdminBootstrap
+    KafkaTopicReplicationFactor = $KafkaTopicReplicationFactor
     RedisMode = $RedisMode
     RedisAddr = $RedisAddr
     RedisSentinelAddrs = $RedisSentinelAddrs

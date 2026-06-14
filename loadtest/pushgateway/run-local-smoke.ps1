@@ -2,6 +2,9 @@ param(
     [string]$PgDsn = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
     [string]$PostgresExecContainer = "nexusim-postgres",
     [string]$KafkaBrokers = "localhost:9092",
+    [string]$KafkaExecContainer = "nexusim-kafka",
+    [string]$KafkaAdminBootstrap = "localhost:9092",
+    [int]$KafkaTopicReplicationFactor = 1,
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
     [string]$TenantId = "",
@@ -294,13 +297,13 @@ if (-not $SkipBuild) {
 
 function Ensure-KafkaTopic {
     param([string]$Topic)
-    docker exec nexusim-kafka kafka-topics `
-        --bootstrap-server localhost:9092 `
+    docker exec $KafkaExecContainer kafka-topics `
+        --bootstrap-server $KafkaAdminBootstrap `
         --create `
         --if-not-exists `
         --topic $Topic `
         --partitions 3 `
-        --replication-factor 1 | Out-Null
+        --replication-factor $KafkaTopicReplicationFactor | Out-Null
 }
 
 function Reset-ConsumerGroupToLatest {
@@ -308,8 +311,8 @@ function Reset-ConsumerGroupToLatest {
         [string]$Group,
         [string]$Topic
     )
-    docker exec nexusim-kafka kafka-consumer-groups `
-        --bootstrap-server localhost:9092 `
+    docker exec $KafkaExecContainer kafka-consumer-groups `
+        --bootstrap-server $KafkaAdminBootstrap `
         --group $Group `
         --topic $Topic `
         --reset-offsets `

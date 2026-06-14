@@ -1,0 +1,97 @@
+name: nexusim-kafka-ha
+
+services:
+  kafka-ha-0:
+    image: confluentinc/cp-kafka:7.7.1
+    container_name: nexusim-kafka-ha-0
+    ports:
+      - "19092:9092"
+    environment:
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-ha-0:29093,2@kafka-ha-1:29093,3@kafka-ha-2:29093"
+      KAFKA_LISTENERS: "PLAINTEXT://kafka-ha-0:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://kafka-ha-0:29093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-ha-0:29092,PLAINTEXT_HOST://127.0.0.1:19092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "3"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "3"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "2"
+      KAFKA_MIN_INSYNC_REPLICAS: "2"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_RETENTION_HOURS: "168"
+    volumes:
+      - kafka_ha_0_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  kafka-ha-1:
+    image: confluentinc/cp-kafka:7.7.1
+    container_name: nexusim-kafka-ha-1
+    ports:
+      - "19093:9092"
+    environment:
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      KAFKA_NODE_ID: "2"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-ha-0:29093,2@kafka-ha-1:29093,3@kafka-ha-2:29093"
+      KAFKA_LISTENERS: "PLAINTEXT://kafka-ha-1:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://kafka-ha-1:29093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-ha-1:29092,PLAINTEXT_HOST://127.0.0.1:19093"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "3"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "3"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "2"
+      KAFKA_MIN_INSYNC_REPLICAS: "2"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_RETENTION_HOURS: "168"
+    volumes:
+      - kafka_ha_1_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  kafka-ha-2:
+    image: confluentinc/cp-kafka:7.7.1
+    container_name: nexusim-kafka-ha-2
+    ports:
+      - "19094:9092"
+    environment:
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      KAFKA_NODE_ID: "3"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-ha-0:29093,2@kafka-ha-1:29093,3@kafka-ha-2:29093"
+      KAFKA_LISTENERS: "PLAINTEXT://kafka-ha-2:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://kafka-ha-2:29093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-ha-2:29092,PLAINTEXT_HOST://127.0.0.1:19094"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "3"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "3"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "2"
+      KAFKA_MIN_INSYNC_REPLICAS: "2"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_RETENTION_HOURS: "168"
+    volumes:
+      - kafka_ha_2_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  kafka_ha_0_data:
+  kafka_ha_1_data:
+  kafka_ha_2_data:

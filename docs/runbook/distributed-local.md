@@ -69,6 +69,12 @@ SendMessage
 .\tools\local-up-postgres-ha.ps1
 ```
 
+如需本地 Kafka 三 broker KRaft 拓扑，改用：
+
+```powershell
+.\tools\local-up-kafka-ha.ps1
+```
+
 运行分布式 smoke：
 
 ```powershell
@@ -112,6 +118,29 @@ SendMessage
 
 ```powershell
 .\tools\local-down-postgres-ha.ps1
+```
+
+本地 Kafka failover smoke：
+
+```powershell
+.\tools\local-kafka-failover-smoke.ps1 -SkipBuild
+```
+
+该脚本会：
+
+```text
+1. 启动三 broker Kafka KRaft 本地拓扑，宿主机 brokers 为 127.0.0.1:19092,19093,19094；
+2. 用容器内 `kafka-ha-x:29092` admin listener 创建 RF=3 的 timeline / delivery topic；
+3. 跑一遍 full distributed smoke；
+4. 找到 `im.delivery.events` partition 0 当前 leader broker 并停止对应容器；
+5. 等待 leader 切到存活 broker，再跑一遍 full distributed smoke；
+6. 输出 before/after summary 和 leader 切换结果。
+```
+
+如需释放 Kafka HA 资源：
+
+```powershell
+.\tools\local-down-kafka-ha.ps1
 ```
 
 同步 Mac 专用 smoke checkout：
@@ -204,6 +233,24 @@ after:  delivery.notify seq=2, PullInbox item_count=1/max_seq=2, delivery.ack.ok
 ```
 
 这证明本地 `repmgr + pgpool` 稳定写入口切主后，`CreateMemberChange -> SendMessage -> delivery.notify -> PullInbox -> delivery.ack.ok` 最小链路仍可跑通。它不代表生产级 PostgreSQL HA，不覆盖 split-brain、quorum、防抖、自动回切、in-flight transaction continuity 或跨机存储故障。
+
+当前 Kafka failover smoke 原始结果：
+
+```text
+H:\NexusIM\loadtest-results\kafka-failover-smoke-20260614b\kafka-failover-summary.json
+```
+
+该 run 使用本地 Kafka KRaft 三 broker 拓扑与 RF=3 topic，执行前后两次 distributed smoke：
+
+```text
+before delivery leader broker = 2
+stop current leader container = nexusim-kafka-ha-1
+after delivery leader broker  = 3
+before: delivery.notify seq=2, PullInbox item_count=1/max_seq=2, delivery.ack.ok last_received_seq=2
+after:  delivery.notify seq=2, PullInbox item_count=1/max_seq=2, delivery.ack.ok last_received_seq=2
+```
+
+这证明本地 Kafka 单 broker 故障与 leader 切换后，`CreateMemberChange -> SendMessage -> delivery.notify -> PullInbox -> delivery.ack.ok` 最小链路仍可跑通。它不代表生产级 Kafka HA，不覆盖 controller failover、multi-broker loss、ISR 抖动、acks/min.insync.replicas 调优、跨机磁盘故障或 in-flight produce/commit continuity。
 
 前一轮脚本验证结果：
 

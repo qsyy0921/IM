@@ -37,6 +37,9 @@ try {
     Write-Host "== grpc correlation logs =="
     & (Join-Path $PSScriptRoot "check-grpc-correlation-logs.ps1")
 
+    Write-Host "== debug listener exposure =="
+    & (Join-Path $PSScriptRoot "check-debug-listener-exposure.ps1")
+
     Write-Host "== git whitespace =="
     git diff --check
     git diff --cached --check

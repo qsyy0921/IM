@@ -1309,9 +1309,6 @@ func rateLimitIdentityFunc(authenticator *gatewayauth.Authenticator) ratelimitin
 
 func rateLimitAuthRequestFromMetadata(ctx context.Context) *http.Request {
 	query := url.Values{}
-	if value := firstIncomingMetadata(ctx, "x-nexusim-gateway-token"); value != "" {
-		query.Set("token", value)
-	}
 	if value := firstIncomingMetadata(ctx, "x-nexusim-tenant-id"); value != "" {
 		query.Set("tenant_id", value)
 	}
@@ -1321,12 +1318,11 @@ func rateLimitAuthRequestFromMetadata(ctx context.Context) *http.Request {
 	if value := firstIncomingMetadata(ctx, "x-nexusim-device-id"); value != "" {
 		query.Set("device_id", value)
 	}
-	if value := firstIncomingMetadata(ctx, "x-nexusim-trace-id"); value != "" {
-		query.Set("trace_id", value)
-	}
 	request, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://api-gateway/rate-limit-auth?"+query.Encode(), nil)
 	if authorization := firstIncomingMetadata(ctx, "authorization"); authorization != "" {
 		request.Header.Set("Authorization", authorization)
+	} else if token := firstIncomingMetadata(ctx, "x-nexusim-gateway-token"); token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
 	}
 	return request
 }

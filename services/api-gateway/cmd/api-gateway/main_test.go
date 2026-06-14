@@ -366,6 +366,47 @@ func TestNewRateLimiterFromEnvTenantScopeUsesAuthenticatedTenant(t *testing.T) {
 	}
 }
 
+func TestRateLimitAuthRequestFromMetadataKeepsTokenOutOfURL(t *testing.T) {
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		"x-nexusim-gateway-token", "gateway-token-secret",
+		"x-nexusim-tenant-id", "tenant-a",
+		"x-nexusim-user-id", "user-a",
+		"x-nexusim-device-id", "device-a",
+		"x-nexusim-trace-id", "trace user=user1@example.com",
+	))
+
+	request := rateLimitAuthRequestFromMetadata(ctx)
+	if got := request.Header.Get("Authorization"); got != "Bearer gateway-token-secret" {
+		t.Fatalf("expected gateway token to be forwarded as Authorization header, got %q", got)
+	}
+	rawURL := request.URL.String()
+	for _, leaked := range []string{"gateway-token-secret", "trace+user", "user1%40example.com", "trace_id"} {
+		if strings.Contains(rawURL, leaked) {
+			t.Fatalf("rate-limit auth request URL leaked %q: %s", leaked, rawURL)
+		}
+	}
+	if request.URL.Query().Get("tenant_id") != "tenant-a" ||
+		request.URL.Query().Get("user_id") != "user-a" ||
+		request.URL.Query().Get("device_id") != "device-a" {
+		t.Fatalf("expected low-sensitive mock auth query fields, got %s", rawURL)
+	}
+}
+
+func TestRateLimitAuthRequestFromMetadataPrefersAuthorizationHeader(t *testing.T) {
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		"authorization", "Bearer authorization-token",
+		"x-nexusim-gateway-token", "gateway-token-secret",
+	))
+
+	request := rateLimitAuthRequestFromMetadata(ctx)
+	if got := request.Header.Get("Authorization"); got != "Bearer authorization-token" {
+		t.Fatalf("expected existing Authorization metadata to be preserved, got %q", got)
+	}
+	if rawURL := request.URL.String(); strings.Contains(rawURL, "gateway-token-secret") {
+		t.Fatalf("rate-limit auth request URL leaked gateway token: %s", rawURL)
+	}
+}
+
 func TestNewRateLimiterFromEnvLoadsTenantPlansJSON(t *testing.T) {
 	clearAPIGatewayRateLimitConfig(t)
 	clearAPIGatewayAuthConfig(t)

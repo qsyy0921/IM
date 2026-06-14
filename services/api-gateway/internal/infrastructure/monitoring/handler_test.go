@@ -71,21 +71,26 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 		return gatewayauth.JWKStats{RemoteURLConfigured: true, CachedKeyCount: 2, RefreshFailures: 1}
 	}).WithRateLimitStats(func() ratelimit.Snapshot {
 		return ratelimit.Snapshot{
-			Enabled:               true,
-			Backend:               "redis",
-			KeyScope:              "tenant",
-			TenantPlans:           1,
-			TenantPlanSource:      "file",
-			TenantPlanGeneratedAt: 1_800_000_000_000,
-			TenantPlanMaxAgeMS:    3_600_000,
-			TenantPlanAgeMS:       3_700_000,
-			TenantPlanStale:       true,
-			TenantReloads:         2,
-			TenantErrors:          3,
-			RedisErrors:           4,
-			IdentityErrors:        5,
-			TotalAccepted:         6,
-			TotalLimited:          7,
+			Enabled:                    true,
+			Backend:                    "redis",
+			KeyScope:                   "tenant",
+			TenantPlans:                1,
+			TenantPlanSource:           "file",
+			TenantPlanGeneratedAt:      1_800_000_000_000,
+			TenantPlanRequireChecksum:  true,
+			TenantPlanMaxAgeMS:         3_600_000,
+			TenantPlanAgeMS:            3_700_000,
+			TenantPlanStale:            true,
+			TenantPlanURLBearerSet:     true,
+			TenantPlanURLRequireHTTPS:  true,
+			TenantPlanURLTLSConfigured: true,
+			TenantPlanURLClientCertSet: true,
+			TenantReloads:              2,
+			TenantErrors:               3,
+			RedisErrors:                4,
+			IdentityErrors:             5,
+			TotalAccepted:              6,
+			TotalLimited:               7,
 		}
 	}).WithRuntimeStats(func() RuntimeSnapshot {
 		return RuntimeSnapshot{RegisterLegacyDescriptors: true, LegacyDescriptorsAllowedUntilMS: 1_800_000_000_000}
@@ -111,6 +116,11 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 	assertContains(t, body, `nexusim_api_gateway_grpc_exposure_requests_total{exposure="legacy_descriptor"} 1`)
 	assertContains(t, body, `nexusim_api_gateway_grpc_legacy_descriptor_last_seen_unix_milliseconds`)
 	assertContains(t, body, `nexusim_api_gateway_rate_limit_enabled{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_require_checksum{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_url_bearer_token_configured{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_url_require_https{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_url_tls_configured{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_url_client_cert_configured{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1`)
 	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_generated_at_unix_milliseconds{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1800000000000`)
 	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_age_milliseconds{backend="redis",key_scope="tenant",tenant_plan_source="file"} 3700000`)
 	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_stale{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1`)
@@ -118,7 +128,7 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 	assertContains(t, body, `nexusim_api_gateway_legacy_descriptors_registered 1`)
 	assertContains(t, body, `nexusim_api_gateway_legacy_descriptors_allowed_until_unix_milliseconds 1800000000000`)
 	assertContains(t, body, `nexusim_api_gateway_otel_traces_enabled{exporter="otlp-grpc"} 1`)
-	for _, leaked := range []string{"tenant_a", "user_a", "gateway-token", "request_id", "trace_id"} {
+	for _, leaked := range []string{"tenant_a", "user_a", "gateway-token", "request_id", "trace_id", "quota-config-token", "client-key.pem", "ca.pem"} {
 		if strings.Contains(body, leaked) {
 			t.Fatalf("prometheus metrics leaked %q in body:\n%s", leaked, body)
 		}

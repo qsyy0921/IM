@@ -42,7 +42,12 @@ type Config struct {
 	TenantPlanVersion           string
 	TenantPlanGeneratedAtUnixMS int64
 	TenantPlanChecksumPresent   bool
+	TenantPlanRequireChecksum   bool
 	TenantPlanMaxAge            time.Duration
+	TenantPlanURLBearerTokenSet bool
+	TenantPlanURLRequireHTTPS   bool
+	TenantPlanURLTLSConfigured  bool
+	TenantPlanURLClientCertSet  bool
 	MaxKeys                     int
 	RedisClient                 redis.UniversalClient
 	RedisKeyPrefix              string
@@ -65,25 +70,30 @@ type Plan struct {
 }
 
 type Limiter struct {
-	enabled           bool
-	backend           string
-	scope             string
-	rate              float64
-	burst             float64
-	source            string
-	planVersion       string
-	planGeneratedAtMS int64
-	planChecksum      bool
-	planMaxAge        time.Duration
-	plansMu           sync.RWMutex
-	plans             map[string]quotaPlan
-	maxKeys           int
-	redis             redis.UniversalClient
-	prefix            string
-	window            time.Duration
-	failOpen          bool
-	identity          IdentityFunc
-	now               func() time.Time
+	enabled             bool
+	backend             string
+	scope               string
+	rate                float64
+	burst               float64
+	source              string
+	planVersion         string
+	planGeneratedAtMS   int64
+	planChecksum        bool
+	planRequireChecksum bool
+	planMaxAge          time.Duration
+	urlBearerSet        bool
+	urlRequireHTTPS     bool
+	urlTLSConfigured    bool
+	urlClientCertSet    bool
+	plansMu             sync.RWMutex
+	plans               map[string]quotaPlan
+	maxKeys             int
+	redis               redis.UniversalClient
+	prefix              string
+	window              time.Duration
+	failOpen            bool
+	identity            IdentityFunc
+	now                 func() time.Time
 
 	mu             sync.Mutex
 	buckets        map[string]*bucket
@@ -115,30 +125,35 @@ type requestQuota struct {
 }
 
 type Snapshot struct {
-	Enabled                   bool    `json:"enabled"`
-	Backend                   string  `json:"backend,omitempty"`
-	KeyScope                  string  `json:"key_scope,omitempty"`
-	RatePerSecond             float64 `json:"rate_per_second,omitempty"`
-	Burst                     int     `json:"burst,omitempty"`
-	TenantPlans               int     `json:"tenant_plan_count,omitempty"`
-	TenantPlanSource          string  `json:"tenant_plan_source,omitempty"`
-	TenantPlanVersion         string  `json:"tenant_plan_version,omitempty"`
-	TenantPlanGeneratedAt     int64   `json:"tenant_plan_generated_at_unix_ms,omitempty"`
-	TenantPlanChecksumPresent bool    `json:"tenant_plan_checksum_present,omitempty"`
-	TenantPlanMaxAgeMS        int64   `json:"tenant_plan_max_age_ms,omitempty"`
-	TenantPlanAgeMS           int64   `json:"tenant_plan_age_ms,omitempty"`
-	TenantPlanStale           bool    `json:"tenant_plan_stale"`
-	TenantReloads             int64   `json:"tenant_plan_reload_count,omitempty"`
-	TenantReloadAt            int64   `json:"tenant_plan_reloaded_at_unix_ms,omitempty"`
-	TenantErrors              int64   `json:"tenant_plan_reload_error_count,omitempty"`
-	TrackedKeys               int     `json:"tracked_keys,omitempty"`
-	MaxKeys                   int     `json:"max_keys,omitempty"`
-	RedisWindowMS             int64   `json:"redis_window_ms,omitempty"`
-	RedisFailOpen             bool    `json:"redis_fail_open,omitempty"`
-	RedisErrors               int64   `json:"redis_error_count,omitempty"`
-	IdentityErrors            int64   `json:"identity_error_count,omitempty"`
-	TotalAccepted             int64   `json:"total_accepted"`
-	TotalLimited              int64   `json:"total_limited"`
+	Enabled                    bool    `json:"enabled"`
+	Backend                    string  `json:"backend,omitempty"`
+	KeyScope                   string  `json:"key_scope,omitempty"`
+	RatePerSecond              float64 `json:"rate_per_second,omitempty"`
+	Burst                      int     `json:"burst,omitempty"`
+	TenantPlans                int     `json:"tenant_plan_count,omitempty"`
+	TenantPlanSource           string  `json:"tenant_plan_source,omitempty"`
+	TenantPlanVersion          string  `json:"tenant_plan_version,omitempty"`
+	TenantPlanGeneratedAt      int64   `json:"tenant_plan_generated_at_unix_ms,omitempty"`
+	TenantPlanChecksumPresent  bool    `json:"tenant_plan_checksum_present,omitempty"`
+	TenantPlanRequireChecksum  bool    `json:"tenant_plan_require_checksum"`
+	TenantPlanMaxAgeMS         int64   `json:"tenant_plan_max_age_ms,omitempty"`
+	TenantPlanAgeMS            int64   `json:"tenant_plan_age_ms,omitempty"`
+	TenantPlanStale            bool    `json:"tenant_plan_stale"`
+	TenantPlanURLBearerSet     bool    `json:"tenant_plan_url_bearer_token_configured,omitempty"`
+	TenantPlanURLRequireHTTPS  bool    `json:"tenant_plan_url_require_https,omitempty"`
+	TenantPlanURLTLSConfigured bool    `json:"tenant_plan_url_tls_configured,omitempty"`
+	TenantPlanURLClientCertSet bool    `json:"tenant_plan_url_client_cert_configured,omitempty"`
+	TenantReloads              int64   `json:"tenant_plan_reload_count,omitempty"`
+	TenantReloadAt             int64   `json:"tenant_plan_reloaded_at_unix_ms,omitempty"`
+	TenantErrors               int64   `json:"tenant_plan_reload_error_count,omitempty"`
+	TrackedKeys                int     `json:"tracked_keys,omitempty"`
+	MaxKeys                    int     `json:"max_keys,omitempty"`
+	RedisWindowMS              int64   `json:"redis_window_ms,omitempty"`
+	RedisFailOpen              bool    `json:"redis_fail_open,omitempty"`
+	RedisErrors                int64   `json:"redis_error_count,omitempty"`
+	IdentityErrors             int64   `json:"identity_error_count,omitempty"`
+	TotalAccepted              int64   `json:"total_accepted"`
+	TotalLimited               int64   `json:"total_limited"`
 }
 
 func New(config Config) (*Limiter, error) {
@@ -151,24 +166,29 @@ func New(config Config) (*Limiter, error) {
 		scope = scopeToken
 	}
 	limiter := &Limiter{
-		enabled:           config.Enabled,
-		backend:           backend,
-		scope:             scope,
-		rate:              config.RequestsPerSecond,
-		burst:             float64(config.Burst),
-		source:            strings.TrimSpace(config.TenantPlanSource),
-		planVersion:       strings.TrimSpace(config.TenantPlanVersion),
-		planGeneratedAtMS: config.TenantPlanGeneratedAtUnixMS,
-		planChecksum:      config.TenantPlanChecksumPresent,
-		planMaxAge:        config.TenantPlanMaxAge,
-		maxKeys:           config.MaxKeys,
-		redis:             config.RedisClient,
-		prefix:            strings.Trim(strings.TrimSpace(config.RedisKeyPrefix), ":"),
-		window:            config.RedisWindow,
-		failOpen:          config.RedisFailOpen,
-		identity:          config.IdentityFunc,
-		now:               config.Now,
-		buckets:           make(map[string]*bucket),
+		enabled:             config.Enabled,
+		backend:             backend,
+		scope:               scope,
+		rate:                config.RequestsPerSecond,
+		burst:               float64(config.Burst),
+		source:              strings.TrimSpace(config.TenantPlanSource),
+		planVersion:         strings.TrimSpace(config.TenantPlanVersion),
+		planGeneratedAtMS:   config.TenantPlanGeneratedAtUnixMS,
+		planChecksum:        config.TenantPlanChecksumPresent,
+		planRequireChecksum: config.TenantPlanRequireChecksum,
+		planMaxAge:          config.TenantPlanMaxAge,
+		urlBearerSet:        config.TenantPlanURLBearerTokenSet,
+		urlRequireHTTPS:     config.TenantPlanURLRequireHTTPS,
+		urlTLSConfigured:    config.TenantPlanURLTLSConfigured,
+		urlClientCertSet:    config.TenantPlanURLClientCertSet,
+		maxKeys:             config.MaxKeys,
+		redis:               config.RedisClient,
+		prefix:              strings.Trim(strings.TrimSpace(config.RedisKeyPrefix), ":"),
+		window:              config.RedisWindow,
+		failOpen:            config.RedisFailOpen,
+		identity:            config.IdentityFunc,
+		now:                 config.Now,
+		buckets:             make(map[string]*bucket),
 	}
 	if limiter.now == nil {
 		limiter.now = time.Now
@@ -268,30 +288,35 @@ func (limiter *Limiter) Snapshot() Snapshot {
 	}
 
 	return Snapshot{
-		Enabled:                   limiter.enabled,
-		Backend:                   limiter.backend,
-		KeyScope:                  limiter.scope,
-		RatePerSecond:             limiter.rate,
-		Burst:                     int(limiter.burst),
-		TenantPlans:               tenantPlanCount,
-		TenantPlanSource:          limiter.source,
-		TenantPlanVersion:         tenantPlanVersion,
-		TenantPlanGeneratedAt:     tenantPlanGeneratedAtMS,
-		TenantPlanChecksumPresent: tenantPlanChecksumPresent,
-		TenantPlanMaxAgeMS:        tenantPlanMaxAgeMS,
-		TenantPlanAgeMS:           tenantPlanAgeMS,
-		TenantPlanStale:           tenantPlanStale,
-		TenantReloads:             limiter.planReloads.Load(),
-		TenantReloadAt:            limiter.planReloadAtMS.Load(),
-		TenantErrors:              limiter.planReloadErrs.Load(),
-		TrackedKeys:               trackedKeys,
-		MaxKeys:                   limiter.maxKeys,
-		RedisWindowMS:             limiter.window.Milliseconds(),
-		RedisFailOpen:             limiter.failOpen,
-		RedisErrors:               limiter.redisErrors.Load(),
-		IdentityErrors:            limiter.identityErrors.Load(),
-		TotalAccepted:             totalAccepted,
-		TotalLimited:              totalLimited,
+		Enabled:                    limiter.enabled,
+		Backend:                    limiter.backend,
+		KeyScope:                   limiter.scope,
+		RatePerSecond:              limiter.rate,
+		Burst:                      int(limiter.burst),
+		TenantPlans:                tenantPlanCount,
+		TenantPlanSource:           limiter.source,
+		TenantPlanVersion:          tenantPlanVersion,
+		TenantPlanGeneratedAt:      tenantPlanGeneratedAtMS,
+		TenantPlanChecksumPresent:  tenantPlanChecksumPresent,
+		TenantPlanRequireChecksum:  limiter.planRequireChecksum,
+		TenantPlanMaxAgeMS:         tenantPlanMaxAgeMS,
+		TenantPlanAgeMS:            tenantPlanAgeMS,
+		TenantPlanStale:            tenantPlanStale,
+		TenantPlanURLBearerSet:     limiter.urlBearerSet,
+		TenantPlanURLRequireHTTPS:  limiter.urlRequireHTTPS,
+		TenantPlanURLTLSConfigured: limiter.urlTLSConfigured,
+		TenantPlanURLClientCertSet: limiter.urlClientCertSet,
+		TenantReloads:              limiter.planReloads.Load(),
+		TenantReloadAt:             limiter.planReloadAtMS.Load(),
+		TenantErrors:               limiter.planReloadErrs.Load(),
+		TrackedKeys:                trackedKeys,
+		MaxKeys:                    limiter.maxKeys,
+		RedisWindowMS:              limiter.window.Milliseconds(),
+		RedisFailOpen:              limiter.failOpen,
+		RedisErrors:                limiter.redisErrors.Load(),
+		IdentityErrors:             limiter.identityErrors.Load(),
+		TotalAccepted:              totalAccepted,
+		TotalLimited:               totalLimited,
 	}
 }
 

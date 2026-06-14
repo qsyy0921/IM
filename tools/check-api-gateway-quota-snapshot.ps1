@@ -6,6 +6,7 @@ param(
     [switch]$RequireRateLimitEnabled,
     [switch]$RequireVersionedSnapshot,
     [switch]$RequireChecksum,
+    [switch]$RequireChecksumPolicy,
     [switch]$AllowStale,
     [switch]$AllowReloadErrors
 )
@@ -84,6 +85,7 @@ $source = (Get-StringOrEmpty $rateLimit.tenant_plan_source).Trim()
 $version = (Get-StringOrEmpty $rateLimit.tenant_plan_version).Trim()
 $generatedAtMS = Get-Int64OrZero $rateLimit.tenant_plan_generated_at_unix_ms
 $checksumPresent = Get-BoolOrFalse $rateLimit.tenant_plan_checksum_present
+$checksumRequired = Get-BoolOrFalse $rateLimit.tenant_plan_require_checksum
 $maxAgeMS = Get-Int64OrZero $rateLimit.tenant_plan_max_age_ms
 $ageMS = Get-Int64OrZero $rateLimit.tenant_plan_age_ms
 $stale = Get-BoolOrFalse $rateLimit.tenant_plan_stale
@@ -112,6 +114,11 @@ if ($RequireChecksum -and -not $checksumPresent) {
     $failed = $true
 }
 
+if ($RequireChecksumPolicy -and -not $checksumRequired) {
+    Write-Host "FAIL api-gateway tenant quota snapshot checksum policy is not enabled." -ForegroundColor Red
+    $failed = $true
+}
+
 if ($requiredMaxAgeMS -gt 0) {
     if ($generatedAtMS -le 0) {
         Write-Host "FAIL api-gateway tenant quota snapshot has no generated_at_unix_ms; cannot prove max age." -ForegroundColor Red
@@ -137,4 +144,4 @@ if ($failed) {
 }
 
 Write-Host "OK   api-gateway tenant quota snapshot gate"
-Write-Host "     enabled=$enabled source=$source version=$version generated_at_unix_ms=$generatedAtMS checksum_present=$checksumPresent max_age_ms=$maxAgeMS age_ms=$ageMS stale=$stale reload_errors=$reloadErrors"
+Write-Host "     enabled=$enabled source=$source version=$version generated_at_unix_ms=$generatedAtMS checksum_present=$checksumPresent checksum_required=$checksumRequired max_age_ms=$maxAgeMS age_ms=$ageMS stale=$stale reload_errors=$reloadErrors"

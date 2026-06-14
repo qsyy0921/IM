@@ -392,6 +392,49 @@ func TestNewRateLimiterFromEnvLoadsTenantPlansJSON(t *testing.T) {
 	}
 }
 
+func TestNewRateLimiterFromEnvExposesTenantPlanURLGuards(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	plans := map[string]ratelimitinfra.Plan{"tenant-url": {RequestsPerSecond: 9, Burst: 10}}
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Authorization") != "Bearer quota-config-token" {
+			t.Fatalf("expected bearer token auth header, got %q", request.Header.Get("Authorization"))
+		}
+		_, _ = writer.Write([]byte(versionedTenantPlanSnapshotJSON(t, plans, "quota-v1.url-guards", time.Now().UnixMilli())))
+	}))
+	defer server.Close()
+	caPath := filepath.Join(t.TempDir(), "quota-url-ca.pem")
+	caPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
+	if err := os.WriteFile(caPath, caPEM, 0o600); err != nil {
+		t.Fatalf("write quota URL CA file: %v", err)
+	}
+
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_ENABLED", "true")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", "1")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE", "url")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL", server.URL)
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_BEARER_TOKEN", "quota-config-token")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_REQUIRE_HTTPS", "true")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_CA_FILE", caPath)
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_REQUIRE_CHECKSUM", "true")
+
+	limiter, closeFn, err := newRateLimiterFromEnv(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("new URL tenant plan limiter: %v", err)
+	}
+	defer closeFn()
+	snapshot := limiter.Snapshot()
+	if snapshot.TenantPlanSource != "url" ||
+		snapshot.TenantPlanVersion != "quota-v1.url-guards" ||
+		!snapshot.TenantPlanChecksumPresent ||
+		!snapshot.TenantPlanRequireChecksum ||
+		!snapshot.TenantPlanURLBearerSet ||
+		!snapshot.TenantPlanURLRequireHTTPS ||
+		!snapshot.TenantPlanURLTLSConfigured ||
+		snapshot.TenantPlanURLClientCertSet {
+		t.Fatalf("unexpected URL guard snapshot: %+v", snapshot)
+	}
+}
+
 func TestParseTenantRateLimitPlansAllowsRPSAlias(t *testing.T) {
 	plans, err := parseTenantRateLimitPlans(`{"tenant-a":{"rps":3,"burst":4}}`)
 	if err != nil {

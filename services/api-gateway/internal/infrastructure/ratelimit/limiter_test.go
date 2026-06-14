@@ -246,11 +246,16 @@ func TestLimiterUpdateTenantPlansChangesQuotaAtRuntime(t *testing.T) {
 func TestLimiterUpdateTenantPlanSnapshotTracksMetadata(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	limiter, err := New(Config{
-		Enabled:           true,
-		KeyScope:          "tenant",
-		RequestsPerSecond: 1,
-		Burst:             1,
-		Now:               func() time.Time { return now },
+		Enabled:                     true,
+		KeyScope:                    "tenant",
+		RequestsPerSecond:           1,
+		Burst:                       1,
+		TenantPlanRequireChecksum:   true,
+		TenantPlanURLBearerTokenSet: true,
+		TenantPlanURLRequireHTTPS:   true,
+		TenantPlanURLTLSConfigured:  true,
+		TenantPlanURLClientCertSet:  true,
+		Now:                         func() time.Time { return now },
 		IdentityFunc: func(ctx context.Context) (Identity, error) {
 			md, _ := metadata.FromIncomingContext(ctx)
 			return Identity{TenantID: md.Get("tenant")[0]}, nil
@@ -268,7 +273,12 @@ func TestLimiterUpdateTenantPlanSnapshotTracksMetadata(t *testing.T) {
 	if snapshot.TenantPlans != 1 ||
 		snapshot.TenantPlanVersion != "quota-v1.test" ||
 		snapshot.TenantPlanGeneratedAt != 1_800_000_000_123 ||
-		!snapshot.TenantPlanChecksumPresent {
+		!snapshot.TenantPlanChecksumPresent ||
+		!snapshot.TenantPlanRequireChecksum ||
+		!snapshot.TenantPlanURLBearerSet ||
+		!snapshot.TenantPlanURLRequireHTTPS ||
+		!snapshot.TenantPlanURLTLSConfigured ||
+		!snapshot.TenantPlanURLClientCertSet {
 		t.Fatalf("unexpected tenant plan metadata snapshot: %+v", snapshot)
 	}
 }

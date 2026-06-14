@@ -689,6 +689,16 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 	if err != nil {
 		return nil, nil, err
 	}
+	tenantPlanSourceIsURL := tenantPlanSnapshot.Source == "url"
+	tenantPlanURLRequireHTTPS := false
+	tenantPlanURLTLSConfig := tenantPlanURLTLSConfig{}
+	if tenantPlanSourceIsURL {
+		tenantPlanURLRequireHTTPS, err = tenantPlanURLRequireHTTPSFromEnv()
+		if err != nil {
+			return nil, nil, err
+		}
+		tenantPlanURLTLSConfig = tenantPlanURLTLSConfigFromEnv()
+	}
 	if tenantPlanReloadInterval > 0 && tenantPlanSnapshot.Source != "file" && tenantPlanSnapshot.Source != "url" {
 		return nil, nil, errors.New("api-gateway tenant plan reload requires NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE=file or url")
 	}
@@ -703,7 +713,12 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 		TenantPlanVersion:           tenantPlanSnapshot.Version,
 		TenantPlanGeneratedAtUnixMS: tenantPlanSnapshot.GeneratedAtUnixMS,
 		TenantPlanChecksumPresent:   tenantPlanSnapshot.ChecksumPresent,
+		TenantPlanRequireChecksum:   tenantPlanRequireChecksum,
 		TenantPlanMaxAge:            tenantPlanMaxAge,
+		TenantPlanURLBearerTokenSet: tenantPlanSourceIsURL && tenantPlanURLBearerTokenConfigured(),
+		TenantPlanURLRequireHTTPS:   tenantPlanSourceIsURL && tenantPlanURLRequireHTTPS,
+		TenantPlanURLTLSConfigured:  tenantPlanSourceIsURL && tenantPlanURLTLSConfig.Enabled(),
+		TenantPlanURLClientCertSet:  tenantPlanSourceIsURL && tenantPlanURLTLSConfig.ClientCertConfigured(),
 		MaxKeys:                     envInt("NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS", 10000),
 		IdentityFunc:                rateLimitIdentityFunc(authenticator),
 	}
@@ -872,7 +887,7 @@ func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge ti
 	if parsed.Scheme != "https" && parsed.Scheme != "http" {
 		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL source requires http or https")
 	}
-	requireHTTPS, _, err := envOptionalBool("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_REQUIRE_HTTPS")
+	requireHTTPS, err := tenantPlanURLRequireHTTPSFromEnv()
 	if err != nil {
 		return tenantRateLimitPlanSnapshot{}, err
 	}
@@ -931,6 +946,15 @@ func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge ti
 	return snapshot, nil
 }
 
+func tenantPlanURLBearerTokenConfigured() bool {
+	return strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_BEARER_TOKEN")) != ""
+}
+
+func tenantPlanURLRequireHTTPSFromEnv() (bool, error) {
+	value, _, err := envOptionalBool("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_REQUIRE_HTTPS")
+	return value, err
+}
+
 type tenantPlanURLTLSConfig struct {
 	CAFile         string
 	ServerName     string
@@ -952,6 +976,10 @@ func (config tenantPlanURLTLSConfig) Enabled() bool {
 		strings.TrimSpace(config.ServerName) != "" ||
 		strings.TrimSpace(config.ClientCertFile) != "" ||
 		strings.TrimSpace(config.ClientKeyFile) != ""
+}
+
+func (config tenantPlanURLTLSConfig) ClientCertConfigured() bool {
+	return strings.TrimSpace(config.ClientCertFile) != "" && strings.TrimSpace(config.ClientKeyFile) != ""
 }
 
 func tenantPlanURLHTTPClient(parsed *url.URL) (*http.Client, error) {

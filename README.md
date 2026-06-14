@@ -1,6 +1,6 @@
 # NexusIM
 
-NexusIM 是面向企业协同的 IM + 智能协作平台。当前仓库已进入本地 / 双机可运行分布式 IM 后端阶段；最新工作入口以 `docs/runbook/current-brief.md` 和 `docs/runbook/README.md` 为准。
+NexusIM 是面向企业协同的 IM + 智能协作平台。当前仓库已进入本地 / 双机可运行分布式 IM 后端阶段；Codex 目标框只放 `prompt.md` 的短 Prompt，最新工作入口以 `docs/runbook/current-brief.md` 和 `docs/runbook/README.md` 为准。
 
 ## 目录结构
 
@@ -25,6 +25,7 @@ NexusIM 是面向企业协同的 IM + 智能协作平台。当前仓库已进入
 | `docs/sdd/README.md` | 服务级 SDD 索引和编码门禁。 |
 | `docs/runbook/README.md` | Runbook 短路由页。先读它，再按需进入服务 brief、SDD 或 smoke 报告。 |
 | `docs/runbook/current-brief.md` | 每轮默认短入口，避免读取长历史文档。 |
+| `prompt.md` | Codex 目标 prompt 的唯一维护源；目标框只复制其中的短 Prompt。 |
 | `docs/runbook/local-loadtest.md` | 本地和双机压测 Runbook。 |
 
 ## 当前实现范围

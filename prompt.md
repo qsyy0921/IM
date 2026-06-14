@@ -5,13 +5,13 @@
 把下面这段放进 Codex 目标框即可：
 
 ```text
-持续推进 E:\development\IM 的 NexusIM 项目。每轮先运行 git status --short --branch --untracked-files=all，再读取仓库根目录 prompt.md，并按其中的文档入口、当前主线、工作原则和结束检查执行。不要把长历史文档全文读一遍；不要回滚用户已有修改。
+持续推进 E:\development\IM 的 NexusIM 项目。每轮先运行 git status --short --branch --untracked-files=all，然后读取仓库根目录 prompt.md；只按 prompt.md 的路由继续读取必要短文档并执行。不要全文读取长历史文档；不要回滚用户已有修改。
 ```
 
 ## 本文件的作用
 
 - 本文件维护 Codex 长期目标 prompt 的真实内容。
-- Codex 目标框只放上面的短 Prompt，不复制本文件全文，也不直接维护长规则。
+- Codex 目标框只放上面的短 Prompt，不复制本文件全文，也不在目标框里直接维护长规则。
 - 当前状态和下一步优先级以 `docs/runbook/current-brief.md` 为准。
 - 需要更细服务状态时，只读取相关 `docs/runbook/service-briefs/<service>.md`。
 - 历史证据、SDD、smoke 报告和 archive 只在需要时按关键词读取。

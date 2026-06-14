@@ -5,7 +5,7 @@
 可复制到 Codex 目标框：
 
 ```text
-持续推进 E:\development\IM 的 NexusIM 项目。每轮先运行 git status --short --branch --untracked-files=all，再读取仓库根目录 prompt.md，并按其中的文档入口、当前主线、工作原则和结束检查执行。不要把长历史文档全文读一遍；不要回滚用户已有修改。
+持续推进 E:\development\IM 的 NexusIM 项目。每轮先运行 git status --short --branch --untracked-files=all，然后读取仓库根目录 prompt.md；只按 prompt.md 的路由继续读取必要短文档并执行。不要全文读取长历史文档；不要回滚用户已有修改。
 ```
 
 维护真实 prompt 内容时只改仓库根目录 `prompt.md`，不要把完整 prompt 复制回本文件。

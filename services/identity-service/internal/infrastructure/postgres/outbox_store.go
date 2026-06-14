@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -86,16 +87,17 @@ func (store *OutboxStore) ProcessReadyBatch(
 	publishedIDs := make([]int64, 0, len(messages))
 	for index, message := range messages {
 		if err := publishErrors[index]; err != nil {
+			lastError := sanitizeIdentityOutboxPublishError(err)
 			attempt := message.RetryCount + 1
 			if attempt >= maxAttempts {
-				if markErr := store.markDeadLettered(ctx, tx, message.ID, attempt, err.Error(), now); markErr != nil {
+				if markErr := store.markDeadLettered(ctx, tx, message.ID, attempt, lastError, now); markErr != nil {
 					return types.OutboxRelayStats{}, markErr
 				}
 				stats.DeadLettered++
 				continue
 			}
 			nextRetryAt := now.Add(retryDelay(retryBaseDelay, attempt))
-			if markErr := store.markRetry(ctx, tx, message.ID, attempt, err.Error(), nextRetryAt); markErr != nil {
+			if markErr := store.markRetry(ctx, tx, message.ID, attempt, lastError, nextRetryAt); markErr != nil {
 				return types.OutboxRelayStats{}, markErr
 			}
 			stats.Retried++
@@ -240,6 +242,55 @@ WHERE id = $1
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
+}
+
+func sanitizeIdentityOutboxPublishError(err error) string {
+	if err == nil {
+		return ""
+	}
+	if errors.Is(err, context.Canceled) {
+		return "identity outbox publish canceled"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "identity outbox publish timeout"
+	}
+	return sanitizeIdentityOutboxPublishErrorText(err.Error())
+}
+
+func sanitizeIdentityOutboxStoredError(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return ""
+	}
+	return sanitizeIdentityOutboxPublishErrorText(value)
+}
+
+func sanitizeIdentityOutboxPublishErrorText(value string) string {
+	message := strings.ToLower(strings.TrimSpace(value))
+	switch {
+	case message == "":
+		return "identity outbox publish failed"
+	case strings.Contains(message, "cancel"):
+		return "identity outbox publish canceled"
+	case strings.Contains(message, "timeout") || strings.Contains(message, "deadline exceeded"):
+		return "identity outbox publish timeout"
+	case strings.Contains(message, "unsupported"):
+		return "identity outbox publish unsupported event"
+	case strings.Contains(message, "malformed") ||
+		strings.Contains(message, "invalid") ||
+		strings.Contains(message, "json") ||
+		strings.Contains(message, "decode") ||
+		strings.Contains(message, "payload"):
+		return "identity outbox publish invalid payload"
+	case strings.Contains(message, "kafka") ||
+		strings.Contains(message, "broker") ||
+		strings.Contains(message, "leader") ||
+		strings.Contains(message, "connection refused") ||
+		strings.Contains(message, "no such host") ||
+		strings.Contains(message, "network"):
+		return "identity outbox publish broker unavailable"
+	default:
+		return "identity outbox publish failed"
+	}
 }
 
 func retryDelay(base time.Duration, attempt int) time.Duration {

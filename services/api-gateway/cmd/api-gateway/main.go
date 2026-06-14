@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"errors"
 	"log"
 	"net"
@@ -555,12 +556,17 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 	rps := envFloat64("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", 0)
 	backend := strings.ToLower(strings.TrimSpace(envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_BACKEND", "local")))
 	scope := strings.ToLower(strings.TrimSpace(envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_SCOPE", "token")))
+	tenantPlans, err := tenantRateLimitPlansFromEnv()
+	if err != nil {
+		return nil, nil, err
+	}
 	config := ratelimitinfra.Config{
 		Enabled:           enabled,
 		Backend:           backend,
 		KeyScope:          scope,
 		RequestsPerSecond: rps,
 		Burst:             envInt("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", int(rps)),
+		TenantPlans:       tenantPlans,
 		MaxKeys:           envInt("NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS", 10000),
 		IdentityFunc:      rateLimitIdentityFunc(authenticator),
 	}
@@ -600,6 +606,50 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 		return nil, nil, err
 	}
 	return limiter, func() error { return nil }, nil
+}
+
+func tenantRateLimitPlansFromEnv() (map[string]ratelimitinfra.Plan, error) {
+	raw := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON"))
+	if raw == "" {
+		path := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE"))
+		if path == "" {
+			return nil, nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		raw = string(data)
+	}
+	plans, err := parseTenantRateLimitPlans(raw)
+	if err != nil {
+		return nil, err
+	}
+	return plans, nil
+}
+
+func parseTenantRateLimitPlans(raw string) (map[string]ratelimitinfra.Plan, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	var payload map[string]struct {
+		RequestsPerSecond float64 `json:"requests_per_second"`
+		RPS               float64 `json:"rps"`
+		Burst             int     `json:"burst"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		return nil, err
+	}
+	plans := make(map[string]ratelimitinfra.Plan, len(payload))
+	for tenantID, item := range payload {
+		rps := item.RequestsPerSecond
+		if rps <= 0 {
+			rps = item.RPS
+		}
+		plans[tenantID] = ratelimitinfra.Plan{RequestsPerSecond: rps, Burst: item.Burst}
+	}
+	return plans, nil
 }
 
 func rateLimitIdentityFunc(authenticator *gatewayauth.Authenticator) ratelimitinfra.IdentityFunc {

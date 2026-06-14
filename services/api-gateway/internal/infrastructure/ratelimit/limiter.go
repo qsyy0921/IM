@@ -37,6 +37,7 @@ type Config struct {
 	KeyScope          string
 	RequestsPerSecond float64
 	Burst             int
+	TenantPlans       map[string]Plan
 	MaxKeys           int
 	RedisClient       redis.UniversalClient
 	RedisKeyPrefix    string
@@ -53,12 +54,18 @@ type Identity struct {
 
 type IdentityFunc func(context.Context) (Identity, error)
 
+type Plan struct {
+	RequestsPerSecond float64
+	Burst             int
+}
+
 type Limiter struct {
 	enabled  bool
 	backend  string
 	scope    string
 	rate     float64
 	burst    float64
+	plans    map[string]quotaPlan
 	maxKeys  int
 	redis    redis.UniversalClient
 	prefix   string
@@ -82,12 +89,24 @@ type bucket struct {
 	accepted int64
 }
 
+type quotaPlan struct {
+	rate  float64
+	burst float64
+}
+
+type requestQuota struct {
+	key   string
+	rate  float64
+	burst float64
+}
+
 type Snapshot struct {
 	Enabled        bool    `json:"enabled"`
 	Backend        string  `json:"backend,omitempty"`
 	KeyScope       string  `json:"key_scope,omitempty"`
 	RatePerSecond  float64 `json:"rate_per_second,omitempty"`
 	Burst          int     `json:"burst,omitempty"`
+	TenantPlans    int     `json:"tenant_plan_count,omitempty"`
 	TrackedKeys    int     `json:"tracked_keys,omitempty"`
 	MaxKeys        int     `json:"max_keys,omitempty"`
 	RedisWindowMS  int64   `json:"redis_window_ms,omitempty"`
@@ -160,6 +179,11 @@ func New(config Config) (*Limiter, error) {
 	if limiter.burst <= 0 {
 		limiter.burst = math.Ceil(limiter.rate)
 	}
+	plans, err := normalizeTenantPlans(config.TenantPlans)
+	if err != nil {
+		return nil, err
+	}
+	limiter.plans = plans
 	if limiter.maxKeys <= 0 {
 		limiter.maxKeys = 10000
 	}
@@ -197,6 +221,7 @@ func (limiter *Limiter) Snapshot() Snapshot {
 		KeyScope:       limiter.scope,
 		RatePerSecond:  limiter.rate,
 		Burst:          int(limiter.burst),
+		TenantPlans:    len(limiter.plans),
 		TrackedKeys:    len(limiter.buckets),
 		MaxKeys:        limiter.maxKeys,
 		RedisWindowMS:  limiter.window.Milliseconds(),
@@ -218,26 +243,26 @@ func (limiter *Limiter) allow(ctx context.Context, method string) (bool, time.Du
 
 func (limiter *Limiter) allowLocal(ctx context.Context, method string) (bool, time.Duration) {
 	now := limiter.now()
-	key := limiter.requestKey(ctx, method)
+	quota := limiter.requestQuota(ctx, method)
 
 	limiter.mu.Lock()
 	defer limiter.mu.Unlock()
 
-	entry := limiter.buckets[key]
+	entry := limiter.buckets[quota.key]
 	if entry == nil {
 		if len(limiter.buckets) >= limiter.maxKeys {
 			limiter.evictOldestLocked()
 		}
-		entry = &bucket{tokens: limiter.burst, lastSeen: now}
-		limiter.buckets[key] = entry
+		entry = &bucket{tokens: quota.burst, lastSeen: now}
+		limiter.buckets[quota.key] = entry
 	}
 	elapsed := now.Sub(entry.lastSeen).Seconds()
 	if elapsed > 0 {
-		entry.tokens = math.Min(limiter.burst, entry.tokens+elapsed*limiter.rate)
+		entry.tokens = math.Min(quota.burst, entry.tokens+elapsed*quota.rate)
 	}
 	entry.lastSeen = now
 	if entry.tokens < 1 {
-		retryDelay := localRetryDelay(1-entry.tokens, limiter.rate)
+		retryDelay := localRetryDelay(1-entry.tokens, quota.rate)
 		entry.limited++
 		limiter.totalLimited++
 		return false, retryDelay
@@ -258,7 +283,8 @@ func (limiter *Limiter) allowRedis(ctx context.Context, method string) (bool, ti
 		window = time.Millisecond
 	}
 	windowID := now.UnixMilli() / window.Milliseconds()
-	key := limiter.redisKey(limiter.requestKey(ctx, method), windowID)
+	quota := limiter.requestQuota(ctx, method)
+	key := limiter.redisKey(quota.key, windowID)
 	count, err := limiter.redis.Incr(ctx, key).Result()
 	if err != nil {
 		limiter.redisErrors.Add(1)
@@ -278,7 +304,7 @@ func (limiter *Limiter) allowRedis(ctx context.Context, method string) (bool, ti
 			return false, 0, err
 		}
 	}
-	if count > int64(limiter.burst) {
+	if count > int64(quota.burst) {
 		limiter.recordLimited()
 		return false, redisRetryDelay(now, window), nil
 	}
@@ -356,23 +382,57 @@ func (limiter *Limiter) evictOldestLocked() {
 	}
 }
 
-func (limiter *Limiter) requestKey(ctx context.Context, method string) string {
+func (limiter *Limiter) requestQuota(ctx context.Context, method string) requestQuota {
 	method = trimKeyPart(method)
 	if limiter != nil && limiter.scope == scopeTenant {
 		identity, err := limiter.identity(ctx)
 		if err == nil && strings.TrimSpace(identity.TenantID) != "" {
-			return method + "|tenant:" + trimKeyPart(identity.TenantID)
+			tenantID := strings.TrimSpace(identity.TenantID)
+			plan := limiter.planForTenant(tenantID)
+			return requestQuota{key: method + "|tenant:" + trimKeyPart(tenantID), rate: plan.rate, burst: plan.burst}
 		}
 		limiter.identityErrors.Add(1)
 	}
 	if token := bearerOrGatewayToken(ctx); token != "" {
 		digest := sha256.Sum256([]byte(token))
-		return method + "|token:" + hex.EncodeToString(digest[:12])
+		return limiter.defaultQuota(method + "|token:" + hex.EncodeToString(digest[:12]))
 	}
 	if peerInfo, ok := peer.FromContext(ctx); ok && peerInfo.Addr != nil {
-		return method + "|peer:" + trimKeyPart(peerInfo.Addr.String())
+		return limiter.defaultQuota(method + "|peer:" + trimKeyPart(peerInfo.Addr.String()))
 	}
-	return method + "|unknown"
+	return limiter.defaultQuota(method + "|unknown")
+}
+
+func (limiter *Limiter) defaultQuota(key string) requestQuota {
+	return requestQuota{key: key, rate: limiter.rate, burst: limiter.burst}
+}
+
+func (limiter *Limiter) planForTenant(tenantID string) quotaPlan {
+	if limiter != nil {
+		if plan, ok := limiter.plans[tenantID]; ok {
+			return plan
+		}
+	}
+	return quotaPlan{rate: limiter.rate, burst: limiter.burst}
+}
+
+func normalizeTenantPlans(plans map[string]Plan) (map[string]quotaPlan, error) {
+	result := make(map[string]quotaPlan, len(plans))
+	for tenantID, plan := range plans {
+		tenantID = strings.TrimSpace(tenantID)
+		if tenantID == "" {
+			return nil, errors.New("api-gateway tenant rate limit plan has empty tenant id")
+		}
+		if plan.RequestsPerSecond <= 0 {
+			return nil, errors.New("api-gateway tenant rate limit plan rps must be greater than 0")
+		}
+		burst := float64(plan.Burst)
+		if burst <= 0 {
+			burst = math.Ceil(plan.RequestsPerSecond)
+		}
+		result[tenantID] = quotaPlan{rate: plan.RequestsPerSecond, burst: burst}
+	}
+	return result, nil
 }
 
 func bearerOrGatewayToken(ctx context.Context) string {

@@ -153,6 +153,48 @@ func TestLimiterTenantScopeSharesQuotaAcrossTokensInTenant(t *testing.T) {
 	}
 }
 
+func TestLimiterTenantPlanOverridesDefaultQuota(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	limiter, err := New(Config{
+		Enabled:           true,
+		KeyScope:          "tenant",
+		RequestsPerSecond: 1,
+		Burst:             1,
+		TenantPlans: map[string]Plan{
+			"tenant-vip": {RequestsPerSecond: 10, Burst: 2},
+		},
+		Now: func() time.Time { return now },
+		IdentityFunc: func(ctx context.Context) (Identity, error) {
+			md, _ := metadata.FromIncomingContext(ctx)
+			return Identity{TenantID: md.Get("tenant")[0]}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("new limiter: %v", err)
+	}
+	vip := metadata.NewIncomingContext(context.Background(), metadata.Pairs("tenant", "tenant-vip"))
+	regular := metadata.NewIncomingContext(context.Background(), metadata.Pairs("tenant", "tenant-regular"))
+
+	for i := 0; i < 2; i++ {
+		allowed, _, err := limiter.allow(vip, "/method")
+		if err != nil || !allowed {
+			t.Fatalf("vip request %d should pass, allowed=%v err=%v", i, allowed, err)
+		}
+	}
+	if allowed, _, err := limiter.allow(vip, "/method"); err != nil || allowed {
+		t.Fatalf("third vip request should be limited, allowed=%v err=%v", allowed, err)
+	}
+	if allowed, _, err := limiter.allow(regular, "/method"); err != nil || !allowed {
+		t.Fatalf("regular first request should pass, allowed=%v err=%v", allowed, err)
+	}
+	if allowed, _, err := limiter.allow(regular, "/method"); err != nil || allowed {
+		t.Fatalf("regular second request should use default burst and be limited, allowed=%v err=%v", allowed, err)
+	}
+	if snapshot := limiter.Snapshot(); snapshot.TenantPlans != 1 || snapshot.TotalAccepted != 3 || snapshot.TotalLimited != 2 {
+		t.Fatalf("unexpected tenant plan snapshot: %+v", snapshot)
+	}
+}
+
 func TestLimiterTenantScopeFallbackDoesNotChargeTenantOnIdentityError(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	limiter, err := New(Config{
@@ -210,6 +252,21 @@ func TestLimiterTenantScopeRequiresIdentityResolver(t *testing.T) {
 func TestLimiterRejectsUnsupportedScope(t *testing.T) {
 	if _, err := New(Config{Enabled: true, KeyScope: "global", RequestsPerSecond: 1}); err == nil {
 		t.Fatalf("expected unsupported scope to fail")
+	}
+}
+
+func TestLimiterRejectsInvalidTenantPlans(t *testing.T) {
+	if _, err := New(Config{
+		Enabled:           true,
+		KeyScope:          "tenant",
+		RequestsPerSecond: 1,
+		Burst:             1,
+		TenantPlans:       map[string]Plan{"tenant-a": {RequestsPerSecond: 0}},
+		IdentityFunc: func(context.Context) (Identity, error) {
+			return Identity{TenantID: "tenant-a"}, nil
+		},
+	}); err == nil {
+		t.Fatalf("expected invalid tenant plan to fail")
 	}
 }
 
@@ -291,6 +348,47 @@ func TestRedisLimiterAllowsNewWindow(t *testing.T) {
 	allowed, retryDelay, err = limiter.allow(ctx, "/method")
 	if err != nil || !allowed || retryDelay != 0 {
 		t.Fatalf("new window request should pass, allowed=%v retryDelay=%s err=%v", allowed, retryDelay, err)
+	}
+}
+
+func TestRedisLimiterTenantPlanOverridesDefaultQuota(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	defer client.Close()
+	now := time.Unix(1_800_000_000, 0)
+	limiter, err := New(Config{
+		Enabled:           true,
+		Backend:           "redis",
+		KeyScope:          "tenant",
+		RequestsPerSecond: 1,
+		Burst:             1,
+		TenantPlans: map[string]Plan{
+			"tenant-vip": {RequestsPerSecond: 10, Burst: 2},
+		},
+		RedisClient: client,
+		RedisWindow: time.Second,
+		Now:         func() time.Time { return now },
+		IdentityFunc: func(ctx context.Context) (Identity, error) {
+			md, _ := metadata.FromIncomingContext(ctx)
+			return Identity{TenantID: md.Get("tenant")[0]}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("new limiter: %v", err)
+	}
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("tenant", "tenant-vip"))
+	for i := 0; i < 2; i++ {
+		allowed, _, err := limiter.allow(ctx, "/method")
+		if err != nil || !allowed {
+			t.Fatalf("vip redis request %d should pass, allowed=%v err=%v", i, allowed, err)
+		}
+	}
+	allowed, retryDelay, err := limiter.allow(ctx, "/method")
+	if err != nil || allowed {
+		t.Fatalf("third vip redis request should be limited, allowed=%v err=%v", allowed, err)
+	}
+	if retryDelay != time.Second {
+		t.Fatalf("unexpected retry delay: %s", retryDelay)
 	}
 }
 

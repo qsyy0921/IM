@@ -359,6 +359,67 @@ func TestNewRateLimiterFromEnvTenantScopeUsesAuthenticatedTenant(t *testing.T) {
 	}
 }
 
+func TestNewRateLimiterFromEnvLoadsTenantPlansJSON(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	clearAPIGatewayAuthConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_MODE", "hmac")
+	t.Setenv("NEXUSIM_API_GATEWAY_AUTH_HMAC_SECRET", "gateway-secret")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_ENABLED", "true")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_SCOPE", "tenant")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", "1")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", "1")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON", `{"tenant-vip":{"requests_per_second":10,"burst":2}}`)
+
+	authenticator, err := newAuthenticatorFromEnv()
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	t.Cleanup(authenticator.Close)
+	limiter, closeFn, err := newRateLimiterFromEnv(context.Background(), authenticator)
+	if err != nil {
+		t.Fatalf("new tenant plan limiter: %v", err)
+	}
+	defer closeFn()
+	snapshot := limiter.Snapshot()
+	if snapshot.TenantPlans != 1 || snapshot.KeyScope != "tenant" {
+		t.Fatalf("unexpected tenant plan snapshot: %+v", snapshot)
+	}
+}
+
+func TestParseTenantRateLimitPlansAllowsRPSAlias(t *testing.T) {
+	plans, err := parseTenantRateLimitPlans(`{"tenant-a":{"rps":3,"burst":4}}`)
+	if err != nil {
+		t.Fatalf("parse tenant plans: %v", err)
+	}
+	if plans["tenant-a"].RequestsPerSecond != 3 || plans["tenant-a"].Burst != 4 {
+		t.Fatalf("unexpected tenant plan: %+v", plans["tenant-a"])
+	}
+}
+
+func TestTenantRateLimitPlansFromEnvLoadsFile(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	path := filepath.Join(t.TempDir(), "tenant-plans.json")
+	if err := os.WriteFile(path, []byte(`{"tenant-a":{"requests_per_second":5,"burst":6}}`), 0o600); err != nil {
+		t.Fatalf("write tenant plans file: %v", err)
+	}
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE", path)
+	plans, err := tenantRateLimitPlansFromEnv()
+	if err != nil {
+		t.Fatalf("load tenant plans file: %v", err)
+	}
+	if plans["tenant-a"].RequestsPerSecond != 5 || plans["tenant-a"].Burst != 6 {
+		t.Fatalf("unexpected tenant plan from file: %+v", plans["tenant-a"])
+	}
+}
+
+func TestTenantRateLimitPlansFromEnvRejectsInvalidJSON(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON", "{")
+	if _, err := tenantRateLimitPlansFromEnv(); err == nil {
+		t.Fatalf("expected invalid tenant plans JSON to fail")
+	}
+}
+
 func TestValidateTrustedMetadataBackendConfigAllowsPrivateAddressWithoutMTLS(t *testing.T) {
 	err := validateTrustedMetadataBackendConfig(
 		"message-service",
@@ -522,6 +583,8 @@ func clearAPIGatewayRateLimitConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_SCOPE", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BACKEND", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_MODE", "")

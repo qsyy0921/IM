@@ -115,7 +115,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 
 | 服务 | 当前状态 | 已有证据 | 主要剩余工作 |
 | --- | --- | --- | --- |
-| `api-gateway` | 已落地、已接主链路 | gateway auth / downstream trusted metadata smoke、token / tenant scope rate limit | OpenTelemetry、动态 tenant plan / quota、legacy descriptor 收敛、生产部署治理 |
+| `api-gateway` | 已落地、已接主链路 | gateway auth / downstream trusted metadata smoke、token / tenant scope rate limit、静态 tenant plan override | OpenTelemetry、运行时动态 quota 配置、legacy descriptor 收敛、生产部署治理 |
 | `identity-service` | 已落地、已接登录主链路 | login / refresh / MFA / recovery code / JWKS / challenge delivery | WebAuthn/passkeys、OIDC、多 issuer、KMS/HSM、完整风控、生产级 email/SMS provider |
 | `message-service` | 已落地、已接主链路 | `SendMessage` / outbox / Kafka timeline | 更多消息类型、私有删除、合规删除、容量和生产观测 |
 | `conversation-service` | 已落地、已接主链路 | `GetSendContext` / member change / saga / worker | 更完整群管理、owner transfer 策略、成员窗口历史 repair |
@@ -130,7 +130,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 
 当前 9 个服务没有已知 P0/P1 阻塞。后续按小切片逐个清 P2，默认顺序如下：
 
-1. `api-gateway`：first-stage tenant-scoped rate limit 已补；下一步继续动态 tenant plan / quota、legacy descriptor 显式 opt-in 和 OpenTelemetry trace，不先扩新 facade。
+1. `api-gateway`：first-stage tenant-scoped rate limit 和静态 tenant plan override 已补；下一步继续 legacy descriptor 显式 opt-in、OpenTelemetry trace 和运行时动态 quota 配置，不先扩新 facade。
 2. `identity-service`：继续身份安全 hardening，优先真实通知 / issuer / key 管理边界。
 3. `message-service`：补消息类型和删除语义前，先守住 outbox / policy /容量观测。
 4. `conversation-service`：补群管理前，先收 owner transfer 和成员窗口 repair。
@@ -159,7 +159,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 
 所以接下来的优先级是：
 
-1. 继续做 `api-gateway` 入口治理：动态 tenant plan / quota、legacy descriptor 显式 opt-in 和 OpenTelemetry trace。
+1. 继续做 `api-gateway` 入口治理：legacy descriptor 显式 opt-in、OpenTelemetry trace 和运行时动态 quota 配置。
 2. 继续把现有 9 个服务做干净。
 3. 继续补分布式故障恢复 smoke。
 4. 清各服务剩余 P2 hardening。

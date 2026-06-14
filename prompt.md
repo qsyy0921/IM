@@ -26,9 +26,9 @@
 
 继续做 `api-gateway` 入口治理：
 
-- 动态 tenant plan / quota；
 - legacy descriptor 显式 opt-in 收敛；
 - OpenTelemetry trace；
+- 运行时动态 quota 配置；
 - 必要单测 / 集成测试；
 - 同步相关 service brief、SDD 或进度文档。
 

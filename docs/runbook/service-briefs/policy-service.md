@@ -4,7 +4,7 @@
 
 - 已有 `CheckMessageAction`、PG exact rules、tenant rules、conversation role gate、contacts projection。
 - 已有 ownership gate / override、decision audit outbox relay 和 repair。
-- 已补 `/healthz`、`/readyz`、`/debug/metrics`，可观察低敏 gRPC、decision、PG pool、policy rule store、projection 和 `policy_decision_audit_outbox` 聚合状态。
+- 已补 `/healthz`、`/readyz`、`/debug/metrics`，可观察低敏 gRPC、decision、PG pool、policy rule store、projection 和 `policy_decision_audit_outbox` 聚合状态；debug HTTP 监听默认只允许 loopback / RFC1918 私网，公网或 unspecified 地址必须显式 `NEXUSIM_POLICY_DEBUG_ALLOW_PUBLIC=true`。
 - 已补 first-stage OpenTelemetry gRPC server span；gRPC access log 只记录低敏 `trace_id/request_id`，并对白名单外入口 metadata 直接丢弃。
 - 当 `NEXUSIM_POLICY_GRPC_ADDR` 是公网地址时，若未启用入口 gRPC TLS，进程会在启动前直接失败，避免把内部 policy decision API 暴露到 plaintext 公网入口；私网 / loopback 仍保留第一阶段本地直连。
 - `outbox-relay` 对非取消运行时错误已改为退避重试，并在 relay 模式通过 `/debug/metrics` 暴露 low-sensitive outbox relay retry 快照；malformed payload / unsupported event 仍保持 store 驱动的 retry / DLQ 语义。

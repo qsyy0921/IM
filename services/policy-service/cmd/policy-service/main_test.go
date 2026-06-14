@@ -227,6 +227,37 @@ func TestValidatePolicyListenerConfigAllowsPublicAddressWithTLS(t *testing.T) {
 	}
 }
 
+func TestPolicyDebugAddrPrefersServiceSpecificEnv(t *testing.T) {
+	t.Setenv("NEXUSIM_DEBUG_ADDR", "127.0.0.1:19200")
+	t.Setenv("NEXUSIM_POLICY_DEBUG_ADDR", "127.0.0.1:19203")
+
+	if addr := policyDebugAddr(); addr != "127.0.0.1:19203" {
+		t.Fatalf("expected service-specific debug addr to win, got %q", addr)
+	}
+}
+
+func TestValidatePolicyDebugListenerConfigAllowsEmptyOrPrivateAddress(t *testing.T) {
+	for _, addr := range []string{"", "127.0.0.1:11911", "localhost:11911", "172.31.50.10:11911"} {
+		if err := validatePolicyDebugListenerConfig(addr, false); err != nil {
+			t.Fatalf("expected policy debug listener %q to be allowed: %v", addr, err)
+		}
+	}
+}
+
+func TestValidatePolicyDebugListenerConfigRejectsPublicAddressByDefault(t *testing.T) {
+	for _, addr := range []string{"0.0.0.0:11911", ":11911", "8.8.8.8:11911"} {
+		if err := validatePolicyDebugListenerConfig(addr, false); err == nil {
+			t.Fatalf("expected policy debug listener %q to be rejected by default", addr)
+		}
+	}
+}
+
+func TestValidatePolicyDebugListenerConfigAllowsExplicitPublicOptIn(t *testing.T) {
+	if err := validatePolicyDebugListenerConfig("0.0.0.0:11911", true); err != nil {
+		t.Fatalf("expected explicit public policy debug listener opt-in to be allowed: %v", err)
+	}
+}
+
 func clearPolicyGRPCTLSConfig(t *testing.T) {
 	t.Helper()
 	t.Setenv("NEXUSIM_POLICY_GRPC_TLS_CERT_FILE", "")

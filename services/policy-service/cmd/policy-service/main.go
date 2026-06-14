@@ -102,7 +102,11 @@ func runOutboxRelay() error {
 			Logf:           log.Printf,
 		},
 	)
-	stopDebug, err := startDebugServer(ctx, policyDebugAddr(), monitoringinfra.NewHandler(pool, true, nil, nil).WithOutboxRelayStats(relay.Snapshot))
+	debugAddr, err := policyDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool, true, nil, nil).WithOutboxRelayStats(relay.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -319,7 +323,11 @@ func runContactConsumer() error {
 			Logf:         log.Printf,
 		},
 	)
-	stopDebug, err := startDebugServer(ctx, policyDebugAddr(), monitoringinfra.NewHandler(pool, true, nil, nil).WithContactProjectionWorkerStats(worker.Snapshot))
+	debugAddr, err := policyDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool, true, nil, nil).WithContactProjectionWorkerStats(worker.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -362,7 +370,11 @@ func runTimelineConsumer() error {
 			Logf:         log.Printf,
 		},
 	)
-	stopDebug, err := startDebugServer(ctx, policyDebugAddr(), monitoringinfra.NewHandler(pool, true, nil, nil).WithTimelineProjectionWorkerStats(worker.Snapshot))
+	debugAddr, err := policyDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool, true, nil, nil).WithTimelineProjectionWorkerStats(worker.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -435,7 +447,11 @@ func runGRPC() error {
 	}()
 	decisionMetrics := monitoringinfra.NewDecisionMetrics()
 	useCaseOptions = append(useCaseOptions, app.WithPolicyDecisionObserver(decisionMetrics))
-	stopDebug, err := startDebugServer(ctx, policyDebugAddr(), monitoringinfra.NewHandler(pool, rulesEnabled, grpcMetrics, decisionMetrics).WithTraceStats(traceRuntime.Snapshot))
+	debugAddr, err := policyDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool, rulesEnabled, grpcMetrics, decisionMetrics).WithTraceStats(traceRuntime.Snapshot))
 	if err != nil {
 		return err
 	}
@@ -564,6 +580,28 @@ func envPositiveDuration(name string, fallback time.Duration) (time.Duration, er
 
 func policyDebugAddr() string {
 	return envString("NEXUSIM_POLICY_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
+}
+
+func policyDebugAddrFromEnv() (string, error) {
+	addr := policyDebugAddr()
+	allowPublic, _, err := envOptionalBool("NEXUSIM_POLICY_DEBUG_ALLOW_PUBLIC")
+	if err != nil {
+		return "", err
+	}
+	return addr, validatePolicyDebugListenerConfig(addr, allowPublic)
+}
+
+func validatePolicyDebugListenerConfig(addr string, allowPublic bool) error {
+	if strings.TrimSpace(addr) == "" {
+		return nil
+	}
+	if listenerAddrTrustedWithoutMTLS(addr) {
+		return nil
+	}
+	if allowPublic {
+		return nil
+	}
+	return errors.New("policy-service debug listener address is non-private; set NEXUSIM_POLICY_DEBUG_ALLOW_PUBLIC=true to allow")
 }
 
 func policyTraceConfigFromEnv() (monitoringinfra.TraceConfig, error) {

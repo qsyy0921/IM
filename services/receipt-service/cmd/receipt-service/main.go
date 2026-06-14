@@ -77,7 +77,15 @@ func runGRPCServer() error {
 	defer stopDebug()
 
 	listenAddr := envString("NEXUSIM_RECEIPT_GRPC_ADDR", "0.0.0.0:10499")
-	server, err := newGRPCServer(grpcMetrics)
+	authMode := envString("NEXUSIM_RECEIPT_AUTH_MODE", "body")
+	serverTLSConfig, serverTLSEnabled, err := receiptGRPCTLSConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	if err := validateTrustedMetadataListenerConfig(listenAddr, authMode, serverTLSConfig); err != nil {
+		return err
+	}
+	server, err := newGRPCServerWithConfig(grpcMetrics, authMode, serverTLSConfig, serverTLSEnabled)
 	if err != nil {
 		return err
 	}
@@ -380,13 +388,26 @@ func envString(name string, fallback string) string {
 }
 
 func newGRPCServer(grpcMetrics ...*monitoringinfra.GRPCMetrics) (*grpc.Server, error) {
+	authMode := envString("NEXUSIM_RECEIPT_AUTH_MODE", "body")
+	tlsConfig, ok, err := receiptGRPCTLSConfigFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	var metrics *monitoringinfra.GRPCMetrics
+	if len(grpcMetrics) > 0 {
+		metrics = grpcMetrics[0]
+	}
+	return newGRPCServerWithConfig(metrics, authMode, tlsConfig, ok)
+}
+
+func newGRPCServerWithConfig(grpcMetrics *monitoringinfra.GRPCMetrics, authMode string, tlsConfig *tls.Config, tlsEnabled bool) (*grpc.Server, error) {
 	interceptors := make([]grpc.UnaryServerInterceptor, 0, 2)
-	if len(grpcMetrics) > 0 && grpcMetrics[0] != nil {
-		interceptors = append(interceptors, grpcMetrics[0].UnaryServerInterceptor(log.Default()))
+	if grpcMetrics != nil {
+		interceptors = append(interceptors, grpcMetrics.UnaryServerInterceptor(log.Default()))
 	} else {
 		interceptors = append(interceptors, monitoringinfra.UnaryAccessLogInterceptor(log.Default()))
 	}
-	switch strings.ToLower(envString("NEXUSIM_RECEIPT_AUTH_MODE", "body")) {
+	switch strings.ToLower(strings.TrimSpace(authMode)) {
 	case "body", "request", "legacy":
 	case "metadata", "verified-metadata":
 		interceptors = append(interceptors, grpcapi.VerifiedAuthUnaryInterceptor(true))
@@ -397,12 +418,48 @@ func newGRPCServer(grpcMetrics ...*monitoringinfra.GRPCMetrics) (*grpc.Server, e
 	if len(interceptors) > 0 {
 		serverOptions = append(serverOptions, grpc.ChainUnaryInterceptor(interceptors...))
 	}
-	if creds, ok, err := loadReceiptGRPCCredentialsFromEnv(); err != nil {
-		return nil, err
-	} else if ok {
-		serverOptions = append(serverOptions, grpc.Creds(creds))
+	if tlsEnabled {
+		serverOptions = append(serverOptions, grpc.Creds(credentials.NewTLS(tlsConfig)))
 	}
 	return grpc.NewServer(serverOptions...), nil
+}
+
+func validateTrustedMetadataListenerConfig(listenAddr string, authMode string, tlsConfig *tls.Config) error {
+	if !usesTrustedMetadataAuth(authMode) {
+		return nil
+	}
+	if listenerAddrTrustedWithoutMTLS(listenAddr) {
+		return nil
+	}
+	if tlsConfig != nil && tlsConfig.ClientAuth == tls.RequireAndVerifyClientCert {
+		return nil
+	}
+	return errors.New("receipt-service uses verified metadata auth on non-private address without gRPC mTLS client certificate")
+}
+
+func usesTrustedMetadataAuth(authMode string) bool {
+	switch strings.ToLower(strings.TrimSpace(authMode)) {
+	case "metadata", "verified-metadata":
+		return true
+	default:
+		return false
+	}
+}
+
+func listenerAddrTrustedWithoutMTLS(addr string) bool {
+	host := strings.TrimSpace(addr)
+	if splitHost, _, err := net.SplitHostPort(host); err == nil {
+		host = splitHost
+	}
+	host = strings.TrimSpace(strings.Trim(host, "[]"))
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate()
 }
 
 func loadReceiptGRPCCredentialsFromEnv() (credentials.TransportCredentials, bool, error) {

@@ -61,6 +61,8 @@ NEXUSIM_RECEIPT_GRPC_TLS_CLIENT_ALLOWED_URIS=spiffe://nexusim/api-gateway
 
 开启 allowlist 时按客户端证书 DNS SAN 小写 exact-match 或 URI SAN exact-match 校验。`loadtest/receipt` 和 `loadtest/demo` 已支持对 delivery / receipt gRPC client 配置 CA、server name 和 client cert/key，用于本地 smoke 验证。其它客户端 TLS 迁移、证书签发 / 轮换 / 分发、动态服务身份治理和全服务 mTLS rollout 仍是后续项。
 
+当 `NEXUSIM_RECEIPT_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端没有启用 mTLS client cert 校验，receipt-service 必须在启动前直接失败，避免把第一阶段 trusted metadata 模式暴露到公网监听面。
+
 ## 3. 六层 DDD 包结构
 
 ```text

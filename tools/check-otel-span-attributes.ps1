@@ -15,6 +15,18 @@ $forbiddenKeys = @(
 $productionGoFiles = Get-ChildItem -LiteralPath (Join-Path $repoRoot "services") -Recurse -Filter "*.go" -File |
     Where-Object { $_.Name -notlike "*_test.go" }
 
+function Convert-ToRepoRelativePath {
+    param([string]$Path)
+
+    $root = [System.IO.Path]::GetFullPath($repoRoot).TrimEnd("\", "/")
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $prefix = $root + [System.IO.Path]::DirectorySeparatorChar
+    if ($fullPath.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $fullPath.Substring($prefix.Length)
+    }
+    return $fullPath
+}
+
 $violations = @()
 foreach ($file in $productionGoFiles) {
     $content = Get-Content -LiteralPath $file.FullName -Raw
@@ -24,7 +36,7 @@ foreach ($file in $productionGoFiles) {
             $content.Contains("attribute.Int(`"$key`"") -or
             $content.Contains("attribute.Int64(`"$key`"") -or
             $content.Contains("attribute.Bool(`"$key`"")) {
-            $relative = [System.IO.Path]::GetRelativePath($repoRoot, $file.FullName)
+            $relative = Convert-ToRepoRelativePath -Path $file.FullName
             $violations += "${relative}: forbidden high-cardinality OTel span attribute '$key'"
         }
     }

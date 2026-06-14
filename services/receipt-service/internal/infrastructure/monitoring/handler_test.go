@@ -107,3 +107,29 @@ func TestHandlerMetricsIncludesDeliveryProjectionWorkerSnapshot(t *testing.T) {
 		t.Fatalf("expected delivery worker metrics, got %+v", body.DeliveryProjectionWorker)
 	}
 }
+
+func TestHandlerMetricsIncludesOutboxRelaySnapshot(t *testing.T) {
+	handler := NewHandler(nil).WithOutboxRelayStats(func() types.OutboxRelayWorkerSnapshot {
+		return types.OutboxRelayWorkerSnapshot{
+			TotalErrors:        3,
+			ConsecutiveErrors:  1,
+			LastErrorAtMS:      100,
+			LastSuccessAtMS:    90,
+			LastPublishedAtMS:  80,
+			LastErrorBackoffMS: 1000,
+		}
+	})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/debug/metrics", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", response.Code)
+	}
+	var body Snapshot
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode metrics response: %v", err)
+	}
+	if body.OutboxRelay == nil || body.OutboxRelay.TotalErrors != 3 {
+		t.Fatalf("expected outbox relay metrics, got %+v", body.OutboxRelay)
+	}
+}

@@ -14,6 +14,7 @@ type Handler struct {
 	pool                     *pgxpool.Pool
 	grpcMetrics              *GRPCMetrics
 	deliveryWorkerSnapshotFn func() types.ProjectionWorkerSnapshot
+	outboxRelaySnapshotFn    func() types.OutboxRelayWorkerSnapshot
 }
 
 func NewHandler(pool *pgxpool.Pool, grpcMetrics ...*GRPCMetrics) *Handler {
@@ -26,6 +27,11 @@ func NewHandler(pool *pgxpool.Pool, grpcMetrics ...*GRPCMetrics) *Handler {
 
 func (h *Handler) WithDeliveryProjectionWorkerStats(snapshotFunc func() types.ProjectionWorkerSnapshot) *Handler {
 	h.deliveryWorkerSnapshotFn = snapshotFunc
+	return h
+}
+
+func (h *Handler) WithOutboxRelayStats(snapshotFunc func() types.OutboxRelayWorkerSnapshot) *Handler {
+	h.outboxRelaySnapshotFn = snapshotFunc
 	return h
 }
 
@@ -69,6 +75,10 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		workerSnapshot := h.deliveryWorkerSnapshotFn()
 		snapshot.DeliveryProjectionWorker = &workerSnapshot
 	}
+	if h.outboxRelaySnapshotFn != nil {
+		relaySnapshot := h.outboxRelaySnapshotFn()
+		snapshot.OutboxRelay = &relaySnapshot
+	}
 	if h.pool != nil {
 		stats := h.pool.Stat()
 		snapshot.PGPool = &PGPoolSnapshot{
@@ -107,15 +117,16 @@ type healthResponse struct {
 }
 
 type Snapshot struct {
-	Service                  string                          `json:"service"`
-	GeneratedAtMS            int64                           `json:"generated_at_ms"`
-	PGPool                   *PGPoolSnapshot                 `json:"pg_pool,omitempty"`
-	Receipt                  *ReceiptSnapshot                `json:"receipt,omitempty"`
-	ReceiptError             string                          `json:"receipt_error,omitempty"`
-	Outbox                   *OutboxSnapshot                 `json:"receipt_outbox,omitempty"`
-	OutboxError              string                          `json:"receipt_outbox_error,omitempty"`
-	GRPC                     *GRPCSnapshot                   `json:"grpc,omitempty"`
-	DeliveryProjectionWorker *types.ProjectionWorkerSnapshot `json:"delivery_projection_worker,omitempty"`
+	Service                  string                           `json:"service"`
+	GeneratedAtMS            int64                            `json:"generated_at_ms"`
+	PGPool                   *PGPoolSnapshot                  `json:"pg_pool,omitempty"`
+	Receipt                  *ReceiptSnapshot                 `json:"receipt,omitempty"`
+	ReceiptError             string                           `json:"receipt_error,omitempty"`
+	Outbox                   *OutboxSnapshot                  `json:"receipt_outbox,omitempty"`
+	OutboxError              string                           `json:"receipt_outbox_error,omitempty"`
+	GRPC                     *GRPCSnapshot                    `json:"grpc,omitempty"`
+	DeliveryProjectionWorker *types.ProjectionWorkerSnapshot  `json:"delivery_projection_worker,omitempty"`
+	OutboxRelay              *types.OutboxRelayWorkerSnapshot `json:"outbox_relay,omitempty"`
 }
 
 type PGPoolSnapshot struct {

@@ -65,6 +65,7 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 	metrics := NewGRPCMetrics()
 	metrics.record("/nexusim.gateway.v1.GatewayService/SendMessage", "OK", 7)
 	metrics.record("/nexusim.gateway.v1.GatewayService/SendMessage", "Unavailable", 11)
+	metrics.record("/nexusim.message.v1.MessageService/SendMessage", "OK", 5)
 	metrics.record("/nexusim.api/Test\"Method\nLine", "OK", 3)
 	handler := NewHandler(metrics).WithAuthJWKStats(func() gatewayauth.JWKStats {
 		return gatewayauth.JWKStats{RemoteURLConfigured: true, CachedKeyCount: 2, RefreshFailures: 1}
@@ -103,6 +104,8 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 	assertContains(t, body, `nexusim_api_gateway_grpc_errors_total{method="/nexusim.gateway.v1.GatewayService/SendMessage"} 1`)
 	assertContains(t, body, `nexusim_api_gateway_grpc_requests_total{code="OK",method="/nexusim.api/Test\"Method\nLine"} 1`)
 	assertContains(t, body, `nexusim_api_gateway_grpc_exposure_requests_total{exposure="facade"} 2`)
+	assertContains(t, body, `nexusim_api_gateway_grpc_exposure_requests_total{exposure="legacy_descriptor"} 1`)
+	assertContains(t, body, `nexusim_api_gateway_grpc_legacy_descriptor_last_seen_unix_milliseconds`)
 	assertContains(t, body, `nexusim_api_gateway_rate_limit_enabled{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1`)
 	assertContains(t, body, `nexusim_api_gateway_auth_jwks_refresh_failures_total 1`)
 	assertContains(t, body, `nexusim_api_gateway_legacy_descriptors_registered 1`)

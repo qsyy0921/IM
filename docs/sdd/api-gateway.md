@@ -153,7 +153,7 @@ NEXUSIM_API_GATEWAY_DEBUG_ADDR=127.0.0.1:12001
 /metrics
 ```
 
-`/debug/metrics` 只输出进程内 JSON 聚合指标：gRPC method/code/count/error_count/latency 和 JWT/JWKS 缓存刷新状态。`/metrics` 复用同一份低敏 snapshot，输出第一阶段 Prometheus text exposition，用于本地 scrape / dashboard 原型；标签只允许 method、code、exposure、backend、key_scope、exporter 等低基数字段，不输出 gateway token、tenant_id、user_id、device_id、session_id、request_id、trace_id 或 request body。gRPC access log 只记录 service/event/method/code/latency_ms/request_id/trace_id，不记录 gateway token、tenant_id、user_id、device_id、session_id 或 request body。两个 endpoint 都属于 first-stage local/debug observability，不是完整 Prometheus 部署、统一 trace、告警系统或生产审计日志。
+`/debug/metrics` 只输出进程内 JSON 聚合指标：gRPC method/code/count/error_count/latency、facade / legacy descriptor / other exposure counters、legacy descriptor last-seen timestamp 和 JWT/JWKS 缓存刷新状态。`/metrics` 复用同一份低敏 snapshot，输出第一阶段 Prometheus text exposition，用于本地 scrape / dashboard 原型；标签只允许 method、code、exposure、backend、key_scope、tenant_plan_source、exporter 等低基数字段，不输出 gateway token、tenant_id、user_id、device_id、session_id、request_id、trace_id 或 request body。gRPC access log 只记录 service/event/method/code/latency_ms/request_id/trace_id，不记录 gateway token、tenant_id、user_id、device_id、session_id 或 request body。两个 endpoint 都属于 first-stage local/debug observability，不是完整 Prometheus 部署、统一 trace、告警系统或生产审计日志。
 
 First-stage OpenTelemetry trace 默认关闭：
 

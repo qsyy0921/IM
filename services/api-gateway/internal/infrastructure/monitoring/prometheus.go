@@ -45,6 +45,8 @@ func writeGRPCPrometheus(builder *strings.Builder, snapshot GRPCSnapshot) {
 	writePrometheusSample(builder, "nexusim_api_gateway_grpc_exposure_requests_total", map[string]string{"exposure": "facade"}, strconv.FormatInt(snapshot.FacadeRequests, 10))
 	writePrometheusSample(builder, "nexusim_api_gateway_grpc_exposure_requests_total", map[string]string{"exposure": "legacy_descriptor"}, strconv.FormatInt(snapshot.LegacyDescriptorRequests, 10))
 	writePrometheusSample(builder, "nexusim_api_gateway_grpc_exposure_requests_total", map[string]string{"exposure": "other"}, strconv.FormatInt(snapshot.OtherRequests, 10))
+	writePrometheusHeader(builder, "nexusim_api_gateway_grpc_legacy_descriptor_last_seen_unix_milliseconds", "Gauge", "Unix time of the last observed api-gateway legacy descriptor request in milliseconds.")
+	writePrometheusSample(builder, "nexusim_api_gateway_grpc_legacy_descriptor_last_seen_unix_milliseconds", nil, strconv.FormatInt(snapshot.LegacyDescriptorLastSeenMS, 10))
 
 	methods := append([]GRPCMethodSnapshot(nil), snapshot.Methods...)
 	sort.Slice(methods, func(i, j int) bool {

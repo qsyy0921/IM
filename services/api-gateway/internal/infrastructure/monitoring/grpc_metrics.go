@@ -30,8 +30,9 @@ var legacyDescriptorMethodPrefixes = []string{
 }
 
 type GRPCMetrics struct {
-	mu      sync.Mutex
-	methods map[string]*grpcMethodMetrics
+	mu                         sync.Mutex
+	methods                    map[string]*grpcMethodMetrics
+	legacyDescriptorLastSeenMS int64
 }
 
 type grpcMethodMetrics struct {
@@ -105,6 +106,7 @@ func (metrics *GRPCMetrics) Snapshot() GRPCSnapshot {
 		}
 		snapshot.Methods = append(snapshot.Methods, methodSnapshot)
 	}
+	snapshot.LegacyDescriptorLastSeenMS = metrics.legacyDescriptorLastSeenMS
 	return snapshot
 }
 
@@ -126,15 +128,19 @@ func (metrics *GRPCMetrics) record(method string, code string, latencyMS int64) 
 	if latencyMS > methodMetrics.maxLatencyMS {
 		methodMetrics.maxLatencyMS = latencyMS
 	}
+	if grpcMethodExposure(method) == "legacy_descriptor" {
+		metrics.legacyDescriptorLastSeenMS = time.Now().UnixMilli()
+	}
 }
 
 type GRPCSnapshot struct {
-	TotalRequests            int64                `json:"total_requests"`
-	TotalErrors              int64                `json:"total_errors"`
-	FacadeRequests           int64                `json:"facade_requests,omitempty"`
-	LegacyDescriptorRequests int64                `json:"legacy_descriptor_requests,omitempty"`
-	OtherRequests            int64                `json:"other_requests,omitempty"`
-	Methods                  []GRPCMethodSnapshot `json:"methods"`
+	TotalRequests              int64                `json:"total_requests"`
+	TotalErrors                int64                `json:"total_errors"`
+	FacadeRequests             int64                `json:"facade_requests,omitempty"`
+	LegacyDescriptorRequests   int64                `json:"legacy_descriptor_requests,omitempty"`
+	LegacyDescriptorLastSeenMS int64                `json:"legacy_descriptor_last_seen_unix_ms,omitempty"`
+	OtherRequests              int64                `json:"other_requests,omitempty"`
+	Methods                    []GRPCMethodSnapshot `json:"methods"`
 }
 
 type GRPCMethodSnapshot struct {

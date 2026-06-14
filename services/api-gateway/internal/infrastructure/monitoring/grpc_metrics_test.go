@@ -107,4 +107,7 @@ func TestGRPCMetricsClassifiesFacadeAndLegacyDescriptorTraffic(t *testing.T) {
 		snapshot.TotalErrors != 1 {
 		t.Fatalf("unexpected classified grpc snapshot: %+v", snapshot)
 	}
+	if snapshot.LegacyDescriptorLastSeenMS <= 0 {
+		t.Fatalf("expected legacy descriptor last seen timestamp, got %+v", snapshot)
+	}
 }

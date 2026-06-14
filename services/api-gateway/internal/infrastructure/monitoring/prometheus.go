@@ -89,8 +89,9 @@ func writeAuthJWKPrometheus(builder *strings.Builder, snapshot gatewayauth.JWKSt
 
 func writeRateLimitPrometheus(builder *strings.Builder, snapshot ratelimit.Snapshot) {
 	labels := map[string]string{
-		"backend":   snapshot.Backend,
-		"key_scope": snapshot.KeyScope,
+		"backend":            snapshot.Backend,
+		"key_scope":          snapshot.KeyScope,
+		"tenant_plan_source": snapshot.TenantPlanSource,
 	}
 	writePrometheusHeader(builder, "nexusim_api_gateway_rate_limit_enabled", "Gauge", "Whether api-gateway rate limiting is enabled.")
 	writePrometheusSample(builder, "nexusim_api_gateway_rate_limit_enabled", labels, prometheusBool(snapshot.Enabled))

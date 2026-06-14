@@ -17,7 +17,7 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 	handler := NewHandler(metrics).WithAuthJWKStats(func() gatewayauth.JWKStats {
 		return gatewayauth.JWKStats{RemoteURLConfigured: true, CachedKeyCount: 2, RefreshFailures: 1}
 	}).WithRateLimitStats(func() ratelimit.Snapshot {
-		return ratelimit.Snapshot{Enabled: true, RatePerSecond: 10, Burst: 20, TotalLimited: 3}
+		return ratelimit.Snapshot{Enabled: true, RatePerSecond: 10, Burst: 20, TenantPlanSource: "none", TotalLimited: 3}
 	}).WithRuntimeStats(func() RuntimeSnapshot {
 		return RuntimeSnapshot{RegisterLegacyDescriptors: false}
 	}).WithTraceStats(func() TraceSnapshot {
@@ -70,16 +70,17 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 		return gatewayauth.JWKStats{RemoteURLConfigured: true, CachedKeyCount: 2, RefreshFailures: 1}
 	}).WithRateLimitStats(func() ratelimit.Snapshot {
 		return ratelimit.Snapshot{
-			Enabled:        true,
-			Backend:        "redis",
-			KeyScope:       "tenant",
-			TenantPlans:    1,
-			TenantReloads:  2,
-			TenantErrors:   3,
-			RedisErrors:    4,
-			IdentityErrors: 5,
-			TotalAccepted:  6,
-			TotalLimited:   7,
+			Enabled:          true,
+			Backend:          "redis",
+			KeyScope:         "tenant",
+			TenantPlans:      1,
+			TenantPlanSource: "file",
+			TenantReloads:    2,
+			TenantErrors:     3,
+			RedisErrors:      4,
+			IdentityErrors:   5,
+			TotalAccepted:    6,
+			TotalLimited:     7,
 		}
 	}).WithRuntimeStats(func() RuntimeSnapshot {
 		return RuntimeSnapshot{RegisterLegacyDescriptors: true}
@@ -102,7 +103,7 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 	assertContains(t, body, `nexusim_api_gateway_grpc_errors_total{method="/nexusim.gateway.v1.GatewayService/SendMessage"} 1`)
 	assertContains(t, body, `nexusim_api_gateway_grpc_requests_total{code="OK",method="/nexusim.api/Test\"Method\nLine"} 1`)
 	assertContains(t, body, `nexusim_api_gateway_grpc_exposure_requests_total{exposure="facade"} 2`)
-	assertContains(t, body, `nexusim_api_gateway_rate_limit_enabled{backend="redis",key_scope="tenant"} 1`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_enabled{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1`)
 	assertContains(t, body, `nexusim_api_gateway_auth_jwks_refresh_failures_total 1`)
 	assertContains(t, body, `nexusim_api_gateway_legacy_descriptors_registered 1`)
 	assertContains(t, body, `nexusim_api_gateway_otel_traces_enabled{exporter="otlp-grpc"} 1`)

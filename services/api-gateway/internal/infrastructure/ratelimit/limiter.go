@@ -38,6 +38,7 @@ type Config struct {
 	RequestsPerSecond float64
 	Burst             int
 	TenantPlans       map[string]Plan
+	TenantPlanSource  string
 	MaxKeys           int
 	RedisClient       redis.UniversalClient
 	RedisKeyPrefix    string
@@ -65,6 +66,7 @@ type Limiter struct {
 	scope    string
 	rate     float64
 	burst    float64
+	source   string
 	plansMu  sync.RWMutex
 	plans    map[string]quotaPlan
 	maxKeys  int
@@ -105,23 +107,24 @@ type requestQuota struct {
 }
 
 type Snapshot struct {
-	Enabled        bool    `json:"enabled"`
-	Backend        string  `json:"backend,omitempty"`
-	KeyScope       string  `json:"key_scope,omitempty"`
-	RatePerSecond  float64 `json:"rate_per_second,omitempty"`
-	Burst          int     `json:"burst,omitempty"`
-	TenantPlans    int     `json:"tenant_plan_count,omitempty"`
-	TenantReloads  int64   `json:"tenant_plan_reload_count,omitempty"`
-	TenantReloadAt int64   `json:"tenant_plan_reloaded_at_unix_ms,omitempty"`
-	TenantErrors   int64   `json:"tenant_plan_reload_error_count,omitempty"`
-	TrackedKeys    int     `json:"tracked_keys,omitempty"`
-	MaxKeys        int     `json:"max_keys,omitempty"`
-	RedisWindowMS  int64   `json:"redis_window_ms,omitempty"`
-	RedisFailOpen  bool    `json:"redis_fail_open,omitempty"`
-	RedisErrors    int64   `json:"redis_error_count,omitempty"`
-	IdentityErrors int64   `json:"identity_error_count,omitempty"`
-	TotalAccepted  int64   `json:"total_accepted"`
-	TotalLimited   int64   `json:"total_limited"`
+	Enabled          bool    `json:"enabled"`
+	Backend          string  `json:"backend,omitempty"`
+	KeyScope         string  `json:"key_scope,omitempty"`
+	RatePerSecond    float64 `json:"rate_per_second,omitempty"`
+	Burst            int     `json:"burst,omitempty"`
+	TenantPlans      int     `json:"tenant_plan_count,omitempty"`
+	TenantPlanSource string  `json:"tenant_plan_source,omitempty"`
+	TenantReloads    int64   `json:"tenant_plan_reload_count,omitempty"`
+	TenantReloadAt   int64   `json:"tenant_plan_reloaded_at_unix_ms,omitempty"`
+	TenantErrors     int64   `json:"tenant_plan_reload_error_count,omitempty"`
+	TrackedKeys      int     `json:"tracked_keys,omitempty"`
+	MaxKeys          int     `json:"max_keys,omitempty"`
+	RedisWindowMS    int64   `json:"redis_window_ms,omitempty"`
+	RedisFailOpen    bool    `json:"redis_fail_open,omitempty"`
+	RedisErrors      int64   `json:"redis_error_count,omitempty"`
+	IdentityErrors   int64   `json:"identity_error_count,omitempty"`
+	TotalAccepted    int64   `json:"total_accepted"`
+	TotalLimited     int64   `json:"total_limited"`
 }
 
 func New(config Config) (*Limiter, error) {
@@ -139,6 +142,7 @@ func New(config Config) (*Limiter, error) {
 		scope:    scope,
 		rate:     config.RequestsPerSecond,
 		burst:    float64(config.Burst),
+		source:   strings.TrimSpace(config.TenantPlanSource),
 		maxKeys:  config.MaxKeys,
 		redis:    config.RedisClient,
 		prefix:   strings.Trim(strings.TrimSpace(config.RedisKeyPrefix), ":"),
@@ -153,6 +157,9 @@ func New(config Config) (*Limiter, error) {
 	}
 	if !limiter.enabled {
 		return limiter, nil
+	}
+	if limiter.source == "" {
+		limiter.source = "none"
 	}
 	if limiter.rate <= 0 {
 		return nil, errors.New("api-gateway rate limit rps must be greater than 0 when enabled")
@@ -230,23 +237,24 @@ func (limiter *Limiter) Snapshot() Snapshot {
 	limiter.plansMu.RUnlock()
 
 	return Snapshot{
-		Enabled:        limiter.enabled,
-		Backend:        limiter.backend,
-		KeyScope:       limiter.scope,
-		RatePerSecond:  limiter.rate,
-		Burst:          int(limiter.burst),
-		TenantPlans:    tenantPlanCount,
-		TenantReloads:  limiter.planReloads.Load(),
-		TenantReloadAt: limiter.planReloadAtMS.Load(),
-		TenantErrors:   limiter.planReloadErrs.Load(),
-		TrackedKeys:    trackedKeys,
-		MaxKeys:        limiter.maxKeys,
-		RedisWindowMS:  limiter.window.Milliseconds(),
-		RedisFailOpen:  limiter.failOpen,
-		RedisErrors:    limiter.redisErrors.Load(),
-		IdentityErrors: limiter.identityErrors.Load(),
-		TotalAccepted:  totalAccepted,
-		TotalLimited:   totalLimited,
+		Enabled:          limiter.enabled,
+		Backend:          limiter.backend,
+		KeyScope:         limiter.scope,
+		RatePerSecond:    limiter.rate,
+		Burst:            int(limiter.burst),
+		TenantPlans:      tenantPlanCount,
+		TenantPlanSource: limiter.source,
+		TenantReloads:    limiter.planReloads.Load(),
+		TenantReloadAt:   limiter.planReloadAtMS.Load(),
+		TenantErrors:     limiter.planReloadErrs.Load(),
+		TrackedKeys:      trackedKeys,
+		MaxKeys:          limiter.maxKeys,
+		RedisWindowMS:    limiter.window.Milliseconds(),
+		RedisFailOpen:    limiter.failOpen,
+		RedisErrors:      limiter.redisErrors.Load(),
+		IdentityErrors:   limiter.identityErrors.Load(),
+		TotalAccepted:    totalAccepted,
+		TotalLimited:     totalLimited,
 	}
 }
 

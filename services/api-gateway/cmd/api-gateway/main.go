@@ -623,13 +623,16 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 	rps := envFloat64("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", 0)
 	backend := strings.ToLower(strings.TrimSpace(envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_BACKEND", "local")))
 	scope := strings.ToLower(strings.TrimSpace(envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_SCOPE", "token")))
-	tenantPlans, err := tenantRateLimitPlansFromEnv()
+	tenantPlans, tenantPlanSource, err := tenantRateLimitPlansFromEnv()
 	if err != nil {
 		return nil, nil, err
 	}
 	tenantPlanReloadInterval, err := tenantPlanReloadIntervalFromEnv()
 	if err != nil {
 		return nil, nil, err
+	}
+	if tenantPlanReloadInterval > 0 && tenantPlanSource != "file" {
+		return nil, nil, errors.New("api-gateway tenant plan reload requires NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE=file")
 	}
 	config := ratelimitinfra.Config{
 		Enabled:           enabled,
@@ -638,6 +641,7 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 		RequestsPerSecond: rps,
 		Burst:             envInt("NEXUSIM_API_GATEWAY_RATE_LIMIT_BURST", int(rps)),
 		TenantPlans:       tenantPlans,
+		TenantPlanSource:  tenantPlanSource,
 		MaxKeys:           envInt("NEXUSIM_API_GATEWAY_RATE_LIMIT_MAX_KEYS", 10000),
 		IdentityFunc:      rateLimitIdentityFunc(authenticator),
 	}
@@ -696,24 +700,50 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 	return limiter, closeFn, nil
 }
 
-func tenantRateLimitPlansFromEnv() (map[string]ratelimitinfra.Plan, error) {
+func tenantRateLimitPlansFromEnv() (map[string]ratelimitinfra.Plan, string, error) {
+	source := strings.ToLower(strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE")))
 	raw := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON"))
-	if raw == "" {
-		path := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE"))
+	path := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE"))
+	if source == "" || source == "auto" {
+		switch {
+		case raw != "":
+			source = "inline"
+		case path != "":
+			source = "file"
+		default:
+			source = "none"
+		}
+	}
+	switch source {
+	case "none":
+		if raw != "" || path != "" {
+			return nil, "", errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE=none cannot be used with tenant plan JSON or file")
+		}
+		return nil, source, nil
+	case "inline", "json":
+		if raw == "" {
+			return nil, "", errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON is required when tenant plan source is inline")
+		}
+		source = "inline"
+	case "file":
 		if path == "" {
-			return nil, nil
+			return nil, "", errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE is required when tenant plan source is file")
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		raw = string(data)
+	case "db", "database", "config", "config-center", "config_center":
+		return nil, "", errors.New("api-gateway tenant plan source " + source + " is not supported yet; use inline or file")
+	default:
+		return nil, "", errors.New("unsupported api-gateway tenant plan source")
 	}
 	plans, err := parseTenantRateLimitPlans(raw)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return plans, nil
+	return plans, source, nil
 }
 
 func parseTenantRateLimitPlans(raw string) (map[string]ratelimitinfra.Plan, error) {

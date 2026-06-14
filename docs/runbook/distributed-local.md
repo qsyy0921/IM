@@ -63,6 +63,12 @@ SendMessage
 .\tools\local-up.ps1
 ```
 
+如需本地 PostgreSQL failover 拓扑，改用：
+
+```powershell
+.\tools\local-up-postgres-ha.ps1
+```
+
 运行分布式 smoke：
 
 ```powershell
@@ -83,6 +89,29 @@ SendMessage
 
 ```powershell
 .\tools\local-distributed-smoke.ps1 -SkipBuild
+```
+
+本地 PostgreSQL failover smoke：
+
+```powershell
+.\tools\local-postgres-failover-smoke.ps1 -SkipBuild
+```
+
+该脚本会：
+
+```text
+1. 启动三节点 `postgresql-repmgr` + `pgpool` 本地写入口；
+2. 通过 pgpool `15432` 端口应用 message / conversation / delivery core migrations；
+3. 用同一个 pgpool DSN 跑一遍 full distributed smoke；
+4. 停止当前 primary 容器，等待 pgpool 指向新 primary 且连续写探针成功；
+5. 继续用同一个 pgpool DSN 再跑一遍 full distributed smoke；
+6. 输出 before/after summary 和 primary 切换结果。
+```
+
+如需释放 PG HA 资源：
+
+```powershell
+.\tools\local-down-postgres-ha.ps1
 ```
 
 同步 Mac 专用 smoke checkout：
@@ -157,6 +186,24 @@ H:\NexusIM\loadtest-results\push-gateway-redis-sentinel-route-resume-final-20260
 ```
 
 该 run 使用 clean commit `7bc35a5`，`git_dirty=false`。拓扑为本地三 Redis / 三 Sentinel，push-gateway 使用 `NEXUSIM_PUSH_REDIS_MODE=sentinel` 和 `mymaster` 发现 master；Sentinel 返回 master `172.31.50.1:6380`，启动脚本已验证该地址可从宿主机 TCP 连接、可从 Sentinel 容器内 `PING`。结果：consumer gateway `redis_resume_append_count=1`、`redis_route_remote_publish_call_count=1`、`redis_route_remote_publish_error_count=0`，重连 gateway `redis_resume_replay_count=1 / redis_resume_miss_count=0`，随后 `PullInbox item_count=1/max_seq=2`，`delivery.ack.ok last_received_seq=2`，`delivery_outbox PUBLISHED=2/PENDING=0/DLQ=0`。这证明 Sentinel discovery 正常路径可用，不证明 master failover / Redis HA。
+
+当前 PostgreSQL failover smoke 原始结果：
+
+```text
+H:\NexusIM\loadtest-results\postgres-failover-smoke-20260614f\postgres-failover-summary.json
+```
+
+该 run 使用本地工作树上的 PostgreSQL HA 脚本切片，写入口固定为 `postgres://nexusim:nexusim@127.0.0.1:15432/nexusim?sslmode=disable`，执行前后两次 distributed smoke：
+
+```text
+before primary = postgres-ha-0
+stop current primary container = nexusim-postgres-ha-0
+after primary  = postgres-ha-1
+before: delivery.notify seq=2, PullInbox item_count=1/max_seq=2, delivery.ack.ok last_received_seq=2
+after:  delivery.notify seq=2, PullInbox item_count=1/max_seq=2, delivery.ack.ok last_received_seq=2
+```
+
+这证明本地 `repmgr + pgpool` 稳定写入口切主后，`CreateMemberChange -> SendMessage -> delivery.notify -> PullInbox -> delivery.ack.ok` 最小链路仍可跑通。它不代表生产级 PostgreSQL HA，不覆盖 split-brain、quorum、防抖、自动回切、in-flight transaction continuity 或跨机存储故障。
 
 前一轮脚本验证结果：
 
@@ -312,7 +359,8 @@ push-gateway 只消费 delivery 事件做在线唤醒，WebSocket 连接和 Kafk
 
 ## 7. 已知缺口
 
-- Redis route 已做一次真实 stop/start fault smoke，证明 online notify 可丢但 `PullInbox + AckDelivery` 可恢复；push-gateway 已在三 Redis / 三 Sentinel 拓扑上跑通 Sentinel discovery 正常路径的 route / resume smoke，但尚未跑 master failover / quorum 异常 / 网络分区，因此仍不是 Redis HA、Redis Cluster 或生产级高可用结论。
+- Redis route 已做一次真实 stop/start fault smoke，证明 online notify 可丢但 `PullInbox + AckDelivery` 可恢复；push-gateway 已在三 Redis / 三 Sentinel 拓扑上跑通 Sentinel discovery、手动 failover 和 master-stop recovery smoke，但尚未跑 quorum 异常 / 网络分区，因此仍不是 Redis HA、Redis Cluster 或生产级高可用结论。
+- PostgreSQL 当前已补本地 `repmgr + pgpool` failover smoke，证明同一个 pgpool DSN 在 primary 切换前后仍可跑通最小分布式链路；但这仍不是 Patroni / etcd / 云托管 PostgreSQL 的生产级 HA 验收，也不覆盖 split-brain、quorum、防抖、自动回切或 in-flight transaction continuity。
 - Redis route 已有 TTL 续期和后台 stale route cleanup；异常进程退出后 session route 仍依赖 TTL 过期，user route set 中的 stale 成员由 lookup / cleanup loop 移除。
 - `push-gateway` Redis-backed cross-instance resume buffer 已有本机跨进程 smoke 和 Win-Mac Docker smoke；跨实例 replay miss、Redis error 或 token mismatch 时仍必须 fallback `PullInbox`。
 - `push-gateway` `/debug/metrics` 仍是本地 smoke 调试端点，不是正式 Prometheus 指标。

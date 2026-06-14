@@ -1,5 +1,6 @@
 param(
     [string]$PgDsn = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
+    [string]$PostgresExecContainer = "nexusim-postgres",
     [string]$KafkaBrokers = "localhost:9092",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
@@ -331,8 +332,8 @@ WHERE status <> 'PUBLISHED'
     $cleanupFile = Join-Path $resultDir "cleanup-message-outbox-residuals.sql"
     $cleanupLog = Join-Path $logDir "preflight-cleanup.out.log"
     Set-Content -LiteralPath $cleanupFile -Value $cleanupSQL -Encoding ASCII
-    docker cp $cleanupFile "nexusim-postgres:/tmp/cleanup-message-outbox-residuals.sql" | Out-Null
-    docker exec nexusim-postgres psql `
+    docker cp $cleanupFile "${PostgresExecContainer}:/tmp/cleanup-message-outbox-residuals.sql" | Out-Null
+    docker exec $PostgresExecContainer psql `
         -U nexusim `
         -d nexusim `
         -v ON_ERROR_STOP=1 `
@@ -535,8 +536,8 @@ try {
         $identityMigrations = Get-ChildItem -LiteralPath (Join-Path $repo "migrations\postgres\identity") -Filter "*.sql" | Sort-Object Name
         foreach ($identityMigration in $identityMigrations) {
             $target = "/tmp/" + $identityMigration.Name
-            docker cp $identityMigration.FullName "nexusim-postgres:$target" | Out-Null
-            docker exec nexusim-postgres psql -U nexusim -d nexusim -f $target | Out-Null
+            docker cp $identityMigration.FullName "${PostgresExecContainer}:$target" | Out-Null
+            docker exec $PostgresExecContainer psql -U nexusim -d nexusim -f $target | Out-Null
         }
     }
 
@@ -625,7 +626,7 @@ try {
             NEXUSIM_PUSH_ROUTE_BACKEND = "redis"
             NEXUSIM_PUSH_GATEWAY_ID = $pushWSGatewayID
             NEXUSIM_PUSH_ROUTE_TTL = "90s"
-        })) -DebugAddr $(if ($pushWsTlsEnabled) { "127.0.0.1:11602" } else { "" }))
+        })) -DebugAddr "127.0.0.1:11602")
         if ($Scenario -eq "cross-instance-resume" -or $Scenario -eq "redis-sentinel-failover" -or $Scenario -eq "redis-sentinel-master-stop") {
             $processes += Start-NexusProcess -Name "push-gateway-ws-reconnect" -FilePath $pushGateway -Port 11599 -Env (Add-PushWSTLSEnv -Env (Add-PushRedisEnv (Add-PushAuthEnv @{
                 NEXUSIM_PUSH_GATEWAY_MODE = "ws"
@@ -638,7 +639,7 @@ try {
                 NEXUSIM_PUSH_ROUTE_BACKEND = "redis"
                 NEXUSIM_PUSH_GATEWAY_ID = $pushReconnectGatewayID
                 NEXUSIM_PUSH_ROUTE_TTL = "90s"
-            })) -DebugAddr $(if ($pushWsTlsEnabled) { "127.0.0.1:11603" } else { "" }))
+            })) -DebugAddr "127.0.0.1:11603")
         }
         $processes += Start-NexusProcess -Name "push-gateway-consumer" -FilePath $pushGateway -Env (Add-PushRedisEnv @{
             NEXUSIM_PUSH_GATEWAY_MODE = "delivery-consumer"
@@ -676,7 +677,7 @@ try {
             NEXUSIM_PUSH_SESSION_QUEUE_SIZE = $pushSessionQueueSize
             NEXUSIM_PUSH_WRITE_TIMEOUT = $pushWriteTimeout
             NEXUSIM_PUSH_TEST_WRITE_DELAY = $pushTestWriteDelay
-        }) -DebugAddr $(if ($pushWsTlsEnabled) { "127.0.0.1:11602" } else { "" }))
+        }) -DebugAddr "127.0.0.1:11602")
     }
 
     $processes += Start-NexusProcess -Name "message-grpc" -FilePath $messageService -Port 11595 -Env @{

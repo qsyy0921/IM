@@ -1,5 +1,6 @@
 param(
     [string]$PgDsn = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
+    [string]$PostgresExecContainer = "nexusim-postgres",
     [string]$KafkaBrokers = "localhost:9092",
     [ValidateSet("single", "sentinel")]
     [string]$RedisMode = "single",
@@ -21,6 +22,7 @@ $scriptArgs = @{
     Scenario = "full"
     RouteBackend = "redis"
     PgDsn = $PgDsn
+    PostgresExecContainer = $PostgresExecContainer
     KafkaBrokers = $KafkaBrokers
     RedisMode = $RedisMode
     RedisAddr = $RedisAddr

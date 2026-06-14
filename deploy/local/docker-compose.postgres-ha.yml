@@ -1,0 +1,122 @@
+name: nexusim-postgres-ha
+
+services:
+  postgres-ha-0:
+    image: bitnamilegacy/postgresql-repmgr:17.6.0
+    container_name: nexusim-postgres-ha-0
+    environment:
+      POSTGRESQL_POSTGRES_PASSWORD: nexusim
+      POSTGRESQL_USERNAME: nexusim
+      POSTGRESQL_PASSWORD: nexusim
+      POSTGRESQL_DATABASE: nexusim
+      REPMGR_USERNAME: repmgr
+      REPMGR_PASSWORD: repmgrpass
+      REPMGR_PRIMARY_HOST: postgres-ha-0
+      REPMGR_PARTNER_NODES: postgres-ha-0,postgres-ha-1,postgres-ha-2
+      REPMGR_NODE_NAME: postgres-ha-0
+      REPMGR_NODE_NETWORK_NAME: postgres-ha-0
+    volumes:
+      - postgres_ha_0_data:/bitnami/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "PGPASSWORD=nexusim pg_isready -h 127.0.0.1 -p 5432 -U nexusim -d nexusim"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  postgres-ha-1:
+    image: bitnamilegacy/postgresql-repmgr:17.6.0
+    container_name: nexusim-postgres-ha-1
+    depends_on:
+      postgres-ha-0:
+        condition: service_healthy
+    environment:
+      POSTGRESQL_POSTGRES_PASSWORD: nexusim
+      POSTGRESQL_USERNAME: nexusim
+      POSTGRESQL_PASSWORD: nexusim
+      POSTGRESQL_DATABASE: nexusim
+      REPMGR_USERNAME: repmgr
+      REPMGR_PASSWORD: repmgrpass
+      REPMGR_PRIMARY_HOST: postgres-ha-0
+      REPMGR_PARTNER_NODES: postgres-ha-0,postgres-ha-1,postgres-ha-2
+      REPMGR_NODE_NAME: postgres-ha-1
+      REPMGR_NODE_NETWORK_NAME: postgres-ha-1
+    volumes:
+      - postgres_ha_1_data:/bitnami/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "PGPASSWORD=nexusim pg_isready -h 127.0.0.1 -p 5432 -U nexusim -d nexusim"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  postgres-ha-2:
+    image: bitnamilegacy/postgresql-repmgr:17.6.0
+    container_name: nexusim-postgres-ha-2
+    depends_on:
+      postgres-ha-0:
+        condition: service_healthy
+    environment:
+      POSTGRESQL_POSTGRES_PASSWORD: nexusim
+      POSTGRESQL_USERNAME: nexusim
+      POSTGRESQL_PASSWORD: nexusim
+      POSTGRESQL_DATABASE: nexusim
+      REPMGR_USERNAME: repmgr
+      REPMGR_PASSWORD: repmgrpass
+      REPMGR_PRIMARY_HOST: postgres-ha-0
+      REPMGR_PARTNER_NODES: postgres-ha-0,postgres-ha-1,postgres-ha-2
+      REPMGR_NODE_NAME: postgres-ha-2
+      REPMGR_NODE_NETWORK_NAME: postgres-ha-2
+    volumes:
+      - postgres_ha_2_data:/bitnami/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "PGPASSWORD=nexusim pg_isready -h 127.0.0.1 -p 5432 -U nexusim -d nexusim"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  pgpool:
+    image: bitnamilegacy/pgpool:4.6.3
+    container_name: nexusim-pgpool
+    depends_on:
+      postgres-ha-0:
+        condition: service_healthy
+      postgres-ha-1:
+        condition: service_healthy
+      postgres-ha-2:
+        condition: service_healthy
+    ports:
+      - "15432:5432"
+    environment:
+      PGPOOL_BACKEND_NODES: 0:postgres-ha-0:5432,1:postgres-ha-1:5432,2:postgres-ha-2:5432
+      PGPOOL_BACKEND_APPLICATION_NAMES: postgres-ha-0,postgres-ha-1,postgres-ha-2
+      PGPOOL_SR_CHECK_USER: repmgr
+      PGPOOL_SR_CHECK_PASSWORD: repmgrpass
+      PGPOOL_SR_CHECK_DATABASE: postgres
+      PGPOOL_HEALTH_CHECK_USER: repmgr
+      PGPOOL_HEALTH_CHECK_PASSWORD: repmgrpass
+      PGPOOL_POSTGRES_USERNAME: nexusim
+      PGPOOL_POSTGRES_PASSWORD: nexusim
+      PGPOOL_POSTGRES_CUSTOM_USERS: repmgr
+      PGPOOL_POSTGRES_CUSTOM_PASSWORDS: repmgrpass
+      PGPOOL_ADMIN_USERNAME: admin
+      PGPOOL_ADMIN_PASSWORD: adminpass
+      PGPOOL_ENABLE_POOL_HBA: "no"
+      PGPOOL_ENABLE_LOAD_BALANCING: "no"
+      PGPOOL_ENABLE_STATEMENT_LOAD_BALANCING: "no"
+      PGPOOL_FAILOVER_ON_BACKEND_ERROR: "yes"
+      PGPOOL_AUTO_FAILBACK: "yes"
+      PGPOOL_HEALTH_CHECK_PERIOD: "5"
+      PGPOOL_HEALTH_CHECK_TIMEOUT: "5"
+      PGPOOL_HEALTH_CHECK_MAX_RETRIES: "6"
+      PGPOOL_HEALTH_CHECK_RETRY_DELAY: "3"
+      PGPOOL_SR_CHECK_PERIOD: "5"
+      PGPOOL_CONNECT_TIMEOUT: "5000"
+    healthcheck:
+      test: ["CMD-SHELL", "PGPASSWORD=nexusim psql -U nexusim -h 127.0.0.1 -p 5432 -d nexusim -At -c 'SELECT 1' >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  postgres_ha_0_data:
+  postgres_ha_1_data:
+  postgres_ha_2_data:

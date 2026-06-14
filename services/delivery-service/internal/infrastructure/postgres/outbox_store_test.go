@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,7 +26,7 @@ func TestOutboxStoreProcessReadyBatchPublishesAndRetriesIntegration(t *testing.T
 		errs := make([]error, len(messages))
 		for index, message := range messages {
 			if message.ConversationID == "conversation-b" {
-				errs[index] = errors.New("kafka unavailable")
+				errs[index] = errors.New("kafka unavailable: broker body user=user1@example.com token=secret-token")
 			}
 		}
 		return errs
@@ -38,6 +39,7 @@ func TestOutboxStoreProcessReadyBatchPublishesAndRetriesIntegration(t *testing.T
 	}
 	assertDeliveryOutboxStatus(t, ctx, pool, "event-1", types.OutboxStatusPublished, 0)
 	assertDeliveryOutboxStatus(t, ctx, pool, "event-2", types.OutboxStatusPending, 1)
+	assertDeliveryOutboxLastError(t, ctx, pool, "event-2", "delivery outbox publish broker unavailable", "user1@example.com", "secret-token")
 }
 
 func TestOutboxStoreProcessReadyBatchDeadLettersAndBlocksLaterVersionIntegration(t *testing.T) {
@@ -64,6 +66,7 @@ func TestOutboxStoreProcessReadyBatchDeadLettersAndBlocksLaterVersionIntegration
 		t.Fatalf("unexpected stats: %+v", stats)
 	}
 	assertDeliveryOutboxStatus(t, ctx, pool, "event-1", types.OutboxStatusDLQ, 1)
+	assertDeliveryOutboxLastError(t, ctx, pool, "event-1", "delivery outbox publish invalid payload", "malformed payload")
 
 	stats, err = store.ProcessReadyBatch(ctx, 10, 3, time.Millisecond, func(ctx context.Context, messages []types.OutboxMessage) []error {
 		return make([]error, len(messages))
@@ -110,7 +113,7 @@ func TestOutboxStoreRepairAuditsDLQIntegration(t *testing.T) {
 		t.Fatalf("unexpected repair stats: %+v", repairStats)
 	}
 	assertDeliveryOutboxStatus(t, ctx, pool, "event-1", types.OutboxStatusDLQ, 1)
-	assertDeliveryOutboxRepairAudit(t, ctx, pool, outboxID, types.OutboxRepairModeAudit, outboxRepairOutcomeAudited, "", types.OutboxStatusDLQ, 1, "malformed payload", types.OutboxStatusDLQ, 1, "malformed payload", "manual audit")
+	assertDeliveryOutboxRepairAudit(t, ctx, pool, outboxID, types.OutboxRepairModeAudit, outboxRepairOutcomeAudited, "", types.OutboxStatusDLQ, 1, "delivery outbox publish invalid payload", types.OutboxStatusDLQ, 1, "delivery outbox publish invalid payload", "manual audit")
 }
 
 func TestOutboxStoreRepairRedrivesDLQIntegration(t *testing.T) {
@@ -143,7 +146,7 @@ func TestOutboxStoreRepairRedrivesDLQIntegration(t *testing.T) {
 		t.Fatalf("unexpected repair stats: %+v", repairStats)
 	}
 	assertDeliveryOutboxStatus(t, ctx, pool, "event-1", types.OutboxStatusPending, 0)
-	assertDeliveryOutboxRepairAudit(t, ctx, pool, outboxID, types.OutboxRepairModeRedriveDLQPending, outboxRepairOutcomeMutated, "", types.OutboxStatusDLQ, 1, "malformed payload", types.OutboxStatusPending, 0, "", "provider recovered")
+	assertDeliveryOutboxRepairAudit(t, ctx, pool, outboxID, types.OutboxRepairModeRedriveDLQPending, outboxRepairOutcomeMutated, "", types.OutboxStatusDLQ, 1, "delivery outbox publish invalid payload", types.OutboxStatusPending, 0, "", "provider recovered")
 }
 
 func TestOutboxStoreRepairSkipsNonDLQIntegration(t *testing.T) {
@@ -514,6 +517,26 @@ WHERE event_id = $1
 	}
 	if status != wantStatus || retryCount != wantRetry {
 		t.Fatalf("unexpected status for %s: status=%s retry=%d want status=%s retry=%d", eventID, status, retryCount, wantStatus, wantRetry)
+	}
+}
+
+func assertDeliveryOutboxLastError(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventID string, want string, forbidden ...string) {
+	t.Helper()
+	var got string
+	if err := pool.QueryRow(ctx, `
+SELECT last_error
+FROM delivery_outbox
+WHERE event_id = $1
+`, eventID).Scan(&got); err != nil {
+		t.Fatalf("read delivery outbox last error: %v", err)
+	}
+	if got != want {
+		t.Fatalf("unexpected last error for %s: got %q want %q", eventID, got, want)
+	}
+	for _, text := range forbidden {
+		if text != "" && strings.Contains(got, text) {
+			t.Fatalf("last error for %s leaked %q: %q", eventID, text, got)
+		}
 	}
 }
 

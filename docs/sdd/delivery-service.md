@@ -224,7 +224,7 @@ Payload 映射：
 Relay 语义：
 
 - 按 `tenant_id + conversation_id + aggregate_version` 保持 fail-closed 顺序保护；低版本 `PENDING` / `DLQ` 会阻塞同会话更高版本 delivery event。
-- publish 成功后批量标记 `PUBLISHED`；publish 失败按指数退避写回 `retry_count/next_retry_at/last_error`。
+- publish 成功后批量标记 `PUBLISHED`；publish 失败按指数退避写回 `retry_count/next_retry_at` 和稳定低敏 `last_error`。
 - 超过最大次数进入 `DLQ`，不自动跳过；repair/replay 必须显式审计。
 - unsupported / malformed `payload_json` 不允许 publish，也不能误标记 `PUBLISHED`，必须进入 retry / DLQ。
 - Kafka publish 是 at-least-once；下游按 `event_id` 幂等去重。
@@ -327,7 +327,7 @@ CREATE TABLE delivery_outbox (
 - timeline event 必须先持久化投影副作用，再提交 Kafka offset。
 - Kafka checkpoint 是 `consumer_group + topic + partition` 维度，不按 tenant 维度记录；同一 partition 可能混有多个 tenant。
 - `delivery_outbox` 与 `user_inbox` / cursor 更新在同一个 PostgreSQL 事务内写入。
-- `delivery_outbox.last_error` 不直接返回给普通客户端。
+- `delivery_outbox.last_error` 不直接返回给普通客户端，且 relay 写入时必须使用稳定低敏文案，不持久化 broker / provider raw error。
 
 ## 8. 核心流程
 

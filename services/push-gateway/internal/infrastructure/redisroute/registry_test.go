@@ -136,7 +136,7 @@ func TestRegistryPublishesRemoteDeviceEvictionAndSubscriberEvicts(t *testing.T) 
 		t.Fatalf("register remote session: %v", err)
 	}
 	done := make(chan error, 1)
-	subscriber := NewSubscriber(localB, client, Config{GatewayID: "gateway-b"})
+	subscriber := NewSubscriber(localB, client, SubscriberConfig{GatewayID: "gateway-b"})
 	go func() {
 		done <- subscriber.Run(ctx)
 	}()
@@ -193,7 +193,7 @@ func TestRegistryPublishesRemoteSessionEvictionOnlyForTarget(t *testing.T) {
 	}
 	done := make(chan error, 1)
 	go func() {
-		done <- NewSubscriber(localB, client, Config{GatewayID: "gateway-b"}).Run(ctx)
+		done <- NewSubscriber(localB, client, SubscriberConfig{GatewayID: "gateway-b"}).Run(ctx)
 	}()
 	time.Sleep(50 * time.Millisecond)
 
@@ -690,7 +690,7 @@ func TestSubscriberEnqueuesRemoteNotificationLocally(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan error, 1)
-	subscriber := NewSubscriber(local, client, Config{GatewayID: "gateway-a"})
+	subscriber := NewSubscriber(local, client, SubscriberConfig{GatewayID: "gateway-a"})
 	go func() {
 		done <- subscriber.Run(ctx)
 	}()
@@ -737,7 +737,7 @@ func TestSubscriberSkipsMalformedPayloadAndContinues(t *testing.T) {
 	defer cancel()
 	done := make(chan error, 1)
 	go func() {
-		done <- NewSubscriber(local, client, Config{GatewayID: "gateway-a"}).Run(ctx)
+		done <- NewSubscriber(local, client, SubscriberConfig{GatewayID: "gateway-a"}).Run(ctx)
 	}()
 	time.Sleep(50 * time.Millisecond)
 
@@ -766,6 +766,43 @@ func TestSubscriberSkipsMalformedPayloadAndContinues(t *testing.T) {
 	}
 	cancel()
 	<-done
+}
+
+func TestSubscriberRetriesRuntimeErrorAndExposesSnapshot(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	local := memory.NewRegistry()
+	subscriber := NewSubscriber(local, client, SubscriberConfig{
+		GatewayID:    "gateway-a",
+		ErrorBackoff: time.Millisecond,
+	})
+	server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- subscriber.Run(ctx)
+	}()
+
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		snapshot := subscriber.Snapshot()
+		if snapshot.TotalErrors > 0 && snapshot.LastErrorBackoffMS == time.Millisecond.Milliseconds() {
+			cancel()
+			if err := <-done; !errors.Is(err, context.Canceled) {
+				t.Fatalf("expected canceled run, got %v", err)
+			}
+			if snapshot.ConsecutiveErrors == 0 || snapshot.LastErrorAtMS == 0 {
+				t.Fatalf("unexpected retry snapshot: %+v", snapshot)
+			}
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	cancel()
+	<-done
+	t.Fatalf("timed out waiting for subscriber retry snapshot")
 }
 
 func testNotification() types.DeliveryNotification {

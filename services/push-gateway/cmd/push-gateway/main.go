@@ -93,7 +93,12 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 		registry = redisRegistry
 		closers = append(closers, redisClient.Close)
 		if enableWS {
-			redisSubscriber = redisroute.NewSubscriber(localRegistry, redisClient, routeConfig)
+			redisSubscriber = redisroute.NewSubscriber(localRegistry, redisClient, redisroute.SubscriberConfig{
+				GatewayID:    routeConfig.GatewayID,
+				KeyPrefix:    routeConfig.KeyPrefix,
+				ErrorBackoff: envDuration("NEXUSIM_PUSH_REDIS_SUBSCRIBER_ERROR_BACKOFF", 200*time.Millisecond),
+				Logf:         log.Printf,
+			})
 			go func() {
 				log.Printf("push-gateway redis route subscriber started for gateway_id=%s", gatewayID)
 				errs <- redisSubscriber.Run(ctx)
@@ -114,6 +119,9 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 		WithAuthJWKStats(func() *authinfra.JWKStats {
 			return authenticatorJWKStats(authenticator)
 		})
+	if redisSubscriber != nil {
+		monitoringHandler.WithRedisSubscriberWorkerStats(redisSubscriber.Snapshot)
+	}
 
 	var wsAddr string
 	if enableWS {

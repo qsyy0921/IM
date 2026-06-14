@@ -39,6 +39,15 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 				RedisRouteSubscriberEnqueuedCount: 4,
 			}
 		}).
+		WithRedisSubscriberWorkerStats(func() types.RedisSubscriberWorkerSnapshot {
+			return types.RedisSubscriberWorkerSnapshot{
+				TotalErrors:        4,
+				ConsecutiveErrors:  1,
+				LastErrorAtMS:      70,
+				LastSuccessAtMS:    120,
+				LastErrorBackoffMS: 250,
+			}
+		}).
 		WithAuthJWKStats(func() *authinfra.JWKStats {
 			return &authinfra.JWKStats{
 				RemoteURLConfigured: true,
@@ -93,6 +102,9 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 	}
 	if snapshot.RedisSubscriberStats == nil || snapshot.RedisSubscriberStats.RedisRouteSubscriberMessageCount != 5 {
 		t.Fatalf("unexpected redis subscriber metrics: %+v", snapshot.RedisSubscriberStats)
+	}
+	if snapshot.RedisSubscriberWorker == nil || snapshot.RedisSubscriberWorker.TotalErrors != 4 {
+		t.Fatalf("unexpected redis subscriber worker stats: %+v", snapshot.RedisSubscriberWorker)
 	}
 	if snapshot.AuthJWKStats == nil || !snapshot.AuthJWKStats.RemoteURLConfigured || snapshot.AuthJWKStats.CachedKeyCount != 2 {
 		t.Fatalf("unexpected auth jwk stats: %+v", snapshot.AuthJWKStats)

@@ -13,22 +13,36 @@ import (
 type Subscriber struct {
 	local  LocalRegistry
 	client redis.UniversalClient
-	config Config
+	config SubscriberConfig
 
 	metrics subscriberMetrics
 }
 
 type subscriberMetrics struct {
-	messageCount   atomic.Uint64
-	malformedCount atomic.Uint64
-	enqueuedCount  atomic.Uint64
-	evictedCount   atomic.Uint64
-	errorCount     atomic.Uint64
+	messageCount       atomic.Uint64
+	malformedCount     atomic.Uint64
+	enqueuedCount      atomic.Uint64
+	evictedCount       atomic.Uint64
+	errorCount         atomic.Uint64
+	consecutiveErrors  atomic.Uint64
+	lastErrorAtMS      atomic.Int64
+	lastSuccessAtMS    atomic.Int64
+	lastErrorBackoffMS atomic.Int64
 }
 
-func NewSubscriber(local LocalRegistry, client redis.UniversalClient, config Config) *Subscriber {
+type SubscriberConfig struct {
+	GatewayID    string
+	KeyPrefix    string
+	ErrorBackoff time.Duration
+	Logf         func(format string, args ...any)
+}
+
+func NewSubscriber(local LocalRegistry, client redis.UniversalClient, config SubscriberConfig) *Subscriber {
 	if config.KeyPrefix == "" {
 		config.KeyPrefix = defaultKeyPrefix
+	}
+	if config.ErrorBackoff <= 0 {
+		config.ErrorBackoff = 200 * time.Millisecond
 	}
 	return &Subscriber{local: local, client: client, config: config}
 }
@@ -43,6 +57,16 @@ func (subscriber *Subscriber) Metrics() Metrics {
 	}
 }
 
+func (subscriber *Subscriber) Snapshot() types.RedisSubscriberWorkerSnapshot {
+	return types.RedisSubscriberWorkerSnapshot{
+		TotalErrors:        subscriber.metrics.errorCount.Load(),
+		ConsecutiveErrors:  subscriber.metrics.consecutiveErrors.Load(),
+		LastErrorAtMS:      subscriber.metrics.lastErrorAtMS.Load(),
+		LastSuccessAtMS:    subscriber.metrics.lastSuccessAtMS.Load(),
+		LastErrorBackoffMS: subscriber.metrics.lastErrorBackoffMS.Load(),
+	}
+}
+
 func (subscriber *Subscriber) Run(ctx context.Context) error {
 	for {
 		if err := subscriber.runOnce(ctx); err != nil {
@@ -50,11 +74,21 @@ func (subscriber *Subscriber) Run(ctx context.Context) error {
 				return ctx.Err()
 			}
 			subscriber.metrics.errorCount.Add(1)
+			subscriber.metrics.consecutiveErrors.Add(1)
+			subscriber.metrics.lastErrorAtMS.Store(time.Now().UnixMilli())
+			subscriber.metrics.lastErrorBackoffMS.Store(subscriber.config.ErrorBackoff.Milliseconds())
+			if subscriber.config.Logf != nil {
+				subscriber.config.Logf("push-gateway redis route subscriber retrying after runtime error: %v", err)
+			}
+			if err := waitForInterval(ctx, subscriber.config.ErrorBackoff); err != nil {
+				return err
+			}
+			continue
 		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(200 * time.Millisecond):
+		subscriber.metrics.consecutiveErrors.Store(0)
+		subscriber.metrics.lastSuccessAtMS.Store(time.Now().UnixMilli())
+		if err := waitForInterval(ctx, subscriber.config.ErrorBackoff); err != nil {
+			return err
 		}
 	}
 }
@@ -85,6 +119,17 @@ func (subscriber *Subscriber) runOnce(ctx context.Context) error {
 				subscriber.metrics.malformedCount.Add(1)
 			}
 		}
+	}
+}
+
+func waitForInterval(ctx context.Context, interval time.Duration) error {
+	timer := time.NewTimer(interval)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
 	}
 }
 

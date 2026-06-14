@@ -82,6 +82,27 @@ grpc.legacy_descriptor_last_seen_unix_ms = 0
 
 这只能证明本次 snapshot 没有 legacy descriptor 暴露 / 流量；正式移除前应使用强门禁和目标环境持续 Prometheus alert / dashboard 观察，确认历史客户端已经切到 `GatewayService` facade。
 
+## Tenant Quota Snapshot Gate
+
+配置源切到 URL source 或后续控制面输出前，可对 `/debug/metrics` 或离线 snapshot 运行 quota gate：
+
+```powershell
+.\tools\check-api-gateway-quota-snapshot.ps1 `
+  -SnapshotPath H:\NexusIM\loadtest-results\<run>\api-gateway-metrics.json `
+  -RequireRateLimitEnabled `
+  -RequiredSource url `
+  -RequireVersionedSnapshot `
+  -RequireChecksum `
+  -RequireChecksumPolicy `
+  -RequireURLHTTPS `
+  -RequireURLBearerToken `
+  -RequireURLTLS `
+  -RequireURLClientCert `
+  -MaxAllowedAge 30m
+```
+
+这些选项只验证当前进程实际应用的低敏配置源状态：source、version、checksum、checksum-required policy、URL HTTPS / bearer / TLS / client-cert guard、snapshot age/stale 和 reload error。它不证明完整配置中心、审批、灰度、签名发布或审计已经完成。
+
 ## Local Grafana
 
 api-gateway 的第一阶段 Grafana dashboard provisioning 位于：

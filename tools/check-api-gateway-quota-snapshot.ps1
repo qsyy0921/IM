@@ -7,6 +7,10 @@ param(
     [switch]$RequireVersionedSnapshot,
     [switch]$RequireChecksum,
     [switch]$RequireChecksumPolicy,
+    [switch]$RequireURLHTTPS,
+    [switch]$RequireURLBearerToken,
+    [switch]$RequireURLTLS,
+    [switch]$RequireURLClientCert,
     [switch]$AllowStale,
     [switch]$AllowReloadErrors
 )
@@ -86,6 +90,10 @@ $version = (Get-StringOrEmpty $rateLimit.tenant_plan_version).Trim()
 $generatedAtMS = Get-Int64OrZero $rateLimit.tenant_plan_generated_at_unix_ms
 $checksumPresent = Get-BoolOrFalse $rateLimit.tenant_plan_checksum_present
 $checksumRequired = Get-BoolOrFalse $rateLimit.tenant_plan_require_checksum
+$urlBearerTokenConfigured = Get-BoolOrFalse $rateLimit.tenant_plan_url_bearer_token_configured
+$urlRequireHTTPS = Get-BoolOrFalse $rateLimit.tenant_plan_url_require_https
+$urlTLSConfigured = Get-BoolOrFalse $rateLimit.tenant_plan_url_tls_configured
+$urlClientCertConfigured = Get-BoolOrFalse $rateLimit.tenant_plan_url_client_cert_configured
 $maxAgeMS = Get-Int64OrZero $rateLimit.tenant_plan_max_age_ms
 $ageMS = Get-Int64OrZero $rateLimit.tenant_plan_age_ms
 $stale = Get-BoolOrFalse $rateLimit.tenant_plan_stale
@@ -119,6 +127,26 @@ if ($RequireChecksumPolicy -and -not $checksumRequired) {
     $failed = $true
 }
 
+if ($RequireURLHTTPS -and -not $urlRequireHTTPS) {
+    Write-Host "FAIL api-gateway tenant quota URL source HTTPS guard is not enabled." -ForegroundColor Red
+    $failed = $true
+}
+
+if ($RequireURLBearerToken -and -not $urlBearerTokenConfigured) {
+    Write-Host "FAIL api-gateway tenant quota URL source bearer token is not configured." -ForegroundColor Red
+    $failed = $true
+}
+
+if ($RequireURLTLS -and -not $urlTLSConfigured) {
+    Write-Host "FAIL api-gateway tenant quota URL source TLS configuration is not enabled." -ForegroundColor Red
+    $failed = $true
+}
+
+if ($RequireURLClientCert -and -not $urlClientCertConfigured) {
+    Write-Host "FAIL api-gateway tenant quota URL source client certificate is not configured." -ForegroundColor Red
+    $failed = $true
+}
+
 if ($requiredMaxAgeMS -gt 0) {
     if ($generatedAtMS -le 0) {
         Write-Host "FAIL api-gateway tenant quota snapshot has no generated_at_unix_ms; cannot prove max age." -ForegroundColor Red
@@ -144,4 +172,4 @@ if ($failed) {
 }
 
 Write-Host "OK   api-gateway tenant quota snapshot gate"
-Write-Host "     enabled=$enabled source=$source version=$version generated_at_unix_ms=$generatedAtMS checksum_present=$checksumPresent checksum_required=$checksumRequired max_age_ms=$maxAgeMS age_ms=$ageMS stale=$stale reload_errors=$reloadErrors"
+Write-Host "     enabled=$enabled source=$source version=$version generated_at_unix_ms=$generatedAtMS checksum_present=$checksumPresent checksum_required=$checksumRequired url_require_https=$urlRequireHTTPS url_bearer_token_configured=$urlBearerTokenConfigured url_tls_configured=$urlTLSConfigured url_client_cert_configured=$urlClientCertConfigured max_age_ms=$maxAgeMS age_ms=$ageMS stale=$stale reload_errors=$reloadErrors"

@@ -137,6 +137,12 @@ NEXUSIM_PG_DSN=
 NEXUSIM_POLICY_PG_MAX_CONNS=
 NEXUSIM_POLICY_DEBUG_ADDR=
 NEXUSIM_DEBUG_ADDR=
+NEXUSIM_POLICY_OTEL_TRACES_ENABLED=false
+NEXUSIM_POLICY_OTEL_SERVICE_NAME=policy-service
+NEXUSIM_POLICY_OTEL_TRACES_EXPORTER=stdout
+NEXUSIM_POLICY_OTEL_TRACES_OTLP_ENDPOINT=
+NEXUSIM_POLICY_OTEL_TRACES_OTLP_INSECURE=false
+NEXUSIM_POLICY_OTEL_TRACES_SAMPLING_RATIO=1
 
 NEXUSIM_POLICY_SERVICE_MODE=contact-consumer
 NEXUSIM_KAFKA_BROKERS=localhost:9092
@@ -257,7 +263,9 @@ The debug metrics include aggregate gRPC request counts and status codes, aggreg
 
 `allowed=false` is counted as a decision deny, while the gRPC method remains `codes.OK`. Transport errors are counted separately.
 
-This is a local debug surface. It is not a replacement for production OpenTelemetry traces, Prometheus deployment, alert rules or external policy audit.
+First-stage OpenTelemetry gRPC server spans are available in `grpc` mode and are disabled by default. When enabled, policy-service can export spans to stdout or an OTLP gRPC endpoint and extracts W3C `traceparent` from incoming gRPC metadata. Spans record only low-sensitive transport fields: full gRPC method name, gRPC status code, latency, optional trace id and optional request id. They must not record tokens, tenant id, user id, device id, session id, conversation id, message id, direct peer id, sender id, payloads, rule parameters, classification, deny reason or SQL/provider error text.
+
+This is a local debug surface plus first-stage trace emission. It is not a replacement for production Prometheus deployment, collector-managed sampling, alert rules or external policy audit.
 
 ## Limitations
 
@@ -269,6 +277,6 @@ This is a local debug surface. It is not a replacement for production OpenTeleme
 - No tenant policy DSL, tenant quota / risk policy, content moderation, risk scoring or rate limiting is implemented yet.
 - Decision audit outbox rows can be relayed to `im.policy.events`, and explicit DLQ event IDs can be redriven through the repair operator after relay-equivalent validation. Broad repair workflow, poison-payload classification beyond fail-closed validation, retention policy and external sink remain future work.
 - First-stage static TLS / mTLS config exists for policy-service, the message-service policy RPC client and direct policy smoke clients, but there is no certificate issuance, rotation, dynamic service identity registry, service mesh policy, or all-service mTLS rollout yet.
-- No production OpenTelemetry / Prometheus / alerting rollout is implemented yet.
+- First-stage OpenTelemetry gRPC server spans exist, but there is no shared collector deployment, fleet-wide sampling policy, dashboard or alerting rollout yet.
 
 These are future production hardening steps; the current value is extracting the policy boundary and replacing message-service internal policy rules with an optional real service dependency.

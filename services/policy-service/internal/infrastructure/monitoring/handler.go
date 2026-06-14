@@ -19,6 +19,7 @@ type Handler struct {
 	requirePostgres        bool
 	grpcMetrics            *GRPCMetrics
 	decisionMetrics        *DecisionMetrics
+	traceStatsFunc         func() TraceSnapshot
 	outboxRelaySnapshot    func() types.OutboxRelayWorkerSnapshot
 	contactWorkerSnapshot  func() types.ProjectionWorkerSnapshot
 	timelineWorkerSnapshot func() types.ProjectionWorkerSnapshot
@@ -45,6 +46,11 @@ func (h *Handler) WithOutboxRelayStats(snapshotFunc func() types.OutboxRelayWork
 
 func (h *Handler) WithTimelineProjectionWorkerStats(snapshotFunc func() types.ProjectionWorkerSnapshot) *Handler {
 	h.timelineWorkerSnapshot = snapshotFunc
+	return h
+}
+
+func (h *Handler) WithTraceStats(snapshotFunc func() TraceSnapshot) *Handler {
+	h.traceStatsFunc = snapshotFunc
 	return h
 }
 
@@ -91,6 +97,10 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	if h.decisionMetrics != nil {
 		decisionSnapshot := h.decisionMetrics.Snapshot()
 		snapshot.Decisions = &decisionSnapshot
+	}
+	if h.traceStatsFunc != nil {
+		traceSnapshot := h.traceStatsFunc()
+		snapshot.Trace = &traceSnapshot
 	}
 	if h.outboxRelaySnapshot != nil {
 		relaySnapshot := h.outboxRelaySnapshot()
@@ -159,6 +169,7 @@ type Snapshot struct {
 	AuditOutboxError         string                           `json:"policy_decision_audit_outbox_error,omitempty"`
 	GRPC                     *GRPCSnapshot                    `json:"grpc,omitempty"`
 	Decisions                *DecisionSnapshot                `json:"decisions,omitempty"`
+	Trace                    *TraceSnapshot                   `json:"trace,omitempty"`
 	OutboxRelay              *types.OutboxRelayWorkerSnapshot `json:"outbox_relay,omitempty"`
 	ContactProjectionWorker  *types.ProjectionWorkerSnapshot  `json:"contact_projection_worker,omitempty"`
 	TimelineProjectionWorker *types.ProjectionWorkerSnapshot  `json:"timeline_projection_worker,omitempty"`

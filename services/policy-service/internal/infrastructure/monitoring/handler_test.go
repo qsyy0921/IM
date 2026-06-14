@@ -97,6 +97,31 @@ func TestHandlerMetricsIncludesGRPCAndDecisionSnapshots(t *testing.T) {
 	}
 }
 
+func TestHandlerMetricsIncludesTraceSnapshot(t *testing.T) {
+	handler := NewHandler(nil, false, nil, nil).WithTraceStats(func() TraceSnapshot {
+		return TraceSnapshot{
+			Enabled:         true,
+			ServiceName:     serviceName,
+			Exporter:        "stdout",
+			SamplingRatio:   1,
+			OTLPEndpointSet: false,
+		}
+	})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/debug/metrics", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", response.Code)
+	}
+	var body Snapshot
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode metrics response: %v", err)
+	}
+	if body.Trace == nil || !body.Trace.Enabled || body.Trace.ServiceName != serviceName {
+		t.Fatalf("expected trace snapshot, got %+v", body.Trace)
+	}
+}
+
 func TestHandlerMetricsIncludesProjectionWorkerSnapshots(t *testing.T) {
 	handler := NewHandler(nil, false, nil, nil).
 		WithContactProjectionWorkerStats(func() types.ProjectionWorkerSnapshot {

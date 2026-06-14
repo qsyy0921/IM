@@ -418,15 +418,33 @@ func runGRPC() error {
 		log.Println("policy-service decision audit outbox enabled")
 	}
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
+	traceConfig, err := policyTraceConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	traceRuntime, err := monitoringinfra.NewTraceRuntime(ctx, traceConfig)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := traceRuntime.Shutdown(shutdownCtx); err != nil {
+			log.Printf("policy-service OpenTelemetry trace shutdown failed: %v", err)
+		}
+	}()
 	decisionMetrics := monitoringinfra.NewDecisionMetrics()
 	useCaseOptions = append(useCaseOptions, app.WithPolicyDecisionObserver(decisionMetrics))
-	stopDebug, err := startDebugServer(ctx, policyDebugAddr(), monitoringinfra.NewHandler(pool, rulesEnabled, grpcMetrics, decisionMetrics))
+	stopDebug, err := startDebugServer(ctx, policyDebugAddr(), monitoringinfra.NewHandler(pool, rulesEnabled, grpcMetrics, decisionMetrics).WithTraceStats(traceRuntime.Snapshot))
 	if err != nil {
 		return err
 	}
 	defer stopDebug()
 
-	serverOptions := []grpc.ServerOption{grpc.UnaryInterceptor(grpcMetrics.UnaryServerInterceptor(log.Default()))}
+	serverOptions := []grpc.ServerOption{grpc.ChainUnaryInterceptor(
+		grpcMetrics.UnaryServerInterceptor(log.Default()),
+		traceRuntime.UnaryServerInterceptor(),
+	)}
 	if serverTLSEnabled {
 		serverOptions = append(serverOptions, grpc.Creds(credentials.NewTLS(serverTLSConfig)))
 	}
@@ -546,6 +564,41 @@ func envPositiveDuration(name string, fallback time.Duration) (time.Duration, er
 
 func policyDebugAddr() string {
 	return envString("NEXUSIM_POLICY_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
+}
+
+func policyTraceConfigFromEnv() (monitoringinfra.TraceConfig, error) {
+	enabled, _, err := envOptionalBool("NEXUSIM_POLICY_OTEL_TRACES_ENABLED")
+	if err != nil {
+		return monitoringinfra.TraceConfig{}, err
+	}
+	otlpInsecure, _, err := envOptionalBool("NEXUSIM_POLICY_OTEL_TRACES_OTLP_INSECURE")
+	if err != nil {
+		return monitoringinfra.TraceConfig{}, err
+	}
+	samplingRatio, err := policyTraceSamplingRatioFromEnv()
+	if err != nil {
+		return monitoringinfra.TraceConfig{}, err
+	}
+	return monitoringinfra.TraceConfig{
+		Enabled:       enabled,
+		ServiceName:   envString("NEXUSIM_POLICY_OTEL_SERVICE_NAME", "policy-service"),
+		Exporter:      envString("NEXUSIM_POLICY_OTEL_TRACES_EXPORTER", "stdout"),
+		OTLPEndpoint:  envString("NEXUSIM_POLICY_OTEL_TRACES_OTLP_ENDPOINT", ""),
+		OTLPInsecure:  otlpInsecure,
+		SamplingRatio: samplingRatio,
+	}, nil
+}
+
+func policyTraceSamplingRatioFromEnv() (float64, error) {
+	raw := strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_OTEL_TRACES_SAMPLING_RATIO"))
+	if raw == "" {
+		return 1, nil
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil || value <= 0 || value > 1 {
+		return 0, errors.New("NEXUSIM_POLICY_OTEL_TRACES_SAMPLING_RATIO must be > 0 and <= 1")
+	}
+	return value, nil
 }
 
 func validatePolicyListenerConfig(listenAddr string, tlsEnabled bool) error {

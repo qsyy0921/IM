@@ -171,6 +171,7 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 - `conversation-service`：first-stage OTel gRPC server span，覆盖会话成员事实服务侧请求；
 - `delivery-service`：first-stage OTel gRPC server span，覆盖 durable inbox / ACK 服务侧请求；
 - `receipt-service`：first-stage OTel gRPC server span，覆盖已读 / 会话列表服务侧请求；
+- `policy-service`：first-stage OTel gRPC server span，覆盖权限决策服务侧请求；
 - `identity-service`：身份安全、通知投递、key / issuer 治理继续 hardening；
 - `message / conversation / delivery / push / receipt / contacts / policy`：继续清 repair、观测、故障语义和容量边界。
 

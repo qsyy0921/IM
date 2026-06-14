@@ -376,6 +376,13 @@ func runGRPC() error {
 	defer stop()
 
 	addr := envString("NEXUSIM_POLICY_GRPC_ADDR", "0.0.0.0:10800")
+	serverTLSConfig, serverTLSEnabled, err := policyGRPCTLSConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	if err := validatePolicyListenerConfig(addr, serverTLSEnabled); err != nil {
+		return err
+	}
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
@@ -420,10 +427,8 @@ func runGRPC() error {
 	defer stopDebug()
 
 	serverOptions := []grpc.ServerOption{grpc.UnaryInterceptor(grpcMetrics.UnaryServerInterceptor(log.Default()))}
-	if creds, ok, err := loadPolicyGRPCCredentialsFromEnv(); err != nil {
-		return err
-	} else if ok {
-		serverOptions = append(serverOptions, grpc.Creds(creds))
+	if serverTLSEnabled {
+		serverOptions = append(serverOptions, grpc.Creds(credentials.NewTLS(serverTLSConfig)))
 	}
 	server := grpc.NewServer(serverOptions...)
 	policygrpc.Register(server, policygrpc.NewServer(app.NewCheckMessageActionUseCase(evaluator, useCaseOptions...)))
@@ -543,12 +548,38 @@ func policyDebugAddr() string {
 	return envString("NEXUSIM_POLICY_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
 }
 
+func validatePolicyListenerConfig(listenAddr string, tlsEnabled bool) error {
+	if listenerAddrTrustedWithoutMTLS(listenAddr) {
+		return nil
+	}
+	if tlsEnabled {
+		return nil
+	}
+	return errors.New("policy-service uses non-private gRPC listener address without TLS")
+}
+
 func loadPolicyGRPCCredentialsFromEnv() (credentials.TransportCredentials, bool, error) {
 	tlsConfig, ok, err := policyGRPCTLSConfigFromEnv()
 	if err != nil || !ok {
 		return nil, ok, err
 	}
 	return credentials.NewTLS(tlsConfig), true, nil
+}
+
+func listenerAddrTrustedWithoutMTLS(addr string) bool {
+	host := strings.TrimSpace(addr)
+	if splitHost, _, err := net.SplitHostPort(host); err == nil {
+		host = splitHost
+	}
+	host = strings.TrimSpace(strings.Trim(host, "[]"))
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate()
 }
 
 func policyGRPCTLSConfigFromEnv() (*tls.Config, bool, error) {

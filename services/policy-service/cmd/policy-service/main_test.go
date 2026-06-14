@@ -152,6 +152,24 @@ func TestPolicyGRPCTLSConfigRejectsUnlistedClientIdentity(t *testing.T) {
 	}
 }
 
+func TestValidatePolicyListenerConfigAllowsPrivateAddressWithoutTLS(t *testing.T) {
+	if err := validatePolicyListenerConfig("172.31.50.10:10800", false); err != nil {
+		t.Fatalf("expected private policy listener without tls to be allowed: %v", err)
+	}
+}
+
+func TestValidatePolicyListenerConfigRejectsPublicAddressWithoutTLS(t *testing.T) {
+	if err := validatePolicyListenerConfig("8.8.8.8:10800", false); err == nil {
+		t.Fatalf("expected public policy listener without tls to be rejected")
+	}
+}
+
+func TestValidatePolicyListenerConfigAllowsPublicAddressWithTLS(t *testing.T) {
+	if err := validatePolicyListenerConfig("8.8.8.8:10800", true); err != nil {
+		t.Fatalf("expected public policy listener with tls to be allowed: %v", err)
+	}
+}
+
 func clearPolicyGRPCTLSConfig(t *testing.T) {
 	t.Helper()
 	t.Setenv("NEXUSIM_POLICY_GRPC_TLS_CERT_FILE", "")

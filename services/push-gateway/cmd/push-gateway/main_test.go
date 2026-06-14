@@ -259,13 +259,13 @@ func TestSplitCSVTrimsAndDropsEmptyValues(t *testing.T) {
 }
 
 func TestValidatePushAuthListenerConfigAllowsPrivateAddressForMock(t *testing.T) {
-	if err := validatePushAuthListenerConfig("172.31.50.10:10496", "mock"); err != nil {
+	if err := validatePushAuthListenerConfig("172.31.50.10:10496", "mock", false); err != nil {
 		t.Fatalf("expected private address mock auth to be allowed: %v", err)
 	}
 }
 
 func TestValidatePushAuthListenerConfigRejectsPublicAddressForMock(t *testing.T) {
-	err := validatePushAuthListenerConfig("8.8.8.8:10496", "mock")
+	err := validatePushAuthListenerConfig("8.8.8.8:10496", "mock", false)
 	if err == nil {
 		t.Fatalf("expected public address mock auth to be rejected")
 	}
@@ -274,9 +274,16 @@ func TestValidatePushAuthListenerConfigRejectsPublicAddressForMock(t *testing.T)
 	}
 }
 
-func TestValidatePushAuthListenerConfigAllowsPublicAddressForJWT(t *testing.T) {
-	if err := validatePushAuthListenerConfig("8.8.8.8:10496", "jwt"); err != nil {
-		t.Fatalf("expected jwt auth to be allowed on public address: %v", err)
+func TestValidatePushAuthListenerConfigRejectsPublicAddressForSignedAuthWithoutTLS(t *testing.T) {
+	err := validatePushAuthListenerConfig("8.8.8.8:10496", "jwt", false)
+	if err == nil {
+		t.Fatalf("expected signed auth without tls to be rejected on public address")
+	}
+}
+
+func TestValidatePushAuthListenerConfigAllowsPublicAddressForSignedAuthWithTLS(t *testing.T) {
+	if err := validatePushAuthListenerConfig("8.8.8.8:10496", "jwt", true); err != nil {
+		t.Fatalf("expected jwt auth with tls to be allowed on public address: %v", err)
 	}
 }
 

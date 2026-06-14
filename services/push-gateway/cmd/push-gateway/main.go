@@ -177,11 +177,11 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 		mux.Handle("/debug/metrics", monitoringHandler)
 		mux.Handle("/", server)
 		wsAddr = envString("NEXUSIM_PUSH_WS_ADDR", "0.0.0.0:10496")
-		if err := validatePushAuthListenerConfig(wsAddr, envString("NEXUSIM_PUSH_AUTH_MODE", "mock")); err != nil {
+		wsTLSConfig, wsTLSEnabled, err := pushWSTLSConfigFromEnv()
+		if err != nil {
 			return err
 		}
-		wsTLSConfig, _, err := pushWSTLSConfigFromEnv()
-		if err != nil {
+		if err := validatePushAuthListenerConfig(wsAddr, envString("NEXUSIM_PUSH_AUTH_MODE", "mock"), wsTLSEnabled); err != nil {
 			return err
 		}
 		startHTTPServer(ctx, errs, "websocket", wsAddr, mux, wsTLSConfig)
@@ -593,18 +593,32 @@ func loadPushAuthJWKSetJSON() (string, error) {
 	return string(content), nil
 }
 
-func validatePushAuthListenerConfig(listenAddr string, authMode string) error {
-	if !usesMockPushAuth(authMode) {
-		return nil
+func validatePushAuthListenerConfig(listenAddr string, authMode string, tlsEnabled bool) error {
+	if usesMockPushAuth(authMode) {
+		if listenerAddrTrustedWithoutMTLS(listenAddr) {
+			return nil
+		}
+		return errors.New("push-gateway uses mock auth on non-private websocket address")
 	}
 	if listenerAddrTrustedWithoutMTLS(listenAddr) {
 		return nil
 	}
-	return errors.New("push-gateway uses mock auth on non-private websocket address")
+	if !usesSignedPushAuth(authMode) {
+		return nil
+	}
+	if tlsEnabled {
+		return nil
+	}
+	return errors.New("push-gateway uses signed auth on non-private websocket address without TLS")
 }
 
 func usesMockPushAuth(authMode string) bool {
 	return strings.EqualFold(strings.TrimSpace(authMode), "mock")
+}
+
+func usesSignedPushAuth(authMode string) bool {
+	mode := strings.TrimSpace(strings.ToLower(authMode))
+	return mode == "hmac" || mode == "jwt"
 }
 
 func listenerAddrTrustedWithoutMTLS(addr string) bool {

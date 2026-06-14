@@ -348,6 +348,62 @@ func TestRegistryResumeGapReturnsBufferMissHint(t *testing.T) {
 	}
 }
 
+func TestRegistryResumeDoesNotPartiallyReplayWhenOutboundCapacityIsInsufficient(t *testing.T) {
+	registry := NewRegistry()
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"}
+	onlineOutbound := make(chan types.ServerFrame, 4)
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-1",
+		ResumeToken: "resume-1",
+		Outbound:    onlineOutbound,
+	}); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	first := testNotification()
+	first.EventID = "delivery-event-1"
+	first.ConversationSeq = 7
+	second := testNotification()
+	second.EventID = "delivery-event-2"
+	second.ConversationSeq = 8
+	if _, err := registry.EnqueueNotification(context.Background(), first); err != nil {
+		t.Fatalf("first notify: %v", err)
+	}
+	if _, err := registry.EnqueueNotification(context.Background(), second); err != nil {
+		t.Fatalf("second notify: %v", err)
+	}
+	registry.Unregister("session-1")
+
+	resumedOutbound := make(chan types.ServerFrame, 1)
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext:     auth,
+		SessionID:       "session-2",
+		ResumeToken:     "resume-1",
+		ResumeRequested: true,
+		LastReceived: []types.ConversationCursor{{
+			ConversationID: "conversation-1",
+			Seq:            6,
+		}},
+		Outbound: resumedOutbound,
+	}); err != nil {
+		t.Fatalf("resume register: %v", err)
+	}
+	if len(resumedOutbound) != 1 {
+		t.Fatalf("expected one broad buffer miss hint, got %d frames", len(resumedOutbound))
+	}
+	hint := <-resumedOutbound
+	if hint.Op != types.OpResumeHint || hint.Reason != "buffer_miss" || !hint.PullRequired {
+		t.Fatalf("unexpected frame after insufficient replay capacity: %+v", hint)
+	}
+	if hint.EventID == first.EventID || hint.EventID == second.EventID {
+		t.Fatalf("resume must not partially replay delivery notify when capacity is insufficient: %+v", hint)
+	}
+	metrics := registry.Metrics()
+	if metrics.ResumeBufferReplayCount != 0 || metrics.ResumeBufferMissCount != 1 {
+		t.Fatalf("unexpected resume metrics after insufficient capacity: %+v", metrics)
+	}
+}
+
 func TestRegistryExpiredResumeTokenReturnsBufferMissAndNewToken(t *testing.T) {
 	now := time.Date(2026, 6, 9, 12, 0, 0, 0, time.UTC)
 	registry := NewRegistryWithConfig(Config{

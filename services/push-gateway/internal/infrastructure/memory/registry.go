@@ -277,6 +277,7 @@ func (registry *Registry) replayLocked(registration types.SessionRegistration, s
 			return true
 		}
 	}
+	pendingFrames := make([]types.ServerFrame, 0, len(state.frames))
 	for _, frame := range state.frames {
 		if frame.Op != types.OpDeliveryNotify {
 			continue
@@ -284,12 +285,17 @@ func (registry *Registry) replayLocked(registration types.SessionRegistration, s
 		if frame.ConversationID != "" && frame.ConversationSeq <= lastReceived[frame.ConversationID] {
 			continue
 		}
-		select {
-		case registration.Outbound <- frame:
-			registry.metrics.ResumeBufferReplayCount++
-		default:
-			return true
-		}
+		pendingFrames = append(pendingFrames, frame)
+	}
+	if len(pendingFrames) == 0 {
+		return false
+	}
+	if available := cap(registration.Outbound) - len(registration.Outbound); available < len(pendingFrames) {
+		return true
+	}
+	for _, frame := range pendingFrames {
+		registration.Outbound <- frame
+		registry.metrics.ResumeBufferReplayCount++
 	}
 	return false
 }

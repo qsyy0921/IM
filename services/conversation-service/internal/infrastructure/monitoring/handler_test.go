@@ -74,6 +74,30 @@ func TestHandlerMetricsIncludesGRPCSnapshot(t *testing.T) {
 	}
 }
 
+func TestHandlerMetricsIncludesTraceSnapshot(t *testing.T) {
+	handler := NewHandler(nil).WithTraceStats(func() TraceSnapshot {
+		return TraceSnapshot{
+			Enabled:       true,
+			ServiceName:   "conversation-service",
+			Exporter:      "stdout",
+			SamplingRatio: 1,
+		}
+	})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/debug/metrics", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", response.Code)
+	}
+	var body Snapshot
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode metrics response: %v", err)
+	}
+	if body.Trace == nil || !body.Trace.Enabled || body.Trace.ServiceName != "conversation-service" {
+		t.Fatalf("unexpected trace snapshot: %+v", body.Trace)
+	}
+}
+
 func TestQueryConversationSnapshotIntegration(t *testing.T) {
 	dsn := os.Getenv("NEXUSIM_PG_DSN")
 	if dsn == "" {

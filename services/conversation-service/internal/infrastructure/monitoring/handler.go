@@ -14,6 +14,7 @@ type Handler struct {
 	pool                   *pgxpool.Pool
 	grpcMetrics            *GRPCMetrics
 	memberChangeWorkerFunc func() types.MemberChangeWorkerSnapshot
+	traceStatsFunc         func() TraceSnapshot
 }
 
 func NewHandler(pool *pgxpool.Pool, grpcMetrics ...*GRPCMetrics) *Handler {
@@ -26,6 +27,11 @@ func NewHandler(pool *pgxpool.Pool, grpcMetrics ...*GRPCMetrics) *Handler {
 
 func (h *Handler) WithMemberChangeWorkerStats(snapshotFunc func() types.MemberChangeWorkerSnapshot) *Handler {
 	h.memberChangeWorkerFunc = snapshotFunc
+	return h
+}
+
+func (h *Handler) WithTraceStats(statsFunc func() TraceSnapshot) *Handler {
+	h.traceStatsFunc = statsFunc
 	return h
 }
 
@@ -69,6 +75,10 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		workerSnapshot := h.memberChangeWorkerFunc()
 		snapshot.MemberChangeWorker = &workerSnapshot
 	}
+	if h.traceStatsFunc != nil {
+		traceSnapshot := h.traceStatsFunc()
+		snapshot.Trace = &traceSnapshot
+	}
 	if h.pool != nil {
 		stats := h.pool.Stat()
 		snapshot.PGPool = &PGPoolSnapshot{
@@ -108,6 +118,7 @@ type Snapshot struct {
 	ConversationError  string                            `json:"conversation_error,omitempty"`
 	GRPC               *GRPCSnapshot                     `json:"grpc,omitempty"`
 	MemberChangeWorker *types.MemberChangeWorkerSnapshot `json:"member_change_worker,omitempty"`
+	Trace              *TraceSnapshot                    `json:"trace,omitempty"`
 }
 
 type PGPoolSnapshot struct {

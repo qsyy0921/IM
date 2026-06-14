@@ -154,13 +154,26 @@ NEXUSIM_CONVERSATION_DEBUG_ADDR=
 
 `/debug/metrics` 只返回低敏聚合快照：gRPC 请求统计、PostgreSQL pool、`conversations` / `conversation_members` / `member_change_saga` 的总量和状态分布，不返回成员标识、会话标题、target user 明细或 raw error 文本。
 
+first-stage OpenTelemetry trace 默认关闭，仅覆盖 conversation-service gRPC server span。启用后从 incoming metadata 提取 W3C `traceparent`，只记录 service / method / gRPC status / latency / trace_id / request_id 等低敏属性，不记录 token、tenant/user/device/session id、conversation_id、target_user_id、成员变更 reason、payload 或 command hash。支持 exporter：
+
+```text
+NEXUSIM_CONVERSATION_OTEL_TRACES_ENABLED=true
+NEXUSIM_CONVERSATION_OTEL_SERVICE_NAME=conversation-service
+NEXUSIM_CONVERSATION_OTEL_TRACES_EXPORTER=stdout|otlp-grpc
+NEXUSIM_CONVERSATION_OTEL_TRACES_OTLP_ENDPOINT=otel-collector:4317
+NEXUSIM_CONVERSATION_OTEL_TRACES_OTLP_INSECURE=true
+NEXUSIM_CONVERSATION_OTEL_TRACES_SAMPLING_RATIO=1
+```
+
+`/debug/metrics` 会暴露低敏 trace runtime snapshot，便于确认 conversation-service 是否启用 trace、使用哪个 exporter 和采样率。当前仍是本地 debug/运维入口，不等同于完整 Prometheus / OpenTelemetry collector / alertmanager 生产栈。
+
 ## 7. 本阶段验收
 
 - `conversation_service.proto` 已生成 Go 代码。
 - `conversation-service` 具备六层目录和 `cmd/conversation-service`。
 - `GetSendContext` gRPC handler 有单元测试。
 - PostgreSQL repository 有可选集成测试。
-- `conversation-service` 已有 `/healthz`、`/readyz`、`/debug/metrics` 和 gRPC metrics。
+- `conversation-service` 已有 `/healthz`、`/readyz`、`/debug/metrics`、gRPC metrics 和 first-stage gRPC server span。
 - `message-service` 可以通过 gRPC client 替换 strict conversation mock。
 - `go test ./...` 通过。
 

@@ -58,7 +58,7 @@ api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan ove
 api-gateway 已补 legacy/facade traffic metrics，用于旧 descriptor 迁移观察；
 legacy descriptor 已收敛为显式 opt-in 默认；
 api-gateway 已补 first-stage OpenTelemetry 入口 server span 和下游 gRPC client span，contacts-service、identity-service、message-service、conversation-service、delivery-service、receipt-service、policy-service 已开始后端服务 gRPC server span rollout；
-本地 OTel collector debug 入口已补，可用于面试演示 OTLP trace 链路，但还不是生产告警平台；
+本地 OTel collector debug 入口和 policy OTLP smoke 脚本已补，可用于面试演示 OTLP trace 链路，但还不是生产告警平台；
 search-service 和 AI 应用后端后置；
 客户端暂不纳入当前面试主线。
 ```

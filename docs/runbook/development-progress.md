@@ -130,7 +130,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 
 当前 9 个服务没有已知 P0/P1 阻塞。后续按小切片逐个清 P2，默认顺序如下：
 
-1. `api-gateway` / 后端观测：first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、legacy descriptor 显式 opt-in 默认、legacy/facade traffic metrics、api-gateway OTel 入口 server span 和下游 gRPC client span 已补；contacts-service、identity-service、message-service、conversation-service、delivery-service、receipt-service、policy-service 已开始后端服务 gRPC server span rollout；本地 OTel collector debug 入口已补；下一步继续 alerting / dashboard / 生产采样治理、其它后端服务 server span rollout、legacy opt-in 实际迁移观察和移除计划，以及配置中心 / DB-backed quota hardening，不先扩新 facade。
+1. `api-gateway` / 后端观测：first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、legacy descriptor 显式 opt-in 默认、legacy/facade traffic metrics、api-gateway OTel 入口 server span 和下游 gRPC client span 已补；contacts-service、identity-service、message-service、conversation-service、delivery-service、receipt-service、policy-service 已开始后端服务 gRPC server span rollout；本地 OTel collector debug 入口和 policy OTLP smoke 脚本已补；下一步继续 alerting / dashboard / 生产采样治理、其它后端服务 server span rollout、legacy opt-in 实际迁移观察和移除计划，以及配置中心 / DB-backed quota hardening，不先扩新 facade。
 2. `identity-service`：继续身份安全 hardening，优先真实通知 / issuer / key 管理边界。
 3. `message-service`：补消息类型和删除语义前，先守住 outbox / policy /容量观测。
 4. `conversation-service`：补群管理前，先收 owner transfer 和成员窗口 repair。

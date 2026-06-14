@@ -26,6 +26,30 @@ health:    http://127.0.0.1:13133
 
 collector 配置位于 `deploy/local/otel-collector.yml`，当前只把 traces / metrics 输出到 collector debug exporter，方便本地看日志确认 span 到达；不做持久化、不做采样治理、不做告警。
 
+## 最小 OTLP Smoke
+
+用 `policy-service` 作为低依赖 gRPC 服务验证 OTLP trace 链路：
+
+```powershell
+.\tools\local-otel-policy-smoke.ps1
+```
+
+该脚本会：
+
+```text
+1. 如 collector 未运行，启动本地 collector；
+2. 临时启用 policy-service 的 OTLP gRPC trace exporter；
+3. 复用 policy-service 本地 smoke 触发 CheckMessageAction；
+4. 从本次运行后的 collector debug logs 中查找 policy-service span；
+5. 将 summary 和 collector log tail 写入 H:\NexusIM\loadtest-results\<run>。
+```
+
+默认脚本结束时会关闭由它启动的 collector；如需保留：
+
+```powershell
+.\tools\local-otel-policy-smoke.ps1 -KeepCollector
+```
+
 ## 服务端启用方式
 
 各服务默认关闭 trace。需要验证某个进程时，只打开该服务自己的 env 前缀：

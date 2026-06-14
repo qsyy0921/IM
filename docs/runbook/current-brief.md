@@ -23,7 +23,7 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 1. 当前面试主线只覆盖后端、分布式可靠性和 AI 应用后端；Web / App / 桌面端暂不纳入当前开发主线。
 2. 先治理已有 9 个微服务，不急着新增 `search-service` / `media-service` / AI 服务。
 3. 当前重点：继续清各服务 P2 hardening，包括生产观测、容量验证、故障演练、repair workflow、权限模型深化和代码复杂度治理。
-4. api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、legacy descriptor 显式 opt-in 默认、legacy/facade traffic metrics、first-stage OpenTelemetry 入口 server span 和下游 gRPC client span；contacts-service、identity-service、message-service、conversation-service、delivery-service、receipt-service、policy-service 已开始后端服务 gRPC server span rollout；本地 OTel collector debug 入口已补；下一步继续治理 api-gateway / 后端观测：alerting / dashboard / 生产采样治理、其它后端服务 server span rollout、legacy opt-in 实际迁移观察和配置中心 / DB-backed quota hardening。
+4. api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、legacy descriptor 显式 opt-in 默认、legacy/facade traffic metrics、first-stage OpenTelemetry 入口 server span 和下游 gRPC client span；contacts-service、identity-service、message-service、conversation-service、delivery-service、receipt-service、policy-service 已开始后端服务 gRPC server span rollout；本地 OTel collector debug 入口和 policy OTLP smoke 脚本已补；下一步继续治理 api-gateway / 后端观测：alerting / dashboard / 生产采样治理、其它后端服务 server span rollout、legacy opt-in 实际迁移观察和配置中心 / DB-backed quota hardening。
 5. 已完成的长历史不要写回本入口；服务状态看 `service-briefs/<service>.md`，总体进度看 `development-progress.md`。
 6. 下一批执行顺序：先保持入口文档短，再按 `api-gateway -> identity-service -> message-service -> conversation-service -> delivery-service -> push-gateway -> receipt-service -> contacts-service -> policy-service` 逐个收口可落地 P2。
 

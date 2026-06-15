@@ -15,6 +15,7 @@ service ContactsService {
   rpc BlockContact(BlockContactRequest) returns (BlockContactResponse);
   rpc UnblockContact(UnblockContactRequest) returns (UnblockContactResponse);
   rpc UpdateContactRemark(UpdateContactRemarkRequest) returns (UpdateContactRemarkResponse);
+  rpc UpdateContactGroup(UpdateContactGroupRequest) returns (UpdateContactGroupResponse);
 }
 
 message AuthContext {
@@ -134,6 +135,7 @@ message ListContactsRequest {
   int32 page_size = 2;
   string page_token = 3;
   string query = 4;
+  string group_name = 5;
 }
 
 message ContactItem {
@@ -144,6 +146,7 @@ message ContactItem {
   int64 created_at_unix_ms = 5;
   int64 updated_at_unix_ms = 6;
   string remark = 7;
+  string group_name = 8;
 }
 
 message ListContactsResponse {
@@ -166,6 +169,7 @@ message GetContactStateResponse {
   string source_request_id = 5;
   int64 version = 6;
   string remark = 7;
+  string group_name = 8;
 }
 
 message DeleteContactRequest {
@@ -232,5 +236,23 @@ message UpdateContactRemarkResponse {
   string source_request_id = 5;
   int64 version = 6;
   string remark = 7;
+  bool idempotent_replay = 8;
+}
+
+message UpdateContactGroupRequest {
+  AuthContext auth_context = 1;
+  string contact_user_id = 2;
+  string group_name = 3;
+  string idempotency_key = 4;
+}
+
+message UpdateContactGroupResponse {
+  string tenant_id = 1;
+  string owner_user_id = 2;
+  string contact_user_id = 3;
+  ContactEdgeStatus status = 4;
+  string source_request_id = 5;
+  int64 version = 6;
+  string group_name = 7;
   bool idempotent_replay = 8;
 }

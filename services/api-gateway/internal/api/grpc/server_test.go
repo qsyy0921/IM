@@ -858,6 +858,10 @@ func (client *fakeContactsClient) UpdateContactRemark(context.Context, *contacts
 	return nil, status.Error(codes.Unimplemented, "not implemented")
 }
 
+func (client *fakeContactsClient) UpdateContactGroup(context.Context, *contactsv1.UpdateContactGroupRequest, ...grpc.CallOption) (*contactsv1.UpdateContactGroupResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
 type fakeReceiptClient struct {
 	ctx         context.Context
 	listRequest *receiptv1.ListConversationsRequest

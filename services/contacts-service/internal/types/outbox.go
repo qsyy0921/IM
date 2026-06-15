@@ -15,6 +15,7 @@ const (
 	ContactEventEdgeBlocked     = "contact.edge.blocked.v1"
 	ContactEventEdgeUnblocked   = "contact.edge.unblocked.v1"
 	ContactEventRemarkUpdated   = "contact.edge.remark_updated.v1"
+	ContactEventGroupUpdated    = "contact.edge.group_updated.v1"
 )
 
 type OutboxMessage struct {

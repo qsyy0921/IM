@@ -45,3 +45,7 @@ type UnblockContactRepository interface {
 type UpdateContactRemarkRepository interface {
 	UpdateContactRemark(context.Context, types.UpdateContactRemarkCommand) (types.UpdateContactRemarkResult, error)
 }
+
+type UpdateContactGroupRepository interface {
+	UpdateContactGroup(context.Context, types.UpdateContactGroupCommand) (types.UpdateContactGroupResult, error)
+}

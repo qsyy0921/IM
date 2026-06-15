@@ -29,6 +29,7 @@ const (
 	ContactsService_BlockContact_FullMethodName          = "/nexusim.contacts.v1.ContactsService/BlockContact"
 	ContactsService_UnblockContact_FullMethodName        = "/nexusim.contacts.v1.ContactsService/UnblockContact"
 	ContactsService_UpdateContactRemark_FullMethodName   = "/nexusim.contacts.v1.ContactsService/UpdateContactRemark"
+	ContactsService_UpdateContactGroup_FullMethodName    = "/nexusim.contacts.v1.ContactsService/UpdateContactGroup"
 )
 
 // ContactsServiceClient is the client API for ContactsService service.
@@ -45,6 +46,7 @@ type ContactsServiceClient interface {
 	BlockContact(ctx context.Context, in *BlockContactRequest, opts ...grpc.CallOption) (*BlockContactResponse, error)
 	UnblockContact(ctx context.Context, in *UnblockContactRequest, opts ...grpc.CallOption) (*UnblockContactResponse, error)
 	UpdateContactRemark(ctx context.Context, in *UpdateContactRemarkRequest, opts ...grpc.CallOption) (*UpdateContactRemarkResponse, error)
+	UpdateContactGroup(ctx context.Context, in *UpdateContactGroupRequest, opts ...grpc.CallOption) (*UpdateContactGroupResponse, error)
 }
 
 type contactsServiceClient struct {
@@ -155,6 +157,16 @@ func (c *contactsServiceClient) UpdateContactRemark(ctx context.Context, in *Upd
 	return out, nil
 }
 
+func (c *contactsServiceClient) UpdateContactGroup(ctx context.Context, in *UpdateContactGroupRequest, opts ...grpc.CallOption) (*UpdateContactGroupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateContactGroupResponse)
+	err := c.cc.Invoke(ctx, ContactsService_UpdateContactGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ContactsServiceServer is the server API for ContactsService service.
 // All implementations must embed UnimplementedContactsServiceServer
 // for forward compatibility.
@@ -169,6 +181,7 @@ type ContactsServiceServer interface {
 	BlockContact(context.Context, *BlockContactRequest) (*BlockContactResponse, error)
 	UnblockContact(context.Context, *UnblockContactRequest) (*UnblockContactResponse, error)
 	UpdateContactRemark(context.Context, *UpdateContactRemarkRequest) (*UpdateContactRemarkResponse, error)
+	UpdateContactGroup(context.Context, *UpdateContactGroupRequest) (*UpdateContactGroupResponse, error)
 	mustEmbedUnimplementedContactsServiceServer()
 }
 
@@ -208,6 +221,9 @@ func (UnimplementedContactsServiceServer) UnblockContact(context.Context, *Unblo
 }
 func (UnimplementedContactsServiceServer) UpdateContactRemark(context.Context, *UpdateContactRemarkRequest) (*UpdateContactRemarkResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateContactRemark not implemented")
+}
+func (UnimplementedContactsServiceServer) UpdateContactGroup(context.Context, *UpdateContactGroupRequest) (*UpdateContactGroupResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateContactGroup not implemented")
 }
 func (UnimplementedContactsServiceServer) mustEmbedUnimplementedContactsServiceServer() {}
 func (UnimplementedContactsServiceServer) testEmbeddedByValue()                         {}
@@ -410,6 +426,24 @@ func _ContactsService_UpdateContactRemark_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ContactsService_UpdateContactGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateContactGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ContactsServiceServer).UpdateContactGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ContactsService_UpdateContactGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ContactsServiceServer).UpdateContactGroup(ctx, req.(*UpdateContactGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ContactsService_ServiceDesc is the grpc.ServiceDesc for ContactsService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -456,6 +490,10 @@ var ContactsService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateContactRemark",
 			Handler:    _ContactsService_UpdateContactRemark_Handler,
+		},
+		{
+			MethodName: "UpdateContactGroup",
+			Handler:    _ContactsService_UpdateContactGroup_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

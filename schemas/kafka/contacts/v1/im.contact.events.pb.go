@@ -51,6 +51,7 @@ type ContactEvent struct {
 	//	*ContactEvent_EdgeRemarkUpdated
 	//	*ContactEvent_EdgeUnblocked
 	//	*ContactEvent_RequestCanceled
+	//	*ContactEvent_EdgeGroupUpdated
 	Payload       isContactEvent_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -263,6 +264,15 @@ func (x *ContactEvent) GetRequestCanceled() *ContactRequestCanceledV1 {
 	return nil
 }
 
+func (x *ContactEvent) GetEdgeGroupUpdated() *ContactEdgeGroupUpdatedV1 {
+	if x != nil {
+		if x, ok := x.Payload.(*ContactEvent_EdgeGroupUpdated); ok {
+			return x.EdgeGroupUpdated
+		}
+	}
+	return nil
+}
+
 type isContactEvent_Payload interface {
 	isContactEvent_Payload()
 }
@@ -299,6 +309,10 @@ type ContactEvent_RequestCanceled struct {
 	RequestCanceled *ContactRequestCanceledV1 `protobuf:"bytes,27,opt,name=request_canceled,json=requestCanceled,proto3,oneof"`
 }
 
+type ContactEvent_EdgeGroupUpdated struct {
+	EdgeGroupUpdated *ContactEdgeGroupUpdatedV1 `protobuf:"bytes,28,opt,name=edge_group_updated,json=edgeGroupUpdated,proto3,oneof"`
+}
+
 func (*ContactEvent_RequestCreated) isContactEvent_Payload() {}
 
 func (*ContactEvent_RequestAccepted) isContactEvent_Payload() {}
@@ -314,6 +328,8 @@ func (*ContactEvent_EdgeRemarkUpdated) isContactEvent_Payload() {}
 func (*ContactEvent_EdgeUnblocked) isContactEvent_Payload() {}
 
 func (*ContactEvent_RequestCanceled) isContactEvent_Payload() {}
+
+func (*ContactEvent_EdgeGroupUpdated) isContactEvent_Payload() {}
 
 type ContactRequestCreatedV1 struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
@@ -951,6 +967,98 @@ func (x *ContactEdgeRemarkUpdatedV1) GetOccurredAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type ContactEdgeGroupUpdatedV1 struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ContactUserId string                 `protobuf:"bytes,3,opt,name=contact_user_id,json=contactUserId,proto3" json:"contact_user_id,omitempty"`
+	Status        string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
+	EdgeVersion   int64                  `protobuf:"varint,5,opt,name=edge_version,json=edgeVersion,proto3" json:"edge_version,omitempty"`
+	GroupName     string                 `protobuf:"bytes,6,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
+	OccurredAt    *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ContactEdgeGroupUpdatedV1) Reset() {
+	*x = ContactEdgeGroupUpdatedV1{}
+	mi := &file_contacts_v1_im_contact_events_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ContactEdgeGroupUpdatedV1) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ContactEdgeGroupUpdatedV1) ProtoMessage() {}
+
+func (x *ContactEdgeGroupUpdatedV1) ProtoReflect() protoreflect.Message {
+	mi := &file_contacts_v1_im_contact_events_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ContactEdgeGroupUpdatedV1.ProtoReflect.Descriptor instead.
+func (*ContactEdgeGroupUpdatedV1) Descriptor() ([]byte, []int) {
+	return file_contacts_v1_im_contact_events_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ContactEdgeGroupUpdatedV1) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *ContactEdgeGroupUpdatedV1) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *ContactEdgeGroupUpdatedV1) GetContactUserId() string {
+	if x != nil {
+		return x.ContactUserId
+	}
+	return ""
+}
+
+func (x *ContactEdgeGroupUpdatedV1) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *ContactEdgeGroupUpdatedV1) GetEdgeVersion() int64 {
+	if x != nil {
+		return x.EdgeVersion
+	}
+	return 0
+}
+
+func (x *ContactEdgeGroupUpdatedV1) GetGroupName() string {
+	if x != nil {
+		return x.GroupName
+	}
+	return ""
+}
+
+func (x *ContactEdgeGroupUpdatedV1) GetOccurredAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.OccurredAt
+	}
+	return nil
+}
+
 type ContactEdgeUnblockedV1 struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	TenantId       string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
@@ -966,7 +1074,7 @@ type ContactEdgeUnblockedV1 struct {
 
 func (x *ContactEdgeUnblockedV1) Reset() {
 	*x = ContactEdgeUnblockedV1{}
-	mi := &file_contacts_v1_im_contact_events_proto_msgTypes[8]
+	mi := &file_contacts_v1_im_contact_events_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -978,7 +1086,7 @@ func (x *ContactEdgeUnblockedV1) String() string {
 func (*ContactEdgeUnblockedV1) ProtoMessage() {}
 
 func (x *ContactEdgeUnblockedV1) ProtoReflect() protoreflect.Message {
-	mi := &file_contacts_v1_im_contact_events_proto_msgTypes[8]
+	mi := &file_contacts_v1_im_contact_events_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -991,7 +1099,7 @@ func (x *ContactEdgeUnblockedV1) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContactEdgeUnblockedV1.ProtoReflect.Descriptor instead.
 func (*ContactEdgeUnblockedV1) Descriptor() ([]byte, []int) {
-	return file_contacts_v1_im_contact_events_proto_rawDescGZIP(), []int{8}
+	return file_contacts_v1_im_contact_events_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ContactEdgeUnblockedV1) GetTenantId() string {
@@ -1047,7 +1155,7 @@ var File_contacts_v1_im_contact_events_proto protoreflect.FileDescriptor
 
 const file_contacts_v1_im_contact_events_proto_rawDesc = "" +
 	"\n" +
-	"#contacts/v1/im.contact.events.proto\x12\x19nexusim.contact.events.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x8e\n" +
+	"#contacts/v1/im.contact.events.proto\x12\x19nexusim.contact.events.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf4\n" +
 	"\n" +
 	"\fContactEvent\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x1d\n" +
@@ -1074,7 +1182,8 @@ const file_contacts_v1_im_contact_events_proto_rawDesc = "" +
 	"\fedge_blocked\x18\x18 \x01(\v2/.nexusim.contact.events.v1.ContactEdgeBlockedV1H\x00R\vedgeBlocked\x12g\n" +
 	"\x13edge_remark_updated\x18\x19 \x01(\v25.nexusim.contact.events.v1.ContactEdgeRemarkUpdatedV1H\x00R\x11edgeRemarkUpdated\x12Z\n" +
 	"\x0eedge_unblocked\x18\x1a \x01(\v21.nexusim.contact.events.v1.ContactEdgeUnblockedV1H\x00R\redgeUnblocked\x12`\n" +
-	"\x10request_canceled\x18\x1b \x01(\v23.nexusim.contact.events.v1.ContactRequestCanceledV1H\x00R\x0frequestCanceledB\t\n" +
+	"\x10request_canceled\x18\x1b \x01(\v23.nexusim.contact.events.v1.ContactRequestCanceledV1H\x00R\x0frequestCanceled\x12d\n" +
+	"\x12edge_group_updated\x18\x1c \x01(\v24.nexusim.contact.events.v1.ContactEdgeGroupUpdatedV1H\x00R\x10edgeGroupUpdatedB\t\n" +
 	"\apayload\"\x94\x02\n" +
 	"\x17ContactRequestCreatedV1\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x1d\n" +
@@ -1141,6 +1250,16 @@ const file_contacts_v1_im_contact_events_proto_rawDesc = "" +
 	"\fedge_version\x18\x05 \x01(\x03R\vedgeVersion\x12\x16\n" +
 	"\x06remark\x18\x06 \x01(\tR\x06remark\x12;\n" +
 	"\voccurred_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"occurredAt\"\x9b\x02\n" +
+	"\x19ContactEdgeGroupUpdatedV1\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12&\n" +
+	"\x0fcontact_user_id\x18\x03 \x01(\tR\rcontactUserId\x12\x16\n" +
+	"\x06status\x18\x04 \x01(\tR\x06status\x12!\n" +
+	"\fedge_version\x18\x05 \x01(\x03R\vedgeVersion\x12\x1d\n" +
+	"\n" +
+	"group_name\x18\x06 \x01(\tR\tgroupName\x12;\n" +
+	"\voccurred_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"occurredAt\"\xa2\x02\n" +
 	"\x16ContactEdgeUnblockedV1\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\"\n" +
@@ -1164,7 +1283,7 @@ func file_contacts_v1_im_contact_events_proto_rawDescGZIP() []byte {
 	return file_contacts_v1_im_contact_events_proto_rawDescData
 }
 
-var file_contacts_v1_im_contact_events_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_contacts_v1_im_contact_events_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_contacts_v1_im_contact_events_proto_goTypes = []any{
 	(*ContactEvent)(nil),               // 0: nexusim.contact.events.v1.ContactEvent
 	(*ContactRequestCreatedV1)(nil),    // 1: nexusim.contact.events.v1.ContactRequestCreatedV1
@@ -1174,32 +1293,35 @@ var file_contacts_v1_im_contact_events_proto_goTypes = []any{
 	(*ContactEdgeDeletedV1)(nil),       // 5: nexusim.contact.events.v1.ContactEdgeDeletedV1
 	(*ContactEdgeBlockedV1)(nil),       // 6: nexusim.contact.events.v1.ContactEdgeBlockedV1
 	(*ContactEdgeRemarkUpdatedV1)(nil), // 7: nexusim.contact.events.v1.ContactEdgeRemarkUpdatedV1
-	(*ContactEdgeUnblockedV1)(nil),     // 8: nexusim.contact.events.v1.ContactEdgeUnblockedV1
-	(*timestamppb.Timestamp)(nil),      // 9: google.protobuf.Timestamp
+	(*ContactEdgeGroupUpdatedV1)(nil),  // 8: nexusim.contact.events.v1.ContactEdgeGroupUpdatedV1
+	(*ContactEdgeUnblockedV1)(nil),     // 9: nexusim.contact.events.v1.ContactEdgeUnblockedV1
+	(*timestamppb.Timestamp)(nil),      // 10: google.protobuf.Timestamp
 }
 var file_contacts_v1_im_contact_events_proto_depIdxs = []int32{
-	9,  // 0: nexusim.contact.events.v1.ContactEvent.occurred_at:type_name -> google.protobuf.Timestamp
+	10, // 0: nexusim.contact.events.v1.ContactEvent.occurred_at:type_name -> google.protobuf.Timestamp
 	1,  // 1: nexusim.contact.events.v1.ContactEvent.request_created:type_name -> nexusim.contact.events.v1.ContactRequestCreatedV1
 	2,  // 2: nexusim.contact.events.v1.ContactEvent.request_accepted:type_name -> nexusim.contact.events.v1.ContactRequestAcceptedV1
 	3,  // 3: nexusim.contact.events.v1.ContactEvent.request_declined:type_name -> nexusim.contact.events.v1.ContactRequestDeclinedV1
 	5,  // 4: nexusim.contact.events.v1.ContactEvent.edge_deleted:type_name -> nexusim.contact.events.v1.ContactEdgeDeletedV1
 	6,  // 5: nexusim.contact.events.v1.ContactEvent.edge_blocked:type_name -> nexusim.contact.events.v1.ContactEdgeBlockedV1
 	7,  // 6: nexusim.contact.events.v1.ContactEvent.edge_remark_updated:type_name -> nexusim.contact.events.v1.ContactEdgeRemarkUpdatedV1
-	8,  // 7: nexusim.contact.events.v1.ContactEvent.edge_unblocked:type_name -> nexusim.contact.events.v1.ContactEdgeUnblockedV1
+	9,  // 7: nexusim.contact.events.v1.ContactEvent.edge_unblocked:type_name -> nexusim.contact.events.v1.ContactEdgeUnblockedV1
 	4,  // 8: nexusim.contact.events.v1.ContactEvent.request_canceled:type_name -> nexusim.contact.events.v1.ContactRequestCanceledV1
-	9,  // 9: nexusim.contact.events.v1.ContactRequestCreatedV1.occurred_at:type_name -> google.protobuf.Timestamp
-	9,  // 10: nexusim.contact.events.v1.ContactRequestAcceptedV1.occurred_at:type_name -> google.protobuf.Timestamp
-	9,  // 11: nexusim.contact.events.v1.ContactRequestDeclinedV1.occurred_at:type_name -> google.protobuf.Timestamp
-	9,  // 12: nexusim.contact.events.v1.ContactRequestCanceledV1.occurred_at:type_name -> google.protobuf.Timestamp
-	9,  // 13: nexusim.contact.events.v1.ContactEdgeDeletedV1.occurred_at:type_name -> google.protobuf.Timestamp
-	9,  // 14: nexusim.contact.events.v1.ContactEdgeBlockedV1.occurred_at:type_name -> google.protobuf.Timestamp
-	9,  // 15: nexusim.contact.events.v1.ContactEdgeRemarkUpdatedV1.occurred_at:type_name -> google.protobuf.Timestamp
-	9,  // 16: nexusim.contact.events.v1.ContactEdgeUnblockedV1.occurred_at:type_name -> google.protobuf.Timestamp
-	17, // [17:17] is the sub-list for method output_type
-	17, // [17:17] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	8,  // 9: nexusim.contact.events.v1.ContactEvent.edge_group_updated:type_name -> nexusim.contact.events.v1.ContactEdgeGroupUpdatedV1
+	10, // 10: nexusim.contact.events.v1.ContactRequestCreatedV1.occurred_at:type_name -> google.protobuf.Timestamp
+	10, // 11: nexusim.contact.events.v1.ContactRequestAcceptedV1.occurred_at:type_name -> google.protobuf.Timestamp
+	10, // 12: nexusim.contact.events.v1.ContactRequestDeclinedV1.occurred_at:type_name -> google.protobuf.Timestamp
+	10, // 13: nexusim.contact.events.v1.ContactRequestCanceledV1.occurred_at:type_name -> google.protobuf.Timestamp
+	10, // 14: nexusim.contact.events.v1.ContactEdgeDeletedV1.occurred_at:type_name -> google.protobuf.Timestamp
+	10, // 15: nexusim.contact.events.v1.ContactEdgeBlockedV1.occurred_at:type_name -> google.protobuf.Timestamp
+	10, // 16: nexusim.contact.events.v1.ContactEdgeRemarkUpdatedV1.occurred_at:type_name -> google.protobuf.Timestamp
+	10, // 17: nexusim.contact.events.v1.ContactEdgeGroupUpdatedV1.occurred_at:type_name -> google.protobuf.Timestamp
+	10, // 18: nexusim.contact.events.v1.ContactEdgeUnblockedV1.occurred_at:type_name -> google.protobuf.Timestamp
+	19, // [19:19] is the sub-list for method output_type
+	19, // [19:19] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_contacts_v1_im_contact_events_proto_init() }
@@ -1216,6 +1338,7 @@ func file_contacts_v1_im_contact_events_proto_init() {
 		(*ContactEvent_EdgeRemarkUpdated)(nil),
 		(*ContactEvent_EdgeUnblocked)(nil),
 		(*ContactEvent_RequestCanceled)(nil),
+		(*ContactEvent_EdgeGroupUpdated)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1223,7 +1346,7 @@ func file_contacts_v1_im_contact_events_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contacts_v1_im_contact_events_proto_rawDesc), len(file_contacts_v1_im_contact_events_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

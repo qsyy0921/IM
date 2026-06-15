@@ -51,6 +51,10 @@ type UpdateContactRemarkExecutor interface {
 	Execute(context.Context, types.UpdateContactRemarkCommand) (types.UpdateContactRemarkResult, error)
 }
 
+type UpdateContactGroupExecutor interface {
+	Execute(context.Context, types.UpdateContactGroupCommand) (types.UpdateContactGroupResult, error)
+}
+
 type Server struct {
 	contactsv1.UnimplementedContactsServiceServer
 	sendContactRequest    SendContactRequestExecutor
@@ -63,6 +67,7 @@ type Server struct {
 	blockContact          BlockContactExecutor
 	unblockContact        UnblockContactExecutor
 	updateContactRemark   UpdateContactRemarkExecutor
+	updateContactGroup    UpdateContactGroupExecutor
 }
 
 func NewServer(
@@ -76,6 +81,7 @@ func NewServer(
 	blockContact BlockContactExecutor,
 	unblockContact UnblockContactExecutor,
 	updateContactRemark UpdateContactRemarkExecutor,
+	updateContactGroup UpdateContactGroupExecutor,
 ) *Server {
 	return &Server{
 		sendContactRequest:    sendContactRequest,
@@ -88,6 +94,7 @@ func NewServer(
 		blockContact:          blockContact,
 		unblockContact:        unblockContact,
 		updateContactRemark:   updateContactRemark,
+		updateContactGroup:    updateContactGroup,
 	}
 }
 
@@ -239,6 +246,7 @@ func (s *Server) ListContacts(
 		PageSize:    int(request.GetPageSize()),
 		PageToken:   request.GetPageToken(),
 		Query:       request.GetQuery(),
+		GroupName:   request.GetGroupName(),
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -253,6 +261,7 @@ func (s *Server) ListContacts(
 			CreatedAtUnixMs: item.CreatedAtUnixMS,
 			UpdatedAtUnixMs: item.UpdatedAtUnixMS,
 			Remark:          item.Remark,
+			GroupName:       item.GroupName,
 		})
 	}
 	return &contactsv1.ListContactsResponse{
@@ -288,6 +297,7 @@ func (s *Server) GetContactState(
 		SourceRequestId: result.SourceRequestID,
 		Version:         result.Version,
 		Remark:          result.Remark,
+		GroupName:       result.GroupName,
 	}, nil
 }
 
@@ -406,6 +416,37 @@ func (s *Server) UpdateContactRemark(
 		SourceRequestId:  result.SourceRequestID,
 		Version:          result.Version,
 		Remark:           result.Remark,
+		IdempotentReplay: result.IdempotentReplay,
+	}, nil
+}
+
+func (s *Server) UpdateContactGroup(
+	ctx context.Context,
+	request *contactsv1.UpdateContactGroupRequest,
+) (*contactsv1.UpdateContactGroupResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.updateContactGroup == nil {
+		return nil, status.Error(codes.Unimplemented, "update contact group is not configured")
+	}
+	result, err := s.updateContactGroup.Execute(ctx, types.UpdateContactGroupCommand{
+		AuthContext:    authFromProto(ctx, request.GetAuthContext()),
+		ContactUserID:  types.UserID(request.GetContactUserId()),
+		IdempotencyKey: request.GetIdempotencyKey(),
+		GroupName:      request.GetGroupName(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &contactsv1.UpdateContactGroupResponse{
+		TenantId:         string(result.TenantID),
+		OwnerUserId:      string(result.OwnerUserID),
+		ContactUserId:    string(result.ContactUserID),
+		Status:           edgeStatusToProto(result.Status),
+		SourceRequestId:  result.SourceRequestID,
+		Version:          result.Version,
+		GroupName:        result.GroupName,
 		IdempotentReplay: result.IdempotentReplay,
 	}, nil
 }

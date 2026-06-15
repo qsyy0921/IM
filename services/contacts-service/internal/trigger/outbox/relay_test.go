@@ -127,6 +127,24 @@ func TestBuildContactEventEdgeBlockedUnblockedAndRemarkUpdated(t *testing.T) {
 	if remark == nil || remark.Remark != "Bob from school" || remark.EdgeVersion != 3 {
 		t.Fatalf("unexpected remark event: %+v payload=%+v", remarkEvent, remark)
 	}
+
+	groupMessage := outboxMessage(types.ContactEventGroupUpdated, map[string]any{
+		"tenant_id":       "tenant-contacts",
+		"owner_user_id":   "alice",
+		"contact_user_id": "bob",
+		"status":          "ACTIVE",
+		"edge_version":    4,
+		"group_name":      "school",
+		"occurred_at":     "2026-06-10T08:00:00Z",
+	})
+	groupEvent, err := BuildContactEvent(groupMessage)
+	if err != nil {
+		t.Fatalf("build group event: %v", err)
+	}
+	group := groupEvent.GetEdgeGroupUpdated()
+	if group == nil || group.GroupName != "school" || group.EdgeVersion != 4 {
+		t.Fatalf("unexpected group event: %+v payload=%+v", groupEvent, group)
+	}
 }
 
 func TestBuildContactEventRejectsMalformedEdgeEvent(t *testing.T) {

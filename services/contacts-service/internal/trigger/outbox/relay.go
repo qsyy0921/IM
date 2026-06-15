@@ -322,6 +322,23 @@ func BuildContactEvent(message types.OutboxMessage) (*contacteventsv1.ContactEve
 			},
 		}
 		return event, nil
+	case types.ContactEventGroupUpdated:
+		payload, err := decodeContactEdgePayload(message.PayloadJSON, false)
+		if err != nil {
+			return nil, err
+		}
+		event.Payload = &contacteventsv1.ContactEvent_EdgeGroupUpdated{
+			EdgeGroupUpdated: &contacteventsv1.ContactEdgeGroupUpdatedV1{
+				TenantId:      payload.TenantID,
+				OwnerUserId:   payload.OwnerUserID,
+				ContactUserId: payload.ContactUserID,
+				Status:        payload.Status,
+				EdgeVersion:   payload.EdgeVersion,
+				GroupName:     payload.GroupName,
+				OccurredAt:    payload.Timestamp(),
+			},
+		}
+		return event, nil
 	default:
 		return nil, errors.New("unsupported contacts outbox event type")
 	}
@@ -341,6 +358,7 @@ type contactPayload struct {
 	PreviousStatus string `json:"previous_status"`
 	Reason         string `json:"reason"`
 	Remark         string `json:"remark"`
+	GroupName      string `json:"group_name"`
 }
 
 func (payload contactPayload) Timestamp() *timestamppb.Timestamp {

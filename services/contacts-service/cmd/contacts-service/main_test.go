@@ -32,7 +32,7 @@ func TestNewGRPCServerRecordsAuthFailures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new grpc server: %v", err)
 	}
-	contactsgrpc.Register(server, contactsgrpc.NewServer(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil))
+	contactsgrpc.Register(server, contactsgrpc.NewServer(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil))
 
 	listener := bufconn.Listen(1024 * 1024)
 	go func() {

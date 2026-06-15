@@ -35,6 +35,19 @@ const (
 	metadataToken     = "x-nexusim-gateway-token"
 )
 
+type contactsClient interface {
+	SendContactRequest(context.Context, *contactsv1.SendContactRequestRequest, ...grpc.CallOption) (*contactsv1.SendContactRequestResponse, error)
+	RespondContactRequest(context.Context, *contactsv1.RespondContactRequestRequest, ...grpc.CallOption) (*contactsv1.RespondContactRequestResponse, error)
+	CancelContactRequest(context.Context, *contactsv1.CancelContactRequestRequest, ...grpc.CallOption) (*contactsv1.CancelContactRequestResponse, error)
+	ListContactRequests(context.Context, *contactsv1.ListContactRequestsRequest, ...grpc.CallOption) (*contactsv1.ListContactRequestsResponse, error)
+	ListContacts(context.Context, *contactsv1.ListContactsRequest, ...grpc.CallOption) (*contactsv1.ListContactsResponse, error)
+	GetContactState(context.Context, *contactsv1.GetContactStateRequest, ...grpc.CallOption) (*contactsv1.GetContactStateResponse, error)
+	DeleteContact(context.Context, *contactsv1.DeleteContactRequest, ...grpc.CallOption) (*contactsv1.DeleteContactResponse, error)
+	BlockContact(context.Context, *contactsv1.BlockContactRequest, ...grpc.CallOption) (*contactsv1.BlockContactResponse, error)
+	UnblockContact(context.Context, *contactsv1.UnblockContactRequest, ...grpc.CallOption) (*contactsv1.UnblockContactResponse, error)
+	UpdateContactRemark(context.Context, *contactsv1.UpdateContactRemarkRequest, ...grpc.CallOption) (*contactsv1.UpdateContactRemarkResponse, error)
+}
+
 type config struct {
 	target                string
 	tls                   grpctls.Config
@@ -295,7 +308,7 @@ func run(cfg config) error {
 		return fmt.Errorf("dial contacts service: %w", err)
 	}
 	defer conn.Close()
-	client := contactsv1.NewContactsServiceClient(conn)
+	var client contactsClient = contactsv1.NewContactsServiceClient(conn)
 	if cfg.gatewayFacade {
 		client = gatewayv1.NewGatewayServiceClient(conn)
 	}
@@ -606,7 +619,7 @@ func sessionIDForDevice(deviceID string) string {
 	return "contacts-smoke-" + deviceID
 }
 
-func sendContactRequest(cfg config, client contactsv1.ContactsServiceClient, suffix string) (sendSummary, float64, error) {
+func sendContactRequest(cfg config, client contactsClient, suffix string) (sendSummary, float64, error) {
 	ctx, cancel, auth := requestContext(cfg, cfg.senderUserID, cfg.senderDeviceID, "contact-send-"+suffix, "trace-contact-"+suffix)
 	defer cancel()
 	begin := time.Now()
@@ -627,7 +640,7 @@ func sendContactRequest(cfg config, client contactsv1.ContactsServiceClient, suf
 	}, elapsed, nil
 }
 
-func respondContactRequest(cfg config, client contactsv1.ContactsServiceClient, requestID string, suffix string) (respondSummary, float64, error) {
+func respondContactRequest(cfg config, client contactsClient, requestID string, suffix string) (respondSummary, float64, error) {
 	ctx, cancel, auth := requestContext(cfg, cfg.receiverUserID, cfg.receiverDeviceID, "contact-respond-"+suffix, "trace-contact-"+suffix)
 	defer cancel()
 	begin := time.Now()
@@ -652,7 +665,7 @@ func respondContactRequest(cfg config, client contactsv1.ContactsServiceClient, 
 	}, elapsed, nil
 }
 
-func cancelContactRequest(cfg config, client contactsv1.ContactsServiceClient, requestID string, suffix string) (respondSummary, float64, error) {
+func cancelContactRequest(cfg config, client contactsClient, requestID string, suffix string) (respondSummary, float64, error) {
 	ctx, cancel, auth := requestContext(cfg, cfg.senderUserID, cfg.senderDeviceID, "contact-cancel-"+suffix, "trace-contact-"+suffix)
 	defer cancel()
 	begin := time.Now()
@@ -672,7 +685,7 @@ func cancelContactRequest(cfg config, client contactsv1.ContactsServiceClient, r
 	}, elapsed, nil
 }
 
-func deleteContact(cfg config, client contactsv1.ContactsServiceClient, suffix string) (edgeActionSummary, float64, error) {
+func deleteContact(cfg config, client contactsClient, suffix string) (edgeActionSummary, float64, error) {
 	ctx, cancel, auth := requestContext(cfg, cfg.senderUserID, cfg.senderDeviceID, "contact-delete-"+suffix, "trace-contact-"+suffix)
 	defer cancel()
 	begin := time.Now()
@@ -692,7 +705,7 @@ func deleteContact(cfg config, client contactsv1.ContactsServiceClient, suffix s
 	}, elapsed, nil
 }
 
-func blockContact(cfg config, client contactsv1.ContactsServiceClient, suffix string) (edgeActionSummary, float64, error) {
+func blockContact(cfg config, client contactsClient, suffix string) (edgeActionSummary, float64, error) {
 	ctx, cancel, auth := requestContext(cfg, cfg.senderUserID, cfg.senderDeviceID, "contact-block-"+suffix, "trace-contact-"+suffix)
 	defer cancel()
 	begin := time.Now()
@@ -713,7 +726,7 @@ func blockContact(cfg config, client contactsv1.ContactsServiceClient, suffix st
 	}, elapsed, nil
 }
 
-func unblockContact(cfg config, client contactsv1.ContactsServiceClient, suffix string) (edgeActionSummary, float64, error) {
+func unblockContact(cfg config, client contactsClient, suffix string) (edgeActionSummary, float64, error) {
 	ctx, cancel, auth := requestContext(cfg, cfg.senderUserID, cfg.senderDeviceID, "contact-unblock-"+suffix, "trace-contact-"+suffix)
 	defer cancel()
 	begin := time.Now()
@@ -733,7 +746,7 @@ func unblockContact(cfg config, client contactsv1.ContactsServiceClient, suffix 
 	}, elapsed, nil
 }
 
-func updateContactRemark(cfg config, client contactsv1.ContactsServiceClient, suffix string) (edgeActionSummary, float64, error) {
+func updateContactRemark(cfg config, client contactsClient, suffix string) (edgeActionSummary, float64, error) {
 	ctx, cancel, auth := requestContext(cfg, cfg.senderUserID, cfg.senderDeviceID, "contact-remark-"+suffix, "trace-contact-"+suffix)
 	defer cancel()
 	begin := time.Now()
@@ -755,7 +768,7 @@ func updateContactRemark(cfg config, client contactsv1.ContactsServiceClient, su
 	}, elapsed, nil
 }
 
-func listContacts(cfg config, client contactsv1.ContactsServiceClient, userID string) (listSummary, float64, error) {
+func listContacts(cfg config, client contactsClient, userID string) (listSummary, float64, error) {
 	ctx, cancel, auth := requestContext(cfg, userID, deviceIDForUser(cfg, userID), "contact-list-"+userID, "trace-contact-list")
 	defer cancel()
 	begin := time.Now()
@@ -780,7 +793,7 @@ func listContacts(cfg config, client contactsv1.ContactsServiceClient, userID st
 
 func listContactRequests(
 	cfg config,
-	client contactsv1.ContactsServiceClient,
+	client contactsClient,
 	userID string,
 	direction contactsv1.ContactRequestListDirection,
 	statusValue contactsv1.ContactRequestStatus,
@@ -815,7 +828,7 @@ func listContactRequests(
 	return result, elapsed, nil
 }
 
-func getContactState(cfg config, client contactsv1.ContactsServiceClient, userID string, otherUserID string) (stateSummary, float64, error) {
+func getContactState(cfg config, client contactsClient, userID string, otherUserID string) (stateSummary, float64, error) {
 	ctx, cancel, auth := requestContext(cfg, userID, deviceIDForUser(cfg, userID), "contact-state-"+userID, "trace-contact-state")
 	defer cancel()
 	begin := time.Now()

@@ -26,6 +26,7 @@ const (
 	commandTypeBlockContact          = "BLOCK_CONTACT"
 	commandTypeUnblockContact        = "UNBLOCK_CONTACT"
 	commandTypeUpdateContactRemark   = "UPDATE_CONTACT_REMARK"
+	commandTypeUpdateContactGroup    = "UPDATE_CONTACT_GROUP"
 
 	eventTypeContactRequestCreated  = "contact.request.created.v1"
 	eventTypeContactRequestAccepted = "contact.request.accepted.v1"
@@ -35,6 +36,7 @@ const (
 	eventTypeContactEdgeBlocked     = "contact.edge.blocked.v1"
 	eventTypeContactEdgeUnblocked   = "contact.edge.unblocked.v1"
 	eventTypeContactRemarkUpdated   = "contact.edge.remark_updated.v1"
+	eventTypeContactGroupUpdated    = "contact.edge.group_updated.v1"
 
 	contactsOutboxEventVersion   = "1.0.0"
 	contactsOutboxMappingVersion = 1
@@ -528,6 +530,7 @@ func (r *Repository) ListContacts(
 	}
 	args := []any{command.AuthContext.TenantID, command.AuthContext.UserID, limit + 1}
 	searchQuery := command.NormalizedQuery()
+	groupName := command.NormalizedGroupName()
 	query := `
 SELECT
     contact_user_id,
@@ -535,6 +538,7 @@ SELECT
     version,
     source_request_id,
     remark,
+    group_name,
     created_at,
     updated_at
 FROM contact_edges
@@ -546,6 +550,11 @@ WHERE tenant_id = $1
 		args = append(args, likePatternForSearchQuery(searchQuery))
 		query += fmt.Sprintf(`  AND (contact_user_id ILIKE $%d ESCAPE '\' OR remark ILIKE $%d ESCAPE '\')
 `, len(args), len(args))
+	}
+	if groupName != "" {
+		args = append(args, groupName)
+		query += fmt.Sprintf(`  AND group_name = $%d
+`, len(args))
 	}
 	if hasCursor {
 		args = append(args, cursor.ContactUserID)
@@ -565,7 +574,7 @@ LIMIT $3
 		var item types.ContactItem
 		var createdAt time.Time
 		var updatedAt time.Time
-		if err := rows.Scan(&item.ContactUserID, &item.Status, &item.Version, &item.SourceRequestID, &item.Remark, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&item.ContactUserID, &item.Status, &item.Version, &item.SourceRequestID, &item.Remark, &item.GroupName, &createdAt, &updatedAt); err != nil {
 			return types.ListContactsResult{}, types.NewDBReadFailed(err.Error())
 		}
 		item.CreatedAtUnixMS = createdAt.UnixMilli()
@@ -584,6 +593,7 @@ LIMIT $3
 			OwnerUserID:   command.AuthContext.UserID,
 			PageSize:      limit,
 			Query:         searchQuery,
+			GroupName:     groupName,
 			ContactUserID: string(last.ContactUserID),
 		})
 		items = items[:limit]
@@ -612,7 +622,8 @@ SELECT
     status,
     source_request_id,
     version,
-    remark
+    remark,
+    group_name
 FROM contact_edges
 WHERE tenant_id = $1
   AND owner_user_id = $2
@@ -625,6 +636,7 @@ WHERE tenant_id = $1
 		&result.SourceRequestID,
 		&result.Version,
 		&result.Remark,
+		&result.GroupName,
 	)
 	if err == pgx.ErrNoRows {
 		return types.GetContactStateResult{}, types.NewContactRequestNotFound("contact state not found")
@@ -947,6 +959,92 @@ func (r *Repository) UpdateContactRemark(
 	return commitUpdateContactRemarkResult(ctx, tx, updateContactRemarkResultFromEdge(updated, false))
 }
 
+func (r *Repository) UpdateContactGroup(
+	ctx context.Context,
+	command types.UpdateContactGroupCommand,
+) (types.UpdateContactGroupResult, error) {
+	if r.pool == nil {
+		return types.UpdateContactGroupResult{}, types.NewDBWriteFailed("contacts repository is not configured")
+	}
+	groupName := command.NormalizedGroupName()
+	commandHash, err := commandHash(commandHashPayload{
+		Kind:          commandTypeUpdateContactGroup,
+		TenantID:      string(command.AuthContext.TenantID),
+		UserID:        string(command.AuthContext.UserID),
+		ContactUserID: string(command.ContactUserID),
+		GroupName:     groupName,
+	})
+	if err != nil {
+		return types.UpdateContactGroupResult{}, err
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.UpdateContactGroupResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+	if err := lockIdempotencyKey(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey); err != nil {
+		return types.UpdateContactGroupResult{}, err
+	}
+	if existing, ok, err := findCommandIdempotency(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey); err != nil {
+		return types.UpdateContactGroupResult{}, err
+	} else if ok {
+		if existing.CommandType != commandTypeUpdateContactGroup || existing.CommandHash != commandHash {
+			return types.UpdateContactGroupResult{}, types.NewContactRequestConflict("idempotency key conflict")
+		}
+		row, err := contactEdgeRowFromIdempotencyResult(existing)
+		if err != nil {
+			return types.UpdateContactGroupResult{}, err
+		}
+		return commitUpdateContactGroupResult(ctx, tx, updateContactGroupResultFromEdge(row, true))
+	}
+	if err := lockContactPair(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.ContactUserID); err != nil {
+		return types.UpdateContactGroupResult{}, err
+	}
+	row, err := lockContactEdge(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.ContactUserID)
+	if err != nil {
+		return types.UpdateContactGroupResult{}, err
+	}
+	if row.Status != types.ContactEdgeStatusActive {
+		return types.UpdateContactGroupResult{}, types.NewContactNotFound("active contact edge not found")
+	}
+	if row.GroupName == groupName {
+		resultJSON, err := edgeResultJSON(row)
+		if err != nil {
+			return types.UpdateContactGroupResult{}, err
+		}
+		if err := insertCommandIdempotencyWithResult(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey, commandTypeUpdateContactGroup, commandHash, contactEdgeID(command.AuthContext.UserID, command.ContactUserID), resultJSON); err != nil {
+			return types.UpdateContactGroupResult{}, err
+		}
+		return commitUpdateContactGroupResult(ctx, tx, updateContactGroupResultFromEdge(row, false))
+	}
+	updated, err := updateContactEdgeGroup(ctx, tx, row, groupName)
+	if err != nil {
+		return types.UpdateContactGroupResult{}, err
+	}
+	resultJSON, err := edgeResultJSON(updated)
+	if err != nil {
+		return types.UpdateContactGroupResult{}, err
+	}
+	if err := insertCommandIdempotencyWithResult(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey, commandTypeUpdateContactGroup, commandHash, contactEdgeID(command.AuthContext.UserID, command.ContactUserID), resultJSON); err != nil {
+		return types.UpdateContactGroupResult{}, err
+	}
+	if err := r.insertEdgeOutbox(ctx, tx, edgeOutboxInput{
+		TenantID:      command.AuthContext.TenantID,
+		OwnerUserID:   command.AuthContext.UserID,
+		ContactUserID: command.ContactUserID,
+		EventType:     eventTypeContactGroupUpdated,
+		CorrelationID: command.AuthContext.RequestID,
+		CausationID:   command.AuthContext.RequestID,
+		TraceID:       command.AuthContext.TraceID,
+		Edge:          updated,
+	}); err != nil {
+		return types.UpdateContactGroupResult{}, err
+	}
+	return commitUpdateContactGroupResult(ctx, tx, updateContactGroupResultFromEdge(updated, false))
+}
+
 type commandHashPayload struct {
 	Kind          string `json:"kind"`
 	TenantID      string `json:"tenant_id"`
@@ -958,6 +1056,7 @@ type commandHashPayload struct {
 	Message       string `json:"message,omitempty"`
 	Reason        string `json:"reason,omitempty"`
 	Remark        string `json:"remark,omitempty"`
+	GroupName     string `json:"group_name,omitempty"`
 }
 
 func commandHash(payload commandHashPayload) (string, error) {
@@ -1312,6 +1411,7 @@ type contactEdgeRow struct {
 	SourceRequestID string
 	Version         int64
 	Remark          string
+	GroupName       string
 }
 
 func getContactEdge(
@@ -1322,7 +1422,7 @@ func getContactEdge(
 	contactUserID types.UserID,
 ) (contactEdgeRow, error) {
 	return scanContactEdge(ctx, tx, `
-SELECT tenant_id, owner_user_id, contact_user_id, status, source_request_id, version, remark
+SELECT tenant_id, owner_user_id, contact_user_id, status, source_request_id, version, remark, group_name
 FROM contact_edges
 WHERE tenant_id = $1
   AND owner_user_id = $2
@@ -1338,7 +1438,7 @@ func lockContactEdge(
 	contactUserID types.UserID,
 ) (contactEdgeRow, error) {
 	return scanContactEdge(ctx, tx, `
-SELECT tenant_id, owner_user_id, contact_user_id, status, source_request_id, version, remark
+SELECT tenant_id, owner_user_id, contact_user_id, status, source_request_id, version, remark, group_name
 FROM contact_edges
 WHERE tenant_id = $1
   AND owner_user_id = $2
@@ -1364,6 +1464,7 @@ func scanContactEdge(
 		&row.SourceRequestID,
 		&row.Version,
 		&row.Remark,
+		&row.GroupName,
 	)
 	if err == pgx.ErrNoRows {
 		return contactEdgeRow{}, types.NewContactNotFound("contact edge not found")
@@ -1389,7 +1490,7 @@ SET status = $4,
 WHERE tenant_id = $1
   AND owner_user_id = $2
   AND contact_user_id = $3
-RETURNING tenant_id, owner_user_id, contact_user_id, status, source_request_id, version, remark
+RETURNING tenant_id, owner_user_id, contact_user_id, status, source_request_id, version, remark, group_name
 `, row.TenantID, row.OwnerUserID, row.ContactUserID, status).Scan(
 		&updated.TenantID,
 		&updated.OwnerUserID,
@@ -1398,6 +1499,7 @@ RETURNING tenant_id, owner_user_id, contact_user_id, status, source_request_id, 
 		&updated.SourceRequestID,
 		&updated.Version,
 		&updated.Remark,
+		&updated.GroupName,
 	)
 	if err != nil {
 		return contactEdgeRow{}, types.NewDBWriteFailed(err.Error())
@@ -1420,7 +1522,7 @@ SET remark = $4,
 WHERE tenant_id = $1
   AND owner_user_id = $2
   AND contact_user_id = $3
-RETURNING tenant_id, owner_user_id, contact_user_id, status, source_request_id, version, remark
+RETURNING tenant_id, owner_user_id, contact_user_id, status, source_request_id, version, remark, group_name
 `, row.TenantID, row.OwnerUserID, row.ContactUserID, remark).Scan(
 		&updated.TenantID,
 		&updated.OwnerUserID,
@@ -1429,6 +1531,39 @@ RETURNING tenant_id, owner_user_id, contact_user_id, status, source_request_id, 
 		&updated.SourceRequestID,
 		&updated.Version,
 		&updated.Remark,
+		&updated.GroupName,
+	)
+	if err != nil {
+		return contactEdgeRow{}, types.NewDBWriteFailed(err.Error())
+	}
+	return updated, nil
+}
+
+func updateContactEdgeGroup(
+	ctx context.Context,
+	tx pgx.Tx,
+	row contactEdgeRow,
+	groupName string,
+) (contactEdgeRow, error) {
+	var updated contactEdgeRow
+	err := tx.QueryRow(ctx, `
+UPDATE contact_edges
+SET group_name = $4,
+    version = version + 1,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND owner_user_id = $2
+  AND contact_user_id = $3
+RETURNING tenant_id, owner_user_id, contact_user_id, status, source_request_id, version, remark, group_name
+`, row.TenantID, row.OwnerUserID, row.ContactUserID, groupName).Scan(
+		&updated.TenantID,
+		&updated.OwnerUserID,
+		&updated.ContactUserID,
+		&updated.Status,
+		&updated.SourceRequestID,
+		&updated.Version,
+		&updated.Remark,
+		&updated.GroupName,
 	)
 	if err != nil {
 		return contactEdgeRow{}, types.NewDBWriteFailed(err.Error())
@@ -1466,6 +1601,7 @@ func (r *Repository) insertEdgeOutbox(ctx context.Context, tx pgx.Tx, input edge
 		"status":          input.Edge.Status,
 		"edge_version":    input.Edge.Version,
 		"remark":          input.Edge.Remark,
+		"group_name":      input.Edge.GroupName,
 		"occurred_at":     r.now().Format(time.RFC3339Nano),
 	}
 	if input.PreviousStatus != "" {
@@ -1617,6 +1753,13 @@ func commitUpdateContactRemarkResult(ctx context.Context, tx pgx.Tx, result type
 	return result, nil
 }
 
+func commitUpdateContactGroupResult(ctx context.Context, tx pgx.Tx, result types.UpdateContactGroupResult) (types.UpdateContactGroupResult, error) {
+	if err := tx.Commit(ctx); err != nil {
+		return types.UpdateContactGroupResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return result, nil
+}
+
 func respondResultFromRequest(request contactRequestRow, replay bool) types.RespondContactRequestResult {
 	return types.RespondContactRequestResult{
 		RequestID:        request.RequestID,
@@ -1688,6 +1831,19 @@ func updateContactRemarkResultFromEdge(row contactEdgeRow, replay bool) types.Up
 	}
 }
 
+func updateContactGroupResultFromEdge(row contactEdgeRow, replay bool) types.UpdateContactGroupResult {
+	return types.UpdateContactGroupResult{
+		TenantID:         row.TenantID,
+		OwnerUserID:      row.OwnerUserID,
+		ContactUserID:    row.ContactUserID,
+		Status:           row.Status,
+		SourceRequestID:  row.SourceRequestID,
+		Version:          row.Version,
+		GroupName:        row.GroupName,
+		IdempotentReplay: replay,
+	}
+}
+
 type contactEdgeResultSnapshot struct {
 	TenantID        types.TenantID          `json:"tenant_id"`
 	OwnerUserID     types.UserID            `json:"owner_user_id"`
@@ -1696,6 +1852,7 @@ type contactEdgeResultSnapshot struct {
 	SourceRequestID string                  `json:"source_request_id"`
 	Version         int64                   `json:"version"`
 	Remark          string                  `json:"remark"`
+	GroupName       string                  `json:"group_name"`
 }
 
 func edgeResultJSON(row contactEdgeRow) ([]byte, error) {
@@ -1707,6 +1864,7 @@ func edgeResultJSON(row contactEdgeRow) ([]byte, error) {
 		SourceRequestID: row.SourceRequestID,
 		Version:         row.Version,
 		Remark:          row.Remark,
+		GroupName:       row.GroupName,
 	})
 	if err != nil {
 		return nil, types.NewDBWriteFailed(err.Error())
@@ -1733,6 +1891,7 @@ func contactEdgeRowFromIdempotencyResult(existing commandIdempotency) (contactEd
 		SourceRequestID: snapshot.SourceRequestID,
 		Version:         snapshot.Version,
 		Remark:          snapshot.Remark,
+		GroupName:       snapshot.GroupName,
 	}, nil
 }
 
@@ -1771,6 +1930,7 @@ type contactPageCursor struct {
 	OwnerUserID   types.UserID   `json:"owner_user_id"`
 	PageSize      int            `json:"page_size"`
 	Query         string         `json:"query,omitempty"`
+	GroupName     string         `json:"group_name,omitempty"`
 	ContactUserID string         `json:"contact_user_id"`
 }
 
@@ -1843,7 +2003,8 @@ func decodePageTokenFor(command types.ListContactsCommand, pageSize int) (contac
 	if cursor.TenantID != command.AuthContext.TenantID ||
 		cursor.OwnerUserID != command.AuthContext.UserID ||
 		cursor.PageSize != pageSize ||
-		cursor.Query != command.NormalizedQuery() {
+		cursor.Query != command.NormalizedQuery() ||
+		cursor.GroupName != command.NormalizedGroupName() {
 		return contactPageCursor{}, false, types.NewInvalidArgument("invalid page_token")
 	}
 	return cursor, true, nil

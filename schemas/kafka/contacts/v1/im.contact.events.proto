@@ -36,6 +36,7 @@ message ContactEvent {
     ContactEdgeRemarkUpdatedV1 edge_remark_updated = 25;
     ContactEdgeUnblockedV1 edge_unblocked = 26;
     ContactRequestCanceledV1 request_canceled = 27;
+    ContactEdgeGroupUpdatedV1 edge_group_updated = 28;
   }
 }
 
@@ -105,6 +106,16 @@ message ContactEdgeRemarkUpdatedV1 {
   string status = 4;
   int64 edge_version = 5;
   string remark = 6;
+  google.protobuf.Timestamp occurred_at = 7;
+}
+
+message ContactEdgeGroupUpdatedV1 {
+  string tenant_id = 1;
+  string owner_user_id = 2;
+  string contact_user_id = 3;
+  string status = 4;
+  int64 edge_version = 5;
+  string group_name = 6;
   google.protobuf.Timestamp occurred_at = 7;
 }
 

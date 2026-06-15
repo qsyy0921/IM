@@ -120,6 +120,7 @@ func runGRPC() error {
 		app.NewBlockContactUseCase(repository),
 		app.NewUnblockContactUseCase(repository),
 		app.NewUpdateContactRemarkUseCase(repository),
+		app.NewUpdateContactGroupUseCase(repository),
 	))
 
 	serveErr := make(chan error, 1)

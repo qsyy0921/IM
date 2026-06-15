@@ -278,6 +278,64 @@ func TestRepositoryUpdateContactRemarkIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryUpdateContactGroupIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+	acceptContact(t, ctx, repository, "alice", "bob")
+	acceptContact(t, ctx, repository, "alice", "carol")
+
+	result, err := repository.UpdateContactGroup(ctx, groupCommand("alice", "bob", "group-1", "school"))
+	if err != nil {
+		t.Fatalf("update contact group: %v", err)
+	}
+	if result.Status != types.ContactEdgeStatusActive || result.Version != 2 || result.GroupName != "school" {
+		t.Fatalf("unexpected group result: %+v", result)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactGroupUpdated, 1)
+
+	replay, err := repository.UpdateContactGroup(ctx, groupCommand("alice", "bob", "group-1", "school"))
+	if err != nil {
+		t.Fatalf("update contact group replay: %v", err)
+	}
+	if !replay.IdempotentReplay || replay.Version != result.Version || replay.GroupName != result.GroupName {
+		t.Fatalf("expected group replay, got %+v", replay)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactGroupUpdated, 1)
+
+	aliceContacts, err := repository.ListContacts(ctx, listGroupCommand("alice", 10, "", "school"))
+	if err != nil {
+		t.Fatalf("list alice grouped contacts: %v", err)
+	}
+	assertContactIDs(t, aliceContacts, "bob")
+	if aliceContacts.Contacts[0].GroupName != "school" {
+		t.Fatalf("expected group in list result, got %+v", aliceContacts.Contacts)
+	}
+	state, err := repository.GetContactState(ctx, stateCommand("alice", "bob"))
+	if err != nil {
+		t.Fatalf("get contact state: %v", err)
+	}
+	if state.GroupName != "school" {
+		t.Fatalf("expected group in state, got %+v", state)
+	}
+
+	if _, err := repository.UpdateContactGroup(ctx, groupCommand("alice", "carol", "group-2", "school")); err != nil {
+		t.Fatalf("update second contact group: %v", err)
+	}
+	paged, err := repository.ListContacts(ctx, listGroupCommand("alice", 1, "", "school"))
+	if err != nil {
+		t.Fatalf("list grouped first page: %v", err)
+	}
+	if paged.NextPageToken == "" {
+		t.Fatal("expected grouped page token")
+	}
+	_, err = repository.ListContacts(ctx, listGroupCommand("alice", 1, paged.NextPageToken, "family"))
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected group-bound page token rejection, got %v", err)
+	}
+}
+
 func TestRepositoryUpdateContactRemarkReplayUsesOriginalSnapshotIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -686,6 +744,21 @@ func remarkCommand(owner string, contact string, key string, remark string) type
 	}
 }
 
+func groupCommand(owner string, contact string, key string, groupName string) types.UpdateContactGroupCommand {
+	return types.UpdateContactGroupCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  "tenant-contacts",
+			UserID:    types.UserID(owner),
+			DeviceID:  "device-1",
+			RequestID: "request-" + key,
+			TraceID:   "trace-" + key,
+		},
+		ContactUserID:  types.UserID(contact),
+		IdempotencyKey: key,
+		GroupName:      groupName,
+	}
+}
+
 func acceptContact(t *testing.T, ctx context.Context, repository *Repository, sender string, receiver string) string {
 	t.Helper()
 	keySuffix := sender + "-" + receiver
@@ -713,6 +786,12 @@ func listSearchCommand(owner string, pageSize int, pageToken string, query strin
 		PageToken: pageToken,
 		Query:     query,
 	}
+}
+
+func listGroupCommand(owner string, pageSize int, pageToken string, groupName string) types.ListContactsCommand {
+	command := listSearchCommand(owner, pageSize, pageToken, "")
+	command.GroupName = groupName
+	return command
 }
 
 func listContactRequestsCommand(

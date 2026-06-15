@@ -77,3 +77,22 @@ func (u *UpdateContactRemarkUseCase) Execute(
 	}
 	return u.repository.UpdateContactRemark(ctx, command)
 }
+
+type UpdateContactGroupUseCase struct {
+	repository UpdateContactGroupRepository
+}
+
+func NewUpdateContactGroupUseCase(repository UpdateContactGroupRepository) *UpdateContactGroupUseCase {
+	return &UpdateContactGroupUseCase{repository: repository}
+}
+
+func (u *UpdateContactGroupUseCase) Execute(
+	ctx context.Context,
+	command types.UpdateContactGroupCommand,
+) (types.UpdateContactGroupResult, error) {
+	if err := command.Validate(); err != nil {
+		return types.UpdateContactGroupResult{}, err
+	}
+	command.GroupName = command.NormalizedGroupName()
+	return u.repository.UpdateContactGroup(ctx, command)
+}

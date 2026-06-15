@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-- 已有好友申请、列表 / 搜索、接受、拒绝、取消、删除、拉黑、解除拉黑、备注。
+- 已有好友申请、列表 / 搜索 / 分组过滤、接受、拒绝、取消、删除、拉黑、解除拉黑、备注、联系人分组。
 - contacts-service 是联系人事实源。
 - policy-service 通过 contacts event projection 做 direct block 决策。
 - 已补 `/healthz`、`/readyz`、`/debug/metrics` 和 first-stage Prometheus text `/metrics`；可观察低敏 gRPC、PG pool、联系人申请 / 联系人边状态聚合、`contacts_outbox`、outbox relay retry 和 OTel trace config 聚合状态；本地 scrape 目标为 `host.docker.internal:11915`，并已补 Prometheus alert rules 和 Grafana dashboard 原型；这些只用于本地开发 / 面试展示，不代表生产 SLO。
@@ -15,5 +15,5 @@
 
 ## 后续
 
-- 联系人分组、更多隐私策略。
+- 更多隐私策略。
 - 生产级 OTel collector、Alertmanager、SLO dashboard 和容量验证仍属于后续统一观测治理。

@@ -4,6 +4,7 @@ import "strings"
 
 const (
 	maxContactRemarkLength      = 128
+	maxContactGroupNameLength   = 64
 	maxContactReasonLength      = 512
 	maxContactSearchQueryLength = 128
 )
@@ -207,6 +208,7 @@ type ListContactsCommand struct {
 	PageSize    int
 	PageToken   string
 	Query       string
+	GroupName   string
 }
 
 func (c ListContactsCommand) Validate() error {
@@ -219,11 +221,18 @@ func (c ListContactsCommand) Validate() error {
 	if len(c.NormalizedQuery()) > maxContactSearchQueryLength {
 		return NewInvalidArgument("query is too long")
 	}
+	if len(c.NormalizedGroupName()) > maxContactGroupNameLength {
+		return NewInvalidArgument("group_name is too long")
+	}
 	return nil
 }
 
 func (c ListContactsCommand) NormalizedQuery() string {
 	return strings.TrimSpace(c.Query)
+}
+
+func (c ListContactsCommand) NormalizedGroupName() string {
+	return strings.TrimSpace(c.GroupName)
 }
 
 type ContactItem struct {
@@ -234,6 +243,7 @@ type ContactItem struct {
 	CreatedAtUnixMS int64
 	UpdatedAtUnixMS int64
 	Remark          string
+	GroupName       string
 }
 
 type ListContactsResult struct {
@@ -272,6 +282,7 @@ type GetContactStateResult struct {
 	SourceRequestID string
 	Version         int64
 	Remark          string
+	GroupName       string
 }
 
 type DeleteContactCommand struct {
@@ -420,5 +431,49 @@ type UpdateContactRemarkResult struct {
 	SourceRequestID  string
 	Version          int64
 	Remark           string
+	IdempotentReplay bool
+}
+
+type UpdateContactGroupCommand struct {
+	AuthContext    AuthContext
+	ContactUserID  UserID
+	IdempotencyKey string
+	GroupName      string
+}
+
+func (c UpdateContactGroupCommand) Validate() error {
+	if c.AuthContext.TenantID == "" {
+		return NewInvalidArgument("tenant_id is required")
+	}
+	if c.AuthContext.UserID == "" {
+		return NewInvalidArgument("user_id is required")
+	}
+	if c.ContactUserID == "" {
+		return NewInvalidArgument("contact_user_id is required")
+	}
+	if c.AuthContext.UserID == c.ContactUserID {
+		return NewInvalidArgument("contact_user_id must differ from user_id")
+	}
+	if strings.TrimSpace(c.IdempotencyKey) == "" {
+		return NewInvalidArgument("idempotency_key is required")
+	}
+	if len(c.NormalizedGroupName()) > maxContactGroupNameLength {
+		return NewInvalidArgument("group_name is too long")
+	}
+	return nil
+}
+
+func (c UpdateContactGroupCommand) NormalizedGroupName() string {
+	return strings.TrimSpace(c.GroupName)
+}
+
+type UpdateContactGroupResult struct {
+	TenantID         TenantID
+	OwnerUserID      UserID
+	ContactUserID    UserID
+	Status           ContactEdgeStatus
+	SourceRequestID  string
+	Version          int64
+	GroupName        string
 	IdempotentReplay bool
 }

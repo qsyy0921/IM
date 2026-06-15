@@ -435,6 +435,7 @@ WHERE tenant_id = $1
   AND user_id = $2
   AND conversation_id = $3
   AND conversation_seq > $4
+  AND hidden_at IS NULL
 ORDER BY conversation_seq ASC
 LIMIT $5
 `, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.AfterSeq, fetchLimit)
@@ -464,6 +465,63 @@ LIMIT $5
 		return nil, types.NewDBReadFailed(err.Error())
 	}
 	return items, nil
+}
+
+func (repository *Repository) HideInboxItem(
+	ctx context.Context,
+	command types.HideInboxItemCommand,
+) (types.HideInboxItemResult, error) {
+	var alreadyHidden bool
+	err := repository.pool.QueryRow(ctx, `
+WITH target AS (
+    SELECT hidden_at
+    FROM user_inbox
+    WHERE tenant_id = $1
+      AND user_id = $2
+      AND conversation_id = $3
+      AND conversation_seq = $4
+    FOR UPDATE
+), updated AS (
+    UPDATE user_inbox item
+    SET hidden_at = COALESCE(item.hidden_at, now()),
+        hidden_by_device_id = CASE
+            WHEN item.hidden_at IS NULL THEN $5
+            ELSE item.hidden_by_device_id
+        END,
+        hide_reason = CASE
+            WHEN item.hidden_at IS NULL THEN $6
+            ELSE item.hide_reason
+        END
+    FROM target
+    WHERE item.tenant_id = $1
+      AND item.user_id = $2
+      AND item.conversation_id = $3
+      AND item.conversation_seq = $4
+    RETURNING target.hidden_at IS NOT NULL
+)
+SELECT already_hidden
+FROM updated AS result(already_hidden)
+`,
+		command.AuthContext.TenantID,
+		command.AuthContext.UserID,
+		command.ConversationID,
+		command.ConversationSeq,
+		command.AuthContext.DeviceID,
+		command.Reason,
+	).Scan(&alreadyHidden)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return types.HideInboxItemResult{}, types.NewInboxItemNotFound("inbox item not found")
+	}
+	if err != nil {
+		return types.HideInboxItemResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.HideInboxItemResult{
+		TenantID:        command.AuthContext.TenantID,
+		UserID:          command.AuthContext.UserID,
+		ConversationID:  command.ConversationID,
+		ConversationSeq: command.ConversationSeq,
+		AlreadyHidden:   alreadyHidden,
+	}, nil
 }
 
 func (repository *Repository) AckDelivery(

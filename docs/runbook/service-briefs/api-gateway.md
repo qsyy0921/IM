@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-- 已有 `GatewayService` facade、gateway token 验证、verified metadata 注入和下游代理。
+- 已有 `GatewayService` facade、gateway token 验证、verified metadata 注入和下游代理，覆盖 delivery `HideInboxItem` 等当前公开主链路 RPC。
 - 默认只注册 `nexusim.gateway.v1.GatewayService` facade；legacy contacts / conversation / message / delivery / receipt descriptors 需要显式 `NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS=true` 才会注册，且可用 `NEXUSIM_API_GATEWAY_LEGACY_DESCRIPTORS_ALLOWED_UNTIL` 配置 opt-in 截止时间。
 - 已有 health / ready / debug metrics / Prometheus text metrics、correlation propagation、rate limiter、RetryInfo、W3C `traceparent` 输入桥接、legacy/facade traffic audit counters 和默认关闭的 first-stage OpenTelemetry 入口 server span / 下游 gRPC client span。
 - gRPC 结构化访问日志已限制 `trace_id` / `request_id` 为低敏安全字符集，外部 metadata / body / token 中夹带的邮箱、token 或任意文本不会进入日志 correlation 字段。

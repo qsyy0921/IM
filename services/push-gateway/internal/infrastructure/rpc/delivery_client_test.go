@@ -99,6 +99,14 @@ func (client *fakeDeliveryServiceClient) AckDelivery(
 	}, nil
 }
 
+func (client *fakeDeliveryServiceClient) HideInboxItem(
+	context.Context,
+	*deliveryv1.HideInboxItemRequest,
+	...grpc.CallOption,
+) (*deliveryv1.HideInboxItemResponse, error) {
+	panic("unexpected HideInboxItem call")
+}
+
 func assertDeliveryMetadataValue(t *testing.T, md metadata.MD, key string, want string) {
 	t.Helper()
 	values := md.Get(key)

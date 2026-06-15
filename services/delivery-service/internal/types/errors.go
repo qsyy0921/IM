@@ -10,6 +10,7 @@ var (
 	ErrPermissionDenied     = errors.New("permission denied")
 	ErrCursorRegression     = errors.New("cursor regression")
 	ErrAckOutOfVisibleRange = errors.New("ack out of visible range")
+	ErrInboxItemNotFound    = errors.New("inbox item not found")
 	ErrDBReadFailed         = errors.New("db read failed")
 	ErrDBWriteFailed        = errors.New("db write failed")
 	ErrServiceOverloaded    = errors.New("service overloaded")
@@ -42,6 +43,13 @@ func NewAckOutOfVisibleRange(reason string) error {
 		return ErrAckOutOfVisibleRange
 	}
 	return fmt.Errorf("%w: %s", ErrAckOutOfVisibleRange, reason)
+}
+
+func NewInboxItemNotFound(reason string) error {
+	if reason == "" {
+		return ErrInboxItemNotFound
+	}
+	return fmt.Errorf("%w: %s", ErrInboxItemNotFound, reason)
 }
 
 func NewDBReadFailed(reason string) error {

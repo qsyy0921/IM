@@ -40,10 +40,25 @@ func (executor *fakeAckDeliveryExecutor) Execute(
 	return executor.result, executor.err
 }
 
+type fakeHideInboxItemExecutor struct {
+	result  types.HideInboxItemResult
+	err     error
+	command types.HideInboxItemCommand
+}
+
+func (executor *fakeHideInboxItemExecutor) Execute(
+	_ context.Context,
+	command types.HideInboxItemCommand,
+) (types.HideInboxItemResult, error) {
+	executor.command = command
+	return executor.result, executor.err
+}
+
 func TestAckDeliveryMapsOutOfVisibleRange(t *testing.T) {
 	server := NewServer(
 		&fakePullInboxExecutor{},
 		&fakeAckDeliveryExecutor{err: types.NewAckOutOfVisibleRange("too high")},
+		&fakeHideInboxItemExecutor{},
 	)
 	_, err := server.AckDelivery(context.Background(), &deliveryv1.AckDeliveryRequest{
 		AuthContext: &deliveryv1.AuthContext{
@@ -56,6 +71,26 @@ func TestAckDeliveryMapsOutOfVisibleRange(t *testing.T) {
 	})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("expected failed precondition, got %v", err)
+	}
+}
+
+func TestHideInboxItemMapsNotFound(t *testing.T) {
+	server := NewServer(
+		&fakePullInboxExecutor{},
+		&fakeAckDeliveryExecutor{},
+		&fakeHideInboxItemExecutor{err: types.NewInboxItemNotFound("missing")},
+	)
+	_, err := server.HideInboxItem(context.Background(), &deliveryv1.HideInboxItemRequest{
+		AuthContext: &deliveryv1.AuthContext{
+			TenantId: "tenant-1",
+			UserId:   "user-1",
+			DeviceId: "device-1",
+		},
+		ConversationId:  "conv-1",
+		ConversationSeq: 8,
+	})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected not found, got %v", err)
 	}
 }
 
@@ -76,7 +111,13 @@ func TestDeliveryAuthMetadataOverridesBodyForCommands(t *testing.T) {
 			ConversationID:  "conv-1",
 			LastReceivedSeq: 8,
 		}}
-		server := NewServer(pullExecutor, ackExecutor)
+		hideExecutor := &fakeHideInboxItemExecutor{result: types.HideInboxItemResult{
+			TenantID:        "trusted-tenant",
+			UserID:          "trusted-user",
+			ConversationID:  "conv-1",
+			ConversationSeq: 8,
+		}}
+		server := NewServer(pullExecutor, ackExecutor, hideExecutor)
 
 		if _, err := server.PullInbox(ctx, &deliveryv1.PullInboxRequest{
 			AuthContext:    testSpoofedAuthContext(),
@@ -93,9 +134,18 @@ func TestDeliveryAuthMetadataOverridesBodyForCommands(t *testing.T) {
 		}); err != nil {
 			t.Fatalf("ack delivery: %v", err)
 		}
+		if _, err := server.HideInboxItem(ctx, &deliveryv1.HideInboxItemRequest{
+			AuthContext:     testSpoofedAuthContext(),
+			ConversationId:  "conv-1",
+			ConversationSeq: 8,
+			Reason:          "hide locally",
+		}); err != nil {
+			t.Fatalf("hide inbox item: %v", err)
+		}
 
 		assertTrustedMetadataAuth(t, pullExecutor.command.AuthContext)
 		assertTrustedMetadataAuth(t, ackExecutor.command.AuthContext)
+		assertTrustedMetadataAuth(t, hideExecutor.command.AuthContext)
 		return nil, nil
 	})
 	if err != nil {
@@ -114,7 +164,7 @@ func TestDeliveryAuthMetadataDoesNotRequireBodyAuthContext(t *testing.T) {
 	interceptor := VerifiedAuthUnaryInterceptor(true)
 	_, err := interceptor(ctx, nil, &grpcgo.UnaryServerInfo{}, func(ctx context.Context, request any) (any, error) {
 		pullExecutor := &fakePullInboxExecutor{result: types.PullInboxResult{}}
-		server := NewServer(pullExecutor, &fakeAckDeliveryExecutor{})
+		server := NewServer(pullExecutor, &fakeAckDeliveryExecutor{}, &fakeHideInboxItemExecutor{})
 		if _, err := server.PullInbox(ctx, &deliveryv1.PullInboxRequest{
 			ConversationId: "conv-1",
 			AfterSeq:       1,

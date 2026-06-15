@@ -39,6 +39,7 @@ service GatewayService {
 
   rpc PullInbox(nexusim.delivery.v1.PullInboxRequest) returns (nexusim.delivery.v1.PullInboxResponse);
   rpc AckDelivery(nexusim.delivery.v1.AckDeliveryRequest) returns (nexusim.delivery.v1.AckDeliveryResponse);
+  rpc HideInboxItem(nexusim.delivery.v1.HideInboxItemRequest) returns (nexusim.delivery.v1.HideInboxItemResponse);
 
   rpc MarkRead(nexusim.receipt.v1.MarkReadRequest) returns (nexusim.receipt.v1.MarkReadResponse);
   rpc GetReceiptState(nexusim.receipt.v1.GetReceiptStateRequest) returns (nexusim.receipt.v1.GetReceiptStateResponse);

@@ -22,9 +22,12 @@
 CreateMemberChange
 -> SendMessage
 -> PullInbox
+-> HideInboxItem
 -> MarkRead
 -> ListConversations
 ```
+
+`HideInboxItem` 只代理 delivery-service 的用户私有 inbox 隐藏语义；api-gateway 不把它解释成 message-service 的会话级删除、撤回或合规删除。
 
 api-gateway 默认只注册 `nexusim.gateway.v1.GatewayService` public facade。确需兼容历史客户端或旧 smoke 时，必须显式设置 `NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS=true`，才会额外注册 contacts / conversation / message / delivery / receipt 的 legacy service descriptor。gateway 内部仍调用对应下游 service client。
 

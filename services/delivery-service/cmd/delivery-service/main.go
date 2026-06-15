@@ -133,6 +133,7 @@ func runGRPCServer() error {
 		grpcapi.NewServer(
 			app.NewPullInboxUseCase(repository),
 			app.NewAckDeliveryUseCase(repository),
+			app.NewHideInboxItemUseCase(repository),
 		),
 	)
 

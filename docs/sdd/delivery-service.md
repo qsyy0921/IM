@@ -89,6 +89,7 @@ api/proto/nexusim/delivery/v1/delivery_service.proto
 ```text
 rpc PullInbox(PullInboxRequest) returns (PullInboxResponse)
 rpc AckDelivery(AckDeliveryRequest) returns (AckDeliveryResponse)
+rpc HideInboxItem(HideInboxItemRequest) returns (HideInboxItemResponse)
 ```
 
 `PullInboxRequest`：
@@ -131,6 +132,27 @@ conversation_id
 received_seq
 request_id
 trace_id
+```
+
+`HideInboxItemRequest`：
+
+```text
+auth_context
+conversation_id
+conversation_seq
+reason
+request_id
+trace_id
+```
+
+`HideInboxItemResponse`：
+
+```text
+tenant_id
+user_id
+conversation_id
+conversation_seq
+already_hidden
 ```
 
 错误码：
@@ -252,6 +274,9 @@ CREATE TABLE user_inbox (
     payload_json        JSONB       NOT NULL DEFAULT '{}'::jsonb,
     fanout_mode         TEXT        NOT NULL,
     permission_version  BIGINT      NOT NULL,
+    hidden_at           TIMESTAMPTZ,
+    hidden_by_device_id TEXT        NOT NULL DEFAULT '',
+    hide_reason         TEXT        NOT NULL DEFAULT '',
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (tenant_id, user_id, conversation_id, conversation_seq),
     UNIQUE (tenant_id, user_id, event_id)
@@ -408,12 +433,14 @@ message-service / conversation-service 发布 timeline event
 | timeline event projection | `tenant_id + user_id + event_id` | consumer 可重复处理，upsert 去重 | Kafka replay 或 PostgreSQL projection rebuild |
 | PullInbox | request 无副作用 | 客户端可重试 | 无 |
 | AckDelivery | `tenant_id + user_id + device_id + conversation_id` | `received_seq <= current` 视为幂等成功，`current < received_seq <= max_visible_seq` 才推进 | `received_seq > max_visible_seq` 返回 `ACK_OUT_OF_VISIBLE_RANGE` |
+| HideInboxItem | `tenant_id + user_id + conversation_id + conversation_seq` | 重复隐藏同一 inbox item 返回 `already_hidden=true`，不改 message facts | 客户端仍以 `PullInbox` 和本地缓存对齐 |
 | delivery outbox publish | `event_id` | at-least-once publish | 下游按 event_id 去重 |
 
 ## 11. 权限和安全
 
-- `PullInbox` 和 `AckDelivery` 必须使用 authenticated `tenant_id/user_id/device_id`，不信任请求体裸 user。
-- gRPC API 支持第一阶段 gateway verified metadata auth mode：`NEXUSIM_DELIVERY_AUTH_MODE=metadata` / `verified-metadata` 时，`PullInbox` 和 `AckDelivery` 的 `tenant_id / user_id / device_id / session_id` 只来自 gRPC metadata，不信任 request body 中可伪造的身份字段；`trace_id / request_id` 可在 metadata 缺失时从 body 兜底用于排障相关性。默认 `body` 模式仅用于兼容历史 smoke。
+- `PullInbox`、`AckDelivery` 和 `HideInboxItem` 必须使用 authenticated `tenant_id/user_id/device_id`，不信任请求体裸 user。
+- gRPC API 支持第一阶段 gateway verified metadata auth mode：`NEXUSIM_DELIVERY_AUTH_MODE=metadata` / `verified-metadata` 时，`PullInbox`、`AckDelivery` 和 `HideInboxItem` 的 `tenant_id / user_id / device_id / session_id` 只来自 gRPC metadata，不信任 request body 中可伪造的身份字段；`trace_id / request_id` 可在 metadata 缺失时从 body 兜底用于排障相关性。默认 `body` 模式仅用于兼容历史 smoke。
+- `HideInboxItem` 只隐藏当前用户的 `user_inbox` 视图，不修改 `message_log`、不写 conversation timeline、不发布 `message.deleted.v1` 或 `delivery.inbox_item.created.v1`。它用于 `DeleteMessage SELF_VIEW` 类产品语义；会话级删除和合规删除仍属于 message-service / retention workflow。
 - 第一阶段可以通过 `user_inbox` 是否存在判断可见性；没有 inbox item 不等于 conversation 不存在。
 - 成员边界事件决定投递可见窗口，不能用当前成员表回写历史可见性。
 - `delivery_membership_projection` 只能由 Kafka timeline event 重建；manual repair 必须留审计。
@@ -449,8 +476,8 @@ delivery_cursor_regression_count
 
 | 测试 | 目标 |
 | --- | --- |
-| unit | fanout decision、ACK 单调性、权限错误映射 |
-| integration | PostgreSQL 写 user_inbox / cursor / delivery_outbox 同事务 |
+| unit | fanout decision、ACK 单调性、HideInboxItem 幂等、权限错误映射 |
+| integration | PostgreSQL 写 user_inbox / cursor / delivery_outbox 同事务；HideInboxItem 过滤 PullInbox 且不破坏 ACK |
 | contract | Proto request/response 和错误码 |
 | server security | gRPC server TLS / mTLS env config、cert/key 成对校验、client DNS / URI SAN allowlist |
 | consumer smoke | 构造 timeline event，投影到 user_inbox |

@@ -315,6 +315,16 @@ func (server *Server) AckDelivery(ctx context.Context, request *deliveryv1.AckDe
 	return server.delivery.AckDelivery(outgoing, cloned)
 }
 
+func (server *Server) HideInboxItem(ctx context.Context, request *deliveryv1.HideInboxItemRequest) (*deliveryv1.HideInboxItemResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*deliveryv1.HideInboxItemRequest)
+	cloned.AuthContext = deliveryAuth(auth)
+	return server.delivery.HideInboxItem(outgoing, cloned)
+}
+
 func (server *Server) MarkRead(ctx context.Context, request *receiptv1.MarkReadRequest) (*receiptv1.MarkReadResponse, error) {
 	auth, outgoing, err := server.authenticate(ctx)
 	if err != nil {

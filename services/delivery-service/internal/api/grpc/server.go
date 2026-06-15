@@ -19,14 +19,19 @@ type AckDeliveryExecutor interface {
 	Execute(context.Context, types.AckDeliveryCommand) (types.AckDeliveryResult, error)
 }
 
-type Server struct {
-	deliveryv1.UnimplementedDeliveryServiceServer
-	pullInbox   PullInboxExecutor
-	ackDelivery AckDeliveryExecutor
+type HideInboxItemExecutor interface {
+	Execute(context.Context, types.HideInboxItemCommand) (types.HideInboxItemResult, error)
 }
 
-func NewServer(pullInbox PullInboxExecutor, ackDelivery AckDeliveryExecutor) *Server {
-	return &Server{pullInbox: pullInbox, ackDelivery: ackDelivery}
+type Server struct {
+	deliveryv1.UnimplementedDeliveryServiceServer
+	pullInbox     PullInboxExecutor
+	ackDelivery   AckDeliveryExecutor
+	hideInboxItem HideInboxItemExecutor
+}
+
+func NewServer(pullInbox PullInboxExecutor, ackDelivery AckDeliveryExecutor, hideInboxItem HideInboxItemExecutor) *Server {
+	return &Server{pullInbox: pullInbox, ackDelivery: ackDelivery, hideInboxItem: hideInboxItem}
 }
 
 func Register(registrar grpcgo.ServiceRegistrar, server *Server) {
@@ -73,6 +78,35 @@ func (s *Server) PullInbox(
 	}, nil
 }
 
+func (s *Server) HideInboxItem(
+	ctx context.Context,
+	request *deliveryv1.HideInboxItemRequest,
+) (*deliveryv1.HideInboxItemResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
+	result, err := s.hideInboxItem.Execute(ctx, types.HideInboxItemCommand{
+		AuthContext:     auth,
+		ConversationID:  types.ConversationID(request.GetConversationId()),
+		ConversationSeq: request.GetConversationSeq(),
+		Reason:          request.GetReason(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &deliveryv1.HideInboxItemResponse{
+		TenantId:        string(result.TenantID),
+		UserId:          string(result.UserID),
+		ConversationId:  string(result.ConversationID),
+		ConversationSeq: result.ConversationSeq,
+		AlreadyHidden:   result.AlreadyHidden,
+	}, nil
+}
+
 func (s *Server) AckDelivery(
 	ctx context.Context,
 	request *deliveryv1.AckDeliveryRequest,
@@ -111,6 +145,8 @@ func grpcError(err error) error {
 		return status.Error(codes.FailedPrecondition, "cursor regression")
 	case errors.Is(err, types.ErrAckOutOfVisibleRange):
 		return status.Error(codes.FailedPrecondition, "ack out of visible range")
+	case errors.Is(err, types.ErrInboxItemNotFound):
+		return status.Error(codes.NotFound, "inbox item not found")
 	case errors.Is(err, types.ErrDBReadFailed):
 		return status.Error(codes.Unavailable, "delivery read failed")
 	case errors.Is(err, types.ErrDBWriteFailed):

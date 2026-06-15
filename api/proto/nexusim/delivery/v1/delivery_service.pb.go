@@ -469,6 +469,150 @@ func (x *AckDeliveryResponse) GetLastReceivedSeq() int64 {
 	return 0
 }
 
+type HideInboxItemRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext     *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	ConversationId  string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	ConversationSeq int64                  `protobuf:"varint,3,opt,name=conversation_seq,json=conversationSeq,proto3" json:"conversation_seq,omitempty"`
+	Reason          string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *HideInboxItemRequest) Reset() {
+	*x = HideInboxItemRequest{}
+	mi := &file_nexusim_delivery_v1_delivery_service_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HideInboxItemRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HideInboxItemRequest) ProtoMessage() {}
+
+func (x *HideInboxItemRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_delivery_v1_delivery_service_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HideInboxItemRequest.ProtoReflect.Descriptor instead.
+func (*HideInboxItemRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_delivery_v1_delivery_service_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *HideInboxItemRequest) GetAuthContext() *AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *HideInboxItemRequest) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *HideInboxItemRequest) GetConversationSeq() int64 {
+	if x != nil {
+		return x.ConversationSeq
+	}
+	return 0
+}
+
+func (x *HideInboxItemRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type HideInboxItemResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	TenantId        string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId          string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ConversationId  string                 `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	ConversationSeq int64                  `protobuf:"varint,4,opt,name=conversation_seq,json=conversationSeq,proto3" json:"conversation_seq,omitempty"`
+	AlreadyHidden   bool                   `protobuf:"varint,5,opt,name=already_hidden,json=alreadyHidden,proto3" json:"already_hidden,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *HideInboxItemResponse) Reset() {
+	*x = HideInboxItemResponse{}
+	mi := &file_nexusim_delivery_v1_delivery_service_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HideInboxItemResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HideInboxItemResponse) ProtoMessage() {}
+
+func (x *HideInboxItemResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_delivery_v1_delivery_service_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HideInboxItemResponse.ProtoReflect.Descriptor instead.
+func (*HideInboxItemResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_delivery_v1_delivery_service_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *HideInboxItemResponse) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *HideInboxItemResponse) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *HideInboxItemResponse) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *HideInboxItemResponse) GetConversationSeq() int64 {
+	if x != nil {
+		return x.ConversationSeq
+	}
+	return 0
+}
+
+func (x *HideInboxItemResponse) GetAlreadyHidden() bool {
+	if x != nil {
+		return x.AlreadyHidden
+	}
+	return false
+}
+
 var File_nexusim_delivery_v1_delivery_service_proto protoreflect.FileDescriptor
 
 const file_nexusim_delivery_v1_delivery_service_proto_rawDesc = "" +
@@ -512,10 +656,22 @@ const file_nexusim_delivery_v1_delivery_service_proto_rawDesc = "" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +
 	"\tdevice_id\x18\x03 \x01(\tR\bdeviceId\x12'\n" +
 	"\x0fconversation_id\x18\x04 \x01(\tR\x0econversationId\x12*\n" +
-	"\x11last_received_seq\x18\x05 \x01(\x03R\x0flastReceivedSeq2\xcf\x01\n" +
+	"\x11last_received_seq\x18\x05 \x01(\x03R\x0flastReceivedSeq\"\xc7\x01\n" +
+	"\x14HideInboxItemRequest\x12C\n" +
+	"\fauth_context\x18\x01 \x01(\v2 .nexusim.delivery.v1.AuthContextR\vauthContext\x12'\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12)\n" +
+	"\x10conversation_seq\x18\x03 \x01(\x03R\x0fconversationSeq\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\"\xc8\x01\n" +
+	"\x15HideInboxItemResponse\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12'\n" +
+	"\x0fconversation_id\x18\x03 \x01(\tR\x0econversationId\x12)\n" +
+	"\x10conversation_seq\x18\x04 \x01(\x03R\x0fconversationSeq\x12%\n" +
+	"\x0ealready_hidden\x18\x05 \x01(\bR\ralreadyHidden2\xb7\x02\n" +
 	"\x0fDeliveryService\x12Z\n" +
 	"\tPullInbox\x12%.nexusim.delivery.v1.PullInboxRequest\x1a&.nexusim.delivery.v1.PullInboxResponse\x12`\n" +
-	"\vAckDelivery\x12'.nexusim.delivery.v1.AckDeliveryRequest\x1a(.nexusim.delivery.v1.AckDeliveryResponseBAZ?github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1;deliveryv1b\x06proto3"
+	"\vAckDelivery\x12'.nexusim.delivery.v1.AckDeliveryRequest\x1a(.nexusim.delivery.v1.AckDeliveryResponse\x12f\n" +
+	"\rHideInboxItem\x12).nexusim.delivery.v1.HideInboxItemRequest\x1a*.nexusim.delivery.v1.HideInboxItemResponseBAZ?github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1;deliveryv1b\x06proto3"
 
 var (
 	file_nexusim_delivery_v1_delivery_service_proto_rawDescOnce sync.Once
@@ -529,28 +685,33 @@ func file_nexusim_delivery_v1_delivery_service_proto_rawDescGZIP() []byte {
 	return file_nexusim_delivery_v1_delivery_service_proto_rawDescData
 }
 
-var file_nexusim_delivery_v1_delivery_service_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_nexusim_delivery_v1_delivery_service_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_nexusim_delivery_v1_delivery_service_proto_goTypes = []any{
-	(*AuthContext)(nil),         // 0: nexusim.delivery.v1.AuthContext
-	(*PullInboxRequest)(nil),    // 1: nexusim.delivery.v1.PullInboxRequest
-	(*InboxItem)(nil),           // 2: nexusim.delivery.v1.InboxItem
-	(*PullInboxResponse)(nil),   // 3: nexusim.delivery.v1.PullInboxResponse
-	(*AckDeliveryRequest)(nil),  // 4: nexusim.delivery.v1.AckDeliveryRequest
-	(*AckDeliveryResponse)(nil), // 5: nexusim.delivery.v1.AckDeliveryResponse
+	(*AuthContext)(nil),           // 0: nexusim.delivery.v1.AuthContext
+	(*PullInboxRequest)(nil),      // 1: nexusim.delivery.v1.PullInboxRequest
+	(*InboxItem)(nil),             // 2: nexusim.delivery.v1.InboxItem
+	(*PullInboxResponse)(nil),     // 3: nexusim.delivery.v1.PullInboxResponse
+	(*AckDeliveryRequest)(nil),    // 4: nexusim.delivery.v1.AckDeliveryRequest
+	(*AckDeliveryResponse)(nil),   // 5: nexusim.delivery.v1.AckDeliveryResponse
+	(*HideInboxItemRequest)(nil),  // 6: nexusim.delivery.v1.HideInboxItemRequest
+	(*HideInboxItemResponse)(nil), // 7: nexusim.delivery.v1.HideInboxItemResponse
 }
 var file_nexusim_delivery_v1_delivery_service_proto_depIdxs = []int32{
 	0, // 0: nexusim.delivery.v1.PullInboxRequest.auth_context:type_name -> nexusim.delivery.v1.AuthContext
 	2, // 1: nexusim.delivery.v1.PullInboxResponse.items:type_name -> nexusim.delivery.v1.InboxItem
 	0, // 2: nexusim.delivery.v1.AckDeliveryRequest.auth_context:type_name -> nexusim.delivery.v1.AuthContext
-	1, // 3: nexusim.delivery.v1.DeliveryService.PullInbox:input_type -> nexusim.delivery.v1.PullInboxRequest
-	4, // 4: nexusim.delivery.v1.DeliveryService.AckDelivery:input_type -> nexusim.delivery.v1.AckDeliveryRequest
-	3, // 5: nexusim.delivery.v1.DeliveryService.PullInbox:output_type -> nexusim.delivery.v1.PullInboxResponse
-	5, // 6: nexusim.delivery.v1.DeliveryService.AckDelivery:output_type -> nexusim.delivery.v1.AckDeliveryResponse
-	5, // [5:7] is the sub-list for method output_type
-	3, // [3:5] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	0, // 3: nexusim.delivery.v1.HideInboxItemRequest.auth_context:type_name -> nexusim.delivery.v1.AuthContext
+	1, // 4: nexusim.delivery.v1.DeliveryService.PullInbox:input_type -> nexusim.delivery.v1.PullInboxRequest
+	4, // 5: nexusim.delivery.v1.DeliveryService.AckDelivery:input_type -> nexusim.delivery.v1.AckDeliveryRequest
+	6, // 6: nexusim.delivery.v1.DeliveryService.HideInboxItem:input_type -> nexusim.delivery.v1.HideInboxItemRequest
+	3, // 7: nexusim.delivery.v1.DeliveryService.PullInbox:output_type -> nexusim.delivery.v1.PullInboxResponse
+	5, // 8: nexusim.delivery.v1.DeliveryService.AckDelivery:output_type -> nexusim.delivery.v1.AckDeliveryResponse
+	7, // 9: nexusim.delivery.v1.DeliveryService.HideInboxItem:output_type -> nexusim.delivery.v1.HideInboxItemResponse
+	7, // [7:10] is the sub-list for method output_type
+	4, // [4:7] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_delivery_v1_delivery_service_proto_init() }
@@ -564,7 +725,7 @@ func file_nexusim_delivery_v1_delivery_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_delivery_v1_delivery_service_proto_rawDesc), len(file_nexusim_delivery_v1_delivery_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

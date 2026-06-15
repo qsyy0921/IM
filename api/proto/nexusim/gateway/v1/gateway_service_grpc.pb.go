@@ -47,6 +47,7 @@ const (
 	GatewayService_DeleteMessage_FullMethodName                = "/nexusim.gateway.v1.GatewayService/DeleteMessage"
 	GatewayService_PullInbox_FullMethodName                    = "/nexusim.gateway.v1.GatewayService/PullInbox"
 	GatewayService_AckDelivery_FullMethodName                  = "/nexusim.gateway.v1.GatewayService/AckDelivery"
+	GatewayService_HideInboxItem_FullMethodName                = "/nexusim.gateway.v1.GatewayService/HideInboxItem"
 	GatewayService_MarkRead_FullMethodName                     = "/nexusim.gateway.v1.GatewayService/MarkRead"
 	GatewayService_GetReceiptState_FullMethodName              = "/nexusim.gateway.v1.GatewayService/GetReceiptState"
 	GatewayService_ListReceiptStates_FullMethodName            = "/nexusim.gateway.v1.GatewayService/ListReceiptStates"
@@ -95,6 +96,7 @@ type GatewayServiceClient interface {
 	DeleteMessage(ctx context.Context, in *v12.DeleteMessageRequest, opts ...grpc.CallOption) (*v12.MessageChangeResponse, error)
 	PullInbox(ctx context.Context, in *v13.PullInboxRequest, opts ...grpc.CallOption) (*v13.PullInboxResponse, error)
 	AckDelivery(ctx context.Context, in *v13.AckDeliveryRequest, opts ...grpc.CallOption) (*v13.AckDeliveryResponse, error)
+	HideInboxItem(ctx context.Context, in *v13.HideInboxItemRequest, opts ...grpc.CallOption) (*v13.HideInboxItemResponse, error)
 	MarkRead(ctx context.Context, in *v14.MarkReadRequest, opts ...grpc.CallOption) (*v14.MarkReadResponse, error)
 	GetReceiptState(ctx context.Context, in *v14.GetReceiptStateRequest, opts ...grpc.CallOption) (*v14.GetReceiptStateResponse, error)
 	ListReceiptStates(ctx context.Context, in *v14.ListReceiptStatesRequest, opts ...grpc.CallOption) (*v14.ListReceiptStatesResponse, error)
@@ -342,6 +344,16 @@ func (c *gatewayServiceClient) AckDelivery(ctx context.Context, in *v13.AckDeliv
 	return out, nil
 }
 
+func (c *gatewayServiceClient) HideInboxItem(ctx context.Context, in *v13.HideInboxItemRequest, opts ...grpc.CallOption) (*v13.HideInboxItemResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v13.HideInboxItemResponse)
+	err := c.cc.Invoke(ctx, GatewayService_HideInboxItem_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *gatewayServiceClient) MarkRead(ctx context.Context, in *v14.MarkReadRequest, opts ...grpc.CallOption) (*v14.MarkReadResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(v14.MarkReadResponse)
@@ -541,6 +553,7 @@ type GatewayServiceServer interface {
 	DeleteMessage(context.Context, *v12.DeleteMessageRequest) (*v12.MessageChangeResponse, error)
 	PullInbox(context.Context, *v13.PullInboxRequest) (*v13.PullInboxResponse, error)
 	AckDelivery(context.Context, *v13.AckDeliveryRequest) (*v13.AckDeliveryResponse, error)
+	HideInboxItem(context.Context, *v13.HideInboxItemRequest) (*v13.HideInboxItemResponse, error)
 	MarkRead(context.Context, *v14.MarkReadRequest) (*v14.MarkReadResponse, error)
 	GetReceiptState(context.Context, *v14.GetReceiptStateRequest) (*v14.GetReceiptStateResponse, error)
 	ListReceiptStates(context.Context, *v14.ListReceiptStatesRequest) (*v14.ListReceiptStatesResponse, error)
@@ -633,6 +646,9 @@ func (UnimplementedGatewayServiceServer) PullInbox(context.Context, *v13.PullInb
 }
 func (UnimplementedGatewayServiceServer) AckDelivery(context.Context, *v13.AckDeliveryRequest) (*v13.AckDeliveryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AckDelivery not implemented")
+}
+func (UnimplementedGatewayServiceServer) HideInboxItem(context.Context, *v13.HideInboxItemRequest) (*v13.HideInboxItemResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method HideInboxItem not implemented")
 }
 func (UnimplementedGatewayServiceServer) MarkRead(context.Context, *v14.MarkReadRequest) (*v14.MarkReadResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method MarkRead not implemented")
@@ -1102,6 +1118,24 @@ func _GatewayService_AckDelivery_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GatewayService_HideInboxItem_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v13.HideInboxItemRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).HideInboxItem(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_HideInboxItem_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).HideInboxItem(ctx, req.(*v13.HideInboxItemRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GatewayService_MarkRead_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(v14.MarkReadRequest)
 	if err := dec(in); err != nil {
@@ -1502,6 +1536,10 @@ var GatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AckDelivery",
 			Handler:    _GatewayService_AckDelivery_Handler,
+		},
+		{
+			MethodName: "HideInboxItem",
+			Handler:    _GatewayService_HideInboxItem_Handler,
 		},
 		{
 			MethodName: "MarkRead",

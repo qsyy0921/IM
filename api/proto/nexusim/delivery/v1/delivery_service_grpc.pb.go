@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	DeliveryService_PullInbox_FullMethodName   = "/nexusim.delivery.v1.DeliveryService/PullInbox"
-	DeliveryService_AckDelivery_FullMethodName = "/nexusim.delivery.v1.DeliveryService/AckDelivery"
+	DeliveryService_PullInbox_FullMethodName     = "/nexusim.delivery.v1.DeliveryService/PullInbox"
+	DeliveryService_AckDelivery_FullMethodName   = "/nexusim.delivery.v1.DeliveryService/AckDelivery"
+	DeliveryService_HideInboxItem_FullMethodName = "/nexusim.delivery.v1.DeliveryService/HideInboxItem"
 )
 
 // DeliveryServiceClient is the client API for DeliveryService service.
@@ -29,6 +30,7 @@ const (
 type DeliveryServiceClient interface {
 	PullInbox(ctx context.Context, in *PullInboxRequest, opts ...grpc.CallOption) (*PullInboxResponse, error)
 	AckDelivery(ctx context.Context, in *AckDeliveryRequest, opts ...grpc.CallOption) (*AckDeliveryResponse, error)
+	HideInboxItem(ctx context.Context, in *HideInboxItemRequest, opts ...grpc.CallOption) (*HideInboxItemResponse, error)
 }
 
 type deliveryServiceClient struct {
@@ -59,12 +61,23 @@ func (c *deliveryServiceClient) AckDelivery(ctx context.Context, in *AckDelivery
 	return out, nil
 }
 
+func (c *deliveryServiceClient) HideInboxItem(ctx context.Context, in *HideInboxItemRequest, opts ...grpc.CallOption) (*HideInboxItemResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HideInboxItemResponse)
+	err := c.cc.Invoke(ctx, DeliveryService_HideInboxItem_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DeliveryServiceServer is the server API for DeliveryService service.
 // All implementations must embed UnimplementedDeliveryServiceServer
 // for forward compatibility.
 type DeliveryServiceServer interface {
 	PullInbox(context.Context, *PullInboxRequest) (*PullInboxResponse, error)
 	AckDelivery(context.Context, *AckDeliveryRequest) (*AckDeliveryResponse, error)
+	HideInboxItem(context.Context, *HideInboxItemRequest) (*HideInboxItemResponse, error)
 	mustEmbedUnimplementedDeliveryServiceServer()
 }
 
@@ -80,6 +93,9 @@ func (UnimplementedDeliveryServiceServer) PullInbox(context.Context, *PullInboxR
 }
 func (UnimplementedDeliveryServiceServer) AckDelivery(context.Context, *AckDeliveryRequest) (*AckDeliveryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AckDelivery not implemented")
+}
+func (UnimplementedDeliveryServiceServer) HideInboxItem(context.Context, *HideInboxItemRequest) (*HideInboxItemResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method HideInboxItem not implemented")
 }
 func (UnimplementedDeliveryServiceServer) mustEmbedUnimplementedDeliveryServiceServer() {}
 func (UnimplementedDeliveryServiceServer) testEmbeddedByValue()                         {}
@@ -138,6 +154,24 @@ func _DeliveryService_AckDelivery_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DeliveryService_HideInboxItem_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HideInboxItemRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeliveryServiceServer).HideInboxItem(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeliveryService_HideInboxItem_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeliveryServiceServer).HideInboxItem(ctx, req.(*HideInboxItemRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DeliveryService_ServiceDesc is the grpc.ServiceDesc for DeliveryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +186,10 @@ var DeliveryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AckDelivery",
 			Handler:    _DeliveryService_AckDelivery_Handler,
+		},
+		{
+			MethodName: "HideInboxItem",
+			Handler:    _DeliveryService_HideInboxItem_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

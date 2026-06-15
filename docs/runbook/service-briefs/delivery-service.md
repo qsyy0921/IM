@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-- 已有 timeline projection、durable `user_inbox`、`PullInbox`、`AckDelivery`、`delivery_outbox` relay。
+- 已有 timeline projection、durable `user_inbox`、`PullInbox`、`AckDelivery`、`HideInboxItem` 用户视图隐藏、`delivery_outbox` relay。
 - 是 push-gateway 的可靠事实源。
 - 不要求 push-gateway 持久化消息或 ACK cursor。
 - 已补 `/healthz`、`/readyz`、`/debug/metrics` 基础观测入口，可在 gRPC / timeline-consumer / outbox-relay 模式下独立挂载；debug HTTP 监听默认只允许 loopback / 私网，公网或未指定地址必须显式 `NEXUSIM_DELIVERY_DEBUG_ALLOW_PUBLIC=true`。
@@ -27,4 +27,4 @@
 
 ## 后续
 
-- Projection DLQ / repair、更多 delivery event 消费方；OTel collector / alerting / dashboard 仍属于后续统一观测治理。
+- Projection DLQ / repair 深化、更多 delivery event 消费方、隐藏项跨设备删除提示；OTel collector / alerting / dashboard 仍属于后续统一观测治理。

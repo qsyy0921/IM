@@ -8,6 +8,7 @@ import (
 
 	contactsv1 "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1"
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
+	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	gatewayv1 "github.com/qsyy0921/IM/api/proto/nexusim/gateway/v1"
 	identityv1 "github.com/qsyy0921/IM/api/proto/nexusim/identity/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
@@ -84,6 +85,58 @@ func TestSendMessageInjectsVerifiedAuthAndOverridesBody(t *testing.T) {
 		metadataDeviceID:  "device-token",
 		metadataSessionID: "session-token",
 		metadataTraceID:   "trace-token",
+		metadataRequestID: "request-1",
+	})
+}
+
+func TestHideInboxItemInjectsVerifiedAuthAndOverridesBody(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	authenticator, err := gatewayauth.NewAuthenticator(gatewayauth.Config{
+		Mode:     gatewayauth.ModeHMAC,
+		Secret:   "secret",
+		Audience: "push-gateway",
+		Now:      func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	token, err := gatewayauth.SignGatewayToken("secret", map[string]string{
+		"tenant_id":  "tenant-token",
+		"user_id":    "user-token",
+		"device_id":  "device-token",
+		"session_id": "session-token",
+	}, now.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("sign gateway token: %v", err)
+	}
+	fake := &fakeDeliveryClient{}
+	server := NewServer(Config{Authenticator: authenticator, Delivery: fake})
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		"authorization", "Bearer "+token,
+		metadataRequestID, "request-1",
+	))
+
+	_, err = server.HideInboxItem(ctx, &deliveryv1.HideInboxItemRequest{
+		AuthContext:     &deliveryv1.AuthContext{TenantId: "tenant-body", UserId: "user-body", DeviceId: "device-body"},
+		ConversationId:  "conv-1",
+		ConversationSeq: 9,
+		Reason:          "hide locally",
+	})
+	if err != nil {
+		t.Fatalf("hide inbox item: %v", err)
+	}
+	if fake.hideRequest.GetAuthContext().GetTenantId() != "tenant-token" ||
+		fake.hideRequest.GetAuthContext().GetUserId() != "user-token" ||
+		fake.hideRequest.GetAuthContext().GetDeviceId() != "device-token" ||
+		fake.hideRequest.GetAuthContext().GetSessionId() != "session-token" ||
+		fake.hideRequest.GetAuthContext().GetRequestId() != "request-1" {
+		t.Fatalf("expected body auth to be overwritten by token auth, got %+v", fake.hideRequest.GetAuthContext())
+	}
+	assertOutgoingMetadata(t, fake.ctx, map[string]string{
+		metadataTenantID:  "tenant-token",
+		metadataUserID:    "user-token",
+		metadataDeviceID:  "device-token",
+		metadataSessionID: "session-token",
 		metadataRequestID: "request-1",
 	})
 }
@@ -636,6 +689,30 @@ func (client *fakeMessageClient) RevokeMessage(context.Context, *messagev1.Revok
 
 func (client *fakeMessageClient) DeleteMessage(context.Context, *messagev1.DeleteMessageRequest, ...grpc.CallOption) (*messagev1.MessageChangeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+type fakeDeliveryClient struct {
+	ctx         context.Context
+	hideRequest *deliveryv1.HideInboxItemRequest
+}
+
+func (client *fakeDeliveryClient) PullInbox(context.Context, *deliveryv1.PullInboxRequest, ...grpc.CallOption) (*deliveryv1.PullInboxResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeDeliveryClient) AckDelivery(context.Context, *deliveryv1.AckDeliveryRequest, ...grpc.CallOption) (*deliveryv1.AckDeliveryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeDeliveryClient) HideInboxItem(ctx context.Context, in *deliveryv1.HideInboxItemRequest, opts ...grpc.CallOption) (*deliveryv1.HideInboxItemResponse, error) {
+	client.ctx = ctx
+	client.hideRequest = in
+	return &deliveryv1.HideInboxItemResponse{
+		TenantId:        in.GetAuthContext().GetTenantId(),
+		UserId:          in.GetAuthContext().GetUserId(),
+		ConversationId:  in.GetConversationId(),
+		ConversationSeq: in.GetConversationSeq(),
+	}, nil
 }
 
 type fakeIdentityClient struct {

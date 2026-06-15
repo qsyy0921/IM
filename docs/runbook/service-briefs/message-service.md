@@ -14,5 +14,5 @@
 
 ## 后续
 
-- 更多消息类型、私有删除、合规删除、容量和生产观测。
+- 更多消息类型、会话级删除策略深化、合规删除、容量和生产观测；用户私有隐藏已由 delivery-service `HideInboxItem` 承担。
 - OTel collector / alerting / dashboard 仍属于后续统一观测治理。

@@ -835,6 +835,84 @@ func TestRepositoryAckDeliveryConcurrentFirstAckIntegration(t *testing.T) {
 	assertDeliveryOutboxCount(t, ctx, pool, "delivery.ack.recorded.v1", 1)
 }
 
+func TestRepositoryHideInboxItemIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+	seedInbox(t, ctx, pool, 1)
+	seedInbox(t, ctx, pool, 2)
+	repository := NewRepository(pool)
+
+	hideCommand := types.HideInboxItemCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-delivery",
+			UserID:   "user-1",
+			DeviceID: "device-1",
+		},
+		ConversationID:  "conv-delivery",
+		ConversationSeq: 1,
+		Reason:          "hide locally",
+	}
+	result, err := repository.HideInboxItem(ctx, hideCommand)
+	if err != nil {
+		t.Fatalf("hide inbox item: %v", err)
+	}
+	if result.AlreadyHidden {
+		t.Fatalf("first hide should not be marked already hidden: %+v", result)
+	}
+
+	items, err := repository.PullInbox(ctx, types.PullInboxCommand{
+		AuthContext:    hideCommand.AuthContext,
+		ConversationID: hideCommand.ConversationID,
+		AfterSeq:       0,
+		Limit:          10,
+	}, 10)
+	if err != nil {
+		t.Fatalf("pull inbox after hide: %v", err)
+	}
+	if len(items) != 1 || items[0].ConversationSeq != 2 {
+		t.Fatalf("expected only seq 2 after hide, got %+v", items)
+	}
+
+	result, err = repository.HideInboxItem(ctx, hideCommand)
+	if err != nil {
+		t.Fatalf("repeat hide inbox item: %v", err)
+	}
+	if !result.AlreadyHidden {
+		t.Fatalf("repeat hide should be idempotent already_hidden: %+v", result)
+	}
+
+	ackResult, err := repository.AckDelivery(ctx, ackCommand(2))
+	if err != nil {
+		t.Fatalf("ack after hide: %v", err)
+	}
+	if ackResult.LastReceivedSeq != 2 {
+		t.Fatalf("expected ack cursor 2, got %d", ackResult.LastReceivedSeq)
+	}
+
+	missing := hideCommand
+	missing.ConversationSeq = 99
+	_, err = repository.HideInboxItem(ctx, missing)
+	if !errors.Is(err, types.ErrInboxItemNotFound) {
+		t.Fatalf("expected inbox item not found, got %v", err)
+	}
+
+	var hiddenByDeviceID, hideReason string
+	if err := pool.QueryRow(ctx, `
+SELECT hidden_by_device_id, hide_reason
+FROM user_inbox
+WHERE tenant_id = 'tenant-delivery'
+  AND user_id = 'user-1'
+  AND conversation_id = 'conv-delivery'
+  AND conversation_seq = 1
+`).Scan(&hiddenByDeviceID, &hideReason); err != nil {
+		t.Fatalf("read hidden metadata: %v", err)
+	}
+	if hiddenByDeviceID != "device-1" || hideReason != "hide locally" {
+		t.Fatalf("unexpected hidden metadata device=%q reason=%q", hiddenByDeviceID, hideReason)
+	}
+}
+
 func messageEvent(eventID string, messageID string, seq int64) types.ProjectTimelineEventCommand {
 	return types.ProjectTimelineEventCommand{
 		TenantID:          "tenant-delivery",

@@ -2,12 +2,14 @@ package types
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 )
 
 const (
 	DefaultPullLimit = 50
 	MaxPullLimit     = 500
+	MaxHideReasonLen = 512
 )
 
 type PullInboxCommand struct {
@@ -85,4 +87,35 @@ type AckDeliveryResult struct {
 	DeviceID        string
 	ConversationID  ConversationID
 	LastReceivedSeq int64
+}
+
+type HideInboxItemCommand struct {
+	AuthContext     AuthContext
+	ConversationID  ConversationID
+	ConversationSeq int64
+	Reason          string
+}
+
+func (command HideInboxItemCommand) Validate() error {
+	if err := command.AuthContext.Validate(); err != nil {
+		return err
+	}
+	if command.ConversationID == "" {
+		return NewInvalidArgument("conversation_id is required")
+	}
+	if command.ConversationSeq <= 0 {
+		return NewInvalidArgument("conversation_seq must be positive")
+	}
+	if len(strings.TrimSpace(command.Reason)) > MaxHideReasonLen {
+		return NewInvalidArgument("reason exceeds maximum")
+	}
+	return nil
+}
+
+type HideInboxItemResult struct {
+	TenantID        TenantID
+	UserID          UserID
+	ConversationID  ConversationID
+	ConversationSeq int64
+	AlreadyHidden   bool
 }

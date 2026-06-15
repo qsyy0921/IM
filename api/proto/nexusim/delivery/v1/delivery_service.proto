@@ -7,6 +7,7 @@ option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1;delive
 service DeliveryService {
   rpc PullInbox(PullInboxRequest) returns (PullInboxResponse);
   rpc AckDelivery(AckDeliveryRequest) returns (AckDeliveryResponse);
+  rpc HideInboxItem(HideInboxItemRequest) returns (HideInboxItemResponse);
 }
 
 message AuthContext {
@@ -54,4 +55,19 @@ message AckDeliveryResponse {
   string device_id = 3;
   string conversation_id = 4;
   int64 last_received_seq = 5;
+}
+
+message HideInboxItemRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  int64 conversation_seq = 3;
+  string reason = 4;
+}
+
+message HideInboxItemResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  string conversation_id = 3;
+  int64 conversation_seq = 4;
+  bool already_hidden = 5;
 }

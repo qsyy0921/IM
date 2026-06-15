@@ -12,7 +12,13 @@ param(
     [switch]$RequireURLTLS,
     [switch]$RequireURLClientCert,
     [switch]$AllowStale,
-    [switch]$AllowReloadErrors
+    [switch]$AllowReloadErrors,
+    [switch]$RequireNoRedisErrors,
+    [switch]$RequireNoIdentityErrors,
+    [int]$MinTenantPlans = 0,
+    [int]$MaxTrackedKeys = 0,
+    [string]$MaxReloadAge = "",
+    [int64]$NowUnixMS = 0
 )
 
 $ErrorActionPreference = "Stop"
@@ -52,7 +58,10 @@ function Get-BoolOrFalse {
 }
 
 function Convert-DurationToMilliseconds {
-    param([string]$Value)
+    param(
+        [string]$Value,
+        [string]$Name
+    )
 
     if ([string]::IsNullOrWhiteSpace($Value)) {
         return [int64]0
@@ -73,7 +82,7 @@ function Convert-DurationToMilliseconds {
     try {
         return [int64][TimeSpan]::Parse($trimmed).TotalMilliseconds
     } catch {
-        throw "MaxAllowedAge must be a duration like 24h, 7d, 30m or 00:30:00"
+        throw "$Name must be a duration like 24h, 7d, 30m or 00:30:00"
     }
 }
 
@@ -98,7 +107,17 @@ $maxAgeMS = Get-Int64OrZero $rateLimit.tenant_plan_max_age_ms
 $ageMS = Get-Int64OrZero $rateLimit.tenant_plan_age_ms
 $stale = Get-BoolOrFalse $rateLimit.tenant_plan_stale
 $reloadErrors = Get-Int64OrZero $rateLimit.tenant_plan_reload_error_count
-$requiredMaxAgeMS = Convert-DurationToMilliseconds $MaxAllowedAge
+$reloadAtMS = Get-Int64OrZero $rateLimit.tenant_plan_reloaded_at_unix_ms
+$tenantPlans = Get-Int64OrZero $rateLimit.tenant_plan_count
+$trackedKeys = Get-Int64OrZero $rateLimit.tracked_keys
+$redisErrors = Get-Int64OrZero $rateLimit.redis_error_count
+$identityErrors = Get-Int64OrZero $rateLimit.identity_error_count
+$requiredMaxAgeMS = Convert-DurationToMilliseconds -Value $MaxAllowedAge -Name "MaxAllowedAge"
+$requiredMaxReloadAgeMS = Convert-DurationToMilliseconds -Value $MaxReloadAge -Name "MaxReloadAge"
+$nowMS = $NowUnixMS
+if ($nowMS -le 0) {
+    $nowMS = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+}
 
 $failed = $false
 if ($RequireRateLimitEnabled -and -not $enabled) {
@@ -167,9 +186,45 @@ if ($reloadErrors -gt 0 -and -not $AllowReloadErrors) {
     $failed = $true
 }
 
+if ($RequireNoRedisErrors -and $redisErrors -gt 0) {
+    Write-Host "FAIL api-gateway rate-limit Redis errors observed: redis_error_count=$redisErrors." -ForegroundColor Red
+    $failed = $true
+}
+
+if ($RequireNoIdentityErrors -and $identityErrors -gt 0) {
+    Write-Host "FAIL api-gateway rate-limit tenant identity errors observed: identity_error_count=$identityErrors." -ForegroundColor Red
+    $failed = $true
+}
+
+if ($MinTenantPlans -gt 0 -and $tenantPlans -lt $MinTenantPlans) {
+    Write-Host "FAIL api-gateway tenant quota plan count is below minimum: min_tenant_plans=$MinTenantPlans actual_tenant_plans=$tenantPlans." -ForegroundColor Red
+    $failed = $true
+}
+
+if ($MaxTrackedKeys -gt 0 -and $trackedKeys -gt $MaxTrackedKeys) {
+    Write-Host "FAIL api-gateway rate-limit tracked key count is above maximum: max_tracked_keys=$MaxTrackedKeys actual_tracked_keys=$trackedKeys." -ForegroundColor Red
+    $failed = $true
+}
+
+if ($requiredMaxReloadAgeMS -gt 0) {
+    if ($reloadAtMS -le 0) {
+        Write-Host "FAIL api-gateway tenant quota snapshot has no successful reload timestamp; cannot prove max reload age." -ForegroundColor Red
+        $failed = $true
+    } else {
+        $reloadAgeMS = $nowMS - $reloadAtMS
+        if ($reloadAgeMS -lt 0) {
+            Write-Host "FAIL api-gateway tenant quota reload timestamp is from the future: reloaded_at_unix_ms=$reloadAtMS now_unix_ms=$nowMS." -ForegroundColor Red
+            $failed = $true
+        } elseif ($reloadAgeMS -gt $requiredMaxReloadAgeMS) {
+            Write-Host "FAIL api-gateway tenant quota reload is older than allowed: max_reload_age_ms=$requiredMaxReloadAgeMS actual_reload_age_ms=$reloadAgeMS reloaded_at_unix_ms=$reloadAtMS." -ForegroundColor Red
+            $failed = $true
+        }
+    }
+}
+
 if ($failed) {
     exit 1
 }
 
 Write-Host "OK   api-gateway tenant quota snapshot gate"
-Write-Host "     enabled=$enabled source=$source version=$version generated_at_unix_ms=$generatedAtMS checksum_present=$checksumPresent checksum_required=$checksumRequired url_require_https=$urlRequireHTTPS url_bearer_token_configured=$urlBearerTokenConfigured url_tls_configured=$urlTLSConfigured url_client_cert_configured=$urlClientCertConfigured max_age_ms=$maxAgeMS age_ms=$ageMS stale=$stale reload_errors=$reloadErrors"
+Write-Host "     enabled=$enabled source=$source version=$version generated_at_unix_ms=$generatedAtMS checksum_present=$checksumPresent checksum_required=$checksumRequired url_require_https=$urlRequireHTTPS url_bearer_token_configured=$urlBearerTokenConfigured url_tls_configured=$urlTLSConfigured url_client_cert_configured=$urlClientCertConfigured max_age_ms=$maxAgeMS age_ms=$ageMS stale=$stale reload_errors=$reloadErrors redis_errors=$redisErrors identity_errors=$identityErrors tenant_plans=$tenantPlans tracked_keys=$trackedKeys reloaded_at_unix_ms=$reloadAtMS now_unix_ms=$nowMS"

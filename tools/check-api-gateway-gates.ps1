@@ -36,10 +36,16 @@ New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
 try {
     $quotaGood = Join-Path $tempDir "quota-good.json"
     $quotaMissingClientCert = Join-Path $tempDir "quota-missing-client-cert.json"
+    $quotaRedisErrors = Join-Path $tempDir "quota-redis-errors.json"
+    $quotaIdentityErrors = Join-Path $tempDir "quota-identity-errors.json"
+    $quotaTooFewPlans = Join-Path $tempDir "quota-too-few-plans.json"
+    $quotaTooManyKeys = Join-Path $tempDir "quota-too-many-keys.json"
+    $quotaOldReload = Join-Path $tempDir "quota-old-reload.json"
     $quotaGoodJson = @'
 {
   "rate_limit": {
     "enabled": true,
+    "tenant_plan_count": 2,
     "tenant_plan_source": "url",
     "tenant_plan_version": "quota-v1.gate",
     "tenant_plan_generated_at_unix_ms": 4102444800000,
@@ -52,12 +58,21 @@ try {
     "tenant_plan_max_age_ms": 3600000,
     "tenant_plan_age_ms": 0,
     "tenant_plan_stale": false,
-    "tenant_plan_reload_error_count": 0
+    "tenant_plan_reload_error_count": 0,
+    "tenant_plan_reloaded_at_unix_ms": 1000000,
+    "redis_error_count": 0,
+    "identity_error_count": 0,
+    "tracked_keys": 42
   }
 }
 '@
     Write-JsonFile -Path $quotaGood -Content $quotaGoodJson
     Write-JsonFile -Path $quotaMissingClientCert -Content ($quotaGoodJson -replace '"tenant_plan_url_client_cert_configured": true', '"tenant_plan_url_client_cert_configured": false')
+    Write-JsonFile -Path $quotaRedisErrors -Content ($quotaGoodJson -replace '"redis_error_count": 0', '"redis_error_count": 1')
+    Write-JsonFile -Path $quotaIdentityErrors -Content ($quotaGoodJson -replace '"identity_error_count": 0', '"identity_error_count": 1')
+    Write-JsonFile -Path $quotaTooFewPlans -Content ($quotaGoodJson -replace '"tenant_plan_count": 2', '"tenant_plan_count": 0')
+    Write-JsonFile -Path $quotaTooManyKeys -Content ($quotaGoodJson -replace '"tracked_keys": 42', '"tracked_keys": 101')
+    Write-JsonFile -Path $quotaOldReload -Content ($quotaGoodJson -replace '"tenant_plan_reloaded_at_unix_ms": 1000000', '"tenant_plan_reloaded_at_unix_ms": 300000')
 
     $quotaStrongArgs = @(
         "-NoProfile",
@@ -72,10 +87,21 @@ try {
         "-RequireURLBearerToken",
         "-RequireURLTLS",
         "-RequireURLClientCert",
-        "-MaxAllowedAge", "1h"
+        "-MaxAllowedAge", "1h",
+        "-RequireNoRedisErrors",
+        "-RequireNoIdentityErrors",
+        "-MinTenantPlans", "1",
+        "-MaxTrackedKeys", "100",
+        "-MaxReloadAge", "10m",
+        "-NowUnixMS", "1005000"
     )
     Invoke-GateExpectPass -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaGood))
     Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaMissingClientCert))
+    Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaRedisErrors))
+    Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaIdentityErrors))
+    Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaTooFewPlans))
+    Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaTooManyKeys))
+    Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaOldReload))
 
     $legacyGood = Join-Path $tempDir "legacy-good.json"
     $legacyNoFacade = Join-Path $tempDir "legacy-no-facade.json"

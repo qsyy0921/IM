@@ -26,6 +26,9 @@ try {
     Write-Host "== service brief sync =="
     Invoke-LocalCheck "check-service-brief-sync.ps1"
 
+    Write-Host "== future service boundary =="
+    Invoke-LocalCheck "check-future-service-boundary.ps1"
+
     Write-Host "== runbook consistency =="
     Invoke-LocalCheck "check-runbook-consistency.ps1"
 

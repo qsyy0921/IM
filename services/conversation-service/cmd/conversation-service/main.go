@@ -37,12 +37,14 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_CONVERSATION_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("conversation-service runtime wiring is idle; set NEXUSIM_CONVERSATION_SERVICE_MODE=grpc or member-change-worker")
+		log.Println("conversation-service runtime wiring is idle; set NEXUSIM_CONVERSATION_SERVICE_MODE=grpc, member-change-worker, or member-change-audit")
 		return nil
 	case "grpc":
 		return runGRPCServer()
 	case "member-change-worker":
 		return runMemberChangeWorker()
+	case "member-change-audit":
+		return runMemberChangeAudit()
 	default:
 		return errors.New("unsupported NEXUSIM_CONVERSATION_SERVICE_MODE")
 	}
@@ -303,6 +305,55 @@ func runMemberChangeWorker() error {
 	return worker.Run(ctx)
 }
 
+func runMemberChangeAudit() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	rows, err := postgresinfra.NewRepository(pool).AuditMemberChanges(ctx, postgresinfra.MemberChangeAuditOptions{
+		ChangeID:       envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_CHANGE_ID", ""),
+		TenantID:       envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_TENANT_ID", ""),
+		ConversationID: envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_CONVERSATION_ID", ""),
+		Status:         envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_STATUS", ""),
+		OutboxEventID:  envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_OUTBOX_EVENT_ID", ""),
+		Limit:          envInt("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_LIMIT", 20),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("conversation-service member change audit completed rows=%d", len(rows))
+	for _, row := range rows {
+		log.Printf(
+			"member_change_saga change_id=%s tenant_id=%s conversation_id=%s target_user_id=%s operator_user_id=%s change_type=%s status=%s boundary_seq=%d timeline_event_id=%s outbox_event_id=%s retry_count=%d next_retry_at=%s dead_lettered_at=%s completed_at=%s last_error=%q",
+			row.ChangeID,
+			row.TenantID,
+			row.ConversationID,
+			row.TargetUserID,
+			row.OperatorUserID,
+			row.ChangeType,
+			row.Status,
+			row.BoundarySeq,
+			row.TimelineEventID,
+			row.OutboxEventID,
+			row.RetryCount,
+			formatOptionalTime(row.NextRetryAt),
+			formatOptionalTime(row.DeadLetteredAt),
+			formatOptionalTime(row.CompletedAt),
+			row.LastError,
+		)
+	}
+	return nil
+}
+
 func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {
 	if strings.TrimSpace(addr) == "" {
 		return func() {}, nil
@@ -524,6 +575,13 @@ func envInt(name string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func formatOptionalTime(value *time.Time) string {
+	if value == nil {
+		return ""
+	}
+	return value.Format(time.RFC3339)
 }
 
 func envDuration(name string, fallback time.Duration) time.Duration {

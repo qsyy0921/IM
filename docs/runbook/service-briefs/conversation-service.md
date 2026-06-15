@@ -12,9 +12,10 @@
 - `member-change-worker` 遇到非取消错误不再直接退出；当前会按 `error_backoff` 退避重试，且进度 batch size 会归一化到安全上限，避免 PostgreSQL 瞬时失败或误配置超大批次把 worker 打死。
 - worker 模式的 `/debug/metrics` 现已额外暴露 `member_change_worker` retry 快照，便于区分持续重试、最近成功和最近推进批次。
 - `MarkPublishedMemberChanges` 只接受同 tenant / conversation、`producer='conversation-service'` 且 event_type 属于 `conversation.member.*` 的已发布 outbox 行推进 saga，异常 outbox 行 fail-closed。
+- 已补 `member-change-audit` 只读 operator，可按 `change_id`、tenant、conversation、status、outbox event 过滤 `member_change_saga`，并对 `last_error` 使用稳定公开文案，避免泄露 SQL / Kafka / repair 内部错误文本。
 - 当 `NEXUSIM_CONVERSATION_AUTH_MODE=metadata|verified-metadata` 时，公网监听地址 + 无 gRPC mTLS client cert 的危险组合会在启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 
 ## 后续
 
-- 更完整群管理、owner transfer 策略、成员窗口历史 repair。
+- 更完整群管理、owner transfer 策略、成员窗口历史 repair / repair action。
 - OTel collector / 生产级 alerting / SLO dashboard 仍属于后续统一观测治理。

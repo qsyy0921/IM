@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-- 已有 `SendMessage`、`EditMessage`、`RevokeMessage`、`DeleteMessage` 主链路；`SendMessage` 支持 `TEXT` 以及第一阶段 `IMAGE` / `FILE` 附件引用消息。
+- 已有 `SendMessage`、`EditMessage`、`RevokeMessage`、`DeleteMessage` 主链路；`SendMessage` 支持 `TEXT`、第一阶段 `IMAGE` / `FILE` / `VOICE` 附件引用消息，以及 `LOCATION` / `CARD` 结构化 payload 消息。
 - 通过 outbox relay 发布 conversation timeline events，不在业务事务里直接 publish Kafka。
 - 已接 conversation-service / policy-service，可走 verified metadata、TLS / mTLS。
 - 已补 `/healthz`、`/readyz`、`/debug/metrics` 和 Prometheus text `/metrics`，可观察低敏 PG pool、send / repository / Kafka / outbox relay 聚合指标和固定 operation latency；debug HTTP 监听默认只允许 loopback / 私网，公网或未指定地址必须显式 `NEXUSIM_MESSAGE_DEBUG_ALLOW_PUBLIC=true`。
@@ -15,5 +15,5 @@
 
 ## 后续
 
-- 语音 / 位置 / 卡片等更多消息类型、会话级删除策略深化、合规删除、容量和生产观测；用户私有隐藏已由 delivery-service `HideInboxItem` 承担，图片 / 文件二进制上传和处理属于后续 media 能力。
+- 会话级删除策略深化、合规删除、容量和生产观测；用户私有隐藏已由 delivery-service `HideInboxItem` 承担，图片 / 文件 / 语音二进制上传和处理属于后续 media 能力。
 - 生产级 OTel collector、告警路由、retention 和 SLO dashboard 仍属于后续统一观测治理。

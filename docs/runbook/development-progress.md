@@ -114,7 +114,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 | --- | --- | --- | --- |
 | `api-gateway` | 已落地、已接主链路 | quota source guard、future snapshot timestamp fail-closed、legacy quiet-window gate、OTel / Prometheus 本地观测 | `service-briefs/api-gateway.md` |
 | `identity-service` | 已落地、已接登录主链路 | login / refresh / MFA / recovery code / JWKS / challenge delivery、SMTP template、repository helper 拆分 | `service-briefs/identity-service.md` |
-| `message-service` | 已落地、已接主链路 | `SendMessage` / 编辑 / 撤回 / 删除、`TEXT` + `IMAGE` / `FILE` 附件引用消息、outbox / Kafka timeline、first-stage `/metrics` 和 OTel server span | `service-briefs/message-service.md` |
+| `message-service` | 已落地、已接主链路 | `SendMessage` / 编辑 / 撤回 / 删除、`TEXT` + `IMAGE` / `FILE` / `VOICE` 附件引用消息、`LOCATION` / `CARD` 结构化 payload 消息、outbox / Kafka timeline、first-stage `/metrics` 和 OTel server span | `service-briefs/message-service.md` |
 | `conversation-service` | 已落地、已接主链路 | `GetSendContext` / member change / saga / audit operator、first-stage `/metrics` 和 OTel server span | `service-briefs/conversation-service.md` |
 | `delivery-service` | 已落地、已接主链路 | projection / `PullInbox` / `AckDelivery` / hide inbox / delivery outbox | `service-briefs/delivery-service.md` |
 | `push-gateway` | 已落地、已接主链路 | notify / ACK / resume / Redis route / Win-Mac / Sentinel / network-partition / TLS smoke | `service-briefs/push-gateway.md` |

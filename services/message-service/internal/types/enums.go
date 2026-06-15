@@ -3,14 +3,22 @@ package types
 type MessageType string
 
 const (
-	MessageTypeText  MessageType = "TEXT"
-	MessageTypeImage MessageType = "IMAGE"
-	MessageTypeFile  MessageType = "FILE"
+	MessageTypeText     MessageType = "TEXT"
+	MessageTypeImage    MessageType = "IMAGE"
+	MessageTypeFile     MessageType = "FILE"
+	MessageTypeVoice    MessageType = "VOICE"
+	MessageTypeLocation MessageType = "LOCATION"
+	MessageTypeCard     MessageType = "CARD"
 )
 
 func IsSupportedMessageType(messageType MessageType) bool {
 	switch messageType {
-	case MessageTypeText, MessageTypeImage, MessageTypeFile:
+	case MessageTypeText,
+		MessageTypeImage,
+		MessageTypeFile,
+		MessageTypeVoice,
+		MessageTypeLocation,
+		MessageTypeCard:
 		return true
 	default:
 		return false
@@ -19,7 +27,7 @@ func IsSupportedMessageType(messageType MessageType) bool {
 
 func MessageTypeRequiresAttachment(messageType MessageType) bool {
 	switch messageType {
-	case MessageTypeImage, MessageTypeFile:
+	case MessageTypeImage, MessageTypeFile, MessageTypeVoice:
 		return true
 	default:
 		return false

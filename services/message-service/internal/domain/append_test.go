@@ -98,41 +98,122 @@ func TestNewAppendMessageRecordBuildsPersistedEvent(t *testing.T) {
 }
 
 func TestNewAppendMessageRecordBuildsAttachmentMessageEvent(t *testing.T) {
-	command := testCommand()
-	command.MessageType = types.MessageTypeImage
-	command.PayloadJSON = []byte(`{"caption":"hello","height":480,"width":640}`)
-	command.AttachmentIDs = []string{"image-2", "image-1"}
-	input := AppendMessageInput{
-		Command: command,
-		Permission: types.PermissionDecision{
-			Allowed:           true,
-			PermissionVersion: 7,
-			Classification:    "INTERNAL",
+	for _, tc := range []struct {
+		name          string
+		messageType   types.MessageType
+		payloadJSON   []byte
+		attachmentIDs []string
+	}{
+		{
+			name:          "image",
+			messageType:   types.MessageTypeImage,
+			payloadJSON:   []byte(`{"caption":"hello","height":480,"width":640}`),
+			attachmentIDs: []string{"image-2", "image-1"},
 		},
-		Conversation: types.ConversationSendContext{
-			ConversationMode:    types.ConversationModeLocalRowLock,
-			FanoutMode:          types.FanoutModeWriteFanout,
-			FanoutPolicyVersion: 3,
+		{
+			name:          "voice",
+			messageType:   types.MessageTypeVoice,
+			payloadJSON:   []byte(`{"duration_ms":3200}`),
+			attachmentIDs: []string{"voice-2", "voice-1"},
 		},
-	}
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			command := testCommand()
+			command.MessageType = tc.messageType
+			command.PayloadJSON = tc.payloadJSON
+			command.AttachmentIDs = tc.attachmentIDs
+			input := AppendMessageInput{
+				Command: command,
+				Permission: types.PermissionDecision{
+					Allowed:           true,
+					PermissionVersion: 7,
+					Classification:    "INTERNAL",
+				},
+				Conversation: types.ConversationSendContext{
+					ConversationMode:    types.ConversationModeLocalRowLock,
+					FanoutMode:          types.FanoutModeWriteFanout,
+					FanoutPolicyVersion: 3,
+				},
+			}
 
-	record, err := NewAppendMessageRecord(input, "msg-image", "event-image", 11, input.Command.ReceivedAt)
-	if err != nil {
-		t.Fatalf("build image append record: %v", err)
+			record, err := NewAppendMessageRecord(input, types.MessageID("msg-"+tc.name), types.EventID("event-"+tc.name), 11, input.Command.ReceivedAt)
+			if err != nil {
+				t.Fatalf("build %s append record: %v", tc.messageType, err)
+			}
+			if record.Message.MessageType != tc.messageType {
+				t.Fatalf("unexpected message type: %s", record.Message.MessageType)
+			}
+			var payload map[string]any
+			if err := json.Unmarshal(record.Outbox.PayloadJSON, &payload); err != nil {
+				t.Fatalf("decode outbox payload: %v", err)
+			}
+			if payload["message_type"] != string(tc.messageType) {
+				t.Fatalf("unexpected event message type: %+v", payload)
+			}
+			attachments, ok := payload["attachment_ids"].([]any)
+			if !ok || len(attachments) != 2 || attachments[0] != tc.attachmentIDs[1] || attachments[1] != tc.attachmentIDs[0] {
+				t.Fatalf("unexpected sorted attachments: %+v", payload["attachment_ids"])
+			}
+		})
 	}
-	if record.Message.MessageType != types.MessageTypeImage {
-		t.Fatalf("unexpected message type: %s", record.Message.MessageType)
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(record.Outbox.PayloadJSON, &payload); err != nil {
-		t.Fatalf("decode outbox payload: %v", err)
-	}
-	if payload["message_type"] != string(types.MessageTypeImage) {
-		t.Fatalf("unexpected event message type: %+v", payload)
-	}
-	attachments, ok := payload["attachment_ids"].([]any)
-	if !ok || len(attachments) != 2 || attachments[0] != "image-1" || attachments[1] != "image-2" {
-		t.Fatalf("unexpected sorted attachments: %+v", payload["attachment_ids"])
+}
+
+func TestNewAppendMessageRecordBuildsPayloadOnlyMessageEvents(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		messageType types.MessageType
+		payloadJSON []byte
+	}{
+		{
+			name:        "location",
+			messageType: types.MessageTypeLocation,
+			payloadJSON: []byte(`{"label":"Shanghai","latitude":31.2304,"longitude":121.4737}`),
+		},
+		{
+			name:        "card",
+			messageType: types.MessageTypeCard,
+			payloadJSON: []byte(`{"card_type":"contact","user_id":"user-2"}`),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			command := testCommand()
+			command.MessageType = tc.messageType
+			command.PayloadJSON = tc.payloadJSON
+			input := AppendMessageInput{
+				Command: command,
+				Permission: types.PermissionDecision{
+					Allowed:           true,
+					PermissionVersion: 7,
+					Classification:    "INTERNAL",
+				},
+				Conversation: types.ConversationSendContext{
+					ConversationMode:    types.ConversationModeLocalRowLock,
+					FanoutMode:          types.FanoutModeWriteFanout,
+					FanoutPolicyVersion: 3,
+				},
+			}
+
+			record, err := NewAppendMessageRecord(input, types.MessageID("msg-"+tc.name), types.EventID("event-"+tc.name), 12, input.Command.ReceivedAt)
+			if err != nil {
+				t.Fatalf("build %s append record: %v", tc.messageType, err)
+			}
+			var payload map[string]any
+			if err := json.Unmarshal(record.Outbox.PayloadJSON, &payload); err != nil {
+				t.Fatalf("decode outbox payload: %v", err)
+			}
+			if payload["message_type"] != string(tc.messageType) {
+				t.Fatalf("unexpected event message type: %+v", payload)
+			}
+			if rawAttachments, ok := payload["attachment_ids"]; ok {
+				if rawAttachments == nil {
+					return
+				}
+				attachments, ok := rawAttachments.([]any)
+				if !ok || len(attachments) != 0 {
+					t.Fatalf("expected no attachments for %s, got %+v", tc.messageType, rawAttachments)
+				}
+			}
+		})
 	}
 }
 

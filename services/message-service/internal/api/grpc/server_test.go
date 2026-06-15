@@ -207,7 +207,7 @@ func TestSendMessageRejectsInvalidRequest(t *testing.T) {
 func TestSendMessageRejectsUnsupportedMessageType(t *testing.T) {
 	server := NewServer(&fakeSendMessageExecutor{})
 	request := testSendMessageRequest()
-	request.MessageType = "VOICE"
+	request.MessageType = "STICKER"
 
 	_, err := server.SendMessage(context.Background(), request)
 	assertStatusDetail(
@@ -245,10 +245,83 @@ func TestSendMessageAcceptsImageAttachmentMessage(t *testing.T) {
 	}
 }
 
+func TestSendMessageAcceptsVoiceAttachmentMessage(t *testing.T) {
+	executor := &fakeSendMessageExecutor{
+		result: types.SendMessageResult{
+			MessageID:       "msg-voice",
+			ConversationID:  "conv-1",
+			ConversationSeq: 12,
+			AcceptedAt:      time.Unix(100, 0).UTC(),
+		},
+	}
+	server := NewServer(executor)
+	request := testSendMessageRequest()
+	request.MessageType = string(types.MessageTypeVoice)
+	request.AttachmentIds = []string{"voice-1"}
+	request.Payload = mustStruct(map[string]any{"duration_ms": float64(3200)})
+
+	if _, err := server.SendMessage(context.Background(), request); err != nil {
+		t.Fatalf("send voice attachment message: %v", err)
+	}
+	if executor.command.MessageType != types.MessageTypeVoice ||
+		len(executor.command.AttachmentIDs) != 1 ||
+		executor.command.AttachmentIDs[0] != "voice-1" {
+		t.Fatalf("unexpected voice command: %+v", executor.command)
+	}
+}
+
+func TestSendMessageAcceptsLocationAndCardMessages(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		messageType types.MessageType
+		payload     map[string]any
+	}{
+		{
+			name:        "location",
+			messageType: types.MessageTypeLocation,
+			payload: map[string]any{
+				"latitude":  float64(31.2304),
+				"longitude": float64(121.4737),
+				"label":     "Shanghai",
+			},
+		},
+		{
+			name:        "card",
+			messageType: types.MessageTypeCard,
+			payload: map[string]any{
+				"card_type": "contact",
+				"user_id":   "user-2",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			executor := &fakeSendMessageExecutor{
+				result: types.SendMessageResult{
+					MessageID:       types.MessageID("msg-" + tc.name),
+					ConversationID:  "conv-1",
+					ConversationSeq: 13,
+					AcceptedAt:      time.Unix(100, 0).UTC(),
+				},
+			}
+			server := NewServer(executor)
+			request := testSendMessageRequest()
+			request.MessageType = string(tc.messageType)
+			request.Payload = mustStruct(tc.payload)
+
+			if _, err := server.SendMessage(context.Background(), request); err != nil {
+				t.Fatalf("send %s message: %v", tc.messageType, err)
+			}
+			if executor.command.MessageType != tc.messageType {
+				t.Fatalf("unexpected command: %+v", executor.command)
+			}
+		})
+	}
+}
+
 func TestSendMessageRejectsAttachmentMessageWithoutAttachments(t *testing.T) {
 	server := NewServer(&fakeSendMessageExecutor{})
 	request := testSendMessageRequest()
-	request.MessageType = string(types.MessageTypeFile)
+	request.MessageType = string(types.MessageTypeVoice)
 	request.AttachmentIds = nil
 
 	_, err := server.SendMessage(context.Background(), request)

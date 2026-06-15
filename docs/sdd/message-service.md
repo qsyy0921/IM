@@ -114,6 +114,9 @@ attachment_ids
 - `TEXT`：文本消息，payload 存放文本结构。
 - `IMAGE`：图片附件引用消息，`attachment_ids` 必须非空；图片上传、缩略图、审核和对象存储仍属于后续 `media-service`。
 - `FILE`：文件附件引用消息，`attachment_ids` 必须非空；文件上传、病毒扫描、下载授权和对象存储仍属于后续 `media-service`。
+- `VOICE`：语音附件引用消息，`attachment_ids` 必须非空；语音上传、转码、时长探测和对象存储仍属于后续 `media-service`。
+- `LOCATION`：位置结构化 payload 消息；地理编码、地图服务和位置隐私策略仍属于后续产品 / policy hardening。
+- `CARD`：卡片结构化 payload 消息；卡片目标实体的跨服务解析和展示由客户端 / 后续业务服务处理。
 
 Response：
 
@@ -131,6 +134,7 @@ accepted_at
 - 幂等键：`tenant_id + sender_id + device_id + client_msg_id`。
 - `client_msg_id` 是 device scoped globally unique UUID。同一 `tenant_id + sender_id + device_id` 下不能跨会话复用。
 - 附件型消息只保存附件引用和 payload 元数据，不在 message-service 内保存二进制内容。
+- `LOCATION` / `CARD` 第一阶段只保证消息事实、timeline 和 outbox 传播，不在 message-service 内反查外部实体。
 
 错误码：
 

@@ -7,24 +7,43 @@ import (
 )
 
 func TestSendMessageCommandValidationSupportsAttachmentMessages(t *testing.T) {
-	command := validSendMessageCommand()
-	command.MessageType = MessageTypeImage
-	command.AttachmentIDs = []string{"image-attachment-1"}
+	for _, tc := range []struct {
+		name          string
+		messageType   MessageType
+		attachmentIDs []string
+	}{
+		{name: "image", messageType: MessageTypeImage, attachmentIDs: []string{"image-attachment-1"}},
+		{name: "file", messageType: MessageTypeFile, attachmentIDs: []string{"file-attachment-1"}},
+		{name: "voice", messageType: MessageTypeVoice, attachmentIDs: []string{"voice-attachment-1"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			command := validSendMessageCommand()
+			command.MessageType = tc.messageType
+			command.AttachmentIDs = tc.attachmentIDs
 
-	if err := command.Validate(); err != nil {
-		t.Fatalf("validate image message: %v", err)
+			if err := command.Validate(); err != nil {
+				t.Fatalf("validate %s message: %v", tc.messageType, err)
+			}
+		})
 	}
+}
 
-	command.MessageType = MessageTypeFile
-	command.AttachmentIDs = []string{"file-attachment-1"}
-	if err := command.Validate(); err != nil {
-		t.Fatalf("validate file message: %v", err)
+func TestSendMessageCommandValidationSupportsPayloadOnlyMessages(t *testing.T) {
+	for _, messageType := range []MessageType{MessageTypeLocation, MessageTypeCard} {
+		t.Run(string(messageType), func(t *testing.T) {
+			command := validSendMessageCommand()
+			command.MessageType = messageType
+
+			if err := command.Validate(); err != nil {
+				t.Fatalf("validate %s message: %v", messageType, err)
+			}
+		})
 	}
 }
 
 func TestSendMessageCommandValidationRejectsUnsupportedMessageType(t *testing.T) {
 	command := validSendMessageCommand()
-	command.MessageType = "VOICE"
+	command.MessageType = "STICKER"
 
 	err := command.Validate()
 	if !errors.Is(err, ErrUnsupportedMessageType) {
@@ -33,13 +52,17 @@ func TestSendMessageCommandValidationRejectsUnsupportedMessageType(t *testing.T)
 }
 
 func TestSendMessageCommandValidationRequiresAttachmentForAttachmentMessages(t *testing.T) {
-	command := validSendMessageCommand()
-	command.MessageType = MessageTypeFile
-	command.AttachmentIDs = nil
+	for _, messageType := range []MessageType{MessageTypeImage, MessageTypeFile, MessageTypeVoice} {
+		t.Run(string(messageType), func(t *testing.T) {
+			command := validSendMessageCommand()
+			command.MessageType = messageType
+			command.AttachmentIDs = nil
 
-	err := command.Validate()
-	if err == nil || errors.Is(err, ErrUnsupportedMessageType) {
-		t.Fatalf("expected attachment validation error, got %v", err)
+			err := command.Validate()
+			if err == nil || errors.Is(err, ErrUnsupportedMessageType) {
+				t.Fatalf("expected attachment validation error, got %v", err)
+			}
+		})
 	}
 }
 

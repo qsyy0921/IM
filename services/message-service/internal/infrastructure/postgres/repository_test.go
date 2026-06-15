@@ -92,6 +92,55 @@ func TestMessageRepositoryAppendAttachmentMessageIntegration(t *testing.T) {
 	assertPersistedFacts(t, ctx, pool, input, result)
 }
 
+func TestMessageRepositoryAppendRichMessageTypesIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	runID := time.Now().UnixNano()
+	repo := NewMessageRepository(pool)
+	tenantID := types.TenantID(fmt.Sprintf("tenant-it-rich-%d", runID))
+	for _, tc := range []struct {
+		name          string
+		messageType   types.MessageType
+		payload       []byte
+		attachmentIDs []string
+	}{
+		{
+			name:          "voice",
+			messageType:   types.MessageTypeVoice,
+			payload:       []byte(`{"duration_ms":3200}`),
+			attachmentIDs: []string{"voice-2", "voice-1"},
+		},
+		{
+			name:        "location",
+			messageType: types.MessageTypeLocation,
+			payload:     []byte(`{"label":"Shanghai","latitude":31.2304,"longitude":121.4737}`),
+		},
+		{
+			name:        "card",
+			messageType: types.MessageTypeCard,
+			payload:     []byte(`{"card_type":"contact","user_id":"user-2"}`),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			input := testAppendInput(tenantID, types.ClientMsgID("client-"+tc.name), tc.payload)
+			input.Command.MessageType = tc.messageType
+			input.Command.AttachmentIDs = tc.attachmentIDs
+
+			result, err := repo.AppendMessage(ctx, input)
+			if err != nil {
+				t.Fatalf("append %s message: %v", tc.messageType, err)
+			}
+			if result.MessageID == "" || result.ConversationSeq <= 0 {
+				t.Fatalf("unexpected append result: %+v", result)
+			}
+			assertPersistedFacts(t, ctx, pool, input, result)
+		})
+	}
+}
+
 func TestMessageRepositoryGetMessagePolicyContextIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openIntegrationPool(t, ctx)

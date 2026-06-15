@@ -358,6 +358,67 @@ func TestRepositoryListConversationsFiltersUnreadOnlyIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryListConversationsFiltersPinnedAndMutedIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	sortTime := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	insertConversationSummary(t, ctx, pool, "conv-a", 11, sortTime)
+	insertConversationSummary(t, ctx, pool, "conv-b", 12, sortTime.Add(-time.Minute))
+	insertConversationSummary(t, ctx, pool, "conv-c", 13, sortTime.Add(-2*time.Minute))
+	insertConversationSummary(t, ctx, pool, "conv-d", 14, sortTime.Add(-3*time.Minute))
+
+	if _, err := repository.PinConversation(ctx, pinConversationCommand("conv-a", true)); err != nil {
+		t.Fatalf("pin conv-a: %v", err)
+	}
+	if _, err := repository.PinConversation(ctx, pinConversationCommand("conv-c", true)); err != nil {
+		t.Fatalf("pin conv-c: %v", err)
+	}
+	if _, err := repository.MuteConversation(ctx, muteConversationCommand("conv-c", true)); err != nil {
+		t.Fatalf("mute conv-c: %v", err)
+	}
+	if _, err := repository.MuteConversation(ctx, muteConversationCommand("conv-d", true)); err != nil {
+		t.Fatalf("mute conv-d: %v", err)
+	}
+
+	pinnedFirst, err := repository.ListConversations(ctx, listConversationsCommandPinnedOnly(1, ""))
+	if err != nil {
+		t.Fatalf("list first pinned page: %v", err)
+	}
+	assertConversationIDs(t, pinnedFirst, "conv-a")
+	if pinnedFirst.NextPageCursor == "" {
+		t.Fatal("expected pinned next cursor")
+	}
+	pinnedSecond, err := repository.ListConversations(ctx, listConversationsCommandPinnedOnly(1, pinnedFirst.NextPageCursor))
+	if err != nil {
+		t.Fatalf("list second pinned page: %v", err)
+	}
+	assertConversationIDs(t, pinnedSecond, "conv-c")
+	if pinnedSecond.NextPageCursor != "" {
+		t.Fatalf("expected empty pinned cursor on last page, got %q", pinnedSecond.NextPageCursor)
+	}
+	_, err = repository.ListConversations(ctx, listConversationsCommandMutedOnly(1, pinnedFirst.NextPageCursor))
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid cursor when pinned_only changes, got %v", err)
+	}
+
+	muted, err := repository.ListConversations(ctx, listConversationsCommandMutedOnly(10, ""))
+	if err != nil {
+		t.Fatalf("list muted conversations: %v", err)
+	}
+	assertConversationIDs(t, muted, "conv-c", "conv-d")
+
+	pinnedMuted := listConversationsCommandPinnedOnly(10, "")
+	pinnedMuted.MutedOnly = true
+	intersection, err := repository.ListConversations(ctx, pinnedMuted)
+	if err != nil {
+		t.Fatalf("list pinned and muted conversations: %v", err)
+	}
+	assertConversationIDs(t, intersection, "conv-c")
+}
+
 func TestRepositoryListConversationsRejectsInvalidCursorIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -701,6 +762,18 @@ func listConversationsCommandIncludingArchived(limit int, cursor string) types.L
 func listConversationsCommandUnreadOnly(limit int, cursor string) types.ListConversationsCommand {
 	command := listConversationsCommand(limit, cursor)
 	command.UnreadOnly = true
+	return command
+}
+
+func listConversationsCommandPinnedOnly(limit int, cursor string) types.ListConversationsCommand {
+	command := listConversationsCommand(limit, cursor)
+	command.PinnedOnly = true
+	return command
+}
+
+func listConversationsCommandMutedOnly(limit int, cursor string) types.ListConversationsCommand {
+	command := listConversationsCommand(limit, cursor)
+	command.MutedOnly = true
 	return command
 }
 

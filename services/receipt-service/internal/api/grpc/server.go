@@ -199,6 +199,8 @@ func (server *Server) ListConversations(
 		Sort:            conversationListSortFromProto(request.GetSort()),
 		IncludeArchived: request.GetIncludeArchived(),
 		UnreadOnly:      request.GetUnreadOnly(),
+		PinnedOnly:      request.GetPinnedOnly(),
+		MutedOnly:       request.GetMutedOnly(),
 	})
 	if err != nil {
 		return nil, grpcError(err)

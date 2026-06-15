@@ -734,6 +734,8 @@ type ListConversationsRequest struct {
 	Sort            ConversationListSort   `protobuf:"varint,4,opt,name=sort,proto3,enum=nexusim.receipt.v1.ConversationListSort" json:"sort,omitempty"`
 	IncludeArchived bool                   `protobuf:"varint,5,opt,name=include_archived,json=includeArchived,proto3" json:"include_archived,omitempty"`
 	UnreadOnly      bool                   `protobuf:"varint,6,opt,name=unread_only,json=unreadOnly,proto3" json:"unread_only,omitempty"`
+	PinnedOnly      bool                   `protobuf:"varint,7,opt,name=pinned_only,json=pinnedOnly,proto3" json:"pinned_only,omitempty"`
+	MutedOnly       bool                   `protobuf:"varint,8,opt,name=muted_only,json=mutedOnly,proto3" json:"muted_only,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -806,6 +808,20 @@ func (x *ListConversationsRequest) GetIncludeArchived() bool {
 func (x *ListConversationsRequest) GetUnreadOnly() bool {
 	if x != nil {
 		return x.UnreadOnly
+	}
+	return false
+}
+
+func (x *ListConversationsRequest) GetPinnedOnly() bool {
+	if x != nil {
+		return x.PinnedOnly
+	}
+	return false
+}
+
+func (x *ListConversationsRequest) GetMutedOnly() bool {
+	if x != nil {
+		return x.MutedOnly
 	}
 	return false
 }
@@ -1419,7 +1435,7 @@ const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12;\n" +
 	"\x05items\x18\x03 \x03(\v2%.nexusim.receipt.v1.ReceiptStateQueryR\x05items\"^\n" +
 	"\x19ListReceiptStatesResponse\x12A\n" +
-	"\x05items\x18\x01 \x03(\v2+.nexusim.receipt.v1.GetReceiptStateResponseR\x05items\"\x9f\x02\n" +
+	"\x05items\x18\x01 \x03(\v2+.nexusim.receipt.v1.GetReceiptStateResponseR\x05items\"\xdf\x02\n" +
 	"\x18ListConversationsRequest\x12B\n" +
 	"\fauth_context\x18\x01 \x01(\v2\x1f.nexusim.receipt.v1.AuthContextR\vauthContext\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x1f\n" +
@@ -1428,7 +1444,11 @@ const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
 	"\x04sort\x18\x04 \x01(\x0e2(.nexusim.receipt.v1.ConversationListSortR\x04sort\x12)\n" +
 	"\x10include_archived\x18\x05 \x01(\bR\x0fincludeArchived\x12\x1f\n" +
 	"\vunread_only\x18\x06 \x01(\bR\n" +
-	"unreadOnly\"}\n" +
+	"unreadOnly\x12\x1f\n" +
+	"\vpinned_only\x18\a \x01(\bR\n" +
+	"pinnedOnly\x12\x1d\n" +
+	"\n" +
+	"muted_only\x18\b \x01(\bR\tmutedOnly\"}\n" +
 	"\x13ProjectionWatermark\x12\x16\n" +
 	"\x06source\x18\x01 \x01(\tR\x06source\x12!\n" +
 	"\foffset_value\x18\x02 \x01(\x03R\voffsetValue\x12+\n" +

@@ -139,6 +139,8 @@ type ListConversationsCommand struct {
 	Sort            string
 	IncludeArchived bool
 	UnreadOnly      bool
+	PinnedOnly      bool
+	MutedOnly       bool
 }
 
 func (command ListConversationsCommand) Validate() error {

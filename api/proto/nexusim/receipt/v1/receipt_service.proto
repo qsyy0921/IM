@@ -96,6 +96,8 @@ message ListConversationsRequest {
   ConversationListSort sort = 4;
   bool include_archived = 5;
   bool unread_only = 6;
+  bool pinned_only = 7;
+  bool muted_only = 8;
 }
 
 message ProjectionWatermark {

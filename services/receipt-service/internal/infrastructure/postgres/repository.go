@@ -410,12 +410,20 @@ func (repository *Repository) ListConversations(
 	if limit > 100 {
 		limit = 100
 	}
-	cursor, hasCursor, err := decodeListCursor(command.PageCursor, sort, command.IncludeArchived, command.UnreadOnly)
+	cursor, hasCursor, err := decodeListCursor(command.PageCursor, sort, command.IncludeArchived, command.UnreadOnly, command.PinnedOnly, command.MutedOnly)
 	if err != nil {
 		return types.ListConversationsResult{}, err
 	}
 
-	args := []any{command.AuthContext.TenantID, command.AuthContext.UserID, limit + 1, command.IncludeArchived, command.UnreadOnly}
+	args := []any{
+		command.AuthContext.TenantID,
+		command.AuthContext.UserID,
+		limit + 1,
+		command.IncludeArchived,
+		command.UnreadOnly,
+		command.PinnedOnly,
+		command.MutedOnly,
+	}
 	query := `
 SELECT
     conversation_id,
@@ -434,20 +442,22 @@ WHERE tenant_id = $1
   AND user_id = $2
   AND ($4 OR archived = FALSE)
   AND (NOT $5 OR unread_count > 0)
+  AND (NOT $6 OR pinned = TRUE)
+  AND (NOT $7 OR muted = TRUE)
 `
 	if hasCursor {
 		if sort == types.ConversationListSortPinnedUpdatedAtDesc {
 			query += `  AND (
-      pinned < $6
-      OR (pinned = $6 AND sort_updated_at < $7)
-      OR (pinned = $6 AND sort_updated_at = $7 AND conversation_id > $8)
+      pinned < $8
+      OR (pinned = $8 AND sort_updated_at < $9)
+      OR (pinned = $8 AND sort_updated_at = $9 AND conversation_id > $10)
   )
 `
 			args = append(args, cursor.Pinned, cursor.SortUpdatedAt, cursor.ConversationID)
 		} else {
 			query += `  AND (
-      sort_updated_at < $6
-      OR (sort_updated_at = $6 AND conversation_id > $7)
+      sort_updated_at < $8
+      OR (sort_updated_at = $8 AND conversation_id > $9)
   )
 `
 			args = append(args, cursor.SortUpdatedAt, cursor.ConversationID)
@@ -501,6 +511,8 @@ LIMIT $3
 			Sort:            sort,
 			IncludeArchived: command.IncludeArchived,
 			UnreadOnly:      command.UnreadOnly,
+			PinnedOnly:      command.PinnedOnly,
+			MutedOnly:       command.MutedOnly,
 			Pinned:          last.Pinned,
 			SortUpdatedAt:   last.UpdatedAt,
 			ConversationID:  string(last.ConversationID),
@@ -711,14 +723,23 @@ type listCursor struct {
 	Sort            string    `json:"sort"`
 	IncludeArchived bool      `json:"include_archived"`
 	UnreadOnly      bool      `json:"unread_only"`
+	PinnedOnly      bool      `json:"pinned_only"`
+	MutedOnly       bool      `json:"muted_only"`
 	Pinned          bool      `json:"pinned"`
 	SortUpdatedAt   time.Time `json:"sort_updated_at"`
 	ConversationID  string    `json:"conversation_id"`
 }
 
-const listCursorVersion = 2
+const listCursorVersion = 3
 
-func decodeListCursor(value string, sort string, includeArchived bool, unreadOnly bool) (listCursor, bool, error) {
+func decodeListCursor(
+	value string,
+	sort string,
+	includeArchived bool,
+	unreadOnly bool,
+	pinnedOnly bool,
+	mutedOnly bool,
+) (listCursor, bool, error) {
 	if value == "" {
 		return listCursor{}, false, nil
 	}
@@ -737,7 +758,9 @@ func decodeListCursor(value string, sort string, includeArchived bool, unreadOnl
 	if cursor.Version != listCursorVersion ||
 		cursor.Sort != sort ||
 		cursor.IncludeArchived != includeArchived ||
-		cursor.UnreadOnly != unreadOnly {
+		cursor.UnreadOnly != unreadOnly ||
+		cursor.PinnedOnly != pinnedOnly ||
+		cursor.MutedOnly != mutedOnly {
 		return listCursor{}, false, types.NewInvalidArgument("invalid page_cursor")
 	}
 	if cursor.SortUpdatedAt.IsZero() || cursor.ConversationID == "" {

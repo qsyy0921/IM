@@ -188,6 +188,8 @@ func TestListConversationsMapsSort(t *testing.T) {
 		PageCursor:  "cursor-1",
 		Sort:        receiptv1.ConversationListSort_CONVERSATION_LIST_SORT_UPDATED_AT_DESC,
 		UnreadOnly:  true,
+		PinnedOnly:  true,
+		MutedOnly:   true,
 	})
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
@@ -195,7 +197,9 @@ func TestListConversationsMapsSort(t *testing.T) {
 	if list.command.Sort != types.ConversationListSortUpdatedAtDesc ||
 		list.command.Limit != 20 ||
 		list.command.PageCursor != "cursor-1" ||
-		!list.command.UnreadOnly {
+		!list.command.UnreadOnly ||
+		!list.command.PinnedOnly ||
+		!list.command.MutedOnly {
 		t.Fatalf("unexpected list command: %+v", list.command)
 	}
 }

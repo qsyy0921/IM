@@ -1,0 +1,370 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "sum by (method) (rate(nexusim_policy_grpc_method_requests_total[5m]))",
+          "legendFormat": "{{method}}"
+        },
+        {
+          "expr": "sum by (method) (rate(nexusim_policy_grpc_method_errors_total[5m]))",
+          "legendFormat": "{{method}} errors"
+        }
+      ],
+      "title": "gRPC requests and errors",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "nexusim_policy_grpc_latency_avg_milliseconds",
+          "legendFormat": "{{method}} avg"
+        },
+        {
+          "expr": "nexusim_policy_grpc_latency_max_milliseconds",
+          "legendFormat": "{{method}} max"
+        }
+      ],
+      "title": "gRPC latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "nexusim_policy_decisions_total",
+          "legendFormat": "{{outcome}}"
+        },
+        {
+          "expr": "nexusim_policy_decision_action_total",
+          "legendFormat": "{{action}} {{outcome}}"
+        }
+      ],
+      "title": "Policy decisions",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 4,
+      "targets": [
+        {
+          "expr": "nexusim_policy_decision_latency_avg_milliseconds",
+          "legendFormat": "{{action}} avg"
+        },
+        {
+          "expr": "nexusim_policy_decision_latency_max_milliseconds",
+          "legendFormat": "{{action}} max"
+        }
+      ],
+      "title": "Decision latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "targets": [
+        {
+          "expr": "nexusim_policy_rules",
+          "legendFormat": "{{scope}} {{decision}}"
+        },
+        {
+          "expr": "nexusim_policy_rule_actions",
+          "legendFormat": "{{scope}} {{action}} {{decision}}"
+        },
+        {
+          "expr": "nexusim_policy_role_rules",
+          "legendFormat": "{{scope}}"
+        },
+        {
+          "expr": "nexusim_policy_role_rule_actions",
+          "legendFormat": "{{scope}} {{action}} {{min_role}}"
+        }
+      ],
+      "title": "Rule store",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 6,
+      "targets": [
+        {
+          "expr": "nexusim_policy_contact_edges_projection",
+          "legendFormat": "contacts {{state}}"
+        },
+        {
+          "expr": "nexusim_policy_conversation_members_projection",
+          "legendFormat": "members {{state}}"
+        },
+        {
+          "expr": "nexusim_policy_conversation_members_by_role",
+          "legendFormat": "role {{role}}"
+        },
+        {
+          "expr": "nexusim_policy_conversation_members_by_status",
+          "legendFormat": "status {{status}}"
+        },
+        {
+          "expr": "nexusim_policy_conversation_members_by_role_status",
+          "legendFormat": "{{role}} {{status}}"
+        }
+      ],
+      "title": "Projection read model",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "id": 7,
+      "targets": [
+        {
+          "expr": "nexusim_policy_kafka_checkpoints",
+          "legendFormat": "{{topic}} {{state}}"
+        },
+        {
+          "expr": "nexusim_policy_kafka_checkpoint_topic_offsets",
+          "legendFormat": "{{topic}} {{bound}}"
+        },
+        {
+          "expr": "nexusim_policy_audit_outbox",
+          "legendFormat": "audit {{state}}"
+        }
+      ],
+      "title": "Checkpoints and audit outbox",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "id": 8,
+      "targets": [
+        {
+          "expr": "nexusim_policy_projection_worker_errors_total",
+          "legendFormat": "{{worker}} errors"
+        },
+        {
+          "expr": "nexusim_policy_projection_worker_consecutive_errors",
+          "legendFormat": "{{worker}} consecutive"
+        },
+        {
+          "expr": "nexusim_policy_outbox_relay_errors_total",
+          "legendFormat": "relay errors"
+        },
+        {
+          "expr": "nexusim_policy_outbox_relay_consecutive_errors",
+          "legendFormat": "relay consecutive"
+        }
+      ],
+      "title": "Worker errors",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "id": 9,
+      "targets": [
+        {
+          "expr": "nexusim_policy_pg_pool_conns",
+          "legendFormat": "{{state}}"
+        },
+        {
+          "expr": "nexusim_policy_pg_pool_canceled_acquire_total",
+          "legendFormat": "canceled acquire"
+        }
+      ],
+      "title": "PostgreSQL pool",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "id": 10,
+      "targets": [
+        {
+          "expr": "nexusim_policy_otel_traces_enabled",
+          "legendFormat": "{{exporter}} enabled"
+        }
+      ],
+      "title": "Tracing",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "nexusim",
+    "policy-service",
+    "local"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "NexusIM Policy Service",
+  "uid": "nexusim-policy-service",
+  "version": 1,
+  "weekStart": ""
+}

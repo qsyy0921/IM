@@ -4,7 +4,7 @@
 
 ## Debug Metrics / Prometheus Text
 
-各服务的 `/debug/metrics` 仍是本地 JSON 快照入口。api-gateway、identity-service、message-service、conversation-service、delivery-service、push-gateway、receipt-service 和 contacts-service 额外提供第一阶段 Prometheus text endpoint：
+各服务的 `/debug/metrics` 仍是本地 JSON 快照入口。当前 9 个服务额外提供第一阶段 Prometheus text endpoint：
 
 ```text
 GET http://<NEXUSIM_API_GATEWAY_DEBUG_ADDR>/metrics
@@ -15,15 +15,16 @@ GET http://<NEXUSIM_DELIVERY_DEBUG_ADDR>/metrics
 GET http://<NEXUSIM_PUSH_DEBUG_ADDR>/metrics
 GET http://<NEXUSIM_RECEIPT_DEBUG_ADDR>/metrics
 GET http://<NEXUSIM_CONTACTS_DEBUG_ADDR>/metrics
+GET http://<NEXUSIM_POLICY_DEBUG_ADDR>/metrics
 ```
 
-`/metrics` 复用 `/debug/metrics` 的低敏 snapshot。api-gateway 当前覆盖 gRPC request / error / latency、facade / legacy descriptor / other request exposure、legacy descriptor last-seen、auth JWK、rate-limit、runtime 和 OTel trace config 聚合指标；identity-service 当前覆盖 gRPC request / error / latency、identity 风险聚合、challenge delivery outbox、challenge delivery debug、worker retry 和 OTel trace config 聚合指标；message-service 当前覆盖 SendMessage / repository / Kafka / outbox relay fixed-operation latency、batch shape、PG pool、outbox relay retry 和 OTel trace config 聚合指标；conversation-service 当前覆盖 gRPC request / error / latency、conversation / member / member-change saga 聚合、member-change worker retry、PG pool 和 OTel trace config 聚合指标；delivery-service 当前覆盖 gRPC request / error / latency、durable inbox read model、membership projection、delivery outbox、projection failure blocker、timeline worker、outbox relay、PG pool 和 OTel trace config 聚合指标；push-gateway 当前覆盖 WebSocket session、slow eviction、in-memory / Redis resume、Redis route / subscriber、delivery / identity consumer worker、auth JWKS 和 OTel trace config 聚合指标；receipt-service 当前覆盖 gRPC request / error / latency、receipt projection、conversation summary、receipt outbox、delivery projection worker、outbox relay、PG pool 和 OTel trace config 聚合指标；contacts-service 当前覆盖 gRPC request / error / latency、contact request / edge 聚合、contacts outbox、outbox relay、PG pool 和 OTel trace config 聚合指标。labels 只允许 method、code、exposure、backend、key_scope、tenant_plan_source、status、failure_class、mode、outcome、operation、state、role、type、class、consumer、event、exporter 等低基数字段；不得输出 token、tenant_id、user_id、device_id、session_id、request_id、trace_id、conversation_id、message_id、event_id、challenge destination、target user、remark、message body、command hash 或 payload。
+`/metrics` 复用 `/debug/metrics` 的低敏 snapshot。api-gateway 当前覆盖 gRPC request / error / latency、facade / legacy descriptor / other request exposure、legacy descriptor last-seen、auth JWK、rate-limit、runtime 和 OTel trace config 聚合指标；identity-service 当前覆盖 gRPC request / error / latency、identity 风险聚合、challenge delivery outbox、challenge delivery debug、worker retry 和 OTel trace config 聚合指标；message-service 当前覆盖 SendMessage / repository / Kafka / outbox relay fixed-operation latency、batch shape、PG pool、outbox relay retry 和 OTel trace config 聚合指标；conversation-service 当前覆盖 gRPC request / error / latency、conversation / member / member-change saga 聚合、member-change worker retry、PG pool 和 OTel trace config 聚合指标；delivery-service 当前覆盖 gRPC request / error / latency、durable inbox read model、membership projection、delivery outbox、projection failure blocker、timeline worker、outbox relay、PG pool 和 OTel trace config 聚合指标；push-gateway 当前覆盖 WebSocket session、slow eviction、in-memory / Redis resume、Redis route / subscriber、delivery / identity consumer worker、auth JWKS 和 OTel trace config 聚合指标；receipt-service 当前覆盖 gRPC request / error / latency、receipt projection、conversation summary、receipt outbox、delivery projection worker、outbox relay、PG pool 和 OTel trace config 聚合指标；contacts-service 当前覆盖 gRPC request / error / latency、contact request / edge 聚合、contacts outbox、outbox relay、PG pool 和 OTel trace config 聚合指标；policy-service 当前覆盖 gRPC request / error / latency、policy decision、rule store、contacts / conversation projection、Kafka checkpoint、audit outbox、projection worker、outbox relay、PG pool 和 OTel trace config 聚合指标。labels 只允许 method、code、exposure、backend、key_scope、tenant_plan_source、status、failure_class、mode、outcome、operation、state、role、type、class、consumer、event、exporter、scope、action、min_role、worker、topic、bound 等低基数字段；不得输出 token、tenant_id、user_id、device_id、session_id、request_id、trace_id、conversation_id、message_id、event_id、challenge destination、target user、remark、message body、command hash 或 payload。
 
 这个 endpoint 只用于本地 scrape / dashboard 原型，不代表生产 Prometheus、Alertmanager、指标保留策略或 SLO 告警已经完成。
 
 ## Local Prometheus
 
-api-gateway / identity-service / message-service / conversation-service / delivery-service / push-gateway / receipt-service / contacts-service `/metrics` 的本地 scrape / alert rule 原型位于：
+当前 9 个服务 `/metrics` 的本地 scrape / alert rule 原型位于：
 
 ```text
 deploy/local/docker-compose.prometheus.yml
@@ -36,6 +37,7 @@ deploy/local/prometheus-delivery-service-alerts.yml
 deploy/local/prometheus-push-gateway-alerts.yml
 deploy/local/prometheus-receipt-service-alerts.yml
 deploy/local/prometheus-contacts-service-alerts.yml
+deploy/local/prometheus-policy-service-alerts.yml
 ```
 
 启动：
@@ -62,9 +64,10 @@ delivery-service scrape target from container: host.docker.internal:11912
 push-gateway scrape target from container: host.docker.internal:11913
 receipt-service scrape target from container: host.docker.internal:11914
 contacts-service scrape target from container: host.docker.internal:11915
+policy-service scrape target from container: host.docker.internal:11916
 ```
 
-当前 first-stage alert rules 覆盖 api-gateway、identity-service、message-service、conversation-service、delivery-service、push-gateway、receipt-service 和 contacts-service。api-gateway 规则包含 gRPC errors、legacy descriptor traffic、rate-limit Redis errors、JWKS refresh failures、OTLP endpoint missing；identity-service 规则包含 gRPC errors、password / MFA / recovery-code lock、challenge delivery failure、challenge delivery outbox DLQ / expired pending rows、worker / relay runtime errors、OTLP endpoint missing；message-service 规则包含 SendMessage / PG pool / Kafka latency、outbox relay runtime error 和 OTLP endpoint missing；conversation-service 规则包含 gRPC errors、metrics query error、member-change failed compensated、worker retry、PG pool canceled acquire 和 OTLP endpoint missing；delivery-service 规则包含 gRPC errors、metrics query error、delivery outbox DLQ / ready pending rows、projection failure blocker、timeline worker retry、outbox relay retry、PG pool canceled acquire 和 OTLP endpoint missing；push-gateway 规则包含 slow session eviction、Redis route / subscriber errors、consumer worker retry、JWKS refresh failure 和 OTLP endpoint missing；receipt-service 规则包含 gRPC errors、metrics query error、receipt outbox DLQ / ready pending rows、delivery projection worker retry、outbox relay retry、PG pool canceled acquire 和 OTLP endpoint missing；contacts-service 规则包含 gRPC errors、metrics query error、contacts outbox DLQ / ready pending rows、outbox relay retry、PG pool canceled acquire、long-lived pending requests 和 OTLP endpoint missing。它们用于本地开发和面试演示，不是生产 SLO 阈值；生产化前还需要 Alertmanager route、retention、dashboard、sampling / label governance 和容量验证。
+当前 first-stage alert rules 覆盖 api-gateway、identity-service、message-service、conversation-service、delivery-service、push-gateway、receipt-service、contacts-service 和 policy-service。api-gateway 规则包含 gRPC errors、legacy descriptor traffic、rate-limit Redis errors、JWKS refresh failures、OTLP endpoint missing；identity-service 规则包含 gRPC errors、password / MFA / recovery-code lock、challenge delivery failure、challenge delivery outbox DLQ / expired pending rows、worker / relay runtime errors、OTLP endpoint missing；message-service 规则包含 SendMessage / PG pool / Kafka latency、outbox relay runtime error 和 OTLP endpoint missing；conversation-service 规则包含 gRPC errors、metrics query error、member-change failed compensated、worker retry、PG pool canceled acquire 和 OTLP endpoint missing；delivery-service 规则包含 gRPC errors、metrics query error、delivery outbox DLQ / ready pending rows、projection failure blocker、timeline worker retry、outbox relay retry、PG pool canceled acquire 和 OTLP endpoint missing；push-gateway 规则包含 slow session eviction、Redis route / subscriber errors、consumer worker retry、JWKS refresh failure 和 OTLP endpoint missing；receipt-service 规则包含 gRPC errors、metrics query error、receipt outbox DLQ / ready pending rows、delivery projection worker retry、outbox relay retry、PG pool canceled acquire 和 OTLP endpoint missing；contacts-service 规则包含 gRPC errors、metrics query error、contacts outbox DLQ / ready pending rows、outbox relay retry、PG pool canceled acquire、long-lived pending requests 和 OTLP endpoint missing；policy-service 规则包含 gRPC / decision errors、rule / projection / audit metrics query error、audit outbox DLQ / pending、projection worker retry、outbox relay retry、PG pool canceled acquire 和 OTLP endpoint missing。它们用于本地开发和面试演示，不是生产 SLO 阈值；生产化前还需要 Alertmanager route、retention、dashboard、sampling / label governance 和容量验证。
 
 注意：启动脚本不会预检镜像是否已存在；如果本机没有 `NEXUSIM_PROMETHEUS_IMAGE` 指定的镜像或默认 `prom/prometheus:v2.54.1`，Docker 会按自身配置尝试拉取镜像。
 
@@ -126,7 +129,7 @@ grpc.legacy_descriptor_last_seen_unix_ms = 0
 
 ## Local Grafana
 
-api-gateway / identity-service / message-service / conversation-service / delivery-service / push-gateway / receipt-service / contacts-service 的第一阶段 Grafana dashboard provisioning 位于：
+当前 9 个服务的第一阶段 Grafana dashboard provisioning 位于：
 
 ```text
 deploy/local/docker-compose.grafana.yml
@@ -140,6 +143,7 @@ deploy/local/grafana/dashboards/delivery-service-observability.json
 deploy/local/grafana/dashboards/push-gateway-observability.json
 deploy/local/grafana/dashboards/receipt-service-observability.json
 deploy/local/grafana/dashboards/contacts-service-observability.json
+deploy/local/grafana/dashboards/policy-service-observability.json
 ```
 
 启动：
@@ -162,7 +166,7 @@ login:      admin / nexusim
 datasource: http://host.docker.internal:19090
 ```
 
-当前 dashboard 覆盖 api-gateway、identity-service、message-service、conversation-service、delivery-service、push-gateway、receipt-service 和 contacts-service 的本地 Prometheus 指标。api-gateway 面板包含 request rate、error rate、facade / legacy descriptor / other exposure、legacy descriptor last-seen、latency、rate-limit decisions、JWKS refresh failures 和 OTel enabled；identity-service 面板包含 request / error / latency、login / MFA lock、challenge delivery outcomes、challenge outbox status、worker runtime errors、failure class 和 OTel enabled；message-service 面板包含 SendMessage p95、PG pool acquire p95、Kafka publish p95、repository / outbox latency、batch shape、PG pool conns、outbox relay error 和 OTel enabled；conversation-service 面板包含 gRPC errors / latency、conversation/member/member-change saga 聚合、member-change worker retry、PG pool conns 和 OTel enabled；delivery-service 面板包含 gRPC errors / latency、durable read model、delivery outbox、projection blockers、worker / relay retry、PG pool conns 和 OTel enabled；push-gateway 面板包含 connected sessions、slow eviction、resume buffer、Redis route / resume、worker retry、JWKS cache 和 OTel enabled；receipt-service 面板包含 gRPC errors / latency、receipt projection、conversation summary、receipt outbox、worker / relay retry、PG pool conns 和 OTel enabled；contacts-service 面板包含 gRPC errors / latency、contact requests、contact edges、contacts outbox、relay retry、PG pool conns 和 OTel enabled。它用于本地开发和面试演示，不是生产 Grafana 部署；生产化前还需要权限、datasource secret 管理、retention、SLO 阈值和告警路由。
+当前 dashboard 覆盖 api-gateway、identity-service、message-service、conversation-service、delivery-service、push-gateway、receipt-service、contacts-service 和 policy-service 的本地 Prometheus 指标。api-gateway 面板包含 request rate、error rate、facade / legacy descriptor / other exposure、legacy descriptor last-seen、latency、rate-limit decisions、JWKS refresh failures 和 OTel enabled；identity-service 面板包含 request / error / latency、login / MFA lock、challenge delivery outcomes、challenge outbox status、worker runtime errors、failure class 和 OTel enabled；message-service 面板包含 SendMessage p95、PG pool acquire p95、Kafka publish p95、repository / outbox latency、batch shape、PG pool conns、outbox relay error 和 OTel enabled；conversation-service 面板包含 gRPC errors / latency、conversation/member/member-change saga 聚合、member-change worker retry、PG pool conns 和 OTel enabled；delivery-service 面板包含 gRPC errors / latency、durable read model、delivery outbox、projection blockers、worker / relay retry、PG pool conns 和 OTel enabled；push-gateway 面板包含 connected sessions、slow eviction、resume buffer、Redis route / resume、worker retry、JWKS cache 和 OTel enabled；receipt-service 面板包含 gRPC errors / latency、receipt projection、conversation summary、receipt outbox、worker / relay retry、PG pool conns 和 OTel enabled；contacts-service 面板包含 gRPC errors / latency、contact requests、contact edges、contacts outbox、relay retry、PG pool conns 和 OTel enabled；policy-service 面板包含 gRPC errors / latency、policy decisions、rule store、projection read model、Kafka checkpoints、audit outbox、worker / relay retry、PG pool conns 和 OTel enabled。它用于本地开发和面试演示，不是生产 Grafana 部署；生产化前还需要权限、datasource secret 管理、retention、SLO 阈值和告警路由。
 
 注意：启动脚本不会预检镜像是否已存在；如果本机没有 `NEXUSIM_GRAFANA_IMAGE` 指定的镜像或默认 `grafana/grafana-oss:11.2.0`，Docker 会按自身配置尝试拉取镜像。
 

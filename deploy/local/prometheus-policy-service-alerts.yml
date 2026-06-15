@@ -1,0 +1,110 @@
+groups:
+  - name: nexusim-policy-service
+    rules:
+      - alert: NexusIMPolicyGrpcErrors
+        expr: increase(nexusim_policy_grpc_method_errors_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: policy-service
+        annotations:
+          summary: "policy-service gRPC errors observed"
+
+      - alert: NexusIMPolicyDecisionErrors
+        expr: increase(nexusim_policy_decisions_total{outcome="error"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: policy-service
+        annotations:
+          summary: "policy-service decision errors observed"
+
+      - alert: NexusIMPolicyRuleStoreQueryError
+        expr: nexusim_policy_rule_store_query_error > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: policy-service
+        annotations:
+          summary: "policy-service rule-store metrics query failed"
+
+      - alert: NexusIMPolicyProjectionQueryError
+        expr: nexusim_policy_projection_query_error > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: policy-service
+        annotations:
+          summary: "policy-service projection metrics query failed"
+
+      - alert: NexusIMPolicyAuditOutboxDLQ
+        expr: nexusim_policy_audit_outbox{state="dlq"} > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: policy-service
+        annotations:
+          summary: "policy-service audit outbox has DLQ rows"
+
+      - alert: NexusIMPolicyAuditOutboxPending
+        expr: nexusim_policy_audit_outbox{state="pending"} > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: policy-service
+        annotations:
+          summary: "policy-service audit outbox has pending rows"
+
+      - alert: NexusIMPolicyProjectionWorkerErrors
+        expr: increase(nexusim_policy_projection_worker_errors_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: policy-service
+        annotations:
+          summary: "policy-service projection worker errors observed"
+
+      - alert: NexusIMPolicyProjectionWorkerConsecutiveErrors
+        expr: nexusim_policy_projection_worker_consecutive_errors > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: policy-service
+        annotations:
+          summary: "policy-service projection worker has consecutive errors"
+
+      - alert: NexusIMPolicyOutboxRelayErrors
+        expr: increase(nexusim_policy_outbox_relay_errors_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: policy-service
+        annotations:
+          summary: "policy-service outbox relay errors observed"
+
+      - alert: NexusIMPolicyOutboxRelayConsecutiveErrors
+        expr: nexusim_policy_outbox_relay_consecutive_errors > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: policy-service
+        annotations:
+          summary: "policy-service outbox relay has consecutive errors"
+
+      - alert: NexusIMPolicyPGPoolCanceledAcquire
+        expr: increase(nexusim_policy_pg_pool_canceled_acquire_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: policy-service
+        annotations:
+          summary: "policy-service PostgreSQL pool canceled acquires observed"
+
+      - alert: NexusIMPolicyOtlpEndpointMissing
+        expr: nexusim_policy_otel_traces_enabled{exporter="otlp-grpc"} == 1 and on(exporter) nexusim_policy_otel_traces_otlp_endpoint_configured{exporter="otlp-grpc"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: policy-service
+        annotations:
+          summary: "policy-service OTLP tracing is enabled without endpoint"

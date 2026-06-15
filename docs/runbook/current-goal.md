@@ -18,8 +18,9 @@
 1. 先治理已有 9 个微服务，新增服务后置；`search-service` 只保留 SDD draft，不进入 proto / migration / skeleton。
 2. 保持入口文档短；总体进度看 `docs/runbook/development-progress.md`，单服务状态看 `docs/runbook/service-briefs/<service>.md`。
 3. 继续清各服务 P2 hardening：生产观测、容量验证、故障演练、repair workflow、权限模型深化和代码复杂度治理。
-4. 保持 api-gateway、identity、message、conversation、delivery、push、receipt、contacts、policy 已有链路稳定。
-5. 本地 PostgreSQL / Kafka / Redis Sentinel 故障 smoke 已补；完整 Redis 网络分区、服务发现、统一观测和部署编排仍属于生产化后续项。
+4. 当前 9 个服务已补 first-stage 本地 Prometheus / Grafana 观测原型；它只用于本地开发和面试展示，不等于生产 SLO / Alertmanager / 统一观测平台。
+5. 保持 api-gateway、identity、message、conversation、delivery、push、receipt、contacts、policy 已有链路稳定。
+6. 本地 PostgreSQL / Kafka / Redis Sentinel 故障 smoke 已补；完整 Redis 网络分区、服务发现、统一观测和部署编排仍属于生产化后续项。
 
 演进原则：当前 9 个服务够支撑 IM 后端主链路；后续服务和中间件都不写死。只有当能力有独立数据模型、独立伸缩需求、独立故障边界，或会明显降低复杂度时才新增服务；替换中间件必须说明兼容、迁移、回滚和压测证据，并通过 ADR。
 

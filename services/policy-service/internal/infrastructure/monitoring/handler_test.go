@@ -190,6 +190,208 @@ func TestHandlerMetricsIncludesOutboxRelaySnapshot(t *testing.T) {
 	}
 }
 
+func TestHandlerPrometheusMetricsWithoutPool(t *testing.T) {
+	grpcMetrics := NewGRPCMetrics()
+	grpcMetrics.record("/nexusim.policy.v1.PolicyService/CheckMessageAction", "OK", 12)
+	grpcMetrics.record("/nexusim.policy.v1.PolicyService/CheckMessageAction", "PermissionDenied", 18)
+	decisionMetrics := NewDecisionMetrics()
+	decisionMetrics.Record("SEND", true, false, 7)
+	decisionMetrics.Record("DELETE", false, false, 5)
+	decisionMetrics.Record("EDIT", false, true, 9)
+	handler := NewHandler(nil, false, grpcMetrics, decisionMetrics).
+		WithTraceStats(func() TraceSnapshot {
+			return TraceSnapshot{
+				Enabled:         true,
+				ServiceName:     serviceName,
+				Exporter:        "otlp-grpc",
+				OTLPEndpointSet: true,
+				OTLPInsecure:    true,
+				SamplingRatio:   0.25,
+			}
+		}).
+		WithContactProjectionWorkerStats(func() types.ProjectionWorkerSnapshot {
+			return types.ProjectionWorkerSnapshot{
+				TotalErrors:        2,
+				ConsecutiveErrors:  1,
+				LastErrorAtMS:      100,
+				LastSuccessAtMS:    90,
+				LastCommitAtMS:     90,
+				LastErrorBackoffMS: 1000,
+			}
+		}).
+		WithTimelineProjectionWorkerStats(func() types.ProjectionWorkerSnapshot {
+			return types.ProjectionWorkerSnapshot{
+				TotalErrors:        3,
+				ConsecutiveErrors:  0,
+				LastErrorAtMS:      80,
+				LastSuccessAtMS:    110,
+				LastCommitAtMS:     110,
+				LastErrorBackoffMS: 500,
+			}
+		}).
+		WithOutboxRelayStats(func() types.OutboxRelayWorkerSnapshot {
+			return types.OutboxRelayWorkerSnapshot{
+				TotalErrors:        4,
+				ConsecutiveErrors:  2,
+				LastErrorAtMS:      120,
+				LastSuccessAtMS:    130,
+				LastPublishedAtMS:  140,
+				LastErrorBackoffMS: 2000,
+			}
+		})
+
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", response.Code)
+	}
+	if contentType := response.Header().Get("Content-Type"); !strings.Contains(contentType, "text/plain") {
+		t.Fatalf("expected prometheus content type, got %q", contentType)
+	}
+	body := response.Body.String()
+	assertContains(t, body, `nexusim_policy_build_info{service="policy-service"} 1`)
+	assertContains(t, body, `nexusim_policy_grpc_method_requests_total{method="/nexusim.policy.v1.PolicyService/CheckMessageAction"} 2`)
+	assertContains(t, body, `nexusim_policy_grpc_requests_total{code="PermissionDenied",method="/nexusim.policy.v1.PolicyService/CheckMessageAction"} 1`)
+	assertContains(t, body, `nexusim_policy_decisions_total{outcome="allowed"} 1`)
+	assertContains(t, body, `nexusim_policy_decision_action_total{action="SEND",outcome="allowed"} 1`)
+	assertContains(t, body, `nexusim_policy_projection_worker_errors_total{worker="contact"} 2`)
+	assertContains(t, body, `nexusim_policy_projection_worker_errors_total{worker="timeline"} 3`)
+	assertContains(t, body, `nexusim_policy_outbox_relay_errors_total 4`)
+	assertContains(t, body, `nexusim_policy_otel_traces_enabled{exporter="otlp-grpc"} 1`)
+
+	for _, forbidden := range []string{
+		"tenant_id",
+		"user_id",
+		"device_id",
+		"session_id",
+		"request_id",
+		"trace_id",
+		"conversation_id",
+		"message_id",
+		"direct_peer",
+		"sender_id",
+		"payload",
+		"classification",
+		"deny_reason",
+		"sql",
+		"secret-token",
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("prometheus metrics should not expose %q: %s", forbidden, body)
+		}
+	}
+}
+
+func TestRenderPrometheusIncludesPolicyAggregates(t *testing.T) {
+	body := renderPrometheus(Snapshot{
+		RuleStore: &RuleSnapshot{
+			ExactMessageActions: &RuleDecisionSnapshot{
+				Total: 3,
+				Allow: 2,
+				Deny:  1,
+				Actions: []RuleActionSnapshot{
+					{Action: "SEND", Total: 2, Allow: 2},
+					{Action: "DELETE", Total: 1, Deny: 1},
+				},
+			},
+			TenantMessageActions: &RuleDecisionSnapshot{
+				Total: 2,
+				Allow: 1,
+				Deny:  1,
+				Actions: []RuleActionSnapshot{
+					{Action: "EDIT", Total: 2, Allow: 1, Deny: 1},
+				},
+			},
+			ConversationRoleActions: &RuleRoleSnapshot{
+				Total: 1,
+				Actions: []RuleRoleActionSnapshot{
+					{Action: "DELETE", MinRole: "ADMIN", Total: 1},
+				},
+			},
+			OwnershipOverrides: &RuleRoleSnapshot{
+				Total: 1,
+				Actions: []RuleRoleActionSnapshot{
+					{Action: "EDIT", MinRole: "OWNER", Total: 1},
+				},
+			},
+		},
+		Projection: &ProjectionSnapshot{
+			ContactEdges: &ContactEdgeProjectionSnapshot{
+				Total: 4, Active: 2, Blocked: 1, Deleted: 1,
+			},
+			ConversationMembers: &ConversationMemberProjectionSnapshot{
+				Total: 5, Active: 3, Left: 1, Banned: 1,
+				ByRole: []ProjectionGroupCountSnapshot{
+					{Value: "OWNER", Total: 1},
+				},
+				ByStatus: []ProjectionGroupCountSnapshot{
+					{Value: "ACTIVE", Total: 3},
+				},
+				ByPair: []ProjectionRoleStatusCount{
+					{Role: "OWNER", Status: "ACTIVE", Total: 1},
+				},
+			},
+			KafkaCheckpoints: &KafkaCheckpointSnapshot{
+				Total: 2,
+				Topics: []KafkaCheckpointTopicSnapshot{
+					{
+						Topic:          "im.contact.events",
+						Rows:           2,
+						ConsumerGroups: 1,
+						Partitions:     2,
+						MinOffsetValue: 11,
+						MaxOffsetValue: 15,
+					},
+				},
+			},
+		},
+		AuditOutbox: &AuditOutboxSnapshot{
+			Total: 7, Pending: 2, Published: 4, DLQ: 1,
+		},
+	})
+
+	assertContains(t, body, `nexusim_policy_rules{decision="total",scope="exact"} 3`)
+	assertContains(t, body, `nexusim_policy_rule_actions{action="SEND",decision="allow",scope="exact"} 2`)
+	assertContains(t, body, `nexusim_policy_role_rules{scope="conversation_role"} 1`)
+	assertContains(t, body, `nexusim_policy_role_rule_actions{action="DELETE",min_role="ADMIN",scope="conversation_role"} 1`)
+	assertContains(t, body, `nexusim_policy_contact_edges_projection{state="blocked"} 1`)
+	assertContains(t, body, `nexusim_policy_conversation_members_projection{state="active"} 3`)
+	assertContains(t, body, `nexusim_policy_conversation_members_by_role{role="OWNER"} 1`)
+	assertContains(t, body, `nexusim_policy_conversation_members_by_status{status="ACTIVE"} 3`)
+	assertContains(t, body, `nexusim_policy_conversation_members_by_role_status{role="OWNER",status="ACTIVE"} 1`)
+	assertContains(t, body, `nexusim_policy_kafka_checkpoints{state="total"} 2`)
+	assertContains(t, body, `nexusim_policy_kafka_checkpoints{state="rows",topic="im.contact.events"} 2`)
+	assertContains(t, body, `nexusim_policy_kafka_checkpoint_topic_offsets{bound="max",topic="im.contact.events"} 15`)
+	assertContains(t, body, `nexusim_policy_audit_outbox{state="dlq"} 1`)
+}
+
+func TestRenderPrometheusIncludesQueryErrorsAndEscapesLabels(t *testing.T) {
+	body := renderPrometheus(Snapshot{
+		RuleStoreError:           "policy rule metrics query failed",
+		ProjectionError:          "policy projection metrics query failed",
+		AuditOutboxError:         "policy audit outbox metrics query failed",
+		RuleStore:                &RuleSnapshot{ExactMessageActions: &RuleDecisionSnapshot{Actions: []RuleActionSnapshot{{Action: "BAD\"ACT\\LINE\nNEXT", Total: 1}}}},
+		Trace:                    &TraceSnapshot{Enabled: true, Exporter: "custom\"exporter", SamplingRatio: 1},
+		GeneratedAtMS:            1,
+		Service:                  serviceName,
+		PGPool:                   nil,
+		Projection:               nil,
+		AuditOutbox:              nil,
+		GRPC:                     nil,
+		Decisions:                nil,
+		OutboxRelay:              nil,
+		ContactProjectionWorker:  nil,
+		TimelineProjectionWorker: nil,
+	})
+
+	assertContains(t, body, `nexusim_policy_rule_store_query_error 1`)
+	assertContains(t, body, `nexusim_policy_projection_query_error 1`)
+	assertContains(t, body, `nexusim_policy_audit_outbox_query_error 1`)
+	assertContains(t, body, `nexusim_policy_rule_actions{action="BAD\"ACT\\LINE\nNEXT",decision="total",scope="exact"} 1`)
+	assertContains(t, body, `nexusim_policy_otel_traces_enabled{exporter="custom\"exporter"} 1`)
+}
+
 func TestQueryRuleSnapshotIncludesAllPolicyRuleStoresIntegration(t *testing.T) {
 	dsn := os.Getenv("NEXUSIM_PG_DSN")
 	if dsn == "" {
@@ -376,4 +578,11 @@ func assertCheckpointTopic(
 		return
 	}
 	t.Fatalf("checkpoint topic %s not found in %+v", topic, snapshot.Topics)
+}
+
+func assertContains(t *testing.T, value string, expected string) {
+	t.Helper()
+	if !strings.Contains(value, expected) {
+		t.Fatalf("expected to find %q in:\n%s", expected, value)
+	}
 }

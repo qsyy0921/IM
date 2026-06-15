@@ -12,8 +12,9 @@ $deliveryDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\de
 $pushGatewayDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\push-gateway-observability.json"
 $receiptDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\receipt-service-observability.json"
 $contactsDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\contacts-service-observability.json"
+$policyDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\policy-service-observability.json"
 
-foreach ($path in @($composePath, $datasourcePath, $providerPath, $apiGatewayDashboardPath, $identityDashboardPath, $messageDashboardPath, $conversationDashboardPath, $deliveryDashboardPath, $pushGatewayDashboardPath, $receiptDashboardPath, $contactsDashboardPath)) {
+foreach ($path in @($composePath, $datasourcePath, $providerPath, $apiGatewayDashboardPath, $identityDashboardPath, $messageDashboardPath, $conversationDashboardPath, $deliveryDashboardPath, $pushGatewayDashboardPath, $receiptDashboardPath, $contactsDashboardPath, $policyDashboardPath)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Missing local Grafana config file: $path"
     }
@@ -186,6 +187,27 @@ $contactsRequiredMetrics = @(
     "nexusim_contacts_otel_traces_enabled"
 )
 
+$policyRequiredMetrics = @(
+    "nexusim_policy_grpc_method_requests_total",
+    "nexusim_policy_grpc_method_errors_total",
+    "nexusim_policy_grpc_latency_avg_milliseconds",
+    "nexusim_policy_decisions_total",
+    "nexusim_policy_decision_action_total",
+    "nexusim_policy_rules",
+    "nexusim_policy_rule_actions",
+    "nexusim_policy_role_rules",
+    "nexusim_policy_contact_edges_projection",
+    "nexusim_policy_conversation_members_projection",
+    "nexusim_policy_kafka_checkpoints",
+    "nexusim_policy_audit_outbox",
+    "nexusim_policy_projection_worker_errors_total",
+    "nexusim_policy_projection_worker_consecutive_errors",
+    "nexusim_policy_outbox_relay_errors_total",
+    "nexusim_policy_outbox_relay_consecutive_errors",
+    "nexusim_policy_pg_pool_conns",
+    "nexusim_policy_otel_traces_enabled"
+)
+
 Test-Dashboard -Path $apiGatewayDashboardPath -Name "api-gateway" -ExpectedUid "nexusim-api-gateway" -MinimumPanels 5 -RequiredMetrics $apiGatewayRequiredMetrics
 Test-Dashboard -Path $identityDashboardPath -Name "identity-service" -ExpectedUid "nexusim-identity-service" -MinimumPanels 8 -RequiredMetrics $identityRequiredMetrics
 Test-Dashboard -Path $messageDashboardPath -Name "message-service" -ExpectedUid "nexusim-message-service" -MinimumPanels 8 -RequiredMetrics $messageRequiredMetrics
@@ -194,5 +216,6 @@ Test-Dashboard -Path $deliveryDashboardPath -Name "delivery-service" -ExpectedUi
 Test-Dashboard -Path $pushGatewayDashboardPath -Name "push-gateway" -ExpectedUid "nexusim-push-gateway" -MinimumPanels 8 -RequiredMetrics $pushGatewayRequiredMetrics
 Test-Dashboard -Path $receiptDashboardPath -Name "receipt-service" -ExpectedUid "nexusim-receipt-service" -MinimumPanels 8 -RequiredMetrics $receiptRequiredMetrics
 Test-Dashboard -Path $contactsDashboardPath -Name "contacts-service" -ExpectedUid "nexusim-contacts-service" -MinimumPanels 8 -RequiredMetrics $contactsRequiredMetrics
+Test-Dashboard -Path $policyDashboardPath -Name "policy-service" -ExpectedUid "nexusim-policy-service" -MinimumPanels 8 -RequiredMetrics $policyRequiredMetrics
 
 Write-Host "OK   local Grafana config"

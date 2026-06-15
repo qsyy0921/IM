@@ -11,7 +11,7 @@ Implemented:
 - Optional exact-match PostgreSQL message action rule store through `NEXUSIM_POLICY_RULES_ENABLED=true`.
 - Optional message-service RPC adapter through `NEXUSIM_POLICY_SERVICE_ADDR`.
 - message-service fallback to legacy `StaticPolicy` when no policy-service address is configured.
-- Optional debug server through `NEXUSIM_POLICY_DEBUG_ADDR` with `/healthz`, `/readyz`, `/debug/metrics`, aggregate gRPC metrics, aggregate decision metrics and PostgreSQL rule-store summaries.
+- Optional debug server through `NEXUSIM_POLICY_DEBUG_ADDR` with `/healthz`, `/readyz`, `/debug/metrics`, first-stage Prometheus text `/metrics`, aggregate gRPC metrics, aggregate decision metrics and PostgreSQL rule-store summaries.
 - message-service policy RPC trace / request metadata propagation for policy-service structured gRPC logs.
 - Contacts event projection consumer through `NEXUSIM_POLICY_SERVICE_MODE=contact-consumer`, storing directed contact edges in `policy_contact_edges_projection`.
 - Conversation timeline projection consumer through `NEXUSIM_POLICY_SERVICE_MODE=timeline-consumer`, storing member role/status rows in `policy_conversation_members_projection`.
@@ -37,6 +37,7 @@ Implemented:
 - message-service `EditMessage` / `RevokeMessage` / `DeleteMessage` first-stage ownership override smoke for non-sender `ADMIN` allow and `MEMBER` deny: `loadtest-report-20260613-policy-message-ownership-override-smoke.md`.
 - policy-service gRPC server and direct policy smoke clients support first-stage optional TLS / mTLS static config. `loadtest/policy`, `loadtest/policycontacts` and `loadtest/policyroles` accept optional CA, server name and client cert/key flags; default remains plaintext. The `loadtest/policyintegration` runner also supports optional message-service client TLS / mTLS flags and `--verified-auth-metadata` for the `message-service -> policy-service` integration smoke.
 - policy-service direct mTLS smoke with client DNS SAN allowlist: `loadtest-report-20260613-policy-service-mtls-smoke.md`.
+- 2026-06-15: policy-service first-stage `/metrics`, local Prometheus scrape / alert rules and local Grafana dashboard prototype were added for local development / interview demo observability. This is not a production SLO or alerting system.
 
 Not yet implemented:
 

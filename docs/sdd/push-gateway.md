@@ -536,7 +536,9 @@ NEXUSIM_PUSH_GATEWAY_MODE=all
 
 本地分布式模拟使用 `NEXUSIM_PUSH_GATEWAY_MODE=ws` 和 `NEXUSIM_PUSH_GATEWAY_MODE=delivery-consumer` 启动两个独立 `push-gateway` 进程：WebSocket 连接只落在 ws 进程，Kafka `im.delivery.events` 只由 consumer 进程消费，在线通知必须经过 Redis route / PubSub 才能到达客户端。该模式用于验证分布式路由边界，不作为生产容量结论。
 
-当 WebSocket HTTP server 启动时，`GET /healthz` 返回 `{"service":"push-gateway","status":"ok"}`，`GET /readyz` 返回 `{"service":"push-gateway","status":"ready"}`。`GET /debug/metrics` 返回当前单实例 registry 调试指标，包括 connected sessions、queue-full eviction、resume replay / buffer miss、resume buffer stored frames、resume token count 和 expired token count。启用 Redis route 时还会返回 `redis_registry_metrics` 和 `redis_subscriber_metrics`，用于区分远端 route 命中、Pub/Sub publish、subscriber 入站 fanout 和 stale cleanup。启用 JWT remote JWKS 时还会返回 `auth_jwks`，包含是否配置远程 URL、当前缓存 key 数、最近 refresh 成功 / 失败时间和失败计数。启用 first-stage OpenTelemetry 时还会返回 `trace` 配置快照。该端点只用于本地 smoke 排障，尚不是生产 Prometheus 指标。debug metrics 默认只挂在 loopback / 私网 WebSocket listener 或 `NEXUSIM_PUSH_DEBUG_ADDR` 独立 debug listener 上；公网 WebSocket listener 默认不挂 `/debug/metrics`，独立 debug listener 绑定公网也会启动失败，显式公网暴露必须设置 `NEXUSIM_PUSH_DEBUG_ALLOW_PUBLIC=true`。
+当 WebSocket HTTP server 启动时，`GET /healthz` 返回 `{"service":"push-gateway","status":"ok"}`，`GET /readyz` 返回 `{"service":"push-gateway","status":"ready"}`。`GET /debug/metrics` 返回当前单实例 registry 调试指标，包括 connected sessions、queue-full eviction、resume replay / buffer miss、resume buffer stored frames、resume token count 和 expired token count。启用 Redis route 时还会返回 `redis_registry_metrics` 和 `redis_subscriber_metrics`，用于区分远端 route 命中、Pub/Sub publish、subscriber 入站 fanout 和 stale cleanup。启用 JWT remote JWKS 时还会返回 `auth_jwks`，包含是否配置远程 URL、当前缓存 key 数、最近 refresh 成功 / 失败时间和失败计数。启用 first-stage OpenTelemetry 时还会返回 `trace` 配置快照。
+
+`GET /metrics` 复用同一低敏 snapshot 并输出 Prometheus text。第一阶段本地 scrape target 为 `host.docker.internal:11913/metrics`，对应进程可用 `NEXUSIM_PUSH_DEBUG_ADDR=127.0.0.1:11913` 启动独立 debug listener。当前指标覆盖 WebSocket session、slow eviction、in-memory / Redis resume、Redis route / subscriber、delivery / identity consumer worker、auth JWKS 和 OTel trace config 聚合。labels 只允许 `state`、`event`、`role`、`consumer`、`exporter` 等低基数字段，不输出 token、tenant_id、user_id、device_id、session_id、request_id、trace_id、conversation_id、message_id 或 event_id。该端点、本地 Prometheus alert rules 和 Grafana dashboard 只用于本地开发 / 面试演示，不是生产 SLO、retention 或 Alertmanager route。debug metrics 默认只挂在 loopback / 私网 WebSocket listener 或 `NEXUSIM_PUSH_DEBUG_ADDR` 独立 debug listener 上；公网 WebSocket listener 默认不挂 `/debug/metrics` / `/metrics`，独立 debug listener 绑定公网也会启动失败，显式公网暴露必须设置 `NEXUSIM_PUSH_DEBUG_ALLOW_PUBLIC=true`。
 
 first-stage OpenTelemetry 通过 `NEXUSIM_PUSH_OTEL_*` 显式启用，默认关闭。当前只覆盖 WebSocket connection span，用于观察在线入口连接生命周期；span 只允许记录 auth mode、route backend、TLS 是否启用、gateway id 是否配置等低敏连接形态字段，不记录 token、tenant_id、user_id、device_id、session_id、conversation_id、message_id、payload 或 Redis / Kafka / gRPC 内部错误文本。生产化前仍需要统一采样、trace retention、告警和高基数属性审计。
 
@@ -686,6 +688,7 @@ delivery-service outbox-relay
 
 ```text
 10496  push-gateway WebSocket and /debug/metrics
+11913  push-gateway local Prometheus /metrics when using NEXUSIM_PUSH_DEBUG_ADDR
 10497  delivery-service gRPC dependency
 ```
 

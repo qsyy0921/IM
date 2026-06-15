@@ -204,6 +204,7 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 		wsAddr = envString("NEXUSIM_PUSH_WS_ADDR", "0.0.0.0:10496")
 		if pushDebugListenerAllowed(wsAddr, allowPublicDebug) {
 			mux.Handle("/debug/metrics", monitoringHandler)
+			mux.Handle("/metrics", monitoringHandler)
 		}
 		wsTLSConfig, wsTLSEnabled, err := pushWSTLSConfigFromEnv()
 		if err != nil {
@@ -223,6 +224,7 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 		mux.Handle("/healthz", monitoringHandler)
 		mux.Handle("/readyz", monitoringHandler)
 		mux.Handle("/debug/metrics", monitoringHandler)
+		mux.Handle("/metrics", monitoringHandler)
 		startHTTPServer(ctx, errs, "debug metrics", debugAddr, mux, nil)
 	}
 

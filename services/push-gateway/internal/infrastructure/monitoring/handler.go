@@ -75,13 +75,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/readyz":
 		writeJSON(w, http.StatusOK, healthResponse{Service: serviceName, Status: "ready"})
 	case "/debug/metrics":
-		h.handleMetrics(w)
+		writeJSON(w, http.StatusOK, h.snapshot())
+	case "/metrics":
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(renderPrometheus(h.snapshot())))
 	default:
 		http.NotFound(w, r)
 	}
 }
 
-func (h *Handler) handleMetrics(w http.ResponseWriter) {
+func (h *Handler) snapshot() Snapshot {
 	snapshot := Snapshot{
 		Service:       serviceName,
 		GeneratedAtMS: time.Now().UnixMilli(),
@@ -117,7 +121,7 @@ func (h *Handler) handleMetrics(w http.ResponseWriter) {
 		stats := h.traceStatsFunc()
 		snapshot.Trace = &stats
 	}
-	writeJSON(w, http.StatusOK, snapshot)
+	return snapshot
 }
 
 type healthResponse struct {

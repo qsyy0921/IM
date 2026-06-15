@@ -5,7 +5,7 @@
 - 已有 WebSocket notify、ACK 转发、slow session close、resume buffer、Redis route、cross-instance smoke。
 - 只做在线唤醒，不拥有 durable inbox。
 - 历史缺口通过 delivery-service `PullInbox` 兜底。
-- 已补 `/healthz`、`/readyz`、`/debug/metrics`，可观察低敏单实例 session / resume 聚合、Redis route / subscriber 聚合和 auth JWK 聚合；debug metrics 默认只挂在 loopback / 私网 WebSocket listener 或独立 debug listener 上，公网暴露必须显式 `NEXUSIM_PUSH_DEBUG_ALLOW_PUBLIC=true`。
+- 已补 `/healthz`、`/readyz`、`/debug/metrics`、Prometheus text `/metrics`、本地 alert rules / Grafana dashboard 原型，可观察低敏 session / resume、Redis route / subscriber、consumer worker、auth JWK 和 OTel trace config 聚合；默认 scrape target 为 `host.docker.internal:11913`，这是本地开发 / 面试演示观测，不是生产 SLO。
 - 已补 first-stage OpenTelemetry WebSocket connection span，默认关闭；启用后可输出 stdout 或 OTLP gRPC trace，span 只记录低敏连接形态字段，不记录 tenant / user / device / session id。
 - 当 `NEXUSIM_PUSH_AUTH_MODE=mock` 时，WebSocket 监听地址仅允许 loopback / RFC1918 私网；公网监听地址会在启动前直接失败，避免把本地 smoke 身份模式暴露到公网。
 - 当 `NEXUSIM_PUSH_AUTH_MODE=hmac|jwt` 且 WebSocket 监听地址是公网地址时，若未启用入口 TLS / WSS，进程也会在启动前直接失败，避免把签名 token 暴露到 plaintext 公网入口。

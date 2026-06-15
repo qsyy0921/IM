@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	authinfra "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/auth"
@@ -53,6 +54,8 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 				RemoteURLConfigured: true,
 				CachedKeyCount:      2,
 				RefreshFailures:     1,
+				LastRefreshSuccess:  1000,
+				LastRefreshFailure:  2000,
 			}
 		}).
 		WithDeliveryConsumerStats(func() types.ConsumerWorkerSnapshot {
@@ -132,10 +135,170 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 	}
 }
 
+func TestHandlerPrometheusMetrics(t *testing.T) {
+	handler := NewHandler().
+		WithMemoryMetrics(func() memory.Metrics {
+			return memory.Metrics{
+				ConnectedSessions:           2,
+				SessionQueueFullCount:       1,
+				ResumeBufferReplayCount:     3,
+				ResumeBufferMissCount:       4,
+				ResumeBufferStoredFrames:    5,
+				ResumeBufferTokenCount:      6,
+				ResumeBufferExpiredCount:    7,
+				SlowSessionEvictedCount:     8,
+				IdentitySessionEvictedCount: 9,
+			}
+		}).
+		WithRedisRegistryMetrics(func() redisroute.Metrics {
+			return redisroute.Metrics{
+				RedisRouteRegisterErrorCount:       1,
+				RedisRouteRenewErrorCount:          2,
+				RedisRouteRenewSessionEvictedCount: 3,
+				RedisRouteLookupErrorCount:         4,
+				RedisRouteRemoteMatchedSessions:    5,
+				RedisRouteRemotePublishCallCount:   6,
+				RedisRouteRemotePublishErrorCount:  7,
+				RedisRouteRemoteNoSubscriberCount:  8,
+				RedisRouteRemoteEnqueuedSessions:   9,
+				RedisRouteStaleRemovedCount:        10,
+				RedisRouteCleanupErrorCount:        11,
+				RedisResumeReplayCount:             12,
+				RedisResumeMissCount:               13,
+				RedisResumeAppendCount:             14,
+				RedisResumeAppendErrorCount:        15,
+				RedisResumePermissionDeniedCount:   16,
+			}
+		}).
+		WithRedisSubscriberMetrics(func() redisroute.Metrics {
+			return redisroute.Metrics{
+				RedisRouteSubscriberMessageCount:   21,
+				RedisRouteSubscriberMalformedCount: 22,
+				RedisRouteSubscriberEnqueuedCount:  23,
+				RedisRouteSubscriberEvictedCount:   24,
+				RedisRouteSubscriberErrorCount:     25,
+			}
+		}).
+		WithRedisSubscriberWorkerStats(func() types.RedisSubscriberWorkerSnapshot {
+			return types.RedisSubscriberWorkerSnapshot{
+				TotalErrors:        4,
+				ConsecutiveErrors:  1,
+				LastErrorAtMS:      70,
+				LastSuccessAtMS:    120,
+				LastErrorBackoffMS: 250,
+			}
+		}).
+		WithAuthJWKStats(func() *authinfra.JWKStats {
+			return &authinfra.JWKStats{
+				RemoteURLConfigured: true,
+				CachedKeyCount:      2,
+				RefreshFailures:     1,
+				LastRefreshSuccess:  1000,
+				LastRefreshFailure:  2000,
+			}
+		}).
+		WithDeliveryConsumerStats(func() types.ConsumerWorkerSnapshot {
+			return types.ConsumerWorkerSnapshot{
+				TotalErrors:        2,
+				ConsecutiveErrors:  1,
+				LastErrorAtMS:      100,
+				LastSuccessAtMS:    90,
+				LastCommitAtMS:     90,
+				LastErrorBackoffMS: 1000,
+			}
+		}).
+		WithIdentityConsumerStats(func() types.ConsumerWorkerSnapshot {
+			return types.ConsumerWorkerSnapshot{
+				TotalErrors:        3,
+				ConsecutiveErrors:  0,
+				LastErrorAtMS:      80,
+				LastSuccessAtMS:    110,
+				LastCommitAtMS:     110,
+				LastErrorBackoffMS: 500,
+			}
+		}).
+		WithTraceStats(func() TraceSnapshot {
+			return TraceSnapshot{
+				Enabled:         true,
+				Exporter:        "otlp-grpc",
+				OTLPEndpointSet: true,
+				OTLPInsecure:    true,
+				SamplingRatio:   0.5,
+			}
+		})
+
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d", recorder.Code)
+	}
+	if contentType := recorder.Header().Get("Content-Type"); !strings.Contains(contentType, "text/plain") {
+		t.Fatalf("content type = %q", contentType)
+	}
+	body := recorder.Body.String()
+	assertContains(t, body, `nexusim_push_gateway_build_info{service="push-gateway"} 1`)
+	assertContains(t, body, `nexusim_push_gateway_sessions{state="connected"} 2`)
+	assertContains(t, body, `nexusim_push_gateway_session_events_total{event="queue_full"} 1`)
+	assertContains(t, body, `nexusim_push_gateway_session_events_total{event="slow_evicted"} 8`)
+	assertContains(t, body, `nexusim_push_gateway_resume_buffer{state="stored_frames"} 5`)
+	assertContains(t, body, `nexusim_push_gateway_resume_buffer_events_total{event="miss"} 4`)
+	assertContains(t, body, `nexusim_push_gateway_redis_route_events_total{event="remote_publish_error",role="registry"} 7`)
+	assertContains(t, body, `nexusim_push_gateway_redis_route_events_total{event="subscriber_malformed",role="subscriber"} 22`)
+	assertContains(t, body, `nexusim_push_gateway_redis_resume_events_total{event="append_error",role="registry"} 15`)
+	assertContains(t, body, `nexusim_push_gateway_redis_subscriber_worker_consecutive_errors 1`)
+	assertContains(t, body, `nexusim_push_gateway_auth_jwks_cached_keys 2`)
+	assertContains(t, body, `nexusim_push_gateway_auth_jwks_refresh_failures_total 1`)
+	assertContains(t, body, `nexusim_push_gateway_consumer_worker_errors_total{consumer="delivery"} 2`)
+	assertContains(t, body, `nexusim_push_gateway_consumer_worker_errors_total{consumer="identity"} 3`)
+	assertContains(t, body, `nexusim_push_gateway_otel_traces_enabled{exporter="otlp-grpc"} 1`)
+	assertContains(t, body, `nexusim_push_gateway_otel_traces_sampling_ratio{exporter="otlp-grpc"} 0.5`)
+	for _, forbidden := range []string{
+		"tenant_id",
+		"user_id",
+		"device_id",
+		"session_id",
+		"request_id",
+		"trace_id",
+		"conversation_id",
+		"message_id",
+		"event_id",
+		"secret-token",
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("prometheus metrics leaked forbidden text %q:\n%s", forbidden, body)
+		}
+	}
+	if strings.Count(body, "# TYPE nexusim_push_gateway_consumer_worker_errors_total counter") != 1 {
+		t.Fatalf("consumer worker TYPE header should be emitted once:\n%s", body)
+	}
+	if strings.Count(body, "# TYPE nexusim_push_gateway_redis_route_events_total counter") != 1 {
+		t.Fatalf("redis route TYPE header should be emitted once:\n%s", body)
+	}
+}
+
+func TestRenderPrometheusEscapesTraceExporterLabel(t *testing.T) {
+	body := renderPrometheus(Snapshot{
+		Service: serviceName,
+		Trace: &TraceSnapshot{
+			Enabled:       true,
+			Exporter:      "otlp-\ngrpc\"quoted",
+			SamplingRatio: 0.75,
+		},
+	})
+	assertContains(t, body, `nexusim_push_gateway_otel_traces_enabled{exporter="otlp-\ngrpc\"quoted"} 1`)
+}
+
 func TestHandlerNotFound(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	NewHandler().ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/unknown", nil))
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("status = %d", recorder.Code)
+	}
+}
+
+func assertContains(t *testing.T, text string, expected string) {
+	t.Helper()
+	if !strings.Contains(text, expected) {
+		t.Fatalf("expected %q in:\n%s", expected, text)
 	}
 }

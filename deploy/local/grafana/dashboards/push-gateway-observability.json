@@ -1,0 +1,289 @@
+{
+  "uid": "nexusim-push-gateway",
+  "title": "NexusIM Push Gateway",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "tags": ["nexusim", "push-gateway", "first-stage"],
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Connected sessions",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(nexusim_push_gateway_sessions{state=\"connected\"})",
+          "legendFormat": "connected"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Slow evictions",
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(nexusim_push_gateway_session_events_total{event=\"slow_evicted\"}[30m])",
+          "legendFormat": "slow evicted"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Consumer consecutive errors",
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(nexusim_push_gateway_consumer_worker_consecutive_errors)",
+          "legendFormat": "{{consumer}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "JWKS refresh failures",
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(nexusim_push_gateway_auth_jwks_refresh_failures_total[30m])",
+          "legendFormat": "failures"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Session events",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(nexusim_push_gateway_session_events_total[30m])",
+          "legendFormat": "{{event}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Resume buffer",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_push_gateway_resume_buffer",
+          "legendFormat": "{{state}}"
+        },
+        {
+          "refId": "B",
+          "expr": "increase(nexusim_push_gateway_resume_buffer_events_total[30m])",
+          "legendFormat": "event {{event}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Redis route events",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(nexusim_push_gateway_redis_route_events_total[30m])",
+          "legendFormat": "{{role}} {{event}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Redis resume events",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(nexusim_push_gateway_redis_resume_events_total[30m])",
+          "legendFormat": "{{role}} {{event}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Worker runtime",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 22},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(nexusim_push_gateway_consumer_worker_errors_total[30m])",
+          "legendFormat": "consumer {{consumer}} errors"
+        },
+        {
+          "refId": "B",
+          "expr": "nexusim_push_gateway_consumer_worker_consecutive_errors",
+          "legendFormat": "consumer {{consumer}} consecutive"
+        },
+        {
+          "refId": "C",
+          "expr": "nexusim_push_gateway_redis_subscriber_worker_consecutive_errors",
+          "legendFormat": "redis subscriber consecutive"
+        },
+        {
+          "refId": "D",
+          "expr": "nexusim_push_gateway_consumer_worker_last_error_backoff_milliseconds",
+          "legendFormat": "consumer {{consumer}} backoff"
+        },
+        {
+          "refId": "E",
+          "expr": "nexusim_push_gateway_redis_subscriber_worker_last_error_backoff_milliseconds",
+          "legendFormat": "redis subscriber backoff"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "JWKS cache",
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 22},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_push_gateway_auth_jwks_cached_keys",
+          "legendFormat": "cached keys"
+        },
+        {
+          "refId": "B",
+          "expr": "nexusim_push_gateway_auth_jwks_remote_url_configured",
+          "legendFormat": "remote url configured"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "OTel enabled",
+      "gridPos": {"h": 8, "w": 6, "x": 18, "y": 22},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(nexusim_push_gateway_otel_traces_enabled)",
+          "legendFormat": "enabled"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "bool"}, "overrides": []},
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    }
+  ]
+}

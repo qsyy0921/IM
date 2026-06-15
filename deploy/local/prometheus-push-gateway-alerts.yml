@@ -1,0 +1,92 @@
+groups:
+  - name: nexusim-push-gateway
+    rules:
+      - alert: NexusIMPushGatewaySlowSessionEvictions
+        expr: increase(nexusim_push_gateway_session_events_total{event="slow_evicted"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: push-gateway
+        annotations:
+          summary: push-gateway evicted slow sessions
+          description: push-gateway evicted slow WebSocket sessions in the last five minutes. Durable inbox recovery is still via delivery-service PullInbox; inspect session queue and client behavior before treating this as message loss.
+
+      - alert: NexusIMPushGatewayRedisRouteErrors
+        expr: increase(nexusim_push_gateway_redis_route_events_total{event=~"register_error|renew_error|lookup_error|remote_publish_error|cleanup_error|subscriber_error"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: push-gateway
+        annotations:
+          summary: push-gateway Redis route errors observed
+          description: Redis route or Pub/Sub errors increased. Online wakeup may be degraded; durable recovery remains PullInbox.
+
+      - alert: NexusIMPushGatewayRedisRouteNoSubscriber
+        expr: increase(nexusim_push_gateway_redis_route_events_total{event="remote_no_subscriber"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: push-gateway
+        annotations:
+          summary: push-gateway remote route had no subscriber
+          description: Redis route publish succeeded but no remote gateway subscriber received it. Check stale routes, gateway lifecycle and Redis Pub/Sub health.
+
+      - alert: NexusIMPushGatewayRedisSubscriberWorkerErrors
+        expr: increase(nexusim_push_gateway_redis_subscriber_worker_errors_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: push-gateway
+        annotations:
+          summary: push-gateway Redis subscriber worker errors increased
+          description: Redis route subscriber worker reported runtime errors and may be relying on backoff retry.
+
+      - alert: NexusIMPushGatewayRedisSubscriberWorkerConsecutiveErrors
+        expr: nexusim_push_gateway_redis_subscriber_worker_consecutive_errors > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: push-gateway
+        annotations:
+          summary: push-gateway Redis subscriber worker is retrying
+          description: Redis route subscriber worker currently has consecutive errors.
+
+      - alert: NexusIMPushGatewayConsumerWorkerErrors
+        expr: increase(nexusim_push_gateway_consumer_worker_errors_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: push-gateway
+        annotations:
+          summary: push-gateway Kafka consumer worker errors increased
+          description: delivery or identity consumer worker has runtime errors in the last five minutes.
+
+      - alert: NexusIMPushGatewayConsumerWorkerConsecutiveErrors
+        expr: nexusim_push_gateway_consumer_worker_consecutive_errors > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: push-gateway
+        annotations:
+          summary: push-gateway Kafka consumer worker is retrying
+          description: delivery or identity consumer worker currently has consecutive errors and may not be committing new events.
+
+      - alert: NexusIMPushGatewayJwksRefreshFailures
+        expr: increase(nexusim_push_gateway_auth_jwks_refresh_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: push-gateway
+        annotations:
+          summary: push-gateway JWKS refresh failures increased
+          description: push-gateway failed to refresh RS256 public keys. Existing cached keys may still verify tokens during the overlap window.
+
+      - alert: NexusIMPushGatewayOtlpEndpointMissing
+        expr: nexusim_push_gateway_otel_traces_enabled{exporter="otlp-grpc"} == 1 and on(exporter) nexusim_push_gateway_otel_traces_otlp_endpoint_configured{exporter="otlp-grpc"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: push-gateway
+        annotations:
+          summary: push-gateway OTLP traces enabled without endpoint
+          description: push-gateway is configured for OTLP gRPC traces but no OTLP endpoint is configured.

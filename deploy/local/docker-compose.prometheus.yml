@@ -18,3 +18,4 @@ services:
       - ./prometheus-message-service-alerts.yml:/etc/prometheus/rules/message-service.yml:ro
       - ./prometheus-conversation-service-alerts.yml:/etc/prometheus/rules/conversation-service.yml:ro
       - ./prometheus-delivery-service-alerts.yml:/etc/prometheus/rules/delivery-service.yml:ro
+      - ./prometheus-push-gateway-alerts.yml:/etc/prometheus/rules/push-gateway.yml:ro

@@ -25,6 +25,9 @@ try {
     Write-Host "== service cmd tests =="
     & (Join-Path $PSScriptRoot "check-service-cmd-tests.ps1")
 
+    Write-Host "== service runtime endpoints =="
+    & (Join-Path $PSScriptRoot "check-service-runtime-endpoints.ps1")
+
     Write-Host "== project naming =="
     & (Join-Path $PSScriptRoot "check-project-naming.ps1")
 

@@ -1026,6 +1026,7 @@ type ListContactsRequest struct {
 	AuthContext   *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
 	PageSize      int32                  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	PageToken     string                 `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	Query         string                 `protobuf:"bytes,4,opt,name=query,proto3" json:"query,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1077,6 +1078,13 @@ func (x *ListContactsRequest) GetPageSize() int32 {
 func (x *ListContactsRequest) GetPageToken() string {
 	if x != nil {
 		return x.PageToken
+	}
+	return ""
+}
+
+func (x *ListContactsRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
 	}
 	return ""
 }
@@ -2094,12 +2102,13 @@ const file_nexusim_contacts_v1_contacts_service_proto_rawDesc = "" +
 	"\tdirection\x18\x03 \x01(\x0e20.nexusim.contacts.v1.ContactRequestListDirectionR\tdirection\x12A\n" +
 	"\x06status\x18\x04 \x01(\x0e2).nexusim.contacts.v1.ContactRequestStatusR\x06status\x12C\n" +
 	"\brequests\x18\x05 \x03(\v2'.nexusim.contacts.v1.ContactRequestItemR\brequests\x12&\n" +
-	"\x0fnext_page_token\x18\x06 \x01(\tR\rnextPageToken\"\x96\x01\n" +
+	"\x0fnext_page_token\x18\x06 \x01(\tR\rnextPageToken\"\xac\x01\n" +
 	"\x13ListContactsRequest\x12C\n" +
 	"\fauth_context\x18\x01 \x01(\v2 .nexusim.contacts.v1.AuthContextR\vauthContext\x12\x1b\n" +
 	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
-	"page_token\x18\x03 \x01(\tR\tpageToken\"\xad\x02\n" +
+	"page_token\x18\x03 \x01(\tR\tpageToken\x12\x14\n" +
+	"\x05query\x18\x04 \x01(\tR\x05query\"\xad\x02\n" +
 	"\vContactItem\x12&\n" +
 	"\x0fcontact_user_id\x18\x01 \x01(\tR\rcontactUserId\x12>\n" +
 	"\x06status\x18\x02 \x01(\x0e2&.nexusim.contacts.v1.ContactEdgeStatusR\x06status\x12\x18\n" +

@@ -3,8 +3,9 @@ package types
 import "strings"
 
 const (
-	maxContactRemarkLength = 128
-	maxContactReasonLength = 512
+	maxContactRemarkLength      = 128
+	maxContactReasonLength      = 512
+	maxContactSearchQueryLength = 128
 )
 
 type ContactRequestStatus string
@@ -205,6 +206,7 @@ type ListContactsCommand struct {
 	AuthContext AuthContext
 	PageSize    int
 	PageToken   string
+	Query       string
 }
 
 func (c ListContactsCommand) Validate() error {
@@ -214,7 +216,14 @@ func (c ListContactsCommand) Validate() error {
 	if c.AuthContext.UserID == "" {
 		return NewInvalidArgument("user_id is required")
 	}
+	if len(c.NormalizedQuery()) > maxContactSearchQueryLength {
+		return NewInvalidArgument("query is too long")
+	}
 	return nil
+}
+
+func (c ListContactsCommand) NormalizedQuery() string {
+	return strings.TrimSpace(c.Query)
 }
 
 type ContactItem struct {

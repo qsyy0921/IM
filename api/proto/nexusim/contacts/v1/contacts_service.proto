@@ -133,6 +133,7 @@ message ListContactsRequest {
   AuthContext auth_context = 1;
   int32 page_size = 2;
   string page_token = 3;
+  string query = 4;
 }
 
 message ContactItem {

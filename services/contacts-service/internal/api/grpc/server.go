@@ -238,6 +238,7 @@ func (s *Server) ListContacts(
 		AuthContext: authFromProto(ctx, request.GetAuthContext()),
 		PageSize:    int(request.GetPageSize()),
 		PageToken:   request.GetPageToken(),
+		Query:       request.GetQuery(),
 	})
 	if err != nil {
 		return nil, grpcError(err)

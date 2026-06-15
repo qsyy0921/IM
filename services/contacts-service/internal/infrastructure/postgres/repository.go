@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -526,6 +527,7 @@ func (r *Repository) ListContacts(
 		return types.ListContactsResult{}, err
 	}
 	args := []any{command.AuthContext.TenantID, command.AuthContext.UserID, limit + 1}
+	searchQuery := command.NormalizedQuery()
 	query := `
 SELECT
     contact_user_id,
@@ -540,10 +542,15 @@ WHERE tenant_id = $1
   AND owner_user_id = $2
   AND status = 'ACTIVE'
 `
+	if searchQuery != "" {
+		args = append(args, likePatternForSearchQuery(searchQuery))
+		query += fmt.Sprintf(`  AND (contact_user_id ILIKE $%d ESCAPE '\' OR remark ILIKE $%d ESCAPE '\')
+`, len(args), len(args))
+	}
 	if hasCursor {
-		query += `  AND contact_user_id > $4
-`
 		args = append(args, cursor.ContactUserID)
+		query += fmt.Sprintf(`  AND contact_user_id > $%d
+`, len(args))
 	}
 	query += `ORDER BY contact_user_id ASC
 LIMIT $3
@@ -576,6 +583,7 @@ LIMIT $3
 			TenantID:      command.AuthContext.TenantID,
 			OwnerUserID:   command.AuthContext.UserID,
 			PageSize:      limit,
+			Query:         searchQuery,
 			ContactUserID: string(last.ContactUserID),
 		})
 		items = items[:limit]
@@ -1762,6 +1770,7 @@ type contactPageCursor struct {
 	TenantID      types.TenantID `json:"tenant_id"`
 	OwnerUserID   types.UserID   `json:"owner_user_id"`
 	PageSize      int            `json:"page_size"`
+	Query         string         `json:"query,omitempty"`
 	ContactUserID string         `json:"contact_user_id"`
 }
 
@@ -1833,7 +1842,8 @@ func decodePageTokenFor(command types.ListContactsCommand, pageSize int) (contac
 	}
 	if cursor.TenantID != command.AuthContext.TenantID ||
 		cursor.OwnerUserID != command.AuthContext.UserID ||
-		cursor.PageSize != pageSize {
+		cursor.PageSize != pageSize ||
+		cursor.Query != command.NormalizedQuery() {
 		return contactPageCursor{}, false, types.NewInvalidArgument("invalid page_token")
 	}
 	return cursor, true, nil
@@ -1845,6 +1855,13 @@ func encodePageToken(cursor contactPageCursor) string {
 		return ""
 	}
 	return base64.RawURLEncoding.EncodeToString(raw)
+}
+
+func likePatternForSearchQuery(query string) string {
+	query = strings.ReplaceAll(query, `\`, `\\`)
+	query = strings.ReplaceAll(query, `%`, `\%`)
+	query = strings.ReplaceAll(query, `_`, `\_`)
+	return "%" + query + "%"
 }
 
 func partitionKeyFor(tenantID types.TenantID, first types.UserID, second types.UserID) string {

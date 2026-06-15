@@ -494,6 +494,50 @@ func TestRepositoryListContactsPaginationIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryListContactsSearchIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	insertContactEdgeWithRemark(t, ctx, pool, "alice", "bob", "work friend")
+	insertContactEdgeWithRemark(t, ctx, pool, "alice", "carol", "School Friend")
+	insertContactEdgeWithRemark(t, ctx, pool, "alice", "dave", "gym")
+	insertContactEdgeWithRemark(t, ctx, pool, "bob", "alice", "not visible to alice search")
+	insertContactEdgeWithRemark(t, ctx, pool, "alice", "erin", "school alumni")
+	setContactEdgeStatus(t, ctx, pool, "alice", "erin", types.ContactEdgeStatusBlocked)
+
+	byID, err := repository.ListContacts(ctx, listSearchCommand("alice", 10, "", "BO"))
+	if err != nil {
+		t.Fatalf("search by id: %v", err)
+	}
+	assertContactIDs(t, byID, "bob")
+
+	byRemark, err := repository.ListContacts(ctx, listSearchCommand("alice", 10, "", "school"))
+	if err != nil {
+		t.Fatalf("search by remark: %v", err)
+	}
+	assertContactIDs(t, byRemark, "carol")
+
+	paged, err := repository.ListContacts(ctx, listSearchCommand("alice", 1, "", "friend"))
+	if err != nil {
+		t.Fatalf("search first page: %v", err)
+	}
+	assertContactIDs(t, paged, "bob")
+	if paged.NextPageToken == "" {
+		t.Fatal("expected search next page token")
+	}
+	next, err := repository.ListContacts(ctx, listSearchCommand("alice", 1, paged.NextPageToken, "friend"))
+	if err != nil {
+		t.Fatalf("search second page: %v", err)
+	}
+	assertContactIDs(t, next, "carol")
+	_, err = repository.ListContacts(ctx, listSearchCommand("alice", 1, paged.NextPageToken, "school"))
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected query-bound page token, got %v", err)
+	}
+}
+
 func TestRepositoryConcurrentSendIdempotencyIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -656,6 +700,10 @@ func acceptContact(t *testing.T, ctx context.Context, repository *Repository, se
 }
 
 func listCommand(owner string, pageSize int, pageToken string) types.ListContactsCommand {
+	return listSearchCommand(owner, pageSize, pageToken, "")
+}
+
+func listSearchCommand(owner string, pageSize int, pageToken string, query string) types.ListContactsCommand {
 	return types.ListContactsCommand{
 		AuthContext: types.AuthContext{
 			TenantID: "tenant-contacts",
@@ -663,6 +711,7 @@ func listCommand(owner string, pageSize int, pageToken string) types.ListContact
 		},
 		PageSize:  pageSize,
 		PageToken: pageToken,
+		Query:     query,
 	}
 }
 
@@ -820,6 +869,10 @@ ORDER BY aggregate_version ASC
 }
 
 func insertContactEdge(t *testing.T, ctx context.Context, pool *pgxpool.Pool, owner string, contact string) {
+	insertContactEdgeWithRemark(t, ctx, pool, owner, contact, "")
+}
+
+func insertContactEdgeWithRemark(t *testing.T, ctx context.Context, pool *pgxpool.Pool, owner string, contact string, remark string) {
 	t.Helper()
 	_, err := pool.Exec(ctx, `
 INSERT INTO contact_edges (
@@ -827,14 +880,30 @@ INSERT INTO contact_edges (
     owner_user_id,
     contact_user_id,
     status,
+    remark,
     source_request_id,
     version,
     created_at,
     updated_at
-) VALUES ('tenant-contacts', $1, $2, 'ACTIVE', 'seed-request', 1, now(), now())
-`, owner, contact)
+) VALUES ('tenant-contacts', $1, $2, 'ACTIVE', $3, 'seed-request', 1, now(), now())
+`, owner, contact, remark)
 	if err != nil {
 		t.Fatalf("insert contact edge: %v", err)
+	}
+}
+
+func setContactEdgeStatus(t *testing.T, ctx context.Context, pool *pgxpool.Pool, owner string, contact string, status types.ContactEdgeStatus) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+UPDATE contact_edges
+SET status = $3,
+    updated_at = now()
+WHERE tenant_id = 'tenant-contacts'
+  AND owner_user_id = $1
+  AND contact_user_id = $2
+`, owner, contact, status)
+	if err != nil {
+		t.Fatalf("set contact edge status: %v", err)
 	}
 }
 

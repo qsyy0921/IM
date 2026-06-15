@@ -14,7 +14,7 @@
 - 接受 / 拒绝 / 取消好友申请；
 - 删除联系人、拉黑联系人、解除拉黑、更新本人的联系人备注；
 - 查询当前用户收到 / 发出的好友申请列表；
-- 查询当前联系人列表；
+- 查询当前联系人列表，并可在当前用户 ACTIVE 联系人的 `contact_user_id / remark` 内做本地搜索；
 - 查询两名用户之间的联系人状态；
 - 通过 outbox 发布联系人事件，供通知、审计、推荐或后续搜索投影消费。
 
@@ -156,7 +156,10 @@ idempotency_key
 auth_context
 page_size
 page_token
+query
 ```
+
+`query` 为可选字段，第一版只在 contacts-service 自有 `contact_edges` read model 中按 `contact_user_id / remark` 做大小写不敏感包含匹配；不查询 identity/profile，不返回全站用户搜索结果。
 
 `ListContactRequestsRequest`：
 
@@ -472,8 +475,9 @@ CancelContactRequest
 ListContacts
 -> validate auth
 -> query contact_edges where owner_user_id = auth.user_id and status = ACTIVE
+-> if query is non-empty, filter current user's ACTIVE edge by contact_user_id / remark
 -> keyset page by contact_user_id
--> page_token binds tenant_id / owner_user_id / page_size / last_contact_user_id
+-> page_token binds tenant_id / owner_user_id / page_size / query / last_contact_user_id
 ```
 
 ```text
@@ -589,7 +593,7 @@ Command hash 规则：
 - 响应申请只能由 receiver 执行。
 - 取消申请只能由原 sender 执行，receiver 不能取消对方发来的申请。
 - `ListContactRequests` 只能查询当前 auth user 收到或发出的好友申请列表；第一阶段不提供 admin 查询或全站搜索。
-- `ListContacts` 只能查询当前 auth user 的联系人列表，第一阶段不提供 admin 查询。
+- `ListContacts` 只能查询当前 auth user 的 ACTIVE 联系人列表；`query` 只过滤当前用户已有联系人，不提供 admin 查询、全站用户搜索或 profile 搜索。
 - 删除 / 拉黑 / 解除拉黑 / 备注名只能操作当前 auth user 自己的 `owner_user_id -> contact_user_id` edge。
 - `BLOCKED` 不直接等同于消息发送权限拒绝；其它服务必须通过正式 policy / projection 使用该事实，不能同步读 contacts-service 内部表。
 - 不在事件 payload 里暴露私密用户资料，只放 user id 和关系状态。
@@ -651,7 +655,7 @@ NEXUSIM_CONTACTS_OTEL_TRACES_SAMPLING_RATIO=1
 | domain unit | 自己加自己、重复 pending、accept 写双向 edge、非 receiver 响应 |
 | app unit | command validation、repository error propagation |
 | api unit | gRPC request/response 转换、稳定错误映射 |
-| postgres integration | SendContactRequest / RespondContactRequest / CancelContactRequest / ListContactRequests / ListContacts / DeleteContact / BlockContact / UpdateContactRemark 真实事务、幂等 replay、并发首次申请、反向 pending、终态相反 decision、分页 token 绑定、单向 edge 变更 |
+| postgres integration | SendContactRequest / RespondContactRequest / CancelContactRequest / ListContactRequests / ListContacts / ListContacts(query) / DeleteContact / BlockContact / UpdateContactRemark 真实事务、幂等 replay、并发首次申请、反向 pending、终态相反 decision、分页 token 绑定、搜索 token 绑定、单向 edge 变更 |
 | outbox integration | contacts_outbox retry / DLQ / mark PUBLISHED / 按 event_id repair DLQ 后恢复顺序发布 |
 | smoke | `SendContactRequest -> ListContactRequests(PENDING) -> RespondContactRequest(ACCEPT) -> ListContactRequests(ACCEPTED) -> ListContacts` |
 | cancel smoke | `SendContactRequest -> ListContactRequests(INCOMING,PENDING) -> CancelContactRequest -> ListContactRequests(INCOMING,PENDING)=0 -> ListContactRequests(OUTGOING,CANCELED)=1` |

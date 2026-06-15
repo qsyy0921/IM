@@ -123,7 +123,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 | `delivery-service` | 已落地、已接主链路 | projection / `PullInbox` / `AckDelivery` / `HideInboxItem` / `delivery.inbox_item.hidden.v1` / delivery outbox、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | Projection DLQ / repair 深化、更多 delivery event 消费方、生产级 OTel collector / alerting / SLO dashboard |
 | `push-gateway` | 已落地、已接主链路 | notify / `delivery.hide` / ACK / resume / Redis route / Win-Mac / Sentinel / Sentinel network-partition / TLS smoke、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel WebSocket connection span | 跨实例 resume 强化、容量测试、Redis Cluster / 生产级 HA 设计、生产级 OTel collector / alerting / SLO dashboard |
 | `receipt-service` | 已落地、已接主链路 | receipt projection / outbox / audit / repair、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 送达回执扩展、批量接口优化、会话列表产品化、生产级 OTel collector / alerting / SLO dashboard |
-| `contacts-service` | 已落地、已接主链路 | contacts grpc / outbox / audit / repair、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 联系人分组、联系人搜索、更多隐私策略、生产级 OTel collector / alerting / SLO dashboard |
+| `contacts-service` | 已落地、已接主链路 | contacts grpc / list search / outbox / audit / repair、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 联系人分组、更多隐私策略、生产级 OTel collector / alerting / SLO dashboard |
 | `policy-service` | 已落地、已接主链路 | decision / projection / outbox / audit / repair、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 完整 ReBAC、moderation policy、tenant DSL / quota、外部 audit sink、生产级 OTel collector / alerting / SLO dashboard |
 | `search-service` | 仅保留占位和 brief | 无真实实现主线 | 等前 9 个服务收干净后再进入 |
 
@@ -150,7 +150,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 5. `delivery-service`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；后续继续 projection DLQ / repair 深化和 delivery event 消费方扩展。
 6. `push-gateway`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；Redis Sentinel network-partition fallback smoke 已归档；后续继续跨实例 resume 强化和容量测试，不把在线通知当 durable delivery。
 7. `receipt-service`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；后续继续送达回执扩展、批量接口优化和会话列表产品化。
-8. `contacts-service`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；后续继续联系人分组、搜索和更多隐私策略。
+8. `contacts-service`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；`ListContacts.query` 已支持当前用户 ACTIVE edge 的 `contact_user_id / remark` 搜索；后续继续联系人分组和更多隐私策略。
 9. `policy-service`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；后续继续 ReBAC / tenant DSL / quota / 外部审计。
 
 每个切片必须满足：

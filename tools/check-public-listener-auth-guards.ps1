@@ -36,21 +36,33 @@ foreach ($file in $cmdMainFiles) {
         if (-not $content.Contains("validateTrustedMetadataListenerConfig")) {
             Add-Violation $violations $file.FullName "trusted metadata server auth is missing validateTrustedMetadataListenerConfig"
         }
+        if (-not $testContent.Contains("TestValidateTrustedMetadataListenerConfigAllowsPrivateAddressWithoutMTLS")) {
+            Add-Violation $violations $file.FullName "trusted metadata server auth is missing private-address no-mTLS allow test"
+        }
         if (-not $testContent.Contains("TestValidateTrustedMetadataListenerConfigRequiresMTLSForPublicAddress")) {
             Add-Violation $violations $file.FullName "trusted metadata server auth is missing public-address mTLS rejection test"
         }
         if (-not $testContent.Contains("TestValidateTrustedMetadataListenerConfigAllowsMTLSForPublicAddress")) {
             Add-Violation $violations $file.FullName "trusted metadata server auth is missing public-address mTLS allow test"
         }
+        if (-not $testContent.Contains("TestValidateTrustedMetadataListenerConfigIgnoresBodyAuth")) {
+            Add-Violation $violations $file.FullName "trusted metadata server auth is missing body-auth skip test"
+        }
     }
 
     $usesTrustedMetadataBackend = $content.Contains("validateTrustedMetadataBackendConfig(")
     if ($usesTrustedMetadataBackend) {
+        if (-not $testContent.Contains("TestValidateTrustedMetadataBackendConfigAllowsPrivateAddressWithoutMTLS")) {
+            Add-Violation $violations $file.FullName "trusted metadata backend config is missing private-address no-mTLS allow test"
+        }
         if (-not $testContent.Contains("TestValidateTrustedMetadataBackendConfigRequiresMTLSForPublicAddress")) {
             Add-Violation $violations $file.FullName "trusted metadata backend config is missing public-address mTLS rejection test"
         }
         if (-not $testContent.Contains("TestValidateTrustedMetadataBackendConfigAllowsMTLSForPublicAddress")) {
             Add-Violation $violations $file.FullName "trusted metadata backend config is missing public-address mTLS allow test"
+        }
+        if (-not $testContent.Contains("TestValidateTrustedMetadataBackendConfigIgnoresBodyAuth")) {
+            Add-Violation $violations $file.FullName "trusted metadata backend config is missing body-auth skip test"
         }
     }
 

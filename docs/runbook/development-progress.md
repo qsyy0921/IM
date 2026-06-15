@@ -134,7 +134,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 
 进入 `search-service` 之前，先把下面几类问题作为统一 backlog 解决：
 
-1. 安全启动门禁：public listener、mock auth、metadata auth、gateway verified metadata、TLS / mTLS allowlist、弱鉴权公网暴露保护必须继续纳入 `tools/check-local.ps1` 和服务级测试；debug listener validator 已纳入门禁，必须覆盖 private allow / public reject / explicit opt-in 三类测试；服务端 gRPC / WSS TLS 配置已纳入门禁，必须覆盖 cert/key 成对、invalid require-client-cert bool、缺 client CA 三类启动失败测试。
+1. 安全启动门禁：public listener、mock auth、metadata auth、gateway verified metadata、TLS / mTLS allowlist、弱鉴权公网暴露保护必须继续纳入 `tools/check-local.ps1` 和服务级测试；trusted metadata listener / backend guard 已纳入门禁，必须覆盖私网无 mTLS 放行、公网无 mTLS 拒绝、公网 mTLS 放行和 body auth 跳过；debug listener validator 已纳入门禁，必须覆盖 private allow / public reject / explicit opt-in 三类测试；服务端 gRPC / WSS TLS 配置已纳入门禁，必须覆盖 cert/key 成对、invalid require-client-cert bool、缺 client CA 三类启动失败测试。
 2. 观测闭环：first-stage `/metrics`、Prometheus rules、Grafana dashboard、OTel trace wiring 继续用于本地开发 / 面试展示；下一步是补 collector / alert / dashboard smoke 和采样治理，不把它写成生产 SLO。
 3. 分布式故障 smoke：补 Redis 网络分区、Kafka 多故障 / controller 切换、PostgreSQL quorum / split-brain 类本地模拟和报告，明确和生产 HA 的差距。
 4. Repair / DLQ / audit：outbox、projection、challenge delivery、policy / contacts / receipt 等 operator 要有可复跑 repair / cleanup / audit 流程。

@@ -1,5 +1,6 @@
 param(
-    [switch]$SkipPowerShellParser
+    [switch]$SkipPowerShellParser,
+    [switch]$SkipShellParser
 )
 
 $ErrorActionPreference = "Stop"
@@ -95,6 +96,11 @@ try {
     if (-not $SkipPowerShellParser) {
         Write-Host "== powershell parser =="
         Invoke-LocalCheck "check-powershell-scripts.ps1"
+    }
+
+    if (-not $SkipShellParser) {
+        Write-Host "== shell parser =="
+        Invoke-LocalCheck "check-shell-scripts.ps1"
     }
 }
 finally {

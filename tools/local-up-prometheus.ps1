@@ -1,4 +1,18 @@
+param(
+    [switch]$AllowImagePull
+)
+
 $ErrorActionPreference = "Stop"
+
+$image = if ($env:NEXUSIM_PROMETHEUS_IMAGE) { $env:NEXUSIM_PROMETHEUS_IMAGE } else { "prom/prometheus:v2.54.1" }
+$previousErrorActionPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+docker image inspect $image > $null 2> $null
+$inspectExitCode = $LASTEXITCODE
+$ErrorActionPreference = $previousErrorActionPreference
+if ($inspectExitCode -ne 0 -and -not $AllowImagePull) {
+    throw "Missing Docker image $image. Pull it explicitly or rerun with -AllowImagePull to let docker compose pull it."
+}
 
 docker compose -f deploy/local/docker-compose.prometheus.yml up -d
 

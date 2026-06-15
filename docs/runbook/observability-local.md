@@ -46,6 +46,12 @@ deploy/local/prometheus-policy-service-alerts.yml
 .\tools\local-up-prometheus.ps1
 ```
 
+默认启动脚本只使用本机已有镜像，避免误触发外网拉取。确实需要允许 Docker 拉取镜像时显式使用：
+
+```powershell
+.\tools\local-up-prometheus.ps1 -AllowImagePull
+```
+
 停止：
 
 ```powershell
@@ -69,7 +75,7 @@ policy-service scrape target from container: host.docker.internal:11916
 
 当前 first-stage alert rules 覆盖 api-gateway、identity-service、message-service、conversation-service、delivery-service、push-gateway、receipt-service、contacts-service 和 policy-service。api-gateway 规则包含 gRPC errors、legacy descriptor traffic、rate-limit Redis errors、JWKS refresh failures、OTLP endpoint missing；identity-service 规则包含 gRPC errors、password / MFA / recovery-code lock、challenge delivery failure、challenge delivery outbox DLQ / expired pending rows、worker / relay runtime errors、OTLP endpoint missing；message-service 规则包含 SendMessage / PG pool / Kafka latency、outbox relay runtime error 和 OTLP endpoint missing；conversation-service 规则包含 gRPC errors、metrics query error、member-change failed compensated、worker retry、PG pool canceled acquire 和 OTLP endpoint missing；delivery-service 规则包含 gRPC errors、metrics query error、delivery outbox DLQ / ready pending rows、projection failure blocker、timeline worker retry、outbox relay retry、PG pool canceled acquire 和 OTLP endpoint missing；push-gateway 规则包含 slow session eviction、Redis route / subscriber errors、consumer worker retry、JWKS refresh failure 和 OTLP endpoint missing；receipt-service 规则包含 gRPC errors、metrics query error、receipt outbox DLQ / ready pending rows、delivery projection worker retry、outbox relay retry、PG pool canceled acquire 和 OTLP endpoint missing；contacts-service 规则包含 gRPC errors、metrics query error、contacts outbox DLQ / ready pending rows、outbox relay retry、PG pool canceled acquire、long-lived pending requests 和 OTLP endpoint missing；policy-service 规则包含 gRPC / decision errors、rule / projection / audit metrics query error、audit outbox DLQ / pending、projection worker retry、outbox relay retry、PG pool canceled acquire 和 OTLP endpoint missing。它们用于本地开发和面试演示，不是生产 SLO 阈值；生产化前还需要 Alertmanager route、retention、dashboard、sampling / label governance 和容量验证。
 
-注意：启动脚本不会预检镜像是否已存在；如果本机没有 `NEXUSIM_PROMETHEUS_IMAGE` 指定的镜像或默认 `prom/prometheus:v2.54.1`，Docker 会按自身配置尝试拉取镜像。
+注意：如果本机没有 `NEXUSIM_PROMETHEUS_IMAGE` 指定的镜像或默认 `prom/prometheus:v2.54.1`，且没有显式 `-AllowImagePull`，启动脚本会直接失败并提示先准备镜像。
 
 ## Legacy Descriptor Migration Gate
 
@@ -183,6 +189,12 @@ deploy/local/grafana/dashboards/policy-service-observability.json
 .\tools\local-up-grafana.ps1
 ```
 
+默认启动脚本只使用本机已有镜像，避免误触发外网拉取。确实需要允许 Docker 拉取镜像时显式使用：
+
+```powershell
+.\tools\local-up-grafana.ps1 -AllowImagePull
+```
+
 停止：
 
 ```powershell
@@ -199,7 +211,23 @@ datasource: http://host.docker.internal:19090
 
 当前 dashboard 覆盖 api-gateway、identity-service、message-service、conversation-service、delivery-service、push-gateway、receipt-service、contacts-service 和 policy-service 的本地 Prometheus 指标。api-gateway 面板包含 request rate、error rate、facade / legacy descriptor / other exposure、legacy descriptor last-seen、latency、rate-limit decisions、JWKS refresh failures 和 OTel enabled；identity-service 面板包含 request / error / latency、login / MFA lock、challenge delivery outcomes、challenge outbox status、worker runtime errors、failure class 和 OTel enabled；message-service 面板包含 SendMessage p95、PG pool acquire p95、Kafka publish p95、repository / outbox latency、batch shape、PG pool conns、outbox relay error 和 OTel enabled；conversation-service 面板包含 gRPC errors / latency、conversation/member/member-change saga 聚合、member-change worker retry、PG pool conns 和 OTel enabled；delivery-service 面板包含 gRPC errors / latency、durable read model、delivery outbox、projection blockers、worker / relay retry、PG pool conns 和 OTel enabled；push-gateway 面板包含 connected sessions、slow eviction、resume buffer、Redis route / resume、worker retry、JWKS cache 和 OTel enabled；receipt-service 面板包含 gRPC errors / latency、receipt projection、conversation summary、receipt outbox、worker / relay retry、PG pool conns 和 OTel enabled；contacts-service 面板包含 gRPC errors / latency、contact requests、contact edges、contacts outbox、relay retry、PG pool conns 和 OTel enabled；policy-service 面板包含 gRPC errors / latency、policy decisions、rule store、projection read model、Kafka checkpoints、audit outbox、worker / relay retry、PG pool conns 和 OTel enabled。它用于本地开发和面试演示，不是生产 Grafana 部署；生产化前还需要权限、datasource secret 管理、retention、SLO 阈值和告警路由。
 
-注意：启动脚本不会预检镜像是否已存在；如果本机没有 `NEXUSIM_GRAFANA_IMAGE` 指定的镜像或默认 `grafana/grafana-oss:11.2.0`，Docker 会按自身配置尝试拉取镜像。
+注意：如果本机没有 `NEXUSIM_GRAFANA_IMAGE` 指定的镜像或默认 `grafana/grafana-oss:11.2.0`，且没有显式 `-AllowImagePull`，启动脚本会直接失败并提示先准备镜像。
+
+## Local Observability Smoke
+
+本地观测栈 smoke 会启动 Prometheus 和 Grafana，验证 Prometheus rule groups 已加载、Grafana 9 个服务 dashboard 已 provision，然后默认清理本轮启动的容器：
+
+```powershell
+.\tools\run-local-observability-smoke.ps1
+```
+
+如果本机尚未准备 Prometheus / Grafana 镜像，脚本默认失败而不会拉取镜像。确实需要允许拉取时显式使用：
+
+```powershell
+.\tools\run-local-observability-smoke.ps1 -AllowImagePull
+```
+
+该 smoke 只证明本地观测配置可被真实进程加载，不证明生产 Alertmanager、SLO、retention、权限、统一日志或容量基线已完成。
 
 ## OpenTelemetry Collector
 

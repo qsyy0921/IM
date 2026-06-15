@@ -14,7 +14,7 @@
    当前 `/metrics`、Prometheus rules、Grafana dashboard 和 OTel trace wiring 是本地开发 / 面试展示级；仍需统一 collector、Alertmanager 路由、retention、结构化日志汇聚、dashboard smoke、容量基线和 SLO 口径。
 
 2. 分布式 HA / 故障演练深化：
-   继续补更长时间 Kafka ISR flapping、consumer rebalance、Kafka producer retry budget smoke / idempotent-producer 客户端评估；继续完善 Redis Cluster / 网络分区组合、PostgreSQL quorum / split-brain fencing 和服务发现 / 部署编排。PostgreSQL 生产 quorum 边界以 ADR-034 为准。
+   继续补更长时间 Kafka ISR flapping、consumer rebalance、Kafka producer 故障重试行为 smoke / idempotent-producer 客户端评估；继续完善 Redis Cluster / 网络分区组合、PostgreSQL quorum / split-brain fencing 和服务发现 / 部署编排。PostgreSQL 生产 quorum 边界以 ADR-034 为准。
 
 3. Repair / DLQ / audit 产品化：
    多数服务已有本地 operator / audit / cleanup；后续要补跨服务 runbook、批量 repair、审批边界、外部审计 sink 和运维 UI，不把手写 SQL 当作长期方案。

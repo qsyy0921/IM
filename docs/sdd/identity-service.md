@@ -17,7 +17,7 @@
 - revoke devices and sessions;
 - keep push-gateway verification local to avoid synchronous auth RPC on every WebSocket handshake.
 
-It is not yet a full OAuth/OIDC identity platform. It does not implement WebAuthn/passkeys, external IdP federation, production-grade account-risk workflows or production-grade asymmetric key management. Email / SMS delivery has a first-stage configurable challenge webhook plus encrypted delivery outbox / worker retry-DLQ; provider-specific templates, bounce handling, DLQ repair audit, tenant policy and KMS/HSM-backed key rotation remain future work.
+It is not yet a full OAuth/OIDC identity platform. It does not implement WebAuthn/passkeys, external IdP federation, production-grade account-risk workflows or production-grade asymmetric key management. Email / SMS delivery has a first-stage configurable challenge webhook plus encrypted delivery outbox / worker retry-DLQ and SMTP subject/body templates; bounce handling, tenant notification policy, provider-grade template management and KMS/HSM-backed key rotation remain future work.
 
 ## Boundary
 
@@ -258,9 +258,9 @@ Challenge token rules:
 - Password reset can also enable an identity-local hashed-target limiter for invalid or nonexistent targets by setting `NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_SECRET`. The app computes an HMAC key from `tenant_id + user_id + challenge_type + channel + normalized destination`, stores only that key in `identity_challenge_request_limits`, and still returns the same neutral accepted response when limited. This is sender-side abuse protection, not account-existence proof.
 - `NEXUSIM_IDENTITY_SERVICE_MODE=challenge-request-limit-cleanup` is a one-shot operator that deletes stale hashed-target limiter rows whose `last_request_at` and `locked_until` are both older than the retention cutoff. It is a table-retention guard for random-target spam, not a risk-decision engine.
 - `identity-service` supports four challenge delivery modes: `noop`, synchronous `webhook`, synchronous `smtp`, and durable `outbox`. In all modes PostgreSQL stores only `identity_challenges.token_hash`, never the raw challenge token.
-- In synchronous `webhook` / `smtp` mode, the provider receives the raw one-time token in memory after the challenge row is created. If the provider returns an error, the RPC returns stable `challenge delivery unavailable` and identity-service immediately marks the newly created challenge `EXPIRED` as compensation, so the unusable token hash does not consume the active challenge cap. SMTP mode only supports EMAIL channel; SMS / phone challenge delivery still requires a future provider.
+- In synchronous `webhook` / `smtp` mode, the provider receives the raw one-time token in memory after the challenge row is created. If the provider returns an error, the RPC returns stable `challenge delivery unavailable` and identity-service immediately marks the newly created challenge `EXPIRED` as compensation, so the unusable token hash does not consume the active challenge cap. SMTP mode only supports EMAIL channel and can use first-stage env-configured subject/body templates. SMTP subject templates may only use low-sensitive `{challenge_type}` and `{purpose}` placeholders and must not contain CR/LF; body templates may also use `{code}` and `{expires_at}`. SMS / phone challenge delivery still requires a future provider.
 - In durable `outbox` mode, the challenge row and `identity_challenge_delivery_outbox` row are committed in the same PostgreSQL transaction. The delivery row stores the challenge token encrypted with AES-GCM under `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY` or the current key version from `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEYRING_JSON` / `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEYRING_FILE`; old key versions remain readable during a local rotation window. The RPC success means durable enqueue, not provider delivery. A separate `challenge-delivery-worker` locks ready rows with `FOR UPDATE SKIP LOCKED`, rechecks that the challenge is still `ACTIVE` and unexpired, decrypts the token in memory, calls the configured worker provider (`webhook` or `smtp`), and marks the delivery `DELIVERED`, retry, `DLQ`, or `CANCELED`. Max-attempt DLQ expires the challenge and records delivery failure, preserving the active-cap safety property.
-- Delivery outcome is persisted on `identity_challenges` through `delivery_status`, `delivery_attempt_count`, `delivered_at`, `delivery_failed_at`, stable public `delivery_last_error` and low-sensitive `delivery_failure_class`. Durable delivery rows and repair audit use the same stable error text / failure class boundary, so provider bodies, destinations and raw tokens must not be persisted for diagnostics. This is a first durable retry / DLQ slice, but still not a full provider platform: provider templates, bounce handling, keyring / KMS rotation and provider-specific alerts remain future work.
+- Delivery outcome is persisted on `identity_challenges` through `delivery_status`, `delivery_attempt_count`, `delivered_at`, `delivery_failed_at`, stable public `delivery_last_error` and low-sensitive `delivery_failure_class`. Durable delivery rows and repair audit use the same stable error text / failure class boundary, so provider bodies, destinations and raw tokens must not be persisted for diagnostics. This is a first durable retry / DLQ slice, but still not a full provider platform: tenant-scoped template policy, bounce handling, keyring / KMS rotation and provider-specific alerts remain future work.
 - `NEXUSIM_IDENTITY_SERVICE_MODE=challenge-delivery-repair` is a one-shot operator tool with audit-first semantics. It accepts explicit delivery row IDs and supports `audit`, `redrive-active-pending` and `cancel-inactive`. It never decrypts challenge tokens, never marks delivery `DELIVERED`, and never reactivates `EXPIRED` / `CONSUMED` challenges. DLQ rows are audited/skipped because worker DLQ has already expired the challenge; users must request a fresh challenge through the normal API.
 - `NEXUSIM_IDENTITY_SERVICE_MODE=challenge-delivery-repair-audit` is a read-only operator view over `identity_challenge_delivery_repair_audit`. It supports delivery / tenant / user / challenge / mode / outcome / failure-class filters, returns newest rows first, and never mutates delivery or challenge state.
 - `NEXUSIM_IDENTITY_SERVICE_MODE=challenge-delivery-repair-cleanup` deletes only repair-audit rows older than the retention cutoff, and supports delivery / tenant / user / challenge / mode / outcome / failure-class filters to narrow cleanup scope. It does not redrive deliveries and does not mutate `identity_challenge_delivery_outbox` or `identity_challenges`.
@@ -270,7 +270,7 @@ Known hardening still pending:
 
 - timing- and sender-side account-enumeration resistance;
 - tenant / IP / device adaptive rate limits for challenge creation and confirmation beyond the first target-level and hashed-target windows;
-- SMS provider, provider-specific templates, bounce handling, KMS-backed key rotation and provider-grade alerting;
+- SMS provider, tenant-scoped template governance, bounce handling, KMS-backed key rotation and provider-grade alerting;
 - WebAuthn and OIDC federation;
 - production alerting for repeated challenge failures.
 
@@ -288,6 +288,12 @@ NEXUSIM_IDENTITY_CHALLENGE_SMTP_PASSWORD=...
 NEXUSIM_IDENTITY_CHALLENGE_SMTP_TLS_MODE=starttls
 NEXUSIM_IDENTITY_CHALLENGE_SMTP_SERVER_NAME=smtp.example.com
 NEXUSIM_IDENTITY_CHALLENGE_SMTP_TIMEOUT=10s
+NEXUSIM_IDENTITY_CHALLENGE_SMTP_SUBJECT_TEMPLATE="NexusIM {purpose} code"
+NEXUSIM_IDENTITY_CHALLENGE_SMTP_SUBJECT_TEMPLATE_EMAIL_VERIFICATION="Verify your email"
+NEXUSIM_IDENTITY_CHALLENGE_SMTP_SUBJECT_TEMPLATE_PASSWORD_RESET="Reset your password"
+NEXUSIM_IDENTITY_CHALLENGE_SMTP_BODY_TEMPLATE="Code: {code}\nExpires: {expires_at}"
+NEXUSIM_IDENTITY_CHALLENGE_SMTP_BODY_TEMPLATE_EMAIL_VERIFICATION=...
+NEXUSIM_IDENTITY_CHALLENGE_SMTP_BODY_TEMPLATE_PASSWORD_RESET=...
 NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY=...
 NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEYRING_JSON={"current":"v2","keys":{"local-v1":"old-secret","v2":"new-secret"}}
 NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEYRING_FILE=/run/secrets/identity-challenge-delivery-keyring.json

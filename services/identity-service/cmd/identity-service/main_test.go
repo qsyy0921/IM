@@ -974,6 +974,22 @@ func TestChallengeNotifierAcceptsSMTPMode(t *testing.T) {
 	}
 }
 
+func TestChallengeSMTPTemplatesFromEnv(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_SMTP_SUBJECT_TEMPLATE", "NexusIM {purpose}")
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_SMTP_SUBJECT_TEMPLATE_EMAIL_VERIFICATION", "Verify {purpose}")
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_SMTP_SUBJECT_TEMPLATE_PASSWORD_RESET", "Reset {purpose}")
+	templates := challengeSMTPTemplatesFromEnv("NEXUSIM_IDENTITY_CHALLENGE_SMTP_SUBJECT_TEMPLATE")
+	if templates[types.ChallengeType("")] != "NexusIM {purpose}" {
+		t.Fatalf("unexpected default subject template %q", templates[types.ChallengeType("")])
+	}
+	if templates[types.ChallengeTypeEmailVerification] != "Verify {purpose}" {
+		t.Fatalf("unexpected email verification template %q", templates[types.ChallengeTypeEmailVerification])
+	}
+	if templates[types.ChallengeTypePasswordReset] != "Reset {purpose}" {
+		t.Fatalf("unexpected password reset template %q", templates[types.ChallengeTypePasswordReset])
+	}
+}
+
 func TestChallengeDeliveryWorkerNotifierAcceptsSMTPProvider(t *testing.T) {
 	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_WORKER_PROVIDER", "smtp")
 	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_SMTP_ADDR", "smtp.example.com:587")

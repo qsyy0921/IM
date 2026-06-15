@@ -320,8 +320,30 @@ func newChallengeSMTPNotifier() (app.ChallengeNotifier, error) {
 		ServerName:    envString("NEXUSIM_IDENTITY_CHALLENGE_SMTP_SERVER_NAME", ""),
 		TLSMode:       envString("NEXUSIM_IDENTITY_CHALLENGE_SMTP_TLS_MODE", "starttls"),
 		SubjectPrefix: envString("NEXUSIM_IDENTITY_CHALLENGE_SMTP_SUBJECT_PREFIX", "NexusIM"),
-		Timeout:       envDuration("NEXUSIM_IDENTITY_CHALLENGE_SMTP_TIMEOUT", 10*time.Second),
+		SubjectTemplates: challengeSMTPTemplatesFromEnv(
+			"NEXUSIM_IDENTITY_CHALLENGE_SMTP_SUBJECT_TEMPLATE",
+		),
+		BodyTemplates: challengeSMTPTemplatesFromEnv(
+			"NEXUSIM_IDENTITY_CHALLENGE_SMTP_BODY_TEMPLATE",
+		),
+		Timeout: envDuration("NEXUSIM_IDENTITY_CHALLENGE_SMTP_TIMEOUT", 10*time.Second),
 	})
+}
+
+func challengeSMTPTemplatesFromEnv(baseName string) map[types.ChallengeType]string {
+	templates := make(map[types.ChallengeType]string)
+	add := func(envName string, challengeType types.ChallengeType) {
+		if value := strings.TrimSpace(os.Getenv(envName)); value != "" {
+			templates[challengeType] = value
+		}
+	}
+	add(baseName, types.ChallengeType(""))
+	add(baseName+"_EMAIL_VERIFICATION", types.ChallengeTypeEmailVerification)
+	add(baseName+"_PASSWORD_RESET", types.ChallengeTypePasswordReset)
+	if len(templates) == 0 {
+		return nil
+	}
+	return templates
 }
 
 func challengeDeliveryMode() string {

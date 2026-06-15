@@ -81,25 +81,29 @@ func (notifier *WebhookChallengeNotifier) SendChallenge(ctx context.Context, not
 }
 
 type SMTPChallengeNotifierConfig struct {
-	Addr          string
-	From          string
-	Username      string
-	Password      string
-	ServerName    string
-	TLSMode       string
-	SubjectPrefix string
-	Timeout       time.Duration
+	Addr             string
+	From             string
+	Username         string
+	Password         string
+	ServerName       string
+	TLSMode          string
+	SubjectPrefix    string
+	SubjectTemplates map[types.ChallengeType]string
+	BodyTemplates    map[types.ChallengeType]string
+	Timeout          time.Duration
 }
 
 type SMTPChallengeNotifier struct {
-	addr          string
-	from          mail.Address
-	username      string
-	password      string
-	serverName    string
-	tlsMode       string
-	subjectPrefix string
-	timeout       time.Duration
+	addr             string
+	from             mail.Address
+	username         string
+	password         string
+	serverName       string
+	tlsMode          string
+	subjectPrefix    string
+	subjectTemplates map[types.ChallengeType]string
+	bodyTemplates    map[types.ChallengeType]string
+	timeout          time.Duration
 }
 
 const (
@@ -142,15 +146,24 @@ func NewSMTPChallengeNotifier(config SMTPChallengeNotifierConfig) (*SMTPChalleng
 	if subjectPrefix == "" {
 		subjectPrefix = "NexusIM"
 	}
+	if containsSMTPHeaderLineBreak(subjectPrefix) {
+		return nil, errors.New("identity challenge smtp subject prefix must not contain CR/LF")
+	}
+	subjectTemplates, err := normalizeChallengeSubjectTemplates(config.SubjectTemplates)
+	if err != nil {
+		return nil, err
+	}
 	return &SMTPChallengeNotifier{
-		addr:          addr,
-		from:          *from,
-		username:      strings.TrimSpace(config.Username),
-		password:      config.Password,
-		serverName:    serverName,
-		tlsMode:       tlsMode,
-		subjectPrefix: subjectPrefix,
-		timeout:       timeout,
+		addr:             addr,
+		from:             *from,
+		username:         strings.TrimSpace(config.Username),
+		password:         config.Password,
+		serverName:       serverName,
+		tlsMode:          tlsMode,
+		subjectPrefix:    subjectPrefix,
+		subjectTemplates: subjectTemplates,
+		bodyTemplates:    normalizeChallengeTemplates(config.BodyTemplates),
+		timeout:          timeout,
 	}, nil
 }
 
@@ -261,6 +274,12 @@ func (notifier *SMTPChallengeNotifier) message(to *mail.Address, notification ty
 }
 
 func (notifier *SMTPChallengeNotifier) subject(challengeType types.ChallengeType) string {
+	if template := challengeTemplateForType(notifier.subjectTemplates, challengeType); template != "" {
+		return renderChallengeTemplate(template, smtpChallengeTemplateData{
+			ChallengeType: string(challengeType),
+			Purpose:       challengePurpose(challengeType),
+		})
+	}
 	switch challengeType {
 	case types.ChallengeTypePasswordReset:
 		return notifier.subjectPrefix + " password reset code"
@@ -275,6 +294,14 @@ func (notifier *SMTPChallengeNotifier) body(notification types.ChallengeNotifica
 	expiresAt := time.UnixMilli(notification.ExpiresAtUnixMS).UTC().Format(time.RFC3339)
 	if notification.ExpiresAtUnixMS <= 0 {
 		expiresAt = "the configured challenge expiry time"
+	}
+	if template := challengeTemplateForType(notifier.bodyTemplates, notification.Type); template != "" {
+		return renderChallengeTemplate(template, smtpChallengeTemplateData{
+			Code:          notification.Token,
+			ExpiresAt:     expiresAt,
+			ChallengeType: string(notification.Type),
+			Purpose:       challengePurpose(notification.Type),
+		})
 	}
 	return fmt.Sprintf("Your %s code is:\r\n\r\n%s\r\n\r\nThis code expires at %s.\r\nIf you did not request this code, ignore this message.\r\n",
 		challengePurpose(notification.Type),
@@ -294,4 +321,66 @@ func challengePurpose(challengeType types.ChallengeType) string {
 	default:
 		return "verification"
 	}
+}
+
+type smtpChallengeTemplateData struct {
+	Code          string
+	ExpiresAt     string
+	ChallengeType string
+	Purpose       string
+}
+
+func normalizeChallengeTemplates(templates map[types.ChallengeType]string) map[types.ChallengeType]string {
+	if len(templates) == 0 {
+		return nil
+	}
+	normalized := make(map[types.ChallengeType]string, len(templates))
+	for challengeType, template := range templates {
+		template = strings.TrimSpace(template)
+		if template == "" {
+			continue
+		}
+		normalized[challengeType] = template
+	}
+	return normalized
+}
+
+func normalizeChallengeSubjectTemplates(templates map[types.ChallengeType]string) (map[types.ChallengeType]string, error) {
+	normalized := normalizeChallengeTemplates(templates)
+	for _, template := range normalized {
+		if containsSMTPHeaderLineBreak(template) {
+			return nil, errors.New("identity challenge smtp subject template must not contain CR/LF")
+		}
+		if strings.Contains(template, "{code}") || strings.Contains(template, "{expires_at}") {
+			return nil, errors.New("identity challenge smtp subject template must only use low-sensitive placeholders")
+		}
+	}
+	return normalized, nil
+}
+
+func containsSMTPHeaderLineBreak(value string) bool {
+	return strings.ContainsAny(value, "\r\n")
+}
+
+func challengeTemplateForType(templates map[types.ChallengeType]string, challengeType types.ChallengeType) string {
+	if len(templates) == 0 {
+		return ""
+	}
+	if template := templates[challengeType]; template != "" {
+		return template
+	}
+	return templates[types.ChallengeType("")]
+}
+
+func renderChallengeTemplate(template string, data smtpChallengeTemplateData) string {
+	replacements := map[string]string{
+		"{code}":           data.Code,
+		"{expires_at}":     data.ExpiresAt,
+		"{challenge_type}": data.ChallengeType,
+		"{purpose}":        data.Purpose,
+	}
+	for placeholder, value := range replacements {
+		template = strings.ReplaceAll(template, placeholder, value)
+	}
+	return template
 }

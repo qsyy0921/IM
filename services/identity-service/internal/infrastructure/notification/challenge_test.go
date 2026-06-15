@@ -119,6 +119,52 @@ func TestSMTPChallengeNotifierSendsEmail(t *testing.T) {
 	}
 }
 
+func TestSMTPChallengeNotifierUsesConfiguredTemplates(t *testing.T) {
+	addr, messages := startFakeSMTPServer(t)
+	expiresAtUnixMS := int64(1_800_000_900_000)
+	expiresAt := time.UnixMilli(expiresAtUnixMS).UTC().Format(time.RFC3339)
+	notifier, err := NewSMTPChallengeNotifier(SMTPChallengeNotifierConfig{
+		Addr:    addr,
+		From:    "NexusIM <no-reply@nexusim.local>",
+		TLSMode: "none",
+		SubjectTemplates: map[types.ChallengeType]string{
+			types.ChallengeTypeEmailVerification: "Verify {challenge_type}",
+		},
+		BodyTemplates: map[types.ChallengeType]string{
+			types.ChallengeTypeEmailVerification: "Code={code}; purpose={purpose}; expires={expires_at}",
+		},
+		Timeout: time.Second,
+	})
+	if err != nil {
+		t.Fatalf("new smtp notifier: %v", err)
+	}
+	err = notifier.SendChallenge(context.Background(), types.ChallengeNotification{
+		TenantID:        "tenant-1",
+		UserID:          "user-1",
+		ChallengeID:     "challenge-1",
+		Type:            types.ChallengeTypeEmailVerification,
+		Channel:         types.VerificationChannelEmail,
+		Destination:     "user1@example.com",
+		Token:           "challenge-token",
+		ExpiresAtUnixMS: expiresAtUnixMS,
+	})
+	if err != nil {
+		t.Fatalf("send smtp challenge: %v", err)
+	}
+	select {
+	case message := <-messages:
+		if !strings.Contains(message, "Subject: Verify EMAIL_VERIFICATION") ||
+			!strings.Contains(message, "Code=challenge-token; purpose=email verification; expires="+expiresAt) {
+			t.Fatalf("template was not rendered into smtp message:\n%s", message)
+		}
+		if strings.Contains(message, "Your email verification code is") {
+			t.Fatalf("expected template body to replace default body:\n%s", message)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("smtp server did not receive message")
+	}
+}
+
 func TestSMTPChallengeNotifierRejectsPhoneChannel(t *testing.T) {
 	notifier, err := NewSMTPChallengeNotifier(SMTPChallengeNotifierConfig{
 		Addr:    "127.0.0.1:2525",
@@ -155,6 +201,31 @@ func TestSMTPChallengeNotifierRequiresConfig(t *testing.T) {
 		TLSMode: "invalid",
 	}); err == nil {
 		t.Fatal("expected invalid tls mode to fail")
+	}
+	if _, err := NewSMTPChallengeNotifier(SMTPChallengeNotifierConfig{
+		Addr:          "127.0.0.1:2525",
+		From:          "no-reply@nexusim.local",
+		SubjectPrefix: "NexusIM\r\nBcc: attacker@example.com",
+	}); err == nil {
+		t.Fatal("expected subject prefix with CR/LF to fail")
+	}
+	if _, err := NewSMTPChallengeNotifier(SMTPChallengeNotifierConfig{
+		Addr: "127.0.0.1:2525",
+		From: "no-reply@nexusim.local",
+		SubjectTemplates: map[types.ChallengeType]string{
+			types.ChallengeTypeEmailVerification: "Verify\r\nBcc: attacker@example.com",
+		},
+	}); err == nil {
+		t.Fatal("expected subject template with CR/LF to fail")
+	}
+	if _, err := NewSMTPChallengeNotifier(SMTPChallengeNotifierConfig{
+		Addr: "127.0.0.1:2525",
+		From: "no-reply@nexusim.local",
+		SubjectTemplates: map[types.ChallengeType]string{
+			types.ChallengeTypeEmailVerification: "Verify with {code}",
+		},
+	}); err == nil {
+		t.Fatal("expected subject template with code placeholder to fail")
 	}
 }
 

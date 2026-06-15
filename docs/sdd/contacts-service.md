@@ -1,6 +1,6 @@
 # NexusIM contacts-service SDD v0.1
 
-状态：Draft；proto / Kafka schema / migration / 六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 `ACCEPT / DECLINE / CANCEL` 真实进程 smoke 已落地；联系人删除 / 拉黑 / 解除拉黑 / 备注名 / 分组 v0.2 已完成代码切片，删除 / 拉黑 / 备注名 / 解除拉黑真实进程 smoke 已通过；删除后重新申请 / 接受恢复联系人关系的 re-add smoke 已通过；first-stage Prometheus text `/metrics`、本地 alert rules 和 Grafana dashboard 原型已落地。
+状态：Draft；proto / Kafka schema / migration / 六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 `ACCEPT / DECLINE / CANCEL` 真实进程 smoke 已落地；联系人删除 / 拉黑 / 解除拉黑 / 备注名 / 分组 v0.2 已完成代码切片；好友申请来源 metadata 和 `USER -> TENANT_DEFAULT -> SYSTEM_DEFAULT` 三层隐私读取已落地；删除 / 拉黑 / 备注名 / 解除拉黑真实进程 smoke 已通过；删除后重新申请 / 接受恢复联系人关系的 re-add smoke 已通过；first-stage Prometheus text `/metrics`、本地 alert rules 和 Grafana dashboard 原型已落地。
 
 本文定义第三层 IM 产品能力中的“联系人 / 好友关系”最小服务边界。目标是补齐社交关系事实源，同时保持低耦合：不把好友关系塞进 `conversation_members`，也不让会话、消息、投递服务直接读联系人表。
 
@@ -15,7 +15,7 @@
 - 删除联系人、拉黑联系人、解除拉黑、更新本人的联系人备注和分组；
 - 读取 / 更新当前用户的联系人申请隐私设置；
 - 查询当前用户收到 / 发出的好友申请列表；
-- 查询当前联系人列表，并可在当前用户 ACTIVE 联系人的 `contact_user_id / remark` 内做本地搜索，也可按联系人分组过滤；
+- 查询当前联系人列表，并可在当前用户 ACTIVE 联系人的 `contact_user_id / remark / group_name` 内做本地搜索，也可按联系人分组过滤；
 - 查询两名用户之间的联系人状态；
 - 通过 outbox 发布联系人事件，供通知、审计、推荐或后续搜索投影消费。
 
@@ -40,8 +40,9 @@
 - 删除联系人是当前用户的单向关系操作：只把 `owner_user_id -> contact_user_id` 这条 edge 标为 `DELETED`，不强制删除对方视角的 edge。是否双向解除关系由产品策略或后续 saga 单独设计。
 - 拉黑联系人是当前用户的单向关系操作：只把 `owner_user_id -> contact_user_id` 标为 `BLOCKED`，并发布 `contact.edge.blocked.v1`。是否影响发消息权限不由 contacts-service 直接决定，后续由 policy-service / conversation-service 投影消费该事件后统一表达。
 - 解除拉黑是当前用户的单向关系操作：只允许 `BLOCKED -> ACTIVE`，并发布 `contact.edge.unblocked.v1`；不能把 `DELETED`、不存在或从未接受的关系恢复成好友。
+- `BLOCKED` 会 gate contacts-service 自己的新建好友申请和接受好友申请路径：任一方向已有 `BLOCKED` edge 时，不写新的 `contact_requests`，也不接受 pending request。它仍不直接等同于 message-service 发送权限。
 - 备注名和分组是当前用户私有资料：只更新 `owner_user_id -> contact_user_id` 的 `remark / group_name`，不进入对方视图，不复制用户 profile。
-- 联系人申请隐私设置只控制“陌生用户能否新建好友申请”；不删除已有联系人，不影响已存在 pending request，不直接改变 message / conversation / delivery 权限。
+- 联系人申请隐私设置只控制“陌生用户能否新建好友申请”；读取优先级为用户显式设置、租户默认、系统默认；不删除已有联系人，不影响已存在 pending request，不直接改变 message / conversation / delivery 权限。
 
 ## 2. 上下游
 
@@ -133,7 +134,11 @@ auth_context
 target_user_id
 idempotency_key
 message
+source_type = DIRECT / SEARCH / GROUP / INVITE_LINK / QR_CODE / IMPORT
+source_ref
 ```
+
+`source_type` 缺省为 `DIRECT`，`source_ref` 是低敏来源引用，例如搜索关键词 hash、群 / 会话引用或邀请链接 hash / id。`source_ref` 会持久化到 `contact_requests`，并进入 `contacts_outbox` / 下游策略和审计事件；调用方不得把原始邀请 token、手机号、邮箱、认证 token、provider secret、完整搜索词或其它用户敏感内容放入该字段。第一版已支持租户级来源策略：没有显式策略时各来源默认允许；若某租户禁用 `SEARCH / INVITE_LINK` 等来源，则 `SendContactRequest` 返回 `PERMISSION_DENIED`，不写 `contact_requests` 或 outbox。
 
 `RespondContactRequestRequest`：
 
@@ -160,7 +165,7 @@ idempotency_key
 auth_context
 ```
 
-缺省没有 `contact_privacy_settings` 行时返回 `allow_contact_requests=true, version=0`。这表示第一版默认允许收到好友申请。
+缺省没有用户级 `contact_privacy_settings` 行时，读取租户级 `contact_tenant_privacy_defaults`；如果租户默认也不存在，则返回 `allow_contact_requests=true, version=0, policy_source=SYSTEM_DEFAULT`。有租户默认时返回 `policy_source=TENANT_DEFAULT`，有用户显式设置时返回 `policy_source=USER`。
 
 `SetContactPrivacyRequest`：
 
@@ -182,7 +187,7 @@ query
 group_name
 ```
 
-`query` 为可选字段，第一版只在 contacts-service 自有 `contact_edges` read model 中按 `contact_user_id / remark` 做大小写不敏感包含匹配；不查询 identity/profile，不返回全站用户搜索结果。`group_name` 为可选字段，只按当前用户 ACTIVE edge 上的私有分组做精确过滤；`page_token` 必须绑定 `tenant_id / owner_user_id / page_size / query / group_name / last_contact_user_id`。
+`query` 为可选字段，只在 contacts-service 自有 `contact_edges` read model 中按 `contact_user_id / remark / group_name` 做大小写不敏感包含匹配；不查询 identity/profile，不返回全站用户搜索结果。`group_name` 为可选字段，只按当前用户 ACTIVE edge 上的私有分组做精确过滤；`page_token` 必须绑定 `tenant_id / owner_user_id / page_size / query / group_name / last_contact_user_id`。
 
 `ListContactRequestsRequest`：
 
@@ -363,6 +368,9 @@ migrations/postgres/contacts/000001_contacts_core.sql
 migrations/postgres/contacts/000002_contact_edge_management.sql
 migrations/postgres/contacts/000006_contact_groups.sql
 migrations/postgres/contacts/000007_contact_privacy_settings.sql
+migrations/postgres/contacts/000008_contact_request_source.sql
+migrations/postgres/contacts/000009_contact_tenant_privacy_defaults.sql
+migrations/postgres/contacts/000010_contact_request_source_policies.sql
 ```
 
 以下 DDL 表示 v0.2 后目标结构。`000001_contacts_core.sql` 已作为第一阶段基线存在；第二阶段只能通过 expand-only migration 增加 `remark / group_name`、`contact_privacy_settings` 和扩展 command type check，不回写旧 migration。
@@ -379,12 +387,16 @@ CREATE TABLE contact_requests (
     idempotency_key   TEXT        NOT NULL,
     command_hash      TEXT        NOT NULL,
     message           TEXT        NOT NULL DEFAULT '',
+    source_type       TEXT        NOT NULL DEFAULT 'DIRECT',
+    source_ref        TEXT        NOT NULL DEFAULT '',
     decided_at        TIMESTAMPTZ,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (tenant_id, sender_user_id, idempotency_key),
     CHECK (sender_user_id <> receiver_user_id),
-    CHECK (status IN ('PENDING', 'ACCEPTED', 'DECLINED', 'CANCELED', 'EXPIRED'))
+    CHECK (status IN ('PENDING', 'ACCEPTED', 'DECLINED', 'CANCELED', 'EXPIRED')),
+    CHECK (source_type IN ('DIRECT', 'SEARCH', 'GROUP', 'INVITE_LINK', 'QR_CODE', 'IMPORT')),
+    CHECK (char_length(source_ref) <= 256)
 );
 
 CREATE UNIQUE INDEX uq_contact_requests_pending_pair
@@ -471,6 +483,9 @@ migrations/postgres/contacts/000007_contact_privacy_settings.sql
 - `contact_edges.remark TEXT NOT NULL DEFAULT ''`；
 - `contact_edges.group_name TEXT NOT NULL DEFAULT ''`；
 - 新增 `contact_privacy_settings(tenant_id, user_id, allow_contact_requests, version, created_at, updated_at)`；
+- 新增 `contact_requests.source_type / source_ref`，用于审计和后续策略输入；`source_ref` 只允许低敏业务引用，不保存原始 invite token、手机号 / 邮箱、认证 token 或 provider secret；
+- 新增 `contact_tenant_privacy_defaults(tenant_id, allow_contact_requests, version, created_at, updated_at)`，用于用户未显式设置时的租户默认；
+- 新增 `contact_tenant_request_source_policies(tenant_id, source_type, allow_contact_requests, version, created_at, updated_at)`，用于租户级好友申请来源 allow / deny；
 - 扩展 `contact_command_idempotency.command_type` check，加入 `CANCEL_CONTACT_REQUEST / DELETE_CONTACT / BLOCK_CONTACT / UNBLOCK_CONTACT / UPDATE_CONTACT_REMARK / UPDATE_CONTACT_GROUP / SET_CONTACT_PRIVACY`；
 - 不新增跨服务外键，不引用 `conversation_members`、`message_log` 或 delivery / receipt 内部表。
 
@@ -485,10 +500,13 @@ SendContactRequest
 -> if contact_requests has same sender idempotency key and same command hash, replay
 -> if same idempotency key but different command hash, conflict
 -> check existing ACTIVE contact edge
+-> check any BLOCKED edge in the pair; if found, return PERMISSION_DENIED
 -> check pending request pair
 -> check target user's contact_privacy_settings; missing row means allow
--> insert contact_requests(PENDING)
--> insert contacts_outbox(contact.request.created.v1)
+-> normalize source_type/source_ref; source_ref must be a low-sensitivity reference, not raw token / phone / email / auth secret
+-> check contact_tenant_request_source_policies for normalized source_type; missing row means allow
+-> insert contact_requests(PENDING, source_type, source_ref)
+-> insert contacts_outbox(contact.request.created.v1, includes source_type/source_ref)
 -> commit
 ```
 
@@ -533,7 +551,7 @@ CancelContactRequest
 ListContacts
 -> validate auth
 -> query contact_edges where owner_user_id = auth.user_id and status = ACTIVE
--> if query is non-empty, filter current user's ACTIVE edge by contact_user_id / remark
+-> if query is non-empty, filter current user's ACTIVE edge by contact_user_id / remark / group_name
 -> if group_name is non-empty, filter current user's ACTIVE edge by exact group_name
 -> keyset page by contact_user_id
 -> page_token binds tenant_id / owner_user_id / page_size / query / group_name / last_contact_user_id
@@ -638,6 +656,10 @@ SetContactPrivacy
 
 `GetContactPrivacy` 缺省返回 `allow_contact_requests=true, version=0`。该设置只影响新建好友申请：关闭后 `SendContactRequest` 返回 `PERMISSION_DENIED`，不写 `contact_requests` 或 outbox；已存在联系人、已存在 pending request、消息发送权限和会话成员事实不被 contacts-service 直接修改。
 
+租户默认值第一阶段只作为 contacts-service 自有 read path 的 fallback policy：当用户没有 `contact_privacy_settings` 行时，`GetContactPrivacy` 和 `SendContactRequest` 会读取 `contact_tenant_privacy_defaults`；用户一旦执行 `SetContactPrivacy`，用户级设置优先于租户默认。当前通过本地 operator mode 审计 / 设置租户默认值，不开放普通 gRPC admin RPC；正式 admin/config service 权限面后续接入，当前不新增跨服务同步依赖。
+
+租户来源策略第一阶段只作为 contacts-service 自有 `SendContactRequest` gate：`contact_tenant_request_source_policies` 缺省允许所有来源，显式禁用某个 `source_type` 后，该来源的新建申请返回 `PERMISSION_DENIED`，不影响其它来源、不删除已有申请、不修改联系人事实，也不直接改变 message / conversation / delivery 权限。当前通过本地 operator mode 审计 / 设置来源策略；正式 admin/config service 权限面后续接入。
+
 ## 9. 一致性和事务
 
 强一致边界：
@@ -672,7 +694,7 @@ contacts_outbox -> Kafka im.contact.events -> push / audit / recommendation
 Command hash 规则：
 
 - 不包含 `idempotency_key`、`request_id`、`trace_id`、`session_id`、`device_id`。
-- `SendContactRequest` 包含 command type、tenant、sender、target、message 原文。
+- `SendContactRequest` 包含 command type、tenant、sender、target、message 原文；当 `source_type != DIRECT` 或 `source_ref != ''` 时额外包含 normalized source_type / source_ref。默认 `DIRECT` + 空 `source_ref` 不写入 hash，保证迁移前已存在的默认申请 idempotency replay 不被误判为 conflict。
 - `RespondContactRequest` 包含 command type、tenant、receiver、request_id、decision。
 - `CancelContactRequest` 包含 command type、tenant、sender、request_id。
 - `DeleteContact` 包含 command type、tenant、owner、contact。
@@ -696,7 +718,9 @@ Command hash 规则：
 - `ListContacts` 只能查询当前 auth user 的 ACTIVE 联系人列表；`query` 和 `group_name` 只过滤当前用户已有联系人，不提供 admin 查询、全站用户搜索或 profile 搜索。
 - 删除 / 拉黑 / 解除拉黑 / 备注名 / 分组只能操作当前 auth user 自己的 `owner_user_id -> contact_user_id` edge。
 - `GetContactPrivacy` / `SetContactPrivacy` 只能读写当前 auth user 自己的联系人申请隐私设置；缺省允许好友申请。该设置只 gate 新建 `SendContactRequest`，不直接撤销已有申请或联系人事实。
-- `BLOCKED` 不直接等同于消息发送权限拒绝；其它服务必须通过正式 policy / projection 使用该事实，不能同步读 contacts-service 内部表。
+- `source_ref` 会进入本服务持久表和 outbox payload，只能作为低敏业务引用；不得存放原始邀请 token、手机号 / 邮箱、认证 token、provider secret、完整搜索词或其它敏感载荷。
+- 租户默认隐私和来源策略当前只通过本地 operator mode 修改，不暴露普通 gRPC admin RPC；后续接入 admin/config service 前，不能把用户请求体里的字段当成 admin 授权。
+- `BLOCKED` 会阻止 contacts-service 新建 / 接受好友申请，但不直接等同于消息发送权限拒绝；其它服务必须通过正式 policy / projection 使用该事实，不能同步读 contacts-service 内部表。
 - 不在事件 payload 里暴露私密用户资料，只放 user id 和关系状态。
 - 用户存在性、封禁状态、组织策略后续通过 identity/policy port 接入；第一阶段先保留端口边界或 strict mock。
 - gRPC server 支持第一阶段静态 TLS / mTLS 配置：`NEXUSIM_CONTACTS_GRPC_TLS_CERT_FILE`、`NEXUSIM_CONTACTS_GRPC_TLS_KEY_FILE` 启用 server TLS；`NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_CA_FILE` 或 `NEXUSIM_CONTACTS_GRPC_TLS_REQUIRE_CLIENT_CERT=true` 启用客户端证书校验；`NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES` / `NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_ALLOWED_URIS` 可做 client certificate DNS / URI SAN exact-match allowlist。默认仍是 plaintext，方便本地 smoke；这不是证书签发、轮换、分发、动态 SPIFFE 身份或全服务 mTLS rollout。
@@ -757,7 +781,7 @@ NEXUSIM_CONTACTS_OTEL_TRACES_SAMPLING_RATIO=1
 | domain unit | 自己加自己、重复 pending、accept 写双向 edge、非 receiver 响应 |
 | app unit | command validation、repository error propagation |
 | api unit | gRPC request/response 转换、稳定错误映射 |
-| postgres integration | SendContactRequest / RespondContactRequest / CancelContactRequest / ListContactRequests / ListContacts / ListContacts(query/group_name) / DeleteContact / BlockContact / UpdateContactRemark / UpdateContactGroup 真实事务、幂等 replay、并发首次申请、反向 pending、终态相反 decision、分页 token 绑定、搜索 / 分组 token 绑定、单向 edge 变更 |
+| postgres integration | SendContactRequest / RespondContactRequest / CancelContactRequest / ListContactRequests / ListContacts / ListContacts(query/group_name) / DeleteContact / BlockContact / UpdateContactRemark / UpdateContactGroup 真实事务、申请来源 metadata、租户默认隐私 operator、来源策略 gate / operator、BLOCKED gate、幂等 replay、并发首次申请、反向 pending、终态相反 decision、分页 token 绑定、搜索 / 分组 token 绑定、单向 edge 变更 |
 | outbox integration | contacts_outbox retry / DLQ / mark PUBLISHED / 按 event_id repair DLQ 后恢复顺序发布 |
 | smoke | `SendContactRequest -> ListContactRequests(PENDING) -> RespondContactRequest(ACCEPT) -> ListContactRequests(ACCEPTED) -> ListContacts` |
 | cancel smoke | `SendContactRequest -> ListContactRequests(INCOMING,PENDING) -> CancelContactRequest -> ListContactRequests(INCOMING,PENDING)=0 -> ListContactRequests(OUTGOING,CANCELED)=1` |
@@ -771,6 +795,10 @@ NEXUSIM_CONTACTS_OTEL_TRACES_SAMPLING_RATIO=1
 NEXUSIM_CONTACTS_SERVICE_MODE=grpc
 NEXUSIM_CONTACTS_SERVICE_MODE=outbox-relay
 NEXUSIM_CONTACTS_SERVICE_MODE=outbox-repair
+NEXUSIM_CONTACTS_SERVICE_MODE=tenant-privacy-default-audit
+NEXUSIM_CONTACTS_SERVICE_MODE=tenant-privacy-default-set
+NEXUSIM_CONTACTS_SERVICE_MODE=source-policy-audit
+NEXUSIM_CONTACTS_SERVICE_MODE=source-policy-set
 NEXUSIM_CONTACTS_AUTH_MODE=metadata   # production / gateway verified identity
 NEXUSIM_CONTACTS_AUTH_MODE=body       # local smoke compatibility only
 NEXUSIM_CONTACTS_DEBUG_ADDR=0.0.0.0:10501
@@ -781,6 +809,38 @@ NEXUSIM_CONTACTS_GRPC_TLS_REQUIRE_CLIENT_CERT=true
 NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES=api-gateway.nexusim.local
 NEXUSIM_CONTACTS_GRPC_TLS_CLIENT_ALLOWED_URIS=spiffe://nexusim/api-gateway
 ```
+
+租户默认隐私 operator：
+
+```powershell
+$env:NEXUSIM_CONTACTS_SERVICE_MODE='tenant-privacy-default-audit'
+$env:NEXUSIM_CONTACTS_TENANT_PRIVACY_TENANT_ID='tenant-demo'
+.\contacts-service.exe
+
+$env:NEXUSIM_CONTACTS_SERVICE_MODE='tenant-privacy-default-set'
+$env:NEXUSIM_CONTACTS_TENANT_PRIVACY_TENANT_ID='tenant-demo'
+$env:NEXUSIM_CONTACTS_TENANT_PRIVACY_ALLOW_CONTACT_REQUESTS='false'
+.\contacts-service.exe
+```
+
+该 operator mode 只读写 `contact_tenant_privacy_defaults`，不发布 Kafka 事件，不绕过用户级隐私设置优先级；正式多租户 admin API / 审批 / audit sink 后续由 admin/config 能力补齐。
+
+租户来源策略 operator：
+
+```powershell
+$env:NEXUSIM_CONTACTS_SERVICE_MODE='source-policy-audit'
+$env:NEXUSIM_CONTACTS_SOURCE_POLICY_TENANT_ID='tenant-demo'
+$env:NEXUSIM_CONTACTS_SOURCE_POLICY_SOURCE_TYPE='SEARCH'
+.\contacts-service.exe
+
+$env:NEXUSIM_CONTACTS_SERVICE_MODE='source-policy-set'
+$env:NEXUSIM_CONTACTS_SOURCE_POLICY_TENANT_ID='tenant-demo'
+$env:NEXUSIM_CONTACTS_SOURCE_POLICY_SOURCE_TYPE='SEARCH'
+$env:NEXUSIM_CONTACTS_SOURCE_POLICY_ALLOW_CONTACT_REQUESTS='false'
+.\contacts-service.exe
+```
+
+该 operator mode 只读写 `contact_tenant_request_source_policies`，不发布 Kafka 事件，不影响已有申请和联系人事实；正式多租户 admin API / 审批 / audit sink 后续由 admin/config 能力补齐。
 
 受控 outbox repair：
 

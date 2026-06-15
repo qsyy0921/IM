@@ -13,12 +13,14 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	contactsv1 "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1"
 	contactsgrpc "github.com/qsyy0921/IM/services/contacts-service/internal/api/grpc"
 	monitoringinfra "github.com/qsyy0921/IM/services/contacts-service/internal/infrastructure/monitoring"
+	"github.com/qsyy0921/IM/services/contacts-service/internal/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -330,6 +332,58 @@ func TestContactsTraceConfigRejectsInvalidValues(t *testing.T) {
 	t.Setenv("NEXUSIM_CONTACTS_OTEL_TRACES_SAMPLING_RATIO", "2")
 	if _, err := contactsTraceConfigFromEnv(); err == nil {
 		t.Fatalf("expected invalid trace sampling ratio to fail")
+	}
+}
+
+func TestRunDispatchesTenantPrivacyDefaultAuditMode(t *testing.T) {
+	t.Setenv("NEXUSIM_CONTACTS_SERVICE_MODE", "tenant-privacy-default-audit")
+	err := run()
+	if err == nil || !strings.Contains(err.Error(), "NEXUSIM_CONTACTS_TENANT_PRIVACY_TENANT_ID is required") {
+		t.Fatalf("expected tenant privacy audit mode validation, got %v", err)
+	}
+}
+
+func TestRunDispatchesSourcePolicyAuditMode(t *testing.T) {
+	t.Setenv("NEXUSIM_CONTACTS_SERVICE_MODE", "source-policy-audit")
+	err := run()
+	if err == nil || !strings.Contains(err.Error(), "NEXUSIM_CONTACTS_SOURCE_POLICY_TENANT_ID is required") {
+		t.Fatalf("expected source policy audit mode validation, got %v", err)
+	}
+}
+
+func TestEnvRequiredBool(t *testing.T) {
+	t.Setenv("NEXUSIM_CONTACTS_TEST_BOOL", "true")
+	parsed, err := envRequiredBool("NEXUSIM_CONTACTS_TEST_BOOL")
+	if err != nil || !parsed {
+		t.Fatalf("expected true bool, parsed=%t err=%v", parsed, err)
+	}
+
+	t.Setenv("NEXUSIM_CONTACTS_TEST_BOOL", "")
+	if _, err := envRequiredBool("NEXUSIM_CONTACTS_TEST_BOOL"); err == nil {
+		t.Fatalf("expected missing bool to fail")
+	}
+
+	t.Setenv("NEXUSIM_CONTACTS_TEST_BOOL", "sometimes")
+	if _, err := envRequiredBool("NEXUSIM_CONTACTS_TEST_BOOL"); err == nil {
+		t.Fatalf("expected invalid bool to fail")
+	}
+}
+
+func TestEnvContactRequestSourceType(t *testing.T) {
+	t.Setenv("NEXUSIM_CONTACTS_TEST_SOURCE_TYPE", " search ")
+	sourceType, err := envContactRequestSourceType("NEXUSIM_CONTACTS_TEST_SOURCE_TYPE")
+	if err != nil || sourceType != types.ContactRequestSourceTypeSearch {
+		t.Fatalf("expected normalized search source type, source_type=%s err=%v", sourceType, err)
+	}
+
+	t.Setenv("NEXUSIM_CONTACTS_TEST_SOURCE_TYPE", "")
+	if _, err := envContactRequestSourceType("NEXUSIM_CONTACTS_TEST_SOURCE_TYPE"); err == nil {
+		t.Fatalf("expected missing source type to fail")
+	}
+
+	t.Setenv("NEXUSIM_CONTACTS_TEST_SOURCE_TYPE", "unknown")
+	if _, err := envContactRequestSourceType("NEXUSIM_CONTACTS_TEST_SOURCE_TYPE"); err == nil {
+		t.Fatalf("expected invalid source type to fail")
 	}
 }
 

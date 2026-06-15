@@ -77,7 +77,7 @@ search-service 和 AI 应用后端后置；
 | `delivery-service` | timeline projection，durable `user_inbox`，`PullInbox`，`AckDelivery`，delivery outbox，first-stage Prometheus text `/metrics`、本地 alert rules / Grafana dashboard、first-stage OTel gRPC server span | 断线可恢复，push-gateway 不拥有 durable inbox，投递服务已进入观测 rollout |
 | `push-gateway` | WebSocket 在线通知，ACK 转发，resume buffer，Redis route，跨实例在线路由，first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel WebSocket connection span | 在线唤醒层和可靠投递层解耦，Redis 故障时 PullInbox 兜底，在线层已进入观测 rollout |
 | `receipt-service` | 已读 / 未读，会话列表，archive / pin / mute，receipt projection，receipt outbox，first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 会话列表和回执从投递事件投影，不跨服务读内部表，回执服务已进入观测 rollout |
-| `contacts-service` | 好友申请、接受、拒绝、取消、删除、拉黑、备注，contacts outbox，first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 联系人事实源，策略服务通过事件投影使用联系人关系，联系人服务已进入观测 rollout |
+| `contacts-service` | 好友申请、申请来源 metadata、租户级来源策略、接受、拒绝、取消、删除、拉黑、解除拉黑、备注、分组、联系人搜索、用户 / 租户 / 系统三级申请隐私、租户默认隐私 operator、contacts outbox，first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 联系人事实源，策略服务通过事件投影使用联系人关系；隐私、来源策略和拉黑只影响本服务关系事实，消息权限通过 policy projection 表达 |
 | `policy-service` | 权限决策、规则存储、conversation role gate、contacts projection、decision audit outbox、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 策略权限独立服务化，不在 message-service 复制权限逻辑，策略服务已进入观测 rollout |
 
 ## 已完成的主链路
@@ -160,7 +160,7 @@ search-service 和 AI 应用后端后置；
 | `delivery-service` | Projection DLQ / repair 深化、更多 delivery event 消费方、投递容量压测；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules 和本地 Grafana dashboard，但还不是生产观测平台 |
 | `push-gateway` | Redis 网络分区 smoke、跨实例 resume 强化、在线连接容量测试、慢连接组合故障验证；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules 和本地 Grafana dashboard，但还不是生产观测平台 |
 | `receipt-service` | 送达回执扩展、批量接口优化、会话列表产品化；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules 和本地 Grafana dashboard，但还不是生产观测平台 |
-| `contacts-service` | 联系人分组、联系人搜索、更多隐私策略；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules 和本地 Grafana dashboard，但还不是生产观测平台 |
+| `contacts-service` | 更细 profile 可见性、黑名单之外的陌生人策略、后续接入 admin/config service 正式权限面；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules 和本地 Grafana dashboard，但还不是生产观测平台 |
 | `policy-service` | 完整 ReBAC、moderation policy、tenant DSL / quota、外部 audit sink；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules 和本地 Grafana dashboard，但还不是生产观测平台 |
 
 ### 中期：完整 IM 产品后端

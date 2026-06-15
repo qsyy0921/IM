@@ -229,6 +229,119 @@ func (ContactRequestListDirection) EnumDescriptor() ([]byte, []int) {
 	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{3}
 }
 
+type ContactRequestSourceType int32
+
+const (
+	ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_UNSPECIFIED ContactRequestSourceType = 0
+	ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_DIRECT      ContactRequestSourceType = 1
+	ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_SEARCH      ContactRequestSourceType = 2
+	ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_GROUP       ContactRequestSourceType = 3
+	ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_INVITE_LINK ContactRequestSourceType = 4
+	ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_QR_CODE     ContactRequestSourceType = 5
+	ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_IMPORT      ContactRequestSourceType = 6
+)
+
+// Enum value maps for ContactRequestSourceType.
+var (
+	ContactRequestSourceType_name = map[int32]string{
+		0: "CONTACT_REQUEST_SOURCE_TYPE_UNSPECIFIED",
+		1: "CONTACT_REQUEST_SOURCE_TYPE_DIRECT",
+		2: "CONTACT_REQUEST_SOURCE_TYPE_SEARCH",
+		3: "CONTACT_REQUEST_SOURCE_TYPE_GROUP",
+		4: "CONTACT_REQUEST_SOURCE_TYPE_INVITE_LINK",
+		5: "CONTACT_REQUEST_SOURCE_TYPE_QR_CODE",
+		6: "CONTACT_REQUEST_SOURCE_TYPE_IMPORT",
+	}
+	ContactRequestSourceType_value = map[string]int32{
+		"CONTACT_REQUEST_SOURCE_TYPE_UNSPECIFIED": 0,
+		"CONTACT_REQUEST_SOURCE_TYPE_DIRECT":      1,
+		"CONTACT_REQUEST_SOURCE_TYPE_SEARCH":      2,
+		"CONTACT_REQUEST_SOURCE_TYPE_GROUP":       3,
+		"CONTACT_REQUEST_SOURCE_TYPE_INVITE_LINK": 4,
+		"CONTACT_REQUEST_SOURCE_TYPE_QR_CODE":     5,
+		"CONTACT_REQUEST_SOURCE_TYPE_IMPORT":      6,
+	}
+)
+
+func (x ContactRequestSourceType) Enum() *ContactRequestSourceType {
+	p := new(ContactRequestSourceType)
+	*p = x
+	return p
+}
+
+func (x ContactRequestSourceType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ContactRequestSourceType) Descriptor() protoreflect.EnumDescriptor {
+	return file_nexusim_contacts_v1_contacts_service_proto_enumTypes[4].Descriptor()
+}
+
+func (ContactRequestSourceType) Type() protoreflect.EnumType {
+	return &file_nexusim_contacts_v1_contacts_service_proto_enumTypes[4]
+}
+
+func (x ContactRequestSourceType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ContactRequestSourceType.Descriptor instead.
+func (ContactRequestSourceType) EnumDescriptor() ([]byte, []int) {
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{4}
+}
+
+type ContactPrivacyPolicySource int32
+
+const (
+	ContactPrivacyPolicySource_CONTACT_PRIVACY_POLICY_SOURCE_UNSPECIFIED    ContactPrivacyPolicySource = 0
+	ContactPrivacyPolicySource_CONTACT_PRIVACY_POLICY_SOURCE_USER           ContactPrivacyPolicySource = 1
+	ContactPrivacyPolicySource_CONTACT_PRIVACY_POLICY_SOURCE_TENANT_DEFAULT ContactPrivacyPolicySource = 2
+	ContactPrivacyPolicySource_CONTACT_PRIVACY_POLICY_SOURCE_SYSTEM_DEFAULT ContactPrivacyPolicySource = 3
+)
+
+// Enum value maps for ContactPrivacyPolicySource.
+var (
+	ContactPrivacyPolicySource_name = map[int32]string{
+		0: "CONTACT_PRIVACY_POLICY_SOURCE_UNSPECIFIED",
+		1: "CONTACT_PRIVACY_POLICY_SOURCE_USER",
+		2: "CONTACT_PRIVACY_POLICY_SOURCE_TENANT_DEFAULT",
+		3: "CONTACT_PRIVACY_POLICY_SOURCE_SYSTEM_DEFAULT",
+	}
+	ContactPrivacyPolicySource_value = map[string]int32{
+		"CONTACT_PRIVACY_POLICY_SOURCE_UNSPECIFIED":    0,
+		"CONTACT_PRIVACY_POLICY_SOURCE_USER":           1,
+		"CONTACT_PRIVACY_POLICY_SOURCE_TENANT_DEFAULT": 2,
+		"CONTACT_PRIVACY_POLICY_SOURCE_SYSTEM_DEFAULT": 3,
+	}
+)
+
+func (x ContactPrivacyPolicySource) Enum() *ContactPrivacyPolicySource {
+	p := new(ContactPrivacyPolicySource)
+	*p = x
+	return p
+}
+
+func (x ContactPrivacyPolicySource) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ContactPrivacyPolicySource) Descriptor() protoreflect.EnumDescriptor {
+	return file_nexusim_contacts_v1_contacts_service_proto_enumTypes[5].Descriptor()
+}
+
+func (ContactPrivacyPolicySource) Type() protoreflect.EnumType {
+	return &file_nexusim_contacts_v1_contacts_service_proto_enumTypes[5]
+}
+
+func (x ContactPrivacyPolicySource) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ContactPrivacyPolicySource.Descriptor instead.
+func (ContactPrivacyPolicySource) EnumDescriptor() ([]byte, []int) {
+	return file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP(), []int{5}
+}
+
 type AuthContext struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
@@ -314,11 +427,13 @@ func (x *AuthContext) GetRequestId() string {
 }
 
 type SendContactRequestRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	AuthContext    *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
-	TargetUserId   string                 `protobuf:"bytes,2,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
-	IdempotencyKey string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
-	Message        string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	state          protoimpl.MessageState   `protogen:"open.v1"`
+	AuthContext    *AuthContext             `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	TargetUserId   string                   `protobuf:"bytes,2,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	IdempotencyKey string                   `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	Message        string                   `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	SourceType     ContactRequestSourceType `protobuf:"varint,5,opt,name=source_type,json=sourceType,proto3,enum=nexusim.contacts.v1.ContactRequestSourceType" json:"source_type,omitempty"`
+	SourceRef      string                   `protobuf:"bytes,6,opt,name=source_ref,json=sourceRef,proto3" json:"source_ref,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -381,14 +496,30 @@ func (x *SendContactRequestRequest) GetMessage() string {
 	return ""
 }
 
+func (x *SendContactRequestRequest) GetSourceType() ContactRequestSourceType {
+	if x != nil {
+		return x.SourceType
+	}
+	return ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_UNSPECIFIED
+}
+
+func (x *SendContactRequestRequest) GetSourceRef() string {
+	if x != nil {
+		return x.SourceRef
+	}
+	return ""
+}
+
 type SendContactRequestResponse struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	RequestId        string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	TenantId         string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
-	SenderUserId     string                 `protobuf:"bytes,3,opt,name=sender_user_id,json=senderUserId,proto3" json:"sender_user_id,omitempty"`
-	ReceiverUserId   string                 `protobuf:"bytes,4,opt,name=receiver_user_id,json=receiverUserId,proto3" json:"receiver_user_id,omitempty"`
-	Status           ContactRequestStatus   `protobuf:"varint,5,opt,name=status,proto3,enum=nexusim.contacts.v1.ContactRequestStatus" json:"status,omitempty"`
-	IdempotentReplay bool                   `protobuf:"varint,6,opt,name=idempotent_replay,json=idempotentReplay,proto3" json:"idempotent_replay,omitempty"`
+	state            protoimpl.MessageState   `protogen:"open.v1"`
+	RequestId        string                   `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	TenantId         string                   `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	SenderUserId     string                   `protobuf:"bytes,3,opt,name=sender_user_id,json=senderUserId,proto3" json:"sender_user_id,omitempty"`
+	ReceiverUserId   string                   `protobuf:"bytes,4,opt,name=receiver_user_id,json=receiverUserId,proto3" json:"receiver_user_id,omitempty"`
+	Status           ContactRequestStatus     `protobuf:"varint,5,opt,name=status,proto3,enum=nexusim.contacts.v1.ContactRequestStatus" json:"status,omitempty"`
+	IdempotentReplay bool                     `protobuf:"varint,6,opt,name=idempotent_replay,json=idempotentReplay,proto3" json:"idempotent_replay,omitempty"`
+	SourceType       ContactRequestSourceType `protobuf:"varint,7,opt,name=source_type,json=sourceType,proto3,enum=nexusim.contacts.v1.ContactRequestSourceType" json:"source_type,omitempty"`
+	SourceRef        string                   `protobuf:"bytes,8,opt,name=source_ref,json=sourceRef,proto3" json:"source_ref,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -463,6 +594,20 @@ func (x *SendContactRequestResponse) GetIdempotentReplay() bool {
 		return x.IdempotentReplay
 	}
 	return false
+}
+
+func (x *SendContactRequestResponse) GetSourceType() ContactRequestSourceType {
+	if x != nil {
+		return x.SourceType
+	}
+	return ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_UNSPECIFIED
+}
+
+func (x *SendContactRequestResponse) GetSourceRef() string {
+	if x != nil {
+		return x.SourceRef
+	}
+	return ""
 }
 
 type RespondContactRequestRequest struct {
@@ -838,15 +983,17 @@ func (x *ListContactRequestsRequest) GetPageToken() string {
 }
 
 type ContactRequestItem struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	RequestId       string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	SenderUserId    string                 `protobuf:"bytes,2,opt,name=sender_user_id,json=senderUserId,proto3" json:"sender_user_id,omitempty"`
-	ReceiverUserId  string                 `protobuf:"bytes,3,opt,name=receiver_user_id,json=receiverUserId,proto3" json:"receiver_user_id,omitempty"`
-	Status          ContactRequestStatus   `protobuf:"varint,4,opt,name=status,proto3,enum=nexusim.contacts.v1.ContactRequestStatus" json:"status,omitempty"`
-	Message         string                 `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
-	CreatedAtUnixMs int64                  `protobuf:"varint,6,opt,name=created_at_unix_ms,json=createdAtUnixMs,proto3" json:"created_at_unix_ms,omitempty"`
-	UpdatedAtUnixMs int64                  `protobuf:"varint,7,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
-	DecidedAtUnixMs int64                  `protobuf:"varint,8,opt,name=decided_at_unix_ms,json=decidedAtUnixMs,proto3" json:"decided_at_unix_ms,omitempty"`
+	state           protoimpl.MessageState   `protogen:"open.v1"`
+	RequestId       string                   `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	SenderUserId    string                   `protobuf:"bytes,2,opt,name=sender_user_id,json=senderUserId,proto3" json:"sender_user_id,omitempty"`
+	ReceiverUserId  string                   `protobuf:"bytes,3,opt,name=receiver_user_id,json=receiverUserId,proto3" json:"receiver_user_id,omitempty"`
+	Status          ContactRequestStatus     `protobuf:"varint,4,opt,name=status,proto3,enum=nexusim.contacts.v1.ContactRequestStatus" json:"status,omitempty"`
+	Message         string                   `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
+	CreatedAtUnixMs int64                    `protobuf:"varint,6,opt,name=created_at_unix_ms,json=createdAtUnixMs,proto3" json:"created_at_unix_ms,omitempty"`
+	UpdatedAtUnixMs int64                    `protobuf:"varint,7,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
+	DecidedAtUnixMs int64                    `protobuf:"varint,8,opt,name=decided_at_unix_ms,json=decidedAtUnixMs,proto3" json:"decided_at_unix_ms,omitempty"`
+	SourceType      ContactRequestSourceType `protobuf:"varint,9,opt,name=source_type,json=sourceType,proto3,enum=nexusim.contacts.v1.ContactRequestSourceType" json:"source_type,omitempty"`
+	SourceRef       string                   `protobuf:"bytes,10,opt,name=source_ref,json=sourceRef,proto3" json:"source_ref,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -935,6 +1082,20 @@ func (x *ContactRequestItem) GetDecidedAtUnixMs() int64 {
 		return x.DecidedAtUnixMs
 	}
 	return 0
+}
+
+func (x *ContactRequestItem) GetSourceType() ContactRequestSourceType {
+	if x != nil {
+		return x.SourceType
+	}
+	return ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_UNSPECIFIED
+}
+
+func (x *ContactRequestItem) GetSourceRef() string {
+	if x != nil {
+		return x.SourceRef
+	}
+	return ""
 }
 
 type ListContactRequestsResponse struct {
@@ -2218,10 +2379,11 @@ func (x *UpdateContactGroupResponse) GetIdempotentReplay() bool {
 }
 
 type ContactPrivacySettings struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	AllowContactRequests bool                   `protobuf:"varint,1,opt,name=allow_contact_requests,json=allowContactRequests,proto3" json:"allow_contact_requests,omitempty"`
-	Version              int64                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
-	UpdatedAtUnixMs      int64                  `protobuf:"varint,3,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
+	state                protoimpl.MessageState     `protogen:"open.v1"`
+	AllowContactRequests bool                       `protobuf:"varint,1,opt,name=allow_contact_requests,json=allowContactRequests,proto3" json:"allow_contact_requests,omitempty"`
+	Version              int64                      `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	UpdatedAtUnixMs      int64                      `protobuf:"varint,3,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
+	PolicySource         ContactPrivacyPolicySource `protobuf:"varint,4,opt,name=policy_source,json=policySource,proto3,enum=nexusim.contacts.v1.ContactPrivacyPolicySource" json:"policy_source,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -2275,6 +2437,13 @@ func (x *ContactPrivacySettings) GetUpdatedAtUnixMs() int64 {
 		return x.UpdatedAtUnixMs
 	}
 	return 0
+}
+
+func (x *ContactPrivacySettings) GetPolicySource() ContactPrivacyPolicySource {
+	if x != nil {
+		return x.PolicySource
+	}
+	return ContactPrivacyPolicySource_CONTACT_PRIVACY_POLICY_SOURCE_UNSPECIFIED
 }
 
 type GetContactPrivacyRequest struct {
@@ -2522,12 +2691,16 @@ const file_nexusim_contacts_v1_contacts_service_proto_rawDesc = "" +
 	"session_id\x18\x04 \x01(\tR\tsessionId\x12\x19\n" +
 	"\btrace_id\x18\x05 \x01(\tR\atraceId\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x06 \x01(\tR\trequestId\"\xc9\x01\n" +
+	"request_id\x18\x06 \x01(\tR\trequestId\"\xb8\x02\n" +
 	"\x19SendContactRequestRequest\x12C\n" +
 	"\fauth_context\x18\x01 \x01(\v2 .nexusim.contacts.v1.AuthContextR\vauthContext\x12$\n" +
 	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12'\n" +
 	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\x12\x18\n" +
-	"\amessage\x18\x04 \x01(\tR\amessage\"\x98\x02\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\x12N\n" +
+	"\vsource_type\x18\x05 \x01(\x0e2-.nexusim.contacts.v1.ContactRequestSourceTypeR\n" +
+	"sourceType\x12\x1d\n" +
+	"\n" +
+	"source_ref\x18\x06 \x01(\tR\tsourceRef\"\x87\x03\n" +
 	"\x1aSendContactRequestResponse\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1b\n" +
@@ -2535,7 +2708,11 @@ const file_nexusim_contacts_v1_contacts_service_proto_rawDesc = "" +
 	"\x0esender_user_id\x18\x03 \x01(\tR\fsenderUserId\x12(\n" +
 	"\x10receiver_user_id\x18\x04 \x01(\tR\x0ereceiverUserId\x12A\n" +
 	"\x06status\x18\x05 \x01(\x0e2).nexusim.contacts.v1.ContactRequestStatusR\x06status\x12+\n" +
-	"\x11idempotent_replay\x18\x06 \x01(\bR\x10idempotentReplay\"\xed\x01\n" +
+	"\x11idempotent_replay\x18\x06 \x01(\bR\x10idempotentReplay\x12N\n" +
+	"\vsource_type\x18\a \x01(\x0e2-.nexusim.contacts.v1.ContactRequestSourceTypeR\n" +
+	"sourceType\x12\x1d\n" +
+	"\n" +
+	"source_ref\x18\b \x01(\tR\tsourceRef\"\xed\x01\n" +
 	"\x1cRespondContactRequestRequest\x12C\n" +
 	"\fauth_context\x18\x01 \x01(\v2 .nexusim.contacts.v1.AuthContextR\vauthContext\x12\x1d\n" +
 	"\n" +
@@ -2569,7 +2746,7 @@ const file_nexusim_contacts_v1_contacts_service_proto_rawDesc = "" +
 	"\x06status\x18\x03 \x01(\x0e2).nexusim.contacts.v1.ContactRequestStatusR\x06status\x12\x1b\n" +
 	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
-	"page_token\x18\x05 \x01(\tR\tpageToken\"\xe7\x02\n" +
+	"page_token\x18\x05 \x01(\tR\tpageToken\"\xd6\x03\n" +
 	"\x12ContactRequestItem\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12$\n" +
@@ -2579,7 +2756,12 @@ const file_nexusim_contacts_v1_contacts_service_proto_rawDesc = "" +
 	"\amessage\x18\x05 \x01(\tR\amessage\x12+\n" +
 	"\x12created_at_unix_ms\x18\x06 \x01(\x03R\x0fcreatedAtUnixMs\x12+\n" +
 	"\x12updated_at_unix_ms\x18\a \x01(\x03R\x0fupdatedAtUnixMs\x12+\n" +
-	"\x12decided_at_unix_ms\x18\b \x01(\x03R\x0fdecidedAtUnixMs\"\xd3\x02\n" +
+	"\x12decided_at_unix_ms\x18\b \x01(\x03R\x0fdecidedAtUnixMs\x12N\n" +
+	"\vsource_type\x18\t \x01(\x0e2-.nexusim.contacts.v1.ContactRequestSourceTypeR\n" +
+	"sourceType\x12\x1d\n" +
+	"\n" +
+	"source_ref\x18\n" +
+	" \x01(\tR\tsourceRef\"\xd3\x02\n" +
 	"\x1bListContactRequestsResponse\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12N\n" +
@@ -2689,11 +2871,12 @@ const file_nexusim_contacts_v1_contacts_service_proto_rawDesc = "" +
 	"\aversion\x18\x06 \x01(\x03R\aversion\x12\x1d\n" +
 	"\n" +
 	"group_name\x18\a \x01(\tR\tgroupName\x12+\n" +
-	"\x11idempotent_replay\x18\b \x01(\bR\x10idempotentReplay\"\x95\x01\n" +
+	"\x11idempotent_replay\x18\b \x01(\bR\x10idempotentReplay\"\xeb\x01\n" +
 	"\x16ContactPrivacySettings\x124\n" +
 	"\x16allow_contact_requests\x18\x01 \x01(\bR\x14allowContactRequests\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12+\n" +
-	"\x12updated_at_unix_ms\x18\x03 \x01(\x03R\x0fupdatedAtUnixMs\"_\n" +
+	"\x12updated_at_unix_ms\x18\x03 \x01(\x03R\x0fupdatedAtUnixMs\x12T\n" +
+	"\rpolicy_source\x18\x04 \x01(\x0e2/.nexusim.contacts.v1.ContactPrivacyPolicySourceR\fpolicySource\"_\n" +
 	"\x18GetContactPrivacyRequest\x12C\n" +
 	"\fauth_context\x18\x01 \x01(\v2 .nexusim.contacts.v1.AuthContextR\vauthContext\"\x9a\x01\n" +
 	"\x19GetContactPrivacyResponse\x12\x1b\n" +
@@ -2728,7 +2911,20 @@ const file_nexusim_contacts_v1_contacts_service_proto_rawDesc = "" +
 	"\x1bContactRequestListDirection\x12.\n" +
 	"*CONTACT_REQUEST_LIST_DIRECTION_UNSPECIFIED\x10\x00\x12+\n" +
 	"'CONTACT_REQUEST_LIST_DIRECTION_INCOMING\x10\x01\x12+\n" +
-	"'CONTACT_REQUEST_LIST_DIRECTION_OUTGOING\x10\x022\xe3\v\n" +
+	"'CONTACT_REQUEST_LIST_DIRECTION_OUTGOING\x10\x02*\xbc\x02\n" +
+	"\x18ContactRequestSourceType\x12+\n" +
+	"'CONTACT_REQUEST_SOURCE_TYPE_UNSPECIFIED\x10\x00\x12&\n" +
+	"\"CONTACT_REQUEST_SOURCE_TYPE_DIRECT\x10\x01\x12&\n" +
+	"\"CONTACT_REQUEST_SOURCE_TYPE_SEARCH\x10\x02\x12%\n" +
+	"!CONTACT_REQUEST_SOURCE_TYPE_GROUP\x10\x03\x12+\n" +
+	"'CONTACT_REQUEST_SOURCE_TYPE_INVITE_LINK\x10\x04\x12'\n" +
+	"#CONTACT_REQUEST_SOURCE_TYPE_QR_CODE\x10\x05\x12&\n" +
+	"\"CONTACT_REQUEST_SOURCE_TYPE_IMPORT\x10\x06*\xd7\x01\n" +
+	"\x1aContactPrivacyPolicySource\x12-\n" +
+	")CONTACT_PRIVACY_POLICY_SOURCE_UNSPECIFIED\x10\x00\x12&\n" +
+	"\"CONTACT_PRIVACY_POLICY_SOURCE_USER\x10\x01\x120\n" +
+	",CONTACT_PRIVACY_POLICY_SOURCE_TENANT_DEFAULT\x10\x02\x120\n" +
+	",CONTACT_PRIVACY_POLICY_SOURCE_SYSTEM_DEFAULT\x10\x032\xe3\v\n" +
 	"\x0fContactsService\x12u\n" +
 	"\x12SendContactRequest\x12..nexusim.contacts.v1.SendContactRequestRequest\x1a/.nexusim.contacts.v1.SendContactRequestResponse\x12~\n" +
 	"\x15RespondContactRequest\x121.nexusim.contacts.v1.RespondContactRequestRequest\x1a2.nexusim.contacts.v1.RespondContactRequestResponse\x12{\n" +
@@ -2756,109 +2952,115 @@ func file_nexusim_contacts_v1_contacts_service_proto_rawDescGZIP() []byte {
 	return file_nexusim_contacts_v1_contacts_service_proto_rawDescData
 }
 
-var file_nexusim_contacts_v1_contacts_service_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_nexusim_contacts_v1_contacts_service_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
 var file_nexusim_contacts_v1_contacts_service_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_nexusim_contacts_v1_contacts_service_proto_goTypes = []any{
 	(ContactRequestStatus)(0),             // 0: nexusim.contacts.v1.ContactRequestStatus
 	(ContactEdgeStatus)(0),                // 1: nexusim.contacts.v1.ContactEdgeStatus
 	(ContactDecision)(0),                  // 2: nexusim.contacts.v1.ContactDecision
 	(ContactRequestListDirection)(0),      // 3: nexusim.contacts.v1.ContactRequestListDirection
-	(*AuthContext)(nil),                   // 4: nexusim.contacts.v1.AuthContext
-	(*SendContactRequestRequest)(nil),     // 5: nexusim.contacts.v1.SendContactRequestRequest
-	(*SendContactRequestResponse)(nil),    // 6: nexusim.contacts.v1.SendContactRequestResponse
-	(*RespondContactRequestRequest)(nil),  // 7: nexusim.contacts.v1.RespondContactRequestRequest
-	(*RespondContactRequestResponse)(nil), // 8: nexusim.contacts.v1.RespondContactRequestResponse
-	(*CancelContactRequestRequest)(nil),   // 9: nexusim.contacts.v1.CancelContactRequestRequest
-	(*CancelContactRequestResponse)(nil),  // 10: nexusim.contacts.v1.CancelContactRequestResponse
-	(*ListContactRequestsRequest)(nil),    // 11: nexusim.contacts.v1.ListContactRequestsRequest
-	(*ContactRequestItem)(nil),            // 12: nexusim.contacts.v1.ContactRequestItem
-	(*ListContactRequestsResponse)(nil),   // 13: nexusim.contacts.v1.ListContactRequestsResponse
-	(*ListContactsRequest)(nil),           // 14: nexusim.contacts.v1.ListContactsRequest
-	(*ContactItem)(nil),                   // 15: nexusim.contacts.v1.ContactItem
-	(*ListContactsResponse)(nil),          // 16: nexusim.contacts.v1.ListContactsResponse
-	(*GetContactStateRequest)(nil),        // 17: nexusim.contacts.v1.GetContactStateRequest
-	(*GetContactStateResponse)(nil),       // 18: nexusim.contacts.v1.GetContactStateResponse
-	(*DeleteContactRequest)(nil),          // 19: nexusim.contacts.v1.DeleteContactRequest
-	(*DeleteContactResponse)(nil),         // 20: nexusim.contacts.v1.DeleteContactResponse
-	(*BlockContactRequest)(nil),           // 21: nexusim.contacts.v1.BlockContactRequest
-	(*BlockContactResponse)(nil),          // 22: nexusim.contacts.v1.BlockContactResponse
-	(*UnblockContactRequest)(nil),         // 23: nexusim.contacts.v1.UnblockContactRequest
-	(*UnblockContactResponse)(nil),        // 24: nexusim.contacts.v1.UnblockContactResponse
-	(*UpdateContactRemarkRequest)(nil),    // 25: nexusim.contacts.v1.UpdateContactRemarkRequest
-	(*UpdateContactRemarkResponse)(nil),   // 26: nexusim.contacts.v1.UpdateContactRemarkResponse
-	(*UpdateContactGroupRequest)(nil),     // 27: nexusim.contacts.v1.UpdateContactGroupRequest
-	(*UpdateContactGroupResponse)(nil),    // 28: nexusim.contacts.v1.UpdateContactGroupResponse
-	(*ContactPrivacySettings)(nil),        // 29: nexusim.contacts.v1.ContactPrivacySettings
-	(*GetContactPrivacyRequest)(nil),      // 30: nexusim.contacts.v1.GetContactPrivacyRequest
-	(*GetContactPrivacyResponse)(nil),     // 31: nexusim.contacts.v1.GetContactPrivacyResponse
-	(*SetContactPrivacyRequest)(nil),      // 32: nexusim.contacts.v1.SetContactPrivacyRequest
-	(*SetContactPrivacyResponse)(nil),     // 33: nexusim.contacts.v1.SetContactPrivacyResponse
+	(ContactRequestSourceType)(0),         // 4: nexusim.contacts.v1.ContactRequestSourceType
+	(ContactPrivacyPolicySource)(0),       // 5: nexusim.contacts.v1.ContactPrivacyPolicySource
+	(*AuthContext)(nil),                   // 6: nexusim.contacts.v1.AuthContext
+	(*SendContactRequestRequest)(nil),     // 7: nexusim.contacts.v1.SendContactRequestRequest
+	(*SendContactRequestResponse)(nil),    // 8: nexusim.contacts.v1.SendContactRequestResponse
+	(*RespondContactRequestRequest)(nil),  // 9: nexusim.contacts.v1.RespondContactRequestRequest
+	(*RespondContactRequestResponse)(nil), // 10: nexusim.contacts.v1.RespondContactRequestResponse
+	(*CancelContactRequestRequest)(nil),   // 11: nexusim.contacts.v1.CancelContactRequestRequest
+	(*CancelContactRequestResponse)(nil),  // 12: nexusim.contacts.v1.CancelContactRequestResponse
+	(*ListContactRequestsRequest)(nil),    // 13: nexusim.contacts.v1.ListContactRequestsRequest
+	(*ContactRequestItem)(nil),            // 14: nexusim.contacts.v1.ContactRequestItem
+	(*ListContactRequestsResponse)(nil),   // 15: nexusim.contacts.v1.ListContactRequestsResponse
+	(*ListContactsRequest)(nil),           // 16: nexusim.contacts.v1.ListContactsRequest
+	(*ContactItem)(nil),                   // 17: nexusim.contacts.v1.ContactItem
+	(*ListContactsResponse)(nil),          // 18: nexusim.contacts.v1.ListContactsResponse
+	(*GetContactStateRequest)(nil),        // 19: nexusim.contacts.v1.GetContactStateRequest
+	(*GetContactStateResponse)(nil),       // 20: nexusim.contacts.v1.GetContactStateResponse
+	(*DeleteContactRequest)(nil),          // 21: nexusim.contacts.v1.DeleteContactRequest
+	(*DeleteContactResponse)(nil),         // 22: nexusim.contacts.v1.DeleteContactResponse
+	(*BlockContactRequest)(nil),           // 23: nexusim.contacts.v1.BlockContactRequest
+	(*BlockContactResponse)(nil),          // 24: nexusim.contacts.v1.BlockContactResponse
+	(*UnblockContactRequest)(nil),         // 25: nexusim.contacts.v1.UnblockContactRequest
+	(*UnblockContactResponse)(nil),        // 26: nexusim.contacts.v1.UnblockContactResponse
+	(*UpdateContactRemarkRequest)(nil),    // 27: nexusim.contacts.v1.UpdateContactRemarkRequest
+	(*UpdateContactRemarkResponse)(nil),   // 28: nexusim.contacts.v1.UpdateContactRemarkResponse
+	(*UpdateContactGroupRequest)(nil),     // 29: nexusim.contacts.v1.UpdateContactGroupRequest
+	(*UpdateContactGroupResponse)(nil),    // 30: nexusim.contacts.v1.UpdateContactGroupResponse
+	(*ContactPrivacySettings)(nil),        // 31: nexusim.contacts.v1.ContactPrivacySettings
+	(*GetContactPrivacyRequest)(nil),      // 32: nexusim.contacts.v1.GetContactPrivacyRequest
+	(*GetContactPrivacyResponse)(nil),     // 33: nexusim.contacts.v1.GetContactPrivacyResponse
+	(*SetContactPrivacyRequest)(nil),      // 34: nexusim.contacts.v1.SetContactPrivacyRequest
+	(*SetContactPrivacyResponse)(nil),     // 35: nexusim.contacts.v1.SetContactPrivacyResponse
 }
 var file_nexusim_contacts_v1_contacts_service_proto_depIdxs = []int32{
-	4,  // 0: nexusim.contacts.v1.SendContactRequestRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	0,  // 1: nexusim.contacts.v1.SendContactRequestResponse.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
-	4,  // 2: nexusim.contacts.v1.RespondContactRequestRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	2,  // 3: nexusim.contacts.v1.RespondContactRequestRequest.decision:type_name -> nexusim.contacts.v1.ContactDecision
-	0,  // 4: nexusim.contacts.v1.RespondContactRequestResponse.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
-	4,  // 5: nexusim.contacts.v1.CancelContactRequestRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	0,  // 6: nexusim.contacts.v1.CancelContactRequestResponse.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
-	4,  // 7: nexusim.contacts.v1.ListContactRequestsRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	3,  // 8: nexusim.contacts.v1.ListContactRequestsRequest.direction:type_name -> nexusim.contacts.v1.ContactRequestListDirection
-	0,  // 9: nexusim.contacts.v1.ListContactRequestsRequest.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
-	0,  // 10: nexusim.contacts.v1.ContactRequestItem.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
-	3,  // 11: nexusim.contacts.v1.ListContactRequestsResponse.direction:type_name -> nexusim.contacts.v1.ContactRequestListDirection
-	0,  // 12: nexusim.contacts.v1.ListContactRequestsResponse.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
-	12, // 13: nexusim.contacts.v1.ListContactRequestsResponse.requests:type_name -> nexusim.contacts.v1.ContactRequestItem
-	4,  // 14: nexusim.contacts.v1.ListContactsRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	1,  // 15: nexusim.contacts.v1.ContactItem.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
-	15, // 16: nexusim.contacts.v1.ListContactsResponse.contacts:type_name -> nexusim.contacts.v1.ContactItem
-	4,  // 17: nexusim.contacts.v1.GetContactStateRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	1,  // 18: nexusim.contacts.v1.GetContactStateResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
-	4,  // 19: nexusim.contacts.v1.DeleteContactRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	1,  // 20: nexusim.contacts.v1.DeleteContactResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
-	4,  // 21: nexusim.contacts.v1.BlockContactRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	1,  // 22: nexusim.contacts.v1.BlockContactResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
-	4,  // 23: nexusim.contacts.v1.UnblockContactRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	1,  // 24: nexusim.contacts.v1.UnblockContactResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
-	4,  // 25: nexusim.contacts.v1.UpdateContactRemarkRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	1,  // 26: nexusim.contacts.v1.UpdateContactRemarkResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
-	4,  // 27: nexusim.contacts.v1.UpdateContactGroupRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	1,  // 28: nexusim.contacts.v1.UpdateContactGroupResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
-	4,  // 29: nexusim.contacts.v1.GetContactPrivacyRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	29, // 30: nexusim.contacts.v1.GetContactPrivacyResponse.settings:type_name -> nexusim.contacts.v1.ContactPrivacySettings
-	4,  // 31: nexusim.contacts.v1.SetContactPrivacyRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
-	29, // 32: nexusim.contacts.v1.SetContactPrivacyResponse.settings:type_name -> nexusim.contacts.v1.ContactPrivacySettings
-	5,  // 33: nexusim.contacts.v1.ContactsService.SendContactRequest:input_type -> nexusim.contacts.v1.SendContactRequestRequest
-	7,  // 34: nexusim.contacts.v1.ContactsService.RespondContactRequest:input_type -> nexusim.contacts.v1.RespondContactRequestRequest
-	9,  // 35: nexusim.contacts.v1.ContactsService.CancelContactRequest:input_type -> nexusim.contacts.v1.CancelContactRequestRequest
-	11, // 36: nexusim.contacts.v1.ContactsService.ListContactRequests:input_type -> nexusim.contacts.v1.ListContactRequestsRequest
-	14, // 37: nexusim.contacts.v1.ContactsService.ListContacts:input_type -> nexusim.contacts.v1.ListContactsRequest
-	17, // 38: nexusim.contacts.v1.ContactsService.GetContactState:input_type -> nexusim.contacts.v1.GetContactStateRequest
-	19, // 39: nexusim.contacts.v1.ContactsService.DeleteContact:input_type -> nexusim.contacts.v1.DeleteContactRequest
-	21, // 40: nexusim.contacts.v1.ContactsService.BlockContact:input_type -> nexusim.contacts.v1.BlockContactRequest
-	23, // 41: nexusim.contacts.v1.ContactsService.UnblockContact:input_type -> nexusim.contacts.v1.UnblockContactRequest
-	25, // 42: nexusim.contacts.v1.ContactsService.UpdateContactRemark:input_type -> nexusim.contacts.v1.UpdateContactRemarkRequest
-	27, // 43: nexusim.contacts.v1.ContactsService.UpdateContactGroup:input_type -> nexusim.contacts.v1.UpdateContactGroupRequest
-	30, // 44: nexusim.contacts.v1.ContactsService.GetContactPrivacy:input_type -> nexusim.contacts.v1.GetContactPrivacyRequest
-	32, // 45: nexusim.contacts.v1.ContactsService.SetContactPrivacy:input_type -> nexusim.contacts.v1.SetContactPrivacyRequest
-	6,  // 46: nexusim.contacts.v1.ContactsService.SendContactRequest:output_type -> nexusim.contacts.v1.SendContactRequestResponse
-	8,  // 47: nexusim.contacts.v1.ContactsService.RespondContactRequest:output_type -> nexusim.contacts.v1.RespondContactRequestResponse
-	10, // 48: nexusim.contacts.v1.ContactsService.CancelContactRequest:output_type -> nexusim.contacts.v1.CancelContactRequestResponse
-	13, // 49: nexusim.contacts.v1.ContactsService.ListContactRequests:output_type -> nexusim.contacts.v1.ListContactRequestsResponse
-	16, // 50: nexusim.contacts.v1.ContactsService.ListContacts:output_type -> nexusim.contacts.v1.ListContactsResponse
-	18, // 51: nexusim.contacts.v1.ContactsService.GetContactState:output_type -> nexusim.contacts.v1.GetContactStateResponse
-	20, // 52: nexusim.contacts.v1.ContactsService.DeleteContact:output_type -> nexusim.contacts.v1.DeleteContactResponse
-	22, // 53: nexusim.contacts.v1.ContactsService.BlockContact:output_type -> nexusim.contacts.v1.BlockContactResponse
-	24, // 54: nexusim.contacts.v1.ContactsService.UnblockContact:output_type -> nexusim.contacts.v1.UnblockContactResponse
-	26, // 55: nexusim.contacts.v1.ContactsService.UpdateContactRemark:output_type -> nexusim.contacts.v1.UpdateContactRemarkResponse
-	28, // 56: nexusim.contacts.v1.ContactsService.UpdateContactGroup:output_type -> nexusim.contacts.v1.UpdateContactGroupResponse
-	31, // 57: nexusim.contacts.v1.ContactsService.GetContactPrivacy:output_type -> nexusim.contacts.v1.GetContactPrivacyResponse
-	33, // 58: nexusim.contacts.v1.ContactsService.SetContactPrivacy:output_type -> nexusim.contacts.v1.SetContactPrivacyResponse
-	46, // [46:59] is the sub-list for method output_type
-	33, // [33:46] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	6,  // 0: nexusim.contacts.v1.SendContactRequestRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	4,  // 1: nexusim.contacts.v1.SendContactRequestRequest.source_type:type_name -> nexusim.contacts.v1.ContactRequestSourceType
+	0,  // 2: nexusim.contacts.v1.SendContactRequestResponse.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
+	4,  // 3: nexusim.contacts.v1.SendContactRequestResponse.source_type:type_name -> nexusim.contacts.v1.ContactRequestSourceType
+	6,  // 4: nexusim.contacts.v1.RespondContactRequestRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	2,  // 5: nexusim.contacts.v1.RespondContactRequestRequest.decision:type_name -> nexusim.contacts.v1.ContactDecision
+	0,  // 6: nexusim.contacts.v1.RespondContactRequestResponse.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
+	6,  // 7: nexusim.contacts.v1.CancelContactRequestRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	0,  // 8: nexusim.contacts.v1.CancelContactRequestResponse.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
+	6,  // 9: nexusim.contacts.v1.ListContactRequestsRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	3,  // 10: nexusim.contacts.v1.ListContactRequestsRequest.direction:type_name -> nexusim.contacts.v1.ContactRequestListDirection
+	0,  // 11: nexusim.contacts.v1.ListContactRequestsRequest.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
+	0,  // 12: nexusim.contacts.v1.ContactRequestItem.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
+	4,  // 13: nexusim.contacts.v1.ContactRequestItem.source_type:type_name -> nexusim.contacts.v1.ContactRequestSourceType
+	3,  // 14: nexusim.contacts.v1.ListContactRequestsResponse.direction:type_name -> nexusim.contacts.v1.ContactRequestListDirection
+	0,  // 15: nexusim.contacts.v1.ListContactRequestsResponse.status:type_name -> nexusim.contacts.v1.ContactRequestStatus
+	14, // 16: nexusim.contacts.v1.ListContactRequestsResponse.requests:type_name -> nexusim.contacts.v1.ContactRequestItem
+	6,  // 17: nexusim.contacts.v1.ListContactsRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	1,  // 18: nexusim.contacts.v1.ContactItem.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
+	17, // 19: nexusim.contacts.v1.ListContactsResponse.contacts:type_name -> nexusim.contacts.v1.ContactItem
+	6,  // 20: nexusim.contacts.v1.GetContactStateRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	1,  // 21: nexusim.contacts.v1.GetContactStateResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
+	6,  // 22: nexusim.contacts.v1.DeleteContactRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	1,  // 23: nexusim.contacts.v1.DeleteContactResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
+	6,  // 24: nexusim.contacts.v1.BlockContactRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	1,  // 25: nexusim.contacts.v1.BlockContactResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
+	6,  // 26: nexusim.contacts.v1.UnblockContactRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	1,  // 27: nexusim.contacts.v1.UnblockContactResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
+	6,  // 28: nexusim.contacts.v1.UpdateContactRemarkRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	1,  // 29: nexusim.contacts.v1.UpdateContactRemarkResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
+	6,  // 30: nexusim.contacts.v1.UpdateContactGroupRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	1,  // 31: nexusim.contacts.v1.UpdateContactGroupResponse.status:type_name -> nexusim.contacts.v1.ContactEdgeStatus
+	5,  // 32: nexusim.contacts.v1.ContactPrivacySettings.policy_source:type_name -> nexusim.contacts.v1.ContactPrivacyPolicySource
+	6,  // 33: nexusim.contacts.v1.GetContactPrivacyRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	31, // 34: nexusim.contacts.v1.GetContactPrivacyResponse.settings:type_name -> nexusim.contacts.v1.ContactPrivacySettings
+	6,  // 35: nexusim.contacts.v1.SetContactPrivacyRequest.auth_context:type_name -> nexusim.contacts.v1.AuthContext
+	31, // 36: nexusim.contacts.v1.SetContactPrivacyResponse.settings:type_name -> nexusim.contacts.v1.ContactPrivacySettings
+	7,  // 37: nexusim.contacts.v1.ContactsService.SendContactRequest:input_type -> nexusim.contacts.v1.SendContactRequestRequest
+	9,  // 38: nexusim.contacts.v1.ContactsService.RespondContactRequest:input_type -> nexusim.contacts.v1.RespondContactRequestRequest
+	11, // 39: nexusim.contacts.v1.ContactsService.CancelContactRequest:input_type -> nexusim.contacts.v1.CancelContactRequestRequest
+	13, // 40: nexusim.contacts.v1.ContactsService.ListContactRequests:input_type -> nexusim.contacts.v1.ListContactRequestsRequest
+	16, // 41: nexusim.contacts.v1.ContactsService.ListContacts:input_type -> nexusim.contacts.v1.ListContactsRequest
+	19, // 42: nexusim.contacts.v1.ContactsService.GetContactState:input_type -> nexusim.contacts.v1.GetContactStateRequest
+	21, // 43: nexusim.contacts.v1.ContactsService.DeleteContact:input_type -> nexusim.contacts.v1.DeleteContactRequest
+	23, // 44: nexusim.contacts.v1.ContactsService.BlockContact:input_type -> nexusim.contacts.v1.BlockContactRequest
+	25, // 45: nexusim.contacts.v1.ContactsService.UnblockContact:input_type -> nexusim.contacts.v1.UnblockContactRequest
+	27, // 46: nexusim.contacts.v1.ContactsService.UpdateContactRemark:input_type -> nexusim.contacts.v1.UpdateContactRemarkRequest
+	29, // 47: nexusim.contacts.v1.ContactsService.UpdateContactGroup:input_type -> nexusim.contacts.v1.UpdateContactGroupRequest
+	32, // 48: nexusim.contacts.v1.ContactsService.GetContactPrivacy:input_type -> nexusim.contacts.v1.GetContactPrivacyRequest
+	34, // 49: nexusim.contacts.v1.ContactsService.SetContactPrivacy:input_type -> nexusim.contacts.v1.SetContactPrivacyRequest
+	8,  // 50: nexusim.contacts.v1.ContactsService.SendContactRequest:output_type -> nexusim.contacts.v1.SendContactRequestResponse
+	10, // 51: nexusim.contacts.v1.ContactsService.RespondContactRequest:output_type -> nexusim.contacts.v1.RespondContactRequestResponse
+	12, // 52: nexusim.contacts.v1.ContactsService.CancelContactRequest:output_type -> nexusim.contacts.v1.CancelContactRequestResponse
+	15, // 53: nexusim.contacts.v1.ContactsService.ListContactRequests:output_type -> nexusim.contacts.v1.ListContactRequestsResponse
+	18, // 54: nexusim.contacts.v1.ContactsService.ListContacts:output_type -> nexusim.contacts.v1.ListContactsResponse
+	20, // 55: nexusim.contacts.v1.ContactsService.GetContactState:output_type -> nexusim.contacts.v1.GetContactStateResponse
+	22, // 56: nexusim.contacts.v1.ContactsService.DeleteContact:output_type -> nexusim.contacts.v1.DeleteContactResponse
+	24, // 57: nexusim.contacts.v1.ContactsService.BlockContact:output_type -> nexusim.contacts.v1.BlockContactResponse
+	26, // 58: nexusim.contacts.v1.ContactsService.UnblockContact:output_type -> nexusim.contacts.v1.UnblockContactResponse
+	28, // 59: nexusim.contacts.v1.ContactsService.UpdateContactRemark:output_type -> nexusim.contacts.v1.UpdateContactRemarkResponse
+	30, // 60: nexusim.contacts.v1.ContactsService.UpdateContactGroup:output_type -> nexusim.contacts.v1.UpdateContactGroupResponse
+	33, // 61: nexusim.contacts.v1.ContactsService.GetContactPrivacy:output_type -> nexusim.contacts.v1.GetContactPrivacyResponse
+	35, // 62: nexusim.contacts.v1.ContactsService.SetContactPrivacy:output_type -> nexusim.contacts.v1.SetContactPrivacyResponse
+	50, // [50:63] is the sub-list for method output_type
+	37, // [37:50] is the sub-list for method input_type
+	37, // [37:37] is the sub-list for extension type_name
+	37, // [37:37] is the sub-list for extension extendee
+	0,  // [0:37] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_contacts_v1_contacts_service_proto_init() }
@@ -2871,7 +3073,7 @@ func file_nexusim_contacts_v1_contacts_service_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_contacts_v1_contacts_service_proto_rawDesc), len(file_nexusim_contacts_v1_contacts_service_proto_rawDesc)),
-			NumEnums:      4,
+			NumEnums:      6,
 			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   1,

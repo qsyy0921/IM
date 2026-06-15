@@ -18,6 +18,22 @@ type SetContactPrivacyRepository interface {
 	SetContactPrivacy(context.Context, types.SetContactPrivacyCommand) (types.SetContactPrivacyResult, error)
 }
 
+type GetTenantContactPrivacyDefaultRepository interface {
+	GetTenantContactPrivacyDefault(context.Context, types.GetTenantContactPrivacyDefaultCommand) (types.GetTenantContactPrivacyDefaultResult, error)
+}
+
+type SetTenantContactPrivacyDefaultRepository interface {
+	SetTenantContactPrivacyDefault(context.Context, types.SetTenantContactPrivacyDefaultCommand) (types.SetTenantContactPrivacyDefaultResult, error)
+}
+
+type GetTenantContactRequestSourcePolicyRepository interface {
+	GetTenantContactRequestSourcePolicy(context.Context, types.GetTenantContactRequestSourcePolicyCommand) (types.GetTenantContactRequestSourcePolicyResult, error)
+}
+
+type SetTenantContactRequestSourcePolicyRepository interface {
+	SetTenantContactRequestSourcePolicy(context.Context, types.SetTenantContactRequestSourcePolicyCommand) (types.SetTenantContactRequestSourcePolicyResult, error)
+}
+
 type RespondContactRequestRepository interface {
 	RespondContactRequest(context.Context, types.RespondContactRequestCommand) (types.RespondContactRequestResult, error)
 }

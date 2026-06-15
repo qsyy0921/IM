@@ -100,13 +100,7 @@ func (r *Repository) SendContactRequest(
 	if r.pool == nil {
 		return types.SendContactRequestResult{}, types.NewDBWriteFailed("contacts repository is not configured")
 	}
-	commandHash, err := commandHash(commandHashPayload{
-		Kind:         commandTypeSendContactRequest,
-		TenantID:     string(command.AuthContext.TenantID),
-		UserID:       string(command.AuthContext.UserID),
-		TargetUserID: string(command.TargetUserID),
-		Message:      command.Message,
-	})
+	commandHash, err := sendContactRequestCommandHash(command)
 	if err != nil {
 		return types.SendContactRequestResult{}, err
 	}
@@ -137,6 +131,11 @@ func (r *Repository) SendContactRequest(
 	} else if ok {
 		return types.SendContactRequestResult{}, types.NewContactAlreadyExists("contact already exists")
 	}
+	if ok, err := blockedContactExists(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.TargetUserID); err != nil {
+		return types.SendContactRequestResult{}, err
+	} else if ok {
+		return types.SendContactRequestResult{}, types.NewPermissionDenied("blocked contact edge exists")
+	}
 	if ok, err := pendingContactRequestExists(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.TargetUserID); err != nil {
 		return types.SendContactRequestResult{}, err
 	} else if ok {
@@ -146,6 +145,11 @@ func (r *Repository) SendContactRequest(
 		return types.SendContactRequestResult{}, err
 	} else if !allowed {
 		return types.SendContactRequestResult{}, types.NewPermissionDenied("target user does not accept contact requests")
+	}
+	if allowed, err := contactRequestSourceAllowed(ctx, tx, command.AuthContext.TenantID, command.NormalizedSourceType()); err != nil {
+		return types.SendContactRequestResult{}, err
+	} else if !allowed {
+		return types.SendContactRequestResult{}, types.NewPermissionDenied("contact request source is not allowed")
 	}
 
 	requestID, err := r.requestID()
@@ -183,6 +187,8 @@ func (r *Repository) SendContactRequest(
 			"receiver_user_id": command.TargetUserID,
 			"status":           types.ContactRequestStatusPending,
 			"message":          command.Message,
+			"source_type":      command.NormalizedSourceType(),
+			"source_ref":       command.NormalizedSourceRef(),
 			"occurred_at":      occurredAt.Format(time.RFC3339Nano),
 		},
 	}); err != nil {
@@ -194,88 +200,9 @@ func (r *Repository) SendContactRequest(
 		SenderUserID:   command.AuthContext.UserID,
 		ReceiverUserID: command.TargetUserID,
 		Status:         types.ContactRequestStatusPending,
+		SourceType:     command.NormalizedSourceType(),
+		SourceRef:      command.NormalizedSourceRef(),
 	})
-}
-
-func (r *Repository) GetContactPrivacy(
-	ctx context.Context,
-	command types.GetContactPrivacyCommand,
-) (types.GetContactPrivacyResult, error) {
-	if r.pool == nil {
-		return types.GetContactPrivacyResult{}, types.NewDBReadFailed("contacts repository is not configured")
-	}
-	row, err := getContactPrivacySettings(ctx, r.pool, command.AuthContext.TenantID, command.AuthContext.UserID)
-	if err != nil {
-		return types.GetContactPrivacyResult{}, err
-	}
-	return contactPrivacyResultFromRow(row), nil
-}
-
-func (r *Repository) SetContactPrivacy(
-	ctx context.Context,
-	command types.SetContactPrivacyCommand,
-) (types.SetContactPrivacyResult, error) {
-	if r.pool == nil {
-		return types.SetContactPrivacyResult{}, types.NewDBWriteFailed("contacts repository is not configured")
-	}
-	commandHash, err := commandHash(commandHashPayload{
-		Kind:                 commandTypeSetContactPrivacy,
-		TenantID:             string(command.AuthContext.TenantID),
-		UserID:               string(command.AuthContext.UserID),
-		AllowContactRequests: &command.AllowContactRequests,
-	})
-	if err != nil {
-		return types.SetContactPrivacyResult{}, err
-	}
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return types.SetContactPrivacyResult{}, types.NewDBWriteFailed(err.Error())
-	}
-	defer func() {
-		_ = tx.Rollback(ctx)
-	}()
-	if err := lockIdempotencyKey(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey); err != nil {
-		return types.SetContactPrivacyResult{}, err
-	}
-	if existing, ok, err := findCommandIdempotency(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey); err != nil {
-		return types.SetContactPrivacyResult{}, err
-	} else if ok {
-		if existing.CommandType != commandTypeSetContactPrivacy || existing.CommandHash != commandHash {
-			return types.SetContactPrivacyResult{}, types.NewContactRequestConflict("idempotency key conflict")
-		}
-		row, err := contactPrivacyRowFromIdempotencyResult(existing)
-		if err != nil {
-			return types.SetContactPrivacyResult{}, err
-		}
-		return commitSetContactPrivacyResult(ctx, tx, setContactPrivacyResultFromRow(row, true))
-	}
-	if err := lockContactPrivacySettings(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID); err != nil {
-		return types.SetContactPrivacyResult{}, err
-	}
-	row, changed, err := upsertContactPrivacySettings(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.AllowContactRequests)
-	if err != nil {
-		return types.SetContactPrivacyResult{}, err
-	}
-	resultJSON, err := contactPrivacyResultJSON(row)
-	if err != nil {
-		return types.SetContactPrivacyResult{}, err
-	}
-	if err := insertCommandIdempotencyWithResult(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey, commandTypeSetContactPrivacy, commandHash, string(command.AuthContext.UserID), resultJSON); err != nil {
-		return types.SetContactPrivacyResult{}, err
-	}
-	if changed {
-		if err := r.insertPrivacyOutbox(ctx, tx, privacyOutboxInput{
-			TenantID:      command.AuthContext.TenantID,
-			UserID:        command.AuthContext.UserID,
-			CorrelationID: command.AuthContext.RequestID,
-			CausationID:   command.AuthContext.RequestID,
-			TraceID:       command.AuthContext.TraceID,
-			Privacy:       row,
-		}); err != nil {
-			return types.SetContactPrivacyResult{}, err
-		}
-	}
-	return commitSetContactPrivacyResult(ctx, tx, setContactPrivacyResultFromRow(row, false))
 }
 
 func (r *Repository) RespondContactRequest(
@@ -343,7 +270,7 @@ func (r *Repository) RespondContactRequest(
 		if ok, err := blockedContactExists(ctx, tx, request.TenantID, request.SenderUserID, request.ReceiverUserID); err != nil {
 			return types.RespondContactRequestResult{}, err
 		} else if ok {
-			return types.RespondContactRequestResult{}, types.NewContactRequestConflict("blocked contact edge exists")
+			return types.RespondContactRequestResult{}, types.NewPermissionDenied("blocked contact edge exists")
 		}
 	}
 	if err := updateContactRequestStatus(ctx, tx, request, expectedStatus); err != nil {
@@ -517,6 +444,8 @@ SELECT
     receiver_user_id,
     status,
     message,
+    source_type,
+    source_ref,
     created_at,
     updated_at,
     decided_at IS NOT NULL AS has_decided_at,
@@ -557,6 +486,8 @@ LIMIT $4
 			&item.ReceiverUserID,
 			&item.Status,
 			&item.Message,
+			&item.SourceType,
+			&item.SourceRef,
 			&createdAt,
 			&updatedAt,
 			&hasDecidedAt,
@@ -636,8 +567,8 @@ WHERE tenant_id = $1
 `
 	if searchQuery != "" {
 		args = append(args, likePatternForSearchQuery(searchQuery))
-		query += fmt.Sprintf(`  AND (contact_user_id ILIKE $%d ESCAPE '\' OR remark ILIKE $%d ESCAPE '\')
-`, len(args), len(args))
+		query += fmt.Sprintf(`  AND (contact_user_id ILIKE $%d ESCAPE '\' OR remark ILIKE $%d ESCAPE '\' OR group_name ILIKE $%d ESCAPE '\')
+`, len(args), len(args), len(args))
 	}
 	if groupName != "" {
 		args = append(args, groupName)
@@ -1142,6 +1073,8 @@ type commandHashPayload struct {
 	RequestID            string `json:"request_id,omitempty"`
 	Decision             string `json:"decision,omitempty"`
 	Message              string `json:"message,omitempty"`
+	SourceType           string `json:"source_type,omitempty"`
+	SourceRef            string `json:"source_ref,omitempty"`
 	Reason               string `json:"reason,omitempty"`
 	Remark               string `json:"remark,omitempty"`
 	GroupName            string `json:"group_name,omitempty"`
@@ -1155,6 +1088,23 @@ func commandHash(payload commandHashPayload) (string, error) {
 	}
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:]), nil
+}
+
+func sendContactRequestCommandHash(command types.SendContactRequestCommand) (string, error) {
+	payload := commandHashPayload{
+		Kind:         commandTypeSendContactRequest,
+		TenantID:     string(command.AuthContext.TenantID),
+		UserID:       string(command.AuthContext.UserID),
+		TargetUserID: string(command.TargetUserID),
+		Message:      command.Message,
+	}
+	sourceType := command.NormalizedSourceType()
+	sourceRef := command.NormalizedSourceRef()
+	if sourceType != types.ContactRequestSourceTypeDirect || sourceRef != "" {
+		payload.SourceType = string(sourceType)
+		payload.SourceRef = sourceRef
+	}
+	return commandHash(payload)
 }
 
 type commandIdempotency struct {
@@ -1234,107 +1184,6 @@ INSERT INTO contact_command_idempotency (
 	return nil
 }
 
-type contactPrivacyRow struct {
-	TenantID             types.TenantID
-	UserID               types.UserID
-	AllowContactRequests bool
-	Version              int64
-	UpdatedAt            time.Time
-}
-
-func defaultContactPrivacyRow(tenantID types.TenantID, userID types.UserID) contactPrivacyRow {
-	return contactPrivacyRow{
-		TenantID:             tenantID,
-		UserID:               userID,
-		AllowContactRequests: true,
-	}
-}
-
-func getContactPrivacySettings(
-	ctx context.Context,
-	queryer interface {
-		QueryRow(context.Context, string, ...any) pgx.Row
-	},
-	tenantID types.TenantID,
-	userID types.UserID,
-) (contactPrivacyRow, error) {
-	var row contactPrivacyRow
-	err := queryer.QueryRow(ctx, `
-SELECT tenant_id, user_id, allow_contact_requests, version, updated_at
-FROM contact_privacy_settings
-WHERE tenant_id = $1
-  AND user_id = $2
-`, tenantID, userID).Scan(&row.TenantID, &row.UserID, &row.AllowContactRequests, &row.Version, &row.UpdatedAt)
-	if err == pgx.ErrNoRows {
-		return defaultContactPrivacyRow(tenantID, userID), nil
-	}
-	if err != nil {
-		return contactPrivacyRow{}, types.NewDBReadFailed(err.Error())
-	}
-	return row, nil
-}
-
-func contactRequestsAllowed(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID) (bool, error) {
-	row, err := getContactPrivacySettings(ctx, tx, tenantID, userID)
-	if err != nil {
-		return false, err
-	}
-	return row.AllowContactRequests, nil
-}
-
-func lockContactPrivacySettings(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID) error {
-	key := fmt.Sprintf("%s\x1f%s\x1fcontacts_privacy", tenantID, userID)
-	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, key)
-	if err != nil {
-		return types.NewDBWriteFailed(err.Error())
-	}
-	return nil
-}
-
-func upsertContactPrivacySettings(
-	ctx context.Context,
-	tx pgx.Tx,
-	tenantID types.TenantID,
-	userID types.UserID,
-	allowContactRequests bool,
-) (contactPrivacyRow, bool, error) {
-	current, err := getContactPrivacySettings(ctx, tx, tenantID, userID)
-	if err != nil {
-		return contactPrivacyRow{}, false, err
-	}
-	if current.Version > 0 && current.AllowContactRequests == allowContactRequests {
-		return current, false, nil
-	}
-	var row contactPrivacyRow
-	if current.Version == 0 {
-		err = tx.QueryRow(ctx, `
-INSERT INTO contact_privacy_settings (
-    tenant_id,
-    user_id,
-    allow_contact_requests,
-    version,
-    created_at,
-    updated_at
-) VALUES ($1, $2, $3, 1, now(), now())
-RETURNING tenant_id, user_id, allow_contact_requests, version, updated_at
-`, tenantID, userID, allowContactRequests).Scan(&row.TenantID, &row.UserID, &row.AllowContactRequests, &row.Version, &row.UpdatedAt)
-	} else {
-		err = tx.QueryRow(ctx, `
-UPDATE contact_privacy_settings
-SET allow_contact_requests = $3,
-    version = version + 1,
-    updated_at = now()
-WHERE tenant_id = $1
-  AND user_id = $2
-RETURNING tenant_id, user_id, allow_contact_requests, version, updated_at
-`, tenantID, userID, allowContactRequests).Scan(&row.TenantID, &row.UserID, &row.AllowContactRequests, &row.Version, &row.UpdatedAt)
-	}
-	if err != nil {
-		return contactPrivacyRow{}, false, types.NewDBWriteFailed(err.Error())
-	}
-	return row, true, nil
-}
-
 type contactRequestRow struct {
 	RequestID      string
 	TenantID       types.TenantID
@@ -1342,6 +1191,8 @@ type contactRequestRow struct {
 	ReceiverUserID types.UserID
 	Status         types.ContactRequestStatus
 	CommandHash    string
+	SourceType     types.ContactRequestSourceType
+	SourceRef      string
 }
 
 func getContactRequestResult(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, requestID string) (types.SendContactRequestResult, error) {
@@ -1360,35 +1211,8 @@ func sendResultFromRequest(row contactRequestRow, replay bool) types.SendContact
 		ReceiverUserID:   row.ReceiverUserID,
 		Status:           row.Status,
 		IdempotentReplay: replay,
-	}
-}
-
-func contactPrivacyResultFromRow(row contactPrivacyRow) types.GetContactPrivacyResult {
-	return types.GetContactPrivacyResult{
-		TenantID: row.TenantID,
-		UserID:   row.UserID,
-		Settings: contactPrivacySettingsFromRow(row),
-	}
-}
-
-func setContactPrivacyResultFromRow(row contactPrivacyRow, replay bool) types.SetContactPrivacyResult {
-	return types.SetContactPrivacyResult{
-		TenantID:         row.TenantID,
-		UserID:           row.UserID,
-		Settings:         contactPrivacySettingsFromRow(row),
-		IdempotentReplay: replay,
-	}
-}
-
-func contactPrivacySettingsFromRow(row contactPrivacyRow) types.ContactPrivacySettings {
-	var updatedAtUnixMS int64
-	if !row.UpdatedAt.IsZero() {
-		updatedAtUnixMS = row.UpdatedAt.UnixMilli()
-	}
-	return types.ContactPrivacySettings{
-		AllowContactRequests: row.AllowContactRequests,
-		Version:              row.Version,
-		UpdatedAtUnixMS:      updatedAtUnixMS,
+		SourceType:       row.SourceType,
+		SourceRef:        row.SourceRef,
 	}
 }
 
@@ -1411,11 +1235,19 @@ func getCancelContactRequestResult(ctx context.Context, tx pgx.Tx, tenantID type
 func getContactRequest(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, requestID string) (contactRequestRow, error) {
 	var row contactRequestRow
 	err := tx.QueryRow(ctx, `
-SELECT request_id, tenant_id, sender_user_id, receiver_user_id, status
+SELECT request_id, tenant_id, sender_user_id, receiver_user_id, status, source_type, source_ref
 FROM contact_requests
 WHERE tenant_id = $1
   AND request_id = $2
-`, tenantID, requestID).Scan(&row.RequestID, &row.TenantID, &row.SenderUserID, &row.ReceiverUserID, &row.Status)
+`, tenantID, requestID).Scan(
+		&row.RequestID,
+		&row.TenantID,
+		&row.SenderUserID,
+		&row.ReceiverUserID,
+		&row.Status,
+		&row.SourceType,
+		&row.SourceRef,
+	)
 	if err == pgx.ErrNoRows {
 		return contactRequestRow{}, types.NewContactRequestNotFound("contact request not found")
 	}
@@ -1434,7 +1266,7 @@ func findContactRequestByIdempotency(
 ) (contactRequestRow, bool, error) {
 	var row contactRequestRow
 	err := tx.QueryRow(ctx, `
-SELECT request_id, tenant_id, sender_user_id, receiver_user_id, status, command_hash
+SELECT request_id, tenant_id, sender_user_id, receiver_user_id, status, command_hash, source_type, source_ref
 FROM contact_requests
 WHERE tenant_id = $1
   AND sender_user_id = $2
@@ -1447,6 +1279,8 @@ FOR UPDATE
 		&row.ReceiverUserID,
 		&row.Status,
 		&row.CommandHash,
+		&row.SourceType,
+		&row.SourceRef,
 	)
 	if err == pgx.ErrNoRows {
 		return contactRequestRow{}, false, nil
@@ -1460,12 +1294,20 @@ FOR UPDATE
 func lockContactRequest(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, requestID string) (contactRequestRow, error) {
 	var row contactRequestRow
 	err := tx.QueryRow(ctx, `
-SELECT request_id, tenant_id, sender_user_id, receiver_user_id, status
+SELECT request_id, tenant_id, sender_user_id, receiver_user_id, status, source_type, source_ref
 FROM contact_requests
 WHERE tenant_id = $1
   AND request_id = $2
 FOR UPDATE
-`, tenantID, requestID).Scan(&row.RequestID, &row.TenantID, &row.SenderUserID, &row.ReceiverUserID, &row.Status)
+`, tenantID, requestID).Scan(
+		&row.RequestID,
+		&row.TenantID,
+		&row.SenderUserID,
+		&row.ReceiverUserID,
+		&row.Status,
+		&row.SourceType,
+		&row.SourceRef,
+	)
 	if err == pgx.ErrNoRows {
 		return contactRequestRow{}, types.NewContactRequestNotFound("contact request not found")
 	}
@@ -1493,10 +1335,12 @@ INSERT INTO contact_requests (
     idempotency_key,
     command_hash,
     message,
+    source_type,
+    source_ref,
     created_at,
     updated_at
-) VALUES ($1, $2, $3, $4, 'PENDING', $5, $6, $7, $8, $8)
-`, requestID, command.AuthContext.TenantID, command.AuthContext.UserID, command.TargetUserID, command.IdempotencyKey, commandHash, command.Message, now)
+) VALUES ($1, $2, $3, $4, 'PENDING', $5, $6, $7, $8, $9, $10, $10)
+`, requestID, command.AuthContext.TenantID, command.AuthContext.UserID, command.TargetUserID, command.IdempotencyKey, commandHash, command.Message, command.NormalizedSourceType(), command.NormalizedSourceRef(), now)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -1844,46 +1688,6 @@ func (r *Repository) insertEdgeOutbox(ctx context.Context, tx pgx.Tx, input edge
 	})
 }
 
-type privacyOutboxInput struct {
-	TenantID      types.TenantID
-	UserID        types.UserID
-	CorrelationID string
-	CausationID   string
-	TraceID       string
-	Privacy       contactPrivacyRow
-}
-
-func (r *Repository) insertPrivacyOutbox(ctx context.Context, tx pgx.Tx, input privacyOutboxInput) error {
-	eventID, err := r.eventID()
-	if err != nil {
-		return types.NewOutboxWriteFailed(err.Error())
-	}
-	partitionKey := fmt.Sprintf("%s:%s", input.TenantID, input.UserID)
-	aggregateVersion, err := nextContactOutboxAggregateVersion(ctx, tx, input.TenantID, partitionKey)
-	if err != nil {
-		return err
-	}
-	return insertContactOutbox(ctx, tx, contactOutboxInput{
-		EventID:          eventID,
-		TenantID:         input.TenantID,
-		AggregateType:    "CONTACT_PRIVACY",
-		AggregateID:      string(input.UserID),
-		AggregateVersion: aggregateVersion,
-		EventType:        eventTypeContactPrivacyUpdated,
-		PartitionKey:     partitionKey,
-		CorrelationID:    input.CorrelationID,
-		CausationID:      input.CausationID,
-		TraceID:          input.TraceID,
-		Payload: map[string]any{
-			"tenant_id":              input.TenantID,
-			"user_id":                input.UserID,
-			"allow_contact_requests": input.Privacy.AllowContactRequests,
-			"privacy_version":        input.Privacy.Version,
-			"occurred_at":            r.now().Format(time.RFC3339Nano),
-		},
-	})
-}
-
 func nextContactOutboxAggregateVersion(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, partitionKey string) (int64, error) {
 	var version int64
 	err := tx.QueryRow(ctx, `
@@ -1966,13 +1770,6 @@ func lockContactPair(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, fi
 func commitSendResult(ctx context.Context, tx pgx.Tx, result types.SendContactRequestResult) (types.SendContactRequestResult, error) {
 	if err := tx.Commit(ctx); err != nil {
 		return types.SendContactRequestResult{}, types.NewDBWriteFailed(err.Error())
-	}
-	return result, nil
-}
-
-func commitSetContactPrivacyResult(ctx context.Context, tx pgx.Tx, result types.SetContactPrivacyResult) (types.SetContactPrivacyResult, error) {
-	if err := tx.Commit(ctx); err != nil {
-		return types.SetContactPrivacyResult{}, types.NewDBWriteFailed(err.Error())
 	}
 	return result, nil
 }
@@ -2119,49 +1916,6 @@ type contactEdgeResultSnapshot struct {
 	Version         int64                   `json:"version"`
 	Remark          string                  `json:"remark"`
 	GroupName       string                  `json:"group_name"`
-}
-
-type contactPrivacyResultSnapshot struct {
-	TenantID             types.TenantID `json:"tenant_id"`
-	UserID               types.UserID   `json:"user_id"`
-	AllowContactRequests bool           `json:"allow_contact_requests"`
-	Version              int64          `json:"version"`
-	UpdatedAtUnixMS      int64          `json:"updated_at_unix_ms"`
-}
-
-func contactPrivacyResultJSON(row contactPrivacyRow) ([]byte, error) {
-	settings := contactPrivacySettingsFromRow(row)
-	raw, err := json.Marshal(contactPrivacyResultSnapshot{
-		TenantID:             row.TenantID,
-		UserID:               row.UserID,
-		AllowContactRequests: settings.AllowContactRequests,
-		Version:              settings.Version,
-		UpdatedAtUnixMS:      settings.UpdatedAtUnixMS,
-	})
-	if err != nil {
-		return nil, types.NewDBWriteFailed(err.Error())
-	}
-	return raw, nil
-}
-
-func contactPrivacyRowFromIdempotencyResult(existing commandIdempotency) (contactPrivacyRow, error) {
-	var snapshot contactPrivacyResultSnapshot
-	if len(existing.ResultJSON) == 0 || string(existing.ResultJSON) == "{}" {
-		return contactPrivacyRow{}, types.NewDBReadFailed("contact privacy idempotency result snapshot missing")
-	}
-	if err := json.Unmarshal(existing.ResultJSON, &snapshot); err != nil {
-		return contactPrivacyRow{}, types.NewDBReadFailed(err.Error())
-	}
-	if snapshot.TenantID == "" || snapshot.UserID == "" || snapshot.Version <= 0 || snapshot.UpdatedAtUnixMS <= 0 {
-		return contactPrivacyRow{}, types.NewDBReadFailed("contact privacy idempotency result snapshot incomplete")
-	}
-	return contactPrivacyRow{
-		TenantID:             snapshot.TenantID,
-		UserID:               snapshot.UserID,
-		AllowContactRequests: snapshot.AllowContactRequests,
-		Version:              snapshot.Version,
-		UpdatedAt:            time.UnixMilli(snapshot.UpdatedAtUnixMS).UTC(),
-	}, nil
 }
 
 func edgeResultJSON(row contactEdgeRow) ([]byte, error) {

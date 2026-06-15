@@ -59,3 +59,89 @@ func (u *SetContactPrivacyUseCase) Execute(
 	}
 	return u.repository.SetContactPrivacy(ctx, command)
 }
+
+type GetTenantContactPrivacyDefaultUseCase struct {
+	repository GetTenantContactPrivacyDefaultRepository
+}
+
+func NewGetTenantContactPrivacyDefaultUseCase(repository GetTenantContactPrivacyDefaultRepository) *GetTenantContactPrivacyDefaultUseCase {
+	return &GetTenantContactPrivacyDefaultUseCase{repository: repository}
+}
+
+func (u *GetTenantContactPrivacyDefaultUseCase) Execute(
+	ctx context.Context,
+	command types.GetTenantContactPrivacyDefaultCommand,
+) (types.GetTenantContactPrivacyDefaultResult, error) {
+	if err := command.Validate(); err != nil {
+		return types.GetTenantContactPrivacyDefaultResult{}, err
+	}
+	if u.repository == nil {
+		return types.GetTenantContactPrivacyDefaultResult{}, types.NewDBReadFailed("tenant contact privacy default repository is not configured")
+	}
+	return u.repository.GetTenantContactPrivacyDefault(ctx, command)
+}
+
+type SetTenantContactPrivacyDefaultUseCase struct {
+	repository SetTenantContactPrivacyDefaultRepository
+}
+
+func NewSetTenantContactPrivacyDefaultUseCase(repository SetTenantContactPrivacyDefaultRepository) *SetTenantContactPrivacyDefaultUseCase {
+	return &SetTenantContactPrivacyDefaultUseCase{repository: repository}
+}
+
+func (u *SetTenantContactPrivacyDefaultUseCase) Execute(
+	ctx context.Context,
+	command types.SetTenantContactPrivacyDefaultCommand,
+) (types.SetTenantContactPrivacyDefaultResult, error) {
+	if err := command.Validate(); err != nil {
+		return types.SetTenantContactPrivacyDefaultResult{}, err
+	}
+	if u.repository == nil {
+		return types.SetTenantContactPrivacyDefaultResult{}, types.NewDBWriteFailed("tenant contact privacy default repository is not configured")
+	}
+	return u.repository.SetTenantContactPrivacyDefault(ctx, command)
+}
+
+type GetTenantContactRequestSourcePolicyUseCase struct {
+	repository GetTenantContactRequestSourcePolicyRepository
+}
+
+func NewGetTenantContactRequestSourcePolicyUseCase(repository GetTenantContactRequestSourcePolicyRepository) *GetTenantContactRequestSourcePolicyUseCase {
+	return &GetTenantContactRequestSourcePolicyUseCase{repository: repository}
+}
+
+func (u *GetTenantContactRequestSourcePolicyUseCase) Execute(
+	ctx context.Context,
+	command types.GetTenantContactRequestSourcePolicyCommand,
+) (types.GetTenantContactRequestSourcePolicyResult, error) {
+	if err := command.Validate(); err != nil {
+		return types.GetTenantContactRequestSourcePolicyResult{}, err
+	}
+	if u.repository == nil {
+		return types.GetTenantContactRequestSourcePolicyResult{}, types.NewDBReadFailed("tenant contact request source policy repository is not configured")
+	}
+	command.SourceType = command.NormalizedSourceType()
+	return u.repository.GetTenantContactRequestSourcePolicy(ctx, command)
+}
+
+type SetTenantContactRequestSourcePolicyUseCase struct {
+	repository SetTenantContactRequestSourcePolicyRepository
+}
+
+func NewSetTenantContactRequestSourcePolicyUseCase(repository SetTenantContactRequestSourcePolicyRepository) *SetTenantContactRequestSourcePolicyUseCase {
+	return &SetTenantContactRequestSourcePolicyUseCase{repository: repository}
+}
+
+func (u *SetTenantContactRequestSourcePolicyUseCase) Execute(
+	ctx context.Context,
+	command types.SetTenantContactRequestSourcePolicyCommand,
+) (types.SetTenantContactRequestSourcePolicyResult, error) {
+	if err := command.Validate(); err != nil {
+		return types.SetTenantContactRequestSourcePolicyResult{}, err
+	}
+	if u.repository == nil {
+		return types.SetTenantContactRequestSourcePolicyResult{}, types.NewDBWriteFailed("tenant contact request source policy repository is not configured")
+	}
+	command.SourceType = command.NormalizedSourceType()
+	return u.repository.SetTenantContactRequestSourcePolicy(ctx, command)
+}

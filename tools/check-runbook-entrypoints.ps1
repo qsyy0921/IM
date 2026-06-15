@@ -2,6 +2,7 @@ param(
     [int]$RunbookIndexMaxLines = 40,
     [int]$CurrentBriefMaxLines = 60,
     [int]$CurrentGoalMaxLines = 80,
+    [int]$RemainingGoalsMaxLines = 100,
     [int]$ServiceBriefIndexMaxLines = 40,
     [int]$ServiceBriefMaxLines = 30
 )
@@ -24,6 +25,11 @@ $checks = @(
         Path = Join-Path $repoRoot "docs\runbook\current-goal.md"
         MaxLines = $CurrentGoalMaxLines
         Purpose = "long-term goal summary"
+    },
+    @{
+        Path = Join-Path $repoRoot "docs\runbook\remaining-goals.md"
+        MaxLines = $RemainingGoalsMaxLines
+        Purpose = "remaining goals backlog"
     },
     @{
         Path = Join-Path $repoRoot "docs\runbook\service-briefs\README.md"

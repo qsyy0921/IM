@@ -23,6 +23,7 @@ import (
 	monitoringinfra "github.com/qsyy0921/IM/services/contacts-service/internal/infrastructure/monitoring"
 	postgresinfra "github.com/qsyy0921/IM/services/contacts-service/internal/infrastructure/postgres"
 	"github.com/qsyy0921/IM/services/contacts-service/internal/trigger/outbox"
+	"github.com/qsyy0921/IM/services/contacts-service/internal/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -37,7 +38,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_CONTACTS_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("contacts-service runtime wiring is idle; set NEXUSIM_CONTACTS_SERVICE_MODE=grpc, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, or outbox-repair-cleanup")
+		log.Println("contacts-service runtime wiring is idle; set NEXUSIM_CONTACTS_SERVICE_MODE=grpc, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, tenant-privacy-default-audit, tenant-privacy-default-set, source-policy-audit, or source-policy-set")
 		return nil
 	case "grpc":
 		return runGRPC()
@@ -51,6 +52,14 @@ func run() error {
 		return runOutboxRepairAudit()
 	case "outbox-repair-cleanup":
 		return runOutboxRepairCleanup()
+	case "tenant-privacy-default-audit":
+		return runTenantPrivacyDefaultAudit()
+	case "tenant-privacy-default-set":
+		return runTenantPrivacyDefaultSet()
+	case "source-policy-audit":
+		return runSourcePolicyAudit()
+	case "source-policy-set":
+		return runSourcePolicySet()
 	default:
 		return errors.New("unsupported NEXUSIM_CONTACTS_SERVICE_MODE")
 	}
@@ -340,6 +349,157 @@ func runOutboxRepairCleanup() error {
 	return nil
 }
 
+func runTenantPrivacyDefaultAudit() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	tenantID := envString("NEXUSIM_CONTACTS_TENANT_PRIVACY_TENANT_ID", "")
+	if tenantID == "" {
+		return errors.New("NEXUSIM_CONTACTS_TENANT_PRIVACY_TENANT_ID is required")
+	}
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	result, err := app.NewGetTenantContactPrivacyDefaultUseCase(postgresinfra.NewRepository(pool)).Execute(
+		ctx,
+		types.GetTenantContactPrivacyDefaultCommand{TenantID: types.TenantID(tenantID)},
+	)
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"contacts-service tenant privacy default tenant_id=%s allow_contact_requests=%t version=%d policy_source=%s updated_at_unix_ms=%d",
+		result.TenantID,
+		result.Settings.AllowContactRequests,
+		result.Settings.Version,
+		result.Settings.PolicySource,
+		result.Settings.UpdatedAtUnixMS,
+	)
+	return nil
+}
+
+func runTenantPrivacyDefaultSet() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	tenantID := envString("NEXUSIM_CONTACTS_TENANT_PRIVACY_TENANT_ID", "")
+	if tenantID == "" {
+		return errors.New("NEXUSIM_CONTACTS_TENANT_PRIVACY_TENANT_ID is required")
+	}
+	allowContactRequests, err := envRequiredBool("NEXUSIM_CONTACTS_TENANT_PRIVACY_ALLOW_CONTACT_REQUESTS")
+	if err != nil {
+		return err
+	}
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	result, err := app.NewSetTenantContactPrivacyDefaultUseCase(postgresinfra.NewRepository(pool)).Execute(
+		ctx,
+		types.SetTenantContactPrivacyDefaultCommand{
+			TenantID:             types.TenantID(tenantID),
+			AllowContactRequests: allowContactRequests,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"contacts-service tenant privacy default updated tenant_id=%s allow_contact_requests=%t version=%d changed=%t updated_at_unix_ms=%d",
+		result.TenantID,
+		result.Settings.AllowContactRequests,
+		result.Settings.Version,
+		result.Changed,
+		result.Settings.UpdatedAtUnixMS,
+	)
+	return nil
+}
+
+func runSourcePolicyAudit() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	tenantID := envString("NEXUSIM_CONTACTS_SOURCE_POLICY_TENANT_ID", "")
+	if tenantID == "" {
+		return errors.New("NEXUSIM_CONTACTS_SOURCE_POLICY_TENANT_ID is required")
+	}
+	sourceType, err := envContactRequestSourceType("NEXUSIM_CONTACTS_SOURCE_POLICY_SOURCE_TYPE")
+	if err != nil {
+		return err
+	}
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	result, err := app.NewGetTenantContactRequestSourcePolicyUseCase(postgresinfra.NewRepository(pool)).Execute(
+		ctx,
+		types.GetTenantContactRequestSourcePolicyCommand{
+			TenantID:   types.TenantID(tenantID),
+			SourceType: sourceType,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"contacts-service source policy tenant_id=%s source_type=%s allow_contact_requests=%t version=%d updated_at_unix_ms=%d",
+		result.TenantID,
+		result.Policy.SourceType,
+		result.Policy.AllowContactRequests,
+		result.Policy.Version,
+		result.Policy.UpdatedAtUnixMS,
+	)
+	return nil
+}
+
+func runSourcePolicySet() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	tenantID := envString("NEXUSIM_CONTACTS_SOURCE_POLICY_TENANT_ID", "")
+	if tenantID == "" {
+		return errors.New("NEXUSIM_CONTACTS_SOURCE_POLICY_TENANT_ID is required")
+	}
+	sourceType, err := envContactRequestSourceType("NEXUSIM_CONTACTS_SOURCE_POLICY_SOURCE_TYPE")
+	if err != nil {
+		return err
+	}
+	allowContactRequests, err := envRequiredBool("NEXUSIM_CONTACTS_SOURCE_POLICY_ALLOW_CONTACT_REQUESTS")
+	if err != nil {
+		return err
+	}
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	result, err := app.NewSetTenantContactRequestSourcePolicyUseCase(postgresinfra.NewRepository(pool)).Execute(
+		ctx,
+		types.SetTenantContactRequestSourcePolicyCommand{
+			TenantID:             types.TenantID(tenantID),
+			SourceType:           sourceType,
+			AllowContactRequests: allowContactRequests,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"contacts-service source policy updated tenant_id=%s source_type=%s allow_contact_requests=%t version=%d changed=%t updated_at_unix_ms=%d",
+		result.TenantID,
+		result.Policy.SourceType,
+		result.Policy.AllowContactRequests,
+		result.Policy.Version,
+		result.Changed,
+		result.Policy.UpdatedAtUnixMS,
+	)
+	return nil
+}
+
 func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {
 	if strings.TrimSpace(addr) == "" {
 		return func() {}, nil
@@ -620,6 +780,30 @@ func envInt(name string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func envRequiredBool(name string) (bool, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return false, errors.New(name + " is required")
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, errors.New(name + " must be true or false")
+	}
+	return parsed, nil
+}
+
+func envContactRequestSourceType(name string) (types.ContactRequestSourceType, error) {
+	value := strings.ToUpper(strings.TrimSpace(os.Getenv(name)))
+	if value == "" {
+		return "", errors.New(name + " is required")
+	}
+	sourceType := types.NormalizeContactRequestSourceType(types.ContactRequestSourceType(value))
+	if sourceType == "" {
+		return "", errors.New(name + " is invalid")
+	}
+	return sourceType, nil
 }
 
 func envDuration(name string, fallback time.Duration) time.Duration {

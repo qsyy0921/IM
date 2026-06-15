@@ -7,12 +7,15 @@ const (
 	maxContactGroupNameLength   = 64
 	maxContactReasonLength      = 512
 	maxContactSearchQueryLength = 128
+	maxContactSourceRefLength   = 256
 )
 
 type ContactRequestStatus string
 type ContactEdgeStatus string
 type ContactDecision string
 type ContactRequestListDirection string
+type ContactRequestSourceType string
+type ContactPrivacyPolicySource string
 
 const (
 	ContactRequestStatusPending  ContactRequestStatus = "PENDING"
@@ -30,6 +33,17 @@ const (
 
 	ContactRequestListDirectionIncoming ContactRequestListDirection = "INCOMING"
 	ContactRequestListDirectionOutgoing ContactRequestListDirection = "OUTGOING"
+
+	ContactRequestSourceTypeDirect     ContactRequestSourceType = "DIRECT"
+	ContactRequestSourceTypeSearch     ContactRequestSourceType = "SEARCH"
+	ContactRequestSourceTypeGroup      ContactRequestSourceType = "GROUP"
+	ContactRequestSourceTypeInviteLink ContactRequestSourceType = "INVITE_LINK"
+	ContactRequestSourceTypeQRCode     ContactRequestSourceType = "QR_CODE"
+	ContactRequestSourceTypeImport     ContactRequestSourceType = "IMPORT"
+
+	ContactPrivacyPolicySourceUser          ContactPrivacyPolicySource = "USER"
+	ContactPrivacyPolicySourceTenantDefault ContactPrivacyPolicySource = "TENANT_DEFAULT"
+	ContactPrivacyPolicySourceSystemDefault ContactPrivacyPolicySource = "SYSTEM_DEFAULT"
 )
 
 type SendContactRequestCommand struct {
@@ -37,6 +51,8 @@ type SendContactRequestCommand struct {
 	TargetUserID   UserID
 	IdempotencyKey string
 	Message        string
+	SourceType     ContactRequestSourceType
+	SourceRef      string
 }
 
 func (c SendContactRequestCommand) Validate() error {
@@ -55,7 +71,38 @@ func (c SendContactRequestCommand) Validate() error {
 	if strings.TrimSpace(c.IdempotencyKey) == "" {
 		return NewInvalidArgument("idempotency_key is required")
 	}
+	if c.NormalizedSourceType() == "" {
+		return NewInvalidArgument("source_type is invalid")
+	}
+	if len(c.NormalizedSourceRef()) > maxContactSourceRefLength {
+		return NewInvalidArgument("source_ref is too long")
+	}
 	return nil
+}
+
+func (c SendContactRequestCommand) NormalizedSourceType() ContactRequestSourceType {
+	return NormalizeContactRequestSourceType(c.SourceType)
+}
+
+func (c SendContactRequestCommand) NormalizedSourceRef() string {
+	return strings.TrimSpace(c.SourceRef)
+}
+
+func NormalizeContactRequestSourceType(value ContactRequestSourceType) ContactRequestSourceType {
+	if value == "" {
+		return ContactRequestSourceTypeDirect
+	}
+	switch value {
+	case ContactRequestSourceTypeDirect,
+		ContactRequestSourceTypeSearch,
+		ContactRequestSourceTypeGroup,
+		ContactRequestSourceTypeInviteLink,
+		ContactRequestSourceTypeQRCode,
+		ContactRequestSourceTypeImport:
+		return value
+	default:
+		return ""
+	}
 }
 
 type SendContactRequestResult struct {
@@ -65,12 +112,15 @@ type SendContactRequestResult struct {
 	ReceiverUserID   UserID
 	Status           ContactRequestStatus
 	IdempotentReplay bool
+	SourceType       ContactRequestSourceType
+	SourceRef        string
 }
 
 type ContactPrivacySettings struct {
 	AllowContactRequests bool
 	Version              int64
 	UpdatedAtUnixMS      int64
+	PolicySource         ContactPrivacyPolicySource
 }
 
 type GetContactPrivacyCommand struct {
@@ -117,6 +167,97 @@ type SetContactPrivacyResult struct {
 	UserID           UserID
 	Settings         ContactPrivacySettings
 	IdempotentReplay bool
+}
+
+type GetTenantContactPrivacyDefaultCommand struct {
+	TenantID TenantID
+}
+
+func (c GetTenantContactPrivacyDefaultCommand) Validate() error {
+	if c.TenantID == "" {
+		return NewInvalidArgument("tenant_id is required")
+	}
+	return nil
+}
+
+type GetTenantContactPrivacyDefaultResult struct {
+	TenantID TenantID
+	Settings ContactPrivacySettings
+}
+
+type SetTenantContactPrivacyDefaultCommand struct {
+	TenantID             TenantID
+	AllowContactRequests bool
+}
+
+func (c SetTenantContactPrivacyDefaultCommand) Validate() error {
+	if c.TenantID == "" {
+		return NewInvalidArgument("tenant_id is required")
+	}
+	return nil
+}
+
+type SetTenantContactPrivacyDefaultResult struct {
+	TenantID TenantID
+	Settings ContactPrivacySettings
+	Changed  bool
+}
+
+type ContactRequestSourcePolicy struct {
+	SourceType           ContactRequestSourceType
+	AllowContactRequests bool
+	Version              int64
+	UpdatedAtUnixMS      int64
+}
+
+type GetTenantContactRequestSourcePolicyCommand struct {
+	TenantID   TenantID
+	SourceType ContactRequestSourceType
+}
+
+func (c GetTenantContactRequestSourcePolicyCommand) Validate() error {
+	if c.TenantID == "" {
+		return NewInvalidArgument("tenant_id is required")
+	}
+	if NormalizeContactRequestSourceType(c.SourceType) == "" {
+		return NewInvalidArgument("source_type is invalid")
+	}
+	return nil
+}
+
+func (c GetTenantContactRequestSourcePolicyCommand) NormalizedSourceType() ContactRequestSourceType {
+	return NormalizeContactRequestSourceType(c.SourceType)
+}
+
+type GetTenantContactRequestSourcePolicyResult struct {
+	TenantID TenantID
+	Policy   ContactRequestSourcePolicy
+}
+
+type SetTenantContactRequestSourcePolicyCommand struct {
+	TenantID             TenantID
+	SourceType           ContactRequestSourceType
+	AllowContactRequests bool
+}
+
+func (c SetTenantContactRequestSourcePolicyCommand) Validate() error {
+	if c.TenantID == "" {
+		return NewInvalidArgument("tenant_id is required")
+	}
+	if NormalizeContactRequestSourceType(c.SourceType) == "" {
+		return NewInvalidArgument("source_type is invalid")
+	}
+	return nil
+}
+
+func (c SetTenantContactRequestSourcePolicyCommand) NormalizedSourceType() ContactRequestSourceType {
+	return NormalizeContactRequestSourceType(c.SourceType)
+}
+
+type SetTenantContactRequestSourcePolicyResult struct {
+	TenantID TenantID
+	Policy   ContactRequestSourcePolicy
+	Changed  bool
 }
 
 type RespondContactRequestCommand struct {
@@ -244,6 +385,8 @@ type ContactRequestItem struct {
 	CreatedAtUnixMS int64
 	UpdatedAtUnixMS int64
 	DecidedAtUnixMS int64
+	SourceType      ContactRequestSourceType
+	SourceRef       string
 }
 
 type ListContactRequestsResult struct {

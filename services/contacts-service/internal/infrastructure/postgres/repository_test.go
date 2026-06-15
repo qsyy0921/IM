@@ -442,6 +442,57 @@ func TestRepositoryBlockContactIsOwnerScopedIntegration(t *testing.T) {
 	assertContactsOutboxCount(t, ctx, pool, eventTypeContactEdgeBlocked, 1)
 }
 
+func TestRepositorySendContactRequestBlockedEdgeDeniedIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+	acceptContact(t, ctx, repository, "alice", "bob")
+	if _, err := repository.BlockContact(ctx, blockCommand("alice", "bob", "block-1", "spam")); err != nil {
+		t.Fatalf("block contact: %v", err)
+	}
+	if _, err := repository.DeleteContact(ctx, deleteCommand("alice", "bob", "delete-after-block")); !errors.Is(err, types.ErrContactNotFound) {
+		t.Fatalf("expected blocked edge not deletable as active contact, got %v", err)
+	}
+
+	_, err := repository.SendContactRequest(ctx, sendCommand("alice", "bob", "send-blocked", "let me add you again"))
+	if !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected permission denied for blocked contact request, got %v", err)
+	}
+	assertContactRequestCount(t, ctx, pool, 1)
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCreated, 1)
+}
+
+func TestRepositoryRespondContactRequestBlockedEdgeDeniedIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	acceptContact(t, ctx, repository, "alice", "bob")
+	if _, err := repository.DeleteContact(ctx, deleteCommand("alice", "bob", "delete-before-readd")); err != nil {
+		t.Fatalf("delete alice contact edge: %v", err)
+	}
+	sendResult, err := repository.SendContactRequest(ctx, sendCommand("alice", "bob", "send-before-block", "hello again"))
+	if err != nil {
+		t.Fatalf("send contact request: %v", err)
+	}
+	if _, err := repository.BlockContact(ctx, blockCommand("bob", "alice", "block-before-accept", "spam")); err != nil {
+		t.Fatalf("block contact: %v", err)
+	}
+
+	_, err = repository.RespondContactRequest(ctx, respondCommand("bob", sendResult.RequestID, "accept-after-block", types.ContactDecisionAccept))
+	if !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected permission denied for blocked accept, got %v", err)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCreated, 2)
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestAccepted, 1)
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactEdgeDeleted, 1)
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactEdgeBlocked, 1)
+	assertContactEdge(t, ctx, pool, "alice", "bob", types.ContactEdgeStatusDeleted, 2)
+	assertContactEdge(t, ctx, pool, "bob", "alice", types.ContactEdgeStatusBlocked, 2)
+}
+
 func TestRepositoryUnblockContactRestoresOwnerScopedEdgeIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -563,6 +614,7 @@ func TestRepositoryListContactsSearchIntegration(t *testing.T) {
 	insertContactEdgeWithRemark(t, ctx, pool, "alice", "dave", "gym")
 	insertContactEdgeWithRemark(t, ctx, pool, "bob", "alice", "not visible to alice search")
 	insertContactEdgeWithRemark(t, ctx, pool, "alice", "erin", "school alumni")
+	insertContactEdgeWithGroup(t, ctx, pool, "alice", "frank", "project phoenix")
 	setContactEdgeStatus(t, ctx, pool, "alice", "erin", types.ContactEdgeStatusBlocked)
 
 	byID, err := repository.ListContacts(ctx, listSearchCommand("alice", 10, "", "BO"))
@@ -576,6 +628,12 @@ func TestRepositoryListContactsSearchIntegration(t *testing.T) {
 		t.Fatalf("search by remark: %v", err)
 	}
 	assertContactIDs(t, byRemark, "carol")
+
+	byGroup, err := repository.ListContacts(ctx, listSearchCommand("alice", 10, "", "phoenix"))
+	if err != nil {
+		t.Fatalf("search by group_name: %v", err)
+	}
+	assertContactIDs(t, byGroup, "frank")
 
 	paged, err := repository.ListContacts(ctx, listSearchCommand("alice", 1, "", "friend"))
 	if err != nil {
@@ -656,7 +714,8 @@ func TestRepositoryContactPrivacyDefaultsAllowRequestsIntegration(t *testing.T) 
 		privacy.UserID != "bob" ||
 		!privacy.Settings.AllowContactRequests ||
 		privacy.Settings.Version != 0 ||
-		privacy.Settings.UpdatedAtUnixMS != 0 {
+		privacy.Settings.UpdatedAtUnixMS != 0 ||
+		privacy.Settings.PolicySource != types.ContactPrivacyPolicySourceSystemDefault {
 		t.Fatalf("unexpected default privacy: %+v", privacy)
 	}
 
@@ -668,6 +727,336 @@ func TestRepositoryContactPrivacyDefaultsAllowRequestsIntegration(t *testing.T) 
 		t.Fatalf("unexpected send result: %+v", sendResult)
 	}
 	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCreated, 1)
+}
+
+func TestRepositoryTenantContactPrivacyDefaultBlocksRequestsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+	insertTenantPrivacyDefault(t, ctx, pool, false)
+
+	privacy, err := repository.GetContactPrivacy(ctx, getPrivacyCommand("bob"))
+	if err != nil {
+		t.Fatalf("get tenant default contact privacy: %v", err)
+	}
+	if privacy.Settings.AllowContactRequests ||
+		privacy.Settings.Version != 1 ||
+		privacy.Settings.UpdatedAtUnixMS == 0 ||
+		privacy.Settings.PolicySource != types.ContactPrivacyPolicySourceTenantDefault {
+		t.Fatalf("unexpected tenant default privacy: %+v", privacy)
+	}
+
+	_, err = repository.SendContactRequest(ctx, sendCommand("alice", "bob", "send-tenant-default-denied", "hello"))
+	if !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected tenant default permission denied, got %v", err)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCreated, 0)
+	assertContactRequestCount(t, ctx, pool, 0)
+
+	open, err := repository.SetContactPrivacy(ctx, setPrivacyCommand("bob", true, "privacy-user-open"))
+	if err != nil {
+		t.Fatalf("set user privacy open: %v", err)
+	}
+	if !open.Settings.AllowContactRequests ||
+		open.Settings.Version != 1 ||
+		open.Settings.PolicySource != types.ContactPrivacyPolicySourceUser {
+		t.Fatalf("unexpected user privacy override: %+v", open)
+	}
+
+	sendResult, err := repository.SendContactRequest(ctx, sendCommand("alice", "bob", "send-user-override-open", "hello again"))
+	if err != nil {
+		t.Fatalf("send after user privacy override: %v", err)
+	}
+	if sendResult.Status != types.ContactRequestStatusPending {
+		t.Fatalf("unexpected send after user privacy override: %+v", sendResult)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCreated, 1)
+}
+
+func TestRepositorySetTenantContactPrivacyDefaultIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	defaultResult, err := repository.GetTenantContactPrivacyDefault(ctx, types.GetTenantContactPrivacyDefaultCommand{
+		TenantID: "tenant-contacts",
+	})
+	if err != nil {
+		t.Fatalf("get system tenant privacy default: %v", err)
+	}
+	if !defaultResult.Settings.AllowContactRequests ||
+		defaultResult.Settings.Version != 0 ||
+		defaultResult.Settings.PolicySource != types.ContactPrivacyPolicySourceSystemDefault {
+		t.Fatalf("unexpected system tenant default: %+v", defaultResult)
+	}
+
+	blocked, err := repository.SetTenantContactPrivacyDefault(ctx, types.SetTenantContactPrivacyDefaultCommand{
+		TenantID:             "tenant-contacts",
+		AllowContactRequests: false,
+	})
+	if err != nil {
+		t.Fatalf("set tenant default blocked: %v", err)
+	}
+	if !blocked.Changed ||
+		blocked.Settings.AllowContactRequests ||
+		blocked.Settings.Version != 1 ||
+		blocked.Settings.PolicySource != types.ContactPrivacyPolicySourceTenantDefault ||
+		blocked.Settings.UpdatedAtUnixMS == 0 {
+		t.Fatalf("unexpected blocked tenant default: %+v", blocked)
+	}
+
+	replay, err := repository.SetTenantContactPrivacyDefault(ctx, types.SetTenantContactPrivacyDefaultCommand{
+		TenantID:             "tenant-contacts",
+		AllowContactRequests: false,
+	})
+	if err != nil {
+		t.Fatalf("set same tenant default: %v", err)
+	}
+	if replay.Changed || replay.Settings.Version != 1 {
+		t.Fatalf("expected unchanged tenant default version, got %+v", replay)
+	}
+
+	open, err := repository.SetTenantContactPrivacyDefault(ctx, types.SetTenantContactPrivacyDefaultCommand{
+		TenantID:             "tenant-contacts",
+		AllowContactRequests: true,
+	})
+	if err != nil {
+		t.Fatalf("set tenant default open: %v", err)
+	}
+	if !open.Changed ||
+		!open.Settings.AllowContactRequests ||
+		open.Settings.Version != 2 ||
+		open.Settings.PolicySource != types.ContactPrivacyPolicySourceTenantDefault {
+		t.Fatalf("unexpected open tenant default: %+v", open)
+	}
+
+	userPrivacy, err := repository.GetContactPrivacy(ctx, getPrivacyCommand("bob"))
+	if err != nil {
+		t.Fatalf("get user privacy from tenant default: %v", err)
+	}
+	if !userPrivacy.Settings.AllowContactRequests ||
+		userPrivacy.Settings.Version != 2 ||
+		userPrivacy.Settings.PolicySource != types.ContactPrivacyPolicySourceTenantDefault {
+		t.Fatalf("unexpected user privacy from tenant default: %+v", userPrivacy)
+	}
+}
+
+func TestRepositoryContactRequestSourceMetadataIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	command := sendCommand("alice", "bob", "send-source", "hello")
+	command.SourceType = types.ContactRequestSourceTypeGroup
+	command.SourceRef = " conversation:conv-1 "
+	sendResult, err := repository.SendContactRequest(ctx, command)
+	if err != nil {
+		t.Fatalf("send contact request with source: %v", err)
+	}
+	if sendResult.SourceType != types.ContactRequestSourceTypeGroup || sendResult.SourceRef != "conversation:conv-1" {
+		t.Fatalf("unexpected send source metadata: %+v", sendResult)
+	}
+
+	replay, err := repository.SendContactRequest(ctx, command)
+	if err != nil {
+		t.Fatalf("replay contact request with source: %v", err)
+	}
+	if !replay.IdempotentReplay ||
+		replay.SourceType != types.ContactRequestSourceTypeGroup ||
+		replay.SourceRef != "conversation:conv-1" {
+		t.Fatalf("unexpected source replay: %+v", replay)
+	}
+
+	conflicting := sendCommand("alice", "bob", "send-source", "hello")
+	conflicting.SourceType = types.ContactRequestSourceTypeSearch
+	conflicting.SourceRef = "search:alice"
+	if _, err := repository.SendContactRequest(ctx, conflicting); !errors.Is(err, types.ErrContactRequestConflict) {
+		t.Fatalf("expected source metadata idempotency conflict, got %v", err)
+	}
+
+	incoming, err := repository.ListContactRequests(ctx, listContactRequestsCommand("bob", types.ContactRequestListDirectionIncoming, types.ContactRequestStatusPending, 10, ""))
+	if err != nil {
+		t.Fatalf("list incoming contact requests: %v", err)
+	}
+	if len(incoming.Requests) != 1 ||
+		incoming.Requests[0].SourceType != types.ContactRequestSourceTypeGroup ||
+		incoming.Requests[0].SourceRef != "conversation:conv-1" {
+		t.Fatalf("unexpected listed source metadata: %+v", incoming)
+	}
+
+	var sourceType string
+	var sourceRef string
+	err = pool.QueryRow(ctx, `
+SELECT source_type, source_ref
+FROM contact_requests
+WHERE tenant_id = 'tenant-contacts'
+  AND request_id = $1
+`, sendResult.RequestID).Scan(&sourceType, &sourceRef)
+	if err != nil {
+		t.Fatalf("query contact request source metadata: %v", err)
+	}
+	if sourceType != string(types.ContactRequestSourceTypeGroup) || sourceRef != "conversation:conv-1" {
+		t.Fatalf("unexpected persisted source metadata: %s %s", sourceType, sourceRef)
+	}
+
+	var payloadSourceType string
+	var payloadSourceRef string
+	err = pool.QueryRow(ctx, `
+SELECT payload_json->>'source_type', payload_json->>'source_ref'
+FROM contacts_outbox
+WHERE tenant_id = 'tenant-contacts'
+  AND event_type = $1
+`, eventTypeContactRequestCreated).Scan(&payloadSourceType, &payloadSourceRef)
+	if err != nil {
+		t.Fatalf("query contact request outbox source metadata: %v", err)
+	}
+	if payloadSourceType != string(types.ContactRequestSourceTypeGroup) || payloadSourceRef != "conversation:conv-1" {
+		t.Fatalf("unexpected outbox source metadata: %s %s", payloadSourceType, payloadSourceRef)
+	}
+}
+
+func TestRepositoryContactRequestDefaultSourceReplaysLegacyHashIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	command := sendCommand("alice", "bob", "send-legacy-source", "hello")
+	legacyHash, err := commandHash(commandHashPayload{
+		Kind:         commandTypeSendContactRequest,
+		TenantID:     string(command.AuthContext.TenantID),
+		UserID:       string(command.AuthContext.UserID),
+		TargetUserID: string(command.TargetUserID),
+		Message:      command.Message,
+	})
+	if err != nil {
+		t.Fatalf("legacy command hash: %v", err)
+	}
+	_, err = pool.Exec(ctx, `
+INSERT INTO contact_requests (
+    request_id,
+    tenant_id,
+    sender_user_id,
+    receiver_user_id,
+    status,
+    idempotency_key,
+    command_hash,
+    message,
+    created_at,
+    updated_at
+) VALUES ('legacy-request-1', 'tenant-contacts', 'alice', 'bob', 'PENDING', $1, $2, $3, now(), now())
+`, command.IdempotencyKey, legacyHash, command.Message)
+	if err != nil {
+		t.Fatalf("insert legacy contact request: %v", err)
+	}
+
+	replay, err := repository.SendContactRequest(ctx, command)
+	if err != nil {
+		t.Fatalf("replay legacy contact request: %v", err)
+	}
+	if !replay.IdempotentReplay ||
+		replay.RequestID != "legacy-request-1" ||
+		replay.SourceType != types.ContactRequestSourceTypeDirect ||
+		replay.SourceRef != "" {
+		t.Fatalf("unexpected legacy replay: %+v", replay)
+	}
+	assertContactRequestCount(t, ctx, pool, 1)
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCreated, 0)
+}
+
+func TestRepositoryTenantContactRequestSourcePolicyBlocksRequestsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	defaultPolicy, err := repository.GetTenantContactRequestSourcePolicy(ctx, types.GetTenantContactRequestSourcePolicyCommand{
+		TenantID:   "tenant-contacts",
+		SourceType: types.ContactRequestSourceTypeSearch,
+	})
+	if err != nil {
+		t.Fatalf("get default source policy: %v", err)
+	}
+	if !defaultPolicy.Policy.AllowContactRequests ||
+		defaultPolicy.Policy.Version != 0 ||
+		defaultPolicy.Policy.SourceType != types.ContactRequestSourceTypeSearch {
+		t.Fatalf("unexpected default source policy: %+v", defaultPolicy)
+	}
+
+	blocked, err := repository.SetTenantContactRequestSourcePolicy(ctx, types.SetTenantContactRequestSourcePolicyCommand{
+		TenantID:             "tenant-contacts",
+		SourceType:           types.ContactRequestSourceTypeSearch,
+		AllowContactRequests: false,
+	})
+	if err != nil {
+		t.Fatalf("set source policy blocked: %v", err)
+	}
+	if !blocked.Changed ||
+		blocked.Policy.AllowContactRequests ||
+		blocked.Policy.Version != 1 ||
+		blocked.Policy.UpdatedAtUnixMS == 0 {
+		t.Fatalf("unexpected blocked source policy: %+v", blocked)
+	}
+
+	searchCommand := sendCommand("alice", "bob", "send-search-blocked", "hello")
+	searchCommand.SourceType = types.ContactRequestSourceTypeSearch
+	_, err = repository.SendContactRequest(ctx, searchCommand)
+	if !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected source policy permission denied, got %v", err)
+	}
+	assertContactRequestCount(t, ctx, pool, 0)
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCreated, 0)
+
+	direct, err := repository.SendContactRequest(ctx, sendCommand("carol", "bob", "send-direct-allowed", "hello"))
+	if err != nil {
+		t.Fatalf("send direct while search blocked: %v", err)
+	}
+	if direct.Status != types.ContactRequestStatusPending ||
+		direct.SourceType != types.ContactRequestSourceTypeDirect {
+		t.Fatalf("unexpected direct send result: %+v", direct)
+	}
+
+	unchanged, err := repository.SetTenantContactRequestSourcePolicy(ctx, types.SetTenantContactRequestSourcePolicyCommand{
+		TenantID:             "tenant-contacts",
+		SourceType:           types.ContactRequestSourceTypeSearch,
+		AllowContactRequests: false,
+	})
+	if err != nil {
+		t.Fatalf("set same source policy: %v", err)
+	}
+	if unchanged.Changed || unchanged.Policy.Version != 1 {
+		t.Fatalf("expected unchanged source policy version, got %+v", unchanged)
+	}
+
+	opened, err := repository.SetTenantContactRequestSourcePolicy(ctx, types.SetTenantContactRequestSourcePolicyCommand{
+		TenantID:             "tenant-contacts",
+		SourceType:           types.ContactRequestSourceTypeSearch,
+		AllowContactRequests: true,
+	})
+	if err != nil {
+		t.Fatalf("set source policy open: %v", err)
+	}
+	if !opened.Changed ||
+		!opened.Policy.AllowContactRequests ||
+		opened.Policy.Version != 2 {
+		t.Fatalf("unexpected open source policy: %+v", opened)
+	}
+
+	allowedSearch := sendCommand("dave", "bob", "send-search-allowed", "hello")
+	allowedSearch.SourceType = types.ContactRequestSourceTypeSearch
+	searchResult, err := repository.SendContactRequest(ctx, allowedSearch)
+	if err != nil {
+		t.Fatalf("send search after source policy opened: %v", err)
+	}
+	if searchResult.Status != types.ContactRequestStatusPending ||
+		searchResult.SourceType != types.ContactRequestSourceTypeSearch {
+		t.Fatalf("unexpected search send result: %+v", searchResult)
+	}
+	assertContactRequestCount(t, ctx, pool, 2)
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCreated, 2)
 }
 
 func TestRepositorySetContactPrivacyBlocksIncomingRequestsIntegration(t *testing.T) {
@@ -684,7 +1073,8 @@ func TestRepositorySetContactPrivacyBlocksIncomingRequestsIntegration(t *testing
 		closed.UserID != "bob" ||
 		closed.Settings.AllowContactRequests ||
 		closed.Settings.Version != 1 ||
-		closed.Settings.UpdatedAtUnixMS == 0 {
+		closed.Settings.UpdatedAtUnixMS == 0 ||
+		closed.Settings.PolicySource != types.ContactPrivacyPolicySourceUser {
 		t.Fatalf("unexpected closed privacy result: %+v", closed)
 	}
 	assertContactsOutboxCount(t, ctx, pool, eventTypeContactPrivacyUpdated, 1)
@@ -696,7 +1086,8 @@ func TestRepositorySetContactPrivacyBlocksIncomingRequestsIntegration(t *testing
 	if !replay.IdempotentReplay ||
 		replay.Settings.AllowContactRequests ||
 		replay.Settings.Version != closed.Settings.Version ||
-		replay.Settings.UpdatedAtUnixMS != closed.Settings.UpdatedAtUnixMS {
+		replay.Settings.UpdatedAtUnixMS != closed.Settings.UpdatedAtUnixMS ||
+		replay.Settings.PolicySource != types.ContactPrivacyPolicySourceUser {
 		t.Fatalf("unexpected privacy replay: %+v", replay)
 	}
 	assertContactsOutboxCount(t, ctx, pool, eventTypeContactPrivacyUpdated, 1)
@@ -717,7 +1108,9 @@ func TestRepositorySetContactPrivacyBlocksIncomingRequestsIntegration(t *testing
 	if err != nil {
 		t.Fatalf("set privacy open: %v", err)
 	}
-	if !open.Settings.AllowContactRequests || open.Settings.Version != 2 {
+	if !open.Settings.AllowContactRequests ||
+		open.Settings.Version != 2 ||
+		open.Settings.PolicySource != types.ContactPrivacyPolicySourceUser {
 		t.Fatalf("unexpected open privacy result: %+v", open)
 	}
 	assertContactsOutboxCount(t, ctx, pool, eventTypeContactPrivacyUpdated, 2)
@@ -1104,6 +1497,22 @@ INSERT INTO contact_edges (
 	}
 }
 
+func insertContactEdgeWithGroup(t *testing.T, ctx context.Context, pool *pgxpool.Pool, owner string, contact string, groupName string) {
+	t.Helper()
+	insertContactEdgeWithRemark(t, ctx, pool, owner, contact, "")
+	_, err := pool.Exec(ctx, `
+UPDATE contact_edges
+SET group_name = $3,
+    updated_at = now()
+WHERE tenant_id = 'tenant-contacts'
+  AND owner_user_id = $1
+  AND contact_user_id = $2
+`, owner, contact, groupName)
+	if err != nil {
+		t.Fatalf("set contact edge group_name: %v", err)
+	}
+}
+
 func setContactEdgeStatus(t *testing.T, ctx context.Context, pool *pgxpool.Pool, owner string, contact string, status types.ContactEdgeStatus) {
 	t.Helper()
 	_, err := pool.Exec(ctx, `
@@ -1130,6 +1539,22 @@ WHERE tenant_id = 'tenant-contacts'
 `, requestID, createdAt)
 	if err != nil {
 		t.Fatalf("set contact request created_at: %v", err)
+	}
+}
+
+func insertTenantPrivacyDefault(t *testing.T, ctx context.Context, pool *pgxpool.Pool, allowContactRequests bool) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+INSERT INTO contact_tenant_privacy_defaults (
+    tenant_id,
+    allow_contact_requests,
+    version,
+    created_at,
+    updated_at
+) VALUES ('tenant-contacts', $1, 1, now(), now())
+`, allowContactRequests)
+	if err != nil {
+		t.Fatalf("insert tenant privacy default: %v", err)
 	}
 }
 
@@ -1183,6 +1608,8 @@ TRUNCATE
     contacts_outbox,
     contact_command_idempotency,
     contact_privacy_settings,
+    contact_tenant_privacy_defaults,
+    contact_tenant_request_source_policies,
     contact_edges,
     contact_requests
 RESTART IDENTITY

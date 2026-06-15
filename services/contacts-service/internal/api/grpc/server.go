@@ -131,6 +131,8 @@ func (s *Server) SendContactRequest(
 		TargetUserID:   types.UserID(request.GetTargetUserId()),
 		IdempotencyKey: request.GetIdempotencyKey(),
 		Message:        request.GetMessage(),
+		SourceType:     requestSourceTypeFromProto(request.GetSourceType()),
+		SourceRef:      request.GetSourceRef(),
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -142,6 +144,8 @@ func (s *Server) SendContactRequest(
 		ReceiverUserId:   string(result.ReceiverUserID),
 		Status:           requestStatusToProto(result.Status),
 		IdempotentReplay: result.IdempotentReplay,
+		SourceType:       requestSourceTypeToProto(result.SourceType),
+		SourceRef:        result.SourceRef,
 	}, nil
 }
 
@@ -282,6 +286,8 @@ func (s *Server) ListContactRequests(
 			CreatedAtUnixMs: item.CreatedAtUnixMS,
 			UpdatedAtUnixMs: item.UpdatedAtUnixMS,
 			DecidedAtUnixMs: item.DecidedAtUnixMS,
+			SourceType:      requestSourceTypeToProto(item.SourceType),
+			SourceRef:       item.SourceRef,
 		})
 	}
 	return &contactsv1.ListContactRequestsResponse{
@@ -519,6 +525,7 @@ func privacySettingsToProto(settings types.ContactPrivacySettings) *contactsv1.C
 		AllowContactRequests: settings.AllowContactRequests,
 		Version:              settings.Version,
 		UpdatedAtUnixMs:      settings.UpdatedAtUnixMS,
+		PolicySource:         privacyPolicySourceToProto(settings.PolicySource),
 	}
 }
 
@@ -617,6 +624,59 @@ func requestListDirectionToProto(value types.ContactRequestListDirection) contac
 		return contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_OUTGOING
 	default:
 		return contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_UNSPECIFIED
+	}
+}
+
+func requestSourceTypeFromProto(value contactsv1.ContactRequestSourceType) types.ContactRequestSourceType {
+	switch value {
+	case contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_UNSPECIFIED:
+		return ""
+	case contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_DIRECT:
+		return types.ContactRequestSourceTypeDirect
+	case contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_SEARCH:
+		return types.ContactRequestSourceTypeSearch
+	case contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_GROUP:
+		return types.ContactRequestSourceTypeGroup
+	case contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_INVITE_LINK:
+		return types.ContactRequestSourceTypeInviteLink
+	case contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_QR_CODE:
+		return types.ContactRequestSourceTypeQRCode
+	case contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_IMPORT:
+		return types.ContactRequestSourceTypeImport
+	default:
+		return types.ContactRequestSourceType(value.String())
+	}
+}
+
+func requestSourceTypeToProto(value types.ContactRequestSourceType) contactsv1.ContactRequestSourceType {
+	switch value {
+	case types.ContactRequestSourceTypeDirect, "":
+		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_DIRECT
+	case types.ContactRequestSourceTypeSearch:
+		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_SEARCH
+	case types.ContactRequestSourceTypeGroup:
+		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_GROUP
+	case types.ContactRequestSourceTypeInviteLink:
+		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_INVITE_LINK
+	case types.ContactRequestSourceTypeQRCode:
+		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_QR_CODE
+	case types.ContactRequestSourceTypeImport:
+		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_IMPORT
+	default:
+		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_UNSPECIFIED
+	}
+}
+
+func privacyPolicySourceToProto(value types.ContactPrivacyPolicySource) contactsv1.ContactPrivacyPolicySource {
+	switch value {
+	case types.ContactPrivacyPolicySourceUser:
+		return contactsv1.ContactPrivacyPolicySource_CONTACT_PRIVACY_POLICY_SOURCE_USER
+	case types.ContactPrivacyPolicySourceTenantDefault:
+		return contactsv1.ContactPrivacyPolicySource_CONTACT_PRIVACY_POLICY_SOURCE_TENANT_DEFAULT
+	case types.ContactPrivacyPolicySourceSystemDefault, "":
+		return contactsv1.ContactPrivacyPolicySource_CONTACT_PRIVACY_POLICY_SOURCE_SYSTEM_DEFAULT
+	default:
+		return contactsv1.ContactPrivacyPolicySource_CONTACT_PRIVACY_POLICY_SOURCE_UNSPECIFIED
 	}
 }
 

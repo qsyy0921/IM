@@ -34,3 +34,8 @@ Web / App / 桌面端是后续产品化展示层，不是当前后端主线。
 ## 文档路由
 
 具体文档路由看 `docs/runbook/README.md`。默认不要读 archive 全文，只在查历史证据时按关键词读取相关段落。
+
+- 当前进度总览：`docs/runbook/development-progress.md`
+- 当前未完成工作：`docs/runbook/remaining-goals.md`
+- 单服务状态：`docs/runbook/service-briefs/<service>.md`
+- 面试讲述进度：`docs/interview/project-progress.md`

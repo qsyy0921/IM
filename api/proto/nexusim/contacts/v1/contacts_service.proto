@@ -57,11 +57,30 @@ enum ContactRequestListDirection {
   CONTACT_REQUEST_LIST_DIRECTION_OUTGOING = 2;
 }
 
+enum ContactRequestSourceType {
+  CONTACT_REQUEST_SOURCE_TYPE_UNSPECIFIED = 0;
+  CONTACT_REQUEST_SOURCE_TYPE_DIRECT = 1;
+  CONTACT_REQUEST_SOURCE_TYPE_SEARCH = 2;
+  CONTACT_REQUEST_SOURCE_TYPE_GROUP = 3;
+  CONTACT_REQUEST_SOURCE_TYPE_INVITE_LINK = 4;
+  CONTACT_REQUEST_SOURCE_TYPE_QR_CODE = 5;
+  CONTACT_REQUEST_SOURCE_TYPE_IMPORT = 6;
+}
+
+enum ContactPrivacyPolicySource {
+  CONTACT_PRIVACY_POLICY_SOURCE_UNSPECIFIED = 0;
+  CONTACT_PRIVACY_POLICY_SOURCE_USER = 1;
+  CONTACT_PRIVACY_POLICY_SOURCE_TENANT_DEFAULT = 2;
+  CONTACT_PRIVACY_POLICY_SOURCE_SYSTEM_DEFAULT = 3;
+}
+
 message SendContactRequestRequest {
   AuthContext auth_context = 1;
   string target_user_id = 2;
   string idempotency_key = 3;
   string message = 4;
+  ContactRequestSourceType source_type = 5;
+  string source_ref = 6;
 }
 
 message SendContactRequestResponse {
@@ -71,6 +90,8 @@ message SendContactRequestResponse {
   string receiver_user_id = 4;
   ContactRequestStatus status = 5;
   bool idempotent_replay = 6;
+  ContactRequestSourceType source_type = 7;
+  string source_ref = 8;
 }
 
 message RespondContactRequestRequest {
@@ -121,6 +142,8 @@ message ContactRequestItem {
   int64 created_at_unix_ms = 6;
   int64 updated_at_unix_ms = 7;
   int64 decided_at_unix_ms = 8;
+  ContactRequestSourceType source_type = 9;
+  string source_ref = 10;
 }
 
 message ListContactRequestsResponse {
@@ -263,6 +286,7 @@ message ContactPrivacySettings {
   bool allow_contact_requests = 1;
   int64 version = 2;
   int64 updated_at_unix_ms = 3;
+  ContactPrivacyPolicySource policy_source = 4;
 }
 
 message GetContactPrivacyRequest {

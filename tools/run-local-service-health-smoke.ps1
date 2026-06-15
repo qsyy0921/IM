@@ -1,7 +1,10 @@
 param(
     [int]$TimeoutSeconds = 120,
     [switch]$SkipImageBuild,
-    [switch]$KeepRunning
+    [switch]$KeepRunning,
+    [switch]$RecordResourceSnapshot,
+    [string]$RunName = "",
+    [string]$ResultRoot = "H:\NexusIM\loadtest-results"
 )
 
 $ErrorActionPreference = "Stop"
@@ -113,6 +116,60 @@ function Wait-ServiceEndpoints {
     }
 }
 
+function New-DefaultRunName {
+    $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    return "local-service-health-smoke-$timestamp"
+}
+
+function Write-ResourceSnapshot {
+    if (-not $RecordResourceSnapshot) {
+        return
+    }
+
+    $actualRunName = if ($RunName.Trim().Length -gt 0) { $RunName.Trim() } else { New-DefaultRunName }
+    $runDirectory = Join-Path $ResultRoot $actualRunName
+    New-Item -ItemType Directory -Force -Path $runDirectory | Out-Null
+
+    $serviceContainers = @($serviceProcesses | ForEach-Object { "nexusim-$_" })
+    $baseContainers = @($baseProcesses | ForEach-Object { "nexusim-$_" })
+    $containers = @($serviceContainers + $baseContainers)
+
+    $statsPath = Join-Path $runDirectory "docker-stats.jsonl"
+    $statsLines = & docker stats --no-stream --format "{{json .}}" @containers
+    if ($LASTEXITCODE -ne 0) {
+        throw "docker stats failed with exit code $LASTEXITCODE"
+    }
+    $statsLines | Set-Content -LiteralPath $statsPath -Encoding UTF8
+
+    $endpointSummary = foreach ($check in $checks) {
+        $url = [string]$check.Url
+        [pscustomobject]@{
+            service = [string]$check.Name
+            healthz = Invoke-Endpoint -Name ([string]$check.Name) -Url $url -Path "/healthz"
+            readyz = Invoke-Endpoint -Name ([string]$check.Name) -Url $url -Path "/readyz"
+            url = $url
+        }
+    }
+    $endpointPath = Join-Path $runDirectory "endpoint-summary.json"
+    $endpointSummary | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $endpointPath -Encoding UTF8
+
+    $summary = [pscustomobject]@{
+        run_name = $actualRunName
+        created_at = (Get-Date).ToUniversalTime().ToString("o")
+        result_root = $ResultRoot
+        service_count = $checks.Count
+        service_containers = $serviceContainers
+        base_containers = $baseContainers
+        docker_stats_path = $statsPath
+        endpoint_summary_path = $endpointPath
+        scope = "single no-stream Docker stats snapshot after healthz/readyz pass; not a capacity benchmark"
+    }
+    $summaryPath = Join-Path $runDirectory "run-summary.json"
+    $summary | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $summaryPath -Encoding UTF8
+
+    Write-Host "resource_snapshot_dir=$runDirectory"
+}
+
 Push-Location $repoRoot
 try {
     if (-not (Test-Path -LiteralPath $baseCompose)) {
@@ -137,6 +194,7 @@ try {
     Invoke-BaseCompose -ComposeArgs @("up", "-d", "postgres", "redis", "kafka")
     Invoke-Compose -ComposeArgs $upArgs
     Wait-ServiceEndpoints
+    Write-ResourceSnapshot
 
     Write-Host "OK   local service health smoke passed for $($checks.Count) services."
 }

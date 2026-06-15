@@ -13,6 +13,7 @@
 - 本文件维护 Codex 长期目标 prompt 的真实内容。
 - Codex 目标框只放上面的短 Prompt，不复制本文件全文，也不在目标框里直接维护长规则。
 - 当前状态和下一步优先级以 `docs/runbook/current-brief.md` 为准。
+- 剩余目标和 P2 backlog 以 `docs/runbook/remaining-goals.md` 为准。
 - 需要更细服务状态时，只读取相关 `docs/runbook/service-briefs/<service>.md`。
 - 历史证据、SDD、smoke 报告和 archive 只在需要时按关键词读取。
 

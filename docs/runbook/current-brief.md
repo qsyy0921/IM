@@ -28,7 +28,7 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 1. 当前面试主线只覆盖后端、分布式可靠性和 AI 应用后端；Web / App / 桌面端暂不纳入当前开发主线。
 2. 先治理已有 9 个微服务，不急着新增 `search-service` / `media-service` / AI 服务。
 3. 当前重点：先把九服务收口问题逐项解决，默认顺序是安全启动门禁 / trusted metadata / TLS 边界 -> 观测和故障 smoke -> repair / DLQ / audit -> 逐服务 P2 hardening -> 容量和代码复杂度治理。
-4. 已完成的长历史不要写回本入口；总体进度看 `docs/runbook/development-progress.md`，单服务状态看 `docs/runbook/service-briefs/<service>.md`。
+4. 已完成的长历史不要写回本入口；总体进度看 `docs/runbook/development-progress.md`，剩余目标看 `docs/runbook/remaining-goals.md`，单服务状态看 `docs/runbook/service-briefs/<service>.md`。
 5. 当前 9 个服务已接入 first-stage 本地 Prometheus / Grafana 观测原型；api-gateway legacy quiet-window gate 已有 observation 归档脚本；下一轮优先继续安全 / trusted metadata / TLS 边界收口，其次继续 api-gateway 配置中心 / DB-backed quota 边界，或按服务清 P2 hardening。
 
 ## 当前收口 Backlog
@@ -39,7 +39,7 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 2. 观测边界：继续把 first-stage `/metrics`、Prometheus rules、Grafana dashboard、OTel trace wiring 收敛为本地可演示闭环；不要写成生产 SLO。
 3. 故障 smoke：Redis Sentinel 网络分区、Kafka controller-switch / ISR observation 和 PostgreSQL quorum observation 已有 clean run 和报告，PostgreSQL 生产 quorum 边界见 ADR-034；后续继续补更长时间 Kafka ISR flapping / consumer rebalance。
 4. Repair / DLQ：补 outbox、projection、challenge delivery 等 operator 的可复跑 repair / audit / cleanup 流程。
-5. 逐服务 P2：按 `development-progress.md` 和对应 service brief 清单逐个清理，不跨服务堆大改。
+5. 逐服务 P2：按 `remaining-goals.md` 和对应 service brief 清单逐个清理，不跨服务堆大改。
 6. 复杂度治理：生产手写文件接近 2500 行、测试或 runner 接近 3000 行时，优先同 package 拆分。
 
 ## 已知硬约束

@@ -16,7 +16,7 @@
 
 当前优先级：
 1. 先治理已有 9 个微服务，新增服务后置；`search-service` 只保留 SDD draft，不进入 proto / migration / skeleton。
-2. 保持入口文档短；总体进度看 `docs/runbook/development-progress.md`，单服务状态看 `docs/runbook/service-briefs/<service>.md`。
+2. 保持入口文档短；总体进度看 `docs/runbook/development-progress.md`，剩余目标看 `docs/runbook/remaining-goals.md`，单服务状态看 `docs/runbook/service-briefs/<service>.md`。
 3. 继续清各服务 P2 hardening：安全启动门禁、trusted metadata / TLS 边界、生产观测、容量验证、故障演练、repair workflow、权限模型深化和代码复杂度治理。
 4. 当前 9 个服务已补 first-stage 本地 Prometheus / Grafana 观测原型；它只用于本地开发和面试展示，不等于生产 SLO / Alertmanager / 统一观测平台。
 5. 保持 api-gateway、identity、message、conversation、delivery、push、receipt、contacts、policy 已有链路稳定。
@@ -45,7 +45,7 @@ outbox、Kafka、durable inbox、Redis route、多实例、Win/Mac Docker smoke�
 1. 安全启动门禁和 trusted metadata / TLS 边界：复核 public listener、mock auth、metadata auth、gateway verified metadata、mTLS allowlist 和 `check-local` 规则。
 2. 观测与故障演练：继续补本地 Prometheus / Grafana / OTel 可演示闭环，并补 Redis 网络分区、Kafka 多故障、PostgreSQL quorum / split-brain 类 smoke。
 3. Repair / DLQ / audit：把 outbox、projection、challenge delivery 等 repair 流程做成可复跑 operator 和报告。
-4. 逐服务 P2 hardening：按 `development-progress.md` 和相关 service brief 清理 api-gateway、identity、message、conversation、delivery、push、receipt、contacts、policy 的剩余问题。
+4. 逐服务 P2 hardening：按 `remaining-goals.md` 和相关 service brief 清理 api-gateway、identity、message、conversation、delivery、push、receipt、contacts、policy 的剩余问题。
 5. 复杂度治理：优先拆接近阈值的大型生产文件、测试和 runner；同 package 拆分优先，不为了架构漂亮提前抽公共包。
 
 每个切片必须有明确验收：代码变更、必要测试或 smoke、对应 service brief / progress 更新；不要一次横跨多个无关服务。
@@ -55,6 +55,7 @@ outbox、Kafka、durable inbox、Redis route、多实例、Win/Mac Docker smoke�
 - 当前入口：`docs/runbook/current-brief.md`
 - 文档总入口：`docs/README.md`
 - runbook 路由：`docs/runbook/README.md`
+- 剩余目标：`docs/runbook/remaining-goals.md`
 - 服务状态索引：`docs/runbook/service-briefs/README.md`
 - 单服务短状态：`docs/runbook/service-briefs/<service>.md`
 - 历史长目标：`docs/runbook/archive/current-goal-20260614-long.md`

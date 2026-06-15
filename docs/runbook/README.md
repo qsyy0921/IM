@@ -13,6 +13,7 @@
 
 - 单服务状态：`service-briefs/<service>.md`
 - 开发进度总览：`development-progress.md`
+- 剩余目标 / P2 backlog：`remaining-goals.md`
 - 开发过程与阶段顺序：`development-process.md`
 - 服务设计：`../sdd/<service>.md`
 - smoke / 压测证据：`loadtest/<service>/`

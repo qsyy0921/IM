@@ -106,59 +106,28 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - outbox / projection / challenge delivery 等 repair / audit / cleanup operator
 - worker / relay 非取消错误退避重试
 
-当前仍属于后续 hardening：
-
-- 更完整的 trace / alert / structured logging
-- 更细粒度的故障演练
-- 更系统化的运维 UI / repair workflow
+更完整的 trace / alert / structured logging、故障演练和运维 workflow 属于后续目标，统一维护在 `remaining-goals.md`。
 
 ## 服务进度矩阵
 
-| 服务 | 当前状态 | 已有证据 | 主要剩余工作 |
+| 服务 | 当前状态 | 最近进展 / 证据 | 详情入口 |
 | --- | --- | --- | --- |
-| `api-gateway` | 已落地、已接主链路 | gateway auth / downstream trusted metadata smoke、token / tenant scope rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota file / URL source、file / URL snapshot 大小上限、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、URL userinfo / redirect fail-closed、可选 checksum-required gate、future quota snapshot timestamp fail-closed、applied quota snapshot stale 观测和 alert 原型、quota snapshot health gate、legacy descriptor 显式 opt-in 默认、legacy/facade traffic metrics、legacy quiet-window gate 和 observation 归档脚本、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、legacy registered/deadline 与 quota reload/identity error 观测、first-stage OTel 入口 server span 和下游 gRPC client span、first-stage trace sampling policy / wiring check、tenant quota source helper 同 package 拆分 | 在目标环境持续运行 legacy quiet-window observation 并最终删除 legacy descriptor 代码、完整配置中心 / DB-backed quota hardening、生产部署治理、统一 OTel collector / alerting / dashboard |
-| `identity-service` | 已落地、已接登录主链路 | login / refresh / MFA / recovery code / JWKS / challenge delivery、SMTP subject/body templates、PostgreSQL repository refresh/outbox helper 拆分、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | WebAuthn/passkeys、OIDC、多 issuer、KMS/HSM、完整风控、生产级 email/SMS provider、生产级 OTel collector / alerting / SLO dashboard |
-| `message-service` | 已落地、已接主链路 | `SendMessage` / outbox / Kafka timeline、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 更多消息类型、会话级删除策略深化、合规删除、容量观测深化、生产级 OTel collector / alerting / SLO dashboard |
-| `conversation-service` | 已落地、已接主链路 | `GetSendContext` / member change / saga / worker、`member-change-audit` 只读 operator、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 更完整群管理、owner transfer 策略、成员窗口历史 repair / repair action、生产级 OTel collector / alerting / SLO dashboard |
-| `delivery-service` | 已落地、已接主链路 | projection / `PullInbox` / `AckDelivery` / `HideInboxItem` / `delivery.inbox_item.hidden.v1` / delivery outbox、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | Projection DLQ / repair 深化、更多 delivery event 消费方、生产级 OTel collector / alerting / SLO dashboard |
-| `push-gateway` | 已落地、已接主链路 | notify / `delivery.hide` / ACK / resume / Redis route / Win-Mac / Sentinel / Sentinel network-partition / TLS smoke、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel WebSocket connection span | 跨实例 resume 强化、容量测试、Redis Cluster / 生产级 HA 设计、生产级 OTel collector / alerting / SLO dashboard |
-| `receipt-service` | 已落地、已接主链路 | receipt projection / outbox / audit / repair、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 送达回执扩展、批量接口优化、会话列表产品化、生产级 OTel collector / alerting / SLO dashboard |
-| `contacts-service` | 已落地、已接主链路 | contacts grpc / list search / group filter / request privacy setting / outbox / audit / repair、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 更细 profile / 来源 / 租户级隐私策略、生产级 OTel collector / alerting / SLO dashboard |
-| `policy-service` | 已落地、已接主链路 | decision / projection / outbox / audit / repair、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 完整 ReBAC、moderation policy、tenant DSL / quota、外部 audit sink、生产级 OTel collector / alerting / SLO dashboard |
-| `search-service` | 仅保留占位和 brief | 无真实实现主线 | 等前 9 个服务收干净后再进入 |
+| `api-gateway` | 已落地、已接主链路 | quota source guard、future snapshot timestamp fail-closed、legacy quiet-window gate、OTel / Prometheus 本地观测 | `service-briefs/api-gateway.md` |
+| `identity-service` | 已落地、已接登录主链路 | login / refresh / MFA / recovery code / JWKS / challenge delivery、SMTP template、repository helper 拆分 | `service-briefs/identity-service.md` |
+| `message-service` | 已落地、已接主链路 | `SendMessage` / outbox / Kafka timeline、first-stage `/metrics` 和 OTel server span | `service-briefs/message-service.md` |
+| `conversation-service` | 已落地、已接主链路 | `GetSendContext` / member change / saga / audit operator、first-stage `/metrics` 和 OTel server span | `service-briefs/conversation-service.md` |
+| `delivery-service` | 已落地、已接主链路 | projection / `PullInbox` / `AckDelivery` / hide inbox / delivery outbox | `service-briefs/delivery-service.md` |
+| `push-gateway` | 已落地、已接主链路 | notify / ACK / resume / Redis route / Win-Mac / Sentinel / network-partition / TLS smoke | `service-briefs/push-gateway.md` |
+| `receipt-service` | 已落地、已接主链路 | receipt projection / outbox / audit / repair、first-stage `/metrics` 和 OTel server span | `service-briefs/receipt-service.md` |
+| `contacts-service` | 已落地、已接主链路 | contacts list search / group filter / privacy setting / outbox / audit / repair | `service-briefs/contacts-service.md` |
+| `policy-service` | 已落地、已接主链路 | decision / projection / outbox / audit / repair、first-stage `/metrics` 和 OTel server span | `service-briefs/policy-service.md` |
+| `search-service` | 占位，尚未进入真实实现主线 | 无真实实现；等前 9 个服务收口后再进入 | `service-briefs/search-service.md` |
 
-## 当前问题处理队列
+## 剩余目标入口
 
-当前 9 个服务没有已知 P0/P1 阻塞。后续按小切片逐个清 P2，默认顺序如下：
+剩余目标、P2 hardening、收口门禁和逐服务 backlog 已拆到 `remaining-goals.md`。
 
-### 收口门禁
-
-进入 `search-service` 之前，先把下面几类问题作为统一 backlog 解决：
-
-1. 安全启动门禁：public listener、mock auth、metadata auth、gateway verified metadata、TLS / mTLS allowlist、弱鉴权公网暴露保护必须继续纳入 `tools/check-local.ps1` 和服务级测试；trusted metadata listener / backend guard 已纳入门禁，必须覆盖私网无 mTLS 放行、公网无 mTLS 拒绝、公网 mTLS 放行和 body auth 跳过；debug listener validator 已纳入门禁，必须覆盖 private allow / public reject / explicit opt-in 三类测试；服务端 gRPC / WSS TLS 配置已纳入门禁，必须覆盖 cert/key 成对、invalid require-client-cert bool、缺 client CA 三类启动失败测试。
-2. 观测闭环：first-stage `/metrics`、Prometheus rules、Grafana dashboard、OTel trace wiring 继续用于本地开发 / 面试展示；本地 Prometheus 配置门禁已覆盖 9 个服务的 scrape job、debug target、`service` label、alert rule mount 和 rule load；下一步是补 collector / alert / dashboard smoke 和采样治理，不把它写成生产 SLO。
-3. 分布式故障 smoke：Redis Sentinel / PostgreSQL / Kafka 本地关键 fault observation 已有 clean run；后续补更长时间 Kafka ISR flapping、consumer rebalance 和 producer retry budget。PostgreSQL 生产 quorum / split-brain fencing 边界已由 ADR-034 固定，后续只在选型和 drill 证据足够时更新生产 HA 口径。
-4. Repair / DLQ / audit：outbox、projection、challenge delivery、policy / contacts / receipt 等 operator 要有可复跑 repair / cleanup / audit 流程。
-5. 代码复杂度治理：生产手写文件接近 2500 行、测试或 runner 接近 3000 行时，优先同 package 拆分，避免继续堆大文件。
-
-### 逐服务队列
-
-1. `api-gateway` / 后端观测：first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota file / URL source、file / URL snapshot 大小上限、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、URL userinfo / redirect fail-closed、可选 checksum-required gate、future quota snapshot timestamp fail-closed、applied quota snapshot stale 观测和 alert 原型、quota snapshot gate、legacy descriptor 显式 opt-in 默认、legacy/facade traffic metrics、legacy quiet-window gate 和 observation 归档脚本、Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、legacy registered/deadline 与 quota reload/identity error 观测、api-gateway OTel 入口 server span 和下游 gRPC client span、first-stage trace sampling policy / service wiring check 已补；tenant quota source / snapshot / reload helper 已同 package 拆分，`cmd/api-gateway/main.go` 回落到千行以内；当前 9 个服务均已纳入 first-stage Prometheus / Grafana 和 trace runtime wiring，其中 8 个后端 gRPC 服务使用 server span，push-gateway 使用 WebSocket connection span；本地 OTel collector debug 入口和 policy OTLP smoke 脚本已补；下一步继续在目标环境持续运行 legacy observation 并形成移除计划、统一 collector / alerting / dashboard、采样治理 hardening，以及完整配置中心 / DB-backed quota hardening，不先扩新 facade。
-2. `identity-service`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；后续继续身份安全 hardening，优先 WebAuthn / OIDC / issuer / key 管理边界，不把本地观测原型表述为生产告警体系。
-3. `message-service`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；补消息类型和删除语义前，继续守住 outbox / policy / 容量观测。
-4. `conversation-service`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；补群管理前，继续收 owner transfer 策略细化和成员窗口历史 repair。
-5. `delivery-service`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；后续继续 projection DLQ / repair 深化和 delivery event 消费方扩展。
-6. `push-gateway`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；Redis Sentinel network-partition fallback smoke 已归档；后续继续跨实例 resume 强化和容量测试，不把在线通知当 durable delivery。
-7. `receipt-service`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；后续继续送达回执扩展、批量接口优化和会话列表产品化。
-8. `contacts-service`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；`ListContacts.query` 已支持当前用户 ACTIVE edge 的 `contact_user_id / remark` 搜索，`group_name` 已支持联系人分组更新和列表分组过滤；已补用户级联系人申请隐私开关，后续继续更细 profile / 来源 / 租户级隐私策略。
-9. `policy-service`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；后续继续 ReBAC / tenant DSL / quota / 外部审计。
-
-每个切片必须满足：
-
-- 只改一个服务或一个清晰跨服务边界。
-- 有单测 / 集成测试 / smoke 中至少一种可复核证据。
-- 更新对应 `service-briefs/<service>.md`。
-- 不把入口文档重新写长。
+本文只回答“现在开发到哪一步”；不要在这里继续堆待办长句。
 
 ## 当前阶段判断
 
@@ -170,14 +139,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 而不是“继续快速新增新服务”。
 ```
 
-所以接下来的优先级是：
-
-1. 9 个服务 first-stage 本地 Prometheus / Grafana 观测面已补齐，Prometheus scrape job / target / label / rules 已纳入本地门禁；下一批回到 api-gateway legacy opt-in 实际迁移观察和配置中心 / DB-backed quota hardening，同时继续按服务清 P2。
-2. 继续把现有 9 个服务做干净。
-3. 继续补分布式故障恢复 smoke。
-4. 清各服务剩余 P2 hardening。
-5. 等这批收口后，再进入 `search-service`。
-6. `search-service` 稳定后，再做 `rag-service` / `summary-service` / `agent-service`。
+下一步优先级和剩余目标统一看 `remaining-goals.md`，不要在本页重复维护。
 
 ## 维护规则
 

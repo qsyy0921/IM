@@ -111,6 +111,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - PowerShell / Bash 脚本解析门禁，`tools` 和 `loadtest` 下的 `.ps1` / `.sh` 都会进入本地检查，避免 smoke / 运维脚本语法回归
 - 本地 Prometheus / Grafana 覆盖门禁，已实现服务目录必须有 scrape / alert rules / dashboard 配置
 - 服务 cmd 层启动配置测试门禁，已实现服务必须保留 `main_test.go` 覆盖启动 / 监听 / TLS / auth guard 配置
+- 服务 cmd 构建门禁，9 个已实现服务的 `services/<service>/cmd/<service>` 必须能通过 `go build`
 - 服务运行态端点门禁，已实现服务必须保留 `/healthz`、`/readyz`、`/debug/metrics` 和 `/metrics`
 - Docker runtime / Mac 镜像同步覆盖门禁，9 个已实现服务必须都有 `deploy/docker/<service>.runtime.Dockerfile`，双机镜像同步脚本默认从 `services/` 推导完整服务集合
 - 压测原始输出路径门禁，loadtest / smoke 默认结果不能写回仓库内 `loadtest/results`，原始数据默认落 `H:\NexusIM\loadtest-results`

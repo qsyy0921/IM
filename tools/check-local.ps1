@@ -38,6 +38,9 @@ try {
     Write-Host "== service cmd tests =="
     Invoke-LocalCheck "check-service-cmd-tests.ps1"
 
+    Write-Host "== service cmd builds =="
+    Invoke-LocalCheck "check-service-cmd-builds.ps1"
+
     Write-Host "== service runtime endpoints =="
     Invoke-LocalCheck "check-service-runtime-endpoints.ps1"
 

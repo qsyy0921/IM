@@ -57,7 +57,7 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、可选 checksum-required gate、applied quota snapshot stale 观测和 quota snapshot gate；
 api-gateway 已补 legacy/facade traffic metrics，用于旧 descriptor 迁移观察；
 legacy descriptor 已收敛为显式 opt-in 默认；
-api-gateway 已补 first-stage OpenTelemetry 入口 server span 和下游 gRPC client span，contacts-service、identity-service、message-service、conversation-service、delivery-service、receipt-service、policy-service 已开始后端服务 gRPC server span rollout；
+api-gateway 已补 first-stage OpenTelemetry 入口 server span 和下游 gRPC client span；当前 9 个服务均已纳入 first-stage trace runtime wiring，其中 8 个后端 gRPC 服务使用 server span，push-gateway 使用 WebSocket connection span，并由采样策略和本地 check-local 门禁约束；
 本地 OTel collector debug 入口和 policy OTLP smoke 脚本已补，可用于面试演示 OTLP trace 链路，但还不是生产告警平台；
 search-service 和 AI 应用后端后置；
 客户端暂不纳入当前面试主线。
@@ -74,7 +74,7 @@ search-service 和 AI 应用后端后置；
 | `message-service` | `SendMessage`、编辑、撤回、删除，message log，outbox，Kafka timeline event，first-stage OTel gRPC server span | 业务事务不直接 publish Kafka，使用 outbox 保证事件传播，核心写服务已进入 trace rollout |
 | `conversation-service` | 会话成员事实源，`GetSendContext`，成员变更 saga，owner transfer，first-stage OTel gRPC server span | 会话成员事实边界、成员事件和消息事件共享 timeline seq，成员事实服务已进入 trace rollout |
 | `delivery-service` | timeline projection，durable `user_inbox`，`PullInbox`，`AckDelivery`，delivery outbox，first-stage OTel gRPC server span | 断线可恢复，push-gateway 不拥有 durable inbox，投递服务已进入 trace rollout |
-| `push-gateway` | WebSocket 在线通知，ACK 转发，resume buffer，Redis route，跨实例在线路由 | 在线唤醒层和可靠投递层解耦，Redis 故障时 PullInbox 兜底 |
+| `push-gateway` | WebSocket 在线通知，ACK 转发，resume buffer，Redis route，跨实例在线路由，first-stage OTel WebSocket connection span | 在线唤醒层和可靠投递层解耦，Redis 故障时 PullInbox 兜底 |
 | `receipt-service` | 已读 / 未读，会话列表，archive / pin / mute，receipt projection，receipt outbox，first-stage OTel gRPC server span | 会话列表和回执从投递事件投影，不跨服务读内部表，回执服务已进入 trace rollout |
 | `contacts-service` | 好友申请、接受、拒绝、取消、删除、拉黑、备注，contacts outbox，first-stage OTel gRPC server span | 联系人事实源，策略服务通过事件投影使用联系人关系，后端服务观测 rollout 的首个服务侧样例 |
 | `policy-service` | 权限决策、规则存储、conversation role gate、contacts projection、decision audit outbox、first-stage OTel gRPC server span | 策略权限独立服务化，不在 message-service 复制权限逻辑，策略服务已进入 trace rollout |
@@ -144,7 +144,7 @@ search-service 和 AI 应用后端后置；
 
 | 服务 | 待开发 / 待完善功能 |
 | --- | --- |
-| `api-gateway` | 后端服务 server span rollout、采样治理 hardening、legacy opt-in 实际迁移观察和移除计划、配置中心 / DB-backed quota hardening、生产部署治理；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules、本地 Grafana dashboard 和 trace sampling policy / check，但还不是生产观测平台 |
+| `api-gateway` | 采样治理 hardening、legacy opt-in 实际迁移观察和移除计划、配置中心 / DB-backed quota hardening、生产部署治理；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules、本地 Grafana dashboard、9 服务 first-stage trace runtime wiring 和 trace sampling / wiring check，但还不是生产观测平台 |
 | `identity-service` | WebAuthn / passkeys、OIDC federation、多 issuer、KMS / HSM key management、完整登录风控、SMS provider、bounce handling、多租户通知模板 |
 | `message-service` | 更多消息类型、私有删除、合规删除、容量压测、生产级发送链路观测 |
 | `conversation-service` | 更完整群管理、owner transfer 策略细化、成员可见窗口历史 repair |
@@ -219,7 +219,7 @@ search / RAG / Agent 后端能力。
 短期优先级：
 
 1. 清已有 9 个服务的 P2 hardening；
-2. 继续做 `api-gateway` OTel collector / 后端服务 server span rollout、legacy opt-in 实际迁移观察和移除计划，以及配置中心 / DB-backed quota hardening；
+2. 继续做 `api-gateway` OTel collector / alerting / dashboard、legacy opt-in 实际迁移观察和移除计划，以及配置中心 / DB-backed quota hardening；
 3. 补更完整的故障恢复 smoke；
 4. 收敛观测、repair、audit、TLS / mTLS 和 trusted metadata 边界；
 5. 控制代码复杂度，避免核心文件继续变大；

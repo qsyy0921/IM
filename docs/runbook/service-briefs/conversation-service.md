@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-- 已有 `GetSendContext`、`CreateMemberChange`、`GetMemberChange`、`ListConversationMembers`、owner transfer。
+- 已有 `GetSendContext`、`CreateMemberChange`、`GetMemberChange`、`ListConversationMembers` 当前 ACTIVE roster 分页 / role 过滤、owner transfer。
 - 成员变更走 shared timeline/outbox，保持 `conversation_seq` 顺序。
 - 是会话成员事实源，其它服务不要跨表读取 `conversation_members`。
 - 已补第一阶段本地观测：`/healthz`、`/readyz`、`/debug/metrics` 和 Prometheus text `/metrics`，包含低敏 gRPC、PG pool、`conversations` / `conversation_members` / `member_change_saga` 聚合快照；debug HTTP 监听默认只允许 loopback / 私网，公网或未指定地址必须显式 `NEXUSIM_CONVERSATION_DEBUG_ALLOW_PUBLIC=true`。
@@ -17,5 +17,5 @@
 
 ## 后续
 
-- 更完整群管理、owner transfer 策略、成员窗口历史 repair / repair action。
+- 更完整群管理、owner transfer 策略继续打磨、成员窗口历史 repair / repair action。
 - OTel collector / 生产级 alerting / SLO dashboard 仍属于后续统一观测治理。

@@ -271,6 +271,71 @@ INSERT INTO conversation_members (
 		t.Fatalf("unexpected owner member: %+v", secondPage.Members[1])
 	}
 
+	adminOnly, err := repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-list",
+		PageSize:       10,
+		RoleFilter:     types.MemberRoleAdmin,
+	})
+	if err != nil {
+		t.Fatalf("list admin members: %v", err)
+	}
+	if len(adminOnly.Members) != 1 || adminOnly.Members[0].UserID != "admin-1" || adminOnly.Members[0].Role != types.MemberRoleAdmin {
+		t.Fatalf("unexpected admin members: %+v", adminOnly.Members)
+	}
+
+	memberFirstPage, err := repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-list",
+		PageSize:       1,
+		RoleFilter:     types.MemberRoleMember,
+	})
+	if err != nil {
+		t.Fatalf("list first member page: %v", err)
+	}
+	if len(memberFirstPage.Members) != 1 ||
+		memberFirstPage.Members[0].UserID != "member-1" ||
+		memberFirstPage.NextPageToken == "" {
+		t.Fatalf("unexpected first member page: %+v", memberFirstPage)
+	}
+	memberSecondPage, err := repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-list",
+		PageSize:       1,
+		PageToken:      memberFirstPage.NextPageToken,
+		RoleFilter:     types.MemberRoleMember,
+	})
+	if err != nil {
+		t.Fatalf("list second member page: %v", err)
+	}
+	if len(memberSecondPage.Members) != 1 ||
+		memberSecondPage.Members[0].UserID != "member-2" ||
+		memberSecondPage.NextPageToken != "" {
+		t.Fatalf("unexpected second member page: %+v", memberSecondPage)
+	}
+	_, err = repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-list",
+		PageSize:       1,
+		PageToken:      memberFirstPage.NextPageToken,
+		RoleFilter:     types.MemberRoleAdmin,
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid cursor when role_filter changes, got %v", err)
+	}
+
 	_, err = repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
 		AuthContext: types.AuthContext{
 			TenantID: "tenant-list",

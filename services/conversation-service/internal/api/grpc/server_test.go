@@ -653,6 +653,7 @@ func TestListConversationMembersConvertsRequestAndResponse(t *testing.T) {
 		ConversationId: "conv-1",
 		PageSize:       50,
 		PageToken:      "page-token",
+		RoleFilter:     conversationv1.MemberRole_MEMBER_ROLE_ADMIN,
 	})
 	if err != nil {
 		t.Fatalf("list conversation members: %v", err)
@@ -665,7 +666,8 @@ func TestListConversationMembersConvertsRequestAndResponse(t *testing.T) {
 		executor.command.AuthContext.RequestID != "request-1" ||
 		executor.command.ConversationID != "conv-1" ||
 		executor.command.PageSize != 50 ||
-		executor.command.PageToken != "page-token" {
+		executor.command.PageToken != "page-token" ||
+		executor.command.RoleFilter != types.MemberRoleAdmin {
 		t.Fatalf("unexpected command: %+v", executor.command)
 	}
 	if response.GetTenantId() != "tenant-1" ||

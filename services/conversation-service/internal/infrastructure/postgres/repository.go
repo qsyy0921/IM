@@ -409,8 +409,9 @@ func canViewMemberChange(
 }
 
 type listMembersPageToken struct {
-	Version int    `json:"v"`
-	UserID  string `json:"user_id"`
+	Version    int    `json:"v"`
+	UserID     string `json:"user_id"`
+	RoleFilter string `json:"role_filter"`
 }
 
 func (r *Repository) ListConversationMembers(
@@ -420,7 +421,7 @@ func (r *Repository) ListConversationMembers(
 	if r.pool == nil {
 		return types.ListConversationMembersResult{}, types.NewDBReadFailed("repository is not configured")
 	}
-	lastUserID, err := decodeListMembersPageToken(command.PageToken)
+	lastUserID, err := decodeListMembersPageToken(command.PageToken, command.RoleFilter)
 	if err != nil {
 		return types.ListConversationMembersResult{}, err
 	}
@@ -477,10 +478,11 @@ FROM conversation_members
 WHERE tenant_id = $1
   AND conversation_id = $2
   AND status = 'ACTIVE'
-  AND ($3 = '' OR user_id > $3)
+  AND ($3 = '' OR role = $3)
+  AND ($4 = '' OR user_id > $4)
 ORDER BY user_id ASC
-LIMIT $4
-`, command.AuthContext.TenantID, command.ConversationID, lastUserID, pageSize+1)
+LIMIT $5
+`, command.AuthContext.TenantID, command.ConversationID, command.RoleFilter, lastUserID, pageSize+1)
 	if err != nil {
 		return types.ListConversationMembersResult{}, types.NewDBReadFailed(err.Error())
 	}
@@ -508,7 +510,7 @@ LIMIT $4
 	}
 	if len(members) > pageSize {
 		page := members[:pageSize]
-		nextToken, err := encodeListMembersPageToken(page[len(page)-1].UserID)
+		nextToken, err := encodeListMembersPageToken(page[len(page)-1].UserID, command.RoleFilter)
 		if err != nil {
 			return types.ListConversationMembersResult{}, types.NewDBReadFailed(err.Error())
 		}
@@ -520,7 +522,7 @@ LIMIT $4
 	return result, nil
 }
 
-func decodeListMembersPageToken(token string) (string, error) {
+func decodeListMembersPageToken(token string, roleFilter types.MemberRole) (string, error) {
 	if token == "" {
 		return "", nil
 	}
@@ -532,16 +534,23 @@ func decodeListMembersPageToken(token string) (string, error) {
 	if err := json.Unmarshal(payload, &decoded); err != nil {
 		return "", types.NewInvalidArgument("page_token is invalid")
 	}
-	if decoded.Version != 1 || decoded.UserID == "" {
+	if decoded.Version == 1 {
+		if roleFilter != "" || decoded.UserID == "" {
+			return "", types.NewInvalidArgument("page_token is invalid")
+		}
+		return decoded.UserID, nil
+	}
+	if decoded.Version != 2 || decoded.UserID == "" || decoded.RoleFilter != string(roleFilter) {
 		return "", types.NewInvalidArgument("page_token is invalid")
 	}
 	return decoded.UserID, nil
 }
 
-func encodeListMembersPageToken(userID types.UserID) (string, error) {
+func encodeListMembersPageToken(userID types.UserID, roleFilter types.MemberRole) (string, error) {
 	payload, err := json.Marshal(listMembersPageToken{
-		Version: 1,
-		UserID:  string(userID),
+		Version:    2,
+		UserID:     string(userID),
+		RoleFilter: string(roleFilter),
 	})
 	if err != nil {
 		return "", err

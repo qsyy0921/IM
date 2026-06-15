@@ -21,6 +21,19 @@ func TestListConversationMembersUseCaseValidatesCommand(t *testing.T) {
 	}
 }
 
+func TestListConversationMembersUseCaseRejectsInvalidRoleFilter(t *testing.T) {
+	repository := &fakeListConversationMembersRepository{}
+	command := validListConversationMembersCommand()
+	command.RoleFilter = "SUPER_ADMIN"
+	_, err := NewListConversationMembersUseCase(repository).Execute(context.Background(), command)
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+	if repository.called {
+		t.Fatalf("repository should not be called")
+	}
+}
+
 func TestListConversationMembersUseCaseForwardsCommand(t *testing.T) {
 	repository := &fakeListConversationMembersRepository{
 		result: types.ListConversationMembersResult{
@@ -32,6 +45,7 @@ func TestListConversationMembersUseCaseForwardsCommand(t *testing.T) {
 		},
 	}
 	command := validListConversationMembersCommand()
+	command.RoleFilter = types.MemberRoleAdmin
 
 	result, err := NewListConversationMembersUseCase(repository).Execute(context.Background(), command)
 	if err != nil {
@@ -78,5 +92,6 @@ func validListConversationMembersCommand() types.ListConversationMembersCommand 
 		},
 		ConversationID: "conv-1",
 		PageSize:       50,
+		RoleFilter:     types.MemberRoleAdmin,
 	}
 }

@@ -12,6 +12,7 @@ type ListConversationMembersCommand struct {
 	ConversationID ConversationID
 	PageSize       int
 	PageToken      string
+	RoleFilter     MemberRole
 }
 
 func (c ListConversationMembersCommand) Validate() error {
@@ -30,6 +31,9 @@ func (c ListConversationMembersCommand) Validate() error {
 	if c.PageSize > MaxConversationMembersPageSize {
 		return NewInvalidArgument("page_size exceeds max")
 	}
+	if c.RoleFilter != "" && !isValidListMemberRoleFilter(c.RoleFilter) {
+		return NewInvalidArgument("role_filter is invalid")
+	}
 	return nil
 }
 
@@ -38,6 +42,15 @@ func (c ListConversationMembersCommand) EffectivePageSize() int {
 		return DefaultConversationMembersPageSize
 	}
 	return c.PageSize
+}
+
+func isValidListMemberRoleFilter(role MemberRole) bool {
+	switch role {
+	case MemberRoleOwner, MemberRoleAdmin, MemberRoleMember:
+		return true
+	default:
+		return false
+	}
 }
 
 type ConversationMember struct {

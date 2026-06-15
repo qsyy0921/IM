@@ -247,6 +247,7 @@ func (s *Server) ListConversationMembers(
 		ConversationID: types.ConversationID(request.GetConversationId()),
 		PageSize:       int(request.GetPageSize()),
 		PageToken:      request.GetPageToken(),
+		RoleFilter:     fromProtoMemberRole(request.GetRoleFilter()),
 	})
 	if err != nil {
 		return nil, grpcError(err)

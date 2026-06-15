@@ -169,6 +169,7 @@ auth_context
 conversation_id
 page_size
 page_token
+role_filter
 ```
 
 返回：
@@ -186,8 +187,9 @@ next_page_token
 
 - 调用者必须是该会话当前 ACTIVE 成员；否则返回 `PERMISSION_DENIED` / `conversation member is not active`。
 - 会话不存在、归档或删除时返回 `CONVERSATION_NOT_FOUND`。
-- 第一版只返回 `status=ACTIVE` 的当前成员，不暴露 `LEFT / BANNED` 历史成员；审计 / 管理视角后续单独设计 admin-only 查询，避免把权限矩阵塞进普通成员列表。
+- 第一版只返回 `status=ACTIVE` 的当前成员，可用 `role_filter=OWNER/ADMIN/MEMBER` 做当前 roster 过滤；不暴露 `LEFT / BANNED` 历史成员。审计 / 管理视角后续单独设计 admin-only 查询，避免把权限矩阵塞进普通成员列表。
 - `page_token` 是 opaque token；当前实现内部按 `user_id ASC` keyset 分页，调用方不得解析 token。
+- `page_token` 绑定 role filter；调用方切换过滤条件时必须从第一页重新拉，不能复用旧 token。
 - 该接口只读 `conversation-service` 自己的 `conversations / conversation_members` 事实表；其它服务需要成员列表时必须通过正式 API / projection，不得跨服务读取内部表。
 
 错误码：

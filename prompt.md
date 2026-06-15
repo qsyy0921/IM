@@ -37,6 +37,13 @@
 
 Web / App / 桌面端属于后续产品化展示层，当前先不作为开发主线。
 
+当前默认任务不是新增服务，而是先解决已有 9 个服务的收口问题：
+
+1. 收紧安全启动门禁、trusted metadata、TLS / mTLS 暴露边界。
+2. 继续补本地可验证的观测、故障恢复 smoke、repair / DLQ / audit。
+3. 按服务清 P2 hardening 和容量 / 复杂度治理。
+4. 每个切片都要有测试或 smoke 证据，并更新对应 service brief / progress 文档。
+
 ## 工作原则
 
 1. 小切片闭环：设计、代码、测试、文档一起收。

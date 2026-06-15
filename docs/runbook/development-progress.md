@@ -130,6 +130,18 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 
 当前 9 个服务没有已知 P0/P1 阻塞。后续按小切片逐个清 P2，默认顺序如下：
 
+### 收口门禁
+
+进入 `search-service` 之前，先把下面几类问题作为统一 backlog 解决：
+
+1. 安全启动门禁：public listener、mock auth、metadata auth、gateway verified metadata、TLS / mTLS allowlist、弱鉴权公网暴露保护必须继续纳入 `tools/check-local.ps1` 和服务级测试；debug listener validator 已纳入门禁，必须覆盖 private allow / public reject / explicit opt-in 三类测试。
+2. 观测闭环：first-stage `/metrics`、Prometheus rules、Grafana dashboard、OTel trace wiring 继续用于本地开发 / 面试展示；下一步是补 collector / alert / dashboard smoke 和采样治理，不把它写成生产 SLO。
+3. 分布式故障 smoke：补 Redis 网络分区、Kafka 多故障 / controller 切换、PostgreSQL quorum / split-brain 类本地模拟和报告，明确和生产 HA 的差距。
+4. Repair / DLQ / audit：outbox、projection、challenge delivery、policy / contacts / receipt 等 operator 要有可复跑 repair / cleanup / audit 流程。
+5. 代码复杂度治理：生产手写文件接近 2500 行、测试或 runner 接近 3000 行时，优先同 package 拆分，避免继续堆大文件。
+
+### 逐服务队列
+
 1. `api-gateway` / 后端观测：first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、可选 checksum-required gate、applied quota snapshot stale 观测和 alert 原型、quota snapshot gate、legacy descriptor 显式 opt-in 默认、legacy/facade traffic metrics、legacy quiet-window gate 和 observation 归档脚本、Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、legacy registered/deadline 与 quota reload/identity error 观测、api-gateway OTel 入口 server span 和下游 gRPC client span、first-stage trace sampling policy / service wiring check 已补；当前 9 个服务均已纳入 first-stage Prometheus / Grafana 和 trace runtime wiring，其中 8 个后端 gRPC 服务使用 server span，push-gateway 使用 WebSocket connection span；本地 OTel collector debug 入口和 policy OTLP smoke 脚本已补；下一步继续在目标环境持续运行 legacy observation 并形成移除计划、统一 collector / alerting / dashboard、采样治理 hardening，以及完整配置中心 / DB-backed quota hardening，不先扩新 facade。
 2. `identity-service`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；后续继续身份安全 hardening，优先 WebAuthn / OIDC / issuer / key 管理边界，不把本地观测原型表述为生产告警体系。
 3. `message-service`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；补消息类型和删除语义前，继续守住 outbox / policy / 容量观测。

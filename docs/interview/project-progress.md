@@ -53,7 +53,7 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 
 ```text
 9 个后端服务已经能跑通主链路；
-现在先继续做 9 服务 hardening；
+现在先继续做 9 服务 hardening，不急着新增 search / RAG 服务；
 api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、可选 checksum-required gate、applied quota snapshot stale 观测和 quota snapshot gate；
 api-gateway 已补 legacy/facade traffic metrics，用于旧 descriptor 迁移观察；
 legacy descriptor 已收敛为显式 opt-in 默认；
@@ -143,6 +143,14 @@ search-service 和 AI 应用后端后置；
 
 短期不急着新开服务，先把已有 9 个服务收口：
 
+统一收口顺序：
+
+1. 安全启动门禁和 trusted metadata / TLS 边界。
+2. 本地观测、故障恢复 smoke、repair / DLQ / audit。
+3. 各服务 P2 hardening 和容量验证。
+4. 代码复杂度治理。
+5. 完成这些后再进入 `search-service`。
+
 | 服务 | 待开发 / 待完善功能 |
 | --- | --- |
 | `api-gateway` | 在目标环境持续运行 legacy quiet-window observation 并形成最终删除计划、采样治理 hardening、配置中心 / DB-backed quota hardening、生产部署治理；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules、本地 Grafana dashboard、9 服务 first-stage trace runtime wiring 和 trace sampling / wiring check，但还不是生产观测平台 |
@@ -219,10 +227,11 @@ search / RAG / Agent 后端能力。
 
 短期优先级：
 
-1. 清已有 9 个服务的 P2 hardening；
-2. 继续做 `api-gateway` OTel collector / alerting / dashboard、legacy opt-in 实际迁移观察和移除计划，以及配置中心 / DB-backed quota hardening；
-3. 补更完整的故障恢复 smoke；
-4. 收敛观测、repair、audit、TLS / mTLS 和 trusted metadata 边界；
+1. 先收敛安全启动门禁、trusted metadata、TLS / mTLS 边界；
+2. 清已有 9 个服务的 P2 hardening；
+3. 继续做 `api-gateway` OTel collector / alerting / dashboard、legacy opt-in 实际迁移观察和移除计划，以及配置中心 / DB-backed quota hardening；
+4. 补更完整的故障恢复 smoke；
+5. 收敛观测、repair、audit 和 DLQ 处理；
 5. 控制代码复杂度，避免核心文件继续变大；
 6. 等 9 个服务稳定后，再进入 `search-service`。
 

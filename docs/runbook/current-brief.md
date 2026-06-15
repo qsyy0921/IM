@@ -17,7 +17,7 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 - Win/Mac Docker 分布式 smoke 已证明跨实例 route / resume / PullInbox fallback 等关键路径。
 - 当前不是生产级 HA：本地 PostgreSQL `repmgr + pgpool` failover smoke、本地 Kafka KRaft 三 broker failover smoke、以及本地 Redis Sentinel quorum-loss fallback smoke 已补齐；完整 Redis 网络分区、服务发现、统一观测和部署编排仍是后续。
 - 当前 9 个服务足够支撑 IM 主链路；后续服务和中间件不写死，新增或替换必须满足拆分 / 演进准则并通过 ADR。
-- 服务 debug endpoint 公网暴露保护已纳入 `.\tools\check-local.ps1`，后续新增 `NEXUSIM_*_DEBUG_ADDR` 必须同步提供显式 public opt-in guard。
+- 服务 debug endpoint 公网暴露保护已纳入 `.\tools\check-local.ps1`，后续新增 `NEXUSIM_*_DEBUG_ADDR` 必须同步提供显式 public opt-in guard，并为 debug listener validator 补 private allow / public reject / explicit opt-in 三类测试。
 - 服务 public listener / trusted metadata 边界已纳入 `.\tools\check-local.ps1`，后续新增 metadata auth、gateway auth 或 public gRPC / WebSocket listener 必须同步提供 TLS / mTLS guard 和回归测试。
 - OTel 采样策略与服务 trace runtime wiring 已纳入 `.\tools\check-local.ps1`，后续服务进入采样策略时必须同步 cmd env、debug trace snapshot 和低敏 span 测试。
 - `docs/runbook/service-briefs/` 与真实 `services/` 目录同步已纳入 `.\tools\check-local.ps1`；未实现服务 brief 必须显式标为 draft / 尚未实现并有对应 SDD。
@@ -26,9 +26,20 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 
 1. 当前面试主线只覆盖后端、分布式可靠性和 AI 应用后端；Web / App / 桌面端暂不纳入当前开发主线。
 2. 先治理已有 9 个微服务，不急着新增 `search-service` / `media-service` / AI 服务。
-3. 当前重点：继续清各服务 P2 hardening，包括生产观测、容量验证、故障演练、repair workflow、权限模型深化和代码复杂度治理。
+3. 当前重点：先把九服务收口问题逐项解决，默认顺序是安全启动门禁 / trusted metadata / TLS 边界 -> 观测和故障 smoke -> repair / DLQ / audit -> 逐服务 P2 hardening -> 容量和代码复杂度治理。
 4. 已完成的长历史不要写回本入口；总体进度看 `docs/runbook/development-progress.md`，单服务状态看 `docs/runbook/service-briefs/<service>.md`。
-5. 当前 9 个服务已接入 first-stage 本地 Prometheus / Grafana 观测原型；api-gateway legacy quiet-window gate 已有 observation 归档脚本；下一轮继续 api-gateway 配置中心 / DB-backed quota 边界，或继续按服务清 P2 hardening。
+5. 当前 9 个服务已接入 first-stage 本地 Prometheus / Grafana 观测原型；api-gateway legacy quiet-window gate 已有 observation 归档脚本；下一轮优先继续安全 / trusted metadata / TLS 边界收口，其次继续 api-gateway 配置中心 / DB-backed quota 边界，或按服务清 P2 hardening。
+
+## 当前收口 Backlog
+
+这些是进入 `search-service` 前的默认任务池：
+
+1. 安全边界：复核 9 个服务的 public listener、mock / metadata auth、gateway verified metadata、TLS / mTLS fail-fast guard 和 `check-local` 门禁。
+2. 观测边界：继续把 first-stage `/metrics`、Prometheus rules、Grafana dashboard、OTel trace wiring 收敛为本地可演示闭环；不要写成生产 SLO。
+3. 故障 smoke：补 Redis 网络分区、Kafka 多故障 / controller 切换、PostgreSQL split-brain / quorum 类本地模拟报告。
+4. Repair / DLQ：补 outbox、projection、challenge delivery 等 operator 的可复跑 repair / audit / cleanup 流程。
+5. 逐服务 P2：按 `development-progress.md` 和对应 service brief 清单逐个清理，不跨服务堆大改。
+6. 复杂度治理：生产手写文件接近 2500 行、测试或 runner 接近 3000 行时，优先同 package 拆分。
 
 ## 已知硬约束
 

@@ -676,6 +676,60 @@ func TestRegistryRedisResumeGapReturnsBufferMiss(t *testing.T) {
 	}
 }
 
+func TestRegistryRedisResumeQueueTooSmallReturnsBufferMissWithoutPartialReplay(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	ctx := context.Background()
+	registry := NewRegistry(memory.NewRegistry(), client, Config{GatewayID: "gateway-a", RouteTTL: time.Minute})
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"}
+	token := "resume-small-queue"
+
+	if err := registry.writeResumeMeta(ctx, token, auth); err != nil {
+		t.Fatalf("write resume meta: %v", err)
+	}
+	first := testNotification()
+	first.ConversationSeq = 7
+	if err := registry.appendRedisResume(ctx, token, domain.DeliveryNotify(first)); err != nil {
+		t.Fatalf("append first resume frame: %v", err)
+	}
+	second := testNotification()
+	second.EventID = "delivery-event-2"
+	second.SourceEventID = "timeline-event-2"
+	second.MessageID = "message-2"
+	second.ConversationSeq = 8
+	if err := registry.appendRedisResume(ctx, token, domain.DeliveryNotify(second)); err != nil {
+		t.Fatalf("append second resume frame: %v", err)
+	}
+
+	outbound := make(chan types.ServerFrame, 1)
+	if _, err := registry.Register(ctx, types.SessionRegistration{
+		AuthContext:     auth,
+		SessionID:       "session-1",
+		ResumeToken:     token,
+		ResumeRequested: true,
+		LastReceived:    []types.ConversationCursor{{ConversationID: first.ConversationID, Seq: 6}},
+		Outbound:        outbound,
+	}); err != nil {
+		t.Fatalf("register with small resume queue: %v", err)
+	}
+	select {
+	case frame := <-outbound:
+		if frame.Op != types.OpResumeHint || frame.Reason != "buffer_miss" {
+			t.Fatalf("expected buffer miss, got %+v", frame)
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for buffer miss")
+	}
+	select {
+	case frame := <-outbound:
+		t.Fatalf("should not partially replay redis resume frames, got %+v", frame)
+	default:
+	}
+	if metrics := registry.Metrics(); metrics.RedisResumeReplayCount != 0 || metrics.RedisResumeMissCount != 1 {
+		t.Fatalf("unexpected small queue metrics: %+v", metrics)
+	}
+}
+
 func TestRegistryRedisResumeReplaysHiddenFrameAtAlreadyReceivedSeq(t *testing.T) {
 	server := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: server.Addr()})

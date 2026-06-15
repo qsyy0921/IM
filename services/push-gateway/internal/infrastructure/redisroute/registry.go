@@ -723,6 +723,7 @@ func (registry *Registry) replayRedisResume(
 			return true
 		}
 	}
+	replayFrames := make([]types.ServerFrame, 0, len(frames))
 	for _, frame := range frames {
 		if !isResumeFrame(frame) {
 			continue
@@ -730,6 +731,15 @@ func (registry *Registry) replayRedisResume(
 		if frame.Op == types.OpDeliveryNotify && frame.ConversationID != "" && frame.ConversationSeq <= lastReceived[frame.ConversationID] {
 			continue
 		}
+		replayFrames = append(replayFrames, frame)
+	}
+	if len(replayFrames) == 0 {
+		return false
+	}
+	if cap(registration.Outbound)-len(registration.Outbound) < len(replayFrames) {
+		return true
+	}
+	for _, frame := range replayFrames {
 		select {
 		case registration.Outbound <- frame:
 			registry.metrics.resumeReplayCount.Add(1)

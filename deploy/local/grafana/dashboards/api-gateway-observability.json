@@ -288,6 +288,84 @@
         "graphMode": "none",
         "justifyMode": "auto"
       }
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Legacy descriptors registered",
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 16},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(nexusim_api_gateway_legacy_descriptors_registered)",
+          "legendFormat": "registered"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bool",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "orange", "value": 1}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Rate-limit dependency errors",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 22},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(nexusim_api_gateway_rate_limit_redis_errors_total[5m]))",
+          "legendFormat": "redis"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(nexusim_api_gateway_rate_limit_identity_errors_total[5m]))",
+          "legendFormat": "identity"
+        },
+        {
+          "refId": "C",
+          "expr": "sum(rate(nexusim_api_gateway_rate_limit_tenant_plan_reload_errors_total[5m]))",
+          "legendFormat": "tenant plan reload"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
     }
   ]
 }

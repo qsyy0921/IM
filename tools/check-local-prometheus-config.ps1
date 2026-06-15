@@ -28,7 +28,11 @@ if ($config -notmatch "host\.docker\.internal:11904") {
 $requiredAlerts = @(
     "NexusIMApiGatewayGrpcErrors",
     "NexusIMApiGatewayLegacyDescriptorTraffic",
+    "NexusIMApiGatewayLegacyDescriptorStillRegistered",
+    "NexusIMApiGatewayLegacyDescriptorOptInExpired",
     "NexusIMApiGatewayRateLimitRedisErrors",
+    "NexusIMApiGatewayRateLimitIdentityErrors",
+    "NexusIMApiGatewayTenantQuotaReloadErrors",
     "NexusIMApiGatewayTenantQuotaSnapshotStale",
     "NexusIMApiGatewayJwksRefreshFailures",
     "NexusIMApiGatewayOtlpEndpointMissing"

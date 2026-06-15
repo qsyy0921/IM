@@ -21,6 +21,26 @@ groups:
           summary: api-gateway legacy descriptor traffic observed
           description: legacy descriptor traffic is still present. Keep legacy descriptor removal blocked until this remains zero in the target environment.
 
+      - alert: NexusIMApiGatewayLegacyDescriptorStillRegistered
+        expr: nexusim_api_gateway_legacy_descriptors_registered == 1
+        for: 1m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: api-gateway legacy descriptors are still registered
+          description: api-gateway is still exposing legacy service descriptors. Keep this as explicit opt-in only and do not remove compatibility code until the migration gate passes.
+
+      - alert: NexusIMApiGatewayLegacyDescriptorOptInExpired
+        expr: nexusim_api_gateway_legacy_descriptors_allowed_until_unix_milliseconds > 0 and nexusim_api_gateway_legacy_descriptors_allowed_until_unix_milliseconds < (time() * 1000)
+        for: 1m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: api-gateway legacy descriptor opt-in deadline expired
+          description: api-gateway is past the configured legacy descriptor opt-in deadline. Disable NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS or extend the deadline with an explicit migration decision.
+
       - alert: NexusIMApiGatewayRateLimitRedisErrors
         expr: increase(nexusim_api_gateway_rate_limit_redis_errors_total[5m]) > 0
         for: 1m
@@ -30,6 +50,26 @@ groups:
         annotations:
           summary: api-gateway rate limiter saw Redis errors
           description: Redis-backed rate limiting has backend errors. Check whether fail-open is enabled and whether tenant quota enforcement is degraded.
+
+      - alert: NexusIMApiGatewayRateLimitIdentityErrors
+        expr: increase(nexusim_api_gateway_rate_limit_identity_errors_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: api-gateway rate limiter saw identity lookup errors
+          description: Tenant-scoped rate limiting could not resolve identity data. Check identity-service connectivity before treating tenant quota enforcement as healthy.
+
+      - alert: NexusIMApiGatewayTenantQuotaReloadErrors
+        expr: increase(nexusim_api_gateway_rate_limit_tenant_plan_reload_errors_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: api-gateway tenant quota reload failed
+          description: api-gateway failed to reload the tenant quota snapshot. Check the file or URL source, checksum policy and TLS / bearer-token configuration.
 
       - alert: NexusIMApiGatewayTenantQuotaSnapshotStale
         expr: nexusim_api_gateway_rate_limit_tenant_plan_stale == 1

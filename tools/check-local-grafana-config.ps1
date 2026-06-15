@@ -47,7 +47,11 @@ $requiredMetrics = @(
     "nexusim_api_gateway_grpc_legacy_descriptor_last_seen_unix_milliseconds",
     "nexusim_api_gateway_grpc_latency_avg_milliseconds",
     "nexusim_api_gateway_rate_limit_limited_total",
+    "nexusim_api_gateway_rate_limit_redis_errors_total",
+    "nexusim_api_gateway_rate_limit_identity_errors_total",
+    "nexusim_api_gateway_rate_limit_tenant_plan_reload_errors_total",
     "nexusim_api_gateway_auth_jwks_refresh_failures_total",
+    "nexusim_api_gateway_legacy_descriptors_registered",
     "nexusim_api_gateway_otel_traces_enabled"
 )
 

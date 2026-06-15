@@ -207,7 +207,7 @@ func TestSendMessageRejectsInvalidRequest(t *testing.T) {
 func TestSendMessageRejectsUnsupportedMessageType(t *testing.T) {
 	server := NewServer(&fakeSendMessageExecutor{})
 	request := testSendMessageRequest()
-	request.MessageType = "IMAGE"
+	request.MessageType = "VOICE"
 
 	_, err := server.SendMessage(context.Background(), request)
 	assertStatusDetail(
@@ -215,6 +215,48 @@ func TestSendMessageRejectsUnsupportedMessageType(t *testing.T) {
 		err,
 		codes.InvalidArgument,
 		messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_UNSUPPORTED_MESSAGE_TYPE,
+		false,
+		"request-1",
+	)
+}
+
+func TestSendMessageAcceptsImageAttachmentMessage(t *testing.T) {
+	executor := &fakeSendMessageExecutor{
+		result: types.SendMessageResult{
+			MessageID:       "msg-image",
+			ConversationID:  "conv-1",
+			ConversationSeq: 11,
+			AcceptedAt:      time.Unix(100, 0).UTC(),
+		},
+	}
+	server := NewServer(executor)
+	request := testSendMessageRequest()
+	request.MessageType = string(types.MessageTypeImage)
+	request.AttachmentIds = []string{"img-1"}
+	request.Payload = mustStruct(map[string]any{"caption": "hello", "width": float64(640), "height": float64(480)})
+
+	if _, err := server.SendMessage(context.Background(), request); err != nil {
+		t.Fatalf("send image attachment message: %v", err)
+	}
+	if executor.command.MessageType != types.MessageTypeImage ||
+		len(executor.command.AttachmentIDs) != 1 ||
+		executor.command.AttachmentIDs[0] != "img-1" {
+		t.Fatalf("unexpected image command: %+v", executor.command)
+	}
+}
+
+func TestSendMessageRejectsAttachmentMessageWithoutAttachments(t *testing.T) {
+	server := NewServer(&fakeSendMessageExecutor{})
+	request := testSendMessageRequest()
+	request.MessageType = string(types.MessageTypeFile)
+	request.AttachmentIds = nil
+
+	_, err := server.SendMessage(context.Background(), request)
+	assertStatusDetail(
+		t,
+		err,
+		codes.InvalidArgument,
+		messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_UNSPECIFIED,
 		false,
 		"request-1",
 	)
@@ -392,10 +434,6 @@ func TestSendMessageServiceOverloadedUsesDynamicRetryInfo(t *testing.T) {
 }
 
 func testSendMessageRequest() *messagev1.SendMessageRequest {
-	payload, err := structpb.NewStruct(map[string]any{"text": "hello"})
-	if err != nil {
-		panic(err)
-	}
 	return &messagev1.SendMessageRequest{
 		AuthContext: &messagev1.AuthContext{
 			TenantId:  "tenant-1",
@@ -408,9 +446,17 @@ func testSendMessageRequest() *messagev1.SendMessageRequest {
 		ConversationId: "conv-1",
 		ClientMsgId:    "client-1",
 		MessageType:    string(types.MessageTypeText),
-		Payload:        payload,
+		Payload:        mustStruct(map[string]any{"text": "hello"}),
 		AttachmentIds:  []string{"att-2", "att-1"},
 	}
+}
+
+func mustStruct(values map[string]any) *structpb.Struct {
+	payload, err := structpb.NewStruct(values)
+	if err != nil {
+		panic(err)
+	}
+	return payload
 }
 
 func testEditMessageRequest() *messagev1.EditMessageRequest {

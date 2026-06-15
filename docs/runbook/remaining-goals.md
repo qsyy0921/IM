@@ -31,7 +31,7 @@
 | --- | --- |
 | `api-gateway` | 目标环境 legacy quiet-window observation；legacy descriptor 移除计划；完整配置中心 / DB-backed quota hardening；生产级 collector / alerting / dashboard。 |
 | `identity-service` | WebAuthn/passkeys；OIDC；多 issuer；KMS/HSM；完整风控；生产级 email/SMS provider；租户级通知模板；bounce handling。 |
-| `message-service` | 更多消息类型；会话级删除策略深化；合规删除；容量观测深化；发送链路生产观测。 |
+| `message-service` | 语音 / 位置 / 卡片等更多消息类型；会话级删除策略深化；合规删除；容量观测深化；发送链路生产观测；图片 / 文件二进制上传处理后续由 media 能力承担。 |
 | `conversation-service` | 更完整群管理；owner transfer 策略继续打磨；成员窗口历史 repair / repair action。 |
 | `delivery-service` | Projection DLQ / repair 深化；更多 delivery event 消费方；隐藏项跨设备提示。 |
 | `push-gateway` | 跨实例 resume 强化；容量测试；Redis Cluster / 生产级 HA 设计；Redis 网络分区组合 smoke。 |

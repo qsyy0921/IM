@@ -207,10 +207,10 @@ func (s *Server) toSendMessageCommand(ctx context.Context, req *messagev1.SendMe
 		ReceivedAt:     s.now(),
 	}
 	if err := command.Validate(); err != nil {
+		if errors.Is(err, types.ErrUnsupportedMessageType) {
+			return types.SendMessageCommand{}, err
+		}
 		return types.SendMessageCommand{}, newInvalidArgument(err.Error())
-	}
-	if command.MessageType != types.MessageTypeText {
-		return types.SendMessageCommand{}, types.NewUnsupportedMessageType("message_type is not supported in phase 1")
 	}
 	return command, nil
 }

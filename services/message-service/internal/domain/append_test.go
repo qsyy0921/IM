@@ -97,6 +97,45 @@ func TestNewAppendMessageRecordBuildsPersistedEvent(t *testing.T) {
 	}
 }
 
+func TestNewAppendMessageRecordBuildsAttachmentMessageEvent(t *testing.T) {
+	command := testCommand()
+	command.MessageType = types.MessageTypeImage
+	command.PayloadJSON = []byte(`{"caption":"hello","height":480,"width":640}`)
+	command.AttachmentIDs = []string{"image-2", "image-1"}
+	input := AppendMessageInput{
+		Command: command,
+		Permission: types.PermissionDecision{
+			Allowed:           true,
+			PermissionVersion: 7,
+			Classification:    "INTERNAL",
+		},
+		Conversation: types.ConversationSendContext{
+			ConversationMode:    types.ConversationModeLocalRowLock,
+			FanoutMode:          types.FanoutModeWriteFanout,
+			FanoutPolicyVersion: 3,
+		},
+	}
+
+	record, err := NewAppendMessageRecord(input, "msg-image", "event-image", 11, input.Command.ReceivedAt)
+	if err != nil {
+		t.Fatalf("build image append record: %v", err)
+	}
+	if record.Message.MessageType != types.MessageTypeImage {
+		t.Fatalf("unexpected message type: %s", record.Message.MessageType)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(record.Outbox.PayloadJSON, &payload); err != nil {
+		t.Fatalf("decode outbox payload: %v", err)
+	}
+	if payload["message_type"] != string(types.MessageTypeImage) {
+		t.Fatalf("unexpected event message type: %+v", payload)
+	}
+	attachments, ok := payload["attachment_ids"].([]any)
+	if !ok || len(attachments) != 2 || attachments[0] != "image-1" || attachments[1] != "image-2" {
+		t.Fatalf("unexpected sorted attachments: %+v", payload["attachment_ids"])
+	}
+}
+
 func testCommand() types.SendMessageCommand {
 	return types.SendMessageCommand{
 		AuthContext: types.AuthContext{

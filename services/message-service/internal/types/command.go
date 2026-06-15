@@ -37,6 +37,12 @@ func (c SendMessageCommand) Validate() error {
 	if c.MessageType == "" {
 		return errors.New("message_type is required")
 	}
+	if !IsSupportedMessageType(c.MessageType) {
+		return NewUnsupportedMessageType("message_type is not supported")
+	}
+	if MessageTypeRequiresAttachment(c.MessageType) && len(c.AttachmentIDs) == 0 {
+		return errors.New("attachment_ids are required for attachment message types")
+	}
 	return nil
 }
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 	"time"
 
@@ -65,6 +66,29 @@ func TestMessageRepositoryAppendMessageIntegration(t *testing.T) {
 	assertCount(t, ctx, pool, "message_log", input.Command.AuthContext.TenantID, 1)
 	assertCount(t, ctx, pool, "conversation_timeline_events", input.Command.AuthContext.TenantID, 1)
 	assertCount(t, ctx, pool, "message_outbox", input.Command.AuthContext.TenantID, 1)
+	assertPersistedFacts(t, ctx, pool, input, result)
+}
+
+func TestMessageRepositoryAppendAttachmentMessageIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	runID := time.Now().UnixNano()
+	repo := NewMessageRepository(pool)
+	tenantID := types.TenantID(fmt.Sprintf("tenant-it-image-%d", runID))
+	input := testAppendInput(tenantID, "client-image-1", []byte(`{"caption":"hello","height":480,"width":640}`))
+	input.Command.MessageType = types.MessageTypeImage
+	input.Command.AttachmentIDs = []string{"image-2", "image-1"}
+
+	result, err := repo.AppendMessage(ctx, input)
+	if err != nil {
+		t.Fatalf("append image message: %v", err)
+	}
+	if result.MessageID == "" || result.ConversationSeq != 1 {
+		t.Fatalf("unexpected image append result: %+v", result)
+	}
 	assertPersistedFacts(t, ctx, pool, input, result)
 }
 
@@ -1069,6 +1093,7 @@ func assertPersistedFacts(
 	t.Helper()
 	var (
 		commandHash         string
+		messageType         string
 		messageStatus       string
 		messagePermission   int64
 		messageClass        string
@@ -1089,6 +1114,7 @@ func assertPersistedFacts(
 	if err := pool.QueryRow(ctx, `
 SELECT
     ml.command_hash,
+    ml.message_type,
     ml.status,
     ml.permission_version,
     ml.classification,
@@ -1121,6 +1147,7 @@ WHERE ml.tenant_id = $1
 		result.MessageID,
 	).Scan(
 		&commandHash,
+		&messageType,
 		&messageStatus,
 		&messagePermission,
 		&messageClass,
@@ -1143,6 +1170,9 @@ WHERE ml.tenant_id = $1
 
 	if commandHash == "" || messageStatus != "NORMAL" {
 		t.Fatalf("unexpected message facts: hash=%q status=%q", commandHash, messageStatus)
+	}
+	if messageType != string(input.Command.MessageType) {
+		t.Fatalf("unexpected message type: got=%s want=%s", messageType, input.Command.MessageType)
 	}
 	if messagePermission != input.Permission.PermissionVersion || messageClass != input.Permission.Classification {
 		t.Fatalf("unexpected message policy facts: permission=%d class=%s", messagePermission, messageClass)
@@ -1168,8 +1198,22 @@ WHERE ml.tenant_id = $1
 	}
 	if outboxPayload["command_hash"] != commandHash ||
 		outboxPayload["message_id"] != string(result.MessageID) ||
-		int64(outboxPayload["conversation_seq"].(float64)) != result.ConversationSeq {
+		int64(outboxPayload["conversation_seq"].(float64)) != result.ConversationSeq ||
+		outboxPayload["message_type"] != string(input.Command.MessageType) {
 		t.Fatalf("unexpected outbox payload: %+v", outboxPayload)
+	}
+	if len(input.Command.AttachmentIDs) > 0 {
+		attachments, ok := outboxPayload["attachment_ids"].([]any)
+		if !ok || len(attachments) != len(input.Command.AttachmentIDs) {
+			t.Fatalf("unexpected attachment payload: %+v", outboxPayload["attachment_ids"])
+		}
+		expected := append([]string(nil), input.Command.AttachmentIDs...)
+		sort.Strings(expected)
+		for index, want := range expected {
+			if attachments[index] != want {
+				t.Fatalf("unexpected attachment payload: got=%+v want=%+v", attachments, expected)
+			}
+		}
 	}
 }
 

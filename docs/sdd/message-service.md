@@ -109,6 +109,12 @@ payload
 attachment_ids
 ```
 
+第一阶段已支持的 `message_type`：
+
+- `TEXT`：文本消息，payload 存放文本结构。
+- `IMAGE`：图片附件引用消息，`attachment_ids` 必须非空；图片上传、缩略图、审核和对象存储仍属于后续 `media-service`。
+- `FILE`：文件附件引用消息，`attachment_ids` 必须非空；文件上传、病毒扫描、下载授权和对象存储仍属于后续 `media-service`。
+
 Response：
 
 ```text
@@ -124,6 +130,7 @@ accepted_at
 - 客户端重试必须复用同一 `client_msg_id`。
 - 幂等键：`tenant_id + sender_id + device_id + client_msg_id`。
 - `client_msg_id` 是 device scoped globally unique UUID。同一 `tenant_id + sender_id + device_id` 下不能跨会话复用。
+- 附件型消息只保存附件引用和 payload 元数据，不在 message-service 内保存二进制内容。
 
 错误码：
 

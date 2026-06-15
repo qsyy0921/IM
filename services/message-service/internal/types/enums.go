@@ -3,8 +3,28 @@ package types
 type MessageType string
 
 const (
-	MessageTypeText MessageType = "TEXT"
+	MessageTypeText  MessageType = "TEXT"
+	MessageTypeImage MessageType = "IMAGE"
+	MessageTypeFile  MessageType = "FILE"
 )
+
+func IsSupportedMessageType(messageType MessageType) bool {
+	switch messageType {
+	case MessageTypeText, MessageTypeImage, MessageTypeFile:
+		return true
+	default:
+		return false
+	}
+}
+
+func MessageTypeRequiresAttachment(messageType MessageType) bool {
+	switch messageType {
+	case MessageTypeImage, MessageTypeFile:
+		return true
+	default:
+		return false
+	}
+}
 
 type TimelineEventType string
 

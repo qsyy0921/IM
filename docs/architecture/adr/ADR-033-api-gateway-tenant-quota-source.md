@@ -29,7 +29,7 @@ file
 url
 ```
 
-`url` is a narrow HTTP(S) snapshot adapter: it consumes the same versioned quota snapshot contract used by file reload and applies it through the same atomic in-memory plan swap. It does not query tenant, billing or business storage. A first-stage authenticated config-source shape is allowed through an optional bearer token header, but bearer-token mode must use HTTPS and secrets must not be exposed through metrics, logs or labels. Operators may also force HTTPS for unauthenticated URL snapshots. Private CA, SNI override and client-certificate configuration are allowed for HTTPS snapshot sources; these transport settings do not make `api-gateway` the owner of quota authoring or approval. Environments may require snapshot checksums so missing checksum metadata fails closed during both startup load and reload.
+`url` is a narrow HTTP(S) snapshot adapter: it consumes the same versioned quota snapshot contract used by file reload and applies it through the same atomic in-memory plan swap. It does not query tenant, billing or business storage. A first-stage authenticated config-source shape is allowed through an optional bearer token header, but bearer-token mode must use HTTPS and secrets must not be exposed through metrics, logs or labels. Operators may also force HTTPS for unauthenticated URL snapshots. URL userinfo is rejected and redirects are not followed, so config-source credentials and bearer/TLS expectations cannot be hidden in or bypassed by the URL chain. Private CA, SNI override and client-certificate configuration are allowed for HTTPS snapshot sources; these transport settings do not make `api-gateway` the owner of quota authoring or approval. Environments may require snapshot checksums so missing checksum metadata fails closed during both startup load and reload.
 
 `db`, `database`, `config`, `config-center` and unknown source values must fail closed until a separate control-plane/config service source is implemented and accepted.
 
@@ -53,6 +53,7 @@ Any future implementation must include:
 - version, checksum and generated-at metadata;
 - a checksum-required gate for environments that treat snapshots as release artifacts;
 - an explicit transport/auth boundary for HTTP(S) snapshot sources;
+- rejection of URL userinfo and redirect-based source changes;
 - CA / mTLS configuration tests if the source uses private PKI;
 - fail-closed behavior for malformed or unsupported config versions;
 - rollback to the last valid applied snapshot;

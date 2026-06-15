@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -607,6 +608,45 @@ func TestTenantRateLimitPlansFromURLSanitizesTransportErrors(t *testing.T) {
 		if strings.Contains(err.Error(), leaked) {
 			t.Fatalf("tenant plan URL transport error leaked %q: %q", leaked, err.Error())
 		}
+	}
+}
+
+func TestTenantRateLimitPlansFromEnvRejectsURLUserInfo(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		t.Fatalf("tenant plan URL source should reject user info before request")
+	}))
+	defer server.Close()
+
+	endpoint, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("parse test URL: %v", err)
+	}
+	endpoint.User = url.UserPassword("quota-user", "quota-secret")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE", "url")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL", endpoint.String())
+	if _, err := tenantRateLimitPlansFromEnv(context.Background()); err == nil {
+		t.Fatalf("expected tenant plan URL user info to fail")
+	}
+}
+
+func TestTenantRateLimitPlansFromEnvRejectsURLRedirect(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	plans := map[string]ratelimitinfra.Plan{"tenant-url": {RequestsPerSecond: 9, Burst: 10}}
+	target := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		t.Fatalf("tenant plan URL source should not follow redirects")
+		_, _ = writer.Write([]byte(versionedTenantPlanSnapshotJSON(t, plans, "quota-v1.redirect-target", time.Now().UnixMilli())))
+	}))
+	defer target.Close()
+	redirector := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		http.Redirect(writer, request, target.URL, http.StatusFound)
+	}))
+	defer redirector.Close()
+
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE", "url")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL", redirector.URL)
+	if _, err := tenantRateLimitPlansFromEnv(context.Background()); err == nil {
+		t.Fatalf("expected tenant plan URL redirect to fail")
 	}
 }
 

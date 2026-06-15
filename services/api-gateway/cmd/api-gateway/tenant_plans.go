@@ -130,6 +130,12 @@ func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge ti
 	if parsed.Scheme != "https" && parsed.Scheme != "http" {
 		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL source requires http or https")
 	}
+	if parsed.Host == "" {
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL source requires a host")
+	}
+	if parsed.User != nil {
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL source must not include user info")
+	}
 	requireHTTPS, err := tenantPlanURLRequireHTTPSFromEnv()
 	if err != nil {
 		return tenantRateLimitPlanSnapshot{}, err
@@ -228,7 +234,7 @@ func (config tenantPlanURLTLSConfig) ClientCertConfigured() bool {
 func tenantPlanURLHTTPClient(parsed *url.URL) (*http.Client, error) {
 	config := tenantPlanURLTLSConfigFromEnv()
 	if !config.Enabled() {
-		return http.DefaultClient, nil
+		return &http.Client{Transport: http.DefaultTransport, CheckRedirect: tenantPlanURLCheckRedirect}, nil
 	}
 	if parsed == nil || parsed.Scheme != "https" {
 		return nil, errors.New("api-gateway tenant plan URL TLS config requires https")
@@ -266,9 +272,13 @@ func tenantPlanURLHTTPClient(parsed *url.URL) (*http.Client, error) {
 	if transport, ok := http.DefaultTransport.(*http.Transport); ok {
 		clone := transport.Clone()
 		clone.TLSClientConfig = tlsConfig
-		return &http.Client{Transport: clone}, nil
+		return &http.Client{Transport: clone, CheckRedirect: tenantPlanURLCheckRedirect}, nil
 	}
-	return &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}, nil
+	return &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}, CheckRedirect: tenantPlanURLCheckRedirect}, nil
+}
+
+func tenantPlanURLCheckRedirect(_ *http.Request, _ []*http.Request) error {
+	return errors.New("api-gateway tenant plan URL source must not redirect")
 }
 
 func parseTenantRateLimitPlans(raw string) (map[string]ratelimitinfra.Plan, error) {

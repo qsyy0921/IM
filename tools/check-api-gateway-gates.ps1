@@ -79,6 +79,7 @@ try {
 
     $legacyGood = Join-Path $tempDir "legacy-good.json"
     $legacyNoFacade = Join-Path $tempDir "legacy-no-facade.json"
+    $legacyFutureOptIn = Join-Path $tempDir "legacy-future-opt-in.json"
     $legacyGoodJson = @'
 {
   "generated_at_ms": 100000,
@@ -96,6 +97,7 @@ try {
 '@
     Write-JsonFile -Path $legacyGood -Content $legacyGoodJson
     Write-JsonFile -Path $legacyNoFacade -Content ($legacyGoodJson -replace '"facade_requests": 12', '"facade_requests": 0')
+    Write-JsonFile -Path $legacyFutureOptIn -Content ($legacyGoodJson -replace '"legacy_descriptors_allowed_until_unix_ms": 0', '"legacy_descriptors_allowed_until_unix_ms": 200000')
 
     $legacyStrongArgs = @(
         "-NoProfile",
@@ -105,10 +107,12 @@ try {
         "-MaxSnapshotAge", "1h",
         "-RequireFacadeTraffic",
         "-DisallowOtherTraffic",
-        "-RequiredQuietDuration", "7d"
+        "-RequiredQuietDuration", "7d",
+        "-RequireLegacyOptInExpiredOrUnset"
     )
     Invoke-GateExpectPass -Arguments ($legacyStrongArgs + @("-SnapshotPath", $legacyGood))
     Invoke-GateExpectFail -Arguments ($legacyStrongArgs + @("-SnapshotPath", $legacyNoFacade))
+    Invoke-GateExpectFail -Arguments ($legacyStrongArgs + @("-SnapshotPath", $legacyFutureOptIn))
 }
 finally {
     Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue

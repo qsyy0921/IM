@@ -7,7 +7,8 @@ param(
     [switch]$AllowRegisteredLegacyDescriptors,
     [switch]$AllowObservedLegacyTraffic,
     [switch]$RequireFacadeTraffic,
-    [switch]$DisallowOtherTraffic
+    [switch]$DisallowOtherTraffic,
+    [switch]$RequireLegacyOptInExpiredOrUnset
 )
 
 $ErrorActionPreference = "Stop"
@@ -98,6 +99,11 @@ if ($registered -and -not $AllowRegisteredLegacyDescriptors) {
 
 if ($registered -and $legacyAllowedUntilMS -gt 0 -and $legacyAllowedUntilMS -le $nowMS) {
     Write-Host "FAIL api-gateway legacy descriptor opt-in deadline has expired: allowed_until_unix_ms=$legacyAllowedUntilMS now_unix_ms=$nowMS." -ForegroundColor Red
+    $failed = $true
+}
+
+if ($RequireLegacyOptInExpiredOrUnset -and $legacyAllowedUntilMS -gt $nowMS) {
+    Write-Host "FAIL api-gateway legacy descriptor opt-in deadline is still in the future: allowed_until_unix_ms=$legacyAllowedUntilMS now_unix_ms=$nowMS." -ForegroundColor Red
     $failed = $true
 }
 

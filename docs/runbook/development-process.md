@@ -165,7 +165,7 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 当前已有 9 个服务已经覆盖这阶段的一部分能力。现在的重点不是继续铺更多功能，而是把这些能力做干净：
 
 - `api-gateway`：入口配额、tenant quota 文件 / URL snapshot、URL bearer token / HTTPS guard、applied quota snapshot stale 观测、OTel server/client trace、legacy/facade traffic metrics 和 legacy opt-in 迁移观察；
-- `contacts-service`：first-stage OTel gRPC server span，作为后端服务 server span rollout 的首个样例；
+- `contacts-service`：first-stage OTel gRPC server span，作为 9 服务 first-stage trace runtime wiring 的服务侧样例；
 - `identity-service`：first-stage OTel gRPC server span，覆盖登录 / Refresh / challenge / MFA 管理服务侧请求；
 - `message-service`：first-stage OTel gRPC server span，开始覆盖核心写链路服务侧请求；
 - `conversation-service`：first-stage OTel gRPC server span，覆盖会话成员事实服务侧请求；
@@ -283,7 +283,7 @@ Web / App / 桌面端是后续产品化展示层，
 
 ```text
 继续收干净当前 9 个核心服务
--> 继续做 api-gateway OTel collector / 后端服务 server span rollout、legacy opt-in 实际迁移观察和配置中心 / DB-backed quota hardening
+-> 继续做 api-gateway OTel collector / alerting / dashboard、trace sampling 治理、legacy opt-in 实际迁移观察和配置中心 / DB-backed quota hardening
 -> 继续补分布式故障恢复 smoke 和服务级 P2 hardening
 -> 再进入 search-service
 -> 再进入 rag-service / summary-service / agent-service

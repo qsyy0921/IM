@@ -17,4 +17,4 @@
 
 ## 后续
 
-- 后端服务 server span rollout、采样治理 hardening、legacy descriptor 实际迁移观察 / quiet-window gate 运行和最终删除代码、完整配置中心 quota source hardening。
+- 采样治理 hardening、统一 OTel collector / alerting / dashboard、legacy descriptor 实际迁移观察 / quiet-window gate 运行和最终删除代码、完整配置中心 quota source hardening。

@@ -112,6 +112,32 @@ foreach ($service in $policy.services) {
     }
 }
 
+$activeDocPaths = @(
+    "docs\runbook\current-brief.md",
+    "docs\runbook\development-progress.md",
+    "docs\runbook\development-process.md",
+    "docs\runbook\service-briefs\api-gateway.md",
+    "docs\interview\project-progress.md"
+)
+$staleDocPhrases = @(
+    "后端服务 server span rollout",
+    "已开始后端服务 gRPC server span rollout"
+)
+foreach ($relativePath in $activeDocPaths) {
+    $docPath = Join-Path $repoRoot $relativePath
+    if (-not (Test-Path -LiteralPath $docPath)) {
+        Add-Violation $violations $docPath "missing active OTel progress document"
+        continue
+    }
+
+    $content = Get-Content -LiteralPath $docPath -Raw
+    foreach ($phrase in $staleDocPhrases) {
+        if ($content.Contains($phrase)) {
+            Add-Violation $violations $docPath "stale OTel rollout wording remains: $phrase"
+        }
+    }
+}
+
 if ($violations.Count -gt 0) {
     throw ($violations -join [Environment]::NewLine)
 }

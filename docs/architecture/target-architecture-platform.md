@@ -400,6 +400,7 @@ RAG/Agent 发布必须跑安全评测：
 | ADR-031 | 授权按场景区分强校验和投影校验 | 在主链路、下载、Agent 写动作等高风险路径避免投影延迟误判 |
 | ADR-032 | push-gateway 支持短断线 resume buffer | 提升移动端短断线体验，同时不改变 delivery 补拉事实源 |
 | ADR-033 | api-gateway tenant quota source 由控制面 / 配置源版本化发布 | 避免 user-facing gateway 直连业务内部表，DB-backed quota 需通过服务拥有的配置契约 |
+| ADR-034 | PostgreSQL production quorum boundary | 本地 `repmgr + pgpool` 只作为 smoke 拓扑；生产 HA 必须另有 quorum / fencing 证据 |
 
 ## 16. 演进结论与下一阶段
 

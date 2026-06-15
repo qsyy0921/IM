@@ -1,6 +1,13 @@
+param(
+    [string]$RepoRoot
+)
+
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Split-Path -Parent $PSScriptRoot
+if (-not $RepoRoot) {
+    $RepoRoot = Split-Path -Parent $PSScriptRoot
+}
+$repoRoot = [System.IO.Path]::GetFullPath($RepoRoot)
 $forbiddenTerms = @(
     ("aka" + "shic"),
     ("ska" + "shic")
@@ -24,6 +31,7 @@ $textExtensions = @(
     ".mod",
     ".proto",
     ".ps1",
+    ".sh",
     ".sql",
     ".sum",
     ".toml",

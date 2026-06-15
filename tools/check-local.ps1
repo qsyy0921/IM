@@ -44,6 +44,9 @@ try {
     Write-Host "== project naming =="
     Invoke-LocalCheck "check-project-naming.ps1"
 
+    Write-Host "== project naming self-test =="
+    Invoke-LocalCheck "check-project-naming-selftest.ps1"
+
     Write-Host "== file size budgets =="
     Invoke-LocalCheck "check-file-size-budget.ps1"
 

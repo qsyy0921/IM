@@ -15,8 +15,8 @@
 - Redis route 已区分“publish 报错”和“publish 成功但 0 subscriber”两类远端失败，避免把 stale route 误记为远端已入队。
 - Redis route 续约连续失败达到阈值后会主动踢掉本地 session，避免 route TTL 失效后仍长时间假装在线；客户端改走重连 + `PullInbox` fallback。
 - Resume buffer 重放已收敛为 all-or-buffer-miss：新连接队列无法容纳全部待重放 notify 时，不做部分 replay，直接提示客户端用本地 cursor + `PullInbox` 校准。
-- 本地 smoke 已覆盖 Redis stop/start、Sentinel discovery、手动 failover、master-stop 和 quorum-loss fallback；完整网络分区、Redis Cluster 和生产级 HA 仍未完成。
+- 本地 smoke 已覆盖 Redis stop/start、Sentinel discovery、手动 failover、master-stop 和 quorum-loss fallback；`redis-sentinel-network-partition` runner 已补，用于断开 Sentinel 当前 master 的 Docker network 并验证 `PullInbox + AckDelivery` 兜底，真实报告归档前不算已通过；Redis Cluster 和生产级 HA 仍未完成。
 
 ## 后续
 
-- Redis 网络分区、跨实例 resume 强化、容量测试。
+- 运行并归档 Redis Sentinel 网络分区 smoke、跨实例 resume 强化、容量测试。

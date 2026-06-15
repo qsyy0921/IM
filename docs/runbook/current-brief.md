@@ -1,60 +1,57 @@
 # NexusIM Current Brief
 
-## 每轮只读这个
+本文件是每轮低 token 入口，只回答“现在处于什么阶段、下一步去哪里看”。不要在这里维护长历史或完整待办。
 
-1. 先运行 `git status --short --branch`。
-2. 本文件是默认入口，保持短。
-3. 需要找文档先看 `docs/runbook/README.md`，再只读相关短索引或服务文件。
-4. 需要服务状态先看 `docs/runbook/service-briefs/README.md` 索引，再只读相关服务文件。
-5. 需要历史证据再按关键词查 `docs/runbook/archive/` 或 `docs/runbook/loadtest/<service>/`。
-6. 不要为了“了解项目”全文读取长文档。
+## 按需读取
 
-## 当前状态
+- 剩余目标：`docs/runbook/remaining-goals.md`
+- 服务细节：先读 `docs/runbook/service-briefs/README.md`，再读对应服务 brief。
+- 历史证据：按关键词查 `docs/runbook/loadtest/`、`docs/runbook/archive/` 或 `docs/runbook/history/`。
 
-NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
+## 当前阶段
 
-- message-service、conversation-service、delivery-service、push-gateway、receipt-service、contacts-service、identity-service、policy-service、api-gateway 均已有真实链路或最小闭环。
-- Win/Mac Docker 分布式 smoke 已证明跨实例 route / resume / PullInbox fallback 等关键路径。
-- 当前不是生产级 HA：本地 PostgreSQL `repmgr + pgpool` failover smoke、本地 PostgreSQL quorum observation、本地 Kafka KRaft failover / controller-switch / ISR observation smoke、本地 Redis Sentinel quorum-loss fallback smoke、以及本地 Redis Sentinel network-partition fallback smoke 已补齐；服务发现、统一观测和部署编排仍是后续。PostgreSQL production quorum 边界已由 ADR-034 固定，不把当前本地拓扑描述为 quorum-fenced。
-- 当前 9 个服务足够支撑 IM 主链路；后续服务和中间件不写死，新增或替换必须满足拆分 / 演进准则并通过 ADR。
-- 服务 debug endpoint 公网暴露保护已纳入 `.\tools\check-local.ps1`，后续新增 `NEXUSIM_*_DEBUG_ADDR` 必须同步提供显式 public opt-in guard，并为 debug listener validator 补 private allow / public reject / explicit opt-in 三类测试。
-- 服务 public listener / trusted metadata 边界已纳入 `.\tools\check-local.ps1`，后续新增 metadata auth、gateway auth 或 public gRPC / WebSocket listener 必须同步提供 TLS / mTLS guard 和回归测试。
-- 服务端 gRPC / WSS TLS 配置门禁已纳入 `.\tools\check-local.ps1`，后续新增 `*_TLS_REQUIRE_CLIENT_CERT` 必须同步覆盖 cert/key 成对、invalid bool、缺 client CA 三类启动失败测试。
-- OTel 采样策略与服务 trace runtime wiring 已纳入 `.\tools\check-local.ps1`，后续服务进入采样策略时必须同步 cmd env、debug trace snapshot 和低敏 span 测试。
-- `docs/runbook/service-briefs/` 与真实 `services/` 目录同步已纳入 `.\tools\check-local.ps1`；未实现服务 brief 必须显式标为 draft / 尚未实现并有对应 SDD。
+NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端。
 
-## 当前优先级
+已进入真实链路的 9 个后端服务：
 
-1. 当前面试主线只覆盖后端、分布式可靠性和 AI 应用后端；Web / App / 桌面端暂不纳入当前开发主线。
-2. 先治理已有 9 个微服务，不急着新增 `search-service` / `media-service` / AI 服务。
-3. 当前重点：先把九服务收口问题逐项解决，默认顺序是安全启动门禁 / trusted metadata / TLS 边界 -> 观测和故障 smoke -> repair / DLQ / audit -> 逐服务 P2 hardening -> 容量和代码复杂度治理。
-4. 已完成的长历史不要写回本入口；总体进度看 `docs/runbook/development-progress.md`，剩余目标看 `docs/runbook/remaining-goals.md`，单服务状态看 `docs/runbook/service-briefs/<service>.md`。
-5. 当前 9 个服务已接入 first-stage 本地 Prometheus / Grafana 观测原型；api-gateway legacy quiet-window gate 已有 observation 归档脚本；下一轮优先继续安全 / trusted metadata / TLS 边界收口，其次继续 api-gateway 配置中心 / DB-backed quota 边界，或按服务清 P2 hardening。
+```text
+api-gateway
+identity-service
+message-service
+conversation-service
+delivery-service
+push-gateway
+receipt-service
+contacts-service
+policy-service
+```
 
-## 当前收口 Backlog
+当前重点不是新增服务，而是先收干净这 9 个服务。
 
-这些是进入 `search-service` 前的默认任务池：
+```text
+安全边界
+-> trusted metadata / TLS
+-> 观测和故障 smoke
+-> repair / DLQ / audit
+-> 逐服务 P2 hardening
+-> 容量和复杂度治理
+```
 
-1. 安全边界：复核 9 个服务的 public listener、mock / metadata auth、gateway verified metadata、TLS / mTLS fail-fast guard 和 `check-local` 门禁。
-2. 观测边界：继续把 first-stage `/metrics`、Prometheus rules、Grafana dashboard、OTel trace wiring 收敛为本地可演示闭环；不要写成生产 SLO。
-3. 故障 smoke：Redis Sentinel 网络分区、Kafka controller-switch / ISR observation 和 PostgreSQL quorum observation 已有 clean run 和报告，PostgreSQL 生产 quorum 边界见 ADR-034；后续继续补更长时间 Kafka ISR flapping / consumer rebalance。
-4. Repair / DLQ：补 outbox、projection、challenge delivery 等 operator 的可复跑 repair / audit / cleanup 流程。
-5. 逐服务 P2：按 `remaining-goals.md` 和对应 service brief 清单逐个清理，不跨服务堆大改。
-6. 复杂度治理：生产手写文件接近 2500 行、测试或 runner 接近 3000 行时，优先同 package 拆分。
+`search-service`、RAG、summary、agent 和客户端属于后续阶段。
 
-## 已知硬约束
+## 文档职责
 
-- 压测原始数据：`H:\NexusIM\loadtest-results`
-- 仓库文档：`E:\development\IM\docs`
-- Win/Mac 有线通信优先 `172.31.50.*`
-- 不做外网流量诊断，除非用户明确要求。
+- 当前进度总览：`docs/runbook/development-progress.md`
+- 当前未完成工作：`docs/runbook/remaining-goals.md`
+- 单服务状态：`docs/runbook/service-briefs/<service>.md`
+- 开发过程讲述线：`docs/runbook/development-process.md`
+- 面试讲述文档：`docs/interview/project-progress.md`
+
+## 硬约束
+
+- 项目统一命名为 NexusIM，不再引入旧项目名。
 - 不回滚用户已有修改。
-- 代码规模治理：生产手写文件接近 2500 行、测试/runner 接近 3000 行时优先同 package 拆分，避免继续堆大文件。
-
-## 每轮结束
-
-1. 更新本文件的“当前优先级”。
-2. 若服务状态变化，更新 `docs/runbook/service-briefs/<service>.md`。
-3. 需要历史归档时只追加或拆分，不把长历史重新塞回入口文档。
-4. 运行 `.\tools\check-local.ps1`，保证下一轮入口仍然短，并捕获基础 whitespace / PowerShell 语法问题。
-5. 按切片风险追加必要测试，提交并推送有意义的切片。
+- 不为了“了解项目”全文读取长历史文档。
+- 压测原始数据放 `H:\NexusIM\loadtest-results`，E 盘仓库只放报告和文档。
+- 新发现的待完成工作写入 `docs/runbook/remaining-goals.md`。
+- 每个有意义切片结束后运行 `.\tools\check-local.ps1`，并按风险追加服务级测试、集成测试或 smoke。

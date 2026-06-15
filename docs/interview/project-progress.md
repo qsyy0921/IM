@@ -7,7 +7,7 @@
 - 还差哪些生产化和产品化能力；
 - 后续如何从后端主链路推进到分布式可靠性和 AI 应用后端。
 
-它不是每轮 Codex 工作入口；每轮工作仍先看 `docs/runbook/current-brief.md`。
+它不是每轮 Codex 工作入口，也不是工程待办来源；每轮工作仍先看 `docs/runbook/current-brief.md`，当前未完成工作以 `docs/runbook/remaining-goals.md` 为准。
 
 ## 项目定位
 

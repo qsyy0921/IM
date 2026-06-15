@@ -117,10 +117,11 @@ type SendContactRequestResult struct {
 }
 
 type ContactPrivacySettings struct {
-	AllowContactRequests bool
-	Version              int64
-	UpdatedAtUnixMS      int64
-	PolicySource         ContactPrivacyPolicySource
+	AllowContactRequests       bool
+	AllowSearchContactRequests bool
+	Version                    int64
+	UpdatedAtUnixMS            int64
+	PolicySource               ContactPrivacyPolicySource
 }
 
 type GetContactPrivacyCommand struct {
@@ -144,9 +145,10 @@ type GetContactPrivacyResult struct {
 }
 
 type SetContactPrivacyCommand struct {
-	AuthContext          AuthContext
-	AllowContactRequests bool
-	IdempotencyKey       string
+	AuthContext                AuthContext
+	AllowContactRequests       bool
+	AllowSearchContactRequests *bool
+	IdempotencyKey             string
 }
 
 func (c SetContactPrivacyCommand) Validate() error {
@@ -186,8 +188,9 @@ type GetTenantContactPrivacyDefaultResult struct {
 }
 
 type SetTenantContactPrivacyDefaultCommand struct {
-	TenantID             TenantID
-	AllowContactRequests bool
+	TenantID                   TenantID
+	AllowContactRequests       bool
+	AllowSearchContactRequests *bool
 }
 
 func (c SetTenantContactPrivacyDefaultCommand) Validate() error {

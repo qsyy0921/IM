@@ -287,6 +287,7 @@ message ContactPrivacySettings {
   int64 version = 2;
   int64 updated_at_unix_ms = 3;
   ContactPrivacyPolicySource policy_source = 4;
+  bool allow_search_contact_requests = 5;
 }
 
 message GetContactPrivacyRequest {
@@ -303,6 +304,7 @@ message SetContactPrivacyRequest {
   AuthContext auth_context = 1;
   bool allow_contact_requests = 2;
   string idempotency_key = 3;
+  optional bool allow_search_contact_requests = 4;
 }
 
 message SetContactPrivacyResponse {

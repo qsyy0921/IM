@@ -1126,18 +1126,123 @@ func TestRepositorySetContactPrivacyBlocksIncomingRequestsIntegration(t *testing
 	assertContactRequestCount(t, ctx, pool, 1)
 }
 
+func TestRepositoryContactPrivacyBlocksSearchRequestsOnlyIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	allowSearch := false
+	result, err := repository.SetContactPrivacy(ctx, types.SetContactPrivacyCommand{
+		AuthContext:                authContext("bob", "privacy-search-close"),
+		AllowContactRequests:       true,
+		AllowSearchContactRequests: &allowSearch,
+		IdempotencyKey:             "privacy-search-close",
+	})
+	if err != nil {
+		t.Fatalf("set search privacy closed: %v", err)
+	}
+	if !result.Settings.AllowContactRequests ||
+		result.Settings.AllowSearchContactRequests ||
+		result.Settings.Version != 1 ||
+		result.Settings.PolicySource != types.ContactPrivacyPolicySourceUser {
+		t.Fatalf("unexpected search privacy result: %+v", result)
+	}
+
+	search := sendCommand("alice", "bob", "send-search-denied", "hello from search")
+	search.SourceType = types.ContactRequestSourceTypeSearch
+	_, err = repository.SendContactRequest(ctx, search)
+	if !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected search request denied by target privacy, got %v", err)
+	}
+	assertContactRequestCount(t, ctx, pool, 0)
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCreated, 0)
+
+	direct, err := repository.SendContactRequest(ctx, sendCommand("carol", "bob", "send-direct-allowed", "hello direct"))
+	if err != nil {
+		t.Fatalf("send direct request after search privacy closed: %v", err)
+	}
+	if direct.Status != types.ContactRequestStatusPending ||
+		direct.SourceType != types.ContactRequestSourceTypeDirect {
+		t.Fatalf("unexpected direct result: %+v", direct)
+	}
+	assertContactRequestCount(t, ctx, pool, 1)
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCreated, 1)
+}
+
+func TestRepositoryTenantPrivacyDefaultBlocksSearchUnlessUserOverridesIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	allowTenantSearch := false
+	tenantDefault, err := repository.SetTenantContactPrivacyDefault(ctx, types.SetTenantContactPrivacyDefaultCommand{
+		TenantID:                   "tenant-contacts",
+		AllowContactRequests:       true,
+		AllowSearchContactRequests: &allowTenantSearch,
+	})
+	if err != nil {
+		t.Fatalf("set tenant search privacy default: %v", err)
+	}
+	if !tenantDefault.Settings.AllowContactRequests ||
+		tenantDefault.Settings.AllowSearchContactRequests ||
+		tenantDefault.Settings.PolicySource != types.ContactPrivacyPolicySourceTenantDefault {
+		t.Fatalf("unexpected tenant search privacy default: %+v", tenantDefault)
+	}
+
+	search := sendCommand("alice", "bob", "send-tenant-search-denied", "hello from search")
+	search.SourceType = types.ContactRequestSourceTypeSearch
+	_, err = repository.SendContactRequest(ctx, search)
+	if !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected search request denied by tenant privacy default, got %v", err)
+	}
+
+	allowUserSearch := true
+	userOverride, err := repository.SetContactPrivacy(ctx, types.SetContactPrivacyCommand{
+		AuthContext:                authContext("bob", "privacy-user-search-open"),
+		AllowContactRequests:       true,
+		AllowSearchContactRequests: &allowUserSearch,
+		IdempotencyKey:             "privacy-user-search-open",
+	})
+	if err != nil {
+		t.Fatalf("set user search privacy open: %v", err)
+	}
+	if !userOverride.Settings.AllowSearchContactRequests ||
+		userOverride.Settings.PolicySource != types.ContactPrivacyPolicySourceUser {
+		t.Fatalf("unexpected user search override: %+v", userOverride)
+	}
+
+	allowed := sendCommand("alice", "bob", "send-user-search-allowed", "hello again")
+	allowed.SourceType = types.ContactRequestSourceTypeSearch
+	sendResult, err := repository.SendContactRequest(ctx, allowed)
+	if err != nil {
+		t.Fatalf("send search request after user override: %v", err)
+	}
+	if sendResult.Status != types.ContactRequestStatusPending ||
+		sendResult.SourceType != types.ContactRequestSourceTypeSearch {
+		t.Fatalf("unexpected search send result: %+v", sendResult)
+	}
+	assertContactRequestCount(t, ctx, pool, 1)
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCreated, 1)
+}
+
 func sendCommand(sender string, target string, key string, message string) types.SendContactRequestCommand {
 	return types.SendContactRequestCommand{
-		AuthContext: types.AuthContext{
-			TenantID:  "tenant-contacts",
-			UserID:    types.UserID(sender),
-			DeviceID:  "device-1",
-			RequestID: "request-" + key,
-			TraceID:   "trace-" + key,
-		},
+		AuthContext:    authContext(sender, key),
 		TargetUserID:   types.UserID(target),
 		IdempotencyKey: key,
 		Message:        message,
+	}
+}
+
+func authContext(user string, key string) types.AuthContext {
+	return types.AuthContext{
+		TenantID:  "tenant-contacts",
+		UserID:    types.UserID(user),
+		DeviceID:  "device-1",
+		RequestID: "request-" + key,
+		TraceID:   "trace-" + key,
 	}
 }
 

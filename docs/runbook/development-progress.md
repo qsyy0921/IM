@@ -119,7 +119,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 | `delivery-service` | 已落地、已接主链路 | projection / `PullInbox` / `AckDelivery` / hide inbox / delivery outbox | `service-briefs/delivery-service.md` |
 | `push-gateway` | 已落地、已接主链路 | notify / ACK / resume / Redis route / Win-Mac / Sentinel / network-partition / TLS smoke | `service-briefs/push-gateway.md` |
 | `receipt-service` | 已落地、已接主链路 | receipt projection / outbox / audit / repair、`ListReceiptStates` repository 级批量查询、first-stage `/metrics` 和 OTel server span | `service-briefs/receipt-service.md` |
-| `contacts-service` | 已落地、已接主链路 | request source metadata / source policy gate / contacts search / group filter / USER-TENANT-SYSTEM privacy / tenant privacy operator / outbox / audit / repair | `service-briefs/contacts-service.md` |
+| `contacts-service` | 已落地、已接主链路 | request source metadata / source policy gate / search-source privacy gate / contacts search / group filter / USER-TENANT-SYSTEM privacy / tenant privacy operator / outbox / audit / repair | `service-briefs/contacts-service.md` |
 | `policy-service` | 已落地、已接主链路 | decision / user action restriction / projection / outbox / audit / repair、first-stage `/metrics` 和 OTel server span | `service-briefs/policy-service.md` |
 | `search-service` | 占位，尚未进入真实实现主线 | 无真实实现；等前 9 个服务收口后再进入 | `service-briefs/search-service.md` |
 

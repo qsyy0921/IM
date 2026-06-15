@@ -18,7 +18,7 @@
 ## 查询规则
 
 - 当前任务入口：`docs/runbook/current-brief.md`
-- 长期目标：`docs/runbook/current-goal.md`
+- 剩余目标：`docs/runbook/remaining-goals.md`
 - 服务当前状态：只读本目录下相关服务文件。
 - 服务设计：读对应 `docs/sdd/<service>.md` 的相关章节。
 - smoke / 压测证据：按关键词查 `docs/runbook/loadtest/<service>/`。

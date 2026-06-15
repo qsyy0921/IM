@@ -183,9 +183,10 @@ func (s *Server) SetContactPrivacy(
 		return nil, status.Error(codes.Unimplemented, "set contact privacy is not configured")
 	}
 	result, err := s.setContactPrivacy.Execute(ctx, types.SetContactPrivacyCommand{
-		AuthContext:          authFromProto(ctx, request.GetAuthContext()),
-		AllowContactRequests: request.GetAllowContactRequests(),
-		IdempotencyKey:       request.GetIdempotencyKey(),
+		AuthContext:                authFromProto(ctx, request.GetAuthContext()),
+		AllowContactRequests:       request.GetAllowContactRequests(),
+		AllowSearchContactRequests: request.AllowSearchContactRequests,
+		IdempotencyKey:             request.GetIdempotencyKey(),
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -522,10 +523,11 @@ func (s *Server) UpdateContactGroup(
 
 func privacySettingsToProto(settings types.ContactPrivacySettings) *contactsv1.ContactPrivacySettings {
 	return &contactsv1.ContactPrivacySettings{
-		AllowContactRequests: settings.AllowContactRequests,
-		Version:              settings.Version,
-		UpdatedAtUnixMs:      settings.UpdatedAtUnixMS,
-		PolicySource:         privacyPolicySourceToProto(settings.PolicySource),
+		AllowContactRequests:       settings.AllowContactRequests,
+		AllowSearchContactRequests: settings.AllowSearchContactRequests,
+		Version:                    settings.Version,
+		UpdatedAtUnixMs:            settings.UpdatedAtUnixMS,
+		PolicySource:               privacyPolicySourceToProto(settings.PolicySource),
 	}
 }
 

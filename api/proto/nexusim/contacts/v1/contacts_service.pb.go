@@ -2379,13 +2379,14 @@ func (x *UpdateContactGroupResponse) GetIdempotentReplay() bool {
 }
 
 type ContactPrivacySettings struct {
-	state                protoimpl.MessageState     `protogen:"open.v1"`
-	AllowContactRequests bool                       `protobuf:"varint,1,opt,name=allow_contact_requests,json=allowContactRequests,proto3" json:"allow_contact_requests,omitempty"`
-	Version              int64                      `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
-	UpdatedAtUnixMs      int64                      `protobuf:"varint,3,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
-	PolicySource         ContactPrivacyPolicySource `protobuf:"varint,4,opt,name=policy_source,json=policySource,proto3,enum=nexusim.contacts.v1.ContactPrivacyPolicySource" json:"policy_source,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state                      protoimpl.MessageState     `protogen:"open.v1"`
+	AllowContactRequests       bool                       `protobuf:"varint,1,opt,name=allow_contact_requests,json=allowContactRequests,proto3" json:"allow_contact_requests,omitempty"`
+	Version                    int64                      `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	UpdatedAtUnixMs            int64                      `protobuf:"varint,3,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
+	PolicySource               ContactPrivacyPolicySource `protobuf:"varint,4,opt,name=policy_source,json=policySource,proto3,enum=nexusim.contacts.v1.ContactPrivacyPolicySource" json:"policy_source,omitempty"`
+	AllowSearchContactRequests bool                       `protobuf:"varint,5,opt,name=allow_search_contact_requests,json=allowSearchContactRequests,proto3" json:"allow_search_contact_requests,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *ContactPrivacySettings) Reset() {
@@ -2444,6 +2445,13 @@ func (x *ContactPrivacySettings) GetPolicySource() ContactPrivacyPolicySource {
 		return x.PolicySource
 	}
 	return ContactPrivacyPolicySource_CONTACT_PRIVACY_POLICY_SOURCE_UNSPECIFIED
+}
+
+func (x *ContactPrivacySettings) GetAllowSearchContactRequests() bool {
+	if x != nil {
+		return x.AllowSearchContactRequests
+	}
+	return false
 }
 
 type GetContactPrivacyRequest struct {
@@ -2551,12 +2559,13 @@ func (x *GetContactPrivacyResponse) GetSettings() *ContactPrivacySettings {
 }
 
 type SetContactPrivacyRequest struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	AuthContext          *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
-	AllowContactRequests bool                   `protobuf:"varint,2,opt,name=allow_contact_requests,json=allowContactRequests,proto3" json:"allow_contact_requests,omitempty"`
-	IdempotencyKey       string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state                      protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext                *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	AllowContactRequests       bool                   `protobuf:"varint,2,opt,name=allow_contact_requests,json=allowContactRequests,proto3" json:"allow_contact_requests,omitempty"`
+	IdempotencyKey             string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	AllowSearchContactRequests *bool                  `protobuf:"varint,4,opt,name=allow_search_contact_requests,json=allowSearchContactRequests,proto3,oneof" json:"allow_search_contact_requests,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *SetContactPrivacyRequest) Reset() {
@@ -2608,6 +2617,13 @@ func (x *SetContactPrivacyRequest) GetIdempotencyKey() string {
 		return x.IdempotencyKey
 	}
 	return ""
+}
+
+func (x *SetContactPrivacyRequest) GetAllowSearchContactRequests() bool {
+	if x != nil && x.AllowSearchContactRequests != nil {
+		return *x.AllowSearchContactRequests
+	}
+	return false
 }
 
 type SetContactPrivacyResponse struct {
@@ -2871,22 +2887,25 @@ const file_nexusim_contacts_v1_contacts_service_proto_rawDesc = "" +
 	"\aversion\x18\x06 \x01(\x03R\aversion\x12\x1d\n" +
 	"\n" +
 	"group_name\x18\a \x01(\tR\tgroupName\x12+\n" +
-	"\x11idempotent_replay\x18\b \x01(\bR\x10idempotentReplay\"\xeb\x01\n" +
+	"\x11idempotent_replay\x18\b \x01(\bR\x10idempotentReplay\"\xae\x02\n" +
 	"\x16ContactPrivacySettings\x124\n" +
 	"\x16allow_contact_requests\x18\x01 \x01(\bR\x14allowContactRequests\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12+\n" +
 	"\x12updated_at_unix_ms\x18\x03 \x01(\x03R\x0fupdatedAtUnixMs\x12T\n" +
-	"\rpolicy_source\x18\x04 \x01(\x0e2/.nexusim.contacts.v1.ContactPrivacyPolicySourceR\fpolicySource\"_\n" +
+	"\rpolicy_source\x18\x04 \x01(\x0e2/.nexusim.contacts.v1.ContactPrivacyPolicySourceR\fpolicySource\x12A\n" +
+	"\x1dallow_search_contact_requests\x18\x05 \x01(\bR\x1aallowSearchContactRequests\"_\n" +
 	"\x18GetContactPrivacyRequest\x12C\n" +
 	"\fauth_context\x18\x01 \x01(\v2 .nexusim.contacts.v1.AuthContextR\vauthContext\"\x9a\x01\n" +
 	"\x19GetContactPrivacyResponse\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12G\n" +
-	"\bsettings\x18\x03 \x01(\v2+.nexusim.contacts.v1.ContactPrivacySettingsR\bsettings\"\xbe\x01\n" +
+	"\bsettings\x18\x03 \x01(\v2+.nexusim.contacts.v1.ContactPrivacySettingsR\bsettings\"\xa8\x02\n" +
 	"\x18SetContactPrivacyRequest\x12C\n" +
 	"\fauth_context\x18\x01 \x01(\v2 .nexusim.contacts.v1.AuthContextR\vauthContext\x124\n" +
 	"\x16allow_contact_requests\x18\x02 \x01(\bR\x14allowContactRequests\x12'\n" +
-	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\"\xc7\x01\n" +
+	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\x12F\n" +
+	"\x1dallow_search_contact_requests\x18\x04 \x01(\bH\x00R\x1aallowSearchContactRequests\x88\x01\x01B \n" +
+	"\x1e_allow_search_contact_requests\"\xc7\x01\n" +
 	"\x19SetContactPrivacyResponse\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12G\n" +
@@ -3068,6 +3087,7 @@ func file_nexusim_contacts_v1_contacts_service_proto_init() {
 	if File_nexusim_contacts_v1_contacts_service_proto != nil {
 		return
 	}
+	file_nexusim_contacts_v1_contacts_service_proto_msgTypes[28].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

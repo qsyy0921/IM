@@ -141,7 +141,7 @@ func (r *Repository) SendContactRequest(
 	} else if ok {
 		return types.SendContactRequestResult{}, types.NewContactRequestConflict("pending contact request already exists")
 	}
-	if allowed, err := contactRequestsAllowed(ctx, tx, command.AuthContext.TenantID, command.TargetUserID); err != nil {
+	if allowed, err := contactRequestsAllowed(ctx, tx, command.AuthContext.TenantID, command.TargetUserID, command.NormalizedSourceType()); err != nil {
 		return types.SendContactRequestResult{}, err
 	} else if !allowed {
 		return types.SendContactRequestResult{}, types.NewPermissionDenied("target user does not accept contact requests")
@@ -1065,20 +1065,21 @@ func (r *Repository) UpdateContactGroup(
 }
 
 type commandHashPayload struct {
-	Kind                 string `json:"kind"`
-	TenantID             string `json:"tenant_id"`
-	UserID               string `json:"user_id"`
-	TargetUserID         string `json:"target_user_id,omitempty"`
-	ContactUserID        string `json:"contact_user_id,omitempty"`
-	RequestID            string `json:"request_id,omitempty"`
-	Decision             string `json:"decision,omitempty"`
-	Message              string `json:"message,omitempty"`
-	SourceType           string `json:"source_type,omitempty"`
-	SourceRef            string `json:"source_ref,omitempty"`
-	Reason               string `json:"reason,omitempty"`
-	Remark               string `json:"remark,omitempty"`
-	GroupName            string `json:"group_name,omitempty"`
-	AllowContactRequests *bool  `json:"allow_contact_requests,omitempty"`
+	Kind                       string `json:"kind"`
+	TenantID                   string `json:"tenant_id"`
+	UserID                     string `json:"user_id"`
+	TargetUserID               string `json:"target_user_id,omitempty"`
+	ContactUserID              string `json:"contact_user_id,omitempty"`
+	RequestID                  string `json:"request_id,omitempty"`
+	Decision                   string `json:"decision,omitempty"`
+	Message                    string `json:"message,omitempty"`
+	SourceType                 string `json:"source_type,omitempty"`
+	SourceRef                  string `json:"source_ref,omitempty"`
+	Reason                     string `json:"reason,omitempty"`
+	Remark                     string `json:"remark,omitempty"`
+	GroupName                  string `json:"group_name,omitempty"`
+	AllowContactRequests       *bool  `json:"allow_contact_requests,omitempty"`
+	AllowSearchContactRequests *bool  `json:"allow_search_contact_requests,omitempty"`
 }
 
 func commandHash(payload commandHashPayload) (string, error) {

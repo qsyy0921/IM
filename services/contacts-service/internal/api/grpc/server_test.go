@@ -130,10 +130,11 @@ func TestContactPrivacyMapsPolicySource(t *testing.T) {
 				TenantID: command.AuthContext.TenantID,
 				UserID:   command.AuthContext.UserID,
 				Settings: types.ContactPrivacySettings{
-					AllowContactRequests: false,
-					Version:              3,
-					UpdatedAtUnixMS:      1234,
-					PolicySource:         types.ContactPrivacyPolicySourceTenantDefault,
+					AllowContactRequests:       false,
+					AllowSearchContactRequests: true,
+					Version:                    3,
+					UpdatedAtUnixMS:            1234,
+					PolicySource:               types.ContactPrivacyPolicySourceTenantDefault,
 				},
 			}, nil
 		}),
@@ -152,6 +153,51 @@ func TestContactPrivacyMapsPolicySource(t *testing.T) {
 	if response.GetSettings().GetPolicySource() != contactsv1.ContactPrivacyPolicySource_CONTACT_PRIVACY_POLICY_SOURCE_TENANT_DEFAULT {
 		t.Fatalf("unexpected privacy policy source: %+v", response.GetSettings())
 	}
+	if !response.GetSettings().GetAllowSearchContactRequests() {
+		t.Fatalf("expected search contact requests to be allowed in privacy response: %+v", response.GetSettings())
+	}
+}
+
+func TestSetContactPrivacyMapsOptionalSearchPolicy(t *testing.T) {
+	var captured types.SetContactPrivacyCommand
+	server := NewServer(
+		nil, nil,
+		setContactPrivacyExecutorFunc(func(_ context.Context, command types.SetContactPrivacyCommand) (types.SetContactPrivacyResult, error) {
+			captured = command
+			return types.SetContactPrivacyResult{
+				TenantID: command.AuthContext.TenantID,
+				UserID:   command.AuthContext.UserID,
+				Settings: types.ContactPrivacySettings{
+					AllowContactRequests:       command.AllowContactRequests,
+					AllowSearchContactRequests: command.AllowSearchContactRequests != nil && *command.AllowSearchContactRequests,
+					Version:                    1,
+					UpdatedAtUnixMS:            1234,
+					PolicySource:               types.ContactPrivacyPolicySourceUser,
+				},
+			}, nil
+		}),
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+	)
+
+	allowSearch := false
+	response, err := server.SetContactPrivacy(context.Background(), &contactsv1.SetContactPrivacyRequest{
+		AuthContext: &contactsv1.AuthContext{
+			TenantId: "tenant-1",
+			UserId:   "bob",
+		},
+		AllowContactRequests:       true,
+		AllowSearchContactRequests: &allowSearch,
+		IdempotencyKey:             "privacy-1",
+	})
+	if err != nil {
+		t.Fatalf("set contact privacy: %v", err)
+	}
+	if captured.AllowSearchContactRequests == nil || *captured.AllowSearchContactRequests {
+		t.Fatalf("expected optional search policy false to reach usecase, got %+v", captured)
+	}
+	if response.GetSettings().GetAllowSearchContactRequests() {
+		t.Fatalf("expected search contact requests false in response: %+v", response.GetSettings())
+	}
 }
 
 type sendContactRequestExecutorFunc func(context.Context, types.SendContactRequestCommand) (types.SendContactRequestResult, error)
@@ -163,6 +209,12 @@ func (f sendContactRequestExecutorFunc) Execute(ctx context.Context, command typ
 type getContactPrivacyExecutorFunc func(context.Context, types.GetContactPrivacyCommand) (types.GetContactPrivacyResult, error)
 
 func (f getContactPrivacyExecutorFunc) Execute(ctx context.Context, command types.GetContactPrivacyCommand) (types.GetContactPrivacyResult, error) {
+	return f(ctx, command)
+}
+
+type setContactPrivacyExecutorFunc func(context.Context, types.SetContactPrivacyCommand) (types.SetContactPrivacyResult, error)
+
+func (f setContactPrivacyExecutorFunc) Execute(ctx context.Context, command types.SetContactPrivacyCommand) (types.SetContactPrivacyResult, error) {
 	return f(ctx, command)
 }
 

@@ -370,9 +370,10 @@ func runTenantPrivacyDefaultAudit() error {
 		return err
 	}
 	log.Printf(
-		"contacts-service tenant privacy default tenant_id=%s allow_contact_requests=%t version=%d policy_source=%s updated_at_unix_ms=%d",
+		"contacts-service tenant privacy default tenant_id=%s allow_contact_requests=%t allow_search_contact_requests=%t version=%d policy_source=%s updated_at_unix_ms=%d",
 		result.TenantID,
 		result.Settings.AllowContactRequests,
+		result.Settings.AllowSearchContactRequests,
 		result.Settings.Version,
 		result.Settings.PolicySource,
 		result.Settings.UpdatedAtUnixMS,
@@ -392,6 +393,14 @@ func runTenantPrivacyDefaultSet() error {
 	if err != nil {
 		return err
 	}
+	allowSearchContactRequests, allowSearchConfigured, err := envOptionalBool("NEXUSIM_CONTACTS_TENANT_PRIVACY_ALLOW_SEARCH_CONTACT_REQUESTS")
+	if err != nil {
+		return err
+	}
+	var allowSearchContactRequestsPtr *bool
+	if allowSearchConfigured {
+		allowSearchContactRequestsPtr = &allowSearchContactRequests
+	}
 	pool, err := openPGPool(ctx)
 	if err != nil {
 		return err
@@ -400,17 +409,19 @@ func runTenantPrivacyDefaultSet() error {
 	result, err := app.NewSetTenantContactPrivacyDefaultUseCase(postgresinfra.NewRepository(pool)).Execute(
 		ctx,
 		types.SetTenantContactPrivacyDefaultCommand{
-			TenantID:             types.TenantID(tenantID),
-			AllowContactRequests: allowContactRequests,
+			TenantID:                   types.TenantID(tenantID),
+			AllowContactRequests:       allowContactRequests,
+			AllowSearchContactRequests: allowSearchContactRequestsPtr,
 		},
 	)
 	if err != nil {
 		return err
 	}
 	log.Printf(
-		"contacts-service tenant privacy default updated tenant_id=%s allow_contact_requests=%t version=%d changed=%t updated_at_unix_ms=%d",
+		"contacts-service tenant privacy default updated tenant_id=%s allow_contact_requests=%t allow_search_contact_requests=%t version=%d changed=%t updated_at_unix_ms=%d",
 		result.TenantID,
 		result.Settings.AllowContactRequests,
+		result.Settings.AllowSearchContactRequests,
 		result.Settings.Version,
 		result.Changed,
 		result.Settings.UpdatedAtUnixMS,

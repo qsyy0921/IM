@@ -20,3 +20,4 @@
 ## 后续
 
 - 跨实例 resume 强化、容量测试、Redis Cluster / 生产 HA 设计。
+- `loadtest/pushgateway/run-local-smoke.ps1` 已超过脚本 warn 线；后续新增 push smoke 场景前先拆 helper / scenario modules。

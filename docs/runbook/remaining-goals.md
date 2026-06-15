@@ -34,7 +34,7 @@
 | `message-service` | 会话级删除策略深化；合规删除；容量观测深化；发送链路生产观测；图片 / 文件 / 语音二进制上传处理后续由 media 能力承担。 |
 | `conversation-service` | 更完整群管理；owner transfer 策略继续打磨；成员窗口历史 repair / repair action。 |
 | `delivery-service` | Projection DLQ / repair 深化；更多 delivery event 消费方；隐藏项跨设备提示。 |
-| `push-gateway` | 跨实例 resume 强化；容量测试；Redis Cluster / 生产级 HA 设计；Redis 网络分区组合 smoke。 |
+| `push-gateway` | 跨实例 resume 强化；容量测试；Redis Cluster / 生产级 HA 设计；Redis 网络分区组合 smoke；拆分已超过脚本 warn 线的 `loadtest/pushgateway/run-local-smoke.ps1`。 |
 | `receipt-service` | 送达回执扩展；会话列表更多产品化能力（草稿、标签、更多摘要策略等）。 |
 | `contacts-service` | 更细 profile；陌生人申请的组织 / 风险 / 审批策略；租户默认值和来源策略后续接入 admin/config service 正式权限面。 |
 | `policy-service` | 完整 ReBAC；内容分类 / provider-backed moderation；tenant DSL / quota；外部 audit sink。 |

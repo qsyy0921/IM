@@ -3,6 +3,8 @@ param(
     [int]$ProductionMaxLines = 3500,
     [int]$TestRunnerWarnLines = 2500,
     [int]$TestRunnerMaxLines = 3000,
+    [int]$ScriptWarnLines = 1000,
+    [int]$ScriptMaxLines = 1500,
     [int]$DocsWarnLines = 1200,
     [int]$DocsMaxLines = 1500
 )
@@ -60,7 +62,7 @@ $files = Get-ChildItem -LiteralPath $repoRoot -Recurse -File |
         if ($_.Extension -eq ".go" -and (Test-IsGeneratedGo -RelativePath $relativePath)) {
             return $false
         }
-        return $_.Extension -in @(".go", ".md")
+        return $_.Extension -in @(".go", ".md", ".ps1", ".sh")
     } |
     Sort-Object FullName
 
@@ -75,6 +77,11 @@ foreach ($file in $files) {
         $kind = "docs"
         $warnLines = $DocsWarnLines
         $maxLines = $DocsMaxLines
+    }
+    elseif ($file.Extension -in @(".ps1", ".sh")) {
+        $kind = "script/runner"
+        $warnLines = $ScriptWarnLines
+        $maxLines = $ScriptMaxLines
     }
     elseif ($relativePath -like "loadtest\*" -or $file.Name -like "*_test.go") {
         $kind = "test/runner"
@@ -115,4 +122,4 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 
-Write-Host "OK   file size budgets checked ($($files.Count) handwritten Go/Markdown files)."
+Write-Host "OK   file size budgets checked ($($files.Count) handwritten Go/Markdown/script files)."

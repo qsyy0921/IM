@@ -411,7 +411,18 @@ ConfirmPasswordReset -> password hash updated + active session / refresh token r
 
 - `GET /healthz`: process liveness, no dependency check.
 - `GET /readyz`: PostgreSQL ping readiness.
-- `GET /debug/metrics`: pgx pool counters, identity user/device/session counts, failed password-login user counts, currently password-login-locked user counts, MFA factor counts, MFA factor failed-login counts, currently MFA-login-locked ACTIVE factor counts, and gRPC method/code/latency counters.
+- `GET /debug/metrics`: pgx pool counters, identity user/device/session counts, failed password-login user counts, currently password-login-locked user counts, MFA factor counts, MFA factor failed-login counts, currently MFA-login-locked ACTIVE factor counts, challenge delivery outbox state, worker retry snapshots, challenge delivery debug counters, OTel config snapshot, and gRPC method/code/latency counters.
+- `GET /metrics`: first-stage Prometheus text exposition derived from the same low-sensitive snapshot. Labels are limited to low-cardinality values such as method, code, status, failure_class, mode, outcome and exporter. It must not expose tokens, tenant IDs, user IDs, device IDs, session IDs, request IDs, trace IDs, destinations, provider URLs, provider bodies or payload fields.
+
+Local Prometheus / Grafana prototype configuration is available under `deploy/local/`:
+
+```text
+deploy/local/prometheus.yml
+deploy/local/prometheus-identity-service-alerts.yml
+deploy/local/grafana/dashboards/identity-service-observability.json
+```
+
+The local scrape target is `host.docker.internal:11905/metrics` when the identity debug server is started with `NEXUSIM_IDENTITY_DEBUG_ADDR=127.0.0.1:11905`. Alert rules cover first-stage gRPC errors, password / MFA / recovery-code lock signals, challenge delivery failures, challenge delivery outbox DLQ / expired pending rows, worker / relay runtime errors and missing OTLP endpoint configuration. This is for local development / interview demonstration only, not production SLO, retention or Alertmanager routing.
 
 The debug HTTP listener is unauthenticated and intended for local or private observability. It fails startup by default when bound to a non-private or unspecified address; explicit public binding requires `NEXUSIM_IDENTITY_DEBUG_ALLOW_PUBLIC=true`.
 
@@ -428,6 +439,6 @@ NEXUSIM_IDENTITY_OTEL_TRACES_OTLP_INSECURE=true
 NEXUSIM_IDENTITY_OTEL_TRACES_SAMPLING_RATIO=1
 ```
 
-`stdout` is for local smoke; `otlp-grpc` requires an explicit endpoint. OTel collector deployment, alerting, sampling governance and dashboards remain future observability hardening.
+`stdout` is for local smoke; `otlp-grpc` requires an explicit endpoint. OTel collector deployment, production alerting, sampling governance and SLO dashboards remain future observability hardening.
 
 This is intentionally a lightweight local/debug endpoint. Production tracing, alerting, all-service mTLS rollout, certificate governance, external SIEM / audit sinks and adaptive risk analytics remain future hardening items.

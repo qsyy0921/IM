@@ -4,7 +4,8 @@
 
 - 已有 `RegisterUser`、`Login`、`RefreshGatewayToken`、JWKS / RS256 keyring、device/session revoke。
 - 已有 verification / password reset challenge、challenge delivery outbox、webhook / SMTP email challenge sender、first-stage SMTP subject/body templates、MFA TOTP、recovery codes、Refresh step-up、mTLS。
-- 已补 `/healthz`、`/readyz`、`/debug/metrics` 和 `/.well-known/jwks.json` / `/jwks.json`，可观察低敏 identity、MFA、challenge delivery outbox 和 challenge delivery debug 聚合状态；debug HTTP 监听默认只允许 loopback / 私网，公网或未指定地址必须显式 `NEXUSIM_IDENTITY_DEBUG_ALLOW_PUBLIC=true`。
+- 已补 `/healthz`、`/readyz`、`/debug/metrics`、Prometheus text `/metrics` 和 `/.well-known/jwks.json` / `/jwks.json`，可观察低敏 identity、MFA、challenge delivery outbox、worker retry、gRPC 和 challenge delivery debug 聚合状态；debug HTTP 监听默认只允许 loopback / 私网，公网或未指定地址必须显式 `NEXUSIM_IDENTITY_DEBUG_ALLOW_PUBLIC=true`。
+- 本地 Prometheus scrape / alert rules 与 Grafana dashboard 原型已覆盖 identity gRPC error、login / MFA lock、challenge delivery failure / outbox DLQ、worker / relay error 和 OTLP endpoint missing；这仍是本地开发 / 面试演示级观测，不是生产 Alertmanager / SLO。
 - 已补 first-stage OpenTelemetry gRPC server span，默认关闭；启用后可输出 stdout 或 OTLP gRPC trace，并从入口 metadata 提取 W3C traceparent。
 - gRPC 结构化访问日志已限制 `trace_id` / `request_id` 为低敏安全字符集，外部 metadata 中夹带的邮箱、token 或任意文本不会进入日志 correlation 字段。
 - `outbox-relay` 对非取消运行时错误已改为退避重试，并在 relay 模式暴露低敏 retry 快照；malformed payload / unsupported event 仍保持 fail-closed。
@@ -17,4 +18,4 @@
 
 ## 后续
 
-- WebAuthn/passkeys、OIDC federation、KMS/HSM、完整风控、SMS provider、bounce handling、租户级通知模板治理；OTel collector / alerting / dashboard 仍属于后续统一观测治理。
+- WebAuthn/passkeys、OIDC federation、KMS/HSM、完整风控、SMS provider、bounce handling、租户级通知模板治理；统一 OTel collector、生产告警路由、retention、SLO dashboard 仍属于后续统一观测治理。

@@ -1,0 +1,102 @@
+groups:
+  - name: nexusim-identity-service-first-stage
+    rules:
+      - alert: NexusIMIdentityGrpcErrors
+        expr: increase(nexusim_identity_grpc_errors_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: identity-service returned gRPC errors
+          description: identity-service has non-OK gRPC responses in the last five minutes. Inspect /debug/metrics and service logs before treating this as a production SLO alert.
+
+      - alert: NexusIMIdentityPasswordLoginLocked
+        expr: nexusim_identity_password_login_locked > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: identity-service password login lockouts observed
+          description: One or more users are currently password-login locked. This is a local security signal, not a complete fraud alert.
+
+      - alert: NexusIMIdentityMFALoginLocked
+        expr: nexusim_identity_mfa_login_locked > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: identity-service MFA factor lockouts observed
+          description: One or more ACTIVE MFA factors are temporarily locked after failed attempts. Check authentication logs and challenge delivery state.
+
+      - alert: NexusIMIdentityMFARecoveryLocked
+        expr: nexusim_identity_mfa_recovery_locked > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: identity-service recovery-code lockouts observed
+          description: One or more users are temporarily locked from recovery-code login. Check whether this is expected local smoke traffic or a real risk signal.
+
+      - alert: NexusIMIdentityChallengeDeliveryFailures
+        expr: increase(nexusim_identity_challenge_delivery_requests_total{outcome="failure"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: identity-service challenge delivery failed
+          description: Challenge notification delivery failed in the last five minutes. Inspect delivery mode, provider availability and challenge delivery audit before retrying manually.
+
+      - alert: NexusIMIdentityChallengeDeliveryOutboxDLQ
+        expr: nexusim_identity_challenge_delivery_outbox{status="dlq"} > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: identity-service challenge delivery outbox has DLQ rows
+          description: At least one challenge delivery outbox row is in DLQ. Use the repair/audit operator path; do not bypass token safety rules.
+
+      - alert: NexusIMIdentityChallengeDeliveryOutboxPendingExpired
+        expr: nexusim_identity_challenge_delivery_outbox{status="pending_expired"} > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: identity-service challenge delivery pending rows expired
+          description: Challenge delivery rows expired before successful delivery. Users should request a new challenge through the normal API path.
+
+      - alert: NexusIMIdentityChallengeDeliveryWorkerErrors
+        expr: increase(nexusim_identity_challenge_delivery_worker_errors_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: identity-service challenge delivery worker errors
+          description: Challenge delivery worker runtime errors increased. Check worker retry state and provider connectivity.
+
+      - alert: NexusIMIdentityOutboxRelayErrors
+        expr: increase(nexusim_identity_outbox_relay_errors_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: identity-service outbox relay errors
+          description: Identity event outbox relay runtime errors increased. Check Kafka connectivity and relay retry state.
+
+      - alert: NexusIMIdentityOtlpEndpointMissing
+        expr: nexusim_identity_otel_traces_enabled{exporter="otlp-grpc"} == 1 and on(exporter) nexusim_identity_otel_traces_otlp_endpoint_configured{exporter="otlp-grpc"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: identity-service OTLP traces enabled without endpoint
+          description: identity-service is configured for otlp-grpc tracing but has no OTLP endpoint configured.

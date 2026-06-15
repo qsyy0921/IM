@@ -4,9 +4,10 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $composePath = Join-Path $repoRoot "deploy\local\docker-compose.grafana.yml"
 $datasourcePath = Join-Path $repoRoot "deploy\local\grafana-datasources.yml"
 $providerPath = Join-Path $repoRoot "deploy\local\grafana-dashboards.yml"
-$dashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\api-gateway-observability.json"
+$apiGatewayDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\api-gateway-observability.json"
+$identityDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\identity-service-observability.json"
 
-foreach ($path in @($composePath, $datasourcePath, $providerPath, $dashboardPath)) {
+foreach ($path in @($composePath, $datasourcePath, $providerPath, $apiGatewayDashboardPath, $identityDashboardPath)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Missing local Grafana config file: $path"
     }
@@ -15,7 +16,6 @@ foreach ($path in @($composePath, $datasourcePath, $providerPath, $dashboardPath
 $compose = Get-Content -LiteralPath $composePath -Raw
 $datasource = Get-Content -LiteralPath $datasourcePath -Raw
 $provider = Get-Content -LiteralPath $providerPath -Raw
-$dashboardRaw = Get-Content -LiteralPath $dashboardPath -Raw
 
 if ($compose -notmatch "13000:3000") {
     throw "Grafana compose must expose host port 13000 to avoid existing local service ports."
@@ -27,20 +27,45 @@ if ($provider -notmatch "/var/lib/grafana/dashboards") {
     throw "Grafana dashboard provider must load dashboards from /var/lib/grafana/dashboards."
 }
 
-try {
-    $dashboard = $dashboardRaw | ConvertFrom-Json
-} catch {
-    throw "Grafana api-gateway dashboard is not valid JSON: $($_.Exception.Message)"
+$forbiddenLabels = @("tenant_id", "user_id", "device_id", "session_id", "request_id", "trace_id", "gateway-token")
+
+function Test-Dashboard {
+    param(
+        [string]$Path,
+        [string]$Name,
+        [string]$ExpectedUid,
+        [int]$MinimumPanels,
+        [string[]]$RequiredMetrics
+    )
+
+    $raw = Get-Content -LiteralPath $Path -Raw
+    try {
+        $dashboard = $raw | ConvertFrom-Json
+    } catch {
+        throw "Grafana $Name dashboard is not valid JSON: $($_.Exception.Message)"
+    }
+
+    if ($dashboard.uid -ne $ExpectedUid) {
+        throw "Grafana $Name dashboard uid mismatch."
+    }
+    if (-not $dashboard.panels -or $dashboard.panels.Count -lt $MinimumPanels) {
+        throw "Grafana $Name dashboard should include core observability panels."
+    }
+
+    foreach ($metric in $RequiredMetrics) {
+        if ($raw -notmatch [regex]::Escape($metric)) {
+            throw "Grafana $Name dashboard missing metric: $metric"
+        }
+    }
+
+    foreach ($label in $forbiddenLabels) {
+        if ($raw -match [regex]::Escape($label)) {
+            throw "Grafana $Name dashboard must not reference sensitive or high-cardinality field: $label"
+        }
+    }
 }
 
-if ($dashboard.uid -ne "nexusim-api-gateway") {
-    throw "Grafana api-gateway dashboard uid mismatch."
-}
-if (-not $dashboard.panels -or $dashboard.panels.Count -lt 5) {
-    throw "Grafana api-gateway dashboard should include core observability panels."
-}
-
-$requiredMetrics = @(
+$apiGatewayRequiredMetrics = @(
     "nexusim_api_gateway_grpc_requests_total",
     "nexusim_api_gateway_grpc_errors_total",
     "nexusim_api_gateway_grpc_exposure_requests_total",
@@ -55,17 +80,21 @@ $requiredMetrics = @(
     "nexusim_api_gateway_otel_traces_enabled"
 )
 
-foreach ($metric in $requiredMetrics) {
-    if ($dashboardRaw -notmatch [regex]::Escape($metric)) {
-        throw "Grafana api-gateway dashboard missing metric: $metric"
-    }
-}
+$identityRequiredMetrics = @(
+    "nexusim_identity_grpc_requests_total",
+    "nexusim_identity_grpc_errors_total",
+    "nexusim_identity_grpc_latency_avg_milliseconds",
+    "nexusim_identity_password_login_locked",
+    "nexusim_identity_mfa_login_locked",
+    "nexusim_identity_mfa_recovery_locked",
+    "nexusim_identity_challenge_delivery_requests_total",
+    "nexusim_identity_challenge_delivery_outbox",
+    "nexusim_identity_challenge_delivery_worker_errors_total",
+    "nexusim_identity_outbox_relay_errors_total",
+    "nexusim_identity_otel_traces_enabled"
+)
 
-$forbiddenLabels = @("tenant_id", "user_id", "device_id", "session_id", "request_id", "trace_id", "gateway-token")
-foreach ($label in $forbiddenLabels) {
-    if ($dashboardRaw -match [regex]::Escape($label)) {
-        throw "Grafana api-gateway dashboard must not reference sensitive or high-cardinality field: $label"
-    }
-}
+Test-Dashboard -Path $apiGatewayDashboardPath -Name "api-gateway" -ExpectedUid "nexusim-api-gateway" -MinimumPanels 5 -RequiredMetrics $apiGatewayRequiredMetrics
+Test-Dashboard -Path $identityDashboardPath -Name "identity-service" -ExpectedUid "nexusim-identity-service" -MinimumPanels 8 -RequiredMetrics $identityRequiredMetrics
 
 Write-Host "OK   local Grafana config"

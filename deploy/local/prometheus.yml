@@ -13,3 +13,11 @@ scrape_configs:
           - host.docker.internal:11904
         labels:
           service: api-gateway
+
+  - job_name: nexusim-identity-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:11905
+        labels:
+          service: identity-service

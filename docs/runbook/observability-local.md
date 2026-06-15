@@ -4,24 +4,26 @@
 
 ## Debug Metrics / Prometheus Text
 
-各服务的 `/debug/metrics` 仍是本地 JSON 快照入口。api-gateway 额外提供第一阶段 Prometheus text endpoint：
+各服务的 `/debug/metrics` 仍是本地 JSON 快照入口。api-gateway 和 identity-service 额外提供第一阶段 Prometheus text endpoint：
 
 ```text
 GET http://<NEXUSIM_API_GATEWAY_DEBUG_ADDR>/metrics
+GET http://<NEXUSIM_IDENTITY_DEBUG_ADDR>/metrics
 ```
 
-`/metrics` 复用 `/debug/metrics` 的低敏 snapshot，当前覆盖 gRPC request / error / latency、facade / legacy descriptor / other request exposure、legacy descriptor last-seen、auth JWK、rate-limit、runtime 和 OTel trace config 聚合指标。labels 只允许 method、code、exposure、backend、key_scope、tenant_plan_source、exporter 等低基数字段；不得输出 token、tenant_id、user_id、device_id、session_id、request_id、trace_id、conversation_id、message_id 或 payload。
+`/metrics` 复用 `/debug/metrics` 的低敏 snapshot。api-gateway 当前覆盖 gRPC request / error / latency、facade / legacy descriptor / other request exposure、legacy descriptor last-seen、auth JWK、rate-limit、runtime 和 OTel trace config 聚合指标；identity-service 当前覆盖 gRPC request / error / latency、identity 风险聚合、challenge delivery outbox、challenge delivery debug、worker retry 和 OTel trace config 聚合指标。labels 只允许 method、code、exposure、backend、key_scope、tenant_plan_source、status、failure_class、mode、outcome、exporter 等低基数字段；不得输出 token、tenant_id、user_id、device_id、session_id、request_id、trace_id、conversation_id、message_id、challenge destination 或 payload。
 
 这个 endpoint 只用于本地 scrape / dashboard 原型，不代表生产 Prometheus、Alertmanager、指标保留策略或 SLO 告警已经完成。
 
 ## Local Prometheus
 
-api-gateway `/metrics` 的本地 scrape / alert rule 原型位于：
+api-gateway / identity-service `/metrics` 的本地 scrape / alert rule 原型位于：
 
 ```text
 deploy/local/docker-compose.prometheus.yml
 deploy/local/prometheus.yml
 deploy/local/prometheus-api-gateway-alerts.yml
+deploy/local/prometheus-identity-service-alerts.yml
 ```
 
 启动：
@@ -41,9 +43,10 @@ deploy/local/prometheus-api-gateway-alerts.yml
 ```text
 Prometheus UI: http://127.0.0.1:19090
 api-gateway scrape target from container: host.docker.internal:11904
+identity-service scrape target from container: host.docker.internal:11905
 ```
 
-当前 first-stage alert rules 只覆盖 api-gateway：gRPC errors、legacy descriptor traffic、rate-limit Redis errors、JWKS refresh failures、OTLP endpoint missing。它们用于本地开发和面试演示，不是生产 SLO 阈值；生产化前还需要多服务 scrape、Alertmanager route、retention、dashboard、sampling / label governance 和容量验证。
+当前 first-stage alert rules 覆盖 api-gateway 和 identity-service。api-gateway 规则包含 gRPC errors、legacy descriptor traffic、rate-limit Redis errors、JWKS refresh failures、OTLP endpoint missing；identity-service 规则包含 gRPC errors、password / MFA / recovery-code lock、challenge delivery failure、challenge delivery outbox DLQ / expired pending rows、worker / relay runtime errors、OTLP endpoint missing。它们用于本地开发和面试演示，不是生产 SLO 阈值；生产化前还需要 Alertmanager route、retention、dashboard、sampling / label governance 和容量验证。
 
 注意：启动脚本不会预检镜像是否已存在；如果本机没有 `NEXUSIM_PROMETHEUS_IMAGE` 指定的镜像或默认 `prom/prometheus:v2.54.1`，Docker 会按自身配置尝试拉取镜像。
 
@@ -105,13 +108,14 @@ grpc.legacy_descriptor_last_seen_unix_ms = 0
 
 ## Local Grafana
 
-api-gateway 的第一阶段 Grafana dashboard provisioning 位于：
+api-gateway / identity-service 的第一阶段 Grafana dashboard provisioning 位于：
 
 ```text
 deploy/local/docker-compose.grafana.yml
 deploy/local/grafana-datasources.yml
 deploy/local/grafana-dashboards.yml
 deploy/local/grafana/dashboards/api-gateway-observability.json
+deploy/local/grafana/dashboards/identity-service-observability.json
 ```
 
 启动：
@@ -134,7 +138,7 @@ login:      admin / nexusim
 datasource: http://host.docker.internal:19090
 ```
 
-当前 dashboard 只覆盖 api-gateway 的本地 Prometheus 指标：request rate、error rate、facade / legacy descriptor / other exposure、legacy descriptor last-seen、latency、rate-limit decisions、JWKS refresh failures 和 OTel enabled。它用于本地开发和面试演示，不是生产 Grafana 部署；生产化前还需要多服务 dashboard、权限、datasource secret 管理、retention、SLO 阈值和告警路由。
+当前 dashboard 覆盖 api-gateway 和 identity-service 的本地 Prometheus 指标。api-gateway 面板包含 request rate、error rate、facade / legacy descriptor / other exposure、legacy descriptor last-seen、latency、rate-limit decisions、JWKS refresh failures 和 OTel enabled；identity-service 面板包含 request / error / latency、login / MFA lock、challenge delivery outcomes、challenge outbox status、worker runtime errors、failure class 和 OTel enabled。它用于本地开发和面试演示，不是生产 Grafana 部署；生产化前还需要权限、datasource secret 管理、retention、SLO 阈值和告警路由。
 
 注意：启动脚本不会预检镜像是否已存在；如果本机没有 `NEXUSIM_GRAFANA_IMAGE` 指定的镜像或默认 `grafana/grafana-oss:11.2.0`，Docker 会按自身配置尝试拉取镜像。
 

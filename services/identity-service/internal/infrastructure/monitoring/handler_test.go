@@ -88,6 +88,111 @@ func TestHandlerMetricsIncludesGRPCSnapshot(t *testing.T) {
 	}
 }
 
+func TestHandlerPrometheusMetrics(t *testing.T) {
+	grpcMetrics := NewGRPCMetrics()
+	grpcMetrics.record("/nexusim.identity.v1.IdentityService/Login", "OK", 12)
+	grpcMetrics.record("/nexusim.identity.v1.IdentityService/Login", "Unauthenticated", 15)
+	grpcMetrics.record("/nexusim.identity.v1.IdentityService/Request\"Verification\nChallenge", "OK", 5)
+	challengeMetrics := NewChallengeDeliveryMetrics("smtp")
+	challengeMetrics.record(17, nil, time.UnixMilli(1_800_000_000_000))
+	challengeMetrics.record(29, types.NewChallengeDeliveryFailed("provider body user1@example.com token=secret-token"), time.UnixMilli(1_800_000_000_100))
+	handler := NewHandler(nil, grpcMetrics).
+		WithChallengeDeliveryMetrics(challengeMetrics).
+		WithChallengeDeliveryWorkerStats(func() types.ChallengeDeliveryWorkerSnapshot {
+			return types.ChallengeDeliveryWorkerSnapshot{
+				TotalErrors:        3,
+				ConsecutiveErrors:  1,
+				LastErrorAtMS:      100,
+				LastSuccessAtMS:    200,
+				LastErrorBackoffMS: 1500,
+			}
+		}).
+		WithOutboxRelayStats(func() types.OutboxRelayWorkerSnapshot {
+			return types.OutboxRelayWorkerSnapshot{
+				TotalErrors:        2,
+				ConsecutiveErrors:  1,
+				LastErrorAtMS:      111,
+				LastSuccessAtMS:    222,
+				LastPublishedAtMS:  333,
+				LastErrorBackoffMS: 1000,
+			}
+		}).
+		WithTraceStats(func() TraceSnapshot {
+			return TraceSnapshot{Enabled: true, Exporter: "otlp-grpc", OTLPEndpointSet: true, SamplingRatio: 0.5}
+		})
+
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", response.Code)
+	}
+	if got := response.Header().Get("Content-Type"); got != "text/plain; version=0.0.4; charset=utf-8" {
+		t.Fatalf("unexpected content type %q", got)
+	}
+	body := response.Body.String()
+	assertContains(t, body, "# TYPE nexusim_identity_grpc_requests_total counter")
+	assertContains(t, body, `nexusim_identity_grpc_requests_total{code="OK",method="/nexusim.identity.v1.IdentityService/Login"} 1`)
+	assertContains(t, body, `nexusim_identity_grpc_requests_total{code="Unauthenticated",method="/nexusim.identity.v1.IdentityService/Login"} 1`)
+	assertContains(t, body, `nexusim_identity_grpc_errors_total{method="/nexusim.identity.v1.IdentityService/Login"} 1`)
+	assertContains(t, body, `nexusim_identity_grpc_requests_total{code="OK",method="/nexusim.identity.v1.IdentityService/Request\"Verification\nChallenge"} 1`)
+	assertContains(t, body, `nexusim_identity_challenge_delivery_requests_total{mode="smtp",outcome="success"} 1`)
+	assertContains(t, body, `nexusim_identity_challenge_delivery_requests_total{mode="smtp",outcome="failure"} 1`)
+	assertContains(t, body, `nexusim_identity_challenge_delivery_failure_classes_total{failure_class="delivery_failed",mode="smtp"} 1`)
+	assertContains(t, body, `nexusim_identity_challenge_delivery_worker_errors_total 3`)
+	assertContains(t, body, `nexusim_identity_outbox_relay_errors_total 2`)
+	assertContains(t, body, `nexusim_identity_otel_traces_enabled{exporter="otlp-grpc"} 1`)
+	for _, leaked := range []string{"user1@example.com", "secret-token", "trace_id", "request_id", "tenant_id", "user_id", "device_id", "session_id"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("prometheus metrics leaked %q in body:\n%s", leaked, body)
+		}
+	}
+}
+
+func TestRenderPrometheusIncludesIdentityAndChallengeOutboxAggregates(t *testing.T) {
+	body := renderPrometheus(Snapshot{
+		Service:       serviceName,
+		GeneratedAtMS: 1_800_000_000_000,
+		PGPool:        &PGPoolSnapshot{AcquireCount: 3, IdleConns: 2, TotalConns: 4, MaxConns: 8},
+		Identity: &IdentitySnapshot{
+			Users:                        10,
+			UsersWithFailures:            2,
+			PasswordLoginLocked:          1,
+			MFARecoveryFailures:          3,
+			MFARecoveryLocked:            1,
+			MFAFactors:                   5,
+			MFAFactorsWithFailures:       2,
+			MFALoginLocked:               1,
+			ChallengeRequestLimits:       7,
+			ChallengeRequestLimitsLocked: 1,
+			ActiveDevices:                6,
+			RevokedDevices:               2,
+			ActiveSessions:               9,
+			RevokedSessions:              1,
+			ExpiredSessions:              4,
+		},
+		ChallengeDeliveryOutbox: &ChallengeDeliveryOutboxSnapshot{
+			Total:            12,
+			Pending:          5,
+			PendingReady:     2,
+			PendingScheduled: 2,
+			PendingExpired:   1,
+			Delivered:        4,
+			DLQ:              2,
+			Canceled:         1,
+			MaxPendingRetry:  3,
+			FailureClasses:   map[string]int64{"provider_non_success": 2},
+		},
+	})
+	assertContains(t, body, `nexusim_identity_users 10`)
+	assertContains(t, body, `nexusim_identity_password_login_locked 1`)
+	assertContains(t, body, `nexusim_identity_mfa_recovery_locked 1`)
+	assertContains(t, body, `nexusim_identity_sessions{status="active"} 9`)
+	assertContains(t, body, `nexusim_identity_challenge_delivery_outbox{status="pending_ready"} 2`)
+	assertContains(t, body, `nexusim_identity_challenge_delivery_outbox{status="dlq"} 2`)
+	assertContains(t, body, `nexusim_identity_challenge_delivery_outbox_failure_classes{failure_class="provider_non_success"} 2`)
+	assertContains(t, body, `nexusim_identity_pg_pool_conns{state="max"} 8`)
+}
+
 func TestHandlerMetricsIncludesOutboxRelaySnapshot(t *testing.T) {
 	handler := NewHandler(nil).WithOutboxRelayStats(func() types.OutboxRelayWorkerSnapshot {
 		return types.OutboxRelayWorkerSnapshot{
@@ -355,6 +460,13 @@ func TestQueryChallengeDeliveryOutboxSnapshotIntegration(t *testing.T) {
 		metrics.ChallengeDeliveryOutbox.DLQ != 1 ||
 		metrics.ChallengeDeliveryOutbox.FailureClasses["provider_non_success"] != 1 {
 		t.Fatalf("expected challenge delivery outbox metrics, got %+v", metrics.ChallengeDeliveryOutbox)
+	}
+}
+
+func assertContains(t *testing.T, body string, want string) {
+	t.Helper()
+	if !strings.Contains(body, want) {
+		t.Fatalf("metrics body missing %q:\n%s", want, body)
 	}
 }
 

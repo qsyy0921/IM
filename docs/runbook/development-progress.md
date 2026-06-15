@@ -81,7 +81,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - Redis Sentinel network-partition fallback smoke
 - PostgreSQL `repmgr + pgpool` local failover smoke
 - PostgreSQL quorum observation smoke and ADR-034 production quorum boundary
-- Kafka KRaft 3 broker local failover / controller-switch smoke
+- Kafka KRaft 3 broker local failover / controller-switch / ISR observation smoke
 
 当前已经证明：
 
@@ -93,7 +93,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 
 - 生产级 Redis HA / Redis Cluster
 - 生产级 PostgreSQL HA / split-brain fencing / quorum write guard
-- 生产级 Kafka multi-failure / ISR 抖动治理
+- 生产级 Kafka multi-failure / sustained ISR flapping / consumer rebalance治理
 - 完整部署编排、服务发现、统一观测、灰度发布
 
 ### 3. 安全与运维
@@ -137,7 +137,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 
 1. 安全启动门禁：public listener、mock auth、metadata auth、gateway verified metadata、TLS / mTLS allowlist、弱鉴权公网暴露保护必须继续纳入 `tools/check-local.ps1` 和服务级测试；trusted metadata listener / backend guard 已纳入门禁，必须覆盖私网无 mTLS 放行、公网无 mTLS 拒绝、公网 mTLS 放行和 body auth 跳过；debug listener validator 已纳入门禁，必须覆盖 private allow / public reject / explicit opt-in 三类测试；服务端 gRPC / WSS TLS 配置已纳入门禁，必须覆盖 cert/key 成对、invalid require-client-cert bool、缺 client CA 三类启动失败测试。
 2. 观测闭环：first-stage `/metrics`、Prometheus rules、Grafana dashboard、OTel trace wiring 继续用于本地开发 / 面试展示；本地 Prometheus 配置门禁已覆盖 9 个服务的 scrape job、debug target、`service` label、alert rule mount 和 rule load；下一步是补 collector / alert / dashboard smoke 和采样治理，不把它写成生产 SLO。
-3. 分布式故障 smoke：补 Kafka 多故障 / ISR 抖动；PostgreSQL 生产 quorum / split-brain fencing 边界已由 ADR-034 固定，后续只在选型和 drill 证据足够时更新生产 HA 口径。
+3. 分布式故障 smoke：Redis Sentinel / PostgreSQL / Kafka 本地关键 fault observation 已有 clean run；后续补更长时间 Kafka ISR flapping、consumer rebalance 和 producer retry budget。PostgreSQL 生产 quorum / split-brain fencing 边界已由 ADR-034 固定，后续只在选型和 drill 证据足够时更新生产 HA 口径。
 4. Repair / DLQ / audit：outbox、projection、challenge delivery、policy / contacts / receipt 等 operator 要有可复跑 repair / cleanup / audit 流程。
 5. 代码复杂度治理：生产手写文件接近 2500 行、测试或 runner 接近 3000 行时，优先同 package 拆分，避免继续堆大文件。
 

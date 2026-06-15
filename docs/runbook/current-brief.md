@@ -15,7 +15,7 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 
 - message-service、conversation-service、delivery-service、push-gateway、receipt-service、contacts-service、identity-service、policy-service、api-gateway 均已有真实链路或最小闭环。
 - Win/Mac Docker 分布式 smoke 已证明跨实例 route / resume / PullInbox fallback 等关键路径。
-- 当前不是生产级 HA：本地 PostgreSQL `repmgr + pgpool` failover smoke、本地 PostgreSQL quorum observation、本地 Kafka KRaft 三 broker failover / controller-switch smoke、本地 Redis Sentinel quorum-loss fallback smoke、以及本地 Redis Sentinel network-partition fallback smoke 已补齐；服务发现、统一观测和部署编排仍是后续。PostgreSQL production quorum 边界已由 ADR-034 固定，不把当前本地拓扑描述为 quorum-fenced。
+- 当前不是生产级 HA：本地 PostgreSQL `repmgr + pgpool` failover smoke、本地 PostgreSQL quorum observation、本地 Kafka KRaft failover / controller-switch / ISR observation smoke、本地 Redis Sentinel quorum-loss fallback smoke、以及本地 Redis Sentinel network-partition fallback smoke 已补齐；服务发现、统一观测和部署编排仍是后续。PostgreSQL production quorum 边界已由 ADR-034 固定，不把当前本地拓扑描述为 quorum-fenced。
 - 当前 9 个服务足够支撑 IM 主链路；后续服务和中间件不写死，新增或替换必须满足拆分 / 演进准则并通过 ADR。
 - 服务 debug endpoint 公网暴露保护已纳入 `.\tools\check-local.ps1`，后续新增 `NEXUSIM_*_DEBUG_ADDR` 必须同步提供显式 public opt-in guard，并为 debug listener validator 补 private allow / public reject / explicit opt-in 三类测试。
 - 服务 public listener / trusted metadata 边界已纳入 `.\tools\check-local.ps1`，后续新增 metadata auth、gateway auth 或 public gRPC / WebSocket listener 必须同步提供 TLS / mTLS guard 和回归测试。
@@ -37,7 +37,7 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 
 1. 安全边界：复核 9 个服务的 public listener、mock / metadata auth、gateway verified metadata、TLS / mTLS fail-fast guard 和 `check-local` 门禁。
 2. 观测边界：继续把 first-stage `/metrics`、Prometheus rules、Grafana dashboard、OTel trace wiring 收敛为本地可演示闭环；不要写成生产 SLO。
-3. 故障 smoke：继续补 Kafka 多故障 / ISR 抖动；Redis Sentinel 网络分区、Kafka controller-switch 和 PostgreSQL quorum observation 已有 clean run 和报告，PostgreSQL 生产 quorum 边界见 ADR-034。
+3. 故障 smoke：Redis Sentinel 网络分区、Kafka controller-switch / ISR observation 和 PostgreSQL quorum observation 已有 clean run 和报告，PostgreSQL 生产 quorum 边界见 ADR-034；后续继续补更长时间 Kafka ISR flapping / consumer rebalance。
 4. Repair / DLQ：补 outbox、projection、challenge delivery 等 operator 的可复跑 repair / audit / cleanup 流程。
 5. 逐服务 P2：按 `development-progress.md` 和对应 service brief 清单逐个清理，不跨服务堆大改。
 6. 复杂度治理：生产手写文件接近 2500 行、测试或 runner 接近 3000 行时，优先同 package 拆分。

@@ -114,6 +114,7 @@ try {
     if ($rules.status -ne "success" -or -not $rules.data.groups -or $rules.data.groups.Count -lt 9) {
         throw "Prometheus did not load expected local rule groups."
     }
+    $activeAlertmanagerUrls = @()
     if ($IncludeAlertmanager) {
         $alertmanagers = Invoke-Endpoint -Url "http://127.0.0.1:19090/api/v1/alertmanagers"
         if ($alertmanagers.status -ne "success" -or -not $alertmanagers.data.activeAlertmanagers) {
@@ -156,7 +157,9 @@ try {
             -RunName $RunName `
             -RuleGroupCount ([int]$rules.data.groups.Count) `
             -ExpectedDashboardUids $expectedDashboardUids `
-            -FoundDashboardUids $foundDashboardUids
+            -FoundDashboardUids $foundDashboardUids `
+            -AlertmanagerChecked ([bool]$IncludeAlertmanager) `
+            -ActiveAlertmanagerUrls $activeAlertmanagerUrls
         if ($LASTEXITCODE -ne 0) {
             throw "write-observability-smoke-summary.ps1 failed with exit code $LASTEXITCODE"
         }

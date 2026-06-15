@@ -9,6 +9,8 @@ param(
     [string[]]$ExpectedDashboardUids,
     [Parameter(Mandatory = $true)]
     [string[]]$FoundDashboardUids,
+    [bool]$AlertmanagerChecked = $false,
+    [string[]]$ActiveAlertmanagerUrls = @(),
     [string]$Scope = "local Prometheus/Grafana provisioning smoke; not a production SLO or Alertmanager validation"
 )
 
@@ -35,6 +37,7 @@ if ($RunName.Trim().Length -eq 0) {
 $outputPath = [System.IO.Path]::GetFullPath($OutputDir)
 $expected = Convert-ToUniqueSortedStrings -Values $ExpectedDashboardUids
 $found = Convert-ToUniqueSortedStrings -Values $FoundDashboardUids
+$activeAlertmanagers = Convert-ToUniqueSortedStrings -Values $ActiveAlertmanagerUrls
 
 if ($expected.Count -eq 0) {
     throw "ExpectedDashboardUids must not be empty."
@@ -52,6 +55,9 @@ $missing = @($expected | Where-Object { -not $foundSet.Contains($_) })
 if ($missing.Count -gt 0) {
     throw "Missing Grafana dashboard uid(s): $($missing -join ', ')"
 }
+if ($AlertmanagerChecked -and $activeAlertmanagers.Count -eq 0) {
+    throw "AlertmanagerChecked requires at least one active Alertmanager URL."
+}
 
 New-Item -ItemType Directory -Force -Path $outputPath | Out-Null
 
@@ -63,6 +69,9 @@ $summary = [pscustomobject]@{
     prometheus_ready = $true
     prometheus_rule_group_count = $RuleGroupCount
     grafana_ready = $true
+    alertmanager_checked = [bool]$AlertmanagerChecked
+    alertmanager_ready = [bool]($AlertmanagerChecked -and $activeAlertmanagers.Count -gt 0)
+    active_alertmanager_urls = $activeAlertmanagers
     expected_dashboard_uids = $expected
     found_dashboard_uids = $found
     missing_dashboard_uids = $missing
@@ -85,6 +94,12 @@ $markdown += "- Created at: $($summary.created_at)"
 $markdown += "- Scope: $Scope"
 $markdown += "- Prometheus: ready, $RuleGroupCount rule groups loaded"
 $markdown += "- Grafana: ready, $($found.Count)/$($expected.Count) dashboards found"
+if ($AlertmanagerChecked) {
+    $markdown += "- Alertmanager: ready, active targets: $($activeAlertmanagers -join ', ')"
+}
+else {
+    $markdown += "- Alertmanager: not checked in this run"
+}
 $markdown += ""
 $markdown += "## Dashboard UIDs"
 $markdown += ""

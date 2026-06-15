@@ -11,7 +11,9 @@ function Invoke-Writer {
         [string]$OutputDir,
         [int]$RuleGroupCount,
         [string[]]$ExpectedDashboardUids,
-        [string[]]$FoundDashboardUids
+        [string[]]$FoundDashboardUids,
+        [bool]$AlertmanagerChecked = $false,
+        [string[]]$ActiveAlertmanagerUrls = @()
     )
 
     try {
@@ -20,7 +22,9 @@ function Invoke-Writer {
             -RunName "observability-summary-selftest" `
             -RuleGroupCount $RuleGroupCount `
             -ExpectedDashboardUids $ExpectedDashboardUids `
-            -FoundDashboardUids $FoundDashboardUids 2>&1
+            -FoundDashboardUids $FoundDashboardUids `
+            -AlertmanagerChecked $AlertmanagerChecked `
+            -ActiveAlertmanagerUrls $ActiveAlertmanagerUrls 2>&1
         return [pscustomobject]@{
             ExitCode = 0
             Output = (($output | Out-String).Trim())
@@ -61,14 +65,58 @@ try {
         Write-Host "FAIL observability summary produced wrong counts." -ForegroundColor Red
         exit 1
     }
+    if ($summary.alertmanager_checked -or $summary.alertmanager_ready) {
+        Write-Host "FAIL observability summary should mark Alertmanager unchecked by default." -ForegroundColor Red
+        exit 1
+    }
     if ($summary.scope -notmatch "not a production SLO") {
         Write-Host "FAIL observability summary scope must state non-production SLO boundary." -ForegroundColor Red
         exit 1
     }
 
     $report = Get-Content -LiteralPath $reportPath -Raw
-    if (-not $report.Contains("2/2 dashboards found") -or -not $report.Contains("not a production SLO")) {
+    if (-not $report.Contains("2/2 dashboards found") -or -not $report.Contains("Alertmanager: not checked") -or -not $report.Contains("not a production SLO")) {
         Write-Host "FAIL observability summary markdown missing expected boundary text." -ForegroundColor Red
+        exit 1
+    }
+
+    $alertDir = Join-Path $tempRoot "alertmanager"
+    $alertResult = Invoke-Writer `
+        -OutputDir $alertDir `
+        -RuleGroupCount 2 `
+        -ExpectedDashboardUids @("nexusim-api-gateway", "nexusim-message-service") `
+        -FoundDashboardUids @("nexusim-api-gateway", "nexusim-message-service") `
+        -AlertmanagerChecked $true `
+        -ActiveAlertmanagerUrls @("http://host.docker.internal:19093")
+    if ($alertResult.ExitCode -ne 0) {
+        Write-Host "FAIL alertmanager fixture should pass." -ForegroundColor Red
+        if ($alertResult.Output) {
+            Write-Host $alertResult.Output -ForegroundColor Red
+        }
+        exit 1
+    }
+    $alertSummary = Get-Content -LiteralPath (Join-Path $alertDir "observability-smoke-summary.json") -Raw | ConvertFrom-Json
+    if (-not $alertSummary.alertmanager_checked -or -not $alertSummary.alertmanager_ready -or $alertSummary.active_alertmanager_urls.Count -ne 1) {
+        Write-Host "FAIL alertmanager fixture produced wrong alertmanager status." -ForegroundColor Red
+        exit 1
+    }
+
+    $badAlertDir = Join-Path $tempRoot "bad-alertmanager"
+    $badAlertResult = Invoke-Writer `
+        -OutputDir $badAlertDir `
+        -RuleGroupCount 2 `
+        -ExpectedDashboardUids @("nexusim-api-gateway", "nexusim-message-service") `
+        -FoundDashboardUids @("nexusim-api-gateway", "nexusim-message-service") `
+        -AlertmanagerChecked $true
+    if ($badAlertResult.ExitCode -eq 0) {
+        Write-Host "FAIL alertmanager checked without active target should fail." -ForegroundColor Red
+        exit 1
+    }
+    if (-not $badAlertResult.Output.Contains("AlertmanagerChecked requires")) {
+        Write-Host "FAIL alertmanager checked fixture did not report missing active target." -ForegroundColor Red
+        if ($badAlertResult.Output) {
+            Write-Host $badAlertResult.Output -ForegroundColor Red
+        }
         exit 1
     }
 

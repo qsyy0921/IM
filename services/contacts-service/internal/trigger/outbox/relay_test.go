@@ -147,6 +147,28 @@ func TestBuildContactEventEdgeBlockedUnblockedAndRemarkUpdated(t *testing.T) {
 	}
 }
 
+func TestBuildContactEventPrivacyUpdated(t *testing.T) {
+	message := outboxMessage(types.ContactEventPrivacyUpdated, map[string]any{
+		"tenant_id":              "tenant-contacts",
+		"user_id":                "bob",
+		"allow_contact_requests": false,
+		"privacy_version":        2,
+		"occurred_at":            "2026-06-10T08:00:00Z",
+	})
+	event, err := BuildContactEvent(message)
+	if err != nil {
+		t.Fatalf("build privacy event: %v", err)
+	}
+	privacy := event.GetPrivacyUpdated()
+	if privacy == nil ||
+		privacy.TenantId != "tenant-contacts" ||
+		privacy.UserId != "bob" ||
+		privacy.AllowContactRequests ||
+		privacy.PrivacyVersion != 2 {
+		t.Fatalf("unexpected privacy event: %+v payload=%+v", event, privacy)
+	}
+}
+
 func TestBuildContactEventRejectsMalformedEdgeEvent(t *testing.T) {
 	_, err := BuildContactEvent(outboxMessage(types.ContactEventEdgeDeleted, map[string]any{
 		"tenant_id":       "tenant-contacts",
@@ -175,6 +197,14 @@ func TestBuildContactEventRejectsUnsupportedAndMalformed(t *testing.T) {
 	}))
 	if err == nil {
 		t.Fatal("expected malformed payload error")
+	}
+	_, err = BuildKafkaValue(outboxMessage(types.ContactEventPrivacyUpdated, map[string]any{
+		"tenant_id":   "tenant-contacts",
+		"user_id":     "bob",
+		"occurred_at": "bad-time",
+	}))
+	if err == nil {
+		t.Fatal("expected malformed privacy payload error")
 	}
 }
 

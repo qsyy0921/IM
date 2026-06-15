@@ -1,7 +1,15 @@
 BEGIN;
 
-ALTER TABLE contact_edges
-    ADD COLUMN IF NOT EXISTS group_name TEXT NOT NULL DEFAULT '';
+CREATE TABLE IF NOT EXISTS contact_privacy_settings (
+    tenant_id              TEXT        NOT NULL,
+    user_id                TEXT        NOT NULL,
+    allow_contact_requests BOOLEAN     NOT NULL DEFAULT true,
+    version                BIGINT      NOT NULL,
+    created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (tenant_id, user_id),
+    CHECK (version > 0)
+);
 
 ALTER TABLE contact_command_idempotency
     DROP CONSTRAINT IF EXISTS contact_command_idempotency_command_type_check;
@@ -19,9 +27,5 @@ ALTER TABLE contact_command_idempotency
         'UPDATE_CONTACT_GROUP',
         'SET_CONTACT_PRIVACY'
     ));
-
-CREATE INDEX IF NOT EXISTS idx_contact_edges_owner_group_active
-    ON contact_edges (tenant_id, owner_user_id, group_name, contact_user_id)
-    WHERE status = 'ACTIVE';
 
 COMMIT;

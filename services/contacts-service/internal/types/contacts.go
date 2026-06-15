@@ -67,6 +67,58 @@ type SendContactRequestResult struct {
 	IdempotentReplay bool
 }
 
+type ContactPrivacySettings struct {
+	AllowContactRequests bool
+	Version              int64
+	UpdatedAtUnixMS      int64
+}
+
+type GetContactPrivacyCommand struct {
+	AuthContext AuthContext
+}
+
+func (c GetContactPrivacyCommand) Validate() error {
+	if c.AuthContext.TenantID == "" {
+		return NewInvalidArgument("tenant_id is required")
+	}
+	if c.AuthContext.UserID == "" {
+		return NewInvalidArgument("user_id is required")
+	}
+	return nil
+}
+
+type GetContactPrivacyResult struct {
+	TenantID TenantID
+	UserID   UserID
+	Settings ContactPrivacySettings
+}
+
+type SetContactPrivacyCommand struct {
+	AuthContext          AuthContext
+	AllowContactRequests bool
+	IdempotencyKey       string
+}
+
+func (c SetContactPrivacyCommand) Validate() error {
+	if c.AuthContext.TenantID == "" {
+		return NewInvalidArgument("tenant_id is required")
+	}
+	if c.AuthContext.UserID == "" {
+		return NewInvalidArgument("user_id is required")
+	}
+	if strings.TrimSpace(c.IdempotencyKey) == "" {
+		return NewInvalidArgument("idempotency_key is required")
+	}
+	return nil
+}
+
+type SetContactPrivacyResult struct {
+	TenantID         TenantID
+	UserID           UserID
+	Settings         ContactPrivacySettings
+	IdempotentReplay bool
+}
+
 type RespondContactRequestCommand struct {
 	AuthContext    AuthContext
 	RequestID      string

@@ -339,26 +339,44 @@ func BuildContactEvent(message types.OutboxMessage) (*contacteventsv1.ContactEve
 			},
 		}
 		return event, nil
+	case types.ContactEventPrivacyUpdated:
+		payload, err := decodeContactPrivacyPayload(message.PayloadJSON)
+		if err != nil {
+			return nil, err
+		}
+		event.Payload = &contacteventsv1.ContactEvent_PrivacyUpdated{
+			PrivacyUpdated: &contacteventsv1.ContactPrivacyUpdatedV1{
+				TenantId:             payload.TenantID,
+				UserId:               payload.UserID,
+				AllowContactRequests: payload.AllowContactRequests,
+				PrivacyVersion:       payload.PrivacyVersion,
+				OccurredAt:           payload.Timestamp(),
+			},
+		}
+		return event, nil
 	default:
 		return nil, errors.New("unsupported contacts outbox event type")
 	}
 }
 
 type contactPayload struct {
-	TenantID       string `json:"tenant_id"`
-	RequestID      string `json:"request_id"`
-	SenderUserID   string `json:"sender_user_id"`
-	ReceiverUserID string `json:"receiver_user_id"`
-	Status         string `json:"status"`
-	Message        string `json:"message"`
-	EdgeVersion    int64  `json:"edge_version"`
-	OccurredAt     string `json:"occurred_at"`
-	OwnerUserID    string `json:"owner_user_id"`
-	ContactUserID  string `json:"contact_user_id"`
-	PreviousStatus string `json:"previous_status"`
-	Reason         string `json:"reason"`
-	Remark         string `json:"remark"`
-	GroupName      string `json:"group_name"`
+	TenantID             string `json:"tenant_id"`
+	RequestID            string `json:"request_id"`
+	SenderUserID         string `json:"sender_user_id"`
+	ReceiverUserID       string `json:"receiver_user_id"`
+	Status               string `json:"status"`
+	Message              string `json:"message"`
+	EdgeVersion          int64  `json:"edge_version"`
+	OccurredAt           string `json:"occurred_at"`
+	OwnerUserID          string `json:"owner_user_id"`
+	ContactUserID        string `json:"contact_user_id"`
+	PreviousStatus       string `json:"previous_status"`
+	Reason               string `json:"reason"`
+	Remark               string `json:"remark"`
+	GroupName            string `json:"group_name"`
+	UserID               string `json:"user_id"`
+	PrivacyVersion       int64  `json:"privacy_version"`
+	AllowContactRequests bool   `json:"allow_contact_requests"`
 }
 
 func (payload contactPayload) Timestamp() *timestamppb.Timestamp {
@@ -414,6 +432,23 @@ func decodeContactEdgePayload(payloadJSON []byte, requirePreviousStatus bool) (c
 	}
 	if _, err := time.Parse(time.RFC3339Nano, payload.OccurredAt); err != nil {
 		return contactPayload{}, errors.New("contact edge payload occurred_at is invalid")
+	}
+	return payload, nil
+}
+
+func decodeContactPrivacyPayload(payloadJSON []byte) (contactPayload, error) {
+	var payload contactPayload
+	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+		return contactPayload{}, err
+	}
+	if payload.TenantID == "" ||
+		payload.UserID == "" ||
+		payload.PrivacyVersion <= 0 ||
+		payload.OccurredAt == "" {
+		return contactPayload{}, errors.New("contact privacy payload is incomplete")
+	}
+	if _, err := time.Parse(time.RFC3339Nano, payload.OccurredAt); err != nil {
+		return contactPayload{}, errors.New("contact privacy payload occurred_at is invalid")
 	}
 	return payload, nil
 }

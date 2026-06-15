@@ -13,7 +13,8 @@ ALTER TABLE contact_command_idempotency
         'BLOCK_CONTACT',
         'UNBLOCK_CONTACT',
         'UPDATE_CONTACT_REMARK',
-        'UPDATE_CONTACT_GROUP'
+        'UPDATE_CONTACT_GROUP',
+        'SET_CONTACT_PRIVACY'
     ));
 
 COMMIT;

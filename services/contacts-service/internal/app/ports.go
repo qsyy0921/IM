@@ -10,6 +10,14 @@ type SendContactRequestRepository interface {
 	SendContactRequest(context.Context, types.SendContactRequestCommand) (types.SendContactRequestResult, error)
 }
 
+type GetContactPrivacyRepository interface {
+	GetContactPrivacy(context.Context, types.GetContactPrivacyCommand) (types.GetContactPrivacyResult, error)
+}
+
+type SetContactPrivacyRepository interface {
+	SetContactPrivacy(context.Context, types.SetContactPrivacyCommand) (types.SetContactPrivacyResult, error)
+}
+
 type RespondContactRequestRepository interface {
 	RespondContactRequest(context.Context, types.RespondContactRequestCommand) (types.RespondContactRequestResult, error)
 }

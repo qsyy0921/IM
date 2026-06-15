@@ -15,6 +15,14 @@ type SendContactRequestExecutor interface {
 	Execute(context.Context, types.SendContactRequestCommand) (types.SendContactRequestResult, error)
 }
 
+type GetContactPrivacyExecutor interface {
+	Execute(context.Context, types.GetContactPrivacyCommand) (types.GetContactPrivacyResult, error)
+}
+
+type SetContactPrivacyExecutor interface {
+	Execute(context.Context, types.SetContactPrivacyCommand) (types.SetContactPrivacyResult, error)
+}
+
 type RespondContactRequestExecutor interface {
 	Execute(context.Context, types.RespondContactRequestCommand) (types.RespondContactRequestResult, error)
 }
@@ -58,6 +66,8 @@ type UpdateContactGroupExecutor interface {
 type Server struct {
 	contactsv1.UnimplementedContactsServiceServer
 	sendContactRequest    SendContactRequestExecutor
+	getContactPrivacy     GetContactPrivacyExecutor
+	setContactPrivacy     SetContactPrivacyExecutor
 	respondContactRequest RespondContactRequestExecutor
 	cancelContactRequest  CancelContactRequestExecutor
 	listContactRequests   ListContactRequestsExecutor
@@ -72,6 +82,8 @@ type Server struct {
 
 func NewServer(
 	sendContactRequest SendContactRequestExecutor,
+	getContactPrivacy GetContactPrivacyExecutor,
+	setContactPrivacy SetContactPrivacyExecutor,
 	respondContactRequest RespondContactRequestExecutor,
 	cancelContactRequest CancelContactRequestExecutor,
 	listContactRequests ListContactRequestsExecutor,
@@ -85,6 +97,8 @@ func NewServer(
 ) *Server {
 	return &Server{
 		sendContactRequest:    sendContactRequest,
+		getContactPrivacy:     getContactPrivacy,
+		setContactPrivacy:     setContactPrivacy,
 		respondContactRequest: respondContactRequest,
 		cancelContactRequest:  cancelContactRequest,
 		listContactRequests:   listContactRequests,
@@ -127,6 +141,55 @@ func (s *Server) SendContactRequest(
 		SenderUserId:     string(result.SenderUserID),
 		ReceiverUserId:   string(result.ReceiverUserID),
 		Status:           requestStatusToProto(result.Status),
+		IdempotentReplay: result.IdempotentReplay,
+	}, nil
+}
+
+func (s *Server) GetContactPrivacy(
+	ctx context.Context,
+	request *contactsv1.GetContactPrivacyRequest,
+) (*contactsv1.GetContactPrivacyResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.getContactPrivacy == nil {
+		return nil, status.Error(codes.Unimplemented, "get contact privacy is not configured")
+	}
+	result, err := s.getContactPrivacy.Execute(ctx, types.GetContactPrivacyCommand{
+		AuthContext: authFromProto(ctx, request.GetAuthContext()),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &contactsv1.GetContactPrivacyResponse{
+		TenantId: string(result.TenantID),
+		UserId:   string(result.UserID),
+		Settings: privacySettingsToProto(result.Settings),
+	}, nil
+}
+
+func (s *Server) SetContactPrivacy(
+	ctx context.Context,
+	request *contactsv1.SetContactPrivacyRequest,
+) (*contactsv1.SetContactPrivacyResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.setContactPrivacy == nil {
+		return nil, status.Error(codes.Unimplemented, "set contact privacy is not configured")
+	}
+	result, err := s.setContactPrivacy.Execute(ctx, types.SetContactPrivacyCommand{
+		AuthContext:          authFromProto(ctx, request.GetAuthContext()),
+		AllowContactRequests: request.GetAllowContactRequests(),
+		IdempotencyKey:       request.GetIdempotencyKey(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &contactsv1.SetContactPrivacyResponse{
+		TenantId:         string(result.TenantID),
+		UserId:           string(result.UserID),
+		Settings:         privacySettingsToProto(result.Settings),
 		IdempotentReplay: result.IdempotentReplay,
 	}, nil
 }
@@ -449,6 +512,14 @@ func (s *Server) UpdateContactGroup(
 		GroupName:        result.GroupName,
 		IdempotentReplay: result.IdempotentReplay,
 	}, nil
+}
+
+func privacySettingsToProto(settings types.ContactPrivacySettings) *contactsv1.ContactPrivacySettings {
+	return &contactsv1.ContactPrivacySettings{
+		AllowContactRequests: settings.AllowContactRequests,
+		Version:              settings.Version,
+		UpdatedAtUnixMs:      settings.UpdatedAtUnixMS,
+	}
 }
 
 func authFromProto(ctx context.Context, auth *contactsv1.AuthContext) types.AuthContext {

@@ -37,6 +37,7 @@ message ContactEvent {
     ContactEdgeUnblockedV1 edge_unblocked = 26;
     ContactRequestCanceledV1 request_canceled = 27;
     ContactEdgeGroupUpdatedV1 edge_group_updated = 28;
+    ContactPrivacyUpdatedV1 privacy_updated = 29;
   }
 }
 
@@ -127,4 +128,12 @@ message ContactEdgeUnblockedV1 {
   string status = 5;
   int64 edge_version = 6;
   google.protobuf.Timestamp occurred_at = 7;
+}
+
+message ContactPrivacyUpdatedV1 {
+  string tenant_id = 1;
+  string user_id = 2;
+  bool allow_contact_requests = 3;
+  int64 privacy_version = 4;
+  google.protobuf.Timestamp occurred_at = 5;
 }

@@ -13,6 +13,7 @@
 - 发起好友申请；
 - 接受 / 拒绝 / 取消好友申请；
 - 删除联系人、拉黑联系人、解除拉黑、更新本人的联系人备注和分组；
+- 读取 / 更新当前用户的联系人申请隐私设置；
 - 查询当前用户收到 / 发出的好友申请列表；
 - 查询当前联系人列表，并可在当前用户 ACTIVE 联系人的 `contact_user_id / remark` 内做本地搜索，也可按联系人分组过滤；
 - 查询两名用户之间的联系人状态；
@@ -40,6 +41,7 @@
 - 拉黑联系人是当前用户的单向关系操作：只把 `owner_user_id -> contact_user_id` 标为 `BLOCKED`，并发布 `contact.edge.blocked.v1`。是否影响发消息权限不由 contacts-service 直接决定，后续由 policy-service / conversation-service 投影消费该事件后统一表达。
 - 解除拉黑是当前用户的单向关系操作：只允许 `BLOCKED -> ACTIVE`，并发布 `contact.edge.unblocked.v1`；不能把 `DELETED`、不存在或从未接受的关系恢复成好友。
 - 备注名和分组是当前用户私有资料：只更新 `owner_user_id -> contact_user_id` 的 `remark / group_name`，不进入对方视图，不复制用户 profile。
+- 联系人申请隐私设置只控制“陌生用户能否新建好友申请”；不删除已有联系人，不影响已存在 pending request，不直接改变 message / conversation / delivery 权限。
 
 ## 2. 上下游
 
@@ -80,6 +82,7 @@ services/contacts-service/
 | --- | --- | --- |
 | ContactRequest | A 向 B 发起的好友申请 | sender != receiver；同一对用户同一时间最多一个 PENDING 请求；requester 只能取消自己的请求；receiver 才能接受或拒绝 |
 | ContactEdge | 方向性联系人边 | ACCEPT 后写两条 ACTIVE 边；删除 / 拉黑 / 备注名 / 分组只更新当前 owner 的方向性 edge；不能物理删除历史请求；`owner_user_id + contact_user_id` 唯一 |
+| ContactPrivacySettings | 当前用户的联系人申请隐私设置 | 缺省视为 `allow_contact_requests=true`；只有当前 auth user 可读写自己的设置；更新必须幂等并发布 `contact.privacy.updated.v1` |
 | ContactEvent | 联系人边界事件 | 只通过 `contacts_outbox` 发布；event_id 幂等 |
 
 状态：
@@ -150,6 +153,24 @@ idempotency_key
 ```
 
 `CancelContactRequest` 只能由原 sender 对 `PENDING` 申请执行，成功后状态变为 `CANCELED`，不创建联系人边。
+
+`GetContactPrivacyRequest`：
+
+```text
+auth_context
+```
+
+缺省没有 `contact_privacy_settings` 行时返回 `allow_contact_requests=true, version=0`。这表示第一版默认允许收到好友申请。
+
+`SetContactPrivacyRequest`：
+
+```text
+auth_context
+allow_contact_requests
+idempotency_key
+```
+
+`SetContactPrivacy` 只允许当前 auth user 修改自己的设置。更新使用 `SET_CONTACT_PRIVACY` 幂等键；同一命令 replay 返回原设置快照，不重复发布事件；相同 idempotency key 但参数不同返回 conflict。
 
 `ListContactsRequest`：
 
@@ -323,9 +344,15 @@ contact.edge.group_updated.v1:
   edge_version
   group_name
   occurred_at
+
+contact.privacy.updated.v1:
+  user_id
+  allow_contact_requests
+  privacy_version
+  occurred_at
 ```
 
-这些事件不表示 conversation membership 已变化，也不表示 message-service 发送权限立即变化。policy-service / conversation-service 后续可以消费 `contact.edge.blocked.v1` 建立自己的权限投影，但 contacts-service 不直接写其它服务内部表。
+这些事件不表示 conversation membership 已变化，也不表示 message-service 发送权限立即变化。policy-service / conversation-service 后续可以消费 `contact.edge.blocked.v1` 建立自己的权限投影，但 contacts-service 不直接写其它服务内部表。`contact.privacy.updated.v1` 只表示该用户是否接受新的联系人申请，不表示已有联系人或已有 pending request 被撤销。
 
 ## 7. 数据库设计
 
@@ -335,9 +362,10 @@ Migration：
 migrations/postgres/contacts/000001_contacts_core.sql
 migrations/postgres/contacts/000002_contact_edge_management.sql
 migrations/postgres/contacts/000006_contact_groups.sql
+migrations/postgres/contacts/000007_contact_privacy_settings.sql
 ```
 
-以下 DDL 表示 v0.2 后目标结构。`000001_contacts_core.sql` 已作为第一阶段基线存在；第二阶段只能通过 expand-only migration 增加 `remark / group_name` 和扩展 command type check，不回写旧 migration。
+以下 DDL 表示 v0.2 后目标结构。`000001_contacts_core.sql` 已作为第一阶段基线存在；第二阶段只能通过 expand-only migration 增加 `remark / group_name`、`contact_privacy_settings` 和扩展 command type check，不回写旧 migration。
 
 核心表：
 
@@ -435,13 +463,15 @@ CREATE TABLE contacts_outbox (
 ```text
 migrations/postgres/contacts/000002_contact_edge_management.sql
 migrations/postgres/contacts/000006_contact_groups.sql
+migrations/postgres/contacts/000007_contact_privacy_settings.sql
 ```
 
 计划变更：
 
 - `contact_edges.remark TEXT NOT NULL DEFAULT ''`；
 - `contact_edges.group_name TEXT NOT NULL DEFAULT ''`；
-- 扩展 `contact_command_idempotency.command_type` check，加入 `CANCEL_CONTACT_REQUEST / DELETE_CONTACT / BLOCK_CONTACT / UNBLOCK_CONTACT / UPDATE_CONTACT_REMARK / UPDATE_CONTACT_GROUP`；
+- 新增 `contact_privacy_settings(tenant_id, user_id, allow_contact_requests, version, created_at, updated_at)`；
+- 扩展 `contact_command_idempotency.command_type` check，加入 `CANCEL_CONTACT_REQUEST / DELETE_CONTACT / BLOCK_CONTACT / UNBLOCK_CONTACT / UPDATE_CONTACT_REMARK / UPDATE_CONTACT_GROUP / SET_CONTACT_PRIVACY`；
 - 不新增跨服务外键，不引用 `conversation_members`、`message_log` 或 delivery / receipt 内部表。
 
 ## 8. 核心流程
@@ -456,6 +486,7 @@ SendContactRequest
 -> if same idempotency key but different command hash, conflict
 -> check existing ACTIVE contact edge
 -> check pending request pair
+-> check target user's contact_privacy_settings; missing row means allow
 -> insert contact_requests(PENDING)
 -> insert contacts_outbox(contact.request.created.v1)
 -> commit
@@ -588,6 +619,25 @@ UpdateContactGroup
 
 联系人分组只属于当前 owner 的联系人视图，不复制到对方，不写 profile/identity，不进入消息事实。空分组表示未分组；列表过滤使用精确 `group_name`，不做全站用户搜索或 profile 搜索。
 
+### 8.9 更新联系人申请隐私
+
+```text
+SetContactPrivacy
+-> validate auth / idempotency_key
+-> lock contact_command_idempotency(tenant, user, idempotency_key)
+-> if same idempotency key and same command hash, replay original snapshot
+-> if same idempotency key but different command hash, conflict
+-> lock contact_privacy_settings(tenant, user) by transaction advisory lock
+-> if row missing, insert version = 1
+-> if row exists and value changes, update allow_contact_requests and version = version + 1
+-> if row exists and value is unchanged, keep version and do not publish duplicate event
+-> insert / reuse contact_command_idempotency result_id = user_id
+-> insert contacts_outbox(contact.privacy.updated.v1) only when setting changed
+-> commit
+```
+
+`GetContactPrivacy` 缺省返回 `allow_contact_requests=true, version=0`。该设置只影响新建好友申请：关闭后 `SendContactRequest` 返回 `PERMISSION_DENIED`，不写 `contact_requests` 或 outbox；已存在联系人、已存在 pending request、消息发送权限和会话成员事实不被 contacts-service 直接修改。
+
 ## 9. 一致性和事务
 
 强一致边界：
@@ -616,6 +666,7 @@ contacts_outbox -> Kafka im.contact.events -> push / audit / recommendation
 | UnblockContact | `tenant_id + owner_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；只允许 `BLOCKED -> ACTIVE`，并 replay 原始 result snapshot | 不能恢复 DELETED；重新加好友仍走申请 / 接受链路 |
 | UpdateContactRemark | `tenant_id + owner_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；remark 相同可 replay | 再次 UpdateContactRemark 覆盖 |
 | UpdateContactGroup | `tenant_id + owner_user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；group_name 相同可 replay | 再次 UpdateContactGroup 覆盖 |
+| SetContactPrivacy | `tenant_id + user_id + idempotency_key`，落到 `contact_command_idempotency` | 同 command hash replay；不同 hash 返回 conflict；同值更新不重复发布事件 | 再次 SetContactPrivacy 覆盖 |
 | contacts outbox publish | `event_id` | at-least-once retry，max attempts 后 DLQ；relay 必须按 `partition_key + aggregate_version` fail-closed 阻塞低版本 PENDING/DLQ，避免 accepted 早于 created 发布 | 已有按 `event_id` 受控 repair 入口，可把 DLQ 重置为 PENDING 后重新进入 relay，并写 `contacts_outbox_repair_audit`；批量 repair 平台和审批 UI 后续实现 |
 
 Command hash 规则：
@@ -629,6 +680,7 @@ Command hash 规则：
 - `UnblockContact` 包含 command type、tenant、owner、contact。
 - `UpdateContactRemark` 包含 command type、tenant、owner、contact、remark 原文。
 - `UpdateContactGroup` 包含 command type、tenant、owner、contact、trim 后的 group_name。
+- `SetContactPrivacy` 包含 command type、tenant、user、allow_contact_requests。
 - 第一阶段不 trim message；消息长度和敏感词等内容治理后续接 policy/identity 端口。
 - 第二阶段不 trim remark / reason；`group_name` 会 trim 后写入；长度上限、敏感词、profile 展示规则后续接 policy/identity 端口。第一版实现必须至少拒绝过长输入，避免写入无限 payload。
 
@@ -643,6 +695,7 @@ Command hash 规则：
 - `ListContactRequests` 只能查询当前 auth user 收到或发出的好友申请列表；第一阶段不提供 admin 查询或全站搜索。
 - `ListContacts` 只能查询当前 auth user 的 ACTIVE 联系人列表；`query` 和 `group_name` 只过滤当前用户已有联系人，不提供 admin 查询、全站用户搜索或 profile 搜索。
 - 删除 / 拉黑 / 解除拉黑 / 备注名 / 分组只能操作当前 auth user 自己的 `owner_user_id -> contact_user_id` edge。
+- `GetContactPrivacy` / `SetContactPrivacy` 只能读写当前 auth user 自己的联系人申请隐私设置；缺省允许好友申请。该设置只 gate 新建 `SendContactRequest`，不直接撤销已有申请或联系人事实。
 - `BLOCKED` 不直接等同于消息发送权限拒绝；其它服务必须通过正式 policy / projection 使用该事实，不能同步读 contacts-service 内部表。
 - 不在事件 payload 里暴露私密用户资料，只放 user id 和关系状态。
 - 用户存在性、封禁状态、组织策略后续通过 identity/policy port 接入；第一阶段先保留端口边界或 strict mock。

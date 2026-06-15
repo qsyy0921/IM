@@ -822,6 +822,14 @@ func (client *fakeContactsClient) SendContactRequest(ctx context.Context, in *co
 	}, nil
 }
 
+func (client *fakeContactsClient) GetContactPrivacy(context.Context, *contactsv1.GetContactPrivacyRequest, ...grpc.CallOption) (*contactsv1.GetContactPrivacyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeContactsClient) SetContactPrivacy(context.Context, *contactsv1.SetContactPrivacyRequest, ...grpc.CallOption) (*contactsv1.SetContactPrivacyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
 func (client *fakeContactsClient) RespondContactRequest(context.Context, *contactsv1.RespondContactRequestRequest, ...grpc.CallOption) (*contactsv1.RespondContactRequestResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "not implemented")
 }

@@ -405,6 +405,26 @@ func (server *Server) SendContactRequest(ctx context.Context, request *contactsv
 	return server.contacts.SendContactRequest(outgoing, cloned)
 }
 
+func (server *Server) GetContactPrivacy(ctx context.Context, request *contactsv1.GetContactPrivacyRequest) (*contactsv1.GetContactPrivacyResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*contactsv1.GetContactPrivacyRequest)
+	cloned.AuthContext = contactsAuth(auth)
+	return server.contacts.GetContactPrivacy(outgoing, cloned)
+}
+
+func (server *Server) SetContactPrivacy(ctx context.Context, request *contactsv1.SetContactPrivacyRequest) (*contactsv1.SetContactPrivacyResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*contactsv1.SetContactPrivacyRequest)
+	cloned.AuthContext = contactsAuth(auth)
+	return server.contacts.SetContactPrivacy(outgoing, cloned)
+}
+
 func (server *Server) RespondContactRequest(ctx context.Context, request *contactsv1.RespondContactRequestRequest) (*contactsv1.RespondContactRequestResponse, error) {
 	auth, outgoing, err := server.authenticate(ctx)
 	if err != nil {
@@ -493,6 +513,16 @@ func (server *Server) UpdateContactRemark(ctx context.Context, request *contacts
 	cloned := proto.Clone(request).(*contactsv1.UpdateContactRemarkRequest)
 	cloned.AuthContext = contactsAuth(auth)
 	return server.contacts.UpdateContactRemark(outgoing, cloned)
+}
+
+func (server *Server) UpdateContactGroup(ctx context.Context, request *contactsv1.UpdateContactGroupRequest) (*contactsv1.UpdateContactGroupResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*contactsv1.UpdateContactGroupRequest)
+	cloned.AuthContext = contactsAuth(auth)
+	return server.contacts.UpdateContactGroup(outgoing, cloned)
 }
 
 func (server *Server) authenticate(ctx context.Context) (gatewayauth.AuthContext, context.Context, error) {

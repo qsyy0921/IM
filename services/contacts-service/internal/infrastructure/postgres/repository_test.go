@@ -642,6 +642,97 @@ func TestRepositoryConcurrentSendIdempotencyIntegration(t *testing.T) {
 	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCreated, 1)
 }
 
+func TestRepositoryContactPrivacyDefaultsAllowRequestsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	privacy, err := repository.GetContactPrivacy(ctx, getPrivacyCommand("bob"))
+	if err != nil {
+		t.Fatalf("get default contact privacy: %v", err)
+	}
+	if privacy.TenantID != "tenant-contacts" ||
+		privacy.UserID != "bob" ||
+		!privacy.Settings.AllowContactRequests ||
+		privacy.Settings.Version != 0 ||
+		privacy.Settings.UpdatedAtUnixMS != 0 {
+		t.Fatalf("unexpected default privacy: %+v", privacy)
+	}
+
+	sendResult, err := repository.SendContactRequest(ctx, sendCommand("alice", "bob", "send-privacy-default", "hello"))
+	if err != nil {
+		t.Fatalf("send contact request with default privacy: %v", err)
+	}
+	if sendResult.Status != types.ContactRequestStatusPending {
+		t.Fatalf("unexpected send result: %+v", sendResult)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCreated, 1)
+}
+
+func TestRepositorySetContactPrivacyBlocksIncomingRequestsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	closed, err := repository.SetContactPrivacy(ctx, setPrivacyCommand("bob", false, "privacy-close"))
+	if err != nil {
+		t.Fatalf("set privacy closed: %v", err)
+	}
+	if closed.IdempotentReplay ||
+		closed.UserID != "bob" ||
+		closed.Settings.AllowContactRequests ||
+		closed.Settings.Version != 1 ||
+		closed.Settings.UpdatedAtUnixMS == 0 {
+		t.Fatalf("unexpected closed privacy result: %+v", closed)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactPrivacyUpdated, 1)
+
+	replay, err := repository.SetContactPrivacy(ctx, setPrivacyCommand("bob", false, "privacy-close"))
+	if err != nil {
+		t.Fatalf("set privacy replay: %v", err)
+	}
+	if !replay.IdempotentReplay ||
+		replay.Settings.AllowContactRequests ||
+		replay.Settings.Version != closed.Settings.Version ||
+		replay.Settings.UpdatedAtUnixMS != closed.Settings.UpdatedAtUnixMS {
+		t.Fatalf("unexpected privacy replay: %+v", replay)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactPrivacyUpdated, 1)
+
+	_, err = repository.SetContactPrivacy(ctx, setPrivacyCommand("bob", true, "privacy-close"))
+	if !errors.Is(err, types.ErrContactRequestConflict) {
+		t.Fatalf("expected privacy idempotency conflict, got %v", err)
+	}
+
+	_, err = repository.SendContactRequest(ctx, sendCommand("alice", "bob", "send-privacy-denied", "hello"))
+	if !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected permission denied from closed privacy, got %v", err)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCreated, 0)
+	assertContactRequestCount(t, ctx, pool, 0)
+
+	open, err := repository.SetContactPrivacy(ctx, setPrivacyCommand("bob", true, "privacy-open"))
+	if err != nil {
+		t.Fatalf("set privacy open: %v", err)
+	}
+	if !open.Settings.AllowContactRequests || open.Settings.Version != 2 {
+		t.Fatalf("unexpected open privacy result: %+v", open)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactPrivacyUpdated, 2)
+
+	sendResult, err := repository.SendContactRequest(ctx, sendCommand("alice", "bob", "send-privacy-open", "hello again"))
+	if err != nil {
+		t.Fatalf("send contact request after open privacy: %v", err)
+	}
+	if sendResult.Status != types.ContactRequestStatusPending {
+		t.Fatalf("unexpected send after open privacy: %+v", sendResult)
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCreated, 1)
+	assertContactRequestCount(t, ctx, pool, 1)
+}
+
 func sendCommand(sender string, target string, key string, message string) types.SendContactRequestCommand {
 	return types.SendContactRequestCommand{
 		AuthContext: types.AuthContext{
@@ -654,6 +745,32 @@ func sendCommand(sender string, target string, key string, message string) types
 		TargetUserID:   types.UserID(target),
 		IdempotencyKey: key,
 		Message:        message,
+	}
+}
+
+func getPrivacyCommand(user string) types.GetContactPrivacyCommand {
+	return types.GetContactPrivacyCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  "tenant-contacts",
+			UserID:    types.UserID(user),
+			DeviceID:  "device-1",
+			RequestID: "request-get-privacy-" + user,
+			TraceID:   "trace-get-privacy-" + user,
+		},
+	}
+}
+
+func setPrivacyCommand(user string, allow bool, key string) types.SetContactPrivacyCommand {
+	return types.SetContactPrivacyCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  "tenant-contacts",
+			UserID:    types.UserID(user),
+			DeviceID:  "device-1",
+			RequestID: "request-" + key,
+			TraceID:   "trace-" + key,
+		},
+		AllowContactRequests: allow,
+		IdempotencyKey:       key,
 	}
 }
 
@@ -885,6 +1002,22 @@ WHERE tenant_id = 'tenant-contacts'
 	}
 }
 
+func assertContactRequestCount(t *testing.T, ctx context.Context, pool *pgxpool.Pool, want int) {
+	t.Helper()
+	var got int
+	err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM contact_requests
+WHERE tenant_id = 'tenant-contacts'
+`).Scan(&got)
+	if err != nil {
+		t.Fatalf("count contact requests: %v", err)
+	}
+	if got != want {
+		t.Fatalf("expected %d contact requests, got %d", want, got)
+	}
+}
+
 func assertContactEdge(t *testing.T, ctx context.Context, pool *pgxpool.Pool, owner string, contact string, status types.ContactEdgeStatus, version int64) {
 	t.Helper()
 	var gotStatus types.ContactEdgeStatus
@@ -1049,6 +1182,7 @@ TRUNCATE
     contacts_outbox_repair_audit,
     contacts_outbox,
     contact_command_idempotency,
+    contact_privacy_settings,
     contact_edges,
     contact_requests
 RESTART IDENTITY

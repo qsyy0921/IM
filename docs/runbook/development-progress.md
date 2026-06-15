@@ -104,6 +104,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - 各核心服务已补 `/healthz`、`/readyz`、`/debug/metrics`
 - 公网地址 + 弱鉴权 / 明文入口的启动门禁
 - trusted metadata / mTLS 边界的第一阶段收口
+- 六层 DDD 反向依赖门禁，生产代码禁止 `api/app/domain/trigger/types` 直接 import `internal/infrastructure`
 - outbox / projection / challenge delivery 等 repair / audit / cleanup operator
 - worker / relay 非取消错误退避重试
 

@@ -13,6 +13,9 @@ try {
     Write-Host "== service brief sync =="
     & (Join-Path $PSScriptRoot "check-service-brief-sync.ps1")
 
+    Write-Host "== ddd boundaries =="
+    & (Join-Path $PSScriptRoot "check-ddd-boundaries.ps1")
+
     Write-Host "== docs entrypoints =="
     & (Join-Path $PSScriptRoot "check-doc-entrypoints.ps1")
 

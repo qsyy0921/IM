@@ -59,6 +59,9 @@ try {
     Write-Host "== mac docker image sync coverage =="
     Invoke-LocalCheck "check-mac-service-docker-sync.ps1"
 
+    Write-Host "== local service compose =="
+    Invoke-LocalCheck "check-local-service-compose.ps1"
+
     Write-Host "== project naming =="
     Invoke-LocalCheck "check-project-naming.ps1"
 

@@ -180,7 +180,7 @@ func TestRepositoryChallengeDeliveryStatusIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create reset challenge: %v", err)
 	}
-	rawProviderError := "provider unavailable: smtp body user=user1@example.com token=secret-token"
+	rawProviderError := "provider returned non-success status 500 body=user1@example.com token=secret-token"
 	if err := repository.RecordChallengeDeliveryFailure(ctx, reset.TenantID, reset.UserID, reset.ChallengeID, rawProviderError, issuedAt.Add(2*time.Minute)); err != nil {
 		t.Fatalf("record delivery failure: %v", err)
 	}
@@ -189,8 +189,8 @@ func TestRepositoryChallengeDeliveryStatusIntegration(t *testing.T) {
 		failedState.DeliveryStatus != "FAILED" ||
 		failedState.DeliveryAttemptCount != 1 ||
 		failedState.DeliveryFailedAt == nil ||
-		failedState.DeliveryLastError != "challenge delivery unavailable" ||
-		failedState.DeliveryFailureClass != types.ChallengeDeliveryFailureClassDeliveryFailed {
+		failedState.DeliveryLastError != "challenge delivery provider returned non-success status" ||
+		failedState.DeliveryFailureClass != types.ChallengeDeliveryFailureClassProviderNonSuccess {
 		t.Fatalf("unexpected failed challenge state: %+v", failedState)
 	}
 	if strings.Contains(failedState.DeliveryLastError, "user1@example.com") ||
@@ -210,34 +210,40 @@ func TestRepositoryChallengeDeliveryStatusIntegration(t *testing.T) {
 
 func TestSanitizeChallengeDeliveryErrorUsesStablePublicMessages(t *testing.T) {
 	cases := []struct {
-		name string
-		raw  string
-		want string
+		name      string
+		raw       string
+		want      string
+		wantClass string
 	}{
 		{
-			name: "provider body",
-			raw:  "provider returned non-success status 500 body=user1@example.com token=secret-token",
-			want: "challenge delivery provider returned non-success status",
+			name:      "provider body",
+			raw:       "provider returned non-success status 500 body=user1@example.com token=secret-token",
+			want:      "challenge delivery provider returned non-success status",
+			wantClass: types.ChallengeDeliveryFailureClassProviderNonSuccess,
 		},
 		{
-			name: "network details",
-			raw:  "dial tcp 10.0.0.8:25: connection refused for user1@example.com",
-			want: "challenge delivery network failed",
+			name:      "network details",
+			raw:       "dial tcp 10.0.0.8:25: connection refused for user1@example.com",
+			want:      "challenge delivery network failed",
+			wantClass: types.ChallengeDeliveryFailureClassNetwork,
 		},
 		{
-			name: "serialization details",
-			raw:  "json marshal failed for template user=user1@example.com",
-			want: "challenge delivery json serialization failed",
+			name:      "serialization details",
+			raw:       "json marshal failed for template user=user1@example.com",
+			want:      "challenge delivery json serialization failed",
+			wantClass: types.ChallengeDeliveryFailureClassSerialization,
 		},
 		{
-			name: "crypto details",
-			raw:  "decrypt token ciphertext failed nonce=secret-nonce",
-			want: "challenge delivery token decrypt failed",
+			name:      "crypto details",
+			raw:       "decrypt token ciphertext failed nonce=secret-nonce",
+			want:      "challenge delivery token decrypt failed",
+			wantClass: types.ChallengeDeliveryFailureClassTokenCrypto,
 		},
 		{
-			name: "unknown raw provider text",
-			raw:  "smtp provider said raw body user=user1@example.com token=secret-token",
-			want: "challenge delivery unavailable",
+			name:      "unknown raw provider text",
+			raw:       "smtp provider said raw body user=user1@example.com token=secret-token",
+			want:      "challenge delivery unavailable",
+			wantClass: types.ChallengeDeliveryFailureClassDeliveryFailed,
 		},
 	}
 
@@ -246,6 +252,9 @@ func TestSanitizeChallengeDeliveryErrorUsesStablePublicMessages(t *testing.T) {
 			got := sanitizeChallengeDeliveryError(tc.raw)
 			if got != tc.want {
 				t.Fatalf("sanitizeChallengeDeliveryError(%q) = %q, want %q", tc.raw, got, tc.want)
+			}
+			if gotClass := types.ClassifyChallengeDeliveryFailureMessage(got, true); gotClass != tc.wantClass {
+				t.Fatalf("classify sanitized challenge delivery error %q = %q, want %q", got, gotClass, tc.wantClass)
 			}
 			for _, leaked := range []string{"user1@example.com", "secret-token", "secret-nonce", "10.0.0.8"} {
 				if strings.Contains(got, leaked) {

@@ -41,6 +41,9 @@ try {
     Write-Host "== service runtime endpoints =="
     Invoke-LocalCheck "check-service-runtime-endpoints.ps1"
 
+    Write-Host "== docker runtime coverage =="
+    Invoke-LocalCheck "check-docker-runtime-coverage.ps1"
+
     Write-Host "== project naming =="
     Invoke-LocalCheck "check-project-naming.ps1"
 

@@ -6,13 +6,15 @@ param(
     [string]$ImageTag = "local",
     [string]$BundleRoot = "H:\NexusIM",
     [string[]]$Services = @(
+        "api-gateway",
         "conversation-service",
         "message-service",
         "delivery-service",
         "push-gateway",
         "receipt-service",
         "contacts-service",
-        "identity-service"
+        "identity-service",
+        "policy-service"
     ),
     [switch]$SkipBuild,
     [switch]$SkipWindowsImages
@@ -28,6 +30,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
 $serviceCommands = @{
+    "api-gateway" = "./services/api-gateway/cmd/api-gateway"
     "conversation-service" = "./services/conversation-service/cmd/conversation-service"
     "message-service" = "./services/message-service/cmd/message-service"
     "delivery-service" = "./services/delivery-service/cmd/delivery-service"
@@ -35,6 +38,7 @@ $serviceCommands = @{
     "receipt-service" = "./services/receipt-service/cmd/receipt-service"
     "contacts-service" = "./services/contacts-service/cmd/contacts-service"
     "identity-service" = "./services/identity-service/cmd/identity-service"
+    "policy-service" = "./services/policy-service/cmd/policy-service"
 }
 
 foreach ($service in $Services) {

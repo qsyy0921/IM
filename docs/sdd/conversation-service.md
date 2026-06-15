@@ -151,8 +151,18 @@ NEXUSIM_CONVERSATION_DEBUG_ADDR=
 - `/healthz`
 - `/readyz`
 - `/debug/metrics`
+- `/metrics`
 
-`/debug/metrics` 只返回低敏聚合快照：gRPC 请求统计、PostgreSQL pool、`conversations` / `conversation_members` / `member_change_saga` 的总量和状态分布，不返回成员标识、会话标题、target user 明细或 raw error 文本。
+`/debug/metrics` 只返回低敏聚合快照：gRPC 请求统计、PostgreSQL pool、`conversations` / `conversation_members` / `member_change_saga` 的总量和状态分布，不返回成员标识、会话标题、target user 明细或 raw error 文本。`/metrics` 复用同一个 snapshot 输出第一阶段 Prometheus text，labels 限定为 `method/code/status/type/role/state/exporter` 等低基数字段，不输出 token、tenant/user/device/session id、request/trace id、conversation id、target user、payload 或 SQL/raw error。
+
+本地 Prometheus / Grafana 原型使用：
+
+```text
+NEXUSIM_CONVERSATION_DEBUG_ADDR=127.0.0.1:11911
+Prometheus scrape target: host.docker.internal:11911/metrics
+```
+
+alert rules 覆盖 gRPC errors、metrics query error、member-change failed compensated、worker retry、PG pool canceled acquire 和 OTLP endpoint missing。该能力只用于本地开发 / smoke / 面试演示，不等同于生产 Prometheus、Alertmanager、Grafana 权限治理、retention 或 SLO 阈值。
 
 The debug HTTP listener uses `NEXUSIM_CONVERSATION_DEBUG_ADDR` or shared `NEXUSIM_DEBUG_ADDR`. It is unauthenticated and intended for local or private observability. Startup fails by default when the listener is bound to a non-private or unspecified address; explicit public binding requires `NEXUSIM_CONVERSATION_DEBUG_ALLOW_PUBLIC=true`.
 
@@ -175,7 +185,7 @@ NEXUSIM_CONVERSATION_OTEL_TRACES_SAMPLING_RATIO=1
 - `conversation-service` 具备六层目录和 `cmd/conversation-service`。
 - `GetSendContext` gRPC handler 有单元测试。
 - PostgreSQL repository 有可选集成测试。
-- `conversation-service` 已有 `/healthz`、`/readyz`、`/debug/metrics`、gRPC metrics 和 first-stage gRPC server span。
+- `conversation-service` 已有 `/healthz`、`/readyz`、`/debug/metrics`、Prometheus text `/metrics`、本地 Prometheus alert rules / Grafana dashboard、gRPC metrics 和 first-stage gRPC server span。
 - `message-service` 可以通过 gRPC client 替换 strict conversation mock。
 - `go test ./...` 通过。
 

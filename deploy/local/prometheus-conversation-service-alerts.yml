@@ -1,0 +1,72 @@
+groups:
+  - name: nexusim-conversation-service
+    rules:
+      - alert: NexusIMConversationGrpcErrors
+        expr: increase(nexusim_conversation_grpc_method_errors_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: conversation-service
+        annotations:
+          summary: conversation-service gRPC errors observed
+          description: conversation-service returned non-OK gRPC status codes in the last 5 minutes.
+
+      - alert: NexusIMConversationMetricsQueryError
+        expr: nexusim_conversation_metrics_query_error > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: conversation-service
+        annotations:
+          summary: conversation-service metrics query failed
+          description: conversation-service could not query PostgreSQL aggregation metrics.
+
+      - alert: NexusIMConversationMemberChangeFailedCompensated
+        expr: nexusim_conversation_member_changes{state="failed_compensated"} > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: conversation-service
+        annotations:
+          summary: conversation-service member changes reached failed compensated state
+          description: member_change_saga contains FAILED_COMPENSATED rows.
+
+      - alert: NexusIMConversationMemberChangeWorkerErrors
+        expr: increase(nexusim_conversation_member_change_worker_errors_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: conversation-service
+        annotations:
+          summary: conversation-service member-change worker errors observed
+          description: member-change progress worker reported errors in the last 5 minutes.
+
+      - alert: NexusIMConversationMemberChangeWorkerConsecutiveErrors
+        expr: nexusim_conversation_member_change_worker_consecutive_errors > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: conversation-service
+        annotations:
+          summary: conversation-service member-change worker is retrying
+          description: member-change progress worker has consecutive errors and is relying on backoff retry.
+
+      - alert: NexusIMConversationPGPoolCanceledAcquire
+        expr: increase(nexusim_conversation_pg_pool_canceled_acquire_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: conversation-service
+        annotations:
+          summary: conversation-service PostgreSQL pool canceled acquire
+          description: conversation-service PostgreSQL pool acquire operations were canceled.
+
+      - alert: NexusIMConversationOtlpEndpointMissing
+        expr: nexusim_conversation_otel_traces_enabled{exporter="otlp-grpc"} == 1 and on(exporter) nexusim_conversation_otel_traces_otlp_endpoint_configured{exporter="otlp-grpc"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: conversation-service
+        annotations:
+          summary: conversation-service OTLP traces enabled without endpoint
+          description: conversation-service is configured for OTLP gRPC traces but no OTLP endpoint is configured.

@@ -118,7 +118,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 | `api-gateway` | 已落地、已接主链路 | gateway auth / downstream trusted metadata smoke、token / tenant scope rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、可选 checksum-required gate、applied quota snapshot stale 观测和 alert 原型、quota snapshot health gate、legacy descriptor 显式 opt-in 默认、legacy/facade traffic metrics、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、legacy registered/deadline 与 quota reload/identity error 观测、first-stage OTel 入口 server span 和下游 gRPC client span、first-stage trace sampling policy / wiring check | legacy opt-in 实际迁移观察和移除计划、完整配置中心 / DB-backed quota hardening、生产部署治理、统一 OTel collector / alerting / dashboard |
 | `identity-service` | 已落地、已接登录主链路 | login / refresh / MFA / recovery code / JWKS / challenge delivery、SMTP subject/body templates、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | WebAuthn/passkeys、OIDC、多 issuer、KMS/HSM、完整风控、生产级 email/SMS provider、生产级 OTel collector / alerting / SLO dashboard |
 | `message-service` | 已落地、已接主链路 | `SendMessage` / outbox / Kafka timeline、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 更多消息类型、会话级删除策略深化、合规删除、容量观测深化、生产级 OTel collector / alerting / SLO dashboard |
-| `conversation-service` | 已落地、已接主链路 | `GetSendContext` / member change / saga / worker、first-stage OTel gRPC server span | 更完整群管理、owner transfer 策略、成员窗口历史 repair、OTel collector / alerting |
+| `conversation-service` | 已落地、已接主链路 | `GetSendContext` / member change / saga / worker、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 更完整群管理、owner transfer 策略、成员窗口历史 repair、生产级 OTel collector / alerting / SLO dashboard |
 | `delivery-service` | 已落地、已接主链路 | projection / `PullInbox` / `AckDelivery` / `HideInboxItem` / delivery outbox、first-stage OTel gRPC server span | Projection DLQ / repair 深化、更多 delivery event 消费方、隐藏项跨设备删除提示、OTel collector / alerting |
 | `push-gateway` | 已落地、已接主链路 | notify / ACK / resume / Redis route / Win-Mac / Sentinel / TLS smoke、first-stage OTel WebSocket connection span | Redis 网络分区、跨实例 resume 强化、容量测试 |
 | `receipt-service` | 已落地、已接主链路 | receipt projection / outbox / audit / repair、first-stage OTel gRPC server span | 送达回执扩展、批量接口优化、会话列表产品化、OTel collector / alerting |
@@ -133,8 +133,8 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 1. `api-gateway` / 后端观测：first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、可选 checksum-required gate、applied quota snapshot stale 观测和 alert 原型、quota snapshot gate、legacy descriptor 显式 opt-in 默认、legacy/facade traffic metrics、Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、legacy registered/deadline 与 quota reload/identity error 观测、api-gateway OTel 入口 server span 和下游 gRPC client span、first-stage trace sampling policy / service wiring check 已补；当前 9 个服务均已纳入 first-stage trace runtime wiring，其中 8 个后端 gRPC 服务使用 server span，push-gateway 使用 WebSocket connection span；本地 OTel collector debug 入口和 policy OTLP smoke 脚本已补；下一步继续 legacy opt-in 实际迁移观察和移除计划、统一 collector / alerting / dashboard、采样治理 hardening，以及完整配置中心 / DB-backed quota hardening，不先扩新 facade。
 2. `identity-service`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；后续继续身份安全 hardening，优先 WebAuthn / OIDC / issuer / key 管理边界，不把本地观测原型表述为生产告警体系。
 3. `message-service`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；补消息类型和删除语义前，继续守住 outbox / policy / 容量观测。
-4. `conversation-service`：补群管理前，先收 owner transfer、成员窗口 repair 和本地 Prometheus / Grafana 观测面。
-5. `delivery-service`：补 projection DLQ / repair 深化，再扩 delivery event 消费方。
+4. `conversation-service`：first-stage `/metrics`、本地 Prometheus alert rules 和 Grafana dashboard 原型已补；补群管理前，继续收 owner transfer 策略细化和成员窗口历史 repair。
+5. `delivery-service`：补本地 Prometheus / Grafana 观测面，再做 projection DLQ / repair 深化和 delivery event 消费方扩展。
 6. `push-gateway`：补 Redis 网络分区和容量测试，不把在线通知当 durable delivery。
 7. `receipt-service`：补送达回执和批量接口，再产品化会话列表。
 8. `contacts-service`：补分组 / 搜索 / 隐私策略。
@@ -159,7 +159,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 
 所以接下来的优先级是：
 
-1. 继续按服务补本地 Prometheus / Grafana 观测面，下一批优先 `conversation-service`，同时保留 api-gateway legacy opt-in 实际迁移观察和配置中心 / DB-backed quota hardening。
+1. 继续按服务补本地 Prometheus / Grafana 观测面，下一批优先 `delivery-service`，同时保留 api-gateway legacy opt-in 实际迁移观察和配置中心 / DB-backed quota hardening。
 2. 继续把现有 9 个服务做干净。
 3. 继续补分布式故障恢复 smoke。
 4. 清各服务剩余 P2 hardening。

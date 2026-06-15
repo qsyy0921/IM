@@ -57,6 +57,7 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、可选 checksum-required gate、applied quota snapshot stale 观测和 quota snapshot gate；
 api-gateway 已补 legacy/facade traffic metrics，用于旧 descriptor 迁移观察；
 legacy descriptor 已收敛为显式 opt-in 默认；
+api-gateway、identity-service、message-service、conversation-service 已补 first-stage Prometheus text /metrics、本地 Prometheus alert rules 和本地 Grafana dashboard 原型；
 api-gateway 已补 first-stage OpenTelemetry 入口 server span 和下游 gRPC client span；当前 9 个服务均已纳入 first-stage trace runtime wiring，其中 8 个后端 gRPC 服务使用 server span，push-gateway 使用 WebSocket connection span，并由采样策略和本地 check-local 门禁约束；
 本地 OTel collector debug 入口和 policy OTLP smoke 脚本已补，可用于面试演示 OTLP trace 链路，但还不是生产告警平台；
 search-service 和 AI 应用后端后置；
@@ -72,7 +73,7 @@ search-service 和 AI 应用后端后置；
 | `api-gateway` | 统一 user-facing gRPC 入口，gateway token 验证，verified metadata 注入，下游代理，token / tenant scope rate limit，静态 tenant plan override，tenant plan 文件热更新，版本化 quota URL source，URL bearer token / HTTPS guard，URL source CA / client cert TLS 边界，可选 checksum-required gate，applied quota snapshot stale 观测，quota snapshot gate，legacy descriptor 显式 opt-in 默认，legacy/facade traffic metrics，first-stage OTel 入口 server span 和下游 gRPC client span，debug metrics | 统一入口、安全边界、correlation / trace 传播、facade-only 默认暴露面 |
 | `identity-service` | 注册、登录、Refresh Token、MFA TOTP、recovery codes、JWKS、session/device revoke、verification/password reset challenge、webhook / SMTP email challenge sender，first-stage OTel gRPC server span | 身份认证、MFA、token 轮换、JWKS、公私钥边界、通知投递可靠性，身份服务已进入 trace rollout |
 | `message-service` | `SendMessage`、编辑、撤回、删除，message log，outbox，Kafka timeline event，first-stage OTel gRPC server span | 业务事务不直接 publish Kafka，使用 outbox 保证事件传播，核心写服务已进入 trace rollout |
-| `conversation-service` | 会话成员事实源，`GetSendContext`，成员变更 saga，owner transfer，first-stage OTel gRPC server span | 会话成员事实边界、成员事件和消息事件共享 timeline seq，成员事实服务已进入 trace rollout |
+| `conversation-service` | 会话成员事实源，`GetSendContext`，成员变更 saga，owner transfer，first-stage Prometheus text `/metrics`、本地 alert rules / Grafana dashboard、first-stage OTel gRPC server span | 会话成员事实边界、成员事件和消息事件共享 timeline seq，成员事实服务已进入观测 rollout |
 | `delivery-service` | timeline projection，durable `user_inbox`，`PullInbox`，`AckDelivery`，delivery outbox，first-stage OTel gRPC server span | 断线可恢复，push-gateway 不拥有 durable inbox，投递服务已进入 trace rollout |
 | `push-gateway` | WebSocket 在线通知，ACK 转发，resume buffer，Redis route，跨实例在线路由，first-stage OTel WebSocket connection span | 在线唤醒层和可靠投递层解耦，Redis 故障时 PullInbox 兜底 |
 | `receipt-service` | 已读 / 未读，会话列表，archive / pin / mute，receipt projection，receipt outbox，first-stage OTel gRPC server span | 会话列表和回执从投递事件投影，不跨服务读内部表，回执服务已进入 trace rollout |
@@ -125,7 +126,7 @@ search-service 和 AI 应用后端后置；
 
 当前已经落地：
 
-- 各核心服务的 `/healthz`、`/readyz`、`/debug/metrics`，以及 api-gateway 第一阶段 Prometheus text `/metrics`、本地 scrape / alert rules 原型、本地 Grafana dashboard 原型和 first-stage trace sampling policy / check；
+- 各核心服务的 `/healthz`、`/readyz`、`/debug/metrics`，以及 api-gateway、identity-service、message-service、conversation-service 第一阶段 Prometheus text `/metrics`、本地 scrape / alert rules 原型、本地 Grafana dashboard 原型和 first-stage trace sampling policy / check；
 - gRPC / WebSocket 公网监听下的弱鉴权 / 明文入口启动门禁；
 - trusted metadata 和 mTLS 边界的第一阶段收口；
 - gateway token、JWKS、RS256 key overlap；
@@ -147,7 +148,7 @@ search-service 和 AI 应用后端后置；
 | `api-gateway` | 采样治理 hardening、legacy opt-in 实际迁移观察和移除计划、配置中心 / DB-backed quota hardening、生产部署治理；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules、本地 Grafana dashboard、9 服务 first-stage trace runtime wiring 和 trace sampling / wiring check，但还不是生产观测平台 |
 | `identity-service` | WebAuthn / passkeys、OIDC federation、多 issuer、KMS / HSM key management、完整登录风控、SMS provider、bounce handling、多租户通知模板 |
 | `message-service` | 更多消息类型、私有删除、合规删除、容量压测、生产级发送链路观测 |
-| `conversation-service` | 更完整群管理、owner transfer 策略细化、成员可见窗口历史 repair |
+| `conversation-service` | 更完整群管理、owner transfer 策略细化、成员可见窗口历史 repair；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules 和本地 Grafana dashboard，但还不是生产观测平台 |
 | `delivery-service` | Projection DLQ / repair 深化、更多 delivery event 消费方、投递容量压测 |
 | `push-gateway` | Redis 网络分区 smoke、跨实例 resume 强化、在线连接容量测试、慢连接组合故障验证 |
 | `receipt-service` | 送达回执扩展、批量接口优化、会话列表产品化 |

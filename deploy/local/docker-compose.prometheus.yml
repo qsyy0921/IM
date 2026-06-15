@@ -16,3 +16,4 @@ services:
       - ./prometheus-api-gateway-alerts.yml:/etc/prometheus/rules/api-gateway.yml:ro
       - ./prometheus-identity-service-alerts.yml:/etc/prometheus/rules/identity-service.yml:ro
       - ./prometheus-message-service-alerts.yml:/etc/prometheus/rules/message-service.yml:ro
+      - ./prometheus-conversation-service-alerts.yml:/etc/prometheus/rules/conversation-service.yml:ro

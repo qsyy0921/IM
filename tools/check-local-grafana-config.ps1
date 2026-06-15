@@ -7,8 +7,9 @@ $providerPath = Join-Path $repoRoot "deploy\local\grafana-dashboards.yml"
 $apiGatewayDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\api-gateway-observability.json"
 $identityDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\identity-service-observability.json"
 $messageDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\message-service-observability.json"
+$conversationDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\conversation-service-observability.json"
 
-foreach ($path in @($composePath, $datasourcePath, $providerPath, $apiGatewayDashboardPath, $identityDashboardPath, $messageDashboardPath)) {
+foreach ($path in @($composePath, $datasourcePath, $providerPath, $apiGatewayDashboardPath, $identityDashboardPath, $messageDashboardPath, $conversationDashboardPath)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Missing local Grafana config file: $path"
     }
@@ -105,8 +106,21 @@ $messageRequiredMetrics = @(
     "nexusim_message_otel_traces_enabled"
 )
 
+$conversationRequiredMetrics = @(
+    "nexusim_conversation_grpc_method_requests_total",
+    "nexusim_conversation_grpc_method_errors_total",
+    "nexusim_conversation_grpc_latency_avg_milliseconds",
+    "nexusim_conversation_conversations",
+    "nexusim_conversation_members",
+    "nexusim_conversation_member_changes",
+    "nexusim_conversation_member_change_worker_consecutive_errors",
+    "nexusim_conversation_pg_pool_conns",
+    "nexusim_conversation_otel_traces_enabled"
+)
+
 Test-Dashboard -Path $apiGatewayDashboardPath -Name "api-gateway" -ExpectedUid "nexusim-api-gateway" -MinimumPanels 5 -RequiredMetrics $apiGatewayRequiredMetrics
 Test-Dashboard -Path $identityDashboardPath -Name "identity-service" -ExpectedUid "nexusim-identity-service" -MinimumPanels 8 -RequiredMetrics $identityRequiredMetrics
 Test-Dashboard -Path $messageDashboardPath -Name "message-service" -ExpectedUid "nexusim-message-service" -MinimumPanels 8 -RequiredMetrics $messageRequiredMetrics
+Test-Dashboard -Path $conversationDashboardPath -Name "conversation-service" -ExpectedUid "nexusim-conversation-service" -MinimumPanels 8 -RequiredMetrics $conversationRequiredMetrics
 
 Write-Host "OK   local Grafana config"

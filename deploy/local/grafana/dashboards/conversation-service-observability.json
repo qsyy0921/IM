@@ -1,0 +1,358 @@
+{
+  "uid": "nexusim-conversation-service",
+  "title": "NexusIM Conversation Service",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "tags": ["nexusim", "conversation-service", "first-stage"],
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "gRPC errors",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(nexusim_conversation_grpc_method_errors_total[30m])",
+          "legendFormat": "{{method}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 1}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Members active",
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(nexusim_conversation_members{state=\"active\"})",
+          "legendFormat": "active"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Member-change failures",
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(nexusim_conversation_member_changes{state=\"failed_compensated\"})",
+          "legendFormat": "failed compensated"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 1}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Worker consecutive errors",
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(nexusim_conversation_member_change_worker_consecutive_errors)",
+          "legendFormat": "consecutive"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 1}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "gRPC requests",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(nexusim_conversation_grpc_method_requests_total[30m])",
+          "legendFormat": "{{method}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "gRPC latency",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_conversation_grpc_latency_avg_milliseconds",
+          "legendFormat": "avg {{method}}"
+        },
+        {
+          "refId": "B",
+          "expr": "nexusim_conversation_grpc_latency_max_milliseconds",
+          "legendFormat": "max {{method}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "ms"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Conversation rows",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 14},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_conversation_conversations",
+          "legendFormat": "{{state}}"
+        },
+        {
+          "refId": "B",
+          "expr": "nexusim_conversation_conversations_by_type",
+          "legendFormat": "{{type}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Member rows",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 14},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_conversation_members",
+          "legendFormat": "{{state}}"
+        },
+        {
+          "refId": "B",
+          "expr": "nexusim_conversation_members_by_role",
+          "legendFormat": "{{role}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Member-change saga",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 14},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_conversation_member_changes",
+          "legendFormat": "{{state}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "PostgreSQL pool connections",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 22},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_conversation_pg_pool_conns",
+          "legendFormat": "{{state}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Worker runtime",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 22},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_conversation_member_change_worker_last_advanced_count",
+          "legendFormat": "last advanced count"
+        },
+        {
+          "refId": "B",
+          "expr": "nexusim_conversation_member_change_worker_last_error_backoff_milliseconds",
+          "legendFormat": "error backoff"
+        },
+        {
+          "refId": "C",
+          "expr": "nexusim_conversation_member_change_worker_poll_interval_milliseconds",
+          "legendFormat": "poll interval"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short"},
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "error backoff"},
+            "properties": [{"id": "unit", "value": "ms"}]
+          },
+          {
+            "matcher": {"id": "byName", "options": "poll interval"},
+            "properties": [{"id": "unit", "value": "ms"}]
+          }
+        ]
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "OTel enabled",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 22},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(nexusim_conversation_otel_traces_enabled)",
+          "legendFormat": "enabled"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "bool"},
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    }
+  ]
+}

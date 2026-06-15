@@ -5,19 +5,10 @@ param(
     [string]$ImagePrefix = "nexusim",
     [string]$ImageTag = "local",
     [string]$BundleRoot = "H:\NexusIM",
-    [string[]]$Services = @(
-        "api-gateway",
-        "conversation-service",
-        "message-service",
-        "delivery-service",
-        "push-gateway",
-        "receipt-service",
-        "contacts-service",
-        "identity-service",
-        "policy-service"
-    ),
+    [string[]]$Services = @(),
     [switch]$SkipBuild,
-    [switch]$SkipWindowsImages
+    [switch]$SkipWindowsImages,
+    [switch]$ListServices
 )
 
 $ErrorActionPreference = "Stop"
@@ -29,22 +20,33 @@ if ($MacPath -notmatch "/IM/_local/distributed-smoke$") {
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
-$serviceCommands = @{
-    "api-gateway" = "./services/api-gateway/cmd/api-gateway"
-    "conversation-service" = "./services/conversation-service/cmd/conversation-service"
-    "message-service" = "./services/message-service/cmd/message-service"
-    "delivery-service" = "./services/delivery-service/cmd/delivery-service"
-    "push-gateway" = "./services/push-gateway/cmd/push-gateway"
-    "receipt-service" = "./services/receipt-service/cmd/receipt-service"
-    "contacts-service" = "./services/contacts-service/cmd/contacts-service"
-    "identity-service" = "./services/identity-service/cmd/identity-service"
-    "policy-service" = "./services/policy-service/cmd/policy-service"
+function Get-ImplementedServices {
+    Get-ChildItem -LiteralPath (Join-Path $repoRoot "services") -Directory |
+        Sort-Object Name |
+        Select-Object -ExpandProperty Name
+}
+
+function Get-ServiceCommand {
+    param([string]$Service)
+
+    $commandPath = Join-Path $repoRoot "services\$Service\cmd\$Service"
+    if (-not (Test-Path -LiteralPath $commandPath)) {
+        throw "Unknown service or missing service command: $Service"
+    }
+    return "./services/$Service/cmd/$Service"
+}
+
+if ($Services.Count -eq 0) {
+    $Services = @(Get-ImplementedServices)
+}
+
+if ($ListServices) {
+    $Services | ForEach-Object { Write-Output $_ }
+    return
 }
 
 foreach ($service in $Services) {
-    if (-not $serviceCommands.ContainsKey($service)) {
-        throw "Unknown service: $service"
-    }
+    [void](Get-ServiceCommand -Service $service)
 }
 
 New-Item -ItemType Directory -Force $BundleRoot | Out-Null
@@ -62,7 +64,7 @@ function Build-GoBinary {
     $env:GOARCH = $Goarch
     $env:CGO_ENABLED = "0"
     try {
-        go build -o $OutputPath $serviceCommands[$Service]
+        go build -o $OutputPath (Get-ServiceCommand -Service $Service)
     }
     finally {
         Remove-Item Env:GOOS,Env:GOARCH,Env:CGO_ENABLED -ErrorAction SilentlyContinue

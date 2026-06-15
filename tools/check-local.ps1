@@ -53,6 +53,9 @@ try {
     Write-Host "== docker runtime coverage =="
     Invoke-LocalCheck "check-docker-runtime-coverage.ps1"
 
+    Write-Host "== local docker image build script coverage =="
+    Invoke-LocalCheck "check-service-docker-image-build-script.ps1"
+
     Write-Host "== mac docker image sync coverage =="
     Invoke-LocalCheck "check-mac-service-docker-sync.ps1"
 

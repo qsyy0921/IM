@@ -115,7 +115,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - 服务 Linux 构建门禁，9 个已实现服务的 cmd 包必须能以 `CGO_ENABLED=0 GOOS=linux GOARCH=amd64/arm64` 交叉编译，保证本地 / Mac Docker runtime 的二进制基础不漂移
 - 服务包级测试门禁，`go test ./services/...` 默认进入 `check-local`，覆盖 9 个已实现服务的轻量单测 / 跳过型集成测试
 - 服务运行态端点门禁，已实现服务必须保留 `/healthz`、`/readyz`、`/debug/metrics` 和 `/metrics`
-- Docker runtime / Mac 镜像同步覆盖门禁，9 个已实现服务必须都有 `deploy/docker/<service>.runtime.Dockerfile`，双机镜像同步脚本默认从 `services/` 推导完整服务集合
+- Docker runtime / 本机镜像构建 / Mac 镜像同步覆盖门禁，9 个已实现服务必须都有 `deploy/docker/<service>.runtime.Dockerfile`，本机构建脚本和双机镜像同步脚本默认从 `services/` 推导完整服务集合
 - 压测原始输出路径门禁，loadtest / smoke 默认结果不能写回仓库内 `loadtest/results`，原始数据默认落 `H:\NexusIM\loadtest-results`
 - outbox / projection / challenge delivery 等 repair / audit / cleanup operator
 - `check-local` 会显式检查子门禁脚本和原生命令 exit code，避免出现打印 `FAIL` 但总检查仍返回成功的假绿。

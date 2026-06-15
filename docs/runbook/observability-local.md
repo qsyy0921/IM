@@ -221,6 +221,23 @@ datasource: http://host.docker.internal:19090
 .\tools\run-local-observability-smoke.ps1
 ```
 
+需要把本次本地 smoke 结果沉淀成可复核证据时，显式启用 summary：
+
+```powershell
+.\tools\run-local-observability-smoke.ps1 `
+  -RecordSummary `
+  -RunName local-observability-smoke-<date>
+```
+
+默认写入：
+
+```text
+H:\NexusIM\loadtest-results\<run>\observability-smoke-summary.json
+H:\NexusIM\loadtest-results\<run>\observability-smoke-report.md
+```
+
+summary 会记录 Prometheus rule group 数、Grafana 9 个服务 dashboard UID 覆盖和本地 smoke 边界。该格式由 `tools/check-observability-smoke-summary.ps1` 自测，不需要 Docker 即可进入 `check-local`。
+
 如果本机尚未准备 Prometheus / Grafana 镜像，脚本默认失败而不会拉取镜像。确实需要允许拉取时显式使用：
 
 ```powershell

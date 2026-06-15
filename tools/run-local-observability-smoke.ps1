@@ -1,7 +1,10 @@
 param(
     [int]$TimeoutSeconds = 90,
     [switch]$AllowImagePull,
-    [switch]$KeepRunning
+    [switch]$KeepRunning,
+    [switch]$RecordSummary,
+    [string]$RunName = "",
+    [string]$ResultRoot = "H:\NexusIM\loadtest-results"
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,6 +14,7 @@ $prometheusUpScript = Join-Path $PSScriptRoot "local-up-prometheus.ps1"
 $grafanaUpScript = Join-Path $PSScriptRoot "local-up-grafana.ps1"
 $prometheusCompose = Join-Path $repoRoot "deploy\local\docker-compose.prometheus.yml"
 $grafanaCompose = Join-Path $repoRoot "deploy\local\docker-compose.grafana.yml"
+$summaryWriter = Join-Path $PSScriptRoot "write-observability-smoke-summary.ps1"
 
 $expectedDashboardUids = @(
     "nexusim-api-gateway",
@@ -70,6 +74,10 @@ function Get-BasicAuthHeader {
     return @{ Authorization = "Basic " + [Convert]::ToBase64String($bytes) }
 }
 
+function New-DefaultRunName {
+    return "local-observability-smoke-" + (Get-Date).ToUniversalTime().ToString("yyyyMMdd-HHmmss")
+}
+
 Push-Location $repoRoot
 try {
     $prometheusWasRunning = Test-ContainerRunning -ContainerName "nexusim-prometheus"
@@ -109,6 +117,28 @@ try {
         if (-not $foundUids.Contains($uid)) {
             throw "Grafana did not provision expected dashboard uid: $uid"
         }
+    }
+
+    if ($RecordSummary) {
+        if (-not (Test-Path -LiteralPath $summaryWriter -PathType Leaf)) {
+            throw "Missing observability summary writer: $summaryWriter"
+        }
+        if ($RunName.Trim().Length -eq 0) {
+            $RunName = New-DefaultRunName
+        }
+
+        $summaryDir = Join-Path $ResultRoot $RunName
+        $foundDashboardUids = @($expectedDashboardUids | Where-Object { $foundUids.Contains($_) })
+        & $summaryWriter `
+            -OutputDir $summaryDir `
+            -RunName $RunName `
+            -RuleGroupCount ([int]$rules.data.groups.Count) `
+            -ExpectedDashboardUids $expectedDashboardUids `
+            -FoundDashboardUids $foundDashboardUids
+        if ($LASTEXITCODE -ne 0) {
+            throw "write-observability-smoke-summary.ps1 failed with exit code $LASTEXITCODE"
+        }
+        Write-Host "observability_summary_dir=$summaryDir"
     }
 
     Write-Host "OK   local observability smoke passed: Prometheus rules and Grafana dashboards loaded."

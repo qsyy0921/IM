@@ -89,6 +89,9 @@ try {
     Write-Host "== resource snapshot summary =="
     Invoke-LocalCheck "check-resource-snapshot-summary.ps1"
 
+    Write-Host "== observability smoke summary =="
+    Invoke-LocalCheck "check-observability-smoke-summary.ps1"
+
     Write-Host "== local prometheus config =="
     Invoke-LocalCheck "check-local-prometheus-config.ps1"
 

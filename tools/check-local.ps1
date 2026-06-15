@@ -29,6 +29,9 @@ try {
     Write-Host "== future service boundary =="
     Invoke-LocalCheck "check-future-service-boundary.ps1"
 
+    Write-Host "== check-local coverage =="
+    Invoke-LocalCheck "check-local-coverage.ps1"
+
     Write-Host "== runbook consistency =="
     Invoke-LocalCheck "check-runbook-consistency.ps1"
 

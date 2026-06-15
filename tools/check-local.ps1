@@ -22,6 +22,9 @@ try {
     Write-Host "== docs entrypoints =="
     & (Join-Path $PSScriptRoot "check-doc-entrypoints.ps1")
 
+    Write-Host "== service cmd tests =="
+    & (Join-Path $PSScriptRoot "check-service-cmd-tests.ps1")
+
     Write-Host "== project naming =="
     & (Join-Path $PSScriptRoot "check-project-naming.ps1")
 

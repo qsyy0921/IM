@@ -49,6 +49,9 @@ try {
     Write-Host "== public listener auth boundaries =="
     & (Join-Path $PSScriptRoot "check-public-listener-auth-guards.ps1")
 
+    Write-Host "== grpc/wss tls config guardrails =="
+    & (Join-Path $PSScriptRoot "check-grpc-tls-config-guards.ps1")
+
     Write-Host "== git whitespace =="
     git diff --check
     git diff --cached --check

@@ -126,6 +126,15 @@ func TestAPIGatewayGRPCTLSConfigRequiresClientCAWhenClientCertsRequired(t *testi
 	}
 }
 
+func TestAPIGatewayGRPCTLSConfigRejectsInvalidRequireClientCert(t *testing.T) {
+	clearAPIGatewayServerTLSConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_REQUIRE_CLIENT_CERT", "sometimes")
+	_, ok, err := apiGatewayGRPCTLSConfigFromEnv()
+	if err == nil || !ok {
+		t.Fatalf("expected invalid require client cert error, ok=%t err=%v", ok, err)
+	}
+}
+
 func TestAPIGatewayGRPCTLSConfigLoadsMutualTLSAllowlist(t *testing.T) {
 	dir := t.TempDir()
 	serverCertFile, serverKeyFile := writeAPIGatewayTLSTestCert(t, dir, "api-gateway")

@@ -209,6 +209,27 @@ func TestLoadConversationGRPCCredentialsFromEnvLoadsServerTLS(t *testing.T) {
 	}
 }
 
+func TestConversationGRPCTLSConfigRejectsInvalidRequireClientCert(t *testing.T) {
+	clearConversationGRPCTLSConfig(t)
+	t.Setenv("NEXUSIM_CONVERSATION_GRPC_TLS_REQUIRE_CLIENT_CERT", "sometimes")
+	if _, ok, err := conversationGRPCTLSConfigFromEnv(); err == nil || !ok {
+		t.Fatalf("expected invalid require client cert error, ok=%v err=%v", ok, err)
+	}
+}
+
+func TestConversationGRPCTLSConfigRequiresClientCAForMTLS(t *testing.T) {
+	clearConversationGRPCTLSConfig(t)
+	dir := t.TempDir()
+	certFile, keyFile := writeConversationTLSTestCert(t, dir, "server")
+	t.Setenv("NEXUSIM_CONVERSATION_GRPC_TLS_CERT_FILE", certFile)
+	t.Setenv("NEXUSIM_CONVERSATION_GRPC_TLS_KEY_FILE", keyFile)
+	t.Setenv("NEXUSIM_CONVERSATION_GRPC_TLS_REQUIRE_CLIENT_CERT", "true")
+
+	if _, ok, err := conversationGRPCTLSConfigFromEnv(); err == nil || !ok {
+		t.Fatalf("expected missing client CA to fail, ok=%v err=%v", ok, err)
+	}
+}
+
 func TestConversationGRPCTLSConfigLoadsMTLS(t *testing.T) {
 	clearConversationGRPCTLSConfig(t)
 	dir := t.TempDir()

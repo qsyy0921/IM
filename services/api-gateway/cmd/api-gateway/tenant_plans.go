@@ -86,11 +86,14 @@ func tenantRateLimitPlansFromEnv(ctx context.Context) (tenantRateLimitPlanSnapsh
 		if path == "" {
 			return tenantRateLimitPlanSnapshot{}, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE is required when tenant plan source is file")
 		}
-		data, err := os.ReadFile(path)
+		snapshot, err := tenantRateLimitPlansFromFile(path)
 		if err != nil {
 			return tenantRateLimitPlanSnapshot{}, err
 		}
-		raw = string(data)
+		if err := validateTenantPlanSnapshotPolicy(snapshot, maxAge, requireChecksum); err != nil {
+			return tenantRateLimitPlanSnapshot{}, err
+		}
+		return snapshot, nil
 	case "url", "http", "https", "config-url", "config_url":
 		if endpoint == "" {
 			return tenantRateLimitPlanSnapshot{}, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL is required when tenant plan source is url")
@@ -520,7 +523,7 @@ func tenantRateLimitPlansFromSource(ctx context.Context, source string, location
 }
 
 func tenantRateLimitPlansFromFile(path string) (tenantRateLimitPlanSnapshot, error) {
-	data, err := os.ReadFile(path)
+	data, err := readTenantPlanSnapshotFile(path)
 	if err != nil {
 		return tenantRateLimitPlanSnapshot{}, err
 	}
@@ -530,4 +533,24 @@ func tenantRateLimitPlansFromFile(path string) (tenantRateLimitPlanSnapshot, err
 	}
 	snapshot.Source = "file"
 	return snapshot, nil
+}
+
+func readTenantPlanSnapshotFile(path string) ([]byte, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE is required when tenant plan source is file")
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, errors.New("api-gateway tenant plan file source read failed")
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, tenantPlanSnapshotMaxBytes+1))
+	if err != nil {
+		return nil, errors.New("api-gateway tenant plan file source read failed")
+	}
+	if len(data) > tenantPlanSnapshotMaxBytes {
+		return nil, errors.New("api-gateway tenant plan file source is too large")
+	}
+	return data, nil
 }

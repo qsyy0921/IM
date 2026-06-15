@@ -536,6 +536,18 @@ func TestTenantRateLimitPlansFromEnvLoadsVersionedFileSnapshot(t *testing.T) {
 	}
 }
 
+func TestTenantRateLimitPlansFromEnvRejectsOversizedFileSnapshot(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	path := filepath.Join(t.TempDir(), "tenant-plans-too-large.json")
+	if err := os.WriteFile(path, []byte(strings.Repeat("x", tenantPlanSnapshotMaxBytes+1)), 0o600); err != nil {
+		t.Fatalf("write oversized tenant plans file: %v", err)
+	}
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE", path)
+	if _, err := tenantRateLimitPlansFromEnv(context.Background()); err == nil {
+		t.Fatalf("expected oversized tenant plan file to fail")
+	}
+}
+
 func TestTenantRateLimitPlansFromEnvRejectsVersionedFileChecksumMismatch(t *testing.T) {
 	clearAPIGatewayRateLimitConfig(t)
 	path := filepath.Join(t.TempDir(), "tenant-plans.json")
@@ -897,6 +909,16 @@ func TestTenantRateLimitPlansFromSourceRejectsMissingChecksumWhenRequired(t *tes
 	}
 	if _, err := tenantRateLimitPlansFromSource(context.Background(), "file", path, 0, true); err == nil {
 		t.Fatalf("expected reload source without checksum to fail when checksum is required")
+	}
+}
+
+func TestTenantRateLimitPlansFromSourceRejectsOversizedFileSnapshot(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tenant-plans-too-large.json")
+	if err := os.WriteFile(path, []byte(strings.Repeat("x", tenantPlanSnapshotMaxBytes+1)), 0o600); err != nil {
+		t.Fatalf("write oversized tenant plans file: %v", err)
+	}
+	if _, err := tenantRateLimitPlansFromSource(context.Background(), "file", path, 0, false); err == nil {
+		t.Fatalf("expected oversized reload file snapshot to fail")
 	}
 }
 

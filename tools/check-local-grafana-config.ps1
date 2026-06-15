@@ -1,9 +1,11 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$servicesRoot = Join-Path $repoRoot "services"
 $composePath = Join-Path $repoRoot "deploy\local\docker-compose.grafana.yml"
 $datasourcePath = Join-Path $repoRoot "deploy\local\grafana-datasources.yml"
 $providerPath = Join-Path $repoRoot "deploy\local\grafana-dashboards.yml"
+$dashboardRoot = Join-Path $repoRoot "deploy\local\grafana\dashboards"
 $apiGatewayDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\api-gateway-observability.json"
 $identityDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\identity-service-observability.json"
 $messageDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\message-service-observability.json"
@@ -18,6 +20,16 @@ foreach ($path in @($composePath, $datasourcePath, $providerPath, $apiGatewayDas
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Missing local Grafana config file: $path"
     }
+}
+
+$implementedServices = @(Get-ChildItem -LiteralPath $servicesRoot -Directory | Sort-Object Name | Select-Object -ExpandProperty Name)
+$dashboardServices = @(Get-ChildItem -LiteralPath $dashboardRoot -Filter "*-observability.json" -File |
+    ForEach-Object { $_.BaseName -replace "-observability$", "" } |
+    Sort-Object)
+$serviceDiff = Compare-Object -ReferenceObject $implementedServices -DifferenceObject $dashboardServices
+if ($serviceDiff) {
+    $diffText = ($serviceDiff | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join ", "
+    throw "Grafana dashboard coverage mismatch with services directory: $diffText"
 }
 
 $compose = Get-Content -LiteralPath $composePath -Raw

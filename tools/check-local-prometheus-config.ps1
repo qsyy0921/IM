@@ -1,6 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$servicesRoot = Join-Path $repoRoot "services"
 $composePath = Join-Path $repoRoot "deploy\local\docker-compose.prometheus.yml"
 $configPath = Join-Path $repoRoot "deploy\local\prometheus.yml"
 $apiGatewayRulesPath = Join-Path $repoRoot "deploy\local\prometheus-api-gateway-alerts.yml"
@@ -24,6 +25,14 @@ $prometheusServices = @(
     @{ Name = "contacts-service"; DebugPort = 11915; RuleFile = "prometheus-contacts-service-alerts.yml" },
     @{ Name = "policy-service"; DebugPort = 11916; RuleFile = "prometheus-policy-service-alerts.yml" }
 )
+
+$implementedServices = @(Get-ChildItem -LiteralPath $servicesRoot -Directory | Sort-Object Name | Select-Object -ExpandProperty Name)
+$configuredServices = @($prometheusServices | ForEach-Object { [string]$_.Name } | Sort-Object)
+$serviceDiff = Compare-Object -ReferenceObject $implementedServices -DifferenceObject $configuredServices
+if ($serviceDiff) {
+    $diffText = ($serviceDiff | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join ", "
+    throw "Prometheus service coverage mismatch with services directory: $diffText"
+}
 
 $requiredConfigFiles = @(
     $composePath,

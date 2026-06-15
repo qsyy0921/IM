@@ -6,8 +6,9 @@ $datasourcePath = Join-Path $repoRoot "deploy\local\grafana-datasources.yml"
 $providerPath = Join-Path $repoRoot "deploy\local\grafana-dashboards.yml"
 $apiGatewayDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\api-gateway-observability.json"
 $identityDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\identity-service-observability.json"
+$messageDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\message-service-observability.json"
 
-foreach ($path in @($composePath, $datasourcePath, $providerPath, $apiGatewayDashboardPath, $identityDashboardPath)) {
+foreach ($path in @($composePath, $datasourcePath, $providerPath, $apiGatewayDashboardPath, $identityDashboardPath, $messageDashboardPath)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Missing local Grafana config file: $path"
     }
@@ -94,7 +95,18 @@ $identityRequiredMetrics = @(
     "nexusim_identity_otel_traces_enabled"
 )
 
+$messageRequiredMetrics = @(
+    "nexusim_message_latency_samples_total",
+    "nexusim_message_latency_p95_milliseconds",
+    "nexusim_message_value_avg",
+    "nexusim_message_pg_pool_conns",
+    "nexusim_message_outbox_relay_errors_total",
+    "nexusim_message_outbox_relay_consecutive_errors",
+    "nexusim_message_otel_traces_enabled"
+)
+
 Test-Dashboard -Path $apiGatewayDashboardPath -Name "api-gateway" -ExpectedUid "nexusim-api-gateway" -MinimumPanels 5 -RequiredMetrics $apiGatewayRequiredMetrics
 Test-Dashboard -Path $identityDashboardPath -Name "identity-service" -ExpectedUid "nexusim-identity-service" -MinimumPanels 8 -RequiredMetrics $identityRequiredMetrics
+Test-Dashboard -Path $messageDashboardPath -Name "message-service" -ExpectedUid "nexusim-message-service" -MinimumPanels 8 -RequiredMetrics $messageRequiredMetrics
 
 Write-Host "OK   local Grafana config"

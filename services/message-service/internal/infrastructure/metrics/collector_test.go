@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -229,5 +230,78 @@ func TestHandlerMetricsIncludesTraceSnapshot(t *testing.T) {
 	}
 	if snapshot.Trace == nil || !snapshot.Trace.Enabled || snapshot.Trace.ServiceName != "message-service" {
 		t.Fatalf("unexpected trace snapshot: %+v", snapshot.Trace)
+	}
+}
+
+func TestHandlerPrometheusMetrics(t *testing.T) {
+	collector := NewCollector()
+	collector.ObserveSendMessage(40 * time.Millisecond)
+	collector.ObserveRepositoryPoolAcquire(5 * time.Millisecond)
+	collector.ObserveKafkaPublishCall(20*time.Millisecond, 4)
+	collector.ObserveOutboxProcessReadyResult(10*time.Millisecond, 2)
+	handler := NewHandler(collector, nil).
+		WithOutboxRelayStats(func() types.OutboxRelayWorkerSnapshot {
+			return types.OutboxRelayWorkerSnapshot{
+				TotalErrors:        3,
+				ConsecutiveErrors:  1,
+				LastErrorAtMS:      100,
+				LastSuccessAtMS:    200,
+				LastPublishedAtMS:  300,
+				LastErrorBackoffMS: 1500,
+			}
+		}).
+		WithTraceStats(func() monitoringinfra.TraceSnapshot {
+			return monitoringinfra.TraceSnapshot{Enabled: true, Exporter: "otlp-grpc", OTLPEndpointSet: true, SamplingRatio: 0.5}
+		})
+
+	request := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d", response.Code)
+	}
+	if got := response.Header().Get("Content-Type"); got != "text/plain; version=0.0.4; charset=utf-8" {
+		t.Fatalf("unexpected content type %q", got)
+	}
+	body := response.Body.String()
+	assertContains(t, body, "# TYPE nexusim_message_latency_samples_total counter")
+	assertContains(t, body, `nexusim_message_latency_samples_total{operation="send_message"} 1`)
+	assertContains(t, body, `nexusim_message_latency_p95_milliseconds{operation="send_message"} 40`)
+	assertContains(t, body, `nexusim_message_latency_p95_milliseconds{operation="repository_pool_acquire"} 5`)
+	assertContains(t, body, `nexusim_message_value_avg{operation="kafka_publish_records_per_call"} 4`)
+	assertContains(t, body, `nexusim_message_outbox_relay_errors_total 3`)
+	assertContains(t, body, `nexusim_message_otel_traces_enabled{exporter="otlp-grpc"} 1`)
+	for _, leaked := range []string{"secret-token", "tenant_id", "user_id", "device_id", "session_id", "request_id", "trace_id", "conversation_id", "message_id"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("prometheus metrics leaked %q in body:\n%s", leaked, body)
+		}
+	}
+}
+
+func TestRenderPrometheusIncludesPoolAndTraceAggregates(t *testing.T) {
+	body := renderPrometheus(Snapshot{
+		SendMessageLatencyMS:           LatencySnapshot{Count: 2, AvgMS: 15, P50MS: 10, P95MS: 20, P99MS: 20, MaxMS: 20},
+		RepositoryPoolAcquireLatencyMS: LatencySnapshot{Count: 1, AvgMS: 6, P50MS: 6, P95MS: 6, P99MS: 6, MaxMS: 6},
+		PGPool:                         &PGPoolSnapshot{AcquireCount: 4, IdleConns: 2, TotalConns: 3, MaxConns: 8},
+		Trace:                          &monitoringinfra.TraceSnapshot{Enabled: true, Exporter: "stdout", SamplingRatio: 1},
+	})
+	assertContains(t, body, `nexusim_message_latency_avg_milliseconds{operation="send_message"} 15`)
+	assertContains(t, body, `nexusim_message_latency_p95_milliseconds{operation="repository_pool_acquire"} 6`)
+	assertContains(t, body, `nexusim_message_pg_pool_conns{state="idle"} 2`)
+	assertContains(t, body, `nexusim_message_pg_pool_conns{state="max"} 8`)
+	assertContains(t, body, `nexusim_message_otel_traces_enabled{exporter="stdout"} 1`)
+}
+
+func TestPrometheusEscapesLabelValues(t *testing.T) {
+	var builder strings.Builder
+	writePrometheusSample(&builder, "nexusim_message_test", map[string]string{"operation": "send\"message\npath\\x"}, "1")
+	assertContains(t, builder.String(), `operation="send\"message\npath\\x"`)
+}
+
+func assertContains(t *testing.T, body string, want string) {
+	t.Helper()
+	if !strings.Contains(body, want) {
+		t.Fatalf("body missing %q:\n%s", want, body)
 	}
 }

@@ -22,3 +22,4 @@ if (-not $ready) {
 Write-Host "prometheus_url=http://127.0.0.1:19090"
 Write-Host "api_gateway_scrape_target=host.docker.internal:11904"
 Write-Host "identity_service_scrape_target=host.docker.internal:11905"
+Write-Host "message_service_scrape_target=host.docker.internal:11910"

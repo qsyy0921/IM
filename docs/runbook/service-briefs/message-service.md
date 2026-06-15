@@ -5,7 +5,8 @@
 - 已有 `SendMessage`、`EditMessage`、`RevokeMessage`、`DeleteMessage` 主链路。
 - 通过 outbox relay 发布 conversation timeline events，不在业务事务里直接 publish Kafka。
 - 已接 conversation-service / policy-service，可走 verified metadata、TLS / mTLS。
-- 已补 `/healthz`、`/readyz` 和 `/debug/metrics`，可观察低敏 PG pool 和 send / repository / outbox relay 聚合指标；debug HTTP 监听默认只允许 loopback / 私网，公网或未指定地址必须显式 `NEXUSIM_MESSAGE_DEBUG_ALLOW_PUBLIC=true`。
+- 已补 `/healthz`、`/readyz`、`/debug/metrics` 和 Prometheus text `/metrics`，可观察低敏 PG pool、send / repository / Kafka / outbox relay 聚合指标和固定 operation latency；debug HTTP 监听默认只允许 loopback / 私网，公网或未指定地址必须显式 `NEXUSIM_MESSAGE_DEBUG_ALLOW_PUBLIC=true`。
+- 本地 Prometheus scrape / alert rules 与 Grafana dashboard 原型已覆盖 SendMessage / PG pool / Kafka / outbox relay latency、relay runtime error 和 OTLP endpoint missing；这仍是本地开发 / 面试演示级观测，不是生产 Alertmanager / SLO。
 - 已补 first-stage OpenTelemetry gRPC server span，默认关闭；启用后可输出 stdout 或 OTLP gRPC trace，并从入口 metadata 提取 W3C `traceparent`。
 - gRPC access log 只记录低敏 `trace_id/request_id`，并对入口 metadata 做 trim、长度上限和字符白名单过滤，避免把 token / 邮箱 / 原始认证头写入结构化日志。
 - `outbox-relay` 对非取消运行时错误已改为退避重试，并在 relay 模式通过 `/debug/metrics` 暴露 low-sensitive outbox relay retry 快照；malformed event / payload 仍保持 fail-closed，交给 outbox retry / DLQ 语义处理；`message_outbox.last_error` 和 repair audit `previous_last_error` 只暴露稳定公开文案，不落 Kafka / publisher 原始错误正文。
@@ -15,4 +16,4 @@
 ## 后续
 
 - 更多消息类型、会话级删除策略深化、合规删除、容量和生产观测；用户私有隐藏已由 delivery-service `HideInboxItem` 承担。
-- OTel collector / alerting / dashboard 仍属于后续统一观测治理。
+- 生产级 OTel collector、告警路由、retention 和 SLO dashboard 仍属于后续统一观测治理。

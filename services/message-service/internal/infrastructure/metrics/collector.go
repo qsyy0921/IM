@@ -327,10 +327,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleReady(w, r)
 		return
 	case "/debug/metrics":
+		writeJSON(w, http.StatusOK, h.snapshot())
+		return
+	case "/metrics":
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(renderPrometheus(h.snapshot())))
+		return
 	default:
 		http.NotFound(w, r)
 		return
 	}
+}
+
+func (h *Handler) snapshot() Snapshot {
 	snapshot := h.collector.Snapshot()
 	if h.pool != nil {
 		stats := h.pool.Stat()
@@ -354,7 +364,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		traceSnapshot := h.traceStats()
 		snapshot.Trace = &traceSnapshot
 	}
-	writeJSON(w, http.StatusOK, snapshot)
+	return snapshot
 }
 
 func (h *Handler) handleReady(w http.ResponseWriter, r *http.Request) {

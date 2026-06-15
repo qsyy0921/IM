@@ -1,0 +1,62 @@
+groups:
+  - name: nexusim-message-service-first-stage
+    rules:
+      - alert: NexusIMMessageSendLatencyHigh
+        expr: nexusim_message_latency_p95_milliseconds{operation="send_message"} > 1000
+        for: 2m
+        labels:
+          severity: warning
+          service: message-service
+        annotations:
+          summary: message-service SendMessage p95 latency is high
+          description: SendMessage p95 latency is above the local first-stage threshold. Inspect repository, seq allocation, Kafka and outbox panels before treating this as a production SLO alert.
+
+      - alert: NexusIMMessageRepositoryPoolAcquireLatencyHigh
+        expr: nexusim_message_latency_p95_milliseconds{operation="repository_pool_acquire_recent"} > 100
+        for: 2m
+        labels:
+          severity: warning
+          service: message-service
+        annotations:
+          summary: message-service PostgreSQL pool acquire latency is high
+          description: Recent repository pool acquire p95 is above the local threshold. Check PostgreSQL connection pressure, pgpool and adaptive admission state.
+
+      - alert: NexusIMMessageKafkaPublishLatencyHigh
+        expr: nexusim_message_latency_p95_milliseconds{operation="kafka_publish_call"} > 1000
+        for: 2m
+        labels:
+          severity: warning
+          service: message-service
+        annotations:
+          summary: message-service Kafka publish latency is high
+          description: Kafka publish call p95 is above the local threshold. Check broker health, batch size and relay worker saturation.
+
+      - alert: NexusIMMessageOutboxRelayErrors
+        expr: increase(nexusim_message_outbox_relay_errors_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: message-service
+        annotations:
+          summary: message-service outbox relay errors increased
+          description: The message outbox relay has runtime errors in the last five minutes. Inspect relay logs and outbox audit before redrive.
+
+      - alert: NexusIMMessageOutboxRelayConsecutiveErrors
+        expr: nexusim_message_outbox_relay_consecutive_errors > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: message-service
+        annotations:
+          summary: message-service outbox relay has consecutive errors
+          description: The outbox relay is currently backing off after consecutive runtime errors. This may block conversation timeline event publishing.
+
+      - alert: NexusIMMessageOtlpEndpointMissing
+        expr: nexusim_message_otel_traces_enabled{exporter="otlp-grpc"} == 1 and on(exporter) nexusim_message_otel_traces_otlp_endpoint_configured{exporter="otlp-grpc"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: message-service
+        annotations:
+          summary: message-service OTLP traces enabled without endpoint
+          description: message-service is configured for otlp-grpc tracing but has no OTLP endpoint configured.

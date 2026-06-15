@@ -1,0 +1,296 @@
+{
+  "uid": "nexusim-message-service",
+  "title": "NexusIM Message Service",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "tags": ["nexusim", "message-service", "first-stage"],
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "SendMessage p95",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(nexusim_message_latency_p95_milliseconds{operation=\"send_message\"})",
+          "legendFormat": "p95"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "orange", "value": 250},
+              {"color": "red", "value": 1000}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "PostgreSQL pool acquire p95",
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(nexusim_message_latency_p95_milliseconds{operation=\"repository_pool_acquire_recent\"})",
+          "legendFormat": "recent p95"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "orange", "value": 50},
+              {"color": "red", "value": 100}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Kafka publish p95",
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(nexusim_message_latency_p95_milliseconds{operation=\"kafka_publish_call\"})",
+          "legendFormat": "p95"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "orange", "value": 250},
+              {"color": "red", "value": 1000}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Outbox relay errors",
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(nexusim_message_outbox_relay_errors_total[30m])",
+          "legendFormat": "errors"
+        },
+        {
+          "refId": "B",
+          "expr": "max(nexusim_message_outbox_relay_consecutive_errors)",
+          "legendFormat": "consecutive"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 1}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Repository p95 by operation",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_message_latency_p95_milliseconds{operation=~\"repository_.*|conversation_seq_alloc\"}",
+          "legendFormat": "{{operation}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "ms"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Outbox relay latencies",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_message_latency_p95_milliseconds{operation=~\"outbox_.*\"}",
+          "legendFormat": "{{operation}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "ms"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Batch shape",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 14},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_message_value_avg{operation=\"outbox_fetched_per_call_recent\"}",
+          "legendFormat": "fetched per call"
+        },
+        {
+          "refId": "B",
+          "expr": "nexusim_message_value_avg{operation=\"kafka_publish_records_per_call_recent\"}",
+          "legendFormat": "kafka records per call"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "PostgreSQL pool connections",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 14},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_message_pg_pool_conns",
+          "legendFormat": "{{state}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "OTel enabled",
+      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 14},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(nexusim_message_otel_traces_enabled)",
+          "legendFormat": "enabled"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "bool"},
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Latency sample counts",
+      "gridPos": {"h": 8, "w": 16, "x": 0, "y": 22},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(nexusim_message_latency_samples_total[30m])",
+          "legendFormat": "{{operation}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    }
+  ]
+}

@@ -21,3 +21,11 @@ scrape_configs:
           - host.docker.internal:11905
         labels:
           service: identity-service
+
+  - job_name: nexusim-message-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:11910
+        labels:
+          service: message-service

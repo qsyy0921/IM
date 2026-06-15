@@ -1,6 +1,6 @@
 # message-service SDD v1.0
 
-状态：冻结；主链路、`outbox-audit` / `outbox-repair` / `outbox-repair-audit` / `outbox-repair-cleanup` operator，以及 `/healthz` / `/readyz` / `/debug/metrics` 低敏观测入口已落地，可继续做后续集成测试和 hardening。
+状态：冻结；主链路、`outbox-audit` / `outbox-repair` / `outbox-repair-audit` / `outbox-repair-cleanup` operator，以及 `/healthz` / `/readyz` / `/debug/metrics` / Prometheus text `/metrics` 低敏观测入口已落地，可继续做后续集成测试和 hardening。
 
 ## 1. 服务定位
 
@@ -881,7 +881,9 @@ NEXUSIM_MESSAGE_OTEL_TRACES_OTLP_INSECURE=true
 NEXUSIM_MESSAGE_OTEL_TRACES_SAMPLING_RATIO=1
 ```
 
-`/debug/metrics` 会暴露低敏 trace runtime snapshot，便于确认 message-service 是否启用 trace、使用哪个 exporter 和采样率。当前仍是本地 debug/运维入口，不等同于完整 Prometheus / OpenTelemetry collector / alertmanager 生产栈。
+`/debug/metrics` 会暴露低敏 trace runtime snapshot，便于确认 message-service 是否启用 trace、使用哪个 exporter 和采样率。`/metrics` 复用同一低敏 snapshot 输出 first-stage Prometheus text 指标，覆盖固定 operation latency / value samples、PostgreSQL pool、outbox relay retry snapshot 和 trace config。Prometheus labels 只允许 `operation`、`state`、`exporter` 等低基数字段，不输出 token、tenant/user/device/session id、trace_id、request_id、conversation/message id、payload 或 SQL/Kafka/provider error body。
+
+本地 Prometheus / Grafana 原型配置位于 `deploy/local/prometheus-message-service-alerts.yml` 和 `deploy/local/grafana/dashboards/message-service-observability.json`。默认本地 scrape target 是 `host.docker.internal:11910/metrics`，对应进程需显式设置 `NEXUSIM_MESSAGE_DEBUG_ADDR=127.0.0.1:11910`。当前 alert rules 只覆盖本地 first-stage 的 SendMessage / PG pool / Kafka latency、outbox relay runtime error 和 OTLP endpoint missing，不等同于生产 Prometheus / OpenTelemetry collector / Alertmanager / SLO dashboard。
 
 The debug HTTP listener uses `NEXUSIM_MESSAGE_DEBUG_ADDR` or shared `NEXUSIM_DEBUG_ADDR`. It is unauthenticated and intended for local or private observability. Startup fails by default when the listener is bound to a non-private or unspecified address; explicit public binding requires `NEXUSIM_MESSAGE_DEBUG_ALLOW_PUBLIC=true`.
 

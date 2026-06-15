@@ -71,6 +71,32 @@ func TestBuildDeliveryEventAckRecorded(t *testing.T) {
 	}
 }
 
+func TestBuildDeliveryEventInboxItemHidden(t *testing.T) {
+	message := testOutboxMessage(types.DeliveryEventInboxItemHidden, []byte(`{
+		"tenant_id":"tenant-1",
+		"user_id":"user-1",
+		"device_id":"device-1",
+		"conversation_id":"conversation-1",
+		"conversation_seq":12,
+		"message_id":"message-1"
+	}`))
+	event, err := BuildDeliveryEvent(message)
+	if err != nil {
+		t.Fatalf("build delivery event: %v", err)
+	}
+	payload := event.GetInboxItemHidden()
+	if payload == nil {
+		t.Fatalf("expected hidden payload")
+	}
+	if event.EventType != types.DeliveryEventInboxItemHidden ||
+		payload.UserId != "user-1" ||
+		payload.DeviceId != "device-1" ||
+		payload.ConversationSeq != 12 ||
+		payload.MessageId != "message-1" {
+		t.Fatalf("unexpected hidden event=%+v payload=%+v", event, payload)
+	}
+}
+
 func TestRelayRunOnceFailClosedForMalformedPayload(t *testing.T) {
 	store := &fakeStore{
 		messages: []types.OutboxMessage{

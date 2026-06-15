@@ -3,8 +3,7 @@
 ## 当前状态
 
 - 已有 timeline projection、durable `user_inbox`、`PullInbox`、`AckDelivery`、`HideInboxItem` 用户视图隐藏、`delivery_outbox` relay。
-- 是 push-gateway 的可靠事实源。
-- 不要求 push-gateway 持久化消息或 ACK cursor。
+- 是 push-gateway 的可靠事实源，不要求 push-gateway 持久化消息或 ACK cursor。
 - 已补 `/healthz`、`/readyz`、`/debug/metrics`、Prometheus text `/metrics`、本地 alert rules / Grafana dashboard 原型；默认 scrape target 为 `host.docker.internal:11912`，覆盖 durable read model、delivery outbox、projection blocker、worker/relay、PG pool 和 OTel trace config 聚合指标；这是本地开发 / 面试演示观测，不是生产 SLO。
 - 已补 `outbox-audit` 只读模式：可直接列出当前 `delivery_outbox` 行，并按 outbox/event/tenant/conversation/status/event_type 缩小排障范围。
 - 已补 `outbox-repair` 运维模式，支持 `audit` 和 `redrive-dlq-pending`，并持久记录 repair audit。
@@ -22,9 +21,10 @@
 - `timeline-consumer` 现已对运行时 `Fetch` / `Commit` 错误做退避重试，并在 worker 模式通过 `/debug/metrics` 暴露低敏 retry 快照；malformed event、projection failure、failure recorder 异常仍保持持久审计 + fail-closed，不会自动越过 blocker。
 - `outbox-relay` 现已对非取消运行时错误做退避重试，并在 relay 模式通过 `/debug/metrics` 暴露低敏 retry 快照；publisher 错误写入稳定低敏 `last_error`，malformed payload / unsupported event 仍保持 fail-closed，交给 outbox retry / DLQ 语义处理。
 - 已补 delivery outbox audit / repair audit 错误脱敏：`last_error`、`before_last_error`、`after_last_error` 对外只返回稳定低敏分类，不暴露 broker body、账号、token 或 provider 原文。
+- 已补 `delivery.inbox_item.hidden.v1`：`HideInboxItem` 首次隐藏时同事务写 delivery outbox，push-gateway 可向同 user 在线设备发送 `delivery.hide` 轻量提示；重复隐藏不重复写 outbox。
 - 已补 trusted metadata 启动门禁：当 `NEXUSIM_DELIVERY_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端未启用 mTLS client cert 校验，则启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - 已补 first-stage OpenTelemetry gRPC server span；gRPC access log 只记录低敏 `trace_id/request_id`，并对白名单外入口 metadata 直接丢弃。
 
 ## 后续
 
-- Projection DLQ / repair 深化、更多 delivery event 消费方、隐藏项跨设备删除提示；OTel collector / 生产级 alerting / SLO dashboard 仍属于后续统一观测治理。
+- Projection DLQ / repair 深化、更多 delivery event 消费方；OTel collector / 生产级 alerting / SLO dashboard 仍属于后续统一观测治理。

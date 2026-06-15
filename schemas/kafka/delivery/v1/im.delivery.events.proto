@@ -30,6 +30,7 @@ message DeliveryEvent {
   oneof payload {
     DeliveryInboxItemCreatedV1 inbox_item_created = 20;
     DeliveryAckRecordedV1 ack_recorded = 21;
+    DeliveryInboxItemHiddenV1 inbox_item_hidden = 22;
   }
 }
 
@@ -50,4 +51,13 @@ message DeliveryAckRecordedV1 {
   string device_id = 3;
   string conversation_id = 4;
   int64 last_received_seq = 5;
+}
+
+message DeliveryInboxItemHiddenV1 {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string conversation_id = 4;
+  int64 conversation_seq = 5;
+  string message_id = 6;
 }

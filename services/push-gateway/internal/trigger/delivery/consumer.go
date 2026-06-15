@@ -15,6 +15,7 @@ const (
 	TopicDeliveryEvents         = "im.delivery.events"
 	EventInboxItemCreatedV1     = "delivery.inbox_item.created.v1"
 	EventDeliveryAckRecordedV1  = "delivery.ack.recorded.v1"
+	EventInboxItemHiddenV1      = "delivery.inbox_item.hidden.v1"
 	SourceEventMessagePersisted = "message.persisted.v1"
 )
 
@@ -212,6 +213,37 @@ func buildCommand(message types.DeliveryEventMessage) (types.NotifyDeliveryComma
 			return types.NotifyDeliveryCommand{}, false, types.NewInvalidFrame("delivery event type mismatch")
 		}
 		return types.NotifyDeliveryCommand{}, false, nil
+	case *deliveryeventsv1.DeliveryEvent_InboxItemHidden:
+		if event.GetEventType() != EventInboxItemHiddenV1 {
+			return types.NotifyDeliveryCommand{}, false, types.NewInvalidFrame("delivery event type mismatch")
+		}
+		hidden := payload.InboxItemHidden
+		if hidden == nil {
+			return types.NotifyDeliveryCommand{}, false, types.NewInvalidFrame("empty inbox item hidden payload")
+		}
+		if hidden.GetTenantId() == "" ||
+			hidden.GetUserId() == "" ||
+			hidden.GetConversationId() == "" ||
+			hidden.GetConversationSeq() <= 0 {
+			return types.NotifyDeliveryCommand{}, false, types.NewInvalidFrame("inbox item hidden payload is incomplete")
+		}
+		if event.GetTenantId() != hidden.GetTenantId() || event.GetAggregateId() != hidden.GetConversationId() {
+			return types.NotifyDeliveryCommand{}, false, types.NewInvalidFrame("delivery event envelope mismatch")
+		}
+		return types.NotifyDeliveryCommand{
+			Notification: types.DeliveryNotification{
+				Kind:            types.DeliveryNotificationKindInboxItemHidden,
+				EventID:         event.GetEventId(),
+				TenantID:        hidden.GetTenantId(),
+				UserID:          hidden.GetUserId(),
+				ConversationID:  hidden.GetConversationId(),
+				ConversationSeq: hidden.GetConversationSeq(),
+				SourceEventID:   event.GetCausationId(),
+				SourceEventType: event.GetEventType(),
+				MessageID:       hidden.GetMessageId(),
+				CorrelationID:   event.GetCorrelationId(),
+			},
+		}, true, nil
 	default:
 		return types.NotifyDeliveryCommand{}, false, types.ErrUnsupportedDeliveryEvent
 	}

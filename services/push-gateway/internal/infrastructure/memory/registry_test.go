@@ -211,6 +211,50 @@ func TestRegistryReplaysResumeBufferAfterLastReceived(t *testing.T) {
 	}
 }
 
+func TestRegistryReplaysHiddenFrameAtAlreadyReceivedSeq(t *testing.T) {
+	registry := NewRegistry()
+	outbound := make(chan types.ServerFrame, 2)
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"}
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-1",
+		ResumeToken: "resume-1",
+		Outbound:    outbound,
+	}); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	hidden := testNotification()
+	hidden.Kind = types.DeliveryNotificationKindInboxItemHidden
+	hidden.EventID = "delivery-event-hide-1"
+	hidden.SourceEventType = "delivery.inbox_item.hidden.v1"
+	if _, err := registry.EnqueueNotification(context.Background(), hidden); err != nil {
+		t.Fatalf("hidden notify: %v", err)
+	}
+	registry.Unregister("session-1")
+
+	resumedOutbound := make(chan types.ServerFrame, 1)
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-2",
+		ResumeToken: "resume-1",
+		LastReceived: []types.ConversationCursor{{
+			ConversationID: hidden.ConversationID,
+			Seq:            hidden.ConversationSeq,
+		}},
+		Outbound: resumedOutbound,
+	}); err != nil {
+		t.Fatalf("resume register: %v", err)
+	}
+	select {
+	case replayed := <-resumedOutbound:
+		if replayed.Op != types.OpDeliveryHide || replayed.EventID != "delivery-event-hide-1" {
+			t.Fatalf("unexpected replay: %+v", replayed)
+		}
+	default:
+		t.Fatalf("expected hidden frame replay despite last_received cursor")
+	}
+}
+
 func TestRegistryRejectsResumeTokenForDifferentDevice(t *testing.T) {
 	registry := NewRegistry()
 	if _, err := registry.Register(context.Background(), types.SessionRegistration{

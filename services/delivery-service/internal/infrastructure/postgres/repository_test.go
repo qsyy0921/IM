@@ -860,6 +860,7 @@ func TestRepositoryHideInboxItemIntegration(t *testing.T) {
 	if result.AlreadyHidden {
 		t.Fatalf("first hide should not be marked already hidden: %+v", result)
 	}
+	assertDeliveryOutboxCount(t, ctx, pool, types.DeliveryEventInboxItemHidden, 1)
 
 	items, err := repository.PullInbox(ctx, types.PullInboxCommand{
 		AuthContext:    hideCommand.AuthContext,
@@ -881,6 +882,7 @@ func TestRepositoryHideInboxItemIntegration(t *testing.T) {
 	if !result.AlreadyHidden {
 		t.Fatalf("repeat hide should be idempotent already_hidden: %+v", result)
 	}
+	assertDeliveryOutboxCount(t, ctx, pool, types.DeliveryEventInboxItemHidden, 1)
 
 	ackResult, err := repository.AckDelivery(ctx, ackCommand(2))
 	if err != nil {
@@ -910,6 +912,24 @@ WHERE tenant_id = 'tenant-delivery'
 	}
 	if hiddenByDeviceID != "device-1" || hideReason != "hide locally" {
 		t.Fatalf("unexpected hidden metadata device=%q reason=%q", hiddenByDeviceID, hideReason)
+	}
+
+	var payloadUserID, payloadDeviceID, payloadMessageID string
+	var payloadSeq int64
+	if err := pool.QueryRow(ctx, `
+SELECT
+    payload_json->>'user_id',
+    payload_json->>'device_id',
+    payload_json->>'message_id',
+    (payload_json->>'conversation_seq')::BIGINT
+FROM delivery_outbox
+WHERE tenant_id = 'tenant-delivery'
+  AND event_type = $1
+`, types.DeliveryEventInboxItemHidden).Scan(&payloadUserID, &payloadDeviceID, &payloadMessageID, &payloadSeq); err != nil {
+		t.Fatalf("read hidden outbox payload: %v", err)
+	}
+	if payloadUserID != "user-1" || payloadDeviceID != "device-1" || payloadMessageID != "seed-msg-1" || payloadSeq != 1 {
+		t.Fatalf("unexpected hidden outbox payload user=%q device=%q message=%q seq=%d", payloadUserID, payloadDeviceID, payloadMessageID, payloadSeq)
 	}
 }
 

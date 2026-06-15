@@ -117,6 +117,48 @@ func TestWorkerCommitsAckRecordedWithoutNotify(t *testing.T) {
 	}
 }
 
+func TestWorkerNotifiesAndCommitsInboxItemHidden(t *testing.T) {
+	event := &deliveryeventsv1.DeliveryEvent{
+		EventId:       "delivery-event-hide-1",
+		EventType:     EventInboxItemHiddenV1,
+		EventVersion:  "1.0.0",
+		TenantId:      "tenant-1",
+		AggregateId:   "conversation-1",
+		PartitionKey:  "tenant-1:conversation-1",
+		CorrelationId: "corr-1",
+		CausationId:   "hide-request-1",
+		Payload: &deliveryeventsv1.DeliveryEvent_InboxItemHidden{
+			InboxItemHidden: &deliveryeventsv1.DeliveryInboxItemHiddenV1{
+				TenantId:        "tenant-1",
+				UserId:          "user-1",
+				DeviceId:        "device-1",
+				ConversationId:  "conversation-1",
+				ConversationSeq: 7,
+				MessageId:       "message-1",
+			},
+		},
+	}
+	value, _ := proto.Marshal(event)
+	consumer := &fakeConsumer{messages: []types.DeliveryEventMessage{{Value: value}}}
+	notifier := &recordingNotifier{}
+	worker := NewWorker(consumer, notifier)
+
+	if err := worker.Run(context.Background()); !errors.Is(err, context.Canceled) {
+		t.Fatalf("run: %v", err)
+	}
+	if notifier.calls != 1 ||
+		notifier.command.Notification.Kind != types.DeliveryNotificationKindInboxItemHidden ||
+		notifier.command.Notification.UserID != "user-1" ||
+		notifier.command.Notification.ConversationSeq != 7 ||
+		notifier.command.Notification.SourceEventType != EventInboxItemHiddenV1 ||
+		notifier.command.Notification.SourceEventID != "hide-request-1" {
+		t.Fatalf("unexpected notifier=%+v", notifier)
+	}
+	if consumer.commits != 1 {
+		t.Fatalf("expected commit, got %d", consumer.commits)
+	}
+}
+
 func TestWorkerFailClosedForUnsupportedEvent(t *testing.T) {
 	value, _ := proto.Marshal(&deliveryeventsv1.DeliveryEvent{
 		EventId:      "delivery-event-1",

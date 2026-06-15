@@ -7,6 +7,7 @@ const (
 	OpServerHello    = "server.hello"
 	OpServerPong     = "server.pong"
 	OpDeliveryNotify = "delivery.notify"
+	OpDeliveryHide   = "delivery.hide"
 	OpDeliveryAckOK  = "delivery.ack.ok"
 	OpResumeHint     = "server.resume_hint"
 	OpError          = "error"

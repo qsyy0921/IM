@@ -664,7 +664,7 @@ func (registry *Registry) loadRedisResume(ctx context.Context, token string) (re
 		if err := json.Unmarshal([]byte(rawFrame), &frame); err != nil {
 			return redisResumeState{meta: meta}, true, nil
 		}
-		if frame.Op == types.OpDeliveryNotify {
+		if isResumeFrame(frame) {
 			frames = append(frames, frame)
 		}
 	}
@@ -672,7 +672,7 @@ func (registry *Registry) loadRedisResume(ctx context.Context, token string) (re
 }
 
 func (registry *Registry) appendRedisResume(ctx context.Context, token string, frame types.ServerFrame) error {
-	if token == "" || frame.Op != types.OpDeliveryNotify {
+	if token == "" || !isResumeFrame(frame) {
 		return nil
 	}
 	payload, err := json.Marshal(frame)
@@ -724,10 +724,10 @@ func (registry *Registry) replayRedisResume(
 		}
 	}
 	for _, frame := range frames {
-		if frame.Op != types.OpDeliveryNotify {
+		if !isResumeFrame(frame) {
 			continue
 		}
-		if frame.ConversationID != "" && frame.ConversationSeq <= lastReceived[frame.ConversationID] {
+		if frame.Op == types.OpDeliveryNotify && frame.ConversationID != "" && frame.ConversationSeq <= lastReceived[frame.ConversationID] {
 			continue
 		}
 		select {
@@ -738,6 +738,10 @@ func (registry *Registry) replayRedisResume(
 		}
 	}
 	return false
+}
+
+func isResumeFrame(frame types.ServerFrame) bool {
+	return frame.Op == types.OpDeliveryNotify || frame.Op == types.OpDeliveryHide
 }
 
 func (registry *Registry) enqueueResumeHint(outbound chan<- types.ServerFrame) {

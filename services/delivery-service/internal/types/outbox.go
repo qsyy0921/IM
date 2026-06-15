@@ -9,6 +9,7 @@ const (
 
 	DeliveryEventInboxItemCreated = "delivery.inbox_item.created.v1"
 	DeliveryEventAckRecorded      = "delivery.ack.recorded.v1"
+	DeliveryEventInboxItemHidden  = "delivery.inbox_item.hidden.v1"
 )
 
 type OutboxMessage struct {

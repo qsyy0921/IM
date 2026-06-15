@@ -279,10 +279,10 @@ func (registry *Registry) replayLocked(registration types.SessionRegistration, s
 	}
 	pendingFrames := make([]types.ServerFrame, 0, len(state.frames))
 	for _, frame := range state.frames {
-		if frame.Op != types.OpDeliveryNotify {
+		if !isResumeFrame(frame) {
 			continue
 		}
-		if frame.ConversationID != "" && frame.ConversationSeq <= lastReceived[frame.ConversationID] {
+		if frame.Op == types.OpDeliveryNotify && frame.ConversationID != "" && frame.ConversationSeq <= lastReceived[frame.ConversationID] {
 			continue
 		}
 		pendingFrames = append(pendingFrames, frame)
@@ -308,7 +308,7 @@ func (registry *Registry) enqueueResumeHintLocked(outbound chan<- types.ServerFr
 }
 
 func (registry *Registry) appendResumeLocked(resumeToken string, frame types.ServerFrame) {
-	if resumeToken == "" || frame.Op != types.OpDeliveryNotify {
+	if resumeToken == "" || !isResumeFrame(frame) {
 		return
 	}
 	state := registry.resumes[resumeToken]
@@ -321,6 +321,10 @@ func (registry *Registry) appendResumeLocked(resumeToken string, frame types.Ser
 		copy(state.frames, state.frames[len(state.frames)-types.DefaultResumeBufferSize:])
 		state.frames = state.frames[:types.DefaultResumeBufferSize]
 	}
+}
+
+func isResumeFrame(frame types.ServerFrame) bool {
+	return frame.Op == types.OpDeliveryNotify || frame.Op == types.OpDeliveryHide
 }
 
 func (registry *Registry) evictLocked(sessionID string, target *session, eviction types.SessionEviction) {

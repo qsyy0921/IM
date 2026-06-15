@@ -471,10 +471,19 @@ func (repository *Repository) HideInboxItem(
 	ctx context.Context,
 	command types.HideInboxItemCommand,
 ) (types.HideInboxItemResult, error) {
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return types.HideInboxItemResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
 	var alreadyHidden bool
-	err := repository.pool.QueryRow(ctx, `
+	var messageID string
+	err = tx.QueryRow(ctx, `
 WITH target AS (
-    SELECT hidden_at
+    SELECT hidden_at, message_id
     FROM user_inbox
     WHERE tenant_id = $1
       AND user_id = $2
@@ -497,10 +506,10 @@ WITH target AS (
       AND item.user_id = $2
       AND item.conversation_id = $3
       AND item.conversation_seq = $4
-    RETURNING target.hidden_at IS NOT NULL
+    RETURNING target.hidden_at IS NOT NULL, target.message_id
 )
-SELECT already_hidden
-FROM updated AS result(already_hidden)
+SELECT already_hidden, message_id
+FROM updated AS result(already_hidden, message_id)
 `,
 		command.AuthContext.TenantID,
 		command.AuthContext.UserID,
@@ -508,11 +517,19 @@ FROM updated AS result(already_hidden)
 		command.ConversationSeq,
 		command.AuthContext.DeviceID,
 		command.Reason,
-	).Scan(&alreadyHidden)
+	).Scan(&alreadyHidden, &messageID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return types.HideInboxItemResult{}, types.NewInboxItemNotFound("inbox item not found")
 	}
 	if err != nil {
+		return types.HideInboxItemResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	if !alreadyHidden {
+		if err := insertHideInboxOutbox(ctx, tx, command, messageID); err != nil {
+			return types.HideInboxItemResult{}, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return types.HideInboxItemResult{}, types.NewDBWriteFailed(err.Error())
 	}
 	return types.HideInboxItemResult{
@@ -522,6 +539,65 @@ FROM updated AS result(already_hidden)
 		ConversationSeq: command.ConversationSeq,
 		AlreadyHidden:   alreadyHidden,
 	}, nil
+}
+
+func insertHideInboxOutbox(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.HideInboxItemCommand,
+	messageID string,
+) error {
+	payload := map[string]any{
+		"tenant_id":        command.AuthContext.TenantID,
+		"user_id":          command.AuthContext.UserID,
+		"device_id":        command.AuthContext.DeviceID,
+		"conversation_id":  command.ConversationID,
+		"conversation_seq": command.ConversationSeq,
+		"message_id":       messageID,
+		"trace_id":         command.AuthContext.TraceID,
+		"correlation_id":   command.AuthContext.RequestID,
+	}
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	eventID := hideEventID(command)
+	_, err = tx.Exec(ctx, `
+INSERT INTO delivery_outbox (
+    event_id,
+    tenant_id,
+    conversation_id,
+    aggregate_version,
+    event_type,
+    event_version,
+    partition_key,
+    mapping_version,
+    correlation_id,
+    causation_id,
+    producer,
+    trace_id,
+    payload_json,
+    status,
+    available_at,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, 'delivery.inbox_item.hidden.v1', '1.0.0', $5, 1, $6, $7, 'delivery-service', $8, $9, 'PENDING', now(), now(), now())
+ON CONFLICT (event_id) DO NOTHING
+`,
+		eventID,
+		command.AuthContext.TenantID,
+		command.ConversationID,
+		command.ConversationSeq,
+		partitionKeyFor(command.AuthContext.TenantID, command.ConversationID),
+		command.AuthContext.RequestID,
+		command.AuthContext.RequestID,
+		command.AuthContext.TraceID,
+		payloadBytes,
+	)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
 }
 
 func (repository *Repository) AckDelivery(
@@ -772,4 +848,17 @@ func ackEventID(command types.AckDeliveryCommand, receivedSeq int64) string {
 	)
 	sum := sha256.Sum256([]byte(raw))
 	return "evt_delivery_ack_" + hex.EncodeToString(sum[:16])
+}
+
+func hideEventID(command types.HideInboxItemCommand) string {
+	raw := fmt.Sprintf(
+		"%s\x1f%s\x1f%s\x1f%s\x1f%d",
+		command.AuthContext.TenantID,
+		command.AuthContext.UserID,
+		command.AuthContext.DeviceID,
+		command.ConversationID,
+		command.ConversationSeq,
+	)
+	sum := sha256.Sum256([]byte(raw))
+	return "evt_delivery_hide_" + hex.EncodeToString(sum[:16])
 }

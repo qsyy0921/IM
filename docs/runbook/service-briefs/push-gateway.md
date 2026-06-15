@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-- 已有 WebSocket notify、ACK 转发、slow session close、resume buffer、Redis route、cross-instance smoke。
+- 已有 WebSocket notify、`delivery.hide` 在线隐藏提示、ACK 转发、slow session close、resume buffer、Redis route、cross-instance smoke。
 - 只做在线唤醒，不拥有 durable inbox。
 - 历史缺口通过 delivery-service `PullInbox` 兜底。
 - 已补 `/healthz`、`/readyz`、`/debug/metrics`、Prometheus text `/metrics`、本地 alert rules / Grafana dashboard 原型，可观察低敏 session / resume、Redis route / subscriber、consumer worker、auth JWK 和 OTel trace config 聚合；默认 scrape target 为 `host.docker.internal:11913`，这是本地开发 / 面试演示观测，不是生产 SLO。

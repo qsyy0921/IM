@@ -35,8 +35,26 @@ func ServerPong(requestID string, now time.Time) types.ServerFrame {
 }
 
 func DeliveryNotify(notification types.DeliveryNotification) types.ServerFrame {
+	if notification.Kind == types.DeliveryNotificationKindInboxItemHidden {
+		return DeliveryHide(notification)
+	}
 	return types.ServerFrame{
 		Op:              types.OpDeliveryNotify,
+		EventID:         notification.EventID,
+		TenantID:        notification.TenantID,
+		ConversationID:  notification.ConversationID,
+		ConversationSeq: notification.ConversationSeq,
+		SourceEventID:   notification.SourceEventID,
+		SourceEventType: notification.SourceEventType,
+		MessageID:       notification.MessageID,
+		CorrelationID:   notification.CorrelationID,
+		PullRequired:    true,
+	}
+}
+
+func DeliveryHide(notification types.DeliveryNotification) types.ServerFrame {
+	return types.ServerFrame{
+		Op:              types.OpDeliveryHide,
 		EventID:         notification.EventID,
 		TenantID:        notification.TenantID,
 		ConversationID:  notification.ConversationID,

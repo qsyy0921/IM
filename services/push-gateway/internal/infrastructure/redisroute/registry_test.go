@@ -676,6 +676,56 @@ func TestRegistryRedisResumeGapReturnsBufferMiss(t *testing.T) {
 	}
 }
 
+func TestRegistryRedisResumeReplaysHiddenFrameAtAlreadyReceivedSeq(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	ctx := context.Background()
+	registry := NewRegistry(memory.NewRegistry(), client, Config{GatewayID: "gateway-a", RouteTTL: time.Minute})
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"}
+	token := "resume-hide"
+
+	if err := registry.writeResumeMeta(ctx, token, auth); err != nil {
+		t.Fatalf("write resume meta: %v", err)
+	}
+	hidden := testNotification()
+	hidden.Kind = types.DeliveryNotificationKindInboxItemHidden
+	hidden.EventID = "delivery-event-hide-1"
+	hidden.SourceEventType = "delivery.inbox_item.hidden.v1"
+	if err := registry.appendRedisResume(ctx, token, domain.DeliveryNotify(hidden)); err != nil {
+		t.Fatalf("append hidden resume frame: %v", err)
+	}
+
+	outbound := make(chan types.ServerFrame, 1)
+	result, err := registry.Register(ctx, types.SessionRegistration{
+		AuthContext:     auth,
+		SessionID:       "session-1",
+		ResumeToken:     token,
+		ResumeRequested: true,
+		LastReceived: []types.ConversationCursor{{
+			ConversationID: hidden.ConversationID,
+			Seq:            hidden.ConversationSeq,
+		}},
+		Outbound: outbound,
+	})
+	if err != nil {
+		t.Fatalf("register with hidden resume token: %v", err)
+	}
+	if result.ResumeToken != token {
+		t.Fatalf("known token should be preserved, got %q", result.ResumeToken)
+	}
+	select {
+	case frame := <-outbound:
+		if frame.Op != types.OpDeliveryHide || frame.EventID != hidden.EventID {
+			t.Fatalf("unexpected hidden replay frame: %+v", frame)
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for hidden replay")
+	}
+	if metrics := registry.Metrics(); metrics.RedisResumeReplayCount != 1 || metrics.RedisResumeMissCount != 0 {
+		t.Fatalf("unexpected hidden replay metrics: %+v", metrics)
+	}
+}
+
 func TestRegistryRedisLookupUnavailableKeepsLocalDeliveryAndResume(t *testing.T) {
 	server := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
@@ -750,12 +800,11 @@ func TestSubscriberEnqueuesRemoteNotificationLocally(t *testing.T) {
 		if frame.Op != types.OpDeliveryNotify || frame.EventID != "delivery-event-1" {
 			t.Fatalf("unexpected frame: %+v", frame)
 		}
-		metrics := subscriber.Metrics()
-		if metrics.RedisRouteSubscriberMessageCount != 1 ||
-			metrics.RedisRouteSubscriberEnqueuedCount != 1 ||
-			metrics.RedisRouteSubscriberMalformedCount != 0 {
-			t.Fatalf("unexpected subscriber metrics: %+v", metrics)
-		}
+		waitForSubscriberMetrics(t, subscriber, func(metrics Metrics) bool {
+			return metrics.RedisRouteSubscriberMessageCount == 1 &&
+				metrics.RedisRouteSubscriberEnqueuedCount == 1 &&
+				metrics.RedisRouteSubscriberMalformedCount == 0
+		})
 	case <-time.After(time.Second):
 		t.Fatalf("timed out waiting for local enqueue")
 	}
@@ -813,12 +862,11 @@ func TestSubscriberSkipsMalformedPayloadAndContinues(t *testing.T) {
 		if frame.Op != types.OpDeliveryNotify || frame.EventID != "delivery-event-1" {
 			t.Fatalf("unexpected frame: %+v", frame)
 		}
-		metrics := subscriber.Metrics()
-		if metrics.RedisRouteSubscriberMessageCount != 1 ||
-			metrics.RedisRouteSubscriberEnqueuedCount != 1 ||
-			metrics.RedisRouteSubscriberMalformedCount != 2 {
-			t.Fatalf("unexpected subscriber metrics: %+v", metrics)
-		}
+		waitForSubscriberMetrics(t, subscriber, func(metrics Metrics) bool {
+			return metrics.RedisRouteSubscriberMessageCount == 1 &&
+				metrics.RedisRouteSubscriberEnqueuedCount == 1 &&
+				metrics.RedisRouteSubscriberMalformedCount == 2
+		})
 	case err := <-done:
 		t.Fatalf("subscriber exited after malformed payload: %v", err)
 	case <-time.After(time.Second):
@@ -888,4 +936,19 @@ func redisSetHasMember(t *testing.T, server *miniredis.Miniredis, key string, me
 		t.Fatalf("check set membership: %v", err)
 	}
 	return ok
+}
+
+func waitForSubscriberMetrics(t *testing.T, subscriber *Subscriber, ready func(Metrics) bool) Metrics {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for {
+		metrics := subscriber.Metrics()
+		if ready(metrics) {
+			return metrics
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for subscriber metrics, last=%+v", metrics)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }

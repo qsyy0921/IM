@@ -209,6 +209,22 @@ func BuildDeliveryEvent(message types.OutboxMessage) (*deliveryeventsv1.Delivery
 			},
 		}
 		return event, nil
+	case types.DeliveryEventInboxItemHidden:
+		payload, err := decodeInboxItemHiddenPayload(message.PayloadJSON)
+		if err != nil {
+			return nil, err
+		}
+		event.Payload = &deliveryeventsv1.DeliveryEvent_InboxItemHidden{
+			InboxItemHidden: &deliveryeventsv1.DeliveryInboxItemHiddenV1{
+				TenantId:        payload.TenantID,
+				UserId:          payload.UserID,
+				DeviceId:        payload.DeviceID,
+				ConversationId:  payload.ConversationID,
+				ConversationSeq: payload.ConversationSeq,
+				MessageId:       payload.MessageID,
+			},
+		}
+		return event, nil
 	default:
 		return nil, errors.New("unsupported delivery outbox event type")
 	}
@@ -269,6 +285,30 @@ func decodeAckRecordedPayload(payloadJSON []byte) (ackRecordedPayload, error) {
 		payload.ConversationID == "" ||
 		payload.LastReceivedSeq <= 0 {
 		return ackRecordedPayload{}, errors.New("delivery ack payload is incomplete")
+	}
+	return payload, nil
+}
+
+type inboxItemHiddenPayload struct {
+	TenantID        string `json:"tenant_id"`
+	UserID          string `json:"user_id"`
+	DeviceID        string `json:"device_id"`
+	ConversationID  string `json:"conversation_id"`
+	ConversationSeq int64  `json:"conversation_seq"`
+	MessageID       string `json:"message_id"`
+}
+
+func decodeInboxItemHiddenPayload(payloadJSON []byte) (inboxItemHiddenPayload, error) {
+	var payload inboxItemHiddenPayload
+	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+		return inboxItemHiddenPayload{}, err
+	}
+	if payload.TenantID == "" ||
+		payload.UserID == "" ||
+		payload.DeviceID == "" ||
+		payload.ConversationID == "" ||
+		payload.ConversationSeq <= 0 {
+		return inboxItemHiddenPayload{}, errors.New("delivery inbox item hidden payload is incomplete")
 	}
 	return payload, nil
 }

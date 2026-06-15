@@ -182,6 +182,24 @@ GET /ws?token=...&device_id=...
 }
 ```
 
+`delivery.hide`：
+
+```json
+{
+  "op": "delivery.hide",
+  "event_id": "evt_hide_01",
+  "tenant_id": "tenant_1",
+  "conversation_id": "conv_1",
+  "conversation_seq": 1025,
+  "source_event_type": "delivery.inbox_item.hidden.v1",
+  "message_id": "msg_01",
+  "correlation_id": "corr_01",
+  "pull_required": true
+}
+```
+
+`delivery.hide` 是同一用户其它在线设备的轻量本地视图更新提示，不代表 message-service 的撤回 / 会话级删除 / 合规删除事实。客户端可先按 `conversation_id + conversation_seq` 本地移除，再用 `PullInbox` 校准 durable delivery 视图。
+
 `delivery.ack.ok`：
 
 ```json
@@ -248,13 +266,14 @@ GET /ws?token=...&device_id=...
 | 事件 | Topic | 分区键 | 处理 |
 | --- | --- | --- | --- |
 | `delivery.inbox_item.created.v1` | `im.delivery.events` | `tenant_id + conversation_id` | 找到在线 user/device session，发送 `delivery.notify` |
+| `delivery.inbox_item.hidden.v1` | `im.delivery.events` | `tenant_id + conversation_id` | 找到在线 user/device session，发送 `delivery.hide` |
 | `delivery.ack.recorded.v1` | `im.delivery.events` | `tenant_id + conversation_id` | 第一阶段只记录指标，不向客户端广播 |
 
 消费规则：
 
 - Kafka consumer 只能在 notification 已成功交给本地 session queue 或确认目标用户不在线后提交 offset。
 - 对没有历史提交位点的新 consumer group，push-gateway 从 latest delivery event 开始消费；它不负责重放历史在线通知，历史缺口由客户端 `PullInbox` 兜底。
-- `delivery.inbox_item.created.v1` 是 user 级投递事件；push-gateway 应向该 user 当前所有在线 device/session 发送 `delivery.notify`，同一 device/session 通过 `event_id` 去重。
+- `delivery.inbox_item.created.v1` 和 `delivery.inbox_item.hidden.v1` 都是 user 级 delivery 事件；push-gateway 应向该 user 当前所有在线 device/session 发送对应 `delivery.notify` / `delivery.hide`，同一 device/session 通过 `event_id` 去重。
 - 如果目标用户不在线，事件可直接视为已处理；离线补拉由 `user_inbox` 保证。
 - 如果发送队列满，不能无限阻塞 Kafka consumer；应标记 session slow，发送 `server.resume_hint` 或断开连接，让客户端回源 `PullInbox`。
 - unsupported / malformed delivery event 必须 fail-closed：不向客户端发送错误通知，不提交业务完成状态；第一阶段可以停止 worker 并报警，后续进入 projection DLQ / repair。

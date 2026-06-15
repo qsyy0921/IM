@@ -9,6 +9,11 @@ const (
 	DefaultResumeBufferTTL   = 10 * time.Minute
 )
 
+const (
+	DeliveryNotificationKindInboxItemCreated = "inbox_item_created"
+	DeliveryNotificationKindInboxItemHidden  = "inbox_item_hidden"
+)
+
 type SessionRegistration struct {
 	AuthContext     AuthContext
 	SessionID       string
@@ -43,6 +48,7 @@ type ConnectSessionResult struct {
 }
 
 type DeliveryNotification struct {
+	Kind            string
 	EventID         string
 	TenantID        string
 	UserID          string
@@ -55,12 +61,21 @@ type DeliveryNotification struct {
 }
 
 func (notification DeliveryNotification) Validate() error {
+	kind := notification.Kind
+	if kind == "" {
+		kind = DeliveryNotificationKindInboxItemCreated
+	}
+	if kind != DeliveryNotificationKindInboxItemCreated && kind != DeliveryNotificationKindInboxItemHidden {
+		return NewInvalidFrame("delivery notification kind is unsupported")
+	}
 	if notification.TenantID == "" ||
 		notification.UserID == "" ||
 		notification.ConversationID == "" ||
 		notification.ConversationSeq <= 0 ||
-		notification.EventID == "" ||
-		notification.SourceEventType == "" {
+		notification.EventID == "" {
+		return NewInvalidFrame("delivery notification is incomplete")
+	}
+	if kind == DeliveryNotificationKindInboxItemCreated && notification.SourceEventType == "" {
 		return NewInvalidFrame("delivery notification is incomplete")
 	}
 	return nil

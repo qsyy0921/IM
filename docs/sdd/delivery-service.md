@@ -214,6 +214,7 @@ schemas/kafka/delivery/v1/im.delivery.events.proto
 | --- | --- | --- |
 | `delivery.inbox_item.created.v1` | `tenant_id + conversation_id` | push-gateway、audit |
 | `delivery.ack.recorded.v1` | `tenant_id + conversation_id` | receipt-service、audit |
+| `delivery.inbox_item.hidden.v1` | `tenant_id + conversation_id` | push-gateway、audit |
 
 `delivery_outbox` 是 delivery-service 的本地事务 outbox。业务事务只写 `delivery_outbox`，由 `NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay` 后台进程发布到 Kafka，不允许 `ProjectTimelineEvent` 或 `AckDelivery` 用例直接 publish Kafka。
 
@@ -240,8 +241,9 @@ Payload 映射：
 
 - `delivery.inbox_item.created.v1` -> `DeliveryInboxItemCreatedV1`，包含 `tenant_id/user_id/conversation_id/conversation_seq/source_event_id/source_event_type/message_id`。
 - `delivery.ack.recorded.v1` -> `DeliveryAckRecordedV1`，包含 `tenant_id/user_id/device_id/conversation_id/last_received_seq`。
+- `delivery.inbox_item.hidden.v1` -> `DeliveryInboxItemHiddenV1`，包含 `tenant_id/user_id/device_id/conversation_id/conversation_seq/message_id`；`message_id` 只是可选定位上下文，客户端仍必须按 `conversation_seq` 和 durable inbox 状态校准。
 
-`delivery.inbox_item.created.v1` 第一阶段定位为在线通知和补拉唤醒信号，不承载完整消息体。push-gateway 收到后只能通知在线客户端有新 inbox item，或调用 delivery-service 查询缺失范围；客户端仍以 `PullInbox` 返回的 durable read model 为准。
+`delivery.inbox_item.created.v1` 和 `delivery.inbox_item.hidden.v1` 第一阶段定位为在线通知和补拉 / 本地视图更新唤醒信号，不承载完整消息体，也不代表 message-service 事实变更。push-gateway 收到后只能通知在线客户端回源或更新本地视图；客户端仍以 `PullInbox` 返回的 durable read model 为准。
 
 Relay 语义：
 
@@ -440,7 +442,7 @@ message-service / conversation-service 发布 timeline event
 
 - `PullInbox`、`AckDelivery` 和 `HideInboxItem` 必须使用 authenticated `tenant_id/user_id/device_id`，不信任请求体裸 user。
 - gRPC API 支持第一阶段 gateway verified metadata auth mode：`NEXUSIM_DELIVERY_AUTH_MODE=metadata` / `verified-metadata` 时，`PullInbox`、`AckDelivery` 和 `HideInboxItem` 的 `tenant_id / user_id / device_id / session_id` 只来自 gRPC metadata，不信任 request body 中可伪造的身份字段；`trace_id / request_id` 可在 metadata 缺失时从 body 兜底用于排障相关性。默认 `body` 模式仅用于兼容历史 smoke。
-- `HideInboxItem` 只隐藏当前用户的 `user_inbox` 视图，不修改 `message_log`、不写 conversation timeline、不发布 `message.deleted.v1` 或 `delivery.inbox_item.created.v1`。它用于 `DeleteMessage SELF_VIEW` 类产品语义；会话级删除和合规删除仍属于 message-service / retention workflow。
+- `HideInboxItem` 只隐藏当前用户的 `user_inbox` 视图，不修改 `message_log`、不写 conversation timeline、不发布 `message.deleted.v1` 或新的 inbox-created 事实。首次隐藏会在同一事务写 `delivery.inbox_item.hidden.v1` 到 delivery outbox，用于同一 user 的其它在线设备收到轻量 `delivery.hide` 后更新本地视图；重复隐藏返回 `already_hidden=true` 且不重复写 outbox。它用于 `DeleteMessage SELF_VIEW` 类产品语义；会话级删除和合规删除仍属于 message-service / retention workflow。
 - 第一阶段可以通过 `user_inbox` 是否存在判断可见性；没有 inbox item 不等于 conversation 不存在。
 - 成员边界事件决定投递可见窗口，不能用当前成员表回写历史可见性。
 - `delivery_membership_projection` 只能由 Kafka timeline event 重建；manual repair 必须留审计。
@@ -492,7 +494,7 @@ Prometheus scrape target: host.docker.internal:11912/metrics
 | 测试 | 目标 |
 | --- | --- |
 | unit | fanout decision、ACK 单调性、HideInboxItem 幂等、权限错误映射 |
-| integration | PostgreSQL 写 user_inbox / cursor / delivery_outbox 同事务；HideInboxItem 过滤 PullInbox 且不破坏 ACK |
+| integration | PostgreSQL 写 user_inbox / cursor / delivery_outbox 同事务；HideInboxItem 过滤 PullInbox、首次写 hidden outbox 且不破坏 ACK |
 | contract | Proto request/response 和错误码 |
 | server security | gRPC server TLS / mTLS env config、cert/key 成对校验、client DNS / URI SAN allowlist |
 | consumer smoke | 构造 timeline event，投影到 user_inbox |

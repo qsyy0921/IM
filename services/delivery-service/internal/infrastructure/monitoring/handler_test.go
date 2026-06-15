@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -134,6 +135,140 @@ func TestHandlerMetricsIncludesTraceSnapshot(t *testing.T) {
 	}
 }
 
+func TestHandlerPrometheusMetrics(t *testing.T) {
+	grpcMetrics := NewGRPCMetrics()
+	grpcMetrics.record("/nexusim.delivery.v1.DeliveryService/PullInbox", "OK", 12)
+	grpcMetrics.record("/nexusim.delivery.v1.DeliveryService/AckDelivery", "PermissionDenied", 34)
+	handler := NewHandler(nil, grpcMetrics).
+		WithTimelineProjectionWorkerStats(func() types.ProjectionWorkerSnapshot {
+			return types.ProjectionWorkerSnapshot{
+				TotalErrors:        2,
+				ConsecutiveErrors:  1,
+				LastErrorAtMS:      100,
+				LastSuccessAtMS:    90,
+				LastCommitAtMS:     80,
+				LastErrorBackoffMS: 1000,
+			}
+		}).
+		WithOutboxRelayStats(func() types.OutboxRelayWorkerSnapshot {
+			return types.OutboxRelayWorkerSnapshot{
+				TotalErrors:        3,
+				ConsecutiveErrors:  1,
+				LastErrorAtMS:      200,
+				LastSuccessAtMS:    190,
+				LastPublishedAtMS:  180,
+				LastErrorBackoffMS: 2000,
+			}
+		}).
+		WithTraceStats(func() TraceSnapshot {
+			return TraceSnapshot{
+				Enabled:         true,
+				ServiceName:     serviceName,
+				Exporter:        "otlp-grpc",
+				OTLPEndpointSet: true,
+				OTLPInsecure:    true,
+				SamplingRatio:   0.5,
+			}
+		})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+	if contentType := response.Header().Get("Content-Type"); !strings.Contains(contentType, "text/plain") {
+		t.Fatalf("expected prometheus content type, got %q", contentType)
+	}
+	body := response.Body.String()
+	assertContains(t, body, "nexusim_delivery_build_info{service=\"delivery-service\"} 1")
+	assertContains(t, body, "nexusim_delivery_grpc_requests_total{code=\"OK\",method=\"/nexusim.delivery.v1.DeliveryService/PullInbox\"} 1")
+	assertContains(t, body, "nexusim_delivery_grpc_method_errors_total{method=\"/nexusim.delivery.v1.DeliveryService/AckDelivery\"} 1")
+	assertContains(t, body, "nexusim_delivery_timeline_worker_errors_total 2")
+	assertContains(t, body, "nexusim_delivery_outbox_relay_errors_total 3")
+	assertContains(t, body, "nexusim_delivery_otel_traces_enabled{exporter=\"otlp-grpc\"} 1")
+	assertContains(t, body, "nexusim_delivery_otel_traces_sampling_ratio{exporter=\"otlp-grpc\"} 0.5")
+	for _, forbidden := range []string{
+		"tenant_id",
+		"user_id",
+		"device_id",
+		"session_id",
+		"request_id",
+		"trace_id",
+		"conversation_id",
+		"message_id",
+		"event_id",
+		"secret-token",
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("prometheus metrics leaked forbidden field %q in:\n%s", forbidden, body)
+		}
+	}
+}
+
+func TestRenderPrometheusIncludesDeliveryAggregates(t *testing.T) {
+	body := renderPrometheus(Snapshot{
+		Service: serviceName,
+		Delivery: &DeliverySnapshot{
+			UserInboxTotal:                 10,
+			UserInboxDistinctUsers:         3,
+			UserInboxDistinctConversations: 2,
+			MembershipProjectionTotal:      4,
+			MembershipProjectionActive:     2,
+			MembershipProjectionInactive:   2,
+			DeviceDeliveryCursors:          5,
+			KafkaCheckpoints:               6,
+			KafkaConsumerGroups:            2,
+		},
+		DeliveryOutbox: &DeliveryOutboxSnapshot{
+			Total:            7,
+			Pending:          3,
+			PendingReady:     1,
+			PendingScheduled: 2,
+			Published:        3,
+			DLQ:              1,
+			MaxPendingRetry:  4,
+		},
+		ProjectionFailures: &ProjectionFailureSnapshot{
+			Total:                2,
+			DecodeFailed:         1,
+			InvalidArgument:      0,
+			ProjectionDependency: 1,
+			DBReadFailed:         0,
+			DBWriteFailed:        0,
+			Unknown:              0,
+			MaxFailureCount:      3,
+			ResolvedTotal:        8,
+		},
+	})
+
+	assertContains(t, body, "nexusim_delivery_read_model{state=\"user_inbox_total\"} 10")
+	assertContains(t, body, "nexusim_delivery_membership_projection{state=\"active\"} 2")
+	assertContains(t, body, "nexusim_delivery_kafka_checkpoints{state=\"consumer_groups\"} 2")
+	assertContains(t, body, "nexusim_delivery_outbox{state=\"dlq\"} 1")
+	assertContains(t, body, "nexusim_delivery_outbox{state=\"max_pending_retry\"} 4")
+	assertContains(t, body, "nexusim_delivery_projection_failures{state=\"unresolved_total\"} 2")
+	assertContains(t, body, "nexusim_delivery_projection_failures_by_class{class=\"projection_dependency\"} 1")
+	assertContains(t, body, "nexusim_delivery_metrics_query_error 0")
+	assertContains(t, body, "nexusim_delivery_outbox_metrics_query_error 0")
+	assertContains(t, body, "nexusim_delivery_projection_failure_metrics_query_error 0")
+}
+
+func TestRenderPrometheusIncludesQueryErrorsAndEscapesLabels(t *testing.T) {
+	body := renderPrometheus(Snapshot{
+		Service:                 serviceName,
+		DeliveryError:           "delivery metrics query failed",
+		DeliveryOutboxError:     "delivery outbox metrics query failed",
+		ProjectionFailuresError: "delivery projection failure metrics query failed",
+		Trace:                   &TraceSnapshot{Enabled: true, Exporter: "otlp\"bad\\label\nnext", SamplingRatio: 1},
+		GeneratedAtMS:           1,
+	})
+
+	assertContains(t, body, "nexusim_delivery_metrics_query_error 1")
+	assertContains(t, body, "nexusim_delivery_outbox_metrics_query_error 1")
+	assertContains(t, body, "nexusim_delivery_projection_failure_metrics_query_error 1")
+	assertContains(t, body, "exporter=\"otlp\\\"bad\\\\label\\nnext\"")
+}
+
 func TestHandlerMetricsIncludesDeliverySnapshotsIntegration(t *testing.T) {
 	pool := openMonitoringTestPool(t)
 	ctx := context.Background()
@@ -187,6 +322,13 @@ func TestHandlerMetricsIncludesDeliverySnapshotsIntegration(t *testing.T) {
 		body.ProjectionFailures.MaxFailureCount != 3 ||
 		body.ProjectionFailures.ResolvedTotal != 1 {
 		t.Fatalf("unexpected projection failure snapshot: %+v", *body.ProjectionFailures)
+	}
+}
+
+func assertContains(t *testing.T, body string, want string) {
+	t.Helper()
+	if !strings.Contains(body, want) {
+		t.Fatalf("expected body to contain %q in:\n%s", want, body)
 	}
 }
 

@@ -5,7 +5,7 @@
 - 已有 timeline projection、durable `user_inbox`、`PullInbox`、`AckDelivery`、`HideInboxItem` 用户视图隐藏、`delivery_outbox` relay。
 - 是 push-gateway 的可靠事实源。
 - 不要求 push-gateway 持久化消息或 ACK cursor。
-- 已补 `/healthz`、`/readyz`、`/debug/metrics` 基础观测入口，可在 gRPC / timeline-consumer / outbox-relay 模式下独立挂载；debug HTTP 监听默认只允许 loopback / 私网，公网或未指定地址必须显式 `NEXUSIM_DELIVERY_DEBUG_ALLOW_PUBLIC=true`。
+- 已补 `/healthz`、`/readyz`、`/debug/metrics`、Prometheus text `/metrics`、本地 alert rules / Grafana dashboard 原型；默认 scrape target 为 `host.docker.internal:11912`，覆盖 durable read model、delivery outbox、projection blocker、worker/relay、PG pool 和 OTel trace config 聚合指标；这是本地开发 / 面试演示观测，不是生产 SLO。
 - 已补 `outbox-audit` 只读模式：可直接列出当前 `delivery_outbox` 行，并按 outbox/event/tenant/conversation/status/event_type 缩小排障范围。
 - 已补 `outbox-repair` 运维模式，支持 `audit` 和 `redrive-dlq-pending`，并持久记录 repair audit。
 - 已补 `outbox-repair-audit` 只读模式：可直接列出 outbox repair audit 历史，并按 outbox/event/tenant/conversation/mode/outcome 缩小排障范围。
@@ -27,4 +27,4 @@
 
 ## 后续
 
-- Projection DLQ / repair 深化、更多 delivery event 消费方、隐藏项跨设备删除提示；OTel collector / alerting / dashboard 仍属于后续统一观测治理。
+- Projection DLQ / repair 深化、更多 delivery event 消费方、隐藏项跨设备删除提示；OTel collector / 生产级 alerting / SLO dashboard 仍属于后续统一观测治理。

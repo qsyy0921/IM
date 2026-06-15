@@ -1,0 +1,112 @@
+groups:
+  - name: nexusim-delivery-service
+    rules:
+      - alert: NexusIMDeliveryGrpcErrors
+        expr: increase(nexusim_delivery_grpc_method_errors_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: delivery-service
+        annotations:
+          summary: delivery-service gRPC errors observed
+          description: delivery-service returned non-OK gRPC status codes in the last 5 minutes.
+
+      - alert: NexusIMDeliveryMetricsQueryError
+        expr: nexusim_delivery_metrics_query_error > 0 or nexusim_delivery_outbox_metrics_query_error > 0 or nexusim_delivery_projection_failure_metrics_query_error > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: delivery-service
+        annotations:
+          summary: delivery-service metrics query failed
+          description: delivery-service could not query one or more PostgreSQL aggregation metric groups.
+
+      - alert: NexusIMDeliveryOutboxDLQ
+        expr: nexusim_delivery_outbox{state="dlq"} > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: delivery-service
+        annotations:
+          summary: delivery outbox has DLQ rows
+          description: delivery_outbox contains DLQ rows that can block same-conversation higher versions.
+
+      - alert: NexusIMDeliveryOutboxPendingReady
+        expr: nexusim_delivery_outbox{state="pending_ready"} > 0
+        for: 10m
+        labels:
+          severity: warning
+          service: delivery-service
+        annotations:
+          summary: delivery outbox has ready pending rows
+          description: delivery_outbox has rows ready for relay publication for more than 10 minutes.
+
+      - alert: NexusIMDeliveryProjectionFailures
+        expr: nexusim_delivery_projection_failures{state="unresolved_total"} > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: delivery-service
+        annotations:
+          summary: delivery timeline projection has unresolved failures
+          description: unresolved delivery_projection_failures rows indicate a fail-closed projection blocker.
+
+      - alert: NexusIMDeliveryTimelineWorkerErrors
+        expr: increase(nexusim_delivery_timeline_worker_errors_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: delivery-service
+        annotations:
+          summary: delivery timeline worker errors observed
+          description: delivery timeline projection worker reported runtime errors in the last 5 minutes.
+
+      - alert: NexusIMDeliveryTimelineWorkerConsecutiveErrors
+        expr: nexusim_delivery_timeline_worker_consecutive_errors > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: delivery-service
+        annotations:
+          summary: delivery timeline worker is retrying
+          description: delivery timeline projection worker has consecutive errors and is relying on backoff retry.
+
+      - alert: NexusIMDeliveryOutboxRelayErrors
+        expr: increase(nexusim_delivery_outbox_relay_errors_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: delivery-service
+        annotations:
+          summary: delivery outbox relay errors observed
+          description: delivery outbox relay reported runtime errors in the last 5 minutes.
+
+      - alert: NexusIMDeliveryOutboxRelayConsecutiveErrors
+        expr: nexusim_delivery_outbox_relay_consecutive_errors > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: delivery-service
+        annotations:
+          summary: delivery outbox relay is retrying
+          description: delivery outbox relay has consecutive errors and is relying on backoff retry.
+
+      - alert: NexusIMDeliveryPGPoolCanceledAcquire
+        expr: increase(nexusim_delivery_pg_pool_canceled_acquire_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: delivery-service
+        annotations:
+          summary: delivery-service PostgreSQL pool canceled acquire
+          description: delivery-service PostgreSQL pool acquire operations were canceled.
+
+      - alert: NexusIMDeliveryOtlpEndpointMissing
+        expr: nexusim_delivery_otel_traces_enabled{exporter="otlp-grpc"} == 1 and on(exporter) nexusim_delivery_otel_traces_otlp_endpoint_configured{exporter="otlp-grpc"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: delivery-service
+        annotations:
+          summary: delivery-service OTLP traces enabled without endpoint
+          description: delivery-service is configured for OTLP gRPC traces but no OTLP endpoint is configured.

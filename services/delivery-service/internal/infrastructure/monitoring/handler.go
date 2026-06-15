@@ -48,7 +48,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/readyz":
 		h.handleReady(w, r)
 	case "/debug/metrics":
-		h.handleMetrics(w, r)
+		writeJSON(w, http.StatusOK, h.snapshot(r.Context()))
+	case "/metrics":
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(renderPrometheus(h.snapshot(r.Context()))))
 	default:
 		http.NotFound(w, r)
 	}
@@ -68,7 +72,7 @@ func (h *Handler) handleReady(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, healthResponse{Service: serviceName, Status: "ready"})
 }
 
-func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) snapshot(ctx context.Context) Snapshot {
 	snapshot := Snapshot{
 		Service:       serviceName,
 		GeneratedAtMS: time.Now().UnixMilli(),
@@ -102,28 +106,28 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 			MaxConns:             stats.MaxConns(),
 			TotalConns:           stats.TotalConns(),
 		}
-		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		queryCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
-		delivery, err := queryDeliverySnapshot(ctx, h.pool)
+		delivery, err := queryDeliverySnapshot(queryCtx, h.pool)
 		if err != nil {
 			snapshot.DeliveryError = "delivery metrics query failed"
 		} else {
 			snapshot.Delivery = &delivery
 		}
-		deliveryOutbox, err := queryDeliveryOutboxSnapshot(ctx, h.pool)
+		deliveryOutbox, err := queryDeliveryOutboxSnapshot(queryCtx, h.pool)
 		if err != nil {
 			snapshot.DeliveryOutboxError = "delivery outbox metrics query failed"
 		} else {
 			snapshot.DeliveryOutbox = &deliveryOutbox
 		}
-		projectionFailures, err := queryProjectionFailureSnapshot(ctx, h.pool)
+		projectionFailures, err := queryProjectionFailureSnapshot(queryCtx, h.pool)
 		if err != nil {
 			snapshot.ProjectionFailuresError = "delivery projection failure metrics query failed"
 		} else {
 			snapshot.ProjectionFailures = &projectionFailures
 		}
 	}
-	writeJSON(w, http.StatusOK, snapshot)
+	return snapshot
 }
 
 type healthResponse struct {

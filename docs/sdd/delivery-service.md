@@ -472,6 +472,21 @@ delivery_outbox_dlq_count
 delivery_cursor_regression_count
 ```
 
+第一阶段本地运维观测通过 debug HTTP 入口暴露：
+
+```text
+NEXUSIM_DELIVERY_DEBUG_ADDR=127.0.0.1:11912
+GET /healthz
+GET /readyz
+GET /debug/metrics
+GET /metrics
+Prometheus scrape target: host.docker.internal:11912/metrics
+```
+
+`/debug/metrics` 返回低敏 JSON snapshot；`/metrics` 复用同一 snapshot 输出 Prometheus text。当前覆盖 gRPC request / error / latency、durable `user_inbox` read model、`delivery_membership_projection`、`delivery_outbox`、unresolved projection failure blocker、timeline worker retry、outbox relay retry、PG pool 和 OTel trace config。labels 限定为 `method/code/state/class/exporter` 等低基数字段，不输出 token、tenant/user/device/session id、request/trace id、conversation id、message id、event id、payload 或 raw broker / SQL error。
+
+本地 alert rules 覆盖 gRPC errors、metrics query error、delivery outbox DLQ / ready pending rows、projection failure blocker、timeline worker retry、outbox relay retry、PG pool canceled acquire 和 OTLP endpoint missing。该能力仅用于本地开发 / smoke / 面试演示，不等同于生产 Prometheus、Alertmanager、Grafana 权限治理、retention 或 SLO 阈值。
+
 ## 13. 测试方案
 
 | 测试 | 目标 |

@@ -23,7 +23,7 @@
    现有 public listener、mock auth、metadata auth、verified metadata、TLS / mTLS allowlist 已纳入 `tools/check-local.ps1`；后续新增 listener / 服务时必须同步门禁和服务级测试。
 
 5. 容量和复杂度治理：
-   已有 9 服务健康态 Docker resource snapshot 入口；仍需补各服务容量基线、瓶颈和资源曲线。生产手写文件接近 2500 行、测试或 runner 接近 3000 行时继续同 package 拆分。
+   已有 9 服务健康态 Docker resource snapshot 入口和摘要工具；仍需补各服务容量基线、瓶颈和资源曲线。生产手写文件接近 2500 行、测试或 runner 接近 3000 行时继续同 package 拆分。
 
 ## 逐服务未完成工作
 

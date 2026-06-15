@@ -1,5 +1,21 @@
 # 本地双机压测 Runbook
 
+## 快速入口：9 服务健康态资源快照
+
+本地 9 服务 Docker 健康态检查可以同时写出一次性资源快照：
+
+```powershell
+.\tools\run-local-service-health-smoke.ps1 -SkipImageBuild -RecordResourceSnapshot -RunName local-service-health-smoke-<name>
+```
+
+原始输出目录固定在 `H:\NexusIM\loadtest-results\<run-name>`，不要写回仓库。快照通过后可生成 JSON / Markdown 摘要：
+
+```powershell
+.\tools\summarize-local-service-resource-snapshot.ps1 -SnapshotDir H:\NexusIM\loadtest-results\local-service-health-smoke-<name>
+```
+
+该摘要只说明健康态下的一次 `docker stats --no-stream` 观察值，不是容量压测、SLO 或生产资源基线。
+
 ## 1. 机器与网络
 
 当前本地双机压测只用于开发阶段，不代表目标态生产拓扑。

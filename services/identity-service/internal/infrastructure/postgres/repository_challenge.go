@@ -11,6 +11,20 @@ import (
 	"github.com/qsyy0921/IM/services/identity-service/internal/types"
 )
 
+type identityChallengeRow struct {
+	TenantID     types.TenantID
+	UserID       types.UserID
+	ChallengeID  types.ChallengeID
+	Type         types.ChallengeType
+	Status       string
+	Channel      types.VerificationChannel
+	Destination  string
+	TokenHash    string
+	ExpiresAt    time.Time
+	AttemptCount int
+	MaxAttempts  int
+}
+
 func upsertChallengeDestination(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, channel types.VerificationChannel, destination string, now time.Time) error {
 	var err error
 	switch channel {

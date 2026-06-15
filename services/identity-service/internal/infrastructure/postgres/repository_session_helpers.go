@@ -8,6 +8,13 @@ import (
 	"github.com/qsyy0921/IM/services/identity-service/internal/types"
 )
 
+type sessionMFAProof struct {
+	Verified   bool
+	VerifiedAt time.Time
+	Method     string
+	FactorID   types.MFAFactorID
+}
+
 func ensureActiveDevice(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, deviceID types.DeviceID) (deviceRow, error) {
 	var row deviceRow
 	err := tx.QueryRow(ctx, `

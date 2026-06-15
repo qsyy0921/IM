@@ -14,7 +14,7 @@
 - 当 `NEXUSIM_IDENTITY_ADMIN_AUTH_MODE=metadata|verified-metadata` 时，公网监听地址 + 无 gRPC mTLS client cert 的危险组合会在启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - TOTP / recovery-code proof 已在最终 Login / Refresh 事务内重新检查 lock；锁定期间不消费 proof、不写 session、不轮换 refresh token。
 - 已有只读 `session-mfa-proof-audit`、只读 `challenge-delivery-repair-audit` 和 `challenge-delivery-repair-cleanup` operator，用于发现历史 session MFA proof 脏数据、直接审计 challenge delivery repair 历史，以及按 retention / scope 清理 repair audit 历史。
-- PostgreSQL repository 已拆出 challenge helpers 和 session/device/MFA proof helpers，核心文件降到 2500 行以下；后续继续按主题拆测试和存储 helpers。
+- PostgreSQL repository 已拆出 challenge、session/device/MFA proof、refresh token 和 identity outbox helpers，核心文件降到 1800 行以下；后续继续按主题拆测试和存储 helpers。
 
 ## 后续
 

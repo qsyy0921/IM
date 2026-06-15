@@ -47,11 +47,14 @@
 这些工作暂不抢在前 9 个服务收口之前做：
 
 - `search-service`
+- `memory-service` / memory projection
 - `media-service`
 - `notification-service`
 - `audit-service`
 - `admin-service`
+- `retrieval-gateway`
 - `rag-service`
 - `summary-service`
 - `agent-service`
+- `ai-eval-service` / AI eval harness
 - Web / App / 桌面端产品化展示层

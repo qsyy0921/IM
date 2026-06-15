@@ -5,6 +5,7 @@
 | 目录 / 文档 | 说明 |
 | --- | --- |
 | `architecture/` | 总架构和架构补充文档。入口是 `architecture/target-architecture.md`，细节分卷在 `target-architecture-*.md`。 |
+| `architecture/target-architecture-ai.md` | 后续 search / memory / RAG / Agent 的目标架构、证据边界、评测门禁和演进顺序。 |
 | `sdd/` | 服务级软件设计文档。当前已落地 `message-service`、`conversation-service`、`delivery-service`、`push-gateway`、`identity-service`、`policy-service`、`receipt-service`、`contacts-service` 和第一版 `api-gateway` 的设计入口。 |
 | `runbook/` | 本地运行、压测、故障处理和演练说明。压测报告按微服务归档到 `runbook/loadtest/<service>/`。 |
 | `interview/project-progress.md` | 面试用项目进度说明：讲述线和后端 / 分布式 / AI 应用后端路线。 |

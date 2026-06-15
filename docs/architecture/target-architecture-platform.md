@@ -62,6 +62,8 @@ freeze affected policy scope
 
 ### 10.2 Search/RAG
 
+详细 AI / memory / Agent 后续目标架构见 `target-architecture-ai.md`。本节只保留跨服务硬边界。
+
 OpenSearch 文档必须包含：
 
 ```text

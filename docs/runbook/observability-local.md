@@ -106,6 +106,37 @@ grpc.legacy_descriptor_last_seen_unix_ms = 0
 
 这只能证明本次 snapshot 没有 legacy descriptor 暴露 / 流量；正式移除前应使用强门禁和目标环境持续 Prometheus alert / dashboard 观察，确认历史客户端已经切到 `GatewayService` facade。
 
+要把一次 live/offline 观察落盘为可复核证据，使用：
+
+```powershell
+.\tools\record-api-gateway-legacy-observation.ps1 `
+  -MetricsUrl http://127.0.0.1:11904/debug/metrics `
+  -RunName api-gateway-legacy-observation-<date> `
+  -RequiredQuietDuration 7d `
+  -MaxSnapshotAge 30m
+```
+
+或使用已保存 snapshot：
+
+```powershell
+.\tools\record-api-gateway-legacy-observation.ps1 `
+  -SnapshotPath H:\NexusIM\loadtest-results\<run>\api-gateway-metrics.json `
+  -RunName api-gateway-legacy-observation-<date> `
+  -RequiredQuietDuration 7d `
+  -MaxSnapshotAge 30m
+```
+
+该脚本会写入：
+
+```text
+H:\NexusIM\loadtest-results\<run>\api-gateway-metrics.json
+H:\NexusIM\loadtest-results\<run>\legacy-gate-output.txt
+H:\NexusIM\loadtest-results\<run>\legacy-observation-summary.json
+H:\NexusIM\loadtest-results\<run>\legacy-observation-report.md
+```
+
+gate 失败时仍会写入证据文件，并以非零 exit code 返回，方便 CI / 本地脚本阻断误删 legacy descriptor。它只能证明该次 snapshot 和所选 gate 参数，不能证明所有环境都完成迁移。
+
 ## Tenant Quota Snapshot Gate
 
 配置源切到 URL source 或后续控制面输出前，可对 `/debug/metrics` 或离线 snapshot 运行 quota gate：

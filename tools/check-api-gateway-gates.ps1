@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $quotaGate = Join-Path $PSScriptRoot "check-api-gateway-quota-snapshot.ps1"
 $legacyGate = Join-Path $PSScriptRoot "check-api-gateway-legacy-descriptor-migration.ps1"
+$legacyObservation = Join-Path $PSScriptRoot "record-api-gateway-legacy-observation.ps1"
 $powerShellExe = (Get-Command powershell -ErrorAction Stop).Source
 $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("nexusim-api-gateway-gates-" + [System.Guid]::NewGuid().ToString("N"))
 
@@ -139,6 +140,42 @@ try {
     Invoke-GateExpectPass -Arguments ($legacyStrongArgs + @("-SnapshotPath", $legacyGood))
     Invoke-GateExpectFail -Arguments ($legacyStrongArgs + @("-SnapshotPath", $legacyNoFacade))
     Invoke-GateExpectFail -Arguments ($legacyStrongArgs + @("-SnapshotPath", $legacyFutureOptIn))
+
+    $observationRoot = Join-Path $tempDir "legacy-observation"
+    Invoke-GateExpectPass -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $legacyObservation,
+        "-SnapshotPath", $legacyGood,
+        "-OutputRoot", $observationRoot,
+        "-RunName", "legacy-observation-pass",
+        "-RequiredQuietDuration", "7d",
+        "-MaxSnapshotAge", "1h",
+        "-NowUnixMS", "100500"
+    )
+    $observationSummary = Join-Path $observationRoot "legacy-observation-pass\legacy-observation-summary.json"
+    $observationReport = Join-Path $observationRoot "legacy-observation-pass\legacy-observation-report.md"
+    if (-not (Test-Path -LiteralPath $observationSummary)) {
+        throw "Expected legacy observation summary to be written: $observationSummary"
+    }
+    if (-not (Test-Path -LiteralPath $observationReport)) {
+        throw "Expected legacy observation report to be written: $observationReport"
+    }
+    Invoke-GateExpectFail -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $legacyObservation,
+        "-SnapshotPath", $legacyNoFacade,
+        "-OutputRoot", $observationRoot,
+        "-RunName", "legacy-observation-fail",
+        "-RequiredQuietDuration", "7d",
+        "-MaxSnapshotAge", "1h",
+        "-NowUnixMS", "100500"
+    )
+    $failedObservationSummary = Join-Path $observationRoot "legacy-observation-fail\legacy-observation-summary.json"
+    if (-not (Test-Path -LiteralPath $failedObservationSummary)) {
+        throw "Expected failed legacy observation summary to be written: $failedObservationSummary"
+    }
 }
 finally {
     Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue

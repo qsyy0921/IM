@@ -13,6 +13,20 @@
 | `loadtest-report-20260614-api-gateway-conversation-correlation-smoke.md` | secure E2E facade smoke 复用链路，验证 conversation-service `CreateMemberChange` gRPC access log 已读取并输出 api-gateway 注入的 `trace_id` / `request_id` |
 | `loadtest-report-20260614-message-conversation-correlation-smoke.md` | secure E2E facade smoke 复用链路，验证 message-service 会把 api-gateway 注入的 `trace_id` / `request_id` 继续透传给 conversation-service `GetSendContext` |
 
+## Legacy Descriptor Observation
+
+`tools/record-api-gateway-legacy-observation.ps1` 可用于记录 legacy descriptor quiet-window gate 证据：
+
+```powershell
+.\tools\record-api-gateway-legacy-observation.ps1 `
+  -MetricsUrl http://127.0.0.1:11904/debug/metrics `
+  -RunName api-gateway-legacy-observation-<date> `
+  -RequiredQuietDuration 7d `
+  -MaxSnapshotAge 30m
+```
+
+输出位于 `H:\NexusIM\loadtest-results\<run>`，包含 raw metrics snapshot、gate 输出、summary JSON 和 markdown report。gate 失败也会落盘，并返回非零码。该证据只代表一次 live/offline snapshot，不代表所有环境的生产迁移完成。
+
 ## 当前边界
 
 - 当前是 first-stage correlation，不是完整 OpenTelemetry trace。

@@ -17,7 +17,7 @@
    继续补更长时间 Kafka ISR flapping、consumer rebalance、Kafka producer 故障重试行为 smoke / idempotent-producer 客户端评估；继续完善 Redis Cluster / 生产级 Redis HA 设计、PostgreSQL quorum / split-brain fencing 和服务发现 / 部署编排。PostgreSQL 生产 quorum 边界以 ADR-034 为准。
 
 3. Repair / DLQ / audit 产品化：
-   多数服务已有本地 operator / audit / cleanup；后续要补跨服务 runbook、批量 repair、审批边界、外部审计 sink 和运维 UI，不把手写 SQL 当作长期方案。
+   多数服务已有本地 operator / audit / cleanup，且已有统一 operator 索引；后续要补跨服务执行编排、批量 repair、审批边界、外部审计 sink 和运维 UI，不把手写 SQL 当作长期方案。
 
 4. 安全启动门禁维护：
    现有 public listener、mock auth、metadata auth、verified metadata、TLS / mTLS allowlist 已纳入 `tools/check-local.ps1`；后续新增 listener / 服务时必须同步门禁和服务级测试。

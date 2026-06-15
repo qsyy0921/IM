@@ -29,6 +29,9 @@ try {
     Write-Host "== runbook consistency =="
     Invoke-LocalCheck "check-runbook-consistency.ps1"
 
+    Write-Host "== repair operator index =="
+    Invoke-LocalCheck "check-repair-operator-index.ps1"
+
     Write-Host "== ddd boundaries =="
     Invoke-LocalCheck "check-ddd-boundaries.ps1"
 

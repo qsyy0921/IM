@@ -20,6 +20,7 @@
 - 本地分布式和 Docker：`distributed-local.md`、`mac-arm64-docker-images.md`
 - 本地观测：`observability-local.md`
 - 本地压测操作：`local-loadtest.md`
+- repair / DLQ operator：`repair-operators.md`
 - 研究论文分类：`../research/paper-organization.md`
 - 历史长文档：`archive/`、`history/`
 

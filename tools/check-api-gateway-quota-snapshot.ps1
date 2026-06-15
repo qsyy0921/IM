@@ -118,6 +118,9 @@ $nowMS = $NowUnixMS
 if ($nowMS -le 0) {
     $nowMS = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
 }
+if ($generatedAtMS -gt 0) {
+    $ageMS = $nowMS - $generatedAtMS
+}
 
 $failed = $false
 if ($RequireRateLimitEnabled -and -not $enabled) {
@@ -170,10 +173,15 @@ if ($requiredMaxAgeMS -gt 0) {
     if ($generatedAtMS -le 0) {
         Write-Host "FAIL api-gateway tenant quota snapshot has no generated_at_unix_ms; cannot prove max age." -ForegroundColor Red
         $failed = $true
-    } elseif ($ageMS -gt $requiredMaxAgeMS) {
-        Write-Host "FAIL api-gateway tenant quota snapshot is older than allowed: max_allowed_age_ms=$requiredMaxAgeMS actual_age_ms=$ageMS." -ForegroundColor Red
-        $failed = $true
     }
+}
+
+if ($generatedAtMS -gt 0 -and $ageMS -lt 0) {
+    Write-Host "FAIL api-gateway tenant quota snapshot generated_at_unix_ms is from the future: generated_at_unix_ms=$generatedAtMS now_unix_ms=$nowMS." -ForegroundColor Red
+    $failed = $true
+} elseif ($requiredMaxAgeMS -gt 0 -and $ageMS -gt $requiredMaxAgeMS) {
+    Write-Host "FAIL api-gateway tenant quota snapshot is older than allowed: max_allowed_age_ms=$requiredMaxAgeMS actual_age_ms=$ageMS." -ForegroundColor Red
+    $failed = $true
 }
 
 if ($stale -and -not $AllowStale) {

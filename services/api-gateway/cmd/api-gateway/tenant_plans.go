@@ -44,6 +44,7 @@ type tenantRateLimitPlanSnapshotPayload struct {
 const (
 	tenantPlanSnapshotMaxBytes      = 1 << 20
 	tenantPlanSnapshotVersionPrefix = "quota-v1"
+	tenantPlanSnapshotMaxFutureSkew = 5 * time.Minute
 )
 
 func tenantRateLimitPlansFromEnv(ctx context.Context) (tenantRateLimitPlanSnapshot, error) {
@@ -437,10 +438,16 @@ func validateTenantPlanSnapshotPolicy(snapshot tenantRateLimitPlanSnapshot, maxA
 }
 
 func validateTenantPlanMaxAge(snapshot tenantRateLimitPlanSnapshot, maxAge time.Duration) error {
-	if maxAge <= 0 || snapshot.GeneratedAtUnixMS <= 0 {
+	if snapshot.GeneratedAtUnixMS <= 0 {
 		return nil
 	}
 	generatedAt := time.UnixMilli(snapshot.GeneratedAtUnixMS)
+	if generatedAt.After(time.Now().Add(tenantPlanSnapshotMaxFutureSkew)) {
+		return errors.New("api-gateway tenant plan snapshot generated_at_unix_ms is from the future")
+	}
+	if maxAge <= 0 {
+		return nil
+	}
 	if time.Since(generatedAt) > maxAge {
 		return errors.New("api-gateway tenant plan snapshot is stale")
 	}

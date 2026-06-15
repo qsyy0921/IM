@@ -42,6 +42,7 @@ try {
     $quotaTooFewPlans = Join-Path $tempDir "quota-too-few-plans.json"
     $quotaTooManyKeys = Join-Path $tempDir "quota-too-many-keys.json"
     $quotaOldReload = Join-Path $tempDir "quota-old-reload.json"
+    $quotaFutureSnapshot = Join-Path $tempDir "quota-future-snapshot.json"
     $quotaGoodJson = @'
 {
   "rate_limit": {
@@ -49,7 +50,7 @@ try {
     "tenant_plan_count": 2,
     "tenant_plan_source": "url",
     "tenant_plan_version": "quota-v1.gate",
-    "tenant_plan_generated_at_unix_ms": 4102444800000,
+    "tenant_plan_generated_at_unix_ms": 1000000,
     "tenant_plan_checksum_present": true,
     "tenant_plan_require_checksum": true,
     "tenant_plan_url_bearer_token_configured": true,
@@ -74,6 +75,7 @@ try {
     Write-JsonFile -Path $quotaTooFewPlans -Content ($quotaGoodJson -replace '"tenant_plan_count": 2', '"tenant_plan_count": 0')
     Write-JsonFile -Path $quotaTooManyKeys -Content ($quotaGoodJson -replace '"tracked_keys": 42', '"tracked_keys": 101')
     Write-JsonFile -Path $quotaOldReload -Content ($quotaGoodJson -replace '"tenant_plan_reloaded_at_unix_ms": 1000000', '"tenant_plan_reloaded_at_unix_ms": 300000')
+    Write-JsonFile -Path $quotaFutureSnapshot -Content ($quotaGoodJson -replace '"tenant_plan_generated_at_unix_ms": 1000000', '"tenant_plan_generated_at_unix_ms": 1006000')
 
     $quotaStrongArgs = @(
         "-NoProfile",
@@ -103,6 +105,7 @@ try {
     Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaTooFewPlans))
     Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaTooManyKeys))
     Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaOldReload))
+    Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaFutureSnapshot))
 
     $legacyGood = Join-Path $tempDir "legacy-good.json"
     $legacyNoFacade = Join-Path $tempDir "legacy-no-facade.json"

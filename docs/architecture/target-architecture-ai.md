@@ -37,11 +37,12 @@ EverMemBench 只是设计输入之一。它强调多人、多群、多时间版�
 
 1. IM 业务事实源仍在现有服务：message、conversation、delivery、identity、contacts、policy 等服务继续拥有各自事实。
 2. AI 服务只消费事件、构建 projection、生成证据包和建议，不直接改 IM 事实源。
-3. Agent 不直连 PostgreSQL、OpenSearch、Milvus、Redis；只能通过 retrieval-gateway、tool-service 或公开业务 API。
-4. Agent 写动作必须走 `Proposal -> Approval -> Executor -> Audit`。
-5. 搜索、RAG、Agent 的任何回答都必须能关联 EvidencePack；没有证据时必须明确标记。
-6. 成员 `join_seq / leave_seq`、消息撤回、删除、保留期清理和 legal hold 必须进入检索过滤。
-7. 旧事实和新事实不能并列无版本地塞进向量库；必须有 `active / superseded / archived / deleted` 语义。
+3. Agent 可以接入真实业务，但不能直连 PostgreSQL、OpenSearch、Milvus、Redis；只能通过 retrieval-gateway、tool-service、action-executor 或公开业务 API。
+4. Agent 写动作必须先做权限前置校验和 tool policy 检查；audit 是必要条件，但不能替代权限检查。
+5. 高风险 Agent 写动作必须走 `Proposal -> Approval -> Executor -> Audit`；低风险 allowlist 动作可在 policy 通过后自动执行并完整 audit。
+6. 搜索、RAG、Agent 的任何回答都必须能关联 EvidencePack；没有证据时必须明确标记。
+7. 成员 `join_seq / leave_seq`、消息撤回、删除、保留期清理和 legal hold 必须进入检索过滤。
+8. 旧事实和新事实不能并列无版本地塞进向量库；必须有 `active / superseded / archived / deleted` 语义。
 
 ## 3. 分层服务规划
 
@@ -358,17 +359,21 @@ candidate facts
 
 问题问“现在应该怎么做”时，只能使用 active facts；问题问“当时发生了什么”时，可以返回历史事实，但必须标注时间窗口。
 
-## 6. Agent 写动作
+## 6. Agent 真实业务接入与写动作
 
-Agent 不能直接执行业务写入。
+Agent 可以接入真实业务，但必须把权限、工具策略、执行和审计拆开。事后 audit 只能追责，不能阻止越权，因此不能把 audit 当成权限替代品。
+
+通用执行边界：
 
 ```text
 agent detects intent
--> creates ActionProposal
+-> retrieval-gateway builds EvidencePack when evidence is needed
 -> policy-service checks actor/resource/action
--> approval-service applies risk and human approval policy
+-> tool policy checks risk, schema, idempotency and approval requirement
+-> low-risk allowlist action may execute automatically through action-executor
+-> high-risk action creates ActionProposal and waits approval
 -> action-executor invokes public business API
--> audit-service records input, evidence, approval and result
+-> audit-service records input, evidence, policy decision, approval and result
 ```
 
 高风险动作默认需要审批：
@@ -385,12 +390,22 @@ Agent 能力按风险分层开放：
 
 | 模式 | 能力 | 是否允许写动作 |
 | --- | --- | --- |
-| read-only | 查询、总结、解释、找证据 | 否 |
-| proposal-only | 生成待审批 proposal | 否 |
-| approved-execute | 审批通过后由 executor 执行 | 仅 executor |
-| autonomous-low-risk | 低风险、可回滚动作 | 需要明确 allowlist 和审计 |
+| read-only | 查询、总结、解释、找证据 | 否；但可接真实查询业务和 retrieval |
+| low-risk-autonomous | 低风险、可回滚、allowlist 动作 | 可以；必须 policy 通过、带 idempotency key、完整 audit |
+| proposal-only | 高风险动作只生成待审批 proposal | 否；不执行 |
+| approved-execute | 审批通过后由 executor 执行 | 仅 executor 调真实业务 API |
+| autonomous-high-risk | 高风险自动执行 | 第一阶段禁止 |
 
-第一版只做 read-only 和 proposal-only。
+第一版只做 read-only、low-risk-autonomous 的极小 allowlist 和 proposal-only。所有 high-risk 动作必须 approval 后由 executor 执行。
+
+动作分级示例：
+
+| 风险级别 | 示例 | 执行策略 |
+| --- | --- | --- |
+| read-only | 查消息、查联系人、查群成员、生成摘要、解释策略 | policy check + EvidencePack + audit |
+| low-risk | 创建草稿、添加个人提醒、生成待发送文本、标记本地视图偏好 | allowlist + idempotency + audit |
+| medium-risk | 创建普通任务、修改非敏感配置、批量生成但不发送内容 | proposal 或按租户策略审批 |
+| high-risk | 撤回/删除消息、踢人、改权限、外发消息/文件、封禁账号 | proposal + approval + executor + audit |
 
 ### 6.2 Tool Policy
 
@@ -417,6 +432,39 @@ Agent 调用 tool 前必须同时满足：
 - tool policy 允许；
 - risk / approval 条件满足；
 - request idempotency key 存在。
+
+### 6.3 Agent Audit
+
+所有真实业务接入都必须记录 audit，不区分成功或失败。
+
+```text
+audit_id
+tenant_id
+agent_run_id
+agent_id
+actor_user_id
+delegated_subject
+tool_id
+action_type
+target_resource
+input_hash
+evidence_pack_id
+policy_decision_id
+approval_id
+idempotency_key
+execution_status
+business_request_id
+business_response_ref
+error_class
+created_at
+```
+
+audit 约束：
+
+- audit 不保存 raw prompt、raw token、provider body 或完整敏感 payload；只保存 hash、摘要、引用和安全裁剪后的错误。
+- audit 必须能追溯到 EvidencePack、policy decision、approval 和业务 API request id。
+- policy 拒绝、approval 拒绝、tool schema 校验失败也必须写 audit。
+- action-executor 失败后重试必须复用 idempotency key，并在 audit 中形成同一 action lineage。
 
 ## 7. AI 评测门禁
 
@@ -569,7 +617,7 @@ Agent 第一版必须等 retrieval-gateway 和 eval harness 稳定后再做。
 | 用户画像 | profile aggregate、supporting evidence、用户控制 | 多证据聚合，可撤销/过期 | 从单条群消息生成长期偏好 |
 | 群聊问答 | search + memory + member visibility | 退群后不可见，跨群证据可归因 | 当前成员状态替代历史窗口 |
 | Agent 读助手 | retrieval-gateway、tool catalog | 只能读授权 evidence | 绕过 retrieval-gateway |
-| Agent 写动作 | proposal、approval、executor、audit | 高风险动作必须审批 | 模型直接写库或直接调内部实现 |
+| Agent 写动作 | policy、tool policy、proposal、approval、executor、audit | 低风险 allowlist 可自动执行；高风险动作必须审批 | 模型直接写库、绕过权限或只靠事后 audit |
 | 智能风控辅助 | audit、policy、EvidencePack | 只输出建议和证据 | AI 直接封禁或改权限 |
 | 客服机器人 | retrieval-gateway、agent-service、approval policy | 可回答 FAQ / 工单建议 | 直接外发敏感信息 |
 
@@ -591,6 +639,9 @@ AnswerWithEvidence(question, evidence_pack_id, answer_options)
 
 CreateActionProposal(intent, evidence_pack_id, tool_intent)
 -> proposal_id, required_approval
+
+ExecuteLowRiskAction(tool_intent, evidence_pack_id, idempotency_key)
+-> execution_status, audit_id
 ```
 
 接口原则：
@@ -598,7 +649,8 @@ CreateActionProposal(intent, evidence_pack_id, tool_intent)
 - `SearchMessages` 属于 search-service；只返回搜索结果，不调用 LLM。
 - `RetrieveEvidence` 属于 retrieval-gateway；统一权限过滤、召回、rerank 和 EvidencePack。
 - `AnswerWithEvidence` 属于 rag-service；只能消费 EvidencePack，不能直接访问索引或业务库。
-- `CreateActionProposal` 属于 agent-service；只创建 proposal，不执行高风险写动作。
+- `CreateActionProposal` 属于 agent-service；只创建高风险 proposal，不执行高风险写动作。
+- `ExecuteLowRiskAction` 可由 agent-service 通过 action-executor 执行极小 allowlist 动作；必须经过 policy、tool policy、idempotency 和 audit。
 - `ExecuteApprovedAction` 后续归 action-executor，不属于 agent-service。
 
 这样可以先形成可测试的后端 AI 主链路：
@@ -609,5 +661,5 @@ message / member events
 -> RetrieveEvidence
 -> read-only RAG answer
 -> eval gate
--> proposal-only Agent
+-> read-only / low-risk / proposal-only Agent
 ```

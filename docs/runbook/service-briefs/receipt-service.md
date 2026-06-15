@@ -5,7 +5,8 @@
 - 已有 `MarkRead`、`GetReceiptState`、`ListReceiptStates`、`ListConversations`。
 - 已支持 unread、archive / pin / mute 的最小会话列表能力。
 - 复用 delivery events 和 receipt projection，不跨服务读 delivery 内部表。
-- 已补 `/healthz`、`/readyz`、`/debug/metrics`，可观察低敏 gRPC、PG pool、receipt projection、conversation summary 和 `receipt_outbox` 聚合状态；debug HTTP 监听默认只允许 loopback / RFC1918 私网，公网或 unspecified 地址必须显式 `NEXUSIM_RECEIPT_DEBUG_ALLOW_PUBLIC=true`。
+- 已补 `/healthz`、`/readyz`、`/debug/metrics` 和 first-stage Prometheus text `/metrics`；可观察低敏 gRPC、PG pool、receipt projection、conversation summary、`receipt_outbox`、worker / relay retry 和 OTel trace config 聚合状态；本地 scrape 目标为 `host.docker.internal:11914`，并已补 Prometheus alert rules 和 Grafana dashboard 原型；这些只用于本地开发 / 面试展示，不代表生产 SLO。
+- debug HTTP 监听默认只允许 loopback / RFC1918 私网，公网或 unspecified 地址必须显式 `NEXUSIM_RECEIPT_DEBUG_ALLOW_PUBLIC=true`。
 - `delivery-consumer` 对非取消错误已改为退避重试，并在 worker 模式通过 `/debug/metrics` 暴露 projection worker retry 快照。
 - `outbox-relay` 对非取消运行时错误已改为退避重试，并在 relay 模式通过 `/debug/metrics` 暴露 low-sensitive outbox relay retry 快照；publisher 错误写入稳定低敏 `last_error`。
 - 已补只读 `outbox-audit`，以及 `outbox-repair` / 只读 `outbox-repair-audit` / `outbox-repair-cleanup` 运维模式，可直接审计、redrive 和清理 `receipt_outbox` repair 历史。
@@ -15,4 +16,4 @@
 
 ## 后续
 
-- 送达回执扩展、批量接口优化、会话列表产品化；OTel collector / alerting / dashboard 仍属于后续统一观测治理。
+- 送达回执扩展、批量接口优化、会话列表产品化；生产级 OTel collector、Alertmanager、SLO dashboard 和容量验证仍属于后续统一观测治理。

@@ -27,6 +27,8 @@ im.delivery.events
 
 2026-06-13 补充：`-VerifiedAuthMetadata` 真实进程 smoke 已通过，验证 conversation / message / delivery / receipt 四个 user-facing gRPC server 在 metadata auth 模式下完成投递、回执、会话列表、未读、归档、置顶和静音链路。receipt-service gRPC mTLS 真实进程 smoke 也已通过，验证 receipt server 端 TLS、require client cert、client DNS / URI SAN allowlist 以及 metadata auth 下的回执 / 列表偏好链路。
 
+2026-06-15 补充：receipt-service 已补 first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 和 Grafana dashboard 原型，覆盖低敏 gRPC、receipt projection、conversation summary、receipt outbox、worker / relay retry、PG pool 和 OTel trace config 聚合指标。该观测面用于本地开发 / 面试展示，不是生产 SLO 或完整告警平台。
+
 ## 报告列表
 
 | 报告 | 内容 |
@@ -85,6 +87,7 @@ NEXUSIM_RECEIPT_LOADTEST_VERIFIED_AUTH_METADATA=true
 - `receipt_outbox` 已通过 relay 发布 `receipt.message.received.v1` / `receipt.message.read.v1` 到 `im.receipt.events`；当前还没有下游真实消费者。
 - 已补只读 `NEXUSIM_RECEIPT_SERVICE_MODE=outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit` 和 `outbox-repair-cleanup`，可直接审计 `receipt_outbox` 当前状态、把指定 `DLQ` event redrive 回 `PENDING`，并按 retention 清理 repair audit 历史；当前 repair audit 仍是第一阶段轻量历史。
 - 已补 receipt-service gRPC mTLS smoke：server 端启用 TLS、require client cert、client DNS SAN allowlist=`api-gateway.nexusim.local`、client URI SAN allowlist=`spiffe://nexusim/api-gateway`，client 端使用 CA/server name/client cert/key，并通过 gateway verified metadata 完成 `GetReceiptState / MarkRead / ListConversations / Archive / Pin / Mute`。
+- 已补 receipt-service first-stage Prometheus text `/metrics`、本地 alert rules 和 Grafana dashboard，覆盖低敏 gRPC、projection、conversation summary、outbox、worker / relay retry、PG pool 和 OTel trace config；该能力只用于本地开发 / 面试展示，不代表生产观测体系完成。
 - receipt outbox 的 `aggregate_version` 是 cursor seq，不是 conversation 全局顺序轴，所以 relay 不用低版本 PENDING/DLQ 阻塞同会话更高版本回执事件，避免某个用户回执阻塞其它用户。
 - 会话列表 / 未读数放在 `receipt-service` 内扩展，不新增 `conversation-list-service`，降低服务间耦合和部署复杂度。
 - `ListConversations` 的 unread 由 `receipt_inbox_projection` 中 `source_event_type=message.persisted.v1` 的可见消息行数减去 read cursor 得出，不把 conversation seq 差值当成未读数，也不把 edit/revoke/delete tombstone 当新未读消息。

@@ -9,8 +9,9 @@ $messageRulesPath = Join-Path $repoRoot "deploy\local\prometheus-message-service
 $conversationRulesPath = Join-Path $repoRoot "deploy\local\prometheus-conversation-service-alerts.yml"
 $deliveryRulesPath = Join-Path $repoRoot "deploy\local\prometheus-delivery-service-alerts.yml"
 $pushGatewayRulesPath = Join-Path $repoRoot "deploy\local\prometheus-push-gateway-alerts.yml"
+$receiptRulesPath = Join-Path $repoRoot "deploy\local\prometheus-receipt-service-alerts.yml"
 
-foreach ($path in @($composePath, $configPath, $apiGatewayRulesPath, $identityRulesPath, $messageRulesPath, $conversationRulesPath, $deliveryRulesPath, $pushGatewayRulesPath)) {
+foreach ($path in @($composePath, $configPath, $apiGatewayRulesPath, $identityRulesPath, $messageRulesPath, $conversationRulesPath, $deliveryRulesPath, $pushGatewayRulesPath, $receiptRulesPath)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Missing local Prometheus config file: $path"
     }
@@ -24,6 +25,7 @@ $messageRules = Get-Content -LiteralPath $messageRulesPath -Raw
 $conversationRules = Get-Content -LiteralPath $conversationRulesPath -Raw
 $deliveryRules = Get-Content -LiteralPath $deliveryRulesPath -Raw
 $pushGatewayRules = Get-Content -LiteralPath $pushGatewayRulesPath -Raw
+$receiptRules = Get-Content -LiteralPath $receiptRulesPath -Raw
 
 if ($compose -notmatch "19090:9090") {
     throw "Prometheus compose must expose host port 19090 to avoid existing local service ports."
@@ -46,6 +48,9 @@ if ($compose -notmatch "prometheus-delivery-service-alerts\.yml") {
 if ($compose -notmatch "prometheus-push-gateway-alerts\.yml") {
     throw "Prometheus compose must mount push-gateway alert rules."
 }
+if ($compose -notmatch "prometheus-receipt-service-alerts\.yml") {
+    throw "Prometheus compose must mount receipt-service alert rules."
+}
 if ($config -notmatch "metrics_path:\s*/metrics") {
     throw "Prometheus config must scrape local /metrics endpoints."
 }
@@ -67,6 +72,9 @@ if ($config -notmatch "host\.docker\.internal:11912") {
 if ($config -notmatch "host\.docker\.internal:11913") {
     throw "Prometheus config must target the local push-gateway debug endpoint through host.docker.internal:11913."
 }
+if ($config -notmatch "host\.docker\.internal:11914") {
+    throw "Prometheus config must target the local receipt-service debug endpoint through host.docker.internal:11914."
+}
 if ($config -notmatch "service:\s*identity-service") {
     throw "Prometheus config must label the identity-service scrape target."
 }
@@ -81,6 +89,9 @@ if ($config -notmatch "service:\s*delivery-service") {
 }
 if ($config -notmatch "service:\s*push-gateway") {
     throw "Prometheus config must label the push-gateway scrape target."
+}
+if ($config -notmatch "service:\s*receipt-service") {
+    throw "Prometheus config must label the receipt-service scrape target."
 }
 
 $requiredAPIGatewayAlerts = @(
@@ -187,6 +198,25 @@ $requiredPushGatewayAlerts = @(
 foreach ($alert in $requiredPushGatewayAlerts) {
     if ($pushGatewayRules -notmatch [regex]::Escape($alert)) {
         throw "Prometheus push-gateway rules missing alert: $alert"
+    }
+}
+
+$requiredReceiptAlerts = @(
+    "NexusIMReceiptGrpcErrors",
+    "NexusIMReceiptMetricsQueryError",
+    "NexusIMReceiptOutboxDLQ",
+    "NexusIMReceiptOutboxReadyPending",
+    "NexusIMReceiptDeliveryProjectionWorkerErrors",
+    "NexusIMReceiptDeliveryProjectionWorkerConsecutiveErrors",
+    "NexusIMReceiptOutboxRelayErrors",
+    "NexusIMReceiptOutboxRelayConsecutiveErrors",
+    "NexusIMReceiptPGPoolCanceledAcquire",
+    "NexusIMReceiptOtlpEndpointMissing"
+)
+
+foreach ($alert in $requiredReceiptAlerts) {
+    if ($receiptRules -notmatch [regex]::Escape($alert)) {
+        throw "Prometheus receipt-service rules missing alert: $alert"
     }
 }
 

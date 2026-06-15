@@ -1,0 +1,102 @@
+groups:
+  - name: nexusim-receipt-service
+    rules:
+      - alert: NexusIMReceiptGrpcErrors
+        expr: increase(nexusim_receipt_grpc_method_errors_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: receipt-service
+        annotations:
+          summary: receipt-service gRPC errors observed
+          description: receipt-service returned non-OK gRPC status codes in the last five minutes.
+
+      - alert: NexusIMReceiptMetricsQueryError
+        expr: nexusim_receipt_metrics_query_error > 0 or nexusim_receipt_outbox_metrics_query_error > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: receipt-service
+        annotations:
+          summary: receipt-service metrics query failed
+          description: receipt-service could not query PostgreSQL aggregation metrics.
+
+      - alert: NexusIMReceiptOutboxDLQ
+        expr: nexusim_receipt_outbox{state="dlq"} > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: receipt-service
+        annotations:
+          summary: receipt-service outbox has DLQ rows
+          description: receipt_outbox has DLQ rows. Use receipt outbox audit / repair before redrive.
+
+      - alert: NexusIMReceiptOutboxReadyPending
+        expr: nexusim_receipt_outbox{state="ready_pending"} > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: receipt-service
+        annotations:
+          summary: receipt-service outbox has ready pending rows
+          description: receipt_outbox ready pending rows stayed non-zero. Check outbox relay runtime and Kafka.
+
+      - alert: NexusIMReceiptDeliveryProjectionWorkerErrors
+        expr: increase(nexusim_receipt_delivery_projection_worker_errors_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: receipt-service
+        annotations:
+          summary: receipt-service delivery projection worker errors observed
+          description: receipt delivery projection worker reported runtime errors in the last five minutes.
+
+      - alert: NexusIMReceiptDeliveryProjectionWorkerConsecutiveErrors
+        expr: nexusim_receipt_delivery_projection_worker_consecutive_errors > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: receipt-service
+        annotations:
+          summary: receipt-service delivery projection worker is retrying
+          description: delivery projection worker currently has consecutive errors and is relying on backoff retry.
+
+      - alert: NexusIMReceiptOutboxRelayErrors
+        expr: increase(nexusim_receipt_outbox_relay_errors_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: receipt-service
+        annotations:
+          summary: receipt-service outbox relay errors observed
+          description: receipt outbox relay reported runtime errors in the last five minutes.
+
+      - alert: NexusIMReceiptOutboxRelayConsecutiveErrors
+        expr: nexusim_receipt_outbox_relay_consecutive_errors > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: receipt-service
+        annotations:
+          summary: receipt-service outbox relay is retrying
+          description: receipt outbox relay currently has consecutive errors and is relying on backoff retry.
+
+      - alert: NexusIMReceiptPGPoolCanceledAcquire
+        expr: increase(nexusim_receipt_pg_pool_canceled_acquire_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: receipt-service
+        annotations:
+          summary: receipt-service PostgreSQL pool canceled acquire
+          description: receipt-service PostgreSQL pool acquire operations were canceled.
+
+      - alert: NexusIMReceiptOtlpEndpointMissing
+        expr: nexusim_receipt_otel_traces_enabled{exporter="otlp-grpc"} == 1 and on(exporter) nexusim_receipt_otel_traces_otlp_endpoint_configured{exporter="otlp-grpc"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: receipt-service
+        annotations:
+          summary: receipt-service OTLP traces enabled without endpoint
+          description: receipt-service is configured for OTLP gRPC traces but no OTLP endpoint is configured.

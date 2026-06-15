@@ -65,6 +65,8 @@ NEXUSIM_RECEIPT_GRPC_TLS_CLIENT_ALLOWED_URIS=spiffe://nexusim/api-gateway
 
 `receipt-service` 的 `/healthz` / `/readyz` / `/debug/metrics` 仅用于本地 smoke 和低敏排障。debug HTTP 监听地址来自 `NEXUSIM_RECEIPT_DEBUG_ADDR`，未配置时可回退 `NEXUSIM_DEBUG_ADDR`；默认只允许 loopback / RFC1918 私网地址。若确需绑定公网或 unspecified 地址，必须显式设置 `NEXUSIM_RECEIPT_DEBUG_ALLOW_PUBLIC=true`，避免未认证 debug endpoint 被误暴露。
 
+`receipt-service` 同一 debug HTTP server 已提供第一阶段 Prometheus text `/metrics`，复用 `/debug/metrics` 的低敏 snapshot。本地默认 scrape 目标为 `host.docker.internal:11914/metrics`，对应本地进程监听 `NEXUSIM_RECEIPT_DEBUG_ADDR=127.0.0.1:11914`。当前 `/metrics` 只覆盖 gRPC request / error / latency、receipt projection、conversation summary、receipt outbox、delivery projection worker、outbox relay、PG pool 和 OTel trace config 聚合指标；labels 只允许 method、code、state、exporter 等低基数字段，不得输出 token、tenant_id、user_id、device_id、session_id、request_id、trace_id、conversation_id、message_id、event_id 或 payload。该 endpoint、Prometheus alert rules 和 Grafana dashboard 只用于本地开发 / 面试展示，不代表生产 Prometheus、Alertmanager、SLO 或容量观测已完成。
+
 `receipt-service grpc` 已支持第一阶段 OpenTelemetry gRPC server span，默认关闭。开启后只记录低敏低基数服务侧属性：gRPC full method、status code、latency，并从 `traceparent` 继承 W3C trace context；不得写入 token、tenant/user/device/session id、trace_id、request_id、conversation id、message id、payload 或回执状态详情。`x-nexusim-trace-id` / `x-nexusim-request-id` 仍用于 metadata / access log correlation，但不作为 span attribute 导出。
 
 ```text

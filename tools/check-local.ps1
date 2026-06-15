@@ -80,6 +80,9 @@ try {
     Write-Host "== loadtest output paths =="
     Invoke-LocalCheck "check-loadtest-output-paths.ps1"
 
+    Write-Host "== resource snapshot summary =="
+    Invoke-LocalCheck "check-resource-snapshot-summary.ps1"
+
     Write-Host "== local prometheus config =="
     Invoke-LocalCheck "check-local-prometheus-config.ps1"
 

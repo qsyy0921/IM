@@ -17,14 +17,20 @@ type WriterProducer struct {
 	writer *kafkago.Writer
 }
 
+const (
+	kafkaProducerMaxAttempts     = 5
+	kafkaProducerWriteBackoffMin = 100 * time.Millisecond
+	kafkaProducerWriteBackoffMax = time.Second
+)
+
 func NewWriterProducer(brokers []string) (*WriterProducer, error) {
 	if len(brokers) == 0 {
 		return nil, errors.New("kafka brokers are required")
 	}
 	// kafka-go does not expose Kafka's enable.idempotence producer flag. This
-	// first-phase writer enforces acks=all and relies on outbox/event_id
-	// idempotency; production hardening must revisit the client choice or lower
-	// level transactional producer support.
+	// first-phase writer enforces acks=all, explicit bounded retry/backoff, and
+	// outbox/event_id idempotency. Production hardening must revisit the client
+	// choice or lower-level transactional producer support.
 	return &WriterProducer{
 		writer: &kafkago.Writer{
 			Addr:                   kafkago.TCP(brokers...),
@@ -33,6 +39,9 @@ func NewWriterProducer(brokers []string) (*WriterProducer, error) {
 			AllowAutoTopicCreation: false,
 			BatchSize:              100,
 			BatchTimeout:           10 * time.Millisecond,
+			MaxAttempts:            kafkaProducerMaxAttempts,
+			WriteBackoffMin:        kafkaProducerWriteBackoffMin,
+			WriteBackoffMax:        kafkaProducerWriteBackoffMax,
 			WriteTimeout:           5 * time.Second,
 			ReadTimeout:            5 * time.Second,
 		},

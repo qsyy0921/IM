@@ -52,6 +52,9 @@ try {
     Write-Host "== grpc/wss tls config guardrails =="
     & (Join-Path $PSScriptRoot "check-grpc-tls-config-guards.ps1")
 
+    Write-Host "== kafka producer config =="
+    & (Join-Path $PSScriptRoot "check-kafka-producer-config.ps1")
+
     Write-Host "== git whitespace =="
     git diff --check
     git diff --cached --check

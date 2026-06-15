@@ -13,6 +13,12 @@ type WriterProducer struct {
 	writer *kafkago.Writer
 }
 
+const (
+	kafkaProducerMaxAttempts     = 5
+	kafkaProducerWriteBackoffMin = 100 * time.Millisecond
+	kafkaProducerWriteBackoffMax = time.Second
+)
+
 func NewWriterProducer(brokers []string) (*WriterProducer, error) {
 	if len(brokers) == 0 {
 		return nil, errors.New("kafka brokers are required")
@@ -25,6 +31,9 @@ func NewWriterProducer(brokers []string) (*WriterProducer, error) {
 			AllowAutoTopicCreation: false,
 			BatchSize:              100,
 			BatchTimeout:           10 * time.Millisecond,
+			MaxAttempts:            kafkaProducerMaxAttempts,
+			WriteBackoffMin:        kafkaProducerWriteBackoffMin,
+			WriteBackoffMax:        kafkaProducerWriteBackoffMax,
 			WriteTimeout:           5 * time.Second,
 			ReadTimeout:            5 * time.Second,
 		},

@@ -82,6 +82,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - PostgreSQL `repmgr + pgpool` local failover smoke
 - PostgreSQL quorum observation smoke and ADR-034 production quorum boundary
 - Kafka KRaft 3 broker local failover / controller-switch / ISR observation smoke
+- outbox Kafka producer first-stage `acks=all` / bounded retry-backoff 配置和本地门禁
 
 当前已经证明：
 

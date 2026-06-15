@@ -20,11 +20,11 @@
 - 已补 `projection-failure-cleanup` operator：只删除超过保留期的 resolved failure 审计行，不会碰 unresolved blocker，并支持按 consumer/topic/partition/class 缩小范围。
 - `timeline-consumer` 现已对运行时 `Fetch` / `Commit` 错误做退避重试，并在 worker 模式通过 `/debug/metrics` 暴露低敏 retry 快照；malformed event、projection failure、failure recorder 异常仍保持持久审计 + fail-closed，不会自动越过 blocker。
 - `outbox-relay` 现已对非取消运行时错误做退避重试，并在 relay 模式通过 `/debug/metrics` 暴露低敏 retry 快照；publisher 错误写入稳定低敏 `last_error`，malformed payload / unsupported event 仍保持 fail-closed，交给 outbox retry / DLQ 语义处理。
+- Kafka writer 已显式固定 `acks=all`、禁自动建 topic、bounded attempts/backoff，并由本地门禁防漂移；真正 idempotent / transactional producer 仍属后续客户端选型。
 - 已补 delivery outbox audit / repair audit 错误脱敏：`last_error`、`before_last_error`、`after_last_error` 对外只返回稳定低敏分类，不暴露 broker body、账号、token 或 provider 原文。
 - 已补 `delivery.inbox_item.hidden.v1`：`HideInboxItem` 首次隐藏时同事务写 delivery outbox，push-gateway 可向同 user 在线设备发送 `delivery.hide` 轻量提示；重复隐藏不重复写 outbox。
 - 已补 trusted metadata 启动门禁：当 `NEXUSIM_DELIVERY_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端未启用 mTLS client cert 校验，则启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - 已补 first-stage OpenTelemetry gRPC server span；gRPC access log 只记录低敏 `trace_id/request_id`，并对白名单外入口 metadata 直接丢弃。
 
 ## 后续
-
 - Projection DLQ / repair 深化、更多 delivery event 消费方；OTel collector / 生产级 alerting / SLO dashboard 仍属于后续统一观测治理。

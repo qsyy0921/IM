@@ -12,6 +12,7 @@
 - 已补只读 `outbox-audit`、只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运维模式，可直接审计当前 `contacts_outbox`，并按 retention 清理 contacts outbox repair 历史。
 - 已补 contacts outbox publish / audit / repair audit 错误脱敏：`last_error`、`previous_last_error` 只保留稳定低敏分类，不暴露 broker body、账号、token 或 provider 原文。
 - 当 `NEXUSIM_CONTACTS_AUTH_MODE=metadata|verified-metadata` 时，公网监听地址 + 无 gRPC mTLS client cert 的危险组合会在启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
+- PostgreSQL repository 已按主流程 / helper / privacy / source policy 同 package 拆分，主文件降到约 1000 行，避免继续把联系人逻辑堆进单个大文件。
 
 ## 后续
 

@@ -13,7 +13,33 @@ $receiptRulesPath = Join-Path $repoRoot "deploy\local\prometheus-receipt-service
 $contactsRulesPath = Join-Path $repoRoot "deploy\local\prometheus-contacts-service-alerts.yml"
 $policyRulesPath = Join-Path $repoRoot "deploy\local\prometheus-policy-service-alerts.yml"
 
-foreach ($path in @($composePath, $configPath, $apiGatewayRulesPath, $identityRulesPath, $messageRulesPath, $conversationRulesPath, $deliveryRulesPath, $pushGatewayRulesPath, $receiptRulesPath, $contactsRulesPath, $policyRulesPath)) {
+$prometheusServices = @(
+    @{ Name = "api-gateway"; DebugPort = 11904; RuleFile = "prometheus-api-gateway-alerts.yml" },
+    @{ Name = "identity-service"; DebugPort = 11905; RuleFile = "prometheus-identity-service-alerts.yml" },
+    @{ Name = "message-service"; DebugPort = 11910; RuleFile = "prometheus-message-service-alerts.yml" },
+    @{ Name = "conversation-service"; DebugPort = 11911; RuleFile = "prometheus-conversation-service-alerts.yml" },
+    @{ Name = "delivery-service"; DebugPort = 11912; RuleFile = "prometheus-delivery-service-alerts.yml" },
+    @{ Name = "push-gateway"; DebugPort = 11913; RuleFile = "prometheus-push-gateway-alerts.yml" },
+    @{ Name = "receipt-service"; DebugPort = 11914; RuleFile = "prometheus-receipt-service-alerts.yml" },
+    @{ Name = "contacts-service"; DebugPort = 11915; RuleFile = "prometheus-contacts-service-alerts.yml" },
+    @{ Name = "policy-service"; DebugPort = 11916; RuleFile = "prometheus-policy-service-alerts.yml" }
+)
+
+$requiredConfigFiles = @(
+    $composePath,
+    $configPath,
+    $apiGatewayRulesPath,
+    $identityRulesPath,
+    $messageRulesPath,
+    $conversationRulesPath,
+    $deliveryRulesPath,
+    $pushGatewayRulesPath,
+    $receiptRulesPath,
+    $contactsRulesPath,
+    $policyRulesPath
+)
+
+foreach ($path in $requiredConfigFiles) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Missing local Prometheus config file: $path"
     }
@@ -34,86 +60,32 @@ $policyRules = Get-Content -LiteralPath $policyRulesPath -Raw
 if ($compose -notmatch "19090:9090") {
     throw "Prometheus compose must expose host port 19090 to avoid existing local service ports."
 }
-if ($compose -notmatch "prometheus-api-gateway-alerts\.yml") {
-    throw "Prometheus compose must mount api-gateway alert rules."
-}
-if ($compose -notmatch "prometheus-identity-service-alerts\.yml") {
-    throw "Prometheus compose must mount identity-service alert rules."
-}
-if ($compose -notmatch "prometheus-message-service-alerts\.yml") {
-    throw "Prometheus compose must mount message-service alert rules."
-}
-if ($compose -notmatch "prometheus-conversation-service-alerts\.yml") {
-    throw "Prometheus compose must mount conversation-service alert rules."
-}
-if ($compose -notmatch "prometheus-delivery-service-alerts\.yml") {
-    throw "Prometheus compose must mount delivery-service alert rules."
-}
-if ($compose -notmatch "prometheus-push-gateway-alerts\.yml") {
-    throw "Prometheus compose must mount push-gateway alert rules."
-}
-if ($compose -notmatch "prometheus-receipt-service-alerts\.yml") {
-    throw "Prometheus compose must mount receipt-service alert rules."
-}
-if ($compose -notmatch "prometheus-contacts-service-alerts\.yml") {
-    throw "Prometheus compose must mount contacts-service alert rules."
-}
-if ($compose -notmatch "prometheus-policy-service-alerts\.yml") {
-    throw "Prometheus compose must mount policy-service alert rules."
-}
 if ($config -notmatch "metrics_path:\s*/metrics") {
     throw "Prometheus config must scrape local /metrics endpoints."
 }
-if ($config -notmatch "host\.docker\.internal:11904") {
-    throw "Prometheus config must target the local api-gateway debug endpoint through host.docker.internal:11904."
+if ($config -notmatch "(?ms)^rule_files:\s*\r?\n\s*-\s*/etc/prometheus/rules/\*\.yml") {
+    throw "Prometheus config must load mounted local alert rule files."
 }
-if ($config -notmatch "host\.docker\.internal:11905") {
-    throw "Prometheus config must target the local identity-service debug endpoint through host.docker.internal:11905."
-}
-if ($config -notmatch "host\.docker\.internal:11910") {
-    throw "Prometheus config must target the local message-service debug endpoint through host.docker.internal:11910."
-}
-if ($config -notmatch "host\.docker\.internal:11911") {
-    throw "Prometheus config must target the local conversation-service debug endpoint through host.docker.internal:11911."
-}
-if ($config -notmatch "host\.docker\.internal:11912") {
-    throw "Prometheus config must target the local delivery-service debug endpoint through host.docker.internal:11912."
-}
-if ($config -notmatch "host\.docker\.internal:11913") {
-    throw "Prometheus config must target the local push-gateway debug endpoint through host.docker.internal:11913."
-}
-if ($config -notmatch "host\.docker\.internal:11914") {
-    throw "Prometheus config must target the local receipt-service debug endpoint through host.docker.internal:11914."
-}
-if ($config -notmatch "host\.docker\.internal:11915") {
-    throw "Prometheus config must target the local contacts-service debug endpoint through host.docker.internal:11915."
-}
-if ($config -notmatch "host\.docker\.internal:11916") {
-    throw "Prometheus config must target the local policy-service debug endpoint through host.docker.internal:11916."
-}
-if ($config -notmatch "service:\s*identity-service") {
-    throw "Prometheus config must label the identity-service scrape target."
-}
-if ($config -notmatch "service:\s*message-service") {
-    throw "Prometheus config must label the message-service scrape target."
-}
-if ($config -notmatch "service:\s*conversation-service") {
-    throw "Prometheus config must label the conversation-service scrape target."
-}
-if ($config -notmatch "service:\s*delivery-service") {
-    throw "Prometheus config must label the delivery-service scrape target."
-}
-if ($config -notmatch "service:\s*push-gateway") {
-    throw "Prometheus config must label the push-gateway scrape target."
-}
-if ($config -notmatch "service:\s*receipt-service") {
-    throw "Prometheus config must label the receipt-service scrape target."
-}
-if ($config -notmatch "service:\s*contacts-service") {
-    throw "Prometheus config must label the contacts-service scrape target."
-}
-if ($config -notmatch "service:\s*policy-service") {
-    throw "Prometheus config must label the policy-service scrape target."
+
+foreach ($service in $prometheusServices) {
+    $name = [string]$service.Name
+    $ruleFile = [string]$service.RuleFile
+    $debugPort = [int]$service.DebugPort
+    $escapedName = [regex]::Escape($name)
+    $escapedRuleFile = [regex]::Escape($ruleFile)
+
+    if ($compose -notmatch $escapedRuleFile) {
+        throw "Prometheus compose must mount $name alert rules."
+    }
+    if ($config -notmatch "job_name:\s*nexusim-$escapedName") {
+        throw "Prometheus config must define a scrape job for $name."
+    }
+    if ($config -notmatch "host\.docker\.internal:$debugPort") {
+        throw "Prometheus config must target the local $name debug endpoint through host.docker.internal:$debugPort."
+    }
+    if ($config -notmatch "service:\s*$escapedName") {
+        throw "Prometheus config must label the $name scrape target."
+    }
 }
 
 $requiredAPIGatewayAlerts = @(

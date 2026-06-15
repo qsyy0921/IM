@@ -48,7 +48,7 @@ if ([string]::IsNullOrWhiteSpace($PGDSN)) {
 }
 
 if (-not $ResultRoot) {
-    $ResultRoot = Join-Path "loadtest\results" ("pgpool-gradient-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+    $ResultRoot = Join-Path "H:\NexusIM\loadtest-results" ("pgpool-gradient-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
 }
 
 . .\tools\go-env.ps1

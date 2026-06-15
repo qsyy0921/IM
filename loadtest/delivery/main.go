@@ -121,7 +121,7 @@ func parseConfig() config {
 	var limit int
 	flag.StringVar(&cfg.target, "target", "127.0.0.1:10497", "delivery-service gRPC target")
 	registerTLSFlags("delivery-tls", "NEXUSIM_DELIVERY_TLS", "delivery-service", &cfg.tls)
-	flag.StringVar(&cfg.resultDir, "result-dir", "loadtest/results/delivery-smoke", "result directory")
+	flag.StringVar(&cfg.resultDir, "result-dir", `H:\NexusIM\loadtest-results\delivery-smoke`, "result directory")
 	flag.DurationVar(&cfg.requestTimeout, "request-timeout", 2*time.Second, "per-request timeout")
 	flag.DurationVar(&cfg.waitTimeout, "wait-timeout", 10*time.Second, "max wait for expected inbox items")
 	flag.DurationVar(&cfg.pollInterval, "poll-interval", 200*time.Millisecond, "pull retry interval while waiting")

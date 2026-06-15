@@ -131,7 +131,7 @@ func parseConfig() config {
 	registerTLSFlags("delivery-tls", "NEXUSIM_DELIVERY_TLS", "delivery-service", &cfg.deliveryTLS)
 	flag.StringVar(&cfg.kafkaBrokers, "kafka-brokers", "localhost:9092", "comma-separated Kafka brokers")
 	flag.StringVar(&cfg.timelineTopic, "timeline-topic", "conversation.timeline.events", "conversation timeline Kafka topic")
-	flag.StringVar(&cfg.resultDir, "result-dir", "loadtest/results/delivery-visibility-smoke", "result directory")
+	flag.StringVar(&cfg.resultDir, "result-dir", `H:\NexusIM\loadtest-results\delivery-visibility-smoke`, "result directory")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", "", "PostgreSQL DSN")
 	flag.DurationVar(&cfg.requestTimeout, "request-timeout", 3*time.Second, "per request timeout")
 	flag.DurationVar(&cfg.waitTimeout, "wait-timeout", 15*time.Second, "wait timeout for async projections")

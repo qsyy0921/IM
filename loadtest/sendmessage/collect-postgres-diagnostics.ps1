@@ -11,7 +11,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 Set-Location $repoRoot
 
 if (-not $ResultDir) {
-    $ResultDir = Join-Path "loadtest\results" ("postgres-diagnostics-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+    $ResultDir = Join-Path "H:\NexusIM\loadtest-results" ("postgres-diagnostics-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
 }
 New-Item -ItemType Directory -Force $ResultDir | Out-Null
 

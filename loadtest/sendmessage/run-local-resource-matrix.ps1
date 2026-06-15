@@ -32,7 +32,7 @@ if ([string]::IsNullOrWhiteSpace($PGDSN)) {
 }
 
 if (-not $ResultRoot) {
-    $ResultRoot = Join-Path "loadtest\results" ("resource-matrix-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+    $ResultRoot = Join-Path "H:\NexusIM\loadtest-results" ("resource-matrix-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
 }
 
 . .\tools\go-env.ps1

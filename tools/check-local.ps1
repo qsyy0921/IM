@@ -34,6 +34,9 @@ try {
     Write-Host "== file size budgets =="
     & (Join-Path $PSScriptRoot "check-file-size-budget.ps1")
 
+    Write-Host "== loadtest output paths =="
+    & (Join-Path $PSScriptRoot "check-loadtest-output-paths.ps1")
+
     Write-Host "== local prometheus config =="
     & (Join-Path $PSScriptRoot "check-local-prometheus-config.ps1")
 

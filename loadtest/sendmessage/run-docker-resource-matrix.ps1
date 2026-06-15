@@ -30,7 +30,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 Set-Location $repoRoot
 
 if (-not $ResultRoot) {
-    $ResultRoot = Join-Path "loadtest\results" ("docker-resource-matrix-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+    $ResultRoot = Join-Path "H:\NexusIM\loadtest-results" ("docker-resource-matrix-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
 }
 
 . .\tools\go-env.ps1

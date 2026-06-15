@@ -467,7 +467,7 @@ func run(args []string, getenv func(string) string) error {
 }
 
 func parseConfig(args []string, getenv func(string) string) (config, error) {
-	defaultResultDir := filepath.Join("loadtest", "results", time.Now().Format("20060102-150405"))
+	defaultResultDir := filepath.Join(`H:\NexusIM\loadtest-results`, time.Now().Format("20060102-150405"))
 	cfg := config{}
 	flags := flag.NewFlagSet("sendmessage", flag.ContinueOnError)
 	flags.StringVar(&cfg.Target, "target", envString(getenv, "NEXUSIM_TARGET", "127.0.0.1:10495"), "gRPC target or comma-separated targets, such as 127.0.0.1:10495 or 127.0.0.1:10495,127.0.0.1:10501")

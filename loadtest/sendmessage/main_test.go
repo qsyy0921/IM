@@ -368,7 +368,7 @@ func TestParseConfigUsesEnvironment(t *testing.T) {
 		"NEXUSIM_TARGET":                             "127.0.0.1:10495,127.0.0.1:10501",
 		"NEXUSIM_VUS":                                "3",
 		"NEXUSIM_DURATION":                           "5s",
-		"NEXUSIM_RESULT_DIR":                         "loadtest/results/test",
+		"NEXUSIM_RESULT_DIR":                         `H:\NexusIM\loadtest-results\test`,
 		"NEXUSIM_CONVERSATION_COUNT":                 "2",
 		"NEXUSIM_SERVICE_METRICS_URL":                "127.0.0.1:10498",
 		"NEXUSIM_RELAY_METRICS_URL":                  "127.0.0.1:10499",
@@ -388,7 +388,7 @@ func TestParseConfigUsesEnvironment(t *testing.T) {
 	if cfg.Target != "127.0.0.1:10495,127.0.0.1:10501" ||
 		cfg.VUs != 3 ||
 		cfg.Duration != 5*time.Second ||
-		cfg.ResultDir != "loadtest/results/test" ||
+		cfg.ResultDir != `H:\NexusIM\loadtest-results\test` ||
 		cfg.ConversationCount != 2 ||
 		cfg.ServiceMetricsURL != "127.0.0.1:10498" ||
 		cfg.RelayMetricsURL != "127.0.0.1:10499" ||

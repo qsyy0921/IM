@@ -134,7 +134,7 @@ func parseConfig() config {
 	flag.IntVar(&cfg.vus, "vus", 1, "concurrent workers")
 	flag.DurationVar(&cfg.duration, "duration", 3*time.Second, "test duration")
 	flag.DurationVar(&cfg.requestTimeout, "request-timeout", 2*time.Second, "per-request timeout")
-	flag.StringVar(&cfg.resultDir, "result-dir", "loadtest/results/memberchange-smoke", "result directory")
+	flag.StringVar(&cfg.resultDir, "result-dir", `H:\NexusIM\loadtest-results\memberchange-smoke`, "result directory")
 	flag.StringVar(&cfg.tenantID, "tenant-id", "tenant-member-smoke", "tenant id")
 	flag.StringVar(&cfg.conversationID, "conversation-id", "conv-member-smoke", "conversation id")
 	flag.StringVar(&cfg.operatorUserID, "operator-user-id", "owner-1", "operator user id")

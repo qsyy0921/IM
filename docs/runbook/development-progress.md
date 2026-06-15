@@ -78,7 +78,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - Redis route / Redis-backed resume
 - Redis stop/start fault fallback
 - Redis Sentinel discovery / failover / master-stop / quorum-loss fallback
-- Redis Sentinel network-partition runner
+- Redis Sentinel network-partition fallback smoke
 - PostgreSQL `repmgr + pgpool` local failover smoke
 - Kafka KRaft 3 broker local failover smoke
 
@@ -90,7 +90,6 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 
 当前还没有证明：
 
-- Redis Sentinel network-partition 真实报告归档
 - 生产级 Redis HA / Redis Cluster
 - 生产级 PostgreSQL HA / split-brain / quorum
 - 生产级 Kafka multi-failure / controller failover / ISR 抖动治理

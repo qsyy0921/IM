@@ -2,6 +2,7 @@ param(
     [int]$TimeoutSeconds = 90,
     [switch]$AllowImagePull,
     [switch]$KeepRunning,
+    [switch]$IncludeAlertmanager,
     [switch]$RecordSummary,
     [string]$RunName = "",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results"
@@ -12,8 +13,10 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $prometheusUpScript = Join-Path $PSScriptRoot "local-up-prometheus.ps1"
 $grafanaUpScript = Join-Path $PSScriptRoot "local-up-grafana.ps1"
+$alertmanagerUpScript = Join-Path $PSScriptRoot "local-up-alertmanager.ps1"
 $prometheusCompose = Join-Path $repoRoot "deploy\local\docker-compose.prometheus.yml"
 $grafanaCompose = Join-Path $repoRoot "deploy\local\docker-compose.grafana.yml"
+$alertmanagerCompose = Join-Path $repoRoot "deploy\local\docker-compose.alertmanager.yml"
 $summaryWriter = Join-Path $PSScriptRoot "write-observability-smoke-summary.ps1"
 
 $expectedDashboardUids = @(
@@ -82,10 +85,19 @@ Push-Location $repoRoot
 try {
     $prometheusWasRunning = Test-ContainerRunning -ContainerName "nexusim-prometheus"
     $grafanaWasRunning = Test-ContainerRunning -ContainerName "nexusim-grafana"
+    $alertmanagerWasRunning = Test-ContainerRunning -ContainerName "nexusim-alertmanager"
 
     $upArgs = @()
     if ($AllowImagePull) {
         $upArgs += "-AllowImagePull"
+    }
+
+    if ($IncludeAlertmanager) {
+        & $alertmanagerUpScript @upArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw "local-up-alertmanager.ps1 failed with exit code $LASTEXITCODE"
+        }
+        Wait-HttpEndpoint -Name "Alertmanager" -Url "http://127.0.0.1:19093/-/ready"
     }
 
     & $prometheusUpScript @upArgs
@@ -101,6 +113,16 @@ try {
     $rules = Invoke-Endpoint -Url "http://127.0.0.1:19090/api/v1/rules"
     if ($rules.status -ne "success" -or -not $rules.data.groups -or $rules.data.groups.Count -lt 9) {
         throw "Prometheus did not load expected local rule groups."
+    }
+    if ($IncludeAlertmanager) {
+        $alertmanagers = Invoke-Endpoint -Url "http://127.0.0.1:19090/api/v1/alertmanagers"
+        if ($alertmanagers.status -ne "success" -or -not $alertmanagers.data.activeAlertmanagers) {
+            throw "Prometheus did not discover the local Alertmanager target."
+        }
+        $activeAlertmanagerUrls = @($alertmanagers.data.activeAlertmanagers | ForEach-Object { [string]$_.url })
+        if (-not (@($activeAlertmanagerUrls | Where-Object { $_ -match "host\.docker\.internal:19093|127\.0\.0\.1:19093|localhost:19093" }).Count -gt 0)) {
+            throw "Prometheus active Alertmanager target did not include local port 19093."
+        }
     }
 
     $grafanaHeaders = Get-BasicAuthHeader
@@ -151,6 +173,9 @@ finally {
             }
             if (-not $prometheusWasRunning) {
                 & docker compose -f $prometheusCompose down
+            }
+            if ($IncludeAlertmanager -and -not $alertmanagerWasRunning) {
+                & docker compose -f $alertmanagerCompose down
             }
         }
         catch {

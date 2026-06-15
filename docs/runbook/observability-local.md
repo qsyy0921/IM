@@ -28,7 +28,9 @@ GET http://<NEXUSIM_POLICY_DEBUG_ADDR>/metrics
 
 ```text
 deploy/local/docker-compose.prometheus.yml
+deploy/local/docker-compose.alertmanager.yml
 deploy/local/prometheus.yml
+deploy/local/alertmanager.yml
 deploy/local/prometheus-api-gateway-alerts.yml
 deploy/local/prometheus-identity-service-alerts.yml
 deploy/local/prometheus-message-service-alerts.yml
@@ -46,10 +48,25 @@ deploy/local/prometheus-policy-service-alerts.yml
 .\tools\local-up-prometheus.ps1
 ```
 
+如果需要同时验证本地 Alertmanager route，先启动本地 null receiver Alertmanager：
+
+```powershell
+.\tools\local-up-alertmanager.ps1
+.\tools\local-up-prometheus.ps1
+```
+
+Prometheus 容器通过 `host.docker.internal:19093` 连接本地 Alertmanager。该 Alertmanager 只配置 `local-null` receiver，不发送邮件、短信、Webhook、Slack 或外部告警；它只用于验证本地 alert routing 配置能被真实进程加载。停止：
+
+```powershell
+.\tools\local-down-prometheus.ps1
+.\tools\local-down-alertmanager.ps1
+```
+
 默认启动脚本只使用本机已有镜像，避免误触发外网拉取。确实需要允许 Docker 拉取镜像时显式使用：
 
 ```powershell
 .\tools\local-up-prometheus.ps1 -AllowImagePull
+.\tools\local-up-alertmanager.ps1 -AllowImagePull
 ```
 
 停止：
@@ -62,6 +79,7 @@ deploy/local/prometheus-policy-service-alerts.yml
 
 ```text
 Prometheus UI: http://127.0.0.1:19090
+Alertmanager UI: http://127.0.0.1:19093
 api-gateway scrape target from container: host.docker.internal:11904
 identity-service scrape target from container: host.docker.internal:11905
 message-service scrape target from container: host.docker.internal:11910
@@ -219,6 +237,12 @@ datasource: http://host.docker.internal:19090
 
 ```powershell
 .\tools\run-local-observability-smoke.ps1
+```
+
+需要同时验证本地 Alertmanager target discovery：
+
+```powershell
+.\tools\run-local-observability-smoke.ps1 -IncludeAlertmanager
 ```
 
 需要把本次本地 smoke 结果沉淀成可复核证据时，显式启用 summary：

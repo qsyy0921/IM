@@ -1,0 +1,15 @@
+name: nexusim-alertmanager
+
+services:
+  alertmanager:
+    image: ${NEXUSIM_ALERTMANAGER_IMAGE:-prom/alertmanager:v0.27.0}
+    container_name: nexusim-alertmanager
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--web.listen-address=0.0.0.0:9093"
+      - "--storage.path=/alertmanager"
+      - "--data.retention=24h"
+    ports:
+      - "19093:9093"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro

@@ -95,6 +95,9 @@ try {
     Write-Host "== local prometheus config =="
     Invoke-LocalCheck "check-local-prometheus-config.ps1"
 
+    Write-Host "== local alertmanager config =="
+    Invoke-LocalCheck "check-local-alertmanager-config.ps1"
+
     Write-Host "== local grafana config =="
     Invoke-LocalCheck "check-local-grafana-config.ps1"
 

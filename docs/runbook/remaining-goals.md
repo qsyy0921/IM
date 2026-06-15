@@ -11,7 +11,7 @@
 ## 全局未完成工作
 
 1. 生产级观测闭环：
-   当前 `/metrics`、Prometheus rules、Grafana dashboard、OTel trace wiring 和本地观测栈 smoke runner 是本地开发 / 面试展示级；仍需目标环境 dashboard smoke、统一 collector、Alertmanager 路由、retention、结构化日志汇聚、容量基线和 SLO 口径。
+   当前 `/metrics`、Prometheus rules、Grafana dashboard、OTel trace wiring、本地 Alertmanager null route 和本地观测栈 smoke runner 是本地开发 / 面试展示级；仍需目标环境 dashboard smoke、统一 collector、生产 Alertmanager 路由、retention、结构化日志汇聚、容量基线和 SLO 口径。
 
 2. 分布式 HA / 故障演练深化：
    继续补更长时间 Kafka ISR flapping、consumer rebalance、Kafka producer 故障重试行为 smoke / idempotent-producer 客户端评估；继续完善 Redis Cluster / 生产级 Redis HA 设计、PostgreSQL quorum / split-brain fencing 和服务发现 / 部署编排。PostgreSQL 生产 quorum 边界以 ADR-034 为准。

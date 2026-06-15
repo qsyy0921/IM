@@ -16,6 +16,9 @@ try {
     Write-Host "== ddd boundaries =="
     & (Join-Path $PSScriptRoot "check-ddd-boundaries.ps1")
 
+    Write-Host "== cross-service table access =="
+    & (Join-Path $PSScriptRoot "check-cross-service-table-access.ps1")
+
     Write-Host "== docs entrypoints =="
     & (Join-Path $PSScriptRoot "check-doc-entrypoints.ps1")
 

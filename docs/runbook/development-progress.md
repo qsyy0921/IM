@@ -105,6 +105,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - 公网地址 + 弱鉴权 / 明文入口的启动门禁
 - trusted metadata / mTLS 边界的第一阶段收口
 - 六层 DDD 反向依赖门禁，生产代码禁止 `api/app/domain/trigger/types` 直接 import `internal/infrastructure`
+- 跨服务私有表访问门禁，生产代码禁止直接 SQL 访问其他服务私有表，只保留已冻结的共享 timeline / outbox 例外
 - outbox / projection / challenge delivery 等 repair / audit / cleanup operator
 - worker / relay 非取消错误退避重试
 

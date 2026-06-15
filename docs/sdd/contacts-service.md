@@ -1,6 +1,6 @@
 # NexusIM contacts-service SDD v0.1
 
-状态：Draft；proto / Kafka schema / migration / 六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 `ACCEPT / DECLINE / CANCEL` 真实进程 smoke 已落地；联系人删除 / 拉黑 / 解除拉黑 / 备注名 v0.2 已完成代码切片，删除 / 拉黑 / 备注名 / 解除拉黑真实进程 smoke 已通过；删除后重新申请 / 接受恢复联系人关系的 re-add smoke 已通过。
+状态：Draft；proto / Kafka schema / migration / 六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 `ACCEPT / DECLINE / CANCEL` 真实进程 smoke 已落地；联系人删除 / 拉黑 / 解除拉黑 / 备注名 v0.2 已完成代码切片，删除 / 拉黑 / 备注名 / 解除拉黑真实进程 smoke 已通过；删除后重新申请 / 接受恢复联系人关系的 re-add smoke 已通过；first-stage Prometheus text `/metrics`、本地 alert rules 和 Grafana dashboard 原型已落地。
 
 本文定义第三层 IM 产品能力中的“联系人 / 好友关系”最小服务边界。目标是补齐社交关系事实源，同时保持低耦合：不把好友关系塞进 `conversation_members`，也不让会话、消息、投递服务直接读联系人表。
 
@@ -628,6 +628,8 @@ GET /debug/metrics
 ```
 
 `/readyz` 会检查 PostgreSQL ping；`/debug/metrics` 第一版输出 pgx pool 状态、低敏联系人聚合快照，以及 `contacts_outbox` 的 total / pending / published / DLQ / ready_pending / oldest age。联系人聚合只包含 `contact_requests` 的总量和各状态计数、`contact_edges` 的总量和 `ACTIVE / DELETED / BLOCKED / with_remark` 聚合计数，以及 `contact_command_idempotency` 总行数；不暴露 user_id、request_id、remark 内容、message 内容或 command hash。gRPC interceptor 会输出 JSON 结构化请求日志，包含 service、method、code、latency_ms。该入口只暴露本服务自己的健康、关系聚合与 outbox 状态，不读取其它服务内部表。debug HTTP 监听地址默认只允许 loopback / RFC1918 私网；公网或 unspecified 地址必须显式设置 `NEXUSIM_CONTACTS_DEBUG_ALLOW_PUBLIC=true`。
+
+同一 debug HTTP server 已提供第一阶段 Prometheus text `/metrics`，复用 `/debug/metrics` 的低敏 snapshot。本地默认 scrape 目标为 `host.docker.internal:11915/metrics`，对应本地进程监听 `NEXUSIM_CONTACTS_DEBUG_ADDR=127.0.0.1:11915`。当前 `/metrics` 只覆盖 gRPC request / error / latency、contact request / edge 聚合、contacts outbox、outbox relay、PG pool 和 OTel trace config 聚合指标；labels 只允许 method、code、state、status、exporter 等低基数字段，不得输出 token、tenant_id、user_id、device_id、session_id、request_id、trace_id、remark、message body、command hash 或 payload。该 endpoint、Prometheus alert rules 和 Grafana dashboard 只用于本地开发 / 面试展示，不代表生产 Prometheus、Alertmanager、SLO 或容量观测已完成。
 
 first-stage OpenTelemetry trace 默认关闭，仅覆盖 contacts-service gRPC server span。启用后从 incoming metadata 提取 W3C `traceparent`，只记录 service / method / gRPC status / latency 等低敏低基数属性，不记录 token、tenant/user/device/session id、trace_id、request_id、remark、payload 或 command hash。`x-nexusim-trace-id` / `x-nexusim-request-id` 仍用于 metadata / access log correlation，但不作为 span attribute 导出。支持 exporter：
 

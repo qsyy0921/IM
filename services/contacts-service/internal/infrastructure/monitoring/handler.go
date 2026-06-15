@@ -44,7 +44,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/readyz":
 		h.handleReady(w, r)
 	case "/debug/metrics":
-		h.handleMetrics(w, r)
+		writeJSON(w, http.StatusOK, h.snapshot(r.Context()))
+	case "/metrics":
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(renderPrometheus(h.snapshot(r.Context()))))
 	default:
 		http.NotFound(w, r)
 	}
@@ -64,7 +68,7 @@ func (h *Handler) handleReady(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, healthResponse{Service: serviceName, Status: "ready"})
 }
 
-func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) snapshot(ctx context.Context) Snapshot {
 	snapshot := Snapshot{
 		Service:       serviceName,
 		GeneratedAtMS: time.Now().UnixMilli(),
@@ -94,7 +98,7 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 			MaxConns:             stats.MaxConns(),
 			TotalConns:           stats.TotalConns(),
 		}
-		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
 		contacts, err := queryContactsSnapshot(ctx, h.pool)
 		if err != nil {
@@ -109,7 +113,7 @@ func (h *Handler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 			snapshot.Outbox = &outbox
 		}
 	}
-	writeJSON(w, http.StatusOK, snapshot)
+	return snapshot
 }
 
 type healthResponse struct {

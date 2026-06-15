@@ -61,3 +61,11 @@ scrape_configs:
           - host.docker.internal:11914
         labels:
           service: receipt-service
+
+  - job_name: nexusim-contacts-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:11915
+        labels:
+          service: contacts-service

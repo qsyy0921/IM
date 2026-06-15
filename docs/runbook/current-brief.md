@@ -28,7 +28,7 @@ NexusIM 已有本地/双机可运行的最小分布式 IM 后端：
 2. 先治理已有 9 个微服务，不急着新增 `search-service` / `media-service` / AI 服务。
 3. 当前重点：继续清各服务 P2 hardening，包括生产观测、容量验证、故障演练、repair workflow、权限模型深化和代码复杂度治理。
 4. 已完成的长历史不要写回本入口；总体进度看 `docs/runbook/development-progress.md`，单服务状态看 `docs/runbook/service-briefs/<service>.md`。
-5. api-gateway、identity-service、message-service、conversation-service、delivery-service、push-gateway、receipt-service 已接入 first-stage 本地 Prometheus / Grafana 观测原型；下一轮按 `contacts-service -> policy-service` 继续清 P2，或回到 api-gateway 的 legacy quiet-window / 配置中心 quota 边界。
+5. api-gateway、identity-service、message-service、conversation-service、delivery-service、push-gateway、receipt-service、contacts-service 已接入 first-stage 本地 Prometheus / Grafana 观测原型；下一轮按 `policy-service` 继续清 P2，或回到 api-gateway 的 legacy quiet-window / 配置中心 quota 边界。
 
 ## 已知硬约束
 

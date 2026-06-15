@@ -57,6 +57,8 @@ gateway verified metadata auth 示例：
 
 2026-06-13 补充：`-VerifiedAuthMetadata` 真实进程 smoke 已通过，验证 `SendContactRequest / ListContactRequests / RespondContactRequest / ListContacts / GetContactState` 在 metadata auth 模式下完成 accept-flow、outbox relay 和 Kafka 读回。
 
+2026-06-15 补充：contacts-service 已补 first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 和 Grafana dashboard 原型，覆盖低敏 gRPC、contact request / edge 聚合、contacts outbox、outbox relay、PG pool 和 OTel trace config 聚合指标。该观测面用于本地开发 / 面试展示，不是生产 SLO 或完整告警平台。
+
 api-gateway facade smoke 示例：
 
 ```powershell
@@ -92,4 +94,5 @@ api-gateway facade smoke 示例：
 - contacts-service 还补了只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运维模式，方便直接审计并按 retention 清理 DLQ repair 历史；它们不直接 publish Kafka，也不会改写当前 outbox 事实状态。
 - api-gateway facade smoke 已验证 contacts user-facing RPC 可以收敛到统一入口，客户端不需要直连 contacts-service；contacts-service 仍是事实源，api-gateway 只做鉴权、身份覆盖和转发。
 - gRPC TLS / mTLS 可以作为“服务端和 smoke 客户端的第一阶段传输安全已接通”来讲，但必须说明还没有做证书生命周期治理、动态服务身份或服务网格。
+- 已补 contacts-service first-stage Prometheus text `/metrics`、本地 alert rules 和 Grafana dashboard，覆盖低敏 gRPC、联系人申请 / 边聚合、outbox、relay retry、PG pool 和 OTel trace config；该能力只用于本地开发 / 面试展示，不代表生产观测体系完成。
 - 后续如果要“接受好友后自动创建单聊”，应通过显式 saga / app port 编排，而不是在 contacts-service 事务里写 conversation-service 表。

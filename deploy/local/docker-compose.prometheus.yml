@@ -20,3 +20,4 @@ services:
       - ./prometheus-delivery-service-alerts.yml:/etc/prometheus/rules/delivery-service.yml:ro
       - ./prometheus-push-gateway-alerts.yml:/etc/prometheus/rules/push-gateway.yml:ro
       - ./prometheus-receipt-service-alerts.yml:/etc/prometheus/rules/receipt-service.yml:ro
+      - ./prometheus-contacts-service-alerts.yml:/etc/prometheus/rules/contacts-service.yml:ro

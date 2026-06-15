@@ -11,8 +11,9 @@ $conversationDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboard
 $deliveryDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\delivery-service-observability.json"
 $pushGatewayDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\push-gateway-observability.json"
 $receiptDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\receipt-service-observability.json"
+$contactsDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\contacts-service-observability.json"
 
-foreach ($path in @($composePath, $datasourcePath, $providerPath, $apiGatewayDashboardPath, $identityDashboardPath, $messageDashboardPath, $conversationDashboardPath, $deliveryDashboardPath, $pushGatewayDashboardPath, $receiptDashboardPath)) {
+foreach ($path in @($composePath, $datasourcePath, $providerPath, $apiGatewayDashboardPath, $identityDashboardPath, $messageDashboardPath, $conversationDashboardPath, $deliveryDashboardPath, $pushGatewayDashboardPath, $receiptDashboardPath, $contactsDashboardPath)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Missing local Grafana config file: $path"
     }
@@ -168,6 +169,23 @@ $receiptRequiredMetrics = @(
     "nexusim_receipt_otel_traces_enabled"
 )
 
+$contactsRequiredMetrics = @(
+    "nexusim_contacts_grpc_method_requests_total",
+    "nexusim_contacts_grpc_method_errors_total",
+    "nexusim_contacts_grpc_latency_avg_milliseconds",
+    "nexusim_contacts_requests",
+    "nexusim_contacts_request_status",
+    "nexusim_contacts_edges",
+    "nexusim_contacts_edge_status",
+    "nexusim_contacts_command_idempotency_total",
+    "nexusim_contacts_outbox",
+    "nexusim_contacts_outbox_age_milliseconds",
+    "nexusim_contacts_outbox_relay_errors_total",
+    "nexusim_contacts_outbox_relay_consecutive_errors",
+    "nexusim_contacts_pg_pool_conns",
+    "nexusim_contacts_otel_traces_enabled"
+)
+
 Test-Dashboard -Path $apiGatewayDashboardPath -Name "api-gateway" -ExpectedUid "nexusim-api-gateway" -MinimumPanels 5 -RequiredMetrics $apiGatewayRequiredMetrics
 Test-Dashboard -Path $identityDashboardPath -Name "identity-service" -ExpectedUid "nexusim-identity-service" -MinimumPanels 8 -RequiredMetrics $identityRequiredMetrics
 Test-Dashboard -Path $messageDashboardPath -Name "message-service" -ExpectedUid "nexusim-message-service" -MinimumPanels 8 -RequiredMetrics $messageRequiredMetrics
@@ -175,5 +193,6 @@ Test-Dashboard -Path $conversationDashboardPath -Name "conversation-service" -Ex
 Test-Dashboard -Path $deliveryDashboardPath -Name "delivery-service" -ExpectedUid "nexusim-delivery-service" -MinimumPanels 8 -RequiredMetrics $deliveryRequiredMetrics
 Test-Dashboard -Path $pushGatewayDashboardPath -Name "push-gateway" -ExpectedUid "nexusim-push-gateway" -MinimumPanels 8 -RequiredMetrics $pushGatewayRequiredMetrics
 Test-Dashboard -Path $receiptDashboardPath -Name "receipt-service" -ExpectedUid "nexusim-receipt-service" -MinimumPanels 8 -RequiredMetrics $receiptRequiredMetrics
+Test-Dashboard -Path $contactsDashboardPath -Name "contacts-service" -ExpectedUid "nexusim-contacts-service" -MinimumPanels 8 -RequiredMetrics $contactsRequiredMetrics
 
 Write-Host "OK   local Grafana config"

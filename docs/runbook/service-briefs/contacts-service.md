@@ -5,7 +5,8 @@
 - 已有好友申请、列表、接受、拒绝、取消、删除、拉黑、解除拉黑、备注。
 - contacts-service 是联系人事实源。
 - policy-service 通过 contacts event projection 做 direct block 决策。
-- 已补 `/healthz`、`/readyz`、`/debug/metrics`，可观察低敏 PG pool、联系人申请 / 联系人边状态聚合和 `contacts_outbox` 聚合状态；debug HTTP 监听默认只允许 loopback / RFC1918 私网，公网或 unspecified 地址必须显式 `NEXUSIM_CONTACTS_DEBUG_ALLOW_PUBLIC=true`。
+- 已补 `/healthz`、`/readyz`、`/debug/metrics` 和 first-stage Prometheus text `/metrics`；可观察低敏 gRPC、PG pool、联系人申请 / 联系人边状态聚合、`contacts_outbox`、outbox relay retry 和 OTel trace config 聚合状态；本地 scrape 目标为 `host.docker.internal:11915`，并已补 Prometheus alert rules 和 Grafana dashboard 原型；这些只用于本地开发 / 面试展示，不代表生产 SLO。
+- debug HTTP 监听默认只允许 loopback / RFC1918 私网，公网或 unspecified 地址必须显式 `NEXUSIM_CONTACTS_DEBUG_ALLOW_PUBLIC=true`。
 - 已补 first-stage OpenTelemetry gRPC server span；gRPC access log 只记录低敏 `trace_id/request_id`，并对白名单外入口 metadata 直接丢弃。
 - `outbox-relay` 现已对非取消运行时错误做退避重试，并在 relay 模式通过 `/debug/metrics` 暴露低敏 retry 快照；现有 outbox / retry / DLQ 业务语义不变。
 - 已补只读 `outbox-audit`、只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运维模式，可直接审计当前 `contacts_outbox`，并按 retention 清理 contacts outbox repair 历史。
@@ -15,4 +16,4 @@
 ## 后续
 
 - 联系人分组、搜索、更多隐私策略。
-- OTel collector / alerting / dashboard 仍属于后续统一观测治理。
+- 生产级 OTel collector、Alertmanager、SLO dashboard 和容量验证仍属于后续统一观测治理。

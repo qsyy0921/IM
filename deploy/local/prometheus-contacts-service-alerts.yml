@@ -1,0 +1,92 @@
+groups:
+  - name: nexusim-contacts-service
+    rules:
+      - alert: NexusIMContactsGrpcErrors
+        expr: increase(nexusim_contacts_grpc_method_errors_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: contacts-service
+        annotations:
+          summary: contacts-service gRPC errors observed
+          description: contacts-service returned non-OK gRPC status codes in the last five minutes.
+
+      - alert: NexusIMContactsMetricsQueryError
+        expr: nexusim_contacts_metrics_query_error > 0 or nexusim_contacts_outbox_metrics_query_error > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: contacts-service
+        annotations:
+          summary: contacts-service metrics query failed
+          description: contacts-service could not query PostgreSQL aggregation metrics.
+
+      - alert: NexusIMContactsOutboxDLQ
+        expr: nexusim_contacts_outbox{state="dlq"} > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: contacts-service
+        annotations:
+          summary: contacts-service outbox has DLQ rows
+          description: contacts_outbox has DLQ rows. Use contacts outbox audit / repair before redrive.
+
+      - alert: NexusIMContactsOutboxReadyPending
+        expr: nexusim_contacts_outbox{state="ready_pending"} > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: contacts-service
+        annotations:
+          summary: contacts-service outbox has ready pending rows
+          description: contacts_outbox ready pending rows stayed non-zero. Check outbox relay runtime and Kafka.
+
+      - alert: NexusIMContactsOutboxRelayErrors
+        expr: increase(nexusim_contacts_outbox_relay_errors_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: contacts-service
+        annotations:
+          summary: contacts-service outbox relay errors observed
+          description: contacts outbox relay reported runtime errors in the last five minutes.
+
+      - alert: NexusIMContactsOutboxRelayConsecutiveErrors
+        expr: nexusim_contacts_outbox_relay_consecutive_errors > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: contacts-service
+        annotations:
+          summary: contacts-service outbox relay is retrying
+          description: contacts outbox relay currently has consecutive errors and is relying on backoff retry.
+
+      - alert: NexusIMContactsPGPoolCanceledAcquire
+        expr: increase(nexusim_contacts_pg_pool_canceled_acquire_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: contacts-service
+        annotations:
+          summary: contacts-service PostgreSQL pool canceled acquire
+          description: contacts-service PostgreSQL pool acquire operations were canceled.
+
+      - alert: NexusIMContactsPendingRequests
+        expr: nexusim_contacts_requests{state="pending"} > 0
+        for: 30m
+        labels:
+          severity: info
+          service: contacts-service
+        annotations:
+          summary: contacts-service has long-lived pending contact requests
+          description: Pending contact requests stayed non-zero. This is a local development signal, not a production SLA.
+
+      - alert: NexusIMContactsOtlpEndpointMissing
+        expr: nexusim_contacts_otel_traces_enabled{exporter="otlp-grpc"} == 1 and on(exporter) nexusim_contacts_otel_traces_otlp_endpoint_configured{exporter="otlp-grpc"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: contacts-service
+        annotations:
+          summary: contacts-service OTLP traces enabled without endpoint
+          description: contacts-service is configured for OTLP gRPC traces but no OTLP endpoint is configured.

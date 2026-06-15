@@ -1,0 +1,307 @@
+{
+  "uid": "nexusim-contacts-service",
+  "title": "NexusIM Contacts Service",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "tags": ["nexusim", "contacts-service", "first-stage"],
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "gRPC errors",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(nexusim_contacts_grpc_method_errors_total[30m])",
+          "legendFormat": "{{method}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Pending requests",
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_contacts_requests{state=\"pending\"}",
+          "legendFormat": "pending"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}]}
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Outbox DLQ",
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_contacts_outbox{state=\"dlq\"}",
+          "legendFormat": "dlq"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Relay consecutive errors",
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_contacts_outbox_relay_consecutive_errors",
+          "legendFormat": "consecutive"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "gRPC requests",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(nexusim_contacts_grpc_method_requests_total[5m])",
+          "legendFormat": "{{method}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "gRPC latency",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_contacts_grpc_latency_avg_milliseconds",
+          "legendFormat": "avg {{method}}"
+        },
+        {
+          "refId": "B",
+          "expr": "nexusim_contacts_grpc_latency_max_milliseconds",
+          "legendFormat": "max {{method}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Contact requests",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 14},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_contacts_requests",
+          "legendFormat": "{{state}}"
+        },
+        {
+          "refId": "B",
+          "expr": "nexusim_contacts_request_status",
+          "legendFormat": "status {{status}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Contact edges",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 14},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_contacts_edges",
+          "legendFormat": "{{state}}"
+        },
+        {
+          "refId": "B",
+          "expr": "nexusim_contacts_edge_status",
+          "legendFormat": "status {{status}}"
+        },
+        {
+          "refId": "C",
+          "expr": "nexusim_contacts_command_idempotency_total",
+          "legendFormat": "idempotency rows"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Outbox rows",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 14},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_contacts_outbox",
+          "legendFormat": "{{state}}"
+        },
+        {
+          "refId": "B",
+          "expr": "nexusim_contacts_outbox_age_milliseconds",
+          "legendFormat": "age {{state}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "PostgreSQL pool connections",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 22},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nexusim_contacts_pg_pool_conns",
+          "legendFormat": "{{state}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Relay runtime",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 22},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(nexusim_contacts_outbox_relay_errors_total[30m])",
+          "legendFormat": "relay errors"
+        },
+        {
+          "refId": "B",
+          "expr": "nexusim_contacts_outbox_relay_last_error_backoff_milliseconds",
+          "legendFormat": "backoff"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "OTel enabled",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 22},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(nexusim_contacts_otel_traces_enabled)",
+          "legendFormat": "enabled"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "bool"}, "overrides": []},
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    }
+  ]
+}

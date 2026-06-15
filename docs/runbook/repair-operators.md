@@ -52,6 +52,8 @@ go run ./services/delivery-service/cmd/delivery-service
 
 `conversation-service` 当前提供：
 
+环境变量：`NEXUSIM_CONVERSATION_SERVICE_MODE`
+
 | 模式 | 作用 |
 | --- | --- |
 | `member-change-audit` | 只读审计 `member_change_saga`，可按 tenant / conversation / status / change_id / outbox event 缩小范围。 |
@@ -61,6 +63,8 @@ go run ./services/delivery-service/cmd/delivery-service
 ## Identity Challenge / Session
 
 `identity-service` 当前提供：
+
+环境变量：`NEXUSIM_IDENTITY_SERVICE_MODE`
 
 | 模式 | 作用 |
 | --- | --- |

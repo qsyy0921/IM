@@ -2,12 +2,8 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $servicesRoot = Join-Path $repoRoot "services"
-$baseComposePath = Join-Path $repoRoot "deploy\local\docker-compose.yml"
 $serviceComposePath = Join-Path $repoRoot "deploy\local\docker-compose.services.yml"
 
-if (-not (Test-Path -LiteralPath $baseComposePath)) {
-    throw "Missing local base compose file: $baseComposePath"
-}
 if (-not (Test-Path -LiteralPath $serviceComposePath)) {
     throw "Missing local service compose file: $serviceComposePath"
 }
@@ -65,11 +61,17 @@ foreach ($entry in $requiredEnvironment) {
 if ($compose -notmatch "172\.30\.80\.0/24") {
     throw "Local service compose must use the private 172.30.80.0/24 Docker network."
 }
+if ($compose -notmatch "host\.docker\.internal:5432" -or $compose -notmatch "host\.docker\.internal:6379") {
+    throw "Local service compose must use host.docker.internal for local infrastructure access."
+}
+if ($compose -match "depends_on:\s*\r?\n\s*(postgres|redis|kafka):") {
+    throw "Local service compose must not depend on the base compose services or mutate the base compose network."
+}
 if ($compose -match "NEXUSIM_.*(TOKEN|SECRET|PASSWORD).*:.*(sk-|bearer|token=|password=)") {
     throw "Local service compose appears to contain a high-risk secret literal."
 }
 
-& docker compose -f $baseComposePath -f $serviceComposePath config --quiet
+& docker compose -f $serviceComposePath config --quiet
 if ($LASTEXITCODE -ne 0) {
     throw "docker compose config validation failed for local service compose."
 }

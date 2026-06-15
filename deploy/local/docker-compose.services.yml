@@ -1,32 +1,27 @@
+name: nexusim-services
+
 services:
   conversation-service-grpc:
     image: nexusim/conversation-service:local
     container_name: nexusim-conversation-service-grpc
-    depends_on:
-      postgres:
-        condition: service_healthy
     environment:
       NEXUSIM_CONVERSATION_SERVICE_MODE: grpc
       NEXUSIM_CONVERSATION_AUTH_MODE: body
       NEXUSIM_CONVERSATION_GRPC_ADDR: 172.30.80.11:10496
       NEXUSIM_CONVERSATION_DEBUG_ADDR: 172.30.80.11:11911
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
     ports:
       - "10496:10496"
       - "11911:11911"
     restart: unless-stopped
     networks:
-      default:
+      nexusim-services:
         ipv4_address: 172.30.80.11
 
   message-service-grpc:
     image: nexusim/message-service:local
     container_name: nexusim-message-service-grpc
     depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
       conversation-service-grpc:
         condition: service_started
       policy-service-grpc:
@@ -36,8 +31,8 @@ services:
       NEXUSIM_MESSAGE_AUTH_MODE: body
       NEXUSIM_GRPC_ADDR: 172.30.80.12:10495
       NEXUSIM_MESSAGE_DEBUG_ADDR: 172.30.80.12:11910
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
-      NEXUSIM_KAFKA_BROKERS: kafka:29092
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_KAFKA_BROKERS: host.docker.internal:9092
       NEXUSIM_CONVERSATION_SERVICE_ADDR: conversation-service-grpc:10496
       NEXUSIM_POLICY_SERVICE_ADDR: policy-service-grpc:10800
     ports:
@@ -45,90 +40,72 @@ services:
       - "11910:11910"
     restart: unless-stopped
     networks:
-      default:
+      nexusim-services:
         ipv4_address: 172.30.80.12
 
   delivery-service-grpc:
     image: nexusim/delivery-service:local
     container_name: nexusim-delivery-service-grpc
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
     environment:
       NEXUSIM_DELIVERY_SERVICE_MODE: grpc
       NEXUSIM_DELIVERY_AUTH_MODE: body
       NEXUSIM_DELIVERY_GRPC_ADDR: 172.30.80.13:10497
       NEXUSIM_DELIVERY_DEBUG_ADDR: 172.30.80.13:11912
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
-      NEXUSIM_KAFKA_BROKERS: kafka:29092
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_KAFKA_BROKERS: host.docker.internal:9092
     ports:
       - "10497:10497"
       - "11912:11912"
     restart: unless-stopped
     networks:
-      default:
+      nexusim-services:
         ipv4_address: 172.30.80.13
 
   receipt-service-grpc:
     image: nexusim/receipt-service:local
     container_name: nexusim-receipt-service-grpc
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
     environment:
       NEXUSIM_RECEIPT_SERVICE_MODE: grpc
       NEXUSIM_RECEIPT_AUTH_MODE: body
       NEXUSIM_RECEIPT_GRPC_ADDR: 172.30.80.14:10499
       NEXUSIM_RECEIPT_DEBUG_ADDR: 172.30.80.14:11914
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
-      NEXUSIM_KAFKA_BROKERS: kafka:29092
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_KAFKA_BROKERS: host.docker.internal:9092
     ports:
       - "10499:10499"
       - "11914:11914"
     restart: unless-stopped
     networks:
-      default:
+      nexusim-services:
         ipv4_address: 172.30.80.14
 
   contacts-service-grpc:
     image: nexusim/contacts-service:local
     container_name: nexusim-contacts-service-grpc
-    depends_on:
-      postgres:
-        condition: service_healthy
     environment:
       NEXUSIM_CONTACTS_SERVICE_MODE: grpc
       NEXUSIM_CONTACTS_AUTH_MODE: body
       NEXUSIM_CONTACTS_GRPC_ADDR: 172.30.80.15:10500
       NEXUSIM_CONTACTS_DEBUG_ADDR: 172.30.80.15:11915
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
     ports:
       - "10500:10500"
       - "11915:11915"
     restart: unless-stopped
     networks:
-      default:
+      nexusim-services:
         ipv4_address: 172.30.80.15
 
   identity-service-grpc:
     image: nexusim/identity-service:local
     container_name: nexusim-identity-service-grpc
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
     environment:
       NEXUSIM_IDENTITY_SERVICE_MODE: grpc
       NEXUSIM_IDENTITY_ADMIN_AUTH_MODE: body
       NEXUSIM_IDENTITY_GRPC_ADDR: 172.30.80.16:10600
       NEXUSIM_IDENTITY_DEBUG_ADDR: 172.30.80.16:11905
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
-      NEXUSIM_KAFKA_BROKERS: kafka:29092
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_KAFKA_BROKERS: host.docker.internal:9092
       NEXUSIM_IDENTITY_GATEWAY_TOKEN_SECRET: local-dev-gateway-token-secret
       NEXUSIM_IDENTITY_MFA_SECRET_KEY: local-dev-mfa-secret-key
       NEXUSIM_IDENTITY_MFA_RECOVERY_CODE_SECRET: local-dev-mfa-recovery-secret
@@ -138,57 +115,48 @@ services:
       - "11905:11905"
     restart: unless-stopped
     networks:
-      default:
+      nexusim-services:
         ipv4_address: 172.30.80.16
 
   policy-service-grpc:
     image: nexusim/policy-service:local
     container_name: nexusim-policy-service-grpc
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
     environment:
       NEXUSIM_POLICY_SERVICE_MODE: grpc
       NEXUSIM_POLICY_GRPC_ADDR: 172.30.80.17:10800
       NEXUSIM_POLICY_DEBUG_ADDR: 172.30.80.17:11916
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
-      NEXUSIM_KAFKA_BROKERS: kafka:29092
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_KAFKA_BROKERS: host.docker.internal:9092
     ports:
       - "10800:10800"
       - "11916:11916"
     restart: unless-stopped
     networks:
-      default:
+      nexusim-services:
         ipv4_address: 172.30.80.17
 
   push-gateway-ws:
     image: nexusim/push-gateway:local
     container_name: nexusim-push-gateway-ws
     depends_on:
-      redis:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
       delivery-service-grpc:
         condition: service_started
     environment:
-      NEXUSIM_PUSH_GATEWAY_MODE: all
+      NEXUSIM_PUSH_GATEWAY_MODE: ws
       NEXUSIM_PUSH_AUTH_MODE: mock
       NEXUSIM_PUSH_WS_ADDR: 172.30.80.18:10498
       NEXUSIM_PUSH_DEBUG_ADDR: 172.30.80.18:11913
       NEXUSIM_PUSH_ROUTE_BACKEND: redis
       NEXUSIM_PUSH_REDIS_MODE: single
-      NEXUSIM_PUSH_REDIS_ADDR: redis:6379
+      NEXUSIM_PUSH_REDIS_ADDR: host.docker.internal:6379
       NEXUSIM_DELIVERY_GRPC_ADDR: delivery-service-grpc:10497
-      NEXUSIM_KAFKA_BROKERS: kafka:29092
+      NEXUSIM_KAFKA_BROKERS: host.docker.internal:9092
     ports:
       - "10498:10498"
       - "11913:11913"
     restart: unless-stopped
     networks:
-      default:
+      nexusim-services:
         ipv4_address: 172.30.80.18
 
   api-gateway-grpc:
@@ -229,11 +197,12 @@ services:
       - "11904:11904"
     restart: unless-stopped
     networks:
-      default:
+      nexusim-services:
         ipv4_address: 172.30.80.19
 
 networks:
-  default:
+  nexusim-services:
+    name: nexusim-services
     ipam:
       config:
         - subnet: 172.30.80.0/24

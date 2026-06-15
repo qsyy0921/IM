@@ -112,6 +112,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - 本地 Prometheus / Grafana 覆盖门禁，已实现服务目录必须有 scrape / alert rules / dashboard 配置
 - 服务 cmd 层启动配置测试门禁，已实现服务必须保留 `main_test.go` 覆盖启动 / 监听 / TLS / auth guard 配置
 - 服务 cmd 构建门禁，9 个已实现服务的 `services/<service>/cmd/<service>` 必须能通过 `go build`
+- 服务 Linux 构建门禁，9 个已实现服务的 cmd 包必须能以 `CGO_ENABLED=0 GOOS=linux GOARCH=amd64/arm64` 交叉编译，保证本地 / Mac Docker runtime 的二进制基础不漂移
 - 服务包级测试门禁，`go test ./services/...` 默认进入 `check-local`，覆盖 9 个已实现服务的轻量单测 / 跳过型集成测试
 - 服务运行态端点门禁，已实现服务必须保留 `/healthz`、`/readyz`、`/debug/metrics` 和 `/metrics`
 - Docker runtime / Mac 镜像同步覆盖门禁，9 个已实现服务必须都有 `deploy/docker/<service>.runtime.Dockerfile`，双机镜像同步脚本默认从 `services/` 推导完整服务集合

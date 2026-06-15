@@ -42,6 +42,7 @@ func TestMarkReadUseCasePassesCommandToRepository(t *testing.T) {
 type fakeReceiptRepository struct {
 	markReadCommand            types.MarkReadCommand
 	getReceiptStateCalls       []types.GetReceiptStateCommand
+	listReceiptStatesCommand   types.ListReceiptStatesCommand
 	listCommand                types.ListConversationsCommand
 	archiveConversationCommand types.ArchiveConversationCommand
 	pinConversationCommand     types.PinConversationCommand
@@ -55,6 +56,21 @@ func (repository *fakeReceiptRepository) GetReceiptState(_ context.Context, comm
 		ConversationSeq: command.ConversationSeq,
 		MessageID:       command.MessageID,
 	}, nil
+}
+
+func (repository *fakeReceiptRepository) ListReceiptStates(_ context.Context, command types.ListReceiptStatesCommand) (types.ListReceiptStatesResult, error) {
+	repository.listReceiptStatesCommand = command
+	result := types.ListReceiptStatesResult{
+		Items: make([]types.GetReceiptStateResult, 0, len(command.Items)),
+	}
+	for _, item := range command.Items {
+		result.Items = append(result.Items, types.GetReceiptStateResult{
+			ConversationID:  command.ConversationID,
+			ConversationSeq: item.ConversationSeq,
+			MessageID:       item.MessageID,
+		})
+	}
+	return result, nil
 }
 
 func (repository *fakeReceiptRepository) ListConversations(_ context.Context, command types.ListConversationsCommand) (types.ListConversationsResult, error) {

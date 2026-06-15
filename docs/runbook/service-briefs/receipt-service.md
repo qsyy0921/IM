@@ -3,6 +3,7 @@
 ## 当前状态
 
 - 已有 `MarkRead`、`GetReceiptState`、`ListReceiptStates`、`ListConversations`。
+- `ListReceiptStates` 已从应用层逐条循环查询收敛为 repository 级批量查询，单次最多 50 个 item，保持输入顺序和原有 not-found 语义。
 - 已支持 unread、archive / pin / mute 的最小会话列表能力。
 - 复用 delivery events 和 receipt projection，不跨服务读 delivery 内部表。
 - 已补 `/healthz`、`/readyz`、`/debug/metrics` 和 first-stage Prometheus text `/metrics`；可观察低敏 gRPC、PG pool、receipt projection、conversation summary、`receipt_outbox`、worker / relay retry 和 OTel trace config 聚合状态；本地 scrape 目标为 `host.docker.internal:11914`，并已补 Prometheus alert rules 和 Grafana dashboard 原型；这些只用于本地开发 / 面试展示，不代表生产 SLO。
@@ -16,4 +17,4 @@
 
 ## 后续
 
-- 送达回执扩展、批量接口优化、会话列表产品化；生产级 OTel collector、Alertmanager、SLO dashboard 和容量验证仍属于后续统一观测治理。
+- 送达回执扩展、会话列表产品化；生产级 OTel collector、Alertmanager、SLO dashboard 和容量验证仍属于后续统一观测治理。

@@ -77,6 +77,75 @@ func TestRepositoryProjectDeliveryEventAndMarkReadIntegration(t *testing.T) {
 	assertReceiptOutboxCount(t, ctx, pool, "receipt.message.read.v1", 1)
 }
 
+func TestRepositoryListReceiptStatesBatchIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	if _, err := repository.ProjectDeliveryEvent(ctx, inboxCreatedCommand(1, "delivery-inbox-1")); err != nil {
+		t.Fatalf("project first inbox item: %v", err)
+	}
+	if _, err := repository.ProjectDeliveryEvent(ctx, ackRecordedCommand(1, "delivery-ack-1")); err != nil {
+		t.Fatalf("project first ack: %v", err)
+	}
+	if _, err := repository.MarkRead(ctx, markReadCommand(1)); err != nil {
+		t.Fatalf("mark first item read: %v", err)
+	}
+	if _, err := repository.ProjectDeliveryEvent(ctx, inboxCreatedCommand(2, "delivery-inbox-2")); err != nil {
+		t.Fatalf("project second inbox item: %v", err)
+	}
+
+	result, err := repository.ListReceiptStates(ctx, types.ListReceiptStatesCommand{
+		AuthContext:    getStateCommandBySeq(1).AuthContext,
+		ConversationID: "conv-receipt",
+		Items: []types.ReceiptStateQuery{
+			{ConversationSeq: 2},
+			{MessageID: "message-1"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("list receipt states: %v", err)
+	}
+	if len(result.Items) != 2 {
+		t.Fatalf("expected 2 receipt states, got %d: %+v", len(result.Items), result.Items)
+	}
+	if result.Items[0].ConversationSeq != 2 ||
+		result.Items[0].MessageID != "message-2" ||
+		result.Items[0].ReceivedUserCount != 0 ||
+		result.Items[0].ReadUserCount != 0 {
+		t.Fatalf("unexpected first batch item: %+v", result.Items[0])
+	}
+	if result.Items[1].ConversationSeq != 1 ||
+		result.Items[1].MessageID != "message-1" ||
+		result.Items[1].ReceivedUserCount != 1 ||
+		result.Items[1].ReadUserCount != 1 {
+		t.Fatalf("unexpected second batch item: %+v", result.Items[1])
+	}
+}
+
+func TestRepositoryListReceiptStatesReturnsNotFoundForMissingItemIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	if _, err := repository.ProjectDeliveryEvent(ctx, inboxCreatedCommand(1, "delivery-inbox-1")); err != nil {
+		t.Fatalf("project inbox item: %v", err)
+	}
+	_, err := repository.ListReceiptStates(ctx, types.ListReceiptStatesCommand{
+		AuthContext:    getStateCommandBySeq(1).AuthContext,
+		ConversationID: "conv-receipt",
+		Items: []types.ReceiptStateQuery{
+			{ConversationSeq: 1},
+			{ConversationSeq: 99},
+		},
+	})
+	if !errors.Is(err, types.ErrReceiptNotFound) {
+		t.Fatalf("expected receipt not found, got %v", err)
+	}
+}
+
 func TestRepositoryMarkReadRejectsOutOfRangeIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

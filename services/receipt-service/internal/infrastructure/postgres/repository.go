@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -254,6 +255,144 @@ ORDER BY user_id ASC
 		VisibilityMode:    types.ReceiptVisibilityDetailed,
 		Receivers:         receivers,
 	}, nil
+}
+
+func (repository *Repository) ListReceiptStates(
+	ctx context.Context,
+	command types.ListReceiptStatesCommand,
+) (types.ListReceiptStatesResult, error) {
+	if err := validateAccessContext(command.AuthContext.TenantID, command.ConversationID, command.AccessContext); err != nil {
+		return types.ListReceiptStatesResult{}, err
+	}
+	if len(command.Items) == 0 {
+		return types.ListReceiptStatesResult{}, types.NewInvalidArgument("items are required")
+	}
+	if len(command.Items) > 50 {
+		return types.ListReceiptStatesResult{}, types.NewInvalidArgument("items exceeds max batch size")
+	}
+
+	args := []any{command.AuthContext.TenantID, command.ConversationID}
+	valueClauses := make([]string, 0, len(command.Items))
+	for index, item := range command.Items {
+		if err := item.Validate(); err != nil {
+			return types.ListReceiptStatesResult{}, err
+		}
+		var messageID any
+		var conversationSeq any
+		if item.MessageID != "" {
+			messageID = item.MessageID
+		} else {
+			conversationSeq = item.ConversationSeq
+		}
+		args = append(args, messageID, conversationSeq)
+		valueClauses = append(valueClauses, fmt.Sprintf("(%d, $%d::text, $%d::bigint)", index, len(args)-1, len(args)))
+	}
+
+	query := fmt.Sprintf(`
+WITH requested(ord, message_id, conversation_seq) AS (
+    VALUES %s
+),
+resolved AS (
+    SELECT
+        requested.ord,
+        matched.message_id,
+        matched.conversation_seq
+    FROM requested
+    JOIN LATERAL (
+        SELECT
+            receipt_inbox_projection.message_id,
+            receipt_inbox_projection.conversation_seq
+        FROM receipt_inbox_projection
+        WHERE receipt_inbox_projection.tenant_id = $1
+          AND receipt_inbox_projection.conversation_id = $2
+          AND (
+              (requested.message_id IS NOT NULL AND receipt_inbox_projection.message_id = requested.message_id)
+              OR (requested.conversation_seq IS NOT NULL AND receipt_inbox_projection.conversation_seq = requested.conversation_seq)
+          )
+        ORDER BY receipt_inbox_projection.conversation_seq ASC, receipt_inbox_projection.user_id ASC
+        LIMIT 1
+    ) AS matched ON TRUE
+)
+SELECT
+    resolved.ord,
+    resolved.conversation_seq,
+    resolved.message_id,
+    message_receipt_states.user_id,
+    CASE WHEN message_receipt_states.received_at IS NULL THEN 0 ELSE message_receipt_states.conversation_seq END AS received_seq,
+    message_receipt_states.received_at,
+    CASE WHEN message_receipt_states.read_at IS NULL THEN 0 ELSE message_receipt_states.conversation_seq END AS read_seq,
+    message_receipt_states.read_at
+FROM resolved
+JOIN message_receipt_states
+  ON message_receipt_states.tenant_id = $1
+ AND message_receipt_states.conversation_id = $2
+ AND message_receipt_states.conversation_seq = resolved.conversation_seq
+ORDER BY resolved.ord ASC, message_receipt_states.user_id ASC
+`, strings.Join(valueClauses, ",\n    "))
+
+	rows, err := repository.pool.Query(ctx, query, args...)
+	if err != nil {
+		return types.ListReceiptStatesResult{}, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	items := make([]types.GetReceiptStateResult, len(command.Items))
+	seen := make([]bool, len(command.Items))
+	for rows.Next() {
+		var ord int
+		var receiver types.ReceiptUserState
+		var conversationSeq int64
+		var messageID string
+		var receivedAt sql.NullTime
+		var readAt sql.NullTime
+		if err := rows.Scan(
+			&ord,
+			&conversationSeq,
+			&messageID,
+			&receiver.UserID,
+			&receiver.ReceivedSeq,
+			&receivedAt,
+			&receiver.ReadSeq,
+			&readAt,
+		); err != nil {
+			return types.ListReceiptStatesResult{}, types.NewDBReadFailed(err.Error())
+		}
+		if ord < 0 || ord >= len(items) {
+			return types.ListReceiptStatesResult{}, types.NewDBReadFailed("receipt state batch ordinal out of range")
+		}
+		if !seen[ord] {
+			items[ord] = types.GetReceiptStateResult{
+				ConversationID:  command.ConversationID,
+				ConversationSeq: conversationSeq,
+				MessageID:       messageID,
+				VisibilityMode:  types.ReceiptVisibilityDetailed,
+				Receivers:       make([]types.ReceiptUserState, 0),
+			}
+			seen[ord] = true
+		}
+		if receivedAt.Valid {
+			receiver.ReceivedAt = receivedAt.Time
+		}
+		if readAt.Valid {
+			receiver.ReadAt = readAt.Time
+		}
+		if receiver.ReceivedSeq > 0 {
+			items[ord].ReceivedUserCount++
+		}
+		if receiver.ReadSeq > 0 {
+			items[ord].ReadUserCount++
+		}
+		items[ord].Receivers = append(items[ord].Receivers, receiver)
+	}
+	if err := rows.Err(); err != nil {
+		return types.ListReceiptStatesResult{}, types.NewDBReadFailed(err.Error())
+	}
+	for index, ok := range seen {
+		if !ok || len(items[index].Receivers) == 0 {
+			return types.ListReceiptStatesResult{}, types.NewReceiptNotFound("receipt state not found")
+		}
+	}
+	return types.ListReceiptStatesResult{Items: items}, nil
 }
 
 func (repository *Repository) ListConversations(

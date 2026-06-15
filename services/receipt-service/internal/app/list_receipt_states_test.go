@@ -8,7 +8,7 @@ import (
 	"github.com/qsyy0921/IM/services/receipt-service/internal/types"
 )
 
-func TestListReceiptStatesUseCasePassesItemsToRepository(t *testing.T) {
+func TestListReceiptStatesUseCasePassesBatchToRepository(t *testing.T) {
 	repository := &fakeReceiptRepository{}
 	access := &fakeReceiptAccess{
 		viewAccess: types.ReceiptAccessContext{
@@ -32,11 +32,14 @@ func TestListReceiptStatesUseCasePassesItemsToRepository(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-	if len(repository.getReceiptStateCalls) != 2 ||
-		repository.getReceiptStateCalls[0].MessageID != "message-1" ||
-		repository.getReceiptStateCalls[1].ConversationSeq != 2 ||
-		repository.getReceiptStateCalls[0].AccessContext.TenantID != "tenant-1" {
-		t.Fatalf("unexpected repository calls: %+v", repository.getReceiptStateCalls)
+	if len(repository.getReceiptStateCalls) != 0 {
+		t.Fatalf("expected no per-item repository calls, got %+v", repository.getReceiptStateCalls)
+	}
+	if repository.listReceiptStatesCommand.AccessContext.TenantID != "tenant-1" ||
+		len(repository.listReceiptStatesCommand.Items) != 2 ||
+		repository.listReceiptStatesCommand.Items[0].MessageID != "message-1" ||
+		repository.listReceiptStatesCommand.Items[1].ConversationSeq != 2 {
+		t.Fatalf("unexpected batch repository command: %+v", repository.listReceiptStatesCommand)
 	}
 	if access.viewCalls != 1 {
 		t.Fatalf("expected one access check, got %d", access.viewCalls)

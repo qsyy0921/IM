@@ -29,21 +29,5 @@ func (useCase *ListReceiptStatesUseCase) Execute(
 		}
 		command.AccessContext = access
 	}
-	result := types.ListReceiptStatesResult{
-		Items: make([]types.GetReceiptStateResult, 0, len(command.Items)),
-	}
-	for _, item := range command.Items {
-		state, err := useCase.repository.GetReceiptState(ctx, types.GetReceiptStateCommand{
-			AuthContext:     command.AuthContext,
-			AccessContext:   command.AccessContext,
-			ConversationID:  command.ConversationID,
-			MessageID:       item.MessageID,
-			ConversationSeq: item.ConversationSeq,
-		})
-		if err != nil {
-			return types.ListReceiptStatesResult{}, err
-		}
-		result.Items = append(result.Items, state)
-	}
-	return result, nil
+	return useCase.repository.ListReceiptStates(ctx, command)
 }

@@ -107,11 +107,13 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - 六层 DDD 反向依赖门禁，生产代码禁止 `api/app/domain/trigger/types` 直接 import `internal/infrastructure`
 - 跨服务私有表访问门禁，生产代码禁止直接 SQL 访问其他服务私有表，只保留已冻结的共享 timeline / outbox 例外
 - 文件大小预算门禁，手写 Go / Markdown / PowerShell / Bash 文件继续按生产代码、测试 / runner、文档和脚本分档控复杂度
+- PowerShell 脚本解析门禁，`tools` 和 `loadtest` 下的 `.ps1` 都会进入本地检查，避免 smoke / 运维脚本语法回归
 - 本地 Prometheus / Grafana 覆盖门禁，已实现服务目录必须有 scrape / alert rules / dashboard 配置
 - 服务 cmd 层启动配置测试门禁，已实现服务必须保留 `main_test.go` 覆盖启动 / 监听 / TLS / auth guard 配置
 - 服务运行态端点门禁，已实现服务必须保留 `/healthz`、`/readyz`、`/debug/metrics` 和 `/metrics`
 - 压测原始输出路径门禁，loadtest / smoke 默认结果不能写回仓库内 `loadtest/results`，原始数据默认落 `H:\NexusIM\loadtest-results`
 - outbox / projection / challenge delivery 等 repair / audit / cleanup operator
+- `check-local` 会显式检查子门禁脚本和原生命令 exit code，避免出现打印 `FAIL` 但总检查仍返回成功的假绿。
 - worker / relay 非取消错误退避重试
 
 更完整的 trace / alert / structured logging、故障演练和运维 workflow 属于后续目标，统一维护在 `remaining-goals.md`。

@@ -8,6 +8,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $allowedInternalReferences = @(
     "tools\check-file-size-budget.ps1",
     "tools\check-project-naming.ps1",
+    "tools\check-powershell-scripts.ps1",
     "tools\check-loadtest-output-paths.ps1"
 )
 $excludedDirectories = @(

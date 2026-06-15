@@ -176,6 +176,58 @@ func TestMessagePolicyEvaluatorExactDenyOverridesTenantAllowIntegration(t *testi
 	}
 }
 
+func TestMessagePolicyEvaluatorUserRestrictionOverridesExactAllowIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           true,
+		PermissionVersion: 1,
+		Classification:    "STATIC_ALLOW",
+	})
+	command := testPolicyCommand(types.MessageActionSend)
+	seedTenantPolicyRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, true, 88, "TENANT_ALLOW", "")
+	seedPolicyRule(t, ctx, pool, command, true, 99, "EXACT_ALLOW", "")
+	seedUserRestriction(t, ctx, pool, command, 123, "USER_MUTED", "user muted")
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if decision.Allowed ||
+		decision.PermissionVersion != 123 ||
+		decision.Classification != "USER_MUTED" ||
+		decision.Reason != "user muted" {
+		t.Fatalf("expected user restriction to override exact allow, got %+v", decision)
+	}
+}
+
+func TestMessagePolicyEvaluatorExpiredUserRestrictionFallsThroughIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           false,
+		PermissionVersion: 1,
+		Classification:    "STATIC_DENY",
+		Reason:            "static deny",
+	})
+	command := testPolicyCommand(types.MessageActionSend)
+	seedExpiredUserRestriction(t, ctx, pool, command, 123, "USER_MUTED", "user muted")
+	seedTenantPolicyRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, true, 88, "TENANT_ALLOW", "")
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if !decision.Allowed ||
+		decision.PermissionVersion != 88 ||
+		decision.Classification != "TENANT_ALLOW" ||
+		decision.Reason != "" {
+		t.Fatalf("expected expired restriction to fall through to tenant allow, got %+v", decision)
+	}
+}
+
 func TestMessagePolicyEvaluatorUsesConversationRoleRuleIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -574,7 +626,7 @@ func applyPolicyMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool)
 
 func resetPolicyTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	if _, err := pool.Exec(ctx, `TRUNCATE policy_decision_audit_outbox_repair_audit, policy_decision_audit_outbox, policy_message_ownership_override_rules, policy_conversation_role_action_rules, policy_conversation_members_projection, policy_tenant_message_action_rules, policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
+	if _, err := pool.Exec(ctx, `TRUNCATE policy_decision_audit_outbox_repair_audit, policy_decision_audit_outbox, policy_user_message_action_restrictions, policy_message_ownership_override_rules, policy_conversation_role_action_rules, policy_conversation_members_projection, policy_tenant_message_action_rules, policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
 		t.Fatalf("reset policy tables: %v", err)
 	}
 }
@@ -631,6 +683,57 @@ INSERT INTO policy_tenant_message_action_rules (
 `, tenantID, action, allowed, permissionVersion, classification, reason)
 	if err != nil {
 		t.Fatalf("seed tenant policy rule: %v", err)
+	}
+}
+
+func seedUserRestriction(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	command types.CheckMessageActionCommand,
+	permissionVersion int64,
+	classification string,
+	reason string,
+) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_user_message_action_restrictions (
+    tenant_id,
+    user_id,
+    action,
+    permission_version,
+    classification,
+    reason
+) VALUES ($1, $2, $3, $4, $5, $6)
+`, command.AuthContext.TenantID, command.AuthContext.UserID, command.Action, permissionVersion, classification, reason)
+	if err != nil {
+		t.Fatalf("seed user restriction: %v", err)
+	}
+}
+
+func seedExpiredUserRestriction(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	command types.CheckMessageActionCommand,
+	permissionVersion int64,
+	classification string,
+	reason string,
+) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_user_message_action_restrictions (
+    tenant_id,
+    user_id,
+    action,
+    permission_version,
+    classification,
+    reason,
+    expires_at
+) VALUES ($1, $2, $3, $4, $5, $6, now() - interval '1 second')
+`, command.AuthContext.TenantID, command.AuthContext.UserID, command.Action, permissionVersion, classification, reason)
+	if err != nil {
+		t.Fatalf("seed expired user restriction: %v", err)
 	}
 }
 

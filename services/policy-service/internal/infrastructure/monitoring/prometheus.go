@@ -111,6 +111,7 @@ func writeRuleStorePrometheus(builder *strings.Builder, snapshot *RuleSnapshot, 
 		return
 	}
 	writeRuleDecisionPrometheus(builder, "exact", snapshot.ExactMessageActions)
+	writeRuleDecisionPrometheus(builder, "user_restriction", snapshot.UserMessageRestrictions)
 	writeRuleDecisionPrometheus(builder, "tenant", snapshot.TenantMessageActions)
 	writeRoleRulePrometheus(builder, "conversation_role", snapshot.ConversationRoleActions)
 	writeRoleRulePrometheus(builder, "ownership_override", snapshot.OwnershipOverrides)

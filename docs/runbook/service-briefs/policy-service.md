@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-- 已有 `CheckMessageAction`、PG exact rules、tenant rules、conversation role gate、contacts projection。
+- 已有 `CheckMessageAction`、PG exact rules、user message action restrictions、tenant rules、conversation role gate、contacts projection。
 - 已有 ownership gate / override、decision audit outbox relay 和 repair。
 - 已补 `/healthz`、`/readyz`、`/debug/metrics` 和 first-stage Prometheus text `/metrics`，可观察低敏 gRPC、decision、PG pool、policy rule store、projection、worker / relay retry 和 `policy_decision_audit_outbox` 聚合状态；本地 Prometheus scrape target 为 `host.docker.internal:11916`，并已有本地 alert rules / Grafana dashboard 原型；debug HTTP 监听默认只允许 loopback / RFC1918 私网，公网或 unspecified 地址必须显式 `NEXUSIM_POLICY_DEBUG_ALLOW_PUBLIC=true`。
 - 已补 first-stage OpenTelemetry gRPC server span；gRPC access log 只记录低敏 `trace_id/request_id`，并对白名单外入口 metadata 直接丢弃。
@@ -15,4 +15,4 @@
 
 ## 后续
 
-- 完整 ReBAC、moderation policy、tenant DSL / quota、外部 audit sink；当前 Prometheus / Grafana 只用于本地开发和面试展示，生产 OTel collector / alerting / SLO dashboard 仍属于后续统一观测治理。
+- 完整 ReBAC、内容分类 / provider-backed moderation、tenant DSL / quota、外部 audit sink；当前 Prometheus / Grafana 只用于本地开发和面试展示，生产 OTel collector / alerting / SLO dashboard 仍属于后续统一观测治理。

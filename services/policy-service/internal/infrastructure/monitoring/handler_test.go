@@ -303,6 +303,13 @@ func TestRenderPrometheusIncludesPolicyAggregates(t *testing.T) {
 					{Action: "EDIT", Total: 2, Allow: 1, Deny: 1},
 				},
 			},
+			UserMessageRestrictions: &RuleDecisionSnapshot{
+				Total: 1,
+				Deny:  1,
+				Actions: []RuleActionSnapshot{
+					{Action: "SEND", Total: 1, Deny: 1},
+				},
+			},
 			ConversationRoleActions: &RuleRoleSnapshot{
 				Total: 1,
 				Actions: []RuleRoleActionSnapshot{
@@ -353,6 +360,8 @@ func TestRenderPrometheusIncludesPolicyAggregates(t *testing.T) {
 
 	assertContains(t, body, `nexusim_policy_rules{decision="total",scope="exact"} 3`)
 	assertContains(t, body, `nexusim_policy_rule_actions{action="SEND",decision="allow",scope="exact"} 2`)
+	assertContains(t, body, `nexusim_policy_rules{decision="deny",scope="user_restriction"} 1`)
+	assertContains(t, body, `nexusim_policy_rule_actions{action="SEND",decision="deny",scope="user_restriction"} 1`)
 	assertContains(t, body, `nexusim_policy_role_rules{scope="conversation_role"} 1`)
 	assertContains(t, body, `nexusim_policy_role_rule_actions{action="DELETE",min_role="ADMIN",scope="conversation_role"} 1`)
 	assertContains(t, body, `nexusim_policy_contact_edges_projection{state="blocked"} 1`)
@@ -406,6 +415,7 @@ func TestQueryRuleSnapshotIncludesAllPolicyRuleStoresIntegration(t *testing.T) {
 	applyPolicyMonitoringMigrations(t, ctx, pool)
 	if _, err := pool.Exec(ctx, `
 TRUNCATE
+    policy_user_message_action_restrictions,
     policy_message_ownership_override_rules,
     policy_conversation_role_action_rules,
     policy_tenant_message_action_rules,
@@ -424,6 +434,15 @@ INSERT INTO policy_tenant_message_action_rules (
 ) VALUES
     ('tenant-metrics', 'SEND', true, 1, 'TENANT_ALLOW'),
     ('tenant-metrics', 'EDIT', false, 1, 'TENANT_DENY');
+INSERT INTO policy_user_message_action_restrictions (
+    tenant_id, user_id, action, permission_version, classification
+) VALUES
+    ('tenant-metrics', 'muted-user', 'SEND', 3, 'USER_MUTED'),
+    ('tenant-metrics', 'expired-user', 'EDIT', 3, 'USER_MUTED_EXPIRED');
+UPDATE policy_user_message_action_restrictions
+SET expires_at = now() - interval '1 second'
+WHERE tenant_id = 'tenant-metrics'
+  AND user_id = 'expired-user';
 INSERT INTO policy_conversation_role_action_rules (
     tenant_id, action, min_role, classification
 ) VALUES
@@ -450,6 +469,14 @@ INSERT INTO policy_message_ownership_override_rules (
 		snapshot.TenantMessageActions.Allow != 1 ||
 		snapshot.TenantMessageActions.Deny != 1 {
 		t.Fatalf("unexpected tenant rule snapshot: %+v", snapshot.TenantMessageActions)
+	}
+	if snapshot.UserMessageRestrictions == nil ||
+		snapshot.UserMessageRestrictions.Total != 1 ||
+		snapshot.UserMessageRestrictions.Allow != 0 ||
+		snapshot.UserMessageRestrictions.Deny != 1 ||
+		len(snapshot.UserMessageRestrictions.Actions) != 1 ||
+		snapshot.UserMessageRestrictions.Actions[0].Action != "SEND" {
+		t.Fatalf("unexpected user restriction snapshot: %+v", snapshot.UserMessageRestrictions)
 	}
 	if snapshot.ConversationRoleActions == nil || snapshot.ConversationRoleActions.Total != 2 || len(snapshot.ConversationRoleActions.Actions) != 2 {
 		t.Fatalf("unexpected role rule snapshot: %+v", snapshot.ConversationRoleActions)
@@ -541,6 +568,7 @@ func applyPolicyMonitoringMigrations(t *testing.T, ctx context.Context, pool *pg
 		"000007_policy_tenant_message_action_rules.sql",
 		"000008_policy_conversation_role_rules.sql",
 		"000009_policy_message_ownership_override_rules.sql",
+		"000010_policy_user_message_action_restrictions.sql",
 	} {
 		path := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "policy", name)
 		statement, err := os.ReadFile(path)

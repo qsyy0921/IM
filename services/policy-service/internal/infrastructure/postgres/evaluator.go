@@ -50,6 +50,14 @@ func (e MessagePolicyEvaluator) DecideMessageAction(
 		}, nil
 	}
 
+	decision, restricted, err := e.lookupUserRestriction(ctx, command)
+	if err != nil {
+		return types.MessageActionDecision{}, err
+	}
+	if restricted {
+		return decision, nil
+	}
+
 	decision, denied, err := e.applyRoleGate(ctx, command)
 	if err != nil {
 		return types.MessageActionDecision{}, err
@@ -73,6 +81,50 @@ func (e MessagePolicyEvaluator) DecideMessageAction(
 		return decision, nil
 	}
 	return e.fallbackDecision(ctx, command)
+}
+
+func (e MessagePolicyEvaluator) lookupUserRestriction(
+	ctx context.Context,
+	command types.CheckMessageActionCommand,
+) (types.MessageActionDecision, bool, error) {
+	decision := types.MessageActionDecision{
+		TenantID:       command.AuthContext.TenantID,
+		UserID:         command.AuthContext.UserID,
+		ConversationID: command.ConversationID,
+		MessageID:      command.MessageID,
+		Action:         command.Action,
+		Allowed:        false,
+	}
+	err := e.pool.QueryRow(ctx, `
+SELECT permission_version, classification, reason
+FROM policy_user_message_action_restrictions
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND action = $3
+  AND (expires_at IS NULL OR expires_at > now())
+`, command.AuthContext.TenantID, command.AuthContext.UserID, command.Action).Scan(
+		&decision.PermissionVersion,
+		&decision.Classification,
+		&decision.Reason,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return types.MessageActionDecision{}, false, nil
+	}
+	if isUndefinedTable(err) {
+		return types.MessageActionDecision{}, false, nil
+	}
+	if err != nil {
+		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy user restriction lookup failed")
+	}
+	decision.Classification = strings.TrimSpace(decision.Classification)
+	decision.Reason = strings.TrimSpace(decision.Reason)
+	if decision.PermissionVersion <= 0 || decision.Classification == "" {
+		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy user restriction is invalid")
+	}
+	if decision.Reason == "" {
+		decision.Reason = "user moderation policy denied"
+	}
+	return decision, true, nil
 }
 
 func (e MessagePolicyEvaluator) fallbackDecision(

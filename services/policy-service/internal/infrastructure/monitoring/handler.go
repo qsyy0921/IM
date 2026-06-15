@@ -197,6 +197,7 @@ type RuleSnapshot struct {
 	Deny                    int64                 `json:"deny"`
 	Actions                 []RuleActionSnapshot  `json:"actions"`
 	ExactMessageActions     *RuleDecisionSnapshot `json:"exact_message_action_rules,omitempty"`
+	UserMessageRestrictions *RuleDecisionSnapshot `json:"user_message_action_restrictions,omitempty"`
 	TenantMessageActions    *RuleDecisionSnapshot `json:"tenant_message_action_rules,omitempty"`
 	ConversationRoleActions *RuleRoleSnapshot     `json:"conversation_role_action_rules,omitempty"`
 	OwnershipOverrides      *RuleRoleSnapshot     `json:"message_ownership_override_rules,omitempty"`
@@ -294,6 +295,15 @@ func queryRuleSnapshot(ctx context.Context, pool *pgxpool.Pool) (RuleSnapshot, e
 	snapshot.Actions = exact.Actions
 	snapshot.ExactMessageActions = &exact
 
+	userRestrictions, err := queryUserMessageActionRestrictions(ctx, pool)
+	if err != nil {
+		if !isUndefinedTable(err) {
+			return RuleSnapshot{}, err
+		}
+	} else {
+		snapshot.UserMessageRestrictions = &userRestrictions
+	}
+
 	tenant, err := queryTenantMessageActionRules(ctx, pool)
 	if err != nil {
 		if !isUndefinedTable(err) {
@@ -338,6 +348,27 @@ SELECT
     COUNT(*) FILTER (WHERE allowed),
     COUNT(*) FILTER (WHERE NOT allowed)
 FROM policy_message_action_rules
+GROUP BY action
+ORDER BY action
+	`)
+}
+
+func queryUserMessageActionRestrictions(ctx context.Context, pool *pgxpool.Pool) (RuleDecisionSnapshot, error) {
+	return queryDecisionRuleSnapshot(ctx, pool, `
+SELECT
+    COUNT(*),
+    0::BIGINT,
+    COUNT(*)
+FROM policy_user_message_action_restrictions
+WHERE expires_at IS NULL OR expires_at > now()
+`, `
+SELECT
+    action,
+    COUNT(*),
+    0::BIGINT,
+    COUNT(*)
+FROM policy_user_message_action_restrictions
+WHERE expires_at IS NULL OR expires_at > now()
 GROUP BY action
 ORDER BY action
 `)

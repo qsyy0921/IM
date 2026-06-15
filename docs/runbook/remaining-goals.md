@@ -37,7 +37,7 @@
 | `push-gateway` | 跨实例 resume 强化；容量测试；Redis Cluster / 生产级 HA 设计；Redis 网络分区组合 smoke。 |
 | `receipt-service` | 送达回执扩展；批量接口优化；会话列表产品化。 |
 | `contacts-service` | 更细 profile；黑名单之外的陌生人策略；租户默认值和来源策略后续接入 admin/config service 正式权限面。 |
-| `policy-service` | 完整 ReBAC；moderation policy；tenant DSL / quota；外部 audit sink。 |
+| `policy-service` | 完整 ReBAC；内容分类 / provider-backed moderation；tenant DSL / quota；外部 audit sink。 |
 
 ## 后续未启动工作
 

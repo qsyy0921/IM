@@ -159,13 +159,16 @@ func (command ListConversationsCommand) Validate() error {
 const (
 	ConversationListSortUpdatedAtDesc       = "updated_at_desc"
 	ConversationListSortPinnedUpdatedAtDesc = "pinned_updated_at_desc"
+	ConversationListSortUnreadUpdatedAtDesc = "unread_updated_at_desc"
 )
 
 func NormalizeConversationListSort(sort string) (string, error) {
 	if sort == "" {
 		return ConversationListSortPinnedUpdatedAtDesc, nil
 	}
-	if sort == ConversationListSortUpdatedAtDesc || sort == ConversationListSortPinnedUpdatedAtDesc {
+	if sort == ConversationListSortUpdatedAtDesc ||
+		sort == ConversationListSortPinnedUpdatedAtDesc ||
+		sort == ConversationListSortUnreadUpdatedAtDesc {
 		return sort, nil
 	}
 	return "", NewInvalidArgument("unsupported conversation list sort")

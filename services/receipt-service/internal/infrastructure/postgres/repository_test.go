@@ -358,6 +358,60 @@ func TestRepositoryListConversationsFiltersUnreadOnlyIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryListConversationsSortsUnreadFirstIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	sortTime := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	insertConversationSummary(t, ctx, pool, "conv-read-new", 11, sortTime.Add(3*time.Minute))
+	insertConversationSummary(t, ctx, pool, "conv-unread-new", 12, sortTime.Add(2*time.Minute))
+	insertConversationSummary(t, ctx, pool, "conv-unread-old", 13, sortTime.Add(time.Minute))
+	insertConversationSummary(t, ctx, pool, "conv-read-old", 14, sortTime)
+	setConversationUnread(t, ctx, pool, "conv-read-new", 0)
+	setConversationUnread(t, ctx, pool, "conv-read-old", 0)
+
+	firstCommand := listConversationsCommandUnreadFirst(1, "")
+	first, err := repository.ListConversations(ctx, firstCommand)
+	if err != nil {
+		t.Fatalf("list first unread-first page: %v", err)
+	}
+	assertConversationIDs(t, first, "conv-unread-new")
+	if first.NextPageCursor == "" {
+		t.Fatal("expected unread-first next cursor")
+	}
+	second, err := repository.ListConversations(ctx, listConversationsCommandUnreadFirst(1, first.NextPageCursor))
+	if err != nil {
+		t.Fatalf("list second unread-first page: %v", err)
+	}
+	assertConversationIDs(t, second, "conv-unread-old")
+	if second.NextPageCursor == "" {
+		t.Fatal("expected unread-first cursor after unread boundary")
+	}
+	third, err := repository.ListConversations(ctx, listConversationsCommandUnreadFirst(1, second.NextPageCursor))
+	if err != nil {
+		t.Fatalf("list third unread-first page: %v", err)
+	}
+	assertConversationIDs(t, third, "conv-read-new")
+	if third.NextPageCursor == "" {
+		t.Fatal("expected unread-first cursor after read boundary")
+	}
+	fourth, err := repository.ListConversations(ctx, listConversationsCommandUnreadFirst(1, third.NextPageCursor))
+	if err != nil {
+		t.Fatalf("list fourth unread-first page: %v", err)
+	}
+	assertConversationIDs(t, fourth, "conv-read-old")
+	if fourth.NextPageCursor != "" {
+		t.Fatalf("expected empty unread-first cursor on last page, got %q", fourth.NextPageCursor)
+	}
+
+	_, err = repository.ListConversations(ctx, listConversationsCommand(1, first.NextPageCursor))
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid cursor when unread-first sort changes, got %v", err)
+	}
+}
+
 func TestRepositoryListConversationsFiltersPinnedAndMutedIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -762,6 +816,12 @@ func listConversationsCommandIncludingArchived(limit int, cursor string) types.L
 func listConversationsCommandUnreadOnly(limit int, cursor string) types.ListConversationsCommand {
 	command := listConversationsCommand(limit, cursor)
 	command.UnreadOnly = true
+	return command
+}
+
+func listConversationsCommandUnreadFirst(limit int, cursor string) types.ListConversationsCommand {
+	command := listConversationsCommand(limit, cursor)
+	command.Sort = types.ConversationListSortUnreadUpdatedAtDesc
 	return command
 }
 

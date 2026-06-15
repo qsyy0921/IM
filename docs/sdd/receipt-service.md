@@ -1,6 +1,6 @@
 # NexusIM receipt-service SDD v0.1 Draft
 
-状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务、`ListReceiptStates` 薄批量查询、receipt outbox relay、只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit`、`outbox-repair-cleanup` operator、最小 `ListConversations`、`unread_only` / `pinned_only` / `muted_only` 会话列表过滤、Archive / Pin / Mute 用户列表偏好、第一阶段 gRPC server TLS / mTLS 配置、`/healthz` / `/readyz` / `/debug/metrics` 低敏观测入口、first-stage OpenTelemetry gRPC server span，以及 receipt / demo smoke runner 的 delivery / receipt client TLS 配置已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events` 和会话列表偏好链路。
+状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务、`ListReceiptStates` repository 级批量查询、receipt outbox relay、只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit`、`outbox-repair-cleanup` operator、最小 `ListConversations`、`unread_only` / `pinned_only` / `muted_only` 会话列表过滤、`UPDATED_AT` / `PINNED_UPDATED_AT` / `UNREAD_UPDATED_AT` 会话列表排序、Archive / Pin / Mute 用户列表偏好、第一阶段 gRPC server TLS / mTLS 配置、`/healthz` / `/readyz` / `/debug/metrics` 低敏观测入口、first-stage OpenTelemetry gRPC server span，以及 receipt / demo smoke runner 的 delivery / receipt client TLS 配置已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events` 和会话列表偏好链路。
 
 本文定义 `receipt-service` 的第一条可编码切片：基于 `delivery-service` 已经产生的 durable delivery 事件，构建消息送达 / 已读回执 read model，并提供最小查询和 `MarkRead` 写入入口。
 
@@ -244,8 +244,28 @@ items[] {
 
 - 每个 item 必须且只能提供 `message_id` 或 `conversation_seq`。
 - 第一阶段最多 50 个 item，响应顺序必须与请求顺序一致。
-- `ListReceiptStates` 只做同一会话内薄批量查询：app 层只调用一次 `ReceiptAccessPort.CanViewReceiptState`，随后按请求顺序复用既有 `GetReceiptState` repository 读模型；不新增批量 SQL、不跨服务读内部表、不新增公共抽象。
+- `ListReceiptStates` 只做同一会话内薄批量查询：app 层只调用一次 `ReceiptAccessPort.CanViewReceiptState`，repository 用单次批量 SQL 按请求顺序读取 receipt read model；不跨服务读内部表、不新增公共抽象。
 - 第一阶段采用 whole-request failure：任一 item 参数错误、无权限、projection lag、not found 或 DB 读取失败，整个 RPC 返回现有稳定错误码；不做 item 级 error 协议。若未来需要部分成功，必须先扩展 proto 契约。
+
+`ListConversationsRequest`：
+
+```text
+auth_context
+limit
+page_cursor
+sort = UPDATED_AT_DESC | PINNED_UPDATED_AT_DESC | UNREAD_UPDATED_AT_DESC
+include_archived
+unread_only
+pinned_only
+muted_only
+```
+
+规则：
+
+- 默认排序为 `PINNED_UPDATED_AT_DESC`，用于常规收件箱。
+- `UNREAD_UPDATED_AT_DESC` 将 `unread_count > 0` 的会话排在已读会话前，再按 `sort_updated_at DESC, conversation_id ASC` 稳定排序。
+- `page_cursor` 绑定 `sort / include_archived / unread_only / pinned_only / muted_only` 和排序边界；`UNREAD_UPDATED_AT_DESC` cursor 必须包含 unread boundary，不能和旧排序 cursor 混用。
+- 会话列表只读取 receipt-service 自有 `user_conversation_summaries` 投影，不跨服务读 delivery / message / conversation 内部表。
 
 错误码：
 

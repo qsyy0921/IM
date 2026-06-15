@@ -446,7 +446,8 @@ WHERE tenant_id = $1
   AND (NOT $7 OR muted = TRUE)
 `
 	if hasCursor {
-		if sort == types.ConversationListSortPinnedUpdatedAtDesc {
+		switch sort {
+		case types.ConversationListSortPinnedUpdatedAtDesc:
 			query += `  AND (
       pinned < $8
       OR (pinned = $8 AND sort_updated_at < $9)
@@ -454,7 +455,15 @@ WHERE tenant_id = $1
   )
 `
 			args = append(args, cursor.Pinned, cursor.SortUpdatedAt, cursor.ConversationID)
-		} else {
+		case types.ConversationListSortUnreadUpdatedAtDesc:
+			query += `  AND (
+      (unread_count > 0) < $8
+      OR ((unread_count > 0) = $8 AND sort_updated_at < $9)
+      OR ((unread_count > 0) = $8 AND sort_updated_at = $9 AND conversation_id > $10)
+  )
+`
+			args = append(args, cursor.Unread, cursor.SortUpdatedAt, cursor.ConversationID)
+		default:
 			query += `  AND (
       sort_updated_at < $8
       OR (sort_updated_at = $8 AND conversation_id > $9)
@@ -463,11 +472,16 @@ WHERE tenant_id = $1
 			args = append(args, cursor.SortUpdatedAt, cursor.ConversationID)
 		}
 	}
-	if sort == types.ConversationListSortPinnedUpdatedAtDesc {
+	switch sort {
+	case types.ConversationListSortPinnedUpdatedAtDesc:
 		query += `ORDER BY pinned DESC, sort_updated_at DESC, conversation_id ASC
 LIMIT $3
 `
-	} else {
+	case types.ConversationListSortUnreadUpdatedAtDesc:
+		query += `ORDER BY (unread_count > 0) DESC, sort_updated_at DESC, conversation_id ASC
+LIMIT $3
+`
+	default:
 		query += `ORDER BY sort_updated_at DESC, conversation_id ASC
 LIMIT $3
 `
@@ -514,6 +528,7 @@ LIMIT $3
 			PinnedOnly:      command.PinnedOnly,
 			MutedOnly:       command.MutedOnly,
 			Pinned:          last.Pinned,
+			Unread:          last.UnreadCount > 0,
 			SortUpdatedAt:   last.UpdatedAt,
 			ConversationID:  string(last.ConversationID),
 		})
@@ -726,11 +741,12 @@ type listCursor struct {
 	PinnedOnly      bool      `json:"pinned_only"`
 	MutedOnly       bool      `json:"muted_only"`
 	Pinned          bool      `json:"pinned"`
+	Unread          bool      `json:"unread"`
 	SortUpdatedAt   time.Time `json:"sort_updated_at"`
 	ConversationID  string    `json:"conversation_id"`
 }
 
-const listCursorVersion = 3
+const listCursorVersion = 4
 
 func decodeListCursor(
 	value string,
@@ -755,12 +771,17 @@ func decodeListCursor(
 		cursor.Version = 1
 		cursor.Sort = types.ConversationListSortUpdatedAtDesc
 	}
-	if cursor.Version != listCursorVersion ||
-		cursor.Sort != sort ||
+	if cursor.Version != listCursorVersion && cursor.Version != 3 {
+		return listCursor{}, false, types.NewInvalidArgument("invalid page_cursor")
+	}
+	if cursor.Sort != sort ||
 		cursor.IncludeArchived != includeArchived ||
 		cursor.UnreadOnly != unreadOnly ||
 		cursor.PinnedOnly != pinnedOnly ||
 		cursor.MutedOnly != mutedOnly {
+		return listCursor{}, false, types.NewInvalidArgument("invalid page_cursor")
+	}
+	if sort == types.ConversationListSortUnreadUpdatedAtDesc && cursor.Version < listCursorVersion {
 		return listCursor{}, false, types.NewInvalidArgument("invalid page_cursor")
 	}
 	if cursor.SortUpdatedAt.IsZero() || cursor.ConversationID == "" {

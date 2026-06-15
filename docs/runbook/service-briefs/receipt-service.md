@@ -4,7 +4,7 @@
 
 - 已有 `MarkRead`、`GetReceiptState`、`ListReceiptStates`、`ListConversations`。
 - `ListReceiptStates` 已从应用层逐条循环查询收敛为 repository 级批量查询，单次最多 50 个 item，保持输入顺序和原有 not-found 语义。
-- 已支持 unread、pinned、muted 过滤，以及 archive / pin / mute 的最小会话列表能力；分页 cursor 会绑定 sort / archived / unread / pinned / muted 过滤条件，避免串页。
+- 已支持 unread、pinned、muted 过滤，`UPDATED_AT` / `PINNED_UPDATED_AT` / `UNREAD_UPDATED_AT` 排序，以及 archive / pin / mute 的最小会话列表能力；分页 cursor 会绑定 sort / archived / unread / pinned / muted 过滤条件和排序边界，避免串页。
 - 复用 delivery events 和 receipt projection，不跨服务读 delivery 内部表。
 - 已补 `/healthz`、`/readyz`、`/debug/metrics` 和 first-stage Prometheus text `/metrics`；可观察低敏 gRPC、PG pool、receipt projection、conversation summary、`receipt_outbox`、worker / relay retry 和 OTel trace config 聚合状态；本地 scrape 目标为 `host.docker.internal:11914`，并已补 Prometheus alert rules 和 Grafana dashboard 原型；这些只用于本地开发 / 面试展示，不代表生产 SLO。
 - debug HTTP 监听默认只允许 loopback / RFC1918 私网，公网或 unspecified 地址必须显式 `NEXUSIM_RECEIPT_DEBUG_ALLOW_PUBLIC=true`。
@@ -17,4 +17,4 @@
 
 ## 后续
 
-- 送达回执扩展、会话列表更多产品化能力；生产级 OTel collector、Alertmanager、SLO dashboard 和容量验证仍属于后续统一观测治理。
+- 送达回执扩展、会话列表更多产品化能力（草稿、标签、更多摘要策略等）；生产级 OTel collector、Alertmanager、SLO dashboard 和容量验证仍属于后续统一观测治理。

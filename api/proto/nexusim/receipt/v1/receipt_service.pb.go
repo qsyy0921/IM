@@ -79,6 +79,7 @@ const (
 	ConversationListSort_CONVERSATION_LIST_SORT_UNSPECIFIED            ConversationListSort = 0
 	ConversationListSort_CONVERSATION_LIST_SORT_UPDATED_AT_DESC        ConversationListSort = 1
 	ConversationListSort_CONVERSATION_LIST_SORT_PINNED_UPDATED_AT_DESC ConversationListSort = 2
+	ConversationListSort_CONVERSATION_LIST_SORT_UNREAD_UPDATED_AT_DESC ConversationListSort = 3
 )
 
 // Enum value maps for ConversationListSort.
@@ -87,11 +88,13 @@ var (
 		0: "CONVERSATION_LIST_SORT_UNSPECIFIED",
 		1: "CONVERSATION_LIST_SORT_UPDATED_AT_DESC",
 		2: "CONVERSATION_LIST_SORT_PINNED_UPDATED_AT_DESC",
+		3: "CONVERSATION_LIST_SORT_UNREAD_UPDATED_AT_DESC",
 	}
 	ConversationListSort_value = map[string]int32{
 		"CONVERSATION_LIST_SORT_UNSPECIFIED":            0,
 		"CONVERSATION_LIST_SORT_UPDATED_AT_DESC":        1,
 		"CONVERSATION_LIST_SORT_PINNED_UPDATED_AT_DESC": 2,
+		"CONVERSATION_LIST_SORT_UNREAD_UPDATED_AT_DESC": 3,
 	}
 )
 
@@ -1492,11 +1495,12 @@ const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
 	"#RECEIPT_VISIBILITY_MODE_UNSPECIFIED\x10\x00\x12$\n" +
 	" RECEIPT_VISIBILITY_MODE_DETAILED\x10\x01\x12&\n" +
 	"\"RECEIPT_VISIBILITY_MODE_COUNT_ONLY\x10\x02\x12\"\n" +
-	"\x1eRECEIPT_VISIBILITY_MODE_HIDDEN\x10\x03*\x9d\x01\n" +
+	"\x1eRECEIPT_VISIBILITY_MODE_HIDDEN\x10\x03*\xd0\x01\n" +
 	"\x14ConversationListSort\x12&\n" +
 	"\"CONVERSATION_LIST_SORT_UNSPECIFIED\x10\x00\x12*\n" +
 	"&CONVERSATION_LIST_SORT_UPDATED_AT_DESC\x10\x01\x121\n" +
-	"-CONVERSATION_LIST_SORT_PINNED_UPDATED_AT_DESC\x10\x022\x8a\x06\n" +
+	"-CONVERSATION_LIST_SORT_PINNED_UPDATED_AT_DESC\x10\x02\x121\n" +
+	"-CONVERSATION_LIST_SORT_UNREAD_UPDATED_AT_DESC\x10\x032\x8a\x06\n" +
 	"\x0eReceiptService\x12U\n" +
 	"\bMarkRead\x12#.nexusim.receipt.v1.MarkReadRequest\x1a$.nexusim.receipt.v1.MarkReadResponse\x12j\n" +
 	"\x0fGetReceiptState\x12*.nexusim.receipt.v1.GetReceiptStateRequest\x1a+.nexusim.receipt.v1.GetReceiptStateResponse\x12p\n" +

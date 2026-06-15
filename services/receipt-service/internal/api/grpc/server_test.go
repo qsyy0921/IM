@@ -180,27 +180,52 @@ func TestVerifiedAuthUnaryInterceptorRequiresTrustedIdentity(t *testing.T) {
 }
 
 func TestListConversationsMapsSort(t *testing.T) {
-	list := &fakeListConversationsCapture{}
-	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, list, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{})
-	_, err := server.ListConversations(context.Background(), &receiptv1.ListConversationsRequest{
-		AuthContext: &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
-		Limit:       20,
-		PageCursor:  "cursor-1",
-		Sort:        receiptv1.ConversationListSort_CONVERSATION_LIST_SORT_UPDATED_AT_DESC,
-		UnreadOnly:  true,
-		PinnedOnly:  true,
-		MutedOnly:   true,
-	})
-	if err != nil {
-		t.Fatalf("expected nil error, got %v", err)
+	tests := []struct {
+		name string
+		sort receiptv1.ConversationListSort
+		want string
+	}{
+		{
+			name: "updated",
+			sort: receiptv1.ConversationListSort_CONVERSATION_LIST_SORT_UPDATED_AT_DESC,
+			want: types.ConversationListSortUpdatedAtDesc,
+		},
+		{
+			name: "pinned",
+			sort: receiptv1.ConversationListSort_CONVERSATION_LIST_SORT_PINNED_UPDATED_AT_DESC,
+			want: types.ConversationListSortPinnedUpdatedAtDesc,
+		},
+		{
+			name: "unread",
+			sort: receiptv1.ConversationListSort_CONVERSATION_LIST_SORT_UNREAD_UPDATED_AT_DESC,
+			want: types.ConversationListSortUnreadUpdatedAtDesc,
+		},
 	}
-	if list.command.Sort != types.ConversationListSortUpdatedAtDesc ||
-		list.command.Limit != 20 ||
-		list.command.PageCursor != "cursor-1" ||
-		!list.command.UnreadOnly ||
-		!list.command.PinnedOnly ||
-		!list.command.MutedOnly {
-		t.Fatalf("unexpected list command: %+v", list.command)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			list := &fakeListConversationsCapture{}
+			server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, list, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{})
+			_, err := server.ListConversations(context.Background(), &receiptv1.ListConversationsRequest{
+				AuthContext: &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
+				Limit:       20,
+				PageCursor:  "cursor-1",
+				Sort:        test.sort,
+				UnreadOnly:  true,
+				PinnedOnly:  true,
+				MutedOnly:   true,
+			})
+			if err != nil {
+				t.Fatalf("expected nil error, got %v", err)
+			}
+			if list.command.Sort != test.want ||
+				list.command.Limit != 20 ||
+				list.command.PageCursor != "cursor-1" ||
+				!list.command.UnreadOnly ||
+				!list.command.PinnedOnly ||
+				!list.command.MutedOnly {
+				t.Fatalf("unexpected list command: %+v", list.command)
+			}
+		})
 	}
 }
 

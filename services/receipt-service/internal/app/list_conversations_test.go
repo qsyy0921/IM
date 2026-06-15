@@ -19,7 +19,7 @@ func TestListConversationsUseCasePassesSortToRepository(t *testing.T) {
 		},
 		Limit:      20,
 		PageCursor: "cursor-1",
-		Sort:       types.ConversationListSortUpdatedAtDesc,
+		Sort:       types.ConversationListSortUnreadUpdatedAtDesc,
 		UnreadOnly: true,
 		PinnedOnly: true,
 		MutedOnly:  true,
@@ -27,7 +27,7 @@ func TestListConversationsUseCasePassesSortToRepository(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-	if repository.listCommand.Sort != types.ConversationListSortUpdatedAtDesc ||
+	if repository.listCommand.Sort != types.ConversationListSortUnreadUpdatedAtDesc ||
 		repository.listCommand.Limit != 20 ||
 		repository.listCommand.PageCursor != "cursor-1" ||
 		!repository.listCommand.UnreadOnly ||

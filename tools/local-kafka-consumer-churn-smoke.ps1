@@ -6,6 +6,7 @@ param(
     [string]$KafkaAdminBootstrap = "kafka-ha-0:29092",
     [int]$KafkaTopicReplicationFactor = 3,
     [int]$ChurnCycles = 3,
+    [int]$ProbeMessagesPerTransition = 0,
     [switch]$SkipBuild
 )
 
@@ -16,6 +17,9 @@ if (-not $RunName) {
 }
 if ($ChurnCycles -lt 1) {
     throw "ChurnCycles must be >= 1."
+}
+if ($ProbeMessagesPerTransition -lt 0) {
+    throw "ProbeMessagesPerTransition must be >= 0."
 }
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -80,6 +84,7 @@ function Get-ConsumerGroupSnapshot {
     }
 
     $assignments = @()
+    $totalLag = [int64]0
     $consumerIDs = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
     $escapedTopic = [regex]::Escape($topic)
     foreach ($line in $describeLines) {
@@ -95,12 +100,17 @@ function Get-ConsumerGroupSnapshot {
         if ($consumerID -eq "-" -or [string]::IsNullOrWhiteSpace($consumerID)) {
             continue
         }
+        $lagText = $match.Groups["lag"].Value
+        $lagValue = [int64]0
+        if ([int64]::TryParse($lagText, [ref]$lagValue)) {
+            $totalLag += $lagValue
+        }
         [void]$consumerIDs.Add($consumerID)
         $assignments += [ordered]@{
             partition = [int]$match.Groups["partition"].Value
             current_offset = $match.Groups["current"].Value
             log_end_offset = $match.Groups["end"].Value
-            lag = $match.Groups["lag"].Value
+            lag = $lagText
             consumer_id = $consumerID
             host = $match.Groups["host"].Value
             client_id = $match.Groups["client"].Value.Trim()
@@ -112,6 +122,7 @@ function Get-ConsumerGroupSnapshot {
         member_count = $memberCount
         consumer_ids = @($consumerIDs | Sort-Object)
         assigned_partition_count = $assignments.Count
+        total_lag = $totalLag
         assignments = $assignments
         state_output = ($stateLines -join "`n")
         describe_output = ($describeLines -join "`n")
@@ -121,6 +132,7 @@ function Get-ConsumerGroupSnapshot {
 function Wait-ConsumerGroupStable {
     param(
         [int]$ExpectedMembers,
+        [switch]$RequireZeroLag,
         [int]$TimeoutSeconds = 90
     )
 
@@ -131,7 +143,8 @@ function Wait-ConsumerGroupStable {
         Start-Sleep -Seconds 2
         try {
             $last = Get-ConsumerGroupSnapshot
-            if ($last.state -eq "Stable" -and [int]$last.member_count -eq $ExpectedMembers -and @($last.consumer_ids).Count -eq $ExpectedMembers -and [int]$last.assigned_partition_count -eq 3) {
+            $lagOK = (-not $RequireZeroLag) -or ([int64]$last.total_lag -eq 0)
+            if ($last.state -eq "Stable" -and [int]$last.member_count -eq $ExpectedMembers -and @($last.consumer_ids).Count -eq $ExpectedMembers -and [int]$last.assigned_partition_count -eq 3 -and $lagOK) {
                 $stableChecks++
             } else {
                 $stableChecks = 0
@@ -143,9 +156,29 @@ function Wait-ConsumerGroupStable {
     } while ($stableChecks -lt 2 -and (Get-Date) -lt $deadline)
 
     if ($stableChecks -lt 2) {
-        throw "Consumer group did not become stable with expected members=$ExpectedMembers; last=$($last | ConvertTo-Json -Depth 6 -Compress)"
+        throw "Consumer group did not become stable with expected members=$ExpectedMembers zero_lag=$RequireZeroLag; last=$($last | ConvertTo-Json -Depth 6 -Compress)"
     }
     return $last
+}
+
+function Invoke-ProbeProduce {
+    param(
+        [string]$BatchRunName,
+        [int]$Count
+    )
+
+    $probeTool = Join-Path $repoRoot "bin\kafka-delivery-event-probe.exe"
+    $outputPath = Join-Path $logDir "$BatchRunName-probe-summary.json"
+    & $probeTool `
+        -brokers $KafkaBrokers `
+        -topic $topic `
+        -run $BatchRunName `
+        -count $Count `
+        -output $outputPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "kafka-delivery-event-probe failed for batch $BatchRunName"
+    }
+    return Get-Content -LiteralPath $outputPath -Raw | ConvertFrom-Json
 }
 
 function Start-PushConsumer {
@@ -191,6 +224,12 @@ try {
         if ($LASTEXITCODE -ne 0) {
             throw "go build push-gateway failed"
         }
+        go build -o bin\kafka-delivery-event-probe.exe ./tools/kafka-delivery-event-probe
+        if ($LASTEXITCODE -ne 0) {
+            throw "go build kafka-delivery-event-probe failed"
+        }
+    } elseif ($ProbeMessagesPerTransition -gt 0 -and -not (Test-Path -LiteralPath (Join-Path $repoRoot "bin\kafka-delivery-event-probe.exe") -PathType Leaf)) {
+        throw "ProbeMessagesPerTransition requires bin\kafka-delivery-event-probe.exe when SkipBuild is set."
     }
 
     Ensure-KafkaTopic
@@ -200,43 +239,59 @@ try {
 
     $initial = Wait-ConsumerGroupStable -ExpectedMembers 2
     $transitions = @()
+    $probeBatches = @()
+
+    function Complete-Transition {
+        param(
+            [int]$Cycle,
+            [string]$Action,
+            [int]$ExpectedMembers,
+            [object]$Snapshot
+        )
+
+        $probe = $null
+        $postProbeSnapshot = $null
+        if ($ProbeMessagesPerTransition -gt 0) {
+            $batchName = "$RunName-cycle$Cycle-$Action"
+            $probe = Invoke-ProbeProduce -BatchRunName $batchName -Count $ProbeMessagesPerTransition
+            $postProbeSnapshot = Wait-ConsumerGroupStable -ExpectedMembers $ExpectedMembers -RequireZeroLag
+            $script:probeBatches += [ordered]@{
+                cycle = $Cycle
+                action = $Action
+                run_name = $batchName
+                attempted = [int]$probe.Attempted
+                acked = [int]$probe.Acked
+                failed = [int]$probe.Failed
+                summary_path = (Join-Path $logDir "$batchName-probe-summary.json")
+            }
+        }
+
+        $script:transitions += [ordered]@{
+            cycle = $Cycle
+            action = $Action
+            expected_members = $ExpectedMembers
+            snapshot = $Snapshot
+            probe = $probe
+            post_probe_snapshot = $postProbeSnapshot
+        }
+    }
 
     for ($cycle = 1; $cycle -le $ChurnCycles; $cycle++) {
         Stop-PushConsumer -Process $consumerA
         $afterStopA = Wait-ConsumerGroupStable -ExpectedMembers 1
-        $transitions += [ordered]@{
-            cycle = $cycle
-            action = "stop_a"
-            expected_members = 1
-            snapshot = $afterStopA
-        }
+        Complete-Transition -Cycle $cycle -Action "stop_a" -ExpectedMembers 1 -Snapshot $afterStopA
 
         $consumerA = Start-PushConsumer -Name "push-consumer-a"
         $afterStartA = Wait-ConsumerGroupStable -ExpectedMembers 2
-        $transitions += [ordered]@{
-            cycle = $cycle
-            action = "start_a"
-            expected_members = 2
-            snapshot = $afterStartA
-        }
+        Complete-Transition -Cycle $cycle -Action "start_a" -ExpectedMembers 2 -Snapshot $afterStartA
 
         Stop-PushConsumer -Process $consumerB
         $afterStopB = Wait-ConsumerGroupStable -ExpectedMembers 1
-        $transitions += [ordered]@{
-            cycle = $cycle
-            action = "stop_b"
-            expected_members = 1
-            snapshot = $afterStopB
-        }
+        Complete-Transition -Cycle $cycle -Action "stop_b" -ExpectedMembers 1 -Snapshot $afterStopB
 
         $consumerB = Start-PushConsumer -Name "push-consumer-b"
         $afterStartB = Wait-ConsumerGroupStable -ExpectedMembers 2
-        $transitions += [ordered]@{
-            cycle = $cycle
-            action = "start_b"
-            expected_members = 2
-            snapshot = $afterStartB
-        }
+        Complete-Transition -Cycle $cycle -Action "start_b" -ExpectedMembers 2 -Snapshot $afterStartB
     }
 
     $summary = [ordered]@{
@@ -250,8 +305,10 @@ try {
         topic_replication_factor = $KafkaTopicReplicationFactor
         consumer_group = $consumerGroup
         churn_cycles = $ChurnCycles
+        probe_messages_per_transition = $ProbeMessagesPerTransition
         initial = $initial
         transitions = $transitions
+        probe_batches = $probeBatches
         log_dir = $logDir
     }
     $summaryPath = Join-Path $resultDir "kafka-consumer-churn-summary.json"
@@ -259,6 +316,7 @@ try {
     Write-Host "kafka_consumer_churn_summary=$summaryPath"
     Write-Host "churn_cycles=$ChurnCycles"
     Write-Host "transition_count=$($transitions.Count)"
+    Write-Host "probe_messages_per_transition=$ProbeMessagesPerTransition"
 }
 finally {
     Stop-PushConsumer -Process $consumerA

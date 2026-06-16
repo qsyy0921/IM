@@ -10,11 +10,13 @@ if (-not (Test-Path -LiteralPath $summarizer -PathType Leaf)) {
 function Write-KafkaConsumerChurnFixture {
     param(
         [string]$Directory,
-        [bool]$BadTransition = $false
+        [bool]$BadTransition = $false,
+        [bool]$BadProbeLag = $false
     )
 
     New-Item -ItemType Directory -Force -Path $Directory | Out-Null
     $transitions = @()
+    $probeBatches = @()
     foreach ($item in @(
         @{ Cycle = 1; Action = "stop_a"; Expected = 1 },
         @{ Cycle = 1; Action = "start_a"; Expected = 2 },
@@ -23,6 +25,8 @@ function Write-KafkaConsumerChurnFixture {
     )) {
         $memberCount = if ($BadTransition -and $item.Action -eq "start_b") { 1 } else { $item.Expected }
         $consumerIDs = if ($memberCount -eq 1) { @("consumer-a") } else { @("consumer-a", "consumer-b") }
+        $postProbeLag = if ($BadProbeLag -and $item.Action -eq "start_b") { 1 } else { 0 }
+        $probeRunName = "kafka-consumer-churn-selftest-cycle$($item.Cycle)-$($item.Action)"
         $transitions += [ordered]@{
             cycle = $item.Cycle
             action = $item.Action
@@ -32,7 +36,28 @@ function Write-KafkaConsumerChurnFixture {
                 member_count = $memberCount
                 consumer_ids = $consumerIDs
                 assigned_partition_count = 3
+                total_lag = 0
             }
+            probe = [ordered]@{
+                attempted = 2
+                acked = 2
+                failed = 0
+            }
+            post_probe_snapshot = [ordered]@{
+                state = "Stable"
+                member_count = $memberCount
+                consumer_ids = $consumerIDs
+                assigned_partition_count = 3
+                total_lag = $postProbeLag
+            }
+        }
+        $probeBatches += [ordered]@{
+            cycle = $item.Cycle
+            action = $item.Action
+            run_name = $probeRunName
+            attempted = 2
+            acked = 2
+            failed = 0
         }
     }
 
@@ -44,13 +69,16 @@ function Write-KafkaConsumerChurnFixture {
         topic = "im.delivery.events"
         consumer_group = "nexusim-push-churn-selftest"
         churn_cycles = 1
+        probe_messages_per_transition = 2
         initial = [ordered]@{
             state = "Stable"
             member_count = 2
             consumer_ids = @("consumer-a", "consumer-b")
             assigned_partition_count = 3
+            total_lag = 0
         }
         transitions = $transitions
+        probe_batches = $probeBatches
     } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $Directory "kafka-consumer-churn-summary.json") -Encoding UTF8
 }
 
@@ -94,7 +122,7 @@ try {
     }
 
     $summary = Get-Content -LiteralPath $jsonPath -Raw | ConvertFrom-Json
-    if (-not $summary.passed -or $summary.transition_count -ne 4) {
+    if (-not $summary.passed -or $summary.transition_count -ne 4 -or $summary.probe_acked -ne 8) {
         Write-Host "FAIL Kafka consumer churn summary produced wrong pass/transition flags." -ForegroundColor Red
         exit 1
     }
@@ -116,6 +144,21 @@ try {
         Write-Host "FAIL Kafka consumer churn bad fixture did not report transition failure." -ForegroundColor Red
         if ($badResult.Output) {
             Write-Host $badResult.Output -ForegroundColor Red
+        }
+        exit 1
+    }
+
+    $badProbeDir = Join-Path $tempRoot "bad-probe"
+    Write-KafkaConsumerChurnFixture -Directory $badProbeDir -BadProbeLag $true
+    $badProbeResult = Invoke-Summarizer -RunDir $badProbeDir -OutputPath (Join-Path $badProbeDir "churn-summary.json") -MarkdownPath (Join-Path $badProbeDir "churn-summary.md")
+    if ($badProbeResult.ExitCode -eq 0) {
+        Write-Host "FAIL Kafka consumer churn fixture with post-probe lag should fail." -ForegroundColor Red
+        exit 1
+    }
+    if (-not $badProbeResult.Output.Contains("Post-probe consumer lag must be zero")) {
+        Write-Host "FAIL Kafka consumer churn bad probe fixture did not report lag failure." -ForegroundColor Red
+        if ($badProbeResult.Output) {
+            Write-Host $badProbeResult.Output -ForegroundColor Red
         }
         exit 1
     }

@@ -52,6 +52,8 @@ function Assert-Condition {
 $source = Read-JsonFile -Path $sourceSummaryPath
 $initial = $source.initial
 $transitions = @(Convert-ToArray -Value $source.transitions)
+$probeBatches = @(Convert-ToArray -Value $source.probe_batches)
+$probeMessagesPerTransition = [int]$source.probe_messages_per_transition
 
 Assert-Condition -Condition ([bool]$source.git_dirty -eq $false) -Message "Kafka consumer churn smoke must be run from a clean worktree."
 Assert-Condition -Condition ([string]$source.topic -eq "im.delivery.events") -Message "Kafka consumer churn smoke must target im.delivery.events."
@@ -65,6 +67,8 @@ foreach ($transition in $transitions) {
     $snapshot = $transition.snapshot
     $expectedMembers = [int]$transition.expected_members
     $consumerIDs = @(Convert-ToArray -Value $snapshot.consumer_ids)
+    $postProbeSnapshot = $transition.post_probe_snapshot
+    $probe = $transition.probe
     $passed = (
         [string]$snapshot.state -eq "Stable" -and
         [int]$snapshot.member_count -eq $expectedMembers -and
@@ -72,14 +76,33 @@ foreach ($transition in $transitions) {
         [int]$snapshot.assigned_partition_count -eq 3
     )
     Assert-Condition -Condition $passed -Message "Consumer churn transition failed validation: cycle=$($transition.cycle) action=$($transition.action)"
+    if ($probeMessagesPerTransition -gt 0) {
+        Assert-Condition -Condition ($null -ne $probe) -Message "Consumer churn transition is missing probe summary: cycle=$($transition.cycle) action=$($transition.action)"
+        Assert-Condition -Condition ([int]$probe.Attempted -eq $probeMessagesPerTransition) -Message "Probe attempted count mismatch: cycle=$($transition.cycle) action=$($transition.action)"
+        Assert-Condition -Condition ([int]$probe.Acked -eq $probeMessagesPerTransition) -Message "Probe acked count mismatch: cycle=$($transition.cycle) action=$($transition.action)"
+        Assert-Condition -Condition ([int]$probe.Failed -eq 0) -Message "Probe had failed writes: cycle=$($transition.cycle) action=$($transition.action)"
+        Assert-Condition -Condition ($null -ne $postProbeSnapshot) -Message "Consumer churn transition is missing post-probe snapshot: cycle=$($transition.cycle) action=$($transition.action)"
+        Assert-Condition -Condition ([string]$postProbeSnapshot.state -eq "Stable") -Message "Post-probe consumer group state must be Stable: cycle=$($transition.cycle) action=$($transition.action)"
+        Assert-Condition -Condition ([int]$postProbeSnapshot.member_count -eq $expectedMembers) -Message "Post-probe member count mismatch: cycle=$($transition.cycle) action=$($transition.action)"
+        Assert-Condition -Condition ([int]$postProbeSnapshot.assigned_partition_count -eq 3) -Message "Post-probe assigned partition count mismatch: cycle=$($transition.cycle) action=$($transition.action)"
+        Assert-Condition -Condition ([int64]$postProbeSnapshot.total_lag -eq 0) -Message "Post-probe consumer lag must be zero: cycle=$($transition.cycle) action=$($transition.action)"
+    }
     $transitionSummaries += [pscustomobject]@{
         cycle = [int]$transition.cycle
         action = [string]$transition.action
         expected_members = $expectedMembers
         member_count = [int]$snapshot.member_count
         assigned_partition_count = [int]$snapshot.assigned_partition_count
+        total_lag = [int64]$snapshot.total_lag
+        probe_attempted = if ($null -ne $probe) { [int]$probe.Attempted } else { 0 }
+        probe_acked = if ($null -ne $probe) { [int]$probe.Acked } else { 0 }
+        post_probe_lag = if ($null -ne $postProbeSnapshot) { [int64]$postProbeSnapshot.total_lag } else { 0 }
         passed = $passed
     }
+}
+
+if ($probeMessagesPerTransition -gt 0) {
+    Assert-Condition -Condition ($probeBatches.Count -eq $transitionSummaries.Count) -Message "Probe batch count must match transition count."
 }
 
 $summary = [pscustomobject]@{
@@ -95,6 +118,10 @@ $summary = [pscustomobject]@{
     consumer_group = [string]$source.consumer_group
     churn_cycles = [int]$source.churn_cycles
     transition_count = $transitionSummaries.Count
+    probe_messages_per_transition = $probeMessagesPerTransition
+    probe_batch_count = $probeBatches.Count
+    probe_attempted = (($transitionSummaries | Measure-Object -Property probe_attempted -Sum).Sum)
+    probe_acked = (($transitionSummaries | Measure-Object -Property probe_acked -Sum).Sum)
     initial_member_count = [int]$initial.member_count
     initial_assigned_partition_count = [int]$initial.assigned_partition_count
     transitions = $transitionSummaries
@@ -125,14 +152,16 @@ $markdown += "- Topic: $($summary.topic)"
 $markdown += "- Consumer group: $($summary.consumer_group)"
 $markdown += "- Churn cycles: $($summary.churn_cycles)"
 $markdown += "- Transition count: $($summary.transition_count)"
+$markdown += "- Probe messages per transition: $($summary.probe_messages_per_transition)"
+$markdown += "- Probe writes acked: $($summary.probe_acked) / $($summary.probe_attempted)"
 $markdown += ""
-$markdown += "| Cycle | Action | Expected members | Assigned partitions |"
-$markdown += "| ---: | --- | ---: | ---: |"
+$markdown += "| Cycle | Action | Expected members | Assigned partitions | Probe acked | Post-probe lag |"
+$markdown += "| ---: | --- | ---: | ---: | ---: | ---: |"
 foreach ($transition in $summary.transitions) {
-    $markdown += "| $($transition.cycle) | $($transition.action) | $($transition.member_count) | $($transition.assigned_partition_count) |"
+    $markdown += "| $($transition.cycle) | $($transition.action) | $($transition.member_count) | $($transition.assigned_partition_count) | $($transition.probe_acked) | $($transition.post_probe_lag) |"
 }
 $markdown += ""
-$markdown += "This validates a local push-gateway delivery-consumer churn observation: consumers repeatedly leave and rejoin the same group, and Kafka returns the group to Stable with all three partitions assigned after every transition. It is not a production rebalance storm SLO, capacity, or long-duration partition churn proof."
+$markdown += "This validates a local push-gateway delivery-consumer churn observation: consumers repeatedly leave and rejoin the same group, Kafka returns the group to Stable with all three partitions assigned after every transition, and optional probe delivery events are consumed to zero lag after each transition. It is not a production rebalance storm SLO, capacity, or long-duration partition churn proof."
 
 $markdown | Set-Content -LiteralPath $markdownFullPath -Encoding UTF8
 

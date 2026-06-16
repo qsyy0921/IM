@@ -364,15 +364,22 @@ func runChallengeDeliveryRepair() error {
 	if err != nil {
 		return err
 	}
+	mode := envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_MODE", types.ChallengeDeliveryRepairModeAudit)
+	dryRun := envBool("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_DRY_RUN", false)
 	log.Printf(
 		"identity-service challenge delivery repair completed requested=%d audited=%d mutated=%d skipped=%d mode=%s dry_run=%t",
 		stats.Requested,
 		stats.Audited,
 		stats.Mutated,
 		stats.Skipped,
-		envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_MODE", types.ChallengeDeliveryRepairModeAudit),
-		envBool("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_DRY_RUN", false),
+		mode,
+		dryRun,
 	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_OUTPUT")); outputPath != "" {
+		if err := writeChallengeDeliveryRepairOutput(outputPath, stats, len(ids), mode, dryRun); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

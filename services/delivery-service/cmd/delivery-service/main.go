@@ -530,6 +530,11 @@ func runProjectionCheckpointRepair() error {
 		failureOffset,
 		dryRun,
 	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_PROJECTION_REPAIR_OUTPUT")); outputPath != "" {
+		if err := writeProjectionRepairOutput(outputPath, stats, mode, targetOffset, failureOffset, dryRun); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

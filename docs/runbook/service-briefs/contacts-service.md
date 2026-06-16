@@ -14,8 +14,9 @@
 - 已补 contacts outbox publish / audit / repair audit 错误脱敏：`last_error`、`previous_last_error` 只保留稳定低敏分类，不暴露 broker body、账号、token 或 provider 原文。
 - 当 `NEXUSIM_CONTACTS_AUTH_MODE=metadata|verified-metadata` 时，公网监听地址 + 无 gRPC mTLS client cert 的危险组合会在启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - PostgreSQL repository 已按主流程 / helper / privacy / source policy 同 package 拆分，主文件降到约 1000 行；PostgreSQL privacy / source-policy 集成测试也已拆到独立同 package 测试文件，避免联系人逻辑和测试继续堆进单个大文件。
+- `loadtest/contacts` summary 已输出 `capacity_summary`，包含运行时长、场景、操作数、Kafka contact event 数、contacts outbox 聚合、ops/s、events/s 和 latency p95/p99；后续容量验证可直接复用该结构。
 
 ## 后续
 
 - 更细隐私策略：profile 可见性、陌生人申请的组织 / 风险 / 审批策略；租户默认值和来源策略后续可接入 admin/config service 的正式权限面。
-- 生产级 OTel collector、Alertmanager、SLO dashboard 和容量验证仍属于后续统一观测治理。
+- 生产级 OTel collector、Alertmanager、SLO dashboard 和基于 `capacity_summary` 的容量基线实跑仍属于后续统一观测治理。

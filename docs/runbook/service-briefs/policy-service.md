@@ -14,7 +14,8 @@
 - 已补只读 `outbox-audit`、只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运维模式，可直接审计当前 `policy_decision_audit_outbox` 行，以及按 retention / scope 清理 policy decision audit outbox repair 历史，不改当前 live outbox 状态。
 - message-service 通过 policy-service 做权限决策，不复制策略实现。
 - `loadtest/policyintegration` smoke runner 已按 config / model / auth / util 同 package 拆分，避免策略集成验证继续堆进单个 `main.go`。
+- `loadtest/policy` summary 已输出 `capacity_summary`，包含运行时长、action/allow/deny 计数、decision/s、latency p95/p99、permission version 和 classification 口径；后续策略容量验证可直接复用该结构。
 
 ## 后续
 
-- 完整 ReBAC、内容分类 / provider-backed moderation、tenant DSL / quota、外部 audit sink；当前 Prometheus / Grafana 只用于本地开发和面试展示，生产 OTel collector / alerting / SLO dashboard 仍属于后续统一观测治理。
+- 完整 ReBAC、内容分类 / provider-backed moderation、tenant DSL / quota、外部 audit sink；当前 Prometheus / Grafana 只用于本地开发和面试展示，生产 OTel collector / alerting / SLO dashboard 和基于 `capacity_summary` 的容量基线实跑仍属于后续统一观测治理。

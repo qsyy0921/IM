@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -115,6 +117,7 @@ type summary struct {
 	ContactsOutbox               outboxStats         `json:"contacts_outbox"`
 	ContactKafkaEvents           []contactKafkaEvent `json:"contact_kafka_events"`
 	LatenciesMS                  map[string]float64  `json:"latencies_ms"`
+	Capacity                     *capacitySummary    `json:"capacity_summary,omitempty"`
 }
 
 type sendSummary struct {
@@ -182,6 +185,20 @@ type contactKafkaEvent struct {
 	Remark           string `json:"remark,omitempty"`
 	AggregateVersion int64  `json:"aggregate_version"`
 	PartitionKey     string `json:"partition_key"`
+}
+
+type capacitySummary struct {
+	DurationSeconds       float64 `json:"duration_seconds"`
+	Scenario              string  `json:"scenario"`
+	OperationCount        int     `json:"operation_count"`
+	ContactEventCount     int     `json:"contact_event_count"`
+	ContactsOutboxTotal   int64   `json:"contacts_outbox_total"`
+	ContactsOutboxPending int64   `json:"contacts_outbox_pending"`
+	ContactsOutboxDLQ     int64   `json:"contacts_outbox_dlq"`
+	OperationsPerSecond   float64 `json:"operations_per_second"`
+	EventsPerSecond       float64 `json:"events_per_second"`
+	LatencyP95MS          float64 `json:"latency_p95_ms,omitempty"`
+	LatencyP99MS          float64 `json:"latency_p99_ms,omitempty"`
 }
 
 func main() {
@@ -279,6 +296,7 @@ func run(cfg config) error {
 	s.GitDirty = strings.TrimSpace(s.GitStatusShort) != ""
 	defer func() {
 		s.FinishedAt = time.Now().UTC()
+		s.Capacity = buildCapacitySummary(s)
 		_ = writeSummary(cfg.resultDir, s)
 	}()
 
@@ -1293,6 +1311,54 @@ func writeSummary(resultDir string, s summary) error {
 		return err
 	}
 	return os.WriteFile(filepath.Join(resultDir, "contacts-summary.json"), raw, 0o644)
+}
+
+func buildCapacitySummary(s summary) *capacitySummary {
+	duration := s.FinishedAt.Sub(s.StartedAt).Seconds()
+	if duration <= 0 {
+		return nil
+	}
+	operationCount := len(s.LatenciesMS)
+	eventCount := len(s.ContactKafkaEvents)
+	return &capacitySummary{
+		DurationSeconds:       duration,
+		Scenario:              s.Scenario,
+		OperationCount:        operationCount,
+		ContactEventCount:     eventCount,
+		ContactsOutboxTotal:   s.ContactsOutbox.Total,
+		ContactsOutboxPending: s.ContactsOutbox.Pending,
+		ContactsOutboxDLQ:     s.ContactsOutbox.DLQ,
+		OperationsPerSecond:   ratePerSecond(operationCount, duration),
+		EventsPerSecond:       ratePerSecond(eventCount, duration),
+		LatencyP95MS:          latencyQuantile(s.LatenciesMS, 0.95),
+		LatencyP99MS:          latencyQuantile(s.LatenciesMS, 0.99),
+	}
+}
+
+func ratePerSecond(count int, durationSeconds float64) float64 {
+	if count <= 0 || durationSeconds <= 0 {
+		return 0
+	}
+	return float64(count) / durationSeconds
+}
+
+func latencyQuantile(values map[string]float64, quantile float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	sorted := make([]float64, 0, len(values))
+	for _, value := range values {
+		sorted = append(sorted, value)
+	}
+	sort.Float64s(sorted)
+	index := int(math.Ceil(quantile*float64(len(sorted)))) - 1
+	if index < 0 {
+		index = 0
+	}
+	if index >= len(sorted) {
+		index = len(sorted) - 1
+	}
+	return sorted[index]
 }
 
 func gitOutput(args ...string) string {

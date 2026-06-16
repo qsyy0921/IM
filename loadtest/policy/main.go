@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -54,6 +56,7 @@ type summary struct {
 	ExpectedReason         string             `json:"expected_reason,omitempty"`
 	Actions                []actionSummary    `json:"actions"`
 	LatenciesMS            map[string]float64 `json:"latencies_ms"`
+	Capacity               *capacitySummary   `json:"capacity_summary,omitempty"`
 }
 
 type actionSummary struct {
@@ -64,6 +67,19 @@ type actionSummary struct {
 	Classification    string  `json:"classification"`
 	Reason            string  `json:"reason,omitempty"`
 	LatencyMS         float64 `json:"latency_ms"`
+}
+
+type capacitySummary struct {
+	DurationSeconds    float64 `json:"duration_seconds"`
+	ActionCount        int     `json:"action_count"`
+	AllowedActionCount int     `json:"allowed_action_count"`
+	DeniedActionCount  int     `json:"denied_action_count"`
+	DecisionsPerSecond float64 `json:"decisions_per_second"`
+	LatencyP95MS       float64 `json:"latency_p95_ms,omitempty"`
+	LatencyP99MS       float64 `json:"latency_p99_ms,omitempty"`
+	ExpectedAllowed    bool    `json:"expected_allowed"`
+	PermissionVersion  int64   `json:"permission_version"`
+	Classification     string  `json:"classification"`
 }
 
 func main() {
@@ -125,6 +141,7 @@ func run(cfg config) error {
 	s.GitDirty = strings.TrimSpace(s.GitStatusShort) != ""
 	defer func() {
 		s.FinishedAt = time.Now().UTC()
+		s.Capacity = buildCapacitySummary(s)
 		_ = writeSummary(cfg.resultDir, s)
 	}()
 
@@ -250,6 +267,58 @@ func writeSummary(resultDir string, s summary) error {
 		return err
 	}
 	return os.WriteFile(path, append(bytes, '\n'), 0o644)
+}
+
+func buildCapacitySummary(s summary) *capacitySummary {
+	duration := s.FinishedAt.Sub(s.StartedAt).Seconds()
+	if duration <= 0 {
+		return nil
+	}
+	allowed := 0
+	for _, action := range s.Actions {
+		if action.Allowed {
+			allowed++
+		}
+	}
+	actionCount := len(s.Actions)
+	return &capacitySummary{
+		DurationSeconds:    duration,
+		ActionCount:        actionCount,
+		AllowedActionCount: allowed,
+		DeniedActionCount:  actionCount - allowed,
+		DecisionsPerSecond: ratePerSecond(actionCount, duration),
+		LatencyP95MS:       latencyQuantile(s.LatenciesMS, 0.95),
+		LatencyP99MS:       latencyQuantile(s.LatenciesMS, 0.99),
+		ExpectedAllowed:    s.ExpectedAllowed,
+		PermissionVersion:  s.ExpectedPermissionVer,
+		Classification:     s.ExpectedClassification,
+	}
+}
+
+func ratePerSecond(count int, durationSeconds float64) float64 {
+	if count <= 0 || durationSeconds <= 0 {
+		return 0
+	}
+	return float64(count) / durationSeconds
+}
+
+func latencyQuantile(values map[string]float64, quantile float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	sorted := make([]float64, 0, len(values))
+	for _, value := range values {
+		sorted = append(sorted, value)
+	}
+	sort.Float64s(sorted)
+	index := int(math.Ceil(quantile*float64(len(sorted)))) - 1
+	if index < 0 {
+		index = 0
+	}
+	if index >= len(sorted) {
+		index = len(sorted) - 1
+	}
+	return sorted[index]
 }
 
 func gitOutput(args ...string) string {

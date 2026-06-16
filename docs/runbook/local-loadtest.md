@@ -73,6 +73,32 @@ receipt-service 的本地 stack 基线也建议使用已有 smoke 包装脚本�
   -RunName capacity-baseline-receipt-stack-<name>
 ```
 
+api-gateway 的本地 stack 基线建议使用 secure demo 包装脚本。该脚本会启动临时 conversation / message / policy / delivery / receipt / push / api-gateway 进程和必要 relay / consumer 角色，走 GatewayService facade、入口 mTLS、下游 mTLS、HMAC gateway auth、push WebSocket、delivery / receipt / policy Kafka readback，结束后自动停止临时进程：
+
+```powershell
+.\loadtest\demo\run-local-secure-demo.ps1 `
+  -RunName capacity-baseline-api-gateway-stack-<name> `
+  -SkipBuild
+```
+
+如果本机 Docker / WSL port proxy 已占用默认端口，可以显式传入备用端口；默认值保持不变。例如：
+
+```powershell
+.\loadtest\demo\run-local-secure-demo.ps1 `
+  -RunName capacity-baseline-api-gateway-stack-<name> `
+  -ConversationPort 13096 `
+  -MessagePort 13095 `
+  -DeliveryPort 13097 `
+  -PushPort 13098 `
+  -ReceiptPort 13099 `
+  -PolicyPort 13100 `
+  -PolicyDebugPort 13101 `
+  -PushDebugPort 13102 `
+  -ApiGatewayPort 13103 `
+  -ApiGatewayDebugPort 13104 `
+  -SkipBuild
+```
+
 contacts stack runner 使用默认 topic `im.contact.events`，本地 Kafka 禁止自动建 topic，首次运行前需要显式创建：
 
 ```powershell

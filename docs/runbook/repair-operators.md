@@ -80,6 +80,8 @@ go run ./services/delivery-service/cmd/delivery-service
 
 `message-service` 还提供只读 `retention-proof-audit`，用于按当前 `message_log` 行聚合删除证明：当前状态、payload 是否仍存在、最新 `DELETE` change history、`message.deleted.v1` timeline / outbox 是否存在。默认审计 `DELETED` 消息，支持按 tenant / conversation / message / status 缩小范围，可选 `NEXUSIM_MESSAGE_RETENTION_PROOF_AUDIT_OUTPUT` 写低敏 JSON 结果；输出不包含消息 payload 或删除 reason 原文。
 
+`message-service` 还提供 `legal-hold-audit` / `legal-hold-set` / `legal-hold-release`，用于审计、设置和释放消息级 legal hold。ACTIVE legal hold 会让 `DeleteMessage` 在事务内 fail-closed，不推进 seq 或写 timeline/outbox。`legal-hold-audit` 可选 `NEXUSIM_MESSAGE_LEGAL_HOLD_AUDIT_OUTPUT` 写低敏 JSON，`legal-hold-set` / `legal-hold-release` 可选 `NEXUSIM_MESSAGE_LEGAL_HOLD_OUTPUT` 写低敏 JSON；输出只包含 hold 元数据和 reason-present，不输出 hold reason 原文。
+
 ## Delivery Projection
 
 `delivery-service` 额外拥有 projection 排障入口：

@@ -455,6 +455,154 @@ WHERE ml.tenant_id = $1
 	}
 }
 
+func TestMessageRepositoryDeleteMessageBlockedByLegalHoldIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	now := time.Date(2026, 6, 10, 3, 45, 0, 0, time.UTC)
+	runID := time.Now().UnixNano()
+	messageCounter := 0
+	eventCounter := 0
+	repo := NewMessageRepository(
+		pool,
+		WithClock(func() time.Time { return now }),
+		WithIDGenerators(
+			func() (types.MessageID, error) {
+				messageCounter++
+				return types.MessageID(fmt.Sprintf("msg-delete-hold-%d-%d", runID, messageCounter)), nil
+			},
+			func() (types.EventID, error) {
+				eventCounter++
+				return types.EventID(fmt.Sprintf("event-delete-hold-%d-%d", runID, eventCounter)), nil
+			},
+		),
+	)
+	tenantID := types.TenantID(fmt.Sprintf("tenant-it-delete-hold-%d", runID))
+	appendInput := testAppendInput(tenantID, "client-delete-hold-source", []byte(`{"text":"legal hold payload"}`))
+	appendResult, err := repo.AppendMessage(ctx, appendInput)
+	if err != nil {
+		t.Fatalf("append source message: %v", err)
+	}
+	_, err = repo.SetMessageLegalHold(ctx, MessageLegalHoldMutationOptions{
+		TenantID:       string(tenantID),
+		ConversationID: string(appendInput.Command.ConversationID),
+		MessageID:      string(appendResult.MessageID),
+		HoldID:         fmt.Sprintf("hold-%d", runID),
+		OperatorID:     "legal-ops",
+		Reason:         "do not leak legal reason with token=secret-token",
+		Now:            now,
+	})
+	if err != nil {
+		t.Fatalf("set legal hold: %v", err)
+	}
+
+	deleteInput := testDeleteInput(appendInput, appendResult.MessageID, "delete-held-key-1", types.DeleteScopeCompliance, "legal retention cleanup")
+	deleteInput.Command.AuthContext.UserID = "compliance-admin"
+	deleteInput.Permission.OwnershipOverride = true
+	deleteInput.Permission.Classification = "COMPLIANCE_RETENTION"
+	_, err = repo.DeleteMessage(ctx, deleteInput)
+	if !errors.Is(err, types.ErrInvalidMessageState) {
+		t.Fatalf("expected invalid message state for held message, got %v", err)
+	}
+
+	assertCurrentSeq(t, ctx, pool, tenantID, appendInput.Command.ConversationID, 1)
+	assertCount(t, ctx, pool, "message_change_history", tenantID, 0)
+	assertCount(t, ctx, pool, "conversation_timeline_events", tenantID, 1)
+	assertCount(t, ctx, pool, "message_outbox", tenantID, 1)
+	var status, payload string
+	if err := pool.QueryRow(ctx, `
+SELECT status, payload_json::text
+FROM message_log
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND message_id = $3
+`, tenantID, appendInput.Command.ConversationID, appendResult.MessageID).Scan(&status, &payload); err != nil {
+		t.Fatalf("read held message: %v", err)
+	}
+	if status != "NORMAL" || !strings.Contains(payload, "legal hold payload") {
+		t.Fatalf("held message should remain unchanged, status=%s payload=%s", status, payload)
+	}
+}
+
+func TestMessageRepositoryLegalHoldSetReleaseAuditIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	now := time.Date(2026, 6, 10, 3, 50, 0, 0, time.UTC)
+	runID := time.Now().UnixNano()
+	repo := NewMessageRepository(
+		pool,
+		WithClock(func() time.Time { return now }),
+		WithIDGenerators(
+			func() (types.MessageID, error) {
+				return types.MessageID(fmt.Sprintf("msg-legal-hold-%d", runID)), nil
+			},
+			func() (types.EventID, error) {
+				return types.EventID(fmt.Sprintf("event-legal-hold-%d", runID)), nil
+			},
+		),
+	)
+	tenantID := types.TenantID(fmt.Sprintf("tenant-it-legal-hold-%d", runID))
+	appendInput := testAppendInput(tenantID, "client-legal-hold", []byte(`{"text":"hold me"}`))
+	appendResult, err := repo.AppendMessage(ctx, appendInput)
+	if err != nil {
+		t.Fatalf("append source message: %v", err)
+	}
+	holdID := fmt.Sprintf("hold-set-release-%d", runID)
+	setResult, err := repo.SetMessageLegalHold(ctx, MessageLegalHoldMutationOptions{
+		TenantID:       string(tenantID),
+		ConversationID: string(appendInput.Command.ConversationID),
+		MessageID:      string(appendResult.MessageID),
+		HoldID:         holdID,
+		OperatorID:     "legal-ops",
+		Reason:         "legal discovery",
+		Now:            now,
+	})
+	if err != nil {
+		t.Fatalf("set legal hold: %v", err)
+	}
+	if setResult.Status != MessageLegalHoldStatusActive || !setResult.ReasonPresent {
+		t.Fatalf("unexpected set result: %+v", setResult)
+	}
+	activeRows, err := repo.AuditMessageLegalHolds(ctx, MessageLegalHoldAuditOptions{
+		TenantID: string(tenantID),
+		Status:   MessageLegalHoldStatusActive,
+	})
+	if err != nil {
+		t.Fatalf("audit active legal hold: %v", err)
+	}
+	if len(activeRows) != 1 || activeRows[0].HoldID != holdID {
+		t.Fatalf("unexpected active legal hold audit rows: %+v", activeRows)
+	}
+
+	released, err := repo.ReleaseMessageLegalHold(ctx, MessageLegalHoldMutationOptions{
+		TenantID:   string(tenantID),
+		HoldID:     holdID,
+		OperatorID: "legal-ops",
+		Now:        now.Add(time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("release legal hold: %v", err)
+	}
+	if released.Status != MessageLegalHoldStatusReleased || released.ReleasedAt == nil || released.ReleasedBy != "legal-ops" {
+		t.Fatalf("unexpected release result: %+v", released)
+	}
+	releasedRows, err := repo.AuditMessageLegalHolds(ctx, MessageLegalHoldAuditOptions{
+		TenantID: string(tenantID),
+		Status:   MessageLegalHoldStatusReleased,
+	})
+	if err != nil {
+		t.Fatalf("audit released legal hold: %v", err)
+	}
+	if len(releasedRows) != 1 || releasedRows[0].HoldID != holdID {
+		t.Fatalf("unexpected released legal hold audit rows: %+v", releasedRows)
+	}
+}
+
 func TestMessageRepositoryDeleteMessageRejectsNonSenderIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openIntegrationPool(t, ctx)

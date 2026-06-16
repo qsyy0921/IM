@@ -70,6 +70,9 @@ func (r *MessageRepository) DeleteMessage(
 	if !message.CanDelete() {
 		return domain.MessageChangeResult{}, types.NewInvalidMessageState("message cannot be deleted")
 	}
+	if err := ensureMessageNotUnderLegalHold(ctx, tx, input.Command); err != nil {
+		return domain.MessageChangeResult{}, err
+	}
 
 	if err := ensureConversationSeqFor(ctx, tx, input.Command.AuthContext.TenantID, input.Command.ConversationID); err != nil {
 		return domain.MessageChangeResult{}, err
@@ -242,6 +245,24 @@ FOR UPDATE
 		return domain.Message{}, types.NewDBWriteFailed(err.Error())
 	}
 	return message, nil
+}
+
+func ensureMessageNotUnderLegalHold(ctx context.Context, tx pgx.Tx, command types.DeleteMessageCommand) error {
+	var activeHoldCount int64
+	if err := tx.QueryRow(ctx, `
+SELECT count(*)
+FROM message_legal_holds
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND message_id = $3
+  AND status = 'ACTIVE'
+`, command.AuthContext.TenantID, command.ConversationID, command.MessageID).Scan(&activeHoldCount); err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if activeHoldCount > 0 {
+		return types.NewInvalidMessageState("message is under legal hold")
+	}
+	return nil
 }
 
 func nextDeleteMessageChangeVersion(

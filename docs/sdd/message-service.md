@@ -263,7 +263,7 @@ conversation_seq
 
 - 个人视图隐藏不进入 message-service，由 api-gateway 路由到 delivery-service / user-inbox 读模型。
 - 会话级删除和合规删除分开。
-- 合规删除第一阶段必须经 policy ownership override；后续再接完整 Retention workflow / legal hold / 外部 proof。
+- 合规删除第一阶段必须经 policy ownership override；message-service 本地 legal hold 会在 `DeleteMessage` 事务内 fail-closed 阻止删除；后续再接完整 Retention approval workflow / 外部 proof。
 
 `delete_scope`：
 
@@ -275,7 +275,7 @@ COMPLIANCE_RETENTION
 语义：
 
 - `CONVERSATION_VIEW` 对会话成员返回 tombstone。
-- `COMPLIANCE_RETENTION` 第一阶段只允许 policy 返回 ownership override 后执行，会 redaction 当前消息 payload 与本次 change history payload；timeline / outbox 只写低敏 reason-present 证明。完整 legal hold / delete proof workflow 后续接入。
+- `COMPLIANCE_RETENTION` 第一阶段只允许 policy 返回 ownership override 后执行，会 redaction 当前消息 payload 与本次 change history payload；timeline / outbox 只写低敏 reason-present 证明。消息级 legal hold 已作为本地 fail-closed 门禁落库；完整审批 / 外部 proof workflow 后续接入。
 
 `SELF_VIEW` 属于 delivery-service / user-inbox 视图状态，不产生 `message.deleted.v1`，不改变 `message_log`、`conversation_timeline_events`、`message_outbox`。
 
@@ -518,6 +518,18 @@ DELETE
 ```
 
 `EditMessage`、`RevokeMessage`、`DeleteMessage` 都必须写 `message_change_history`，不能只依赖 Kafka 事件或 audit-service 追溯状态变化。
+
+### 6.6 message_legal_holds
+
+`message_legal_holds` 是第一阶段消息级 legal hold 本地门禁。它不是完整法务审批系统，也不保存外部 proof 包；只用于在 `DeleteMessage` 事务内阻止被 hold 的消息被删除或合规 redaction。
+
+关键约束：
+
+- `tenant_id + hold_id` 唯一，operator 复用同一 hold id 只能作用于同一 message。
+- `status` 只允许 `ACTIVE / RELEASED`。
+- `ACTIVE` hold 不允许带 `released_at`，`RELEASED` hold 必须带 `released_at`。
+- `DeleteMessage` 在锁定 message row 后检查 ACTIVE hold；命中时返回稳定 invalid-state 错误，不分配新的 `conversation_seq`，不写 `message_change_history`、timeline 或 outbox。
+- operator 输出只暴露 reason-present，不输出 hold reason 原文。
 
 ### 6.6 message_command_idempotency
 

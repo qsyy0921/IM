@@ -941,6 +941,92 @@ WHERE tenant_id = 'tenant-owner-transfer'
 	assertMemberChangeStatus(t, ctx, pool, result.ChangeID, types.MemberChangeStatusDone, true)
 }
 
+func TestRepositoryTransferConversationOwnerRejectsInvalidTargetsWithoutSideEffectsIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pg pool: %v", err)
+	}
+	defer pool.Close()
+
+	cases := []struct {
+		name          string
+		targetRole    types.MemberRole
+		targetStatus  types.MemberStatus
+		wantErr       error
+		idempotencyID string
+	}{
+		{
+			name:          "inactive target",
+			targetRole:    types.MemberRoleMember,
+			targetStatus:  types.MemberStatusLeft,
+			wantErr:       types.ErrMemberConflict,
+			idempotencyID: "idem-owner-transfer-inactive",
+		},
+		{
+			name:          "target already owner",
+			targetRole:    types.MemberRoleOwner,
+			targetStatus:  types.MemberStatusActive,
+			wantErr:       types.ErrPermissionDenied,
+			idempotencyID: "idem-owner-transfer-existing-owner",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resetMemberChangeTables(t, ctx, pool)
+			ensureOwnerTransferConstraint(t, ctx, pool)
+			if _, err := pool.Exec(ctx, `
+INSERT INTO conversations (
+    tenant_id, conversation_id, conversation_type, status, conversation_mode,
+    fanout_mode, fanout_policy_version, member_version, permission_version, current_seq_shard
+) VALUES ('tenant-owner-transfer-negative', 'conv-owner-transfer-negative', 'GROUP', 'ACTIVE', 'LOCAL_ROW_LOCK', 'WRITE_FANOUT', 3, 5, 7, 'local');
+`); err != nil {
+				t.Fatalf("seed invalid owner transfer conversation: %v", err)
+			}
+			if _, err := pool.Exec(ctx, `
+INSERT INTO conversation_members (
+    tenant_id, conversation_id, user_id, role, status, join_seq, member_version, permission_version
+) VALUES
+    ('tenant-owner-transfer-negative', 'conv-owner-transfer-negative', 'owner-1', 'OWNER', 'ACTIVE', 1, 5, 7),
+    ('tenant-owner-transfer-negative', 'conv-owner-transfer-negative', 'user-2', $1, $2, 2, 5, 7);
+`, tc.targetRole, tc.targetStatus); err != nil {
+				t.Fatalf("seed invalid owner transfer members: %v", err)
+			}
+
+			repository := NewRepository(
+				pool,
+				WithClock(func() time.Time {
+					return time.Date(2026, 6, 10, 11, 0, 0, 0, time.UTC)
+				}),
+				WithIDGenerators(
+					func() (types.ChangeID, error) { return "change-owner-transfer-negative", nil },
+					func() (types.EventID, error) { return "event-owner-transfer-negative", nil },
+				),
+			)
+			_, err := repository.TransferConversationOwner(ctx, types.TransferConversationOwnerCommand{
+				AuthContext: types.AuthContext{
+					TenantID: "tenant-owner-transfer-negative",
+					UserID:   "owner-1",
+				},
+				ConversationID:        "conv-owner-transfer-negative",
+				NewOwnerUserID:        "user-2",
+				ExpectedMemberVersion: 5,
+				IdempotencyKey:        tc.idempotencyID,
+				Reason:                "invalid target",
+			})
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("expected %v, got %v", tc.wantErr, err)
+			}
+			assertNoOwnerTransferSideEffects(t, ctx, pool)
+		})
+	}
+}
+
 func TestRepositoryMarkPublishedMemberChangesIntegration(t *testing.T) {
 	dsn := os.Getenv("NEXUSIM_PG_DSN")
 	if dsn == "" {
@@ -1184,6 +1270,86 @@ WHERE change_id = $1
 	}
 	if status != want || completedAt.Valid != wantCompleted {
 		t.Fatalf("unexpected member change state: status=%s completed=%v", status, completedAt)
+	}
+}
+
+func assertNoOwnerTransferSideEffects(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+	t.Helper()
+	for tableName, query := range map[string]string{
+		"conversation_seq": `
+SELECT count(*)
+FROM conversation_seq
+WHERE tenant_id = 'tenant-owner-transfer-negative'
+  AND conversation_id = 'conv-owner-transfer-negative'
+`,
+		"member_change_saga": `
+SELECT count(*)
+FROM member_change_saga
+WHERE tenant_id = 'tenant-owner-transfer-negative'
+  AND conversation_id = 'conv-owner-transfer-negative'
+`,
+		"conversation_timeline_events": `
+SELECT count(*)
+FROM conversation_timeline_events
+WHERE tenant_id = 'tenant-owner-transfer-negative'
+  AND conversation_id = 'conv-owner-transfer-negative'
+`,
+		"message_outbox": `
+SELECT count(*)
+FROM message_outbox
+WHERE tenant_id = 'tenant-owner-transfer-negative'
+  AND conversation_id = 'conv-owner-transfer-negative'
+`,
+	} {
+		var count int
+		if err := pool.QueryRow(ctx, query).Scan(&count); err != nil {
+			t.Fatalf("count %s: %v", tableName, err)
+		}
+		if count != 0 {
+			t.Fatalf("expected no %s side effects, got %d rows", tableName, count)
+		}
+	}
+
+	rows, err := pool.Query(ctx, `
+SELECT user_id, role, status, member_version, permission_version
+FROM conversation_members
+WHERE tenant_id = 'tenant-owner-transfer-negative'
+  AND conversation_id = 'conv-owner-transfer-negative'
+ORDER BY user_id
+`)
+	if err != nil {
+		t.Fatalf("query member side effects: %v", err)
+	}
+	defer rows.Close()
+	members := map[string]struct {
+		role              types.MemberRole
+		status            types.MemberStatus
+		memberVersion     int64
+		permissionVersion int64
+	}{}
+	for rows.Next() {
+		var userID string
+		value := struct {
+			role              types.MemberRole
+			status            types.MemberStatus
+			memberVersion     int64
+			permissionVersion int64
+		}{}
+		if err := rows.Scan(&userID, &value.role, &value.status, &value.memberVersion, &value.permissionVersion); err != nil {
+			t.Fatalf("scan member side effects: %v", err)
+		}
+		members[userID] = value
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("member side effect rows: %v", err)
+	}
+	if members["owner-1"].role != types.MemberRoleOwner ||
+		members["owner-1"].status != types.MemberStatusActive ||
+		members["owner-1"].memberVersion != 5 ||
+		members["owner-1"].permissionVersion != 7 ||
+		members["user-2"].memberVersion != 5 ||
+		members["user-2"].permissionVersion != 7 {
+		t.Fatalf("unexpected member mutations after rejected transfer: %+v", members)
 	}
 }
 

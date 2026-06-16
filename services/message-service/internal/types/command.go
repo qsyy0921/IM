@@ -80,13 +80,15 @@ func IsSupportedDeleteScope(deleteScope DeleteScope) bool {
 }
 
 type DeleteMessageCommand struct {
-	AuthContext    AuthContext
-	ConversationID ConversationID
-	MessageID      MessageID
-	IdempotencyKey string
-	DeleteScope    DeleteScope
-	Reason         string
-	ReceivedAt     time.Time
+	AuthContext          AuthContext
+	ConversationID       ConversationID
+	MessageID            MessageID
+	IdempotencyKey       string
+	DeleteScope          DeleteScope
+	Reason               string
+	ComplianceApprovalID string
+	ExternalProofRef     string
+	ReceivedAt           time.Time
 }
 
 type EditMessageCommand struct {
@@ -133,6 +135,14 @@ func (c DeleteMessageCommand) Validate() error {
 	}
 	if !IsSupportedDeleteScope(c.DeleteScope) {
 		return NewUnsupportedDeleteScope("delete_scope is not supported")
+	}
+	if c.DeleteScope == DeleteScopeCompliance {
+		if c.ComplianceApprovalID == "" {
+			return errors.New("compliance_approval_id is required for compliance delete")
+		}
+		if c.ExternalProofRef == "" {
+			return errors.New("external_proof_ref is required for compliance delete")
+		}
 	}
 	return nil
 }

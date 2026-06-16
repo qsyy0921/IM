@@ -94,7 +94,7 @@ func TestDeleteMessageUseCaseRequiresOwnershipOverrideForComplianceScope(t *test
 	policy := &fakePolicy{decision: allowedDecision()}
 	conversation := &fakeConversation{context: localConversation()}
 	command := testDeleteCommand()
-	command.DeleteScope = types.DeleteScopeCompliance
+	command = withComplianceApproval(command)
 	useCase := NewDeleteMessageUseCase(policy, conversation, repo)
 
 	_, err := useCase.Execute(context.Background(), command)
@@ -122,7 +122,7 @@ func TestDeleteMessageUseCaseAllowsComplianceScopeWithOwnershipOverride(t *testi
 	conversation := &fakeConversation{context: localConversation()}
 	command := testDeleteCommand()
 	command.AuthContext.UserID = "compliance-admin"
-	command.DeleteScope = types.DeleteScopeCompliance
+	command = withComplianceApproval(command)
 	useCase := NewDeleteMessageUseCase(policy, conversation, repo)
 
 	result, err := useCase.Execute(context.Background(), command)
@@ -164,4 +164,11 @@ func testDeleteCommand() types.DeleteMessageCommand {
 		Reason:         "cleanup",
 		ReceivedAt:     time.Date(2026, 6, 10, 3, 0, 0, 0, time.UTC),
 	}
+}
+
+func withComplianceApproval(command types.DeleteMessageCommand) types.DeleteMessageCommand {
+	command.DeleteScope = types.DeleteScopeCompliance
+	command.ComplianceApprovalID = "approval-1"
+	command.ExternalProofRef = "proof://case-1"
+	return command
 }

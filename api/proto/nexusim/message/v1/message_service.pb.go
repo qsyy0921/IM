@@ -479,15 +479,17 @@ func (x *RevokeMessageRequest) GetReason() string {
 }
 
 type DeleteMessageRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	AuthContext    *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
-	ConversationId string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	MessageId      string                 `protobuf:"bytes,3,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	IdempotencyKey string                 `protobuf:"bytes,4,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
-	DeleteScope    DeleteScope            `protobuf:"varint,5,opt,name=delete_scope,json=deleteScope,proto3,enum=nexusim.message.v1.DeleteScope" json:"delete_scope,omitempty"`
-	Reason         string                 `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext          *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	ConversationId       string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	MessageId            string                 `protobuf:"bytes,3,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	IdempotencyKey       string                 `protobuf:"bytes,4,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	DeleteScope          DeleteScope            `protobuf:"varint,5,opt,name=delete_scope,json=deleteScope,proto3,enum=nexusim.message.v1.DeleteScope" json:"delete_scope,omitempty"`
+	Reason               string                 `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
+	ComplianceApprovalId string                 `protobuf:"bytes,7,opt,name=compliance_approval_id,json=complianceApprovalId,proto3" json:"compliance_approval_id,omitempty"`
+	ExternalProofRef     string                 `protobuf:"bytes,8,opt,name=external_proof_ref,json=externalProofRef,proto3" json:"external_proof_ref,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *DeleteMessageRequest) Reset() {
@@ -558,6 +560,20 @@ func (x *DeleteMessageRequest) GetDeleteScope() DeleteScope {
 func (x *DeleteMessageRequest) GetReason() string {
 	if x != nil {
 		return x.Reason
+	}
+	return ""
+}
+
+func (x *DeleteMessageRequest) GetComplianceApprovalId() string {
+	if x != nil {
+		return x.ComplianceApprovalId
+	}
+	return ""
+}
+
+func (x *DeleteMessageRequest) GetExternalProofRef() string {
+	if x != nil {
+		return x.ExternalProofRef
 	}
 	return ""
 }
@@ -810,7 +826,7 @@ const file_nexusim_message_v1_message_service_proto_rawDesc = "" +
 	"\n" +
 	"message_id\x18\x03 \x01(\tR\tmessageId\x12'\n" +
 	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\x12\x16\n" +
-	"\x06reason\x18\x05 \x01(\tR\x06reason\"\xa7\x02\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\"\x8b\x03\n" +
 	"\x14DeleteMessageRequest\x12B\n" +
 	"\fauth_context\x18\x01 \x01(\v2\x1f.nexusim.message.v1.AuthContextR\vauthContext\x12'\n" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x1d\n" +
@@ -818,7 +834,9 @@ const file_nexusim_message_v1_message_service_proto_rawDesc = "" +
 	"message_id\x18\x03 \x01(\tR\tmessageId\x12'\n" +
 	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\x12B\n" +
 	"\fdelete_scope\x18\x05 \x01(\x0e2\x1f.nexusim.message.v1.DeleteScopeR\vdeleteScope\x12\x16\n" +
-	"\x06reason\x18\x06 \x01(\tR\x06reason\"\x9b\x02\n" +
+	"\x06reason\x18\x06 \x01(\tR\x06reason\x124\n" +
+	"\x16compliance_approval_id\x18\a \x01(\tR\x14complianceApprovalId\x12,\n" +
+	"\x12external_proof_ref\x18\b \x01(\tR\x10externalProofRef\"\x9b\x02\n" +
 	"\x15MessageChangeResponse\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\tR\tmessageId\x12'\n" +

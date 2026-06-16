@@ -75,6 +75,8 @@ message DeleteMessageRequest {
   string idempotency_key = 4;
   DeleteScope delete_scope = 5;
   string reason = 6;
+  string compliance_approval_id = 7;
+  string external_proof_ref = 8;
 }
 
 message MessageChangeResponse {

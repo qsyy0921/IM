@@ -73,6 +73,11 @@ func (r *MessageRepository) DeleteMessage(
 	if err := ensureMessageNotUnderLegalHold(ctx, tx, input.Command); err != nil {
 		return domain.MessageChangeResult{}, err
 	}
+	if input.Command.DeleteScope == types.DeleteScopeCompliance {
+		if err := lockApprovedComplianceDeleteApproval(ctx, tx, input.Command); err != nil {
+			return domain.MessageChangeResult{}, err
+		}
+	}
 
 	if err := ensureConversationSeqFor(ctx, tx, input.Command.AuthContext.TenantID, input.Command.ConversationID); err != nil {
 		return domain.MessageChangeResult{}, err
@@ -100,6 +105,11 @@ func (r *MessageRepository) DeleteMessage(
 	}
 	if err := insertDeleteMessageChangeHistory(ctx, tx, input, record); err != nil {
 		return domain.MessageChangeResult{}, err
+	}
+	if input.Command.DeleteScope == types.DeleteScopeCompliance {
+		if err := consumeComplianceDeleteApproval(ctx, tx, input.Command, record); err != nil {
+			return domain.MessageChangeResult{}, err
+		}
 	}
 	if err := insertDeleteCommandResult(ctx, tx, input.Command, record); err != nil {
 		return domain.MessageChangeResult{}, err
@@ -245,6 +255,52 @@ FOR UPDATE
 		return domain.Message{}, types.NewDBWriteFailed(err.Error())
 	}
 	return message, nil
+}
+
+func lockApprovedComplianceDeleteApproval(ctx context.Context, tx pgx.Tx, command types.DeleteMessageCommand) error {
+	var approvalID string
+	err := tx.QueryRow(ctx, `
+SELECT approval_id
+FROM message_compliance_delete_approvals
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND message_id = $3
+  AND approval_id = $4
+  AND external_proof_ref = $5
+  AND status = 'APPROVED'
+FOR UPDATE
+`, command.AuthContext.TenantID, command.ConversationID, command.MessageID, command.ComplianceApprovalID, command.ExternalProofRef).Scan(&approvalID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return types.NewPermissionDenied("compliance delete approval is required")
+	}
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func consumeComplianceDeleteApproval(ctx context.Context, tx pgx.Tx, command types.DeleteMessageCommand, record domain.MessageChangeRecord) error {
+	commandTag, err := tx.Exec(ctx, `
+UPDATE message_compliance_delete_approvals
+SET status = 'CONSUMED',
+    consumed_by = $6,
+    consumed_event_id = $7,
+    consumed_at = $8,
+    updated_at = $8
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND message_id = $3
+  AND approval_id = $4
+  AND external_proof_ref = $5
+  AND status = 'APPROVED'
+`, command.AuthContext.TenantID, command.ConversationID, command.MessageID, command.ComplianceApprovalID, command.ExternalProofRef, command.AuthContext.UserID, record.Timeline.EventID, record.ChangedAt)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if commandTag.RowsAffected() != 1 {
+		return types.NewPermissionDenied("compliance delete approval is required")
+	}
+	return nil
 }
 
 func ensureMessageNotUnderLegalHold(ctx context.Context, tx pgx.Tx, command types.DeleteMessageCommand) error {

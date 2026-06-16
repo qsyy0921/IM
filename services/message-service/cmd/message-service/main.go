@@ -40,7 +40,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_MESSAGE_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("message-service runtime wiring is idle; set NEXUSIM_MESSAGE_SERVICE_MODE=grpc, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, change-history-audit, retention-proof-audit, legal-hold-audit, legal-hold-set, or legal-hold-release")
+		log.Println("message-service runtime wiring is idle; set NEXUSIM_MESSAGE_SERVICE_MODE=grpc, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, change-history-audit, retention-proof-audit, legal-hold-audit, legal-hold-set, legal-hold-release, compliance-approval-audit, compliance-approval-create, or compliance-approval-cancel")
 		return nil
 	case "grpc":
 		return runGRPCServer()
@@ -64,6 +64,12 @@ func run() error {
 		return runMessageLegalHoldSet()
 	case "legal-hold-release":
 		return runMessageLegalHoldRelease()
+	case "compliance-approval-audit":
+		return runMessageComplianceApprovalAudit()
+	case "compliance-approval-create":
+		return runMessageComplianceApprovalCreate()
+	case "compliance-approval-cancel":
+		return runMessageComplianceApprovalCancel()
 	default:
 		return errors.New("unsupported NEXUSIM_MESSAGE_SERVICE_MODE")
 	}

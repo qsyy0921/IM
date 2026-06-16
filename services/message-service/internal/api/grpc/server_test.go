@@ -229,6 +229,8 @@ func TestDeleteMessageMapsUnsupportedDeleteScope(t *testing.T) {
 	)
 	request := testDeleteMessageRequest()
 	request.DeleteScope = messagev1.DeleteScope_DELETE_SCOPE_COMPLIANCE_RETENTION
+	request.ComplianceApprovalId = "approval-1"
+	request.ExternalProofRef = "proof://case-1"
 
 	_, err := server.DeleteMessage(context.Background(), request)
 	assertStatusDetail(

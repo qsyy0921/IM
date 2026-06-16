@@ -76,6 +76,25 @@ func TestDeleteMessageCommandValidationRejectsUnsupportedDeleteScope(t *testing.
 	}
 }
 
+func TestDeleteMessageCommandValidationRequiresComplianceApproval(t *testing.T) {
+	command := validDeleteMessageCommand()
+	command.DeleteScope = DeleteScopeCompliance
+
+	if err := command.Validate(); err == nil {
+		t.Fatalf("expected compliance approval validation error")
+	}
+
+	command.ComplianceApprovalID = "approval-1"
+	if err := command.Validate(); err == nil {
+		t.Fatalf("expected external proof ref validation error")
+	}
+
+	command.ExternalProofRef = "proof://case-1"
+	if err := command.Validate(); err != nil {
+		t.Fatalf("validate compliance delete command: %v", err)
+	}
+}
+
 func validSendMessageCommand() SendMessageCommand {
 	return SendMessageCommand{
 		AuthContext: AuthContext{

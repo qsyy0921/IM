@@ -331,6 +331,8 @@ func ComputeDeleteMessageCommandHash(command types.DeleteMessageCommand) (string
 		IdempotencyKey string               `json:"idempotency_key"`
 		DeleteScope    types.DeleteScope    `json:"delete_scope"`
 		Reason         string               `json:"reason"`
+		ApprovalID     string               `json:"compliance_approval_id,omitempty"`
+		ProofRef       string               `json:"external_proof_ref,omitempty"`
 	}{
 		TenantID:       command.AuthContext.TenantID,
 		ConversationID: command.ConversationID,
@@ -340,6 +342,8 @@ func ComputeDeleteMessageCommandHash(command types.DeleteMessageCommand) (string
 		IdempotencyKey: command.IdempotencyKey,
 		DeleteScope:    command.DeleteScope,
 		Reason:         command.Reason,
+		ApprovalID:     command.ComplianceApprovalID,
+		ProofRef:       command.ExternalProofRef,
 	}
 	encoded, err := json.Marshal(hashInput)
 	if err != nil {
@@ -392,6 +396,8 @@ func buildMessageDeletedPayload(
 	}
 	if input.Command.DeleteScope == types.DeleteScopeCompliance {
 		payload["reason_present"] = input.Command.Reason != ""
+		payload["compliance_approval_id"] = input.Command.ComplianceApprovalID
+		payload["external_proof_ref_present"] = input.Command.ExternalProofRef != ""
 	} else {
 		payload["reason"] = input.Command.Reason
 	}
@@ -403,12 +409,14 @@ func buildComplianceRedactedPayload(
 	acceptedAt time.Time,
 ) ([]byte, error) {
 	return json.Marshal(map[string]any{
-		"message_id":      input.Command.MessageID,
-		"conversation_id": input.Command.ConversationID,
-		"redacted":        true,
-		"redaction_scope": input.Command.DeleteScope,
-		"redacted_by":     input.Command.AuthContext.UserID,
-		"redacted_at":     acceptedAt.UTC().Format(time.RFC3339Nano),
+		"message_id":        input.Command.MessageID,
+		"conversation_id":   input.Command.ConversationID,
+		"redacted":          true,
+		"redaction_scope":   input.Command.DeleteScope,
+		"redacted_by":       input.Command.AuthContext.UserID,
+		"redacted_at":       acceptedAt.UTC().Format(time.RFC3339Nano),
+		"approval_id":       input.Command.ComplianceApprovalID,
+		"proof_ref_present": input.Command.ExternalProofRef != "",
 	})
 }
 

@@ -401,8 +401,22 @@ func TestMessageRepositoryDeleteMessageComplianceRedactsPayloadIntegration(t *te
 
 	deleteInput := testDeleteInput(appendInput, appendResult.MessageID, "delete-compliance-key-1", types.DeleteScopeCompliance, "legal retention cleanup")
 	deleteInput.Command.AuthContext.UserID = "compliance-admin"
+	deleteInput.Command.ComplianceApprovalID = fmt.Sprintf("approval-compliance-%d", runID)
+	deleteInput.Command.ExternalProofRef = fmt.Sprintf("proof://compliance/%d", runID)
 	deleteInput.Permission.OwnershipOverride = true
 	deleteInput.Permission.Classification = "COMPLIANCE_RETENTION"
+	if _, err := repo.ApproveComplianceDelete(ctx, MessageComplianceDeleteApprovalMutationOptions{
+		TenantID:         string(tenantID),
+		ConversationID:   string(appendInput.Command.ConversationID),
+		MessageID:        string(appendResult.MessageID),
+		ApprovalID:       deleteInput.Command.ComplianceApprovalID,
+		ExternalProofRef: deleteInput.Command.ExternalProofRef,
+		OperatorID:       "legal-approver",
+		Reason:           "approval reason with token=secret-token",
+		Now:              now,
+	}); err != nil {
+		t.Fatalf("approve compliance delete: %v", err)
+	}
 	result, err := repo.DeleteMessage(ctx, deleteInput)
 	if err != nil {
 		t.Fatalf("compliance delete message: %v", err)
@@ -452,6 +466,19 @@ WHERE ml.tenant_id = $1
 		!strings.Contains(afterPayload, `"redacted": true`) ||
 		!strings.Contains(outboxPayload, `"delete_scope": "COMPLIANCE_RETENTION"`) {
 		t.Fatalf("unexpected redaction payloads current=%s before=%s after=%s outbox=%s", currentPayload, beforePayload, afterPayload, outboxPayload)
+	}
+	approvalRows, err := repo.AuditComplianceDeleteApprovals(ctx, MessageComplianceDeleteApprovalAuditOptions{
+		TenantID:   string(tenantID),
+		ApprovalID: deleteInput.Command.ComplianceApprovalID,
+	})
+	if err != nil {
+		t.Fatalf("audit compliance approval: %v", err)
+	}
+	if len(approvalRows) != 1 ||
+		approvalRows[0].Status != MessageComplianceApprovalStatusConsumed ||
+		approvalRows[0].ConsumedEventID == "" ||
+		approvalRows[0].ConsumedBy != "compliance-admin" {
+		t.Fatalf("unexpected consumed compliance approval rows: %+v", approvalRows)
 	}
 }
 
@@ -600,6 +627,78 @@ func TestMessageRepositoryLegalHoldSetReleaseAuditIntegration(t *testing.T) {
 	}
 	if len(releasedRows) != 1 || releasedRows[0].HoldID != holdID {
 		t.Fatalf("unexpected released legal hold audit rows: %+v", releasedRows)
+	}
+}
+
+func TestMessageRepositoryComplianceDeleteApprovalSetCancelAuditIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	now := time.Date(2026, 6, 10, 3, 55, 0, 0, time.UTC)
+	runID := time.Now().UnixNano()
+	repo := NewMessageRepository(
+		pool,
+		WithClock(func() time.Time { return now }),
+		WithIDGenerators(
+			func() (types.MessageID, error) {
+				return types.MessageID(fmt.Sprintf("msg-compliance-approval-%d", runID)), nil
+			},
+			func() (types.EventID, error) {
+				return types.EventID(fmt.Sprintf("event-compliance-approval-%d", runID)), nil
+			},
+		),
+	)
+	tenantID := types.TenantID(fmt.Sprintf("tenant-it-compliance-approval-%d", runID))
+	appendInput := testAppendInput(tenantID, "client-compliance-approval", []byte(`{"text":"approve me"}`))
+	appendResult, err := repo.AppendMessage(ctx, appendInput)
+	if err != nil {
+		t.Fatalf("append source message: %v", err)
+	}
+	approvalID := fmt.Sprintf("approval-set-cancel-%d", runID)
+	approved, err := repo.ApproveComplianceDelete(ctx, MessageComplianceDeleteApprovalMutationOptions{
+		TenantID:         string(tenantID),
+		ConversationID:   string(appendInput.Command.ConversationID),
+		MessageID:        string(appendResult.MessageID),
+		ApprovalID:       approvalID,
+		ExternalProofRef: "proof://case/set-cancel",
+		OperatorID:       "legal-approver",
+		Reason:           "approval reason",
+		Now:              now,
+	})
+	if err != nil {
+		t.Fatalf("approve compliance delete: %v", err)
+	}
+	if approved.Status != MessageComplianceApprovalStatusApproved ||
+		approved.ExternalProofRef != "proof://case/set-cancel" ||
+		!approved.ReasonPresent {
+		t.Fatalf("unexpected approval result: %+v", approved)
+	}
+	approvedRows, err := repo.AuditComplianceDeleteApprovals(ctx, MessageComplianceDeleteApprovalAuditOptions{
+		TenantID: string(tenantID),
+		Status:   MessageComplianceApprovalStatusApproved,
+	})
+	if err != nil {
+		t.Fatalf("audit approved compliance delete: %v", err)
+	}
+	if len(approvedRows) != 1 || approvedRows[0].ApprovalID != approvalID {
+		t.Fatalf("unexpected approved rows: %+v", approvedRows)
+	}
+
+	canceled, err := repo.CancelComplianceDeleteApproval(ctx, MessageComplianceDeleteApprovalMutationOptions{
+		TenantID:   string(tenantID),
+		ApprovalID: approvalID,
+		OperatorID: "legal-approver",
+		Now:        now.Add(time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("cancel compliance delete approval: %v", err)
+	}
+	if canceled.Status != MessageComplianceApprovalStatusCanceled ||
+		canceled.CanceledAt == nil ||
+		canceled.CanceledBy != "legal-approver" {
+		t.Fatalf("unexpected canceled approval: %+v", canceled)
 	}
 }
 

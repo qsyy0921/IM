@@ -286,13 +286,15 @@ func (s *Server) toDeleteMessageCommand(ctx context.Context, req *messagev1.Dele
 		return types.DeleteMessageCommand{}, newInvalidArgument(err.Error())
 	}
 	command := types.DeleteMessageCommand{
-		AuthContext:    auth,
-		ConversationID: types.ConversationID(req.GetConversationId()),
-		MessageID:      types.MessageID(req.GetMessageId()),
-		IdempotencyKey: req.GetIdempotencyKey(),
-		DeleteScope:    scope,
-		Reason:         req.GetReason(),
-		ReceivedAt:     s.now(),
+		AuthContext:          auth,
+		ConversationID:       types.ConversationID(req.GetConversationId()),
+		MessageID:            types.MessageID(req.GetMessageId()),
+		IdempotencyKey:       req.GetIdempotencyKey(),
+		DeleteScope:          scope,
+		Reason:               req.GetReason(),
+		ComplianceApprovalID: req.GetComplianceApprovalId(),
+		ExternalProofRef:     req.GetExternalProofRef(),
+		ReceivedAt:           s.now(),
 	}
 	if err := command.Validate(); err != nil {
 		return types.DeleteMessageCommand{}, newInvalidArgument(err.Error())

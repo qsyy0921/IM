@@ -82,6 +82,8 @@ go run ./services/delivery-service/cmd/delivery-service
 
 `message-service` 还提供 `legal-hold-audit` / `legal-hold-set` / `legal-hold-release`，用于审计、设置和释放消息级 legal hold。ACTIVE legal hold 会让 `DeleteMessage` 在事务内 fail-closed，不推进 seq 或写 timeline/outbox。`legal-hold-audit` 可选 `NEXUSIM_MESSAGE_LEGAL_HOLD_AUDIT_OUTPUT` 写低敏 JSON，`legal-hold-set` / `legal-hold-release` 可选 `NEXUSIM_MESSAGE_LEGAL_HOLD_OUTPUT` 写低敏 JSON；输出只包含 hold 元数据和 reason-present，不输出 hold reason 原文。
 
+`message-service` 还提供 `compliance-approval-audit` / `compliance-approval-create` / `compliance-approval-cancel`，用于审计、创建和取消合规删除审批。`COMPLIANCE_RETENTION` 删除必须提交匹配的 approval id 和 external proof ref，并在事务内把 `APPROVED` approval 消费为 `CONSUMED`。`compliance-approval-audit` 可选 `NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_AUDIT_OUTPUT` 写低敏 JSON，`compliance-approval-create` / `compliance-approval-cancel` 可选 `NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_OUTPUT` 写低敏 JSON；输出只包含审批元数据、低敏 proof ref 和 reason-present，不输出审批 reason 或外部 proof 正文。
+
 ## Delivery Projection
 
 `delivery-service` 额外拥有 projection 排障入口：

@@ -22,4 +22,4 @@
 
 ## 后续
 
-- 跨实例 resume 强化、Redis Cluster / 生产 HA 设计、长时间容量曲线和生产 sizing。
+- Redis-backed resume 的 miss / permission-denied / buffer-gap 真实进程负向 smoke、Redis Cluster / 生产 HA 设计、长时间容量曲线和生产 sizing。

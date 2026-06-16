@@ -107,7 +107,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - 项目命名门禁覆盖 Go / Markdown / PowerShell / Bash 等文本文件，并带 shell fixture 自测，防止旧项目名回流
 - 六层 DDD 反向依赖门禁，生产代码禁止 `api/app/domain/trigger/types` 直接 import `internal/infrastructure`
 - 跨服务私有表访问门禁，生产代码禁止直接 SQL 访问其他服务私有表，只保留已冻结的共享 timeline / outbox 例外
-- 文件大小预算门禁，手写 Go / Markdown / PowerShell / Bash 文件继续按生产代码、测试 / runner、文档和脚本分档控复杂度；`tools/check-file-size-budget.ps1` 可按需输出 JSON / Markdown hotspot summary，且摘要格式已有 `check-local` 自测门禁
+- 文件大小预算门禁，手写 Go / Markdown / PowerShell / Bash 文件继续按生产代码、测试 / runner、文档和脚本分档控复杂度；`tools/check-file-size-budget.ps1` 可按需输出 JSON / Markdown hotspot summary，且摘要格式已有 `check-local` 自测门禁；`loadtest/pushgateway` 已开始按同 package helper 拆分 runner 热点
 - PowerShell / Bash 脚本解析门禁，`tools` 和 `loadtest` 下的 `.ps1` / `.sh` 都会进入本地检查，避免 smoke / 运维脚本语法回归
 - `check-local` 覆盖门禁，新增 `tools/check-*.ps1` 默认必须接入主检查；间接或手动检查必须显式列为例外
 - future service boundary 门禁，当前阶段只允许 9 个已实现服务目录存在；`search-service` / RAG / Agent 等只能保持 future / draft 文档状态，直到 current-brief 明确切换阶段

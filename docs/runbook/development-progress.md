@@ -79,6 +79,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - Redis stop/start fault fallback
 - Redis Sentinel discovery / failover / master-stop / quorum-loss fallback
 - Redis Sentinel network-partition fallback smoke
+- Redis Cluster 本地三节点 topology smoke
 - PostgreSQL `repmgr + pgpool` local failover smoke
 - PostgreSQL quorum observation smoke and ADR-034 production quorum boundary
 - Kafka KRaft 3 broker local failover / controller-switch / ISR observation smoke，且 ISR observation raw summary 已有可复用 JSON / Markdown summary validator
@@ -92,7 +93,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 
 当前还没有证明：
 
-- 生产级 Redis HA / Redis Cluster
+- 生产级 Redis HA / Redis Cluster 故障、failover、容量和跨机器治理
 - 生产级 PostgreSQL HA / split-brain fencing / quorum write guard
 - 生产级 Kafka multi-failure / sustained ISR flapping / consumer rebalance治理
 - 完整部署编排、服务发现、统一观测、灰度发布
@@ -135,7 +136,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 | `message-service` | 已落地、已接主链路 | `SendMessage` / 编辑 / 撤回 / 删除、delete scope fail-closed 错误语义、`TEXT` + `IMAGE` / `FILE` / `VOICE` 附件引用消息、`LOCATION` / `CARD` 结构化 payload 消息、outbox / Kafka timeline、first-stage `/metrics` 和 OTel server span、mutation repository 测试拆分、loadtest `capacity_summary` 口径 | `service-briefs/message-service.md` |
 | `conversation-service` | 已落地、已接主链路 | `GetSendContext` / member change / owner transfer / owner transfer 负向 PG 回归 / ACTIVE roster 分页与 role 过滤 / saga / audit operator、first-stage `/metrics` 和 OTel server span、loadtest `capacity_summary` 口径 | `service-briefs/conversation-service.md` |
 | `delivery-service` | 已落地、已接主链路 | projection / `PullInbox` / `AckDelivery` / hide inbox / delivery outbox、loadtest `capacity_summary` 口径 | `service-briefs/delivery-service.md` |
-| `push-gateway` | 已落地、已接主链路 | notify / ACK / resume / Redis route / Redis resume negative fallback / Win-Mac / Sentinel / network-partition / TLS smoke、stack 短基线和 loadtest `capacity_summary` | `service-briefs/push-gateway.md` |
+| `push-gateway` | 已落地、已接主链路 | notify / ACK / resume / Redis route / Redis resume negative fallback / Win-Mac / Sentinel / network-partition / Redis Cluster topology / TLS smoke、stack 短基线和 loadtest `capacity_summary` | `service-briefs/push-gateway.md` |
 | `receipt-service` | 已落地、已接主链路 | receipt projection / outbox / audit / repair、`ListReceiptStates` repository 级批量查询、会话列表 unread / pinned / muted 过滤和 unread-first 排序、first-stage `/metrics` 和 OTel server span、loadtest `capacity_summary` 口径 | `service-briefs/receipt-service.md` |
 | `contacts-service` | 已落地、已接主链路 | request source metadata / source_ref 低敏 fail-fast 校验 / source policy gate / search-source privacy gate / contacts search / group filter / USER-TENANT-SYSTEM privacy / tenant privacy operator / outbox / audit / repair、repository 同 package 拆分、loadtest `capacity_summary` 口径 | `service-briefs/contacts-service.md` |
 | `policy-service` | 已落地、已接主链路 | decision / user action restriction / projection / outbox / audit / repair、first-stage `/metrics` 和 OTel server span、loadtest `capacity_summary` 口径、本地 direct 短基线 | `service-briefs/policy-service.md` |

@@ -111,6 +111,7 @@ search-service 和 AI 应用后端后置；
 - Redis route / Redis-backed resume；
 - Redis stop / start fallback；
 - Redis Sentinel discovery / failover / master-stop / quorum-loss fallback；
+- Redis Cluster 本地三节点 topology smoke；
 - PostgreSQL `repmgr + pgpool` local failover smoke；
 - Kafka KRaft 3 broker local leader failover smoke。
 
@@ -158,7 +159,7 @@ search-service 和 AI 应用后端后置；
 | `message-service` | 会话级删除策略深化、合规删除、容量压测、生产级发送链路观测；图片 / 文件 / 语音二进制上传处理后续交给 media 能力 |
 | `conversation-service` | 更完整群管理、owner transfer 策略细化、成员可见窗口历史 repair；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules 和本地 Grafana dashboard，但还不是生产观测平台 |
 | `delivery-service` | Projection DLQ / repair 深化、更多 delivery event 消费方、投递容量压测；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules 和本地 Grafana dashboard，但还不是生产观测平台 |
-| `push-gateway` | Redis Cluster / 生产级 HA 设计、跨实例 resume 生产化策略、在线连接容量测试、慢连接组合故障验证；当前已有 Redis route / Sentinel / network-partition / Redis resume negative fallback smoke、第一阶段 Prometheus text `/metrics`、本地 alert rules 和本地 Grafana dashboard，但还不是生产观测平台 |
+| `push-gateway` | Redis Cluster 故障 / failover / 容量验证和生产级 HA 设计、跨实例 resume 生产化策略、在线连接容量测试、慢连接组合故障验证；当前已有 Redis route / Sentinel / network-partition / Redis Cluster topology / Redis resume negative fallback smoke、第一阶段 Prometheus text `/metrics`、本地 alert rules 和本地 Grafana dashboard，但还不是生产观测平台 |
 | `receipt-service` | 送达回执扩展、会话列表更多产品化能力；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules 和本地 Grafana dashboard，但还不是生产观测平台 |
 | `contacts-service` | 更细 profile 可见性、黑名单之外的陌生人策略、后续接入 admin/config service 正式权限面；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules 和本地 Grafana dashboard，但还不是生产观测平台 |
 | `policy-service` | 完整 ReBAC、内容分类 / provider-backed moderation、tenant DSL / quota、外部 audit sink；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules 和本地 Grafana dashboard，但还不是生产观测平台 |
@@ -181,8 +182,8 @@ search-service 和 AI 应用后端后置；
 
 当前已经做了本地 / 双机 smoke，但还没完整证明生产级 HA。后续待开发 / 待验证：
 
-- 真实 Redis 网络分区；
-- 生产级 Redis HA / Redis Cluster；
+- Redis Cluster 故障 / failover / 容量验证；
+- 生产级 Redis HA；
 - PostgreSQL split-brain / quorum / 跨机存储故障；
 - Kafka multi-failure / controller failover / ISR 抖动；
 - 完整服务发现；

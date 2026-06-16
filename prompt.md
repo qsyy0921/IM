@@ -5,7 +5,7 @@
 把下面这段放进 Codex 目标框即可：
 
 ```text
-持续推进 E:\development\IM 的 NexusIM 项目。每轮先运行 git status --short --branch --untracked-files=all，然后读取仓库根目录 prompt.md，并按 prompt.md 指向的项目目标文档继续执行；不要把具体目标写在目标框里，不全文读取长历史文档，不回滚用户已有修改。
+持续推进 E:\development\IM 的 NexusIM 项目。每轮先运行 git status --short --branch --untracked-files=all，然后读取仓库根目录 prompt.md 和 agent.md，并按文档指向的项目目标继续执行；不要把具体目标写在目标框里，不全文读取长历史文档，不回滚用户已有修改。
 ```
 
 ## 本文件的作用

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/qsyy0921/IM/services/contacts-service/internal/types"
 )
@@ -538,6 +539,31 @@ func TestRepositoryAuditContactRequestReviewsIntegration(t *testing.T) {
 		!row.ReasonPresent ||
 		!row.ReviewRequired {
 		t.Fatalf("unexpected review audit row: %+v", row)
+	}
+
+	reviewedAfter := row.ReviewedAt.Add(-time.Second)
+	reviewedBefore := row.ReviewedAt.Add(time.Second)
+	windowRows, err := repository.AuditContactRequestReviews(ctx, ContactRequestReviewAuditOptions{
+		TenantID:       "tenant-contacts",
+		ReviewedAfter:  &reviewedAfter,
+		ReviewedBefore: &reviewedBefore,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit contact request reviews by reviewed_at window: %v", err)
+	}
+	if len(windowRows) != 1 || windowRows[0].AuditID != row.AuditID {
+		t.Fatalf("expected review audit row inside reviewed_at window, got %+v", windowRows)
+	}
+
+	_, err = repository.AuditContactRequestReviews(ctx, ContactRequestReviewAuditOptions{
+		TenantID:       "tenant-contacts",
+		ReviewedAfter:  &reviewedBefore,
+		ReviewedBefore: &reviewedBefore,
+		Limit:          10,
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid reviewed_at window error, got %v", err)
 	}
 
 	declinedRows, err := repository.AuditContactRequestReviews(ctx, ContactRequestReviewAuditOptions{

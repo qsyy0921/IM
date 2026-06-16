@@ -669,15 +669,39 @@ func runContactRequestReviewAudit() error {
 	if err != nil {
 		return err
 	}
+	reviewedAfter, err := envOptionalRFC3339Time("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_REVIEWED_AFTER")
+	if err != nil {
+		return err
+	}
+	reviewedBefore, err := envOptionalRFC3339Time("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_REVIEWED_BEFORE")
+	if err != nil {
+		return err
+	}
+	filters := map[string]string{
+		"tenant_id":       tenantID,
+		"request_id":      envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_REQUEST_ID", ""),
+		"operator":        envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_OPERATOR", ""),
+		"decision":        envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_DECISION", ""),
+		"next_status":     envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_NEXT_STATUS", ""),
+		"source_type":     envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_SOURCE_TYPE", ""),
+		"risk_level":      envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_RISK_LEVEL", ""),
+		"reviewed_after":  formatOptionalTime(reviewedAfter),
+		"reviewed_before": formatOptionalTime(reviewedBefore),
+	}
+	if reviewRequiredFilter != nil {
+		filters["review_required"] = strconv.FormatBool(*reviewRequiredFilter)
+	}
 	rows, err := postgresinfra.NewRepository(pool).AuditContactRequestReviews(ctx, postgresinfra.ContactRequestReviewAuditOptions{
 		TenantID:       tenantID,
-		RequestID:      envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_REQUEST_ID", ""),
-		Operator:       envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_OPERATOR", ""),
-		Decision:       envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_DECISION", ""),
-		NextStatus:     envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_NEXT_STATUS", ""),
-		SourceType:     envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_SOURCE_TYPE", ""),
-		RiskLevel:      envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_RISK_LEVEL", ""),
+		RequestID:      filters["request_id"],
+		Operator:       filters["operator"],
+		Decision:       filters["decision"],
+		NextStatus:     filters["next_status"],
+		SourceType:     filters["source_type"],
+		RiskLevel:      filters["risk_level"],
 		ReviewRequired: reviewRequiredFilter,
+		ReviewedAfter:  reviewedAfter,
+		ReviewedBefore: reviewedBefore,
 		Limit:          envInt("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_LIMIT", 20),
 	})
 	if err != nil {
@@ -702,7 +726,7 @@ func runContactRequestReviewAudit() error {
 		)
 	}
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_OUTPUT")); outputPath != "" {
-		if err := writeContactRequestReviewAuditOutput(outputPath, rows); err != nil {
+		if err := writeContactRequestReviewAuditOutput(outputPath, rows, filters); err != nil {
 			return err
 		}
 	}
@@ -1015,6 +1039,19 @@ func envOptionalBoolPointer(name string) (*bool, error) {
 	return &parsed, nil
 }
 
+func envOptionalRFC3339Time(name string) (*time.Time, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil, errors.New(name + " must be RFC3339")
+	}
+	utc := parsed.UTC()
+	return &utc, nil
+}
+
 func envContactRequestSourceType(name string) (types.ContactRequestSourceType, error) {
 	value := strings.ToUpper(strings.TrimSpace(os.Getenv(name)))
 	if value == "" {
@@ -1174,7 +1211,7 @@ func formatOptionalTime(value *time.Time) string {
 	if value == nil {
 		return ""
 	}
-	return value.Format(time.RFC3339)
+	return value.UTC().Format(time.RFC3339)
 }
 
 func envPositiveInt(name string, fallback int) (int, error) {

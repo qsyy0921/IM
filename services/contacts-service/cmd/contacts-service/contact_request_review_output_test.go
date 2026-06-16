@@ -27,7 +27,12 @@ func TestWriteContactRequestReviewAuditOutputOmitsReasonText(t *testing.T) {
 		ReviewedAt:     time.Unix(100, 0).UTC(),
 	}}
 
-	if err := writeContactRequestReviewAuditOutput(outputPath, rows); err != nil {
+	if err := writeContactRequestReviewAuditOutput(outputPath, rows, map[string]string{
+		"tenant_id":       "tenant-contacts",
+		"decision":        "APPROVE",
+		"reviewed_after":  "2026-06-17T01:00:00Z",
+		"reviewed_before": "",
+	}); err != nil {
 		t.Fatalf("write review audit output: %v", err)
 	}
 	raw, err := os.ReadFile(outputPath)
@@ -40,10 +45,14 @@ func TestWriteContactRequestReviewAuditOutputOmitsReasonText(t *testing.T) {
 		`"request_id": "request-1"`,
 		`"reason_present": true`,
 		`"source_type": "QR_CODE"`,
+		`"reviewed_after": "2026-06-17T01:00:00Z"`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("expected output to contain %s, got %s", want, text)
 		}
+	}
+	if strings.Contains(text, `"reviewed_before":`) {
+		t.Fatalf("expected empty reviewed_before filter to be omitted, got %s", text)
 	}
 	if strings.Contains(text, `"reason":`) || strings.Contains(text, "internal source risk reviewed") {
 		t.Fatalf("expected output to omit review reason field, got %s", text)

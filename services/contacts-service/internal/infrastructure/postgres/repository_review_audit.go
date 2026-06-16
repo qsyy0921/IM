@@ -20,6 +20,8 @@ type ContactRequestReviewAuditOptions struct {
 	SourceType     string
 	RiskLevel      string
 	ReviewRequired *bool
+	ReviewedAfter  *time.Time
+	ReviewedBefore *time.Time
 	Limit          int
 }
 
@@ -61,6 +63,9 @@ func (r *Repository) AuditContactRequestReviews(
 	if options.SourceType != "" && types.NormalizeContactRequestSourceType(types.ContactRequestSourceType(options.SourceType)) == "" {
 		return nil, types.NewInvalidArgument("source_type is invalid")
 	}
+	if options.ReviewedAfter != nil && options.ReviewedBefore != nil && !options.ReviewedAfter.Before(*options.ReviewedBefore) {
+		return nil, types.NewInvalidArgument("reviewed_after must be before reviewed_before")
+	}
 	limit := options.Limit
 	if limit <= 0 {
 		limit = defaultContactRequestReviewAuditLimit
@@ -91,9 +96,11 @@ WHERE tenant_id = $1
   AND ($6 = '' OR risk_level = $6)
   AND ($7 = '' OR source_type = $7)
   AND ($8 = false OR review_required = $9)
+  AND ($10::timestamptz IS NULL OR reviewed_at >= $10)
+  AND ($11::timestamptz IS NULL OR reviewed_at < $11)
 ORDER BY reviewed_at DESC, audit_id DESC
-LIMIT $10
-`, options.TenantID, options.RequestID, options.Operator, options.Decision, options.NextStatus, options.RiskLevel, options.SourceType, options.ReviewRequired != nil, boolValue(options.ReviewRequired), limit)
+LIMIT $12
+`, options.TenantID, options.RequestID, options.Operator, options.Decision, options.NextStatus, options.RiskLevel, options.SourceType, options.ReviewRequired != nil, boolValue(options.ReviewRequired), nullableTime(options.ReviewedAfter), nullableTime(options.ReviewedBefore), limit)
 	if err != nil {
 		return nil, types.NewDBReadFailed(err.Error())
 	}
@@ -142,6 +149,13 @@ func boolValue(value *bool) bool {
 		return false
 	}
 	return *value
+}
+
+func nullableTime(value *time.Time) any {
+	if value == nil {
+		return nil
+	}
+	return value.UTC()
 }
 
 func isReviewAuditContactRequestStatus(status string) bool {

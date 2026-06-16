@@ -42,6 +42,7 @@ func writeContactRequestReviewOutput(path string, result types.ReviewContactRequ
 type contactRequestReviewAuditOutput struct {
 	GeneratedAt string                               `json:"generated_at"`
 	Count       int                                  `json:"count"`
+	Filters     map[string]string                    `json:"filters,omitempty"`
 	Rows        []contactRequestReviewAuditOutputRow `json:"rows"`
 }
 
@@ -60,7 +61,7 @@ type contactRequestReviewAuditOutputRow struct {
 	ReviewedAt     string `json:"reviewed_at"`
 }
 
-func writeContactRequestReviewAuditOutput(path string, rows []postgresinfra.ContactRequestReviewAuditRow) error {
+func writeContactRequestReviewAuditOutput(path string, rows []postgresinfra.ContactRequestReviewAuditRow, filters map[string]string) error {
 	outputRows := make([]contactRequestReviewAuditOutputRow, 0, len(rows))
 	for _, row := range rows {
 		outputRows = append(outputRows, contactRequestReviewAuditOutputRow{
@@ -81,6 +82,7 @@ func writeContactRequestReviewAuditOutput(path string, rows []postgresinfra.Cont
 	return writeJSONFile(path, contactRequestReviewAuditOutput{
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339Nano),
 		Count:       len(outputRows),
+		Filters:     compactCleanupFilters(filters),
 		Rows:        outputRows,
 	})
 }

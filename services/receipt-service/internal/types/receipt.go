@@ -199,6 +199,7 @@ type ListConversationsCommand struct {
 	PageCursor      string
 	Sort            string
 	IncludeArchived bool
+	ArchivedOnly    bool
 	UnreadOnly      bool
 	PinnedOnly      bool
 	MutedOnly       bool

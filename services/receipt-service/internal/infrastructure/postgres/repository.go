@@ -561,7 +561,7 @@ func (repository *Repository) ListConversations(
 	if limit > 100 {
 		limit = 100
 	}
-	cursor, hasCursor, err := decodeListCursor(command.PageCursor, sort, command.IncludeArchived, command.UnreadOnly, command.PinnedOnly, command.MutedOnly, command.DraftOnly, tagFilter)
+	cursor, hasCursor, err := decodeListCursor(command.PageCursor, sort, command.IncludeArchived, command.ArchivedOnly, command.UnreadOnly, command.PinnedOnly, command.MutedOnly, command.DraftOnly, tagFilter)
 	if err != nil {
 		return types.ListConversationsResult{}, err
 	}
@@ -571,6 +571,7 @@ func (repository *Repository) ListConversations(
 		command.AuthContext.UserID,
 		limit + 1,
 		command.IncludeArchived,
+		command.ArchivedOnly,
 		command.UnreadOnly,
 		command.PinnedOnly,
 		command.MutedOnly,
@@ -596,54 +597,54 @@ SELECT
 FROM user_conversation_summaries
 WHERE tenant_id = $1
   AND user_id = $2
-  AND ($4 OR archived = FALSE)
-  AND (NOT $5 OR unread_count > 0)
-  AND (NOT $6 OR pinned = TRUE)
-  AND (NOT $7 OR muted = TRUE)
-  AND (NOT $8 OR draft_text <> '')
-  AND ($9 = '' OR $9 = ANY(tags))
+  AND (($5 AND archived = TRUE) OR (NOT $5 AND ($4 OR archived = FALSE)))
+  AND (NOT $6 OR unread_count > 0)
+  AND (NOT $7 OR pinned = TRUE)
+  AND (NOT $8 OR muted = TRUE)
+  AND (NOT $9 OR draft_text <> '')
+  AND ($10 = '' OR $10 = ANY(tags))
 `
 	if hasCursor {
 		switch sort {
 		case types.ConversationListSortPinnedUpdatedAtDesc:
 			query += `  AND (
-      pinned < $10
-      OR (pinned = $10 AND sort_updated_at < $11)
-      OR (pinned = $10 AND sort_updated_at = $11 AND conversation_id > $12)
+      pinned < $11
+      OR (pinned = $11 AND sort_updated_at < $12)
+      OR (pinned = $11 AND sort_updated_at = $12 AND conversation_id > $13)
   )
 `
 			args = append(args, cursor.Pinned, cursor.SortUpdatedAt, cursor.ConversationID)
 		case types.ConversationListSortUnreadUpdatedAtDesc:
 			query += `  AND (
-      (unread_count > 0) < $10
-      OR ((unread_count > 0) = $10 AND sort_updated_at < $11)
-      OR ((unread_count > 0) = $10 AND sort_updated_at = $11 AND conversation_id > $12)
+      (unread_count > 0) < $11
+      OR ((unread_count > 0) = $11 AND sort_updated_at < $12)
+      OR ((unread_count > 0) = $11 AND sort_updated_at = $12 AND conversation_id > $13)
   )
 `
 			args = append(args, cursor.Unread, cursor.SortUpdatedAt, cursor.ConversationID)
 		case types.ConversationListSortDraftUpdatedAtDesc:
 			if cursor.Draft {
 				query += `  AND (
-      (draft_text <> '') < $10
-      OR ((draft_text <> '') = $10 AND draft_updated_at < $11)
-      OR ((draft_text <> '') = $10 AND draft_updated_at = $11 AND sort_updated_at < $12)
-      OR ((draft_text <> '') = $10 AND draft_updated_at = $11 AND sort_updated_at = $12 AND conversation_id > $13)
+      (draft_text <> '') < $11
+      OR ((draft_text <> '') = $11 AND draft_updated_at < $12)
+      OR ((draft_text <> '') = $11 AND draft_updated_at = $12 AND sort_updated_at < $13)
+      OR ((draft_text <> '') = $11 AND draft_updated_at = $12 AND sort_updated_at = $13 AND conversation_id > $14)
   )
 `
 				args = append(args, cursor.Draft, cursor.DraftUpdatedAt, cursor.SortUpdatedAt, cursor.ConversationID)
 			} else {
 				query += `  AND (
-      (draft_text <> '') < $10
-      OR ((draft_text <> '') = $10 AND sort_updated_at < $11)
-      OR ((draft_text <> '') = $10 AND sort_updated_at = $11 AND conversation_id > $12)
+      (draft_text <> '') < $11
+      OR ((draft_text <> '') = $11 AND sort_updated_at < $12)
+      OR ((draft_text <> '') = $11 AND sort_updated_at = $12 AND conversation_id > $13)
   )
 `
 				args = append(args, cursor.Draft, cursor.SortUpdatedAt, cursor.ConversationID)
 			}
 		default:
 			query += `  AND (
-      sort_updated_at < $10
-      OR (sort_updated_at = $10 AND conversation_id > $11)
+      sort_updated_at < $11
+      OR (sort_updated_at = $11 AND conversation_id > $12)
   )
 `
 			args = append(args, cursor.SortUpdatedAt, cursor.ConversationID)
@@ -693,6 +694,7 @@ LIMIT $3
 			Version:         listCursorVersion,
 			Sort:            sort,
 			IncludeArchived: command.IncludeArchived,
+			ArchivedOnly:    command.ArchivedOnly,
 			UnreadOnly:      command.UnreadOnly,
 			PinnedOnly:      command.PinnedOnly,
 			MutedOnly:       command.MutedOnly,
@@ -998,6 +1000,7 @@ type listCursor struct {
 	Version         int       `json:"v"`
 	Sort            string    `json:"sort"`
 	IncludeArchived bool      `json:"include_archived"`
+	ArchivedOnly    bool      `json:"archived_only"`
 	UnreadOnly      bool      `json:"unread_only"`
 	PinnedOnly      bool      `json:"pinned_only"`
 	MutedOnly       bool      `json:"muted_only"`
@@ -1011,12 +1014,13 @@ type listCursor struct {
 	ConversationID  string    `json:"conversation_id"`
 }
 
-const listCursorVersion = 6
+const listCursorVersion = 7
 
 func decodeListCursor(
 	value string,
 	sort string,
 	includeArchived bool,
+	archivedOnly bool,
 	unreadOnly bool,
 	pinnedOnly bool,
 	mutedOnly bool,
@@ -1043,6 +1047,7 @@ func decodeListCursor(
 	}
 	if cursor.Sort != sort ||
 		cursor.IncludeArchived != includeArchived ||
+		cursor.ArchivedOnly != archivedOnly ||
 		cursor.UnreadOnly != unreadOnly ||
 		cursor.PinnedOnly != pinnedOnly ||
 		cursor.MutedOnly != mutedOnly ||

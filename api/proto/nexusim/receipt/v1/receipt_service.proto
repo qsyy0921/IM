@@ -117,6 +117,7 @@ message ListConversationsRequest {
   bool muted_only = 8;
   string tag_filter = 9;
   bool draft_only = 10;
+  bool archived_only = 11;
 }
 
 message ProjectionWatermark {

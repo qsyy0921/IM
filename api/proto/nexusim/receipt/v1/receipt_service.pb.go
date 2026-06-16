@@ -860,6 +860,7 @@ type ListConversationsRequest struct {
 	MutedOnly       bool                   `protobuf:"varint,8,opt,name=muted_only,json=mutedOnly,proto3" json:"muted_only,omitempty"`
 	TagFilter       string                 `protobuf:"bytes,9,opt,name=tag_filter,json=tagFilter,proto3" json:"tag_filter,omitempty"`
 	DraftOnly       bool                   `protobuf:"varint,10,opt,name=draft_only,json=draftOnly,proto3" json:"draft_only,omitempty"`
+	ArchivedOnly    bool                   `protobuf:"varint,11,opt,name=archived_only,json=archivedOnly,proto3" json:"archived_only,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -960,6 +961,13 @@ func (x *ListConversationsRequest) GetTagFilter() string {
 func (x *ListConversationsRequest) GetDraftOnly() bool {
 	if x != nil {
 		return x.DraftOnly
+	}
+	return false
+}
+
+func (x *ListConversationsRequest) GetArchivedOnly() bool {
+	if x != nil {
+		return x.ArchivedOnly
 	}
 	return false
 }
@@ -1816,7 +1824,7 @@ const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
 	"\x18include_received_devices\x18\x04 \x01(\bR\x16includeReceivedDevices\x122\n" +
 	"\x15received_device_limit\x18\x05 \x01(\x05R\x13receivedDeviceLimit\"^\n" +
 	"\x19ListReceiptStatesResponse\x12A\n" +
-	"\x05items\x18\x01 \x03(\v2+.nexusim.receipt.v1.GetReceiptStateResponseR\x05items\"\x9d\x03\n" +
+	"\x05items\x18\x01 \x03(\v2+.nexusim.receipt.v1.GetReceiptStateResponseR\x05items\"\xc2\x03\n" +
 	"\x18ListConversationsRequest\x12B\n" +
 	"\fauth_context\x18\x01 \x01(\v2\x1f.nexusim.receipt.v1.AuthContextR\vauthContext\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x1f\n" +
@@ -1834,7 +1842,8 @@ const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
 	"tag_filter\x18\t \x01(\tR\ttagFilter\x12\x1d\n" +
 	"\n" +
 	"draft_only\x18\n" +
-	" \x01(\bR\tdraftOnly\"}\n" +
+	" \x01(\bR\tdraftOnly\x12#\n" +
+	"\rarchived_only\x18\v \x01(\bR\farchivedOnly\"}\n" +
 	"\x13ProjectionWatermark\x12\x16\n" +
 	"\x06source\x18\x01 \x01(\tR\x06source\x12!\n" +
 	"\foffset_value\x18\x02 \x01(\x03R\voffsetValue\x12+\n" +

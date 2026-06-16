@@ -228,6 +228,7 @@ func (server *Server) ListConversations(
 		PageCursor:      request.GetPageCursor(),
 		Sort:            conversationListSortFromProto(request.GetSort()),
 		IncludeArchived: request.GetIncludeArchived(),
+		ArchivedOnly:    request.GetArchivedOnly(),
 		UnreadOnly:      request.GetUnreadOnly(),
 		PinnedOnly:      request.GetPinnedOnly(),
 		MutedOnly:       request.GetMutedOnly(),

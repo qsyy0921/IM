@@ -814,6 +814,61 @@ func TestRepositoryArchiveConversationFiltersListIntegration(t *testing.T) {
 	assertConversationSummaryWithArchive(t, defaultList, 2, false)
 }
 
+func TestRepositoryListConversationsFiltersArchivedOnlyIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	sortTime := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	insertConversationSummary(t, ctx, pool, "conv-a", 11, sortTime)
+	insertConversationSummary(t, ctx, pool, "conv-b", 12, sortTime.Add(-time.Minute))
+	insertConversationSummary(t, ctx, pool, "conv-c", 13, sortTime.Add(-2*time.Minute))
+	if _, err := repository.ArchiveConversation(ctx, archiveConversationCommandForConversation("conv-a", true)); err != nil {
+		t.Fatalf("archive conv-a: %v", err)
+	}
+	if _, err := repository.ArchiveConversation(ctx, archiveConversationCommandForConversation("conv-c", true)); err != nil {
+		t.Fatalf("archive conv-c: %v", err)
+	}
+
+	first, err := repository.ListConversations(ctx, listConversationsCommandArchivedOnly(1, ""))
+	if err != nil {
+		t.Fatalf("list first archived-only page: %v", err)
+	}
+	assertConversationIDs(t, first, "conv-a")
+	if !first.Items[0].Archived {
+		t.Fatalf("expected first archived conversation, got %+v", first.Items[0])
+	}
+	if first.NextPageCursor == "" {
+		t.Fatal("expected archived-only cursor")
+	}
+
+	second, err := repository.ListConversations(ctx, listConversationsCommandArchivedOnly(1, first.NextPageCursor))
+	if err != nil {
+		t.Fatalf("list second archived-only page: %v", err)
+	}
+	assertConversationIDs(t, second, "conv-c")
+	if !second.Items[0].Archived {
+		t.Fatalf("expected second archived conversation, got %+v", second.Items[0])
+	}
+	if second.NextPageCursor != "" {
+		t.Fatalf("expected empty archived-only cursor on last page, got %q", second.NextPageCursor)
+	}
+
+	_, err = repository.ListConversations(ctx, listConversationsCommandIncludingArchived(1, first.NextPageCursor))
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid cursor when archived_only changes, got %v", err)
+	}
+
+	archivedIncluded := listConversationsCommandArchivedOnly(10, "")
+	archivedIncluded.IncludeArchived = true
+	included, err := repository.ListConversations(ctx, archivedIncluded)
+	if err != nil {
+		t.Fatalf("list archived-only with include_archived: %v", err)
+	}
+	assertConversationIDs(t, included, "conv-a", "conv-c")
+}
+
 func TestRepositoryArchiveConversationRejectsUnknownSummaryIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -1064,6 +1119,12 @@ func listConversationsCommandIncludingArchived(limit int, cursor string) types.L
 	return command
 }
 
+func listConversationsCommandArchivedOnly(limit int, cursor string) types.ListConversationsCommand {
+	command := listConversationsCommand(limit, cursor)
+	command.ArchivedOnly = true
+	return command
+}
+
 func listConversationsCommandUnreadOnly(limit int, cursor string) types.ListConversationsCommand {
 	command := listConversationsCommand(limit, cursor)
 	command.UnreadOnly = true
@@ -1149,13 +1210,20 @@ WHERE tenant_id = 'tenant-receipt'
 }
 
 func archiveConversationCommand(archived bool) types.ArchiveConversationCommand {
+	return archiveConversationCommandForConversation("conv-receipt", archived)
+}
+
+func archiveConversationCommandForConversation(
+	conversationID string,
+	archived bool,
+) types.ArchiveConversationCommand {
 	return types.ArchiveConversationCommand{
 		AuthContext: types.AuthContext{
 			TenantID: "tenant-receipt",
 			UserID:   "receiver-1",
 			DeviceID: "device-1",
 		},
-		ConversationID: "conv-receipt",
+		ConversationID: types.ConversationID(conversationID),
 		Archived:       archived,
 	}
 }

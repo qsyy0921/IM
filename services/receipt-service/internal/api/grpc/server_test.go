@@ -229,15 +229,16 @@ func TestListConversationsMapsSort(t *testing.T) {
 			list := &fakeListConversationsCapture{}
 			server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, list, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{}, fakeSetConversationTags{}, fakeSetConversationDraft{})
 			_, err := server.ListConversations(context.Background(), &receiptv1.ListConversationsRequest{
-				AuthContext: &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
-				Limit:       20,
-				PageCursor:  "cursor-1",
-				Sort:        test.sort,
-				UnreadOnly:  true,
-				PinnedOnly:  true,
-				MutedOnly:   true,
-				TagFilter:   "work",
-				DraftOnly:   true,
+				AuthContext:  &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
+				Limit:        20,
+				PageCursor:   "cursor-1",
+				Sort:         test.sort,
+				ArchivedOnly: true,
+				UnreadOnly:   true,
+				PinnedOnly:   true,
+				MutedOnly:    true,
+				TagFilter:    "work",
+				DraftOnly:    true,
 			})
 			if err != nil {
 				t.Fatalf("expected nil error, got %v", err)
@@ -245,6 +246,7 @@ func TestListConversationsMapsSort(t *testing.T) {
 			if list.command.Sort != test.want ||
 				list.command.Limit != 20 ||
 				list.command.PageCursor != "cursor-1" ||
+				!list.command.ArchivedOnly ||
 				!list.command.UnreadOnly ||
 				!list.command.PinnedOnly ||
 				!list.command.MutedOnly ||

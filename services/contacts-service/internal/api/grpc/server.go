@@ -384,11 +384,14 @@ func (s *Server) ListContactRequests(
 		return nil, status.Error(codes.Unimplemented, "list contact requests is not configured")
 	}
 	result, err := s.listContactRequests.Execute(ctx, types.ListContactRequestsCommand{
-		AuthContext: authFromProto(ctx, request.GetAuthContext()),
-		Direction:   requestListDirectionFromProto(request.GetDirection()),
-		Status:      requestStatusFromProto(request.GetStatus()),
-		PageSize:    int(request.GetPageSize()),
-		PageToken:   request.GetPageToken(),
+		AuthContext:          authFromProto(ctx, request.GetAuthContext()),
+		Direction:            requestListDirectionFromProto(request.GetDirection()),
+		Status:               requestStatusFromProto(request.GetStatus()),
+		PageSize:             int(request.GetPageSize()),
+		PageToken:            request.GetPageToken(),
+		SourceTypeFilter:     requestSourceTypeFilterFromProto(request.GetSourceTypeFilter()),
+		RiskLevelFilter:      requestRiskLevelFilterFromProto(request.GetRiskLevelFilter()),
+		ReviewRequiredFilter: request.ReviewRequiredFilter,
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -821,6 +824,13 @@ func requestSourceTypeFromProto(value contactsv1.ContactRequestSourceType) types
 	}
 }
 
+func requestSourceTypeFilterFromProto(value contactsv1.ContactRequestSourceType) types.ContactRequestSourceType {
+	if value == contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_UNSPECIFIED {
+		return ""
+	}
+	return requestSourceTypeFromProto(value)
+}
+
 func requestSourceTypeToProto(value types.ContactRequestSourceType) contactsv1.ContactRequestSourceType {
 	switch value {
 	case types.ContactRequestSourceTypeDirect, "":
@@ -837,6 +847,21 @@ func requestSourceTypeToProto(value types.ContactRequestSourceType) contactsv1.C
 		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_IMPORT
 	default:
 		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_UNSPECIFIED
+	}
+}
+
+func requestRiskLevelFilterFromProto(value contactsv1.ContactRequestRiskLevel) types.ContactRequestRiskLevel {
+	switch value {
+	case contactsv1.ContactRequestRiskLevel_CONTACT_REQUEST_RISK_LEVEL_UNSPECIFIED:
+		return ""
+	case contactsv1.ContactRequestRiskLevel_CONTACT_REQUEST_RISK_LEVEL_LOW:
+		return types.ContactRequestRiskLevelLow
+	case contactsv1.ContactRequestRiskLevel_CONTACT_REQUEST_RISK_LEVEL_MEDIUM:
+		return types.ContactRequestRiskLevelMedium
+	case contactsv1.ContactRequestRiskLevel_CONTACT_REQUEST_RISK_LEVEL_HIGH:
+		return types.ContactRequestRiskLevelHigh
+	default:
+		return types.ContactRequestRiskLevel(value.String())
 	}
 }
 

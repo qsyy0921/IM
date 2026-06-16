@@ -83,9 +83,11 @@ func TestSendContactRequestRejectsUnknownSourceType(t *testing.T) {
 }
 
 func TestListContactRequestsMapsSourceMetadata(t *testing.T) {
+	var captured types.ListContactRequestsCommand
 	server := NewServer(
 		nil, nil, nil, nil, nil, nil, nil, nil,
-		listContactRequestsExecutorFunc(func(_ context.Context, _ types.ListContactRequestsCommand) (types.ListContactRequestsResult, error) {
+		listContactRequestsExecutorFunc(func(_ context.Context, command types.ListContactRequestsCommand) (types.ListContactRequestsResult, error) {
+			captured = command
 			return types.ListContactRequestsResult{
 				TenantID:  "tenant-1",
 				UserID:    "bob",
@@ -112,11 +114,23 @@ func TestListContactRequestsMapsSourceMetadata(t *testing.T) {
 			TenantId: "tenant-1",
 			UserId:   "bob",
 		},
-		Direction: contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_INCOMING,
-		Status:    contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_PENDING,
+		Direction:        contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_INCOMING,
+		Status:           contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_PENDING,
+		SourceTypeFilter: contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_INVITE_LINK,
+		RiskLevelFilter:  contactsv1.ContactRequestRiskLevel_CONTACT_REQUEST_RISK_LEVEL_MEDIUM,
+		ReviewRequiredFilter: func() *bool {
+			value := true
+			return &value
+		}(),
 	})
 	if err != nil {
 		t.Fatalf("list contact requests: %v", err)
+	}
+	if captured.SourceTypeFilter != types.ContactRequestSourceTypeInviteLink ||
+		captured.RiskLevelFilter != types.ContactRequestRiskLevelMedium ||
+		captured.ReviewRequiredFilter == nil ||
+		!*captured.ReviewRequiredFilter {
+		t.Fatalf("unexpected captured list filters: %+v", captured)
 	}
 	if len(response.GetRequests()) != 1 {
 		t.Fatalf("expected one request, got %+v", response)

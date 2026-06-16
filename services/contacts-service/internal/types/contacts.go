@@ -689,11 +689,14 @@ type CancelContactRequestResult struct {
 }
 
 type ListContactRequestsCommand struct {
-	AuthContext AuthContext
-	Direction   ContactRequestListDirection
-	Status      ContactRequestStatus
-	PageSize    int
-	PageToken   string
+	AuthContext          AuthContext
+	Direction            ContactRequestListDirection
+	Status               ContactRequestStatus
+	PageSize             int
+	PageToken            string
+	SourceTypeFilter     ContactRequestSourceType
+	RiskLevelFilter      ContactRequestRiskLevel
+	ReviewRequiredFilter *bool
 }
 
 func (c ListContactRequestsCommand) Validate() error {
@@ -708,6 +711,12 @@ func (c ListContactRequestsCommand) Validate() error {
 	}
 	if c.NormalizedStatus() == "" {
 		return NewInvalidArgument("status is invalid")
+	}
+	if c.SourceTypeFilter != "" && c.NormalizedSourceTypeFilter() == "" {
+		return NewInvalidArgument("source_type_filter is invalid")
+	}
+	if c.RiskLevelFilter != "" && c.NormalizedRiskLevelFilter() == "" {
+		return NewInvalidArgument("risk_level_filter is invalid")
 	}
 	return nil
 }
@@ -734,6 +743,35 @@ func (c ListContactRequestsCommand) NormalizedStatus() ContactRequestStatus {
 		ContactRequestStatusCanceled,
 		ContactRequestStatusExpired:
 		return c.Status
+	default:
+		return ""
+	}
+}
+
+func (c ListContactRequestsCommand) NormalizedSourceTypeFilter() ContactRequestSourceType {
+	switch c.SourceTypeFilter {
+	case "":
+		return ""
+	case ContactRequestSourceTypeDirect,
+		ContactRequestSourceTypeSearch,
+		ContactRequestSourceTypeGroup,
+		ContactRequestSourceTypeInviteLink,
+		ContactRequestSourceTypeQRCode,
+		ContactRequestSourceTypeImport:
+		return c.SourceTypeFilter
+	default:
+		return ""
+	}
+}
+
+func (c ListContactRequestsCommand) NormalizedRiskLevelFilter() ContactRequestRiskLevel {
+	switch c.RiskLevelFilter {
+	case "":
+		return ""
+	case ContactRequestRiskLevelLow,
+		ContactRequestRiskLevelMedium,
+		ContactRequestRiskLevelHigh:
+		return c.RiskLevelFilter
 	default:
 		return ""
 	}

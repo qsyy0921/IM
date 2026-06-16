@@ -159,6 +159,9 @@ message ListContactRequestsRequest {
   ContactRequestStatus status = 3;
   int32 page_size = 4;
   string page_token = 5;
+  ContactRequestSourceType source_type_filter = 6;
+  ContactRequestRiskLevel risk_level_filter = 7;
+  optional bool review_required_filter = 8;
 }
 
 message ContactRequestItem {

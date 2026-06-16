@@ -172,13 +172,39 @@ func TestRepositoryListContactRequestsIntegration(t *testing.T) {
 	resetContactsTables(t, ctx, pool)
 	repository := newTestRepository(pool)
 
+	if _, err := repository.SetTenantContactRequestSourcePolicy(ctx, types.SetTenantContactRequestSourcePolicyCommand{
+		TenantID:             "tenant-contacts",
+		SourceType:           types.ContactRequestSourceTypeSearch,
+		AllowContactRequests: true,
+		RiskLevel:            types.ContactRequestRiskLevelMedium,
+	}); err != nil {
+		t.Fatalf("set search source policy: %v", err)
+	}
+	if _, err := repository.SetTenantContactRequestSourcePolicy(ctx, types.SetTenantContactRequestSourcePolicyCommand{
+		TenantID:             "tenant-contacts",
+		SourceType:           types.ContactRequestSourceTypeInviteLink,
+		AllowContactRequests: true,
+		RiskLevel:            types.ContactRequestRiskLevelHigh,
+		ReviewRequired:       true,
+	}); err != nil {
+		t.Fatalf("set invite source policy: %v", err)
+	}
+
 	aliceToBob, err := repository.SendContactRequest(ctx, sendCommand("alice", "bob", "send-alice-bob", "alice says hi"))
 	if err != nil {
 		t.Fatalf("send alice -> bob: %v", err)
 	}
-	carolToBob, err := repository.SendContactRequest(ctx, sendCommand("carol", "bob", "send-carol-bob", "carol says hi"))
+	carolCommand := sendCommand("carol", "bob", "send-carol-bob", "carol says hi")
+	carolCommand.SourceType = types.ContactRequestSourceTypeSearch
+	carolToBob, err := repository.SendContactRequest(ctx, carolCommand)
 	if err != nil {
 		t.Fatalf("send carol -> bob: %v", err)
+	}
+	erinCommand := sendCommand("erin", "bob", "send-erin-bob", "erin says hi")
+	erinCommand.SourceType = types.ContactRequestSourceTypeInviteLink
+	erinToBob, err := repository.SendContactRequest(ctx, erinCommand)
+	if err != nil {
+		t.Fatalf("send erin -> bob: %v", err)
 	}
 	bobToDave, err := repository.SendContactRequest(ctx, sendCommand("bob", "dave", "send-bob-dave", "bob says hi"))
 	if err != nil {
@@ -186,6 +212,7 @@ func TestRepositoryListContactRequestsIntegration(t *testing.T) {
 	}
 	setContactRequestCreatedAt(t, ctx, pool, aliceToBob.RequestID, time.Date(2026, 6, 10, 8, 0, 0, 0, time.UTC))
 	setContactRequestCreatedAt(t, ctx, pool, carolToBob.RequestID, time.Date(2026, 6, 10, 8, 1, 0, 0, time.UTC))
+	setContactRequestCreatedAt(t, ctx, pool, erinToBob.RequestID, time.Date(2026, 6, 10, 8, 2, 0, 0, time.UTC))
 	setContactRequestCreatedAt(t, ctx, pool, bobToDave.RequestID, time.Date(2026, 6, 10, 8, 2, 0, 0, time.UTC))
 
 	firstIncoming, err := repository.ListContactRequests(ctx, listContactRequestsCommand("bob", types.ContactRequestListDirectionIncoming, types.ContactRequestStatusPending, 1, ""))
@@ -211,6 +238,54 @@ func TestRepositoryListContactRequestsIntegration(t *testing.T) {
 	_, err = repository.ListContactRequests(ctx, listContactRequestsCommand("bob", types.ContactRequestListDirectionIncoming, types.ContactRequestStatusAccepted, 1, firstIncoming.NextPageToken))
 	if !errors.Is(err, types.ErrInvalidArgument) {
 		t.Fatalf("expected status cursor mismatch, got %v", err)
+	}
+	sourceFilteredCommand := listContactRequestsCommand("bob", types.ContactRequestListDirectionIncoming, types.ContactRequestStatusPending, 1, firstIncoming.NextPageToken)
+	sourceFilteredCommand.SourceTypeFilter = types.ContactRequestSourceTypeSearch
+	_, err = repository.ListContactRequests(ctx, sourceFilteredCommand)
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected source filter cursor mismatch, got %v", err)
+	}
+
+	searchIncomingCommand := listContactRequestsCommand("bob", types.ContactRequestListDirectionIncoming, types.ContactRequestStatusPending, 10, "")
+	searchIncomingCommand.SourceTypeFilter = types.ContactRequestSourceTypeSearch
+	searchIncoming, err := repository.ListContactRequests(ctx, searchIncomingCommand)
+	if err != nil {
+		t.Fatalf("list search source incoming: %v", err)
+	}
+	assertContactRequestIDs(t, searchIncoming, carolToBob.RequestID)
+
+	mediumIncomingCommand := listContactRequestsCommand("bob", types.ContactRequestListDirectionIncoming, types.ContactRequestStatusPending, 10, "")
+	mediumIncomingCommand.RiskLevelFilter = types.ContactRequestRiskLevelMedium
+	mediumIncoming, err := repository.ListContactRequests(ctx, mediumIncomingCommand)
+	if err != nil {
+		t.Fatalf("list medium risk incoming: %v", err)
+	}
+	assertContactRequestIDs(t, mediumIncoming, carolToBob.RequestID)
+
+	reviewFalse := false
+	reviewFalseCommand := listContactRequestsCommand("bob", types.ContactRequestListDirectionIncoming, types.ContactRequestStatusPending, 10, "")
+	reviewFalseCommand.ReviewRequiredFilter = &reviewFalse
+	reviewFalseIncoming, err := repository.ListContactRequests(ctx, reviewFalseCommand)
+	if err != nil {
+		t.Fatalf("list review false incoming: %v", err)
+	}
+	assertContactRequestIDs(t, reviewFalseIncoming, carolToBob.RequestID, aliceToBob.RequestID)
+
+	reviewTrue := true
+	reviewRequiredCommand := listContactRequestsCommand("bob", types.ContactRequestListDirectionIncoming, types.ContactRequestStatusReviewRequired, 10, "")
+	reviewRequiredCommand.SourceTypeFilter = types.ContactRequestSourceTypeInviteLink
+	reviewRequiredCommand.RiskLevelFilter = types.ContactRequestRiskLevelHigh
+	reviewRequiredCommand.ReviewRequiredFilter = &reviewTrue
+	reviewRequired, err := repository.ListContactRequests(ctx, reviewRequiredCommand)
+	if err != nil {
+		t.Fatalf("list review required incoming: %v", err)
+	}
+	assertContactRequestIDs(t, reviewRequired, erinToBob.RequestID)
+	if len(reviewRequired.Requests) != 1 ||
+		reviewRequired.Requests[0].SourceType != types.ContactRequestSourceTypeInviteLink ||
+		reviewRequired.Requests[0].RiskLevel != types.ContactRequestRiskLevelHigh ||
+		!reviewRequired.Requests[0].ReviewRequired {
+		t.Fatalf("unexpected review required request metadata: %+v", reviewRequired.Requests)
 	}
 
 	outgoing, err := repository.ListContactRequests(ctx, listContactRequestsCommand("bob", types.ContactRequestListDirectionOutgoing, types.ContactRequestStatusPending, 10, ""))

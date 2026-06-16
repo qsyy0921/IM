@@ -522,8 +522,15 @@ func (r *Repository) ListContactRequests(
 	}
 	direction := command.NormalizedDirection()
 	status := command.NormalizedStatus()
+	sourceTypeFilter := command.NormalizedSourceTypeFilter()
+	riskLevelFilter := command.NormalizedRiskLevelFilter()
+	reviewRequiredFilterSet := command.ReviewRequiredFilter != nil
+	reviewRequiredFilter := false
+	if command.ReviewRequiredFilter != nil {
+		reviewRequiredFilter = *command.ReviewRequiredFilter
+	}
 	limit := domain.NormalizePageSize(command.PageSize)
-	cursor, hasCursor, err := decodeContactRequestPageTokenFor(command, direction, status, limit)
+	cursor, hasCursor, err := decodeContactRequestPageTokenFor(command, direction, status, sourceTypeFilter, riskLevelFilter, command.ReviewRequiredFilter, limit)
 	if err != nil {
 		return types.ListContactRequestsResult{}, err
 	}
@@ -532,7 +539,16 @@ func (r *Repository) ListContactRequests(
 	if direction == types.ContactRequestListDirectionOutgoing {
 		userColumn = "sender_user_id"
 	}
-	args := []any{command.AuthContext.TenantID, command.AuthContext.UserID, status, limit + 1}
+	args := []any{
+		command.AuthContext.TenantID,
+		command.AuthContext.UserID,
+		status,
+		limit + 1,
+		sourceTypeFilter,
+		riskLevelFilter,
+		reviewRequiredFilterSet,
+		reviewRequiredFilter,
+	}
 	query := fmt.Sprintf(`
 SELECT
     request_id,
@@ -552,9 +568,12 @@ FROM contact_requests
 WHERE tenant_id = $1
   AND %s = $2
   AND status = $3
+  AND ($5 = '' OR source_type = $5)
+  AND ($6 = '' OR risk_level = $6)
+  AND ($7 = false OR review_required = $8)
 `, userColumn)
 	if hasCursor {
-		query += `  AND (created_at < $5 OR (created_at = $5 AND request_id > $6))
+		query += `  AND (created_at < $9 OR (created_at = $9 AND request_id > $10))
 `
 		args = append(args, cursor.CreatedAt, cursor.RequestID)
 	}
@@ -610,14 +629,17 @@ LIMIT $4
 	if len(listed) > limit {
 		last := listed[limit-1]
 		nextToken = encodeContactRequestPageToken(contactRequestPageCursor{
-			Version:   1,
-			TenantID:  command.AuthContext.TenantID,
-			UserID:    command.AuthContext.UserID,
-			Direction: direction,
-			Status:    status,
-			PageSize:  limit,
-			CreatedAt: last.createdAt,
-			RequestID: last.item.RequestID,
+			Version:              2,
+			TenantID:             command.AuthContext.TenantID,
+			UserID:               command.AuthContext.UserID,
+			Direction:            direction,
+			Status:               status,
+			SourceTypeFilter:     sourceTypeFilter,
+			RiskLevelFilter:      riskLevelFilter,
+			ReviewRequiredFilter: command.ReviewRequiredFilter,
+			PageSize:             limit,
+			CreatedAt:            last.createdAt,
+			RequestID:            last.item.RequestID,
 		})
 		listed = listed[:limit]
 	}

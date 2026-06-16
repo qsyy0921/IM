@@ -196,12 +196,16 @@ group_name
 ```text
 auth_context
 direction = INCOMING | OUTGOING, default INCOMING
-status = PENDING | ACCEPTED | DECLINED | CANCELED | EXPIRED, default PENDING
+status = PENDING | REVIEW_REQUIRED | ACCEPTED | DECLINED | CANCELED | EXPIRED, default PENDING
 page_size
 page_token
+source_type_filter = DIRECT / SEARCH / GROUP / INVITE_LINK / QR_CODE / IMPORT, optional
+risk_level_filter = LOW / MEDIUM / HIGH, optional
+review_required_filter = true / false, optional
 ```
 
 `ListContactRequestsResponse` 返回当前用户视角的好友申请列表，按 `created_at DESC, request_id ASC` keyset 分页。`page_token` 绑定 `tenant_id / user_id / direction / status / page_size / last_created_at / last_request_id`，不能跨用户、跨方向、跨状态或跨 page size 复用。
+当传入 `source_type_filter / risk_level_filter / review_required_filter` 时，只返回匹配来源、风险等级或审批标记的申请；这些过滤条件也会写入分页 token，不能跨过滤条件复用。`source_type_filter` 的 unspecified 表示不过滤，不沿用 `SendContactRequest` 的 `DIRECT` 默认语义。
 
 `DeleteContactRequest`：
 

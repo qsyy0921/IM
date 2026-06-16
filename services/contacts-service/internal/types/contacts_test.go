@@ -109,6 +109,40 @@ func TestTenantContactRequestSourcePolicyCommandValidation(t *testing.T) {
 	}
 }
 
+func TestListContactRequestsCommandFilterValidation(t *testing.T) {
+	reviewRequired := false
+	command := ListContactRequestsCommand{
+		AuthContext: AuthContext{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+		},
+		Direction:            ContactRequestListDirectionIncoming,
+		Status:               ContactRequestStatusPending,
+		SourceTypeFilter:     ContactRequestSourceTypeSearch,
+		RiskLevelFilter:      ContactRequestRiskLevelMedium,
+		ReviewRequiredFilter: &reviewRequired,
+	}
+	if err := command.Validate(); err != nil {
+		t.Fatalf("expected list request filters to be valid: %v", err)
+	}
+	if command.NormalizedSourceTypeFilter() != ContactRequestSourceTypeSearch {
+		t.Fatalf("unexpected source filter: %s", command.NormalizedSourceTypeFilter())
+	}
+	if command.NormalizedRiskLevelFilter() != ContactRequestRiskLevelMedium {
+		t.Fatalf("unexpected risk filter: %s", command.NormalizedRiskLevelFilter())
+	}
+
+	command.SourceTypeFilter = ContactRequestSourceType("UNKNOWN")
+	if err := command.Validate(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("expected invalid source filter, got %v", err)
+	}
+	command.SourceTypeFilter = ""
+	command.RiskLevelFilter = ContactRequestRiskLevel("UNKNOWN")
+	if err := command.Validate(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("expected invalid risk filter, got %v", err)
+	}
+}
+
 func TestNormalizeContactProfileVisibilityFields(t *testing.T) {
 	fields, err := NormalizeContactProfileVisibilityFields([]ContactProfileVisibilityField{
 		ContactProfileVisibilityField("display-name"),

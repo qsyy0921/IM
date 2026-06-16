@@ -1035,14 +1035,17 @@ type contactPageCursor struct {
 }
 
 type contactRequestPageCursor struct {
-	Version   int                               `json:"v"`
-	TenantID  types.TenantID                    `json:"tenant_id"`
-	UserID    types.UserID                      `json:"user_id"`
-	Direction types.ContactRequestListDirection `json:"direction"`
-	Status    types.ContactRequestStatus        `json:"status"`
-	PageSize  int                               `json:"page_size"`
-	CreatedAt time.Time                         `json:"created_at"`
-	RequestID string                            `json:"request_id"`
+	Version              int                               `json:"v"`
+	TenantID             types.TenantID                    `json:"tenant_id"`
+	UserID               types.UserID                      `json:"user_id"`
+	Direction            types.ContactRequestListDirection `json:"direction"`
+	Status               types.ContactRequestStatus        `json:"status"`
+	SourceTypeFilter     types.ContactRequestSourceType    `json:"source_type_filter,omitempty"`
+	RiskLevelFilter      types.ContactRequestRiskLevel     `json:"risk_level_filter,omitempty"`
+	ReviewRequiredFilter *bool                             `json:"review_required_filter,omitempty"`
+	PageSize             int                               `json:"page_size"`
+	CreatedAt            time.Time                         `json:"created_at"`
+	RequestID            string                            `json:"request_id"`
 }
 
 type contactPrivacyExceptionPageCursor struct {
@@ -1057,6 +1060,9 @@ func decodeContactRequestPageTokenFor(
 	command types.ListContactRequestsCommand,
 	direction types.ContactRequestListDirection,
 	status types.ContactRequestStatus,
+	sourceTypeFilter types.ContactRequestSourceType,
+	riskLevelFilter types.ContactRequestRiskLevel,
+	reviewRequiredFilter *bool,
 	pageSize int,
 ) (contactRequestPageCursor, bool, error) {
 	value := command.PageToken
@@ -1071,7 +1077,7 @@ func decodeContactRequestPageTokenFor(
 	if err := json.Unmarshal(raw, &cursor); err != nil {
 		return contactRequestPageCursor{}, false, types.NewInvalidArgument("invalid page_token")
 	}
-	if cursor.Version != 1 || cursor.RequestID == "" || cursor.CreatedAt.IsZero() {
+	if cursor.Version != 1 && cursor.Version != 2 || cursor.RequestID == "" || cursor.CreatedAt.IsZero() {
 		return contactRequestPageCursor{}, false, types.NewInvalidArgument("invalid page_token")
 	}
 	if cursor.TenantID != command.AuthContext.TenantID ||
@@ -1081,7 +1087,25 @@ func decodeContactRequestPageTokenFor(
 		cursor.PageSize != pageSize {
 		return contactRequestPageCursor{}, false, types.NewInvalidArgument("invalid page_token")
 	}
+	if cursor.Version == 1 {
+		if sourceTypeFilter != "" || riskLevelFilter != "" || reviewRequiredFilter != nil {
+			return contactRequestPageCursor{}, false, types.NewInvalidArgument("invalid page_token")
+		}
+		return cursor, true, nil
+	}
+	if cursor.SourceTypeFilter != sourceTypeFilter ||
+		cursor.RiskLevelFilter != riskLevelFilter ||
+		!boolPointerEqual(cursor.ReviewRequiredFilter, reviewRequiredFilter) {
+		return contactRequestPageCursor{}, false, types.NewInvalidArgument("invalid page_token")
+	}
 	return cursor, true, nil
+}
+
+func boolPointerEqual(left *bool, right *bool) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
 }
 
 func encodeContactRequestPageToken(cursor contactRequestPageCursor) string {

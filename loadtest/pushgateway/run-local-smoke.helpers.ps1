@@ -1,4 +1,4 @@
-function Ensure-KafkaTopic {
+﻿function Ensure-KafkaTopic {
     param([string]$Topic)
     docker exec $KafkaExecContainer kafka-topics `
         --bootstrap-server $KafkaAdminBootstrap `
@@ -103,6 +103,8 @@ function Add-PushRedisEnv {
     if ($RedisMode -eq "sentinel") {
         $Env["NEXUSIM_PUSH_REDIS_SENTINEL_ADDRS"] = $RedisSentinelAddrs
         $Env["NEXUSIM_PUSH_REDIS_SENTINEL_MASTER_NAME"] = $RedisSentinelMasterName
+    } elseif ($RedisMode -eq "cluster") {
+        $Env["NEXUSIM_PUSH_REDIS_CLUSTER_ADDRS"] = $RedisClusterAddrs
     } else {
         $Env["NEXUSIM_PUSH_REDIS_ADDR"] = $RedisAddr
     }

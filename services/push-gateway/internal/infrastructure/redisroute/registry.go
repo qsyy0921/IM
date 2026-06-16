@@ -2,6 +2,7 @@ package redisroute
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -242,7 +243,7 @@ func (registry *Registry) StartCleanupLoop(ctx context.Context, interval time.Du
 }
 
 func (registry *Registry) CleanupStaleRoutes(ctx context.Context) (int, error) {
-	pattern := registry.config.KeyPrefix + ":route:user:*"
+	pattern := registry.config.KeyPrefix + ":route:*:user"
 	var cursor uint64
 	totalRemoved := 0
 	for {
@@ -435,8 +436,8 @@ func (registry *Registry) writeRoute(ctx context.Context, entry routeEntry) erro
 	if err != nil {
 		return err
 	}
-	sessionKey := registry.sessionKey(entry.SessionID)
 	userKey := registry.userKey(entry.TenantID, entry.UserID)
+	sessionKey := registry.sessionKey(entry.TenantID, entry.UserID, entry.SessionID)
 	pipe := registry.client.TxPipeline()
 	pipe.Set(ctx, sessionKey, payload, registry.config.RouteTTL)
 	pipe.SAdd(ctx, userKey, entry.SessionID)
@@ -504,7 +505,7 @@ func (registry *Registry) renewRouteLoop(ctx context.Context, entry routeEntry) 
 
 func (registry *Registry) deleteRoute(ctx context.Context, entry routeEntry) error {
 	pipe := registry.client.TxPipeline()
-	pipe.Del(ctx, registry.sessionKey(entry.SessionID))
+	pipe.Del(ctx, registry.sessionKey(entry.TenantID, entry.UserID, entry.SessionID))
 	pipe.SRem(ctx, registry.userKey(entry.TenantID, entry.UserID), entry.SessionID)
 	_, err := pipe.Exec(ctx)
 	return err
@@ -517,7 +518,7 @@ func (registry *Registry) cleanupUserRouteKey(ctx context.Context, userKey strin
 	}
 	stale := make([]interface{}, 0)
 	for _, sessionID := range sessionIDs {
-		raw, err := registry.client.Get(ctx, registry.sessionKey(sessionID)).Result()
+		raw, err := registry.client.Get(ctx, registry.sessionKeyForUserKey(userKey, sessionID)).Result()
 		if errors.Is(err, redis.Nil) {
 			stale = append(stale, sessionID)
 			continue
@@ -552,7 +553,7 @@ func (registry *Registry) lookupRoutes(ctx context.Context, tenantID string, use
 	routes := make([]routeEntry, 0, len(sessionIDs))
 	stale := make([]interface{}, 0)
 	for _, sessionID := range sessionIDs {
-		raw, err := registry.client.Get(ctx, registry.sessionKey(sessionID)).Result()
+		raw, err := registry.client.Get(ctx, registry.sessionKey(tenantID, userID, sessionID)).Result()
 		if errors.Is(err, redis.Nil) {
 			stale = append(stale, sessionID)
 			continue
@@ -604,12 +605,24 @@ func (registry *Registry) publishRemoteEviction(
 	return registry.client.Publish(ctx, registry.gatewayEvictionChannel(gatewayID), payload).Result()
 }
 
-func (registry *Registry) sessionKey(sessionID string) string {
-	return strings.Join([]string{registry.config.KeyPrefix, "route", "session", sessionID}, ":")
+func (registry *Registry) sessionKey(tenantID string, userID string, sessionID string) string {
+	return strings.Join([]string{registry.config.KeyPrefix, "route", registry.userRouteHashTag(tenantID, userID), "session", sessionID}, ":")
+}
+
+func (registry *Registry) sessionKeyForUserKey(userKey string, sessionID string) string {
+	prefix := strings.TrimSuffix(userKey, ":user")
+	if prefix == userKey {
+		return strings.Join([]string{registry.config.KeyPrefix, "route", "{user:unknown}", "session", sessionID}, ":")
+	}
+	return strings.Join([]string{prefix, "session", sessionID}, ":")
 }
 
 func (registry *Registry) userKey(tenantID string, userID string) string {
-	return strings.Join([]string{registry.config.KeyPrefix, "route", "user", tenantID, userID}, ":")
+	return strings.Join([]string{registry.config.KeyPrefix, "route", registry.userRouteHashTag(tenantID, userID), "user"}, ":")
+}
+
+func (registry *Registry) userRouteHashTag(tenantID string, userID string) string {
+	return "{user:" + redisKeyPart(tenantID) + ":" + redisKeyPart(userID) + "}"
 }
 
 func (registry *Registry) gatewayChannel(gatewayID string) string {
@@ -768,11 +781,15 @@ func sameDevice(left resumeMeta, right types.AuthContext) bool {
 }
 
 func (registry *Registry) resumeMetaKey(token string) string {
-	return strings.Join([]string{registry.config.KeyPrefix, "resume", "token", token, "meta"}, ":")
+	return strings.Join([]string{registry.config.KeyPrefix, "resume", registry.resumeHashTag(token), "meta"}, ":")
 }
 
 func (registry *Registry) resumeFramesKey(token string) string {
-	return strings.Join([]string{registry.config.KeyPrefix, "resume", "token", token, "frames"}, ":")
+	return strings.Join([]string{registry.config.KeyPrefix, "resume", registry.resumeHashTag(token), "frames"}, ":")
+}
+
+func (registry *Registry) resumeHashTag(token string) string {
+	return "{resume:" + redisKeyPart(token) + "}"
 }
 
 func GatewayChannel(keyPrefix string, gatewayID string) string {
@@ -796,4 +813,8 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func redisKeyPart(value string) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(value))
 }

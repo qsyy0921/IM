@@ -129,15 +129,19 @@ func (store *RedisStore) IsRevoked(ctx context.Context, auth types.AuthContext) 
 	if store == nil || store.client == nil {
 		return false, nil
 	}
-	keys := []string{store.deviceRedisKey(auth.TenantID, auth.UserID, auth.DeviceID)}
+	revoked, err := store.exists(ctx, store.deviceRedisKey(auth.TenantID, auth.UserID, auth.DeviceID))
+	if err != nil || revoked {
+		return revoked, err
+	}
 	if auth.SessionID != "" {
-		keys = append(keys, store.sessionRedisKey(auth.TenantID, auth.UserID, auth.DeviceID, auth.SessionID))
+		return store.exists(ctx, store.sessionRedisKey(auth.TenantID, auth.UserID, auth.DeviceID, auth.SessionID))
 	}
-	count, err := store.client.Exists(ctx, keys...).Result()
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
+	return false, nil
+}
+
+func (store *RedisStore) exists(ctx context.Context, key string) (bool, error) {
+	count, err := store.client.Exists(ctx, key).Result()
+	return count > 0, err
 }
 
 func (store *RedisStore) RevokeDevice(ctx context.Context, tenantID string, userID string, deviceID string) error {

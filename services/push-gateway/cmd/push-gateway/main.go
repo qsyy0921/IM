@@ -295,6 +295,7 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 type redisClientConfig struct {
 	Mode               string
 	Addr               string
+	ClusterAddrs       []string
 	SentinelAddrs      []string
 	SentinelMasterName string
 	Username           string
@@ -308,6 +309,7 @@ func loadRedisClientConfigFromEnv() redisClientConfig {
 	return redisClientConfig{
 		Mode:               envString("NEXUSIM_PUSH_REDIS_MODE", "single"),
 		Addr:               envString("NEXUSIM_PUSH_REDIS_ADDR", "127.0.0.1:6379"),
+		ClusterAddrs:       splitCSV(os.Getenv("NEXUSIM_PUSH_REDIS_CLUSTER_ADDRS")),
 		SentinelAddrs:      splitCSV(os.Getenv("NEXUSIM_PUSH_REDIS_SENTINEL_ADDRS")),
 		SentinelMasterName: envString("NEXUSIM_PUSH_REDIS_SENTINEL_MASTER_NAME", ""),
 		Username:           os.Getenv("NEXUSIM_PUSH_REDIS_USERNAME"),
@@ -326,6 +328,18 @@ func newRedisUniversalClient(config redisClientConfig) (redis.UniversalClient, e
 			Username: config.Username,
 			Password: config.Password,
 			DB:       config.DB,
+		}), nil
+	case "cluster":
+		if len(config.ClusterAddrs) == 0 {
+			return nil, errors.New("NEXUSIM_PUSH_REDIS_CLUSTER_ADDRS is required when NEXUSIM_PUSH_REDIS_MODE=cluster")
+		}
+		if config.DB != 0 {
+			return nil, errors.New("NEXUSIM_PUSH_REDIS_DB must be 0 when NEXUSIM_PUSH_REDIS_MODE=cluster")
+		}
+		return redis.NewClusterClient(&redis.ClusterOptions{
+			Addrs:    config.ClusterAddrs,
+			Username: config.Username,
+			Password: config.Password,
 		}), nil
 	case "sentinel":
 		if strings.TrimSpace(config.SentinelMasterName) == "" {

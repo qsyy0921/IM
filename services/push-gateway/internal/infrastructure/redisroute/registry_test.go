@@ -27,19 +27,38 @@ func TestRegistryWritesAndDeletesRoute(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("register: %v", err)
 	}
-	if !server.Exists("nexusim:push:route:session:session-1") {
+	sessionKey := registry.sessionKey("tenant-1", "user-1", "session-1")
+	userKey := registry.userKey("tenant-1", "user-1")
+	if !server.Exists(sessionKey) {
 		t.Fatalf("expected session route key")
 	}
-	if !redisSetHasMember(t, server, "nexusim:push:route:user:tenant-1:user-1", "session-1") {
+	if !redisSetHasMember(t, server, userKey, "session-1") {
 		t.Fatalf("expected user route membership")
 	}
 
 	registry.Unregister("session-1")
-	if server.Exists("nexusim:push:route:session:session-1") {
+	if server.Exists(sessionKey) {
 		t.Fatalf("session route key should be removed")
 	}
-	if redisSetHasMember(t, server, "nexusim:push:route:user:tenant-1:user-1", "session-1") {
+	if redisSetHasMember(t, server, userKey, "session-1") {
 		t.Fatalf("user route membership should be removed")
+	}
+}
+
+func TestRegistryRouteKeysUseClusterHashTag(t *testing.T) {
+	registry := NewRegistry(memory.NewRegistry(), nil, Config{})
+	userKey := registry.userKey("tenant-1", "user-1")
+	sessionKey := registry.sessionKey("tenant-1", "user-1", "session-1")
+	if redisHashTagForTest(userKey) == "" || redisHashTagForTest(userKey) != redisHashTagForTest(sessionKey) {
+		t.Fatalf("expected user and session route keys to share hash tag: user=%s session=%s", userKey, sessionKey)
+	}
+	if sessionKey != registry.sessionKeyForUserKey(userKey, "session-1") {
+		t.Fatalf("session key reconstructed from user key does not match")
+	}
+	metaKey := registry.resumeMetaKey("resume-token-1")
+	framesKey := registry.resumeFramesKey("resume-token-1")
+	if redisHashTagForTest(metaKey) == "" || redisHashTagForTest(metaKey) != redisHashTagForTest(framesKey) {
+		t.Fatalf("expected resume keys to share hash tag: meta=%s frames=%s", metaKey, framesKey)
 	}
 }
 
@@ -240,12 +259,12 @@ func TestRegistryRenewsRouteTTLUntilUnregister(t *testing.T) {
 
 	time.Sleep(1200 * time.Millisecond)
 	server.FastForward(2500 * time.Millisecond)
-	if !server.Exists("nexusim:push:route:session:session-1") {
+	if !server.Exists(registry.sessionKey("tenant-1", "user-1", "session-1")) {
 		t.Fatalf("expected session route key to be renewed before TTL expiry")
 	}
 
 	registry.Unregister("session-1")
-	if server.Exists("nexusim:push:route:session:session-1") {
+	if server.Exists(registry.sessionKey("tenant-1", "user-1", "session-1")) {
 		t.Fatalf("session route key should be removed after unregister")
 	}
 }
@@ -298,15 +317,16 @@ func TestRegistryCleansStaleRoutesDuringLookup(t *testing.T) {
 	local := memory.NewRegistry()
 	registry := NewRegistry(local, client, Config{GatewayID: "gateway-a", RouteTTL: time.Minute})
 	ctx := context.Background()
+	userKey := registry.userKey("tenant-1", "user-1")
 
-	if err := client.SAdd(ctx, "nexusim:push:route:user:tenant-1:user-1",
+	if err := client.SAdd(ctx, userKey,
 		"missing-session",
 		"malformed-session",
 		"wrong-user-session",
 	).Err(); err != nil {
 		t.Fatalf("seed user set: %v", err)
 	}
-	if err := client.Set(ctx, "nexusim:push:route:session:malformed-session", "{", time.Minute).Err(); err != nil {
+	if err := client.Set(ctx, registry.sessionKeyForUserKey(userKey, "malformed-session"), "{", time.Minute).Err(); err != nil {
 		t.Fatalf("seed malformed route: %v", err)
 	}
 	if err := registry.writeRoute(ctx, routeEntry{
@@ -318,7 +338,7 @@ func TestRegistryCleansStaleRoutesDuringLookup(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed wrong user route: %v", err)
 	}
-	if err := client.SAdd(ctx, "nexusim:push:route:user:tenant-1:user-1", "wrong-user-session").Err(); err != nil {
+	if err := client.SAdd(ctx, userKey, "wrong-user-session").Err(); err != nil {
 		t.Fatalf("re-seed wrong user membership: %v", err)
 	}
 
@@ -330,7 +350,7 @@ func TestRegistryCleansStaleRoutesDuringLookup(t *testing.T) {
 		t.Fatalf("unexpected result for stale-only routes: %+v", result)
 	}
 	for _, sessionID := range []string{"missing-session", "malformed-session", "wrong-user-session"} {
-		if redisSetHasMember(t, server, "nexusim:push:route:user:tenant-1:user-1", sessionID) {
+		if redisSetHasMember(t, server, userKey, sessionID) {
 			t.Fatalf("expected stale session %s to be removed from user set", sessionID)
 		}
 	}
@@ -345,7 +365,7 @@ func TestRegistryCleanupStaleRoutesScansUserSets(t *testing.T) {
 	local := memory.NewRegistry()
 	registry := NewRegistry(local, client, Config{GatewayID: "gateway-a", RouteTTL: time.Minute})
 	ctx := context.Background()
-	userKey := "nexusim:push:route:user:tenant-1:user-1"
+	userKey := registry.userKey("tenant-1", "user-1")
 
 	if err := client.SAdd(ctx, userKey,
 		"valid-session",
@@ -364,7 +384,7 @@ func TestRegistryCleanupStaleRoutesScansUserSets(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed valid route: %v", err)
 	}
-	if err := client.Set(ctx, "nexusim:push:route:session:malformed-session", "{", time.Minute).Err(); err != nil {
+	if err := client.Set(ctx, registry.sessionKeyForUserKey(userKey, "malformed-session"), "{", time.Minute).Err(); err != nil {
 		t.Fatalf("seed malformed route: %v", err)
 	}
 	if err := registry.writeRoute(ctx, routeEntry{
@@ -577,10 +597,10 @@ func TestRegistryUnknownRedisResumeTokenIssuesNewTokenAndBufferMiss(t *testing.T
 	if result.ResumeToken == "" || result.ResumeToken == "client-chosen-token" {
 		t.Fatalf("expected server-generated replacement token, got %q", result.ResumeToken)
 	}
-	if server.Exists("nexusim:push:resume:token:client-chosen-token:meta") {
+	if server.Exists(registry.resumeMetaKey("client-chosen-token")) {
 		t.Fatalf("unknown client token should not be registered")
 	}
-	if !server.Exists("nexusim:push:resume:token:" + result.ResumeToken + ":meta") {
+	if !server.Exists(registry.resumeMetaKey(result.ResumeToken)) {
 		t.Fatalf("replacement token metadata should be stored in redis")
 	}
 	select {
@@ -990,6 +1010,25 @@ func redisSetHasMember(t *testing.T, server *miniredis.Miniredis, key string, me
 		t.Fatalf("check set membership: %v", err)
 	}
 	return ok
+}
+
+func redisHashTagForTest(key string) string {
+	start := -1
+	for i, char := range key {
+		if char == '{' {
+			start = i
+			break
+		}
+	}
+	if start < 0 {
+		return ""
+	}
+	for i := start + 1; i < len(key); i++ {
+		if key[i] == '}' {
+			return key[start+1 : i]
+		}
+	}
+	return ""
 }
 
 func waitForSubscriberMetrics(t *testing.T, subscriber *Subscriber, ready func(Metrics) bool) Metrics {

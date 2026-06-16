@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$PgDsn = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
     [string]$PostgresExecContainer = "nexusim-postgres",
     [string]$KafkaBrokers = "localhost:9092",
@@ -57,9 +57,10 @@ param(
     [string]$PushTlsClientCertFile = "",
     [string]$PushTlsClientKeyFile = "",
     [string]$PushAuthTokenTtl = "10m",
-    [ValidateSet("single", "sentinel")]
+    [ValidateSet("single", "sentinel", "cluster")]
     [string]$RedisMode = "single",
     [string]$RedisAddr = "127.0.0.1:6379",
+    [string]$RedisClusterAddrs = "127.0.0.1:7000,127.0.0.1:7001,127.0.0.1:7002",
     [string]$RedisSentinelAddrs = "127.0.0.1:26379,127.0.0.1:26380,127.0.0.1:26381",
     [string]$RedisSentinelMasterName = "mymaster",
     [string]$RedisKeyPrefix = "",
@@ -846,6 +847,8 @@ if ($RouteBackend -eq "redis") {
     if ($RedisMode -eq "sentinel") {
         Write-Host "redis_sentinel_addrs=$RedisSentinelAddrs"
         Write-Host "redis_sentinel_master_name=$RedisSentinelMasterName"
+    } elseif ($RedisMode -eq "cluster") {
+        Write-Host "redis_cluster_addrs=$RedisClusterAddrs"
     } else {
         Write-Host "redis_addr=$RedisAddr"
     }

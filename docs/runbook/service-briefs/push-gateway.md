@@ -14,6 +14,7 @@
 - Redis route subscriber 对非取消运行时错误已改为退避重试，并在 `/debug/metrics` 暴露低敏 retry 快照；malformed / incomplete payload 只记聚合计数，不会入队或打死 subscriber。
 - Redis route 已区分“publish 报错”和“publish 成功但 0 subscriber”两类远端失败，避免把 stale route 误记为远端已入队。
 - Redis route 续约连续失败达到阈值后会主动踢掉本地 session，避免 route TTL 失效后仍长时间假装在线；客户端改走重连 + `PullInbox` fallback。
+- Redis route 已支持 `NEXUSIM_PUSH_REDIS_MODE=cluster` 和 `NEXUSIM_PUSH_REDIS_CLUSTER_ADDRS` 第一版配置；route / resume 相关 multi-key pipeline 使用 Redis Cluster hash tag，identity revoke 查询避免跨 slot multi-key `EXISTS`。这只是 client / key-schema readiness，尚未跑真实 Redis Cluster topology smoke。
 - Resume buffer 重放已有回归测试固定 all-or-buffer-miss：新连接队列无法容纳全部待重放 notify 时，不做部分 replay，直接提示客户端用本地 cursor + `PullInbox` 校准。
 - `loadtest/pushgateway/run-local-smoke.ps1` 的通用 helper 已拆到同目录 `run-local-smoke.helpers.ps1`，脚本复杂度回到预算线内。
 - `loadtest/pushgateway` Go runner 已按 config / model / auth / scenario / util 同 package 拆分，避免后续 Redis route、slow-client、resume 和容量 smoke 继续堆进单个 `main.go`。
@@ -23,4 +24,4 @@
 
 ## 后续
 
-- Redis Cluster / 生产 HA 设计；长时间容量曲线和生产 sizing。
+- Redis Cluster 真实拓扑 smoke / 生产 HA 设计；长时间容量曲线和生产 sizing。

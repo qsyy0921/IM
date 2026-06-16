@@ -66,6 +66,26 @@ func TestLoadRedisClientConfigSentinel(t *testing.T) {
 	}
 }
 
+func TestLoadRedisClientConfigCluster(t *testing.T) {
+	t.Setenv("NEXUSIM_PUSH_REDIS_MODE", "cluster")
+	t.Setenv("NEXUSIM_PUSH_REDIS_CLUSTER_ADDRS", "10.0.0.1:6379, 10.0.0.2:6379")
+	t.Setenv("NEXUSIM_PUSH_REDIS_USERNAME", "redis-user")
+	t.Setenv("NEXUSIM_PUSH_REDIS_PASSWORD", "redis-pass")
+
+	config := loadRedisClientConfigFromEnv()
+	if config.Mode != "cluster" {
+		t.Fatalf("expected cluster mode, got %q", config.Mode)
+	}
+	if len(config.ClusterAddrs) != 2 ||
+		config.ClusterAddrs[0] != "10.0.0.1:6379" ||
+		config.ClusterAddrs[1] != "10.0.0.2:6379" {
+		t.Fatalf("unexpected cluster addrs: %#v", config.ClusterAddrs)
+	}
+	if config.Username != "redis-user" || config.Password != "redis-pass" {
+		t.Fatalf("unexpected redis auth: %q/%q", config.Username, config.Password)
+	}
+}
+
 func TestNewRedisUniversalClientValidatesSentinelConfig(t *testing.T) {
 	if _, err := newRedisUniversalClient(redisClientConfig{
 		Mode:               "sentinel",
@@ -93,10 +113,37 @@ func TestNewRedisUniversalClientValidatesSentinelConfig(t *testing.T) {
 	_ = client.Close()
 }
 
+func TestNewRedisUniversalClientValidatesClusterConfig(t *testing.T) {
+	if _, err := newRedisUniversalClient(redisClientConfig{
+		Mode: "cluster",
+	}); err == nil {
+		t.Fatalf("expected missing cluster addrs error")
+	}
+
+	if _, err := newRedisUniversalClient(redisClientConfig{
+		Mode:         "cluster",
+		ClusterAddrs: []string{"127.0.0.1:6379"},
+		DB:           2,
+	}); err == nil {
+		t.Fatalf("expected cluster db validation error")
+	}
+
+	client, err := newRedisUniversalClient(redisClientConfig{
+		Mode:         "cluster",
+		ClusterAddrs: []string{"127.0.0.1:6379", "127.0.0.1:6380"},
+		Username:     "redis-user",
+		Password:     "redis-pass",
+	})
+	if err != nil {
+		t.Fatalf("expected cluster client, got error: %v", err)
+	}
+	_ = client.Close()
+}
+
 func TestNewRedisUniversalClientRejectsUnsupportedMode(t *testing.T) {
-	if _, err := newRedisUniversalClient(redisClientConfig{Mode: "cluster"}); err == nil {
+	if _, err := newRedisUniversalClient(redisClientConfig{Mode: "unknown-mode"}); err == nil {
 		t.Fatalf("expected unsupported mode error")
-	} else if !strings.Contains(err.Error(), "cluster") {
+	} else if !strings.Contains(err.Error(), "unknown-mode") {
 		t.Fatalf("expected unsupported mode error to include mode value, got %v", err)
 	}
 }

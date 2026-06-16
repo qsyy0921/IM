@@ -135,6 +135,18 @@ NEXUSIM_PUSH_ROUTE_TTL=90s
 NEXUSIM_PUSH_ROUTE_CLEANUP_INTERVAL=30s
 ```
 
+Redis Cluster client mode 已支持第一版配置：
+
+```text
+NEXUSIM_PUSH_REDIS_MODE=cluster
+NEXUSIM_PUSH_REDIS_CLUSTER_ADDRS=127.0.0.1:7000,127.0.0.1:7001,127.0.0.1:7002
+NEXUSIM_PUSH_REDIS_USERNAME=
+NEXUSIM_PUSH_REDIS_PASSWORD=
+NEXUSIM_PUSH_REDIS_DB=0
+```
+
+Cluster mode 下 `NEXUSIM_PUSH_REDIS_DB` 必须保持 `0`。push-gateway 的 route / resume 相关 multi-key pipeline 已使用 hash tag，避免同一用户 route 或同一 resume token 的 key 落到不同 slot；identity revoke deny-list 查询也避免跨 slot multi-key `EXISTS`。当前这只代表 client / key-schema readiness，还没有跑真实 Redis Cluster topology smoke，也不代表生产级 Redis HA。
+
 Redis-backed resume 负向 smoke runner 已支持 `redis-resume-negative` 场景：
 
 ```powershell

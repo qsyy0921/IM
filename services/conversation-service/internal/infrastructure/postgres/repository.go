@@ -411,6 +411,8 @@ func canViewMemberChange(
 type listMembersPageToken struct {
 	Version     int      `json:"v"`
 	UserID      string   `json:"user_id"`
+	Role        string   `json:"role,omitempty"`
+	Sort        string   `json:"sort,omitempty"`
 	RoleFilter  string   `json:"role_filter"`
 	RoleFilters []string `json:"role_filters,omitempty"`
 }
@@ -429,8 +431,12 @@ func (r *Repository) ListConversationMembers(
 	if err != nil {
 		return types.ListConversationMembersResult{}, err
 	}
+	sort, err := types.NormalizeConversationMemberListSort(command.Sort)
+	if err != nil {
+		return types.ListConversationMembersResult{}, err
+	}
 	roleFilterValues := memberRolesToStrings(roleFilters)
-	lastUserID, err := decodeListMembersPageToken(command.PageToken, command.RoleFilter, roleFilterValues)
+	pageToken, hasPageToken, err := decodeListMembersPageToken(command.PageToken, command.RoleFilter, roleFilterValues, sort)
 	if err != nil {
 		return types.ListConversationMembersResult{}, err
 	}
@@ -473,7 +479,14 @@ WHERE c.tenant_id = $1
 	}
 
 	pageSize := command.EffectivePageSize()
-	rows, err := r.pool.Query(ctx, `
+	args := []any{
+		command.AuthContext.TenantID,
+		command.ConversationID,
+		command.RoleFilter,
+		roleFilterValues,
+		pageSize + 1,
+	}
+	query := `
 SELECT
     user_id,
     role,
@@ -489,10 +502,33 @@ WHERE tenant_id = $1
   AND status = 'ACTIVE'
   AND ($3 = '' OR role = $3)
   AND (cardinality($4::text[]) = 0 OR role = ANY($4::text[]))
-  AND ($5 = '' OR user_id > $5)
-ORDER BY user_id ASC
-LIMIT $6
-`, command.AuthContext.TenantID, command.ConversationID, command.RoleFilter, roleFilterValues, lastUserID, pageSize+1)
+`
+	if hasPageToken {
+		switch sort {
+		case types.ConversationMemberListSortRoleUserIDAsc:
+			query += `  AND (
+      CASE role WHEN 'OWNER' THEN 1 WHEN 'ADMIN' THEN 2 ELSE 3 END > $6
+      OR (CASE role WHEN 'OWNER' THEN 1 WHEN 'ADMIN' THEN 2 ELSE 3 END = $6 AND user_id > $7)
+  )
+`
+			args = append(args, memberRoleSortWeight(types.MemberRole(pageToken.Role)), pageToken.UserID)
+		default:
+			query += `  AND user_id > $6
+`
+			args = append(args, pageToken.UserID)
+		}
+	}
+	switch sort {
+	case types.ConversationMemberListSortRoleUserIDAsc:
+		query += `ORDER BY CASE role WHEN 'OWNER' THEN 1 WHEN 'ADMIN' THEN 2 ELSE 3 END ASC, user_id ASC
+LIMIT $5
+`
+	default:
+		query += `ORDER BY user_id ASC
+LIMIT $5
+`
+	}
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return types.ListConversationMembersResult{}, types.NewDBReadFailed(err.Error())
 	}
@@ -520,7 +556,7 @@ LIMIT $6
 	}
 	if len(members) > pageSize {
 		page := members[:pageSize]
-		nextToken, err := encodeListMembersPageToken(page[len(page)-1].UserID, command.RoleFilter, roleFilterValues)
+		nextToken, err := encodeListMembersPageToken(page[len(page)-1], command.RoleFilter, roleFilterValues, sort)
 		if err != nil {
 			return types.ListConversationMembersResult{}, types.NewDBReadFailed(err.Error())
 		}
@@ -532,43 +568,61 @@ LIMIT $6
 	return result, nil
 }
 
-func decodeListMembersPageToken(token string, roleFilter types.MemberRole, roleFilters []string) (string, error) {
+func decodeListMembersPageToken(token string, roleFilter types.MemberRole, roleFilters []string, sort string) (listMembersPageToken, bool, error) {
 	if token == "" {
-		return "", nil
+		return listMembersPageToken{}, false, nil
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(token)
 	if err != nil {
-		return "", types.NewInvalidArgument("page_token is invalid")
+		return listMembersPageToken{}, false, types.NewInvalidArgument("page_token is invalid")
 	}
 	var decoded listMembersPageToken
 	if err := json.Unmarshal(payload, &decoded); err != nil {
-		return "", types.NewInvalidArgument("page_token is invalid")
+		return listMembersPageToken{}, false, types.NewInvalidArgument("page_token is invalid")
 	}
 	if decoded.Version == 1 {
-		if roleFilter != "" || len(roleFilters) != 0 || decoded.UserID == "" {
-			return "", types.NewInvalidArgument("page_token is invalid")
+		if sort != types.ConversationMemberListSortUserIDAsc || roleFilter != "" || len(roleFilters) != 0 || decoded.UserID == "" {
+			return listMembersPageToken{}, false, types.NewInvalidArgument("page_token is invalid")
 		}
-		return decoded.UserID, nil
+		return decoded, true, nil
 	}
 	if decoded.Version == 2 {
-		if decoded.UserID == "" || decoded.RoleFilter != string(roleFilter) || len(roleFilters) != 0 {
-			return "", types.NewInvalidArgument("page_token is invalid")
+		if sort != types.ConversationMemberListSortUserIDAsc ||
+			decoded.UserID == "" ||
+			decoded.RoleFilter != string(roleFilter) ||
+			len(roleFilters) != 0 {
+			return listMembersPageToken{}, false, types.NewInvalidArgument("page_token is invalid")
 		}
-		return decoded.UserID, nil
+		return decoded, true, nil
 	}
-	if decoded.Version != 3 ||
+	if decoded.Version == 3 {
+		if sort != types.ConversationMemberListSortUserIDAsc ||
+			decoded.UserID == "" ||
+			decoded.RoleFilter != string(roleFilter) ||
+			!sameStringSlice(decoded.RoleFilters, roleFilters) {
+			return listMembersPageToken{}, false, types.NewInvalidArgument("page_token is invalid")
+		}
+		return decoded, true, nil
+	}
+	if decoded.Version != 4 ||
 		decoded.UserID == "" ||
+		decoded.Sort != sort ||
 		decoded.RoleFilter != string(roleFilter) ||
 		!sameStringSlice(decoded.RoleFilters, roleFilters) {
-		return "", types.NewInvalidArgument("page_token is invalid")
+		return listMembersPageToken{}, false, types.NewInvalidArgument("page_token is invalid")
 	}
-	return decoded.UserID, nil
+	if sort == types.ConversationMemberListSortRoleUserIDAsc && memberRoleSortWeight(types.MemberRole(decoded.Role)) == 0 {
+		return listMembersPageToken{}, false, types.NewInvalidArgument("page_token is invalid")
+	}
+	return decoded, true, nil
 }
 
-func encodeListMembersPageToken(userID types.UserID, roleFilter types.MemberRole, roleFilters []string) (string, error) {
+func encodeListMembersPageToken(member types.ConversationMember, roleFilter types.MemberRole, roleFilters []string, sort string) (string, error) {
 	payload, err := json.Marshal(listMembersPageToken{
-		Version:     3,
-		UserID:      string(userID),
+		Version:     4,
+		UserID:      string(member.UserID),
+		Role:        string(member.Role),
+		Sort:        sort,
 		RoleFilter:  string(roleFilter),
 		RoleFilters: roleFilters,
 	})
@@ -584,6 +638,19 @@ func memberRolesToStrings(roles []types.MemberRole) []string {
 		values = append(values, string(role))
 	}
 	return values
+}
+
+func memberRoleSortWeight(role types.MemberRole) int {
+	switch role {
+	case types.MemberRoleOwner:
+		return 1
+	case types.MemberRoleAdmin:
+		return 2
+	case types.MemberRoleMember:
+		return 3
+	default:
+		return 0
+	}
 }
 
 func sameStringSlice(left []string, right []string) bool {

@@ -658,6 +658,7 @@ func TestListConversationMembersConvertsRequestAndResponse(t *testing.T) {
 			conversationv1.MemberRole_MEMBER_ROLE_OWNER,
 			conversationv1.MemberRole_MEMBER_ROLE_ADMIN,
 		},
+		Sort: conversationv1.ConversationMemberListSort_CONVERSATION_MEMBER_LIST_SORT_ROLE_USER_ID_ASC,
 	})
 	if err != nil {
 		t.Fatalf("list conversation members: %v", err)
@@ -672,6 +673,7 @@ func TestListConversationMembersConvertsRequestAndResponse(t *testing.T) {
 		executor.command.PageSize != 50 ||
 		executor.command.PageToken != "page-token" ||
 		executor.command.RoleFilter != types.MemberRoleAdmin ||
+		executor.command.Sort != types.ConversationMemberListSortRoleUserIDAsc ||
 		!memberRolesEqual(executor.command.RoleFilters, []types.MemberRole{types.MemberRoleOwner, types.MemberRoleAdmin}) {
 		t.Fatalf("unexpected command: %+v", executor.command)
 	}

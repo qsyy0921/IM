@@ -143,6 +143,12 @@ message GetMemberChangeResponse {
   string last_error = 14;
 }
 
+enum ConversationMemberListSort {
+  CONVERSATION_MEMBER_LIST_SORT_UNSPECIFIED = 0;
+  CONVERSATION_MEMBER_LIST_SORT_USER_ID_ASC = 1;
+  CONVERSATION_MEMBER_LIST_SORT_ROLE_USER_ID_ASC = 2;
+}
+
 message ListConversationMembersRequest {
   AuthContext auth_context = 1;
   string conversation_id = 2;
@@ -150,6 +156,7 @@ message ListConversationMembersRequest {
   string page_token = 4;
   MemberRole role_filter = 5;
   repeated MemberRole role_filters = 6;
+  ConversationMemberListSort sort = 7;
 }
 
 message ConversationMember {

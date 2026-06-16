@@ -287,6 +287,57 @@ INSERT INTO conversation_members (
 		t.Fatalf("unexpected admin members: %+v", adminOnly.Members)
 	}
 
+	roleFirstPage, err := repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-list",
+		PageSize:       2,
+		Sort:           types.ConversationMemberListSortRoleUserIDAsc,
+	})
+	if err != nil {
+		t.Fatalf("list role-sorted first page: %v", err)
+	}
+	if len(roleFirstPage.Members) != 2 ||
+		roleFirstPage.Members[0].UserID != "owner-1" ||
+		roleFirstPage.Members[1].UserID != "admin-1" ||
+		roleFirstPage.NextPageToken == "" {
+		t.Fatalf("unexpected role-sorted first page: %+v", roleFirstPage)
+	}
+	roleSecondPage, err := repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-list",
+		PageSize:       2,
+		PageToken:      roleFirstPage.NextPageToken,
+		Sort:           types.ConversationMemberListSortRoleUserIDAsc,
+	})
+	if err != nil {
+		t.Fatalf("list role-sorted second page: %v", err)
+	}
+	if len(roleSecondPage.Members) != 2 ||
+		roleSecondPage.Members[0].UserID != "member-1" ||
+		roleSecondPage.Members[1].UserID != "member-2" ||
+		roleSecondPage.NextPageToken != "" {
+		t.Fatalf("unexpected role-sorted second page: %+v", roleSecondPage)
+	}
+	_, err = repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-list",
+		PageSize:       2,
+		PageToken:      roleFirstPage.NextPageToken,
+		Sort:           types.ConversationMemberListSortUserIDAsc,
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid cursor when sort changes, got %v", err)
+	}
+
 	privilegedFirstPage, err := repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
 		AuthContext: types.AuthContext{
 			TenantID: "tenant-list",

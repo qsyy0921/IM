@@ -17,6 +17,7 @@ type ListConversationMembersCommand struct {
 	PageToken      string
 	RoleFilter     MemberRole
 	RoleFilters    []MemberRole
+	Sort           string
 }
 
 func (c ListConversationMembersCommand) Validate() error {
@@ -41,6 +42,9 @@ func (c ListConversationMembersCommand) Validate() error {
 	if _, err := NormalizeListMemberRoleFilters(c.RoleFilters); err != nil {
 		return err
 	}
+	if _, err := NormalizeConversationMemberListSort(c.Sort); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -49,6 +53,23 @@ func (c ListConversationMembersCommand) EffectivePageSize() int {
 		return DefaultConversationMembersPageSize
 	}
 	return c.PageSize
+}
+
+const (
+	ConversationMemberListSortUserIDAsc     = "user_id_asc"
+	ConversationMemberListSortRoleUserIDAsc = "role_user_id_asc"
+)
+
+func NormalizeConversationMemberListSort(sort string) (string, error) {
+	if sort == "" {
+		return ConversationMemberListSortUserIDAsc, nil
+	}
+	switch sort {
+	case ConversationMemberListSortUserIDAsc, ConversationMemberListSortRoleUserIDAsc:
+		return sort, nil
+	default:
+		return "", NewInvalidArgument("member list sort is invalid")
+	}
 }
 
 func isValidListMemberRoleFilter(role MemberRole) bool {

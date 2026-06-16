@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-- 已有 `GetSendContext`、`CreateMemberChange`、`GetMemberChange`、`ListConversationMembers` 当前 ACTIVE roster 分页 / legacy 单 role 和多 role OR 过滤、owner transfer。
+- 已有 `GetSendContext`、`CreateMemberChange`、`GetMemberChange`、`ListConversationMembers` 当前 ACTIVE roster 分页 / legacy 单 role 和多 role OR 过滤 / `USER_ID_ASC` 与 `ROLE_USER_ID_ASC` 排序、owner transfer。
 - 成员变更走 shared timeline/outbox，保持 `conversation_seq` 顺序。
 - 是会话成员事实源，其它服务不要跨表读取 `conversation_members`。
 - 已补第一阶段本地观测：`/healthz`、`/readyz`、`/debug/metrics` 和 Prometheus text `/metrics`，包含低敏 gRPC、PG pool、`conversations` / `conversation_members` / `member_change_saga` 聚合快照；debug HTTP 监听默认只允许 loopback / 私网，公网或未指定地址必须显式 `NEXUSIM_CONVERSATION_DEBUG_ALLOW_PUBLIC=true`。

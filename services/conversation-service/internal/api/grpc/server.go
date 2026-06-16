@@ -249,6 +249,7 @@ func (s *Server) ListConversationMembers(
 		PageToken:      request.GetPageToken(),
 		RoleFilter:     fromProtoMemberRole(request.GetRoleFilter()),
 		RoleFilters:    fromProtoMemberRoles(request.GetRoleFilters()),
+		Sort:           fromProtoConversationMemberListSort(request.GetSort()),
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -390,6 +391,17 @@ func fromProtoMemberRoles(values []conversationv1.MemberRole) []types.MemberRole
 		roles = append(roles, fromProtoMemberRole(value))
 	}
 	return roles
+}
+
+func fromProtoConversationMemberListSort(value conversationv1.ConversationMemberListSort) string {
+	switch value {
+	case conversationv1.ConversationMemberListSort_CONVERSATION_MEMBER_LIST_SORT_USER_ID_ASC:
+		return types.ConversationMemberListSortUserIDAsc
+	case conversationv1.ConversationMemberListSort_CONVERSATION_MEMBER_LIST_SORT_ROLE_USER_ID_ASC:
+		return types.ConversationMemberListSortRoleUserIDAsc
+	default:
+		return ""
+	}
 }
 
 func toProtoMemberRole(value types.MemberRole) conversationv1.MemberRole {

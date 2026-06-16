@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"math"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -184,6 +185,75 @@ func assertMetadataValue(t *testing.T, md metadata.MD, key string, want string) 
 	values := md.Get(key)
 	if len(values) != 1 || values[0] != want {
 		t.Fatalf("metadata %s = %v, want [%s]", key, values, want)
+	}
+}
+
+func TestBuildCapacitySummary(t *testing.T) {
+	started := time.Date(2026, 6, 16, 10, 0, 0, 0, time.UTC)
+	s := summary{
+		GatewayFacade:   true,
+		GatewayAuthMode: "hmac",
+		StartedAt:       started,
+		FinishedAt:      started.Add(2 * time.Second),
+		ServerHello:     serverFrame{Op: opServerHello},
+		MemberJoin:      memberJoinSummary{ChangeID: "change-1", BoundarySeq: 1},
+		SendMessage:     sendSummary{MessageID: "msg-1", ConversationSeq: 2},
+		Notify:          serverFrame{Op: opDeliveryNotify, ConversationSeq: 2},
+		PullInbox:       pullSummary{ItemCount: 1, MaxSeq: 2},
+		WebSocketAck:    serverFrame{Op: opDeliveryAckOK, LastReceivedSeq: 2},
+		MarkRead:        markReadSummary{LastReadSeq: 2},
+		ListBeforeRead: conversationListSummary{
+			ItemCount: 1,
+			Items: []conversationSummaryItem{
+				{ConversationID: "conv-1", LastVisibleSeq: 2, UnreadCount: 1},
+			},
+		},
+		ListAfterRead: conversationListSummary{
+			ItemCount: 1,
+			Items: []conversationSummaryItem{
+				{ConversationID: "conv-1", LastVisibleSeq: 2, UnreadCount: 0},
+			},
+		},
+		Postgres:         postgresSummary{UserInboxCount: 1, UserConversationSummaries: 1},
+		PolicyAuditKafka: &policyAuditKafkaSummary{EventCount: 1},
+	}
+
+	capacity := buildCapacitySummary(s)
+	if capacity == nil {
+		t.Fatal("expected capacity summary")
+	}
+	if !capacity.GatewayFacade || capacity.GatewayAuthMode != "hmac" {
+		t.Fatalf("unexpected gateway fields: %+v", capacity)
+	}
+	if capacity.UserFacingOperationCount != 7 {
+		t.Fatalf("operation count = %d, want 7", capacity.UserFacingOperationCount)
+	}
+	if capacity.WebSocketFrameCount != 3 {
+		t.Fatalf("websocket frame count = %d, want 3", capacity.WebSocketFrameCount)
+	}
+	if capacity.ItemsPulled != 1 || capacity.MaxConversationSeq != 2 {
+		t.Fatalf("unexpected inbox/seq fields: %+v", capacity)
+	}
+	if capacity.UnreadBeforeRead != 1 || capacity.UnreadAfterRead != 0 {
+		t.Fatalf("unexpected unread fields: %+v", capacity)
+	}
+	if capacity.PostgresUserInboxCount != 1 || capacity.PostgresSummaryCount != 1 || capacity.PolicyAuditKafkaEvents != 1 {
+		t.Fatalf("unexpected aggregate fields: %+v", capacity)
+	}
+	assertFloatNear(t, capacity.OperationsPerSecond, 3.5)
+}
+
+func TestBuildCapacitySummaryRequiresPositiveDuration(t *testing.T) {
+	now := time.Date(2026, 6, 16, 10, 0, 0, 0, time.UTC)
+	if capacity := buildCapacitySummary(summary{StartedAt: now, FinishedAt: now}); capacity != nil {
+		t.Fatalf("expected nil capacity for zero duration, got %+v", capacity)
+	}
+}
+
+func assertFloatNear(t *testing.T, got float64, want float64) {
+	t.Helper()
+	if math.Abs(got-want) > 0.000001 {
+		t.Fatalf("float = %f, want %f", got, want)
 	}
 }
 

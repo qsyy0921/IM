@@ -16,7 +16,8 @@
 - `ADR-033` 已固定 tenant quota source 边界：api-gateway 不直接读业务内部表；`url` source 只消费版本化 snapshot，可选 bearer token 且 bearer mode 强制 HTTPS，并支持 URL source 专用 CA / client cert 和强制 checksum；后续完整配置中心 / DB-backed quota 必须通过控制面 / 配置契约。
 - tenant quota source / snapshot / reload helper 已从 `cmd/api-gateway/main.go` 拆到同 package 文件，composition root 继续负责 wiring，避免继续堆大文件。
 - cmd 层 rate-limit / tenant-plan 配置测试已从 `main_test.go` 拆到同 package `rate_limit_config_test.go`，保留原启动配置覆盖，同时降低单个测试文件复杂度。
+- `loadtest/demo --gateway-facade` summary 已输出 `capacity_summary`，包含 GatewayService facade 标记、gateway auth mode、端到端用户侧操作数、WebSocket frame 数、PullInbox item 数、最大 conversation seq、read 前后 unread、PG 聚合和 policy audit Kafka readback 数；后续 api-gateway 容量验证可复用该结构。
 
 ## 后续
 
-- 采样治理 hardening、统一 OTel collector / alerting / dashboard、在目标环境持续运行 legacy quiet-window observation 并最终删除 legacy descriptor 代码、完整配置中心 quota source hardening。
+- 采样治理 hardening、统一 OTel collector / alerting / dashboard、在目标环境持续运行 legacy quiet-window observation 并最终删除 legacy descriptor 代码、完整配置中心 quota source hardening、基于 `loadtest/demo --gateway-facade` `capacity_summary` 的容量基线实跑。

@@ -23,13 +23,13 @@
    现有 public listener、mock auth、metadata auth、verified metadata、TLS / mTLS allowlist 已纳入 `tools/check-local.ps1`；后续新增 listener / 服务时必须同步门禁和服务级测试。
 
 5. 容量和复杂度治理：
-   已有 9 服务健康态 Docker resource snapshot 入口、摘要工具、文件大小 hotspot summary，且 identity-service / conversation-service / message-service / delivery-service / push-gateway / receipt-service / contacts-service / policy-service loadtest runner 已能输出 `capacity_summary`。仍需补各服务容量基线实跑、瓶颈和资源曲线。生产手写文件接近 2500 行、测试或 runner 接近 3000 行时继续同 package 拆分。
+   已有 9 服务健康态 Docker resource snapshot 入口、摘要工具、文件大小 hotspot summary；9 个服务均已有可复用 `capacity_summary` 口径，其中 api-gateway 通过 `loadtest/demo --gateway-facade` 统计 GatewayService facade 端到端容量，其余服务通过对应 loadtest runner 统计。仍需补各服务容量基线实跑、瓶颈和资源曲线。生产手写文件接近 2500 行、测试或 runner 接近 3000 行时继续同 package 拆分。
 
 ## 逐服务未完成工作
 
 | 服务 | 未完成工作 |
 | --- | --- |
-| `api-gateway` | 目标环境 legacy quiet-window observation；legacy descriptor 移除计划；完整配置中心 / DB-backed quota hardening；生产级 collector / alerting / dashboard。 |
+| `api-gateway` | 目标环境 legacy quiet-window observation；legacy descriptor 移除计划；完整配置中心 / DB-backed quota hardening；生产级 collector / alerting / dashboard；基于 `loadtest/demo --gateway-facade` `capacity_summary` 的容量基线实跑。 |
 | `identity-service` | WebAuthn/passkeys；OIDC；多 issuer；KMS/HSM；完整风控；生产级 email/SMS provider；租户级通知模板；bounce handling；基于 `capacity_summary` 的容量基线实跑。 |
 | `message-service` | 会话级删除策略深化；合规删除；基于 `capacity_summary` 的容量基线实跑；发送链路生产观测；图片 / 文件 / 语音二进制上传处理后续由 media 能力承担。 |
 | `conversation-service` | 更完整群管理；owner transfer 策略继续打磨；成员窗口历史 repair / repair action；基于 `capacity_summary` 的容量基线实跑。 |

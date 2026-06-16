@@ -145,6 +145,8 @@ go run ./services/delivery-service/cmd/delivery-service
 | `tenant-privacy-default-set` | 设置租户联系人隐私默认值；可选 `NEXUSIM_CONTACTS_TENANT_PRIVACY_SET_OUTPUT` 写低敏 JSON 结果。 |
 | `source-policy-audit` | 只读审计联系人来源策略；可选 `NEXUSIM_CONTACTS_SOURCE_POLICY_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
 | `source-policy-set` | 设置联系人来源策略；可选 `NEXUSIM_CONTACTS_SOURCE_POLICY_SET_OUTPUT` 写低敏 JSON 结果。 |
+| `contact-request-review` | 审批 `REVIEW_REQUIRED` 联系人申请；可选 `NEXUSIM_CONTACTS_REQUEST_REVIEW_OUTPUT` 写低敏 JSON 结果，只写 reason-present，不写审核 reason 原文。 |
+| `contact-request-review-audit` | 只读导出联系人申请审核审计；按 tenant / request / operator / decision / next_status / risk_level 过滤；可选 `NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_OUTPUT` 写低敏 JSON 结果，只写 reason-present，不写审核 reason 原文。 |
 
 这些仍是本地 operator 形态；后续 admin/config service 接入后，应迁移到正式权限面和审批流。
 

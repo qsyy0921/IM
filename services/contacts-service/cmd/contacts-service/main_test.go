@@ -359,6 +359,14 @@ func TestRunDispatchesContactRequestReviewMode(t *testing.T) {
 	}
 }
 
+func TestRunDispatchesContactRequestReviewAuditMode(t *testing.T) {
+	t.Setenv("NEXUSIM_CONTACTS_SERVICE_MODE", "contact-request-review-audit")
+	err := run()
+	if err == nil || !strings.Contains(err.Error(), "NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_TENANT_ID is required") {
+		t.Fatalf("expected contact request review audit mode validation, got %v", err)
+	}
+}
+
 func TestEnvRequiredBool(t *testing.T) {
 	t.Setenv("NEXUSIM_CONTACTS_TEST_BOOL", "true")
 	parsed, err := envRequiredBool("NEXUSIM_CONTACTS_TEST_BOOL")

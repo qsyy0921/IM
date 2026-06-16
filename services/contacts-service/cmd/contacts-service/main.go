@@ -38,7 +38,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_CONTACTS_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("contacts-service runtime wiring is idle; set NEXUSIM_CONTACTS_SERVICE_MODE=grpc, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, tenant-privacy-default-audit, tenant-privacy-default-set, source-policy-audit, source-policy-set, or contact-request-review")
+		log.Println("contacts-service runtime wiring is idle; set NEXUSIM_CONTACTS_SERVICE_MODE=grpc, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, tenant-privacy-default-audit, tenant-privacy-default-set, source-policy-audit, source-policy-set, contact-request-review, or contact-request-review-audit")
 		return nil
 	case "grpc":
 		return runGRPC()
@@ -62,6 +62,8 @@ func run() error {
 		return runSourcePolicySet()
 	case "contact-request-review":
 		return runContactRequestReview()
+	case "contact-request-review-audit":
+		return runContactRequestReviewAudit()
 	default:
 		return errors.New("unsupported NEXUSIM_CONTACTS_SERVICE_MODE")
 	}
@@ -644,6 +646,56 @@ func runContactRequestReview() error {
 	)
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_CONTACTS_REQUEST_REVIEW_OUTPUT")); outputPath != "" {
 		if err := writeContactRequestReviewOutput(outputPath, result, operator, reason != ""); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runContactRequestReviewAudit() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	tenantID := envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_TENANT_ID", "")
+	if tenantID == "" {
+		return errors.New("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_TENANT_ID is required")
+	}
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	rows, err := postgresinfra.NewRepository(pool).AuditContactRequestReviews(ctx, postgresinfra.ContactRequestReviewAuditOptions{
+		TenantID:   tenantID,
+		RequestID:  envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_REQUEST_ID", ""),
+		Operator:   envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_OPERATOR", ""),
+		Decision:   envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_DECISION", ""),
+		NextStatus: envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_NEXT_STATUS", ""),
+		RiskLevel:  envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_RISK_LEVEL", ""),
+		Limit:      envInt("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_LIMIT", 20),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("contacts-service contact request review audit completed rows=%d", len(rows))
+	for _, row := range rows {
+		log.Printf(
+			"contacts_request_review audit_id=%d tenant_id=%s request_id=%s decision=%s previous_status=%s next_status=%s operator=%s reason_present=%t risk_level=%s review_required=%t reviewed_at=%s",
+			row.AuditID,
+			row.TenantID,
+			row.RequestID,
+			row.Decision,
+			row.PreviousStatus,
+			row.NextStatus,
+			row.Operator,
+			row.ReasonPresent,
+			row.RiskLevel,
+			row.ReviewRequired,
+			row.ReviewedAt.Format(time.RFC3339),
+		)
+	}
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_OUTPUT")); outputPath != "" {
+		if err := writeContactRequestReviewAuditOutput(outputPath, rows); err != nil {
 			return err
 		}
 	}

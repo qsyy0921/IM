@@ -476,6 +476,79 @@ func TestRepositoryReviewContactRequestDeclineIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryAuditContactRequestReviewsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	if _, err := repository.SetTenantContactRequestSourcePolicy(ctx, types.SetTenantContactRequestSourcePolicyCommand{
+		TenantID:             "tenant-contacts",
+		SourceType:           types.ContactRequestSourceTypeQRCode,
+		AllowContactRequests: true,
+		RiskLevel:            types.ContactRequestRiskLevelHigh,
+		ReviewRequired:       true,
+	}); err != nil {
+		t.Fatalf("set qr code source policy: %v", err)
+	}
+	command := sendCommand("alice", "bob", "send-review-audit", "hello")
+	command.SourceType = types.ContactRequestSourceTypeQRCode
+	command.SourceRef = "qr:campaign-1"
+	sendResult, err := repository.SendContactRequest(ctx, command)
+	if err != nil {
+		t.Fatalf("send review required request: %v", err)
+	}
+	if _, err := repository.ReviewContactRequest(ctx, types.ReviewContactRequestCommand{
+		TenantID:  "tenant-contacts",
+		RequestID: sendResult.RequestID,
+		Decision:  types.ContactRequestReviewDecisionApprove,
+		Operator:  "operator-audit",
+		Reason:    "internal source risk reviewed",
+	}); err != nil {
+		t.Fatalf("review contact request: %v", err)
+	}
+
+	rows, err := repository.AuditContactRequestReviews(ctx, ContactRequestReviewAuditOptions{
+		TenantID:   "tenant-contacts",
+		RequestID:  sendResult.RequestID,
+		Operator:   "operator-audit",
+		Decision:   "approve",
+		NextStatus: "pending",
+		RiskLevel:  "high",
+		Limit:      10,
+	})
+	if err != nil {
+		t.Fatalf("audit contact request reviews: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one review audit row, got %+v", rows)
+	}
+	row := rows[0]
+	if row.TenantID != "tenant-contacts" ||
+		row.RequestID != sendResult.RequestID ||
+		row.PreviousStatus != string(types.ContactRequestStatusReviewRequired) ||
+		row.NextStatus != string(types.ContactRequestStatusPending) ||
+		row.Decision != string(types.ContactRequestReviewDecisionApprove) ||
+		row.Operator != "operator-audit" ||
+		row.RiskLevel != string(types.ContactRequestRiskLevelHigh) ||
+		!row.ReasonPresent ||
+		!row.ReviewRequired {
+		t.Fatalf("unexpected review audit row: %+v", row)
+	}
+
+	declinedRows, err := repository.AuditContactRequestReviews(ctx, ContactRequestReviewAuditOptions{
+		TenantID: "tenant-contacts",
+		Decision: "DECLINE",
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("audit declined contact request reviews: %v", err)
+	}
+	if len(declinedRows) != 0 {
+		t.Fatalf("expected no declined review audit rows, got %+v", declinedRows)
+	}
+}
+
 func TestRepositorySetContactPrivacyBlocksIncomingRequestsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

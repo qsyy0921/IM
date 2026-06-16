@@ -1,50 +1,49 @@
 package main
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/qsyy0921/IM/services/contacts-service/internal/types"
+	postgresinfra "github.com/qsyy0921/IM/services/contacts-service/internal/infrastructure/postgres"
 )
 
-func TestWriteContactRequestReviewOutput(t *testing.T) {
-	outputPath := filepath.Join(t.TempDir(), "review", "result.json")
-	result := types.ReviewContactRequestResult{
+func TestWriteContactRequestReviewAuditOutputOmitsReasonText(t *testing.T) {
+	outputPath := filepath.Join(t.TempDir(), "review-audit.json")
+	rows := []postgresinfra.ContactRequestReviewAuditRow{{
+		AuditID:        7,
+		TenantID:       "tenant-contacts",
 		RequestID:      "request-1",
-		TenantID:       "tenant-1",
-		SenderUserID:   "alice",
-		ReceiverUserID: "bob",
-		PreviousStatus: types.ContactRequestStatusReviewRequired,
-		Status:         types.ContactRequestStatusPending,
-		Decision:       types.ContactRequestReviewDecisionApprove,
-		RiskLevel:      types.ContactRequestRiskLevelHigh,
+		PreviousStatus: "REVIEW_REQUIRED",
+		NextStatus:     "PENDING",
+		Decision:       "APPROVE",
+		Operator:       "operator-1",
+		ReasonPresent:  true,
+		RiskLevel:      "HIGH",
 		ReviewRequired: true,
-	}
-	if err := writeContactRequestReviewOutput(outputPath, result, "operator-1", true); err != nil {
-		t.Fatalf("writeContactRequestReviewOutput() error = %v", err)
+		ReviewedAt:     time.Unix(100, 0).UTC(),
+	}}
+
+	if err := writeContactRequestReviewAuditOutput(outputPath, rows); err != nil {
+		t.Fatalf("write review audit output: %v", err)
 	}
 	raw, err := os.ReadFile(outputPath)
 	if err != nil {
-		t.Fatalf("read output: %v", err)
+		t.Fatalf("read review audit output: %v", err)
 	}
-	var output contactRequestReviewOutput
-	if err := json.Unmarshal(raw, &output); err != nil {
-		t.Fatalf("unmarshal output: %v", err)
+	text := string(raw)
+	for _, want := range []string{
+		`"count": 1`,
+		`"request_id": "request-1"`,
+		`"reason_present": true`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("expected output to contain %s, got %s", want, text)
+		}
 	}
-	if output.RequestID != "request-1" ||
-		output.PreviousStatus != "REVIEW_REQUIRED" ||
-		output.Status != "PENDING" ||
-		output.Decision != "APPROVE" ||
-		output.RiskLevel != "HIGH" ||
-		!output.ReviewRequired ||
-		output.Operator != "operator-1" ||
-		!output.ReasonPresent {
-		t.Fatalf("unexpected contact request review output: %+v", output)
-	}
-	if strings.Contains(string(raw), "source risk rejected") {
-		t.Fatalf("review output must not expose raw reason")
+	if strings.Contains(text, `"reason":`) || strings.Contains(text, "internal source risk reviewed") {
+		t.Fatalf("expected output to omit review reason field, got %s", text)
 	}
 }

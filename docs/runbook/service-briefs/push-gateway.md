@@ -16,6 +16,7 @@
 - Redis route 续约连续失败达到阈值后会主动踢掉本地 session，避免 route TTL 失效后仍长时间假装在线；客户端改走重连 + `PullInbox` fallback。
 - Resume buffer 重放已有回归测试固定 all-or-buffer-miss：新连接队列无法容纳全部待重放 notify 时，不做部分 replay，直接提示客户端用本地 cursor + `PullInbox` 校准。
 - `loadtest/pushgateway/run-local-smoke.ps1` 的通用 helper 已拆到同目录 `run-local-smoke.helpers.ps1`，脚本复杂度回到预算线内。
+- `loadtest/pushgateway` Go runner 已按 config / model / auth / scenario / util 同 package 拆分，避免后续 Redis route、slow-client、resume 和容量 smoke 继续堆进单个 `main.go`。
 - 本地 smoke 已覆盖 Redis stop/start、Sentinel discovery、手动 failover、master-stop、quorum-loss fallback 和 network-partition fallback；network-partition 场景会断开 Sentinel 当前 master 的 Docker network，并验证 `delivery.notify` 超时后 `PullInbox + AckDelivery` 兜底。Redis Cluster 和生产级 HA 仍未完成。
 
 ## 后续

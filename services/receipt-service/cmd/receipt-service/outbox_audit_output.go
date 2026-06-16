@@ -11,6 +11,7 @@ import (
 
 type outboxAuditOutput struct {
 	GeneratedAt string                 `json:"generated_at"`
+	Filters     map[string]string      `json:"filters,omitempty"`
 	Rows        []outboxAuditOutputRow `json:"rows"`
 }
 
@@ -31,9 +32,10 @@ type outboxAuditOutputRow struct {
 	CreatedAt        string `json:"created_at"`
 }
 
-func writeOutboxAuditOutput(path string, rows []postgresinfra.OutboxAuditRow) error {
+func writeOutboxAuditOutput(path string, rows []postgresinfra.OutboxAuditRow, filters map[string]string) error {
 	output := outboxAuditOutput{
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		Filters:     compactCleanupFilters(filters),
 		Rows:        make([]outboxAuditOutputRow, 0, len(rows)),
 	}
 	for _, row := range rows {

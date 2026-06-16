@@ -36,6 +36,10 @@ func TestWriteOutboxAuditOutput(t *testing.T) {
 			DeadLetteredAt:   &deadLetteredAt,
 			CreatedAt:        createdAt,
 		},
+	}, map[string]string{
+		"event_id":     "event-1",
+		"tenant_id":    "tenant-a",
+		"aggregate_id": "",
 	})
 	if err != nil {
 		t.Fatalf("write outbox audit output: %v", err)
@@ -51,6 +55,12 @@ func TestWriteOutboxAuditOutput(t *testing.T) {
 	}
 	if output.GeneratedAt == "" || len(output.Rows) != 1 {
 		t.Fatalf("unexpected output header: %+v", output)
+	}
+	if output.Filters["event_id"] != "event-1" || output.Filters["tenant_id"] != "tenant-a" {
+		t.Fatalf("unexpected filters: %+v", output.Filters)
+	}
+	if _, ok := output.Filters["aggregate_id"]; ok {
+		t.Fatalf("empty filter should be compacted: %+v", output.Filters)
 	}
 	row := output.Rows[0]
 	if row.ID != 42 ||

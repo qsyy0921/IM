@@ -327,17 +327,23 @@ func runOutboxAudit() error {
 	defer pool.Close()
 
 	var outboxID *int64
-	if value := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_OUTBOX_AUDIT_OUTBOX_ID")); value != "" {
+	outboxIDFilter := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_OUTBOX_AUDIT_OUTBOX_ID"))
+	if outboxIDFilter != "" {
 		parsed := envInt64AllowZero("NEXUSIM_DELIVERY_OUTBOX_AUDIT_OUTBOX_ID", 0)
 		outboxID = &parsed
 	}
+	eventID := envString("NEXUSIM_DELIVERY_OUTBOX_AUDIT_EVENT_ID", "")
+	tenantID := envString("NEXUSIM_DELIVERY_OUTBOX_AUDIT_TENANT_ID", "")
+	conversationID := envString("NEXUSIM_DELIVERY_OUTBOX_AUDIT_CONVERSATION_ID", "")
+	status := envString("NEXUSIM_DELIVERY_OUTBOX_AUDIT_STATUS", "")
+	eventType := envString("NEXUSIM_DELIVERY_OUTBOX_AUDIT_EVENT_TYPE", "")
 	rows, err := postgresinfra.NewOutboxStore(pool).AuditOutbox(ctx, postgresinfra.OutboxAuditOptions{
 		OutboxID:       outboxID,
-		EventID:        envString("NEXUSIM_DELIVERY_OUTBOX_AUDIT_EVENT_ID", ""),
-		TenantID:       envString("NEXUSIM_DELIVERY_OUTBOX_AUDIT_TENANT_ID", ""),
-		ConversationID: envString("NEXUSIM_DELIVERY_OUTBOX_AUDIT_CONVERSATION_ID", ""),
-		Status:         envString("NEXUSIM_DELIVERY_OUTBOX_AUDIT_STATUS", ""),
-		EventType:      envString("NEXUSIM_DELIVERY_OUTBOX_AUDIT_EVENT_TYPE", ""),
+		EventID:        eventID,
+		TenantID:       tenantID,
+		ConversationID: conversationID,
+		Status:         status,
+		EventType:      eventType,
 		Limit:          envInt("NEXUSIM_DELIVERY_OUTBOX_AUDIT_LIMIT", 20),
 	})
 	if err != nil {
@@ -362,7 +368,14 @@ func runOutboxAudit() error {
 		)
 	}
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_OUTBOX_AUDIT_OUTPUT")); outputPath != "" {
-		if err := writeOutboxAuditOutput(outputPath, rows); err != nil {
+		if err := writeOutboxAuditOutput(outputPath, rows, map[string]string{
+			"outbox_id":       outboxIDFilter,
+			"event_id":        eventID,
+			"tenant_id":       tenantID,
+			"conversation_id": conversationID,
+			"status":          status,
+			"event_type":      eventType,
+		}); err != nil {
 			return err
 		}
 	}

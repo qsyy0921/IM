@@ -56,7 +56,7 @@ go run ./services/delivery-service/cmd/delivery-service
 | `contacts-service` | `NEXUSIM_CONTACTS_OUTBOX_REPAIR_AUDIT_OUTPUT` |
 | `policy-service` | `NEXUSIM_POLICY_OUTBOX_REPAIR_AUDIT_OUTPUT` |
 
-以下服务的只读 `outbox-audit` 也支持写低敏 JSON 当前 outbox 结果，便于排障前留存证据；输出只包含 outbox 元数据、状态、retry 计数、时间戳和稳定低敏 `last_error`，不写业务 payload：
+以下服务的只读 `outbox-audit` 也支持写低敏 JSON 当前 outbox 结果，便于排障前留存证据；输出只包含 outbox 元数据、状态、retry 计数、时间戳、稳定低敏 `last_error` 和 compacted filters，不写业务 payload：
 
 | 服务 | JSON 输出环境变量 |
 | --- | --- |

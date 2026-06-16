@@ -202,6 +202,11 @@ func runOutboxRepair() error {
 		stats.Skipped,
 		stats.Invalid,
 	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_OUTBOX_REPAIR_OUTPUT")); outputPath != "" {
+		if err := writeOutboxRepairOutput(outputPath, stats, len(eventIDs)); err != nil {
+			return err
+		}
+	}
 	if stats.Invalid > 0 {
 		return errors.New("policy audit outbox repair skipped invalid events")
 	}

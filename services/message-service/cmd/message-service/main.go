@@ -415,6 +415,11 @@ func runOutboxRepair() error {
 		stats.Repaired,
 		stats.Skipped,
 	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_MESSAGE_OUTBOX_REPAIR_OUTPUT")); outputPath != "" {
+		if err := writeOutboxRepairOutput(outputPath, stats, len(eventIDs)); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

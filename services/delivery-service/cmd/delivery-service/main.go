@@ -300,6 +300,11 @@ func runOutboxRepair() error {
 		mode,
 		dryRun,
 	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_OUTBOX_REPAIR_OUTPUT")); outputPath != "" {
+		if err := writeOutboxRepairOutput(outputPath, stats, len(ids), mode, dryRun); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

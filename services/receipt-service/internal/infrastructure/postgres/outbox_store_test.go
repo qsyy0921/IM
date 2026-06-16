@@ -234,6 +234,49 @@ INSERT INTO receipt_outbox_repair_audit (
 	assertReceiptOutboxErrorDoesNotContain(t, rows[0].PreviousLastError, "user1@example.com")
 }
 
+func TestOutboxStoreAuditOutboxRepairsFiltersRepairedWindowIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO receipt_outbox_repair_audit (
+    event_id, tenant_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at, repair_reason, repaired_at
+) VALUES
+    ('repair-window-old', 'tenant-window', 'DLQ', 1, 'publish failed', '2026-06-17T00:59:00Z'::timestamptz, 'manual audit', '2026-06-17T01:00:00Z'::timestamptz),
+    ('repair-window-inside', 'tenant-window', 'DLQ', 2, 'provider unavailable', '2026-06-17T01:59:00Z'::timestamptz, 'provider recovered', '2026-06-17T02:00:00Z'::timestamptz),
+    ('repair-window-new', 'tenant-window', 'DLQ', 3, 'broker unavailable', '2026-06-17T02:59:00Z'::timestamptz, 'manual audit', '2026-06-17T03:00:00Z'::timestamptz)
+`)
+	if err != nil {
+		t.Fatalf("seed receipt outbox repair audit: %v", err)
+	}
+
+	repairedAfter := time.Date(2026, 6, 17, 1, 30, 0, 0, time.UTC)
+	repairedBefore := time.Date(2026, 6, 17, 2, 30, 0, 0, time.UTC)
+	rows, err := NewOutboxStore(pool).AuditOutboxRepairs(ctx, OutboxRepairAuditOptions{
+		TenantID:       "tenant-window",
+		RepairedAfter:  &repairedAfter,
+		RepairedBefore: &repairedBefore,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit receipt outbox repairs by repaired_at window: %v", err)
+	}
+	if len(rows) != 1 || rows[0].EventID != "repair-window-inside" {
+		t.Fatalf("expected only row inside repaired_at window, got %+v", rows)
+	}
+
+	_, err = NewOutboxStore(pool).AuditOutboxRepairs(ctx, OutboxRepairAuditOptions{
+		TenantID:       "tenant-window",
+		RepairedAfter:  &repairedBefore,
+		RepairedBefore: &repairedBefore,
+		Limit:          10,
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid repaired_at window error, got %v", err)
+	}
+}
+
 func TestOutboxStoreCleanupOutboxRepairsDeletesOnlyExpiredRowsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

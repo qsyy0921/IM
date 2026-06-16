@@ -46,7 +46,7 @@ go run ./services/delivery-service/cmd/delivery-service
 | `contacts-service` | `NEXUSIM_CONTACTS_OUTBOX_REPAIR_OUTPUT` |
 | `policy-service` | `NEXUSIM_POLICY_OUTBOX_REPAIR_OUTPUT` |
 
-以下服务的 `outbox-repair-audit` 支持写低敏 JSON 结果，便于 operator 留存证据，不写 Kafka 原始错误正文或业务 payload：
+以下服务的 `outbox-repair-audit` 支持写低敏 JSON 结果，便于 operator 留存证据，不写 Kafka 原始错误正文或业务 payload。`receipt-service` 额外支持按 `repaired_at` RFC3339 时间窗口过滤，并在 JSON 中写 compacted filters：
 
 | 服务 | JSON 输出环境变量 |
 | --- | --- |

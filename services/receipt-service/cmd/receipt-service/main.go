@@ -334,10 +334,26 @@ func runOutboxRepairAudit() error {
 	}
 	defer pool.Close()
 
+	repairedAfter, err := envOptionalRFC3339Time("NEXUSIM_RECEIPT_OUTBOX_REPAIR_AUDIT_REPAIRED_AFTER")
+	if err != nil {
+		return err
+	}
+	repairedBefore, err := envOptionalRFC3339Time("NEXUSIM_RECEIPT_OUTBOX_REPAIR_AUDIT_REPAIRED_BEFORE")
+	if err != nil {
+		return err
+	}
+	filters := map[string]string{
+		"event_id":        envString("NEXUSIM_RECEIPT_OUTBOX_REPAIR_AUDIT_EVENT_ID", ""),
+		"tenant_id":       envString("NEXUSIM_RECEIPT_OUTBOX_REPAIR_AUDIT_TENANT_ID", ""),
+		"repaired_after":  formatOptionalTime(repairedAfter),
+		"repaired_before": formatOptionalTime(repairedBefore),
+	}
 	rows, err := postgresinfra.NewOutboxStore(pool).AuditOutboxRepairs(ctx, postgresinfra.OutboxRepairAuditOptions{
-		EventID:  envString("NEXUSIM_RECEIPT_OUTBOX_REPAIR_AUDIT_EVENT_ID", ""),
-		TenantID: envString("NEXUSIM_RECEIPT_OUTBOX_REPAIR_AUDIT_TENANT_ID", ""),
-		Limit:    envInt("NEXUSIM_RECEIPT_OUTBOX_REPAIR_AUDIT_LIMIT", 20),
+		EventID:        filters["event_id"],
+		TenantID:       filters["tenant_id"],
+		RepairedAfter:  repairedAfter,
+		RepairedBefore: repairedBefore,
+		Limit:          envInt("NEXUSIM_RECEIPT_OUTBOX_REPAIR_AUDIT_LIMIT", 20),
 	})
 	if err != nil {
 		return err
@@ -357,7 +373,7 @@ func runOutboxRepairAudit() error {
 		)
 	}
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_RECEIPT_OUTBOX_REPAIR_AUDIT_OUTPUT")); outputPath != "" {
-		if err := writeOutboxRepairAuditOutput(outputPath, rows); err != nil {
+		if err := writeOutboxRepairAuditOutput(outputPath, rows, filters); err != nil {
 			return err
 		}
 	}
@@ -813,11 +829,24 @@ func envPositiveInt(name string, fallback int) (int, error) {
 	return parsed, nil
 }
 
+func envOptionalRFC3339Time(name string) (*time.Time, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil, errors.New(name + " must be RFC3339")
+	}
+	utc := parsed.UTC()
+	return &utc, nil
+}
+
 func formatOptionalTime(value *time.Time) string {
 	if value == nil {
 		return ""
 	}
-	return value.Format(time.RFC3339)
+	return value.UTC().Format(time.RFC3339)
 }
 
 func outboxRepairCleanupConfigFromEnv() (outboxRepairCleanupConfig, error) {

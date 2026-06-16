@@ -172,6 +172,7 @@ page_token
 role_filter
 role_filters[]
 sort = USER_ID_ASC | ROLE_USER_ID_ASC
+user_id_prefix
 ```
 
 返回：
@@ -190,9 +191,10 @@ next_page_token
 - 调用者必须是该会话当前 ACTIVE 成员；否则返回 `PERMISSION_DENIED` / `conversation member is not active`。
 - 会话不存在、归档或删除时返回 `CONVERSATION_NOT_FOUND`。
 - 第一版只返回 `status=ACTIVE` 的当前成员，可用 legacy `role_filter=OWNER/ADMIN/MEMBER` 做单角色过滤，也可用 `role_filters[]` 做多角色 OR 过滤（例如一次拉 `OWNER + ADMIN` 管理视图）；两者同时出现时取交集。不暴露 `LEFT / BANNED` 历史成员。审计 / 管理视角后续单独设计 admin-only 查询，避免把权限矩阵塞进普通成员列表。
+- `user_id_prefix` 是当前 roster 内的轻量 user_id 前缀过滤，用于大群成员管理页快速定位；它不做昵称 / 备注 / 全文搜索，不替代后续 contacts/search 能力。
 - 默认 `sort=USER_ID_ASC`，也支持 `ROLE_USER_ID_ASC`，按 `OWNER -> ADMIN -> MEMBER` 后再按 `user_id ASC` 稳定排序，适合管理视图。
 - `page_token` 是 opaque token；当前实现内部按 `user_id ASC` 或 `(role_weight, user_id)` keyset 分页，调用方不得解析 token。
-- `page_token` 绑定 role filter / role filters / sort；调用方切换过滤条件或排序时必须从第一页重新拉，不能复用旧 token。
+- `page_token` 绑定 role filter / role filters / sort / user_id_prefix；调用方切换过滤条件、排序或前缀时必须从第一页重新拉，不能复用旧 token。
 - 该接口只读 `conversation-service` 自己的 `conversations / conversation_members` 事实表；其它服务需要成员列表时必须通过正式 API / projection，不得跨服务读取内部表。
 
 错误码：

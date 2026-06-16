@@ -60,6 +60,19 @@ func TestListConversationMembersUseCaseRejectsInvalidSort(t *testing.T) {
 	}
 }
 
+func TestListConversationMembersUseCaseRejectsInvalidUserIDPrefix(t *testing.T) {
+	repository := &fakeListConversationMembersRepository{}
+	command := validListConversationMembersCommand()
+	command.UserIDPrefix = string([]byte{'u', 0})
+	_, err := NewListConversationMembersUseCase(repository).Execute(context.Background(), command)
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+	if repository.called {
+		t.Fatalf("repository should not be called")
+	}
+}
+
 func TestListConversationMembersUseCaseForwardsCommand(t *testing.T) {
 	repository := &fakeListConversationMembersRepository{
 		result: types.ListConversationMembersResult{
@@ -74,6 +87,7 @@ func TestListConversationMembersUseCaseForwardsCommand(t *testing.T) {
 	command.RoleFilter = types.MemberRoleAdmin
 	command.RoleFilters = []types.MemberRole{types.MemberRoleOwner, types.MemberRoleAdmin}
 	command.Sort = types.ConversationMemberListSortRoleUserIDAsc
+	command.UserIDPrefix = "user-"
 
 	result, err := NewListConversationMembersUseCase(repository).Execute(context.Background(), command)
 	if err != nil {
@@ -131,6 +145,7 @@ func listConversationMembersCommandsEqual(left types.ListConversationMembersComm
 		left.PageToken == right.PageToken &&
 		left.RoleFilter == right.RoleFilter &&
 		left.Sort == right.Sort &&
+		left.UserIDPrefix == right.UserIDPrefix &&
 		memberRolesEqual(left.RoleFilters, right.RoleFilters)
 }
 

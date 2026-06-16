@@ -8,6 +8,7 @@ import (
 const (
 	DefaultConversationMembersPageSize = 100
 	MaxConversationMembersPageSize     = 500
+	MaxConversationMemberUserIDPrefix  = 128
 )
 
 type ListConversationMembersCommand struct {
@@ -18,6 +19,7 @@ type ListConversationMembersCommand struct {
 	RoleFilter     MemberRole
 	RoleFilters    []MemberRole
 	Sort           string
+	UserIDPrefix   string
 }
 
 func (c ListConversationMembersCommand) Validate() error {
@@ -45,6 +47,9 @@ func (c ListConversationMembersCommand) Validate() error {
 	if _, err := NormalizeConversationMemberListSort(c.Sort); err != nil {
 		return err
 	}
+	if err := ValidateConversationMemberUserIDPrefix(c.UserIDPrefix); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -53,6 +58,18 @@ func (c ListConversationMembersCommand) EffectivePageSize() int {
 		return DefaultConversationMembersPageSize
 	}
 	return c.PageSize
+}
+
+func ValidateConversationMemberUserIDPrefix(prefix string) error {
+	if len(prefix) > MaxConversationMemberUserIDPrefix {
+		return NewInvalidArgument("user_id_prefix is too long")
+	}
+	for _, char := range prefix {
+		if char == 0 {
+			return NewInvalidArgument("user_id_prefix contains unsupported characters")
+		}
+	}
+	return nil
 }
 
 const (

@@ -1153,6 +1153,7 @@ type ListConversationMembersRequest struct {
 	RoleFilter     MemberRole                 `protobuf:"varint,5,opt,name=role_filter,json=roleFilter,proto3,enum=nexusim.conversation.v1.MemberRole" json:"role_filter,omitempty"`
 	RoleFilters    []MemberRole               `protobuf:"varint,6,rep,packed,name=role_filters,json=roleFilters,proto3,enum=nexusim.conversation.v1.MemberRole" json:"role_filters,omitempty"`
 	Sort           ConversationMemberListSort `protobuf:"varint,7,opt,name=sort,proto3,enum=nexusim.conversation.v1.ConversationMemberListSort" json:"sort,omitempty"`
+	UserIdPrefix   string                     `protobuf:"bytes,8,opt,name=user_id_prefix,json=userIdPrefix,proto3" json:"user_id_prefix,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1234,6 +1235,13 @@ func (x *ListConversationMembersRequest) GetSort() ConversationMemberListSort {
 		return x.Sort
 	}
 	return ConversationMemberListSort_CONVERSATION_MEMBER_LIST_SORT_UNSPECIFIED
+}
+
+func (x *ListConversationMembersRequest) GetUserIdPrefix() string {
+	if x != nil {
+		return x.UserIdPrefix
+	}
+	return ""
 }
 
 type ConversationMember struct {
@@ -1696,7 +1704,7 @@ const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
 	"\bnew_role\x18\f \x01(\x0e2#.nexusim.conversation.v1.MemberRoleR\anewRole\x12\x16\n" +
 	"\x06reason\x18\r \x01(\tR\x06reason\x12\x1d\n" +
 	"\n" +
-	"last_error\x18\x0e \x01(\tR\tlastError\"\xa5\x03\n" +
+	"last_error\x18\x0e \x01(\tR\tlastError\"\xcb\x03\n" +
 	"\x1eListConversationMembersRequest\x12G\n" +
 	"\fauth_context\x18\x01 \x01(\v2$.nexusim.conversation.v1.AuthContextR\vauthContext\x12'\n" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x1b\n" +
@@ -1706,7 +1714,8 @@ const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
 	"\vrole_filter\x18\x05 \x01(\x0e2#.nexusim.conversation.v1.MemberRoleR\n" +
 	"roleFilter\x12F\n" +
 	"\frole_filters\x18\x06 \x03(\x0e2#.nexusim.conversation.v1.MemberRoleR\vroleFilters\x12G\n" +
-	"\x04sort\x18\a \x01(\x0e23.nexusim.conversation.v1.ConversationMemberListSortR\x04sort\"\xe0\x02\n" +
+	"\x04sort\x18\a \x01(\x0e23.nexusim.conversation.v1.ConversationMemberListSortR\x04sort\x12$\n" +
+	"\x0euser_id_prefix\x18\b \x01(\tR\fuserIdPrefix\"\xe0\x02\n" +
 	"\x12ConversationMember\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x127\n" +
 	"\x04role\x18\x02 \x01(\x0e2#.nexusim.conversation.v1.MemberRoleR\x04role\x12=\n" +

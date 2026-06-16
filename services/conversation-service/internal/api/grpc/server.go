@@ -250,6 +250,7 @@ func (s *Server) ListConversationMembers(
 		RoleFilter:     fromProtoMemberRole(request.GetRoleFilter()),
 		RoleFilters:    fromProtoMemberRoles(request.GetRoleFilters()),
 		Sort:           fromProtoConversationMemberListSort(request.GetSort()),
+		UserIDPrefix:   request.GetUserIdPrefix(),
 	})
 	if err != nil {
 		return nil, grpcError(err)

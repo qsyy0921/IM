@@ -463,6 +463,55 @@ INSERT INTO conversation_members (
 		t.Fatalf("expected invalid cursor when role_filter changes, got %v", err)
 	}
 
+	prefixFirstPage, err := repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-list",
+		PageSize:       1,
+		UserIDPrefix:   "member-",
+	})
+	if err != nil {
+		t.Fatalf("list first prefix page: %v", err)
+	}
+	if len(prefixFirstPage.Members) != 1 ||
+		prefixFirstPage.Members[0].UserID != "member-1" ||
+		prefixFirstPage.NextPageToken == "" {
+		t.Fatalf("unexpected first prefix page: %+v", prefixFirstPage)
+	}
+	prefixSecondPage, err := repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-list",
+		PageSize:       1,
+		PageToken:      prefixFirstPage.NextPageToken,
+		UserIDPrefix:   "member-",
+	})
+	if err != nil {
+		t.Fatalf("list second prefix page: %v", err)
+	}
+	if len(prefixSecondPage.Members) != 1 ||
+		prefixSecondPage.Members[0].UserID != "member-2" ||
+		prefixSecondPage.NextPageToken != "" {
+		t.Fatalf("unexpected second prefix page: %+v", prefixSecondPage)
+	}
+	_, err = repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-list",
+		PageSize:       1,
+		PageToken:      prefixFirstPage.NextPageToken,
+		UserIDPrefix:   "owner-",
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid cursor when user_id_prefix changes, got %v", err)
+	}
+
 	_, err = repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
 		AuthContext: types.AuthContext{
 			TenantID: "tenant-list",

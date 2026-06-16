@@ -157,6 +157,7 @@ message ListConversationMembersRequest {
   MemberRole role_filter = 5;
   repeated MemberRole role_filters = 6;
   ConversationMemberListSort sort = 7;
+  string user_id_prefix = 8;
 }
 
 message ConversationMember {

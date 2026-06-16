@@ -81,7 +81,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - Redis Sentinel network-partition fallback smoke
 - PostgreSQL `repmgr + pgpool` local failover smoke
 - PostgreSQL quorum observation smoke and ADR-034 production quorum boundary
-- Kafka KRaft 3 broker local failover / controller-switch / ISR observation smoke
+- Kafka KRaft 3 broker local failover / controller-switch / ISR observation smoke，且 ISR observation raw summary 已有可复用 JSON / Markdown summary validator
 - outbox Kafka producer first-stage `acks=all` / bounded retry-backoff 配置、本地门禁、6 个 producer package 配置单测和 producer config summary
 
 当前已经证明：

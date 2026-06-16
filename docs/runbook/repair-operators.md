@@ -96,7 +96,7 @@ go run ./services/delivery-service/cmd/delivery-service
 
 | 模式 | 作用 |
 | --- | --- |
-| `member-change-audit` | 只读审计 `member_change_saga`，可按 tenant / conversation / status / change_id / outbox event 缩小范围；可选 `NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
+| `member-change-audit` | 只读审计 `member_change_saga`，可按 tenant / conversation / target user / operator / change type / status / change_id / outbox event 缩小范围；可选 `NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
 
 成员窗口历史 repair / repair action 仍是后续工作，不能用手写 SQL 直接改成员事实。
 

@@ -15,6 +15,9 @@ type MemberChangeAuditOptions struct {
 	ChangeID       string
 	TenantID       string
 	ConversationID string
+	TargetUserID   string
+	OperatorUserID string
+	ChangeType     string
 	Status         string
 	OutboxEventID  string
 	Limit          int
@@ -53,7 +56,7 @@ func (r *Repository) AuditMemberChanges(ctx context.Context, options MemberChang
 	}
 
 	var args []any
-	clauses := make([]string, 0, 5)
+	clauses := make([]string, 0, 8)
 	if changeID := strings.TrimSpace(options.ChangeID); changeID != "" {
 		args = append(args, changeID)
 		clauses = append(clauses, "change_id = $"+strconv.Itoa(len(args)))
@@ -65,6 +68,22 @@ func (r *Repository) AuditMemberChanges(ctx context.Context, options MemberChang
 	if conversationID := strings.TrimSpace(options.ConversationID); conversationID != "" {
 		args = append(args, conversationID)
 		clauses = append(clauses, "conversation_id = $"+strconv.Itoa(len(args)))
+	}
+	if targetUserID := strings.TrimSpace(options.TargetUserID); targetUserID != "" {
+		args = append(args, targetUserID)
+		clauses = append(clauses, "user_id = $"+strconv.Itoa(len(args)))
+	}
+	if operatorUserID := strings.TrimSpace(options.OperatorUserID); operatorUserID != "" {
+		args = append(args, operatorUserID)
+		clauses = append(clauses, "operator_id = $"+strconv.Itoa(len(args)))
+	}
+	if rawChangeType := strings.TrimSpace(options.ChangeType); rawChangeType != "" {
+		changeType := normalizeMemberChangeAuditChangeType(rawChangeType)
+		if changeType == "" {
+			return nil, errors.New("unsupported member change type")
+		}
+		args = append(args, changeType)
+		clauses = append(clauses, "change_type = $"+strconv.Itoa(len(args)))
 	}
 	if rawStatus := strings.TrimSpace(options.Status); rawStatus != "" {
 		status := normalizeMemberChangeAuditStatus(rawStatus)
@@ -147,6 +166,20 @@ LIMIT $`+strconv.Itoa(len(args)), args...)
 		return nil, types.NewDBReadFailed(err.Error())
 	}
 	return result, nil
+}
+
+func normalizeMemberChangeAuditChangeType(value string) string {
+	changeType := strings.ToUpper(strings.TrimSpace(value))
+	switch types.MemberChangeType(changeType) {
+	case types.MemberChangeTypeJoin,
+		types.MemberChangeTypeLeave,
+		types.MemberChangeTypeRoleChanged,
+		types.MemberChangeTypeRemove,
+		types.MemberChangeTypeOwnerTransfer:
+		return changeType
+	default:
+		return ""
+	}
 }
 
 func normalizeMemberChangeAuditStatus(value string) string {

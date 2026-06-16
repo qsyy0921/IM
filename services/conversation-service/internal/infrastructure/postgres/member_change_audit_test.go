@@ -51,6 +51,9 @@ INSERT INTO member_change_saga (
 	rows, err := repository.AuditMemberChanges(ctx, MemberChangeAuditOptions{
 		TenantID:       "tenant-audit",
 		ConversationID: "conv-audit",
+		TargetUserID:   "target-1",
+		OperatorUserID: "operator-1",
+		ChangeType:     "join",
 		Status:         "outbox_enqueued",
 		OutboxEventID:  "outbox-audit-1",
 		Limit:          10,
@@ -83,5 +86,8 @@ INSERT INTO member_change_saga (
 
 	if _, err := repository.AuditMemberChanges(ctx, MemberChangeAuditOptions{Status: "not-a-status"}); err == nil {
 		t.Fatalf("expected unsupported status to fail")
+	}
+	if _, err := repository.AuditMemberChanges(ctx, MemberChangeAuditOptions{ChangeType: "not-a-change"}); err == nil {
+		t.Fatalf("expected unsupported change type to fail")
 	}
 }

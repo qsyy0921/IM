@@ -563,6 +563,11 @@ func runProjectionFailureAudit() error {
 			row.LastError,
 		)
 	}
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_OUTPUT")); outputPath != "" {
+		if err := writeProjectionFailureAuditOutput(outputPath, rows, includeResolved); err != nil {
+			return err
+		}
+	}
 	if !includeResolved && len(rows) > 0 {
 		return fmt.Errorf("delivery projection failure audit found %d unresolved rows", len(rows))
 	}

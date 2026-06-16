@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"math/big"
 	"net/url"
@@ -13,6 +14,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	postgresinfra "github.com/qsyy0921/IM/services/delivery-service/internal/infrastructure/postgres"
 )
 
 func TestLoadDeliveryGRPCCredentialsFromEnvDisabledByDefault(t *testing.T) {
@@ -353,6 +356,71 @@ func TestProjectionFailureCleanupConfigFromEnvRejectsInvalidValues(t *testing.T)
 
 	if _, err := projectionFailureCleanupConfigFromEnv(); err == nil {
 		t.Fatalf("expected invalid projection failure cleanup config to fail")
+	}
+}
+
+func TestWriteProjectionFailureAuditOutput(t *testing.T) {
+	resolvedAt := time.Date(2026, 6, 16, 8, 30, 0, 0, time.UTC)
+	resolvedOffset := int64(43)
+	outputPath := filepath.Join(t.TempDir(), "projection-failure-audit.json")
+
+	err := writeProjectionFailureAuditOutput(outputPath, []postgresinfra.ProjectionFailureAuditRow{
+		{
+			ConsumerGroup: "group-1",
+			Topic:         "conversation.timeline.events",
+			PartitionID:   0,
+			OffsetValue:   41,
+			EventID:       "event-1",
+			EventType:     "message.revoked.v1",
+			FailureClass:  "projection_dependency",
+			FailureCount:  2,
+			LastError:     "delivery projection dependency failed",
+			LastSeenAt:    resolvedAt.Add(-time.Minute),
+		},
+		{
+			ConsumerGroup:            "group-1",
+			Topic:                    "conversation.timeline.events",
+			PartitionID:              0,
+			OffsetValue:              42,
+			EventID:                  "event-2",
+			EventType:                "message.edited.v1",
+			FailureClass:             "db_write_failed",
+			FailureCount:             1,
+			LastError:                "delivery projection write failed",
+			LastSeenAt:               resolvedAt,
+			ResolvedAt:               &resolvedAt,
+			ResolvedCheckpointOffset: &resolvedOffset,
+		},
+	}, true)
+	if err != nil {
+		t.Fatalf("write projection failure audit output: %v", err)
+	}
+
+	raw, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("read projection failure audit output: %v", err)
+	}
+	var output struct {
+		IncludeResolved bool `json:"include_resolved"`
+		UnresolvedCount int  `json:"unresolved_count"`
+		Rows            []struct {
+			EventID                  string `json:"event_id"`
+			LastError                string `json:"last_error"`
+			Resolved                 bool   `json:"resolved"`
+			ResolvedCheckpointOffset *int64 `json:"resolved_checkpoint_offset"`
+		} `json:"rows"`
+	}
+	if err := json.Unmarshal(raw, &output); err != nil {
+		t.Fatalf("decode projection failure audit output: %v", err)
+	}
+	if !output.IncludeResolved || output.UnresolvedCount != 1 || len(output.Rows) != 2 {
+		t.Fatalf("unexpected projection failure audit output: %+v", output)
+	}
+	if output.Rows[0].EventID != "event-1" || output.Rows[0].Resolved || output.Rows[0].LastError != "delivery projection dependency failed" {
+		t.Fatalf("unexpected unresolved row: %+v", output.Rows[0])
+	}
+	if output.Rows[1].EventID != "event-2" || !output.Rows[1].Resolved || output.Rows[1].ResolvedCheckpointOffset == nil || *output.Rows[1].ResolvedCheckpointOffset != resolvedOffset {
+		t.Fatalf("unexpected resolved row: %+v", output.Rows[1])
 	}
 }
 

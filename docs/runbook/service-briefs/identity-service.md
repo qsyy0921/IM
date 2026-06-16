@@ -17,6 +17,7 @@
 - 已有只读 `session-mfa-proof-audit`、只读 `challenge-delivery-repair-audit` 和 `challenge-delivery-repair-cleanup` operator，用于发现历史 session MFA proof 脏数据、直接审计 challenge delivery repair 历史，以及按 retention / scope 清理 repair audit 历史。
 - PostgreSQL repository 已拆出 challenge helper、challenge command methods、session/device/MFA proof、refresh token 和 identity outbox helpers，核心文件降到约 1400 行；后续继续按主题拆测试和存储 helpers。
 - app 层登录相关测试已按基础 login/register、MFA、Refresh token step-up、Challenge / Password reset 拆到同 package 测试文件，降低单文件复杂度并保留原覆盖面。
+- cmd 层 challenge delivery、MFA、gateway token / JWKS 和 env config helpers 已拆到同 package 文件，`main.go` 继续保留进程模式和启动编排。
 
 ## 后续
 

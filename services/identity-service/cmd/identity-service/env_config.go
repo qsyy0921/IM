@@ -1,0 +1,184 @@
+package main
+
+import (
+	"errors"
+	"fmt"
+	"net/url"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+func envString(name string, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func envStringSet(name string, normalize func(string) string) map[string]struct{} {
+	values := make(map[string]struct{})
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return values
+	}
+	for _, item := range strings.Split(raw, ",") {
+		value := strings.TrimSpace(item)
+		if value == "" {
+			continue
+		}
+		if normalize != nil {
+			value = normalize(value)
+		}
+		values[value] = struct{}{}
+	}
+	return values
+}
+
+func envURIStringSet(name string) (map[string]struct{}, error) {
+	values := make(map[string]struct{})
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return values, nil
+	}
+	for _, item := range strings.Split(raw, ",") {
+		value := strings.TrimSpace(item)
+		if value == "" {
+			continue
+		}
+		parsed, err := url.Parse(value)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" && parsed.Opaque == "" {
+			return nil, fmt.Errorf("%s contains an invalid URI", name)
+		}
+		values[parsed.String()] = struct{}{}
+	}
+	return values, nil
+}
+
+func envInt(name string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func envPositiveInt(name string, fallback int) (int, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("%s must be a positive integer", name)
+	}
+	return parsed, nil
+}
+
+func envBool(name string, fallback bool) bool {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv(name)))
+	if value == "" {
+		return fallback
+	}
+	switch value {
+	case "1", "true", "yes", "y", "on":
+		return true
+	case "0", "false", "no", "n", "off":
+		return false
+	default:
+		return fallback
+	}
+}
+
+func envOptionalBool(name string) (bool, bool, error) {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv(name)))
+	if value == "" {
+		return false, false, nil
+	}
+	switch value {
+	case "1", "true", "yes", "y", "on":
+		return true, true, nil
+	case "0", "false", "no", "n", "off":
+		return false, true, nil
+	default:
+		return false, true, fmt.Errorf("%s must be a boolean", name)
+	}
+}
+
+func envDuration(name string, fallback time.Duration) time.Duration {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func envPositiveDuration(name string, fallback time.Duration) (time.Duration, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("%s must be a positive duration", name)
+	}
+	return parsed, nil
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+	return result
+}
+
+func parseInt64CSV(value string) ([]int64, error) {
+	parts := strings.Split(value, ",")
+	result := make([]int64, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		parsed, err := strconv.ParseInt(part, 10, 64)
+		if err != nil || parsed <= 0 {
+			return nil, errors.New("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_IDS must contain positive integer ids")
+		}
+		result = append(result, parsed)
+	}
+	return result, nil
+}
+
+func optionalPositiveInt64Env(name string) (*int64, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed <= 0 {
+		return nil, fmt.Errorf("%s must be a positive integer", name)
+	}
+	return &parsed, nil
+}
+
+func formatOptionalTime(value *time.Time) string {
+	if value == nil {
+		return ""
+	}
+	return value.Format(time.RFC3339)
+}

@@ -78,7 +78,7 @@ go run ./services/delivery-service/cmd/delivery-service
 
 | 模式 | 作用 |
 | --- | --- |
-| `session-mfa-proof-audit` | 只读发现历史 session MFA proof 脏数据。 |
+| `session-mfa-proof-audit` | 只读发现历史 session MFA proof 脏数据；可选 `NEXUSIM_IDENTITY_SESSION_MFA_PROOF_AUDIT_OUTPUT` 写低敏聚合 JSON 结果。 |
 | `challenge-delivery-repair` | 处理 challenge delivery outbox / retry / expire / DLQ 相关修复。 |
 | `challenge-delivery-repair-audit` | 只读审计 challenge delivery repair 历史；可选 `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
 | `challenge-delivery-repair-cleanup` | 按 retention / scope 清理 challenge delivery repair audit 历史。 |

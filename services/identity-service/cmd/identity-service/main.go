@@ -534,6 +534,11 @@ func runSessionMFAProofAudit() error {
 		stats.TOTPMissingProof,
 		stats.RecoveryInvalidProof,
 	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_SESSION_MFA_PROOF_AUDIT_OUTPUT")); outputPath != "" {
+		if err := writeSessionMFAProofAuditOutput(outputPath, stats); err != nil {
+			return err
+		}
+	}
 	if stats.InvalidTotal > 0 {
 		return fmt.Errorf("identity session mfa proof audit found %d invalid rows", stats.InvalidTotal)
 	}

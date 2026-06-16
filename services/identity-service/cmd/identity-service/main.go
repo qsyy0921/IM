@@ -431,6 +431,11 @@ func runChallengeDeliveryRepairAudit() error {
 			formatOptionalTime(row.PreviousDeadLetteredAt),
 		)
 	}
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_OUTPUT")); outputPath != "" {
+		if err := writeChallengeDeliveryRepairAuditOutput(outputPath, rows); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

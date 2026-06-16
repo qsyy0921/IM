@@ -263,7 +263,7 @@ conversation_seq
 
 - 个人视图隐藏不进入 message-service，由 api-gateway 路由到 delivery-service / user-inbox 读模型。
 - 会话级删除和合规删除分开。
-- 合规删除必须进入 Retention workflow。
+- 合规删除第一阶段必须经 policy ownership override；后续再接完整 Retention workflow / legal hold / 外部 proof。
 
 `delete_scope`：
 
@@ -275,7 +275,7 @@ COMPLIANCE_RETENTION
 语义：
 
 - `CONVERSATION_VIEW` 对会话成员返回 tombstone。
-- `COMPLIANCE_RETENTION` 进入 Retention workflow，并按 legal hold / delete proof 约束执行。
+- `COMPLIANCE_RETENTION` 第一阶段只允许 policy 返回 ownership override 后执行，会 redaction 当前消息 payload 与本次 change history payload；timeline / outbox 只写低敏 reason-present 证明。完整 legal hold / delete proof workflow 后续接入。
 
 `SELF_VIEW` 属于 delivery-service / user-inbox 视图状态，不产生 `message.deleted.v1`，不改变 `message_log`、`conversation_timeline_events`、`message_outbox`。
 

@@ -32,16 +32,15 @@ func (u *DeleteMessageUseCase) Execute(
 	if err := command.Validate(); err != nil {
 		return types.MessageChangeResult{}, err
 	}
-	if command.DeleteScope != types.DeleteScopeConversationView {
-		return types.MessageChangeResult{}, types.NewUnsupportedDeleteScope("delete_scope is not enabled in phase 1")
-	}
-
 	conversation, permission, err := u.readConsistentDeleteDependencies(ctx, command)
 	if err != nil {
 		return types.MessageChangeResult{}, err
 	}
 	if !permission.Allowed {
 		return types.MessageChangeResult{}, types.NewPermissionDenied(permission.Reason)
+	}
+	if command.DeleteScope == types.DeleteScopeCompliance && !permission.OwnershipOverride {
+		return types.MessageChangeResult{}, types.NewPermissionDenied("compliance delete requires policy ownership override")
 	}
 	if conversation.ConversationMode != types.ConversationModeLocalRowLock {
 		return types.MessageChangeResult{}, types.NewSequencerUnavailable("sequencer mode is contract-only in phase 1")

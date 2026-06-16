@@ -716,7 +716,7 @@ WHERE ml.tenant_id = $1
 	}
 	if outboxPayload["message_id"] != string(input.Command.MessageID) ||
 		outboxPayload["deleted_by"] != string(input.Command.AuthContext.UserID) ||
-		outboxPayload["delete_scope"] != string(types.DeleteScopeConversationView) ||
+		outboxPayload["delete_scope"] != string(input.Command.DeleteScope) ||
 		int64(outboxPayload["conversation_seq"].(float64)) != result.ConversationSeq {
 		t.Fatalf("unexpected delete payload: %+v", outboxPayload)
 	}

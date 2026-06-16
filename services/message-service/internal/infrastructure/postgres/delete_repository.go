@@ -256,11 +256,12 @@ func updateMessageDeleted(ctx context.Context, tx pgx.Tx, record domain.MessageC
 	_, err := tx.Exec(ctx, `
 UPDATE message_log
 SET status = 'DELETED',
-    deleted_at = $4
+    deleted_at = $4,
+    payload_json = CASE WHEN $5::jsonb IS NULL THEN payload_json ELSE $5::jsonb END
 WHERE tenant_id = $1
   AND conversation_id = $2
   AND message_id = $3
-`, record.Timeline.TenantID, record.ConversationID, record.MessageID, record.ChangedAt)
+`, record.Timeline.TenantID, record.ConversationID, record.MessageID, record.ChangedAt, nullableJSON(record.AfterPayload))
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -288,12 +289,19 @@ INSERT INTO message_change_history (
     reason,
     trace_id,
     changed_at
-) VALUES ($1, $2, $3, $4, $5, $6::jsonb, NULL, $7, $8, $9, $10, $11, $12)
-`, record.Timeline.TenantID, record.ConversationID, record.MessageID, record.ChangeVersion, record.ChangeType, record.BeforePayload, record.BeforeStatus, record.AfterStatus, input.Command.AuthContext.UserID, input.Command.Reason, record.Timeline.TraceID, record.ChangedAt)
+) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11, $12, $13)
+`, record.Timeline.TenantID, record.ConversationID, record.MessageID, record.ChangeVersion, record.ChangeType, nullableJSON(record.BeforePayload), nullableJSON(record.AfterPayload), record.BeforeStatus, record.AfterStatus, input.Command.AuthContext.UserID, input.Command.Reason, record.Timeline.TraceID, record.ChangedAt)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
+}
+
+func nullableJSON(payload []byte) any {
+	if len(payload) == 0 {
+		return nil
+	}
+	return payload
 }
 
 func insertDeleteCommandResult(

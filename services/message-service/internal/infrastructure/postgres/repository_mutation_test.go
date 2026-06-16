@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -365,6 +366,93 @@ func TestMessageRepositoryDeleteMessageIntegration(t *testing.T) {
 	assertCount(t, ctx, pool, "message_outbox", tenantID, 2)
 	assertCurrentSeq(t, ctx, pool, tenantID, appendInput.Command.ConversationID, 2)
 	assertDeletedFacts(t, ctx, pool, deleteInput, result)
+}
+
+func TestMessageRepositoryDeleteMessageComplianceRedactsPayloadIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	now := time.Date(2026, 6, 10, 3, 30, 0, 0, time.UTC)
+	runID := time.Now().UnixNano()
+	messageCounter := 0
+	eventCounter := 0
+	repo := NewMessageRepository(
+		pool,
+		WithClock(func() time.Time { return now }),
+		WithIDGenerators(
+			func() (types.MessageID, error) {
+				messageCounter++
+				return types.MessageID(fmt.Sprintf("msg-delete-compliance-%d-%d", runID, messageCounter)), nil
+			},
+			func() (types.EventID, error) {
+				eventCounter++
+				return types.EventID(fmt.Sprintf("event-delete-compliance-%d-%d", runID, eventCounter)), nil
+			},
+		),
+	)
+	tenantID := types.TenantID(fmt.Sprintf("tenant-it-delete-compliance-%d", runID))
+	appendInput := testAppendInput(tenantID, "client-delete-compliance-source", []byte(`{"text":"secret compliance payload"}`))
+	appendResult, err := repo.AppendMessage(ctx, appendInput)
+	if err != nil {
+		t.Fatalf("append source message: %v", err)
+	}
+
+	deleteInput := testDeleteInput(appendInput, appendResult.MessageID, "delete-compliance-key-1", types.DeleteScopeCompliance, "legal retention cleanup")
+	deleteInput.Command.AuthContext.UserID = "compliance-admin"
+	deleteInput.Permission.OwnershipOverride = true
+	deleteInput.Permission.Classification = "COMPLIANCE_RETENTION"
+	result, err := repo.DeleteMessage(ctx, deleteInput)
+	if err != nil {
+		t.Fatalf("compliance delete message: %v", err)
+	}
+	if result.MessageID != appendResult.MessageID ||
+		result.ConversationSeq != 2 ||
+		result.ChangeVersion != 1 ||
+		result.IdempotentReplay {
+		t.Fatalf("unexpected compliance delete result: %+v", result)
+	}
+
+	assertDeletedFacts(t, ctx, pool, deleteInput, result)
+	var currentPayload, beforePayload, afterPayload, outboxPayload string
+	if err := pool.QueryRow(ctx, `
+SELECT
+    ml.payload_json::text,
+    mch.before_payload_json::text,
+    COALESCE(mch.after_payload_json::text, ''),
+    mo.payload_json::text
+FROM message_log ml
+JOIN message_change_history mch
+  ON mch.tenant_id = ml.tenant_id
+ AND mch.conversation_id = ml.conversation_id
+ AND mch.message_id = ml.message_id
+JOIN message_outbox mo
+  ON mo.tenant_id = ml.tenant_id
+ AND mo.conversation_id = ml.conversation_id
+ AND mo.aggregate_version = $4
+WHERE ml.tenant_id = $1
+  AND ml.conversation_id = $2
+  AND ml.message_id = $3
+`, tenantID, appendInput.Command.ConversationID, appendResult.MessageID, result.ConversationSeq).Scan(&currentPayload, &beforePayload, &afterPayload, &outboxPayload); err != nil {
+		t.Fatalf("read compliance delete payload facts: %v", err)
+	}
+	for label, payload := range map[string]string{
+		"current": currentPayload,
+		"before":  beforePayload,
+		"after":   afterPayload,
+		"outbox":  outboxPayload,
+	} {
+		if strings.Contains(payload, "secret compliance payload") || strings.Contains(payload, "legal retention cleanup") {
+			t.Fatalf("%s payload leaked raw content or reason: %s", label, payload)
+		}
+	}
+	if !strings.Contains(currentPayload, `"redacted": true`) ||
+		!strings.Contains(beforePayload, `"redacted": true`) ||
+		!strings.Contains(afterPayload, `"redacted": true`) ||
+		!strings.Contains(outboxPayload, `"delete_scope": "COMPLIANCE_RETENTION"`) {
+		t.Fatalf("unexpected redaction payloads current=%s before=%s after=%s outbox=%s", currentPayload, beforePayload, afterPayload, outboxPayload)
+	}
 }
 
 func TestMessageRepositoryDeleteMessageRejectsNonSenderIntegration(t *testing.T) {

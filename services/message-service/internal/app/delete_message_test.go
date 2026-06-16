@@ -87,8 +87,10 @@ func TestDeleteMessageUseCaseStopsAfterPolicyOwnershipDeny(t *testing.T) {
 	}
 }
 
-func TestDeleteMessageUseCaseRejectsComplianceScopeBeforeDependencyReads(t *testing.T) {
-	repo := &fakeMessageRepository{}
+func TestDeleteMessageUseCaseRequiresOwnershipOverrideForComplianceScope(t *testing.T) {
+	repo := &fakeMessageRepository{
+		messagePolicyContext: types.MessagePolicyContext{SenderUserID: "user-1"},
+	}
 	policy := &fakePolicy{decision: allowedDecision()}
 	conversation := &fakeConversation{context: localConversation()}
 	command := testDeleteCommand()
@@ -96,11 +98,43 @@ func TestDeleteMessageUseCaseRejectsComplianceScopeBeforeDependencyReads(t *test
 	useCase := NewDeleteMessageUseCase(policy, conversation, repo)
 
 	_, err := useCase.Execute(context.Background(), command)
-	if !errors.Is(err, types.ErrUnsupportedDeleteScope) {
-		t.Fatalf("expected unsupported delete scope, got %v", err)
+	if !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected permission denied, got %v", err)
 	}
-	if conversation.calls != 0 || repo.messagePolicyCalls != 0 || policy.calls != 0 || repo.deleteCalls != 0 {
-		t.Fatalf("unsupported compliance delete should fail before dependency reads, conversation=%d message_context=%d policy=%d repo=%d", conversation.calls, repo.messagePolicyCalls, policy.calls, repo.deleteCalls)
+	if conversation.calls != 1 || repo.messagePolicyCalls != 1 || policy.calls != 1 || repo.deleteCalls != 0 {
+		t.Fatalf("compliance delete should read dependencies and stop before repository, conversation=%d message_context=%d policy=%d repo=%d", conversation.calls, repo.messagePolicyCalls, policy.calls, repo.deleteCalls)
+	}
+}
+
+func TestDeleteMessageUseCaseAllowsComplianceScopeWithOwnershipOverride(t *testing.T) {
+	repo := &fakeMessageRepository{
+		messagePolicyContext: types.MessagePolicyContext{SenderUserID: "user-1"},
+		deleteResult: domain.MessageChangeResult{
+			MessageID:       "msg-1",
+			ConversationSeq: 2,
+			ChangeVersion:   1,
+			AcceptedAt:      time.Date(2026, 6, 10, 3, 0, 0, 0, time.UTC),
+		},
+	}
+	decision := allowedDecision()
+	decision.OwnershipOverride = true
+	policy := &fakePolicy{decision: decision}
+	conversation := &fakeConversation{context: localConversation()}
+	command := testDeleteCommand()
+	command.AuthContext.UserID = "compliance-admin"
+	command.DeleteScope = types.DeleteScopeCompliance
+	useCase := NewDeleteMessageUseCase(policy, conversation, repo)
+
+	result, err := useCase.Execute(context.Background(), command)
+	if err != nil {
+		t.Fatalf("compliance delete: %v", err)
+	}
+	if result.MessageID != "msg-1" || repo.deleteCalls != 1 {
+		t.Fatalf("unexpected compliance delete result=%+v repo_calls=%d", result, repo.deleteCalls)
+	}
+	if repo.deleteInput.Command.DeleteScope != types.DeleteScopeCompliance ||
+		!repo.deleteInput.Permission.OwnershipOverride {
+		t.Fatalf("repository did not receive compliance delete override input: %+v", repo.deleteInput)
 	}
 }
 

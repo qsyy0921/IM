@@ -231,6 +231,16 @@ func NewDeleteMessageRecord(
 	if err != nil {
 		return MessageChangeRecord{}, err
 	}
+	beforePayload := append([]byte(nil), message.PayloadJSON...)
+	var afterPayload []byte
+	if input.Command.DeleteScope == types.DeleteScopeCompliance {
+		redactedPayload, err := buildComplianceRedactedPayload(input, acceptedAt)
+		if err != nil {
+			return MessageChangeRecord{}, err
+		}
+		beforePayload = redactedPayload
+		afterPayload = redactedPayload
+	}
 
 	return MessageChangeRecord{
 		MessageID:       input.Command.MessageID,
@@ -239,7 +249,8 @@ func NewDeleteMessageRecord(
 		ChangeVersion:   changeVersion,
 		ChangedAt:       acceptedAt,
 		CommandHash:     commandHash,
-		BeforePayload:   append([]byte(nil), message.PayloadJSON...),
+		BeforePayload:   beforePayload,
+		AfterPayload:    afterPayload,
 		BeforeStatus:    message.Status,
 		AfterStatus:     MessageStatusDeleted,
 		ChangeType:      MessageChangeTypeDelete,
@@ -370,15 +381,34 @@ func buildMessageDeletedPayload(
 	changeVersion int32,
 	acceptedAt time.Time,
 ) ([]byte, error) {
-	return json.Marshal(map[string]any{
+	payload := map[string]any{
 		"message_id":       input.Command.MessageID,
 		"conversation_id":  input.Command.ConversationID,
 		"conversation_seq": seq,
 		"change_version":   changeVersion,
 		"deleted_by":       input.Command.AuthContext.UserID,
 		"delete_scope":     input.Command.DeleteScope,
-		"reason":           input.Command.Reason,
 		"deleted_at":       acceptedAt.UTC().Format(time.RFC3339Nano),
+	}
+	if input.Command.DeleteScope == types.DeleteScopeCompliance {
+		payload["reason_present"] = input.Command.Reason != ""
+	} else {
+		payload["reason"] = input.Command.Reason
+	}
+	return json.Marshal(payload)
+}
+
+func buildComplianceRedactedPayload(
+	input DeleteMessageInput,
+	acceptedAt time.Time,
+) ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"message_id":      input.Command.MessageID,
+		"conversation_id": input.Command.ConversationID,
+		"redacted":        true,
+		"redaction_scope": input.Command.DeleteScope,
+		"redacted_by":     input.Command.AuthContext.UserID,
+		"redacted_at":     acceptedAt.UTC().Format(time.RFC3339Nano),
 	})
 }
 

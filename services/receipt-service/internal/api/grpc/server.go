@@ -233,6 +233,7 @@ func (server *Server) ListConversations(
 		PinnedOnly:      request.GetPinnedOnly(),
 		MutedOnly:       request.GetMutedOnly(),
 		TagFilter:       request.GetTagFilter(),
+		TagFilters:      request.GetTagFilters(),
 		DraftOnly:       request.GetDraftOnly(),
 	})
 	if err != nil {

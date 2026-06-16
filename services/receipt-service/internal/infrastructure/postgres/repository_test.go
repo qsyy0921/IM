@@ -596,6 +596,62 @@ func TestRepositoryListConversationsFiltersTagsIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryListConversationsFiltersMultipleTagsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	sortTime := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	insertConversationSummary(t, ctx, pool, "conv-a", 11, sortTime)
+	insertConversationSummary(t, ctx, pool, "conv-b", 12, sortTime.Add(-time.Minute))
+	insertConversationSummary(t, ctx, pool, "conv-c", 13, sortTime.Add(-2*time.Minute))
+	insertConversationSummary(t, ctx, pool, "conv-d", 14, sortTime.Add(-3*time.Minute))
+
+	if _, err := repository.SetConversationTags(ctx, setConversationTagsCommand("conv-a", "work", "urgent", "vip")); err != nil {
+		t.Fatalf("set conv-a tags: %v", err)
+	}
+	if _, err := repository.SetConversationTags(ctx, setConversationTagsCommand("conv-b", "work", "vip")); err != nil {
+		t.Fatalf("set conv-b tags: %v", err)
+	}
+	if _, err := repository.SetConversationTags(ctx, setConversationTagsCommand("conv-c", "urgent", "vip")); err != nil {
+		t.Fatalf("set conv-c tags: %v", err)
+	}
+	if _, err := repository.SetConversationTags(ctx, setConversationTagsCommand("conv-d", "work", "urgent")); err != nil {
+		t.Fatalf("set conv-d tags: %v", err)
+	}
+
+	first, err := repository.ListConversations(ctx, listConversationsCommandWithTags(1, "", "urgent", "work"))
+	if err != nil {
+		t.Fatalf("list first multi-tag page: %v", err)
+	}
+	assertConversationIDs(t, first, "conv-a")
+	if first.NextPageCursor == "" {
+		t.Fatal("expected multi-tag next cursor")
+	}
+	second, err := repository.ListConversations(ctx, listConversationsCommandWithTags(1, first.NextPageCursor, "work", "urgent"))
+	if err != nil {
+		t.Fatalf("list second multi-tag page with reversed filters: %v", err)
+	}
+	assertConversationIDs(t, second, "conv-d")
+	if second.NextPageCursor != "" {
+		t.Fatalf("expected empty multi-tag cursor on last page, got %q", second.NextPageCursor)
+	}
+
+	_, err = repository.ListConversations(ctx, listConversationsCommandWithTags(1, first.NextPageCursor, "work"))
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid cursor when tag_filters changes, got %v", err)
+	}
+
+	withLegacyFilter := listConversationsCommandWithTags(10, "", "work", "urgent")
+	withLegacyFilter.TagFilter = "vip"
+	filtered, err := repository.ListConversations(ctx, withLegacyFilter)
+	if err != nil {
+		t.Fatalf("list combined legacy and multi-tag filters: %v", err)
+	}
+	assertConversationIDs(t, filtered, "conv-a")
+}
+
 func TestRepositorySetConversationDraftIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -1158,6 +1214,12 @@ func listConversationsCommandMutedOnly(limit int, cursor string) types.ListConve
 func listConversationsCommandWithTag(limit int, cursor string, tag string) types.ListConversationsCommand {
 	command := listConversationsCommand(limit, cursor)
 	command.TagFilter = tag
+	return command
+}
+
+func listConversationsCommandWithTags(limit int, cursor string, tags ...string) types.ListConversationsCommand {
+	command := listConversationsCommand(limit, cursor)
+	command.TagFilters = tags
 	return command
 }
 

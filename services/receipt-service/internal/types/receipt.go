@@ -1,6 +1,9 @@
 package types
 
-import "time"
+import (
+	"sort"
+	"time"
+)
 
 const (
 	ReceiptVisibilityDetailed  = "DETAILED"
@@ -204,6 +207,7 @@ type ListConversationsCommand struct {
 	PinnedOnly      bool
 	MutedOnly       bool
 	TagFilter       string
+	TagFilters      []string
 	DraftOnly       bool
 }
 
@@ -221,6 +225,9 @@ func (command ListConversationsCommand) Validate() error {
 		if _, err := NormalizeConversationTag(command.TagFilter); err != nil {
 			return err
 		}
+	}
+	if _, err := NormalizeConversationTagFilters(command.TagFilters); err != nil {
+		return err
 	}
 	return nil
 }
@@ -405,6 +412,18 @@ func NormalizeConversationTags(tags []string) ([]string, error) {
 		seen[value] = true
 		normalized = append(normalized, value)
 	}
+	return normalized, nil
+}
+
+func NormalizeConversationTagFilters(tags []string) ([]string, error) {
+	if len(tags) == 0 {
+		return []string{}, nil
+	}
+	normalized, err := NormalizeConversationTags(tags)
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(normalized)
 	return normalized, nil
 }
 

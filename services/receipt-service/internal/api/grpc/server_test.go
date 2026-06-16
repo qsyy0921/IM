@@ -238,6 +238,7 @@ func TestListConversationsMapsSort(t *testing.T) {
 				PinnedOnly:   true,
 				MutedOnly:    true,
 				TagFilter:    "work",
+				TagFilters:   []string{"urgent", "vip"},
 				DraftOnly:    true,
 			})
 			if err != nil {
@@ -251,6 +252,7 @@ func TestListConversationsMapsSort(t *testing.T) {
 				!list.command.PinnedOnly ||
 				!list.command.MutedOnly ||
 				list.command.TagFilter != "work" ||
+				!stringSlicesEqual(list.command.TagFilters, []string{"urgent", "vip"}) ||
 				!list.command.DraftOnly {
 				t.Fatalf("unexpected list command: %+v", list.command)
 			}
@@ -630,6 +632,18 @@ type fakeListConversationsCapture struct {
 func (fake *fakeListConversationsCapture) Execute(_ context.Context, command types.ListConversationsCommand) (types.ListConversationsResult, error) {
 	fake.command = command
 	return fake.result, nil
+}
+
+func stringSlicesEqual(left []string, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
 }
 
 type fakeArchiveConversation struct{}

@@ -760,6 +760,31 @@ func setPrivacyExceptionCommand(owner string, other string, decision types.Conta
 	}
 }
 
+func listPrivacyExceptionsCommand(owner string, pageSize int, pageToken string) types.ListContactPrivacyExceptionsCommand {
+	return types.ListContactPrivacyExceptionsCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-contacts",
+			UserID:   types.UserID(owner),
+		},
+		PageSize:  pageSize,
+		PageToken: pageToken,
+	}
+}
+
+func deletePrivacyExceptionCommand(owner string, other string, key string) types.DeleteContactPrivacyExceptionCommand {
+	return types.DeleteContactPrivacyExceptionCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  "tenant-contacts",
+			UserID:    types.UserID(owner),
+			DeviceID:  "device-1",
+			RequestID: "request-" + key,
+			TraceID:   "trace-" + key,
+		},
+		OtherUserID:    types.UserID(other),
+		IdempotencyKey: key,
+	}
+}
+
 func respondCommand(receiver string, requestID string, key string, decision types.ContactDecision) types.RespondContactRequestCommand {
 	return types.RespondContactRequestCommand{
 		AuthContext: types.AuthContext{

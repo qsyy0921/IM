@@ -18,6 +18,7 @@ const (
 	ContactEventGroupUpdated            = "contact.edge.group_updated.v1"
 	ContactEventPrivacyUpdated          = "contact.privacy.updated.v1"
 	ContactEventPrivacyExceptionUpdated = "contact.privacy_exception.updated.v1"
+	ContactEventPrivacyExceptionDeleted = "contact.privacy_exception.deleted.v1"
 )
 
 type OutboxMessage struct {

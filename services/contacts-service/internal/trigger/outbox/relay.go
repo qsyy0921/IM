@@ -373,6 +373,21 @@ func BuildContactEvent(message types.OutboxMessage) (*contacteventsv1.ContactEve
 			},
 		}
 		return event, nil
+	case types.ContactEventPrivacyExceptionDeleted:
+		payload, err := decodeContactPrivacyExceptionDeletedPayload(message.PayloadJSON)
+		if err != nil {
+			return nil, err
+		}
+		event.Payload = &contacteventsv1.ContactEvent_PrivacyExceptionDeleted{
+			PrivacyExceptionDeleted: &contacteventsv1.ContactPrivacyExceptionDeletedV1{
+				TenantId:                 payload.TenantID,
+				OwnerUserId:              payload.OwnerUserID,
+				OtherUserId:              payload.OtherUserID,
+				PreviousExceptionVersion: payload.PreviousExceptionVersion,
+				OccurredAt:               payload.Timestamp(),
+			},
+		}
+		return event, nil
 	default:
 		return nil, errors.New("unsupported contacts outbox event type")
 	}
@@ -402,6 +417,7 @@ type contactPayload struct {
 	OtherUserID                string   `json:"other_user_id"`
 	Decision                   string   `json:"decision"`
 	ExceptionVersion           int64    `json:"exception_version"`
+	PreviousExceptionVersion   int64    `json:"previous_exception_version"`
 }
 
 func (payload contactPayload) Timestamp() *timestamppb.Timestamp {
@@ -520,6 +536,24 @@ func decodeContactPrivacyExceptionPayload(payloadJSON []byte) (contactPayload, e
 	}
 	if _, err := time.Parse(time.RFC3339Nano, payload.OccurredAt); err != nil {
 		return contactPayload{}, errors.New("contact privacy exception payload occurred_at is invalid")
+	}
+	return payload, nil
+}
+
+func decodeContactPrivacyExceptionDeletedPayload(payloadJSON []byte) (contactPayload, error) {
+	var payload contactPayload
+	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+		return contactPayload{}, err
+	}
+	if payload.TenantID == "" ||
+		payload.OwnerUserID == "" ||
+		payload.OtherUserID == "" ||
+		payload.PreviousExceptionVersion <= 0 ||
+		payload.OccurredAt == "" {
+		return contactPayload{}, errors.New("contact privacy exception deleted payload is incomplete")
+	}
+	if _, err := time.Parse(time.RFC3339Nano, payload.OccurredAt); err != nil {
+		return contactPayload{}, errors.New("contact privacy exception deleted payload occurred_at is invalid")
 	}
 	return payload, nil
 }

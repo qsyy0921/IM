@@ -158,6 +158,44 @@ func TestSetContactPrivacyExceptionCommandValidation(t *testing.T) {
 	}
 }
 
+func TestPrivacyExceptionManagementCommandValidation(t *testing.T) {
+	listCommand := ListContactPrivacyExceptionsCommand{
+		AuthContext: AuthContext{
+			TenantID: "tenant-1",
+			UserID:   "bob",
+		},
+		PageSize: 10,
+	}
+	if err := listCommand.Validate(); err != nil {
+		t.Fatalf("expected list privacy exceptions command to be valid: %v", err)
+	}
+	listCommand.PageSize = -1
+	if err := listCommand.Validate(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("expected negative page size to be invalid, got %v", err)
+	}
+
+	deleteCommand := DeleteContactPrivacyExceptionCommand{
+		AuthContext: AuthContext{
+			TenantID: "tenant-1",
+			UserID:   "bob",
+		},
+		OtherUserID:    "alice",
+		IdempotencyKey: "privacy-exception-delete-1",
+	}
+	if err := deleteCommand.Validate(); err != nil {
+		t.Fatalf("expected delete privacy exception command to be valid: %v", err)
+	}
+	deleteCommand.OtherUserID = "bob"
+	if err := deleteCommand.Validate(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("expected self privacy exception delete to be invalid, got %v", err)
+	}
+	deleteCommand.OtherUserID = "alice"
+	deleteCommand.IdempotencyKey = " "
+	if err := deleteCommand.Validate(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("expected blank idempotency key to be invalid, got %v", err)
+	}
+}
+
 func validSendContactRequestCommand() SendContactRequestCommand {
 	return SendContactRequestCommand{
 		AuthContext: AuthContext{

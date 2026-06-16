@@ -223,6 +223,28 @@ func TestBuildContactEventPrivacyExceptionUpdated(t *testing.T) {
 	}
 }
 
+func TestBuildContactEventPrivacyExceptionDeleted(t *testing.T) {
+	message := outboxMessage(types.ContactEventPrivacyExceptionDeleted, map[string]any{
+		"tenant_id":                  "tenant-contacts",
+		"owner_user_id":              "bob",
+		"other_user_id":              "alice",
+		"previous_exception_version": 2,
+		"occurred_at":                "2026-06-10T08:00:00Z",
+	})
+	event, err := BuildContactEvent(message)
+	if err != nil {
+		t.Fatalf("build privacy exception deleted event: %v", err)
+	}
+	deleted := event.GetPrivacyExceptionDeleted()
+	if deleted == nil ||
+		deleted.TenantId != "tenant-contacts" ||
+		deleted.OwnerUserId != "bob" ||
+		deleted.OtherUserId != "alice" ||
+		deleted.PreviousExceptionVersion != 2 {
+		t.Fatalf("unexpected privacy exception deleted event: %+v payload=%+v", event, deleted)
+	}
+}
+
 func TestBuildContactEventRejectsMalformedEdgeEvent(t *testing.T) {
 	_, err := BuildContactEvent(outboxMessage(types.ContactEventEdgeDeleted, map[string]any{
 		"tenant_id":       "tenant-contacts",
@@ -259,6 +281,15 @@ func TestBuildContactEventRejectsUnsupportedAndMalformed(t *testing.T) {
 	}))
 	if err == nil {
 		t.Fatal("expected malformed privacy payload error")
+	}
+	_, err = BuildKafkaValue(outboxMessage(types.ContactEventPrivacyExceptionDeleted, map[string]any{
+		"tenant_id":     "tenant-contacts",
+		"owner_user_id": "bob",
+		"other_user_id": "alice",
+		"occurred_at":   "2026-06-10T08:00:00Z",
+	}))
+	if err == nil {
+		t.Fatal("expected malformed privacy exception deleted payload error")
 	}
 }
 

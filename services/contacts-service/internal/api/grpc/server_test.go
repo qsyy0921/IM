@@ -25,7 +25,7 @@ func TestSendContactRequestMapsSourceMetadata(t *testing.T) {
 				SourceRef:      command.SourceRef,
 			}, nil
 		}),
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
 
 	response, err := server.SendContactRequest(context.Background(), &contactsv1.SendContactRequestRequest{
@@ -60,7 +60,7 @@ func TestSendContactRequestRejectsUnknownSourceType(t *testing.T) {
 			t.Fatalf("expected unknown source type to fail validation, got %+v", command)
 			return types.SendContactRequestResult{}, nil
 		}),
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
 
 	_, err := server.SendContactRequest(context.Background(), &contactsv1.SendContactRequestRequest{
@@ -80,7 +80,7 @@ func TestSendContactRequestRejectsUnknownSourceType(t *testing.T) {
 
 func TestListContactRequestsMapsSourceMetadata(t *testing.T) {
 	server := NewServer(
-		nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil,
 		listContactRequestsExecutorFunc(func(_ context.Context, _ types.ListContactRequestsCommand) (types.ListContactRequestsResult, error) {
 			return types.ListContactRequestsResult{
 				TenantID:  "tenant-1",
@@ -142,7 +142,7 @@ func TestContactPrivacyMapsPolicySource(t *testing.T) {
 				},
 			}, nil
 		}),
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
 
 	response, err := server.GetContactPrivacy(context.Background(), &contactsv1.GetContactPrivacyRequest{
@@ -189,7 +189,7 @@ func TestSetContactPrivacyMapsOptionalPolicies(t *testing.T) {
 				},
 			}, nil
 		}),
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
 
 	allowSearch := false
@@ -250,7 +250,7 @@ func TestSetContactPrivacyExceptionMapsDecision(t *testing.T) {
 				Version:     1,
 			}, nil
 		}),
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
 
 	response, err := server.SetContactPrivacyException(context.Background(), &contactsv1.SetContactPrivacyExceptionRequest{
@@ -277,6 +277,84 @@ func TestSetContactPrivacyExceptionMapsDecision(t *testing.T) {
 	}
 }
 
+func TestListContactPrivacyExceptionsMapsItems(t *testing.T) {
+	var captured types.ListContactPrivacyExceptionsCommand
+	server := NewServer(
+		nil, nil, nil, nil,
+		listContactPrivacyExceptionsExecutorFunc(func(_ context.Context, command types.ListContactPrivacyExceptionsCommand) (types.ListContactPrivacyExceptionsResult, error) {
+			captured = command
+			return types.ListContactPrivacyExceptionsResult{
+				TenantID:    command.AuthContext.TenantID,
+				OwnerUserID: command.AuthContext.UserID,
+				Exceptions: []types.ContactPrivacyExceptionItem{{
+					OtherUserID:     "alice",
+					Decision:        types.ContactPrivacyExceptionDecisionAllow,
+					Version:         2,
+					UpdatedAtUnixMS: 1234,
+				}},
+				NextPageToken: "next",
+			}, nil
+		}),
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+	)
+
+	response, err := server.ListContactPrivacyExceptions(context.Background(), &contactsv1.ListContactPrivacyExceptionsRequest{
+		AuthContext: &contactsv1.AuthContext{
+			TenantId: "tenant-1",
+			UserId:   "bob",
+		},
+		PageSize:  10,
+		PageToken: "page",
+	})
+	if err != nil {
+		t.Fatalf("list contact privacy exceptions: %v", err)
+	}
+	if captured.PageSize != 10 || captured.PageToken != "page" {
+		t.Fatalf("unexpected captured command: %+v", captured)
+	}
+	if response.GetOwnerUserId() != "bob" ||
+		response.GetNextPageToken() != "next" ||
+		len(response.GetExceptions()) != 1 ||
+		response.GetExceptions()[0].GetDecision() != contactsv1.ContactPrivacyExceptionDecision_CONTACT_PRIVACY_EXCEPTION_DECISION_ALLOW {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
+func TestDeleteContactPrivacyExceptionMapsCommand(t *testing.T) {
+	var captured types.DeleteContactPrivacyExceptionCommand
+	server := NewServer(
+		nil, nil, nil, nil, nil,
+		deleteContactPrivacyExceptionExecutorFunc(func(_ context.Context, command types.DeleteContactPrivacyExceptionCommand) (types.DeleteContactPrivacyExceptionResult, error) {
+			captured = command
+			return types.DeleteContactPrivacyExceptionResult{
+				TenantID:    command.AuthContext.TenantID,
+				OwnerUserID: command.AuthContext.UserID,
+				OtherUserID: command.OtherUserID,
+				Deleted:     true,
+			}, nil
+		}),
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+	)
+
+	response, err := server.DeleteContactPrivacyException(context.Background(), &contactsv1.DeleteContactPrivacyExceptionRequest{
+		AuthContext: &contactsv1.AuthContext{
+			TenantId: "tenant-1",
+			UserId:   "bob",
+		},
+		OtherUserId:    "alice",
+		IdempotencyKey: "privacy-exception-delete-1",
+	})
+	if err != nil {
+		t.Fatalf("delete contact privacy exception: %v", err)
+	}
+	if captured.OtherUserID != "alice" || captured.IdempotencyKey != "privacy-exception-delete-1" {
+		t.Fatalf("unexpected captured command: %+v", captured)
+	}
+	if !response.GetDeleted() || response.GetOwnerUserId() != "bob" || response.GetOtherUserId() != "alice" {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
 type sendContactRequestExecutorFunc func(context.Context, types.SendContactRequestCommand) (types.SendContactRequestResult, error)
 
 func (f sendContactRequestExecutorFunc) Execute(ctx context.Context, command types.SendContactRequestCommand) (types.SendContactRequestResult, error) {
@@ -298,6 +376,18 @@ func (f setContactPrivacyExecutorFunc) Execute(ctx context.Context, command type
 type setContactPrivacyExceptionExecutorFunc func(context.Context, types.SetContactPrivacyExceptionCommand) (types.SetContactPrivacyExceptionResult, error)
 
 func (f setContactPrivacyExceptionExecutorFunc) Execute(ctx context.Context, command types.SetContactPrivacyExceptionCommand) (types.SetContactPrivacyExceptionResult, error) {
+	return f(ctx, command)
+}
+
+type listContactPrivacyExceptionsExecutorFunc func(context.Context, types.ListContactPrivacyExceptionsCommand) (types.ListContactPrivacyExceptionsResult, error)
+
+func (f listContactPrivacyExceptionsExecutorFunc) Execute(ctx context.Context, command types.ListContactPrivacyExceptionsCommand) (types.ListContactPrivacyExceptionsResult, error) {
+	return f(ctx, command)
+}
+
+type deleteContactPrivacyExceptionExecutorFunc func(context.Context, types.DeleteContactPrivacyExceptionCommand) (types.DeleteContactPrivacyExceptionResult, error)
+
+func (f deleteContactPrivacyExceptionExecutorFunc) Execute(ctx context.Context, command types.DeleteContactPrivacyExceptionCommand) (types.DeleteContactPrivacyExceptionResult, error) {
 	return f(ctx, command)
 }
 

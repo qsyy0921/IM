@@ -22,6 +22,14 @@ type SetContactPrivacyExceptionRepository interface {
 	SetContactPrivacyException(context.Context, types.SetContactPrivacyExceptionCommand) (types.SetContactPrivacyExceptionResult, error)
 }
 
+type ListContactPrivacyExceptionsRepository interface {
+	ListContactPrivacyExceptions(context.Context, types.ListContactPrivacyExceptionsCommand) (types.ListContactPrivacyExceptionsResult, error)
+}
+
+type DeleteContactPrivacyExceptionRepository interface {
+	DeleteContactPrivacyException(context.Context, types.DeleteContactPrivacyExceptionCommand) (types.DeleteContactPrivacyExceptionResult, error)
+}
+
 type GetTenantContactPrivacyDefaultRepository interface {
 	GetTenantContactPrivacyDefault(context.Context, types.GetTenantContactPrivacyDefaultCommand) (types.GetTenantContactPrivacyDefaultResult, error)
 }

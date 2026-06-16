@@ -12,16 +12,17 @@ import (
 )
 
 const (
-	commandTypeSendContactRequest    = "SEND_CONTACT_REQUEST"
-	commandTypeRespondContactRequest = "RESPOND_CONTACT_REQUEST"
-	commandTypeCancelContactRequest  = "CANCEL_CONTACT_REQUEST"
-	commandTypeDeleteContact         = "DELETE_CONTACT"
-	commandTypeBlockContact          = "BLOCK_CONTACT"
-	commandTypeUnblockContact        = "UNBLOCK_CONTACT"
-	commandTypeUpdateContactRemark   = "UPDATE_CONTACT_REMARK"
-	commandTypeUpdateContactGroup    = "UPDATE_CONTACT_GROUP"
-	commandTypeSetContactPrivacy     = "SET_CONTACT_PRIVACY"
-	commandTypeSetPrivacyException   = "SET_CONTACT_PRIVACY_EXCEPTION"
+	commandTypeSendContactRequest     = "SEND_CONTACT_REQUEST"
+	commandTypeRespondContactRequest  = "RESPOND_CONTACT_REQUEST"
+	commandTypeCancelContactRequest   = "CANCEL_CONTACT_REQUEST"
+	commandTypeDeleteContact          = "DELETE_CONTACT"
+	commandTypeBlockContact           = "BLOCK_CONTACT"
+	commandTypeUnblockContact         = "UNBLOCK_CONTACT"
+	commandTypeUpdateContactRemark    = "UPDATE_CONTACT_REMARK"
+	commandTypeUpdateContactGroup     = "UPDATE_CONTACT_GROUP"
+	commandTypeSetContactPrivacy      = "SET_CONTACT_PRIVACY"
+	commandTypeSetPrivacyException    = "SET_CONTACT_PRIVACY_EXCEPTION"
+	commandTypeDeletePrivacyException = "DELETE_CONTACT_PRIVACY_EXCEPTION"
 
 	eventTypeContactRequestCreated          = "contact.request.created.v1"
 	eventTypeContactRequestAccepted         = "contact.request.accepted.v1"
@@ -34,6 +35,7 @@ const (
 	eventTypeContactGroupUpdated            = "contact.edge.group_updated.v1"
 	eventTypeContactPrivacyUpdated          = "contact.privacy.updated.v1"
 	eventTypeContactPrivacyExceptionUpdated = "contact.privacy_exception.updated.v1"
+	eventTypeContactPrivacyExceptionDeleted = "contact.privacy_exception.deleted.v1"
 
 	contactsOutboxEventVersion   = "1.0.0"
 	contactsOutboxMappingVersion = 1

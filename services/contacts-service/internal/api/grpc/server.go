@@ -27,6 +27,14 @@ type SetContactPrivacyExceptionExecutor interface {
 	Execute(context.Context, types.SetContactPrivacyExceptionCommand) (types.SetContactPrivacyExceptionResult, error)
 }
 
+type ListContactPrivacyExceptionsExecutor interface {
+	Execute(context.Context, types.ListContactPrivacyExceptionsCommand) (types.ListContactPrivacyExceptionsResult, error)
+}
+
+type DeleteContactPrivacyExceptionExecutor interface {
+	Execute(context.Context, types.DeleteContactPrivacyExceptionCommand) (types.DeleteContactPrivacyExceptionResult, error)
+}
+
 type RespondContactRequestExecutor interface {
 	Execute(context.Context, types.RespondContactRequestCommand) (types.RespondContactRequestResult, error)
 }
@@ -73,6 +81,8 @@ type Server struct {
 	getContactPrivacy          GetContactPrivacyExecutor
 	setContactPrivacy          SetContactPrivacyExecutor
 	setContactPrivacyException SetContactPrivacyExceptionExecutor
+	listPrivacyExceptions      ListContactPrivacyExceptionsExecutor
+	deletePrivacyException     DeleteContactPrivacyExceptionExecutor
 	respondContactRequest      RespondContactRequestExecutor
 	cancelContactRequest       CancelContactRequestExecutor
 	listContactRequests        ListContactRequestsExecutor
@@ -90,6 +100,8 @@ func NewServer(
 	getContactPrivacy GetContactPrivacyExecutor,
 	setContactPrivacy SetContactPrivacyExecutor,
 	setContactPrivacyException SetContactPrivacyExceptionExecutor,
+	listPrivacyExceptions ListContactPrivacyExceptionsExecutor,
+	deletePrivacyException DeleteContactPrivacyExceptionExecutor,
 	respondContactRequest RespondContactRequestExecutor,
 	cancelContactRequest CancelContactRequestExecutor,
 	listContactRequests ListContactRequestsExecutor,
@@ -106,6 +118,8 @@ func NewServer(
 		getContactPrivacy:          getContactPrivacy,
 		setContactPrivacy:          setContactPrivacy,
 		setContactPrivacyException: setContactPrivacyException,
+		listPrivacyExceptions:      listPrivacyExceptions,
+		deletePrivacyException:     deletePrivacyException,
 		respondContactRequest:      respondContactRequest,
 		cancelContactRequest:       cancelContactRequest,
 		listContactRequests:        listContactRequests,
@@ -234,6 +248,68 @@ func (s *Server) SetContactPrivacyException(
 		OtherUserId:      string(result.OtherUserID),
 		Decision:         privacyExceptionDecisionToProto(result.Decision),
 		Version:          result.Version,
+		IdempotentReplay: result.IdempotentReplay,
+	}, nil
+}
+
+func (s *Server) ListContactPrivacyExceptions(
+	ctx context.Context,
+	request *contactsv1.ListContactPrivacyExceptionsRequest,
+) (*contactsv1.ListContactPrivacyExceptionsResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.listPrivacyExceptions == nil {
+		return nil, status.Error(codes.Unimplemented, "list contact privacy exceptions is not configured")
+	}
+	result, err := s.listPrivacyExceptions.Execute(ctx, types.ListContactPrivacyExceptionsCommand{
+		AuthContext: authFromProto(ctx, request.GetAuthContext()),
+		PageSize:    int(request.GetPageSize()),
+		PageToken:   request.GetPageToken(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	items := make([]*contactsv1.ContactPrivacyExceptionItem, 0, len(result.Exceptions))
+	for _, item := range result.Exceptions {
+		items = append(items, &contactsv1.ContactPrivacyExceptionItem{
+			OtherUserId:     string(item.OtherUserID),
+			Decision:        privacyExceptionDecisionToProto(item.Decision),
+			Version:         item.Version,
+			UpdatedAtUnixMs: item.UpdatedAtUnixMS,
+		})
+	}
+	return &contactsv1.ListContactPrivacyExceptionsResponse{
+		TenantId:      string(result.TenantID),
+		OwnerUserId:   string(result.OwnerUserID),
+		Exceptions:    items,
+		NextPageToken: result.NextPageToken,
+	}, nil
+}
+
+func (s *Server) DeleteContactPrivacyException(
+	ctx context.Context,
+	request *contactsv1.DeleteContactPrivacyExceptionRequest,
+) (*contactsv1.DeleteContactPrivacyExceptionResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.deletePrivacyException == nil {
+		return nil, status.Error(codes.Unimplemented, "delete contact privacy exception is not configured")
+	}
+	result, err := s.deletePrivacyException.Execute(ctx, types.DeleteContactPrivacyExceptionCommand{
+		AuthContext:    authFromProto(ctx, request.GetAuthContext()),
+		OtherUserID:    types.UserID(request.GetOtherUserId()),
+		IdempotencyKey: request.GetIdempotencyKey(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &contactsv1.DeleteContactPrivacyExceptionResponse{
+		TenantId:         string(result.TenantID),
+		OwnerUserId:      string(result.OwnerUserID),
+		OtherUserId:      string(result.OtherUserID),
+		Deleted:          result.Deleted,
 		IdempotentReplay: result.IdempotentReplay,
 	}, nil
 }

@@ -82,6 +82,48 @@ func (u *SetContactPrivacyExceptionUseCase) Execute(
 	return u.repository.SetContactPrivacyException(ctx, command)
 }
 
+type ListContactPrivacyExceptionsUseCase struct {
+	repository ListContactPrivacyExceptionsRepository
+}
+
+func NewListContactPrivacyExceptionsUseCase(repository ListContactPrivacyExceptionsRepository) *ListContactPrivacyExceptionsUseCase {
+	return &ListContactPrivacyExceptionsUseCase{repository: repository}
+}
+
+func (u *ListContactPrivacyExceptionsUseCase) Execute(
+	ctx context.Context,
+	command types.ListContactPrivacyExceptionsCommand,
+) (types.ListContactPrivacyExceptionsResult, error) {
+	if err := command.Validate(); err != nil {
+		return types.ListContactPrivacyExceptionsResult{}, err
+	}
+	if u.repository == nil {
+		return types.ListContactPrivacyExceptionsResult{}, types.NewDBReadFailed("contact privacy exception repository is not configured")
+	}
+	return u.repository.ListContactPrivacyExceptions(ctx, command)
+}
+
+type DeleteContactPrivacyExceptionUseCase struct {
+	repository DeleteContactPrivacyExceptionRepository
+}
+
+func NewDeleteContactPrivacyExceptionUseCase(repository DeleteContactPrivacyExceptionRepository) *DeleteContactPrivacyExceptionUseCase {
+	return &DeleteContactPrivacyExceptionUseCase{repository: repository}
+}
+
+func (u *DeleteContactPrivacyExceptionUseCase) Execute(
+	ctx context.Context,
+	command types.DeleteContactPrivacyExceptionCommand,
+) (types.DeleteContactPrivacyExceptionResult, error) {
+	if err := command.Validate(); err != nil {
+		return types.DeleteContactPrivacyExceptionResult{}, err
+	}
+	if u.repository == nil {
+		return types.DeleteContactPrivacyExceptionResult{}, types.NewDBWriteFailed("contact privacy exception repository is not configured")
+	}
+	return u.repository.DeleteContactPrivacyException(ctx, command)
+}
+
 type GetTenantContactPrivacyDefaultUseCase struct {
 	repository GetTenantContactPrivacyDefaultRepository
 }

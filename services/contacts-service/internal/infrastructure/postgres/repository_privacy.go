@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/qsyy0921/IM/services/contacts-service/internal/domain"
 	"github.com/qsyy0921/IM/services/contacts-service/internal/types"
 )
 
@@ -235,6 +236,148 @@ func (r *Repository) SetContactPrivacyException(
 		}
 	}
 	return commitSetContactPrivacyExceptionResult(ctx, tx, setContactPrivacyExceptionResultFromRow(row, false))
+}
+
+func (r *Repository) ListContactPrivacyExceptions(
+	ctx context.Context,
+	command types.ListContactPrivacyExceptionsCommand,
+) (types.ListContactPrivacyExceptionsResult, error) {
+	if r.pool == nil {
+		return types.ListContactPrivacyExceptionsResult{}, types.NewDBReadFailed("contacts repository is not configured")
+	}
+	limit := domain.NormalizePageSize(command.PageSize)
+	cursor, hasCursor, err := decodeContactPrivacyExceptionPageTokenFor(command, limit)
+	if err != nil {
+		return types.ListContactPrivacyExceptionsResult{}, err
+	}
+	args := []any{command.AuthContext.TenantID, command.AuthContext.UserID, limit + 1}
+	query := `
+SELECT other_user_id, decision, version, updated_at
+FROM contact_privacy_exceptions
+WHERE tenant_id = $1
+  AND owner_user_id = $2
+`
+	if hasCursor {
+		args = append(args, cursor.OtherUserID)
+		query += fmt.Sprintf(`  AND other_user_id > $%d
+`, len(args))
+	}
+	query += `ORDER BY other_user_id ASC
+LIMIT $3
+`
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return types.ListContactPrivacyExceptionsResult{}, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+	items := make([]types.ContactPrivacyExceptionItem, 0, limit)
+	for rows.Next() {
+		var item types.ContactPrivacyExceptionItem
+		var updatedAt time.Time
+		if err := rows.Scan(&item.OtherUserID, &item.Decision, &item.Version, &updatedAt); err != nil {
+			return types.ListContactPrivacyExceptionsResult{}, types.NewDBReadFailed(err.Error())
+		}
+		item.Decision = types.NormalizeContactPrivacyExceptionDecision(item.Decision)
+		if item.Decision == "" {
+			return types.ListContactPrivacyExceptionsResult{}, types.NewDBReadFailed("contact privacy exception decision is invalid")
+		}
+		item.UpdatedAtUnixMS = updatedAt.UnixMilli()
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return types.ListContactPrivacyExceptionsResult{}, types.NewDBReadFailed(err.Error())
+	}
+	nextToken := ""
+	if len(items) > limit {
+		last := items[limit-1]
+		nextToken = encodeContactPrivacyExceptionPageToken(contactPrivacyExceptionPageCursor{
+			Version:     1,
+			TenantID:    command.AuthContext.TenantID,
+			OwnerUserID: command.AuthContext.UserID,
+			PageSize:    limit,
+			OtherUserID: string(last.OtherUserID),
+		})
+		items = items[:limit]
+	}
+	return types.ListContactPrivacyExceptionsResult{
+		TenantID:      command.AuthContext.TenantID,
+		OwnerUserID:   command.AuthContext.UserID,
+		Exceptions:    items,
+		NextPageToken: nextToken,
+	}, nil
+}
+
+func (r *Repository) DeleteContactPrivacyException(
+	ctx context.Context,
+	command types.DeleteContactPrivacyExceptionCommand,
+) (types.DeleteContactPrivacyExceptionResult, error) {
+	if r.pool == nil {
+		return types.DeleteContactPrivacyExceptionResult{}, types.NewDBWriteFailed("contacts repository is not configured")
+	}
+	commandHash, err := commandHash(commandHashPayload{
+		Kind:        commandTypeDeletePrivacyException,
+		TenantID:    string(command.AuthContext.TenantID),
+		UserID:      string(command.AuthContext.UserID),
+		OtherUserID: string(command.OtherUserID),
+	})
+	if err != nil {
+		return types.DeleteContactPrivacyExceptionResult{}, err
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.DeleteContactPrivacyExceptionResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+	if err := lockIdempotencyKey(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey); err != nil {
+		return types.DeleteContactPrivacyExceptionResult{}, err
+	}
+	if existing, ok, err := findCommandIdempotency(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey); err != nil {
+		return types.DeleteContactPrivacyExceptionResult{}, err
+	} else if ok {
+		if existing.CommandType != commandTypeDeletePrivacyException || existing.CommandHash != commandHash {
+			return types.DeleteContactPrivacyExceptionResult{}, types.NewContactRequestConflict("idempotency key conflict")
+		}
+		result, err := deleteContactPrivacyExceptionResultFromIdempotencyResult(existing)
+		if err != nil {
+			return types.DeleteContactPrivacyExceptionResult{}, err
+		}
+		result.IdempotentReplay = true
+		return commitDeleteContactPrivacyExceptionResult(ctx, tx, result)
+	}
+	if err := lockContactPrivacyException(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.OtherUserID); err != nil {
+		return types.DeleteContactPrivacyExceptionResult{}, err
+	}
+	row, err := deleteContactPrivacyException(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.OtherUserID)
+	if err != nil {
+		return types.DeleteContactPrivacyExceptionResult{}, err
+	}
+	result := types.DeleteContactPrivacyExceptionResult{
+		TenantID:    row.TenantID,
+		OwnerUserID: row.OwnerUserID,
+		OtherUserID: row.OtherUserID,
+		Deleted:     true,
+	}
+	resultJSON, err := deleteContactPrivacyExceptionResultJSON(result)
+	if err != nil {
+		return types.DeleteContactPrivacyExceptionResult{}, err
+	}
+	if err := insertCommandIdempotencyWithResult(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey, commandTypeDeletePrivacyException, commandHash, string(command.OtherUserID), resultJSON); err != nil {
+		return types.DeleteContactPrivacyExceptionResult{}, err
+	}
+	if err := r.insertPrivacyExceptionDeletedOutbox(ctx, tx, privacyExceptionOutboxInput{
+		TenantID:      command.AuthContext.TenantID,
+		OwnerUserID:   command.AuthContext.UserID,
+		OtherUserID:   command.OtherUserID,
+		CorrelationID: command.AuthContext.RequestID,
+		CausationID:   command.AuthContext.RequestID,
+		TraceID:       command.AuthContext.TraceID,
+		Exception:     row,
+	}); err != nil {
+		return types.DeleteContactPrivacyExceptionResult{}, err
+	}
+	return commitDeleteContactPrivacyExceptionResult(ctx, tx, result)
 }
 
 type contactPrivacyRow struct {
@@ -505,6 +648,34 @@ RETURNING tenant_id, owner_user_id, other_user_id, decision, version, updated_at
 		return contactPrivacyExceptionRow{}, false, types.NewDBWriteFailed(err.Error())
 	}
 	return row, true, nil
+}
+
+func deleteContactPrivacyException(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	ownerUserID types.UserID,
+	otherUserID types.UserID,
+) (contactPrivacyExceptionRow, error) {
+	var row contactPrivacyExceptionRow
+	err := tx.QueryRow(ctx, `
+DELETE FROM contact_privacy_exceptions
+WHERE tenant_id = $1
+  AND owner_user_id = $2
+  AND other_user_id = $3
+RETURNING tenant_id, owner_user_id, other_user_id, decision, version, updated_at
+`, tenantID, ownerUserID, otherUserID).Scan(&row.TenantID, &row.OwnerUserID, &row.OtherUserID, &row.Decision, &row.Version, &row.UpdatedAt)
+	if err == pgx.ErrNoRows {
+		return contactPrivacyExceptionRow{}, types.NewContactNotFound("contact privacy exception not found")
+	}
+	if err != nil {
+		return contactPrivacyExceptionRow{}, types.NewDBWriteFailed(err.Error())
+	}
+	row.Decision = types.NormalizeContactPrivacyExceptionDecision(row.Decision)
+	if row.Decision == "" {
+		return contactPrivacyExceptionRow{}, types.NewDBReadFailed("contact privacy exception decision is invalid")
+	}
+	return row, nil
 }
 
 func upsertContactPrivacySettings(
@@ -812,6 +983,37 @@ func (r *Repository) insertPrivacyExceptionOutbox(ctx context.Context, tx pgx.Tx
 	})
 }
 
+func (r *Repository) insertPrivacyExceptionDeletedOutbox(ctx context.Context, tx pgx.Tx, input privacyExceptionOutboxInput) error {
+	eventID, err := r.eventID()
+	if err != nil {
+		return types.NewOutboxWriteFailed(err.Error())
+	}
+	partitionKey := partitionKeyFor(input.TenantID, input.OwnerUserID, input.OtherUserID)
+	aggregateVersion, err := nextContactOutboxAggregateVersion(ctx, tx, input.TenantID, partitionKey)
+	if err != nil {
+		return err
+	}
+	return insertContactOutbox(ctx, tx, contactOutboxInput{
+		EventID:          eventID,
+		TenantID:         input.TenantID,
+		AggregateType:    "CONTACT_PRIVACY_EXCEPTION",
+		AggregateID:      fmt.Sprintf("%s:%s", input.OwnerUserID, input.OtherUserID),
+		AggregateVersion: aggregateVersion,
+		EventType:        eventTypeContactPrivacyExceptionDeleted,
+		PartitionKey:     partitionKey,
+		CorrelationID:    input.CorrelationID,
+		CausationID:      input.CausationID,
+		TraceID:          input.TraceID,
+		Payload: map[string]any{
+			"tenant_id":                  input.TenantID,
+			"owner_user_id":              input.OwnerUserID,
+			"other_user_id":              input.OtherUserID,
+			"previous_exception_version": input.Exception.Version,
+			"occurred_at":                r.now().Format(time.RFC3339Nano),
+		},
+	})
+}
+
 func commitSetContactPrivacyResult(ctx context.Context, tx pgx.Tx, result types.SetContactPrivacyResult) (types.SetContactPrivacyResult, error) {
 	if err := tx.Commit(ctx); err != nil {
 		return types.SetContactPrivacyResult{}, types.NewDBWriteFailed(err.Error())
@@ -822,6 +1024,13 @@ func commitSetContactPrivacyResult(ctx context.Context, tx pgx.Tx, result types.
 func commitSetContactPrivacyExceptionResult(ctx context.Context, tx pgx.Tx, result types.SetContactPrivacyExceptionResult) (types.SetContactPrivacyExceptionResult, error) {
 	if err := tx.Commit(ctx); err != nil {
 		return types.SetContactPrivacyExceptionResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return result, nil
+}
+
+func commitDeleteContactPrivacyExceptionResult(ctx context.Context, tx pgx.Tx, result types.DeleteContactPrivacyExceptionResult) (types.DeleteContactPrivacyExceptionResult, error) {
+	if err := tx.Commit(ctx); err != nil {
+		return types.DeleteContactPrivacyExceptionResult{}, types.NewDBWriteFailed(err.Error())
 	}
 	return result, nil
 }
@@ -845,6 +1054,13 @@ type contactPrivacyExceptionResultSnapshot struct {
 	Decision        string         `json:"decision"`
 	Version         int64          `json:"version"`
 	UpdatedAtUnixMS int64          `json:"updated_at_unix_ms"`
+}
+
+type deleteContactPrivacyExceptionResultSnapshot struct {
+	TenantID    types.TenantID `json:"tenant_id"`
+	OwnerUserID types.UserID   `json:"owner_user_id"`
+	OtherUserID types.UserID   `json:"other_user_id"`
+	Deleted     bool           `json:"deleted"`
 }
 
 func contactPrivacyResultJSON(row contactPrivacyRow) ([]byte, error) {
@@ -874,6 +1090,19 @@ func contactPrivacyExceptionResultJSON(row contactPrivacyExceptionRow) ([]byte, 
 		Decision:        string(row.Decision),
 		Version:         row.Version,
 		UpdatedAtUnixMS: row.UpdatedAt.UnixMilli(),
+	})
+	if err != nil {
+		return nil, types.NewDBWriteFailed(err.Error())
+	}
+	return raw, nil
+}
+
+func deleteContactPrivacyExceptionResultJSON(result types.DeleteContactPrivacyExceptionResult) ([]byte, error) {
+	raw, err := json.Marshal(deleteContactPrivacyExceptionResultSnapshot{
+		TenantID:    result.TenantID,
+		OwnerUserID: result.OwnerUserID,
+		OtherUserID: result.OtherUserID,
+		Deleted:     result.Deleted,
 	})
 	if err != nil {
 		return nil, types.NewDBWriteFailed(err.Error())
@@ -953,6 +1182,25 @@ func contactPrivacyExceptionRowFromIdempotencyResult(existing commandIdempotency
 		Decision:    decision,
 		Version:     snapshot.Version,
 		UpdatedAt:   time.UnixMilli(snapshot.UpdatedAtUnixMS).UTC(),
+	}, nil
+}
+
+func deleteContactPrivacyExceptionResultFromIdempotencyResult(existing commandIdempotency) (types.DeleteContactPrivacyExceptionResult, error) {
+	var snapshot deleteContactPrivacyExceptionResultSnapshot
+	if len(existing.ResultJSON) == 0 || string(existing.ResultJSON) == "{}" {
+		return types.DeleteContactPrivacyExceptionResult{}, types.NewDBReadFailed("contact privacy exception delete idempotency result snapshot missing")
+	}
+	if err := json.Unmarshal(existing.ResultJSON, &snapshot); err != nil {
+		return types.DeleteContactPrivacyExceptionResult{}, types.NewDBReadFailed(err.Error())
+	}
+	if snapshot.TenantID == "" || snapshot.OwnerUserID == "" || snapshot.OtherUserID == "" || !snapshot.Deleted {
+		return types.DeleteContactPrivacyExceptionResult{}, types.NewDBReadFailed("contact privacy exception delete idempotency result snapshot incomplete")
+	}
+	return types.DeleteContactPrivacyExceptionResult{
+		TenantID:    snapshot.TenantID,
+		OwnerUserID: snapshot.OwnerUserID,
+		OtherUserID: snapshot.OtherUserID,
+		Deleted:     snapshot.Deleted,
 	}, nil
 }
 

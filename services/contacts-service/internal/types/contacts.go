@@ -296,6 +296,72 @@ type SetContactPrivacyExceptionResult struct {
 	IdempotentReplay bool
 }
 
+type ContactPrivacyExceptionItem struct {
+	OtherUserID     UserID
+	Decision        ContactPrivacyExceptionDecision
+	Version         int64
+	UpdatedAtUnixMS int64
+}
+
+type ListContactPrivacyExceptionsCommand struct {
+	AuthContext AuthContext
+	PageSize    int
+	PageToken   string
+}
+
+func (c ListContactPrivacyExceptionsCommand) Validate() error {
+	if c.AuthContext.TenantID == "" {
+		return NewInvalidArgument("tenant_id is required")
+	}
+	if c.AuthContext.UserID == "" {
+		return NewInvalidArgument("user_id is required")
+	}
+	if c.PageSize < 0 {
+		return NewInvalidArgument("page_size must be non-negative")
+	}
+	return nil
+}
+
+type ListContactPrivacyExceptionsResult struct {
+	TenantID      TenantID
+	OwnerUserID   UserID
+	Exceptions    []ContactPrivacyExceptionItem
+	NextPageToken string
+}
+
+type DeleteContactPrivacyExceptionCommand struct {
+	AuthContext    AuthContext
+	OtherUserID    UserID
+	IdempotencyKey string
+}
+
+func (c DeleteContactPrivacyExceptionCommand) Validate() error {
+	if c.AuthContext.TenantID == "" {
+		return NewInvalidArgument("tenant_id is required")
+	}
+	if c.AuthContext.UserID == "" {
+		return NewInvalidArgument("user_id is required")
+	}
+	if c.OtherUserID == "" {
+		return NewInvalidArgument("other_user_id is required")
+	}
+	if c.AuthContext.UserID == c.OtherUserID {
+		return NewInvalidArgument("other_user_id must differ from user_id")
+	}
+	if strings.TrimSpace(c.IdempotencyKey) == "" {
+		return NewInvalidArgument("idempotency_key is required")
+	}
+	return nil
+}
+
+type DeleteContactPrivacyExceptionResult struct {
+	TenantID         TenantID
+	OwnerUserID      UserID
+	OtherUserID      UserID
+	Deleted          bool
+	IdempotentReplay bool
+}
+
 type GetTenantContactPrivacyDefaultCommand struct {
 	TenantID TenantID
 }

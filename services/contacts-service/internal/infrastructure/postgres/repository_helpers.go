@@ -965,6 +965,14 @@ type contactRequestPageCursor struct {
 	RequestID string                            `json:"request_id"`
 }
 
+type contactPrivacyExceptionPageCursor struct {
+	Version     int            `json:"v"`
+	TenantID    types.TenantID `json:"tenant_id"`
+	OwnerUserID types.UserID   `json:"owner_user_id"`
+	PageSize    int            `json:"page_size"`
+	OtherUserID string         `json:"other_user_id"`
+}
+
 func decodeContactRequestPageTokenFor(
 	command types.ListContactRequestsCommand,
 	direction types.ContactRequestListDirection,
@@ -1031,6 +1039,38 @@ func decodePageTokenFor(command types.ListContactsCommand, pageSize int) (contac
 }
 
 func encodePageToken(cursor contactPageCursor) string {
+	raw, err := json.Marshal(cursor)
+	if err != nil {
+		return ""
+	}
+	return base64.RawURLEncoding.EncodeToString(raw)
+}
+
+func decodeContactPrivacyExceptionPageTokenFor(command types.ListContactPrivacyExceptionsCommand, pageSize int) (contactPrivacyExceptionPageCursor, bool, error) {
+	value := command.PageToken
+	if value == "" {
+		return contactPrivacyExceptionPageCursor{}, false, nil
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		return contactPrivacyExceptionPageCursor{}, false, types.NewInvalidArgument("invalid page_token")
+	}
+	var cursor contactPrivacyExceptionPageCursor
+	if err := json.Unmarshal(raw, &cursor); err != nil {
+		return contactPrivacyExceptionPageCursor{}, false, types.NewInvalidArgument("invalid page_token")
+	}
+	if cursor.Version != 1 || cursor.OtherUserID == "" {
+		return contactPrivacyExceptionPageCursor{}, false, types.NewInvalidArgument("invalid page_token")
+	}
+	if cursor.TenantID != command.AuthContext.TenantID ||
+		cursor.OwnerUserID != command.AuthContext.UserID ||
+		cursor.PageSize != pageSize {
+		return contactPrivacyExceptionPageCursor{}, false, types.NewInvalidArgument("invalid page_token")
+	}
+	return cursor, true, nil
+}
+
+func encodeContactPrivacyExceptionPageToken(cursor contactPrivacyExceptionPageCursor) string {
 	raw, err := json.Marshal(cursor)
 	if err != nil {
 		return ""

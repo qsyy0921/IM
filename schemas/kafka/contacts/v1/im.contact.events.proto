@@ -39,6 +39,7 @@ message ContactEvent {
     ContactEdgeGroupUpdatedV1 edge_group_updated = 28;
     ContactPrivacyUpdatedV1 privacy_updated = 29;
     ContactPrivacyExceptionUpdatedV1 privacy_exception_updated = 30;
+    ContactPrivacyExceptionDeletedV1 privacy_exception_deleted = 31;
   }
 }
 
@@ -149,4 +150,12 @@ message ContactPrivacyExceptionUpdatedV1 {
   string decision = 4;
   int64 exception_version = 5;
   google.protobuf.Timestamp occurred_at = 6;
+}
+
+message ContactPrivacyExceptionDeletedV1 {
+  string tenant_id = 1;
+  string owner_user_id = 2;
+  string other_user_id = 3;
+  int64 previous_exception_version = 4;
+  google.protobuf.Timestamp occurred_at = 5;
 }

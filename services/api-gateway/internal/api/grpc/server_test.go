@@ -834,6 +834,14 @@ func (client *fakeContactsClient) SetContactPrivacyException(context.Context, *c
 	return nil, status.Error(codes.Unimplemented, "not implemented")
 }
 
+func (client *fakeContactsClient) ListContactPrivacyExceptions(context.Context, *contactsv1.ListContactPrivacyExceptionsRequest, ...grpc.CallOption) (*contactsv1.ListContactPrivacyExceptionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeContactsClient) DeleteContactPrivacyException(context.Context, *contactsv1.DeleteContactPrivacyExceptionRequest, ...grpc.CallOption) (*contactsv1.DeleteContactPrivacyExceptionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
 func (client *fakeContactsClient) RespondContactRequest(context.Context, *contactsv1.RespondContactRequestRequest, ...grpc.CallOption) (*contactsv1.RespondContactRequestResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "not implemented")
 }

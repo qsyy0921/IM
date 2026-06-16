@@ -19,6 +19,8 @@ service ContactsService {
   rpc GetContactPrivacy(GetContactPrivacyRequest) returns (GetContactPrivacyResponse);
   rpc SetContactPrivacy(SetContactPrivacyRequest) returns (SetContactPrivacyResponse);
   rpc SetContactPrivacyException(SetContactPrivacyExceptionRequest) returns (SetContactPrivacyExceptionResponse);
+  rpc ListContactPrivacyExceptions(ListContactPrivacyExceptionsRequest) returns (ListContactPrivacyExceptionsResponse);
+  rpc DeleteContactPrivacyException(DeleteContactPrivacyExceptionRequest) returns (DeleteContactPrivacyExceptionResponse);
 }
 
 message AuthContext {
@@ -349,4 +351,38 @@ message SetContactPrivacyExceptionResponse {
   ContactPrivacyExceptionDecision decision = 4;
   int64 version = 5;
   bool idempotent_replay = 6;
+}
+
+message ContactPrivacyExceptionItem {
+  string other_user_id = 1;
+  ContactPrivacyExceptionDecision decision = 2;
+  int64 version = 3;
+  int64 updated_at_unix_ms = 4;
+}
+
+message ListContactPrivacyExceptionsRequest {
+  AuthContext auth_context = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListContactPrivacyExceptionsResponse {
+  string tenant_id = 1;
+  string owner_user_id = 2;
+  repeated ContactPrivacyExceptionItem exceptions = 3;
+  string next_page_token = 4;
+}
+
+message DeleteContactPrivacyExceptionRequest {
+  AuthContext auth_context = 1;
+  string other_user_id = 2;
+  string idempotency_key = 3;
+}
+
+message DeleteContactPrivacyExceptionResponse {
+  string tenant_id = 1;
+  string owner_user_id = 2;
+  string other_user_id = 3;
+  bool deleted = 4;
+  bool idempotent_replay = 5;
 }

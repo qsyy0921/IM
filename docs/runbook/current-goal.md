@@ -1,12 +1,38 @@
 # NexusIM Current Goal
 
-本文件只维护长期目标摘要。可复制到 Codex 目标框的真实 prompt 维护在仓库根目录 `prompt.md`。
+本文件维护 Codex 每轮要执行的具体项目目标。目标框只放 `prompt.md` 里的短 Prompt，不把本页长目标复制进去。
 
 ## 短 Goal Prompt
 
 ```text
-持续推进 E:\development\IM 的 NexusIM 项目。每轮先运行 git status --short --branch --untracked-files=all，然后读取仓库根目录 prompt.md；只按 prompt.md 的路由继续读取必要短文档并执行。不要全文读取长历史文档；不要回滚用户已有修改。
+持续推进 E:\development\IM 的 NexusIM 项目。每轮先运行 git status --short --branch --untracked-files=all，然后读取仓库根目录 prompt.md，并按 prompt.md 指向的项目目标文档继续执行；不要把具体目标写在目标框里，不全文读取长历史文档，不回滚用户已有修改。
 ```
+
+## 当前具体执行目标
+
+持续推进 NexusIM 后端项目，但不要急着新增服务。当前主线是先把已有 9 个真实后端微服务收干净，再进入 search / RAG / Agent。
+
+每个有意义切片都要尽量闭环：
+
+```text
+选定一个明确缺口
+-> 读对应短文档和必要源码
+-> 实现代码
+-> 补测试
+-> 更新对应进度文档
+-> 运行 focused checks + .\tools\check-local.ps1
+-> 提交 focused commit
+```
+
+当前优先级：
+
+1. 安全边界：public listener、mock auth、trusted metadata、TLS / mTLS、敏感字段外泄。
+2. 逐服务 P2 hardening：以 `remaining-goals.md` 和对应 service brief 为准。
+3. Repair / DLQ / audit：operator 安全、批量 repair、错误脱敏、审计证据。
+4. 观测和故障 smoke：本地 / 双机 / Docker 可验证，不能夸大为生产 SLO。
+5. 容量和复杂度治理：长时间容量曲线、生产 sizing、及时拆分大文件。
+
+新发现的待完成工作必须写入 `docs/runbook/remaining-goals.md`；已完成的工作从该文档移除，并同步到对应 service brief / progress 文档。
 
 ## 长期目标
 

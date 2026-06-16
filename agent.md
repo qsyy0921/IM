@@ -7,9 +7,10 @@ reading or duplicating long documents.
 
 1. Run `git status --short --branch --untracked-files=all`.
 2. Read `prompt.md`.
-3. Read `docs/runbook/current-brief.md`.
-4. Read `docs/runbook/remaining-goals.md` only when choosing or updating work.
-5. For service work, read `docs/runbook/service-briefs/README.md`, then only the
+3. Read `docs/runbook/current-goal.md`.
+4. Read `docs/runbook/current-brief.md`.
+5. Read `docs/runbook/remaining-goals.md` only when choosing or updating work.
+6. For service work, read `docs/runbook/service-briefs/README.md`, then only the
    specific `docs/runbook/service-briefs/<service>.md` file involved.
 
 Do not read long SDD, archive, history, or loadtest reports unless the current
@@ -40,6 +41,7 @@ or clients unless `docs/runbook/current-brief.md` and
 Use these documents for different jobs:
 
 - `prompt.md`: Codex goal-box prompt and document routing.
+- `docs/runbook/current-goal.md`: concrete execution goal for Codex.
 - `docs/runbook/current-brief.md`: current phase and where to look next.
 - `docs/runbook/remaining-goals.md`: only unfinished work.
 - `docs/runbook/development-progress.md`: human-readable current progress.
@@ -110,4 +112,3 @@ For meaningful changes:
 5. Commit with a focused message.
 
 If a check is skipped, document why in the final response.
-

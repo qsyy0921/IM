@@ -4,6 +4,7 @@
 
 ## 按需读取
 
+- 具体执行目标：`docs/runbook/current-goal.md`
 - 剩余目标：`docs/runbook/remaining-goals.md`
 - 服务细节：先读 `docs/runbook/service-briefs/README.md`，再读对应服务 brief。
 - 历史证据：按关键词查 `docs/runbook/loadtest/`、`docs/runbook/archive/` 或 `docs/runbook/history/`。
@@ -41,6 +42,7 @@ policy-service
 
 ## 文档职责
 
+- 具体执行目标：`docs/runbook/current-goal.md`
 - 当前进度总览：`docs/runbook/development-progress.md`
 - 当前未完成工作：`docs/runbook/remaining-goals.md`
 - 单服务状态：`docs/runbook/service-briefs/<service>.md`

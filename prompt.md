@@ -5,12 +5,13 @@
 把下面这段放进 Codex 目标框即可：
 
 ```text
-持续推进 E:\development\IM 的 NexusIM 项目。每轮先运行 git status --short --branch --untracked-files=all，然后读取仓库根目录 prompt.md；只按 prompt.md 的路由继续读取必要短文档并执行。不要全文读取长历史文档；不要回滚用户已有修改。
+持续推进 E:\development\IM 的 NexusIM 项目。每轮先运行 git status --short --branch --untracked-files=all，然后读取仓库根目录 prompt.md，并按 prompt.md 指向的项目目标文档继续执行；不要把具体目标写在目标框里，不全文读取长历史文档，不回滚用户已有修改。
 ```
 
 ## 本文件的作用
 
-- 本文件维护 Codex 目标框短 Prompt 和每轮文档路由。
+- 本文件只维护 Codex 目标框短 Prompt 和每轮文档路由。
+- 具体执行目标维护在 `docs/runbook/current-goal.md`；目标框不要复制长目标。
 - Agent 进度管理规则见 `agent.md`；需要管理项目进度、分配子 agent 或选择下一切片时先读它。
 - 具体当前阶段不在这里维护，见 `docs/runbook/current-brief.md`。
 - 当前未完成工作不在这里维护，见 `docs/runbook/remaining-goals.md`。
@@ -20,11 +21,12 @@
 
 1. 运行 `git status --short --branch --untracked-files=all`。
 2. 读取 `agent.md`，确认本轮进度管理规则。
-3. 读取 `docs/runbook/current-brief.md`。
-4. 若需要定位文档，先读 `docs/runbook/README.md`。
-5. 若需要服务状态，先读 `docs/runbook/service-briefs/README.md`，再读对应服务短文档。
-6. 若需要剩余工作，读 `docs/runbook/remaining-goals.md`。
-7. 不为了“了解项目”全文读取长历史文档。
+3. 读取 `docs/runbook/current-goal.md`，确认本轮具体目标。
+4. 读取 `docs/runbook/current-brief.md`，确认当前阶段。
+5. 若需要定位文档，先读 `docs/runbook/README.md`。
+6. 若需要服务状态，先读 `docs/runbook/service-briefs/README.md`，再读对应服务短文档。
+7. 若需要选择或更新剩余工作，读 `docs/runbook/remaining-goals.md`。
+8. 不为了“了解项目”全文读取长历史文档。
 
 ## 工作原则
 

@@ -87,18 +87,20 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - PostgreSQL quorum observation smoke and ADR-034 production quorum boundary
 - Kafka KRaft 3 broker local failover / controller-switch / ISR observation smoke，且 ISR observation raw summary 已有可复用 JSON / Markdown summary validator
 - outbox Kafka producer first-stage `acks=all` / bounded retry-backoff 配置、本地门禁、6 个 producer package 配置单测、producer config summary 和 Kafka producer hardening evaluation；当前 `kafka-go` writer 明确不声明 idempotent / transactional producer 语义，可靠业务边界仍是 outbox / event_id 幂等
+- push-gateway delivery-consumer 本地 Kafka consumer group rebalance smoke：2 个 consumer 进入同一 group 后停止 1 个，Kafka 将 `im.delivery.events` 3 个 partition 重新分配到剩余 consumer
 
 当前已经证明：
 
 - 在线通知层可以跨实例工作
 - Redis 故障时 durable `PullInbox + AckDelivery` 可以兜底
 - PostgreSQL / Kafka 单点切换后最小链路仍可恢复
+- Kafka consumer group 能完成第一阶段本地 rebalance 观察
 
 当前还没有证明：
 
 - 生产级 Redis HA / Redis Cluster 长时间容量曲线和跨机器治理
 - 生产级 PostgreSQL HA / split-brain fencing / quorum write guard
-- 生产级 Kafka multi-failure / sustained ISR flapping / consumer rebalance治理
+- 生产级 Kafka multi-failure / sustained ISR flapping / rebalance storm 治理
 - 完整部署编排、服务发现、统一观测、灰度发布
 
 ### 3. 安全与运维

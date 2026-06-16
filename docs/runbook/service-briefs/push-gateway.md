@@ -15,6 +15,7 @@
 - Redis route 已区分“publish 报错”和“publish 成功但 0 subscriber”两类远端失败，避免把 stale route 误记为远端已入队。
 - Redis route 续约连续失败达到阈值后会主动踢掉本地 session，避免 route TTL 失效后仍长时间假装在线；客户端改走重连 + `PullInbox` fallback。
 - Redis route 已支持 `NEXUSIM_PUSH_REDIS_MODE=cluster` 和 `NEXUSIM_PUSH_REDIS_CLUSTER_ADDRS` 第一版配置；route / resume 相关 multi-key pipeline 使用 Redis Cluster hash tag，identity revoke 查询避免跨 slot multi-key `EXISTS`。本地三节点 Redis Cluster topology smoke 已跑通 `cross-instance-resume`，证明 cluster client / key schema / route / resume 最小链路可用；本地 Redis Cluster node-stop fallback smoke 已停止 route key slot owner node，并验证 `delivery.notify` 超时后仍可通过 `PullInbox + AckDelivery` 恢复；本地六节点 Redis Cluster 自动 failover smoke 已停止 route key slot owner master，并验证 replica 提升后在线 `delivery.notify`、`PullInbox` 和 `AckDelivery` 仍可用；本地六节点 Redis Cluster 短容量基线已跑通 16 条消息、2 个 device、32 个 notify 和 2 个 ACK，但不代表生产级 Redis HA、长时间容量曲线或生产 sizing。
+- 本地 Kafka consumer group rebalance smoke 已覆盖两个 `delivery-consumer` 进同一 group 后停止一个进程，Kafka 将 `im.delivery.events` 的 3 个 partition 稳定重新分配到剩余 consumer；这是本地 rebalance 观察，不代表持续 rebalance storm 或生产 SLO。
 - Resume buffer 重放已有回归测试固定 all-or-buffer-miss：新连接队列无法容纳全部待重放 notify 时，不做部分 replay，直接提示客户端用本地 cursor + `PullInbox` 校准。
 - `loadtest/pushgateway/run-local-smoke.ps1` 的通用 helper 已拆到同目录 `run-local-smoke.helpers.ps1`，脚本复杂度回到预算线内。
 - `loadtest/pushgateway` Go runner 已按 config / model / auth / scenario / util 同 package 拆分，避免后续 Redis route、slow-client、resume 和容量 smoke 继续堆进单个 `main.go`。

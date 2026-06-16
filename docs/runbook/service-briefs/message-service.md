@@ -14,6 +14,7 @@
 - 已补 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运维模式，可直接审计、redrive 和清理 `message_outbox` repair 历史。
 - 已补 trusted metadata 启动门禁：当 `NEXUSIM_MESSAGE_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端未启用 mTLS client cert 校验，则启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - `loadtest/sendmessage` 容量 runner 已按 config / model / auth / util 同 package 拆分，避免后续容量观测继续堆进单个 `main.go`。
+- PostgreSQL repository 的 revoke / edit / delete mutation 集成测试已拆到同 package `repository_mutation_test.go`，保留原覆盖面并降低单个测试文件复杂度。
 
 ## 后续
 

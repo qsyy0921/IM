@@ -99,6 +99,14 @@ func TestTenantContactRequestSourcePolicyCommandValidation(t *testing.T) {
 	if err := setCommand.Validate(); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("expected invalid set source type, got %v", err)
 	}
+	setCommand = SetTenantContactRequestSourcePolicyCommand{
+		TenantID:   "tenant-1",
+		SourceType: ContactRequestSourceTypeSearch,
+		RiskLevel:  ContactRequestRiskLevel("UNKNOWN"),
+	}
+	if err := setCommand.Validate(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("expected invalid risk level, got %v", err)
+	}
 }
 
 func TestNormalizeContactProfileVisibilityFields(t *testing.T) {

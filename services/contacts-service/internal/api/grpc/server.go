@@ -167,6 +167,8 @@ func (s *Server) SendContactRequest(
 		IdempotentReplay: result.IdempotentReplay,
 		SourceType:       requestSourceTypeToProto(result.SourceType),
 		SourceRef:        result.SourceRef,
+		RiskLevel:        requestRiskLevelToProto(result.RiskLevel),
+		ReviewRequired:   result.ReviewRequired,
 	}, nil
 }
 
@@ -404,6 +406,8 @@ func (s *Server) ListContactRequests(
 			DecidedAtUnixMs: item.DecidedAtUnixMS,
 			SourceType:      requestSourceTypeToProto(item.SourceType),
 			SourceRef:       item.SourceRef,
+			RiskLevel:       requestRiskLevelToProto(item.RiskLevel),
+			ReviewRequired:  item.ReviewRequired,
 		})
 	}
 	return &contactsv1.ListContactRequestsResponse{
@@ -829,6 +833,19 @@ func requestSourceTypeToProto(value types.ContactRequestSourceType) contactsv1.C
 		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_IMPORT
 	default:
 		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_UNSPECIFIED
+	}
+}
+
+func requestRiskLevelToProto(value types.ContactRequestRiskLevel) contactsv1.ContactRequestRiskLevel {
+	switch value {
+	case types.ContactRequestRiskLevelLow, "":
+		return contactsv1.ContactRequestRiskLevel_CONTACT_REQUEST_RISK_LEVEL_LOW
+	case types.ContactRequestRiskLevelMedium:
+		return contactsv1.ContactRequestRiskLevel_CONTACT_REQUEST_RISK_LEVEL_MEDIUM
+	case types.ContactRequestRiskLevelHigh:
+		return contactsv1.ContactRequestRiskLevel_CONTACT_REQUEST_RISK_LEVEL_HIGH
+	default:
+		return contactsv1.ContactRequestRiskLevel_CONTACT_REQUEST_RISK_LEVEL_UNSPECIFIED
 	}
 }
 

@@ -23,6 +23,8 @@ func TestSendContactRequestMapsSourceMetadata(t *testing.T) {
 				Status:         types.ContactRequestStatusPending,
 				SourceType:     command.SourceType,
 				SourceRef:      command.SourceRef,
+				RiskLevel:      types.ContactRequestRiskLevelHigh,
+				ReviewRequired: true,
 			}, nil
 		}),
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
@@ -46,7 +48,9 @@ func TestSendContactRequestMapsSourceMetadata(t *testing.T) {
 		t.Fatalf("unexpected captured source metadata: %+v", captured)
 	}
 	if response.GetSourceType() != contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_GROUP ||
-		response.GetSourceRef() != "conversation:conv-1" {
+		response.GetSourceRef() != "conversation:conv-1" ||
+		response.GetRiskLevel() != contactsv1.ContactRequestRiskLevel_CONTACT_REQUEST_RISK_LEVEL_HIGH ||
+		!response.GetReviewRequired() {
 		t.Fatalf("unexpected response source metadata: %+v", response)
 	}
 }
@@ -95,6 +99,8 @@ func TestListContactRequestsMapsSourceMetadata(t *testing.T) {
 					Message:        "hello",
 					SourceType:     types.ContactRequestSourceTypeInviteLink,
 					SourceRef:      "invite:hash-1",
+					RiskLevel:      types.ContactRequestRiskLevelMedium,
+					ReviewRequired: true,
 				}},
 			}, nil
 		}),
@@ -117,7 +123,9 @@ func TestListContactRequestsMapsSourceMetadata(t *testing.T) {
 	}
 	item := response.GetRequests()[0]
 	if item.GetSourceType() != contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_INVITE_LINK ||
-		item.GetSourceRef() != "invite:hash-1" {
+		item.GetSourceRef() != "invite:hash-1" ||
+		item.GetRiskLevel() != contactsv1.ContactRequestRiskLevel_CONTACT_REQUEST_RISK_LEVEL_MEDIUM ||
+		!item.GetReviewRequired() {
 		t.Fatalf("unexpected listed source metadata: %+v", item)
 	}
 }

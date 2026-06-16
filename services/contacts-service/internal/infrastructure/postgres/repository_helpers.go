@@ -150,6 +150,8 @@ type contactRequestRow struct {
 	CommandHash    string
 	SourceType     types.ContactRequestSourceType
 	SourceRef      string
+	RiskLevel      types.ContactRequestRiskLevel
+	ReviewRequired bool
 }
 
 func getContactRequestResult(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, requestID string) (types.SendContactRequestResult, error) {
@@ -170,6 +172,8 @@ func sendResultFromRequest(row contactRequestRow, replay bool) types.SendContact
 		IdempotentReplay: replay,
 		SourceType:       row.SourceType,
 		SourceRef:        row.SourceRef,
+		RiskLevel:        row.RiskLevel,
+		ReviewRequired:   row.ReviewRequired,
 	}
 }
 
@@ -192,7 +196,7 @@ func getCancelContactRequestResult(ctx context.Context, tx pgx.Tx, tenantID type
 func getContactRequest(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, requestID string) (contactRequestRow, error) {
 	var row contactRequestRow
 	err := tx.QueryRow(ctx, `
-SELECT request_id, tenant_id, sender_user_id, receiver_user_id, status, source_type, source_ref
+SELECT request_id, tenant_id, sender_user_id, receiver_user_id, status, source_type, source_ref, risk_level, review_required
 FROM contact_requests
 WHERE tenant_id = $1
   AND request_id = $2
@@ -204,6 +208,8 @@ WHERE tenant_id = $1
 		&row.Status,
 		&row.SourceType,
 		&row.SourceRef,
+		&row.RiskLevel,
+		&row.ReviewRequired,
 	)
 	if err == pgx.ErrNoRows {
 		return contactRequestRow{}, types.NewContactRequestNotFound("contact request not found")
@@ -223,7 +229,7 @@ func findContactRequestByIdempotency(
 ) (contactRequestRow, bool, error) {
 	var row contactRequestRow
 	err := tx.QueryRow(ctx, `
-SELECT request_id, tenant_id, sender_user_id, receiver_user_id, status, command_hash, source_type, source_ref
+SELECT request_id, tenant_id, sender_user_id, receiver_user_id, status, command_hash, source_type, source_ref, risk_level, review_required
 FROM contact_requests
 WHERE tenant_id = $1
   AND sender_user_id = $2
@@ -238,6 +244,8 @@ FOR UPDATE
 		&row.CommandHash,
 		&row.SourceType,
 		&row.SourceRef,
+		&row.RiskLevel,
+		&row.ReviewRequired,
 	)
 	if err == pgx.ErrNoRows {
 		return contactRequestRow{}, false, nil
@@ -251,7 +259,7 @@ FOR UPDATE
 func lockContactRequest(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, requestID string) (contactRequestRow, error) {
 	var row contactRequestRow
 	err := tx.QueryRow(ctx, `
-SELECT request_id, tenant_id, sender_user_id, receiver_user_id, status, source_type, source_ref
+SELECT request_id, tenant_id, sender_user_id, receiver_user_id, status, source_type, source_ref, risk_level, review_required
 FROM contact_requests
 WHERE tenant_id = $1
   AND request_id = $2
@@ -264,6 +272,8 @@ FOR UPDATE
 		&row.Status,
 		&row.SourceType,
 		&row.SourceRef,
+		&row.RiskLevel,
+		&row.ReviewRequired,
 	)
 	if err == pgx.ErrNoRows {
 		return contactRequestRow{}, types.NewContactRequestNotFound("contact request not found")
@@ -278,6 +288,7 @@ func insertContactRequest(
 	ctx context.Context,
 	tx pgx.Tx,
 	command types.SendContactRequestCommand,
+	sourcePolicy contactRequestSourcePolicyRow,
 	requestID string,
 	commandHash string,
 	now time.Time,
@@ -294,10 +305,12 @@ INSERT INTO contact_requests (
     message,
     source_type,
     source_ref,
+    risk_level,
+    review_required,
     created_at,
     updated_at
-) VALUES ($1, $2, $3, $4, 'PENDING', $5, $6, $7, $8, $9, $10, $10)
-`, requestID, command.AuthContext.TenantID, command.AuthContext.UserID, command.TargetUserID, command.IdempotencyKey, commandHash, command.Message, command.NormalizedSourceType(), command.NormalizedSourceRef(), now)
+) VALUES ($1, $2, $3, $4, 'PENDING', $5, $6, $7, $8, $9, $10, $11, $12, $12)
+`, requestID, command.AuthContext.TenantID, command.AuthContext.UserID, command.TargetUserID, command.IdempotencyKey, commandHash, command.Message, command.NormalizedSourceType(), command.NormalizedSourceRef(), sourcePolicy.RiskLevel, sourcePolicy.ReviewRequired, now)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}

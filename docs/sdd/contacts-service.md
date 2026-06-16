@@ -1,6 +1,6 @@
 # NexusIM contacts-service SDD v0.1
 
-状态：Draft；proto / Kafka schema / migration / 六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 `ACCEPT / DECLINE / CANCEL` 真实进程 smoke 已落地；联系人删除 / 拉黑 / 解除拉黑 / 备注名 / 分组 v0.2 已完成代码切片；好友申请来源 metadata、`USER -> TENANT_DEFAULT -> SYSTEM_DEFAULT` 三层隐私读取、搜索来源陌生申请 gate 和第一阶段 profile visibility 总开关已落地；删除 / 拉黑 / 备注名 / 解除拉黑真实进程 smoke 已通过；删除后重新申请 / 接受恢复联系人关系的 re-add smoke 已通过；first-stage Prometheus text `/metrics`、本地 alert rules 和 Grafana dashboard 原型已落地。
+状态：Draft；proto / Kafka schema / migration / 六层骨架、PostgreSQL repository 真实事务、contacts outbox relay 和 `ACCEPT / DECLINE / CANCEL` 真实进程 smoke 已落地；联系人删除 / 拉黑 / 解除拉黑 / 备注名 / 分组 v0.2 已完成代码切片；好友申请来源 metadata、`USER -> TENANT_DEFAULT -> SYSTEM_DEFAULT` 三层隐私读取、搜索来源陌生申请 gate、第一阶段 profile visibility 总开关、租户来源风险标注和 review-required 持久化已落地；删除 / 拉黑 / 备注名 / 解除拉黑真实进程 smoke 已通过；删除后重新申请 / 接受恢复联系人关系的 re-add smoke 已通过；first-stage Prometheus text `/metrics`、本地 alert rules 和 Grafana dashboard 原型已落地。
 
 本文定义第三层 IM 产品能力中的“联系人 / 好友关系”最小服务边界。目标是补齐社交关系事实源，同时保持低耦合：不把好友关系塞进 `conversation_members`，也不让会话、消息、投递服务直接读联系人表。
 
@@ -138,7 +138,7 @@ source_type = DIRECT / SEARCH / GROUP / INVITE_LINK / QR_CODE / IMPORT
 source_ref
 ```
 
-`source_type` 缺省为 `DIRECT`，`source_ref` 是低敏来源引用，例如搜索关键词 hash、群 / 会话引用或邀请链接 hash / id。`source_ref` 会持久化到 `contact_requests`，并进入 `contacts_outbox` / 下游策略和审计事件；调用方不得把原始邀请 token、手机号、邮箱、认证 token、provider secret、完整搜索词或其它用户敏感内容放入该字段。第一版已支持租户级来源策略：没有显式策略时各来源默认允许；若某租户禁用 `SEARCH / INVITE_LINK` 等来源，则 `SendContactRequest` 返回 `PERMISSION_DENIED`，不写 `contact_requests` 或 outbox。
+`source_type` 缺省为 `DIRECT`，`source_ref` 是低敏来源引用，例如搜索关键词 hash、群 / 会话引用或邀请链接 hash / id。`source_ref` 会持久化到 `contact_requests`，并进入 `contacts_outbox` / 下游策略和审计事件；调用方不得把原始邀请 token、手机号、邮箱、认证 token、provider secret、完整搜索词或其它用户敏感内容放入该字段。第一版已支持租户级来源策略：没有显式策略时各来源默认允许、风险为 `LOW`、`review_required=false`；若某租户禁用 `SEARCH / INVITE_LINK` 等来源，则 `SendContactRequest` 返回 `PERMISSION_DENIED`，不写 `contact_requests` 或 outbox；若策略标记 `risk_level=MEDIUM/HIGH` 或 `review_required=true`，新申请会持久化这些低敏审计字段并发布到 `contact.request.created.v1`，但不代表已经接入正式 admin 审批流。
 
 `RespondContactRequestRequest`：
 
@@ -377,6 +377,7 @@ migrations/postgres/contacts/000009_contact_tenant_privacy_defaults.sql
 migrations/postgres/contacts/000010_contact_request_source_policies.sql
 migrations/postgres/contacts/000011_contact_search_privacy.sql
 migrations/postgres/contacts/000012_contact_profile_visibility_privacy.sql
+migrations/postgres/contacts/000015_contact_request_risk_policy.sql
 ```
 
 以下 DDL 表示 v0.2 后目标结构。`000001_contacts_core.sql` 已作为第一阶段基线存在；第二阶段只能通过 expand-only migration 增加 `remark / group_name`、`contact_privacy_settings` 和扩展 command type check，不回写旧 migration。
@@ -395,6 +396,8 @@ CREATE TABLE contact_requests (
     message           TEXT        NOT NULL DEFAULT '',
     source_type       TEXT        NOT NULL DEFAULT 'DIRECT',
     source_ref        TEXT        NOT NULL DEFAULT '',
+    risk_level        TEXT        NOT NULL DEFAULT 'LOW',
+    review_required   BOOLEAN     NOT NULL DEFAULT false,
     decided_at        TIMESTAMPTZ,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -402,6 +405,7 @@ CREATE TABLE contact_requests (
     CHECK (sender_user_id <> receiver_user_id),
     CHECK (status IN ('PENDING', 'ACCEPTED', 'DECLINED', 'CANCELED', 'EXPIRED')),
     CHECK (source_type IN ('DIRECT', 'SEARCH', 'GROUP', 'INVITE_LINK', 'QR_CODE', 'IMPORT')),
+    CHECK (risk_level IN ('LOW', 'MEDIUM', 'HIGH')),
     CHECK (char_length(source_ref) <= 256)
 );
 
@@ -491,7 +495,7 @@ migrations/postgres/contacts/000007_contact_privacy_settings.sql
 - 新增 `contact_privacy_settings(tenant_id, user_id, allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, version, created_at, updated_at)`；
 - 新增 `contact_requests.source_type / source_ref`，用于审计和后续策略输入；`source_ref` 只允许低敏业务引用，不保存原始 invite token、手机号 / 邮箱、认证 token 或 provider secret；
 - 新增 `contact_tenant_privacy_defaults(tenant_id, allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, version, created_at, updated_at)`，用于用户未显式设置时的租户默认；
-- 新增 `contact_tenant_request_source_policies(tenant_id, source_type, allow_contact_requests, version, created_at, updated_at)`，用于租户级好友申请来源 allow / deny；
+- 新增 `contact_tenant_request_source_policies(tenant_id, source_type, allow_contact_requests, risk_level, review_required, version, created_at, updated_at)`，用于租户级好友申请来源 allow / deny、风险标注和 first-stage review-required 提示；
 - 扩展 `contact_command_idempotency.command_type` check，加入 `CANCEL_CONTACT_REQUEST / DELETE_CONTACT / BLOCK_CONTACT / UNBLOCK_CONTACT / UPDATE_CONTACT_REMARK / UPDATE_CONTACT_GROUP / SET_CONTACT_PRIVACY`；
 - 不新增跨服务外键，不引用 `conversation_members`、`message_log` 或 delivery / receipt 内部表。
 
@@ -510,9 +514,9 @@ SendContactRequest
 -> check pending request pair
 -> check target user's contact_privacy_settings; missing row means allow; SEARCH source additionally checks allow_search_contact_requests; profile visibility is returned / published as first-stage preference and does not gate SendContactRequest
 -> normalize source_type/source_ref; source_ref must be a low-sensitivity reference, not raw token / phone / email / auth secret
--> check contact_tenant_request_source_policies for normalized source_type; missing row means allow
--> insert contact_requests(PENDING, source_type, source_ref)
--> insert contacts_outbox(contact.request.created.v1, includes source_type/source_ref)
+-> check contact_tenant_request_source_policies for normalized source_type; missing row means allow, LOW risk, no review
+-> insert contact_requests(PENDING, source_type, source_ref, risk_level, review_required)
+-> insert contacts_outbox(contact.request.created.v1, includes source_type/source_ref/risk_level/review_required)
 -> commit
 ```
 
@@ -664,7 +668,7 @@ SetContactPrivacy
 
 租户默认值第一阶段只作为 contacts-service 自有 read path 的 fallback policy：当用户没有 `contact_privacy_settings` 行时，`GetContactPrivacy` 和 `SendContactRequest` 会读取 `contact_tenant_privacy_defaults`；用户一旦执行 `SetContactPrivacy`，用户级设置优先于租户默认。当前通过本地 operator mode 审计 / 设置租户默认值，不开放普通 gRPC admin RPC；正式 admin/config service 权限面后续接入，当前不新增跨服务同步依赖。
 
-租户来源策略第一阶段只作为 contacts-service 自有 `SendContactRequest` gate：`contact_tenant_request_source_policies` 缺省允许所有来源，显式禁用某个 `source_type` 后，该来源的新建申请返回 `PERMISSION_DENIED`，不影响其它来源、不删除已有申请、不修改联系人事实，也不直接改变 message / conversation / delivery 权限。当前通过本地 operator mode 审计 / 设置来源策略；正式 admin/config service 权限面后续接入。
+租户来源策略第一阶段只作为 contacts-service 自有 `SendContactRequest` gate 和审计标注：`contact_tenant_request_source_policies` 缺省允许所有来源，显式禁用某个 `source_type` 后，该来源的新建申请返回 `PERMISSION_DENIED`，不影响其它来源、不删除已有申请、不修改联系人事实，也不直接改变 message / conversation / delivery 权限。`risk_level` 只允许 `LOW / MEDIUM / HIGH`，`review_required=true` 只表示申请需要后续 operator / admin 审核关注；当前不会阻止 receiver 通过现有 `RespondContactRequest` 响应，也不表示正式审批状态机已完成。当前通过本地 operator mode 审计 / 设置来源策略；正式 admin/config service 权限面和 approval workflow 后续接入。
 
 ## 9. 一致性和事务
 
@@ -845,10 +849,12 @@ $env:NEXUSIM_CONTACTS_SERVICE_MODE='source-policy-set'
 $env:NEXUSIM_CONTACTS_SOURCE_POLICY_TENANT_ID='tenant-demo'
 $env:NEXUSIM_CONTACTS_SOURCE_POLICY_SOURCE_TYPE='SEARCH'
 $env:NEXUSIM_CONTACTS_SOURCE_POLICY_ALLOW_CONTACT_REQUESTS='false'
+$env:NEXUSIM_CONTACTS_SOURCE_POLICY_RISK_LEVEL='HIGH'
+$env:NEXUSIM_CONTACTS_SOURCE_POLICY_REVIEW_REQUIRED='true'
 .\contacts-service.exe
 ```
 
-该 operator mode 只读写 `contact_tenant_request_source_policies`，不发布 Kafka 事件，不影响已有申请和联系人事实；正式多租户 admin API / 审批 / audit sink 后续由 admin/config 能力补齐。
+该 operator mode 只读写 `contact_tenant_request_source_policies`，不发布 Kafka 事件，不影响已有申请和联系人事实；`risk_level` 和 `review_required` 只影响之后新建申请的持久化审计字段和 `contact.request.created.v1` payload。正式多租户 admin API / 审批 / audit sink 后续由 admin/config 能力补齐。
 
 受控 outbox repair：
 

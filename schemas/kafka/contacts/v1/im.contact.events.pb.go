@@ -388,6 +388,10 @@ type ContactRequestCreatedV1 struct {
 	Status         string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
 	Message        string                 `protobuf:"bytes,6,opt,name=message,proto3" json:"message,omitempty"`
 	OccurredAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	SourceType     string                 `protobuf:"bytes,8,opt,name=source_type,json=sourceType,proto3" json:"source_type,omitempty"`
+	SourceRef      string                 `protobuf:"bytes,9,opt,name=source_ref,json=sourceRef,proto3" json:"source_ref,omitempty"`
+	RiskLevel      string                 `protobuf:"bytes,10,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
+	ReviewRequired bool                   `protobuf:"varint,11,opt,name=review_required,json=reviewRequired,proto3" json:"review_required,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -469,6 +473,34 @@ func (x *ContactRequestCreatedV1) GetOccurredAt() *timestamppb.Timestamp {
 		return x.OccurredAt
 	}
 	return nil
+}
+
+func (x *ContactRequestCreatedV1) GetSourceType() string {
+	if x != nil {
+		return x.SourceType
+	}
+	return ""
+}
+
+func (x *ContactRequestCreatedV1) GetSourceRef() string {
+	if x != nil {
+		return x.SourceRef
+	}
+	return ""
+}
+
+func (x *ContactRequestCreatedV1) GetRiskLevel() string {
+	if x != nil {
+		return x.RiskLevel
+	}
+	return ""
+}
+
+func (x *ContactRequestCreatedV1) GetReviewRequired() bool {
+	if x != nil {
+		return x.ReviewRequired
+	}
+	return false
 }
 
 type ContactRequestAcceptedV1 struct {
@@ -1494,7 +1526,7 @@ const file_contacts_v1_im_contact_events_proto_rawDesc = "" +
 	"\x0fprivacy_updated\x18\x1d \x01(\v22.nexusim.contact.events.v1.ContactPrivacyUpdatedV1H\x00R\x0eprivacyUpdated\x12y\n" +
 	"\x19privacy_exception_updated\x18\x1e \x01(\v2;.nexusim.contact.events.v1.ContactPrivacyExceptionUpdatedV1H\x00R\x17privacyExceptionUpdated\x12y\n" +
 	"\x19privacy_exception_deleted\x18\x1f \x01(\v2;.nexusim.contact.events.v1.ContactPrivacyExceptionDeletedV1H\x00R\x17privacyExceptionDeletedB\t\n" +
-	"\apayload\"\x94\x02\n" +
+	"\apayload\"\x9c\x03\n" +
 	"\x17ContactRequestCreatedV1\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x1d\n" +
 	"\n" +
@@ -1504,7 +1536,15 @@ const file_contacts_v1_im_contact_events_proto_rawDesc = "" +
 	"\x06status\x18\x05 \x01(\tR\x06status\x12\x18\n" +
 	"\amessage\x18\x06 \x01(\tR\amessage\x12;\n" +
 	"\voccurred_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"occurredAt\"\x9e\x02\n" +
+	"occurredAt\x12\x1f\n" +
+	"\vsource_type\x18\b \x01(\tR\n" +
+	"sourceType\x12\x1d\n" +
+	"\n" +
+	"source_ref\x18\t \x01(\tR\tsourceRef\x12\x1d\n" +
+	"\n" +
+	"risk_level\x18\n" +
+	" \x01(\tR\triskLevel\x12'\n" +
+	"\x0freview_required\x18\v \x01(\bR\x0ereviewRequired\"\x9e\x02\n" +
 	"\x18ContactRequestAcceptedV1\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x1d\n" +
 	"\n" +

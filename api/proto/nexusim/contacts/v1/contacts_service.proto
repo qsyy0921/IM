@@ -70,6 +70,13 @@ enum ContactRequestSourceType {
   CONTACT_REQUEST_SOURCE_TYPE_IMPORT = 6;
 }
 
+enum ContactRequestRiskLevel {
+  CONTACT_REQUEST_RISK_LEVEL_UNSPECIFIED = 0;
+  CONTACT_REQUEST_RISK_LEVEL_LOW = 1;
+  CONTACT_REQUEST_RISK_LEVEL_MEDIUM = 2;
+  CONTACT_REQUEST_RISK_LEVEL_HIGH = 3;
+}
+
 enum ContactPrivacyPolicySource {
   CONTACT_PRIVACY_POLICY_SOURCE_UNSPECIFIED = 0;
   CONTACT_PRIVACY_POLICY_SOURCE_USER = 1;
@@ -110,6 +117,8 @@ message SendContactRequestResponse {
   bool idempotent_replay = 6;
   ContactRequestSourceType source_type = 7;
   string source_ref = 8;
+  ContactRequestRiskLevel risk_level = 9;
+  bool review_required = 10;
 }
 
 message RespondContactRequestRequest {
@@ -162,6 +171,8 @@ message ContactRequestItem {
   int64 decided_at_unix_ms = 8;
   ContactRequestSourceType source_type = 9;
   string source_ref = 10;
+  ContactRequestRiskLevel risk_level = 11;
+  bool review_required = 12;
 }
 
 message ListContactRequestsResponse {

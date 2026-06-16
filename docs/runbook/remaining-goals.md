@@ -36,7 +36,7 @@
 | `delivery-service` | Projection DLQ / repair 深化；更多 delivery event 消费方；长时间容量曲线和生产 sizing。 |
 | `push-gateway` | 生产级 Redis HA 设计；长时间容量曲线和生产 sizing。 |
 | `receipt-service` | 会话列表更多产品化能力（更多摘要策略等）；长时间容量曲线和生产 sizing。 |
-| `contacts-service` | 陌生人申请的组织 / 风险 / 审批策略；租户默认值、来源策略和隐私例外后续接入 admin/config service 正式权限面；长时间容量曲线和生产 sizing。 |
+| `contacts-service` | 陌生人申请的正式审批 workflow、组织级策略、租户默认值 / 来源策略 / 隐私例外接入 admin/config service 正式权限面；已完成 first-stage 来源风险标注和 `review_required` 持久化，仍需长时间容量曲线和生产 sizing。 |
 | `policy-service` | 完整 ReBAC；provider-grade moderation / risk scoring；tenant DSL / quota；外部 audit sink；已完成 first-stage keyword / HTTP content moderation 和本地 direct 短基线，仍需长时间容量曲线和生产 sizing。 |
 
 ## 后续未启动工作

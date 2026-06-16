@@ -39,6 +39,8 @@ type sourcePolicyAuditOutput struct {
 	TenantID             string `json:"tenant_id"`
 	SourceType           string `json:"source_type"`
 	AllowContactRequests bool   `json:"allow_contact_requests"`
+	RiskLevel            string `json:"risk_level"`
+	ReviewRequired       bool   `json:"review_required"`
 	Version              int64  `json:"version"`
 	UpdatedAtUnixMS      int64  `json:"updated_at_unix_ms"`
 }
@@ -48,6 +50,8 @@ type sourcePolicySetOutput struct {
 	TenantID             string `json:"tenant_id"`
 	SourceType           string `json:"source_type"`
 	AllowContactRequests bool   `json:"allow_contact_requests"`
+	RiskLevel            string `json:"risk_level"`
+	ReviewRequired       bool   `json:"review_required"`
 	Version              int64  `json:"version"`
 	Changed              bool   `json:"changed"`
 	UpdatedAtUnixMS      int64  `json:"updated_at_unix_ms"`
@@ -88,6 +92,8 @@ func writeSourcePolicyAuditOutput(path string, result types.GetTenantContactRequ
 		TenantID:             string(result.TenantID),
 		SourceType:           string(result.Policy.SourceType),
 		AllowContactRequests: result.Policy.AllowContactRequests,
+		RiskLevel:            string(result.Policy.RiskLevel),
+		ReviewRequired:       result.Policy.ReviewRequired,
 		Version:              result.Policy.Version,
 		UpdatedAtUnixMS:      result.Policy.UpdatedAtUnixMS,
 	})
@@ -99,6 +105,8 @@ func writeSourcePolicySetOutput(path string, result types.SetTenantContactReques
 		TenantID:             string(result.TenantID),
 		SourceType:           string(result.Policy.SourceType),
 		AllowContactRequests: result.Policy.AllowContactRequests,
+		RiskLevel:            string(result.Policy.RiskLevel),
+		ReviewRequired:       result.Policy.ReviewRequired,
 		Version:              result.Policy.Version,
 		Changed:              result.Changed,
 		UpdatedAtUnixMS:      result.Policy.UpdatedAtUnixMS,

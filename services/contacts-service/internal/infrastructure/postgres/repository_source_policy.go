@@ -41,7 +41,15 @@ func (r *Repository) SetTenantContactRequestSourcePolicy(
 	if err := lockTenantContactRequestSourcePolicy(ctx, tx, command.TenantID, sourceType); err != nil {
 		return types.SetTenantContactRequestSourcePolicyResult{}, err
 	}
-	row, changed, err := upsertTenantContactRequestSourcePolicy(ctx, tx, command.TenantID, sourceType, command.AllowContactRequests)
+	row, changed, err := upsertTenantContactRequestSourcePolicy(
+		ctx,
+		tx,
+		command.TenantID,
+		sourceType,
+		command.AllowContactRequests,
+		command.NormalizedRiskLevel(),
+		command.ReviewRequired,
+	)
 	if err != nil {
 		return types.SetTenantContactRequestSourcePolicyResult{}, err
 	}
@@ -55,6 +63,8 @@ type contactRequestSourcePolicyRow struct {
 	TenantID             types.TenantID
 	SourceType           types.ContactRequestSourceType
 	AllowContactRequests bool
+	RiskLevel            types.ContactRequestRiskLevel
+	ReviewRequired       bool
 	Version              int64
 	UpdatedAt            time.Time
 }
@@ -64,6 +74,7 @@ func defaultContactRequestSourcePolicyRow(tenantID types.TenantID, sourceType ty
 		TenantID:             tenantID,
 		SourceType:           sourceType,
 		AllowContactRequests: true,
+		RiskLevel:            types.ContactRequestRiskLevelLow,
 	}
 }
 
@@ -77,11 +88,19 @@ func getTenantContactRequestSourcePolicy(
 ) (contactRequestSourcePolicyRow, error) {
 	var row contactRequestSourcePolicyRow
 	err := queryer.QueryRow(ctx, `
-SELECT tenant_id, source_type, allow_contact_requests, version, updated_at
+SELECT tenant_id, source_type, allow_contact_requests, risk_level, review_required, version, updated_at
 FROM contact_tenant_request_source_policies
 WHERE tenant_id = $1
   AND source_type = $2
-`, tenantID, sourceType).Scan(&row.TenantID, &row.SourceType, &row.AllowContactRequests, &row.Version, &row.UpdatedAt)
+`, tenantID, sourceType).Scan(
+		&row.TenantID,
+		&row.SourceType,
+		&row.AllowContactRequests,
+		&row.RiskLevel,
+		&row.ReviewRequired,
+		&row.Version,
+		&row.UpdatedAt,
+	)
 	if err == pgx.ErrNoRows {
 		return defaultContactRequestSourcePolicyRow(tenantID, sourceType), nil
 	}
@@ -114,12 +133,17 @@ func upsertTenantContactRequestSourcePolicy(
 	tenantID types.TenantID,
 	sourceType types.ContactRequestSourceType,
 	allowContactRequests bool,
+	riskLevel types.ContactRequestRiskLevel,
+	reviewRequired bool,
 ) (contactRequestSourcePolicyRow, bool, error) {
 	current, err := getTenantContactRequestSourcePolicy(ctx, tx, tenantID, sourceType)
 	if err != nil {
 		return contactRequestSourcePolicyRow{}, false, err
 	}
-	if current.Version > 0 && current.AllowContactRequests == allowContactRequests {
+	if current.Version > 0 &&
+		current.AllowContactRequests == allowContactRequests &&
+		current.RiskLevel == riskLevel &&
+		current.ReviewRequired == reviewRequired {
 		return current, false, nil
 	}
 	var row contactRequestSourcePolicyRow
@@ -129,22 +153,42 @@ INSERT INTO contact_tenant_request_source_policies (
     tenant_id,
     source_type,
     allow_contact_requests,
+    risk_level,
+    review_required,
     version,
     created_at,
     updated_at
-) VALUES ($1, $2, $3, 1, now(), now())
-RETURNING tenant_id, source_type, allow_contact_requests, version, updated_at
-`, tenantID, sourceType, allowContactRequests).Scan(&row.TenantID, &row.SourceType, &row.AllowContactRequests, &row.Version, &row.UpdatedAt)
+) VALUES ($1, $2, $3, $4, $5, 1, now(), now())
+RETURNING tenant_id, source_type, allow_contact_requests, risk_level, review_required, version, updated_at
+`, tenantID, sourceType, allowContactRequests, riskLevel, reviewRequired).Scan(
+			&row.TenantID,
+			&row.SourceType,
+			&row.AllowContactRequests,
+			&row.RiskLevel,
+			&row.ReviewRequired,
+			&row.Version,
+			&row.UpdatedAt,
+		)
 	} else {
 		err = tx.QueryRow(ctx, `
 UPDATE contact_tenant_request_source_policies
 SET allow_contact_requests = $3,
+    risk_level = $4,
+    review_required = $5,
     version = version + 1,
     updated_at = now()
 WHERE tenant_id = $1
   AND source_type = $2
-RETURNING tenant_id, source_type, allow_contact_requests, version, updated_at
-`, tenantID, sourceType, allowContactRequests).Scan(&row.TenantID, &row.SourceType, &row.AllowContactRequests, &row.Version, &row.UpdatedAt)
+RETURNING tenant_id, source_type, allow_contact_requests, risk_level, review_required, version, updated_at
+`, tenantID, sourceType, allowContactRequests, riskLevel, reviewRequired).Scan(
+			&row.TenantID,
+			&row.SourceType,
+			&row.AllowContactRequests,
+			&row.RiskLevel,
+			&row.ReviewRequired,
+			&row.Version,
+			&row.UpdatedAt,
+		)
 	}
 	if err != nil {
 		return contactRequestSourcePolicyRow{}, false, types.NewDBWriteFailed(err.Error())
@@ -175,6 +219,8 @@ func contactRequestSourcePolicyFromRow(row contactRequestSourcePolicyRow) types.
 	return types.ContactRequestSourcePolicy{
 		SourceType:           row.SourceType,
 		AllowContactRequests: row.AllowContactRequests,
+		RiskLevel:            row.RiskLevel,
+		ReviewRequired:       row.ReviewRequired,
 		Version:              row.Version,
 		UpdatedAtUnixMS:      updatedAtUnixMS,
 	}

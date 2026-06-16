@@ -18,6 +18,7 @@ type ContactEdgeStatus string
 type ContactDecision string
 type ContactRequestListDirection string
 type ContactRequestSourceType string
+type ContactRequestRiskLevel string
 type ContactPrivacyPolicySource string
 type ContactProfileVisibilityField string
 type ContactPrivacyExceptionDecision string
@@ -45,6 +46,10 @@ const (
 	ContactRequestSourceTypeInviteLink ContactRequestSourceType = "INVITE_LINK"
 	ContactRequestSourceTypeQRCode     ContactRequestSourceType = "QR_CODE"
 	ContactRequestSourceTypeImport     ContactRequestSourceType = "IMPORT"
+
+	ContactRequestRiskLevelLow    ContactRequestRiskLevel = "LOW"
+	ContactRequestRiskLevelMedium ContactRequestRiskLevel = "MEDIUM"
+	ContactRequestRiskLevelHigh   ContactRequestRiskLevel = "HIGH"
 
 	ContactPrivacyPolicySourceUser          ContactPrivacyPolicySource = "USER"
 	ContactPrivacyPolicySourceTenantDefault ContactPrivacyPolicySource = "TENANT_DEFAULT"
@@ -171,6 +176,20 @@ func NormalizeContactRequestSourceType(value ContactRequestSourceType) ContactRe
 	}
 }
 
+func NormalizeContactRequestRiskLevel(value ContactRequestRiskLevel) ContactRequestRiskLevel {
+	if value == "" {
+		return ContactRequestRiskLevelLow
+	}
+	switch value {
+	case ContactRequestRiskLevelLow,
+		ContactRequestRiskLevelMedium,
+		ContactRequestRiskLevelHigh:
+		return value
+	default:
+		return ""
+	}
+}
+
 type SendContactRequestResult struct {
 	RequestID        string
 	TenantID         TenantID
@@ -180,6 +199,8 @@ type SendContactRequestResult struct {
 	IdempotentReplay bool
 	SourceType       ContactRequestSourceType
 	SourceRef        string
+	RiskLevel        ContactRequestRiskLevel
+	ReviewRequired   bool
 }
 
 type ContactPrivacySettings struct {
@@ -472,6 +493,8 @@ type SetTenantContactPrivacyDefaultResult struct {
 type ContactRequestSourcePolicy struct {
 	SourceType           ContactRequestSourceType
 	AllowContactRequests bool
+	RiskLevel            ContactRequestRiskLevel
+	ReviewRequired       bool
 	Version              int64
 	UpdatedAtUnixMS      int64
 }
@@ -504,6 +527,8 @@ type SetTenantContactRequestSourcePolicyCommand struct {
 	TenantID             TenantID
 	SourceType           ContactRequestSourceType
 	AllowContactRequests bool
+	RiskLevel            ContactRequestRiskLevel
+	ReviewRequired       bool
 }
 
 func (c SetTenantContactRequestSourcePolicyCommand) Validate() error {
@@ -513,11 +538,18 @@ func (c SetTenantContactRequestSourcePolicyCommand) Validate() error {
 	if NormalizeContactRequestSourceType(c.SourceType) == "" {
 		return NewInvalidArgument("source_type is invalid")
 	}
+	if NormalizeContactRequestRiskLevel(c.RiskLevel) == "" {
+		return NewInvalidArgument("risk_level is invalid")
+	}
 	return nil
 }
 
 func (c SetTenantContactRequestSourcePolicyCommand) NormalizedSourceType() ContactRequestSourceType {
 	return NormalizeContactRequestSourceType(c.SourceType)
+}
+
+func (c SetTenantContactRequestSourcePolicyCommand) NormalizedRiskLevel() ContactRequestRiskLevel {
+	return NormalizeContactRequestRiskLevel(c.RiskLevel)
 }
 
 type SetTenantContactRequestSourcePolicyResult struct {
@@ -653,6 +685,8 @@ type ContactRequestItem struct {
 	DecidedAtUnixMS int64
 	SourceType      ContactRequestSourceType
 	SourceRef       string
+	RiskLevel       ContactRequestRiskLevel
+	ReviewRequired  bool
 }
 
 type ListContactRequestsResult struct {

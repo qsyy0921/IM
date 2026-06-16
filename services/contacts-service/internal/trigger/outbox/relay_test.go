@@ -42,6 +42,36 @@ func TestBuildContactEventAccepted(t *testing.T) {
 	}
 }
 
+func TestBuildContactEventRequestCreatedMapsRiskMetadata(t *testing.T) {
+	message := outboxMessage(types.ContactEventRequestCreated, map[string]any{
+		"tenant_id":        "tenant-contacts",
+		"request_id":       "request-1",
+		"sender_user_id":   "alice",
+		"receiver_user_id": "bob",
+		"status":           "PENDING",
+		"message":          "hello",
+		"source_type":      "SEARCH",
+		"source_ref":       "search:hash-1",
+		"risk_level":       "HIGH",
+		"review_required":  true,
+		"occurred_at":      "2026-06-10T08:00:00Z",
+	})
+	event, err := BuildContactEvent(message)
+	if err != nil {
+		t.Fatalf("build created event: %v", err)
+	}
+	created := event.GetRequestCreated()
+	if created == nil {
+		t.Fatalf("expected created payload: %+v", event)
+	}
+	if created.SourceType != "SEARCH" ||
+		created.SourceRef != "search:hash-1" ||
+		created.RiskLevel != "HIGH" ||
+		!created.ReviewRequired {
+		t.Fatalf("unexpected created risk metadata: %+v", created)
+	}
+}
+
 func TestBuildContactEventCanceled(t *testing.T) {
 	message := outboxMessage(types.ContactEventRequestCanceled, map[string]any{
 		"tenant_id":        "tenant-contacts",

@@ -51,6 +51,10 @@ message ContactRequestCreatedV1 {
   string status = 5;
   string message = 6;
   google.protobuf.Timestamp occurred_at = 7;
+  string source_type = 8;
+  string source_ref = 9;
+  string risk_level = 10;
+  bool review_required = 11;
 }
 
 message ContactRequestAcceptedV1 {

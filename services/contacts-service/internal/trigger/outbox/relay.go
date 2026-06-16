@@ -201,6 +201,10 @@ func BuildContactEvent(message types.OutboxMessage) (*contacteventsv1.ContactEve
 				Status:         payload.Status,
 				Message:        payload.Message,
 				OccurredAt:     payload.Timestamp(),
+				SourceType:     payload.SourceType,
+				SourceRef:      payload.SourceRef,
+				RiskLevel:      payload.RiskLevelValue(),
+				ReviewRequired: payload.ReviewRequired,
 			},
 		}
 		return event, nil
@@ -400,6 +404,10 @@ type contactPayload struct {
 	ReceiverUserID             string   `json:"receiver_user_id"`
 	Status                     string   `json:"status"`
 	Message                    string   `json:"message"`
+	SourceType                 string   `json:"source_type"`
+	SourceRef                  string   `json:"source_ref"`
+	RiskLevel                  string   `json:"risk_level"`
+	ReviewRequired             bool     `json:"review_required"`
 	EdgeVersion                int64    `json:"edge_version"`
 	OccurredAt                 string   `json:"occurred_at"`
 	OwnerUserID                string   `json:"owner_user_id"`
@@ -423,6 +431,13 @@ type contactPayload struct {
 func (payload contactPayload) Timestamp() *timestamppb.Timestamp {
 	occurredAt, _ := time.Parse(time.RFC3339Nano, payload.OccurredAt)
 	return timestamppb.New(occurredAt)
+}
+
+func (payload contactPayload) RiskLevelValue() string {
+	if payload.RiskLevel == "" {
+		return "LOW"
+	}
+	return payload.RiskLevel
 }
 
 func (payload contactPayload) AllowSearchContactRequestsValue() bool {

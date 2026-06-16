@@ -291,7 +291,9 @@ func TestRepositoryTenantContactRequestSourcePolicyBlocksRequestsIntegration(t *
 	}
 	if !defaultPolicy.Policy.AllowContactRequests ||
 		defaultPolicy.Policy.Version != 0 ||
-		defaultPolicy.Policy.SourceType != types.ContactRequestSourceTypeSearch {
+		defaultPolicy.Policy.SourceType != types.ContactRequestSourceTypeSearch ||
+		defaultPolicy.Policy.RiskLevel != types.ContactRequestRiskLevelLow ||
+		defaultPolicy.Policy.ReviewRequired {
 		t.Fatalf("unexpected default source policy: %+v", defaultPolicy)
 	}
 
@@ -344,12 +346,16 @@ func TestRepositoryTenantContactRequestSourcePolicyBlocksRequestsIntegration(t *
 		TenantID:             "tenant-contacts",
 		SourceType:           types.ContactRequestSourceTypeSearch,
 		AllowContactRequests: true,
+		RiskLevel:            types.ContactRequestRiskLevelHigh,
+		ReviewRequired:       true,
 	})
 	if err != nil {
 		t.Fatalf("set source policy open: %v", err)
 	}
 	if !opened.Changed ||
 		!opened.Policy.AllowContactRequests ||
+		opened.Policy.RiskLevel != types.ContactRequestRiskLevelHigh ||
+		!opened.Policy.ReviewRequired ||
 		opened.Policy.Version != 2 {
 		t.Fatalf("unexpected open source policy: %+v", opened)
 	}
@@ -361,9 +367,29 @@ func TestRepositoryTenantContactRequestSourcePolicyBlocksRequestsIntegration(t *
 		t.Fatalf("send search after source policy opened: %v", err)
 	}
 	if searchResult.Status != types.ContactRequestStatusPending ||
-		searchResult.SourceType != types.ContactRequestSourceTypeSearch {
+		searchResult.SourceType != types.ContactRequestSourceTypeSearch ||
+		searchResult.RiskLevel != types.ContactRequestRiskLevelHigh ||
+		!searchResult.ReviewRequired {
 		t.Fatalf("unexpected search send result: %+v", searchResult)
 	}
+	incoming, err := repository.ListContactRequests(ctx, listContactRequestsCommand("bob", types.ContactRequestListDirectionIncoming, types.ContactRequestStatusPending, 10, ""))
+	if err != nil {
+		t.Fatalf("list incoming requests: %v", err)
+	}
+	var foundRiskRequest bool
+	for _, item := range incoming.Requests {
+		if item.RequestID == searchResult.RequestID {
+			foundRiskRequest = true
+			if item.RiskLevel != types.ContactRequestRiskLevelHigh || !item.ReviewRequired {
+				t.Fatalf("unexpected listed risk metadata: %+v", item)
+			}
+		}
+	}
+	if !foundRiskRequest {
+		t.Fatalf("expected listed risk request %s in %+v", searchResult.RequestID, incoming.Requests)
+	}
+	assertContactRequestRiskMetadata(t, ctx, pool, searchResult.RequestID, types.ContactRequestRiskLevelHigh, true)
+	assertContactRequestCreatedPayloadRiskMetadata(t, ctx, pool, searchResult.RequestID, types.ContactRequestRiskLevelHigh, true)
 	assertContactRequestCount(t, ctx, pool, 2)
 	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCreated, 2)
 }

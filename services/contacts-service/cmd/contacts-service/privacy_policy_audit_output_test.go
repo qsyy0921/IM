@@ -102,6 +102,8 @@ func TestWriteSourcePolicyAuditOutput(t *testing.T) {
 		Policy: types.ContactRequestSourcePolicy{
 			SourceType:           types.ContactRequestSourceTypeSearch,
 			AllowContactRequests: false,
+			RiskLevel:            types.ContactRequestRiskLevelHigh,
+			ReviewRequired:       true,
 			Version:              7,
 			UpdatedAtUnixMS:      1800000001000,
 		},
@@ -123,6 +125,8 @@ func TestWriteSourcePolicyAuditOutput(t *testing.T) {
 		output.TenantID != "tenant-a" ||
 		output.SourceType != "SEARCH" ||
 		output.AllowContactRequests ||
+		output.RiskLevel != "HIGH" ||
+		!output.ReviewRequired ||
 		output.Version != 7 ||
 		output.UpdatedAtUnixMS != 1800000001000 {
 		t.Fatalf("unexpected source policy audit output: %+v", output)
@@ -136,6 +140,8 @@ func TestWriteSourcePolicySetOutput(t *testing.T) {
 		Policy: types.ContactRequestSourcePolicy{
 			SourceType:           types.ContactRequestSourceTypeSearch,
 			AllowContactRequests: true,
+			RiskLevel:            types.ContactRequestRiskLevelMedium,
+			ReviewRequired:       true,
 			Version:              8,
 			UpdatedAtUnixMS:      1800000003000,
 		},
@@ -158,6 +164,8 @@ func TestWriteSourcePolicySetOutput(t *testing.T) {
 		output.TenantID != "tenant-a" ||
 		output.SourceType != "SEARCH" ||
 		!output.AllowContactRequests ||
+		output.RiskLevel != "MEDIUM" ||
+		!output.ReviewRequired ||
 		output.Version != 8 ||
 		output.Changed ||
 		output.UpdatedAtUnixMS != 1800000003000 {

@@ -1029,6 +1029,57 @@ WHERE tenant_id = 'tenant-contacts'
 	}
 }
 
+func assertContactRequestRiskMetadata(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	requestID string,
+	wantRiskLevel types.ContactRequestRiskLevel,
+	wantReviewRequired bool,
+) {
+	t.Helper()
+	var gotRiskLevel types.ContactRequestRiskLevel
+	var gotReviewRequired bool
+	err := pool.QueryRow(ctx, `
+SELECT risk_level, review_required
+FROM contact_requests
+WHERE tenant_id = 'tenant-contacts'
+  AND request_id = $1
+`, requestID).Scan(&gotRiskLevel, &gotReviewRequired)
+	if err != nil {
+		t.Fatalf("query contact request risk metadata: %v", err)
+	}
+	if gotRiskLevel != wantRiskLevel || gotReviewRequired != wantReviewRequired {
+		t.Fatalf("unexpected contact request risk metadata: risk=%s review_required=%t", gotRiskLevel, gotReviewRequired)
+	}
+}
+
+func assertContactRequestCreatedPayloadRiskMetadata(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	requestID string,
+	wantRiskLevel types.ContactRequestRiskLevel,
+	wantReviewRequired bool,
+) {
+	t.Helper()
+	var gotRiskLevel types.ContactRequestRiskLevel
+	var gotReviewRequired bool
+	err := pool.QueryRow(ctx, `
+SELECT payload_json->>'risk_level', COALESCE((payload_json->>'review_required')::boolean, false)
+FROM contacts_outbox
+WHERE tenant_id = 'tenant-contacts'
+  AND event_type = $1
+  AND aggregate_id = $2
+`, eventTypeContactRequestCreated, requestID).Scan(&gotRiskLevel, &gotReviewRequired)
+	if err != nil {
+		t.Fatalf("query contact request created payload risk metadata: %v", err)
+	}
+	if gotRiskLevel != wantRiskLevel || gotReviewRequired != wantReviewRequired {
+		t.Fatalf("unexpected contact outbox risk metadata: risk=%s review_required=%t", gotRiskLevel, gotReviewRequired)
+	}
+}
+
 func assertContactEdge(t *testing.T, ctx context.Context, pool *pgxpool.Pool, owner string, contact string, status types.ContactEdgeStatus, version int64) {
 	t.Helper()
 	var gotStatus types.ContactEdgeStatus

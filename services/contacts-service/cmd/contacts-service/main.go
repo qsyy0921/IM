@@ -512,10 +512,12 @@ func runSourcePolicyAudit() error {
 		return err
 	}
 	log.Printf(
-		"contacts-service source policy tenant_id=%s source_type=%s allow_contact_requests=%t version=%d updated_at_unix_ms=%d",
+		"contacts-service source policy tenant_id=%s source_type=%s allow_contact_requests=%t risk_level=%s review_required=%t version=%d updated_at_unix_ms=%d",
 		result.TenantID,
 		result.Policy.SourceType,
 		result.Policy.AllowContactRequests,
+		result.Policy.RiskLevel,
+		result.Policy.ReviewRequired,
 		result.Policy.Version,
 		result.Policy.UpdatedAtUnixMS,
 	)
@@ -543,6 +545,14 @@ func runSourcePolicySet() error {
 	if err != nil {
 		return err
 	}
+	riskLevel, err := envOptionalContactRequestRiskLevel("NEXUSIM_CONTACTS_SOURCE_POLICY_RISK_LEVEL", types.ContactRequestRiskLevelLow)
+	if err != nil {
+		return err
+	}
+	reviewRequired, _, err := envOptionalBool("NEXUSIM_CONTACTS_SOURCE_POLICY_REVIEW_REQUIRED")
+	if err != nil {
+		return err
+	}
 	pool, err := openPGPool(ctx)
 	if err != nil {
 		return err
@@ -554,16 +564,20 @@ func runSourcePolicySet() error {
 			TenantID:             types.TenantID(tenantID),
 			SourceType:           sourceType,
 			AllowContactRequests: allowContactRequests,
+			RiskLevel:            riskLevel,
+			ReviewRequired:       reviewRequired,
 		},
 	)
 	if err != nil {
 		return err
 	}
 	log.Printf(
-		"contacts-service source policy updated tenant_id=%s source_type=%s allow_contact_requests=%t version=%d changed=%t updated_at_unix_ms=%d",
+		"contacts-service source policy updated tenant_id=%s source_type=%s allow_contact_requests=%t risk_level=%s review_required=%t version=%d changed=%t updated_at_unix_ms=%d",
 		result.TenantID,
 		result.Policy.SourceType,
 		result.Policy.AllowContactRequests,
+		result.Policy.RiskLevel,
+		result.Policy.ReviewRequired,
 		result.Policy.Version,
 		result.Changed,
 		result.Policy.UpdatedAtUnixMS,
@@ -880,6 +894,18 @@ func envContactRequestSourceType(name string) (types.ContactRequestSourceType, e
 		return "", errors.New(name + " is invalid")
 	}
 	return sourceType, nil
+}
+
+func envOptionalContactRequestRiskLevel(name string, fallback types.ContactRequestRiskLevel) (types.ContactRequestRiskLevel, error) {
+	value := strings.ToUpper(strings.TrimSpace(os.Getenv(name)))
+	if value == "" {
+		return fallback, nil
+	}
+	riskLevel := types.NormalizeContactRequestRiskLevel(types.ContactRequestRiskLevel(value))
+	if riskLevel == "" {
+		return "", errors.New(name + " is invalid")
+	}
+	return riskLevel, nil
 }
 
 func envDuration(name string, fallback time.Duration) time.Duration {

@@ -160,9 +160,11 @@ func (r *Repository) SendContactRequest(
 			return types.SendContactRequestResult{}, types.NewPermissionDenied("target user does not accept contact requests")
 		}
 	}
-	if allowed, err := contactRequestSourceAllowed(ctx, tx, command.AuthContext.TenantID, command.NormalizedSourceType()); err != nil {
+	sourcePolicy, err := getTenantContactRequestSourcePolicy(ctx, tx, command.AuthContext.TenantID, command.NormalizedSourceType())
+	if err != nil {
 		return types.SendContactRequestResult{}, err
-	} else if !allowed {
+	}
+	if !sourcePolicy.AllowContactRequests {
 		return types.SendContactRequestResult{}, types.NewPermissionDenied("contact request source is not allowed")
 	}
 
@@ -171,7 +173,7 @@ func (r *Repository) SendContactRequest(
 		return types.SendContactRequestResult{}, types.NewDBWriteFailed(err.Error())
 	}
 	occurredAt := r.now()
-	if err := insertContactRequest(ctx, tx, command, requestID, commandHash, occurredAt); err != nil {
+	if err := insertContactRequest(ctx, tx, command, sourcePolicy, requestID, commandHash, occurredAt); err != nil {
 		return types.SendContactRequestResult{}, err
 	}
 	eventID, err := r.eventID()
@@ -203,6 +205,8 @@ func (r *Repository) SendContactRequest(
 			"message":          command.Message,
 			"source_type":      command.NormalizedSourceType(),
 			"source_ref":       command.NormalizedSourceRef(),
+			"risk_level":       sourcePolicy.RiskLevel,
+			"review_required":  sourcePolicy.ReviewRequired,
 			"occurred_at":      occurredAt.Format(time.RFC3339Nano),
 		},
 	}); err != nil {
@@ -216,6 +220,8 @@ func (r *Repository) SendContactRequest(
 		Status:         types.ContactRequestStatusPending,
 		SourceType:     command.NormalizedSourceType(),
 		SourceRef:      command.NormalizedSourceRef(),
+		RiskLevel:      sourcePolicy.RiskLevel,
+		ReviewRequired: sourcePolicy.ReviewRequired,
 	})
 }
 
@@ -460,6 +466,8 @@ SELECT
     message,
     source_type,
     source_ref,
+    risk_level,
+    review_required,
     created_at,
     updated_at,
     decided_at IS NOT NULL AS has_decided_at,
@@ -502,6 +510,8 @@ LIMIT $4
 			&item.Message,
 			&item.SourceType,
 			&item.SourceRef,
+			&item.RiskLevel,
+			&item.ReviewRequired,
 			&createdAt,
 			&updatedAt,
 			&hasDecidedAt,

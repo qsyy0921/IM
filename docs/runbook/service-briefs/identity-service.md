@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-- 已有 `RegisterUser`、`Login`、`RefreshGatewayToken`、JWKS / RS256 keyring、one-shot `gateway-token-keyring-rotate` 本地 operator、device/session revoke。
+- 已有 `RegisterUser`、`Login`、`RefreshGatewayToken`、JWKS / RS256 keyring、one-shot `gateway-token-keyring-rotate` 本地 operator、device/session revoke；keyring rotate 可通过 `NEXUSIM_IDENTITY_GATEWAY_TOKEN_KEYRING_ROTATE_OUTPUT` 写不含 JWK 材料的低敏 JSON summary。
 - 已有 verification / password reset challenge、challenge delivery outbox、webhook / SMTP email challenge sender、first-stage SMTP subject/body templates、MFA TOTP、recovery codes、Refresh step-up、mTLS。
 - 已补 `/healthz`、`/readyz`、`/debug/metrics`、Prometheus text `/metrics` 和 `/.well-known/jwks.json` / `/jwks.json`，可观察低敏 identity、MFA、challenge delivery outbox、worker retry、gRPC 和 challenge delivery debug 聚合状态；debug HTTP 监听默认只允许 loopback / 私网，公网或未指定地址必须显式 `NEXUSIM_IDENTITY_DEBUG_ALLOW_PUBLIC=true`。
 - 本地 Prometheus scrape / alert rules 与 Grafana dashboard 原型已覆盖 identity gRPC error、login / MFA lock、challenge delivery failure / outbox DLQ、worker / relay error 和 OTLP endpoint missing；这仍是本地开发 / 面试演示级观测，不是生产 Alertmanager / SLO。

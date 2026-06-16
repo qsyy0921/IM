@@ -146,16 +146,22 @@ func runGatewayTokenKeyRingRotate() error {
 	if path == "" {
 		return errors.New("NEXUSIM_IDENTITY_GATEWAY_TOKEN_RS256_KEYRING_FILE is required")
 	}
-	rotated, err := rotateRS256KeyRingFile(path, gatewayTokenKeyRingRotateOptions{
+	options := gatewayTokenKeyRingRotateOptions{
 		NewKeyID:    envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ROTATE_NEW_KID", ""),
 		RSABits:     envInt("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ROTATE_RSA_BITS", 2048),
 		OldKeyLimit: envInt("NEXUSIM_IDENTITY_GATEWAY_TOKEN_ROTATE_OLD_KEY_LIMIT", 3),
 		Now:         time.Now().UTC(),
-	})
+	}
+	rotated, err := rotateRS256KeyRingFile(path, options)
 	if err != nil {
 		return err
 	}
 	log.Printf("rotated identity gateway RS256 keyring file=%s current_kid=%s old_public_keys=%d", path, rotated.Current.KeyID, len(rotated.OldPublicKeys))
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_KEYRING_ROTATE_OUTPUT")); outputPath != "" {
+		if err := writeGatewayTokenKeyRingRotateOutput(outputPath, rotated, options); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

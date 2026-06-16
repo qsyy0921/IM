@@ -131,6 +131,9 @@ try {
     Write-Host "== kafka producer config =="
     Invoke-LocalCheck "check-kafka-producer-config.ps1"
 
+    Write-Host "== kafka producer config summary =="
+    Invoke-LocalCheck "check-kafka-producer-config-summary.ps1"
+
     Write-Host "== git whitespace =="
     git diff --check
     if ($LASTEXITCODE -ne 0) {

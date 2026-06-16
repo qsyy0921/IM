@@ -232,6 +232,7 @@ func (server *Server) ListConversations(
 		PinnedOnly:      request.GetPinnedOnly(),
 		MutedOnly:       request.GetMutedOnly(),
 		TagFilter:       request.GetTagFilter(),
+		DraftOnly:       request.GetDraftOnly(),
 	})
 	if err != nil {
 		return nil, grpcError(err)

@@ -203,6 +203,7 @@ type ListConversationsCommand struct {
 	PinnedOnly      bool
 	MutedOnly       bool
 	TagFilter       string
+	DraftOnly       bool
 }
 
 func (command ListConversationsCommand) Validate() error {

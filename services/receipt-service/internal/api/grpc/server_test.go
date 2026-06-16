@@ -232,6 +232,7 @@ func TestListConversationsMapsSort(t *testing.T) {
 				PinnedOnly:  true,
 				MutedOnly:   true,
 				TagFilter:   "work",
+				DraftOnly:   true,
 			})
 			if err != nil {
 				t.Fatalf("expected nil error, got %v", err)
@@ -242,7 +243,8 @@ func TestListConversationsMapsSort(t *testing.T) {
 				!list.command.UnreadOnly ||
 				!list.command.PinnedOnly ||
 				!list.command.MutedOnly ||
-				list.command.TagFilter != "work" {
+				list.command.TagFilter != "work" ||
+				!list.command.DraftOnly {
 				t.Fatalf("unexpected list command: %+v", list.command)
 			}
 		})

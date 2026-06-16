@@ -628,6 +628,59 @@ func TestRepositorySetConversationDraftIntegration(t *testing.T) {
 	assertConversationDraft(t, cleared.Conversation, "", false)
 }
 
+func TestRepositoryListConversationsFiltersDraftOnlyIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	sortTime := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	insertConversationSummary(t, ctx, pool, "conv-a", 11, sortTime)
+	insertConversationSummary(t, ctx, pool, "conv-b", 12, sortTime.Add(-time.Minute))
+	insertConversationSummary(t, ctx, pool, "conv-c", 13, sortTime.Add(-2*time.Minute))
+
+	if _, err := repository.SetConversationDraft(ctx, setConversationDraftCommand("conv-a", "draft-a")); err != nil {
+		t.Fatalf("set conv-a draft: %v", err)
+	}
+	if _, err := repository.SetConversationDraft(ctx, setConversationDraftCommand("conv-c", "draft-c")); err != nil {
+		t.Fatalf("set conv-c draft: %v", err)
+	}
+
+	first, err := repository.ListConversations(ctx, listConversationsCommandDraftOnly(1, ""))
+	if err != nil {
+		t.Fatalf("list first draft page: %v", err)
+	}
+	assertConversationIDs(t, first, "conv-a")
+	assertConversationDraft(t, first.Items[0], "draft-a", true)
+	if first.NextPageCursor == "" {
+		t.Fatal("expected draft-only next cursor")
+	}
+
+	second, err := repository.ListConversations(ctx, listConversationsCommandDraftOnly(1, first.NextPageCursor))
+	if err != nil {
+		t.Fatalf("list second draft page: %v", err)
+	}
+	assertConversationIDs(t, second, "conv-c")
+	assertConversationDraft(t, second.Items[0], "draft-c", true)
+	if second.NextPageCursor != "" {
+		t.Fatalf("expected empty draft-only cursor on last page, got %q", second.NextPageCursor)
+	}
+
+	_, err = repository.ListConversations(ctx, listConversationsCommand(1, first.NextPageCursor))
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid cursor when draft_only changes, got %v", err)
+	}
+
+	if _, err := repository.SetConversationDraft(ctx, setConversationDraftCommand("conv-a", "")); err != nil {
+		t.Fatalf("clear conv-a draft: %v", err)
+	}
+	filtered, err := repository.ListConversations(ctx, listConversationsCommandDraftOnly(10, ""))
+	if err != nil {
+		t.Fatalf("list draft-only after clear: %v", err)
+	}
+	assertConversationIDs(t, filtered, "conv-c")
+}
+
 func TestRepositoryListConversationsRejectsInvalidCursorIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -999,6 +1052,12 @@ func listConversationsCommandMutedOnly(limit int, cursor string) types.ListConve
 func listConversationsCommandWithTag(limit int, cursor string, tag string) types.ListConversationsCommand {
 	command := listConversationsCommand(limit, cursor)
 	command.TagFilter = tag
+	return command
+}
+
+func listConversationsCommandDraftOnly(limit int, cursor string) types.ListConversationsCommand {
+	command := listConversationsCommand(limit, cursor)
+	command.DraftOnly = true
 	return command
 }
 

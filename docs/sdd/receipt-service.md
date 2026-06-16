@@ -1,6 +1,6 @@
 # NexusIM receipt-service SDD v0.1 Draft
 
-状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务、`GetReceiptState` / `ListReceiptStates` repository 级查询、低敏 `received_device_count` 聚合、显式 opt-in / capped 的 received device 明细、receipt outbox relay、只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit`、`outbox-repair-cleanup` operator、最小 `ListConversations`、`unread_only` / `pinned_only` / `muted_only` / `tag_filter` 会话列表过滤、`UPDATED_AT` / `PINNED_UPDATED_AT` / `UNREAD_UPDATED_AT` 会话列表排序、Archive / Pin / Mute / Tags / Draft 用户列表偏好、第一阶段 gRPC server TLS / mTLS 配置、`/healthz` / `/readyz` / `/debug/metrics` 低敏观测入口、first-stage OpenTelemetry gRPC server span，以及 receipt / demo smoke runner 的 delivery / receipt client TLS 配置已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events` 和会话列表偏好链路。
+状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务、`GetReceiptState` / `ListReceiptStates` repository 级查询、低敏 `received_device_count` 聚合、显式 opt-in / capped 的 received device 明细、receipt outbox relay、只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit`、`outbox-repair-cleanup` operator、最小 `ListConversations`、`unread_only` / `pinned_only` / `muted_only` / `tag_filter` / `draft_only` 会话列表过滤、`UPDATED_AT` / `PINNED_UPDATED_AT` / `UNREAD_UPDATED_AT` 会话列表排序、Archive / Pin / Mute / Tags / Draft 用户列表偏好、第一阶段 gRPC server TLS / mTLS 配置、`/healthz` / `/readyz` / `/debug/metrics` 低敏观测入口、first-stage OpenTelemetry gRPC server span，以及 receipt / demo smoke runner 的 delivery / receipt client TLS 配置已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events` 和会话列表偏好链路。
 
 本文定义 `receipt-service` 的第一条可编码切片：基于 `delivery-service` 已经产生的 durable delivery 事件，构建消息送达 / 已读回执 read model，并提供最小查询和 `MarkRead` 写入入口。
 
@@ -271,6 +271,7 @@ unread_only
 pinned_only
 muted_only
 tag_filter
+draft_only
 ```
 
 规则：
@@ -278,7 +279,8 @@ tag_filter
 - 默认排序为 `PINNED_UPDATED_AT_DESC`，用于常规收件箱。
 - `UNREAD_UPDATED_AT_DESC` 将 `unread_count > 0` 的会话排在已读会话前，再按 `sort_updated_at DESC, conversation_id ASC` 稳定排序。
 - `tag_filter` 是用户自定义会话标签的精确匹配过滤；标签由 `SetConversationTags` 写入，最多 10 个，每个最多 32 个 ASCII 字符，只允许字母、数字、`_`、`-`、`.`。
-- `page_cursor` 绑定 `sort / include_archived / unread_only / pinned_only / muted_only / tag_filter` 和排序边界；`UNREAD_UPDATED_AT_DESC` cursor 必须包含 unread boundary，不能和旧排序 cursor 混用。
+- `draft_only` 只返回当前用户存在本地草稿的会话；草稿是用户级列表状态，不改变消息事实或 conversation seq。
+- `page_cursor` 绑定 `sort / include_archived / unread_only / pinned_only / muted_only / tag_filter / draft_only` 和排序边界；`UNREAD_UPDATED_AT_DESC` cursor 必须包含 unread boundary，不能和旧排序 cursor 混用。
 - 会话列表只读取 receipt-service 自有 `user_conversation_summaries` 投影，不跨服务读 delivery / message / conversation 内部表。
 - `ConversationSummary.draft_text / draft_updated_at_unix_ms` 是当前用户本地草稿状态；空 `draft_text` 表示无草稿，`draft_updated_at_unix_ms=0` 表示无草稿更新时间。
 

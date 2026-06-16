@@ -24,6 +24,8 @@ type ProjectionFailureAuditOptions struct {
 	EventID        string
 	EventType      string
 	FailureClass   string
+	LastSeenAfter  *time.Time
+	LastSeenBefore *time.Time
 	UnresolvedOnly bool
 	Limit          int
 }
@@ -153,6 +155,9 @@ func (store *ProjectionFailureStore) AuditFailures(ctx context.Context, options 
 	if limit > 200 {
 		limit = 200
 	}
+	if options.LastSeenAfter != nil && options.LastSeenBefore != nil && !options.LastSeenAfter.Before(*options.LastSeenBefore) {
+		return nil, types.NewInvalidArgument("last_seen_after must be before last_seen_before")
+	}
 	topic := strings.TrimSpace(options.Topic)
 	if topic == "" {
 		topic = "conversation.timeline.events"
@@ -184,6 +189,14 @@ func (store *ProjectionFailureStore) AuditFailures(ctx context.Context, options 
 	if failureClass := strings.TrimSpace(options.FailureClass); failureClass != "" {
 		args = append(args, failureClass)
 		clauses = append(clauses, "failure_class = $"+itoa(len(args)))
+	}
+	if options.LastSeenAfter != nil {
+		args = append(args, options.LastSeenAfter.UTC())
+		clauses = append(clauses, "last_seen_at >= $"+itoa(len(args)))
+	}
+	if options.LastSeenBefore != nil {
+		args = append(args, options.LastSeenBefore.UTC())
+		clauses = append(clauses, "last_seen_at < $"+itoa(len(args)))
 	}
 	if options.UnresolvedOnly {
 		clauses = append(clauses, "resolved_at IS NULL")

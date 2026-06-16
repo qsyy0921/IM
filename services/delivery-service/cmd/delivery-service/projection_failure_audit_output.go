@@ -13,6 +13,7 @@ type projectionFailureAuditOutput struct {
 	GeneratedAt     string                            `json:"generated_at"`
 	IncludeResolved bool                              `json:"include_resolved"`
 	UnresolvedCount int                               `json:"unresolved_count"`
+	Filters         map[string]string                 `json:"filters,omitempty"`
 	Rows            []projectionFailureAuditOutputRow `json:"rows"`
 }
 
@@ -32,10 +33,11 @@ type projectionFailureAuditOutputRow struct {
 	ResolvedCheckpointOffset *int64 `json:"resolved_checkpoint_offset,omitempty"`
 }
 
-func writeProjectionFailureAuditOutput(path string, rows []postgresinfra.ProjectionFailureAuditRow, includeResolved bool) error {
+func writeProjectionFailureAuditOutput(path string, rows []postgresinfra.ProjectionFailureAuditRow, includeResolved bool, filters map[string]string) error {
 	output := projectionFailureAuditOutput{
 		GeneratedAt:     time.Now().UTC().Format(time.RFC3339Nano),
 		IncludeResolved: includeResolved,
+		Filters:         compactCleanupFilters(filters),
 		Rows:            make([]projectionFailureAuditOutputRow, 0, len(rows)),
 	}
 	for _, row := range rows {

@@ -566,15 +566,30 @@ func runProjectionFailureAudit() error {
 		parsed := envInt64AllowZero("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_OFFSET_VALUE", 0)
 		offsetValue = &parsed
 	}
+	lastSeenAfter, err := envOptionalRFC3339Time("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_LAST_SEEN_AFTER")
+	if err != nil {
+		return err
+	}
+	lastSeenBefore, err := envOptionalRFC3339Time("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_LAST_SEEN_BEFORE")
+	if err != nil {
+		return err
+	}
 	includeResolved := envBool("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_INCLUDE_RESOLVED", false)
+	consumerGroup := envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_CONSUMER_GROUP", "")
+	topic := envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_TOPIC", "conversation.timeline.events")
+	eventID := envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_EVENT_ID", "")
+	eventType := envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_EVENT_TYPE", "")
+	failureClass := envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_FAILURE_CLASS", "")
 	rows, err := postgresinfra.NewProjectionFailureStore(pool).AuditFailures(ctx, postgresinfra.ProjectionFailureAuditOptions{
-		ConsumerGroup:  envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_CONSUMER_GROUP", ""),
-		Topic:          envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_TOPIC", "conversation.timeline.events"),
+		ConsumerGroup:  consumerGroup,
+		Topic:          topic,
 		PartitionID:    partitionID,
 		OffsetValue:    offsetValue,
-		EventID:        envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_EVENT_ID", ""),
-		EventType:      envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_EVENT_TYPE", ""),
-		FailureClass:   envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_FAILURE_CLASS", ""),
+		EventID:        eventID,
+		EventType:      eventType,
+		FailureClass:   failureClass,
+		LastSeenAfter:  lastSeenAfter,
+		LastSeenBefore: lastSeenBefore,
 		UnresolvedOnly: !includeResolved,
 		Limit:          envInt("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_LIMIT", 20),
 	})
@@ -604,7 +619,25 @@ func runProjectionFailureAudit() error {
 		)
 	}
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_OUTPUT")); outputPath != "" {
-		if err := writeProjectionFailureAuditOutput(outputPath, rows, includeResolved); err != nil {
+		filters := map[string]string{
+			"consumer_group":   consumerGroup,
+			"topic":            topic,
+			"event_id":         eventID,
+			"event_type":       eventType,
+			"failure_class":    failureClass,
+			"last_seen_after":  formatOptionalTime(lastSeenAfter),
+			"last_seen_before": formatOptionalTime(lastSeenBefore),
+		}
+		if partitionID != nil {
+			filters["partition_id"] = strconv.FormatInt(int64(*partitionID), 10)
+		}
+		if offsetValue != nil {
+			filters["offset_value"] = strconv.FormatInt(*offsetValue, 10)
+		}
+		if includeResolved {
+			filters["include_resolved"] = strconv.FormatBool(includeResolved)
+		}
+		if err := writeProjectionFailureAuditOutput(outputPath, rows, includeResolved, filters); err != nil {
 			return err
 		}
 	}
@@ -920,7 +953,20 @@ func formatOptionalTime(value *time.Time) string {
 	if value == nil {
 		return ""
 	}
-	return value.Format(time.RFC3339)
+	return value.UTC().Format(time.RFC3339)
+}
+
+func envOptionalRFC3339Time(name string) (*time.Time, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil, fmt.Errorf("%s must be RFC3339: %w", name, err)
+	}
+	utc := parsed.UTC()
+	return &utc, nil
 }
 
 func projectionCheckpointRepairCleanupPartitionID() *int32 {

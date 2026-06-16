@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -286,6 +287,53 @@ INSERT INTO delivery_projection_failures (
 	}
 	if len(rows) != 1 || rows[0].OffsetValue != 91 || rows[0].EventID != "event-a" || rows[0].EventType != types.TimelineEventMessageEdited {
 		t.Fatalf("unexpected filtered audit rows: %+v", rows)
+	}
+}
+
+func TestProjectionFailureStoreAuditFiltersByLastSeenWindowIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_failures (
+    consumer_group, topic, partition_id, offset_value, event_id, event_type, tenant_id, conversation_id, aggregate_version, trace_id, failure_class, last_error, failure_count, first_seen_at, last_seen_at, resolved_at, resolved_checkpoint_offset
+) VALUES
+    ('group-window', 'conversation.timeline.events', 0, 101, 'event-old', 'message.edited.v1', 'tenant-1', 'conv-1', 7, 'trace-1', 'db_write_failed', 'write failed', 1, '2026-06-17 10:00:00+00', '2026-06-17 10:00:00+00', NULL, NULL),
+    ('group-window', 'conversation.timeline.events', 0, 102, 'event-target', 'message.deleted.v1', 'tenant-1', 'conv-1', 8, 'trace-2', 'decode_failed', 'decode failed', 1, '2026-06-17 10:05:00+00', '2026-06-17 10:05:00+00', NULL, NULL),
+    ('group-window', 'conversation.timeline.events', 0, 103, 'event-new', 'message.deleted.v1', 'tenant-1', 'conv-1', 9, 'trace-3', 'decode_failed', 'decode failed', 1, '2026-06-17 10:10:00+00', '2026-06-17 10:10:00+00', NULL, NULL)
+`)
+	if err != nil {
+		t.Fatalf("seed projection failures: %v", err)
+	}
+
+	after := time.Date(2026, 6, 17, 10, 3, 0, 0, time.UTC)
+	before := time.Date(2026, 6, 17, 10, 6, 0, 0, time.UTC)
+	store := NewProjectionFailureStore(pool)
+	rows, err := store.AuditFailures(ctx, ProjectionFailureAuditOptions{
+		ConsumerGroup:  "group-window",
+		Topic:          "conversation.timeline.events",
+		LastSeenAfter:  &after,
+		LastSeenBefore: &before,
+		UnresolvedOnly: true,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit projection failures by last_seen window: %v", err)
+	}
+	if len(rows) != 1 || rows[0].OffsetValue != 102 || rows[0].EventID != "event-target" {
+		t.Fatalf("unexpected filtered audit rows: %+v", rows)
+	}
+
+	_, err = store.AuditFailures(ctx, ProjectionFailureAuditOptions{
+		Topic:          "conversation.timeline.events",
+		LastSeenAfter:  &before,
+		LastSeenBefore: &before,
+		UnresolvedOnly: true,
+		Limit:          10,
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument for empty last_seen window, got %v", err)
 	}
 }
 

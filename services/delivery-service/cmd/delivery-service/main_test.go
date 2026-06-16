@@ -470,7 +470,12 @@ func TestWriteProjectionFailureAuditOutput(t *testing.T) {
 			ResolvedAt:               &resolvedAt,
 			ResolvedCheckpointOffset: &resolvedOffset,
 		},
-	}, true)
+	}, true, map[string]string{
+		"consumer_group":   "group-1",
+		"event_type":       "",
+		"last_seen_after":  "2026-06-16T08:00:00Z",
+		"last_seen_before": "",
+	})
 	if err != nil {
 		t.Fatalf("write projection failure audit output: %v", err)
 	}
@@ -480,8 +485,9 @@ func TestWriteProjectionFailureAuditOutput(t *testing.T) {
 		t.Fatalf("read projection failure audit output: %v", err)
 	}
 	var output struct {
-		IncludeResolved bool `json:"include_resolved"`
-		UnresolvedCount int  `json:"unresolved_count"`
+		IncludeResolved bool              `json:"include_resolved"`
+		UnresolvedCount int               `json:"unresolved_count"`
+		Filters         map[string]string `json:"filters"`
 		Rows            []struct {
 			EventID                  string `json:"event_id"`
 			LastError                string `json:"last_error"`
@@ -495,11 +501,42 @@ func TestWriteProjectionFailureAuditOutput(t *testing.T) {
 	if !output.IncludeResolved || output.UnresolvedCount != 1 || len(output.Rows) != 2 {
 		t.Fatalf("unexpected projection failure audit output: %+v", output)
 	}
+	if output.Filters["consumer_group"] != "group-1" || output.Filters["last_seen_after"] != "2026-06-16T08:00:00Z" {
+		t.Fatalf("unexpected projection failure audit filters: %+v", output.Filters)
+	}
+	if _, ok := output.Filters["event_type"]; ok {
+		t.Fatalf("expected empty projection failure audit filter to be omitted: %+v", output.Filters)
+	}
 	if output.Rows[0].EventID != "event-1" || output.Rows[0].Resolved || output.Rows[0].LastError != "delivery projection dependency failed" {
 		t.Fatalf("unexpected unresolved row: %+v", output.Rows[0])
 	}
 	if output.Rows[1].EventID != "event-2" || !output.Rows[1].Resolved || output.Rows[1].ResolvedCheckpointOffset == nil || *output.Rows[1].ResolvedCheckpointOffset != resolvedOffset {
 		t.Fatalf("unexpected resolved row: %+v", output.Rows[1])
+	}
+}
+
+func TestEnvOptionalRFC3339Time(t *testing.T) {
+	t.Setenv("NEXUSIM_TEST_TIME", "")
+	empty, err := envOptionalRFC3339Time("NEXUSIM_TEST_TIME")
+	if err != nil {
+		t.Fatalf("parse empty optional time: %v", err)
+	}
+	if empty != nil {
+		t.Fatalf("expected empty optional time to be nil, got %v", empty)
+	}
+
+	t.Setenv("NEXUSIM_TEST_TIME", "2026-06-17T09:20:00+08:00")
+	parsed, err := envOptionalRFC3339Time("NEXUSIM_TEST_TIME")
+	if err != nil {
+		t.Fatalf("parse optional RFC3339 time: %v", err)
+	}
+	if parsed == nil || parsed.Format(time.RFC3339) != "2026-06-17T01:20:00Z" {
+		t.Fatalf("unexpected parsed time: %v", parsed)
+	}
+
+	t.Setenv("NEXUSIM_TEST_TIME", "2026-06-17")
+	if _, err := envOptionalRFC3339Time("NEXUSIM_TEST_TIME"); err == nil {
+		t.Fatalf("expected invalid optional time to fail")
 	}
 }
 

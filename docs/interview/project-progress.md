@@ -122,6 +122,7 @@ search-service 和 AI 应用后端后置；
 - Kafka producer fault observation：本地 `kafka-go` producer 在 broker stop/restore 窗口内写入 120 条 records，消费侧观察到 unique 120、missing ack 0、duplicate 0；这只是本地观察，不是 exactly-once 证明。
 - Kafka consumer group rebalance smoke：两个 push-gateway delivery-consumer 进入同一 group，停止一个后，`im.delivery.events` 的 3 个 partition 被重新分配给剩余 consumer。
 - Kafka consumer churn smoke：2 个 push-gateway delivery-consumer 在同一 group 中反复 leave / rejoin，2 轮 8 个 transition 均回到 Stable，且 3 个 partition 都已分配。
+- Kafka consumer churn probe smoke：8 个 transition 后共写入 24 条合法 `delivery.inbox_item.created.v1` probe，producer ack 24，consumer group 每次 post-probe lag 回到 0。
 
 这些验证证明：
 
@@ -133,6 +134,7 @@ search-service 和 AI 应用后端后置；
 - Kafka producer fault observation 下，本地已 ack records 可以在消费侧全部找到，同时继续保留 outbox / event_id 幂等作为业务可靠性边界；
 - Kafka consumer group 可以完成第一阶段本地 rebalance；
 - Kafka consumer group 可以完成第一阶段 repeated leave / rejoin churn；
+- Kafka consumer group 在本地 churn 后仍可继续消费合法 delivery event 并提交到 zero lag；
 - 多个 worker / relay 已具备退避重试和 fail-closed 行为；
 - outbox / projection / challenge delivery 具备第一阶段 audit / repair / cleanup。
 

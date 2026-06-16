@@ -91,6 +91,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - 本地 `kafka-go` producer in-flight broker-fault observation：120 条 records 在 broker stop/restore 窗口内全部 ack，消费侧 unique 120、missing acknowledged 0、observed duplicate 0；这是一次本地观察，不证明 exactly-once producer 语义
 - push-gateway delivery-consumer 本地 Kafka consumer group rebalance smoke：2 个 consumer 进入同一 group 后停止 1 个，Kafka 将 `im.delivery.events` 3 个 partition 重新分配到剩余 consumer
 - push-gateway delivery-consumer 本地 Kafka consumer churn smoke：2 轮 leave / rejoin、8 个 transition 均回到 Stable，且 `im.delivery.events` 3 个 partition 每次都已分配；这是本地 churn 观察，不是生产 rebalance storm SLO
+- push-gateway delivery-consumer 本地 Kafka consumer churn probe smoke：在 8 个 transition 后共写入 24 条合法 `delivery.inbox_item.created.v1` probe，全部 ack，consumer group 每次 post-probe lag 回到 0；这是本地消息连续性观察，不是生产 rebalance storm SLO
 
 当前已经证明：
 
@@ -99,6 +100,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - PostgreSQL / Kafka 单点切换后最小链路仍可恢复
 - Kafka consumer group 能完成第一阶段本地 rebalance 观察
 - Kafka consumer group 能完成第一阶段本地 repeated leave / rejoin churn 观察
+- Kafka consumer group 在本地 churn 后还能消费合法 delivery probe 并回到 zero lag
 
 当前还没有证明：
 

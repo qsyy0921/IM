@@ -23,6 +23,12 @@ $operatorSpecs = @(
         Cmd = "services\message-service\cmd\message-service\main.go"
         Env = "NEXUSIM_MESSAGE_SERVICE_MODE"
         Modes = @("outbox-audit", "outbox-repair", "outbox-repair-audit", "outbox-repair-cleanup")
+        OutputEnvs = @(
+            "NEXUSIM_MESSAGE_OUTBOX_AUDIT_OUTPUT",
+            "NEXUSIM_MESSAGE_OUTBOX_REPAIR_OUTPUT",
+            "NEXUSIM_MESSAGE_OUTBOX_REPAIR_AUDIT_OUTPUT",
+            "NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_OUTPUT"
+        )
     },
     @{
         Service = "delivery-service"
@@ -39,12 +45,28 @@ $operatorSpecs = @(
             "projection-checkpoint-repair-cleanup",
             "projection-failure-cleanup"
         )
+        OutputEnvs = @(
+            "NEXUSIM_DELIVERY_OUTBOX_AUDIT_OUTPUT",
+            "NEXUSIM_DELIVERY_OUTBOX_REPAIR_OUTPUT",
+            "NEXUSIM_DELIVERY_OUTBOX_REPAIR_AUDIT_OUTPUT",
+            "NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_OUTPUT",
+            "NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_OUTPUT",
+            "NEXUSIM_DELIVERY_PROJECTION_REPAIR_AUDIT_OUTPUT",
+            "NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_OUTPUT",
+            "NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_OUTPUT"
+        )
     },
     @{
         Service = "receipt-service"
         Cmd = "services\receipt-service\cmd\receipt-service\main.go"
         Env = "NEXUSIM_RECEIPT_SERVICE_MODE"
         Modes = @("outbox-audit", "outbox-repair", "outbox-repair-audit", "outbox-repair-cleanup")
+        OutputEnvs = @(
+            "NEXUSIM_RECEIPT_OUTBOX_AUDIT_OUTPUT",
+            "NEXUSIM_RECEIPT_OUTBOX_REPAIR_OUTPUT",
+            "NEXUSIM_RECEIPT_OUTBOX_REPAIR_AUDIT_OUTPUT",
+            "NEXUSIM_RECEIPT_OUTBOX_REPAIR_CLEANUP_OUTPUT"
+        )
     },
     @{
         Service = "contacts-service"
@@ -60,18 +82,37 @@ $operatorSpecs = @(
             "source-policy-audit",
             "source-policy-set"
         )
+        OutputEnvs = @(
+            "NEXUSIM_CONTACTS_OUTBOX_AUDIT_OUTPUT",
+            "NEXUSIM_CONTACTS_OUTBOX_REPAIR_OUTPUT",
+            "NEXUSIM_CONTACTS_OUTBOX_REPAIR_AUDIT_OUTPUT",
+            "NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_OUTPUT",
+            "NEXUSIM_CONTACTS_TENANT_PRIVACY_AUDIT_OUTPUT",
+            "NEXUSIM_CONTACTS_TENANT_PRIVACY_SET_OUTPUT",
+            "NEXUSIM_CONTACTS_SOURCE_POLICY_AUDIT_OUTPUT",
+            "NEXUSIM_CONTACTS_SOURCE_POLICY_SET_OUTPUT"
+        )
     },
     @{
         Service = "policy-service"
         Cmd = "services\policy-service\cmd\policy-service\main.go"
         Env = "NEXUSIM_POLICY_SERVICE_MODE"
         Modes = @("outbox-audit", "outbox-repair", "outbox-repair-audit", "outbox-repair-cleanup")
+        OutputEnvs = @(
+            "NEXUSIM_POLICY_OUTBOX_AUDIT_OUTPUT",
+            "NEXUSIM_POLICY_OUTBOX_REPAIR_OUTPUT",
+            "NEXUSIM_POLICY_OUTBOX_REPAIR_AUDIT_OUTPUT",
+            "NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OUTPUT"
+        )
     },
     @{
         Service = "conversation-service"
         Cmd = "services\conversation-service\cmd\conversation-service\main.go"
         Env = "NEXUSIM_CONVERSATION_SERVICE_MODE"
         Modes = @("member-change-audit")
+        OutputEnvs = @(
+            "NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_OUTPUT"
+        )
     },
     @{
         Service = "identity-service"
@@ -84,6 +125,16 @@ $operatorSpecs = @(
             "challenge-delivery-repair-cleanup",
             "challenge-request-limit-cleanup",
             "gateway-token-keyring-rotate"
+        )
+        ExtraCmdFiles = @(
+            "services\identity-service\cmd\identity-service\gateway_token_config.go"
+        )
+        OutputEnvs = @(
+            "NEXUSIM_IDENTITY_SESSION_MFA_PROOF_AUDIT_OUTPUT",
+            "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_OUTPUT",
+            "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_OUTPUT",
+            "NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_OUTPUT",
+            "NEXUSIM_IDENTITY_GATEWAY_TOKEN_KEYRING_ROTATE_OUTPUT"
         )
     }
 )
@@ -103,6 +154,17 @@ foreach ($spec in $operatorSpecs) {
     }
 
     $cmd = Get-Content -LiteralPath $cmdPath -Raw
+    foreach ($extraCmd in @($spec.ExtraCmdFiles)) {
+        $extraCmd = [string]$extraCmd
+        if ([string]::IsNullOrWhiteSpace($extraCmd)) {
+            continue
+        }
+        $extraCmdPath = Join-Path $repoRoot $extraCmd
+        if (-not (Test-Path -LiteralPath $extraCmdPath -PathType Leaf)) {
+            throw "Missing extra service cmd file for repair operator check: $extraCmd"
+        }
+        $cmd += "`n" + (Get-Content -LiteralPath $extraCmdPath -Raw)
+    }
     $envName = [string]$spec.Env
     if (-not $repairIndex.Contains($service)) {
         throw "docs/runbook/repair-operators.md missing service: $service"
@@ -121,6 +183,16 @@ foreach ($spec in $operatorSpecs) {
         }
         if (-not $cmd.Contains("`"$mode`"")) {
             throw "$($spec.Cmd) missing documented repair operator mode for ${service}: $mode"
+        }
+    }
+
+    foreach ($outputEnv in @($spec.OutputEnvs)) {
+        $outputEnv = [string]$outputEnv
+        if (-not $repairIndex.Contains($outputEnv)) {
+            throw "docs/runbook/repair-operators.md missing documented output env for ${service}: $outputEnv"
+        }
+        if (-not $cmd.Contains($outputEnv)) {
+            throw "$($spec.Cmd) missing documented output env for ${service}: $outputEnv"
         }
     }
 }

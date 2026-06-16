@@ -916,3 +916,7 @@ func (client *fakeReceiptClient) PinConversation(context.Context, *receiptv1.Pin
 func (client *fakeReceiptClient) MuteConversation(context.Context, *receiptv1.MuteConversationRequest, ...grpc.CallOption) (*receiptv1.MuteConversationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "not implemented")
 }
+
+func (client *fakeReceiptClient) SetConversationTags(context.Context, *receiptv1.SetConversationTagsRequest, ...grpc.CallOption) (*receiptv1.SetConversationTagsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}

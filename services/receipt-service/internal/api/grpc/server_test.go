@@ -14,7 +14,7 @@ import (
 )
 
 func TestMarkReadMapsValidationError(t *testing.T) {
-	server := NewServer(fakeMarkRead{err: types.NewInvalidArgument("tenant_id is required")}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{}, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{})
+	server := NewServer(fakeMarkRead{err: types.NewInvalidArgument("tenant_id is required")}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{}, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{}, fakeSetConversationTags{})
 	_, err := server.MarkRead(context.Background(), &receiptv1.MarkReadRequest{})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", status.Code(err))
@@ -22,7 +22,7 @@ func TestMarkReadMapsValidationError(t *testing.T) {
 }
 
 func TestMarkReadSanitizesDBWriteError(t *testing.T) {
-	server := NewServer(fakeMarkRead{err: types.NewDBWriteFailed("duplicate key value violates unique constraint receipt_outbox_event_id_key")}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{}, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{})
+	server := NewServer(fakeMarkRead{err: types.NewDBWriteFailed("duplicate key value violates unique constraint receipt_outbox_event_id_key")}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{}, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{}, fakeSetConversationTags{})
 	_, err := server.MarkRead(context.Background(), &receiptv1.MarkReadRequest{
 		AuthContext:    &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
 		ConversationId: "conversation-1",
@@ -41,7 +41,7 @@ func TestMarkReadSanitizesDBWriteError(t *testing.T) {
 }
 
 func TestListConversationsMapsValidationError(t *testing.T) {
-	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{err: types.NewInvalidArgument("tenant_id is required")}, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{})
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{err: types.NewInvalidArgument("tenant_id is required")}, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{}, fakeSetConversationTags{})
 	_, err := server.ListConversations(context.Background(), &receiptv1.ListConversationsRequest{})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", status.Code(err))
@@ -73,7 +73,8 @@ func TestReceiptAuthMetadataOverridesBodyForAllUserCommands(t *testing.T) {
 		archive := &fakeArchiveConversationCapture{}
 		pin := &fakePinConversationCapture{}
 		mute := &fakeMuteConversationCapture{}
-		server := NewServer(mark, get, listStates, listConversations, archive, pin, mute)
+		setTags := &fakeSetConversationTagsCapture{}
+		server := NewServer(mark, get, listStates, listConversations, archive, pin, mute, setTags)
 
 		if _, err := server.MarkRead(ctx, &receiptv1.MarkReadRequest{
 			AuthContext:    testSpoofedAuthContext(),
@@ -123,6 +124,13 @@ func TestReceiptAuthMetadataOverridesBodyForAllUserCommands(t *testing.T) {
 		}); err != nil {
 			t.Fatalf("mute conversation: %v", err)
 		}
+		if _, err := server.SetConversationTags(ctx, &receiptv1.SetConversationTagsRequest{
+			AuthContext:    testSpoofedAuthContext(),
+			ConversationId: "conversation-1",
+			Tags:           []string{"work"},
+		}); err != nil {
+			t.Fatalf("set conversation tags: %v", err)
+		}
 
 		assertTrustedMetadataAuth(t, mark.command.AuthContext)
 		assertTrustedMetadataAuth(t, get.command.AuthContext)
@@ -131,6 +139,7 @@ func TestReceiptAuthMetadataOverridesBodyForAllUserCommands(t *testing.T) {
 		assertTrustedMetadataAuth(t, archive.command.AuthContext)
 		assertTrustedMetadataAuth(t, pin.command.AuthContext)
 		assertTrustedMetadataAuth(t, mute.command.AuthContext)
+		assertTrustedMetadataAuth(t, setTags.command.AuthContext)
 		return nil, nil
 	})
 	if err != nil {
@@ -149,7 +158,7 @@ func TestReceiptAuthMetadataDoesNotRequireBodyAuthContext(t *testing.T) {
 	interceptor := VerifiedAuthUnaryInterceptor(true)
 	_, err := interceptor(ctx, nil, &grpcgo.UnaryServerInfo{}, func(ctx context.Context, request any) (any, error) {
 		list := &fakeListConversationsCapture{}
-		server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, list, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{})
+		server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, list, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{}, fakeSetConversationTags{})
 		if _, err := server.ListConversations(ctx, &receiptv1.ListConversationsRequest{Limit: 10}); err != nil {
 			t.Fatalf("list conversations: %v", err)
 		}
@@ -204,7 +213,7 @@ func TestListConversationsMapsSort(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			list := &fakeListConversationsCapture{}
-			server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, list, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{})
+			server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, list, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{}, fakeSetConversationTags{})
 			_, err := server.ListConversations(context.Background(), &receiptv1.ListConversationsRequest{
 				AuthContext: &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
 				Limit:       20,
@@ -213,6 +222,7 @@ func TestListConversationsMapsSort(t *testing.T) {
 				UnreadOnly:  true,
 				PinnedOnly:  true,
 				MutedOnly:   true,
+				TagFilter:   "work",
 			})
 			if err != nil {
 				t.Fatalf("expected nil error, got %v", err)
@@ -222,7 +232,8 @@ func TestListConversationsMapsSort(t *testing.T) {
 				list.command.PageCursor != "cursor-1" ||
 				!list.command.UnreadOnly ||
 				!list.command.PinnedOnly ||
-				!list.command.MutedOnly {
+				!list.command.MutedOnly ||
+				list.command.TagFilter != "work" {
 				t.Fatalf("unexpected list command: %+v", list.command)
 			}
 		})
@@ -242,6 +253,7 @@ func TestListConversationsMapsResponse(t *testing.T) {
 				UnreadCount:         0,
 				LastReadSeq:         12,
 				UpdatedAt:           updatedAt,
+				Tags:                []string{"work", "urgent"},
 			}},
 			NextPageCursor: "next-cursor",
 			ProjectionWatermark: types.ProjectionWatermark{
@@ -251,7 +263,7 @@ func TestListConversationsMapsResponse(t *testing.T) {
 			},
 		},
 	}
-	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, list, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{})
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, list, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{}, fakeSetConversationTags{})
 	response, err := server.ListConversations(context.Background(), &receiptv1.ListConversationsRequest{
 		AuthContext: &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
 	})
@@ -267,7 +279,10 @@ func TestListConversationsMapsResponse(t *testing.T) {
 	if item.GetConversationId() != "conversation-1" ||
 		item.GetLastSourceEventType() != types.SourceEventMessageEdited ||
 		item.GetUpdatedAtUnixMs() != updatedAt.UnixMilli() ||
-		item.GetArchived() {
+		item.GetArchived() ||
+		len(item.GetTags()) != 2 ||
+		item.GetTags()[0] != "work" ||
+		item.GetTags()[1] != "urgent" {
 		t.Fatalf("unexpected item: %+v", item)
 	}
 }
@@ -294,7 +309,7 @@ func TestGetReceiptStateMapsReceivedDeviceDetails(t *testing.T) {
 			}},
 		},
 	}
-	server := NewServer(fakeMarkRead{}, get, fakeListReceiptStates{}, fakeListConversations{}, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{})
+	server := NewServer(fakeMarkRead{}, get, fakeListReceiptStates{}, fakeListConversations{}, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{}, fakeSetConversationTags{})
 	response, err := server.GetReceiptState(context.Background(), &receiptv1.GetReceiptStateRequest{
 		AuthContext:            &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
 		ConversationId:         "conversation-1",
@@ -344,7 +359,7 @@ func TestListReceiptStatesMapsRequestAndResponse(t *testing.T) {
 			}},
 		},
 	}
-	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, list, fakeListConversations{}, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{})
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, list, fakeListConversations{}, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{}, fakeSetConversationTags{})
 	response, err := server.ListReceiptStates(context.Background(), &receiptv1.ListReceiptStatesRequest{
 		AuthContext:    &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
 		ConversationId: "conversation-1",
@@ -386,7 +401,7 @@ func TestArchiveConversationMapsRequestAndResponse(t *testing.T) {
 			},
 		},
 	}
-	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{}, archive, fakePinConversation{}, fakeMuteConversation{})
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{}, archive, fakePinConversation{}, fakeMuteConversation{}, fakeSetConversationTags{})
 	response, err := server.ArchiveConversation(context.Background(), &receiptv1.ArchiveConversationRequest{
 		AuthContext:    &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
 		ConversationId: "conversation-1",
@@ -415,7 +430,7 @@ func TestPinConversationMapsRequestAndResponse(t *testing.T) {
 			},
 		},
 	}
-	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{}, fakeArchiveConversation{}, pin, fakeMuteConversation{})
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{}, fakeArchiveConversation{}, pin, fakeMuteConversation{}, fakeSetConversationTags{})
 	response, err := server.PinConversation(context.Background(), &receiptv1.PinConversationRequest{
 		AuthContext:    &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
 		ConversationId: "conversation-1",
@@ -444,7 +459,7 @@ func TestMuteConversationMapsRequestAndResponse(t *testing.T) {
 			},
 		},
 	}
-	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{}, fakeArchiveConversation{}, fakePinConversation{}, mute)
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{}, fakeArchiveConversation{}, fakePinConversation{}, mute, fakeSetConversationTags{})
 	response, err := server.MuteConversation(context.Background(), &receiptv1.MuteConversationRequest{
 		AuthContext:    &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
 		ConversationId: "conversation-1",
@@ -458,6 +473,39 @@ func TestMuteConversationMapsRequestAndResponse(t *testing.T) {
 	}
 	if response.GetConversation().GetConversationId() != "conversation-1" ||
 		!response.GetConversation().GetMuted() {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
+func TestSetConversationTagsMapsRequestAndResponse(t *testing.T) {
+	setTags := &fakeSetConversationTagsCapture{
+		result: types.SetConversationTagsResult{
+			Conversation: types.ConversationSummary{
+				ConversationID: "conversation-1",
+				LastVisibleSeq: 7,
+				LastMessageID:  "message-7",
+				Tags:           []string{"work", "urgent"},
+			},
+		},
+	}
+	server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, fakeListConversations{}, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{}, setTags)
+	response, err := server.SetConversationTags(context.Background(), &receiptv1.SetConversationTagsRequest{
+		AuthContext:    &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
+		ConversationId: "conversation-1",
+		Tags:           []string{"work", "urgent"},
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if setTags.command.ConversationID != "conversation-1" ||
+		len(setTags.command.Tags) != 2 ||
+		setTags.command.Tags[0] != "work" ||
+		setTags.command.Tags[1] != "urgent" {
+		t.Fatalf("unexpected set tags command: %+v", setTags.command)
+	}
+	if response.GetConversation().GetConversationId() != "conversation-1" ||
+		len(response.GetConversation().GetTags()) != 2 ||
+		response.GetConversation().GetTags()[1] != "urgent" {
 		t.Fatalf("unexpected response: %+v", response)
 	}
 }
@@ -580,6 +628,22 @@ type fakeMuteConversationCapture struct {
 }
 
 func (fake *fakeMuteConversationCapture) Execute(_ context.Context, command types.MuteConversationCommand) (types.MuteConversationResult, error) {
+	fake.command = command
+	return fake.result, nil
+}
+
+type fakeSetConversationTags struct{}
+
+func (fakeSetConversationTags) Execute(context.Context, types.SetConversationTagsCommand) (types.SetConversationTagsResult, error) {
+	return types.SetConversationTagsResult{}, nil
+}
+
+type fakeSetConversationTagsCapture struct {
+	command types.SetConversationTagsCommand
+	result  types.SetConversationTagsResult
+}
+
+func (fake *fakeSetConversationTagsCapture) Execute(_ context.Context, command types.SetConversationTagsCommand) (types.SetConversationTagsResult, error) {
 	fake.command = command
 	return fake.result, nil
 }

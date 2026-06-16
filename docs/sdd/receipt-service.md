@@ -1,6 +1,6 @@
 # NexusIM receipt-service SDD v0.1 Draft
 
-状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务、`GetReceiptState` / `ListReceiptStates` repository 级查询、低敏 `received_device_count` 聚合、显式 opt-in / capped 的 received device 明细、receipt outbox relay、只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit`、`outbox-repair-cleanup` operator、最小 `ListConversations`、`unread_only` / `pinned_only` / `muted_only` 会话列表过滤、`UPDATED_AT` / `PINNED_UPDATED_AT` / `UNREAD_UPDATED_AT` 会话列表排序、Archive / Pin / Mute 用户列表偏好、第一阶段 gRPC server TLS / mTLS 配置、`/healthz` / `/readyz` / `/debug/metrics` 低敏观测入口、first-stage OpenTelemetry gRPC server span，以及 receipt / demo smoke runner 的 delivery / receipt client TLS 配置已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events` 和会话列表偏好链路。
+状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务、`GetReceiptState` / `ListReceiptStates` repository 级查询、低敏 `received_device_count` 聚合、显式 opt-in / capped 的 received device 明细、receipt outbox relay、只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit`、`outbox-repair-cleanup` operator、最小 `ListConversations`、`unread_only` / `pinned_only` / `muted_only` / `tag_filter` 会话列表过滤、`UPDATED_AT` / `PINNED_UPDATED_AT` / `UNREAD_UPDATED_AT` 会话列表排序、Archive / Pin / Mute / Tags 用户列表偏好、第一阶段 gRPC server TLS / mTLS 配置、`/healthz` / `/readyz` / `/debug/metrics` 低敏观测入口、first-stage OpenTelemetry gRPC server span，以及 receipt / demo smoke runner 的 delivery / receipt client TLS 配置已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events` 和会话列表偏好链路。
 
 本文定义 `receipt-service` 的第一条可编码切片：基于 `delivery-service` 已经产生的 durable delivery 事件，构建消息送达 / 已读回执 read model，并提供最小查询和 `MarkRead` 写入入口。
 
@@ -46,7 +46,7 @@
 
 权限来源必须显式化：app 层通过 `ReceiptAccessPort` 调用 conversation / policy 能力，第一阶段可以用本地 mock，但接口必须表达 `CanMarkRead` 和 `CanViewReceiptState` 两种语义。该端口返回 visibility mode、permission version 和必要的 membership window；无权限返回 `PERMISSION_DENIED`。不能用 receipt projection 的存在性替代权限判断。
 
-`receipt-service grpc` 支持第一阶段 gateway verified metadata auth mode：`NEXUSIM_RECEIPT_AUTH_MODE=metadata` / `verified-metadata` 时，`MarkRead / GetReceiptState / ListReceiptStates / ListConversations / ArchiveConversation / PinConversation / MuteConversation` 的 `tenant_id / user_id / device_id / session_id` 只来自 gRPC metadata，不信任 request body 中可伪造的身份字段；`trace_id / request_id` 可在 metadata 缺失时从 body 兜底用于排障相关性。默认 `body` 模式仅用于兼容历史 smoke。该模式只定义 receipt-service 如何消费已验证身份，不等同完整 API gateway、token exchange、服务发现或全服务统一身份治理。
+`receipt-service grpc` 支持第一阶段 gateway verified metadata auth mode：`NEXUSIM_RECEIPT_AUTH_MODE=metadata` / `verified-metadata` 时，`MarkRead / GetReceiptState / ListReceiptStates / ListConversations / ArchiveConversation / PinConversation / MuteConversation / SetConversationTags` 的 `tenant_id / user_id / device_id / session_id` 只来自 gRPC metadata，不信任 request body 中可伪造的身份字段；`trace_id / request_id` 可在 metadata 缺失时从 body 兜底用于排障相关性。默认 `body` 模式仅用于兼容历史 smoke。该模式只定义 receipt-service 如何消费已验证身份，不等同完整 API gateway、token exchange、服务发现或全服务统一身份治理。
 
 `receipt-service grpc` 默认仍以 plaintext 启动，兼容现有 receipt smoke、demo 和内部客户端。第一阶段可选开启静态 TLS / mTLS：
 
@@ -270,14 +270,30 @@ include_archived
 unread_only
 pinned_only
 muted_only
+tag_filter
 ```
 
 规则：
 
 - 默认排序为 `PINNED_UPDATED_AT_DESC`，用于常规收件箱。
 - `UNREAD_UPDATED_AT_DESC` 将 `unread_count > 0` 的会话排在已读会话前，再按 `sort_updated_at DESC, conversation_id ASC` 稳定排序。
-- `page_cursor` 绑定 `sort / include_archived / unread_only / pinned_only / muted_only` 和排序边界；`UNREAD_UPDATED_AT_DESC` cursor 必须包含 unread boundary，不能和旧排序 cursor 混用。
+- `tag_filter` 是用户自定义会话标签的精确匹配过滤；标签由 `SetConversationTags` 写入，最多 10 个，每个最多 32 个 ASCII 字符，只允许字母、数字、`_`、`-`、`.`。
+- `page_cursor` 绑定 `sort / include_archived / unread_only / pinned_only / muted_only / tag_filter` 和排序边界；`UNREAD_UPDATED_AT_DESC` cursor 必须包含 unread boundary，不能和旧排序 cursor 混用。
 - 会话列表只读取 receipt-service 自有 `user_conversation_summaries` 投影，不跨服务读 delivery / message / conversation 内部表。
+
+`SetConversationTagsRequest`：
+
+```text
+auth_context
+conversation_id
+tags[]
+```
+
+规则：
+
+- tags 是用户级会话列表偏好，不是 conversation-service 的会话事实，不会发布成员或消息事件。
+- repository 只更新 receipt-service 自有 `user_conversation_summaries.tags`，并返回最新 `ConversationSummary`。
+- 设置空数组表示清空标签；重复标签会被去重。
 
 错误码：
 

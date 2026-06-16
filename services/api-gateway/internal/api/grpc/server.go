@@ -395,6 +395,16 @@ func (server *Server) MuteConversation(ctx context.Context, request *receiptv1.M
 	return server.receipt.MuteConversation(outgoing, cloned)
 }
 
+func (server *Server) SetConversationTags(ctx context.Context, request *receiptv1.SetConversationTagsRequest) (*receiptv1.SetConversationTagsResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*receiptv1.SetConversationTagsRequest)
+	cloned.AuthContext = receiptAuth(auth)
+	return server.receipt.SetConversationTags(outgoing, cloned)
+}
+
 func (server *Server) SendContactRequest(ctx context.Context, request *contactsv1.SendContactRequestRequest) (*contactsv1.SendContactRequestResponse, error) {
 	auth, outgoing, err := server.authenticate(ctx)
 	if err != nil {

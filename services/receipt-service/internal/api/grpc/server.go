@@ -39,6 +39,10 @@ type MuteConversationExecutor interface {
 	Execute(context.Context, types.MuteConversationCommand) (types.MuteConversationResult, error)
 }
 
+type SetConversationTagsExecutor interface {
+	Execute(context.Context, types.SetConversationTagsCommand) (types.SetConversationTagsResult, error)
+}
+
 type Server struct {
 	receiptv1.UnimplementedReceiptServiceServer
 	markRead            MarkReadExecutor
@@ -48,6 +52,7 @@ type Server struct {
 	archiveConversation ArchiveConversationExecutor
 	pinConversation     PinConversationExecutor
 	muteConversation    MuteConversationExecutor
+	setConversationTags SetConversationTagsExecutor
 }
 
 func NewServer(
@@ -58,6 +63,7 @@ func NewServer(
 	archiveConversation ArchiveConversationExecutor,
 	pinConversation PinConversationExecutor,
 	muteConversation MuteConversationExecutor,
+	setConversationTags SetConversationTagsExecutor,
 ) *Server {
 	return &Server{
 		markRead:            markRead,
@@ -67,6 +73,7 @@ func NewServer(
 		archiveConversation: archiveConversation,
 		pinConversation:     pinConversation,
 		muteConversation:    muteConversation,
+		setConversationTags: setConversationTags,
 	}
 }
 
@@ -216,6 +223,7 @@ func (server *Server) ListConversations(
 		UnreadOnly:      request.GetUnreadOnly(),
 		PinnedOnly:      request.GetPinnedOnly(),
 		MutedOnly:       request.GetMutedOnly(),
+		TagFilter:       request.GetTagFilter(),
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -234,6 +242,7 @@ func (server *Server) ListConversations(
 			Archived:            item.Archived,
 			Pinned:              item.Pinned,
 			Muted:               item.Muted,
+			Tags:                item.Tags,
 		})
 	}
 	return &receiptv1.ListConversationsResponse{
@@ -319,6 +328,30 @@ func (server *Server) MuteConversation(
 	}, nil
 }
 
+func (server *Server) SetConversationTags(
+	ctx context.Context,
+	request *receiptv1.SetConversationTagsRequest,
+) (*receiptv1.SetConversationTagsResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
+	result, err := server.setConversationTags.Execute(ctx, types.SetConversationTagsCommand{
+		AuthContext:    auth,
+		ConversationID: types.ConversationID(request.GetConversationId()),
+		Tags:           request.GetTags(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &receiptv1.SetConversationTagsResponse{
+		Conversation: conversationSummaryResponse(result.Conversation),
+	}, nil
+}
+
 func conversationSummaryResponse(item types.ConversationSummary) *receiptv1.ConversationSummary {
 	return &receiptv1.ConversationSummary{
 		ConversationId:      string(item.ConversationID),
@@ -332,6 +365,7 @@ func conversationSummaryResponse(item types.ConversationSummary) *receiptv1.Conv
 		Archived:            item.Archived,
 		Pinned:              item.Pinned,
 		Muted:               item.Muted,
+		Tags:                item.Tags,
 	}
 }
 

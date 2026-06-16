@@ -540,9 +540,19 @@ func (repository *Repository) ListConversations(
 	ctx context.Context,
 	command types.ListConversationsCommand,
 ) (types.ListConversationsResult, error) {
+	if err := command.Validate(); err != nil {
+		return types.ListConversationsResult{}, err
+	}
 	sort, err := types.NormalizeConversationListSort(command.Sort)
 	if err != nil {
 		return types.ListConversationsResult{}, err
+	}
+	tagFilter := ""
+	if command.TagFilter != "" {
+		tagFilter, err = types.NormalizeConversationTag(command.TagFilter)
+		if err != nil {
+			return types.ListConversationsResult{}, err
+		}
 	}
 	limit := command.Limit
 	if limit <= 0 {
@@ -551,7 +561,7 @@ func (repository *Repository) ListConversations(
 	if limit > 100 {
 		limit = 100
 	}
-	cursor, hasCursor, err := decodeListCursor(command.PageCursor, sort, command.IncludeArchived, command.UnreadOnly, command.PinnedOnly, command.MutedOnly)
+	cursor, hasCursor, err := decodeListCursor(command.PageCursor, sort, command.IncludeArchived, command.UnreadOnly, command.PinnedOnly, command.MutedOnly, tagFilter)
 	if err != nil {
 		return types.ListConversationsResult{}, err
 	}
@@ -564,6 +574,7 @@ func (repository *Repository) ListConversations(
 		command.UnreadOnly,
 		command.PinnedOnly,
 		command.MutedOnly,
+		tagFilter,
 	}
 	query := `
 SELECT
@@ -577,7 +588,8 @@ SELECT
     sort_updated_at,
     archived,
     pinned,
-    muted
+    muted,
+    tags
 FROM user_conversation_summaries
 WHERE tenant_id = $1
   AND user_id = $2
@@ -585,29 +597,30 @@ WHERE tenant_id = $1
   AND (NOT $5 OR unread_count > 0)
   AND (NOT $6 OR pinned = TRUE)
   AND (NOT $7 OR muted = TRUE)
+  AND ($8 = '' OR $8 = ANY(tags))
 `
 	if hasCursor {
 		switch sort {
 		case types.ConversationListSortPinnedUpdatedAtDesc:
 			query += `  AND (
-      pinned < $8
-      OR (pinned = $8 AND sort_updated_at < $9)
-      OR (pinned = $8 AND sort_updated_at = $9 AND conversation_id > $10)
+      pinned < $9
+      OR (pinned = $9 AND sort_updated_at < $10)
+      OR (pinned = $9 AND sort_updated_at = $10 AND conversation_id > $11)
   )
 `
 			args = append(args, cursor.Pinned, cursor.SortUpdatedAt, cursor.ConversationID)
 		case types.ConversationListSortUnreadUpdatedAtDesc:
 			query += `  AND (
-      (unread_count > 0) < $8
-      OR ((unread_count > 0) = $8 AND sort_updated_at < $9)
-      OR ((unread_count > 0) = $8 AND sort_updated_at = $9 AND conversation_id > $10)
+      (unread_count > 0) < $9
+      OR ((unread_count > 0) = $9 AND sort_updated_at < $10)
+      OR ((unread_count > 0) = $9 AND sort_updated_at = $10 AND conversation_id > $11)
   )
 `
 			args = append(args, cursor.Unread, cursor.SortUpdatedAt, cursor.ConversationID)
 		default:
 			query += `  AND (
-      sort_updated_at < $8
-      OR (sort_updated_at = $8 AND conversation_id > $9)
+      sort_updated_at < $9
+      OR (sort_updated_at = $9 AND conversation_id > $10)
   )
 `
 			args = append(args, cursor.SortUpdatedAt, cursor.ConversationID)
@@ -649,6 +662,7 @@ LIMIT $3
 			&item.Archived,
 			&item.Pinned,
 			&item.Muted,
+			&item.Tags,
 		); err != nil {
 			return types.ListConversationsResult{}, types.NewDBReadFailed(err.Error())
 		}
@@ -668,6 +682,7 @@ LIMIT $3
 			UnreadOnly:      command.UnreadOnly,
 			PinnedOnly:      command.PinnedOnly,
 			MutedOnly:       command.MutedOnly,
+			TagFilter:       tagFilter,
 			Pinned:          last.Pinned,
 			Unread:          last.UnreadCount > 0,
 			SortUpdatedAt:   last.UpdatedAt,
@@ -715,6 +730,7 @@ RETURNING
     archived,
     pinned,
     muted,
+    tags,
     archived_at
 `, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.Archived).Scan(
 		&item.ConversationID,
@@ -728,6 +744,7 @@ RETURNING
 		&item.Archived,
 		&item.Pinned,
 		&item.Muted,
+		&item.Tags,
 		&archivedAt,
 	)
 	if err == pgx.ErrNoRows {
@@ -768,6 +785,7 @@ RETURNING
     archived,
     pinned,
     muted,
+    tags,
     pinned_at
 `, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.Pinned).Scan(
 		&item.ConversationID,
@@ -781,6 +799,7 @@ RETURNING
 		&item.Archived,
 		&item.Pinned,
 		&item.Muted,
+		&item.Tags,
 		&pinnedAt,
 	)
 	if err == pgx.ErrNoRows {
@@ -821,6 +840,7 @@ RETURNING
     archived,
     pinned,
     muted,
+    tags,
     muted_at
 `, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.Muted).Scan(
 		&item.ConversationID,
@@ -834,6 +854,7 @@ RETURNING
 		&item.Archived,
 		&item.Pinned,
 		&item.Muted,
+		&item.Tags,
 		&mutedAt,
 	)
 	if err == pgx.ErrNoRows {
@@ -843,6 +864,61 @@ RETURNING
 		return types.MuteConversationResult{}, types.NewDBWriteFailed(err.Error())
 	}
 	return types.MuteConversationResult{Conversation: item}, nil
+}
+
+func (repository *Repository) SetConversationTags(
+	ctx context.Context,
+	command types.SetConversationTagsCommand,
+) (types.SetConversationTagsResult, error) {
+	if err := command.Validate(); err != nil {
+		return types.SetConversationTagsResult{}, err
+	}
+	tags, err := types.NormalizeConversationTags(command.Tags)
+	if err != nil {
+		return types.SetConversationTagsResult{}, err
+	}
+	var item types.ConversationSummary
+	err = repository.pool.QueryRow(ctx, `
+UPDATE user_conversation_summaries
+SET tags = $4,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND conversation_id = $3
+RETURNING
+    conversation_id,
+    last_visible_seq,
+    last_message_id,
+    last_sender_id,
+    last_source_event_type,
+    unread_count,
+    last_read_seq,
+    sort_updated_at,
+    archived,
+    pinned,
+    muted,
+    tags
+`, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, tags).Scan(
+		&item.ConversationID,
+		&item.LastVisibleSeq,
+		&item.LastMessageID,
+		&item.LastSenderID,
+		&item.LastSourceEventType,
+		&item.UnreadCount,
+		&item.LastReadSeq,
+		&item.UpdatedAt,
+		&item.Archived,
+		&item.Pinned,
+		&item.Muted,
+		&item.Tags,
+	)
+	if err == pgx.ErrNoRows {
+		return types.SetConversationTagsResult{}, types.NewConversationNotFound("conversation summary not found")
+	}
+	if err != nil {
+		return types.SetConversationTagsResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.SetConversationTagsResult{Conversation: item}, nil
 }
 
 func (repository *Repository) conversationSummaryWatermark(ctx context.Context) (types.ProjectionWatermark, error) {
@@ -881,13 +957,14 @@ type listCursor struct {
 	UnreadOnly      bool      `json:"unread_only"`
 	PinnedOnly      bool      `json:"pinned_only"`
 	MutedOnly       bool      `json:"muted_only"`
+	TagFilter       string    `json:"tag_filter"`
 	Pinned          bool      `json:"pinned"`
 	Unread          bool      `json:"unread"`
 	SortUpdatedAt   time.Time `json:"sort_updated_at"`
 	ConversationID  string    `json:"conversation_id"`
 }
 
-const listCursorVersion = 4
+const listCursorVersion = 5
 
 func decodeListCursor(
 	value string,
@@ -896,6 +973,7 @@ func decodeListCursor(
 	unreadOnly bool,
 	pinnedOnly bool,
 	mutedOnly bool,
+	tagFilter string,
 ) (listCursor, bool, error) {
 	if value == "" {
 		return listCursor{}, false, nil
@@ -912,14 +990,15 @@ func decodeListCursor(
 		cursor.Version = 1
 		cursor.Sort = types.ConversationListSortUpdatedAtDesc
 	}
-	if cursor.Version != listCursorVersion && cursor.Version != 3 {
+	if cursor.Version != listCursorVersion {
 		return listCursor{}, false, types.NewInvalidArgument("invalid page_cursor")
 	}
 	if cursor.Sort != sort ||
 		cursor.IncludeArchived != includeArchived ||
 		cursor.UnreadOnly != unreadOnly ||
 		cursor.PinnedOnly != pinnedOnly ||
-		cursor.MutedOnly != mutedOnly {
+		cursor.MutedOnly != mutedOnly ||
+		cursor.TagFilter != tagFilter {
 		return listCursor{}, false, types.NewInvalidArgument("invalid page_cursor")
 	}
 	if sort == types.ConversationListSortUnreadUpdatedAtDesc && cursor.Version < listCursorVersion {

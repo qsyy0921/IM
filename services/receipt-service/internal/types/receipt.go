@@ -13,6 +13,11 @@ const (
 	MaxReceivedDeviceDetailLimit     = 50
 )
 
+const (
+	MaxConversationTags    = 10
+	MaxConversationTagSize = 32
+)
+
 type MarkReadCommand struct {
 	AuthContext    AuthContext
 	AccessContext  ReceiptAccessContext
@@ -196,6 +201,7 @@ type ListConversationsCommand struct {
 	UnreadOnly      bool
 	PinnedOnly      bool
 	MutedOnly       bool
+	TagFilter       string
 }
 
 func (command ListConversationsCommand) Validate() error {
@@ -207,6 +213,11 @@ func (command ListConversationsCommand) Validate() error {
 	}
 	if _, err := NormalizeConversationListSort(command.Sort); err != nil {
 		return err
+	}
+	if command.TagFilter != "" {
+		if _, err := NormalizeConversationTag(command.TagFilter); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -241,6 +252,7 @@ type ConversationSummary struct {
 	Archived            bool
 	Pinned              bool
 	Muted               bool
+	Tags                []string
 }
 
 type ProjectionWatermark struct {
@@ -313,4 +325,66 @@ func (command MuteConversationCommand) Validate() error {
 
 type MuteConversationResult struct {
 	Conversation ConversationSummary
+}
+
+type SetConversationTagsCommand struct {
+	AuthContext    AuthContext
+	ConversationID ConversationID
+	Tags           []string
+}
+
+func (command SetConversationTagsCommand) Validate() error {
+	if err := command.AuthContext.Validate(); err != nil {
+		return err
+	}
+	if command.ConversationID == "" {
+		return NewInvalidArgument("conversation_id is required")
+	}
+	_, err := NormalizeConversationTags(command.Tags)
+	return err
+}
+
+type SetConversationTagsResult struct {
+	Conversation ConversationSummary
+}
+
+func NormalizeConversationTags(tags []string) ([]string, error) {
+	if len(tags) > MaxConversationTags {
+		return nil, NewInvalidArgument("tags exceeds max")
+	}
+	normalized := make([]string, 0, len(tags))
+	seen := make(map[string]bool, len(tags))
+	for _, tag := range tags {
+		value, err := NormalizeConversationTag(tag)
+		if err != nil {
+			return nil, err
+		}
+		if seen[value] {
+			continue
+		}
+		seen[value] = true
+		normalized = append(normalized, value)
+	}
+	return normalized, nil
+}
+
+func NormalizeConversationTag(tag string) (string, error) {
+	if tag == "" {
+		return "", NewInvalidArgument("tag must be non-empty")
+	}
+	if len(tag) > MaxConversationTagSize {
+		return "", NewInvalidArgument("tag is too long")
+	}
+	for _, char := range tag {
+		if (char >= 'a' && char <= 'z') ||
+			(char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') ||
+			char == '_' ||
+			char == '-' ||
+			char == '.' {
+			continue
+		}
+		return "", NewInvalidArgument("tag contains unsupported characters")
+	}
+	return tag, nil
 }

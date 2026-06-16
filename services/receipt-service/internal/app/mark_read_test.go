@@ -47,6 +47,7 @@ type fakeReceiptRepository struct {
 	archiveConversationCommand types.ArchiveConversationCommand
 	pinConversationCommand     types.PinConversationCommand
 	muteConversationCommand    types.MuteConversationCommand
+	setConversationTagsCommand types.SetConversationTagsCommand
 }
 
 func (repository *fakeReceiptRepository) GetReceiptState(_ context.Context, command types.GetReceiptStateCommand) (types.GetReceiptStateResult, error) {
@@ -104,6 +105,16 @@ func (repository *fakeReceiptRepository) MuteConversation(_ context.Context, com
 		Conversation: types.ConversationSummary{
 			ConversationID: command.ConversationID,
 			Muted:          command.Muted,
+		},
+	}, nil
+}
+
+func (repository *fakeReceiptRepository) SetConversationTags(_ context.Context, command types.SetConversationTagsCommand) (types.SetConversationTagsResult, error) {
+	repository.setConversationTagsCommand = command
+	return types.SetConversationTagsResult{
+		Conversation: types.ConversationSummary{
+			ConversationID: command.ConversationID,
+			Tags:           command.Tags,
 		},
 	}, nil
 }

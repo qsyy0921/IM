@@ -12,6 +12,7 @@ service ReceiptService {
   rpc ArchiveConversation(ArchiveConversationRequest) returns (ArchiveConversationResponse);
   rpc PinConversation(PinConversationRequest) returns (PinConversationResponse);
   rpc MuteConversation(MuteConversationRequest) returns (MuteConversationResponse);
+  rpc SetConversationTags(SetConversationTagsRequest) returns (SetConversationTagsResponse);
 }
 
 message AuthContext {
@@ -112,6 +113,7 @@ message ListConversationsRequest {
   bool unread_only = 6;
   bool pinned_only = 7;
   bool muted_only = 8;
+  string tag_filter = 9;
 }
 
 message ProjectionWatermark {
@@ -132,6 +134,7 @@ message ConversationSummary {
   bool archived = 9;
   bool pinned = 10;
   bool muted = 11;
+  repeated string tags = 12;
 }
 
 message ListConversationsResponse {
@@ -167,5 +170,15 @@ message MuteConversationRequest {
 }
 
 message MuteConversationResponse {
+  ConversationSummary conversation = 1;
+}
+
+message SetConversationTagsRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  repeated string tags = 3;
+}
+
+message SetConversationTagsResponse {
   ConversationSummary conversation = 1;
 }

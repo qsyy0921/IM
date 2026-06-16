@@ -533,6 +533,69 @@ func TestRepositoryListConversationsFiltersPinnedAndMutedIntegration(t *testing.
 	assertConversationIDs(t, intersection, "conv-c")
 }
 
+func TestRepositoryListConversationsFiltersTagsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	sortTime := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	insertConversationSummary(t, ctx, pool, "conv-a", 11, sortTime)
+	insertConversationSummary(t, ctx, pool, "conv-b", 12, sortTime.Add(-time.Minute))
+	insertConversationSummary(t, ctx, pool, "conv-c", 13, sortTime.Add(-2*time.Minute))
+
+	if _, err := repository.SetConversationTags(ctx, setConversationTagsCommand("conv-a", "work", "urgent", "work")); err != nil {
+		t.Fatalf("set conv-a tags: %v", err)
+	}
+	if _, err := repository.SetConversationTags(ctx, setConversationTagsCommand("conv-c", "work")); err != nil {
+		t.Fatalf("set conv-c tags: %v", err)
+	}
+
+	workFirst, err := repository.ListConversations(ctx, listConversationsCommandWithTag(1, "", "work"))
+	if err != nil {
+		t.Fatalf("list first tagged page: %v", err)
+	}
+	assertConversationIDs(t, workFirst, "conv-a")
+	assertConversationTags(t, workFirst.Items[0], "work", "urgent")
+	if workFirst.NextPageCursor == "" {
+		t.Fatal("expected tagged next cursor")
+	}
+	workSecond, err := repository.ListConversations(ctx, listConversationsCommandWithTag(1, workFirst.NextPageCursor, "work"))
+	if err != nil {
+		t.Fatalf("list second tagged page: %v", err)
+	}
+	assertConversationIDs(t, workSecond, "conv-c")
+	if workSecond.NextPageCursor != "" {
+		t.Fatalf("expected empty tagged cursor on last page, got %q", workSecond.NextPageCursor)
+	}
+
+	_, err = repository.ListConversations(ctx, listConversationsCommandWithTag(1, workFirst.NextPageCursor, "urgent"))
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid cursor when tag_filter changes, got %v", err)
+	}
+
+	urgent, err := repository.ListConversations(ctx, listConversationsCommandWithTag(10, "", "urgent"))
+	if err != nil {
+		t.Fatalf("list urgent conversations: %v", err)
+	}
+	assertConversationIDs(t, urgent, "conv-a")
+
+	cleared, err := repository.SetConversationTags(ctx, setConversationTagsCommand("conv-a"))
+	if err != nil {
+		t.Fatalf("clear conv-a tags: %v", err)
+	}
+	if len(cleared.Conversation.Tags) != 0 {
+		t.Fatalf("expected cleared tags, got %+v", cleared.Conversation)
+	}
+	urgent, err = repository.ListConversations(ctx, listConversationsCommandWithTag(10, "", "urgent"))
+	if err != nil {
+		t.Fatalf("list urgent after clear: %v", err)
+	}
+	if len(urgent.Items) != 0 {
+		t.Fatalf("expected no urgent conversations after clear, got %+v", urgent.Items)
+	}
+}
+
 func TestRepositoryListConversationsRejectsInvalidCursorIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -901,6 +964,12 @@ func listConversationsCommandMutedOnly(limit int, cursor string) types.ListConve
 	return command
 }
 
+func listConversationsCommandWithTag(limit int, cursor string, tag string) types.ListConversationsCommand {
+	command := listConversationsCommand(limit, cursor)
+	command.TagFilter = tag
+	return command
+}
+
 func setConversationUnread(
 	t *testing.T,
 	ctx context.Context,
@@ -954,6 +1023,18 @@ func muteConversationCommand(conversationID string, muted bool) types.MuteConver
 		},
 		ConversationID: types.ConversationID(conversationID),
 		Muted:          muted,
+	}
+}
+
+func setConversationTagsCommand(conversationID string, tags ...string) types.SetConversationTagsCommand {
+	return types.SetConversationTagsCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-receipt",
+			UserID:   "receiver-1",
+			DeviceID: "device-1",
+		},
+		ConversationID: types.ConversationID(conversationID),
+		Tags:           tags,
 	}
 }
 
@@ -1044,6 +1125,18 @@ func assertConversationSummaryWithArchive(
 	assertConversationSummary(t, result, wantLastVisibleSeq, wantLastVisibleSeq, 0)
 	if result.Items[0].Archived != wantArchived {
 		t.Fatalf("expected archived=%v, got %+v", wantArchived, result.Items[0])
+	}
+}
+
+func assertConversationTags(t *testing.T, item types.ConversationSummary, want ...string) {
+	t.Helper()
+	if len(item.Tags) != len(want) {
+		t.Fatalf("expected %d tags, got %d: %+v", len(want), len(item.Tags), item)
+	}
+	for index, tag := range want {
+		if item.Tags[index] != tag {
+			t.Fatalf("expected tag %d=%s, got %+v", index, tag, item.Tags)
+		}
 	}
 }
 
@@ -1169,6 +1262,7 @@ func applyReceiptMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool
 		"000008_conversation_unread_filter.sql",
 		"000009_receipt_outbox_repair_audit.sql",
 		"000010_device_received_cursor_lookup.sql",
+		"000011_conversation_tags.sql",
 	} {
 		migrationPath := filepath.Join(root, "migrations", "postgres", "receipt", name)
 		sqlBytes, err := os.ReadFile(migrationPath)

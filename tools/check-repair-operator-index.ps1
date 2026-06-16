@@ -111,9 +111,10 @@ $operatorSpecs = @(
         Service = "conversation-service"
         Cmd = "services\conversation-service\cmd\conversation-service\main.go"
         Env = "NEXUSIM_CONVERSATION_SERVICE_MODE"
-        Modes = @("member-change-audit")
+        Modes = @("member-change-audit", "member-window-audit")
         OutputEnvs = @(
-            "NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_OUTPUT"
+            "NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_OUTPUT",
+            "NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_OUTPUT"
         )
     },
     @{

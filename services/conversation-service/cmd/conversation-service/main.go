@@ -37,7 +37,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_CONVERSATION_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("conversation-service runtime wiring is idle; set NEXUSIM_CONVERSATION_SERVICE_MODE=grpc, member-change-worker, or member-change-audit")
+		log.Println("conversation-service runtime wiring is idle; set NEXUSIM_CONVERSATION_SERVICE_MODE=grpc, member-change-worker, member-change-audit, or member-window-audit")
 		return nil
 	case "grpc":
 		return runGRPCServer()
@@ -45,6 +45,8 @@ func run() error {
 		return runMemberChangeWorker()
 	case "member-change-audit":
 		return runMemberChangeAudit()
+	case "member-window-audit":
+		return runMemberWindowAudit()
 	default:
 		return errors.New("unsupported NEXUSIM_CONVERSATION_SERVICE_MODE")
 	}
@@ -362,6 +364,60 @@ func runMemberChangeAudit() error {
 	return nil
 }
 
+func runMemberWindowAudit() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	rows, err := postgresinfra.NewRepository(pool).AuditMemberWindows(ctx, postgresinfra.MemberWindowAuditOptions{
+		TenantID:       envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_TENANT_ID", ""),
+		ConversationID: envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_CONVERSATION_ID", ""),
+		UserID:         envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_USER_ID", ""),
+		Role:           envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_ROLE", ""),
+		Status:         envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_STATUS", ""),
+		IssueClass:     envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_ISSUE_CLASS", ""),
+		Limit:          envInt("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_LIMIT", 20),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("conversation-service member window audit completed rows=%d", len(rows))
+	for _, row := range rows {
+		log.Printf(
+			"conversation_member_window tenant_id=%s conversation_id=%s user_id=%s role=%s status=%s join_seq=%s leave_seq=%s member_version=%d permission_version=%d conversation_member_version=%d conversation_permission_version=%d conversation_status=%s issue_class=%s updated_at=%s",
+			row.TenantID,
+			row.ConversationID,
+			row.UserID,
+			row.Role,
+			row.Status,
+			formatOptionalInt64(row.JoinSeq, row.HasJoinSeq),
+			formatOptionalInt64(row.LeaveSeq, row.HasLeaveSeq),
+			row.MemberVersion,
+			row.PermissionVersion,
+			row.ConversationMemberVersion,
+			row.ConversationPermissionVersion,
+			row.ConversationStatus,
+			row.IssueClass,
+			row.UpdatedAt.UTC().Format(time.RFC3339Nano),
+		)
+	}
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_OUTPUT")); outputPath != "" {
+		if err := writeMemberWindowAuditOutput(outputPath, rows); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {
 	if strings.TrimSpace(addr) == "" {
 		return func() {}, nil
@@ -590,6 +646,13 @@ func formatOptionalTime(value *time.Time) string {
 		return ""
 	}
 	return value.Format(time.RFC3339)
+}
+
+func formatOptionalInt64(value int64, ok bool) string {
+	if !ok {
+		return ""
+	}
+	return strconv.FormatInt(value, 10)
 }
 
 func envDuration(name string, fallback time.Duration) time.Duration {

@@ -14,11 +14,12 @@
 - `MarkPublishedMemberChanges` 只接受同 tenant / conversation、`producer='conversation-service'` 且 event_type 属于 `conversation.member.*` 的已发布 outbox 行推进 saga，异常 outbox 行 fail-closed。
 - owner transfer 已补真实 PostgreSQL 负向回归：目标成员 inactive 或目标已是 owner 时必须拒绝，且不能提交 `conversation_seq`、`member_change_saga`、timeline、outbox 或 roster mutation。
 - 已补 `member-change-audit` 只读 operator，可按 `change_id`、tenant、conversation、target user、operator、change type、status、outbox event 过滤 `member_change_saga`；支持 `NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_OUTPUT` 写低敏 JSON 结果，并对 `last_error` 使用稳定公开文案，避免泄露 SQL / Kafka / repair 内部错误文本。
+- 已补 `member-window-audit` 只读 operator，用于发现 `conversation_members` 当前窗口 cache 异常；覆盖 ACTIVE 无 join_seq、ACTIVE 带 leave_seq、inactive 无 leave_seq、leave_seq 早于 join_seq、成员版本高于会话版本、非 ACTIVE 会话仍有 ACTIVE 成员等 issue class；支持 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_OUTPUT` 写低敏 JSON 结果。
 - 当 `NEXUSIM_CONVERSATION_AUTH_MODE=metadata|verified-metadata` 时，公网监听地址 + 无 gRPC mTLS client cert 的危险组合会在启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - `loadtest/memberchange` summary 已输出 `capacity_summary`，包含运行时长、VUs、请求 / 成功 / 错误计数、成功率、RPS、latency avg/p95/p99、成员变更类型、saga / timeline / outbox / roster / conversation_seq 聚合；后续容量验证可直接复用该结构。
 - `loadtest/capacityseed` 已能准备 `tenant-capacity-conversation` 下的 ACTIVE owner fixture；`capacity-baseline-seeded-20260616` 本地 seeded 短基线中 `memberchange` 成功 214、`requests_per_second=42.8`，报告见 `loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md`。
 
 ## 后续
 
-- 更完整群管理、owner transfer 策略继续打磨、成员窗口历史 repair / repair action。
+- 更完整群管理、owner transfer 策略继续打磨、成员窗口历史 repair action。
 - OTel collector / 生产级 alerting / SLO dashboard、长时间容量曲线仍属于后续统一观测治理。

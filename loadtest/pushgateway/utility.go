@@ -133,6 +133,9 @@ func observedDeviceCount(result *summary) int {
 }
 
 func observedMessageCount(result *summary) int {
+	if result.MessageCount > 0 {
+		return result.MessageCount
+	}
 	if result.SlowClient != nil && result.SlowClient.MessageCount > 0 {
 		return result.SlowClient.MessageCount
 	}
@@ -146,6 +149,9 @@ func observedMessageCount(result *summary) int {
 }
 
 func observedNotifyFrameCount(result *summary) int {
+	if result.Scenario == "full" && result.MessageCount > 0 {
+		return result.MessageCount * observedDeviceCount(result)
+	}
 	count := 0
 	for _, device := range result.DeviceNotifications {
 		if device.DeliveryNotify.Op == opDeliveryNotify {

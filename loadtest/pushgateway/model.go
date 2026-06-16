@@ -80,6 +80,7 @@ type config struct {
 	receiverDeviceID                   string
 	receiverDeviceIDs                  []string
 	scenario                           string
+	messageCount                       int
 	slowMessageCount                   int
 	pushMetricsURL                     string
 	reconnectMetricsURL                string
@@ -149,6 +150,7 @@ type summary struct {
 	ReceiverUserID                          string                      `json:"receiver_user_id"`
 	ReceiverDeviceID                        string                      `json:"receiver_device_id"`
 	ReceiverDeviceIDs                       []string                    `json:"receiver_device_ids,omitempty"`
+	MessageCount                            int                         `json:"message_count,omitempty"`
 	StartedAt                               time.Time                   `json:"started_at"`
 	FinishedAt                              time.Time                   `json:"finished_at"`
 	Success                                 bool                        `json:"success"`

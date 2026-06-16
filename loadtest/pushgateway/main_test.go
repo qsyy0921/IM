@@ -90,6 +90,8 @@ func TestBuildCapacitySummaryForMultiDeviceFullRun(t *testing.T) {
 	published := int64(3)
 	summary := &summary{
 		ReceiverDeviceIDs: []string{"device-1", "device-2"},
+		MessageCount:      3,
+		Scenario:          "full",
 		StartedAt:         startedAt,
 		FinishedAt:        startedAt.Add(2 * time.Second),
 		SendMessage:       sendSummary{MessageID: "msg-1", ConversationSeq: 2},
@@ -108,14 +110,14 @@ func TestBuildCapacitySummaryForMultiDeviceFullRun(t *testing.T) {
 	if capacity.DurationMS != 2000 {
 		t.Fatalf("duration_ms = %v, want 2000", capacity.DurationMS)
 	}
-	if capacity.DeviceCount != 2 || capacity.MessageCount != 1 || capacity.NotifyFrameCount != 2 || capacity.AckFrameCount != 2 {
+	if capacity.DeviceCount != 2 || capacity.MessageCount != 3 || capacity.NotifyFrameCount != 6 || capacity.AckFrameCount != 2 {
 		t.Fatalf("unexpected counts: %+v", capacity)
 	}
 	if capacity.PullInboxItemCount != 1 || capacity.DeliveryOutboxPublished != 3 {
 		t.Fatalf("unexpected pull/outbox counts: %+v", capacity)
 	}
-	assertFloatNear(t, capacity.MessagesPerSecond, 0.5)
-	assertFloatNear(t, capacity.NotifyFramesPerSecond, 1.0)
+	assertFloatNear(t, capacity.MessagesPerSecond, 1.5)
+	assertFloatNear(t, capacity.NotifyFramesPerSecond, 3.0)
 	assertFloatNear(t, capacity.AckFramesPerSecond, 1.0)
 	assertFloatNear(t, capacity.PullItemsPerSecond, 0.5)
 }

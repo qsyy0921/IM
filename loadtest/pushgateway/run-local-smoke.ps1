@@ -66,6 +66,7 @@
     [string]$RedisKeyPrefix = "",
     [string]$RedisFaultCommand = "",
     [string]$RedisRestoreCommand = "",
+    [int]$MessageCount = 1,
     [int]$SlowMessageCount = 128,
     [switch]$SkipBuild
 )
@@ -113,6 +114,9 @@ if ($Scenario -eq "slow-client") {
     $pushSessionQueueSize = "1"
     $pushWriteTimeout = "1ms"
     $pushTestWriteDelay = "50ms"
+}
+if ($MessageCount -lt 1) {
+    throw "-MessageCount must be positive"
 }
 if ($Scenario -eq "redis-fault" -and -not $RedisFaultCommand) {
     $RedisFaultCommand = "docker stop nexusim-redis | Out-Null"
@@ -734,6 +738,7 @@ try {
         "--scenario", $Scenario,
         "--message-change-action", $MessageChangeAction,
         "--identity-revoke-scope", $IdentityRevokeScope,
+        "--message-count", [string]$MessageCount,
         "--slow-message-count", [string]$SlowMessageCount,
         "--push-metrics-url", $pushMetricsURL,
         "--route-backend", $RouteBackend,

@@ -32,6 +32,7 @@ func parseConfig() config {
 	var receiverDeviceIDs string
 	flag.StringVar(&receiverDeviceIDs, "receiver-device-ids", "", "comma separated online receiver device ids; overrides receiver-device-id when set")
 	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, message-change-notify, resume-replay, redis-resume-negative, cross-instance-resume, slow-client, redis-fault, redis-cluster-node-stop, redis-cluster-failover, redis-sentinel-failover, redis-sentinel-master-stop, redis-sentinel-quorum-loss, redis-sentinel-network-partition, or identity-revoke")
+	flag.IntVar(&cfg.messageCount, "message-count", 1, "number of messages sent in the full online notify scenario")
 	flag.IntVar(&cfg.slowMessageCount, "slow-message-count", 128, "number of messages sent while slow client does not read")
 	flag.StringVar(&cfg.messageChangeAction, "message-change-action", "edit", "message-change-notify action: edit, revoke, or delete")
 	flag.StringVar(&cfg.pushMetricsURL, "push-metrics-url", "", "push-gateway debug metrics URL")
@@ -65,6 +66,9 @@ func parseConfig() config {
 	cfg.messageChangeAction = strings.ToLower(strings.TrimSpace(cfg.messageChangeAction))
 	if cfg.messageChangeAction == "" {
 		cfg.messageChangeAction = "edit"
+	}
+	if cfg.messageCount <= 0 {
+		cfg.messageCount = 1
 	}
 	cfg.identityRevokeScope = strings.ToLower(strings.TrimSpace(cfg.identityRevokeScope))
 	if cfg.identityRevokeScope == "" {

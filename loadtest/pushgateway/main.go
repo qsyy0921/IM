@@ -155,6 +155,7 @@ func run(cfg config) error {
 		ReceiverUserID:                          cfg.receiverUserID,
 		ReceiverDeviceID:                        cfg.receiverDeviceID,
 		ReceiverDeviceIDs:                       cfg.receiverDeviceIDs,
+		MessageCount:                            cfg.messageCount,
 		StartedAt:                               time.Now().UTC(),
 		Latencies:                               map[string]float64{},
 	}
@@ -228,45 +229,52 @@ func run(cfg config) error {
 		return finish(cfg, &result, err)
 	}
 
+	var lastSend *messagev1.SendMessageResponse
 	begin = time.Now()
-	send, err := sendMessage(ctx, cfg, messageClient, 1)
-	result.Latencies["send_message"] = elapsedMS(begin)
-	if err != nil {
-		return finish(cfg, &result, fmt.Errorf("send message: %w", err))
-	}
-	result.SendMessage = sendSummary{MessageID: send.GetMessageId(), ConversationSeq: send.GetConversationSeq()}
-
-	for i, device := range devices {
-		notify, err := waitNotify(ctx, cfg, device.conn)
+	for messageIndex := 1; messageIndex <= cfg.messageCount; messageIndex++ {
+		send, err := sendMessage(ctx, cfg, messageClient, messageIndex)
 		if err != nil {
-			return finish(cfg, &result, fmt.Errorf("wait notify %s: %w", device.deviceID, err))
+			return finish(cfg, &result, fmt.Errorf("send message %d: %w", messageIndex, err))
 		}
-		result.DeviceNotifications[i].DeliveryNotify = snapshotFrame(notify)
-		if notify.ConversationSeq != send.GetConversationSeq() || notify.MessageID != send.GetMessageId() {
-			return finish(cfg, &result, fmt.Errorf("notify mismatch for %s: notify=%+v send=%+v", device.deviceID, notify, send))
+		lastSend = send
+		result.SendMessage = sendSummary{MessageID: send.GetMessageId(), ConversationSeq: send.GetConversationSeq()}
+
+		for i, device := range devices {
+			notify, err := waitNotify(ctx, cfg, device.conn)
+			if err != nil {
+				return finish(cfg, &result, fmt.Errorf("wait notify %s message %d: %w", device.deviceID, messageIndex, err))
+			}
+			result.DeviceNotifications[i].DeliveryNotify = snapshotFrame(notify)
+			if notify.ConversationSeq != send.GetConversationSeq() || notify.MessageID != send.GetMessageId() {
+				return finish(cfg, &result, fmt.Errorf("notify mismatch for %s message %d: notify=%+v send=%+v", device.deviceID, messageIndex, notify, send))
+			}
 		}
 	}
+	result.Latencies["send_messages"] = elapsedMS(begin)
 	result.DeliveryNotify = result.DeviceNotifications[0].DeliveryNotify
+	if lastSend == nil {
+		return finish(cfg, &result, errors.New("no message was sent"))
+	}
 
-	pull, err := pullInbox(ctx, cfg, deliveryClient)
+	pull, err := pullInboxAtLeast(ctx, cfg, deliveryClient, 0, cfg.messageCount+10, cfg.messageCount, lastSend.GetConversationSeq())
 	if err != nil {
 		return finish(cfg, &result, fmt.Errorf("pull inbox: %w", err))
 	}
 	result.PullInbox = pull
-	if pull.ItemCount == 0 || pull.MaxSeq < send.GetConversationSeq() {
+	if pull.ItemCount < cfg.messageCount || pull.MaxSeq < lastSend.GetConversationSeq() {
 		return finish(cfg, &result, fmt.Errorf("pull inbox did not include notify seq: %+v", pull))
 	}
 
 	for i, device := range devices {
-		ackOK, err := ackViaWebSocket(ctx, cfg, device.conn, device.deviceID, send.GetConversationSeq())
+		ackOK, err := ackViaWebSocket(ctx, cfg, device.conn, device.deviceID, lastSend.GetConversationSeq())
 		if err != nil {
 			return finish(cfg, &result, fmt.Errorf("websocket ack %s: %w", device.deviceID, err))
 		}
 		result.DeviceNotifications[i].DeliveryAckOK = snapshotFrame(ackOK)
-		if ackOK.LastReceivedSeq != send.GetConversationSeq() {
+		if ackOK.LastReceivedSeq != lastSend.GetConversationSeq() {
 			return finish(cfg, &result, fmt.Errorf("ack seq mismatch for %s: %+v", device.deviceID, ackOK))
 		}
-		if err := waitCursor(ctx, pool, cfg, device.deviceID, send.GetConversationSeq()); err != nil {
+		if err := waitCursor(ctx, pool, cfg, device.deviceID, lastSend.GetConversationSeq()); err != nil {
 			return finish(cfg, &result, err)
 		}
 		cursor, err := queryCursor(ctx, pool, cfg, device.deviceID)

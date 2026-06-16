@@ -29,6 +29,19 @@
 
 如果要确认 9 个服务都已有至少一份 `capacity_summary`，追加 `-RequireAllServices`。该汇总只聚合既有压测结果，不能替代真实容量压测、SLO 或生产 sizing 结论。
 
+如果本地 9 个服务已经按 `deploy/local/docker-compose.services.yml` 暴露默认端口，可以先 dry-run 生成计划，再执行一轮短基线：
+
+```powershell
+.\tools\run-loadtest-capacity-baseline-suite.ps1 -DryRun
+
+.\tools\run-loadtest-capacity-baseline-suite.ps1 `
+  -RunName capacity-baseline-<name> `
+  -PGDSN postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable `
+  -KafkaBrokers localhost:9092
+```
+
+suite runner 会顺序调用 9 个 loadtest runner，并在同一 run 目录下写 `capacity-baseline-suite-summary.json` / `.md` 和聚合后的 `capacity-baseline-summary.json` / `.md`。它只负责协调本地压测，不负责启动服务；服务进程、Docker 基础设施和 topic/migration 仍需按对应 runbook 先启动。
+
 ## 1. 机器与网络
 
 当前本地双机压测只用于开发阶段，不代表目标态生产拓扑。

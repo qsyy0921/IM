@@ -744,6 +744,8 @@ func requestStatusFromProto(value contactsv1.ContactRequestStatus) types.Contact
 	switch value {
 	case contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_PENDING:
 		return types.ContactRequestStatusPending
+	case contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_REVIEW_REQUIRED:
+		return types.ContactRequestStatusReviewRequired
 	case contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_ACCEPTED:
 		return types.ContactRequestStatusAccepted
 	case contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_DECLINED:
@@ -761,6 +763,8 @@ func requestStatusToProto(value types.ContactRequestStatus) contactsv1.ContactRe
 	switch value {
 	case types.ContactRequestStatusPending:
 		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_PENDING
+	case types.ContactRequestStatusReviewRequired:
+		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_REVIEW_REQUIRED
 	case types.ContactRequestStatusAccepted:
 		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_ACCEPTED
 	case types.ContactRequestStatusDeclined:

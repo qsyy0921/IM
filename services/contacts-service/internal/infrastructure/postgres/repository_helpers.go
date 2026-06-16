@@ -291,6 +291,7 @@ func insertContactRequest(
 	sourcePolicy contactRequestSourcePolicyRow,
 	requestID string,
 	commandHash string,
+	status types.ContactRequestStatus,
 	now time.Time,
 ) error {
 	_, err := tx.Exec(ctx, `
@@ -309,8 +310,8 @@ INSERT INTO contact_requests (
     review_required,
     created_at,
     updated_at
-) VALUES ($1, $2, $3, $4, 'PENDING', $5, $6, $7, $8, $9, $10, $11, $12, $12)
-`, requestID, command.AuthContext.TenantID, command.AuthContext.UserID, command.TargetUserID, command.IdempotencyKey, commandHash, command.Message, command.NormalizedSourceType(), command.NormalizedSourceRef(), sourcePolicy.RiskLevel, sourcePolicy.ReviewRequired, now)
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13)
+`, requestID, command.AuthContext.TenantID, command.AuthContext.UserID, command.TargetUserID, status, command.IdempotencyKey, commandHash, command.Message, command.NormalizedSourceType(), command.NormalizedSourceRef(), sourcePolicy.RiskLevel, sourcePolicy.ReviewRequired, now)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -373,15 +374,60 @@ SELECT EXISTS (
 	return exists, nil
 }
 
+func pendingOrReviewContactRequestExists(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, first types.UserID, second types.UserID) (bool, error) {
+	var exists bool
+	err := tx.QueryRow(ctx, `
+SELECT EXISTS (
+    SELECT 1
+    FROM contact_requests
+    WHERE tenant_id = $1
+      AND status IN ('PENDING', 'REVIEW_REQUIRED')
+      AND LEAST(sender_user_id, receiver_user_id) = LEAST($2::text, $3::text)
+      AND GREATEST(sender_user_id, receiver_user_id) = GREATEST($2::text, $3::text)
+)
+`, tenantID, first, second).Scan(&exists)
+	if err != nil {
+		return false, types.NewDBReadFailed(err.Error())
+	}
+	return exists, nil
+}
+
 func updateContactRequestStatus(ctx context.Context, tx pgx.Tx, request contactRequestRow, status types.ContactRequestStatus) error {
 	_, err := tx.Exec(ctx, `
 UPDATE contact_requests
 SET status = $3,
-    decided_at = now(),
+    decided_at = CASE WHEN $3 = 'PENDING' THEN NULL ELSE now() END,
     updated_at = now()
 WHERE tenant_id = $1
   AND request_id = $2
 `, request.TenantID, request.RequestID, status)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func insertContactRequestReviewAudit(
+	ctx context.Context,
+	tx pgx.Tx,
+	request contactRequestRow,
+	nextStatus types.ContactRequestStatus,
+	command types.ReviewContactRequestCommand,
+) error {
+	_, err := tx.Exec(ctx, `
+INSERT INTO contact_request_review_audit (
+    tenant_id,
+    request_id,
+    previous_status,
+    next_status,
+    decision,
+    operator,
+    reason,
+    risk_level,
+    review_required,
+    reviewed_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
+`, request.TenantID, request.RequestID, request.Status, nextStatus, command.Decision, command.Operator, command.Reason, request.RiskLevel, request.ReviewRequired)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -793,6 +839,13 @@ func commitUpdateContactGroupResult(ctx context.Context, tx pgx.Tx, result types
 	return result, nil
 }
 
+func commitReviewContactRequestResult(ctx context.Context, tx pgx.Tx, result types.ReviewContactRequestResult) (types.ReviewContactRequestResult, error) {
+	if err := tx.Commit(ctx); err != nil {
+		return types.ReviewContactRequestResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return result, nil
+}
+
 func respondResultFromRequest(request contactRequestRow, replay bool) types.RespondContactRequestResult {
 	return types.RespondContactRequestResult{
 		RequestID:        request.RequestID,
@@ -874,6 +927,20 @@ func updateContactGroupResultFromEdge(row contactEdgeRow, replay bool) types.Upd
 		Version:          row.Version,
 		GroupName:        row.GroupName,
 		IdempotentReplay: replay,
+	}
+}
+
+func reviewResultFromRequest(request contactRequestRow, nextStatus types.ContactRequestStatus, decision types.ContactRequestReviewDecision) types.ReviewContactRequestResult {
+	return types.ReviewContactRequestResult{
+		RequestID:      request.RequestID,
+		TenantID:       request.TenantID,
+		SenderUserID:   request.SenderUserID,
+		ReceiverUserID: request.ReceiverUserID,
+		PreviousStatus: request.Status,
+		Status:         nextStatus,
+		Decision:       decision,
+		RiskLevel:      request.RiskLevel,
+		ReviewRequired: request.ReviewRequired,
 	}
 }
 

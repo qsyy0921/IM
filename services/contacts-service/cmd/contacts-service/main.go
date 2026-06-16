@@ -38,7 +38,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_CONTACTS_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("contacts-service runtime wiring is idle; set NEXUSIM_CONTACTS_SERVICE_MODE=grpc, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, tenant-privacy-default-audit, tenant-privacy-default-set, source-policy-audit, or source-policy-set")
+		log.Println("contacts-service runtime wiring is idle; set NEXUSIM_CONTACTS_SERVICE_MODE=grpc, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, tenant-privacy-default-audit, tenant-privacy-default-set, source-policy-audit, source-policy-set, or contact-request-review")
 		return nil
 	case "grpc":
 		return runGRPC()
@@ -60,6 +60,8 @@ func run() error {
 		return runSourcePolicyAudit()
 	case "source-policy-set":
 		return runSourcePolicySet()
+	case "contact-request-review":
+		return runContactRequestReview()
 	default:
 		return errors.New("unsupported NEXUSIM_CONTACTS_SERVICE_MODE")
 	}
@@ -590,6 +592,64 @@ func runSourcePolicySet() error {
 	return nil
 }
 
+func runContactRequestReview() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	tenantID := envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_TENANT_ID", "")
+	if tenantID == "" {
+		return errors.New("NEXUSIM_CONTACTS_REQUEST_REVIEW_TENANT_ID is required")
+	}
+	requestID := envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_REQUEST_ID", "")
+	if requestID == "" {
+		return errors.New("NEXUSIM_CONTACTS_REQUEST_REVIEW_REQUEST_ID is required")
+	}
+	decision, err := envContactRequestReviewDecision("NEXUSIM_CONTACTS_REQUEST_REVIEW_DECISION")
+	if err != nil {
+		return err
+	}
+	operator := envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_OPERATOR", "manual")
+	reason := envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_REASON", "")
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	result, err := app.NewReviewContactRequestUseCase(postgresinfra.NewRepository(pool)).Execute(
+		ctx,
+		types.ReviewContactRequestCommand{
+			TenantID:  types.TenantID(tenantID),
+			RequestID: requestID,
+			Decision:  decision,
+			Operator:  operator,
+			Reason:    reason,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"contacts-service contact request review completed tenant_id=%s request_id=%s decision=%s previous_status=%s next_status=%s sender_user_id=%s receiver_user_id=%s risk_level=%s review_required=%t operator=%s reason_present=%t",
+		result.TenantID,
+		result.RequestID,
+		result.Decision,
+		result.PreviousStatus,
+		result.Status,
+		result.SenderUserID,
+		result.ReceiverUserID,
+		result.RiskLevel,
+		result.ReviewRequired,
+		operator,
+		reason != "",
+	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_CONTACTS_REQUEST_REVIEW_OUTPUT")); outputPath != "" {
+		if err := writeContactRequestReviewOutput(outputPath, result, operator, reason != ""); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {
 	if strings.TrimSpace(addr) == "" {
 		return func() {}, nil
@@ -906,6 +966,18 @@ func envOptionalContactRequestRiskLevel(name string, fallback types.ContactReque
 		return "", errors.New(name + " is invalid")
 	}
 	return riskLevel, nil
+}
+
+func envContactRequestReviewDecision(name string) (types.ContactRequestReviewDecision, error) {
+	value := strings.ToUpper(strings.TrimSpace(os.Getenv(name)))
+	if value == "" {
+		return "", errors.New(name + " is required")
+	}
+	decision := types.NormalizeContactRequestReviewDecision(types.ContactRequestReviewDecision(value))
+	if decision == "" {
+		return "", errors.New(name + " is invalid")
+	}
+	return decision, nil
 }
 
 func envDuration(name string, fallback time.Duration) time.Duration {

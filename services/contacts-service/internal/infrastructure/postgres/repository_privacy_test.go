@@ -366,18 +366,26 @@ func TestRepositoryTenantContactRequestSourcePolicyBlocksRequestsIntegration(t *
 	if err != nil {
 		t.Fatalf("send search after source policy opened: %v", err)
 	}
-	if searchResult.Status != types.ContactRequestStatusPending ||
+	if searchResult.Status != types.ContactRequestStatusReviewRequired ||
 		searchResult.SourceType != types.ContactRequestSourceTypeSearch ||
 		searchResult.RiskLevel != types.ContactRequestRiskLevelHigh ||
 		!searchResult.ReviewRequired {
 		t.Fatalf("unexpected search send result: %+v", searchResult)
 	}
-	incoming, err := repository.ListContactRequests(ctx, listContactRequestsCommand("bob", types.ContactRequestListDirectionIncoming, types.ContactRequestStatusPending, 10, ""))
+	if _, err := repository.RespondContactRequest(ctx, respondCommand("bob", searchResult.RequestID, "respond-before-review", types.ContactDecisionAccept)); !errors.Is(err, types.ErrContactRequestConflict) {
+		t.Fatalf("expected review required request to reject receiver response, got %v", err)
+	}
+	pendingBeforeReview, err := repository.ListContactRequests(ctx, listContactRequestsCommand("bob", types.ContactRequestListDirectionIncoming, types.ContactRequestStatusPending, 10, ""))
 	if err != nil {
-		t.Fatalf("list incoming requests: %v", err)
+		t.Fatalf("list pending incoming before review: %v", err)
+	}
+	assertContactRequestIDs(t, pendingBeforeReview, direct.RequestID)
+	reviewIncoming, err := repository.ListContactRequests(ctx, listContactRequestsCommand("bob", types.ContactRequestListDirectionIncoming, types.ContactRequestStatusReviewRequired, 10, ""))
+	if err != nil {
+		t.Fatalf("list review required incoming requests: %v", err)
 	}
 	var foundRiskRequest bool
-	for _, item := range incoming.Requests {
+	for _, item := range reviewIncoming.Requests {
 		if item.RequestID == searchResult.RequestID {
 			foundRiskRequest = true
 			if item.RiskLevel != types.ContactRequestRiskLevelHigh || !item.ReviewRequired {
@@ -386,12 +394,86 @@ func TestRepositoryTenantContactRequestSourcePolicyBlocksRequestsIntegration(t *
 		}
 	}
 	if !foundRiskRequest {
-		t.Fatalf("expected listed risk request %s in %+v", searchResult.RequestID, incoming.Requests)
+		t.Fatalf("expected listed risk request %s in %+v", searchResult.RequestID, reviewIncoming.Requests)
+	}
+	reviewResult, err := repository.ReviewContactRequest(ctx, types.ReviewContactRequestCommand{
+		TenantID:  "tenant-contacts",
+		RequestID: searchResult.RequestID,
+		Decision:  types.ContactRequestReviewDecisionApprove,
+		Operator:  "operator-1",
+		Reason:    "risk reviewed",
+	})
+	if err != nil {
+		t.Fatalf("approve contact request review: %v", err)
+	}
+	if reviewResult.PreviousStatus != types.ContactRequestStatusReviewRequired ||
+		reviewResult.Status != types.ContactRequestStatusPending ||
+		reviewResult.Decision != types.ContactRequestReviewDecisionApprove {
+		t.Fatalf("unexpected review result: %+v", reviewResult)
+	}
+	assertContactRequestReviewAuditCount(t, ctx, pool, searchResult.RequestID, 1)
+	accepted, err := repository.RespondContactRequest(ctx, respondCommand("bob", searchResult.RequestID, "respond-after-review", types.ContactDecisionAccept))
+	if err != nil {
+		t.Fatalf("accept approved contact request: %v", err)
+	}
+	if accepted.Status != types.ContactRequestStatusAccepted {
+		t.Fatalf("unexpected accepted reviewed request: %+v", accepted)
 	}
 	assertContactRequestRiskMetadata(t, ctx, pool, searchResult.RequestID, types.ContactRequestRiskLevelHigh, true)
 	assertContactRequestCreatedPayloadRiskMetadata(t, ctx, pool, searchResult.RequestID, types.ContactRequestRiskLevelHigh, true)
 	assertContactRequestCount(t, ctx, pool, 2)
 	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCreated, 2)
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestAccepted, 1)
+}
+
+func TestRepositoryReviewContactRequestDeclineIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	if _, err := repository.SetTenantContactRequestSourcePolicy(ctx, types.SetTenantContactRequestSourcePolicyCommand{
+		TenantID:             "tenant-contacts",
+		SourceType:           types.ContactRequestSourceTypeInviteLink,
+		AllowContactRequests: true,
+		RiskLevel:            types.ContactRequestRiskLevelHigh,
+		ReviewRequired:       true,
+	}); err != nil {
+		t.Fatalf("set invite source policy: %v", err)
+	}
+	command := sendCommand("alice", "bob", "send-review-decline", "hello")
+	command.SourceType = types.ContactRequestSourceTypeInviteLink
+	command.SourceRef = "invite:batch-1"
+	sendResult, err := repository.SendContactRequest(ctx, command)
+	if err != nil {
+		t.Fatalf("send review required request: %v", err)
+	}
+	if sendResult.Status != types.ContactRequestStatusReviewRequired {
+		t.Fatalf("expected review required request, got %+v", sendResult)
+	}
+	reviewResult, err := repository.ReviewContactRequest(ctx, types.ReviewContactRequestCommand{
+		TenantID:  "tenant-contacts",
+		RequestID: sendResult.RequestID,
+		Decision:  types.ContactRequestReviewDecisionDecline,
+		Operator:  "operator-1",
+		Reason:    "source risk rejected",
+	})
+	if err != nil {
+		t.Fatalf("decline contact request review: %v", err)
+	}
+	if reviewResult.PreviousStatus != types.ContactRequestStatusReviewRequired ||
+		reviewResult.Status != types.ContactRequestStatusDeclined ||
+		reviewResult.Decision != types.ContactRequestReviewDecisionDecline {
+		t.Fatalf("unexpected declined review result: %+v", reviewResult)
+	}
+	assertContactRequestReviewAuditCount(t, ctx, pool, sendResult.RequestID, 1)
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestDeclined, 1)
+	assertNoContactEdges(t, ctx, pool)
+
+	_, err = repository.RespondContactRequest(ctx, respondCommand("bob", sendResult.RequestID, "respond-after-review-decline", types.ContactDecisionAccept))
+	if !errors.Is(err, types.ErrContactRequestConflict) {
+		t.Fatalf("expected response after review decline conflict, got %v", err)
+	}
 }
 
 func TestRepositorySetContactPrivacyBlocksIncomingRequestsIntegration(t *testing.T) {

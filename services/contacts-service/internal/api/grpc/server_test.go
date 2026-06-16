@@ -130,6 +130,15 @@ func TestListContactRequestsMapsSourceMetadata(t *testing.T) {
 	}
 }
 
+func TestContactRequestStatusMapsReviewRequired(t *testing.T) {
+	if got := requestStatusFromProto(contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_REVIEW_REQUIRED); got != types.ContactRequestStatusReviewRequired {
+		t.Fatalf("expected review required status from proto, got %s", got)
+	}
+	if got := requestStatusToProto(types.ContactRequestStatusReviewRequired); got != contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_REVIEW_REQUIRED {
+		t.Fatalf("expected review required status to proto, got %s", got)
+	}
+}
+
 func TestContactPrivacyMapsPolicySource(t *testing.T) {
 	server := NewServer(
 		nil,

@@ -209,3 +209,26 @@ func (u *SetTenantContactRequestSourcePolicyUseCase) Execute(
 	command.SourceType = command.NormalizedSourceType()
 	return u.repository.SetTenantContactRequestSourcePolicy(ctx, command)
 }
+
+type ReviewContactRequestUseCase struct {
+	repository ReviewContactRequestRepository
+}
+
+func NewReviewContactRequestUseCase(repository ReviewContactRequestRepository) *ReviewContactRequestUseCase {
+	return &ReviewContactRequestUseCase{repository: repository}
+}
+
+func (u *ReviewContactRequestUseCase) Execute(
+	ctx context.Context,
+	command types.ReviewContactRequestCommand,
+) (types.ReviewContactRequestResult, error) {
+	if err := command.Validate(); err != nil {
+		return types.ReviewContactRequestResult{}, err
+	}
+	if u.repository == nil {
+		return types.ReviewContactRequestResult{}, types.NewDBWriteFailed("contact request review repository is not configured")
+	}
+	command.Decision = command.NormalizedDecision()
+	command.Operator = command.NormalizedOperator()
+	return u.repository.ReviewContactRequest(ctx, command)
+}

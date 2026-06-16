@@ -1080,6 +1080,23 @@ WHERE tenant_id = 'tenant-contacts'
 	}
 }
 
+func assertContactRequestReviewAuditCount(t *testing.T, ctx context.Context, pool *pgxpool.Pool, requestID string, want int) {
+	t.Helper()
+	var got int
+	err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM contact_request_review_audit
+WHERE tenant_id = 'tenant-contacts'
+  AND request_id = $1
+`, requestID).Scan(&got)
+	if err != nil {
+		t.Fatalf("count contact request review audit: %v", err)
+	}
+	if got != want {
+		t.Fatalf("expected %d contact request review audit rows, got %d", want, got)
+	}
+}
+
 func assertContactEdge(t *testing.T, ctx context.Context, pool *pgxpool.Pool, owner string, contact string, status types.ContactEdgeStatus, version int64) {
 	t.Helper()
 	var gotStatus types.ContactEdgeStatus
@@ -1275,6 +1292,7 @@ func resetContactsTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) 
 TRUNCATE
     contacts_outbox_repair_audit,
     contacts_outbox,
+    contact_request_review_audit,
     contact_command_idempotency,
     contact_privacy_exceptions,
     contact_privacy_settings,

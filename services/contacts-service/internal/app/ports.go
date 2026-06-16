@@ -46,6 +46,10 @@ type SetTenantContactRequestSourcePolicyRepository interface {
 	SetTenantContactRequestSourcePolicy(context.Context, types.SetTenantContactRequestSourcePolicyCommand) (types.SetTenantContactRequestSourcePolicyResult, error)
 }
 
+type ReviewContactRequestRepository interface {
+	ReviewContactRequest(context.Context, types.ReviewContactRequestCommand) (types.ReviewContactRequestResult, error)
+}
+
 type RespondContactRequestRepository interface {
 	RespondContactRequest(context.Context, types.RespondContactRequestCommand) (types.RespondContactRequestResult, error)
 }

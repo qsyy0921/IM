@@ -24,12 +24,13 @@ const (
 type ContactRequestStatus int32
 
 const (
-	ContactRequestStatus_CONTACT_REQUEST_STATUS_UNSPECIFIED ContactRequestStatus = 0
-	ContactRequestStatus_CONTACT_REQUEST_STATUS_PENDING     ContactRequestStatus = 1
-	ContactRequestStatus_CONTACT_REQUEST_STATUS_ACCEPTED    ContactRequestStatus = 2
-	ContactRequestStatus_CONTACT_REQUEST_STATUS_DECLINED    ContactRequestStatus = 3
-	ContactRequestStatus_CONTACT_REQUEST_STATUS_CANCELED    ContactRequestStatus = 4
-	ContactRequestStatus_CONTACT_REQUEST_STATUS_EXPIRED     ContactRequestStatus = 5
+	ContactRequestStatus_CONTACT_REQUEST_STATUS_UNSPECIFIED     ContactRequestStatus = 0
+	ContactRequestStatus_CONTACT_REQUEST_STATUS_PENDING         ContactRequestStatus = 1
+	ContactRequestStatus_CONTACT_REQUEST_STATUS_ACCEPTED        ContactRequestStatus = 2
+	ContactRequestStatus_CONTACT_REQUEST_STATUS_DECLINED        ContactRequestStatus = 3
+	ContactRequestStatus_CONTACT_REQUEST_STATUS_CANCELED        ContactRequestStatus = 4
+	ContactRequestStatus_CONTACT_REQUEST_STATUS_EXPIRED         ContactRequestStatus = 5
+	ContactRequestStatus_CONTACT_REQUEST_STATUS_REVIEW_REQUIRED ContactRequestStatus = 6
 )
 
 // Enum value maps for ContactRequestStatus.
@@ -41,14 +42,16 @@ var (
 		3: "CONTACT_REQUEST_STATUS_DECLINED",
 		4: "CONTACT_REQUEST_STATUS_CANCELED",
 		5: "CONTACT_REQUEST_STATUS_EXPIRED",
+		6: "CONTACT_REQUEST_STATUS_REVIEW_REQUIRED",
 	}
 	ContactRequestStatus_value = map[string]int32{
-		"CONTACT_REQUEST_STATUS_UNSPECIFIED": 0,
-		"CONTACT_REQUEST_STATUS_PENDING":     1,
-		"CONTACT_REQUEST_STATUS_ACCEPTED":    2,
-		"CONTACT_REQUEST_STATUS_DECLINED":    3,
-		"CONTACT_REQUEST_STATUS_CANCELED":    4,
-		"CONTACT_REQUEST_STATUS_EXPIRED":     5,
+		"CONTACT_REQUEST_STATUS_UNSPECIFIED":     0,
+		"CONTACT_REQUEST_STATUS_PENDING":         1,
+		"CONTACT_REQUEST_STATUS_ACCEPTED":        2,
+		"CONTACT_REQUEST_STATUS_DECLINED":        3,
+		"CONTACT_REQUEST_STATUS_CANCELED":        4,
+		"CONTACT_REQUEST_STATUS_EXPIRED":         5,
+		"CONTACT_REQUEST_STATUS_REVIEW_REQUIRED": 6,
 	}
 )
 
@@ -3677,14 +3680,15 @@ const file_nexusim_contacts_v1_contacts_service_proto_rawDesc = "" +
 	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\"\n" +
 	"\rother_user_id\x18\x03 \x01(\tR\votherUserId\x12\x18\n" +
 	"\adeleted\x18\x04 \x01(\bR\adeleted\x12+\n" +
-	"\x11idempotent_replay\x18\x05 \x01(\bR\x10idempotentReplay*\xf5\x01\n" +
+	"\x11idempotent_replay\x18\x05 \x01(\bR\x10idempotentReplay*\xa1\x02\n" +
 	"\x14ContactRequestStatus\x12&\n" +
 	"\"CONTACT_REQUEST_STATUS_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eCONTACT_REQUEST_STATUS_PENDING\x10\x01\x12#\n" +
 	"\x1fCONTACT_REQUEST_STATUS_ACCEPTED\x10\x02\x12#\n" +
 	"\x1fCONTACT_REQUEST_STATUS_DECLINED\x10\x03\x12#\n" +
 	"\x1fCONTACT_REQUEST_STATUS_CANCELED\x10\x04\x12\"\n" +
-	"\x1eCONTACT_REQUEST_STATUS_EXPIRED\x10\x05*\x9a\x01\n" +
+	"\x1eCONTACT_REQUEST_STATUS_EXPIRED\x10\x05\x12*\n" +
+	"&CONTACT_REQUEST_STATUS_REVIEW_REQUIRED\x10\x06*\x9a\x01\n" +
 	"\x11ContactEdgeStatus\x12#\n" +
 	"\x1fCONTACT_EDGE_STATUS_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aCONTACT_EDGE_STATUS_ACTIVE\x10\x01\x12\x1f\n" +

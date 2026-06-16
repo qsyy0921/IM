@@ -6,11 +6,12 @@ import (
 )
 
 const (
-	maxContactRemarkLength      = 128
-	maxContactGroupNameLength   = 64
-	maxContactReasonLength      = 512
-	maxContactSearchQueryLength = 128
-	maxContactSourceRefLength   = 256
+	maxContactRemarkLength       = 128
+	maxContactGroupNameLength    = 64
+	maxContactReasonLength       = 512
+	maxContactReviewReasonLength = 512
+	maxContactSearchQueryLength  = 128
+	maxContactSourceRefLength    = 256
 )
 
 type ContactRequestStatus string
@@ -22,13 +23,15 @@ type ContactRequestRiskLevel string
 type ContactPrivacyPolicySource string
 type ContactProfileVisibilityField string
 type ContactPrivacyExceptionDecision string
+type ContactRequestReviewDecision string
 
 const (
-	ContactRequestStatusPending  ContactRequestStatus = "PENDING"
-	ContactRequestStatusAccepted ContactRequestStatus = "ACCEPTED"
-	ContactRequestStatusDeclined ContactRequestStatus = "DECLINED"
-	ContactRequestStatusCanceled ContactRequestStatus = "CANCELED"
-	ContactRequestStatusExpired  ContactRequestStatus = "EXPIRED"
+	ContactRequestStatusPending        ContactRequestStatus = "PENDING"
+	ContactRequestStatusReviewRequired ContactRequestStatus = "REVIEW_REQUIRED"
+	ContactRequestStatusAccepted       ContactRequestStatus = "ACCEPTED"
+	ContactRequestStatusDeclined       ContactRequestStatus = "DECLINED"
+	ContactRequestStatusCanceled       ContactRequestStatus = "CANCELED"
+	ContactRequestStatusExpired        ContactRequestStatus = "EXPIRED"
 
 	ContactEdgeStatusActive  ContactEdgeStatus = "ACTIVE"
 	ContactEdgeStatusDeleted ContactEdgeStatus = "DELETED"
@@ -63,6 +66,9 @@ const (
 
 	ContactPrivacyExceptionDecisionAllow ContactPrivacyExceptionDecision = "ALLOW"
 	ContactPrivacyExceptionDecisionDeny  ContactPrivacyExceptionDecision = "DENY"
+
+	ContactRequestReviewDecisionApprove ContactRequestReviewDecision = "APPROVE"
+	ContactRequestReviewDecisionDecline ContactRequestReviewDecision = "DECLINE"
 )
 
 type SendContactRequestCommand struct {
@@ -558,6 +564,64 @@ type SetTenantContactRequestSourcePolicyResult struct {
 	Changed  bool
 }
 
+type ReviewContactRequestCommand struct {
+	TenantID  TenantID
+	RequestID string
+	Decision  ContactRequestReviewDecision
+	Operator  string
+	Reason    string
+}
+
+func (c ReviewContactRequestCommand) Validate() error {
+	if c.TenantID == "" {
+		return NewInvalidArgument("tenant_id is required")
+	}
+	if strings.TrimSpace(c.RequestID) == "" {
+		return NewInvalidArgument("request_id is required")
+	}
+	if NormalizeContactRequestReviewDecision(c.Decision) == "" {
+		return NewInvalidArgument("decision is invalid")
+	}
+	if strings.TrimSpace(c.Operator) == "" {
+		return NewInvalidArgument("operator is required")
+	}
+	if len(c.Reason) > maxContactReviewReasonLength {
+		return NewInvalidArgument("reason is too long")
+	}
+	return nil
+}
+
+func (c ReviewContactRequestCommand) NormalizedDecision() ContactRequestReviewDecision {
+	return NormalizeContactRequestReviewDecision(c.Decision)
+}
+
+func (c ReviewContactRequestCommand) NormalizedOperator() string {
+	return strings.TrimSpace(c.Operator)
+}
+
+func NormalizeContactRequestReviewDecision(value ContactRequestReviewDecision) ContactRequestReviewDecision {
+	switch ContactRequestReviewDecision(strings.ToUpper(strings.TrimSpace(string(value)))) {
+	case ContactRequestReviewDecisionApprove:
+		return ContactRequestReviewDecisionApprove
+	case ContactRequestReviewDecisionDecline:
+		return ContactRequestReviewDecisionDecline
+	default:
+		return ""
+	}
+}
+
+type ReviewContactRequestResult struct {
+	RequestID      string
+	TenantID       TenantID
+	SenderUserID   UserID
+	ReceiverUserID UserID
+	PreviousStatus ContactRequestStatus
+	Status         ContactRequestStatus
+	Decision       ContactRequestReviewDecision
+	RiskLevel      ContactRequestRiskLevel
+	ReviewRequired bool
+}
+
 type RespondContactRequestCommand struct {
 	AuthContext    AuthContext
 	RequestID      string
@@ -664,6 +728,7 @@ func (c ListContactRequestsCommand) NormalizedStatus() ContactRequestStatus {
 	}
 	switch c.Status {
 	case ContactRequestStatusPending,
+		ContactRequestStatusReviewRequired,
 		ContactRequestStatusAccepted,
 		ContactRequestStatusDeclined,
 		ContactRequestStatusCanceled,

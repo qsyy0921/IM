@@ -133,7 +133,7 @@ func (r *Repository) SendContactRequest(
 	} else if ok {
 		return types.SendContactRequestResult{}, types.NewPermissionDenied("blocked contact edge exists")
 	}
-	if ok, err := pendingContactRequestExists(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.TargetUserID); err != nil {
+	if ok, err := pendingOrReviewContactRequestExists(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.TargetUserID); err != nil {
 		return types.SendContactRequestResult{}, err
 	} else if ok {
 		return types.SendContactRequestResult{}, types.NewContactRequestConflict("pending contact request already exists")
@@ -173,7 +173,11 @@ func (r *Repository) SendContactRequest(
 		return types.SendContactRequestResult{}, types.NewDBWriteFailed(err.Error())
 	}
 	occurredAt := r.now()
-	if err := insertContactRequest(ctx, tx, command, sourcePolicy, requestID, commandHash, occurredAt); err != nil {
+	initialStatus := types.ContactRequestStatusPending
+	if sourcePolicy.ReviewRequired {
+		initialStatus = types.ContactRequestStatusReviewRequired
+	}
+	if err := insertContactRequest(ctx, tx, command, sourcePolicy, requestID, commandHash, initialStatus, occurredAt); err != nil {
 		return types.SendContactRequestResult{}, err
 	}
 	eventID, err := r.eventID()
@@ -201,7 +205,7 @@ func (r *Repository) SendContactRequest(
 			"request_id":       requestID,
 			"sender_user_id":   command.AuthContext.UserID,
 			"receiver_user_id": command.TargetUserID,
-			"status":           types.ContactRequestStatusPending,
+			"status":           initialStatus,
 			"message":          command.Message,
 			"source_type":      command.NormalizedSourceType(),
 			"source_ref":       command.NormalizedSourceRef(),
@@ -217,7 +221,7 @@ func (r *Repository) SendContactRequest(
 		TenantID:       command.AuthContext.TenantID,
 		SenderUserID:   command.AuthContext.UserID,
 		ReceiverUserID: command.TargetUserID,
-		Status:         types.ContactRequestStatusPending,
+		Status:         initialStatus,
 		SourceType:     command.NormalizedSourceType(),
 		SourceRef:      command.NormalizedSourceRef(),
 		RiskLevel:      sourcePolicy.RiskLevel,
@@ -277,6 +281,9 @@ func (r *Repository) RespondContactRequest(
 	}
 	expectedStatus := requestStatusForDecision(command.Decision)
 	if request.Status != types.ContactRequestStatusPending {
+		if request.Status == types.ContactRequestStatusReviewRequired {
+			return types.RespondContactRequestResult{}, types.NewContactRequestConflict("contact request requires operator review")
+		}
 		if request.Status != expectedStatus {
 			return types.RespondContactRequestResult{}, types.NewContactRequestConflict("contact request already completed with a different status")
 		}
@@ -388,7 +395,7 @@ func (r *Repository) CancelContactRequest(
 	if err := lockContactPair(ctx, tx, request.TenantID, request.SenderUserID, request.ReceiverUserID); err != nil {
 		return types.CancelContactRequestResult{}, err
 	}
-	if request.Status != types.ContactRequestStatusPending {
+	if request.Status != types.ContactRequestStatusPending && request.Status != types.ContactRequestStatusReviewRequired {
 		if request.Status != types.ContactRequestStatusCanceled {
 			return types.CancelContactRequestResult{}, types.NewContactRequestConflict("contact request already completed with a different status")
 		}
@@ -435,6 +442,75 @@ func (r *Repository) CancelContactRequest(
 		ReceiverUserID: request.ReceiverUserID,
 		Status:         types.ContactRequestStatusCanceled,
 	})
+}
+
+func (r *Repository) ReviewContactRequest(
+	ctx context.Context,
+	command types.ReviewContactRequestCommand,
+) (types.ReviewContactRequestResult, error) {
+	if r.pool == nil {
+		return types.ReviewContactRequestResult{}, types.NewDBWriteFailed("contacts repository is not configured")
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.ReviewContactRequestResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+	request, err := lockContactRequest(ctx, tx, command.TenantID, command.RequestID)
+	if err != nil {
+		return types.ReviewContactRequestResult{}, err
+	}
+	if request.Status != types.ContactRequestStatusReviewRequired {
+		if command.Decision == types.ContactRequestReviewDecisionApprove &&
+			request.Status == types.ContactRequestStatusPending &&
+			request.ReviewRequired {
+			return commitReviewContactRequestResult(ctx, tx, reviewResultFromRequest(request, request.Status, command.Decision))
+		}
+		if command.Decision == types.ContactRequestReviewDecisionDecline &&
+			request.Status == types.ContactRequestStatusDeclined &&
+			request.ReviewRequired {
+			return commitReviewContactRequestResult(ctx, tx, reviewResultFromRequest(request, request.Status, command.Decision))
+		}
+		return types.ReviewContactRequestResult{}, types.NewContactRequestConflict("contact request is not awaiting review")
+	}
+	nextStatus := types.ContactRequestStatusPending
+	if command.Decision == types.ContactRequestReviewDecisionDecline {
+		nextStatus = types.ContactRequestStatusDeclined
+	}
+	if err := updateContactRequestStatus(ctx, tx, request, nextStatus); err != nil {
+		return types.ReviewContactRequestResult{}, err
+	}
+	if err := insertContactRequestReviewAudit(ctx, tx, request, nextStatus, command); err != nil {
+		return types.ReviewContactRequestResult{}, err
+	}
+	if command.Decision == types.ContactRequestReviewDecisionDecline {
+		eventID, err := r.eventID()
+		if err != nil {
+			return types.ReviewContactRequestResult{}, types.NewOutboxWriteFailed(err.Error())
+		}
+		partitionKey := partitionKeyFor(request.TenantID, request.SenderUserID, request.ReceiverUserID)
+		aggregateVersion, err := nextContactOutboxAggregateVersion(ctx, tx, request.TenantID, partitionKey)
+		if err != nil {
+			return types.ReviewContactRequestResult{}, err
+		}
+		if err := insertContactOutbox(ctx, tx, contactOutboxInput{
+			EventID:          eventID,
+			TenantID:         request.TenantID,
+			AggregateType:    "CONTACT_REQUEST",
+			AggregateID:      request.RequestID,
+			AggregateVersion: aggregateVersion,
+			EventType:        eventTypeContactRequestDeclined,
+			PartitionKey:     partitionKey,
+			CorrelationID:    command.Operator,
+			CausationID:      request.RequestID,
+			Payload:          responsePayload(request, types.ContactRequestStatusDeclined, 0, r.now()),
+		}); err != nil {
+			return types.ReviewContactRequestResult{}, err
+		}
+	}
+	return commitReviewContactRequestResult(ctx, tx, reviewResultFromRequest(request, nextStatus, command.Decision))
 }
 
 func (r *Repository) ListContactRequests(

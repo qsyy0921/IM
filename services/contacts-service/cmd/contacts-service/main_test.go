@@ -351,6 +351,14 @@ func TestRunDispatchesSourcePolicyAuditMode(t *testing.T) {
 	}
 }
 
+func TestRunDispatchesContactRequestReviewMode(t *testing.T) {
+	t.Setenv("NEXUSIM_CONTACTS_SERVICE_MODE", "contact-request-review")
+	err := run()
+	if err == nil || !strings.Contains(err.Error(), "NEXUSIM_CONTACTS_REQUEST_REVIEW_TENANT_ID is required") {
+		t.Fatalf("expected contact request review mode validation, got %v", err)
+	}
+}
+
 func TestEnvRequiredBool(t *testing.T) {
 	t.Setenv("NEXUSIM_CONTACTS_TEST_BOOL", "true")
 	parsed, err := envRequiredBool("NEXUSIM_CONTACTS_TEST_BOOL")
@@ -384,6 +392,24 @@ func TestEnvContactRequestSourceType(t *testing.T) {
 	t.Setenv("NEXUSIM_CONTACTS_TEST_SOURCE_TYPE", "unknown")
 	if _, err := envContactRequestSourceType("NEXUSIM_CONTACTS_TEST_SOURCE_TYPE"); err == nil {
 		t.Fatalf("expected invalid source type to fail")
+	}
+}
+
+func TestEnvContactRequestReviewDecision(t *testing.T) {
+	t.Setenv("NEXUSIM_CONTACTS_TEST_REVIEW_DECISION", " approve ")
+	decision, err := envContactRequestReviewDecision("NEXUSIM_CONTACTS_TEST_REVIEW_DECISION")
+	if err != nil || decision != types.ContactRequestReviewDecisionApprove {
+		t.Fatalf("expected normalized approve decision, decision=%s err=%v", decision, err)
+	}
+
+	t.Setenv("NEXUSIM_CONTACTS_TEST_REVIEW_DECISION", "")
+	if _, err := envContactRequestReviewDecision("NEXUSIM_CONTACTS_TEST_REVIEW_DECISION"); err == nil {
+		t.Fatalf("expected missing review decision to fail")
+	}
+
+	t.Setenv("NEXUSIM_CONTACTS_TEST_REVIEW_DECISION", "maybe")
+	if _, err := envContactRequestReviewDecision("NEXUSIM_CONTACTS_TEST_REVIEW_DECISION"); err == nil {
+		t.Fatalf("expected invalid review decision to fail")
 	}
 }
 

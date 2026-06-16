@@ -34,6 +34,19 @@ func TestListConversationMembersUseCaseRejectsInvalidRoleFilter(t *testing.T) {
 	}
 }
 
+func TestListConversationMembersUseCaseRejectsInvalidRoleFilters(t *testing.T) {
+	repository := &fakeListConversationMembersRepository{}
+	command := validListConversationMembersCommand()
+	command.RoleFilters = []types.MemberRole{"SUPER_ADMIN"}
+	_, err := NewListConversationMembersUseCase(repository).Execute(context.Background(), command)
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+	if repository.called {
+		t.Fatalf("repository should not be called")
+	}
+}
+
 func TestListConversationMembersUseCaseForwardsCommand(t *testing.T) {
 	repository := &fakeListConversationMembersRepository{
 		result: types.ListConversationMembersResult{
@@ -46,12 +59,13 @@ func TestListConversationMembersUseCaseForwardsCommand(t *testing.T) {
 	}
 	command := validListConversationMembersCommand()
 	command.RoleFilter = types.MemberRoleAdmin
+	command.RoleFilters = []types.MemberRole{types.MemberRoleOwner, types.MemberRoleAdmin}
 
 	result, err := NewListConversationMembersUseCase(repository).Execute(context.Background(), command)
 	if err != nil {
 		t.Fatalf("list conversation members: %v", err)
 	}
-	if repository.command != command {
+	if !listConversationMembersCommandsEqual(repository.command, command) {
 		t.Fatalf("unexpected command: %+v", repository.command)
 	}
 	if len(result.Members) != 1 || result.Members[0].UserID != "user-1" {
@@ -94,4 +108,25 @@ func validListConversationMembersCommand() types.ListConversationMembersCommand 
 		PageSize:       50,
 		RoleFilter:     types.MemberRoleAdmin,
 	}
+}
+
+func listConversationMembersCommandsEqual(left types.ListConversationMembersCommand, right types.ListConversationMembersCommand) bool {
+	return left.AuthContext == right.AuthContext &&
+		left.ConversationID == right.ConversationID &&
+		left.PageSize == right.PageSize &&
+		left.PageToken == right.PageToken &&
+		left.RoleFilter == right.RoleFilter &&
+		memberRolesEqual(left.RoleFilters, right.RoleFilters)
+}
+
+func memberRolesEqual(left []types.MemberRole, right []types.MemberRole) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
 }

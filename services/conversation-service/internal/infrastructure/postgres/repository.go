@@ -409,9 +409,10 @@ func canViewMemberChange(
 }
 
 type listMembersPageToken struct {
-	Version    int    `json:"v"`
-	UserID     string `json:"user_id"`
-	RoleFilter string `json:"role_filter"`
+	Version     int      `json:"v"`
+	UserID      string   `json:"user_id"`
+	RoleFilter  string   `json:"role_filter"`
+	RoleFilters []string `json:"role_filters,omitempty"`
 }
 
 func (r *Repository) ListConversationMembers(
@@ -421,7 +422,15 @@ func (r *Repository) ListConversationMembers(
 	if r.pool == nil {
 		return types.ListConversationMembersResult{}, types.NewDBReadFailed("repository is not configured")
 	}
-	lastUserID, err := decodeListMembersPageToken(command.PageToken, command.RoleFilter)
+	if err := command.Validate(); err != nil {
+		return types.ListConversationMembersResult{}, err
+	}
+	roleFilters, err := types.NormalizeListMemberRoleFilters(command.RoleFilters)
+	if err != nil {
+		return types.ListConversationMembersResult{}, err
+	}
+	roleFilterValues := memberRolesToStrings(roleFilters)
+	lastUserID, err := decodeListMembersPageToken(command.PageToken, command.RoleFilter, roleFilterValues)
 	if err != nil {
 		return types.ListConversationMembersResult{}, err
 	}
@@ -479,10 +488,11 @@ WHERE tenant_id = $1
   AND conversation_id = $2
   AND status = 'ACTIVE'
   AND ($3 = '' OR role = $3)
-  AND ($4 = '' OR user_id > $4)
+  AND (cardinality($4::text[]) = 0 OR role = ANY($4::text[]))
+  AND ($5 = '' OR user_id > $5)
 ORDER BY user_id ASC
-LIMIT $5
-`, command.AuthContext.TenantID, command.ConversationID, command.RoleFilter, lastUserID, pageSize+1)
+LIMIT $6
+`, command.AuthContext.TenantID, command.ConversationID, command.RoleFilter, roleFilterValues, lastUserID, pageSize+1)
 	if err != nil {
 		return types.ListConversationMembersResult{}, types.NewDBReadFailed(err.Error())
 	}
@@ -510,7 +520,7 @@ LIMIT $5
 	}
 	if len(members) > pageSize {
 		page := members[:pageSize]
-		nextToken, err := encodeListMembersPageToken(page[len(page)-1].UserID, command.RoleFilter)
+		nextToken, err := encodeListMembersPageToken(page[len(page)-1].UserID, command.RoleFilter, roleFilterValues)
 		if err != nil {
 			return types.ListConversationMembersResult{}, types.NewDBReadFailed(err.Error())
 		}
@@ -522,7 +532,7 @@ LIMIT $5
 	return result, nil
 }
 
-func decodeListMembersPageToken(token string, roleFilter types.MemberRole) (string, error) {
+func decodeListMembersPageToken(token string, roleFilter types.MemberRole, roleFilters []string) (string, error) {
 	if token == "" {
 		return "", nil
 	}
@@ -535,27 +545,57 @@ func decodeListMembersPageToken(token string, roleFilter types.MemberRole) (stri
 		return "", types.NewInvalidArgument("page_token is invalid")
 	}
 	if decoded.Version == 1 {
-		if roleFilter != "" || decoded.UserID == "" {
+		if roleFilter != "" || len(roleFilters) != 0 || decoded.UserID == "" {
 			return "", types.NewInvalidArgument("page_token is invalid")
 		}
 		return decoded.UserID, nil
 	}
-	if decoded.Version != 2 || decoded.UserID == "" || decoded.RoleFilter != string(roleFilter) {
+	if decoded.Version == 2 {
+		if decoded.UserID == "" || decoded.RoleFilter != string(roleFilter) || len(roleFilters) != 0 {
+			return "", types.NewInvalidArgument("page_token is invalid")
+		}
+		return decoded.UserID, nil
+	}
+	if decoded.Version != 3 ||
+		decoded.UserID == "" ||
+		decoded.RoleFilter != string(roleFilter) ||
+		!sameStringSlice(decoded.RoleFilters, roleFilters) {
 		return "", types.NewInvalidArgument("page_token is invalid")
 	}
 	return decoded.UserID, nil
 }
 
-func encodeListMembersPageToken(userID types.UserID, roleFilter types.MemberRole) (string, error) {
+func encodeListMembersPageToken(userID types.UserID, roleFilter types.MemberRole, roleFilters []string) (string, error) {
 	payload, err := json.Marshal(listMembersPageToken{
-		Version:    2,
-		UserID:     string(userID),
-		RoleFilter: string(roleFilter),
+		Version:     3,
+		UserID:      string(userID),
+		RoleFilter:  string(roleFilter),
+		RoleFilters: roleFilters,
 	})
 	if err != nil {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(payload), nil
+}
+
+func memberRolesToStrings(roles []types.MemberRole) []string {
+	values := make([]string, 0, len(roles))
+	for _, role := range roles {
+		values = append(values, string(role))
+	}
+	return values
+}
+
+func sameStringSlice(left []string, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func (r *Repository) MarkPublishedMemberChanges(

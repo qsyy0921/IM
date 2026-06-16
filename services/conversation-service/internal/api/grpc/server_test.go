@@ -654,6 +654,10 @@ func TestListConversationMembersConvertsRequestAndResponse(t *testing.T) {
 		PageSize:       50,
 		PageToken:      "page-token",
 		RoleFilter:     conversationv1.MemberRole_MEMBER_ROLE_ADMIN,
+		RoleFilters: []conversationv1.MemberRole{
+			conversationv1.MemberRole_MEMBER_ROLE_OWNER,
+			conversationv1.MemberRole_MEMBER_ROLE_ADMIN,
+		},
 	})
 	if err != nil {
 		t.Fatalf("list conversation members: %v", err)
@@ -667,7 +671,8 @@ func TestListConversationMembersConvertsRequestAndResponse(t *testing.T) {
 		executor.command.ConversationID != "conv-1" ||
 		executor.command.PageSize != 50 ||
 		executor.command.PageToken != "page-token" ||
-		executor.command.RoleFilter != types.MemberRoleAdmin {
+		executor.command.RoleFilter != types.MemberRoleAdmin ||
+		!memberRolesEqual(executor.command.RoleFilters, []types.MemberRole{types.MemberRoleOwner, types.MemberRoleAdmin}) {
 		t.Fatalf("unexpected command: %+v", executor.command)
 	}
 	if response.GetTenantId() != "tenant-1" ||
@@ -855,4 +860,16 @@ func (f *fakeListConversationMembersExecutor) Execute(
 		}
 	}
 	return f.result, f.err
+}
+
+func memberRolesEqual(left []types.MemberRole, right []types.MemberRole) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
 }

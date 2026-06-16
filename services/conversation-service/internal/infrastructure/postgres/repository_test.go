@@ -287,6 +287,82 @@ INSERT INTO conversation_members (
 		t.Fatalf("unexpected admin members: %+v", adminOnly.Members)
 	}
 
+	privilegedFirstPage, err := repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-list",
+		PageSize:       1,
+		RoleFilters: []types.MemberRole{
+			types.MemberRoleOwner,
+			types.MemberRoleAdmin,
+		},
+	})
+	if err != nil {
+		t.Fatalf("list first privileged members page: %v", err)
+	}
+	if len(privilegedFirstPage.Members) != 1 ||
+		privilegedFirstPage.Members[0].UserID != "admin-1" ||
+		privilegedFirstPage.NextPageToken == "" {
+		t.Fatalf("unexpected first privileged page: %+v", privilegedFirstPage)
+	}
+	privilegedSecondPage, err := repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-list",
+		PageSize:       1,
+		PageToken:      privilegedFirstPage.NextPageToken,
+		RoleFilters: []types.MemberRole{
+			types.MemberRoleAdmin,
+			types.MemberRoleOwner,
+		},
+	})
+	if err != nil {
+		t.Fatalf("list second privileged members page with reversed filters: %v", err)
+	}
+	if len(privilegedSecondPage.Members) != 1 ||
+		privilegedSecondPage.Members[0].UserID != "owner-1" ||
+		privilegedSecondPage.NextPageToken != "" {
+		t.Fatalf("unexpected second privileged page: %+v", privilegedSecondPage)
+	}
+	_, err = repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-list",
+		PageSize:       1,
+		PageToken:      privilegedFirstPage.NextPageToken,
+		RoleFilters:    []types.MemberRole{types.MemberRoleAdmin},
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid cursor when role_filters changes, got %v", err)
+	}
+	privilegedAdminOnly, err := repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-list",
+			UserID:   "owner-1",
+		},
+		ConversationID: "conv-list",
+		PageSize:       10,
+		RoleFilter:     types.MemberRoleAdmin,
+		RoleFilters: []types.MemberRole{
+			types.MemberRoleOwner,
+			types.MemberRoleAdmin,
+		},
+	})
+	if err != nil {
+		t.Fatalf("list combined legacy and multi-role filters: %v", err)
+	}
+	if len(privilegedAdminOnly.Members) != 1 ||
+		privilegedAdminOnly.Members[0].UserID != "admin-1" ||
+		privilegedAdminOnly.Members[0].Role != types.MemberRoleAdmin {
+		t.Fatalf("unexpected combined role filters: %+v", privilegedAdminOnly.Members)
+	}
+
 	memberFirstPage, err := repository.ListConversationMembers(ctx, types.ListConversationMembersCommand{
 		AuthContext: types.AuthContext{
 			TenantID: "tenant-list",

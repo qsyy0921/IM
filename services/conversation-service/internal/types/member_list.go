@@ -1,6 +1,9 @@
 package types
 
-import "time"
+import (
+	"sort"
+	"time"
+)
 
 const (
 	DefaultConversationMembersPageSize = 100
@@ -13,6 +16,7 @@ type ListConversationMembersCommand struct {
 	PageSize       int
 	PageToken      string
 	RoleFilter     MemberRole
+	RoleFilters    []MemberRole
 }
 
 func (c ListConversationMembersCommand) Validate() error {
@@ -34,6 +38,9 @@ func (c ListConversationMembersCommand) Validate() error {
 	if c.RoleFilter != "" && !isValidListMemberRoleFilter(c.RoleFilter) {
 		return NewInvalidArgument("role_filter is invalid")
 	}
+	if _, err := NormalizeListMemberRoleFilters(c.RoleFilters); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -51,6 +58,28 @@ func isValidListMemberRoleFilter(role MemberRole) bool {
 	default:
 		return false
 	}
+}
+
+func NormalizeListMemberRoleFilters(filters []MemberRole) ([]MemberRole, error) {
+	if len(filters) == 0 {
+		return []MemberRole{}, nil
+	}
+	seen := make(map[MemberRole]bool, len(filters))
+	normalized := make([]MemberRole, 0, len(filters))
+	for _, filter := range filters {
+		if !isValidListMemberRoleFilter(filter) {
+			return nil, NewInvalidArgument("role_filters is invalid")
+		}
+		if seen[filter] {
+			continue
+		}
+		seen[filter] = true
+		normalized = append(normalized, filter)
+	}
+	sort.Slice(normalized, func(i, j int) bool {
+		return normalized[i] < normalized[j]
+	})
+	return normalized, nil
 }
 
 type ConversationMember struct {

@@ -1102,6 +1102,7 @@ type ListConversationMembersRequest struct {
 	PageSize       int32                  `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	PageToken      string                 `protobuf:"bytes,4,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	RoleFilter     MemberRole             `protobuf:"varint,5,opt,name=role_filter,json=roleFilter,proto3,enum=nexusim.conversation.v1.MemberRole" json:"role_filter,omitempty"`
+	RoleFilters    []MemberRole           `protobuf:"varint,6,rep,packed,name=role_filters,json=roleFilters,proto3,enum=nexusim.conversation.v1.MemberRole" json:"role_filters,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1169,6 +1170,13 @@ func (x *ListConversationMembersRequest) GetRoleFilter() MemberRole {
 		return x.RoleFilter
 	}
 	return MemberRole_MEMBER_ROLE_UNSPECIFIED
+}
+
+func (x *ListConversationMembersRequest) GetRoleFilters() []MemberRole {
+	if x != nil {
+		return x.RoleFilters
+	}
+	return nil
 }
 
 type ConversationMember struct {
@@ -1631,7 +1639,7 @@ const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
 	"\bnew_role\x18\f \x01(\x0e2#.nexusim.conversation.v1.MemberRoleR\anewRole\x12\x16\n" +
 	"\x06reason\x18\r \x01(\tR\x06reason\x12\x1d\n" +
 	"\n" +
-	"last_error\x18\x0e \x01(\tR\tlastError\"\x94\x02\n" +
+	"last_error\x18\x0e \x01(\tR\tlastError\"\xdc\x02\n" +
 	"\x1eListConversationMembersRequest\x12G\n" +
 	"\fauth_context\x18\x01 \x01(\v2$.nexusim.conversation.v1.AuthContextR\vauthContext\x12'\n" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x1b\n" +
@@ -1639,7 +1647,8 @@ const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
 	"\n" +
 	"page_token\x18\x04 \x01(\tR\tpageToken\x12D\n" +
 	"\vrole_filter\x18\x05 \x01(\x0e2#.nexusim.conversation.v1.MemberRoleR\n" +
-	"roleFilter\"\xe0\x02\n" +
+	"roleFilter\x12F\n" +
+	"\frole_filters\x18\x06 \x03(\x0e2#.nexusim.conversation.v1.MemberRoleR\vroleFilters\"\xe0\x02\n" +
 	"\x12ConversationMember\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x127\n" +
 	"\x04role\x18\x02 \x01(\x0e2#.nexusim.conversation.v1.MemberRoleR\x04role\x12=\n" +
@@ -1776,26 +1785,27 @@ var file_nexusim_conversation_v1_conversation_service_proto_depIdxs = []int32{
 	3,  // 12: nexusim.conversation.v1.GetMemberChangeResponse.new_role:type_name -> nexusim.conversation.v1.MemberRole
 	9,  // 13: nexusim.conversation.v1.ListConversationMembersRequest.auth_context:type_name -> nexusim.conversation.v1.AuthContext
 	3,  // 14: nexusim.conversation.v1.ListConversationMembersRequest.role_filter:type_name -> nexusim.conversation.v1.MemberRole
-	3,  // 15: nexusim.conversation.v1.ConversationMember.role:type_name -> nexusim.conversation.v1.MemberRole
-	4,  // 16: nexusim.conversation.v1.ConversationMember.status:type_name -> nexusim.conversation.v1.MemberStatus
-	15, // 17: nexusim.conversation.v1.ListConversationMembersResponse.members:type_name -> nexusim.conversation.v1.ConversationMember
-	9,  // 18: nexusim.conversation.v1.TransferConversationOwnerRequest.auth_context:type_name -> nexusim.conversation.v1.AuthContext
-	6,  // 19: nexusim.conversation.v1.TransferConversationOwnerResponse.status:type_name -> nexusim.conversation.v1.MemberChangeStatus
-	7,  // 20: nexusim.conversation.v1.ConversationService.GetSendContext:input_type -> nexusim.conversation.v1.GetSendContextRequest
-	10, // 21: nexusim.conversation.v1.ConversationService.CreateMemberChange:input_type -> nexusim.conversation.v1.CreateMemberChangeRequest
-	12, // 22: nexusim.conversation.v1.ConversationService.GetMemberChange:input_type -> nexusim.conversation.v1.GetMemberChangeRequest
-	14, // 23: nexusim.conversation.v1.ConversationService.ListConversationMembers:input_type -> nexusim.conversation.v1.ListConversationMembersRequest
-	17, // 24: nexusim.conversation.v1.ConversationService.TransferConversationOwner:input_type -> nexusim.conversation.v1.TransferConversationOwnerRequest
-	8,  // 25: nexusim.conversation.v1.ConversationService.GetSendContext:output_type -> nexusim.conversation.v1.GetSendContextResponse
-	11, // 26: nexusim.conversation.v1.ConversationService.CreateMemberChange:output_type -> nexusim.conversation.v1.CreateMemberChangeResponse
-	13, // 27: nexusim.conversation.v1.ConversationService.GetMemberChange:output_type -> nexusim.conversation.v1.GetMemberChangeResponse
-	16, // 28: nexusim.conversation.v1.ConversationService.ListConversationMembers:output_type -> nexusim.conversation.v1.ListConversationMembersResponse
-	18, // 29: nexusim.conversation.v1.ConversationService.TransferConversationOwner:output_type -> nexusim.conversation.v1.TransferConversationOwnerResponse
-	25, // [25:30] is the sub-list for method output_type
-	20, // [20:25] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	3,  // 15: nexusim.conversation.v1.ListConversationMembersRequest.role_filters:type_name -> nexusim.conversation.v1.MemberRole
+	3,  // 16: nexusim.conversation.v1.ConversationMember.role:type_name -> nexusim.conversation.v1.MemberRole
+	4,  // 17: nexusim.conversation.v1.ConversationMember.status:type_name -> nexusim.conversation.v1.MemberStatus
+	15, // 18: nexusim.conversation.v1.ListConversationMembersResponse.members:type_name -> nexusim.conversation.v1.ConversationMember
+	9,  // 19: nexusim.conversation.v1.TransferConversationOwnerRequest.auth_context:type_name -> nexusim.conversation.v1.AuthContext
+	6,  // 20: nexusim.conversation.v1.TransferConversationOwnerResponse.status:type_name -> nexusim.conversation.v1.MemberChangeStatus
+	7,  // 21: nexusim.conversation.v1.ConversationService.GetSendContext:input_type -> nexusim.conversation.v1.GetSendContextRequest
+	10, // 22: nexusim.conversation.v1.ConversationService.CreateMemberChange:input_type -> nexusim.conversation.v1.CreateMemberChangeRequest
+	12, // 23: nexusim.conversation.v1.ConversationService.GetMemberChange:input_type -> nexusim.conversation.v1.GetMemberChangeRequest
+	14, // 24: nexusim.conversation.v1.ConversationService.ListConversationMembers:input_type -> nexusim.conversation.v1.ListConversationMembersRequest
+	17, // 25: nexusim.conversation.v1.ConversationService.TransferConversationOwner:input_type -> nexusim.conversation.v1.TransferConversationOwnerRequest
+	8,  // 26: nexusim.conversation.v1.ConversationService.GetSendContext:output_type -> nexusim.conversation.v1.GetSendContextResponse
+	11, // 27: nexusim.conversation.v1.ConversationService.CreateMemberChange:output_type -> nexusim.conversation.v1.CreateMemberChangeResponse
+	13, // 28: nexusim.conversation.v1.ConversationService.GetMemberChange:output_type -> nexusim.conversation.v1.GetMemberChangeResponse
+	16, // 29: nexusim.conversation.v1.ConversationService.ListConversationMembers:output_type -> nexusim.conversation.v1.ListConversationMembersResponse
+	18, // 30: nexusim.conversation.v1.ConversationService.TransferConversationOwner:output_type -> nexusim.conversation.v1.TransferConversationOwnerResponse
+	26, // [26:31] is the sub-list for method output_type
+	21, // [21:26] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_conversation_v1_conversation_service_proto_init() }

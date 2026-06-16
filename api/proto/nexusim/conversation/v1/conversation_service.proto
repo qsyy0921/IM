@@ -149,6 +149,7 @@ message ListConversationMembersRequest {
   int32 page_size = 3;
   string page_token = 4;
   MemberRole role_filter = 5;
+  repeated MemberRole role_filters = 6;
 }
 
 message ConversationMember {

@@ -248,6 +248,7 @@ func (s *Server) ListConversationMembers(
 		PageSize:       int(request.GetPageSize()),
 		PageToken:      request.GetPageToken(),
 		RoleFilter:     fromProtoMemberRole(request.GetRoleFilter()),
+		RoleFilters:    fromProtoMemberRoles(request.GetRoleFilters()),
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -381,6 +382,14 @@ func fromProtoMemberRole(value conversationv1.MemberRole) types.MemberRole {
 	default:
 		return ""
 	}
+}
+
+func fromProtoMemberRoles(values []conversationv1.MemberRole) []types.MemberRole {
+	roles := make([]types.MemberRole, 0, len(values))
+	for _, value := range values {
+		roles = append(roles, fromProtoMemberRole(value))
+	}
+	return roles
 }
 
 func toProtoMemberRole(value types.MemberRole) conversationv1.MemberRole {

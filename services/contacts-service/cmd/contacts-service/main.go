@@ -665,14 +665,20 @@ func runContactRequestReviewAudit() error {
 		return err
 	}
 	defer pool.Close()
+	reviewRequiredFilter, err := envOptionalBoolPointer("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_REVIEW_REQUIRED")
+	if err != nil {
+		return err
+	}
 	rows, err := postgresinfra.NewRepository(pool).AuditContactRequestReviews(ctx, postgresinfra.ContactRequestReviewAuditOptions{
-		TenantID:   tenantID,
-		RequestID:  envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_REQUEST_ID", ""),
-		Operator:   envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_OPERATOR", ""),
-		Decision:   envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_DECISION", ""),
-		NextStatus: envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_NEXT_STATUS", ""),
-		RiskLevel:  envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_RISK_LEVEL", ""),
-		Limit:      envInt("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_LIMIT", 20),
+		TenantID:       tenantID,
+		RequestID:      envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_REQUEST_ID", ""),
+		Operator:       envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_OPERATOR", ""),
+		Decision:       envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_DECISION", ""),
+		NextStatus:     envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_NEXT_STATUS", ""),
+		SourceType:     envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_SOURCE_TYPE", ""),
+		RiskLevel:      envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_RISK_LEVEL", ""),
+		ReviewRequired: reviewRequiredFilter,
+		Limit:          envInt("NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_LIMIT", 20),
 	})
 	if err != nil {
 		return err
@@ -680,7 +686,7 @@ func runContactRequestReviewAudit() error {
 	log.Printf("contacts-service contact request review audit completed rows=%d", len(rows))
 	for _, row := range rows {
 		log.Printf(
-			"contacts_request_review audit_id=%d tenant_id=%s request_id=%s decision=%s previous_status=%s next_status=%s operator=%s reason_present=%t risk_level=%s review_required=%t reviewed_at=%s",
+			"contacts_request_review audit_id=%d tenant_id=%s request_id=%s decision=%s previous_status=%s next_status=%s operator=%s reason_present=%t source_type=%s risk_level=%s review_required=%t reviewed_at=%s",
 			row.AuditID,
 			row.TenantID,
 			row.RequestID,
@@ -689,6 +695,7 @@ func runContactRequestReviewAudit() error {
 			row.NextStatus,
 			row.Operator,
 			row.ReasonPresent,
+			row.SourceType,
 			row.RiskLevel,
 			row.ReviewRequired,
 			row.ReviewedAt.Format(time.RFC3339),
@@ -994,6 +1001,18 @@ func envRequiredBool(name string) (bool, error) {
 		return false, errors.New(name + " must be true or false")
 	}
 	return parsed, nil
+}
+
+func envOptionalBoolPointer(name string) (*bool, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return nil, errors.New(name + " must be true or false")
+	}
+	return &parsed, nil
 }
 
 func envContactRequestSourceType(name string) (types.ContactRequestSourceType, error) {

@@ -385,6 +385,25 @@ func TestEnvRequiredBool(t *testing.T) {
 	}
 }
 
+func TestEnvOptionalBoolPointer(t *testing.T) {
+	t.Setenv("NEXUSIM_CONTACTS_TEST_OPTIONAL_BOOL", "")
+	parsed, err := envOptionalBoolPointer("NEXUSIM_CONTACTS_TEST_OPTIONAL_BOOL")
+	if err != nil || parsed != nil {
+		t.Fatalf("expected empty optional bool to be nil, parsed=%v err=%v", parsed, err)
+	}
+
+	t.Setenv("NEXUSIM_CONTACTS_TEST_OPTIONAL_BOOL", " false ")
+	parsed, err = envOptionalBoolPointer("NEXUSIM_CONTACTS_TEST_OPTIONAL_BOOL")
+	if err != nil || parsed == nil || *parsed {
+		t.Fatalf("expected false optional bool, parsed=%v err=%v", parsed, err)
+	}
+
+	t.Setenv("NEXUSIM_CONTACTS_TEST_OPTIONAL_BOOL", "sometimes")
+	if _, err := envOptionalBoolPointer("NEXUSIM_CONTACTS_TEST_OPTIONAL_BOOL"); err == nil {
+		t.Fatalf("expected invalid optional bool to fail")
+	}
+}
+
 func TestEnvContactRequestSourceType(t *testing.T) {
 	t.Setenv("NEXUSIM_CONTACTS_TEST_SOURCE_TYPE", " search ")
 	sourceType, err := envContactRequestSourceType("NEXUSIM_CONTACTS_TEST_SOURCE_TYPE")

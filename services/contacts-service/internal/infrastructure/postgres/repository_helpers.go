@@ -422,12 +422,13 @@ INSERT INTO contact_request_review_audit (
     next_status,
     decision,
     operator,
-    reason,
-    risk_level,
-    review_required,
-    reviewed_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
-`, request.TenantID, request.RequestID, request.Status, nextStatus, command.Decision, command.Operator, command.Reason, request.RiskLevel, request.ReviewRequired)
+	reason,
+	source_type,
+	risk_level,
+	review_required,
+	reviewed_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
+`, request.TenantID, request.RequestID, request.Status, nextStatus, command.Decision, command.Operator, command.Reason, request.SourceType, request.RiskLevel, request.ReviewRequired)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}

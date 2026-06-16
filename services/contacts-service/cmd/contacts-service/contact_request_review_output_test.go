@@ -21,6 +21,7 @@ func TestWriteContactRequestReviewAuditOutputOmitsReasonText(t *testing.T) {
 		Decision:       "APPROVE",
 		Operator:       "operator-1",
 		ReasonPresent:  true,
+		SourceType:     "QR_CODE",
 		RiskLevel:      "HIGH",
 		ReviewRequired: true,
 		ReviewedAt:     time.Unix(100, 0).UTC(),
@@ -38,6 +39,7 @@ func TestWriteContactRequestReviewAuditOutputOmitsReasonText(t *testing.T) {
 		`"count": 1`,
 		`"request_id": "request-1"`,
 		`"reason_present": true`,
+		`"source_type": "QR_CODE"`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("expected output to contain %s, got %s", want, text)

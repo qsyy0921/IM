@@ -508,14 +508,17 @@ func TestRepositoryAuditContactRequestReviewsIntegration(t *testing.T) {
 		t.Fatalf("review contact request: %v", err)
 	}
 
+	reviewRequired := true
 	rows, err := repository.AuditContactRequestReviews(ctx, ContactRequestReviewAuditOptions{
-		TenantID:   "tenant-contacts",
-		RequestID:  sendResult.RequestID,
-		Operator:   "operator-audit",
-		Decision:   "approve",
-		NextStatus: "pending",
-		RiskLevel:  "high",
-		Limit:      10,
+		TenantID:       "tenant-contacts",
+		RequestID:      sendResult.RequestID,
+		Operator:       "operator-audit",
+		Decision:       "approve",
+		NextStatus:     "pending",
+		SourceType:     "qr_code",
+		RiskLevel:      "high",
+		ReviewRequired: &reviewRequired,
+		Limit:          10,
 	})
 	if err != nil {
 		t.Fatalf("audit contact request reviews: %v", err)
@@ -530,6 +533,7 @@ func TestRepositoryAuditContactRequestReviewsIntegration(t *testing.T) {
 		row.NextStatus != string(types.ContactRequestStatusPending) ||
 		row.Decision != string(types.ContactRequestReviewDecisionApprove) ||
 		row.Operator != "operator-audit" ||
+		row.SourceType != string(types.ContactRequestSourceTypeQRCode) ||
 		row.RiskLevel != string(types.ContactRequestRiskLevelHigh) ||
 		!row.ReasonPresent ||
 		!row.ReviewRequired {

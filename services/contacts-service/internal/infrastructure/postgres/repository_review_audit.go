@@ -12,13 +12,15 @@ const defaultContactRequestReviewAuditLimit = 20
 const maxContactRequestReviewAuditLimit = 200
 
 type ContactRequestReviewAuditOptions struct {
-	TenantID   string
-	RequestID  string
-	Operator   string
-	Decision   string
-	NextStatus string
-	RiskLevel  string
-	Limit      int
+	TenantID       string
+	RequestID      string
+	Operator       string
+	Decision       string
+	NextStatus     string
+	SourceType     string
+	RiskLevel      string
+	ReviewRequired *bool
+	Limit          int
 }
 
 type ContactRequestReviewAuditRow struct {
@@ -30,6 +32,7 @@ type ContactRequestReviewAuditRow struct {
 	Decision       string
 	Operator       string
 	ReasonPresent  bool
+	SourceType     string
 	RiskLevel      string
 	ReviewRequired bool
 	ReviewedAt     time.Time
@@ -55,6 +58,9 @@ func (r *Repository) AuditContactRequestReviews(
 	if options.NextStatus != "" && !isReviewAuditContactRequestStatus(options.NextStatus) {
 		return nil, types.NewInvalidArgument("next_status is invalid")
 	}
+	if options.SourceType != "" && types.NormalizeContactRequestSourceType(types.ContactRequestSourceType(options.SourceType)) == "" {
+		return nil, types.NewInvalidArgument("source_type is invalid")
+	}
 	limit := options.Limit
 	if limit <= 0 {
 		limit = defaultContactRequestReviewAuditLimit
@@ -72,6 +78,7 @@ SELECT audit_id,
        decision,
        operator,
        reason <> '' AS reason_present,
+       source_type,
        risk_level,
        review_required,
        reviewed_at
@@ -82,9 +89,11 @@ WHERE tenant_id = $1
   AND ($4 = '' OR decision = $4)
   AND ($5 = '' OR next_status = $5)
   AND ($6 = '' OR risk_level = $6)
+  AND ($7 = '' OR source_type = $7)
+  AND ($8 = false OR review_required = $9)
 ORDER BY reviewed_at DESC, audit_id DESC
-LIMIT $7
-`, options.TenantID, options.RequestID, options.Operator, options.Decision, options.NextStatus, options.RiskLevel, limit)
+LIMIT $10
+`, options.TenantID, options.RequestID, options.Operator, options.Decision, options.NextStatus, options.RiskLevel, options.SourceType, options.ReviewRequired != nil, boolValue(options.ReviewRequired), limit)
 	if err != nil {
 		return nil, types.NewDBReadFailed(err.Error())
 	}
@@ -102,6 +111,7 @@ LIMIT $7
 			&row.Decision,
 			&row.Operator,
 			&row.ReasonPresent,
+			&row.SourceType,
 			&row.RiskLevel,
 			&row.ReviewRequired,
 			&row.ReviewedAt,
@@ -122,8 +132,16 @@ func normalizeContactRequestReviewAuditOptions(options ContactRequestReviewAudit
 	options.Operator = strings.TrimSpace(options.Operator)
 	options.Decision = strings.ToUpper(strings.TrimSpace(options.Decision))
 	options.NextStatus = strings.ToUpper(strings.TrimSpace(options.NextStatus))
+	options.SourceType = strings.ToUpper(strings.TrimSpace(options.SourceType))
 	options.RiskLevel = strings.ToUpper(strings.TrimSpace(options.RiskLevel))
 	return options
+}
+
+func boolValue(value *bool) bool {
+	if value == nil {
+		return false
+	}
+	return *value
 }
 
 func isReviewAuditContactRequestStatus(status string) bool {

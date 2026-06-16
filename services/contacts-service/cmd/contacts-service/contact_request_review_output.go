@@ -54,6 +54,7 @@ type contactRequestReviewAuditOutputRow struct {
 	Decision       string `json:"decision"`
 	Operator       string `json:"operator"`
 	ReasonPresent  bool   `json:"reason_present"`
+	SourceType     string `json:"source_type"`
 	RiskLevel      string `json:"risk_level"`
 	ReviewRequired bool   `json:"review_required"`
 	ReviewedAt     string `json:"reviewed_at"`
@@ -71,6 +72,7 @@ func writeContactRequestReviewAuditOutput(path string, rows []postgresinfra.Cont
 			Decision:       row.Decision,
 			Operator:       row.Operator,
 			ReasonPresent:  row.ReasonPresent,
+			SourceType:     row.SourceType,
 			RiskLevel:      row.RiskLevel,
 			ReviewRequired: row.ReviewRequired,
 			ReviewedAt:     row.ReviewedAt.UTC().Format(time.RFC3339Nano),

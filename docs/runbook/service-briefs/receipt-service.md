@@ -16,7 +16,8 @@
 - 已补 trusted metadata 启动门禁：当 `NEXUSIM_RECEIPT_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端未启用 mTLS client cert 校验，则启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - 已补 first-stage OpenTelemetry gRPC server span；gRPC access log 只记录低敏 `trace_id/request_id`，并对白名单外入口 metadata 直接丢弃。
 - receipt full-smoke runner 已按 config / model / auth / util 同 package 拆分，避免后续回执和会话列表验证继续堆进单个 `main.go`。
+- receipt full-smoke summary 已新增 `capacity_summary`，统一输出 actual duration、message/pull/ACK/mark-read/list/mutation/event 计数、outbox 计数和每秒速率；这是容量基线口径，不等于已完成生产容量压测。
 
 ## 后续
 
-- 送达回执扩展、会话列表更多产品化能力（草稿、标签、更多摘要策略等）；生产级 OTel collector、Alertmanager、SLO dashboard 和容量验证仍属于后续统一观测治理。
+- 送达回执扩展、会话列表更多产品化能力（草稿、标签、更多摘要策略等）、基于 `capacity_summary` 的容量基线实跑；生产级 OTel collector、Alertmanager、SLO dashboard 和容量验证仍属于后续统一观测治理。

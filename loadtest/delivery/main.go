@@ -51,44 +51,63 @@ type config struct {
 }
 
 type summary struct {
-	Commit                string       `json:"commit"`
-	CommitFull            string       `json:"commit_full"`
-	GitDirty              bool         `json:"git_dirty"`
-	GitStatusShort        string       `json:"git_status_short,omitempty"`
-	Target                string       `json:"target"`
-	TLSEnabled            bool         `json:"tls_enabled"`
-	VerifiedAuthMetadata  bool         `json:"verified_auth_metadata"`
-	TenantID              string       `json:"tenant_id"`
-	UserID                string       `json:"user_id"`
-	DeviceID              string       `json:"device_id"`
-	ConversationID        string       `json:"conversation_id"`
-	AfterSeq              int64        `json:"after_seq"`
-	Limit                 int32        `json:"limit"`
-	ExpectedCount         int          `json:"expected_count"`
-	ConsumerGroup         string       `json:"consumer_group,omitempty"`
-	PollCount             int          `json:"poll_count"`
-	ItemCount             int          `json:"item_count"`
-	MaxSeq                int64        `json:"max_seq"`
-	HasMore               bool         `json:"has_more"`
-	AckEnabled            bool         `json:"ack_enabled"`
-	AckLastReceivedSeq    int64        `json:"ack_last_received_seq,omitempty"`
-	Success               bool         `json:"success"`
-	Error                 string       `json:"error,omitempty"`
-	WaitTimeout           string       `json:"wait_timeout"`
-	PollInterval          string       `json:"poll_interval"`
-	PullAvgMS             float64      `json:"pull_avg_ms"`
-	PullP95MS             float64      `json:"pull_p95_ms"`
-	PullP99MS             float64      `json:"pull_p99_ms"`
-	AckLatencyMS          float64      `json:"ack_latency_ms,omitempty"`
-	InboxCount            *int64       `json:"inbox_count,omitempty"`
-	DeliveryOutboxTotal   *int64       `json:"delivery_outbox_total,omitempty"`
-	DeliveryOutboxPending *int64       `json:"delivery_outbox_pending,omitempty"`
-	DeliveryOutboxDLQ     *int64       `json:"delivery_outbox_dlq,omitempty"`
-	CursorLastReceivedSeq *int64       `json:"cursor_last_received_seq,omitempty"`
-	CheckpointOffsetValue *int64       `json:"checkpoint_offset_value,omitempty"`
-	StartedAt             time.Time    `json:"started_at"`
-	FinishedAt            time.Time    `json:"finished_at"`
-	Items                 []pulledItem `json:"items,omitempty"`
+	Commit                string           `json:"commit"`
+	CommitFull            string           `json:"commit_full"`
+	GitDirty              bool             `json:"git_dirty"`
+	GitStatusShort        string           `json:"git_status_short,omitempty"`
+	Target                string           `json:"target"`
+	TLSEnabled            bool             `json:"tls_enabled"`
+	VerifiedAuthMetadata  bool             `json:"verified_auth_metadata"`
+	TenantID              string           `json:"tenant_id"`
+	UserID                string           `json:"user_id"`
+	DeviceID              string           `json:"device_id"`
+	ConversationID        string           `json:"conversation_id"`
+	AfterSeq              int64            `json:"after_seq"`
+	Limit                 int32            `json:"limit"`
+	ExpectedCount         int              `json:"expected_count"`
+	ConsumerGroup         string           `json:"consumer_group,omitempty"`
+	PollCount             int              `json:"poll_count"`
+	ItemCount             int              `json:"item_count"`
+	MaxSeq                int64            `json:"max_seq"`
+	HasMore               bool             `json:"has_more"`
+	AckEnabled            bool             `json:"ack_enabled"`
+	AckLastReceivedSeq    int64            `json:"ack_last_received_seq,omitempty"`
+	Success               bool             `json:"success"`
+	Error                 string           `json:"error,omitempty"`
+	WaitTimeout           string           `json:"wait_timeout"`
+	PollInterval          string           `json:"poll_interval"`
+	PullAvgMS             float64          `json:"pull_avg_ms"`
+	PullP95MS             float64          `json:"pull_p95_ms"`
+	PullP99MS             float64          `json:"pull_p99_ms"`
+	AckLatencyMS          float64          `json:"ack_latency_ms,omitempty"`
+	InboxCount            *int64           `json:"inbox_count,omitempty"`
+	DeliveryOutboxTotal   *int64           `json:"delivery_outbox_total,omitempty"`
+	DeliveryOutboxPending *int64           `json:"delivery_outbox_pending,omitempty"`
+	DeliveryOutboxDLQ     *int64           `json:"delivery_outbox_dlq,omitempty"`
+	CursorLastReceivedSeq *int64           `json:"cursor_last_received_seq,omitempty"`
+	CheckpointOffsetValue *int64           `json:"checkpoint_offset_value,omitempty"`
+	Capacity              *capacitySummary `json:"capacity_summary,omitempty"`
+	StartedAt             time.Time        `json:"started_at"`
+	FinishedAt            time.Time        `json:"finished_at"`
+	Items                 []pulledItem     `json:"items,omitempty"`
+}
+
+type capacitySummary struct {
+	DurationMS            float64 `json:"duration_ms"`
+	PollCount             int     `json:"poll_count"`
+	ItemCount             int     `json:"item_count"`
+	ExpectedCount         int     `json:"expected_count"`
+	PullsPerSecond        float64 `json:"pulls_per_second"`
+	ItemsPerSecond        float64 `json:"items_per_second"`
+	PullP95MS             float64 `json:"pull_p95_ms"`
+	PullP99MS             float64 `json:"pull_p99_ms"`
+	AckEnabled            bool    `json:"ack_enabled"`
+	AckLatencyMS          float64 `json:"ack_latency_ms,omitempty"`
+	InboxCount            *int64  `json:"inbox_count,omitempty"`
+	DeliveryOutboxTotal   *int64  `json:"delivery_outbox_total,omitempty"`
+	DeliveryOutboxPending *int64  `json:"delivery_outbox_pending,omitempty"`
+	DeliveryOutboxDLQ     *int64  `json:"delivery_outbox_dlq,omitempty"`
+	CheckpointOffsetValue *int64  `json:"checkpoint_offset_value,omitempty"`
 }
 
 type pulledItem struct {
@@ -314,6 +333,7 @@ func run(cfg config) error {
 		}
 	}
 	result.FinishedAt = time.Now().UTC()
+	result.Capacity = buildCapacitySummary(&result)
 
 	encoded, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
@@ -411,6 +431,41 @@ func summarizeLatencies(values []float64) (float64, float64, float64) {
 		total += value
 	}
 	return total / float64(len(copied)), percentile(copied, 0.95), percentile(copied, 0.99)
+}
+
+func buildCapacitySummary(result *summary) *capacitySummary {
+	if result == nil || result.StartedAt.IsZero() || result.FinishedAt.IsZero() {
+		return nil
+	}
+	duration := result.FinishedAt.Sub(result.StartedAt)
+	if duration <= 0 {
+		return nil
+	}
+	durationSeconds := duration.Seconds()
+	return &capacitySummary{
+		DurationMS:            float64(duration.Microseconds()) / 1000,
+		PollCount:             result.PollCount,
+		ItemCount:             result.ItemCount,
+		ExpectedCount:         result.ExpectedCount,
+		PullsPerSecond:        ratePerSecond(int64(result.PollCount), durationSeconds),
+		ItemsPerSecond:        ratePerSecond(int64(result.ItemCount), durationSeconds),
+		PullP95MS:             result.PullP95MS,
+		PullP99MS:             result.PullP99MS,
+		AckEnabled:            result.AckEnabled,
+		AckLatencyMS:          result.AckLatencyMS,
+		InboxCount:            result.InboxCount,
+		DeliveryOutboxTotal:   result.DeliveryOutboxTotal,
+		DeliveryOutboxPending: result.DeliveryOutboxPending,
+		DeliveryOutboxDLQ:     result.DeliveryOutboxDLQ,
+		CheckpointOffsetValue: result.CheckpointOffsetValue,
+	}
+}
+
+func ratePerSecond(count int64, durationSeconds float64) float64 {
+	if count <= 0 || durationSeconds <= 0 {
+		return 0
+	}
+	return float64(count) / durationSeconds
 }
 
 func percentile(sorted []float64, quantile float64) float64 {

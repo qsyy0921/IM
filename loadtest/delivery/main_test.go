@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"math"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc/metadata"
 )
@@ -65,10 +67,74 @@ func TestEnvBoolUsesFirstConfiguredValue(t *testing.T) {
 	}
 }
 
+func TestBuildCapacitySummary(t *testing.T) {
+	started := time.Date(2026, 6, 16, 1, 2, 3, 0, time.UTC)
+	inboxCount := int64(8)
+	outboxTotal := int64(3)
+	outboxPending := int64(1)
+	outboxDLQ := int64(0)
+	checkpoint := int64(42)
+	result := &summary{
+		PollCount:             4,
+		ItemCount:             8,
+		ExpectedCount:         6,
+		PullP95MS:             12.5,
+		PullP99MS:             20.5,
+		AckEnabled:            true,
+		AckLatencyMS:          3.5,
+		InboxCount:            &inboxCount,
+		DeliveryOutboxTotal:   &outboxTotal,
+		DeliveryOutboxPending: &outboxPending,
+		DeliveryOutboxDLQ:     &outboxDLQ,
+		CheckpointOffsetValue: &checkpoint,
+		StartedAt:             started,
+		FinishedAt:            started.Add(2 * time.Second),
+	}
+
+	capacity := buildCapacitySummary(result)
+	if capacity == nil {
+		t.Fatal("expected capacity summary")
+	}
+	if capacity.DurationMS != 2000 ||
+		capacity.PollCount != 4 ||
+		capacity.ItemCount != 8 ||
+		capacity.ExpectedCount != 6 ||
+		!capacity.AckEnabled ||
+		capacity.AckLatencyMS != 3.5 {
+		t.Fatalf("unexpected capacity fields: %+v", capacity)
+	}
+	assertFloatNear(t, capacity.PullsPerSecond, 2)
+	assertFloatNear(t, capacity.ItemsPerSecond, 4)
+	if capacity.InboxCount == nil || *capacity.InboxCount != 8 ||
+		capacity.DeliveryOutboxTotal == nil || *capacity.DeliveryOutboxTotal != 3 ||
+		capacity.DeliveryOutboxPending == nil || *capacity.DeliveryOutboxPending != 1 ||
+		capacity.DeliveryOutboxDLQ == nil || *capacity.DeliveryOutboxDLQ != 0 ||
+		capacity.CheckpointOffsetValue == nil || *capacity.CheckpointOffsetValue != 42 {
+		t.Fatalf("unexpected pointer fields: %+v", capacity)
+	}
+}
+
+func TestBuildCapacitySummaryRequiresPositiveDuration(t *testing.T) {
+	if got := buildCapacitySummary(&summary{}); got != nil {
+		t.Fatalf("expected nil capacity for empty timestamps, got %+v", got)
+	}
+	started := time.Date(2026, 6, 16, 1, 2, 3, 0, time.UTC)
+	if got := buildCapacitySummary(&summary{StartedAt: started, FinishedAt: started}); got != nil {
+		t.Fatalf("expected nil capacity for zero duration, got %+v", got)
+	}
+}
+
 func assertMetadataValue(t *testing.T, md metadata.MD, key string, want string) {
 	t.Helper()
 	values := md.Get(key)
 	if len(values) != 1 || values[0] != want {
 		t.Fatalf("metadata %s = %v, want [%s]", key, values, want)
+	}
+}
+
+func assertFloatNear(t *testing.T, got float64, want float64) {
+	t.Helper()
+	if math.Abs(got-want) > 0.000001 {
+		t.Fatalf("got %v, want %v", got, want)
 	}
 }

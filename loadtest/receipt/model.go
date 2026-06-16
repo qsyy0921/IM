@@ -65,7 +65,29 @@ type summary struct {
 	ReceiptOutbox                            receiptOutboxStats      `json:"receipt_outbox"`
 	ReceiptKafkaEvents                       []receiptKafkaEvent     `json:"receipt_kafka_events"`
 	DeliveryOutbox                           outboxStats             `json:"delivery_outbox"`
+	Capacity                                 *capacitySummary        `json:"capacity_summary,omitempty"`
 	LatenciesMS                              map[string]float64      `json:"latencies_ms"`
+}
+
+type capacitySummary struct {
+	DurationMS                float64 `json:"duration_ms"`
+	MessageCount              int     `json:"message_count"`
+	PullItemCount             int     `json:"pull_item_count"`
+	AckCount                  int     `json:"ack_count"`
+	MarkReadCount             int     `json:"mark_read_count"`
+	ReceiptStateQueryCount    int     `json:"receipt_state_query_count"`
+	ConversationListCallCount int     `json:"conversation_list_call_count"`
+	StateMutationCount        int     `json:"state_mutation_count"`
+	ReceiptKafkaEventCount    int     `json:"receipt_kafka_event_count"`
+	ReceiptOutboxPublished    int64   `json:"receipt_outbox_published"`
+	ReceiptOutboxPending      int64   `json:"receipt_outbox_pending"`
+	ReceiptOutboxDLQ          int64   `json:"receipt_outbox_dlq"`
+	DeliveryOutboxPublished   int64   `json:"delivery_outbox_published"`
+	DeliveryOutboxPending     int64   `json:"delivery_outbox_pending"`
+	DeliveryOutboxDLQ         int64   `json:"delivery_outbox_dlq"`
+	OperationsPerSecond       float64 `json:"operations_per_second"`
+	MessagesPerSecond         float64 `json:"messages_per_second"`
+	ReceiptEventsPerSecond    float64 `json:"receipt_events_per_second"`
 }
 
 type memberJoinSummary struct {

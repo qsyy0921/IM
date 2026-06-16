@@ -1255,6 +1255,7 @@ func summarizeReceiptKafkaEvent(message kafkago.Message, event *receipteventsv1.
 }
 
 func writeSummary(cfg config, result summary) error {
+	result.Capacity = buildCapacitySummary(&result)
 	encoded, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode summary: %w", err)

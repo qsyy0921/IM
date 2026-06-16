@@ -682,10 +682,11 @@ func runProjectionFailureCleanup() error {
 		return err
 	}
 	cutoff := time.Now().UTC().Add(-config.Retention)
+	partitionID := projectionFailureCleanupPartitionID()
 	stats, err := postgresinfra.NewProjectionFailureStore(pool).CleanupResolvedFailures(ctx, postgresinfra.ProjectionFailureCleanupOptions{
 		ConsumerGroup: envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_CONSUMER_GROUP", ""),
 		Topic:         envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_TOPIC", "conversation.timeline.events"),
-		PartitionID:   projectionFailureCleanupPartitionID(),
+		PartitionID:   partitionID,
 		FailureClass:  envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_FAILURE_CLASS", ""),
 		Cutoff:        cutoff,
 		Limit:         config.BatchSize,
@@ -700,6 +701,19 @@ func runProjectionFailureCleanup() error {
 		config.Retention,
 		config.BatchSize,
 	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_OUTPUT")); outputPath != "" {
+		filters := map[string]string{
+			"consumer_group": envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_CONSUMER_GROUP", ""),
+			"topic":          envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_TOPIC", "conversation.timeline.events"),
+			"failure_class":  envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_FAILURE_CLASS", ""),
+		}
+		if partitionID != nil {
+			filters["partition_id"] = strconv.FormatInt(int64(*partitionID), 10)
+		}
+		if err := writeOperatorCleanupOutput(outputPath, stats.Deleted, cutoff, config.Retention, config.BatchSize, filters); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -722,10 +736,11 @@ func runProjectionCheckpointRepairCleanup() error {
 		return err
 	}
 	cutoff := time.Now().UTC().Add(-config.Retention)
+	partitionID := projectionCheckpointRepairCleanupPartitionID()
 	stats, err := postgresinfra.NewProjectionRepairStore(pool).CleanupCheckpointRepairs(ctx, postgresinfra.ProjectionRepairCleanupOptions{
 		ConsumerGroup: envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_CONSUMER_GROUP", ""),
 		Topic:         envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_TOPIC", "conversation.timeline.events"),
-		PartitionID:   projectionCheckpointRepairCleanupPartitionID(),
+		PartitionID:   partitionID,
 		Mode:          envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_MODE", ""),
 		Outcome:       envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_OUTCOME", ""),
 		Cutoff:        cutoff,
@@ -741,6 +756,20 @@ func runProjectionCheckpointRepairCleanup() error {
 		config.Retention,
 		config.BatchSize,
 	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_OUTPUT")); outputPath != "" {
+		filters := map[string]string{
+			"consumer_group": envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_CONSUMER_GROUP", ""),
+			"topic":          envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_TOPIC", "conversation.timeline.events"),
+			"mode":           envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_MODE", ""),
+			"outcome":        envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_OUTCOME", ""),
+		}
+		if partitionID != nil {
+			filters["partition_id"] = strconv.FormatInt(int64(*partitionID), 10)
+		}
+		if err := writeOperatorCleanupOutput(outputPath, stats.Deleted, cutoff, config.Retention, config.BatchSize, filters); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

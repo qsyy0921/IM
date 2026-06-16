@@ -480,6 +480,23 @@ func runChallengeDeliveryRepairCleanup() error {
 		config.Retention,
 		config.BatchSize,
 	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_OUTPUT")); outputPath != "" {
+		filters := map[string]string{
+			"tenant_id":              envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_TENANT_ID", ""),
+			"user_id":                envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_USER_ID", ""),
+			"challenge_id":           envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_CHALLENGE_ID", ""),
+			"mode":                   envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_MODE", ""),
+			"outcome":                envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_OUTCOME", ""),
+			"previous_failure_class": envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_PREVIOUS_FAILURE_CLASS", ""),
+			"new_failure_class":      envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_NEW_FAILURE_CLASS", ""),
+		}
+		if deliveryID != nil {
+			filters["delivery_id"] = strconv.FormatInt(*deliveryID, 10)
+		}
+		if err := writeOperatorCleanupOutput(outputPath, stats.Deleted, cutoff, config.Retention, config.BatchSize, filters); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -509,6 +526,11 @@ func runChallengeRequestLimitCleanup() error {
 		config.Retention,
 		config.BatchSize,
 	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_OUTPUT")); outputPath != "" {
+		if err := writeOperatorCleanupOutput(outputPath, deleted, cutoff, config.Retention, config.BatchSize, nil); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

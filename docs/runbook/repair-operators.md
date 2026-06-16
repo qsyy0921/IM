@@ -75,8 +75,8 @@ go run ./services/delivery-service/cmd/delivery-service
 | `projection-failure-audit` | 只读列出 unresolved projection failure，支持按 offset / event / failure class 缩小范围；可选 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
 | `projection-checkpoint-repair` | 带审计回调 checkpoint 做 replay；只允许回调，不允许前跳跳过事件。 |
 | `projection-checkpoint-repair-audit` | 只读列出 checkpoint repair audit 历史；可选 `NEXUSIM_DELIVERY_PROJECTION_REPAIR_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
-| `projection-checkpoint-repair-cleanup` | 清理超过保留期的 checkpoint repair audit 历史。 |
-| `projection-failure-cleanup` | 只清理 resolved 且超过保留期的 failure 审计行，不触碰 unresolved blocker。 |
+| `projection-checkpoint-repair-cleanup` | 清理超过保留期的 checkpoint repair audit 历史；可选 `NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_OUTPUT` 写低敏 JSON summary。 |
+| `projection-failure-cleanup` | 只清理 resolved 且超过保留期的 failure 审计行，不触碰 unresolved blocker；可选 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_OUTPUT` 写低敏 JSON summary。 |
 
 ## Conversation Member Change
 
@@ -101,8 +101,8 @@ go run ./services/delivery-service/cmd/delivery-service
 | `session-mfa-proof-audit` | 只读发现历史 session MFA proof 脏数据；可选 `NEXUSIM_IDENTITY_SESSION_MFA_PROOF_AUDIT_OUTPUT` 写低敏聚合 JSON 结果。 |
 | `challenge-delivery-repair` | 处理 challenge delivery outbox / retry / expire / DLQ 相关修复。 |
 | `challenge-delivery-repair-audit` | 只读审计 challenge delivery repair 历史；可选 `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
-| `challenge-delivery-repair-cleanup` | 按 retention / scope 清理 challenge delivery repair audit 历史。 |
-| `challenge-request-limit-cleanup` | 清理 verification / password reset request limit 历史。 |
+| `challenge-delivery-repair-cleanup` | 按 retention / scope 清理 challenge delivery repair audit 历史；可选 `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_OUTPUT` 写低敏 JSON summary。 |
+| `challenge-request-limit-cleanup` | 清理 verification / password reset request limit 历史；可选 `NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_OUTPUT` 写低敏 JSON summary。 |
 | `gateway-token-keyring-rotate` | 轮换本地 RS256 gateway token keyring 文件；生成新当前私钥，把旧当前 key 降级为 public-only overlap，并按 old-key limit 保留旧公钥。 |
 
 `gateway-token-keyring-rotate` 只处理本地 secret-bearing JSON 文件。它不是 KMS / HSM、不会跨主机分发密钥，也不替代正式密钥管理审批。

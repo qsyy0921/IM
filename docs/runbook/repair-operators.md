@@ -78,6 +78,8 @@ go run ./services/delivery-service/cmd/delivery-service
 
 `message-service` 还提供只读 `change-history-audit`，用于审计 `message_change_history` 中 `EDIT / REVOKE / DELETE` 变更证明；支持按 tenant / conversation / message / change type / changed_by 缩小范围，可选 `NEXUSIM_MESSAGE_CHANGE_HISTORY_AUDIT_OUTPUT` 写低敏 JSON 结果。输出只包含变更元数据、状态转换、payload 是否存在和 reason 是否存在，不输出消息 payload 或 reason 原文。
 
+`message-service` 还提供只读 `retention-proof-audit`，用于按当前 `message_log` 行聚合删除证明：当前状态、payload 是否仍存在、最新 `DELETE` change history、`message.deleted.v1` timeline / outbox 是否存在。默认审计 `DELETED` 消息，支持按 tenant / conversation / message / status 缩小范围，可选 `NEXUSIM_MESSAGE_RETENTION_PROOF_AUDIT_OUTPUT` 写低敏 JSON 结果；输出不包含消息 payload 或删除 reason 原文。
+
 ## Delivery Projection
 
 `delivery-service` 额外拥有 projection 排障入口：

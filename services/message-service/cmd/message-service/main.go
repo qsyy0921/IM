@@ -40,7 +40,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_MESSAGE_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("message-service runtime wiring is idle; set NEXUSIM_MESSAGE_SERVICE_MODE=grpc, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, or change-history-audit")
+		log.Println("message-service runtime wiring is idle; set NEXUSIM_MESSAGE_SERVICE_MODE=grpc, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, change-history-audit, or retention-proof-audit")
 		return nil
 	case "grpc":
 		return runGRPCServer()
@@ -56,6 +56,8 @@ func run() error {
 		return runOutboxRepairCleanup()
 	case "change-history-audit":
 		return runMessageChangeHistoryAudit()
+	case "retention-proof-audit":
+		return runMessageRetentionProofAudit()
 	default:
 		return errors.New("unsupported NEXUSIM_MESSAGE_SERVICE_MODE")
 	}
@@ -576,6 +578,57 @@ func runMessageChangeHistoryAudit() error {
 	return nil
 }
 
+func runMessageRetentionProofAudit() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	rows, err := postgresinfra.NewMessageRepository(pool).AuditMessageRetentionProof(ctx, postgresinfra.MessageRetentionProofAuditOptions{
+		TenantID:       envString("NEXUSIM_MESSAGE_RETENTION_PROOF_AUDIT_TENANT_ID", ""),
+		ConversationID: envString("NEXUSIM_MESSAGE_RETENTION_PROOF_AUDIT_CONVERSATION_ID", ""),
+		MessageID:      envString("NEXUSIM_MESSAGE_RETENTION_PROOF_AUDIT_MESSAGE_ID", ""),
+		Status:         envString("NEXUSIM_MESSAGE_RETENTION_PROOF_AUDIT_STATUS", "DELETED"),
+		Limit:          envInt("NEXUSIM_MESSAGE_RETENTION_PROOF_AUDIT_LIMIT", 20),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("message-service retention proof audit completed rows=%d", len(rows))
+	for _, row := range rows {
+		log.Printf(
+			"message_retention_proof tenant_id=%s conversation_id=%s message_id=%s conversation_seq=%d message_type=%s status=%s current_payload_present=%t deleted_at=%s delete_change_version=%s delete_changed_by=%s delete_reason_present=%t delete_timeline_event_present=%t delete_outbox_event_present=%t",
+			row.TenantID,
+			row.ConversationID,
+			row.MessageID,
+			row.ConversationSeq,
+			row.MessageType,
+			row.Status,
+			row.CurrentPayloadPresent,
+			formatOptionalTime(row.DeletedAt),
+			formatOptionalInt(row.DeleteChangeVersion),
+			row.DeleteChangedBy,
+			row.DeleteReasonPresent,
+			row.DeleteTimelineEventPresent,
+			row.DeleteOutboxEventPresent,
+		)
+	}
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_MESSAGE_RETENTION_PROOF_AUDIT_OUTPUT")); outputPath != "" {
+		if err := writeMessageRetentionProofAuditOutput(outputPath, rows); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func startDebugServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {
 	if strings.TrimSpace(addr) == "" {
 		return func() {}, nil
@@ -1051,4 +1104,11 @@ func formatOptionalTime(value *time.Time) string {
 		return ""
 	}
 	return value.Format(time.RFC3339)
+}
+
+func formatOptionalInt(value *int) string {
+	if value == nil {
+		return ""
+	}
+	return strconv.Itoa(*value)
 }

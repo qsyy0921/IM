@@ -22,13 +22,14 @@ $operatorSpecs = @(
         Service = "message-service"
         Cmd = "services\message-service\cmd\message-service\main.go"
         Env = "NEXUSIM_MESSAGE_SERVICE_MODE"
-        Modes = @("outbox-audit", "outbox-repair", "outbox-repair-audit", "outbox-repair-cleanup", "change-history-audit")
+        Modes = @("outbox-audit", "outbox-repair", "outbox-repair-audit", "outbox-repair-cleanup", "change-history-audit", "retention-proof-audit")
         OutputEnvs = @(
             "NEXUSIM_MESSAGE_OUTBOX_AUDIT_OUTPUT",
             "NEXUSIM_MESSAGE_OUTBOX_REPAIR_OUTPUT",
             "NEXUSIM_MESSAGE_OUTBOX_REPAIR_AUDIT_OUTPUT",
             "NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_OUTPUT",
-            "NEXUSIM_MESSAGE_CHANGE_HISTORY_AUDIT_OUTPUT"
+            "NEXUSIM_MESSAGE_CHANGE_HISTORY_AUDIT_OUTPUT",
+            "NEXUSIM_MESSAGE_RETENTION_PROOF_AUDIT_OUTPUT"
         )
     },
     @{

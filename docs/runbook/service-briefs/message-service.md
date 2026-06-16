@@ -14,6 +14,7 @@
 - Kafka writer 已显式固定 `acks=all`、禁自动建 topic、bounded attempts/backoff，并由本地门禁和 package 单测防漂移；真正 idempotent / transactional producer 仍属后续客户端选型。
 - 已补 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运维模式，可直接审计、redrive 和清理 `message_outbox` repair 历史；`outbox-audit` / `outbox-repair` / `outbox-repair-audit` / `outbox-repair-cleanup` 可通过 `NEXUSIM_MESSAGE_OUTBOX_AUDIT_OUTPUT` / `NEXUSIM_MESSAGE_OUTBOX_REPAIR_OUTPUT` / `NEXUSIM_MESSAGE_OUTBOX_REPAIR_AUDIT_OUTPUT` / `NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_OUTPUT` 写低敏 JSON 结果或 cleanup summary，便于 operator 留存证据。
 - 已补只读 `change-history-audit`，可按 tenant / conversation / message / change type / changed_by 审计 `message_change_history` 中 `EDIT / REVOKE / DELETE` 变更证明；可通过 `NEXUSIM_MESSAGE_CHANGE_HISTORY_AUDIT_OUTPUT` 写低敏 JSON 结果，输出只包含状态转换和 payload / reason 存在性，不输出消息 payload 或 reason 原文。
+- 已补只读 `retention-proof-audit`，可按 tenant / conversation / message / status 审计当前 `message_log` 与最新 `DELETE` change history、`message.deleted.v1` timeline / outbox 的删除证明；默认只看 `DELETED` 消息，可通过 `NEXUSIM_MESSAGE_RETENTION_PROOF_AUDIT_OUTPUT` 写低敏 JSON 结果，不输出消息 payload 或删除 reason 原文。
 - 已补 trusted metadata 启动门禁：当 `NEXUSIM_MESSAGE_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端未启用 mTLS client cert 校验，则启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - `loadtest/sendmessage` 容量 runner 已按 config / model / auth / util 同 package 拆分，避免后续容量观测继续堆进单个 `main.go`。
 - `loadtest/sendmessage` summary 已新增 `capacity_summary`，统一输出 actual duration、targets、VU、conversation、request/success/error、logical request、RPS、p95/p99、outbox 和 PG pool 关键计数；这是容量基线口径，不等于已完成生产容量压测。
@@ -22,5 +23,5 @@
 
 ## 后续
 
-- 会话级删除策略深化、合规删除 workflow / retention proof、长时间容量曲线和生产观测；用户私有隐藏已由 delivery-service `HideInboxItem` 承担，图片 / 文件 / 语音二进制上传和处理属于后续 media 能力。
+- 会话级删除策略深化、真正合规删除 workflow / redaction 策略、长时间容量曲线和生产观测；用户私有隐藏已由 delivery-service `HideInboxItem` 承担，图片 / 文件 / 语音二进制上传和处理属于后续 media 能力。
 - 生产级 OTel collector、告警路由、retention 和 SLO dashboard 仍属于后续统一观测治理。

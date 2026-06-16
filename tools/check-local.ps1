@@ -92,6 +92,9 @@ try {
     Write-Host "== loadtest capacity summaries =="
     Invoke-LocalCheck "check-loadtest-capacity-summaries.ps1"
 
+    Write-Host "== loadtest capacity baseline summary =="
+    Invoke-LocalCheck "check-loadtest-capacity-baseline-summary.ps1"
+
     Write-Host "== resource snapshot summary =="
     Invoke-LocalCheck "check-resource-snapshot-summary.ps1"
 

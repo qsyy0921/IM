@@ -16,6 +16,19 @@
 
 该摘要只说明健康态下的一次 `docker stats --no-stream` 观察值，不是容量压测、SLO 或生产资源基线。
 
+## 快速入口：容量基线汇总
+
+9 个已实现服务的 loadtest runner 会在各自 summary JSON 中输出 `capacity_summary`。完成一轮或多轮压测后，可以从 H 盘原始结果目录生成统一容量基线索引：
+
+```powershell
+.\tools\summarize-loadtest-capacity-baselines.ps1 `
+  -ResultRoot H:\NexusIM\loadtest-results `
+  -OutputPath H:\NexusIM\loadtest-results\capacity-baseline-summary\capacity-baseline-summary.json `
+  -MarkdownPath H:\NexusIM\loadtest-results\capacity-baseline-summary\capacity-baseline-summary.md
+```
+
+如果要确认 9 个服务都已有至少一份 `capacity_summary`，追加 `-RequireAllServices`。该汇总只聚合既有压测结果，不能替代真实容量压测、SLO 或生产 sizing 结论。
+
 ## 1. 机器与网络
 
 当前本地双机压测只用于开发阶段，不代表目标态生产拓扑。

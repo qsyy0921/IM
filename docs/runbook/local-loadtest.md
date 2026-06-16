@@ -59,6 +59,18 @@ docker compose `
 
 该 overlay 覆盖 message outbox relay、delivery timeline consumer / outbox relay、push delivery / identity consumer、receipt delivery consumer / outbox relay、contacts outbox relay 和 identity outbox relay。它不包含动态 webhook fixture；`loadtest/identity` 的 challenge delivery runner 仍需按 runner 参数准备 webhook 接收端和 identity challenge delivery outbox / worker 配置。
 
+contacts stack runner 使用默认 topic `im.contact.events`，本地 Kafka 禁止自动建 topic，首次运行前需要显式创建：
+
+```powershell
+docker exec nexusim-kafka kafka-topics `
+  --bootstrap-server localhost:9092 `
+  --create `
+  --if-not-exists `
+  --topic im.contact.events `
+  --partitions 1 `
+  --replication-factor 1
+```
+
 需要预置业务数据的 runner 会标记为 `skipped_seed_required`。例如 message-service send runner 和 conversation-service memberchange runner 需要预置 ACTIVE conversation / member fixture；`delivery-service` 直接 runner 读取既有 `PullInbox` 状态。如果已经先用 smoke / fixture 脚本准备了对应数据，再显式追加：
 
 ```powershell

@@ -408,6 +408,8 @@ func conversationListSortFromProto(sort receiptv1.ConversationListSort) string {
 		return types.ConversationListSortPinnedUpdatedAtDesc
 	case receiptv1.ConversationListSort_CONVERSATION_LIST_SORT_UNREAD_UPDATED_AT_DESC:
 		return types.ConversationListSortUnreadUpdatedAtDesc
+	case receiptv1.ConversationListSort_CONVERSATION_LIST_SORT_DRAFT_UPDATED_AT_DESC:
+		return types.ConversationListSortDraftUpdatedAtDesc
 	default:
 		return "unsupported"
 	}

@@ -681,6 +681,45 @@ func TestRepositoryListConversationsFiltersDraftOnlyIntegration(t *testing.T) {
 	assertConversationIDs(t, filtered, "conv-c")
 }
 
+func TestRepositoryListConversationsSortsDraftFirstIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	sortTime := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	draftTime := time.Date(2026, 6, 10, 13, 0, 0, 0, time.UTC)
+	insertConversationSummary(t, ctx, pool, "conv-no-draft-new", 11, sortTime.Add(time.Minute))
+	insertConversationSummary(t, ctx, pool, "conv-draft-new", 12, sortTime)
+	insertConversationSummary(t, ctx, pool, "conv-draft-old", 13, sortTime.Add(-time.Minute))
+	insertConversationSummary(t, ctx, pool, "conv-no-draft-old", 14, sortTime.Add(-2*time.Minute))
+	setConversationDraftAt(t, ctx, pool, "conv-draft-new", "draft-new", draftTime)
+	setConversationDraftAt(t, ctx, pool, "conv-draft-old", "draft-old", draftTime.Add(-time.Minute))
+
+	first, err := repository.ListConversations(ctx, listConversationsCommandDraftFirst(2, ""))
+	if err != nil {
+		t.Fatalf("list first draft-first page: %v", err)
+	}
+	assertConversationIDs(t, first, "conv-draft-new", "conv-draft-old")
+	if first.NextPageCursor == "" {
+		t.Fatal("expected draft-first cursor after first page")
+	}
+
+	second, err := repository.ListConversations(ctx, listConversationsCommandDraftFirst(2, first.NextPageCursor))
+	if err != nil {
+		t.Fatalf("list second draft-first page: %v", err)
+	}
+	assertConversationIDs(t, second, "conv-no-draft-new", "conv-no-draft-old")
+	if second.NextPageCursor != "" {
+		t.Fatalf("expected empty draft-first cursor on last page, got %q", second.NextPageCursor)
+	}
+
+	_, err = repository.ListConversations(ctx, listConversationsCommand(2, first.NextPageCursor))
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid cursor when draft-first sort changes, got %v", err)
+	}
+}
+
 func TestRepositoryListConversationsRejectsInvalidCursorIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -1037,6 +1076,12 @@ func listConversationsCommandUnreadFirst(limit int, cursor string) types.ListCon
 	return command
 }
 
+func listConversationsCommandDraftFirst(limit int, cursor string) types.ListConversationsCommand {
+	command := listConversationsCommand(limit, cursor)
+	command.Sort = types.ConversationListSortDraftUpdatedAtDesc
+	return command
+}
+
 func listConversationsCommandPinnedOnly(limit int, cursor string) types.ListConversationsCommand {
 	command := listConversationsCommand(limit, cursor)
 	command.PinnedOnly = true
@@ -1078,6 +1123,28 @@ WHERE tenant_id = 'tenant-receipt'
 `, unreadCount, conversationID)
 	if err != nil {
 		t.Fatalf("set conversation unread %s: %v", conversationID, err)
+	}
+}
+
+func setConversationDraftAt(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	conversationID string,
+	draftText string,
+	draftUpdatedAt time.Time,
+) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+UPDATE user_conversation_summaries
+SET draft_text = $1,
+    draft_updated_at = $2
+WHERE tenant_id = 'tenant-receipt'
+  AND user_id = 'receiver-1'
+  AND conversation_id = $3
+`, draftText, draftUpdatedAt, conversationID)
+	if err != nil {
+		t.Fatalf("set conversation draft %s: %v", conversationID, err)
 	}
 }
 

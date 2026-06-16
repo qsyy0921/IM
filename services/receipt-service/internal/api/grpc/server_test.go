@@ -218,6 +218,11 @@ func TestListConversationsMapsSort(t *testing.T) {
 			sort: receiptv1.ConversationListSort_CONVERSATION_LIST_SORT_UNREAD_UPDATED_AT_DESC,
 			want: types.ConversationListSortUnreadUpdatedAtDesc,
 		},
+		{
+			name: "draft",
+			sort: receiptv1.ConversationListSort_CONVERSATION_LIST_SORT_DRAFT_UPDATED_AT_DESC,
+			want: types.ConversationListSortDraftUpdatedAtDesc,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

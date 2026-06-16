@@ -621,6 +621,25 @@ WHERE tenant_id = $1
   )
 `
 			args = append(args, cursor.Unread, cursor.SortUpdatedAt, cursor.ConversationID)
+		case types.ConversationListSortDraftUpdatedAtDesc:
+			if cursor.Draft {
+				query += `  AND (
+      (draft_text <> '') < $10
+      OR ((draft_text <> '') = $10 AND draft_updated_at < $11)
+      OR ((draft_text <> '') = $10 AND draft_updated_at = $11 AND sort_updated_at < $12)
+      OR ((draft_text <> '') = $10 AND draft_updated_at = $11 AND sort_updated_at = $12 AND conversation_id > $13)
+  )
+`
+				args = append(args, cursor.Draft, cursor.DraftUpdatedAt, cursor.SortUpdatedAt, cursor.ConversationID)
+			} else {
+				query += `  AND (
+      (draft_text <> '') < $10
+      OR ((draft_text <> '') = $10 AND sort_updated_at < $11)
+      OR ((draft_text <> '') = $10 AND sort_updated_at = $11 AND conversation_id > $12)
+  )
+`
+				args = append(args, cursor.Draft, cursor.SortUpdatedAt, cursor.ConversationID)
+			}
 		default:
 			query += `  AND (
       sort_updated_at < $10
@@ -637,6 +656,10 @@ LIMIT $3
 `
 	case types.ConversationListSortUnreadUpdatedAtDesc:
 		query += `ORDER BY (unread_count > 0) DESC, sort_updated_at DESC, conversation_id ASC
+LIMIT $3
+`
+	case types.ConversationListSortDraftUpdatedAtDesc:
+		query += `ORDER BY (draft_text <> '') DESC, draft_updated_at DESC NULLS LAST, sort_updated_at DESC, conversation_id ASC
 LIMIT $3
 `
 	default:
@@ -677,6 +700,8 @@ LIMIT $3
 			TagFilter:       tagFilter,
 			Pinned:          last.Pinned,
 			Unread:          last.UnreadCount > 0,
+			Draft:           last.DraftText != "",
+			DraftUpdatedAt:  last.DraftUpdatedAt,
 			SortUpdatedAt:   last.UpdatedAt,
 			ConversationID:  string(last.ConversationID),
 		})
@@ -980,11 +1005,13 @@ type listCursor struct {
 	TagFilter       string    `json:"tag_filter"`
 	Pinned          bool      `json:"pinned"`
 	Unread          bool      `json:"unread"`
+	Draft           bool      `json:"draft"`
+	DraftUpdatedAt  time.Time `json:"draft_updated_at"`
 	SortUpdatedAt   time.Time `json:"sort_updated_at"`
 	ConversationID  string    `json:"conversation_id"`
 }
 
-const listCursorVersion = 5
+const listCursorVersion = 6
 
 func decodeListCursor(
 	value string,
@@ -1023,7 +1050,7 @@ func decodeListCursor(
 		cursor.TagFilter != tagFilter {
 		return listCursor{}, false, types.NewInvalidArgument("invalid page_cursor")
 	}
-	if sort == types.ConversationListSortUnreadUpdatedAtDesc && cursor.Version < listCursorVersion {
+	if sort == types.ConversationListSortDraftUpdatedAtDesc && cursor.Draft && cursor.DraftUpdatedAt.IsZero() {
 		return listCursor{}, false, types.NewInvalidArgument("invalid page_cursor")
 	}
 	if cursor.SortUpdatedAt.IsZero() || cursor.ConversationID == "" {

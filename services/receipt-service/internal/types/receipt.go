@@ -228,6 +228,7 @@ const (
 	ConversationListSortUpdatedAtDesc       = "updated_at_desc"
 	ConversationListSortPinnedUpdatedAtDesc = "pinned_updated_at_desc"
 	ConversationListSortUnreadUpdatedAtDesc = "unread_updated_at_desc"
+	ConversationListSortDraftUpdatedAtDesc  = "draft_updated_at_desc"
 )
 
 func NormalizeConversationListSort(sort string) (string, error) {
@@ -236,7 +237,8 @@ func NormalizeConversationListSort(sort string) (string, error) {
 	}
 	if sort == ConversationListSortUpdatedAtDesc ||
 		sort == ConversationListSortPinnedUpdatedAtDesc ||
-		sort == ConversationListSortUnreadUpdatedAtDesc {
+		sort == ConversationListSortUnreadUpdatedAtDesc ||
+		sort == ConversationListSortDraftUpdatedAtDesc {
 		return sort, nil
 	}
 	return "", NewInvalidArgument("unsupported conversation list sort")

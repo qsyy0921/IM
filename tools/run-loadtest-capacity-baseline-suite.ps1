@@ -14,6 +14,7 @@ param(
     ),
     [switch]$DryRun,
     [switch]$ContinueOnError,
+    [switch]$IncludeSeededRunners,
     [string]$PGDSN = $env:NEXUSIM_PG_DSN,
     [string]$KafkaBrokers = "localhost:9092",
     [int]$VUs = 2,
@@ -84,7 +85,10 @@ function New-Step {
     param(
         [string]$Service,
         [string]$Runner,
-        [string[]]$RunnerArgs
+        [string[]]$RunnerArgs,
+        [string]$BaselineMode = "self_contained",
+        [bool]$RequiresSeed = $false,
+        [string]$SkipReason = ""
     )
 
     $argumentList = New-Object System.Collections.Generic.List[string]
@@ -97,6 +101,9 @@ function New-Step {
     return [pscustomobject]@{
         service = $Service
         runner = $Runner
+        baseline_mode = $BaselineMode
+        requires_seed = $RequiresSeed
+        skip_reason = $SkipReason
         command = "go"
         args = @($argumentList.ToArray())
         command_line = "go " + (Format-CommandLine -ArgumentList @($argumentList.ToArray()))
@@ -177,7 +184,13 @@ function Build-Step {
             $runnerArgsList.Add("--result-dir")
             $runnerArgsList.Add($resultDir)
             Add-ArgIfValue -ArgumentList $runnerArgsList -Name "--pg-dsn" -Value $PGDSN
-            $step = New-Step -Service $Service -Runner "delivery" -RunnerArgs @($runnerArgsList.ToArray())
+            $step = New-Step `
+                -Service $Service `
+                -Runner "delivery" `
+                -RunnerArgs @($runnerArgsList.ToArray()) `
+                -BaselineMode "requires_seed" `
+                -RequiresSeed $true `
+                -SkipReason "delivery loadtest validates existing PullInbox state and requires seeded inbox data"
         }
         "push-gateway" {
             $runnerArgsList.Add("--conversation-target")
@@ -252,9 +265,13 @@ function Write-SuiteSummary {
         suite_root = ([System.IO.Path]::GetFullPath($SuiteRoot))
         scope = $Scope
         dry_run = $DryRunValue
+        include_seeded_runners = [bool]$IncludeSeededRunners
         status = $Status
         service_count = $Steps.Count
+        runnable_service_count = @($Steps | Where-Object { $_.status -ne "skipped_seed_required" }).Count
+        skipped_service_count = @($Steps | Where-Object { $_.status -eq "skipped_seed_required" }).Count
         services = @($Steps | ForEach-Object { $_.service })
+        skipped_services = @($Steps | Where-Object { $_.status -eq "skipped_seed_required" } | ForEach-Object { $_.service })
         steps = @($Steps)
     }
 
@@ -267,17 +284,22 @@ function Write-SuiteSummary {
     $markdown += "- Run: $RunName"
     $markdown += "- Created at: $($summary.created_at)"
     $markdown += "- Dry run: $DryRunValue"
+    $markdown += "- Include seeded runners: $([bool]$IncludeSeededRunners)"
     $markdown += "- Status: $Status"
     $markdown += "- Scope: $Scope"
     $markdown += "- Suite root: $($summary.suite_root)"
-    $markdown += ""
-    $markdown += "| Service | Runner | Status | Command |"
-    $markdown += "| --- | --- | --- | --- |"
-    foreach ($step in $Steps) {
-        $markdown += "| $($step.service) | $($step.runner) | $($step.status) | `$($step.command_line)` |"
+    $markdown += "- Runnable services: $($summary.runnable_service_count)/$($summary.service_count)"
+    if ($summary.skipped_service_count -gt 0) {
+        $markdown += "- Skipped services: $($summary.skipped_services -join ', ')"
     }
     $markdown += ""
-    $markdown += "This suite only coordinates local loadtest runners and writes raw outputs under H drive by default. It is not a production SLO, HA proof, or sizing claim."
+    $markdown += "| Service | Runner | Baseline mode | Status | Skip reason | Command |"
+    $markdown += "| --- | --- | --- | --- | --- | --- |"
+    foreach ($step in $Steps) {
+        $markdown += "| $($step.service) | $($step.runner) | $($step.baseline_mode) | $($step.status) | $($step.skip_reason) | `$($step.command_line)` |"
+    }
+    $markdown += ""
+    $markdown += "This suite only coordinates local loadtest runners and writes raw outputs under H drive by default. Seeded runners are skipped unless explicitly enabled because they need pre-populated state. This is not a production SLO, HA proof, or sizing claim."
 
     $markdownPath = Join-Path $SuiteRoot "capacity-baseline-suite-summary.md"
     $markdown | Set-Content -LiteralPath $markdownPath -Encoding UTF8
@@ -330,6 +352,10 @@ if (-not $DryRun) {
 $suiteStatus = "planned"
 foreach ($step in $steps) {
     New-Item -ItemType Directory -Force -Path $step.result_dir | Out-Null
+    if ($step.requires_seed -and -not $IncludeSeededRunners) {
+        $step.status = "skipped_seed_required"
+        continue
+    }
     if ($DryRun) {
         $step.status = "dry_run"
         continue
@@ -363,6 +389,9 @@ foreach ($step in $steps) {
 if ($DryRun) {
     $suiteStatus = "dry_run"
 }
+elseif (@($steps | Where-Object { $_.status -ne "skipped_seed_required" }).Count -eq 0) {
+    $suiteStatus = "skipped"
+}
 elseif ($suiteStatus -ne "failed") {
     $suiteStatus = "passed"
 }
@@ -370,14 +399,21 @@ elseif ($suiteStatus -ne "failed") {
 $paths = Write-SuiteSummary -SuiteRoot $suiteRoot -Steps @($steps.ToArray()) -DryRunValue ([bool]$DryRun) -Status $suiteStatus
 
 if (-not $DryRun) {
+    $expectedSummaryServices = @(
+        $steps |
+            Where-Object { $_.status -ne "skipped_seed_required" } |
+            ForEach-Object { $_.service }
+    )
     $baselinePath = Join-Path $suiteRoot "capacity-baseline-summary.json"
     $baselineMarkdownPath = Join-Path $suiteRoot "capacity-baseline-summary.md"
-    & (Join-Path $PSScriptRoot "summarize-loadtest-capacity-baselines.ps1") `
-        -ResultRoot $suiteRoot `
-        -OutputPath $baselinePath `
-        -MarkdownPath $baselineMarkdownPath `
-        -ExpectedServices $canonicalServices `
-        -RequireAllServices
+    if ($expectedSummaryServices.Count -gt 0 -and $suiteStatus -ne "failed") {
+        & (Join-Path $PSScriptRoot "summarize-loadtest-capacity-baselines.ps1") `
+            -ResultRoot $suiteRoot `
+            -OutputPath $baselinePath `
+            -MarkdownPath $baselineMarkdownPath `
+            -ExpectedServices $expectedSummaryServices `
+            -RequireAllServices
+    }
 }
 
 Write-Host "OK   capacity baseline suite summary written: $($paths.summary_path)"

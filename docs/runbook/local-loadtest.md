@@ -40,7 +40,13 @@
   -KafkaBrokers localhost:9092
 ```
 
-suite runner 会顺序调用 9 个 loadtest runner，并在同一 run 目录下写 `capacity-baseline-suite-summary.json` / `.md` 和聚合后的 `capacity-baseline-summary.json` / `.md`。它只负责协调本地压测，不负责启动服务；服务进程、Docker 基础设施和 topic/migration 仍需按对应 runbook 先启动。
+suite runner 默认只执行自包含 runner，并在同一 run 目录下写 `capacity-baseline-suite-summary.json` / `.md` 和聚合后的 `capacity-baseline-summary.json` / `.md`。`delivery-service` 的直接 runner 读取既有 `PullInbox` 状态，默认会标记为 `skipped_seed_required`；如果已经先用 demo / push / receipt 等链路预置了对应 inbox 数据，再显式追加：
+
+```powershell
+.\tools\run-loadtest-capacity-baseline-suite.ps1 -IncludeSeededRunners
+```
+
+不要把 seeded-only runner 的默认跳过解释为服务不可用。suite runner 只负责协调本地压测，不负责启动服务或造数；服务进程、Docker 基础设施、topic/migration 和需要的测试数据仍需按对应 runbook 先准备。
 
 ## 1. 机器与网络
 

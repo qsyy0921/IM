@@ -64,6 +64,51 @@ try {
         Write-Host "FAIL capacity suite markdown missing expected boundary text." -ForegroundColor Red
         exit 1
     }
+
+    $seededRoot = Join-Path $tempRoot "seeded"
+    $seededOutput = & $powerShellExe -NoProfile -ExecutionPolicy Bypass -File $runner `
+        -ResultRoot $seededRoot `
+        -RunName "capacity-suite-seeded-selftest" `
+        -Services "delivery-service" `
+        -DryRun 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "FAIL capacity suite seeded dry-run should pass." -ForegroundColor Red
+        if ($seededOutput) {
+            Write-Host (($seededOutput | Out-String).Trim()) -ForegroundColor Red
+        }
+        exit 1
+    }
+
+    $seededSummaryPath = Join-Path $seededRoot "capacity-suite-seeded-selftest\capacity-baseline-suite-summary.json"
+    $seededSummary = Get-Content -LiteralPath $seededSummaryPath -Raw | ConvertFrom-Json
+    $deliveryStep = @($seededSummary.steps | Where-Object { $_.service -eq "delivery-service" })[0]
+    if ($deliveryStep.requires_seed -ne $true -or $deliveryStep.baseline_mode -ne "requires_seed" -or $deliveryStep.status -ne "skipped_seed_required") {
+        Write-Host "FAIL delivery-service capacity runner must be marked seeded-only by default." -ForegroundColor Red
+        exit 1
+    }
+
+    $includeSeededRoot = Join-Path $tempRoot "include-seeded"
+    $includeSeededOutput = & $powerShellExe -NoProfile -ExecutionPolicy Bypass -File $runner `
+        -ResultRoot $includeSeededRoot `
+        -RunName "capacity-suite-include-seeded-selftest" `
+        -Services "delivery-service" `
+        -IncludeSeededRunners `
+        -DryRun 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "FAIL capacity suite include-seeded dry-run should pass." -ForegroundColor Red
+        if ($includeSeededOutput) {
+            Write-Host (($includeSeededOutput | Out-String).Trim()) -ForegroundColor Red
+        }
+        exit 1
+    }
+
+    $includeSeededSummaryPath = Join-Path $includeSeededRoot "capacity-suite-include-seeded-selftest\capacity-baseline-suite-summary.json"
+    $includeSeededSummary = Get-Content -LiteralPath $includeSeededSummaryPath -Raw | ConvertFrom-Json
+    $includeSeededStep = @($includeSeededSummary.steps | Where-Object { $_.service -eq "delivery-service" })[0]
+    if ($includeSeededSummary.include_seeded_runners -ne $true -or $includeSeededStep.status -ne "dry_run") {
+        Write-Host "FAIL delivery-service capacity runner should be planned when seeded runners are enabled." -ForegroundColor Red
+        exit 1
+    }
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) {

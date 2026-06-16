@@ -558,6 +558,10 @@ func (repository *Repository) ListConversations(
 	if err != nil {
 		return types.ListConversationsResult{}, err
 	}
+	lastSourceEventTypeFilter, err := types.NormalizeLastSourceEventTypeFilter(command.LastSourceEventTypeFilter)
+	if err != nil {
+		return types.ListConversationsResult{}, err
+	}
 	limit := command.Limit
 	if limit <= 0 {
 		limit = 50
@@ -565,7 +569,7 @@ func (repository *Repository) ListConversations(
 	if limit > 100 {
 		limit = 100
 	}
-	cursor, hasCursor, err := decodeListCursor(command.PageCursor, sort, command.IncludeArchived, command.ArchivedOnly, command.UnreadOnly, command.PinnedOnly, command.MutedOnly, command.DraftOnly, tagFilter, tagFilters)
+	cursor, hasCursor, err := decodeListCursor(command.PageCursor, sort, command.IncludeArchived, command.ArchivedOnly, command.UnreadOnly, command.PinnedOnly, command.MutedOnly, command.DraftOnly, tagFilter, tagFilters, lastSourceEventTypeFilter)
 	if err != nil {
 		return types.ListConversationsResult{}, err
 	}
@@ -582,6 +586,7 @@ func (repository *Repository) ListConversations(
 		command.DraftOnly,
 		tagFilter,
 		tagFilters,
+		lastSourceEventTypeFilter,
 	}
 	query := `
 SELECT
@@ -609,48 +614,49 @@ WHERE tenant_id = $1
   AND (NOT $9 OR draft_text <> '')
   AND ($10 = '' OR $10 = ANY(tags))
   AND (cardinality($11::text[]) = 0 OR tags @> $11::text[])
+  AND ($12 = '' OR last_source_event_type = $12)
 `
 	if hasCursor {
 		switch sort {
 		case types.ConversationListSortPinnedUpdatedAtDesc:
 			query += `  AND (
-      pinned < $12
-      OR (pinned = $12 AND sort_updated_at < $13)
-      OR (pinned = $12 AND sort_updated_at = $13 AND conversation_id > $14)
+      pinned < $13
+      OR (pinned = $13 AND sort_updated_at < $14)
+      OR (pinned = $13 AND sort_updated_at = $14 AND conversation_id > $15)
   )
 `
 			args = append(args, cursor.Pinned, cursor.SortUpdatedAt, cursor.ConversationID)
 		case types.ConversationListSortUnreadUpdatedAtDesc:
 			query += `  AND (
-      (unread_count > 0) < $12
-      OR ((unread_count > 0) = $12 AND sort_updated_at < $13)
-      OR ((unread_count > 0) = $12 AND sort_updated_at = $13 AND conversation_id > $14)
+      (unread_count > 0) < $13
+      OR ((unread_count > 0) = $13 AND sort_updated_at < $14)
+      OR ((unread_count > 0) = $13 AND sort_updated_at = $14 AND conversation_id > $15)
   )
 `
 			args = append(args, cursor.Unread, cursor.SortUpdatedAt, cursor.ConversationID)
 		case types.ConversationListSortDraftUpdatedAtDesc:
 			if cursor.Draft {
 				query += `  AND (
-      (draft_text <> '') < $12
-      OR ((draft_text <> '') = $12 AND draft_updated_at < $13)
-      OR ((draft_text <> '') = $12 AND draft_updated_at = $13 AND sort_updated_at < $14)
-      OR ((draft_text <> '') = $12 AND draft_updated_at = $13 AND sort_updated_at = $14 AND conversation_id > $15)
+      (draft_text <> '') < $13
+      OR ((draft_text <> '') = $13 AND draft_updated_at < $14)
+      OR ((draft_text <> '') = $13 AND draft_updated_at = $14 AND sort_updated_at < $15)
+      OR ((draft_text <> '') = $13 AND draft_updated_at = $14 AND sort_updated_at = $15 AND conversation_id > $16)
   )
 `
 				args = append(args, cursor.Draft, cursor.DraftUpdatedAt, cursor.SortUpdatedAt, cursor.ConversationID)
 			} else {
 				query += `  AND (
-      (draft_text <> '') < $12
-      OR ((draft_text <> '') = $12 AND sort_updated_at < $13)
-      OR ((draft_text <> '') = $12 AND sort_updated_at = $13 AND conversation_id > $14)
+      (draft_text <> '') < $13
+      OR ((draft_text <> '') = $13 AND sort_updated_at < $14)
+      OR ((draft_text <> '') = $13 AND sort_updated_at = $14 AND conversation_id > $15)
   )
 `
 				args = append(args, cursor.Draft, cursor.SortUpdatedAt, cursor.ConversationID)
 			}
 		default:
 			query += `  AND (
-      sort_updated_at < $12
-      OR (sort_updated_at = $12 AND conversation_id > $13)
+      sort_updated_at < $13
+      OR (sort_updated_at = $13 AND conversation_id > $14)
   )
 `
 			args = append(args, cursor.SortUpdatedAt, cursor.ConversationID)
@@ -697,22 +703,23 @@ LIMIT $3
 	if len(items) > limit {
 		last := items[limit-1]
 		nextCursor = encodeListCursor(listCursor{
-			Version:         listCursorVersion,
-			Sort:            sort,
-			IncludeArchived: command.IncludeArchived,
-			ArchivedOnly:    command.ArchivedOnly,
-			UnreadOnly:      command.UnreadOnly,
-			PinnedOnly:      command.PinnedOnly,
-			MutedOnly:       command.MutedOnly,
-			DraftOnly:       command.DraftOnly,
-			TagFilter:       tagFilter,
-			TagFilters:      tagFilters,
-			Pinned:          last.Pinned,
-			Unread:          last.UnreadCount > 0,
-			Draft:           last.DraftText != "",
-			DraftUpdatedAt:  last.DraftUpdatedAt,
-			SortUpdatedAt:   last.UpdatedAt,
-			ConversationID:  string(last.ConversationID),
+			Version:                   listCursorVersion,
+			Sort:                      sort,
+			IncludeArchived:           command.IncludeArchived,
+			ArchivedOnly:              command.ArchivedOnly,
+			UnreadOnly:                command.UnreadOnly,
+			PinnedOnly:                command.PinnedOnly,
+			MutedOnly:                 command.MutedOnly,
+			DraftOnly:                 command.DraftOnly,
+			TagFilter:                 tagFilter,
+			TagFilters:                tagFilters,
+			LastSourceEventTypeFilter: lastSourceEventTypeFilter,
+			Pinned:                    last.Pinned,
+			Unread:                    last.UnreadCount > 0,
+			Draft:                     last.DraftText != "",
+			DraftUpdatedAt:            last.DraftUpdatedAt,
+			SortUpdatedAt:             last.UpdatedAt,
+			ConversationID:            string(last.ConversationID),
 		})
 		items = items[:limit]
 	}
@@ -1004,25 +1011,26 @@ func validateAccessContext(tenantID types.TenantID, conversationID types.Convers
 }
 
 type listCursor struct {
-	Version         int       `json:"v"`
-	Sort            string    `json:"sort"`
-	IncludeArchived bool      `json:"include_archived"`
-	ArchivedOnly    bool      `json:"archived_only"`
-	UnreadOnly      bool      `json:"unread_only"`
-	PinnedOnly      bool      `json:"pinned_only"`
-	MutedOnly       bool      `json:"muted_only"`
-	DraftOnly       bool      `json:"draft_only"`
-	TagFilter       string    `json:"tag_filter"`
-	TagFilters      []string  `json:"tag_filters,omitempty"`
-	Pinned          bool      `json:"pinned"`
-	Unread          bool      `json:"unread"`
-	Draft           bool      `json:"draft"`
-	DraftUpdatedAt  time.Time `json:"draft_updated_at"`
-	SortUpdatedAt   time.Time `json:"sort_updated_at"`
-	ConversationID  string    `json:"conversation_id"`
+	Version                   int       `json:"v"`
+	Sort                      string    `json:"sort"`
+	IncludeArchived           bool      `json:"include_archived"`
+	ArchivedOnly              bool      `json:"archived_only"`
+	UnreadOnly                bool      `json:"unread_only"`
+	PinnedOnly                bool      `json:"pinned_only"`
+	MutedOnly                 bool      `json:"muted_only"`
+	DraftOnly                 bool      `json:"draft_only"`
+	TagFilter                 string    `json:"tag_filter"`
+	TagFilters                []string  `json:"tag_filters,omitempty"`
+	LastSourceEventTypeFilter string    `json:"last_source_event_type_filter,omitempty"`
+	Pinned                    bool      `json:"pinned"`
+	Unread                    bool      `json:"unread"`
+	Draft                     bool      `json:"draft"`
+	DraftUpdatedAt            time.Time `json:"draft_updated_at"`
+	SortUpdatedAt             time.Time `json:"sort_updated_at"`
+	ConversationID            string    `json:"conversation_id"`
 }
 
-const listCursorVersion = 8
+const listCursorVersion = 9
 
 func decodeListCursor(
 	value string,
@@ -1035,6 +1043,7 @@ func decodeListCursor(
 	draftOnly bool,
 	tagFilter string,
 	tagFilters []string,
+	lastSourceEventTypeFilter string,
 ) (listCursor, bool, error) {
 	if value == "" {
 		return listCursor{}, false, nil
@@ -1062,7 +1071,8 @@ func decodeListCursor(
 		cursor.MutedOnly != mutedOnly ||
 		cursor.DraftOnly != draftOnly ||
 		cursor.TagFilter != tagFilter ||
-		!sameStringSlice(cursor.TagFilters, tagFilters) {
+		!sameStringSlice(cursor.TagFilters, tagFilters) ||
+		cursor.LastSourceEventTypeFilter != lastSourceEventTypeFilter {
 		return listCursor{}, false, types.NewInvalidArgument("invalid page_cursor")
 	}
 	if sort == types.ConversationListSortDraftUpdatedAtDesc && cursor.Draft && cursor.DraftUpdatedAt.IsZero() {

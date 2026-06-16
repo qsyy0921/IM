@@ -223,18 +223,19 @@ func (server *Server) ListConversations(
 		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
 	}
 	result, err := server.listConversations.Execute(ctx, types.ListConversationsCommand{
-		AuthContext:     auth,
-		Limit:           int(request.GetLimit()),
-		PageCursor:      request.GetPageCursor(),
-		Sort:            conversationListSortFromProto(request.GetSort()),
-		IncludeArchived: request.GetIncludeArchived(),
-		ArchivedOnly:    request.GetArchivedOnly(),
-		UnreadOnly:      request.GetUnreadOnly(),
-		PinnedOnly:      request.GetPinnedOnly(),
-		MutedOnly:       request.GetMutedOnly(),
-		TagFilter:       request.GetTagFilter(),
-		TagFilters:      request.GetTagFilters(),
-		DraftOnly:       request.GetDraftOnly(),
+		AuthContext:               auth,
+		Limit:                     int(request.GetLimit()),
+		PageCursor:                request.GetPageCursor(),
+		Sort:                      conversationListSortFromProto(request.GetSort()),
+		IncludeArchived:           request.GetIncludeArchived(),
+		ArchivedOnly:              request.GetArchivedOnly(),
+		UnreadOnly:                request.GetUnreadOnly(),
+		PinnedOnly:                request.GetPinnedOnly(),
+		MutedOnly:                 request.GetMutedOnly(),
+		TagFilter:                 request.GetTagFilter(),
+		TagFilters:                request.GetTagFilters(),
+		DraftOnly:                 request.GetDraftOnly(),
+		LastSourceEventTypeFilter: request.GetLastSourceEventTypeFilter(),
 	})
 	if err != nil {
 		return nil, grpcError(err)

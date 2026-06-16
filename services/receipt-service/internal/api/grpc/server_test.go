@@ -229,17 +229,18 @@ func TestListConversationsMapsSort(t *testing.T) {
 			list := &fakeListConversationsCapture{}
 			server := NewServer(fakeMarkRead{}, fakeGetReceiptState{}, fakeListReceiptStates{}, list, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{}, fakeSetConversationTags{}, fakeSetConversationDraft{})
 			_, err := server.ListConversations(context.Background(), &receiptv1.ListConversationsRequest{
-				AuthContext:  &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
-				Limit:        20,
-				PageCursor:   "cursor-1",
-				Sort:         test.sort,
-				ArchivedOnly: true,
-				UnreadOnly:   true,
-				PinnedOnly:   true,
-				MutedOnly:    true,
-				TagFilter:    "work",
-				TagFilters:   []string{"urgent", "vip"},
-				DraftOnly:    true,
+				AuthContext:               &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
+				Limit:                     20,
+				PageCursor:                "cursor-1",
+				Sort:                      test.sort,
+				ArchivedOnly:              true,
+				UnreadOnly:                true,
+				PinnedOnly:                true,
+				MutedOnly:                 true,
+				TagFilter:                 "work",
+				TagFilters:                []string{"urgent", "vip"},
+				DraftOnly:                 true,
+				LastSourceEventTypeFilter: types.SourceEventMessageDeleted,
 			})
 			if err != nil {
 				t.Fatalf("expected nil error, got %v", err)
@@ -253,7 +254,8 @@ func TestListConversationsMapsSort(t *testing.T) {
 				!list.command.MutedOnly ||
 				list.command.TagFilter != "work" ||
 				!stringSlicesEqual(list.command.TagFilters, []string{"urgent", "vip"}) ||
-				!list.command.DraftOnly {
+				!list.command.DraftOnly ||
+				list.command.LastSourceEventTypeFilter != types.SourceEventMessageDeleted {
 				t.Fatalf("unexpected list command: %+v", list.command)
 			}
 		})

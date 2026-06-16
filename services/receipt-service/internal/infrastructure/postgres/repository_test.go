@@ -652,6 +652,48 @@ func TestRepositoryListConversationsFiltersMultipleTagsIntegration(t *testing.T)
 	assertConversationIDs(t, filtered, "conv-a")
 }
 
+func TestRepositoryListConversationsFiltersLastSourceEventTypeIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	sortTime := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	insertConversationSummary(t, ctx, pool, "conv-a", 11, sortTime)
+	insertConversationSummary(t, ctx, pool, "conv-b", 12, sortTime.Add(-time.Minute))
+	insertConversationSummary(t, ctx, pool, "conv-c", 13, sortTime.Add(-2*time.Minute))
+	setConversationSummaryLastSourceEventType(t, ctx, pool, "conv-a", types.SourceEventMessageDeleted)
+	setConversationSummaryLastSourceEventType(t, ctx, pool, "conv-c", types.SourceEventMessageDeleted)
+
+	first, err := repository.ListConversations(ctx, listConversationsCommandWithLastSourceEventType(1, "", types.SourceEventMessageDeleted))
+	if err != nil {
+		t.Fatalf("list first source event page: %v", err)
+	}
+	assertConversationIDs(t, first, "conv-a")
+	if first.NextPageCursor == "" {
+		t.Fatal("expected source event next cursor")
+	}
+	second, err := repository.ListConversations(ctx, listConversationsCommandWithLastSourceEventType(1, first.NextPageCursor, types.SourceEventMessageDeleted))
+	if err != nil {
+		t.Fatalf("list second source event page: %v", err)
+	}
+	assertConversationIDs(t, second, "conv-c")
+	if second.NextPageCursor != "" {
+		t.Fatalf("expected empty source event cursor on last page, got %q", second.NextPageCursor)
+	}
+
+	_, err = repository.ListConversations(ctx, listConversationsCommandWithLastSourceEventType(1, first.NextPageCursor, types.SourceEventMessagePersisted))
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid cursor when last source event filter changes, got %v", err)
+	}
+
+	persisted, err := repository.ListConversations(ctx, listConversationsCommandWithLastSourceEventType(10, "", types.SourceEventMessagePersisted))
+	if err != nil {
+		t.Fatalf("list persisted source event conversations: %v", err)
+	}
+	assertConversationIDs(t, persisted, "conv-b")
+}
+
 func TestRepositorySetConversationDraftIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -1223,10 +1265,36 @@ func listConversationsCommandWithTags(limit int, cursor string, tags ...string) 
 	return command
 }
 
+func listConversationsCommandWithLastSourceEventType(limit int, cursor string, eventType string) types.ListConversationsCommand {
+	command := listConversationsCommand(limit, cursor)
+	command.LastSourceEventTypeFilter = eventType
+	return command
+}
+
 func listConversationsCommandDraftOnly(limit int, cursor string) types.ListConversationsCommand {
 	command := listConversationsCommand(limit, cursor)
 	command.DraftOnly = true
 	return command
+}
+
+func setConversationSummaryLastSourceEventType(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	conversationID string,
+	eventType string,
+) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+UPDATE user_conversation_summaries
+SET last_source_event_type = $4
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND conversation_id = $3
+`, "tenant-receipt", "receiver-1", conversationID, eventType)
+	if err != nil {
+		t.Fatalf("set last source event type for %s: %v", conversationID, err)
+	}
 }
 
 func setConversationUnread(

@@ -274,6 +274,7 @@ muted_only
 tag_filter
 tag_filters[]
 draft_only
+last_source_event_type_filter
 ```
 
 规则：
@@ -284,7 +285,8 @@ draft_only
 - `include_archived` 表示归档和非归档会话都返回；`archived_only` 表示只返回归档会话，若两者同时为 true，`archived_only` 优先。
 - `tag_filter` 是 legacy 单标签精确匹配过滤；`tag_filters[]` 是多标签 all-match 过滤，要求会话同时包含所有过滤标签。两者同时出现时取交集。标签由 `SetConversationTags` 写入，最多 10 个，每个最多 32 个 ASCII 字符，只允许字母、数字、`_`、`-`、`.`；`tag_filters[]` 会规范化、去重并排序后进入分页 cursor。
 - `draft_only` 只返回当前用户存在本地草稿的会话；草稿是用户级列表状态，不改变消息事实或 conversation seq。
-- `page_cursor` 绑定 `sort / include_archived / archived_only / unread_only / pinned_only / muted_only / tag_filter / tag_filters / draft_only` 和排序边界；`UNREAD_UPDATED_AT_DESC` cursor 必须包含 unread boundary，不能和旧排序 cursor 混用。
+- `last_source_event_type_filter` 只按 receipt-service 自有 summary 的 `last_source_event_type` 精确过滤，当前允许 `message.persisted.v1 / message.edited.v1 / message.revoked.v1 / message.deleted.v1`；它用于产品化摘要筛选和排障，不回读 message-service 内部表。
+- `page_cursor` 绑定 `sort / include_archived / archived_only / unread_only / pinned_only / muted_only / tag_filter / tag_filters / draft_only / last_source_event_type_filter` 和排序边界；`UNREAD_UPDATED_AT_DESC` cursor 必须包含 unread boundary，不能和旧排序 cursor 混用。
 - 会话列表只读取 receipt-service 自有 `user_conversation_summaries` 投影，不跨服务读 delivery / message / conversation 内部表。
 - `ConversationSummary.draft_text / draft_updated_at_unix_ms` 是当前用户本地草稿状态；空 `draft_text` 表示无草稿，`draft_updated_at_unix_ms=0` 表示无草稿更新时间。
 

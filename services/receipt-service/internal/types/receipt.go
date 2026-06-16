@@ -197,18 +197,19 @@ type ReceiptAccessContext struct {
 }
 
 type ListConversationsCommand struct {
-	AuthContext     AuthContext
-	Limit           int
-	PageCursor      string
-	Sort            string
-	IncludeArchived bool
-	ArchivedOnly    bool
-	UnreadOnly      bool
-	PinnedOnly      bool
-	MutedOnly       bool
-	TagFilter       string
-	TagFilters      []string
-	DraftOnly       bool
+	AuthContext               AuthContext
+	Limit                     int
+	PageCursor                string
+	Sort                      string
+	IncludeArchived           bool
+	ArchivedOnly              bool
+	UnreadOnly                bool
+	PinnedOnly                bool
+	MutedOnly                 bool
+	TagFilter                 string
+	TagFilters                []string
+	DraftOnly                 bool
+	LastSourceEventTypeFilter string
 }
 
 func (command ListConversationsCommand) Validate() error {
@@ -229,7 +230,24 @@ func (command ListConversationsCommand) Validate() error {
 	if _, err := NormalizeConversationTagFilters(command.TagFilters); err != nil {
 		return err
 	}
+	if _, err := NormalizeLastSourceEventTypeFilter(command.LastSourceEventTypeFilter); err != nil {
+		return err
+	}
 	return nil
+}
+
+func NormalizeLastSourceEventTypeFilter(eventType string) (string, error) {
+	switch eventType {
+	case "":
+		return "", nil
+	case SourceEventMessagePersisted,
+		SourceEventMessageEdited,
+		SourceEventMessageRevoked,
+		SourceEventMessageDeleted:
+		return eventType, nil
+	default:
+		return "", NewInvalidArgument("unsupported last_source_event_type_filter")
+	}
 }
 
 const (

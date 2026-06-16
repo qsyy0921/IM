@@ -119,6 +119,7 @@ message ListConversationsRequest {
   bool draft_only = 10;
   bool archived_only = 11;
   repeated string tag_filters = 12;
+  string last_source_event_type_filter = 13;
 }
 
 message ProjectionWatermark {

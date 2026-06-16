@@ -849,21 +849,22 @@ func (x *ListReceiptStatesResponse) GetItems() []*GetReceiptStateResponse {
 }
 
 type ListConversationsRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	AuthContext     *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
-	Limit           int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
-	PageCursor      string                 `protobuf:"bytes,3,opt,name=page_cursor,json=pageCursor,proto3" json:"page_cursor,omitempty"`
-	Sort            ConversationListSort   `protobuf:"varint,4,opt,name=sort,proto3,enum=nexusim.receipt.v1.ConversationListSort" json:"sort,omitempty"`
-	IncludeArchived bool                   `protobuf:"varint,5,opt,name=include_archived,json=includeArchived,proto3" json:"include_archived,omitempty"`
-	UnreadOnly      bool                   `protobuf:"varint,6,opt,name=unread_only,json=unreadOnly,proto3" json:"unread_only,omitempty"`
-	PinnedOnly      bool                   `protobuf:"varint,7,opt,name=pinned_only,json=pinnedOnly,proto3" json:"pinned_only,omitempty"`
-	MutedOnly       bool                   `protobuf:"varint,8,opt,name=muted_only,json=mutedOnly,proto3" json:"muted_only,omitempty"`
-	TagFilter       string                 `protobuf:"bytes,9,opt,name=tag_filter,json=tagFilter,proto3" json:"tag_filter,omitempty"`
-	DraftOnly       bool                   `protobuf:"varint,10,opt,name=draft_only,json=draftOnly,proto3" json:"draft_only,omitempty"`
-	ArchivedOnly    bool                   `protobuf:"varint,11,opt,name=archived_only,json=archivedOnly,proto3" json:"archived_only,omitempty"`
-	TagFilters      []string               `protobuf:"bytes,12,rep,name=tag_filters,json=tagFilters,proto3" json:"tag_filters,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext               *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	Limit                     int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	PageCursor                string                 `protobuf:"bytes,3,opt,name=page_cursor,json=pageCursor,proto3" json:"page_cursor,omitempty"`
+	Sort                      ConversationListSort   `protobuf:"varint,4,opt,name=sort,proto3,enum=nexusim.receipt.v1.ConversationListSort" json:"sort,omitempty"`
+	IncludeArchived           bool                   `protobuf:"varint,5,opt,name=include_archived,json=includeArchived,proto3" json:"include_archived,omitempty"`
+	UnreadOnly                bool                   `protobuf:"varint,6,opt,name=unread_only,json=unreadOnly,proto3" json:"unread_only,omitempty"`
+	PinnedOnly                bool                   `protobuf:"varint,7,opt,name=pinned_only,json=pinnedOnly,proto3" json:"pinned_only,omitempty"`
+	MutedOnly                 bool                   `protobuf:"varint,8,opt,name=muted_only,json=mutedOnly,proto3" json:"muted_only,omitempty"`
+	TagFilter                 string                 `protobuf:"bytes,9,opt,name=tag_filter,json=tagFilter,proto3" json:"tag_filter,omitempty"`
+	DraftOnly                 bool                   `protobuf:"varint,10,opt,name=draft_only,json=draftOnly,proto3" json:"draft_only,omitempty"`
+	ArchivedOnly              bool                   `protobuf:"varint,11,opt,name=archived_only,json=archivedOnly,proto3" json:"archived_only,omitempty"`
+	TagFilters                []string               `protobuf:"bytes,12,rep,name=tag_filters,json=tagFilters,proto3" json:"tag_filters,omitempty"`
+	LastSourceEventTypeFilter string                 `protobuf:"bytes,13,opt,name=last_source_event_type_filter,json=lastSourceEventTypeFilter,proto3" json:"last_source_event_type_filter,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *ListConversationsRequest) Reset() {
@@ -978,6 +979,13 @@ func (x *ListConversationsRequest) GetTagFilters() []string {
 		return x.TagFilters
 	}
 	return nil
+}
+
+func (x *ListConversationsRequest) GetLastSourceEventTypeFilter() string {
+	if x != nil {
+		return x.LastSourceEventTypeFilter
+	}
+	return ""
 }
 
 type ProjectionWatermark struct {
@@ -1832,7 +1840,7 @@ const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
 	"\x18include_received_devices\x18\x04 \x01(\bR\x16includeReceivedDevices\x122\n" +
 	"\x15received_device_limit\x18\x05 \x01(\x05R\x13receivedDeviceLimit\"^\n" +
 	"\x19ListReceiptStatesResponse\x12A\n" +
-	"\x05items\x18\x01 \x03(\v2+.nexusim.receipt.v1.GetReceiptStateResponseR\x05items\"\xe3\x03\n" +
+	"\x05items\x18\x01 \x03(\v2+.nexusim.receipt.v1.GetReceiptStateResponseR\x05items\"\xa5\x04\n" +
 	"\x18ListConversationsRequest\x12B\n" +
 	"\fauth_context\x18\x01 \x01(\v2\x1f.nexusim.receipt.v1.AuthContextR\vauthContext\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x1f\n" +
@@ -1853,7 +1861,8 @@ const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
 	" \x01(\bR\tdraftOnly\x12#\n" +
 	"\rarchived_only\x18\v \x01(\bR\farchivedOnly\x12\x1f\n" +
 	"\vtag_filters\x18\f \x03(\tR\n" +
-	"tagFilters\"}\n" +
+	"tagFilters\x12@\n" +
+	"\x1dlast_source_event_type_filter\x18\r \x01(\tR\x19lastSourceEventTypeFilter\"}\n" +
 	"\x13ProjectionWatermark\x12\x16\n" +
 	"\x06source\x18\x01 \x01(\tR\x06source\x12!\n" +
 	"\foffset_value\x18\x02 \x01(\x03R\voffsetValue\x12+\n" +

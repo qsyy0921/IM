@@ -42,6 +42,7 @@ or clients unless `docs/runbook/current-brief.md` and
 Use these documents for different jobs:
 
 - `prompt.md`: Codex goal-box prompt and document routing.
+- `agent.md`: document-routing and progress-maintenance rules for Codex and sub-agents.
 - `docs/runbook/current-goal.md`: concrete execution goal for Codex.
 - `docs/runbook/current-brief.md`: current phase and where to look next.
 - `docs/runbook/remaining-goals.md`: only unfinished work.
@@ -56,7 +57,8 @@ When a slice removes or discovers unfinished work, update
 `remaining-goals.md`.
 
 Do not copy the same long status paragraph across multiple files. Prefer links
-and short summaries.
+and short summaries. Do not maintain every document on every turn; update only
+the documents whose facts changed in the current slice.
 
 ## Work Selection
 

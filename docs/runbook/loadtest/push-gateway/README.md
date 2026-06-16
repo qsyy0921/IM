@@ -143,7 +143,7 @@ Redis-backed resume 负向 smoke runner 已支持 `redis-resume-negative` 场景
   -RouteBackend redis
 ```
 
-该场景验证三个退化语义：未知客户端 `resume_token` 不会被接受为有效 token，而是由服务端签发新 token 并返回 `server.resume_hint(reason=buffer_miss)`；同一 resume token 被另一个 device 使用时返回非重试 `PERMISSION_DENIED`；Redis-backed resume buffer 存在 gap 时返回 `buffer_miss`，客户端必须用本地 cursor / durable `PullInbox` 校准并再 `AckDelivery`。当前 runner 入口已具备，真实运行结果仍需单独归档报告；不要把它提前表述为已完成 smoke。
+该场景验证三个退化语义：未知客户端 `resume_token` 不会被接受为有效 token，而是由服务端签发新 token 并返回 `server.resume_hint(reason=buffer_miss)`；同一 resume token 被另一个 device 使用时返回非重试 `PERMISSION_DENIED`；Redis-backed resume buffer 存在 gap 时返回 `buffer_miss`，客户端必须用本地 cursor / durable `PullInbox` 校准并再 `AckDelivery`。clean commit `6e500c1` 已完成一次真实进程 smoke，报告见 `loadtest-report-20260616-push-gateway-redis-resume-negative-smoke.md`。
 
 Redis Sentinel client 参数：
 
@@ -181,6 +181,7 @@ Sentinel 模式当前已证明五件事：客户端 master discovery 正常路�
 | `loadtest-report-20260609-push-gateway-redis-sentinel-master-stop-smoke.md` | 停止 Sentinel 当前 master 容器，等待 Sentinel 自主选主后继续 route / resume / PullInbox / AckDelivery；不代表 quorum / 网络分区 / Redis Cluster 验收 |
 | `loadtest-report-20260614-push-gateway-redis-sentinel-quorum-loss-smoke.md` | 停止两个 Sentinel peer 并停止当前 master，观察 `delivery.notify` 超时后仍可通过 `PullInbox / AckDelivery` 恢复；不代表完整网络分区 / Redis Cluster / 生产级 Redis HA |
 | `loadtest-report-20260615-push-gateway-redis-sentinel-network-partition-smoke.md` | 断开 Sentinel 当前 master 的 Docker network，观察 `delivery.notify` 超时后仍可通过 `PullInbox / AckDelivery` 恢复；不代表 Redis Cluster / 跨 AZ 网络分区 / 生产级 Redis HA |
+| `loadtest-report-20260616-push-gateway-redis-resume-negative-smoke.md` | Redis-backed resume 负向路径：未知 token 返回新 token + `buffer_miss`，跨 device token 返回非重试 `PERMISSION_DENIED`，buffer gap 返回 `buffer_miss` 并通过 `PullInbox / AckDelivery` 恢复 |
 | `loadtest-report-20260614-push-gateway-postgres-failover-smoke.md` | 本地三节点 `postgresql-repmgr` + `pgpool` 稳定写入口下，停止当前 primary 后再次跑通 `delivery.notify -> PullInbox -> AckDelivery`；不代表生产级 PostgreSQL HA |
 | `loadtest-report-20260615-push-gateway-postgres-quorum-observation-smoke.md` | 停止两个 standby 后观察到当前 `repmgr + pgpool` 本地拓扑仍接受 only-primary 写入；这是生产级 quorum / split-brain fencing 差距证据，不是 HA 通过结论 |
 | `loadtest-report-20260614-push-gateway-kafka-failover-smoke.md` | 本地三 broker Kafka KRaft + `RF=3` topic 下，停止 `im.delivery.events` 当前 leader broker 后再次跑通 `delivery.notify -> PullInbox -> AckDelivery`；不代表生产级 Kafka HA |

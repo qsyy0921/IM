@@ -13,6 +13,7 @@
 - 本文件只维护 Codex 目标框短 Prompt 和每轮文档路由。
 - 具体执行目标维护在 `docs/runbook/current-goal.md`；目标框不要复制长目标。
 - Agent 进度管理规则见 `agent.md`；需要管理项目进度、分配子 agent 或选择下一切片时先读它。
+- `prompt.md` 只负责把 Codex 带到正确入口；`agent.md` 决定本轮需要按需读取和维护哪些项目文档。
 - 具体当前阶段不在这里维护，见 `docs/runbook/current-brief.md`。
 - 当前未完成工作不在这里维护，见 `docs/runbook/remaining-goals.md`。
 - 单服务状态不在这里维护，见 `docs/runbook/service-briefs/<service>.md`。
@@ -26,7 +27,7 @@
 5. 若需要定位文档，先读 `docs/runbook/README.md`。
 6. 若需要服务状态，先读 `docs/runbook/service-briefs/README.md`，再读对应服务短文档。
 7. 若需要选择或更新剩余工作，读 `docs/runbook/remaining-goals.md`。
-8. 不为了“了解项目”全文读取长历史文档。
+8. 只维护本轮事实变化涉及的文档；不为了“了解项目”全文读取或批量改写长历史文档。
 
 ## 工作原则
 

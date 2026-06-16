@@ -8,6 +8,16 @@ param(
     [string]$SenderUserId = "demo-sender",
     [string]$ReceiverUserId = "demo-receiver",
     [string]$ReceiverDeviceId = "demo-device-1",
+    [int]$ConversationPort = 11896,
+    [int]$MessagePort = 11895,
+    [int]$PolicyPort = 11900,
+    [int]$DeliveryPort = 11897,
+    [int]$PushPort = 11898,
+    [int]$ReceiptPort = 11899,
+    [int]$ApiGatewayPort = 11903,
+    [int]$PolicyDebugPort = 11901,
+    [int]$PushDebugPort = 11902,
+    [int]$ApiGatewayDebugPort = 11904,
     [switch]$SkipBuild
 )
 
@@ -42,13 +52,16 @@ $receiptConsumerGroup = "nexusim-receipt-demo-secure-" + (Get-Date -Format "yyyy
 $pushConsumerGroup = "nexusim-push-demo-secure-" + (Get-Date -Format "yyyyMMddHHmmss")
 $pushIdentityConsumerGroup = "nexusim-push-identity-demo-secure-" + (Get-Date -Format "yyyyMMddHHmmss")
 
-$conversationTarget = "127.0.0.1:11896"
-$messageTarget = "127.0.0.1:11895"
-$policyTarget = "127.0.0.1:11900"
-$deliveryTarget = "127.0.0.1:11897"
-$pushTarget = "127.0.0.1:11898"
-$receiptTarget = "127.0.0.1:11899"
-$apiGatewayTarget = "127.0.0.1:11903"
+$conversationTarget = "127.0.0.1:$ConversationPort"
+$messageTarget = "127.0.0.1:$MessagePort"
+$policyTarget = "127.0.0.1:$PolicyPort"
+$deliveryTarget = "127.0.0.1:$DeliveryPort"
+$pushTarget = "127.0.0.1:$PushPort"
+$receiptTarget = "127.0.0.1:$ReceiptPort"
+$apiGatewayTarget = "127.0.0.1:$ApiGatewayPort"
+$policyDebugTarget = "127.0.0.1:$PolicyDebugPort"
+$pushDebugTarget = "127.0.0.1:$PushDebugPort"
+$apiGatewayDebugTarget = "127.0.0.1:$ApiGatewayDebugPort"
 $pushURL = "wss://$pushTarget"
 $gatewayAuthSecret = "nexusim-secure-demo-gateway-secret"
 
@@ -397,7 +410,18 @@ $desktopClient = New-SmokeCert -Directory $certDir -Name "desktop-client" -Commo
 
 $processes = @()
 try {
-    foreach ($port in @(11895, 11896, 11897, 11898, 11899, 11900, 11901, 11902, 11903, 11904)) {
+    foreach ($port in @(
+        $MessagePort,
+        $ConversationPort,
+        $DeliveryPort,
+        $PushPort,
+        $ReceiptPort,
+        $PolicyPort,
+        $PolicyDebugPort,
+        $PushDebugPort,
+        $ApiGatewayPort,
+        $ApiGatewayDebugPort
+    )) {
         Assert-TcpPortAvailable -HostName "127.0.0.1" -Port $port
     }
 
@@ -439,7 +463,7 @@ try {
     $apiGateway = Join-Path $repo "bin\api-gateway.exe"
     $runner = Join-Path $repo "bin\nexusim-e2e-demo.exe"
 
-    $processes += Start-NexusProcess -Name "conversation-grpc" -FilePath $conversationService -Port 11896 -Env @{
+    $processes += Start-NexusProcess -Name "conversation-grpc" -FilePath $conversationService -Port $ConversationPort -Env @{
         NEXUSIM_CONVERSATION_SERVICE_MODE = "grpc"
         NEXUSIM_CONVERSATION_GRPC_ADDR = $conversationTarget
         NEXUSIM_CONVERSATION_AUTH_MODE = "metadata"
@@ -462,7 +486,7 @@ try {
         NEXUSIM_OUTBOX_POLL_INTERVAL = "200ms"
     }
 
-    $processes += Start-NexusProcess -Name "policy-grpc" -FilePath $policyService -Port 11900 -Env @{
+    $processes += Start-NexusProcess -Name "policy-grpc" -FilePath $policyService -Port $PolicyPort -Env @{
         NEXUSIM_POLICY_SERVICE_MODE = "grpc"
         NEXUSIM_POLICY_GRPC_ADDR = $policyTarget
         NEXUSIM_POLICY_MESSAGE_ALLOWED = "true"
@@ -470,7 +494,7 @@ try {
         NEXUSIM_POLICY_CLASSIFICATION = "POLICY_DEMO_ALLOWED"
         NEXUSIM_POLICY_RULES_ENABLED = "true"
         NEXUSIM_PG_DSN = $PgDsn
-        NEXUSIM_POLICY_DEBUG_ADDR = "127.0.0.1:11901"
+        NEXUSIM_POLICY_DEBUG_ADDR = $policyDebugTarget
         NEXUSIM_POLICY_GRPC_TLS_CERT_FILE = $policyServer.Cert
         NEXUSIM_POLICY_GRPC_TLS_KEY_FILE = $policyServer.Key
         NEXUSIM_POLICY_GRPC_TLS_CLIENT_CA_FILE = $ca.Cert
@@ -495,7 +519,7 @@ try {
         NEXUSIM_DELIVERY_CONSUMER_GROUP = $deliveryConsumerGroup
     }
 
-    $processes += Start-NexusProcess -Name "delivery-grpc" -FilePath $deliveryService -Port 11897 -Env @{
+    $processes += Start-NexusProcess -Name "delivery-grpc" -FilePath $deliveryService -Port $DeliveryPort -Env @{
         NEXUSIM_DELIVERY_SERVICE_MODE = "grpc"
         NEXUSIM_DELIVERY_GRPC_ADDR = $deliveryTarget
         NEXUSIM_DELIVERY_AUTH_MODE = "metadata"
@@ -532,7 +556,7 @@ try {
         NEXUSIM_RECEIPT_OUTBOX_POLL_INTERVAL = "200ms"
     }
 
-    $processes += Start-NexusProcess -Name "receipt-grpc" -FilePath $receiptService -Port 11899 -Env @{
+    $processes += Start-NexusProcess -Name "receipt-grpc" -FilePath $receiptService -Port $ReceiptPort -Env @{
         NEXUSIM_RECEIPT_SERVICE_MODE = "grpc"
         NEXUSIM_RECEIPT_GRPC_ADDR = $receiptTarget
         NEXUSIM_RECEIPT_AUTH_MODE = "metadata"
@@ -545,7 +569,7 @@ try {
         NEXUSIM_RECEIPT_GRPC_TLS_CLIENT_ALLOWED_URIS = "spiffe://nexusim/api-gateway"
     }
 
-    $processes += Start-NexusProcess -Name "push-gateway" -FilePath $pushGateway -Port 11898 -Env @{
+    $processes += Start-NexusProcess -Name "push-gateway" -FilePath $pushGateway -Port $PushPort -Env @{
         NEXUSIM_PUSH_GATEWAY_MODE = "all"
         NEXUSIM_PUSH_WS_ADDR = $pushTarget
         NEXUSIM_DELIVERY_GRPC_ADDR = $deliveryTarget
@@ -561,14 +585,14 @@ try {
         NEXUSIM_PUSH_WS_TLS_REQUIRE_CLIENT_CERT = "true"
         NEXUSIM_PUSH_WS_TLS_CLIENT_ALLOWED_DNS_NAMES = "desktop-client.nexusim.local"
         NEXUSIM_PUSH_WS_TLS_CLIENT_ALLOWED_URIS = "spiffe://nexusim/desktop-client"
-        NEXUSIM_PUSH_DEBUG_ADDR = "127.0.0.1:11902"
+        NEXUSIM_PUSH_DEBUG_ADDR = $pushDebugTarget
         NEXUSIM_DELIVERY_SERVICE_TLS_CA_FILE = $ca.Cert
         NEXUSIM_DELIVERY_SERVICE_TLS_SERVER_NAME = "delivery-service.nexusim.local"
         NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_CERT_FILE = $pushClient.Cert
         NEXUSIM_DELIVERY_SERVICE_TLS_CLIENT_KEY_FILE = $pushClient.Key
     }
 
-    $processes += Start-NexusProcess -Name "message-grpc" -FilePath $messageService -Port 11895 -Env @{
+    $processes += Start-NexusProcess -Name "message-grpc" -FilePath $messageService -Port $MessagePort -Env @{
         NEXUSIM_MESSAGE_SERVICE_MODE = "grpc"
         NEXUSIM_GRPC_ADDR = $messageTarget
         NEXUSIM_MESSAGE_AUTH_MODE = "metadata"
@@ -593,7 +617,7 @@ try {
         NEXUSIM_MESSAGE_GRPC_TLS_CLIENT_ALLOWED_URIS = "spiffe://nexusim/api-gateway"
     }
 
-    $processes += Start-NexusProcess -Name "api-gateway-grpc" -FilePath $apiGateway -Port 11903 -Env @{
+    $processes += Start-NexusProcess -Name "api-gateway-grpc" -FilePath $apiGateway -Port $ApiGatewayPort -Env @{
         NEXUSIM_API_GATEWAY_MODE = "grpc"
         NEXUSIM_API_GATEWAY_GRPC_ADDR = $apiGatewayTarget
         NEXUSIM_API_GATEWAY_AUTH_MODE = "hmac"
@@ -626,7 +650,7 @@ try {
         NEXUSIM_API_GATEWAY_GRPC_TLS_REQUIRE_CLIENT_CERT = "true"
         NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES = "desktop-client.nexusim.local"
         NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_ALLOWED_URIS = "spiffe://nexusim/desktop-client"
-        NEXUSIM_API_GATEWAY_DEBUG_ADDR = "127.0.0.1:11904"
+        NEXUSIM_API_GATEWAY_DEBUG_ADDR = $apiGatewayDebugTarget
     }
 
     $runnerArgs = @(
@@ -682,7 +706,7 @@ try {
     Wait-TenantOutboxSettled -TableName "delivery_outbox" -TenantID $TenantId
     Wait-TenantOutboxSettled -TableName "receipt_outbox" -TenantID $TenantId
     $apiGatewayMetricsPath = Join-Path $resultDir "api-gateway-debug-metrics.json"
-    Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:11904/debug/metrics" -OutFile $apiGatewayMetricsPath | Out-Null
+    Invoke-WebRequest -UseBasicParsing -Uri "http://$apiGatewayDebugTarget/debug/metrics" -OutFile $apiGatewayMetricsPath | Out-Null
 } finally {
     foreach ($proc in $processes) {
         if ($null -ne $proc -and -not $proc.HasExited) {

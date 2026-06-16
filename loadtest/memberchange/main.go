@@ -111,12 +111,37 @@ type summary struct {
 	OwnerTransferOwnerCount           *int64            `json:"owner_transfer_owner_count,omitempty"`
 	StartedAt                         time.Time         `json:"started_at"`
 	FinishedAt                        time.Time         `json:"finished_at"`
+	Capacity                          *capacitySummary  `json:"capacity_summary,omitempty"`
 	Stats                             map[string]string `json:"stats,omitempty"`
 }
 
 type errorCount struct {
 	Error string `json:"error"`
 	Count int64  `json:"count"`
+}
+
+type capacitySummary struct {
+	DurationSeconds        float64 `json:"duration_seconds"`
+	VUs                    int     `json:"vus"`
+	RequestCount           int64   `json:"request_count"`
+	SuccessCount           int64   `json:"success_count"`
+	ErrorCount             int64   `json:"error_count"`
+	SuccessRate            float64 `json:"success_rate"`
+	RequestsPerSecond      float64 `json:"requests_per_second"`
+	AvgMS                  float64 `json:"avg_ms"`
+	P95MS                  float64 `json:"p95_ms"`
+	P99MS                  float64 `json:"p99_ms"`
+	ChangeType             string  `json:"change_type"`
+	TargetRole             string  `json:"target_role,omitempty"`
+	SagaCount              int64   `json:"saga_count,omitempty"`
+	SagaDoneCount          int64   `json:"saga_done_count,omitempty"`
+	TimelineCount          int64   `json:"timeline_count,omitempty"`
+	OutboxTotalCount       int64   `json:"outbox_total_count,omitempty"`
+	OutboxPendingCount     int64   `json:"outbox_pending_count,omitempty"`
+	OutboxPublishedCount   int64   `json:"outbox_published_count,omitempty"`
+	OutboxDLQCount         int64   `json:"outbox_dlq_count,omitempty"`
+	MemberListCount        int64   `json:"member_list_count,omitempty"`
+	ConversationSeqCurrent int64   `json:"conversation_seq_current,omitempty"`
 }
 
 func main() {
@@ -420,6 +445,7 @@ func run(cfg config) error {
 	if err := fillMemberListSample(context.Background(), client, cfg, &result); err != nil {
 		result.MemberListError = err.Error()
 	}
+	result.Capacity = buildCapacitySummary(result)
 	encoded, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode summary: %w", err)
@@ -530,6 +556,47 @@ func topErrors(counts map[string]int64, limit int) []errorCount {
 		result = result[:limit]
 	}
 	return result
+}
+
+func buildCapacitySummary(s summary) *capacitySummary {
+	duration := s.FinishedAt.Sub(s.StartedAt).Seconds()
+	if duration <= 0 {
+		return nil
+	}
+	requestsPerSecond := s.RPS
+	if requestsPerSecond == 0 && s.RequestCount > 0 {
+		requestsPerSecond = float64(s.RequestCount) / duration
+	}
+	return &capacitySummary{
+		DurationSeconds:        duration,
+		VUs:                    s.VUs,
+		RequestCount:           s.RequestCount,
+		SuccessCount:           s.SuccessCount,
+		ErrorCount:             s.ErrorCount,
+		SuccessRate:            s.SuccessRate,
+		RequestsPerSecond:      requestsPerSecond,
+		AvgMS:                  s.AvgMS,
+		P95MS:                  s.P95MS,
+		P99MS:                  s.P99MS,
+		ChangeType:             s.ChangeType,
+		TargetRole:             s.TargetRole,
+		SagaCount:              int64Value(s.SagaCount),
+		SagaDoneCount:          int64Value(s.SagaDoneCount),
+		TimelineCount:          int64Value(s.TimelineCount),
+		OutboxTotalCount:       int64Value(s.OutboxTotalCount),
+		OutboxPendingCount:     int64Value(s.OutboxPendingCount),
+		OutboxPublishedCount:   int64Value(s.OutboxPublishedCount),
+		OutboxDLQCount:         int64Value(s.OutboxDLQCount),
+		MemberListCount:        int64Value(s.MemberListCount),
+		ConversationSeqCurrent: int64Value(s.ConversationSeqCurrent),
+	}
+}
+
+func int64Value(value *int64) int64 {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 func fillPostgresStats(ctx context.Context, cfg config, result *summary) error {

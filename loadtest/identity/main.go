@@ -10,11 +10,13 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"math"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -90,6 +92,7 @@ type summary struct {
 	ChallengeDeliveryOutboxRow deliveryOutboxRow    `json:"challenge_delivery_outbox_row"`
 	ChallengeRow               challengeRow         `json:"challenge_row"`
 	LatenciesMS                map[string]float64   `json:"latencies_ms"`
+	Capacity                   *capacitySummary     `json:"capacity_summary,omitempty"`
 }
 
 type identityChallengeClient interface {
@@ -212,6 +215,22 @@ type challengeRow struct {
 	DeliveryStatus       string `json:"delivery_status"`
 	DeliveryAttemptCount int    `json:"delivery_attempt_count"`
 	DeliveryLastError    string `json:"delivery_last_error,omitempty"`
+}
+
+type capacitySummary struct {
+	DurationSeconds                  float64 `json:"duration_seconds"`
+	OperationCount                   int     `json:"operation_count"`
+	TokenIssueCount                  int     `json:"token_issue_count"`
+	ExpectedErrorCount               int     `json:"expected_error_count"`
+	ChallengeDeliveryOutboxTotal     int64   `json:"challenge_delivery_outbox_total"`
+	ChallengeDeliveryOutboxPending   int64   `json:"challenge_delivery_outbox_pending"`
+	ChallengeDeliveryOutboxDelivered int64   `json:"challenge_delivery_outbox_delivered"`
+	ChallengeDeliveryOutboxDLQ       int64   `json:"challenge_delivery_outbox_dlq"`
+	ChallengeDeliveryAttemptCount    int     `json:"challenge_delivery_attempt_count"`
+	OperationsPerSecond              float64 `json:"operations_per_second"`
+	LatencyP95MS                     float64 `json:"latency_p95_ms,omitempty"`
+	LatencyP99MS                     float64 `json:"latency_p99_ms,omitempty"`
+	MFARecoveryCodeCount             int     `json:"mfa_recovery_code_count,omitempty"`
 }
 
 type challengeNotification struct {
@@ -1054,6 +1073,7 @@ func finish(cfg config, result *summary, runErr error) error {
 	if runErr != nil {
 		result.Error = runErr.Error()
 	}
+	result.Capacity = buildCapacitySummary(*result)
 	if err := os.MkdirAll(cfg.resultDir, 0o755); err != nil {
 		return fmt.Errorf("create result dir: %w", err)
 	}
@@ -1074,6 +1094,90 @@ func finish(cfg config, result *summary, runErr error) error {
 
 func elapsedMS(start time.Time) float64 {
 	return float64(time.Since(start).Microseconds()) / 1000.0
+}
+
+func buildCapacitySummary(s summary) *capacitySummary {
+	duration := s.FinishedAt.Sub(s.StartedAt).Seconds()
+	if duration <= 0 {
+		return nil
+	}
+	operationCount := len(s.LatenciesMS)
+	return &capacitySummary{
+		DurationSeconds:                  duration,
+		OperationCount:                   operationCount,
+		TokenIssueCount:                  tokenIssueCount(s),
+		ExpectedErrorCount:               expectedErrorCount(s),
+		ChallengeDeliveryOutboxTotal:     s.ChallengeDeliveryOutbox.Total,
+		ChallengeDeliveryOutboxPending:   s.ChallengeDeliveryOutbox.Pending,
+		ChallengeDeliveryOutboxDelivered: s.ChallengeDeliveryOutbox.Delivered,
+		ChallengeDeliveryOutboxDLQ:       s.ChallengeDeliveryOutbox.DLQ,
+		ChallengeDeliveryAttemptCount:    s.ChallengeRow.DeliveryAttemptCount,
+		OperationsPerSecond:              ratePerSecond(operationCount, duration),
+		LatencyP95MS:                     latencyQuantile(s.LatenciesMS, 0.95),
+		LatencyP99MS:                     latencyQuantile(s.LatenciesMS, 0.99),
+		MFARecoveryCodeCount:             recoveryCodeCount(s),
+	}
+}
+
+func tokenIssueCount(s summary) int {
+	count := 0
+	if s.Login.GatewayTokenSet {
+		count++
+	}
+	if s.Refresh.GatewayTokenSet {
+		count++
+	}
+	if s.PostResetLogin.GatewayTokenSet {
+		count++
+	}
+	if s.RefreshWithMFA.GatewayTokenSet {
+		count++
+	}
+	if s.MFALogin.GatewayTokenSet {
+		count++
+	}
+	return count
+}
+
+func expectedErrorCount(s summary) int {
+	count := 0
+	if s.RefreshWithoutMFA.Occurred {
+		count++
+	}
+	if s.LoginWithoutMFA.Occurred {
+		count++
+	}
+	return count
+}
+
+func recoveryCodeCount(s summary) int {
+	return s.ConfirmMFAEnrollment.RecoveryCodeCount + s.RegenerateMFARecoveryCodes.RecoveryCodeCount
+}
+
+func ratePerSecond(count int, durationSeconds float64) float64 {
+	if count <= 0 || durationSeconds <= 0 {
+		return 0
+	}
+	return float64(count) / durationSeconds
+}
+
+func latencyQuantile(values map[string]float64, quantile float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	sorted := make([]float64, 0, len(values))
+	for _, value := range values {
+		sorted = append(sorted, value)
+	}
+	sort.Float64s(sorted)
+	index := int(math.Ceil(quantile*float64(len(sorted)))) - 1
+	if index < 0 {
+		index = 0
+	}
+	if index >= len(sorted) {
+		index = len(sorted) - 1
+	}
+	return sorted[index]
 }
 
 func generateTOTPCode(secret string, now time.Time) string {

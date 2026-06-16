@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"math"
 	"testing"
+	"time"
 
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	"google.golang.org/grpc/metadata"
@@ -105,5 +107,75 @@ func assertMetadataValue(t *testing.T, md metadata.MD, key string, want string) 
 	values := md.Get(key)
 	if len(values) != 1 || values[0] != want {
 		t.Fatalf("metadata %s = %v, want [%s]", key, values, want)
+	}
+}
+
+func TestBuildCapacitySummary(t *testing.T) {
+	started := time.Date(2026, 6, 16, 10, 0, 0, 0, time.UTC)
+	sagaCount := int64(4)
+	sagaDoneCount := int64(3)
+	timelineCount := int64(4)
+	outboxTotal := int64(4)
+	outboxPublished := int64(3)
+	outboxPending := int64(1)
+	outboxDLQ := int64(0)
+	memberListCount := int64(6)
+	seq := int64(9)
+	s := summary{
+		StartedAt:              started,
+		FinishedAt:             started.Add(2 * time.Second),
+		VUs:                    2,
+		RequestCount:           4,
+		SuccessCount:           3,
+		ErrorCount:             1,
+		SuccessRate:            0.75,
+		RPS:                    2,
+		AvgMS:                  10,
+		P95MS:                  20,
+		P99MS:                  30,
+		ChangeType:             "JOIN",
+		TargetRole:             "MEMBER",
+		SagaCount:              &sagaCount,
+		SagaDoneCount:          &sagaDoneCount,
+		TimelineCount:          &timelineCount,
+		OutboxTotalCount:       &outboxTotal,
+		OutboxPublishedCount:   &outboxPublished,
+		OutboxPendingCount:     &outboxPending,
+		OutboxDLQCount:         &outboxDLQ,
+		MemberListCount:        &memberListCount,
+		ConversationSeqCurrent: &seq,
+	}
+
+	capacity := buildCapacitySummary(s)
+	if capacity == nil {
+		t.Fatal("expected capacity summary")
+	}
+	if capacity.VUs != 2 || capacity.RequestCount != 4 || capacity.SuccessCount != 3 || capacity.ErrorCount != 1 {
+		t.Fatalf("unexpected count fields: %+v", capacity)
+	}
+	assertFloatNear(t, capacity.SuccessRate, 0.75)
+	assertFloatNear(t, capacity.RequestsPerSecond, 2)
+	if capacity.SagaCount != 4 || capacity.SagaDoneCount != 3 || capacity.TimelineCount != 4 {
+		t.Fatalf("unexpected saga/timeline fields: %+v", capacity)
+	}
+	if capacity.OutboxTotalCount != 4 || capacity.OutboxPublishedCount != 3 || capacity.OutboxPendingCount != 1 || capacity.OutboxDLQCount != 0 {
+		t.Fatalf("unexpected outbox fields: %+v", capacity)
+	}
+	if capacity.MemberListCount != 6 || capacity.ConversationSeqCurrent != 9 {
+		t.Fatalf("unexpected member/seq fields: %+v", capacity)
+	}
+}
+
+func TestBuildCapacitySummaryRequiresPositiveDuration(t *testing.T) {
+	now := time.Date(2026, 6, 16, 10, 0, 0, 0, time.UTC)
+	if capacity := buildCapacitySummary(summary{StartedAt: now, FinishedAt: now}); capacity != nil {
+		t.Fatalf("expected nil capacity for zero duration, got %+v", capacity)
+	}
+}
+
+func assertFloatNear(t *testing.T, got float64, want float64) {
+	t.Helper()
+	if math.Abs(got-want) > 0.000001 {
+		t.Fatalf("float = %f, want %f", got, want)
 	}
 }

@@ -36,11 +36,13 @@ func main() {
 	}
 }
 
+const deliveryServiceModeHelp = "grpc, timeline-consumer, outbox-relay, outbox-repair, outbox-audit, outbox-repair-audit, outbox-repair-cleanup, projection-checkpoint-repair, projection-checkpoint-repair-audit, projection-checkpoint-repair-cleanup, projection-failure-audit, or projection-failure-cleanup"
+
 func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("delivery-service runtime wiring is idle; set NEXUSIM_DELIVERY_SERVICE_MODE=grpc")
+		log.Printf("delivery-service runtime wiring is idle; set NEXUSIM_DELIVERY_SERVICE_MODE=%s", deliveryServiceModeHelp)
 		return nil
 	case "grpc":
 		return runGRPCServer()

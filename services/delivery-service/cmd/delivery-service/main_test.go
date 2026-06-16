@@ -12,11 +12,33 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	postgresinfra "github.com/qsyy0921/IM/services/delivery-service/internal/infrastructure/postgres"
 )
+
+func TestDeliveryServiceModeHelpIncludesOperatorModes(t *testing.T) {
+	for _, mode := range []string{
+		"grpc",
+		"timeline-consumer",
+		"outbox-relay",
+		"outbox-repair",
+		"outbox-audit",
+		"outbox-repair-audit",
+		"outbox-repair-cleanup",
+		"projection-checkpoint-repair",
+		"projection-checkpoint-repair-audit",
+		"projection-checkpoint-repair-cleanup",
+		"projection-failure-audit",
+		"projection-failure-cleanup",
+	} {
+		if !strings.Contains(deliveryServiceModeHelp, mode) {
+			t.Fatalf("delivery service mode help missing %q: %s", mode, deliveryServiceModeHelp)
+		}
+	}
+}
 
 func TestLoadDeliveryGRPCCredentialsFromEnvDisabledByDefault(t *testing.T) {
 	clearDeliveryGRPCTLSConfig(t)

@@ -527,7 +527,7 @@ NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay
 
 另有只读 `outbox-repair-audit` 运维模式，可直接列出 outbox repair audit 历史，并按 `outbox_id / event_id / tenant_id / conversation_id / mode / outcome` 缩小排障范围；它不 redrive，不修改 outbox 行。
 
-另有 `outbox-repair-cleanup` operator，只删除超过保留期的 outbox repair audit 历史，并支持按 `outbox_id / event_id / tenant_id / conversation_id / mode / outcome` 缩小 cleanup 范围；它不 redrive，也不修改 `delivery_outbox` 当前状态。
+另有 `outbox-repair-cleanup` operator，只删除超过保留期的 outbox repair audit 历史，并支持按 `outbox_id / event_id / tenant_id / conversation_id / mode / outcome` 缩小 cleanup 范围；它支持 `NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_DRY_RUN=true` 只统计候选行不删除，低敏 JSON summary 会写出 `dry_run`；它不 redrive，也不修改 `delivery_outbox` 当前状态。
 
 另有只读 `projection-failure-audit` 运维模式，用于直接列出 unresolved projection failure，并可按 `offset_value / event_id / event_type / failure_class` 缩小排障范围；可选 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_OUTPUT` 会写低敏 JSON 结果，便于 CI / operator 留存结构化证据。第一阶段它只做只读排障，不负责自动 repair / retry。
 

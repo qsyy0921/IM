@@ -774,6 +774,40 @@ INSERT INTO policy_decision_audit_outbox_repair_audit (
 	assertPolicyAuditOutboxRepairAuditCount(t, ctx, pool, "tenant-cleanup", 1)
 }
 
+func TestOutboxStoreCleanupOutboxRepairsDryRunDoesNotDeleteIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_decision_audit_outbox_repair_audit (
+    event_id, tenant_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at,
+    repair_operator, repair_reason, repair_outcome, skip_reason, repaired_at
+) VALUES
+    ('cleanup-policy-dry-run-old-1', 'tenant-cleanup-dry-run', 'DLQ', 1, 'publish failed', now() - interval '2 hours', 'operator-a', 'manual repair', 'REPAIRED', '', now() - interval '2 hours'),
+    ('cleanup-policy-dry-run-old-2', 'tenant-cleanup-dry-run', 'DLQ', 2, 'validation failed', now() - interval '90 minutes', 'operator-b', 'manual validation', 'SKIPPED', 'validation_failed', now() - interval '90 minutes'),
+    ('cleanup-policy-dry-run-fresh', 'tenant-cleanup-dry-run', 'DLQ', 1, 'recent failure', now() - interval '10 minutes', 'operator-a', 'manual repair', 'REPAIRED', '', now() - interval '10 minutes')
+`)
+	if err != nil {
+		t.Fatalf("seed dry-run cleanup policy outbox repair audit: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	stats, err := store.CleanupOutboxRepairs(ctx, OutboxRepairCleanupOptions{
+		TenantID: "tenant-cleanup-dry-run",
+		Cutoff:   time.Now().UTC().Add(-30 * time.Minute),
+		Limit:    10,
+		DryRun:   true,
+	})
+	if err != nil {
+		t.Fatalf("dry-run cleanup policy outbox repairs: %v", err)
+	}
+	if stats.Deleted != 2 {
+		t.Fatalf("expected 2 dry-run deleted rows, got %+v", stats)
+	}
+	assertPolicyAuditOutboxRepairAuditCount(t, ctx, pool, "tenant-cleanup-dry-run", 3)
+}
+
 func ptrTime(value time.Time) *time.Time {
 	return &value
 }

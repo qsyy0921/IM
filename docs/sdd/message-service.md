@@ -182,7 +182,7 @@ accepted_at
 
 `NEXUSIM_MESSAGE_SERVICE_MODE=outbox-repair-audit` is a read-only view over `message_outbox_repair_audit`, with `event_id / tenant_id / conversation_id` filters for local debugging and operator traceability.
 
-`NEXUSIM_MESSAGE_SERVICE_MODE=outbox-repair-cleanup` only deletes old repair audit history older than a retention cutoff, with optional `event_id / tenant_id / conversation_id` narrowing. It never mutates current `message_outbox` state.
+`NEXUSIM_MESSAGE_SERVICE_MODE=outbox-repair-cleanup` only deletes old repair audit history older than a retention cutoff, with optional `event_id / tenant_id / conversation_id` narrowing. It supports `NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_DRY_RUN=true` to count matching rows without deleting and records `dry_run` in the low-sensitive JSON summary. It never mutates current `message_outbox` state.
 
 约束：
 

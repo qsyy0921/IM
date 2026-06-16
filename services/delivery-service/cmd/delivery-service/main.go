@@ -506,16 +506,18 @@ func runOutboxRepairCleanup() error {
 		Outcome:        envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_OUTCOME", ""),
 		Cutoff:         cutoff,
 		Limit:          config.BatchSize,
+		DryRun:         config.DryRun,
 	})
 	if err != nil {
 		return err
 	}
 	log.Printf(
-		"delivery-service outbox repair cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d",
+		"delivery-service outbox repair cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d dry_run=%t",
 		stats.Deleted,
 		cutoff.Format(time.RFC3339),
 		config.Retention,
 		config.BatchSize,
+		config.DryRun,
 	)
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_OUTPUT")); outputPath != "" {
 		filters := map[string]string{
@@ -528,7 +530,7 @@ func runOutboxRepairCleanup() error {
 		if outboxID != nil {
 			filters["outbox_id"] = strconv.FormatInt(*outboxID, 10)
 		}
-		if err := writeOutboxRepairCleanupOutput(outputPath, stats, cutoff, config.Retention, config.BatchSize, filters); err != nil {
+		if err := writeOutboxRepairCleanupOutput(outputPath, stats, cutoff, config.Retention, config.BatchSize, config.DryRun, filters); err != nil {
 			return err
 		}
 	}
@@ -926,6 +928,7 @@ type projectionFailureCleanupConfig struct {
 type outboxRepairCleanupConfig struct {
 	Retention time.Duration
 	BatchSize int
+	DryRun    bool
 }
 
 type projectionCheckpointRepairCleanupConfig struct {
@@ -960,6 +963,7 @@ func outboxRepairCleanupConfigFromEnv() (outboxRepairCleanupConfig, error) {
 	return outboxRepairCleanupConfig{
 		Retention: retention,
 		BatchSize: batchSize,
+		DryRun:    envBool("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_DRY_RUN", false),
 	}, nil
 }
 

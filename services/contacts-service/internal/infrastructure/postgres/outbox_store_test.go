@@ -596,6 +596,38 @@ INSERT INTO contacts_outbox_repair_audit (
 	assertContactsOutboxRepairAuditCount(t, ctx, pool, "tenant-cleanup", 1)
 }
 
+func TestOutboxStoreCleanupOutboxRepairsDryRunDoesNotDeleteIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO contacts_outbox_repair_audit (
+    event_id, tenant_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at, repair_reason, repaired_at
+) VALUES
+    ('cleanup-dry-run-event-1', 'tenant-cleanup-dry-run', 'DLQ', 1, 'publish failed', now() - interval '1 minute', 'manual audit', now() - interval '10 days'),
+    ('cleanup-dry-run-event-2', 'tenant-cleanup-dry-run', 'DLQ', 2, 'provider unavailable', now() - interval '2 minutes', 'provider recovered', now() - interval '9 days'),
+    ('cleanup-dry-run-event-3', 'tenant-cleanup-dry-run', 'DLQ', 3, 'recent failure', now() - interval '3 minutes', 'recent repair', now() - interval '1 day')
+`)
+	if err != nil {
+		t.Fatalf("seed contacts outbox dry-run cleanup rows: %v", err)
+	}
+
+	stats, err := NewOutboxStore(pool).CleanupOutboxRepairs(ctx, OutboxRepairCleanupOptions{
+		TenantID: "tenant-cleanup-dry-run",
+		Cutoff:   time.Now().UTC().Add(-7 * 24 * time.Hour),
+		Limit:    10,
+		DryRun:   true,
+	})
+	if err != nil {
+		t.Fatalf("dry-run cleanup contacts outbox repairs: %v", err)
+	}
+	if stats.Deleted != 2 {
+		t.Fatalf("unexpected dry-run deleted count: %+v", stats)
+	}
+	assertContactsOutboxRepairAuditCount(t, ctx, pool, "tenant-cleanup-dry-run", 3)
+}
+
 func ptrTime(value time.Time) *time.Time {
 	return &value
 }

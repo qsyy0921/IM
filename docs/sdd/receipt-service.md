@@ -103,7 +103,7 @@ services/receipt-service/
 | `types` | Command、DTO、错误 sentinel、枚举 |
 | `trigger` | Kafka consumer worker、receipt outbox relay、repair worker |
 
-第一阶段运维面补充：`receipt-service` 提供只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运行模式，用于直接按 `outbox_id / event_id / tenant_id / conversation_id / status / event_type / created_at RFC3339 时间窗口` 审计 `receipt_outbox` 当前状态，把指定 `DLQ` event redrive 回 `PENDING`，并按 retention / scope 清理 repair audit 历史。当前 repair audit 仍是轻量历史，只记录 `previous_status / previous_retry_count / previous_last_error / previous_dead_lettered_at / repair_reason / repaired_at`，更细 operator / outcome 语义后续再补。
+第一阶段运维面补充：`receipt-service` 提供只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运行模式，用于直接按 `outbox_id / event_id / tenant_id / conversation_id / status / event_type / created_at RFC3339 时间窗口` 审计 `receipt_outbox` 当前状态，把指定 `DLQ` event redrive 回 `PENDING`，并按 retention / scope 清理 repair audit 历史。`outbox-repair-cleanup` 支持 `NEXUSIM_RECEIPT_OUTBOX_REPAIR_CLEANUP_DRY_RUN=true` 只统计候选行不删除，低敏 JSON summary 会写出 `dry_run`。当前 repair audit 仍是轻量历史，只记录 `previous_status / previous_retry_count / previous_last_error / previous_dead_lettered_at / repair_reason / repaired_at`，更细 operator / outcome 语义后续再补。
 
 ## 4. 领域模型
 

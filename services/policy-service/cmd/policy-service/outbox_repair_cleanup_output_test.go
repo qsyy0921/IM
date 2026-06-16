@@ -20,6 +20,7 @@ func TestWriteOutboxRepairCleanupOutput(t *testing.T) {
 		cutoff,
 		2*time.Hour,
 		200,
+		true,
 		map[string]string{"tenant_id": "tenant-a", "event_id": "", "operator": "operator-a", "outcome": "MUTATED"},
 	)
 	if err != nil {
@@ -39,6 +40,7 @@ func TestWriteOutboxRepairCleanupOutput(t *testing.T) {
 		output.Cutoff == "" ||
 		output.RetentionSeconds != int64((2*time.Hour).Seconds()) ||
 		output.BatchSize != 200 ||
+		!output.DryRun ||
 		output.Filters["tenant_id"] != "tenant-a" ||
 		output.Filters["operator"] != "operator-a" ||
 		output.Filters["outcome"] != "MUTATED" {

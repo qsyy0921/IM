@@ -536,6 +536,7 @@ func runOutboxRepairAudit() error {
 type outboxRepairCleanupConfig struct {
 	Retention time.Duration
 	BatchSize int
+	DryRun    bool
 }
 
 func runOutboxRepairCleanup() error {
@@ -563,19 +564,21 @@ func runOutboxRepairCleanup() error {
 		ConversationID: envString("NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_CONVERSATION_ID", ""),
 		Cutoff:         cutoff,
 		Limit:          config.BatchSize,
+		DryRun:         config.DryRun,
 	})
 	if err != nil {
 		return err
 	}
 	log.Printf(
-		"message-service outbox repair cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d",
+		"message-service outbox repair cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d dry_run=%t",
 		stats.Deleted,
 		cutoff.Format(time.RFC3339),
 		config.Retention,
 		config.BatchSize,
+		config.DryRun,
 	)
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_OUTPUT")); outputPath != "" {
-		if err := writeOutboxRepairCleanupOutput(outputPath, stats, cutoff, config.Retention, config.BatchSize, map[string]string{
+		if err := writeOutboxRepairCleanupOutput(outputPath, stats, cutoff, config.Retention, config.BatchSize, config.DryRun, map[string]string{
 			"event_id":        envString("NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_EVENT_ID", ""),
 			"tenant_id":       envString("NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_TENANT_ID", ""),
 			"conversation_id": envString("NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_CONVERSATION_ID", ""),
@@ -1062,6 +1065,7 @@ func outboxRepairCleanupConfigFromEnv() (outboxRepairCleanupConfig, error) {
 	return outboxRepairCleanupConfig{
 		Retention: retention,
 		BatchSize: batchSize,
+		DryRun:    envBool("NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_DRY_RUN", false),
 	}, nil
 }
 

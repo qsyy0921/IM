@@ -64,6 +64,7 @@ type OutboxRepairCleanupOptions struct {
 	ConversationID string
 	Cutoff         time.Time
 	Limit          int
+	DryRun         bool
 }
 
 type OutboxRepairCleanupStats struct {
@@ -566,6 +567,23 @@ func (s *OutboxStore) CleanupOutboxRepairs(ctx context.Context, options OutboxRe
 		clauses = append(clauses, "conversation_id = $"+strconv.Itoa(len(args)))
 	}
 	args = append(args, options.Limit)
+	if options.DryRun {
+		var stats OutboxRepairCleanupStats
+		err := s.pool.QueryRow(ctx, `
+WITH doomed AS (
+    SELECT id
+    FROM message_outbox_repair_audit
+    WHERE `+strings.Join(clauses, " AND ")+`
+    ORDER BY repaired_at ASC, event_id ASC, id ASC
+    LIMIT $`+strconv.Itoa(len(args))+`
+)
+SELECT count(*) FROM doomed
+`, args...).Scan(&stats.Deleted)
+		if err != nil {
+			return OutboxRepairCleanupStats{}, types.NewDBWriteFailed(err.Error())
+		}
+		return stats, nil
+	}
 	rows, err := s.pool.Query(ctx, `
 WITH doomed AS (
     SELECT id

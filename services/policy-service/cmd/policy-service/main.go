@@ -74,6 +74,7 @@ func run() error {
 type outboxRepairCleanupConfig struct {
 	Retention time.Duration
 	BatchSize int
+	DryRun    bool
 }
 
 func runOutboxRelay() error {
@@ -338,18 +339,20 @@ func runOutboxRepairCleanup() error {
 		Outcome:  envString("NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OUTCOME", ""),
 		Cutoff:   cutoff,
 		Limit:    config.BatchSize,
+		DryRun:   config.DryRun,
 	})
 	if err != nil {
 		return err
 	}
 	log.Printf(
-		"policy-service outbox repair cleanup completed deleted=%d retention=%s batch_size=%d",
+		"policy-service outbox repair cleanup completed deleted=%d retention=%s batch_size=%d dry_run=%t",
 		stats.Deleted,
 		config.Retention,
 		config.BatchSize,
+		config.DryRun,
 	)
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OUTPUT")); outputPath != "" {
-		if err := writeOutboxRepairCleanupOutput(outputPath, stats, cutoff, config.Retention, config.BatchSize, map[string]string{
+		if err := writeOutboxRepairCleanupOutput(outputPath, stats, cutoff, config.Retention, config.BatchSize, config.DryRun, map[string]string{
 			"event_id":  envString("NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_EVENT_ID", ""),
 			"tenant_id": envString("NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_TENANT_ID", ""),
 			"operator":  envString("NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OPERATOR", ""),
@@ -1185,6 +1188,7 @@ func outboxRepairCleanupConfigFromEnv() (outboxRepairCleanupConfig, error) {
 	return outboxRepairCleanupConfig{
 		Retention: retention,
 		BatchSize: batchSize,
+		DryRun:    envBool("NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_DRY_RUN", false),
 	}, nil
 }
 

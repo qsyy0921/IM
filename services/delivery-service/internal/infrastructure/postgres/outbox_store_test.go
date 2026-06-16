@@ -541,6 +541,47 @@ INSERT INTO delivery_outbox_repair_audit (
 	assertDeliveryOutboxRepairAuditCount(t, ctx, pool, "tenant-c", 1)
 }
 
+func TestOutboxStoreCleanupOutboxRepairsDryRunDoesNotDeleteIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_outbox_repair_audit (
+    outbox_id, event_id, tenant_id, conversation_id, aggregate_version, mode, outcome, skip_reason, operator, reason, dry_run,
+    before_status, before_retry_count, before_last_error, before_next_retry_at, before_dead_lettered_at,
+    after_status, after_retry_count, after_last_error, after_next_retry_at, after_dead_lettered_at, created_at
+) VALUES
+    (331, 'event-dry-run-331', 'tenant-cleanup-dry-run', 'conversation-a', 1, 'audit', 'AUDITED', '', 'operator-a', 'manual audit', true,
+     'DLQ', 1, 'malformed payload', NULL, NULL,
+     'DLQ', 1, 'malformed payload', NULL, NULL, now() - interval '10 days'),
+    (332, 'event-dry-run-332', 'tenant-cleanup-dry-run', 'conversation-b', 2, 'redrive-dlq-pending', 'MUTATED', '', 'operator-b', 'provider recovered', false,
+     'DLQ', 2, 'provider down', NULL, NULL,
+     'PENDING', 0, '', NULL, NULL, now() - interval '9 days'),
+    (333, 'event-dry-run-333', 'tenant-cleanup-dry-run', 'conversation-c', 3, 'audit', 'AUDITED', '', 'operator-a', 'recent audit', true,
+     'DLQ', 1, 'recent failure', NULL, NULL,
+     'DLQ', 1, 'recent failure', NULL, NULL, now() - interval '1 day')
+`)
+	if err != nil {
+		t.Fatalf("seed delivery outbox dry-run cleanup rows: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	stats, err := store.CleanupOutboxRepairs(ctx, OutboxRepairCleanupOptions{
+		TenantID: "tenant-cleanup-dry-run",
+		Cutoff:   time.Now().UTC().Add(-7 * 24 * time.Hour),
+		Limit:    10,
+		DryRun:   true,
+	})
+	if err != nil {
+		t.Fatalf("dry-run cleanup delivery outbox repairs: %v", err)
+	}
+	if stats.Deleted != 2 {
+		t.Fatalf("unexpected dry-run deleted count: %+v", stats)
+	}
+	assertDeliveryOutboxRepairAuditCount(t, ctx, pool, "tenant-cleanup-dry-run", 3)
+}
+
 func ptrTime(value time.Time) *time.Time {
 	return &value
 }

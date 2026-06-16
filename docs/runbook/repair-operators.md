@@ -66,7 +66,7 @@ go run ./services/delivery-service/cmd/delivery-service
 | `contacts-service` | `NEXUSIM_CONTACTS_OUTBOX_AUDIT_OUTPUT` |
 | `policy-service` | `NEXUSIM_POLICY_OUTBOX_AUDIT_OUTPUT` |
 
-以下服务的 `outbox-repair-cleanup` 支持写低敏 JSON summary，便于留存 cleanup 证据；输出只包含删除行数、cutoff、retention、batch size 和过滤条件，不重新输出被清理的历史错误明细：
+以下服务的 `outbox-repair-cleanup` 支持显式 dry-run 和写低敏 JSON summary，便于留存 cleanup 证据；输出只包含删除行数或 dry-run 命中行数、cutoff、retention、batch size、dry-run 标记和过滤条件，不重新输出被清理的历史错误明细。执行正式删除前建议先设置对应 `*_OUTBOX_REPAIR_CLEANUP_DRY_RUN=true` 复核范围。
 
 | 服务 | JSON 输出环境变量 |
 | --- | --- |

@@ -376,6 +376,7 @@ func runOutboxRepairAudit() error {
 type outboxRepairCleanupConfig struct {
 	Retention time.Duration
 	BatchSize int
+	DryRun    bool
 }
 
 func runOutboxRepairCleanup() error {
@@ -398,19 +399,21 @@ func runOutboxRepairCleanup() error {
 		TenantID: envString("NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_TENANT_ID", ""),
 		Cutoff:   cutoff,
 		Limit:    config.BatchSize,
+		DryRun:   config.DryRun,
 	})
 	if err != nil {
 		return err
 	}
 	log.Printf(
-		"contacts-service outbox repair cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d",
+		"contacts-service outbox repair cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d dry_run=%t",
 		stats.Deleted,
 		cutoff.Format(time.RFC3339),
 		config.Retention,
 		config.BatchSize,
+		config.DryRun,
 	)
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_OUTPUT")); outputPath != "" {
-		if err := writeOutboxRepairCleanupOutput(outputPath, stats, cutoff, config.Retention, config.BatchSize, map[string]string{
+		if err := writeOutboxRepairCleanupOutput(outputPath, stats, cutoff, config.Retention, config.BatchSize, config.DryRun, map[string]string{
 			"event_id":  envString("NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_EVENT_ID", ""),
 			"tenant_id": envString("NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_TENANT_ID", ""),
 		}); err != nil {
@@ -1267,6 +1270,18 @@ func envPositiveInt(name string, fallback int) (int, error) {
 	return parsed, nil
 }
 
+func envBool(name string, fallback bool) bool {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
 func outboxRepairCleanupConfigFromEnv() (outboxRepairCleanupConfig, error) {
 	retention, err := envPositiveDuration("NEXUSIM_CONTACTS_OUTBOX_REPAIR_RETENTION", 7*24*time.Hour)
 	if err != nil {
@@ -1279,5 +1294,6 @@ func outboxRepairCleanupConfigFromEnv() (outboxRepairCleanupConfig, error) {
 	return outboxRepairCleanupConfig{
 		Retention: retention,
 		BatchSize: batchSize,
+		DryRun:    envBool("NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_DRY_RUN", false),
 	}, nil
 }

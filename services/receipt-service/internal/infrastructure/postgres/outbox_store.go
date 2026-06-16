@@ -59,6 +59,7 @@ type OutboxRepairCleanupOptions struct {
 	TenantID string
 	Cutoff   time.Time
 	Limit    int
+	DryRun   bool
 }
 
 type OutboxRepairCleanupStats struct {
@@ -700,6 +701,23 @@ func (store *OutboxStore) CleanupOutboxRepairs(ctx context.Context, options Outb
 		clauses = append(clauses, "tenant_id = $"+itoa(len(args)))
 	}
 	args = append(args, options.Limit)
+	if options.DryRun {
+		var stats OutboxRepairCleanupStats
+		err := store.pool.QueryRow(ctx, `
+WITH doomed AS (
+    SELECT id
+    FROM receipt_outbox_repair_audit
+    WHERE `+strings.Join(clauses, " AND ")+`
+    ORDER BY repaired_at ASC, event_id ASC, id ASC
+    LIMIT $`+itoa(len(args))+`
+)
+SELECT count(*) FROM doomed
+`, args...).Scan(&stats.Deleted)
+		if err != nil {
+			return OutboxRepairCleanupStats{}, types.NewDBReadFailed(err.Error())
+		}
+		return stats, nil
+	}
 	rows, err := store.pool.Query(ctx, `
 WITH doomed AS (
     SELECT id

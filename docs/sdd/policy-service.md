@@ -137,7 +137,7 @@ When PostgreSQL rules mode is enabled, successful `CheckMessageAction` decisions
 
 `NEXUSIM_POLICY_SERVICE_MODE=outbox-repair-audit` is a read-only operator view over `policy_decision_audit_outbox_repair_audit`. It supports `event_id / tenant_id / repair_operator / repair_outcome` filters, returns newest rows first, and never mutates outbox state.
 
-`NEXUSIM_POLICY_SERVICE_MODE=outbox-repair-cleanup` is a retention operator for `policy_decision_audit_outbox_repair_audit`. It deletes oldest repair audit rows before `now - retention`, supports optional `event_id / tenant_id / repair_operator / repair_outcome` filters for scoped cleanup, and never mutates the live outbox rows themselves.
+`NEXUSIM_POLICY_SERVICE_MODE=outbox-repair-cleanup` is a retention operator for `policy_decision_audit_outbox_repair_audit`. It deletes oldest repair audit rows before `now - retention`, supports optional `event_id / tenant_id / repair_operator / repair_outcome` filters for scoped cleanup, supports `NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_DRY_RUN=true` to count matching rows without deleting, records `dry_run` in the low-sensitive JSON summary, and never mutates the live outbox rows themselves.
 
 Audit rows intentionally store low-sensitive decision metadata:
 

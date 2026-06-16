@@ -36,7 +36,14 @@ go run ./services/delivery-service/cmd/delivery-service
 
 具体过滤参数以对应服务 cmd / service brief / smoke 报告为准。
 
-`message-service` 的 `outbox-repair-audit` 支持通过 `NEXUSIM_MESSAGE_OUTBOX_REPAIR_AUDIT_OUTPUT` 写低敏 JSON 结果，内容只包含 event / tenant / conversation / reason / previous status / retry count / stable previous error / repaired_at 等 operator 证据，不写 Kafka 原始错误正文或业务 payload。
+以下服务的 `outbox-repair-audit` 支持写低敏 JSON 结果，便于 operator 留存证据，不写 Kafka 原始错误正文或业务 payload：
+
+| 服务 | JSON 输出环境变量 |
+| --- | --- |
+| `message-service` | `NEXUSIM_MESSAGE_OUTBOX_REPAIR_AUDIT_OUTPUT` |
+| `receipt-service` | `NEXUSIM_RECEIPT_OUTBOX_REPAIR_AUDIT_OUTPUT` |
+| `contacts-service` | `NEXUSIM_CONTACTS_OUTBOX_REPAIR_AUDIT_OUTPUT` |
+| `policy-service` | `NEXUSIM_POLICY_OUTBOX_REPAIR_AUDIT_OUTPUT` |
 
 ## Delivery Projection
 

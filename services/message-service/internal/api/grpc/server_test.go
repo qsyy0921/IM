@@ -220,6 +220,34 @@ func TestSendMessageRejectsUnsupportedMessageType(t *testing.T) {
 	)
 }
 
+func TestDeleteMessageMapsUnsupportedDeleteScope(t *testing.T) {
+	server := NewServer(
+		&fakeSendMessageExecutor{},
+		WithDeleteMessage(&fakeDeleteMessageExecutor{
+			err: types.NewUnsupportedDeleteScope("compliance delete is not enabled"),
+		}),
+	)
+	request := testDeleteMessageRequest()
+	request.DeleteScope = messagev1.DeleteScope_DELETE_SCOPE_COMPLIANCE_RETENTION
+
+	_, err := server.DeleteMessage(context.Background(), request)
+	assertStatusDetail(
+		t,
+		err,
+		codes.FailedPrecondition,
+		messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_UNSPECIFIED,
+		false,
+		"body-request",
+	)
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	if st.Message() != "unsupported delete scope" {
+		t.Fatalf("unexpected public message %q", st.Message())
+	}
+}
+
 func TestSendMessageAcceptsImageAttachmentMessage(t *testing.T) {
 	executor := &fakeSendMessageExecutor{
 		result: types.SendMessageResult{

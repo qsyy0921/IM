@@ -33,7 +33,7 @@ func (u *DeleteMessageUseCase) Execute(
 		return types.MessageChangeResult{}, err
 	}
 	if command.DeleteScope != types.DeleteScopeConversationView {
-		return types.MessageChangeResult{}, types.NewUnsupportedMessageType("delete_scope is not supported in phase 1")
+		return types.MessageChangeResult{}, types.NewUnsupportedDeleteScope("delete_scope is not enabled in phase 1")
 	}
 
 	conversation, permission, err := u.readConsistentDeleteDependencies(ctx, command)

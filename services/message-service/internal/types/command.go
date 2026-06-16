@@ -70,6 +70,15 @@ const (
 	DeleteScopeCompliance       DeleteScope = "COMPLIANCE_RETENTION"
 )
 
+func IsSupportedDeleteScope(deleteScope DeleteScope) bool {
+	switch deleteScope {
+	case DeleteScopeConversationView, DeleteScopeCompliance:
+		return true
+	default:
+		return false
+	}
+}
+
 type DeleteMessageCommand struct {
 	AuthContext    AuthContext
 	ConversationID ConversationID
@@ -121,6 +130,9 @@ func (c DeleteMessageCommand) Validate() error {
 	}
 	if c.DeleteScope == "" {
 		return errors.New("delete_scope is required")
+	}
+	if !IsSupportedDeleteScope(c.DeleteScope) {
+		return NewUnsupportedDeleteScope("delete_scope is not supported")
 	}
 	return nil
 }

@@ -66,6 +66,8 @@ func classifyError(err error) (codes.Code, messagev1.MessageErrorCode, bool) {
 		return codes.PermissionDenied, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_PERMISSION_DENIED, false
 	case errors.Is(err, types.ErrUnsupportedMessageType):
 		return codes.InvalidArgument, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_UNSUPPORTED_MESSAGE_TYPE, false
+	case errors.Is(err, types.ErrUnsupportedDeleteScope):
+		return codes.FailedPrecondition, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_UNSPECIFIED, false
 	case errors.Is(err, types.ErrConversationNotFound):
 		return codes.NotFound, messagev1.MessageErrorCode_MESSAGE_ERROR_CODE_CONVERSATION_NOT_FOUND, false
 	case errors.Is(err, types.ErrMessageNotFound):
@@ -100,6 +102,8 @@ func publicErrorMessage(err error) string {
 		return "permission denied"
 	case errors.Is(err, types.ErrUnsupportedMessageType):
 		return "unsupported message type"
+	case errors.Is(err, types.ErrUnsupportedDeleteScope):
+		return "unsupported delete scope"
 	case errors.Is(err, types.ErrConversationNotFound):
 		return "conversation not found"
 	case errors.Is(err, types.ErrMessageNotFound):

@@ -15,6 +15,7 @@ var (
 	ErrSequencerUnavailable   = errors.New("sequencer unavailable")
 	ErrIdempotencyConflict    = errors.New("idempotency conflict")
 	ErrUnsupportedMessageType = errors.New("unsupported message type")
+	ErrUnsupportedDeleteScope = errors.New("unsupported delete scope")
 	ErrConversationNotFound   = errors.New("conversation not found")
 	ErrMessageNotFound        = errors.New("message not found")
 	ErrInvalidMessageState    = errors.New("invalid message state")
@@ -51,6 +52,13 @@ func NewUnsupportedMessageType(reason string) error {
 		return ErrUnsupportedMessageType
 	}
 	return fmt.Errorf("%w: %s", ErrUnsupportedMessageType, reason)
+}
+
+func NewUnsupportedDeleteScope(reason string) error {
+	if reason == "" {
+		return ErrUnsupportedDeleteScope
+	}
+	return fmt.Errorf("%w: %s", ErrUnsupportedDeleteScope, reason)
 }
 
 func NewConversationNotFound(reason string) error {

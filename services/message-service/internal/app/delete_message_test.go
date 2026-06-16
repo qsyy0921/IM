@@ -87,6 +87,34 @@ func TestDeleteMessageUseCaseStopsAfterPolicyOwnershipDeny(t *testing.T) {
 	}
 }
 
+func TestDeleteMessageUseCaseRejectsComplianceScopeBeforeDependencyReads(t *testing.T) {
+	repo := &fakeMessageRepository{}
+	policy := &fakePolicy{decision: allowedDecision()}
+	conversation := &fakeConversation{context: localConversation()}
+	command := testDeleteCommand()
+	command.DeleteScope = types.DeleteScopeCompliance
+	useCase := NewDeleteMessageUseCase(policy, conversation, repo)
+
+	_, err := useCase.Execute(context.Background(), command)
+	if !errors.Is(err, types.ErrUnsupportedDeleteScope) {
+		t.Fatalf("expected unsupported delete scope, got %v", err)
+	}
+	if conversation.calls != 0 || repo.messagePolicyCalls != 0 || policy.calls != 0 || repo.deleteCalls != 0 {
+		t.Fatalf("unsupported compliance delete should fail before dependency reads, conversation=%d message_context=%d policy=%d repo=%d", conversation.calls, repo.messagePolicyCalls, policy.calls, repo.deleteCalls)
+	}
+}
+
+func TestDeleteMessageUseCaseRejectsInvalidDeleteScope(t *testing.T) {
+	command := testDeleteCommand()
+	command.DeleteScope = "TENANT_WIDE"
+	useCase := NewDeleteMessageUseCase(&fakePolicy{}, &fakeConversation{}, &fakeMessageRepository{})
+
+	_, err := useCase.Execute(context.Background(), command)
+	if !errors.Is(err, types.ErrUnsupportedDeleteScope) {
+		t.Fatalf("expected unsupported delete scope, got %v", err)
+	}
+}
+
 func testDeleteCommand() types.DeleteMessageCommand {
 	return types.DeleteMessageCommand{
 		AuthContext: types.AuthContext{

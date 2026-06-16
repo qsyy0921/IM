@@ -66,6 +66,16 @@ func TestSendMessageCommandValidationRequiresAttachmentForAttachmentMessages(t *
 	}
 }
 
+func TestDeleteMessageCommandValidationRejectsUnsupportedDeleteScope(t *testing.T) {
+	command := validDeleteMessageCommand()
+	command.DeleteScope = "TENANT_WIDE"
+
+	err := command.Validate()
+	if !errors.Is(err, ErrUnsupportedDeleteScope) {
+		t.Fatalf("expected unsupported delete scope, got %v", err)
+	}
+}
+
 func validSendMessageCommand() SendMessageCommand {
 	return SendMessageCommand{
 		AuthContext: AuthContext{
@@ -78,6 +88,22 @@ func validSendMessageCommand() SendMessageCommand {
 		ClientMsgID:    "client-1",
 		MessageType:    MessageTypeText,
 		PayloadJSON:    []byte(`{"text":"hello"}`),
+		ReceivedAt:     time.Unix(100, 0).UTC(),
+	}
+}
+
+func validDeleteMessageCommand() DeleteMessageCommand {
+	return DeleteMessageCommand{
+		AuthContext: AuthContext{
+			TenantID:  "tenant-1",
+			UserID:    "user-1",
+			DeviceID:  "device-1",
+			SessionID: "session-1",
+		},
+		ConversationID: "conv-1",
+		MessageID:      "msg-1",
+		IdempotencyKey: "delete-1",
+		DeleteScope:    DeleteScopeConversationView,
 		ReceivedAt:     time.Unix(100, 0).UTC(),
 	}
 }

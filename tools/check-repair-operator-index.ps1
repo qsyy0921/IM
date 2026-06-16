@@ -82,7 +82,8 @@ $operatorSpecs = @(
             "challenge-delivery-repair",
             "challenge-delivery-repair-audit",
             "challenge-delivery-repair-cleanup",
-            "challenge-request-limit-cleanup"
+            "challenge-request-limit-cleanup",
+            "gateway-token-keyring-rotate"
         )
     }
 )

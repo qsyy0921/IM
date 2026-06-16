@@ -2,11 +2,14 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/qsyy0921/IM/services/conversation-service/internal/types"
 )
 
 func TestRepositoryAuditMemberChangesIntegration(t *testing.T) {
@@ -82,6 +85,39 @@ INSERT INTO member_change_saga (
 	}
 	if strings.Contains(row.LastError, "constraint") || strings.Contains(row.LastError, "target@example.com") {
 		t.Fatalf("last_error leaked raw details: %q", row.LastError)
+	}
+
+	updatedAfter := time.Now().Add(-90 * time.Second)
+	updatedBefore := time.Now().Add(30 * time.Second)
+	windowed, err := repository.AuditMemberChanges(ctx, MemberChangeAuditOptions{
+		TenantID:      "tenant-audit",
+		UpdatedAfter:  &updatedAfter,
+		UpdatedBefore: &updatedBefore,
+		Limit:         10,
+	})
+	if err != nil {
+		t.Fatalf("audit member changes by updated window: %v", err)
+	}
+	if len(windowed) != 1 || windowed[0].ChangeID != "change-audit-1" {
+		t.Fatalf("unexpected updated window rows: %+v", windowed)
+	}
+	emptyAfter := time.Now().Add(time.Hour)
+	emptyRows, err := repository.AuditMemberChanges(ctx, MemberChangeAuditOptions{
+		TenantID:     "tenant-audit",
+		UpdatedAfter: &emptyAfter,
+		Limit:        10,
+	})
+	if err != nil {
+		t.Fatalf("audit member changes by empty updated window: %v", err)
+	}
+	if len(emptyRows) != 0 {
+		t.Fatalf("expected empty updated window rows, got %+v", emptyRows)
+	}
+	if _, err := repository.AuditMemberChanges(ctx, MemberChangeAuditOptions{
+		UpdatedAfter:  &updatedBefore,
+		UpdatedBefore: &updatedBefore,
+	}); !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid updated window error, got %v", err)
 	}
 
 	if _, err := repository.AuditMemberChanges(ctx, MemberChangeAuditOptions{Status: "not-a-status"}); err == nil {

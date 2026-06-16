@@ -37,6 +37,10 @@ func TestWriteMemberChangeAuditOutput(t *testing.T) {
 			CreatedAt:       now,
 			UpdatedAt:       now.Add(4 * time.Minute),
 		},
+	}, map[string]string{
+		"tenant_id":     "tenant-a",
+		"updated_after": "2026-06-16T00:00:00Z",
+		"operator_user": "",
 	})
 	if err != nil {
 		t.Fatalf("writeMemberChangeAuditOutput() error = %v", err)
@@ -52,6 +56,14 @@ func TestWriteMemberChangeAuditOutput(t *testing.T) {
 	}
 	if output.GeneratedAt == "" {
 		t.Fatal("generated_at is empty")
+	}
+	if output.Filters["tenant_id"] != "tenant-a" ||
+		output.Filters["updated_after"] != "2026-06-16T00:00:00Z" ||
+		len(output.Filters) != 2 {
+		t.Fatalf("unexpected filters: %+v", output.Filters)
+	}
+	if _, ok := output.Filters["operator_user"]; ok {
+		t.Fatalf("empty filter should be omitted: %+v", output.Filters)
 	}
 	if len(output.Rows) != 1 {
 		t.Fatalf("rows length = %d, want 1", len(output.Rows))

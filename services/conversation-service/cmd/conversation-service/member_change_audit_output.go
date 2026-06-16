@@ -11,6 +11,7 @@ import (
 
 type memberChangeAuditOutput struct {
 	GeneratedAt string                       `json:"generated_at"`
+	Filters     map[string]string            `json:"filters,omitempty"`
 	Rows        []memberChangeAuditOutputRow `json:"rows"`
 }
 
@@ -34,7 +35,7 @@ type memberChangeAuditOutputRow struct {
 	UpdatedAt       string `json:"updated_at"`
 }
 
-func writeMemberChangeAuditOutput(path string, rows []postgresinfra.MemberChangeAuditRow) error {
+func writeMemberChangeAuditOutput(path string, rows []postgresinfra.MemberChangeAuditRow, filters map[string]string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -46,6 +47,7 @@ func writeMemberChangeAuditOutput(path string, rows []postgresinfra.MemberChange
 
 	output := memberChangeAuditOutput{
 		GeneratedAt: formatAuditOutputTime(time.Now()),
+		Filters:     compactAuditOutputFilters(filters),
 		Rows:        make([]memberChangeAuditOutputRow, 0, len(rows)),
 	}
 	for _, row := range rows {
@@ -72,6 +74,23 @@ func writeMemberChangeAuditOutput(path string, rows []postgresinfra.MemberChange
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(output)
+}
+
+func compactAuditOutputFilters(filters map[string]string) map[string]string {
+	if len(filters) == 0 {
+		return nil
+	}
+	compacted := make(map[string]string, len(filters))
+	for key, value := range filters {
+		if value == "" {
+			continue
+		}
+		compacted[key] = value
+	}
+	if len(compacted) == 0 {
+		return nil
+	}
+	return compacted
 }
 
 func formatOptionalAuditOutputTime(value *time.Time) string {

@@ -2,10 +2,13 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/qsyy0921/IM/services/conversation-service/internal/types"
 )
 
 func TestRepositoryAuditMemberWindowsIntegration(t *testing.T) {
@@ -82,6 +85,41 @@ INSERT INTO conversation_members (
 		if got := issueByUser[userID]; got != wantIssue {
 			t.Fatalf("issue for %s = %q, want %q", userID, got, wantIssue)
 		}
+	}
+
+	updatedAfter := time.Now().Add(-90 * time.Second)
+	updatedBefore := time.Now().Add(30 * time.Second)
+	windowed, err := repository.AuditMemberWindows(ctx, MemberWindowAuditOptions{
+		TenantID:       "tenant-window",
+		ConversationID: "conv-active",
+		UpdatedAfter:   &updatedAfter,
+		UpdatedBefore:  &updatedBefore,
+		Limit:          20,
+	})
+	if err != nil {
+		t.Fatalf("audit member windows by updated window: %v", err)
+	}
+	if len(windowed) != 1 || windowed[0].UserID != "active-missing-join" {
+		t.Fatalf("unexpected updated window rows: %+v", windowed)
+	}
+	emptyAfter := time.Now().Add(time.Hour)
+	emptyRows, err := repository.AuditMemberWindows(ctx, MemberWindowAuditOptions{
+		TenantID:       "tenant-window",
+		ConversationID: "conv-active",
+		UpdatedAfter:   &emptyAfter,
+		Limit:          20,
+	})
+	if err != nil {
+		t.Fatalf("audit member windows by empty updated window: %v", err)
+	}
+	if len(emptyRows) != 0 {
+		t.Fatalf("expected empty updated window rows, got %+v", emptyRows)
+	}
+	if _, err := repository.AuditMemberWindows(ctx, MemberWindowAuditOptions{
+		UpdatedAfter:  &updatedBefore,
+		UpdatedBefore: &updatedBefore,
+	}); !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid updated window error, got %v", err)
 	}
 
 	filtered, err := repository.AuditMemberWindows(ctx, MemberWindowAuditOptions{

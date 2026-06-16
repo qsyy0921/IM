@@ -20,6 +20,8 @@ type MemberChangeAuditOptions struct {
 	ChangeType     string
 	Status         string
 	OutboxEventID  string
+	UpdatedAfter   *time.Time
+	UpdatedBefore  *time.Time
 	Limit          int
 }
 
@@ -96,6 +98,17 @@ func (r *Repository) AuditMemberChanges(ctx context.Context, options MemberChang
 	if outboxEventID := strings.TrimSpace(options.OutboxEventID); outboxEventID != "" {
 		args = append(args, outboxEventID)
 		clauses = append(clauses, "outbox_event_id = $"+strconv.Itoa(len(args)))
+	}
+	if options.UpdatedAfter != nil {
+		args = append(args, options.UpdatedAfter.UTC())
+		clauses = append(clauses, "updated_at >= $"+strconv.Itoa(len(args)))
+	}
+	if options.UpdatedBefore != nil {
+		args = append(args, options.UpdatedBefore.UTC())
+		clauses = append(clauses, "updated_at < $"+strconv.Itoa(len(args)))
+	}
+	if options.UpdatedAfter != nil && options.UpdatedBefore != nil && !options.UpdatedAfter.Before(*options.UpdatedBefore) {
+		return nil, types.NewInvalidArgument("updated_after must be before updated_before")
 	}
 	where := ""
 	if len(clauses) > 0 {

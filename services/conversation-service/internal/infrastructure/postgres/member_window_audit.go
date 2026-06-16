@@ -18,6 +18,8 @@ type MemberWindowAuditOptions struct {
 	Role           string
 	Status         string
 	IssueClass     string
+	UpdatedAfter   *time.Time
+	UpdatedBefore  *time.Time
 	Limit          int
 }
 
@@ -89,6 +91,17 @@ func (r *Repository) AuditMemberWindows(ctx context.Context, options MemberWindo
 		}
 		args = append(args, issueClass)
 		clauses = append(clauses, "issue_class = $"+strconv.Itoa(len(args)))
+	}
+	if options.UpdatedAfter != nil {
+		args = append(args, options.UpdatedAfter.UTC())
+		clauses = append(clauses, "updated_at >= $"+strconv.Itoa(len(args)))
+	}
+	if options.UpdatedBefore != nil {
+		args = append(args, options.UpdatedBefore.UTC())
+		clauses = append(clauses, "updated_at < $"+strconv.Itoa(len(args)))
+	}
+	if options.UpdatedAfter != nil && options.UpdatedBefore != nil && !options.UpdatedAfter.Before(*options.UpdatedBefore) {
+		return nil, types.NewInvalidArgument("updated_after must be before updated_before")
 	}
 	args = append(args, limit)
 

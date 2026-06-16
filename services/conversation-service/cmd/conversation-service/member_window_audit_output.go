@@ -11,6 +11,7 @@ import (
 
 type memberWindowAuditOutput struct {
 	GeneratedAt string                       `json:"generated_at"`
+	Filters     map[string]string            `json:"filters,omitempty"`
 	Rows        []memberWindowAuditOutputRow `json:"rows"`
 }
 
@@ -33,7 +34,7 @@ type memberWindowAuditOutputRow struct {
 	UpdatedAt                     string `json:"updated_at"`
 }
 
-func writeMemberWindowAuditOutput(path string, rows []postgresinfra.MemberWindowAuditRow) error {
+func writeMemberWindowAuditOutput(path string, rows []postgresinfra.MemberWindowAuditRow, filters map[string]string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -45,6 +46,7 @@ func writeMemberWindowAuditOutput(path string, rows []postgresinfra.MemberWindow
 
 	output := memberWindowAuditOutput{
 		GeneratedAt: formatAuditOutputTime(time.Now()),
+		Filters:     compactAuditOutputFilters(filters),
 		Rows:        make([]memberWindowAuditOutputRow, 0, len(rows)),
 	}
 	for _, row := range rows {

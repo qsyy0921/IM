@@ -325,15 +325,37 @@ func runMemberChangeAudit() error {
 	}
 	defer pool.Close()
 
+	updatedAfter, err := envOptionalRFC3339Time("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_UPDATED_AFTER")
+	if err != nil {
+		return err
+	}
+	updatedBefore, err := envOptionalRFC3339Time("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_UPDATED_BEFORE")
+	if err != nil {
+		return err
+	}
+	filters := map[string]string{
+		"change_id":        envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_CHANGE_ID", ""),
+		"tenant_id":        envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_TENANT_ID", ""),
+		"conversation_id":  envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_CONVERSATION_ID", ""),
+		"target_user_id":   envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_TARGET_USER_ID", ""),
+		"operator_user_id": envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_OPERATOR_USER_ID", ""),
+		"change_type":      envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_CHANGE_TYPE", ""),
+		"status":           envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_STATUS", ""),
+		"outbox_event_id":  envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_OUTBOX_EVENT_ID", ""),
+		"updated_after":    formatAuditFilterTime(updatedAfter),
+		"updated_before":   formatAuditFilterTime(updatedBefore),
+	}
 	rows, err := postgresinfra.NewRepository(pool).AuditMemberChanges(ctx, postgresinfra.MemberChangeAuditOptions{
-		ChangeID:       envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_CHANGE_ID", ""),
-		TenantID:       envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_TENANT_ID", ""),
-		ConversationID: envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_CONVERSATION_ID", ""),
-		TargetUserID:   envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_TARGET_USER_ID", ""),
-		OperatorUserID: envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_OPERATOR_USER_ID", ""),
-		ChangeType:     envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_CHANGE_TYPE", ""),
-		Status:         envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_STATUS", ""),
-		OutboxEventID:  envString("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_OUTBOX_EVENT_ID", ""),
+		ChangeID:       filters["change_id"],
+		TenantID:       filters["tenant_id"],
+		ConversationID: filters["conversation_id"],
+		TargetUserID:   filters["target_user_id"],
+		OperatorUserID: filters["operator_user_id"],
+		ChangeType:     filters["change_type"],
+		Status:         filters["status"],
+		OutboxEventID:  filters["outbox_event_id"],
+		UpdatedAfter:   updatedAfter,
+		UpdatedBefore:  updatedBefore,
 		Limit:          envInt("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_LIMIT", 20),
 	})
 	if err != nil {
@@ -361,7 +383,7 @@ func runMemberChangeAudit() error {
 		)
 	}
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_OUTPUT")); outputPath != "" {
-		if err := writeMemberChangeAuditOutput(outputPath, rows); err != nil {
+		if err := writeMemberChangeAuditOutput(outputPath, rows, filters); err != nil {
 			return err
 		}
 	}
@@ -382,13 +404,33 @@ func runMemberWindowAudit() error {
 	}
 	defer pool.Close()
 
+	updatedAfter, err := envOptionalRFC3339Time("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_UPDATED_AFTER")
+	if err != nil {
+		return err
+	}
+	updatedBefore, err := envOptionalRFC3339Time("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_UPDATED_BEFORE")
+	if err != nil {
+		return err
+	}
+	filters := map[string]string{
+		"tenant_id":       envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_TENANT_ID", ""),
+		"conversation_id": envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_CONVERSATION_ID", ""),
+		"user_id":         envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_USER_ID", ""),
+		"role":            envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_ROLE", ""),
+		"status":          envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_STATUS", ""),
+		"issue_class":     envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_ISSUE_CLASS", ""),
+		"updated_after":   formatAuditFilterTime(updatedAfter),
+		"updated_before":  formatAuditFilterTime(updatedBefore),
+	}
 	rows, err := postgresinfra.NewRepository(pool).AuditMemberWindows(ctx, postgresinfra.MemberWindowAuditOptions{
-		TenantID:       envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_TENANT_ID", ""),
-		ConversationID: envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_CONVERSATION_ID", ""),
-		UserID:         envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_USER_ID", ""),
-		Role:           envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_ROLE", ""),
-		Status:         envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_STATUS", ""),
-		IssueClass:     envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_ISSUE_CLASS", ""),
+		TenantID:       filters["tenant_id"],
+		ConversationID: filters["conversation_id"],
+		UserID:         filters["user_id"],
+		Role:           filters["role"],
+		Status:         filters["status"],
+		IssueClass:     filters["issue_class"],
+		UpdatedAfter:   updatedAfter,
+		UpdatedBefore:  updatedBefore,
 		Limit:          envInt("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_LIMIT", 20),
 	})
 	if err != nil {
@@ -415,7 +457,7 @@ func runMemberWindowAudit() error {
 		)
 	}
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_OUTPUT")); outputPath != "" {
-		if err := writeMemberWindowAuditOutput(outputPath, rows); err != nil {
+		if err := writeMemberWindowAuditOutput(outputPath, rows, filters); err != nil {
 			return err
 		}
 	}
@@ -749,6 +791,26 @@ func envInt(name string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func envOptionalRFC3339Time(name string) (*time.Time, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil, errors.New(name + " must be RFC3339")
+	}
+	utc := parsed.UTC()
+	return &utc, nil
+}
+
+func formatAuditFilterTime(value *time.Time) string {
+	if value == nil {
+		return ""
+	}
+	return value.UTC().Format(time.RFC3339)
 }
 
 func formatOptionalTime(value *time.Time) string {

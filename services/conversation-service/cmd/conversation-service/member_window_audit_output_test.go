@@ -33,6 +33,10 @@ func TestWriteMemberWindowAuditOutput(t *testing.T) {
 			IssueClass:                    "MEMBER_VERSION_AHEAD_CONVERSATION",
 			UpdatedAt:                     now,
 		},
+	}, map[string]string{
+		"tenant_id":     "tenant-window",
+		"issue_class":   "MEMBER_VERSION_AHEAD_CONVERSATION",
+		"updated_after": "",
 	})
 	if err != nil {
 		t.Fatalf("writeMemberWindowAuditOutput() error = %v", err)
@@ -48,6 +52,14 @@ func TestWriteMemberWindowAuditOutput(t *testing.T) {
 	}
 	if output.GeneratedAt == "" {
 		t.Fatal("generated_at is empty")
+	}
+	if output.Filters["tenant_id"] != "tenant-window" ||
+		output.Filters["issue_class"] != "MEMBER_VERSION_AHEAD_CONVERSATION" ||
+		len(output.Filters) != 2 {
+		t.Fatalf("unexpected filters: %+v", output.Filters)
+	}
+	if _, ok := output.Filters["updated_after"]; ok {
+		t.Fatalf("empty filter should be omitted: %+v", output.Filters)
 	}
 	if len(output.Rows) != 1 {
 		t.Fatalf("rows length = %d, want 1", len(output.Rows))

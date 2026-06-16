@@ -158,6 +158,9 @@ try {
     Write-Host "== kafka consumer rebalance summary =="
     Invoke-LocalCheck "check-kafka-consumer-rebalance-summary.ps1"
 
+    Write-Host "== kafka consumer churn summary =="
+    Invoke-LocalCheck "check-kafka-consumer-churn-summary.ps1"
+
     Write-Host "== git whitespace =="
     git diff --check
     if ($LASTEXITCODE -ne 0) {

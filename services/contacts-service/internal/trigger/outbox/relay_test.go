@@ -199,6 +199,30 @@ func TestBuildContactEventPrivacyUpdatedDefaultsMissingOptionalFields(t *testing
 	}
 }
 
+func TestBuildContactEventPrivacyExceptionUpdated(t *testing.T) {
+	message := outboxMessage(types.ContactEventPrivacyExceptionUpdated, map[string]any{
+		"tenant_id":         "tenant-contacts",
+		"owner_user_id":     "bob",
+		"other_user_id":     "alice",
+		"decision":          "DENY",
+		"exception_version": 2,
+		"occurred_at":       "2026-06-10T08:00:00Z",
+	})
+	event, err := BuildContactEvent(message)
+	if err != nil {
+		t.Fatalf("build privacy exception event: %v", err)
+	}
+	exception := event.GetPrivacyExceptionUpdated()
+	if exception == nil ||
+		exception.TenantId != "tenant-contacts" ||
+		exception.OwnerUserId != "bob" ||
+		exception.OtherUserId != "alice" ||
+		exception.Decision != "DENY" ||
+		exception.ExceptionVersion != 2 {
+		t.Fatalf("unexpected privacy exception event: %+v payload=%+v", event, exception)
+	}
+}
+
 func TestBuildContactEventRejectsMalformedEdgeEvent(t *testing.T) {
 	_, err := BuildContactEvent(outboxMessage(types.ContactEventEdgeDeleted, map[string]any{
 		"tenant_id":       "tenant-contacts",

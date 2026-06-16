@@ -60,6 +60,28 @@ func (u *SetContactPrivacyUseCase) Execute(
 	return u.repository.SetContactPrivacy(ctx, command)
 }
 
+type SetContactPrivacyExceptionUseCase struct {
+	repository SetContactPrivacyExceptionRepository
+}
+
+func NewSetContactPrivacyExceptionUseCase(repository SetContactPrivacyExceptionRepository) *SetContactPrivacyExceptionUseCase {
+	return &SetContactPrivacyExceptionUseCase{repository: repository}
+}
+
+func (u *SetContactPrivacyExceptionUseCase) Execute(
+	ctx context.Context,
+	command types.SetContactPrivacyExceptionCommand,
+) (types.SetContactPrivacyExceptionResult, error) {
+	if err := command.Validate(); err != nil {
+		return types.SetContactPrivacyExceptionResult{}, err
+	}
+	if u.repository == nil {
+		return types.SetContactPrivacyExceptionResult{}, types.NewDBWriteFailed("contact privacy exception repository is not configured")
+	}
+	command.Decision = types.NormalizeContactPrivacyExceptionDecision(command.Decision)
+	return u.repository.SetContactPrivacyException(ctx, command)
+}
+
 type GetTenantContactPrivacyDefaultUseCase struct {
 	repository GetTenantContactPrivacyDefaultRepository
 }

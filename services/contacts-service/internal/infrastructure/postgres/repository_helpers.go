@@ -21,6 +21,7 @@ type commandHashPayload struct {
 	TenantID                      string   `json:"tenant_id"`
 	UserID                        string   `json:"user_id"`
 	TargetUserID                  string   `json:"target_user_id,omitempty"`
+	OtherUserID                   string   `json:"other_user_id,omitempty"`
 	ContactUserID                 string   `json:"contact_user_id,omitempty"`
 	RequestID                     string   `json:"request_id,omitempty"`
 	Decision                      string   `json:"decision,omitempty"`

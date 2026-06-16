@@ -164,6 +164,79 @@ func (r *Repository) SetTenantContactPrivacyDefault(
 	return setTenantContactPrivacyDefaultResultFromRow(row, changed), nil
 }
 
+func (r *Repository) SetContactPrivacyException(
+	ctx context.Context,
+	command types.SetContactPrivacyExceptionCommand,
+) (types.SetContactPrivacyExceptionResult, error) {
+	if r.pool == nil {
+		return types.SetContactPrivacyExceptionResult{}, types.NewDBWriteFailed("contacts repository is not configured")
+	}
+	decision := types.NormalizeContactPrivacyExceptionDecision(command.Decision)
+	if decision == "" {
+		return types.SetContactPrivacyExceptionResult{}, types.NewInvalidArgument("decision is invalid")
+	}
+	commandHash, err := commandHash(commandHashPayload{
+		Kind:        commandTypeSetPrivacyException,
+		TenantID:    string(command.AuthContext.TenantID),
+		UserID:      string(command.AuthContext.UserID),
+		OtherUserID: string(command.OtherUserID),
+		Decision:    string(decision),
+	})
+	if err != nil {
+		return types.SetContactPrivacyExceptionResult{}, err
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return types.SetContactPrivacyExceptionResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+	if err := lockIdempotencyKey(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey); err != nil {
+		return types.SetContactPrivacyExceptionResult{}, err
+	}
+	if existing, ok, err := findCommandIdempotency(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey); err != nil {
+		return types.SetContactPrivacyExceptionResult{}, err
+	} else if ok {
+		if existing.CommandType != commandTypeSetPrivacyException || existing.CommandHash != commandHash {
+			return types.SetContactPrivacyExceptionResult{}, types.NewContactRequestConflict("idempotency key conflict")
+		}
+		row, err := contactPrivacyExceptionRowFromIdempotencyResult(existing)
+		if err != nil {
+			return types.SetContactPrivacyExceptionResult{}, err
+		}
+		return commitSetContactPrivacyExceptionResult(ctx, tx, setContactPrivacyExceptionResultFromRow(row, true))
+	}
+	if err := lockContactPrivacyException(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.OtherUserID); err != nil {
+		return types.SetContactPrivacyExceptionResult{}, err
+	}
+	row, changed, err := upsertContactPrivacyException(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.OtherUserID, decision)
+	if err != nil {
+		return types.SetContactPrivacyExceptionResult{}, err
+	}
+	resultJSON, err := contactPrivacyExceptionResultJSON(row)
+	if err != nil {
+		return types.SetContactPrivacyExceptionResult{}, err
+	}
+	if err := insertCommandIdempotencyWithResult(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.IdempotencyKey, commandTypeSetPrivacyException, commandHash, string(command.OtherUserID), resultJSON); err != nil {
+		return types.SetContactPrivacyExceptionResult{}, err
+	}
+	if changed {
+		if err := r.insertPrivacyExceptionOutbox(ctx, tx, privacyExceptionOutboxInput{
+			TenantID:      command.AuthContext.TenantID,
+			OwnerUserID:   command.AuthContext.UserID,
+			OtherUserID:   command.OtherUserID,
+			CorrelationID: command.AuthContext.RequestID,
+			CausationID:   command.AuthContext.RequestID,
+			TraceID:       command.AuthContext.TraceID,
+			Exception:     row,
+		}); err != nil {
+			return types.SetContactPrivacyExceptionResult{}, err
+		}
+	}
+	return commitSetContactPrivacyExceptionResult(ctx, tx, setContactPrivacyExceptionResultFromRow(row, false))
+}
+
 type contactPrivacyRow struct {
 	TenantID                   types.TenantID
 	UserID                     types.UserID
@@ -174,6 +247,15 @@ type contactPrivacyRow struct {
 	Version                    int64
 	UpdatedAt                  time.Time
 	PolicySource               types.ContactPrivacyPolicySource
+}
+
+type contactPrivacyExceptionRow struct {
+	TenantID    types.TenantID
+	OwnerUserID types.UserID
+	OtherUserID types.UserID
+	Decision    types.ContactPrivacyExceptionDecision
+	Version     int64
+	UpdatedAt   time.Time
 }
 
 func defaultContactPrivacyRow(tenantID types.TenantID, userID types.UserID) contactPrivacyRow {
@@ -300,6 +382,36 @@ func getTenantContactPrivacyDefault(
 	return getTenantDefaultContactPrivacySettings(ctx, queryer, tenantID, "")
 }
 
+func getContactPrivacyExceptionDecision(
+	ctx context.Context,
+	queryer interface {
+		QueryRow(context.Context, string, ...any) pgx.Row
+	},
+	tenantID types.TenantID,
+	ownerUserID types.UserID,
+	otherUserID types.UserID,
+) (types.ContactPrivacyExceptionDecision, bool, error) {
+	var decision types.ContactPrivacyExceptionDecision
+	err := queryer.QueryRow(ctx, `
+SELECT decision
+FROM contact_privacy_exceptions
+WHERE tenant_id = $1
+  AND owner_user_id = $2
+  AND other_user_id = $3
+`, tenantID, ownerUserID, otherUserID).Scan(&decision)
+	if err == pgx.ErrNoRows {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, types.NewDBReadFailed(err.Error())
+	}
+	decision = types.NormalizeContactPrivacyExceptionDecision(decision)
+	if decision == "" {
+		return "", false, types.NewDBReadFailed("contact privacy exception decision is invalid")
+	}
+	return decision, true, nil
+}
+
 func contactRequestsAllowed(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, sourceType types.ContactRequestSourceType) (bool, error) {
 	row, err := getContactPrivacySettings(ctx, tx, tenantID, userID)
 	if err != nil {
@@ -330,6 +442,69 @@ func lockContactPrivacySettings(ctx context.Context, tx pgx.Tx, tenantID types.T
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
+}
+
+func lockContactPrivacyException(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, ownerUserID types.UserID, otherUserID types.UserID) error {
+	key := fmt.Sprintf("%s\x1f%s\x1f%s\x1fcontacts_privacy_exception", tenantID, ownerUserID, otherUserID)
+	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, key)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func upsertContactPrivacyException(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	ownerUserID types.UserID,
+	otherUserID types.UserID,
+	decision types.ContactPrivacyExceptionDecision,
+) (contactPrivacyExceptionRow, bool, error) {
+	var current contactPrivacyExceptionRow
+	err := tx.QueryRow(ctx, `
+SELECT tenant_id, owner_user_id, other_user_id, decision, version, updated_at
+FROM contact_privacy_exceptions
+WHERE tenant_id = $1
+  AND owner_user_id = $2
+  AND other_user_id = $3
+`, tenantID, ownerUserID, otherUserID).Scan(&current.TenantID, &current.OwnerUserID, &current.OtherUserID, &current.Decision, &current.Version, &current.UpdatedAt)
+	if err != nil && err != pgx.ErrNoRows {
+		return contactPrivacyExceptionRow{}, false, types.NewDBReadFailed(err.Error())
+	}
+	if err == nil && current.Decision == decision {
+		return current, false, nil
+	}
+	var row contactPrivacyExceptionRow
+	if err == pgx.ErrNoRows {
+		err = tx.QueryRow(ctx, `
+INSERT INTO contact_privacy_exceptions (
+    tenant_id,
+    owner_user_id,
+    other_user_id,
+    decision,
+    version,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, 1, now(), now())
+RETURNING tenant_id, owner_user_id, other_user_id, decision, version, updated_at
+`, tenantID, ownerUserID, otherUserID, decision).Scan(&row.TenantID, &row.OwnerUserID, &row.OtherUserID, &row.Decision, &row.Version, &row.UpdatedAt)
+	} else {
+		err = tx.QueryRow(ctx, `
+UPDATE contact_privacy_exceptions
+SET decision = $4,
+    version = version + 1,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND owner_user_id = $2
+  AND other_user_id = $3
+RETURNING tenant_id, owner_user_id, other_user_id, decision, version, updated_at
+`, tenantID, ownerUserID, otherUserID, decision).Scan(&row.TenantID, &row.OwnerUserID, &row.OtherUserID, &row.Decision, &row.Version, &row.UpdatedAt)
+	}
+	if err != nil {
+		return contactPrivacyExceptionRow{}, false, types.NewDBWriteFailed(err.Error())
+	}
+	return row, true, nil
 }
 
 func upsertContactPrivacySettings(
@@ -525,6 +700,17 @@ func setTenantContactPrivacyDefaultResultFromRow(row contactPrivacyRow, changed 
 	}
 }
 
+func setContactPrivacyExceptionResultFromRow(row contactPrivacyExceptionRow, replay bool) types.SetContactPrivacyExceptionResult {
+	return types.SetContactPrivacyExceptionResult{
+		TenantID:         row.TenantID,
+		OwnerUserID:      row.OwnerUserID,
+		OtherUserID:      row.OtherUserID,
+		Decision:         row.Decision,
+		Version:          row.Version,
+		IdempotentReplay: replay,
+	}
+}
+
 func contactPrivacySettingsFromRow(row contactPrivacyRow) types.ContactPrivacySettings {
 	var updatedAtUnixMS int64
 	if !row.UpdatedAt.IsZero() {
@@ -548,6 +734,16 @@ type privacyOutboxInput struct {
 	CausationID   string
 	TraceID       string
 	Privacy       contactPrivacyRow
+}
+
+type privacyExceptionOutboxInput struct {
+	TenantID      types.TenantID
+	OwnerUserID   types.UserID
+	OtherUserID   types.UserID
+	CorrelationID string
+	CausationID   string
+	TraceID       string
+	Exception     contactPrivacyExceptionRow
 }
 
 func (r *Repository) insertPrivacyOutbox(ctx context.Context, tx pgx.Tx, input privacyOutboxInput) error {
@@ -584,9 +780,48 @@ func (r *Repository) insertPrivacyOutbox(ctx context.Context, tx pgx.Tx, input p
 	})
 }
 
+func (r *Repository) insertPrivacyExceptionOutbox(ctx context.Context, tx pgx.Tx, input privacyExceptionOutboxInput) error {
+	eventID, err := r.eventID()
+	if err != nil {
+		return types.NewOutboxWriteFailed(err.Error())
+	}
+	partitionKey := partitionKeyFor(input.TenantID, input.OwnerUserID, input.OtherUserID)
+	aggregateVersion, err := nextContactOutboxAggregateVersion(ctx, tx, input.TenantID, partitionKey)
+	if err != nil {
+		return err
+	}
+	return insertContactOutbox(ctx, tx, contactOutboxInput{
+		EventID:          eventID,
+		TenantID:         input.TenantID,
+		AggregateType:    "CONTACT_PRIVACY_EXCEPTION",
+		AggregateID:      fmt.Sprintf("%s:%s", input.OwnerUserID, input.OtherUserID),
+		AggregateVersion: aggregateVersion,
+		EventType:        eventTypeContactPrivacyExceptionUpdated,
+		PartitionKey:     partitionKey,
+		CorrelationID:    input.CorrelationID,
+		CausationID:      input.CausationID,
+		TraceID:          input.TraceID,
+		Payload: map[string]any{
+			"tenant_id":         input.TenantID,
+			"owner_user_id":     input.OwnerUserID,
+			"other_user_id":     input.OtherUserID,
+			"decision":          input.Exception.Decision,
+			"exception_version": input.Exception.Version,
+			"occurred_at":       r.now().Format(time.RFC3339Nano),
+		},
+	})
+}
+
 func commitSetContactPrivacyResult(ctx context.Context, tx pgx.Tx, result types.SetContactPrivacyResult) (types.SetContactPrivacyResult, error) {
 	if err := tx.Commit(ctx); err != nil {
 		return types.SetContactPrivacyResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return result, nil
+}
+
+func commitSetContactPrivacyExceptionResult(ctx context.Context, tx pgx.Tx, result types.SetContactPrivacyExceptionResult) (types.SetContactPrivacyExceptionResult, error) {
+	if err := tx.Commit(ctx); err != nil {
+		return types.SetContactPrivacyExceptionResult{}, types.NewDBWriteFailed(err.Error())
 	}
 	return result, nil
 }
@@ -603,6 +838,15 @@ type contactPrivacyResultSnapshot struct {
 	PolicySource               string         `json:"policy_source"`
 }
 
+type contactPrivacyExceptionResultSnapshot struct {
+	TenantID        types.TenantID `json:"tenant_id"`
+	OwnerUserID     types.UserID   `json:"owner_user_id"`
+	OtherUserID     types.UserID   `json:"other_user_id"`
+	Decision        string         `json:"decision"`
+	Version         int64          `json:"version"`
+	UpdatedAtUnixMS int64          `json:"updated_at_unix_ms"`
+}
+
 func contactPrivacyResultJSON(row contactPrivacyRow) ([]byte, error) {
 	settings := contactPrivacySettingsFromRow(row)
 	raw, err := json.Marshal(contactPrivacyResultSnapshot{
@@ -615,6 +859,21 @@ func contactPrivacyResultJSON(row contactPrivacyRow) ([]byte, error) {
 		Version:                    settings.Version,
 		UpdatedAtUnixMS:            settings.UpdatedAtUnixMS,
 		PolicySource:               string(settings.PolicySource),
+	})
+	if err != nil {
+		return nil, types.NewDBWriteFailed(err.Error())
+	}
+	return raw, nil
+}
+
+func contactPrivacyExceptionResultJSON(row contactPrivacyExceptionRow) ([]byte, error) {
+	raw, err := json.Marshal(contactPrivacyExceptionResultSnapshot{
+		TenantID:        row.TenantID,
+		OwnerUserID:     row.OwnerUserID,
+		OtherUserID:     row.OtherUserID,
+		Decision:        string(row.Decision),
+		Version:         row.Version,
+		UpdatedAtUnixMS: row.UpdatedAt.UnixMilli(),
 	})
 	if err != nil {
 		return nil, types.NewDBWriteFailed(err.Error())
@@ -673,6 +932,28 @@ func profileVisibilityFieldsFromDB(values []string, allowProfileVisibility bool)
 		return types.DefaultContactProfileVisibilityFields()
 	}
 	return fields
+}
+
+func contactPrivacyExceptionRowFromIdempotencyResult(existing commandIdempotency) (contactPrivacyExceptionRow, error) {
+	var snapshot contactPrivacyExceptionResultSnapshot
+	if len(existing.ResultJSON) == 0 || string(existing.ResultJSON) == "{}" {
+		return contactPrivacyExceptionRow{}, types.NewDBReadFailed("contact privacy exception idempotency result snapshot missing")
+	}
+	if err := json.Unmarshal(existing.ResultJSON, &snapshot); err != nil {
+		return contactPrivacyExceptionRow{}, types.NewDBReadFailed(err.Error())
+	}
+	decision := types.NormalizeContactPrivacyExceptionDecision(types.ContactPrivacyExceptionDecision(snapshot.Decision))
+	if snapshot.TenantID == "" || snapshot.OwnerUserID == "" || snapshot.OtherUserID == "" || decision == "" || snapshot.Version <= 0 || snapshot.UpdatedAtUnixMS <= 0 {
+		return contactPrivacyExceptionRow{}, types.NewDBReadFailed("contact privacy exception idempotency result snapshot incomplete")
+	}
+	return contactPrivacyExceptionRow{
+		TenantID:    snapshot.TenantID,
+		OwnerUserID: snapshot.OwnerUserID,
+		OtherUserID: snapshot.OtherUserID,
+		Decision:    decision,
+		Version:     snapshot.Version,
+		UpdatedAt:   time.UnixMilli(snapshot.UpdatedAtUnixMS).UTC(),
+	}, nil
 }
 
 func contactPrivacyPolicySourceFromSnapshot(source string) types.ContactPrivacyPolicySource {

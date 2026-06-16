@@ -745,6 +745,21 @@ func setPrivacyCommand(user string, allow bool, key string) types.SetContactPriv
 	}
 }
 
+func setPrivacyExceptionCommand(owner string, other string, decision types.ContactPrivacyExceptionDecision, key string) types.SetContactPrivacyExceptionCommand {
+	return types.SetContactPrivacyExceptionCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  "tenant-contacts",
+			UserID:    types.UserID(owner),
+			DeviceID:  "device-1",
+			RequestID: "request-" + key,
+			TraceID:   "trace-" + key,
+		},
+		OtherUserID:    types.UserID(other),
+		Decision:       decision,
+		IdempotencyKey: key,
+	}
+}
+
 func respondCommand(receiver string, requestID string, key string, decision types.ContactDecision) types.RespondContactRequestCommand {
 	return types.RespondContactRequestCommand{
 		AuthContext: types.AuthContext{
@@ -1185,6 +1200,7 @@ TRUNCATE
     contacts_outbox_repair_audit,
     contacts_outbox,
     contact_command_idempotency,
+    contact_privacy_exceptions,
     contact_privacy_settings,
     contact_tenant_privacy_defaults,
     contact_tenant_request_source_policies,

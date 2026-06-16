@@ -38,6 +38,7 @@ message ContactEvent {
     ContactRequestCanceledV1 request_canceled = 27;
     ContactEdgeGroupUpdatedV1 edge_group_updated = 28;
     ContactPrivacyUpdatedV1 privacy_updated = 29;
+    ContactPrivacyExceptionUpdatedV1 privacy_exception_updated = 30;
   }
 }
 
@@ -139,4 +140,13 @@ message ContactPrivacyUpdatedV1 {
   bool allow_search_contact_requests = 6;
   bool allow_profile_visibility = 7;
   repeated string profile_visibility_fields = 8;
+}
+
+message ContactPrivacyExceptionUpdatedV1 {
+  string tenant_id = 1;
+  string owner_user_id = 2;
+  string other_user_id = 3;
+  string decision = 4;
+  int64 exception_version = 5;
+  google.protobuf.Timestamp occurred_at = 6;
 }

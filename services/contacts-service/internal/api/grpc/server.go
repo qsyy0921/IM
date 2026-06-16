@@ -23,6 +23,10 @@ type SetContactPrivacyExecutor interface {
 	Execute(context.Context, types.SetContactPrivacyCommand) (types.SetContactPrivacyResult, error)
 }
 
+type SetContactPrivacyExceptionExecutor interface {
+	Execute(context.Context, types.SetContactPrivacyExceptionCommand) (types.SetContactPrivacyExceptionResult, error)
+}
+
 type RespondContactRequestExecutor interface {
 	Execute(context.Context, types.RespondContactRequestCommand) (types.RespondContactRequestResult, error)
 }
@@ -65,25 +69,27 @@ type UpdateContactGroupExecutor interface {
 
 type Server struct {
 	contactsv1.UnimplementedContactsServiceServer
-	sendContactRequest    SendContactRequestExecutor
-	getContactPrivacy     GetContactPrivacyExecutor
-	setContactPrivacy     SetContactPrivacyExecutor
-	respondContactRequest RespondContactRequestExecutor
-	cancelContactRequest  CancelContactRequestExecutor
-	listContactRequests   ListContactRequestsExecutor
-	listContacts          ListContactsExecutor
-	getContactState       GetContactStateExecutor
-	deleteContact         DeleteContactExecutor
-	blockContact          BlockContactExecutor
-	unblockContact        UnblockContactExecutor
-	updateContactRemark   UpdateContactRemarkExecutor
-	updateContactGroup    UpdateContactGroupExecutor
+	sendContactRequest         SendContactRequestExecutor
+	getContactPrivacy          GetContactPrivacyExecutor
+	setContactPrivacy          SetContactPrivacyExecutor
+	setContactPrivacyException SetContactPrivacyExceptionExecutor
+	respondContactRequest      RespondContactRequestExecutor
+	cancelContactRequest       CancelContactRequestExecutor
+	listContactRequests        ListContactRequestsExecutor
+	listContacts               ListContactsExecutor
+	getContactState            GetContactStateExecutor
+	deleteContact              DeleteContactExecutor
+	blockContact               BlockContactExecutor
+	unblockContact             UnblockContactExecutor
+	updateContactRemark        UpdateContactRemarkExecutor
+	updateContactGroup         UpdateContactGroupExecutor
 }
 
 func NewServer(
 	sendContactRequest SendContactRequestExecutor,
 	getContactPrivacy GetContactPrivacyExecutor,
 	setContactPrivacy SetContactPrivacyExecutor,
+	setContactPrivacyException SetContactPrivacyExceptionExecutor,
 	respondContactRequest RespondContactRequestExecutor,
 	cancelContactRequest CancelContactRequestExecutor,
 	listContactRequests ListContactRequestsExecutor,
@@ -96,19 +102,20 @@ func NewServer(
 	updateContactGroup UpdateContactGroupExecutor,
 ) *Server {
 	return &Server{
-		sendContactRequest:    sendContactRequest,
-		getContactPrivacy:     getContactPrivacy,
-		setContactPrivacy:     setContactPrivacy,
-		respondContactRequest: respondContactRequest,
-		cancelContactRequest:  cancelContactRequest,
-		listContactRequests:   listContactRequests,
-		listContacts:          listContacts,
-		getContactState:       getContactState,
-		deleteContact:         deleteContact,
-		blockContact:          blockContact,
-		unblockContact:        unblockContact,
-		updateContactRemark:   updateContactRemark,
-		updateContactGroup:    updateContactGroup,
+		sendContactRequest:         sendContactRequest,
+		getContactPrivacy:          getContactPrivacy,
+		setContactPrivacy:          setContactPrivacy,
+		setContactPrivacyException: setContactPrivacyException,
+		respondContactRequest:      respondContactRequest,
+		cancelContactRequest:       cancelContactRequest,
+		listContactRequests:        listContactRequests,
+		listContacts:               listContacts,
+		getContactState:            getContactState,
+		deleteContact:              deleteContact,
+		blockContact:               blockContact,
+		unblockContact:             unblockContact,
+		updateContactRemark:        updateContactRemark,
+		updateContactGroup:         updateContactGroup,
 	}
 }
 
@@ -198,6 +205,35 @@ func (s *Server) SetContactPrivacy(
 		TenantId:         string(result.TenantID),
 		UserId:           string(result.UserID),
 		Settings:         privacySettingsToProto(result.Settings),
+		IdempotentReplay: result.IdempotentReplay,
+	}, nil
+}
+
+func (s *Server) SetContactPrivacyException(
+	ctx context.Context,
+	request *contactsv1.SetContactPrivacyExceptionRequest,
+) (*contactsv1.SetContactPrivacyExceptionResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.setContactPrivacyException == nil {
+		return nil, status.Error(codes.Unimplemented, "set contact privacy exception is not configured")
+	}
+	result, err := s.setContactPrivacyException.Execute(ctx, types.SetContactPrivacyExceptionCommand{
+		AuthContext:    authFromProto(ctx, request.GetAuthContext()),
+		OtherUserID:    types.UserID(request.GetOtherUserId()),
+		Decision:       privacyExceptionDecisionFromProto(request.GetDecision()),
+		IdempotencyKey: request.GetIdempotencyKey(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &contactsv1.SetContactPrivacyExceptionResponse{
+		TenantId:         string(result.TenantID),
+		OwnerUserId:      string(result.OwnerUserID),
+		OtherUserId:      string(result.OtherUserID),
+		Decision:         privacyExceptionDecisionToProto(result.Decision),
+		Version:          result.Version,
 		IdempotentReplay: result.IdempotentReplay,
 	}, nil
 }
@@ -730,6 +766,28 @@ func privacyPolicySourceToProto(value types.ContactPrivacyPolicySource) contacts
 		return contactsv1.ContactPrivacyPolicySource_CONTACT_PRIVACY_POLICY_SOURCE_SYSTEM_DEFAULT
 	default:
 		return contactsv1.ContactPrivacyPolicySource_CONTACT_PRIVACY_POLICY_SOURCE_UNSPECIFIED
+	}
+}
+
+func privacyExceptionDecisionFromProto(value contactsv1.ContactPrivacyExceptionDecision) types.ContactPrivacyExceptionDecision {
+	switch value {
+	case contactsv1.ContactPrivacyExceptionDecision_CONTACT_PRIVACY_EXCEPTION_DECISION_ALLOW:
+		return types.ContactPrivacyExceptionDecisionAllow
+	case contactsv1.ContactPrivacyExceptionDecision_CONTACT_PRIVACY_EXCEPTION_DECISION_DENY:
+		return types.ContactPrivacyExceptionDecisionDeny
+	default:
+		return ""
+	}
+}
+
+func privacyExceptionDecisionToProto(value types.ContactPrivacyExceptionDecision) contactsv1.ContactPrivacyExceptionDecision {
+	switch value {
+	case types.ContactPrivacyExceptionDecisionAllow:
+		return contactsv1.ContactPrivacyExceptionDecision_CONTACT_PRIVACY_EXCEPTION_DECISION_ALLOW
+	case types.ContactPrivacyExceptionDecisionDeny:
+		return contactsv1.ContactPrivacyExceptionDecision_CONTACT_PRIVACY_EXCEPTION_DECISION_DENY
+	default:
+		return contactsv1.ContactPrivacyExceptionDecision_CONTACT_PRIVACY_EXCEPTION_DECISION_UNSPECIFIED
 	}
 }
 

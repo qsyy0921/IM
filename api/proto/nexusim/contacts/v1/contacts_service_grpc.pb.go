@@ -19,19 +19,20 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ContactsService_SendContactRequest_FullMethodName    = "/nexusim.contacts.v1.ContactsService/SendContactRequest"
-	ContactsService_RespondContactRequest_FullMethodName = "/nexusim.contacts.v1.ContactsService/RespondContactRequest"
-	ContactsService_CancelContactRequest_FullMethodName  = "/nexusim.contacts.v1.ContactsService/CancelContactRequest"
-	ContactsService_ListContactRequests_FullMethodName   = "/nexusim.contacts.v1.ContactsService/ListContactRequests"
-	ContactsService_ListContacts_FullMethodName          = "/nexusim.contacts.v1.ContactsService/ListContacts"
-	ContactsService_GetContactState_FullMethodName       = "/nexusim.contacts.v1.ContactsService/GetContactState"
-	ContactsService_DeleteContact_FullMethodName         = "/nexusim.contacts.v1.ContactsService/DeleteContact"
-	ContactsService_BlockContact_FullMethodName          = "/nexusim.contacts.v1.ContactsService/BlockContact"
-	ContactsService_UnblockContact_FullMethodName        = "/nexusim.contacts.v1.ContactsService/UnblockContact"
-	ContactsService_UpdateContactRemark_FullMethodName   = "/nexusim.contacts.v1.ContactsService/UpdateContactRemark"
-	ContactsService_UpdateContactGroup_FullMethodName    = "/nexusim.contacts.v1.ContactsService/UpdateContactGroup"
-	ContactsService_GetContactPrivacy_FullMethodName     = "/nexusim.contacts.v1.ContactsService/GetContactPrivacy"
-	ContactsService_SetContactPrivacy_FullMethodName     = "/nexusim.contacts.v1.ContactsService/SetContactPrivacy"
+	ContactsService_SendContactRequest_FullMethodName         = "/nexusim.contacts.v1.ContactsService/SendContactRequest"
+	ContactsService_RespondContactRequest_FullMethodName      = "/nexusim.contacts.v1.ContactsService/RespondContactRequest"
+	ContactsService_CancelContactRequest_FullMethodName       = "/nexusim.contacts.v1.ContactsService/CancelContactRequest"
+	ContactsService_ListContactRequests_FullMethodName        = "/nexusim.contacts.v1.ContactsService/ListContactRequests"
+	ContactsService_ListContacts_FullMethodName               = "/nexusim.contacts.v1.ContactsService/ListContacts"
+	ContactsService_GetContactState_FullMethodName            = "/nexusim.contacts.v1.ContactsService/GetContactState"
+	ContactsService_DeleteContact_FullMethodName              = "/nexusim.contacts.v1.ContactsService/DeleteContact"
+	ContactsService_BlockContact_FullMethodName               = "/nexusim.contacts.v1.ContactsService/BlockContact"
+	ContactsService_UnblockContact_FullMethodName             = "/nexusim.contacts.v1.ContactsService/UnblockContact"
+	ContactsService_UpdateContactRemark_FullMethodName        = "/nexusim.contacts.v1.ContactsService/UpdateContactRemark"
+	ContactsService_UpdateContactGroup_FullMethodName         = "/nexusim.contacts.v1.ContactsService/UpdateContactGroup"
+	ContactsService_GetContactPrivacy_FullMethodName          = "/nexusim.contacts.v1.ContactsService/GetContactPrivacy"
+	ContactsService_SetContactPrivacy_FullMethodName          = "/nexusim.contacts.v1.ContactsService/SetContactPrivacy"
+	ContactsService_SetContactPrivacyException_FullMethodName = "/nexusim.contacts.v1.ContactsService/SetContactPrivacyException"
 )
 
 // ContactsServiceClient is the client API for ContactsService service.
@@ -51,6 +52,7 @@ type ContactsServiceClient interface {
 	UpdateContactGroup(ctx context.Context, in *UpdateContactGroupRequest, opts ...grpc.CallOption) (*UpdateContactGroupResponse, error)
 	GetContactPrivacy(ctx context.Context, in *GetContactPrivacyRequest, opts ...grpc.CallOption) (*GetContactPrivacyResponse, error)
 	SetContactPrivacy(ctx context.Context, in *SetContactPrivacyRequest, opts ...grpc.CallOption) (*SetContactPrivacyResponse, error)
+	SetContactPrivacyException(ctx context.Context, in *SetContactPrivacyExceptionRequest, opts ...grpc.CallOption) (*SetContactPrivacyExceptionResponse, error)
 }
 
 type contactsServiceClient struct {
@@ -191,6 +193,16 @@ func (c *contactsServiceClient) SetContactPrivacy(ctx context.Context, in *SetCo
 	return out, nil
 }
 
+func (c *contactsServiceClient) SetContactPrivacyException(ctx context.Context, in *SetContactPrivacyExceptionRequest, opts ...grpc.CallOption) (*SetContactPrivacyExceptionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetContactPrivacyExceptionResponse)
+	err := c.cc.Invoke(ctx, ContactsService_SetContactPrivacyException_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ContactsServiceServer is the server API for ContactsService service.
 // All implementations must embed UnimplementedContactsServiceServer
 // for forward compatibility.
@@ -208,6 +220,7 @@ type ContactsServiceServer interface {
 	UpdateContactGroup(context.Context, *UpdateContactGroupRequest) (*UpdateContactGroupResponse, error)
 	GetContactPrivacy(context.Context, *GetContactPrivacyRequest) (*GetContactPrivacyResponse, error)
 	SetContactPrivacy(context.Context, *SetContactPrivacyRequest) (*SetContactPrivacyResponse, error)
+	SetContactPrivacyException(context.Context, *SetContactPrivacyExceptionRequest) (*SetContactPrivacyExceptionResponse, error)
 	mustEmbedUnimplementedContactsServiceServer()
 }
 
@@ -256,6 +269,9 @@ func (UnimplementedContactsServiceServer) GetContactPrivacy(context.Context, *Ge
 }
 func (UnimplementedContactsServiceServer) SetContactPrivacy(context.Context, *SetContactPrivacyRequest) (*SetContactPrivacyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetContactPrivacy not implemented")
+}
+func (UnimplementedContactsServiceServer) SetContactPrivacyException(context.Context, *SetContactPrivacyExceptionRequest) (*SetContactPrivacyExceptionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetContactPrivacyException not implemented")
 }
 func (UnimplementedContactsServiceServer) mustEmbedUnimplementedContactsServiceServer() {}
 func (UnimplementedContactsServiceServer) testEmbeddedByValue()                         {}
@@ -512,6 +528,24 @@ func _ContactsService_SetContactPrivacy_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ContactsService_SetContactPrivacyException_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetContactPrivacyExceptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ContactsServiceServer).SetContactPrivacyException(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ContactsService_SetContactPrivacyException_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ContactsServiceServer).SetContactPrivacyException(ctx, req.(*SetContactPrivacyExceptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ContactsService_ServiceDesc is the grpc.ServiceDesc for ContactsService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -570,6 +604,10 @@ var ContactsService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetContactPrivacy",
 			Handler:    _ContactsService_SetContactPrivacy_Handler,
+		},
+		{
+			MethodName: "SetContactPrivacyException",
+			Handler:    _ContactsService_SetContactPrivacyException_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

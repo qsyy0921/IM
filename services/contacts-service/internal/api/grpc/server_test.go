@@ -25,7 +25,7 @@ func TestSendContactRequestMapsSourceMetadata(t *testing.T) {
 				SourceRef:      command.SourceRef,
 			}, nil
 		}),
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
 
 	response, err := server.SendContactRequest(context.Background(), &contactsv1.SendContactRequestRequest{
@@ -60,7 +60,7 @@ func TestSendContactRequestRejectsUnknownSourceType(t *testing.T) {
 			t.Fatalf("expected unknown source type to fail validation, got %+v", command)
 			return types.SendContactRequestResult{}, nil
 		}),
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
 
 	_, err := server.SendContactRequest(context.Background(), &contactsv1.SendContactRequestRequest{
@@ -80,7 +80,7 @@ func TestSendContactRequestRejectsUnknownSourceType(t *testing.T) {
 
 func TestListContactRequestsMapsSourceMetadata(t *testing.T) {
 	server := NewServer(
-		nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil,
 		listContactRequestsExecutorFunc(func(_ context.Context, _ types.ListContactRequestsCommand) (types.ListContactRequestsResult, error) {
 			return types.ListContactRequestsResult{
 				TenantID:  "tenant-1",
@@ -142,7 +142,7 @@ func TestContactPrivacyMapsPolicySource(t *testing.T) {
 				},
 			}, nil
 		}),
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
 
 	response, err := server.GetContactPrivacy(context.Background(), &contactsv1.GetContactPrivacyRequest{
@@ -189,7 +189,7 @@ func TestSetContactPrivacyMapsOptionalPolicies(t *testing.T) {
 				},
 			}, nil
 		}),
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
 
 	allowSearch := false
@@ -236,6 +236,47 @@ func TestSetContactPrivacyMapsOptionalPolicies(t *testing.T) {
 	}
 }
 
+func TestSetContactPrivacyExceptionMapsDecision(t *testing.T) {
+	var captured types.SetContactPrivacyExceptionCommand
+	server := NewServer(
+		nil, nil, nil,
+		setContactPrivacyExceptionExecutorFunc(func(_ context.Context, command types.SetContactPrivacyExceptionCommand) (types.SetContactPrivacyExceptionResult, error) {
+			captured = command
+			return types.SetContactPrivacyExceptionResult{
+				TenantID:    command.AuthContext.TenantID,
+				OwnerUserID: command.AuthContext.UserID,
+				OtherUserID: command.OtherUserID,
+				Decision:    command.Decision,
+				Version:     1,
+			}, nil
+		}),
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+	)
+
+	response, err := server.SetContactPrivacyException(context.Background(), &contactsv1.SetContactPrivacyExceptionRequest{
+		AuthContext: &contactsv1.AuthContext{
+			TenantId: "tenant-1",
+			UserId:   "bob",
+		},
+		OtherUserId:    "alice",
+		Decision:       contactsv1.ContactPrivacyExceptionDecision_CONTACT_PRIVACY_EXCEPTION_DECISION_DENY,
+		IdempotencyKey: "privacy-exception-1",
+	})
+	if err != nil {
+		t.Fatalf("set contact privacy exception: %v", err)
+	}
+	if captured.OtherUserID != "alice" ||
+		captured.Decision != types.ContactPrivacyExceptionDecisionDeny ||
+		captured.IdempotencyKey != "privacy-exception-1" {
+		t.Fatalf("unexpected captured command: %+v", captured)
+	}
+	if response.GetDecision() != contactsv1.ContactPrivacyExceptionDecision_CONTACT_PRIVACY_EXCEPTION_DECISION_DENY ||
+		response.GetOwnerUserId() != "bob" ||
+		response.GetOtherUserId() != "alice" {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
 type sendContactRequestExecutorFunc func(context.Context, types.SendContactRequestCommand) (types.SendContactRequestResult, error)
 
 func (f sendContactRequestExecutorFunc) Execute(ctx context.Context, command types.SendContactRequestCommand) (types.SendContactRequestResult, error) {
@@ -251,6 +292,12 @@ func (f getContactPrivacyExecutorFunc) Execute(ctx context.Context, command type
 type setContactPrivacyExecutorFunc func(context.Context, types.SetContactPrivacyCommand) (types.SetContactPrivacyResult, error)
 
 func (f setContactPrivacyExecutorFunc) Execute(ctx context.Context, command types.SetContactPrivacyCommand) (types.SetContactPrivacyResult, error) {
+	return f(ctx, command)
+}
+
+type setContactPrivacyExceptionExecutorFunc func(context.Context, types.SetContactPrivacyExceptionCommand) (types.SetContactPrivacyExceptionResult, error)
+
+func (f setContactPrivacyExceptionExecutorFunc) Execute(ctx context.Context, command types.SetContactPrivacyExceptionCommand) (types.SetContactPrivacyExceptionResult, error) {
 	return f(ctx, command)
 }
 

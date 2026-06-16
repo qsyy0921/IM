@@ -7,16 +7,17 @@ const (
 	OutboxStatusPublished = "PUBLISHED"
 	OutboxStatusDLQ       = "DLQ"
 
-	ContactEventRequestCreated  = "contact.request.created.v1"
-	ContactEventRequestAccepted = "contact.request.accepted.v1"
-	ContactEventRequestDeclined = "contact.request.declined.v1"
-	ContactEventRequestCanceled = "contact.request.canceled.v1"
-	ContactEventEdgeDeleted     = "contact.edge.deleted.v1"
-	ContactEventEdgeBlocked     = "contact.edge.blocked.v1"
-	ContactEventEdgeUnblocked   = "contact.edge.unblocked.v1"
-	ContactEventRemarkUpdated   = "contact.edge.remark_updated.v1"
-	ContactEventGroupUpdated    = "contact.edge.group_updated.v1"
-	ContactEventPrivacyUpdated  = "contact.privacy.updated.v1"
+	ContactEventRequestCreated          = "contact.request.created.v1"
+	ContactEventRequestAccepted         = "contact.request.accepted.v1"
+	ContactEventRequestDeclined         = "contact.request.declined.v1"
+	ContactEventRequestCanceled         = "contact.request.canceled.v1"
+	ContactEventEdgeDeleted             = "contact.edge.deleted.v1"
+	ContactEventEdgeBlocked             = "contact.edge.blocked.v1"
+	ContactEventEdgeUnblocked           = "contact.edge.unblocked.v1"
+	ContactEventRemarkUpdated           = "contact.edge.remark_updated.v1"
+	ContactEventGroupUpdated            = "contact.edge.group_updated.v1"
+	ContactEventPrivacyUpdated          = "contact.privacy.updated.v1"
+	ContactEventPrivacyExceptionUpdated = "contact.privacy_exception.updated.v1"
 )
 
 type OutboxMessage struct {

@@ -124,6 +124,40 @@ func TestNormalizeContactProfileVisibilityFields(t *testing.T) {
 	}
 }
 
+func TestSetContactPrivacyExceptionCommandValidation(t *testing.T) {
+	command := SetContactPrivacyExceptionCommand{
+		AuthContext: AuthContext{
+			TenantID: "tenant-1",
+			UserID:   "bob",
+		},
+		OtherUserID:    "alice",
+		Decision:       ContactPrivacyExceptionDecision("deny"),
+		IdempotencyKey: "privacy-exception-1",
+	}
+	if err := command.Validate(); err != nil {
+		t.Fatalf("expected privacy exception command to be valid: %v", err)
+	}
+	if NormalizeContactPrivacyExceptionDecision(command.Decision) != ContactPrivacyExceptionDecisionDeny {
+		t.Fatalf("expected decision to normalize to DENY")
+	}
+	command.Decision = "BLOCK"
+	if err := command.Validate(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("expected invalid decision, got %v", err)
+	}
+	command = SetContactPrivacyExceptionCommand{
+		AuthContext: AuthContext{
+			TenantID: "tenant-1",
+			UserID:   "bob",
+		},
+		OtherUserID:    "bob",
+		Decision:       ContactPrivacyExceptionDecisionAllow,
+		IdempotencyKey: "privacy-exception-2",
+	}
+	if err := command.Validate(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("expected self exception to be invalid, got %v", err)
+	}
+}
+
 func validSendContactRequestCommand() SendContactRequestCommand {
 	return SendContactRequestCommand{
 		AuthContext: AuthContext{

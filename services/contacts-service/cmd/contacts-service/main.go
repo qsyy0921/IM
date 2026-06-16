@@ -122,6 +122,7 @@ func runGRPC() error {
 		app.NewSendContactRequestUseCase(repository),
 		app.NewGetContactPrivacyUseCase(repository),
 		app.NewSetContactPrivacyUseCase(repository),
+		app.NewSetContactPrivacyExceptionUseCase(repository),
 		app.NewRespondContactRequestUseCase(repository),
 		app.NewCancelContactRequestUseCase(repository),
 		app.NewListContactRequestsUseCase(repository),

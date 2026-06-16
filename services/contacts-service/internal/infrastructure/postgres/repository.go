@@ -21,17 +21,19 @@ const (
 	commandTypeUpdateContactRemark   = "UPDATE_CONTACT_REMARK"
 	commandTypeUpdateContactGroup    = "UPDATE_CONTACT_GROUP"
 	commandTypeSetContactPrivacy     = "SET_CONTACT_PRIVACY"
+	commandTypeSetPrivacyException   = "SET_CONTACT_PRIVACY_EXCEPTION"
 
-	eventTypeContactRequestCreated  = "contact.request.created.v1"
-	eventTypeContactRequestAccepted = "contact.request.accepted.v1"
-	eventTypeContactRequestDeclined = "contact.request.declined.v1"
-	eventTypeContactRequestCanceled = "contact.request.canceled.v1"
-	eventTypeContactEdgeDeleted     = "contact.edge.deleted.v1"
-	eventTypeContactEdgeBlocked     = "contact.edge.blocked.v1"
-	eventTypeContactEdgeUnblocked   = "contact.edge.unblocked.v1"
-	eventTypeContactRemarkUpdated   = "contact.edge.remark_updated.v1"
-	eventTypeContactGroupUpdated    = "contact.edge.group_updated.v1"
-	eventTypeContactPrivacyUpdated  = "contact.privacy.updated.v1"
+	eventTypeContactRequestCreated          = "contact.request.created.v1"
+	eventTypeContactRequestAccepted         = "contact.request.accepted.v1"
+	eventTypeContactRequestDeclined         = "contact.request.declined.v1"
+	eventTypeContactRequestCanceled         = "contact.request.canceled.v1"
+	eventTypeContactEdgeDeleted             = "contact.edge.deleted.v1"
+	eventTypeContactEdgeBlocked             = "contact.edge.blocked.v1"
+	eventTypeContactEdgeUnblocked           = "contact.edge.unblocked.v1"
+	eventTypeContactRemarkUpdated           = "contact.edge.remark_updated.v1"
+	eventTypeContactGroupUpdated            = "contact.edge.group_updated.v1"
+	eventTypeContactPrivacyUpdated          = "contact.privacy.updated.v1"
+	eventTypeContactPrivacyExceptionUpdated = "contact.privacy_exception.updated.v1"
 
 	contactsOutboxEventVersion   = "1.0.0"
 	contactsOutboxMappingVersion = 1
@@ -134,10 +136,27 @@ func (r *Repository) SendContactRequest(
 	} else if ok {
 		return types.SendContactRequestResult{}, types.NewContactRequestConflict("pending contact request already exists")
 	}
-	if allowed, err := contactRequestsAllowed(ctx, tx, command.AuthContext.TenantID, command.TargetUserID, command.NormalizedSourceType()); err != nil {
+	exceptionDecision, hasException, err := getContactPrivacyExceptionDecision(
+		ctx,
+		tx,
+		command.AuthContext.TenantID,
+		command.TargetUserID,
+		command.AuthContext.UserID,
+	)
+	if err != nil {
 		return types.SendContactRequestResult{}, err
-	} else if !allowed {
-		return types.SendContactRequestResult{}, types.NewPermissionDenied("target user does not accept contact requests")
+	}
+	if hasException && exceptionDecision == types.ContactPrivacyExceptionDecisionDeny {
+		return types.SendContactRequestResult{}, types.NewPermissionDenied("target user denied this contact request")
+	}
+	if !hasException || exceptionDecision != types.ContactPrivacyExceptionDecisionAllow {
+		allowed, err := contactRequestsAllowed(ctx, tx, command.AuthContext.TenantID, command.TargetUserID, command.NormalizedSourceType())
+		if err != nil {
+			return types.SendContactRequestResult{}, err
+		}
+		if !allowed {
+			return types.SendContactRequestResult{}, types.NewPermissionDenied("target user does not accept contact requests")
+		}
 	}
 	if allowed, err := contactRequestSourceAllowed(ctx, tx, command.AuthContext.TenantID, command.NormalizedSourceType()); err != nil {
 		return types.SendContactRequestResult{}, err

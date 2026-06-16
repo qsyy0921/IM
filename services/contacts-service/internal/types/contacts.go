@@ -20,6 +20,7 @@ type ContactRequestListDirection string
 type ContactRequestSourceType string
 type ContactPrivacyPolicySource string
 type ContactProfileVisibilityField string
+type ContactPrivacyExceptionDecision string
 
 const (
 	ContactRequestStatusPending  ContactRequestStatus = "PENDING"
@@ -54,6 +55,9 @@ const (
 	ContactProfileVisibilityFieldOrganization  ContactProfileVisibilityField = "ORGANIZATION"
 	ContactProfileVisibilityFieldTitle         ContactProfileVisibilityField = "TITLE"
 	ContactProfileVisibilityFieldStatusMessage ContactProfileVisibilityField = "STATUS_MESSAGE"
+
+	ContactPrivacyExceptionDecisionAllow ContactPrivacyExceptionDecision = "ALLOW"
+	ContactPrivacyExceptionDecisionDeny  ContactPrivacyExceptionDecision = "DENY"
 )
 
 type SendContactRequestCommand struct {
@@ -240,6 +244,55 @@ type SetContactPrivacyResult struct {
 	TenantID         TenantID
 	UserID           UserID
 	Settings         ContactPrivacySettings
+	IdempotentReplay bool
+}
+
+type SetContactPrivacyExceptionCommand struct {
+	AuthContext    AuthContext
+	OtherUserID    UserID
+	Decision       ContactPrivacyExceptionDecision
+	IdempotencyKey string
+}
+
+func (c SetContactPrivacyExceptionCommand) Validate() error {
+	if c.AuthContext.TenantID == "" {
+		return NewInvalidArgument("tenant_id is required")
+	}
+	if c.AuthContext.UserID == "" {
+		return NewInvalidArgument("user_id is required")
+	}
+	if c.OtherUserID == "" {
+		return NewInvalidArgument("other_user_id is required")
+	}
+	if c.AuthContext.UserID == c.OtherUserID {
+		return NewInvalidArgument("other_user_id must differ from user_id")
+	}
+	if strings.TrimSpace(c.IdempotencyKey) == "" {
+		return NewInvalidArgument("idempotency_key is required")
+	}
+	if NormalizeContactPrivacyExceptionDecision(c.Decision) == "" {
+		return NewInvalidArgument("decision is invalid")
+	}
+	return nil
+}
+
+func NormalizeContactPrivacyExceptionDecision(value ContactPrivacyExceptionDecision) ContactPrivacyExceptionDecision {
+	switch ContactPrivacyExceptionDecision(strings.ToUpper(strings.TrimSpace(string(value)))) {
+	case ContactPrivacyExceptionDecisionAllow:
+		return ContactPrivacyExceptionDecisionAllow
+	case ContactPrivacyExceptionDecisionDeny:
+		return ContactPrivacyExceptionDecisionDeny
+	default:
+		return ""
+	}
+}
+
+type SetContactPrivacyExceptionResult struct {
+	TenantID         TenantID
+	OwnerUserID      UserID
+	OtherUserID      UserID
+	Decision         ContactPrivacyExceptionDecision
+	Version          int64
 	IdempotentReplay bool
 }
 

@@ -14,7 +14,7 @@
    当前 `/metrics`、Prometheus rules、Grafana dashboard、OTel trace wiring、本地 Alertmanager null route 和本地观测栈 smoke runner 是本地开发 / 面试展示级；仍需目标环境 dashboard smoke、统一 collector、生产 Alertmanager 路由、retention、结构化日志汇聚、容量基线和 SLO 口径。
 
 2. 分布式 HA / 故障演练深化：
-   已有 Kafka producer first-stage `acks=all` / bounded retry-backoff 门禁、6 个 producer package 配置单测和 config summary；已有 Kafka ISR observation raw summary 的 JSON / Markdown validator。仍需补更长时间 Kafka ISR flapping、consumer rebalance、Kafka producer 真实故障重试行为 smoke / idempotent-producer 客户端评估。Redis Cluster 本地真实拓扑 smoke 和 node-stop fallback smoke 已通过，后续仍需生产级 Redis HA 设计、Redis Cluster 自动 failover / 容量验证、PostgreSQL quorum / split-brain fencing 和服务发现 / 部署编排。PostgreSQL 生产 quorum 边界以 ADR-034 为准。
+   已有 Kafka producer first-stage `acks=all` / bounded retry-backoff 门禁、6 个 producer package 配置单测和 config summary；已有 Kafka ISR observation raw summary 的 JSON / Markdown validator。仍需补更长时间 Kafka ISR flapping、consumer rebalance、Kafka producer 真实故障重试行为 smoke / idempotent-producer 客户端评估。Redis Cluster 本地真实拓扑、node-stop fallback 和六节点自动 failover smoke 已通过，后续仍需生产级 Redis HA 设计、Redis Cluster 容量验证、PostgreSQL quorum / split-brain fencing 和服务发现 / 部署编排。PostgreSQL 生产 quorum 边界以 ADR-034 为准。
 
 3. Repair / DLQ / audit 产品化：
    多数服务已有本地 operator / audit / cleanup，且已有统一 operator 索引；后续要补跨服务执行编排、批量 repair、审批边界、外部审计 sink 和运维 UI，不把手写 SQL 当作长期方案。
@@ -34,7 +34,7 @@
 | `message-service` | 会话级删除策略深化；合规删除 workflow / retention proof；发送链路生产观测；长时间容量曲线和生产 sizing；图片 / 文件 / 语音二进制上传处理后续由 media 能力承担。 |
 | `conversation-service` | 更完整群管理；owner transfer 策略继续打磨；成员窗口历史 repair / repair action；长时间容量曲线和生产 sizing。 |
 | `delivery-service` | Projection DLQ / repair 深化；更多 delivery event 消费方；长时间容量曲线和生产 sizing。 |
-| `push-gateway` | Redis Cluster 自动 failover / 容量验证和生产级 HA 设计；长时间容量曲线和生产 sizing。 |
+| `push-gateway` | Redis Cluster 容量验证和生产级 HA 设计；长时间容量曲线和生产 sizing。 |
 | `receipt-service` | 送达回执扩展；会话列表更多产品化能力（草稿、标签、更多摘要策略等）；长时间容量曲线和生产 sizing。 |
 | `contacts-service` | 更细 profile；陌生人申请的组织 / 风险 / 审批策略；租户默认值和来源策略后续接入 admin/config service 正式权限面；长时间容量曲线和生产 sizing。 |
 | `policy-service` | 完整 ReBAC；内容分类 / provider-backed moderation；tenant DSL / quota；外部 audit sink；已完成本地 direct 短基线，仍需长时间容量曲线和生产 sizing。 |

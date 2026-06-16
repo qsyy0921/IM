@@ -14,14 +14,14 @@
 - Redis route subscriber 对非取消运行时错误已改为退避重试，并在 `/debug/metrics` 暴露低敏 retry 快照；malformed / incomplete payload 只记聚合计数，不会入队或打死 subscriber。
 - Redis route 已区分“publish 报错”和“publish 成功但 0 subscriber”两类远端失败，避免把 stale route 误记为远端已入队。
 - Redis route 续约连续失败达到阈值后会主动踢掉本地 session，避免 route TTL 失效后仍长时间假装在线；客户端改走重连 + `PullInbox` fallback。
-- Redis route 已支持 `NEXUSIM_PUSH_REDIS_MODE=cluster` 和 `NEXUSIM_PUSH_REDIS_CLUSTER_ADDRS` 第一版配置；route / resume 相关 multi-key pipeline 使用 Redis Cluster hash tag，identity revoke 查询避免跨 slot multi-key `EXISTS`。本地三节点 Redis Cluster topology smoke 已跑通 `cross-instance-resume`，证明 cluster client / key schema / route / resume 最小链路可用；本地 Redis Cluster node-stop fallback smoke 已停止 route key slot owner node，并验证 `delivery.notify` 超时后仍可通过 `PullInbox + AckDelivery` 恢复，但不代表生产级 Redis HA。
+- Redis route 已支持 `NEXUSIM_PUSH_REDIS_MODE=cluster` 和 `NEXUSIM_PUSH_REDIS_CLUSTER_ADDRS` 第一版配置；route / resume 相关 multi-key pipeline 使用 Redis Cluster hash tag，identity revoke 查询避免跨 slot multi-key `EXISTS`。本地三节点 Redis Cluster topology smoke 已跑通 `cross-instance-resume`，证明 cluster client / key schema / route / resume 最小链路可用；本地 Redis Cluster node-stop fallback smoke 已停止 route key slot owner node，并验证 `delivery.notify` 超时后仍可通过 `PullInbox + AckDelivery` 恢复；本地六节点 Redis Cluster 自动 failover smoke 已停止 route key slot owner master，并验证 replica 提升后在线 `delivery.notify`、`PullInbox` 和 `AckDelivery` 仍可用，但不代表生产级 Redis HA。
 - Resume buffer 重放已有回归测试固定 all-or-buffer-miss：新连接队列无法容纳全部待重放 notify 时，不做部分 replay，直接提示客户端用本地 cursor + `PullInbox` 校准。
 - `loadtest/pushgateway/run-local-smoke.ps1` 的通用 helper 已拆到同目录 `run-local-smoke.helpers.ps1`，脚本复杂度回到预算线内。
 - `loadtest/pushgateway` Go runner 已按 config / model / auth / scenario / util 同 package 拆分，避免后续 Redis route、slow-client、resume 和容量 smoke 继续堆进单个 `main.go`。
 - `loadtest/pushgateway` summary 已新增 `capacity_summary` 派生字段，统一输出 duration、device/message/notify/ack/pull 计数和每秒速率；本地 push-gateway stack 短基线已跑通 `full` 场景，clean summary 记录 `git_dirty=false`、1 个 device、1 条 message、1 个 notify、1 个 ACK、PullInbox 1 条、delivery_outbox published 2 条。
 - `loadtest/pushgateway` 已新增并跑通 `redis-resume-negative` 真实进程 smoke，用于验证未知 resume token 被服务端替换并返回 `buffer_miss`、跨 device resume token 返回非重试 `PERMISSION_DENIED`、Redis resume buffer gap 返回 `buffer_miss` 后通过 `PullInbox + AckDelivery` 兜底；报告见 `docs/runbook/loadtest/push-gateway/loadtest-report-20260616-push-gateway-redis-resume-negative-smoke.md`。
-- 本地 smoke 已覆盖 Redis stop/start、Sentinel discovery、手动 failover、master-stop、quorum-loss fallback、network-partition fallback、三节点 Redis Cluster topology 和 Redis Cluster node-stop fallback；network-partition 场景会断开 Sentinel 当前 master 的 Docker network，Cluster node-stop 场景会停止 route key slot owner node，并验证 `delivery.notify` 超时后 `PullInbox + AckDelivery` 兜底。Redis Cluster 自动 failover / 容量和生产级 HA 仍未完成。
+- 本地 smoke 已覆盖 Redis stop/start、Sentinel discovery、手动 failover、master-stop、quorum-loss fallback、network-partition fallback、三节点 Redis Cluster topology、Redis Cluster node-stop fallback 和六节点 Redis Cluster 自动 failover；network-partition 场景会断开 Sentinel 当前 master 的 Docker network，Cluster node-stop 场景会停止 route key slot owner node，Cluster failover 场景会停止 route key slot owner master 并等待 replica 提升。生产级 Redis HA / 容量仍未完成。
 
 ## 后续
 
-- Redis Cluster 自动 failover / 容量验证和生产 HA 设计；长时间容量曲线和生产 sizing。
+- Redis Cluster 容量验证和生产 HA 设计；长时间容量曲线和生产 sizing。

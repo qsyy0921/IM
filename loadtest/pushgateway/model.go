@@ -176,7 +176,22 @@ type summary struct {
 	DeliveryOutboxPending                   *int64                 `json:"delivery_outbox_pending,omitempty"`
 	DeliveryOutboxPublished                 *int64                 `json:"delivery_outbox_published,omitempty"`
 	DeliveryOutboxDLQ                       *int64                 `json:"delivery_outbox_dlq,omitempty"`
+	Capacity                                *capacitySummary       `json:"capacity_summary,omitempty"`
 	Latencies                               map[string]float64     `json:"latencies_ms"`
+}
+
+type capacitySummary struct {
+	DurationMS              float64 `json:"duration_ms"`
+	DeviceCount             int     `json:"device_count"`
+	MessageCount            int     `json:"message_count"`
+	NotifyFrameCount        int     `json:"notify_frame_count"`
+	AckFrameCount           int     `json:"ack_frame_count"`
+	PullInboxItemCount      int     `json:"pull_inbox_item_count"`
+	DeliveryOutboxPublished int64   `json:"delivery_outbox_published"`
+	MessagesPerSecond       float64 `json:"messages_per_second"`
+	NotifyFramesPerSecond   float64 `json:"notify_frames_per_second"`
+	AckFramesPerSecond      float64 `json:"ack_frames_per_second"`
+	PullItemsPerSecond      float64 `json:"pull_items_per_second"`
 }
 
 type deviceSummary struct {

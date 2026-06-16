@@ -23,7 +23,7 @@
    现有 public listener、mock auth、metadata auth、verified metadata、TLS / mTLS allowlist 已纳入 `tools/check-local.ps1`；后续新增 listener / 服务时必须同步门禁和服务级测试。
 
 5. 容量和复杂度治理：
-   已有 9 服务健康态 Docker resource snapshot 入口、摘要工具和文件大小 hotspot summary；仍需补各服务容量基线、瓶颈和资源曲线。生产手写文件接近 2500 行、测试或 runner 接近 3000 行时继续同 package 拆分。
+   已有 9 服务健康态 Docker resource snapshot 入口、摘要工具、文件大小 hotspot summary，且 push-gateway loadtest runner 已能输出 `capacity_summary`。仍需补各服务容量基线实跑、瓶颈和资源曲线。生产手写文件接近 2500 行、测试或 runner 接近 3000 行时继续同 package 拆分。
 
 ## 逐服务未完成工作
 
@@ -34,7 +34,7 @@
 | `message-service` | 会话级删除策略深化；合规删除；容量观测深化；发送链路生产观测；图片 / 文件 / 语音二进制上传处理后续由 media 能力承担。 |
 | `conversation-service` | 更完整群管理；owner transfer 策略继续打磨；成员窗口历史 repair / repair action。 |
 | `delivery-service` | Projection DLQ / repair 深化；更多 delivery event 消费方；隐藏项跨设备提示。 |
-| `push-gateway` | 跨实例 resume 强化；容量测试；Redis Cluster / 生产级 HA 设计。 |
+| `push-gateway` | 跨实例 resume 强化；基于 `capacity_summary` 的容量基线实跑；Redis Cluster / 生产级 HA 设计。 |
 | `receipt-service` | 送达回执扩展；会话列表更多产品化能力（草稿、标签、更多摘要策略等）。 |
 | `contacts-service` | 更细 profile；陌生人申请的组织 / 风险 / 审批策略；租户默认值和来源策略后续接入 admin/config service 正式权限面。 |
 | `policy-service` | 完整 ReBAC；内容分类 / provider-backed moderation；tenant DSL / quota；外部 audit sink。 |

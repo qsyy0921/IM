@@ -135,7 +135,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 | `message-service` | 已落地、已接主链路 | `SendMessage` / 编辑 / 撤回 / 删除、`TEXT` + `IMAGE` / `FILE` / `VOICE` 附件引用消息、`LOCATION` / `CARD` 结构化 payload 消息、outbox / Kafka timeline、first-stage `/metrics` 和 OTel server span、mutation repository 测试拆分 | `service-briefs/message-service.md` |
 | `conversation-service` | 已落地、已接主链路 | `GetSendContext` / member change / owner transfer / ACTIVE roster 分页与 role 过滤 / saga / audit operator、first-stage `/metrics` 和 OTel server span | `service-briefs/conversation-service.md` |
 | `delivery-service` | 已落地、已接主链路 | projection / `PullInbox` / `AckDelivery` / hide inbox / delivery outbox | `service-briefs/delivery-service.md` |
-| `push-gateway` | 已落地、已接主链路 | notify / ACK / resume / Redis route / Win-Mac / Sentinel / network-partition / TLS smoke | `service-briefs/push-gateway.md` |
+| `push-gateway` | 已落地、已接主链路 | notify / ACK / resume / Redis route / Win-Mac / Sentinel / network-partition / TLS smoke、loadtest `capacity_summary` 口径 | `service-briefs/push-gateway.md` |
 | `receipt-service` | 已落地、已接主链路 | receipt projection / outbox / audit / repair、`ListReceiptStates` repository 级批量查询、会话列表 unread / pinned / muted 过滤和 unread-first 排序、first-stage `/metrics` 和 OTel server span | `service-briefs/receipt-service.md` |
 | `contacts-service` | 已落地、已接主链路 | request source metadata / source policy gate / search-source privacy gate / contacts search / group filter / USER-TENANT-SYSTEM privacy / tenant privacy operator / outbox / audit / repair、repository 同 package 拆分 | `service-briefs/contacts-service.md` |
 | `policy-service` | 已落地、已接主链路 | decision / user action restriction / projection / outbox / audit / repair、first-stage `/metrics` 和 OTel server span | `service-briefs/policy-service.md` |

@@ -10,6 +10,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/pem"
+	"math"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -81,6 +82,89 @@ func TestDerivePushMetricsURL(t *testing.T) {
 				t.Fatalf("derivePushMetricsURL(%q) = %q, want %q", test.in, got, test.want)
 			}
 		})
+	}
+}
+
+func TestBuildCapacitySummaryForMultiDeviceFullRun(t *testing.T) {
+	startedAt := time.Date(2026, 6, 16, 1, 2, 3, 0, time.UTC)
+	published := int64(3)
+	summary := &summary{
+		ReceiverDeviceIDs: []string{"device-1", "device-2"},
+		StartedAt:         startedAt,
+		FinishedAt:        startedAt.Add(2 * time.Second),
+		SendMessage:       sendSummary{MessageID: "msg-1", ConversationSeq: 2},
+		DeviceNotifications: []deviceSummary{
+			{DeliveryNotify: frameSnapshot{Op: opDeliveryNotify}, DeliveryAckOK: frameSnapshot{Op: opDeliveryAckOK}},
+			{DeliveryNotify: frameSnapshot{Op: opDeliveryNotify}, DeliveryAckOK: frameSnapshot{Op: opDeliveryAckOK}},
+		},
+		PullInbox:               pullSummary{ItemCount: 1},
+		DeliveryOutboxPublished: &published,
+	}
+
+	capacity := buildCapacitySummary(summary)
+	if capacity == nil {
+		t.Fatal("expected capacity summary")
+	}
+	if capacity.DurationMS != 2000 {
+		t.Fatalf("duration_ms = %v, want 2000", capacity.DurationMS)
+	}
+	if capacity.DeviceCount != 2 || capacity.MessageCount != 1 || capacity.NotifyFrameCount != 2 || capacity.AckFrameCount != 2 {
+		t.Fatalf("unexpected counts: %+v", capacity)
+	}
+	if capacity.PullInboxItemCount != 1 || capacity.DeliveryOutboxPublished != 3 {
+		t.Fatalf("unexpected pull/outbox counts: %+v", capacity)
+	}
+	assertFloatNear(t, capacity.MessagesPerSecond, 0.5)
+	assertFloatNear(t, capacity.NotifyFramesPerSecond, 1.0)
+	assertFloatNear(t, capacity.AckFramesPerSecond, 1.0)
+	assertFloatNear(t, capacity.PullItemsPerSecond, 0.5)
+}
+
+func TestBuildCapacitySummaryForSlowClientDoesNotDoubleCountAck(t *testing.T) {
+	startedAt := time.Date(2026, 6, 16, 1, 2, 3, 0, time.UTC)
+	published := int64(129)
+	summary := &summary{
+		ReceiverDeviceID:        "device-1",
+		StartedAt:               startedAt,
+		FinishedAt:              startedAt.Add(4 * time.Second),
+		SendMessage:             sendSummary{MessageID: "msg-1", ConversationSeq: 2},
+		DeliveryAckOK:           frameSnapshot{Op: opDeliveryAckOK},
+		PullInbox:               pullSummary{ItemCount: 128},
+		DeliveryOutboxPublished: &published,
+		SlowClient: &slowClientSummary{
+			MessageCount:     128,
+			NotifyFramesRead: 2,
+			ReplayFramesRead: 1,
+			RecoveryPullInbox: pullSummary{
+				ItemCount: 128,
+			},
+			AckOK: frameSnapshot{Op: opDeliveryAckOK},
+		},
+	}
+
+	capacity := buildCapacitySummary(summary)
+	if capacity == nil {
+		t.Fatal("expected capacity summary")
+	}
+	if capacity.DeviceCount != 1 || capacity.MessageCount != 128 || capacity.NotifyFrameCount != 3 || capacity.AckFrameCount != 1 {
+		t.Fatalf("unexpected counts: %+v", capacity)
+	}
+	if capacity.PullInboxItemCount != 128 || capacity.DeliveryOutboxPublished != 129 {
+		t.Fatalf("unexpected pull/outbox counts: %+v", capacity)
+	}
+	assertFloatNear(t, capacity.MessagesPerSecond, 32.0)
+	assertFloatNear(t, capacity.NotifyFramesPerSecond, 0.75)
+	assertFloatNear(t, capacity.AckFramesPerSecond, 0.25)
+	assertFloatNear(t, capacity.PullItemsPerSecond, 32.0)
+}
+
+func TestBuildCapacitySummaryRequiresPositiveDuration(t *testing.T) {
+	if got := buildCapacitySummary(&summary{}); got != nil {
+		t.Fatalf("expected nil capacity for empty timestamps, got %+v", got)
+	}
+	startedAt := time.Date(2026, 6, 16, 1, 2, 3, 0, time.UTC)
+	if got := buildCapacitySummary(&summary{StartedAt: startedAt, FinishedAt: startedAt}); got != nil {
+		t.Fatalf("expected nil capacity for zero duration, got %+v", got)
 	}
 }
 
@@ -346,6 +430,13 @@ func assertMetadataValue(t *testing.T, md metadata.MD, key string, want string) 
 	values := md.Get(key)
 	if len(values) != 1 || values[0] != want {
 		t.Fatalf("metadata %s = %v, want [%s]", key, values, want)
+	}
+}
+
+func assertFloatNear(t *testing.T, got float64, want float64) {
+	t.Helper()
+	if math.Abs(got-want) > 0.000001 {
+		t.Fatalf("got %v, want %v", got, want)
 	}
 }
 

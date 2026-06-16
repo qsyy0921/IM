@@ -78,6 +78,118 @@ func elapsedMS(begin time.Time) float64 {
 	return float64(time.Since(begin).Microseconds()) / 1000
 }
 
+func buildCapacitySummary(result *summary) *capacitySummary {
+	if result == nil || result.StartedAt.IsZero() || result.FinishedAt.IsZero() {
+		return nil
+	}
+	duration := result.FinishedAt.Sub(result.StartedAt)
+	if duration <= 0 {
+		return nil
+	}
+	durationMS := float64(duration.Microseconds()) / 1000
+	durationSeconds := duration.Seconds()
+
+	messageCount := observedMessageCount(result)
+	notifyCount := observedNotifyFrameCount(result)
+	ackCount := observedAckFrameCount(result)
+	pullItemCount := result.PullInbox.ItemCount
+	if result.SlowClient != nil && result.SlowClient.RecoveryPullInbox.ItemCount > pullItemCount {
+		pullItemCount = result.SlowClient.RecoveryPullInbox.ItemCount
+	}
+	if result.RedisFault != nil && result.RedisFault.RecoveryPullInbox.ItemCount > pullItemCount {
+		pullItemCount = result.RedisFault.RecoveryPullInbox.ItemCount
+	}
+	published := int64(0)
+	if result.DeliveryOutboxPublished != nil {
+		published = *result.DeliveryOutboxPublished
+	}
+
+	return &capacitySummary{
+		DurationMS:              durationMS,
+		DeviceCount:             observedDeviceCount(result),
+		MessageCount:            messageCount,
+		NotifyFrameCount:        notifyCount,
+		AckFrameCount:           ackCount,
+		PullInboxItemCount:      pullItemCount,
+		DeliveryOutboxPublished: published,
+		MessagesPerSecond:       ratePerSecond(messageCount, durationSeconds),
+		NotifyFramesPerSecond:   ratePerSecond(notifyCount, durationSeconds),
+		AckFramesPerSecond:      ratePerSecond(ackCount, durationSeconds),
+		PullItemsPerSecond:      ratePerSecond(pullItemCount, durationSeconds),
+	}
+}
+
+func observedDeviceCount(result *summary) int {
+	if len(result.DeviceNotifications) > 0 {
+		return len(result.DeviceNotifications)
+	}
+	if len(result.ReceiverDeviceIDs) > 0 {
+		return len(result.ReceiverDeviceIDs)
+	}
+	if result.ReceiverDeviceID != "" {
+		return 1
+	}
+	return 0
+}
+
+func observedMessageCount(result *summary) int {
+	if result.SlowClient != nil && result.SlowClient.MessageCount > 0 {
+		return result.SlowClient.MessageCount
+	}
+	if result.SendMessage.MessageID != "" || result.SendMessage.ConversationSeq > 0 {
+		return 1
+	}
+	return 0
+}
+
+func observedNotifyFrameCount(result *summary) int {
+	count := 0
+	for _, device := range result.DeviceNotifications {
+		if device.DeliveryNotify.Op == opDeliveryNotify {
+			count++
+		}
+	}
+	if count == 0 && result.DeliveryNotify.Op == opDeliveryNotify {
+		count++
+	}
+	if result.ChangeDeliveryNotify.Op == opDeliveryNotify {
+		count++
+	}
+	if result.SlowClient != nil {
+		count += result.SlowClient.NotifyFramesRead + result.SlowClient.ReplayFramesRead
+	}
+	if result.RedisFault != nil && result.RedisFault.NotifyReceived {
+		count++
+	}
+	return count
+}
+
+func observedAckFrameCount(result *summary) int {
+	count := 0
+	for _, device := range result.DeviceNotifications {
+		if device.DeliveryAckOK.Op == opDeliveryAckOK {
+			count++
+		}
+	}
+	if count == 0 && result.DeliveryAckOK.Op == opDeliveryAckOK {
+		count++
+	}
+	if result.SlowClient != nil && result.SlowClient.AckOK.Op == opDeliveryAckOK && result.DeliveryAckOK.Op != opDeliveryAckOK {
+		count++
+	}
+	if result.RedisFault != nil && result.RedisFault.AckOK.Op == opDeliveryAckOK && result.DeliveryAckOK.Op != opDeliveryAckOK {
+		count++
+	}
+	return count
+}
+
+func ratePerSecond(count int, durationSeconds float64) float64 {
+	if count <= 0 || durationSeconds <= 0 {
+		return 0
+	}
+	return float64(count) / durationSeconds
+}
+
 func percentile(values []float64, quantile float64) float64 {
 	if len(values) == 0 {
 		return 0

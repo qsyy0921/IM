@@ -891,6 +891,7 @@ func finish(cfg config, result *summary, runErr error) error {
 			result.PushConsumerMetrics = &metrics
 		}
 	}
+	result.Capacity = buildCapacitySummary(result)
 	encoded, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode summary: %w", err)

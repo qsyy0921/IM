@@ -2,7 +2,7 @@
 
 `policy-service` owns first-stage policy decisions that must not be hard-coded inside message-service. The initial implementation is intentionally small: it exposes a gRPC `CheckMessageAction` endpoint for message send / edit / revoke / delete decisions, and it returns a stable `permission_version`, `classification`, allow/deny flag and public deny reason.
 
-This service is a boundary extraction step. It is not yet a full ReBAC engine, tenant policy DSL / quota / risk engine, provider-backed content moderation platform or complete contacts/conversation policy engine. The current contacts projection is consumed only for direct conversation `SEND` hard-deny when the caller supplies safe direct-peer context. The current conversation member projection is consumed only as a first-stage role gate with a permission-version fence and as a narrow `ADMIN` / `OWNER` message ownership override for mutations. The current moderation slices are limited to user-level message action restrictions such as tenant-local mute / action deny rules, plus a first-stage configurable keyword content moderator for `SEND` / `EDIT` message text. A separate `MODERATOR` role, provider-backed classification, risk scoring and full product-level moderation policy remain future work.
+This service is a boundary extraction step. It is not yet a full ReBAC engine, tenant policy DSL / quota / risk engine, provider-grade content moderation platform or complete contacts/conversation policy engine. The current contacts projection is consumed only for direct conversation `SEND` hard-deny when the caller supplies safe direct-peer context. The current conversation member projection is consumed only as a first-stage role gate with a permission-version fence and as a narrow `ADMIN` / `OWNER` message ownership override for mutations. The current moderation slices are limited to user-level message action restrictions such as tenant-local mute / action deny rules, plus first-stage configurable keyword and HTTP content moderator adapters for `SEND` / `EDIT` message text. A separate `MODERATOR` role, richer risk scoring and full product-level moderation policy remain future work.
 
 ## Boundary
 
@@ -67,7 +67,19 @@ NEXUSIM_POLICY_MODERATION_CLASSIFICATION=CONTENT_MODERATION_DENIED
 NEXUSIM_POLICY_MODERATION_DENY_REASON=content moderation policy denied
 ```
 
-message-service forwards only `payload.text` for `SEND` / `EDIT`; it does not forward the whole message payload for policy classification. policy-service does not persist the text, does not write raw content into `policy_decision_audit_outbox`, and returns only stable `classification` / public reason fields. Empty text, missing text or disabled moderation mode fall through to the normal contact / user restriction / role / exact / tenant / static policy path. Keyword mode is a local first-stage provider adapter for smoke and interview demonstration; it is not an external provider integration, risk score model, prompt-based classifier or tenant policy DSL.
+HTTP provider mode is configured with:
+
+```text
+NEXUSIM_POLICY_MODERATION_MODE=http
+NEXUSIM_POLICY_MODERATION_HTTP_ENDPOINT=https://moderation.example/check
+NEXUSIM_POLICY_MODERATION_HTTP_BEARER_TOKEN=...
+NEXUSIM_POLICY_MODERATION_HTTP_TIMEOUT=1s
+NEXUSIM_POLICY_MODERATION_PERMISSION_VERSION=1
+NEXUSIM_POLICY_MODERATION_CLASSIFICATION=CONTENT_PROVIDER_DENIED
+NEXUSIM_POLICY_MODERATION_DENY_REASON=content moderation provider denied
+```
+
+`http://` provider endpoints are rejected unless `NEXUSIM_POLICY_MODERATION_HTTP_ALLOW_INSECURE=true` is explicitly set for local smoke. message-service forwards only `payload.text` for `SEND` / `EDIT`; it does not forward the whole message payload for policy classification. policy-service does not persist the text, does not write raw content or provider response bodies into `policy_decision_audit_outbox`, and returns only stable `classification` / public reason fields. Empty text, missing text or disabled moderation mode fall through to the normal contact / user restriction / role / exact / tenant / static policy path. Keyword mode is a local first-stage adapter; HTTP mode is a first-stage external provider adapter. Neither one is a complete risk score platform, prompt audit model or tenant policy DSL.
 
 The conversation role gate is a hard deny / freshness gate, not a complete role allow engine. `policy-service` consumes member boundary events from `conversation.timeline.events` into `policy_conversation_members_projection`. `message-service` forwards `conversation_permission_version` from the `ConversationSendContext` it already read from conversation-service. If a role gate rule exists in `policy_conversation_role_action_rules`, the caller's projected member row must exist, be at the same `permission_version`, be `ACTIVE`, and have a role rank greater than or equal to `min_role`. Missing projection, stale version or PostgreSQL lookup failure returns policy unavailable; insufficient role returns business deny with the projected `permission_version`. If the role gate passes, the request continues to exact / tenant / static decision logic.
 

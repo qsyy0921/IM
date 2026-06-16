@@ -111,6 +111,25 @@ func TestPolicyContentModeratorFromEnvLoadsKeywordMode(t *testing.T) {
 	}
 }
 
+func TestPolicyContentModeratorFromEnvLoadsHTTPMode(t *testing.T) {
+	clearPolicyModerationConfig(t)
+	t.Setenv("NEXUSIM_POLICY_MODERATION_MODE", "http")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_HTTP_ENDPOINT", "https://moderation.example.test/check")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_HTTP_BEARER_TOKEN", "token")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_HTTP_TIMEOUT", "2s")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_PERMISSION_VERSION", "29")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_CLASSIFICATION", "PROVIDER_DENIED")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_DENY_REASON", "provider denied")
+
+	moderator, enabled, err := policyContentModeratorFromEnv()
+	if err != nil {
+		t.Fatalf("load policy http moderation config: %v", err)
+	}
+	if !enabled || moderator == nil {
+		t.Fatalf("expected http moderation enabled, enabled=%t moderator=%T", enabled, moderator)
+	}
+}
+
 func TestPolicyContentModeratorFromEnvRejectsInvalidConfig(t *testing.T) {
 	clearPolicyModerationConfig(t)
 	t.Setenv("NEXUSIM_POLICY_MODERATION_MODE", "keyword")
@@ -122,6 +141,27 @@ func TestPolicyContentModeratorFromEnvRejectsInvalidConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_POLICY_MODERATION_MODE", "provider")
 	if _, enabled, err := policyContentModeratorFromEnv(); err == nil || !enabled {
 		t.Fatalf("expected unsupported moderation mode to fail, enabled=%t err=%v", enabled, err)
+	}
+
+	clearPolicyModerationConfig(t)
+	t.Setenv("NEXUSIM_POLICY_MODERATION_MODE", "http")
+	if _, enabled, err := policyContentModeratorFromEnv(); err == nil || !enabled {
+		t.Fatalf("expected http mode without endpoint to fail, enabled=%t err=%v", enabled, err)
+	}
+
+	clearPolicyModerationConfig(t)
+	t.Setenv("NEXUSIM_POLICY_MODERATION_MODE", "http")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_HTTP_ENDPOINT", "http://moderation.example.test/check")
+	if _, enabled, err := policyContentModeratorFromEnv(); err == nil || !enabled {
+		t.Fatalf("expected insecure http endpoint to fail without override, enabled=%t err=%v", enabled, err)
+	}
+
+	clearPolicyModerationConfig(t)
+	t.Setenv("NEXUSIM_POLICY_MODERATION_MODE", "http")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_HTTP_ENDPOINT", "http://moderation.example.test/check")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_HTTP_ALLOW_INSECURE", "true")
+	if _, enabled, err := policyContentModeratorFromEnv(); err != nil || !enabled {
+		t.Fatalf("expected insecure http endpoint to load with override, enabled=%t err=%v", enabled, err)
 	}
 }
 
@@ -324,6 +364,10 @@ func clearPolicyModerationConfig(t *testing.T) {
 	t.Helper()
 	t.Setenv("NEXUSIM_POLICY_MODERATION_MODE", "")
 	t.Setenv("NEXUSIM_POLICY_MODERATION_DENY_TERMS", "")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_HTTP_ENDPOINT", "")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_HTTP_BEARER_TOKEN", "")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_HTTP_TIMEOUT", "")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_HTTP_ALLOW_INSECURE", "")
 	t.Setenv("NEXUSIM_POLICY_MODERATION_PERMISSION_VERSION", "")
 	t.Setenv("NEXUSIM_POLICY_MODERATION_CLASSIFICATION", "")
 	t.Setenv("NEXUSIM_POLICY_MODERATION_DENY_REASON", "")

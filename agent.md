@@ -7,10 +7,11 @@ reading or duplicating long documents.
 
 1. Run `git status --short --branch --untracked-files=all`.
 2. Read `prompt.md`.
-3. Read `docs/runbook/current-goal.md`.
-4. Read `docs/runbook/current-brief.md`.
-5. Read `docs/runbook/remaining-goals.md` only when choosing or updating work.
-6. For service work, read `docs/runbook/service-briefs/README.md`, then only the
+3. Read `agent.md` to confirm progress-management rules.
+4. Read `docs/runbook/current-goal.md`.
+5. Read `docs/runbook/current-brief.md`.
+6. Read `docs/runbook/remaining-goals.md` only when choosing or updating work.
+7. For service work, read `docs/runbook/service-briefs/README.md`, then only the
    specific `docs/runbook/service-briefs/<service>.md` file involved.
 
 Do not read long SDD, archive, history, or loadtest reports unless the current

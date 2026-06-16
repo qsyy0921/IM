@@ -71,7 +71,12 @@ func TestWriteMemberWindowRepairAuditOutput(t *testing.T) {
 		DryRun:                   false,
 		RepairedAt:               now,
 	}}
-	if err := writeMemberWindowRepairAuditOutput(outputPath, rows); err != nil {
+	if err := writeMemberWindowRepairAuditOutput(outputPath, rows, map[string]string{
+		"tenant_id":       "tenant-repair",
+		"issue_class":     "ACTIVE_WITH_LEAVE_SEQ",
+		"repaired_after":  "2026-06-16T07:00:00Z",
+		"repaired_before": "",
+	}); err != nil {
 		t.Fatalf("writeMemberWindowRepairAuditOutput() error = %v", err)
 	}
 
@@ -85,6 +90,14 @@ func TestWriteMemberWindowRepairAuditOutput(t *testing.T) {
 	}
 	if output.GeneratedAt == "" || len(output.Rows) != 1 {
 		t.Fatalf("unexpected output header: %+v", output)
+	}
+	if output.Filters["tenant_id"] != "tenant-repair" ||
+		output.Filters["issue_class"] != "ACTIVE_WITH_LEAVE_SEQ" ||
+		output.Filters["repaired_after"] != "2026-06-16T07:00:00Z" {
+		t.Fatalf("unexpected audit filters: %+v", output.Filters)
+	}
+	if _, ok := output.Filters["repaired_before"]; ok {
+		t.Fatalf("expected empty repaired_before filter to be omitted: %+v", output.Filters)
 	}
 	row := output.Rows[0]
 	if row.ID != 7 ||

@@ -25,6 +25,7 @@ type memberWindowRepairOutputOptions struct {
 
 type memberWindowRepairAuditOutput struct {
 	GeneratedAt string                             `json:"generated_at"`
+	Filters     map[string]string                  `json:"filters,omitempty"`
 	Rows        []memberWindowRepairAuditOutputRow `json:"rows"`
 }
 
@@ -87,7 +88,7 @@ func writeMemberWindowRepairOutput(path string, stats postgresinfra.MemberWindow
 	return encoder.Encode(output)
 }
 
-func writeMemberWindowRepairAuditOutput(path string, rows []postgresinfra.MemberWindowRepairAuditRow) error {
+func writeMemberWindowRepairAuditOutput(path string, rows []postgresinfra.MemberWindowRepairAuditRow, filters map[string]string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -99,6 +100,7 @@ func writeMemberWindowRepairAuditOutput(path string, rows []postgresinfra.Member
 
 	output := memberWindowRepairAuditOutput{
 		GeneratedAt: formatAuditOutputTime(time.Now()),
+		Filters:     compactAuditOutputFilters(filters),
 		Rows:        make([]memberWindowRepairAuditOutputRow, 0, len(rows)),
 	}
 	for _, row := range rows {

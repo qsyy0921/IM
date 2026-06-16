@@ -57,6 +57,8 @@ type MemberWindowRepairAuditOptions struct {
 	UserID         string
 	IssueClass     string
 	Outcome        string
+	RepairedAfter  *time.Time
+	RepairedBefore *time.Time
 	Limit          int
 }
 
@@ -170,6 +172,9 @@ func (r *Repository) AuditMemberWindowRepairs(ctx context.Context, options Membe
 	if r.pool == nil {
 		return nil, types.NewDBReadFailed("repository is not configured")
 	}
+	if options.RepairedAfter != nil && options.RepairedBefore != nil && !options.RepairedAfter.Before(*options.RepairedBefore) {
+		return nil, types.NewInvalidArgument("repaired_after must be before repaired_before")
+	}
 	limit := normalizeMemberWindowRepairLimit(options.Limit)
 	args := make([]any, 0, 6)
 	clauses := make([]string, 0, 5)
@@ -200,6 +205,14 @@ func (r *Repository) AuditMemberWindowRepairs(ctx context.Context, options Membe
 		}
 		args = append(args, outcome)
 		clauses = append(clauses, "repair_outcome = $"+strconv.Itoa(len(args)))
+	}
+	if options.RepairedAfter != nil {
+		args = append(args, options.RepairedAfter.UTC())
+		clauses = append(clauses, "repaired_at >= $"+strconv.Itoa(len(args)))
+	}
+	if options.RepairedBefore != nil {
+		args = append(args, options.RepairedBefore.UTC())
+		clauses = append(clauses, "repaired_at < $"+strconv.Itoa(len(args)))
 	}
 	where := ""
 	if len(clauses) > 0 {

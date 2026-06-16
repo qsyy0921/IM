@@ -2,11 +2,14 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/qsyy0921/IM/services/conversation-service/internal/types"
 )
 
 func TestRepositoryRepairMemberWindowsSetsActiveJoinSeqIntegration(t *testing.T) {
@@ -171,6 +174,69 @@ func TestRepositoryRepairMemberWindowsClearsActiveLeaveSeqIntegration(t *testing
 	}
 	if _, err := repository.AuditMemberWindowRepairs(ctx, MemberWindowRepairAuditOptions{Outcome: "unknown"}); err == nil {
 		t.Fatalf("expected unsupported repair outcome to fail")
+	}
+}
+
+func TestRepositoryAuditMemberWindowRepairsFiltersByRepairedWindowIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pg pool: %v", err)
+	}
+	defer pool.Close()
+
+	ensureMemberWindowRepairAuditSchema(t, ctx, pool)
+	resetConversationTables(t, ctx, pool)
+	truncateMemberWindowRepairAudit(t, ctx, pool)
+
+	_, err = pool.Exec(ctx, `
+INSERT INTO conversation_member_window_repair_audit (
+    tenant_id,
+    conversation_id,
+    user_id,
+    issue_class,
+    repair_action,
+    repair_outcome,
+    operator_id,
+    repair_reason,
+    dry_run,
+    repaired_at
+) VALUES
+    ('tenant-window-repair', 'conv-window-repair', 'user-old', 'ACTIVE_WITH_LEAVE_SEQ', 'clear_active_leave_seq', 'MUTATED', 'operator-1', 'old repair', false, '2026-06-17 09:00:00+00'),
+    ('tenant-window-repair', 'conv-window-repair', 'user-target', 'ACTIVE_WITH_LEAVE_SEQ', 'clear_active_leave_seq', 'MUTATED', 'operator-1', 'target repair', false, '2026-06-17 09:05:00+00'),
+    ('tenant-window-repair', 'conv-window-repair', 'user-new', 'ACTIVE_WITH_LEAVE_SEQ', 'clear_active_leave_seq', 'MUTATED', 'operator-1', 'new repair', false, '2026-06-17 09:10:00+00')
+`)
+	if err != nil {
+		t.Fatalf("seed member window repair audit: %v", err)
+	}
+
+	after := time.Date(2026, 6, 17, 9, 3, 0, 0, time.UTC)
+	before := time.Date(2026, 6, 17, 9, 6, 0, 0, time.UTC)
+	repository := NewRepository(pool)
+	rows, err := repository.AuditMemberWindowRepairs(ctx, MemberWindowRepairAuditOptions{
+		TenantID:       "tenant-window-repair",
+		ConversationID: "conv-window-repair",
+		RepairedAfter:  &after,
+		RepairedBefore: &before,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit repair rows by repaired window: %v", err)
+	}
+	if len(rows) != 1 || rows[0].UserID != "user-target" || rows[0].Reason != "target repair" {
+		t.Fatalf("unexpected repair audit rows: %+v", rows)
+	}
+
+	_, err = repository.AuditMemberWindowRepairs(ctx, MemberWindowRepairAuditOptions{
+		RepairedAfter:  &before,
+		RepairedBefore: &before,
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument for empty repaired window, got %v", err)
 	}
 }
 

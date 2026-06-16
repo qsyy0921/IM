@@ -532,12 +532,31 @@ func runMemberWindowRepairAudit() error {
 	}
 	defer pool.Close()
 
+	repairedAfter, err := envOptionalRFC3339Time("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_REPAIRED_AFTER")
+	if err != nil {
+		return err
+	}
+	repairedBefore, err := envOptionalRFC3339Time("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_REPAIRED_BEFORE")
+	if err != nil {
+		return err
+	}
+	filters := map[string]string{
+		"tenant_id":       envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_TENANT_ID", ""),
+		"conversation_id": envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_CONVERSATION_ID", ""),
+		"user_id":         envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_USER_ID", ""),
+		"issue_class":     envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_ISSUE_CLASS", ""),
+		"outcome":         envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_OUTCOME", ""),
+		"repaired_after":  formatAuditFilterTime(repairedAfter),
+		"repaired_before": formatAuditFilterTime(repairedBefore),
+	}
 	rows, err := postgresinfra.NewRepository(pool).AuditMemberWindowRepairs(ctx, postgresinfra.MemberWindowRepairAuditOptions{
-		TenantID:       envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_TENANT_ID", ""),
-		ConversationID: envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_CONVERSATION_ID", ""),
-		UserID:         envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_USER_ID", ""),
-		IssueClass:     envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_ISSUE_CLASS", ""),
-		Outcome:        envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_OUTCOME", ""),
+		TenantID:       filters["tenant_id"],
+		ConversationID: filters["conversation_id"],
+		UserID:         filters["user_id"],
+		IssueClass:     filters["issue_class"],
+		Outcome:        filters["outcome"],
+		RepairedAfter:  repairedAfter,
+		RepairedBefore: repairedBefore,
 		Limit:          envInt("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_LIMIT", 20),
 	})
 	if err != nil {
@@ -563,7 +582,7 @@ func runMemberWindowRepairAudit() error {
 		)
 	}
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_OUTPUT")); outputPath != "" {
-		if err := writeMemberWindowRepairAuditOutput(outputPath, rows); err != nil {
+		if err := writeMemberWindowRepairAuditOutput(outputPath, rows, filters); err != nil {
 			return err
 		}
 	}

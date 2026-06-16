@@ -412,6 +412,73 @@ INSERT INTO identity_challenge_delivery_repair_audit (
 	}
 }
 
+func TestChallengeDeliveryStoreAuditDeliveryRepairsFiltersRepairedWindowIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO identity_challenge_delivery_repair_audit (
+    delivery_id,
+    tenant_id,
+    user_id,
+    challenge_id,
+    previous_delivery_status,
+    previous_challenge_status,
+    previous_challenge_delivery_status,
+    previous_retry_count,
+    previous_last_error,
+    previous_failure_class,
+    previous_dead_lettered_at,
+    new_delivery_status,
+    new_challenge_status,
+    new_challenge_delivery_status,
+    new_failure_class,
+    repair_mode,
+    repair_outcome,
+    skip_reason,
+    dry_run,
+    repair_operator,
+    repair_reason,
+    repaired_at
+) VALUES
+    (211, 'tenant-window', 'user-1', 'challenge-old', 'DLQ', 'EXPIRED', 'FAILED', 1, 'provider unavailable', 'delivery_failed', NULL,
+     'DLQ', 'EXPIRED', 'FAILED', 'delivery_failed', 'audit', 'AUDITED', '', true, 'operator-a', 'manual audit', '2026-06-17T01:00:00Z'::timestamptz),
+    (212, 'tenant-window', 'user-1', 'challenge-inside', 'PENDING', 'ACTIVE', 'PENDING', 3, 'timeout', 'timeout', NULL,
+     'PENDING', 'ACTIVE', 'PENDING', '', 'redrive-active-pending', 'MUTATED', '', false, 'operator-b', 'provider recovered', '2026-06-17T02:00:00Z'::timestamptz),
+    (213, 'tenant-window', 'user-2', 'challenge-new', 'PENDING', 'ACTIVE', 'PENDING', 0, '', '', NULL,
+     'CANCELED', 'EXPIRED', 'FAILED', 'inactive', 'cancel-inactive', 'MUTATED', '', false, 'operator-c', 'manual cleanup', '2026-06-17T03:00:00Z'::timestamptz)
+`)
+	if err != nil {
+		t.Fatalf("seed challenge delivery repair audit: %v", err)
+	}
+
+	repairedAfter := time.Date(2026, 6, 17, 1, 30, 0, 0, time.UTC)
+	repairedBefore := time.Date(2026, 6, 17, 2, 30, 0, 0, time.UTC)
+	rows, err := NewChallengeDeliveryStore(pool).AuditDeliveryRepairs(ctx, ChallengeDeliveryRepairAuditOptions{
+		TenantID:       "tenant-window",
+		RepairedAfter:  &repairedAfter,
+		RepairedBefore: &repairedBefore,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit challenge delivery repairs by repaired_at window: %v", err)
+	}
+	if len(rows) != 1 || rows[0].DeliveryID != 212 {
+		t.Fatalf("expected only row inside repaired_at window, got %+v", rows)
+	}
+
+	_, err = NewChallengeDeliveryStore(pool).AuditDeliveryRepairs(ctx, ChallengeDeliveryRepairAuditOptions{
+		TenantID:       "tenant-window",
+		RepairedAfter:  &repairedBefore,
+		RepairedBefore: &repairedBefore,
+		Limit:          10,
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid repaired_at window error, got %v", err)
+	}
+}
+
 func TestChallengeDeliveryStoreCleanupDeliveryRepairsDeletesOnlyExpiredRowsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

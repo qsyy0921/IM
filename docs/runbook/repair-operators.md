@@ -128,7 +128,7 @@ go run ./services/delivery-service/cmd/delivery-service
 | --- | --- |
 | `session-mfa-proof-audit` | 只读发现历史 session MFA proof 脏数据；可选 `NEXUSIM_IDENTITY_SESSION_MFA_PROOF_AUDIT_OUTPUT` 写低敏聚合 JSON 结果。 |
 | `challenge-delivery-repair` | 处理 challenge delivery outbox / retry / expire / DLQ 相关修复；可选 `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_OUTPUT` 写低敏 JSON summary。 |
-| `challenge-delivery-repair-audit` | 只读审计 challenge delivery repair 历史；可选 `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
+| `challenge-delivery-repair-audit` | 只读审计 challenge delivery repair 历史；支持按 delivery / tenant / user / challenge / mode / outcome / failure class / `repaired_at` RFC3339 时间窗口缩小范围；可选 `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_OUTPUT` 写低敏 JSON 结果和 compacted filters。 |
 | `challenge-delivery-repair-cleanup` | 按 retention / scope 清理 challenge delivery repair audit 历史；可选 `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_OUTPUT` 写低敏 JSON summary。 |
 | `challenge-request-limit-cleanup` | 清理 verification / password reset request limit 历史；可选 `NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_OUTPUT` 写低敏 JSON summary。 |
 | `gateway-token-keyring-rotate` | 轮换本地 RS256 gateway token keyring 文件；生成新当前私钥，把旧当前 key 降级为 public-only overlap，并按 old-key limit 保留旧公钥；可选 `NEXUSIM_IDENTITY_GATEWAY_TOKEN_KEYRING_ROTATE_OUTPUT` 写不含 JWK 材料的低敏 JSON summary。 |

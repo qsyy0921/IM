@@ -397,15 +397,39 @@ func runChallengeDeliveryRepairAudit() error {
 	if err != nil {
 		return err
 	}
+	repairedAfter, err := optionalRFC3339TimeEnv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_REPAIRED_AFTER")
+	if err != nil {
+		return err
+	}
+	repairedBefore, err := optionalRFC3339TimeEnv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_REPAIRED_BEFORE")
+	if err != nil {
+		return err
+	}
+	filters := map[string]string{
+		"tenant_id":              envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_TENANT_ID", ""),
+		"user_id":                envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_USER_ID", ""),
+		"challenge_id":           envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_CHALLENGE_ID", ""),
+		"mode":                   envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_MODE", ""),
+		"outcome":                envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_OUTCOME", ""),
+		"previous_failure_class": envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_PREVIOUS_FAILURE_CLASS", ""),
+		"new_failure_class":      envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_NEW_FAILURE_CLASS", ""),
+		"repaired_after":         formatOptionalTime(repairedAfter),
+		"repaired_before":        formatOptionalTime(repairedBefore),
+	}
+	if deliveryID != nil {
+		filters["delivery_id"] = strconv.FormatInt(*deliveryID, 10)
+	}
 	rows, err := postgresinfra.NewChallengeDeliveryStore(pool).AuditDeliveryRepairs(ctx, postgresinfra.ChallengeDeliveryRepairAuditOptions{
 		DeliveryID:           deliveryID,
-		TenantID:             envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_TENANT_ID", ""),
-		UserID:               envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_USER_ID", ""),
-		ChallengeID:          envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_CHALLENGE_ID", ""),
-		Mode:                 envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_MODE", ""),
-		Outcome:              envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_OUTCOME", ""),
-		PreviousFailureClass: envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_PREVIOUS_FAILURE_CLASS", ""),
-		NewFailureClass:      envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_NEW_FAILURE_CLASS", ""),
+		TenantID:             filters["tenant_id"],
+		UserID:               filters["user_id"],
+		ChallengeID:          filters["challenge_id"],
+		Mode:                 filters["mode"],
+		Outcome:              filters["outcome"],
+		PreviousFailureClass: filters["previous_failure_class"],
+		NewFailureClass:      filters["new_failure_class"],
+		RepairedAfter:        repairedAfter,
+		RepairedBefore:       repairedBefore,
 		Limit:                envInt("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_LIMIT", 20),
 	})
 	if err != nil {
@@ -439,7 +463,7 @@ func runChallengeDeliveryRepairAudit() error {
 		)
 	}
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_OUTPUT")); outputPath != "" {
-		if err := writeChallengeDeliveryRepairAuditOutput(outputPath, rows); err != nil {
+		if err := writeChallengeDeliveryRepairAuditOutput(outputPath, rows, filters); err != nil {
 			return err
 		}
 	}

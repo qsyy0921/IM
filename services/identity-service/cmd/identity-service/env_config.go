@@ -176,9 +176,22 @@ func optionalPositiveInt64Env(name string) (*int64, error) {
 	return &parsed, nil
 }
 
+func optionalRFC3339TimeEnv(name string) (*time.Time, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil, fmt.Errorf("%s must be RFC3339", name)
+	}
+	utc := parsed.UTC()
+	return &utc, nil
+}
+
 func formatOptionalTime(value *time.Time) string {
 	if value == nil {
 		return ""
 	}
-	return value.Format(time.RFC3339)
+	return value.UTC().Format(time.RFC3339)
 }

@@ -11,6 +11,7 @@ import (
 
 type challengeDeliveryRepairAuditOutput struct {
 	GeneratedAt string                                  `json:"generated_at"`
+	Filters     map[string]string                       `json:"filters,omitempty"`
 	Rows        []challengeDeliveryRepairAuditOutputRow `json:"rows"`
 }
 
@@ -39,9 +40,10 @@ type challengeDeliveryRepairAuditOutputRow struct {
 	RepairedAt                      string `json:"repaired_at"`
 }
 
-func writeChallengeDeliveryRepairAuditOutput(path string, rows []postgresinfra.ChallengeDeliveryRepairAuditRow) error {
+func writeChallengeDeliveryRepairAuditOutput(path string, rows []postgresinfra.ChallengeDeliveryRepairAuditRow, filters map[string]string) error {
 	output := challengeDeliveryRepairAuditOutput{
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		Filters:     compactOperatorCleanupFilters(filters),
 		Rows:        make([]challengeDeliveryRepairAuditOutputRow, 0, len(rows)),
 	}
 	for _, row := range rows {

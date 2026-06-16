@@ -26,6 +26,8 @@ type ChallengeDeliveryRepairAuditOptions struct {
 	Outcome              string
 	PreviousFailureClass string
 	NewFailureClass      string
+	RepairedAfter        *time.Time
+	RepairedBefore       *time.Time
 	Limit                int
 }
 
@@ -226,9 +228,12 @@ func (store *ChallengeDeliveryStore) AuditDeliveryRepairs(ctx context.Context, o
 	if limit > 200 {
 		limit = 200
 	}
+	if options.RepairedAfter != nil && options.RepairedBefore != nil && !options.RepairedAfter.Before(*options.RepairedBefore) {
+		return nil, types.NewInvalidArgument("repaired_after must be before repaired_before")
+	}
 
 	var args []any
-	clauses := make([]string, 0, 8)
+	clauses := make([]string, 0, 10)
 	if options.DeliveryID != nil {
 		args = append(args, *options.DeliveryID)
 		clauses = append(clauses, "delivery_id = $"+strconv.Itoa(len(args)))
@@ -276,6 +281,14 @@ func (store *ChallengeDeliveryStore) AuditDeliveryRepairs(ctx context.Context, o
 		}
 		args = append(args, failureClass)
 		clauses = append(clauses, "new_failure_class = $"+strconv.Itoa(len(args)))
+	}
+	if options.RepairedAfter != nil {
+		args = append(args, options.RepairedAfter.UTC())
+		clauses = append(clauses, "repaired_at >= $"+strconv.Itoa(len(args)))
+	}
+	if options.RepairedBefore != nil {
+		args = append(args, options.RepairedBefore.UTC())
+		clauses = append(clauses, "repaired_at < $"+strconv.Itoa(len(args)))
 	}
 
 	where := ""

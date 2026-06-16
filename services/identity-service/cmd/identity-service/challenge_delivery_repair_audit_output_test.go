@@ -38,6 +38,10 @@ func TestWriteChallengeDeliveryRepairAuditOutput(t *testing.T) {
 			NewChallengeDeliveryStatus:      "PENDING",
 			RepairedAt:                      repairedAt,
 		},
+	}, map[string]string{
+		"tenant_id":       "tenant-a",
+		"repaired_after":  "2026-06-16T09:00:00Z",
+		"repaired_before": "",
 	})
 	if err != nil {
 		t.Fatalf("write challenge delivery repair audit output: %v", err)
@@ -48,7 +52,8 @@ func TestWriteChallengeDeliveryRepairAuditOutput(t *testing.T) {
 		t.Fatalf("read challenge delivery repair audit output: %v", err)
 	}
 	var output struct {
-		Rows []struct {
+		Filters map[string]string `json:"filters"`
+		Rows    []struct {
 			DeliveryID                      int64  `json:"delivery_id"`
 			TenantID                        string `json:"tenant_id"`
 			UserID                          string `json:"user_id"`
@@ -72,6 +77,12 @@ func TestWriteChallengeDeliveryRepairAuditOutput(t *testing.T) {
 	}
 	if len(output.Rows) != 1 {
 		t.Fatalf("unexpected row count: %+v", output)
+	}
+	if output.Filters["tenant_id"] != "tenant-a" || output.Filters["repaired_after"] != "2026-06-16T09:00:00Z" {
+		t.Fatalf("expected compacted filters, got %+v", output.Filters)
+	}
+	if _, ok := output.Filters["repaired_before"]; ok {
+		t.Fatalf("expected empty repaired_before filter to be omitted, got %+v", output.Filters)
 	}
 	row := output.Rows[0]
 	if row.DeliveryID != 42 ||

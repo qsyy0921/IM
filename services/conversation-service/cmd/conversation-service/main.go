@@ -351,6 +351,11 @@ func runMemberChangeAudit() error {
 			row.LastError,
 		)
 	}
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_OUTPUT")); outputPath != "" {
+		if err := writeMemberChangeAuditOutput(outputPath, rows); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

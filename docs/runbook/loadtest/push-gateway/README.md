@@ -153,6 +153,18 @@ Cluster mode 下 `NEXUSIM_PUSH_REDIS_DB` 必须保持 `0`。push-gateway 的 rou
 .\tools\local-redis-cluster-smoke.ps1 -RunName redis-cluster-smoke-YYYYMMDD
 ```
 
+Redis Cluster node-stop fallback smoke 可以用下面的顶层 wrapper 运行：
+
+```powershell
+.\tools\local-redis-cluster-node-stop-smoke.ps1 -RunName redis-cluster-node-stop-smoke-YYYYMMDD
+```
+
+该场景会定位 receiver route key 所在 slot 的 master node，停止该 Redis
+Cluster node，验证 `delivery.notify` 可以超时，但客户端仍能通过 durable
+`PullInbox + AckDelivery` 恢复。clean commit `fb75bf1` 已完成一次真实进程
+smoke，报告见 `loadtest-report-20260616-push-gateway-redis-cluster-node-stop-smoke.md`。
+这证明的是本地 node-stop fallback，不是生产级 Redis Cluster HA 或零丢失在线唤醒。
+
 Redis-backed resume 负向 smoke runner 已支持 `redis-resume-negative` 场景：
 
 ```powershell
@@ -200,6 +212,7 @@ Sentinel 模式当前已证明五件事：客户端 master discovery 正常路�
 | `loadtest-report-20260614-push-gateway-redis-sentinel-quorum-loss-smoke.md` | 停止两个 Sentinel peer 并停止当前 master，观察 `delivery.notify` 超时后仍可通过 `PullInbox / AckDelivery` 恢复；不代表完整网络分区 / Redis Cluster / 生产级 Redis HA |
 | `loadtest-report-20260615-push-gateway-redis-sentinel-network-partition-smoke.md` | 断开 Sentinel 当前 master 的 Docker network，观察 `delivery.notify` 超时后仍可通过 `PullInbox / AckDelivery` 恢复；不代表 Redis Cluster / 跨 AZ 网络分区 / 生产级 Redis HA |
 | `loadtest-report-20260616-push-gateway-redis-cluster-smoke.md` | 本地三节点 Redis Cluster topology 下，`cross-instance-resume` 真实进程 smoke 通过；证明 cluster client / key schema / route / Redis-backed resume 最小链路，不代表生产级 Redis HA |
+| `loadtest-report-20260616-push-gateway-redis-cluster-node-stop-smoke.md` | 本地三节点 Redis Cluster 中停止 route key slot owner node，在线 `delivery.notify` 超时后仍通过 `PullInbox / AckDelivery` 恢复；不代表生产级 Redis Cluster HA |
 | `loadtest-report-20260616-push-gateway-redis-resume-negative-smoke.md` | Redis-backed resume 负向路径：未知 token 返回新 token + `buffer_miss`，跨 device token 返回非重试 `PERMISSION_DENIED`，buffer gap 返回 `buffer_miss` 并通过 `PullInbox / AckDelivery` 恢复 |
 | `loadtest-report-20260614-push-gateway-postgres-failover-smoke.md` | 本地三节点 `postgresql-repmgr` + `pgpool` 稳定写入口下，停止当前 primary 后再次跑通 `delivery.notify -> PullInbox -> AckDelivery`；不代表生产级 PostgreSQL HA |
 | `loadtest-report-20260615-push-gateway-postgres-quorum-observation-smoke.md` | 停止两个 standby 后观察到当前 `repmgr + pgpool` 本地拓扑仍接受 only-primary 写入；这是生产级 quorum / split-brain fencing 差距证据，不是 HA 通过结论 |
@@ -392,7 +405,7 @@ Sentinel get-master-addr-by-name mymaster
 - 不把 queue-full active close 表述为完整慢连接治理；当前 `server.resume_hint` 只是 broad pull fallback，客户端必须用本地 durable cursor 决定 `PullInbox` 起点。已完成单实例 slow-client 真实进程负向 smoke，它验证的是 durable `PullInbox` fallback；已另外完成单实例 resume replay smoke 和 cross-instance resume smoke，分别验证短时 in-memory buffer 命中路径和 Redis-backed 跨 gateway replay 路径；后续还没有多实例慢连接验证。
 - `/debug/metrics` 暴露单实例 in-memory registry、Redis route、Redis resume、auth JWKS、consumer worker 和 trace config 调试指标，用于 smoke 排障；`/metrics` 复用同一低敏 snapshot 输出 first-stage Prometheus text。本地 scrape target 为 `host.docker.internal:11913`，只用于本地开发 / 面试演示；它不代表 durable delivery 成功率、完整 issuer federation、KMS 状态或生产级 Prometheus / Alertmanager / SLO。WebSocket gateway 可通过 `NEXUSIM_PUSH_WS_ADDR` 暴露 debug 端点，consumer-only gateway 可通过 `NEXUSIM_PUSH_DEBUG_ADDR` 单独暴露只读 debug 端点。
 - `NEXUSIM_PUSH_TEST_WRITE_DELAY` 只允许本地 smoke 使用，生产环境必须 unset 或保持 `0`。
-- Redis route 当前对在线通知采用 fail-open：lookup / publish 错误不会阻塞 delivery consumer 提交当前 Kafka event；该次在线唤醒可以丢，客户端靠 durable `PullInbox` 恢复。connect 写 route 失败仍 fail-closed，避免把无法跨实例路由的 session 注册成在线。后台 cleanup loop 已能清理 missing / malformed / mismatched stale route；clean commit `074902b` 已完成一次真实 Redis stop/start fault smoke，证明 Redis route 中断时 `PullInbox + AckDelivery` 仍可恢复；clean commit `7bc35a5` 已完成 Redis Sentinel discovery 正常路径下的 route / resume smoke；clean commit `819c14a` 已完成手动 Sentinel master failover 后的 route / resume recovery smoke；clean commit `8ddc2fb` 已完成停止 Sentinel 当前 master 容器后的自动切主 recovery smoke；clean commit `a511de5` 已完成停止两个 Sentinel peer 并停止当前 master 的 quorum-loss fallback smoke，结果为 `delivery.notify` 在 1s 观察窗内超时、`redis_route_remote_no_subscriber_count=1`、`PullInbox item_count=1/max_seq=2`、`delivery.ack.ok last_received_seq=2`；clean commit `e6071d9` 已完成断开 Sentinel 当前 master Docker network 的 network-partition fallback smoke，结果为 `delivery.notify` 超时、`PullInbox item_count=1/max_seq=2`、`delivery.ack.ok last_received_seq=2`；clean commit `c235edb` 已完成本地三节点 Redis Cluster topology 的 route / resume 正常路径 smoke。这些都仍不是完整 Redis Cluster failover / 生产级 HA 结论。
+- Redis route 当前对在线通知采用 fail-open：lookup / publish 错误不会阻塞 delivery consumer 提交当前 Kafka event；该次在线唤醒可以丢，客户端靠 durable `PullInbox` 恢复。connect 写 route 失败仍 fail-closed，避免把无法跨实例路由的 session 注册成在线。后台 cleanup loop 已能清理 missing / malformed / mismatched stale route；clean commit `074902b` 已完成一次真实 Redis stop/start fault smoke，证明 Redis route 中断时 `PullInbox + AckDelivery` 仍可恢复；clean commit `7bc35a5` 已完成 Redis Sentinel discovery 正常路径下的 route / resume smoke；clean commit `819c14a` 已完成手动 Sentinel master failover 后的 route / resume recovery smoke；clean commit `8ddc2fb` 已完成停止 Sentinel 当前 master 容器后的自动切主 recovery smoke；clean commit `a511de5` 已完成停止两个 Sentinel peer 并停止当前 master 的 quorum-loss fallback smoke，结果为 `delivery.notify` 在 1s 观察窗内超时、`redis_route_remote_no_subscriber_count=1`、`PullInbox item_count=1/max_seq=2`、`delivery.ack.ok last_received_seq=2`；clean commit `e6071d9` 已完成断开 Sentinel 当前 master Docker network 的 network-partition fallback smoke，结果为 `delivery.notify` 超时、`PullInbox item_count=1/max_seq=2`、`delivery.ack.ok last_received_seq=2`；clean commit `c235edb` 已完成本地三节点 Redis Cluster topology 的 route / resume 正常路径 smoke；clean commit `fb75bf1` 已完成停止 Redis Cluster route key slot owner node 的 fallback smoke，结果为 `delivery.notify` 超时、`redis_route_lookup_error_count=1`、`PullInbox item_count=1/max_seq=2`、`delivery.ack.ok last_received_seq=2`。这些都仍不是完整 Redis Cluster failover / 生产级 HA 结论。
 - PostgreSQL 当前已补本地 `bitnamilegacy/postgresql-repmgr + pgpool` failover smoke：稳定写入口固定为 `postgres://nexusim:nexusim@127.0.0.1:15432/nexusim?sslmode=disable`，在停止当前 primary 容器后，wait-for-failover 需要满足“新 primary 可见 + 连续写探针成功”，随后再次跑通 `CreateMemberChange -> SendMessage -> delivery.notify -> PullInbox -> delivery.ack.ok`。同时已补 quorum observation：停止两个 standby 后，pgpool 仍接受 only-primary 写入，完整链路也能跑通。这证明本地 stable writer endpoint failover 可复现，也证明当前本地拓扑不是 quorum-fenced；不要把它表述为生产级 PostgreSQL HA、split-brain 防护、quorum write guard 或 in-flight transaction continuity。
 - Kafka 当前已补本地三 broker KRaft failover smoke、controller-switch smoke 和 ISR observation：停止 1 个 broker 后 ISR 缩到 2 且再次跑通 `delivery.notify -> PullInbox -> AckDelivery`；停止第 2 个 broker 后，`min.insync.replicas=2` 的 probe 被 `NOT_ENOUGH_REPLICAS` 拒绝，恢复 broker 后链路再次通过。这证明本地 broker list、KRaft controller 切换和 ISR fail-closed 可演示，不代表生产级 Kafka HA、跨机器 Kafka 集群、持续 ISR 抖动、rack awareness 或 in-flight produce / commit continuity。
 

@@ -449,6 +449,11 @@ func runTenantPrivacyDefaultSet() error {
 		result.Changed,
 		result.Settings.UpdatedAtUnixMS,
 	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_CONTACTS_TENANT_PRIVACY_SET_OUTPUT")); outputPath != "" {
+		if err := writeTenantPrivacySetOutput(outputPath, result); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -536,6 +541,11 @@ func runSourcePolicySet() error {
 		result.Changed,
 		result.Policy.UpdatedAtUnixMS,
 	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_CONTACTS_SOURCE_POLICY_SET_OUTPUT")); outputPath != "" {
+		if err := writeSourcePolicySetOutput(outputPath, result); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

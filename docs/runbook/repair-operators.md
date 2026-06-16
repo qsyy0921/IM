@@ -114,9 +114,9 @@ go run ./services/delivery-service/cmd/delivery-service
 | 模式 | 作用 |
 | --- | --- |
 | `tenant-privacy-default-audit` | 只读审计租户联系人隐私默认值；可选 `NEXUSIM_CONTACTS_TENANT_PRIVACY_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
-| `tenant-privacy-default-set` | 设置租户联系人隐私默认值。 |
+| `tenant-privacy-default-set` | 设置租户联系人隐私默认值；可选 `NEXUSIM_CONTACTS_TENANT_PRIVACY_SET_OUTPUT` 写低敏 JSON 结果。 |
 | `source-policy-audit` | 只读审计联系人来源策略；可选 `NEXUSIM_CONTACTS_SOURCE_POLICY_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
-| `source-policy-set` | 设置联系人来源策略。 |
+| `source-policy-set` | 设置联系人来源策略；可选 `NEXUSIM_CONTACTS_SOURCE_POLICY_SET_OUTPUT` 写低敏 JSON 结果。 |
 
 这些仍是本地 operator 形态；后续 admin/config service 接入后，应迁移到正式权限面和审批流。
 

@@ -64,13 +64,11 @@ func runMessageComplianceProofRegister() error {
 	}
 	defer closeRepository()
 
-	result, err := repository.RegisterComplianceExternalProof(ctx, postgresinfra.MessageComplianceExternalProofMutationOptions{
-		TenantID:         envString("NEXUSIM_MESSAGE_COMPLIANCE_PROOF_TENANT_ID", ""),
-		ExternalProofRef: envString("NEXUSIM_MESSAGE_COMPLIANCE_PROOF_EXTERNAL_PROOF_REF", ""),
-		Provider:         envString("NEXUSIM_MESSAGE_COMPLIANCE_PROOF_PROVIDER", ""),
-		ProofHash:        envString("NEXUSIM_MESSAGE_COMPLIANCE_PROOF_HASH", ""),
-		OperatorID:       envString("NEXUSIM_MESSAGE_COMPLIANCE_PROOF_OPERATOR_ID", ""),
-	})
+	options, err := messageComplianceProofRegisterOptionsFromEnv()
+	if err != nil {
+		return err
+	}
+	result, err := repository.RegisterComplianceExternalProof(ctx, options)
 	if err != nil {
 		return err
 	}

@@ -540,6 +540,8 @@ DELETE
 - `tenant_id + external_proof_ref` 唯一。
 - `status` 只允许 `VERIFIED / REVOKED`。
 - `proof_hash` 必须非空，用于把本地 ref 绑定到外部 proof 包摘要；proof 正文仍由外部系统保存。
+- `compliance-proof-register` 默认仍支持手工低敏登记；当 `NEXUSIM_MESSAGE_COMPLIANCE_PROOF_PROVIDER_MODE=manifest` 时，会先读取 `NEXUSIM_MESSAGE_COMPLIANCE_PROOF_MANIFEST_PATH` 指向的外部 proof manifest，要求目标 `external_proof_ref` 处于 `VERIFIED`，并使用 manifest 中的 provider / proof hash 登记本地 VERIFIED ref。
+- manifest 模式只接受低敏索引字段：`external_proof_ref`、`provider`、`proof_hash`、`status`。即使外部系统另有 proof 正文 / case file，NexusIM 也不解析、不存储、不输出正文。
 - `compliance-approval-create` 必须引用仍为 `VERIFIED` 的 proof ref。
 - `DeleteMessage(COMPLIANCE_RETENTION)` 会在事务内同时锁定 `APPROVED` approval 和 `VERIFIED` proof ref；proof 被 revoke 后不能继续触发合规删除。
 - operator audit 可输出低敏 proof ref、provider 和 proof hash，不输出 proof 正文。

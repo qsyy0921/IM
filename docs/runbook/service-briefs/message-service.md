@@ -5,7 +5,7 @@
 - 已有 `SendMessage`、`EditMessage`、`RevokeMessage`、`DeleteMessage` 主链路；`SendMessage` 支持 `TEXT`、第一阶段 `IMAGE` / `FILE` / `VOICE` 附件引用消息，以及 `LOCATION` / `CARD` 结构化 payload 消息。
 - `DeleteMessage` 已收紧 delete scope 契约：内部未知 scope 直接拒绝；`CONVERSATION_VIEW` 保持作者 / policy override 删除语义；`COMPLIANCE_RETENTION` 第一阶段只允许 policy 返回 `OwnershipOverride=true`、提交 `compliance_approval_id` / `external_proof_ref`，且本地 external proof ref 处于 `VERIFIED`、approval row 处于 `APPROVED` 后执行；成功删除会在同一事务内消费 approval、redaction 当前 `message_log.payload_json` 与本次 change history payload，timeline / outbox 只写低敏 reason-present / proof-ref-present 证明。
 - 已补 first-stage legal hold：`message_legal_holds` 可记录 / release 消息级 hold，`DeleteMessage` 在同一事务内检查 ACTIVE hold，命中时 fail-closed，不推进 `conversation_seq`，不写 change history、timeline 或 outbox；`legal-hold-audit` / `legal-hold-set` / `legal-hold-release` operator 可写低敏 JSON 结果，输出只暴露 reason-present，不输出 hold reason 原文。
-- 已补 first-stage compliance external proof / delete approval：`message_compliance_external_proofs` 只保存低敏 proof ref、provider 和 proof hash，不保存 proof 正文；`message_compliance_delete_approvals` 引用已 VERIFIED 的 external proof ref；`compliance-proof-audit/register/revoke` 和 `compliance-approval-audit/create/cancel` operator 可写低敏 JSON 结果。
+- 已补 first-stage compliance external proof / delete approval：`message_compliance_external_proofs` 只保存低敏 proof ref、provider 和 proof hash，不保存 proof 正文；`message_compliance_delete_approvals` 引用已 VERIFIED 的 external proof ref；`compliance-proof-register` 支持默认手工低敏登记和 manifest verifier 模式，manifest 模式只从外部 proof manifest 校验 `VERIFIED` ref 并导入 provider / proof hash；`compliance-proof-audit/revoke` 和 `compliance-approval-audit/create/cancel` operator 可写低敏 JSON 结果。
 - 通过 outbox relay 发布 conversation timeline events，不在业务事务里直接 publish Kafka。
 - 已接 conversation-service / policy-service，可走 verified metadata、TLS / mTLS。
 - 已补 `/healthz`、`/readyz`、`/debug/metrics` 和 Prometheus text `/metrics`，可观察低敏 PG pool、send / repository / Kafka / outbox relay 聚合指标和固定 operation latency；debug HTTP 监听默认只允许 loopback / 私网，公网或未指定地址必须显式 `NEXUSIM_MESSAGE_DEBUG_ALLOW_PUBLIC=true`。
@@ -25,5 +25,5 @@
 
 ## 后续
 
-- 会话级删除策略深化、外部 proof provider 集成 / proof 正文存证留在外部系统、长时间容量曲线和生产观测；用户私有隐藏已由 delivery-service `HideInboxItem` 承担，图片 / 文件 / 语音二进制上传和处理属于后续 media 能力。
+- 会话级删除策略深化、provider-grade 外部 proof 工作流 / 审批系统集成、长时间容量曲线和生产观测；用户私有隐藏已由 delivery-service `HideInboxItem` 承担，图片 / 文件 / 语音二进制上传和处理属于后续 media 能力。
 - 生产级 OTel collector、告警路由、retention 和 SLO dashboard 仍属于后续统一观测治理。

@@ -393,11 +393,12 @@ func runTenantPrivacyDefaultAudit() error {
 		return err
 	}
 	log.Printf(
-		"contacts-service tenant privacy default tenant_id=%s allow_contact_requests=%t allow_search_contact_requests=%t allow_profile_visibility=%t version=%d policy_source=%s updated_at_unix_ms=%d",
+		"contacts-service tenant privacy default tenant_id=%s allow_contact_requests=%t allow_search_contact_requests=%t allow_profile_visibility=%t profile_visibility_fields=%v version=%d policy_source=%s updated_at_unix_ms=%d",
 		result.TenantID,
 		result.Settings.AllowContactRequests,
 		result.Settings.AllowSearchContactRequests,
 		result.Settings.AllowProfileVisibility,
+		types.ContactProfileVisibilityFieldsToStrings(result.Settings.ProfileVisibilityFields),
 		result.Settings.Version,
 		result.Settings.PolicySource,
 		result.Settings.UpdatedAtUnixMS,
@@ -438,6 +439,10 @@ func runTenantPrivacyDefaultSet() error {
 	if allowProfileConfigured {
 		allowProfileVisibilityPtr = &allowProfileVisibility
 	}
+	profileVisibilityFields, updateProfileVisibilityFields, err := envOptionalProfileVisibilityFields("NEXUSIM_CONTACTS_TENANT_PRIVACY_PROFILE_VISIBILITY_FIELDS")
+	if err != nil {
+		return err
+	}
 	pool, err := openPGPool(ctx)
 	if err != nil {
 		return err
@@ -446,21 +451,24 @@ func runTenantPrivacyDefaultSet() error {
 	result, err := app.NewSetTenantContactPrivacyDefaultUseCase(postgresinfra.NewRepository(pool)).Execute(
 		ctx,
 		types.SetTenantContactPrivacyDefaultCommand{
-			TenantID:                   types.TenantID(tenantID),
-			AllowContactRequests:       allowContactRequests,
-			AllowSearchContactRequests: allowSearchContactRequestsPtr,
-			AllowProfileVisibility:     allowProfileVisibilityPtr,
+			TenantID:                      types.TenantID(tenantID),
+			AllowContactRequests:          allowContactRequests,
+			AllowSearchContactRequests:    allowSearchContactRequestsPtr,
+			AllowProfileVisibility:        allowProfileVisibilityPtr,
+			UpdateProfileVisibilityFields: updateProfileVisibilityFields,
+			ProfileVisibilityFields:       profileVisibilityFields,
 		},
 	)
 	if err != nil {
 		return err
 	}
 	log.Printf(
-		"contacts-service tenant privacy default updated tenant_id=%s allow_contact_requests=%t allow_search_contact_requests=%t allow_profile_visibility=%t version=%d changed=%t updated_at_unix_ms=%d",
+		"contacts-service tenant privacy default updated tenant_id=%s allow_contact_requests=%t allow_search_contact_requests=%t allow_profile_visibility=%t profile_visibility_fields=%v version=%d changed=%t updated_at_unix_ms=%d",
 		result.TenantID,
 		result.Settings.AllowContactRequests,
 		result.Settings.AllowSearchContactRequests,
 		result.Settings.AllowProfileVisibility,
+		types.ContactProfileVisibilityFieldsToStrings(result.Settings.ProfileVisibilityFields),
 		result.Settings.Version,
 		result.Changed,
 		result.Settings.UpdatedAtUnixMS,
@@ -947,6 +955,23 @@ func envOptionalBool(name string) (bool, bool, error) {
 	default:
 		return false, true, errors.New(name + " must be a boolean")
 	}
+}
+
+func envOptionalProfileVisibilityFields(name string) ([]types.ContactProfileVisibilityField, bool, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return nil, false, nil
+	}
+	rawFields := splitCSV(value)
+	fields := make([]types.ContactProfileVisibilityField, 0, len(rawFields))
+	for _, field := range rawFields {
+		fields = append(fields, types.ContactProfileVisibilityField(field))
+	}
+	normalized, err := types.NormalizeContactProfileVisibilityFields(fields)
+	if err != nil {
+		return nil, true, errors.New(name + " contains an unsupported profile visibility field")
+	}
+	return normalized, true, nil
 }
 
 func splitCSV(value string) []string {

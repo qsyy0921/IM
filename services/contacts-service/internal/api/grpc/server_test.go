@@ -133,9 +133,12 @@ func TestContactPrivacyMapsPolicySource(t *testing.T) {
 					AllowContactRequests:       false,
 					AllowSearchContactRequests: true,
 					AllowProfileVisibility:     false,
-					Version:                    3,
-					UpdatedAtUnixMS:            1234,
-					PolicySource:               types.ContactPrivacyPolicySourceTenantDefault,
+					ProfileVisibilityFields: []types.ContactProfileVisibilityField{
+						types.ContactProfileVisibilityFieldDisplayName,
+					},
+					Version:         3,
+					UpdatedAtUnixMS: 1234,
+					PolicySource:    types.ContactPrivacyPolicySourceTenantDefault,
 				},
 			}, nil
 		}),
@@ -160,6 +163,10 @@ func TestContactPrivacyMapsPolicySource(t *testing.T) {
 	if response.GetSettings().GetAllowProfileVisibility() {
 		t.Fatalf("expected profile visibility to be disabled in privacy response: %+v", response.GetSettings())
 	}
+	if got := response.GetSettings().GetProfileVisibilityFields(); len(got) != 1 ||
+		got[0] != contactsv1.ContactProfileVisibilityField_CONTACT_PROFILE_VISIBILITY_FIELD_DISPLAY_NAME {
+		t.Fatalf("unexpected profile visibility fields: %+v", got)
+	}
 }
 
 func TestSetContactPrivacyMapsOptionalPolicies(t *testing.T) {
@@ -175,6 +182,7 @@ func TestSetContactPrivacyMapsOptionalPolicies(t *testing.T) {
 					AllowContactRequests:       command.AllowContactRequests,
 					AllowSearchContactRequests: command.AllowSearchContactRequests != nil && *command.AllowSearchContactRequests,
 					AllowProfileVisibility:     command.AllowProfileVisibility != nil && *command.AllowProfileVisibility,
+					ProfileVisibilityFields:    command.ProfileVisibilityFields,
 					Version:                    1,
 					UpdatedAtUnixMS:            1234,
 					PolicySource:               types.ContactPrivacyPolicySourceUser,
@@ -191,10 +199,15 @@ func TestSetContactPrivacyMapsOptionalPolicies(t *testing.T) {
 			TenantId: "tenant-1",
 			UserId:   "bob",
 		},
-		AllowContactRequests:       true,
-		AllowSearchContactRequests: &allowSearch,
-		AllowProfileVisibility:     &allowProfile,
-		IdempotencyKey:             "privacy-1",
+		AllowContactRequests:          true,
+		AllowSearchContactRequests:    &allowSearch,
+		AllowProfileVisibility:        &allowProfile,
+		UpdateProfileVisibilityFields: true,
+		ProfileVisibilityFields: []contactsv1.ContactProfileVisibilityField{
+			contactsv1.ContactProfileVisibilityField_CONTACT_PROFILE_VISIBILITY_FIELD_DISPLAY_NAME,
+			contactsv1.ContactProfileVisibilityField_CONTACT_PROFILE_VISIBILITY_FIELD_STATUS_MESSAGE,
+		},
+		IdempotencyKey: "privacy-1",
 	})
 	if err != nil {
 		t.Fatalf("set contact privacy: %v", err)
@@ -205,11 +218,21 @@ func TestSetContactPrivacyMapsOptionalPolicies(t *testing.T) {
 	if captured.AllowProfileVisibility == nil || !*captured.AllowProfileVisibility {
 		t.Fatalf("expected optional profile policy true to reach usecase, got %+v", captured)
 	}
+	if !captured.UpdateProfileVisibilityFields ||
+		len(captured.ProfileVisibilityFields) != 2 ||
+		captured.ProfileVisibilityFields[0] != types.ContactProfileVisibilityFieldDisplayName ||
+		captured.ProfileVisibilityFields[1] != types.ContactProfileVisibilityFieldStatusMessage {
+		t.Fatalf("expected profile fields to reach usecase, got %+v", captured)
+	}
 	if response.GetSettings().GetAllowSearchContactRequests() {
 		t.Fatalf("expected search contact requests false in response: %+v", response.GetSettings())
 	}
 	if !response.GetSettings().GetAllowProfileVisibility() {
 		t.Fatalf("expected profile visibility true in response: %+v", response.GetSettings())
+	}
+	if got := response.GetSettings().GetProfileVisibilityFields(); len(got) != 2 ||
+		got[1] != contactsv1.ContactProfileVisibilityField_CONTACT_PROFILE_VISIBILITY_FIELD_STATUS_MESSAGE {
+		t.Fatalf("unexpected response profile fields: %+v", got)
 	}
 }
 

@@ -351,6 +351,7 @@ func BuildContactEvent(message types.OutboxMessage) (*contacteventsv1.ContactEve
 				AllowContactRequests:       payload.AllowContactRequests,
 				AllowSearchContactRequests: payload.AllowSearchContactRequestsValue(),
 				AllowProfileVisibility:     payload.AllowProfileVisibilityValue(),
+				ProfileVisibilityFields:    payload.ProfileVisibilityFieldsValue(),
 				PrivacyVersion:             payload.PrivacyVersion,
 				OccurredAt:                 payload.Timestamp(),
 			},
@@ -362,25 +363,26 @@ func BuildContactEvent(message types.OutboxMessage) (*contacteventsv1.ContactEve
 }
 
 type contactPayload struct {
-	TenantID                   string `json:"tenant_id"`
-	RequestID                  string `json:"request_id"`
-	SenderUserID               string `json:"sender_user_id"`
-	ReceiverUserID             string `json:"receiver_user_id"`
-	Status                     string `json:"status"`
-	Message                    string `json:"message"`
-	EdgeVersion                int64  `json:"edge_version"`
-	OccurredAt                 string `json:"occurred_at"`
-	OwnerUserID                string `json:"owner_user_id"`
-	ContactUserID              string `json:"contact_user_id"`
-	PreviousStatus             string `json:"previous_status"`
-	Reason                     string `json:"reason"`
-	Remark                     string `json:"remark"`
-	GroupName                  string `json:"group_name"`
-	UserID                     string `json:"user_id"`
-	PrivacyVersion             int64  `json:"privacy_version"`
-	AllowContactRequests       bool   `json:"allow_contact_requests"`
-	AllowSearchContactRequests *bool  `json:"allow_search_contact_requests"`
-	AllowProfileVisibility     *bool  `json:"allow_profile_visibility"`
+	TenantID                   string   `json:"tenant_id"`
+	RequestID                  string   `json:"request_id"`
+	SenderUserID               string   `json:"sender_user_id"`
+	ReceiverUserID             string   `json:"receiver_user_id"`
+	Status                     string   `json:"status"`
+	Message                    string   `json:"message"`
+	EdgeVersion                int64    `json:"edge_version"`
+	OccurredAt                 string   `json:"occurred_at"`
+	OwnerUserID                string   `json:"owner_user_id"`
+	ContactUserID              string   `json:"contact_user_id"`
+	PreviousStatus             string   `json:"previous_status"`
+	Reason                     string   `json:"reason"`
+	Remark                     string   `json:"remark"`
+	GroupName                  string   `json:"group_name"`
+	UserID                     string   `json:"user_id"`
+	PrivacyVersion             int64    `json:"privacy_version"`
+	AllowContactRequests       bool     `json:"allow_contact_requests"`
+	AllowSearchContactRequests *bool    `json:"allow_search_contact_requests"`
+	AllowProfileVisibility     *bool    `json:"allow_profile_visibility"`
+	ProfileVisibilityFields    []string `json:"profile_visibility_fields"`
 }
 
 func (payload contactPayload) Timestamp() *timestamppb.Timestamp {
@@ -400,6 +402,16 @@ func (payload contactPayload) AllowProfileVisibilityValue() bool {
 		return true
 	}
 	return *payload.AllowProfileVisibility
+}
+
+func (payload contactPayload) ProfileVisibilityFieldsValue() []string {
+	if payload.ProfileVisibilityFields != nil {
+		return append([]string(nil), payload.ProfileVisibilityFields...)
+	}
+	if !payload.AllowProfileVisibilityValue() {
+		return nil
+	}
+	return []string{"DISPLAY_NAME", "AVATAR", "ORGANIZATION", "TITLE"}
 }
 
 func decodeContactRequestPayload(payloadJSON []byte) (contactPayload, error) {

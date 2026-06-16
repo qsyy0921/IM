@@ -21,6 +21,7 @@ func TestRepositoryContactPrivacyDefaultsAllowRequestsIntegration(t *testing.T) 
 	if privacy.TenantID != "tenant-contacts" ||
 		privacy.UserID != "bob" ||
 		!privacy.Settings.AllowContactRequests ||
+		len(privacy.Settings.ProfileVisibilityFields) != 4 ||
 		privacy.Settings.Version != 0 ||
 		privacy.Settings.UpdatedAtUnixMS != 0 ||
 		privacy.Settings.PolicySource != types.ContactPrivacyPolicySourceSystemDefault {
@@ -489,6 +490,7 @@ func TestRepositoryContactPrivacyProfileVisibilityIntegration(t *testing.T) {
 		t.Fatalf("get default profile privacy: %v", err)
 	}
 	if !defaultPrivacy.Settings.AllowProfileVisibility ||
+		len(defaultPrivacy.Settings.ProfileVisibilityFields) != 4 ||
 		defaultPrivacy.Settings.PolicySource != types.ContactPrivacyPolicySourceSystemDefault {
 		t.Fatalf("unexpected default profile privacy: %+v", defaultPrivacy)
 	}
@@ -504,6 +506,7 @@ func TestRepositoryContactPrivacyProfileVisibilityIntegration(t *testing.T) {
 		t.Fatalf("set profile privacy closed: %v", err)
 	}
 	if closed.Settings.AllowProfileVisibility ||
+		len(closed.Settings.ProfileVisibilityFields) != 0 ||
 		!closed.Settings.AllowContactRequests ||
 		!closed.Settings.AllowSearchContactRequests ||
 		closed.Settings.Version != 1 ||
@@ -522,6 +525,7 @@ func TestRepositoryContactPrivacyProfileVisibilityIntegration(t *testing.T) {
 	}
 	if !replay.IdempotentReplay ||
 		replay.Settings.AllowProfileVisibility ||
+		len(replay.Settings.ProfileVisibilityFields) != 0 ||
 		replay.Settings.Version != closed.Settings.Version {
 		t.Fatalf("unexpected profile privacy replay: %+v", replay)
 	}
@@ -540,6 +544,45 @@ WHERE tenant_id = 'tenant-contacts'
 		t.Fatalf("expected profile visibility false in privacy outbox payload")
 	}
 	assertContactsOutboxCount(t, ctx, pool, eventTypeContactPrivacyUpdated, 1)
+
+	allowProfile = true
+	fields := []types.ContactProfileVisibilityField{
+		types.ContactProfileVisibilityFieldDisplayName,
+		types.ContactProfileVisibilityFieldStatusMessage,
+	}
+	fieldResult, err := repository.SetContactPrivacy(ctx, types.SetContactPrivacyCommand{
+		AuthContext:                   authContext("bob", "privacy-profile-fields"),
+		AllowContactRequests:          true,
+		AllowProfileVisibility:        &allowProfile,
+		UpdateProfileVisibilityFields: true,
+		ProfileVisibilityFields:       fields,
+		IdempotencyKey:                "privacy-profile-fields",
+	})
+	if err != nil {
+		t.Fatalf("set profile privacy fields: %v", err)
+	}
+	if !fieldResult.Settings.AllowProfileVisibility ||
+		len(fieldResult.Settings.ProfileVisibilityFields) != 2 ||
+		fieldResult.Settings.ProfileVisibilityFields[1] != types.ContactProfileVisibilityFieldStatusMessage {
+		t.Fatalf("unexpected profile visibility fields result: %+v", fieldResult)
+	}
+	var payloadProfileFields []string
+	err = pool.QueryRow(ctx, `
+SELECT array_agg(value::text ORDER BY ordinality)
+FROM contacts_outbox, jsonb_array_elements_text(payload_json->'profile_visibility_fields') WITH ORDINALITY AS fields(value, ordinality)
+WHERE tenant_id = 'tenant-contacts'
+  AND event_type = $1
+  AND payload_json->>'user_id' = 'bob'
+  AND (payload_json->>'allow_profile_visibility')::boolean = true
+`, eventTypeContactPrivacyUpdated).Scan(&payloadProfileFields)
+	if err != nil {
+		t.Fatalf("query profile privacy fields outbox payload: %v", err)
+	}
+	if len(payloadProfileFields) != 2 ||
+		payloadProfileFields[0] != "DISPLAY_NAME" ||
+		payloadProfileFields[1] != "STATUS_MESSAGE" {
+		t.Fatalf("unexpected profile visibility fields payload: %+v", payloadProfileFields)
+	}
 }
 
 func TestRepositoryTenantProfilePrivacyDefaultInheritanceIntegration(t *testing.T) {
@@ -558,6 +601,7 @@ func TestRepositoryTenantProfilePrivacyDefaultInheritanceIntegration(t *testing.
 		t.Fatalf("set tenant profile privacy default: %v", err)
 	}
 	if tenantDefault.Settings.AllowProfileVisibility ||
+		len(tenantDefault.Settings.ProfileVisibilityFields) != 0 ||
 		tenantDefault.Settings.PolicySource != types.ContactPrivacyPolicySourceTenantDefault {
 		t.Fatalf("unexpected tenant profile privacy default: %+v", tenantDefault)
 	}
@@ -567,6 +611,7 @@ func TestRepositoryTenantProfilePrivacyDefaultInheritanceIntegration(t *testing.
 		t.Fatalf("get inherited profile privacy: %v", err)
 	}
 	if inherited.Settings.AllowProfileVisibility ||
+		len(inherited.Settings.ProfileVisibilityFields) != 0 ||
 		inherited.Settings.PolicySource != types.ContactPrivacyPolicySourceTenantDefault ||
 		inherited.Settings.Version != tenantDefault.Settings.Version {
 		t.Fatalf("unexpected inherited profile privacy: %+v", inherited)
@@ -583,8 +628,27 @@ func TestRepositoryTenantProfilePrivacyDefaultInheritanceIntegration(t *testing.
 		t.Fatalf("set user profile privacy open: %v", err)
 	}
 	if !userOverride.Settings.AllowProfileVisibility ||
+		len(userOverride.Settings.ProfileVisibilityFields) != 4 ||
 		userOverride.Settings.PolicySource != types.ContactPrivacyPolicySourceUser {
 		t.Fatalf("unexpected user profile privacy override: %+v", userOverride)
+	}
+
+	tenantFields, err := repository.SetTenantContactPrivacyDefault(ctx, types.SetTenantContactPrivacyDefaultCommand{
+		TenantID:                      "tenant-contacts",
+		AllowContactRequests:          true,
+		AllowProfileVisibility:        &allowUserProfile,
+		UpdateProfileVisibilityFields: true,
+		ProfileVisibilityFields: []types.ContactProfileVisibilityField{
+			types.ContactProfileVisibilityFieldDisplayName,
+			types.ContactProfileVisibilityFieldAvatar,
+		},
+	})
+	if err != nil {
+		t.Fatalf("set tenant profile privacy fields: %v", err)
+	}
+	if len(tenantFields.Settings.ProfileVisibilityFields) != 2 ||
+		tenantFields.Settings.ProfileVisibilityFields[1] != types.ContactProfileVisibilityFieldAvatar {
+		t.Fatalf("unexpected tenant profile visibility fields: %+v", tenantFields)
 	}
 }
 

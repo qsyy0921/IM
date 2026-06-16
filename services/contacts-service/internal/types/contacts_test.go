@@ -101,6 +101,29 @@ func TestTenantContactRequestSourcePolicyCommandValidation(t *testing.T) {
 	}
 }
 
+func TestNormalizeContactProfileVisibilityFields(t *testing.T) {
+	fields, err := NormalizeContactProfileVisibilityFields([]ContactProfileVisibilityField{
+		ContactProfileVisibilityField("display-name"),
+		ContactProfileVisibilityFieldDisplayName,
+		ContactProfileVisibilityFieldStatusMessage,
+	})
+	if err != nil {
+		t.Fatalf("normalize profile visibility fields: %v", err)
+	}
+	if len(fields) != 2 ||
+		fields[0] != ContactProfileVisibilityFieldDisplayName ||
+		fields[1] != ContactProfileVisibilityFieldStatusMessage {
+		t.Fatalf("unexpected normalized fields: %+v", fields)
+	}
+
+	if _, err := NormalizeContactProfileVisibilityFields([]ContactProfileVisibilityField{""}); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("expected empty explicit profile visibility field to be invalid, got %v", err)
+	}
+	if _, err := NormalizeContactProfileVisibilityFields([]ContactProfileVisibilityField{"EMAIL"}); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("expected unsupported profile visibility field to be invalid, got %v", err)
+	}
+}
+
 func validSendContactRequestCommand() SendContactRequestCommand {
 	return SendContactRequestCommand{
 		AuthContext: AuthContext{

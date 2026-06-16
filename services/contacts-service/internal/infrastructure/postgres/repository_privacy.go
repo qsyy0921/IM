@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -31,13 +32,19 @@ func (r *Repository) SetContactPrivacy(
 	if r.pool == nil {
 		return types.SetContactPrivacyResult{}, types.NewDBWriteFailed("contacts repository is not configured")
 	}
+	profileVisibilityFields, err := types.NormalizeContactProfileVisibilityFields(command.ProfileVisibilityFields)
+	if err != nil {
+		return types.SetContactPrivacyResult{}, err
+	}
 	commandHash, err := commandHash(commandHashPayload{
-		Kind:                       commandTypeSetContactPrivacy,
-		TenantID:                   string(command.AuthContext.TenantID),
-		UserID:                     string(command.AuthContext.UserID),
-		AllowContactRequests:       &command.AllowContactRequests,
-		AllowSearchContactRequests: command.AllowSearchContactRequests,
-		AllowProfileVisibility:     command.AllowProfileVisibility,
+		Kind:                          commandTypeSetContactPrivacy,
+		TenantID:                      string(command.AuthContext.TenantID),
+		UserID:                        string(command.AuthContext.UserID),
+		AllowContactRequests:          &command.AllowContactRequests,
+		AllowSearchContactRequests:    command.AllowSearchContactRequests,
+		AllowProfileVisibility:        command.AllowProfileVisibility,
+		UpdateProfileVisibilityFields: command.UpdateProfileVisibilityFields,
+		ProfileVisibilityFields:       types.ContactProfileVisibilityFieldsToStrings(profileVisibilityFields),
 	})
 	if err != nil {
 		return types.SetContactPrivacyResult{}, err
@@ -67,7 +74,17 @@ func (r *Repository) SetContactPrivacy(
 	if err := lockContactPrivacySettings(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID); err != nil {
 		return types.SetContactPrivacyResult{}, err
 	}
-	row, changed, err := upsertContactPrivacySettings(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.AllowContactRequests, command.AllowSearchContactRequests, command.AllowProfileVisibility)
+	row, changed, err := upsertContactPrivacySettings(
+		ctx,
+		tx,
+		command.AuthContext.TenantID,
+		command.AuthContext.UserID,
+		command.AllowContactRequests,
+		command.AllowSearchContactRequests,
+		command.AllowProfileVisibility,
+		command.UpdateProfileVisibilityFields,
+		profileVisibilityFields,
+	)
 	if err != nil {
 		return types.SetContactPrivacyResult{}, err
 	}
@@ -124,7 +141,20 @@ func (r *Repository) SetTenantContactPrivacyDefault(
 	if err := lockTenantContactPrivacyDefault(ctx, tx, command.TenantID); err != nil {
 		return types.SetTenantContactPrivacyDefaultResult{}, err
 	}
-	row, changed, err := upsertTenantContactPrivacyDefault(ctx, tx, command.TenantID, command.AllowContactRequests, command.AllowSearchContactRequests, command.AllowProfileVisibility)
+	profileVisibilityFields, err := types.NormalizeContactProfileVisibilityFields(command.ProfileVisibilityFields)
+	if err != nil {
+		return types.SetTenantContactPrivacyDefaultResult{}, err
+	}
+	row, changed, err := upsertTenantContactPrivacyDefault(
+		ctx,
+		tx,
+		command.TenantID,
+		command.AllowContactRequests,
+		command.AllowSearchContactRequests,
+		command.AllowProfileVisibility,
+		command.UpdateProfileVisibilityFields,
+		profileVisibilityFields,
+	)
 	if err != nil {
 		return types.SetTenantContactPrivacyDefaultResult{}, err
 	}
@@ -140,6 +170,7 @@ type contactPrivacyRow struct {
 	AllowContactRequests       bool
 	AllowSearchContactRequests bool
 	AllowProfileVisibility     bool
+	ProfileVisibilityFields    []types.ContactProfileVisibilityField
 	Version                    int64
 	UpdatedAt                  time.Time
 	PolicySource               types.ContactPrivacyPolicySource
@@ -152,17 +183,28 @@ func defaultContactPrivacyRow(tenantID types.TenantID, userID types.UserID) cont
 		AllowContactRequests:       true,
 		AllowSearchContactRequests: true,
 		AllowProfileVisibility:     true,
+		ProfileVisibilityFields:    types.DefaultContactProfileVisibilityFields(),
 		PolicySource:               types.ContactPrivacyPolicySourceSystemDefault,
 	}
 }
 
-func tenantDefaultContactPrivacyRow(tenantID types.TenantID, userID types.UserID, allowContactRequests bool, allowSearchContactRequests bool, allowProfileVisibility bool, version int64, updatedAt time.Time) contactPrivacyRow {
+func tenantDefaultContactPrivacyRow(
+	tenantID types.TenantID,
+	userID types.UserID,
+	allowContactRequests bool,
+	allowSearchContactRequests bool,
+	allowProfileVisibility bool,
+	profileVisibilityFields []types.ContactProfileVisibilityField,
+	version int64,
+	updatedAt time.Time,
+) contactPrivacyRow {
 	return contactPrivacyRow{
 		TenantID:                   tenantID,
 		UserID:                     userID,
 		AllowContactRequests:       allowContactRequests,
 		AllowSearchContactRequests: allowSearchContactRequests,
 		AllowProfileVisibility:     allowProfileVisibility,
+		ProfileVisibilityFields:    copyContactProfileVisibilityFields(profileVisibilityFields),
 		Version:                    version,
 		UpdatedAt:                  updatedAt,
 		PolicySource:               types.ContactPrivacyPolicySourceTenantDefault,
@@ -193,18 +235,20 @@ func getUserContactPrivacySettings(
 	userID types.UserID,
 ) (contactPrivacyRow, bool, error) {
 	var row contactPrivacyRow
+	var profileVisibilityFields []string
 	err := queryer.QueryRow(ctx, `
-SELECT tenant_id, user_id, allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, version, updated_at
+SELECT tenant_id, user_id, allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, profile_visibility_fields, version, updated_at
 FROM contact_privacy_settings
 WHERE tenant_id = $1
   AND user_id = $2
-`, tenantID, userID).Scan(&row.TenantID, &row.UserID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.AllowProfileVisibility, &row.Version, &row.UpdatedAt)
+`, tenantID, userID).Scan(&row.TenantID, &row.UserID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.AllowProfileVisibility, &profileVisibilityFields, &row.Version, &row.UpdatedAt)
 	if err == pgx.ErrNoRows {
 		return contactPrivacyRow{}, false, nil
 	}
 	if err != nil {
 		return contactPrivacyRow{}, false, types.NewDBReadFailed(err.Error())
 	}
+	row.ProfileVisibilityFields = profileVisibilityFieldsFromDB(profileVisibilityFields, row.AllowProfileVisibility)
 	row.PolicySource = types.ContactPrivacyPolicySourceUser
 	return row, true, nil
 }
@@ -220,20 +264,30 @@ func getTenantDefaultContactPrivacySettings(
 	var allowContactRequests bool
 	var allowSearchContactRequests bool
 	var allowProfileVisibility bool
+	var profileVisibilityFields []string
 	var version int64
 	var updatedAt time.Time
 	err := queryer.QueryRow(ctx, `
-SELECT allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, version, updated_at
+SELECT allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, profile_visibility_fields, version, updated_at
 FROM contact_tenant_privacy_defaults
 WHERE tenant_id = $1
-`, tenantID).Scan(&allowContactRequests, &allowSearchContactRequests, &allowProfileVisibility, &version, &updatedAt)
+`, tenantID).Scan(&allowContactRequests, &allowSearchContactRequests, &allowProfileVisibility, &profileVisibilityFields, &version, &updatedAt)
 	if err == pgx.ErrNoRows {
 		return defaultContactPrivacyRow(tenantID, userID), nil
 	}
 	if err != nil {
 		return contactPrivacyRow{}, types.NewDBReadFailed(err.Error())
 	}
-	return tenantDefaultContactPrivacyRow(tenantID, userID, allowContactRequests, allowSearchContactRequests, allowProfileVisibility, version, updatedAt), nil
+	return tenantDefaultContactPrivacyRow(
+		tenantID,
+		userID,
+		allowContactRequests,
+		allowSearchContactRequests,
+		allowProfileVisibility,
+		profileVisibilityFieldsFromDB(profileVisibilityFields, allowProfileVisibility),
+		version,
+		updatedAt,
+	), nil
 }
 
 func getTenantContactPrivacyDefault(
@@ -286,6 +340,8 @@ func upsertContactPrivacySettings(
 	allowContactRequests bool,
 	allowSearchContactRequests *bool,
 	allowProfileVisibility *bool,
+	updateProfileVisibilityFields bool,
+	profileVisibilityFields []types.ContactProfileVisibilityField,
 ) (contactPrivacyRow, bool, error) {
 	current, ok, err := getUserContactPrivacySettings(ctx, tx, tenantID, userID)
 	if err != nil {
@@ -305,13 +361,25 @@ func upsertContactPrivacySettings(
 	if allowProfileVisibility != nil {
 		nextAllowProfileVisibility = *allowProfileVisibility
 	}
+	nextProfileVisibilityFields := copyContactProfileVisibilityFields(current.ProfileVisibilityFields)
+	switch {
+	case !nextAllowProfileVisibility:
+		nextProfileVisibilityFields = nil
+	case updateProfileVisibilityFields:
+		nextProfileVisibilityFields = copyContactProfileVisibilityFields(profileVisibilityFields)
+	}
+	if nextAllowProfileVisibility && len(nextProfileVisibilityFields) == 0 {
+		nextProfileVisibilityFields = types.DefaultContactProfileVisibilityFields()
+	}
 	if ok &&
 		current.AllowContactRequests == allowContactRequests &&
 		current.AllowSearchContactRequests == nextAllowSearchContactRequests &&
-		current.AllowProfileVisibility == nextAllowProfileVisibility {
+		current.AllowProfileVisibility == nextAllowProfileVisibility &&
+		slices.Equal(current.ProfileVisibilityFields, nextProfileVisibilityFields) {
 		return current, false, nil
 	}
 	var row contactPrivacyRow
+	nextProfileVisibilityFieldValues := types.ContactProfileVisibilityFieldsToStrings(nextProfileVisibilityFields)
 	if !ok {
 		err = tx.QueryRow(ctx, `
 INSERT INTO contact_privacy_settings (
@@ -320,28 +388,31 @@ INSERT INTO contact_privacy_settings (
     allow_contact_requests,
     allow_search_contact_requests,
     allow_profile_visibility,
+    profile_visibility_fields,
     version,
     created_at,
     updated_at
-) VALUES ($1, $2, $3, $4, $5, 1, now(), now())
-RETURNING tenant_id, user_id, allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, version, updated_at
-`, tenantID, userID, allowContactRequests, nextAllowSearchContactRequests, nextAllowProfileVisibility).Scan(&row.TenantID, &row.UserID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.AllowProfileVisibility, &row.Version, &row.UpdatedAt)
+) VALUES ($1, $2, $3, $4, $5, $6, 1, now(), now())
+RETURNING tenant_id, user_id, allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, profile_visibility_fields, version, updated_at
+`, tenantID, userID, allowContactRequests, nextAllowSearchContactRequests, nextAllowProfileVisibility, nextProfileVisibilityFieldValues).Scan(&row.TenantID, &row.UserID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.AllowProfileVisibility, &nextProfileVisibilityFieldValues, &row.Version, &row.UpdatedAt)
 	} else {
 		err = tx.QueryRow(ctx, `
 UPDATE contact_privacy_settings
 SET allow_contact_requests = $3,
     allow_search_contact_requests = $4,
     allow_profile_visibility = $5,
+    profile_visibility_fields = $6,
     version = version + 1,
     updated_at = now()
 WHERE tenant_id = $1
   AND user_id = $2
-RETURNING tenant_id, user_id, allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, version, updated_at
-`, tenantID, userID, allowContactRequests, nextAllowSearchContactRequests, nextAllowProfileVisibility).Scan(&row.TenantID, &row.UserID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.AllowProfileVisibility, &row.Version, &row.UpdatedAt)
+RETURNING tenant_id, user_id, allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, profile_visibility_fields, version, updated_at
+`, tenantID, userID, allowContactRequests, nextAllowSearchContactRequests, nextAllowProfileVisibility, nextProfileVisibilityFieldValues).Scan(&row.TenantID, &row.UserID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.AllowProfileVisibility, &nextProfileVisibilityFieldValues, &row.Version, &row.UpdatedAt)
 	}
 	if err != nil {
 		return contactPrivacyRow{}, false, types.NewDBWriteFailed(err.Error())
 	}
+	row.ProfileVisibilityFields = profileVisibilityFieldsFromDB(nextProfileVisibilityFieldValues, row.AllowProfileVisibility)
 	row.PolicySource = types.ContactPrivacyPolicySourceUser
 	return row, true, nil
 }
@@ -353,6 +424,8 @@ func upsertTenantContactPrivacyDefault(
 	allowContactRequests bool,
 	allowSearchContactRequests *bool,
 	allowProfileVisibility *bool,
+	updateProfileVisibilityFields bool,
+	profileVisibilityFields []types.ContactProfileVisibilityField,
 ) (contactPrivacyRow, bool, error) {
 	current, err := getTenantContactPrivacyDefault(ctx, tx, tenantID)
 	if err != nil {
@@ -366,13 +439,25 @@ func upsertTenantContactPrivacyDefault(
 	if allowProfileVisibility != nil {
 		nextAllowProfileVisibility = *allowProfileVisibility
 	}
+	nextProfileVisibilityFields := copyContactProfileVisibilityFields(current.ProfileVisibilityFields)
+	switch {
+	case !nextAllowProfileVisibility:
+		nextProfileVisibilityFields = nil
+	case updateProfileVisibilityFields:
+		nextProfileVisibilityFields = copyContactProfileVisibilityFields(profileVisibilityFields)
+	}
+	if nextAllowProfileVisibility && len(nextProfileVisibilityFields) == 0 {
+		nextProfileVisibilityFields = types.DefaultContactProfileVisibilityFields()
+	}
 	if current.PolicySource == types.ContactPrivacyPolicySourceTenantDefault &&
 		current.AllowContactRequests == allowContactRequests &&
 		current.AllowSearchContactRequests == nextAllowSearchContactRequests &&
-		current.AllowProfileVisibility == nextAllowProfileVisibility {
+		current.AllowProfileVisibility == nextAllowProfileVisibility &&
+		slices.Equal(current.ProfileVisibilityFields, nextProfileVisibilityFields) {
 		return current, false, nil
 	}
 	var row contactPrivacyRow
+	nextProfileVisibilityFieldValues := types.ContactProfileVisibilityFieldsToStrings(nextProfileVisibilityFields)
 	if current.PolicySource != types.ContactPrivacyPolicySourceTenantDefault {
 		err = tx.QueryRow(ctx, `
 INSERT INTO contact_tenant_privacy_defaults (
@@ -380,27 +465,30 @@ INSERT INTO contact_tenant_privacy_defaults (
     allow_contact_requests,
     allow_search_contact_requests,
     allow_profile_visibility,
+    profile_visibility_fields,
     version,
     created_at,
     updated_at
-) VALUES ($1, $2, $3, $4, 1, now(), now())
-RETURNING tenant_id, allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, version, updated_at
-`, tenantID, allowContactRequests, nextAllowSearchContactRequests, nextAllowProfileVisibility).Scan(&row.TenantID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.AllowProfileVisibility, &row.Version, &row.UpdatedAt)
+) VALUES ($1, $2, $3, $4, $5, 1, now(), now())
+RETURNING tenant_id, allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, profile_visibility_fields, version, updated_at
+`, tenantID, allowContactRequests, nextAllowSearchContactRequests, nextAllowProfileVisibility, nextProfileVisibilityFieldValues).Scan(&row.TenantID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.AllowProfileVisibility, &nextProfileVisibilityFieldValues, &row.Version, &row.UpdatedAt)
 	} else {
 		err = tx.QueryRow(ctx, `
 UPDATE contact_tenant_privacy_defaults
 SET allow_contact_requests = $2,
     allow_search_contact_requests = $3,
     allow_profile_visibility = $4,
+    profile_visibility_fields = $5,
     version = version + 1,
     updated_at = now()
 WHERE tenant_id = $1
-RETURNING tenant_id, allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, version, updated_at
-`, tenantID, allowContactRequests, nextAllowSearchContactRequests, nextAllowProfileVisibility).Scan(&row.TenantID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.AllowProfileVisibility, &row.Version, &row.UpdatedAt)
+RETURNING tenant_id, allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, profile_visibility_fields, version, updated_at
+`, tenantID, allowContactRequests, nextAllowSearchContactRequests, nextAllowProfileVisibility, nextProfileVisibilityFieldValues).Scan(&row.TenantID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.AllowProfileVisibility, &nextProfileVisibilityFieldValues, &row.Version, &row.UpdatedAt)
 	}
 	if err != nil {
 		return contactPrivacyRow{}, false, types.NewDBWriteFailed(err.Error())
 	}
+	row.ProfileVisibilityFields = profileVisibilityFieldsFromDB(nextProfileVisibilityFieldValues, row.AllowProfileVisibility)
 	row.PolicySource = types.ContactPrivacyPolicySourceTenantDefault
 	return row, true, nil
 }
@@ -446,6 +534,7 @@ func contactPrivacySettingsFromRow(row contactPrivacyRow) types.ContactPrivacySe
 		AllowContactRequests:       row.AllowContactRequests,
 		AllowSearchContactRequests: row.AllowSearchContactRequests,
 		AllowProfileVisibility:     row.AllowProfileVisibility,
+		ProfileVisibilityFields:    copyContactProfileVisibilityFields(row.ProfileVisibilityFields),
 		Version:                    row.Version,
 		UpdatedAtUnixMS:            updatedAtUnixMS,
 		PolicySource:               row.PolicySource,
@@ -488,6 +577,7 @@ func (r *Repository) insertPrivacyOutbox(ctx context.Context, tx pgx.Tx, input p
 			"allow_contact_requests":        input.Privacy.AllowContactRequests,
 			"allow_search_contact_requests": input.Privacy.AllowSearchContactRequests,
 			"allow_profile_visibility":      input.Privacy.AllowProfileVisibility,
+			"profile_visibility_fields":     types.ContactProfileVisibilityFieldsToStrings(input.Privacy.ProfileVisibilityFields),
 			"privacy_version":               input.Privacy.Version,
 			"occurred_at":                   r.now().Format(time.RFC3339Nano),
 		},
@@ -507,6 +597,7 @@ type contactPrivacyResultSnapshot struct {
 	AllowContactRequests       bool           `json:"allow_contact_requests"`
 	AllowSearchContactRequests *bool          `json:"allow_search_contact_requests,omitempty"`
 	AllowProfileVisibility     *bool          `json:"allow_profile_visibility,omitempty"`
+	ProfileVisibilityFields    []string       `json:"profile_visibility_fields,omitempty"`
 	Version                    int64          `json:"version"`
 	UpdatedAtUnixMS            int64          `json:"updated_at_unix_ms"`
 	PolicySource               string         `json:"policy_source"`
@@ -520,6 +611,7 @@ func contactPrivacyResultJSON(row contactPrivacyRow) ([]byte, error) {
 		AllowContactRequests:       settings.AllowContactRequests,
 		AllowSearchContactRequests: &settings.AllowSearchContactRequests,
 		AllowProfileVisibility:     &settings.AllowProfileVisibility,
+		ProfileVisibilityFields:    types.ContactProfileVisibilityFieldsToStrings(settings.ProfileVisibilityFields),
 		Version:                    settings.Version,
 		UpdatedAtUnixMS:            settings.UpdatedAtUnixMS,
 		PolicySource:               string(settings.PolicySource),
@@ -549,16 +641,38 @@ func contactPrivacyRowFromIdempotencyResult(existing commandIdempotency) (contac
 	if snapshot.AllowSearchContactRequests != nil {
 		allowSearchContactRequests = *snapshot.AllowSearchContactRequests
 	}
+	profileVisibilityFields := types.ContactProfileVisibilityFieldsFromStrings(snapshot.ProfileVisibilityFields)
+	if len(profileVisibilityFields) == 0 && allowProfileVisibility {
+		profileVisibilityFields = types.DefaultContactProfileVisibilityFields()
+	}
 	return contactPrivacyRow{
 		TenantID:                   snapshot.TenantID,
 		UserID:                     snapshot.UserID,
 		AllowContactRequests:       snapshot.AllowContactRequests,
 		AllowSearchContactRequests: allowSearchContactRequests,
 		AllowProfileVisibility:     allowProfileVisibility,
+		ProfileVisibilityFields:    profileVisibilityFields,
 		Version:                    snapshot.Version,
 		UpdatedAt:                  time.UnixMilli(snapshot.UpdatedAtUnixMS).UTC(),
 		PolicySource:               contactPrivacyPolicySourceFromSnapshot(snapshot.PolicySource),
 	}, nil
+}
+
+func copyContactProfileVisibilityFields(fields []types.ContactProfileVisibilityField) []types.ContactProfileVisibilityField {
+	if len(fields) == 0 {
+		return nil
+	}
+	copied := make([]types.ContactProfileVisibilityField, len(fields))
+	copy(copied, fields)
+	return copied
+}
+
+func profileVisibilityFieldsFromDB(values []string, allowProfileVisibility bool) []types.ContactProfileVisibilityField {
+	fields := types.ContactProfileVisibilityFieldsFromStrings(values)
+	if len(fields) == 0 && allowProfileVisibility {
+		return types.DefaultContactProfileVisibilityFields()
+	}
+	return fields
 }
 
 func contactPrivacyPolicySourceFromSnapshot(source string) types.ContactPrivacyPolicySource {

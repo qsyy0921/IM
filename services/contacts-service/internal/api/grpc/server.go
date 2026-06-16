@@ -183,11 +183,13 @@ func (s *Server) SetContactPrivacy(
 		return nil, status.Error(codes.Unimplemented, "set contact privacy is not configured")
 	}
 	result, err := s.setContactPrivacy.Execute(ctx, types.SetContactPrivacyCommand{
-		AuthContext:                authFromProto(ctx, request.GetAuthContext()),
-		AllowContactRequests:       request.GetAllowContactRequests(),
-		AllowSearchContactRequests: request.AllowSearchContactRequests,
-		AllowProfileVisibility:     request.AllowProfileVisibility,
-		IdempotencyKey:             request.GetIdempotencyKey(),
+		AuthContext:                   authFromProto(ctx, request.GetAuthContext()),
+		AllowContactRequests:          request.GetAllowContactRequests(),
+		AllowSearchContactRequests:    request.AllowSearchContactRequests,
+		AllowProfileVisibility:        request.AllowProfileVisibility,
+		UpdateProfileVisibilityFields: request.GetUpdateProfileVisibilityFields(),
+		ProfileVisibilityFields:       profileVisibilityFieldsFromProto(request.GetProfileVisibilityFields()),
+		IdempotencyKey:                request.GetIdempotencyKey(),
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -527,10 +529,57 @@ func privacySettingsToProto(settings types.ContactPrivacySettings) *contactsv1.C
 		AllowContactRequests:       settings.AllowContactRequests,
 		AllowSearchContactRequests: settings.AllowSearchContactRequests,
 		AllowProfileVisibility:     settings.AllowProfileVisibility,
+		ProfileVisibilityFields:    profileVisibilityFieldsToProto(settings.ProfileVisibilityFields),
 		Version:                    settings.Version,
 		UpdatedAtUnixMs:            settings.UpdatedAtUnixMS,
 		PolicySource:               privacyPolicySourceToProto(settings.PolicySource),
 	}
+}
+
+func profileVisibilityFieldsToProto(fields []types.ContactProfileVisibilityField) []contactsv1.ContactProfileVisibilityField {
+	if len(fields) == 0 {
+		return nil
+	}
+	values := make([]contactsv1.ContactProfileVisibilityField, 0, len(fields))
+	for _, field := range fields {
+		switch field {
+		case types.ContactProfileVisibilityFieldDisplayName:
+			values = append(values, contactsv1.ContactProfileVisibilityField_CONTACT_PROFILE_VISIBILITY_FIELD_DISPLAY_NAME)
+		case types.ContactProfileVisibilityFieldAvatar:
+			values = append(values, contactsv1.ContactProfileVisibilityField_CONTACT_PROFILE_VISIBILITY_FIELD_AVATAR)
+		case types.ContactProfileVisibilityFieldOrganization:
+			values = append(values, contactsv1.ContactProfileVisibilityField_CONTACT_PROFILE_VISIBILITY_FIELD_ORGANIZATION)
+		case types.ContactProfileVisibilityFieldTitle:
+			values = append(values, contactsv1.ContactProfileVisibilityField_CONTACT_PROFILE_VISIBILITY_FIELD_TITLE)
+		case types.ContactProfileVisibilityFieldStatusMessage:
+			values = append(values, contactsv1.ContactProfileVisibilityField_CONTACT_PROFILE_VISIBILITY_FIELD_STATUS_MESSAGE)
+		}
+	}
+	return values
+}
+
+func profileVisibilityFieldsFromProto(fields []contactsv1.ContactProfileVisibilityField) []types.ContactProfileVisibilityField {
+	if len(fields) == 0 {
+		return nil
+	}
+	values := make([]types.ContactProfileVisibilityField, 0, len(fields))
+	for _, field := range fields {
+		switch field {
+		case contactsv1.ContactProfileVisibilityField_CONTACT_PROFILE_VISIBILITY_FIELD_DISPLAY_NAME:
+			values = append(values, types.ContactProfileVisibilityFieldDisplayName)
+		case contactsv1.ContactProfileVisibilityField_CONTACT_PROFILE_VISIBILITY_FIELD_AVATAR:
+			values = append(values, types.ContactProfileVisibilityFieldAvatar)
+		case contactsv1.ContactProfileVisibilityField_CONTACT_PROFILE_VISIBILITY_FIELD_ORGANIZATION:
+			values = append(values, types.ContactProfileVisibilityFieldOrganization)
+		case contactsv1.ContactProfileVisibilityField_CONTACT_PROFILE_VISIBILITY_FIELD_TITLE:
+			values = append(values, types.ContactProfileVisibilityFieldTitle)
+		case contactsv1.ContactProfileVisibilityField_CONTACT_PROFILE_VISIBILITY_FIELD_STATUS_MESSAGE:
+			values = append(values, types.ContactProfileVisibilityFieldStatusMessage)
+		default:
+			values = append(values, types.ContactProfileVisibilityField(""))
+		}
+	}
+	return values
 }
 
 func authFromProto(ctx context.Context, auth *contactsv1.AuthContext) types.AuthContext {

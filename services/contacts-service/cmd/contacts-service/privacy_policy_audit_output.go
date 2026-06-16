@@ -10,26 +10,28 @@ import (
 )
 
 type tenantPrivacyAuditOutput struct {
-	GeneratedAt                string `json:"generated_at"`
-	TenantID                   string `json:"tenant_id"`
-	AllowContactRequests       bool   `json:"allow_contact_requests"`
-	AllowSearchContactRequests bool   `json:"allow_search_contact_requests"`
-	AllowProfileVisibility     bool   `json:"allow_profile_visibility"`
-	Version                    int64  `json:"version"`
-	PolicySource               string `json:"policy_source"`
-	UpdatedAtUnixMS            int64  `json:"updated_at_unix_ms"`
+	GeneratedAt                string   `json:"generated_at"`
+	TenantID                   string   `json:"tenant_id"`
+	AllowContactRequests       bool     `json:"allow_contact_requests"`
+	AllowSearchContactRequests bool     `json:"allow_search_contact_requests"`
+	AllowProfileVisibility     bool     `json:"allow_profile_visibility"`
+	ProfileVisibilityFields    []string `json:"profile_visibility_fields"`
+	Version                    int64    `json:"version"`
+	PolicySource               string   `json:"policy_source"`
+	UpdatedAtUnixMS            int64    `json:"updated_at_unix_ms"`
 }
 
 type tenantPrivacySetOutput struct {
-	GeneratedAt                string `json:"generated_at"`
-	TenantID                   string `json:"tenant_id"`
-	AllowContactRequests       bool   `json:"allow_contact_requests"`
-	AllowSearchContactRequests bool   `json:"allow_search_contact_requests"`
-	AllowProfileVisibility     bool   `json:"allow_profile_visibility"`
-	Version                    int64  `json:"version"`
-	PolicySource               string `json:"policy_source"`
-	Changed                    bool   `json:"changed"`
-	UpdatedAtUnixMS            int64  `json:"updated_at_unix_ms"`
+	GeneratedAt                string   `json:"generated_at"`
+	TenantID                   string   `json:"tenant_id"`
+	AllowContactRequests       bool     `json:"allow_contact_requests"`
+	AllowSearchContactRequests bool     `json:"allow_search_contact_requests"`
+	AllowProfileVisibility     bool     `json:"allow_profile_visibility"`
+	ProfileVisibilityFields    []string `json:"profile_visibility_fields"`
+	Version                    int64    `json:"version"`
+	PolicySource               string   `json:"policy_source"`
+	Changed                    bool     `json:"changed"`
+	UpdatedAtUnixMS            int64    `json:"updated_at_unix_ms"`
 }
 
 type sourcePolicyAuditOutput struct {
@@ -58,6 +60,7 @@ func writeTenantPrivacyAuditOutput(path string, result types.GetTenantContactPri
 		AllowContactRequests:       result.Settings.AllowContactRequests,
 		AllowSearchContactRequests: result.Settings.AllowSearchContactRequests,
 		AllowProfileVisibility:     result.Settings.AllowProfileVisibility,
+		ProfileVisibilityFields:    types.ContactProfileVisibilityFieldsToStrings(result.Settings.ProfileVisibilityFields),
 		Version:                    result.Settings.Version,
 		PolicySource:               string(result.Settings.PolicySource),
 		UpdatedAtUnixMS:            result.Settings.UpdatedAtUnixMS,
@@ -71,6 +74,7 @@ func writeTenantPrivacySetOutput(path string, result types.SetTenantContactPriva
 		AllowContactRequests:       result.Settings.AllowContactRequests,
 		AllowSearchContactRequests: result.Settings.AllowSearchContactRequests,
 		AllowProfileVisibility:     result.Settings.AllowProfileVisibility,
+		ProfileVisibilityFields:    types.ContactProfileVisibilityFieldsToStrings(result.Settings.ProfileVisibilityFields),
 		Version:                    result.Settings.Version,
 		PolicySource:               string(result.Settings.PolicySource),
 		Changed:                    result.Changed,

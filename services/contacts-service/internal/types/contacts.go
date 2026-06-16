@@ -19,6 +19,7 @@ type ContactDecision string
 type ContactRequestListDirection string
 type ContactRequestSourceType string
 type ContactPrivacyPolicySource string
+type ContactProfileVisibilityField string
 
 const (
 	ContactRequestStatusPending  ContactRequestStatus = "PENDING"
@@ -47,6 +48,12 @@ const (
 	ContactPrivacyPolicySourceUser          ContactPrivacyPolicySource = "USER"
 	ContactPrivacyPolicySourceTenantDefault ContactPrivacyPolicySource = "TENANT_DEFAULT"
 	ContactPrivacyPolicySourceSystemDefault ContactPrivacyPolicySource = "SYSTEM_DEFAULT"
+
+	ContactProfileVisibilityFieldDisplayName   ContactProfileVisibilityField = "DISPLAY_NAME"
+	ContactProfileVisibilityFieldAvatar        ContactProfileVisibilityField = "AVATAR"
+	ContactProfileVisibilityFieldOrganization  ContactProfileVisibilityField = "ORGANIZATION"
+	ContactProfileVisibilityFieldTitle         ContactProfileVisibilityField = "TITLE"
+	ContactProfileVisibilityFieldStatusMessage ContactProfileVisibilityField = "STATUS_MESSAGE"
 )
 
 type SendContactRequestCommand struct {
@@ -175,6 +182,7 @@ type ContactPrivacySettings struct {
 	AllowContactRequests       bool
 	AllowSearchContactRequests bool
 	AllowProfileVisibility     bool
+	ProfileVisibilityFields    []ContactProfileVisibilityField
 	Version                    int64
 	UpdatedAtUnixMS            int64
 	PolicySource               ContactPrivacyPolicySource
@@ -201,11 +209,13 @@ type GetContactPrivacyResult struct {
 }
 
 type SetContactPrivacyCommand struct {
-	AuthContext                AuthContext
-	AllowContactRequests       bool
-	AllowSearchContactRequests *bool
-	AllowProfileVisibility     *bool
-	IdempotencyKey             string
+	AuthContext                   AuthContext
+	AllowContactRequests          bool
+	AllowSearchContactRequests    *bool
+	AllowProfileVisibility        *bool
+	UpdateProfileVisibilityFields bool
+	ProfileVisibilityFields       []ContactProfileVisibilityField
+	IdempotencyKey                string
 }
 
 func (c SetContactPrivacyCommand) Validate() error {
@@ -217,6 +227,11 @@ func (c SetContactPrivacyCommand) Validate() error {
 	}
 	if strings.TrimSpace(c.IdempotencyKey) == "" {
 		return NewInvalidArgument("idempotency_key is required")
+	}
+	if c.UpdateProfileVisibilityFields {
+		if _, err := NormalizeContactProfileVisibilityFields(c.ProfileVisibilityFields); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -245,17 +260,88 @@ type GetTenantContactPrivacyDefaultResult struct {
 }
 
 type SetTenantContactPrivacyDefaultCommand struct {
-	TenantID                   TenantID
-	AllowContactRequests       bool
-	AllowSearchContactRequests *bool
-	AllowProfileVisibility     *bool
+	TenantID                      TenantID
+	AllowContactRequests          bool
+	AllowSearchContactRequests    *bool
+	AllowProfileVisibility        *bool
+	UpdateProfileVisibilityFields bool
+	ProfileVisibilityFields       []ContactProfileVisibilityField
 }
 
 func (c SetTenantContactPrivacyDefaultCommand) Validate() error {
 	if c.TenantID == "" {
 		return NewInvalidArgument("tenant_id is required")
 	}
+	if c.UpdateProfileVisibilityFields {
+		if _, err := NormalizeContactProfileVisibilityFields(c.ProfileVisibilityFields); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func DefaultContactProfileVisibilityFields() []ContactProfileVisibilityField {
+	return []ContactProfileVisibilityField{
+		ContactProfileVisibilityFieldDisplayName,
+		ContactProfileVisibilityFieldAvatar,
+		ContactProfileVisibilityFieldOrganization,
+		ContactProfileVisibilityFieldTitle,
+	}
+}
+
+func NormalizeContactProfileVisibilityFields(fields []ContactProfileVisibilityField) ([]ContactProfileVisibilityField, error) {
+	if len(fields) == 0 {
+		return nil, nil
+	}
+	seen := make(map[ContactProfileVisibilityField]struct{}, len(fields))
+	normalized := make([]ContactProfileVisibilityField, 0, len(fields))
+	for _, field := range fields {
+		value := ContactProfileVisibilityField(strings.ToUpper(strings.TrimSpace(strings.ReplaceAll(string(field), "-", "_"))))
+		if value == "" {
+			return nil, NewInvalidArgument("profile_visibility_fields contains unsupported field")
+		}
+		switch value {
+		case ContactProfileVisibilityFieldDisplayName,
+			ContactProfileVisibilityFieldAvatar,
+			ContactProfileVisibilityFieldOrganization,
+			ContactProfileVisibilityFieldTitle,
+			ContactProfileVisibilityFieldStatusMessage:
+			if _, ok := seen[value]; ok {
+				continue
+			}
+			seen[value] = struct{}{}
+			normalized = append(normalized, value)
+		default:
+			return nil, NewInvalidArgument("profile_visibility_fields contains unsupported field")
+		}
+	}
+	return normalized, nil
+}
+
+func ContactProfileVisibilityFieldsToStrings(fields []ContactProfileVisibilityField) []string {
+	if len(fields) == 0 {
+		return []string{}
+	}
+	values := make([]string, 0, len(fields))
+	for _, field := range fields {
+		values = append(values, string(field))
+	}
+	return values
+}
+
+func ContactProfileVisibilityFieldsFromStrings(values []string) []ContactProfileVisibilityField {
+	if len(values) == 0 {
+		return nil
+	}
+	fields := make([]ContactProfileVisibilityField, 0, len(values))
+	for _, value := range values {
+		fields = append(fields, ContactProfileVisibilityField(value))
+	}
+	normalized, err := NormalizeContactProfileVisibilityFields(fields)
+	if err != nil {
+		return nil
+	}
+	return normalized
 }
 
 type SetTenantContactPrivacyDefaultResult struct {

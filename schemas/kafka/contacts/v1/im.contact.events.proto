@@ -138,4 +138,5 @@ message ContactPrivacyUpdatedV1 {
   google.protobuf.Timestamp occurred_at = 5;
   bool allow_search_contact_requests = 6;
   bool allow_profile_visibility = 7;
+  repeated string profile_visibility_fields = 8;
 }

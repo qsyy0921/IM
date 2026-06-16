@@ -17,22 +17,24 @@ import (
 )
 
 type commandHashPayload struct {
-	Kind                       string `json:"kind"`
-	TenantID                   string `json:"tenant_id"`
-	UserID                     string `json:"user_id"`
-	TargetUserID               string `json:"target_user_id,omitempty"`
-	ContactUserID              string `json:"contact_user_id,omitempty"`
-	RequestID                  string `json:"request_id,omitempty"`
-	Decision                   string `json:"decision,omitempty"`
-	Message                    string `json:"message,omitempty"`
-	SourceType                 string `json:"source_type,omitempty"`
-	SourceRef                  string `json:"source_ref,omitempty"`
-	Reason                     string `json:"reason,omitempty"`
-	Remark                     string `json:"remark,omitempty"`
-	GroupName                  string `json:"group_name,omitempty"`
-	AllowContactRequests       *bool  `json:"allow_contact_requests,omitempty"`
-	AllowSearchContactRequests *bool  `json:"allow_search_contact_requests,omitempty"`
-	AllowProfileVisibility     *bool  `json:"allow_profile_visibility,omitempty"`
+	Kind                          string   `json:"kind"`
+	TenantID                      string   `json:"tenant_id"`
+	UserID                        string   `json:"user_id"`
+	TargetUserID                  string   `json:"target_user_id,omitempty"`
+	ContactUserID                 string   `json:"contact_user_id,omitempty"`
+	RequestID                     string   `json:"request_id,omitempty"`
+	Decision                      string   `json:"decision,omitempty"`
+	Message                       string   `json:"message,omitempty"`
+	SourceType                    string   `json:"source_type,omitempty"`
+	SourceRef                     string   `json:"source_ref,omitempty"`
+	Reason                        string   `json:"reason,omitempty"`
+	Remark                        string   `json:"remark,omitempty"`
+	GroupName                     string   `json:"group_name,omitempty"`
+	AllowContactRequests          *bool    `json:"allow_contact_requests,omitempty"`
+	AllowSearchContactRequests    *bool    `json:"allow_search_contact_requests,omitempty"`
+	AllowProfileVisibility        *bool    `json:"allow_profile_visibility,omitempty"`
+	UpdateProfileVisibilityFields bool     `json:"update_profile_visibility_fields,omitempty"`
+	ProfileVisibilityFields       []string `json:"profile_visibility_fields,omitempty"`
 }
 
 func commandHash(payload commandHashPayload) (string, error) {

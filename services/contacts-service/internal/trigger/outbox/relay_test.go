@@ -154,6 +154,7 @@ func TestBuildContactEventPrivacyUpdated(t *testing.T) {
 		"allow_contact_requests":        false,
 		"allow_search_contact_requests": false,
 		"allow_profile_visibility":      true,
+		"profile_visibility_fields":     []string{"DISPLAY_NAME", "AVATAR"},
 		"privacy_version":               2,
 		"occurred_at":                   "2026-06-10T08:00:00Z",
 	})
@@ -168,6 +169,9 @@ func TestBuildContactEventPrivacyUpdated(t *testing.T) {
 		privacy.AllowContactRequests ||
 		privacy.AllowSearchContactRequests ||
 		!privacy.AllowProfileVisibility ||
+		len(privacy.ProfileVisibilityFields) != 2 ||
+		privacy.ProfileVisibilityFields[0] != "DISPLAY_NAME" ||
+		privacy.ProfileVisibilityFields[1] != "AVATAR" ||
 		privacy.PrivacyVersion != 2 {
 		t.Fatalf("unexpected privacy event: %+v payload=%+v", event, privacy)
 	}
@@ -189,7 +193,8 @@ func TestBuildContactEventPrivacyUpdatedDefaultsMissingOptionalFields(t *testing
 	if privacy == nil ||
 		!privacy.AllowContactRequests ||
 		!privacy.AllowSearchContactRequests ||
-		!privacy.AllowProfileVisibility {
+		!privacy.AllowProfileVisibility ||
+		len(privacy.ProfileVisibilityFields) != 4 {
 		t.Fatalf("unexpected privacy defaults: %+v payload=%+v", event, privacy)
 	}
 }

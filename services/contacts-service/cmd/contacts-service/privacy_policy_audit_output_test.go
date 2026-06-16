@@ -17,9 +17,13 @@ func TestWriteTenantPrivacyAuditOutput(t *testing.T) {
 			AllowContactRequests:       true,
 			AllowSearchContactRequests: false,
 			AllowProfileVisibility:     true,
-			Version:                    12,
-			PolicySource:               types.ContactPrivacyPolicySourceTenantDefault,
-			UpdatedAtUnixMS:            1800000000000,
+			ProfileVisibilityFields: []types.ContactProfileVisibilityField{
+				types.ContactProfileVisibilityFieldDisplayName,
+				types.ContactProfileVisibilityFieldAvatar,
+			},
+			Version:         12,
+			PolicySource:    types.ContactPrivacyPolicySourceTenantDefault,
+			UpdatedAtUnixMS: 1800000000000,
 		},
 	}
 
@@ -40,6 +44,8 @@ func TestWriteTenantPrivacyAuditOutput(t *testing.T) {
 		!output.AllowContactRequests ||
 		output.AllowSearchContactRequests ||
 		!output.AllowProfileVisibility ||
+		len(output.ProfileVisibilityFields) != 2 ||
+		output.ProfileVisibilityFields[1] != "AVATAR" ||
 		output.Version != 12 ||
 		output.PolicySource != "TENANT_DEFAULT" ||
 		output.UpdatedAtUnixMS != 1800000000000 {
@@ -55,6 +61,7 @@ func TestWriteTenantPrivacySetOutput(t *testing.T) {
 			AllowContactRequests:       false,
 			AllowSearchContactRequests: false,
 			AllowProfileVisibility:     false,
+			ProfileVisibilityFields:    nil,
 			Version:                    13,
 			PolicySource:               types.ContactPrivacyPolicySourceTenantDefault,
 			UpdatedAtUnixMS:            1800000002000,
@@ -79,6 +86,7 @@ func TestWriteTenantPrivacySetOutput(t *testing.T) {
 		output.AllowContactRequests ||
 		output.AllowSearchContactRequests ||
 		output.AllowProfileVisibility ||
+		len(output.ProfileVisibilityFields) != 0 ||
 		output.Version != 13 ||
 		output.PolicySource != "TENANT_DEFAULT" ||
 		!output.Changed ||

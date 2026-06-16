@@ -74,6 +74,15 @@ enum ContactPrivacyPolicySource {
   CONTACT_PRIVACY_POLICY_SOURCE_SYSTEM_DEFAULT = 3;
 }
 
+enum ContactProfileVisibilityField {
+  CONTACT_PROFILE_VISIBILITY_FIELD_UNSPECIFIED = 0;
+  CONTACT_PROFILE_VISIBILITY_FIELD_DISPLAY_NAME = 1;
+  CONTACT_PROFILE_VISIBILITY_FIELD_AVATAR = 2;
+  CONTACT_PROFILE_VISIBILITY_FIELD_ORGANIZATION = 3;
+  CONTACT_PROFILE_VISIBILITY_FIELD_TITLE = 4;
+  CONTACT_PROFILE_VISIBILITY_FIELD_STATUS_MESSAGE = 5;
+}
+
 message SendContactRequestRequest {
   AuthContext auth_context = 1;
   string target_user_id = 2;
@@ -289,6 +298,7 @@ message ContactPrivacySettings {
   ContactPrivacyPolicySource policy_source = 4;
   bool allow_search_contact_requests = 5;
   bool allow_profile_visibility = 6;
+  repeated ContactProfileVisibilityField profile_visibility_fields = 7;
 }
 
 message GetContactPrivacyRequest {
@@ -307,6 +317,8 @@ message SetContactPrivacyRequest {
   string idempotency_key = 3;
   optional bool allow_search_contact_requests = 4;
   optional bool allow_profile_visibility = 5;
+  bool update_profile_visibility_fields = 6;
+  repeated ContactProfileVisibilityField profile_visibility_fields = 7;
 }
 
 message SetContactPrivacyResponse {

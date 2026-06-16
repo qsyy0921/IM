@@ -1176,6 +1176,7 @@ type ContactPrivacyUpdatedV1 struct {
 	OccurredAt                 *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
 	AllowSearchContactRequests bool                   `protobuf:"varint,6,opt,name=allow_search_contact_requests,json=allowSearchContactRequests,proto3" json:"allow_search_contact_requests,omitempty"`
 	AllowProfileVisibility     bool                   `protobuf:"varint,7,opt,name=allow_profile_visibility,json=allowProfileVisibility,proto3" json:"allow_profile_visibility,omitempty"`
+	ProfileVisibilityFields    []string               `protobuf:"bytes,8,rep,name=profile_visibility_fields,json=profileVisibilityFields,proto3" json:"profile_visibility_fields,omitempty"`
 	unknownFields              protoimpl.UnknownFields
 	sizeCache                  protoimpl.SizeCache
 }
@@ -1257,6 +1258,13 @@ func (x *ContactPrivacyUpdatedV1) GetAllowProfileVisibility() bool {
 		return x.AllowProfileVisibility
 	}
 	return false
+}
+
+func (x *ContactPrivacyUpdatedV1) GetProfileVisibilityFields() []string {
+	if x != nil {
+		return x.ProfileVisibilityFields
+	}
+	return nil
 }
 
 var File_contacts_v1_im_contact_events_proto protoreflect.FileDescriptor
@@ -1377,7 +1385,7 @@ const file_contacts_v1_im_contact_events_proto_rawDesc = "" +
 	"\x06status\x18\x05 \x01(\tR\x06status\x12!\n" +
 	"\fedge_version\x18\x06 \x01(\x03R\vedgeVersion\x12;\n" +
 	"\voccurred_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"occurredAt\"\xe8\x02\n" +
+	"occurredAt\"\xa4\x03\n" +
 	"\x17ContactPrivacyUpdatedV1\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x124\n" +
@@ -1386,7 +1394,8 @@ const file_contacts_v1_im_contact_events_proto_rawDesc = "" +
 	"\voccurred_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"occurredAt\x12A\n" +
 	"\x1dallow_search_contact_requests\x18\x06 \x01(\bR\x1aallowSearchContactRequests\x128\n" +
-	"\x18allow_profile_visibility\x18\a \x01(\bR\x16allowProfileVisibilityBBZ@github.com/qsyy0921/IM/schemas/kafka/contacts/v1;contacteventsv1b\x06proto3"
+	"\x18allow_profile_visibility\x18\a \x01(\bR\x16allowProfileVisibility\x12:\n" +
+	"\x19profile_visibility_fields\x18\b \x03(\tR\x17profileVisibilityFieldsBBZ@github.com/qsyy0921/IM/schemas/kafka/contacts/v1;contacteventsv1b\x06proto3"
 
 var (
 	file_contacts_v1_im_contact_events_proto_rawDescOnce sync.Once

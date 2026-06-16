@@ -1,6 +1,9 @@
 package types
 
-import "strings"
+import (
+	"strings"
+	"unicode"
+)
 
 const (
 	maxContactRemarkLength      = 128
@@ -77,6 +80,9 @@ func (c SendContactRequestCommand) Validate() error {
 	if len(c.NormalizedSourceRef()) > maxContactSourceRefLength {
 		return NewInvalidArgument("source_ref is too long")
 	}
+	if containsSensitiveContactSourceRef(c.NormalizedSourceRef()) {
+		return NewInvalidArgument("source_ref must not contain sensitive data")
+	}
 	return nil
 }
 
@@ -86,6 +92,55 @@ func (c SendContactRequestCommand) NormalizedSourceType() ContactRequestSourceTy
 
 func (c SendContactRequestCommand) NormalizedSourceRef() string {
 	return strings.TrimSpace(c.SourceRef)
+}
+
+func containsSensitiveContactSourceRef(sourceRef string) bool {
+	if sourceRef == "" {
+		return false
+	}
+	if strings.Contains(sourceRef, "@") {
+		return true
+	}
+	if isPhoneLikeSourceRef(sourceRef) {
+		return true
+	}
+	for _, part := range strings.FieldsFunc(strings.ToLower(sourceRef), sourceRefSeparator) {
+		switch part {
+		case "auth", "authorization", "bearer", "cookie", "credential", "credentials",
+			"email", "jwt", "mobile", "password", "passwd", "phone", "secret", "session", "token":
+			return true
+		}
+	}
+	for _, r := range sourceRef {
+		if unicode.IsControl(r) {
+			return true
+		}
+	}
+	return false
+}
+
+func sourceRefSeparator(r rune) bool {
+	switch r {
+	case ':', '=', '&', '?', '/', '#', ';', ',', '|', ' ', '\t', '\r', '\n':
+		return true
+	default:
+		return false
+	}
+}
+
+func isPhoneLikeSourceRef(sourceRef string) bool {
+	digits := 0
+	for _, r := range sourceRef {
+		switch {
+		case r >= '0' && r <= '9':
+			digits++
+		case r == '+' || r == '-' || r == ' ' || r == '(' || r == ')':
+			continue
+		default:
+			return false
+		}
+	}
+	return digits >= 10 && digits <= 15
 }
 
 func NormalizeContactRequestSourceType(value ContactRequestSourceType) ContactRequestSourceType {

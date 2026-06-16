@@ -34,6 +34,45 @@ func TestSendContactRequestCommandSourceValidation(t *testing.T) {
 	}
 }
 
+func TestSendContactRequestCommandRejectsSensitiveSourceRef(t *testing.T) {
+	tests := []string{
+		"user@example.com",
+		"+1 415 555 0101",
+		"token=raw-invite-token",
+		"bearer abc.def",
+		"password:secret",
+		"phone:13800138000",
+		"safe-ref\nsecond-line",
+	}
+
+	for _, sourceRef := range tests {
+		t.Run(sourceRef, func(t *testing.T) {
+			command := validSendContactRequestCommand()
+			command.SourceRef = sourceRef
+			if err := command.Validate(); !errors.Is(err, ErrInvalidArgument) {
+				t.Fatalf("expected sensitive source_ref to be invalid, got %v", err)
+			}
+		})
+	}
+}
+
+func TestSendContactRequestCommandAllowsLowSensitivitySourceRef(t *testing.T) {
+	for _, sourceRef := range []string{
+		"invite:abc",
+		"group/project-42",
+		"qr_code:campaign-2026-06",
+		"import:batch_001",
+	} {
+		t.Run(sourceRef, func(t *testing.T) {
+			command := validSendContactRequestCommand()
+			command.SourceRef = sourceRef
+			if err := command.Validate(); err != nil {
+				t.Fatalf("expected low-sensitivity source_ref to be valid: %v", err)
+			}
+		})
+	}
+}
+
 func TestTenantContactRequestSourcePolicyCommandValidation(t *testing.T) {
 	getCommand := GetTenantContactRequestSourcePolicyCommand{TenantID: "tenant-1"}
 	if err := getCommand.Validate(); err != nil {

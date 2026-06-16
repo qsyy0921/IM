@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-- 已有好友申请、申请来源 metadata、列表 / 搜索 / 分组过滤、接受、拒绝、取消、删除、拉黑、解除拉黑、备注、联系人分组、联系人申请隐私开关；新建申请会被双向 `BLOCKED` 关系、租户级来源策略、目标用户 / 租户默认隐私 gate；目标用户可在总体允许好友申请的前提下单独拒绝 `SEARCH` 来源的陌生申请；申请 `source_ref` 只允许低敏业务引用，不放原始 invite token、手机号 / 邮箱或认证 secret；联系人搜索覆盖 `contact_user_id / remark / group_name`；联系人申请隐私支持 `USER -> TENANT_DEFAULT -> SYSTEM_DEFAULT` 三层读取，并提供租户默认值 / 来源策略本地 operator mode。
+- 已有好友申请、申请来源 metadata、列表 / 搜索 / 分组过滤、接受、拒绝、取消、删除、拉黑、解除拉黑、备注、联系人分组、联系人申请隐私开关；新建申请会被双向 `BLOCKED` 关系、租户级来源策略、目标用户 / 租户默认隐私 gate；目标用户可在总体允许好友申请的前提下单独拒绝 `SEARCH` 来源的陌生申请；申请 `source_ref` 只允许低敏业务引用，types 层已 fail-fast 拒绝邮箱、手机号样式、token / password / secret / bearer 等认证敏感字段和控制字符，不放原始 invite token、手机号 / 邮箱或认证 secret；联系人搜索覆盖 `contact_user_id / remark / group_name`；联系人申请隐私支持 `USER -> TENANT_DEFAULT -> SYSTEM_DEFAULT` 三层读取，并提供租户默认值 / 来源策略本地 operator mode。
 - contacts-service 是联系人事实源。
 - policy-service 通过 contacts event projection 做 direct block 决策。
 - 已补 `/healthz`、`/readyz`、`/debug/metrics` 和 first-stage Prometheus text `/metrics`；可观察低敏 gRPC、PG pool、联系人申请 / 联系人边状态聚合、`contacts_outbox`、outbox relay retry 和 OTel trace config 聚合状态；本地 scrape 目标为 `host.docker.internal:11915`，并已补 Prometheus alert rules 和 Grafana dashboard 原型；这些只用于本地开发 / 面试展示，不代表生产 SLO。

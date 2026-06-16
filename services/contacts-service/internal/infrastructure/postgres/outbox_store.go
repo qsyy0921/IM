@@ -18,13 +18,15 @@ type OutboxStore struct {
 }
 
 type OutboxAuditOptions struct {
-	OutboxID    *int64
-	EventID     string
-	TenantID    string
-	AggregateID string
-	Status      string
-	EventType   string
-	Limit       int
+	OutboxID      *int64
+	EventID       string
+	TenantID      string
+	AggregateID   string
+	Status        string
+	EventType     string
+	CreatedAfter  *time.Time
+	CreatedBefore *time.Time
+	Limit         int
 }
 
 type OutboxAuditRow struct {
@@ -321,9 +323,12 @@ func (store *OutboxStore) AuditOutbox(ctx context.Context, options OutboxAuditOp
 	if limit > 200 {
 		limit = 200
 	}
+	if options.CreatedAfter != nil && options.CreatedBefore != nil && !options.CreatedAfter.Before(*options.CreatedBefore) {
+		return nil, types.NewInvalidArgument("created_after must be before created_before")
+	}
 
 	var args []any
-	clauses := make([]string, 0, 6)
+	clauses := make([]string, 0, 8)
 	if options.OutboxID != nil {
 		args = append(args, *options.OutboxID)
 		clauses = append(clauses, "id = $"+strconv.Itoa(len(args)))
@@ -351,6 +356,14 @@ func (store *OutboxStore) AuditOutbox(ctx context.Context, options OutboxAuditOp
 	if eventType := strings.TrimSpace(options.EventType); eventType != "" {
 		args = append(args, eventType)
 		clauses = append(clauses, "event_type = $"+strconv.Itoa(len(args)))
+	}
+	if options.CreatedAfter != nil {
+		args = append(args, options.CreatedAfter.UTC())
+		clauses = append(clauses, "created_at >= $"+strconv.Itoa(len(args)))
+	}
+	if options.CreatedBefore != nil {
+		args = append(args, options.CreatedBefore.UTC())
+		clauses = append(clauses, "created_at < $"+strconv.Itoa(len(args)))
 	}
 	where := ""
 	if len(clauses) > 0 {

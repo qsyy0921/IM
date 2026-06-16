@@ -337,6 +337,14 @@ func runOutboxAudit() error {
 	conversationID := envString("NEXUSIM_DELIVERY_OUTBOX_AUDIT_CONVERSATION_ID", "")
 	status := envString("NEXUSIM_DELIVERY_OUTBOX_AUDIT_STATUS", "")
 	eventType := envString("NEXUSIM_DELIVERY_OUTBOX_AUDIT_EVENT_TYPE", "")
+	createdAfter, err := envOptionalRFC3339Time("NEXUSIM_DELIVERY_OUTBOX_AUDIT_CREATED_AFTER")
+	if err != nil {
+		return err
+	}
+	createdBefore, err := envOptionalRFC3339Time("NEXUSIM_DELIVERY_OUTBOX_AUDIT_CREATED_BEFORE")
+	if err != nil {
+		return err
+	}
 	rows, err := postgresinfra.NewOutboxStore(pool).AuditOutbox(ctx, postgresinfra.OutboxAuditOptions{
 		OutboxID:       outboxID,
 		EventID:        eventID,
@@ -344,6 +352,8 @@ func runOutboxAudit() error {
 		ConversationID: conversationID,
 		Status:         status,
 		EventType:      eventType,
+		CreatedAfter:   createdAfter,
+		CreatedBefore:  createdBefore,
 		Limit:          envInt("NEXUSIM_DELIVERY_OUTBOX_AUDIT_LIMIT", 20),
 	})
 	if err != nil {
@@ -375,6 +385,8 @@ func runOutboxAudit() error {
 			"conversation_id": conversationID,
 			"status":          status,
 			"event_type":      eventType,
+			"created_after":   formatOptionalTime(createdAfter),
+			"created_before":  formatOptionalTime(createdBefore),
 		}); err != nil {
 			return err
 		}

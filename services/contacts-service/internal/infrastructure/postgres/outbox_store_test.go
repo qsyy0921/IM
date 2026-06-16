@@ -360,6 +360,89 @@ WHERE event_id = $1
 	assertContactsOutboxErrorDoesNotContain(t, rows[0].LastError, "user1@example.com", "secret-token", "broker body")
 }
 
+func TestOutboxStoreAuditOutboxFiltersCreatedAtIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	if _, err := repository.SendContactRequest(ctx, sendCommand("alice", "bob", "send-created-1", "hello")); err != nil {
+		t.Fatalf("send first contact request: %v", err)
+	}
+	if _, err := repository.SendContactRequest(ctx, sendCommand("carol", "dave", "send-created-2", "hi")); err != nil {
+		t.Fatalf("send second contact request: %v", err)
+	}
+	if _, err := repository.SendContactRequest(ctx, sendCommand("erin", "frank", "send-created-3", "hey")); err != nil {
+		t.Fatalf("send third contact request: %v", err)
+	}
+	var ids []int64
+	rows, err := pool.Query(ctx, `
+SELECT id
+FROM contacts_outbox
+WHERE tenant_id = 'tenant-contacts'
+ORDER BY id
+`)
+	if err != nil {
+		t.Fatalf("query contacts outbox ids: %v", err)
+	}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			t.Fatalf("scan contacts outbox id: %v", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		t.Fatalf("iterate contacts outbox ids: %v", err)
+	}
+	rows.Close()
+	if len(ids) != 3 {
+		t.Fatalf("expected three contacts outbox ids, got %d", len(ids))
+	}
+	base := time.Date(2026, 6, 17, 10, 0, 0, 0, time.UTC)
+	if _, err := pool.Exec(ctx, `
+UPDATE contacts_outbox
+SET created_at = CASE id
+    WHEN $1 THEN $4
+    WHEN $2 THEN $5
+    WHEN $3 THEN $6
+    ELSE created_at
+END
+WHERE id IN ($1, $2, $3)
+`, ids[0], ids[1], ids[2], base.Add(-time.Hour), base, base.Add(time.Hour)); err != nil {
+		t.Fatalf("set contacts outbox created_at values: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	auditRows, err := store.AuditOutbox(ctx, OutboxAuditOptions{
+		TenantID:      "tenant-contacts",
+		CreatedAfter:  ptrTime(base.Add(-time.Minute)),
+		CreatedBefore: ptrTime(base.Add(time.Minute)),
+		Limit:         10,
+	})
+	if err != nil {
+		t.Fatalf("audit contacts outbox by created_at: %v", err)
+	}
+	if len(auditRows) != 1 {
+		t.Fatalf("expected one row, got %d", len(auditRows))
+	}
+	if auditRows[0].ID != ids[1] || !auditRows[0].CreatedAt.Equal(base) {
+		t.Fatalf("unexpected created_at filtered row: %+v", auditRows[0])
+	}
+
+	_, err = store.AuditOutbox(ctx, OutboxAuditOptions{
+		TenantID:      "tenant-contacts",
+		CreatedAfter:  ptrTime(base),
+		CreatedBefore: ptrTime(base),
+		Limit:         10,
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid created_at window, got %v", err)
+	}
+}
+
 func TestOutboxStoreAuditOutboxRepairsReturnsLatestRowsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

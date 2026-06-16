@@ -291,6 +291,56 @@ func TestOutboxStoreAuditOutboxFiltersStatusIntegration(t *testing.T) {
 	}
 }
 
+func TestOutboxStoreAuditOutboxFiltersCreatedAtIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	seedDeliveryOutboxWithStatus(t, ctx, pool, "event-created-old", "tenant-created", "conversation-a", 1, types.DeliveryEventInboxItemCreated, types.OutboxStatusPending, 0, "")
+	seedDeliveryOutboxWithStatus(t, ctx, pool, "event-created-hit", "tenant-created", "conversation-a", 2, types.DeliveryEventAckRecorded, types.OutboxStatusPublished, 0, "")
+	seedDeliveryOutboxWithStatus(t, ctx, pool, "event-created-new", "tenant-created", "conversation-a", 3, types.DeliveryEventInboxItemCreated, types.OutboxStatusDLQ, 1, "decode failed")
+	base := time.Date(2026, 6, 17, 10, 0, 0, 0, time.UTC)
+	if _, err := pool.Exec(ctx, `
+UPDATE delivery_outbox
+SET created_at = CASE event_id
+    WHEN 'event-created-old' THEN $2
+    WHEN 'event-created-hit' THEN $3
+    WHEN 'event-created-new' THEN $4
+    ELSE created_at
+END
+WHERE tenant_id = $1
+`, "tenant-created", base.Add(-time.Hour), base, base.Add(time.Hour)); err != nil {
+		t.Fatalf("set delivery outbox created_at values: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	rows, err := store.AuditOutbox(ctx, OutboxAuditOptions{
+		TenantID:      "tenant-created",
+		CreatedAfter:  ptrTime(base.Add(-time.Minute)),
+		CreatedBefore: ptrTime(base.Add(time.Minute)),
+		Limit:         10,
+	})
+	if err != nil {
+		t.Fatalf("audit delivery outbox by created_at: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one row, got %d", len(rows))
+	}
+	if rows[0].EventID != "event-created-hit" || !rows[0].CreatedAt.Equal(base) {
+		t.Fatalf("unexpected created_at filtered row: %+v", rows[0])
+	}
+
+	_, err = store.AuditOutbox(ctx, OutboxAuditOptions{
+		TenantID:      "tenant-created",
+		CreatedAfter:  ptrTime(base),
+		CreatedBefore: ptrTime(base),
+		Limit:         10,
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid created_at window, got %v", err)
+	}
+}
+
 func TestOutboxStoreAuditOutboxRepairsReturnsLatestRowsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

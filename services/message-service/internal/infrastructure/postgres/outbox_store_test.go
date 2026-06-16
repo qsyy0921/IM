@@ -280,6 +280,58 @@ func TestOutboxStoreAuditOutboxFiltersStatusAndEventTypeIntegration(t *testing.T
 	}
 }
 
+func TestOutboxStoreAuditOutboxFiltersCreatedAtIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+	resetMessageCoreTables(t, ctx, pool)
+
+	tenantID := types.TenantID(fmt.Sprintf("tenant-outbox-audit-created-%d", time.Now().UnixNano()))
+	repo := NewMessageRepository(pool)
+	appendConversationMessages(t, ctx, repo, tenantID, "conversation-created", 3)
+	base := time.Date(2026, 6, 17, 10, 0, 0, 0, time.UTC)
+	_, err := pool.Exec(ctx, `
+UPDATE message_outbox
+SET created_at = CASE aggregate_version
+    WHEN 1 THEN $2
+    WHEN 2 THEN $3
+    WHEN 3 THEN $4
+    ELSE created_at
+END
+WHERE tenant_id = $1
+`, string(tenantID), base.Add(-time.Hour), base, base.Add(time.Hour))
+	if err != nil {
+		t.Fatalf("set message outbox created_at values: %v", err)
+	}
+
+	rows, err := NewOutboxStore(pool).AuditOutbox(ctx, OutboxAuditOptions{
+		TenantID:      string(tenantID),
+		CreatedAfter:  ptrTime(base.Add(-time.Minute)),
+		CreatedBefore: ptrTime(base.Add(time.Minute)),
+		Limit:         10,
+	})
+	if err != nil {
+		t.Fatalf("audit message outbox by created_at: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one outbox row, got %d", len(rows))
+	}
+	if rows[0].AggregateVersion != 2 || !rows[0].CreatedAt.Equal(base) {
+		t.Fatalf("unexpected created_at filtered row: %+v", rows[0])
+	}
+
+	_, err = NewOutboxStore(pool).AuditOutbox(ctx, OutboxAuditOptions{
+		TenantID:      string(tenantID),
+		CreatedAfter:  ptrTime(base),
+		CreatedBefore: ptrTime(base),
+		Limit:         10,
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid created_at window, got %v", err)
+	}
+}
+
 func TestOutboxStoreRepairDLQEventsResetsMessageOutboxStateIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openIntegrationPool(t, ctx)

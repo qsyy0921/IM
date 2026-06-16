@@ -405,6 +405,56 @@ WHERE id = $1
 	assertPolicyAuditOutboxErrorDoesNotContain(t, rows[0].LastError, "user1@example.com", "secret-token")
 }
 
+func TestOutboxStoreAuditOutboxFiltersCreatedAtIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+
+	oldID, _ := insertPolicyAuditOutboxRow(t, ctx, pool, "policy-audit-created-old", "tenant-policy:conversation-old", types.OutboxStatusPending, 0)
+	hitID, _ := insertPolicyAuditOutboxRow(t, ctx, pool, "policy-audit-created-hit", "tenant-policy:conversation-hit", types.OutboxStatusPublished, 0)
+	newID, _ := insertPolicyAuditOutboxRow(t, ctx, pool, "policy-audit-created-new", "tenant-policy:conversation-new", types.OutboxStatusDLQ, 1)
+	base := time.Date(2026, 6, 17, 10, 0, 0, 0, time.UTC)
+	if _, err := pool.Exec(ctx, `
+UPDATE policy_decision_audit_outbox
+SET created_at = CASE id
+    WHEN $1 THEN $4
+    WHEN $2 THEN $5
+    WHEN $3 THEN $6
+    ELSE created_at
+END
+WHERE id IN ($1, $2, $3)
+`, oldID, hitID, newID, base.Add(-time.Hour), base, base.Add(time.Hour)); err != nil {
+		t.Fatalf("set policy outbox created_at values: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	rows, err := store.AuditOutbox(ctx, OutboxAuditOptions{
+		TenantID:      "tenant-policy",
+		CreatedAfter:  ptrTime(base.Add(-time.Minute)),
+		CreatedBefore: ptrTime(base.Add(time.Minute)),
+		Limit:         10,
+	})
+	if err != nil {
+		t.Fatalf("audit policy outbox by created_at: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one row, got %d", len(rows))
+	}
+	if rows[0].ID != hitID || !rows[0].CreatedAt.Equal(base) {
+		t.Fatalf("unexpected created_at filtered row: %+v", rows[0])
+	}
+
+	_, err = store.AuditOutbox(ctx, OutboxAuditOptions{
+		TenantID:      "tenant-policy",
+		CreatedAfter:  ptrTime(base),
+		CreatedBefore: ptrTime(base),
+		Limit:         10,
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid created_at window, got %v", err)
+	}
+}
+
 func insertPolicyAuditOutboxRow(
 	t *testing.T,
 	ctx context.Context,

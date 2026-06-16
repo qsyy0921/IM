@@ -131,7 +131,7 @@ Policy-service does not guess direct peers and does not synchronously query cont
 
 When PostgreSQL rules mode is enabled, successful `CheckMessageAction` decisions are staged into `policy_decision_audit_outbox` before the response is returned. Audit write failure fails closed as policy unavailable. `NEXUSIM_POLICY_SERVICE_MODE=outbox-relay` publishes these rows to `im.policy.events` as protobuf `PolicyEvent` records and marks successful rows `PUBLISHED`.
 
-`NEXUSIM_POLICY_SERVICE_MODE=outbox-audit` is a read-only operator view over `policy_decision_audit_outbox`. It supports `outbox_id / event_id / tenant_id / aggregate_id / status / event_type` filters, returns newest rows first, and never mutates relay state, retry state or repair history.
+`NEXUSIM_POLICY_SERVICE_MODE=outbox-audit` is a read-only operator view over `policy_decision_audit_outbox`. It supports `outbox_id / event_id / tenant_id / aggregate_id / status / event_type / created_at RFC3339 window` filters, returns newest rows first, and never mutates relay state, retry state or repair history.
 
 `NEXUSIM_POLICY_SERVICE_MODE=outbox-repair` is the first-stage repair operator for policy decision audit rows. It accepts an explicit comma-separated list of DLQ `event_id` values, validates each DLQ row through the same policy-event builder used by the relay, resets only valid rows to `PENDING`, clears retry state, and writes `policy_decision_audit_outbox_repair_audit`. Invalid envelope or payload rows stay in `DLQ`, write a `SKIPPED / validation_failed` audit row, and make the operator return a non-zero error so automation cannot mistake a poison row for a clean repair. It does not publish Kafka directly, skip ordered blockers, rewrite payloads, repair all rows, implement retention or export audit data to an external sink. After repair, the normal outbox relay is still responsible for publishing to `im.policy.events`.
 
@@ -202,6 +202,8 @@ NEXUSIM_POLICY_OUTBOX_AUDIT_TENANT_ID=
 NEXUSIM_POLICY_OUTBOX_AUDIT_AGGREGATE_ID=
 NEXUSIM_POLICY_OUTBOX_AUDIT_STATUS=
 NEXUSIM_POLICY_OUTBOX_AUDIT_EVENT_TYPE=
+NEXUSIM_POLICY_OUTBOX_AUDIT_CREATED_AFTER=
+NEXUSIM_POLICY_OUTBOX_AUDIT_CREATED_BEFORE=
 NEXUSIM_POLICY_OUTBOX_AUDIT_LIMIT=20
 
 NEXUSIM_POLICY_SERVICE_MODE=outbox-repair

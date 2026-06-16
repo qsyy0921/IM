@@ -258,14 +258,24 @@ func runOutboxAudit() error {
 	aggregateID := envString("NEXUSIM_CONTACTS_OUTBOX_AUDIT_AGGREGATE_ID", "")
 	status := envString("NEXUSIM_CONTACTS_OUTBOX_AUDIT_STATUS", "")
 	eventType := envString("NEXUSIM_CONTACTS_OUTBOX_AUDIT_EVENT_TYPE", "")
+	createdAfter, err := envOptionalRFC3339Time("NEXUSIM_CONTACTS_OUTBOX_AUDIT_CREATED_AFTER")
+	if err != nil {
+		return err
+	}
+	createdBefore, err := envOptionalRFC3339Time("NEXUSIM_CONTACTS_OUTBOX_AUDIT_CREATED_BEFORE")
+	if err != nil {
+		return err
+	}
 	rows, err := postgresinfra.NewOutboxStore(pool).AuditOutbox(ctx, postgresinfra.OutboxAuditOptions{
-		OutboxID:    outboxID,
-		EventID:     eventID,
-		TenantID:    tenantID,
-		AggregateID: aggregateID,
-		Status:      status,
-		EventType:   eventType,
-		Limit:       envInt("NEXUSIM_CONTACTS_OUTBOX_AUDIT_LIMIT", 20),
+		OutboxID:      outboxID,
+		EventID:       eventID,
+		TenantID:      tenantID,
+		AggregateID:   aggregateID,
+		Status:        status,
+		EventType:     eventType,
+		CreatedAfter:  createdAfter,
+		CreatedBefore: createdBefore,
+		Limit:         envInt("NEXUSIM_CONTACTS_OUTBOX_AUDIT_LIMIT", 20),
 	})
 	if err != nil {
 		return err
@@ -292,12 +302,14 @@ func runOutboxAudit() error {
 	}
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_CONTACTS_OUTBOX_AUDIT_OUTPUT")); outputPath != "" {
 		if err := writeOutboxAuditOutput(outputPath, rows, map[string]string{
-			"outbox_id":    outboxIDFilter,
-			"event_id":     eventID,
-			"tenant_id":    tenantID,
-			"aggregate_id": aggregateID,
-			"status":       status,
-			"event_type":   eventType,
+			"outbox_id":      outboxIDFilter,
+			"event_id":       eventID,
+			"tenant_id":      tenantID,
+			"aggregate_id":   aggregateID,
+			"status":         status,
+			"event_type":     eventType,
+			"created_after":  formatOptionalTime(createdAfter),
+			"created_before": formatOptionalTime(createdBefore),
 		}); err != nil {
 			return err
 		}

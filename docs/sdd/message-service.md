@@ -176,7 +176,7 @@ accepted_at
 | message-service -> timeline-service | 20ms | 仅热点会话可重试 | 返回 `SEQUENCER_UNAVAILABLE` |
 | outbox-relay -> Kafka | producer config | 指数退避，更新 `retry_count`、稳定公开 `last_error`、`next_retry_at` | 留在 outbox；超过上限进入 `DLQ` |
 
-`NEXUSIM_MESSAGE_SERVICE_MODE=outbox-audit` is a read-only operator view over `message_outbox`. It supports `outbox_id / event_id / tenant_id / conversation_id / status / event_type` filters, returns newest rows first, and never mutates outbox state.
+`NEXUSIM_MESSAGE_SERVICE_MODE=outbox-audit` is a read-only operator view over `message_outbox`. It supports `outbox_id / event_id / tenant_id / conversation_id / status / event_type / created_at RFC3339 window` filters, returns newest rows first, and never mutates outbox state.
 
 `NEXUSIM_MESSAGE_SERVICE_MODE=outbox-repair` is a first-stage operator that only requeues explicitly listed DLQ events by `event_id`, resets them to `PENDING`, and records a repair audit row. It does not skip events, does not mutate message facts, and does not broaden into batch tenant replay.
 

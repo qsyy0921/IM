@@ -37,6 +37,7 @@ func (r *Repository) SetContactPrivacy(
 		UserID:                     string(command.AuthContext.UserID),
 		AllowContactRequests:       &command.AllowContactRequests,
 		AllowSearchContactRequests: command.AllowSearchContactRequests,
+		AllowProfileVisibility:     command.AllowProfileVisibility,
 	})
 	if err != nil {
 		return types.SetContactPrivacyResult{}, err
@@ -66,7 +67,7 @@ func (r *Repository) SetContactPrivacy(
 	if err := lockContactPrivacySettings(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID); err != nil {
 		return types.SetContactPrivacyResult{}, err
 	}
-	row, changed, err := upsertContactPrivacySettings(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.AllowContactRequests, command.AllowSearchContactRequests)
+	row, changed, err := upsertContactPrivacySettings(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.AllowContactRequests, command.AllowSearchContactRequests, command.AllowProfileVisibility)
 	if err != nil {
 		return types.SetContactPrivacyResult{}, err
 	}
@@ -123,7 +124,7 @@ func (r *Repository) SetTenantContactPrivacyDefault(
 	if err := lockTenantContactPrivacyDefault(ctx, tx, command.TenantID); err != nil {
 		return types.SetTenantContactPrivacyDefaultResult{}, err
 	}
-	row, changed, err := upsertTenantContactPrivacyDefault(ctx, tx, command.TenantID, command.AllowContactRequests, command.AllowSearchContactRequests)
+	row, changed, err := upsertTenantContactPrivacyDefault(ctx, tx, command.TenantID, command.AllowContactRequests, command.AllowSearchContactRequests, command.AllowProfileVisibility)
 	if err != nil {
 		return types.SetTenantContactPrivacyDefaultResult{}, err
 	}
@@ -138,6 +139,7 @@ type contactPrivacyRow struct {
 	UserID                     types.UserID
 	AllowContactRequests       bool
 	AllowSearchContactRequests bool
+	AllowProfileVisibility     bool
 	Version                    int64
 	UpdatedAt                  time.Time
 	PolicySource               types.ContactPrivacyPolicySource
@@ -149,16 +151,18 @@ func defaultContactPrivacyRow(tenantID types.TenantID, userID types.UserID) cont
 		UserID:                     userID,
 		AllowContactRequests:       true,
 		AllowSearchContactRequests: true,
+		AllowProfileVisibility:     true,
 		PolicySource:               types.ContactPrivacyPolicySourceSystemDefault,
 	}
 }
 
-func tenantDefaultContactPrivacyRow(tenantID types.TenantID, userID types.UserID, allowContactRequests bool, allowSearchContactRequests bool, version int64, updatedAt time.Time) contactPrivacyRow {
+func tenantDefaultContactPrivacyRow(tenantID types.TenantID, userID types.UserID, allowContactRequests bool, allowSearchContactRequests bool, allowProfileVisibility bool, version int64, updatedAt time.Time) contactPrivacyRow {
 	return contactPrivacyRow{
 		TenantID:                   tenantID,
 		UserID:                     userID,
 		AllowContactRequests:       allowContactRequests,
 		AllowSearchContactRequests: allowSearchContactRequests,
+		AllowProfileVisibility:     allowProfileVisibility,
 		Version:                    version,
 		UpdatedAt:                  updatedAt,
 		PolicySource:               types.ContactPrivacyPolicySourceTenantDefault,
@@ -190,11 +194,11 @@ func getUserContactPrivacySettings(
 ) (contactPrivacyRow, bool, error) {
 	var row contactPrivacyRow
 	err := queryer.QueryRow(ctx, `
-SELECT tenant_id, user_id, allow_contact_requests, allow_search_contact_requests, version, updated_at
+SELECT tenant_id, user_id, allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, version, updated_at
 FROM contact_privacy_settings
 WHERE tenant_id = $1
   AND user_id = $2
-`, tenantID, userID).Scan(&row.TenantID, &row.UserID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.Version, &row.UpdatedAt)
+`, tenantID, userID).Scan(&row.TenantID, &row.UserID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.AllowProfileVisibility, &row.Version, &row.UpdatedAt)
 	if err == pgx.ErrNoRows {
 		return contactPrivacyRow{}, false, nil
 	}
@@ -215,20 +219,21 @@ func getTenantDefaultContactPrivacySettings(
 ) (contactPrivacyRow, error) {
 	var allowContactRequests bool
 	var allowSearchContactRequests bool
+	var allowProfileVisibility bool
 	var version int64
 	var updatedAt time.Time
 	err := queryer.QueryRow(ctx, `
-SELECT allow_contact_requests, allow_search_contact_requests, version, updated_at
+SELECT allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, version, updated_at
 FROM contact_tenant_privacy_defaults
 WHERE tenant_id = $1
-`, tenantID).Scan(&allowContactRequests, &allowSearchContactRequests, &version, &updatedAt)
+`, tenantID).Scan(&allowContactRequests, &allowSearchContactRequests, &allowProfileVisibility, &version, &updatedAt)
 	if err == pgx.ErrNoRows {
 		return defaultContactPrivacyRow(tenantID, userID), nil
 	}
 	if err != nil {
 		return contactPrivacyRow{}, types.NewDBReadFailed(err.Error())
 	}
-	return tenantDefaultContactPrivacyRow(tenantID, userID, allowContactRequests, allowSearchContactRequests, version, updatedAt), nil
+	return tenantDefaultContactPrivacyRow(tenantID, userID, allowContactRequests, allowSearchContactRequests, allowProfileVisibility, version, updatedAt), nil
 }
 
 func getTenantContactPrivacyDefault(
@@ -280,6 +285,7 @@ func upsertContactPrivacySettings(
 	userID types.UserID,
 	allowContactRequests bool,
 	allowSearchContactRequests *bool,
+	allowProfileVisibility *bool,
 ) (contactPrivacyRow, bool, error) {
 	current, ok, err := getUserContactPrivacySettings(ctx, tx, tenantID, userID)
 	if err != nil {
@@ -295,9 +301,14 @@ func upsertContactPrivacySettings(
 	if allowSearchContactRequests != nil {
 		nextAllowSearchContactRequests = *allowSearchContactRequests
 	}
+	nextAllowProfileVisibility := current.AllowProfileVisibility
+	if allowProfileVisibility != nil {
+		nextAllowProfileVisibility = *allowProfileVisibility
+	}
 	if ok &&
 		current.AllowContactRequests == allowContactRequests &&
-		current.AllowSearchContactRequests == nextAllowSearchContactRequests {
+		current.AllowSearchContactRequests == nextAllowSearchContactRequests &&
+		current.AllowProfileVisibility == nextAllowProfileVisibility {
 		return current, false, nil
 	}
 	var row contactPrivacyRow
@@ -308,23 +319,25 @@ INSERT INTO contact_privacy_settings (
     user_id,
     allow_contact_requests,
     allow_search_contact_requests,
+    allow_profile_visibility,
     version,
     created_at,
     updated_at
-) VALUES ($1, $2, $3, $4, 1, now(), now())
-RETURNING tenant_id, user_id, allow_contact_requests, allow_search_contact_requests, version, updated_at
-`, tenantID, userID, allowContactRequests, nextAllowSearchContactRequests).Scan(&row.TenantID, &row.UserID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.Version, &row.UpdatedAt)
+) VALUES ($1, $2, $3, $4, $5, 1, now(), now())
+RETURNING tenant_id, user_id, allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, version, updated_at
+`, tenantID, userID, allowContactRequests, nextAllowSearchContactRequests, nextAllowProfileVisibility).Scan(&row.TenantID, &row.UserID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.AllowProfileVisibility, &row.Version, &row.UpdatedAt)
 	} else {
 		err = tx.QueryRow(ctx, `
 UPDATE contact_privacy_settings
 SET allow_contact_requests = $3,
     allow_search_contact_requests = $4,
+    allow_profile_visibility = $5,
     version = version + 1,
     updated_at = now()
 WHERE tenant_id = $1
   AND user_id = $2
-RETURNING tenant_id, user_id, allow_contact_requests, allow_search_contact_requests, version, updated_at
-`, tenantID, userID, allowContactRequests, nextAllowSearchContactRequests).Scan(&row.TenantID, &row.UserID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.Version, &row.UpdatedAt)
+RETURNING tenant_id, user_id, allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, version, updated_at
+`, tenantID, userID, allowContactRequests, nextAllowSearchContactRequests, nextAllowProfileVisibility).Scan(&row.TenantID, &row.UserID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.AllowProfileVisibility, &row.Version, &row.UpdatedAt)
 	}
 	if err != nil {
 		return contactPrivacyRow{}, false, types.NewDBWriteFailed(err.Error())
@@ -339,6 +352,7 @@ func upsertTenantContactPrivacyDefault(
 	tenantID types.TenantID,
 	allowContactRequests bool,
 	allowSearchContactRequests *bool,
+	allowProfileVisibility *bool,
 ) (contactPrivacyRow, bool, error) {
 	current, err := getTenantContactPrivacyDefault(ctx, tx, tenantID)
 	if err != nil {
@@ -348,9 +362,14 @@ func upsertTenantContactPrivacyDefault(
 	if allowSearchContactRequests != nil {
 		nextAllowSearchContactRequests = *allowSearchContactRequests
 	}
+	nextAllowProfileVisibility := current.AllowProfileVisibility
+	if allowProfileVisibility != nil {
+		nextAllowProfileVisibility = *allowProfileVisibility
+	}
 	if current.PolicySource == types.ContactPrivacyPolicySourceTenantDefault &&
 		current.AllowContactRequests == allowContactRequests &&
-		current.AllowSearchContactRequests == nextAllowSearchContactRequests {
+		current.AllowSearchContactRequests == nextAllowSearchContactRequests &&
+		current.AllowProfileVisibility == nextAllowProfileVisibility {
 		return current, false, nil
 	}
 	var row contactPrivacyRow
@@ -360,22 +379,24 @@ INSERT INTO contact_tenant_privacy_defaults (
     tenant_id,
     allow_contact_requests,
     allow_search_contact_requests,
+    allow_profile_visibility,
     version,
     created_at,
     updated_at
-) VALUES ($1, $2, $3, 1, now(), now())
-RETURNING tenant_id, allow_contact_requests, allow_search_contact_requests, version, updated_at
-`, tenantID, allowContactRequests, nextAllowSearchContactRequests).Scan(&row.TenantID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.Version, &row.UpdatedAt)
+) VALUES ($1, $2, $3, $4, 1, now(), now())
+RETURNING tenant_id, allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, version, updated_at
+`, tenantID, allowContactRequests, nextAllowSearchContactRequests, nextAllowProfileVisibility).Scan(&row.TenantID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.AllowProfileVisibility, &row.Version, &row.UpdatedAt)
 	} else {
 		err = tx.QueryRow(ctx, `
 UPDATE contact_tenant_privacy_defaults
 SET allow_contact_requests = $2,
     allow_search_contact_requests = $3,
+    allow_profile_visibility = $4,
     version = version + 1,
     updated_at = now()
 WHERE tenant_id = $1
-RETURNING tenant_id, allow_contact_requests, allow_search_contact_requests, version, updated_at
-`, tenantID, allowContactRequests, nextAllowSearchContactRequests).Scan(&row.TenantID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.Version, &row.UpdatedAt)
+RETURNING tenant_id, allow_contact_requests, allow_search_contact_requests, allow_profile_visibility, version, updated_at
+`, tenantID, allowContactRequests, nextAllowSearchContactRequests, nextAllowProfileVisibility).Scan(&row.TenantID, &row.AllowContactRequests, &row.AllowSearchContactRequests, &row.AllowProfileVisibility, &row.Version, &row.UpdatedAt)
 	}
 	if err != nil {
 		return contactPrivacyRow{}, false, types.NewDBWriteFailed(err.Error())
@@ -424,6 +445,7 @@ func contactPrivacySettingsFromRow(row contactPrivacyRow) types.ContactPrivacySe
 	return types.ContactPrivacySettings{
 		AllowContactRequests:       row.AllowContactRequests,
 		AllowSearchContactRequests: row.AllowSearchContactRequests,
+		AllowProfileVisibility:     row.AllowProfileVisibility,
 		Version:                    row.Version,
 		UpdatedAtUnixMS:            updatedAtUnixMS,
 		PolicySource:               row.PolicySource,
@@ -465,6 +487,7 @@ func (r *Repository) insertPrivacyOutbox(ctx context.Context, tx pgx.Tx, input p
 			"user_id":                       input.UserID,
 			"allow_contact_requests":        input.Privacy.AllowContactRequests,
 			"allow_search_contact_requests": input.Privacy.AllowSearchContactRequests,
+			"allow_profile_visibility":      input.Privacy.AllowProfileVisibility,
 			"privacy_version":               input.Privacy.Version,
 			"occurred_at":                   r.now().Format(time.RFC3339Nano),
 		},
@@ -482,7 +505,8 @@ type contactPrivacyResultSnapshot struct {
 	TenantID                   types.TenantID `json:"tenant_id"`
 	UserID                     types.UserID   `json:"user_id"`
 	AllowContactRequests       bool           `json:"allow_contact_requests"`
-	AllowSearchContactRequests bool           `json:"allow_search_contact_requests"`
+	AllowSearchContactRequests *bool          `json:"allow_search_contact_requests,omitempty"`
+	AllowProfileVisibility     *bool          `json:"allow_profile_visibility,omitempty"`
 	Version                    int64          `json:"version"`
 	UpdatedAtUnixMS            int64          `json:"updated_at_unix_ms"`
 	PolicySource               string         `json:"policy_source"`
@@ -494,7 +518,8 @@ func contactPrivacyResultJSON(row contactPrivacyRow) ([]byte, error) {
 		TenantID:                   row.TenantID,
 		UserID:                     row.UserID,
 		AllowContactRequests:       settings.AllowContactRequests,
-		AllowSearchContactRequests: settings.AllowSearchContactRequests,
+		AllowSearchContactRequests: &settings.AllowSearchContactRequests,
+		AllowProfileVisibility:     &settings.AllowProfileVisibility,
 		Version:                    settings.Version,
 		UpdatedAtUnixMS:            settings.UpdatedAtUnixMS,
 		PolicySource:               string(settings.PolicySource),
@@ -516,11 +541,20 @@ func contactPrivacyRowFromIdempotencyResult(existing commandIdempotency) (contac
 	if snapshot.TenantID == "" || snapshot.UserID == "" || snapshot.Version <= 0 || snapshot.UpdatedAtUnixMS <= 0 {
 		return contactPrivacyRow{}, types.NewDBReadFailed("contact privacy idempotency result snapshot incomplete")
 	}
+	allowProfileVisibility := true
+	if snapshot.AllowProfileVisibility != nil {
+		allowProfileVisibility = *snapshot.AllowProfileVisibility
+	}
+	allowSearchContactRequests := true
+	if snapshot.AllowSearchContactRequests != nil {
+		allowSearchContactRequests = *snapshot.AllowSearchContactRequests
+	}
 	return contactPrivacyRow{
 		TenantID:                   snapshot.TenantID,
 		UserID:                     snapshot.UserID,
 		AllowContactRequests:       snapshot.AllowContactRequests,
-		AllowSearchContactRequests: snapshot.AllowSearchContactRequests,
+		AllowSearchContactRequests: allowSearchContactRequests,
+		AllowProfileVisibility:     allowProfileVisibility,
 		Version:                    snapshot.Version,
 		UpdatedAt:                  time.UnixMilli(snapshot.UpdatedAtUnixMS).UTC(),
 		PolicySource:               contactPrivacyPolicySourceFromSnapshot(snapshot.PolicySource),

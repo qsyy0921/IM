@@ -132,6 +132,7 @@ func TestContactPrivacyMapsPolicySource(t *testing.T) {
 				Settings: types.ContactPrivacySettings{
 					AllowContactRequests:       false,
 					AllowSearchContactRequests: true,
+					AllowProfileVisibility:     false,
 					Version:                    3,
 					UpdatedAtUnixMS:            1234,
 					PolicySource:               types.ContactPrivacyPolicySourceTenantDefault,
@@ -156,9 +157,12 @@ func TestContactPrivacyMapsPolicySource(t *testing.T) {
 	if !response.GetSettings().GetAllowSearchContactRequests() {
 		t.Fatalf("expected search contact requests to be allowed in privacy response: %+v", response.GetSettings())
 	}
+	if response.GetSettings().GetAllowProfileVisibility() {
+		t.Fatalf("expected profile visibility to be disabled in privacy response: %+v", response.GetSettings())
+	}
 }
 
-func TestSetContactPrivacyMapsOptionalSearchPolicy(t *testing.T) {
+func TestSetContactPrivacyMapsOptionalPolicies(t *testing.T) {
 	var captured types.SetContactPrivacyCommand
 	server := NewServer(
 		nil, nil,
@@ -170,6 +174,7 @@ func TestSetContactPrivacyMapsOptionalSearchPolicy(t *testing.T) {
 				Settings: types.ContactPrivacySettings{
 					AllowContactRequests:       command.AllowContactRequests,
 					AllowSearchContactRequests: command.AllowSearchContactRequests != nil && *command.AllowSearchContactRequests,
+					AllowProfileVisibility:     command.AllowProfileVisibility != nil && *command.AllowProfileVisibility,
 					Version:                    1,
 					UpdatedAtUnixMS:            1234,
 					PolicySource:               types.ContactPrivacyPolicySourceUser,
@@ -180,6 +185,7 @@ func TestSetContactPrivacyMapsOptionalSearchPolicy(t *testing.T) {
 	)
 
 	allowSearch := false
+	allowProfile := true
 	response, err := server.SetContactPrivacy(context.Background(), &contactsv1.SetContactPrivacyRequest{
 		AuthContext: &contactsv1.AuthContext{
 			TenantId: "tenant-1",
@@ -187,6 +193,7 @@ func TestSetContactPrivacyMapsOptionalSearchPolicy(t *testing.T) {
 		},
 		AllowContactRequests:       true,
 		AllowSearchContactRequests: &allowSearch,
+		AllowProfileVisibility:     &allowProfile,
 		IdempotencyKey:             "privacy-1",
 	})
 	if err != nil {
@@ -195,8 +202,14 @@ func TestSetContactPrivacyMapsOptionalSearchPolicy(t *testing.T) {
 	if captured.AllowSearchContactRequests == nil || *captured.AllowSearchContactRequests {
 		t.Fatalf("expected optional search policy false to reach usecase, got %+v", captured)
 	}
+	if captured.AllowProfileVisibility == nil || !*captured.AllowProfileVisibility {
+		t.Fatalf("expected optional profile policy true to reach usecase, got %+v", captured)
+	}
 	if response.GetSettings().GetAllowSearchContactRequests() {
 		t.Fatalf("expected search contact requests false in response: %+v", response.GetSettings())
+	}
+	if !response.GetSettings().GetAllowProfileVisibility() {
+		t.Fatalf("expected profile visibility true in response: %+v", response.GetSettings())
 	}
 }
 

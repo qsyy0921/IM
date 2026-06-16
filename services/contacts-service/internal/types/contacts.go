@@ -174,6 +174,7 @@ type SendContactRequestResult struct {
 type ContactPrivacySettings struct {
 	AllowContactRequests       bool
 	AllowSearchContactRequests bool
+	AllowProfileVisibility     bool
 	Version                    int64
 	UpdatedAtUnixMS            int64
 	PolicySource               ContactPrivacyPolicySource
@@ -203,6 +204,7 @@ type SetContactPrivacyCommand struct {
 	AuthContext                AuthContext
 	AllowContactRequests       bool
 	AllowSearchContactRequests *bool
+	AllowProfileVisibility     *bool
 	IdempotencyKey             string
 }
 
@@ -246,6 +248,7 @@ type SetTenantContactPrivacyDefaultCommand struct {
 	TenantID                   TenantID
 	AllowContactRequests       bool
 	AllowSearchContactRequests *bool
+	AllowProfileVisibility     *bool
 }
 
 func (c SetTenantContactPrivacyDefaultCommand) Validate() error {

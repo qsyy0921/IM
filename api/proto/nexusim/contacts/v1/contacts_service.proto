@@ -288,6 +288,7 @@ message ContactPrivacySettings {
   int64 updated_at_unix_ms = 3;
   ContactPrivacyPolicySource policy_source = 4;
   bool allow_search_contact_requests = 5;
+  bool allow_profile_visibility = 6;
 }
 
 message GetContactPrivacyRequest {
@@ -305,6 +306,7 @@ message SetContactPrivacyRequest {
   bool allow_contact_requests = 2;
   string idempotency_key = 3;
   optional bool allow_search_contact_requests = 4;
+  optional bool allow_profile_visibility = 5;
 }
 
 message SetContactPrivacyResponse {

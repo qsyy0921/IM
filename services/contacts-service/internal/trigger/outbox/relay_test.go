@@ -149,11 +149,13 @@ func TestBuildContactEventEdgeBlockedUnblockedAndRemarkUpdated(t *testing.T) {
 
 func TestBuildContactEventPrivacyUpdated(t *testing.T) {
 	message := outboxMessage(types.ContactEventPrivacyUpdated, map[string]any{
-		"tenant_id":              "tenant-contacts",
-		"user_id":                "bob",
-		"allow_contact_requests": false,
-		"privacy_version":        2,
-		"occurred_at":            "2026-06-10T08:00:00Z",
+		"tenant_id":                     "tenant-contacts",
+		"user_id":                       "bob",
+		"allow_contact_requests":        false,
+		"allow_search_contact_requests": false,
+		"allow_profile_visibility":      true,
+		"privacy_version":               2,
+		"occurred_at":                   "2026-06-10T08:00:00Z",
 	})
 	event, err := BuildContactEvent(message)
 	if err != nil {
@@ -164,8 +166,31 @@ func TestBuildContactEventPrivacyUpdated(t *testing.T) {
 		privacy.TenantId != "tenant-contacts" ||
 		privacy.UserId != "bob" ||
 		privacy.AllowContactRequests ||
+		privacy.AllowSearchContactRequests ||
+		!privacy.AllowProfileVisibility ||
 		privacy.PrivacyVersion != 2 {
 		t.Fatalf("unexpected privacy event: %+v payload=%+v", event, privacy)
+	}
+}
+
+func TestBuildContactEventPrivacyUpdatedDefaultsMissingOptionalFields(t *testing.T) {
+	message := outboxMessage(types.ContactEventPrivacyUpdated, map[string]any{
+		"tenant_id":              "tenant-contacts",
+		"user_id":                "bob",
+		"allow_contact_requests": true,
+		"privacy_version":        2,
+		"occurred_at":            "2026-06-10T08:00:00Z",
+	})
+	event, err := BuildContactEvent(message)
+	if err != nil {
+		t.Fatalf("build privacy event: %v", err)
+	}
+	privacy := event.GetPrivacyUpdated()
+	if privacy == nil ||
+		!privacy.AllowContactRequests ||
+		!privacy.AllowSearchContactRequests ||
+		!privacy.AllowProfileVisibility {
+		t.Fatalf("unexpected privacy defaults: %+v payload=%+v", event, privacy)
 	}
 }
 

@@ -32,6 +32,7 @@ type commandHashPayload struct {
 	GroupName                  string `json:"group_name,omitempty"`
 	AllowContactRequests       *bool  `json:"allow_contact_requests,omitempty"`
 	AllowSearchContactRequests *bool  `json:"allow_search_contact_requests,omitempty"`
+	AllowProfileVisibility     *bool  `json:"allow_profile_visibility,omitempty"`
 }
 
 func commandHash(payload commandHashPayload) (string, error) {

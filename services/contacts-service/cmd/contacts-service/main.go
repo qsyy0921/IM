@@ -393,10 +393,11 @@ func runTenantPrivacyDefaultAudit() error {
 		return err
 	}
 	log.Printf(
-		"contacts-service tenant privacy default tenant_id=%s allow_contact_requests=%t allow_search_contact_requests=%t version=%d policy_source=%s updated_at_unix_ms=%d",
+		"contacts-service tenant privacy default tenant_id=%s allow_contact_requests=%t allow_search_contact_requests=%t allow_profile_visibility=%t version=%d policy_source=%s updated_at_unix_ms=%d",
 		result.TenantID,
 		result.Settings.AllowContactRequests,
 		result.Settings.AllowSearchContactRequests,
+		result.Settings.AllowProfileVisibility,
 		result.Settings.Version,
 		result.Settings.PolicySource,
 		result.Settings.UpdatedAtUnixMS,
@@ -429,6 +430,14 @@ func runTenantPrivacyDefaultSet() error {
 	if allowSearchConfigured {
 		allowSearchContactRequestsPtr = &allowSearchContactRequests
 	}
+	allowProfileVisibility, allowProfileConfigured, err := envOptionalBool("NEXUSIM_CONTACTS_TENANT_PRIVACY_ALLOW_PROFILE_VISIBILITY")
+	if err != nil {
+		return err
+	}
+	var allowProfileVisibilityPtr *bool
+	if allowProfileConfigured {
+		allowProfileVisibilityPtr = &allowProfileVisibility
+	}
 	pool, err := openPGPool(ctx)
 	if err != nil {
 		return err
@@ -440,16 +449,18 @@ func runTenantPrivacyDefaultSet() error {
 			TenantID:                   types.TenantID(tenantID),
 			AllowContactRequests:       allowContactRequests,
 			AllowSearchContactRequests: allowSearchContactRequestsPtr,
+			AllowProfileVisibility:     allowProfileVisibilityPtr,
 		},
 	)
 	if err != nil {
 		return err
 	}
 	log.Printf(
-		"contacts-service tenant privacy default updated tenant_id=%s allow_contact_requests=%t allow_search_contact_requests=%t version=%d changed=%t updated_at_unix_ms=%d",
+		"contacts-service tenant privacy default updated tenant_id=%s allow_contact_requests=%t allow_search_contact_requests=%t allow_profile_visibility=%t version=%d changed=%t updated_at_unix_ms=%d",
 		result.TenantID,
 		result.Settings.AllowContactRequests,
 		result.Settings.AllowSearchContactRequests,
+		result.Settings.AllowProfileVisibility,
 		result.Settings.Version,
 		result.Changed,
 		result.Settings.UpdatedAtUnixMS,

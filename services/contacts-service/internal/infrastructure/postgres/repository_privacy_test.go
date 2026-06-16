@@ -478,6 +478,116 @@ func TestRepositoryContactPrivacyBlocksSearchRequestsOnlyIntegration(t *testing.
 	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestCreated, 1)
 }
 
+func TestRepositoryContactPrivacyProfileVisibilityIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	defaultPrivacy, err := repository.GetContactPrivacy(ctx, getPrivacyCommand("bob"))
+	if err != nil {
+		t.Fatalf("get default profile privacy: %v", err)
+	}
+	if !defaultPrivacy.Settings.AllowProfileVisibility ||
+		defaultPrivacy.Settings.PolicySource != types.ContactPrivacyPolicySourceSystemDefault {
+		t.Fatalf("unexpected default profile privacy: %+v", defaultPrivacy)
+	}
+
+	allowProfile := false
+	closed, err := repository.SetContactPrivacy(ctx, types.SetContactPrivacyCommand{
+		AuthContext:            authContext("bob", "privacy-profile-close"),
+		AllowContactRequests:   true,
+		AllowProfileVisibility: &allowProfile,
+		IdempotencyKey:         "privacy-profile-close",
+	})
+	if err != nil {
+		t.Fatalf("set profile privacy closed: %v", err)
+	}
+	if closed.Settings.AllowProfileVisibility ||
+		!closed.Settings.AllowContactRequests ||
+		!closed.Settings.AllowSearchContactRequests ||
+		closed.Settings.Version != 1 ||
+		closed.Settings.PolicySource != types.ContactPrivacyPolicySourceUser {
+		t.Fatalf("unexpected closed profile privacy: %+v", closed)
+	}
+
+	replay, err := repository.SetContactPrivacy(ctx, types.SetContactPrivacyCommand{
+		AuthContext:            authContext("bob", "privacy-profile-close"),
+		AllowContactRequests:   true,
+		AllowProfileVisibility: &allowProfile,
+		IdempotencyKey:         "privacy-profile-close",
+	})
+	if err != nil {
+		t.Fatalf("set profile privacy replay: %v", err)
+	}
+	if !replay.IdempotentReplay ||
+		replay.Settings.AllowProfileVisibility ||
+		replay.Settings.Version != closed.Settings.Version {
+		t.Fatalf("unexpected profile privacy replay: %+v", replay)
+	}
+
+	var payloadProfileVisibility bool
+	err = pool.QueryRow(ctx, `
+SELECT (payload_json->>'allow_profile_visibility')::boolean
+FROM contacts_outbox
+WHERE tenant_id = 'tenant-contacts'
+  AND event_type = $1
+`, eventTypeContactPrivacyUpdated).Scan(&payloadProfileVisibility)
+	if err != nil {
+		t.Fatalf("query profile privacy outbox payload: %v", err)
+	}
+	if payloadProfileVisibility {
+		t.Fatalf("expected profile visibility false in privacy outbox payload")
+	}
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactPrivacyUpdated, 1)
+}
+
+func TestRepositoryTenantProfilePrivacyDefaultInheritanceIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetContactsTables(t, ctx, pool)
+	repository := newTestRepository(pool)
+
+	allowTenantProfile := false
+	tenantDefault, err := repository.SetTenantContactPrivacyDefault(ctx, types.SetTenantContactPrivacyDefaultCommand{
+		TenantID:               "tenant-contacts",
+		AllowContactRequests:   true,
+		AllowProfileVisibility: &allowTenantProfile,
+	})
+	if err != nil {
+		t.Fatalf("set tenant profile privacy default: %v", err)
+	}
+	if tenantDefault.Settings.AllowProfileVisibility ||
+		tenantDefault.Settings.PolicySource != types.ContactPrivacyPolicySourceTenantDefault {
+		t.Fatalf("unexpected tenant profile privacy default: %+v", tenantDefault)
+	}
+
+	inherited, err := repository.GetContactPrivacy(ctx, getPrivacyCommand("bob"))
+	if err != nil {
+		t.Fatalf("get inherited profile privacy: %v", err)
+	}
+	if inherited.Settings.AllowProfileVisibility ||
+		inherited.Settings.PolicySource != types.ContactPrivacyPolicySourceTenantDefault ||
+		inherited.Settings.Version != tenantDefault.Settings.Version {
+		t.Fatalf("unexpected inherited profile privacy: %+v", inherited)
+	}
+
+	allowUserProfile := true
+	userOverride, err := repository.SetContactPrivacy(ctx, types.SetContactPrivacyCommand{
+		AuthContext:            authContext("bob", "privacy-profile-open"),
+		AllowContactRequests:   true,
+		AllowProfileVisibility: &allowUserProfile,
+		IdempotencyKey:         "privacy-profile-open",
+	})
+	if err != nil {
+		t.Fatalf("set user profile privacy open: %v", err)
+	}
+	if !userOverride.Settings.AllowProfileVisibility ||
+		userOverride.Settings.PolicySource != types.ContactPrivacyPolicySourceUser {
+		t.Fatalf("unexpected user profile privacy override: %+v", userOverride)
+	}
+}
+
 func TestRepositoryTenantPrivacyDefaultBlocksSearchUnlessUserOverridesIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

@@ -136,4 +136,6 @@ message ContactPrivacyUpdatedV1 {
   bool allow_contact_requests = 3;
   int64 privacy_version = 4;
   google.protobuf.Timestamp occurred_at = 5;
+  bool allow_search_contact_requests = 6;
+  bool allow_profile_visibility = 7;
 }

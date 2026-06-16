@@ -186,6 +186,7 @@ func (s *Server) SetContactPrivacy(
 		AuthContext:                authFromProto(ctx, request.GetAuthContext()),
 		AllowContactRequests:       request.GetAllowContactRequests(),
 		AllowSearchContactRequests: request.AllowSearchContactRequests,
+		AllowProfileVisibility:     request.AllowProfileVisibility,
 		IdempotencyKey:             request.GetIdempotencyKey(),
 	})
 	if err != nil {
@@ -525,6 +526,7 @@ func privacySettingsToProto(settings types.ContactPrivacySettings) *contactsv1.C
 	return &contactsv1.ContactPrivacySettings{
 		AllowContactRequests:       settings.AllowContactRequests,
 		AllowSearchContactRequests: settings.AllowSearchContactRequests,
+		AllowProfileVisibility:     settings.AllowProfileVisibility,
 		Version:                    settings.Version,
 		UpdatedAtUnixMs:            settings.UpdatedAtUnixMS,
 		PolicySource:               privacyPolicySourceToProto(settings.PolicySource),

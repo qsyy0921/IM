@@ -2385,6 +2385,7 @@ type ContactPrivacySettings struct {
 	UpdatedAtUnixMs            int64                      `protobuf:"varint,3,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
 	PolicySource               ContactPrivacyPolicySource `protobuf:"varint,4,opt,name=policy_source,json=policySource,proto3,enum=nexusim.contacts.v1.ContactPrivacyPolicySource" json:"policy_source,omitempty"`
 	AllowSearchContactRequests bool                       `protobuf:"varint,5,opt,name=allow_search_contact_requests,json=allowSearchContactRequests,proto3" json:"allow_search_contact_requests,omitempty"`
+	AllowProfileVisibility     bool                       `protobuf:"varint,6,opt,name=allow_profile_visibility,json=allowProfileVisibility,proto3" json:"allow_profile_visibility,omitempty"`
 	unknownFields              protoimpl.UnknownFields
 	sizeCache                  protoimpl.SizeCache
 }
@@ -2450,6 +2451,13 @@ func (x *ContactPrivacySettings) GetPolicySource() ContactPrivacyPolicySource {
 func (x *ContactPrivacySettings) GetAllowSearchContactRequests() bool {
 	if x != nil {
 		return x.AllowSearchContactRequests
+	}
+	return false
+}
+
+func (x *ContactPrivacySettings) GetAllowProfileVisibility() bool {
+	if x != nil {
+		return x.AllowProfileVisibility
 	}
 	return false
 }
@@ -2564,6 +2572,7 @@ type SetContactPrivacyRequest struct {
 	AllowContactRequests       bool                   `protobuf:"varint,2,opt,name=allow_contact_requests,json=allowContactRequests,proto3" json:"allow_contact_requests,omitempty"`
 	IdempotencyKey             string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
 	AllowSearchContactRequests *bool                  `protobuf:"varint,4,opt,name=allow_search_contact_requests,json=allowSearchContactRequests,proto3,oneof" json:"allow_search_contact_requests,omitempty"`
+	AllowProfileVisibility     *bool                  `protobuf:"varint,5,opt,name=allow_profile_visibility,json=allowProfileVisibility,proto3,oneof" json:"allow_profile_visibility,omitempty"`
 	unknownFields              protoimpl.UnknownFields
 	sizeCache                  protoimpl.SizeCache
 }
@@ -2622,6 +2631,13 @@ func (x *SetContactPrivacyRequest) GetIdempotencyKey() string {
 func (x *SetContactPrivacyRequest) GetAllowSearchContactRequests() bool {
 	if x != nil && x.AllowSearchContactRequests != nil {
 		return *x.AllowSearchContactRequests
+	}
+	return false
+}
+
+func (x *SetContactPrivacyRequest) GetAllowProfileVisibility() bool {
+	if x != nil && x.AllowProfileVisibility != nil {
+		return *x.AllowProfileVisibility
 	}
 	return false
 }
@@ -2887,25 +2903,28 @@ const file_nexusim_contacts_v1_contacts_service_proto_rawDesc = "" +
 	"\aversion\x18\x06 \x01(\x03R\aversion\x12\x1d\n" +
 	"\n" +
 	"group_name\x18\a \x01(\tR\tgroupName\x12+\n" +
-	"\x11idempotent_replay\x18\b \x01(\bR\x10idempotentReplay\"\xae\x02\n" +
+	"\x11idempotent_replay\x18\b \x01(\bR\x10idempotentReplay\"\xe8\x02\n" +
 	"\x16ContactPrivacySettings\x124\n" +
 	"\x16allow_contact_requests\x18\x01 \x01(\bR\x14allowContactRequests\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x03R\aversion\x12+\n" +
 	"\x12updated_at_unix_ms\x18\x03 \x01(\x03R\x0fupdatedAtUnixMs\x12T\n" +
 	"\rpolicy_source\x18\x04 \x01(\x0e2/.nexusim.contacts.v1.ContactPrivacyPolicySourceR\fpolicySource\x12A\n" +
-	"\x1dallow_search_contact_requests\x18\x05 \x01(\bR\x1aallowSearchContactRequests\"_\n" +
+	"\x1dallow_search_contact_requests\x18\x05 \x01(\bR\x1aallowSearchContactRequests\x128\n" +
+	"\x18allow_profile_visibility\x18\x06 \x01(\bR\x16allowProfileVisibility\"_\n" +
 	"\x18GetContactPrivacyRequest\x12C\n" +
 	"\fauth_context\x18\x01 \x01(\v2 .nexusim.contacts.v1.AuthContextR\vauthContext\"\x9a\x01\n" +
 	"\x19GetContactPrivacyResponse\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12G\n" +
-	"\bsettings\x18\x03 \x01(\v2+.nexusim.contacts.v1.ContactPrivacySettingsR\bsettings\"\xa8\x02\n" +
+	"\bsettings\x18\x03 \x01(\v2+.nexusim.contacts.v1.ContactPrivacySettingsR\bsettings\"\x84\x03\n" +
 	"\x18SetContactPrivacyRequest\x12C\n" +
 	"\fauth_context\x18\x01 \x01(\v2 .nexusim.contacts.v1.AuthContextR\vauthContext\x124\n" +
 	"\x16allow_contact_requests\x18\x02 \x01(\bR\x14allowContactRequests\x12'\n" +
 	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\x12F\n" +
-	"\x1dallow_search_contact_requests\x18\x04 \x01(\bH\x00R\x1aallowSearchContactRequests\x88\x01\x01B \n" +
-	"\x1e_allow_search_contact_requests\"\xc7\x01\n" +
+	"\x1dallow_search_contact_requests\x18\x04 \x01(\bH\x00R\x1aallowSearchContactRequests\x88\x01\x01\x12=\n" +
+	"\x18allow_profile_visibility\x18\x05 \x01(\bH\x01R\x16allowProfileVisibility\x88\x01\x01B \n" +
+	"\x1e_allow_search_contact_requestsB\x1b\n" +
+	"\x19_allow_profile_visibility\"\xc7\x01\n" +
 	"\x19SetContactPrivacyResponse\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12G\n" +

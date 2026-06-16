@@ -16,6 +16,7 @@ func TestWriteTenantPrivacyAuditOutput(t *testing.T) {
 		Settings: types.ContactPrivacySettings{
 			AllowContactRequests:       true,
 			AllowSearchContactRequests: false,
+			AllowProfileVisibility:     true,
 			Version:                    12,
 			PolicySource:               types.ContactPrivacyPolicySourceTenantDefault,
 			UpdatedAtUnixMS:            1800000000000,
@@ -38,6 +39,7 @@ func TestWriteTenantPrivacyAuditOutput(t *testing.T) {
 		output.TenantID != "tenant-a" ||
 		!output.AllowContactRequests ||
 		output.AllowSearchContactRequests ||
+		!output.AllowProfileVisibility ||
 		output.Version != 12 ||
 		output.PolicySource != "TENANT_DEFAULT" ||
 		output.UpdatedAtUnixMS != 1800000000000 {
@@ -52,6 +54,7 @@ func TestWriteTenantPrivacySetOutput(t *testing.T) {
 		Settings: types.ContactPrivacySettings{
 			AllowContactRequests:       false,
 			AllowSearchContactRequests: false,
+			AllowProfileVisibility:     false,
 			Version:                    13,
 			PolicySource:               types.ContactPrivacyPolicySourceTenantDefault,
 			UpdatedAtUnixMS:            1800000002000,
@@ -75,6 +78,7 @@ func TestWriteTenantPrivacySetOutput(t *testing.T) {
 		output.TenantID != "tenant-a" ||
 		output.AllowContactRequests ||
 		output.AllowSearchContactRequests ||
+		output.AllowProfileVisibility ||
 		output.Version != 13 ||
 		output.PolicySource != "TENANT_DEFAULT" ||
 		!output.Changed ||

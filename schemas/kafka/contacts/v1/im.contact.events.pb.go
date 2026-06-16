@@ -1168,14 +1168,16 @@ func (x *ContactEdgeUnblockedV1) GetOccurredAt() *timestamppb.Timestamp {
 }
 
 type ContactPrivacyUpdatedV1 struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	TenantId             string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
-	UserId               string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	AllowContactRequests bool                   `protobuf:"varint,3,opt,name=allow_contact_requests,json=allowContactRequests,proto3" json:"allow_contact_requests,omitempty"`
-	PrivacyVersion       int64                  `protobuf:"varint,4,opt,name=privacy_version,json=privacyVersion,proto3" json:"privacy_version,omitempty"`
-	OccurredAt           *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state                      protoimpl.MessageState `protogen:"open.v1"`
+	TenantId                   string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId                     string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	AllowContactRequests       bool                   `protobuf:"varint,3,opt,name=allow_contact_requests,json=allowContactRequests,proto3" json:"allow_contact_requests,omitempty"`
+	PrivacyVersion             int64                  `protobuf:"varint,4,opt,name=privacy_version,json=privacyVersion,proto3" json:"privacy_version,omitempty"`
+	OccurredAt                 *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	AllowSearchContactRequests bool                   `protobuf:"varint,6,opt,name=allow_search_contact_requests,json=allowSearchContactRequests,proto3" json:"allow_search_contact_requests,omitempty"`
+	AllowProfileVisibility     bool                   `protobuf:"varint,7,opt,name=allow_profile_visibility,json=allowProfileVisibility,proto3" json:"allow_profile_visibility,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *ContactPrivacyUpdatedV1) Reset() {
@@ -1241,6 +1243,20 @@ func (x *ContactPrivacyUpdatedV1) GetOccurredAt() *timestamppb.Timestamp {
 		return x.OccurredAt
 	}
 	return nil
+}
+
+func (x *ContactPrivacyUpdatedV1) GetAllowSearchContactRequests() bool {
+	if x != nil {
+		return x.AllowSearchContactRequests
+	}
+	return false
+}
+
+func (x *ContactPrivacyUpdatedV1) GetAllowProfileVisibility() bool {
+	if x != nil {
+		return x.AllowProfileVisibility
+	}
+	return false
 }
 
 var File_contacts_v1_im_contact_events_proto protoreflect.FileDescriptor
@@ -1361,14 +1377,16 @@ const file_contacts_v1_im_contact_events_proto_rawDesc = "" +
 	"\x06status\x18\x05 \x01(\tR\x06status\x12!\n" +
 	"\fedge_version\x18\x06 \x01(\x03R\vedgeVersion\x12;\n" +
 	"\voccurred_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"occurredAt\"\xeb\x01\n" +
+	"occurredAt\"\xe8\x02\n" +
 	"\x17ContactPrivacyUpdatedV1\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x124\n" +
 	"\x16allow_contact_requests\x18\x03 \x01(\bR\x14allowContactRequests\x12'\n" +
 	"\x0fprivacy_version\x18\x04 \x01(\x03R\x0eprivacyVersion\x12;\n" +
 	"\voccurred_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"occurredAtBBZ@github.com/qsyy0921/IM/schemas/kafka/contacts/v1;contacteventsv1b\x06proto3"
+	"occurredAt\x12A\n" +
+	"\x1dallow_search_contact_requests\x18\x06 \x01(\bR\x1aallowSearchContactRequests\x128\n" +
+	"\x18allow_profile_visibility\x18\a \x01(\bR\x16allowProfileVisibilityBBZ@github.com/qsyy0921/IM/schemas/kafka/contacts/v1;contacteventsv1b\x06proto3"
 
 var (
 	file_contacts_v1_im_contact_events_proto_rawDescOnce sync.Once

@@ -122,6 +122,69 @@ WITH member_windows AS (
     JOIN conversations c
       ON c.tenant_id = cm.tenant_id
      AND c.conversation_id = cm.conversation_id
+),
+active_owner_counts AS (
+    SELECT
+        c.tenant_id,
+        c.conversation_id,
+        c.member_version AS conversation_member_version,
+        c.permission_version AS conversation_permission_version,
+        c.status AS conversation_status,
+        COUNT(*) FILTER (WHERE cm.status = 'ACTIVE' AND cm.role = 'OWNER') AS active_owner_count,
+        COALESCE(MAX(cm.updated_at), now()) AS updated_at
+    FROM conversations c
+    LEFT JOIN conversation_members cm
+      ON cm.tenant_id = c.tenant_id
+     AND cm.conversation_id = c.conversation_id
+    WHERE c.status = 'ACTIVE'
+    GROUP BY c.tenant_id, c.conversation_id, c.member_version, c.permission_version, c.status
+),
+owner_count_issues AS (
+    SELECT
+        tenant_id,
+        conversation_id,
+        '' AS user_id,
+        '' AS role,
+        '' AS status,
+        NULL::bigint AS join_seq,
+        NULL::bigint AS leave_seq,
+        0::bigint AS member_version,
+        0::bigint AS permission_version,
+        conversation_member_version,
+        conversation_permission_version,
+        conversation_status,
+        updated_at,
+        'ACTIVE_CONVERSATION_WITHOUT_OWNER' AS issue_class
+    FROM active_owner_counts
+    WHERE active_owner_count = 0
+    UNION ALL
+    SELECT
+        cm.tenant_id,
+        cm.conversation_id,
+        cm.user_id,
+        cm.role,
+        cm.status,
+        cm.join_seq,
+        cm.leave_seq,
+        cm.member_version,
+        cm.permission_version,
+        aoc.conversation_member_version,
+        aoc.conversation_permission_version,
+        aoc.conversation_status,
+        cm.updated_at,
+        'ACTIVE_CONVERSATION_WITH_MULTIPLE_OWNERS' AS issue_class
+    FROM active_owner_counts aoc
+    JOIN conversation_members cm
+      ON cm.tenant_id = aoc.tenant_id
+     AND cm.conversation_id = aoc.conversation_id
+    WHERE aoc.active_owner_count > 1
+      AND cm.status = 'ACTIVE'
+      AND cm.role = 'OWNER'
+),
+all_issues AS (
+    SELECT * FROM member_windows
+    UNION ALL
+    SELECT * FROM owner_count_issues
 )
 SELECT
     tenant_id,
@@ -138,7 +201,7 @@ SELECT
     conversation_status,
     issue_class,
     updated_at
-FROM member_windows
+FROM all_issues
 WHERE `+strings.Join(clauses, " AND ")+`
 ORDER BY updated_at DESC, tenant_id, conversation_id, user_id
 LIMIT $`+strconv.Itoa(len(args)), args...)
@@ -211,7 +274,9 @@ func normalizeMemberWindowIssueClass(value string) string {
 		"LEAVE_BEFORE_JOIN",
 		"MEMBER_VERSION_AHEAD_CONVERSATION",
 		"PERMISSION_VERSION_AHEAD_CONVERSATION",
-		"ACTIVE_MEMBER_IN_INACTIVE_CONVERSATION":
+		"ACTIVE_MEMBER_IN_INACTIVE_CONVERSATION",
+		"ACTIVE_CONVERSATION_WITHOUT_OWNER",
+		"ACTIVE_CONVERSATION_WITH_MULTIPLE_OWNERS":
 		return issueClass
 	default:
 		return ""

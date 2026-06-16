@@ -27,6 +27,8 @@ INSERT INTO conversations (
     fanout_mode, fanout_policy_version, member_version, permission_version, current_seq_shard
 ) VALUES
     ('tenant-window', 'conv-active', 'GROUP', 'ACTIVE', 'LOCAL_ROW_LOCK', 'WRITE_FANOUT', 1, 10, 20, 'local'),
+    ('tenant-window', 'conv-no-owner', 'GROUP', 'ACTIVE', 'LOCAL_ROW_LOCK', 'WRITE_FANOUT', 1, 10, 20, 'local'),
+    ('tenant-window', 'conv-multi-owner', 'GROUP', 'ACTIVE', 'LOCAL_ROW_LOCK', 'WRITE_FANOUT', 1, 10, 20, 'local'),
     ('tenant-window', 'conv-archived', 'GROUP', 'ARCHIVED', 'LOCAL_ROW_LOCK', 'WRITE_FANOUT', 1, 10, 20, 'local');
 
 INSERT INTO conversation_members (
@@ -40,7 +42,11 @@ INSERT INTO conversation_members (
     ('tenant-window', 'conv-active', 'version-ahead', 'MEMBER', 'ACTIVE', 5, NULL, 11, 19, now() - interval '5 minutes'),
     ('tenant-window', 'conv-active', 'permission-ahead', 'MEMBER', 'ACTIVE', 6, NULL, 9, 21, now() - interval '6 minutes'),
     ('tenant-window', 'conv-archived', 'active-archived', 'OWNER', 'ACTIVE', 1, NULL, 9, 19, now() - interval '7 minutes'),
-    ('tenant-window', 'conv-active', 'healthy-member', 'MEMBER', 'ACTIVE', 1, NULL, 9, 19, now() - interval '8 minutes');
+    ('tenant-window', 'conv-active', 'healthy-member', 'MEMBER', 'ACTIVE', 1, NULL, 9, 19, now() - interval '8 minutes'),
+    ('tenant-window', 'conv-active', 'healthy-owner', 'OWNER', 'ACTIVE', 1, NULL, 9, 19, now() - interval '9 minutes'),
+    ('tenant-window', 'conv-no-owner', 'member-only', 'MEMBER', 'ACTIVE', 1, NULL, 9, 19, now() - interval '10 minutes'),
+    ('tenant-window', 'conv-multi-owner', 'owner-a', 'OWNER', 'ACTIVE', 1, NULL, 9, 19, now() - interval '11 minutes'),
+    ('tenant-window', 'conv-multi-owner', 'owner-b', 'OWNER', 'ACTIVE', 2, NULL, 10, 20, now() - interval '12 minutes');
 `)
 	if err != nil {
 		t.Fatalf("seed member windows: %v", err)
@@ -89,6 +95,40 @@ INSERT INTO conversation_members (
 	}
 	if len(filtered) != 1 || filtered[0].UserID != "active-archived" {
 		t.Fatalf("unexpected filtered result: %+v", filtered)
+	}
+
+	withoutOwner, err := repository.AuditMemberWindows(ctx, MemberWindowAuditOptions{
+		TenantID:       "tenant-window",
+		ConversationID: "conv-no-owner",
+		IssueClass:     "active_conversation_without_owner",
+	})
+	if err != nil {
+		t.Fatalf("audit active conversation without owner: %v", err)
+	}
+	if len(withoutOwner) != 1 ||
+		withoutOwner[0].ConversationID != "conv-no-owner" ||
+		withoutOwner[0].UserID != "" ||
+		withoutOwner[0].IssueClass != "ACTIVE_CONVERSATION_WITHOUT_OWNER" {
+		t.Fatalf("unexpected without-owner result: %+v", withoutOwner)
+	}
+
+	multipleOwners, err := repository.AuditMemberWindows(ctx, MemberWindowAuditOptions{
+		TenantID:       "tenant-window",
+		ConversationID: "conv-multi-owner",
+		IssueClass:     "active_conversation_with_multiple_owners",
+	})
+	if err != nil {
+		t.Fatalf("audit active conversation with multiple owners: %v", err)
+	}
+	if len(multipleOwners) != 2 {
+		t.Fatalf("expected two multiple-owner rows, got %+v", multipleOwners)
+	}
+	for _, row := range multipleOwners {
+		if row.Role != "OWNER" ||
+			row.Status != "ACTIVE" ||
+			row.IssueClass != "ACTIVE_CONVERSATION_WITH_MULTIPLE_OWNERS" {
+			t.Fatalf("unexpected multiple-owner row: %+v", row)
+		}
 	}
 
 	if _, err := repository.AuditMemberWindows(ctx, MemberWindowAuditOptions{IssueClass: "unknown"}); err == nil {

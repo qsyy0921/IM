@@ -152,6 +152,9 @@ try {
     Write-Host "== kafka producer hardening summary =="
     Invoke-LocalCheck "check-kafka-producer-hardening-summary.ps1"
 
+    Write-Host "== kafka producer fault summary =="
+    Invoke-LocalCheck "check-kafka-producer-fault-summary.ps1"
+
     Write-Host "== kafka consumer rebalance summary =="
     Invoke-LocalCheck "check-kafka-consumer-rebalance-summary.ps1"
 

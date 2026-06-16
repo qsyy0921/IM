@@ -12,6 +12,7 @@
 - 已补按 unresolved failure 定点回调 checkpoint：repair 可直接指定 failure offset，先锁定未解决 failure，再带审计回调到该 offset。
 - 已补按最早 unresolved failure 自动回调 checkpoint：repair 不再必须手填 offset，也能安全 rewind 到当前最早 blocker。
 - 已补 `projection-failure-audit` 只读模式：可直接列出 unresolved projection failure，并支持按 offset / event / failure class 过滤，减少手写 SQL 排障；可选 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_OUTPUT` 会写低敏 JSON 结果，便于 CI / operator 留存结构化证据。
+- 已补 `projection-failure-resolve` operator：人工确认某个 unresolved failure 已通过外部补偿或无需再作为 blocker 后，可带 dry-run / operator / reason 审计地标记 resolved；该模式不移动 Kafka checkpoint，只维护 projection failure 审计状态，并可通过 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_OUTPUT` 写低敏 JSON summary。
 - 已补 `projection-failure-cleanup` operator：只删除超过保留期的 resolved failure 审计行，不会碰 unresolved blocker，并支持按 consumer/topic/partition/class 缩小范围；可选 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_OUTPUT` 写低敏 cleanup summary。
 - `timeline-consumer` 现已对运行时 `Fetch` / `Commit` 错误做退避重试，并在 worker 模式通过 `/debug/metrics` 暴露低敏 retry 快照；malformed event、projection failure、failure recorder 异常仍保持持久审计 + fail-closed，不会自动越过 blocker。
 - `outbox-relay` 现已对非取消运行时错误做退避重试，并在 relay 模式通过 `/debug/metrics` 暴露低敏 retry 快照；publisher 错误写入稳定低敏 `last_error`，malformed payload / unsupported event 仍保持 fail-closed，交给 outbox retry / DLQ 语义处理。
@@ -24,4 +25,4 @@
 - `loadtest/capacityseed` 已能准备 `tenant-capacity-delivery` 下的 `user_inbox` fixture；`capacity-baseline-seeded-20260616` 本地 seeded 短基线中 `PullInbox + AckDelivery` 成功，`items_per_second=10.49`，报告见 `loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md`。
 
 ## 后续
-- Projection DLQ / repair 深化、更多 delivery event 消费方、长时间容量曲线；OTel collector / 生产级 alerting / SLO dashboard 仍属于后续统一观测治理。
+- 更多 delivery event 消费方、长时间容量曲线；OTel collector / 生产级 alerting / SLO dashboard 仍属于后续统一观测治理。

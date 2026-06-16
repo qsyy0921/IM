@@ -1110,6 +1110,7 @@ func resetDeliveryTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) 
 	t.Helper()
 	_, err := pool.Exec(ctx, `
 TRUNCATE
+    delivery_projection_failure_resolution_audit,
     delivery_projection_failures,
     delivery_projection_checkpoint_repair_audit,
     delivery_outbox_repair_audit,

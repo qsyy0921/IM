@@ -33,7 +33,7 @@
 | `identity-service` | WebAuthn/passkeys；OIDC；多 issuer；KMS/HSM；完整风控；生产级 email/SMS provider；租户级通知模板；bounce handling；长时间容量曲线和生产 sizing。 |
 | `message-service` | 会话级删除策略深化；provider-grade 外部 proof 工作流 / 审批系统集成；发送链路生产观测；长时间容量曲线和生产 sizing；图片 / 文件 / 语音二进制上传处理后续由 media 能力承担。 |
 | `conversation-service` | 更完整群管理；owner transfer 策略继续打磨；更复杂成员窗口历史 repair action；长时间容量曲线和生产 sizing。 |
-| `delivery-service` | Projection DLQ / repair 深化；更多 delivery event 消费方；长时间容量曲线和生产 sizing。 |
+| `delivery-service` | 更多 delivery event 消费方；已完成 projection failure audit / rewind / resolve / cleanup 第一阶段 operator 闭环，仍需长时间容量曲线和生产 sizing。 |
 | `push-gateway` | 生产级 Redis HA 设计；长时间容量曲线和生产 sizing。 |
 | `receipt-service` | 会话列表更多产品化能力（更多摘要策略等）；长时间容量曲线和生产 sizing。 |
 | `contacts-service` | 组织级策略、租户默认值 / 来源策略 / 隐私例外接入 admin/config service 正式权限面；已完成 first-stage 来源风险标注、`REVIEW_REQUIRED` 持久化和本地 operator 审批状态机，仍需长时间容量曲线和生产 sizing。 |

@@ -17,6 +17,22 @@ type ProjectionFailureRecord struct {
 	LastError        string
 }
 
+type ProjectionFailureResolveOptions struct {
+	ConsumerGroup string
+	Topic         string
+	PartitionID   int32
+	OffsetValue   int64
+	Operator      string
+	Reason        string
+	DryRun        bool
+}
+
+type ProjectionFailureResolveStats struct {
+	Requested int
+	Audited   int
+	Resolved  int
+}
+
 const (
 	ProjectionFailureClassDecode               = "decode_failed"
 	ProjectionFailureClassInvalidArgument      = "invalid_argument"

@@ -17,6 +17,7 @@ import (
 	"time"
 
 	postgresinfra "github.com/qsyy0921/IM/services/delivery-service/internal/infrastructure/postgres"
+	"github.com/qsyy0921/IM/services/delivery-service/internal/types"
 )
 
 func TestDeliveryServiceModeHelpIncludesOperatorModes(t *testing.T) {
@@ -32,6 +33,7 @@ func TestDeliveryServiceModeHelpIncludesOperatorModes(t *testing.T) {
 		"projection-checkpoint-repair-audit",
 		"projection-checkpoint-repair-cleanup",
 		"projection-failure-audit",
+		"projection-failure-resolve",
 		"projection-failure-cleanup",
 	} {
 		if !strings.Contains(deliveryServiceModeHelp, mode) {
@@ -378,6 +380,61 @@ func TestProjectionFailureCleanupConfigFromEnvRejectsInvalidValues(t *testing.T)
 
 	if _, err := projectionFailureCleanupConfigFromEnv(); err == nil {
 		t.Fatalf("expected invalid projection failure cleanup config to fail")
+	}
+}
+
+func TestEnvRequiredInt64AllowZero(t *testing.T) {
+	t.Setenv("NEXUSIM_TEST_REQUIRED_INT64", "")
+	if _, err := envRequiredInt64AllowZero("NEXUSIM_TEST_REQUIRED_INT64"); err == nil {
+		t.Fatalf("expected missing required int64 to fail")
+	}
+	t.Setenv("NEXUSIM_TEST_REQUIRED_INT64", "-1")
+	if _, err := envRequiredInt64AllowZero("NEXUSIM_TEST_REQUIRED_INT64"); err == nil {
+		t.Fatalf("expected negative required int64 to fail")
+	}
+	t.Setenv("NEXUSIM_TEST_REQUIRED_INT64", "0")
+	value, err := envRequiredInt64AllowZero("NEXUSIM_TEST_REQUIRED_INT64")
+	if err != nil || value != 0 {
+		t.Fatalf("expected zero required int64 to pass, value=%d err=%v", value, err)
+	}
+}
+
+func TestWriteProjectionFailureResolveOutput(t *testing.T) {
+	outputPath := filepath.Join(t.TempDir(), "projection-failure-resolve.json")
+	err := writeProjectionFailureResolveOutput(
+		outputPath,
+		types.ProjectionFailureResolveStats{Requested: 1, Resolved: 1},
+		types.ProjectionFailureResolveOptions{
+			ConsumerGroup: "group-1",
+			Topic:         "conversation.timeline.events",
+			PartitionID:   0,
+			OffsetValue:   42,
+			Operator:      "operator-1",
+			Reason:        "raw reason should not be emitted",
+		},
+	)
+	if err != nil {
+		t.Fatalf("write projection failure resolve output: %v", err)
+	}
+	raw, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("read projection failure resolve output: %v", err)
+	}
+	if strings.Contains(string(raw), "raw reason should not be emitted") {
+		t.Fatalf("projection failure resolve output leaked raw reason: %s", string(raw))
+	}
+	var output struct {
+		Requested     int    `json:"requested"`
+		Resolved      int    `json:"resolved"`
+		ConsumerGroup string `json:"consumer_group"`
+		OffsetValue   int64  `json:"offset_value"`
+		ReasonPresent bool   `json:"reason_present"`
+	}
+	if err := json.Unmarshal(raw, &output); err != nil {
+		t.Fatalf("decode projection failure resolve output: %v", err)
+	}
+	if output.Requested != 1 || output.Resolved != 1 || output.ConsumerGroup != "group-1" || output.OffsetValue != 42 || !output.ReasonPresent {
+		t.Fatalf("unexpected projection failure resolve output: %+v", output)
 	}
 }
 

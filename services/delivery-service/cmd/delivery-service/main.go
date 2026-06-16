@@ -36,7 +36,7 @@ func main() {
 	}
 }
 
-const deliveryServiceModeHelp = "grpc, timeline-consumer, outbox-relay, outbox-repair, outbox-audit, outbox-repair-audit, outbox-repair-cleanup, projection-checkpoint-repair, projection-checkpoint-repair-audit, projection-checkpoint-repair-cleanup, projection-failure-audit, or projection-failure-cleanup"
+const deliveryServiceModeHelp = "grpc, timeline-consumer, outbox-relay, outbox-repair, outbox-audit, outbox-repair-audit, outbox-repair-cleanup, projection-checkpoint-repair, projection-checkpoint-repair-audit, projection-checkpoint-repair-cleanup, projection-failure-audit, projection-failure-resolve, or projection-failure-cleanup"
 
 func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_SERVICE_MODE"))
@@ -66,6 +66,8 @@ func run() error {
 		return runProjectionCheckpointRepairCleanup()
 	case "projection-failure-audit":
 		return runProjectionFailureAudit()
+	case "projection-failure-resolve":
+		return runProjectionFailureResolve()
 	case "projection-failure-cleanup":
 		return runProjectionFailureCleanup()
 	default:
@@ -608,6 +610,57 @@ func runProjectionFailureAudit() error {
 	}
 	if !includeResolved && len(rows) > 0 {
 		return fmt.Errorf("delivery projection failure audit found %d unresolved rows", len(rows))
+	}
+	return nil
+}
+
+func runProjectionFailureResolve() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	offsetValue, err := envRequiredInt64AllowZero("NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_OFFSET_VALUE")
+	if err != nil {
+		return err
+	}
+	options := types.ProjectionFailureResolveOptions{
+		ConsumerGroup: envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_CONSUMER_GROUP", ""),
+		Topic:         envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_TOPIC", "conversation.timeline.events"),
+		PartitionID:   int32(envIntAllowZero("NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_PARTITION_ID", 0)),
+		OffsetValue:   offsetValue,
+		Operator:      envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_OPERATOR", "manual"),
+		Reason:        envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_REASON", "manual delivery projection failure resolution"),
+		DryRun:        envBool("NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_DRY_RUN", false),
+	}
+	stats, err := postgresinfra.NewProjectionFailureStore(pool).ResolveFailure(ctx, options)
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"delivery-service projection failure resolve completed requested=%d audited=%d resolved=%d consumer_group=%s topic=%s partition_id=%d offset=%d dry_run=%t reason_present=%t",
+		stats.Requested,
+		stats.Audited,
+		stats.Resolved,
+		options.ConsumerGroup,
+		options.Topic,
+		options.PartitionID,
+		options.OffsetValue,
+		options.DryRun,
+		strings.TrimSpace(options.Reason) != "",
+	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_OUTPUT")); outputPath != "" {
+		if err := writeProjectionFailureResolveOutput(outputPath, stats, options); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -1181,6 +1234,18 @@ func envInt64AllowZero(name string, fallback int64) int64 {
 		return fallback
 	}
 	return parsed
+}
+
+func envRequiredInt64AllowZero(name string) (int64, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return 0, errors.New(name + " is required")
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed < 0 {
+		return 0, errors.New(name + " must be a non-negative integer")
+	}
+	return parsed, nil
 }
 
 func envStringSet(name string, normalize func(string) string) map[string]struct{} {

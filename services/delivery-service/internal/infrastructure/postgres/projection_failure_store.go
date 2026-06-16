@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/qsyy0921/IM/services/delivery-service/internal/types"
 )
@@ -46,6 +47,21 @@ type ProjectionFailureCleanupStats struct {
 	Deleted int64
 }
 
+type ProjectionFailureResolveAuditRow struct {
+	ConsumerGroup         string
+	Topic                 string
+	PartitionID           int32
+	OffsetValue           int64
+	EventID               string
+	FailureClass          string
+	Operator              string
+	Reason                string
+	DryRun                bool
+	Outcome               string
+	CheckpointOffsetValue *int64
+	CreatedAt             time.Time
+}
+
 type ProjectionFailureCleanupOptions struct {
 	ConsumerGroup string
 	Topic         string
@@ -54,6 +70,11 @@ type ProjectionFailureCleanupOptions struct {
 	Cutoff        time.Time
 	Limit         int
 }
+
+const (
+	projectionFailureResolutionOutcomeAudited  = "AUDITED"
+	projectionFailureResolutionOutcomeResolved = "RESOLVED"
+)
 
 func NewProjectionFailureStore(pool *pgxpool.Pool) *ProjectionFailureStore {
 	return &ProjectionFailureStore{pool: pool}
@@ -220,6 +241,74 @@ LIMIT $` + itoa(len(args))
 	return result, nil
 }
 
+func (store *ProjectionFailureStore) ResolveFailure(ctx context.Context, options types.ProjectionFailureResolveOptions) (types.ProjectionFailureResolveStats, error) {
+	if store == nil || store.pool == nil {
+		return types.ProjectionFailureResolveStats{}, errors.New("delivery projection failure store is not configured")
+	}
+	if strings.TrimSpace(options.ConsumerGroup) == "" {
+		return types.ProjectionFailureResolveStats{}, types.NewInvalidArgument("consumer_group is required")
+	}
+	topic := strings.TrimSpace(options.Topic)
+	if topic == "" {
+		topic = "conversation.timeline.events"
+	}
+	if options.PartitionID < 0 {
+		return types.ProjectionFailureResolveStats{}, types.NewInvalidArgument("partition_id must be non-negative")
+	}
+	if options.OffsetValue < 0 {
+		return types.ProjectionFailureResolveStats{}, types.NewInvalidArgument("offset_value must be non-negative")
+	}
+	operator := normalizeProjectionFailureResolveText(options.Operator, "manual")
+	reason := normalizeProjectionFailureResolveText(options.Reason, "manual delivery projection failure resolution")
+
+	tx, err := store.pool.Begin(ctx)
+	if err != nil {
+		return types.ProjectionFailureResolveStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	failure, err := readProjectionFailureForResolution(ctx, tx, options.ConsumerGroup, topic, options.PartitionID, options.OffsetValue)
+	if err != nil {
+		return types.ProjectionFailureResolveStats{}, err
+	}
+	checkpointOffset, err := readProjectionCheckpointOffset(ctx, tx, options.ConsumerGroup, topic, options.PartitionID)
+	if err != nil {
+		return types.ProjectionFailureResolveStats{}, err
+	}
+	outcome := projectionFailureResolutionOutcomeAudited
+	if !options.DryRun {
+		_, err := tx.Exec(ctx, `
+UPDATE delivery_projection_failures
+SET resolved_at = now(),
+    resolved_checkpoint_offset = $5
+WHERE consumer_group = $1
+  AND topic = $2
+  AND partition_id = $3
+  AND offset_value = $4
+  AND resolved_at IS NULL
+`, options.ConsumerGroup, topic, options.PartitionID, options.OffsetValue, checkpointOffset)
+		if err != nil {
+			return types.ProjectionFailureResolveStats{}, types.NewDBWriteFailed(err.Error())
+		}
+		outcome = projectionFailureResolutionOutcomeResolved
+	}
+	if err := insertProjectionFailureResolutionAudit(ctx, tx, failure, operator, reason, options.DryRun, outcome, checkpointOffset); err != nil {
+		return types.ProjectionFailureResolveStats{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.ProjectionFailureResolveStats{}, types.NewDBWriteFailed(err.Error())
+	}
+	stats := types.ProjectionFailureResolveStats{Requested: 1}
+	if options.DryRun {
+		stats.Audited = 1
+	} else {
+		stats.Resolved = 1
+	}
+	return stats, nil
+}
+
 func (store *ProjectionFailureStore) CleanupResolvedFailures(ctx context.Context, options ProjectionFailureCleanupOptions) (ProjectionFailureCleanupStats, error) {
 	if store == nil || store.pool == nil {
 		return ProjectionFailureCleanupStats{}, errors.New("delivery projection failure store is not configured")
@@ -277,6 +366,113 @@ RETURNING 1
 		return ProjectionFailureCleanupStats{}, types.NewDBWriteFailed(err.Error())
 	}
 	return stats, nil
+}
+
+type projectionFailureResolutionRow struct {
+	ConsumerGroup string
+	Topic         string
+	PartitionID   int32
+	OffsetValue   int64
+	EventID       string
+	FailureClass  string
+}
+
+func readProjectionFailureForResolution(ctx context.Context, tx pgx.Tx, consumerGroup string, topic string, partitionID int32, offsetValue int64) (projectionFailureResolutionRow, error) {
+	var row projectionFailureResolutionRow
+	err := tx.QueryRow(ctx, `
+SELECT consumer_group, topic, partition_id, offset_value, event_id, failure_class
+FROM delivery_projection_failures
+WHERE consumer_group = $1
+  AND topic = $2
+  AND partition_id = $3
+  AND offset_value = $4
+  AND resolved_at IS NULL
+FOR UPDATE
+`, consumerGroup, topic, partitionID, offsetValue).Scan(
+		&row.ConsumerGroup,
+		&row.Topic,
+		&row.PartitionID,
+		&row.OffsetValue,
+		&row.EventID,
+		&row.FailureClass,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return projectionFailureResolutionRow{}, types.NewInvalidArgument("unresolved delivery projection failure not found")
+		}
+		return projectionFailureResolutionRow{}, types.NewDBReadFailed(err.Error())
+	}
+	return row, nil
+}
+
+func readProjectionCheckpointOffset(ctx context.Context, tx pgx.Tx, consumerGroup string, topic string, partitionID int32) (*int64, error) {
+	var value int64
+	err := tx.QueryRow(ctx, `
+SELECT offset_value
+FROM delivery_kafka_checkpoints
+WHERE consumer_group = $1
+  AND topic = $2
+  AND partition_id = $3
+`, consumerGroup, topic, partitionID).Scan(&value)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	return &value, nil
+}
+
+func insertProjectionFailureResolutionAudit(
+	ctx context.Context,
+	tx pgx.Tx,
+	failure projectionFailureResolutionRow,
+	operator string,
+	reason string,
+	dryRun bool,
+	outcome string,
+	checkpointOffset *int64,
+) error {
+	_, err := tx.Exec(ctx, `
+INSERT INTO delivery_projection_failure_resolution_audit (
+    consumer_group,
+    topic,
+    partition_id,
+    offset_value,
+    event_id,
+    failure_class,
+    operator,
+    reason,
+    dry_run,
+    outcome,
+    checkpoint_offset_value,
+    created_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
+`,
+		failure.ConsumerGroup,
+		failure.Topic,
+		failure.PartitionID,
+		failure.OffsetValue,
+		failure.EventID,
+		failure.FailureClass,
+		operator,
+		reason,
+		dryRun,
+		outcome,
+		checkpointOffset,
+	)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func normalizeProjectionFailureResolveText(value string, fallback string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
 func sanitizeProjectionFailureError(failureClass string, _ string) string {

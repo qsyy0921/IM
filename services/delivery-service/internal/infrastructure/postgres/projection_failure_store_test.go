@@ -289,6 +289,115 @@ INSERT INTO delivery_projection_failures (
 	}
 }
 
+func TestProjectionFailureStoreResolveFailureDryRunAuditsOnlyIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_kafka_checkpoints (
+    consumer_group, topic, partition_id, offset_value, updated_at
+) VALUES (
+    'group-resolve', 'conversation.timeline.events', 0, 88, now()
+);
+INSERT INTO delivery_projection_failures (
+    consumer_group, topic, partition_id, offset_value, event_id, event_type, tenant_id, conversation_id, aggregate_version, trace_id, failure_class, last_error, failure_count, first_seen_at, last_seen_at, resolved_at, resolved_checkpoint_offset
+) VALUES (
+    'group-resolve', 'conversation.timeline.events', 0, 81, 'event-resolve', 'message.deleted.v1', 'tenant-1', 'conv-1', 12, 'trace-1', 'decode_failed', 'decode failed', 1, now(), now(), NULL, NULL
+)
+`)
+	if err != nil {
+		t.Fatalf("seed projection failure for dry-run resolve: %v", err)
+	}
+
+	store := NewProjectionFailureStore(pool)
+	stats, err := store.ResolveFailure(ctx, types.ProjectionFailureResolveOptions{
+		ConsumerGroup: "group-resolve",
+		Topic:         "conversation.timeline.events",
+		PartitionID:   0,
+		OffsetValue:   81,
+		Operator:      "operator-1",
+		Reason:        "verify external replay before resolve",
+		DryRun:        true,
+	})
+	if err != nil {
+		t.Fatalf("dry-run resolve projection failure: %v", err)
+	}
+	if stats.Requested != 1 || stats.Audited != 1 || stats.Resolved != 0 {
+		t.Fatalf("unexpected dry-run resolve stats: %+v", stats)
+	}
+	assertProjectionFailureRow(t, ctx, pool, "group-resolve", "conversation.timeline.events", 0, 81, types.ProjectionFailureClassDecode, "decode failed", 1, false, 0)
+	assertProjectionFailureResolutionAudit(t, ctx, pool, "group-resolve", "conversation.timeline.events", 0, 81, "AUDITED", true, 88)
+}
+
+func TestProjectionFailureStoreResolveFailureMarksResolvedIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_kafka_checkpoints (
+    consumer_group, topic, partition_id, offset_value, updated_at
+) VALUES (
+    'group-resolve', 'conversation.timeline.events', 0, 90, now()
+);
+INSERT INTO delivery_projection_failures (
+    consumer_group, topic, partition_id, offset_value, event_id, event_type, tenant_id, conversation_id, aggregate_version, trace_id, failure_class, last_error, failure_count, first_seen_at, last_seen_at, resolved_at, resolved_checkpoint_offset
+) VALUES (
+    'group-resolve', 'conversation.timeline.events', 0, 82, 'event-resolve-2', 'message.edited.v1', 'tenant-1', 'conv-1', 13, 'trace-1', 'projection_dependency', 'missing source message', 3, now(), now(), NULL, NULL
+)
+`)
+	if err != nil {
+		t.Fatalf("seed projection failure for resolve: %v", err)
+	}
+
+	store := NewProjectionFailureStore(pool)
+	stats, err := store.ResolveFailure(ctx, types.ProjectionFailureResolveOptions{
+		ConsumerGroup: "group-resolve",
+		Topic:         "conversation.timeline.events",
+		PartitionID:   0,
+		OffsetValue:   82,
+		Operator:      "operator-1",
+		Reason:        "operator confirmed projection compensated",
+	})
+	if err != nil {
+		t.Fatalf("resolve projection failure: %v", err)
+	}
+	if stats.Requested != 1 || stats.Audited != 0 || stats.Resolved != 1 {
+		t.Fatalf("unexpected resolve stats: %+v", stats)
+	}
+	assertProjectionFailureRow(t, ctx, pool, "group-resolve", "conversation.timeline.events", 0, 82, types.ProjectionFailureClassProjectionDependency, "missing source message", 3, true, 90)
+	assertProjectionFailureResolutionAudit(t, ctx, pool, "group-resolve", "conversation.timeline.events", 0, 82, "RESOLVED", false, 90)
+}
+
+func TestProjectionFailureStoreResolveFailureRejectsAlreadyResolvedIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_failures (
+    consumer_group, topic, partition_id, offset_value, event_id, event_type, tenant_id, conversation_id, aggregate_version, trace_id, failure_class, last_error, failure_count, first_seen_at, last_seen_at, resolved_at, resolved_checkpoint_offset
+) VALUES (
+    'group-resolve', 'conversation.timeline.events', 0, 83, 'event-resolved', 'message.edited.v1', 'tenant-1', 'conv-1', 13, 'trace-1', 'projection_dependency', 'missing source message', 3, now(), now(), now(), 84
+)
+`)
+	if err != nil {
+		t.Fatalf("seed resolved projection failure: %v", err)
+	}
+
+	store := NewProjectionFailureStore(pool)
+	_, err = store.ResolveFailure(ctx, types.ProjectionFailureResolveOptions{
+		ConsumerGroup: "group-resolve",
+		Topic:         "conversation.timeline.events",
+		PartitionID:   0,
+		OffsetValue:   83,
+	})
+	if err == nil {
+		t.Fatalf("expected resolving already resolved projection failure to fail")
+	}
+}
+
 func TestProjectionFailureStoreCleanupResolvedFailuresDeletesOnlyExpiredResolvedRowsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -322,6 +431,31 @@ INSERT INTO delivery_projection_failures (
 	assertProjectionFailureMissing(t, ctx, pool, "group-1", "conversation.timeline.events", 0, 41)
 	assertProjectionFailureRow(t, ctx, pool, "group-1", "conversation.timeline.events", 0, 42, types.ProjectionFailureClassDBWrite, "recent resolved", 1, true, 43)
 	assertProjectionFailureRow(t, ctx, pool, "group-1", "conversation.timeline.events", 0, 43, types.ProjectionFailureClassDecode, "still unresolved", 1, false, 0)
+}
+
+func assertProjectionFailureResolutionAudit(t *testing.T, ctx context.Context, pool *pgxpool.Pool, consumerGroup string, topic string, partitionID int32, offsetValue int64, outcome string, dryRun bool, checkpointOffset int64) {
+	t.Helper()
+	var gotOutcome string
+	var gotDryRun bool
+	var gotCheckpointOffset *int64
+	if err := pool.QueryRow(ctx, `
+SELECT outcome, dry_run, checkpoint_offset_value
+FROM delivery_projection_failure_resolution_audit
+WHERE consumer_group = $1
+  AND topic = $2
+  AND partition_id = $3
+  AND offset_value = $4
+ORDER BY created_at DESC, id DESC
+LIMIT 1
+`, consumerGroup, topic, partitionID, offsetValue).Scan(&gotOutcome, &gotDryRun, &gotCheckpointOffset); err != nil {
+		t.Fatalf("read projection failure resolution audit: %v", err)
+	}
+	if gotOutcome != outcome || gotDryRun != dryRun {
+		t.Fatalf("unexpected projection failure resolution audit: outcome=%s dry_run=%t", gotOutcome, gotDryRun)
+	}
+	if gotCheckpointOffset == nil || *gotCheckpointOffset != checkpointOffset {
+		t.Fatalf("unexpected projection failure resolution checkpoint offset: %v", gotCheckpointOffset)
+	}
 }
 
 func TestProjectionFailureStoreCleanupResolvedFailuresHonorsBatchLimitIntegration(t *testing.T) {

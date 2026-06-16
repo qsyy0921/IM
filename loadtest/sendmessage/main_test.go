@@ -126,6 +126,83 @@ func TestSummarizeLatencies(t *testing.T) {
 	}
 }
 
+func TestBuildCapacitySummary(t *testing.T) {
+	started := time.Date(2026, 6, 16, 1, 2, 3, 0, time.UTC)
+	finished := started.Add(5 * time.Second)
+	published := int64(900)
+	pending := int64(3)
+	dlq := int64(1)
+	result := &summary{
+		Target:               "127.0.0.1:10495",
+		Targets:              []string{"127.0.0.1:10495", "127.0.0.1:10501"},
+		VUs:                  16,
+		ConversationCount:    32,
+		RequestCount:         1000,
+		SuccessCount:         950,
+		ErrorCount:           50,
+		LogicalRequestCount:  900,
+		LogicalSuccessCount:  880,
+		SuccessRate:          0.95,
+		LogicalSuccessRate:   0.9777777777777777,
+		P95MS:                12.5,
+		P99MS:                30.5,
+		LogicalP95MS:         11.5,
+		LogicalP99MS:         28.5,
+		OutboxPublishedCount: &published,
+		OutboxPendingCount:   &pending,
+		OutboxDLQCount:       &dlq,
+		ServicePGPool:        &pgPoolStats{MaxConns: 20},
+		RelayPGPool:          &pgPoolStats{MaxConns: 10},
+		StartedAt:            started.Format(time.RFC3339Nano),
+		FinishedAt:           finished.Format(time.RFC3339Nano),
+	}
+
+	capacity := buildCapacitySummary(result)
+	if capacity == nil {
+		t.Fatal("expected capacity summary")
+	}
+	if capacity.DurationMS != 5000 ||
+		capacity.TargetCount != 2 ||
+		capacity.VUs != 16 ||
+		capacity.ConversationCount != 32 ||
+		capacity.RequestCount != 1000 ||
+		capacity.SuccessCount != 950 ||
+		capacity.ErrorCount != 50 ||
+		capacity.LogicalRequestCount != 900 ||
+		capacity.LogicalSuccessCount != 880 {
+		t.Fatalf("unexpected capacity counts: %+v", capacity)
+	}
+	assertFloatNear(t, capacity.RequestRPS, 200)
+	assertFloatNear(t, capacity.AcceptedRPS, 190)
+	assertFloatNear(t, capacity.ErrorRPS, 10)
+	assertFloatNear(t, capacity.LogicalRequestRPS, 180)
+	assertFloatNear(t, capacity.LogicalAcceptedRPS, 176)
+	assertFloatNear(t, capacity.SuccessRate, 0.95)
+	assertFloatNear(t, capacity.LogicalSuccessRate, 0.9777777777777777)
+	if capacity.OutboxPublishedCount == nil || *capacity.OutboxPublishedCount != 900 ||
+		capacity.OutboxPendingCount == nil || *capacity.OutboxPendingCount != 3 ||
+		capacity.OutboxDLQCount == nil || *capacity.OutboxDLQCount != 1 {
+		t.Fatalf("unexpected outbox counts: %+v", capacity)
+	}
+	if capacity.ServicePGPoolMaxConns == nil || *capacity.ServicePGPoolMaxConns != 20 ||
+		capacity.RelayPGPoolMaxConns == nil || *capacity.RelayPGPoolMaxConns != 10 {
+		t.Fatalf("unexpected pg pool counts: %+v", capacity)
+	}
+}
+
+func TestBuildCapacitySummaryRequiresValidDuration(t *testing.T) {
+	if got := buildCapacitySummary(&summary{}); got != nil {
+		t.Fatalf("expected nil capacity summary for empty timestamps, got %+v", got)
+	}
+	started := time.Date(2026, 6, 16, 1, 2, 3, 0, time.UTC)
+	if got := buildCapacitySummary(&summary{
+		StartedAt:  started.Format(time.RFC3339Nano),
+		FinishedAt: started.Format(time.RFC3339Nano),
+	}); got != nil {
+		t.Fatalf("expected nil capacity summary for zero duration, got %+v", got)
+	}
+}
+
 func TestApplyLatency(t *testing.T) {
 	var avg *float64
 	var p95 *float64
@@ -133,6 +210,13 @@ func TestApplyLatency(t *testing.T) {
 	applyLatency(&avg, &p95, &p99, latencySnapshot{Count: 2, AvgMS: 1.5, P95MS: 2.5, P99MS: 3.5})
 	if avg == nil || *avg != 1.5 || p95 == nil || *p95 != 2.5 || p99 == nil || *p99 != 3.5 {
 		t.Fatalf("unexpected latency values avg=%v p95=%v p99=%v", avg, p95, p99)
+	}
+}
+
+func assertFloatNear(t *testing.T, got float64, want float64) {
+	t.Helper()
+	if math.Abs(got-want) > 0.000001 {
+		t.Fatalf("got %v, want %v", got, want)
 	}
 }
 

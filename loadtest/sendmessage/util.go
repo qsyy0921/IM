@@ -14,6 +14,7 @@ func writeSummary(resultDir string, result *summary) error {
 	if err := os.MkdirAll(resultDir, 0755); err != nil {
 		return err
 	}
+	result.Capacity = buildCapacitySummary(result)
 	result.ResultFile = filepath.Join(resultDir, "sendmessage-summary.json")
 	encoded, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
@@ -87,4 +88,79 @@ func commitInfoFromEnv() commitInfo {
 
 func durationMS(value time.Duration) float64 {
 	return float64(value) / float64(time.Millisecond)
+}
+
+func buildCapacitySummary(result *summary) *capacitySummary {
+	if result == nil {
+		return nil
+	}
+	duration := observedRunDuration(result)
+	if duration <= 0 {
+		return nil
+	}
+	durationSeconds := duration.Seconds()
+	return &capacitySummary{
+		DurationMS:            durationMS(duration),
+		TargetCount:           observedTargetCount(result),
+		VUs:                   result.VUs,
+		ConversationCount:     result.ConversationCount,
+		RequestCount:          result.RequestCount,
+		SuccessCount:          result.SuccessCount,
+		ErrorCount:            result.ErrorCount,
+		LogicalRequestCount:   result.LogicalRequestCount,
+		LogicalSuccessCount:   result.LogicalSuccessCount,
+		RequestRPS:            ratePerSecond(result.RequestCount, durationSeconds),
+		AcceptedRPS:           ratePerSecond(result.SuccessCount, durationSeconds),
+		ErrorRPS:              ratePerSecond(result.ErrorCount, durationSeconds),
+		LogicalRequestRPS:     ratePerSecond(result.LogicalRequestCount, durationSeconds),
+		LogicalAcceptedRPS:    ratePerSecond(result.LogicalSuccessCount, durationSeconds),
+		SuccessRate:           result.SuccessRate,
+		LogicalSuccessRate:    result.LogicalSuccessRate,
+		P95MS:                 result.P95MS,
+		P99MS:                 result.P99MS,
+		LogicalP95MS:          result.LogicalP95MS,
+		LogicalP99MS:          result.LogicalP99MS,
+		OutboxPublishedCount:  result.OutboxPublishedCount,
+		OutboxPendingCount:    result.OutboxPendingCount,
+		OutboxDLQCount:        result.OutboxDLQCount,
+		ServicePGPoolMaxConns: pgPoolMaxConns(result.ServicePGPool),
+		RelayPGPoolMaxConns:   pgPoolMaxConns(result.RelayPGPool),
+	}
+}
+
+func observedRunDuration(result *summary) time.Duration {
+	started, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(result.StartedAt))
+	if err != nil {
+		return 0
+	}
+	finished, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(result.FinishedAt))
+	if err != nil {
+		return 0
+	}
+	return finished.Sub(started)
+}
+
+func observedTargetCount(result *summary) int {
+	if len(result.Targets) > 0 {
+		return len(result.Targets)
+	}
+	if strings.TrimSpace(result.Target) != "" {
+		return 1
+	}
+	return 0
+}
+
+func ratePerSecond(count int64, durationSeconds float64) float64 {
+	if count <= 0 || durationSeconds <= 0 {
+		return 0
+	}
+	return float64(count) / durationSeconds
+}
+
+func pgPoolMaxConns(stats *pgPoolStats) *int32 {
+	if stats == nil {
+		return nil
+	}
+	value := stats.MaxConns
+	return &value
 }

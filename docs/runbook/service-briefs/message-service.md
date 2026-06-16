@@ -14,9 +14,10 @@
 - 已补 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运维模式，可直接审计、redrive 和清理 `message_outbox` repair 历史。
 - 已补 trusted metadata 启动门禁：当 `NEXUSIM_MESSAGE_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端未启用 mTLS client cert 校验，则启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - `loadtest/sendmessage` 容量 runner 已按 config / model / auth / util 同 package 拆分，避免后续容量观测继续堆进单个 `main.go`。
+- `loadtest/sendmessage` summary 已新增 `capacity_summary`，统一输出 actual duration、targets、VU、conversation、request/success/error、logical request、RPS、p95/p99、outbox 和 PG pool 关键计数；这是容量基线口径，不等于已完成生产容量压测。
 - PostgreSQL repository 的 revoke / edit / delete mutation 集成测试已拆到同 package `repository_mutation_test.go`，保留原覆盖面并降低单个测试文件复杂度。
 
 ## 后续
 
-- 会话级删除策略深化、合规删除、容量和生产观测；用户私有隐藏已由 delivery-service `HideInboxItem` 承担，图片 / 文件 / 语音二进制上传和处理属于后续 media 能力。
+- 会话级删除策略深化、合规删除、基于 `capacity_summary` 的容量基线实跑和生产观测；用户私有隐藏已由 delivery-service `HideInboxItem` 承担，图片 / 文件 / 语音二进制上传和处理属于后续 media 能力。
 - 生产级 OTel collector、告警路由、retention 和 SLO dashboard 仍属于后续统一观测治理。

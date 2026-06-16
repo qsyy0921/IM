@@ -157,11 +157,40 @@ type summary struct {
 	ServiceLatencyMetrics                 map[string]latencySnapshot `json:"service_latency_metrics,omitempty"`
 	RelayLatencyMetrics                   map[string]latencySnapshot `json:"relay_latency_metrics,omitempty"`
 	RelayValueMetrics                     map[string]valueSnapshot   `json:"relay_value_metrics,omitempty"`
+	Capacity                              *capacitySummary           `json:"capacity_summary,omitempty"`
 	ErrorTopN                             []errorCount               `json:"error_topn"`
 	MessageErrorCounts                    []messageErrorCount        `json:"message_error_counts,omitempty"`
 	StartedAt                             string                     `json:"started_at"`
 	FinishedAt                            string                     `json:"finished_at"`
 	ResultFile                            string                     `json:"result_file"`
+}
+
+type capacitySummary struct {
+	DurationMS            float64 `json:"duration_ms"`
+	TargetCount           int     `json:"target_count"`
+	VUs                   int     `json:"vus"`
+	ConversationCount     int     `json:"conversation_count"`
+	RequestCount          int64   `json:"request_count"`
+	SuccessCount          int64   `json:"success_count"`
+	ErrorCount            int64   `json:"error_count"`
+	LogicalRequestCount   int64   `json:"logical_request_count"`
+	LogicalSuccessCount   int64   `json:"logical_success_count"`
+	RequestRPS            float64 `json:"request_rps"`
+	AcceptedRPS           float64 `json:"accepted_rps"`
+	ErrorRPS              float64 `json:"error_rps"`
+	LogicalRequestRPS     float64 `json:"logical_request_rps"`
+	LogicalAcceptedRPS    float64 `json:"logical_accepted_rps"`
+	SuccessRate           float64 `json:"success_rate"`
+	LogicalSuccessRate    float64 `json:"logical_success_rate"`
+	P95MS                 float64 `json:"p95_ms"`
+	P99MS                 float64 `json:"p99_ms"`
+	LogicalP95MS          float64 `json:"logical_p95_ms"`
+	LogicalP99MS          float64 `json:"logical_p99_ms"`
+	OutboxPublishedCount  *int64  `json:"outbox_published_count,omitempty"`
+	OutboxPendingCount    *int64  `json:"outbox_pending_count,omitempty"`
+	OutboxDLQCount        *int64  `json:"outbox_dlq_count,omitempty"`
+	ServicePGPoolMaxConns *int32  `json:"service_pg_pool_max_conns,omitempty"`
+	RelayPGPoolMaxConns   *int32  `json:"relay_pg_pool_max_conns,omitempty"`
 }
 
 type errorCount struct {

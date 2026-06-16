@@ -15,6 +15,7 @@
 - 已补 receipt outbox audit / repair audit 错误脱敏：`last_error`、`previous_last_error` 对外和新写 repair 历史只保留稳定低敏分类，不暴露 broker body、账号、token 或 provider 原文。
 - 已补 trusted metadata 启动门禁：当 `NEXUSIM_RECEIPT_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端未启用 mTLS client cert 校验，则启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - 已补 first-stage OpenTelemetry gRPC server span；gRPC access log 只记录低敏 `trace_id/request_id`，并对白名单外入口 metadata 直接丢弃。
+- receipt full-smoke runner 已按 config / model / auth / util 同 package 拆分，避免后续回执和会话列表验证继续堆进单个 `main.go`。
 
 ## 后续
 

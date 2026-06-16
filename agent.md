@@ -8,14 +8,29 @@ reading or duplicating long documents.
 1. Run `git status --short --branch --untracked-files=all`.
 2. Read `prompt.md`.
 3. Read `agent.md` to confirm progress-management rules.
-4. Read `docs/runbook/current-goal.md`.
-5. Read `docs/runbook/current-brief.md`.
-6. Read `docs/runbook/remaining-goals.md` only when choosing or updating work.
-7. For service work, read `docs/runbook/service-briefs/README.md`, then only the
-   specific `docs/runbook/service-briefs/<service>.md` file involved.
+4. Read additional documents only when the current task needs them. Use the
+   routing table below instead of opening every runbook or SDD file.
 
 Do not read long SDD, archive, history, or loadtest reports unless the current
 slice needs exact evidence from them.
+
+## Document Routing
+
+Use this table to decide what to read and what to maintain.
+
+| Task | Read first | Maintain when facts change |
+| --- | --- | --- |
+| Continue the active Codex goal | `docs/runbook/current-goal.md` | `docs/runbook/current-goal.md` only if the concrete goal changed |
+| Understand current phase | `docs/runbook/current-brief.md` | `docs/runbook/current-brief.md` |
+| Choose next unfinished backend work | `docs/runbook/remaining-goals.md` | `docs/runbook/remaining-goals.md` |
+| Work on one service | `docs/runbook/service-briefs/README.md`, then that service brief | that service brief, plus `development-progress.md` if public progress changed |
+| Repair / DLQ / operator work | `docs/runbook/repair-operators.md` and the relevant service brief | `repair-operators.md`, relevant service brief |
+| Distributed smoke / fault evidence | relevant runbook README and only the exact report path needed | the new report or summary, not the entrance docs |
+| Interview progress narrative | `docs/interview/project-progress.md` | `docs/interview/project-progress.md` |
+| Architecture target or service split rules | `docs/architecture/target-architecture.md` only when architecture changes | target architecture or ADR, not routine progress docs |
+
+Do not duplicate the same status into every document. Keep entrance documents
+short, route to the owner document, and update only the owner document.
 
 ## Current Project Direction
 
@@ -59,6 +74,9 @@ When a slice removes or discovers unfinished work, update
 Do not copy the same long status paragraph across multiple files. Prefer links
 and short summaries. Do not maintain every document on every turn; update only
 the documents whose facts changed in the current slice.
+
+When new work is discovered, add it to `remaining-goals.md` first. Only promote
+it into `current-goal.md` when it becomes the active execution goal.
 
 ## Work Selection
 

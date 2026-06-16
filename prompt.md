@@ -21,13 +21,9 @@
 ## 每轮开始
 
 1. 运行 `git status --short --branch --untracked-files=all`。
-2. 读取 `agent.md`，确认本轮进度管理规则。
-3. 读取 `docs/runbook/current-goal.md`，确认本轮具体目标。
-4. 读取 `docs/runbook/current-brief.md`，确认当前阶段。
-5. 若需要定位文档，先读 `docs/runbook/README.md`。
-6. 若需要服务状态，先读 `docs/runbook/service-briefs/README.md`，再读对应服务短文档。
-7. 若需要选择或更新剩余工作，读 `docs/runbook/remaining-goals.md`。
-8. 只维护本轮事实变化涉及的文档；不为了“了解项目”全文读取或批量改写长历史文档。
+2. 读取 `agent.md`，确认本轮文档路由和进度维护规则。
+3. 按 `agent.md` 的任务类型读取对应文档；不要默认全文读取所有 runbook、SDD、archive、loadtest 报告。
+4. 只维护本轮事实变化涉及的文档；不为了“了解项目”全文读取或批量改写长历史文档。
 
 ## 工作原则
 
@@ -45,5 +41,6 @@
 1. 若当前阶段变化，更新 `docs/runbook/current-brief.md`。
 2. 若剩余工作变化，更新 `docs/runbook/remaining-goals.md`。
 3. 若服务状态变化，更新对应 `docs/runbook/service-briefs/<service>.md`。
-4. 需要历史归档时追加到 archive / loadtest 报告，不把长历史塞回入口文档。
-5. 至少运行 `.\tools\check-local.ps1`；按风险追加服务级测试、集成测试或 smoke。
+4. 若面试讲述线变化，更新 `docs/interview/project-progress.md`。
+5. 需要历史归档时追加到 archive / loadtest 报告，不把长历史塞回入口文档。
+6. 至少运行 `.\tools\check-local.ps1`；按风险追加服务级测试、集成测试或 smoke。

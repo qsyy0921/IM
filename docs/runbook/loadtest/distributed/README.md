@@ -6,6 +6,7 @@
 
 | 报告 | 说明 |
 | --- | --- |
+| `loadtest-report-20260616-seeded-capacity-baseline.md` | 本地 seeded capacity baseline 覆盖 message / conversation / delivery 三个需要预置业务状态的 runner，原始结果在 H 盘 |
 | `loadtest-report-20260612-all-service-docker-smoke.md` | Windows Docker runner 通过有线 `172.31.50.2` 访问 Mac Docker 中的 NexusIM 基础设施和服务容器，覆盖 conversation / message / delivery / push / receipt / contacts / identity 的小规模功能 smoke |
 
 ## 原始结果

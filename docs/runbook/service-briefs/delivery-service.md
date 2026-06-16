@@ -5,13 +5,8 @@
 - 已有 timeline projection、durable `user_inbox`、`PullInbox`、`AckDelivery`、`HideInboxItem` 用户视图隐藏、`delivery_outbox` relay。
 - 是 push-gateway 的可靠事实源，不要求 push-gateway 持久化消息或 ACK cursor。
 - 已补 `/healthz`、`/readyz`、`/debug/metrics`、Prometheus text `/metrics`、本地 alert rules / Grafana dashboard 原型；默认 scrape target 为 `host.docker.internal:11912`，覆盖 durable read model、delivery outbox、projection blocker、worker/relay、PG pool 和 OTel trace config 聚合指标；这是本地开发 / 面试演示观测，不是生产 SLO。
-- 已补 `outbox-audit` 只读模式：可直接列出当前 `delivery_outbox` 行，并按 outbox/event/tenant/conversation/status/event_type 缩小排障范围。
-- 已补 `outbox-repair` 运维模式，支持 `audit` 和 `redrive-dlq-pending`，并持久记录 repair audit。
-- 已补 `outbox-repair-audit` 只读模式：可直接列出 outbox repair audit 历史，并按 outbox/event/tenant/conversation/mode/outcome 缩小排障范围。
-- 已补 `outbox-repair-cleanup` operator：只删除超过保留期的 outbox repair audit 历史，并支持按 outbox/event/tenant/conversation/mode/outcome 缩小范围。
-- 已补 `projection-checkpoint-repair` 运维模式，当前只允许带审计地回调 checkpoint 做 replay，不允许前跳跳过事件。
-- 已补 `projection-checkpoint-repair-audit` 只读模式：可直接列出 repair audit 历史，并按 mode/outcome 缩小排障范围。
-- 已补 `projection-checkpoint-repair-cleanup` operator：只删除超过保留期的 repair audit 历史，并支持按 consumer/topic/partition/mode/outcome 缩小范围。
+- 已补 `outbox-audit` / `outbox-repair` / `outbox-repair-audit` / `outbox-repair-cleanup`，可审计、redrive `delivery_outbox` DLQ 并清理 repair audit 历史。
+- 已补 `projection-checkpoint-repair` / audit / cleanup，当前只允许带审计地回调 checkpoint 做 replay，不允许前跳跳过事件。
 - 已补 projection fail-closed 持久审计：timeline consumer 在 malformed / projection failure 停下前会写低敏失败记录，`last_error` 只保存稳定分类文案，且仍不会提交 checkpoint。
 - 已补 projection failure resolved 标记：同一 offset 成功重放后会保留失败记录但标记 `resolved`，`/debug/metrics` 只聚合未解决 blocker。
 - 已补按 unresolved failure 定点回调 checkpoint：repair 可直接指定 failure offset，先锁定未解决 failure，再带审计回调到该 offset。
@@ -26,6 +21,7 @@
 - 已补 trusted metadata 启动门禁：当 `NEXUSIM_DELIVERY_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端未启用 mTLS client cert 校验，则启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - 已补 first-stage OpenTelemetry gRPC server span；gRPC access log 只记录低敏 `trace_id/request_id`，并对白名单外入口 metadata 直接丢弃。
 - `loadtest/delivery` summary 已新增 `capacity_summary`，统一输出 actual duration、poll/item、pull p95/p99、ACK、inbox/outbox 和 checkpoint 关键计数；这是容量基线口径，不等于已完成生产容量压测。
+- `loadtest/capacityseed` 已能准备 `tenant-capacity-delivery` 下的 `user_inbox` fixture；`capacity-baseline-seeded-20260616` 本地 seeded 短基线中 `PullInbox + AckDelivery` 成功，`items_per_second=10.49`，报告见 `loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md`。
 
 ## 后续
-- Projection DLQ / repair 深化、更多 delivery event 消费方、基于 `capacity_summary` 的容量基线实跑；OTel collector / 生产级 alerting / SLO dashboard 仍属于后续统一观测治理。
+- Projection DLQ / repair 深化、更多 delivery event 消费方、长时间容量曲线；OTel collector / 生产级 alerting / SLO dashboard 仍属于后续统一观测治理。

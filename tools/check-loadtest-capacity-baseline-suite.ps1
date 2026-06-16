@@ -72,6 +72,10 @@ try {
         Write-Host "FAIL message-service capacity suite step must be marked seeded-only by default." -ForegroundColor Red
         exit 1
     }
+    if ($messageStep.command_line -notmatch "--tenant-id tenant-capacity-message" -or $messageStep.command_line -notmatch "--conversation-prefix conv-capacity-message") {
+        Write-Host "FAIL message-service capacity suite step must use capacity seed fixture ids." -ForegroundColor Red
+        exit 1
+    }
 
     $markdown = Get-Content -LiteralPath $markdownPath -Raw
     if (-not $markdown.Contains("Loadtest Capacity Baseline Suite") -or -not $markdown.Contains("not a production SLO")) {
@@ -102,6 +106,40 @@ try {
     $deliveryStep = @($seededSummary.steps | Where-Object { $_.service -eq "delivery-service" })[0]
     if ($deliveryStep.requires_seed -ne $true -or $deliveryStep.baseline_mode -ne "requires_seed" -or $deliveryStep.status -ne "skipped_seed_required") {
         Write-Host "FAIL delivery-service capacity runner must be marked seeded-only by default." -ForegroundColor Red
+        exit 1
+    }
+    if ($deliveryStep.command_line -notmatch "--tenant-id tenant-capacity-delivery" -or
+        $deliveryStep.command_line -notmatch "--conversation-id conv-capacity-delivery" -or
+        $deliveryStep.command_line -notmatch "--user-id delivery-user-1") {
+        Write-Host "FAIL delivery-service capacity suite step must use capacity seed fixture ids." -ForegroundColor Red
+        exit 1
+    }
+
+    $conversationRoot = Join-Path $tempRoot "conversation"
+    $conversationOutput = & $powerShellExe -NoProfile -ExecutionPolicy Bypass -File $runner `
+        -ResultRoot $conversationRoot `
+        -RunName "capacity-suite-conversation-selftest" `
+        -Services "conversation-service" `
+        -DryRun 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "FAIL capacity suite conversation dry-run should pass." -ForegroundColor Red
+        if ($conversationOutput) {
+            Write-Host (($conversationOutput | Out-String).Trim()) -ForegroundColor Red
+        }
+        exit 1
+    }
+
+    $conversationSummaryPath = Join-Path $conversationRoot "capacity-suite-conversation-selftest\capacity-baseline-suite-summary.json"
+    $conversationSummary = Get-Content -LiteralPath $conversationSummaryPath -Raw | ConvertFrom-Json
+    $conversationStep = @($conversationSummary.steps | Where-Object { $_.service -eq "conversation-service" })[0]
+    if ($conversationStep.requires_seed -ne $true -or $conversationStep.baseline_mode -ne "requires_seed" -or $conversationStep.status -ne "skipped_seed_required") {
+        Write-Host "FAIL conversation-service capacity runner must be marked seeded-only by default." -ForegroundColor Red
+        exit 1
+    }
+    if ($conversationStep.command_line -notmatch "--tenant-id tenant-capacity-conversation" -or
+        $conversationStep.command_line -notmatch "--conversation-id conv-capacity-memberchange" -or
+        $conversationStep.command_line -notmatch "--operator-user-id owner-1") {
+        Write-Host "FAIL conversation-service capacity suite step must use capacity seed fixture ids." -ForegroundColor Red
         exit 1
     }
 

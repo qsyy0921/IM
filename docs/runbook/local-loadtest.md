@@ -65,6 +65,23 @@ docker compose `
 .\tools\run-loadtest-capacity-baseline-suite.ps1 -IncludeSeededRunners
 ```
 
+本地默认 fixture 可用 `loadtest/capacityseed` 准备，参数与 suite 的 seeded runner 默认值对齐：
+
+```powershell
+. .\tools\go-env.ps1
+go run .\loadtest\capacityseed `
+  --pg-dsn postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable `
+  --cleanup
+
+.\tools\run-loadtest-capacity-baseline-suite.ps1 `
+  -RunName capacity-baseline-seeded-<name> `
+  -PGDSN postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable `
+  -IncludeSeededRunners `
+  -Services message-service,conversation-service,delivery-service
+```
+
+seed 工具只写本地压测 fixture 租户：`tenant-capacity-message`、`tenant-capacity-conversation`、`tenant-capacity-delivery`。不要把它用于生产库或长期手工造数。
+
 不要把 stack-only / seeded-only runner 的默认跳过解释为服务不可用。suite runner 只负责协调本地压测，不负责启动服务、启动后台角色或造数；服务进程、Docker 基础设施、topic/migration 和需要的测试数据仍需按对应 runbook 先准备。
 
 ## 1. 机器与网络

@@ -15,8 +15,9 @@
 - 已补 `member-change-audit` 只读 operator，可按 `change_id`、tenant、conversation、status、outbox event 过滤 `member_change_saga`，并对 `last_error` 使用稳定公开文案，避免泄露 SQL / Kafka / repair 内部错误文本。
 - 当 `NEXUSIM_CONVERSATION_AUTH_MODE=metadata|verified-metadata` 时，公网监听地址 + 无 gRPC mTLS client cert 的危险组合会在启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - `loadtest/memberchange` summary 已输出 `capacity_summary`，包含运行时长、VUs、请求 / 成功 / 错误计数、成功率、RPS、latency avg/p95/p99、成员变更类型、saga / timeline / outbox / roster / conversation_seq 聚合；后续容量验证可直接复用该结构。
+- `loadtest/capacityseed` 已能准备 `tenant-capacity-conversation` 下的 ACTIVE owner fixture；`capacity-baseline-seeded-20260616` 本地 seeded 短基线中 `memberchange` 成功 214、`requests_per_second=42.8`，报告见 `loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md`。
 
 ## 后续
 
 - 更完整群管理、owner transfer 策略继续打磨、成员窗口历史 repair / repair action。
-- OTel collector / 生产级 alerting / SLO dashboard 和基于 `capacity_summary` 的容量基线实跑仍属于后续统一观测治理。
+- OTel collector / 生产级 alerting / SLO dashboard、长时间容量曲线仍属于后续统一观测治理。

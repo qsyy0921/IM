@@ -56,6 +56,16 @@ go run ./services/delivery-service/cmd/delivery-service
 | `contacts-service` | `NEXUSIM_CONTACTS_OUTBOX_AUDIT_OUTPUT` |
 | `policy-service` | `NEXUSIM_POLICY_OUTBOX_AUDIT_OUTPUT` |
 
+以下服务的 `outbox-repair-cleanup` 支持写低敏 JSON summary，便于留存 cleanup 证据；输出只包含删除行数、cutoff、retention、batch size 和过滤条件，不重新输出被清理的历史错误明细：
+
+| 服务 | JSON 输出环境变量 |
+| --- | --- |
+| `message-service` | `NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_OUTPUT` |
+| `delivery-service` | `NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_OUTPUT` |
+| `receipt-service` | `NEXUSIM_RECEIPT_OUTBOX_REPAIR_CLEANUP_OUTPUT` |
+| `contacts-service` | `NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_OUTPUT` |
+| `policy-service` | `NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OUTPUT` |
+
 ## Delivery Projection
 
 `delivery-service` 额外拥有 projection 排障入口：

@@ -440,8 +440,9 @@ func runOutboxRepairCleanup() error {
 		return err
 	}
 	cutoff := time.Now().UTC().Add(-config.Retention)
+	outboxID := outboxRepairCleanupOutboxID()
 	stats, err := postgresinfra.NewOutboxStore(pool).CleanupOutboxRepairs(ctx, postgresinfra.OutboxRepairCleanupOptions{
-		OutboxID:       outboxRepairCleanupOutboxID(),
+		OutboxID:       outboxID,
 		EventID:        envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_EVENT_ID", ""),
 		TenantID:       envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_TENANT_ID", ""),
 		ConversationID: envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_CONVERSATION_ID", ""),
@@ -460,6 +461,21 @@ func runOutboxRepairCleanup() error {
 		config.Retention,
 		config.BatchSize,
 	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_OUTPUT")); outputPath != "" {
+		filters := map[string]string{
+			"event_id":        envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_EVENT_ID", ""),
+			"tenant_id":       envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_TENANT_ID", ""),
+			"conversation_id": envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_CONVERSATION_ID", ""),
+			"mode":            envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_MODE", ""),
+			"outcome":         envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_OUTCOME", ""),
+		}
+		if outboxID != nil {
+			filters["outbox_id"] = strconv.FormatInt(*outboxID, 10)
+		}
+		if err := writeOutboxRepairCleanupOutput(outputPath, stats, cutoff, config.Retention, config.BatchSize, filters); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

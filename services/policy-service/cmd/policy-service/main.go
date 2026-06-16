@@ -275,12 +275,13 @@ func runOutboxRepairCleanup() error {
 	}
 	defer pool.Close()
 
+	cutoff := time.Now().UTC().Add(-config.Retention)
 	stats, err := postgresinfra.NewOutboxStore(pool).CleanupOutboxRepairs(ctx, postgresinfra.OutboxRepairCleanupOptions{
 		EventID:  envString("NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_EVENT_ID", ""),
 		TenantID: envString("NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_TENANT_ID", ""),
 		Operator: envString("NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OPERATOR", ""),
 		Outcome:  envString("NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OUTCOME", ""),
-		Cutoff:   time.Now().UTC().Add(-config.Retention),
+		Cutoff:   cutoff,
 		Limit:    config.BatchSize,
 	})
 	if err != nil {
@@ -292,6 +293,16 @@ func runOutboxRepairCleanup() error {
 		config.Retention,
 		config.BatchSize,
 	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OUTPUT")); outputPath != "" {
+		if err := writeOutboxRepairCleanupOutput(outputPath, stats, cutoff, config.Retention, config.BatchSize, map[string]string{
+			"event_id":  envString("NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_EVENT_ID", ""),
+			"tenant_id": envString("NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_TENANT_ID", ""),
+			"operator":  envString("NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OPERATOR", ""),
+			"outcome":   envString("NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OUTCOME", ""),
+		}); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

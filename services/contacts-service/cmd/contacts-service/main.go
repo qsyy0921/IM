@@ -356,6 +356,14 @@ func runOutboxRepairCleanup() error {
 		config.Retention,
 		config.BatchSize,
 	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_OUTPUT")); outputPath != "" {
+		if err := writeOutboxRepairCleanupOutput(outputPath, stats, cutoff, config.Retention, config.BatchSize, map[string]string{
+			"event_id":  envString("NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_EVENT_ID", ""),
+			"tenant_id": envString("NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_TENANT_ID", ""),
+		}); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

@@ -23,7 +23,7 @@
    现有 public listener、mock auth、metadata auth、verified metadata、TLS / mTLS allowlist 已纳入 `tools/check-local.ps1`；后续新增 listener / 服务时必须同步门禁和服务级测试。
 
 5. 容量和复杂度治理：
-   已有 9 服务健康态 Docker resource snapshot 入口、摘要工具、文件大小 hotspot summary；9 个服务均已有可复用 `capacity_summary` 口径，其中 api-gateway 通过 `loadtest/demo --gateway-facade` 统计 GatewayService facade 端到端容量，其余服务通过对应 loadtest runner 统计；`tools/summarize-loadtest-capacity-baselines.ps1` 可从 H 盘原始结果聚合容量基线索引，`tools/run-loadtest-capacity-baseline-suite.ps1` 可 dry-run / 顺序执行 direct 短基线，并会把需要额外 relay/consumer 角色的 runner 标记为 `skipped_stack_required`、把需要预置业务数据的 runner 标记为 `skipped_seed_required`；`deploy/local/docker-compose.service-workers.yml` 已提供本地后台 relay / consumer overlay；`loadtest/capacityseed` 已提供 message / conversation / delivery seeded runner 的本地 fixture 准备入口，且三条 seeded 短基线已跑通；contacts stack 短基线已通过 contacts outbox relay 和 `im.contact.events` Kafka readback；identity stack 短基线已通过临时 webhook fixture 和 challenge-delivery-worker；receipt stack 短基线已通过 message / delivery / receipt relay-consumer 链路和 receipt Kafka readback；api-gateway stack 短基线已通过 secure mTLS + HMAC GatewayService facade、push WebSocket、delivery / receipt / policy Kafka readback 链路；push-gateway stack 短基线已通过 full 场景在线 notify / PullInbox / ACK / delivery_outbox 链路。仍需完成剩余服务容量基线实跑、长时间瓶颈和资源曲线。生产手写文件接近 2500 行、测试或 runner 接近 3000 行时继续同 package 拆分。
+   已有 9 服务健康态 Docker resource snapshot 入口、摘要工具、文件大小 hotspot summary；9 个服务均已有可复用 `capacity_summary` 口径，其中 api-gateway 通过 `loadtest/demo --gateway-facade` 统计 GatewayService facade 端到端容量，其余服务通过对应 loadtest runner 统计；`tools/summarize-loadtest-capacity-baselines.ps1` 可从 H 盘原始结果聚合容量基线索引，`tools/run-loadtest-capacity-baseline-suite.ps1` 可 dry-run / 顺序执行 direct 短基线，并会把需要额外 relay/consumer 角色的 runner 标记为 `skipped_stack_required`、把需要预置业务数据的 runner 标记为 `skipped_seed_required`；`deploy/local/docker-compose.service-workers.yml` 已提供本地后台 relay / consumer overlay；`loadtest/capacityseed` 已提供 message / conversation / delivery seeded runner 的本地 fixture 准备入口，且三条 seeded 短基线已跑通；contacts stack 短基线已通过 contacts outbox relay 和 `im.contact.events` Kafka readback；identity stack 短基线已通过临时 webhook fixture 和 challenge-delivery-worker；receipt stack 短基线已通过 message / delivery / receipt relay-consumer 链路和 receipt Kafka readback；api-gateway stack 短基线已通过 secure mTLS + HMAC GatewayService facade、push WebSocket、delivery / receipt / policy Kafka readback 链路；push-gateway stack 短基线已通过 full 场景在线 notify / PullInbox / ACK / delivery_outbox 链路；policy-service 已有本地 direct 短基线。9 个服务的短基线证据已覆盖，后续仍需长时间瓶颈、资源曲线和生产 sizing。生产手写文件接近 2500 行、测试或 runner 接近 3000 行时继续同 package 拆分。
 
 ## 逐服务未完成工作
 
@@ -31,9 +31,9 @@
 | --- | --- |
 | `api-gateway` | 目标环境 legacy quiet-window observation；legacy descriptor 移除计划；完整配置中心 / DB-backed quota hardening；生产级 collector / alerting / dashboard；长时间容量曲线和生产 sizing。 |
 | `identity-service` | WebAuthn/passkeys；OIDC；多 issuer；KMS/HSM；完整风控；生产级 email/SMS provider；租户级通知模板；bounce handling；长时间容量曲线和生产 sizing。 |
-| `message-service` | 会话级删除策略深化；合规删除；基于 `capacity_summary` 的容量基线实跑；发送链路生产观测；图片 / 文件 / 语音二进制上传处理后续由 media 能力承担。 |
-| `conversation-service` | 更完整群管理；owner transfer 策略继续打磨；成员窗口历史 repair / repair action；基于 `capacity_summary` 的容量基线实跑。 |
-| `delivery-service` | Projection DLQ / repair 深化；更多 delivery event 消费方；隐藏项跨设备提示；基于 `capacity_summary` 的容量基线实跑。 |
+| `message-service` | 会话级删除策略深化；合规删除；发送链路生产观测；长时间容量曲线和生产 sizing；图片 / 文件 / 语音二进制上传处理后续由 media 能力承担。 |
+| `conversation-service` | 更完整群管理；owner transfer 策略继续打磨；成员窗口历史 repair / repair action；长时间容量曲线和生产 sizing。 |
+| `delivery-service` | Projection DLQ / repair 深化；更多 delivery event 消费方；隐藏项跨设备提示；长时间容量曲线和生产 sizing。 |
 | `push-gateway` | 跨实例 resume 强化；Redis Cluster / 生产级 HA 设计；长时间容量曲线和生产 sizing。 |
 | `receipt-service` | 送达回执扩展；会话列表更多产品化能力（草稿、标签、更多摘要策略等）；长时间容量曲线和生产 sizing。 |
 | `contacts-service` | 更细 profile；陌生人申请的组织 / 风险 / 审批策略；租户默认值和来源策略后续接入 admin/config service 正式权限面；长时间容量曲线和生产 sizing。 |

@@ -31,7 +31,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "push-device-1", "online receiver device id")
 	var receiverDeviceIDs string
 	flag.StringVar(&receiverDeviceIDs, "receiver-device-ids", "", "comma separated online receiver device ids; overrides receiver-device-id when set")
-	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, message-change-notify, resume-replay, redis-resume-negative, cross-instance-resume, slow-client, redis-fault, redis-sentinel-failover, redis-sentinel-master-stop, redis-sentinel-quorum-loss, redis-sentinel-network-partition, or identity-revoke")
+	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, message-change-notify, resume-replay, redis-resume-negative, cross-instance-resume, slow-client, redis-fault, redis-cluster-node-stop, redis-sentinel-failover, redis-sentinel-master-stop, redis-sentinel-quorum-loss, redis-sentinel-network-partition, or identity-revoke")
 	flag.IntVar(&cfg.slowMessageCount, "slow-message-count", 128, "number of messages sent while slow client does not read")
 	flag.StringVar(&cfg.messageChangeAction, "message-change-action", "edit", "message-change-notify action: edit, revoke, or delete")
 	flag.StringVar(&cfg.pushMetricsURL, "push-metrics-url", "", "push-gateway debug metrics URL")

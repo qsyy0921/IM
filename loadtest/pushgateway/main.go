@@ -185,6 +185,8 @@ func run(cfg config) error {
 		return runSlowClientScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "redis-fault":
 		return runRedisFaultScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
+	case "redis-cluster-node-stop":
+		return runRedisFaultScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "identity-revoke":
 		return runIdentityRevokeScenario(ctx, cfg, &result)
 	default:

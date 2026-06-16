@@ -10,7 +10,7 @@
     [string]$TenantId = "",
     [string]$ConversationId = "",
     [string]$ReceiverDeviceIds = "push-device-1",
-    [ValidateSet("full", "message-change-notify", "resume-replay", "redis-resume-negative", "cross-instance-resume", "slow-client", "redis-fault", "redis-sentinel-failover", "redis-sentinel-master-stop", "redis-sentinel-quorum-loss", "redis-sentinel-network-partition", "identity-revoke")]
+    [ValidateSet("full", "message-change-notify", "resume-replay", "redis-resume-negative", "cross-instance-resume", "slow-client", "redis-fault", "redis-cluster-node-stop", "redis-sentinel-failover", "redis-sentinel-master-stop", "redis-sentinel-quorum-loss", "redis-sentinel-network-partition", "identity-revoke")]
     [string]$Scenario = "full",
     [ValidateSet("edit", "revoke", "delete")]
     [string]$MessageChangeAction = "edit",
@@ -120,6 +120,20 @@ if ($Scenario -eq "redis-fault" -and -not $RedisFaultCommand) {
 if ($Scenario -eq "redis-fault" -and -not $RedisRestoreCommand) {
     $RedisRestoreCommand = "docker start nexusim-redis | Out-Null"
 }
+if ($Scenario -eq "redis-cluster-node-stop") {
+    if ($RouteBackend -ne "redis") {
+        throw "redis-cluster-node-stop requires -RouteBackend redis"
+    }
+    if ($RedisMode -ne "cluster") {
+        throw "redis-cluster-node-stop requires -RedisMode cluster"
+    }
+    if (-not $RedisFaultCommand) {
+        throw "redis-cluster-node-stop requires -RedisFaultCommand"
+    }
+    if (-not $RedisRestoreCommand) {
+        throw "redis-cluster-node-stop requires -RedisRestoreCommand"
+    }
+}
 $runnerRequestTimeout = "3s"
 if ($Scenario -eq "redis-sentinel-failover") {
     $runnerRequestTimeout = "60s"
@@ -132,6 +146,9 @@ if ($Scenario -eq "redis-sentinel-quorum-loss") {
 }
 if ($Scenario -eq "redis-sentinel-network-partition") {
     $runnerRequestTimeout = "90s"
+}
+if ($Scenario -eq "redis-cluster-node-stop") {
+    $runnerRequestTimeout = "30s"
 }
 $userFacingAuthMode = if ($VerifiedAuthMetadata) { "metadata" } else { "body" }
 
@@ -820,6 +837,9 @@ try {
         Invoke-Expression $RedisRestoreCommand
     }
     if ($Scenario -eq "redis-sentinel-network-partition" -and $RedisRestoreCommand) {
+        Invoke-Expression $RedisRestoreCommand
+    }
+    if ($Scenario -eq "redis-cluster-node-stop" -and $RedisRestoreCommand) {
         Invoke-Expression $RedisRestoreCommand
     }
 }

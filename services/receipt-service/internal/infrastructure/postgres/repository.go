@@ -255,7 +255,7 @@ ORDER BY user_id ASC
 	if len(receivers) == 0 {
 		return types.GetReceiptStateResult{}, types.NewReceiptNotFound("receipt state not found")
 	}
-	return types.GetReceiptStateResult{
+	result := types.GetReceiptStateResult{
 		ConversationID:    command.ConversationID,
 		ConversationSeq:   conversationSeq,
 		MessageID:         messageID,
@@ -263,7 +263,19 @@ ORDER BY user_id ASC
 		ReadUserCount:     readCount,
 		VisibilityMode:    types.ReceiptVisibilityDetailed,
 		Receivers:         receivers,
-	}, nil
+	}
+	if command.IncludeReceivedDevices {
+		if err := repository.attachReceivedDeviceDetails(
+			ctx,
+			command.AuthContext.TenantID,
+			command.ConversationID,
+			[]*types.GetReceiptStateResult{&result},
+			command.ReceivedDeviceLimit(),
+		); err != nil {
+			return types.GetReceiptStateResult{}, err
+		}
+	}
+	return result, nil
 }
 
 func (repository *Repository) ListReceiptStates(
@@ -410,7 +422,118 @@ ORDER BY resolved.ord ASC, message_receipt_states.user_id ASC
 			return types.ListReceiptStatesResult{}, types.NewReceiptNotFound("receipt state not found")
 		}
 	}
+	if command.IncludeReceivedDevices {
+		itemRefs := make([]*types.GetReceiptStateResult, 0, len(items))
+		for index := range items {
+			itemRefs = append(itemRefs, &items[index])
+		}
+		if err := repository.attachReceivedDeviceDetails(
+			ctx,
+			command.AuthContext.TenantID,
+			command.ConversationID,
+			itemRefs,
+			command.ReceivedDeviceLimit(),
+		); err != nil {
+			return types.ListReceiptStatesResult{}, err
+		}
+	}
 	return types.ListReceiptStatesResult{Items: items}, nil
+}
+
+func (repository *Repository) attachReceivedDeviceDetails(
+	ctx context.Context,
+	tenantID types.TenantID,
+	conversationID types.ConversationID,
+	items []*types.GetReceiptStateResult,
+	limit int,
+) error {
+	if limit <= 0 {
+		return nil
+	}
+	args := []any{tenantID, conversationID, limit}
+	valueClauses := make([]string, 0)
+	receiverIndex := make(map[string]*types.ReceiptUserState)
+	for itemIndex, item := range items {
+		for receiverIndexInItem := range item.Receivers {
+			receiver := &item.Receivers[receiverIndexInItem]
+			if receiver.ReceivedDeviceCount == 0 {
+				continue
+			}
+			args = append(args, string(receiver.UserID), item.ConversationSeq)
+			valueClauses = append(
+				valueClauses,
+				fmt.Sprintf("(%d, $%d::text, $%d::bigint)", itemIndex, len(args)-1, len(args)),
+			)
+			receiverIndex[receivedDeviceDetailKey(itemIndex, receiver.UserID)] = receiver
+		}
+	}
+	if len(valueClauses) == 0 {
+		return nil
+	}
+	query := fmt.Sprintf(`
+WITH requested(ord, user_id, conversation_seq) AS (
+    VALUES %s
+),
+ranked AS (
+    SELECT
+        requested.ord,
+        requested.user_id,
+        device_received_cursors.device_id,
+        device_received_cursors.last_received_seq,
+        device_received_cursors.updated_at,
+        ROW_NUMBER() OVER (
+            PARTITION BY requested.ord, requested.user_id
+            ORDER BY device_received_cursors.last_received_seq DESC,
+                     device_received_cursors.updated_at DESC,
+                     device_received_cursors.device_id ASC
+        ) AS row_number
+    FROM requested
+    JOIN device_received_cursors
+      ON device_received_cursors.tenant_id = $1
+     AND device_received_cursors.conversation_id = $2
+     AND device_received_cursors.user_id = requested.user_id
+     AND device_received_cursors.last_received_seq >= requested.conversation_seq
+)
+SELECT ord, user_id, device_id, last_received_seq, updated_at
+FROM ranked
+WHERE row_number <= $3
+ORDER BY ord ASC, user_id ASC, row_number ASC
+`, strings.Join(valueClauses, ",\n    "))
+	rows, err := repository.pool.Query(ctx, query, args...)
+	if err != nil {
+		return types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var ord int
+		var userID types.UserID
+		var detail types.ReceivedDeviceState
+		if err := rows.Scan(
+			&ord,
+			&userID,
+			&detail.DeviceID,
+			&detail.LastReceivedSeq,
+			&detail.UpdatedAt,
+		); err != nil {
+			return types.NewDBReadFailed(err.Error())
+		}
+		receiver := receiverIndex[receivedDeviceDetailKey(ord, userID)]
+		if receiver == nil {
+			return types.NewDBReadFailed("receipt received device detail ordinal out of range")
+		}
+		receiver.ReceivedDevices = append(receiver.ReceivedDevices, detail)
+	}
+	if err := rows.Err(); err != nil {
+		return types.NewDBReadFailed(err.Error())
+	}
+	for _, receiver := range receiverIndex {
+		receiver.ReceivedDevicesTruncated = receiver.ReceivedDeviceCount > len(receiver.ReceivedDevices)
+	}
+	return nil
+}
+
+func receivedDeviceDetailKey(itemIndex int, userID types.UserID) string {
+	return fmt.Sprintf("%d\x1f%s", itemIndex, userID)
 }
 
 func (repository *Repository) ListConversations(

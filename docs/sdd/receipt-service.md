@@ -1,6 +1,6 @@
 # NexusIM receipt-service SDD v0.1 Draft
 
-状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务、`ListReceiptStates` repository 级批量查询、低敏 `received_device_count` 聚合、receipt outbox relay、只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit`、`outbox-repair-cleanup` operator、最小 `ListConversations`、`unread_only` / `pinned_only` / `muted_only` 会话列表过滤、`UPDATED_AT` / `PINNED_UPDATED_AT` / `UNREAD_UPDATED_AT` 会话列表排序、Archive / Pin / Mute 用户列表偏好、第一阶段 gRPC server TLS / mTLS 配置、`/healthz` / `/readyz` / `/debug/metrics` 低敏观测入口、first-stage OpenTelemetry gRPC server span，以及 receipt / demo smoke runner 的 delivery / receipt client TLS 配置已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events` 和会话列表偏好链路。
+状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务、`GetReceiptState` / `ListReceiptStates` repository 级查询、低敏 `received_device_count` 聚合、显式 opt-in / capped 的 received device 明细、receipt outbox relay、只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit`、`outbox-repair-cleanup` operator、最小 `ListConversations`、`unread_only` / `pinned_only` / `muted_only` 会话列表过滤、`UPDATED_AT` / `PINNED_UPDATED_AT` / `UNREAD_UPDATED_AT` 会话列表排序、Archive / Pin / Mute 用户列表偏好、第一阶段 gRPC server TLS / mTLS 配置、`/healthz` / `/readyz` / `/debug/metrics` 低敏观测入口、first-stage OpenTelemetry gRPC server span，以及 receipt / demo smoke runner 的 delivery / receipt client TLS 配置已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events` 和会话列表偏好链路。
 
 本文定义 `receipt-service` 的第一条可编码切片：基于 `delivery-service` 已经产生的 durable delivery 事件，构建消息送达 / 已读回执 read model，并提供最小查询和 `MarkRead` 写入入口。
 
@@ -132,7 +132,7 @@ delivery.ack.recorded.v1
 -> message_receipt_states.received
 ```
 
-第一阶段 `received` 是“至少一个设备已 ACK 到该 seq”。`GetReceiptState` / `ListReceiptStates` 可以返回低敏 `received_device_count`，表示该用户已 ACK 到该 message seq 的设备数量；普通 API 不返回 device_id 明细。如果后续产品要求“所有在线设备均收到”或“每设备送达状态明细”，需要扩展查询模型和隐私策略，但不能改变第一阶段事件含义。
+第一阶段 `received` 是“至少一个设备已 ACK 到该 seq”。`GetReceiptState` / `ListReceiptStates` 默认只返回低敏 `received_device_count`，表示该用户已 ACK 到该 message seq 的设备数量。调用方显式设置 `include_received_devices=true` 时，API 可以返回 capped `received_devices[]`，每个元素只包含 `device_id`、`last_received_seq` 和 cursor `updated_at_unix_ms`；单个 receiver 默认最多 10 条、最大 50 条，超过时通过 `received_devices_truncated=true` 告知调用方。该明细用于小群 / 自有客户端排障和产品展示，不等同“所有在线设备均收到”的强保证，也不改变第一阶段 received 事件含义。
 
 ### 5.2 已读 / read
 
@@ -209,6 +209,8 @@ auth_context
 conversation_id
 message_id
 conversation_seq
+include_received_devices
+received_device_limit
 ```
 
 `GetReceiptStateResponse`：
@@ -226,6 +228,13 @@ receivers[] {
   received_at_unix_ms
   read_seq
   read_at_unix_ms
+  received_device_count
+  received_devices[] {
+    device_id
+    last_received_seq
+    updated_at_unix_ms
+  }
+  received_devices_truncated
 }
 ```
 
@@ -238,6 +247,8 @@ items[] {
   message_id
   conversation_seq
 }
+include_received_devices
+received_device_limit
 ```
 
 规则：
@@ -245,6 +256,7 @@ items[] {
 - 每个 item 必须且只能提供 `message_id` 或 `conversation_seq`。
 - 第一阶段最多 50 个 item，响应顺序必须与请求顺序一致。
 - `ListReceiptStates` 只做同一会话内薄批量查询：app 层只调用一次 `ReceiptAccessPort.CanViewReceiptState`，repository 用单次批量 SQL 按请求顺序读取 receipt read model；不跨服务读内部表、不新增公共抽象。
+- `include_received_devices` 默认关闭；开启时 `received_device_limit=0` 表示默认 10，最大 50。返回明细可能被截断，完整数量仍以 `received_device_count` 为准。
 - 第一阶段采用 whole-request failure：任一 item 参数错误、无权限、projection lag、not found 或 DB 读取失败，整个 RPC 返回现有稳定错误码；不做 item 级 error 协议。若未来需要部分成功，必须先扩展 proto 契约。
 
 `ListConversationsRequest`：
@@ -459,7 +471,7 @@ SendMessage
 ## 10. 当前不做
 
 - 不做群已读完整 UI。
-- 不做每设备细粒度展示。
+- 不做默认 / 无上限 / 强一致的每设备细粒度展示；received device 明细必须显式 opt-in 且受 limit 限制。
 - 不做大规模 receipt fanout 压测。
 - 不做跨租户聚合报表。
 - 不做 RAG / Agent 读取 receipt 状态。

@@ -3,7 +3,7 @@
 ## 当前状态
 
 - 已有 `MarkRead`、`GetReceiptState`、`ListReceiptStates`、`ListConversations`。
-- `GetReceiptState` / `ListReceiptStates` 已暴露低敏 `received_device_count` 聚合：按用户统计已 ACK 到该 message seq 的设备数，不返回 device_id 明细。
+- `GetReceiptState` / `ListReceiptStates` 已暴露低敏 `received_device_count` 聚合：按用户统计已 ACK 到该 message seq 的设备数；默认不返回 device_id 明细，显式 `include_received_devices` 时才返回 capped `received_devices[]` 和 `received_devices_truncated`，用于小群 / 自有客户端排障和产品展示。
 - `ListReceiptStates` 已从应用层逐条循环查询收敛为 repository 级批量查询，单次最多 50 个 item，保持输入顺序和原有 not-found 语义。
 - 已支持 unread、pinned、muted 过滤，`UPDATED_AT` / `PINNED_UPDATED_AT` / `UNREAD_UPDATED_AT` 排序，以及 archive / pin / mute 的最小会话列表能力；分页 cursor 会绑定 sort / archived / unread / pinned / muted 过滤条件和排序边界，避免串页。
 - 复用 delivery events 和 receipt projection，不跨服务读 delivery 内部表。
@@ -22,4 +22,4 @@
 
 ## 后续
 
-- 更细设备明细展示策略、会话列表更多产品化能力（草稿、标签、更多摘要策略等）、长时间容量曲线；生产级 OTel collector、Alertmanager、SLO dashboard 和容量验证仍属于后续统一观测治理。
+- 会话列表更多产品化能力（草稿、标签、更多摘要策略等）、长时间容量曲线；生产级 OTel collector、Alertmanager、SLO dashboard 和容量验证仍属于后续统一观测治理。

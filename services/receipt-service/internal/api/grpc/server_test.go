@@ -272,7 +272,55 @@ func TestListConversationsMapsResponse(t *testing.T) {
 	}
 }
 
+func TestGetReceiptStateMapsReceivedDeviceDetails(t *testing.T) {
+	updatedAt := time.Date(2026, 6, 10, 12, 30, 0, 0, time.UTC)
+	get := &fakeGetReceiptStateCapture{
+		result: types.GetReceiptStateResult{
+			ConversationID:    "conversation-1",
+			ConversationSeq:   11,
+			MessageID:         "message-11",
+			ReceivedUserCount: 1,
+			VisibilityMode:    types.ReceiptVisibilityDetailed,
+			Receivers: []types.ReceiptUserState{{
+				UserID:                   "user-2",
+				ReceivedSeq:              11,
+				ReceivedDeviceCount:      2,
+				ReceivedDevicesTruncated: true,
+				ReceivedDevices: []types.ReceivedDeviceState{{
+					DeviceID:        "device-2",
+					LastReceivedSeq: 12,
+					UpdatedAt:       updatedAt,
+				}},
+			}},
+		},
+	}
+	server := NewServer(fakeMarkRead{}, get, fakeListReceiptStates{}, fakeListConversations{}, fakeArchiveConversation{}, fakePinConversation{}, fakeMuteConversation{})
+	response, err := server.GetReceiptState(context.Background(), &receiptv1.GetReceiptStateRequest{
+		AuthContext:            &receiptv1.AuthContext{TenantId: "tenant-1", UserId: "user-1", DeviceId: "device-1"},
+		ConversationId:         "conversation-1",
+		MessageId:              "message-11",
+		IncludeReceivedDevices: true,
+		ReceivedDeviceLimit:    1,
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if !get.command.IncludeReceivedDevices || get.command.ReceivedDeviceLimitHint != 1 {
+		t.Fatalf("unexpected get command: %+v", get.command)
+	}
+	receiver := response.GetReceivers()[0]
+	if receiver.GetReceivedDeviceCount() != 2 ||
+		!receiver.GetReceivedDevicesTruncated() ||
+		len(receiver.GetReceivedDevices()) != 1 ||
+		receiver.GetReceivedDevices()[0].GetDeviceId() != "device-2" ||
+		receiver.GetReceivedDevices()[0].GetLastReceivedSeq() != 12 ||
+		receiver.GetReceivedDevices()[0].GetUpdatedAtUnixMs() != updatedAt.UnixMilli() {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+}
+
 func TestListReceiptStatesMapsRequestAndResponse(t *testing.T) {
+	updatedAt := time.Date(2026, 6, 10, 12, 30, 0, 0, time.UTC)
 	list := &fakeListReceiptStatesCapture{
 		result: types.ListReceiptStatesResult{
 			Items: []types.GetReceiptStateResult{{
@@ -287,6 +335,11 @@ func TestListReceiptStatesMapsRequestAndResponse(t *testing.T) {
 					ReceivedSeq:         11,
 					ReadSeq:             11,
 					ReceivedDeviceCount: 2,
+					ReceivedDevices: []types.ReceivedDeviceState{{
+						DeviceID:        "device-2",
+						LastReceivedSeq: 12,
+						UpdatedAt:       updatedAt,
+					}},
 				}},
 			}},
 		},
@@ -299,6 +352,8 @@ func TestListReceiptStatesMapsRequestAndResponse(t *testing.T) {
 			{MessageId: "message-11"},
 			{ConversationSeq: 12},
 		},
+		IncludeReceivedDevices: true,
+		ReceivedDeviceLimit:    5,
 	})
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
@@ -306,13 +361,16 @@ func TestListReceiptStatesMapsRequestAndResponse(t *testing.T) {
 	if list.command.ConversationID != "conversation-1" ||
 		len(list.command.Items) != 2 ||
 		list.command.Items[0].MessageID != "message-11" ||
-		list.command.Items[1].ConversationSeq != 12 {
+		list.command.Items[1].ConversationSeq != 12 ||
+		!list.command.IncludeReceivedDevices ||
+		list.command.ReceivedDeviceLimitHint != 5 {
 		t.Fatalf("unexpected command: %+v", list.command)
 	}
 	if len(response.GetItems()) != 1 ||
 		response.GetItems()[0].GetConversationSeq() != 11 ||
 		response.GetItems()[0].GetReadUserCount() != 1 ||
-		response.GetItems()[0].GetReceivers()[0].GetReceivedDeviceCount() != 2 {
+		response.GetItems()[0].GetReceivers()[0].GetReceivedDeviceCount() != 2 ||
+		response.GetItems()[0].GetReceivers()[0].GetReceivedDevices()[0].GetDeviceId() != "device-2" {
 		t.Fatalf("unexpected response: %+v", response)
 	}
 }

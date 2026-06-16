@@ -8,6 +8,11 @@ const (
 	ReceiptVisibilityHidden    = "HIDDEN"
 )
 
+const (
+	DefaultReceivedDeviceDetailLimit = 10
+	MaxReceivedDeviceDetailLimit     = 50
+)
+
 type MarkReadCommand struct {
 	AuthContext    AuthContext
 	AccessContext  ReceiptAccessContext
@@ -36,11 +41,13 @@ type MarkReadResult struct {
 }
 
 type GetReceiptStateCommand struct {
-	AuthContext     AuthContext
-	AccessContext   ReceiptAccessContext
-	ConversationID  ConversationID
-	MessageID       string
-	ConversationSeq int64
+	AuthContext             AuthContext
+	AccessContext           ReceiptAccessContext
+	ConversationID          ConversationID
+	MessageID               string
+	ConversationSeq         int64
+	IncludeReceivedDevices  bool
+	ReceivedDeviceLimitHint int
 }
 
 func (command GetReceiptStateCommand) Validate() error {
@@ -55,16 +62,31 @@ func (command GetReceiptStateCommand) Validate() error {
 	if hasMessageID == hasSeq {
 		return NewInvalidArgument("exactly one of message_id or conversation_seq is required")
 	}
+	if err := validateReceivedDeviceDetailLimit(command.IncludeReceivedDevices, command.ReceivedDeviceLimitHint); err != nil {
+		return err
+	}
 	return nil
 }
 
+func (command GetReceiptStateCommand) ReceivedDeviceLimit() int {
+	return normalizeReceivedDeviceDetailLimit(command.IncludeReceivedDevices, command.ReceivedDeviceLimitHint)
+}
+
 type ReceiptUserState struct {
-	UserID              UserID
-	ReceivedSeq         int64
-	ReceivedAt          time.Time
-	ReadSeq             int64
-	ReadAt              time.Time
-	ReceivedDeviceCount int
+	UserID                   UserID
+	ReceivedSeq              int64
+	ReceivedAt               time.Time
+	ReadSeq                  int64
+	ReadAt                   time.Time
+	ReceivedDeviceCount      int
+	ReceivedDevices          []ReceivedDeviceState
+	ReceivedDevicesTruncated bool
+}
+
+type ReceivedDeviceState struct {
+	DeviceID        string
+	LastReceivedSeq int64
+	UpdatedAt       time.Time
 }
 
 type GetReceiptStateResult struct {
@@ -92,10 +114,12 @@ func (query ReceiptStateQuery) Validate() error {
 }
 
 type ListReceiptStatesCommand struct {
-	AuthContext    AuthContext
-	AccessContext  ReceiptAccessContext
-	ConversationID ConversationID
-	Items          []ReceiptStateQuery
+	AuthContext             AuthContext
+	AccessContext           ReceiptAccessContext
+	ConversationID          ConversationID
+	Items                   []ReceiptStateQuery
+	IncludeReceivedDevices  bool
+	ReceivedDeviceLimitHint int
 }
 
 func (command ListReceiptStatesCommand) Validate() error {
@@ -116,11 +140,41 @@ func (command ListReceiptStatesCommand) Validate() error {
 			return err
 		}
 	}
+	if err := validateReceivedDeviceDetailLimit(command.IncludeReceivedDevices, command.ReceivedDeviceLimitHint); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (command ListReceiptStatesCommand) ReceivedDeviceLimit() int {
+	return normalizeReceivedDeviceDetailLimit(command.IncludeReceivedDevices, command.ReceivedDeviceLimitHint)
 }
 
 type ListReceiptStatesResult struct {
 	Items []GetReceiptStateResult
+}
+
+func validateReceivedDeviceDetailLimit(include bool, limit int) error {
+	if limit < 0 {
+		return NewInvalidArgument("received_device_limit must be non-negative")
+	}
+	if !include && limit > 0 {
+		return NewInvalidArgument("received_device_limit requires include_received_devices")
+	}
+	if include && limit > MaxReceivedDeviceDetailLimit {
+		return NewInvalidArgument("received_device_limit exceeds max")
+	}
+	return nil
+}
+
+func normalizeReceivedDeviceDetailLimit(include bool, limit int) int {
+	if !include {
+		return 0
+	}
+	if limit == 0 {
+		return DefaultReceivedDeviceDetailLimit
+	}
+	return limit
 }
 
 type ReceiptAccessContext struct {

@@ -150,17 +150,37 @@ func TestRepositoryReceiptStateCountsReceivedDevicesIntegration(t *testing.T) {
 	if state.Receivers[0].ReceivedDeviceCount != 2 {
 		t.Fatalf("expected received_device_count=2, got %+v", state.Receivers[0])
 	}
+	if len(state.Receivers[0].ReceivedDevices) != 0 || state.Receivers[0].ReceivedDevicesTruncated {
+		t.Fatalf("expected default receipt state to hide device details, got %+v", state.Receivers[0])
+	}
+
+	detailedCommand := getStateCommandBySeq(1)
+	detailedCommand.IncludeReceivedDevices = true
+	detailedCommand.ReceivedDeviceLimitHint = 2
+	detailed, err := repository.GetReceiptState(ctx, detailedCommand)
+	if err != nil {
+		t.Fatalf("get detailed receipt state: %v", err)
+	}
+	assertReceivedDeviceIDs(t, detailed.Receivers[0], "device-1", "device-2")
+	if detailed.Receivers[0].ReceivedDevicesTruncated {
+		t.Fatalf("did not expect detailed device list to be truncated: %+v", detailed.Receivers[0])
+	}
 
 	batch, err := repository.ListReceiptStates(ctx, types.ListReceiptStatesCommand{
-		AuthContext:    getStateCommandBySeq(1).AuthContext,
-		ConversationID: "conv-receipt",
-		Items:          []types.ReceiptStateQuery{{ConversationSeq: 1}},
+		AuthContext:             getStateCommandBySeq(1).AuthContext,
+		ConversationID:          "conv-receipt",
+		Items:                   []types.ReceiptStateQuery{{ConversationSeq: 1}},
+		IncludeReceivedDevices:  true,
+		ReceivedDeviceLimitHint: 1,
 	})
 	if err != nil {
 		t.Fatalf("list receipt states: %v", err)
 	}
 	if batch.Items[0].Receivers[0].ReceivedDeviceCount != 2 {
 		t.Fatalf("expected batch received_device_count=2, got %+v", batch.Items[0].Receivers[0])
+	}
+	if len(batch.Items[0].Receivers[0].ReceivedDevices) != 1 || !batch.Items[0].Receivers[0].ReceivedDevicesTruncated {
+		t.Fatalf("expected batch device details to be limited and truncated, got %+v", batch.Items[0].Receivers[0])
 	}
 }
 
@@ -1057,6 +1077,25 @@ WHERE tenant_id = 'tenant-receipt'
 	}
 	if got != want {
 		t.Fatalf("expected %d receipt states, got %d", want, got)
+	}
+}
+
+func assertReceivedDeviceIDs(t *testing.T, receiver types.ReceiptUserState, want ...string) {
+	t.Helper()
+	if len(receiver.ReceivedDevices) != len(want) {
+		t.Fatalf("expected %d received device details, got %d: %+v", len(want), len(receiver.ReceivedDevices), receiver)
+	}
+	got := make(map[string]bool, len(receiver.ReceivedDevices))
+	for _, device := range receiver.ReceivedDevices {
+		if device.DeviceID == "" || device.LastReceivedSeq == 0 || device.UpdatedAt.IsZero() {
+			t.Fatalf("unexpected empty received device detail: %+v", device)
+		}
+		got[device.DeviceID] = true
+	}
+	for _, deviceID := range want {
+		if !got[deviceID] {
+			t.Fatalf("missing received device %s in %+v", deviceID, receiver.ReceivedDevices)
+		}
 	}
 }
 

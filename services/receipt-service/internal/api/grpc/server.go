@@ -113,10 +113,12 @@ func (server *Server) GetReceiptState(
 		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
 	}
 	result, err := server.getReceiptState.Execute(ctx, types.GetReceiptStateCommand{
-		AuthContext:     auth,
-		ConversationID:  types.ConversationID(request.GetConversationId()),
-		MessageID:       request.GetMessageId(),
-		ConversationSeq: request.GetConversationSeq(),
+		AuthContext:             auth,
+		ConversationID:          types.ConversationID(request.GetConversationId()),
+		MessageID:               request.GetMessageId(),
+		ConversationSeq:         request.GetConversationSeq(),
+		IncludeReceivedDevices:  request.GetIncludeReceivedDevices(),
+		ReceivedDeviceLimitHint: int(request.GetReceivedDeviceLimit()),
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -143,9 +145,11 @@ func (server *Server) ListReceiptStates(
 		})
 	}
 	result, err := server.listReceiptStates.Execute(ctx, types.ListReceiptStatesCommand{
-		AuthContext:    auth,
-		ConversationID: types.ConversationID(request.GetConversationId()),
-		Items:          items,
+		AuthContext:             auth,
+		ConversationID:          types.ConversationID(request.GetConversationId()),
+		Items:                   items,
+		IncludeReceivedDevices:  request.GetIncludeReceivedDevices(),
+		ReceivedDeviceLimitHint: int(request.GetReceivedDeviceLimit()),
 	})
 	if err != nil {
 		return nil, grpcError(err)
@@ -162,13 +166,23 @@ func (server *Server) ListReceiptStates(
 func receiptStateResponse(result types.GetReceiptStateResult) *receiptv1.GetReceiptStateResponse {
 	receivers := make([]*receiptv1.ReceiptUserState, 0, len(result.Receivers))
 	for _, receiver := range result.Receivers {
+		devices := make([]*receiptv1.ReceivedDeviceState, 0, len(receiver.ReceivedDevices))
+		for _, device := range receiver.ReceivedDevices {
+			devices = append(devices, &receiptv1.ReceivedDeviceState{
+				DeviceId:        device.DeviceID,
+				LastReceivedSeq: device.LastReceivedSeq,
+				UpdatedAtUnixMs: device.UpdatedAt.UnixMilli(),
+			})
+		}
 		receivers = append(receivers, &receiptv1.ReceiptUserState{
-			UserId:              string(receiver.UserID),
-			ReceivedSeq:         receiver.ReceivedSeq,
-			ReceivedAtUnixMs:    receiver.ReceivedAt.UnixMilli(),
-			ReadSeq:             receiver.ReadSeq,
-			ReadAtUnixMs:        receiver.ReadAt.UnixMilli(),
-			ReceivedDeviceCount: int32(receiver.ReceivedDeviceCount),
+			UserId:                   string(receiver.UserID),
+			ReceivedSeq:              receiver.ReceivedSeq,
+			ReceivedAtUnixMs:         receiver.ReceivedAt.UnixMilli(),
+			ReadSeq:                  receiver.ReadSeq,
+			ReadAtUnixMs:             receiver.ReadAt.UnixMilli(),
+			ReceivedDeviceCount:      int32(receiver.ReceivedDeviceCount),
+			ReceivedDevices:          devices,
+			ReceivedDevicesTruncated: receiver.ReceivedDevicesTruncated,
 		})
 	}
 	return &receiptv1.GetReceiptStateResponse{

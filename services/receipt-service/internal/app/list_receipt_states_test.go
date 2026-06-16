@@ -66,6 +66,49 @@ func TestListReceiptStatesUseCaseRejectsEmptyItems(t *testing.T) {
 	}
 }
 
+func TestListReceiptStatesUseCaseRejectsInvalidReceivedDeviceDetailLimit(t *testing.T) {
+	useCase := NewListReceiptStatesUseCase(&fakeReceiptRepository{}, nil)
+	base := types.ListReceiptStatesCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			DeviceID: "device-1",
+		},
+		ConversationID: "conversation-1",
+		Items:          []types.ReceiptStateQuery{{ConversationSeq: 1}},
+	}
+	tests := []struct {
+		name    string
+		command types.ListReceiptStatesCommand
+	}{
+		{
+			name: "limit without include",
+			command: func() types.ListReceiptStatesCommand {
+				command := base
+				command.ReceivedDeviceLimitHint = 1
+				return command
+			}(),
+		},
+		{
+			name: "limit over max",
+			command: func() types.ListReceiptStatesCommand {
+				command := base
+				command.IncludeReceivedDevices = true
+				command.ReceivedDeviceLimitHint = types.MaxReceivedDeviceDetailLimit + 1
+				return command
+			}(),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := useCase.Execute(context.Background(), test.command)
+			if !errors.Is(err, types.ErrInvalidArgument) {
+				t.Fatalf("expected invalid argument, got %v", err)
+			}
+		})
+	}
+}
+
 type fakeReceiptAccess struct {
 	viewCalls  int
 	viewAccess types.ReceiptAccessContext

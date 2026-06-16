@@ -451,6 +451,11 @@ func runOutboxRepairAudit() error {
 			row.PreviousLastError,
 		)
 	}
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_MESSAGE_OUTBOX_REPAIR_AUDIT_OUTPUT")); outputPath != "" {
+		if err := writeOutboxRepairAuditOutput(outputPath, rows); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

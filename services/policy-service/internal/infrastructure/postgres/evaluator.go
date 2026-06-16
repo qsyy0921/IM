@@ -66,6 +66,14 @@ func (e MessagePolicyEvaluator) DecideMessageAction(
 		return decision, nil
 	}
 
+	decision, quotaExceeded, err := e.applyTenantActionQuota(ctx, command)
+	if err != nil {
+		return types.MessageActionDecision{}, err
+	}
+	if quotaExceeded {
+		return decision, nil
+	}
+
 	decision, found, err := e.lookupRule(ctx, command)
 	if err != nil {
 		return types.MessageActionDecision{}, err
@@ -216,6 +224,68 @@ WHERE tenant_id = $1
 	}
 	if !decision.Allowed && decision.Reason == "" {
 		decision.Reason = "policy denied"
+	}
+	return decision, true, nil
+}
+
+func (e MessagePolicyEvaluator) applyTenantActionQuota(
+	ctx context.Context,
+	command types.CheckMessageActionCommand,
+) (types.MessageActionDecision, bool, error) {
+	decision := types.MessageActionDecision{
+		TenantID:       command.AuthContext.TenantID,
+		UserID:         command.AuthContext.UserID,
+		ConversationID: command.ConversationID,
+		MessageID:      command.MessageID,
+		Action:         command.Action,
+		Allowed:        false,
+	}
+	var maxDecisions int
+	var recentAllowedDecisions int
+	err := e.pool.QueryRow(ctx, `
+SELECT
+    q.max_decisions,
+    q.permission_version,
+    q.classification,
+    q.reason,
+    (
+        SELECT COUNT(*)
+        FROM policy_decision_audit_outbox audit
+        WHERE audit.tenant_id = q.tenant_id
+          AND audit.action = q.action
+          AND audit.allowed = true
+          AND audit.created_at >= now() - (q.window_seconds * interval '1 second')
+    ) AS recent_allowed_decisions
+FROM policy_tenant_message_action_quotas q
+WHERE q.tenant_id = $1
+  AND q.action = $2
+  AND q.enabled = true
+`, command.AuthContext.TenantID, command.Action).Scan(
+		&maxDecisions,
+		&decision.PermissionVersion,
+		&decision.Classification,
+		&decision.Reason,
+		&recentAllowedDecisions,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return types.MessageActionDecision{}, false, nil
+	}
+	if isUndefinedTable(err) {
+		return types.MessageActionDecision{}, false, nil
+	}
+	if err != nil {
+		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy tenant quota lookup failed")
+	}
+	decision.Classification = strings.TrimSpace(decision.Classification)
+	decision.Reason = strings.TrimSpace(decision.Reason)
+	if maxDecisions <= 0 || decision.PermissionVersion <= 0 || decision.Classification == "" {
+		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy tenant quota is invalid")
+	}
+	if recentAllowedDecisions < maxDecisions {
+		return types.MessageActionDecision{}, false, nil
+	}
+	if decision.Reason == "" {
+		decision.Reason = "tenant quota exceeded"
 	}
 	return decision, true, nil
 }

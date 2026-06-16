@@ -42,7 +42,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("policy-service runtime wiring is idle; set NEXUSIM_POLICY_SERVICE_MODE=grpc, contact-consumer, timeline-consumer, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, or decision-audit-export")
+		log.Println("policy-service runtime wiring is idle; set NEXUSIM_POLICY_SERVICE_MODE=grpc, contact-consumer, timeline-consumer, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, decision-audit-export, tenant-quota-audit, or tenant-quota-set")
 		return nil
 	case "grpc":
 		return runGRPC()
@@ -62,6 +62,10 @@ func run() error {
 		return runOutboxRepairCleanup()
 	case "decision-audit-export":
 		return runDecisionAuditExport()
+	case "tenant-quota-audit":
+		return runTenantQuotaAudit()
+	case "tenant-quota-set":
+		return runTenantQuotaSet()
 	default:
 		return errors.New("unsupported NEXUSIM_POLICY_SERVICE_MODE")
 	}
@@ -375,6 +379,126 @@ func runDecisionAuditExport() error {
 	}
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_OUTPUT")); outputPath != "" {
 		if err := writeDecisionAuditExportOutput(outputPath, rows, filters); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runTenantQuotaAudit() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := envString("NEXUSIM_PG_DSN", "")
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required for policy tenant quota audit")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	enabled, enabledConfigured, err := envOptionalBool("NEXUSIM_POLICY_TENANT_QUOTA_AUDIT_ENABLED")
+	if err != nil {
+		return err
+	}
+	var enabledFilter *bool
+	if enabledConfigured {
+		enabledFilter = &enabled
+	}
+	rows, err := postgresinfra.NewTenantQuotaStore(pool).AuditTenantQuotas(ctx, postgresinfra.TenantQuotaAuditOptions{
+		TenantID: envString("NEXUSIM_POLICY_TENANT_QUOTA_AUDIT_TENANT_ID", ""),
+		Action:   envString("NEXUSIM_POLICY_TENANT_QUOTA_AUDIT_ACTION", ""),
+		Enabled:  enabledFilter,
+		Limit:    envInt("NEXUSIM_POLICY_TENANT_QUOTA_AUDIT_LIMIT", 20),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("policy-service tenant quota audit completed rows=%d", len(rows))
+	for _, row := range rows {
+		log.Printf(
+			"policy_tenant_quota tenant_id=%s action=%s max_decisions=%d window_seconds=%d permission_version=%d classification=%s enabled=%t source=%s updated_at=%s",
+			row.TenantID,
+			row.Action,
+			row.MaxDecisions,
+			row.WindowSeconds,
+			row.PermissionVersion,
+			row.Classification,
+			row.Enabled,
+			row.Source,
+			row.UpdatedAt.Format(time.RFC3339),
+		)
+	}
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_TENANT_QUOTA_AUDIT_OUTPUT")); outputPath != "" {
+		if err := writeTenantQuotaAuditOutput(outputPath, rows); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runTenantQuotaSet() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := envString("NEXUSIM_PG_DSN", "")
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required for policy tenant quota set")
+	}
+	maxDecisions, err := envPositiveInt("NEXUSIM_POLICY_TENANT_QUOTA_SET_MAX_DECISIONS", 0)
+	if err != nil {
+		return err
+	}
+	window, err := envPositiveDuration("NEXUSIM_POLICY_TENANT_QUOTA_SET_WINDOW", 0)
+	if err != nil {
+		return err
+	}
+	permissionVersion, err := envPositiveInt64("NEXUSIM_POLICY_TENANT_QUOTA_SET_PERMISSION_VERSION", 0)
+	if err != nil {
+		return err
+	}
+	enabled, enabledConfigured, err := envOptionalBool("NEXUSIM_POLICY_TENANT_QUOTA_SET_ENABLED")
+	if err != nil {
+		return err
+	}
+	if !enabledConfigured {
+		enabled = true
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	row, err := postgresinfra.NewTenantQuotaStore(pool).SetTenantQuota(ctx, postgresinfra.TenantQuotaSetOptions{
+		TenantID:          envString("NEXUSIM_POLICY_TENANT_QUOTA_SET_TENANT_ID", ""),
+		Action:            envString("NEXUSIM_POLICY_TENANT_QUOTA_SET_ACTION", ""),
+		MaxDecisions:      maxDecisions,
+		WindowSeconds:     int(window.Seconds()),
+		PermissionVersion: permissionVersion,
+		Classification:    envString("NEXUSIM_POLICY_TENANT_QUOTA_SET_CLASSIFICATION", ""),
+		Reason:            envString("NEXUSIM_POLICY_TENANT_QUOTA_SET_REASON", ""),
+		Enabled:           enabled,
+		Source:            envString("NEXUSIM_POLICY_TENANT_QUOTA_SET_SOURCE", "manual"),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"policy-service tenant quota set tenant_id=%s action=%s max_decisions=%d window_seconds=%d permission_version=%d classification=%s enabled=%t source=%s",
+		row.TenantID,
+		row.Action,
+		row.MaxDecisions,
+		row.WindowSeconds,
+		row.PermissionVersion,
+		row.Classification,
+		row.Enabled,
+		row.Source,
+	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_TENANT_QUOTA_SET_OUTPUT")); outputPath != "" {
+		if err := writeTenantQuotaSetOutput(outputPath, row); err != nil {
 			return err
 		}
 	}
@@ -946,6 +1070,21 @@ func envPositiveInt(name string, fallback int) (int, error) {
 		return fallback, nil
 	}
 	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return 0, errors.New(name + " must be a positive integer")
+	}
+	return parsed, nil
+}
+
+func envPositiveInt64(name string, fallback int64) (int64, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		if fallback > 0 {
+			return fallback, nil
+		}
+		return 0, errors.New(name + " is required")
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
 	if err != nil || parsed <= 0 {
 		return 0, errors.New(name + " must be a positive integer")
 	}

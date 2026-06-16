@@ -13,6 +13,7 @@
 - `contact-consumer` 和 `timeline-consumer` 对非取消错误已改为退避重试，并在 worker 模式通过 `/debug/metrics` 暴露 projection worker retry 快照。
 - 已补只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运维模式，可直接审计 / redrive 当前 `policy_decision_audit_outbox` 行，以及按 retention / scope 清理 policy decision audit outbox repair 历史；`outbox-audit` / `outbox-repair` / `outbox-repair-audit` / `outbox-repair-cleanup` 可通过 `NEXUSIM_POLICY_OUTBOX_AUDIT_OUTPUT` / `NEXUSIM_POLICY_OUTBOX_REPAIR_OUTPUT` / `NEXUSIM_POLICY_OUTBOX_REPAIR_AUDIT_OUTPUT` / `NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OUTPUT` 写低敏 JSON 结果或 cleanup summary，便于 operator 留存证据。
 - 已补 first-stage `decision-audit-export` 运维模式，可按 tenant / event / action / allowed / classification / reason_code / outbox status 导出 `policy_decision_audit_outbox` 中的低敏决策审计 JSON，只输出 stable key、决策元数据、trace/request id 和发布状态，不输出消息正文、provider body、payload_json 或用户原始标识。
+- 已补 first-stage tenant action quota：`policy_tenant_message_action_quotas` 可按 tenant / action 配置窗口内已允许决策上限，达到阈值时在 exact / tenant allow rule 前 fail-closed deny；`tenant-quota-audit` / `tenant-quota-set` 提供本地 JSON operator，输出只暴露配置元数据和 reason-present，不输出 operator reason 原文。
 - 已补 first-stage content moderation adapter：message-service 只把 `SEND` / `EDIT` 的 `payload.text` 传给 policy-service；policy-service 通过 `NEXUSIM_POLICY_MODERATION_MODE=keyword` 做本地分类 deny，或通过 `NEXUSIM_POLICY_MODERATION_MODE=http` 调用外部 provider 返回稳定 allow/deny 决策；不持久化正文，不把 provider 原文、provider body 或消息正文写入 audit/outbox，HTTP endpoint 默认要求 HTTPS。
 - message-service 通过 policy-service 做权限决策，不复制策略实现。
 - `loadtest/policyintegration` smoke runner 已按 config / model / auth / util 同 package 拆分，避免策略集成验证继续堆进单个 `main.go`。
@@ -20,4 +21,4 @@
 
 ## 后续
 
-- 完整 ReBAC、provider-grade moderation / risk scoring、tenant DSL / quota、provider-grade 外部 audit sink；当前 keyword / HTTP moderation、decision-audit-export、Prometheus / Grafana 和 direct capacity baseline 只用于本地开发和面试展示，生产 OTel collector / alerting / SLO dashboard、长时间容量曲线和生产 sizing 仍属于后续统一观测治理。
+- 完整 ReBAC、provider-grade moderation / risk scoring、provider-grade tenant DSL / quota、provider-grade 外部 audit sink；当前 keyword / HTTP moderation、decision-audit-export、tenant action quota、Prometheus / Grafana 和 direct capacity baseline 只用于本地开发和面试展示，生产 OTel collector / alerting / SLO dashboard、长时间容量曲线和生产 sizing 仍属于后续统一观测治理。

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -199,6 +200,92 @@ func TestMessagePolicyEvaluatorUserRestrictionOverridesExactAllowIntegration(t *
 		decision.Classification != "USER_MUTED" ||
 		decision.Reason != "user muted" {
 		t.Fatalf("expected user restriction to override exact allow, got %+v", decision)
+	}
+}
+
+func TestMessagePolicyEvaluatorTenantQuotaDeniesBeforeExactAllowIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           true,
+		PermissionVersion: 1,
+		Classification:    "STATIC_ALLOW",
+	})
+	command := testPolicyCommand(types.MessageActionSend)
+	seedTenantActionQuota(t, ctx, pool, command.AuthContext.TenantID, command.Action, 2, 3600, 301, "TENANT_SEND_QUOTA", "")
+	seedPolicyRule(t, ctx, pool, command, true, 99, "EXACT_ALLOW", "")
+	seedPolicyDecisionAuditRow(t, ctx, pool, "quota-audit-1", command.AuthContext.TenantID, command.Action, true, time.Now().UTC().Add(-2*time.Minute))
+	seedPolicyDecisionAuditRow(t, ctx, pool, "quota-audit-2", command.AuthContext.TenantID, command.Action, true, time.Now().UTC().Add(-time.Minute))
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if decision.Allowed ||
+		decision.PermissionVersion != 301 ||
+		decision.Classification != "TENANT_SEND_QUOTA" ||
+		decision.Reason != "tenant quota exceeded" {
+		t.Fatalf("expected tenant quota deny before exact allow, got %+v", decision)
+	}
+}
+
+func TestMessagePolicyEvaluatorTenantQuotaAllowsBelowLimitIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           false,
+		PermissionVersion: 1,
+		Classification:    "STATIC_DENY",
+	})
+	command := testPolicyCommand(types.MessageActionEdit)
+	command.MessageID = "msg-policy-edit"
+	seedTenantActionQuota(t, ctx, pool, command.AuthContext.TenantID, command.Action, 2, 3600, 302, "TENANT_EDIT_QUOTA", "tenant edit quota exceeded")
+	seedTenantPolicyRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, true, 88, "TENANT_ALLOW", "")
+	seedPolicyDecisionAuditRow(t, ctx, pool, "quota-edit-allowed", command.AuthContext.TenantID, command.Action, true, time.Now().UTC().Add(-time.Minute))
+	seedPolicyDecisionAuditRow(t, ctx, pool, "quota-edit-denied", command.AuthContext.TenantID, command.Action, false, time.Now().UTC().Add(-30*time.Second))
+	seedPolicyDecisionAuditRow(t, ctx, pool, "quota-edit-expired", command.AuthContext.TenantID, command.Action, true, time.Now().UTC().Add(-2*time.Hour))
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if !decision.Allowed ||
+		decision.PermissionVersion != 88 ||
+		decision.Classification != "TENANT_ALLOW" {
+		t.Fatalf("expected quota below limit to fall through to tenant allow, got %+v", decision)
+	}
+}
+
+func TestMessagePolicyEvaluatorDisabledTenantQuotaFallsThroughIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           true,
+		PermissionVersion: 7,
+		Classification:    "STATIC_ALLOW",
+	})
+	command := testPolicyCommand(types.MessageActionSend)
+	seedTenantActionQuota(t, ctx, pool, command.AuthContext.TenantID, command.Action, 1, 3600, 303, "TENANT_SEND_QUOTA", "")
+	if _, err := pool.Exec(ctx, `
+UPDATE policy_tenant_message_action_quotas
+SET enabled = false
+WHERE tenant_id = $1 AND action = $2
+`, command.AuthContext.TenantID, command.Action); err != nil {
+		t.Fatalf("disable tenant quota: %v", err)
+	}
+	seedPolicyDecisionAuditRow(t, ctx, pool, "quota-disabled-allowed", command.AuthContext.TenantID, command.Action, true, time.Now().UTC().Add(-time.Minute))
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if !decision.Allowed ||
+		decision.PermissionVersion != 7 ||
+		decision.Classification != "STATIC_ALLOW" {
+		t.Fatalf("expected disabled quota to fall through, got %+v", decision)
 	}
 }
 
@@ -626,8 +713,104 @@ func applyPolicyMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool)
 
 func resetPolicyTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	if _, err := pool.Exec(ctx, `TRUNCATE policy_decision_audit_outbox_repair_audit, policy_decision_audit_outbox, policy_user_message_action_restrictions, policy_message_ownership_override_rules, policy_conversation_role_action_rules, policy_conversation_members_projection, policy_tenant_message_action_rules, policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
+	if _, err := pool.Exec(ctx, `TRUNCATE policy_decision_audit_outbox_repair_audit, policy_decision_audit_outbox, policy_user_message_action_restrictions, policy_message_ownership_override_rules, policy_conversation_role_action_rules, policy_conversation_members_projection, policy_tenant_message_action_quotas, policy_tenant_message_action_rules, policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
 		t.Fatalf("reset policy tables: %v", err)
+	}
+}
+
+func seedTenantActionQuota(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	tenantID types.TenantID,
+	action types.MessageAction,
+	maxDecisions int,
+	windowSeconds int,
+	permissionVersion int64,
+	classification string,
+	reason string,
+) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_tenant_message_action_quotas (
+    tenant_id,
+    action,
+    max_decisions,
+    window_seconds,
+    permission_version,
+    classification,
+    reason
+) VALUES ($1, $2, $3, $4, $5, $6, $7)
+`, tenantID, action, maxDecisions, windowSeconds, permissionVersion, classification, reason)
+	if err != nil {
+		t.Fatalf("seed tenant action quota: %v", err)
+	}
+}
+
+func seedPolicyDecisionAuditRow(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	eventID string,
+	tenantID types.TenantID,
+	action types.MessageAction,
+	allowed bool,
+	createdAt time.Time,
+) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_decision_audit_outbox (
+    event_id,
+    tenant_id,
+    aggregate_type,
+    aggregate_id,
+    mapping_version,
+    actor_user_key,
+    device_key,
+    conversation_key,
+    message_key,
+    action,
+    message_id_present,
+    allowed,
+    permission_version,
+    classification,
+    reason_code,
+    partition_key,
+    correlation_id,
+    causation_id,
+    trace_id,
+    payload_json,
+    created_at,
+    available_at,
+    updated_at
+) VALUES (
+    $1,
+    $2,
+    'policy_decision',
+    'quota-test',
+    1,
+    'actor-key',
+    'device-key',
+    'conversation-key',
+    'message-key',
+    $3,
+    true,
+    $4,
+    1,
+    'QUOTA_TEST',
+    '',
+    'quota-test',
+    'request-quota',
+    'request-quota',
+    'trace-quota',
+    $5::jsonb,
+    $6,
+    $6,
+    $6
+)
+`, eventID, tenantID, action, allowed, `{"event_id":"`+eventID+`"}`, createdAt)
+	if err != nil {
+		t.Fatalf("seed policy decision audit row: %v", err)
 	}
 }
 

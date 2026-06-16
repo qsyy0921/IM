@@ -125,4 +125,21 @@ foreach ($spec in $operatorSpecs) {
     }
 }
 
+$operatorModePattern = "(audit|repair|cleanup|keyring-rotate|tenant-privacy-default-set|source-policy-set)"
+$serviceCommandFiles = Get-ChildItem -LiteralPath (Join-Path $repoRoot "services") -Recurse -Filter "main.go" -File |
+    Where-Object { $_.FullName -like "*\cmd\*" } |
+    Sort-Object FullName
+
+foreach ($commandFile in $serviceCommandFiles) {
+    $relativeCommandPath = Resolve-Path -LiteralPath $commandFile.FullName -Relative
+    $commandText = Get-Content -LiteralPath $commandFile.FullName -Raw
+    $modeMatches = [regex]::Matches($commandText, 'case\s+"([^"]+)"')
+    foreach ($match in $modeMatches) {
+        $mode = [string]$match.Groups[1].Value
+        if ($mode -match $operatorModePattern -and -not $repairIndex.Contains($mode)) {
+            throw "docs/runbook/repair-operators.md missing discovered operator mode ${mode} from ${relativeCommandPath}."
+        }
+    }
+}
+
 Write-Host "OK   repair operator index guardrails"

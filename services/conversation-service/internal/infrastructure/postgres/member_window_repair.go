@@ -18,15 +18,17 @@ const (
 	MemberWindowIssueLeaveBeforeJoin         = "LEAVE_BEFORE_JOIN"
 	MemberWindowIssueMemberVersionAhead      = "MEMBER_VERSION_AHEAD_CONVERSATION"
 	MemberWindowIssuePermissionVersionAhead  = "PERMISSION_VERSION_AHEAD_CONVERSATION"
+	MemberWindowIssueActiveInInactiveConv    = "ACTIVE_MEMBER_IN_INACTIVE_CONVERSATION"
 
-	memberWindowRepairActionClearActiveLeaveSeq = "clear_active_leave_seq"
-	memberWindowRepairActionSetInactiveLeaveSeq = "set_inactive_leave_seq"
-	memberWindowRepairActionClampLeaveToJoinSeq = "clamp_leave_to_join_seq"
-	memberWindowRepairActionRaiseMemberVersion  = "raise_conversation_member_version"
-	memberWindowRepairActionRaisePermVersion    = "raise_conversation_permission_version"
-	memberWindowRepairOutcomeAudited            = "AUDITED"
-	memberWindowRepairOutcomeMutated            = "MUTATED"
-	memberWindowRepairOutcomeSkipped            = "SKIPPED"
+	memberWindowRepairActionClearActiveLeaveSeq  = "clear_active_leave_seq"
+	memberWindowRepairActionSetInactiveLeaveSeq  = "set_inactive_leave_seq"
+	memberWindowRepairActionClampLeaveToJoinSeq  = "clamp_leave_to_join_seq"
+	memberWindowRepairActionRaiseMemberVersion   = "raise_conversation_member_version"
+	memberWindowRepairActionRaisePermVersion     = "raise_conversation_permission_version"
+	memberWindowRepairActionMarkLeftInactiveConv = "mark_active_member_left_in_inactive_conversation"
+	memberWindowRepairOutcomeAudited             = "AUDITED"
+	memberWindowRepairOutcomeMutated             = "MUTATED"
+	memberWindowRepairOutcomeSkipped             = "SKIPPED"
 )
 
 type MemberWindowRepairOptions struct {
@@ -74,6 +76,9 @@ type MemberWindowRepairAuditRow struct {
 	HasPreviousMemberVersion     bool
 	NewMemberVersion             int64
 	HasNewMemberVersion          bool
+	ConversationStatus           string
+	PreviousMemberStatus         string
+	NewMemberStatus              string
 	PreviousPermissionVersion    int64
 	HasPreviousPermissionVersion bool
 	NewPermissionVersion         int64
@@ -93,6 +98,9 @@ type memberWindowRepairCandidate struct {
 	NewLeaveSeq               sql.NullInt64
 	PreviousMemberVersion     sql.NullInt64
 	NewMemberVersion          sql.NullInt64
+	ConversationStatus        sql.NullString
+	PreviousMemberStatus      sql.NullString
+	NewMemberStatus           sql.NullString
 	PreviousPermissionVersion sql.NullInt64
 	NewPermissionVersion      sql.NullInt64
 }
@@ -208,6 +216,9 @@ SELECT
     new_leave_seq,
     previous_member_version,
     new_member_version,
+    conversation_status,
+    previous_member_status,
+    new_member_status,
     previous_permission_version,
     new_permission_version,
     operator_id,
@@ -231,6 +242,9 @@ LIMIT $`+strconv.Itoa(len(args)), args...)
 		var newLeaveSeq sql.NullInt64
 		var previousMemberVersion sql.NullInt64
 		var newMemberVersion sql.NullInt64
+		var conversationStatus sql.NullString
+		var previousMemberStatus sql.NullString
+		var newMemberStatus sql.NullString
 		var previousPermissionVersion sql.NullInt64
 		var newPermissionVersion sql.NullInt64
 		if err := rows.Scan(
@@ -246,6 +260,9 @@ LIMIT $`+strconv.Itoa(len(args)), args...)
 			&newLeaveSeq,
 			&previousMemberVersion,
 			&newMemberVersion,
+			&conversationStatus,
+			&previousMemberStatus,
+			&newMemberStatus,
 			&previousPermissionVersion,
 			&newPermissionVersion,
 			&row.OperatorID,
@@ -265,6 +282,9 @@ LIMIT $`+strconv.Itoa(len(args)), args...)
 		row.HasPreviousMemberVersion = previousMemberVersion.Valid
 		row.NewMemberVersion = newMemberVersion.Int64
 		row.HasNewMemberVersion = newMemberVersion.Valid
+		row.ConversationStatus = conversationStatus.String
+		row.PreviousMemberStatus = previousMemberStatus.String
+		row.NewMemberStatus = newMemberStatus.String
 		row.PreviousPermissionVersion = previousPermissionVersion.Int64
 		row.HasPreviousPermissionVersion = previousPermissionVersion.Valid
 		row.NewPermissionVersion = newPermissionVersion.Int64
@@ -283,6 +303,9 @@ func selectMemberWindowRepairCandidates(ctx context.Context, tx pgx.Tx, options 
 	selectNewLeaveSeq := "NULL::BIGINT"
 	selectPreviousMemberVersion := "NULL::BIGINT"
 	selectNewMemberVersion := "NULL::BIGINT"
+	selectConversationStatus := "NULL::TEXT"
+	selectPreviousMemberStatus := "NULL::TEXT"
+	selectNewMemberStatus := "NULL::TEXT"
 	selectPreviousPermissionVersion := "NULL::BIGINT"
 	selectNewPermissionVersion := "NULL::BIGINT"
 	fromClause := "conversation_members cm"
@@ -347,6 +370,24 @@ JOIN conversations c
 		distinctOn = "DISTINCT ON (cm.tenant_id, cm.conversation_id)"
 		orderBy = "cm.tenant_id, cm.conversation_id, cm.permission_version DESC, cm.updated_at DESC, cm.user_id"
 		lockClause = ""
+	case MemberWindowIssueActiveInInactiveConv:
+		fromClause = `conversation_members cm
+JOIN conversations c
+  ON c.tenant_id = cm.tenant_id
+ AND c.conversation_id = cm.conversation_id`
+		clauses = append(clauses,
+			"c.status <> 'ACTIVE'",
+			"cm.status = 'ACTIVE'",
+			"cm.join_seq IS NOT NULL",
+			"cm.join_seq > 0",
+			"(cm.leave_seq IS NULL OR cm.leave_seq <= 0)",
+			"cm.member_version > 0",
+			"cm.member_version >= cm.join_seq",
+		)
+		selectNewLeaveSeq = "cm.member_version"
+		selectConversationStatus = "c.status"
+		selectPreviousMemberStatus = "cm.status"
+		selectNewMemberStatus = "'LEFT'::TEXT"
 	default:
 		return nil, types.NewInvalidArgument("unsupported member window repair issue class")
 	}
@@ -374,6 +415,9 @@ SELECT `+distinctOn+`
     `+selectNewLeaveSeq+`,
     `+selectPreviousMemberVersion+`,
     `+selectNewMemberVersion+`,
+    `+selectConversationStatus+`,
+    `+selectPreviousMemberStatus+`,
+    `+selectNewMemberStatus+`,
     `+selectPreviousPermissionVersion+`,
     `+selectNewPermissionVersion+`
 FROM `+fromClause+`
@@ -399,6 +443,9 @@ LIMIT $`+strconv.Itoa(len(args))+`
 			&candidate.NewLeaveSeq,
 			&candidate.PreviousMemberVersion,
 			&candidate.NewMemberVersion,
+			&candidate.ConversationStatus,
+			&candidate.PreviousMemberStatus,
+			&candidate.NewMemberStatus,
 			&candidate.PreviousPermissionVersion,
 			&candidate.NewPermissionVersion,
 		); err != nil {
@@ -424,6 +471,8 @@ func repairMemberWindowCandidate(ctx context.Context, tx pgx.Tx, issueClass stri
 		return raiseConversationMemberVersion(ctx, tx, candidate)
 	case MemberWindowIssuePermissionVersionAhead:
 		return raiseConversationPermissionVersion(ctx, tx, candidate)
+	case MemberWindowIssueActiveInInactiveConv:
+		return markActiveMemberLeftInInactiveConversation(ctx, tx, candidate)
 	default:
 		return false, types.NewInvalidArgument("unsupported member window repair issue class")
 	}
@@ -533,6 +582,35 @@ WHERE tenant_id = $1
 	return tag.RowsAffected() > 0, nil
 }
 
+func markActiveMemberLeftInInactiveConversation(ctx context.Context, tx pgx.Tx, candidate memberWindowRepairCandidate) (bool, error) {
+	if !candidate.NewLeaveSeq.Valid || candidate.NewLeaveSeq.Int64 <= 0 {
+		return false, nil
+	}
+	tag, err := tx.Exec(ctx, `
+UPDATE conversation_members cm
+SET status = 'LEFT',
+    leave_seq = $4,
+    updated_at = now()
+FROM conversations c
+WHERE cm.tenant_id = $1
+  AND cm.conversation_id = $2
+  AND cm.user_id = $3
+  AND c.tenant_id = cm.tenant_id
+  AND c.conversation_id = cm.conversation_id
+  AND c.status <> 'ACTIVE'
+  AND cm.status = 'ACTIVE'
+  AND cm.join_seq IS NOT NULL
+  AND cm.join_seq > 0
+  AND (cm.leave_seq IS NULL OR cm.leave_seq <= 0)
+  AND cm.member_version = $4
+  AND cm.member_version >= cm.join_seq
+`, candidate.TenantID, candidate.ConversationID, candidate.UserID, candidate.NewLeaveSeq.Int64)
+	if err != nil {
+		return false, types.NewDBWriteFailed(err.Error())
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
 func insertMemberWindowRepairAudit(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -561,12 +639,15 @@ INSERT INTO conversation_member_window_repair_audit (
     new_leave_seq,
     previous_member_version,
     new_member_version,
+    conversation_status,
+    previous_member_status,
+    new_member_status,
     previous_permission_version,
     new_permission_version,
     operator_id,
     repair_reason,
     dry_run
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 `,
 		candidate.TenantID,
 		candidate.ConversationID,
@@ -579,6 +660,9 @@ INSERT INTO conversation_member_window_repair_audit (
 		newLeaveSeq,
 		nullableSQLInt64(candidate.PreviousMemberVersion),
 		nullableSQLInt64(candidate.NewMemberVersion),
+		nullableSQLString(candidate.ConversationStatus),
+		nullableSQLString(candidate.PreviousMemberStatus),
+		nullableSQLString(candidate.NewMemberStatus),
 		nullableSQLInt64(candidate.PreviousPermissionVersion),
 		nullableSQLInt64(candidate.NewPermissionVersion),
 		operatorID,
@@ -601,7 +685,8 @@ func normalizeMemberWindowRepairIssueClass(value string) string {
 		MemberWindowIssueInactiveWithoutLeaveSeq,
 		MemberWindowIssueLeaveBeforeJoin,
 		MemberWindowIssueMemberVersionAhead,
-		MemberWindowIssuePermissionVersionAhead:
+		MemberWindowIssuePermissionVersionAhead,
+		MemberWindowIssueActiveInInactiveConv:
 		return issueClass
 	default:
 		return ""
@@ -618,6 +703,8 @@ func memberWindowRepairActionForIssueClass(issueClass string) string {
 		return memberWindowRepairActionRaiseMemberVersion
 	case MemberWindowIssuePermissionVersionAhead:
 		return memberWindowRepairActionRaisePermVersion
+	case MemberWindowIssueActiveInInactiveConv:
+		return memberWindowRepairActionMarkLeftInactiveConv
 	default:
 		return memberWindowRepairActionClearActiveLeaveSeq
 	}
@@ -659,6 +746,13 @@ func nullableSQLInt64(value sql.NullInt64) any {
 		return nil
 	}
 	return value.Int64
+}
+
+func nullableSQLString(value sql.NullString) any {
+	if !value.Valid {
+		return nil
+	}
+	return value.String
 }
 
 func ensureSupportedMemberWindowRepairIssueClass(value string) error {

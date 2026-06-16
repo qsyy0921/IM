@@ -355,6 +355,85 @@ func TestRepositoryRepairMemberWindowsRaisesConversationVersionsIntegration(t *t
 	}
 }
 
+func TestRepositoryRepairMemberWindowsMarksActiveMembersLeftInInactiveConversationIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pg pool: %v", err)
+	}
+	defer pool.Close()
+
+	ensureMemberWindowRepairAuditSchema(t, ctx, pool)
+	resetConversationTables(t, ctx, pool)
+	truncateMemberWindowRepairAudit(t, ctx, pool)
+	seedMemberWindowRepairFixtures(t, ctx, pool)
+
+	repository := NewRepository(pool)
+	dryRunStats, err := repository.RepairMemberWindows(ctx, MemberWindowRepairOptions{
+		TenantID:       "tenant-window-repair",
+		ConversationID: "conv-window-archived",
+		IssueClass:     MemberWindowIssueActiveInInactiveConv,
+		OperatorID:     "operator-6",
+		Reason:         "dry run inactive conversation active member",
+		DryRun:         true,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("dry-run active-in-inactive-conversation repair: %v", err)
+	}
+	if dryRunStats.Requested != 1 || dryRunStats.Repaired != 0 || dryRunStats.Skipped != 1 || !dryRunStats.DryRun {
+		t.Fatalf("unexpected dry-run active-in-inactive-conversation stats: %+v", dryRunStats)
+	}
+	assertMemberStatusAndLeaveSeq(t, ctx, pool, "tenant-window-repair", "conv-window-archived", "active-in-archived", "ACTIVE", nil)
+
+	mutateStats, err := repository.RepairMemberWindows(ctx, MemberWindowRepairOptions{
+		TenantID:       "tenant-window-repair",
+		ConversationID: "conv-window-archived",
+		IssueClass:     "active_member_in_inactive_conversation",
+		OperatorID:     "operator-6",
+		Reason:         "mark active member left in inactive conversation",
+		DryRun:         false,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("mutating active-in-inactive-conversation repair: %v", err)
+	}
+	if mutateStats.Requested != 1 || mutateStats.Repaired != 1 || mutateStats.Skipped != 0 || mutateStats.DryRun {
+		t.Fatalf("unexpected mutate active-in-inactive-conversation stats: %+v", mutateStats)
+	}
+	assertMemberStatusAndLeaveSeq(t, ctx, pool, "tenant-window-repair", "conv-window-archived", "active-in-archived", "LEFT", ptrInt64(13))
+
+	rows, err := repository.AuditMemberWindowRepairs(ctx, MemberWindowRepairAuditOptions{
+		TenantID:       "tenant-window-repair",
+		ConversationID: "conv-window-archived",
+		IssueClass:     "active_member_in_inactive_conversation",
+		Outcome:        "mutated",
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit active-in-inactive-conversation repair: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one active-in-inactive-conversation audit row, got %d: %+v", len(rows), rows)
+	}
+	row := rows[0]
+	if row.UserID != "active-in-archived" ||
+		row.RepairAction != memberWindowRepairActionMarkLeftInactiveConv ||
+		row.RepairOutcome != memberWindowRepairOutcomeMutated ||
+		row.ConversationStatus != "ARCHIVED" ||
+		row.PreviousMemberStatus != "ACTIVE" ||
+		row.NewMemberStatus != "LEFT" ||
+		!row.HasJoinSeq ||
+		!row.HasNewLeaveSeq ||
+		row.NewLeaveSeq != 13 {
+		t.Fatalf("unexpected active-in-inactive-conversation audit row: %+v", row)
+	}
+}
+
 func ensureMemberWindowRepairAuditSchema(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	for _, filename := range []string{
@@ -362,6 +441,7 @@ func ensureMemberWindowRepairAuditSchema(t *testing.T, ctx context.Context, pool
 		"000006_member_window_repair_inactive_leave_seq.sql",
 		"000007_member_window_repair_leave_before_join.sql",
 		"000008_member_window_repair_version_ahead.sql",
+		"000009_member_window_repair_inactive_conversation.sql",
 	} {
 		path := filepath.Clean(filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "conversation", filename))
 		ddl, err := os.ReadFile(path)
@@ -387,7 +467,9 @@ func seedMemberWindowRepairFixtures(t *testing.T, ctx context.Context, pool *pgx
 INSERT INTO conversations (
     tenant_id, conversation_id, conversation_type, status, conversation_mode,
     fanout_mode, fanout_policy_version, member_version, permission_version, current_seq_shard
-) VALUES ('tenant-window-repair', 'conv-window-repair', 'GROUP', 'ACTIVE', 'LOCAL_ROW_LOCK', 'WRITE_FANOUT', 1, 10, 20, 'local');
+) VALUES
+    ('tenant-window-repair', 'conv-window-repair', 'GROUP', 'ACTIVE', 'LOCAL_ROW_LOCK', 'WRITE_FANOUT', 1, 10, 20, 'local'),
+    ('tenant-window-repair', 'conv-window-archived', 'GROUP', 'ARCHIVED', 'LOCAL_ROW_LOCK', 'WRITE_FANOUT', 1, 13, 23, 'local');
 
 INSERT INTO conversation_members (
     tenant_id, conversation_id, user_id, role, status, join_seq, leave_seq,
@@ -401,7 +483,8 @@ INSERT INTO conversation_members (
     ('tenant-window-repair', 'conv-window-repair', 'inactive-leave-before-join', 'MEMBER', 'LEFT', 8, 7, 10, 19, now() - interval '6 minutes'),
     ('tenant-window-repair', 'conv-window-repair', 'member-version-ahead-low', 'MEMBER', 'ACTIVE', 9, NULL, 11, 20, now() - interval '7 minutes'),
     ('tenant-window-repair', 'conv-window-repair', 'member-version-ahead-high', 'MEMBER', 'ACTIVE', 10, NULL, 12, 20, now() - interval '8 minutes'),
-    ('tenant-window-repair', 'conv-window-repair', 'permission-version-ahead', 'MEMBER', 'ACTIVE', 11, NULL, 10, 25, now() - interval '9 minutes');
+    ('tenant-window-repair', 'conv-window-repair', 'permission-version-ahead', 'MEMBER', 'ACTIVE', 11, NULL, 10, 25, now() - interval '9 minutes'),
+    ('tenant-window-repair', 'conv-window-archived', 'active-in-archived', 'OWNER', 'ACTIVE', 12, NULL, 13, 23, now() - interval '10 minutes');
 `)
 	if err != nil {
 		t.Fatalf("seed member window repair fixtures: %v", err)
@@ -448,6 +531,36 @@ WHERE tenant_id = $1
 			t.Fatalf("leave_seq = NULL, want %d for user %s", *want, userID)
 		}
 		t.Fatalf("leave_seq = %d, want %d for user %s", *leaveSeq, *want, userID)
+	}
+}
+
+func assertMemberStatusAndLeaveSeq(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID string, conversationID string, userID string, wantStatus string, wantLeaveSeq *int64) {
+	t.Helper()
+	var status string
+	var leaveSeq *int64
+	if err := pool.QueryRow(ctx, `
+SELECT status, leave_seq
+FROM conversation_members
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND user_id = $3
+`, tenantID, conversationID, userID).Scan(&status, &leaveSeq); err != nil {
+		t.Fatalf("query member status/leave_seq: %v", err)
+	}
+	if status != wantStatus {
+		t.Fatalf("status = %q, want %q for user %s", status, wantStatus, userID)
+	}
+	if wantLeaveSeq == nil {
+		if leaveSeq != nil {
+			t.Fatalf("leave_seq = %d, want NULL for user %s", *leaveSeq, userID)
+		}
+		return
+	}
+	if leaveSeq == nil || *leaveSeq != *wantLeaveSeq {
+		if leaveSeq == nil {
+			t.Fatalf("leave_seq = NULL, want %d for user %s", *wantLeaveSeq, userID)
+		}
+		t.Fatalf("leave_seq = %d, want %d for user %s", *leaveSeq, *wantLeaveSeq, userID)
 	}
 }
 

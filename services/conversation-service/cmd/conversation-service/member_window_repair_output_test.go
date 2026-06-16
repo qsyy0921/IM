@@ -61,6 +61,9 @@ func TestWriteMemberWindowRepairAuditOutput(t *testing.T) {
 		HasPreviousMemberVersion: true,
 		NewMemberVersion:         12,
 		HasNewMemberVersion:      true,
+		ConversationStatus:       "ARCHIVED",
+		PreviousMemberStatus:     "ACTIVE",
+		NewMemberStatus:          "LEFT",
 		OperatorID:               "operator-1",
 		Reason:                   "clear stale leave seq",
 		DryRun:                   false,
@@ -89,6 +92,9 @@ func TestWriteMemberWindowRepairAuditOutput(t *testing.T) {
 		row.PreviousLeaveSeq != 9 ||
 		row.PreviousMemberVersion != 5 ||
 		row.NewMemberVersion != 12 ||
+		row.ConversationStatus != "ARCHIVED" ||
+		row.PreviousMemberStatus != "ACTIVE" ||
+		row.NewMemberStatus != "LEFT" ||
 		!row.HasNewMemberVersion ||
 		row.HasNewLeaveSeq ||
 		row.RepairedAt == "" {

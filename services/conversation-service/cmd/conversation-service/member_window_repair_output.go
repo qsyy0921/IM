@@ -46,6 +46,9 @@ type memberWindowRepairAuditOutputRow struct {
 	HasPreviousMemberVersion     bool   `json:"has_previous_member_version"`
 	NewMemberVersion             int64  `json:"new_member_version,omitempty"`
 	HasNewMemberVersion          bool   `json:"has_new_member_version"`
+	ConversationStatus           string `json:"conversation_status,omitempty"`
+	PreviousMemberStatus         string `json:"previous_member_status,omitempty"`
+	NewMemberStatus              string `json:"new_member_status,omitempty"`
 	PreviousPermissionVersion    int64  `json:"previous_permission_version,omitempty"`
 	HasPreviousPermissionVersion bool   `json:"has_previous_permission_version"`
 	NewPermissionVersion         int64  `json:"new_permission_version,omitempty"`
@@ -115,6 +118,9 @@ func writeMemberWindowRepairAuditOutput(path string, rows []postgresinfra.Member
 			HasPreviousMemberVersion:     row.HasPreviousMemberVersion,
 			NewMemberVersion:             row.NewMemberVersion,
 			HasNewMemberVersion:          row.HasNewMemberVersion,
+			ConversationStatus:           row.ConversationStatus,
+			PreviousMemberStatus:         row.PreviousMemberStatus,
+			NewMemberStatus:              row.NewMemberStatus,
 			PreviousPermissionVersion:    row.PreviousPermissionVersion,
 			HasPreviousPermissionVersion: row.HasPreviousPermissionVersion,
 			NewPermissionVersion:         row.NewPermissionVersion,

@@ -90,6 +90,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - outbox Kafka producer first-stage `acks=all` / bounded retry-backoff 配置、本地门禁、6 个 producer package 配置单测、producer config summary 和 Kafka producer hardening evaluation；当前 `kafka-go` writer 明确不声明 idempotent / transactional producer 语义，可靠业务边界仍是 outbox / event_id 幂等
 - 本地 `kafka-go` producer in-flight broker-fault observation：120 条 records 在 broker stop/restore 窗口内全部 ack，消费侧 unique 120、missing acknowledged 0、observed duplicate 0；这是一次本地观察，不证明 exactly-once producer 语义
 - push-gateway delivery-consumer 本地 Kafka consumer group rebalance smoke：2 个 consumer 进入同一 group 后停止 1 个，Kafka 将 `im.delivery.events` 3 个 partition 重新分配到剩余 consumer
+- push-gateway delivery-consumer 本地 Kafka consumer churn smoke：2 轮 leave / rejoin、8 个 transition 均回到 Stable，且 `im.delivery.events` 3 个 partition 每次都已分配；这是本地 churn 观察，不是生产 rebalance storm SLO
 
 当前已经证明：
 
@@ -97,6 +98,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - Redis 故障时 durable `PullInbox + AckDelivery` 可以兜底
 - PostgreSQL / Kafka 单点切换后最小链路仍可恢复
 - Kafka consumer group 能完成第一阶段本地 rebalance 观察
+- Kafka consumer group 能完成第一阶段本地 repeated leave / rejoin churn 观察
 
 当前还没有证明：
 

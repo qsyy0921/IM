@@ -40,13 +40,21 @@
   -KafkaBrokers localhost:9092
 ```
 
-suite runner 默认只执行自包含 runner，并在同一 run 目录下写 `capacity-baseline-suite-summary.json` / `.md` 和聚合后的 `capacity-baseline-summary.json` / `.md`。`delivery-service` 的直接 runner 读取既有 `PullInbox` 状态，默认会标记为 `skipped_seed_required`；如果已经先用 demo / push / receipt 等链路预置了对应 inbox 数据，再显式追加：
+suite runner 默认只执行主入口服务可直接支撑的 direct runner，并在同一 run 目录下写 `capacity-baseline-suite-summary.json` / `.md` 和聚合后的 `capacity-baseline-summary.json` / `.md`。
+
+需要额外后台角色或 fixture 的端到端 runner 会标记为 `skipped_stack_required`，例如 api-gateway demo、identity challenge delivery、push-gateway full、receipt 和 contacts 事件链路。这些 runner 需要先启动对应 outbox relay / timeline consumer / delivery consumer / webhook fixture 等角色，再显式追加：
+
+```powershell
+.\tools\run-loadtest-capacity-baseline-suite.ps1 -IncludeStackRunners
+```
+
+需要预置业务数据的 runner 会标记为 `skipped_seed_required`。例如 message-service send runner 和 conversation-service memberchange runner 需要预置 ACTIVE conversation / member fixture；`delivery-service` 直接 runner 读取既有 `PullInbox` 状态。如果已经先用 smoke / fixture 脚本准备了对应数据，再显式追加：
 
 ```powershell
 .\tools\run-loadtest-capacity-baseline-suite.ps1 -IncludeSeededRunners
 ```
 
-不要把 seeded-only runner 的默认跳过解释为服务不可用。suite runner 只负责协调本地压测，不负责启动服务或造数；服务进程、Docker 基础设施、topic/migration 和需要的测试数据仍需按对应 runbook 先准备。
+不要把 stack-only / seeded-only runner 的默认跳过解释为服务不可用。suite runner 只负责协调本地压测，不负责启动服务、启动后台角色或造数；服务进程、Docker 基础设施、topic/migration 和需要的测试数据仍需按对应 runbook 先准备。
 
 ## 1. 机器与网络
 

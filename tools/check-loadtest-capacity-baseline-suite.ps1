@@ -52,16 +52,34 @@ try {
         Write-Host "FAIL api-gateway capacity suite step must use GatewayService facade in mock auth mode." -ForegroundColor Red
         exit 1
     }
+    if ($apiStep.requires_runtime_stack -ne $true -or $apiStep.baseline_mode -ne "requires_stack" -or $apiStep.status -ne "skipped_stack_required") {
+        Write-Host "FAIL api-gateway capacity suite step must be marked stack-required by default." -ForegroundColor Red
+        exit 1
+    }
 
     $pushStep = @($summary.steps | Where-Object { $_.service -eq "push-gateway" })[0]
     if ($pushStep.command_line -notmatch "--scenario full") {
         Write-Host "FAIL push-gateway capacity suite step must run full scenario." -ForegroundColor Red
         exit 1
     }
+    if ($pushStep.requires_runtime_stack -ne $true -or $pushStep.baseline_mode -ne "requires_stack" -or $pushStep.status -ne "skipped_stack_required") {
+        Write-Host "FAIL push-gateway capacity suite step must be marked stack-required by default." -ForegroundColor Red
+        exit 1
+    }
+
+    $messageStep = @($summary.steps | Where-Object { $_.service -eq "message-service" })[0]
+    if ($messageStep.requires_seed -ne $true -or $messageStep.baseline_mode -ne "requires_seed" -or $messageStep.status -ne "skipped_seed_required") {
+        Write-Host "FAIL message-service capacity suite step must be marked seeded-only by default." -ForegroundColor Red
+        exit 1
+    }
 
     $markdown = Get-Content -LiteralPath $markdownPath -Raw
     if (-not $markdown.Contains("Loadtest Capacity Baseline Suite") -or -not $markdown.Contains("not a production SLO")) {
         Write-Host "FAIL capacity suite markdown missing expected boundary text." -ForegroundColor Red
+        exit 1
+    }
+    if ($markdown.Contains('$(@')) {
+        Write-Host "FAIL capacity suite markdown contains unevaluated PowerShell interpolation." -ForegroundColor Red
         exit 1
     }
 
@@ -107,6 +125,29 @@ try {
     $includeSeededStep = @($includeSeededSummary.steps | Where-Object { $_.service -eq "delivery-service" })[0]
     if ($includeSeededSummary.include_seeded_runners -ne $true -or $includeSeededStep.status -ne "dry_run") {
         Write-Host "FAIL delivery-service capacity runner should be planned when seeded runners are enabled." -ForegroundColor Red
+        exit 1
+    }
+
+    $includeStackRoot = Join-Path $tempRoot "include-stack"
+    $includeStackOutput = & $powerShellExe -NoProfile -ExecutionPolicy Bypass -File $runner `
+        -ResultRoot $includeStackRoot `
+        -RunName "capacity-suite-include-stack-selftest" `
+        -Services "api-gateway,identity-service,push-gateway,contacts-service,receipt-service" `
+        -IncludeStackRunners `
+        -DryRun 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "FAIL capacity suite include-stack dry-run should pass." -ForegroundColor Red
+        if ($includeStackOutput) {
+            Write-Host (($includeStackOutput | Out-String).Trim()) -ForegroundColor Red
+        }
+        exit 1
+    }
+
+    $includeStackSummaryPath = Join-Path $includeStackRoot "capacity-suite-include-stack-selftest\capacity-baseline-suite-summary.json"
+    $includeStackSummary = Get-Content -LiteralPath $includeStackSummaryPath -Raw | ConvertFrom-Json
+    $stackStatuses = @($includeStackSummary.steps | ForEach-Object { $_.status } | Sort-Object -Unique)
+    if ($includeStackSummary.include_stack_runners -ne $true -or $stackStatuses.Count -ne 1 -or $stackStatuses[0] -ne "dry_run") {
+        Write-Host "FAIL stack-required capacity runners should be planned when stack runners are enabled." -ForegroundColor Red
         exit 1
     }
 }

@@ -130,6 +130,7 @@ function Get-PrimaryRate {
         "accepted_rps",
         "logical_accepted_rps",
         "request_rps",
+        "requests_per_second",
         "operations_per_second",
         "messages_per_second",
         "notify_frames_per_second",
@@ -286,13 +287,15 @@ else {
 $markdown += ""
 $markdown += "| Service | Runner | Duration(s) | Primary rate | Summary |"
 $markdown += "| --- | --- | ---: | ---: | --- |"
+$tick = [char]96
 foreach ($row in @($rows | Sort-Object service, summary_path)) {
     $durationText = Format-NullableNumber -Value $row.duration_seconds
     $rateText = ""
     if ($row.primary_rate_field.Trim().Length -gt 0) {
         $rateText = "$($row.primary_rate_field)=$(Format-NullableNumber -Value $row.primary_rate_value)"
     }
-    $markdown += "| $($row.service) | $($row.runner) | $durationText | $rateText | `$($row.summary_path)` |"
+    $summaryPathText = [string]$row.summary_path
+    $markdown += "| $($row.service) | $($row.runner) | $durationText | $rateText | $tick$summaryPathText$tick |"
 }
 $markdown += ""
 $markdown += "This summary aggregates existing loadtest output files. It is evidence for local capacity-baseline tracking only; it is not a production SLO, production sizing claim, or HA proof."

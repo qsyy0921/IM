@@ -134,6 +134,10 @@ try {
         Write-Host "FAIL capacity baseline markdown missing expected content." -ForegroundColor Red
         exit 1
     }
+    if ($markdown.Contains('$(@')) {
+        Write-Host "FAIL capacity baseline markdown contains unevaluated PowerShell interpolation." -ForegroundColor Red
+        exit 1
+    }
 
     $badResult = Invoke-Summarizer `
         -ResultRoot $tempRoot `

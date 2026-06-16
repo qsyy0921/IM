@@ -15,6 +15,7 @@ param(
     [switch]$DryRun,
     [switch]$ContinueOnError,
     [switch]$IncludeSeededRunners,
+    [switch]$IncludeStackRunners,
     [string]$PGDSN = $env:NEXUSIM_PG_DSN,
     [string]$KafkaBrokers = "localhost:9092",
     [int]$VUs = 2,
@@ -81,13 +82,132 @@ function Format-CommandLine {
     return ($parts -join " ")
 }
 
+function Get-PropertyValue {
+    param(
+        [object]$Object,
+        [string]$Name
+    )
+
+    if ($null -eq $Object) {
+        return $null
+    }
+
+    $property = $Object.PSObject.Properties[$Name]
+    if ($null -eq $property) {
+        return $null
+    }
+
+    return $property.Value
+}
+
+function Test-IsNumber {
+    param([object]$Value)
+
+    if ($null -eq $Value) {
+        return $false
+    }
+
+    return $Value -is [byte] -or
+        $Value -is [int16] -or
+        $Value -is [int32] -or
+        $Value -is [int64] -or
+        $Value -is [single] -or
+        $Value -is [double] -or
+        $Value -is [decimal]
+}
+
+function Convert-ToDoubleOrNull {
+    param([object]$Value)
+
+    if (Test-IsNumber -Value $Value) {
+        return [double]$Value
+    }
+
+    return $null
+}
+
+function Test-CapacityResult {
+    param([string]$ResultDir)
+
+    $summaryFiles = @(Get-ChildItem -LiteralPath $ResultDir -Recurse -File -Filter "*summary.json" -ErrorAction SilentlyContinue | Sort-Object FullName)
+    foreach ($file in $summaryFiles) {
+        $json = Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json
+        $capacity = Get-PropertyValue -Object $json -Name "capacity_summary"
+        if ($null -eq $capacity) {
+            continue
+        }
+
+        $success = Get-PropertyValue -Object $json -Name "success"
+        if ($success -is [bool] -and -not $success) {
+            return [pscustomobject]@{
+                ok = $false
+                summary_path = $file.FullName
+                reason = "summary success=false"
+            }
+        }
+
+        foreach ($field in @("success_count", "logical_success_count", "allowed_action_count")) {
+            $value = Convert-ToDoubleOrNull (Get-PropertyValue -Object $capacity -Name $field)
+            if ($null -ne $value) {
+                if ($value -gt 0) {
+                    return [pscustomobject]@{
+                        ok = $true
+                        summary_path = $file.FullName
+                        reason = "$field=$value"
+                    }
+                }
+                return [pscustomobject]@{
+                    ok = $false
+                    summary_path = $file.FullName
+                    reason = "$field is zero"
+                }
+            }
+        }
+
+        foreach ($field in @(
+            "accepted_rps",
+            "logical_accepted_rps",
+            "operations_per_second",
+            "messages_per_second",
+            "notify_frames_per_second",
+            "decisions_per_second",
+            "ops_per_second",
+            "events_per_second",
+            "acks_per_second",
+            "items_per_second"
+        )) {
+            $value = Convert-ToDoubleOrNull (Get-PropertyValue -Object $capacity -Name $field)
+            if ($null -ne $value -and $value -gt 0) {
+                return [pscustomobject]@{
+                    ok = $true
+                    summary_path = $file.FullName
+                    reason = "$field=$value"
+                }
+            }
+        }
+
+        return [pscustomobject]@{
+            ok = $false
+            summary_path = $file.FullName
+            reason = "capacity_summary has no positive success or throughput metric"
+        }
+    }
+
+    return [pscustomobject]@{
+        ok = $false
+        summary_path = ""
+        reason = "no capacity_summary file found"
+    }
+}
+
 function New-Step {
     param(
         [string]$Service,
         [string]$Runner,
         [string[]]$RunnerArgs,
-        [string]$BaselineMode = "self_contained",
+        [string]$BaselineMode = "direct",
         [bool]$RequiresSeed = $false,
+        [bool]$RequiresRuntimeStack = $false,
         [string]$SkipReason = ""
     )
 
@@ -103,6 +223,7 @@ function New-Step {
         runner = $Runner
         baseline_mode = $BaselineMode
         requires_seed = $RequiresSeed
+        requires_runtime_stack = $RequiresRuntimeStack
         skip_reason = $SkipReason
         command = "go"
         args = @($argumentList.ToArray())
@@ -110,6 +231,8 @@ function New-Step {
         result_dir = ""
         exit_code = $null
         status = "planned"
+        capacity_summary_path = ""
+        capacity_check_reason = ""
         started_at = ""
         finished_at = ""
         output_log = ""
@@ -141,7 +264,13 @@ function Build-Step {
             $runnerArgsList.Add("--result-dir")
             $runnerArgsList.Add($resultDir)
             Add-ArgIfValue -ArgumentList $runnerArgsList -Name "--pg-dsn" -Value $PGDSN
-            $step = New-Step -Service $Service -Runner "demo" -RunnerArgs @($runnerArgsList.ToArray())
+            $step = New-Step `
+                -Service $Service `
+                -Runner "demo" `
+                -RunnerArgs @($runnerArgsList.ToArray()) `
+                -BaselineMode "requires_stack" `
+                -RequiresRuntimeStack $true `
+                -SkipReason "api-gateway demo validates an end-to-end stack and requires relay/consumer roles"
         }
         "identity-service" {
             $runnerArgsList.Add("--target")
@@ -150,7 +279,13 @@ function Build-Step {
             $runnerArgsList.Add($resultDir)
             $runnerArgsList.Add("--cleanup")
             Add-ArgIfValue -ArgumentList $runnerArgsList -Name "--pg-dsn" -Value $PGDSN
-            $step = New-Step -Service $Service -Runner "identity" -RunnerArgs @($runnerArgsList.ToArray())
+            $step = New-Step `
+                -Service $Service `
+                -Runner "identity" `
+                -RunnerArgs @($runnerArgsList.ToArray()) `
+                -BaselineMode "requires_stack" `
+                -RequiresRuntimeStack $true `
+                -SkipReason "identity loadtest exercises challenge delivery and requires webhook fixture or delivery worker setup"
         }
         "message-service" {
             $runnerArgsList.Add("--target")
@@ -164,7 +299,13 @@ function Build-Step {
             $runnerArgsList.Add("--conversation-count")
             $runnerArgsList.Add([string]$ConversationCount)
             Add-ArgIfValue -ArgumentList $runnerArgsList -Name "--pg-dsn" -Value $PGDSN
-            $step = New-Step -Service $Service -Runner "sendmessage" -RunnerArgs @($runnerArgsList.ToArray())
+            $step = New-Step `
+                -Service $Service `
+                -Runner "sendmessage" `
+                -RunnerArgs @($runnerArgsList.ToArray()) `
+                -BaselineMode "requires_seed" `
+                -RequiresSeed $true `
+                -SkipReason "message loadtest requires pre-seeded ACTIVE conversations and members"
         }
         "conversation-service" {
             $runnerArgsList.Add("--target")
@@ -176,7 +317,13 @@ function Build-Step {
             $runnerArgsList.Add("--duration")
             $runnerArgsList.Add($Duration)
             Add-ArgIfValue -ArgumentList $runnerArgsList -Name "--pg-dsn" -Value $PGDSN
-            $step = New-Step -Service $Service -Runner "memberchange" -RunnerArgs @($runnerArgsList.ToArray())
+            $step = New-Step `
+                -Service $Service `
+                -Runner "memberchange" `
+                -RunnerArgs @($runnerArgsList.ToArray()) `
+                -BaselineMode "requires_seed" `
+                -RequiresSeed $true `
+                -SkipReason "conversation memberchange loadtest requires a pre-seeded conversation with an ACTIVE owner"
         }
         "delivery-service" {
             $runnerArgsList.Add("--target")
@@ -206,7 +353,13 @@ function Build-Step {
             $runnerArgsList.Add("--scenario")
             $runnerArgsList.Add("full")
             Add-ArgIfValue -ArgumentList $runnerArgsList -Name "--pg-dsn" -Value $PGDSN
-            $step = New-Step -Service $Service -Runner "pushgateway" -RunnerArgs @($runnerArgsList.ToArray())
+            $step = New-Step `
+                -Service $Service `
+                -Runner "pushgateway" `
+                -RunnerArgs @($runnerArgsList.ToArray()) `
+                -BaselineMode "requires_stack" `
+                -RequiresRuntimeStack $true `
+                -SkipReason "push-gateway full scenario requires delivery timeline/outbox relay and push delivery-consumer roles"
         }
         "receipt-service" {
             $runnerArgsList.Add("--conversation-target")
@@ -220,7 +373,13 @@ function Build-Step {
             $runnerArgsList.Add("--result-dir")
             $runnerArgsList.Add($resultDir)
             Add-ArgIfValue -ArgumentList $runnerArgsList -Name "--pg-dsn" -Value $PGDSN
-            $step = New-Step -Service $Service -Runner "receipt" -RunnerArgs @($runnerArgsList.ToArray())
+            $step = New-Step `
+                -Service $Service `
+                -Runner "receipt" `
+                -RunnerArgs @($runnerArgsList.ToArray()) `
+                -BaselineMode "requires_stack" `
+                -RequiresRuntimeStack $true `
+                -SkipReason "receipt loadtest requires message/delivery/receipt relay and consumer roles"
         }
         "contacts-service" {
             $runnerArgsList.Add("--target")
@@ -231,7 +390,13 @@ function Build-Step {
             $runnerArgsList.Add($KafkaBrokers)
             $runnerArgsList.Add("--cleanup")
             Add-ArgIfValue -ArgumentList $runnerArgsList -Name "--pg-dsn" -Value $PGDSN
-            $step = New-Step -Service $Service -Runner "contacts" -RunnerArgs @($runnerArgsList.ToArray())
+            $step = New-Step `
+                -Service $Service `
+                -Runner "contacts" `
+                -RunnerArgs @($runnerArgsList.ToArray()) `
+                -BaselineMode "requires_stack" `
+                -RequiresRuntimeStack $true `
+                -SkipReason "contacts loadtest validates Kafka contact events and requires contacts outbox-relay"
         }
         "policy-service" {
             $runnerArgsList.Add("--target")
@@ -266,12 +431,13 @@ function Write-SuiteSummary {
         scope = $Scope
         dry_run = $DryRunValue
         include_seeded_runners = [bool]$IncludeSeededRunners
+        include_stack_runners = [bool]$IncludeStackRunners
         status = $Status
         service_count = $Steps.Count
-        runnable_service_count = @($Steps | Where-Object { $_.status -ne "skipped_seed_required" }).Count
-        skipped_service_count = @($Steps | Where-Object { $_.status -eq "skipped_seed_required" }).Count
+        runnable_service_count = @($Steps | Where-Object { $_.status -notlike "skipped_*" }).Count
+        skipped_service_count = @($Steps | Where-Object { $_.status -like "skipped_*" }).Count
         services = @($Steps | ForEach-Object { $_.service })
-        skipped_services = @($Steps | Where-Object { $_.status -eq "skipped_seed_required" } | ForEach-Object { $_.service })
+        skipped_services = @($Steps | Where-Object { $_.status -like "skipped_*" } | ForEach-Object { $_.service })
         steps = @($Steps)
     }
 
@@ -285,6 +451,7 @@ function Write-SuiteSummary {
     $markdown += "- Created at: $($summary.created_at)"
     $markdown += "- Dry run: $DryRunValue"
     $markdown += "- Include seeded runners: $([bool]$IncludeSeededRunners)"
+    $markdown += "- Include stack runners: $([bool]$IncludeStackRunners)"
     $markdown += "- Status: $Status"
     $markdown += "- Scope: $Scope"
     $markdown += "- Suite root: $($summary.suite_root)"
@@ -295,11 +462,13 @@ function Write-SuiteSummary {
     $markdown += ""
     $markdown += "| Service | Runner | Baseline mode | Status | Skip reason | Command |"
     $markdown += "| --- | --- | --- | --- | --- | --- |"
+    $tick = [char]96
     foreach ($step in $Steps) {
-        $markdown += "| $($step.service) | $($step.runner) | $($step.baseline_mode) | $($step.status) | $($step.skip_reason) | `$($step.command_line)` |"
+        $commandText = [string]$step.command_line
+        $markdown += "| $($step.service) | $($step.runner) | $($step.baseline_mode) | $($step.status) | $($step.skip_reason) | $tick$commandText$tick |"
     }
     $markdown += ""
-    $markdown += "This suite only coordinates local loadtest runners and writes raw outputs under H drive by default. Seeded runners are skipped unless explicitly enabled because they need pre-populated state. This is not a production SLO, HA proof, or sizing claim."
+    $markdown += "This suite only coordinates local loadtest runners and writes raw outputs under H drive by default. Seeded runners and stack runners are skipped unless explicitly enabled because they need pre-populated state or extra relay/consumer roles. This is not a production SLO, HA proof, or sizing claim."
 
     $markdownPath = Join-Path $SuiteRoot "capacity-baseline-suite-summary.md"
     $markdown | Set-Content -LiteralPath $markdownPath -Encoding UTF8
@@ -356,6 +525,10 @@ foreach ($step in $steps) {
         $step.status = "skipped_seed_required"
         continue
     }
+    if ($step.requires_runtime_stack -and -not $IncludeStackRunners) {
+        $step.status = "skipped_stack_required"
+        continue
+    }
     if ($DryRun) {
         $step.status = "dry_run"
         continue
@@ -371,6 +544,19 @@ foreach ($step in $steps) {
         $output | Set-Content -LiteralPath $step.output_log -Encoding UTF8
         $step.finished_at = (Get-Date).ToUniversalTime().ToString("o")
         if ($exitCode -eq 0) {
+            $capacityCheck = Test-CapacityResult -ResultDir $step.result_dir
+            $step.capacity_summary_path = $capacityCheck.summary_path
+            $step.capacity_check_reason = $capacityCheck.reason
+            if (-not $capacityCheck.ok) {
+                $step.exit_code = 1
+                $step.status = "failed"
+                $suiteStatus = "failed"
+                Add-Content -LiteralPath $step.output_log -Encoding UTF8 -Value "capacity summary check failed: $($capacityCheck.reason)"
+                if (-not $ContinueOnError) {
+                    break
+                }
+                continue
+            }
             $step.status = "passed"
         }
         else {
@@ -389,7 +575,7 @@ foreach ($step in $steps) {
 if ($DryRun) {
     $suiteStatus = "dry_run"
 }
-elseif (@($steps | Where-Object { $_.status -ne "skipped_seed_required" }).Count -eq 0) {
+elseif (@($steps | Where-Object { $_.status -notlike "skipped_*" }).Count -eq 0) {
     $suiteStatus = "skipped"
 }
 elseif ($suiteStatus -ne "failed") {
@@ -401,7 +587,7 @@ $paths = Write-SuiteSummary -SuiteRoot $suiteRoot -Steps @($steps.ToArray()) -Dr
 if (-not $DryRun) {
     $expectedSummaryServices = @(
         $steps |
-            Where-Object { $_.status -ne "skipped_seed_required" } |
+            Where-Object { $_.status -notlike "skipped_*" } |
             ForEach-Object { $_.service }
     )
     $baselinePath = Join-Path $suiteRoot "capacity-baseline-summary.json"

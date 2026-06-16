@@ -38,6 +38,7 @@ Implemented:
 - policy-service gRPC server and direct policy smoke clients support first-stage optional TLS / mTLS static config. `loadtest/policy`, `loadtest/policycontacts` and `loadtest/policyroles` accept optional CA, server name and client cert/key flags; default remains plaintext. The `loadtest/policyintegration` runner also supports optional message-service client TLS / mTLS flags and `--verified-auth-metadata` for the `message-service -> policy-service` integration smoke.
 - policy-service direct mTLS smoke with client DNS SAN allowlist: `loadtest-report-20260613-policy-service-mtls-smoke.md`.
 - 2026-06-15: policy-service first-stage `/metrics`, local Prometheus scrape / alert rules and local Grafana dashboard prototype were added for local development / interview demo observability. This is not a production SLO or alerting system.
+- 2026-06-16: policy-service direct capacity-baseline smoke through `tools/run-loadtest-capacity-baseline-suite.ps1`: `loadtest-report-20260616-policy-direct-capacity-baseline.md`. This is a local short baseline only, not production sizing.
 
 Not yet implemented:
 

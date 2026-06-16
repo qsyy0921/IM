@@ -1,6 +1,6 @@
 # NexusIM receipt-service SDD v0.1 Draft
 
-状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务、`ListReceiptStates` repository 级批量查询、receipt outbox relay、只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit`、`outbox-repair-cleanup` operator、最小 `ListConversations`、`unread_only` / `pinned_only` / `muted_only` 会话列表过滤、`UPDATED_AT` / `PINNED_UPDATED_AT` / `UNREAD_UPDATED_AT` 会话列表排序、Archive / Pin / Mute 用户列表偏好、第一阶段 gRPC server TLS / mTLS 配置、`/healthz` / `/readyz` / `/debug/metrics` 低敏观测入口、first-stage OpenTelemetry gRPC server span，以及 receipt / demo smoke runner 的 delivery / receipt client TLS 配置已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events` 和会话列表偏好链路。
+状态：Draft，proto / Kafka schema / migration / 六层骨架、PostgreSQL repository、delivery event consumer、`MarkRead` 事务、`ListReceiptStates` repository 级批量查询、低敏 `received_device_count` 聚合、receipt outbox relay、只读 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit`、`outbox-repair-cleanup` operator、最小 `ListConversations`、`unread_only` / `pinned_only` / `muted_only` 会话列表过滤、`UPDATED_AT` / `PINNED_UPDATED_AT` / `UNREAD_UPDATED_AT` 会话列表排序、Archive / Pin / Mute 用户列表偏好、第一阶段 gRPC server TLS / mTLS 配置、`/healthz` / `/readyz` / `/debug/metrics` 低敏观测入口、first-stage OpenTelemetry gRPC server span，以及 receipt / demo smoke runner 的 delivery / receipt client TLS 配置已落地；真实进程 smoke 已覆盖 `im.delivery.events -> receipt projection -> MarkRead -> receipt_outbox -> im.receipt.events` 和会话列表偏好链路。
 
 本文定义 `receipt-service` 的第一条可编码切片：基于 `delivery-service` 已经产生的 durable delivery 事件，构建消息送达 / 已读回执 read model，并提供最小查询和 `MarkRead` 写入入口。
 
@@ -132,7 +132,7 @@ delivery.ack.recorded.v1
 -> message_receipt_states.received
 ```
 
-第一阶段 `received` 是“至少一个设备已 ACK 到该 seq”。如果后续产品要求“所有在线设备均收到”或“每设备送达状态”，需要扩展查询模型，但不能改变第一阶段事件含义。
+第一阶段 `received` 是“至少一个设备已 ACK 到该 seq”。`GetReceiptState` / `ListReceiptStates` 可以返回低敏 `received_device_count`，表示该用户已 ACK 到该 message seq 的设备数量；普通 API 不返回 device_id 明细。如果后续产品要求“所有在线设备均收到”或“每设备送达状态明细”，需要扩展查询模型和隐私策略，但不能改变第一阶段事件含义。
 
 ### 5.2 已读 / read
 
@@ -379,6 +379,9 @@ CREATE TABLE device_received_cursors (
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (tenant_id, user_id, device_id, conversation_id)
 );
+
+CREATE INDEX idx_device_received_cursors_user_conversation_seq
+    ON device_received_cursors (tenant_id, user_id, conversation_id, last_received_seq);
 
 CREATE TABLE user_received_cursors (
     tenant_id           TEXT        NOT NULL,

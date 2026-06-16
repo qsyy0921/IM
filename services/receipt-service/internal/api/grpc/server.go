@@ -163,11 +163,12 @@ func receiptStateResponse(result types.GetReceiptStateResult) *receiptv1.GetRece
 	receivers := make([]*receiptv1.ReceiptUserState, 0, len(result.Receivers))
 	for _, receiver := range result.Receivers {
 		receivers = append(receivers, &receiptv1.ReceiptUserState{
-			UserId:           string(receiver.UserID),
-			ReceivedSeq:      receiver.ReceivedSeq,
-			ReceivedAtUnixMs: receiver.ReceivedAt.UnixMilli(),
-			ReadSeq:          receiver.ReadSeq,
-			ReadAtUnixMs:     receiver.ReadAt.UnixMilli(),
+			UserId:              string(receiver.UserID),
+			ReceivedSeq:         receiver.ReceivedSeq,
+			ReceivedAtUnixMs:    receiver.ReceivedAt.UnixMilli(),
+			ReadSeq:             receiver.ReadSeq,
+			ReadAtUnixMs:        receiver.ReadAt.UnixMilli(),
+			ReceivedDeviceCount: int32(receiver.ReceivedDeviceCount),
 		})
 	}
 	return &receiptv1.GetReceiptStateResponse{

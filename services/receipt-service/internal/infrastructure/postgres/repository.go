@@ -198,7 +198,15 @@ SELECT
     CASE WHEN received_at IS NULL THEN 0 ELSE conversation_seq END AS received_seq,
     received_at,
     CASE WHEN read_at IS NULL THEN 0 ELSE conversation_seq END AS read_seq,
-    read_at
+    read_at,
+    (
+        SELECT COUNT(*)
+        FROM device_received_cursors
+        WHERE device_received_cursors.tenant_id = message_receipt_states.tenant_id
+          AND device_received_cursors.user_id = message_receipt_states.user_id
+          AND device_received_cursors.conversation_id = message_receipt_states.conversation_id
+          AND device_received_cursors.last_received_seq >= message_receipt_states.conversation_seq
+    ) AS received_device_count
 FROM message_receipt_states
 WHERE tenant_id = $1
   AND conversation_id = $2
@@ -223,6 +231,7 @@ ORDER BY user_id ASC
 			&receivedAt,
 			&receiver.ReadSeq,
 			&readAt,
+			&receiver.ReceivedDeviceCount,
 		); err != nil {
 			return types.GetReceiptStateResult{}, types.NewDBReadFailed(err.Error())
 		}
@@ -321,7 +330,15 @@ SELECT
     CASE WHEN message_receipt_states.received_at IS NULL THEN 0 ELSE message_receipt_states.conversation_seq END AS received_seq,
     message_receipt_states.received_at,
     CASE WHEN message_receipt_states.read_at IS NULL THEN 0 ELSE message_receipt_states.conversation_seq END AS read_seq,
-    message_receipt_states.read_at
+    message_receipt_states.read_at,
+    (
+        SELECT COUNT(*)
+        FROM device_received_cursors
+        WHERE device_received_cursors.tenant_id = message_receipt_states.tenant_id
+          AND device_received_cursors.user_id = message_receipt_states.user_id
+          AND device_received_cursors.conversation_id = message_receipt_states.conversation_id
+          AND device_received_cursors.last_received_seq >= message_receipt_states.conversation_seq
+    ) AS received_device_count
 FROM resolved
 JOIN message_receipt_states
   ON message_receipt_states.tenant_id = $1
@@ -354,6 +371,7 @@ ORDER BY resolved.ord ASC, message_receipt_states.user_id ASC
 			&receivedAt,
 			&receiver.ReadSeq,
 			&readAt,
+			&receiver.ReceivedDeviceCount,
 		); err != nil {
 			return types.ListReceiptStatesResult{}, types.NewDBReadFailed(err.Error())
 		}

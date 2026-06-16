@@ -406,14 +406,15 @@ func (x *GetReceiptStateRequest) GetConversationSeq() int64 {
 }
 
 type ReceiptUserState struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	UserId           string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ReceivedSeq      int64                  `protobuf:"varint,2,opt,name=received_seq,json=receivedSeq,proto3" json:"received_seq,omitempty"`
-	ReceivedAtUnixMs int64                  `protobuf:"varint,3,opt,name=received_at_unix_ms,json=receivedAtUnixMs,proto3" json:"received_at_unix_ms,omitempty"`
-	ReadSeq          int64                  `protobuf:"varint,4,opt,name=read_seq,json=readSeq,proto3" json:"read_seq,omitempty"`
-	ReadAtUnixMs     int64                  `protobuf:"varint,5,opt,name=read_at_unix_ms,json=readAtUnixMs,proto3" json:"read_at_unix_ms,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	UserId              string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ReceivedSeq         int64                  `protobuf:"varint,2,opt,name=received_seq,json=receivedSeq,proto3" json:"received_seq,omitempty"`
+	ReceivedAtUnixMs    int64                  `protobuf:"varint,3,opt,name=received_at_unix_ms,json=receivedAtUnixMs,proto3" json:"received_at_unix_ms,omitempty"`
+	ReadSeq             int64                  `protobuf:"varint,4,opt,name=read_seq,json=readSeq,proto3" json:"read_seq,omitempty"`
+	ReadAtUnixMs        int64                  `protobuf:"varint,5,opt,name=read_at_unix_ms,json=readAtUnixMs,proto3" json:"read_at_unix_ms,omitempty"`
+	ReceivedDeviceCount int32                  `protobuf:"varint,6,opt,name=received_device_count,json=receivedDeviceCount,proto3" json:"received_device_count,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *ReceiptUserState) Reset() {
@@ -477,6 +478,13 @@ func (x *ReceiptUserState) GetReadSeq() int64 {
 func (x *ReceiptUserState) GetReadAtUnixMs() int64 {
 	if x != nil {
 		return x.ReadAtUnixMs
+	}
+	return 0
+}
+
+func (x *ReceiptUserState) GetReceivedDeviceCount() int32 {
+	if x != nil {
+		return x.ReceivedDeviceCount
 	}
 	return 0
 }
@@ -1413,13 +1421,14 @@ const file_nexusim_receipt_v1_receipt_service_proto_rawDesc = "" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x03 \x01(\tR\tmessageId\x12)\n" +
-	"\x10conversation_seq\x18\x04 \x01(\x03R\x0fconversationSeq\"\xbf\x01\n" +
+	"\x10conversation_seq\x18\x04 \x01(\x03R\x0fconversationSeq\"\xf3\x01\n" +
 	"\x10ReceiptUserState\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12!\n" +
 	"\freceived_seq\x18\x02 \x01(\x03R\vreceivedSeq\x12-\n" +
 	"\x13received_at_unix_ms\x18\x03 \x01(\x03R\x10receivedAtUnixMs\x12\x19\n" +
 	"\bread_seq\x18\x04 \x01(\x03R\areadSeq\x12%\n" +
-	"\x0fread_at_unix_ms\x18\x05 \x01(\x03R\freadAtUnixMs\"\xfc\x02\n" +
+	"\x0fread_at_unix_ms\x18\x05 \x01(\x03R\freadAtUnixMs\x122\n" +
+	"\x15received_device_count\x18\x06 \x01(\x05R\x13receivedDeviceCount\"\xfc\x02\n" +
 	"\x17GetReceiptStateResponse\x12'\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12)\n" +
 	"\x10conversation_seq\x18\x02 \x01(\x03R\x0fconversationSeq\x12\x1d\n" +

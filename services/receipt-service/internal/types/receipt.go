@@ -59,11 +59,12 @@ func (command GetReceiptStateCommand) Validate() error {
 }
 
 type ReceiptUserState struct {
-	UserID      UserID
-	ReceivedSeq int64
-	ReceivedAt  time.Time
-	ReadSeq     int64
-	ReadAt      time.Time
+	UserID              UserID
+	ReceivedSeq         int64
+	ReceivedAt          time.Time
+	ReadSeq             int64
+	ReadAt              time.Time
+	ReceivedDeviceCount int
 }
 
 type GetReceiptStateResult struct {

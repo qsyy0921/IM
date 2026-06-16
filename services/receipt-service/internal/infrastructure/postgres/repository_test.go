@@ -124,6 +124,46 @@ func TestRepositoryListReceiptStatesBatchIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryReceiptStateCountsReceivedDevicesIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	if _, err := repository.ProjectDeliveryEvent(ctx, inboxCreatedCommand(1, "delivery-inbox-1")); err != nil {
+		t.Fatalf("project inbox item: %v", err)
+	}
+	if _, err := repository.ProjectDeliveryEvent(ctx, ackRecordedCommandForDevice(1, "delivery-ack-device-1", "device-1")); err != nil {
+		t.Fatalf("project first device ack: %v", err)
+	}
+	if _, err := repository.ProjectDeliveryEvent(ctx, ackRecordedCommandForDevice(1, "delivery-ack-device-2", "device-2")); err != nil {
+		t.Fatalf("project second device ack: %v", err)
+	}
+
+	state, err := repository.GetReceiptState(ctx, getStateCommandBySeq(1))
+	if err != nil {
+		t.Fatalf("get receipt state: %v", err)
+	}
+	if state.ReceivedUserCount != 1 || len(state.Receivers) != 1 {
+		t.Fatalf("unexpected user receipt state: %+v", state)
+	}
+	if state.Receivers[0].ReceivedDeviceCount != 2 {
+		t.Fatalf("expected received_device_count=2, got %+v", state.Receivers[0])
+	}
+
+	batch, err := repository.ListReceiptStates(ctx, types.ListReceiptStatesCommand{
+		AuthContext:    getStateCommandBySeq(1).AuthContext,
+		ConversationID: "conv-receipt",
+		Items:          []types.ReceiptStateQuery{{ConversationSeq: 1}},
+	})
+	if err != nil {
+		t.Fatalf("list receipt states: %v", err)
+	}
+	if batch.Items[0].Receivers[0].ReceivedDeviceCount != 2 {
+		t.Fatalf("expected batch received_device_count=2, got %+v", batch.Items[0].Receivers[0])
+	}
+}
+
 func TestRepositoryListReceiptStatesReturnsNotFoundForMissingItemIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -718,12 +758,16 @@ func inboxCreatedCommand(seq int64, eventID string) types.ProjectDeliveryEventCo
 }
 
 func ackRecordedCommand(receivedSeq int64, eventID string) types.ProjectDeliveryEventCommand {
+	return ackRecordedCommandForDevice(receivedSeq, eventID, "device-1")
+}
+
+func ackRecordedCommandForDevice(receivedSeq int64, eventID string, deviceID string) types.ProjectDeliveryEventCommand {
 	return types.ProjectDeliveryEventCommand{
 		TenantID:        "tenant-receipt",
 		EventID:         eventID,
 		EventType:       types.DeliveryEventAckRecorded,
 		UserID:          "receiver-1",
-		DeviceID:        "device-1",
+		DeviceID:        deviceID,
 		ConversationID:  "conv-receipt",
 		LastReceivedSeq: receivedSeq,
 		ConsumerGroup:   "receipt-test",
@@ -1085,6 +1129,7 @@ func applyReceiptMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool
 		"000007_conversation_mute.sql",
 		"000008_conversation_unread_filter.sql",
 		"000009_receipt_outbox_repair_audit.sql",
+		"000010_device_received_cursor_lookup.sql",
 	} {
 		migrationPath := filepath.Join(root, "migrations", "postgres", "receipt", name)
 		sqlBytes, err := os.ReadFile(migrationPath)

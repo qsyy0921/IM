@@ -49,6 +49,7 @@ message ReceiptUserState {
   int64 received_at_unix_ms = 3;
   int64 read_seq = 4;
   int64 read_at_unix_ms = 5;
+  int32 received_device_count = 6;
 }
 
 enum ReceiptVisibilityMode {

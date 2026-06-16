@@ -283,9 +283,10 @@ func TestListReceiptStatesMapsRequestAndResponse(t *testing.T) {
 				ReadUserCount:     1,
 				VisibilityMode:    types.ReceiptVisibilityDetailed,
 				Receivers: []types.ReceiptUserState{{
-					UserID:      "user-2",
-					ReceivedSeq: 11,
-					ReadSeq:     11,
+					UserID:              "user-2",
+					ReceivedSeq:         11,
+					ReadSeq:             11,
+					ReceivedDeviceCount: 2,
 				}},
 			}},
 		},
@@ -310,7 +311,8 @@ func TestListReceiptStatesMapsRequestAndResponse(t *testing.T) {
 	}
 	if len(response.GetItems()) != 1 ||
 		response.GetItems()[0].GetConversationSeq() != 11 ||
-		response.GetItems()[0].GetReadUserCount() != 1 {
+		response.GetItems()[0].GetReadUserCount() != 1 ||
+		response.GetItems()[0].GetReceivers()[0].GetReceivedDeviceCount() != 2 {
 		t.Fatalf("unexpected response: %+v", response)
 	}
 }

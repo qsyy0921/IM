@@ -56,6 +56,7 @@ const (
 	GatewayService_PinConversation_FullMethodName              = "/nexusim.gateway.v1.GatewayService/PinConversation"
 	GatewayService_MuteConversation_FullMethodName             = "/nexusim.gateway.v1.GatewayService/MuteConversation"
 	GatewayService_SetConversationTags_FullMethodName          = "/nexusim.gateway.v1.GatewayService/SetConversationTags"
+	GatewayService_SetConversationDraft_FullMethodName         = "/nexusim.gateway.v1.GatewayService/SetConversationDraft"
 	GatewayService_SendContactRequest_FullMethodName           = "/nexusim.gateway.v1.GatewayService/SendContactRequest"
 	GatewayService_RespondContactRequest_FullMethodName        = "/nexusim.gateway.v1.GatewayService/RespondContactRequest"
 	GatewayService_CancelContactRequest_FullMethodName         = "/nexusim.gateway.v1.GatewayService/CancelContactRequest"
@@ -106,6 +107,7 @@ type GatewayServiceClient interface {
 	PinConversation(ctx context.Context, in *v14.PinConversationRequest, opts ...grpc.CallOption) (*v14.PinConversationResponse, error)
 	MuteConversation(ctx context.Context, in *v14.MuteConversationRequest, opts ...grpc.CallOption) (*v14.MuteConversationResponse, error)
 	SetConversationTags(ctx context.Context, in *v14.SetConversationTagsRequest, opts ...grpc.CallOption) (*v14.SetConversationTagsResponse, error)
+	SetConversationDraft(ctx context.Context, in *v14.SetConversationDraftRequest, opts ...grpc.CallOption) (*v14.SetConversationDraftResponse, error)
 	SendContactRequest(ctx context.Context, in *v15.SendContactRequestRequest, opts ...grpc.CallOption) (*v15.SendContactRequestResponse, error)
 	RespondContactRequest(ctx context.Context, in *v15.RespondContactRequestRequest, opts ...grpc.CallOption) (*v15.RespondContactRequestResponse, error)
 	CancelContactRequest(ctx context.Context, in *v15.CancelContactRequestRequest, opts ...grpc.CallOption) (*v15.CancelContactRequestResponse, error)
@@ -436,6 +438,16 @@ func (c *gatewayServiceClient) SetConversationTags(ctx context.Context, in *v14.
 	return out, nil
 }
 
+func (c *gatewayServiceClient) SetConversationDraft(ctx context.Context, in *v14.SetConversationDraftRequest, opts ...grpc.CallOption) (*v14.SetConversationDraftResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v14.SetConversationDraftResponse)
+	err := c.cc.Invoke(ctx, GatewayService_SetConversationDraft_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *gatewayServiceClient) SendContactRequest(ctx context.Context, in *v15.SendContactRequestRequest, opts ...grpc.CallOption) (*v15.SendContactRequestResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(v15.SendContactRequestResponse)
@@ -574,6 +586,7 @@ type GatewayServiceServer interface {
 	PinConversation(context.Context, *v14.PinConversationRequest) (*v14.PinConversationResponse, error)
 	MuteConversation(context.Context, *v14.MuteConversationRequest) (*v14.MuteConversationResponse, error)
 	SetConversationTags(context.Context, *v14.SetConversationTagsRequest) (*v14.SetConversationTagsResponse, error)
+	SetConversationDraft(context.Context, *v14.SetConversationDraftRequest) (*v14.SetConversationDraftResponse, error)
 	SendContactRequest(context.Context, *v15.SendContactRequestRequest) (*v15.SendContactRequestResponse, error)
 	RespondContactRequest(context.Context, *v15.RespondContactRequestRequest) (*v15.RespondContactRequestResponse, error)
 	CancelContactRequest(context.Context, *v15.CancelContactRequestRequest) (*v15.CancelContactRequestResponse, error)
@@ -686,6 +699,9 @@ func (UnimplementedGatewayServiceServer) MuteConversation(context.Context, *v14.
 }
 func (UnimplementedGatewayServiceServer) SetConversationTags(context.Context, *v14.SetConversationTagsRequest) (*v14.SetConversationTagsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetConversationTags not implemented")
+}
+func (UnimplementedGatewayServiceServer) SetConversationDraft(context.Context, *v14.SetConversationDraftRequest) (*v14.SetConversationDraftResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetConversationDraft not implemented")
 }
 func (UnimplementedGatewayServiceServer) SendContactRequest(context.Context, *v15.SendContactRequestRequest) (*v15.SendContactRequestResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SendContactRequest not implemented")
@@ -1296,6 +1312,24 @@ func _GatewayService_SetConversationTags_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GatewayService_SetConversationDraft_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v14.SetConversationDraftRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).SetConversationDraft(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_SetConversationDraft_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).SetConversationDraft(ctx, req.(*v14.SetConversationDraftRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GatewayService_SendContactRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(v15.SendContactRequestRequest)
 	if err := dec(in); err != nil {
@@ -1606,6 +1640,10 @@ var GatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetConversationTags",
 			Handler:    _GatewayService_SetConversationTags_Handler,
+		},
+		{
+			MethodName: "SetConversationDraft",
+			Handler:    _GatewayService_SetConversationDraft_Handler,
 		},
 		{
 			MethodName: "SendContactRequest",

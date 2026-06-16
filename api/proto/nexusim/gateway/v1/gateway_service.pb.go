@@ -30,7 +30,7 @@ var File_nexusim_gateway_v1_gateway_service_proto protoreflect.FileDescriptor
 
 const file_nexusim_gateway_v1_gateway_service_proto_rawDesc = "" +
 	"\n" +
-	"(nexusim/gateway/v1/gateway_service.proto\x12\x12nexusim.gateway.v1\x1a*nexusim/contacts/v1/contacts_service.proto\x1a2nexusim/conversation/v1/conversation_service.proto\x1a*nexusim/delivery/v1/delivery_service.proto\x1a*nexusim/identity/v1/identity_service.proto\x1a(nexusim/message/v1/message_service.proto\x1a(nexusim/receipt/v1/receipt_service.proto2\x90%\n" +
+	"(nexusim/gateway/v1/gateway_service.proto\x12\x12nexusim.gateway.v1\x1a*nexusim/contacts/v1/contacts_service.proto\x1a2nexusim/conversation/v1/conversation_service.proto\x1a*nexusim/delivery/v1/delivery_service.proto\x1a*nexusim/identity/v1/identity_service.proto\x1a(nexusim/message/v1/message_service.proto\x1a(nexusim/receipt/v1/receipt_service.proto2\x8b&\n" +
 	"\x0eGatewayService\x12c\n" +
 	"\fRegisterUser\x12(.nexusim.identity.v1.RegisterUserRequest\x1a).nexusim.identity.v1.RegisterUserResponse\x12N\n" +
 	"\x05Login\x12!.nexusim.identity.v1.LoginRequest\x1a\".nexusim.identity.v1.LoginResponse\x12x\n" +
@@ -62,7 +62,8 @@ const file_nexusim_gateway_v1_gateway_service_proto_rawDesc = "" +
 	"\x13ArchiveConversation\x12..nexusim.receipt.v1.ArchiveConversationRequest\x1a/.nexusim.receipt.v1.ArchiveConversationResponse\x12j\n" +
 	"\x0fPinConversation\x12*.nexusim.receipt.v1.PinConversationRequest\x1a+.nexusim.receipt.v1.PinConversationResponse\x12m\n" +
 	"\x10MuteConversation\x12+.nexusim.receipt.v1.MuteConversationRequest\x1a,.nexusim.receipt.v1.MuteConversationResponse\x12v\n" +
-	"\x13SetConversationTags\x12..nexusim.receipt.v1.SetConversationTagsRequest\x1a/.nexusim.receipt.v1.SetConversationTagsResponse\x12u\n" +
+	"\x13SetConversationTags\x12..nexusim.receipt.v1.SetConversationTagsRequest\x1a/.nexusim.receipt.v1.SetConversationTagsResponse\x12y\n" +
+	"\x14SetConversationDraft\x12/.nexusim.receipt.v1.SetConversationDraftRequest\x1a0.nexusim.receipt.v1.SetConversationDraftResponse\x12u\n" +
 	"\x12SendContactRequest\x12..nexusim.contacts.v1.SendContactRequestRequest\x1a/.nexusim.contacts.v1.SendContactRequestResponse\x12~\n" +
 	"\x15RespondContactRequest\x121.nexusim.contacts.v1.RespondContactRequestRequest\x1a2.nexusim.contacts.v1.RespondContactRequestResponse\x12{\n" +
 	"\x14CancelContactRequest\x120.nexusim.contacts.v1.CancelContactRequestRequest\x1a1.nexusim.contacts.v1.CancelContactRequestResponse\x12x\n" +
@@ -106,55 +107,57 @@ var file_nexusim_gateway_v1_gateway_service_proto_goTypes = []any{
 	(*v14.PinConversationRequest)(nil),              // 28: nexusim.receipt.v1.PinConversationRequest
 	(*v14.MuteConversationRequest)(nil),             // 29: nexusim.receipt.v1.MuteConversationRequest
 	(*v14.SetConversationTagsRequest)(nil),          // 30: nexusim.receipt.v1.SetConversationTagsRequest
-	(*v15.SendContactRequestRequest)(nil),           // 31: nexusim.contacts.v1.SendContactRequestRequest
-	(*v15.RespondContactRequestRequest)(nil),        // 32: nexusim.contacts.v1.RespondContactRequestRequest
-	(*v15.CancelContactRequestRequest)(nil),         // 33: nexusim.contacts.v1.CancelContactRequestRequest
-	(*v15.ListContactRequestsRequest)(nil),          // 34: nexusim.contacts.v1.ListContactRequestsRequest
-	(*v15.ListContactsRequest)(nil),                 // 35: nexusim.contacts.v1.ListContactsRequest
-	(*v15.GetContactStateRequest)(nil),              // 36: nexusim.contacts.v1.GetContactStateRequest
-	(*v15.DeleteContactRequest)(nil),                // 37: nexusim.contacts.v1.DeleteContactRequest
-	(*v15.BlockContactRequest)(nil),                 // 38: nexusim.contacts.v1.BlockContactRequest
-	(*v15.UnblockContactRequest)(nil),               // 39: nexusim.contacts.v1.UnblockContactRequest
-	(*v15.UpdateContactRemarkRequest)(nil),          // 40: nexusim.contacts.v1.UpdateContactRemarkRequest
-	(*v1.RegisterUserResponse)(nil),                 // 41: nexusim.identity.v1.RegisterUserResponse
-	(*v1.LoginResponse)(nil),                        // 42: nexusim.identity.v1.LoginResponse
-	(*v1.RefreshGatewayTokenResponse)(nil),          // 43: nexusim.identity.v1.RefreshGatewayTokenResponse
-	(*v1.RequestVerificationChallengeResponse)(nil), // 44: nexusim.identity.v1.RequestVerificationChallengeResponse
-	(*v1.ConfirmVerificationChallengeResponse)(nil), // 45: nexusim.identity.v1.ConfirmVerificationChallengeResponse
-	(*v1.RequestPasswordResetResponse)(nil),         // 46: nexusim.identity.v1.RequestPasswordResetResponse
-	(*v1.ConfirmPasswordResetResponse)(nil),         // 47: nexusim.identity.v1.ConfirmPasswordResetResponse
-	(*v1.BeginMFAEnrollmentResponse)(nil),           // 48: nexusim.identity.v1.BeginMFAEnrollmentResponse
-	(*v1.ConfirmMFAEnrollmentResponse)(nil),         // 49: nexusim.identity.v1.ConfirmMFAEnrollmentResponse
-	(*v1.DisableMFAFactorResponse)(nil),             // 50: nexusim.identity.v1.DisableMFAFactorResponse
-	(*v1.RegenerateMFARecoveryCodesResponse)(nil),   // 51: nexusim.identity.v1.RegenerateMFARecoveryCodesResponse
-	(*v1.RevokeMFARecoveryCodesResponse)(nil),       // 52: nexusim.identity.v1.RevokeMFARecoveryCodesResponse
-	(*v11.CreateMemberChangeResponse)(nil),          // 53: nexusim.conversation.v1.CreateMemberChangeResponse
-	(*v11.GetMemberChangeResponse)(nil),             // 54: nexusim.conversation.v1.GetMemberChangeResponse
-	(*v11.ListConversationMembersResponse)(nil),     // 55: nexusim.conversation.v1.ListConversationMembersResponse
-	(*v11.TransferConversationOwnerResponse)(nil),   // 56: nexusim.conversation.v1.TransferConversationOwnerResponse
-	(*v12.SendMessageResponse)(nil),                 // 57: nexusim.message.v1.SendMessageResponse
-	(*v12.MessageChangeResponse)(nil),               // 58: nexusim.message.v1.MessageChangeResponse
-	(*v13.PullInboxResponse)(nil),                   // 59: nexusim.delivery.v1.PullInboxResponse
-	(*v13.AckDeliveryResponse)(nil),                 // 60: nexusim.delivery.v1.AckDeliveryResponse
-	(*v13.HideInboxItemResponse)(nil),               // 61: nexusim.delivery.v1.HideInboxItemResponse
-	(*v14.MarkReadResponse)(nil),                    // 62: nexusim.receipt.v1.MarkReadResponse
-	(*v14.GetReceiptStateResponse)(nil),             // 63: nexusim.receipt.v1.GetReceiptStateResponse
-	(*v14.ListReceiptStatesResponse)(nil),           // 64: nexusim.receipt.v1.ListReceiptStatesResponse
-	(*v14.ListConversationsResponse)(nil),           // 65: nexusim.receipt.v1.ListConversationsResponse
-	(*v14.ArchiveConversationResponse)(nil),         // 66: nexusim.receipt.v1.ArchiveConversationResponse
-	(*v14.PinConversationResponse)(nil),             // 67: nexusim.receipt.v1.PinConversationResponse
-	(*v14.MuteConversationResponse)(nil),            // 68: nexusim.receipt.v1.MuteConversationResponse
-	(*v14.SetConversationTagsResponse)(nil),         // 69: nexusim.receipt.v1.SetConversationTagsResponse
-	(*v15.SendContactRequestResponse)(nil),          // 70: nexusim.contacts.v1.SendContactRequestResponse
-	(*v15.RespondContactRequestResponse)(nil),       // 71: nexusim.contacts.v1.RespondContactRequestResponse
-	(*v15.CancelContactRequestResponse)(nil),        // 72: nexusim.contacts.v1.CancelContactRequestResponse
-	(*v15.ListContactRequestsResponse)(nil),         // 73: nexusim.contacts.v1.ListContactRequestsResponse
-	(*v15.ListContactsResponse)(nil),                // 74: nexusim.contacts.v1.ListContactsResponse
-	(*v15.GetContactStateResponse)(nil),             // 75: nexusim.contacts.v1.GetContactStateResponse
-	(*v15.DeleteContactResponse)(nil),               // 76: nexusim.contacts.v1.DeleteContactResponse
-	(*v15.BlockContactResponse)(nil),                // 77: nexusim.contacts.v1.BlockContactResponse
-	(*v15.UnblockContactResponse)(nil),              // 78: nexusim.contacts.v1.UnblockContactResponse
-	(*v15.UpdateContactRemarkResponse)(nil),         // 79: nexusim.contacts.v1.UpdateContactRemarkResponse
+	(*v14.SetConversationDraftRequest)(nil),         // 31: nexusim.receipt.v1.SetConversationDraftRequest
+	(*v15.SendContactRequestRequest)(nil),           // 32: nexusim.contacts.v1.SendContactRequestRequest
+	(*v15.RespondContactRequestRequest)(nil),        // 33: nexusim.contacts.v1.RespondContactRequestRequest
+	(*v15.CancelContactRequestRequest)(nil),         // 34: nexusim.contacts.v1.CancelContactRequestRequest
+	(*v15.ListContactRequestsRequest)(nil),          // 35: nexusim.contacts.v1.ListContactRequestsRequest
+	(*v15.ListContactsRequest)(nil),                 // 36: nexusim.contacts.v1.ListContactsRequest
+	(*v15.GetContactStateRequest)(nil),              // 37: nexusim.contacts.v1.GetContactStateRequest
+	(*v15.DeleteContactRequest)(nil),                // 38: nexusim.contacts.v1.DeleteContactRequest
+	(*v15.BlockContactRequest)(nil),                 // 39: nexusim.contacts.v1.BlockContactRequest
+	(*v15.UnblockContactRequest)(nil),               // 40: nexusim.contacts.v1.UnblockContactRequest
+	(*v15.UpdateContactRemarkRequest)(nil),          // 41: nexusim.contacts.v1.UpdateContactRemarkRequest
+	(*v1.RegisterUserResponse)(nil),                 // 42: nexusim.identity.v1.RegisterUserResponse
+	(*v1.LoginResponse)(nil),                        // 43: nexusim.identity.v1.LoginResponse
+	(*v1.RefreshGatewayTokenResponse)(nil),          // 44: nexusim.identity.v1.RefreshGatewayTokenResponse
+	(*v1.RequestVerificationChallengeResponse)(nil), // 45: nexusim.identity.v1.RequestVerificationChallengeResponse
+	(*v1.ConfirmVerificationChallengeResponse)(nil), // 46: nexusim.identity.v1.ConfirmVerificationChallengeResponse
+	(*v1.RequestPasswordResetResponse)(nil),         // 47: nexusim.identity.v1.RequestPasswordResetResponse
+	(*v1.ConfirmPasswordResetResponse)(nil),         // 48: nexusim.identity.v1.ConfirmPasswordResetResponse
+	(*v1.BeginMFAEnrollmentResponse)(nil),           // 49: nexusim.identity.v1.BeginMFAEnrollmentResponse
+	(*v1.ConfirmMFAEnrollmentResponse)(nil),         // 50: nexusim.identity.v1.ConfirmMFAEnrollmentResponse
+	(*v1.DisableMFAFactorResponse)(nil),             // 51: nexusim.identity.v1.DisableMFAFactorResponse
+	(*v1.RegenerateMFARecoveryCodesResponse)(nil),   // 52: nexusim.identity.v1.RegenerateMFARecoveryCodesResponse
+	(*v1.RevokeMFARecoveryCodesResponse)(nil),       // 53: nexusim.identity.v1.RevokeMFARecoveryCodesResponse
+	(*v11.CreateMemberChangeResponse)(nil),          // 54: nexusim.conversation.v1.CreateMemberChangeResponse
+	(*v11.GetMemberChangeResponse)(nil),             // 55: nexusim.conversation.v1.GetMemberChangeResponse
+	(*v11.ListConversationMembersResponse)(nil),     // 56: nexusim.conversation.v1.ListConversationMembersResponse
+	(*v11.TransferConversationOwnerResponse)(nil),   // 57: nexusim.conversation.v1.TransferConversationOwnerResponse
+	(*v12.SendMessageResponse)(nil),                 // 58: nexusim.message.v1.SendMessageResponse
+	(*v12.MessageChangeResponse)(nil),               // 59: nexusim.message.v1.MessageChangeResponse
+	(*v13.PullInboxResponse)(nil),                   // 60: nexusim.delivery.v1.PullInboxResponse
+	(*v13.AckDeliveryResponse)(nil),                 // 61: nexusim.delivery.v1.AckDeliveryResponse
+	(*v13.HideInboxItemResponse)(nil),               // 62: nexusim.delivery.v1.HideInboxItemResponse
+	(*v14.MarkReadResponse)(nil),                    // 63: nexusim.receipt.v1.MarkReadResponse
+	(*v14.GetReceiptStateResponse)(nil),             // 64: nexusim.receipt.v1.GetReceiptStateResponse
+	(*v14.ListReceiptStatesResponse)(nil),           // 65: nexusim.receipt.v1.ListReceiptStatesResponse
+	(*v14.ListConversationsResponse)(nil),           // 66: nexusim.receipt.v1.ListConversationsResponse
+	(*v14.ArchiveConversationResponse)(nil),         // 67: nexusim.receipt.v1.ArchiveConversationResponse
+	(*v14.PinConversationResponse)(nil),             // 68: nexusim.receipt.v1.PinConversationResponse
+	(*v14.MuteConversationResponse)(nil),            // 69: nexusim.receipt.v1.MuteConversationResponse
+	(*v14.SetConversationTagsResponse)(nil),         // 70: nexusim.receipt.v1.SetConversationTagsResponse
+	(*v14.SetConversationDraftResponse)(nil),        // 71: nexusim.receipt.v1.SetConversationDraftResponse
+	(*v15.SendContactRequestResponse)(nil),          // 72: nexusim.contacts.v1.SendContactRequestResponse
+	(*v15.RespondContactRequestResponse)(nil),       // 73: nexusim.contacts.v1.RespondContactRequestResponse
+	(*v15.CancelContactRequestResponse)(nil),        // 74: nexusim.contacts.v1.CancelContactRequestResponse
+	(*v15.ListContactRequestsResponse)(nil),         // 75: nexusim.contacts.v1.ListContactRequestsResponse
+	(*v15.ListContactsResponse)(nil),                // 76: nexusim.contacts.v1.ListContactsResponse
+	(*v15.GetContactStateResponse)(nil),             // 77: nexusim.contacts.v1.GetContactStateResponse
+	(*v15.DeleteContactResponse)(nil),               // 78: nexusim.contacts.v1.DeleteContactResponse
+	(*v15.BlockContactResponse)(nil),                // 79: nexusim.contacts.v1.BlockContactResponse
+	(*v15.UnblockContactResponse)(nil),              // 80: nexusim.contacts.v1.UnblockContactResponse
+	(*v15.UpdateContactRemarkResponse)(nil),         // 81: nexusim.contacts.v1.UpdateContactRemarkResponse
 }
 var file_nexusim_gateway_v1_gateway_service_proto_depIdxs = []int32{
 	0,  // 0: nexusim.gateway.v1.GatewayService.RegisterUser:input_type -> nexusim.identity.v1.RegisterUserRequest
@@ -188,59 +191,61 @@ var file_nexusim_gateway_v1_gateway_service_proto_depIdxs = []int32{
 	28, // 28: nexusim.gateway.v1.GatewayService.PinConversation:input_type -> nexusim.receipt.v1.PinConversationRequest
 	29, // 29: nexusim.gateway.v1.GatewayService.MuteConversation:input_type -> nexusim.receipt.v1.MuteConversationRequest
 	30, // 30: nexusim.gateway.v1.GatewayService.SetConversationTags:input_type -> nexusim.receipt.v1.SetConversationTagsRequest
-	31, // 31: nexusim.gateway.v1.GatewayService.SendContactRequest:input_type -> nexusim.contacts.v1.SendContactRequestRequest
-	32, // 32: nexusim.gateway.v1.GatewayService.RespondContactRequest:input_type -> nexusim.contacts.v1.RespondContactRequestRequest
-	33, // 33: nexusim.gateway.v1.GatewayService.CancelContactRequest:input_type -> nexusim.contacts.v1.CancelContactRequestRequest
-	34, // 34: nexusim.gateway.v1.GatewayService.ListContactRequests:input_type -> nexusim.contacts.v1.ListContactRequestsRequest
-	35, // 35: nexusim.gateway.v1.GatewayService.ListContacts:input_type -> nexusim.contacts.v1.ListContactsRequest
-	36, // 36: nexusim.gateway.v1.GatewayService.GetContactState:input_type -> nexusim.contacts.v1.GetContactStateRequest
-	37, // 37: nexusim.gateway.v1.GatewayService.DeleteContact:input_type -> nexusim.contacts.v1.DeleteContactRequest
-	38, // 38: nexusim.gateway.v1.GatewayService.BlockContact:input_type -> nexusim.contacts.v1.BlockContactRequest
-	39, // 39: nexusim.gateway.v1.GatewayService.UnblockContact:input_type -> nexusim.contacts.v1.UnblockContactRequest
-	40, // 40: nexusim.gateway.v1.GatewayService.UpdateContactRemark:input_type -> nexusim.contacts.v1.UpdateContactRemarkRequest
-	41, // 41: nexusim.gateway.v1.GatewayService.RegisterUser:output_type -> nexusim.identity.v1.RegisterUserResponse
-	42, // 42: nexusim.gateway.v1.GatewayService.Login:output_type -> nexusim.identity.v1.LoginResponse
-	43, // 43: nexusim.gateway.v1.GatewayService.RefreshGatewayToken:output_type -> nexusim.identity.v1.RefreshGatewayTokenResponse
-	44, // 44: nexusim.gateway.v1.GatewayService.RequestVerificationChallenge:output_type -> nexusim.identity.v1.RequestVerificationChallengeResponse
-	45, // 45: nexusim.gateway.v1.GatewayService.ConfirmVerificationChallenge:output_type -> nexusim.identity.v1.ConfirmVerificationChallengeResponse
-	46, // 46: nexusim.gateway.v1.GatewayService.RequestPasswordReset:output_type -> nexusim.identity.v1.RequestPasswordResetResponse
-	47, // 47: nexusim.gateway.v1.GatewayService.ConfirmPasswordReset:output_type -> nexusim.identity.v1.ConfirmPasswordResetResponse
-	48, // 48: nexusim.gateway.v1.GatewayService.BeginMFAEnrollment:output_type -> nexusim.identity.v1.BeginMFAEnrollmentResponse
-	49, // 49: nexusim.gateway.v1.GatewayService.ConfirmMFAEnrollment:output_type -> nexusim.identity.v1.ConfirmMFAEnrollmentResponse
-	50, // 50: nexusim.gateway.v1.GatewayService.DisableMFAFactor:output_type -> nexusim.identity.v1.DisableMFAFactorResponse
-	51, // 51: nexusim.gateway.v1.GatewayService.RegenerateMFARecoveryCodes:output_type -> nexusim.identity.v1.RegenerateMFARecoveryCodesResponse
-	52, // 52: nexusim.gateway.v1.GatewayService.RevokeMFARecoveryCodes:output_type -> nexusim.identity.v1.RevokeMFARecoveryCodesResponse
-	53, // 53: nexusim.gateway.v1.GatewayService.CreateMemberChange:output_type -> nexusim.conversation.v1.CreateMemberChangeResponse
-	54, // 54: nexusim.gateway.v1.GatewayService.GetMemberChange:output_type -> nexusim.conversation.v1.GetMemberChangeResponse
-	55, // 55: nexusim.gateway.v1.GatewayService.ListConversationMembers:output_type -> nexusim.conversation.v1.ListConversationMembersResponse
-	56, // 56: nexusim.gateway.v1.GatewayService.TransferConversationOwner:output_type -> nexusim.conversation.v1.TransferConversationOwnerResponse
-	57, // 57: nexusim.gateway.v1.GatewayService.SendMessage:output_type -> nexusim.message.v1.SendMessageResponse
-	58, // 58: nexusim.gateway.v1.GatewayService.EditMessage:output_type -> nexusim.message.v1.MessageChangeResponse
-	58, // 59: nexusim.gateway.v1.GatewayService.RevokeMessage:output_type -> nexusim.message.v1.MessageChangeResponse
-	58, // 60: nexusim.gateway.v1.GatewayService.DeleteMessage:output_type -> nexusim.message.v1.MessageChangeResponse
-	59, // 61: nexusim.gateway.v1.GatewayService.PullInbox:output_type -> nexusim.delivery.v1.PullInboxResponse
-	60, // 62: nexusim.gateway.v1.GatewayService.AckDelivery:output_type -> nexusim.delivery.v1.AckDeliveryResponse
-	61, // 63: nexusim.gateway.v1.GatewayService.HideInboxItem:output_type -> nexusim.delivery.v1.HideInboxItemResponse
-	62, // 64: nexusim.gateway.v1.GatewayService.MarkRead:output_type -> nexusim.receipt.v1.MarkReadResponse
-	63, // 65: nexusim.gateway.v1.GatewayService.GetReceiptState:output_type -> nexusim.receipt.v1.GetReceiptStateResponse
-	64, // 66: nexusim.gateway.v1.GatewayService.ListReceiptStates:output_type -> nexusim.receipt.v1.ListReceiptStatesResponse
-	65, // 67: nexusim.gateway.v1.GatewayService.ListConversations:output_type -> nexusim.receipt.v1.ListConversationsResponse
-	66, // 68: nexusim.gateway.v1.GatewayService.ArchiveConversation:output_type -> nexusim.receipt.v1.ArchiveConversationResponse
-	67, // 69: nexusim.gateway.v1.GatewayService.PinConversation:output_type -> nexusim.receipt.v1.PinConversationResponse
-	68, // 70: nexusim.gateway.v1.GatewayService.MuteConversation:output_type -> nexusim.receipt.v1.MuteConversationResponse
-	69, // 71: nexusim.gateway.v1.GatewayService.SetConversationTags:output_type -> nexusim.receipt.v1.SetConversationTagsResponse
-	70, // 72: nexusim.gateway.v1.GatewayService.SendContactRequest:output_type -> nexusim.contacts.v1.SendContactRequestResponse
-	71, // 73: nexusim.gateway.v1.GatewayService.RespondContactRequest:output_type -> nexusim.contacts.v1.RespondContactRequestResponse
-	72, // 74: nexusim.gateway.v1.GatewayService.CancelContactRequest:output_type -> nexusim.contacts.v1.CancelContactRequestResponse
-	73, // 75: nexusim.gateway.v1.GatewayService.ListContactRequests:output_type -> nexusim.contacts.v1.ListContactRequestsResponse
-	74, // 76: nexusim.gateway.v1.GatewayService.ListContacts:output_type -> nexusim.contacts.v1.ListContactsResponse
-	75, // 77: nexusim.gateway.v1.GatewayService.GetContactState:output_type -> nexusim.contacts.v1.GetContactStateResponse
-	76, // 78: nexusim.gateway.v1.GatewayService.DeleteContact:output_type -> nexusim.contacts.v1.DeleteContactResponse
-	77, // 79: nexusim.gateway.v1.GatewayService.BlockContact:output_type -> nexusim.contacts.v1.BlockContactResponse
-	78, // 80: nexusim.gateway.v1.GatewayService.UnblockContact:output_type -> nexusim.contacts.v1.UnblockContactResponse
-	79, // 81: nexusim.gateway.v1.GatewayService.UpdateContactRemark:output_type -> nexusim.contacts.v1.UpdateContactRemarkResponse
-	41, // [41:82] is the sub-list for method output_type
-	0,  // [0:41] is the sub-list for method input_type
+	31, // 31: nexusim.gateway.v1.GatewayService.SetConversationDraft:input_type -> nexusim.receipt.v1.SetConversationDraftRequest
+	32, // 32: nexusim.gateway.v1.GatewayService.SendContactRequest:input_type -> nexusim.contacts.v1.SendContactRequestRequest
+	33, // 33: nexusim.gateway.v1.GatewayService.RespondContactRequest:input_type -> nexusim.contacts.v1.RespondContactRequestRequest
+	34, // 34: nexusim.gateway.v1.GatewayService.CancelContactRequest:input_type -> nexusim.contacts.v1.CancelContactRequestRequest
+	35, // 35: nexusim.gateway.v1.GatewayService.ListContactRequests:input_type -> nexusim.contacts.v1.ListContactRequestsRequest
+	36, // 36: nexusim.gateway.v1.GatewayService.ListContacts:input_type -> nexusim.contacts.v1.ListContactsRequest
+	37, // 37: nexusim.gateway.v1.GatewayService.GetContactState:input_type -> nexusim.contacts.v1.GetContactStateRequest
+	38, // 38: nexusim.gateway.v1.GatewayService.DeleteContact:input_type -> nexusim.contacts.v1.DeleteContactRequest
+	39, // 39: nexusim.gateway.v1.GatewayService.BlockContact:input_type -> nexusim.contacts.v1.BlockContactRequest
+	40, // 40: nexusim.gateway.v1.GatewayService.UnblockContact:input_type -> nexusim.contacts.v1.UnblockContactRequest
+	41, // 41: nexusim.gateway.v1.GatewayService.UpdateContactRemark:input_type -> nexusim.contacts.v1.UpdateContactRemarkRequest
+	42, // 42: nexusim.gateway.v1.GatewayService.RegisterUser:output_type -> nexusim.identity.v1.RegisterUserResponse
+	43, // 43: nexusim.gateway.v1.GatewayService.Login:output_type -> nexusim.identity.v1.LoginResponse
+	44, // 44: nexusim.gateway.v1.GatewayService.RefreshGatewayToken:output_type -> nexusim.identity.v1.RefreshGatewayTokenResponse
+	45, // 45: nexusim.gateway.v1.GatewayService.RequestVerificationChallenge:output_type -> nexusim.identity.v1.RequestVerificationChallengeResponse
+	46, // 46: nexusim.gateway.v1.GatewayService.ConfirmVerificationChallenge:output_type -> nexusim.identity.v1.ConfirmVerificationChallengeResponse
+	47, // 47: nexusim.gateway.v1.GatewayService.RequestPasswordReset:output_type -> nexusim.identity.v1.RequestPasswordResetResponse
+	48, // 48: nexusim.gateway.v1.GatewayService.ConfirmPasswordReset:output_type -> nexusim.identity.v1.ConfirmPasswordResetResponse
+	49, // 49: nexusim.gateway.v1.GatewayService.BeginMFAEnrollment:output_type -> nexusim.identity.v1.BeginMFAEnrollmentResponse
+	50, // 50: nexusim.gateway.v1.GatewayService.ConfirmMFAEnrollment:output_type -> nexusim.identity.v1.ConfirmMFAEnrollmentResponse
+	51, // 51: nexusim.gateway.v1.GatewayService.DisableMFAFactor:output_type -> nexusim.identity.v1.DisableMFAFactorResponse
+	52, // 52: nexusim.gateway.v1.GatewayService.RegenerateMFARecoveryCodes:output_type -> nexusim.identity.v1.RegenerateMFARecoveryCodesResponse
+	53, // 53: nexusim.gateway.v1.GatewayService.RevokeMFARecoveryCodes:output_type -> nexusim.identity.v1.RevokeMFARecoveryCodesResponse
+	54, // 54: nexusim.gateway.v1.GatewayService.CreateMemberChange:output_type -> nexusim.conversation.v1.CreateMemberChangeResponse
+	55, // 55: nexusim.gateway.v1.GatewayService.GetMemberChange:output_type -> nexusim.conversation.v1.GetMemberChangeResponse
+	56, // 56: nexusim.gateway.v1.GatewayService.ListConversationMembers:output_type -> nexusim.conversation.v1.ListConversationMembersResponse
+	57, // 57: nexusim.gateway.v1.GatewayService.TransferConversationOwner:output_type -> nexusim.conversation.v1.TransferConversationOwnerResponse
+	58, // 58: nexusim.gateway.v1.GatewayService.SendMessage:output_type -> nexusim.message.v1.SendMessageResponse
+	59, // 59: nexusim.gateway.v1.GatewayService.EditMessage:output_type -> nexusim.message.v1.MessageChangeResponse
+	59, // 60: nexusim.gateway.v1.GatewayService.RevokeMessage:output_type -> nexusim.message.v1.MessageChangeResponse
+	59, // 61: nexusim.gateway.v1.GatewayService.DeleteMessage:output_type -> nexusim.message.v1.MessageChangeResponse
+	60, // 62: nexusim.gateway.v1.GatewayService.PullInbox:output_type -> nexusim.delivery.v1.PullInboxResponse
+	61, // 63: nexusim.gateway.v1.GatewayService.AckDelivery:output_type -> nexusim.delivery.v1.AckDeliveryResponse
+	62, // 64: nexusim.gateway.v1.GatewayService.HideInboxItem:output_type -> nexusim.delivery.v1.HideInboxItemResponse
+	63, // 65: nexusim.gateway.v1.GatewayService.MarkRead:output_type -> nexusim.receipt.v1.MarkReadResponse
+	64, // 66: nexusim.gateway.v1.GatewayService.GetReceiptState:output_type -> nexusim.receipt.v1.GetReceiptStateResponse
+	65, // 67: nexusim.gateway.v1.GatewayService.ListReceiptStates:output_type -> nexusim.receipt.v1.ListReceiptStatesResponse
+	66, // 68: nexusim.gateway.v1.GatewayService.ListConversations:output_type -> nexusim.receipt.v1.ListConversationsResponse
+	67, // 69: nexusim.gateway.v1.GatewayService.ArchiveConversation:output_type -> nexusim.receipt.v1.ArchiveConversationResponse
+	68, // 70: nexusim.gateway.v1.GatewayService.PinConversation:output_type -> nexusim.receipt.v1.PinConversationResponse
+	69, // 71: nexusim.gateway.v1.GatewayService.MuteConversation:output_type -> nexusim.receipt.v1.MuteConversationResponse
+	70, // 72: nexusim.gateway.v1.GatewayService.SetConversationTags:output_type -> nexusim.receipt.v1.SetConversationTagsResponse
+	71, // 73: nexusim.gateway.v1.GatewayService.SetConversationDraft:output_type -> nexusim.receipt.v1.SetConversationDraftResponse
+	72, // 74: nexusim.gateway.v1.GatewayService.SendContactRequest:output_type -> nexusim.contacts.v1.SendContactRequestResponse
+	73, // 75: nexusim.gateway.v1.GatewayService.RespondContactRequest:output_type -> nexusim.contacts.v1.RespondContactRequestResponse
+	74, // 76: nexusim.gateway.v1.GatewayService.CancelContactRequest:output_type -> nexusim.contacts.v1.CancelContactRequestResponse
+	75, // 77: nexusim.gateway.v1.GatewayService.ListContactRequests:output_type -> nexusim.contacts.v1.ListContactRequestsResponse
+	76, // 78: nexusim.gateway.v1.GatewayService.ListContacts:output_type -> nexusim.contacts.v1.ListContactsResponse
+	77, // 79: nexusim.gateway.v1.GatewayService.GetContactState:output_type -> nexusim.contacts.v1.GetContactStateResponse
+	78, // 80: nexusim.gateway.v1.GatewayService.DeleteContact:output_type -> nexusim.contacts.v1.DeleteContactResponse
+	79, // 81: nexusim.gateway.v1.GatewayService.BlockContact:output_type -> nexusim.contacts.v1.BlockContactResponse
+	80, // 82: nexusim.gateway.v1.GatewayService.UnblockContact:output_type -> nexusim.contacts.v1.UnblockContactResponse
+	81, // 83: nexusim.gateway.v1.GatewayService.UpdateContactRemark:output_type -> nexusim.contacts.v1.UpdateContactRemarkResponse
+	42, // [42:84] is the sub-list for method output_type
+	0,  // [0:42] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name
 	0,  // [0:0] is the sub-list for extension extendee
 	0,  // [0:0] is the sub-list for field type_name

@@ -589,7 +589,9 @@ SELECT
     archived,
     pinned,
     muted,
-    tags
+    tags,
+    draft_text,
+    draft_updated_at
 FROM user_conversation_summaries
 WHERE tenant_id = $1
   AND user_id = $2
@@ -650,20 +652,7 @@ LIMIT $3
 	items := make([]types.ConversationSummary, 0, limit)
 	for rows.Next() {
 		var item types.ConversationSummary
-		if err := rows.Scan(
-			&item.ConversationID,
-			&item.LastVisibleSeq,
-			&item.LastMessageID,
-			&item.LastSenderID,
-			&item.LastSourceEventType,
-			&item.UnreadCount,
-			&item.LastReadSeq,
-			&item.UpdatedAt,
-			&item.Archived,
-			&item.Pinned,
-			&item.Muted,
-			&item.Tags,
-		); err != nil {
+		if err := scanConversationSummary(rows, &item); err != nil {
 			return types.ListConversationsResult{}, types.NewDBReadFailed(err.Error())
 		}
 		items = append(items, item)
@@ -709,8 +698,7 @@ func (repository *Repository) ArchiveConversation(
 		return types.ArchiveConversationResult{}, err
 	}
 	var item types.ConversationSummary
-	var archivedAt sql.NullTime
-	err := repository.pool.QueryRow(ctx, `
+	row := repository.pool.QueryRow(ctx, `
 UPDATE user_conversation_summaries
 SET archived = $4,
     archived_at = CASE WHEN $4 THEN now() ELSE NULL END,
@@ -731,22 +719,10 @@ RETURNING
     pinned,
     muted,
     tags,
-    archived_at
-`, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.Archived).Scan(
-		&item.ConversationID,
-		&item.LastVisibleSeq,
-		&item.LastMessageID,
-		&item.LastSenderID,
-		&item.LastSourceEventType,
-		&item.UnreadCount,
-		&item.LastReadSeq,
-		&item.UpdatedAt,
-		&item.Archived,
-		&item.Pinned,
-		&item.Muted,
-		&item.Tags,
-		&archivedAt,
-	)
+    draft_text,
+    draft_updated_at
+`, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.Archived)
+	err := scanConversationSummary(row, &item)
 	if err == pgx.ErrNoRows {
 		return types.ArchiveConversationResult{}, types.NewConversationNotFound("conversation summary not found")
 	}
@@ -764,8 +740,7 @@ func (repository *Repository) PinConversation(
 		return types.PinConversationResult{}, err
 	}
 	var item types.ConversationSummary
-	var pinnedAt sql.NullTime
-	err := repository.pool.QueryRow(ctx, `
+	row := repository.pool.QueryRow(ctx, `
 UPDATE user_conversation_summaries
 SET pinned = $4,
     pinned_at = CASE WHEN $4 THEN now() ELSE NULL END,
@@ -786,22 +761,10 @@ RETURNING
     pinned,
     muted,
     tags,
-    pinned_at
-`, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.Pinned).Scan(
-		&item.ConversationID,
-		&item.LastVisibleSeq,
-		&item.LastMessageID,
-		&item.LastSenderID,
-		&item.LastSourceEventType,
-		&item.UnreadCount,
-		&item.LastReadSeq,
-		&item.UpdatedAt,
-		&item.Archived,
-		&item.Pinned,
-		&item.Muted,
-		&item.Tags,
-		&pinnedAt,
-	)
+    draft_text,
+    draft_updated_at
+`, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.Pinned)
+	err := scanConversationSummary(row, &item)
 	if err == pgx.ErrNoRows {
 		return types.PinConversationResult{}, types.NewConversationNotFound("conversation summary not found")
 	}
@@ -819,8 +782,7 @@ func (repository *Repository) MuteConversation(
 		return types.MuteConversationResult{}, err
 	}
 	var item types.ConversationSummary
-	var mutedAt sql.NullTime
-	err := repository.pool.QueryRow(ctx, `
+	row := repository.pool.QueryRow(ctx, `
 UPDATE user_conversation_summaries
 SET muted = $4,
     muted_at = CASE WHEN $4 THEN now() ELSE NULL END,
@@ -841,22 +803,10 @@ RETURNING
     pinned,
     muted,
     tags,
-    muted_at
-`, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.Muted).Scan(
-		&item.ConversationID,
-		&item.LastVisibleSeq,
-		&item.LastMessageID,
-		&item.LastSenderID,
-		&item.LastSourceEventType,
-		&item.UnreadCount,
-		&item.LastReadSeq,
-		&item.UpdatedAt,
-		&item.Archived,
-		&item.Pinned,
-		&item.Muted,
-		&item.Tags,
-		&mutedAt,
-	)
+    draft_text,
+    draft_updated_at
+`, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.Muted)
+	err := scanConversationSummary(row, &item)
 	if err == pgx.ErrNoRows {
 		return types.MuteConversationResult{}, types.NewConversationNotFound("conversation summary not found")
 	}
@@ -878,7 +828,7 @@ func (repository *Repository) SetConversationTags(
 		return types.SetConversationTagsResult{}, err
 	}
 	var item types.ConversationSummary
-	err = repository.pool.QueryRow(ctx, `
+	row := repository.pool.QueryRow(ctx, `
 UPDATE user_conversation_summaries
 SET tags = $4,
     updated_at = now()
@@ -897,8 +847,73 @@ RETURNING
     archived,
     pinned,
     muted,
-    tags
-`, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, tags).Scan(
+    tags,
+    draft_text,
+    draft_updated_at
+`, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, tags)
+	err = scanConversationSummary(row, &item)
+	if err == pgx.ErrNoRows {
+		return types.SetConversationTagsResult{}, types.NewConversationNotFound("conversation summary not found")
+	}
+	if err != nil {
+		return types.SetConversationTagsResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.SetConversationTagsResult{Conversation: item}, nil
+}
+
+func (repository *Repository) SetConversationDraft(
+	ctx context.Context,
+	command types.SetConversationDraftCommand,
+) (types.SetConversationDraftResult, error) {
+	if err := command.Validate(); err != nil {
+		return types.SetConversationDraftResult{}, err
+	}
+	draftText, err := types.NormalizeConversationDraft(command.DraftText)
+	if err != nil {
+		return types.SetConversationDraftResult{}, err
+	}
+	var item types.ConversationSummary
+	row := repository.pool.QueryRow(ctx, `
+UPDATE user_conversation_summaries
+SET draft_text = $4,
+    draft_updated_at = CASE WHEN $4 = '' THEN NULL ELSE now() END,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND user_id = $2
+  AND conversation_id = $3
+RETURNING
+    conversation_id,
+    last_visible_seq,
+    last_message_id,
+    last_sender_id,
+    last_source_event_type,
+    unread_count,
+    last_read_seq,
+    sort_updated_at,
+    archived,
+    pinned,
+    muted,
+    tags,
+    draft_text,
+    draft_updated_at
+`, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, draftText)
+	err = scanConversationSummary(row, &item)
+	if err == pgx.ErrNoRows {
+		return types.SetConversationDraftResult{}, types.NewConversationNotFound("conversation summary not found")
+	}
+	if err != nil {
+		return types.SetConversationDraftResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.SetConversationDraftResult{Conversation: item}, nil
+}
+
+type conversationSummaryScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanConversationSummary(scanner conversationSummaryScanner, item *types.ConversationSummary) error {
+	var draftUpdatedAt sql.NullTime
+	if err := scanner.Scan(
 		&item.ConversationID,
 		&item.LastVisibleSeq,
 		&item.LastMessageID,
@@ -911,14 +926,15 @@ RETURNING
 		&item.Pinned,
 		&item.Muted,
 		&item.Tags,
-	)
-	if err == pgx.ErrNoRows {
-		return types.SetConversationTagsResult{}, types.NewConversationNotFound("conversation summary not found")
+		&item.DraftText,
+		&draftUpdatedAt,
+	); err != nil {
+		return err
 	}
-	if err != nil {
-		return types.SetConversationTagsResult{}, types.NewDBWriteFailed(err.Error())
+	if draftUpdatedAt.Valid {
+		item.DraftUpdatedAt = draftUpdatedAt.Time
 	}
-	return types.SetConversationTagsResult{Conversation: item}, nil
+	return nil
 }
 
 func (repository *Repository) conversationSummaryWatermark(ctx context.Context) (types.ProjectionWatermark, error) {

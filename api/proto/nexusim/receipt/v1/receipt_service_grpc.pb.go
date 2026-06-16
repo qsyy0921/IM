@@ -19,14 +19,15 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ReceiptService_MarkRead_FullMethodName            = "/nexusim.receipt.v1.ReceiptService/MarkRead"
-	ReceiptService_GetReceiptState_FullMethodName     = "/nexusim.receipt.v1.ReceiptService/GetReceiptState"
-	ReceiptService_ListReceiptStates_FullMethodName   = "/nexusim.receipt.v1.ReceiptService/ListReceiptStates"
-	ReceiptService_ListConversations_FullMethodName   = "/nexusim.receipt.v1.ReceiptService/ListConversations"
-	ReceiptService_ArchiveConversation_FullMethodName = "/nexusim.receipt.v1.ReceiptService/ArchiveConversation"
-	ReceiptService_PinConversation_FullMethodName     = "/nexusim.receipt.v1.ReceiptService/PinConversation"
-	ReceiptService_MuteConversation_FullMethodName    = "/nexusim.receipt.v1.ReceiptService/MuteConversation"
-	ReceiptService_SetConversationTags_FullMethodName = "/nexusim.receipt.v1.ReceiptService/SetConversationTags"
+	ReceiptService_MarkRead_FullMethodName             = "/nexusim.receipt.v1.ReceiptService/MarkRead"
+	ReceiptService_GetReceiptState_FullMethodName      = "/nexusim.receipt.v1.ReceiptService/GetReceiptState"
+	ReceiptService_ListReceiptStates_FullMethodName    = "/nexusim.receipt.v1.ReceiptService/ListReceiptStates"
+	ReceiptService_ListConversations_FullMethodName    = "/nexusim.receipt.v1.ReceiptService/ListConversations"
+	ReceiptService_ArchiveConversation_FullMethodName  = "/nexusim.receipt.v1.ReceiptService/ArchiveConversation"
+	ReceiptService_PinConversation_FullMethodName      = "/nexusim.receipt.v1.ReceiptService/PinConversation"
+	ReceiptService_MuteConversation_FullMethodName     = "/nexusim.receipt.v1.ReceiptService/MuteConversation"
+	ReceiptService_SetConversationTags_FullMethodName  = "/nexusim.receipt.v1.ReceiptService/SetConversationTags"
+	ReceiptService_SetConversationDraft_FullMethodName = "/nexusim.receipt.v1.ReceiptService/SetConversationDraft"
 )
 
 // ReceiptServiceClient is the client API for ReceiptService service.
@@ -41,6 +42,7 @@ type ReceiptServiceClient interface {
 	PinConversation(ctx context.Context, in *PinConversationRequest, opts ...grpc.CallOption) (*PinConversationResponse, error)
 	MuteConversation(ctx context.Context, in *MuteConversationRequest, opts ...grpc.CallOption) (*MuteConversationResponse, error)
 	SetConversationTags(ctx context.Context, in *SetConversationTagsRequest, opts ...grpc.CallOption) (*SetConversationTagsResponse, error)
+	SetConversationDraft(ctx context.Context, in *SetConversationDraftRequest, opts ...grpc.CallOption) (*SetConversationDraftResponse, error)
 }
 
 type receiptServiceClient struct {
@@ -131,6 +133,16 @@ func (c *receiptServiceClient) SetConversationTags(ctx context.Context, in *SetC
 	return out, nil
 }
 
+func (c *receiptServiceClient) SetConversationDraft(ctx context.Context, in *SetConversationDraftRequest, opts ...grpc.CallOption) (*SetConversationDraftResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetConversationDraftResponse)
+	err := c.cc.Invoke(ctx, ReceiptService_SetConversationDraft_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ReceiptServiceServer is the server API for ReceiptService service.
 // All implementations must embed UnimplementedReceiptServiceServer
 // for forward compatibility.
@@ -143,6 +155,7 @@ type ReceiptServiceServer interface {
 	PinConversation(context.Context, *PinConversationRequest) (*PinConversationResponse, error)
 	MuteConversation(context.Context, *MuteConversationRequest) (*MuteConversationResponse, error)
 	SetConversationTags(context.Context, *SetConversationTagsRequest) (*SetConversationTagsResponse, error)
+	SetConversationDraft(context.Context, *SetConversationDraftRequest) (*SetConversationDraftResponse, error)
 	mustEmbedUnimplementedReceiptServiceServer()
 }
 
@@ -176,6 +189,9 @@ func (UnimplementedReceiptServiceServer) MuteConversation(context.Context, *Mute
 }
 func (UnimplementedReceiptServiceServer) SetConversationTags(context.Context, *SetConversationTagsRequest) (*SetConversationTagsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetConversationTags not implemented")
+}
+func (UnimplementedReceiptServiceServer) SetConversationDraft(context.Context, *SetConversationDraftRequest) (*SetConversationDraftResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetConversationDraft not implemented")
 }
 func (UnimplementedReceiptServiceServer) mustEmbedUnimplementedReceiptServiceServer() {}
 func (UnimplementedReceiptServiceServer) testEmbeddedByValue()                        {}
@@ -342,6 +358,24 @@ func _ReceiptService_SetConversationTags_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ReceiptService_SetConversationDraft_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetConversationDraftRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReceiptServiceServer).SetConversationDraft(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReceiptService_SetConversationDraft_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReceiptServiceServer).SetConversationDraft(ctx, req.(*SetConversationDraftRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ReceiptService_ServiceDesc is the grpc.ServiceDesc for ReceiptService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -380,6 +414,10 @@ var ReceiptService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetConversationTags",
 			Handler:    _ReceiptService_SetConversationTags_Handler,
+		},
+		{
+			MethodName: "SetConversationDraft",
+			Handler:    _ReceiptService_SetConversationDraft_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

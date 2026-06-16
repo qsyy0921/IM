@@ -125,6 +125,7 @@ func runGRPCServer() error {
 			app.NewPinConversationUseCase(repository),
 			app.NewMuteConversationUseCase(repository),
 			app.NewSetConversationTagsUseCase(repository),
+			app.NewSetConversationDraftUseCase(repository),
 		),
 	)
 

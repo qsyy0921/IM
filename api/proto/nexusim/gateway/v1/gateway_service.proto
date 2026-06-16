@@ -49,6 +49,7 @@ service GatewayService {
   rpc PinConversation(nexusim.receipt.v1.PinConversationRequest) returns (nexusim.receipt.v1.PinConversationResponse);
   rpc MuteConversation(nexusim.receipt.v1.MuteConversationRequest) returns (nexusim.receipt.v1.MuteConversationResponse);
   rpc SetConversationTags(nexusim.receipt.v1.SetConversationTagsRequest) returns (nexusim.receipt.v1.SetConversationTagsResponse);
+  rpc SetConversationDraft(nexusim.receipt.v1.SetConversationDraftRequest) returns (nexusim.receipt.v1.SetConversationDraftResponse);
 
   rpc SendContactRequest(nexusim.contacts.v1.SendContactRequestRequest) returns (nexusim.contacts.v1.SendContactRequestResponse);
   rpc RespondContactRequest(nexusim.contacts.v1.RespondContactRequestRequest) returns (nexusim.contacts.v1.RespondContactRequestResponse);

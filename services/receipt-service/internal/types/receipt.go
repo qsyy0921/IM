@@ -14,8 +14,9 @@ const (
 )
 
 const (
-	MaxConversationTags    = 10
-	MaxConversationTagSize = 32
+	MaxConversationTags      = 10
+	MaxConversationTagSize   = 32
+	MaxConversationDraftSize = 4096
 )
 
 type MarkReadCommand struct {
@@ -253,6 +254,8 @@ type ConversationSummary struct {
 	Pinned              bool
 	Muted               bool
 	Tags                []string
+	DraftText           string
+	DraftUpdatedAt      time.Time
 }
 
 type ProjectionWatermark struct {
@@ -346,6 +349,39 @@ func (command SetConversationTagsCommand) Validate() error {
 
 type SetConversationTagsResult struct {
 	Conversation ConversationSummary
+}
+
+type SetConversationDraftCommand struct {
+	AuthContext    AuthContext
+	ConversationID ConversationID
+	DraftText      string
+}
+
+func (command SetConversationDraftCommand) Validate() error {
+	if err := command.AuthContext.Validate(); err != nil {
+		return err
+	}
+	if command.ConversationID == "" {
+		return NewInvalidArgument("conversation_id is required")
+	}
+	_, err := NormalizeConversationDraft(command.DraftText)
+	return err
+}
+
+type SetConversationDraftResult struct {
+	Conversation ConversationSummary
+}
+
+func NormalizeConversationDraft(draft string) (string, error) {
+	if len(draft) > MaxConversationDraftSize {
+		return "", NewInvalidArgument("draft_text is too long")
+	}
+	for _, char := range draft {
+		if char == 0 {
+			return "", NewInvalidArgument("draft_text contains unsupported characters")
+		}
+	}
+	return draft, nil
 }
 
 func NormalizeConversationTags(tags []string) ([]string, error) {

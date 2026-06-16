@@ -13,6 +13,7 @@ service ReceiptService {
   rpc PinConversation(PinConversationRequest) returns (PinConversationResponse);
   rpc MuteConversation(MuteConversationRequest) returns (MuteConversationResponse);
   rpc SetConversationTags(SetConversationTagsRequest) returns (SetConversationTagsResponse);
+  rpc SetConversationDraft(SetConversationDraftRequest) returns (SetConversationDraftResponse);
 }
 
 message AuthContext {
@@ -135,6 +136,8 @@ message ConversationSummary {
   bool pinned = 10;
   bool muted = 11;
   repeated string tags = 12;
+  string draft_text = 13;
+  int64 draft_updated_at_unix_ms = 14;
 }
 
 message ListConversationsResponse {
@@ -180,5 +183,15 @@ message SetConversationTagsRequest {
 }
 
 message SetConversationTagsResponse {
+  ConversationSummary conversation = 1;
+}
+
+message SetConversationDraftRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  string draft_text = 3;
+}
+
+message SetConversationDraftResponse {
   ConversationSummary conversation = 1;
 }

@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"errors"
+	"time"
 
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
 	"github.com/qsyy0921/IM/services/receipt-service/internal/types"
@@ -43,16 +44,21 @@ type SetConversationTagsExecutor interface {
 	Execute(context.Context, types.SetConversationTagsCommand) (types.SetConversationTagsResult, error)
 }
 
+type SetConversationDraftExecutor interface {
+	Execute(context.Context, types.SetConversationDraftCommand) (types.SetConversationDraftResult, error)
+}
+
 type Server struct {
 	receiptv1.UnimplementedReceiptServiceServer
-	markRead            MarkReadExecutor
-	getReceiptState     GetReceiptStateExecutor
-	listReceiptStates   ListReceiptStatesExecutor
-	listConversations   ListConversationsExecutor
-	archiveConversation ArchiveConversationExecutor
-	pinConversation     PinConversationExecutor
-	muteConversation    MuteConversationExecutor
-	setConversationTags SetConversationTagsExecutor
+	markRead             MarkReadExecutor
+	getReceiptState      GetReceiptStateExecutor
+	listReceiptStates    ListReceiptStatesExecutor
+	listConversations    ListConversationsExecutor
+	archiveConversation  ArchiveConversationExecutor
+	pinConversation      PinConversationExecutor
+	muteConversation     MuteConversationExecutor
+	setConversationTags  SetConversationTagsExecutor
+	setConversationDraft SetConversationDraftExecutor
 }
 
 func NewServer(
@@ -64,16 +70,18 @@ func NewServer(
 	pinConversation PinConversationExecutor,
 	muteConversation MuteConversationExecutor,
 	setConversationTags SetConversationTagsExecutor,
+	setConversationDraft SetConversationDraftExecutor,
 ) *Server {
 	return &Server{
-		markRead:            markRead,
-		getReceiptState:     getReceiptState,
-		listReceiptStates:   listReceiptStates,
-		listConversations:   listConversations,
-		archiveConversation: archiveConversation,
-		pinConversation:     pinConversation,
-		muteConversation:    muteConversation,
-		setConversationTags: setConversationTags,
+		markRead:             markRead,
+		getReceiptState:      getReceiptState,
+		listReceiptStates:    listReceiptStates,
+		listConversations:    listConversations,
+		archiveConversation:  archiveConversation,
+		pinConversation:      pinConversation,
+		muteConversation:     muteConversation,
+		setConversationTags:  setConversationTags,
+		setConversationDraft: setConversationDraft,
 	}
 }
 
@@ -230,20 +238,7 @@ func (server *Server) ListConversations(
 	}
 	items := make([]*receiptv1.ConversationSummary, 0, len(result.Items))
 	for _, item := range result.Items {
-		items = append(items, &receiptv1.ConversationSummary{
-			ConversationId:      string(item.ConversationID),
-			LastVisibleSeq:      item.LastVisibleSeq,
-			LastMessageId:       item.LastMessageID,
-			LastSenderId:        string(item.LastSenderID),
-			LastSourceEventType: item.LastSourceEventType,
-			UnreadCount:         item.UnreadCount,
-			LastReadSeq:         item.LastReadSeq,
-			UpdatedAtUnixMs:     item.UpdatedAt.UnixMilli(),
-			Archived:            item.Archived,
-			Pinned:              item.Pinned,
-			Muted:               item.Muted,
-			Tags:                item.Tags,
-		})
+		items = append(items, conversationSummaryResponse(item))
 	}
 	return &receiptv1.ListConversationsResponse{
 		Items:          items,
@@ -352,21 +347,54 @@ func (server *Server) SetConversationTags(
 	}, nil
 }
 
+func (server *Server) SetConversationDraft(
+	ctx context.Context,
+	request *receiptv1.SetConversationDraftRequest,
+) (*receiptv1.SetConversationDraftResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
+	result, err := server.setConversationDraft.Execute(ctx, types.SetConversationDraftCommand{
+		AuthContext:    auth,
+		ConversationID: types.ConversationID(request.GetConversationId()),
+		DraftText:      request.GetDraftText(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &receiptv1.SetConversationDraftResponse{
+		Conversation: conversationSummaryResponse(result.Conversation),
+	}, nil
+}
+
 func conversationSummaryResponse(item types.ConversationSummary) *receiptv1.ConversationSummary {
 	return &receiptv1.ConversationSummary{
-		ConversationId:      string(item.ConversationID),
-		LastVisibleSeq:      item.LastVisibleSeq,
-		LastMessageId:       item.LastMessageID,
-		LastSenderId:        string(item.LastSenderID),
-		LastSourceEventType: item.LastSourceEventType,
-		UnreadCount:         item.UnreadCount,
-		LastReadSeq:         item.LastReadSeq,
-		UpdatedAtUnixMs:     item.UpdatedAt.UnixMilli(),
-		Archived:            item.Archived,
-		Pinned:              item.Pinned,
-		Muted:               item.Muted,
-		Tags:                item.Tags,
+		ConversationId:       string(item.ConversationID),
+		LastVisibleSeq:       item.LastVisibleSeq,
+		LastMessageId:        item.LastMessageID,
+		LastSenderId:         string(item.LastSenderID),
+		LastSourceEventType:  item.LastSourceEventType,
+		UnreadCount:          item.UnreadCount,
+		LastReadSeq:          item.LastReadSeq,
+		UpdatedAtUnixMs:      item.UpdatedAt.UnixMilli(),
+		Archived:             item.Archived,
+		Pinned:               item.Pinned,
+		Muted:                item.Muted,
+		Tags:                 item.Tags,
+		DraftText:            item.DraftText,
+		DraftUpdatedAtUnixMs: unixMilliOrZero(item.DraftUpdatedAt),
 	}
+}
+
+func unixMilliOrZero(value time.Time) int64 {
+	if value.IsZero() {
+		return 0
+	}
+	return value.UnixMilli()
 }
 
 func conversationListSortFromProto(sort receiptv1.ConversationListSort) string {

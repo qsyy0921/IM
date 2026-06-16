@@ -186,6 +186,52 @@ func TestListConversationsInjectsVerifiedAuth(t *testing.T) {
 	})
 }
 
+func TestSetConversationDraftInjectsVerifiedAuth(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	authenticator, err := gatewayauth.NewAuthenticator(gatewayauth.Config{
+		Mode:     gatewayauth.ModeHMAC,
+		Secret:   "secret",
+		Audience: "push-gateway",
+		Now:      func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("new authenticator: %v", err)
+	}
+	token, err := gatewayauth.SignGatewayToken("secret", map[string]string{
+		"tenant_id": "tenant-token",
+		"user_id":   "user-token",
+		"device_id": "device-token",
+	}, now.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("sign gateway token: %v", err)
+	}
+	fake := &fakeReceiptClient{}
+	server := NewServer(Config{Authenticator: authenticator, Receipt: fake})
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		"authorization", "Bearer "+token,
+		metadataDeviceID, "device-token",
+	))
+
+	_, err = server.SetConversationDraft(ctx, &receiptv1.SetConversationDraftRequest{
+		AuthContext:    &receiptv1.AuthContext{TenantId: "tenant-body", UserId: "user-body", DeviceId: "device-body"},
+		ConversationId: "conv-1",
+		DraftText:      "hello draft",
+	})
+	if err != nil {
+		t.Fatalf("set conversation draft: %v", err)
+	}
+	if fake.setDraftRequest.GetAuthContext().GetTenantId() != "tenant-token" ||
+		fake.setDraftRequest.GetAuthContext().GetUserId() != "user-token" ||
+		fake.setDraftRequest.GetAuthContext().GetDeviceId() != "device-token" {
+		t.Fatalf("expected receipt auth to be overwritten, got %+v", fake.setDraftRequest.GetAuthContext())
+	}
+	assertOutgoingMetadata(t, fake.ctx, map[string]string{
+		metadataTenantID: "tenant-token",
+		metadataUserID:   "user-token",
+		metadataDeviceID: "device-token",
+	})
+}
+
 func TestGatewayGeneratesMissingCorrelationIDsForDownstream(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	authenticator, err := gatewayauth.NewAuthenticator(gatewayauth.Config{
@@ -883,8 +929,9 @@ func (client *fakeContactsClient) UpdateContactGroup(context.Context, *contactsv
 }
 
 type fakeReceiptClient struct {
-	ctx         context.Context
-	listRequest *receiptv1.ListConversationsRequest
+	ctx             context.Context
+	listRequest     *receiptv1.ListConversationsRequest
+	setDraftRequest *receiptv1.SetConversationDraftRequest
 }
 
 func (client *fakeReceiptClient) MarkRead(context.Context, *receiptv1.MarkReadRequest, ...grpc.CallOption) (*receiptv1.MarkReadResponse, error) {
@@ -919,4 +966,10 @@ func (client *fakeReceiptClient) MuteConversation(context.Context, *receiptv1.Mu
 
 func (client *fakeReceiptClient) SetConversationTags(context.Context, *receiptv1.SetConversationTagsRequest, ...grpc.CallOption) (*receiptv1.SetConversationTagsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (client *fakeReceiptClient) SetConversationDraft(ctx context.Context, in *receiptv1.SetConversationDraftRequest, opts ...grpc.CallOption) (*receiptv1.SetConversationDraftResponse, error) {
+	client.ctx = ctx
+	client.setDraftRequest = in
+	return &receiptv1.SetConversationDraftResponse{}, nil
 }

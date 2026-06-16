@@ -405,6 +405,16 @@ func (server *Server) SetConversationTags(ctx context.Context, request *receiptv
 	return server.receipt.SetConversationTags(outgoing, cloned)
 }
 
+func (server *Server) SetConversationDraft(ctx context.Context, request *receiptv1.SetConversationDraftRequest) (*receiptv1.SetConversationDraftResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*receiptv1.SetConversationDraftRequest)
+	cloned.AuthContext = receiptAuth(auth)
+	return server.receipt.SetConversationDraft(outgoing, cloned)
+}
+
 func (server *Server) SendContactRequest(ctx context.Context, request *contactsv1.SendContactRequestRequest) (*contactsv1.SendContactRequestResponse, error) {
 	auth, outgoing, err := server.authenticate(ctx)
 	if err != nil {

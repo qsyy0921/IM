@@ -40,14 +40,15 @@ func TestMarkReadUseCasePassesCommandToRepository(t *testing.T) {
 }
 
 type fakeReceiptRepository struct {
-	markReadCommand            types.MarkReadCommand
-	getReceiptStateCalls       []types.GetReceiptStateCommand
-	listReceiptStatesCommand   types.ListReceiptStatesCommand
-	listCommand                types.ListConversationsCommand
-	archiveConversationCommand types.ArchiveConversationCommand
-	pinConversationCommand     types.PinConversationCommand
-	muteConversationCommand    types.MuteConversationCommand
-	setConversationTagsCommand types.SetConversationTagsCommand
+	markReadCommand             types.MarkReadCommand
+	getReceiptStateCalls        []types.GetReceiptStateCommand
+	listReceiptStatesCommand    types.ListReceiptStatesCommand
+	listCommand                 types.ListConversationsCommand
+	archiveConversationCommand  types.ArchiveConversationCommand
+	pinConversationCommand      types.PinConversationCommand
+	muteConversationCommand     types.MuteConversationCommand
+	setConversationTagsCommand  types.SetConversationTagsCommand
+	setConversationDraftCommand types.SetConversationDraftCommand
 }
 
 func (repository *fakeReceiptRepository) GetReceiptState(_ context.Context, command types.GetReceiptStateCommand) (types.GetReceiptStateResult, error) {
@@ -115,6 +116,16 @@ func (repository *fakeReceiptRepository) SetConversationTags(_ context.Context, 
 		Conversation: types.ConversationSummary{
 			ConversationID: command.ConversationID,
 			Tags:           command.Tags,
+		},
+	}, nil
+}
+
+func (repository *fakeReceiptRepository) SetConversationDraft(_ context.Context, command types.SetConversationDraftCommand) (types.SetConversationDraftResult, error) {
+	repository.setConversationDraftCommand = command
+	return types.SetConversationDraftResult{
+		Conversation: types.ConversationSummary{
+			ConversationID: command.ConversationID,
+			DraftText:      command.DraftText,
 		},
 	}, nil
 }

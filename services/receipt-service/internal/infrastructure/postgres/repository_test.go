@@ -596,6 +596,38 @@ func TestRepositoryListConversationsFiltersTagsIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositorySetConversationDraftIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	sortTime := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	insertConversationSummary(t, ctx, pool, "conv-a", 11, sortTime)
+	insertConversationSummary(t, ctx, pool, "conv-b", 12, sortTime.Add(time.Minute))
+
+	set, err := repository.SetConversationDraft(ctx, setConversationDraftCommand("conv-a", "hello draft"))
+	if err != nil {
+		t.Fatalf("set draft: %v", err)
+	}
+	if set.Conversation.DraftText != "hello draft" || set.Conversation.DraftUpdatedAt.IsZero() {
+		t.Fatalf("unexpected draft after set: %+v", set.Conversation)
+	}
+
+	list, err := repository.ListConversations(ctx, listConversationsCommand(10, ""))
+	if err != nil {
+		t.Fatalf("list conversations: %v", err)
+	}
+	assertConversationIDs(t, list, "conv-b", "conv-a")
+	assertConversationDraft(t, list.Items[1], "hello draft", true)
+
+	cleared, err := repository.SetConversationDraft(ctx, setConversationDraftCommand("conv-a", ""))
+	if err != nil {
+		t.Fatalf("clear draft: %v", err)
+	}
+	assertConversationDraft(t, cleared.Conversation, "", false)
+}
+
 func TestRepositoryListConversationsRejectsInvalidCursorIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -1038,6 +1070,18 @@ func setConversationTagsCommand(conversationID string, tags ...string) types.Set
 	}
 }
 
+func setConversationDraftCommand(conversationID string, draftText string) types.SetConversationDraftCommand {
+	return types.SetConversationDraftCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-receipt",
+			UserID:   "receiver-1",
+			DeviceID: "device-1",
+		},
+		ConversationID: types.ConversationID(conversationID),
+		DraftText:      draftText,
+	}
+}
+
 func getStateCommandBySeq(seq int64) types.GetReceiptStateCommand {
 	return types.GetReceiptStateCommand{
 		AuthContext: types.AuthContext{
@@ -1137,6 +1181,16 @@ func assertConversationTags(t *testing.T, item types.ConversationSummary, want .
 		if item.Tags[index] != tag {
 			t.Fatalf("expected tag %d=%s, got %+v", index, tag, item.Tags)
 		}
+	}
+}
+
+func assertConversationDraft(t *testing.T, item types.ConversationSummary, wantText string, wantUpdated bool) {
+	t.Helper()
+	if item.DraftText != wantText {
+		t.Fatalf("expected draft_text=%q, got %+v", wantText, item)
+	}
+	if item.DraftUpdatedAt.IsZero() == wantUpdated {
+		t.Fatalf("expected draft_updated_at set=%v, got %+v", wantUpdated, item)
 	}
 }
 
@@ -1263,6 +1317,7 @@ func applyReceiptMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool
 		"000009_receipt_outbox_repair_audit.sql",
 		"000010_device_received_cursor_lookup.sql",
 		"000011_conversation_tags.sql",
+		"000012_conversation_draft.sql",
 	} {
 		migrationPath := filepath.Join(root, "migrations", "postgres", "receipt", name)
 		sqlBytes, err := os.ReadFile(migrationPath)

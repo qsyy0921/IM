@@ -38,6 +38,8 @@ type memberWindowRepairAuditOutputRow struct {
 	RepairOutcome                string `json:"repair_outcome"`
 	PreviousJoinSeq              int64  `json:"previous_join_seq,omitempty"`
 	HasJoinSeq                   bool   `json:"has_join_seq"`
+	NewJoinSeq                   int64  `json:"new_join_seq,omitempty"`
+	HasNewJoinSeq                bool   `json:"has_new_join_seq"`
 	PreviousLeaveSeq             int64  `json:"previous_leave_seq,omitempty"`
 	HasLeaveSeq                  bool   `json:"has_leave_seq"`
 	NewLeaveSeq                  int64  `json:"new_leave_seq,omitempty"`
@@ -110,6 +112,8 @@ func writeMemberWindowRepairAuditOutput(path string, rows []postgresinfra.Member
 			RepairOutcome:                row.RepairOutcome,
 			PreviousJoinSeq:              row.PreviousJoinSeq,
 			HasJoinSeq:                   row.HasJoinSeq,
+			NewJoinSeq:                   row.NewJoinSeq,
+			HasNewJoinSeq:                row.HasNewJoinSeq,
 			PreviousLeaveSeq:             row.PreviousLeaveSeq,
 			HasLeaveSeq:                  row.HasLeaveSeq,
 			NewLeaveSeq:                  row.NewLeaveSeq,

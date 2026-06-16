@@ -113,10 +113,10 @@ go run ./services/delivery-service/cmd/delivery-service
 | --- | --- |
 | `member-change-audit` | 只读审计 `member_change_saga`，可按 tenant / conversation / target user / operator / change type / status / change_id / outbox event 缩小范围；可选 `NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
 | `member-window-audit` | 只读审计 `conversation_members` 当前窗口 cache 异常，覆盖 ACTIVE 无 join_seq、ACTIVE 带 leave_seq、inactive 无 leave_seq、leave_seq 早于 join_seq、成员版本高于会话版本、非 ACTIVE 会话仍有 ACTIVE 成员等 issue class；可选 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
-| `member-window-repair` | 保守修复成员窗口 cache：`ACTIVE_WITH_LEAVE_SEQ` 会清空 ACTIVE 成员残留的历史 `leave_seq`；`INACTIVE_WITHOUT_LEAVE_SEQ` 会在 inactive 成员有合法 `join_seq` / `member_version` 时把 `leave_seq` 补为 `member_version`；inactive `LEAVE_BEFORE_JOIN` 会把早于 `join_seq` 的 `leave_seq` clamp 到 `join_seq`；`MEMBER_VERSION_AHEAD_CONVERSATION` / `PERMISSION_VERSION_AHEAD_CONVERSATION` 会把 conversation 版本 floor 提升到当前成员最大版本；`ACTIVE_MEMBER_IN_INACTIVE_CONVERSATION` 会把非 ACTIVE 会话内仍 ACTIVE 且窗口合法的成员标为 `LEFT` 并补 `leave_seq = member_version`；默认 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_DRY_RUN=true`，只有显式设为 false 才 mutate；可选 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_OUTPUT` 写低敏 JSON summary。 |
+| `member-window-repair` | 保守修复成员窗口 cache：`ACTIVE_WITHOUT_JOIN_SEQ` 只会在 ACTIVE、无 `leave_seq`、`member_version` 合法且不超过会话版本时把 `join_seq` 补为 `member_version`；`ACTIVE_WITH_LEAVE_SEQ` 会清空 ACTIVE 成员残留的历史 `leave_seq`；`INACTIVE_WITHOUT_LEAVE_SEQ` 会在 inactive 成员有合法 `join_seq` / `member_version` 时把 `leave_seq` 补为 `member_version`；inactive `LEAVE_BEFORE_JOIN` 会把早于 `join_seq` 的 `leave_seq` clamp 到 `join_seq`；`MEMBER_VERSION_AHEAD_CONVERSATION` / `PERMISSION_VERSION_AHEAD_CONVERSATION` 会把 conversation 版本 floor 提升到当前成员最大版本；`ACTIVE_MEMBER_IN_INACTIVE_CONVERSATION` 会把非 ACTIVE 会话内仍 ACTIVE 且窗口合法的成员标为 `LEFT` 并补 `leave_seq = member_version`；默认 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_DRY_RUN=true`，只有显式设为 false 才 mutate；可选 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_OUTPUT` 写低敏 JSON summary。 |
 | `member-window-repair-audit` | 只读审计 `member-window-repair` 历史；可按 tenant / conversation / user / issue class / outcome 缩小范围；可选 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
 
-更复杂的成员窗口历史 repair action 仍是后续工作；执行 mutate 前仍应先用 `member-window-audit` 缩小范围并留存证据，不能用手写 SQL 直接改成员事实。
+完整历史窗口 / targeted replay repair 仍是后续工作；执行 mutate 前仍应先用 `member-window-audit` 缩小范围并留存证据，不能用手写 SQL 直接改成员事实。
 
 ## Identity Challenge / Session
 

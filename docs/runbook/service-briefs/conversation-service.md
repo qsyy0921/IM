@@ -16,12 +16,12 @@
 - JOIN / rejoin 写路径会刷新 `join_seq` 并清空旧 `leave_seq`，避免 LEFT 后重新加入的成员在当前窗口 cache 中残留历史离开边界。
 - 已补 `member-change-audit` 只读 operator，可按 `change_id`、tenant、conversation、target user、operator、change type、status、outbox event 过滤 `member_change_saga`；支持 `NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_OUTPUT` 写低敏 JSON 结果，并对 `last_error` 使用稳定公开文案，避免泄露 SQL / Kafka / repair 内部错误文本。
 - 已补 `member-window-audit` 只读 operator，用于发现 `conversation_members` 当前窗口 cache 异常；覆盖 ACTIVE 无 join_seq、ACTIVE 带 leave_seq、inactive 无 leave_seq、leave_seq 早于 join_seq、成员版本高于会话版本、非 ACTIVE 会话仍有 ACTIVE 成员等 issue class；支持 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_OUTPUT` 写低敏 JSON 结果。
-- 已补 `member-window-repair` / `member-window-repair-audit`，支持保守修复 `ACTIVE_WITH_LEAVE_SEQ`、`INACTIVE_WITHOUT_LEAVE_SEQ`、inactive `LEAVE_BEFORE_JOIN`、`MEMBER_VERSION_AHEAD_CONVERSATION`、`PERMISSION_VERSION_AHEAD_CONVERSATION` 和 `ACTIVE_MEMBER_IN_INACTIVE_CONVERSATION`：分别清空 ACTIVE 成员残留 `leave_seq`、在 inactive 成员有合法 `join_seq` / `member_version` 时补 `leave_seq = member_version`、把 inactive 成员早于 `join_seq` 的 `leave_seq` clamp 到 `join_seq`、把 conversation 版本 floor 提升到当前成员最大版本，以及把非 ACTIVE 会话内仍 ACTIVE 且窗口合法的成员标为 `LEFT` 并补 `leave_seq = member_version`；默认 dry-run，mutate 时会写 `conversation_member_window_repair_audit`。
+- 已补 `member-window-repair` / `member-window-repair-audit`，支持保守修复 `ACTIVE_WITHOUT_JOIN_SEQ`、`ACTIVE_WITH_LEAVE_SEQ`、`INACTIVE_WITHOUT_LEAVE_SEQ`、inactive `LEAVE_BEFORE_JOIN`、`MEMBER_VERSION_AHEAD_CONVERSATION`、`PERMISSION_VERSION_AHEAD_CONVERSATION` 和 `ACTIVE_MEMBER_IN_INACTIVE_CONVERSATION`：分别把安全候选的 ACTIVE 成员 `join_seq` 补为 `member_version`、清空 ACTIVE 成员残留 `leave_seq`、在 inactive 成员有合法 `join_seq` / `member_version` 时补 `leave_seq = member_version`、把 inactive 成员早于 `join_seq` 的 `leave_seq` clamp 到 `join_seq`、把 conversation 版本 floor 提升到当前成员最大版本，以及把非 ACTIVE 会话内仍 ACTIVE 且窗口合法的成员标为 `LEFT` 并补 `leave_seq = member_version`；默认 dry-run，mutate 时会写 `conversation_member_window_repair_audit`。
 - 当 `NEXUSIM_CONVERSATION_AUTH_MODE=metadata|verified-metadata` 时，公网监听地址 + 无 gRPC mTLS client cert 的危险组合会在启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - `loadtest/memberchange` summary 已输出 `capacity_summary`，包含运行时长、VUs、请求 / 成功 / 错误计数、成功率、RPS、latency avg/p95/p99、成员变更类型、saga / timeline / outbox / roster / conversation_seq 聚合；后续容量验证可直接复用该结构。
 - `loadtest/capacityseed` 已能准备 `tenant-capacity-conversation` 下的 ACTIVE owner fixture；`capacity-baseline-seeded-20260616` 本地 seeded 短基线中 `memberchange` 成功 214、`requests_per_second=42.8`，报告见 `loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md`。
 
 ## 后续
 
-- 更完整群管理、owner transfer 策略继续打磨；更复杂成员窗口历史 repair action 仍需后续设计。
+- 更完整群管理、owner transfer 策略继续打磨；完整历史窗口 / targeted replay repair 仍需后续设计，当前 `member-window-repair` 只修 conversation-service 当前窗口 cache。
 - OTel collector / 生产级 alerting / SLO dashboard、长时间容量曲线仍属于后续统一观测治理。

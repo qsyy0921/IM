@@ -55,6 +55,8 @@ func TestWriteMemberWindowRepairAuditOutput(t *testing.T) {
 		RepairOutcome:            "MUTATED",
 		PreviousJoinSeq:          4,
 		HasJoinSeq:               true,
+		NewJoinSeq:               6,
+		HasNewJoinSeq:            true,
 		PreviousLeaveSeq:         9,
 		HasLeaveSeq:              true,
 		PreviousMemberVersion:    5,
@@ -89,12 +91,14 @@ func TestWriteMemberWindowRepairAuditOutput(t *testing.T) {
 		row.UserID != "user-repair" ||
 		row.RepairOutcome != "MUTATED" ||
 		row.PreviousJoinSeq != 4 ||
+		row.NewJoinSeq != 6 ||
 		row.PreviousLeaveSeq != 9 ||
 		row.PreviousMemberVersion != 5 ||
 		row.NewMemberVersion != 12 ||
 		row.ConversationStatus != "ARCHIVED" ||
 		row.PreviousMemberStatus != "ACTIVE" ||
 		row.NewMemberStatus != "LEFT" ||
+		!row.HasNewJoinSeq ||
 		!row.HasNewMemberVersion ||
 		row.HasNewLeaveSeq ||
 		row.RepairedAt == "" {

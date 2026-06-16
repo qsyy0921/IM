@@ -9,6 +9,86 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+func TestRepositoryRepairMemberWindowsSetsActiveJoinSeqIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pg pool: %v", err)
+	}
+	defer pool.Close()
+
+	ensureMemberWindowRepairAuditSchema(t, ctx, pool)
+	resetConversationTables(t, ctx, pool)
+	truncateMemberWindowRepairAudit(t, ctx, pool)
+	seedMemberWindowRepairFixtures(t, ctx, pool)
+
+	repository := NewRepository(pool)
+	dryRunStats, err := repository.RepairMemberWindows(ctx, MemberWindowRepairOptions{
+		TenantID:       "tenant-window-repair",
+		ConversationID: "conv-window-repair",
+		IssueClass:     MemberWindowIssueActiveWithoutJoinSeq,
+		OperatorID:     "operator-active-join",
+		Reason:         "dry run active missing join_seq",
+		DryRun:         true,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("dry-run active join repair: %v", err)
+	}
+	if dryRunStats.Requested != 1 || dryRunStats.Repaired != 0 || dryRunStats.Skipped != 1 || !dryRunStats.DryRun {
+		t.Fatalf("unexpected active join dry-run stats: %+v", dryRunStats)
+	}
+	assertMemberJoinSeqValue(t, ctx, pool, "tenant-window-repair", "conv-window-repair", "active-missing-join", nil)
+
+	mutateStats, err := repository.RepairMemberWindows(ctx, MemberWindowRepairOptions{
+		TenantID:       "tenant-window-repair",
+		ConversationID: "conv-window-repair",
+		IssueClass:     "active_without_join_seq",
+		OperatorID:     "operator-active-join",
+		Reason:         "set active join_seq from member_version",
+		DryRun:         false,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("mutating active join repair: %v", err)
+	}
+	if mutateStats.Requested != 1 || mutateStats.Repaired != 1 || mutateStats.Skipped != 0 || mutateStats.DryRun {
+		t.Fatalf("unexpected active join mutate stats: %+v", mutateStats)
+	}
+	assertMemberJoinSeqValue(t, ctx, pool, "tenant-window-repair", "conv-window-repair", "active-missing-join", ptrInt64(8))
+	assertMemberJoinSeqValue(t, ctx, pool, "tenant-window-repair", "conv-window-repair", "active-missing-join-with-leave", nil)
+
+	rows, err := repository.AuditMemberWindowRepairs(ctx, MemberWindowRepairAuditOptions{
+		TenantID:       "tenant-window-repair",
+		ConversationID: "conv-window-repair",
+		IssueClass:     "active_without_join_seq",
+		Outcome:        "mutated",
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit active join repairs: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one active join audit row, got %d: %+v", len(rows), rows)
+	}
+	row := rows[0]
+	if row.UserID != "active-missing-join" ||
+		row.RepairAction != memberWindowRepairActionSetActiveJoinSeq ||
+		row.RepairOutcome != memberWindowRepairOutcomeMutated ||
+		row.OperatorID != "operator-active-join" ||
+		row.Reason != "set active join_seq from member_version" ||
+		row.DryRun ||
+		row.HasJoinSeq ||
+		!row.HasNewJoinSeq ||
+		row.NewJoinSeq != 8 {
+		t.Fatalf("unexpected active join audit row: %+v", row)
+	}
+}
+
 func TestRepositoryRepairMemberWindowsClearsActiveLeaveSeqIntegration(t *testing.T) {
 	dsn := os.Getenv("NEXUSIM_PG_DSN")
 	if dsn == "" {
@@ -442,6 +522,7 @@ func ensureMemberWindowRepairAuditSchema(t *testing.T, ctx context.Context, pool
 		"000007_member_window_repair_leave_before_join.sql",
 		"000008_member_window_repair_version_ahead.sql",
 		"000009_member_window_repair_inactive_conversation.sql",
+		"000010_member_window_repair_active_join_seq.sql",
 	} {
 		path := filepath.Clean(filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "conversation", filename))
 		ddl, err := os.ReadFile(path)
@@ -476,6 +557,8 @@ INSERT INTO conversation_members (
     member_version, permission_version, updated_at
 ) VALUES
     ('tenant-window-repair', 'conv-window-repair', 'stale-active', 'MEMBER', 'ACTIVE', 4, 9, 9, 19, now() - interval '1 minute'),
+    ('tenant-window-repair', 'conv-window-repair', 'active-missing-join', 'MEMBER', 'ACTIVE', NULL, NULL, 8, 19, now() - interval '30 seconds'),
+    ('tenant-window-repair', 'conv-window-repair', 'active-missing-join-with-leave', 'MEMBER', 'ACTIVE', NULL, 8, 8, 19, now() - interval '45 seconds'),
     ('tenant-window-repair', 'conv-window-repair', 'leave-before-join', 'MEMBER', 'ACTIVE', 8, 7, 9, 19, now() - interval '2 minutes'),
     ('tenant-window-repair', 'conv-window-repair', 'healthy-active', 'MEMBER', 'ACTIVE', 5, NULL, 9, 19, now() - interval '3 minutes'),
     ('tenant-window-repair', 'conv-window-repair', 'left-missing-leave', 'MEMBER', 'LEFT', 6, NULL, 9, 19, now() - interval '4 minutes'),
@@ -505,6 +588,32 @@ WHERE tenant_id = $1
 	}
 	if (leaveSeq != nil) != wantValid {
 		t.Fatalf("leave_seq valid = %t, want %t for user %s", leaveSeq != nil, wantValid, userID)
+	}
+}
+
+func assertMemberJoinSeqValue(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID string, conversationID string, userID string, want *int64) {
+	t.Helper()
+	var joinSeq *int64
+	if err := pool.QueryRow(ctx, `
+SELECT join_seq
+FROM conversation_members
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND user_id = $3
+`, tenantID, conversationID, userID).Scan(&joinSeq); err != nil {
+		t.Fatalf("query member join_seq: %v", err)
+	}
+	if want == nil {
+		if joinSeq != nil {
+			t.Fatalf("join_seq = %d, want NULL for user %s", *joinSeq, userID)
+		}
+		return
+	}
+	if joinSeq == nil || *joinSeq != *want {
+		if joinSeq == nil {
+			t.Fatalf("join_seq = NULL, want %d for user %s", *want, userID)
+		}
+		t.Fatalf("join_seq = %d, want %d for user %s", *joinSeq, *want, userID)
 	}
 }
 

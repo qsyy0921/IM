@@ -340,6 +340,14 @@ func runDecisionAuditExport() error {
 	if allowedConfigured {
 		allowedFilter = &allowed
 	}
+	createdAfter, err := envOptionalRFC3339Time("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_CREATED_AFTER")
+	if err != nil {
+		return err
+	}
+	createdBefore, err := envOptionalRFC3339Time("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_CREATED_BEFORE")
+	if err != nil {
+		return err
+	}
 	filters := map[string]string{
 		"event_id":       envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_EVENT_ID", ""),
 		"tenant_id":      envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_TENANT_ID", ""),
@@ -348,6 +356,8 @@ func runDecisionAuditExport() error {
 		"classification": envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_CLASSIFICATION", ""),
 		"reason_code":    envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_REASON_CODE", ""),
 		"status":         envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_STATUS", ""),
+		"created_after":  formatOptionalFilterTime(createdAfter),
+		"created_before": formatOptionalFilterTime(createdBefore),
 	}
 	rows, err := postgresinfra.NewOutboxStore(pool).ExportDecisionAudit(ctx, postgresinfra.DecisionAuditExportOptions{
 		EventID:        filters["event_id"],
@@ -357,6 +367,8 @@ func runDecisionAuditExport() error {
 		Classification: filters["classification"],
 		ReasonCode:     filters["reason_code"],
 		Status:         filters["status"],
+		CreatedAfter:   createdAfter,
+		CreatedBefore:  createdBefore,
 		Limit:          envInt("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_LIMIT", 100),
 	})
 	if err != nil {
@@ -792,6 +804,26 @@ func envDuration(name string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return parsed
+}
+
+func envOptionalRFC3339Time(name string) (*time.Time, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil, errors.New(name + " must be RFC3339")
+	}
+	utc := parsed.UTC()
+	return &utc, nil
+}
+
+func formatOptionalFilterTime(value *time.Time) string {
+	if value == nil {
+		return ""
+	}
+	return value.UTC().Format(time.RFC3339)
 }
 
 func envPositiveDuration(name string, fallback time.Duration) (time.Duration, error) {

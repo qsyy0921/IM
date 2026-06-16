@@ -42,9 +42,11 @@ func TestWriteDecisionAuditExportOutput(t *testing.T) {
 			PublishedAt:              &publishedAt,
 		},
 	}, map[string]string{
-		"tenant_id": "tenant-a",
-		"allowed":   "false",
-		"event_id":  "",
+		"tenant_id":      "tenant-a",
+		"allowed":        "false",
+		"created_after":  "2026-06-17T09:00:00Z",
+		"created_before": "2026-06-17T10:00:00Z",
+		"event_id":       "",
 	})
 	if err != nil {
 		t.Fatalf("write decision audit export output: %v", err)
@@ -58,7 +60,10 @@ func TestWriteDecisionAuditExportOutput(t *testing.T) {
 	if err := json.Unmarshal(raw, &output); err != nil {
 		t.Fatalf("decode decision audit export output: %v", err)
 	}
-	if output.GeneratedAt == "" || len(output.Rows) != 1 || output.Filters["tenant_id"] != "tenant-a" || output.Filters["event_id"] != "" {
+	if output.GeneratedAt == "" || len(output.Rows) != 1 ||
+		output.Filters["tenant_id"] != "tenant-a" ||
+		output.Filters["created_after"] != "2026-06-17T09:00:00Z" ||
+		output.Filters["event_id"] != "" {
 		t.Fatalf("unexpected output header: %+v", output)
 	}
 	row := output.Rows[0]

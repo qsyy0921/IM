@@ -18,6 +18,8 @@ type DecisionAuditExportOptions struct {
 	Classification string
 	ReasonCode     string
 	Status         string
+	CreatedAfter   *time.Time
+	CreatedBefore  *time.Time
 	Limit          int
 }
 
@@ -94,6 +96,17 @@ func (store *OutboxStore) ExportDecisionAudit(ctx context.Context, options Decis
 		}
 		args = append(args, status)
 		clauses = append(clauses, "status = $"+strconv.Itoa(len(args)))
+	}
+	if options.CreatedAfter != nil {
+		args = append(args, options.CreatedAfter.UTC())
+		clauses = append(clauses, "created_at >= $"+strconv.Itoa(len(args)))
+	}
+	if options.CreatedBefore != nil {
+		args = append(args, options.CreatedBefore.UTC())
+		clauses = append(clauses, "created_at < $"+strconv.Itoa(len(args)))
+	}
+	if options.CreatedAfter != nil && options.CreatedBefore != nil && !options.CreatedAfter.Before(*options.CreatedBefore) {
+		return nil, types.NewInvalidArgument("created_after must be before created_before")
 	}
 	where := ""
 	if len(clauses) > 0 {

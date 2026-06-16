@@ -59,6 +59,13 @@ docker compose `
 
 该 overlay 覆盖 message outbox relay、delivery timeline consumer / outbox relay、push delivery / identity consumer、receipt delivery consumer / outbox relay、contacts outbox relay 和 identity outbox relay。它不包含动态 webhook fixture；`loadtest/identity` 的 challenge delivery runner 仍需按 runner 参数准备 webhook 接收端和 identity challenge delivery outbox / worker 配置。
 
+identity-service 的本地 challenge delivery stack 基线建议直接使用已有 smoke 包装脚本。该脚本会启动临时 identity gRPC、webhook fixture 和 `challenge-delivery-worker`，结束后自动停止临时进程：
+
+```powershell
+.\loadtest\identity\run-local-smoke.ps1 `
+  -RunName capacity-baseline-identity-stack-<name>
+```
+
 contacts stack runner 使用默认 topic `im.contact.events`，本地 Kafka 禁止自动建 topic，首次运行前需要显式创建：
 
 ```powershell

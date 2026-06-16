@@ -19,7 +19,8 @@
 - app 层登录相关测试已按基础 login/register、MFA、Refresh token step-up、Challenge / Password reset 拆到同 package 测试文件，降低单文件复杂度并保留原覆盖面。
 - cmd 层 challenge delivery、MFA、gateway token / JWKS 和 env config helpers 已拆到同 package 文件，`main.go` 继续保留进程模式和启动编排。
 - `loadtest/identity` summary 已输出 `capacity_summary`，包含运行时长、identity 操作数、token 签发次数、预期 step-up 错误数、challenge delivery outbox 聚合、challenge delivery attempt 数、ops/s、latency p95/p99 和 MFA recovery code 数；后续容量验证可直接复用该结构。
+- `capacity-baseline-identity-stack-20260616` 本地 stack 短基线已跑通：临时 identity gRPC + webhook fixture + `challenge-delivery-worker` 覆盖 Register/Login/Refresh/Password Reset/MFA/recovery-code 管理，`challenge_delivery_outbox DELIVERED=2/PENDING=0/DLQ=0`，`operations_per_second=14.09`；报告见 `loadtest/distributed/loadtest-report-20260616-identity-stack-capacity-baseline.md`。
 
 ## 后续
 
-- WebAuthn/passkeys、OIDC federation、KMS/HSM、完整风控、SMS provider、bounce handling、租户级通知模板治理；统一 OTel collector、生产告警路由、retention、SLO dashboard 和基于 `capacity_summary` 的容量基线实跑仍属于后续统一观测治理。
+- WebAuthn/passkeys、OIDC federation、KMS/HSM、完整风控、SMS provider、bounce handling、租户级通知模板治理；统一 OTel collector、生产告警路由、retention、SLO dashboard、长时间容量曲线仍属于后续统一观测治理。

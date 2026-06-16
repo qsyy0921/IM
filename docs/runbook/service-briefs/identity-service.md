@@ -11,7 +11,7 @@
 - `outbox-relay` 对非取消运行时错误已改为退避重试，并在 relay 模式暴露低敏 retry 快照；malformed payload / unsupported event 仍保持 fail-closed。
 - Kafka writer 已显式固定 `acks=all`、禁自动建 topic、bounded attempts/backoff，并由本地门禁和 package 单测防漂移；真正 idempotent / transactional producer 仍属后续客户端选型。
 - 普通 `identity_outbox` relay 写入 retry / DLQ 的 `last_error` 时只保存稳定低敏公开文案，不落 Kafka / 网络 / provider 原始错误正文。
-- `challenge-delivery-worker` 对非取消运行时错误已改为退避重试，并在 worker 模式暴露低敏 retry 快照；decrypt failure / incomplete message / notifier error 仍保持 store 驱动的 retry / expire / DLQ 语义，持久化 last_error 只保存稳定公开文案和 failure_class，并有回归测试防止 provider body / destination / raw token 泄漏或低敏分类丢失。
+- `challenge-delivery-worker` 对非取消运行时错误已改为退避重试，并在 worker 模式暴露低敏 retry 快照；decrypt failure / incomplete message / notifier error 仍保持 store 驱动的 retry / expire / DLQ 语义，持久化 last_error 只保存稳定公开文案和 failure_class，并有同步 sender 与 worker retry / DLQ 回归测试防止 provider body / destination / raw token 泄漏或低敏分类丢失。
 - 当 `NEXUSIM_IDENTITY_ADMIN_AUTH_MODE=metadata|verified-metadata` 时，公网监听地址 + 无 gRPC mTLS client cert 的危险组合会在启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - TOTP / recovery-code proof 已在最终 Login / Refresh 事务内重新检查 lock；锁定期间不消费 proof、不写 session、不轮换 refresh token。
 - 已有只读 `session-mfa-proof-audit`、只读 `challenge-delivery-repair-audit` 和 `challenge-delivery-repair-cleanup` operator，用于发现历史 session MFA proof 脏数据、直接审计 challenge delivery repair 历史，以及按 retention / scope 清理 repair audit 历史。

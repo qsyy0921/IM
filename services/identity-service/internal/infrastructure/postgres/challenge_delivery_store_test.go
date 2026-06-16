@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -59,7 +60,7 @@ func TestChallengeDeliveryStoreDeadLettersIntegration(t *testing.T) {
 		if len(messages) != 1 {
 			t.Fatalf("expected one delivery message, got %d", len(messages))
 		}
-		return []error{types.NewChallengeDeliveryFailed("provider unavailable")}
+		return []error{types.NewChallengeDeliveryFailed("provider returned non-success status 503 body=user1@example.com token=secret-token destination=user1@example.com")}
 	})
 	if err != nil {
 		t.Fatalf("process failed delivery: %v", err)
@@ -73,10 +74,22 @@ func TestChallengeDeliveryStoreDeadLettersIntegration(t *testing.T) {
 		state.DeliveryStatus != "FAILED" ||
 		state.DeliveryAttemptCount != 1 ||
 		state.DeliveryFailedAt == nil ||
-		state.DeliveryFailureClass != types.ChallengeDeliveryFailureClassDeliveryFailed {
+		state.DeliveryFailureClass != types.ChallengeDeliveryFailureClassProviderNonSuccess ||
+		state.DeliveryLastError != "challenge delivery provider returned non-success status" {
 		t.Fatalf("unexpected dlq challenge state: %+v", state)
 	}
-	assertChallengeDeliveryOutboxFailureClass(t, ctx, pool, "challenge-dlq", types.ChallengeDeliveryFailureClassDeliveryFailed)
+	assertChallengeDeliveryOutboxFailureClass(t, ctx, pool, "challenge-dlq", types.ChallengeDeliveryFailureClassProviderNonSuccess)
+	if outboxLastError := readChallengeDeliveryOutboxLastError(t, ctx, pool, "challenge-dlq"); outboxLastError != "challenge delivery provider returned non-success status" {
+		t.Fatalf("unexpected delivery outbox last_error: %q", outboxLastError)
+	}
+	for _, leaked := range []string{"user1@example.com", "secret-token", "body=", "destination="} {
+		if strings.Contains(state.DeliveryLastError, leaked) {
+			t.Fatalf("challenge delivery_last_error leaked %q in %q", leaked, state.DeliveryLastError)
+		}
+		if outboxLastError := readChallengeDeliveryOutboxLastError(t, ctx, pool, "challenge-dlq"); strings.Contains(outboxLastError, leaked) {
+			t.Fatalf("delivery outbox last_error leaked %q in %q", leaked, outboxLastError)
+		}
+	}
 	_, err = repository.ConfirmVerificationChallenge(ctx, types.ConfirmVerificationChallengeCommand{
 		TenantID:    "tenant-identity",
 		UserID:      "user-1",
@@ -588,6 +601,22 @@ WHERE tenant_id = 'tenant-identity'
 	if gotFailureClass != wantFailureClass {
 		t.Fatalf("expected delivery outbox failure_class=%q, got %q", wantFailureClass, gotFailureClass)
 	}
+}
+
+func readChallengeDeliveryOutboxLastError(t *testing.T, ctx context.Context, pool *pgxpool.Pool, challengeID string) string {
+	t.Helper()
+	var gotLastError string
+	err := pool.QueryRow(ctx, `
+SELECT last_error
+FROM identity_challenge_delivery_outbox
+WHERE tenant_id = 'tenant-identity'
+  AND user_id = 'user-1'
+  AND challenge_id = $1
+`, challengeID).Scan(&gotLastError)
+	if err != nil {
+		t.Fatalf("read challenge delivery outbox last_error: %v", err)
+	}
+	return gotLastError
 }
 
 func readChallengeDeliveryOutboxID(t *testing.T, ctx context.Context, pool *pgxpool.Pool, challengeID string) int64 {

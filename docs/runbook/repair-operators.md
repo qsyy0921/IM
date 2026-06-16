@@ -41,6 +41,7 @@ go run ./services/delivery-service/cmd/delivery-service
 | 服务 | JSON 输出环境变量 |
 | --- | --- |
 | `message-service` | `NEXUSIM_MESSAGE_OUTBOX_REPAIR_AUDIT_OUTPUT` |
+| `delivery-service` | `NEXUSIM_DELIVERY_OUTBOX_REPAIR_AUDIT_OUTPUT` |
 | `receipt-service` | `NEXUSIM_RECEIPT_OUTBOX_REPAIR_AUDIT_OUTPUT` |
 | `contacts-service` | `NEXUSIM_CONTACTS_OUTBOX_REPAIR_AUDIT_OUTPUT` |
 | `policy-service` | `NEXUSIM_POLICY_OUTBOX_REPAIR_AUDIT_OUTPUT` |

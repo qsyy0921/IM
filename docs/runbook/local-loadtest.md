@@ -66,6 +66,13 @@ identity-service 的本地 challenge delivery stack 基线建议直接使用已�
   -RunName capacity-baseline-identity-stack-<name>
 ```
 
+receipt-service 的本地 stack 基线也建议使用已有 smoke 包装脚本。该脚本会启动临时 conversation / message / delivery / receipt 主进程和必要 relay / consumer 角色，结束后自动停止临时进程：
+
+```powershell
+.\loadtest\receipt\run-local-smoke.ps1 `
+  -RunName capacity-baseline-receipt-stack-<name>
+```
+
 contacts stack runner 使用默认 topic `im.contact.events`，本地 Kafka 禁止自动建 topic，首次运行前需要显式创建：
 
 ```powershell

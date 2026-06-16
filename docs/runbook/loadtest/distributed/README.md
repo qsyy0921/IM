@@ -6,6 +6,7 @@
 
 | 报告 | 说明 |
 | --- | --- |
+| `loadtest-report-20260616-receipt-stack-capacity-baseline.md` | 本地 receipt-service stack capacity baseline 覆盖 message / delivery / receipt relay-consumer 链路、回执、会话列表和 `im.receipt.events` Kafka readback，原始结果在 H 盘 |
 | `loadtest-report-20260616-identity-stack-capacity-baseline.md` | 本地 identity-service stack capacity baseline 覆盖 identity gRPC、webhook fixture、challenge-delivery-worker、MFA / recovery-code / refresh step-up，原始结果在 H 盘 |
 | `loadtest-report-20260616-contacts-stack-capacity-baseline.md` | 本地 contacts-service stack capacity baseline 覆盖 contacts gRPC、contacts outbox relay 和 `im.contact.events` Kafka readback，原始结果在 H 盘 |
 | `loadtest-report-20260616-seeded-capacity-baseline.md` | 本地 seeded capacity baseline 覆盖 message / conversation / delivery 三个需要预置业务状态的 runner，原始结果在 H 盘 |

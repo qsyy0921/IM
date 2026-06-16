@@ -11,6 +11,7 @@
 ## 本文件的作用
 
 - 本文件维护 Codex 目标框短 Prompt 和每轮文档路由。
+- Agent 进度管理规则见 `agent.md`；需要管理项目进度、分配子 agent 或选择下一切片时先读它。
 - 具体当前阶段不在这里维护，见 `docs/runbook/current-brief.md`。
 - 当前未完成工作不在这里维护，见 `docs/runbook/remaining-goals.md`。
 - 单服务状态不在这里维护，见 `docs/runbook/service-briefs/<service>.md`。
@@ -18,11 +19,12 @@
 ## 每轮开始
 
 1. 运行 `git status --short --branch --untracked-files=all`。
-2. 读取 `docs/runbook/current-brief.md`。
-3. 若需要定位文档，先读 `docs/runbook/README.md`。
-4. 若需要服务状态，先读 `docs/runbook/service-briefs/README.md`，再读对应服务短文档。
-5. 若需要剩余工作，读 `docs/runbook/remaining-goals.md`。
-6. 不为了“了解项目”全文读取长历史文档。
+2. 读取 `agent.md`，确认本轮进度管理规则。
+3. 读取 `docs/runbook/current-brief.md`。
+4. 若需要定位文档，先读 `docs/runbook/README.md`。
+5. 若需要服务状态，先读 `docs/runbook/service-briefs/README.md`，再读对应服务短文档。
+6. 若需要剩余工作，读 `docs/runbook/remaining-goals.md`。
+7. 不为了“了解项目”全文读取长历史文档。
 
 ## 工作原则
 

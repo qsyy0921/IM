@@ -83,6 +83,9 @@ try {
     Write-Host "== file size budgets =="
     Invoke-LocalCheck "check-file-size-budget.ps1"
 
+    Write-Host "== file size budget summary =="
+    Invoke-LocalCheck "check-file-size-budget-summary.ps1"
+
     Write-Host "== loadtest output paths =="
     Invoke-LocalCheck "check-loadtest-output-paths.ps1"
 

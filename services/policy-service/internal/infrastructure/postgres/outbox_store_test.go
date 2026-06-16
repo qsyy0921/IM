@@ -647,6 +647,50 @@ INSERT INTO policy_decision_audit_outbox_repair_audit (
 	assertPolicyAuditOutboxErrorDoesNotContain(t, rows[0].PreviousLastError, "user1@example.com", "secret-token")
 }
 
+func TestOutboxStoreAuditOutboxRepairsFiltersRepairedAtIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+
+	base := time.Date(2026, 6, 16, 2, 0, 0, 0, time.UTC)
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_decision_audit_outbox_repair_audit (
+    event_id, tenant_id, previous_status, previous_retry_count, previous_last_error, previous_dead_lettered_at,
+    repair_operator, repair_reason, repair_outcome, skip_reason, repaired_at
+) VALUES
+    ('event-window-old', 'tenant-window', 'DLQ', 1, 'publish failed', $1::timestamptz, 'operator-a', 'manual old', 'REPAIRED', '', $2::timestamptz),
+    ('event-window-hit', 'tenant-window', 'DLQ', 2, 'provider unavailable', $1::timestamptz, 'operator-b', 'manual hit', 'SKIPPED', 'validation_failed', $3::timestamptz),
+    ('event-window-new', 'tenant-window', 'DLQ', 3, 'provider unavailable', $1::timestamptz, 'operator-c', 'manual new', 'REPAIRED', '', $4::timestamptz)
+`, base, base.Add(-time.Hour), base, base.Add(time.Hour))
+	if err != nil {
+		t.Fatalf("seed policy outbox repair audit window rows: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	rows, err := store.AuditOutboxRepairs(ctx, OutboxRepairAuditOptions{
+		TenantID:       "tenant-window",
+		RepairedAfter:  ptrTime(base.Add(-30 * time.Minute)),
+		RepairedBefore: ptrTime(base.Add(30 * time.Minute)),
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit policy outbox repairs by repaired_at: %v", err)
+	}
+	if len(rows) != 1 || rows[0].EventID != "event-window-hit" {
+		t.Fatalf("unexpected repaired_at window rows: %+v", rows)
+	}
+
+	_, err = store.AuditOutboxRepairs(ctx, OutboxRepairAuditOptions{
+		TenantID:       "tenant-window",
+		RepairedAfter:  ptrTime(base),
+		RepairedBefore: ptrTime(base),
+		Limit:          10,
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid repaired_at window, got %v", err)
+	}
+}
+
 func TestOutboxStoreCleanupOutboxRepairsDeletesOnlyExpiredRowsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -678,6 +722,10 @@ INSERT INTO policy_decision_audit_outbox_repair_audit (
 		t.Fatalf("expected 2 deleted rows, got %+v", stats)
 	}
 	assertPolicyAuditOutboxRepairAuditCount(t, ctx, pool, "tenant-cleanup", 1)
+}
+
+func ptrTime(value time.Time) *time.Time {
+	return &value
 }
 
 func TestOutboxStoreCleanupOutboxRepairsHonorsBatchLimitIntegration(t *testing.T) {

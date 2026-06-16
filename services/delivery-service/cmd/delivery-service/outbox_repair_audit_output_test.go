@@ -37,6 +37,10 @@ func TestWriteOutboxRepairAuditOutput(t *testing.T) {
 			AfterNextRetryAt:     &afterNextRetryAt,
 			CreatedAt:            createdAt,
 		},
+	}, map[string]string{
+		"outbox_id":       "42",
+		"repaired_after":  "2026-06-16T09:00:00Z",
+		"repaired_before": "",
 	})
 	if err != nil {
 		t.Fatalf("write outbox repair audit output: %v", err)
@@ -47,7 +51,8 @@ func TestWriteOutboxRepairAuditOutput(t *testing.T) {
 		t.Fatalf("read outbox repair audit output: %v", err)
 	}
 	var output struct {
-		Rows []struct {
+		Filters map[string]string `json:"filters"`
+		Rows    []struct {
 			OutboxID             int64  `json:"outbox_id"`
 			EventID              string `json:"event_id"`
 			TenantID             string `json:"tenant_id"`
@@ -68,6 +73,13 @@ func TestWriteOutboxRepairAuditOutput(t *testing.T) {
 	}
 	if len(output.Rows) != 1 {
 		t.Fatalf("unexpected row count: %+v", output)
+	}
+	if output.Filters["outbox_id"] != "42" ||
+		output.Filters["repaired_after"] != "2026-06-16T09:00:00Z" {
+		t.Fatalf("unexpected filters: %+v", output.Filters)
+	}
+	if _, ok := output.Filters["repaired_before"]; ok {
+		t.Fatalf("expected empty filter to be compacted: %+v", output.Filters)
 	}
 	row := output.Rows[0]
 	if row.OutboxID != 42 ||

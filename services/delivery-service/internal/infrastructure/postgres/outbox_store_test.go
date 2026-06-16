@@ -403,6 +403,57 @@ INSERT INTO delivery_outbox_repair_audit (
 	}
 }
 
+func TestOutboxStoreAuditOutboxRepairsFiltersRepairedAtIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	base := time.Date(2026, 6, 16, 2, 0, 0, 0, time.UTC)
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_outbox_repair_audit (
+    outbox_id, event_id, tenant_id, conversation_id, aggregate_version, mode, outcome, skip_reason, operator, reason, dry_run,
+    before_status, before_retry_count, before_last_error, before_next_retry_at, before_dead_lettered_at,
+    after_status, after_retry_count, after_last_error, after_next_retry_at, after_dead_lettered_at, created_at
+) VALUES
+    (121, 'event-window-old', 'tenant-window', 'conversation-a', 1, 'audit', 'AUDITED', '', 'operator-a', 'manual old', true,
+     'DLQ', 1, 'malformed payload', NULL, NULL,
+     'DLQ', 1, 'malformed payload', NULL, NULL, $1::timestamptz),
+    (122, 'event-window-hit', 'tenant-window', 'conversation-a', 2, 'redrive-dlq-pending', 'MUTATED', '', 'operator-b', 'manual hit', false,
+     'DLQ', 2, 'provider down', NULL, NULL,
+     'PENDING', 0, '', NULL, NULL, $2::timestamptz),
+    (123, 'event-window-new', 'tenant-window', 'conversation-a', 3, 'audit', 'AUDITED', '', 'operator-c', 'manual new', true,
+     'DLQ', 3, 'provider down', NULL, NULL,
+     'DLQ', 3, 'provider down', NULL, NULL, $3::timestamptz)
+`, base.Add(-time.Hour), base, base.Add(time.Hour))
+	if err != nil {
+		t.Fatalf("seed delivery outbox repair audit window rows: %v", err)
+	}
+
+	store := NewOutboxStore(pool)
+	rows, err := store.AuditOutboxRepairs(ctx, OutboxRepairAuditOptions{
+		TenantID:       "tenant-window",
+		RepairedAfter:  ptrTime(base.Add(-30 * time.Minute)),
+		RepairedBefore: ptrTime(base.Add(30 * time.Minute)),
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit delivery outbox repairs by repaired_at: %v", err)
+	}
+	if len(rows) != 1 || rows[0].EventID != "event-window-hit" {
+		t.Fatalf("unexpected repaired_at window rows: %+v", rows)
+	}
+
+	_, err = store.AuditOutboxRepairs(ctx, OutboxRepairAuditOptions{
+		TenantID:       "tenant-window",
+		RepairedAfter:  ptrTime(base),
+		RepairedBefore: ptrTime(base),
+		Limit:          10,
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid repaired_at window, got %v", err)
+	}
+}
+
 func TestOutboxStoreCleanupOutboxRepairsDeletesOnlyExpiredRowsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -438,6 +489,10 @@ INSERT INTO delivery_outbox_repair_audit (
 		t.Fatalf("unexpected deleted count: %+v", stats)
 	}
 	assertDeliveryOutboxRepairAuditCount(t, ctx, pool, "tenant-c", 1)
+}
+
+func ptrTime(value time.Time) *time.Time {
+	return &value
 }
 
 func TestOutboxStoreCleanupOutboxRepairsHonorsBatchLimitIntegration(t *testing.T) {

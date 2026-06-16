@@ -302,10 +302,26 @@ func runOutboxRepairAudit() error {
 	}
 	defer pool.Close()
 
+	repairedAfter, err := envOptionalRFC3339Time("NEXUSIM_CONTACTS_OUTBOX_REPAIR_AUDIT_REPAIRED_AFTER")
+	if err != nil {
+		return err
+	}
+	repairedBefore, err := envOptionalRFC3339Time("NEXUSIM_CONTACTS_OUTBOX_REPAIR_AUDIT_REPAIRED_BEFORE")
+	if err != nil {
+		return err
+	}
+	filters := map[string]string{
+		"event_id":        envString("NEXUSIM_CONTACTS_OUTBOX_REPAIR_AUDIT_EVENT_ID", ""),
+		"tenant_id":       envString("NEXUSIM_CONTACTS_OUTBOX_REPAIR_AUDIT_TENANT_ID", ""),
+		"repaired_after":  formatOptionalTime(repairedAfter),
+		"repaired_before": formatOptionalTime(repairedBefore),
+	}
 	rows, err := postgresinfra.NewOutboxStore(pool).AuditOutboxRepairs(ctx, postgresinfra.OutboxRepairAuditOptions{
-		EventID:  envString("NEXUSIM_CONTACTS_OUTBOX_REPAIR_AUDIT_EVENT_ID", ""),
-		TenantID: envString("NEXUSIM_CONTACTS_OUTBOX_REPAIR_AUDIT_TENANT_ID", ""),
-		Limit:    envInt("NEXUSIM_CONTACTS_OUTBOX_REPAIR_AUDIT_LIMIT", 20),
+		EventID:        filters["event_id"],
+		TenantID:       filters["tenant_id"],
+		RepairedAfter:  repairedAfter,
+		RepairedBefore: repairedBefore,
+		Limit:          envInt("NEXUSIM_CONTACTS_OUTBOX_REPAIR_AUDIT_LIMIT", 20),
 	})
 	if err != nil {
 		return err
@@ -325,7 +341,7 @@ func runOutboxRepairAudit() error {
 		)
 	}
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_CONTACTS_OUTBOX_REPAIR_AUDIT_OUTPUT")); outputPath != "" {
-		if err := writeOutboxRepairAuditOutput(outputPath, rows); err != nil {
+		if err := writeOutboxRepairAuditOutput(outputPath, rows, filters); err != nil {
 			return err
 		}
 	}

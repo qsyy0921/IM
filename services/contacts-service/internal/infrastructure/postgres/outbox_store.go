@@ -46,9 +46,11 @@ type OutboxAuditRow struct {
 }
 
 type OutboxRepairAuditOptions struct {
-	EventID  string
-	TenantID string
-	Limit    int
+	EventID        string
+	TenantID       string
+	RepairedAfter  *time.Time
+	RepairedBefore *time.Time
+	Limit          int
 }
 
 type OutboxRepairCleanupOptions struct {
@@ -416,6 +418,9 @@ func (store *OutboxStore) AuditOutboxRepairs(ctx context.Context, options Outbox
 	if store == nil || store.pool == nil {
 		return nil, errors.New("contacts outbox store is not configured")
 	}
+	if options.RepairedAfter != nil && options.RepairedBefore != nil && !options.RepairedAfter.Before(*options.RepairedBefore) {
+		return nil, types.NewInvalidArgument("repaired_after must be before repaired_before")
+	}
 	limit := options.Limit
 	if limit <= 0 {
 		limit = 20
@@ -433,6 +438,14 @@ func (store *OutboxStore) AuditOutboxRepairs(ctx context.Context, options Outbox
 	if tenantID := strings.TrimSpace(options.TenantID); tenantID != "" {
 		args = append(args, tenantID)
 		clauses = append(clauses, "tenant_id = $"+strconv.Itoa(len(args)))
+	}
+	if options.RepairedAfter != nil {
+		args = append(args, options.RepairedAfter.UTC())
+		clauses = append(clauses, "repaired_at >= $"+strconv.Itoa(len(args)))
+	}
+	if options.RepairedBefore != nil {
+		args = append(args, options.RepairedBefore.UTC())
+		clauses = append(clauses, "repaired_at < $"+strconv.Itoa(len(args)))
 	}
 	where := ""
 	if len(clauses) > 0 {

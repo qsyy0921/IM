@@ -433,6 +433,10 @@ func TestWriteOutboxRepairAuditOutput(t *testing.T) {
 			PreviousDeadLetteredAt: &deadLetteredAt,
 			RepairedAt:             repairedAt,
 		},
+	}, map[string]string{
+		"tenant_id":       "tenant-a",
+		"repaired_after":  "2026-06-16T09:00:00Z",
+		"repaired_before": "",
 	})
 	if err != nil {
 		t.Fatalf("write outbox repair audit output: %v", err)
@@ -443,7 +447,8 @@ func TestWriteOutboxRepairAuditOutput(t *testing.T) {
 		t.Fatalf("read outbox repair audit output: %v", err)
 	}
 	var output struct {
-		Rows []struct {
+		Filters map[string]string `json:"filters"`
+		Rows    []struct {
 			EventID                string `json:"event_id"`
 			TenantID               string `json:"tenant_id"`
 			ConversationID         string `json:"conversation_id"`
@@ -458,6 +463,13 @@ func TestWriteOutboxRepairAuditOutput(t *testing.T) {
 	}
 	if len(output.Rows) != 1 {
 		t.Fatalf("unexpected row count: %+v", output)
+	}
+	if output.Filters["tenant_id"] != "tenant-a" ||
+		output.Filters["repaired_after"] != "2026-06-16T09:00:00Z" {
+		t.Fatalf("unexpected filters: %+v", output.Filters)
+	}
+	if _, ok := output.Filters["repaired_before"]; ok {
+		t.Fatalf("expected empty filter to be compacted: %+v", output.Filters)
 	}
 	row := output.Rows[0]
 	if row.EventID != "event-1" ||

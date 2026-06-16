@@ -388,13 +388,35 @@ func runOutboxRepairAudit() error {
 		parsed := envInt64AllowZero("NEXUSIM_DELIVERY_OUTBOX_REPAIR_AUDIT_OUTBOX_ID", 0)
 		outboxID = &parsed
 	}
+	repairedAfter, err := envOptionalRFC3339Time("NEXUSIM_DELIVERY_OUTBOX_REPAIR_AUDIT_REPAIRED_AFTER")
+	if err != nil {
+		return err
+	}
+	repairedBefore, err := envOptionalRFC3339Time("NEXUSIM_DELIVERY_OUTBOX_REPAIR_AUDIT_REPAIRED_BEFORE")
+	if err != nil {
+		return err
+	}
+	filters := map[string]string{
+		"event_id":        envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_AUDIT_EVENT_ID", ""),
+		"tenant_id":       envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_AUDIT_TENANT_ID", ""),
+		"conversation_id": envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_AUDIT_CONVERSATION_ID", ""),
+		"mode":            envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_AUDIT_MODE", ""),
+		"outcome":         envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_AUDIT_OUTCOME", ""),
+		"repaired_after":  formatOptionalTime(repairedAfter),
+		"repaired_before": formatOptionalTime(repairedBefore),
+	}
+	if outboxID != nil {
+		filters["outbox_id"] = strconv.FormatInt(*outboxID, 10)
+	}
 	rows, err := postgresinfra.NewOutboxStore(pool).AuditOutboxRepairs(ctx, postgresinfra.OutboxRepairAuditOptions{
 		OutboxID:       outboxID,
-		EventID:        envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_AUDIT_EVENT_ID", ""),
-		TenantID:       envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_AUDIT_TENANT_ID", ""),
-		ConversationID: envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_AUDIT_CONVERSATION_ID", ""),
-		Mode:           envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_AUDIT_MODE", ""),
-		Outcome:        envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_AUDIT_OUTCOME", ""),
+		EventID:        filters["event_id"],
+		TenantID:       filters["tenant_id"],
+		ConversationID: filters["conversation_id"],
+		Mode:           filters["mode"],
+		Outcome:        filters["outcome"],
+		RepairedAfter:  repairedAfter,
+		RepairedBefore: repairedBefore,
 		Limit:          envInt("NEXUSIM_DELIVERY_OUTBOX_REPAIR_AUDIT_LIMIT", 20),
 	})
 	if err != nil {
@@ -423,7 +445,7 @@ func runOutboxRepairAudit() error {
 		)
 	}
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_OUTBOX_REPAIR_AUDIT_OUTPUT")); outputPath != "" {
-		if err := writeOutboxRepairAuditOutput(outputPath, rows); err != nil {
+		if err := writeOutboxRepairAuditOutput(outputPath, rows, filters); err != nil {
 			return err
 		}
 	}

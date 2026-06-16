@@ -117,6 +117,7 @@ search-service 和 AI 应用后端后置；
 - Redis Cluster 六节点短容量基线；
 - PostgreSQL `repmgr + pgpool` local failover smoke；
 - Kafka KRaft 3 broker local leader failover / controller-switch / ISR observation smoke；
+- Kafka KRaft repeated ISR flapping smoke：2 轮 broker stop/start 均观察到 ISR 收缩 / 恢复和 `acks=all` probe 写入成功；
 - Kafka producer hardening evaluation：6 个 producer package 固定 `acks=all`、禁自动建 topic、bounded retry/backoff，并明确当前 `kafka-go` 不声明 idempotent / transactional producer 语义，业务可靠性边界仍是 outbox / event_id 幂等。
 - Kafka consumer group rebalance smoke：两个 push-gateway delivery-consumer 进入同一 group，停止一个后，`im.delivery.events` 的 3 个 partition 被重新分配给剩余 consumer。
 
@@ -126,6 +127,7 @@ search-service 和 AI 应用后端后置；
 - 在线通知失败时，durable `PullInbox + AckDelivery` 能兜底；
 - Redis、Kafka、PostgreSQL 单点切换后，最小链路可以恢复；
 - Kafka 在本地 RF=3 / min.insync.replicas=2 下，一 broker down 仍可写，两 broker down 会按 `NOT_ENOUGH_REPLICAS` fail-closed；
+- Kafka repeated ISR flapping 下，本地 broker stop/start 后 ISR 能在 2 / 3 之间按预期收缩和恢复；
 - Kafka consumer group 可以完成第一阶段本地 rebalance；
 - 多个 worker / relay 已具备退避重试和 fail-closed 行为；
 - outbox / projection / challenge delivery 具备第一阶段 audit / repair / cleanup。

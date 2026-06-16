@@ -4,6 +4,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $quotaGate = Join-Path $PSScriptRoot "check-api-gateway-quota-snapshot.ps1"
 $legacyGate = Join-Path $PSScriptRoot "check-api-gateway-legacy-descriptor-migration.ps1"
 $legacyObservation = Join-Path $PSScriptRoot "record-api-gateway-legacy-observation.ps1"
+$legacyObservationWindow = Join-Path $PSScriptRoot "check-api-gateway-legacy-observation-window.ps1"
 $powerShellExe = (Get-Command powershell -ErrorAction Stop).Source
 $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("nexusim-api-gateway-gates-" + [System.Guid]::NewGuid().ToString("N"))
 
@@ -13,6 +14,32 @@ function Write-JsonFile {
         [string]$Content
     )
     $Content | Set-Content -LiteralPath $Path -Encoding UTF8
+}
+
+function Write-LegacyObservationSummary {
+    param(
+        [string]$Directory,
+        [int64]$GeneratedAtMS,
+        [bool]$GatePassed = $true,
+        [bool]$RegisteredLegacyDescriptors = $false,
+        [int64]$FacadeRequests = 1,
+        [int64]$LegacyRequests = 0,
+        [int64]$LegacyLastSeenMS = 0,
+        [int64]$OtherRequests = 0
+    )
+
+    New-Item -ItemType Directory -Force -Path $Directory | Out-Null
+    $summary = [ordered]@{
+        run_name = Split-Path -Leaf $Directory
+        generated_at_unix_ms = $GeneratedAtMS
+        gate_passed = $GatePassed
+        registered_legacy_descriptors = $RegisteredLegacyDescriptors
+        facade_requests = $FacadeRequests
+        legacy_descriptor_requests = $LegacyRequests
+        legacy_descriptor_last_seen_unix_ms = $LegacyLastSeenMS
+        other_requests = $OtherRequests
+    }
+    $summary | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $Directory "legacy-observation-summary.json") -Encoding UTF8
 }
 
 function Invoke-GateExpectPass {
@@ -179,6 +206,60 @@ try {
     if (-not (Test-Path -LiteralPath $failedObservationSummary)) {
         throw "Expected failed legacy observation summary to be written: $failedObservationSummary"
     }
+
+    $windowRoot = Join-Path $tempDir "legacy-window"
+    Write-LegacyObservationSummary -Directory (Join-Path $windowRoot "obs-1") -GeneratedAtMS 100000 -FacadeRequests 5
+    Write-LegacyObservationSummary -Directory (Join-Path $windowRoot "obs-2") -GeneratedAtMS 500000 -FacadeRequests 7
+    Write-LegacyObservationSummary -Directory (Join-Path $windowRoot "obs-3") -GeneratedAtMS 800000 -FacadeRequests 9
+    Invoke-GateExpectPass -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $legacyObservationWindow,
+        "-SummaryRoot", $windowRoot,
+        "-RequiredWindow", "700s",
+        "-MaxObservationGap", "500s",
+        "-MinObservations", "3",
+        "-NowUnixMS", "900000"
+    )
+
+    Invoke-GateExpectFail -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $legacyObservationWindow,
+        "-SummaryRoot", $windowRoot,
+        "-RequiredWindow", "701s",
+        "-MaxObservationGap", "500s",
+        "-MinObservations", "3",
+        "-NowUnixMS", "900000"
+    )
+
+    $windowGapRoot = Join-Path $tempDir "legacy-window-gap"
+    Write-LegacyObservationSummary -Directory (Join-Path $windowGapRoot "obs-1") -GeneratedAtMS 100000 -FacadeRequests 5
+    Write-LegacyObservationSummary -Directory (Join-Path $windowGapRoot "obs-2") -GeneratedAtMS 800000 -FacadeRequests 7
+    Invoke-GateExpectFail -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $legacyObservationWindow,
+        "-SummaryRoot", $windowGapRoot,
+        "-RequiredWindow", "1s",
+        "-MaxObservationGap", "500s",
+        "-MinObservations", "2",
+        "-NowUnixMS", "900000"
+    )
+
+    $windowLegacyRoot = Join-Path $tempDir "legacy-window-traffic"
+    Write-LegacyObservationSummary -Directory (Join-Path $windowLegacyRoot "obs-1") -GeneratedAtMS 100000 -FacadeRequests 5
+    Write-LegacyObservationSummary -Directory (Join-Path $windowLegacyRoot "obs-2") -GeneratedAtMS 800000 -FacadeRequests 7 -LegacyRequests 1 -LegacyLastSeenMS 800000
+    Invoke-GateExpectFail -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $legacyObservationWindow,
+        "-SummaryRoot", $windowLegacyRoot,
+        "-RequiredWindow", "1s",
+        "-MaxObservationGap", "1000s",
+        "-MinObservations", "2",
+        "-NowUnixMS", "900000"
+    )
 }
 finally {
     Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue

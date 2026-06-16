@@ -27,6 +27,19 @@
 
 输出位于 `H:\NexusIM\loadtest-results\<run>`，包含 raw metrics snapshot、gate 输出、summary JSON 和 markdown report。gate 失败也会落盘，并返回非零码。该证据只代表一次 live/offline snapshot，不代表所有环境的生产迁移完成。
 
+删除 legacy descriptor 前，如果已经按天或按固定间隔保存了多次 observation，可用窗口 gate 汇总这些 summary：
+
+```powershell
+.\tools\check-api-gateway-legacy-observation-window.ps1 `
+  -SummaryRoot H:\NexusIM\loadtest-results `
+  -RequiredWindow 7d `
+  -MaxObservationGap 24h `
+  -MinObservations 7 `
+  -OutputPath H:\NexusIM\loadtest-results\api-gateway-legacy-window-summary.json
+```
+
+窗口 gate 会检查 observation 数量、持续时间、最大采样间隔、所有单次 gate 是否通过、是否仍注册 legacy descriptor、是否仍有 legacy / other exposure，以及窗口内是否有 facade 流量。它仍只是目标环境观察证据，不等于生产 SLO 或永久删除证明。
+
 ## 当前边界
 
 - 当前是 first-stage correlation，不是完整 OpenTelemetry trace。

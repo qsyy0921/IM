@@ -11,7 +11,7 @@
 - 当 `NEXUSIM_API_GATEWAY_AUTH_MODE=mock` 时，gRPC 监听地址仅允许 loopback / RFC1918 私网；公网监听地址会在启动前直接失败，避免把本地 smoke 身份模式暴露到公网。
 - 当 `NEXUSIM_API_GATEWAY_AUTH_MODE=hmac|jwt` 且 gRPC 监听地址是公网地址时，若未启用入口 gRPC TLS，进程也会在启动前直接失败，避免把签名 token 暴露到 plaintext 公网入口。
 - 后端启用 verified-metadata auth 时，api-gateway 启动阶段会拒绝“公网地址 + 无 mTLS client cert”的危险组合；当前已覆盖 conversation / message / delivery / receipt / contacts / identity 下游，私网 / loopback 仍可保留第一阶段 trusted metadata 直连。
-- 已有 `tools/check-api-gateway-legacy-descriptor-migration.ps1`，可基于 `/debug/metrics` 或离线 JSON snapshot 做 legacy descriptor 移除前 gate；默认任何历史 legacy traffic 都失败，也可用 `-RequiredQuietDuration` 要求 `legacy_descriptor_last_seen_unix_ms` 满足静默窗口，并可选要求 facade 已有流量、snapshot 足够新、other exposure 为 0、legacy opt-in deadline 已过期或未配置；`tools/record-api-gateway-legacy-observation.ps1` 可把 live/offline snapshot、gate 输出、summary JSON 和 markdown report 写入 `H:\NexusIM\loadtest-results\<run>`，用于持续观察和面试证据归档。
+- 已有 `tools/check-api-gateway-legacy-descriptor-migration.ps1`，可基于 `/debug/metrics` 或离线 JSON snapshot 做 legacy descriptor 移除前 gate；默认任何历史 legacy traffic 都失败，也可用 `-RequiredQuietDuration` 要求 `legacy_descriptor_last_seen_unix_ms` 满足静默窗口，并可选要求 facade 已有流量、snapshot 足够新、other exposure 为 0、legacy opt-in deadline 已过期或未配置；`tools/record-api-gateway-legacy-observation.ps1` 可把 live/offline snapshot、gate 输出、summary JSON 和 markdown report 写入 `H:\NexusIM\loadtest-results\<run>`；`tools/check-api-gateway-legacy-observation-window.ps1` 可汇总多次 observation summary，检查 observation 数量、持续窗口、最大采样间隔、facade 流量、legacy / other exposure 和 gate 结果，用于删除 legacy descriptor 前的持续观察证据。
 - 已有 `tools/check-api-gateway-quota-snapshot.ps1`，可基于 `/debug/metrics` 或离线 JSON snapshot 做 tenant quota 门禁，检查 rate-limit 是否启用、source、version/checksum、checksum-required policy、URL HTTPS / bearer / TLS / client-cert guard、snapshot age / future timestamp / stale、reload error、Redis / identity 错误、tenant plan 数、tracked key 数和最近 reload 成功时间；`check-local` 已包含 legacy / quota gate 正反样本自检。
 - `ADR-033` 已固定 tenant quota source 边界：api-gateway 不直接读业务内部表；`url` source 只消费版本化 snapshot，可选 bearer token 且 bearer mode 强制 HTTPS，并支持 URL source 专用 CA / client cert 和强制 checksum；后续完整配置中心 / DB-backed quota 必须通过控制面 / 配置契约。
 - tenant quota source / snapshot / reload helper 已从 `cmd/api-gateway/main.go` 拆到同 package 文件，composition root 继续负责 wiring，避免继续堆大文件。
@@ -21,4 +21,4 @@
 
 ## 后续
 
-- 采样治理 hardening、统一 OTel collector / alerting / dashboard、在目标环境持续运行 legacy quiet-window observation 并最终删除 legacy descriptor 代码、完整配置中心 quota source hardening、长时间容量曲线和生产 sizing。
+- 采样治理 hardening、统一 OTel collector / alerting / dashboard、在目标环境持续运行 legacy quiet-window observation window gate 并最终删除 legacy descriptor 代码、完整配置中心 quota source hardening、长时间容量曲线和生产 sizing。

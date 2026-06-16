@@ -161,6 +161,19 @@ H:\NexusIM\loadtest-results\<run>\legacy-observation-report.md
 
 gate 失败时仍会写入证据文件，并以非零 exit code 返回，方便 CI / 本地脚本阻断误删 legacy descriptor。它只能证明该次 snapshot 和所选 gate 参数，不能证明所有环境都完成迁移。
 
+如果已经有多次 observation summary，可以用窗口 gate 汇总持续观察证据：
+
+```powershell
+.\tools\check-api-gateway-legacy-observation-window.ps1 `
+  -SummaryRoot H:\NexusIM\loadtest-results `
+  -RequiredWindow 7d `
+  -MaxObservationGap 24h `
+  -MinObservations 7 `
+  -OutputPath H:\NexusIM\loadtest-results\api-gateway-legacy-window-summary.json
+```
+
+该 gate 会检查 observation 数量、持续窗口、最大采样间隔、单次 gate 结果、facade 流量、legacy descriptor 注册状态、legacy traffic 和 other exposure。它用于删除 legacy descriptor 前的目标环境证据汇总；正式移除仍需要在目标环境实际连续运行并归档结果。
+
 ## Tenant Quota Snapshot Gate
 
 配置源切到 URL source 或后续控制面输出前，可对 `/debug/metrics` 或离线 snapshot 运行 quota gate：

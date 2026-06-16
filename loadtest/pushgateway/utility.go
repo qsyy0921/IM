@@ -136,6 +136,9 @@ func observedMessageCount(result *summary) int {
 	if result.SlowClient != nil && result.SlowClient.MessageCount > 0 {
 		return result.SlowClient.MessageCount
 	}
+	if result.RedisResumeNegative != nil && result.RedisResumeNegative.GapMessageCount > 0 {
+		return result.RedisResumeNegative.GapMessageCount
+	}
 	if result.SendMessage.MessageID != "" || result.SendMessage.ConversationSeq > 0 {
 		return 1
 	}

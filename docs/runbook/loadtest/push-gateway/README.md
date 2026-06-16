@@ -135,6 +135,16 @@ NEXUSIM_PUSH_ROUTE_TTL=90s
 NEXUSIM_PUSH_ROUTE_CLEANUP_INTERVAL=30s
 ```
 
+Redis-backed resume 负向 smoke runner 已支持 `redis-resume-negative` 场景：
+
+```powershell
+.\loadtest\pushgateway\run-local-smoke.ps1 `
+  -Scenario redis-resume-negative `
+  -RouteBackend redis
+```
+
+该场景验证三个退化语义：未知客户端 `resume_token` 不会被接受为有效 token，而是由服务端签发新 token 并返回 `server.resume_hint(reason=buffer_miss)`；同一 resume token 被另一个 device 使用时返回非重试 `PERMISSION_DENIED`；Redis-backed resume buffer 存在 gap 时返回 `buffer_miss`，客户端必须用本地 cursor / durable `PullInbox` 校准并再 `AckDelivery`。当前 runner 入口已具备，真实运行结果仍需单独归档报告；不要把它提前表述为已完成 smoke。
+
 Redis Sentinel client 参数：
 
 ```text

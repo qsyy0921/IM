@@ -10,7 +10,7 @@ param(
     [string]$TenantId = "",
     [string]$ConversationId = "",
     [string]$ReceiverDeviceIds = "push-device-1",
-    [ValidateSet("full", "message-change-notify", "resume-replay", "cross-instance-resume", "slow-client", "redis-fault", "redis-sentinel-failover", "redis-sentinel-master-stop", "redis-sentinel-quorum-loss", "redis-sentinel-network-partition", "identity-revoke")]
+    [ValidateSet("full", "message-change-notify", "resume-replay", "redis-resume-negative", "cross-instance-resume", "slow-client", "redis-fault", "redis-sentinel-failover", "redis-sentinel-master-stop", "redis-sentinel-quorum-loss", "redis-sentinel-network-partition", "identity-revoke")]
     [string]$Scenario = "full",
     [ValidateSet("edit", "revoke", "delete")]
     [string]$MessageChangeAction = "edit",

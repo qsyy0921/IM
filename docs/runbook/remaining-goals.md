@@ -34,7 +34,7 @@
 | `message-service` | 会话级删除策略深化；合规删除 workflow / retention proof；发送链路生产观测；长时间容量曲线和生产 sizing；图片 / 文件 / 语音二进制上传处理后续由 media 能力承担。 |
 | `conversation-service` | 更完整群管理；owner transfer 策略继续打磨；成员窗口历史 repair / repair action；长时间容量曲线和生产 sizing。 |
 | `delivery-service` | Projection DLQ / repair 深化；更多 delivery event 消费方；长时间容量曲线和生产 sizing。 |
-| `push-gateway` | Redis-backed resume 的 miss / permission-denied / buffer-gap 真实进程负向 smoke；Redis Cluster / 生产级 HA 设计；长时间容量曲线和生产 sizing。 |
+| `push-gateway` | 跑通并归档 `redis-resume-negative` 真实进程结果；Redis Cluster / 生产级 HA 设计；长时间容量曲线和生产 sizing。 |
 | `receipt-service` | 送达回执扩展；会话列表更多产品化能力（草稿、标签、更多摘要策略等）；长时间容量曲线和生产 sizing。 |
 | `contacts-service` | 更细 profile；陌生人申请的组织 / 风险 / 审批策略；租户默认值和来源策略后续接入 admin/config service 正式权限面；长时间容量曲线和生产 sizing。 |
 | `policy-service` | 完整 ReBAC；内容分类 / provider-backed moderation；tenant DSL / quota；外部 audit sink；已完成本地 direct 短基线，仍需长时间容量曲线和生产 sizing。 |

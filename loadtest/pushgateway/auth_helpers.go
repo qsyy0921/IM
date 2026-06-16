@@ -267,6 +267,74 @@ func connectWebSocketWithTokenAndResume(
 	return conn, hello, nil
 }
 
+func connectWebSocketWithResumeExpectError(
+	ctx context.Context,
+	cfg config,
+	deviceID string,
+	resumeToken string,
+	lastReceived []cursor,
+) (serverFrame, error) {
+	u, err := url.Parse(cfg.pushURL)
+	if err != nil {
+		return serverFrame{}, err
+	}
+	query := u.Query()
+	query.Set("device_id", deviceID)
+	var header http.Header
+	switch cfg.pushAuthMode {
+	case "", "mock":
+		query.Set("tenant_id", cfg.tenantID)
+		query.Set("user_id", cfg.receiverUserID)
+	case "hmac", "jwt":
+		token, err := gatewayToken(ctx, cfg, deviceID)
+		if err != nil {
+			return serverFrame{}, err
+		}
+		header = http.Header{"Authorization": []string{"Bearer " + token}}
+	default:
+		return serverFrame{}, fmt.Errorf("unsupported push auth mode: %s", cfg.pushAuthMode)
+	}
+	u.RawQuery = query.Encode()
+	dialOptions, err := webSocketDialOptions(cfg, header)
+	if err != nil {
+		return serverFrame{}, fmt.Errorf("configure push WebSocket TLS: %w", err)
+	}
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	conn, _, err := nhooyr.Dial(requestCtx, u.String(), dialOptions)
+	if err != nil {
+		return serverFrame{}, err
+	}
+	defer conn.CloseNow()
+	if err := wsjson.Write(requestCtx, conn, clientFrame{
+		Op:           opClientHello,
+		RequestID:    "push-smoke-resume-error-" + deviceID,
+		DeviceID:     deviceID,
+		ResumeToken:  resumeToken,
+		LastReceived: lastReceived,
+	}); err != nil {
+		return serverFrame{}, err
+	}
+	frame, err := readServerFrame(requestCtx, cfg, conn)
+	if err != nil {
+		return serverFrame{}, err
+	}
+	if frame.Op != opError {
+		return frame, fmt.Errorf("expected error frame, got %+v", frame)
+	}
+	return frame, nil
+}
+
+func readServerFrame(ctx context.Context, cfg config, conn *nhooyr.Conn) (serverFrame, error) {
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	var frame serverFrame
+	if err := wsjson.Read(requestCtx, conn, &frame); err != nil {
+		return serverFrame{}, err
+	}
+	return frame, nil
+}
+
 func waitWebSocketPermissionDenied(ctx context.Context, cfg config, deviceID string, token string) (serverFrame, int, error) {
 	deadline := time.Now().Add(cfg.waitTimeout)
 	attempts := 0

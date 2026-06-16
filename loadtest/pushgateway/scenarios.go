@@ -411,6 +411,198 @@ func runResumeReplayScenario(
 	return finish(cfg, result, nil)
 }
 
+func runRedisResumeNegativeScenario(
+	ctx context.Context,
+	cfg config,
+	pool *pgxpool.Pool,
+	conversationClient conversationv1.ConversationServiceClient,
+	messageClient messagev1.MessageServiceClient,
+	deliveryClient deliveryv1.DeliveryServiceClient,
+	result *summary,
+) error {
+	beforeMetrics, _ := fetchPushMetrics(ctx, cfg.pushMetricsURL)
+
+	unknownRequestedToken := "client-picked-token"
+	unknownConn, unknownHello, err := connectWebSocketWithResume(
+		ctx,
+		cfg,
+		cfg.receiverDeviceID+"-unknown",
+		unknownRequestedToken,
+		nil,
+	)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("connect unknown resume token: %w", err))
+	}
+	unknownHint, err := readServerFrame(ctx, cfg, unknownConn)
+	_ = unknownConn.Close(nhooyr.StatusNormalClosure, "unknown resume checked")
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("read unknown resume hint: %w", err))
+	}
+	if unknownHello.ResumeToken == "" || unknownHello.ResumeToken == unknownRequestedToken {
+		return finish(cfg, result, fmt.Errorf("unknown resume token was not replaced: %+v", unknownHello))
+	}
+	if unknownHint.Op != opResumeHint || unknownHint.Reason != "buffer_miss" {
+		return finish(cfg, result, fmt.Errorf("expected unknown token buffer_miss hint, got %+v", unknownHint))
+	}
+
+	conn, hello, err := connectWebSocket(ctx, cfg, cfg.receiverDeviceID)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("connect websocket: %w", err))
+	}
+	result.ServerHello = snapshotFrame(hello)
+	result.DeviceNotifications = []deviceSummary{{
+		DeviceID:    cfg.receiverDeviceID,
+		ServerHello: snapshotFrame(hello),
+	}}
+
+	deniedFrame, err := connectWebSocketWithResumeExpectError(
+		ctx,
+		cfg,
+		cfg.receiverDeviceID+"-other",
+		hello.ResumeToken,
+		nil,
+	)
+	if err != nil {
+		conn.CloseNow()
+		return finish(cfg, result, fmt.Errorf("connect with another device resume token: %w", err))
+	}
+	if deniedFrame.Code != "PERMISSION_DENIED" || deniedFrame.Retryable {
+		conn.CloseNow()
+		return finish(cfg, result, fmt.Errorf("expected non-retryable permission denied frame, got %+v", deniedFrame))
+	}
+
+	begin := time.Now()
+	join, err := createReceiverJoin(ctx, cfg, conversationClient)
+	result.Latencies["create_member_join"] = elapsedMS(begin)
+	if err != nil {
+		conn.CloseNow()
+		return finish(cfg, result, fmt.Errorf("create receiver join: %w", err))
+	}
+	result.MemberJoin = memberJoinSummary{
+		ChangeID:          join.GetChangeId(),
+		BoundarySeq:       join.GetBoundarySeq(),
+		MemberVersion:     join.GetMemberVersion(),
+		PermissionVersion: join.GetPermissionVersion(),
+	}
+	if err := waitMembership(ctx, pool, cfg); err != nil {
+		conn.CloseNow()
+		return finish(cfg, result, err)
+	}
+
+	gapMessageCount := cfg.slowMessageCount
+	if gapMessageCount < 260 {
+		gapMessageCount = 260
+	}
+	var firstSeq int64
+	var lastSeq int64
+	var firstNotify serverFrame
+	var lastNotify serverFrame
+	begin = time.Now()
+	for i := 1; i <= gapMessageCount; i++ {
+		send, err := sendMessage(ctx, cfg, messageClient, i)
+		if err != nil {
+			conn.CloseNow()
+			return finish(cfg, result, fmt.Errorf("send gap message %d: %w", i, err))
+		}
+		notify, err := waitNotify(ctx, cfg, conn)
+		if err != nil {
+			conn.CloseNow()
+			return finish(cfg, result, fmt.Errorf("wait gap notify %d: %w", i, err))
+		}
+		if notify.ConversationSeq != send.GetConversationSeq() || notify.MessageID != send.GetMessageId() {
+			conn.CloseNow()
+			return finish(cfg, result, fmt.Errorf("gap notify mismatch: notify=%+v send=%+v", notify, send))
+		}
+		if firstSeq == 0 {
+			firstSeq = send.GetConversationSeq()
+			firstNotify = notify
+			result.SendMessage = sendSummary{MessageID: send.GetMessageId(), ConversationSeq: send.GetConversationSeq()}
+			result.DeliveryNotify = snapshotFrame(notify)
+			result.DeviceNotifications[0].DeliveryNotify = snapshotFrame(notify)
+		}
+		lastSeq = send.GetConversationSeq()
+		lastNotify = notify
+	}
+	result.Latencies["send_messages"] = elapsedMS(begin)
+	_ = conn.Close(nhooyr.StatusNormalClosure, "resume negative")
+
+	gapConn, gapHello, err := connectWebSocketWithResume(
+		ctx,
+		cfg,
+		cfg.receiverDeviceID,
+		hello.ResumeToken,
+		[]cursor{{ConversationID: cfg.conversationID, Seq: join.GetBoundarySeq()}},
+	)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("connect with gapped redis resume token: %w", err))
+	}
+	defer gapConn.Close(nhooyr.StatusNormalClosure, "")
+	if gapHello.ResumeToken != hello.ResumeToken {
+		return finish(cfg, result, fmt.Errorf("expected known resume token to be preserved, got %+v", gapHello))
+	}
+	gapHint, err := readServerFrame(ctx, cfg, gapConn)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("read gap resume hint: %w", err))
+	}
+	if gapHint.Op != opResumeHint || gapHint.Reason != "buffer_miss" {
+		return finish(cfg, result, fmt.Errorf("expected gap buffer_miss hint, got %+v", gapHint))
+	}
+
+	pull, err := pullInboxAtLeast(ctx, cfg, deliveryClient, 0, gapMessageCount+10, gapMessageCount, lastSeq)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("pull inbox after redis resume misses: %w", err))
+	}
+	if pull.ItemCount < gapMessageCount || pull.MaxSeq < lastSeq {
+		return finish(cfg, result, fmt.Errorf("pull inbox did not recover resume miss message: %+v", pull))
+	}
+	ackOK, skipped, err := ackViaWebSocketWithSkipped(ctx, cfg, gapConn, cfg.receiverDeviceID, pull.MaxSeq)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("ack after redis resume negative checks: %w", err))
+	}
+	if err := waitCursor(ctx, pool, cfg, cfg.receiverDeviceID, pull.MaxSeq); err != nil {
+		return finish(cfg, result, err)
+	}
+	cursorSeq, err := queryCursor(ctx, pool, cfg, cfg.receiverDeviceID)
+	if err != nil {
+		return finish(cfg, result, err)
+	}
+	if err := waitDeliveryOutboxDrain(ctx, pool, cfg); err != nil {
+		return finish(cfg, result, err)
+	}
+	if err := fillPostgresStats(ctx, pool, cfg, result); err != nil {
+		return finish(cfg, result, err)
+	}
+	afterMetrics, _ := fetchPushMetrics(ctx, cfg.pushMetricsURL)
+
+	result.PullInbox = pull
+	result.DeliveryAckOK = snapshotFrame(ackOK)
+	result.CursorLastReceivedSeq = &cursorSeq
+	result.DeviceNotifications[0].DeliveryAckOK = snapshotFrame(ackOK)
+	result.DeviceNotifications[0].CursorLastReceivedSeq = &cursorSeq
+	result.PushMetricsBefore = &beforeMetrics
+	result.PushMetricsAfter = &afterMetrics
+	result.RedisResumeNegative = &redisResumeNegativeSummary{
+		UnknownRequestedToken: unknownRequestedToken,
+		UnknownHello:          snapshotFrame(unknownHello),
+		UnknownHint:           snapshotFrame(unknownHint),
+		PermissionDenied:      snapshotFrame(deniedFrame),
+		GapHello:              snapshotFrame(gapHello),
+		GapHint:               snapshotFrame(gapHint),
+		GapMessageCount:       gapMessageCount,
+		FirstSeq:              firstSeq,
+		LastSeq:               lastSeq,
+		OriginalNotify:        snapshotFrame(firstNotify),
+		LastNotify:            snapshotFrame(lastNotify),
+		RecoveryPullInbox:     pull,
+		AckOK:                 snapshotFrame(ackOK),
+		SkippedFramesWhileAck: skipped,
+		MetricsBefore:         &beforeMetrics,
+		MetricsAfter:          &afterMetrics,
+	}
+	result.Success = true
+	return finish(cfg, result, nil)
+}
+
 func fetchResumeGatewayMetrics(ctx context.Context, cfg config) pushMetrics {
 	metricsURL := cfg.pushMetricsURL
 	if cfg.reconnectMetricsURL != "" {

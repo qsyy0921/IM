@@ -60,6 +60,9 @@ func run(cfg config) error {
 			return fmt.Errorf("%s scenario requires --reconnect-push-url to point at a different gateway", cfg.scenario)
 		}
 	}
+	if cfg.scenario == "redis-resume-negative" && cfg.routeBackend != "redis" {
+		return fmt.Errorf("%s scenario requires --route-backend redis", cfg.scenario)
+	}
 	if err := os.MkdirAll(cfg.resultDir, 0o755); err != nil {
 		return fmt.Errorf("create result dir: %w", err)
 	}
@@ -166,6 +169,8 @@ func run(cfg config) error {
 		return runMessageChangeNotifyScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "resume-replay":
 		return runResumeReplayScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
+	case "redis-resume-negative":
+		return runRedisResumeNegativeScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "cross-instance-resume":
 		return runResumeReplayScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "redis-sentinel-failover":

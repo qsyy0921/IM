@@ -15,9 +15,11 @@ import (
 const (
 	MemberWindowIssueActiveWithLeaveSeq      = "ACTIVE_WITH_LEAVE_SEQ"
 	MemberWindowIssueInactiveWithoutLeaveSeq = "INACTIVE_WITHOUT_LEAVE_SEQ"
+	MemberWindowIssueLeaveBeforeJoin         = "LEAVE_BEFORE_JOIN"
 
 	memberWindowRepairActionClearActiveLeaveSeq = "clear_active_leave_seq"
 	memberWindowRepairActionSetInactiveLeaveSeq = "set_inactive_leave_seq"
+	memberWindowRepairActionClampLeaveToJoinSeq = "clamp_leave_to_join_seq"
 	memberWindowRepairOutcomeAudited            = "AUDITED"
 	memberWindowRepairOutcomeMutated            = "MUTATED"
 	memberWindowRepairOutcomeSkipped            = "SKIPPED"
@@ -262,6 +264,17 @@ func selectMemberWindowRepairCandidates(ctx context.Context, tx pgx.Tx, options 
 			"member_version >= join_seq",
 		)
 		selectNewLeaveSeq = "member_version"
+	case MemberWindowIssueLeaveBeforeJoin:
+		clauses = append(clauses,
+			"status IN ('LEFT', 'BANNED')",
+			"join_seq IS NOT NULL",
+			"join_seq > 0",
+			"leave_seq IS NOT NULL",
+			"leave_seq > 0",
+			"leave_seq < join_seq",
+			"member_version >= join_seq",
+		)
+		selectNewLeaveSeq = "join_seq"
 	default:
 		return nil, types.NewInvalidArgument("unsupported member window repair issue class")
 	}
@@ -319,6 +332,8 @@ func repairMemberWindowCandidate(ctx context.Context, tx pgx.Tx, issueClass stri
 		return clearActiveMemberLeaveSeq(ctx, tx, candidate)
 	case MemberWindowIssueInactiveWithoutLeaveSeq:
 		return setInactiveMemberLeaveSeq(ctx, tx, candidate)
+	case MemberWindowIssueLeaveBeforeJoin:
+		return clampInactiveMemberLeaveSeqToJoinSeq(ctx, tx, candidate)
 	default:
 		return false, types.NewInvalidArgument("unsupported member window repair issue class")
 	}
@@ -360,6 +375,30 @@ WHERE tenant_id = $1
   AND join_seq > 0
   AND (leave_seq IS NULL OR leave_seq <= 0)
   AND member_version = $4
+  AND member_version >= join_seq
+`, candidate.TenantID, candidate.ConversationID, candidate.UserID, candidate.NewLeaveSeq.Int64)
+	if err != nil {
+		return false, types.NewDBWriteFailed(err.Error())
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+func clampInactiveMemberLeaveSeqToJoinSeq(ctx context.Context, tx pgx.Tx, candidate memberWindowRepairCandidate) (bool, error) {
+	if !candidate.NewLeaveSeq.Valid || candidate.NewLeaveSeq.Int64 <= 0 {
+		return false, nil
+	}
+	tag, err := tx.Exec(ctx, `
+UPDATE conversation_members
+SET leave_seq = $4,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND user_id = $3
+  AND status IN ('LEFT', 'BANNED')
+  AND join_seq = $4
+  AND leave_seq IS NOT NULL
+  AND leave_seq > 0
+  AND leave_seq < join_seq
   AND member_version >= join_seq
 `, candidate.TenantID, candidate.ConversationID, candidate.UserID, candidate.NewLeaveSeq.Int64)
 	if err != nil {
@@ -424,7 +463,7 @@ func normalizeMemberWindowRepairIssueClass(value string) string {
 		return MemberWindowIssueActiveWithLeaveSeq
 	}
 	switch issueClass {
-	case MemberWindowIssueActiveWithLeaveSeq, MemberWindowIssueInactiveWithoutLeaveSeq:
+	case MemberWindowIssueActiveWithLeaveSeq, MemberWindowIssueInactiveWithoutLeaveSeq, MemberWindowIssueLeaveBeforeJoin:
 		return issueClass
 	default:
 		return ""
@@ -435,6 +474,8 @@ func memberWindowRepairActionForIssueClass(issueClass string) string {
 	switch issueClass {
 	case MemberWindowIssueInactiveWithoutLeaveSeq:
 		return memberWindowRepairActionSetInactiveLeaveSeq
+	case MemberWindowIssueLeaveBeforeJoin:
+		return memberWindowRepairActionClampLeaveToJoinSeq
 	default:
 		return memberWindowRepairActionClearActiveLeaveSeq
 	}

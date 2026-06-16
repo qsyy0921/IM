@@ -86,7 +86,7 @@ func TestRepositoryRepairMemberWindowsClearsActiveLeaveSeqIntegration(t *testing
 		t.Fatalf("unexpected mutated audit row: %+v", row)
 	}
 
-	if _, err := repository.RepairMemberWindows(ctx, MemberWindowRepairOptions{IssueClass: "leave_before_join"}); err == nil {
+	if _, err := repository.RepairMemberWindows(ctx, MemberWindowRepairOptions{IssueClass: "unknown"}); err == nil {
 		t.Fatalf("expected unsupported repair issue class to fail")
 	}
 	if _, err := repository.AuditMemberWindowRepairs(ctx, MemberWindowRepairAuditOptions{Outcome: "unknown"}); err == nil {
@@ -174,11 +174,94 @@ func TestRepositoryRepairMemberWindowsSetsInactiveLeaveSeqIntegration(t *testing
 	}
 }
 
+func TestRepositoryRepairMemberWindowsClampsLeaveBeforeJoinIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pg pool: %v", err)
+	}
+	defer pool.Close()
+
+	ensureMemberWindowRepairAuditSchema(t, ctx, pool)
+	resetConversationTables(t, ctx, pool)
+	truncateMemberWindowRepairAudit(t, ctx, pool)
+	seedMemberWindowRepairFixtures(t, ctx, pool)
+
+	repository := NewRepository(pool)
+	dryRunStats, err := repository.RepairMemberWindows(ctx, MemberWindowRepairOptions{
+		TenantID:       "tenant-window-repair",
+		ConversationID: "conv-window-repair",
+		IssueClass:     MemberWindowIssueLeaveBeforeJoin,
+		OperatorID:     "operator-3",
+		Reason:         "dry run leave before join",
+		DryRun:         true,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("dry-run leave-before-join repair member windows: %v", err)
+	}
+	if dryRunStats.Requested != 1 || dryRunStats.Repaired != 0 || dryRunStats.Skipped != 1 || !dryRunStats.DryRun {
+		t.Fatalf("unexpected leave-before-join dry-run stats: %+v", dryRunStats)
+	}
+	assertMemberLeaveSeqValue(t, ctx, pool, "tenant-window-repair", "conv-window-repair", "inactive-leave-before-join", ptrInt64(7))
+
+	mutateStats, err := repository.RepairMemberWindows(ctx, MemberWindowRepairOptions{
+		TenantID:       "tenant-window-repair",
+		ConversationID: "conv-window-repair",
+		IssueClass:     "leave_before_join",
+		OperatorID:     "operator-3",
+		Reason:         "clamp leave_seq to join_seq",
+		DryRun:         false,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("mutating leave-before-join repair member windows: %v", err)
+	}
+	if mutateStats.Requested != 1 || mutateStats.Repaired != 1 || mutateStats.Skipped != 0 || mutateStats.DryRun {
+		t.Fatalf("unexpected leave-before-join mutate stats: %+v", mutateStats)
+	}
+	assertMemberLeaveSeqValue(t, ctx, pool, "tenant-window-repair", "conv-window-repair", "inactive-leave-before-join", ptrInt64(8))
+
+	rows, err := repository.AuditMemberWindowRepairs(ctx, MemberWindowRepairAuditOptions{
+		TenantID:       "tenant-window-repair",
+		ConversationID: "conv-window-repair",
+		IssueClass:     "leave_before_join",
+		Outcome:        "mutated",
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit leave-before-join member window repairs: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one leave-before-join mutated audit row, got %d: %+v", len(rows), rows)
+	}
+	row := rows[0]
+	if row.UserID != "inactive-leave-before-join" ||
+		row.RepairAction != memberWindowRepairActionClampLeaveToJoinSeq ||
+		row.RepairOutcome != memberWindowRepairOutcomeMutated ||
+		row.OperatorID != "operator-3" ||
+		row.Reason != "clamp leave_seq to join_seq" ||
+		row.DryRun ||
+		!row.HasJoinSeq ||
+		!row.HasLeaveSeq ||
+		!row.HasNewLeaveSeq ||
+		row.PreviousJoinSeq != 8 ||
+		row.PreviousLeaveSeq != 7 ||
+		row.NewLeaveSeq != 8 {
+		t.Fatalf("unexpected leave-before-join audit row: %+v", row)
+	}
+}
+
 func ensureMemberWindowRepairAuditSchema(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	for _, filename := range []string{
 		"000005_member_window_repair_audit.sql",
 		"000006_member_window_repair_inactive_leave_seq.sql",
+		"000007_member_window_repair_leave_before_join.sql",
 	} {
 		path := filepath.Clean(filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "conversation", filename))
 		ddl, err := os.ReadFile(path)
@@ -214,7 +297,8 @@ INSERT INTO conversation_members (
     ('tenant-window-repair', 'conv-window-repair', 'leave-before-join', 'MEMBER', 'ACTIVE', 8, 7, 9, 19, now() - interval '2 minutes'),
     ('tenant-window-repair', 'conv-window-repair', 'healthy-active', 'MEMBER', 'ACTIVE', 5, NULL, 9, 19, now() - interval '3 minutes'),
     ('tenant-window-repair', 'conv-window-repair', 'left-missing-leave', 'MEMBER', 'LEFT', 6, NULL, 9, 19, now() - interval '4 minutes'),
-    ('tenant-window-repair', 'conv-window-repair', 'banned-zero-leave', 'MEMBER', 'BANNED', 7, 0, 10, 19, now() - interval '5 minutes');
+    ('tenant-window-repair', 'conv-window-repair', 'banned-zero-leave', 'MEMBER', 'BANNED', 7, 0, 10, 19, now() - interval '5 minutes'),
+    ('tenant-window-repair', 'conv-window-repair', 'inactive-leave-before-join', 'MEMBER', 'LEFT', 8, 7, 10, 19, now() - interval '6 minutes');
 `)
 	if err != nil {
 		t.Fatalf("seed member window repair fixtures: %v", err)

@@ -32,7 +32,7 @@
 | `api-gateway` | 在目标环境持续运行 legacy observation window gate 并归档结果；legacy descriptor 移除计划；完整配置中心 / DB-backed quota hardening；生产级 collector / alerting / dashboard；长时间容量曲线和生产 sizing。 |
 | `identity-service` | WebAuthn/passkeys；OIDC；多 issuer；KMS/HSM；完整风控；生产级 email/SMS provider；租户级通知模板；bounce handling；长时间容量曲线和生产 sizing。 |
 | `message-service` | 会话级删除策略深化；外部 proof provider 集成 / proof 正文存证留在外部系统；发送链路生产观测；长时间容量曲线和生产 sizing；图片 / 文件 / 语音二进制上传处理后续由 media 能力承担。 |
-| `conversation-service` | 更完整群管理；owner transfer 策略继续打磨；`LEAVE_BEFORE_JOIN`、版本号超前、非 ACTIVE 会话仍有 ACTIVE 成员等更复杂成员窗口历史 repair action；长时间容量曲线和生产 sizing。 |
+| `conversation-service` | 更完整群管理；owner transfer 策略继续打磨；版本号超前、非 ACTIVE 会话仍有 ACTIVE 成员等更复杂成员窗口历史 repair action；长时间容量曲线和生产 sizing。 |
 | `delivery-service` | Projection DLQ / repair 深化；更多 delivery event 消费方；长时间容量曲线和生产 sizing。 |
 | `push-gateway` | 生产级 Redis HA 设计；长时间容量曲线和生产 sizing。 |
 | `receipt-service` | 送达回执扩展；会话列表更多产品化能力（草稿、标签、更多摘要策略等）；长时间容量曲线和生产 sizing。 |

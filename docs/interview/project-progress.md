@@ -116,13 +116,15 @@ search-service 和 AI 应用后端后置；
 - Redis Cluster 六节点自动 failover smoke；
 - Redis Cluster 六节点短容量基线；
 - PostgreSQL `repmgr + pgpool` local failover smoke；
-- Kafka KRaft 3 broker local leader failover smoke。
+- Kafka KRaft 3 broker local leader failover / controller-switch / ISR observation smoke；
+- Kafka producer hardening evaluation：6 个 producer package 固定 `acks=all`、禁自动建 topic、bounded retry/backoff，并明确当前 `kafka-go` 不声明 idempotent / transactional producer 语义，业务可靠性边界仍是 outbox / event_id 幂等。
 
 这些验证证明：
 
 - 在线通知可以跨实例工作；
 - 在线通知失败时，durable `PullInbox + AckDelivery` 能兜底；
 - Redis、Kafka、PostgreSQL 单点切换后，最小链路可以恢复；
+- Kafka 在本地 RF=3 / min.insync.replicas=2 下，一 broker down 仍可写，两 broker down 会按 `NOT_ENOUGH_REPLICAS` fail-closed；
 - 多个 worker / relay 已具备退避重试和 fail-closed 行为；
 - outbox / projection / challenge delivery 具备第一阶段 audit / repair / cleanup。
 

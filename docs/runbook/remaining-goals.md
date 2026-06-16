@@ -14,7 +14,7 @@
    当前 `/metrics`、Prometheus rules、Grafana dashboard、OTel trace wiring、本地 Alertmanager null route 和本地观测栈 smoke runner 是本地开发 / 面试展示级；仍需目标环境 dashboard smoke、统一 collector、生产 Alertmanager 路由、retention、结构化日志汇聚、容量基线和 SLO 口径。
 
 2. 分布式 HA / 故障演练深化：
-   已有 Kafka producer first-stage `acks=all` / bounded retry-backoff 门禁、6 个 producer package 配置单测和 config summary；已有 Kafka ISR observation raw summary 的 JSON / Markdown validator。仍需补更长时间 Kafka ISR flapping、consumer rebalance、Kafka producer 真实故障重试行为 smoke / idempotent-producer 客户端评估。Redis Cluster 本地真实拓扑、node-stop fallback、六节点自动 failover smoke 和六节点短容量基线已通过，后续仍需生产级 Redis HA 设计、长时间 Redis Cluster 容量曲线 / 生产 sizing、PostgreSQL quorum / split-brain fencing 和服务发现 / 部署编排。PostgreSQL 生产 quorum 边界以 ADR-034 为准。
+   已有 Kafka producer first-stage `acks=all` / bounded retry-backoff 门禁、6 个 producer package 配置单测、config summary、ISR observation raw summary 的 JSON / Markdown validator，以及 Kafka producer hardening evaluation（明确当前 `kafka-go` 不声明 idempotent / transactional producer 语义）。仍需补更长时间 Kafka ISR flapping、consumer rebalance、in-flight produce / duplicate behavior under broker faults，以及如果后续要声明 exactly-once producer 语义时的客户端替换和实测验证。Redis Cluster 本地真实拓扑、node-stop fallback、六节点自动 failover smoke 和六节点短容量基线已通过，后续仍需生产级 Redis HA 设计、长时间 Redis Cluster 容量曲线 / 生产 sizing、PostgreSQL quorum / split-brain fencing 和服务发现 / 部署编排。PostgreSQL 生产 quorum 边界以 ADR-034 为准。
 
 3. Repair / DLQ / audit 产品化：
    多数服务已有本地 operator / audit / cleanup，且已有统一 operator 索引；后续要补跨服务执行编排、批量 repair、审批边界、外部审计 sink 和运维 UI，不把手写 SQL 当作长期方案。

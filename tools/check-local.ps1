@@ -146,6 +146,9 @@ try {
     Write-Host "== kafka isr observation summary =="
     Invoke-LocalCheck "check-kafka-isr-observation-summary.ps1"
 
+    Write-Host "== kafka producer hardening summary =="
+    Invoke-LocalCheck "check-kafka-producer-hardening-summary.ps1"
+
     Write-Host "== git whitespace =="
     git diff --check
     if ($LASTEXITCODE -ne 0) {

@@ -11,7 +11,7 @@
 - Kafka writer 已显式固定 `acks=all`、禁自动建 topic、bounded attempts/backoff，并由本地门禁和 package 单测防漂移；真正 idempotent / transactional producer 仍属后续客户端选型。
 - `policy_decision_audit_outbox` publish / audit / repair audit 已补错误脱敏，`last_error` / `previous_last_error` 只保留稳定低敏分类，不暴露 broker body、账号、token 或 provider 原文。
 - `contact-consumer` 和 `timeline-consumer` 对非取消错误已改为退避重试，并在 worker 模式通过 `/debug/metrics` 暴露 projection worker retry 快照。
-- 已补只读 `outbox-audit`、只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运维模式，可直接审计当前 `policy_decision_audit_outbox` 行，以及按 retention / scope 清理 policy decision audit outbox repair 历史，不改当前 live outbox 状态；`outbox-repair-audit` 可通过 `NEXUSIM_POLICY_OUTBOX_REPAIR_AUDIT_OUTPUT` 写低敏 JSON 结果，便于 operator 留存证据。
+- 已补只读 `outbox-audit`、只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运维模式，可直接审计当前 `policy_decision_audit_outbox` 行，以及按 retention / scope 清理 policy decision audit outbox repair 历史，不改当前 live outbox 状态；`outbox-audit` / `outbox-repair-audit` 可通过 `NEXUSIM_POLICY_OUTBOX_AUDIT_OUTPUT` / `NEXUSIM_POLICY_OUTBOX_REPAIR_AUDIT_OUTPUT` 写低敏 JSON 结果，便于 operator 留存证据。
 - message-service 通过 policy-service 做权限决策，不复制策略实现。
 - `loadtest/policyintegration` smoke runner 已按 config / model / auth / util 同 package 拆分，避免策略集成验证继续堆进单个 `main.go`。
 - `loadtest/policy` summary 已输出 `capacity_summary`，包含运行时长、action/allow/deny 计数、decision/s、latency p95/p99、permission version 和 classification 口径；已通过 `capacity-baseline-direct-20260616-v3` 跑过本地 direct 短基线，原始结果在 `H:\NexusIM\loadtest-results\capacity-baseline-direct-20260616-v3`，报告见 `docs/runbook/loadtest/policy-service/loadtest-report-20260616-policy-direct-capacity-baseline.md`。

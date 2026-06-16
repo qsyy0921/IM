@@ -405,6 +405,16 @@ func TestMessageRepositoryDeleteMessageComplianceRedactsPayloadIntegration(t *te
 	deleteInput.Command.ExternalProofRef = fmt.Sprintf("proof://compliance/%d", runID)
 	deleteInput.Permission.OwnershipOverride = true
 	deleteInput.Permission.Classification = "COMPLIANCE_RETENTION"
+	if _, err := repo.RegisterComplianceExternalProof(ctx, MessageComplianceExternalProofMutationOptions{
+		TenantID:         string(tenantID),
+		ExternalProofRef: deleteInput.Command.ExternalProofRef,
+		Provider:         "legal-proof-system",
+		ProofHash:        fmt.Sprintf("sha256:proof-%d", runID),
+		OperatorID:       "legal-ops",
+		Now:              now,
+	}); err != nil {
+		t.Fatalf("register compliance proof: %v", err)
+	}
 	if _, err := repo.ApproveComplianceDelete(ctx, MessageComplianceDeleteApprovalMutationOptions{
 		TenantID:         string(tenantID),
 		ConversationID:   string(appendInput.Command.ConversationID),
@@ -657,6 +667,16 @@ func TestMessageRepositoryComplianceDeleteApprovalSetCancelAuditIntegration(t *t
 		t.Fatalf("append source message: %v", err)
 	}
 	approvalID := fmt.Sprintf("approval-set-cancel-%d", runID)
+	if _, err := repo.RegisterComplianceExternalProof(ctx, MessageComplianceExternalProofMutationOptions{
+		TenantID:         string(tenantID),
+		ExternalProofRef: "proof://case/set-cancel",
+		Provider:         "legal-proof-system",
+		ProofHash:        fmt.Sprintf("sha256:set-cancel-%d", runID),
+		OperatorID:       "legal-ops",
+		Now:              now,
+	}); err != nil {
+		t.Fatalf("register compliance proof: %v", err)
+	}
 	approved, err := repo.ApproveComplianceDelete(ctx, MessageComplianceDeleteApprovalMutationOptions{
 		TenantID:         string(tenantID),
 		ConversationID:   string(appendInput.Command.ConversationID),
@@ -699,6 +719,102 @@ func TestMessageRepositoryComplianceDeleteApprovalSetCancelAuditIntegration(t *t
 		canceled.CanceledAt == nil ||
 		canceled.CanceledBy != "legal-approver" {
 		t.Fatalf("unexpected canceled approval: %+v", canceled)
+	}
+}
+
+func TestMessageRepositoryComplianceExternalProofRevokeBlocksDeleteIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	now := time.Date(2026, 6, 17, 4, 0, 0, 0, time.UTC)
+	runID := time.Now().UnixNano()
+	messageCounter := 0
+	eventCounter := 0
+	repo := NewMessageRepository(
+		pool,
+		WithClock(func() time.Time { return now }),
+		WithIDGenerators(
+			func() (types.MessageID, error) {
+				messageCounter++
+				return types.MessageID(fmt.Sprintf("msg-compliance-proof-%d-%d", runID, messageCounter)), nil
+			},
+			func() (types.EventID, error) {
+				eventCounter++
+				return types.EventID(fmt.Sprintf("event-compliance-proof-%d-%d", runID, eventCounter)), nil
+			},
+		),
+	)
+	tenantID := types.TenantID(fmt.Sprintf("tenant-it-compliance-proof-%d", runID))
+	appendInput := testAppendInput(tenantID, "client-compliance-proof", []byte(`{"text":"proof gated"}`))
+	appendResult, err := repo.AppendMessage(ctx, appendInput)
+	if err != nil {
+		t.Fatalf("append source message: %v", err)
+	}
+	proofRef := fmt.Sprintf("proof://case/revoke-%d", runID)
+	proof, err := repo.RegisterComplianceExternalProof(ctx, MessageComplianceExternalProofMutationOptions{
+		TenantID:         string(tenantID),
+		ExternalProofRef: proofRef,
+		Provider:         "legal-proof-system",
+		ProofHash:        fmt.Sprintf("sha256:revoke-%d", runID),
+		OperatorID:       "legal-ops",
+		Now:              now,
+	})
+	if err != nil {
+		t.Fatalf("register compliance proof: %v", err)
+	}
+	if proof.Status != MessageComplianceExternalProofStatusVerified || proof.ProofHash == "" {
+		t.Fatalf("unexpected proof registration: %+v", proof)
+	}
+	approvalID := fmt.Sprintf("approval-proof-revoked-%d", runID)
+	if _, err := repo.ApproveComplianceDelete(ctx, MessageComplianceDeleteApprovalMutationOptions{
+		TenantID:         string(tenantID),
+		ConversationID:   string(appendInput.Command.ConversationID),
+		MessageID:        string(appendResult.MessageID),
+		ApprovalID:       approvalID,
+		ExternalProofRef: proofRef,
+		OperatorID:       "legal-approver",
+		Reason:           "approved before proof revoke",
+		Now:              now,
+	}); err != nil {
+		t.Fatalf("approve compliance delete: %v", err)
+	}
+	revoked, err := repo.RevokeComplianceExternalProof(ctx, MessageComplianceExternalProofMutationOptions{
+		TenantID:         string(tenantID),
+		ExternalProofRef: proofRef,
+		OperatorID:       "legal-ops",
+		Now:              now.Add(time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("revoke compliance proof: %v", err)
+	}
+	if revoked.Status != MessageComplianceExternalProofStatusRevoked || revoked.RevokedAt == nil {
+		t.Fatalf("unexpected revoked proof: %+v", revoked)
+	}
+
+	deleteInput := testDeleteInput(appendInput, appendResult.MessageID, "delete-revoked-proof-key-1", types.DeleteScopeCompliance, "legal retention cleanup")
+	deleteInput.Command.AuthContext.UserID = "compliance-admin"
+	deleteInput.Command.ComplianceApprovalID = approvalID
+	deleteInput.Command.ExternalProofRef = proofRef
+	deleteInput.Permission.OwnershipOverride = true
+	deleteInput.Permission.Classification = "COMPLIANCE_RETENTION"
+	_, err = repo.DeleteMessage(ctx, deleteInput)
+	if !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected permission denied for revoked proof, got %v", err)
+	}
+	assertCurrentSeq(t, ctx, pool, tenantID, appendInput.Command.ConversationID, 1)
+	assertCount(t, ctx, pool, "message_change_history", tenantID, 0)
+
+	proofRows, err := repo.AuditComplianceExternalProofs(ctx, MessageComplianceExternalProofAuditOptions{
+		TenantID: string(tenantID),
+		Status:   MessageComplianceExternalProofStatusRevoked,
+	})
+	if err != nil {
+		t.Fatalf("audit compliance proof: %v", err)
+	}
+	if len(proofRows) != 1 || proofRows[0].ExternalProofRef != proofRef {
+		t.Fatalf("unexpected proof audit rows: %+v", proofRows)
 	}
 }
 

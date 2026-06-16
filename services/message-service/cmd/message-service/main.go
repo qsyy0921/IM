@@ -40,7 +40,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_MESSAGE_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("message-service runtime wiring is idle; set NEXUSIM_MESSAGE_SERVICE_MODE=grpc, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, change-history-audit, retention-proof-audit, legal-hold-audit, legal-hold-set, legal-hold-release, compliance-approval-audit, compliance-approval-create, or compliance-approval-cancel")
+		log.Println("message-service runtime wiring is idle; set NEXUSIM_MESSAGE_SERVICE_MODE=grpc, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, change-history-audit, retention-proof-audit, legal-hold-audit, legal-hold-set, legal-hold-release, compliance-proof-audit, compliance-proof-register, compliance-proof-revoke, compliance-approval-audit, compliance-approval-create, or compliance-approval-cancel")
 		return nil
 	case "grpc":
 		return runGRPCServer()
@@ -64,6 +64,12 @@ func run() error {
 		return runMessageLegalHoldSet()
 	case "legal-hold-release":
 		return runMessageLegalHoldRelease()
+	case "compliance-proof-audit":
+		return runMessageComplianceProofAudit()
+	case "compliance-proof-register":
+		return runMessageComplianceProofRegister()
+	case "compliance-proof-revoke":
+		return runMessageComplianceProofRevoke()
 	case "compliance-approval-audit":
 		return runMessageComplianceApprovalAudit()
 	case "compliance-approval-create":

@@ -85,6 +85,9 @@ func (r *MessageRepository) ApproveComplianceDelete(ctx context.Context, options
 	if err := assertComplianceApprovalIDMatchesMessage(ctx, tx, options); err != nil {
 		return MessageComplianceDeleteApprovalResult{}, err
 	}
+	if err := lockVerifiedComplianceExternalProof(ctx, tx, options.TenantID, options.ExternalProofRef); err != nil {
+		return MessageComplianceDeleteApprovalResult{}, err
+	}
 	row := tx.QueryRow(ctx, `
 INSERT INTO message_compliance_delete_approvals (
     tenant_id,

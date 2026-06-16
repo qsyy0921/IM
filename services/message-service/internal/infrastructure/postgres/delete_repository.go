@@ -260,15 +260,19 @@ FOR UPDATE
 func lockApprovedComplianceDeleteApproval(ctx context.Context, tx pgx.Tx, command types.DeleteMessageCommand) error {
 	var approvalID string
 	err := tx.QueryRow(ctx, `
-SELECT approval_id
-FROM message_compliance_delete_approvals
-WHERE tenant_id = $1
-  AND conversation_id = $2
-  AND message_id = $3
-  AND approval_id = $4
-  AND external_proof_ref = $5
-  AND status = 'APPROVED'
-FOR UPDATE
+SELECT approval.approval_id
+FROM message_compliance_delete_approvals approval
+JOIN message_compliance_external_proofs proof
+  ON proof.tenant_id = approval.tenant_id
+ AND proof.external_proof_ref = approval.external_proof_ref
+ AND proof.status = 'VERIFIED'
+WHERE approval.tenant_id = $1
+  AND approval.conversation_id = $2
+  AND approval.message_id = $3
+  AND approval.approval_id = $4
+  AND approval.external_proof_ref = $5
+  AND approval.status = 'APPROVED'
+FOR UPDATE OF approval, proof
 `, command.AuthContext.TenantID, command.ConversationID, command.MessageID, command.ComplianceApprovalID, command.ExternalProofRef).Scan(&approvalID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return types.NewPermissionDenied("compliance delete approval is required")

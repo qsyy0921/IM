@@ -263,7 +263,7 @@ conversation_seq
 
 - 个人视图隐藏不进入 message-service，由 api-gateway 路由到 delivery-service / user-inbox 读模型。
 - 会话级删除和合规删除分开。
-- 合规删除第一阶段必须经 policy ownership override，并提交本地 `APPROVED` compliance delete approval；message-service 本地 legal hold 会在 `DeleteMessage` 事务内 fail-closed 阻止删除；后续再接完整 Retention workflow / 外部 proof sink。
+- 合规删除第一阶段必须经 policy ownership override，并提交本地 `VERIFIED` external proof ref + `APPROVED` compliance delete approval；message-service 本地 legal hold 会在 `DeleteMessage` 事务内 fail-closed 阻止删除；后续再接完整 Retention workflow / 外部 proof provider。
 
 `delete_scope`：
 
@@ -275,7 +275,7 @@ COMPLIANCE_RETENTION
 语义：
 
 - `CONVERSATION_VIEW` 对会话成员返回 tombstone。
-- `COMPLIANCE_RETENTION` 第一阶段只允许 policy 返回 ownership override、request 带 `compliance_approval_id` / `external_proof_ref`，且 `message_compliance_delete_approvals` 中存在匹配 `APPROVED` 行后执行；成功时会 redaction 当前消息 payload 与本次 change history payload，并在同一事务内把 approval 标记为 `CONSUMED`。timeline / outbox 只写低敏 reason-present / proof-ref-present 证明。消息级 legal hold 已作为本地 fail-closed 门禁落库；外部 proof 正文、审批工作流和法务系统集成后续接入。
+- `COMPLIANCE_RETENTION` 第一阶段只允许 policy 返回 ownership override、request 带 `compliance_approval_id` / `external_proof_ref`，且 `message_compliance_external_proofs` 中存在匹配 `VERIFIED` 行、`message_compliance_delete_approvals` 中存在匹配 `APPROVED` 行后执行；成功时会 redaction 当前消息 payload 与本次 change history payload，并在同一事务内把 approval 标记为 `CONSUMED`。timeline / outbox 只写低敏 reason-present / proof-ref-present 证明。消息级 legal hold 已作为本地 fail-closed 门禁落库；外部 proof 正文、审批工作流和法务系统集成后续接入。
 
 `SELF_VIEW` 属于 delivery-service / user-inbox 视图状态，不产生 `message.deleted.v1`，不改变 `message_log`、`conversation_timeline_events`、`message_outbox`。
 
@@ -531,15 +531,28 @@ DELETE
 - `DeleteMessage` 在锁定 message row 后检查 ACTIVE hold；命中时返回稳定 invalid-state 错误，不分配新的 `conversation_seq`，不写 `message_change_history`、timeline 或 outbox。
 - operator 输出只暴露 reason-present，不输出 hold reason 原文。
 
-### 6.7 message_compliance_delete_approvals
+### 6.7 message_compliance_external_proofs
 
-`message_compliance_delete_approvals` 是第一阶段合规删除本地审批门禁。它只保存低敏 `external_proof_ref`，不保存外部 proof 正文、case file 或 provider body。
+`message_compliance_external_proofs` 是第一阶段外部 proof ref 本地校验门禁。它只保存低敏 `external_proof_ref`、provider 和 proof hash，不保存外部 proof 正文、case file 或 provider body。
+
+关键约束：
+
+- `tenant_id + external_proof_ref` 唯一。
+- `status` 只允许 `VERIFIED / REVOKED`。
+- `proof_hash` 必须非空，用于把本地 ref 绑定到外部 proof 包摘要；proof 正文仍由外部系统保存。
+- `compliance-approval-create` 必须引用仍为 `VERIFIED` 的 proof ref。
+- `DeleteMessage(COMPLIANCE_RETENTION)` 会在事务内同时锁定 `APPROVED` approval 和 `VERIFIED` proof ref；proof 被 revoke 后不能继续触发合规删除。
+- operator audit 可输出低敏 proof ref、provider 和 proof hash，不输出 proof 正文。
+
+### 6.8 message_compliance_delete_approvals
+
+`message_compliance_delete_approvals` 是第一阶段合规删除本地审批门禁。它只保存低敏 `external_proof_ref`，并要求该 ref 在 `message_compliance_external_proofs` 中处于 `VERIFIED`；不保存外部 proof 正文、case file 或 provider body。
 
 关键约束：
 
 - `tenant_id + approval_id` 唯一，operator 复用同一 approval id 只能作用于同一 message。
 - `status` 只允许 `APPROVED / CONSUMED / CANCELED`。
-- `external_proof_ref` 必须非空，表示外部 proof 的低敏引用。
+- `external_proof_ref` 必须非空，表示外部 proof 的低敏引用；创建 approval 时该 ref 必须已注册为 `VERIFIED`。
 - `DeleteMessage(COMPLIANCE_RETENTION)` 必须带匹配 `compliance_approval_id` 和 `external_proof_ref`；repository 在同一事务内锁定 `APPROVED` approval，并在写 change history 后、提交前标记为 `CONSUMED`。
 - timeline / outbox 不写 proof ref 原文，只写 proof-ref-present；operator audit 可输出低敏 proof ref，但不输出审批 reason 或外部 proof 正文。
 

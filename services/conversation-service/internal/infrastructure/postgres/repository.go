@@ -955,7 +955,12 @@ ON CONFLICT (tenant_id, conversation_id, user_id) DO UPDATE
 SET role = EXCLUDED.role,
     status = EXCLUDED.status,
     join_seq = COALESCE(EXCLUDED.join_seq, conversation_members.join_seq),
-    leave_seq = COALESCE(EXCLUDED.leave_seq, conversation_members.leave_seq),
+    leave_seq = CASE
+        WHEN EXCLUDED.status = 'ACTIVE'
+         AND EXCLUDED.join_seq IS NOT NULL
+         AND EXCLUDED.leave_seq IS NULL THEN NULL
+        ELSE COALESCE(EXCLUDED.leave_seq, conversation_members.leave_seq)
+    END,
     member_version = EXCLUDED.member_version,
     permission_version = EXCLUDED.permission_version,
     updated_at = now()

@@ -37,7 +37,7 @@
 | `push-gateway` | 生产级 Redis HA 设计；长时间容量曲线和生产 sizing。 |
 | `receipt-service` | 会话列表更多产品化能力（更多摘要策略等）；长时间容量曲线和生产 sizing。 |
 | `contacts-service` | 组织级策略、租户默认值 / 来源策略 / 隐私例外接入 admin/config service 正式权限面；已完成 first-stage 来源风险标注、`REVIEW_REQUIRED` 持久化和本地 operator 审批状态机，仍需长时间容量曲线和生产 sizing。 |
-| `policy-service` | 完整 ReBAC；provider-grade moderation / risk scoring；tenant DSL / quota；外部 audit sink；已完成 first-stage keyword / HTTP content moderation 和本地 direct 短基线，仍需长时间容量曲线和生产 sizing。 |
+| `policy-service` | 完整 ReBAC；provider-grade moderation / risk scoring；tenant DSL / quota；provider-grade 外部 audit sink；已完成 first-stage keyword / HTTP content moderation、低敏 `decision-audit-export` 本地审计交接和本地 direct 短基线，仍需长时间容量曲线和生产 sizing。 |
 
 ## 后续未启动工作
 

@@ -42,7 +42,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("policy-service runtime wiring is idle; set NEXUSIM_POLICY_SERVICE_MODE=grpc, contact-consumer, timeline-consumer, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, or outbox-repair-cleanup")
+		log.Println("policy-service runtime wiring is idle; set NEXUSIM_POLICY_SERVICE_MODE=grpc, contact-consumer, timeline-consumer, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, or decision-audit-export")
 		return nil
 	case "grpc":
 		return runGRPC()
@@ -60,6 +60,8 @@ func run() error {
 		return runOutboxRepairAudit()
 	case "outbox-repair-cleanup":
 		return runOutboxRepairCleanup()
+	case "decision-audit-export":
+		return runDecisionAuditExport()
 	default:
 		return errors.New("unsupported NEXUSIM_POLICY_SERVICE_MODE")
 	}
@@ -306,6 +308,73 @@ func runOutboxRepairCleanup() error {
 			"operator":  envString("NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OPERATOR", ""),
 			"outcome":   envString("NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OUTCOME", ""),
 		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runDecisionAuditExport() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := envString("NEXUSIM_PG_DSN", "")
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required for policy decision audit export")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	allowed, allowedConfigured, err := envOptionalBool("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_ALLOWED")
+	if err != nil {
+		return err
+	}
+	var allowedFilter *bool
+	if allowedConfigured {
+		allowedFilter = &allowed
+	}
+	filters := map[string]string{
+		"event_id":       envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_EVENT_ID", ""),
+		"tenant_id":      envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_TENANT_ID", ""),
+		"action":         envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_ACTION", ""),
+		"allowed":        envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_ALLOWED", ""),
+		"classification": envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_CLASSIFICATION", ""),
+		"reason_code":    envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_REASON_CODE", ""),
+		"status":         envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_STATUS", ""),
+	}
+	rows, err := postgresinfra.NewOutboxStore(pool).ExportDecisionAudit(ctx, postgresinfra.DecisionAuditExportOptions{
+		EventID:        filters["event_id"],
+		TenantID:       filters["tenant_id"],
+		Action:         filters["action"],
+		Allowed:        allowedFilter,
+		Classification: filters["classification"],
+		ReasonCode:     filters["reason_code"],
+		Status:         filters["status"],
+		Limit:          envInt("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_LIMIT", 100),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("policy-service decision audit export completed rows=%d", len(rows))
+	for _, row := range rows {
+		log.Printf(
+			"policy_decision_audit event_id=%s tenant_id=%s action=%s allowed=%t classification=%s reason_code=%s status=%s permission_version=%d created_at=%s",
+			row.EventID,
+			row.TenantID,
+			row.Action,
+			row.Allowed,
+			row.Classification,
+			row.ReasonCode,
+			row.Status,
+			row.PermissionVersion,
+			row.CreatedAt.Format(time.RFC3339),
+		)
+	}
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_OUTPUT")); outputPath != "" {
+		if err := writeDecisionAuditExportOutput(outputPath, rows, filters); err != nil {
 			return err
 		}
 	}

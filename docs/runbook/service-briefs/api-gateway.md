@@ -15,6 +15,7 @@
 - 已有 `tools/check-api-gateway-quota-snapshot.ps1`，可基于 `/debug/metrics` 或离线 JSON snapshot 做 tenant quota 门禁，检查 rate-limit 是否启用、source、version/checksum、checksum-required policy、URL HTTPS / bearer / TLS / client-cert guard、snapshot age / future timestamp / stale、reload error、Redis / identity 错误、tenant plan 数、tracked key 数和最近 reload 成功时间；`check-local` 已包含 legacy / quota gate 正反样本自检。
 - `ADR-033` 已固定 tenant quota source 边界：api-gateway 不直接读业务内部表；`url` source 只消费版本化 snapshot，可选 bearer token 且 bearer mode 强制 HTTPS，并支持 URL source 专用 CA / client cert 和强制 checksum；后续完整配置中心 / DB-backed quota 必须通过控制面 / 配置契约。
 - tenant quota source / snapshot / reload helper 已从 `cmd/api-gateway/main.go` 拆到同 package 文件，composition root 继续负责 wiring，避免继续堆大文件。
+- cmd 层 rate-limit / tenant-plan 配置测试已从 `main_test.go` 拆到同 package `rate_limit_config_test.go`，保留原启动配置覆盖，同时降低单个测试文件复杂度。
 
 ## 后续
 

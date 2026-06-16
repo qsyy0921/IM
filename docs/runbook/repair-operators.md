@@ -44,7 +44,7 @@ go run ./services/delivery-service/cmd/delivery-service
 | --- | --- |
 | `projection-failure-audit` | 只读列出 unresolved projection failure，支持按 offset / event / failure class 缩小范围；可选 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
 | `projection-checkpoint-repair` | 带审计回调 checkpoint 做 replay；只允许回调，不允许前跳跳过事件。 |
-| `projection-checkpoint-repair-audit` | 只读列出 checkpoint repair audit 历史。 |
+| `projection-checkpoint-repair-audit` | 只读列出 checkpoint repair audit 历史；可选 `NEXUSIM_DELIVERY_PROJECTION_REPAIR_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
 | `projection-checkpoint-repair-cleanup` | 清理超过保留期的 checkpoint repair audit 历史。 |
 | `projection-failure-cleanup` | 只清理 resolved 且超过保留期的 failure 审计行，不触碰 unresolved blocker。 |
 

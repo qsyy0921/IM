@@ -629,6 +629,11 @@ func runProjectionCheckpointRepairAudit() error {
 			row.Reason,
 		)
 	}
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_PROJECTION_REPAIR_AUDIT_OUTPUT")); outputPath != "" {
+		if err := writeProjectionRepairAuditOutput(outputPath, rows); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

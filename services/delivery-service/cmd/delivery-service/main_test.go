@@ -424,6 +424,86 @@ func TestWriteProjectionFailureAuditOutput(t *testing.T) {
 	}
 }
 
+func TestWriteProjectionRepairAuditOutput(t *testing.T) {
+	createdAt := time.Date(2026, 6, 16, 8, 45, 0, 0, time.UTC)
+	failureOffset := int64(41)
+	outputPath := filepath.Join(t.TempDir(), "projection-repair-audit.json")
+
+	err := writeProjectionRepairAuditOutput(outputPath, []postgresinfra.ProjectionRepairAuditRow{
+		{
+			ConsumerGroup: "group-1",
+			Topic:         "conversation.timeline.events",
+			PartitionID:   0,
+			Mode:          "rewind-unresolved-failure",
+			Outcome:       "MUTATED",
+			Operator:      "operator-1",
+			Reason:        "replay blocked projection",
+			DryRun:        false,
+			BeforeOffset:  45,
+			AfterOffset:   41,
+			FailureOffset: &failureOffset,
+			FailureEvent:  "event-1",
+			FailureClass:  "projection_dependency",
+			CreatedAt:     createdAt,
+		},
+		{
+			ConsumerGroup: "group-1",
+			Topic:         "conversation.timeline.events",
+			PartitionID:   1,
+			Mode:          "rewind-next-offset",
+			Outcome:       "SKIPPED",
+			SkipReason:    "target_offset_is_not_lower",
+			Operator:      "operator-2",
+			Reason:        "dry run",
+			DryRun:        true,
+			BeforeOffset:  10,
+			AfterOffset:   10,
+			CreatedAt:     createdAt.Add(time.Minute),
+		},
+	})
+	if err != nil {
+		t.Fatalf("write projection repair audit output: %v", err)
+	}
+
+	raw, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("read projection repair audit output: %v", err)
+	}
+	var output struct {
+		Rows []struct {
+			Mode          string `json:"mode"`
+			Outcome       string `json:"outcome"`
+			SkipReason    string `json:"skip_reason"`
+			BeforeOffset  int64  `json:"before_offset"`
+			AfterOffset   int64  `json:"after_offset"`
+			FailureOffset *int64 `json:"failure_offset"`
+			FailureEvent  string `json:"failure_event_id"`
+			FailureClass  string `json:"failure_class"`
+		} `json:"rows"`
+	}
+	if err := json.Unmarshal(raw, &output); err != nil {
+		t.Fatalf("decode projection repair audit output: %v", err)
+	}
+	if len(output.Rows) != 2 {
+		t.Fatalf("unexpected projection repair audit output row count: %+v", output)
+	}
+	if output.Rows[0].Mode != "rewind-unresolved-failure" ||
+		output.Rows[0].Outcome != "MUTATED" ||
+		output.Rows[0].BeforeOffset != 45 ||
+		output.Rows[0].AfterOffset != 41 ||
+		output.Rows[0].FailureOffset == nil ||
+		*output.Rows[0].FailureOffset != failureOffset ||
+		output.Rows[0].FailureEvent != "event-1" ||
+		output.Rows[0].FailureClass != "projection_dependency" {
+		t.Fatalf("unexpected mutated repair row: %+v", output.Rows[0])
+	}
+	if output.Rows[1].Outcome != "SKIPPED" ||
+		output.Rows[1].SkipReason != "target_offset_is_not_lower" ||
+		output.Rows[1].FailureOffset != nil {
+		t.Fatalf("unexpected skipped repair row: %+v", output.Rows[1])
+	}
+}
+
 func clearDeliveryGRPCTLSConfig(t *testing.T) {
 	t.Helper()
 	t.Setenv("NEXUSIM_DELIVERY_GRPC_TLS_CERT_FILE", "")

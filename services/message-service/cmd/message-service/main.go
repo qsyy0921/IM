@@ -40,7 +40,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_MESSAGE_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("message-service runtime wiring is idle; set NEXUSIM_MESSAGE_SERVICE_MODE=grpc, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, or outbox-repair-cleanup")
+		log.Println("message-service runtime wiring is idle; set NEXUSIM_MESSAGE_SERVICE_MODE=grpc, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, or change-history-audit")
 		return nil
 	case "grpc":
 		return runGRPCServer()
@@ -54,6 +54,8 @@ func run() error {
 		return runOutboxRepairAudit()
 	case "outbox-repair-cleanup":
 		return runOutboxRepairCleanup()
+	case "change-history-audit":
+		return runMessageChangeHistoryAudit()
 	default:
 		return errors.New("unsupported NEXUSIM_MESSAGE_SERVICE_MODE")
 	}
@@ -516,6 +518,58 @@ func runOutboxRepairCleanup() error {
 			"tenant_id":       envString("NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_TENANT_ID", ""),
 			"conversation_id": envString("NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_CONVERSATION_ID", ""),
 		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runMessageChangeHistoryAudit() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	rows, err := postgresinfra.NewMessageRepository(pool).AuditMessageChangeHistory(ctx, postgresinfra.MessageChangeHistoryAuditOptions{
+		TenantID:       envString("NEXUSIM_MESSAGE_CHANGE_HISTORY_AUDIT_TENANT_ID", ""),
+		ConversationID: envString("NEXUSIM_MESSAGE_CHANGE_HISTORY_AUDIT_CONVERSATION_ID", ""),
+		MessageID:      envString("NEXUSIM_MESSAGE_CHANGE_HISTORY_AUDIT_MESSAGE_ID", ""),
+		ChangeType:     envString("NEXUSIM_MESSAGE_CHANGE_HISTORY_AUDIT_CHANGE_TYPE", ""),
+		ChangedBy:      envString("NEXUSIM_MESSAGE_CHANGE_HISTORY_AUDIT_CHANGED_BY", ""),
+		Limit:          envInt("NEXUSIM_MESSAGE_CHANGE_HISTORY_AUDIT_LIMIT", 20),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("message-service change history audit completed rows=%d", len(rows))
+	for _, row := range rows {
+		log.Printf(
+			"message_change_history tenant_id=%s conversation_id=%s message_id=%s change_version=%d change_type=%s before_status=%s after_status=%s changed_by=%s before_payload_present=%t after_payload_present=%t reason_present=%t trace_id=%s changed_at=%s",
+			row.TenantID,
+			row.ConversationID,
+			row.MessageID,
+			row.ChangeVersion,
+			row.ChangeType,
+			row.BeforeStatus,
+			row.AfterStatus,
+			row.ChangedBy,
+			row.BeforePayloadPresent,
+			row.AfterPayloadPresent,
+			row.ReasonPresent,
+			row.TraceID,
+			row.ChangedAt.Format(time.RFC3339),
+		)
+	}
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_MESSAGE_CHANGE_HISTORY_AUDIT_OUTPUT")); outputPath != "" {
+		if err := writeMessageChangeHistoryAuditOutput(outputPath, rows); err != nil {
 			return err
 		}
 	}

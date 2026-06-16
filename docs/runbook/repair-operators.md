@@ -76,6 +76,8 @@ go run ./services/delivery-service/cmd/delivery-service
 | `contacts-service` | `NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_OUTPUT` |
 | `policy-service` | `NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OUTPUT` |
 
+`message-service` 还提供只读 `change-history-audit`，用于审计 `message_change_history` 中 `EDIT / REVOKE / DELETE` 变更证明；支持按 tenant / conversation / message / change type / changed_by 缩小范围，可选 `NEXUSIM_MESSAGE_CHANGE_HISTORY_AUDIT_OUTPUT` 写低敏 JSON 结果。输出只包含变更元数据、状态转换、payload 是否存在和 reason 是否存在，不输出消息 payload 或 reason 原文。
+
 ## Delivery Projection
 
 `delivery-service` 额外拥有 projection 排障入口：

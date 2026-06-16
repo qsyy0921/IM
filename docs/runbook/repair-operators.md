@@ -100,8 +100,10 @@ go run ./services/delivery-service/cmd/delivery-service
 | --- | --- |
 | `member-change-audit` | 只读审计 `member_change_saga`，可按 tenant / conversation / target user / operator / change type / status / change_id / outbox event 缩小范围；可选 `NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
 | `member-window-audit` | 只读审计 `conversation_members` 当前窗口 cache 异常，覆盖 ACTIVE 无 join_seq、ACTIVE 带 leave_seq、inactive 无 leave_seq、leave_seq 早于 join_seq、成员版本高于会话版本、非 ACTIVE 会话仍有 ACTIVE 成员等 issue class；可选 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
+| `member-window-repair` | 只修复 `ACTIVE_WITH_LEAVE_SEQ`：清空 ACTIVE 成员残留的历史 `leave_seq`；默认 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_DRY_RUN=true`，只有显式设为 false 才 mutate；可选 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_OUTPUT` 写低敏 JSON summary。 |
+| `member-window-repair-audit` | 只读审计 `member-window-repair` 历史；可按 tenant / conversation / user / issue class / outcome 缩小范围；可选 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
 
-成员窗口历史 repair action 仍是后续工作；应先用 `member-window-audit` 缩小范围并留存证据，不能用手写 SQL 直接改成员事实。
+更复杂的成员窗口历史 repair action 仍是后续工作；应先用 `member-window-audit` 缩小范围并留存证据，不能用手写 SQL 直接改成员事实。
 
 ## Identity Challenge / Session
 

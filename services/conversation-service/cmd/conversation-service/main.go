@@ -37,7 +37,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_CONVERSATION_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("conversation-service runtime wiring is idle; set NEXUSIM_CONVERSATION_SERVICE_MODE=grpc, member-change-worker, member-change-audit, or member-window-audit")
+		log.Println("conversation-service runtime wiring is idle; set NEXUSIM_CONVERSATION_SERVICE_MODE=grpc, member-change-worker, member-change-audit, member-window-audit, member-window-repair, or member-window-repair-audit")
 		return nil
 	case "grpc":
 		return runGRPCServer()
@@ -47,6 +47,10 @@ func run() error {
 		return runMemberChangeAudit()
 	case "member-window-audit":
 		return runMemberWindowAudit()
+	case "member-window-repair":
+		return runMemberWindowRepair()
+	case "member-window-repair-audit":
+		return runMemberWindowRepairAudit()
 	default:
 		return errors.New("unsupported NEXUSIM_CONVERSATION_SERVICE_MODE")
 	}
@@ -412,6 +416,112 @@ func runMemberWindowAudit() error {
 	}
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_OUTPUT")); outputPath != "" {
 		if err := writeMemberWindowAuditOutput(outputPath, rows); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runMemberWindowRepair() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	dryRun := true
+	if value, present, err := envOptionalBool("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_DRY_RUN"); err != nil {
+		return err
+	} else if present {
+		dryRun = value
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	options := postgresinfra.MemberWindowRepairOptions{
+		TenantID:       envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_TENANT_ID", ""),
+		ConversationID: envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_CONVERSATION_ID", ""),
+		UserID:         envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_USER_ID", ""),
+		IssueClass:     envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_ISSUE_CLASS", ""),
+		OperatorID:     envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_OPERATOR_ID", "manual"),
+		Reason:         envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_REASON", "manual member window repair"),
+		DryRun:         dryRun,
+		Limit:          envInt("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_LIMIT", 20),
+	}
+	stats, err := postgresinfra.NewRepository(pool).RepairMemberWindows(ctx, options)
+	if err != nil {
+		return err
+	}
+	issueClass := strings.TrimSpace(options.IssueClass)
+	if issueClass == "" {
+		issueClass = postgresinfra.MemberWindowIssueActiveWithLeaveSeq
+	}
+	log.Printf(
+		"conversation-service member window repair completed requested=%d repaired=%d skipped=%d dry_run=%t issue_class=%s",
+		stats.Requested,
+		stats.Repaired,
+		stats.Skipped,
+		stats.DryRun,
+		issueClass,
+	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_OUTPUT")); outputPath != "" {
+		if err := writeMemberWindowRepairOutput(outputPath, stats, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runMemberWindowRepairAudit() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	rows, err := postgresinfra.NewRepository(pool).AuditMemberWindowRepairs(ctx, postgresinfra.MemberWindowRepairAuditOptions{
+		TenantID:       envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_TENANT_ID", ""),
+		ConversationID: envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_CONVERSATION_ID", ""),
+		UserID:         envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_USER_ID", ""),
+		IssueClass:     envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_ISSUE_CLASS", ""),
+		Outcome:        envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_OUTCOME", ""),
+		Limit:          envInt("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_LIMIT", 20),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("conversation-service member window repair audit completed rows=%d", len(rows))
+	for _, row := range rows {
+		log.Printf(
+			"conversation_member_window_repair id=%d tenant_id=%s conversation_id=%s user_id=%s issue_class=%s action=%s outcome=%s previous_join_seq=%s previous_leave_seq=%s new_leave_seq=%s operator_id=%s dry_run=%t repaired_at=%s",
+			row.ID,
+			row.TenantID,
+			row.ConversationID,
+			row.UserID,
+			row.IssueClass,
+			row.RepairAction,
+			row.RepairOutcome,
+			formatOptionalInt64(row.PreviousJoinSeq, row.HasJoinSeq),
+			formatOptionalInt64(row.PreviousLeaveSeq, row.HasLeaveSeq),
+			formatOptionalInt64(row.NewLeaveSeq, row.HasNewLeaveSeq),
+			row.OperatorID,
+			row.DryRun,
+			row.RepairedAt.UTC().Format(time.RFC3339Nano),
+		)
+	}
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_OUTPUT")); outputPath != "" {
+		if err := writeMemberWindowRepairAuditOutput(outputPath, rows); err != nil {
 			return err
 		}
 	}

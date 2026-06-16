@@ -307,7 +307,7 @@ func runResumeReplayScenario(
 		}
 		if err != nil {
 			conn.CloseNow()
-			return finish(cfg, result, fmt.Errorf("execute redis sentinel failover command: %w", err))
+			return finish(cfg, result, fmt.Errorf("execute redis failover command: %w", err))
 		}
 	}
 
@@ -735,6 +735,122 @@ func runRedisFaultScenario(
 		fault.DeliveryOutboxTotal = *result.DeliveryOutboxTotal
 	}
 	result.RedisFault = fault
+	result.Success = true
+	return finish(cfg, result, nil)
+}
+
+func runRedisClusterFailoverScenario(
+	ctx context.Context,
+	cfg config,
+	pool *pgxpool.Pool,
+	conversationClient conversationv1.ConversationServiceClient,
+	messageClient messagev1.MessageServiceClient,
+	deliveryClient deliveryv1.DeliveryServiceClient,
+	result *summary,
+) error {
+	if strings.TrimSpace(cfg.redisFaultCommand) == "" {
+		return finish(cfg, result, errors.New("redis-fault-command is required for redis-cluster-failover scenario"))
+	}
+	conn, hello, err := connectWebSocket(ctx, cfg, cfg.receiverDeviceID)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("connect websocket before redis cluster failover: %w", err))
+	}
+	defer conn.Close(nhooyr.StatusNormalClosure, "")
+	result.ServerHello = snapshotFrame(hello)
+	result.DeviceNotifications = []deviceSummary{{
+		DeviceID:    cfg.receiverDeviceID,
+		ServerHello: snapshotFrame(hello),
+	}}
+
+	begin := time.Now()
+	join, err := createReceiverJoin(ctx, cfg, conversationClient)
+	result.Latencies["create_member_join"] = elapsedMS(begin)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("create receiver join: %w", err))
+	}
+	result.MemberJoin = memberJoinSummary{
+		ChangeID:          join.GetChangeId(),
+		BoundarySeq:       join.GetBoundarySeq(),
+		MemberVersion:     join.GetMemberVersion(),
+		PermissionVersion: join.GetPermissionVersion(),
+	}
+	if err := waitMembership(ctx, pool, cfg); err != nil {
+		return finish(cfg, result, err)
+	}
+
+	output, err := executeCommand(ctx, cfg, cfg.redisFaultCommand)
+	fault := &redisFaultSummary{
+		FaultCommand:    cfg.redisFaultCommand,
+		CommandOutput:   output,
+		NotifyReceived:  true,
+		NotifyWaitError: "online notify is expected after Redis Cluster failover reports a promoted master",
+	}
+	result.RedisFault = fault
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("execute redis cluster failover command: %w", err))
+	}
+
+	beforeMetrics, _ := fetchPushMetrics(ctx, cfg.pushMetricsURL)
+	result.PushMetricsBefore = &beforeMetrics
+
+	begin = time.Now()
+	send, err := sendMessage(ctx, cfg, messageClient, 1)
+	result.Latencies["send_message"] = elapsedMS(begin)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("send message after redis cluster failover: %w", err))
+	}
+	result.SendMessage = sendSummary{MessageID: send.GetMessageId(), ConversationSeq: send.GetConversationSeq()}
+
+	notify, err := waitNotify(ctx, cfg, conn)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("wait notify after redis cluster failover: %w", err))
+	}
+	if notify.ConversationSeq != send.GetConversationSeq() || notify.MessageID != send.GetMessageId() {
+		return finish(cfg, result, fmt.Errorf("notify mismatch after redis cluster failover: notify=%+v send=%+v", notify, send))
+	}
+	result.DeliveryNotify = snapshotFrame(notify)
+	result.DeviceNotifications[0].DeliveryNotify = snapshotFrame(notify)
+
+	pull, err := pullInbox(ctx, cfg, deliveryClient)
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("pull inbox after redis cluster failover: %w", err))
+	}
+	result.PullInbox = pull
+	fault.RecoveryPullInbox = pull
+	if pull.ItemCount == 0 || pull.MaxSeq < send.GetConversationSeq() {
+		return finish(cfg, result, fmt.Errorf("pull inbox did not include redis cluster failover message: %+v", pull))
+	}
+
+	ackOK, err := ackViaWebSocket(ctx, cfg, conn, cfg.receiverDeviceID, send.GetConversationSeq())
+	if err != nil {
+		return finish(cfg, result, fmt.Errorf("ack after redis cluster failover: %w", err))
+	}
+	if ackOK.LastReceivedSeq != send.GetConversationSeq() {
+		return finish(cfg, result, fmt.Errorf("ack seq mismatch after redis cluster failover: %+v", ackOK))
+	}
+	result.DeliveryAckOK = snapshotFrame(ackOK)
+	result.DeviceNotifications[0].DeliveryAckOK = snapshotFrame(ackOK)
+	fault.AckOK = snapshotFrame(ackOK)
+	if err := waitCursor(ctx, pool, cfg, cfg.receiverDeviceID, send.GetConversationSeq()); err != nil {
+		return finish(cfg, result, err)
+	}
+	cursorSeq, err := queryCursor(ctx, pool, cfg, cfg.receiverDeviceID)
+	if err != nil {
+		return finish(cfg, result, err)
+	}
+	result.CursorLastReceivedSeq = &cursorSeq
+	result.DeviceNotifications[0].CursorLastReceivedSeq = &cursorSeq
+	if err := waitDeliveryOutboxDrain(ctx, pool, cfg); err != nil {
+		return finish(cfg, result, err)
+	}
+	if err := fillPostgresStats(ctx, pool, cfg, result); err != nil {
+		return finish(cfg, result, err)
+	}
+	if result.DeliveryOutboxTotal != nil {
+		fault.DeliveryOutboxTotal = *result.DeliveryOutboxTotal
+	}
+	consumerMetrics, _ := fetchPushMetrics(ctx, cfg.consumerMetricsURL)
+	result.PushConsumerMetrics = &consumerMetrics
 	result.Success = true
 	return finish(cfg, result, nil)
 }

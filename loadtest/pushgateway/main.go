@@ -177,6 +177,8 @@ func run(cfg config) error {
 		return runResumeReplayScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "redis-sentinel-master-stop":
 		return runResumeReplayScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
+	case "redis-cluster-failover":
+		return runRedisClusterFailoverScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "redis-sentinel-quorum-loss":
 		return runRedisFaultScenario(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, &result)
 	case "redis-sentinel-network-partition":

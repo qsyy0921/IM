@@ -1,0 +1,28 @@
+services:
+  redis-cluster-ha:
+    image: redis:7-alpine
+    container_name: nexusim-redis-cluster-ha
+    ports:
+      - "7000:7000"
+      - "7001:7001"
+      - "7002:7002"
+      - "7003:7003"
+      - "7004:7004"
+      - "7005:7005"
+      - "17000:17000"
+      - "17001:17001"
+      - "17002:17002"
+      - "17003:17003"
+      - "17004:17004"
+      - "17005:17005"
+    command: >
+      sh -c "mkdir -p /data/7000 /data/7001 /data/7002 /data/7003 /data/7004 /data/7005 &&
+      for port in 7000 7001 7002 7003 7004 7005; do
+        redis-server --port $$port --cluster-enabled yes --cluster-config-file nodes-$$port.conf --cluster-node-timeout 5000 --cluster-announce-ip 127.0.0.1 --cluster-announce-port $$port --cluster-announce-bus-port 1$$port --appendonly no --protected-mode no --dir /data/$$port &
+      done &&
+      wait"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "7000", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20

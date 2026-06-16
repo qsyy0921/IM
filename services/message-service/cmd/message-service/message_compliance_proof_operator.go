@@ -22,11 +22,29 @@ func runMessageComplianceProofAudit() error {
 	}
 	defer closeRepository()
 
+	updatedAfter, err := envOptionalRFC3339Time("NEXUSIM_MESSAGE_COMPLIANCE_PROOF_AUDIT_UPDATED_AFTER")
+	if err != nil {
+		return err
+	}
+	updatedBefore, err := envOptionalRFC3339Time("NEXUSIM_MESSAGE_COMPLIANCE_PROOF_AUDIT_UPDATED_BEFORE")
+	if err != nil {
+		return err
+	}
+	filters := map[string]string{
+		"tenant_id":          envString("NEXUSIM_MESSAGE_COMPLIANCE_PROOF_AUDIT_TENANT_ID", ""),
+		"external_proof_ref": envString("NEXUSIM_MESSAGE_COMPLIANCE_PROOF_AUDIT_EXTERNAL_PROOF_REF", ""),
+		"status":             envString("NEXUSIM_MESSAGE_COMPLIANCE_PROOF_AUDIT_STATUS", ""),
+		"provider":           envString("NEXUSIM_MESSAGE_COMPLIANCE_PROOF_AUDIT_PROVIDER", ""),
+		"updated_after":      formatOptionalFilterTime(updatedAfter),
+		"updated_before":     formatOptionalFilterTime(updatedBefore),
+	}
 	rows, err := repository.AuditComplianceExternalProofs(ctx, postgresinfra.MessageComplianceExternalProofAuditOptions{
-		TenantID:         envString("NEXUSIM_MESSAGE_COMPLIANCE_PROOF_AUDIT_TENANT_ID", ""),
-		ExternalProofRef: envString("NEXUSIM_MESSAGE_COMPLIANCE_PROOF_AUDIT_EXTERNAL_PROOF_REF", ""),
-		Status:           envString("NEXUSIM_MESSAGE_COMPLIANCE_PROOF_AUDIT_STATUS", ""),
-		Provider:         envString("NEXUSIM_MESSAGE_COMPLIANCE_PROOF_AUDIT_PROVIDER", ""),
+		TenantID:         filters["tenant_id"],
+		ExternalProofRef: filters["external_proof_ref"],
+		Status:           filters["status"],
+		Provider:         filters["provider"],
+		UpdatedAfter:     updatedAfter,
+		UpdatedBefore:    updatedBefore,
 		Limit:            envInt("NEXUSIM_MESSAGE_COMPLIANCE_PROOF_AUDIT_LIMIT", 20),
 	})
 	if err != nil {
@@ -47,7 +65,7 @@ func runMessageComplianceProofAudit() error {
 		)
 	}
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_MESSAGE_COMPLIANCE_PROOF_AUDIT_OUTPUT")); outputPath != "" {
-		if err := writeMessageComplianceProofAuditOutput(outputPath, rows); err != nil {
+		if err := writeMessageComplianceProofAuditOutput(outputPath, rows, filters); err != nil {
 			return err
 		}
 	}

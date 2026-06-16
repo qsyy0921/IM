@@ -22,12 +22,31 @@ func runMessageComplianceApprovalAudit() error {
 	}
 	defer closeRepository()
 
+	updatedAfter, err := envOptionalRFC3339Time("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_AUDIT_UPDATED_AFTER")
+	if err != nil {
+		return err
+	}
+	updatedBefore, err := envOptionalRFC3339Time("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_AUDIT_UPDATED_BEFORE")
+	if err != nil {
+		return err
+	}
+	filters := map[string]string{
+		"tenant_id":       envString("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_AUDIT_TENANT_ID", ""),
+		"conversation_id": envString("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_AUDIT_CONVERSATION_ID", ""),
+		"message_id":      envString("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_AUDIT_MESSAGE_ID", ""),
+		"approval_id":     envString("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_AUDIT_APPROVAL_ID", ""),
+		"status":          envString("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_AUDIT_STATUS", ""),
+		"updated_after":   formatOptionalFilterTime(updatedAfter),
+		"updated_before":  formatOptionalFilterTime(updatedBefore),
+	}
 	rows, err := repository.AuditComplianceDeleteApprovals(ctx, postgresinfra.MessageComplianceDeleteApprovalAuditOptions{
-		TenantID:       envString("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_AUDIT_TENANT_ID", ""),
-		ConversationID: envString("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_AUDIT_CONVERSATION_ID", ""),
-		MessageID:      envString("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_AUDIT_MESSAGE_ID", ""),
-		ApprovalID:     envString("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_AUDIT_APPROVAL_ID", ""),
-		Status:         envString("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_AUDIT_STATUS", ""),
+		TenantID:       filters["tenant_id"],
+		ConversationID: filters["conversation_id"],
+		MessageID:      filters["message_id"],
+		ApprovalID:     filters["approval_id"],
+		Status:         filters["status"],
+		UpdatedAfter:   updatedAfter,
+		UpdatedBefore:  updatedBefore,
 		Limit:          envInt("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_AUDIT_LIMIT", 20),
 	})
 	if err != nil {
@@ -51,7 +70,7 @@ func runMessageComplianceApprovalAudit() error {
 		)
 	}
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_AUDIT_OUTPUT")); outputPath != "" {
-		if err := writeMessageComplianceApprovalAuditOutput(outputPath, rows); err != nil {
+		if err := writeMessageComplianceApprovalAuditOutput(outputPath, rows, filters); err != nil {
 			return err
 		}
 	}

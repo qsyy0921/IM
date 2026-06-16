@@ -238,6 +238,25 @@ func TestMessageDebugAddrPrefersServiceSpecificEnv(t *testing.T) {
 	}
 }
 
+func TestEnvOptionalRFC3339Time(t *testing.T) {
+	t.Setenv("NEXUSIM_MESSAGE_TEST_TIME", "")
+	parsed, err := envOptionalRFC3339Time("NEXUSIM_MESSAGE_TEST_TIME")
+	if err != nil || parsed != nil {
+		t.Fatalf("expected empty optional time to be nil, parsed=%v err=%v", parsed, err)
+	}
+
+	t.Setenv("NEXUSIM_MESSAGE_TEST_TIME", "2026-06-17T09:20:00+08:00")
+	parsed, err = envOptionalRFC3339Time("NEXUSIM_MESSAGE_TEST_TIME")
+	if err != nil || parsed == nil || parsed.Format(time.RFC3339) != "2026-06-17T01:20:00Z" {
+		t.Fatalf("expected parsed UTC RFC3339 time, parsed=%v err=%v", parsed, err)
+	}
+
+	t.Setenv("NEXUSIM_MESSAGE_TEST_TIME", "2026-06-17")
+	if _, err := envOptionalRFC3339Time("NEXUSIM_MESSAGE_TEST_TIME"); err == nil {
+		t.Fatalf("expected invalid optional time to fail")
+	}
+}
+
 func TestValidateMessageDebugListenerConfigAllowsEmptyOrPrivateAddress(t *testing.T) {
 	for _, addr := range []string{"", "127.0.0.1:11904", "localhost:11904", "172.31.50.10:11904"} {
 		if err := validateMessageDebugListenerConfig(addr, false); err != nil {

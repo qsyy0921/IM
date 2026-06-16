@@ -25,7 +25,12 @@ func TestWriteMessageComplianceApprovalAuditOutputOmitsReasonText(t *testing.T) 
 		ApprovedAt:       time.Date(2026, 6, 16, 3, 0, 0, 0, time.UTC),
 		UpdatedAt:        time.Date(2026, 6, 16, 3, 0, 0, 0, time.UTC),
 	}}
-	if err := writeMessageComplianceApprovalAuditOutput(outputPath, rows); err != nil {
+	if err := writeMessageComplianceApprovalAuditOutput(outputPath, rows, map[string]string{
+		"tenant_id":      "tenant-a",
+		"updated_after":  "2026-06-16T00:00:00Z",
+		"updated_before": "2026-06-17T00:00:00Z",
+		"message_id":     "",
+	}); err != nil {
 		t.Fatalf("write compliance approval audit output: %v", err)
 	}
 	payload, err := os.ReadFile(outputPath)
@@ -40,10 +45,15 @@ func TestWriteMessageComplianceApprovalAuditOutputOmitsReasonText(t *testing.T) 
 		t.Fatalf("unmarshal compliance approval audit output: %v", err)
 	}
 	if len(output.Rows) != 1 ||
+		output.Filters["tenant_id"] != "tenant-a" ||
+		output.Filters["updated_after"] != "2026-06-16T00:00:00Z" ||
 		output.Rows[0].ApprovalID != "approval-a" ||
 		output.Rows[0].ExternalProofRef != "proof://case/a" ||
 		!output.Rows[0].ReasonPresent {
 		t.Fatalf("unexpected compliance approval audit output: %+v", output)
+	}
+	if _, ok := output.Filters["message_id"]; ok {
+		t.Fatalf("empty message_id filter should be omitted: %+v", output.Filters)
 	}
 }
 

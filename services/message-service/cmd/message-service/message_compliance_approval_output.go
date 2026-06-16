@@ -11,6 +11,7 @@ import (
 
 type messageComplianceApprovalOutput struct {
 	GeneratedAt string                               `json:"generated_at"`
+	Filters     map[string]string                    `json:"filters,omitempty"`
 	Rows        []messageComplianceApprovalOutputRow `json:"rows"`
 }
 
@@ -37,9 +38,10 @@ type messageComplianceApprovalOutputRow struct {
 	UpdatedAt        string `json:"updated_at"`
 }
 
-func writeMessageComplianceApprovalAuditOutput(path string, rows []postgresinfra.MessageComplianceDeleteApprovalAuditRow) error {
+func writeMessageComplianceApprovalAuditOutput(path string, rows []postgresinfra.MessageComplianceDeleteApprovalAuditRow, filters map[string]string) error {
 	output := messageComplianceApprovalOutput{
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		Filters:     compactCleanupFilters(filters),
 		Rows:        make([]messageComplianceApprovalOutputRow, 0, len(rows)),
 	}
 	for _, row := range rows {

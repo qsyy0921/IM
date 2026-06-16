@@ -726,6 +726,26 @@ func envString(name string, fallback string) string {
 	return value
 }
 
+func envOptionalRFC3339Time(name string) (*time.Time, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil, errors.New(name + " must be RFC3339")
+	}
+	utc := parsed.UTC()
+	return &utc, nil
+}
+
+func formatOptionalFilterTime(value *time.Time) string {
+	if value == nil {
+		return ""
+	}
+	return value.UTC().Format(time.RFC3339)
+}
+
 func policyClientTLSConfigFromEnv() (rpcinfra.PolicyClientTLSConfig, error) {
 	config := rpcinfra.PolicyClientTLSConfig{
 		CAFile:         envString("NEXUSIM_POLICY_SERVICE_TLS_CA_FILE", ""),

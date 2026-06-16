@@ -16,6 +16,7 @@ var (
 	ErrIdempotencyConflict    = errors.New("idempotency conflict")
 	ErrUnsupportedMessageType = errors.New("unsupported message type")
 	ErrUnsupportedDeleteScope = errors.New("unsupported delete scope")
+	ErrInvalidArgument        = errors.New("invalid argument")
 	ErrConversationNotFound   = errors.New("conversation not found")
 	ErrMessageNotFound        = errors.New("message not found")
 	ErrInvalidMessageState    = errors.New("invalid message state")
@@ -59,6 +60,13 @@ func NewUnsupportedDeleteScope(reason string) error {
 		return ErrUnsupportedDeleteScope
 	}
 	return fmt.Errorf("%w: %s", ErrUnsupportedDeleteScope, reason)
+}
+
+func NewInvalidArgument(reason string) error {
+	if reason == "" {
+		return ErrInvalidArgument
+	}
+	return fmt.Errorf("%w: %s", ErrInvalidArgument, reason)
 }
 
 func NewConversationNotFound(reason string) error {

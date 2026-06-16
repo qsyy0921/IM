@@ -23,7 +23,12 @@ func TestWriteMessageComplianceProofAuditOutput(t *testing.T) {
 		VerifiedAt:       time.Date(2026, 6, 17, 1, 0, 0, 0, time.UTC),
 		UpdatedAt:        time.Date(2026, 6, 17, 1, 0, 0, 0, time.UTC),
 	}}
-	if err := writeMessageComplianceProofAuditOutput(outputPath, rows); err != nil {
+	if err := writeMessageComplianceProofAuditOutput(outputPath, rows, map[string]string{
+		"tenant_id":      "tenant-a",
+		"updated_after":  "2026-06-17T00:00:00Z",
+		"updated_before": "2026-06-18T00:00:00Z",
+		"provider":       "",
+	}); err != nil {
 		t.Fatalf("write compliance proof audit output: %v", err)
 	}
 	data, err := os.ReadFile(outputPath)
@@ -38,10 +43,15 @@ func TestWriteMessageComplianceProofAuditOutput(t *testing.T) {
 		t.Fatalf("decode compliance proof output: %v", err)
 	}
 	if len(output.Rows) != 1 ||
+		output.Filters["tenant_id"] != "tenant-a" ||
+		output.Filters["updated_after"] != "2026-06-17T00:00:00Z" ||
 		output.Rows[0].ExternalProofRef != "proof://case/a" ||
 		output.Rows[0].ProofHash != "sha256:abc123" ||
 		output.Rows[0].Status != postgresinfra.MessageComplianceExternalProofStatusVerified {
 		t.Fatalf("unexpected compliance proof output: %+v", output)
+	}
+	if _, ok := output.Filters["provider"]; ok {
+		t.Fatalf("empty provider filter should be omitted: %+v", output.Filters)
 	}
 }
 

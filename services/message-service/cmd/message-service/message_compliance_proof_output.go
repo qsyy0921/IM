@@ -11,6 +11,7 @@ import (
 
 type messageComplianceProofOutput struct {
 	GeneratedAt string                            `json:"generated_at"`
+	Filters     map[string]string                 `json:"filters,omitempty"`
 	Rows        []messageComplianceProofOutputRow `json:"rows"`
 }
 
@@ -32,9 +33,10 @@ type messageComplianceProofOutputRow struct {
 	UpdatedAt        string `json:"updated_at"`
 }
 
-func writeMessageComplianceProofAuditOutput(path string, rows []postgresinfra.MessageComplianceExternalProofAuditRow) error {
+func writeMessageComplianceProofAuditOutput(path string, rows []postgresinfra.MessageComplianceExternalProofAuditRow, filters map[string]string) error {
 	output := messageComplianceProofOutput{
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		Filters:     compactCleanupFilters(filters),
 		Rows:        make([]messageComplianceProofOutputRow, 0, len(rows)),
 	}
 	for _, row := range rows {

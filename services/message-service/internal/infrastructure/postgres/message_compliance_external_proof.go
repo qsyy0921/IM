@@ -43,6 +43,8 @@ type MessageComplianceExternalProofAuditOptions struct {
 	ExternalProofRef string
 	Status           string
 	Provider         string
+	UpdatedAfter     *time.Time
+	UpdatedBefore    *time.Time
 	Limit            int
 }
 
@@ -144,6 +146,15 @@ func (r *MessageRepository) AuditComplianceExternalProofs(ctx context.Context, o
 	}
 	if value := strings.TrimSpace(options.Provider); value != "" {
 		addClause("provider = $"+strconv.Itoa(len(args)+1), value)
+	}
+	if options.UpdatedAfter != nil {
+		addClause("updated_at >= $"+strconv.Itoa(len(args)+1), options.UpdatedAfter.UTC())
+	}
+	if options.UpdatedBefore != nil {
+		addClause("updated_at < $"+strconv.Itoa(len(args)+1), options.UpdatedBefore.UTC())
+	}
+	if options.UpdatedAfter != nil && options.UpdatedBefore != nil && !options.UpdatedAfter.Before(*options.UpdatedBefore) {
+		return nil, types.NewInvalidArgument("updated_after must be before updated_before")
 	}
 	args = append(args, limit)
 	rows, err := r.pool.Query(ctx, `

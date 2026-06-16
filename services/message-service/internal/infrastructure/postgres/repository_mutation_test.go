@@ -696,14 +696,34 @@ func TestMessageRepositoryComplianceDeleteApprovalSetCancelAuditIntegration(t *t
 		t.Fatalf("unexpected approval result: %+v", approved)
 	}
 	approvedRows, err := repo.AuditComplianceDeleteApprovals(ctx, MessageComplianceDeleteApprovalAuditOptions{
-		TenantID: string(tenantID),
-		Status:   MessageComplianceApprovalStatusApproved,
+		TenantID:      string(tenantID),
+		Status:        MessageComplianceApprovalStatusApproved,
+		UpdatedAfter:  timePtr(now.Add(-time.Minute)),
+		UpdatedBefore: timePtr(now.Add(time.Minute)),
 	})
 	if err != nil {
 		t.Fatalf("audit approved compliance delete: %v", err)
 	}
 	if len(approvedRows) != 1 || approvedRows[0].ApprovalID != approvalID {
 		t.Fatalf("unexpected approved rows: %+v", approvedRows)
+	}
+	emptyApprovedRows, err := repo.AuditComplianceDeleteApprovals(ctx, MessageComplianceDeleteApprovalAuditOptions{
+		TenantID:     string(tenantID),
+		Status:       MessageComplianceApprovalStatusApproved,
+		UpdatedAfter: timePtr(now.Add(time.Hour)),
+	})
+	if err != nil {
+		t.Fatalf("audit approved compliance delete outside window: %v", err)
+	}
+	if len(emptyApprovedRows) != 0 {
+		t.Fatalf("expected no approved rows outside updated_at window, got %+v", emptyApprovedRows)
+	}
+	if _, err := repo.AuditComplianceDeleteApprovals(ctx, MessageComplianceDeleteApprovalAuditOptions{
+		TenantID:      string(tenantID),
+		UpdatedAfter:  timePtr(now),
+		UpdatedBefore: timePtr(now),
+	}); !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid approval audit time window, got %v", err)
 	}
 
 	canceled, err := repo.CancelComplianceDeleteApproval(ctx, MessageComplianceDeleteApprovalMutationOptions{
@@ -807,8 +827,10 @@ func TestMessageRepositoryComplianceExternalProofRevokeBlocksDeleteIntegration(t
 	assertCount(t, ctx, pool, "message_change_history", tenantID, 0)
 
 	proofRows, err := repo.AuditComplianceExternalProofs(ctx, MessageComplianceExternalProofAuditOptions{
-		TenantID: string(tenantID),
-		Status:   MessageComplianceExternalProofStatusRevoked,
+		TenantID:      string(tenantID),
+		Status:        MessageComplianceExternalProofStatusRevoked,
+		UpdatedAfter:  timePtr(now.Add(30 * time.Second)),
+		UpdatedBefore: timePtr(now.Add(2 * time.Minute)),
 	})
 	if err != nil {
 		t.Fatalf("audit compliance proof: %v", err)
@@ -816,6 +838,28 @@ func TestMessageRepositoryComplianceExternalProofRevokeBlocksDeleteIntegration(t
 	if len(proofRows) != 1 || proofRows[0].ExternalProofRef != proofRef {
 		t.Fatalf("unexpected proof audit rows: %+v", proofRows)
 	}
+	emptyProofRows, err := repo.AuditComplianceExternalProofs(ctx, MessageComplianceExternalProofAuditOptions{
+		TenantID:      string(tenantID),
+		Status:        MessageComplianceExternalProofStatusRevoked,
+		UpdatedBefore: timePtr(now.Add(30 * time.Second)),
+	})
+	if err != nil {
+		t.Fatalf("audit compliance proof outside window: %v", err)
+	}
+	if len(emptyProofRows) != 0 {
+		t.Fatalf("expected no proof rows outside updated_at window, got %+v", emptyProofRows)
+	}
+	if _, err := repo.AuditComplianceExternalProofs(ctx, MessageComplianceExternalProofAuditOptions{
+		TenantID:      string(tenantID),
+		UpdatedAfter:  timePtr(now),
+		UpdatedBefore: timePtr(now),
+	}); !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid proof audit time window, got %v", err)
+	}
+}
+
+func timePtr(value time.Time) *time.Time {
+	return &value
 }
 
 func TestMessageRepositoryDeleteMessageRejectsNonSenderIntegration(t *testing.T) {

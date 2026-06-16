@@ -52,6 +52,8 @@ type MessageComplianceDeleteApprovalAuditOptions struct {
 	MessageID      string
 	ApprovalID     string
 	Status         string
+	UpdatedAfter   *time.Time
+	UpdatedBefore  *time.Time
 	Limit          int
 }
 
@@ -191,6 +193,15 @@ func (r *MessageRepository) AuditComplianceDeleteApprovals(ctx context.Context, 
 	}
 	if status != "" {
 		addClause("status = $"+strconv.Itoa(len(args)+1), status)
+	}
+	if options.UpdatedAfter != nil {
+		addClause("updated_at >= $"+strconv.Itoa(len(args)+1), options.UpdatedAfter.UTC())
+	}
+	if options.UpdatedBefore != nil {
+		addClause("updated_at < $"+strconv.Itoa(len(args)+1), options.UpdatedBefore.UTC())
+	}
+	if options.UpdatedAfter != nil && options.UpdatedBefore != nil && !options.UpdatedAfter.Before(*options.UpdatedBefore) {
+		return nil, types.NewInvalidArgument("updated_after must be before updated_before")
 	}
 	args = append(args, limit)
 	rows, err := r.pool.Query(ctx, `

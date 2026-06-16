@@ -6,6 +6,8 @@
 
 2026-06-13 补充：`full + WSS/mTLS + -VerifiedAuthMetadata` 真实进程 smoke 已通过，验证 push-gateway WebSocket 入口在 `NEXUSIM_PUSH_WS_TLS_REQUIRE_CLIENT_CERT=true`、client DNS / URI SAN allowlist 下完成 `delivery.notify -> PullInbox -> delivery.ack.ok`。该 run 只验证 WebSocket 入口静态 WSS / mTLS，不代表全服务 mTLS rollout 或证书生命周期治理。
 
+2026-06-16 补充：本地 `full` 场景 stack 短基线已通过，并写出 `capacity_summary`。报告见 `loadtest-report-20260616-push-gateway-stack-capacity-baseline.md`，原始结果在 `H:\NexusIM\loadtest-results\capacity-baseline-push-gateway-stack-clean-20260616`。
+
 ## 当前验证目标
 
 第一阶段只验证在线通知链路，不做 WebSocket 容量极限：

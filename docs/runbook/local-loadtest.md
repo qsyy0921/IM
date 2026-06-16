@@ -48,6 +48,17 @@ suite runner 默认只执行主入口服务可直接支撑的 direct runner，�
 .\tools\run-loadtest-capacity-baseline-suite.ps1 -IncludeStackRunners
 ```
 
+本地 Docker 9 服务主进程由 `deploy/local/docker-compose.services.yml` 启动；后台 relay / consumer 角色不要默认常驻，可以按需叠加 worker overlay：
+
+```powershell
+docker compose `
+  -f deploy\local\docker-compose.services.yml `
+  -f deploy\local\docker-compose.service-workers.yml `
+  up -d
+```
+
+该 overlay 覆盖 message outbox relay、delivery timeline consumer / outbox relay、push delivery / identity consumer、receipt delivery consumer / outbox relay、contacts outbox relay 和 identity outbox relay。它不包含动态 webhook fixture；`loadtest/identity` 的 challenge delivery runner 仍需按 runner 参数准备 webhook 接收端和 identity challenge delivery outbox / worker 配置。
+
 需要预置业务数据的 runner 会标记为 `skipped_seed_required`。例如 message-service send runner 和 conversation-service memberchange runner 需要预置 ACTIVE conversation / member fixture；`delivery-service` 直接 runner 读取既有 `PullInbox` 状态。如果已经先用 smoke / fixture 脚本准备了对应数据，再显式追加：
 
 ```powershell

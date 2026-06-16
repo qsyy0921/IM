@@ -33,6 +33,7 @@ message CheckMessageActionRequest {
   string direct_peer_user_id = 5;
   int64 conversation_permission_version = 6;
   string message_sender_user_id = 7;
+  string message_text = 8;
 }
 
 message CheckMessageActionResponse {

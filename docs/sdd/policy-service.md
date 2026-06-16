@@ -2,7 +2,7 @@
 
 `policy-service` owns first-stage policy decisions that must not be hard-coded inside message-service. The initial implementation is intentionally small: it exposes a gRPC `CheckMessageAction` endpoint for message send / edit / revoke / delete decisions, and it returns a stable `permission_version`, `classification`, allow/deny flag and public deny reason.
 
-This service is a boundary extraction step. It is not yet a full ReBAC engine, tenant policy DSL / quota / risk engine, content moderation platform or complete contacts/conversation policy engine. The current contacts projection is consumed only for direct conversation `SEND` hard-deny when the caller supplies safe direct-peer context. The current conversation member projection is consumed only as a first-stage role gate with a permission-version fence and as a narrow `ADMIN` / `OWNER` message ownership override for mutations. The current moderation slice is limited to user-level message action restrictions such as tenant-local mute / action deny rules. A separate `MODERATOR` role, content classification, risk scoring and full product-level moderation policy remain future work.
+This service is a boundary extraction step. It is not yet a full ReBAC engine, tenant policy DSL / quota / risk engine, provider-backed content moderation platform or complete contacts/conversation policy engine. The current contacts projection is consumed only for direct conversation `SEND` hard-deny when the caller supplies safe direct-peer context. The current conversation member projection is consumed only as a first-stage role gate with a permission-version fence and as a narrow `ADMIN` / `OWNER` message ownership override for mutations. The current moderation slices are limited to user-level message action restrictions such as tenant-local mute / action deny rules, plus a first-stage configurable keyword content moderator for `SEND` / `EDIT` message text. A separate `MODERATOR` role, provider-backed classification, risk scoring and full product-level moderation policy remain future work.
 
 ## Boundary
 
@@ -56,6 +56,18 @@ tenant_id + user_id + action -> permission_version + classification + public rea
 ```
 
 It is intended for low-cardinality tenant-local controls such as temporarily preventing a user from sending messages. Expired rows are ignored by the evaluator. The table does not store message content, risk features, raw moderation provider output, prompt text or model output. Missing table during rollout is treated as no restriction, while other PostgreSQL errors fail closed as policy unavailable.
+
+The first-stage content moderation adapter is configured with:
+
+```text
+NEXUSIM_POLICY_MODERATION_MODE=keyword
+NEXUSIM_POLICY_MODERATION_DENY_TERMS=term1,term2
+NEXUSIM_POLICY_MODERATION_PERMISSION_VERSION=1
+NEXUSIM_POLICY_MODERATION_CLASSIFICATION=CONTENT_MODERATION_DENIED
+NEXUSIM_POLICY_MODERATION_DENY_REASON=content moderation policy denied
+```
+
+message-service forwards only `payload.text` for `SEND` / `EDIT`; it does not forward the whole message payload for policy classification. policy-service does not persist the text, does not write raw content into `policy_decision_audit_outbox`, and returns only stable `classification` / public reason fields. Empty text, missing text or disabled moderation mode fall through to the normal contact / user restriction / role / exact / tenant / static policy path. Keyword mode is a local first-stage provider adapter for smoke and interview demonstration; it is not an external provider integration, risk score model, prompt-based classifier or tenant policy DSL.
 
 The conversation role gate is a hard deny / freshness gate, not a complete role allow engine. `policy-service` consumes member boundary events from `conversation.timeline.events` into `policy_conversation_members_projection`. `message-service` forwards `conversation_permission_version` from the `ConversationSendContext` it already read from conversation-service. If a role gate rule exists in `policy_conversation_role_action_rules`, the caller's projected member row must exist, be at the same `permission_version`, be `ACTIVE`, and have a role rank greater than or equal to `min_role`. Missing projection, stale version or PostgreSQL lookup failure returns policy unavailable; insufficient role returns business deny with the projected `permission_version`. If the role gate passes, the request continues to exact / tenant / static decision logic.
 
@@ -286,7 +298,7 @@ This is a local debug surface plus first-stage Prometheus text and trace emissio
 - Contacts block / unblock events are consumed only for direct `SEND` when safe `direct_peer_user_id` context is supplied.
 - Conversation role policy is only an action-level role gate backed by a local projection and permission-version fence. It is not complete ReBAC and does not synchronously query conversation-service.
 - Message ownership policy supports sender mutation and first-stage `ADMIN` / `OWNER` override for edit / revoke / delete when message-service supplies sender context. It does not implement a separate `MODERATOR` role, full ReBAC, owner transfer semantics, retention policy, compliance delete or user-private delete.
-- No tenant policy DSL, tenant quota / risk policy, content classification, provider-backed moderation, risk scoring or rate limiting is implemented yet.
+- No tenant policy DSL, tenant quota / risk policy, external provider-backed moderation, risk scoring or rate limiting is implemented yet. First-stage keyword content moderation exists only as a local adapter and does not store message text.
 - Decision audit outbox rows can be relayed to `im.policy.events`, and explicit DLQ event IDs can be redriven through the repair operator after relay-equivalent validation. Broad repair workflow, poison-payload classification beyond fail-closed validation, retention policy and external sink remain future work.
 - First-stage static TLS / mTLS config exists for policy-service, the message-service policy RPC client and direct policy smoke clients, but there is no certificate issuance, rotation, dynamic service identity registry, service mesh policy, or all-service mTLS rollout yet.
 - First-stage OpenTelemetry gRPC server spans exist, but there is no shared collector deployment, fleet-wide sampling policy, dashboard or alerting rollout yet.

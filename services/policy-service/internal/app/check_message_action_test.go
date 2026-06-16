@@ -24,6 +24,88 @@ func TestCheckMessageActionUseCaseAllowsStaticDecision(t *testing.T) {
 	}
 }
 
+func TestCheckMessageActionUseCaseDeniesModeratedContentBeforeEvaluator(t *testing.T) {
+	auditor := &fakePolicyDecisionAuditor{}
+	evaluator := &countingEvaluator{
+		decision: types.MessageActionDecision{
+			TenantID:          "tenant-1",
+			UserID:            "user-1",
+			ConversationID:    "conv-1",
+			Action:            types.MessageActionSend,
+			Allowed:           true,
+			PermissionVersion: 7,
+			Classification:    "STATIC_ALLOW",
+		},
+	}
+	moderator := &fakeContentModerator{
+		handled: true,
+		decision: types.MessageActionDecision{
+			TenantID:          "tenant-1",
+			UserID:            "user-1",
+			ConversationID:    "conv-1",
+			Action:            types.MessageActionSend,
+			Allowed:           false,
+			PermissionVersion: 11,
+			Classification:    "CONTENT_MODERATION_DENIED",
+			Reason:            "content moderation policy denied",
+		},
+	}
+	useCase := NewCheckMessageActionUseCase(
+		evaluator,
+		WithMessageContentModerator(moderator),
+		WithPolicyDecisionAuditor(auditor),
+	)
+	command := testPolicyCommand(types.MessageActionSend)
+	command.MessageText = "blocked text"
+
+	result, err := useCase.Execute(context.Background(), command)
+	if err != nil {
+		t.Fatalf("check message action: %v", err)
+	}
+	if result.Allowed || result.Classification != "CONTENT_MODERATION_DENIED" || result.PermissionVersion != 11 {
+		t.Fatalf("unexpected moderation decision: %+v", result)
+	}
+	if evaluator.calls != 0 {
+		t.Fatalf("moderated content should not call evaluator, got %d", evaluator.calls)
+	}
+	if !auditor.called || auditor.decision.Classification != "CONTENT_MODERATION_DENIED" {
+		t.Fatalf("expected moderation decision audit, got %+v", auditor.decision)
+	}
+	if moderator.calls != 1 || moderator.command.MessageText != "blocked text" {
+		t.Fatalf("expected moderation command text, got calls=%d command=%+v", moderator.calls, moderator.command)
+	}
+}
+
+func TestCheckMessageActionUseCaseSkipsModerationForDelete(t *testing.T) {
+	evaluator := &countingEvaluator{
+		decision: types.MessageActionDecision{
+			TenantID:          "tenant-1",
+			UserID:            "user-1",
+			ConversationID:    "conv-1",
+			MessageID:         "msg-1",
+			Action:            types.MessageActionDelete,
+			Allowed:           true,
+			PermissionVersion: 7,
+			Classification:    "STATIC_ALLOW",
+		},
+	}
+	moderator := &fakeContentModerator{handled: true}
+	useCase := NewCheckMessageActionUseCase(evaluator, WithMessageContentModerator(moderator))
+	command := testPolicyCommand(types.MessageActionDelete)
+	command.MessageText = "ignored"
+
+	result, err := useCase.Execute(context.Background(), command)
+	if err != nil {
+		t.Fatalf("check message action: %v", err)
+	}
+	if !result.Allowed || evaluator.calls != 1 {
+		t.Fatalf("expected delete to fall through evaluator: result=%+v calls=%d", result, evaluator.calls)
+	}
+	if moderator.calls != 0 {
+		t.Fatalf("delete should not call moderator, got %d", moderator.calls)
+	}
+}
+
 func TestCheckMessageActionUseCaseDeniesStaticDecision(t *testing.T) {
 	useCase := NewCheckMessageActionUseCase(domain.StaticMessagePolicy{
 		Allowed:           false,
@@ -384,6 +466,26 @@ type fakeOwnershipOverrideChecker struct {
 	decision types.MessageActionDecision
 	allowed  bool
 	err      error
+}
+
+type fakeContentModerator struct {
+	calls    int
+	command  types.CheckMessageActionCommand
+	decision types.MessageActionDecision
+	handled  bool
+	err      error
+}
+
+func (f *fakeContentModerator) ModerateMessageContent(
+	_ context.Context,
+	command types.CheckMessageActionCommand,
+) (types.MessageActionDecision, bool, error) {
+	f.calls++
+	f.command = command
+	if f.err != nil {
+		return types.MessageActionDecision{}, false, f.err
+	}
+	return f.decision, f.handled, nil
 }
 
 func (f *fakeOwnershipOverrideChecker) DecideMessageOwnershipOverride(

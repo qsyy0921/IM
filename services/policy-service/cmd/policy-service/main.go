@@ -21,6 +21,7 @@ import (
 	"github.com/qsyy0921/IM/services/policy-service/internal/app"
 	"github.com/qsyy0921/IM/services/policy-service/internal/domain"
 	kafkainfra "github.com/qsyy0921/IM/services/policy-service/internal/infrastructure/kafka"
+	moderationinfra "github.com/qsyy0921/IM/services/policy-service/internal/infrastructure/moderation"
 	monitoringinfra "github.com/qsyy0921/IM/services/policy-service/internal/infrastructure/monitoring"
 	postgresinfra "github.com/qsyy0921/IM/services/policy-service/internal/infrastructure/postgres"
 	contacttrigger "github.com/qsyy0921/IM/services/policy-service/internal/trigger/contact"
@@ -454,6 +455,14 @@ func runGRPC() error {
 		useCaseOptions = append(useCaseOptions, app.WithMessageOwnershipOverrideChecker(postgresEvaluator))
 		log.Println("policy-service message action rule store enabled")
 		log.Println("policy-service decision audit outbox enabled")
+	}
+	moderator, moderationEnabled, err := policyContentModeratorFromEnv()
+	if err != nil {
+		return err
+	}
+	if moderationEnabled {
+		useCaseOptions = append(useCaseOptions, app.WithMessageContentModerator(moderator))
+		log.Println("policy-service message content moderation enabled")
 	}
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
 	traceConfig, err := policyTraceConfigFromEnv()
@@ -894,4 +903,25 @@ func outboxRepairCleanupConfigFromEnv() (outboxRepairCleanupConfig, error) {
 		Retention: retention,
 		BatchSize: batchSize,
 	}, nil
+}
+
+func policyContentModeratorFromEnv() (app.MessageContentModerator, bool, error) {
+	mode := strings.TrimSpace(strings.ToLower(os.Getenv("NEXUSIM_POLICY_MODERATION_MODE")))
+	switch mode {
+	case "", "disabled", "noop":
+		return nil, false, nil
+	case "keyword":
+		terms := splitCSV(os.Getenv("NEXUSIM_POLICY_MODERATION_DENY_TERMS"))
+		if len(terms) == 0 {
+			return nil, true, errors.New("NEXUSIM_POLICY_MODERATION_DENY_TERMS is required when keyword moderation is enabled")
+		}
+		return moderationinfra.NewKeywordModerator(moderationinfra.KeywordConfig{
+			DenyTerms:         terms,
+			PermissionVersion: envInt64("NEXUSIM_POLICY_MODERATION_PERMISSION_VERSION", 1),
+			Classification:    envString("NEXUSIM_POLICY_MODERATION_CLASSIFICATION", "CONTENT_MODERATION_DENIED"),
+			Reason:            envString("NEXUSIM_POLICY_MODERATION_DENY_REASON", "content moderation policy denied"),
+		}), true, nil
+	default:
+		return nil, true, errors.New("unsupported NEXUSIM_POLICY_MODERATION_MODE")
+	}
 }

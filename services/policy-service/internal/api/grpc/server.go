@@ -45,6 +45,7 @@ func (s *Server) CheckMessageAction(
 		MessageID:                     types.MessageID(request.GetMessageId()),
 		DirectPeerUserID:              types.UserID(request.GetDirectPeerUserId()),
 		MessageSenderUserID:           types.UserID(request.GetMessageSenderUserId()),
+		MessageText:                   request.GetMessageText(),
 		ConversationPermissionVersion: request.GetConversationPermissionVersion(),
 	})
 	if err != nil {

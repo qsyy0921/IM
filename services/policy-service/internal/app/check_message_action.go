@@ -22,6 +22,13 @@ type MessageOwnershipOverrideChecker interface {
 	) (types.MessageActionDecision, bool, error)
 }
 
+type MessageContentModerator interface {
+	ModerateMessageContent(
+		context.Context,
+		types.CheckMessageActionCommand,
+	) (types.MessageActionDecision, bool, error)
+}
+
 type PolicyDecisionObserver interface {
 	RecordPolicyDecisionMetric(action types.MessageAction, allowed bool, failed bool, latencyMS int64)
 }
@@ -30,6 +37,7 @@ type CheckMessageActionUseCase struct {
 	evaluator        MessagePolicyEvaluator
 	auditor          PolicyDecisionAuditor
 	ownershipChecker MessageOwnershipOverrideChecker
+	moderator        MessageContentModerator
 	observer         PolicyDecisionObserver
 }
 
@@ -52,6 +60,12 @@ func WithPolicyDecisionAuditor(auditor PolicyDecisionAuditor) CheckMessageAction
 func WithMessageOwnershipOverrideChecker(checker MessageOwnershipOverrideChecker) CheckMessageActionOption {
 	return func(useCase *CheckMessageActionUseCase) {
 		useCase.ownershipChecker = checker
+	}
+}
+
+func WithMessageContentModerator(moderator MessageContentModerator) CheckMessageActionOption {
+	return func(useCase *CheckMessageActionUseCase) {
+		useCase.moderator = moderator
 	}
 }
 
@@ -88,6 +102,17 @@ func (u CheckMessageActionUseCase) Execute(
 		}
 		return decision, nil
 	}
+	if moderationDecision, handled, err := u.messageModerationDecision(ctx, command); err != nil {
+		return types.MessageActionDecision{}, err
+	} else if handled {
+		decision = moderationDecision
+		if u.auditor != nil {
+			if err := u.auditor.RecordPolicyDecision(ctx, command, decision); err != nil {
+				return types.MessageActionDecision{}, err
+			}
+		}
+		return decision, nil
+	}
 	decision, err = u.evaluator.DecideMessageAction(ctx, command)
 	if err != nil {
 		return types.MessageActionDecision{}, err
@@ -98,6 +123,21 @@ func (u CheckMessageActionUseCase) Execute(
 		}
 	}
 	return decision, nil
+}
+
+func (u CheckMessageActionUseCase) messageModerationDecision(
+	ctx context.Context,
+	command types.CheckMessageActionCommand,
+) (types.MessageActionDecision, bool, error) {
+	if u.moderator == nil {
+		return types.MessageActionDecision{}, false, nil
+	}
+	switch command.Action {
+	case types.MessageActionSend, types.MessageActionEdit:
+	default:
+		return types.MessageActionDecision{}, false, nil
+	}
+	return u.moderator.ModerateMessageContent(ctx, command)
 }
 
 func (u CheckMessageActionUseCase) messageOwnershipDecision(

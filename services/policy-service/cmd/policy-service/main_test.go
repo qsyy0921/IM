@@ -83,6 +83,48 @@ func TestPolicyTraceConfigRejectsInvalidValues(t *testing.T) {
 	}
 }
 
+func TestPolicyContentModeratorFromEnvDisabledByDefault(t *testing.T) {
+	clearPolicyModerationConfig(t)
+	moderator, enabled, err := policyContentModeratorFromEnv()
+	if err != nil {
+		t.Fatalf("load policy moderation config: %v", err)
+	}
+	if enabled || moderator != nil {
+		t.Fatalf("expected moderation disabled by default, enabled=%t moderator=%T", enabled, moderator)
+	}
+}
+
+func TestPolicyContentModeratorFromEnvLoadsKeywordMode(t *testing.T) {
+	clearPolicyModerationConfig(t)
+	t.Setenv("NEXUSIM_POLICY_MODERATION_MODE", "keyword")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_DENY_TERMS", "spam, abuse")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_PERMISSION_VERSION", "17")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_CLASSIFICATION", "CONTENT_REVIEW")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_DENY_REASON", "content rejected")
+
+	moderator, enabled, err := policyContentModeratorFromEnv()
+	if err != nil {
+		t.Fatalf("load policy moderation config: %v", err)
+	}
+	if !enabled || moderator == nil {
+		t.Fatalf("expected moderation enabled, enabled=%t moderator=%T", enabled, moderator)
+	}
+}
+
+func TestPolicyContentModeratorFromEnvRejectsInvalidConfig(t *testing.T) {
+	clearPolicyModerationConfig(t)
+	t.Setenv("NEXUSIM_POLICY_MODERATION_MODE", "keyword")
+	if _, enabled, err := policyContentModeratorFromEnv(); err == nil || !enabled {
+		t.Fatalf("expected keyword mode without terms to fail, enabled=%t err=%v", enabled, err)
+	}
+
+	clearPolicyModerationConfig(t)
+	t.Setenv("NEXUSIM_POLICY_MODERATION_MODE", "provider")
+	if _, enabled, err := policyContentModeratorFromEnv(); err == nil || !enabled {
+		t.Fatalf("expected unsupported moderation mode to fail, enabled=%t err=%v", enabled, err)
+	}
+}
+
 func TestLoadPolicyGRPCCredentialsFromEnvRequiresCertKeyPair(t *testing.T) {
 	clearPolicyGRPCTLSConfig(t)
 	t.Setenv("NEXUSIM_POLICY_GRPC_TLS_CERT_FILE", "server.crt")
@@ -276,6 +318,15 @@ func clearPolicyTraceConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_POLICY_OTEL_TRACES_OTLP_ENDPOINT", "")
 	t.Setenv("NEXUSIM_POLICY_OTEL_TRACES_OTLP_INSECURE", "")
 	t.Setenv("NEXUSIM_POLICY_OTEL_TRACES_SAMPLING_RATIO", "")
+}
+
+func clearPolicyModerationConfig(t *testing.T) {
+	t.Helper()
+	t.Setenv("NEXUSIM_POLICY_MODERATION_MODE", "")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_DENY_TERMS", "")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_PERMISSION_VERSION", "")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_CLASSIFICATION", "")
+	t.Setenv("NEXUSIM_POLICY_MODERATION_DENY_REASON", "")
 }
 
 func writePolicyTLSTestCert(t *testing.T, dir string, name string) (string, string) {

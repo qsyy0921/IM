@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -83,19 +84,19 @@ func (c PolicyClient) CheckSendPermission(
 	command types.SendMessageCommand,
 	conversation types.ConversationSendContext,
 ) (types.PermissionDecision, error) {
-	return c.checkMessageAction(ctx, command.AuthContext, command.ConversationID, "", policyv1.MessageAction_MESSAGE_ACTION_SEND, conversation.DirectPeerUserID, "", conversation.PermissionVersion)
+	return c.checkMessageAction(ctx, command.AuthContext, command.ConversationID, "", policyv1.MessageAction_MESSAGE_ACTION_SEND, conversation.DirectPeerUserID, "", conversation.PermissionVersion, messageTextFromPayloadJSON(command.PayloadJSON))
 }
 
 func (c PolicyClient) CheckEditPermission(ctx context.Context, command types.EditMessageCommand, conversation types.ConversationSendContext, message types.MessagePolicyContext) (types.PermissionDecision, error) {
-	return c.checkMessageAction(ctx, command.AuthContext, command.ConversationID, types.MessageID(command.MessageID), policyv1.MessageAction_MESSAGE_ACTION_EDIT, "", message.SenderUserID, conversation.PermissionVersion)
+	return c.checkMessageAction(ctx, command.AuthContext, command.ConversationID, types.MessageID(command.MessageID), policyv1.MessageAction_MESSAGE_ACTION_EDIT, "", message.SenderUserID, conversation.PermissionVersion, messageTextFromPayloadJSON(command.PayloadJSON))
 }
 
 func (c PolicyClient) CheckRevokePermission(ctx context.Context, command types.RevokeMessageCommand, conversation types.ConversationSendContext, message types.MessagePolicyContext) (types.PermissionDecision, error) {
-	return c.checkMessageAction(ctx, command.AuthContext, command.ConversationID, command.MessageID, policyv1.MessageAction_MESSAGE_ACTION_REVOKE, "", message.SenderUserID, conversation.PermissionVersion)
+	return c.checkMessageAction(ctx, command.AuthContext, command.ConversationID, command.MessageID, policyv1.MessageAction_MESSAGE_ACTION_REVOKE, "", message.SenderUserID, conversation.PermissionVersion, "")
 }
 
 func (c PolicyClient) CheckDeletePermission(ctx context.Context, command types.DeleteMessageCommand, conversation types.ConversationSendContext, message types.MessagePolicyContext) (types.PermissionDecision, error) {
-	return c.checkMessageAction(ctx, command.AuthContext, command.ConversationID, command.MessageID, policyv1.MessageAction_MESSAGE_ACTION_DELETE, "", message.SenderUserID, conversation.PermissionVersion)
+	return c.checkMessageAction(ctx, command.AuthContext, command.ConversationID, command.MessageID, policyv1.MessageAction_MESSAGE_ACTION_DELETE, "", message.SenderUserID, conversation.PermissionVersion, "")
 }
 
 func (c PolicyClient) checkMessageAction(
@@ -107,6 +108,7 @@ func (c PolicyClient) checkMessageAction(
 	directPeerUserID types.UserID,
 	messageSenderUserID types.UserID,
 	conversationPermissionVersion int64,
+	messageText string,
 ) (types.PermissionDecision, error) {
 	callCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
@@ -127,6 +129,7 @@ func (c PolicyClient) checkMessageAction(
 		DirectPeerUserId:              string(directPeerUserID),
 		MessageSenderUserId:           string(messageSenderUserID),
 		ConversationPermissionVersion: conversationPermissionVersion,
+		MessageText:                   messageText,
 	})
 	if err != nil {
 		return types.PermissionDecision{}, mapPolicyError(err)
@@ -193,6 +196,21 @@ func validatePolicyResponse(
 		}
 	}
 	return nil
+}
+
+func messageTextFromPayloadJSON(payload []byte) string {
+	if len(payload) == 0 {
+		return ""
+	}
+	var values map[string]any
+	if err := json.Unmarshal(payload, &values); err != nil {
+		return ""
+	}
+	text, ok := values["text"].(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(text)
 }
 
 func mapPolicyError(err error) error {

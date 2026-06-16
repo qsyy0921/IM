@@ -37,7 +37,8 @@ func TestPolicyClientCheckSendPermission(t *testing.T) {
 		fake.request.GetConversationId() != "conv-1" ||
 		fake.request.GetAuthContext().GetDeviceId() != "device-1" ||
 		fake.request.GetDirectPeerUserId() != "user-2" ||
-		fake.request.GetConversationPermissionVersion() != 7 {
+		fake.request.GetConversationPermissionVersion() != 7 ||
+		fake.request.GetMessageText() != "hello policy" {
 		t.Fatalf("unexpected request: %+v", fake.request)
 	}
 	if fake.outgoingMetadata.Get(policyMetadataTraceID)[0] != "trace-1" ||
@@ -65,6 +66,7 @@ func TestPolicyClientCheckEditPermissionIncludesMessageID(t *testing.T) {
 		AuthContext:    testPolicyClientAuth(),
 		ConversationID: "conv-1",
 		MessageID:      "msg-1",
+		PayloadJSON:    []byte(`{"text":"edited policy"}`),
 	}, testPolicyClientConversation(), types.MessagePolicyContext{SenderUserID: "sender-1"})
 	if err != nil {
 		t.Fatalf("check edit permission: %v", err)
@@ -74,8 +76,36 @@ func TestPolicyClientCheckEditPermissionIncludesMessageID(t *testing.T) {
 	}
 	if fake.request.GetMessageId() != "msg-1" ||
 		fake.request.GetAction() != policyv1.MessageAction_MESSAGE_ACTION_EDIT ||
-		fake.request.GetMessageSenderUserId() != "sender-1" {
+		fake.request.GetMessageSenderUserId() != "sender-1" ||
+		fake.request.GetMessageText() != "edited policy" {
 		t.Fatalf("unexpected request: %+v", fake.request)
+	}
+}
+
+func TestPolicyClientDoesNotSendTextForRevoke(t *testing.T) {
+	fake := &fakePolicyServiceClient{
+		response: &policyv1.CheckMessageActionResponse{
+			TenantId:          "tenant-1",
+			UserId:            "user-1",
+			ConversationId:    "conv-1",
+			MessageId:         "msg-1",
+			Action:            policyv1.MessageAction_MESSAGE_ACTION_REVOKE,
+			Allowed:           true,
+			PermissionVersion: 7,
+			Classification:    "CONTACT",
+		},
+	}
+	client := NewPolicyClient(fake, 0)
+	_, err := client.CheckRevokePermission(context.Background(), types.RevokeMessageCommand{
+		AuthContext:    testPolicyClientAuth(),
+		ConversationID: "conv-1",
+		MessageID:      "msg-1",
+	}, testPolicyClientConversation(), types.MessagePolicyContext{SenderUserID: "sender-1"})
+	if err != nil {
+		t.Fatalf("check revoke permission: %v", err)
+	}
+	if fake.request.GetMessageText() != "" {
+		t.Fatalf("expected revoke not to send message text, got %+v", fake.request)
 	}
 }
 
@@ -152,6 +182,25 @@ func TestPolicyClientMapsTransportPermissionDeniedAsDependencyUnavailable(t *tes
 	}
 }
 
+func TestMessageTextFromPayloadJSON(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		raw  []byte
+		want string
+	}{
+		{name: "text", raw: []byte(`{"text":" hello "}`), want: "hello"},
+		{name: "non string text", raw: []byte(`{"text":123}`), want: ""},
+		{name: "malformed", raw: []byte(`{"text"`), want: ""},
+		{name: "empty", raw: nil, want: ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := messageTextFromPayloadJSON(tc.raw); got != tc.want {
+				t.Fatalf("expected %q, got %q", tc.want, got)
+			}
+		})
+	}
+}
+
 type fakePolicyServiceClient struct {
 	request          *policyv1.CheckMessageActionRequest
 	outgoingMetadata metadata.MD
@@ -176,6 +225,7 @@ func testPolicyClientSendCommand() types.SendMessageCommand {
 	return types.SendMessageCommand{
 		AuthContext:    testPolicyClientAuth(),
 		ConversationID: "conv-1",
+		PayloadJSON:    []byte(`{"text":" hello policy "}`),
 	}
 }
 

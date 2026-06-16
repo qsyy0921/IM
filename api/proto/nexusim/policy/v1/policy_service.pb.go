@@ -169,6 +169,7 @@ type CheckMessageActionRequest struct {
 	DirectPeerUserId              string                 `protobuf:"bytes,5,opt,name=direct_peer_user_id,json=directPeerUserId,proto3" json:"direct_peer_user_id,omitempty"`
 	ConversationPermissionVersion int64                  `protobuf:"varint,6,opt,name=conversation_permission_version,json=conversationPermissionVersion,proto3" json:"conversation_permission_version,omitempty"`
 	MessageSenderUserId           string                 `protobuf:"bytes,7,opt,name=message_sender_user_id,json=messageSenderUserId,proto3" json:"message_sender_user_id,omitempty"`
+	MessageText                   string                 `protobuf:"bytes,8,opt,name=message_text,json=messageText,proto3" json:"message_text,omitempty"`
 	unknownFields                 protoimpl.UnknownFields
 	sizeCache                     protoimpl.SizeCache
 }
@@ -248,6 +249,13 @@ func (x *CheckMessageActionRequest) GetConversationPermissionVersion() int64 {
 func (x *CheckMessageActionRequest) GetMessageSenderUserId() string {
 	if x != nil {
 		return x.MessageSenderUserId
+	}
+	return ""
+}
+
+func (x *CheckMessageActionRequest) GetMessageText() string {
+	if x != nil {
+		return x.MessageText
 	}
 	return ""
 }
@@ -381,7 +389,7 @@ const file_nexusim_policy_v1_policy_service_proto_rawDesc = "" +
 	"session_id\x18\x04 \x01(\tR\tsessionId\x12\x19\n" +
 	"\btrace_id\x18\x05 \x01(\tR\atraceId\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x06 \x01(\tR\trequestId\"\x8c\x03\n" +
+	"request_id\x18\x06 \x01(\tR\trequestId\"\xaf\x03\n" +
 	"\x19CheckMessageActionRequest\x12A\n" +
 	"\fauth_context\x18\x01 \x01(\v2\x1e.nexusim.policy.v1.AuthContextR\vauthContext\x12'\n" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x128\n" +
@@ -390,7 +398,8 @@ const file_nexusim_policy_v1_policy_service_proto_rawDesc = "" +
 	"message_id\x18\x04 \x01(\tR\tmessageId\x12-\n" +
 	"\x13direct_peer_user_id\x18\x05 \x01(\tR\x10directPeerUserId\x12F\n" +
 	"\x1fconversation_permission_version\x18\x06 \x01(\x03R\x1dconversationPermissionVersion\x123\n" +
-	"\x16message_sender_user_id\x18\a \x01(\tR\x13messageSenderUserId\"\x8c\x03\n" +
+	"\x16message_sender_user_id\x18\a \x01(\tR\x13messageSenderUserId\x12!\n" +
+	"\fmessage_text\x18\b \x01(\tR\vmessageText\"\x8c\x03\n" +
 	"\x1aCheckMessageActionResponse\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12'\n" +

@@ -25,6 +25,7 @@ type CheckMessageActionCommand struct {
 	MessageID                     MessageID
 	DirectPeerUserID              UserID
 	MessageSenderUserID           UserID
+	MessageText                   string
 	ConversationPermissionVersion int64
 }
 

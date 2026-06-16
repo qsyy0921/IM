@@ -29,23 +29,31 @@ type memberWindowRepairAuditOutput struct {
 }
 
 type memberWindowRepairAuditOutputRow struct {
-	ID               int64  `json:"id"`
-	TenantID         string `json:"tenant_id"`
-	ConversationID   string `json:"conversation_id"`
-	UserID           string `json:"user_id"`
-	IssueClass       string `json:"issue_class"`
-	RepairAction     string `json:"repair_action"`
-	RepairOutcome    string `json:"repair_outcome"`
-	PreviousJoinSeq  int64  `json:"previous_join_seq,omitempty"`
-	HasJoinSeq       bool   `json:"has_join_seq"`
-	PreviousLeaveSeq int64  `json:"previous_leave_seq,omitempty"`
-	HasLeaveSeq      bool   `json:"has_leave_seq"`
-	NewLeaveSeq      int64  `json:"new_leave_seq,omitempty"`
-	HasNewLeaveSeq   bool   `json:"has_new_leave_seq"`
-	OperatorID       string `json:"operator_id"`
-	Reason           string `json:"reason,omitempty"`
-	DryRun           bool   `json:"dry_run"`
-	RepairedAt       string `json:"repaired_at"`
+	ID                           int64  `json:"id"`
+	TenantID                     string `json:"tenant_id"`
+	ConversationID               string `json:"conversation_id"`
+	UserID                       string `json:"user_id"`
+	IssueClass                   string `json:"issue_class"`
+	RepairAction                 string `json:"repair_action"`
+	RepairOutcome                string `json:"repair_outcome"`
+	PreviousJoinSeq              int64  `json:"previous_join_seq,omitempty"`
+	HasJoinSeq                   bool   `json:"has_join_seq"`
+	PreviousLeaveSeq             int64  `json:"previous_leave_seq,omitempty"`
+	HasLeaveSeq                  bool   `json:"has_leave_seq"`
+	NewLeaveSeq                  int64  `json:"new_leave_seq,omitempty"`
+	HasNewLeaveSeq               bool   `json:"has_new_leave_seq"`
+	PreviousMemberVersion        int64  `json:"previous_member_version,omitempty"`
+	HasPreviousMemberVersion     bool   `json:"has_previous_member_version"`
+	NewMemberVersion             int64  `json:"new_member_version,omitempty"`
+	HasNewMemberVersion          bool   `json:"has_new_member_version"`
+	PreviousPermissionVersion    int64  `json:"previous_permission_version,omitempty"`
+	HasPreviousPermissionVersion bool   `json:"has_previous_permission_version"`
+	NewPermissionVersion         int64  `json:"new_permission_version,omitempty"`
+	HasNewPermissionVersion      bool   `json:"has_new_permission_version"`
+	OperatorID                   string `json:"operator_id"`
+	Reason                       string `json:"reason,omitempty"`
+	DryRun                       bool   `json:"dry_run"`
+	RepairedAt                   string `json:"repaired_at"`
 }
 
 func writeMemberWindowRepairOutput(path string, stats postgresinfra.MemberWindowRepairStats, options postgresinfra.MemberWindowRepairOptions) error {
@@ -90,23 +98,31 @@ func writeMemberWindowRepairAuditOutput(path string, rows []postgresinfra.Member
 	}
 	for _, row := range rows {
 		output.Rows = append(output.Rows, memberWindowRepairAuditOutputRow{
-			ID:               row.ID,
-			TenantID:         row.TenantID,
-			ConversationID:   row.ConversationID,
-			UserID:           row.UserID,
-			IssueClass:       row.IssueClass,
-			RepairAction:     row.RepairAction,
-			RepairOutcome:    row.RepairOutcome,
-			PreviousJoinSeq:  row.PreviousJoinSeq,
-			HasJoinSeq:       row.HasJoinSeq,
-			PreviousLeaveSeq: row.PreviousLeaveSeq,
-			HasLeaveSeq:      row.HasLeaveSeq,
-			NewLeaveSeq:      row.NewLeaveSeq,
-			HasNewLeaveSeq:   row.HasNewLeaveSeq,
-			OperatorID:       row.OperatorID,
-			Reason:           row.Reason,
-			DryRun:           row.DryRun,
-			RepairedAt:       formatAuditOutputTime(row.RepairedAt),
+			ID:                           row.ID,
+			TenantID:                     row.TenantID,
+			ConversationID:               row.ConversationID,
+			UserID:                       row.UserID,
+			IssueClass:                   row.IssueClass,
+			RepairAction:                 row.RepairAction,
+			RepairOutcome:                row.RepairOutcome,
+			PreviousJoinSeq:              row.PreviousJoinSeq,
+			HasJoinSeq:                   row.HasJoinSeq,
+			PreviousLeaveSeq:             row.PreviousLeaveSeq,
+			HasLeaveSeq:                  row.HasLeaveSeq,
+			NewLeaveSeq:                  row.NewLeaveSeq,
+			HasNewLeaveSeq:               row.HasNewLeaveSeq,
+			PreviousMemberVersion:        row.PreviousMemberVersion,
+			HasPreviousMemberVersion:     row.HasPreviousMemberVersion,
+			NewMemberVersion:             row.NewMemberVersion,
+			HasNewMemberVersion:          row.HasNewMemberVersion,
+			PreviousPermissionVersion:    row.PreviousPermissionVersion,
+			HasPreviousPermissionVersion: row.HasPreviousPermissionVersion,
+			NewPermissionVersion:         row.NewPermissionVersion,
+			HasNewPermissionVersion:      row.HasNewPermissionVersion,
+			OperatorID:                   row.OperatorID,
+			Reason:                       row.Reason,
+			DryRun:                       row.DryRun,
+			RepairedAt:                   formatAuditOutputTime(row.RepairedAt),
 		})
 	}
 	encoder := json.NewEncoder(file)

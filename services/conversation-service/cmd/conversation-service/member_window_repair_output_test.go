@@ -46,21 +46,25 @@ func TestWriteMemberWindowRepairAuditOutput(t *testing.T) {
 	now := time.Date(2026, 6, 16, 15, 16, 17, 18, time.FixedZone("test", 8*60*60))
 	outputPath := filepath.Join(t.TempDir(), "nested", "member-window-repair-audit.json")
 	rows := []postgresinfra.MemberWindowRepairAuditRow{{
-		ID:               7,
-		TenantID:         "tenant-repair",
-		ConversationID:   "conv-repair",
-		UserID:           "user-repair",
-		IssueClass:       "ACTIVE_WITH_LEAVE_SEQ",
-		RepairAction:     "clear_active_leave_seq",
-		RepairOutcome:    "MUTATED",
-		PreviousJoinSeq:  4,
-		HasJoinSeq:       true,
-		PreviousLeaveSeq: 9,
-		HasLeaveSeq:      true,
-		OperatorID:       "operator-1",
-		Reason:           "clear stale leave seq",
-		DryRun:           false,
-		RepairedAt:       now,
+		ID:                       7,
+		TenantID:                 "tenant-repair",
+		ConversationID:           "conv-repair",
+		UserID:                   "user-repair",
+		IssueClass:               "ACTIVE_WITH_LEAVE_SEQ",
+		RepairAction:             "clear_active_leave_seq",
+		RepairOutcome:            "MUTATED",
+		PreviousJoinSeq:          4,
+		HasJoinSeq:               true,
+		PreviousLeaveSeq:         9,
+		HasLeaveSeq:              true,
+		PreviousMemberVersion:    5,
+		HasPreviousMemberVersion: true,
+		NewMemberVersion:         12,
+		HasNewMemberVersion:      true,
+		OperatorID:               "operator-1",
+		Reason:                   "clear stale leave seq",
+		DryRun:                   false,
+		RepairedAt:               now,
 	}}
 	if err := writeMemberWindowRepairAuditOutput(outputPath, rows); err != nil {
 		t.Fatalf("writeMemberWindowRepairAuditOutput() error = %v", err)
@@ -83,6 +87,9 @@ func TestWriteMemberWindowRepairAuditOutput(t *testing.T) {
 		row.RepairOutcome != "MUTATED" ||
 		row.PreviousJoinSeq != 4 ||
 		row.PreviousLeaveSeq != 9 ||
+		row.PreviousMemberVersion != 5 ||
+		row.NewMemberVersion != 12 ||
+		!row.HasNewMemberVersion ||
 		row.HasNewLeaveSeq ||
 		row.RepairedAt == "" {
 		t.Fatalf("unexpected audit output row: %+v", row)

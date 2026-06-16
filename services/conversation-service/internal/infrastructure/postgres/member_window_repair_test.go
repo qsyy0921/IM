@@ -256,12 +256,112 @@ func TestRepositoryRepairMemberWindowsClampsLeaveBeforeJoinIntegration(t *testin
 	}
 }
 
+func TestRepositoryRepairMemberWindowsRaisesConversationVersionsIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pg pool: %v", err)
+	}
+	defer pool.Close()
+
+	ensureMemberWindowRepairAuditSchema(t, ctx, pool)
+	resetConversationTables(t, ctx, pool)
+	truncateMemberWindowRepairAudit(t, ctx, pool)
+	seedMemberWindowRepairFixtures(t, ctx, pool)
+
+	repository := NewRepository(pool)
+	memberStats, err := repository.RepairMemberWindows(ctx, MemberWindowRepairOptions{
+		TenantID:       "tenant-window-repair",
+		ConversationID: "conv-window-repair",
+		IssueClass:     MemberWindowIssueMemberVersionAhead,
+		OperatorID:     "operator-4",
+		Reason:         "raise conversation member version",
+		DryRun:         false,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("repair member version ahead: %v", err)
+	}
+	if memberStats.Requested != 1 || memberStats.Repaired != 1 || memberStats.Skipped != 0 || memberStats.DryRun {
+		t.Fatalf("unexpected member version stats: %+v", memberStats)
+	}
+	assertConversationVersions(t, ctx, pool, "tenant-window-repair", "conv-window-repair", 12, 20)
+
+	permissionStats, err := repository.RepairMemberWindows(ctx, MemberWindowRepairOptions{
+		TenantID:       "tenant-window-repair",
+		ConversationID: "conv-window-repair",
+		IssueClass:     "permission_version_ahead_conversation",
+		OperatorID:     "operator-5",
+		Reason:         "raise conversation permission version",
+		DryRun:         false,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("repair permission version ahead: %v", err)
+	}
+	if permissionStats.Requested != 1 || permissionStats.Repaired != 1 || permissionStats.Skipped != 0 || permissionStats.DryRun {
+		t.Fatalf("unexpected permission version stats: %+v", permissionStats)
+	}
+	assertConversationVersions(t, ctx, pool, "tenant-window-repair", "conv-window-repair", 12, 25)
+
+	rows, err := repository.AuditMemberWindowRepairs(ctx, MemberWindowRepairAuditOptions{
+		TenantID:       "tenant-window-repair",
+		ConversationID: "conv-window-repair",
+		IssueClass:     "member_version_ahead_conversation",
+		Outcome:        "mutated",
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit member version repair: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one member version audit row, got %d: %+v", len(rows), rows)
+	}
+	memberRow := rows[0]
+	if memberRow.UserID != "member-version-ahead-high" ||
+		memberRow.RepairAction != memberWindowRepairActionRaiseMemberVersion ||
+		!memberRow.HasPreviousMemberVersion ||
+		!memberRow.HasNewMemberVersion ||
+		memberRow.PreviousMemberVersion != 10 ||
+		memberRow.NewMemberVersion != 12 {
+		t.Fatalf("unexpected member version audit row: %+v", memberRow)
+	}
+
+	rows, err = repository.AuditMemberWindowRepairs(ctx, MemberWindowRepairAuditOptions{
+		TenantID:       "tenant-window-repair",
+		ConversationID: "conv-window-repair",
+		IssueClass:     "permission_version_ahead_conversation",
+		Outcome:        "mutated",
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit permission version repair: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one permission version audit row, got %d: %+v", len(rows), rows)
+	}
+	permissionRow := rows[0]
+	if permissionRow.UserID != "permission-version-ahead" ||
+		permissionRow.RepairAction != memberWindowRepairActionRaisePermVersion ||
+		!permissionRow.HasPreviousPermissionVersion ||
+		!permissionRow.HasNewPermissionVersion ||
+		permissionRow.PreviousPermissionVersion != 20 ||
+		permissionRow.NewPermissionVersion != 25 {
+		t.Fatalf("unexpected permission version audit row: %+v", permissionRow)
+	}
+}
+
 func ensureMemberWindowRepairAuditSchema(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	for _, filename := range []string{
 		"000005_member_window_repair_audit.sql",
 		"000006_member_window_repair_inactive_leave_seq.sql",
 		"000007_member_window_repair_leave_before_join.sql",
+		"000008_member_window_repair_version_ahead.sql",
 	} {
 		path := filepath.Clean(filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "conversation", filename))
 		ddl, err := os.ReadFile(path)
@@ -298,7 +398,10 @@ INSERT INTO conversation_members (
     ('tenant-window-repair', 'conv-window-repair', 'healthy-active', 'MEMBER', 'ACTIVE', 5, NULL, 9, 19, now() - interval '3 minutes'),
     ('tenant-window-repair', 'conv-window-repair', 'left-missing-leave', 'MEMBER', 'LEFT', 6, NULL, 9, 19, now() - interval '4 minutes'),
     ('tenant-window-repair', 'conv-window-repair', 'banned-zero-leave', 'MEMBER', 'BANNED', 7, 0, 10, 19, now() - interval '5 minutes'),
-    ('tenant-window-repair', 'conv-window-repair', 'inactive-leave-before-join', 'MEMBER', 'LEFT', 8, 7, 10, 19, now() - interval '6 minutes');
+    ('tenant-window-repair', 'conv-window-repair', 'inactive-leave-before-join', 'MEMBER', 'LEFT', 8, 7, 10, 19, now() - interval '6 minutes'),
+    ('tenant-window-repair', 'conv-window-repair', 'member-version-ahead-low', 'MEMBER', 'ACTIVE', 9, NULL, 11, 20, now() - interval '7 minutes'),
+    ('tenant-window-repair', 'conv-window-repair', 'member-version-ahead-high', 'MEMBER', 'ACTIVE', 10, NULL, 12, 20, now() - interval '8 minutes'),
+    ('tenant-window-repair', 'conv-window-repair', 'permission-version-ahead', 'MEMBER', 'ACTIVE', 11, NULL, 10, 25, now() - interval '9 minutes');
 `)
 	if err != nil {
 		t.Fatalf("seed member window repair fixtures: %v", err)
@@ -345,6 +448,23 @@ WHERE tenant_id = $1
 			t.Fatalf("leave_seq = NULL, want %d for user %s", *want, userID)
 		}
 		t.Fatalf("leave_seq = %d, want %d for user %s", *leaveSeq, *want, userID)
+	}
+}
+
+func assertConversationVersions(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID string, conversationID string, wantMemberVersion int64, wantPermissionVersion int64) {
+	t.Helper()
+	var memberVersion int64
+	var permissionVersion int64
+	if err := pool.QueryRow(ctx, `
+SELECT member_version, permission_version
+FROM conversations
+WHERE tenant_id = $1
+  AND conversation_id = $2
+`, tenantID, conversationID).Scan(&memberVersion, &permissionVersion); err != nil {
+		t.Fatalf("query conversation versions: %v", err)
+	}
+	if memberVersion != wantMemberVersion || permissionVersion != wantPermissionVersion {
+		t.Fatalf("conversation versions = member:%d permission:%d, want member:%d permission:%d", memberVersion, permissionVersion, wantMemberVersion, wantPermissionVersion)
 	}
 }
 

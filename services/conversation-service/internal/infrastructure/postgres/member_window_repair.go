@@ -16,10 +16,14 @@ const (
 	MemberWindowIssueActiveWithLeaveSeq      = "ACTIVE_WITH_LEAVE_SEQ"
 	MemberWindowIssueInactiveWithoutLeaveSeq = "INACTIVE_WITHOUT_LEAVE_SEQ"
 	MemberWindowIssueLeaveBeforeJoin         = "LEAVE_BEFORE_JOIN"
+	MemberWindowIssueMemberVersionAhead      = "MEMBER_VERSION_AHEAD_CONVERSATION"
+	MemberWindowIssuePermissionVersionAhead  = "PERMISSION_VERSION_AHEAD_CONVERSATION"
 
 	memberWindowRepairActionClearActiveLeaveSeq = "clear_active_leave_seq"
 	memberWindowRepairActionSetInactiveLeaveSeq = "set_inactive_leave_seq"
 	memberWindowRepairActionClampLeaveToJoinSeq = "clamp_leave_to_join_seq"
+	memberWindowRepairActionRaiseMemberVersion  = "raise_conversation_member_version"
+	memberWindowRepairActionRaisePermVersion    = "raise_conversation_permission_version"
 	memberWindowRepairOutcomeAudited            = "AUDITED"
 	memberWindowRepairOutcomeMutated            = "MUTATED"
 	memberWindowRepairOutcomeSkipped            = "SKIPPED"
@@ -53,32 +57,44 @@ type MemberWindowRepairAuditOptions struct {
 }
 
 type MemberWindowRepairAuditRow struct {
-	ID               int64
-	TenantID         string
-	ConversationID   string
-	UserID           string
-	IssueClass       string
-	RepairAction     string
-	RepairOutcome    string
-	PreviousJoinSeq  int64
-	HasJoinSeq       bool
-	PreviousLeaveSeq int64
-	HasLeaveSeq      bool
-	NewLeaveSeq      int64
-	HasNewLeaveSeq   bool
-	OperatorID       string
-	Reason           string
-	DryRun           bool
-	RepairedAt       time.Time
+	ID                           int64
+	TenantID                     string
+	ConversationID               string
+	UserID                       string
+	IssueClass                   string
+	RepairAction                 string
+	RepairOutcome                string
+	PreviousJoinSeq              int64
+	HasJoinSeq                   bool
+	PreviousLeaveSeq             int64
+	HasLeaveSeq                  bool
+	NewLeaveSeq                  int64
+	HasNewLeaveSeq               bool
+	PreviousMemberVersion        int64
+	HasPreviousMemberVersion     bool
+	NewMemberVersion             int64
+	HasNewMemberVersion          bool
+	PreviousPermissionVersion    int64
+	HasPreviousPermissionVersion bool
+	NewPermissionVersion         int64
+	HasNewPermissionVersion      bool
+	OperatorID                   string
+	Reason                       string
+	DryRun                       bool
+	RepairedAt                   time.Time
 }
 
 type memberWindowRepairCandidate struct {
-	TenantID         string
-	ConversationID   string
-	UserID           string
-	PreviousJoinSeq  sql.NullInt64
-	PreviousLeaveSeq sql.NullInt64
-	NewLeaveSeq      sql.NullInt64
+	TenantID                  string
+	ConversationID            string
+	UserID                    string
+	PreviousJoinSeq           sql.NullInt64
+	PreviousLeaveSeq          sql.NullInt64
+	NewLeaveSeq               sql.NullInt64
+	PreviousMemberVersion     sql.NullInt64
+	NewMemberVersion          sql.NullInt64
+	PreviousPermissionVersion sql.NullInt64
+	NewPermissionVersion      sql.NullInt64
 }
 
 func (r *Repository) RepairMemberWindows(ctx context.Context, options MemberWindowRepairOptions) (MemberWindowRepairStats, error) {
@@ -190,6 +206,10 @@ SELECT
     previous_join_seq,
     previous_leave_seq,
     new_leave_seq,
+    previous_member_version,
+    new_member_version,
+    previous_permission_version,
+    new_permission_version,
     operator_id,
     repair_reason,
     dry_run,
@@ -209,6 +229,10 @@ LIMIT $`+strconv.Itoa(len(args)), args...)
 		var previousJoinSeq sql.NullInt64
 		var previousLeaveSeq sql.NullInt64
 		var newLeaveSeq sql.NullInt64
+		var previousMemberVersion sql.NullInt64
+		var newMemberVersion sql.NullInt64
+		var previousPermissionVersion sql.NullInt64
+		var newPermissionVersion sql.NullInt64
 		if err := rows.Scan(
 			&row.ID,
 			&row.TenantID,
@@ -220,6 +244,10 @@ LIMIT $`+strconv.Itoa(len(args)), args...)
 			&previousJoinSeq,
 			&previousLeaveSeq,
 			&newLeaveSeq,
+			&previousMemberVersion,
+			&newMemberVersion,
+			&previousPermissionVersion,
+			&newPermissionVersion,
 			&row.OperatorID,
 			&row.Reason,
 			&row.DryRun,
@@ -233,6 +261,14 @@ LIMIT $`+strconv.Itoa(len(args)), args...)
 		row.HasLeaveSeq = previousLeaveSeq.Valid
 		row.NewLeaveSeq = newLeaveSeq.Int64
 		row.HasNewLeaveSeq = newLeaveSeq.Valid
+		row.PreviousMemberVersion = previousMemberVersion.Int64
+		row.HasPreviousMemberVersion = previousMemberVersion.Valid
+		row.NewMemberVersion = newMemberVersion.Int64
+		row.HasNewMemberVersion = newMemberVersion.Valid
+		row.PreviousPermissionVersion = previousPermissionVersion.Int64
+		row.HasPreviousPermissionVersion = previousPermissionVersion.Valid
+		row.NewPermissionVersion = newPermissionVersion.Int64
+		row.HasNewPermissionVersion = newPermissionVersion.Valid
 		result = append(result, row)
 	}
 	if err := rows.Err(); err != nil {
@@ -245,60 +281,106 @@ func selectMemberWindowRepairCandidates(ctx context.Context, tx pgx.Tx, options 
 	args := make([]any, 0, 4)
 	clauses := make([]string, 0, 8)
 	selectNewLeaveSeq := "NULL::BIGINT"
+	selectPreviousMemberVersion := "NULL::BIGINT"
+	selectNewMemberVersion := "NULL::BIGINT"
+	selectPreviousPermissionVersion := "NULL::BIGINT"
+	selectNewPermissionVersion := "NULL::BIGINT"
+	fromClause := "conversation_members cm"
+	distinctOn := ""
+	orderBy := "cm.updated_at DESC, cm.tenant_id, cm.conversation_id, cm.user_id"
+	lockClause := "FOR UPDATE OF cm"
 	switch issueClass {
 	case MemberWindowIssueActiveWithLeaveSeq:
 		clauses = append(clauses,
-			"status = 'ACTIVE'",
-			"join_seq IS NOT NULL",
-			"join_seq > 0",
-			"leave_seq IS NOT NULL",
-			"leave_seq >= join_seq",
+			"cm.status = 'ACTIVE'",
+			"cm.join_seq IS NOT NULL",
+			"cm.join_seq > 0",
+			"cm.leave_seq IS NOT NULL",
+			"cm.leave_seq >= cm.join_seq",
 		)
 	case MemberWindowIssueInactiveWithoutLeaveSeq:
 		clauses = append(clauses,
-			"status IN ('LEFT', 'BANNED')",
-			"join_seq IS NOT NULL",
-			"join_seq > 0",
-			"(leave_seq IS NULL OR leave_seq <= 0)",
-			"member_version > 0",
-			"member_version >= join_seq",
+			"cm.status IN ('LEFT', 'BANNED')",
+			"cm.join_seq IS NOT NULL",
+			"cm.join_seq > 0",
+			"(cm.leave_seq IS NULL OR cm.leave_seq <= 0)",
+			"cm.member_version > 0",
+			"cm.member_version >= cm.join_seq",
 		)
-		selectNewLeaveSeq = "member_version"
+		selectNewLeaveSeq = "cm.member_version"
 	case MemberWindowIssueLeaveBeforeJoin:
 		clauses = append(clauses,
-			"status IN ('LEFT', 'BANNED')",
-			"join_seq IS NOT NULL",
-			"join_seq > 0",
-			"leave_seq IS NOT NULL",
-			"leave_seq > 0",
-			"leave_seq < join_seq",
-			"member_version >= join_seq",
+			"cm.status IN ('LEFT', 'BANNED')",
+			"cm.join_seq IS NOT NULL",
+			"cm.join_seq > 0",
+			"cm.leave_seq IS NOT NULL",
+			"cm.leave_seq > 0",
+			"cm.leave_seq < cm.join_seq",
+			"cm.member_version >= cm.join_seq",
 		)
-		selectNewLeaveSeq = "join_seq"
+		selectNewLeaveSeq = "cm.join_seq"
+	case MemberWindowIssueMemberVersionAhead:
+		fromClause = `conversation_members cm
+JOIN conversations c
+  ON c.tenant_id = cm.tenant_id
+ AND c.conversation_id = cm.conversation_id`
+		clauses = append(clauses,
+			"cm.member_version > c.member_version",
+			"cm.member_version > 0",
+		)
+		selectPreviousMemberVersion = "c.member_version"
+		selectNewMemberVersion = "cm.member_version"
+		distinctOn = "DISTINCT ON (cm.tenant_id, cm.conversation_id)"
+		orderBy = "cm.tenant_id, cm.conversation_id, cm.member_version DESC, cm.updated_at DESC, cm.user_id"
+		lockClause = ""
+	case MemberWindowIssuePermissionVersionAhead:
+		fromClause = `conversation_members cm
+JOIN conversations c
+  ON c.tenant_id = cm.tenant_id
+ AND c.conversation_id = cm.conversation_id`
+		clauses = append(clauses,
+			"cm.permission_version > c.permission_version",
+			"cm.permission_version > 0",
+		)
+		selectPreviousPermissionVersion = "c.permission_version"
+		selectNewPermissionVersion = "cm.permission_version"
+		distinctOn = "DISTINCT ON (cm.tenant_id, cm.conversation_id)"
+		orderBy = "cm.tenant_id, cm.conversation_id, cm.permission_version DESC, cm.updated_at DESC, cm.user_id"
+		lockClause = ""
 	default:
 		return nil, types.NewInvalidArgument("unsupported member window repair issue class")
 	}
 	if tenantID := strings.TrimSpace(options.TenantID); tenantID != "" {
 		args = append(args, tenantID)
-		clauses = append(clauses, "tenant_id = $"+strconv.Itoa(len(args)))
+		clauses = append(clauses, "cm.tenant_id = $"+strconv.Itoa(len(args)))
 	}
 	if conversationID := strings.TrimSpace(options.ConversationID); conversationID != "" {
 		args = append(args, conversationID)
-		clauses = append(clauses, "conversation_id = $"+strconv.Itoa(len(args)))
+		clauses = append(clauses, "cm.conversation_id = $"+strconv.Itoa(len(args)))
 	}
 	if userID := strings.TrimSpace(options.UserID); userID != "" {
 		args = append(args, userID)
-		clauses = append(clauses, "user_id = $"+strconv.Itoa(len(args)))
+		clauses = append(clauses, "cm.user_id = $"+strconv.Itoa(len(args)))
 	}
 	args = append(args, limit)
 
 	rows, err := tx.Query(ctx, `
-SELECT tenant_id, conversation_id, user_id, join_seq, leave_seq, `+selectNewLeaveSeq+`
-FROM conversation_members
+SELECT `+distinctOn+`
+    cm.tenant_id,
+    cm.conversation_id,
+    cm.user_id,
+    cm.join_seq,
+    cm.leave_seq,
+    `+selectNewLeaveSeq+`,
+    `+selectPreviousMemberVersion+`,
+    `+selectNewMemberVersion+`,
+    `+selectPreviousPermissionVersion+`,
+    `+selectNewPermissionVersion+`
+FROM `+fromClause+`
 WHERE `+strings.Join(clauses, " AND ")+`
-ORDER BY updated_at DESC, tenant_id, conversation_id, user_id
+ORDER BY `+orderBy+`
 LIMIT $`+strconv.Itoa(len(args))+`
-FOR UPDATE
+`+lockClause+`
 `, args...)
 	if err != nil {
 		return nil, types.NewDBWriteFailed(err.Error())
@@ -315,6 +397,10 @@ FOR UPDATE
 			&candidate.PreviousJoinSeq,
 			&candidate.PreviousLeaveSeq,
 			&candidate.NewLeaveSeq,
+			&candidate.PreviousMemberVersion,
+			&candidate.NewMemberVersion,
+			&candidate.PreviousPermissionVersion,
+			&candidate.NewPermissionVersion,
 		); err != nil {
 			return nil, types.NewDBWriteFailed(err.Error())
 		}
@@ -334,6 +420,10 @@ func repairMemberWindowCandidate(ctx context.Context, tx pgx.Tx, issueClass stri
 		return setInactiveMemberLeaveSeq(ctx, tx, candidate)
 	case MemberWindowIssueLeaveBeforeJoin:
 		return clampInactiveMemberLeaveSeqToJoinSeq(ctx, tx, candidate)
+	case MemberWindowIssueMemberVersionAhead:
+		return raiseConversationMemberVersion(ctx, tx, candidate)
+	case MemberWindowIssuePermissionVersionAhead:
+		return raiseConversationPermissionVersion(ctx, tx, candidate)
 	default:
 		return false, types.NewInvalidArgument("unsupported member window repair issue class")
 	}
@@ -407,6 +497,42 @@ WHERE tenant_id = $1
 	return tag.RowsAffected() > 0, nil
 }
 
+func raiseConversationMemberVersion(ctx context.Context, tx pgx.Tx, candidate memberWindowRepairCandidate) (bool, error) {
+	if !candidate.NewMemberVersion.Valid || candidate.NewMemberVersion.Int64 <= 0 {
+		return false, nil
+	}
+	tag, err := tx.Exec(ctx, `
+UPDATE conversations
+SET member_version = $3,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND member_version < $3
+`, candidate.TenantID, candidate.ConversationID, candidate.NewMemberVersion.Int64)
+	if err != nil {
+		return false, types.NewDBWriteFailed(err.Error())
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+func raiseConversationPermissionVersion(ctx context.Context, tx pgx.Tx, candidate memberWindowRepairCandidate) (bool, error) {
+	if !candidate.NewPermissionVersion.Valid || candidate.NewPermissionVersion.Int64 <= 0 {
+		return false, nil
+	}
+	tag, err := tx.Exec(ctx, `
+UPDATE conversations
+SET permission_version = $3,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND permission_version < $3
+`, candidate.TenantID, candidate.ConversationID, candidate.NewPermissionVersion.Int64)
+	if err != nil {
+		return false, types.NewDBWriteFailed(err.Error())
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
 func insertMemberWindowRepairAudit(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -433,10 +559,14 @@ INSERT INTO conversation_member_window_repair_audit (
     previous_join_seq,
     previous_leave_seq,
     new_leave_seq,
+    previous_member_version,
+    new_member_version,
+    previous_permission_version,
+    new_permission_version,
     operator_id,
     repair_reason,
     dry_run
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 `,
 		candidate.TenantID,
 		candidate.ConversationID,
@@ -447,6 +577,10 @@ INSERT INTO conversation_member_window_repair_audit (
 		nullableSQLInt64(candidate.PreviousJoinSeq),
 		nullableSQLInt64(candidate.PreviousLeaveSeq),
 		newLeaveSeq,
+		nullableSQLInt64(candidate.PreviousMemberVersion),
+		nullableSQLInt64(candidate.NewMemberVersion),
+		nullableSQLInt64(candidate.PreviousPermissionVersion),
+		nullableSQLInt64(candidate.NewPermissionVersion),
 		operatorID,
 		reason,
 		dryRun,
@@ -463,7 +597,11 @@ func normalizeMemberWindowRepairIssueClass(value string) string {
 		return MemberWindowIssueActiveWithLeaveSeq
 	}
 	switch issueClass {
-	case MemberWindowIssueActiveWithLeaveSeq, MemberWindowIssueInactiveWithoutLeaveSeq, MemberWindowIssueLeaveBeforeJoin:
+	case MemberWindowIssueActiveWithLeaveSeq,
+		MemberWindowIssueInactiveWithoutLeaveSeq,
+		MemberWindowIssueLeaveBeforeJoin,
+		MemberWindowIssueMemberVersionAhead,
+		MemberWindowIssuePermissionVersionAhead:
 		return issueClass
 	default:
 		return ""
@@ -476,6 +614,10 @@ func memberWindowRepairActionForIssueClass(issueClass string) string {
 		return memberWindowRepairActionSetInactiveLeaveSeq
 	case MemberWindowIssueLeaveBeforeJoin:
 		return memberWindowRepairActionClampLeaveToJoinSeq
+	case MemberWindowIssueMemberVersionAhead:
+		return memberWindowRepairActionRaiseMemberVersion
+	case MemberWindowIssuePermissionVersionAhead:
+		return memberWindowRepairActionRaisePermVersion
 	default:
 		return memberWindowRepairActionClearActiveLeaveSeq
 	}

@@ -94,15 +94,100 @@ func TestRepositoryRepairMemberWindowsClearsActiveLeaveSeqIntegration(t *testing
 	}
 }
 
+func TestRepositoryRepairMemberWindowsSetsInactiveLeaveSeqIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pg pool: %v", err)
+	}
+	defer pool.Close()
+
+	ensureMemberWindowRepairAuditSchema(t, ctx, pool)
+	resetConversationTables(t, ctx, pool)
+	truncateMemberWindowRepairAudit(t, ctx, pool)
+	seedMemberWindowRepairFixtures(t, ctx, pool)
+
+	repository := NewRepository(pool)
+	dryRunStats, err := repository.RepairMemberWindows(ctx, MemberWindowRepairOptions{
+		TenantID:       "tenant-window-repair",
+		ConversationID: "conv-window-repair",
+		IssueClass:     MemberWindowIssueInactiveWithoutLeaveSeq,
+		OperatorID:     "operator-2",
+		Reason:         "dry run inactive missing leave_seq",
+		DryRun:         true,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("dry-run inactive repair member windows: %v", err)
+	}
+	if dryRunStats.Requested != 2 || dryRunStats.Repaired != 0 || dryRunStats.Skipped != 2 || !dryRunStats.DryRun {
+		t.Fatalf("unexpected inactive dry-run stats: %+v", dryRunStats)
+	}
+	assertMemberLeaveSeqValue(t, ctx, pool, "tenant-window-repair", "conv-window-repair", "left-missing-leave", nil)
+
+	mutateStats, err := repository.RepairMemberWindows(ctx, MemberWindowRepairOptions{
+		TenantID:       "tenant-window-repair",
+		ConversationID: "conv-window-repair",
+		IssueClass:     "inactive_without_leave_seq",
+		OperatorID:     "operator-2",
+		Reason:         "set inactive leave_seq",
+		DryRun:         false,
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("mutating inactive repair member windows: %v", err)
+	}
+	if mutateStats.Requested != 2 || mutateStats.Repaired != 2 || mutateStats.Skipped != 0 || mutateStats.DryRun {
+		t.Fatalf("unexpected inactive mutate stats: %+v", mutateStats)
+	}
+	assertMemberLeaveSeqValue(t, ctx, pool, "tenant-window-repair", "conv-window-repair", "left-missing-leave", ptrInt64(9))
+	assertMemberLeaveSeqValue(t, ctx, pool, "tenant-window-repair", "conv-window-repair", "banned-zero-leave", ptrInt64(10))
+	assertMemberLeaveSeqValue(t, ctx, pool, "tenant-window-repair", "conv-window-repair", "leave-before-join", ptrInt64(7))
+
+	rows, err := repository.AuditMemberWindowRepairs(ctx, MemberWindowRepairAuditOptions{
+		TenantID:       "tenant-window-repair",
+		ConversationID: "conv-window-repair",
+		IssueClass:     "inactive_without_leave_seq",
+		Outcome:        "mutated",
+		Limit:          10,
+	})
+	if err != nil {
+		t.Fatalf("audit inactive member window repairs: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected two inactive mutated audit rows, got %d: %+v", len(rows), rows)
+	}
+	for _, row := range rows {
+		if row.RepairAction != memberWindowRepairActionSetInactiveLeaveSeq ||
+			row.RepairOutcome != memberWindowRepairOutcomeMutated ||
+			row.OperatorID != "operator-2" ||
+			row.Reason != "set inactive leave_seq" ||
+			row.DryRun ||
+			!row.HasJoinSeq ||
+			!row.HasNewLeaveSeq {
+			t.Fatalf("unexpected inactive mutated audit row: %+v", row)
+		}
+	}
+}
+
 func ensureMemberWindowRepairAuditSchema(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	path := filepath.Clean(filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "conversation", "000005_member_window_repair_audit.sql"))
-	ddl, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read member window repair migration: %v", err)
-	}
-	if _, err := pool.Exec(ctx, string(ddl)); err != nil {
-		t.Fatalf("apply member window repair migration: %v", err)
+	for _, filename := range []string{
+		"000005_member_window_repair_audit.sql",
+		"000006_member_window_repair_inactive_leave_seq.sql",
+	} {
+		path := filepath.Clean(filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "conversation", filename))
+		ddl, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read member window repair migration %s: %v", filename, err)
+		}
+		if _, err := pool.Exec(ctx, string(ddl)); err != nil {
+			t.Fatalf("apply member window repair migration %s: %v", filename, err)
+		}
 	}
 }
 
@@ -127,7 +212,9 @@ INSERT INTO conversation_members (
 ) VALUES
     ('tenant-window-repair', 'conv-window-repair', 'stale-active', 'MEMBER', 'ACTIVE', 4, 9, 9, 19, now() - interval '1 minute'),
     ('tenant-window-repair', 'conv-window-repair', 'leave-before-join', 'MEMBER', 'ACTIVE', 8, 7, 9, 19, now() - interval '2 minutes'),
-    ('tenant-window-repair', 'conv-window-repair', 'healthy-active', 'MEMBER', 'ACTIVE', 5, NULL, 9, 19, now() - interval '3 minutes');
+    ('tenant-window-repair', 'conv-window-repair', 'healthy-active', 'MEMBER', 'ACTIVE', 5, NULL, 9, 19, now() - interval '3 minutes'),
+    ('tenant-window-repair', 'conv-window-repair', 'left-missing-leave', 'MEMBER', 'LEFT', 6, NULL, 9, 19, now() - interval '4 minutes'),
+    ('tenant-window-repair', 'conv-window-repair', 'banned-zero-leave', 'MEMBER', 'BANNED', 7, 0, 10, 19, now() - interval '5 minutes');
 `)
 	if err != nil {
 		t.Fatalf("seed member window repair fixtures: %v", err)
@@ -149,4 +236,34 @@ WHERE tenant_id = $1
 	if (leaveSeq != nil) != wantValid {
 		t.Fatalf("leave_seq valid = %t, want %t for user %s", leaveSeq != nil, wantValid, userID)
 	}
+}
+
+func assertMemberLeaveSeqValue(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID string, conversationID string, userID string, want *int64) {
+	t.Helper()
+	var leaveSeq *int64
+	if err := pool.QueryRow(ctx, `
+SELECT leave_seq
+FROM conversation_members
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND user_id = $3
+`, tenantID, conversationID, userID).Scan(&leaveSeq); err != nil {
+		t.Fatalf("query member leave_seq: %v", err)
+	}
+	if want == nil {
+		if leaveSeq != nil {
+			t.Fatalf("leave_seq = %d, want NULL for user %s", *leaveSeq, userID)
+		}
+		return
+	}
+	if leaveSeq == nil || *leaveSeq != *want {
+		if leaveSeq == nil {
+			t.Fatalf("leave_seq = NULL, want %d for user %s", *want, userID)
+		}
+		t.Fatalf("leave_seq = %d, want %d for user %s", *leaveSeq, *want, userID)
+	}
+}
+
+func ptrInt64(value int64) *int64 {
+	return &value
 }

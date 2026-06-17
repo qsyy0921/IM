@@ -132,11 +132,19 @@ foreach ($writerScript in $writerScripts) {
             "Get-Sha256Hex",
             "Assert-LowSensitiveActor",
             "Assert-LowSensitiveRepairIdentifier",
+            "Assert-ExternalRepairOutputPath",
+            "Test-RepairPathInsideDirectory",
             "Assert-LowSensitiveAdHocEnv"
         )) {
         if ($writerText -match "function\s+$duplicateFunction\b") {
             throw "$writerScript must not duplicate safety helper function: $duplicateFunction"
         }
+    }
+
+    if ($writerText -match "\[string\]\`$(OutputPath|PlanOutputPath)" -and
+        $writerText -match "Set-Content\s+-LiteralPath\s+\`$(OutputPath|PlanOutputPath)" -and
+        $writerText -notmatch "Assert-ExternalRepairOutputPath") {
+        throw "$writerScript writes repair/operator artifacts but does not guard OutputPath with Assert-ExternalRepairOutputPath."
     }
 }
 

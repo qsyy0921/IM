@@ -89,7 +89,7 @@
       "category": "operator-safety",
       "script": "tools/check-repair-operator-safety.ps1",
       "check_local_label": "repair operator safety helper",
-      "note": "Repair handoff writers must reuse shared low-sensitive actor, ad-hoc env, and hash guardrails."
+      "note": "Repair handoff writers must reuse shared low-sensitive actor, identifier, output-path, ad-hoc env, and hash guardrails."
     },
     {
       "name": "repair operator plan writer",

@@ -149,6 +149,9 @@ try {
     Write-Host "== observability evidence =="
     Invoke-LocalCheck "check-observability-evidence.ps1"
 
+    Write-Host "== local observability image preflight =="
+    Invoke-LocalCheck "check-local-observability-images.ps1"
+
     Write-Host "== local prometheus config =="
     Invoke-LocalCheck "check-local-prometheus-config.ps1"
 

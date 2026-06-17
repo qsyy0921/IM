@@ -69,6 +69,20 @@ Prometheus 容器通过 `host.docker.internal:19093` 连接本地 Alertmanager�
 .\tools\local-up-alertmanager.ps1 -AllowImagePull
 ```
 
+启动本地观测栈或运行 smoke 前，可以先做不会启动容器、不会拉镜像的本地镜像预检：
+
+```powershell
+.\tools\check-local-observability-images.ps1
+```
+
+该预检会检查 Prometheus、Grafana、Alertmanager 的当前配置镜像是否已在本机存在；默认只报告 `present` / `missing` 并返回成功，方便纳入 `check-local`。如果某次 smoke 必须依赖这些镜像，可加严格门禁：
+
+```powershell
+.\tools\check-local-observability-images.ps1 -RequireImages
+```
+
+镜像缺失时不要默认拉取；只有确认网络和流量允许后，再显式使用对应 `-AllowImagePull` 参数。
+
 停止：
 
 ```powershell
@@ -294,6 +308,14 @@ summary 会记录 Prometheus rule group 数、Grafana 9 个服务 dashboard UID 
 ```powershell
 .\tools\run-local-observability-smoke.ps1 -AllowImagePull
 ```
+
+建议在运行本地 smoke 前先执行：
+
+```powershell
+.\tools\check-local-observability-images.ps1 -RequireImages
+```
+
+如果预检提示 `missing`，先准备本机镜像，或在确认可以消耗网络流量时再使用 `-AllowImagePull`。
 
 该 smoke 只证明本地观测配置可被真实进程加载，不证明生产 Alertmanager、SLO、retention、权限、统一日志或容量基线已完成。
 

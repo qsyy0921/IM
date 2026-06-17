@@ -2,13 +2,10 @@
 
 ## 当前状态
 
-- 已有 WebSocket notify、`delivery.hide` 在线隐藏提示、ACK 转发、slow session close、resume buffer、Redis route、cross-instance smoke。
-- 只做在线唤醒，不拥有 durable inbox。
-- 历史缺口通过 delivery-service `PullInbox` 兜底。
-- 已补 `/healthz`、`/readyz`、`/debug/metrics`、Prometheus text `/metrics`、本地 alert rules / Grafana dashboard 原型，可观察低敏 session / resume、Redis route / subscriber、consumer worker、auth JWK 和 OTel trace config 聚合；默认 scrape target 为 `host.docker.internal:11913`，这是本地开发 / 面试演示观测，不是生产 SLO。
-- 已补 first-stage OpenTelemetry WebSocket connection span，默认关闭；启用后可输出 stdout 或 OTLP gRPC trace，span 只记录低敏连接形态字段，不记录 tenant / user / device / session id。
+- 已有 WebSocket notify、`delivery.hide` 在线隐藏提示、ACK 转发、slow session close、resume buffer、Redis route、cross-instance smoke；只做在线唤醒，不拥有 durable inbox，历史缺口通过 delivery-service `PullInbox` 兜底。
+- 已补 `/healthz`、`/readyz`、`/debug/metrics`、Prometheus text `/metrics`、本地 alert rules / Grafana dashboard 原型，可观察低敏 session / resume、Redis route / subscriber、consumer worker、auth JWK 和 OTel trace config 聚合；默认 scrape target 为 `host.docker.internal:11913`，这是本地开发 / 面试演示观测，不是生产 SLO。first-stage OpenTelemetry WebSocket connection span 默认关闭，启用后只记录低敏连接形态字段。
 - 当 `NEXUSIM_PUSH_AUTH_MODE=mock` 时，WebSocket 监听地址仅允许 loopback / RFC1918 私网；公网监听地址会在启动前直接失败，避免把本地 smoke 身份模式暴露到公网。
-- 当 `NEXUSIM_PUSH_AUTH_MODE=hmac|jwt` 且 WebSocket 监听地址是公网地址时，若未启用入口 TLS / WSS，进程也会在启动前直接失败，避免把签名 token 暴露到 plaintext 公网入口。
+- 当 `NEXUSIM_PUSH_AUTH_MODE=hmac|jwt` 且 WebSocket 监听地址是公网地址时，若未启用入口 TLS / WSS，进程也会在启动前直接失败；WebSocket TLS / mTLS 配置已有 TLS 1.2 minimum、client certificate identity allowlist positive path 和 unlisted identity rejection 单测，`check-local` 通过 `tools/check-grpc-tls-config-guards.ps1` 强制保留这些本地门禁。
 - 转发 `AckDelivery` 到 delivery-service 时，只传播低敏 `trace_id/request_id`；不符合白名单的 correlation metadata 会在 RPC adapter 出口丢弃。
 - `delivery-consumer` 和 `identity-consumer` 仅对运行时错误做退避重试；`invalid frame` / `unsupported event` 仍保持 fail-closed，并在 worker 模式通过 `/debug/metrics` 暴露 consumer retry 快照。
 - Redis route subscriber 对非取消运行时错误已改为退避重试，并在 `/debug/metrics` 暴露低敏 retry 快照；malformed / incomplete payload 只记聚合计数，不会入队或打死 subscriber。
@@ -21,8 +18,7 @@
 - 本地 Kafka KRaft repeated ISR flapping smoke 已覆盖 2 轮 broker stop/start：降级阶段 replicated probe topic 稳定到 `ISR=2` 且 `acks=all` probe 可写，恢复阶段回到 `ISR=3` 且 probe 继续可写；这是本地 flapping 观察，不代表生产 Kafka HA、长时间容量曲线或 exactly-once producer 语义。
 - 本地 `kafka-go` producer in-flight broker-fault observation 已覆盖 broker stop/restore 窗口内 120 条 records：producer ack 120，consumer unique 120，missing ack 0，observed duplicate 0；这是本地观察，不代表 exactly-once producer 语义。
 - Resume buffer 重放已有回归测试固定 all-or-buffer-miss：新连接队列无法容纳全部待重放 notify 时，不做部分 replay，直接提示客户端用本地 cursor + `PullInbox` 校准。
-- `loadtest/pushgateway/run-local-smoke.ps1` 的通用 helper 已拆到同目录 `run-local-smoke.helpers.ps1`，Redis fault setup / Sentinel / Cluster fault script 生成已拆到 `run-local-smoke.redis-faults.ps1`，主 runner 入口保持在约 520 行。
-- `loadtest/pushgateway` Go runner 已按 config / model / auth / scenario / util 同 package 拆分，避免后续 Redis route、slow-client、resume 和容量 smoke 继续堆进单个 `main.go`。
+- `loadtest/pushgateway/run-local-smoke.ps1` 通用 helper、Redis fault helper 和 Go runner config / model / auth / scenario / util 已按同目录 / 同 package 拆分，避免后续 Redis route、slow-client、resume 和容量 smoke 继续堆进单个大文件。
 - `loadtest/pushgateway` summary 已新增 `capacity_summary` 派生字段，统一输出 duration、device/message/notify/ack/pull 计数和每秒速率；本地 push-gateway stack 短基线已跑通 `full` 场景，clean summary 记录 `git_dirty=false`、1 个 device、1 条 message、1 个 notify、1 个 ACK、PullInbox 1 条、delivery_outbox published 2 条。
 - `loadtest/pushgateway` 已新增并跑通 `redis-resume-negative` 真实进程 smoke，用于验证未知 resume token 被服务端替换并返回 `buffer_miss`、跨 device resume token 返回非重试 `PERMISSION_DENIED`、Redis resume buffer gap 返回 `buffer_miss` 后通过 `PullInbox + AckDelivery` 兜底；报告见 `docs/runbook/loadtest/push-gateway/loadtest-report-20260616-push-gateway-redis-resume-negative-smoke.md`。
 - 本地 smoke 已覆盖 Redis stop/start、Sentinel discovery、手动 failover、master-stop、quorum-loss fallback、network-partition fallback、三节点 Redis Cluster topology、Redis Cluster node-stop fallback 和六节点 Redis Cluster 自动 failover；network-partition 场景会断开 Sentinel 当前 master 的 Docker network，Cluster node-stop 场景会停止 route key slot owner node，Cluster failover 场景会停止 route key slot owner master 并等待 replica 提升。Redis Sentinel / Cluster smoke summary 已有离线 validator。生产级 Redis HA / 容量仍未完成。

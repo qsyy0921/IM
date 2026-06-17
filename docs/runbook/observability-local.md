@@ -301,7 +301,7 @@ summary 会记录 Prometheus rule group 数、Grafana 9 个服务 dashboard UID 
   -Note "Target Prometheus/Grafana dashboard smoke; not production SLO evidence."
 ```
 
-证据索引位于 `docs/runbook/observability-evidence.json`。该索引只保存低敏路径和边界说明，不复制指标内容；可用 `tools/validate-observability-evidence.ps1 -RequireFiles` 复核 H 盘 summary / report 是否仍存在并符合 schema。当前索引只收录已有 policy-service debug metrics smoke；真实目标环境 9 服务 dashboard smoke 仍需要另跑并归档。
+证据索引位于 `docs/runbook/observability-evidence.json`。该索引只保存低敏路径和边界说明，不复制指标内容；可用 `tools/validate-observability-evidence.ps1 -RequireFiles` 复核 H 盘 summary / report 是否仍存在并符合 schema。当前索引收录已有 policy-service debug metrics smoke 和本地观测镜像准备 dry-run 计划（`observability-image-prepare-plan`）；真实目标环境 9 服务 dashboard smoke 仍需要另跑并归档。
 
 如果本机尚未准备 Prometheus / Grafana 镜像，脚本默认失败而不会拉取镜像。确实需要允许拉取时显式使用：
 

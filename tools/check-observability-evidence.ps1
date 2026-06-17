@@ -62,6 +62,25 @@ if ($schemaOnlyResult.ExitCode -ne 0) {
     exit 1
 }
 
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$repoManifestObject = Get-Content -LiteralPath $repoManifest -Raw | ConvertFrom-Json
+$hasImagePrepareEvidence = @($repoManifestObject.entries | Where-Object { $_.kind -eq "observability-image-prepare-plan" }).Count -gt 0
+if ($hasImagePrepareEvidence) {
+    $progressDoc = Join-Path $repoRoot "docs\runbook\development-progress.md"
+    $localDoc = Join-Path $repoRoot "docs\runbook\observability-local.md"
+    foreach ($doc in @($progressDoc, $localDoc)) {
+        if (-not (Test-Path -LiteralPath $doc -PathType Leaf)) {
+            Write-Host "FAIL missing observability progress document: $doc" -ForegroundColor Red
+            exit 1
+        }
+        $content = Get-Content -LiteralPath $doc -Raw
+        if (-not $content.Contains("observability-image-prepare-plan")) {
+            Write-Host "FAIL observability evidence wording should mention observability-image-prepare-plan in $doc." -ForegroundColor Red
+            exit 1
+        }
+    }
+}
+
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("nexusim-observability-evidence-" + [System.Guid]::NewGuid().ToString("N"))
 try {
     New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null

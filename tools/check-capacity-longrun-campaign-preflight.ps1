@@ -59,6 +59,7 @@ try {
     $planPath = Join-Path $tempRoot "$campaign\capacity-longrun-campaign-plan.json"
     $skipResult = Invoke-Tool -Path $preflight -Arguments @(
         "-PlanPath", $planPath,
+        "-Services", "policy-service",
         "-SkipNetworkChecks",
         "-PGDSN", "postgres://fixture:fixture@127.0.0.1:5432/fixture?sslmode=disable",
         "-KafkaBrokers", "127.0.0.1:9092"
@@ -74,7 +75,7 @@ try {
         exit 1
     }
     $summary = Get-Content -LiteralPath $preflightPath -Raw | ConvertFrom-Json
-    if ($summary.status -ne "passed" -or $summary.skip_network_checks -ne $true -or $summary.endpoint_count -lt 3) {
+    if ($summary.status -ne "passed" -or $summary.skip_network_checks -ne $true -or $summary.endpoint_count -ne 1) {
         Write-Host "FAIL capacity long-run preflight summary has wrong skip-network fields." -ForegroundColor Red
         exit 1
     }
@@ -129,6 +130,7 @@ try {
     try {
         $badPlanResult = Invoke-Tool -Path $preflight -Arguments @(
             "-PlanPath", $repoCopyPath,
+            "-Services", "policy-service",
             "-SkipNetworkChecks"
         )
         if ($badPlanResult.ExitCode -eq 0 -or -not $badPlanResult.Output.Contains("PlanPath must stay under plan output_root")) {

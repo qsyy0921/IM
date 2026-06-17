@@ -426,6 +426,10 @@ function Build-Step {
             $runnerArgsList.Add($PolicyTarget)
             $runnerArgsList.Add("--result-dir")
             $runnerArgsList.Add($resultDir)
+            $runnerArgsList.Add("--vus")
+            $runnerArgsList.Add([string]$VUs)
+            $runnerArgsList.Add("--duration")
+            $runnerArgsList.Add($Duration)
             $step = New-Step -Service $Service -Runner "policy" -RunnerArgs @($runnerArgsList.ToArray())
         }
         default {

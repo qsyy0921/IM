@@ -53,6 +53,35 @@ func TestBuildCapacitySummaryRequiresPositiveDuration(t *testing.T) {
 	}
 }
 
+func TestBuildCapacitySummaryUsesAggregatedCounts(t *testing.T) {
+	started := time.Date(2026, 6, 16, 10, 0, 0, 0, time.UTC)
+	s := summary{
+		StartedAt:              started,
+		FinishedAt:             started.Add(10 * time.Second),
+		ExpectedAllowed:        true,
+		ExpectedPermissionVer:  3,
+		ExpectedClassification: "INTERNAL",
+		Actions: []actionSummary{
+			{Action: "SEND", Allowed: true, LatencyMS: 100},
+		},
+		ActionCount:        200,
+		AllowedActionCount: 150,
+		DeniedActionCount:  50,
+		latencySamplesMS:   []float64{1, 2, 3, 4, 5},
+	}
+
+	capacity := buildCapacitySummary(s)
+	if capacity == nil {
+		t.Fatal("expected capacity summary")
+	}
+	if capacity.ActionCount != 200 || capacity.AllowedActionCount != 150 || capacity.DeniedActionCount != 50 {
+		t.Fatalf("capacity did not use aggregated counts: %+v", capacity)
+	}
+	assertFloatNear(t, capacity.DecisionsPerSecond, 20)
+	assertFloatNear(t, capacity.LatencyP95MS, 5)
+	assertFloatNear(t, capacity.LatencyP99MS, 5)
+}
+
 func assertFloatNear(t *testing.T, got float64, want float64) {
 	t.Helper()
 	if math.Abs(got-want) > 0.000001 {

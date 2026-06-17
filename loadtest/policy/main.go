@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	policyv1 "github.com/qsyy0921/IM/api/proto/nexusim/policy/v1"
@@ -23,6 +24,8 @@ type config struct {
 	policyTLS              grpctls.Config
 	resultDir              string
 	requestTimeout         time.Duration
+	duration               time.Duration
+	vus                    int
 	tenantID               string
 	userID                 string
 	deviceID               string
@@ -46,6 +49,8 @@ type summary struct {
 	TenantID               string             `json:"tenant_id"`
 	UserID                 string             `json:"user_id"`
 	ConversationID         string             `json:"conversation_id"`
+	RequestedDurationSec   float64            `json:"requested_duration_seconds,omitempty"`
+	VUs                    int                `json:"vus,omitempty"`
 	StartedAt              time.Time          `json:"started_at"`
 	FinishedAt             time.Time          `json:"finished_at"`
 	Success                bool               `json:"success"`
@@ -56,7 +61,12 @@ type summary struct {
 	ExpectedReason         string             `json:"expected_reason,omitempty"`
 	Actions                []actionSummary    `json:"actions"`
 	LatenciesMS            map[string]float64 `json:"latencies_ms"`
+	ActionCount            int                `json:"action_count"`
+	AllowedActionCount     int                `json:"allowed_action_count"`
+	DeniedActionCount      int                `json:"denied_action_count"`
 	Capacity               *capacitySummary   `json:"capacity_summary,omitempty"`
+
+	latencySamplesMS []float64
 }
 
 type actionSummary struct {
@@ -99,6 +109,8 @@ func parseConfig() config {
 	flag.StringVar(&cfg.policyTLS.ClientKeyFile, "policy-tls-client-key-file", "", "client private key PEM for policy-service mTLS")
 	flag.StringVar(&cfg.resultDir, "result-dir", "H:\\NexusIM\\loadtest-results\\policy-smoke", "result directory")
 	flag.DurationVar(&cfg.requestTimeout, "request-timeout", 5*time.Second, "per-request timeout")
+	flag.DurationVar(&cfg.duration, "duration", 0, "capacity run duration; zero runs one action set")
+	flag.IntVar(&cfg.vus, "vus", 1, "virtual users for duration mode")
 	flag.StringVar(&cfg.tenantID, "tenant-id", "tenant-policy-smoke", "tenant id")
 	flag.StringVar(&cfg.userID, "user-id", "policy-user", "user id")
 	flag.StringVar(&cfg.deviceID, "device-id", "policy-device-1", "device id")
@@ -112,6 +124,12 @@ func parseConfig() config {
 	flag.Parse()
 	if cfg.requestTimeout <= 0 {
 		cfg.requestTimeout = 5 * time.Second
+	}
+	if cfg.duration < 0 {
+		cfg.duration = 0
+	}
+	if cfg.vus <= 0 {
+		cfg.vus = 1
 	}
 	return cfg
 }
@@ -131,6 +149,8 @@ func run(cfg config) error {
 		TenantID:               cfg.tenantID,
 		UserID:                 cfg.userID,
 		ConversationID:         cfg.conversationID,
+		RequestedDurationSec:   cfg.duration.Seconds(),
+		VUs:                    cfg.vus,
 		StartedAt:              started,
 		ExpectedAllowed:        cfg.expectedAllowed,
 		ExpectedPermissionVer:  cfg.expectedPermissionVer,
@@ -158,40 +178,138 @@ func run(cfg config) error {
 	defer conn.Close()
 	client := policyv1.NewPolicyServiceClient(conn)
 
-	actions := []struct {
-		name      string
-		proto     policyv1.MessageAction
-		messageID string
-	}{
+	if cfg.duration > 0 {
+		if err := runCapacityMode(cfg, client, &s); err != nil {
+			s.Error = err.Error()
+			return err
+		}
+	} else {
+		if err := runOnce(cfg, client, &s); err != nil {
+			s.Error = err.Error()
+			return err
+		}
+	}
+	s.Success = true
+	return nil
+}
+
+type policyAction struct {
+	name      string
+	proto     policyv1.MessageAction
+	messageID string
+}
+
+func policyActions(cfg config) []policyAction {
+	return []policyAction{
 		{name: "SEND", proto: policyv1.MessageAction_MESSAGE_ACTION_SEND},
 		{name: "EDIT", proto: policyv1.MessageAction_MESSAGE_ACTION_EDIT, messageID: cfg.messageID},
 		{name: "REVOKE", proto: policyv1.MessageAction_MESSAGE_ACTION_REVOKE, messageID: cfg.messageID},
 		{name: "DELETE", proto: policyv1.MessageAction_MESSAGE_ACTION_DELETE, messageID: cfg.messageID},
 	}
-	for _, action := range actions {
-		result, err := callPolicy(cfg, client, action.name, action.proto, action.messageID)
+}
+
+func runOnce(cfg config, client policyv1.PolicyServiceClient, s *summary) error {
+	for _, action := range policyActions(cfg) {
+		actionResult, err := executeAction(context.Background(), cfg, client, action, strings.ToLower(action.name))
 		if err != nil {
-			s.Error = err.Error()
 			return err
 		}
-		if err := validateAction(cfg, action.name, action.proto, action.messageID, result.response); err != nil {
-			s.Error = err.Error()
-			return err
-		}
-		actionResult := actionSummary{
-			Action:            action.name,
-			MessageID:         action.messageID,
-			Allowed:           result.response.GetAllowed(),
-			PermissionVersion: result.response.GetPermissionVersion(),
-			Classification:    result.response.GetClassification(),
-			Reason:            result.response.GetReason(),
-			LatencyMS:         result.latencyMS,
-		}
-		s.Actions = append(s.Actions, actionResult)
-		s.LatenciesMS[strings.ToLower(action.name)] = result.latencyMS
+		recordAction(s, actionResult)
 	}
-	s.Success = true
 	return nil
+}
+
+func runCapacityMode(cfg config, client policyv1.PolicyServiceClient, s *summary) error {
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.duration)
+	defer cancel()
+
+	var mu sync.Mutex
+	var firstErr error
+	var wg sync.WaitGroup
+	for workerID := 0; workerID < cfg.vus; workerID++ {
+		workerID := workerID
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			iteration := 0
+			for {
+				if ctx.Err() != nil {
+					return
+				}
+				for _, action := range policyActions(cfg) {
+					if ctx.Err() != nil {
+						return
+					}
+					requestSuffix := fmt.Sprintf("vu-%d-%d-%s", workerID, iteration, strings.ToLower(action.name))
+					actionResult, err := executeAction(ctx, cfg, client, action, requestSuffix)
+					if err != nil {
+						if ctx.Err() != nil {
+							return
+						}
+						mu.Lock()
+						if firstErr == nil {
+							firstErr = err
+							cancel()
+						}
+						mu.Unlock()
+						return
+					}
+					mu.Lock()
+					recordAction(s, actionResult)
+					mu.Unlock()
+				}
+				iteration++
+			}
+		}()
+	}
+	wg.Wait()
+	if firstErr != nil {
+		return firstErr
+	}
+	if s.ActionCount == 0 {
+		return fmt.Errorf("policy capacity run produced no actions")
+	}
+	return nil
+}
+
+func executeAction(
+	ctx context.Context,
+	cfg config,
+	client policyv1.PolicyServiceClient,
+	action policyAction,
+	requestSuffix string,
+) (actionSummary, error) {
+	result, err := callPolicy(ctx, cfg, client, action.name, action.proto, action.messageID, requestSuffix)
+	if err != nil {
+		return actionSummary{}, err
+	}
+	if err := validateAction(cfg, action.name, action.proto, action.messageID, result.response); err != nil {
+		return actionSummary{}, err
+	}
+	return actionSummary{
+		Action:            action.name,
+		MessageID:         action.messageID,
+		Allowed:           result.response.GetAllowed(),
+		PermissionVersion: result.response.GetPermissionVersion(),
+		Classification:    result.response.GetClassification(),
+		Reason:            result.response.GetReason(),
+		LatencyMS:         result.latencyMS,
+	}, nil
+}
+
+func recordAction(s *summary, action actionSummary) {
+	const maxActionSamples = 100
+	if len(s.Actions) < maxActionSamples {
+		s.Actions = append(s.Actions, action)
+	}
+	s.LatenciesMS[strings.ToLower(action.Action)] = action.LatencyMS
+	s.latencySamplesMS = append(s.latencySamplesMS, action.LatencyMS)
+	s.ActionCount++
+	if action.Allowed {
+		s.AllowedActionCount++
+	} else {
+		s.DeniedActionCount++
+	}
 }
 
 type callResult struct {
@@ -200,14 +318,19 @@ type callResult struct {
 }
 
 func callPolicy(
+	parent context.Context,
 	cfg config,
 	client policyv1.PolicyServiceClient,
 	actionName string,
 	action policyv1.MessageAction,
 	messageID string,
+	requestSuffix string,
 ) (callResult, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
+	ctx, cancel := context.WithTimeout(parent, cfg.requestTimeout)
 	defer cancel()
+	if strings.TrimSpace(requestSuffix) == "" {
+		requestSuffix = strings.ToLower(actionName)
+	}
 	started := time.Now()
 	response, err := client.CheckMessageAction(ctx, &policyv1.CheckMessageActionRequest{
 		AuthContext: &policyv1.AuthContext{
@@ -216,7 +339,7 @@ func callPolicy(
 			DeviceId:  cfg.deviceID,
 			SessionId: cfg.sessionID,
 			TraceId:   "trace-policy-smoke",
-			RequestId: "policy-smoke-" + strings.ToLower(actionName),
+			RequestId: "policy-smoke-" + requestSuffix,
 		},
 		ConversationId: cfg.conversationID,
 		Action:         action,
@@ -274,21 +397,34 @@ func buildCapacitySummary(s summary) *capacitySummary {
 	if duration <= 0 {
 		return nil
 	}
-	allowed := 0
-	for _, action := range s.Actions {
-		if action.Allowed {
-			allowed++
+	actionCount := s.ActionCount
+	allowed := s.AllowedActionCount
+	denied := s.DeniedActionCount
+	if actionCount == 0 {
+		for _, action := range s.Actions {
+			if action.Allowed {
+				allowed++
+			} else {
+				denied++
+			}
+		}
+		actionCount = len(s.Actions)
+	}
+	latencySamples := s.latencySamplesMS
+	if len(latencySamples) == 0 {
+		latencySamples = make([]float64, 0, len(s.LatenciesMS))
+		for _, value := range s.LatenciesMS {
+			latencySamples = append(latencySamples, value)
 		}
 	}
-	actionCount := len(s.Actions)
 	return &capacitySummary{
 		DurationSeconds:    duration,
 		ActionCount:        actionCount,
 		AllowedActionCount: allowed,
-		DeniedActionCount:  actionCount - allowed,
+		DeniedActionCount:  denied,
 		DecisionsPerSecond: ratePerSecond(actionCount, duration),
-		LatencyP95MS:       latencyQuantile(s.LatenciesMS, 0.95),
-		LatencyP99MS:       latencyQuantile(s.LatenciesMS, 0.99),
+		LatencyP95MS:       latencyQuantile(latencySamples, 0.95),
+		LatencyP99MS:       latencyQuantile(latencySamples, 0.99),
 		ExpectedAllowed:    s.ExpectedAllowed,
 		PermissionVersion:  s.ExpectedPermissionVer,
 		Classification:     s.ExpectedClassification,
@@ -302,14 +438,12 @@ func ratePerSecond(count int, durationSeconds float64) float64 {
 	return float64(count) / durationSeconds
 }
 
-func latencyQuantile(values map[string]float64, quantile float64) float64 {
+func latencyQuantile(values []float64, quantile float64) float64 {
 	if len(values) == 0 {
 		return 0
 	}
 	sorted := make([]float64, 0, len(values))
-	for _, value := range values {
-		sorted = append(sorted, value)
-	}
+	sorted = append(sorted, values...)
 	sort.Float64s(sorted)
 	index := int(math.Ceil(quantile*float64(len(sorted)))) - 1
 	if index < 0 {

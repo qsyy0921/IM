@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$PlanPath,
+    [string[]]$Services = @(),
     [string]$OutputPath = "",
     [string]$PGDSN = $env:NEXUSIM_PG_DSN,
     [string]$KafkaBrokers = "localhost:9092",
@@ -84,6 +85,22 @@ function Convert-ToStringArray {
         $text = ([string]$item).Trim()
         if ($text.Length -gt 0) {
             $items.Add($text)
+        }
+    }
+    return @($items.ToArray())
+}
+
+function Convert-ToRequestedServices {
+    param([string[]]$Values)
+
+    $items = New-Object System.Collections.Generic.List[string]
+    $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($value in @($Values)) {
+        foreach ($part in (([string]$value) -split "[,;]")) {
+            $text = $part.Trim()
+            if ($text.Length -gt 0 -and $seen.Add($text)) {
+                $items.Add($text)
+            }
         }
     }
     return @($items.ToArray())
@@ -227,11 +244,21 @@ Assert-Condition ([int]$plan.duration_seconds -ge 1800) "capacity long-run campa
 $campaignName = Get-JsonPropertyString -Object $plan -Name "campaign_name"
 $outputRoot = Get-JsonPropertyString -Object $plan -Name "output_root"
 $runDirectory = Get-JsonPropertyString -Object $plan -Name "run_directory"
-$services = Convert-ToStringArray -Value $plan.services
+$planServices = Convert-ToStringArray -Value $plan.services
+$requestedServices = Convert-ToRequestedServices -Values $Services
+$planServiceSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+foreach ($service in $planServices) {
+    [void]$planServiceSet.Add($service)
+}
+$services = if ($requestedServices.Count -gt 0) { $requestedServices } else { $planServices }
+foreach ($service in $services) {
+    Assert-Condition ($planServiceSet.Contains($service)) "Requested service is not in the capacity long-run campaign plan: $service"
+}
 Assert-Condition ($campaignName.Length -gt 0) "capacity long-run campaign plan campaign_name is required."
 Assert-Condition ($outputRoot.Length -gt 0) "capacity long-run campaign plan output_root is required."
 Assert-Condition ($runDirectory.Length -gt 0) "capacity long-run campaign plan run_directory is required."
-Assert-Condition ($services.Count -gt 0) "capacity long-run campaign plan services are required."
+Assert-Condition ($planServices.Count -gt 0) "capacity long-run campaign plan services are required."
+Assert-Condition ($services.Count -gt 0) "capacity long-run campaign preflight services are required."
 
 $outputRootFullPath = [System.IO.Path]::GetFullPath($outputRoot)
 $runDirectoryFullPath = [System.IO.Path]::GetFullPath($runDirectory)

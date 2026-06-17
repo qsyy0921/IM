@@ -58,6 +58,7 @@ try {
     $planPath = Join-Path $tempRoot "$campaign\capacity-longrun-campaign-plan.json"
     $invokeResult = Invoke-Tool -Path $invoker -Arguments @(
         "-PlanPath", $planPath,
+        "-Services", "policy-service",
         "-DryRun",
         "-SkipSummary",
         "-PGDSN", "postgres://fixture:fixture@127.0.0.1:5432/fixture?sslmode=disable",
@@ -75,7 +76,7 @@ try {
         exit 1
     }
     $summary = Get-Content -LiteralPath $suiteSummaryPath -Raw | ConvertFrom-Json
-    if ($summary.run_name -ne $campaign -or $summary.dry_run -ne $true -or $summary.status -ne "dry_run") {
+    if ($summary.run_name -ne $campaign -or $summary.dry_run -ne $true -or $summary.status -ne "dry_run" -or $summary.service_count -ne 1) {
         Write-Host "FAIL capacity long-run invocation suite summary has wrong dry-run fields." -ForegroundColor Red
         exit 1
     }
@@ -83,8 +84,8 @@ try {
         Write-Host "FAIL capacity long-run invocation should keep non-SLO boundary and include planned runner classes by default." -ForegroundColor Red
         exit 1
     }
-    $messageStep = @($summary.steps | Where-Object { $_.service -eq "message-service" })[0]
-    if ($messageStep.status -ne "dry_run" -or $messageStep.command_line -notmatch "--duration 30m") {
+    $policyStep = @($summary.steps | Where-Object { $_.service -eq "policy-service" })[0]
+    if ($policyStep.status -ne "dry_run" -or $policyStep.command_line -notmatch "--duration 30m") {
         Write-Host "FAIL capacity long-run invocation should preserve plan duration in runner command." -ForegroundColor Red
         exit 1
     }
@@ -110,6 +111,7 @@ try {
     try {
         $badInvokeResult = Invoke-Tool -Path $invoker -Arguments @(
             "-PlanPath", $repoCopyPath,
+            "-Services", "policy-service",
             "-DryRun"
         )
         if ($badInvokeResult.ExitCode -eq 0 -or -not $badInvokeResult.Output.Contains("PlanPath must stay under plan output_root")) {

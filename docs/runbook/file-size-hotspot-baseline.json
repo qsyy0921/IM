@@ -1,7 +1,7 @@
 ﻿{
-    "created_at":  "2026-06-17T03:49:02.4812502Z",
+    "created_at":  "2026-06-17T08:43:07.3498708Z",
     "scope":  "handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score",
-    "file_count":  1066,
+    "file_count":  1136,
     "thresholds":  {
                        "production_warn_lines":  2500,
                        "production_max_lines":  3500,
@@ -16,7 +16,7 @@
     "totals":  {
                    "warnings":  0,
                    "failures":  0,
-                   "hotspots":  2
+                   "hotspots":  1
                },
     "top_files":  [
                       {
@@ -36,33 +36,6 @@
                           "Max":  1500,
                           "WarnRatio":  0.7875,
                           "MaxRatio":  0.63
-                      },
-                      {
-                          "Path":  "loadtest\\pushgateway\\run-local-smoke.ps1",
-                          "Lines":  897,
-                          "Kind":  "script/runner",
-                          "Warn":  1000,
-                          "Max":  1500,
-                          "WarnRatio":  0.897,
-                          "MaxRatio":  0.598
-                      },
-                      {
-                          "Path":  "services\\receipt-service\\internal\\infrastructure\\postgres\\repository_test.go",
-                          "Lines":  1694,
-                          "Kind":  "test/runner",
-                          "Warn":  2500,
-                          "Max":  3000,
-                          "WarnRatio":  0.6776,
-                          "MaxRatio":  0.5647
-                      },
-                      {
-                          "Path":  "services\\conversation-service\\internal\\infrastructure\\postgres\\repository_test.go",
-                          "Lines":  1564,
-                          "Kind":  "test/runner",
-                          "Warn":  2500,
-                          "Max":  3000,
-                          "WarnRatio":  0.6256,
-                          "MaxRatio":  0.5213
                       },
                       {
                           "Path":  "docs\\runbook\\local-loadtest.md",
@@ -92,42 +65,6 @@
                           "MaxRatio":  0.4867
                       },
                       {
-                          "Path":  "services\\contacts-service\\internal\\infrastructure\\postgres\\repository_test.go",
-                          "Lines":  1418,
-                          "Kind":  "test/runner",
-                          "Warn":  2500,
-                          "Max":  3000,
-                          "WarnRatio":  0.5672,
-                          "MaxRatio":  0.4727
-                      },
-                      {
-                          "Path":  "services\\receipt-service\\internal\\infrastructure\\postgres\\repository.go",
-                          "Lines":  1650,
-                          "Kind":  "production",
-                          "Warn":  2500,
-                          "Max":  3500,
-                          "WarnRatio":  0.66,
-                          "MaxRatio":  0.4714
-                      },
-                      {
-                          "Path":  "loadtest\\contacts\\main.go",
-                          "Lines":  1395,
-                          "Kind":  "test/runner",
-                          "Warn":  2500,
-                          "Max":  3000,
-                          "WarnRatio":  0.558,
-                          "MaxRatio":  0.465
-                      },
-                      {
-                          "Path":  "loadtest\\demo\\main.go",
-                          "Lines":  1350,
-                          "Kind":  "test/runner",
-                          "Warn":  2500,
-                          "Max":  3000,
-                          "WarnRatio":  0.54,
-                          "MaxRatio":  0.45
-                      },
-                      {
                           "Path":  "docs\\architecture\\target-architecture-ai.md",
                           "Lines":  665,
                           "Kind":  "docs",
@@ -135,24 +72,6 @@
                           "Max":  1500,
                           "WarnRatio":  0.5542,
                           "MaxRatio":  0.4433
-                      },
-                      {
-                          "Path":  "services\\delivery-service\\cmd\\delivery-service\\main.go",
-                          "Lines":  1488,
-                          "Kind":  "production",
-                          "Warn":  2500,
-                          "Max":  3500,
-                          "WarnRatio":  0.5952,
-                          "MaxRatio":  0.4251
-                      },
-                      {
-                          "Path":  "loadtest\\receipt\\main.go",
-                          "Lines":  1270,
-                          "Kind":  "test/runner",
-                          "Warn":  2500,
-                          "Max":  3000,
-                          "WarnRatio":  0.508,
-                          "MaxRatio":  0.4233
                       },
                       {
                           "Path":  "tools\\run-loadtest-capacity-baseline-suite.ps1",
@@ -164,13 +83,13 @@
                           "MaxRatio":  0.42
                       },
                       {
-                          "Path":  "services\\identity-service\\internal\\infrastructure\\postgres\\repository.go",
-                          "Lines":  1466,
-                          "Kind":  "production",
-                          "Warn":  2500,
-                          "Max":  3500,
-                          "WarnRatio":  0.5864,
-                          "MaxRatio":  0.4189
+                          "Path":  "docs\\runbook\\loadtest\\message-service\\loadtest-report-20260609.md",
+                          "Lines":  622,
+                          "Kind":  "docs",
+                          "Warn":  1200,
+                          "Max":  1500,
+                          "WarnRatio":  0.5183,
+                          "MaxRatio":  0.4147
                       },
                       {
                           "Path":  "docs\\sdd\\delivery-service.md",
@@ -182,34 +101,106 @@
                           "MaxRatio":  0.4147
                       },
                       {
-                          "Path":  "docs\\runbook\\loadtest\\message-service\\loadtest-report-20260609.md",
-                          "Lines":  622,
+                          "Path":  "docs\\architecture\\target-architecture-platform.md",
+                          "Lines":  576,
                           "Kind":  "docs",
                           "Warn":  1200,
                           "Max":  1500,
-                          "WarnRatio":  0.5183,
-                          "MaxRatio":  0.4147
+                          "WarnRatio":  0.48,
+                          "MaxRatio":  0.384
                       },
                       {
-                          "Path":  "services\\message-service\\internal\\trigger\\outbox\\relay_test.go",
-                          "Lines":  1220,
+                          "Path":  "services\\identity-service\\cmd\\identity-service\\main_test.go",
+                          "Lines":  1137,
                           "Kind":  "test/runner",
                           "Warn":  2500,
                           "Max":  3000,
-                          "WarnRatio":  0.488,
-                          "MaxRatio":  0.4067
+                          "WarnRatio":  0.4548,
+                          "MaxRatio":  0.379
+                      },
+                      {
+                          "Path":  "docs\\runbook\\history\\current-goal-archive-20260611.md",
+                          "Lines":  563,
+                          "Kind":  "docs",
+                          "Warn":  1200,
+                          "Max":  1500,
+                          "WarnRatio":  0.4692,
+                          "MaxRatio":  0.3753
+                      },
+                      {
+                          "Path":  "docs\\sdd\\conversation-service-member-change-saga.md",
+                          "Lines":  563,
+                          "Kind":  "docs",
+                          "Warn":  1200,
+                          "Max":  1500,
+                          "WarnRatio":  0.4692,
+                          "MaxRatio":  0.3753
+                      },
+                      {
+                          "Path":  "services\\contacts-service\\internal\\infrastructure\\postgres\\repository_test.go",
+                          "Lines":  1089,
+                          "Kind":  "test/runner",
+                          "Warn":  2500,
+                          "Max":  3000,
+                          "WarnRatio":  0.4356,
+                          "MaxRatio":  0.363
+                      },
+                      {
+                          "Path":  "docs\\architecture\\target-architecture-timeline.md",
+                          "Lines":  542,
+                          "Kind":  "docs",
+                          "Warn":  1200,
+                          "Max":  1500,
+                          "WarnRatio":  0.4517,
+                          "MaxRatio":  0.3613
+                      },
+                      {
+                          "Path":  "docs\\sdd\\receipt-service.md",
+                          "Lines":  530,
+                          "Kind":  "docs",
+                          "Warn":  1200,
+                          "Max":  1500,
+                          "WarnRatio":  0.4417,
+                          "MaxRatio":  0.3533
+                      },
+                      {
+                          "Path":  "loadtest\\contacts\\main.go",
+                          "Lines":  1057,
+                          "Kind":  "test/runner",
+                          "Warn":  2500,
+                          "Max":  3000,
+                          "WarnRatio":  0.4228,
+                          "MaxRatio":  0.3523
+                      },
+                      {
+                          "Path":  "services\\push-gateway\\internal\\infrastructure\\redisroute\\registry_test.go",
+                          "Lines":  1047,
+                          "Kind":  "test/runner",
+                          "Warn":  2500,
+                          "Max":  3000,
+                          "WarnRatio":  0.4188,
+                          "MaxRatio":  0.349
+                      },
+                      {
+                          "Path":  "services\\policy-service\\internal\\infrastructure\\postgres\\evaluator_test.go",
+                          "Lines":  1042,
+                          "Kind":  "test/runner",
+                          "Warn":  2500,
+                          "Max":  3000,
+                          "WarnRatio":  0.4168,
+                          "MaxRatio":  0.3473
+                      },
+                      {
+                          "Path":  "loadtest\\pushgateway\\run-local-smoke.ps1",
+                          "Lines":  520,
+                          "Kind":  "script/runner",
+                          "Warn":  1000,
+                          "Max":  1500,
+                          "WarnRatio":  0.52,
+                          "MaxRatio":  0.3467
                       }
                   ],
     "hotspots":  [
-                     {
-                         "Path":  "loadtest\\pushgateway\\run-local-smoke.ps1",
-                         "Lines":  897,
-                         "Kind":  "script/runner",
-                         "Warn":  1000,
-                         "Max":  1500,
-                         "WarnRatio":  0.897,
-                         "MaxRatio":  0.598
-                     },
                      {
                          "Path":  "docs\\sdd\\message-service.md",
                          "Lines":  1048,

@@ -21,7 +21,7 @@
 - 本地 Kafka KRaft repeated ISR flapping smoke 已覆盖 2 轮 broker stop/start：降级阶段 replicated probe topic 稳定到 `ISR=2` 且 `acks=all` probe 可写，恢复阶段回到 `ISR=3` 且 probe 继续可写；这是本地 flapping 观察，不代表生产 Kafka HA、长时间容量曲线或 exactly-once producer 语义。
 - 本地 `kafka-go` producer in-flight broker-fault observation 已覆盖 broker stop/restore 窗口内 120 条 records：producer ack 120，consumer unique 120，missing ack 0，observed duplicate 0；这是本地观察，不代表 exactly-once producer 语义。
 - Resume buffer 重放已有回归测试固定 all-or-buffer-miss：新连接队列无法容纳全部待重放 notify 时，不做部分 replay，直接提示客户端用本地 cursor + `PullInbox` 校准。
-- `loadtest/pushgateway/run-local-smoke.ps1` 的通用 helper 已拆到同目录 `run-local-smoke.helpers.ps1`，脚本复杂度回到预算线内。
+- `loadtest/pushgateway/run-local-smoke.ps1` 的通用 helper 已拆到同目录 `run-local-smoke.helpers.ps1`，Redis fault setup / Sentinel / Cluster fault script 生成已拆到 `run-local-smoke.redis-faults.ps1`，主 runner 入口保持在约 520 行。
 - `loadtest/pushgateway` Go runner 已按 config / model / auth / scenario / util 同 package 拆分，避免后续 Redis route、slow-client、resume 和容量 smoke 继续堆进单个 `main.go`。
 - `loadtest/pushgateway` summary 已新增 `capacity_summary` 派生字段，统一输出 duration、device/message/notify/ack/pull 计数和每秒速率；本地 push-gateway stack 短基线已跑通 `full` 场景，clean summary 记录 `git_dirty=false`、1 个 device、1 条 message、1 个 notify、1 个 ACK、PullInbox 1 条、delivery_outbox published 2 条。
 - `loadtest/pushgateway` 已新增并跑通 `redis-resume-negative` 真实进程 smoke，用于验证未知 resume token 被服务端替换并返回 `buffer_miss`、跨 device resume token 返回非重试 `PERMISSION_DENIED`、Redis resume buffer gap 返回 `buffer_miss` 后通过 `PullInbox + AckDelivery` 兜底；报告见 `docs/runbook/loadtest/push-gateway/loadtest-report-20260616-push-gateway-redis-resume-negative-smoke.md`。

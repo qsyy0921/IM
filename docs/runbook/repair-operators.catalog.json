@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "description": "Machine-readable first-stage NexusIM repair/operator catalog. It is a local runbook artifact, not a production approval system.",
+  "services": [
+    {
+      "service": "message-service",
+      "mode_env": "NEXUSIM_MESSAGE_SERVICE_MODE",
+      "modes": [
+        "outbox-audit",
+        "outbox-repair",
+        "outbox-repair-audit",
+        "outbox-repair-cleanup",
+        "change-history-audit",
+        "retention-proof-audit"
+      ],
+      "output_envs": [
+        "NEXUSIM_MESSAGE_OUTBOX_AUDIT_OUTPUT",
+        "NEXUSIM_MESSAGE_OUTBOX_REPAIR_OUTPUT",
+        "NEXUSIM_MESSAGE_OUTBOX_REPAIR_AUDIT_OUTPUT",
+        "NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_OUTPUT",
+        "NEXUSIM_MESSAGE_CHANGE_HISTORY_AUDIT_OUTPUT",
+        "NEXUSIM_MESSAGE_RETENTION_PROOF_AUDIT_OUTPUT"
+      ],
+      "dry_run_envs": [
+        "NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
+      ]
+    },
+    {
+      "service": "delivery-service",
+      "mode_env": "NEXUSIM_DELIVERY_SERVICE_MODE",
+      "modes": [
+        "outbox-audit",
+        "outbox-repair",
+        "outbox-repair-audit",
+        "outbox-repair-cleanup",
+        "projection-failure-audit",
+        "projection-checkpoint-repair",
+        "projection-checkpoint-repair-audit",
+        "projection-checkpoint-repair-cleanup",
+        "projection-failure-cleanup"
+      ],
+      "output_envs": [
+        "NEXUSIM_DELIVERY_OUTBOX_AUDIT_OUTPUT",
+        "NEXUSIM_DELIVERY_OUTBOX_REPAIR_OUTPUT",
+        "NEXUSIM_DELIVERY_OUTBOX_REPAIR_AUDIT_OUTPUT",
+        "NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_OUTPUT",
+        "NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_OUTPUT",
+        "NEXUSIM_DELIVERY_PROJECTION_REPAIR_OUTPUT",
+        "NEXUSIM_DELIVERY_PROJECTION_REPAIR_AUDIT_OUTPUT",
+        "NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_OUTPUT",
+        "NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_OUTPUT"
+      ],
+      "dry_run_envs": [
+        "NEXUSIM_DELIVERY_OUTBOX_REPAIR_DRY_RUN",
+        "NEXUSIM_DELIVERY_PROJECTION_REPAIR_DRY_RUN",
+        "NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_DRY_RUN",
+        "NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_DRY_RUN",
+        "NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_DRY_RUN",
+        "NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_DRY_RUN"
+      ]
+    },
+    {
+      "service": "receipt-service",
+      "mode_env": "NEXUSIM_RECEIPT_SERVICE_MODE",
+      "modes": [
+        "outbox-audit",
+        "outbox-repair",
+        "outbox-repair-audit",
+        "outbox-repair-cleanup"
+      ],
+      "output_envs": [
+        "NEXUSIM_RECEIPT_OUTBOX_AUDIT_OUTPUT",
+        "NEXUSIM_RECEIPT_OUTBOX_REPAIR_OUTPUT",
+        "NEXUSIM_RECEIPT_OUTBOX_REPAIR_AUDIT_OUTPUT",
+        "NEXUSIM_RECEIPT_OUTBOX_REPAIR_CLEANUP_OUTPUT"
+      ],
+      "dry_run_envs": [
+        "NEXUSIM_RECEIPT_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
+      ]
+    },
+    {
+      "service": "contacts-service",
+      "mode_env": "NEXUSIM_CONTACTS_SERVICE_MODE",
+      "modes": [
+        "outbox-audit",
+        "outbox-repair",
+        "outbox-repair-audit",
+        "outbox-repair-cleanup",
+        "tenant-privacy-default-audit",
+        "tenant-privacy-default-set",
+        "source-policy-audit",
+        "source-policy-set"
+      ],
+      "output_envs": [
+        "NEXUSIM_CONTACTS_OUTBOX_AUDIT_OUTPUT",
+        "NEXUSIM_CONTACTS_OUTBOX_REPAIR_OUTPUT",
+        "NEXUSIM_CONTACTS_OUTBOX_REPAIR_AUDIT_OUTPUT",
+        "NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_OUTPUT",
+        "NEXUSIM_CONTACTS_TENANT_PRIVACY_AUDIT_OUTPUT",
+        "NEXUSIM_CONTACTS_TENANT_PRIVACY_SET_OUTPUT",
+        "NEXUSIM_CONTACTS_SOURCE_POLICY_AUDIT_OUTPUT",
+        "NEXUSIM_CONTACTS_SOURCE_POLICY_SET_OUTPUT"
+      ],
+      "dry_run_envs": [
+        "NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
+      ]
+    },
+    {
+      "service": "policy-service",
+      "mode_env": "NEXUSIM_POLICY_SERVICE_MODE",
+      "modes": [
+        "outbox-audit",
+        "outbox-repair",
+        "outbox-repair-audit",
+        "outbox-repair-cleanup"
+      ],
+      "output_envs": [
+        "NEXUSIM_POLICY_OUTBOX_AUDIT_OUTPUT",
+        "NEXUSIM_POLICY_OUTBOX_REPAIR_OUTPUT",
+        "NEXUSIM_POLICY_OUTBOX_REPAIR_AUDIT_OUTPUT",
+        "NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OUTPUT"
+      ],
+      "dry_run_envs": [
+        "NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
+      ]
+    },
+    {
+      "service": "conversation-service",
+      "mode_env": "NEXUSIM_CONVERSATION_SERVICE_MODE",
+      "modes": [
+        "member-change-audit",
+        "member-window-audit",
+        "member-window-repair",
+        "member-window-repair-audit"
+      ],
+      "output_envs": [
+        "NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_OUTPUT",
+        "NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_OUTPUT",
+        "NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_OUTPUT",
+        "NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_OUTPUT"
+      ],
+      "dry_run_envs": [
+        "NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_DRY_RUN"
+      ]
+    },
+    {
+      "service": "identity-service",
+      "mode_env": "NEXUSIM_IDENTITY_SERVICE_MODE",
+      "modes": [
+        "session-mfa-proof-audit",
+        "challenge-delivery-repair",
+        "challenge-delivery-repair-audit",
+        "challenge-delivery-repair-cleanup",
+        "challenge-request-limit-cleanup",
+        "gateway-token-keyring-rotate"
+      ],
+      "output_envs": [
+        "NEXUSIM_IDENTITY_SESSION_MFA_PROOF_AUDIT_OUTPUT",
+        "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_OUTPUT",
+        "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_OUTPUT",
+        "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_OUTPUT",
+        "NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_OUTPUT",
+        "NEXUSIM_IDENTITY_GATEWAY_TOKEN_KEYRING_ROTATE_OUTPUT"
+      ],
+      "dry_run_envs": [
+        "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_DRY_RUN",
+        "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_DRY_RUN",
+        "NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_DRY_RUN"
+      ]
+    }
+  ]
+}

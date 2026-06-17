@@ -2,6 +2,8 @@
 
 本文件只做现有本地 operator 的统一入口。它不替代服务 SDD、smoke 报告或审批系统，也不代表已经有生产级运维 UI。
 
+机器可读索引见 `repair-operators.catalog.json`。后续跨服务执行编排、审批 UI 或外部审计 sink 应优先消费该 catalog，而不是解析本 Markdown。
+
 ## 使用原则
 
 - 先 audit，后 repair；没有明确 event / outbox / checkpoint / failure 范围时不要 redrive。

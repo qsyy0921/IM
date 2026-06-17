@@ -3,8 +3,9 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $runbookIndexPath = Join-Path $repoRoot "docs\runbook\README.md"
 $repairIndexPath = Join-Path $repoRoot "docs\runbook\repair-operators.md"
+$repairCatalogPath = Join-Path $repoRoot "docs\runbook\repair-operators.catalog.json"
 
-foreach ($path in @($runbookIndexPath, $repairIndexPath)) {
+foreach ($path in @($runbookIndexPath, $repairIndexPath, $repairCatalogPath)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Missing repair operator documentation file: $path"
     }
@@ -12,9 +13,13 @@ foreach ($path in @($runbookIndexPath, $repairIndexPath)) {
 
 $runbookIndex = Get-Content -LiteralPath $runbookIndexPath -Raw
 $repairIndex = Get-Content -LiteralPath $repairIndexPath -Raw
+$repairCatalog = Get-Content -LiteralPath $repairCatalogPath -Raw | ConvertFrom-Json
 
 if ($runbookIndex -notmatch [regex]::Escape("repair-operators.md")) {
     throw "docs/runbook/README.md must link repair-operators.md."
+}
+if ($runbookIndex -notmatch [regex]::Escape("repair-operators.catalog.json")) {
+    throw "docs/runbook/README.md must link repair-operators.catalog.json."
 }
 
 $operatorSpecs = @(
@@ -181,8 +186,66 @@ foreach ($term in $requiredSharedTerms) {
     }
 }
 
+if ($repairCatalog.schema_version -ne 1) {
+    throw "docs/runbook/repair-operators.catalog.json must have schema_version=1."
+}
+if (-not $repairCatalog.services) {
+    throw "docs/runbook/repair-operators.catalog.json must define services."
+}
+
+$catalogByService = @{}
+foreach ($catalogService in @($repairCatalog.services)) {
+    $catalogServiceName = [string]$catalogService.service
+    if ([string]::IsNullOrWhiteSpace($catalogServiceName)) {
+        throw "docs/runbook/repair-operators.catalog.json contains a service without name."
+    }
+    if ($catalogByService.ContainsKey($catalogServiceName)) {
+        throw "docs/runbook/repair-operators.catalog.json contains duplicate service: $catalogServiceName"
+    }
+    $catalogByService[$catalogServiceName] = $catalogService
+}
+
+function Assert-CatalogArrayContainsAll {
+    param(
+        [string]$Service,
+        [string]$FieldName,
+        [object[]]$ExpectedValues,
+        [object[]]$ActualValues
+    )
+
+    $actualSet = @{}
+    foreach ($actual in @($ActualValues)) {
+        $actualValue = [string]$actual
+        if (-not [string]::IsNullOrWhiteSpace($actualValue)) {
+            $actualSet[$actualValue] = $true
+        }
+    }
+
+    foreach ($expected in @($ExpectedValues)) {
+        $expectedValue = [string]$expected
+        if ([string]::IsNullOrWhiteSpace($expectedValue)) {
+            continue
+        }
+        if (-not $actualSet.ContainsKey($expectedValue)) {
+            throw "docs/runbook/repair-operators.catalog.json service ${Service} missing ${FieldName}: $expectedValue"
+        }
+    }
+}
+
 foreach ($spec in $operatorSpecs) {
     $service = [string]$spec.Service
+    if (-not $catalogByService.ContainsKey($service)) {
+        throw "docs/runbook/repair-operators.catalog.json missing service: $service"
+    }
+    $catalogService = $catalogByService[$service]
+    $catalogEnv = [string]$catalogService.mode_env
+    if ($catalogEnv -ne [string]$spec.Env) {
+        throw "docs/runbook/repair-operators.catalog.json service ${service} has mode_env=${catalogEnv}, expected $($spec.Env)"
+    }
+    Assert-CatalogArrayContainsAll -Service $service -FieldName "mode" -ExpectedValues @($spec.Modes) -ActualValues @($catalogService.modes)
+    Assert-CatalogArrayContainsAll -Service $service -FieldName "output_env" -ExpectedValues @($spec.OutputEnvs) -ActualValues @($catalogService.output_envs)
+    Assert-CatalogArrayContainsAll -Service $service -FieldName "dry_run_env" -ExpectedValues @($spec.DryRunEnvs) -ActualValues @($catalogService.dry_run_envs)
+
     $cmdPath = Join-Path $repoRoot ([string]$spec.Cmd)
     if (-not (Test-Path -LiteralPath $cmdPath -PathType Leaf)) {
         throw "Missing service cmd file for repair operator check: $($spec.Cmd)"

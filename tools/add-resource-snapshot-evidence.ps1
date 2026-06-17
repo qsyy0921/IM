@@ -105,7 +105,8 @@ try {
     & $validator -ManifestPath $resolvedManifestPath -ExpectedResultRoot $ExpectedResultRoot | Out-Null
 }
 catch {
-    $originalJson | Set-Content -LiteralPath $resolvedManifestPath -Encoding UTF8
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($resolvedManifestPath, $originalJson, $utf8NoBom)
     throw
 }
 

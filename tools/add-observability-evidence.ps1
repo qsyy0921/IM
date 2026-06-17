@@ -75,7 +75,8 @@ if ($Kind -eq "prometheus-grafana-smoke") {
     Assert-Condition ($ExpectedDashboardCount -ge 0) "ExpectedDashboardCount must be >= 0."
 }
 
-$manifest = Get-Content -LiteralPath $resolvedManifestPath -Raw | ConvertFrom-Json
+$originalJson = Get-Content -LiteralPath $resolvedManifestPath -Raw
+$manifest = $originalJson | ConvertFrom-Json
 Assert-Condition ([int]$manifest.schema_version -eq 1) "observability evidence schema_version must be 1."
 
 foreach ($entry in @($manifest.entries)) {
@@ -116,7 +117,12 @@ $updated = [ordered]@{
 
 $json = $updated | ConvertTo-Json -Depth 10
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-[System.IO.File]::WriteAllText($resolvedManifestPath, ($json + [Environment]::NewLine), $utf8NoBom)
-
-& $validator -ManifestPath $resolvedManifestPath -ExpectedResultRoot $ExpectedResultRoot -ReportRoot $ReportRoot | Out-Null
+try {
+    [System.IO.File]::WriteAllText($resolvedManifestPath, ($json + [Environment]::NewLine), $utf8NoBom)
+    & $validator -ManifestPath $resolvedManifestPath -ExpectedResultRoot $ExpectedResultRoot -ReportRoot $ReportRoot | Out-Null
+}
+catch {
+    [System.IO.File]::WriteAllText($resolvedManifestPath, $originalJson, $utf8NoBom)
+    throw
+}
 Write-Host "OK   observability evidence entry added: $($Name.Trim())"

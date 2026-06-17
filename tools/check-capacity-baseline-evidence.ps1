@@ -252,6 +252,32 @@ try {
         exit 1
     }
 
+    $beforeFailedAdd = Get-Content -LiteralPath $manifestPath -Raw
+    $failedAddRolledBack = $false
+    try {
+        & $adder `
+            -ManifestPath $manifestPath `
+            -Service "message-service" `
+            -Runner "sendmessage" `
+            -BaselineType "seeded" `
+            -SummaryPath "docs/runbook/loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md" `
+            -ReportPath $reportPath `
+            -Note "bad path fixture" `
+            -Replace | Out-Null
+    }
+    catch {
+        $failedAddRolledBack = $_.Exception.Message.Contains("must point under")
+    }
+    if (-not $failedAddRolledBack) {
+        Write-Host "FAIL add-capacity-baseline-evidence.ps1 should fail validation for repo-local summary_path." -ForegroundColor Red
+        exit 1
+    }
+    $afterFailedAdd = Get-Content -LiteralPath $manifestPath -Raw
+    if ($afterFailedAdd -ne $beforeFailedAdd) {
+        Write-Host "FAIL failed add-capacity-baseline-evidence.ps1 call should restore original manifest." -ForegroundColor Red
+        exit 1
+    }
+
     $sensitiveFailed = $false
     try {
         & $adder `

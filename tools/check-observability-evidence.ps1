@@ -380,6 +380,33 @@ try {
         exit 1
     }
 
+    $beforeFailedAdd = Get-Content -LiteralPath $manifestPath -Raw
+    $failedAddRolledBack = $false
+    try {
+        & $adder `
+            -ManifestPath $manifestPath `
+            -ExpectedResultRoot $tempRoot `
+            -ReportRoot (Join-Path $tempRoot "report-root") `
+            -Name "bad report path fixture" `
+            -Kind "service-debug-smoke" `
+            -Service "policy-service" `
+            -SummaryPath $summaryPath `
+            -ReportPath $reportPath `
+            -Note "bad report path fixture" 2>$null | Out-Null
+    }
+    catch {
+        $failedAddRolledBack = ($_.Exception.Message -match "must stay under")
+    }
+    if (-not $failedAddRolledBack) {
+        Write-Host "FAIL add-observability-evidence.ps1 should fail validation for report outside ReportRoot." -ForegroundColor Red
+        exit 1
+    }
+    $afterFailedAdd = Get-Content -LiteralPath $manifestPath -Raw
+    if ($afterFailedAdd -ne $beforeFailedAdd) {
+        Write-Host "FAIL failed add-observability-evidence.ps1 call should restore original manifest." -ForegroundColor Red
+        exit 1
+    }
+
     $sensitiveAddFailed = $false
     try {
         & $adder `

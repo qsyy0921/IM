@@ -70,7 +70,8 @@ if ($Kind -eq "redis-smoke") {
     Assert-Condition ($ExpectedRedisMode.Trim().Length -gt 0) "ExpectedRedisMode is required for redis-smoke evidence."
 }
 
-$manifest = Get-Content -LiteralPath $resolvedManifestPath -Raw | ConvertFrom-Json
+$originalJson = Get-Content -LiteralPath $resolvedManifestPath -Raw
+$manifest = $originalJson | ConvertFrom-Json
 Assert-Condition ([int]$manifest.schema_version -eq 1) "distributed smoke evidence schema_version must be 1."
 
 foreach ($entry in @($manifest.entries)) {
@@ -101,7 +102,13 @@ $updated = [ordered]@{
     entries = $entries
 }
 
-$updated | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $resolvedManifestPath -Encoding UTF8
-
-& $validator -ManifestPath $resolvedManifestPath -ExpectedResultRoot $ExpectedResultRoot | Out-Null
+try {
+    $updated | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $resolvedManifestPath -Encoding UTF8
+    & $validator -ManifestPath $resolvedManifestPath -ExpectedResultRoot $ExpectedResultRoot | Out-Null
+}
+catch {
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($resolvedManifestPath, $originalJson, $utf8NoBom)
+    throw
+}
 Write-Host "OK   distributed smoke evidence entry added: $($Name.Trim())"

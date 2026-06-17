@@ -203,6 +203,31 @@ try {
         exit 1
     }
 
+    $beforeFailedAdd = Get-Content -LiteralPath $manifestPath -Raw
+    $failedAddRolledBack = $false
+    try {
+        & $adder `
+            -ManifestPath $manifestPath `
+            -ExpectedResultRoot $tempRoot `
+            -Name "bad path add" `
+            -Kind "pushgateway-full" `
+            -SummaryPath "docs/runbook/loadtest/pushgateway-summary.json" `
+            -ExpectedScenario "full" `
+            -Note "bad path fixture" 2>$null | Out-Null
+    }
+    catch {
+        $failedAddRolledBack = ($_.Exception.Message -match "must point under")
+    }
+    if (-not $failedAddRolledBack) {
+        Write-Host "FAIL add-distributed-smoke-evidence.ps1 should fail validation for repo-local summary_path." -ForegroundColor Red
+        exit 1
+    }
+    $afterFailedAdd = Get-Content -LiteralPath $manifestPath -Raw
+    if ($afterFailedAdd -ne $beforeFailedAdd) {
+        Write-Host "FAIL failed add-distributed-smoke-evidence.ps1 call should restore original manifest." -ForegroundColor Red
+        exit 1
+    }
+
     $sensitiveAddFailed = $false
     try {
         & $adder `

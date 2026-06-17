@@ -259,6 +259,30 @@ try {
         exit 1
     }
 
+    $beforeFailedAdd = Get-Content -LiteralPath $manifestPath -Raw
+    $failedAddRolledBack = $false
+    try {
+        & $adder `
+            -ManifestPath $manifestPath `
+            -ExpectedResultRoot $tempRoot `
+            -Name "bad path add" `
+            -SummaryPath "docs/runbook/loadtest/resource-summary.json" `
+            -MarkdownPath $markdownSummaryPath `
+            -Note "bad path fixture" | Out-Null
+    }
+    catch {
+        $failedAddRolledBack = $_.Exception.Message.Contains("must point under")
+    }
+    if (-not $failedAddRolledBack) {
+        Write-Host "FAIL add-resource-snapshot-evidence.ps1 should fail validation for repo-local summary_path." -ForegroundColor Red
+        exit 1
+    }
+    $afterFailedAdd = Get-Content -LiteralPath $manifestPath -Raw
+    if ($afterFailedAdd -ne $beforeFailedAdd) {
+        Write-Host "FAIL failed add-resource-snapshot-evidence.ps1 call should restore original manifest." -ForegroundColor Red
+        exit 1
+    }
+
     $sensitiveFailed = $false
     try {
         & $adder `

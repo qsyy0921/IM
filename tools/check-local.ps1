@@ -140,6 +140,9 @@ try {
     Write-Host "== observability target smoke =="
     Invoke-LocalCheck "check-observability-target-smoke.ps1"
 
+    Write-Host "== observability evidence =="
+    Invoke-LocalCheck "check-observability-evidence.ps1"
+
     Write-Host "== local prometheus config =="
     Invoke-LocalCheck "check-local-prometheus-config.ps1"
 

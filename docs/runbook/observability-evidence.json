@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-06-17",
+  "scope": "Local observability smoke evidence index for NexusIM. These entries are local/development evidence, not production SLO, retention, Alertmanager route, or unified collector claims.",
+  "entries": [
+    {
+      "name": "policy-service debug metrics smoke",
+      "kind": "service-debug-smoke",
+      "service": "policy-service",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\policy-service-observability-smoke-20260613\\policy-smoke-summary.json",
+      "report_path": "docs/runbook/loadtest/policy-service/loadtest-report-20260613-policy-service-observability-smoke.md",
+      "require_clean_git": false,
+      "note": "First-stage policy-service /debug/metrics smoke; not Prometheus, Grafana, Alertmanager, or production SLO evidence."
+    }
+  ]
+}

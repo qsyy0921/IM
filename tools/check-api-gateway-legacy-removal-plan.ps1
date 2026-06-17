@@ -112,6 +112,23 @@ function Invoke-ValidatorExpectFail {
     }
 }
 
+function Invoke-WriterExpectFail {
+    param([string[]]$Arguments)
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & $powerShellExe @Arguments 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($exitCode -eq 0) {
+        $output | Out-Host
+        throw "Expected write-api-gateway-legacy-removal-plan.ps1 to fail"
+    }
+}
+
 New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
 try {
     $readySummaryPath = Join-Path $tempRoot "ready-summary.json"
@@ -180,6 +197,21 @@ try {
     $sensitive.note = "Authorization: Bearer abc123"
     ($sensitive | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath $sensitivePath -Encoding UTF8
     Invoke-ValidatorExpectFail -PlanPath $sensitivePath
+
+    Invoke-WriterExpectFail -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $writerPath,
+        "-ObservationWindowSummaryPath", $readySummaryPath,
+        "-Operator", "operator@example.com",
+        "-NowUnixMS", "950000"
+    )
+
+    $sensitiveLabelPath = Join-Path $tempRoot "sensitive-label-plan.json"
+    $sensitiveLabel = Get-Content -LiteralPath $readyPlanPath -Raw | ConvertFrom-Json
+    $sensitiveLabel.target_environment = "prod-token"
+    ($sensitiveLabel | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath $sensitiveLabelPath -Encoding UTF8
+    Invoke-ValidatorExpectFail -PlanPath $sensitiveLabelPath
 }
 finally {
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue

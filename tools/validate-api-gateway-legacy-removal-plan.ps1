@@ -6,6 +6,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "repair-operator-safety.ps1")
+
 if (-not (Test-Path -LiteralPath $PlanPath -PathType Leaf)) {
     throw "Missing api-gateway legacy removal plan: $PlanPath"
 }
@@ -57,6 +59,18 @@ function Assert-NonNegativeInt64 {
     return $number
 }
 
+function Assert-OptionalLowSensitiveLegacyPlanLabel {
+    param(
+        [object]$Value,
+        [string]$Name
+    )
+
+    if ([string]::IsNullOrWhiteSpace([string]$Value)) {
+        return
+    }
+    Assert-LowSensitiveRepairActor -Value ([string]$Value) -FieldName $Name
+}
+
 $raw = Get-Content -LiteralPath $PlanPath -Raw
 try {
     $plan = $raw | ConvertFrom-Json
@@ -86,6 +100,9 @@ if (@("READY", "BLOCKED") -notcontains [string]$plan.status) {
 Assert-Boolean -Value $plan.ready_for_removal -Name "ready_for_removal"
 
 Assert-String $plan.operator "operator"
+Assert-LowSensitiveRepairActor -Value ([string]$plan.operator) -FieldName "operator"
+Assert-OptionalLowSensitiveLegacyPlanLabel -Value $plan.change_id -Name "change_id"
+Assert-OptionalLowSensitiveLegacyPlanLabel -Value $plan.target_environment -Name "target_environment"
 Assert-String $plan.source_observation_window_summary_path "source_observation_window_summary_path"
 if ($plan.generated_at_unix_ms -le 0) {
     throw "Legacy removal plan generated_at_unix_ms must be positive."
@@ -149,7 +166,7 @@ if ($rollbackSteps.Count -lt 2) {
     throw "Legacy removal plan must include rollback_steps."
 }
 
-$sensitivePattern = "(?i)(authorization|bearer\s+\S+|token\s*[:=]|password\s*[:=]|secret\s*[:=]|email@example\.com)"
+$sensitivePattern = "(?i)(authorization|bearer\s+\S+|token\s*[:=]|password\s*[:=]|secret\s*[:=]|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|sk-[A-Za-z0-9_-]{8,}|eyJ[A-Za-z0-9_-]+\.)"
 if ($raw -match $sensitivePattern) {
     throw "Legacy removal plan contains a sensitive-looking field or value."
 }

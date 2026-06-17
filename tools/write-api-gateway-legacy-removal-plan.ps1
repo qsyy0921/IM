@@ -10,6 +10,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "repair-operator-safety.ps1")
+
 function Get-Int64OrZero {
     param([object]$Value)
     if ($null -eq $Value) {
@@ -26,9 +28,25 @@ function Add-Blocker {
     $Blockers.Add($Message)
 }
 
+function Assert-OptionalLowSensitiveLegacyPlanLabel {
+    param(
+        [string]$Value,
+        [string]$FieldName
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return
+    }
+    Assert-LowSensitiveRepairActor -Value $Value -FieldName $FieldName
+}
+
 if (-not (Test-Path -LiteralPath $ObservationWindowSummaryPath -PathType Leaf)) {
     throw "Missing api-gateway legacy observation-window summary: $ObservationWindowSummaryPath"
 }
+
+Assert-LowSensitiveRepairActor -Value $Operator -FieldName "Operator"
+Assert-OptionalLowSensitiveLegacyPlanLabel -Value $ChangeID -FieldName "ChangeID"
+Assert-OptionalLowSensitiveLegacyPlanLabel -Value $TargetEnvironment -FieldName "TargetEnvironment"
 
 $nowMS = $NowUnixMS
 if ($nowMS -le 0) {

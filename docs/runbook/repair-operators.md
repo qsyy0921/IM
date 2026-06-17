@@ -12,6 +12,14 @@
 
 该脚本只读取 catalog 并输出低敏 JSON plan，不执行 operator、不连接数据库、不读取业务数据。后续审批 / 运维 UI 可以先复用这个计划格式，再接正式执行编排。
 
+本地审批请求生成入口：
+
+```powershell
+.\tools\write-repair-approval-request.ps1 -PlanPath H:\NexusIM\operator-plans\plan.json -RequestedBy operator-a -ReasonFile H:\NexusIM\operator-plans\reason.txt
+```
+
+审批请求只保存 `plan_sha256`、`reason_sha256`、service / mode / command 和环境变量名，不保存环境变量值、operator reason 原文或业务数据。它是 first-stage 审批交接文件，不是正式审批系统。
+
 ## 使用原则
 
 - 先 audit，后 repair；没有明确 event / outbox / checkpoint / failure 范围时不要 redrive。

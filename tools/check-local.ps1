@@ -41,6 +41,9 @@ try {
     Write-Host "== repair operator plan writer =="
     Invoke-LocalCheck "check-repair-operator-plan.ps1"
 
+    Write-Host "== repair approval request =="
+    Invoke-LocalCheck "check-repair-approval-request.ps1"
+
     Write-Host "== ddd boundaries =="
     Invoke-LocalCheck "check-ddd-boundaries.ps1"
 

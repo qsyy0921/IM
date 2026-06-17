@@ -191,6 +191,9 @@ try {
     Write-Host "== redis smoke summary =="
     Invoke-LocalCheck "check-redis-smoke-summary.ps1"
 
+    Write-Host "== postgres smoke summary =="
+    Invoke-LocalCheck "check-postgres-smoke-summary.ps1"
+
     Write-Host "== git whitespace =="
     git diff --check
     if ($LASTEXITCODE -ne 0) {

@@ -85,7 +85,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - Redis Cluster 六节点短容量基线
 - Redis Sentinel / Cluster smoke summary 离线 validator
 - PostgreSQL `repmgr + pgpool` local failover smoke
-- PostgreSQL quorum observation smoke and ADR-034 production quorum boundary
+- PostgreSQL quorum observation smoke、summary 离线 validator，以及 ADR-034 production quorum boundary
 - Kafka KRaft 3 broker local failover / controller-switch / ISR observation smoke，且 ISR observation raw summary 已有可复用 JSON / Markdown summary validator
 - Kafka KRaft repeated ISR flapping smoke：本地 2 轮 broker stop/start 均验证 ISR 从 3 收缩到 2、恢复到 3，且 `acks=all` probe 在降级和恢复阶段均可写入；这是本地 flapping 观察，不是生产 Kafka HA 或 rebalance storm 证明
 - outbox Kafka producer first-stage `acks=all` / bounded retry-backoff 配置、本地门禁、6 个 producer package 配置单测、producer config summary 和 Kafka producer hardening evaluation；当前 `kafka-go` writer 明确不声明 idempotent / transactional producer 语义，可靠业务边界仍是 outbox / event_id 幂等

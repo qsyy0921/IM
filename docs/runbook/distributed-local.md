@@ -242,6 +242,15 @@ after:  delivery.notify seq=2, PullInbox item_count=1/max_seq=2, delivery.ack.ok
 
 这证明本地 `repmgr + pgpool` 稳定写入口切主后，`CreateMemberChange -> SendMessage -> delivery.notify -> PullInbox -> delivery.ack.ok` 最小链路仍可跑通。它不代表生产级 PostgreSQL HA，不覆盖 split-brain、quorum、防抖、自动回切、in-flight transaction continuity 或跨机存储故障。
 
+PostgreSQL failover / quorum observation summary 可用离线 validator 做格式和关键不变量复核：
+
+```powershell
+.\tools\validate-postgres-smoke-summary.ps1 `
+  -SummaryPath H:\NexusIM\loadtest-results\<run>\<postgres-summary>.json
+```
+
+该 validator 会检查 wrapper summary、被引用的 push-gateway full smoke summary、`delivery_outbox` 无积压 / 无 DLQ、`PullInbox + AckDelivery` 兜底链路，以及 failover 场景的 primary 变更或 quorum-observation 场景的 standby stop / restore 证据。它只是本地 summary 可信度门禁，不代表生产 PostgreSQL HA / quorum SLO。
+
 当前 Kafka failover smoke 原始结果：
 
 ```text
@@ -425,7 +434,7 @@ Redis Sentinel / Cluster smoke 结果可以用下面的离线 validator 校验 w
 ## 7. 已知缺口
 
 - Redis route 已做一次真实 stop/start fault smoke，证明 online notify 可丢但 `PullInbox + AckDelivery` 可恢复；push-gateway 已在三 Redis / 三 Sentinel 拓扑上跑通 Sentinel discovery、手动 failover、master-stop recovery、quorum-loss fallback 和 network-partition fallback smoke，也跑通过 Redis Cluster topology / node-stop / failover / 短容量 smoke，且 summary 格式已有离线 validator；这些仍不是生产 Redis HA、长时间容量曲线或生产级高可用结论。
-- PostgreSQL 当前已补本地 `repmgr + pgpool` failover smoke，证明同一个 pgpool DSN 在 primary 切换前后仍可跑通最小分布式链路；但这仍不是 Patroni / etcd / 云托管 PostgreSQL 的生产级 HA 验收，也不覆盖 split-brain、quorum、防抖、自动回切或 in-flight transaction continuity。
+- PostgreSQL 当前已补本地 `repmgr + pgpool` failover smoke、quorum observation smoke 和 summary 离线 validator，证明同一个 pgpool DSN 在 primary 切换前后仍可跑通最小分布式链路，并能离线复核 wrapper / linked pushgateway summary 的关键不变量；但这仍不是 Patroni / etcd / 云托管 PostgreSQL 的生产级 HA 验收，也不覆盖 split-brain、quorum、防抖、自动回切或 in-flight transaction continuity。
 - Redis route 已有 TTL 续期和后台 stale route cleanup；异常进程退出后 session route 仍依赖 TTL 过期，user route set 中的 stale 成员由 lookup / cleanup loop 移除。
 - `push-gateway` Redis-backed cross-instance resume buffer 已有本机跨进程 smoke 和 Win-Mac Docker smoke；跨实例 replay miss、Redis error 或 token mismatch 时仍必须 fallback `PullInbox`。
 - `push-gateway` `/debug/metrics` 仍是本地 smoke 调试端点，不是正式 Prometheus 指标。

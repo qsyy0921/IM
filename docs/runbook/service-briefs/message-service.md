@@ -21,6 +21,7 @@
 - `loadtest/sendmessage` 容量 runner 已按 config / model / auth / util 同 package 拆分，避免后续容量观测继续堆进单个 `main.go`。
 - `loadtest/sendmessage` summary 已新增 `capacity_summary`，统一输出 actual duration、targets、VU、conversation、request/success/error、logical request、RPS、p95/p99、outbox 和 PG pool 关键计数；这是容量基线口径，不等于已完成生产容量压测。
 - `loadtest/capacityseed` 已能准备 `tenant-capacity-message` 下的 ACTIVE conversation / member fixture；`capacity-baseline-seeded-20260616` 本地 seeded 短基线中 `sendmessage` 成功 408、`accepted_rps=81.34`，报告见 `loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md`。
+- `cmd/message-service` 已按 env / debug listener / gRPC server 与 TLS / downstream client TLS / observability config / operator config 同 package 拆分，避免入口 `main.go` 继续承载横切 helper。
 - PostgreSQL repository 的 revoke / edit / delete mutation 集成测试已拆到同 package `repository_mutation_test.go`，保留原覆盖面并降低单个测试文件复杂度。
 
 ## 后续

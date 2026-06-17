@@ -61,6 +61,11 @@ $operatorSpecs = @(
         DryRunEnvs = @(
             "NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
         )
+        ReasonFileEnvs = @(
+            "NEXUSIM_MESSAGE_OUTBOX_REPAIR_REASON_FILE",
+            "NEXUSIM_MESSAGE_LEGAL_HOLD_REASON_FILE",
+            "NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_REASON_FILE"
+        )
         ExtraCmdFiles = @(
             "services\message-service\cmd\message-service\message_legal_hold_operator.go",
             "services\message-service\cmd\message-service\message_compliance_proof_operator.go",
@@ -104,6 +109,11 @@ $operatorSpecs = @(
             "NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_DRY_RUN",
             "NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_DRY_RUN"
         )
+        ReasonFileEnvs = @(
+            "NEXUSIM_DELIVERY_OUTBOX_REPAIR_REASON_FILE",
+            "NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON_FILE",
+            "NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_REASON_FILE"
+        )
     },
     @{
         Service = "receipt-service"
@@ -118,6 +128,9 @@ $operatorSpecs = @(
         )
         DryRunEnvs = @(
             "NEXUSIM_RECEIPT_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
+        )
+        ReasonFileEnvs = @(
+            "NEXUSIM_RECEIPT_OUTBOX_REPAIR_REASON_FILE"
         )
     },
     @{
@@ -151,6 +164,10 @@ $operatorSpecs = @(
         DryRunEnvs = @(
             "NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
         )
+        ReasonFileEnvs = @(
+            "NEXUSIM_CONTACTS_OUTBOX_REPAIR_REASON_FILE",
+            "NEXUSIM_CONTACTS_REQUEST_REVIEW_REASON_FILE"
+        )
     },
     @{
         Service = "policy-service"
@@ -177,6 +194,10 @@ $operatorSpecs = @(
         DryRunEnvs = @(
             "NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
         )
+        ReasonFileEnvs = @(
+            "NEXUSIM_POLICY_OUTBOX_REPAIR_REASON_FILE",
+            "NEXUSIM_POLICY_TENANT_QUOTA_SET_REASON_FILE"
+        )
     },
     @{
         Service = "conversation-service"
@@ -191,6 +212,9 @@ $operatorSpecs = @(
         )
         DryRunEnvs = @(
             "NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_DRY_RUN"
+        )
+        ReasonFileEnvs = @(
+            "NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_REASON_FILE"
         )
     },
     @{
@@ -220,6 +244,9 @@ $operatorSpecs = @(
             "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_DRY_RUN",
             "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_DRY_RUN",
             "NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_DRY_RUN"
+        )
+        ReasonFileEnvs = @(
+            "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_REASON_FILE"
         )
     }
 )
@@ -290,6 +317,7 @@ foreach ($spec in $operatorSpecs) {
     Assert-CatalogArrayContainsAll -Service $service -FieldName "mode" -ExpectedValues @($spec.Modes) -ActualValues @($catalogService.modes)
     Assert-CatalogArrayContainsAll -Service $service -FieldName "output_env" -ExpectedValues @($spec.OutputEnvs) -ActualValues @($catalogService.output_envs)
     Assert-CatalogArrayContainsAll -Service $service -FieldName "dry_run_env" -ExpectedValues @($spec.DryRunEnvs) -ActualValues @($catalogService.dry_run_envs)
+    Assert-CatalogArrayContainsAll -Service $service -FieldName "reason_file_env" -ExpectedValues @($spec.ReasonFileEnvs) -ActualValues @($catalogService.reason_file_envs)
 
     $cmdPath = Join-Path $repoRoot ([string]$spec.Cmd)
     if (-not (Test-Path -LiteralPath $cmdPath -PathType Leaf)) {
@@ -357,6 +385,38 @@ foreach ($spec in $operatorSpecs) {
         }
         if (-not $cmd.Contains($dryRunEnv)) {
             throw "$($spec.Cmd) missing documented dry-run env for ${service}: $dryRunEnv"
+        }
+    }
+
+    $catalogReasonFileSet = @{}
+    foreach ($catalogReasonFileEnv in @($catalogService.reason_file_envs)) {
+        $catalogReasonFileEnv = [string]$catalogReasonFileEnv
+        if (-not [string]::IsNullOrWhiteSpace($catalogReasonFileEnv)) {
+            $catalogReasonFileSet[$catalogReasonFileEnv] = $true
+        }
+    }
+
+    foreach ($reasonFileEnv in @($spec.ReasonFileEnvs)) {
+        $reasonFileEnv = [string]$reasonFileEnv
+        if ([string]::IsNullOrWhiteSpace($reasonFileEnv)) {
+            continue
+        }
+        if (-not $repairIndex.Contains($reasonFileEnv)) {
+            throw "docs/runbook/repair-operators.md missing documented reason file env for ${service}: $reasonFileEnv"
+        }
+        if (-not $cmd.Contains($reasonFileEnv)) {
+            throw "$($spec.Cmd) missing documented reason file env for ${service}: $reasonFileEnv"
+        }
+    }
+
+    $reasonFileMatches = [regex]::Matches($cmd, 'NEXUSIM_[A-Z0-9_]+_REASON_FILE')
+    foreach ($match in $reasonFileMatches) {
+        $reasonFileEnv = [string]$match.Value
+        if ($reasonFileEnv -match "_TEST_REASON_FILE$") {
+            continue
+        }
+        if (-not $catalogReasonFileSet.ContainsKey($reasonFileEnv)) {
+            throw "docs/runbook/repair-operators.catalog.json service ${service} missing discovered reason_file_env from cmd package: $reasonFileEnv"
         }
     }
 }

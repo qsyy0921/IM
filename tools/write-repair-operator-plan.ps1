@@ -9,6 +9,8 @@ param(
     [string]$OutputEnv = "",
     [switch]$DryRun,
     [string]$DryRunEnv = "",
+    [string]$ReasonFilePath = "",
+    [string]$ReasonFileEnv = "",
     [string[]]$Env = @(),
     [string]$PlanOutputPath = ""
 )
@@ -70,6 +72,7 @@ function Convert-ToStringList {
 
 $outputEnvSet = Convert-ToSet @($serviceSpec.output_envs)
 $dryRunEnvSet = Convert-ToSet @($serviceSpec.dry_run_envs)
+$reasonFileEnvSet = Convert-ToSet @($serviceSpec.reason_file_envs)
 
 $environment = [ordered]@{}
 $environment[[string]$serviceSpec.mode_env] = $Mode
@@ -100,6 +103,27 @@ if ($DryRun) {
     $environment[$selectedDryRunEnv] = "true"
 }
 
+if (-not [string]::IsNullOrWhiteSpace($ReasonFilePath)) {
+    $selectedReasonFileEnv = $ReasonFileEnv
+    if ([string]::IsNullOrWhiteSpace($selectedReasonFileEnv)) {
+        $reasonFileEnvValues = Convert-ToStringList @($serviceSpec.reason_file_envs)
+        if ($reasonFileEnvValues.Count -eq 1) {
+            $selectedReasonFileEnv = $reasonFileEnvValues[0]
+        } else {
+            throw "ReasonFilePath requires ReasonFileEnv when ${Service} has zero or multiple reason-file envs."
+        }
+    }
+    if (-not $reasonFileEnvSet.ContainsKey($selectedReasonFileEnv)) {
+        throw "Unsupported reason-file env for ${Service}: $selectedReasonFileEnv"
+    }
+    Assert-LowSensitiveRepairAdHocEnv -Key $selectedReasonFileEnv -Value $ReasonFilePath
+    $environment[$selectedReasonFileEnv] = $ReasonFilePath
+}
+
+if ([string]::IsNullOrWhiteSpace($ReasonFilePath) -and -not [string]::IsNullOrWhiteSpace($ReasonFileEnv)) {
+    throw "ReasonFileEnv requires ReasonFilePath."
+}
+
 foreach ($entry in @($Env)) {
     if ([string]::IsNullOrWhiteSpace($entry)) {
         continue
@@ -109,6 +133,9 @@ foreach ($entry in @($Env)) {
         throw "Env entries must use KEY=VALUE format: $entry"
     }
     Assert-LowSensitiveRepairAdHocEnv -Key $parts[0] -Value $parts[1]
+    if ($environment.Contains($parts[0])) {
+        throw "Env entry duplicates a catalog-managed environment key. Use the dedicated parameter for: $($parts[0])"
+    }
     $environment[$parts[0]] = $parts[1]
 }
 

@@ -26,7 +26,8 @@ try {
         -Mode "projection-checkpoint-repair" `
         -DryRun `
         -DryRunEnv "NEXUSIM_DELIVERY_PROJECTION_REPAIR_DRY_RUN" `
-        -Env "NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON=do-not-copy-this-value"
+        -ReasonFileEnv "NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON_FILE" `
+        -ReasonFilePath "H:\NexusIM\operator-plans\projection-reason.txt"
     if ($LASTEXITCODE -ne 0) {
         throw "write-repair-operator-plan.ps1 failed while preparing approval decision test"
     }
@@ -75,7 +76,7 @@ try {
     if (-not $decision.reason_present -or [string]::IsNullOrWhiteSpace([string]$decision.reason_sha256)) {
         throw "approval decision should include decision reason presence and hash."
     }
-    if ($decisionRaw.Contains("do-not-copy-this-value") -or $decisionRaw.Contains("operator approver checked external ticket")) {
+    if ($decisionRaw.Contains("projection-reason.txt") -or $decisionRaw.Contains("operator approver checked external ticket")) {
         throw "approval decision leaked raw env value or decision reason text."
     }
 

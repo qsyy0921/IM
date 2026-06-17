@@ -53,6 +53,8 @@ try {
         -Mode "projection-checkpoint-repair" `
         -DryRun `
         -DryRunEnv "NEXUSIM_DELIVERY_PROJECTION_REPAIR_DRY_RUN" `
+        -ReasonFileEnv "NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON_FILE" `
+        -ReasonFilePath "H:\NexusIM\operator-plans\projection-reason.txt" `
         -Env "NEXUSIM_DELIVERY_PROJECTION_REPAIR_OPERATOR=manual"
     if ($LASTEXITCODE -ne 0) {
         throw "write-repair-operator-plan.ps1 failed for delivery-service"
@@ -60,8 +62,22 @@ try {
     $deliveryPlan = $deliveryPlanJson | ConvertFrom-Json
     if ($deliveryPlan.environment.NEXUSIM_DELIVERY_SERVICE_MODE -ne "projection-checkpoint-repair" -or
         $deliveryPlan.environment.NEXUSIM_DELIVERY_PROJECTION_REPAIR_DRY_RUN -ne "true" -or
+        $deliveryPlan.environment.NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON_FILE -ne "H:\NexusIM\operator-plans\projection-reason.txt" -or
         $deliveryPlan.environment.NEXUSIM_DELIVERY_PROJECTION_REPAIR_OPERATOR -ne "manual") {
         throw "delivery-service repair operator plan has unexpected environment."
+    }
+
+    $receiptPlanJson = & powershell -NoProfile -ExecutionPolicy Bypass -File $plannerPath `
+        -Service "receipt-service" `
+        -Mode "outbox-repair" `
+        -ReasonFilePath "H:\NexusIM\operator-plans\receipt-reason.txt"
+    if ($LASTEXITCODE -ne 0) {
+        throw "write-repair-operator-plan.ps1 failed for receipt-service reason file"
+    }
+    $receiptPlan = $receiptPlanJson | ConvertFrom-Json
+    if ($receiptPlan.environment.NEXUSIM_RECEIPT_SERVICE_MODE -ne "outbox-repair" -or
+        $receiptPlan.environment.NEXUSIM_RECEIPT_OUTBOX_REPAIR_REASON_FILE -ne "H:\NexusIM\operator-plans\receipt-reason.txt") {
+        throw "receipt-service repair operator plan has unexpected reason-file environment."
     }
 
     $policyPlanJson = & powershell -NoProfile -ExecutionPolicy Bypass -File $plannerPath `
@@ -93,6 +109,22 @@ try {
     }
     if ($sensitiveKeyExitCode -eq 0 -or ($sensitiveKeyOutput -join "`n") -notmatch "potentially sensitive Env key") {
         throw "repair operator plan should reject sensitive ad-hoc env keys."
+    }
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $duplicateReasonFileOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $plannerPath `
+            -Service "receipt-service" `
+            -Mode "outbox-repair" `
+            -ReasonFilePath "H:\NexusIM\operator-plans\receipt-reason.txt" `
+            -Env "NEXUSIM_RECEIPT_OUTBOX_REPAIR_REASON_FILE=H:\NexusIM\operator-plans\other.txt" 2>&1
+        $duplicateReasonFileExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($duplicateReasonFileExitCode -eq 0 -or ($duplicateReasonFileOutput -join "`n") -notmatch "duplicates a catalog-managed environment key") {
+        throw "repair operator plan should reject duplicate reason-file env values."
     }
 
     $previousErrorActionPreference = $ErrorActionPreference

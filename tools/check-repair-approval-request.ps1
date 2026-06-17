@@ -24,7 +24,8 @@ try {
         -Mode "projection-checkpoint-repair" `
         -DryRun `
         -DryRunEnv "NEXUSIM_DELIVERY_PROJECTION_REPAIR_DRY_RUN" `
-        -Env "NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON=do-not-copy-this-reason"
+        -ReasonFileEnv "NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON_FILE" `
+        -ReasonFilePath "H:\NexusIM\operator-plans\projection-reason.txt"
     if ($LASTEXITCODE -ne 0) {
         throw "write-repair-operator-plan.ps1 failed while preparing approval test"
     }
@@ -61,13 +62,13 @@ try {
     foreach ($expectedKey in @(
         "NEXUSIM_DELIVERY_SERVICE_MODE",
         "NEXUSIM_DELIVERY_PROJECTION_REPAIR_DRY_RUN",
-        "NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON"
+        "NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON_FILE"
     )) {
         if ($environmentKeys -notcontains $expectedKey) {
             throw "approval request missing environment key: $expectedKey"
         }
     }
-    if ($approvalRaw.Contains("do-not-copy-this-reason") -or $approvalRaw.Contains("operator needs to replay")) {
+    if ($approvalRaw.Contains("projection-reason.txt") -or $approvalRaw.Contains("operator needs to replay")) {
         throw "approval request leaked raw env value or reason text."
     }
 

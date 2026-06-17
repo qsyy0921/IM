@@ -25,7 +25,8 @@ try {
         -Mode "projection-checkpoint-repair" `
         -DryRun `
         -DryRunEnv "NEXUSIM_DELIVERY_PROJECTION_REPAIR_DRY_RUN" `
-        -Env "NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON=do-not-copy-invocation-value"
+        -ReasonFileEnv "NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON_FILE" `
+        -ReasonFilePath "H:\NexusIM\operator-plans\projection-reason.txt"
     if ($LASTEXITCODE -ne 0) {
         throw "write-repair-operator-plan.ps1 failed while preparing approved invocation test"
     }
@@ -71,10 +72,10 @@ try {
         $summary.dry_run_requested -ne $true) {
         throw "approved invocation summary has unexpected fields."
     }
-    if (@($summary.environment_keys) -notcontains "NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON") {
+    if (@($summary.environment_keys) -notcontains "NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON_FILE") {
         throw "approved invocation summary should include redacted environment keys."
     }
-    if ($summaryRaw.Contains("do-not-copy-invocation-value")) {
+    if ($summaryRaw.Contains("projection-reason.txt")) {
         throw "approved invocation summary leaked raw env value."
     }
 

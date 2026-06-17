@@ -38,6 +38,11 @@
       ],
       "dry_run_envs": [
         "NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
+      ],
+      "reason_file_envs": [
+        "NEXUSIM_MESSAGE_OUTBOX_REPAIR_REASON_FILE",
+        "NEXUSIM_MESSAGE_LEGAL_HOLD_REASON_FILE",
+        "NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_REASON_FILE"
       ]
     },
     {
@@ -74,6 +79,11 @@
         "NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_DRY_RUN",
         "NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_DRY_RUN",
         "NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_DRY_RUN"
+      ],
+      "reason_file_envs": [
+        "NEXUSIM_DELIVERY_OUTBOX_REPAIR_REASON_FILE",
+        "NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON_FILE",
+        "NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_REASON_FILE"
       ]
     },
     {
@@ -93,6 +103,9 @@
       ],
       "dry_run_envs": [
         "NEXUSIM_RECEIPT_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
+      ],
+      "reason_file_envs": [
+        "NEXUSIM_RECEIPT_OUTBOX_REPAIR_REASON_FILE"
       ]
     },
     {
@@ -124,6 +137,10 @@
       ],
       "dry_run_envs": [
         "NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
+      ],
+      "reason_file_envs": [
+        "NEXUSIM_CONTACTS_OUTBOX_REPAIR_REASON_FILE",
+        "NEXUSIM_CONTACTS_REQUEST_REVIEW_REASON_FILE"
       ]
     },
     {
@@ -149,6 +166,10 @@
       ],
       "dry_run_envs": [
         "NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
+      ],
+      "reason_file_envs": [
+        "NEXUSIM_POLICY_OUTBOX_REPAIR_REASON_FILE",
+        "NEXUSIM_POLICY_TENANT_QUOTA_SET_REASON_FILE"
       ]
     },
     {
@@ -168,6 +189,9 @@
       ],
       "dry_run_envs": [
         "NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_DRY_RUN"
+      ],
+      "reason_file_envs": [
+        "NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_REASON_FILE"
       ]
     },
     {
@@ -193,6 +217,9 @@
         "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_DRY_RUN",
         "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_DRY_RUN",
         "NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_DRY_RUN"
+      ],
+      "reason_file_envs": [
+        "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_REASON_FILE"
       ]
     }
   ]

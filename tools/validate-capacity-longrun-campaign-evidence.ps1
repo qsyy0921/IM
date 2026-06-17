@@ -1,6 +1,7 @@
 param(
     [string]$ManifestPath = "docs/runbook/capacity-longrun-campaign-evidence.json",
     [string]$ExpectedResultRoot = "H:\NexusIM\loadtest-results",
+    [string]$ReportRoot = "docs/runbook/loadtest",
     [switch]$RequireFiles,
     [string]$OutputPath = "",
     [string]$MarkdownPath = ""
@@ -82,7 +83,7 @@ function Escape-MarkdownCell {
 }
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
-$reportRoot = Join-Path $repoRoot "docs\runbook\loadtest"
+$reportRoot = Resolve-RepoPath $ReportRoot
 $resolvedManifestPath = Resolve-RepoPath $ManifestPath
 Assert-Condition (Test-Path -LiteralPath $resolvedManifestPath -PathType Leaf) "ManifestPath does not exist: $resolvedManifestPath"
 Assert-Condition ($ExpectedResultRoot.Trim().Length -gt 0) "ExpectedResultRoot is required."
@@ -139,6 +140,14 @@ foreach ($entry in @($manifest.entries)) {
         if ($RequireFiles) {
             Assert-Condition (Test-Path -LiteralPath $resolvedSummaryPath -PathType Leaf) "capacity long-run campaign summary does not exist for $name`: $resolvedSummaryPath"
             Assert-Condition (Test-Path -LiteralPath $resolvedReportPath -PathType Leaf) "capacity long-run campaign report does not exist for $name`: $reportPath"
+            $summary = Get-Content -LiteralPath $resolvedSummaryPath -Raw | ConvertFrom-Json
+            Assert-Condition ([int]$summary.schema_version -eq 1) "capacity long-run campaign summary for $name schema_version must be 1."
+            Assert-Condition ((Get-JsonPropertyString -Object $summary -Name "scope") -match "not a production SLO") "capacity long-run campaign summary for $name must state non-SLO boundary."
+            Assert-Condition ((Get-JsonPropertyString -Object $summary -Name "status") -eq "completed") "capacity long-run campaign summary for $name must be completed."
+            Assert-Condition ([int]$summary.service_count -gt 0) "capacity long-run campaign summary for $name service_count must be positive."
+            Assert-Condition ([int]$summary.completed_service_count -eq [int]$summary.service_count) "capacity long-run campaign summary for $name must complete every service."
+            Assert-Condition ([int]$summary.failed_service_count -eq 0) "capacity long-run campaign summary for $name must not have failed services."
+            Assert-Condition ([double]$summary.minimum_duration_seconds -ge 1800) "capacity long-run campaign summary for $name minimum_duration_seconds must be at least 30m."
             $report = Get-Content -LiteralPath $resolvedReportPath -Raw
             $reportLower = $report.ToLowerInvariant()
             Assert-Condition ($reportLower.Contains("capacity") -and ($reportLower.Contains("production") -or $reportLower.Contains("slo") -or $reportLower.Contains("sizing"))) "capacity long-run campaign report must state capacity and non-production/SLO/sizing boundary for $name."

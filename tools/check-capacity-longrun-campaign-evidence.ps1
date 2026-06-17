@@ -28,6 +28,7 @@ function Invoke-Validator {
     param(
         [string]$ManifestPath,
         [string]$ExpectedResultRoot,
+        [string]$ReportRoot = "",
         [switch]$RequireFiles,
         [string]$MarkdownPath = ""
     )
@@ -36,6 +37,9 @@ function Invoke-Validator {
         $args = @{
             ManifestPath = $ManifestPath
             ExpectedResultRoot = $ExpectedResultRoot
+        }
+        if ($ReportRoot.Trim().Length -gt 0) {
+            $args.ReportRoot = $ReportRoot
         }
         if ($RequireFiles) {
             $args.RequireFiles = $true
@@ -131,6 +135,52 @@ try {
     $markdown = Get-Content -LiteralPath $markdownPath -Raw
     if (-not $markdown.Contains("Capacity Long-Run Campaign Evidence") -or -not $markdown.Contains("not a production SLO") -or -not $markdown.Contains("planned-fixture")) {
         Write-Host "FAIL capacity long-run campaign evidence markdown missing boundary text." -ForegroundColor Red
+        exit 1
+    }
+
+    $completedSummaryPath = Join-Path $campaignRoot "$planName\capacity-longrun-campaign-summary.json"
+    Write-JsonFile -Path $completedSummaryPath -Value ([ordered]@{
+        schema_version = 1
+        generated_at = "2026-06-18T00:00:00Z"
+        scope = "fixture long-run summary; not a production SLO or sizing proof"
+        plan_path = $planPath
+        campaign_name = $planName
+        status = "completed"
+        service_count = 2
+        completed_service_count = 2
+        failed_service_count = 0
+        minimum_duration_seconds = 1800
+        rows = @()
+    })
+    $completedReportPath = Join-Path $tempRoot "reports\completed-fixture-report.md"
+    $completedReportDir = Split-Path -Parent $completedReportPath
+    New-Item -ItemType Directory -Force -Path $completedReportDir | Out-Null
+    @(
+        "# Fixture Capacity Report",
+        "",
+        "This capacity report is not a production SLO or sizing proof."
+    ) | Set-Content -LiteralPath $completedReportPath -Encoding UTF8
+
+    $completedManifestPath = Join-Path $tempRoot "completed-evidence.json"
+    Write-JsonFile -Path $completedManifestPath -Value ([ordered]@{
+        schema_version = 1
+        updated_at = "2026-06-18"
+        scope = "self-test completed long-run capacity evidence"
+        entries = @(
+            [ordered]@{
+                name = "completed-fixture"
+                status = "completed"
+                plan_path = $planPath
+                summary_path = $completedSummaryPath
+                report_path = $completedReportPath
+                note = "fixture"
+            }
+        )
+    })
+    $completedResult = Invoke-Validator -ManifestPath $completedManifestPath -ExpectedResultRoot $campaignRoot -ReportRoot $completedReportDir -RequireFiles
+    if ($completedResult.ExitCode -ne 0) {
+        Write-Host "FAIL completed capacity long-run campaign evidence fixture should pass." -ForegroundColor Red
+        Write-Host $completedResult.Output -ForegroundColor Red
         exit 1
     }
 

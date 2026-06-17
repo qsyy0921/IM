@@ -239,6 +239,17 @@ try {
         "-MaxSnapshotAge", "1h",
         "-NowUnixMS", "100500"
     )
+    Invoke-GateExpectFail -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $legacyObservation,
+        "-SnapshotPath", $legacyGood,
+        "-OutputRoot", (Join-Path $repoRoot "tmp-legacy-observation"),
+        "-RunName", "legacy-observation-repo-output",
+        "-RequiredQuietDuration", "7d",
+        "-MaxSnapshotAge", "1h",
+        "-NowUnixMS", "100500"
+    )
     $failedObservationSummary = Join-Path $observationRoot "legacy-observation-fail\legacy-observation-summary.json"
     if (-not (Test-Path -LiteralPath $failedObservationSummary)) {
         throw "Expected failed legacy observation summary to be written: $failedObservationSummary"

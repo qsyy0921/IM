@@ -83,6 +83,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - Redis Cluster node-stop fallback smoke
 - Redis Cluster 六节点自动 failover smoke
 - Redis Cluster 六节点短容量基线
+- Redis Sentinel / Cluster smoke summary 离线 validator
 - PostgreSQL `repmgr + pgpool` local failover smoke
 - PostgreSQL quorum observation smoke and ADR-034 production quorum boundary
 - Kafka KRaft 3 broker local failover / controller-switch / ISR observation smoke，且 ISR observation raw summary 已有可复用 JSON / Markdown summary validator

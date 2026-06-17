@@ -412,9 +412,19 @@ push-gateway 只消费 delivery 事件做在线唤醒，WebSocket 连接和 Kafk
 生产级还需要真实鉴权、Kubernetes 部署、Redis HA / Sentinel / Cluster、跨实例慢连接组合验证、正式 metrics、容量和故障演练。
 ```
 
+Redis Sentinel / Cluster smoke 结果可以用下面的离线 validator 校验 wrapper summary 和 `pushgateway-summary.json` 的关键不变量：
+
+```powershell
+.\tools\validate-redis-smoke-summary.ps1 `
+  -SummaryPath H:\NexusIM\loadtest-results\<run>\<redis-summary>.json `
+  -RequireCleanGit
+```
+
+该 validator 只验证本地 smoke 证据格式、Redis route fallback / failover / capacity summary 不变量，不证明生产 Redis HA、长时间容量曲线或容量 SLO。
+
 ## 7. 已知缺口
 
-- Redis route 已做一次真实 stop/start fault smoke，证明 online notify 可丢但 `PullInbox + AckDelivery` 可恢复；push-gateway 已在三 Redis / 三 Sentinel 拓扑上跑通 Sentinel discovery、手动 failover、master-stop recovery 和 quorum-loss fallback smoke，但真实网络分区仍未覆盖，因此仍不是 Redis HA、Redis Cluster 或生产级高可用结论。
+- Redis route 已做一次真实 stop/start fault smoke，证明 online notify 可丢但 `PullInbox + AckDelivery` 可恢复；push-gateway 已在三 Redis / 三 Sentinel 拓扑上跑通 Sentinel discovery、手动 failover、master-stop recovery、quorum-loss fallback 和 network-partition fallback smoke，也跑通过 Redis Cluster topology / node-stop / failover / 短容量 smoke，且 summary 格式已有离线 validator；这些仍不是生产 Redis HA、长时间容量曲线或生产级高可用结论。
 - PostgreSQL 当前已补本地 `repmgr + pgpool` failover smoke，证明同一个 pgpool DSN 在 primary 切换前后仍可跑通最小分布式链路；但这仍不是 Patroni / etcd / 云托管 PostgreSQL 的生产级 HA 验收，也不覆盖 split-brain、quorum、防抖、自动回切或 in-flight transaction continuity。
 - Redis route 已有 TTL 续期和后台 stale route cleanup；异常进程退出后 session route 仍依赖 TTL 过期，user route set 中的 stale 成员由 lookup / cleanup loop 移除。
 - `push-gateway` Redis-backed cross-instance resume buffer 已有本机跨进程 smoke 和 Win-Mac Docker smoke；跨实例 replay miss、Redis error 或 token mismatch 时仍必须 fallback `PullInbox`。

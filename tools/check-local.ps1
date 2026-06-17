@@ -188,6 +188,9 @@ try {
     Write-Host "== kafka consumer churn summary =="
     Invoke-LocalCheck "check-kafka-consumer-churn-summary.ps1"
 
+    Write-Host "== redis smoke summary =="
+    Invoke-LocalCheck "check-redis-smoke-summary.ps1"
+
     Write-Host "== git whitespace =="
     git diff --check
     if ($LASTEXITCODE -ne 0) {

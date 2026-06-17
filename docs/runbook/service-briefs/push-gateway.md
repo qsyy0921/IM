@@ -25,7 +25,7 @@
 - `loadtest/pushgateway` Go runner 已按 config / model / auth / scenario / util 同 package 拆分，避免后续 Redis route、slow-client、resume 和容量 smoke 继续堆进单个 `main.go`。
 - `loadtest/pushgateway` summary 已新增 `capacity_summary` 派生字段，统一输出 duration、device/message/notify/ack/pull 计数和每秒速率；本地 push-gateway stack 短基线已跑通 `full` 场景，clean summary 记录 `git_dirty=false`、1 个 device、1 条 message、1 个 notify、1 个 ACK、PullInbox 1 条、delivery_outbox published 2 条。
 - `loadtest/pushgateway` 已新增并跑通 `redis-resume-negative` 真实进程 smoke，用于验证未知 resume token 被服务端替换并返回 `buffer_miss`、跨 device resume token 返回非重试 `PERMISSION_DENIED`、Redis resume buffer gap 返回 `buffer_miss` 后通过 `PullInbox + AckDelivery` 兜底；报告见 `docs/runbook/loadtest/push-gateway/loadtest-report-20260616-push-gateway-redis-resume-negative-smoke.md`。
-- 本地 smoke 已覆盖 Redis stop/start、Sentinel discovery、手动 failover、master-stop、quorum-loss fallback、network-partition fallback、三节点 Redis Cluster topology、Redis Cluster node-stop fallback 和六节点 Redis Cluster 自动 failover；network-partition 场景会断开 Sentinel 当前 master 的 Docker network，Cluster node-stop 场景会停止 route key slot owner node，Cluster failover 场景会停止 route key slot owner master 并等待 replica 提升。生产级 Redis HA / 容量仍未完成。
+- 本地 smoke 已覆盖 Redis stop/start、Sentinel discovery、手动 failover、master-stop、quorum-loss fallback、network-partition fallback、三节点 Redis Cluster topology、Redis Cluster node-stop fallback 和六节点 Redis Cluster 自动 failover；network-partition 场景会断开 Sentinel 当前 master 的 Docker network，Cluster node-stop 场景会停止 route key slot owner node，Cluster failover 场景会停止 route key slot owner master 并等待 replica 提升。Redis Sentinel / Cluster smoke summary 已有离线 validator。生产级 Redis HA / 容量仍未完成。
 
 ## 后续
 

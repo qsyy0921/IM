@@ -294,6 +294,40 @@ INSERT INTO delivery_projection_checkpoint_repair_audit (
 	assertCheckpointRepairAuditCount(t, ctx, pool, "group-c", "conversation.timeline.events", 0, 1)
 }
 
+func TestProjectionRepairStoreCleanupCheckpointRepairsDryRunDoesNotDeleteIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_checkpoint_repair_audit (
+    consumer_group, topic, partition_id, mode, outcome, skip_reason, operator, reason, dry_run, before_offset_value, after_offset_value, failure_offset_value, failure_event_id, failure_class, created_at
+) VALUES
+    ('group-cleanup-dry-run', 'conversation.timeline.events', 0, 'audit', 'AUDITED', '', 'operator-a', 'repair-a', true, 42, 42, NULL, '', '', now() - interval '10 days'),
+    ('group-cleanup-dry-run', 'conversation.timeline.events', 0, 'rewind-next-offset', 'MUTATED', '', 'operator-b', 'repair-b', false, 42, 21, NULL, '', '', now() - interval '9 days'),
+    ('group-cleanup-dry-run', 'conversation.timeline.events', 0, 'audit', 'AUDITED', '', 'operator-a', 'recent repair', true, 42, 42, NULL, '', '', now() - interval '1 day')
+`)
+	if err != nil {
+		t.Fatalf("seed checkpoint repair dry-run audit: %v", err)
+	}
+
+	store := NewProjectionRepairStore(pool)
+	stats, err := store.CleanupCheckpointRepairs(ctx, ProjectionRepairCleanupOptions{
+		ConsumerGroup: "group-cleanup-dry-run",
+		Topic:         "conversation.timeline.events",
+		Cutoff:        time.Now().UTC().Add(-7 * 24 * time.Hour),
+		Limit:         10,
+		DryRun:        true,
+	})
+	if err != nil {
+		t.Fatalf("dry-run cleanup checkpoint repairs: %v", err)
+	}
+	if stats.Deleted != 2 {
+		t.Fatalf("unexpected dry-run deleted count: %+v", stats)
+	}
+	assertCheckpointRepairAuditCount(t, ctx, pool, "group-cleanup-dry-run", "conversation.timeline.events", 0, 3)
+}
+
 func TestProjectionRepairStoreCleanupCheckpointRepairsHonorsBatchLimitIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

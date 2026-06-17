@@ -481,6 +481,43 @@ INSERT INTO delivery_projection_failures (
 	assertProjectionFailureRow(t, ctx, pool, "group-1", "conversation.timeline.events", 0, 43, types.ProjectionFailureClassDecode, "still unresolved", 1, false, 0)
 }
 
+func TestProjectionFailureStoreCleanupResolvedFailuresDryRunDoesNotDeleteIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO delivery_projection_failures (
+    consumer_group, topic, partition_id, offset_value, event_id, event_type, tenant_id, conversation_id, aggregate_version, trace_id, failure_class, last_error, failure_count, first_seen_at, last_seen_at, resolved_at, resolved_checkpoint_offset
+) VALUES
+    ('group-cleanup-dry-run', 'conversation.timeline.events', 0, 81, 'event-1', 'message.revoked.v1', 'tenant-1', 'conv-1', 7, 'trace-1', 'projection_dependency', 'old resolved', 2, now(), now(), now() - interval '3 days', 82),
+    ('group-cleanup-dry-run', 'conversation.timeline.events', 0, 82, 'event-2', 'message.edited.v1', 'tenant-1', 'conv-1', 8, 'trace-2', 'db_write_failed', 'old resolved 2', 1, now(), now(), now() - interval '2 days', 83),
+    ('group-cleanup-dry-run', 'conversation.timeline.events', 0, 83, 'event-3', 'message.deleted.v1', 'tenant-1', 'conv-1', 9, 'trace-3', 'decode_failed', 'recent resolved', 1, now(), now(), now() - interval '1 hour', 84)
+`)
+	if err != nil {
+		t.Fatalf("seed projection dry-run failures: %v", err)
+	}
+
+	store := NewProjectionFailureStore(pool)
+	stats, err := store.CleanupResolvedFailures(ctx, ProjectionFailureCleanupOptions{
+		ConsumerGroup: "group-cleanup-dry-run",
+		Topic:         "conversation.timeline.events",
+		Cutoff:        time.Now().UTC().Add(-24 * time.Hour),
+		Limit:         10,
+		DryRun:        true,
+	})
+	if err != nil {
+		t.Fatalf("dry-run cleanup resolved projection failures: %v", err)
+	}
+	if stats.Deleted != 2 {
+		t.Fatalf("expected two dry-run deleted rows, got %d", stats.Deleted)
+	}
+
+	assertProjectionFailureRow(t, ctx, pool, "group-cleanup-dry-run", "conversation.timeline.events", 0, 81, types.ProjectionFailureClassProjectionDependency, "old resolved", 2, true, 82)
+	assertProjectionFailureRow(t, ctx, pool, "group-cleanup-dry-run", "conversation.timeline.events", 0, 82, types.ProjectionFailureClassDBWrite, "old resolved 2", 1, true, 83)
+	assertProjectionFailureRow(t, ctx, pool, "group-cleanup-dry-run", "conversation.timeline.events", 0, 83, types.ProjectionFailureClassDecode, "recent resolved", 1, true, 84)
+}
+
 func assertProjectionFailureResolutionAudit(t *testing.T, ctx context.Context, pool *pgxpool.Pool, consumerGroup string, topic string, partitionID int32, offsetValue int64, outcome string, dryRun bool, checkpointOffset int64) {
 	t.Helper()
 	var gotOutcome string

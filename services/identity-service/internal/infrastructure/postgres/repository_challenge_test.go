@@ -677,7 +677,7 @@ INSERT INTO identity_challenge_request_limits (
 		}
 	}
 
-	deleted, err := repository.CleanupChallengeRequestLimits(ctx, cutoff, 100)
+	deleted, err := repository.CleanupChallengeRequestLimits(ctx, cutoff, 100, false)
 	if err != nil {
 		t.Fatalf("cleanup challenge request limits: %v", err)
 	}
@@ -708,5 +708,63 @@ ORDER BY user_id
 	}
 	if strings.Join(remaining, ",") != "active-lock,recent" {
 		t.Fatalf("unexpected remaining limiter rows: %v", remaining)
+	}
+}
+
+func TestRepositoryCleanupChallengeRequestLimitsDryRunDoesNotDeleteIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+	repository := NewRepository(pool)
+	now := time.Unix(1_800_000_000, 0).UTC()
+	cutoff := now.Add(-24 * time.Hour)
+	rows := []struct {
+		userID        string
+		targetKey     string
+		lastRequestAt time.Time
+		lockedUntil   any
+	}{
+		{userID: "dry-run-stale-unlocked", targetKey: strings.Repeat("a", 64), lastRequestAt: cutoff.Add(-time.Hour), lockedUntil: nil},
+		{userID: "dry-run-stale-expired-lock", targetKey: strings.Repeat("b", 64), lastRequestAt: cutoff.Add(-2 * time.Hour), lockedUntil: cutoff.Add(-time.Minute)},
+		{userID: "dry-run-recent", targetKey: strings.Repeat("c", 64), lastRequestAt: cutoff.Add(time.Minute), lockedUntil: nil},
+	}
+	for _, row := range rows {
+		if _, err := pool.Exec(ctx, `
+INSERT INTO identity_challenge_request_limits (
+    tenant_id,
+    user_id,
+    challenge_type,
+    channel,
+    target_key,
+    request_count,
+    window_start,
+    last_request_at,
+    locked_until,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, 3, $6, $7, $8, $7, $7)
+`, "tenant-identity-dry-run", row.userID, types.ChallengeTypePasswordReset, types.VerificationChannelEmail, row.targetKey, row.lastRequestAt.Add(-time.Minute), row.lastRequestAt, row.lockedUntil); err != nil {
+			t.Fatalf("seed dry-run limiter row %s: %v", row.userID, err)
+		}
+	}
+
+	deleted, err := repository.CleanupChallengeRequestLimits(ctx, cutoff, 100, true)
+	if err != nil {
+		t.Fatalf("dry-run cleanup challenge request limits: %v", err)
+	}
+	if deleted != 2 {
+		t.Fatalf("expected 2 dry-run deleted rows, got %d", deleted)
+	}
+
+	var remaining int
+	if err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM identity_challenge_request_limits
+WHERE tenant_id = $1
+`, "tenant-identity-dry-run").Scan(&remaining); err != nil {
+		t.Fatalf("count dry-run limiter rows: %v", err)
+	}
+	if remaining != 3 {
+		t.Fatalf("expected dry-run to keep 3 limiter rows, got %d", remaining)
 	}
 }

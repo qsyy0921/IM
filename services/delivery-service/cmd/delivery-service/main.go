@@ -837,16 +837,18 @@ func runProjectionFailureCleanup() error {
 		FailureClass:  envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_FAILURE_CLASS", ""),
 		Cutoff:        cutoff,
 		Limit:         config.BatchSize,
+		DryRun:        config.DryRun,
 	})
 	if err != nil {
 		return err
 	}
 	log.Printf(
-		"delivery-service projection failure cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d",
+		"delivery-service projection failure cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d dry_run=%t",
 		stats.Deleted,
 		cutoff.Format(time.RFC3339),
 		config.Retention,
 		config.BatchSize,
+		config.DryRun,
 	)
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_OUTPUT")); outputPath != "" {
 		filters := map[string]string{
@@ -857,7 +859,7 @@ func runProjectionFailureCleanup() error {
 		if partitionID != nil {
 			filters["partition_id"] = strconv.FormatInt(int64(*partitionID), 10)
 		}
-		if err := writeOperatorCleanupOutput(outputPath, stats.Deleted, cutoff, config.Retention, config.BatchSize, filters); err != nil {
+		if err := writeOperatorCleanupOutput(outputPath, stats.Deleted, cutoff, config.Retention, config.BatchSize, config.DryRun, filters); err != nil {
 			return err
 		}
 	}
@@ -892,16 +894,18 @@ func runProjectionCheckpointRepairCleanup() error {
 		Outcome:       envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_OUTCOME", ""),
 		Cutoff:        cutoff,
 		Limit:         config.BatchSize,
+		DryRun:        config.DryRun,
 	})
 	if err != nil {
 		return err
 	}
 	log.Printf(
-		"delivery-service projection checkpoint repair cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d",
+		"delivery-service projection checkpoint repair cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d dry_run=%t",
 		stats.Deleted,
 		cutoff.Format(time.RFC3339),
 		config.Retention,
 		config.BatchSize,
+		config.DryRun,
 	)
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_OUTPUT")); outputPath != "" {
 		filters := map[string]string{
@@ -913,7 +917,7 @@ func runProjectionCheckpointRepairCleanup() error {
 		if partitionID != nil {
 			filters["partition_id"] = strconv.FormatInt(int64(*partitionID), 10)
 		}
-		if err := writeOperatorCleanupOutput(outputPath, stats.Deleted, cutoff, config.Retention, config.BatchSize, filters); err != nil {
+		if err := writeOperatorCleanupOutput(outputPath, stats.Deleted, cutoff, config.Retention, config.BatchSize, config.DryRun, filters); err != nil {
 			return err
 		}
 	}
@@ -923,6 +927,7 @@ func runProjectionCheckpointRepairCleanup() error {
 type projectionFailureCleanupConfig struct {
 	Retention time.Duration
 	BatchSize int
+	DryRun    bool
 }
 
 type outboxRepairCleanupConfig struct {
@@ -934,6 +939,7 @@ type outboxRepairCleanupConfig struct {
 type projectionCheckpointRepairCleanupConfig struct {
 	Retention time.Duration
 	BatchSize int
+	DryRun    bool
 }
 
 func projectionFailureCleanupConfigFromEnv() (projectionFailureCleanupConfig, error) {
@@ -948,6 +954,7 @@ func projectionFailureCleanupConfigFromEnv() (projectionFailureCleanupConfig, er
 	return projectionFailureCleanupConfig{
 		Retention: retention,
 		BatchSize: batchSize,
+		DryRun:    envBool("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_DRY_RUN", false),
 	}, nil
 }
 
@@ -979,6 +986,7 @@ func projectionCheckpointRepairCleanupConfigFromEnv() (projectionCheckpointRepai
 	return projectionCheckpointRepairCleanupConfig{
 		Retention: retention,
 		BatchSize: batchSize,
+		DryRun:    envBool("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_DRY_RUN", false),
 	}, nil
 }
 

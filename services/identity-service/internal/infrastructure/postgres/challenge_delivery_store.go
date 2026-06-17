@@ -42,6 +42,7 @@ type ChallengeDeliveryRepairCleanupOptions struct {
 	NewFailureClass      string
 	Cutoff               time.Time
 	Limit                int
+	DryRun               bool
 }
 
 type ChallengeDeliveryRepairCleanupStats struct {
@@ -426,6 +427,23 @@ func (store *ChallengeDeliveryStore) CleanupDeliveryRepairs(ctx context.Context,
 		clauses = append(clauses, "new_failure_class = $"+strconv.Itoa(len(args)))
 	}
 	args = append(args, options.Limit)
+	if options.DryRun {
+		var stats ChallengeDeliveryRepairCleanupStats
+		err := store.pool.QueryRow(ctx, `
+WITH doomed AS (
+    SELECT id
+    FROM identity_challenge_delivery_repair_audit
+    WHERE `+strings.Join(clauses, " AND ")+`
+    ORDER BY repaired_at ASC, delivery_id ASC, id ASC
+    LIMIT $`+strconv.Itoa(len(args))+`
+)
+SELECT count(*) FROM doomed
+`, args...).Scan(&stats.Deleted)
+		if err != nil {
+			return ChallengeDeliveryRepairCleanupStats{}, types.NewDBReadFailed(err.Error())
+		}
+		return stats, nil
+	}
 	rows, err := store.pool.Query(ctx, `
 WITH doomed AS (
     SELECT id

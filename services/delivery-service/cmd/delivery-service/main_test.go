@@ -372,6 +372,18 @@ func TestProjectionFailureCleanupConfigFromEnvDefaults(t *testing.T) {
 	if config.BatchSize != 5000 {
 		t.Fatalf("expected default batch size, got %d", config.BatchSize)
 	}
+	if config.DryRun {
+		t.Fatalf("expected default dry_run=false")
+	}
+
+	t.Setenv("NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_DRY_RUN", "true")
+	config, err = projectionFailureCleanupConfigFromEnv()
+	if err != nil {
+		t.Fatalf("projection failure cleanup config with dry-run: %v", err)
+	}
+	if !config.DryRun {
+		t.Fatalf("expected custom dry_run=true")
+	}
 }
 
 func TestProjectionFailureCleanupConfigFromEnvRejectsInvalidValues(t *testing.T) {
@@ -380,6 +392,45 @@ func TestProjectionFailureCleanupConfigFromEnvRejectsInvalidValues(t *testing.T)
 
 	if _, err := projectionFailureCleanupConfigFromEnv(); err == nil {
 		t.Fatalf("expected invalid projection failure cleanup config to fail")
+	}
+}
+
+func TestProjectionCheckpointRepairCleanupConfigFromEnv(t *testing.T) {
+	t.Setenv("NEXUSIM_DELIVERY_PROJECTION_REPAIR_RETENTION", "")
+	t.Setenv("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_BATCH_SIZE", "")
+
+	config, err := projectionCheckpointRepairCleanupConfigFromEnv()
+	if err != nil {
+		t.Fatalf("projection checkpoint repair cleanup config: %v", err)
+	}
+	if config.Retention != 7*24*time.Hour {
+		t.Fatalf("expected default retention, got %s", config.Retention)
+	}
+	if config.BatchSize != 5000 {
+		t.Fatalf("expected default batch size, got %d", config.BatchSize)
+	}
+	if config.DryRun {
+		t.Fatalf("expected default dry_run=false")
+	}
+
+	t.Setenv("NEXUSIM_DELIVERY_PROJECTION_REPAIR_RETENTION", "2h")
+	t.Setenv("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_BATCH_SIZE", "123")
+	t.Setenv("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_DRY_RUN", "true")
+	config, err = projectionCheckpointRepairCleanupConfigFromEnv()
+	if err != nil {
+		t.Fatalf("custom projection checkpoint repair cleanup config: %v", err)
+	}
+	if config.Retention != 2*time.Hour || config.BatchSize != 123 || !config.DryRun {
+		t.Fatalf("unexpected custom projection checkpoint repair cleanup config: %+v", config)
+	}
+}
+
+func TestProjectionCheckpointRepairCleanupConfigFromEnvRejectsInvalidValues(t *testing.T) {
+	t.Setenv("NEXUSIM_DELIVERY_PROJECTION_REPAIR_RETENTION", "0")
+	t.Setenv("NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_BATCH_SIZE", "0")
+
+	if _, err := projectionCheckpointRepairCleanupConfigFromEnv(); err == nil {
+		t.Fatalf("expected invalid projection checkpoint repair cleanup config to fail")
 	}
 }
 

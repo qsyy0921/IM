@@ -71,6 +71,7 @@ type ProjectionFailureCleanupOptions struct {
 	FailureClass  string
 	Cutoff        time.Time
 	Limit         int
+	DryRun        bool
 }
 
 const (
@@ -349,6 +350,23 @@ func (store *ProjectionFailureStore) CleanupResolvedFailures(ctx context.Context
 		clauses = append(clauses, "failure_class = $"+itoa(len(args)))
 	}
 	args = append(args, options.Limit)
+	if options.DryRun {
+		var stats ProjectionFailureCleanupStats
+		err := store.pool.QueryRow(ctx, `
+WITH doomed AS (
+    SELECT consumer_group, topic, partition_id, offset_value
+    FROM delivery_projection_failures
+    WHERE `+strings.Join(clauses, " AND ")+`
+    ORDER BY resolved_at ASC, consumer_group, topic, partition_id, offset_value
+    LIMIT $`+itoa(len(args))+`
+)
+SELECT count(*) FROM doomed
+`, args...).Scan(&stats.Deleted)
+		if err != nil {
+			return ProjectionFailureCleanupStats{}, types.NewDBReadFailed(err.Error())
+		}
+		return stats, nil
+	}
 	rows, err := store.pool.Query(ctx, `
 WITH doomed AS (
     SELECT consumer_group, topic, partition_id, offset_value

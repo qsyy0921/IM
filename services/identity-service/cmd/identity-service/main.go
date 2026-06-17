@@ -500,16 +500,18 @@ func runChallengeDeliveryRepairCleanup() error {
 		NewFailureClass:      envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_NEW_FAILURE_CLASS", ""),
 		Cutoff:               cutoff,
 		Limit:                config.BatchSize,
+		DryRun:               config.DryRun,
 	})
 	if err != nil {
 		return err
 	}
 	log.Printf(
-		"identity-service challenge delivery repair cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d",
+		"identity-service challenge delivery repair cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d dry_run=%t",
 		stats.Deleted,
 		cutoff.Format(time.RFC3339),
 		config.Retention,
 		config.BatchSize,
+		config.DryRun,
 	)
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_OUTPUT")); outputPath != "" {
 		filters := map[string]string{
@@ -524,7 +526,7 @@ func runChallengeDeliveryRepairCleanup() error {
 		if deliveryID != nil {
 			filters["delivery_id"] = strconv.FormatInt(*deliveryID, 10)
 		}
-		if err := writeOperatorCleanupOutput(outputPath, stats.Deleted, cutoff, config.Retention, config.BatchSize, filters); err != nil {
+		if err := writeOperatorCleanupOutput(outputPath, stats.Deleted, cutoff, config.Retention, config.BatchSize, config.DryRun, filters); err != nil {
 			return err
 		}
 	}
@@ -546,19 +548,20 @@ func runChallengeRequestLimitCleanup() error {
 		return err
 	}
 	cutoff := time.Now().UTC().Add(-config.Retention)
-	deleted, err := postgresinfra.NewRepository(pool).CleanupChallengeRequestLimits(ctx, cutoff, config.BatchSize)
+	deleted, err := postgresinfra.NewRepository(pool).CleanupChallengeRequestLimits(ctx, cutoff, config.BatchSize, config.DryRun)
 	if err != nil {
 		return err
 	}
 	log.Printf(
-		"identity-service challenge request limit cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d",
+		"identity-service challenge request limit cleanup completed deleted=%d cutoff=%s retention=%s batch_size=%d dry_run=%t",
 		deleted,
 		cutoff.Format(time.RFC3339),
 		config.Retention,
 		config.BatchSize,
+		config.DryRun,
 	)
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_OUTPUT")); outputPath != "" {
-		if err := writeOperatorCleanupOutput(outputPath, deleted, cutoff, config.Retention, config.BatchSize, nil); err != nil {
+		if err := writeOperatorCleanupOutput(outputPath, deleted, cutoff, config.Retention, config.BatchSize, config.DryRun, nil); err != nil {
 			return err
 		}
 	}
@@ -601,11 +604,13 @@ func runSessionMFAProofAudit() error {
 type challengeRequestLimitCleanupConfig struct {
 	Retention time.Duration
 	BatchSize int
+	DryRun    bool
 }
 
 type challengeDeliveryRepairCleanupConfig struct {
 	Retention time.Duration
 	BatchSize int
+	DryRun    bool
 }
 
 func challengeDeliveryRepairCleanupConfigFromEnv() (challengeDeliveryRepairCleanupConfig, error) {
@@ -620,6 +625,7 @@ func challengeDeliveryRepairCleanupConfigFromEnv() (challengeDeliveryRepairClean
 	return challengeDeliveryRepairCleanupConfig{
 		Retention: retention,
 		BatchSize: batchSize,
+		DryRun:    envBool("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_DRY_RUN", false),
 	}, nil
 }
 
@@ -635,6 +641,7 @@ func challengeRequestLimitCleanupConfigFromEnv() (challengeRequestLimitCleanupCo
 	config := challengeRequestLimitCleanupConfig{
 		Retention: retention,
 		BatchSize: batchSize,
+		DryRun:    envBool("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_DRY_RUN", false),
 	}
 	return config, nil
 }

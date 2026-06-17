@@ -18,6 +18,7 @@ func TestWriteOperatorCleanupOutput(t *testing.T) {
 		cutoff,
 		3*time.Hour,
 		500,
+		true,
 		map[string]string{
 			"consumer_group": "delivery-consumer",
 			"topic":          "conversation.timeline.events",
@@ -39,6 +40,7 @@ func TestWriteOperatorCleanupOutput(t *testing.T) {
 	}
 	if output.GeneratedAt == "" ||
 		output.Deleted != 7 ||
+		!output.DryRun ||
 		output.Cutoff == "" ||
 		output.RetentionSeconds != int64((3*time.Hour).Seconds()) ||
 		output.BatchSize != 500 ||

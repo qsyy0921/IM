@@ -10,16 +10,18 @@ import (
 type operatorCleanupOutput struct {
 	GeneratedAt      string            `json:"generated_at"`
 	Deleted          int64             `json:"deleted"`
+	DryRun           bool              `json:"dry_run"`
 	Cutoff           string            `json:"cutoff"`
 	RetentionSeconds int64             `json:"retention_seconds"`
 	BatchSize        int               `json:"batch_size"`
 	Filters          map[string]string `json:"filters,omitempty"`
 }
 
-func writeOperatorCleanupOutput(path string, deleted int64, cutoff time.Time, retention time.Duration, batchSize int, filters map[string]string) error {
+func writeOperatorCleanupOutput(path string, deleted int64, cutoff time.Time, retention time.Duration, batchSize int, dryRun bool, filters map[string]string) error {
 	output := operatorCleanupOutput{
 		GeneratedAt:      time.Now().UTC().Format(time.RFC3339Nano),
 		Deleted:          deleted,
+		DryRun:           dryRun,
 		Cutoff:           cutoff.UTC().Format(time.RFC3339Nano),
 		RetentionSeconds: int64(retention.Seconds()),
 		BatchSize:        batchSize,

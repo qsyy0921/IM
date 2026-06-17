@@ -515,6 +515,45 @@ INSERT INTO identity_challenge_delivery_repair_audit (
 	assertChallengeDeliveryRepairAuditCount(t, ctx, pool, "tenant-3", 1)
 }
 
+func TestChallengeDeliveryStoreCleanupDeliveryRepairsDryRunDoesNotDeleteIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetIdentityTables(t, ctx, pool)
+
+	_, err := pool.Exec(ctx, `
+INSERT INTO identity_challenge_delivery_repair_audit (
+    delivery_id, tenant_id, user_id, challenge_id, previous_delivery_status, previous_challenge_status,
+    previous_challenge_delivery_status, previous_retry_count, previous_last_error, previous_failure_class,
+    new_delivery_status, new_challenge_status, new_challenge_delivery_status, new_failure_class,
+    repair_mode, repair_outcome, skip_reason, dry_run, repair_operator, repair_reason, repaired_at
+) VALUES
+    (3301, 'tenant-dry-run', 'user-1', 'challenge-a', 'DLQ', 'EXPIRED', 'FAILED', 1, 'provider unavailable', 'delivery_failed',
+     'DLQ', 'EXPIRED', 'FAILED', 'delivery_failed', 'audit', 'AUDITED', '', true, 'operator-a', 'manual audit', now() - interval '10 days'),
+    (3302, 'tenant-dry-run', 'user-1', 'challenge-b', 'PENDING', 'ACTIVE', 'PENDING', 0, '', '',
+     'CANCELED', 'EXPIRED', 'FAILED', 'inactive', 'cancel-inactive', 'MUTATED', '', false, 'operator-b', 'manual cleanup', now() - interval '9 days'),
+    (3303, 'tenant-dry-run', 'user-1', 'challenge-c', 'PENDING', 'ACTIVE', 'PENDING', 0, '', '',
+     'PENDING', 'ACTIVE', 'PENDING', '', 'redrive-active-pending', 'MUTATED', '', false, 'operator-c', 'recent repair', now() - interval '1 day')
+`)
+	if err != nil {
+		t.Fatalf("seed challenge delivery dry-run repair audit: %v", err)
+	}
+
+	store := NewChallengeDeliveryStore(pool)
+	stats, err := store.CleanupDeliveryRepairs(ctx, ChallengeDeliveryRepairCleanupOptions{
+		TenantID: "tenant-dry-run",
+		Cutoff:   time.Now().UTC().Add(-7 * 24 * time.Hour),
+		Limit:    10,
+		DryRun:   true,
+	})
+	if err != nil {
+		t.Fatalf("dry-run cleanup challenge delivery repairs: %v", err)
+	}
+	if stats.Deleted != 2 {
+		t.Fatalf("unexpected dry-run deleted count: %+v", stats)
+	}
+	assertChallengeDeliveryRepairAuditCount(t, ctx, pool, "tenant-dry-run", 3)
+}
+
 func TestChallengeDeliveryStoreCleanupDeliveryRepairsHonorsBatchLimitIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

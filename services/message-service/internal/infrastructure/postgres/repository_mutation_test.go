@@ -858,6 +858,17 @@ func TestMessageRepositoryComplianceExternalProofRevokeBlocksDeleteIntegration(t
 	if revoked.Status != MessageComplianceExternalProofStatusRevoked || revoked.RevokedAt == nil {
 		t.Fatalf("unexpected revoked proof: %+v", revoked)
 	}
+	_, err = repo.RegisterComplianceExternalProof(ctx, MessageComplianceExternalProofMutationOptions{
+		TenantID:         string(tenantID),
+		ExternalProofRef: proofRef,
+		Provider:         "legal-proof-system",
+		ProofHash:        fmt.Sprintf("sha256:re-register-%d", runID),
+		OperatorID:       "legal-ops",
+		Now:              now.Add(2 * time.Minute),
+	})
+	if !errors.Is(err, types.ErrInvalidMessageState) {
+		t.Fatalf("expected revoked proof re-register to fail, got %v", err)
+	}
 
 	deleteInput := testDeleteInput(appendInput, appendResult.MessageID, "delete-revoked-proof-key-1", types.DeleteScopeCompliance, "legal retention cleanup")
 	deleteInput.Command.AuthContext.UserID = "compliance-admin"
@@ -883,6 +894,11 @@ func TestMessageRepositoryComplianceExternalProofRevokeBlocksDeleteIntegration(t
 	}
 	if len(proofRows) != 1 || proofRows[0].ExternalProofRef != proofRef {
 		t.Fatalf("unexpected proof audit rows: %+v", proofRows)
+	}
+	if proofRows[0].Status != MessageComplianceExternalProofStatusRevoked ||
+		proofRows[0].ProofHash != proof.ProofHash ||
+		proofRows[0].RevokedAt == nil {
+		t.Fatalf("revoked proof should remain revoked after failed re-register, got %+v", proofRows[0])
 	}
 	emptyProofRows, err := repo.AuditComplianceExternalProofs(ctx, MessageComplianceExternalProofAuditOptions{
 		TenantID:      string(tenantID),

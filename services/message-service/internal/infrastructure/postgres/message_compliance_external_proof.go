@@ -79,9 +79,17 @@ SET status = 'VERIFIED',
     revoked_by = '',
     revoked_at = NULL,
     updated_at = EXCLUDED.updated_at
+WHERE message_compliance_external_proofs.status <> 'REVOKED'
 RETURNING tenant_id, external_proof_ref, status, provider, proof_hash, verified_by, verified_at, revoked_by, revoked_at, updated_at
 `, options.TenantID, options.ExternalProofRef, options.Provider, options.ProofHash, options.OperatorID, options.Now)
-	return scanComplianceExternalProofRow(row)
+	result, err := scanComplianceExternalProofRow(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return MessageComplianceExternalProofResult{}, types.NewInvalidMessageState("revoked compliance external proof cannot be re-registered")
+		}
+		return MessageComplianceExternalProofResult{}, err
+	}
+	return result, nil
 }
 
 func (r *MessageRepository) RevokeComplianceExternalProof(ctx context.Context, options MessageComplianceExternalProofMutationOptions) (MessageComplianceExternalProofResult, error) {

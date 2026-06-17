@@ -34,6 +34,7 @@ if ([string]::IsNullOrWhiteSpace($ApprovalID)) {
 }
 
 Assert-LowSensitiveRepairActor -Value $RequestedBy -FieldName "RequestedBy"
+Assert-LowSensitiveRepairIdentifier -Value $ApprovalID -FieldName "ApprovalID"
 
 $planBytes = [System.Text.Encoding]::UTF8.GetBytes($planRaw)
 $planHash = Get-RepairSha256Hex -Bytes $planBytes

@@ -174,6 +174,36 @@ try {
     $ErrorActionPreference = "Continue"
     try {
         & powershell -NoProfile -ExecutionPolicy Bypass -File $bundleWriterPath `
+            -EvidencePath $summaryPath `
+            -GeneratedBy "operator-a" `
+            -BundleID "repair-audit-bundle-token-secret" 2>$null | Out-Null
+        $badBundleIDExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldErrorActionPreference
+    }
+    if ($badBundleIDExitCode -eq 0) {
+        throw "repair audit bundle should reject credential-like bundle ids."
+    }
+
+    $sensitiveIDBundlePath = Join-Path $tempRoot "audit-bundle-sensitive-id.json"
+    $sensitiveIDBundle = $bundleRaw | ConvertFrom-Json
+    $sensitiveIDBundle.bundle_id = "repair-audit-bundle-token-secret"
+    ($sensitiveIDBundle | ConvertTo-Json -Depth 10) | Set-Content -LiteralPath $sensitiveIDBundlePath -Encoding UTF8
+    $ErrorActionPreference = "Continue"
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $bundleValidatorPath `
+            -BundlePath $sensitiveIDBundlePath 2>$null | Out-Null
+        $sensitiveBundleIDExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldErrorActionPreference
+    }
+    if ($sensitiveBundleIDExitCode -eq 0) {
+        throw "repair audit bundle validator should reject credential-like bundle ids."
+    }
+
+    $ErrorActionPreference = "Continue"
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $bundleWriterPath `
             -EvidencePath $summaryPath,$summaryPath `
             -GeneratedBy "operator-a" 2>$null | Out-Null
         $duplicateExitCode = $LASTEXITCODE

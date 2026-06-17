@@ -58,6 +58,7 @@ function Get-RepairEvidenceKind {
 }
 
 Assert-LowSensitiveRepairActor -Value $GeneratedBy -FieldName "GeneratedBy"
+Assert-LowSensitiveRepairIdentifier -Value $BundleID -FieldName "BundleID"
 
 $reasonPresent = $false
 $reasonHash = ""
@@ -117,6 +118,10 @@ foreach ($evidencePath in $expandedEvidencePaths) {
         execute_requested = if ($null -ne $document.execute_requested) { [bool]$document.execute_requested } else { $null }
         valid = if ($null -ne $document.valid) { [bool]$document.valid } else { $null }
     }
+
+    Assert-LowSensitiveRepairIdentifier -Value ([string]$document.batch_id) -FieldName "batch_id" -AllowEmpty
+    Assert-LowSensitiveRepairIdentifier -Value ([string]$document.approval_id) -FieldName "approval_id" -AllowEmpty
+    Assert-LowSensitiveRepairIdentifier -Value ([string]$document.decision_id) -FieldName "decision_id" -AllowEmpty
     $index++
 }
 

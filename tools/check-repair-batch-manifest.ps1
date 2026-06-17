@@ -207,6 +207,36 @@ try {
         throw "repair batch manifest should reject sensitive or personal RequestedBy values."
     }
 
+    $ErrorActionPreference = "Continue"
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $batchWriterPath `
+            -InvocationSummaryPath $summaryA `
+            -RequestedBy "operator-a" `
+            -BatchID "repair-batch-token-secret" 2>$null | Out-Null
+        $badBatchIDExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($badBatchIDExitCode -eq 0) {
+        throw "repair batch manifest should reject credential-like batch ids."
+    }
+
+    $sensitiveIDManifestPath = Join-Path $tempRoot "batch-manifest-sensitive-id.json"
+    $sensitiveIDManifest = $manifestRaw | ConvertFrom-Json
+    $sensitiveIDManifest.batch_id = "repair-batch-token-secret"
+    ($sensitiveIDManifest | ConvertTo-Json -Depth 10) | Set-Content -LiteralPath $sensitiveIDManifestPath -Encoding UTF8
+    $ErrorActionPreference = "Continue"
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $batchValidatorPath `
+            -ManifestPath $sensitiveIDManifestPath 2>$null | Out-Null
+        $sensitiveBatchIDExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($sensitiveBatchIDExitCode -eq 0) {
+        throw "repair batch manifest validator should reject credential-like batch ids."
+    }
+
     $mutatingManifestPath = Join-Path $tempRoot "batch-manifest-mutating.json"
     & powershell -NoProfile -ExecutionPolicy Bypass -File $batchWriterPath `
         -InvocationSummaryPath $summaryA,$summaryMutating `

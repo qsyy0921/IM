@@ -81,9 +81,56 @@ try {
         throw "approval chain summary leaked raw env value."
     }
 
+    $oldErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $requestWriterPath `
+            -PlanPath $planPath `
+            -RequestedBy "operator-a" `
+            -ApprovalID "approval-token-secret" 2>$null | Out-Null
+        $badApprovalIDExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldErrorActionPreference
+    }
+    if ($badApprovalIDExitCode -eq 0) {
+        throw "write-repair-approval-request.ps1 should reject credential-like approval ids."
+    }
+
+    $ErrorActionPreference = "Continue"
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $decisionWriterPath `
+            -RequestPath $requestPath `
+            -Decision "APPROVED" `
+            -DecidedBy "approver-a" `
+            -DecisionID "decision-token-secret" 2>$null | Out-Null
+        $badDecisionIDExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldErrorActionPreference
+    }
+    if ($badDecisionIDExitCode -eq 0) {
+        throw "write-repair-approval-decision.ps1 should reject credential-like decision ids."
+    }
+
+    $sensitiveRequest = Join-Path $tempRoot "sensitive-request.json"
+    $sensitiveRequestDocument = Get-Content -LiteralPath $requestPath -Raw | ConvertFrom-Json
+    $sensitiveRequestDocument.approval_id = "approval-token-secret"
+    ($sensitiveRequestDocument | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath $sensitiveRequest -Encoding UTF8
+    $ErrorActionPreference = "Continue"
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $validatorPath `
+            -PlanPath $planPath `
+            -RequestPath $sensitiveRequest `
+            -DecisionPath $decisionPath 2>$null | Out-Null
+        $sensitiveRequestExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldErrorActionPreference
+    }
+    if ($sensitiveRequestExitCode -eq 0) {
+        throw "approval chain validator should reject credential-like approval ids."
+    }
+
     $tamperedPlan = Join-Path $tempRoot "tampered-plan.json"
     ($planJson -replace "projection-checkpoint-repair", "outbox-audit") | Set-Content -LiteralPath $tamperedPlan -Encoding UTF8
-    $oldErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
         & powershell -NoProfile -ExecutionPolicy Bypass -File $validatorPath `

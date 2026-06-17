@@ -43,6 +43,7 @@ function Assert-RequiredString {
 }
 
 Assert-LowSensitiveRepairActor -Value $RequestedBy -FieldName "RequestedBy"
+Assert-LowSensitiveRepairIdentifier -Value $BatchID -FieldName "BatchID"
 
 $reasonPresent = $false
 $reasonHash = ""
@@ -92,6 +93,8 @@ foreach ($summaryPath in $expandedInvocationSummaryPaths) {
     Assert-RequiredString $summary.decision_sha256 "decision_sha256" $resolvedSummaryPath
 
     $approvalID = [string]$summary.approval_id
+    Assert-LowSensitiveRepairIdentifier -Value $approvalID -FieldName "approval_id"
+    Assert-LowSensitiveRepairIdentifier -Value ([string]$summary.decision_id) -FieldName "decision_id"
     if ($seenApprovalIDs.ContainsKey($approvalID)) {
         throw "Duplicate approval_id in repair batch: $approvalID"
     }

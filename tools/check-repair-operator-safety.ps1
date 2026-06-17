@@ -9,6 +9,7 @@ $helperText = Get-Content -LiteralPath $helperPath -Raw
 foreach ($functionName in @(
         "Get-RepairSha256Hex",
         "Assert-LowSensitiveRepairActor",
+        "Assert-LowSensitiveRepairIdentifier",
         "Assert-LowSensitiveRepairAdHocEnv",
         "Read-RepairReasonFileSummary"
     )) {
@@ -52,6 +53,18 @@ Assert-FailsWith -Label "email actor" -Pattern "low-sensitive operator id" -Scri
 }
 Assert-FailsWith -Label "credential actor" -Pattern "credential-like" -Script {
     Assert-LowSensitiveRepairActor -Value "operator-token" -FieldName "RequestedBy"
+}
+
+Assert-LowSensitiveRepairIdentifier -Value "approval-1" -FieldName "ApprovalID"
+Assert-LowSensitiveRepairIdentifier -Value "repair-batch:local-1" -FieldName "BatchID"
+Assert-FailsWith -Label "blank repair identifier" -Pattern "required" -Script {
+    Assert-LowSensitiveRepairIdentifier -Value " " -FieldName "ApprovalID"
+}
+Assert-FailsWith -Label "email repair identifier" -Pattern "repair identifier" -Script {
+    Assert-LowSensitiveRepairIdentifier -Value "operator@example.com" -FieldName "ApprovalID"
+}
+Assert-FailsWith -Label "credential repair identifier" -Pattern "credential-like" -Script {
+    Assert-LowSensitiveRepairIdentifier -Value "approval-token-secret" -FieldName "ApprovalID"
 }
 
 Assert-LowSensitiveRepairAdHocEnv -Key "NEXUSIM_FILTER" -Value "tenant-1"
@@ -105,6 +118,7 @@ foreach ($writerScript in $writerScripts) {
     foreach ($duplicateFunction in @(
             "Get-Sha256Hex",
             "Assert-LowSensitiveActor",
+            "Assert-LowSensitiveRepairIdentifier",
             "Assert-LowSensitiveAdHocEnv"
         )) {
         if ($writerText -match "function\s+$duplicateFunction\b") {

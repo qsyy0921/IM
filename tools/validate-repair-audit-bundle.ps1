@@ -7,20 +7,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "repair-operator-safety.ps1")
+
 if (-not (Test-Path -LiteralPath $BundlePath -PathType Leaf)) {
     throw "Missing repair audit bundle file: $BundlePath"
-}
-
-function Get-Sha256Hex {
-    param([byte[]]$Bytes)
-
-    $sha = [System.Security.Cryptography.SHA256]::Create()
-    try {
-        $hash = $sha.ComputeHash($Bytes)
-    } finally {
-        $sha.Dispose()
-    }
-    return -join ($hash | ForEach-Object { $_.ToString("x2") })
 }
 
 function Assert-RequiredString {
@@ -43,6 +33,8 @@ if ($bundle.schema_version -ne 1) {
 }
 Assert-RequiredString $bundle.bundle_id "bundle_id" $BundlePath
 Assert-RequiredString $bundle.generated_by "generated_by" $BundlePath
+Assert-LowSensitiveRepairIdentifier -Value ([string]$bundle.bundle_id) -FieldName "bundle_id"
+Assert-LowSensitiveRepairActor -Value ([string]$bundle.generated_by) -FieldName "generated_by"
 
 $files = @($bundle.files)
 if ($files.Count -eq 0) {
@@ -70,7 +62,7 @@ foreach ($file in $files) {
         throw "Repair audit bundle references missing evidence file: $evidencePath"
     }
     $evidenceRaw = Get-Content -LiteralPath $evidencePath -Raw
-    $actualHash = Get-Sha256Hex -Bytes ([System.Text.Encoding]::UTF8.GetBytes($evidenceRaw))
+    $actualHash = Get-RepairSha256Hex -Bytes ([System.Text.Encoding]::UTF8.GetBytes($evidenceRaw))
     if ($actualHash -ne $hash) {
         throw "Repair audit bundle evidence hash mismatch: $evidencePath"
     }
@@ -83,6 +75,9 @@ foreach ($file in $files) {
     if ($evidenceDocument.schema_version -ne [int]$file.schema_version) {
         throw "Repair audit bundle evidence schema_version mismatch: $evidencePath"
     }
+    Assert-LowSensitiveRepairIdentifier -Value ([string]$file.batch_id) -FieldName "file.batch_id" -AllowEmpty
+    Assert-LowSensitiveRepairIdentifier -Value ([string]$file.approval_id) -FieldName "file.approval_id" -AllowEmpty
+    Assert-LowSensitiveRepairIdentifier -Value ([string]$file.decision_id) -FieldName "file.decision_id" -AllowEmpty
 
     $kind = [string]$file.kind
     if (-not $kindCounts.ContainsKey($kind)) {

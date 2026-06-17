@@ -29,6 +29,29 @@ function Assert-LowSensitiveRepairActor {
     }
 }
 
+function Assert-LowSensitiveRepairIdentifier {
+    param(
+        [string]$Value,
+        [string]$FieldName,
+        [switch]$AllowEmpty
+    )
+
+    $text = ([string]$Value).Trim()
+    if ($text.Length -eq 0) {
+        if ($AllowEmpty) {
+            return
+        }
+        throw "$FieldName is required."
+    }
+    if ($text.Length -gt 128 -or $text -notmatch "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$") {
+        throw "$FieldName must be a low-sensitive repair identifier using letters, digits, dot, underscore, dash, or colon."
+    }
+    if ($text -match "(?i)(password|passwd|secret|token|bearer|credential|api[_-]?key|access[_-]?key|refresh|session|cookie|sk-|eyJ)" -or
+        $text -match "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}") {
+        throw "$FieldName must be a low-sensitive repair identifier, not a credential-like or personal value."
+    }
+}
+
 function Assert-LowSensitiveRepairAdHocEnv {
     param(
         [string]$Key,

@@ -7,20 +7,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "repair-operator-safety.ps1")
+
 if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) {
     throw "Missing repair batch manifest file: $ManifestPath"
-}
-
-function Get-Sha256Hex {
-    param([byte[]]$Bytes)
-
-    $sha = [System.Security.Cryptography.SHA256]::Create()
-    try {
-        $hash = $sha.ComputeHash($Bytes)
-    } finally {
-        $sha.Dispose()
-    }
-    return -join ($hash | ForEach-Object { $_.ToString("x2") })
 }
 
 function Assert-RequiredString {
@@ -46,6 +36,8 @@ if ($manifest.executes -ne $false) {
 }
 Assert-RequiredString $manifest.batch_id "batch_id" $ManifestPath
 Assert-RequiredString $manifest.requested_by "requested_by" $ManifestPath
+Assert-LowSensitiveRepairIdentifier -Value ([string]$manifest.batch_id) -FieldName "batch_id"
+Assert-LowSensitiveRepairActor -Value ([string]$manifest.requested_by) -FieldName "requested_by"
 
 $items = @($manifest.items)
 if ($items.Count -eq 0) {
@@ -76,6 +68,8 @@ foreach ($item in $items) {
     Assert-RequiredString $item.decision_sha256 "item.decision_sha256" $ManifestPath
 
     $approvalID = [string]$item.approval_id
+    Assert-LowSensitiveRepairIdentifier -Value $approvalID -FieldName "item.approval_id"
+    Assert-LowSensitiveRepairIdentifier -Value ([string]$item.decision_id) -FieldName "item.decision_id"
     if ($seenApprovalIDs.ContainsKey($approvalID)) {
         throw "Duplicate approval_id in repair batch manifest: $approvalID"
     }
@@ -92,7 +86,7 @@ foreach ($item in $items) {
     }
 
     $summaryRaw = Get-Content -LiteralPath ([string]$item.summary_path) -Raw
-    $actualSummaryHash = Get-Sha256Hex -Bytes ([System.Text.Encoding]::UTF8.GetBytes($summaryRaw))
+    $actualSummaryHash = Get-RepairSha256Hex -Bytes ([System.Text.Encoding]::UTF8.GetBytes($summaryRaw))
     if ($actualSummaryHash -ne $summaryHash) {
         throw "Repair batch manifest summary_sha256 mismatch for $($item.summary_path)"
     }

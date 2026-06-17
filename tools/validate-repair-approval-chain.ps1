@@ -13,6 +13,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "repair-operator-safety.ps1")
+
 foreach ($path in @($PlanPath, $RequestPath, $DecisionPath)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "Missing repair approval chain file: $path"
@@ -25,21 +27,9 @@ if (-not (Test-Path -LiteralPath $catalogPath -PathType Leaf)) {
     throw "Missing repair operator catalog: $catalogPath"
 }
 
-function Get-Sha256Hex {
-    param([byte[]]$Bytes)
-
-    $sha = [System.Security.Cryptography.SHA256]::Create()
-    try {
-        $hash = $sha.ComputeHash($Bytes)
-    } finally {
-        $sha.Dispose()
-    }
-    return -join ($hash | ForEach-Object { $_.ToString("x2") })
-}
-
 function Get-Utf8Hash {
     param([string]$Text)
-    return Get-Sha256Hex -Bytes ([System.Text.Encoding]::UTF8.GetBytes($Text))
+    return Get-RepairSha256Hex -Bytes ([System.Text.Encoding]::UTF8.GetBytes($Text))
 }
 
 $planRaw = Get-Content -LiteralPath $PlanPath -Raw
@@ -72,6 +62,8 @@ if ($request.status -ne "PENDING") {
 if ($decision.status -ne "APPROVED") {
     throw "Repair approval decision must be APPROVED."
 }
+Assert-LowSensitiveRepairIdentifier -Value ([string]$request.approval_id) -FieldName "approval_id"
+Assert-LowSensitiveRepairIdentifier -Value ([string]$decision.decision_id) -FieldName "decision_id"
 
 $planHash = Get-Utf8Hash -Text $planRaw
 $requestHash = Get-Utf8Hash -Text $requestRaw

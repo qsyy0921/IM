@@ -44,6 +44,8 @@ if ([string]::IsNullOrWhiteSpace($DecisionID)) {
 }
 
 Assert-LowSensitiveRepairActor -Value $DecidedBy -FieldName "DecidedBy"
+Assert-LowSensitiveRepairIdentifier -Value ([string]$request.approval_id) -FieldName "approval_id"
+Assert-LowSensitiveRepairIdentifier -Value $DecisionID -FieldName "DecisionID"
 
 $requestBytes = [System.Text.Encoding]::UTF8.GetBytes($requestRaw)
 $requestHash = Get-RepairSha256Hex -Bytes $requestBytes

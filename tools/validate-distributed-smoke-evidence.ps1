@@ -1,7 +1,8 @@
 param(
     [string]$ManifestPath = "docs/runbook/distributed-smoke-evidence.json",
     [switch]$RequireFiles,
-    [string]$OutputPath = ""
+    [string]$OutputPath = "",
+    [string]$MarkdownPath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -145,6 +146,14 @@ function Validate-KafkaConsumerChurn {
     }
 }
 
+function Escape-MarkdownCell {
+    param(
+        [string]$Value
+    )
+
+    return $Value.Replace("|", "\|").Replace("`r", " ").Replace("`n", " ").Trim()
+}
+
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $resolvedManifestPath = Resolve-RepoPath $ManifestPath
 Assert-Condition (Test-Path -LiteralPath $resolvedManifestPath -PathType Leaf) "ManifestPath does not exist: $resolvedManifestPath"
@@ -165,6 +174,7 @@ $knownKinds = @(
 )
 $seenNames = @{}
 $validatedFiles = 0
+$entryResults = @()
 
 foreach ($entry in @($manifest.entries)) {
     $name = Get-JsonPropertyString -Object $entry -Name "name"
@@ -177,7 +187,15 @@ foreach ($entry in @($manifest.entries)) {
     Assert-Condition ($kind -in $knownKinds) "distributed smoke evidence entry $name has unknown kind: $kind"
     Assert-Condition ($summaryPath.Length -gt 0) "distributed smoke evidence entry $name summary_path is required."
 
+    $entryValidated = $false
     if (-not $RequireFiles) {
+        $entryResults += [pscustomobject]@{
+            name = $name
+            kind = $kind
+            summary_path = $summaryPath
+            files_checked = $false
+            note = Get-JsonPropertyString -Object $entry -Name "note"
+        }
         continue
     }
 
@@ -228,6 +246,14 @@ foreach ($entry in @($manifest.entries)) {
         }
     }
     $validatedFiles++
+    $entryValidated = $true
+    $entryResults += [pscustomobject]@{
+        name = $name
+        kind = $kind
+        summary_path = $summaryPath
+        files_checked = $entryValidated
+        note = Get-JsonPropertyString -Object $entry -Name "note"
+    }
 }
 
 $validation = [pscustomobject]@{
@@ -239,6 +265,34 @@ $validation = [pscustomobject]@{
     validated_files = $validatedFiles
     valid = $true
     scope = "local distributed smoke evidence manifest validation; not a production HA or SLO claim"
+}
+
+if ($MarkdownPath.Trim().Length -gt 0) {
+    $resolvedMarkdownPath = Resolve-RepoPath $MarkdownPath
+    $markdownDir = Split-Path -Parent $resolvedMarkdownPath
+    if ($markdownDir -and -not (Test-Path -LiteralPath $markdownDir)) {
+        New-Item -ItemType Directory -Force -Path $markdownDir | Out-Null
+    }
+
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add("# NexusIM Distributed Smoke Evidence")
+    $lines.Add("")
+    $lines.Add("- Manifest: $resolvedManifestPath")
+    $lines.Add("- Entries: $(@($manifest.entries).Count)")
+    $lines.Add("- Files checked: $validatedFiles")
+    $lines.Add("- Require files: $([bool]$RequireFiles)")
+    $lines.Add("- Scope: local distributed smoke evidence manifest validation; not a production HA or SLO claim.")
+    $lines.Add("")
+    $lines.Add("| Name | Kind | Files checked | Summary path | Note |")
+    $lines.Add("| --- | --- | --- | --- | --- |")
+    foreach ($result in $entryResults) {
+        $summaryPathCell = Escape-MarkdownCell $result.summary_path
+        $lines.Add("| $(Escape-MarkdownCell $result.name) | $(Escape-MarkdownCell $result.kind) | $($result.files_checked) | $summaryPathCell | $(Escape-MarkdownCell $result.note) |")
+    }
+    $lines.Add("")
+    $lines.Add("This report is for local development and interview evidence review. It does not prove production Redis, PostgreSQL, Kafka, deployment, or SLO readiness.")
+    $lines | Set-Content -LiteralPath $resolvedMarkdownPath -Encoding UTF8
+    Write-Host "OK   distributed smoke evidence markdown written: $resolvedMarkdownPath"
 }
 
 if ($OutputPath.Trim().Length -gt 0) {

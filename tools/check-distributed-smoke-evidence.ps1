@@ -22,7 +22,8 @@ function Write-JsonFile {
 function Invoke-Validator {
     param(
         [string]$ManifestPath,
-        [switch]$RequireFiles
+        [switch]$RequireFiles,
+        [string]$MarkdownPath = ""
     )
 
     try {
@@ -31,6 +32,9 @@ function Invoke-Validator {
         }
         if ($RequireFiles) {
             $invocationArgs.RequireFiles = $true
+        }
+        if ($MarkdownPath.Trim().Length -gt 0) {
+            $invocationArgs.MarkdownPath = $MarkdownPath
         }
         $output = & $validator @invocationArgs 2>&1
         return [pscustomobject]@{
@@ -83,10 +87,16 @@ try {
             }
         )
     })
-    $goodResult = Invoke-Validator -ManifestPath $manifestPath -RequireFiles
+    $markdownPath = Join-Path $tempRoot "distributed-smoke-evidence.md"
+    $goodResult = Invoke-Validator -ManifestPath $manifestPath -RequireFiles -MarkdownPath $markdownPath
     if ($goodResult.ExitCode -ne 0) {
         Write-Host "FAIL distributed smoke evidence fixture should pass." -ForegroundColor Red
         Write-Host $goodResult.Output -ForegroundColor Red
+        exit 1
+    }
+    $markdown = Get-Content -LiteralPath $markdownPath -Raw
+    if (-not $markdown.Contains("NexusIM Distributed Smoke Evidence") -or -not $markdown.Contains("self-test pushgateway") -or -not $markdown.Contains("not a production HA or SLO claim")) {
+        Write-Host "FAIL distributed smoke evidence markdown missing expected boundary text." -ForegroundColor Red
         exit 1
     }
 

@@ -442,10 +442,11 @@ docs/runbook/distributed-smoke-evidence.json
 ```powershell
 .\tools\validate-distributed-smoke-evidence.ps1 `
   -ManifestPath docs\runbook\distributed-smoke-evidence.json `
-  -RequireFiles
+  -RequireFiles `
+  -MarkdownPath H:\NexusIM\loadtest-results\distributed-smoke-evidence.md
 ```
 
-该索引用于避免 runbook 中散落的 Redis / PostgreSQL / Kafka smoke 证据失效；它仍是本地 / 面试展示级证据目录，不是生产 HA 证明。
+该索引用于避免 runbook 中散落的 Redis / PostgreSQL / Kafka smoke 证据失效；可选 Markdown report 只输出低敏路径、场景和边界说明。它仍是本地 / 面试展示级证据目录，不是生产 HA 证明。
 
 ## 7. 已知缺口
 

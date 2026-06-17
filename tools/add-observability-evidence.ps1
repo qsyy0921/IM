@@ -1,5 +1,7 @@
 param(
     [string]$ManifestPath = "docs/runbook/observability-evidence.json",
+    [string]$ExpectedResultRoot = "H:\NexusIM\loadtest-results",
+    [string]$ReportRoot = "docs/runbook/loadtest",
     [Parameter(Mandatory = $true)]
     [string]$Name,
     [Parameter(Mandatory = $true)]
@@ -116,5 +118,5 @@ $json = $updated | ConvertTo-Json -Depth 10
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText($resolvedManifestPath, ($json + [Environment]::NewLine), $utf8NoBom)
 
-& $validator -ManifestPath $resolvedManifestPath | Out-Null
+& $validator -ManifestPath $resolvedManifestPath -ExpectedResultRoot $ExpectedResultRoot -ReportRoot $ReportRoot | Out-Null
 Write-Host "OK   observability evidence entry added: $($Name.Trim())"

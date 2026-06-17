@@ -1,5 +1,6 @@
 param(
     [string]$ManifestPath = "docs/runbook/distributed-smoke-evidence.json",
+    [string]$ExpectedResultRoot = "H:\NexusIM\loadtest-results",
     [switch]$RequireFiles,
     [string]$OutputPath = "",
     [string]$MarkdownPath = ""
@@ -53,6 +54,41 @@ function Resolve-RepoPath {
     return [System.IO.Path]::GetFullPath((Join-Path $repoRoot $PathValue))
 }
 
+function Test-PathInsideDirectory {
+    param(
+        [string]$Path,
+        [string]$Directory
+    )
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+    $fullDirectory = [System.IO.Path]::GetFullPath($Directory).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+
+    if ($fullPath.Equals($fullDirectory, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $true
+    }
+
+    $prefix = $fullDirectory + [System.IO.Path]::DirectorySeparatorChar
+    return $fullPath.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Resolve-EvidenceSummaryPath {
+    param(
+        [string]$PathValue,
+        [string]$Context
+    )
+
+    Assert-Condition ($PathValue.Trim().Length -gt 0) "$Context is required."
+    $resolvedPath = Resolve-RepoPath $PathValue
+    Assert-Condition (Test-PathInsideDirectory -Path $resolvedPath -Directory $ExpectedResultRoot) "$Context must point under $ExpectedResultRoot`: $PathValue"
+    return $resolvedPath
+}
+
 function Validate-PushGatewaySummary {
     param(
         [string]$Path,
@@ -88,8 +124,8 @@ function Validate-KafkaFailover {
     Assert-Condition ($beforeLeader.Length -gt 0) "kafka failover before_leader_broker_id is required."
     Assert-Condition ($afterLeader.Length -gt 0) "kafka failover after_leader_broker_id is required."
     Assert-Condition ($beforeLeader -ne $afterLeader) "kafka failover after leader must differ from before leader."
-    Validate-PushGatewaySummary -Path (Resolve-RepoPath (Get-JsonPropertyString -Object $summary -Name "before_summary"))
-    Validate-PushGatewaySummary -Path (Resolve-RepoPath (Get-JsonPropertyString -Object $summary -Name "after_summary"))
+    Validate-PushGatewaySummary -Path (Resolve-EvidenceSummaryPath -PathValue (Get-JsonPropertyString -Object $summary -Name "before_summary") -Context "kafka failover before_summary")
+    Validate-PushGatewaySummary -Path (Resolve-EvidenceSummaryPath -PathValue (Get-JsonPropertyString -Object $summary -Name "after_summary") -Context "kafka failover after_summary")
 }
 
 function Validate-KafkaISRFlapping {
@@ -157,6 +193,7 @@ function Escape-MarkdownCell {
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $resolvedManifestPath = Resolve-RepoPath $ManifestPath
 Assert-Condition (Test-Path -LiteralPath $resolvedManifestPath -PathType Leaf) "ManifestPath does not exist: $resolvedManifestPath"
+Assert-Condition ($ExpectedResultRoot.Trim().Length -gt 0) "ExpectedResultRoot is required."
 
 $manifest = Get-Content -LiteralPath $resolvedManifestPath -Raw | ConvertFrom-Json
 Assert-Condition ([int]$manifest.schema_version -eq 1) "distributed smoke evidence schema_version must be 1."
@@ -186,6 +223,7 @@ foreach ($entry in @($manifest.entries)) {
     $seenNames[$name] = $true
     Assert-Condition ($kind -in $knownKinds) "distributed smoke evidence entry $name has unknown kind: $kind"
     Assert-Condition ($summaryPath.Length -gt 0) "distributed smoke evidence entry $name summary_path is required."
+    $resolvedSummaryPath = Resolve-EvidenceSummaryPath -PathValue $summaryPath -Context "distributed smoke evidence entry $name summary_path"
 
     $entryValidated = $false
     if (-not $RequireFiles) {
@@ -199,7 +237,6 @@ foreach ($entry in @($manifest.entries)) {
         continue
     }
 
-    $resolvedSummaryPath = Resolve-RepoPath $summaryPath
     Assert-Condition (Test-Path -LiteralPath $resolvedSummaryPath -PathType Leaf) "distributed smoke evidence entry $name summary_path does not exist: $resolvedSummaryPath"
 
     $entrySummary = Get-Content -LiteralPath $resolvedSummaryPath -Raw | ConvertFrom-Json

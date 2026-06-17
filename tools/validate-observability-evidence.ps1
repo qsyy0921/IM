@@ -1,5 +1,7 @@
 param(
     [string]$ManifestPath = "docs/runbook/observability-evidence.json",
+    [string]$ExpectedResultRoot = "H:\NexusIM\loadtest-results",
+    [string]$ReportRoot = "docs/runbook/loadtest",
     [switch]$RequireFiles,
     [string]$OutputPath = "",
     [string]$MarkdownPath = ""
@@ -55,6 +57,29 @@ function Escape-MarkdownCell {
     param([string]$Value)
 
     return $Value.Replace("|", "\|").Replace("`r", " ").Replace("`n", " ").Trim()
+}
+
+function Test-PathInsideDirectory {
+    param(
+        [string]$Path,
+        [string]$Directory
+    )
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+    $fullDirectory = [System.IO.Path]::GetFullPath($Directory).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+
+    if ($fullPath.Equals($fullDirectory, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $true
+    }
+
+    $prefix = $fullDirectory + [System.IO.Path]::DirectorySeparatorChar
+    return $fullPath.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)
 }
 
 function Validate-ServiceDebugSmoke {
@@ -126,8 +151,11 @@ function Validate-ObservabilityImagePreparePlan {
 }
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
+$resolvedReportRoot = Resolve-RepoPath $ReportRoot
 $resolvedManifestPath = Resolve-RepoPath $ManifestPath
 Assert-Condition (Test-Path -LiteralPath $resolvedManifestPath -PathType Leaf) "ManifestPath does not exist: $resolvedManifestPath"
+Assert-Condition ($ExpectedResultRoot.Trim().Length -gt 0) "ExpectedResultRoot is required."
+Assert-Condition ($ReportRoot.Trim().Length -gt 0) "ReportRoot is required."
 
 $manifest = Get-Content -LiteralPath $resolvedManifestPath -Raw | ConvertFrom-Json
 Assert-Condition ([int]$manifest.schema_version -eq 1) "observability evidence schema_version must be 1."
@@ -153,8 +181,16 @@ foreach ($entry in @($manifest.entries)) {
     Assert-Condition ($summaryPath.Length -gt 0) "observability evidence entry $name summary_path is required."
     Assert-Condition ($note.Length -gt 0) "observability evidence entry $name note is required."
 
+    $resolvedSummaryPath = Resolve-RepoPath $summaryPath
+    Assert-Condition (Test-PathInsideDirectory -Path $resolvedSummaryPath -Directory $ExpectedResultRoot) "observability evidence summary_path for $name must point under $ExpectedResultRoot`: $summaryPath"
     if ($reportPath.Length -gt 0) {
         $resolvedReportPath = Resolve-RepoPath $reportPath
+        if ($kind -eq "observability-image-prepare-plan") {
+            Assert-Condition (Test-PathInsideDirectory -Path $resolvedReportPath -Directory $ExpectedResultRoot) "observability image prepare report_path for $name must point under $ExpectedResultRoot`: $reportPath"
+        }
+        else {
+            Assert-Condition (Test-PathInsideDirectory -Path $resolvedReportPath -Directory $resolvedReportRoot) "observability evidence report_path for $name must stay under $ReportRoot`: $reportPath"
+        }
         Assert-Condition (Test-Path -LiteralPath $resolvedReportPath -PathType Leaf) "observability evidence report does not exist for $name`: $reportPath"
         $reportText = (Get-Content -LiteralPath $resolvedReportPath -Raw).ToLowerInvariant()
         Assert-Condition ($reportText.Contains("observability") -or $reportText.Contains("metrics")) "observability evidence report must mention observability or metrics for $name."
@@ -163,7 +199,6 @@ foreach ($entry in @($manifest.entries)) {
 
     $fileChecked = $false
     if ($RequireFiles) {
-        $resolvedSummaryPath = Resolve-RepoPath $summaryPath
         Assert-Condition (Test-Path -LiteralPath $resolvedSummaryPath -PathType Leaf) "observability evidence summary does not exist for $name`: $resolvedSummaryPath"
         switch ($kind) {
             "service-debug-smoke" {

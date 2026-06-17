@@ -26,6 +26,8 @@ function Write-JsonFile {
 function Invoke-Validator {
     param(
         [string]$ManifestPath,
+        [string]$ExpectedResultRoot = "",
+        [string]$ReportRoot = "",
         [switch]$RequireFiles,
         [string]$MarkdownPath = ""
     )
@@ -33,6 +35,12 @@ function Invoke-Validator {
     try {
         $invocationArgs = @{
             ManifestPath = $ManifestPath
+        }
+        if ($ExpectedResultRoot.Trim().Length -gt 0) {
+            $invocationArgs.ExpectedResultRoot = $ExpectedResultRoot
+        }
+        if ($ReportRoot.Trim().Length -gt 0) {
+            $invocationArgs.ReportRoot = $ReportRoot
         }
         if ($RequireFiles) {
             $invocationArgs.RequireFiles = $true
@@ -126,7 +134,7 @@ try {
     })
 
     $markdownPath = Join-Path $tempRoot "observability-evidence.md"
-    $goodResult = Invoke-Validator -ManifestPath $manifestPath -RequireFiles -MarkdownPath $markdownPath
+    $goodResult = Invoke-Validator -ManifestPath $manifestPath -ExpectedResultRoot $tempRoot -ReportRoot $tempRoot -RequireFiles -MarkdownPath $markdownPath
     if ($goodResult.ExitCode -ne 0) {
         Write-Host "FAIL observability evidence fixture should pass." -ForegroundColor Red
         Write-Host $goodResult.Output -ForegroundColor Red
@@ -172,6 +180,66 @@ try {
         exit 1
     }
 
+    $repoLocalSummaryManifestPath = Join-Path $tempRoot "repo-local-observability-evidence.json"
+    Write-JsonFile -Path $repoLocalSummaryManifestPath -Value ([ordered]@{
+        schema_version = 1
+        scope = "self-test"
+        entries = @(
+            [ordered]@{
+                name = "repo-local summary fixture"
+                kind = "service-debug-smoke"
+                service = "policy-service"
+                summary_path = "docs/runbook/loadtest/policy-service/policy-smoke-summary.json"
+                report_path = $reportPath
+                note = "fixture"
+            }
+        )
+    })
+    $repoLocalSummaryResult = Invoke-Validator -ManifestPath $repoLocalSummaryManifestPath -ExpectedResultRoot $tempRoot -ReportRoot $tempRoot
+    if ($repoLocalSummaryResult.ExitCode -eq 0) {
+        Write-Host "FAIL observability evidence with repo-local summary_path should fail." -ForegroundColor Red
+        exit 1
+    }
+    if (-not $repoLocalSummaryResult.Output.Contains("must point under")) {
+        Write-Host "FAIL repo-local observability summary path fixture returned unexpected error." -ForegroundColor Red
+        Write-Host $repoLocalSummaryResult.Output -ForegroundColor Red
+        exit 1
+    }
+
+    $externalReportManifestPath = Join-Path $tempRoot "external-report-observability-evidence.json"
+    $externalReportRoot = Join-Path $tempRoot "external-report-root"
+    $externalReportPath = Join-Path $externalReportRoot "observability-report.md"
+    New-Item -ItemType Directory -Force -Path $externalReportRoot | Out-Null
+    @(
+        "# Fixture observability report",
+        "",
+        "This verifies local debug metrics. It is not a production SLO or observability platform claim."
+    ) | Set-Content -LiteralPath $externalReportPath -Encoding UTF8
+    Write-JsonFile -Path $externalReportManifestPath -Value ([ordered]@{
+        schema_version = 1
+        scope = "self-test"
+        entries = @(
+            [ordered]@{
+                name = "external report fixture"
+                kind = "service-debug-smoke"
+                service = "policy-service"
+                summary_path = $summaryPath
+                report_path = $externalReportPath
+                note = "fixture"
+            }
+        )
+    })
+    $externalReportResult = Invoke-Validator -ManifestPath $externalReportManifestPath -ExpectedResultRoot $tempRoot -ReportRoot (Join-Path $tempRoot "report-root")
+    if ($externalReportResult.ExitCode -eq 0) {
+        Write-Host "FAIL observability evidence with service report outside ReportRoot should fail." -ForegroundColor Red
+        exit 1
+    }
+    if (-not $externalReportResult.Output.Contains("must stay under")) {
+        Write-Host "FAIL external observability report path fixture returned unexpected error." -ForegroundColor Red
+        Write-Host $externalReportResult.Output -ForegroundColor Red
+        exit 1
+    }
+
     $targetSummaryPath = Join-Path $tempRoot "observability-smoke-summary.json"
     Write-JsonFile -Path $targetSummaryPath -Value ([ordered]@{
         run_name = "target-fixture"
@@ -211,6 +279,8 @@ try {
     try {
         $addResultOutput = & $adder `
             -ManifestPath $manifestPath `
+            -ExpectedResultRoot $tempRoot `
+            -ReportRoot $tempRoot `
             -Name "target fixture" `
             -Kind "prometheus-grafana-smoke" `
             -SummaryPath $targetSummaryPath `
@@ -228,7 +298,7 @@ try {
         Write-Host "FAIL add-observability-evidence.ps1 did not append expected entry." -ForegroundColor Red
         exit 1
     }
-    $afterAddResult = Invoke-Validator -ManifestPath $manifestPath -RequireFiles
+    $afterAddResult = Invoke-Validator -ManifestPath $manifestPath -ExpectedResultRoot $tempRoot -ReportRoot $tempRoot -RequireFiles
     if ($afterAddResult.ExitCode -ne 0) {
         Write-Host "FAIL manifest after add should validate with files." -ForegroundColor Red
         Write-Host $afterAddResult.Output -ForegroundColor Red
@@ -268,6 +338,8 @@ try {
     try {
         & $adder `
             -ManifestPath $manifestPath `
+            -ExpectedResultRoot $tempRoot `
+            -ReportRoot $tempRoot `
             -Name "image prepare fixture" `
             -Kind "observability-image-prepare-plan" `
             -SummaryPath $imagePlanPath `
@@ -280,7 +352,7 @@ try {
         exit 1
     }
 
-    $afterImagePlanResult = Invoke-Validator -ManifestPath $manifestPath -RequireFiles
+    $afterImagePlanResult = Invoke-Validator -ManifestPath $manifestPath -ExpectedResultRoot $tempRoot -ReportRoot $tempRoot -RequireFiles
     if ($afterImagePlanResult.ExitCode -ne 0) {
         Write-Host "FAIL manifest after image prepare add should validate with files." -ForegroundColor Red
         Write-Host $afterImagePlanResult.Output -ForegroundColor Red
@@ -291,6 +363,8 @@ try {
     try {
         & $adder `
             -ManifestPath $manifestPath `
+            -ExpectedResultRoot $tempRoot `
+            -ReportRoot $tempRoot `
             -Name "target fixture" `
             -Kind "prometheus-grafana-smoke" `
             -SummaryPath $targetSummaryPath `
@@ -310,6 +384,8 @@ try {
     try {
         & $adder `
             -ManifestPath $manifestPath `
+            -ExpectedResultRoot $tempRoot `
+            -ReportRoot $tempRoot `
             -Name "sensitive target fixture" `
             -Kind "prometheus-grafana-smoke" `
             -SummaryPath $targetSummaryPath `

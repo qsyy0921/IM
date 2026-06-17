@@ -26,6 +26,7 @@ function Write-JsonFile {
 function Invoke-Validator {
     param(
         [string]$ManifestPath,
+        [string]$ExpectedResultRoot = "",
         [switch]$RequireFiles,
         [string]$MarkdownPath = ""
     )
@@ -33,6 +34,9 @@ function Invoke-Validator {
     try {
         $invocationArgs = @{
             ManifestPath = $ManifestPath
+        }
+        if ($ExpectedResultRoot.Trim().Length -gt 0) {
+            $invocationArgs.ExpectedResultRoot = $ExpectedResultRoot
         }
         if ($RequireFiles) {
             $invocationArgs.RequireFiles = $true
@@ -92,7 +96,7 @@ try {
         )
     })
     $markdownPath = Join-Path $tempRoot "distributed-smoke-evidence.md"
-    $goodResult = Invoke-Validator -ManifestPath $manifestPath -RequireFiles -MarkdownPath $markdownPath
+    $goodResult = Invoke-Validator -ManifestPath $manifestPath -ExpectedResultRoot $tempRoot -RequireFiles -MarkdownPath $markdownPath
     if ($goodResult.ExitCode -ne 0) {
         Write-Host "FAIL distributed smoke evidence fixture should pass." -ForegroundColor Red
         Write-Host $goodResult.Output -ForegroundColor Red
@@ -132,9 +136,33 @@ try {
         exit 1
     }
 
+    $repoLocalManifestPath = Join-Path $tempRoot "repo-local-distributed-smoke-evidence.json"
+    Write-JsonFile -Path $repoLocalManifestPath -Value ([ordered]@{
+        schema_version = 1
+        scope = "self-test"
+        entries = @(
+            [ordered]@{
+                name = "repo-local distributed"
+                kind = "pushgateway-full"
+                summary_path = "docs/runbook/loadtest/pushgateway-summary.json"
+            }
+        )
+    })
+    $repoLocalResult = Invoke-Validator -ManifestPath $repoLocalManifestPath -ExpectedResultRoot $tempRoot
+    if ($repoLocalResult.ExitCode -eq 0) {
+        Write-Host "FAIL distributed smoke evidence with repo-local summary_path should fail." -ForegroundColor Red
+        exit 1
+    }
+    if (-not $repoLocalResult.Output.Contains("must point under")) {
+        Write-Host "FAIL repo-local distributed smoke path fixture returned unexpected error." -ForegroundColor Red
+        Write-Host $repoLocalResult.Output -ForegroundColor Red
+        exit 1
+    }
+
     try {
         $addResultOutput = & $adder `
             -ManifestPath $manifestPath `
+            -ExpectedResultRoot $tempRoot `
             -Name "self-test redis" `
             -Kind "redis-smoke" `
             -SummaryPath $pushPath `
@@ -159,6 +187,7 @@ try {
     try {
         & $adder `
             -ManifestPath $manifestPath `
+            -ExpectedResultRoot $tempRoot `
             -Name "self-test redis" `
             -Kind "redis-smoke" `
             -SummaryPath $pushPath `
@@ -178,6 +207,7 @@ try {
     try {
         & $adder `
             -ManifestPath $manifestPath `
+            -ExpectedResultRoot $tempRoot `
             -Name "operator@example.com" `
             -Kind "redis-smoke" `
             -SummaryPath $pushPath `

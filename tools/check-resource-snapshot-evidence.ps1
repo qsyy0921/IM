@@ -26,6 +26,7 @@ function Write-JsonFile {
 function Invoke-Validator {
     param(
         [string]$ManifestPath,
+        [string]$ExpectedResultRoot = "",
         [switch]$RequireFiles,
         [string]$MarkdownPath = ""
     )
@@ -33,6 +34,9 @@ function Invoke-Validator {
     try {
         $invocationArgs = @{
             ManifestPath = $ManifestPath
+        }
+        if ($ExpectedResultRoot.Trim().Length -gt 0) {
+            $invocationArgs.ExpectedResultRoot = $ExpectedResultRoot
         }
         if ($RequireFiles) {
             $invocationArgs.RequireFiles = $true
@@ -144,7 +148,7 @@ try {
     })
 
     $markdownPath = Join-Path $tempRoot "resource-snapshot-evidence.md"
-    $goodResult = Invoke-Validator -ManifestPath $manifestPath -RequireFiles -MarkdownPath $markdownPath
+    $goodResult = Invoke-Validator -ManifestPath $manifestPath -ExpectedResultRoot $tempRoot -RequireFiles -MarkdownPath $markdownPath
     if ($goodResult.ExitCode -ne 0) {
         Write-Host "FAIL resource snapshot evidence fixture should pass." -ForegroundColor Red
         Write-Host $goodResult.Output -ForegroundColor Red
@@ -173,7 +177,7 @@ try {
             }
         )
     })
-    $badResult = Invoke-Validator -ManifestPath $badManifestPath -RequireFiles
+    $badResult = Invoke-Validator -ManifestPath $badManifestPath -ExpectedResultRoot $tempRoot -RequireFiles
     if ($badResult.ExitCode -eq 0) {
         Write-Host "FAIL resource snapshot evidence fixture missing boundary should fail." -ForegroundColor Red
         exit 1
@@ -184,8 +188,34 @@ try {
         exit 1
     }
 
+    $repoLocalManifestPath = Join-Path $tempRoot "repo-local-resource-snapshot-evidence.json"
+    Write-JsonFile -Path $repoLocalManifestPath -Value ([ordered]@{
+        schema_version = 1
+        scope = "self-test"
+        entries = @(
+            [ordered]@{
+                name = "repo-local-resource-evidence-selftest"
+                summary_path = "docs/runbook/loadtest/resource-summary.json"
+                markdown_path = $markdownSummaryPath
+                require_clean_git = $false
+                note = "fixture"
+            }
+        )
+    })
+    $repoLocalResult = Invoke-Validator -ManifestPath $repoLocalManifestPath -ExpectedResultRoot $tempRoot
+    if ($repoLocalResult.ExitCode -eq 0) {
+        Write-Host "FAIL resource snapshot evidence with repo-local summary_path should fail." -ForegroundColor Red
+        exit 1
+    }
+    if (-not $repoLocalResult.Output.Contains("must point under")) {
+        Write-Host "FAIL repo-local resource snapshot path fixture returned unexpected error." -ForegroundColor Red
+        Write-Host $repoLocalResult.Output -ForegroundColor Red
+        exit 1
+    }
+
     & $adder `
         -ManifestPath $manifestPath `
+        -ExpectedResultRoot $tempRoot `
         -Name "resource-evidence-selftest-2" `
         -SummaryPath $summaryPath `
         -MarkdownPath $markdownSummaryPath `
@@ -200,6 +230,7 @@ try {
     try {
         & $adder `
             -ManifestPath $manifestPath `
+            -ExpectedResultRoot $tempRoot `
             -Name "resource-evidence-selftest-2" `
             -SummaryPath $summaryPath `
             -MarkdownPath $markdownSummaryPath `
@@ -215,6 +246,7 @@ try {
 
     & $adder `
         -ManifestPath $manifestPath `
+        -ExpectedResultRoot $tempRoot `
         -Name "resource-evidence-selftest-2" `
         -SummaryPath $summaryPath `
         -MarkdownPath $markdownSummaryPath `
@@ -231,6 +263,7 @@ try {
     try {
         & $adder `
             -ManifestPath $manifestPath `
+            -ExpectedResultRoot $tempRoot `
             -Name "resource-evidence-sensitive" `
             -SummaryPath $summaryPath `
             -MarkdownPath $markdownSummaryPath `

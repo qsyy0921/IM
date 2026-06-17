@@ -1,5 +1,6 @@
 param(
     [string]$ManifestPath = "docs/runbook/resource-snapshot-evidence.json",
+    [string]$ExpectedResultRoot = "H:\NexusIM\loadtest-results",
     [Parameter(Mandatory = $true)]
     [string]$Name,
     [Parameter(Mandatory = $true)]
@@ -101,7 +102,7 @@ $updated = [ordered]@{
 
 try {
     $updated | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $resolvedManifestPath -Encoding UTF8
-    & $validator -ManifestPath $resolvedManifestPath | Out-Null
+    & $validator -ManifestPath $resolvedManifestPath -ExpectedResultRoot $ExpectedResultRoot | Out-Null
 }
 catch {
     $originalJson | Set-Content -LiteralPath $resolvedManifestPath -Encoding UTF8

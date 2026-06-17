@@ -1,5 +1,6 @@
 param(
     [string]$ManifestPath = "docs/runbook/resource-snapshot-evidence.json",
+    [string]$ExpectedResultRoot = "H:\NexusIM\loadtest-results",
     [switch]$RequireFiles,
     [string]$OutputPath = "",
     [string]$MarkdownPath = ""
@@ -57,9 +58,33 @@ function Escape-MarkdownCell {
     return $Value.Replace("|", "\|").Replace("`r", " ").Replace("`n", " ").Trim()
 }
 
+function Test-PathInsideDirectory {
+    param(
+        [string]$Path,
+        [string]$Directory
+    )
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+    $fullDirectory = [System.IO.Path]::GetFullPath($Directory).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+
+    if ($fullPath.Equals($fullDirectory, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $true
+    }
+
+    $prefix = $fullDirectory + [System.IO.Path]::DirectorySeparatorChar
+    return $fullPath.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)
+}
+
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $resolvedManifestPath = Resolve-RepoPath $ManifestPath
 Assert-Condition (Test-Path -LiteralPath $resolvedManifestPath -PathType Leaf) "ManifestPath does not exist: $resolvedManifestPath"
+Assert-Condition ($ExpectedResultRoot.Trim().Length -gt 0) "ExpectedResultRoot is required."
 
 $manifest = Get-Content -LiteralPath $resolvedManifestPath -Raw | ConvertFrom-Json
 Assert-Condition ([int]$manifest.schema_version -eq 1) "resource snapshot evidence schema_version must be 1."
@@ -83,13 +108,16 @@ foreach ($entry in @($manifest.entries)) {
     Assert-Condition ($markdownSummaryPath.Length -gt 0) "resource snapshot evidence entry $name markdown_path is required."
     Assert-Condition ($note.Length -gt 0) "resource snapshot evidence entry $name note is required."
 
+    $resolvedSummaryPath = Resolve-RepoPath $summaryPath
+    Assert-Condition (Test-PathInsideDirectory -Path $resolvedSummaryPath -Directory $ExpectedResultRoot) "resource snapshot summary_path for $name must point under $ExpectedResultRoot`: $summaryPath"
+    $resolvedMarkdownSummaryPath = Resolve-RepoPath $markdownSummaryPath
+    Assert-Condition (Test-PathInsideDirectory -Path $resolvedMarkdownSummaryPath -Directory $ExpectedResultRoot) "resource snapshot markdown_path for $name must point under $ExpectedResultRoot`: $markdownSummaryPath"
+
     $filesChecked = $false
     $serviceCount = $null
     $healthyEndpoints = $null
     $serviceContainers = $null
     if ($RequireFiles) {
-        $resolvedSummaryPath = Resolve-RepoPath $summaryPath
-        $resolvedMarkdownSummaryPath = Resolve-RepoPath $markdownSummaryPath
         Assert-Condition (Test-Path -LiteralPath $resolvedSummaryPath -PathType Leaf) "resource snapshot summary does not exist for $name`: $summaryPath"
         Assert-Condition (Test-Path -LiteralPath $resolvedMarkdownSummaryPath -PathType Leaf) "resource snapshot markdown summary does not exist for $name`: $markdownSummaryPath"
 

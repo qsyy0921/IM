@@ -312,10 +312,10 @@ summary 会记录 Prometheus rule group 数、Grafana 9 个服务 dashboard UID 
 建议在运行本地 smoke 前先执行：
 
 ```powershell
-.\tools\check-local-observability-images.ps1 -RequireImages
+.\tools\check-local-observability-images.ps1 -RequireImages -SkipAlertmanager
 ```
 
-如果预检提示 `missing`，先准备本机镜像，或在确认可以消耗网络流量时再使用 `-AllowImagePull`。
+如果本次 smoke 使用 `-IncludeAlertmanager`，不要加 `-SkipAlertmanager`，让预检同时要求 Alertmanager 镜像。如果预检提示 `missing`，先准备本机镜像，或在确认可以消耗网络流量时再使用 `-AllowImagePull`。
 
 该 smoke 只证明本地观测配置可被真实进程加载，不证明生产 Alertmanager、SLO、retention、权限、统一日志或容量基线已完成。
 

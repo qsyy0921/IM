@@ -1,5 +1,6 @@
 param(
-    [switch]$RequireImages
+    [switch]$RequireImages,
+    [switch]$SkipAlertmanager
 )
 
 $ErrorActionPreference = "Stop"
@@ -45,12 +46,15 @@ $images = @(
     [pscustomobject]@{
         Name = "grafana"
         Image = Get-ObservabilityImage -EnvName "NEXUSIM_GRAFANA_IMAGE" -DefaultImage "grafana/grafana-oss:11.2.0"
-    },
-    [pscustomobject]@{
+    }
+)
+
+if (-not $SkipAlertmanager) {
+    $images += [pscustomobject]@{
         Name = "alertmanager"
         Image = Get-ObservabilityImage -EnvName "NEXUSIM_ALERTMANAGER_IMAGE" -DefaultImage "prom/alertmanager:v0.27.0"
     }
-)
+}
 
 if (-not (Test-DockerAvailable)) {
     if ($RequireImages) {
@@ -89,6 +93,7 @@ if ($missing.Count -gt 0 -and $RequireImages) {
 
 Write-Host "OK   local observability image preflight"
 Write-Host "     require_images=$([bool]$RequireImages)"
+Write-Host "     include_alertmanager=$(-not [bool]$SkipAlertmanager)"
 foreach ($result in $results) {
     $status = if ($result.Present) { "present" } else { "missing" }
     Write-Host "     $($result.Name)=$status image=$($result.Image)"

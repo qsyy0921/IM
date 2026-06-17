@@ -14,6 +14,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $prometheusUpScript = Join-Path $PSScriptRoot "local-up-prometheus.ps1"
 $grafanaUpScript = Join-Path $PSScriptRoot "local-up-grafana.ps1"
 $alertmanagerUpScript = Join-Path $PSScriptRoot "local-up-alertmanager.ps1"
+$imagePreflightScript = Join-Path $PSScriptRoot "check-local-observability-images.ps1"
 $prometheusCompose = Join-Path $repoRoot "deploy\local\docker-compose.prometheus.yml"
 $grafanaCompose = Join-Path $repoRoot "deploy\local\docker-compose.grafana.yml"
 $alertmanagerCompose = Join-Path $repoRoot "deploy\local\docker-compose.alertmanager.yml"
@@ -90,6 +91,20 @@ try {
     $upArgs = @()
     if ($AllowImagePull) {
         $upArgs += "-AllowImagePull"
+    }
+    else {
+        if (-not (Test-Path -LiteralPath $imagePreflightScript -PathType Leaf)) {
+            throw "Missing local observability image preflight script: $imagePreflightScript"
+        }
+
+        $preflightArgs = @("-RequireImages")
+        if (-not $IncludeAlertmanager) {
+            $preflightArgs += "-SkipAlertmanager"
+        }
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $imagePreflightScript @preflightArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw "local observability image preflight failed with exit code $LASTEXITCODE. Prepare local images or rerun with -AllowImagePull."
+        }
     }
 
     if ($IncludeAlertmanager) {

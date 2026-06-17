@@ -77,7 +77,7 @@ func TestNewRateLimiterFromEnvRedisBackend(t *testing.T) {
 	}
 	defer closeFn()
 	snapshot := limiter.Snapshot()
-	if !snapshot.Enabled || snapshot.Backend != "redis" || snapshot.Burst != 8 || snapshot.RedisWindowMS != 2000 || snapshot.RedisFailOpen {
+	if !snapshot.Enabled || snapshot.Backend != "redis" || snapshot.RedisMode != "single" || snapshot.Burst != 8 || snapshot.RedisWindowMS != 2000 || snapshot.RedisFailOpen {
 		t.Fatalf("unexpected redis limiter snapshot: %+v", snapshot)
 	}
 }

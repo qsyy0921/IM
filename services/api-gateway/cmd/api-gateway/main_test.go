@@ -469,6 +469,21 @@ func TestNewRedisUniversalClientSupportsClusterConfig(t *testing.T) {
 	}
 }
 
+func TestNormalizeRedisClientMode(t *testing.T) {
+	tests := map[string]string{
+		"":              "",
+		"single":        "single",
+		" sentinel ":    "sentinel",
+		"cluster":       "cluster",
+		"redis-cluster": "cluster",
+	}
+	for input, want := range tests {
+		if got := normalizeRedisClientMode(input); got != want {
+			t.Fatalf("normalizeRedisClientMode(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
 func TestLoadRateLimitRedisClientConfigFromEnvLoadsClusterAddrs(t *testing.T) {
 	clearAPIGatewayRateLimitConfig(t)
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_MODE", "cluster")

@@ -17,7 +17,7 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 	handler := NewHandler(metrics).WithAuthJWKStats(func() gatewayauth.JWKStats {
 		return gatewayauth.JWKStats{RemoteURLConfigured: true, CachedKeyCount: 2, RefreshFailures: 1}
 	}).WithRateLimitStats(func() ratelimit.Snapshot {
-		return ratelimit.Snapshot{Enabled: true, RatePerSecond: 10, Burst: 20, TenantPlanSource: "none", TotalLimited: 3}
+		return ratelimit.Snapshot{Enabled: true, Backend: "redis", RedisMode: "single", RatePerSecond: 10, Burst: 20, TenantPlanSource: "none", TotalLimited: 3}
 	}).WithRuntimeStats(func() RuntimeSnapshot {
 		return RuntimeSnapshot{RegisterLegacyDescriptors: false}
 	}).WithTraceStats(func() TraceSnapshot {
@@ -53,6 +53,9 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 	if snapshot.RateLimit == nil || !snapshot.RateLimit.Enabled || snapshot.RateLimit.TotalLimited != 3 {
 		t.Fatalf("unexpected rate limit stats: %+v", snapshot.RateLimit)
 	}
+	if snapshot.RateLimit.RedisMode != "single" {
+		t.Fatalf("expected redis mode in rate limit stats, got %+v", snapshot.RateLimit)
+	}
 	if snapshot.Runtime == nil || snapshot.Runtime.RegisterLegacyDescriptors {
 		t.Fatalf("unexpected runtime stats: %+v", snapshot.Runtime)
 	}
@@ -73,6 +76,7 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 		return ratelimit.Snapshot{
 			Enabled:                    true,
 			Backend:                    "redis",
+			RedisMode:                  "cluster",
 			KeyScope:                   "tenant",
 			TenantPlans:                1,
 			TenantPlanSource:           "file",
@@ -107,6 +111,7 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 		t.Fatalf("unexpected content type %q", got)
 	}
 	body := recorder.Body.String()
+	rateLabels := `backend="redis",key_scope="tenant",redis_mode="cluster",tenant_plan_source="file"`
 	assertContains(t, body, "# TYPE nexusim_api_gateway_grpc_requests_total counter")
 	assertContains(t, body, `nexusim_api_gateway_grpc_requests_total{code="OK",method="/nexusim.gateway.v1.GatewayService/SendMessage"} 1`)
 	assertContains(t, body, `nexusim_api_gateway_grpc_requests_total{code="Unavailable",method="/nexusim.gateway.v1.GatewayService/SendMessage"} 1`)
@@ -115,18 +120,18 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 	assertContains(t, body, `nexusim_api_gateway_grpc_exposure_requests_total{exposure="facade"} 2`)
 	assertContains(t, body, `nexusim_api_gateway_grpc_exposure_requests_total{exposure="legacy_descriptor"} 1`)
 	assertContains(t, body, `nexusim_api_gateway_grpc_legacy_descriptor_last_seen_unix_milliseconds`)
-	assertContains(t, body, `nexusim_api_gateway_rate_limit_enabled{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1`)
-	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_require_checksum{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1`)
-	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_url_bearer_token_configured{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1`)
-	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_url_require_https{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1`)
-	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_url_tls_configured{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1`)
-	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_url_client_cert_configured{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1`)
-	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_generated_at_unix_milliseconds{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1800000000000`)
-	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_age_milliseconds{backend="redis",key_scope="tenant",tenant_plan_source="file"} 3700000`)
-	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_stale{backend="redis",key_scope="tenant",tenant_plan_source="file"} 1`)
-	assertContains(t, body, `nexusim_api_gateway_rate_limit_redis_errors_total{backend="redis",key_scope="tenant",tenant_plan_source="file"} 4`)
-	assertContains(t, body, `nexusim_api_gateway_rate_limit_identity_errors_total{backend="redis",key_scope="tenant",tenant_plan_source="file"} 5`)
-	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_reload_errors_total{backend="redis",key_scope="tenant",tenant_plan_source="file"} 3`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_enabled{`+rateLabels+`} 1`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_require_checksum{`+rateLabels+`} 1`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_url_bearer_token_configured{`+rateLabels+`} 1`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_url_require_https{`+rateLabels+`} 1`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_url_tls_configured{`+rateLabels+`} 1`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_url_client_cert_configured{`+rateLabels+`} 1`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_generated_at_unix_milliseconds{`+rateLabels+`} 1800000000000`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_age_milliseconds{`+rateLabels+`} 3700000`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_stale{`+rateLabels+`} 1`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_redis_errors_total{`+rateLabels+`} 4`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_identity_errors_total{`+rateLabels+`} 5`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_reload_errors_total{`+rateLabels+`} 3`)
 	assertContains(t, body, `nexusim_api_gateway_auth_jwks_refresh_failures_total 1`)
 	assertContains(t, body, `nexusim_api_gateway_legacy_descriptors_registered 1`)
 	assertContains(t, body, `nexusim_api_gateway_legacy_descriptors_allowed_until_unix_milliseconds 1800000000000`)

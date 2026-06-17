@@ -745,7 +745,8 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 		} else if configured {
 			failOpen = value
 		}
-		client, err := newRedisUniversalClient(loadRateLimitRedisClientConfigFromEnv())
+		redisConfig := loadRateLimitRedisClientConfigFromEnv()
+		client, err := newRedisUniversalClient(redisConfig)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -759,6 +760,7 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 			log.Printf("api-gateway redis rate limiter ping failed; continuing because fail-open is enabled: %v", err)
 		}
 		config.RedisClient = client
+		config.RedisMode = normalizeRedisClientMode(redisConfig.Mode)
 		config.RedisKeyPrefix = envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_KEY_PREFIX", "nexusim:api-gateway")
 		config.RedisWindow = envDuration("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_WINDOW", time.Second)
 		config.RedisFailOpen = failOpen
@@ -890,7 +892,7 @@ func loadRateLimitRedisClientConfigFromEnv() redisClientConfig {
 }
 
 func newRedisUniversalClient(config redisClientConfig) (redis.UniversalClient, error) {
-	switch strings.ToLower(strings.TrimSpace(config.Mode)) {
+	switch normalizeRedisClientMode(config.Mode) {
 	case "", "single":
 		return redis.NewClient(&redis.Options{
 			Addr:     config.Addr,
@@ -926,6 +928,14 @@ func newRedisUniversalClient(config redisClientConfig) (redis.UniversalClient, e
 	default:
 		return nil, errors.New("unsupported NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_MODE=" + config.Mode)
 	}
+}
+
+func normalizeRedisClientMode(mode string) string {
+	mode = strings.ToLower(strings.TrimSpace(mode))
+	if mode == "redis-cluster" {
+		return "cluster"
+	}
+	return mode
 }
 
 func grpcClientTLSConfigFromEnv(envPrefix string) grpcClientTLSConfig {

@@ -50,6 +50,7 @@ type Config struct {
 	TenantPlanURLClientCertSet  bool
 	MaxKeys                     int
 	RedisClient                 redis.UniversalClient
+	RedisMode                   string
 	RedisKeyPrefix              string
 	RedisWindow                 time.Duration
 	RedisFailOpen               bool
@@ -89,6 +90,7 @@ type Limiter struct {
 	plans               map[string]quotaPlan
 	maxKeys             int
 	redis               redis.UniversalClient
+	redisMode           string
 	prefix              string
 	window              time.Duration
 	failOpen            bool
@@ -149,6 +151,7 @@ type Snapshot struct {
 	TrackedKeys                int     `json:"tracked_keys,omitempty"`
 	MaxKeys                    int     `json:"max_keys,omitempty"`
 	RedisWindowMS              int64   `json:"redis_window_ms,omitempty"`
+	RedisMode                  string  `json:"redis_mode,omitempty"`
 	RedisFailOpen              bool    `json:"redis_fail_open,omitempty"`
 	RedisErrors                int64   `json:"redis_error_count,omitempty"`
 	IdentityErrors             int64   `json:"identity_error_count,omitempty"`
@@ -160,6 +163,10 @@ func New(config Config) (*Limiter, error) {
 	backend := strings.ToLower(strings.TrimSpace(config.Backend))
 	if backend == "" {
 		backend = backendLocal
+	}
+	redisMode := ""
+	if backend == backendRedis {
+		redisMode = normalizeRedisMode(config.RedisMode)
 	}
 	scope := strings.ToLower(strings.TrimSpace(config.KeyScope))
 	if scope == "" {
@@ -183,6 +190,7 @@ func New(config Config) (*Limiter, error) {
 		urlClientCertSet:    config.TenantPlanURLClientCertSet,
 		maxKeys:             config.MaxKeys,
 		redis:               config.RedisClient,
+		redisMode:           redisMode,
 		prefix:              strings.Trim(strings.TrimSpace(config.RedisKeyPrefix), ":"),
 		window:              config.RedisWindow,
 		failOpen:            config.RedisFailOpen,
@@ -312,11 +320,24 @@ func (limiter *Limiter) Snapshot() Snapshot {
 		TrackedKeys:                trackedKeys,
 		MaxKeys:                    limiter.maxKeys,
 		RedisWindowMS:              limiter.window.Milliseconds(),
+		RedisMode:                  limiter.redisMode,
 		RedisFailOpen:              limiter.failOpen,
 		RedisErrors:                limiter.redisErrors.Load(),
 		IdentityErrors:             limiter.identityErrors.Load(),
 		TotalAccepted:              totalAccepted,
 		TotalLimited:               totalLimited,
+	}
+}
+
+func normalizeRedisMode(mode string) string {
+	mode = strings.ToLower(strings.TrimSpace(mode))
+	switch mode {
+	case "", "single":
+		return "single"
+	case "redis-cluster":
+		return "cluster"
+	default:
+		return mode
 	}
 }
 

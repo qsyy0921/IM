@@ -470,6 +470,25 @@ func TestRedisLimiterSharesLimitAcrossInstances(t *testing.T) {
 	}
 }
 
+func TestRedisLimiterSnapshotExposesRedisMode(t *testing.T) {
+	client := redis.NewClient(&redis.Options{Addr: "127.0.0.1:1"})
+	defer client.Close()
+	limiter, err := New(Config{
+		Enabled:           true,
+		Backend:           "redis",
+		RequestsPerSecond: 1,
+		Burst:             1,
+		RedisClient:       client,
+		RedisMode:         "redis-cluster",
+	})
+	if err != nil {
+		t.Fatalf("new redis limiter: %v", err)
+	}
+	if snapshot := limiter.Snapshot(); snapshot.RedisMode != "cluster" {
+		t.Fatalf("expected normalized redis mode in snapshot, got %+v", snapshot)
+	}
+}
+
 func TestRedisLimiterAllowsNewWindow(t *testing.T) {
 	server := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: server.Addr()})

@@ -64,6 +64,7 @@ New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
 try {
     $quotaGood = Join-Path $tempDir "quota-good.json"
     $quotaMissingClientCert = Join-Path $tempDir "quota-missing-client-cert.json"
+    $quotaWrongRedisMode = Join-Path $tempDir "quota-wrong-redis-mode.json"
     $quotaRedisErrors = Join-Path $tempDir "quota-redis-errors.json"
     $quotaIdentityErrors = Join-Path $tempDir "quota-identity-errors.json"
     $quotaTooFewPlans = Join-Path $tempDir "quota-too-few-plans.json"
@@ -84,6 +85,7 @@ try {
     "tenant_plan_url_require_https": true,
     "tenant_plan_url_tls_configured": true,
     "tenant_plan_url_client_cert_configured": true,
+    "redis_mode": "cluster",
     "tenant_plan_max_age_ms": 3600000,
     "tenant_plan_age_ms": 0,
     "tenant_plan_stale": false,
@@ -97,6 +99,7 @@ try {
 '@
     Write-JsonFile -Path $quotaGood -Content $quotaGoodJson
     Write-JsonFile -Path $quotaMissingClientCert -Content ($quotaGoodJson -replace '"tenant_plan_url_client_cert_configured": true', '"tenant_plan_url_client_cert_configured": false')
+    Write-JsonFile -Path $quotaWrongRedisMode -Content ($quotaGoodJson -replace '"redis_mode": "cluster"', '"redis_mode": "single"')
     Write-JsonFile -Path $quotaRedisErrors -Content ($quotaGoodJson -replace '"redis_error_count": 0', '"redis_error_count": 1')
     Write-JsonFile -Path $quotaIdentityErrors -Content ($quotaGoodJson -replace '"identity_error_count": 0', '"identity_error_count": 1')
     Write-JsonFile -Path $quotaTooFewPlans -Content ($quotaGoodJson -replace '"tenant_plan_count": 2', '"tenant_plan_count": 0')
@@ -110,6 +113,7 @@ try {
         "-File", $quotaGate,
         "-RequireRateLimitEnabled",
         "-RequiredSource", "url",
+        "-RequiredRedisMode", "cluster",
         "-RequireVersionedSnapshot",
         "-RequireChecksum",
         "-RequireChecksumPolicy",
@@ -127,6 +131,7 @@ try {
     )
     Invoke-GateExpectPass -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaGood))
     Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaMissingClientCert))
+    Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaWrongRedisMode))
     Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaRedisErrors))
     Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaIdentityErrors))
     Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaTooFewPlans))

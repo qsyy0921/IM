@@ -2,6 +2,7 @@ param(
     [string]$MetricsUrl = "http://127.0.0.1:11904/debug/metrics",
     [string]$SnapshotPath = "",
     [string]$RequiredSource = "",
+    [string]$RequiredRedisMode = "",
     [string]$MaxAllowedAge = "",
     [switch]$RequireRateLimitEnabled,
     [switch]$RequireVersionedSnapshot,
@@ -57,6 +58,18 @@ function Get-BoolOrFalse {
     return [bool]$Value
 }
 
+function Normalize-RedisMode {
+    param([string]$Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return ""
+    }
+    $mode = $Value.Trim().ToLowerInvariant()
+    if ($mode -eq "redis-cluster") {
+        return "cluster"
+    }
+    return $mode
+}
+
 function Convert-DurationToMilliseconds {
     param(
         [string]$Value,
@@ -95,6 +108,7 @@ if ($null -eq $snapshot.rate_limit) {
 $rateLimit = $snapshot.rate_limit
 $enabled = Get-BoolOrFalse $rateLimit.enabled
 $source = (Get-StringOrEmpty $rateLimit.tenant_plan_source).Trim()
+$redisMode = (Get-StringOrEmpty $rateLimit.redis_mode).Trim()
 $version = (Get-StringOrEmpty $rateLimit.tenant_plan_version).Trim()
 $generatedAtMS = Get-Int64OrZero $rateLimit.tenant_plan_generated_at_unix_ms
 $checksumPresent = Get-BoolOrFalse $rateLimit.tenant_plan_checksum_present
@@ -131,6 +145,12 @@ if ($RequireRateLimitEnabled -and -not $enabled) {
 $requiredSourceValue = $RequiredSource.Trim()
 if ($requiredSourceValue -ne "" -and $source.ToLowerInvariant() -ne $requiredSourceValue.ToLowerInvariant()) {
     Write-Host "FAIL api-gateway tenant quota source mismatch: required_source=$requiredSourceValue actual_source=$source." -ForegroundColor Red
+    $failed = $true
+}
+
+$requiredRedisModeValue = $RequiredRedisMode.Trim()
+if ($requiredRedisModeValue -ne "" -and (Normalize-RedisMode $redisMode) -ne (Normalize-RedisMode $requiredRedisModeValue)) {
+    Write-Host "FAIL api-gateway rate-limit Redis mode mismatch: required_redis_mode=$requiredRedisModeValue actual_redis_mode=$redisMode." -ForegroundColor Red
     $failed = $true
 }
 
@@ -235,4 +255,4 @@ if ($failed) {
 }
 
 Write-Host "OK   api-gateway tenant quota snapshot gate"
-Write-Host "     enabled=$enabled source=$source version=$version generated_at_unix_ms=$generatedAtMS checksum_present=$checksumPresent checksum_required=$checksumRequired url_require_https=$urlRequireHTTPS url_bearer_token_configured=$urlBearerTokenConfigured url_tls_configured=$urlTLSConfigured url_client_cert_configured=$urlClientCertConfigured max_age_ms=$maxAgeMS age_ms=$ageMS stale=$stale reload_errors=$reloadErrors redis_errors=$redisErrors identity_errors=$identityErrors tenant_plans=$tenantPlans tracked_keys=$trackedKeys reloaded_at_unix_ms=$reloadAtMS now_unix_ms=$nowMS"
+Write-Host "     enabled=$enabled source=$source redis_mode=$redisMode version=$version generated_at_unix_ms=$generatedAtMS checksum_present=$checksumPresent checksum_required=$checksumRequired url_require_https=$urlRequireHTTPS url_bearer_token_configured=$urlBearerTokenConfigured url_tls_configured=$urlTLSConfigured url_client_cert_configured=$urlClientCertConfigured max_age_ms=$maxAgeMS age_ms=$ageMS stale=$stale reload_errors=$reloadErrors redis_errors=$redisErrors identity_errors=$identityErrors tenant_plans=$tenantPlans tracked_keys=$trackedKeys reloaded_at_unix_ms=$reloadAtMS now_unix_ms=$nowMS"

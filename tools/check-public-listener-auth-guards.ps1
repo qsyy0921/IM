@@ -20,9 +20,24 @@ function Add-Violation([System.Collections.Generic.List[string]]$Violations, [st
     $Violations.Add("$(Get-RelativePath $Path): $Message")
 }
 
+function Read-CmdPackageProductionSource {
+    param([string]$MainPath)
+
+    $cmdDir = Split-Path -Parent $MainPath
+    $source = Get-Content -LiteralPath $MainPath -Raw
+    $mainFileName = Split-Path -Leaf $MainPath
+    $packageFiles = Get-ChildItem -LiteralPath $cmdDir -Filter "*.go" -File |
+        Where-Object { $_.Name -ne $mainFileName -and $_.Name -notlike "*_test.go" } |
+        Sort-Object Name
+    foreach ($packageFile in $packageFiles) {
+        $source += "`n" + (Get-Content -LiteralPath $packageFile.FullName -Raw)
+    }
+    return $source
+}
+
 $violations = [System.Collections.Generic.List[string]]::new()
 foreach ($file in $cmdMainFiles) {
-    $content = Get-Content -LiteralPath $file.FullName -Raw
+    $content = Read-CmdPackageProductionSource -MainPath $file.FullName
     $testFile = Join-Path $file.DirectoryName "main_test.go"
     $testContent = ""
     if (Test-Path -LiteralPath $testFile) {

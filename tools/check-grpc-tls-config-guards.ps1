@@ -18,9 +18,24 @@ function Convert-ToRepoRelativePath {
     return $fullPath
 }
 
+function Read-CmdPackageProductionSource {
+    param([string]$MainPath)
+
+    $cmdDir = Split-Path -Parent $MainPath
+    $source = Get-Content -LiteralPath $MainPath -Raw
+    $mainFileName = Split-Path -Leaf $MainPath
+    $packageFiles = Get-ChildItem -LiteralPath $cmdDir -Filter "*.go" -File |
+        Where-Object { $_.Name -ne $mainFileName -and $_.Name -notlike "*_test.go" } |
+        Sort-Object Name
+    foreach ($packageFile in $packageFiles) {
+        $source += "`n" + (Get-Content -LiteralPath $packageFile.FullName -Raw)
+    }
+    return $source
+}
+
 $violations = @()
 foreach ($file in $cmdMainFiles) {
-    $content = Get-Content -LiteralPath $file.FullName -Raw
+    $content = Read-CmdPackageProductionSource -MainPath $file.FullName
     if (-not ($content.Contains("_TLS_REQUIRE_CLIENT_CERT") -and $content.Contains("ConfigFromEnv()"))) {
         continue
     }

@@ -93,7 +93,7 @@ foreach ($entry in @($catalog.entries)) {
     }
 }
 
-foreach ($requiredCategory in @("architecture-boundary", "listener-boundary", "transport-security", "operator-safety")) {
+foreach ($requiredCategory in @("architecture-boundary", "listener-boundary", "transport-security", "gateway-security", "operator-safety")) {
     Assert-Condition ($categories.ContainsKey($requiredCategory)) "security gate catalog missing required category: $requiredCategory"
 }
 

@@ -82,6 +82,53 @@ try {
         Write-Host $badResult.Output -ForegroundColor Red
         exit 1
     }
+
+    $missingGatewayCatalog = Join-Path $tempRoot "missing-gateway-security-catalog.json"
+    Write-JsonFile -Path $missingGatewayCatalog -Value ([ordered]@{
+        schema_version = 1
+        scope = "self-test"
+        entries = @(
+            [ordered]@{
+                name = "DDD boundary imports"
+                category = "architecture-boundary"
+                script = "tools/check-ddd-boundaries.ps1"
+                check_local_label = "ddd boundaries"
+                note = "fixture"
+            },
+            [ordered]@{
+                name = "debug listener exposure"
+                category = "listener-boundary"
+                script = "tools/check-debug-listener-exposure.ps1"
+                check_local_label = "debug listener exposure"
+                note = "fixture"
+            },
+            [ordered]@{
+                name = "grpc and websocket tls config"
+                category = "transport-security"
+                script = "tools/check-grpc-tls-config-guards.ps1"
+                check_local_label = "grpc/wss tls config guardrails"
+                note = "fixture"
+            },
+            [ordered]@{
+                name = "repair operator catalog"
+                category = "operator-safety"
+                script = "tools/check-repair-operator-index.ps1"
+                check_local_label = "repair operator index"
+                note = "fixture"
+            }
+        )
+    })
+
+    $missingGatewayResult = Invoke-Validator -CatalogPath $missingGatewayCatalog
+    if ($missingGatewayResult.ExitCode -eq 0) {
+        Write-Host "FAIL catalog without gateway-security category should fail." -ForegroundColor Red
+        exit 1
+    }
+    if (-not $missingGatewayResult.Output.Contains("gateway-security")) {
+        Write-Host "FAIL missing-gateway-security catalog returned unexpected error." -ForegroundColor Red
+        Write-Host $missingGatewayResult.Output -ForegroundColor Red
+        exit 1
+    }
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) {

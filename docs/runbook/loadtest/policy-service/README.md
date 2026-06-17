@@ -39,6 +39,7 @@ Implemented:
 - policy-service direct mTLS smoke with client DNS SAN allowlist: `loadtest-report-20260613-policy-service-mtls-smoke.md`.
 - 2026-06-15: policy-service first-stage `/metrics`, local Prometheus scrape / alert rules and local Grafana dashboard prototype were added for local development / interview demo observability. This is not a production SLO or alerting system.
 - 2026-06-16: policy-service direct capacity-baseline smoke through `tools/run-loadtest-capacity-baseline-suite.ps1`: `loadtest-report-20260616-policy-direct-capacity-baseline.md`. This is a local short baseline only, not production sizing.
+- 2026-06-18: policy-service direct 30m long-run capacity slice through `tools/invoke-capacity-longrun-campaign.ps1 -Services policy-service`: `loadtest-report-20260618-policy-direct-longrun-slice.md`. This is a single-service local slice, not the completed nine-service campaign or production sizing.
 
 Not yet implemented:
 

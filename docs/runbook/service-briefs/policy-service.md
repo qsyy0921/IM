@@ -18,8 +18,9 @@
 - message-service 通过 policy-service 做权限决策，不复制策略实现。
 - `cmd/policy-service` 已按 env / debug listener / gRPC TLS / moderation config / operator config 同 package 拆分，避免入口 `main.go` 继续承载横切 helper。
 - `loadtest/policyintegration` smoke runner 已按 config / model / auth / util / validation / PostgreSQL helper 同 package 拆分，`main.go` 已收敛到约 410 行，避免策略集成验证继续堆进单个入口文件。
-- `loadtest/policy` summary 已输出 `capacity_summary`，包含运行时长、action/allow/deny 计数、decision/s、latency p95/p99、permission version 和 classification 口径；已通过 `capacity-baseline-direct-20260616-v3` 跑过本地 direct 短基线，原始结果在 `H:\NexusIM\loadtest-results\capacity-baseline-direct-20260616-v3`，报告见 `docs/runbook/loadtest/policy-service/loadtest-report-20260616-policy-direct-capacity-baseline.md`。
+- `loadtest/policy` summary 已输出 `capacity_summary`，包含运行时长、action/allow/deny 计数、decision/s、latency p95/p99、permission version 和 classification 口径；runner 支持 `--duration` / `--vus`，长跑时只保留有界 action samples 并使用聚合计数输出容量指标；已通过 `capacity-baseline-direct-20260616-v3` 跑过本地 direct 短基线，原始结果在 `H:\NexusIM\loadtest-results\capacity-baseline-direct-20260616-v3`，报告见 `docs/runbook/loadtest/policy-service/loadtest-report-20260616-policy-direct-capacity-baseline.md`。
+- 已完成一条 clean commit direct 30m 长跑切片：commit `0f650e71`，4 VU，4,317,626 次 decision，约 2398.484 decisions/s，p95 4.444ms，p99 13.905ms；原始结果在 `H:\NexusIM\loadtest-results\capacity-longrun-nine-services-20260618-plan\policy-service`，报告见 `docs/runbook/loadtest/policy-service/loadtest-report-20260618-policy-direct-longrun-slice.md`。这不是完整 9 服务 campaign 或生产 sizing。
 
 ## 后续
 
-- 完整 ReBAC、provider-grade moderation / risk scoring、provider-grade tenant DSL / quota、provider-grade 外部 audit sink；当前 keyword / HTTP moderation、decision-audit-export、tenant action quota、Prometheus / Grafana 和 direct capacity baseline 只用于本地开发和面试展示，生产 OTel collector / alerting / SLO dashboard、长时间容量曲线和生产 sizing 仍属于后续统一观测治理。
+- 完整 ReBAC、provider-grade moderation / risk scoring、provider-grade tenant DSL / quota、provider-grade 外部 audit sink；当前 keyword / HTTP moderation、decision-audit-export、tenant action quota、Prometheus / Grafana、direct capacity baseline 和单服务 30m 长跑切片只用于本地开发和面试展示，完整 9 服务长跑、生产 OTel collector / alerting / SLO dashboard、生产容量曲线和 sizing 仍属于后续统一观测治理。

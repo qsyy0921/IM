@@ -19,7 +19,7 @@
 - 已补 `member-window-repair` / `member-window-repair-audit`，支持保守修复 `ACTIVE_WITHOUT_JOIN_SEQ`、`ACTIVE_WITH_LEAVE_SEQ`、`INACTIVE_WITHOUT_LEAVE_SEQ`、inactive `LEAVE_BEFORE_JOIN`、`MEMBER_VERSION_AHEAD_CONVERSATION`、`PERMISSION_VERSION_AHEAD_CONVERSATION` 和 `ACTIVE_MEMBER_IN_INACTIVE_CONVERSATION`：分别把安全候选的 ACTIVE 成员 `join_seq` 补为 `member_version`、清空 ACTIVE 成员残留 `leave_seq`、在 inactive 成员有合法 `join_seq` / `member_version` 时补 `leave_seq = member_version`、把 inactive 成员早于 `join_seq` 的 `leave_seq` clamp 到 `join_seq`、把 conversation 版本 floor 提升到当前成员最大版本，以及把非 ACTIVE 会话内仍 ACTIVE 且窗口合法的成员标为 `LEFT` 并补 `leave_seq = member_version`；默认 dry-run，mutate 时会写 `conversation_member_window_repair_audit`；repair audit 支持 `repaired_at` RFC3339 时间窗口过滤和低敏 JSON filters。
 - 当 `NEXUSIM_CONVERSATION_AUTH_MODE=metadata|verified-metadata` 时，公网监听地址 + 无 gRPC mTLS client cert 的危险组合会在启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - PostgreSQL repository 已按当前窗口成员列表、成员变更写路径、发布推进和通用工具同 package 拆分，避免主 `repository.go` 继续承载所有 SQL helper。
-- PostgreSQL owner-transfer 集成测试已拆到独立同 package 文件，避免成员变更、owner transfer 和发布推进场景继续堆进单个仓储测试文件。
+- PostgreSQL owner-transfer、成员列表、成员变更 / 发布推进集成测试已拆到独立同 package 文件，避免成员变更、owner transfer、成员列表和发布推进场景继续堆进单个仓储测试文件。
 - `loadtest/memberchange` summary 已输出 `capacity_summary`，包含运行时长、VUs、请求 / 成功 / 错误计数、成功率、RPS、latency avg/p95/p99、成员变更类型、saga / timeline / outbox / roster / conversation_seq 聚合；后续容量验证可直接复用该结构。
 - `loadtest/capacityseed` 已能准备 `tenant-capacity-conversation` 下的 ACTIVE owner fixture；`capacity-baseline-seeded-20260616` 本地 seeded 短基线中 `memberchange` 成功 214、`requests_per_second=42.8`，报告见 `loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md`。
 

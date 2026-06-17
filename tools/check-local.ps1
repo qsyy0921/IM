@@ -152,6 +152,9 @@ try {
     Write-Host "== capacity long-run campaign invocation =="
     Invoke-LocalCheck "check-capacity-longrun-campaign-invocation.ps1"
 
+    Write-Host "== capacity long-run campaign preflight =="
+    Invoke-LocalCheck "check-capacity-longrun-campaign-preflight.ps1"
+
     Write-Host "== capacity long-run campaign evidence =="
     Invoke-LocalCheck "check-capacity-longrun-campaign-evidence.ps1"
 

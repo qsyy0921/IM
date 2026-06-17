@@ -5,6 +5,7 @@ param(
     [switch]$ContinueOnError,
     [switch]$SkipSeededRunners,
     [switch]$SkipStackRunners,
+    [switch]$SkipPreflight,
     [switch]$SkipSummary,
     [string]$ReportRoot = "docs/runbook/loadtest",
     [string]$PGDSN = $env:NEXUSIM_PG_DSN,
@@ -109,8 +110,10 @@ Assert-Condition (Test-Path -LiteralPath $resolvedPlanPath -PathType Leaf) "Plan
 
 $suite = Join-Path $PSScriptRoot "run-loadtest-capacity-baseline-suite.ps1"
 $summarizer = Join-Path $PSScriptRoot "summarize-capacity-longrun-campaign.ps1"
+$preflight = Join-Path $PSScriptRoot "test-capacity-longrun-campaign-preflight.ps1"
 Assert-Condition (Test-Path -LiteralPath $suite -PathType Leaf) "Missing capacity baseline suite runner: $suite"
 Assert-Condition (Test-Path -LiteralPath $summarizer -PathType Leaf) "Missing capacity long-run campaign summarizer: $summarizer"
+Assert-Condition (Test-Path -LiteralPath $preflight -PathType Leaf) "Missing capacity long-run campaign preflight: $preflight"
 
 $plan = Get-Content -LiteralPath $resolvedPlanPath -Raw | ConvertFrom-Json
 Assert-Condition ([int]$plan.schema_version -eq 1) "capacity long-run campaign plan schema_version must be 1."
@@ -189,6 +192,28 @@ if (-not $SkipSeededRunners) {
 }
 if (-not $SkipStackRunners) {
     $suiteArgs.Add("-IncludeStackRunners")
+}
+
+if (-not $DryRun -and -not $SkipPreflight) {
+    $preflightArgs = @(
+        "-PlanPath", $resolvedPlanPath,
+        "-PGDSN", $PGDSN,
+        "-KafkaBrokers", $KafkaBrokers,
+        "-ApiGatewayTarget", $ApiGatewayTarget,
+        "-ConversationTarget", $ConversationTarget,
+        "-MessageTarget", $MessageTarget,
+        "-DeliveryTarget", $DeliveryTarget,
+        "-ReceiptTarget", $ReceiptTarget,
+        "-PushURL", $PushURL,
+        "-ContactsTarget", $ContactsTarget,
+        "-IdentityTarget", $IdentityTarget,
+        "-PolicyTarget", $PolicyTarget
+    )
+    Write-Host "== capacity long-run campaign preflight =="
+    $preflightExit = Invoke-Tool -Path $preflight -Arguments $preflightArgs
+    if ($preflightExit -ne 0) {
+        exit $preflightExit
+    }
 }
 
 Write-Host "== capacity long-run campaign suite =="

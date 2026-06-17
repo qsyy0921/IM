@@ -88,6 +88,10 @@ try {
         Write-Host "FAIL capacity long-run invocation should preserve plan duration in runner command." -ForegroundColor Red
         exit 1
     }
+    if (Test-Path -LiteralPath (Join-Path $tempRoot "$campaign\capacity-longrun-campaign-preflight.json")) {
+        Write-Host "FAIL capacity long-run invocation dry-run should not perform network preflight." -ForegroundColor Red
+        exit 1
+    }
 
     $repoPlanResult = Invoke-Tool -Path $writer -Arguments @(
         "-OutputRoot", $tempRoot,

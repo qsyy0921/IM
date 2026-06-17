@@ -6,6 +6,7 @@ $legacyGate = Join-Path $PSScriptRoot "check-api-gateway-legacy-descriptor-migra
 $legacyObservation = Join-Path $PSScriptRoot "record-api-gateway-legacy-observation.ps1"
 $legacyObservationWindow = Join-Path $PSScriptRoot "check-api-gateway-legacy-observation-window.ps1"
 $legacyRemovalPlanCheck = Join-Path $PSScriptRoot "check-api-gateway-legacy-removal-plan.ps1"
+$legacyRemovalPlanValidator = Join-Path $PSScriptRoot "validate-api-gateway-legacy-removal-plan.ps1"
 $powerShellExe = (Get-Command powershell -ErrorAction Stop).Source
 $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("nexusim-api-gateway-gates-" + [System.Guid]::NewGuid().ToString("N"))
 
@@ -272,6 +273,9 @@ try {
         "-ExecutionPolicy", "Bypass",
         "-File", $legacyRemovalPlanCheck
     )
+    if (-not (Test-Path -LiteralPath $legacyRemovalPlanValidator -PathType Leaf)) {
+        throw "Missing legacy removal plan validator: $legacyRemovalPlanValidator"
+    }
 }
 finally {
     Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue

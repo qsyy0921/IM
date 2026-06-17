@@ -1,6 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $writerPath = Join-Path $PSScriptRoot "write-api-gateway-legacy-removal-plan.ps1"
+$validatorPath = Join-Path $PSScriptRoot "validate-api-gateway-legacy-removal-plan.ps1"
 $powerShellExe = (Get-Command powershell -ErrorAction Stop).Source
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("nexusim-api-gateway-legacy-removal-plan-" + [System.Guid]::NewGuid().ToString("N"))
 
@@ -65,6 +66,52 @@ function Invoke-Writer {
     return (Get-Content -LiteralPath $PlanPath -Raw | ConvertFrom-Json)
 }
 
+function Invoke-Validator {
+    param(
+        [string]$PlanPath,
+        [string]$OutputPath = ""
+    )
+
+    $arguments = @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $validatorPath,
+        "-PlanPath", $PlanPath
+    )
+    if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
+        $arguments += @("-OutputPath", $OutputPath)
+    }
+    $output = & $powerShellExe @arguments 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $output | Out-Host
+        throw "validate-api-gateway-legacy-removal-plan.ps1 failed"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
+        if (-not (Test-Path -LiteralPath $OutputPath -PathType Leaf)) {
+            throw "Expected legacy removal plan validation summary: $OutputPath"
+        }
+        return (Get-Content -LiteralPath $OutputPath -Raw | ConvertFrom-Json)
+    }
+    return ($output | Out-String | ConvertFrom-Json)
+}
+
+function Invoke-ValidatorExpectFail {
+    param([string]$PlanPath)
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & $powerShellExe -NoProfile -ExecutionPolicy Bypass -File $validatorPath -PlanPath $PlanPath 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($exitCode -eq 0) {
+        $output | Out-Host
+        throw "Expected validate-api-gateway-legacy-removal-plan.ps1 to fail"
+    }
+}
+
 New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
 try {
     $readySummaryPath = Join-Path $tempRoot "ready-summary.json"
@@ -82,6 +129,14 @@ try {
         $readyPlan.evidence.total_facade_requests -ne 21 -or
         @($readyPlan.blockers).Count -ne 0) {
         throw "READY legacy removal plan fields are incorrect."
+    }
+    $readyValidationPath = Join-Path $tempRoot "ready-validation.json"
+    $readyValidation = Invoke-Validator -PlanPath $readyPlanPath -OutputPath $readyValidationPath
+    if ($readyValidation.valid -ne $true -or
+        $readyValidation.status -ne "READY" -or
+        $readyValidation.ready_for_removal -ne $true -or
+        $readyValidation.total_facade_requests -ne 21) {
+        throw "READY legacy removal plan validation summary is incorrect."
     }
 
     $blockedSummaryPath = Join-Path $tempRoot "blocked-summary.json"
@@ -106,6 +161,25 @@ try {
     if (($blockedPlan | ConvertTo-Json -Depth 8) -match "token|authorization|bearer|email@example.com") {
         throw "Legacy removal plan must stay low-sensitive."
     }
+    $blockedValidation = Invoke-Validator -PlanPath $blockedPlanPath
+    if ($blockedValidation.valid -ne $true -or
+        $blockedValidation.status -ne "BLOCKED" -or
+        $blockedValidation.ready_for_removal -ne $false -or
+        $blockedValidation.blocker_count -lt 4) {
+        throw "BLOCKED legacy removal plan validation summary is incorrect."
+    }
+
+    $tamperedReadyPath = Join-Path $tempRoot "tampered-ready.json"
+    $tamperedReady = Get-Content -LiteralPath $readyPlanPath -Raw | ConvertFrom-Json
+    $tamperedReady.evidence.total_legacy_descriptor_requests = 1
+    ($tamperedReady | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath $tamperedReadyPath -Encoding UTF8
+    Invoke-ValidatorExpectFail -PlanPath $tamperedReadyPath
+
+    $sensitivePath = Join-Path $tempRoot "sensitive-plan.json"
+    $sensitive = Get-Content -LiteralPath $blockedPlanPath -Raw | ConvertFrom-Json
+    $sensitive.note = "Authorization: Bearer abc123"
+    ($sensitive | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath $sensitivePath -Encoding UTF8
+    Invoke-ValidatorExpectFail -PlanPath $sensitivePath
 }
 finally {
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue

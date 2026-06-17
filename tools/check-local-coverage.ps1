@@ -14,6 +14,7 @@ $indirectChecks = @{
     "check-api-gateway-legacy-observation-window.ps1" = "check-api-gateway-gates.ps1"
     "check-api-gateway-legacy-removal-plan.ps1" = "check-api-gateway-gates.ps1"
     "check-api-gateway-quota-snapshot.ps1" = "check-api-gateway-gates.ps1"
+    "validate-api-gateway-legacy-removal-plan.ps1" = "check-api-gateway-gates.ps1"
 }
 
 $manualChecks = @(

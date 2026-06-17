@@ -78,6 +78,14 @@
 
 Audit bundle 只保存 evidence 文件路径、sha256、schema version 和低敏元数据，例如 service / mode / approval id / decision id / batch id / execute flags。它不复制 evidence 原文、不保存环境变量值、operator reason 原文或业务数据。它是 first-stage 本地审计交接 manifest，不是外部 audit sink。
 
+本地 repair audit bundle 校验入口：
+
+```powershell
+.\tools\validate-repair-audit-bundle.ps1 -BundlePath H:\NexusIM\operator-plans\audit-bundle.json -OutputPath H:\NexusIM\operator-plans\audit-bundle-validation.json
+```
+
+校验器会重新读取 audit bundle 引用的 evidence 文件，验证 sha256 和 kind summary，没有复制 evidence 原文，也不会执行 operator。
+
 ## 使用原则
 
 - 先 audit，后 repair；没有明确 event / outbox / checkpoint / failure 范围时不要 redrive。

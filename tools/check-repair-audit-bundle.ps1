@@ -8,8 +8,9 @@ $batchWriterPath = Join-Path $PSScriptRoot "write-repair-batch-manifest.ps1"
 $batchValidatorPath = Join-Path $PSScriptRoot "validate-repair-batch-manifest.ps1"
 $batchInvokerPath = Join-Path $PSScriptRoot "invoke-repair-batch-manifest.ps1"
 $bundleWriterPath = Join-Path $PSScriptRoot "write-repair-audit-bundle.ps1"
+$bundleValidatorPath = Join-Path $PSScriptRoot "validate-repair-audit-bundle.ps1"
 
-foreach ($path in @($plannerPath, $requestWriterPath, $decisionWriterPath, $invokePath, $batchWriterPath, $batchValidatorPath, $batchInvokerPath, $bundleWriterPath)) {
+foreach ($path in @($plannerPath, $requestWriterPath, $decisionWriterPath, $invokePath, $batchWriterPath, $batchValidatorPath, $batchInvokerPath, $bundleWriterPath, $bundleValidatorPath)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "Missing repair audit bundle test dependency: $path"
     }
@@ -137,6 +138,25 @@ try {
         }
     }
 
+    $validationPath = Join-Path $tempRoot "audit-bundle-validation.json"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $bundleValidatorPath `
+        -BundlePath $bundlePath `
+        -OutputPath $validationPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "validate-repair-audit-bundle.ps1 failed"
+    }
+    $validationRaw = Get-Content -LiteralPath $validationPath -Raw
+    $validation = $validationRaw | ConvertFrom-Json
+    if ($validation.schema_version -ne 1 -or
+        $validation.bundle_id -ne "repair-audit-bundle-test" -or
+        $validation.file_count -ne 7 -or
+        $validation.valid -ne $true) {
+        throw "repair audit bundle validation has unexpected fields."
+    }
+    if ($validationRaw.Contains("do-not-copy-audit-bundle-value") -or $validationRaw.Contains("do-not-copy-audit-bundle-reason")) {
+        throw "repair audit bundle validation leaked raw environment value or reason text."
+    }
+
     $oldErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
@@ -149,6 +169,21 @@ try {
     }
     if ($duplicateExitCode -eq 0) {
         throw "repair audit bundle should reject duplicate evidence content."
+    }
+
+    $tamperedPlan = Get-Content -LiteralPath $planPath -Raw | ConvertFrom-Json
+    $tamperedPlan.note = "tampered"
+    ($tamperedPlan | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath $planPath -Encoding UTF8
+    $ErrorActionPreference = "Continue"
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $bundleValidatorPath `
+            -BundlePath $bundlePath 2>$null | Out-Null
+        $tamperedExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldErrorActionPreference
+    }
+    if ($tamperedExitCode -eq 0) {
+        throw "repair audit bundle validator should reject tampered evidence content."
     }
 } finally {
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue

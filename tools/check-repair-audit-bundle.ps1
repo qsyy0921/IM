@@ -185,6 +185,20 @@ try {
         throw "repair audit bundle should reject credential-like bundle ids."
     }
 
+    $ErrorActionPreference = "Continue"
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $bundleWriterPath `
+            -EvidencePath $summaryPath `
+            -GeneratedBy "operator-a" `
+            -OutputPath (Join-Path (Split-Path -Parent $PSScriptRoot) "tmp-repair-audit-bundle.json") 2>$null | Out-Null
+        $repoBundleOutputExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldErrorActionPreference
+    }
+    if ($repoBundleOutputExitCode -eq 0) {
+        throw "repair audit bundle should reject repository-local OutputPath."
+    }
+
     $sensitiveIDBundlePath = Join-Path $tempRoot "audit-bundle-sensitive-id.json"
     $sensitiveIDBundle = $bundleRaw | ConvertFrom-Json
     $sensitiveIDBundle.bundle_id = "repair-audit-bundle-token-secret"

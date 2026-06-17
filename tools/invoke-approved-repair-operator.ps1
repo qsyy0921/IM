@@ -15,6 +15,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "repair-operator-safety.ps1")
+
 $validatorPath = Join-Path $PSScriptRoot "validate-repair-approval-chain.ps1"
 if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
     throw "Missing repair approval chain validator: $validatorPath"
@@ -100,6 +102,7 @@ $summary = [ordered]@{
 
 $json = $summary | ConvertTo-Json -Depth 8
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
+    Assert-ExternalRepairOutputPath -Value $OutputPath -FieldName "OutputPath"
     $parent = Split-Path -Parent $OutputPath
     if (-not [string]::IsNullOrWhiteSpace($parent)) {
         New-Item -ItemType Directory -Force -Path $parent | Out-Null

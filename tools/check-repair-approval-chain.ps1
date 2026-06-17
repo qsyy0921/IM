@@ -98,6 +98,20 @@ try {
 
     $ErrorActionPreference = "Continue"
     try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $requestWriterPath `
+            -PlanPath $planPath `
+            -RequestedBy "operator-a" `
+            -OutputPath (Join-Path (Split-Path -Parent $PSScriptRoot) "tmp-repair-request.json") 2>$null | Out-Null
+        $repoOutputExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldErrorActionPreference
+    }
+    if ($repoOutputExitCode -eq 0) {
+        throw "write-repair-approval-request.ps1 should reject repository-local OutputPath."
+    }
+
+    $ErrorActionPreference = "Continue"
+    try {
         & powershell -NoProfile -ExecutionPolicy Bypass -File $decisionWriterPath `
             -RequestPath $requestPath `
             -Decision "APPROVED" `

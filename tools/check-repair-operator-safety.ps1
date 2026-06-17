@@ -8,6 +8,7 @@ if (-not (Test-Path -LiteralPath $helperPath -PathType Leaf)) {
 $helperText = Get-Content -LiteralPath $helperPath -Raw
 foreach ($functionName in @(
         "Get-RepairSha256Hex",
+        "Assert-ExternalRepairOutputPath",
         "Assert-LowSensitiveRepairActor",
         "Assert-LowSensitiveRepairIdentifier",
         "Assert-LowSensitiveRepairAdHocEnv",
@@ -67,6 +68,13 @@ Assert-FailsWith -Label "credential repair identifier" -Pattern "credential-like
     Assert-LowSensitiveRepairIdentifier -Value "approval-token-secret" -FieldName "ApprovalID"
 }
 
+$externalRepairPath = Join-Path ([System.IO.Path]::GetTempPath()) "nexusim-repair-safety-output.json"
+Assert-ExternalRepairOutputPath -Value $externalRepairPath -FieldName "OutputPath"
+$repoLocalRepairPath = Join-Path (Split-Path -Parent $PSScriptRoot) "tmp-repair-output.json"
+Assert-FailsWith -Label "repo-local repair output path" -Pattern "must not be inside the repository" -Script {
+    Assert-ExternalRepairOutputPath -Value $repoLocalRepairPath -FieldName "OutputPath"
+}
+
 Assert-LowSensitiveRepairAdHocEnv -Key "NEXUSIM_FILTER" -Value "tenant-1"
 Assert-FailsWith -Label "lowercase env key" -Pattern "uppercase environment variable" -Script {
     Assert-LowSensitiveRepairAdHocEnv -Key "nexusim_filter" -Value "tenant-1"
@@ -103,7 +111,12 @@ $writerScripts = @(
     "write-repair-approval-request.ps1",
     "write-repair-approval-decision.ps1",
     "write-repair-batch-manifest.ps1",
-    "write-repair-audit-bundle.ps1"
+    "write-repair-audit-bundle.ps1",
+    "validate-repair-approval-chain.ps1",
+    "validate-repair-batch-manifest.ps1",
+    "validate-repair-audit-bundle.ps1",
+    "invoke-approved-repair-operator.ps1",
+    "invoke-repair-batch-manifest.ps1"
 )
 
 foreach ($writerScript in $writerScripts) {

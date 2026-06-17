@@ -79,6 +79,7 @@ $decisionDocument = [ordered]@{
 
 $json = $decisionDocument | ConvertTo-Json -Depth 8
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
+    Assert-ExternalRepairOutputPath -Value $OutputPath -FieldName "OutputPath"
     $parent = Split-Path -Parent $OutputPath
     if (-not [string]::IsNullOrWhiteSpace($parent)) {
         New-Item -ItemType Directory -Force -Path $parent | Out-Null

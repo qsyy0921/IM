@@ -12,6 +12,49 @@ function Get-RepairSha256Hex {
     return -join ($hash | ForEach-Object { $_.ToString("x2") })
 }
 
+function Test-RepairPathInsideDirectory {
+    param(
+        [string]$Path,
+        [string]$Directory
+    )
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+    $fullDirectory = [System.IO.Path]::GetFullPath($Directory).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+
+    if ($fullPath.Equals($fullDirectory, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $true
+    }
+
+    $prefix = $fullDirectory + [System.IO.Path]::DirectorySeparatorChar
+    return $fullPath.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Assert-ExternalRepairOutputPath {
+    param(
+        [string]$Value,
+        [string]$FieldName = "OutputPath",
+        [switch]$AllowEmpty
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        if ($AllowEmpty) {
+            return
+        }
+        throw "$FieldName is required."
+    }
+
+    $repoRoot = Split-Path -Parent $PSScriptRoot
+    if (Test-RepairPathInsideDirectory -Path $Value -Directory $repoRoot) {
+        throw "$FieldName must not be inside the repository. Store repair/operator artifacts under H:\NexusIM\operator-plans or another external scratch directory."
+    }
+}
+
 function Assert-LowSensitiveRepairActor {
     param(
         [string]$Value,

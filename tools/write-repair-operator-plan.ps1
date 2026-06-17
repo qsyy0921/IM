@@ -78,6 +78,7 @@ $environment = [ordered]@{}
 $environment[[string]$serviceSpec.mode_env] = $Mode
 
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
+    Assert-ExternalRepairOutputPath -Value $OutputPath -FieldName "OutputPath"
     if ([string]::IsNullOrWhiteSpace($OutputEnv)) {
         throw "OutputPath requires OutputEnv. Choose one of the service output_envs from the catalog."
     }
@@ -158,6 +159,7 @@ $plan = [ordered]@{
 
 $json = $plan | ConvertTo-Json -Depth 8
 if (-not [string]::IsNullOrWhiteSpace($PlanOutputPath)) {
+    Assert-ExternalRepairOutputPath -Value $PlanOutputPath -FieldName "PlanOutputPath"
     $parent = Split-Path -Parent $PlanOutputPath
     if (-not [string]::IsNullOrWhiteSpace($parent)) {
         New-Item -ItemType Directory -Force -Path $parent | Out-Null

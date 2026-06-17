@@ -9,6 +9,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "repair-operator-safety.ps1")
+
 $batchValidatorPath = Join-Path $PSScriptRoot "validate-repair-batch-manifest.ps1"
 $singleInvokerPath = Join-Path $PSScriptRoot "invoke-approved-repair-operator.ps1"
 foreach ($path in @($batchValidatorPath, $singleInvokerPath)) {
@@ -126,6 +128,7 @@ $summary = [ordered]@{
 
 $json = $summary | ConvertTo-Json -Depth 10
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
+    Assert-ExternalRepairOutputPath -Value $OutputPath -FieldName "OutputPath"
     $parent = Split-Path -Parent $OutputPath
     if (-not [string]::IsNullOrWhiteSpace($parent)) {
         New-Item -ItemType Directory -Force -Path $parent | Out-Null

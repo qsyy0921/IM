@@ -221,6 +221,20 @@ try {
         throw "repair batch manifest should reject credential-like batch ids."
     }
 
+    $ErrorActionPreference = "Continue"
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $batchWriterPath `
+            -InvocationSummaryPath $summaryA `
+            -RequestedBy "operator-a" `
+            -OutputPath (Join-Path (Split-Path -Parent $PSScriptRoot) "tmp-repair-batch.json") 2>$null | Out-Null
+        $repoBatchOutputExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($repoBatchOutputExitCode -eq 0) {
+        throw "repair batch manifest should reject repository-local OutputPath."
+    }
+
     $sensitiveIDManifestPath = Join-Path $tempRoot "batch-manifest-sensitive-id.json"
     $sensitiveIDManifest = $manifestRaw | ConvertFrom-Json
     $sensitiveIDManifest.batch_id = "repair-batch-token-secret"

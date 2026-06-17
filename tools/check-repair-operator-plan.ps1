@@ -63,6 +63,22 @@ try {
         $deliveryPlan.environment.NEXUSIM_DELIVERY_PROJECTION_REPAIR_OPERATOR -ne "manual") {
         throw "delivery-service repair operator plan has unexpected environment."
     }
+
+    $policyPlanJson = & powershell -NoProfile -ExecutionPolicy Bypass -File $plannerPath `
+        -Service "policy-service" `
+        -Mode "tenant-quota-set" `
+        -OutputEnv "NEXUSIM_POLICY_TENANT_QUOTA_SET_OUTPUT" `
+        -OutputPath "H:\NexusIM\operator-plans\policy-quota-set.json" `
+        -Env "NEXUSIM_POLICY_TENANT_QUOTA_SET_TENANT_ID=tenant_1"
+    if ($LASTEXITCODE -ne 0) {
+        throw "write-repair-operator-plan.ps1 failed for policy-service tenant-quota-set"
+    }
+    $policyPlan = $policyPlanJson | ConvertFrom-Json
+    if ($policyPlan.environment.NEXUSIM_POLICY_SERVICE_MODE -ne "tenant-quota-set" -or
+        $policyPlan.environment.NEXUSIM_POLICY_TENANT_QUOTA_SET_OUTPUT -ne "H:\NexusIM\operator-plans\policy-quota-set.json" -or
+        $policyPlan.environment.NEXUSIM_POLICY_TENANT_QUOTA_SET_TENANT_ID -ne "tenant_1") {
+        throw "policy-service tenant-quota-set repair operator plan has unexpected environment."
+    }
 } finally {
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }

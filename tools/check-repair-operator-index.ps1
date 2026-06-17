@@ -27,17 +27,45 @@ $operatorSpecs = @(
         Service = "message-service"
         Cmd = "services\message-service\cmd\message-service\main.go"
         Env = "NEXUSIM_MESSAGE_SERVICE_MODE"
-        Modes = @("outbox-audit", "outbox-repair", "outbox-repair-audit", "outbox-repair-cleanup", "change-history-audit", "retention-proof-audit")
+        Modes = @(
+            "outbox-audit",
+            "outbox-repair",
+            "outbox-repair-audit",
+            "outbox-repair-cleanup",
+            "change-history-audit",
+            "retention-proof-audit",
+            "legal-hold-audit",
+            "legal-hold-set",
+            "legal-hold-release",
+            "compliance-proof-audit",
+            "compliance-proof-register",
+            "compliance-proof-revoke",
+            "compliance-approval-audit",
+            "compliance-approval-create",
+            "compliance-approval-cancel"
+        )
         OutputEnvs = @(
             "NEXUSIM_MESSAGE_OUTBOX_AUDIT_OUTPUT",
             "NEXUSIM_MESSAGE_OUTBOX_REPAIR_OUTPUT",
             "NEXUSIM_MESSAGE_OUTBOX_REPAIR_AUDIT_OUTPUT",
             "NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_OUTPUT",
             "NEXUSIM_MESSAGE_CHANGE_HISTORY_AUDIT_OUTPUT",
-            "NEXUSIM_MESSAGE_RETENTION_PROOF_AUDIT_OUTPUT"
+            "NEXUSIM_MESSAGE_RETENTION_PROOF_AUDIT_OUTPUT",
+            "NEXUSIM_MESSAGE_LEGAL_HOLD_AUDIT_OUTPUT",
+            "NEXUSIM_MESSAGE_LEGAL_HOLD_OUTPUT",
+            "NEXUSIM_MESSAGE_COMPLIANCE_PROOF_AUDIT_OUTPUT",
+            "NEXUSIM_MESSAGE_COMPLIANCE_PROOF_OUTPUT",
+            "NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_AUDIT_OUTPUT",
+            "NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_OUTPUT"
         )
         DryRunEnvs = @(
             "NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
+        )
+        ExtraCmdFiles = @(
+            "services\message-service\cmd\message-service\message_legal_hold_operator.go",
+            "services\message-service\cmd\message-service\message_compliance_proof_operator.go",
+            "services\message-service\cmd\message-service\message_compliance_proof_provider.go",
+            "services\message-service\cmd\message-service\message_compliance_approval_operator.go"
         )
     },
     @{
@@ -53,6 +81,7 @@ $operatorSpecs = @(
             "projection-checkpoint-repair",
             "projection-checkpoint-repair-audit",
             "projection-checkpoint-repair-cleanup",
+            "projection-failure-resolve",
             "projection-failure-cleanup"
         )
         OutputEnvs = @(
@@ -64,6 +93,7 @@ $operatorSpecs = @(
             "NEXUSIM_DELIVERY_PROJECTION_REPAIR_OUTPUT",
             "NEXUSIM_DELIVERY_PROJECTION_REPAIR_AUDIT_OUTPUT",
             "NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_OUTPUT",
+            "NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_OUTPUT",
             "NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_OUTPUT"
         )
         DryRunEnvs = @(
@@ -102,7 +132,9 @@ $operatorSpecs = @(
             "tenant-privacy-default-audit",
             "tenant-privacy-default-set",
             "source-policy-audit",
-            "source-policy-set"
+            "source-policy-set",
+            "contact-request-review",
+            "contact-request-review-audit"
         )
         OutputEnvs = @(
             "NEXUSIM_CONTACTS_OUTBOX_AUDIT_OUTPUT",
@@ -112,7 +144,9 @@ $operatorSpecs = @(
             "NEXUSIM_CONTACTS_TENANT_PRIVACY_AUDIT_OUTPUT",
             "NEXUSIM_CONTACTS_TENANT_PRIVACY_SET_OUTPUT",
             "NEXUSIM_CONTACTS_SOURCE_POLICY_AUDIT_OUTPUT",
-            "NEXUSIM_CONTACTS_SOURCE_POLICY_SET_OUTPUT"
+            "NEXUSIM_CONTACTS_SOURCE_POLICY_SET_OUTPUT",
+            "NEXUSIM_CONTACTS_REQUEST_REVIEW_OUTPUT",
+            "NEXUSIM_CONTACTS_REQUEST_REVIEW_AUDIT_OUTPUT"
         )
         DryRunEnvs = @(
             "NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
@@ -122,12 +156,23 @@ $operatorSpecs = @(
         Service = "policy-service"
         Cmd = "services\policy-service\cmd\policy-service\main.go"
         Env = "NEXUSIM_POLICY_SERVICE_MODE"
-        Modes = @("outbox-audit", "outbox-repair", "outbox-repair-audit", "outbox-repair-cleanup")
+        Modes = @(
+            "outbox-audit",
+            "outbox-repair",
+            "outbox-repair-audit",
+            "outbox-repair-cleanup",
+            "decision-audit-export",
+            "tenant-quota-audit",
+            "tenant-quota-set"
+        )
         OutputEnvs = @(
             "NEXUSIM_POLICY_OUTBOX_AUDIT_OUTPUT",
             "NEXUSIM_POLICY_OUTBOX_REPAIR_OUTPUT",
             "NEXUSIM_POLICY_OUTBOX_REPAIR_AUDIT_OUTPUT",
-            "NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OUTPUT"
+            "NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OUTPUT",
+            "NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_OUTPUT",
+            "NEXUSIM_POLICY_TENANT_QUOTA_AUDIT_OUTPUT",
+            "NEXUSIM_POLICY_TENANT_QUOTA_SET_OUTPUT"
         )
         DryRunEnvs = @(
             "NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_DRY_RUN"

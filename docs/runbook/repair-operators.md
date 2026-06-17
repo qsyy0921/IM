@@ -28,6 +28,14 @@
 
 审批决定只保存 `request_sha256`、`plan_sha256`、`reason_sha256`、service / mode / command 和审批状态，不保存审批 reason 原文、环境变量值或业务数据。它不执行 operator，只为后续正式执行编排 / 运维 UI 提供可校验的低敏交接文件。
 
+本地审批链校验入口：
+
+```powershell
+.\tools\validate-repair-approval-chain.ps1 -PlanPath H:\NexusIM\operator-plans\plan.json -RequestPath H:\NexusIM\operator-plans\approval.json -DecisionPath H:\NexusIM\operator-plans\decision.json
+```
+
+校验器只确认 plan / request / decision 的 hash、`approval_id`、service / mode / command 和 `APPROVED` 状态一致。它不执行 operator，也不会复制环境变量值、审批 reason 或业务数据。
+
 ## 使用原则
 
 - 先 audit，后 repair；没有明确 event / outbox / checkpoint / failure 范围时不要 redrive。

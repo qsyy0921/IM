@@ -47,6 +47,9 @@ try {
     Write-Host "== repair approval decision =="
     Invoke-LocalCheck "check-repair-approval-decision.ps1"
 
+    Write-Host "== repair approval chain =="
+    Invoke-LocalCheck "check-repair-approval-chain.ps1"
+
     Write-Host "== ddd boundaries =="
     Invoke-LocalCheck "check-ddd-boundaries.ps1"
 

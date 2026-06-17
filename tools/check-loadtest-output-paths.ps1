@@ -76,6 +76,35 @@ function Test-CallsOutputRootGuard {
     return $Text -match '(?m)^\s*Assert-ExternalOutputRoot\b'
 }
 
+function Add-EmptyDefaultGuardFailures {
+    param(
+        [string]$Text,
+        [string]$RelativePath,
+        [System.Collections.ArrayList]$Failures
+    )
+
+    foreach ($match in [regex]::Matches($Text, '\[string\]\$(ResultRoot|OutputRoot)\s*=\s*""')) {
+        $parameterName = $match.Groups[1].Value
+        $fallbackPattern = 'if\s*\(-not\s*\$' + [regex]::Escape($parameterName) + '\)\s*\{[\s\S]{0,300}?H:\\NexusIM\\loadtest-results'
+        $guardPattern = '(?m)^\s*Assert-ExternalOutputRoot\b[^\r\n]*-Value\s+\$' + [regex]::Escape($parameterName) + '\b'
+        $fallbackMatch = [regex]::Match($Text, $fallbackPattern)
+        $guardMatch = [regex]::Match($Text, $guardPattern)
+
+        if (-not $fallbackMatch.Success) {
+            [void]$Failures.Add([pscustomobject]@{
+                Path = $RelativePath
+                Text = "$parameterName has an empty default and must set an H:\NexusIM\loadtest-results fallback before validation"
+            })
+        }
+        elseif ($guardMatch.Success -and $fallbackMatch.Index -gt $guardMatch.Index) {
+            [void]$Failures.Add([pscustomobject]@{
+                Path = $RelativePath
+                Text = "$parameterName sets the H:\NexusIM\loadtest-results fallback after Assert-ExternalOutputRoot"
+            })
+        }
+    }
+}
+
 $scanRoots = @(
     (Join-Path $repoRoot "loadtest"),
     (Join-Path $repoRoot "tools")
@@ -89,7 +118,7 @@ $files = foreach ($root in $scanRoots) {
 }
 
 $failures = @()
-$guardFailures = @()
+$guardFailures = [System.Collections.ArrayList]@()
 foreach ($file in ($files | Sort-Object FullName)) {
     $relativePath = Convert-ToRepoRelativePath -Path $file.FullName
     if (Test-IsAllowedInternalReference -RelativePath $relativePath) {
@@ -102,17 +131,18 @@ foreach ($file in ($files | Sort-Object FullName)) {
     $fileText = Get-Content -LiteralPath $file.FullName -Raw
     if ($fileText -match "\[string\]\`$(ResultRoot|OutputRoot)") {
         if (-not (Test-UsesOutputRootHelper -Text $fileText)) {
-            $guardFailures += [pscustomobject]@{
+            [void]$guardFailures.Add([pscustomobject]@{
                 Path = $relativePath
                 Text = "ResultRoot/OutputRoot writer is missing output-root-safety.ps1 helper"
-            }
+            })
         }
         if (-not (Test-CallsOutputRootGuard -Text $fileText)) {
-            $guardFailures += [pscustomobject]@{
+            [void]$guardFailures.Add([pscustomobject]@{
                 Path = $relativePath
                 Text = "ResultRoot/OutputRoot writer is missing an active Assert-ExternalOutputRoot call"
-            }
+            })
         }
+        Add-EmptyDefaultGuardFailures -Text $fileText -RelativePath $relativePath -Failures $guardFailures
     }
 
     $lineNumber = 0

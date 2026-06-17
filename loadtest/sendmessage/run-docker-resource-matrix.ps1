@@ -26,16 +26,16 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+if (-not $ResultRoot) {
+    $ResultRoot = Join-Path "H:\NexusIM\loadtest-results" ("docker-resource-matrix-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+}
+
 $nexusIMRepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 . (Join-Path $nexusIMRepoRoot "tools\output-root-safety.ps1")
 Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot $nexusIMRepoRoot -Name "ResultRoot"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 Set-Location $repoRoot
-
-if (-not $ResultRoot) {
-    $ResultRoot = Join-Path "H:\NexusIM\loadtest-results" ("docker-resource-matrix-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
-}
 
 . .\tools\go-env.ps1
 New-Item -ItemType Directory -Force bin\linux, logs, $ResultRoot | Out-Null

@@ -56,6 +56,28 @@ try {
         exit 1
     }
 
+    $cleanEmptyDefaultScript = Join-Path $tempRoot "loadtest\demo\run-local-gradient.ps1"
+    Set-FixtureFile -Path $cleanEmptyDefaultScript -Lines @(
+        "param(",
+        "    [string]`$ResultRoot = """"",
+        ")",
+        "if (-not `$ResultRoot) {",
+        "    `$ResultRoot = Join-Path 'H:\NexusIM\loadtest-results' ('gradient-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))",
+        "}",
+        ". (Join-Path `$PSScriptRoot '..\..\tools\output-root-safety.ps1')",
+        "Assert-ExternalOutputRoot -Value `$ResultRoot -RepositoryRoot 'E:\development\IM'",
+        "Write-Host 'ok'"
+    )
+
+    $cleanEmptyDefaultResult = Invoke-OutputPathCheck -RepoRoot $tempRoot
+    if ($cleanEmptyDefaultResult.ExitCode -ne 0) {
+        Write-Host "FAIL fixture with early H-drive fallback should pass loadtest output path guard." -ForegroundColor Red
+        if ($cleanEmptyDefaultResult.Output) {
+            Write-Host $cleanEmptyDefaultResult.Output -ForegroundColor Red
+        }
+        exit 1
+    }
+
     $missingHelper = Join-Path $tempRoot "tools\bad-missing-helper.ps1"
     Set-FixtureFile -Path $missingHelper -Lines @(
         "param(",
@@ -94,6 +116,28 @@ try {
     }
 
     Remove-Item -LiteralPath $commentOnly -Force
+    $lateFallback = Join-Path $tempRoot "loadtest\demo\bad-late-fallback.ps1"
+    Set-FixtureFile -Path $lateFallback -Lines @(
+        "param(",
+        "    [string]`$ResultRoot = """"",
+        ")",
+        ". (Join-Path `$PSScriptRoot '..\..\tools\output-root-safety.ps1')",
+        "Assert-ExternalOutputRoot -Value `$ResultRoot -RepositoryRoot 'E:\development\IM'",
+        "if (-not `$ResultRoot) {",
+        "    `$ResultRoot = Join-Path 'H:\NexusIM\loadtest-results' ('late-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))",
+        "}"
+    )
+
+    $lateFallbackResult = Invoke-OutputPathCheck -RepoRoot $tempRoot
+    if ($lateFallbackResult.ExitCode -eq 0 -or $lateFallbackResult.Output -notmatch "fallback after Assert-ExternalOutputRoot") {
+        Write-Host "FAIL fixture with late H-drive fallback should fail loadtest output path guard." -ForegroundColor Red
+        if ($lateFallbackResult.Output) {
+            Write-Host $lateFallbackResult.Output -ForegroundColor Red
+        }
+        exit 1
+    }
+
+    Remove-Item -LiteralPath $lateFallback -Force
     $repoLocalReference = Join-Path $tempRoot "loadtest\demo\main.go"
     Set-FixtureFile -Path $repoLocalReference -Lines @(
         "package main",
@@ -116,4 +160,4 @@ finally {
     }
 }
 
-Write-Host "OK   loadtest output path guard self-test covers helper, active guard, and repo-local path requirements."
+Write-Host "OK   loadtest output path guard self-test covers helper, active guard, fallback order, and repo-local path requirements."

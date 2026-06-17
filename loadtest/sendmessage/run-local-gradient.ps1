@@ -19,6 +19,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+if (-not $ResultRoot) {
+    $ResultRoot = Join-Path "H:\NexusIM\loadtest-results" ("gradient-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+}
+
 $nexusIMRepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 . (Join-Path $nexusIMRepoRoot "tools\output-root-safety.ps1")
 Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot $nexusIMRepoRoot -Name "ResultRoot"
@@ -28,10 +32,6 @@ Set-Location $repoRoot
 
 if ([string]::IsNullOrWhiteSpace($PGDSN)) {
     $PGDSN = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable"
-}
-
-if (-not $ResultRoot) {
-    $ResultRoot = Join-Path "H:\NexusIM\loadtest-results" ("gradient-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
 }
 
 . .\tools\go-env.ps1

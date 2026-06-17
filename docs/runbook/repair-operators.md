@@ -70,6 +70,14 @@
 
 默认只对批量 manifest 做校验，并逐条重新校验 approved invocation summary 对应的 plan / request / decision 链路，输出低敏批量预检摘要，不执行 operator。只有显式加 `-Execute` 才会按 item 顺序委托 `invoke-approved-repair-operator.ps1`；如果任一 item 不是 dry-run，还必须额外加 `-AllowMutating`。
 
+本地 repair audit bundle 生成入口：
+
+```powershell
+.\tools\write-repair-audit-bundle.ps1 -EvidencePath H:\NexusIM\operator-plans\plan.json,H:\NexusIM\operator-plans\approval.json,H:\NexusIM\operator-plans\decision.json,H:\NexusIM\operator-plans\invoke-summary.json,H:\NexusIM\operator-plans\batch-manifest.json,H:\NexusIM\operator-plans\batch-validation.json,H:\NexusIM\operator-plans\batch-invoke-summary.json -GeneratedBy operator-a -ReasonFile H:\NexusIM\operator-plans\audit-reason.txt -OutputPath H:\NexusIM\operator-plans\audit-bundle.json
+```
+
+Audit bundle 只保存 evidence 文件路径、sha256、schema version 和低敏元数据，例如 service / mode / approval id / decision id / batch id / execute flags。它不复制 evidence 原文、不保存环境变量值、operator reason 原文或业务数据。它是 first-stage 本地审计交接 manifest，不是外部 audit sink。
+
 ## 使用原则
 
 - 先 audit，后 repair；没有明确 event / outbox / checkpoint / failure 范围时不要 redrive。
@@ -224,5 +232,5 @@ go run ./services/delivery-service/cmd/delivery-service
 
 - 跨服务统一 repair runbook 的执行编排。
 - 正式批量 repair 执行编排、审批系统和运维 UI。
-- 外部 audit sink。
+- provider-grade 外部 audit sink。
 - 更细 poison payload 分类和长期 retention 策略。

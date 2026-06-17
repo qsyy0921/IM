@@ -2,9 +2,13 @@ $ErrorActionPreference = "Stop"
 
 $toolsRoot = $PSScriptRoot
 $preparePath = Join-Path $toolsRoot "prepare-local-observability-images.ps1"
+$validatorPath = Join-Path $toolsRoot "validate-observability-image-prepare-plan.ps1"
 
 if (-not (Test-Path -LiteralPath $preparePath -PathType Leaf)) {
     throw "Missing prepare-local-observability-images.ps1"
+}
+if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
+    throw "Missing validate-observability-image-prepare-plan.ps1"
 }
 
 function Assert-Contains {
@@ -128,6 +132,12 @@ try {
     $planMarkdown = Get-Content -LiteralPath $planMarkdownPath -Raw
     Assert-Contains -Text $planMarkdown -Pattern "NexusIM Observability Image Prepare Plan" -Message "Prepare Markdown plan must have title."
     Assert-Contains -Text $planMarkdown -Pattern $alertmanagerImage -Message "Prepare Markdown plan must include Alertmanager image."
+
+    $validatorOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $validatorPath -PlanPath $planJsonPath -RequireReport 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "validate-observability-image-prepare-plan.ps1 failed with exit code $LASTEXITCODE`: $($validatorOutput -join [Environment]::NewLine)"
+    }
+    Assert-Contains -Text ($validatorOutput -join [Environment]::NewLine) -Pattern "OK   observability image prepare plan validated" -Message "Prepare plan validator must report success."
 }
 finally {
     if ($planDir -and (Test-Path -LiteralPath $planDir)) {

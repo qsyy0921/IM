@@ -331,6 +331,14 @@ summary 会记录 Prometheus rule group 数、Grafana 9 个服务 dashboard UID 
   -OutputDir H:\NexusIM\loadtest-results\observability-image-prepare-<date>
 ```
 
+生成后的计划可离线校验：
+
+```powershell
+.\tools\validate-observability-image-prepare-plan.ps1 `
+  -PlanPath H:\NexusIM\loadtest-results\observability-image-prepare-<date>\observability-image-prepare-plan.json `
+  -RequireReport
+```
+
 确认网络和流量预算允许后，再显式拉取：
 
 ```powershell

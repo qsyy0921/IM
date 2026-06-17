@@ -60,6 +60,7 @@ foreach ($entry in @($catalog.entries)) {
     $category = Get-JsonPropertyString -Object $entry -Name "category"
     $script = Get-JsonPropertyString -Object $entry -Name "script"
     $label = Get-JsonPropertyString -Object $entry -Name "check_local_label"
+    $coveredByScript = Get-JsonPropertyString -Object $entry -Name "covered_by_script"
     $note = Get-JsonPropertyString -Object $entry -Name "note"
 
     Assert-Condition ($name.Length -gt 0) "security gate entry name is required."
@@ -76,8 +77,20 @@ foreach ($entry in @($catalog.entries)) {
     $scriptPath = Resolve-RepoPath $script
     Assert-Condition (Test-Path -LiteralPath $scriptPath -PathType Leaf) "security gate entry $name script does not exist: $script"
     $scriptLeaf = Split-Path -Leaf $scriptPath
-    Assert-Condition ($checkLocal.Contains($scriptLeaf)) "security gate entry $name script is not invoked by check-local.ps1: $scriptLeaf"
     Assert-Condition ($checkLocal.Contains($label)) "security gate entry $name label is not present in check-local.ps1: $label"
+
+    if ($coveredByScript.Length -gt 0) {
+        Assert-Condition ($coveredByScript.StartsWith("tools/") -or $coveredByScript.StartsWith("tools\")) "security gate entry $name covered_by_script must live under tools."
+        $coveredByPath = Resolve-RepoPath $coveredByScript
+        Assert-Condition (Test-Path -LiteralPath $coveredByPath -PathType Leaf) "security gate entry $name covered_by_script does not exist: $coveredByScript"
+        $coveredByLeaf = Split-Path -Leaf $coveredByPath
+        Assert-Condition ($checkLocal.Contains($coveredByLeaf)) "security gate entry $name covered_by_script is not invoked by check-local.ps1: $coveredByLeaf"
+        $coveredByText = Get-Content -LiteralPath $coveredByPath -Raw
+        Assert-Condition ($coveredByText.Contains($scriptLeaf)) "security gate entry $name script is not covered by ${coveredByLeaf}: $scriptLeaf"
+    }
+    else {
+        Assert-Condition ($checkLocal.Contains($scriptLeaf)) "security gate entry $name script is not invoked by check-local.ps1: $scriptLeaf"
+    }
 }
 
 foreach ($requiredCategory in @("architecture-boundary", "listener-boundary", "transport-security", "operator-safety")) {

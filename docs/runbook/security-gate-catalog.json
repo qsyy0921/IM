@@ -46,6 +46,30 @@
       "note": "Gateway-specific startup, auth, quota, and public boundary gates."
     },
     {
+      "name": "api-gateway legacy descriptor migration gate",
+      "category": "gateway-security",
+      "script": "tools/check-api-gateway-legacy-descriptor-migration.ps1",
+      "covered_by_script": "tools/check-api-gateway-gates.ps1",
+      "check_local_label": "api-gateway gates",
+      "note": "Legacy descriptors cannot be removed until facade traffic, quiet-window, opt-in deadline, and exposure checks pass."
+    },
+    {
+      "name": "api-gateway legacy observation window gate",
+      "category": "gateway-security",
+      "script": "tools/check-api-gateway-legacy-observation-window.ps1",
+      "covered_by_script": "tools/check-api-gateway-gates.ps1",
+      "check_local_label": "api-gateway gates",
+      "note": "Legacy descriptor removal must use multiple clean observations with bounded gaps and no legacy or other exposure."
+    },
+    {
+      "name": "api-gateway quota snapshot gate",
+      "category": "gateway-security",
+      "script": "tools/check-api-gateway-quota-snapshot.ps1",
+      "covered_by_script": "tools/check-api-gateway-gates.ps1",
+      "check_local_label": "api-gateway gates",
+      "note": "Tenant quota snapshots must keep HTTPS, checksum, TLS/client-cert, freshness, and error guardrails."
+    },
+    {
       "name": "repair operator catalog",
       "category": "operator-safety",
       "script": "tools/check-repair-operator-index.ps1",

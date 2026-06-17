@@ -60,6 +60,14 @@ try {
                 script = "tools/check-public-listener-auth-guards.ps1"
                 check_local_label = "missing label"
                 note = "fixture"
+            },
+            [ordered]@{
+                name = "covered child gate"
+                category = "gateway-security"
+                script = "tools/check-api-gateway-legacy-observation-window.ps1"
+                covered_by_script = "tools/check-api-gateway-gates.ps1"
+                check_local_label = "api-gateway gates"
+                note = "fixture"
             }
         )
     })

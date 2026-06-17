@@ -1,9 +1,13 @@
 $ErrorActionPreference = "Stop"
 
 $validator = Join-Path $PSScriptRoot "validate-distributed-smoke-evidence.ps1"
+$adder = Join-Path $PSScriptRoot "add-distributed-smoke-evidence.ps1"
 
 if (-not (Test-Path -LiteralPath $validator -PathType Leaf)) {
     throw "Missing distributed smoke evidence validator: $validator"
+}
+if (-not (Test-Path -LiteralPath $adder -PathType Leaf)) {
+    throw "Missing distributed smoke evidence adder: $adder"
 }
 
 function Write-JsonFile {
@@ -125,6 +129,48 @@ try {
     if (-not $badResult.Output.Contains("duplicate")) {
         Write-Host "FAIL bad distributed smoke evidence fixture returned unexpected error." -ForegroundColor Red
         Write-Host $badResult.Output -ForegroundColor Red
+        exit 1
+    }
+
+    try {
+        $addResultOutput = & $adder `
+            -ManifestPath $manifestPath `
+            -Name "self-test redis" `
+            -Kind "redis-smoke" `
+            -SummaryPath $pushPath `
+            -ExpectedRedisMode "cluster" `
+            -ExpectedScenario "redis-cluster-failover" `
+            -Note "fixture redis evidence" 2>&1
+    }
+    catch {
+        Write-Host "FAIL add-distributed-smoke-evidence.ps1 should append redis fixture." -ForegroundColor Red
+        Write-Host $_.Exception.Message -ForegroundColor Red
+        exit 1
+    }
+    $afterAdd = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    $added = @($afterAdd.entries | Where-Object { $_.name -eq "self-test redis" })
+    if (@($afterAdd.entries).Count -ne 2 -or $added.Count -ne 1 -or $added[0].expected_redis_mode -ne "cluster") {
+        Write-Host "FAIL add-distributed-smoke-evidence.ps1 did not append expected redis entry." -ForegroundColor Red
+        Write-Host (($addResultOutput | Out-String).Trim()) -ForegroundColor Red
+        exit 1
+    }
+
+    $duplicateAddFailed = $false
+    try {
+        & $adder `
+            -ManifestPath $manifestPath `
+            -Name "self-test redis" `
+            -Kind "redis-smoke" `
+            -SummaryPath $pushPath `
+            -ExpectedRedisMode "cluster" `
+            -ExpectedScenario "redis-cluster-failover" `
+            -Note "fixture redis evidence" 2>$null | Out-Null
+    }
+    catch {
+        $duplicateAddFailed = ($_.Exception.Message -match "already exists")
+    }
+    if (-not $duplicateAddFailed) {
+        Write-Host "FAIL add-distributed-smoke-evidence.ps1 should reject duplicate names." -ForegroundColor Red
         exit 1
     }
 }

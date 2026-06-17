@@ -448,6 +448,21 @@ docs/runbook/distributed-smoke-evidence.json
 
 该索引用于避免 runbook 中散落的 Redis / PostgreSQL / Kafka smoke 证据失效；可选 Markdown report 只输出低敏路径、场景和边界说明。它仍是本地 / 面试展示级证据目录，不是生产 HA 证明。
 
+新跑完 Redis / PostgreSQL / Kafka / push-gateway 分布式 smoke 后，优先用工具追加索引，避免手改 JSON：
+
+```powershell
+.\tools\add-distributed-smoke-evidence.ps1 `
+  -Name "redis cluster failover <date>" `
+  -Kind redis-smoke `
+  -SummaryPath "H:\NexusIM\loadtest-results\<run>\redis-cluster-failover-summary.json" `
+  -ExpectedRedisMode cluster `
+  -ExpectedScenario redis-cluster-failover `
+  -RequireCleanGit `
+  -Note "Local Redis Cluster failover evidence; not production HA."
+```
+
+追加后用 `validate-distributed-smoke-evidence.ps1 -RequireFiles` 复核 H 盘真实文件仍存在且关键不变量成立。
+
 ## 7. 已知缺口
 
 - Redis route 已做一次真实 stop/start fault smoke，证明 online notify 可丢但 `PullInbox + AckDelivery` 可恢复；push-gateway 已在三 Redis / 三 Sentinel 拓扑上跑通 Sentinel discovery、手动 failover、master-stop recovery、quorum-loss fallback 和 network-partition fallback smoke，也跑通过 Redis Cluster topology / node-stop / failover / 短容量 smoke，且 summary 格式已有离线 validator；这些仍不是生产 Redis HA、长时间容量曲线或生产级高可用结论。

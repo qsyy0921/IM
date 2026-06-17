@@ -50,4 +50,22 @@ Assert-Fails -Value "sk-abcdefghijklmnop" -Message "OpenAI-style secret keys sho
 Assert-Fails -Value "eyJaaaaaaaaaaa.payload.signature" -Message "JWT-like values should be rejected."
 Assert-Fails -Value "" -Message "Required evidence metadata should reject blanks."
 
+$appendScripts = Get-ChildItem -LiteralPath $PSScriptRoot -Filter "add-*evidence*.ps1" -File
+if (@($appendScripts).Count -lt 1) {
+    Write-Host "FAIL expected at least one evidence append script." -ForegroundColor Red
+    exit 1
+}
+
+foreach ($script in $appendScripts) {
+    $content = Get-Content -LiteralPath $script.FullName -Raw
+    if (-not $content.Contains("evidence-metadata-safety.ps1")) {
+        Write-Host "FAIL $($script.Name) must dot-source evidence-metadata-safety.ps1." -ForegroundColor Red
+        exit 1
+    }
+    if (-not $content.Contains("Assert-LowSensitiveEvidenceText")) {
+        Write-Host "FAIL $($script.Name) must validate caller-supplied evidence metadata." -ForegroundColor Red
+        exit 1
+    }
+}
+
 Write-Host "OK   evidence metadata safety helper self-test"

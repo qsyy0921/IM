@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-06-17",
+  "scope": "Local distributed smoke evidence index for NexusIM. These entries are local/development evidence, not production HA or SLO claims.",
+  "entries": [
+    {
+      "name": "push-gateway redis route fallback",
+      "kind": "pushgateway-full",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\push-gateway-redis-fault-smoke-20260609-195200\\pushgateway-summary.json",
+      "expected_scenario": "redis-fault",
+      "require_clean_git": false,
+      "note": "Local Redis route fault fallback; PullInbox remains authoritative."
+    },
+    {
+      "name": "redis sentinel quorum loss",
+      "kind": "redis-smoke",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\redis-sentinel-quorum-loss-smoke-20260614f\\redis-sentinel-quorum-loss-summary.json",
+      "expected_redis_mode": "sentinel",
+      "expected_scenario": "redis-sentinel-quorum-loss",
+      "require_clean_git": false,
+      "note": "Local Sentinel quorum-loss fallback evidence."
+    },
+    {
+      "name": "redis cluster failover",
+      "kind": "redis-smoke",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\redis-cluster-failover-smoke-20260616-clean\\redis-cluster-failover-summary.json",
+      "expected_redis_mode": "cluster",
+      "expected_scenario": "redis-cluster-failover",
+      "require_clean_git": true,
+      "note": "Local six-node Redis Cluster failover evidence."
+    },
+    {
+      "name": "postgres failover",
+      "kind": "postgres-smoke",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\postgres-failover-smoke-20260614f\\postgres-failover-summary.json",
+      "expected_scenario": "postgres-failover",
+      "require_clean_git": false,
+      "note": "Local repmgr + pgpool primary switch evidence."
+    },
+    {
+      "name": "postgres quorum observation",
+      "kind": "postgres-smoke",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\postgres-quorum-observation-smoke-20260615-202747\\postgres-quorum-observation-summary.json",
+      "expected_scenario": "postgres-quorum-observation",
+      "require_clean_git": true,
+      "note": "Local standby-stop observation; production quorum boundary remains ADR-034."
+    },
+    {
+      "name": "kafka failover",
+      "kind": "kafka-failover",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\kafka-failover-smoke-20260614b\\kafka-failover-summary.json",
+      "require_clean_git": false,
+      "note": "Local broker stop / leader change evidence with before and after full smoke."
+    },
+    {
+      "name": "kafka isr flapping",
+      "kind": "kafka-isr-flapping",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\kafka-isr-flapping-smoke-20260616-clean-2\\kafka-isr-flapping-summary.json",
+      "require_clean_git": true,
+      "note": "Local repeated ISR shrink/restore observation."
+    },
+    {
+      "name": "kafka producer in-flight broker fault",
+      "kind": "kafka-producer-fault",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\kafka-producer-fault-observation-20260616-clean-3\\kafka-producer-fault-observation-summary.json",
+      "require_clean_git": true,
+      "note": "Local kafka-go producer broker-fault observation; not exactly-once proof."
+    },
+    {
+      "name": "kafka consumer churn probe",
+      "kind": "kafka-consumer-churn",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\kafka-consumer-churn-probe-smoke-20260616\\kafka-consumer-churn-summary.json",
+      "require_clean_git": true,
+      "note": "Local consumer group repeated leave/rejoin with probe events."
+    }
+  ]
+}

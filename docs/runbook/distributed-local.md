@@ -431,6 +431,22 @@ Redis Sentinel / Cluster smoke 结果可以用下面的离线 validator 校验 w
 
 该 validator 只验证本地 smoke 证据格式、Redis route fallback / failover / capacity summary 不变量，不证明生产 Redis HA、长时间容量曲线或容量 SLO。
 
+分布式 smoke 证据索引维护在：
+
+```text
+docs/runbook/distributed-smoke-evidence.json
+```
+
+它只记录低敏本地 summary 路径和 validator 类型。默认本地门禁只校验 manifest schema；在当前机器上可加 `-RequireFiles` 复核 H 盘真实文件：
+
+```powershell
+.\tools\validate-distributed-smoke-evidence.ps1 `
+  -ManifestPath docs\runbook\distributed-smoke-evidence.json `
+  -RequireFiles
+```
+
+该索引用于避免 runbook 中散落的 Redis / PostgreSQL / Kafka smoke 证据失效；它仍是本地 / 面试展示级证据目录，不是生产 HA 证明。
+
 ## 7. 已知缺口
 
 - Redis route 已做一次真实 stop/start fault smoke，证明 online notify 可丢但 `PullInbox + AckDelivery` 可恢复；push-gateway 已在三 Redis / 三 Sentinel 拓扑上跑通 Sentinel discovery、手动 failover、master-stop recovery、quorum-loss fallback 和 network-partition fallback smoke，也跑通过 Redis Cluster topology / node-stop / failover / 短容量 smoke，且 summary 格式已有离线 validator；这些仍不是生产 Redis HA、长时间容量曲线或生产级高可用结论。

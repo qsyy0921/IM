@@ -15,6 +15,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "repair-operator-safety.ps1")
+
 function Convert-DurationToMilliseconds {
     param([string]$Value)
 
@@ -60,6 +62,30 @@ function Read-MetricsSnapshotRaw {
     return [string]$response.Content
 }
 
+function Assert-LowSensitiveMetricsUrl {
+    param([string]$Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        throw "MetricsUrl is required in live mode."
+    }
+    try {
+        $uri = [System.Uri]$Value
+    } catch {
+        throw "MetricsUrl must be a valid HTTP(S) URL."
+    }
+    if (-not $uri.IsAbsoluteUri -or @("http", "https") -notcontains $uri.Scheme.ToLowerInvariant()) {
+        throw "MetricsUrl must be an absolute HTTP(S) URL."
+    }
+    if (-not [string]::IsNullOrWhiteSpace($uri.UserInfo) -or
+        -not [string]::IsNullOrWhiteSpace($uri.Query) -or
+        -not [string]::IsNullOrWhiteSpace($uri.Fragment)) {
+        throw "MetricsUrl must not contain userinfo, query, or fragment because it is written into the observation report."
+    }
+    if ($Value -match "(?i)(bearer\s+\S+|token\s*=|password\s*=|secret\s*=|sk-[A-Za-z0-9_-]{8,}|eyJ[A-Za-z0-9_-]+\.)") {
+        throw "MetricsUrl contains a sensitive-looking value."
+    }
+}
+
 function Add-Argument {
     param(
         [System.Collections.Generic.List[string]]$Arguments,
@@ -78,6 +104,10 @@ $powerShellExe = (Get-Command powershell -ErrorAction Stop).Source
 
 if ([string]::IsNullOrWhiteSpace($RunName)) {
     $RunName = "api-gateway-legacy-observation-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+}
+Assert-LowSensitiveRepairActor -Value $RunName -FieldName "RunName"
+if ([string]::IsNullOrWhiteSpace($SnapshotPath)) {
+    Assert-LowSensitiveMetricsUrl -Value $MetricsUrl
 }
 
 $runDir = Join-Path $OutputRoot $RunName

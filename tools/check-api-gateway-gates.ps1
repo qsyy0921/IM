@@ -55,8 +55,16 @@ function Invoke-GateExpectPass {
 
 function Invoke-GateExpectFail {
     param([string[]]$Arguments)
-    $output = & $powerShellExe @Arguments 2>&1
-    if ($LASTEXITCODE -eq 0) {
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & $powerShellExe @Arguments 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($exitCode -eq 0) {
         $output | Out-Host
         throw "Expected gate to fail, args=$($Arguments -join ' ')"
     }
@@ -209,6 +217,28 @@ try {
         "-MaxSnapshotAge", "1h",
         "-NowUnixMS", "100500"
     )
+    Invoke-GateExpectFail -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $legacyObservation,
+        "-SnapshotPath", $legacyGood,
+        "-OutputRoot", $observationRoot,
+        "-RunName", "operator@example.com",
+        "-RequiredQuietDuration", "7d",
+        "-MaxSnapshotAge", "1h",
+        "-NowUnixMS", "100500"
+    )
+    Invoke-GateExpectFail -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $legacyObservation,
+        "-MetricsUrl", "http://127.0.0.1:11904/debug/metrics?token=secret",
+        "-OutputRoot", $observationRoot,
+        "-RunName", "legacy-observation-sensitive-url",
+        "-RequiredQuietDuration", "7d",
+        "-MaxSnapshotAge", "1h",
+        "-NowUnixMS", "100500"
+    )
     $failedObservationSummary = Join-Path $observationRoot "legacy-observation-fail\legacy-observation-summary.json"
     if (-not (Test-Path -LiteralPath $failedObservationSummary)) {
         throw "Expected failed legacy observation summary to be written: $failedObservationSummary"
@@ -265,6 +295,23 @@ try {
         "-RequiredWindow", "1s",
         "-MaxObservationGap", "1000s",
         "-MinObservations", "2",
+        "-NowUnixMS", "900000"
+    )
+
+    $windowSensitiveRoot = Join-Path $tempDir "legacy-window-sensitive"
+    Write-LegacyObservationSummary -Directory (Join-Path $windowSensitiveRoot "obs-1") -GeneratedAtMS 100000 -FacadeRequests 5
+    $sensitiveSummaryPath = Join-Path $windowSensitiveRoot "obs-1\legacy-observation-summary.json"
+    $sensitiveSummary = Get-Content -LiteralPath $sensitiveSummaryPath -Raw | ConvertFrom-Json
+    $sensitiveSummary.run_name = "operator@example.com"
+    ($sensitiveSummary | ConvertTo-Json -Depth 4) | Set-Content -LiteralPath $sensitiveSummaryPath -Encoding UTF8
+    Invoke-GateExpectFail -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $legacyObservationWindow,
+        "-SummaryRoot", $windowSensitiveRoot,
+        "-RequiredWindow", "1s",
+        "-MaxObservationGap", "1000s",
+        "-MinObservations", "1",
         "-NowUnixMS", "900000"
     )
 

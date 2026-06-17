@@ -15,6 +15,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "repair-operator-safety.ps1")
+
 function Convert-DurationToMilliseconds {
     param([string]$Value)
 
@@ -86,6 +88,9 @@ $observations = @()
 foreach ($file in $distinctSummaryFiles) {
     $raw = Get-Content -LiteralPath $file -Raw
     $summary = $raw | ConvertFrom-Json
+    if (-not [string]::IsNullOrWhiteSpace([string]$summary.run_name)) {
+        Assert-LowSensitiveRepairActor -Value ([string]$summary.run_name) -FieldName "run_name"
+    }
     $generatedAt = Get-Int64OrZero $summary.generated_at_unix_ms
     if ($generatedAt -le 0) {
         $generatedAt = Get-Int64OrZero $summary.snapshot_generated_at_unix_ms

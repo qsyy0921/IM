@@ -33,6 +33,11 @@ if ($items.Count -eq 0) {
     throw "Repair batch manifest contains no items."
 }
 
+$nonDryRunItems = @($items | Where-Object { $_.dry_run_requested -ne $true })
+if ($Execute -and $nonDryRunItems.Count -gt 0 -and -not $AllowMutating) {
+    throw "Refusing to execute a repair batch with $($nonDryRunItems.Count) non-dry-run item(s). Pass -AllowMutating only after explicit operator approval."
+}
+
 $itemSummaries = @()
 $allDryRun = $true
 $executedCount = 0

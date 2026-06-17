@@ -23,7 +23,8 @@ function New-ApprovedInvocationSummary {
         [string]$DryRunEnv,
         [string]$ApprovalID,
         [string]$DecisionID,
-        [string]$OutputName
+        [string]$OutputName,
+        [bool]$UseDryRun = $true
     )
 
     $planPath = Join-Path $tempRoot "$OutputName-plan.json"
@@ -31,12 +32,16 @@ function New-ApprovedInvocationSummary {
     $decisionPath = Join-Path $tempRoot "$OutputName-decision.json"
     $summaryPath = Join-Path $tempRoot "$OutputName-summary.json"
 
-    $planJson = & powershell -NoProfile -ExecutionPolicy Bypass -File $plannerPath `
-        -Service "delivery-service" `
-        -Mode $Mode `
-        -DryRun `
-        -DryRunEnv $DryRunEnv `
-        -Env "NEXUSIM_DELIVERY_BATCH_TEST_SECRET=do-not-copy-batch-value"
+    $plannerArgs = @(
+        "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $plannerPath,
+        "-Service", "delivery-service",
+        "-Mode", $Mode,
+        "-Env", "NEXUSIM_DELIVERY_BATCH_TEST_SECRET=do-not-copy-batch-value"
+    )
+    if ($UseDryRun) {
+        $plannerArgs += @("-DryRun", "-DryRunEnv", $DryRunEnv)
+    }
+    $planJson = & powershell @plannerArgs
     if ($LASTEXITCODE -ne 0) {
         throw "write-repair-operator-plan.ps1 failed while preparing repair batch test"
     }
@@ -86,6 +91,13 @@ try {
         -ApprovalID "approval-batch-2" `
         -DecisionID "decision-batch-2" `
         -OutputName "two"
+    $summaryMutating = New-ApprovedInvocationSummary `
+        -Mode "projection-failure-cleanup" `
+        -DryRunEnv "NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_DRY_RUN" `
+        -ApprovalID "approval-batch-mutating" `
+        -DecisionID "decision-batch-mutating" `
+        -OutputName "mutating" `
+        -UseDryRun $false
 
     $reasonPath = Join-Path $tempRoot "batch-reason.txt"
     "batch reason do-not-copy-batch-reason" | Set-Content -LiteralPath $reasonPath -Encoding UTF8
@@ -181,7 +193,30 @@ try {
         throw "repair batch invocation preflight leaked raw environment value or reason text."
     }
 
+    $mutatingManifestPath = Join-Path $tempRoot "batch-manifest-mutating.json"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $batchWriterPath `
+        -InvocationSummaryPath $summaryA,$summaryMutating `
+        -RequestedBy "operator-a" `
+        -BatchID "repair-batch-mutating-test" `
+        -OutputPath $mutatingManifestPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "write-repair-batch-manifest.ps1 failed while preparing mutating batch test"
+    }
+
     $oldErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $batchInvokerPath `
+            -ManifestPath $mutatingManifestPath `
+            -Execute 2>$null | Out-Null
+        $mutatingBatchExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldErrorActionPreference
+    }
+    if ($mutatingBatchExitCode -eq 0) {
+        throw "repair batch invocation should reject mixed mutating execution before running any item unless AllowMutating is set."
+    }
+
     $ErrorActionPreference = "Continue"
     try {
         & powershell -NoProfile -ExecutionPolicy Bypass -File $batchWriterPath `

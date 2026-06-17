@@ -124,6 +124,9 @@ foreach ($item in $items) {
             throw "Repair batch manifest item $($pair[0]) does not match invocation summary: $($item.summary_path)"
         }
     }
+    if ([bool]$summary.dry_run_requested -ne [bool]$item.dry_run_requested) {
+        throw "Repair batch manifest item dry_run_requested does not match invocation summary: $($item.summary_path)"
+    }
 
     $services[[string]$item.service] = $true
     $modes["$($item.service)/$($item.mode)"] = $true

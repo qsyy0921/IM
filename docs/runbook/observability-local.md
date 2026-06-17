@@ -317,6 +317,20 @@ summary 会记录 Prometheus rule group 数、Grafana 9 个服务 dashboard UID 
 
 如果本次 smoke 使用 `-IncludeAlertmanager`，不要加 `-SkipAlertmanager`，让预检同时要求 Alertmanager 镜像。如果预检提示 `missing`，先准备本机镜像，或在确认可以消耗网络流量时再使用 `-AllowImagePull`。
 
+需要准备缺失镜像时，先 dry-run 生成明确的 pull 清单：
+
+```powershell
+.\tools\prepare-local-observability-images.ps1 -IncludeAlertmanager
+```
+
+确认网络和流量预算允许后，再显式拉取：
+
+```powershell
+.\tools\prepare-local-observability-images.ps1 -IncludeAlertmanager -AllowImagePull
+```
+
+不需要验证 Alertmanager 的普通本地 smoke 可以不传 `-IncludeAlertmanager`，只准备 Prometheus / Grafana。该脚本不会启动容器；它只用于把镜像准备动作和 smoke 启动动作拆开。
+
 该 smoke 只证明本地观测配置可被真实进程加载，不证明生产 Alertmanager、SLO、retention、权限、统一日志或容量基线已完成。
 
 ## Target Observability Endpoint Smoke

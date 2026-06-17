@@ -25,7 +25,8 @@ try {
         -Mode "projection-checkpoint-repair" `
         -DryRun `
         -DryRunEnv "NEXUSIM_DELIVERY_PROJECTION_REPAIR_DRY_RUN" `
-        -Env "NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON=do-not-copy-this-chain-value"
+        -ReasonFileEnv "NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON_FILE" `
+        -ReasonFilePath "H:\NexusIM\operator-plans\projection-reason.txt"
     if ($LASTEXITCODE -ne 0) {
         throw "write-repair-operator-plan.ps1 failed while preparing approval chain test"
     }
@@ -76,7 +77,7 @@ try {
             throw "approval chain summary missing hash: $hashField"
         }
     }
-    if ($summaryRaw.Contains("do-not-copy-this-chain-value")) {
+    if ($summaryRaw.Contains("projection-reason.txt")) {
         throw "approval chain summary leaked raw env value."
     }
 

@@ -132,6 +132,9 @@ foreach ($entry in @($Env)) {
     if ($parts.Count -ne 2 -or [string]::IsNullOrWhiteSpace($parts[0])) {
         throw "Env entries must use KEY=VALUE format: $entry"
     }
+    if ($parts[0] -match "_REASON$") {
+        throw "Refusing to write raw operator reason into repair operator plan: $($parts[0]). Use -ReasonFilePath and -ReasonFileEnv instead."
+    }
     Assert-LowSensitiveRepairAdHocEnv -Key $parts[0] -Value $parts[1]
     if ($environment.Contains($parts[0])) {
         throw "Env entry duplicates a catalog-managed environment key. Use the dedicated parameter for: $($parts[0])"

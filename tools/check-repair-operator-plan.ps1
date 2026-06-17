@@ -130,10 +130,25 @@ try {
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
+        $directReasonOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $plannerPath `
+            -Service "delivery-service" `
+            -Mode "projection-checkpoint-repair" `
+            -Env "NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON=do-not-copy-this-reason" 2>&1
+        $directReasonExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($directReasonExitCode -eq 0 -or ($directReasonOutput -join "`n") -notmatch "raw operator reason") {
+        throw "repair operator plan should reject direct *_REASON env values."
+    }
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
         $sensitiveValueOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $plannerPath `
             -Service "delivery-service" `
             -Mode "projection-checkpoint-repair" `
-            -Env "NEXUSIM_OPERATOR_REASON=Bearer abc.def.ghi" 2>&1
+            -Env "NEXUSIM_OPERATOR_NOTE=Bearer abc.def.ghi" 2>&1
         $sensitiveValueExitCode = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $previousErrorActionPreference

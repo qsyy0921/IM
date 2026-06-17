@@ -283,6 +283,33 @@ summary 会记录 Prometheus rule group 数、Grafana 9 个服务 dashboard UID 
 
 该 smoke 只证明本地观测配置可被真实进程加载，不证明生产 Alertmanager、SLO、retention、权限、统一日志或容量基线已完成。
 
+## Target Observability Endpoint Smoke
+
+目标环境已经有 Prometheus / Grafana 端点时，可以不启动本地 Docker，直接验证 Prometheus rules、Grafana 9 服务 dashboard 和可选 Alertmanager discovery：
+
+```powershell
+.\tools\run-observability-target-smoke.ps1 `
+  -PrometheusBaseUrl http://<prometheus-host>:9090 `
+  -GrafanaBaseUrl http://<grafana-host>:3000 `
+  -GrafanaUsername admin `
+  -GrafanaPassword <password> `
+  -RunName target-observability-smoke-<date>
+```
+
+需要同时验证 Prometheus 已发现 Alertmanager target：
+
+```powershell
+.\tools\run-observability-target-smoke.ps1 `
+  -PrometheusBaseUrl http://<prometheus-host>:9090 `
+  -GrafanaBaseUrl http://<grafana-host>:3000 `
+  -GrafanaUsername admin `
+  -GrafanaPassword <password> `
+  -IncludeAlertmanager `
+  -RunName target-observability-smoke-<date>
+```
+
+该脚本会写入 summary、report 和 validation JSON，并复用 `tools/validate-observability-smoke-summary.ps1` 做离线校验。它用于目标环境 dashboard smoke 取证；仍不证明生产 Alertmanager 路由、SLO、retention、权限、统一日志或容量基线已完成。
+
 ## OpenTelemetry Collector
 
 默认本地基础设施不会启动 collector。需要验证 OTLP trace exporter 时单独启动：

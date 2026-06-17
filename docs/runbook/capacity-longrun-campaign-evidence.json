@@ -1,13 +1,21 @@
-{
-  "schema_version": 1,
-  "updated_at": "2026-06-18",
-  "scope": "Local long-run capacity campaign evidence index for NexusIM. Planned entries reference external campaign plans; completed entries reference external raw summaries plus repository runbook reports. This is not a production SLO or sizing proof.",
-  "entries": [
-    {
-      "name": "nine-service-longrun-campaign-plan-20260618",
-      "status": "planned",
-      "plan_path": "H:\\NexusIM\\loadtest-results\\capacity-longrun-nine-services-20260618-plan\\capacity-longrun-campaign-plan.json",
-      "note": "Planned nine-service long-run capacity campaign; execution, raw summaries, and completed report are pending."
-    }
-  ]
+﻿{
+    "schema_version":  1,
+    "updated_at":  "2026-06-17",
+    "scope":  "Local long-run capacity campaign evidence index for NexusIM. Planned entries reference external campaign plans; completed entries reference external raw summaries plus repository runbook reports. This is not a production SLO or sizing proof.",
+    "entries":  [
+                    {
+                        "name":  "nine-service-longrun-campaign-plan-20260618",
+                        "status":  "planned",
+                        "plan_path":  "H:\\NexusIM\\loadtest-results\\capacity-longrun-nine-services-20260618-plan\\capacity-longrun-campaign-plan.json",
+                        "note":  "Planned nine-service long-run capacity campaign; execution, raw summaries, and completed report are pending."
+                    },
+                    {
+                        "name":  "delivery-service-longrun-slice-20260618",
+                        "status":  "completed",
+                        "plan_path":  "H:\\NexusIM\\loadtest-results\\capacity-longrun-nine-services-20260618-plan\\capacity-longrun-campaign-plan.json",
+                        "note":  "delivery-service seeded PullInbox plus AckDelivery 30m local long-run slice, completed as one selected service from the nine-service campaign plan; local evidence only, not production sizing.",
+                        "summary_path":  "H:\\NexusIM\\loadtest-results\\capacity-longrun-nine-services-20260618-plan\\capacity-longrun-campaign-summary.json",
+                        "report_path":  "docs\\runbook\\loadtest\\delivery-service\\loadtest-report-20260618-delivery-longrun-slice.md"
+                    }
+                ]
 }

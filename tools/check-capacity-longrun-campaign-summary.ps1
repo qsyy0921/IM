@@ -153,6 +153,25 @@ try {
         Write-Host $missingResult.Output -ForegroundColor Red
         exit 1
     }
+    $subsetSummaryPath = Join-Path $campaignRoot "$missingCampaign\capacity-longrun-campaign-subset-summary.json"
+    $subsetReportPath = Join-Path $reportRoot "$missingCampaign-subset-report.md"
+    $subsetResult = Invoke-Tool -Path $summarizer -Arguments @(
+        "-PlanPath", $missingPlanPath,
+        "-SummaryPath", $subsetSummaryPath,
+        "-ReportRoot", $reportRoot,
+        "-ReportPath", $subsetReportPath,
+        "-Services", ([string]$firstStep.service)
+    )
+    if ($subsetResult.ExitCode -ne 0) {
+        Write-Host "FAIL campaign summary should pass when limited to a completed service subset." -ForegroundColor Red
+        Write-Host $subsetResult.Output -ForegroundColor Red
+        exit 1
+    }
+    $subsetSummary = Get-Content -LiteralPath $subsetSummaryPath -Raw | ConvertFrom-Json
+    if ($subsetSummary.status -ne "completed" -or $subsetSummary.service_count -ne 1 -or $subsetSummary.plan_service_count -ne 2) {
+        Write-Host "FAIL campaign subset summary has incorrect service counts." -ForegroundColor Red
+        exit 1
+    }
 
     $shortCampaign = "summary-short"
     $shortPlanResult = Invoke-Tool -Path $writer -Arguments @(

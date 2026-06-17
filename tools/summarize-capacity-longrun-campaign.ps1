@@ -4,6 +4,7 @@ param(
     [string]$SummaryPath = "",
     [string]$ReportPath = "",
     [string]$ReportRoot = "docs/runbook/loadtest",
+    [string[]]$Services = @(),
     [int]$MinimumDurationSeconds = 1800,
     [switch]$AllowIncomplete
 )
@@ -78,6 +79,35 @@ function Get-JsonPropertyString {
         return ""
     }
     return ([string]$value).Trim()
+}
+
+function Convert-ToStringArray {
+    param([object]$Value)
+
+    $items = New-Object System.Collections.Generic.List[string]
+    foreach ($item in @($Value)) {
+        $text = ([string]$item).Trim()
+        if ($text.Length -gt 0) {
+            $items.Add($text)
+        }
+    }
+    return @($items.ToArray())
+}
+
+function Convert-ToRequestedServices {
+    param([string[]]$Values)
+
+    $items = New-Object System.Collections.Generic.List[string]
+    $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($value in @($Values)) {
+        foreach ($part in (([string]$value) -split "[,;]")) {
+            $text = $part.Trim()
+            if ($text.Length -gt 0 -and $seen.Add($text)) {
+                $items.Add($text)
+            }
+        }
+    }
+    return @($items.ToArray())
 }
 
 function Test-IsNumber {
@@ -235,6 +265,22 @@ Assert-Condition ($MinimumDurationSeconds -ge 1800) "MinimumDurationSeconds must
 $plan = Get-Content -LiteralPath $resolvedPlanPath -Raw | ConvertFrom-Json
 Assert-Condition ([int]$plan.schema_version -eq 1) "capacity long-run campaign plan schema_version must be 1."
 Assert-Condition ((Get-JsonPropertyString -Object $plan -Name "scope") -match "not a production SLO") "capacity long-run campaign plan must state non-SLO boundary."
+$planServices = Convert-ToStringArray -Value $plan.services
+$requestedServices = Convert-ToRequestedServices -Values $Services
+$planServiceSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+foreach ($service in $planServices) {
+    [void]$planServiceSet.Add($service)
+}
+foreach ($service in $requestedServices) {
+    Assert-Condition ($planServiceSet.Contains($service)) "Requested service is not in the capacity long-run campaign plan: $service"
+}
+$selectedServiceSet = $null
+if ($requestedServices.Count -gt 0) {
+    $selectedServiceSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($service in $requestedServices) {
+        [void]$selectedServiceSet.Add($service)
+    }
+}
 
 $campaignName = Get-JsonPropertyString -Object $plan -Name "campaign_name"
 $outputRoot = Get-JsonPropertyString -Object $plan -Name "output_root"
@@ -269,6 +315,9 @@ Assert-Condition (Test-PathInsideDirectory -Path $resolvedReportPath -Directory 
 $rows = New-Object System.Collections.Generic.List[object]
 foreach ($step in @($plan.steps)) {
     $service = Get-JsonPropertyString -Object $step -Name "service"
+    if ($null -ne $selectedServiceSet -and -not $selectedServiceSet.Contains($service)) {
+        continue
+    }
     $runner = Get-JsonPropertyString -Object $step -Name "runner"
     $runnerMode = Get-JsonPropertyString -Object $step -Name "runner_mode"
     $resultDir = Get-JsonPropertyString -Object $step -Name "result_dir"
@@ -342,11 +391,13 @@ foreach ($step in @($plan.steps)) {
 }
 
 $allRows = @($rows.ToArray())
+$selectedServiceCount = $allRows.Count
+Assert-Condition ($selectedServiceCount -gt 0) "capacity long-run campaign selected services produced no plan rows."
 $passedRows = @($allRows | Where-Object { $_.status -eq "passed" })
 $failedRows = @($allRows | Where-Object { $_.status -ne "passed" })
 $durationValues = @($passedRows | ForEach-Object { $_.duration_seconds } | Where-Object { $null -ne $_ })
 $statusValue = "completed"
-if ($failedRows.Count -gt 0 -or $passedRows.Count -ne [int]$plan.service_count) {
+if ($failedRows.Count -gt 0 -or $passedRows.Count -ne $selectedServiceCount) {
     $statusValue = "incomplete"
 }
 
@@ -364,7 +415,9 @@ $summaryObject = [ordered]@{
     plan_path = $resolvedPlanPath
     campaign_name = $campaignName
     status = $statusValue
-    service_count = [int]$plan.service_count
+    service_count = $selectedServiceCount
+    plan_service_count = [int]$plan.service_count
+    selected_services = @($allRows | ForEach-Object { $_.service })
     completed_service_count = $passedRows.Count
     failed_service_count = $failedRows.Count
     minimum_required_duration_seconds = $MinimumDurationSeconds
@@ -391,7 +444,8 @@ $lines.Add("- Campaign: $campaignName")
 $lines.Add("- Status: $statusValue")
 $lines.Add("- Plan: $resolvedPlanPath")
 $lines.Add("- Summary: $resolvedSummaryPath")
-$lines.Add("- Services completed: $($passedRows.Count)/$([int]$plan.service_count)")
+$lines.Add("- Services completed: $($passedRows.Count)/$selectedServiceCount selected services")
+$lines.Add("- Plan services: $([int]$plan.service_count)")
 $lines.Add("- Minimum required duration: $MinimumDurationSeconds seconds")
 $lines.Add("- Minimum observed duration: $(Format-NullableNumber $minimumObservedDuration)")
 $lines.Add("- Boundary: local long-run campaign evidence only; not a production SLO, benchmark guarantee, or sizing proof.")
@@ -406,7 +460,7 @@ foreach ($row in $allRows) {
     $lines.Add("| $(Escape-MarkdownCell $row.service) | $(Escape-MarkdownCell $row.runner) | $(Escape-MarkdownCell $row.runner_mode) | $(Escape-MarkdownCell $row.status) | $(Format-NullableNumber $row.duration_seconds) | $(Escape-MarkdownCell $metricText) | $(Escape-MarkdownCell $row.summary_path) | $(Escape-MarkdownCell $row.reason) |")
 }
 $lines.Add("")
-$lines.Add("Completed status means every service in the plan produced a capacity_summary with duration at least the configured minimum and a positive success or throughput metric. It is still not a production sizing claim.")
+$lines.Add("Completed status means every selected service produced a capacity_summary with duration at least the configured minimum and a positive success or throughput metric. It is still not a production sizing claim.")
 $lines | Set-Content -LiteralPath $resolvedReportPath -Encoding UTF8
 
 Write-Host "OK   capacity long-run campaign summary written: $resolvedSummaryPath"

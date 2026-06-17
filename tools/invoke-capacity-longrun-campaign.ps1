@@ -268,6 +268,7 @@ if ($DryRun -or $SkipSummary) {
 
 $summaryArgs = @(
     "-PlanPath", $resolvedPlanPath,
+    "-Services", ($services -join ","),
     "-ReportRoot", $ReportRoot
 )
 Write-Host "== capacity long-run campaign summary =="

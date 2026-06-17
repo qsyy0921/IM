@@ -29,6 +29,14 @@
 
 如果要确认 9 个服务都已有至少一份 `capacity_summary`，追加 `-RequireAllServices`。该汇总只聚合既有压测结果，不能替代真实容量压测、SLO 或生产 sizing 结论。
 
+已归档的 9 服务本地短容量基线证据索引见 `docs/runbook/capacity-baseline-evidence.json`。默认门禁只校验 schema 和报告边界；如需复核 H 盘原始 summary 是否仍存在，运行：
+
+```powershell
+.\tools\validate-capacity-baseline-evidence.ps1 `
+  -ManifestPath docs\runbook\capacity-baseline-evidence.json `
+  -RequireFiles
+```
+
 如果本地 9 个服务已经按 `deploy/local/docker-compose.services.yml` 暴露默认端口，可以先 dry-run 生成计划，再执行一轮短基线：
 
 ```powershell

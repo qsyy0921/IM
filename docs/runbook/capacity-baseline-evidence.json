@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-06-17",
+  "scope": "Local short capacity-baseline evidence index for NexusIM. These entries point to existing local loadtest summaries and runbook reports; they are not production SLO, long-running capacity, or production sizing claims.",
+  "entries": [
+    {
+      "service": "api-gateway",
+      "runner": "demo",
+      "baseline_type": "stack",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\capacity-baseline-api-gateway-stack-clean-20260616\\e2e-demo-summary.json",
+      "report_path": "docs/runbook/loadtest/distributed/loadtest-report-20260616-api-gateway-stack-capacity-baseline.md",
+      "note": "GatewayService facade short baseline with secure mTLS + HMAC stack."
+    },
+    {
+      "service": "identity-service",
+      "runner": "identity",
+      "baseline_type": "stack",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\capacity-baseline-identity-stack-20260616\\identity-summary.json",
+      "report_path": "docs/runbook/loadtest/distributed/loadtest-report-20260616-identity-stack-capacity-baseline.md",
+      "note": "Identity challenge delivery stack short baseline with webhook fixture and worker."
+    },
+    {
+      "service": "message-service",
+      "runner": "sendmessage",
+      "baseline_type": "seeded",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\capacity-baseline-seeded-20260616\\message-service\\sendmessage-summary.json",
+      "report_path": "docs/runbook/loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md",
+      "note": "Seeded SendMessage short baseline."
+    },
+    {
+      "service": "conversation-service",
+      "runner": "memberchange",
+      "baseline_type": "seeded",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\capacity-baseline-seeded-20260616\\conversation-service\\memberchange-summary.json",
+      "report_path": "docs/runbook/loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md",
+      "note": "Seeded member-change short baseline."
+    },
+    {
+      "service": "delivery-service",
+      "runner": "delivery",
+      "baseline_type": "seeded",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\capacity-baseline-seeded-20260616\\delivery-service\\delivery-summary.json",
+      "report_path": "docs/runbook/loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md",
+      "note": "Seeded PullInbox / AckDelivery short baseline."
+    },
+    {
+      "service": "push-gateway",
+      "runner": "pushgateway",
+      "baseline_type": "stack",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\capacity-baseline-push-gateway-stack-clean-20260616\\pushgateway-summary.json",
+      "report_path": "docs/runbook/loadtest/push-gateway/loadtest-report-20260616-push-gateway-stack-capacity-baseline.md",
+      "note": "Single-instance full scenario short baseline."
+    },
+    {
+      "service": "receipt-service",
+      "runner": "receipt",
+      "baseline_type": "stack",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\capacity-baseline-receipt-stack-20260616\\receipt-summary.json",
+      "report_path": "docs/runbook/loadtest/distributed/loadtest-report-20260616-receipt-stack-capacity-baseline.md",
+      "note": "Receipt stack short baseline with message/delivery/receipt relay-consumer chain."
+    },
+    {
+      "service": "contacts-service",
+      "runner": "contacts",
+      "baseline_type": "stack",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\capacity-baseline-contacts-stack-20260616-r2\\contacts-service\\contacts-summary.json",
+      "report_path": "docs/runbook/loadtest/distributed/loadtest-report-20260616-contacts-stack-capacity-baseline.md",
+      "note": "Contacts outbox relay and Kafka readback short baseline."
+    },
+    {
+      "service": "policy-service",
+      "runner": "policy",
+      "baseline_type": "direct",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\capacity-baseline-direct-20260616-v3\\policy-service\\policy-summary.json",
+      "report_path": "docs/runbook/loadtest/policy-service/loadtest-report-20260616-policy-direct-capacity-baseline.md",
+      "note": "Policy direct short baseline."
+    }
+  ]
+}

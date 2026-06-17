@@ -25,6 +25,21 @@ function Add-Violation {
     $Violations.Add("$(Convert-ToRepoRelativePath -Path $Path): $Message")
 }
 
+function Read-CmdPackageProductionSource {
+    param([string]$MainPath)
+
+    $cmdDir = Split-Path -Parent $MainPath
+    $source = Get-Content -LiteralPath $MainPath -Raw
+    $mainFileName = Split-Path -Leaf $MainPath
+    $packageFiles = Get-ChildItem -LiteralPath $cmdDir -Filter "*.go" -File |
+        Where-Object { $_.Name -ne $mainFileName -and $_.Name -notlike "*_test.go" } |
+        Sort-Object Name
+    foreach ($packageFile in $packageFiles) {
+        $source += "`n" + (Get-Content -LiteralPath $packageFile.FullName -Raw)
+    }
+    return $source
+}
+
 if (-not (Test-Path -LiteralPath $policyPath)) {
     throw "Missing OTel sampling policy file: $policyPath"
 }
@@ -53,7 +68,7 @@ foreach ($service in $policy.services) {
         Add-Violation $violations $mainPath "service listed in OTel sampling policy but monitoring/otel_trace.go is missing"
     }
 
-    $main = Get-Content -LiteralPath $mainPath -Raw
+    $main = Read-CmdPackageProductionSource -MainPath $mainPath
     $mainTest = Get-Content -LiteralPath $mainTestPath -Raw
     $trace = ""
     if (Test-Path -LiteralPath $tracePath) {

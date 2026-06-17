@@ -297,6 +297,14 @@ foreach ($spec in $operatorSpecs) {
     }
 
     $cmd = Get-Content -LiteralPath $cmdPath -Raw
+    $cmdDir = Split-Path -Parent $cmdPath
+    $cmdFileName = Split-Path -Leaf $cmdPath
+    $cmdPackageFiles = Get-ChildItem -LiteralPath $cmdDir -Filter "*.go" -File |
+        Where-Object { $_.Name -ne $cmdFileName -and $_.Name -notlike "*_test.go" } |
+        Sort-Object Name
+    foreach ($cmdPackageFile in $cmdPackageFiles) {
+        $cmd += "`n" + (Get-Content -LiteralPath $cmdPackageFile.FullName -Raw)
+    }
     foreach ($extraCmd in @($spec.ExtraCmdFiles)) {
         $extraCmd = [string]$extraCmd
         if ([string]::IsNullOrWhiteSpace($extraCmd)) {

@@ -308,7 +308,14 @@ func runContactRequestReview() error {
 		return err
 	}
 	operator := envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_OPERATOR", "manual")
-	reason := envString("NEXUSIM_CONTACTS_REQUEST_REVIEW_REASON", "")
+	reason, err := contactsOperatorReasonFromEnv(
+		"NEXUSIM_CONTACTS_REQUEST_REVIEW_REASON",
+		"NEXUSIM_CONTACTS_REQUEST_REVIEW_REASON_FILE",
+		"",
+	)
+	if err != nil {
+		return err
+	}
 	pool, err := openPGPool(ctx)
 	if err != nil {
 		return err

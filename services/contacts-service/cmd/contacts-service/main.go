@@ -210,7 +210,14 @@ func runOutboxRepair() error {
 	defer pool.Close()
 
 	eventIDs := splitCSV(os.Getenv("NEXUSIM_CONTACTS_OUTBOX_REPAIR_EVENT_IDS"))
-	reason := envString("NEXUSIM_CONTACTS_OUTBOX_REPAIR_REASON", "manual contacts outbox repair")
+	reason, err := contactsOperatorReasonFromEnv(
+		"NEXUSIM_CONTACTS_OUTBOX_REPAIR_REASON",
+		"NEXUSIM_CONTACTS_OUTBOX_REPAIR_REASON_FILE",
+		"manual contacts outbox repair",
+	)
+	if err != nil {
+		return err
+	}
 	stats, err := postgresinfra.NewOutboxStore(pool).RepairDLQEvents(ctx, eventIDs, reason)
 	if err != nil {
 		return err

@@ -12,6 +12,8 @@
 
 该脚本只读取 catalog 并输出低敏 JSON plan，不执行 operator、不连接数据库、不读取业务数据。后续审批 / 运维 UI 可以先复用这个计划格式，再接正式执行编排。
 
+`tools/check-repair-operator-catalog-plannable.ps1` 会遍历 `repair-operators.catalog.json` 中的所有 service / mode，确认它们都能生成非执行 plan，避免新增 operator 后只更新 Markdown、漏更新机器可读 catalog 或 plan writer。
+
 本地审批请求生成入口：
 
 ```powershell

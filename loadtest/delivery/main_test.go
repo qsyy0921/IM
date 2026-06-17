@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -121,6 +122,60 @@ func TestBuildCapacitySummaryRequiresPositiveDuration(t *testing.T) {
 	started := time.Date(2026, 6, 16, 1, 2, 3, 0, time.UTC)
 	if got := buildCapacitySummary(&summary{StartedAt: started, FinishedAt: started}); got != nil {
 		t.Fatalf("expected nil capacity for zero duration, got %+v", got)
+	}
+}
+
+func TestRecordPullResponseAggregatesAndCapsSamples(t *testing.T) {
+	result := &summary{}
+	items := make([]*deliveryv1.InboxItem, 0, 105)
+	for seq := int64(1); seq <= 105; seq++ {
+		items = append(items, &deliveryv1.InboxItem{
+			ConversationSeq: seq,
+			EventId:         "event",
+			EventType:       "message.persisted.v1",
+			MessageId:       "message",
+			SenderId:        "sender",
+		})
+	}
+
+	recordPullResponse(result, &deliveryv1.PullInboxResponse{
+		Items:   items,
+		HasMore: true,
+	}, true)
+
+	if result.ItemCount != 105 || result.MaxSeq != 105 || !result.HasMore {
+		t.Fatalf("unexpected aggregate fields: %+v", result)
+	}
+	if len(result.Items) != 100 {
+		t.Fatalf("expected 100 sampled items, got %d", len(result.Items))
+	}
+	if result.Items[0].ConversationSeq != 1 || result.Items[99].ConversationSeq != 100 {
+		t.Fatalf("unexpected sampled bounds: first=%+v last=%+v", result.Items[0], result.Items[99])
+	}
+}
+
+func TestRecordPullResponseSnapshotOverwritesPreviousAttempt(t *testing.T) {
+	result := &summary{}
+	recordPullResponse(result, &deliveryv1.PullInboxResponse{
+		Items: []*deliveryv1.InboxItem{{
+			ConversationSeq: 10,
+			EventId:         "old-event",
+		}},
+		HasMore: true,
+	}, false)
+	recordPullResponse(result, &deliveryv1.PullInboxResponse{
+		Items: []*deliveryv1.InboxItem{{
+			ConversationSeq: 2,
+			EventId:         "new-event",
+		}},
+		HasMore: false,
+	}, false)
+
+	if result.ItemCount != 1 || result.MaxSeq != 2 || result.HasMore {
+		t.Fatalf("unexpected snapshot fields: %+v", result)
+	}
+	if len(result.Items) != 1 || result.Items[0].EventID != "new-event" {
+		t.Fatalf("expected latest response sample only, got %+v", result.Items)
 	}
 }
 

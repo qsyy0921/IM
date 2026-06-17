@@ -23,7 +23,7 @@
 - cmd 启动编排已把 env / TLS / debug listener helper 拆到独立同 package 文件，`main.go` 保持运行模式编排，避免后续 operator 模式继续堆进单文件。
 - 已补 first-stage OpenTelemetry gRPC server span；gRPC access log 只记录低敏 `trace_id/request_id`，并对白名单外入口 metadata 直接丢弃。
 - PostgreSQL repository 集成测试已按基础 projection、message mutation projection、ACK / hide command 同 package 拆分，保留覆盖面并降低单个测试文件复杂度。
-- `loadtest/delivery` summary 已新增 `capacity_summary`，统一输出 actual duration、poll/item、pull p95/p99、ACK、inbox/outbox 和 checkpoint 关键计数；这是容量基线口径，不等于已完成生产容量压测。
+- `loadtest/delivery` summary 已新增 `capacity_summary`，统一输出 actual duration、poll/item、pull p95/p99、ACK、inbox/outbox 和 checkpoint 关键计数；runner 已支持等待型 smoke 模式和 `--duration` / `--vus` 长跑模式，并已接入容量 baseline suite 的 seeded runner 参数；这是容量基线口径，不等于已完成生产容量压测。
 - `loadtest/capacityseed` 已能准备 `tenant-capacity-delivery` 下的 `user_inbox` fixture；`capacity-baseline-seeded-20260616` 本地 seeded 短基线中 `PullInbox + AckDelivery` 成功，`items_per_second=10.49`，报告见 `loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md`。
 
 ## 后续

@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -37,6 +38,8 @@ type config struct {
 	requestTimeout       time.Duration
 	waitTimeout          time.Duration
 	pollInterval         time.Duration
+	duration             time.Duration
+	vus                  int
 	tenantID             string
 	userID               string
 	deviceID             string
@@ -65,6 +68,8 @@ type summary struct {
 	AfterSeq              int64            `json:"after_seq"`
 	Limit                 int32            `json:"limit"`
 	ExpectedCount         int              `json:"expected_count"`
+	RequestedDurationSec  float64          `json:"requested_duration_seconds,omitempty"`
+	VUs                   int              `json:"vus,omitempty"`
 	ConsumerGroup         string           `json:"consumer_group,omitempty"`
 	PollCount             int              `json:"poll_count"`
 	ItemCount             int              `json:"item_count"`
@@ -144,6 +149,8 @@ func parseConfig() config {
 	flag.DurationVar(&cfg.requestTimeout, "request-timeout", 2*time.Second, "per-request timeout")
 	flag.DurationVar(&cfg.waitTimeout, "wait-timeout", 10*time.Second, "max wait for expected inbox items")
 	flag.DurationVar(&cfg.pollInterval, "poll-interval", 200*time.Millisecond, "pull retry interval while waiting")
+	flag.DurationVar(&cfg.duration, "duration", 0, "capacity run duration; zero waits until expected count")
+	flag.IntVar(&cfg.vus, "vus", 1, "virtual users for duration mode")
 	flag.StringVar(&cfg.tenantID, "tenant-id", "tenant-delivery-smoke", "tenant id")
 	flag.StringVar(&cfg.userID, "user-id", "delivery-user-1", "inbox owner user id")
 	flag.StringVar(&cfg.deviceID, "device-id", "delivery-device-1", "ack device id")
@@ -164,6 +171,12 @@ func parseConfig() config {
 	}
 	if cfg.pollInterval <= 0 {
 		cfg.pollInterval = 200 * time.Millisecond
+	}
+	if cfg.duration < 0 {
+		cfg.duration = 0
+	}
+	if cfg.vus <= 0 {
+		cfg.vus = 1
 	}
 	if limit <= 0 {
 		limit = 100
@@ -252,6 +265,8 @@ func run(cfg config) error {
 		AfterSeq:             cfg.afterSeq,
 		Limit:                cfg.limit,
 		ExpectedCount:        cfg.expectedCount,
+		RequestedDurationSec: cfg.duration.Seconds(),
+		VUs:                  cfg.vus,
 		ConsumerGroup:        cfg.consumerGroup,
 		AckEnabled:           cfg.ack,
 		WaitTimeout:          cfg.waitTimeout.String(),
@@ -259,49 +274,14 @@ func run(cfg config) error {
 		StartedAt:            time.Now().UTC(),
 	}
 
-	deadline := time.Now().Add(cfg.waitTimeout)
 	latencies := make([]float64, 0, 16)
-	var lastResponse *deliveryv1.PullInboxResponse
-	for {
-		pullCtx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout)
-		begin := time.Now()
-		requestID := fmt.Sprintf("delivery-pull-%d", result.PollCount+1)
-		auth := deliverySmokeAuth(cfg, requestID, requestID)
-		pullCtx = withVerifiedAuthMetadata(pullCtx, cfg, auth)
-		response, err := client.PullInbox(pullCtx, &deliveryv1.PullInboxRequest{
-			AuthContext:    deliveryAuth(auth),
-			ConversationId: cfg.conversationID,
-			AfterSeq:       cfg.afterSeq,
-			Limit:          cfg.limit,
-		})
-		elapsedMS := float64(time.Since(begin).Microseconds()) / 1000
-		cancel()
-		result.PollCount++
-		latencies = append(latencies, elapsedMS)
-		if err != nil {
+	if cfg.duration > 0 {
+		if err := runDurationPulls(cfg, client, &result, &latencies); err != nil {
 			result.Error = err.Error()
-			break
 		}
-		lastResponse = response
-		if len(response.GetItems()) >= cfg.expectedCount || time.Now().After(deadline) {
-			break
-		}
-		time.Sleep(cfg.pollInterval)
-	}
-	if lastResponse != nil {
-		result.ItemCount = len(lastResponse.GetItems())
-		result.HasMore = lastResponse.GetHasMore()
-		for _, item := range lastResponse.GetItems() {
-			if item.GetConversationSeq() > result.MaxSeq {
-				result.MaxSeq = item.GetConversationSeq()
-			}
-			result.Items = append(result.Items, pulledItem{
-				ConversationSeq: item.GetConversationSeq(),
-				EventID:         item.GetEventId(),
-				EventType:       item.GetEventType(),
-				MessageID:       item.GetMessageId(),
-				SenderID:        item.GetSenderId(),
-			})
+	} else {
+		if err := runWaitPulls(cfg, client, &result, &latencies); err != nil {
+			result.Error = err.Error()
 		}
 	}
 	result.PullAvgMS, result.PullP95MS, result.PullP99MS = summarizeLatencies(latencies)
@@ -349,6 +329,142 @@ func run(cfg config) error {
 		return fmt.Errorf("delivery smoke failed: %s", firstNonEmpty(result.Error, "expected item count not reached"))
 	}
 	return nil
+}
+
+type pullResult struct {
+	response  *deliveryv1.PullInboxResponse
+	latencyMS float64
+}
+
+func runWaitPulls(
+	cfg config,
+	client deliveryv1.DeliveryServiceClient,
+	result *summary,
+	latencies *[]float64,
+) error {
+	deadline := time.Now().Add(cfg.waitTimeout)
+	for {
+		pulled, err := pullInbox(context.Background(), cfg, client, fmt.Sprintf("delivery-pull-%d", result.PollCount+1))
+		result.PollCount++
+		*latencies = append(*latencies, pulled.latencyMS)
+		if err != nil {
+			return err
+		}
+		recordPullResponse(result, pulled.response, false)
+		if len(pulled.response.GetItems()) >= cfg.expectedCount || time.Now().After(deadline) {
+			return nil
+		}
+		time.Sleep(cfg.pollInterval)
+	}
+}
+
+func runDurationPulls(
+	cfg config,
+	client deliveryv1.DeliveryServiceClient,
+	result *summary,
+	latencies *[]float64,
+) error {
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.duration)
+	defer cancel()
+
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	var firstErr error
+	for workerID := 0; workerID < cfg.vus; workerID++ {
+		workerID := workerID
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			iteration := 0
+			for {
+				if ctx.Err() != nil {
+					return
+				}
+				requestID := fmt.Sprintf("delivery-pull-vu-%d-%d", workerID, iteration)
+				pulled, err := pullInbox(ctx, cfg, client, requestID)
+				if err != nil {
+					if ctx.Err() != nil {
+						return
+					}
+					mu.Lock()
+					if firstErr == nil {
+						firstErr = err
+						cancel()
+					}
+					mu.Unlock()
+					return
+				}
+				mu.Lock()
+				result.PollCount++
+				*latencies = append(*latencies, pulled.latencyMS)
+				recordPullResponse(result, pulled.response, true)
+				mu.Unlock()
+				iteration++
+			}
+		}()
+	}
+	wg.Wait()
+	if firstErr != nil {
+		return firstErr
+	}
+	if result.PollCount == 0 {
+		return fmt.Errorf("delivery capacity run produced no pulls")
+	}
+	return nil
+}
+
+func pullInbox(
+	parent context.Context,
+	cfg config,
+	client deliveryv1.DeliveryServiceClient,
+	requestID string,
+) (pullResult, error) {
+	pullCtx, cancel := context.WithTimeout(parent, cfg.requestTimeout)
+	defer cancel()
+	begin := time.Now()
+	auth := deliverySmokeAuth(cfg, requestID, requestID)
+	pullCtx = withVerifiedAuthMetadata(pullCtx, cfg, auth)
+	response, err := client.PullInbox(pullCtx, &deliveryv1.PullInboxRequest{
+		AuthContext:    deliveryAuth(auth),
+		ConversationId: cfg.conversationID,
+		AfterSeq:       cfg.afterSeq,
+		Limit:          cfg.limit,
+	})
+	elapsedMS := float64(time.Since(begin).Microseconds()) / 1000
+	if err != nil {
+		return pullResult{latencyMS: elapsedMS}, fmt.Errorf("pull inbox: %w", err)
+	}
+	return pullResult{response: response, latencyMS: elapsedMS}, nil
+}
+
+func recordPullResponse(result *summary, response *deliveryv1.PullInboxResponse, aggregate bool) {
+	if response == nil {
+		return
+	}
+	const maxItemSamples = 100
+	items := response.GetItems()
+	if aggregate {
+		result.ItemCount += len(items)
+	} else {
+		result.ItemCount = len(items)
+		result.MaxSeq = 0
+		result.Items = result.Items[:0]
+	}
+	result.HasMore = response.GetHasMore()
+	for _, item := range items {
+		if item.GetConversationSeq() > result.MaxSeq {
+			result.MaxSeq = item.GetConversationSeq()
+		}
+		if len(result.Items) < maxItemSamples {
+			result.Items = append(result.Items, pulledItem{
+				ConversationSeq: item.GetConversationSeq(),
+				EventID:         item.GetEventId(),
+				EventType:       item.GetEventType(),
+				MessageID:       item.GetMessageId(),
+				SenderID:        item.GetSenderId(),
+			})
+		}
+	}
 }
 
 func fillPostgresStats(ctx context.Context, cfg config, result *summary) error {

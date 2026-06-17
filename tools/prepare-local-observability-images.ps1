@@ -1,7 +1,8 @@
 param(
     [switch]$IncludeAlertmanager,
     [switch]$AllowImagePull,
-    [string]$Platform = ""
+    [string]$Platform = "",
+    [string]$OutputDir = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -62,6 +63,44 @@ function Invoke-DockerPull {
     }
 }
 
+function Write-ImagePreparePlan {
+    param(
+        [string]$PlanOutputDir,
+        [object]$Plan
+    )
+
+    New-Item -ItemType Directory -Force -Path $PlanOutputDir | Out-Null
+    $jsonPath = Join-Path $PlanOutputDir "observability-image-prepare-plan.json"
+    $markdownPath = Join-Path $PlanOutputDir "observability-image-prepare-plan.md"
+
+    $Plan | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $jsonPath -Encoding utf8
+
+    $lines = @(
+        "# NexusIM Observability Image Prepare Plan",
+        "",
+        "Generated at UTC: $($Plan.generated_at_utc)",
+        "",
+        "This file is a low-sensitive local Docker image preparation plan. It does not prove a production observability SLO.",
+        "",
+        "| Image role | Image | Status | Pull command |",
+        "| --- | --- | --- | --- |"
+    )
+    foreach ($image in $Plan.images) {
+        $lines += "| $($image.name) | ``$($image.image)`` | $($image.status) | ``$($image.pull_command)`` |"
+    }
+    $lines += ""
+    $lines += "Missing count: $($Plan.missing_count)"
+    $lines += "Allow image pull: $($Plan.allow_image_pull)"
+    $lines += "Include Alertmanager: $($Plan.include_alertmanager)"
+    if (-not [string]::IsNullOrWhiteSpace([string]$Plan.platform)) {
+        $lines += "Platform: $($Plan.platform)"
+    }
+    $lines | Set-Content -LiteralPath $markdownPath -Encoding utf8
+
+    Write-Host "observability_image_prepare_plan_json=$jsonPath"
+    Write-Host "observability_image_prepare_plan_report=$markdownPath"
+}
+
 $images = @(
     [pscustomobject]@{
         Name = "prometheus"
@@ -86,14 +125,22 @@ if (-not $dockerAvailable -and $AllowImagePull) {
 }
 
 $missing = @()
+$results = @()
 foreach ($entry in $images) {
     $present = $false
     if ($dockerAvailable) {
         $present = Test-DockerImagePresent -Image $entry.Image
     }
 
+    $pullCommand = New-DockerPullCommand -Image $entry.Image
     if ($present) {
         Write-Host "present $($entry.Name) image=$($entry.Image)"
+        $results += [pscustomobject]@{
+            name = $entry.Name
+            image = $entry.Image
+            status = "present"
+            pull_command = $pullCommand
+        }
         continue
     }
 
@@ -101,11 +148,38 @@ foreach ($entry in $images) {
     if ($AllowImagePull) {
         Write-Host "pulling $($entry.Name) image=$($entry.Image)"
         Invoke-DockerPull -Image $entry.Image
+        $results += [pscustomobject]@{
+            name = $entry.Name
+            image = $entry.Image
+            status = "pulled"
+            pull_command = $pullCommand
+        }
     }
     else {
         Write-Host "missing $($entry.Name) image=$($entry.Image)"
-        Write-Host "        $(New-DockerPullCommand -Image $entry.Image)"
+        Write-Host "        $pullCommand"
+        $results += [pscustomobject]@{
+            name = $entry.Name
+            image = $entry.Image
+            status = "missing"
+            pull_command = $pullCommand
+        }
     }
+}
+
+$plan = [pscustomobject]@{
+    generated_at_utc = (Get-Date).ToUniversalTime().ToString("o")
+    docker_available = [bool]$dockerAvailable
+    include_alertmanager = [bool]$IncludeAlertmanager
+    allow_image_pull = [bool]$AllowImagePull
+    platform = $Platform
+    missing_count = [int]$missing.Count
+    images = $results
+    boundary = "local observability image preparation only; does not start containers or prove production observability"
+}
+
+if (-not [string]::IsNullOrWhiteSpace($OutputDir)) {
+    Write-ImagePreparePlan -PlanOutputDir $OutputDir -Plan $plan
 }
 
 if ($AllowImagePull) {

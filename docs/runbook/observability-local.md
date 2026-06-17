@@ -323,6 +323,14 @@ summary 会记录 Prometheus rule group 数、Grafana 9 个服务 dashboard UID 
 .\tools\prepare-local-observability-images.ps1 -IncludeAlertmanager
 ```
 
+需要把 dry-run 计划保存到 H 盘便于复核时：
+
+```powershell
+.\tools\prepare-local-observability-images.ps1 `
+  -IncludeAlertmanager `
+  -OutputDir H:\NexusIM\loadtest-results\observability-image-prepare-<date>
+```
+
 确认网络和流量预算允许后，再显式拉取：
 
 ```powershell

@@ -149,6 +149,7 @@ $plan = [ordered]@{
 
 $json = $plan | ConvertTo-Json -Depth 8
 if (-not [string]::IsNullOrWhiteSpace($PlanOutputPath)) {
+    Assert-ExternalRepairOutputPath -Value $PlanOutputPath -FieldName "PlanOutputPath"
     $parent = Split-Path -Parent $PlanOutputPath
     if (-not [string]::IsNullOrWhiteSpace($parent)) {
         New-Item -ItemType Directory -Force -Path $parent | Out-Null

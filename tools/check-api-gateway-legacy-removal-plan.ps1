@@ -207,6 +207,31 @@ try {
         "-NowUnixMS", "950000"
     )
 
+    Invoke-WriterExpectFail -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $writerPath,
+        "-ObservationWindowSummaryPath", $readySummaryPath,
+        "-PlanOutputPath", (Join-Path (Split-Path -Parent $PSScriptRoot) "tmp-legacy-removal-plan.json"),
+        "-Operator", "operator_1",
+        "-NowUnixMS", "950000"
+    )
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $validatorOutput = & $powerShellExe -NoProfile -ExecutionPolicy Bypass -File $validatorPath `
+            -PlanPath $readyPlanPath `
+            -OutputPath (Join-Path (Split-Path -Parent $PSScriptRoot) "tmp-legacy-removal-validation.json") 2>&1
+        $validatorExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($validatorExitCode -eq 0) {
+        $validatorOutput | Out-Host
+        throw "validate-api-gateway-legacy-removal-plan.ps1 should reject repository-local OutputPath."
+    }
+
     $sensitiveLabelPath = Join-Path $tempRoot "sensitive-label-plan.json"
     $sensitiveLabel = Get-Content -LiteralPath $readyPlanPath -Raw | ConvertFrom-Json
     $sensitiveLabel.target_environment = "prod-token"

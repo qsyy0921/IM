@@ -12,18 +12,6 @@ if (-not (Test-Path -LiteralPath $PlanPath -PathType Leaf)) {
     throw "Missing api-gateway legacy removal plan: $PlanPath"
 }
 
-function Get-Sha256Hex {
-    param([byte[]]$Bytes)
-
-    $sha = [System.Security.Cryptography.SHA256]::Create()
-    try {
-        $hash = $sha.ComputeHash($Bytes)
-    } finally {
-        $sha.Dispose()
-    }
-    return -join ($hash | ForEach-Object { $_.ToString("x2") })
-}
-
 function Assert-String {
     param(
         [object]$Value,
@@ -179,7 +167,7 @@ $summary = [ordered]@{
     plan_type = "legacy_descriptor_removal"
     status = [string]$plan.status
     ready_for_removal = [bool]$plan.ready_for_removal
-    plan_sha256 = Get-Sha256Hex -Bytes ([System.Text.Encoding]::UTF8.GetBytes($raw))
+    plan_sha256 = Get-RepairSha256Hex -Bytes ([System.Text.Encoding]::UTF8.GetBytes($raw))
     executes = $false
     observation_count = $observationCount
     observed_window_ms = $observedWindowMS
@@ -192,6 +180,7 @@ $summary = [ordered]@{
 
 $json = $summary | ConvertTo-Json -Depth 8
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
+    Assert-ExternalRepairOutputPath -Value $OutputPath -FieldName "OutputPath"
     $parent = Split-Path -Parent $OutputPath
     if (-not [string]::IsNullOrWhiteSpace($parent)) {
         New-Item -ItemType Directory -Force -Path $parent | Out-Null

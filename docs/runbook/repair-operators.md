@@ -20,7 +20,7 @@
 
 需要使用真实凭据时应走部署环境或正式 secret 管理，不要写入 plan / request / decision / bundle 文件。
 
-审批请求、审批决定、批量 manifest 和 audit bundle 中的 `requested_by` / `decided_by` / `generated_by` 也只允许低敏 operator id，例如 `operator-a` 或 `approver_1`。不要写邮箱、手机号、Bearer token、session id 或自由文本；详细原因放 `ReasonFile`，最终 JSON 只保存 reason hash。
+审批请求、审批决定、批量 manifest 和 audit bundle 中的 `requested_by` / `decided_by` / `generated_by` 也只允许低敏 operator id，例如 `operator-a` 或 `approver_1`。不要写邮箱、手机号、Bearer token、session id 或自由文本；详细原因放 `ReasonFile`，最终 JSON 只保存 reason hash。`ReasonFile` 是短文本 operator reason，不是日志包或证据附件；本地工具会拒绝超过 64 KiB 的 reason 文件。
 
 新增 repair 交接 writer 时必须复用 `tools/repair-operator-safety.ps1`，并由 `tools/check-repair-operator-safety.ps1` 纳入 `check-local`，避免低敏 actor / ad-hoc env / hash 规则在多个脚本里漂移。
 

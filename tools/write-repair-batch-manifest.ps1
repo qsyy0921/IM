@@ -47,14 +47,9 @@ Assert-LowSensitiveRepairActor -Value $RequestedBy -FieldName "RequestedBy"
 $reasonPresent = $false
 $reasonHash = ""
 if (-not [string]::IsNullOrWhiteSpace($ReasonFile)) {
-    if (-not (Test-Path -LiteralPath $ReasonFile -PathType Leaf)) {
-        throw "Missing repair batch reason file: $ReasonFile"
-    }
-    $reasonBytes = [System.IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $ReasonFile))
-    $reasonPresent = $reasonBytes.Length -gt 0
-    if ($reasonPresent) {
-        $reasonHash = Get-RepairSha256Hex -Bytes $reasonBytes
-    }
+    $reasonSummary = Read-RepairReasonFileSummary -Path $ReasonFile -MissingMessage "Missing repair batch reason file"
+    $reasonPresent = [bool]$reasonSummary.Present
+    $reasonHash = [string]$reasonSummary.Sha256
 }
 
 $seenApprovalIDs = @{}

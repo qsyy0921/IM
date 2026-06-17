@@ -51,14 +51,9 @@ $requestHash = Get-RepairSha256Hex -Bytes $requestBytes
 $reasonPresent = $false
 $reasonHash = ""
 if (-not [string]::IsNullOrWhiteSpace($ReasonFile)) {
-    if (-not (Test-Path -LiteralPath $ReasonFile -PathType Leaf)) {
-        throw "Missing repair approval decision reason file: $ReasonFile"
-    }
-    $reasonBytes = [System.IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $ReasonFile))
-    $reasonPresent = $reasonBytes.Length -gt 0
-    if ($reasonPresent) {
-        $reasonHash = Get-RepairSha256Hex -Bytes $reasonBytes
-    }
+    $reasonSummary = Read-RepairReasonFileSummary -Path $ReasonFile -MissingMessage "Missing repair approval decision reason file"
+    $reasonPresent = [bool]$reasonSummary.Present
+    $reasonHash = [string]$reasonSummary.Sha256
 }
 
 $decisionDocument = [ordered]@{

@@ -9,7 +9,8 @@ $helperText = Get-Content -LiteralPath $helperPath -Raw
 foreach ($functionName in @(
         "Get-RepairSha256Hex",
         "Assert-LowSensitiveRepairActor",
-        "Assert-LowSensitiveRepairAdHocEnv"
+        "Assert-LowSensitiveRepairAdHocEnv",
+        "Read-RepairReasonFileSummary"
     )) {
     if ($helperText -notmatch "function\s+$functionName\b") {
         throw "repair-operator-safety.ps1 missing function: $functionName"
@@ -62,6 +63,26 @@ Assert-FailsWith -Label "sensitive env key" -Pattern "sensitive Env key" -Script
 }
 Assert-FailsWith -Label "sensitive env value" -Pattern "sensitive Env value" -Script {
     Assert-LowSensitiveRepairAdHocEnv -Key "NEXUSIM_FILTER" -Value "Bearer abc.def.ghi"
+}
+
+$tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("nexusim-repair-safety-" + [System.Guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+try {
+    $reasonPath = Join-Path $tempRoot "reason.txt"
+    "short operator reason" | Set-Content -LiteralPath $reasonPath -Encoding UTF8
+    $reasonSummary = Read-RepairReasonFileSummary -Path $reasonPath -MissingMessage "Missing repair reason"
+    if (-not $reasonSummary.Present -or [string]::IsNullOrWhiteSpace([string]$reasonSummary.Sha256) -or $reasonSummary.ByteLength -le 0) {
+        throw "Read-RepairReasonFileSummary should hash non-empty reason files."
+    }
+
+    $largeReasonPath = Join-Path $tempRoot "large-reason.txt"
+    $largeBytes = New-Object byte[] (64 * 1024 + 1)
+    [System.IO.File]::WriteAllBytes($largeReasonPath, $largeBytes)
+    Assert-FailsWith -Label "large reason file" -Pattern "too large" -Script {
+        Read-RepairReasonFileSummary -Path $largeReasonPath -MissingMessage "Missing repair reason" | Out-Null
+    }
+} finally {
+    Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 $writerScripts = @(

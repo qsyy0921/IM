@@ -47,3 +47,42 @@ function Assert-LowSensitiveRepairAdHocEnv {
         throw "Refusing to write potentially sensitive Env value into repair operator plan: $Key"
     }
 }
+
+function Read-RepairReasonFileSummary {
+    param(
+        [string]$Path,
+        [string]$MissingMessage
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return [ordered]@{
+            Present = $false
+            Sha256 = ""
+            ByteLength = 0
+        }
+    }
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "$MissingMessage`: $Path"
+    }
+
+    $resolvedPath = Resolve-Path -LiteralPath $Path
+    $fileInfo = Get-Item -LiteralPath $resolvedPath
+    $maxReasonBytes = 64 * 1024
+    if ($fileInfo.Length -gt $maxReasonBytes) {
+        throw "Repair reason file is too large: $Path. Keep operator reason files at or below 64 KiB."
+    }
+
+    $reasonBytes = [System.IO.File]::ReadAllBytes($resolvedPath)
+    $reasonPresent = $reasonBytes.Length -gt 0
+    $reasonHash = ""
+    if ($reasonPresent) {
+        $reasonHash = Get-RepairSha256Hex -Bytes $reasonBytes
+    }
+
+    return [ordered]@{
+        Present = $reasonPresent
+        Sha256 = $reasonHash
+        ByteLength = $reasonBytes.Length
+    }
+}

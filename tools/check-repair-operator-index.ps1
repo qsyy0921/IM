@@ -31,6 +31,9 @@ $operatorSpecs = @(
             "NEXUSIM_MESSAGE_CHANGE_HISTORY_AUDIT_OUTPUT",
             "NEXUSIM_MESSAGE_RETENTION_PROOF_AUDIT_OUTPUT"
         )
+        DryRunEnvs = @(
+            "NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
+        )
     },
     @{
         Service = "delivery-service"
@@ -58,6 +61,14 @@ $operatorSpecs = @(
             "NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_OUTPUT",
             "NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_OUTPUT"
         )
+        DryRunEnvs = @(
+            "NEXUSIM_DELIVERY_OUTBOX_REPAIR_DRY_RUN",
+            "NEXUSIM_DELIVERY_PROJECTION_REPAIR_DRY_RUN",
+            "NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_DRY_RUN",
+            "NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_DRY_RUN",
+            "NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_DRY_RUN",
+            "NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_DRY_RUN"
+        )
     },
     @{
         Service = "receipt-service"
@@ -69,6 +80,9 @@ $operatorSpecs = @(
             "NEXUSIM_RECEIPT_OUTBOX_REPAIR_OUTPUT",
             "NEXUSIM_RECEIPT_OUTBOX_REPAIR_AUDIT_OUTPUT",
             "NEXUSIM_RECEIPT_OUTBOX_REPAIR_CLEANUP_OUTPUT"
+        )
+        DryRunEnvs = @(
+            "NEXUSIM_RECEIPT_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
         )
     },
     @{
@@ -95,6 +109,9 @@ $operatorSpecs = @(
             "NEXUSIM_CONTACTS_SOURCE_POLICY_AUDIT_OUTPUT",
             "NEXUSIM_CONTACTS_SOURCE_POLICY_SET_OUTPUT"
         )
+        DryRunEnvs = @(
+            "NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
+        )
     },
     @{
         Service = "policy-service"
@@ -107,6 +124,9 @@ $operatorSpecs = @(
             "NEXUSIM_POLICY_OUTBOX_REPAIR_AUDIT_OUTPUT",
             "NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OUTPUT"
         )
+        DryRunEnvs = @(
+            "NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
+        )
     },
     @{
         Service = "conversation-service"
@@ -118,6 +138,9 @@ $operatorSpecs = @(
             "NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_OUTPUT",
             "NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_OUTPUT",
             "NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_OUTPUT"
+        )
+        DryRunEnvs = @(
+            "NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_DRY_RUN"
         )
     },
     @{
@@ -142,6 +165,11 @@ $operatorSpecs = @(
             "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_OUTPUT",
             "NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_OUTPUT",
             "NEXUSIM_IDENTITY_GATEWAY_TOKEN_KEYRING_ROTATE_OUTPUT"
+        )
+        DryRunEnvs = @(
+            "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_DRY_RUN",
+            "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_DRY_RUN",
+            "NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_DRY_RUN"
         )
     }
 )
@@ -200,6 +228,19 @@ foreach ($spec in $operatorSpecs) {
         }
         if (-not $cmd.Contains($outputEnv)) {
             throw "$($spec.Cmd) missing documented output env for ${service}: $outputEnv"
+        }
+    }
+
+    foreach ($dryRunEnv in @($spec.DryRunEnvs)) {
+        $dryRunEnv = [string]$dryRunEnv
+        if ([string]::IsNullOrWhiteSpace($dryRunEnv)) {
+            continue
+        }
+        if (-not $repairIndex.Contains($dryRunEnv)) {
+            throw "docs/runbook/repair-operators.md missing documented dry-run env for ${service}: $dryRunEnv"
+        }
+        if (-not $cmd.Contains($dryRunEnv)) {
+            throw "$($spec.Cmd) missing documented dry-run env for ${service}: $dryRunEnv"
         }
     }
 }

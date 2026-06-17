@@ -46,6 +46,8 @@ go run ./services/delivery-service/cmd/delivery-service
 | `contacts-service` | `NEXUSIM_CONTACTS_OUTBOX_REPAIR_OUTPUT` |
 | `policy-service` | `NEXUSIM_POLICY_OUTBOX_REPAIR_OUTPUT` |
 
+`delivery-service` 的 `outbox-repair` 额外支持 `NEXUSIM_DELIVERY_OUTBOX_REPAIR_DRY_RUN=true`，用于只写 repair audit、不 mutate outbox 状态。
+
 以下服务的 `outbox-repair-audit` 支持写低敏 JSON 结果，便于 operator 留存证据，不写 Kafka 原始错误正文或业务 payload；并统一支持按 `repaired_at` RFC3339 时间窗口过滤，在 JSON 中写 compacted filters：
 
 | 服务 | JSON 输出环境变量 |
@@ -66,15 +68,15 @@ go run ./services/delivery-service/cmd/delivery-service
 | `contacts-service` | `NEXUSIM_CONTACTS_OUTBOX_AUDIT_OUTPUT` |
 | `policy-service` | `NEXUSIM_POLICY_OUTBOX_AUDIT_OUTPUT` |
 
-以下服务的 `outbox-repair-cleanup` 支持显式 dry-run 和写低敏 JSON summary，便于留存 cleanup 证据；输出只包含删除行数或 dry-run 命中行数、cutoff、retention、batch size、dry-run 标记和过滤条件，不重新输出被清理的历史错误明细。执行正式删除前建议先设置对应 `*_OUTBOX_REPAIR_CLEANUP_DRY_RUN=true` 复核范围。
+以下服务的 `outbox-repair-cleanup` 支持显式 dry-run 和写低敏 JSON summary，便于留存 cleanup 证据；输出只包含删除行数或 dry-run 命中行数、cutoff、retention、batch size、dry-run 标记和过滤条件，不重新输出被清理的历史错误明细。执行正式删除前建议先设置对应 dry-run 环境变量复核范围。
 
-| 服务 | JSON 输出环境变量 |
-| --- | --- |
-| `message-service` | `NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_OUTPUT` |
-| `delivery-service` | `NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_OUTPUT` |
-| `receipt-service` | `NEXUSIM_RECEIPT_OUTBOX_REPAIR_CLEANUP_OUTPUT` |
-| `contacts-service` | `NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_OUTPUT` |
-| `policy-service` | `NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OUTPUT` |
+| 服务 | Dry-run 环境变量 | JSON 输出环境变量 |
+| --- | --- | --- |
+| `message-service` | `NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_DRY_RUN` | `NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_OUTPUT` |
+| `delivery-service` | `NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_DRY_RUN` | `NEXUSIM_DELIVERY_OUTBOX_REPAIR_CLEANUP_OUTPUT` |
+| `receipt-service` | `NEXUSIM_RECEIPT_OUTBOX_REPAIR_CLEANUP_DRY_RUN` | `NEXUSIM_RECEIPT_OUTBOX_REPAIR_CLEANUP_OUTPUT` |
+| `contacts-service` | `NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_DRY_RUN` | `NEXUSIM_CONTACTS_OUTBOX_REPAIR_CLEANUP_OUTPUT` |
+| `policy-service` | `NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_DRY_RUN` | `NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OUTPUT` |
 
 `message-service` 还提供只读 `change-history-audit`，用于审计 `message_change_history` 中 `EDIT / REVOKE / DELETE` 变更证明；支持按 tenant / conversation / message / change type / changed_by 缩小范围，可选 `NEXUSIM_MESSAGE_CHANGE_HISTORY_AUDIT_OUTPUT` 写低敏 JSON 结果。输出只包含变更元数据、状态转换、payload 是否存在和 reason 是否存在，不输出消息 payload 或 reason 原文。
 
@@ -97,10 +99,10 @@ go run ./services/delivery-service/cmd/delivery-service
 | 模式 | 作用 |
 | --- | --- |
 | `projection-failure-audit` | 只读列出 unresolved projection failure，支持按 offset / event / failure class / `last_seen_at` RFC3339 时间窗口缩小范围；可选 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
-| `projection-checkpoint-repair` | 带审计回调 checkpoint 做 replay；只允许回调，不允许前跳跳过事件；可选 `NEXUSIM_DELIVERY_PROJECTION_REPAIR_OUTPUT` 写低敏 JSON summary。 |
+| `projection-checkpoint-repair` | 带审计回调 checkpoint 做 replay；只允许回调，不允许前跳跳过事件；支持 `NEXUSIM_DELIVERY_PROJECTION_REPAIR_DRY_RUN=true` 只写 repair audit、不 mutate checkpoint；可选 `NEXUSIM_DELIVERY_PROJECTION_REPAIR_OUTPUT` 写低敏 JSON summary。 |
 | `projection-checkpoint-repair-audit` | 只读列出 checkpoint repair audit 历史；可选 `NEXUSIM_DELIVERY_PROJECTION_REPAIR_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
 | `projection-checkpoint-repair-cleanup` | 清理超过保留期的 checkpoint repair audit 历史；支持 `NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_DRY_RUN=true` 只统计候选行不删除；可选 `NEXUSIM_DELIVERY_PROJECTION_REPAIR_CLEANUP_OUTPUT` 写低敏 JSON summary。 |
-| `projection-failure-resolve` | 人工确认指定 unresolved failure 已外部补偿或不再作为 blocker 后，带 operator / reason / dry-run 审计地标记 resolved；不移动 Kafka checkpoint；可选 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_OUTPUT` 写低敏 JSON summary。 |
+| `projection-failure-resolve` | 人工确认指定 unresolved failure 已外部补偿或不再作为 blocker 后，带 operator / reason / dry-run 审计地标记 resolved；支持 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_DRY_RUN=true` 只写 resolution audit、不 mutate failure 状态；不移动 Kafka checkpoint；可选 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_OUTPUT` 写低敏 JSON summary。 |
 | `projection-failure-cleanup` | 只清理 resolved 且超过保留期的 failure 审计行，不触碰 unresolved blocker；支持 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_DRY_RUN=true` 只统计候选行不删除；可选 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_OUTPUT` 写低敏 JSON summary。 |
 
 ## Conversation Member Change
@@ -127,7 +129,7 @@ go run ./services/delivery-service/cmd/delivery-service
 | 模式 | 作用 |
 | --- | --- |
 | `session-mfa-proof-audit` | 只读发现历史 session MFA proof 脏数据；可选 `NEXUSIM_IDENTITY_SESSION_MFA_PROOF_AUDIT_OUTPUT` 写低敏聚合 JSON 结果。 |
-| `challenge-delivery-repair` | 处理 challenge delivery outbox / retry / expire / DLQ 相关修复；可选 `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_OUTPUT` 写低敏 JSON summary。 |
+| `challenge-delivery-repair` | 处理 challenge delivery outbox / retry / expire / DLQ 相关修复；支持 `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_DRY_RUN=true` 只写 repair audit、不 mutate delivery / challenge 状态；可选 `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_OUTPUT` 写低敏 JSON summary。 |
 | `challenge-delivery-repair-audit` | 只读审计 challenge delivery repair 历史；支持按 delivery / tenant / user / challenge / mode / outcome / failure class / `repaired_at` RFC3339 时间窗口缩小范围；可选 `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_AUDIT_OUTPUT` 写低敏 JSON 结果和 compacted filters。 |
 | `challenge-delivery-repair-cleanup` | 按 retention / scope 清理 challenge delivery repair audit 历史；支持 `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_DRY_RUN=true` 只统计候选行不删除；可选 `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_OUTPUT` 写低敏 JSON summary。 |
 | `challenge-request-limit-cleanup` | 清理 verification / password reset request limit 历史；支持 `NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_DRY_RUN=true` 只统计候选行不删除；可选 `NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_OUTPUT` 写低敏 JSON summary。 |

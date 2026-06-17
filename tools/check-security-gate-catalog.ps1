@@ -149,6 +149,24 @@ try {
         exit 1
     }
 
+    $missingRequiredGatewayGateCatalog = Join-Path $tempRoot "missing-required-gateway-gate-catalog.json"
+    Write-JsonFile -Path $missingRequiredGatewayGateCatalog -Value ([ordered]@{
+        schema_version = 1
+        scope = "self-test"
+        entries = @($repoCatalogObject.entries | Where-Object { $_.script -ne "tools/check-api-gateway-legacy-removal-plan.ps1" })
+    })
+
+    $missingRequiredGatewayGateResult = Invoke-Validator -CatalogPath $missingRequiredGatewayGateCatalog
+    if ($missingRequiredGatewayGateResult.ExitCode -eq 0) {
+        Write-Host "FAIL catalog without a required api-gateway gate should fail." -ForegroundColor Red
+        exit 1
+    }
+    if (-not $missingRequiredGatewayGateResult.Output.Contains("tools/check-api-gateway-legacy-removal-plan.ps1")) {
+        Write-Host "FAIL missing-required-gateway-gate catalog returned unexpected error." -ForegroundColor Red
+        Write-Host $missingRequiredGatewayGateResult.Output -ForegroundColor Red
+        exit 1
+    }
+
     $missingRequiredEvidenceGateCatalog = Join-Path $tempRoot "missing-required-evidence-gate-catalog.json"
     Write-JsonFile -Path $missingRequiredEvidenceGateCatalog -Value ([ordered]@{
         schema_version = 1

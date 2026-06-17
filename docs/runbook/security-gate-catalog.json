@@ -70,6 +70,14 @@
       "note": "Legacy descriptor removal plans must remain non-executing, low-sensitive, approval-gated, external-output guarded, and consistent with quiet-window evidence."
     },
     {
+      "name": "api-gateway legacy removal plan gate",
+      "category": "gateway-security",
+      "script": "tools/check-api-gateway-legacy-removal-plan.ps1",
+      "covered_by_script": "tools/check-api-gateway-gates.ps1",
+      "check_local_label": "api-gateway gates",
+      "note": "Legacy descriptor removal plan writer and validator self-tests must remain covered by the api-gateway gate bundle."
+    },
+    {
       "name": "api-gateway quota snapshot gate",
       "category": "gateway-security",
       "script": "tools/check-api-gateway-quota-snapshot.ps1",

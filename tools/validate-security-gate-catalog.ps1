@@ -113,6 +113,7 @@ $requiredCatalogScripts = @(
     "tools/check-loadtest-output-paths.ps1",
     "tools/check-output-root-safety.ps1",
     "tools/check-evidence-metadata-safety.ps1",
+    "tools/check-api-gateway-legacy-removal-plan.ps1",
     "tools/check-message-compliance-proof-manifest.ps1",
     "tools/check-capacity-baseline-evidence.ps1",
     "tools/check-resource-snapshot-evidence.ps1",

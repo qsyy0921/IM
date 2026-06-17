@@ -44,7 +44,7 @@ func (repository *Repository) ListConversations(
 	if limit > 100 {
 		limit = 100
 	}
-	cursor, hasCursor, err := decodeListCursor(command.PageCursor, sort, command.IncludeArchived, command.ArchivedOnly, command.UnreadOnly, command.PinnedOnly, command.MutedOnly, command.DraftOnly, tagFilter, tagFilters, lastSourceEventTypeFilter)
+	cursor, hasCursor, err := decodeListCursor(command.PageCursor, sort, command.IncludeArchived, command.ArchivedOnly, command.UnreadOnly, command.PinnedOnly, command.MutedOnly, command.ExcludeMuted, command.DraftOnly, tagFilter, tagFilters, lastSourceEventTypeFilter)
 	if err != nil {
 		return types.ListConversationsResult{}, err
 	}
@@ -58,6 +58,7 @@ func (repository *Repository) ListConversations(
 		command.UnreadOnly,
 		command.PinnedOnly,
 		command.MutedOnly,
+		command.ExcludeMuted,
 		command.DraftOnly,
 		tagFilter,
 		tagFilters,
@@ -86,52 +87,53 @@ WHERE tenant_id = $1
   AND (NOT $6 OR unread_count > 0)
   AND (NOT $7 OR pinned = TRUE)
   AND (NOT $8 OR muted = TRUE)
-  AND (NOT $9 OR draft_text <> '')
-  AND ($10 = '' OR $10 = ANY(tags))
-  AND (cardinality($11::text[]) = 0 OR tags @> $11::text[])
-  AND ($12 = '' OR last_source_event_type = $12)
+  AND (NOT $9 OR muted = FALSE)
+  AND (NOT $10 OR draft_text <> '')
+  AND ($11 = '' OR $11 = ANY(tags))
+  AND (cardinality($12::text[]) = 0 OR tags @> $12::text[])
+  AND ($13 = '' OR last_source_event_type = $13)
 `
 	if hasCursor {
 		switch sort {
 		case types.ConversationListSortPinnedUpdatedAtDesc:
 			query += `  AND (
-      pinned < $13
-      OR (pinned = $13 AND sort_updated_at < $14)
-      OR (pinned = $13 AND sort_updated_at = $14 AND conversation_id > $15)
+      pinned < $14
+      OR (pinned = $14 AND sort_updated_at < $15)
+      OR (pinned = $14 AND sort_updated_at = $15 AND conversation_id > $16)
   )
 `
 			args = append(args, cursor.Pinned, cursor.SortUpdatedAt, cursor.ConversationID)
 		case types.ConversationListSortUnreadUpdatedAtDesc:
 			query += `  AND (
-      (unread_count > 0) < $13
-      OR ((unread_count > 0) = $13 AND sort_updated_at < $14)
-      OR ((unread_count > 0) = $13 AND sort_updated_at = $14 AND conversation_id > $15)
+      (unread_count > 0) < $14
+      OR ((unread_count > 0) = $14 AND sort_updated_at < $15)
+      OR ((unread_count > 0) = $14 AND sort_updated_at = $15 AND conversation_id > $16)
   )
 `
 			args = append(args, cursor.Unread, cursor.SortUpdatedAt, cursor.ConversationID)
 		case types.ConversationListSortDraftUpdatedAtDesc:
 			if cursor.Draft {
 				query += `  AND (
-      (draft_text <> '') < $13
-      OR ((draft_text <> '') = $13 AND draft_updated_at < $14)
-      OR ((draft_text <> '') = $13 AND draft_updated_at = $14 AND sort_updated_at < $15)
-      OR ((draft_text <> '') = $13 AND draft_updated_at = $14 AND sort_updated_at = $15 AND conversation_id > $16)
+      (draft_text <> '') < $14
+      OR ((draft_text <> '') = $14 AND draft_updated_at < $15)
+      OR ((draft_text <> '') = $14 AND draft_updated_at = $15 AND sort_updated_at < $16)
+      OR ((draft_text <> '') = $14 AND draft_updated_at = $15 AND sort_updated_at = $16 AND conversation_id > $17)
   )
 `
 				args = append(args, cursor.Draft, cursor.DraftUpdatedAt, cursor.SortUpdatedAt, cursor.ConversationID)
 			} else {
 				query += `  AND (
-      (draft_text <> '') < $13
-      OR ((draft_text <> '') = $13 AND sort_updated_at < $14)
-      OR ((draft_text <> '') = $13 AND sort_updated_at = $14 AND conversation_id > $15)
+      (draft_text <> '') < $14
+      OR ((draft_text <> '') = $14 AND sort_updated_at < $15)
+      OR ((draft_text <> '') = $14 AND sort_updated_at = $15 AND conversation_id > $16)
   )
 `
 				args = append(args, cursor.Draft, cursor.SortUpdatedAt, cursor.ConversationID)
 			}
 		default:
 			query += `  AND (
-      sort_updated_at < $13
-      OR (sort_updated_at = $13 AND conversation_id > $14)
+      sort_updated_at < $14
+      OR (sort_updated_at = $14 AND conversation_id > $15)
   )
 `
 			args = append(args, cursor.SortUpdatedAt, cursor.ConversationID)
@@ -185,6 +187,7 @@ LIMIT $3
 			UnreadOnly:                command.UnreadOnly,
 			PinnedOnly:                command.PinnedOnly,
 			MutedOnly:                 command.MutedOnly,
+			ExcludeMuted:              command.ExcludeMuted,
 			DraftOnly:                 command.DraftOnly,
 			TagFilter:                 tagFilter,
 			TagFilters:                tagFilters,
@@ -493,6 +496,7 @@ type listCursor struct {
 	UnreadOnly                bool      `json:"unread_only"`
 	PinnedOnly                bool      `json:"pinned_only"`
 	MutedOnly                 bool      `json:"muted_only"`
+	ExcludeMuted              bool      `json:"exclude_muted"`
 	DraftOnly                 bool      `json:"draft_only"`
 	TagFilter                 string    `json:"tag_filter"`
 	TagFilters                []string  `json:"tag_filters,omitempty"`
@@ -505,7 +509,7 @@ type listCursor struct {
 	ConversationID            string    `json:"conversation_id"`
 }
 
-const listCursorVersion = 9
+const listCursorVersion = 10
 
 func decodeListCursor(
 	value string,
@@ -515,6 +519,7 @@ func decodeListCursor(
 	unreadOnly bool,
 	pinnedOnly bool,
 	mutedOnly bool,
+	excludeMuted bool,
 	draftOnly bool,
 	tagFilter string,
 	tagFilters []string,
@@ -544,6 +549,7 @@ func decodeListCursor(
 		cursor.UnreadOnly != unreadOnly ||
 		cursor.PinnedOnly != pinnedOnly ||
 		cursor.MutedOnly != mutedOnly ||
+		cursor.ExcludeMuted != excludeMuted ||
 		cursor.DraftOnly != draftOnly ||
 		cursor.TagFilter != tagFilter ||
 		!sameStringSlice(cursor.TagFilters, tagFilters) ||

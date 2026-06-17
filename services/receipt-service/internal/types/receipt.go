@@ -206,6 +206,7 @@ type ListConversationsCommand struct {
 	UnreadOnly                bool
 	PinnedOnly                bool
 	MutedOnly                 bool
+	ExcludeMuted              bool
 	TagFilter                 string
 	TagFilters                []string
 	DraftOnly                 bool
@@ -221,6 +222,9 @@ func (command ListConversationsCommand) Validate() error {
 	}
 	if _, err := NormalizeConversationListSort(command.Sort); err != nil {
 		return err
+	}
+	if command.MutedOnly && command.ExcludeMuted {
+		return NewInvalidArgument("muted_only conflicts with exclude_muted")
 	}
 	if command.TagFilter != "" {
 		if _, err := NormalizeConversationTag(command.TagFilter); err != nil {

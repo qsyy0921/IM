@@ -232,6 +232,7 @@ func (server *Server) ListConversations(
 		UnreadOnly:                request.GetUnreadOnly(),
 		PinnedOnly:                request.GetPinnedOnly(),
 		MutedOnly:                 request.GetMutedOnly(),
+		ExcludeMuted:              request.GetExcludeMuted(),
 		TagFilter:                 request.GetTagFilter(),
 		TagFilters:                request.GetTagFilters(),
 		DraftOnly:                 request.GetDraftOnly(),

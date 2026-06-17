@@ -236,7 +236,7 @@ func TestListConversationsMapsSort(t *testing.T) {
 				ArchivedOnly:              true,
 				UnreadOnly:                true,
 				PinnedOnly:                true,
-				MutedOnly:                 true,
+				ExcludeMuted:              true,
 				TagFilter:                 "work",
 				TagFilters:                []string{"urgent", "vip"},
 				DraftOnly:                 true,
@@ -251,7 +251,7 @@ func TestListConversationsMapsSort(t *testing.T) {
 				!list.command.ArchivedOnly ||
 				!list.command.UnreadOnly ||
 				!list.command.PinnedOnly ||
-				!list.command.MutedOnly ||
+				!list.command.ExcludeMuted ||
 				list.command.TagFilter != "work" ||
 				!stringSlicesEqual(list.command.TagFilters, []string{"urgent", "vip"}) ||
 				!list.command.DraftOnly ||

@@ -22,7 +22,7 @@ func TestListConversationsUseCasePassesSortToRepository(t *testing.T) {
 		Sort:                      types.ConversationListSortUnreadUpdatedAtDesc,
 		UnreadOnly:                true,
 		PinnedOnly:                true,
-		MutedOnly:                 true,
+		ExcludeMuted:              true,
 		LastSourceEventTypeFilter: types.SourceEventMessageDeleted,
 	})
 	if err != nil {
@@ -33,7 +33,7 @@ func TestListConversationsUseCasePassesSortToRepository(t *testing.T) {
 		repository.listCommand.PageCursor != "cursor-1" ||
 		!repository.listCommand.UnreadOnly ||
 		!repository.listCommand.PinnedOnly ||
-		!repository.listCommand.MutedOnly ||
+		!repository.listCommand.ExcludeMuted ||
 		repository.listCommand.LastSourceEventTypeFilter != types.SourceEventMessageDeleted {
 		t.Fatalf("unexpected repository command: %+v", repository.listCommand)
 	}
@@ -63,6 +63,22 @@ func TestListConversationsUseCaseRejectsUnsupportedSourceEventTypeFilter(t *test
 			DeviceID: "device-1",
 		},
 		LastSourceEventTypeFilter: "conversation.member.joined.v1",
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+}
+
+func TestListConversationsUseCaseRejectsMutedOnlyWithExcludeMuted(t *testing.T) {
+	useCase := NewListConversationsUseCase(&fakeReceiptRepository{})
+	_, err := useCase.Execute(context.Background(), types.ListConversationsCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			DeviceID: "device-1",
+		},
+		MutedOnly:    true,
+		ExcludeMuted: true,
 	})
 	if !errors.Is(err, types.ErrInvalidArgument) {
 		t.Fatalf("expected invalid argument, got %v", err)

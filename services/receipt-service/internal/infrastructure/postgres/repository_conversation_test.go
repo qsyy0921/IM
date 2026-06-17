@@ -293,6 +293,56 @@ func TestRepositoryListConversationsFiltersPinnedAndMutedIntegration(t *testing.
 	assertConversationIDs(t, intersection, "conv-c")
 }
 
+func TestRepositoryListConversationsExcludesMutedIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetReceiptTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	sortTime := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	insertConversationSummary(t, ctx, pool, "conv-a", 11, sortTime)
+	insertConversationSummary(t, ctx, pool, "conv-b", 12, sortTime.Add(-time.Minute))
+	insertConversationSummary(t, ctx, pool, "conv-c", 13, sortTime.Add(-2*time.Minute))
+	if _, err := repository.MuteConversation(ctx, muteConversationCommand("conv-b", true)); err != nil {
+		t.Fatalf("mute conv-b: %v", err)
+	}
+
+	defaultList, err := repository.ListConversations(ctx, listConversationsCommand(10, ""))
+	if err != nil {
+		t.Fatalf("list default conversations: %v", err)
+	}
+	assertConversationIDs(t, defaultList, "conv-a", "conv-b", "conv-c")
+
+	first, err := repository.ListConversations(ctx, listConversationsCommandExcludeMuted(1, ""))
+	if err != nil {
+		t.Fatalf("list first exclude-muted page: %v", err)
+	}
+	assertConversationIDs(t, first, "conv-a")
+	if first.NextPageCursor == "" {
+		t.Fatal("expected exclude-muted next cursor")
+	}
+	second, err := repository.ListConversations(ctx, listConversationsCommandExcludeMuted(1, first.NextPageCursor))
+	if err != nil {
+		t.Fatalf("list second exclude-muted page: %v", err)
+	}
+	assertConversationIDs(t, second, "conv-c")
+	if second.NextPageCursor != "" {
+		t.Fatalf("expected empty exclude-muted cursor on last page, got %q", second.NextPageCursor)
+	}
+
+	_, err = repository.ListConversations(ctx, listConversationsCommand(1, first.NextPageCursor))
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid cursor when exclude_muted changes, got %v", err)
+	}
+
+	conflicting := listConversationsCommandExcludeMuted(10, "")
+	conflicting.MutedOnly = true
+	_, err = repository.ListConversations(ctx, conflicting)
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument for muted_only + exclude_muted, got %v", err)
+	}
+}
+
 func TestRepositoryListConversationsFiltersTagsIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

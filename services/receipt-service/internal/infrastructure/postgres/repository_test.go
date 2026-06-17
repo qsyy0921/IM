@@ -405,6 +405,12 @@ func listConversationsCommandMutedOnly(limit int, cursor string) types.ListConve
 	return command
 }
 
+func listConversationsCommandExcludeMuted(limit int, cursor string) types.ListConversationsCommand {
+	command := listConversationsCommand(limit, cursor)
+	command.ExcludeMuted = true
+	return command
+}
+
 func listConversationsCommandWithTag(limit int, cursor string, tag string) types.ListConversationsCommand {
 	command := listConversationsCommand(limit, cursor)
 	command.TagFilter = tag

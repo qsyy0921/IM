@@ -120,6 +120,7 @@ message ListConversationsRequest {
   bool archived_only = 11;
   repeated string tag_filters = 12;
   string last_source_event_type_filter = 13;
+  bool exclude_muted = 14;
 }
 
 message ProjectionWatermark {

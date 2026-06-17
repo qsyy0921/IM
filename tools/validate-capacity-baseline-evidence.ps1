@@ -1,5 +1,6 @@
 param(
     [string]$ManifestPath = "docs/runbook/capacity-baseline-evidence.json",
+    [string]$ExpectedResultRoot = "H:\NexusIM\loadtest-results",
     [switch]$RequireFiles,
     [string]$OutputPath = "",
     [string]$MarkdownPath = ""
@@ -57,6 +58,29 @@ function Escape-MarkdownCell {
     return $Value.Replace("|", "\|").Replace("`r", " ").Replace("`n", " ").Trim()
 }
 
+function Test-PathInsideDirectory {
+    param(
+        [string]$Path,
+        [string]$Directory
+    )
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+    $fullDirectory = [System.IO.Path]::GetFullPath($Directory).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+
+    if ($fullPath.Equals($fullDirectory, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $true
+    }
+
+    $prefix = $fullDirectory + [System.IO.Path]::DirectorySeparatorChar
+    return $fullPath.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)
+}
+
 function Get-ServiceFromRunner {
     param([string]$Runner)
 
@@ -75,8 +99,10 @@ function Get-ServiceFromRunner {
 }
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
+$reportRoot = Join-Path $repoRoot "docs\runbook\loadtest"
 $resolvedManifestPath = Resolve-RepoPath $ManifestPath
 Assert-Condition (Test-Path -LiteralPath $resolvedManifestPath -PathType Leaf) "ManifestPath does not exist: $resolvedManifestPath"
+Assert-Condition ($ExpectedResultRoot.Trim().Length -gt 0) "ExpectedResultRoot is required."
 
 $manifest = Get-Content -LiteralPath $resolvedManifestPath -Raw | ConvertFrom-Json
 Assert-Condition ([int]$manifest.schema_version -eq 1) "capacity baseline evidence schema_version must be 1."
@@ -116,7 +142,11 @@ foreach ($entry in @($manifest.entries)) {
     Assert-Condition ($reportPath.Length -gt 0) "capacity baseline evidence entry $service report_path is required."
     Assert-Condition ($note.Length -gt 0) "capacity baseline evidence entry $service note is required."
 
+    $resolvedSummaryPath = Resolve-RepoPath $summaryPath
+    Assert-Condition (Test-PathInsideDirectory -Path $resolvedSummaryPath -Directory $ExpectedResultRoot) "capacity baseline summary_path for $service must point under $ExpectedResultRoot`: $summaryPath"
+
     $resolvedReportPath = Resolve-RepoPath $reportPath
+    Assert-Condition (Test-PathInsideDirectory -Path $resolvedReportPath -Directory $reportRoot) "capacity baseline report_path for $service must stay under docs/runbook/loadtest: $reportPath"
     Assert-Condition (Test-Path -LiteralPath $resolvedReportPath -PathType Leaf) "capacity baseline report does not exist for $service`: $reportPath"
     $report = Get-Content -LiteralPath $resolvedReportPath -Raw
     $reportLower = $report.ToLowerInvariant()
@@ -125,7 +155,6 @@ foreach ($entry in @($manifest.entries)) {
 
     $fileChecked = $false
     if ($RequireFiles) {
-        $resolvedSummaryPath = Resolve-RepoPath $summaryPath
         Assert-Condition (Test-Path -LiteralPath $resolvedSummaryPath -PathType Leaf) "capacity baseline summary does not exist for $service`: $resolvedSummaryPath"
         $summary = Get-Content -LiteralPath $resolvedSummaryPath -Raw | ConvertFrom-Json
         $capacity = Get-JsonProperty -Object $summary -Name "capacity_summary"

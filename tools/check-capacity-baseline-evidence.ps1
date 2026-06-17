@@ -65,24 +65,8 @@ if ($schemaOnlyResult.ExitCode -ne 0) {
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("nexusim-capacity-evidence-" + [System.Guid]::NewGuid().ToString("N"))
 try {
     New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
-    $reportPath = Join-Path $tempRoot "capacity-report.md"
-    @(
-        "# Fixture capacity report",
-        "",
-        "This is a local short capacity baseline. It is not a production SLO or sizing claim."
-    ) | Set-Content -LiteralPath $reportPath -Encoding UTF8
-
-    $summaryPath = Join-Path $tempRoot "sendmessage-summary.json"
-    Write-JsonFile -Path $summaryPath -Value ([ordered]@{
-        service = "message-service"
-        started_at = "2026-06-17T00:00:00Z"
-        finished_at = "2026-06-17T00:00:05Z"
-        capacity_summary = [ordered]@{
-            duration_seconds = 5
-            request_count = 10
-            accepted_rps = 2.0
-        }
-    })
+    $reportPath = "docs/runbook/loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md"
+    $summaryPath = "H:\NexusIM\loadtest-results\capacity-evidence-selftest\sendmessage-summary.json"
 
     $manifestPath = Join-Path $tempRoot "capacity-baseline-evidence.json"
     $entries = @()
@@ -148,6 +132,66 @@ try {
     if (-not $badResult.Output.Contains("missing service")) {
         Write-Host "FAIL bad capacity baseline evidence fixture returned unexpected error." -ForegroundColor Red
         Write-Host $badResult.Output -ForegroundColor Red
+        exit 1
+    }
+
+    $repoSummaryManifestPath = Join-Path $tempRoot "repo-summary-capacity-baseline-evidence.json"
+    Write-JsonFile -Path $repoSummaryManifestPath -Value ([ordered]@{
+        schema_version = 1
+        scope = "self-test"
+        entries = @($entries | ForEach-Object {
+            $copy = [ordered]@{}
+            foreach ($property in $_.GetEnumerator()) {
+                $copy[$property.Key] = $property.Value
+            }
+            if ($copy.service -eq "message-service") {
+                $copy.summary_path = "docs/runbook/loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md"
+            }
+            $copy
+        })
+    })
+
+    $repoSummaryResult = Invoke-Validator -ManifestPath $repoSummaryManifestPath
+    if ($repoSummaryResult.ExitCode -eq 0) {
+        Write-Host "FAIL capacity baseline evidence with repo-local summary_path should fail." -ForegroundColor Red
+        exit 1
+    }
+    if (-not $repoSummaryResult.Output.Contains("must point under")) {
+        Write-Host "FAIL repo-local summary_path fixture returned unexpected error." -ForegroundColor Red
+        Write-Host $repoSummaryResult.Output -ForegroundColor Red
+        exit 1
+    }
+
+    $externalReportManifestPath = Join-Path $tempRoot "external-report-capacity-baseline-evidence.json"
+    $externalReportPath = Join-Path $tempRoot "capacity-report.md"
+    @(
+        "# Fixture capacity report",
+        "",
+        "This is a local short capacity baseline. It is not a production SLO or sizing claim."
+    ) | Set-Content -LiteralPath $externalReportPath -Encoding UTF8
+    Write-JsonFile -Path $externalReportManifestPath -Value ([ordered]@{
+        schema_version = 1
+        scope = "self-test"
+        entries = @($entries | ForEach-Object {
+            $copy = [ordered]@{}
+            foreach ($property in $_.GetEnumerator()) {
+                $copy[$property.Key] = $property.Value
+            }
+            if ($copy.service -eq "message-service") {
+                $copy.report_path = $externalReportPath
+            }
+            $copy
+        })
+    })
+
+    $externalReportResult = Invoke-Validator -ManifestPath $externalReportManifestPath
+    if ($externalReportResult.ExitCode -eq 0) {
+        Write-Host "FAIL capacity baseline evidence with external report_path should fail." -ForegroundColor Red
+        exit 1
+    }
+    if (-not $externalReportResult.Output.Contains("must stay under docs/runbook/loadtest")) {
+        Write-Host "FAIL external report_path fixture returned unexpected error." -ForegroundColor Red
+        Write-Host $externalReportResult.Output -ForegroundColor Red
         exit 1
     }
 

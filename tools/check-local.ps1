@@ -35,6 +35,9 @@ try {
     Write-Host "== runbook consistency =="
     Invoke-LocalCheck "check-runbook-consistency.ps1"
 
+    Write-Host "== security gate catalog =="
+    Invoke-LocalCheck "check-security-gate-catalog.ps1"
+
     Write-Host "== repair operator index =="
     Invoke-LocalCheck "check-repair-operator-index.ps1"
 

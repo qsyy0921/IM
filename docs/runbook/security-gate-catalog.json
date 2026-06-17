@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-06-17",
+  "scope": "Local startup/security boundary gate catalog for NexusIM. These gates protect local development and CI-style checks; they are not a substitute for production identity, network policy, mTLS rollout, or external audit controls.",
+  "entries": [
+    {
+      "name": "DDD boundary imports",
+      "category": "architecture-boundary",
+      "script": "tools/check-ddd-boundaries.ps1",
+      "check_local_label": "ddd boundaries",
+      "note": "Production api/app/domain/trigger/types packages must not import internal/infrastructure."
+    },
+    {
+      "name": "cross-service private table access",
+      "category": "architecture-boundary",
+      "script": "tools/check-cross-service-table-access.ps1",
+      "check_local_label": "cross-service table access",
+      "note": "Production code must not read other services private tables except explicitly allowed shared contracts."
+    },
+    {
+      "name": "debug listener exposure",
+      "category": "listener-boundary",
+      "script": "tools/check-debug-listener-exposure.ps1",
+      "check_local_label": "debug listener exposure",
+      "note": "Debug listeners must stay local/private and not become public ingress."
+    },
+    {
+      "name": "public listener auth boundaries",
+      "category": "listener-boundary",
+      "script": "tools/check-public-listener-auth-guards.ps1",
+      "check_local_label": "public listener auth boundaries",
+      "note": "Mock auth and unsigned trusted metadata cannot be exposed on public listeners."
+    },
+    {
+      "name": "grpc and websocket tls config",
+      "category": "transport-security",
+      "script": "tools/check-grpc-tls-config-guards.ps1",
+      "check_local_label": "grpc/wss tls config guardrails",
+      "note": "TLS and client-certificate config must keep startup validation coverage."
+    },
+    {
+      "name": "api-gateway startup gates",
+      "category": "gateway-security",
+      "script": "tools/check-api-gateway-gates.ps1",
+      "check_local_label": "api-gateway gates",
+      "note": "Gateway-specific startup, auth, quota, and public boundary gates."
+    },
+    {
+      "name": "repair operator catalog",
+      "category": "operator-safety",
+      "script": "tools/check-repair-operator-index.ps1",
+      "check_local_label": "repair operator index",
+      "note": "Repair and cleanup operators must remain indexed and documented."
+    },
+    {
+      "name": "repair operator plan writer",
+      "category": "operator-safety",
+      "script": "tools/check-repair-operator-plan.ps1",
+      "check_local_label": "repair operator plan writer",
+      "note": "Operator planning must remain low-sensitive and dry-run oriented."
+    },
+    {
+      "name": "repair operator approval chain",
+      "category": "operator-safety",
+      "script": "tools/check-repair-approval-chain.ps1",
+      "check_local_label": "repair approval chain",
+      "note": "Approved repair execution must require a valid request/decision chain."
+    },
+    {
+      "name": "approved repair invocation",
+      "category": "operator-safety",
+      "script": "tools/check-approved-repair-invocation.ps1",
+      "check_local_label": "approved repair invocation",
+      "note": "Approved repair invocation defaults to preflight and must not silently mutate data."
+    }
+  ]
+}

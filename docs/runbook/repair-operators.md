@@ -20,6 +20,14 @@
 
 审批请求只保存 `plan_sha256`、`reason_sha256`、service / mode / command 和环境变量名，不保存环境变量值、operator reason 原文或业务数据。它是 first-stage 审批交接文件，不是正式审批系统。
 
+本地审批决定生成入口：
+
+```powershell
+.\tools\write-repair-approval-decision.ps1 -RequestPath H:\NexusIM\operator-plans\approval.json -Decision APPROVED -DecidedBy approver-a -ReasonFile H:\NexusIM\operator-plans\decision-reason.txt
+```
+
+审批决定只保存 `request_sha256`、`plan_sha256`、`reason_sha256`、service / mode / command 和审批状态，不保存审批 reason 原文、环境变量值或业务数据。它不执行 operator，只为后续正式执行编排 / 运维 UI 提供可校验的低敏交接文件。
+
 ## 使用原则
 
 - 先 audit，后 repair；没有明确 event / outbox / checkpoint / failure 范围时不要 redrive。

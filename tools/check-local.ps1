@@ -125,6 +125,9 @@ try {
     Write-Host "== loadtest output paths =="
     Invoke-LocalCheck "check-loadtest-output-paths.ps1"
 
+    Write-Host "== loadtest output path guard self-test =="
+    Invoke-LocalCheck "check-loadtest-output-paths-selftest.ps1"
+
     Write-Host "== output root safety helper =="
     Invoke-LocalCheck "check-output-root-safety.ps1"
 

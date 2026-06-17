@@ -1,10 +1,16 @@
 param(
-    [string]$ExpectedResultRoot = "H:\NexusIM\loadtest-results"
+    [string]$ExpectedResultRoot = "H:\NexusIM\loadtest-results",
+    [string]$RepoRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Split-Path -Parent $PSScriptRoot
+if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+    $repoRoot = Split-Path -Parent $PSScriptRoot
+}
+else {
+    $repoRoot = [System.IO.Path]::GetFullPath($RepoRoot)
+}
 $allowedInternalReferences = @(
     "tools\check-file-size-budget.ps1",
     "tools\check-project-naming.ps1",
@@ -58,6 +64,18 @@ function Test-IsExcluded {
     return $false
 }
 
+function Test-UsesOutputRootHelper {
+    param([string]$Text)
+
+    return $Text -match '(?m)^\s*\.\s*\([^\r\n]*output-root-safety\.ps1'
+}
+
+function Test-CallsOutputRootGuard {
+    param([string]$Text)
+
+    return $Text -match '(?m)^\s*Assert-ExternalOutputRoot\b'
+}
+
 $scanRoots = @(
     (Join-Path $repoRoot "loadtest"),
     (Join-Path $repoRoot "tools")
@@ -82,10 +100,18 @@ foreach ($file in ($files | Sort-Object FullName)) {
     }
 
     $fileText = Get-Content -LiteralPath $file.FullName -Raw
-    if ($fileText -match "\[string\]\`$(ResultRoot|OutputRoot)" -and $fileText -notmatch "Assert-ExternalOutputRoot") {
-        $guardFailures += [pscustomobject]@{
-            Path = $relativePath
-            Text = "ResultRoot/OutputRoot writer is missing Assert-ExternalOutputRoot"
+    if ($fileText -match "\[string\]\`$(ResultRoot|OutputRoot)") {
+        if (-not (Test-UsesOutputRootHelper -Text $fileText)) {
+            $guardFailures += [pscustomobject]@{
+                Path = $relativePath
+                Text = "ResultRoot/OutputRoot writer is missing output-root-safety.ps1 helper"
+            }
+        }
+        if (-not (Test-CallsOutputRootGuard -Text $fileText)) {
+            $guardFailures += [pscustomobject]@{
+                Path = $relativePath
+                Text = "ResultRoot/OutputRoot writer is missing an active Assert-ExternalOutputRoot call"
+            }
         }
     }
 

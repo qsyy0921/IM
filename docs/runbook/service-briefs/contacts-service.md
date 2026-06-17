@@ -14,6 +14,7 @@
 - 已补 contacts outbox publish / audit / repair audit 错误脱敏：`last_error`、`previous_last_error` 只保留稳定低敏分类，不暴露 broker body、账号、token 或 provider 原文。
 - 当 `NEXUSIM_CONTACTS_AUTH_MODE=metadata|verified-metadata` 时，公网监听地址 + 无 gRPC mTLS client cert 的危险组合会在启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - PostgreSQL repository 已按主流程 / helper / privacy / source policy 同 package 拆分，主文件降到约 1000 行；PostgreSQL privacy / source-policy / contact-edge 集成测试也已拆到独立同 package 测试文件，避免联系人逻辑和测试继续堆进单个大文件。
+- cmd 启动编排已把 outbox cleanup、tenant privacy、source policy、review operator 和 env / TLS / debug listener helper 拆到独立同 package 文件，`main.go` 保留核心 gRPC / relay / audit 编排。
 - `loadtest/contacts` summary 已输出 `capacity_summary`，包含运行时长、场景、操作数、Kafka contact event 数、contacts outbox 聚合、ops/s、events/s 和 latency p95/p99；后续容量验证可直接复用该结构。
 - `capacity-baseline-contacts-stack-20260616-r2` 本地 stack 短基线已跑通：`contacts_outbox PUBLISHED=2/PENDING=0/DLQ=0`，Kafka 读回 `contact.request.created.v1` 和 `contact.request.accepted.v1`，`operations_per_second=0.89`；报告见 `loadtest/distributed/loadtest-report-20260616-contacts-stack-capacity-baseline.md`。
 

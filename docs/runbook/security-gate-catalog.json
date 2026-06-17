@@ -62,6 +62,14 @@
       "note": "Legacy descriptor removal must use multiple clean observations with bounded gaps and no legacy or other exposure."
     },
     {
+      "name": "api-gateway legacy removal plan validator",
+      "category": "gateway-security",
+      "script": "tools/validate-api-gateway-legacy-removal-plan.ps1",
+      "covered_by_script": "tools/check-api-gateway-gates.ps1",
+      "check_local_label": "api-gateway gates",
+      "note": "Legacy descriptor removal plans must remain non-executing, low-sensitive, approval-gated, and consistent with quiet-window evidence."
+    },
+    {
       "name": "api-gateway quota snapshot gate",
       "category": "gateway-security",
       "script": "tools/check-api-gateway-quota-snapshot.ps1",

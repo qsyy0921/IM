@@ -67,6 +67,7 @@ try {
         $summary.decision_id -ne "decision-chain-1" -or
         $summary.service -ne "delivery-service" -or
         $summary.mode -ne "projection-checkpoint-repair" -or
+        $summary.mode_env -ne "NEXUSIM_DELIVERY_SERVICE_MODE" -or
         $summary.executes -ne $false) {
         throw "approval chain summary has unexpected fields."
     }
@@ -94,6 +95,50 @@ try {
     }
     if ($tamperedExitCode -eq 0) {
         throw "approval chain validator should reject tampered plan file."
+    }
+
+    $unsupportedPlan = Join-Path $tempRoot "unsupported-plan.json"
+    $unsupportedPlanJson = & powershell -NoProfile -ExecutionPolicy Bypass -File $plannerPath `
+        -Service "delivery-service" `
+        -Mode "projection-checkpoint-repair" `
+        -DryRun `
+        -DryRunEnv "NEXUSIM_DELIVERY_PROJECTION_REPAIR_DRY_RUN"
+    if ($LASTEXITCODE -ne 0) {
+        throw "write-repair-operator-plan.ps1 failed while preparing unsupported mode test"
+    }
+    $unsupportedPlanJson = $unsupportedPlanJson -replace "projection-checkpoint-repair", "not-in-catalog"
+    $unsupportedPlanJson | Set-Content -LiteralPath $unsupportedPlan -Encoding UTF8
+    $unsupportedRequest = Join-Path $tempRoot "unsupported-request.json"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $requestWriterPath `
+        -PlanPath $unsupportedPlan `
+        -RequestedBy "operator-a" `
+        -ApprovalID "approval-chain-unsupported" `
+        -OutputPath $unsupportedRequest
+    if ($LASTEXITCODE -ne 0) {
+        throw "write-repair-approval-request.ps1 failed while preparing unsupported mode test"
+    }
+    $unsupportedDecision = Join-Path $tempRoot "unsupported-decision.json"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $decisionWriterPath `
+        -RequestPath $unsupportedRequest `
+        -Decision "APPROVED" `
+        -DecidedBy "approver-a" `
+        -DecisionID "decision-chain-unsupported" `
+        -OutputPath $unsupportedDecision
+    if ($LASTEXITCODE -ne 0) {
+        throw "write-repair-approval-decision.ps1 failed while preparing unsupported mode test"
+    }
+    $ErrorActionPreference = "Continue"
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $validatorPath `
+            -PlanPath $unsupportedPlan `
+            -RequestPath $unsupportedRequest `
+            -DecisionPath $unsupportedDecision 2>$null | Out-Null
+        $unsupportedExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldErrorActionPreference
+    }
+    if ($unsupportedExitCode -eq 0) {
+        throw "approval chain validator should reject unsupported catalog mode."
     }
 } finally {
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue

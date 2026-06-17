@@ -19,6 +19,12 @@ foreach ($path in @($PlanPath, $RequestPath, $DecisionPath)) {
     }
 }
 
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$catalogPath = Join-Path $repoRoot "docs\runbook\repair-operators.catalog.json"
+if (-not (Test-Path -LiteralPath $catalogPath -PathType Leaf)) {
+    throw "Missing repair operator catalog: $catalogPath"
+}
+
 function Get-Sha256Hex {
     param([byte[]]$Bytes)
 
@@ -43,6 +49,7 @@ $decisionRaw = Get-Content -LiteralPath $DecisionPath -Raw
 $plan = $planRaw | ConvertFrom-Json
 $request = $requestRaw | ConvertFrom-Json
 $decision = $decisionRaw | ConvertFrom-Json
+$catalog = Get-Content -LiteralPath $catalogPath -Raw | ConvertFrom-Json
 
 if ($plan.schema_version -ne 1) {
     throw "Unsupported repair operator plan schema_version: $($plan.schema_version)"
@@ -52,6 +59,9 @@ if ($request.schema_version -ne 1) {
 }
 if ($decision.schema_version -ne 1) {
     throw "Unsupported repair approval decision schema_version: $($decision.schema_version)"
+}
+if ($catalog.schema_version -ne 1) {
+    throw "Unsupported repair operator catalog schema_version: $($catalog.schema_version)"
 }
 if ($plan.executes -ne $false -or $request.executes -ne $false -or $decision.executes -ne $false) {
     throw "Repair approval chain only accepts non-executing artifacts."
@@ -90,6 +100,32 @@ foreach ($field in @("service", "mode", "command")) {
     }
 }
 
+$serviceSpec = @($catalog.services) | Where-Object { [string]$_.service -eq [string]$plan.service } | Select-Object -First 1
+if ($null -eq $serviceSpec) {
+    throw "Repair approval chain service is not present in catalog: $($plan.service)"
+}
+
+$modeSet = @{}
+foreach ($catalogMode in @($serviceSpec.modes)) {
+    $modeSet[[string]$catalogMode] = $true
+}
+if (-not $modeSet.ContainsKey([string]$plan.mode)) {
+    throw "Repair approval chain mode is not present in catalog for $($plan.service): $($plan.mode)"
+}
+
+$expectedCommand = "go run .\services\$($plan.service)\cmd\$($plan.service)"
+if ([string]$plan.command -ne $expectedCommand) {
+    throw "Repair approval chain command does not match catalog-derived service command."
+}
+
+$modeEnv = [string]$serviceSpec.mode_env
+if ([string]::IsNullOrWhiteSpace($modeEnv)) {
+    throw "Repair operator catalog is missing mode_env for $($plan.service)."
+}
+if ($null -eq $plan.environment -or [string]$plan.environment.$modeEnv -ne [string]$plan.mode) {
+    throw "Repair approval chain plan environment does not set catalog mode env to the selected mode."
+}
+
 $summary = [ordered]@{
     schema_version = 1
     validated_at = (Get-Date).ToUniversalTime().ToString("o")
@@ -99,6 +135,7 @@ $summary = [ordered]@{
     service = [string]$plan.service
     mode = [string]$plan.mode
     command = [string]$plan.command
+    mode_env = $modeEnv
     plan_sha256 = $planHash
     request_sha256 = $requestHash
     decision_sha256 = Get-Utf8Hash -Text $decisionRaw

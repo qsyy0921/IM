@@ -34,7 +34,7 @@
 .\tools\validate-repair-approval-chain.ps1 -PlanPath H:\NexusIM\operator-plans\plan.json -RequestPath H:\NexusIM\operator-plans\approval.json -DecisionPath H:\NexusIM\operator-plans\decision.json
 ```
 
-校验器只确认 plan / request / decision 的 hash、`approval_id`、service / mode / command 和 `APPROVED` 状态一致。它不执行 operator，也不会复制环境变量值、审批 reason 或业务数据。
+校验器确认 plan / request / decision 的 hash、`approval_id`、service / mode / command 和 `APPROVED` 状态一致，并回查 `repair-operators.catalog.json`，确保 service / mode / mode env / command 仍属于当前机器可读 catalog。它不执行 operator，也不会复制环境变量值、审批 reason 或业务数据。
 
 ## 使用原则
 

@@ -67,13 +67,22 @@ func runMessageLegalHoldSet() error {
 	}
 	defer closeRepository()
 
+	reason, err := messageOperatorReasonFromEnv(
+		"NEXUSIM_MESSAGE_LEGAL_HOLD_REASON",
+		"NEXUSIM_MESSAGE_LEGAL_HOLD_REASON_FILE",
+		"manual legal hold",
+	)
+	if err != nil {
+		return err
+	}
+
 	result, err := repository.SetMessageLegalHold(ctx, postgresinfra.MessageLegalHoldMutationOptions{
 		TenantID:       envString("NEXUSIM_MESSAGE_LEGAL_HOLD_TENANT_ID", ""),
 		ConversationID: envString("NEXUSIM_MESSAGE_LEGAL_HOLD_CONVERSATION_ID", ""),
 		MessageID:      envString("NEXUSIM_MESSAGE_LEGAL_HOLD_MESSAGE_ID", ""),
 		HoldID:         envString("NEXUSIM_MESSAGE_LEGAL_HOLD_ID", ""),
 		OperatorID:     envString("NEXUSIM_MESSAGE_LEGAL_HOLD_OPERATOR_ID", ""),
-		Reason:         envString("NEXUSIM_MESSAGE_LEGAL_HOLD_REASON", "manual legal hold"),
+		Reason:         reason,
 	})
 	if err != nil {
 		return err

@@ -87,6 +87,15 @@ func runMessageComplianceApprovalCreate() error {
 	}
 	defer closeRepository()
 
+	reason, err := messageOperatorReasonFromEnv(
+		"NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_REASON",
+		"NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_REASON_FILE",
+		"manual compliance approval",
+	)
+	if err != nil {
+		return err
+	}
+
 	result, err := repository.ApproveComplianceDelete(ctx, postgresinfra.MessageComplianceDeleteApprovalMutationOptions{
 		TenantID:         envString("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_TENANT_ID", ""),
 		ConversationID:   envString("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_CONVERSATION_ID", ""),
@@ -94,7 +103,7 @@ func runMessageComplianceApprovalCreate() error {
 		ApprovalID:       envString("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_ID", ""),
 		ExternalProofRef: envString("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_EXTERNAL_PROOF_REF", ""),
 		OperatorID:       envString("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_OPERATOR_ID", ""),
-		Reason:           envString("NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_REASON", "manual compliance approval"),
+		Reason:           reason,
 	})
 	if err != nil {
 		return err

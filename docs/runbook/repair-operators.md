@@ -138,6 +138,8 @@ go run ./services/delivery-service/cmd/delivery-service
 
 `delivery-service` 的 `outbox-repair` 额外支持 `NEXUSIM_DELIVERY_OUTBOX_REPAIR_DRY_RUN=true`，用于只写 repair audit、不 mutate outbox 状态。
 
+`message-service` 的 `outbox-repair` 额外支持 `NEXUSIM_MESSAGE_OUTBOX_REPAIR_REASON_FILE` 读取 repair reason 原文，避免把 reason 写进 operator plan / shell env。
+
 以下服务的 `outbox-repair-audit` 支持写低敏 JSON 结果，便于 operator 留存证据，不写 Kafka 原始错误正文或业务 payload；并统一支持按 `repaired_at` RFC3339 时间窗口过滤，在 JSON 中写 compacted filters：
 
 | 服务 | JSON 输出环境变量 |
@@ -172,13 +174,13 @@ go run ./services/delivery-service/cmd/delivery-service
 
 `message-service` 还提供只读 `retention-proof-audit`，用于按当前 `message_log` 行聚合删除证明：当前状态、payload 是否仍存在、最新 `DELETE` change history、`message.deleted.v1` timeline / outbox 是否存在。默认审计 `DELETED` 消息，支持按 tenant / conversation / message / status 缩小范围，可选 `NEXUSIM_MESSAGE_RETENTION_PROOF_AUDIT_OUTPUT` 写低敏 JSON 结果；输出不包含消息 payload 或删除 reason 原文。
 
-`message-service` 还提供 `legal-hold-audit` / `legal-hold-set` / `legal-hold-release`，用于审计、设置和释放消息级 legal hold。ACTIVE legal hold 会让 `DeleteMessage` 在事务内 fail-closed，不推进 seq 或写 timeline/outbox。`legal-hold-audit` 可选 `NEXUSIM_MESSAGE_LEGAL_HOLD_AUDIT_OUTPUT` 写低敏 JSON，`legal-hold-set` / `legal-hold-release` 可选 `NEXUSIM_MESSAGE_LEGAL_HOLD_OUTPUT` 写低敏 JSON；输出只包含 hold 元数据和 reason-present，不输出 hold reason 原文。
+`message-service` 还提供 `legal-hold-audit` / `legal-hold-set` / `legal-hold-release`，用于审计、设置和释放消息级 legal hold。ACTIVE legal hold 会让 `DeleteMessage` 在事务内 fail-closed，不推进 seq 或写 timeline/outbox。`legal-hold-audit` 可选 `NEXUSIM_MESSAGE_LEGAL_HOLD_AUDIT_OUTPUT` 写低敏 JSON，`legal-hold-set` / `legal-hold-release` 可选 `NEXUSIM_MESSAGE_LEGAL_HOLD_OUTPUT` 写低敏 JSON；`legal-hold-set` 支持 `NEXUSIM_MESSAGE_LEGAL_HOLD_REASON_FILE` 读取 reason 原文，避免把 reason 写进 operator plan / shell env；输出只包含 hold 元数据和 reason-present，不输出 hold reason 原文。
 
 `message-service` 还提供 `compliance-proof-audit` / `compliance-proof-register` / `compliance-proof-revoke`，用于登记、吊销和审计外部合规 proof 的低敏引用。`compliance-proof-register` 只保存 `external_proof_ref`、provider 和 proof hash，不保存 proof 正文；审批创建和最终 `COMPLIANCE_RETENTION` 删除都会要求 proof ref 仍为 `VERIFIED`。`compliance-proof-audit` 支持按 tenant / proof ref / status / provider / `updated_at` RFC3339 时间窗口过滤，可选 `NEXUSIM_MESSAGE_COMPLIANCE_PROOF_AUDIT_OUTPUT` 写低敏 JSON，`compliance-proof-register` / `compliance-proof-revoke` 可选 `NEXUSIM_MESSAGE_COMPLIANCE_PROOF_OUTPUT` 写低敏 JSON。
 
 `compliance-proof-register` 的 manifest provider 模式可先用 `tools/validate-message-compliance-proof-manifest.ps1` 校验外部 proof manifest。该 validator 比 runtime parser 更严格：只允许 `external_proof_ref`、`provider`、`proof_hash`、`status` 字段，拒绝 proof 正文、token、secret 或未知字段，并可校验指定 proof ref 必须是 `VERIFIED`。
 
-`message-service` 还提供 `compliance-approval-audit` / `compliance-approval-create` / `compliance-approval-cancel`，用于审计、创建和取消合规删除审批。`COMPLIANCE_RETENTION` 删除必须提交匹配的 approval id 和 external proof ref，并在事务内把 `APPROVED` approval 消费为 `CONSUMED`。`compliance-approval-create` 只能引用已 `VERIFIED` 的 external proof ref。`compliance-approval-audit` 支持按 tenant / conversation / message / approval / status / `updated_at` RFC3339 时间窗口过滤，可选 `NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_AUDIT_OUTPUT` 写低敏 JSON，`compliance-approval-create` / `compliance-approval-cancel` 可选 `NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_OUTPUT` 写低敏 JSON；输出只包含审批元数据、低敏 proof ref 和 reason-present，不输出审批 reason 或外部 proof 正文。
+`message-service` 还提供 `compliance-approval-audit` / `compliance-approval-create` / `compliance-approval-cancel`，用于审计、创建和取消合规删除审批。`COMPLIANCE_RETENTION` 删除必须提交匹配的 approval id 和 external proof ref，并在事务内把 `APPROVED` approval 消费为 `CONSUMED`。`compliance-approval-create` 只能引用已 `VERIFIED` 的 external proof ref，并支持 `NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_REASON_FILE` 读取审批 reason 原文，避免把 reason 写进 operator plan / shell env。`compliance-approval-audit` 支持按 tenant / conversation / message / approval / status / `updated_at` RFC3339 时间窗口过滤，可选 `NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_AUDIT_OUTPUT` 写低敏 JSON，`compliance-approval-create` / `compliance-approval-cancel` 可选 `NEXUSIM_MESSAGE_COMPLIANCE_APPROVAL_OUTPUT` 写低敏 JSON；输出只包含审批元数据、低敏 proof ref 和 reason-present，不输出审批 reason 或外部 proof 正文。
 
 `policy-service` 还提供只读 `decision-audit-export`，用于把 `policy_decision_audit_outbox` 中的低敏决策审计行导出为 JSON，支持按 tenant / event / action / allowed / classification / reason_code / outbox status / created_at RFC3339 时间窗口过滤；可选 `NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_OUTPUT` 写结果。输出只包含 stable key、决策元数据、trace/request id 和 outbox 发布状态，不输出消息正文、provider body、payload_json 或用户原始标识。它是 first-stage 本地审计交接文件，不等于 provider-grade 外部 audit sink。
 

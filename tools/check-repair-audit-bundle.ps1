@@ -35,7 +35,7 @@ try {
         -Mode "projection-checkpoint-repair" `
         -DryRun `
         -DryRunEnv "NEXUSIM_DELIVERY_PROJECTION_REPAIR_DRY_RUN" `
-        -Env "NEXUSIM_REPAIR_AUDIT_BUNDLE_SECRET=do-not-copy-audit-bundle-value"
+        -Env "NEXUSIM_REPAIR_AUDIT_BUNDLE_REF=do-not-copy-audit-bundle-value"
     if ($LASTEXITCODE -ne 0) {
         throw "write-repair-operator-plan.ps1 failed while preparing repair audit bundle test"
     }

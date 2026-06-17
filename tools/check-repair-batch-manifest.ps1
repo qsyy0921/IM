@@ -36,7 +36,7 @@ function New-ApprovedInvocationSummary {
         "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $plannerPath,
         "-Service", "delivery-service",
         "-Mode", $Mode,
-        "-Env", "NEXUSIM_DELIVERY_BATCH_TEST_SECRET=do-not-copy-batch-value"
+        "-Env", "NEXUSIM_DELIVERY_BATCH_TEST_REF=do-not-copy-batch-value"
     )
     if ($UseDryRun) {
         $plannerArgs += @("-DryRun", "-DryRunEnv", $DryRunEnv)
@@ -146,7 +146,7 @@ try {
             [string]::IsNullOrWhiteSpace([string]$item.decision_sha256)) {
             throw "repair batch manifest item is missing expected hashes."
         }
-        if (@($item.environment_keys) -notcontains "NEXUSIM_DELIVERY_BATCH_TEST_SECRET") {
+        if (@($item.environment_keys) -notcontains "NEXUSIM_DELIVERY_BATCH_TEST_REF") {
             throw "repair batch manifest should preserve redacted environment key names."
         }
     }

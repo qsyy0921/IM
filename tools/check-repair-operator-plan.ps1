@@ -79,6 +79,36 @@ try {
         $policyPlan.environment.NEXUSIM_POLICY_TENANT_QUOTA_SET_TENANT_ID -ne "tenant_1") {
         throw "policy-service tenant-quota-set repair operator plan has unexpected environment."
     }
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $sensitiveKeyOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $plannerPath `
+            -Service "delivery-service" `
+            -Mode "projection-checkpoint-repair" `
+            -Env "NEXUSIM_OPERATOR_SECRET=do-not-store" 2>&1
+        $sensitiveKeyExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($sensitiveKeyExitCode -eq 0 -or ($sensitiveKeyOutput -join "`n") -notmatch "potentially sensitive Env key") {
+        throw "repair operator plan should reject sensitive ad-hoc env keys."
+    }
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $sensitiveValueOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $plannerPath `
+            -Service "delivery-service" `
+            -Mode "projection-checkpoint-repair" `
+            -Env "NEXUSIM_OPERATOR_REASON=Bearer abc.def.ghi" 2>&1
+        $sensitiveValueExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($sensitiveValueExitCode -eq 0 -or ($sensitiveValueOutput -join "`n") -notmatch "potentially sensitive Env value") {
+        throw "repair operator plan should reject sensitive ad-hoc env values."
+    }
 } finally {
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }

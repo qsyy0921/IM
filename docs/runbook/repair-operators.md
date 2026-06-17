@@ -4,6 +4,14 @@
 
 机器可读索引见 `repair-operators.catalog.json`。后续跨服务执行编排、审批 UI 或外部审计 sink 应优先消费该 catalog，而不是解析本 Markdown。
 
+本地计划生成入口：
+
+```powershell
+.\tools\write-repair-operator-plan.ps1 -Service delivery-service -Mode projection-checkpoint-repair -DryRun -DryRunEnv NEXUSIM_DELIVERY_PROJECTION_REPAIR_DRY_RUN
+```
+
+该脚本只读取 catalog 并输出低敏 JSON plan，不执行 operator、不连接数据库、不读取业务数据。后续审批 / 运维 UI 可以先复用这个计划格式，再接正式执行编排。
+
 ## 使用原则
 
 - 先 audit，后 repair；没有明确 event / outbox / checkpoint / failure 范围时不要 redrive。

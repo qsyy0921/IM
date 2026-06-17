@@ -94,6 +94,7 @@ $apiGatewayRequiredMetrics = @(
     "nexusim_api_gateway_rate_limit_redis_errors_total",
     "nexusim_api_gateway_rate_limit_identity_errors_total",
     "nexusim_api_gateway_rate_limit_tenant_plan_reload_errors_total",
+    "redis_mode",
     "nexusim_api_gateway_auth_jwks_refresh_failures_total",
     "nexusim_api_gateway_legacy_descriptors_registered",
     "nexusim_api_gateway_otel_traces_enabled"

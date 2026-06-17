@@ -366,6 +366,43 @@
           "sort": "none"
         }
       }
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "Rate-limit Redis mode",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 22},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (backend, redis_mode) (nexusim_api_gateway_rate_limit_enabled)",
+          "legendFormat": "{{backend}} {{redis_mode}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
     }
   ]
 }

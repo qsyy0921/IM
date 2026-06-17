@@ -1,9 +1,13 @@
 $ErrorActionPreference = "Stop"
 
 $validator = Join-Path $PSScriptRoot "validate-observability-evidence.ps1"
+$adder = Join-Path $PSScriptRoot "add-observability-evidence.ps1"
 
 if (-not (Test-Path -LiteralPath $validator -PathType Leaf)) {
     throw "Missing observability evidence validator: $validator"
+}
+if (-not (Test-Path -LiteralPath $adder -PathType Leaf)) {
+    throw "Missing observability evidence adder: $adder"
 }
 
 function Write-JsonFile {
@@ -146,6 +150,88 @@ try {
     if (-not $badResult.Output.Contains("duplicate")) {
         Write-Host "FAIL bad observability evidence fixture returned unexpected error." -ForegroundColor Red
         Write-Host $badResult.Output -ForegroundColor Red
+        exit 1
+    }
+
+    $targetSummaryPath = Join-Path $tempRoot "observability-smoke-summary.json"
+    Write-JsonFile -Path $targetSummaryPath -Value ([ordered]@{
+        run_name = "target-fixture"
+        prometheus_ready = $true
+        grafana_ready = $true
+        prometheus_rule_group_count = 9
+        expected_dashboard_uids = @(
+            "nexusim-api-gateway",
+            "nexusim-contacts-service",
+            "nexusim-conversation-service",
+            "nexusim-delivery-service",
+            "nexusim-identity-service",
+            "nexusim-message-service",
+            "nexusim-policy-service",
+            "nexusim-push-gateway",
+            "nexusim-receipt-service"
+        )
+        found_dashboard_uids = @(
+            "nexusim-api-gateway",
+            "nexusim-contacts-service",
+            "nexusim-conversation-service",
+            "nexusim-delivery-service",
+            "nexusim-identity-service",
+            "nexusim-message-service",
+            "nexusim-policy-service",
+            "nexusim-push-gateway",
+            "nexusim-receipt-service"
+        )
+        missing_dashboard_uids = @()
+        dashboard_count = [ordered]@{ expected = 9; found = 9 }
+        alertmanager_checked = $false
+        alertmanager_ready = $false
+        active_alertmanager_urls = @()
+        scope = "target environment Prometheus/Grafana smoke evidence; not a production SLO or Alertmanager validation"
+    })
+
+    try {
+        $addResultOutput = & $adder `
+            -ManifestPath $manifestPath `
+            -Name "target fixture" `
+            -Kind "prometheus-grafana-smoke" `
+            -SummaryPath $targetSummaryPath `
+            -ReportPath $reportPath `
+            -ExpectedDashboardCount 9 `
+            -Note "fixture target observability evidence" 2>&1
+    }
+    catch {
+        Write-Host "FAIL add-observability-evidence.ps1 should append target fixture." -ForegroundColor Red
+        Write-Host $_.Exception.Message -ForegroundColor Red
+        exit 1
+    }
+    $afterAdd = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    if (@($afterAdd.entries).Count -ne 2 -or @($afterAdd.entries | Where-Object { $_.name -eq "target fixture" }).Count -ne 1) {
+        Write-Host "FAIL add-observability-evidence.ps1 did not append expected entry." -ForegroundColor Red
+        exit 1
+    }
+    $afterAddResult = Invoke-Validator -ManifestPath $manifestPath -RequireFiles
+    if ($afterAddResult.ExitCode -ne 0) {
+        Write-Host "FAIL manifest after add should validate with files." -ForegroundColor Red
+        Write-Host $afterAddResult.Output -ForegroundColor Red
+        exit 1
+    }
+
+    $duplicateAddFailed = $false
+    try {
+        & $adder `
+            -ManifestPath $manifestPath `
+            -Name "target fixture" `
+            -Kind "prometheus-grafana-smoke" `
+            -SummaryPath $targetSummaryPath `
+            -ReportPath $reportPath `
+            -ExpectedDashboardCount 9 `
+            -Note "fixture target observability evidence" 2>$null | Out-Null
+    }
+    catch {
+        $duplicateAddFailed = ($_.Exception.Message -match "already exists")
+    }
+    if (-not $duplicateAddFailed) {
+        Write-Host "FAIL add-observability-evidence.ps1 should reject duplicate names." -ForegroundColor Red
         exit 1
     }
 }

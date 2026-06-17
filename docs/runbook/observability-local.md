@@ -275,6 +275,20 @@ H:\NexusIM\loadtest-results\<run>\observability-smoke-report.md
 
 summary 会记录 Prometheus rule group 数、Grafana 9 个服务 dashboard UID 覆盖和本地 smoke 边界；若本次同时使用 `-IncludeAlertmanager`，还会记录 Prometheus 发现的 active Alertmanager target。该格式由 `tools/check-observability-smoke-summary.ps1` 自测，并可用 `tools/validate-observability-smoke-summary.ps1` 离线校验已有 summary，不需要 Docker 即可进入 `check-local`。
 
+如果需要把某次本地或目标环境观测 smoke 结果纳入统一证据索引，使用：
+
+```powershell
+.\tools\add-observability-evidence.ps1 `
+  -Name "target observability smoke <date>" `
+  -Kind prometheus-grafana-smoke `
+  -SummaryPath "H:\NexusIM\loadtest-results\<run>\observability-smoke-summary.json" `
+  -ReportPath "H:\NexusIM\loadtest-results\<run>\observability-smoke-report.md" `
+  -ExpectedDashboardCount 9 `
+  -Note "Target Prometheus/Grafana dashboard smoke; not production SLO evidence."
+```
+
+证据索引位于 `docs/runbook/observability-evidence.json`。该索引只保存低敏路径和边界说明，不复制指标内容；可用 `tools/validate-observability-evidence.ps1 -RequireFiles` 复核 H 盘 summary / report 是否仍存在并符合 schema。当前索引只收录已有 policy-service debug metrics smoke；真实目标环境 9 服务 dashboard smoke 仍需要另跑并归档。
+
 如果本机尚未准备 Prometheus / Grafana 镜像，脚本默认失败而不会拉取镜像。确实需要允许拉取时显式使用：
 
 ```powershell

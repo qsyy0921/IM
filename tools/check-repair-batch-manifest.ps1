@@ -5,8 +5,9 @@ $requestWriterPath = Join-Path $PSScriptRoot "write-repair-approval-request.ps1"
 $decisionWriterPath = Join-Path $PSScriptRoot "write-repair-approval-decision.ps1"
 $invokePath = Join-Path $PSScriptRoot "invoke-approved-repair-operator.ps1"
 $batchWriterPath = Join-Path $PSScriptRoot "write-repair-batch-manifest.ps1"
+$batchValidatorPath = Join-Path $PSScriptRoot "validate-repair-batch-manifest.ps1"
 
-foreach ($path in @($plannerPath, $requestWriterPath, $decisionWriterPath, $invokePath, $batchWriterPath)) {
+foreach ($path in @($plannerPath, $requestWriterPath, $decisionWriterPath, $invokePath, $batchWriterPath, $batchValidatorPath)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "Missing repair batch manifest test dependency: $path"
     }
@@ -134,6 +135,26 @@ try {
         }
     }
 
+    $validationPath = Join-Path $tempRoot "batch-validation.json"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $batchValidatorPath `
+        -ManifestPath $manifestPath `
+        -OutputPath $validationPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "validate-repair-batch-manifest.ps1 failed"
+    }
+    $validationRaw = Get-Content -LiteralPath $validationPath -Raw
+    $validation = $validationRaw | ConvertFrom-Json
+    if ($validation.schema_version -ne 1 -or
+        $validation.batch_id -ne "repair-batch-test" -or
+        $validation.item_count -ne 2 -or
+        $validation.valid -ne $true -or
+        $validation.executes -ne $false) {
+        throw "repair batch manifest validation output has unexpected fields."
+    }
+    if ($validationRaw.Contains("do-not-copy-batch-value") -or $validationRaw.Contains("do-not-copy-batch-reason")) {
+        throw "repair batch manifest validation leaked raw environment value or reason text."
+    }
+
     $oldErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
@@ -146,6 +167,22 @@ try {
     }
     if ($duplicateExitCode -eq 0) {
         throw "repair batch manifest should reject duplicate summary files."
+    }
+
+    $tamperedManifestPath = Join-Path $tempRoot "batch-manifest-tampered.json"
+    $tamperedManifest = $manifestRaw | ConvertFrom-Json
+    $tamperedManifest.items[0].plan_sha256 = "tampered"
+    ($tamperedManifest | ConvertTo-Json -Depth 10) | Set-Content -LiteralPath $tamperedManifestPath -Encoding UTF8
+    $ErrorActionPreference = "Continue"
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $batchValidatorPath `
+            -ManifestPath $tamperedManifestPath 2>$null | Out-Null
+        $tamperedExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldErrorActionPreference
+    }
+    if ($tamperedExitCode -eq 0) {
+        throw "repair batch manifest validator should reject tampered summary metadata."
     }
 } finally {
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue

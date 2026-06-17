@@ -54,6 +54,14 @@
 
 批量 manifest 只接受默认预检模式生成的 approved invocation summary，要求每个 item 都是 `execute_requested=false`、`executed=false`。它只保存 summary / plan / request / decision hash、service / mode / command、审批 id 和环境变量名，不保存环境变量值、operator reason 原文或业务数据，也不会执行 operator。它是 first-stage 批量交接文件，给后续正式批量执行编排、审批系统、外部 audit sink 或运维 UI 复用。
 
+本地批量 manifest 校验入口：
+
+```powershell
+.\tools\validate-repair-batch-manifest.ps1 -ManifestPath H:\NexusIM\operator-plans\batch-manifest.json -OutputPath H:\NexusIM\operator-plans\batch-validation.json
+```
+
+校验器会重新读取 manifest 引用的 approved invocation summary，确认 summary hash、approval / decision id、service / mode / command 和 plan / request / decision hash 没有被篡改。它只输出低敏验证摘要，不执行 operator。
+
 ## 使用原则
 
 - 先 audit，后 repair；没有明确 event / outbox / checkpoint / failure 范围时不要 redrive。

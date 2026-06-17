@@ -39,6 +39,17 @@ function Resolve-RepoPath {
     return [System.IO.Path]::GetFullPath((Join-Path $repoRoot $PathValue))
 }
 
+function Get-DiscoveredToolScripts {
+    param(
+        [string[]]$Patterns
+    )
+
+    foreach ($pattern in $Patterns) {
+        Get-ChildItem -LiteralPath (Join-Path $repoRoot "tools") -Filter $pattern -File |
+            ForEach-Object { "tools/$($_.Name)" }
+    }
+}
+
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $catalogFullPath = Resolve-RepoPath $CatalogPath
 Assert-Condition (Test-Path -LiteralPath $catalogFullPath -PathType Leaf) "CatalogPath does not exist: $catalogFullPath"
@@ -120,17 +131,19 @@ $requiredCatalogScripts = @(
     "tools/check-distributed-smoke-evidence.ps1",
     "tools/check-observability-evidence.ps1"
 )
-$discoveredEvidenceGateScripts = Get-ChildItem -LiteralPath (Join-Path $repoRoot "tools") -Filter "check-*evidence*.ps1" -File |
-    ForEach-Object { "tools/$($_.Name)" }
-$discoveredAPIGatewayGateScripts = Get-ChildItem -LiteralPath (Join-Path $repoRoot "tools") -Filter "check-api-gateway-*.ps1" -File |
-    ForEach-Object { "tools/$($_.Name)" }
-$discoveredRepairGateScripts = Get-ChildItem -LiteralPath (Join-Path $repoRoot "tools") -Filter "check-repair-*.ps1" -File |
-    ForEach-Object { "tools/$($_.Name)" }
+$discoveredSecurityGateScripts = Get-DiscoveredToolScripts -Patterns @(
+    "check-api-gateway-*.ps1",
+    "check-repair-*.ps1",
+    "check-*evidence*.ps1",
+    "check-*safety*.ps1",
+    "check-*guard*.ps1",
+    "check-*listener*.ps1",
+    "check-*tls*.ps1",
+    "check-message-compliance-*.ps1"
+)
 $requiredCatalogScripts = @(
     $requiredCatalogScripts +
-    $discoveredEvidenceGateScripts +
-    $discoveredAPIGatewayGateScripts +
-    $discoveredRepairGateScripts
+    $discoveredSecurityGateScripts
 ) |
     Sort-Object -Unique
 foreach ($requiredScript in $requiredCatalogScripts) {

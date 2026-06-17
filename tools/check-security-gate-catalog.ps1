@@ -167,6 +167,24 @@ try {
         exit 1
     }
 
+    $missingRequiredListenerGateCatalog = Join-Path $tempRoot "missing-required-listener-gate-catalog.json"
+    Write-JsonFile -Path $missingRequiredListenerGateCatalog -Value ([ordered]@{
+        schema_version = 1
+        scope = "self-test"
+        entries = @($repoCatalogObject.entries | Where-Object { $_.script -ne "tools/check-public-listener-auth-guards.ps1" })
+    })
+
+    $missingRequiredListenerGateResult = Invoke-Validator -CatalogPath $missingRequiredListenerGateCatalog
+    if ($missingRequiredListenerGateResult.ExitCode -eq 0) {
+        Write-Host "FAIL catalog without a required listener/auth guard should fail." -ForegroundColor Red
+        exit 1
+    }
+    if (-not $missingRequiredListenerGateResult.Output.Contains("tools/check-public-listener-auth-guards.ps1")) {
+        Write-Host "FAIL missing-required-listener-gate catalog returned unexpected error." -ForegroundColor Red
+        Write-Host $missingRequiredListenerGateResult.Output -ForegroundColor Red
+        exit 1
+    }
+
     $missingRequiredEvidenceGateCatalog = Join-Path $tempRoot "missing-required-evidence-gate-catalog.json"
     Write-JsonFile -Path $missingRequiredEvidenceGateCatalog -Value ([ordered]@{
         schema_version = 1

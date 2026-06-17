@@ -490,6 +490,29 @@ WHERE ml.tenant_id = $1
 		approvalRows[0].ConsumedBy != "compliance-admin" {
 		t.Fatalf("unexpected consumed compliance approval rows: %+v", approvalRows)
 	}
+	_, err = repo.ApproveComplianceDelete(ctx, MessageComplianceDeleteApprovalMutationOptions{
+		TenantID:         string(tenantID),
+		ConversationID:   string(appendInput.Command.ConversationID),
+		MessageID:        string(appendResult.MessageID),
+		ApprovalID:       deleteInput.Command.ComplianceApprovalID,
+		ExternalProofRef: deleteInput.Command.ExternalProofRef,
+		OperatorID:       "legal-approver",
+		Reason:           "attempt to resurrect consumed approval",
+		Now:              now.Add(time.Minute),
+	})
+	if !errors.Is(err, types.ErrInvalidMessageState) {
+		t.Fatalf("expected consumed approval re-approve to fail, got %v", err)
+	}
+	approvalRows, err = repo.AuditComplianceDeleteApprovals(ctx, MessageComplianceDeleteApprovalAuditOptions{
+		TenantID:   string(tenantID),
+		ApprovalID: deleteInput.Command.ComplianceApprovalID,
+	})
+	if err != nil {
+		t.Fatalf("audit compliance approval after failed re-approve: %v", err)
+	}
+	if len(approvalRows) != 1 || approvalRows[0].Status != MessageComplianceApprovalStatusConsumed {
+		t.Fatalf("consumed compliance approval should remain consumed, got %+v", approvalRows)
+	}
 }
 
 func TestMessageRepositoryDeleteMessageBlockedByLegalHoldIntegration(t *testing.T) {
@@ -739,6 +762,29 @@ func TestMessageRepositoryComplianceDeleteApprovalSetCancelAuditIntegration(t *t
 		canceled.CanceledAt == nil ||
 		canceled.CanceledBy != "legal-approver" {
 		t.Fatalf("unexpected canceled approval: %+v", canceled)
+	}
+	_, err = repo.ApproveComplianceDelete(ctx, MessageComplianceDeleteApprovalMutationOptions{
+		TenantID:         string(tenantID),
+		ConversationID:   string(appendInput.Command.ConversationID),
+		MessageID:        string(appendResult.MessageID),
+		ApprovalID:       approvalID,
+		ExternalProofRef: "proof://case/set-cancel",
+		OperatorID:       "legal-approver",
+		Reason:           "attempt to resurrect canceled approval",
+		Now:              now.Add(2 * time.Minute),
+	})
+	if !errors.Is(err, types.ErrInvalidMessageState) {
+		t.Fatalf("expected canceled approval re-approve to fail, got %v", err)
+	}
+	canceledRows, err := repo.AuditComplianceDeleteApprovals(ctx, MessageComplianceDeleteApprovalAuditOptions{
+		TenantID:   string(tenantID),
+		ApprovalID: approvalID,
+	})
+	if err != nil {
+		t.Fatalf("audit canceled compliance delete: %v", err)
+	}
+	if len(canceledRows) != 1 || canceledRows[0].Status != MessageComplianceApprovalStatusCanceled {
+		t.Fatalf("canceled compliance approval should remain canceled, got %+v", canceledRows)
 	}
 }
 

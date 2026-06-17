@@ -84,7 +84,7 @@ func (r *MessageRepository) ApproveComplianceDelete(ctx context.Context, options
 	if err := ensureMessageExistsForComplianceApproval(ctx, tx, options); err != nil {
 		return MessageComplianceDeleteApprovalResult{}, err
 	}
-	if err := assertComplianceApprovalIDMatchesMessage(ctx, tx, options); err != nil {
+	if err := assertComplianceApprovalIDReusableForMessage(ctx, tx, options); err != nil {
 		return MessageComplianceDeleteApprovalResult{}, err
 	}
 	if err := lockVerifiedComplianceExternalProof(ctx, tx, options.TenantID, options.ExternalProofRef); err != nil {
@@ -247,15 +247,15 @@ SELECT EXISTS (
 	return nil
 }
 
-func assertComplianceApprovalIDMatchesMessage(ctx context.Context, tx pgx.Tx, options MessageComplianceDeleteApprovalMutationOptions) error {
-	var conversationID, messageID string
+func assertComplianceApprovalIDReusableForMessage(ctx context.Context, tx pgx.Tx, options MessageComplianceDeleteApprovalMutationOptions) error {
+	var conversationID, messageID, status string
 	err := tx.QueryRow(ctx, `
-SELECT conversation_id, message_id
+SELECT conversation_id, message_id, status
 FROM message_compliance_delete_approvals
 WHERE tenant_id = $1
   AND approval_id = $2
 FOR UPDATE
-`, options.TenantID, options.ApprovalID).Scan(&conversationID, &messageID)
+`, options.TenantID, options.ApprovalID).Scan(&conversationID, &messageID, &status)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -264,6 +264,9 @@ FOR UPDATE
 	}
 	if conversationID != options.ConversationID || messageID != options.MessageID {
 		return types.NewIdempotencyConflict("compliance approval id belongs to another message")
+	}
+	if status == MessageComplianceApprovalStatusConsumed || status == MessageComplianceApprovalStatusCanceled {
+		return types.NewInvalidMessageState("terminal compliance delete approval cannot be re-approved")
 	}
 	return nil
 }

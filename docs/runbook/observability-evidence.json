@@ -11,6 +11,14 @@
       "report_path": "docs/runbook/loadtest/policy-service/loadtest-report-20260613-policy-service-observability-smoke.md",
       "require_clean_git": false,
       "note": "First-stage policy-service /debug/metrics smoke; not Prometheus, Grafana, Alertmanager, or production SLO evidence."
+    },
+    {
+      "name": "local observability image prepare 20260617",
+      "kind": "observability-image-prepare-plan",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\observability-image-prepare-20260617-local\\observability-image-prepare-plan.json",
+      "report_path": "H:\\NexusIM\\loadtest-results\\observability-image-prepare-20260617-local\\observability-image-prepare-plan.md",
+      "require_clean_git": false,
+      "note": "Local dry-run image preparation plan for Prometheus/Grafana/Alertmanager; no images were pulled and this is not production observability evidence."
     }
   ]
 }

@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Name,
     [Parameter(Mandatory = $true)]
-    [ValidateSet("service-debug-smoke", "prometheus-grafana-smoke")]
+    [ValidateSet("service-debug-smoke", "prometheus-grafana-smoke", "observability-image-prepare-plan")]
     [string]$Kind,
     [Parameter(Mandatory = $true)]
     [string]$SummaryPath,
@@ -105,7 +105,9 @@ $updated = [ordered]@{
     entries = $entries
 }
 
-$updated | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $resolvedManifestPath -Encoding UTF8
+$json = $updated | ConvertTo-Json -Depth 10
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($resolvedManifestPath, ($json + [Environment]::NewLine), $utf8NoBom)
 
 & $validator -ManifestPath $resolvedManifestPath | Out-Null
 Write-Host "OK   observability evidence entry added: $($Name.Trim())"

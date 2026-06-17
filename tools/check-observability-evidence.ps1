@@ -216,6 +216,58 @@ try {
         exit 1
     }
 
+    $imagePlanDir = Join-Path $tempRoot "image-plan"
+    New-Item -ItemType Directory -Force -Path $imagePlanDir | Out-Null
+    $imagePlanPath = Join-Path $imagePlanDir "observability-image-prepare-plan.json"
+    $imagePlanReportPath = Join-Path $imagePlanDir "observability-image-prepare-plan.md"
+    Write-JsonFile -Path $imagePlanPath -Value ([ordered]@{
+        generated_at_utc = (Get-Date).ToUniversalTime().ToString("o")
+        docker_available = $true
+        include_alertmanager = $true
+        allow_image_pull = $false
+        platform = "linux/arm64"
+        missing_count = 3
+        images = @(
+            [ordered]@{ name = "prometheus"; image = "fixture/prometheus:missing"; status = "missing"; pull_command = "docker pull --platform linux/arm64 fixture/prometheus:missing" },
+            [ordered]@{ name = "grafana"; image = "fixture/grafana:missing"; status = "missing"; pull_command = "docker pull --platform linux/arm64 fixture/grafana:missing" },
+            [ordered]@{ name = "alertmanager"; image = "fixture/alertmanager:missing"; status = "missing"; pull_command = "docker pull --platform linux/arm64 fixture/alertmanager:missing" }
+        )
+        boundary = "local observability image preparation only; does not start containers or prove production observability"
+    })
+    @(
+        "# NexusIM Observability Image Prepare Plan",
+        "",
+        "This is a local observability image preparation plan. It is not a production SLO claim.",
+        "",
+        "| Image role | Image | Status | Pull command |",
+        "| --- | --- | --- | --- |",
+        "| prometheus | `fixture/prometheus:missing` | missing | `docker pull --platform linux/arm64 fixture/prometheus:missing` |",
+        "| grafana | `fixture/grafana:missing` | missing | `docker pull --platform linux/arm64 fixture/grafana:missing` |",
+        "| alertmanager | `fixture/alertmanager:missing` | missing | `docker pull --platform linux/arm64 fixture/alertmanager:missing` |"
+    ) | Set-Content -LiteralPath $imagePlanReportPath -Encoding UTF8
+
+    try {
+        & $adder `
+            -ManifestPath $manifestPath `
+            -Name "image prepare fixture" `
+            -Kind "observability-image-prepare-plan" `
+            -SummaryPath $imagePlanPath `
+            -ReportPath $imagePlanReportPath `
+            -Note "fixture local observability image preparation evidence" 2>&1 | Out-Null
+    }
+    catch {
+        Write-Host "FAIL add-observability-evidence.ps1 should append image prepare fixture." -ForegroundColor Red
+        Write-Host $_.Exception.Message -ForegroundColor Red
+        exit 1
+    }
+
+    $afterImagePlanResult = Invoke-Validator -ManifestPath $manifestPath -RequireFiles
+    if ($afterImagePlanResult.ExitCode -ne 0) {
+        Write-Host "FAIL manifest after image prepare add should validate with files." -ForegroundColor Red
+        Write-Host $afterImagePlanResult.Output -ForegroundColor Red
+        exit 1
+    }
+
     $duplicateAddFailed = $false
     try {
         & $adder `

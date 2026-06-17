@@ -107,6 +107,24 @@ function Validate-PrometheusGrafanaSmoke {
     }
 }
 
+function Validate-ObservabilityImagePreparePlan {
+    param(
+        [string]$SummaryPath,
+        [bool]$RequireReport
+    )
+
+    $validator = Join-Path $PSScriptRoot "validate-observability-image-prepare-plan.ps1"
+    Assert-Condition (Test-Path -LiteralPath $validator -PathType Leaf) "Missing observability image prepare plan validator: $validator"
+
+    $args = @{
+        PlanPath = $SummaryPath
+    }
+    if ($RequireReport) {
+        $args.RequireReport = $true
+    }
+    & $validator @args | Out-Null
+}
+
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $resolvedManifestPath = Resolve-RepoPath $ManifestPath
 Assert-Condition (Test-Path -LiteralPath $resolvedManifestPath -PathType Leaf) "ManifestPath does not exist: $resolvedManifestPath"
@@ -116,7 +134,7 @@ Assert-Condition ([int]$manifest.schema_version -eq 1) "observability evidence s
 Assert-Condition ((Get-JsonPropertyString -Object $manifest -Name "scope").Length -gt 0) "observability evidence scope is required."
 Assert-Condition (@($manifest.entries).Count -gt 0) "observability evidence entries are required."
 
-$knownKinds = @("service-debug-smoke", "prometheus-grafana-smoke")
+$knownKinds = @("service-debug-smoke", "prometheus-grafana-smoke", "observability-image-prepare-plan")
 $seenNames = @{}
 $validatedFiles = 0
 $entryResults = @()
@@ -153,6 +171,9 @@ foreach ($entry in @($manifest.entries)) {
             }
             "prometheus-grafana-smoke" {
                 Validate-PrometheusGrafanaSmoke -Entry $entry -SummaryPath $resolvedSummaryPath
+            }
+            "observability-image-prepare-plan" {
+                Validate-ObservabilityImagePreparePlan -SummaryPath $resolvedSummaryPath -RequireReport ($reportPath.Length -gt 0)
             }
         }
         $validatedFiles++

@@ -12,6 +12,7 @@ $checkLocal = [System.IO.File]::ReadAllText($checkLocalPath, [System.Text.Encodi
 $indirectChecks = @{
     "check-api-gateway-legacy-descriptor-migration.ps1" = "check-api-gateway-gates.ps1"
     "check-api-gateway-legacy-observation-window.ps1" = "check-api-gateway-gates.ps1"
+    "check-api-gateway-legacy-removal-plan.ps1" = "check-api-gateway-gates.ps1"
     "check-api-gateway-quota-snapshot.ps1" = "check-api-gateway-gates.ps1"
 }
 

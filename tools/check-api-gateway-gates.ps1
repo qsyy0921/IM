@@ -5,6 +5,7 @@ $quotaGate = Join-Path $PSScriptRoot "check-api-gateway-quota-snapshot.ps1"
 $legacyGate = Join-Path $PSScriptRoot "check-api-gateway-legacy-descriptor-migration.ps1"
 $legacyObservation = Join-Path $PSScriptRoot "record-api-gateway-legacy-observation.ps1"
 $legacyObservationWindow = Join-Path $PSScriptRoot "check-api-gateway-legacy-observation-window.ps1"
+$legacyRemovalPlanCheck = Join-Path $PSScriptRoot "check-api-gateway-legacy-removal-plan.ps1"
 $powerShellExe = (Get-Command powershell -ErrorAction Stop).Source
 $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("nexusim-api-gateway-gates-" + [System.Guid]::NewGuid().ToString("N"))
 
@@ -264,6 +265,12 @@ try {
         "-MaxObservationGap", "1000s",
         "-MinObservations", "2",
         "-NowUnixMS", "900000"
+    )
+
+    Invoke-GateExpectPass -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $legacyRemovalPlanCheck
     )
 }
 finally {

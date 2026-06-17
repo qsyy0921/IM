@@ -92,6 +92,23 @@ try {
         }
         exit 1
     }
+
+    Remove-Item -LiteralPath $commentOnly -Force
+    $repoLocalReference = Join-Path $tempRoot "loadtest\demo\main.go"
+    Set-FixtureFile -Path $repoLocalReference -Lines @(
+        "package main",
+        "",
+        "const badDefaultResultRoot = ""loadtest/results/demo"""
+    )
+
+    $repoLocalReferenceResult = Invoke-OutputPathCheck -RepoRoot $tempRoot
+    if ($repoLocalReferenceResult.ExitCode -eq 0 -or $repoLocalReferenceResult.Output -notmatch "repo-local loadtest results path") {
+        Write-Host "FAIL fixture with repo-local loadtest results path should fail loadtest output path guard." -ForegroundColor Red
+        if ($repoLocalReferenceResult.Output) {
+            Write-Host $repoLocalReferenceResult.Output -ForegroundColor Red
+        }
+        exit 1
+    }
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) {
@@ -99,4 +116,4 @@ finally {
     }
 }
 
-Write-Host "OK   loadtest output path guard self-test covers helper and active guard requirements."
+Write-Host "OK   loadtest output path guard self-test covers helper, active guard, and repo-local path requirements."

@@ -413,6 +413,18 @@ func TestRepositoryTenantContactRequestSourcePolicyBlocksRequestsIntegration(t *
 		t.Fatalf("unexpected review result: %+v", reviewResult)
 	}
 	assertContactRequestReviewAuditCount(t, ctx, pool, searchResult.RequestID, 1)
+	_, err = repository.ReviewContactRequest(ctx, types.ReviewContactRequestCommand{
+		TenantID:  "tenant-contacts",
+		RequestID: searchResult.RequestID,
+		Decision:  types.ContactRequestReviewDecisionDecline,
+		Operator:  "operator-2",
+		Reason:    "attempt reverse decision after approve",
+	})
+	if !errors.Is(err, types.ErrContactRequestConflict) {
+		t.Fatalf("expected reverse review decision after approve conflict, got %v", err)
+	}
+	assertContactRequestReviewAuditCount(t, ctx, pool, searchResult.RequestID, 1)
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestDeclined, 0)
 	accepted, err := repository.RespondContactRequest(ctx, respondCommand("bob", searchResult.RequestID, "respond-after-review", types.ContactDecisionAccept))
 	if err != nil {
 		t.Fatalf("accept approved contact request: %v", err)
@@ -470,6 +482,18 @@ func TestRepositoryReviewContactRequestDeclineIntegration(t *testing.T) {
 	assertContactRequestReviewAuditCount(t, ctx, pool, sendResult.RequestID, 1)
 	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestDeclined, 1)
 	assertNoContactEdges(t, ctx, pool)
+	_, err = repository.ReviewContactRequest(ctx, types.ReviewContactRequestCommand{
+		TenantID:  "tenant-contacts",
+		RequestID: sendResult.RequestID,
+		Decision:  types.ContactRequestReviewDecisionApprove,
+		Operator:  "operator-2",
+		Reason:    "attempt reverse decision after decline",
+	})
+	if !errors.Is(err, types.ErrContactRequestConflict) {
+		t.Fatalf("expected reverse review decision after decline conflict, got %v", err)
+	}
+	assertContactRequestReviewAuditCount(t, ctx, pool, sendResult.RequestID, 1)
+	assertContactsOutboxCount(t, ctx, pool, eventTypeContactRequestDeclined, 1)
 
 	_, err = repository.RespondContactRequest(ctx, respondCommand("bob", sendResult.RequestID, "respond-after-review-decline", types.ContactDecisionAccept))
 	if !errors.Is(err, types.ErrContactRequestConflict) {

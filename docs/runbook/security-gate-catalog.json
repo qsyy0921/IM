@@ -111,6 +111,20 @@
       "script": "tools/check-approved-repair-invocation.ps1",
       "check_local_label": "approved repair invocation",
       "note": "Approved repair invocation defaults to preflight and must not silently mutate data."
+    },
+    {
+      "name": "raw evidence output path guard",
+      "category": "evidence-safety",
+      "script": "tools/check-loadtest-output-paths.ps1",
+      "check_local_label": "loadtest output paths",
+      "note": "Smoke/loadtest ResultRoot and OutputRoot writers must reject repository-local raw evidence output paths."
+    },
+    {
+      "name": "external output root safety helper",
+      "category": "evidence-safety",
+      "script": "tools/check-output-root-safety.ps1",
+      "check_local_label": "output root safety helper",
+      "note": "Shared output-root helper must reject empty and repository-local raw evidence roots while allowing external scratch paths."
     }
   ]
 }

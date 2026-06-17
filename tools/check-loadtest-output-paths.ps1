@@ -82,10 +82,10 @@ foreach ($file in ($files | Sort-Object FullName)) {
     }
 
     $fileText = Get-Content -LiteralPath $file.FullName -Raw
-    if ($fileText -match "\[string\]\`$ResultRoot" -and $fileText -notmatch "Assert-ExternalOutputRoot") {
+    if ($fileText -match "\[string\]\`$(ResultRoot|OutputRoot)" -and $fileText -notmatch "Assert-ExternalOutputRoot") {
         $guardFailures += [pscustomobject]@{
             Path = $relativePath
-            Text = "ResultRoot writer is missing Assert-ExternalOutputRoot"
+            Text = "ResultRoot/OutputRoot writer is missing Assert-ExternalOutputRoot"
         }
     }
 
@@ -110,8 +110,8 @@ foreach ($failure in $failures) {
 }
 
 if ($guardFailures.Count -gt 0 -or $failures.Count -gt 0) {
-    Write-Host "Raw loadtest output must default to $ExpectedResultRoot, and ResultRoot writers must reject repository-local output roots." -ForegroundColor Red
+    Write-Host "Raw loadtest output must default to $ExpectedResultRoot, and ResultRoot/OutputRoot writers must reject repository-local output roots." -ForegroundColor Red
     exit 1
 }
 
-Write-Host "OK   loadtest output defaults and ResultRoot guards keep raw output outside the repository; expected raw root is $ExpectedResultRoot."
+Write-Host "OK   loadtest output defaults and ResultRoot/OutputRoot guards keep raw output outside the repository; expected raw root is $ExpectedResultRoot."

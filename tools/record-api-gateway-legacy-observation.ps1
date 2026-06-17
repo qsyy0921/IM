@@ -16,6 +16,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "repair-operator-safety.ps1")
+. (Join-Path $PSScriptRoot "output-root-safety.ps1")
 
 function Convert-DurationToMilliseconds {
     param([string]$Value)
@@ -86,26 +87,6 @@ function Assert-LowSensitiveMetricsUrl {
     }
 }
 
-function Assert-ObservationOutputRootOutsideRepository {
-    param(
-        [string]$Value,
-        [string]$RepositoryRoot
-    )
-
-    if ([string]::IsNullOrWhiteSpace($Value)) {
-        throw "OutputRoot is required."
-    }
-
-    $fullOutputRoot = [System.IO.Path]::GetFullPath($Value)
-    $fullRepositoryRoot = [System.IO.Path]::GetFullPath($RepositoryRoot).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
-    $repositoryPrefix = $fullRepositoryRoot + [System.IO.Path]::DirectorySeparatorChar
-
-    if ($fullOutputRoot.Equals($fullRepositoryRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
-        $fullOutputRoot.StartsWith($repositoryPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "OutputRoot must not be inside the repository. Store raw api-gateway observation output under H:\NexusIM\loadtest-results or another external scratch directory."
-    }
-}
-
 function Add-Argument {
     param(
         [System.Collections.Generic.List[string]]$Arguments,
@@ -122,7 +103,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $legacyGate = Join-Path $PSScriptRoot "check-api-gateway-legacy-descriptor-migration.ps1"
 $powerShellExe = (Get-Command powershell -ErrorAction Stop).Source
 
-Assert-ObservationOutputRootOutsideRepository -Value $OutputRoot -RepositoryRoot $repoRoot
+Assert-ExternalOutputRoot -Value $OutputRoot -RepositoryRoot $repoRoot -Name "OutputRoot"
 
 if ([string]::IsNullOrWhiteSpace($RunName)) {
     $RunName = "api-gateway-legacy-observation-" + (Get-Date -Format "yyyyMMdd-HHmmss")

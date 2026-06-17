@@ -49,4 +49,17 @@ Assert-Fails -Path $repoRoot -ExpectedPattern "must not be inside the repository
 Assert-Fails -Path (Join-Path $repoRoot "loadtest\results\bad") -ExpectedPattern "must not be inside the repository" -Message "Repository child output root should be rejected."
 Assert-Fails -Path "   " -ExpectedPattern "must not be empty" -Message "Blank output root should be rejected."
 
+try {
+    Assert-ExternalOutputRoot -Value (Join-Path $repoRoot "tmp-observation") -RepositoryRoot $repoRoot -Name "OutputRoot"
+    Write-Host "FAIL OutputRoot name should be included in repository child rejection." -ForegroundColor Red
+    exit 1
+}
+catch {
+    if ($_.Exception.Message -notmatch "OutputRoot must not be inside the repository") {
+        Write-Host "FAIL OutputRoot rejection returned unexpected error." -ForegroundColor Red
+        Write-Host $_.Exception.Message -ForegroundColor Red
+        exit 1
+    }
+}
+
 Write-Host "OK   output root safety helper self-test"

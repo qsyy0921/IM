@@ -16,6 +16,8 @@
 
 审批请求、审批决定、批量 manifest 和 audit bundle 中的 `requested_by` / `decided_by` / `generated_by` 也只允许低敏 operator id，例如 `operator-a` 或 `approver_1`。不要写邮箱、手机号、Bearer token、session id 或自由文本；详细原因放 `ReasonFile`，最终 JSON 只保存 reason hash。
 
+新增 repair 交接 writer 时必须复用 `tools/repair-operator-safety.ps1`，并由 `tools/check-repair-operator-safety.ps1` 纳入 `check-local`，避免低敏 actor / ad-hoc env / hash 规则在多个脚本里漂移。
+
 `tools/check-repair-operator-catalog-plannable.ps1` 会遍历 `repair-operators.catalog.json` 中的所有 service / mode，确认它们都能生成非执行 plan，避免新增 operator 后只更新 Markdown、漏更新机器可读 catalog 或 plan writer。
 
 本地审批请求生成入口：

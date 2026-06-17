@@ -35,7 +35,7 @@ function Assert-LowSensitiveRepairAdHocEnv {
         [string]$Value
     )
 
-    if ($Key -notmatch "^[A-Z][A-Z0-9_]*$") {
+    if ($Key -cnotmatch "^[A-Z][A-Z0-9_]*$") {
         throw "Env key must be an uppercase environment variable name: $Key"
     }
 

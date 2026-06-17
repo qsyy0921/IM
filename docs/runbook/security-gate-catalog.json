@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-06-17",
+  "updated_at": "2026-06-18",
   "scope": "Local startup/security boundary gate catalog for NexusIM. These gates protect local development and CI-style checks; they are not a substitute for production identity, network policy, mTLS rollout, or external audit controls.",
   "entries": [
     {
@@ -174,6 +174,34 @@
       "script": "tools/check-message-compliance-proof-manifest.ps1",
       "check_local_label": "message compliance proof manifest",
       "note": "Message compliance proof manifests must contain only external proof references and hashes, not raw proof bodies."
+    },
+    {
+      "name": "capacity baseline evidence manifest",
+      "category": "evidence-safety",
+      "script": "tools/check-capacity-baseline-evidence.ps1",
+      "check_local_label": "capacity baseline evidence",
+      "note": "Capacity baseline evidence manifests must reference H-drive raw summaries and repository runbook reports with low-sensitive metadata."
+    },
+    {
+      "name": "resource snapshot evidence manifest",
+      "category": "evidence-safety",
+      "script": "tools/check-resource-snapshot-evidence.ps1",
+      "check_local_label": "resource snapshot evidence",
+      "note": "Resource snapshot evidence manifests must keep raw snapshots outside the repository while indexing only low-sensitive summaries and reports."
+    },
+    {
+      "name": "distributed smoke evidence manifest",
+      "category": "evidence-safety",
+      "script": "tools/check-distributed-smoke-evidence.ps1",
+      "check_local_label": "distributed smoke evidence",
+      "note": "Distributed smoke evidence manifests must keep raw plans and summaries outside the repository and only retain low-sensitive references."
+    },
+    {
+      "name": "observability evidence manifest",
+      "category": "evidence-safety",
+      "script": "tools/check-observability-evidence.ps1",
+      "check_local_label": "observability evidence",
+      "note": "Observability evidence manifests must keep local raw plans under the external result root while repository reports stay in runbook paths."
     }
   ]
 }

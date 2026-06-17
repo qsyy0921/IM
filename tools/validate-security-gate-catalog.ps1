@@ -113,7 +113,11 @@ $requiredCatalogScripts = @(
     "tools/check-loadtest-output-paths.ps1",
     "tools/check-output-root-safety.ps1",
     "tools/check-evidence-metadata-safety.ps1",
-    "tools/check-message-compliance-proof-manifest.ps1"
+    "tools/check-message-compliance-proof-manifest.ps1",
+    "tools/check-capacity-baseline-evidence.ps1",
+    "tools/check-resource-snapshot-evidence.ps1",
+    "tools/check-distributed-smoke-evidence.ps1",
+    "tools/check-observability-evidence.ps1"
 )
 foreach ($requiredScript in $requiredCatalogScripts) {
     Assert-Condition ($catalogScripts.ContainsKey($requiredScript.Replace("\", "/"))) "security gate catalog missing required gate script: $requiredScript"

@@ -21,9 +21,9 @@
 - PostgreSQL repository 已按当前窗口成员列表、成员变更写路径、发布推进和通用工具同 package 拆分，避免主 `repository.go` 继续承载所有 SQL helper。
 - PostgreSQL owner-transfer、成员列表、成员变更 / 发布推进集成测试已拆到独立同 package 文件，避免成员变更、owner transfer、成员列表和发布推进场景继续堆进单个仓储测试文件。
 - `loadtest/memberchange` summary 已输出 `capacity_summary`，包含运行时长、VUs、请求 / 成功 / 错误计数、成功率、RPS、latency avg/p95/p99、成员变更类型、saga / timeline / outbox / roster / conversation_seq 聚合；后续容量验证可直接复用该结构。
-- `loadtest/capacityseed` 已能准备 `tenant-capacity-conversation` 下的 ACTIVE owner fixture；`capacity-baseline-seeded-20260616` 本地 seeded 短基线中 `memberchange` 成功 214、`requests_per_second=42.8`，报告见 `loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md`。
+- `loadtest/capacityseed` 已能准备 `tenant-capacity-conversation` 下的 ACTIVE owner fixture；`capacity-baseline-seeded-20260616` 本地 seeded 短基线中 `memberchange` 成功 214、`requests_per_second=42.8`，报告见 `loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md`；`conversation-service-longrun-slice-20260618` 本地 seeded 30m 长跑中 `success_count=51633`、`success_rate=99.998%`、`requests_per_second=28.686`，报告见 `loadtest/conversation-service/loadtest-report-20260618-conversation-longrun-slice.md`。
 
 ## 后续
 
 - 更完整群管理、owner transfer 策略继续打磨；完整历史窗口 / targeted replay repair 仍需后续设计，当前 `member-window-audit` 已能发现 owner 数量异常，但 `member-window-repair` 只修 conversation-service 当前窗口 cache 中可保守推导的窗口 / 版本问题，不自动修复 owner 数量冲突。
-- OTel collector / 生产级 alerting / SLO dashboard、长时间容量曲线仍属于后续统一观测治理。
+- OTel collector / 生产级 alerting / SLO dashboard、更完整容量曲线仍属于后续统一观测治理。

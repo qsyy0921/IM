@@ -24,6 +24,14 @@
                         "note":  "message-service seeded SendMessage 30m local long-run slice with 4 VUs and seeded active members; local evidence only, not production sizing.",
                         "summary_path":  "H:\\NexusIM\\loadtest-results\\capacity-longrun-nine-services-20260618-plan\\message-service\\capacity-longrun-campaign-summary.json",
                         "report_path":  "docs\\runbook\\loadtest\\message-service\\loadtest-report-20260618-message-longrun-slice.md"
+                    },
+                    {
+                        "name":  "conversation-service-longrun-slice-20260618",
+                        "status":  "completed",
+                        "plan_path":  "H:\\NexusIM\\loadtest-results\\capacity-longrun-nine-services-20260618-plan\\capacity-longrun-campaign-plan.json",
+                        "note":  "conversation-service seeded CreateMemberChange JOIN 30m local long-run slice with 4 VUs and a seeded ACTIVE owner; local evidence only, not production sizing.",
+                        "summary_path":  "H:\\NexusIM\\loadtest-results\\capacity-longrun-nine-services-20260618-plan\\conversation-service\\capacity-longrun-campaign-summary.json",
+                        "report_path":  "docs\\runbook\\loadtest\\conversation-service\\loadtest-report-20260618-conversation-longrun-slice.md"
                     }
                 ]
 }

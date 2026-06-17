@@ -68,6 +68,9 @@ try {
     Write-Host "== repair audit bundle =="
     Invoke-LocalCheck "check-repair-audit-bundle.ps1"
 
+    Write-Host "== message compliance proof manifest =="
+    Invoke-LocalCheck "check-message-compliance-proof-manifest.ps1"
+
     Write-Host "== ddd boundaries =="
     Invoke-LocalCheck "check-ddd-boundaries.ps1"
 

@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-06-18",
+  "scope": "Local long-run capacity campaign evidence index for NexusIM. Planned entries reference external campaign plans; completed entries reference external raw summaries plus repository runbook reports. This is not a production SLO or sizing proof.",
+  "entries": []
+}

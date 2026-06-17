@@ -198,6 +198,13 @@
       "note": "Capacity baseline evidence manifests must reference H-drive raw summaries and repository runbook reports with low-sensitive metadata."
     },
     {
+      "name": "capacity long-run campaign evidence manifest",
+      "category": "evidence-safety",
+      "script": "tools/check-capacity-longrun-campaign-evidence.ps1",
+      "check_local_label": "capacity long-run campaign evidence",
+      "note": "Long-run capacity campaign evidence must reference external plans and raw summaries while repository reports stay low-sensitive."
+    },
+    {
       "name": "resource snapshot evidence manifest",
       "category": "evidence-safety",
       "script": "tools/check-resource-snapshot-evidence.ps1",

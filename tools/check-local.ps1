@@ -56,6 +56,9 @@ try {
     Write-Host "== approved repair invocation =="
     Invoke-LocalCheck "check-approved-repair-invocation.ps1"
 
+    Write-Host "== repair batch manifest =="
+    Invoke-LocalCheck "check-repair-batch-manifest.ps1"
+
     Write-Host "== ddd boundaries =="
     Invoke-LocalCheck "check-ddd-boundaries.ps1"
 

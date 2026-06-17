@@ -46,6 +46,14 @@
 
 默认只做审批链校验并输出低敏执行摘要，不执行 operator。显式加 `-Execute` 才会按 plan 设置环境变量并运行服务 operator；如果 plan 没有 `*_DRY_RUN=true`，还必须额外加 `-AllowMutating`，避免误执行 mutate / cleanup。
 
+本地批量 repair manifest 生成入口：
+
+```powershell
+.\tools\write-repair-batch-manifest.ps1 -InvocationSummaryPath H:\NexusIM\operator-plans\invoke-1.json,H:\NexusIM\operator-plans\invoke-2.json -RequestedBy operator-a -ReasonFile H:\NexusIM\operator-plans\batch-reason.txt -OutputPath H:\NexusIM\operator-plans\batch-manifest.json
+```
+
+批量 manifest 只接受默认预检模式生成的 approved invocation summary，要求每个 item 都是 `execute_requested=false`、`executed=false`。它只保存 summary / plan / request / decision hash、service / mode / command、审批 id 和环境变量名，不保存环境变量值、operator reason 原文或业务数据，也不会执行 operator。它是 first-stage 批量交接文件，给后续正式批量执行编排、审批系统、外部 audit sink 或运维 UI 复用。
+
 ## 使用原则
 
 - 先 audit，后 repair；没有明确 event / outbox / checkpoint / failure 范围时不要 redrive。
@@ -199,6 +207,6 @@ go run ./services/delivery-service/cmd/delivery-service
 ## 仍未完成
 
 - 跨服务统一 repair runbook 的执行编排。
-- 批量 repair 审批流和运维 UI。
+- 正式批量 repair 执行编排、审批系统和运维 UI。
 - 外部 audit sink。
 - 更细 poison payload 分类和长期 retention 策略。

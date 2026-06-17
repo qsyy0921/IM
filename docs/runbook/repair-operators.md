@@ -142,6 +142,8 @@ go run ./services/delivery-service/cmd/delivery-service
 
 `contacts-service` 的 `outbox-repair` 额外支持 `NEXUSIM_CONTACTS_OUTBOX_REPAIR_REASON_FILE` 读取 repair reason 原文，避免把 reason 写进 operator plan / shell env。
 
+`policy-service` 的 `outbox-repair` 额外支持 `NEXUSIM_POLICY_OUTBOX_REPAIR_REASON_FILE` 读取 repair reason 原文，避免把 reason 写进 operator plan / shell env。
+
 以下服务的 `outbox-repair-audit` 支持写低敏 JSON 结果，便于 operator 留存证据，不写 Kafka 原始错误正文或业务 payload；并统一支持按 `repaired_at` RFC3339 时间窗口过滤，在 JSON 中写 compacted filters：
 
 | 服务 | JSON 输出环境变量 |
@@ -186,7 +188,7 @@ go run ./services/delivery-service/cmd/delivery-service
 
 `policy-service` 还提供只读 `decision-audit-export`，用于把 `policy_decision_audit_outbox` 中的低敏决策审计行导出为 JSON，支持按 tenant / event / action / allowed / classification / reason_code / outbox status / created_at RFC3339 时间窗口过滤；可选 `NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_OUTPUT` 写结果。输出只包含 stable key、决策元数据、trace/request id 和 outbox 发布状态，不输出消息正文、provider body、payload_json 或用户原始标识。它是 first-stage 本地审计交接文件，不等于 provider-grade 外部 audit sink。
 
-`policy-service` 还提供 `tenant-quota-audit` / `tenant-quota-set`，用于审计和设置 first-stage tenant action quota。quota 按 tenant / action / window_seconds 统计已允许的历史 policy decision，达到 `max_decisions` 后 fail-closed deny；`tenant-quota-audit` 可选 `NEXUSIM_POLICY_TENANT_QUOTA_AUDIT_OUTPUT` 写低敏 JSON，`tenant-quota-set` 可选 `NEXUSIM_POLICY_TENANT_QUOTA_SET_OUTPUT` 写低敏 JSON。输出只包含配置元数据和 reason-present，不输出 operator reason 原文。该能力不是 provider-grade tenant DSL / billing quota。
+`policy-service` 还提供 `tenant-quota-audit` / `tenant-quota-set`，用于审计和设置 first-stage tenant action quota。quota 按 tenant / action / window_seconds 统计已允许的历史 policy decision，达到 `max_decisions` 后 fail-closed deny；`tenant-quota-audit` 可选 `NEXUSIM_POLICY_TENANT_QUOTA_AUDIT_OUTPUT` 写低敏 JSON，`tenant-quota-set` 可选 `NEXUSIM_POLICY_TENANT_QUOTA_SET_OUTPUT` 写低敏 JSON。`tenant-quota-set` 支持 `NEXUSIM_POLICY_TENANT_QUOTA_SET_REASON_FILE` 读取 operator reason 原文，避免把 reason 写进 operator plan / shell env；输出只包含配置元数据和 reason-present，不输出 operator reason 原文。该能力不是 provider-grade tenant DSL / billing quota。
 
 ## Delivery Projection
 

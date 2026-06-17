@@ -211,7 +211,14 @@ func runOutboxRepair() error {
 
 	eventIDs := splitCSV(os.Getenv("NEXUSIM_POLICY_OUTBOX_REPAIR_EVENT_IDS"))
 	operator := envString("NEXUSIM_POLICY_OUTBOX_REPAIR_OPERATOR", "local-operator")
-	reason := envString("NEXUSIM_POLICY_OUTBOX_REPAIR_REASON", "manual policy audit outbox repair")
+	reason, err := policyOperatorReasonFromEnv(
+		"NEXUSIM_POLICY_OUTBOX_REPAIR_REASON",
+		"NEXUSIM_POLICY_OUTBOX_REPAIR_REASON_FILE",
+		"manual policy audit outbox repair",
+	)
+	if err != nil {
+		return err
+	}
 	stats, err := postgresinfra.NewOutboxStore(pool).RepairDLQEvents(ctx, eventIDs, operator, reason, validatePolicyAuditOutboxMessage)
 	if err != nil {
 		return err
@@ -512,6 +519,14 @@ func runTenantQuotaSet() error {
 	if !enabledConfigured {
 		enabled = true
 	}
+	reason, err := policyOperatorReasonFromEnv(
+		"NEXUSIM_POLICY_TENANT_QUOTA_SET_REASON",
+		"NEXUSIM_POLICY_TENANT_QUOTA_SET_REASON_FILE",
+		"",
+	)
+	if err != nil {
+		return err
+	}
 	pool, err := openPGPool(ctx, dsn)
 	if err != nil {
 		return err
@@ -525,7 +540,7 @@ func runTenantQuotaSet() error {
 		WindowSeconds:     int(window.Seconds()),
 		PermissionVersion: permissionVersion,
 		Classification:    envString("NEXUSIM_POLICY_TENANT_QUOTA_SET_CLASSIFICATION", ""),
-		Reason:            envString("NEXUSIM_POLICY_TENANT_QUOTA_SET_REASON", ""),
+		Reason:            reason,
 		Enabled:           enabled,
 		Source:            envString("NEXUSIM_POLICY_TENANT_QUOTA_SET_SOURCE", "manual"),
 	})

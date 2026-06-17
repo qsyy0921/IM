@@ -12,6 +12,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "repair-operator-safety.ps1")
+
 $expandedEvidencePaths = @()
 foreach ($pathEntry in $EvidencePath) {
     foreach ($pathPart in ([string]$pathEntry -split ",")) {
@@ -26,18 +28,6 @@ if ($expandedEvidencePaths.Count -eq 0) {
 }
 if ([string]::IsNullOrWhiteSpace($BundleID)) {
     $BundleID = "repair-audit-bundle-" + [System.Guid]::NewGuid().ToString("N")
-}
-
-function Get-Sha256Hex {
-    param([byte[]]$Bytes)
-
-    $sha = [System.Security.Cryptography.SHA256]::Create()
-    try {
-        $hash = $sha.ComputeHash($Bytes)
-    } finally {
-        $sha.Dispose()
-    }
-    return -join ($hash | ForEach-Object { $_.ToString("x2") })
 }
 
 function Get-RepairEvidenceKind {
@@ -67,24 +57,7 @@ function Get-RepairEvidenceKind {
     return "unknown_json"
 }
 
-function Assert-LowSensitiveActor {
-    param(
-        [string]$Value,
-        [string]$FieldName
-    )
-
-    if ([string]::IsNullOrWhiteSpace($Value)) {
-        throw "$FieldName is required."
-    }
-    if ($Value.Length -gt 64 -or $Value -notmatch "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$") {
-        throw "$FieldName must be a low-sensitive operator id using letters, digits, dot, underscore, or dash."
-    }
-    if ($Value -match "(?i)(password|passwd|secret|token|bearer|credential|api[_-]?key|access[_-]?key|refresh|session|cookie|sk-|eyJ)") {
-        throw "$FieldName must be a low-sensitive operator id, not a credential-like value."
-    }
-}
-
-Assert-LowSensitiveActor -Value $GeneratedBy -FieldName "GeneratedBy"
+Assert-LowSensitiveRepairActor -Value $GeneratedBy -FieldName "GeneratedBy"
 
 $reasonPresent = $false
 $reasonHash = ""
@@ -95,7 +68,7 @@ if (-not [string]::IsNullOrWhiteSpace($ReasonFile)) {
     $reasonBytes = [System.IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $ReasonFile))
     $reasonPresent = $reasonBytes.Length -gt 0
     if ($reasonPresent) {
-        $reasonHash = Get-Sha256Hex -Bytes $reasonBytes
+        $reasonHash = Get-RepairSha256Hex -Bytes $reasonBytes
     }
 }
 
@@ -111,7 +84,7 @@ foreach ($evidencePath in $expandedEvidencePaths) {
     $resolvedPath = [string](Resolve-Path -LiteralPath $evidencePath)
     $raw = Get-Content -LiteralPath $resolvedPath -Raw
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($raw)
-    $hash = Get-Sha256Hex -Bytes $bytes
+    $hash = Get-RepairSha256Hex -Bytes $bytes
     if ($seenHashes.ContainsKey($hash)) {
         throw "Duplicate repair audit evidence content: $resolvedPath"
     }

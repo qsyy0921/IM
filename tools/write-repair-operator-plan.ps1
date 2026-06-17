@@ -15,6 +15,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "repair-operator-safety.ps1")
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $catalogPath = Join-Path $repoRoot "docs\runbook\repair-operators.catalog.json"
 
@@ -66,27 +68,6 @@ function Convert-ToStringList {
     return ,$list
 }
 
-function Assert-LowSensitiveAdHocEnv {
-    param(
-        [string]$Key,
-        [string]$Value
-    )
-
-    if ($Key -notmatch "^[A-Z][A-Z0-9_]*$") {
-        throw "Env key must be an uppercase environment variable name: $Key"
-    }
-
-    $sensitiveKeyPattern = "(?i)(PASSWORD|PASSWD|SECRET|TOKEN|BEARER|PRIVATE|CREDENTIAL|API[_-]?KEY|ACCESS[_-]?KEY|REFRESH|SESSION|COOKIE)"
-    if ($Key -match $sensitiveKeyPattern) {
-        throw "Refusing to write potentially sensitive Env key into repair operator plan: $Key"
-    }
-
-    $sensitiveValuePattern = "(?i)(bearer\s+\S+|password\s*=|secret\s*=|token\s*=|sk-[A-Za-z0-9_-]{8,}|eyJ[A-Za-z0-9_-]+\.)"
-    if ($Value -match $sensitiveValuePattern) {
-        throw "Refusing to write potentially sensitive Env value into repair operator plan: $Key"
-    }
-}
-
 $outputEnvSet = Convert-ToSet @($serviceSpec.output_envs)
 $dryRunEnvSet = Convert-ToSet @($serviceSpec.dry_run_envs)
 
@@ -127,7 +108,7 @@ foreach ($entry in @($Env)) {
     if ($parts.Count -ne 2 -or [string]::IsNullOrWhiteSpace($parts[0])) {
         throw "Env entries must use KEY=VALUE format: $entry"
     }
-    Assert-LowSensitiveAdHocEnv -Key $parts[0] -Value $parts[1]
+    Assert-LowSensitiveRepairAdHocEnv -Key $parts[0] -Value $parts[1]
     $environment[$parts[0]] = $parts[1]
 }
 

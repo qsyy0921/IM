@@ -12,6 +12,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "repair-operator-safety.ps1")
+
 $expandedInvocationSummaryPaths = @()
 foreach ($pathEntry in $InvocationSummaryPath) {
     foreach ($pathPart in ([string]$pathEntry -split ",")) {
@@ -28,18 +30,6 @@ if ([string]::IsNullOrWhiteSpace($BatchID)) {
     $BatchID = "repair-batch-" + [System.Guid]::NewGuid().ToString("N")
 }
 
-function Get-Sha256Hex {
-    param([byte[]]$Bytes)
-
-    $sha = [System.Security.Cryptography.SHA256]::Create()
-    try {
-        $hash = $sha.ComputeHash($Bytes)
-    } finally {
-        $sha.Dispose()
-    }
-    return -join ($hash | ForEach-Object { $_.ToString("x2") })
-}
-
 function Assert-RequiredString {
     param(
         [object]$Value,
@@ -52,24 +42,7 @@ function Assert-RequiredString {
     }
 }
 
-function Assert-LowSensitiveActor {
-    param(
-        [string]$Value,
-        [string]$FieldName
-    )
-
-    if ([string]::IsNullOrWhiteSpace($Value)) {
-        throw "$FieldName is required."
-    }
-    if ($Value.Length -gt 64 -or $Value -notmatch "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$") {
-        throw "$FieldName must be a low-sensitive operator id using letters, digits, dot, underscore, or dash."
-    }
-    if ($Value -match "(?i)(password|passwd|secret|token|bearer|credential|api[_-]?key|access[_-]?key|refresh|session|cookie|sk-|eyJ)") {
-        throw "$FieldName must be a low-sensitive operator id, not a credential-like value."
-    }
-}
-
-Assert-LowSensitiveActor -Value $RequestedBy -FieldName "RequestedBy"
+Assert-LowSensitiveRepairActor -Value $RequestedBy -FieldName "RequestedBy"
 
 $reasonPresent = $false
 $reasonHash = ""
@@ -80,7 +53,7 @@ if (-not [string]::IsNullOrWhiteSpace($ReasonFile)) {
     $reasonBytes = [System.IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $ReasonFile))
     $reasonPresent = $reasonBytes.Length -gt 0
     if ($reasonPresent) {
-        $reasonHash = Get-Sha256Hex -Bytes $reasonBytes
+        $reasonHash = Get-RepairSha256Hex -Bytes $reasonBytes
     }
 }
 
@@ -97,7 +70,7 @@ foreach ($summaryPath in $expandedInvocationSummaryPaths) {
     $resolvedSummaryPath = [string](Resolve-Path -LiteralPath $summaryPath)
     $summaryRaw = Get-Content -LiteralPath $summaryPath -Raw
     $summary = $summaryRaw | ConvertFrom-Json
-    $summaryHash = Get-Sha256Hex -Bytes ([System.Text.Encoding]::UTF8.GetBytes($summaryRaw))
+    $summaryHash = Get-RepairSha256Hex -Bytes ([System.Text.Encoding]::UTF8.GetBytes($summaryRaw))
 
     if ($seenSummaryHashes.ContainsKey($summaryHash)) {
         throw "Duplicate repair invocation summary content in batch: $resolvedSummaryPath"

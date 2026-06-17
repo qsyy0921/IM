@@ -16,6 +16,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "repair-operator-safety.ps1")
+
 if (-not (Test-Path -LiteralPath $RequestPath -PathType Leaf)) {
     throw "Missing repair approval request file: $RequestPath"
 }
@@ -41,39 +43,10 @@ if ([string]::IsNullOrWhiteSpace($DecisionID)) {
     $DecisionID = "decision-" + [System.Guid]::NewGuid().ToString("N")
 }
 
-function Get-Sha256Hex {
-    param([byte[]]$Bytes)
-
-    $sha = [System.Security.Cryptography.SHA256]::Create()
-    try {
-        $hash = $sha.ComputeHash($Bytes)
-    } finally {
-        $sha.Dispose()
-    }
-    return -join ($hash | ForEach-Object { $_.ToString("x2") })
-}
-
-function Assert-LowSensitiveActor {
-    param(
-        [string]$Value,
-        [string]$FieldName
-    )
-
-    if ([string]::IsNullOrWhiteSpace($Value)) {
-        throw "$FieldName is required."
-    }
-    if ($Value.Length -gt 64 -or $Value -notmatch "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$") {
-        throw "$FieldName must be a low-sensitive operator id using letters, digits, dot, underscore, or dash."
-    }
-    if ($Value -match "(?i)(password|passwd|secret|token|bearer|credential|api[_-]?key|access[_-]?key|refresh|session|cookie|sk-|eyJ)") {
-        throw "$FieldName must be a low-sensitive operator id, not a credential-like value."
-    }
-}
-
-Assert-LowSensitiveActor -Value $DecidedBy -FieldName "DecidedBy"
+Assert-LowSensitiveRepairActor -Value $DecidedBy -FieldName "DecidedBy"
 
 $requestBytes = [System.Text.Encoding]::UTF8.GetBytes($requestRaw)
-$requestHash = Get-Sha256Hex -Bytes $requestBytes
+$requestHash = Get-RepairSha256Hex -Bytes $requestBytes
 
 $reasonPresent = $false
 $reasonHash = ""
@@ -84,7 +57,7 @@ if (-not [string]::IsNullOrWhiteSpace($ReasonFile)) {
     $reasonBytes = [System.IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $ReasonFile))
     $reasonPresent = $reasonBytes.Length -gt 0
     if ($reasonPresent) {
-        $reasonHash = Get-Sha256Hex -Bytes $reasonBytes
+        $reasonHash = Get-RepairSha256Hex -Bytes $reasonBytes
     }
 }
 

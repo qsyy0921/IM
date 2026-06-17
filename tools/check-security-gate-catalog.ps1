@@ -129,6 +129,25 @@ try {
         Write-Host $missingGatewayResult.Output -ForegroundColor Red
         exit 1
     }
+
+    $missingRequiredGateCatalog = Join-Path $tempRoot "missing-required-repair-gate-catalog.json"
+    $repoCatalogObject = Get-Content -LiteralPath $repoCatalog -Raw | ConvertFrom-Json
+    Write-JsonFile -Path $missingRequiredGateCatalog -Value ([ordered]@{
+        schema_version = 1
+        scope = "self-test"
+        entries = @($repoCatalogObject.entries | Where-Object { $_.script -ne "tools/check-repair-approval-request.ps1" })
+    })
+
+    $missingRequiredGateResult = Invoke-Validator -CatalogPath $missingRequiredGateCatalog
+    if ($missingRequiredGateResult.ExitCode -eq 0) {
+        Write-Host "FAIL catalog without a required repair gate should fail." -ForegroundColor Red
+        exit 1
+    }
+    if (-not $missingRequiredGateResult.Output.Contains("tools/check-repair-approval-request.ps1")) {
+        Write-Host "FAIL missing-required-repair-gate catalog returned unexpected error." -ForegroundColor Red
+        Write-Host $missingRequiredGateResult.Output -ForegroundColor Red
+        exit 1
+    }
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) {

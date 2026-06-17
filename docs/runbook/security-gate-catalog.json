@@ -99,6 +99,27 @@
       "note": "Operator planning must remain low-sensitive and dry-run oriented."
     },
     {
+      "name": "repair operator catalog plannable coverage",
+      "category": "operator-safety",
+      "script": "tools/check-repair-operator-catalog-plannable.ps1",
+      "check_local_label": "repair operator catalog plannable",
+      "note": "Every indexed repair mode must remain plannable through the low-sensitive dry-run planning path."
+    },
+    {
+      "name": "repair approval request writer",
+      "category": "operator-safety",
+      "script": "tools/check-repair-approval-request.ps1",
+      "check_local_label": "repair approval request",
+      "note": "Repair approval requests must keep low-sensitive requester, approval id, reason, and external-output guardrails."
+    },
+    {
+      "name": "repair approval decision writer",
+      "category": "operator-safety",
+      "script": "tools/check-repair-approval-decision.ps1",
+      "check_local_label": "repair approval decision",
+      "note": "Repair approval decisions must remain low-sensitive and tied to a valid approval request."
+    },
+    {
       "name": "repair operator approval chain",
       "category": "operator-safety",
       "script": "tools/check-repair-approval-chain.ps1",
@@ -111,6 +132,20 @@
       "script": "tools/check-approved-repair-invocation.ps1",
       "check_local_label": "approved repair invocation",
       "note": "Approved repair invocation defaults to preflight and must not silently mutate data."
+    },
+    {
+      "name": "repair batch manifest",
+      "category": "operator-safety",
+      "script": "tools/check-repair-batch-manifest.ps1",
+      "check_local_label": "repair batch manifest",
+      "note": "Repair batch manifests must only reference validated approved invocation summaries and must not leak raw reason or environment values."
+    },
+    {
+      "name": "repair audit bundle",
+      "category": "operator-safety",
+      "script": "tools/check-repair-audit-bundle.ps1",
+      "check_local_label": "repair audit bundle",
+      "note": "Repair audit bundles must hash referenced evidence, remain low-sensitive, and avoid embedding raw repair evidence bodies."
     },
     {
       "name": "raw evidence output path guard",
@@ -132,6 +167,13 @@
       "script": "tools/check-evidence-metadata-safety.ps1",
       "check_local_label": "evidence metadata safety helper",
       "note": "Evidence manifest append tools must reject obvious email, credential, bearer, JWT, and URL userinfo metadata."
+    },
+    {
+      "name": "message compliance proof manifest",
+      "category": "evidence-safety",
+      "script": "tools/check-message-compliance-proof-manifest.ps1",
+      "check_local_label": "message compliance proof manifest",
+      "note": "Message compliance proof manifests must contain only external proof references and hashes, not raw proof bodies."
     }
   ]
 }

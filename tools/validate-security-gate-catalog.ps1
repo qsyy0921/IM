@@ -54,6 +54,7 @@ $checkLocal = Get-Content -LiteralPath $checkLocalPath -Raw
 
 $seenNames = @{}
 $seenScripts = @{}
+$catalogScripts = @{}
 $categories = @{}
 foreach ($entry in @($catalog.entries)) {
     $name = Get-JsonPropertyString -Object $entry -Name "name"
@@ -71,6 +72,7 @@ foreach ($entry in @($catalog.entries)) {
     Assert-Condition ($script.StartsWith("tools/") -or $script.StartsWith("tools\")) "security gate entry $name script must live under tools."
     Assert-Condition (-not $seenScripts.ContainsKey($script)) "duplicate security gate script: $script"
     $seenScripts[$script] = $true
+    $catalogScripts[$script.Replace("\", "/")] = $true
     Assert-Condition ($label.Length -gt 0) "security gate entry $name check_local_label is required."
     Assert-Condition ($note.Length -gt 0) "security gate entry $name note is required."
 
@@ -93,8 +95,28 @@ foreach ($entry in @($catalog.entries)) {
     }
 }
 
-foreach ($requiredCategory in @("architecture-boundary", "listener-boundary", "transport-security", "gateway-security", "operator-safety")) {
+foreach ($requiredCategory in @("architecture-boundary", "listener-boundary", "transport-security", "gateway-security", "operator-safety", "evidence-safety")) {
     Assert-Condition ($categories.ContainsKey($requiredCategory)) "security gate catalog missing required category: $requiredCategory"
+}
+
+$requiredCatalogScripts = @(
+    "tools/check-repair-operator-index.ps1",
+    "tools/check-repair-operator-safety.ps1",
+    "tools/check-repair-operator-plan.ps1",
+    "tools/check-repair-operator-catalog-plannable.ps1",
+    "tools/check-repair-approval-request.ps1",
+    "tools/check-repair-approval-decision.ps1",
+    "tools/check-repair-approval-chain.ps1",
+    "tools/check-approved-repair-invocation.ps1",
+    "tools/check-repair-batch-manifest.ps1",
+    "tools/check-repair-audit-bundle.ps1",
+    "tools/check-loadtest-output-paths.ps1",
+    "tools/check-output-root-safety.ps1",
+    "tools/check-evidence-metadata-safety.ps1",
+    "tools/check-message-compliance-proof-manifest.ps1"
+)
+foreach ($requiredScript in $requiredCatalogScripts) {
+    Assert-Condition ($catalogScripts.ContainsKey($requiredScript.Replace("\", "/"))) "security gate catalog missing required gate script: $requiredScript"
 }
 
 $validation = [pscustomobject]@{

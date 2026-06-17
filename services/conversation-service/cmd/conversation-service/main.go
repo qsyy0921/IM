@@ -483,6 +483,14 @@ func runMemberWindowRepair() error {
 		return err
 	}
 	defer pool.Close()
+	reason, err := conversationOperatorReasonFromEnv(
+		"NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_REASON",
+		"NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_REASON_FILE",
+		"manual member window repair",
+	)
+	if err != nil {
+		return err
+	}
 
 	options := postgresinfra.MemberWindowRepairOptions{
 		TenantID:       envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_TENANT_ID", ""),
@@ -490,7 +498,7 @@ func runMemberWindowRepair() error {
 		UserID:         envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_USER_ID", ""),
 		IssueClass:     envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_ISSUE_CLASS", ""),
 		OperatorID:     envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_OPERATOR_ID", "manual"),
-		Reason:         envString("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_REASON", "manual member window repair"),
+		Reason:         reason,
 		DryRun:         dryRun,
 		Limit:          envInt("NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_LIMIT", 20),
 	}

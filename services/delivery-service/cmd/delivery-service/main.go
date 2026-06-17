@@ -276,13 +276,21 @@ func runOutboxRepair() error {
 	}
 	mode := envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_MODE", types.OutboxRepairModeAudit)
 	dryRun := envBool("NEXUSIM_DELIVERY_OUTBOX_REPAIR_DRY_RUN", false)
+	reason, err := deliveryOperatorReasonFromEnv(
+		"NEXUSIM_DELIVERY_OUTBOX_REPAIR_REASON",
+		"NEXUSIM_DELIVERY_OUTBOX_REPAIR_REASON_FILE",
+		"manual delivery outbox repair",
+	)
+	if err != nil {
+		return err
+	}
 	stats, err := postgresinfra.NewOutboxStore(pool).RepairOutbox(
 		ctx,
 		types.OutboxRepairOptions{
 			OutboxIDs: ids,
 			Mode:      mode,
 			Operator:  envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_OPERATOR", "manual"),
-			Reason:    envString("NEXUSIM_DELIVERY_OUTBOX_REPAIR_REASON", "manual delivery outbox repair"),
+			Reason:    reason,
 			DryRun:    dryRun,
 		},
 	)
@@ -549,6 +557,14 @@ func runProjectionCheckpointRepair() error {
 	dryRun := envBool("NEXUSIM_DELIVERY_PROJECTION_REPAIR_DRY_RUN", false)
 	targetOffset := envInt64AllowZero("NEXUSIM_DELIVERY_PROJECTION_REPAIR_TARGET_OFFSET", 0)
 	failureOffset := envInt64AllowZero("NEXUSIM_DELIVERY_PROJECTION_REPAIR_FAILURE_OFFSET", 0)
+	reason, err := deliveryOperatorReasonFromEnv(
+		"NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON",
+		"NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON_FILE",
+		"manual delivery projection checkpoint repair",
+	)
+	if err != nil {
+		return err
+	}
 	stats, err := postgresinfra.NewProjectionRepairStore(pool).RepairCheckpoint(
 		ctx,
 		types.ProjectionCheckpointRepairOptions{
@@ -559,7 +575,7 @@ func runProjectionCheckpointRepair() error {
 			FailureOffset: failureOffset,
 			Mode:          mode,
 			Operator:      envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_OPERATOR", "manual"),
-			Reason:        envString("NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON", "manual delivery projection checkpoint repair"),
+			Reason:        reason,
 			DryRun:        dryRun,
 		},
 	)
@@ -708,13 +724,21 @@ func runProjectionFailureResolve() error {
 	if err != nil {
 		return err
 	}
+	reason, err := deliveryOperatorReasonFromEnv(
+		"NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_REASON",
+		"NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_REASON_FILE",
+		"manual delivery projection failure resolution",
+	)
+	if err != nil {
+		return err
+	}
 	options := types.ProjectionFailureResolveOptions{
 		ConsumerGroup: envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_CONSUMER_GROUP", ""),
 		Topic:         envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_TOPIC", "conversation.timeline.events"),
 		PartitionID:   int32(envIntAllowZero("NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_PARTITION_ID", 0)),
 		OffsetValue:   offsetValue,
 		Operator:      envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_OPERATOR", "manual"),
-		Reason:        envString("NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_REASON", "manual delivery projection failure resolution"),
+		Reason:        reason,
 		DryRun:        envBool("NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_DRY_RUN", false),
 	}
 	stats, err := postgresinfra.NewProjectionFailureStore(pool).ResolveFailure(ctx, options)

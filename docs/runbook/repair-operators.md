@@ -136,9 +136,11 @@ go run ./services/delivery-service/cmd/delivery-service
 | `contacts-service` | `NEXUSIM_CONTACTS_OUTBOX_REPAIR_OUTPUT` |
 | `policy-service` | `NEXUSIM_POLICY_OUTBOX_REPAIR_OUTPUT` |
 
-`delivery-service` 的 `outbox-repair` 额外支持 `NEXUSIM_DELIVERY_OUTBOX_REPAIR_DRY_RUN=true`，用于只写 repair audit、不 mutate outbox 状态。
+`delivery-service` 的 `outbox-repair` 额外支持 `NEXUSIM_DELIVERY_OUTBOX_REPAIR_DRY_RUN=true`，用于只写 repair audit、不 mutate outbox 状态；并支持 `NEXUSIM_DELIVERY_OUTBOX_REPAIR_REASON_FILE` 读取 repair reason 原文，避免把 reason 写进 operator plan / shell env。
 
 `message-service` 的 `outbox-repair` 额外支持 `NEXUSIM_MESSAGE_OUTBOX_REPAIR_REASON_FILE` 读取 repair reason 原文，避免把 reason 写进 operator plan / shell env。
+
+`receipt-service` 的 `outbox-repair` 额外支持 `NEXUSIM_RECEIPT_OUTBOX_REPAIR_REASON_FILE` 读取 repair reason 原文，避免把 reason 写进 operator plan / shell env。
 
 `contacts-service` 的 `outbox-repair` 额外支持 `NEXUSIM_CONTACTS_OUTBOX_REPAIR_REASON_FILE` 读取 repair reason 原文，避免把 reason 写进 operator plan / shell env。
 
@@ -203,6 +205,8 @@ go run ./services/delivery-service/cmd/delivery-service
 | `projection-failure-resolve` | 人工确认指定 unresolved failure 已外部补偿或不再作为 blocker 后，带 operator / reason / dry-run 审计地标记 resolved；支持 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_DRY_RUN=true` 只写 resolution audit、不 mutate failure 状态；不移动 Kafka checkpoint；可选 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_OUTPUT` 写低敏 JSON summary。 |
 | `projection-failure-cleanup` | 只清理 resolved 且超过保留期的 failure 审计行，不触碰 unresolved blocker；支持 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_DRY_RUN=true` 只统计候选行不删除；可选 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_OUTPUT` 写低敏 JSON summary。 |
 
+`projection-checkpoint-repair` 支持 `NEXUSIM_DELIVERY_PROJECTION_REPAIR_REASON_FILE`，`projection-failure-resolve` 支持 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_RESOLVE_REASON_FILE`，用于从文件读取 operator reason 原文，避免把 reason 写进 operator plan / shell env。
+
 ## Conversation Member Change
 
 `conversation-service` 当前提供：
@@ -215,6 +219,8 @@ go run ./services/delivery-service/cmd/delivery-service
 | `member-window-audit` | 只读审计 `conversation_members` 当前窗口 cache 异常，覆盖 ACTIVE 无 join_seq、ACTIVE 带 leave_seq、inactive 无 leave_seq、leave_seq 早于 join_seq、成员版本高于会话版本、非 ACTIVE 会话仍有 ACTIVE 成员，以及 ACTIVE 会话无 ACTIVE OWNER / 多个 ACTIVE OWNER 等 issue class；支持 `updated_at` RFC3339 时间窗口过滤，可选 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_OUTPUT` 写低敏 JSON 结果。 |
 | `member-window-repair` | 保守修复成员窗口 cache：`ACTIVE_WITHOUT_JOIN_SEQ` 只会在 ACTIVE、无 `leave_seq`、`member_version` 合法且不超过会话版本时把 `join_seq` 补为 `member_version`；`ACTIVE_WITH_LEAVE_SEQ` 会清空 ACTIVE 成员残留的历史 `leave_seq`；`INACTIVE_WITHOUT_LEAVE_SEQ` 会在 inactive 成员有合法 `join_seq` / `member_version` 时把 `leave_seq` 补为 `member_version`；inactive `LEAVE_BEFORE_JOIN` 会把早于 `join_seq` 的 `leave_seq` clamp 到 `join_seq`；`MEMBER_VERSION_AHEAD_CONVERSATION` / `PERMISSION_VERSION_AHEAD_CONVERSATION` 会把 conversation 版本 floor 提升到当前成员最大版本；`ACTIVE_MEMBER_IN_INACTIVE_CONVERSATION` 会把非 ACTIVE 会话内仍 ACTIVE 且窗口合法的成员标为 `LEFT` 并补 `leave_seq = member_version`；默认 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_DRY_RUN=true`，只有显式设为 false 才 mutate；可选 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_OUTPUT` 写低敏 JSON summary。 |
 | `member-window-repair-audit` | 只读审计 `member-window-repair` 历史；可按 tenant / conversation / user / issue class / outcome / `repaired_at` RFC3339 时间窗口缩小范围；可选 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_AUDIT_OUTPUT` 写低敏 JSON 结果和 compacted filters。 |
+
+`member-window-repair` 支持 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_REASON_FILE` 读取 operator reason 原文，避免把 reason 写进 operator plan / shell env；输出仍只写低敏 repair 元数据。
 
 完整历史窗口 / targeted replay repair 仍是后续工作；执行 mutate 前仍应先用 `member-window-audit` 缩小范围并留存证据，不能用手写 SQL 直接改成员事实。
 
@@ -232,6 +238,8 @@ go run ./services/delivery-service/cmd/delivery-service
 | `challenge-delivery-repair-cleanup` | 按 retention / scope 清理 challenge delivery repair audit 历史；支持 `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_DRY_RUN=true` 只统计候选行不删除；可选 `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_CLEANUP_OUTPUT` 写低敏 JSON summary。 |
 | `challenge-request-limit-cleanup` | 清理 verification / password reset request limit 历史；支持 `NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_DRY_RUN=true` 只统计候选行不删除；可选 `NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_CLEANUP_OUTPUT` 写低敏 JSON summary。 |
 | `gateway-token-keyring-rotate` | 轮换本地 RS256 gateway token keyring 文件；生成新当前私钥，把旧当前 key 降级为 public-only overlap，并按 old-key limit 保留旧公钥；可选 `NEXUSIM_IDENTITY_GATEWAY_TOKEN_KEYRING_ROTATE_OUTPUT` 写不含 JWK 材料的低敏 JSON summary。 |
+
+`challenge-delivery-repair` 支持 `NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_REASON_FILE` 读取 operator reason 原文，避免把 reason 写进 operator plan / shell env；输出仍只写低敏 delivery / repair 元数据。
 
 `gateway-token-keyring-rotate` 只处理本地 secret-bearing JSON 文件。它不是 KMS / HSM、不会跨主机分发密钥，也不替代正式密钥管理审批。
 

@@ -352,13 +352,21 @@ func runChallengeDeliveryRepair() error {
 	if err != nil {
 		return err
 	}
+	reason, err := identityOperatorReasonFromEnv(
+		"NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_REASON",
+		"NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_REASON_FILE",
+		"manual identity challenge delivery repair",
+	)
+	if err != nil {
+		return err
+	}
 	stats, err := postgresinfra.NewChallengeDeliveryStore(pool).RepairDeliveries(
 		ctx,
 		types.ChallengeDeliveryRepairOptions{
 			DeliveryIDs: ids,
 			Mode:        envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_MODE", types.ChallengeDeliveryRepairModeAudit),
 			Operator:    envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_OPERATOR", "manual"),
-			Reason:      envString("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_REASON", "manual identity challenge delivery repair"),
+			Reason:      reason,
 			DryRun:      envBool("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_DRY_RUN", false),
 		})
 	if err != nil {

@@ -226,6 +226,23 @@ try {
         Write-Host "FAIL resource snapshot evidence adder did not replace expected entry." -ForegroundColor Red
         exit 1
     }
+
+    $sensitiveFailed = $false
+    try {
+        & $adder `
+            -ManifestPath $manifestPath `
+            -Name "resource-evidence-sensitive" `
+            -SummaryPath $summaryPath `
+            -MarkdownPath $markdownSummaryPath `
+            -Note "eyJaaaaaaaaaaa.payload.signature" | Out-Null
+    }
+    catch {
+        $sensitiveFailed = $_.Exception.Message.Contains("low-sensitive evidence metadata")
+    }
+    if (-not $sensitiveFailed) {
+        Write-Host "FAIL resource snapshot evidence adder should reject sensitive metadata." -ForegroundColor Red
+        exit 1
+    }
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) {

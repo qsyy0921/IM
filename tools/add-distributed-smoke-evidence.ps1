@@ -16,6 +16,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "evidence-metadata-safety.ps1")
+
 function Assert-Condition {
     param(
         [bool]$Condition,
@@ -57,6 +59,11 @@ Assert-Condition (Test-Path -LiteralPath $resolvedManifestPath -PathType Leaf) "
 Assert-Condition ($Name.Trim().Length -gt 0) "Name is required."
 Assert-Condition ($SummaryPath.Trim().Length -gt 0) "SummaryPath is required."
 Assert-Condition ($Note.Trim().Length -gt 0) "Note is required."
+Assert-LowSensitiveEvidenceText -Value $Name -FieldName "Name" -MaxLength 128
+Assert-LowSensitiveEvidenceText -Value $SummaryPath -FieldName "SummaryPath"
+Assert-LowSensitiveEvidenceText -Value $ExpectedScenario -FieldName "ExpectedScenario" -MaxLength 128 -AllowEmpty
+Assert-LowSensitiveEvidenceText -Value $ExpectedRedisMode -FieldName "ExpectedRedisMode" -MaxLength 64 -AllowEmpty
+Assert-LowSensitiveEvidenceText -Value $Note -FieldName "Note"
 
 if ($Kind -eq "redis-smoke") {
     Assert-Condition ($ExpectedRedisMode.Trim().Length -gt 0) "ExpectedRedisMode is required for redis-smoke evidence."

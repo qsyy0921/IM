@@ -305,6 +305,25 @@ try {
         Write-Host "FAIL add-observability-evidence.ps1 should reject duplicate names." -ForegroundColor Red
         exit 1
     }
+
+    $sensitiveAddFailed = $false
+    try {
+        & $adder `
+            -ManifestPath $manifestPath `
+            -Name "sensitive target fixture" `
+            -Kind "prometheus-grafana-smoke" `
+            -SummaryPath $targetSummaryPath `
+            -ReportPath $reportPath `
+            -ExpectedDashboardCount 9 `
+            -Note "Bearer abcdefghijklmnop" 2>$null | Out-Null
+    }
+    catch {
+        $sensitiveAddFailed = ($_.Exception.Message -match "low-sensitive evidence metadata")
+    }
+    if (-not $sensitiveAddFailed) {
+        Write-Host "FAIL add-observability-evidence.ps1 should reject sensitive metadata." -ForegroundColor Red
+        exit 1
+    }
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) {

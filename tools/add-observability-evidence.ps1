@@ -18,6 +18,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "evidence-metadata-safety.ps1")
+
 function Assert-Condition {
     param(
         [bool]$Condition,
@@ -59,6 +61,11 @@ Assert-Condition (Test-Path -LiteralPath $resolvedManifestPath -PathType Leaf) "
 Assert-Condition ($Name.Trim().Length -gt 0) "Name is required."
 Assert-Condition ($SummaryPath.Trim().Length -gt 0) "SummaryPath is required."
 Assert-Condition ($Note.Trim().Length -gt 0) "Note is required."
+Assert-LowSensitiveEvidenceText -Value $Name -FieldName "Name" -MaxLength 128
+Assert-LowSensitiveEvidenceText -Value $SummaryPath -FieldName "SummaryPath"
+Assert-LowSensitiveEvidenceText -Value $ReportPath -FieldName "ReportPath" -AllowEmpty
+Assert-LowSensitiveEvidenceText -Value $Service -FieldName "Service" -MaxLength 64 -AllowEmpty
+Assert-LowSensitiveEvidenceText -Value $Note -FieldName "Note"
 if ($Kind -eq "service-debug-smoke") {
     Assert-Condition ($Service.Trim().Length -gt 0) "Service is required for service-debug-smoke evidence."
 }

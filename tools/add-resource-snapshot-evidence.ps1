@@ -14,6 +14,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "evidence-metadata-safety.ps1")
+
 function Assert-Condition {
     param(
         [bool]$Condition,
@@ -56,6 +58,10 @@ Assert-Condition ($Name.Trim().Length -gt 0) "Name is required."
 Assert-Condition ($SummaryPath.Trim().Length -gt 0) "SummaryPath is required."
 Assert-Condition ($MarkdownPath.Trim().Length -gt 0) "MarkdownPath is required."
 Assert-Condition ($Note.Trim().Length -gt 0) "Note is required."
+Assert-LowSensitiveEvidenceText -Value $Name -FieldName "Name" -MaxLength 128
+Assert-LowSensitiveEvidenceText -Value $SummaryPath -FieldName "SummaryPath"
+Assert-LowSensitiveEvidenceText -Value $MarkdownPath -FieldName "MarkdownPath"
+Assert-LowSensitiveEvidenceText -Value $Note -FieldName "Note"
 
 $originalJson = Get-Content -LiteralPath $resolvedManifestPath -Raw
 $manifest = $originalJson | ConvertFrom-Json

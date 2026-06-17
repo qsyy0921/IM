@@ -125,6 +125,13 @@
       "script": "tools/check-output-root-safety.ps1",
       "check_local_label": "output root safety helper",
       "note": "Shared output-root helper must reject empty and repository-local raw evidence roots while allowing external scratch paths."
+    },
+    {
+      "name": "low-sensitive evidence metadata helper",
+      "category": "evidence-safety",
+      "script": "tools/check-evidence-metadata-safety.ps1",
+      "check_local_label": "evidence metadata safety helper",
+      "note": "Evidence manifest append tools must reject obvious email, credential, bearer, JWT, and URL userinfo metadata."
     }
   ]
 }

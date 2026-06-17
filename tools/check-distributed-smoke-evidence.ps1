@@ -173,6 +173,25 @@ try {
         Write-Host "FAIL add-distributed-smoke-evidence.ps1 should reject duplicate names." -ForegroundColor Red
         exit 1
     }
+
+    $sensitiveAddFailed = $false
+    try {
+        & $adder `
+            -ManifestPath $manifestPath `
+            -Name "operator@example.com" `
+            -Kind "redis-smoke" `
+            -SummaryPath $pushPath `
+            -ExpectedRedisMode "cluster" `
+            -ExpectedScenario "redis-cluster-failover" `
+            -Note "fixture redis evidence" 2>$null | Out-Null
+    }
+    catch {
+        $sensitiveAddFailed = ($_.Exception.Message -match "low-sensitive evidence metadata")
+    }
+    if (-not $sensitiveAddFailed) {
+        Write-Host "FAIL add-distributed-smoke-evidence.ps1 should reject sensitive metadata." -ForegroundColor Red
+        exit 1
+    }
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) {

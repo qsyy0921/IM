@@ -207,6 +207,26 @@ try {
         Write-Host "FAIL capacity baseline evidence adder should reject service/runner mismatch." -ForegroundColor Red
         exit 1
     }
+
+    $sensitiveFailed = $false
+    try {
+        & $adder `
+            -ManifestPath $manifestPath `
+            -Service "message-service" `
+            -Runner "sendmessage" `
+            -BaselineType "seeded" `
+            -SummaryPath "${summaryPath}?token=secret" `
+            -ReportPath $reportPath `
+            -Note "sensitive fixture" `
+            -Replace | Out-Null
+    }
+    catch {
+        $sensitiveFailed = $_.Exception.Message.Contains("low-sensitive evidence metadata")
+    }
+    if (-not $sensitiveFailed) {
+        Write-Host "FAIL capacity baseline evidence adder should reject sensitive metadata." -ForegroundColor Red
+        exit 1
+    }
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) {

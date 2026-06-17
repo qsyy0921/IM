@@ -128,6 +128,9 @@ try {
     Write-Host "== output root safety helper =="
     Invoke-LocalCheck "check-output-root-safety.ps1"
 
+    Write-Host "== evidence metadata safety helper =="
+    Invoke-LocalCheck "check-evidence-metadata-safety.ps1"
+
     Write-Host "== loadtest capacity summaries =="
     Invoke-LocalCheck "check-loadtest-capacity-summaries.ps1"
 

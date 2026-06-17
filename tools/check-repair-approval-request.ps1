@@ -70,6 +70,20 @@ try {
     if ($approvalRaw.Contains("do-not-copy-this-reason") -or $approvalRaw.Contains("operator needs to replay")) {
         throw "approval request leaked raw env value or reason text."
     }
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $badActorOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $approvalWriterPath `
+            -PlanPath $planPath `
+            -RequestedBy "operator@example.com" 2>&1
+        $badActorExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($badActorExitCode -eq 0 -or ($badActorOutput -join "`n") -notmatch "low-sensitive operator id") {
+        throw "approval request should reject sensitive or personal RequestedBy values."
+    }
 } finally {
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }

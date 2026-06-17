@@ -14,6 +14,8 @@
 
 `write-repair-operator-plan.ps1 -Env KEY=VALUE` 只用于低敏过滤条件、operator 标识或 reason 引用这类执行参数。计划文件会进入审批 / 审计链路，因此脚本会拒绝看起来像 password / secret / token / bearer / API key / session / cookie 的 ad-hoc env key 或 value。需要使用真实凭据时应走部署环境或正式 secret 管理，不要写入 plan / request / decision / bundle 文件。
 
+审批请求、审批决定、批量 manifest 和 audit bundle 中的 `requested_by` / `decided_by` / `generated_by` 也只允许低敏 operator id，例如 `operator-a` 或 `approver_1`。不要写邮箱、手机号、Bearer token、session id 或自由文本；详细原因放 `ReasonFile`，最终 JSON 只保存 reason hash。
+
 `tools/check-repair-operator-catalog-plannable.ps1` 会遍历 `repair-operators.catalog.json` 中的所有 service / mode，确认它们都能生成非执行 plan，避免新增 operator 后只更新 Markdown、漏更新机器可读 catalog 或 plan writer。
 
 本地审批请求生成入口：

@@ -24,9 +24,6 @@ foreach ($pathEntry in $EvidencePath) {
 if ($expandedEvidencePaths.Count -eq 0) {
     throw "At least one repair audit evidence file is required."
 }
-if ([string]::IsNullOrWhiteSpace($GeneratedBy)) {
-    throw "GeneratedBy is required."
-}
 if ([string]::IsNullOrWhiteSpace($BundleID)) {
     $BundleID = "repair-audit-bundle-" + [System.Guid]::NewGuid().ToString("N")
 }
@@ -69,6 +66,25 @@ function Get-RepairEvidenceKind {
     }
     return "unknown_json"
 }
+
+function Assert-LowSensitiveActor {
+    param(
+        [string]$Value,
+        [string]$FieldName
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        throw "$FieldName is required."
+    }
+    if ($Value.Length -gt 64 -or $Value -notmatch "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$") {
+        throw "$FieldName must be a low-sensitive operator id using letters, digits, dot, underscore, or dash."
+    }
+    if ($Value -match "(?i)(password|passwd|secret|token|bearer|credential|api[_-]?key|access[_-]?key|refresh|session|cookie|sk-|eyJ)") {
+        throw "$FieldName must be a low-sensitive operator id, not a credential-like value."
+    }
+}
+
+Assert-LowSensitiveActor -Value $GeneratedBy -FieldName "GeneratedBy"
 
 $reasonPresent = $false
 $reasonHash = ""

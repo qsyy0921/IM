@@ -78,6 +78,21 @@ try {
     if ($decisionRaw.Contains("do-not-copy-this-value") -or $decisionRaw.Contains("operator approver checked external ticket")) {
         throw "approval decision leaked raw env value or decision reason text."
     }
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $badActorOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $decisionWriterPath `
+            -RequestPath $requestPath `
+            -Decision "APPROVED" `
+            -DecidedBy "approver-token" 2>&1
+        $badActorExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($badActorExitCode -eq 0 -or ($badActorOutput -join "`n") -notmatch "low-sensitive operator id") {
+        throw "approval decision should reject credential-like DecidedBy values."
+    }
 } finally {
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }

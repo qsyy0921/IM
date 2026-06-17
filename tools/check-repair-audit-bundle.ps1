@@ -161,6 +161,19 @@ try {
     $ErrorActionPreference = "Continue"
     try {
         & powershell -NoProfile -ExecutionPolicy Bypass -File $bundleWriterPath `
+            -EvidencePath $summaryPath `
+            -GeneratedBy "Bearer abc.def.ghi" 2>$null | Out-Null
+        $badActorExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldErrorActionPreference
+    }
+    if ($badActorExitCode -eq 0) {
+        throw "repair audit bundle should reject credential-like GeneratedBy values."
+    }
+
+    $ErrorActionPreference = "Continue"
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $bundleWriterPath `
             -EvidencePath $summaryPath,$summaryPath `
             -GeneratedBy "operator-a" 2>$null | Out-Null
         $duplicateExitCode = $LASTEXITCODE

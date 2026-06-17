@@ -193,6 +193,20 @@ try {
         throw "repair batch invocation preflight leaked raw environment value or reason text."
     }
 
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $badActorOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $batchWriterPath `
+            -InvocationSummaryPath $summaryA `
+            -RequestedBy "operator@example.com" 2>&1
+        $badActorExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($badActorExitCode -eq 0 -or ($badActorOutput -join "`n") -notmatch "low-sensitive operator id") {
+        throw "repair batch manifest should reject sensitive or personal RequestedBy values."
+    }
+
     $mutatingManifestPath = Join-Path $tempRoot "batch-manifest-mutating.json"
     & powershell -NoProfile -ExecutionPolicy Bypass -File $batchWriterPath `
         -InvocationSummaryPath $summaryA,$summaryMutating `

@@ -15,10 +15,6 @@ $ErrorActionPreference = "Stop"
 if (-not (Test-Path -LiteralPath $PlanPath -PathType Leaf)) {
     throw "Missing repair operator plan file: $PlanPath"
 }
-if ([string]::IsNullOrWhiteSpace($RequestedBy)) {
-    throw "RequestedBy is required."
-}
-
 $planRaw = Get-Content -LiteralPath $PlanPath -Raw
 $plan = $planRaw | ConvertFrom-Json
 if ($plan.schema_version -ne 1) {
@@ -46,6 +42,25 @@ function Get-Sha256Hex {
     }
     return -join ($hash | ForEach-Object { $_.ToString("x2") })
 }
+
+function Assert-LowSensitiveActor {
+    param(
+        [string]$Value,
+        [string]$FieldName
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        throw "$FieldName is required."
+    }
+    if ($Value.Length -gt 64 -or $Value -notmatch "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$") {
+        throw "$FieldName must be a low-sensitive operator id using letters, digits, dot, underscore, or dash."
+    }
+    if ($Value -match "(?i)(password|passwd|secret|token|bearer|credential|api[_-]?key|access[_-]?key|refresh|session|cookie|sk-|eyJ)") {
+        throw "$FieldName must be a low-sensitive operator id, not a credential-like value."
+    }
+}
+
+Assert-LowSensitiveActor -Value $RequestedBy -FieldName "RequestedBy"
 
 $planBytes = [System.Text.Encoding]::UTF8.GetBytes($planRaw)
 $planHash = Get-Sha256Hex -Bytes $planBytes

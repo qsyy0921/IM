@@ -19,10 +19,6 @@ $ErrorActionPreference = "Stop"
 if (-not (Test-Path -LiteralPath $RequestPath -PathType Leaf)) {
     throw "Missing repair approval request file: $RequestPath"
 }
-if ([string]::IsNullOrWhiteSpace($DecidedBy)) {
-    throw "DecidedBy is required."
-}
-
 $requestRaw = Get-Content -LiteralPath $RequestPath -Raw
 $request = $requestRaw | ConvertFrom-Json
 if ($request.schema_version -ne 1) {
@@ -56,6 +52,25 @@ function Get-Sha256Hex {
     }
     return -join ($hash | ForEach-Object { $_.ToString("x2") })
 }
+
+function Assert-LowSensitiveActor {
+    param(
+        [string]$Value,
+        [string]$FieldName
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        throw "$FieldName is required."
+    }
+    if ($Value.Length -gt 64 -or $Value -notmatch "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$") {
+        throw "$FieldName must be a low-sensitive operator id using letters, digits, dot, underscore, or dash."
+    }
+    if ($Value -match "(?i)(password|passwd|secret|token|bearer|credential|api[_-]?key|access[_-]?key|refresh|session|cookie|sk-|eyJ)") {
+        throw "$FieldName must be a low-sensitive operator id, not a credential-like value."
+    }
+}
+
+Assert-LowSensitiveActor -Value $DecidedBy -FieldName "DecidedBy"
 
 $requestBytes = [System.Text.Encoding]::UTF8.GetBytes($requestRaw)
 $requestHash = Get-Sha256Hex -Bytes $requestBytes

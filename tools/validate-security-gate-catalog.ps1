@@ -119,6 +119,10 @@ $requiredCatalogScripts = @(
     "tools/check-distributed-smoke-evidence.ps1",
     "tools/check-observability-evidence.ps1"
 )
+$discoveredEvidenceGateScripts = Get-ChildItem -LiteralPath (Join-Path $repoRoot "tools") -Filter "check-*evidence*.ps1" -File |
+    ForEach-Object { "tools/$($_.Name)" }
+$requiredCatalogScripts = @($requiredCatalogScripts + $discoveredEvidenceGateScripts) |
+    Sort-Object -Unique
 foreach ($requiredScript in $requiredCatalogScripts) {
     Assert-Condition ($catalogScripts.ContainsKey($requiredScript.Replace("\", "/"))) "security gate catalog missing required gate script: $requiredScript"
 }

@@ -148,6 +148,24 @@ try {
         Write-Host $missingRequiredGateResult.Output -ForegroundColor Red
         exit 1
     }
+
+    $missingRequiredEvidenceGateCatalog = Join-Path $tempRoot "missing-required-evidence-gate-catalog.json"
+    Write-JsonFile -Path $missingRequiredEvidenceGateCatalog -Value ([ordered]@{
+        schema_version = 1
+        scope = "self-test"
+        entries = @($repoCatalogObject.entries | Where-Object { $_.script -ne "tools/check-observability-evidence.ps1" })
+    })
+
+    $missingRequiredEvidenceGateResult = Invoke-Validator -CatalogPath $missingRequiredEvidenceGateCatalog
+    if ($missingRequiredEvidenceGateResult.ExitCode -eq 0) {
+        Write-Host "FAIL catalog without a required evidence gate should fail." -ForegroundColor Red
+        exit 1
+    }
+    if (-not $missingRequiredEvidenceGateResult.Output.Contains("tools/check-observability-evidence.ps1")) {
+        Write-Host "FAIL missing-required-evidence-gate catalog returned unexpected error." -ForegroundColor Red
+        Write-Host $missingRequiredEvidenceGateResult.Output -ForegroundColor Red
+        exit 1
+    }
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) {

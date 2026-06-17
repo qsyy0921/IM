@@ -166,7 +166,7 @@
       "category": "evidence-safety",
       "script": "tools/check-evidence-metadata-safety.ps1",
       "check_local_label": "evidence metadata safety helper",
-      "note": "Evidence manifest append tools must reject obvious email, credential, bearer, JWT, and URL userinfo metadata."
+      "note": "Evidence manifest append tools must reject obvious email, credential, bearer, JWT, and URL userinfo metadata, and roll back the original manifest if validation fails."
     },
     {
       "name": "message compliance proof manifest",

@@ -273,7 +273,7 @@ H:\NexusIM\loadtest-results\<run>\observability-smoke-summary.json
 H:\NexusIM\loadtest-results\<run>\observability-smoke-report.md
 ```
 
-summary 会记录 Prometheus rule group 数、Grafana 9 个服务 dashboard UID 覆盖和本地 smoke 边界；若本次同时使用 `-IncludeAlertmanager`，还会记录 Prometheus 发现的 active Alertmanager target。该格式由 `tools/check-observability-smoke-summary.ps1` 自测，不需要 Docker 即可进入 `check-local`。
+summary 会记录 Prometheus rule group 数、Grafana 9 个服务 dashboard UID 覆盖和本地 smoke 边界；若本次同时使用 `-IncludeAlertmanager`，还会记录 Prometheus 发现的 active Alertmanager target。该格式由 `tools/check-observability-smoke-summary.ps1` 自测，并可用 `tools/validate-observability-smoke-summary.ps1` 离线校验已有 summary，不需要 Docker 即可进入 `check-local`。
 
 如果本机尚未准备 Prometheus / Grafana 镜像，脚本默认失败而不会拉取镜像。确实需要允许拉取时显式使用：
 

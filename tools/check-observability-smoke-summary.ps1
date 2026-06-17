@@ -1,9 +1,13 @@
 $ErrorActionPreference = "Stop"
 
 $writer = Join-Path $PSScriptRoot "write-observability-smoke-summary.ps1"
+$validator = Join-Path $PSScriptRoot "validate-observability-smoke-summary.ps1"
 
 if (-not (Test-Path -LiteralPath $writer -PathType Leaf)) {
     throw "Missing observability smoke summary writer: $writer"
+}
+if (-not (Test-Path -LiteralPath $validator -PathType Leaf)) {
+    throw "Missing observability smoke summary validator: $validator"
 }
 
 function Invoke-Writer {
@@ -79,6 +83,9 @@ try {
         Write-Host "FAIL observability summary markdown missing expected boundary text." -ForegroundColor Red
         exit 1
     }
+    & $validator `
+        -SummaryPath $summaryPath `
+        -ExpectedDashboardUids @("nexusim-api-gateway", "nexusim-message-service") | Out-Null
 
     $alertDir = Join-Path $tempRoot "alertmanager"
     $alertResult = Invoke-Writer `
@@ -100,6 +107,10 @@ try {
         Write-Host "FAIL alertmanager fixture produced wrong alertmanager status." -ForegroundColor Red
         exit 1
     }
+    & $validator `
+        -SummaryPath (Join-Path $alertDir "observability-smoke-summary.json") `
+        -ExpectedDashboardUids @("nexusim-api-gateway", "nexusim-message-service") `
+        -RequireAlertmanager | Out-Null
 
     $badAlertDir = Join-Path $tempRoot "bad-alertmanager"
     $badAlertResult = Invoke-Writer `
@@ -154,6 +165,51 @@ try {
             Write-Host $ruleResult.Output -ForegroundColor Red
         }
         exit 1
+    }
+
+    $tamperedScopeDir = Join-Path $tempRoot "tampered-scope"
+    New-Item -ItemType Directory -Force -Path $tamperedScopeDir | Out-Null
+    $tamperedScopePath = Join-Path $tamperedScopeDir "observability-smoke-summary.json"
+    Copy-Item -LiteralPath $summaryPath -Destination $tamperedScopePath
+    $tamperedScope = Get-Content -LiteralPath $tamperedScopePath -Raw | ConvertFrom-Json
+    $tamperedScope.scope = "production SLO"
+    $tamperedScope | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $tamperedScopePath -Encoding UTF8
+    try {
+        & $validator `
+            -SummaryPath $tamperedScopePath `
+            -ExpectedDashboardUids @("nexusim-api-gateway", "nexusim-message-service") | Out-Null
+        Write-Host "FAIL validator should reject production SLO scope." -ForegroundColor Red
+        exit 1
+    }
+    catch {
+        if (-not ([string]$_.Exception.Message).Contains("not a production SLO")) {
+            Write-Host "FAIL validator rejected production SLO scope with unexpected message." -ForegroundColor Red
+            Write-Host ([string]$_.Exception.Message) -ForegroundColor Red
+            exit 1
+        }
+    }
+
+    $tamperedDashboardDir = Join-Path $tempRoot "tampered-dashboard"
+    New-Item -ItemType Directory -Force -Path $tamperedDashboardDir | Out-Null
+    $tamperedDashboardPath = Join-Path $tamperedDashboardDir "observability-smoke-summary.json"
+    Copy-Item -LiteralPath $summaryPath -Destination $tamperedDashboardPath
+    $tamperedDashboard = Get-Content -LiteralPath $tamperedDashboardPath -Raw | ConvertFrom-Json
+    $tamperedDashboard.found_dashboard_uids = @("nexusim-api-gateway")
+    $tamperedDashboard.dashboard_count.found = 1
+    $tamperedDashboard | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $tamperedDashboardPath -Encoding UTF8
+    try {
+        & $validator `
+            -SummaryPath $tamperedDashboardPath `
+            -ExpectedDashboardUids @("nexusim-api-gateway", "nexusim-message-service") | Out-Null
+        Write-Host "FAIL validator should reject missing found dashboard." -ForegroundColor Red
+        exit 1
+    }
+    catch {
+        if (-not ([string]$_.Exception.Message).Contains("found_dashboard_uids")) {
+            Write-Host "FAIL validator rejected missing found dashboard with unexpected message." -ForegroundColor Red
+            Write-Host ([string]$_.Exception.Message) -ForegroundColor Red
+            exit 1
+        }
     }
 }
 finally {

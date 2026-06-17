@@ -17,6 +17,7 @@ import (
 
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
 	ratelimitinfra "github.com/qsyy0921/IM/services/api-gateway/internal/infrastructure/ratelimit"
+	"github.com/redis/go-redis/v9"
 )
 
 func TestGRPCClientTLSConfigFromEnvDisabledByDefault(t *testing.T) {
@@ -444,8 +445,40 @@ func TestNewRedisUniversalClientRequiresSentinelConfig(t *testing.T) {
 	if _, err := newRedisUniversalClient(redisClientConfig{Mode: "sentinel"}); err == nil {
 		t.Fatalf("expected sentinel mode without master name to fail")
 	}
+}
+
+func TestNewRedisUniversalClientRequiresClusterConfig(t *testing.T) {
 	if _, err := newRedisUniversalClient(redisClientConfig{Mode: "cluster"}); err == nil {
-		t.Fatalf("expected unsupported redis mode to fail")
+		t.Fatalf("expected cluster mode without addrs to fail")
+	}
+}
+
+func TestNewRedisUniversalClientSupportsClusterConfig(t *testing.T) {
+	client, err := newRedisUniversalClient(redisClientConfig{
+		Mode:         "cluster",
+		ClusterAddrs: []string{"127.0.0.1:7000", "127.0.0.1:7001"},
+		Username:     "api-gateway",
+		Password:     "secret",
+	})
+	if err != nil {
+		t.Fatalf("expected cluster mode with addrs to create client: %v", err)
+	}
+	defer client.Close()
+	if _, ok := client.(*redis.ClusterClient); !ok {
+		t.Fatalf("expected *redis.ClusterClient, got %T", client)
+	}
+}
+
+func TestLoadRateLimitRedisClientConfigFromEnvLoadsClusterAddrs(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_MODE", "cluster")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_CLUSTER_ADDRS", "127.0.0.1:7000, 127.0.0.1:7001")
+
+	config := loadRateLimitRedisClientConfigFromEnv()
+	if config.Mode != "cluster" || len(config.ClusterAddrs) != 2 ||
+		config.ClusterAddrs[0] != "127.0.0.1:7000" ||
+		config.ClusterAddrs[1] != "127.0.0.1:7001" {
+		t.Fatalf("unexpected redis cluster config: %+v", config)
 	}
 }
 
@@ -502,6 +535,7 @@ func clearAPIGatewayRateLimitConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_BACKEND", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_MODE", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_ADDR", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_CLUSTER_ADDRS", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_SENTINEL_ADDRS", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_SENTINEL_MASTER_NAME", "")
 	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_USERNAME", "")

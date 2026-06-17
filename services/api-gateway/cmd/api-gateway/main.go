@@ -864,6 +864,7 @@ type grpcClientTLSConfig struct {
 type redisClientConfig struct {
 	Mode               string
 	Addr               string
+	ClusterAddrs       []string
 	SentinelAddrs      []string
 	SentinelMasterName string
 	Username           string
@@ -877,6 +878,7 @@ func loadRateLimitRedisClientConfigFromEnv() redisClientConfig {
 	return redisClientConfig{
 		Mode:               envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_MODE", "single"),
 		Addr:               envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_ADDR", "127.0.0.1:6379"),
+		ClusterAddrs:       splitCSV(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_CLUSTER_ADDRS")),
 		SentinelAddrs:      splitCSV(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_SENTINEL_ADDRS")),
 		SentinelMasterName: envString("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_SENTINEL_MASTER_NAME", ""),
 		Username:           os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_USERNAME"),
@@ -911,6 +913,15 @@ func newRedisUniversalClient(config redisClientConfig) (redis.UniversalClient, e
 			DB:               config.DB,
 			SentinelUsername: config.SentinelUsername,
 			SentinelPassword: config.SentinelPassword,
+		}), nil
+	case "cluster", "redis-cluster":
+		if len(config.ClusterAddrs) == 0 {
+			return nil, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_CLUSTER_ADDRS is required when redis cluster mode is enabled")
+		}
+		return redis.NewClusterClient(&redis.ClusterOptions{
+			Addrs:    config.ClusterAddrs,
+			Username: config.Username,
+			Password: config.Password,
 		}), nil
 	default:
 		return nil, errors.New("unsupported NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_MODE=" + config.Mode)

@@ -37,6 +37,21 @@
   -RequireFiles
 ```
 
+新跑出一条服务短基线后，不要手改 manifest。使用追加工具替换该服务的当前证据槽：
+
+```powershell
+.\tools\add-capacity-baseline-evidence.ps1 `
+  -Service message-service `
+  -Runner sendmessage `
+  -BaselineType seeded `
+  -SummaryPath H:\NexusIM\loadtest-results\<run>\message-service\sendmessage-summary.json `
+  -ReportPath docs\runbook\loadtest\<service>\<report>.md `
+  -Note "local short capacity baseline; not production sizing" `
+  -Replace
+```
+
+不带 `-Replace` 时，工具会拒绝覆盖已有服务证据，避免误改 9 服务索引。
+
 如果本地 9 个服务已经按 `deploy/local/docker-compose.services.yml` 暴露默认端口，可以先 dry-run 生成计划，再执行一轮短基线：
 
 ```powershell

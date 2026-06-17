@@ -20,7 +20,7 @@
 - smoke / 压测证据：`loadtest/<service>/`
 - 本地分布式和 Docker：`distributed-local.md`、`mac-arm64-docker-images.md`；分布式 smoke 证据 manifest：`distributed-smoke-evidence.json`
 - 本地观测：`observability-local.md`；观测证据 manifest：`observability-evidence.json`
-- 本地压测操作：`local-loadtest.md`
+- 本地压测操作：`local-loadtest.md`；容量短基线证据 manifest：`capacity-baseline-evidence.json`
 - repair / DLQ operator：`repair-operators.md`；机器可读 catalog：`repair-operators.catalog.json`
 - 研究论文分类：`../research/paper-organization.md`
 - 历史长文档：`archive/`、`history/`

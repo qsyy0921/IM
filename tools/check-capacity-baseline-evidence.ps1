@@ -1,9 +1,13 @@
 $ErrorActionPreference = "Stop"
 
 $validator = Join-Path $PSScriptRoot "validate-capacity-baseline-evidence.ps1"
+$adder = Join-Path $PSScriptRoot "add-capacity-baseline-evidence.ps1"
 
 if (-not (Test-Path -LiteralPath $validator -PathType Leaf)) {
     throw "Missing capacity baseline evidence validator: $validator"
+}
+if (-not (Test-Path -LiteralPath $adder -PathType Leaf)) {
+    throw "Missing capacity baseline evidence adder: $adder"
 }
 
 function Write-JsonFile {
@@ -144,6 +148,63 @@ try {
     if (-not $badResult.Output.Contains("missing service")) {
         Write-Host "FAIL bad capacity baseline evidence fixture returned unexpected error." -ForegroundColor Red
         Write-Host $badResult.Output -ForegroundColor Red
+        exit 1
+    }
+
+    & $adder `
+        -ManifestPath $manifestPath `
+        -Service "message-service" `
+        -Runner "sendmessage" `
+        -BaselineType "seeded" `
+        -SummaryPath $summaryPath `
+        -ReportPath $reportPath `
+        -Note "replacement fixture" `
+        -Replace | Out-Null
+
+    $updatedManifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    $updatedEntries = @($updatedManifest.entries)
+    $updatedMessageEntries = @($updatedEntries | Where-Object { $_.service -eq "message-service" })
+    if ($updatedEntries.Count -ne 9 -or $updatedMessageEntries.Count -ne 1 -or $updatedMessageEntries[0].note -ne "replacement fixture" -or $updatedMessageEntries[0].baseline_type -ne "seeded") {
+        Write-Host "FAIL capacity baseline evidence adder did not replace exactly one service entry." -ForegroundColor Red
+        exit 1
+    }
+
+    $duplicateFailed = $false
+    try {
+        & $adder `
+            -ManifestPath $manifestPath `
+            -Service "message-service" `
+            -Runner "sendmessage" `
+            -BaselineType "seeded" `
+            -SummaryPath $summaryPath `
+            -ReportPath $reportPath `
+            -Note "duplicate fixture" | Out-Null
+    }
+    catch {
+        $duplicateFailed = $_.Exception.Message.Contains("already exists")
+    }
+    if (-not $duplicateFailed) {
+        Write-Host "FAIL capacity baseline evidence adder should reject duplicate service without -Replace." -ForegroundColor Red
+        exit 1
+    }
+
+    $mismatchFailed = $false
+    try {
+        & $adder `
+            -ManifestPath $manifestPath `
+            -Service "message-service" `
+            -Runner "delivery" `
+            -BaselineType "seeded" `
+            -SummaryPath $summaryPath `
+            -ReportPath $reportPath `
+            -Note "mismatch fixture" `
+            -Replace | Out-Null
+    }
+    catch {
+        $mismatchFailed = $_.Exception.Message.Contains("does not match")
+    }
+    if (-not $mismatchFailed) {
+        Write-Host "FAIL capacity baseline evidence adder should reject service/runner mismatch." -ForegroundColor Red
         exit 1
     }
 }

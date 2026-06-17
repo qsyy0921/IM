@@ -167,6 +167,24 @@ try {
         exit 1
     }
 
+    $missingRequiredBoundaryGateCatalog = Join-Path $tempRoot "missing-required-boundary-gate-catalog.json"
+    Write-JsonFile -Path $missingRequiredBoundaryGateCatalog -Value ([ordered]@{
+        schema_version = 1
+        scope = "self-test"
+        entries = @($repoCatalogObject.entries | Where-Object { $_.script -ne "tools/check-future-service-boundary.ps1" })
+    })
+
+    $missingRequiredBoundaryGateResult = Invoke-Validator -CatalogPath $missingRequiredBoundaryGateCatalog
+    if ($missingRequiredBoundaryGateResult.ExitCode -eq 0) {
+        Write-Host "FAIL catalog without a required architecture boundary gate should fail." -ForegroundColor Red
+        exit 1
+    }
+    if (-not $missingRequiredBoundaryGateResult.Output.Contains("tools/check-future-service-boundary.ps1")) {
+        Write-Host "FAIL missing-required-boundary-gate catalog returned unexpected error." -ForegroundColor Red
+        Write-Host $missingRequiredBoundaryGateResult.Output -ForegroundColor Red
+        exit 1
+    }
+
     $missingRequiredListenerGateCatalog = Join-Path $tempRoot "missing-required-listener-gate-catalog.json"
     Write-JsonFile -Path $missingRequiredListenerGateCatalog -Value ([ordered]@{
         schema_version = 1

@@ -132,6 +132,8 @@ $requiredCatalogScripts = @(
     "tools/check-observability-evidence.ps1"
 )
 $discoveredSecurityGateScripts = Get-DiscoveredToolScripts -Patterns @(
+    "check-*boundar*.ps1",
+    "check-cross-service-*.ps1",
     "check-api-gateway-*.ps1",
     "check-repair-*.ps1",
     "check-*evidence*.ps1",

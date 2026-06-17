@@ -18,6 +18,13 @@
       "note": "Production code must not read other services private tables except explicitly allowed shared contracts."
     },
     {
+      "name": "future service boundary",
+      "category": "architecture-boundary",
+      "script": "tools/check-future-service-boundary.ps1",
+      "check_local_label": "future service boundary",
+      "note": "Future search, RAG, agent, media, notification, audit, admin, and client-facing service directories must not appear before the current phase explicitly switches."
+    },
+    {
       "name": "debug listener exposure",
       "category": "listener-boundary",
       "script": "tools/check-debug-listener-exposure.ps1",

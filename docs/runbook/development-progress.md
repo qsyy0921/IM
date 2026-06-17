@@ -87,7 +87,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - PostgreSQL `repmgr + pgpool` local failover smoke
 - PostgreSQL quorum observation smoke、summary 离线 validator，以及 ADR-034 production quorum boundary
 - 分布式 smoke 证据低敏 manifest：集中索引 Redis / PostgreSQL / Kafka 本地 summary 路径，支持 schema-only / H 盘真实文件复核和 Markdown report，且可用 `tools/add-distributed-smoke-evidence.ps1` 追加新故障 smoke 证据，避免手改 JSON
-- 安全启动门禁 catalog：集中索引 DDD / cross-service table / debug listener / public listener auth / TLS / gateway / api-gateway legacy / quota 子门禁 / repair operator safety gates，并校验已接入 `check-local` 或由父 check 覆盖
+- 安全启动门禁 catalog：集中索引 DDD / cross-service table / future service boundary / debug listener / public listener auth / TLS / gateway / api-gateway legacy / quota 子门禁 / repair operator safety gates，并校验已接入 `check-local` 或由父 check 覆盖
 - Kafka KRaft 3 broker local failover / controller-switch / ISR observation smoke，且 ISR observation raw summary 已有可复用 JSON / Markdown summary validator
 - Kafka KRaft repeated ISR flapping smoke：本地 2 轮 broker stop/start 均验证 ISR 从 3 收缩到 2、恢复到 3，且 `acks=all` probe 在降级和恢复阶段均可写入；这是本地 flapping 观察，不是生产 Kafka HA 或 rebalance storm 证明
 - outbox Kafka producer first-stage `acks=all` / bounded retry-backoff 配置、本地门禁、6 个 producer package 配置单测、producer config summary 和 Kafka producer hardening evaluation；当前 `kafka-go` writer 明确不声明 idempotent / transactional producer 语义，可靠业务边界仍是 outbox / event_id 幂等

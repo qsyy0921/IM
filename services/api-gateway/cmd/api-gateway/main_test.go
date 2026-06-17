@@ -147,8 +147,55 @@ func TestAPIGatewayGRPCTLSConfigLoadsMutualTLSAllowlist(t *testing.T) {
 	if tlsConfig.ClientAuth != tls.RequireAndVerifyClientCert {
 		t.Fatalf("expected RequireAndVerifyClientCert, got %v", tlsConfig.ClientAuth)
 	}
+	if tlsConfig.MinVersion != tls.VersionTLS12 {
+		t.Fatalf("expected TLS 1.2 minimum, got %x", tlsConfig.MinVersion)
+	}
 	if tlsConfig.VerifyConnection == nil {
 		t.Fatalf("expected client certificate allowlist verifier")
+	}
+}
+
+func TestAPIGatewayGRPCTLSConfigAllowsClientIdentity(t *testing.T) {
+	dir := t.TempDir()
+	serverCertFile, serverKeyFile := writeAPIGatewayTLSTestCert(t, dir, "api-gateway")
+	caFile, _ := writeAPIGatewayTLSTestCert(t, dir, "ca")
+	clientCertFile, _ := writeAPIGatewayTLSTestCert(t, dir, "client")
+	clearAPIGatewayServerTLSConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_CERT_FILE", serverCertFile)
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_KEY_FILE", serverKeyFile)
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_CA_FILE", caFile)
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES", "api-gateway.nexusim.local")
+	tlsConfig, ok, err := apiGatewayGRPCTLSConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load api-gateway grpc tls config: %v", err)
+	}
+	if !ok || tlsConfig.VerifyConnection == nil {
+		t.Fatalf("expected client identity verifier, ok=%t has_verifier=%t", ok, tlsConfig.VerifyConnection != nil)
+	}
+	if err := tlsConfig.VerifyConnection(tls.ConnectionState{PeerCertificates: []*x509.Certificate{readAPIGatewayTLSTestCert(t, clientCertFile)}}); err != nil {
+		t.Fatalf("expected allowed api-gateway client identity: %v", err)
+	}
+}
+
+func TestAPIGatewayGRPCTLSConfigRejectsUnlistedClientIdentity(t *testing.T) {
+	dir := t.TempDir()
+	serverCertFile, serverKeyFile := writeAPIGatewayTLSTestCert(t, dir, "api-gateway")
+	caFile, _ := writeAPIGatewayTLSTestCert(t, dir, "ca")
+	clientCertFile, _ := writeAPIGatewayTLSTestCert(t, dir, "client")
+	clearAPIGatewayServerTLSConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_CERT_FILE", serverCertFile)
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_KEY_FILE", serverKeyFile)
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_CA_FILE", caFile)
+	t.Setenv("NEXUSIM_API_GATEWAY_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES", "desktop-client.nexusim.local")
+	tlsConfig, ok, err := apiGatewayGRPCTLSConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load api-gateway grpc tls config: %v", err)
+	}
+	if !ok || tlsConfig.VerifyConnection == nil {
+		t.Fatalf("expected client identity verifier, ok=%t has_verifier=%t", ok, tlsConfig.VerifyConnection != nil)
+	}
+	if err := tlsConfig.VerifyConnection(tls.ConnectionState{PeerCertificates: []*x509.Certificate{readAPIGatewayTLSTestCert(t, clientCertFile)}}); err == nil {
+		t.Fatalf("expected unlisted api-gateway client identity to be rejected")
 	}
 }
 
@@ -645,6 +692,23 @@ func writeAPIGatewayTLSTestCert(t *testing.T, dir string, name string) (string, 
 		t.Fatalf("write tls key: %v", err)
 	}
 	return certFile, keyFile
+}
+
+func readAPIGatewayTLSTestCert(t *testing.T, certFile string) *x509.Certificate {
+	t.Helper()
+	pemBytes, err := os.ReadFile(certFile)
+	if err != nil {
+		t.Fatalf("read tls cert: %v", err)
+	}
+	block, _ := pem.Decode(pemBytes)
+	if block == nil {
+		t.Fatalf("decode tls cert pem")
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		t.Fatalf("parse tls cert: %v", err)
+	}
+	return cert
 }
 
 func newSerialNumber(t *testing.T) *big.Int {

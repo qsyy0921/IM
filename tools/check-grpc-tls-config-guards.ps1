@@ -55,11 +55,24 @@ foreach ($file in $cmdMainFiles) {
     $requiredFragments = @(
         "RequiresCertKeyPair",
         "RejectsInvalidRequireClientCert",
-        "RequiresClientCA"
+        "RequiresClientCA",
+        "VersionTLS12"
     )
     foreach ($fragment in $requiredFragments) {
         if (-not $testContent.Contains($fragment)) {
             $violations += "${relative}: server TLS config is missing test coverage fragment '$fragment'"
+        }
+    }
+
+    $supportsClientIdentityAllowlist = $content.Contains("_TLS_CLIENT_ALLOWED_DNS_NAMES") -or
+        $content.Contains("_TLS_CLIENT_ALLOWED_URIS") -or
+        $content.Contains("VerifyConnection")
+    if ($supportsClientIdentityAllowlist) {
+        if ($testContent -notmatch "AllowsClient(Identity|DNSName|URI)") {
+            $violations += "${relative}: server TLS client identity allowlist is missing positive allow test"
+        }
+        if (-not $testContent.Contains("RejectsUnlistedClientIdentity")) {
+            $violations += "${relative}: server TLS client identity allowlist is missing unlisted-client rejection test"
         }
     }
 }

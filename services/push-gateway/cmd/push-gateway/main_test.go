@@ -334,6 +334,52 @@ func TestPushWSTLSConfigFromEnvLoadsMTLS(t *testing.T) {
 	}
 }
 
+func TestPushWSTLSConfigAllowsClientIdentity(t *testing.T) {
+	clearPushWSTLSEnv(t)
+	dir := t.TempDir()
+	certFile, keyFile := writePushWSTLSTestCert(t, dir, "server")
+	caFile, _ := writePushWSTLSTestCert(t, dir, "ca")
+	clientCertFile, _ := writePushWSTLSTestCert(t, dir, "desktop-client")
+	t.Setenv("NEXUSIM_PUSH_WS_TLS_CERT_FILE", certFile)
+	t.Setenv("NEXUSIM_PUSH_WS_TLS_KEY_FILE", keyFile)
+	t.Setenv("NEXUSIM_PUSH_WS_TLS_CLIENT_CA_FILE", caFile)
+	t.Setenv("NEXUSIM_PUSH_WS_TLS_CLIENT_ALLOWED_DNS_NAMES", "DESKTOP-CLIENT.NEXUSIM.LOCAL")
+
+	config, ok, err := pushWSTLSConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load push ws tls config: %v", err)
+	}
+	if !ok || config == nil || config.VerifyConnection == nil {
+		t.Fatalf("expected push websocket client identity verifier, ok=%v has_verifier=%v", ok, config != nil && config.VerifyConnection != nil)
+	}
+	if err := config.VerifyConnection(tls.ConnectionState{PeerCertificates: []*x509.Certificate{readPushWSTLSTestCert(t, clientCertFile)}}); err != nil {
+		t.Fatalf("expected allowed websocket client identity: %v", err)
+	}
+}
+
+func TestPushWSTLSConfigRejectsUnlistedClientIdentity(t *testing.T) {
+	clearPushWSTLSEnv(t)
+	dir := t.TempDir()
+	certFile, keyFile := writePushWSTLSTestCert(t, dir, "server")
+	caFile, _ := writePushWSTLSTestCert(t, dir, "ca")
+	clientCertFile, _ := writePushWSTLSTestCert(t, dir, "desktop-client")
+	t.Setenv("NEXUSIM_PUSH_WS_TLS_CERT_FILE", certFile)
+	t.Setenv("NEXUSIM_PUSH_WS_TLS_KEY_FILE", keyFile)
+	t.Setenv("NEXUSIM_PUSH_WS_TLS_CLIENT_CA_FILE", caFile)
+	t.Setenv("NEXUSIM_PUSH_WS_TLS_CLIENT_ALLOWED_DNS_NAMES", "mobile-client.nexusim.local")
+
+	config, ok, err := pushWSTLSConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load push ws tls config: %v", err)
+	}
+	if !ok || config == nil || config.VerifyConnection == nil {
+		t.Fatalf("expected push websocket client identity verifier, ok=%v has_verifier=%v", ok, config != nil && config.VerifyConnection != nil)
+	}
+	if err := config.VerifyConnection(tls.ConnectionState{PeerCertificates: []*x509.Certificate{readPushWSTLSTestCert(t, clientCertFile)}}); err == nil {
+		t.Fatalf("expected unlisted websocket client identity to be rejected")
+	}
+}
+
 func TestVerifyAllowedPushWSClient(t *testing.T) {
 	uri, err := url.Parse("spiffe://nexusim/desktop-client")
 	if err != nil {
@@ -502,4 +548,21 @@ func writePushWSTLSTestCert(t *testing.T, dir string, name string) (string, stri
 		t.Fatalf("write tls key: %v", err)
 	}
 	return certFile, keyFile
+}
+
+func readPushWSTLSTestCert(t *testing.T, certFile string) *x509.Certificate {
+	t.Helper()
+	pemBytes, err := os.ReadFile(certFile)
+	if err != nil {
+		t.Fatalf("read tls cert: %v", err)
+	}
+	block, _ := pem.Decode(pemBytes)
+	if block == nil {
+		t.Fatalf("decode tls cert pem")
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		t.Fatalf("parse tls cert: %v", err)
+	}
+	return cert
 }

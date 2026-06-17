@@ -17,6 +17,7 @@
 - tenant quota source / snapshot / reload helper 已从 `cmd/api-gateway/main.go` 拆到同 package 文件，composition root 继续负责 wiring，避免继续堆大文件。
 - cmd 层 rate-limit / tenant-plan 配置测试已从 `main_test.go` 拆到同 package `rate_limit_config_test.go`，保留原启动配置覆盖，同时降低单个测试文件复杂度。
 - `loadtest/demo --gateway-facade` summary 已输出 `capacity_summary`，包含 GatewayService facade 标记、gateway auth mode、端到端用户侧操作数、WebSocket frame 数、PullInbox item 数、最大 conversation seq、read 前后 unread、PG 聚合和 policy audit Kafka readback 数；本地 api-gateway stack 短基线已跑通 secure mTLS + HMAC facade 链路，clean summary 记录 `git_dirty=false`、7 个用户侧操作、3 个 WebSocket frame、PullInbox 1 条、unread 1->0、policy audit Kafka readback 1 条。
+- `loadtest/demo` runner 已按 config / model / auth / summary helper 同 package 拆分，避免 api-gateway facade 演示和容量验证继续堆进单个 `main.go`。
 - `loadtest/demo/run-local-secure-demo.ps1` 的 gRPC / debug 端口已参数化，默认端口不变；本地被 Docker / WSL port proxy 占用时可传入备用端口，避免 secure demo 被固定端口阻塞。
 
 ## 后续

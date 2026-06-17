@@ -16,6 +16,7 @@
 - 已补 first-stage tenant action quota：`policy_tenant_message_action_quotas` 可按 tenant / action 配置窗口内已允许决策上限，达到阈值时在 exact / tenant allow rule 前 fail-closed deny；`tenant-quota-audit` / `tenant-quota-set` 提供本地 JSON operator，输出只暴露配置元数据和 reason-present，不输出 operator reason 原文。
 - 已补 first-stage content moderation adapter：message-service 只把 `SEND` / `EDIT` 的 `payload.text` 传给 policy-service；policy-service 通过 `NEXUSIM_POLICY_MODERATION_MODE=keyword` 做本地分类 deny，或通过 `NEXUSIM_POLICY_MODERATION_MODE=http` 调用外部 provider 返回稳定 allow/deny 决策；不持久化正文，不把 provider 原文、provider body 或消息正文写入 audit/outbox，HTTP endpoint 默认要求 HTTPS。
 - message-service 通过 policy-service 做权限决策，不复制策略实现。
+- `cmd/policy-service` 已按 env / debug listener / gRPC TLS / moderation config / operator config 同 package 拆分，避免入口 `main.go` 继续承载横切 helper。
 - `loadtest/policyintegration` smoke runner 已按 config / model / auth / util 同 package 拆分，避免策略集成验证继续堆进单个 `main.go`。
 - `loadtest/policy` summary 已输出 `capacity_summary`，包含运行时长、action/allow/deny 计数、decision/s、latency p95/p99、permission version 和 classification 口径；已通过 `capacity-baseline-direct-20260616-v3` 跑过本地 direct 短基线，原始结果在 `H:\NexusIM\loadtest-results\capacity-baseline-direct-20260616-v3`，报告见 `docs/runbook/loadtest/policy-service/loadtest-report-20260616-policy-direct-capacity-baseline.md`。
 

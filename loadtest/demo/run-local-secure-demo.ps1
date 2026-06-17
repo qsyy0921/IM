@@ -23,6 +23,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$nexusIMRepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
+. (Join-Path $nexusIMRepoRoot "tools\output-root-safety.ps1")
+Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot $nexusIMRepoRoot -Name "ResultRoot"
+
 $repo = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 Set-Location $repo
 

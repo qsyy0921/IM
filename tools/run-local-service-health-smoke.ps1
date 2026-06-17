@@ -9,6 +9,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "output-root-safety.ps1")
+Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot (Split-Path -Parent $PSScriptRoot) -Name "ResultRoot"
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $baseCompose = Join-Path $repoRoot "deploy\local\docker-compose.yml"
 $serviceCompose = Join-Path $repoRoot "deploy\local\docker-compose.services.yml"

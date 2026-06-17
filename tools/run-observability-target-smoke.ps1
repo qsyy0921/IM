@@ -23,6 +23,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "output-root-safety.ps1")
+Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot (Split-Path -Parent $PSScriptRoot) -Name "ResultRoot"
+
 $summaryWriter = Join-Path $PSScriptRoot "write-observability-smoke-summary.ps1"
 $summaryValidator = Join-Path $PSScriptRoot "validate-observability-smoke-summary.ps1"
 

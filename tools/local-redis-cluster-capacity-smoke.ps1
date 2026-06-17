@@ -14,6 +14,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "output-root-safety.ps1")
+Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot (Split-Path -Parent $PSScriptRoot) -Name "ResultRoot"
+
 if ($MessageCount -lt 1) {
     throw "-MessageCount must be positive"
 }

@@ -18,6 +18,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$nexusIMRepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
+. (Join-Path $nexusIMRepoRoot "tools\output-root-safety.ps1")
+Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot $nexusIMRepoRoot -Name "ResultRoot"
+
 if (-not $RunName) {
     $RunName = "policy-message-smoke-" + (Get-Date -Format "yyyyMMdd-HHmmss")
 }

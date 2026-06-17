@@ -35,6 +35,10 @@ function Convert-ToRepoRelativePath {
 function Test-IsAllowedInternalReference {
     param([string]$RelativePath)
 
+    if ($RelativePath.StartsWith("tools\check-") -and $RelativePath.EndsWith(".ps1")) {
+        return $true
+    }
+
     foreach ($allowed in $allowedInternalReferences) {
         if ($RelativePath -eq $allowed) {
             return $true
@@ -67,6 +71,7 @@ $files = foreach ($root in $scanRoots) {
 }
 
 $failures = @()
+$guardFailures = @()
 foreach ($file in ($files | Sort-Object FullName)) {
     $relativePath = Convert-ToRepoRelativePath -Path $file.FullName
     if (Test-IsAllowedInternalReference -RelativePath $relativePath) {
@@ -76,8 +81,16 @@ foreach ($file in ($files | Sort-Object FullName)) {
         continue
     }
 
+    $fileText = Get-Content -LiteralPath $file.FullName -Raw
+    if ($fileText -match "\[string\]\`$ResultRoot" -and $fileText -notmatch "Assert-ExternalOutputRoot") {
+        $guardFailures += [pscustomobject]@{
+            Path = $relativePath
+            Text = "ResultRoot writer is missing Assert-ExternalOutputRoot"
+        }
+    }
+
     $lineNumber = 0
-    foreach ($line in Get-Content -LiteralPath $file.FullName) {
+    foreach ($line in ($fileText -split "`r?`n")) {
         $lineNumber++
         if ($line -match "loadtest[\\/]+results") {
             $failures += [pscustomobject]@{
@@ -89,13 +102,16 @@ foreach ($file in ($files | Sort-Object FullName)) {
     }
 }
 
+foreach ($failure in $guardFailures) {
+    Write-Host "FAIL $($failure.Path) is missing output-root guard: $($failure.Text)" -ForegroundColor Red
+}
 foreach ($failure in $failures) {
     Write-Host "FAIL $($failure.Path):$($failure.Line) uses repo-local loadtest results path: $($failure.Text)" -ForegroundColor Red
 }
 
-if ($failures.Count -gt 0) {
-    Write-Host "Raw loadtest output must default to $ExpectedResultRoot; keep only reports/docs in the repo." -ForegroundColor Red
+if ($guardFailures.Count -gt 0 -or $failures.Count -gt 0) {
+    Write-Host "Raw loadtest output must default to $ExpectedResultRoot, and ResultRoot writers must reject repository-local output roots." -ForegroundColor Red
     exit 1
 }
 
-Write-Host "OK   loadtest output defaults avoid repo-local loadtest/results; expected raw root is $ExpectedResultRoot."
+Write-Host "OK   loadtest output defaults and ResultRoot guards keep raw output outside the repository; expected raw root is $ExpectedResultRoot."

@@ -10,6 +10,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "output-root-safety.ps1")
+Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot (Split-Path -Parent $PSScriptRoot) -Name "ResultRoot"
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $prometheusUpScript = Join-Path $PSScriptRoot "local-up-prometheus.ps1"
 $grafanaUpScript = Join-Path $PSScriptRoot "local-up-grafana.ps1"

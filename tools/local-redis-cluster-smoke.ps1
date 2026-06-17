@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
     [string]$PgDsn = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
@@ -11,6 +11,9 @@
 )
 
 $ErrorActionPreference = "Stop"
+
+. (Join-Path $PSScriptRoot "output-root-safety.ps1")
+Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot (Split-Path -Parent $PSScriptRoot) -Name "ResultRoot"
 
 if (-not $RunName) {
     $RunName = "redis-cluster-smoke-" + (Get-Date -Format "yyyyMMdd-HHmmss")

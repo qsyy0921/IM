@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$PgDsn = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
     [string]$PostgresExecContainer = "nexusim-postgres",
     [string]$KafkaBrokers = "localhost:9092",
@@ -72,6 +72,10 @@
 )
 
 $ErrorActionPreference = "Stop"
+
+$nexusIMRepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
+. (Join-Path $nexusIMRepoRoot "tools\output-root-safety.ps1")
+Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot $nexusIMRepoRoot -Name "ResultRoot"
 
 if (-not $RunName) {
     $RunName = "push-gateway-$Scenario-smoke-" + (Get-Date -Format "yyyyMMdd-HHmmss")

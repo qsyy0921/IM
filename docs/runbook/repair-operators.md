@@ -36,6 +36,14 @@
 
 校验器确认 plan / request / decision 的 hash、`approval_id`、service / mode / command 和 `APPROVED` 状态一致，并回查 `repair-operators.catalog.json`，确保 service / mode / mode env / command 仍属于当前机器可读 catalog。它不执行 operator，也不会复制环境变量值、审批 reason 或业务数据。
 
+本地审批后执行预检入口：
+
+```powershell
+.\tools\invoke-approved-repair-operator.ps1 -PlanPath H:\NexusIM\operator-plans\plan.json -RequestPath H:\NexusIM\operator-plans\approval.json -DecisionPath H:\NexusIM\operator-plans\decision.json -OutputPath H:\NexusIM\operator-plans\invoke-summary.json
+```
+
+默认只做审批链校验并输出低敏执行摘要，不执行 operator。显式加 `-Execute` 才会按 plan 设置环境变量并运行服务 operator；如果 plan 没有 `*_DRY_RUN=true`，还必须额外加 `-AllowMutating`，避免误执行 mutate / cleanup。
+
 ## 使用原则
 
 - 先 audit，后 repair；没有明确 event / outbox / checkpoint / failure 范围时不要 redrive。

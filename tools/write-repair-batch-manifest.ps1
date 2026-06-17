@@ -100,6 +100,9 @@ foreach ($summaryPath in $expandedInvocationSummaryPaths) {
     Assert-RequiredString $summary.service "service" $resolvedSummaryPath
     Assert-RequiredString $summary.mode "mode" $resolvedSummaryPath
     Assert-RequiredString $summary.command "command" $resolvedSummaryPath
+    Assert-RequiredString $summary.plan_path "plan_path" $resolvedSummaryPath
+    Assert-RequiredString $summary.request_path "request_path" $resolvedSummaryPath
+    Assert-RequiredString $summary.decision_path "decision_path" $resolvedSummaryPath
     Assert-RequiredString $summary.plan_sha256 "plan_sha256" $resolvedSummaryPath
     Assert-RequiredString $summary.request_sha256 "request_sha256" $resolvedSummaryPath
     Assert-RequiredString $summary.decision_sha256 "decision_sha256" $resolvedSummaryPath
@@ -120,6 +123,9 @@ foreach ($summaryPath in $expandedInvocationSummaryPaths) {
         mode = [string]$summary.mode
         command = [string]$summary.command
         mode_env = [string]$summary.mode_env
+        plan_path = [string]$summary.plan_path
+        request_path = [string]$summary.request_path
+        decision_path = [string]$summary.decision_path
         plan_sha256 = [string]$summary.plan_sha256
         request_sha256 = [string]$summary.request_sha256
         decision_sha256 = [string]$summary.decision_sha256

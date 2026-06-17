@@ -62,6 +62,14 @@
 
 校验器会重新读取 manifest 引用的 approved invocation summary，确认 summary hash、approval / decision id、service / mode / command 和 plan / request / decision hash 没有被篡改。它只输出低敏验证摘要，不执行 operator。
 
+本地批量执行预检入口：
+
+```powershell
+.\tools\invoke-repair-batch-manifest.ps1 -ManifestPath H:\NexusIM\operator-plans\batch-manifest.json -OutputPath H:\NexusIM\operator-plans\batch-invoke-summary.json
+```
+
+默认只对批量 manifest 做校验，并逐条重新校验 approved invocation summary 对应的 plan / request / decision 链路，输出低敏批量预检摘要，不执行 operator。只有显式加 `-Execute` 才会按 item 顺序委托 `invoke-approved-repair-operator.ps1`；如果任一 item 不是 dry-run，还必须额外加 `-AllowMutating`。
+
 ## 使用原则
 
 - 先 audit，后 repair；没有明确 event / outbox / checkpoint / failure 范围时不要 redrive。

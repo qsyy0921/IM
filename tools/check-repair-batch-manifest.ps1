@@ -6,8 +6,9 @@ $decisionWriterPath = Join-Path $PSScriptRoot "write-repair-approval-decision.ps
 $invokePath = Join-Path $PSScriptRoot "invoke-approved-repair-operator.ps1"
 $batchWriterPath = Join-Path $PSScriptRoot "write-repair-batch-manifest.ps1"
 $batchValidatorPath = Join-Path $PSScriptRoot "validate-repair-batch-manifest.ps1"
+$batchInvokerPath = Join-Path $PSScriptRoot "invoke-repair-batch-manifest.ps1"
 
-foreach ($path in @($plannerPath, $requestWriterPath, $decisionWriterPath, $invokePath, $batchWriterPath, $batchValidatorPath)) {
+foreach ($path in @($plannerPath, $requestWriterPath, $decisionWriterPath, $invokePath, $batchWriterPath, $batchValidatorPath, $batchInvokerPath)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "Missing repair batch manifest test dependency: $path"
     }
@@ -125,6 +126,9 @@ try {
     }
     foreach ($item in $items) {
         if ([string]::IsNullOrWhiteSpace([string]$item.summary_sha256) -or
+            [string]::IsNullOrWhiteSpace([string]$item.plan_path) -or
+            [string]::IsNullOrWhiteSpace([string]$item.request_path) -or
+            [string]::IsNullOrWhiteSpace([string]$item.decision_path) -or
             [string]::IsNullOrWhiteSpace([string]$item.plan_sha256) -or
             [string]::IsNullOrWhiteSpace([string]$item.request_sha256) -or
             [string]::IsNullOrWhiteSpace([string]$item.decision_sha256)) {
@@ -153,6 +157,28 @@ try {
     }
     if ($validationRaw.Contains("do-not-copy-batch-value") -or $validationRaw.Contains("do-not-copy-batch-reason")) {
         throw "repair batch manifest validation leaked raw environment value or reason text."
+    }
+
+    $batchInvokePath = Join-Path $tempRoot "batch-invoke.json"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $batchInvokerPath `
+        -ManifestPath $manifestPath `
+        -OutputPath $batchInvokePath
+    if ($LASTEXITCODE -ne 0) {
+        throw "invoke-repair-batch-manifest.ps1 failed in preflight mode"
+    }
+    $batchInvokeRaw = Get-Content -LiteralPath $batchInvokePath -Raw
+    $batchInvoke = $batchInvokeRaw | ConvertFrom-Json
+    if ($batchInvoke.schema_version -ne 1 -or
+        $batchInvoke.batch_id -ne "repair-batch-test" -or
+        $batchInvoke.item_count -ne 2 -or
+        $batchInvoke.execute_requested -ne $false -or
+        $batchInvoke.executed_count -ne 0 -or
+        $batchInvoke.failed_count -ne 0 -or
+        $batchInvoke.all_items_dry_run -ne $true) {
+        throw "repair batch invocation preflight output has unexpected fields."
+    }
+    if ($batchInvokeRaw.Contains("do-not-copy-batch-value") -or $batchInvokeRaw.Contains("do-not-copy-batch-reason")) {
+        throw "repair batch invocation preflight leaked raw environment value or reason text."
     }
 
     $oldErrorActionPreference = $ErrorActionPreference

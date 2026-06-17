@@ -68,6 +68,9 @@ foreach ($item in $items) {
     Assert-RequiredString $item.service "item.service" $ManifestPath
     Assert-RequiredString $item.mode "item.mode" $ManifestPath
     Assert-RequiredString $item.command "item.command" $ManifestPath
+    Assert-RequiredString $item.plan_path "item.plan_path" $ManifestPath
+    Assert-RequiredString $item.request_path "item.request_path" $ManifestPath
+    Assert-RequiredString $item.decision_path "item.decision_path" $ManifestPath
     Assert-RequiredString $item.plan_sha256 "item.plan_sha256" $ManifestPath
     Assert-RequiredString $item.request_sha256 "item.request_sha256" $ManifestPath
     Assert-RequiredString $item.decision_sha256 "item.decision_sha256" $ManifestPath
@@ -109,6 +112,9 @@ foreach ($item in $items) {
         @("mode", $summary.mode, $item.mode),
         @("command", $summary.command, $item.command),
         @("mode_env", $summary.mode_env, $item.mode_env),
+        @("plan_path", $summary.plan_path, $item.plan_path),
+        @("request_path", $summary.request_path, $item.request_path),
+        @("decision_path", $summary.decision_path, $item.decision_path),
         @("plan_sha256", $summary.plan_sha256, $item.plan_sha256),
         @("request_sha256", $summary.request_sha256, $item.request_sha256),
         @("decision_sha256", $summary.decision_sha256, $item.decision_sha256)

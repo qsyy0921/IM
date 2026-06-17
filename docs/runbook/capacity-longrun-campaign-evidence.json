@@ -14,8 +14,16 @@
                         "status":  "completed",
                         "plan_path":  "H:\\NexusIM\\loadtest-results\\capacity-longrun-nine-services-20260618-plan\\capacity-longrun-campaign-plan.json",
                         "note":  "delivery-service seeded PullInbox plus AckDelivery 30m local long-run slice, completed as one selected service from the nine-service campaign plan; local evidence only, not production sizing.",
-                        "summary_path":  "H:\\NexusIM\\loadtest-results\\capacity-longrun-nine-services-20260618-plan\\capacity-longrun-campaign-summary.json",
+                        "summary_path":  "H:\\NexusIM\\loadtest-results\\capacity-longrun-nine-services-20260618-plan\\delivery-service\\capacity-longrun-campaign-summary.json",
                         "report_path":  "docs\\runbook\\loadtest\\delivery-service\\loadtest-report-20260618-delivery-longrun-slice.md"
+                    },
+                    {
+                        "name":  "message-service-longrun-slice-20260618",
+                        "status":  "completed",
+                        "plan_path":  "H:\\NexusIM\\loadtest-results\\capacity-longrun-nine-services-20260618-plan\\capacity-longrun-campaign-plan.json",
+                        "note":  "message-service seeded SendMessage 30m local long-run slice with 4 VUs and seeded active members; local evidence only, not production sizing.",
+                        "summary_path":  "H:\\NexusIM\\loadtest-results\\capacity-longrun-nine-services-20260618-plan\\message-service\\capacity-longrun-campaign-summary.json",
+                        "report_path":  "docs\\runbook\\loadtest\\message-service\\loadtest-report-20260618-message-longrun-slice.md"
                     }
                 ]
 }

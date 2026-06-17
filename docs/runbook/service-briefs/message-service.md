@@ -20,11 +20,11 @@
 - 已补 trusted metadata 启动门禁：当 `NEXUSIM_MESSAGE_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端未启用 mTLS client cert 校验，则启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - `loadtest/sendmessage` 容量 runner 已按 config / model / auth / util 同 package 拆分，避免后续容量观测继续堆进单个 `main.go`。
 - `loadtest/sendmessage` summary 已新增 `capacity_summary`，统一输出 actual duration、targets、VU、conversation、request/success/error、logical request、RPS、p95/p99、outbox 和 PG pool 关键计数；这是容量基线口径，不等于已完成生产容量压测。
-- `loadtest/capacityseed` 已能准备 `tenant-capacity-message` 下的 ACTIVE conversation / member fixture；`capacity-baseline-seeded-20260616` 本地 seeded 短基线中 `sendmessage` 成功 408、`accepted_rps=81.34`，报告见 `loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md`。
+- `loadtest/capacityseed` 已能准备 `tenant-capacity-message` 下的 ACTIVE conversation / member fixture；`capacity-baseline-seeded-20260616` 本地 seeded 短基线中 `sendmessage` 成功 408、`accepted_rps=81.34`，报告见 `loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md`；`message-service-longrun-slice-20260618` 本地 seeded 30m 长跑中 `success_count=156902`、`accepted_rps=87.164`、`success_rate=95.42%`，报告见 `loadtest/message-service/loadtest-report-20260618-message-longrun-slice.md`。
 - `cmd/message-service` 已按 env / debug listener / gRPC server 与 TLS / downstream client TLS / observability config / operator config 同 package 拆分，避免入口 `main.go` 继续承载横切 helper。
 - PostgreSQL repository 的 revoke / edit / delete mutation 集成测试已拆到同 package `repository_mutation_test.go`；outbox relay 生产代码已按 relay loop、message event builder、member boundary builder 拆分，builder 用例已拆到 `relay_builder_test.go`，outbox store audit / repair 用例已拆到 `outbox_store_audit_test.go`，保留原覆盖面并降低单个文件复杂度。
 
 ## 后续
 
-- 会话级删除策略深化、provider-grade 外部 proof 工作流 / 审批系统集成、长时间容量曲线和生产观测；用户私有隐藏已由 delivery-service `HideInboxItem` 承担，图片 / 文件 / 语音二进制上传和处理属于后续 media 能力。
+- 会话级删除策略深化、provider-grade 外部 proof 工作流 / 审批系统集成、更完整容量曲线和生产观测；用户私有隐藏已由 delivery-service `HideInboxItem` 承担，图片 / 文件 / 语音二进制上传和处理属于后续 media 能力。
 - 生产级 OTel collector、告警路由、retention 和 SLO dashboard 仍属于后续统一观测治理。

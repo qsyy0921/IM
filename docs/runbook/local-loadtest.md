@@ -16,6 +16,26 @@
 
 该摘要只说明健康态下的一次 `docker stats --no-stream` 观察值，不是容量压测、SLO 或生产资源基线。
 
+已归档的健康态资源快照证据索引见 `docs/runbook/resource-snapshot-evidence.json`。默认门禁只校验 schema 和边界；如需复核 H 盘原始 summary / markdown 是否仍存在，运行：
+
+```powershell
+.\tools\validate-resource-snapshot-evidence.ps1 `
+  -ManifestPath docs\runbook\resource-snapshot-evidence.json `
+  -RequireFiles
+```
+
+新跑出一条资源快照后，不要手改 manifest。使用追加工具登记低敏索引：
+
+```powershell
+.\tools\add-resource-snapshot-evidence.ps1 `
+  -Name local-service-health-smoke-<name> `
+  -SummaryPath H:\NexusIM\loadtest-results\local-service-health-smoke-<name>\resource-summary.json `
+  -MarkdownPath H:\NexusIM\loadtest-results\local-service-health-smoke-<name>\resource-summary.md `
+  -Note "9-service Docker health-state resource snapshot"
+```
+
+同名条目默认拒绝覆盖；确认要更新时再显式加 `-Replace`。
+
 ## 快速入口：容量基线汇总
 
 9 个已实现服务的 loadtest runner 会在各自 summary JSON 中输出 `capacity_summary`。完成一轮或多轮压测后，可以从 H 盘原始结果目录生成统一容量基线索引：

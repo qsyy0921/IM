@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-06-17",
+  "scope": "Local 9-service Docker health-state resource snapshot evidence index for NexusIM. These entries point to existing local docker stats summaries; they are not capacity benchmarks, production SLO, or production sizing claims.",
+  "entries": [
+    {
+      "name": "local-service-health-smoke-codex-check",
+      "summary_path": "H:\\NexusIM\\loadtest-results\\local-service-health-smoke-codex-check\\resource-summary.json",
+      "markdown_path": "H:\\NexusIM\\loadtest-results\\local-service-health-smoke-codex-check\\resource-summary.md",
+      "require_clean_git": false,
+      "note": "9-service Docker health-state resource snapshot; single no-stream docker stats observation."
+    }
+  ]
+}

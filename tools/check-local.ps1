@@ -131,6 +131,9 @@ try {
     Write-Host "== resource snapshot summary =="
     Invoke-LocalCheck "check-resource-snapshot-summary.ps1"
 
+    Write-Host "== resource snapshot evidence =="
+    Invoke-LocalCheck "check-resource-snapshot-evidence.ps1"
+
     Write-Host "== distributed smoke evidence =="
     Invoke-LocalCheck "check-distributed-smoke-evidence.ps1"
 

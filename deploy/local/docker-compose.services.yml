@@ -137,6 +137,19 @@ services:
       nexusim-services:
         ipv4_address: 172.30.80.17
 
+  search-service-noop:
+    image: nexusim/search-service:local
+    container_name: nexusim-search-service-noop
+    environment:
+      NEXUSIM_SEARCH_SERVICE_MODE: noop
+      NEXUSIM_SEARCH_DEBUG_ADDR: 172.30.80.20:11917
+    ports:
+      - "11917:11917"
+    restart: unless-stopped
+    networks:
+      nexusim-services:
+        ipv4_address: 172.30.80.20
+
   push-gateway-ws:
     image: nexusim/push-gateway:local
     container_name: nexusim-push-gateway-ws

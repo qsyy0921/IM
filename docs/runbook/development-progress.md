@@ -23,9 +23,12 @@
 - `contacts-service`
 - `policy-service`
 
-当前即将进入 AI 大模型应用底座建设、但尚未真实实现的后续能力：
+当前已开始的 AI 大模型应用底座能力：
 
 - `search-service`
+
+当前尚未真实实现的后续 AI / Agent 能力：
+
 - `memory-service` / group memory projection
 - `retrieval-gateway`
 - `rag-service`
@@ -44,7 +47,7 @@
 后端微服务主链路
 -> 分布式可靠性
 -> 9 个现有服务必要收口
--> search-service v0.1
+-> search-service v0.1 第一实现切片已开始
 -> memory-service / retrieval-gateway
 -> RAG / summary-service / Agent
 -> skill-registry / mcp-gateway / action-executor
@@ -167,7 +170,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 | `receipt-service` | 已落地、已接主链路 | receipt projection / outbox / audit / repair、outbox audit / repair / repair audit / cleanup JSON 留存、`ListReceiptStates` repository 级批量查询、低敏 `received_device_count` 聚合和 opt-in capped device details、会话列表 archived-only / unread / pinned / muted / legacy tag / multi-tag all-match / draft-only / last-source-event-type 过滤、draft-first 和 unread-first 排序、first-stage `/metrics` 和 OTel server span、loadtest `capacity_summary` 口径和本地 stack 30m 长跑切片 | `service-briefs/receipt-service.md` |
 | `contacts-service` | 已落地、已接主链路 | request source metadata / source_ref 低敏 fail-fast 校验 / source policy gate / first-stage risk_level + `REVIEW_REQUIRED` operator 审批状态机 / ListContactRequests source-risk-review 过滤与分页 token 绑定 / first-stage ALLOW-DENY privacy exception set / list / delete / search-source privacy gate / profile visibility 总开关和字段级白名单 / contacts search / group filter / USER-TENANT-SYSTEM privacy / tenant privacy operator / outbox / audit / repair、outbox audit / repair / repair audit / cleanup 与 privacy / source policy audit / set / contact-request-review / contact-request-review-audit JSON 留存、repository 同 package 拆分、loadtest `capacity_summary` 口径和本地 stack 30m 长跑切片 | `service-briefs/contacts-service.md` |
 | `policy-service` | 已落地、已接主链路 | decision / user action restriction / first-stage ReBAC decision source / first-stage relationship gate + 本地低敏 relation operator / first-stage keyword + HTTP content moderation / first-stage tenant action quota / first-stage tool policy precheck + low-sensitive local audit / projection / outbox / audit / repair、outbox audit / repair / repair audit / cleanup JSON 留存、低敏 decision audit export / forward、本地 direct 短基线和 clean commit direct 30m 长跑切片 | `service-briefs/policy-service.md` |
-| `search-service` | 占位，当前第一步 active slice | 无真实实现；当前下一步是 v0.1 SDD 收敛、proto / migration / skeleton、timeline projection、`SearchMessages`，定位为 search projection / visibility / tombstone / EvidencePack 前置，不做 LLM demo；后续再接 `memory-service` / `retrieval-gateway` / RAG / `summary-service` / Agent / `skill-registry` / `mcp-gateway` / `action-executor` | `service-briefs/search-service.md` |
+| `search-service` | 已开始第一实现切片 | `search_service.proto`、PostgreSQL core migration、六层 skeleton、`SearchMessages` app / domain / gRPC adapter 和 projection usecase skeleton 已落地；下一步是 PostgreSQL repository、timeline projection consumer、真实 `SearchMessages` 和 search smoke；定位为 search projection / visibility / tombstone / EvidencePack 前置，不做 LLM demo | `service-briefs/search-service.md` |
 
 ## 剩余目标入口
 
@@ -182,7 +185,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 ```text
 前 9 个微服务已经能跑通 IM 主链路，
 现在处于“9 个现有服务做必要收口，并向 AI 大模型应用底座转进”，
-search-service v0.1 是第一步，后续是 memory-service / retrieval-gateway / RAG / summary-service / Agent / skill-registry / mcp-gateway / action-executor。
+search-service v0.1 第一实现切片已开始，后续是 memory-service / retrieval-gateway / RAG / summary-service / Agent / skill-registry / mcp-gateway / action-executor。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。
 ```
 

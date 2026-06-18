@@ -1,0 +1,20 @@
+groups:
+  - name: nexusim-search-service
+    rules:
+      - alert: NexusIMSearchServiceDown
+        expr: up{service="search-service"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: search-service
+        annotations:
+          summary: "search-service metrics endpoint is down"
+
+      - alert: NexusIMSearchServiceInfoMissing
+        expr: absent(nexusim_search_service_info)
+        for: 1m
+        labels:
+          severity: warning
+          service: search-service
+        annotations:
+          summary: "search-service info metric is missing"

@@ -17,6 +17,7 @@ protoc `
     "$ApiProtoDir/nexusim/identity/v1/identity_service.proto" `
     "$ApiProtoDir/nexusim/policy/v1/policy_service.proto" `
     "$ApiProtoDir/nexusim/receipt/v1/receipt_service.proto" `
+    "$ApiProtoDir/nexusim/search/v1/search_service.proto" `
     "$ApiProtoDir/nexusim/conversation/v1/conversation_service.proto" `
     "$ApiProtoDir/nexusim/message/v1/message_error.proto" `
     "$ApiProtoDir/nexusim/message/v1/message_service.proto"

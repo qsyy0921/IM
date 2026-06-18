@@ -32,17 +32,9 @@ Keep entrance docs short. Do not copy the same status into every file.
 NexusIM is in the "necessary closeout + AI large-model application foundation"
 phase.
 
-Existing real services:
-
-- `api-gateway`
-- `identity-service`
-- `message-service`
-- `conversation-service`
-- `delivery-service`
-- `push-gateway`
-- `receipt-service`
-- `contacts-service`
-- `policy-service`
+Existing real services: `api-gateway`, `identity-service`, `message-service`,
+`conversation-service`, `delivery-service`, `push-gateway`, `receipt-service`,
+`contacts-service`, and `policy-service`.
 
 Current main line:
 
@@ -56,34 +48,17 @@ Current main line:
 4. Keep production-grade HA, long load tests, sizing, full SLOs, and provider
    operations in hardening backlog unless the user explicitly asks for them.
 
-Current AI architecture baseline:
-
-- Treat facts, projections, retrieval, and controlled execution as separate
-  planes.
-- Build `search-service`, then `memory-service`, then `retrieval-gateway`
-  before RAG or Agent execution.
-- `memory-service` must model group memory with source references, speaker /
-  audience scope, validity windows, supersession, confidence, and review state;
-  it is not a plain vector store or summary cache.
-- RAG / summary / Agent outputs must consume EvidencePack and must not bypass
-  policy or retrieval boundaries.
-- Agent actions must use policy precheck, tool policy, proposal / approval,
-  action executor, and audit; high-risk autonomous execution is out of scope for
-  first-stage work.
+Current AI baseline: keep facts / projections / retrieval / controlled
+execution separate; build search -> memory -> retrieval before RAG / Agent;
+memory requires source refs, scope, validity, supersession, confidence and
+review state; RAG / Agent consume EvidencePack and actions go through policy,
+proposal / approval, executor and audit.
 
 ## Progress Documents
 
-- `prompt.md`: goal-box prompt and route.
-- `agent.md`: this routing and collaboration guide.
-- `docs/runbook/current-goal.md`: concrete active goal.
-- `docs/runbook/current-brief.md`: current phase.
-- `docs/runbook/remaining-goals.md`: unfinished work only.
-- `docs/runbook/development-progress.md`: human progress overview.
-- `docs/runbook/service-briefs/<service>.md`: single-service state.
-- `docs/interview/project-progress.md`: interview-facing progress.
-
-When work changes facts, update only the owning document. New work goes into
-`remaining-goals.md`; promote it to `current-goal.md` only when active.
+Use the routing table above as the source of truth. When facts change, update
+only the owning document. New work goes into `remaining-goals.md`; promote it to
+`current-goal.md` only when active.
 
 ## Work Selection
 
@@ -118,28 +93,10 @@ practical.
 
 ## Sub-Agents
 
-Use sub-agents only for explicitly requested parallel work, review, test-gap
-discovery, or disjoint implementation. Keep each task narrow: one service, one
-concern, one output format.
-
-Bound concurrency. Normally use 2-3 agents; use more only when the user asks and
-write scopes are disjoint. Do not let two agents edit the same file or section.
-The main agent owns integration, consistency, validation, and closing stale
-agents.
-
-For the current AI foundation phase, acceptable sub-agent splits are:
-
-- architecture / SDD review agents that only read and report inconsistencies;
-- one worker per disjoint service or document set, for example
-  `search-service` contracts, `memory-service` SDD, and `retrieval-gateway`
-  EvidencePack contracts;
-- verification agents that run focused checks or find test gaps while the main
-  agent works on a different write scope.
-
-Do not use sub-agents to create competing versions of the same architecture
-document, edit the same service brief, or make uncoordinated cross-service API
-changes. The main agent must merge results, run the final checks, and close
-completed agents promptly.
+Use sub-agents only when requested or clearly useful for disjoint review,
+implementation or verification. Keep one service / concern / output per agent,
+avoid concurrent edits to the same file or section, and close stale agents after
+the main agent integrates and validates their output.
 
 ## Validation Before Finishing
 

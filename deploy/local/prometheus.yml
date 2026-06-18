@@ -83,3 +83,11 @@ scrape_configs:
           - host.docker.internal:11916
         labels:
           service: policy-service
+
+  - job_name: nexusim-search-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:11917
+        labels:
+          service: search-service

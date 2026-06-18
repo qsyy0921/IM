@@ -52,11 +52,11 @@
 | `contacts-service` | 组织级策略、租户默认值 / 来源策略 / 隐私例外接入 admin/config service 正式权限面；已完成 first-stage 来源风险标注、`REVIEW_REQUIRED` 持久化和本地 operator 审批状态机，已有本地 stack 30m 长跑切片，仍需更完整容量曲线和生产 sizing。 |
 | `policy-service` | provider-grade ReBAC graph / DSL；provider-grade moderation / risk scoring；provider-grade tenant DSL / quota；provider-grade tool policy operator / approval integration；provider-grade 外部 audit pipeline；已完成 first-stage decision source、first-stage relationship gate、ReBAC relation 本地低敏 operator、keyword / HTTP content moderation、低敏 `decision-audit-export` 本地审计交接、低敏 `decision-audit-forward` 外部审计交接、first-stage tenant action quota、first-stage tool policy precheck / low-sensitive local audit 和本地 direct 短基线，仍需长时间容量曲线和生产 sizing。 |
 
-## 后续未启动工作
+## 后续待开发工作
 
 这些工作按依赖分批进入，不再永久等到所有生产级 hardening 完成后才启动：
 
-- `search-service`：AI 底座第一步，先做 v0.1 搜索 projection、visibility、tombstone、`SearchMessages`，不做 LLM。
+- `search-service`：AI 底座第一步，第一实现切片已落 proto / migration / 六层 skeleton；下一步补 v0.1 搜索 projection、visibility、tombstone、真实 `SearchMessages` 和 smoke，不做 LLM。
 - `memory-service` / group memory projection：在 search-service 边界稳定后做结构化协作记忆、版本语义、speaker / audience 归因、Memory Graph 和画像聚合；无 source ref 的长期 memory 不能进入 ACTIVE。
 - `retrieval-gateway`：在 search / memory 之后做统一 EvidencePack、权限过滤、引用来源和 temporal version 入口。
 - `rag-service`：只消费 EvidencePack，不直接检索业务库。

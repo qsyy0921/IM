@@ -30,8 +30,11 @@ $currentImplementedServices = @(
     "policy-service"
 )
 
+$currentFoundationServices = @(
+    "search-service"
+)
+
 $futureServices = @(
-    "search-service",
     "memory-service",
     "media-service",
     "notification-service",
@@ -56,10 +59,31 @@ foreach ($service in $currentImplementedServices) {
     }
 }
 
+$allowedServiceDirs = @($currentImplementedServices + $currentFoundationServices)
 $actualServiceDirs = @(Get-ChildItem -LiteralPath $servicesRoot -Directory | ForEach-Object { $_.Name })
-$unexpectedServices = @($actualServiceDirs | Where-Object { $_ -notin $currentImplementedServices } | Sort-Object)
+$unexpectedServices = @($actualServiceDirs | Where-Object { $_ -notin $allowedServiceDirs } | Sort-Object)
 if ($unexpectedServices.Count -gt 0) {
-    throw "Unexpected service directories before stage switch: $($unexpectedServices -join ', '). Current phase must clean the 9 existing services before new service code."
+    throw "Unexpected service directories before ADR/stage switch: $($unexpectedServices -join ', '). Future services must not appear before the current phase explicitly allows them."
+}
+
+foreach ($service in $currentFoundationServices) {
+    if (-not $currentBrief.Contains($service)) {
+        throw "current-brief.md must list active foundation service: $service"
+    }
+    if (-not $remainingGoals.Contains($service)) {
+        throw "remaining-goals.md must keep active foundation service backlog: $service"
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $servicesRoot $service) -PathType Container)) {
+        throw "Missing active foundation service directory: services\$service"
+    }
+    $briefPath = Join-Path $serviceBriefRoot "$service.md"
+    if (-not (Test-Path -LiteralPath $briefPath -PathType Leaf)) {
+        throw "Missing active foundation service brief: docs\runbook\service-briefs\$service.md"
+    }
+    $brief = Read-UTF8Text -Path $briefPath
+    if (-not ($brief.Contains("search_service.proto") -and $brief.Contains("projection usecase skeleton"))) {
+        throw "Active foundation service brief must state first implementation slice: docs\runbook\service-briefs\$service.md"
+    }
 }
 
 foreach ($futureService in $futureServices) {

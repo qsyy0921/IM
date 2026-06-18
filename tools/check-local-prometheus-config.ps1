@@ -13,6 +13,7 @@ $pushGatewayRulesPath = Join-Path $repoRoot "deploy\local\prometheus-push-gatewa
 $receiptRulesPath = Join-Path $repoRoot "deploy\local\prometheus-receipt-service-alerts.yml"
 $contactsRulesPath = Join-Path $repoRoot "deploy\local\prometheus-contacts-service-alerts.yml"
 $policyRulesPath = Join-Path $repoRoot "deploy\local\prometheus-policy-service-alerts.yml"
+$searchRulesPath = Join-Path $repoRoot "deploy\local\prometheus-search-service-alerts.yml"
 
 $prometheusServices = @(
     @{ Name = "api-gateway"; DebugPort = 11904; RuleFile = "prometheus-api-gateway-alerts.yml" },
@@ -23,7 +24,8 @@ $prometheusServices = @(
     @{ Name = "push-gateway"; DebugPort = 11913; RuleFile = "prometheus-push-gateway-alerts.yml" },
     @{ Name = "receipt-service"; DebugPort = 11914; RuleFile = "prometheus-receipt-service-alerts.yml" },
     @{ Name = "contacts-service"; DebugPort = 11915; RuleFile = "prometheus-contacts-service-alerts.yml" },
-    @{ Name = "policy-service"; DebugPort = 11916; RuleFile = "prometheus-policy-service-alerts.yml" }
+    @{ Name = "policy-service"; DebugPort = 11916; RuleFile = "prometheus-policy-service-alerts.yml" },
+    @{ Name = "search-service"; DebugPort = 11917; RuleFile = "prometheus-search-service-alerts.yml" }
 )
 
 $implementedServices = @(Get-ChildItem -LiteralPath $servicesRoot -Directory | Sort-Object Name | Select-Object -ExpandProperty Name)
@@ -45,7 +47,8 @@ $requiredConfigFiles = @(
     $pushGatewayRulesPath,
     $receiptRulesPath,
     $contactsRulesPath,
-    $policyRulesPath
+    $policyRulesPath,
+    $searchRulesPath
 )
 
 foreach ($path in $requiredConfigFiles) {
@@ -65,6 +68,7 @@ $pushGatewayRules = Get-Content -LiteralPath $pushGatewayRulesPath -Raw
 $receiptRules = Get-Content -LiteralPath $receiptRulesPath -Raw
 $contactsRules = Get-Content -LiteralPath $contactsRulesPath -Raw
 $policyRules = Get-Content -LiteralPath $policyRulesPath -Raw
+$searchRules = Get-Content -LiteralPath $searchRulesPath -Raw
 
 if ($compose -notmatch "19090:9090") {
     throw "Prometheus compose must expose host port 19090 to avoid existing local service ports."
@@ -259,6 +263,17 @@ $requiredPolicyAlerts = @(
 foreach ($alert in $requiredPolicyAlerts) {
     if ($policyRules -notmatch [regex]::Escape($alert)) {
         throw "Prometheus policy-service rules missing alert: $alert"
+    }
+}
+
+$requiredSearchAlerts = @(
+    "NexusIMSearchServiceDown",
+    "NexusIMSearchServiceInfoMissing"
+)
+
+foreach ($alert in $requiredSearchAlerts) {
+    if ($searchRules -notmatch [regex]::Escape($alert)) {
+        throw "Prometheus search-service rules missing alert: $alert"
     }
 }
 

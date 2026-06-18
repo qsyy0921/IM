@@ -15,8 +15,9 @@ $pushGatewayDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards
 $receiptDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\receipt-service-observability.json"
 $contactsDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\contacts-service-observability.json"
 $policyDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\policy-service-observability.json"
+$searchDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\search-service-observability.json"
 
-foreach ($path in @($composePath, $datasourcePath, $providerPath, $apiGatewayDashboardPath, $identityDashboardPath, $messageDashboardPath, $conversationDashboardPath, $deliveryDashboardPath, $pushGatewayDashboardPath, $receiptDashboardPath, $contactsDashboardPath, $policyDashboardPath)) {
+foreach ($path in @($composePath, $datasourcePath, $providerPath, $apiGatewayDashboardPath, $identityDashboardPath, $messageDashboardPath, $conversationDashboardPath, $deliveryDashboardPath, $pushGatewayDashboardPath, $receiptDashboardPath, $contactsDashboardPath, $policyDashboardPath, $searchDashboardPath)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Missing local Grafana config file: $path"
     }
@@ -221,6 +222,10 @@ $policyRequiredMetrics = @(
     "nexusim_policy_otel_traces_enabled"
 )
 
+$searchRequiredMetrics = @(
+    "nexusim_search_service_info"
+)
+
 Test-Dashboard -Path $apiGatewayDashboardPath -Name "api-gateway" -ExpectedUid "nexusim-api-gateway" -MinimumPanels 5 -RequiredMetrics $apiGatewayRequiredMetrics
 Test-Dashboard -Path $identityDashboardPath -Name "identity-service" -ExpectedUid "nexusim-identity-service" -MinimumPanels 8 -RequiredMetrics $identityRequiredMetrics
 Test-Dashboard -Path $messageDashboardPath -Name "message-service" -ExpectedUid "nexusim-message-service" -MinimumPanels 8 -RequiredMetrics $messageRequiredMetrics
@@ -230,5 +235,6 @@ Test-Dashboard -Path $pushGatewayDashboardPath -Name "push-gateway" -ExpectedUid
 Test-Dashboard -Path $receiptDashboardPath -Name "receipt-service" -ExpectedUid "nexusim-receipt-service" -MinimumPanels 8 -RequiredMetrics $receiptRequiredMetrics
 Test-Dashboard -Path $contactsDashboardPath -Name "contacts-service" -ExpectedUid "nexusim-contacts-service" -MinimumPanels 8 -RequiredMetrics $contactsRequiredMetrics
 Test-Dashboard -Path $policyDashboardPath -Name "policy-service" -ExpectedUid "nexusim-policy-service" -MinimumPanels 8 -RequiredMetrics $policyRequiredMetrics
+Test-Dashboard -Path $searchDashboardPath -Name "search-service" -ExpectedUid "nexusim-search-service" -MinimumPanels 1 -RequiredMetrics $searchRequiredMetrics
 
 Write-Host "OK   local Grafana config"

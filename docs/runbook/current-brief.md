@@ -37,7 +37,7 @@ policy-service
 -> skill-registry / mcp-gateway / action-executor
 ```
 
-当前必要收口已继续推进到 policy-service tool policy precheck / low-sensitive audit，后续 Agent / skill-registry / MCP gateway / action-executor 可先调用 policy-service 预检，不直接绕过权限边界。当前下一步仍是 `search-service v0.1`：先做 SDD 收敛、proto / migration / 六层 skeleton、timeline projection 和 `SearchMessages`，不做 LLM。后续依次推进 `memory-service`、`retrieval-gateway`、RAG、`summary-service`、Agent、`skill-registry`、`mcp-gateway`、`action-executor`。完整系统测试、生产级 HA、长压和 sizing 后置为 hardening backlog，不阻塞当前 AI 底座启动。
+当前必要收口已继续推进到 policy-service tool policy precheck / low-sensitive audit，后续 Agent / skill-registry / MCP gateway / action-executor 可先调用 policy-service 预检，不直接绕过权限边界。`search-service v0.1` 第一实现切片已开始：proto、PostgreSQL core migration、六层 skeleton、`SearchMessages` app / domain / gRPC adapter 和 projection usecase skeleton 已落地；下一步是 PostgreSQL repository、timeline projection consumer 和真实 `SearchMessages` 查询，不做 LLM。后续依次推进 `memory-service`、`retrieval-gateway`、RAG、`summary-service`、Agent、`skill-registry`、`mcp-gateway`、`action-executor`。完整系统测试、生产级 HA、长压和 sizing 后置为 hardening backlog，不阻塞当前 AI 底座启动。
 
 当前可以用 multi sub-agent 并行推进设计、实现和验证，但必须按 `agent.md` 拆分互不重叠的服务 / 文档 / 测试范围。主 agent 负责集成、最终检查和关闭不再需要的 sub-agent。
 

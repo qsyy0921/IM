@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package nexusim.search.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/search/v1;searchv1";
+
+service SearchService {
+  rpc SearchMessages(SearchMessagesRequest) returns (SearchMessagesResponse);
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+message SearchMessagesRequest {
+  AuthContext auth_context = 1;
+  string query = 2;
+  string conversation_id = 3;
+  int64 after_seq = 4;
+  int32 limit = 5;
+}
+
+message HighlightRange {
+  int32 start = 1;
+  int32 end = 2;
+}
+
+message SearchMessageHit {
+  string conversation_id = 1;
+  string message_id = 2;
+  int64 conversation_seq = 3;
+  string source_event_id = 4;
+  string sender_id = 5;
+  string message_type = 6;
+  string snippet = 7;
+  repeated HighlightRange highlight_ranges = 8;
+  int64 occurred_at_unix_ms = 9;
+  int64 visibility_version = 10;
+}
+
+message SearchMessagesResponse {
+  repeated SearchMessageHit items = 1;
+  string next_cursor = 2;
+  int64 projection_version = 3;
+}

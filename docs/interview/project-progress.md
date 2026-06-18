@@ -47,7 +47,7 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 第三阶段：补 delivery-service 和 push-gateway，把 durable inbox、PullInbox、AckDelivery、在线通知和跨实例 route 串起来。
 第四阶段：补 receipt-service、contacts-service、policy-service 和 api-gateway，把已读/未读、联系人、权限决策和统一入口补齐。
 第五阶段：集中治理分布式可靠性、安全启动门禁、trusted metadata / TLS 边界、repair / audit / cleanup、debug metrics 和代码复杂度。
-第六阶段：9 个核心服务做必要收口后，以 search-service v0.1 作为向 AI 大模型应用后端转进的第一步；当前 search-service 第一实现切片已跑通 projection smoke；memory-service 已从 SDD / proto / migration contract 推进到 foundation-active implementation，并跑通 source-backed projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过；后续继续 EvidencePack 字段 / policy hardening，然后进入 RAG、summary、Agent、skill-registry、MCP gateway 和 action-executor。
+第六阶段：9 个核心服务做必要收口后，以 search-service v0.1 作为向 AI 大模型应用后端转进的第一步；当前 search-service 第一实现切片已跑通 projection smoke；memory-service 已从 SDD / proto / migration contract 推进到 foundation-active implementation，并跑通 source-backed projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，且已补 first-stage policy-service retrieval precheck；后续继续 EvidencePack 字段 hardening，然后进入 RAG、summary、Agent、skill-registry、MCP gateway 和 action-executor。
 ```
 
 当前项目处在第五阶段到第六阶段之间：
@@ -268,7 +268,7 @@ search / RAG / Agent 后端能力。
 
 在身份侧，我实现了登录、Refresh Token、MFA、recovery code、JWKS、challenge delivery outbox、SMTP / webhook challenge sender 和启动安全门禁。系统也补了 health、ready、debug metrics、repair、audit、cleanup、worker retry 和多种本地故障 smoke。
 
-后续我会先把 9 个核心服务做必要收口，补齐消息变更、成员窗口、群管理、回执、联系人和策略这些 AI 会依赖的 IM 语义；短期不把生产级完整系统测试作为转进阻塞，而是用切片级本地检查和最小 smoke 守住事实、权限和证据边界。当前 search-service v0.1 已跑通 projection smoke；memory-service 已跑通 source-backed group memory projection smoke；retrieval-gateway 已跑通 search + memory -> EvidencePack smoke；后续继续补 EvidencePack policy / 字段 hardening，再做 RAG、summary、Agent、skill-registry、MCP gateway 和 action-executor。大模型只能通过权限过滤后的 EvidencePack 访问聊天记录，Agent 写动作必须走 proposal、approval、executor 和 audit。
+后续我会先把 9 个核心服务做必要收口，补齐消息变更、成员窗口、群管理、回执、联系人和策略这些 AI 会依赖的 IM 语义；短期不把生产级完整系统测试作为转进阻塞，而是用切片级本地检查和最小 smoke 守住事实、权限和证据边界。当前 search-service v0.1 已跑通 projection smoke；memory-service 已跑通 source-backed group memory projection smoke；retrieval-gateway 已跑通 search + memory -> EvidencePack smoke，并已接入 first-stage 可选 policy-service retrieval precheck；后续继续补 EvidencePack 字段 hardening，再做 RAG、summary、Agent、skill-registry、MCP gateway 和 action-executor。大模型只能通过权限过滤后的 EvidencePack 访问聊天记录，Agent 写动作必须走 proposal、approval、executor 和 audit。
 ```
 
 ## 维护规则

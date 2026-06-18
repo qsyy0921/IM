@@ -13,3 +13,7 @@ type SearchPort interface {
 type MemoryPort interface {
 	QueryMemoryEvents(context.Context, types.MemoryQuery) (types.MemoryResult, error)
 }
+
+type PolicyPort interface {
+	CheckRetrieveEvidence(context.Context, types.RetrievalPolicyCheck) (types.RetrievalPolicyDecision, error)
+}

@@ -13,7 +13,7 @@
 
 当前开发主线：
 1. 只做会阻塞 AI 底座的 9-service closeout：mutation/tombstone、visibility window、contacts privacy、policy/audit/security 边界。
-2. 当前 active slice：retrieval-gateway / EvidencePack hardening，优先补 explicit policy-service retrieval check、source coverage、rerank score、dedupe reason；继续保证 source refs、temporal version、visibility / policy boundary，不直接读 message/conversation/private tables。
+2. 当前 active slice：retrieval-gateway / EvidencePack hardening；policy-service retrieval precheck 已有 first-stage 可选接入，下一步优先补 source coverage、rerank score、dedupe reason；继续保证 source refs、temporal version、visibility / policy boundary，不直接读 message/conversation/private tables。
 3. 完成 EvidencePack 边界后，按顺序推进：rag-service -> summary-service -> agent-service -> skill-registry -> mcp-gateway/tool-gateway -> action-executor -> ai-eval。
 
 本轮只做能推进上述主线的工作；新发现的非阻塞生产化事项写入 docs/runbook/remaining-goals.md，不要抢占当前 AI 底座路线。

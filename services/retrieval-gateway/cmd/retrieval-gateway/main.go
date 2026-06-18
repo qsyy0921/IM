@@ -82,6 +82,15 @@ func runGRPC(ctx context.Context) error {
 		return err
 	}
 	defer closeMemory()
+	options := []app.RetrieveEvidenceOption{}
+	if policyAddr := envString("NEXUSIM_POLICY_GRPC_ADDR", ""); policyAddr != "" {
+		policyClient, closePolicy, err := rpcinfra.DialPolicyClient(ctx, policyAddr, timeout)
+		if err != nil {
+			return err
+		}
+		defer closePolicy()
+		options = append(options, app.WithPolicyPort(policyClient))
+	}
 
 	addr := envString("NEXUSIM_RETRIEVAL_GRPC_ADDR", "127.0.0.1:10590")
 	listener, err := net.Listen("tcp", addr)
@@ -89,7 +98,7 @@ func runGRPC(ctx context.Context) error {
 		return err
 	}
 	server := grpc.NewServer()
-	retrievalgrpc.Register(server, retrievalgrpc.NewServer(app.NewRetrieveEvidenceUseCase(searchClient, memoryClient)))
+	retrievalgrpc.Register(server, retrievalgrpc.NewServer(app.NewRetrieveEvidenceUseCase(searchClient, memoryClient, options...)))
 
 	serveErr := make(chan error, 1)
 	go func() {

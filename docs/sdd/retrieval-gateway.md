@@ -52,8 +52,15 @@ RAG / summary / Agent 必须消费 `EvidencePack`，不能绕过 retrieval-gatew
 - search-service 负责消息可见性和 tombstone 过滤。
 - memory-service 负责 memory event 可见性和 revoked / deleted 隐藏。
 - retrieval-gateway 透传 verified auth metadata 和 request body auth context。
+- 如果配置 `NEXUSIM_POLICY_GRPC_ADDR`，retrieval-gateway 会在调用 search / memory
+  前通过 policy-service `CheckToolAction` 执行显式 retrieval precheck：
+  `tool_name=retrieval.evidence`、`action=CALL`、`risk_level=LOW`。
+  policy deny、requires approval 或 policy 依赖不可用时 fail-closed，不继续查询
+  search / memory。
 
-后续如果接入更强 policy check，必须通过 policy-service port，而不是直接读其它服务内部表。
+该 precheck 只通过 policy-service 公开 gRPC 契约完成，不直接读其它服务内部表。
+未配置 `NEXUSIM_POLICY_GRPC_ADDR` 时，第一阶段仍可依赖 search / memory 下游
+visibility projection 跑本地 smoke。
 
 ## 运行模式
 
@@ -69,12 +76,14 @@ RAG / summary / Agent 必须消费 `EvidencePack`，不能绕过 retrieval-gatew
 - `NEXUSIM_RETRIEVAL_DEBUG_ADDR`
 - `NEXUSIM_SEARCH_GRPC_ADDR`
 - `NEXUSIM_MEMORY_GRPC_ADDR`
+- `NEXUSIM_POLICY_GRPC_ADDR`（可选；配置后启用 retrieval policy precheck）
 - `NEXUSIM_RETRIEVAL_DEPENDENCY_TIMEOUT`
 
 ## 后续
 
 - 真实 `search + memory -> EvidencePack` smoke。
 - EvidencePack 字段打磨：rerank score、source coverage、dedupe reason。
-- policy-service 显式 retrieval check。
+- policy-service 显式 retrieval check 已有 first-stage 可选 precheck；后续如果
+  RAG / Agent 需要更细粒度的 retrieval policy，可在 policy-service 规则侧扩展。
 - AI eval harness：retrieval miss、temporal version、attribution、permission leak。
 - RAG / summary / Agent 只能在本边界稳定后进入。

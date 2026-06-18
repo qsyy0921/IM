@@ -18,6 +18,12 @@ const (
 	EvidenceSourceSearchMessage = "SEARCH_MESSAGE"
 	EvidenceSourceMemoryEvent   = "MEMORY_EVENT"
 
+	RetrievalPolicyToolName                 = "retrieval.evidence"
+	RetrievalPolicyIntent                   = "retrieve_evidence"
+	RetrievalPolicyResourceTypeConversation = "conversation"
+	RetrievalPolicyResourceTypeTenant       = "tenant"
+	RetrievalPolicyRiskLow                  = "LOW"
+
 	MemoryStatusPending    = "PENDING"
 	MemoryStatusActive     = "ACTIVE"
 	MemoryStatusSuperseded = "SUPERSEDED"
@@ -135,6 +141,20 @@ type MemoryQuery struct {
 type MemoryResult struct {
 	Items             []MemoryEventEvidence
 	ProjectionVersion int64
+}
+
+type RetrievalPolicyCheck struct {
+	AuthContext    AuthContext
+	ConversationID ConversationID
+}
+
+type RetrievalPolicyDecision struct {
+	Allowed           bool
+	RequiresApproval  bool
+	PermissionVersion int64
+	Classification    string
+	Reason            string
+	DecisionSource    string
 }
 
 type MemoryEventEvidence struct {

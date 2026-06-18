@@ -10,10 +10,25 @@ import (
 type RetrieveEvidenceUseCase struct {
 	search SearchPort
 	memory MemoryPort
+	policy PolicyPort
 }
 
-func NewRetrieveEvidenceUseCase(search SearchPort, memory MemoryPort) RetrieveEvidenceUseCase {
-	return RetrieveEvidenceUseCase{search: search, memory: memory}
+type RetrieveEvidenceOption func(*RetrieveEvidenceUseCase)
+
+func WithPolicyPort(policy PolicyPort) RetrieveEvidenceOption {
+	return func(usecase *RetrieveEvidenceUseCase) {
+		usecase.policy = policy
+	}
+}
+
+func NewRetrieveEvidenceUseCase(search SearchPort, memory MemoryPort, options ...RetrieveEvidenceOption) RetrieveEvidenceUseCase {
+	usecase := RetrieveEvidenceUseCase{search: search, memory: memory}
+	for _, option := range options {
+		if option != nil {
+			option(&usecase)
+		}
+	}
+	return usecase
 }
 
 func (usecase RetrieveEvidenceUseCase) Execute(
@@ -21,6 +36,9 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 	command types.RetrieveEvidenceCommand,
 ) (types.RetrieveEvidenceResult, error) {
 	if err := command.Validate(); err != nil {
+		return types.RetrieveEvidenceResult{}, err
+	}
+	if err := usecase.checkPolicy(ctx, command); err != nil {
 		return types.RetrieveEvidenceResult{}, err
 	}
 
@@ -91,6 +109,23 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 			RetrievalVersion:        types.RetrievalVersion,
 		},
 	}, nil
+}
+
+func (usecase RetrieveEvidenceUseCase) checkPolicy(ctx context.Context, command types.RetrieveEvidenceCommand) error {
+	if usecase.policy == nil {
+		return nil
+	}
+	decision, err := usecase.policy.CheckRetrieveEvidence(ctx, types.RetrievalPolicyCheck{
+		AuthContext:    command.AuthContext,
+		ConversationID: command.ConversationID,
+	})
+	if err != nil {
+		return err
+	}
+	if !decision.Allowed || decision.RequiresApproval {
+		return types.ErrPermissionDenied
+	}
+	return nil
 }
 
 func appendEvidence(items *[]types.EvidenceItem, seen map[string]struct{}, item types.EvidenceItem, limit int) bool {

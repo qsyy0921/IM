@@ -74,6 +74,67 @@ func TestRetrieveEvidenceDefaultsToBothSources(t *testing.T) {
 	}
 }
 
+func TestRetrieveEvidenceChecksPolicyBeforeSources(t *testing.T) {
+	search := fakeSearchPort{}
+	memory := fakeMemoryPort{}
+	policy := fakePolicyPort{decision: types.RetrievalPolicyDecision{Allowed: true}}
+	_, err := NewRetrieveEvidenceUseCase(&search, &memory, WithPolicyPort(&policy)).Execute(context.Background(), validCommand())
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if !policy.called {
+		t.Fatal("expected policy to be checked")
+	}
+	if policy.check.ConversationID != "conv-1" {
+		t.Fatalf("unexpected policy check: %+v", policy.check)
+	}
+	if !search.called || !memory.called {
+		t.Fatalf("expected sources after policy allow: search=%t memory=%t", search.called, memory.called)
+	}
+}
+
+func TestRetrieveEvidencePolicyDenySkipsSources(t *testing.T) {
+	search := fakeSearchPort{}
+	memory := fakeMemoryPort{}
+	policy := fakePolicyPort{decision: types.RetrievalPolicyDecision{Allowed: false}}
+	_, err := NewRetrieveEvidenceUseCase(&search, &memory, WithPolicyPort(&policy)).Execute(context.Background(), validCommand())
+	if !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected permission denied, got %v", err)
+	}
+	if !policy.called {
+		t.Fatal("expected policy to be checked")
+	}
+	if search.called || memory.called {
+		t.Fatalf("sources should not be called after policy deny: search=%t memory=%t", search.called, memory.called)
+	}
+}
+
+func TestRetrieveEvidencePolicyApprovalRequiredSkipsSources(t *testing.T) {
+	search := fakeSearchPort{}
+	memory := fakeMemoryPort{}
+	policy := fakePolicyPort{decision: types.RetrievalPolicyDecision{Allowed: true, RequiresApproval: true}}
+	_, err := NewRetrieveEvidenceUseCase(&search, &memory, WithPolicyPort(&policy)).Execute(context.Background(), validCommand())
+	if !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected permission denied, got %v", err)
+	}
+	if search.called || memory.called {
+		t.Fatalf("sources should not be called after approval requirement: search=%t memory=%t", search.called, memory.called)
+	}
+}
+
+func TestRetrieveEvidencePolicyUnavailableSkipsSources(t *testing.T) {
+	search := fakeSearchPort{}
+	memory := fakeMemoryPort{}
+	policy := fakePolicyPort{err: types.ErrRetrievalUnavailable}
+	_, err := NewRetrieveEvidenceUseCase(&search, &memory, WithPolicyPort(&policy)).Execute(context.Background(), validCommand())
+	if !errors.Is(err, types.ErrRetrievalUnavailable) {
+		t.Fatalf("expected retrieval unavailable, got %v", err)
+	}
+	if search.called || memory.called {
+		t.Fatalf("sources should not be called after policy error: search=%t memory=%t", search.called, memory.called)
+	}
+}
+
 func TestRetrieveEvidenceHonorsSourceFlags(t *testing.T) {
 	command := validCommand()
 	command.IncludeSearch = true
@@ -139,4 +200,20 @@ type fakeMemoryPort struct {
 func (port *fakeMemoryPort) QueryMemoryEvents(context.Context, types.MemoryQuery) (types.MemoryResult, error) {
 	port.called = true
 	return port.result, port.err
+}
+
+type fakePolicyPort struct {
+	decision types.RetrievalPolicyDecision
+	err      error
+	check    types.RetrievalPolicyCheck
+	called   bool
+}
+
+func (port *fakePolicyPort) CheckRetrieveEvidence(
+	_ context.Context,
+	check types.RetrievalPolicyCheck,
+) (types.RetrievalPolicyDecision, error) {
+	port.called = true
+	port.check = check
+	return port.decision, port.err
 }

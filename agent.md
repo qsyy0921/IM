@@ -34,7 +34,8 @@ short, route to the owner document, and update only the owner document.
 
 ## Current Project Direction
 
-NexusIM is currently in the "clean the existing backend services" phase.
+NexusIM is currently in the "complete IM backend semantics and AI foundation"
+phase.
 
 The existing service set is:
 
@@ -48,9 +49,10 @@ The existing service set is:
 - `contacts-service`
 - `policy-service`
 
-Do not start `search-service`, RAG, summary, agent, media, notification, admin,
-or clients unless `docs/runbook/current-brief.md` and
-`docs/runbook/remaining-goals.md` explicitly move the project into that phase.
+Do not start broad RAG, summary, autonomous Agent, media, notification, admin,
+or clients until the IM semantics needed by search / memory are stable.
+`search-service` may start when selected, but only as search / visibility /
+tombstone infrastructure, not as an LLM demo.
 
 ## Progress Documents
 
@@ -68,8 +70,7 @@ Use these documents for different jobs:
 When a slice changes current facts, update the matching service brief and, if
 the high-level progress changed, `development-progress.md`.
 
-When a slice removes or discovers unfinished work, update
-`remaining-goals.md`.
+When a slice removes or discovers unfinished work, update `remaining-goals.md`.
 
 Do not copy the same long status paragraph across multiple files. Prefer links
 and short summaries. Do not maintain every document on every turn; update only
@@ -82,12 +83,14 @@ it into `current-goal.md` when it becomes the active execution goal.
 
 Prefer work in this order:
 
-1. Security boundaries: public listener guards, mock auth boundaries, trusted
+1. IM semantics required by search / memory / Agent.
+2. Security boundaries: public listener guards, mock auth boundaries, trusted
    metadata, TLS / mTLS.
-2. Service P2 hardening from `remaining-goals.md`.
-3. Repair / DLQ / audit and operator safety.
-4. Observability and fault-smoke evidence.
-5. Capacity and complexity governance.
+3. Service P2 hardening from `remaining-goals.md`.
+4. Repair / DLQ / audit and operator safety.
+5. Search / group memory / retrieval foundations before RAG or Agent.
+6. Observability and fault-smoke evidence.
+7. Capacity and complexity governance.
 
 Each slice should be small enough to close with code, tests, docs, and a clean
 commit.
@@ -104,10 +107,8 @@ commit.
   the same package before adding more behavior.
 - If a test or runner approaches 3000 lines, split helpers or scenario files in
   the same package.
-- If legitimate file additions or line-count changes make the file-size hotspot
-  baseline drift, refresh it with `tools/update-file-size-hotspot-baseline.ps1`
-  instead of ad hoc `Get-Content` commands. The file-size scripts explicitly use
-  UTF-8 so the baseline does not depend on the current PowerShell profile.
+- If file-size hotspot baseline drifts legitimately, refresh it with
+  `tools/update-file-size-hotspot-baseline.ps1`; the scripts use explicit UTF-8.
 - Raw loadtest data belongs under `H:\NexusIM\loadtest-results`; the repository
   only stores summaries and reports.
 

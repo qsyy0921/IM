@@ -1,5 +1,5 @@
 ﻿{
-    "created_at":  "2026-06-18T08:23:26.4894380Z",
+    "created_at":  "2026-06-18T08:54:00.8669148Z",
     "scope":  "handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score",
     "file_count":  1204,
     "thresholds":  {
@@ -75,12 +75,12 @@
                       },
                       {
                           "Path":  "docs\\architecture\\target-architecture-ai.md",
-                          "Lines":  665,
+                          "Lines":  666,
                           "Kind":  "docs",
                           "Warn":  1200,
                           "Max":  1500,
-                          "WarnRatio":  0.5542,
-                          "MaxRatio":  0.4433
+                          "WarnRatio":  0.555,
+                          "MaxRatio":  0.444
                       },
                       {
                           "Path":  "services\\identity-service\\cmd\\identity-service\\main_test.go",

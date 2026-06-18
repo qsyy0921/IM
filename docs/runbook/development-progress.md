@@ -23,9 +23,11 @@
 - `contacts-service`
 - `policy-service`
 
-当前未进入真实实现主线、仍属于后续能力：
+当前即将进入基础建设、但尚未真实实现的后续能力：
 
 - `search-service`
+- `memory-service` / group memory projection
+- `retrieval-gateway`
 - `media-service`
 - `notification-service`
 - `audit-service`
@@ -37,8 +39,9 @@
 ```text
 后端微服务主链路
 -> 分布式可靠性
+-> 完整 IM 产品语义和 AI-ready 数据边界
+-> search / group memory / retrieval / RAG / Agent 应用后端
 -> 安全 / 观测 / repair / 运维 hardening
--> search / RAG / Agent 应用后端
 ```
 
 Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发主线。
@@ -125,7 +128,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - 文件大小预算门禁，手写 Go / Markdown / PowerShell / Bash 文件继续按生产代码、测试 / runner、文档和脚本分档控复杂度；`tools/check-file-size-budget.ps1` 可按需输出 JSON / Markdown hotspot summary，当前持久基线见 `docs/runbook/file-size-hotspot-baseline.json` 和 `docs/runbook/file-size-hotspots.md`，且摘要格式 / 持久基线均已有 `check-local` 自测门禁；`loadtest/pushgateway` 已按 config / model / auth / scenario / util 同 package 文件拆分，避免在线通知 / Redis route / slow-client / resume smoke 继续堆进单个 `main.go`；`loadtest/receipt`、`loadtest/policyintegration`、`loadtest/sendmessage` 已按 config / model / auth / util 等同 package 文件拆分；`contacts-service` PostgreSQL privacy / source-policy 集成测试已拆到同 package 测试文件；`message-service` PostgreSQL revoke / edit / delete mutation 集成测试已拆出同 package 测试文件；`identity-service` PostgreSQL challenge command methods 已拆出，核心 repository 文件降到约 1.4k 行，app 层登录 / MFA / Refresh / Challenge 测试和 cmd 层 challenge / MFA / gateway-token / env 配置 helper 也已按主题拆分；`api-gateway` cmd 层 rate-limit / tenant-plan 配置测试已从 `main_test.go` 拆到同 package 测试文件，继续降低启动配置测试文件复杂度
 - PowerShell / Bash 脚本解析门禁，`tools` 和 `loadtest` 下的 `.ps1` / `.sh` 都会进入本地检查，避免 smoke / 运维脚本语法回归
 - `check-local` 覆盖门禁，新增 `tools/check-*.ps1` 默认必须接入主检查；间接或手动检查必须显式列为例外
-- future service boundary 门禁，当前阶段只允许 9 个已实现服务目录存在；`search-service` / RAG / Agent 等只能保持 future / draft 文档状态，直到 current-brief 明确切换阶段
+- future service boundary 门禁仍保护未授权服务目录；`search-service` 可以作为下一阶段基础服务推进，但创建真实服务目录前必须同步 current-brief / current-goal / remaining-goals、SDD 和门禁；RAG / Agent 仍不能绕过 search / memory / retrieval 直接落 demo
 - 本地 Prometheus / Grafana / Alertmanager 覆盖门禁，已实现服务目录必须有 scrape / alert rules / dashboard 配置；`tools/run-local-observability-smoke.ps1` 可在本机已有镜像时验证 Prometheus rules、Grafana 9 服务 dashboard 和可选本地 Alertmanager null route 已由真实进程加载，也可按需把本地观测 smoke summary / report 写到 `H:\NexusIM\loadtest-results`；`tools/run-observability-target-smoke.ps1` 可对已有 Prometheus / Grafana 端点做目标环境 dashboard smoke，summary / validation 格式已有 `check-local` 自测门禁；`docs/runbook/observability-evidence.json` 已提供低敏观测证据索引，`tools/add-observability-evidence.ps1` 可追加本地 / 目标环境 smoke evidence，validator 支持 schema / H 盘文件复核；当前索引包含 policy-service debug metrics smoke 和本地观测镜像准备 dry-run 计划（`observability-image-prepare-plan`），不把目标环境 9 服务 dashboard smoke 写成已完成
 - 服务 cmd 层启动配置测试门禁，已实现服务必须保留 `main_test.go` 覆盖启动 / 监听 / TLS / auth guard 配置
 - 服务 cmd 构建门禁，9 个已实现服务的 `services/<service>/cmd/<service>` 必须能通过 `go build`
@@ -155,7 +158,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 | `receipt-service` | 已落地、已接主链路 | receipt projection / outbox / audit / repair、outbox audit / repair / repair audit / cleanup JSON 留存、`ListReceiptStates` repository 级批量查询、低敏 `received_device_count` 聚合和 opt-in capped device details、会话列表 archived-only / unread / pinned / muted / legacy tag / multi-tag all-match / draft-only / last-source-event-type 过滤、draft-first 和 unread-first 排序、first-stage `/metrics` 和 OTel server span、loadtest `capacity_summary` 口径和本地 stack 30m 长跑切片 | `service-briefs/receipt-service.md` |
 | `contacts-service` | 已落地、已接主链路 | request source metadata / source_ref 低敏 fail-fast 校验 / source policy gate / first-stage risk_level + `REVIEW_REQUIRED` operator 审批状态机 / ListContactRequests source-risk-review 过滤与分页 token 绑定 / first-stage ALLOW-DENY privacy exception set / list / delete / search-source privacy gate / profile visibility 总开关和字段级白名单 / contacts search / group filter / USER-TENANT-SYSTEM privacy / tenant privacy operator / outbox / audit / repair、outbox audit / repair / repair audit / cleanup 与 privacy / source policy audit / set / contact-request-review / contact-request-review-audit JSON 留存、repository 同 package 拆分、loadtest `capacity_summary` 口径和本地 stack 30m 长跑切片 | `service-briefs/contacts-service.md` |
 | `policy-service` | 已落地、已接主链路 | decision / user action restriction / first-stage ReBAC decision source / first-stage relationship gate + 本地低敏 relation operator / first-stage keyword + HTTP content moderation / first-stage tenant action quota / projection / outbox / audit / repair、outbox audit / repair / repair audit / cleanup JSON 留存、低敏 decision audit export / forward、本地 direct 短基线和 clean commit direct 30m 长跑切片 | `service-briefs/policy-service.md` |
-| `search-service` | 占位，尚未进入真实实现主线 | 无真实实现；等前 9 个服务收口后再进入 | `service-briefs/search-service.md` |
+| `search-service` | 占位，下一阶段基础服务 | 无真实实现；下一步定位为 search projection / visibility / tombstone / EvidencePack 前置，不做 LLM demo | `service-briefs/search-service.md` |
 
 ## 剩余目标入口
 
@@ -169,8 +172,8 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 
 ```text
 前 9 个微服务已经能跑通 IM 主链路，
-现在处于“继续清现有服务的生产化 hardening”，
-而不是“继续快速新增新服务”。
+现在处于“补完整 IM 产品语义并建设 AI-ready 数据底座”，
+而不是“直接快速铺 RAG / Agent demo”。
 ```
 
 下一步优先级和剩余目标统一看 `remaining-goals.md`，不要在本页重复维护。

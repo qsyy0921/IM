@@ -10,7 +10,7 @@
 
 ## 当前具体执行目标
 
-持续推进 NexusIM 后端项目，但不要急着新增服务。当前主线是先把已有 9 个真实后端微服务收干净，再进入 search / RAG / Agent。
+持续推进 NexusIM 后端项目。当前主线是补完整 IM 后端产品语义，并为 search / group memory / RAG / Agent 建立数据、权限和审计底座；不要为了演示直接做孤立 LLM demo。
 
 每个有意义切片都要尽量闭环：
 
@@ -26,11 +26,12 @@
 
 当前优先级：
 
-1. 安全边界：public listener、mock auth、trusted metadata、TLS / mTLS、敏感字段外泄。
-2. 逐服务 P2 hardening：以 `remaining-goals.md` 和对应 service brief 为准。
-3. Repair / DLQ / audit：operator 安全、批量 repair、错误脱敏、审计证据。
-4. 观测和故障 smoke：本地 / 双机 / Docker 可验证，不能夸大为生产 SLO。
-5. 容量和复杂度治理：长时间容量曲线、生产 sizing、及时拆分大文件。
+1. IM 语义补齐：消息编辑 / 撤回 / 删除、群管理、成员可见窗口、回执、联系人、策略决策。
+2. AI 数据底座：search projection、tombstone、visibility filter、EvidencePack、group memory 结构化事件。
+3. 安全边界：public listener、mock auth、trusted metadata、TLS / mTLS、敏感字段外泄。
+4. Repair / DLQ / audit：operator 安全、批量 repair、错误脱敏、审计证据。
+5. 观测和故障 smoke：本地 / 双机 / Docker 可验证，不能夸大为生产 SLO。
+6. 容量和复杂度治理：长时间容量曲线、生产 sizing、及时拆分大文件。
 
 新发现的待完成工作必须写入 `docs/runbook/remaining-goals.md`；已完成的工作从该文档移除，并同步到对应 service brief / progress 文档。
 
@@ -41,8 +42,8 @@
 当前阶段：
 
 ```text
-先收干净已有 9 个后端服务
--> 再进入 search-service
+补完整 IM 后端产品语义
+-> 启动 search-service / group memory / retrieval foundation
 -> 再做 RAG / summary / agent 后端
 ```
 
@@ -54,8 +55,8 @@ Web / App / 桌面端是后续产品化展示层，不是当前后端主线。
 | --- | --- | --- |
 | 第一层 | 最小 IM 主链路：发消息、会话、投递、在线通知、ACK | 已完成最小闭环 |
 | 第二层 | 分布式与可靠性：outbox、Kafka、durable inbox、Redis route、多实例、故障 smoke | 已有本地 / 双机 smoke，不等于生产 HA |
-| 第三层 | 完整 IM 后端产品能力：回执、撤回/编辑/删除、会话列表、联系人、群管理、鉴权、api-gateway | 已落地基础能力，继续 hardening |
-| 第四层 | 搜索与智能化后端：search、RAG、summary、agent | 后续阶段 |
+| 第三层 | 完整 IM 后端产品能力：回执、撤回/编辑/删除、会话列表、联系人、群管理、鉴权、api-gateway | 正在补齐 AI 所需语义 |
+| 第四层 | 搜索与智能化后端：search、group memory、retrieval、RAG、summary、agent | search / memory foundation 进入规划优先级 |
 
 ## 文档路由
 

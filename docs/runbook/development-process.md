@@ -21,8 +21,9 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 ```text
 先把主链路做对
 -> 再把分布式和可靠性做稳
--> 再把已有后端服务收干净
--> 再扩搜索和 AI 应用后端
+-> 再补完整 IM 产品语义
+-> 再建设搜索、群组记忆和检索证据底座
+-> 再扩 RAG / summary / Agent 后端
 -> 最后按需要做客户端和产品化展示
 ```
 
@@ -61,13 +62,13 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 
 当前这个阶段已经完成。
 
-## 2. 第二阶段：把 9 个核心服务收干净
+## 2. 第二阶段：把 9 个核心服务做成 AI-ready IM 底座
 
 目标：
 
 ```text
-不继续急着加新服务，
-先把已有 9 个核心服务做干净。
+不急着做孤立 LLM demo，
+先把已有 9 个核心服务补成 search / memory / Agent 能安全依赖的 IM 后端底座。
 ```
 
 当前核心服务是：
@@ -82,8 +83,12 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 - `contacts-service`
 - `policy-service`
 
-这一阶段重点不是新功能，而是 hardening：
+这一阶段重点不只是 hardening，也包括 AI 所需的 IM 产品语义：
 
+- 消息编辑 / 撤回 / 删除 / 合规删除的事件语义；
+- 群管理、owner transfer、成员历史可见窗口；
+- 回执、未读、会话摘要、联系人分组 / 搜索 / 隐私策略；
+- policy 决策来源、moderation、关系门禁和 audit；
 - `/healthz` / `/readyz` / `/debug/metrics`
 - trusted metadata / TLS / mTLS 边界
 - outbox / projection / challenge delivery 的 repair / audit / cleanup
@@ -102,8 +107,8 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 当前执行规则：
 
 1. 每次只解决一个服务或一个明确跨服务边界的问题。
-2. 先做能验证的 hardening，再做大功能扩展。
-3. 不为了面试说法一次性铺开多个新服务。
+2. 优先做 search / memory / Agent 会依赖的 IM 语义和安全边界。
+3. 不为了面试说法一次性铺开多个 AI 服务；先让 search / memory / retrieval 有可信数据源。
 4. 每个切片完成后更新对应 service brief，并运行本地检查。
 5. 生产代码文件接近 2500 行、测试或 runner 接近 3000 行时，优先同 package 拆文件。
 
@@ -176,15 +181,15 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 - `identity-service`：身份安全、通知投递、key / issuer 治理继续 hardening；
 - `message / conversation / delivery / push / receipt / contacts / policy`：继续清 repair、观测、故障语义和容量边界。
 
-## 5. 第五阶段：搜索服务
+## 5. 第五阶段：搜索与群组记忆底座
 
 目标：
 
 ```text
-为聊天记录搜索和 RAG 建立可控的检索事实层。
+为聊天记录搜索、群组 memory 和 RAG 建立可控的检索事实层。
 ```
 
-进入这一阶段前，前 9 个服务要先稳定，尤其是 message / conversation / policy / delivery 的事实边界要清楚。
+进入这一阶段前，不要求所有生产级 HA 都完成，但 message / conversation / policy / delivery 的事实边界必须足够稳定，尤其是编辑、撤回、删除、成员窗口和权限策略。
 
 `search-service` 第一阶段应该只做后端：
 
@@ -194,21 +199,29 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 - 支持撤回 / 删除 tombstone；
 - 不让 RAG 或 Agent 直接读业务库。
 
+`memory-service` / memory projection 第一阶段应该关注：
+
+- 消费 message / conversation / contacts / receipt / policy 事件；
+- 抽取 StructuredMemoryEvent；
+- 维护 group memory 的 actor / group / topic / time / status / supersedes 语义；
+- 不把群事实直接升级成个人长期偏好；
+- 不替代 search-service 或 policy-service。
+
 ## 6. 第六阶段：AI 应用后端
 
 目标：
 
 ```text
-在 search-service 和权限过滤稳定后，
+在 search-service、group memory 和 retrieval-gateway 稳定后，
 再开发 RAG、summary、agent 等智能化后端能力。
 ```
 
 这一阶段更合理的顺序：
 
-1. `rag-service`
-2. `summary-service`
-3. `agent-service`
-4. evidence pack / source citation
+1. `retrieval-gateway` 和 EvidencePack
+2. `rag-service`
+3. `summary-service`
+4. `agent-service` read-only / proposal-only
 5. proposal / approval / executor / audit
 
 必须遵守的边界：
@@ -282,16 +295,16 @@ Web / App / 桌面端是后续产品化展示层，
 按目前项目状态，最合理的顺序仍然是：
 
 ```text
-继续收干净当前 9 个核心服务
--> 继续做 api-gateway OTel collector / alerting / dashboard、trace sampling 治理、legacy opt-in 实际迁移观察和配置中心 / DB-backed quota hardening
--> 继续补分布式故障恢复 smoke 和服务级 P2 hardening
--> 再进入 search-service
+补完整当前 9 个核心服务的 IM 语义和 AI 所需事件边界
+-> 启动 search-service，先做 projection / visibility / tombstone
+-> 启动 group memory / retrieval-gateway / EvidencePack
 -> 再进入 rag-service / summary-service / agent-service
+-> 生产级 HA、完整系统测试和客户端产品化继续后置
 -> 后续再按需要补 media / notification / audit / admin / 客户端
 ```
 
 这条顺序的关键点只有一个：
 
 ```text
-先把底座做扎实，再继续长能力。
+先把 AI 会依赖的数据、权限、证据和审计底座做扎实，再继续长能力。
 ```

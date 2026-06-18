@@ -46,21 +46,21 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 第三阶段：补 delivery-service 和 push-gateway，把 durable inbox、PullInbox、AckDelivery、在线通知和跨实例 route 串起来。
 第四阶段：补 receipt-service、contacts-service、policy-service 和 api-gateway，把已读/未读、联系人、权限决策和统一入口补齐。
 第五阶段：集中治理分布式可靠性、安全启动门禁、trusted metadata / TLS 边界、repair / audit / cleanup、debug metrics 和代码复杂度。
-第六阶段：收干净现有 9 个服务后，再进入 search-service，并在搜索和权限边界上继续做 RAG / summary / agent 后端。
+第六阶段：补齐 AI 会依赖的 IM 产品语义后，进入 search-service、group memory、retrieval-gateway，并在证据和权限边界上继续做 RAG / summary / agent 后端。
 ```
 
 当前项目处在第五阶段到第六阶段之间：
 
 ```text
 9 个后端服务已经能跑通主链路；
-现在先继续做 9 服务 hardening，不急着新增 search / RAG 服务；
+现在先补完整 IM 后端产品语义和 AI-ready 数据边界，不急着直接铺 RAG / Agent demo；
 api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、DB-backed tenant plan snapshot source、本地 tenant quota audit / set operator、tenant quota approval manifest 强制校验、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、可选 checksum-required gate、applied quota snapshot stale 观测和 quota snapshot gate；
 api-gateway 已补 legacy/facade traffic metrics，以及 legacy observation-window / removal-plan 低敏 evidence manifest，用于旧 descriptor 迁移观察和归档；
 legacy descriptor 已收敛为显式 opt-in 默认；
 当前 9 个服务已补 first-stage Prometheus text /metrics、本地 Prometheus alert rules 和本地 Grafana dashboard 原型；
 api-gateway 已补 first-stage OpenTelemetry 入口 server span 和下游 gRPC client span；当前 9 个服务均已纳入 first-stage trace runtime wiring，其中 8 个后端 gRPC 服务使用 server span，push-gateway 使用 WebSocket connection span，并由采样策略和本地 check-local 门禁约束；
 本地 OTel collector debug 入口和 policy OTLP smoke 脚本已补，可用于面试演示 OTLP trace 链路，但还不是生产告警平台；
-search-service 和 AI 应用后端后置；
+search-service / group memory / retrieval 是下一阶段基础能力，RAG / summary / Agent 后置到 EvidencePack 和权限过滤稳定之后；
 客户端暂不纳入当前面试主线。
 ```
 
@@ -157,15 +157,15 @@ search-service 和 AI 应用后端后置；
 
 ### 短期：继续把 9 个核心服务做干净
 
-短期不急着新开服务，先把已有 9 个服务收口：
+短期先把已有 9 个服务补成 AI-ready IM 后端底座：
 
-统一收口顺序：
+统一推进顺序：
 
-1. 安全启动门禁和 trusted metadata / TLS 边界。
-2. 本地观测、故障恢复 smoke、repair / DLQ / audit。
-3. 各服务 P2 hardening 和容量验证。
-4. 代码复杂度治理。
-5. 完成这些后再进入 `search-service`。
+1. 补齐消息编辑 / 撤回 / 删除、群管理、成员可见窗口、回执、联系人、策略决策等 AI 依赖语义。
+2. 保持安全启动门禁、trusted metadata / TLS 边界和 policy / audit 不回退。
+3. 启动 `search-service` 的 projection / visibility / tombstone 基础，不做 LLM demo。
+4. 建设 group memory、retrieval-gateway 和 EvidencePack。
+5. 再进入 RAG / summary / Agent；完整系统测试和生产级 HA 深水区后置。
 
 | 服务 | 待开发 / 待完善功能 |
 | --- | --- |
@@ -181,11 +181,13 @@ search-service 和 AI 应用后端后置；
 
 ### 中期：完整 IM 产品后端
 
-等 9 个服务稳定后，再补产品级后端服务。服务数量不写死，只有满足独立数据模型、独立伸缩需求、独立故障边界或能明显降低现有服务复杂度时才拆。
+产品级后端按依赖逐步进入。`search-service` / group memory / retrieval 是 AI 前置基础；media、notification、audit、admin 等服务后续再按边界拆。服务数量不写死，只有满足独立数据模型、独立伸缩需求、独立故障边界或能明显降低现有服务复杂度时才拆。
 
 | 待开发服务 / 能力 | 目标 |
 | --- | --- |
-| `search-service` | 聊天记录搜索、索引、权限过滤、撤回 / 删除 tombstone |
+| `search-service` | 聊天记录搜索、索引、成员可见窗口过滤、编辑 / 撤回 / 删除 tombstone |
+| `memory-service` / group memory projection | 多人、多群、多时间版本的 StructuredMemoryEvent、Memory Graph、ProfileAggregate |
+| `retrieval-gateway` | 统一结构过滤、BM25 / 向量 / 图扩展、policy check 和 EvidencePack |
 | `media-service` | 图片、语音、视频、文件上传下载、对象存储、缩略图、病毒扫描、语音转码 / 时长探测 |
 | `notification-service` | 邮件、短信、APNs / FCM、系统通知、模板、bounce handling |
 | `audit-service` | 登录审计、安全审计、管理操作审计、策略决策归档 |
@@ -216,6 +218,7 @@ search-service 和 AI 应用后端后置；
 | `rag-service` | 基于聊天记录的权限安全问答 |
 | `summary-service` | 会话总结、未读摘要、日报 |
 | `agent-service` | 客服机器人、群助手、任务 Agent |
+| group memory | 群组事实、任务、决策、版本覆盖和归因；避免把群事实误升成个人偏好 |
 | retrieval gateway | 统一检索入口，强制 policy check 和成员可见窗口过滤 |
 | evidence pack | AI 输出必须携带 source message id、conversation seq、conversation id |
 | Agent 写动作链路 | Proposal -> Approval -> Executor -> Audit，避免 Agent 直接改业务事实 |
@@ -238,18 +241,17 @@ search / RAG / Agent 后端能力。
 当前阶段是：
 
 ```text
-继续把已有 9 个核心服务做干净。
+把已有 9 个核心服务补成 AI-ready IM 后端底座。
 ```
 
 短期优先级：
 
-1. 先收敛安全启动门禁、trusted metadata、TLS / mTLS 边界；
-2. 清已有 9 个服务的 P2 hardening；
-3. 继续做 `api-gateway` OTel collector / alerting / dashboard、legacy opt-in 实际迁移观察和移除计划，以及完整配置中心 quota 控制面；
-4. 补更完整的故障恢复 smoke；
-5. 收敛观测、repair、audit 和 DLQ 处理；
-5. 控制代码复杂度，避免核心文件继续变大；
-6. 等 9 个服务稳定后，再进入 `search-service`。
+1. 补齐 message / conversation / receipt / contacts / policy 中搜索和记忆依赖的事件语义；
+2. 保持安全启动门禁、trusted metadata、TLS / mTLS 边界；
+3. 启动 `search-service` 的索引、visibility 和 tombstone 基础；
+4. 设计并实现 group memory / EvidencePack / retrieval-gateway 最小链路；
+5. 收敛观测、repair、audit、DLQ 和容量证据；
+6. 控制代码复杂度，避免核心文件继续变大。
 
 ## 面试讲述线
 
@@ -260,7 +262,7 @@ search / RAG / Agent 后端能力。
 
 在身份侧，我实现了登录、Refresh Token、MFA、recovery code、JWKS、challenge delivery outbox、SMTP / webhook challenge sender 和启动安全门禁。系统也补了 health、ready、debug metrics、repair、audit、cleanup、worker retry 和多种本地故障 smoke。
 
-后续我会在当前 9 个服务稳定后继续做 search-service、rag-service 和 agent-service，让大模型只能通过权限过滤后的检索层访问聊天记录，并且输出必须带证据消息和审计链路。
+后续我会先补齐消息变更、成员窗口、群管理、回执、联系人和策略这些 AI 会依赖的 IM 语义，再做 search-service、group memory、retrieval-gateway、rag-service 和 agent-service。大模型只能通过权限过滤后的 EvidencePack 访问聊天记录，Agent 写动作必须走 proposal、approval、executor 和 audit。
 ```
 
 ## 维护规则

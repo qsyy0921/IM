@@ -1,6 +1,6 @@
 # NexusIM AI / Memory / Agent Target Architecture
 
-本文规划 NexusIM 后续 AI 相关后端能力。它不是立即开工清单；当前仍先收干净已有 9 个后端服务。本文用于保证后续 `search-service`、RAG、summary、agent 等能力不会各自长成孤岛。
+本文规划 NexusIM 后续 AI 相关后端能力。它不是一次性全开工清单；当前应先补齐 AI 会依赖的 IM 语义，然后按 search-service、group memory、retrieval-gateway、RAG、summary、agent 的顺序推进。本文用于保证后续能力不会各自长成孤岛。
 
 ## 1. 设计输入
 
@@ -574,13 +574,13 @@ model
 
 ## 9. 推荐演进顺序
 
-1. 收干净已有 9 个后端服务。
+1. 补齐已有 9 个后端服务中 AI 依赖的 IM 语义：编辑、撤回、删除、群管理、成员窗口、回执、联系人和 policy decision audit。
 2. 实现 `search-service`：先做消息搜索 projection、成员可见窗口、撤回/删除 tombstone。
-3. 实现 `retrieval-gateway` 第一版：只基于 search projection 输出 EvidencePack，不急着做生成。
-4. 实现 `memory-service` / memory projection：抽取结构化事件、版本语义和画像聚合。
-5. 实现 RAG 问答：必须经过 retrieval-gateway 和 EvidencePack。
-6. 实现 Agent：只做低风险 read-only / proposal-only，再逐步接 approval / executor。
-7. 建立 AI eval harness：覆盖权限、时间版本、画像、oracle evidence 和 agent safety。
+3. 实现 `memory-service` / group memory projection：抽取结构化事件、版本语义、跨群归因和画像聚合。
+4. 实现 `retrieval-gateway` 第一版：基于 search / memory 输出 EvidencePack，不急着做生成。
+5. 建立 AI eval harness：先覆盖权限、删除后不可见、时间版本、oracle evidence 和 attribution。
+6. 实现 RAG 问答：必须经过 retrieval-gateway 和 EvidencePack。
+7. 实现 Agent：只做低风险 read-only / proposal-only，再逐步接 approval / executor。
 
 ## 10. 与现有 9 服务的关系
 
@@ -598,9 +598,10 @@ model
 
 1. `search-service` 最小 projection：message persisted / edited / revoked / deleted + member visibility。
 2. `SearchMessages` API：只返回可见消息，不做生成。
-3. `retrieval-gateway` thin facade：调用 search-service，生成 EvidencePack。
-4. `rag-service` read-only 问答：只接受 EvidencePack，不直接检索。
-5. eval harness：覆盖权限泄漏、删除后不可见、oracle evidence 和无证据拒答。
+3. `memory-service` / group memory 最小 projection：StructuredMemoryEvent + supersedes + source refs。
+4. `retrieval-gateway` thin facade：调用 search-service / memory-service，生成 EvidencePack。
+5. eval harness：覆盖权限泄漏、删除后不可见、oracle evidence、跨群归因和无证据拒答。
+6. `rag-service` read-only 问答：只接受 EvidencePack，不直接检索。
 
 Agent 第一版必须等 retrieval-gateway 和 eval harness 稳定后再做。
 

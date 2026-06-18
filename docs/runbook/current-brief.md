@@ -27,18 +27,16 @@ contacts-service
 policy-service
 ```
 
-当前重点不是新增服务，而是先收干净这 9 个服务。
+当前重点从“只收干净 9 个服务”调整为“补完整 IM 后端产品语义，并为 search / group memory / RAG / Agent 建立数据和权限底座”。
 
 ```text
-安全边界
--> trusted metadata / TLS
--> 观测和故障 smoke
--> repair / DLQ / audit
--> 逐服务 P2 hardening
--> 容量和复杂度治理
+IM 语义补齐：编辑 / 撤回 / 删除 / 群管理 / 成员可见窗口 / 回执 / 联系人 / 策略
+-> AI 数据底座：search projection / tombstone / visibility / EvidencePack / group memory
+-> 安全边界：trusted metadata / TLS / policy / audit
+-> 观测、repair、DLQ、容量和复杂度治理
 ```
 
-`search-service`、RAG、summary、agent 和客户端属于后续阶段。
+`search-service` 可以作为下一阶段基础服务启动；RAG、summary、agent 必须建立在 search / memory / retrieval-gateway / policy / audit 之上。完整系统测试和生产级 HA 深水区后置，不阻塞当前功能推进。
 
 ## 文档职责
 

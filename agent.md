@@ -29,8 +29,8 @@ Keep entrance docs short. Do not copy the same status into every file.
 
 ## Current Direction
 
-NexusIM's current main line is no longer "keep hardening everything forever".
-It is:
+This section is the routing guard. If a future prompt or short Codex goal is
+ambiguous, this wins unless the user gives a more specific request.
 
 ```text
 9-service necessary closeout -> search -> group memory -> retrieval/EvidencePack
@@ -38,45 +38,23 @@ It is:
 -> action executor -> AI evaluation
 ```
 
+The AI/RAG/Agent line is the main product direction, not future side work.
+When the user says "continue development", move this chain forward by default.
 Production HA drills, long load tests, sizing, and provider-grade operations are
-hardening backlog unless explicitly named; "continue development" means move
-the AI foundation forward while keeping the IM backend clean enough.
-
-The AI line is not a side quest. It is the main product direction after the
-existing IM backend is clean enough: group memory, cross-group/cross-time
-evidence, permissioned RAG, multi-agent collaboration, MCP/skill/tool execution,
-and proposal / approval / executor / audit for real business actions.
+hardening backlog unless explicitly named or they expose a P0/P1 blocker.
 
 Existing real services: `api-gateway`, `identity-service`, `message-service`,
 `conversation-service`, `delivery-service`, `push-gateway`, `receipt-service`,
 `contacts-service`, and `policy-service`.
 
-Current execution chain:
+Current active slice: run the real `retrieval-gateway -> rag-service` RAG
+adapter smoke. Search, memory and retrieval smokes are passed; `rag-service`,
+`loadtest/rag`, and the first RAG eval execution adapter are landed.
 
-1. Close only 9-service gaps that block search / memory / retrieval / Agent:
-   mutation semantics, visibility, contacts privacy, policy, audit, and security.
-2. Keep `search-service v0.1` as projection / visibility / tombstone /
-   `SearchMessages`, not an LLM demo; its first projection smoke is now passed.
-3. Build `memory-service`, `retrieval-gateway`, RAG, `summary-service`, Agent,
-   `skill-registry`, `mcp-gateway`, and `action-executor`.
-4. Keep production-grade HA, long load tests, sizing, full SLOs, and provider
-   operations in hardening backlog unless they directly unblock the current
-   execution chain.
-
-Current active slice: run the real retrieval-gateway -> rag-service RAG adapter smoke.
-Search, memory, and retrieval smokes are passed; EvidencePack now includes
-source coverage, rerank score, and dedupe reason. Optional policy-service
-retrieval precheck is wired, and first-stage AI eval cases are under
-`docs/runbook/ai-eval/`. `rag-service` first read-only answer path,
-`loadtest/rag`, and the first RAG eval execution adapter are landed; next is
-runtime smoke. RAG / summary / Agent must stay EvidencePack-only and must not
-bypass message / conversation private table boundaries.
-
-Current AI baseline: keep facts / projections / retrieval / controlled
-execution separate; build search -> memory -> retrieval before RAG / Agent;
-memory requires source refs, scope, validity, supersession, confidence and
-review state; RAG / Agent consume EvidencePack and actions go through policy,
-proposal / approval, executor and audit.
+AI invariants: keep facts, projections, retrieval and controlled execution
+separate. Memory requires source refs, scope, validity, supersession,
+confidence and review state. RAG / summary / Agent consume EvidencePack only;
+actions go through policy, proposal / approval, executor and audit.
 
 ## Progress Documents
 

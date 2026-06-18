@@ -7,22 +7,18 @@
 ```text
 持续推进 E:\development\IM 的 NexusIM 项目。
 
-当前主线必须放在第一位：NexusIM 已从“只做 IM 后端服务”转向“面试导向的后端 + 分布式 + AI 大模型应用系统”。后续默认围绕 AI/RAG/Agent 主链路推进，而不是无限做生产化 hardening。
-当前 active slice：运行真实 `retrieval-gateway -> rag-service` RAG adapter smoke。
-开发路线：
-1. 只做现有 9 个 IM 后端服务的必要收口；非阻塞生产化事项写入 backlog。
-2. 主动推进 AI 链路：search-service -> memory-service -> retrieval-gateway / EvidencePack -> rag-service -> summary-service -> agent-service -> skill-registry -> mcp-gateway/tool-gateway -> action-executor -> ai-eval。
-3. AI 重点：群组 memory、跨群/跨时间 evidence、权限过滤 RAG、multi-agent 协作、MCP/skill/tool 调用、proposal/approval/executor/audit 真实业务闭环。
+当前主线必须始终第一：NexusIM 现在不是“继续无限打磨 9 个 IM 服务”，而是“9 服务必要收口 -> AI/RAG/Agent 大模型应用底座”。如果用户只说“继续开发”，默认推进 AI/RAG/Agent 主链路，不默认转去生产级长压、完整 HA、sizing 或 provider-grade 运维。
 
-不要把“继续开发”理解成无限做生产级长压、完整 HA、sizing 或 provider-grade 运维；这些只作为 hardening backlog，除非用户明确点名。
+当前 active slice：启动 search / memory / retrieval / rag runtime，运行真实 `retrieval-gateway -> rag-service` RAG adapter smoke，并把结果写入对应 runbook / service brief。
+
+主线顺序：
+1. 现有 9 个 IM 后端服务只做阻塞 AI 链路的必要收口；非阻塞生产化事项写入 `docs/runbook/remaining-goals.md`。
+2. 继续推进 AI 链路：search-service -> memory-service -> retrieval-gateway / EvidencePack -> rag-service -> summary-service -> agent-service -> skill-registry -> mcp-gateway/tool-gateway -> action-executor -> ai-eval。
+3. AI 重点：群组 memory、跨群 / 跨时间 evidence、权限过滤 RAG、multi-agent 协作、MCP / skill / tool 调用、proposal / approval / executor / audit 真实业务闭环。
+
 已完成基线：9 个 IM 后端服务已跑通主链路；search-service projection smoke passed；memory-service group memory / StructuredMemoryEvent projection smoke passed；retrieval-gateway 第一轮 search + memory -> EvidencePack smoke passed；EvidencePack field hardening first pass 已落；AI eval harness first pass 已有低敏 case schema / validator；rag-service first read-only answer path、`loadtest/rag` 和 RAG eval execution adapter 已落。
 
-当前开发主线：
-1. 启动 search / memory / retrieval / rag runtime 后运行真实 RAG adapter smoke；EvidencePack 必须继续保持 source refs、temporal version、visibility / policy boundary，不直接读 message/conversation/private tables。
-2. RAG / summary / Agent 仍只能消费 EvidencePack；新增 eval case 先进入 docs/runbook/ai-eval/retrieval-eval-cases.json。
-3. 后续按顺序推进 summary / Agent / skill / MCP / action execution。
-
-本轮只做能推进上述主线的工作；新发现的非阻塞生产化事项写入 docs/runbook/remaining-goals.md，不要抢占当前 AI/RAG/Agent 路线。
+硬约束：EvidencePack 必须保留 source refs、temporal version、visibility / policy boundary；RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；新增 eval case 先进入 `docs/runbook/ai-eval/retrieval-eval-cases.json`。
 
 每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 做互不重叠任务；不全文扫长历史文档，不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
 ```

@@ -22,7 +22,7 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 -> WebSocket 在线通知
 -> ACK / 回执 / 联系人 / 策略权限
 -> search-service v0.1
--> memory / retrieval / RAG / Agent / MCP / Skill
+-> memory / retrieval / RAG / summary / Agent / skill-registry / MCP gateway / action-executor
 ```
 
 当前可以准确表述为：
@@ -47,7 +47,7 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 第三阶段：补 delivery-service 和 push-gateway，把 durable inbox、PullInbox、AckDelivery、在线通知和跨实例 route 串起来。
 第四阶段：补 receipt-service、contacts-service、policy-service 和 api-gateway，把已读/未读、联系人、权限决策和统一入口补齐。
 第五阶段：集中治理分布式可靠性、安全启动门禁、trusted metadata / TLS 边界、repair / audit / cleanup、debug metrics 和代码复杂度。
-第六阶段：9 个服务做必要收口后，以 search-service v0.1 作为向 AI 大模型应用后端转进的第一步；后续再接 memory、retrieval、RAG、Agent、MCP 和 Skill。
+第六阶段：9 个服务做必要收口后，以 search-service v0.1 作为向 AI 大模型应用后端转进的第一步；后续再接 memory、retrieval、RAG、summary、Agent、skill-registry、MCP gateway 和 action-executor。
 ```
 
 当前项目处在第五阶段到第六阶段之间：
@@ -57,14 +57,15 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 短期目标是对 9 个服务做必要收口，然后向 AI 大模型应用后端转进；
 短期不以生产级完整系统测试或生产级 HA 作为进入 search-service v0.1 的前置阻塞，验证重点放在当前切片的本地检查、最小 smoke、权限过滤和 EvidencePack 证据边界；
 search-service v0.1 是第一步，先做 projection / visibility / tombstone / SearchMessages；
-后续按 memory / retrieval / RAG / Agent / MCP / Skill 顺序推进；
+后续按 memory / retrieval / RAG / summary / Agent / skill-registry / MCP gateway / action-executor 顺序推进；
 api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、DB-backed tenant plan snapshot source、本地 tenant quota audit / set operator、tenant quota approval manifest 强制校验、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、可选 checksum-required gate、applied quota snapshot stale 观测和 quota snapshot gate；
 api-gateway 已补 legacy/facade traffic metrics，以及 legacy observation-window / removal-plan 低敏 evidence manifest，用于旧 descriptor 迁移观察和归档；
 legacy descriptor 已收敛为显式 opt-in 默认；
 当前 9 个服务已补 first-stage Prometheus text /metrics、本地 Prometheus alert rules 和本地 Grafana dashboard 原型；
 api-gateway 已补 first-stage OpenTelemetry 入口 server span 和下游 gRPC client span；当前 9 个服务均已纳入 first-stage trace runtime wiring，其中 8 个后端 gRPC 服务使用 server span，push-gateway 使用 WebSocket connection span，并由采样策略和本地 check-local 门禁约束；
 本地 OTel collector debug 入口和 policy OTLP smoke 脚本已补，可用于面试演示 OTLP trace 链路，但还不是生产告警平台；
-search-service v0.1 / group memory / retrieval 是下一阶段基础能力，RAG / summary / Agent / MCP / Skill 后置到 EvidencePack 和权限过滤稳定之后；
+search-service v0.1 / group memory / retrieval 是下一阶段基础能力，RAG / summary / Agent / skill-registry / MCP gateway / action-executor 后置到 EvidencePack 和权限过滤稳定之后；
+后续开发可以使用 multi sub-agent 并行推进，但以服务 / 文档 / 测试面拆分，最终由主 agent 统一集成和验证；
 客户端暂不纳入当前面试主线。
 ```
 
@@ -82,7 +83,7 @@ search-service v0.1 / group memory / retrieval 是下一阶段基础能力，RAG
 | `push-gateway` | WebSocket 在线通知，ACK 转发，resume buffer，Redis route，跨实例在线路由，Redis resume negative fallback，Redis Cluster topology、node-stop fallback、六节点 failover smoke 和六节点短容量基线，first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel WebSocket connection span | 在线唤醒层和可靠投递层解耦，Redis / resume / Cluster node 故障时 PullInbox 兜底，在线层已进入观测 rollout |
 | `receipt-service` | 已读 / 未读，会话列表，archive / pin / mute / tags / 多标签 all-match 过滤 / draft / last-source-event-type 过滤，unread-first 会话排序，receipt projection，receipt outbox，`ListReceiptStates` repository 级批量查询，低敏 `received_device_count` 聚合和 opt-in capped device details，first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 会话列表和回执从投递事件投影，不跨服务读内部表，设备明细默认隐藏、显式开启且限量返回，回执服务已进入观测 rollout |
 | `contacts-service` | 好友申请、申请来源 metadata、租户级来源策略、来源风险标注和 `REVIEW_REQUIRED` operator 审批状态机、申请列表 source / risk / review 过滤、接受、拒绝、取消、删除、拉黑、解除拉黑、备注、分组、联系人搜索、用户 / 租户 / 系统三级申请隐私、first-stage ALLOW-DENY 隐私例外写入 / 查询 / 清理、搜索来源申请 gate、profile visibility 总开关和字段级白名单、租户默认隐私 operator、contacts outbox，first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 联系人事实源，策略服务通过事件投影使用联系人关系；隐私、来源策略、审批状态和拉黑只影响本服务关系事实，消息权限通过 policy projection 表达 |
-| `policy-service` | 权限决策、规则存储、用户级消息动作限制、first-stage ReBAC decision source、first-stage relationship gate + 本地 relation operator、first-stage keyword / HTTP content moderation、first-stage tenant action quota、first-stage tool policy precheck / low-sensitive local audit、conversation role gate、contacts projection、decision audit outbox、低敏 decision audit export / forward、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 策略权限独立服务化，不在 message-service 复制权限逻辑；`decision_source` 让 API / audit / Kafka 能解释决策来自 exact rule、tenant rule、关系门禁、联系人投影、quota、ownership 或 moderation；relationship gate 用 policy-service 自有 projection / relation rules 做直接联系人和活跃成员要求，不满足时在 allow 规则前 fail-closed；工具动作通过 `CheckToolAction` 做统一预检，默认 fail-closed，审计只保存低敏 stable key 和 tool/action/resource/risk 元数据，为后续 Agent / MCP / Skill 接真实业务动作提供权限边界；关系规则、决策审计和 tenant quota 先以本地低敏 operator 形式闭环；内容分类通过 policy provider port 接入，keyword / HTTP adapter 都不持久化正文；decision audit forward 只推低敏审计行到外部 HTTPS sink，provider-grade 外部 audit pipeline、ReBAC graph / DSL、tenant DSL、tool policy operator / approval integration 和 risk scoring 后续深化 |
+| `policy-service` | 权限决策、规则存储、用户级消息动作限制、first-stage ReBAC decision source、first-stage relationship gate + 本地 relation operator、first-stage keyword / HTTP content moderation、first-stage tenant action quota、first-stage tool policy precheck / low-sensitive local audit、conversation role gate、contacts projection、decision audit outbox、低敏 decision audit export / forward、first-stage Prometheus text `/metrics`、本地 Prometheus scrape / alert rules 原型、本地 Grafana dashboard 原型、first-stage OTel gRPC server span | 策略权限独立服务化，不在 message-service 复制权限逻辑；`decision_source` 让 API / audit / Kafka 能解释决策来自 exact rule、tenant rule、关系门禁、联系人投影、quota、ownership 或 moderation；relationship gate 用 policy-service 自有 projection / relation rules 做直接联系人和活跃成员要求，不满足时在 allow 规则前 fail-closed；工具动作通过 `CheckToolAction` 做统一预检，默认 fail-closed，审计只保存低敏 stable key 和 tool/action/resource/risk 元数据，为后续 Agent / skill-registry / MCP gateway / action-executor 接真实业务动作提供权限边界；关系规则、决策审计和 tenant quota 先以本地低敏 operator 形式闭环；内容分类通过 policy provider port 接入，keyword / HTTP adapter 都不持久化正文；decision audit forward 只推低敏审计行到外部 HTTPS sink，provider-grade 外部 audit pipeline、ReBAC graph / DSL、tenant DSL、tool policy operator / approval integration 和 risk scoring 后续深化 |
 
 ## 已完成的主链路
 
@@ -169,7 +170,7 @@ search-service v0.1 / group memory / retrieval 是下一阶段基础能力，RAG
 2. 保持安全启动门禁、trusted metadata / TLS 边界和 policy / audit 不回退。
 3. 以 `search-service` v0.1 作为第一步，先完成 projection / visibility / tombstone / `SearchMessages`。
 4. 再建设 memory / group memory、retrieval-gateway 和 EvidencePack。
-5. 之后进入 RAG / summary / Agent / MCP / Skill；生产级完整系统测试和生产级 HA 深水区继续后置。
+5. 之后进入 RAG / summary / Agent / skill-registry / MCP gateway / action-executor；生产级完整系统测试和生产级 HA 深水区继续后置。
 
 | 服务 | 待开发 / 待完善功能 |
 | --- | --- |
@@ -190,13 +191,13 @@ AI 能力先按依赖逐步进入。`search-service` / group memory / retrieval 
 | 待开发服务 / 能力 | 目标 |
 | --- | --- |
 | `search-service` | 聊天记录搜索、索引、成员可见窗口过滤、编辑 / 撤回 / 删除 tombstone |
-| `memory-service` / group memory projection | 多人、多群、多时间版本的 StructuredMemoryEvent、Memory Graph、ProfileAggregate |
+| `memory-service` / group memory projection | 多人、多群、多时间版本的 StructuredMemoryEvent、Memory Graph、ProfileAggregate；memory 必须有 source refs、speaker / audience、valid_from / valid_to、supersedes、confidence 和 review state；状态至少区分 PENDING / ACTIVE / SUPERSEDED / REJECTED / ARCHIVED，单条群消息不能直接升级成长期个人画像 |
 | `retrieval-gateway` | 统一结构过滤、BM25 / 向量 / 图扩展、policy check 和 EvidencePack |
 | `rag-service` | 基于聊天记录的权限安全问答，只消费 EvidencePack |
 | `summary-service` | 会话总结、未读摘要、日报 |
 | `agent-service` | 客服机器人、群助手、任务 Agent，先 read-only / proposal-only |
-| MCP tool surface | 把检索、摘要、proposal-only Agent 动作封装成受权限和审计约束的工具入口 |
-| Skill runtime / registry | 把可复用的 IM / knowledge 工作流沉淀为可版本化、可审计、可回放的 Skill |
+| `mcp-gateway/tool-gateway` | 把检索、摘要、proposal-only Agent 动作封装成受权限和审计约束的工具入口 |
+| `skill-registry` | 把可复用的 IM / knowledge 工作流沉淀为可版本化、可审计、可回放的 Skill |
 | evidence pack | AI 输出必须携带 source message id、conversation seq、conversation id |
 | Agent 写动作链路 | Proposal -> Approval -> Executor -> Audit，避免 Agent 直接改业务事实 |
 
@@ -255,7 +256,7 @@ search / RAG / Agent 后端能力。
 3. 以 `search-service` v0.1 启动索引、visibility、tombstone 和 `SearchMessages`；
 4. 设计并实现 memory / group memory、EvidencePack 和 retrieval-gateway 最小链路；
 5. 收敛必要的观测、repair、audit、DLQ 和容量证据，不把生产级完整系统测试作为短期阻塞；
-6. 再进入 RAG / Agent / MCP / Skill 的后端能力；
+6. 再进入 RAG / summary / Agent / skill-registry / MCP gateway / action-executor 的后端能力；
 7. 控制代码复杂度，避免核心文件继续变大。
 
 ## 面试讲述线
@@ -267,7 +268,7 @@ search / RAG / Agent 后端能力。
 
 在身份侧，我实现了登录、Refresh Token、MFA、recovery code、JWKS、challenge delivery outbox、SMTP / webhook challenge sender 和启动安全门禁。系统也补了 health、ready、debug metrics、repair、audit、cleanup、worker retry 和多种本地故障 smoke。
 
-后续我会先把 9 个服务做必要收口，补齐消息变更、成员窗口、群管理、回执、联系人和策略这些 AI 会依赖的 IM 语义；短期不把生产级完整系统测试作为转进阻塞，而是用切片级本地检查和最小 smoke 守住事实、权限和证据边界。第一步是 search-service v0.1，先做索引 projection、visibility、tombstone 和 SearchMessages；后续再做 memory、retrieval-gateway、RAG、Agent、MCP 和 Skill。大模型只能通过权限过滤后的 EvidencePack 访问聊天记录，Agent 写动作必须走 proposal、approval、executor 和 audit。
+后续我会先把 9 个服务做必要收口，补齐消息变更、成员窗口、群管理、回执、联系人和策略这些 AI 会依赖的 IM 语义；短期不把生产级完整系统测试作为转进阻塞，而是用切片级本地检查和最小 smoke 守住事实、权限和证据边界。第一步是 search-service v0.1，先做索引 projection、visibility、tombstone 和 SearchMessages；后续再做 memory、retrieval-gateway、RAG、summary、Agent、skill-registry、MCP gateway 和 action-executor。大模型只能通过权限过滤后的 EvidencePack 访问聊天记录，Agent 写动作必须走 proposal、approval、executor 和 audit。
 ```
 
 ## 维护规则

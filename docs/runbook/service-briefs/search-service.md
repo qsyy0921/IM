@@ -11,7 +11,10 @@
 - 第一版目标：消费 `conversation.timeline.events`，维护消息索引、可见性窗口和 tombstone。
 - 第一版查询：提供 `SearchMessages`，按 tenant / conversation / join_seq / leave_seq / deleted/revoked 状态过滤。
 - 第一版不调用 LLM，不做 RAG 回答，不直接读 message-service / conversation-service 私有表。
-- 后续 memory / retrieval-gateway / RAG / Agent / MCP / Skill 都必须复用它的 visibility / tombstone 语义。
+- 后续 memory / retrieval-gateway / RAG / summary / Agent / skill-registry / MCP gateway / action-executor 都必须复用它的 visibility / tombstone 语义。
+- 搜索索引不直接承载每个 viewer 的成员窗口膨胀字段；v0.1 需要保留 message `conversation_seq`、source event、status、permission / visibility version，并配合 membership visibility projection 做查询过滤。
+- `memory-service` 会在 search 边界稳定后消费同一事实事件，生成带 source refs 和版本语义的 group memory；search-service 不保存长期 memory。
+- Agent / skill-registry / MCP gateway / action-executor 不能绕过 search/retrieval 的 visibility 和 tombstone 语义。真实业务写动作必须通过 policy-service tool policy precheck，再进入 proposal / approval / action-executor / audit。
 
 ## 后续
 
@@ -19,4 +22,4 @@
 - timeline projection：message persisted / edited / revoked / deleted + member boundary。
 - search smoke：发消息可搜，编辑更新，撤回/删除不可见，退群后不可见。
 - EvidencePack 前置 smoke：搜索结果必须带 source message id、conversation seq、source event id 和 visibility version。
-- 后续链路：memory / group memory -> retrieval-gateway / EvidencePack -> RAG / summary -> Agent -> MCP tool surface -> Skill runtime / registry。
+- 后续链路：memory / group memory -> retrieval-gateway / EvidencePack -> RAG / summary -> Agent -> skill-registry -> mcp-gateway/tool-gateway -> action-executor。

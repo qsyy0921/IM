@@ -51,10 +51,25 @@ Current main line:
    security boundaries.
 2. Start `search-service v0.1` as projection / visibility / tombstone /
    `SearchMessages`, not an LLM demo.
-3. Then build `memory-service`, `retrieval-gateway`, RAG, Agent,
-   `skill-registry`, `mcp-gateway`, and `action-executor`.
+3. Then build `memory-service`, `retrieval-gateway`, RAG, `summary-service`,
+   Agent, `skill-registry`, `mcp-gateway`, and `action-executor`.
 4. Keep production-grade HA, long load tests, sizing, full SLOs, and provider
    operations in hardening backlog unless the user explicitly asks for them.
+
+Current AI architecture baseline:
+
+- Treat facts, projections, retrieval, and controlled execution as separate
+  planes.
+- Build `search-service`, then `memory-service`, then `retrieval-gateway`
+  before RAG or Agent execution.
+- `memory-service` must model group memory with source references, speaker /
+  audience scope, validity windows, supersession, confidence, and review state;
+  it is not a plain vector store or summary cache.
+- RAG / summary / Agent outputs must consume EvidencePack and must not bypass
+  policy or retrieval boundaries.
+- Agent actions must use policy precheck, tool policy, proposal / approval,
+  action executor, and audit; high-risk autonomous execution is out of scope for
+  first-stage work.
 
 ## Progress Documents
 
@@ -111,6 +126,20 @@ Bound concurrency. Normally use 2-3 agents; use more only when the user asks and
 write scopes are disjoint. Do not let two agents edit the same file or section.
 The main agent owns integration, consistency, validation, and closing stale
 agents.
+
+For the current AI foundation phase, acceptable sub-agent splits are:
+
+- architecture / SDD review agents that only read and report inconsistencies;
+- one worker per disjoint service or document set, for example
+  `search-service` contracts, `memory-service` SDD, and `retrieval-gateway`
+  EvidencePack contracts;
+- verification agents that run focused checks or find test gaps while the main
+  agent works on a different write scope.
+
+Do not use sub-agents to create competing versions of the same architecture
+document, edit the same service brief, or make uncoordinated cross-service API
+changes. The main agent must merge results, run the final checks, and close
+completed agents promptly.
 
 ## Validation Before Finishing
 

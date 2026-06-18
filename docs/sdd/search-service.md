@@ -26,7 +26,9 @@
 - 不修改 `message_log`、`conversation_timeline_events`、`message_outbox`。
 - 不分配 conversation seq。
 - 不决定成员事实，成员边界来自 `conversation-service`。
-- 不做 RAG chunk / embedding / rerank；这些属于后续 `rag-ingest` / `retrieval-gateway`。
+- 不做 RAG chunk / embedding / rerank；这些属于后续 `memory-service`、`retrieval-gateway`、`rag-service` 或 `summary-service`。
+- 不保存长期 memory、不生成用户画像；group memory 由后续 `memory-service` 消费同一事实事件后生成。
+- 不触发 Agent 工具动作；Agent / MCP / Skill 必须通过 `retrieval-gateway` 和 policy tool check。
 - 不直接读取其它服务内部表，不直接访问 message-service 或 conversation-service 数据库。
 
 ## 2. 上下游
@@ -36,7 +38,7 @@
 | 上游事件 | Kafka `conversation.timeline.events` | 消费 message/member boundary 事件 |
 | 同步入口 | `api-gateway` | 调用 `SearchMessages` |
 | 同步依赖 | PostgreSQL | 写 projection、checkpoint、可选第一版索引表 |
-| 可选同步依赖 | `policy-service` | projection stale 或 strict mode 时做最终授权 |
+| 可选同步依赖 | `policy-service` | projection stale 或 strict mode 时做最终授权；后续 Agent/tool action 做 tool policy precheck |
 | 后端端口 | `SearchIndexPort` | 写入 / 删除 / 查询索引，不绑定具体中间件 |
 
 ## 3. 六层 DDD 包结构
@@ -70,7 +72,7 @@ services/search-service/
 | `SearchVisibilityWindow` | 用户在会话内的可见窗口 | 来自 member boundary event，不能作为成员事实源 |
 | `SearchTombstone` | 撤回 / 删除 / 保留期清理状态 | tombstone 后默认不返回文档正文 |
 | `SearchProjectionCheckpoint` | Kafka projection 进度 | DB / index 副作用成功后才推进 next offset |
-| `SearchHit` | 查询结果 | 必须带 source event id、message id、conversation seq |
+| `SearchHit` | 查询结果 | 必须带 source event id、message id、conversation seq、visibility version |
 
 可见性规则：
 
@@ -82,6 +84,8 @@ AND document.tombstone_status = NONE
 ```
 
 如果查询时 projection 不确定、checkpoint 明显落后或 policy version stale，第一版必须 fail closed：返回 `SEARCH_UNAVAILABLE` 或走 `policy-service` strict check，不得放宽为“有结果就返回”。
+
+后续 `memory-service`、`retrieval-gateway`、RAG、summary 和 Agent 都必须复用这里的 tombstone / visibility 语义。任何 AI 输出或工具调用不得使用绕过 search visibility 的消息片段。
 
 ## 5. 同步 API 契约
 

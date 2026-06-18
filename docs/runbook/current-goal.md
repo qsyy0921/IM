@@ -24,6 +24,17 @@ search-service v0.1（第一步）
 -> 不做孤立 LLM demo
 ```
 
+当前可以采用 multi sub-agent 方式推进，但只用于互不重叠的工作：
+
+```text
+主 agent：统一方案、最终写入、集成和验证
+sub-agent A：只读检查架构 / SDD 一致性
+sub-agent B：负责某个服务或契约的独立实现切片
+sub-agent C：负责测试缺口 / 运行验证 / 文档复核
+```
+
+禁止多个 agent 同时改同一份架构文档、同一 service brief、同一 proto 或同一 migration；任何 sub-agent 产出都由主 agent 合并后再提交。
+
 每个有意义切片都要尽量闭环：
 
 ```text
@@ -34,9 +45,9 @@ search-service v0.1（第一步）
 
 1. 9 个现有服务必要收口：只补 search / memory / retrieval / Agent 必须依赖的消息 mutation、成员可见窗口、联系人隐私、policy decision source、tool policy precheck、audit 和安全边界。
 2. `search-service v0.1`：先落 search projection、visibility、tombstone、`SearchMessages`，作为第一步 AI 数据入口。
-3. `memory-service`：在 search 事件边界稳定后做 group memory / StructuredMemoryEvent / profile aggregate。
+3. `memory-service`：在 search 事件边界稳定后做 group memory / StructuredMemoryEvent / Memory Graph / profile aggregate；必须带 source refs、speaker / audience scope、valid_from / valid_to、supersedes、confidence 和 review state，不能把群聊事实直接升级成个人长期偏好。
 4. `retrieval-gateway`：统一 EvidencePack、权限过滤、引用来源和 temporal version。
-5. RAG / Agent / `skill-registry` / `mcp-gateway` / `action-executor`：只消费受控 EvidencePack 和 tool policy，不直接读业务库。
+5. RAG / `summary-service` / Agent / `skill-registry` / `mcp-gateway` / `action-executor`：只消费受控 EvidencePack 和 tool policy，不直接读业务库。
 6. 生产级观测、HA、长压和 sizing：继续作为 hardening backlog 推进，但不阻塞当前 AI 底座路线启动。
 
 新发现的待完成工作必须写入 `docs/runbook/remaining-goals.md`；已完成的工作从该文档移除，并同步到对应 service brief / progress 文档。
@@ -49,7 +60,7 @@ search-service v0.1（第一步）
 9 个现有服务做必要收口
 -> search-service v0.1
 -> memory-service / retrieval-gateway
--> RAG / Agent
+-> RAG / summary-service / Agent
 -> skill-registry / mcp-gateway / action-executor
 ```
 
@@ -62,7 +73,7 @@ Web / App / 桌面端是后续产品化展示层，不是当前后端主线。
 | 第一层 | 最小 IM 主链路：发消息、会话、投递、在线通知、ACK | 已完成最小闭环 |
 | 第二层 | 分布式与可靠性：outbox、Kafka、durable inbox、Redis route、多实例、故障 smoke | 已有本地 / 双机 smoke，不等于生产 HA |
 | 第三层 | 完整 IM 后端产品能力：回执、撤回/编辑/删除、会话列表、联系人、群管理、鉴权、api-gateway | 做必要收口，不以生产级测试深水区阻塞 AI 底座 |
-| 第四层 | AI 大模型应用底座：search、memory、retrieval、RAG、Agent、skill registry、MCP gateway、action executor | `search-service v0.1` 是第一步 |
+| 第四层 | AI 大模型应用底座：search、memory、retrieval、RAG、summary、Agent、skill registry、MCP gateway、action executor | `search-service v0.1` 是第一步 |
 
 ## 文档路由
 

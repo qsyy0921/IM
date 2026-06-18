@@ -119,7 +119,7 @@ repair event
 | B | 多服务各写 outbox，但共享 `conversation_timeline_publish_cursor` 按 `aggregate_version` 全局发布 | 可用但治理复杂 |
 | C | 所有 timeline event 进入同一张 `conversation_timeline_events` 和同一条 outbox 流 | 推荐用于第一批生产化 |
 
-第一阶段只有 message-service 产生 message timeline event，因此 message-service outbox 顺序保护足够。成员边界、gap marker 和 repair event 生产化前，`conversation-service / member_change_saga SDD` 必须选定 A/B/C 之一。
+当前普通消息 timeline event 仍由 message-service 写入并通过 outbox 保护顺序。成员边界、gap marker、repair event 和后续更多 producer 生产化前，必须显式选择统一 timeline append / publish 机制，并证明同 conversation 顺序不被破坏。
 
 热点 seq 分配流水：
 
@@ -424,7 +424,7 @@ Replay Source Policy：
 
 ## 9. Redis 与长连接
 
-Redis 拆成三类集群：
+Redis 按逻辑角色拆成三类；物理上可以先共用本地 Redis，也可以按生产 ADR 拆成独立集群：
 
 | 集群 | 用途 | 降级策略 |
 | --- | --- | --- |
@@ -432,7 +432,7 @@ Redis 拆成三类集群：
 | redis-counter | 限流、receipt 聚合、未读热点、fanout 热点 | 降低刷新频率，保留主链路 |
 | redis-cache | 权限缓存、预算缓存、检索缓存 | 缓存 miss 回源 |
 
-禁止一个 Redis 集群承载所有热状态，避免未读和限流热点拖垮连接路由。
+生产形态不建议一个 Redis 集群承载所有热状态，避免未读和限流热点拖垮连接路由；本地开发 / smoke 可用单 Redis namespace 简化。
 
 push-gateway 只负责：
 

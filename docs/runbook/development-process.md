@@ -23,7 +23,7 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 -> 把 9 个核心服务做必要收口
 -> 以 search-service v0.1 建搜索、可见性和 tombstone 底座
 -> 再建设 memory / retrieval / EvidencePack
--> 再扩 RAG / summary / Agent / MCP / Skill 后端
+-> 再扩 RAG / summary / Agent / skill-registry / mcp-gateway / action-executor 后端
 -> 分布式可靠性和生产级完整测试按风险持续补强
 -> 最后按需要做客户端和产品化展示
 ```
@@ -37,6 +37,7 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 5. 代码复杂度要持续治理，不能把单个核心文件继续堆成大文件。
 6. 当前面试主线只覆盖后端、分布式可靠性和 AI 应用后端；客户端暂不作为当前开发主线。
 7. 短期转进 AI 大模型应用后端不以生产级完整系统测试或生产级 HA 为阻塞，但当前切片仍必须有本地检查、最小 smoke 或等价证据。
+8. 可以使用 multi sub-agent 并行开发，但只能拆分互不重叠的服务、文档或测试面；主 agent 负责集成、最终验证和关闭 stale agents。
 
 ## 1. 第一阶段：最小 IM 主链路
 
@@ -192,7 +193,7 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 
 ```text
 以 search-service v0.1 作为第一步，
-为聊天记录搜索、群组 memory、retrieval 和后续 RAG / Agent / MCP / Skill 建立可控的检索事实层。
+为聊天记录搜索、群组 memory、retrieval 和后续 RAG / summary / Agent / skill-registry / mcp-gateway / action-executor 建立可控的检索事实层。
 ```
 
 进入这一阶段前，不要求所有生产级 HA 或生产级完整系统测试都完成，但 message / conversation / policy / delivery 的事实边界必须足够稳定，尤其是编辑、撤回、删除、成员窗口和权限策略。
@@ -211,8 +212,11 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 - 消费 message / conversation / contacts / receipt / policy 事件；
 - 抽取 StructuredMemoryEvent；
 - 维护 group memory 的 actor / group / topic / time / status / supersedes 语义；
+- 记录 source refs、speaker / audience scope、valid_from / valid_to、confidence 和 review state；
 - 不把群事实直接升级成个人长期偏好；
 - 不替代 search-service 或 policy-service。
+
+2025/2026 memory benchmark 和论文暴露的主要风险必须进入第一版测试：多人归因错误、旧事实覆盖失败、群组共识和个人偏好混淆、退群后可见性泄漏、无证据 memory active、无证据回答和需要拒答时未拒答。
 
 ## 6. 第六阶段：AI 应用后端
 
@@ -229,9 +233,9 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 2. `rag-service`
 3. `summary-service`
 4. `agent-service` read-only / proposal-only
-5. MCP tool surface
-6. Skill runtime / registry
-7. proposal / approval / executor / audit
+5. `skill-registry`
+6. `mcp-gateway/tool-gateway`
+7. `action-executor` + proposal / approval / audit
 
 必须遵守的边界：
 
@@ -240,7 +244,7 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 - 撤回 / 删除 / 成员可见窗口必须影响搜索和 RAG；
 - AI 输出必须带 source message id、conversation seq 和 evidence pack；
 - Agent 写动作必须可审计、可审批、可回放。
-- MCP / Skill 只能封装已通过权限、证据和审计约束的后端能力。
+- `skill-registry`、`mcp-gateway/tool-gateway` 和 `action-executor` 只能封装已通过权限、证据和审计约束的后端能力。
 
 ## 7. 第七阶段：其它产品后端服务
 
@@ -310,7 +314,7 @@ Web / App / 桌面端是后续产品化展示层，
 -> 启动 search-service v0.1，先做 projection / visibility / tombstone / SearchMessages
 -> 启动 memory / group memory / retrieval-gateway / EvidencePack
 -> 再进入 rag-service / summary-service / agent-service
--> 再封装 MCP tool surface 和 Skill runtime / registry
+-> 再封装 skill-registry / mcp-gateway / action-executor
 -> 生产级 HA、生产级完整系统测试和客户端产品化继续后置
 -> 后续再按需要补 media / notification / audit / admin / 客户端
 ```

@@ -37,7 +37,7 @@ EverMemBench 只是设计输入之一。它强调多人、多群、多时间版�
 
 1. IM 业务事实源仍在现有服务：message、conversation、delivery、identity、contacts、policy 等服务继续拥有各自事实。
 2. AI 服务只消费事件、构建 projection、生成证据包和建议，不直接改 IM 事实源。
-3. 未来 AI 层服务拆分以 `search-service`、`memory-service`、`retrieval-gateway`、`rag-service`、`summary-service`、`agent-service`、`skill-registry`、`mcp-gateway/tool-gateway`、`action-executor`、`ai-eval-service` 为基线，但服务和中间件不是写死终局。
+3. 未来 AI 层服务拆分以 `search-service`、`memory-service`、`retrieval-gateway`、`rag-service`、`summary-service`、`agent-service`、`skill-registry`、`mcp-gateway/tool-gateway`、`action-executor` 为主线；`ai-eval-service` 第一阶段可以先作为 harness / gate 存在。服务和中间件不是写死终局。
 4. 新增服务必须满足独立数据模型、独立伸缩需求、独立故障边界、独立安全边界之一，或显著降低复杂度，并通过 ADR。
 5. Agent 可以接入真实业务，但不能直连 PostgreSQL、OpenSearch、Milvus、Redis；只能通过 retrieval-gateway、mcp-gateway/tool-gateway、action-executor 或公开业务 API。
 6. Agent 写动作必须先做权限前置校验和 tool policy 检查；audit 是必要条件，但不能替代权限检查。
@@ -589,10 +589,10 @@ model
 2. 实现 `search-service`：先做消息搜索 projection、成员可见窗口、撤回/删除 tombstone。
 3. 实现 `memory-service`：抽取结构化事件、版本语义、跨群归因、memory graph 和画像聚合。
 4. 实现 `retrieval-gateway` 第一版：基于 search / memory 输出 EvidencePack，不急着做生成。
-5. 建立 `ai-eval-service` 最小门禁：先覆盖权限、删除后不可见、时间版本、oracle evidence、attribution 和 tool policy。
-6. 实现 `rag-service` 和 `summary-service`：必须经过 retrieval-gateway 和 EvidencePack。
+5. 实现 `rag-service` 和 `summary-service`：必须经过 retrieval-gateway 和 EvidencePack。
+6. 实现 `agent-service`：先做 read-only / proposal-only，再逐步接低风险自动执行意图。
 7. 实现 `skill-registry`、`mcp-gateway/tool-gateway`、`action-executor` 的最小 allowlist / proposal / idempotency / audit 边界。
-8. 实现 `agent-service`：先做 read-only / proposal-only，再逐步接低风险自动执行。
+8. 建立 AI eval harness / `ai-eval-service` 最小门禁：伴随 search、retrieval、RAG、summary、Agent 和 tool policy 演进，覆盖权限、删除后不可见、时间版本、oracle evidence、attribution 和 tool policy。
 
 ## 10. 与现有 9 服务的关系
 
@@ -612,11 +612,11 @@ model
 2. `SearchMessages` API：只返回可见消息，不做生成。
 3. `memory-service` / group memory 最小 projection：StructuredMemoryEvent + supersedes + source refs。
 4. `retrieval-gateway` thin facade：调用 search-service / memory-service，生成 EvidencePack。
-5. `ai-eval-service` 最小 harness：覆盖权限泄漏、删除后不可见、oracle evidence、跨群归因和无证据拒答。
-6. `rag-service` read-only 问答：只接受 EvidencePack，不直接检索。
-7. `summary-service` 最小摘要任务：只基于 EvidencePack 生成，可按删除和 tombstone 重算。
+5. `rag-service` read-only 问答：只接受 EvidencePack，不直接检索。
+6. `summary-service` 最小摘要任务：只基于 EvidencePack 生成，可按删除和 tombstone 重算。
+7. AI eval harness：覆盖权限泄漏、删除后不可见、oracle evidence、跨群归因、无证据拒答和 tool policy；需要独立运行/存储后再升级为 `ai-eval-service`。
 
-Agent 第一版必须等 retrieval-gateway 和 `ai-eval-service` 最小门禁稳定后再做；`skill-registry`、`mcp-gateway/tool-gateway`、`action-executor` 先只开放极小 allowlist 和 proposal 链路。
+Agent 第一版必须等 retrieval-gateway 和最小 eval gate 稳定后再做；`skill-registry`、`mcp-gateway/tool-gateway`、`action-executor` 先只开放极小 allowlist 和 proposal 链路。
 
 ## 12. AI 能力复用矩阵
 

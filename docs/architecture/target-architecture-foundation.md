@@ -61,7 +61,7 @@ NexusIM 是面向大规模企业协同的 IM + 智能协作平台。核心原则
 
 | 层级 | 状态 | 内容 | 变更规则 |
 | --- | --- | --- | --- |
-| Level 1 | 核心不变量 | 六层 DDD、gRPC + Protobuf、HTTP/OpenAPI gateway 适配、Transactional Outbox、`message-service SendMessage` 第一阶段主链路、Go module 和工程目录 | 变更必须走 ADR |
+| Level 1 | 核心不变量 | 六层 DDD、gRPC + Protobuf、HTTP/OpenAPI gateway 适配、Transactional Outbox、9 个已实现后端服务的事实源 / outbox / projection 边界、Go module 和工程目录 | 变更必须走 ADR |
 | Level 2 | 当前推荐方向 | PostgreSQL、Kafka、Redis、Schema Registry、OpenSearch、Kubernetes/GitOps、OpenTelemetry、S3-compatible Object Storage、mTLS | 可替换，但必须有迁移、回滚和压测证据 |
 | Level 3 | 候选/待验证 | Kratos、wire、sqlc、Temporal、OpenFGA-compatible backend、Milvus、分片/副本/版本小号、HPA 参数、机器规格、RAG chunk 策略、embedding/rerank model | 由服务级 SDD、压测结果和发布评审决定 |
 
@@ -71,7 +71,7 @@ ADR 触发条件：
 改变 Level 1 不变量
 改变事实源或事件平台
 改变服务分层和目录约束
-改变 message-service 第一阶段主链路
+改变当前 9 服务主链路事实边界
 改变历史事件 replay / migration / rollback 语义
 ```
 
@@ -196,7 +196,15 @@ flowchart TB
 
 ## 4. 服务边界
 
-目标态核心服务清单是当前架构快照，不是服务数量上限。新增服务和中间件不写死，必须满足独立数据模型、独立伸缩需求、独立故障边界、独立安全边界之一，或能显著降低现有服务复杂度，并通过 ADR。当前已独立实现的 `contacts-service` 正式纳入核心服务，不再把它隐含到 conversation-service。
+目标态核心服务清单是演进蓝图，不等同当前已实现快照，也不是服务数量上限。新增服务和中间件不写死，必须满足独立数据模型、独立伸缩需求、独立故障边界、独立安全边界之一，或能显著降低现有服务复杂度，并通过 ADR。当前已独立实现的 `contacts-service` 正式纳入核心服务，不再把它隐含到 conversation-service。
+
+当前事实和目标态分层如下：
+
+| 分层 | 当前口径 |
+| --- | --- |
+| 已实现后端主链路 | `api-gateway`、`identity-service`、`message-service`、`conversation-service`、`delivery-service`、`push-gateway`、`receipt-service`、`contacts-service`、`policy-service` |
+| 下一阶段 AI 底座主线 | `search-service v0.1`、`memory-service`、`retrieval-gateway`、`rag-service`、`summary-service`、`agent-service`、`skill-registry`、`mcp-gateway/tool-gateway`、`action-executor` |
+| 目标态候选 / 后置平台能力 | `route-service`、`control-plane-service`、`timeline-service`、`media-service`、`audit-service`、`notification-service`、`admin-service`、`ai-eval-service` 等按 ADR 渐进拆分 |
 
 | 层级 | 组件 |
 | --- | --- |

@@ -1,6 +1,6 @@
 # NexusIM ADD v1.0
 
-> Legacy reference: this is an early architecture draft, not the current work entrypoint. Current routing starts from the root `prompt.md` / `agent.md`, and current architecture status is maintained in `docs/architecture/target-architecture.md` plus the runbook docs.
+> Legacy reference: this is an early architecture draft, not the current work entrypoint. It contains obsolete phase scope such as `message-service SendMessage` as the only current delivery target. Current routing starts from the root `prompt.md` / `agent.md`, and current architecture status is maintained in `docs/architecture/target-architecture.md`, ADRs, SDDs, and the runbook docs.
 
 ADD（Architecture Design Document）描述系统级业务架构、服务边界和关键业务链路。本文不展开具体 SQL、代码目录和部署参数；这些内容进入 TADD、SDD、契约和 migration。
 
@@ -27,7 +27,9 @@ Search/RAG/Agent 是异步投影和智能协作层。
 
 ## 2. 架构范围
 
-当前阶段只交付：
+以下“当前阶段”是早期历史切片，不代表 2026-06-18 的当前路线。当前路线是 9 个已实现后端服务必要收口后进入 `search-service v0.1 -> memory-service -> retrieval-gateway -> RAG / summary / Agent`。
+
+早期阶段只交付：
 
 - Web 端基础聊天；
 - `message-service SendMessage` 普通会话写入；

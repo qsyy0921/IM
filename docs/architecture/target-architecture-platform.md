@@ -62,7 +62,7 @@ freeze affected policy scope
 
 ### 10.2 Search/RAG
 
-详细 AI / memory / Agent 后续目标架构见 `target-architecture-ai.md`。本节只保留跨服务硬边界。未来 AI 层服务拆分以 `search-service`、`memory-service`、`retrieval-gateway`、`rag-service`、`summary-service`、`agent-service`、`skill-registry`、`mcp-gateway/tool-gateway`、`action-executor`、`ai-eval-service` 为基线；服务和中间件不是写死终局，新增或替换必须符合独立数据模型、独立伸缩、独立故障、独立安全边界之一，或显著降低复杂度，并通过 ADR。
+详细 AI / memory / Agent 后续目标架构见 `target-architecture-ai.md`。本节只保留跨服务硬边界。AI 底座主线为 `search-service -> memory-service -> retrieval-gateway -> rag-service / summary-service -> agent-service -> skill-registry / mcp-gateway -> action-executor`；`ai-eval-service` 可先以 harness / gate 落地。服务和中间件不是写死终局，新增或替换必须符合独立数据模型、独立伸缩、独立故障、独立安全边界之一，或显著降低复杂度，并通过 ADR。
 
 OpenSearch 文档必须包含：
 
@@ -403,7 +403,7 @@ RAG/summary/Agent 进入生产发布前必须跑安全评测。短期建设 AI �
 | ADR-032 | push-gateway 支持短断线 resume buffer | 提升移动端短断线体验，同时不改变 delivery 补拉事实源 |
 | ADR-033 | api-gateway tenant quota source 由控制面 / 配置源版本化发布 | 避免 user-facing gateway 直连业务内部表，DB-backed quota 需通过服务拥有的配置契约 |
 | ADR-034 | PostgreSQL production quorum boundary | 本地 `repmgr + pgpool` 只作为 smoke 拓扑；生产 HA 必须另有 quorum / fencing 证据 |
-| ADR-035 | AI 层以 search、memory、retrieval、RAG、summary、Agent、skill、tool、executor、eval 十个服务为目标基线 | 先形成可复用大模型应用底座；后续新增、合并或替换必须满足独立数据模型/伸缩/故障/安全边界或降低复杂度 |
+| ADR-035 | AI 底座按 search、memory、retrieval、RAG、summary、Agent、skill、tool、executor 和 eval gate 分阶段演进 | 先形成可复用大模型应用底座；eval 可先是 harness，后续新增、合并或替换必须满足独立数据模型/伸缩/故障/安全边界或降低复杂度 |
 
 ## 16. 演进结论与下一阶段
 
@@ -415,11 +415,15 @@ RAG/summary/Agent 进入生产发布前必须跑安全评测。短期建设 AI �
 | --- | --- | --- |
 | P0 | 9 服务必要收口 | 编辑、撤回、删除、群管理、成员窗口、回执、联系人、policy decision audit、事件契约和本地集成验证 |
 | P0 | 契约和 migration 补齐 | 当前 9 服务需要的 Proto / OpenAPI / AsyncAPI、PostgreSQL migration、Kafka schema，保证 search / memory 可消费 |
-| P1 | `search-service` + `memory-service` | 可重建搜索 projection、tombstone、成员可见窗口、StructuredMemoryEvent、版本语义和画像聚合 |
-| P1 | `retrieval-gateway` + `ai-eval-service` | strict ACL、EvidencePack、索引版本、最小权限/删除/时间版本/evidence/tool policy 门禁 |
+| P1 | `search-service` | 可重建搜索 projection、tombstone、成员可见窗口和 `SearchMessages` |
+| P1 | `memory-service` | StructuredMemoryEvent、版本语义、跨群归因、memory graph 和画像聚合 |
+| P1 | `retrieval-gateway` | strict ACL、EvidencePack、索引版本、引用来源和 temporal version |
 | P1 | `rag-service` + `summary-service` | 只消费 EvidencePack 的只读问答和摘要，不直接检索、不写事实源 |
-| P2 | `skill-registry` + `mcp-gateway/tool-gateway` + `action-executor` + `agent-service` | skill schema、tool policy、低风险 allowlist、proposal、idempotency、audit 和 read-only/proposal-only Agent |
+| P1 | AI eval harness / `ai-eval-service` | 伴随 search / retrieval / RAG / Agent 演进，覆盖权限/删除/时间版本/evidence/tool policy 门禁 |
+| P2 | `agent-service` + `skill-registry` + `mcp-gateway/tool-gateway` + `action-executor` | read-only/proposal-only Agent、skill schema、tool policy、低风险 allowlist、proposal、idempotency 和 audit |
 | P2 | 生产级验证和容量基线 | HA、全量压测、混沌、跨 Region、K8s rollout、容量模型和故障演练，作为上线加固而非当前阶段阻塞 |
+
+这些交付物可以用 multi sub-agent 并行推进，但只能按互不重叠的服务、文档或验证面拆分；主 agent 必须统一合并、做最终检查并关闭不再需要的 sub-agent。
 
 九服务必要收口中的代码边界：
 
@@ -431,7 +435,7 @@ RAG/summary/Agent 进入生产发布前必须跑安全评测。短期建设 AI �
 | PostgreSQL migration 未落文件 | 阻塞对应本地事务代码，不阻塞服务拆分设计 | 先落 9 服务必要收口涉及的事实表和唯一约束 |
 | Kafka schema 未落文件 | 阻塞 outbox relay 对外发布和 search / memory projection 消费 | 先落必要 timeline/message/member/receipt/policy 事件和 envelope，再实现 projection consumer |
 | Outbox DLQ repair 契约文件未落地 | 不阻塞当前消息链路 `SendMessage`，但阻塞后续运维闭环 | SDD 已定义 replay/skip 语义；后续必须落 Proto/AsyncAPI 和 `audit.repair.events` schema |
-| 跨服务 timeline append / publish ordering 未落地 | 不阻塞当前只有 message event 的 `SendMessage`；阻塞成员边界、gap marker、repair event 生产化 | `conversation-service / member_change_saga SDD` 必须选择统一 timeline append / publish 机制 |
+| 跨服务 timeline append / publish ordering 未完全统一 | 不阻塞当前已验证的 message / member / delivery / push 主链路；阻塞更多 timeline producer、gap marker 和 repair event 生产化 | 新 producer 接入前必须选择统一 timeline append / publish 机制，并证明同 conversation 顺序和 repair 语义 |
 
 本地开发和双机压测配置属于运行手册，不固化在目标态架构正文中。当前机器 IP、端口、防火墙和代理约定见 `docs/runbook/local-loadtest.md`。
 

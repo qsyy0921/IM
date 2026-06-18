@@ -5,7 +5,7 @@
 把下面这段放进 Codex 目标框即可：
 
 ```text
-持续推进 E:\development\IM 的 NexusIM 项目，当前主线是必要收口 + 转向 AI 大模型应用底座。每轮先运行 git status --short --branch --untracked-files=all，然后读取仓库根目录 prompt.md 和 agent.md，再按需读取本轮必要文档；短期生产级测试后置，不把具体长目标写进目标框，不全文扫长历史文档，不回滚用户已有修改。
+持续推进 E:\development\IM 的 NexusIM 项目，当前主线是必要收口 + 转向 AI 大模型应用底座。每轮先运行 git status --short --branch --untracked-files=all，然后读取仓库根目录 prompt.md 和 agent.md，再按需读取本轮必要文档；允许按 agent.md 使用多个 sub-agent 并行处理互不重叠的设计/实现/验证任务；短期生产级测试后置，不把具体长目标写进目标框，不全文扫长历史文档，不回滚用户已有修改。
 ```
 
 ## 本文件的作用
@@ -33,9 +33,10 @@
 3. 降低耦合：不跨服务读内部表，不引入网状同步 RPC，不为了短期功能抽公共包。
 4. 控制复杂度：生产手写文件接近 2500 行、测试或 runner 接近 3000 行时，优先同 package 拆分。
 5. 新服务和中间件不写死；只有独立数据模型、独立伸缩需求、独立故障边界或显著降低复杂度时才新增，并通过 ADR。
-6. 压测原始数据放 `H:\NexusIM\loadtest-results`；E 盘仓库只放报告和文档。
-7. 新发现的待完成工作写入 `docs/runbook/remaining-goals.md`。
-8. 不回滚用户已有修改。
+6. 可以使用多个 sub-agent 加快推进，但必须拆分互不重叠的文件/服务/职责；主 agent 负责集成、最终检查和关闭不再需要的 sub-agent。
+7. 压测原始数据放 `H:\NexusIM\loadtest-results`；E 盘仓库只放报告和文档。
+8. 新发现的待完成工作写入 `docs/runbook/remaining-goals.md`。
+9. 不回滚用户已有修改。
 
 ## 每轮结束
 

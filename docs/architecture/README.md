@@ -1,6 +1,6 @@
 # 架构文档索引
 
-`docs/architecture/target-architecture.md` 现在是总架构短索引，不再承载全部章节正文。详细内容按主题拆到 foundation、timeline、platform、AI 四个分卷；`add.md` 和 `tadd.md` 仍是辅助文档。
+`docs/architecture/target-architecture.md` 现在是总架构短索引，不再承载全部章节正文。详细内容按主题拆到 foundation、timeline、platform、AI 四个分卷；`add.md` 和 `tadd.md` 是早期历史草案，只用于对照，不作为当前开发路线或技术栈事实来源。
 
 ## 文档关系
 
@@ -12,8 +12,8 @@
 | `target-architecture-platform.md` | 权限、搜索、RAG、Agent、多 Region、审计、观测、ADR、演进结论。 |
 | `target-architecture-ai.md` | AI / memory / RAG / Agent 的后续目标架构、数据模型、检索流程和评测门禁。 |
 | `adr/` | 已接受的关键架构决策记录。 |
-| `add.md` | 业务架构补充。描述系统范围、参与方、服务边界、核心业务流和阶段路线。 |
-| `tadd.md` | 技术架构补充。描述六层 DDD、工程目录、中间件、本地环境、观测、测试和编码门禁。 |
+| `add.md` | Legacy 业务架构草案。保留早期系统范围、服务边界和阶段路线，用于历史对照；当前路线以 target 系列和 runbook 为准。 |
+| `tadd.md` | Legacy 技术架构草案。保留早期技术栈和工程约束讨论；当前中间件、门禁和服务状态以 target 系列、ADR、SDD 和 runbook 为准。 |
 
 ## 阅读顺序
 
@@ -22,11 +22,10 @@
 3. 需要消息主链路、Kafka、Redis route、push resume 时，读 `target-architecture-timeline.md`。
 4. 需要搜索、RAG、Agent、观测、ADR 和演进路线时，读 `target-architecture-platform.md`。
 5. 需要 AI / memory / Agent 的详细目标架构时，读 `target-architecture-ai.md`。
-6. 需要工程目录、Docker Compose、观测和编码门禁时，再查 `tadd.md`。
-7. 需要业务流和服务边界简版时，再查 `add.md`。
+6. 需要早期设计对照或演进背景时，再查 `add.md` / `tadd.md`；不要从这两份文档推导当前开发目标。
 
 ## 变更规则
 
-- 不允许在 `add.md` 或 `tadd.md` 中引入与 `target-architecture.md` 冲突的新决策。
+- 不允许在 `add.md` 或 `tadd.md` 中引入与 `target-architecture.md`、ADR、SDD 或 runbook 冲突的新决策。
 - 服务级细节优先写入 `docs/sdd/`，不要继续塞回总架构。
 - 接口、事件和数据库结构必须落到 `api/`、`schemas/`、`migrations/`，不能只停留在文档描述。

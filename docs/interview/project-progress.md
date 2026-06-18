@@ -54,7 +54,7 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 ```text
 9 个后端服务已经能跑通主链路；
 现在先继续做 9 服务 hardening，不急着新增 search / RAG 服务；
-api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、可选 checksum-required gate、applied quota snapshot stale 观测和 quota snapshot gate；
+api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、DB-backed tenant plan snapshot source、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、可选 checksum-required gate、applied quota snapshot stale 观测和 quota snapshot gate；
 api-gateway 已补 legacy/facade traffic metrics，用于旧 descriptor 迁移观察；
 legacy descriptor 已收敛为显式 opt-in 默认；
 当前 9 个服务已补 first-stage Prometheus text /metrics、本地 Prometheus alert rules 和本地 Grafana dashboard 原型；
@@ -70,7 +70,7 @@ search-service 和 AI 应用后端后置；
 
 | 服务 | 已完成能力 | 面试可讲重点 |
 | --- | --- | --- |
-| `api-gateway` | 统一 user-facing gRPC 入口，gateway token 验证，verified metadata 注入，下游代理，token / tenant scope rate limit，静态 tenant plan override，tenant plan 文件热更新，版本化 quota URL source，URL bearer token / HTTPS guard，URL source CA / client cert TLS 边界，可选 checksum-required gate，applied quota snapshot stale 观测，quota snapshot gate，legacy descriptor 显式 opt-in 默认，legacy/facade traffic metrics，legacy quiet-window gate 和 observation 归档脚本，first-stage OTel 入口 server span 和下游 gRPC client span，debug metrics | 统一入口、安全边界、correlation / trace 传播、facade-only 默认暴露面 |
+| `api-gateway` | 统一 user-facing gRPC 入口，gateway token 验证，verified metadata 注入，下游代理，token / tenant scope rate limit，静态 tenant plan override，tenant plan 文件热更新，版本化 quota URL source，DB-backed tenant plan snapshot source，URL bearer token / HTTPS guard，URL source CA / client cert TLS 边界，可选 checksum-required gate，applied quota snapshot stale 观测，quota snapshot gate，legacy descriptor 显式 opt-in 默认，legacy/facade traffic metrics，legacy quiet-window gate 和 observation 归档脚本，first-stage OTel 入口 server span 和下游 gRPC client span，debug metrics | 统一入口、安全边界、correlation / trace 传播、facade-only 默认暴露面 |
 | `identity-service` | 注册、登录、Refresh Token、MFA TOTP、recovery codes、JWKS、opt-in OIDC discovery、session/device revoke、verification/password reset challenge、webhook / SMTP email challenge sender、production-like key guard，first-stage OTel gRPC server span | 身份认证、MFA、token 轮换、JWKS、公私钥边界、issuer discovery 边界、通知投递可靠性，生产样式启动配置拒绝 local fallback key，身份服务已进入 trace rollout |
 | `message-service` | `SendMessage`、编辑、撤回、删除，合规删除 external proof manifest verifier，`TEXT` + `IMAGE` / `FILE` / `VOICE` 附件引用消息，`LOCATION` / `CARD` 结构化 payload 消息，message log，outbox，Kafka timeline event，first-stage OTel gRPC server span | 业务事务不直接 publish Kafka，使用 outbox 保证事件传播；合规 proof 只登记低敏 ref/provider/hash，不保存正文；核心写服务已进入 trace rollout；图片 / 文件 / 语音二进制处理后续交给 media 能力 |
 | `conversation-service` | 会话成员事实源，`GetSendContext`，成员变更 saga，owner transfer，ACTIVE roster 分页、单 / 多 role 过滤、role-first 管理排序和 `user_id_prefix` 轻量前缀过滤，成员窗口 audit / repair / repair audit（含当前窗口 `join_seq` / `leave_seq` / 版本 floor 保守修复），first-stage Prometheus text `/metrics`、本地 alert rules / Grafana dashboard、first-stage OTel gRPC server span | 会话成员事实边界、成员事件和消息事件共享 timeline seq，成员事实服务已进入观测 rollout |
@@ -169,7 +169,7 @@ search-service 和 AI 应用后端后置；
 
 | 服务 | 待开发 / 待完善功能 |
 | --- | --- |
-| `api-gateway` | 在目标环境持续运行 legacy quiet-window observation 并形成最终删除计划、采样治理 hardening、配置中心 / DB-backed quota hardening、生产部署治理；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules、本地 Grafana dashboard、9 服务 first-stage trace runtime wiring 和 trace sampling / wiring check，但还不是生产观测平台 |
+| `api-gateway` | 在目标环境持续运行 legacy quiet-window observation 并形成最终删除计划、采样治理 hardening、完整配置中心 quota 控制面和发布治理、生产部署治理；当前已有 first-stage DB-backed tenant plan snapshot source、第一阶段 Prometheus text `/metrics`、本地 alert rules、本地 Grafana dashboard、9 服务 first-stage trace runtime wiring 和 trace sampling / wiring check，但还不是生产观测平台 |
 | `identity-service` | WebAuthn / passkeys、外部 OIDC federation / OAuth client flows、多 issuer 治理、真正的 KMS / HSM-backed key management、完整登录风控、SMS provider、bounce handling、多租户通知模板 |
 | `message-service` | 会话级删除策略深化、provider-grade 外部 proof 工作流 / 审批系统集成、容量压测、生产级发送链路观测；图片 / 文件 / 语音二进制上传处理后续交给 media 能力 |
 | `conversation-service` | 更完整群管理、owner transfer 策略细化、完整历史窗口 / targeted replay repair；当前已有第一阶段 Prometheus text `/metrics`、本地 alert rules 和本地 Grafana dashboard，但还不是生产观测平台 |
@@ -245,7 +245,7 @@ search / RAG / Agent 后端能力。
 
 1. 先收敛安全启动门禁、trusted metadata、TLS / mTLS 边界；
 2. 清已有 9 个服务的 P2 hardening；
-3. 继续做 `api-gateway` OTel collector / alerting / dashboard、legacy opt-in 实际迁移观察和移除计划，以及配置中心 / DB-backed quota hardening；
+3. 继续做 `api-gateway` OTel collector / alerting / dashboard、legacy opt-in 实际迁移观察和移除计划，以及完整配置中心 quota 控制面；
 4. 补更完整的故障恢复 smoke；
 5. 收敛观测、repair、audit 和 DLQ 处理；
 5. 控制代码复杂度，避免核心文件继续变大；

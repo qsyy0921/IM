@@ -99,6 +99,7 @@ NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE=auto
 NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON=
 NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE=
 NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL=
+NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_DB_DSN=
 NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_BEARER_TOKEN=
 NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_REQUIRE_HTTPS=false
 NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_CA_FILE=
@@ -135,7 +136,11 @@ NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_RELOAD_INTERVAL=0
 
 未配置 override 的 tenant 使用全局 `RPS / BURST`。它不记录 token 原文、tenant_id 或 user_id，也不向业务服务透出限流 key。被限流请求返回 `ResourceExhausted / rate limit exceeded`，并携带 gRPC `RetryInfo`：local backend 使用 token bucket 补齐下一枚 token的估算等待时间，Redis backend 使用 fixed-window 下一窗口剩余时间。该请求也会进入 api-gateway gRPC metrics。
 
-`NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE` 默认 `auto`：存在 `TENANT_PLANS_JSON` 时使用 `inline`，否则存在 `TENANT_PLANS_FILE` 时使用 `file`，否则存在 `TENANT_PLANS_URL` 时使用 `url`，都不存在时为 `none`。第一阶段只支持 `inline/json`、`file` 与 `url`；如果配置为 `db`、`config-center` 或其它未知 source，api-gateway 必须在启动阶段 fail-closed，避免误以为 DB / 配置中心 quota 已生效。当 `NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_RELOAD_INTERVAL` 配置为正 duration 时，source 必须是 `file` 或 `url`，api-gateway 会定期重读 / 拉取 tenant plan，并原子替换内存中的 plan map。`url` source 只接受 HTTP(S) `200` JSON，响应体上限 1 MiB，且必须是 versioned snapshot；URL 中不得携带 `user:pass@host` 形式的 userinfo，也不跟随 redirect，避免配置源凭据或 bearer/TLS 边界被 URL 本身或跳转链路绕开。`NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_MAX_AGE` 可选启用 stale snapshot 拒绝，并在已应用 snapshot 超过 max age 后通过 `tenant_plan_age_ms / tenant_plan_stale` 暴露运行期陈旧状态。`tools/check-api-gateway-quota-snapshot.ps1` 可基于 live `/debug/metrics` 或离线 JSON snapshot 执行 quota 门禁，检查 rate-limit enabled、source、version/checksum、checksum-required policy、URL HTTPS / bearer / TLS / client-cert guard、age/stale、reload error、Redis / identity 错误、tenant plan 数、tracked key 数和最近 reload 成功时间。`url` source 可通过 `NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_BEARER_TOKEN` 向配置源发送 `Authorization: Bearer ...`，该值不进入 metrics / logs；配置 bearer token 时必须使用 HTTPS；URL fetch / transport / response-read 这类外部错误只返回稳定低敏文案，不持久化或记录 URL query、bearer token 或 provider body。`NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_REQUIRE_HTTPS=true` 可强制普通 `url` source 也拒绝 HTTP。需要私有 CA、SNI override 或配置源 mTLS 时，可配置 `URL_CA_FILE / URL_SERVER_NAME / URL_CLIENT_CERT_FILE / URL_CLIENT_KEY_FILE`；这些 TLS 配置只允许用于 HTTPS endpoint，client cert 和 key 必须成对配置。`NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_REQUIRE_CHECKSUM=true` 可强制启动加载和 reload snapshot 都必须携带有效 checksum，适合 config-source / release gate 环境。reload 失败、JSON 解析失败、versioned snapshot 结构错误、unsupported version、checksum 缺失 / 格式错误 / 不匹配、stale snapshot、HTTP(S) / TLS / auth 配置错误或 plan 校验失败时保留上一版有效配置，不把错误 plan 发布到限流路径；`/debug/metrics` 只暴露 `tenant_plan_source`、`tenant_plan_version`、`tenant_plan_generated_at_unix_ms`、`tenant_plan_checksum_present`、`tenant_plan_require_checksum`、`tenant_plan_url_*_configured`、`tenant_plan_max_age_ms`、`tenant_plan_age_ms`、`tenant_plan_stale`、`tenant_plan_reload_count`、`tenant_plan_reloaded_at_unix_ms` 和 `tenant_plan_reload_error_count` 这类低敏聚合字段，不输出 tenant id、plan 明细、checksum 原文、bearer token 或 TLS 路径。第一版 `url` source 不是完整配置中心：服务发现、配置鉴权策略、灰度发布、审批和审计仍是后续；`TENANT_PLANS_JSON` 仍是启动期输入，不参与运行时 reload。
+`NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE` 默认 `auto`：存在 `TENANT_PLANS_JSON` 时使用 `inline`，否则存在 `TENANT_PLANS_FILE` 时使用 `file`，否则存在 `TENANT_PLANS_URL` 时使用 `url`，否则存在显式 `TENANT_PLANS_DB_DSN` 时使用 `db`，都不存在时为 `none`。通用 `NEXUSIM_PG_DSN` 只在显式 `SOURCE=db` 时作为 fallback 使用，不会在 `auto` 模式下隐式改变 tenant plan source。第一阶段支持 `inline/json`、`file`、`url` 与 `db`；如果配置为 `config-center` 或其它未知 source，api-gateway 必须在启动阶段 fail-closed，避免误以为完整配置中心 quota 已生效。当 `NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_RELOAD_INTERVAL` 配置为正 duration 时，source 必须是 `file`、`url` 或 `db`，api-gateway 会定期重读 / 拉取 tenant plan，并原子替换内存中的 plan map。
+
+`db` source 读取 api-gateway 自有控制面表 `api_gateway_rate_limit_tenant_plans` 中 `enabled=true` 的行，字段为 `tenant_id / requests_per_second / burst / updated_at`。它会按最新 `updated_at` 生成 `quota-v1.db.<timestamp>` 版本，按计划内容计算 checksum-present 状态，并继续受 `MAX_AGE`、`REQUIRE_VERSIONED` 和 `REQUIRE_CHECKSUM` 约束。DB source 不读取业务服务内部表，不把 tenant 明细或 checksum 原文输出到 metrics，也不是完整配置中心控制面；套餐审批、灰度发布、管理 API、审计和多环境发布治理仍是后续。
+
+`url` source 只接受 HTTP(S) `200` JSON，响应体上限 1 MiB，且必须是 versioned snapshot；URL 中不得携带 `user:pass@host` 形式的 userinfo，也不跟随 redirect，避免配置源凭据或 bearer/TLS 边界被 URL 本身或跳转链路绕开。`NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_MAX_AGE` 可选启用 stale snapshot 拒绝，并在已应用 snapshot 超过 max age 后通过 `tenant_plan_age_ms / tenant_plan_stale` 暴露运行期陈旧状态。`tools/check-api-gateway-quota-snapshot.ps1` 可基于 live `/debug/metrics` 或离线 JSON snapshot 执行 quota 门禁，检查 rate-limit enabled、source、version/checksum、checksum-required policy、URL HTTPS / bearer / TLS / client-cert guard、age/stale、reload error、Redis / identity 错误、tenant plan 数、tracked key 数和最近 reload 成功时间。`url` source 可通过 `NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_BEARER_TOKEN` 向配置源发送 `Authorization: Bearer ...`，该值不进入 metrics / logs；配置 bearer token 时必须使用 HTTPS；URL fetch / transport / response-read 这类外部错误只返回稳定低敏文案，不持久化或记录 URL query、bearer token 或 provider body。`NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL_REQUIRE_HTTPS=true` 可强制普通 `url` source 也拒绝 HTTP。需要私有 CA、SNI override 或配置源 mTLS 时，可配置 `URL_CA_FILE / URL_SERVER_NAME / URL_CLIENT_CERT_FILE / URL_CLIENT_KEY_FILE`；这些 TLS 配置只允许用于 HTTPS endpoint，client cert 和 key 必须成对配置。`NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_REQUIRE_CHECKSUM=true` 可强制启动加载和 reload snapshot 都必须携带有效 checksum，适合 config-source / release gate 环境。reload 失败、JSON 解析失败、DB 查询失败、versioned snapshot 结构错误、unsupported version、checksum 缺失 / 格式错误 / 不匹配、stale snapshot、HTTP(S) / TLS / auth 配置错误或 plan 校验失败时保留上一版有效配置，不把错误 plan 发布到限流路径；`/debug/metrics` 只暴露 `tenant_plan_source`、`tenant_plan_version`、`tenant_plan_generated_at_unix_ms`、`tenant_plan_checksum_present`、`tenant_plan_require_checksum`、`tenant_plan_url_*_configured`、`tenant_plan_max_age_ms`、`tenant_plan_age_ms`、`tenant_plan_stale`、`tenant_plan_reload_count`、`tenant_plan_reloaded_at_unix_ms` 和 `tenant_plan_reload_error_count` 这类低敏聚合字段，不输出 tenant id、plan 明细、checksum 原文、bearer token、DSN 或 TLS 路径。第一版 `url` / `db` source 不是完整配置中心：服务发现、配置鉴权策略、灰度发布、审批和审计仍是后续；`TENANT_PLANS_JSON` 仍是启动期输入，不参与运行时 reload。
 
 `local` backend 是本进程 token bucket。需要跨实例共享入口预算时启用 Redis backend：
 
@@ -150,7 +155,7 @@ NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_FAIL_OPEN=true
 
 Redis backend 使用 fixed-window counter，把同一 token/method 或 tenant/method 在多个 api-gateway 实例上的请求合并计数。`FAIL_OPEN=true` 时 Redis 短故障只记录 `redis_error_count` 并放行请求；启动阶段 Redis `PING` 失败也不会阻止 api-gateway 启动，后续请求仍会按运行时 Redis 错误计数并放行。`FAIL_OPEN=false` 时启动探测失败会阻止进程启动，运行时 Redis 错误返回 `Unavailable / rate limiter unavailable`。
 
-这是第一阶段分布式入口保护，不是完整产品级配额系统：tenant plan 生命周期、外部配置中心 / DB-backed quota、IP reputation、WAF、自适应风控、跨区域一致性、Redis 限流故障演练和统一告警仍是后续 production hardening。
+这是第一阶段分布式入口保护，不是完整产品级配额系统：tenant plan 管理控制面、配置中心发布治理、IP reputation、WAF、自适应风控、跨区域一致性、Redis 限流故障演练和统一告警仍是后续 production hardening。
 
 入口 gRPC 默认 plaintext；本地 secure smoke 和后续部署可以启用静态 TLS / mTLS：
 
@@ -249,12 +254,12 @@ NEXUSIM_API_GATEWAY_CONTACTS_TLS_CLIENT_KEY_FILE
 - 不做 HTTP / REST / GraphQL 转换。
 - 不做 OIDC federation。
 - 不做全服务 mTLS rollout 或证书生命周期治理。
-- 不做完整 WAF、配置中心 / DB-backed quota、全服务 OpenTelemetry rollout、collector / alerting 或跨 Kafka envelope trace。
+- 不做完整 WAF、配置中心控制面、全服务 OpenTelemetry rollout、collector / alerting 或跨 Kafka envelope trace。
 - 不替代 push-gateway 的 WebSocket online notify / ACK 转发职责。
 
 后续优先级：
 
-1. 继续把配置中心 / DB-backed quota、审计采样、统一 collector / alerting 和跨服务 tracing 作为独立 production hardening，不塞进当前 proxy skeleton。
+1. 继续把配置中心控制面、审计采样、统一 collector / alerting 和跨服务 tracing 作为独立 production hardening，不塞进当前 proxy skeleton。
 2. 历史客户端确需 legacy descriptor 时，必须显式 opt-in，并在迁移计划中移除。
 
 2026-06-13 补充：clean commit `cff1668` 已跑通 `loadtest/demo/run-local-secure-demo.ps1` 经真实 api-gateway 的 secure E2E smoke。demo runner 对 conversation / message / delivery / receipt 的 gRPC target 均指向 api-gateway，使用 HMAC gateway token 和 desktop-client mTLS；api-gateway 再通过 mTLS 调下游，并向下游注入 trusted metadata。报告见 `docs/runbook/loadtest/demo/loadtest-report-20260613-e2e-demo-api-gateway-secure-smoke.md`，原始结果在 `H:\NexusIM\loadtest-results\e2e-demo-api-gateway-secure-smoke-20260613-clean`。
@@ -271,11 +276,13 @@ NEXUSIM_API_GATEWAY_CONTACTS_TLS_CLIENT_KEY_FILE
 
 2026-06-14 补充：api-gateway rate limiter 已新增静态 tenant plan override，支持 `NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON` 或 `..._FILE`。指定 tenant 可以覆盖全局 RPS / burst，local 和 Redis backend 都会按该 tenant plan 判定限流；`/debug/metrics` 只输出 `tenant_plan_count`，不输出 tenant id 或 plan 明细。该能力仍不是运行时动态配置中心或完整计费套餐系统。
 
-2026-06-14 补充：api-gateway tenant plan override 已新增第一阶段文件热更新。配置 `NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_RELOAD_INTERVAL` 后，进程会按周期重读 `NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE` 并原子替换有效 plan；reload / parse / validation 失败时保留上一版有效配置并只在 `/debug/metrics` 记录低敏 reload count / error count。这仍不是完整配置中心、套餐生命周期或 DB-backed quota 系统。
+2026-06-14 补充：api-gateway tenant plan override 已新增第一阶段文件热更新。配置 `NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_RELOAD_INTERVAL` 后，进程会按周期重读 `NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE` 并原子替换有效 plan；reload / parse / validation 失败时保留上一版有效配置并只在 `/debug/metrics` 记录低敏 reload count / error count。这仍不是完整配置中心或套餐生命周期系统。
 
 2026-06-14 补充：api-gateway tenant plan file 已支持版本化 quota snapshot：`version / generated_at_unix_ms / checksum / plans`。checksum 只校验规范化 plans JSON，格式错误或不匹配会 fail-closed；`/debug/metrics` 只输出版本、生成时间和 checksum-present 标记，不输出 tenant 明细或 checksum 原文。这是未来配置中心输出契约的本地可验证形态，仍不是完整配置中心 adapter。
 
-2026-06-14 补充：api-gateway tenant plan source 已新增 first-stage HTTP(S) `url` adapter。它只拉取 versioned quota snapshot，支持 reload 与 `MAX_AGE` stale 拒绝；unsupported version、checksum mismatch、stale snapshot 或非 200 response 都不会替换上一版有效 plan。`db/config-center` 仍 fail-closed，避免把业务库直连伪装成配置中心。
+2026-06-14 补充：api-gateway tenant plan source 已新增 first-stage HTTP(S) `url` adapter。它只拉取 versioned quota snapshot，支持 reload 与 `MAX_AGE` stale 拒绝；unsupported version、checksum mismatch、stale snapshot 或非 200 response 都不会替换上一版有效 plan。`config-center` 仍 fail-closed，避免把未实现的完整配置中心伪装成已生效。
+
+2026-06-18 补充：api-gateway tenant plan source 已新增 first-stage `db` adapter 和 expand-only migration `api_gateway_rate_limit_tenant_plans`。该 adapter 只读取 api-gateway 自有控制面表的 enabled row，生成 versioned / checksum-present snapshot，并支持 reload、max-age、checksum-required 和 versioned-required guard；`auto` 模式只在显式 `NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_DB_DSN` 存在时选择 DB，通用 `NEXUSIM_PG_DSN` 只作为显式 `SOURCE=db` fallback。这不是完整配置中心控制面，套餐审批、发布审计、灰度和多环境治理仍是后续。
 
 2026-06-14 补充：clean commit `9b16b8c` 已修正 Redis rate-limit fail-open 启动语义：`NEXUSIM_API_GATEWAY_RATE_LIMIT_REDIS_FAIL_OPEN=true` 时 Redis `PING` 失败只记录启动日志并继续启动，首个请求上的 Redis 错误仍进入 `redis_error_count` 并放行；`FAIL_OPEN=false` 仍 fail-closed 拒绝启动。
 

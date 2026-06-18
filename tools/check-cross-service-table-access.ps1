@@ -19,6 +19,10 @@ function Convert-ToRepoRelativePath {
 function Convert-MigrationOwnerToServiceName {
     param([string]$Owner)
 
+    $directServicePath = Join-Path $servicesRoot $Owner
+    if (Test-Path -LiteralPath $directServicePath -PathType Container) {
+        return $Owner
+    }
     return "$Owner-service"
 }
 

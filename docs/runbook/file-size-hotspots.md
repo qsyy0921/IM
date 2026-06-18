@@ -1,6 +1,6 @@
 ﻿# File Size Budget Hotspots
 
-- Created at: 2026-06-18T05:48:59.9635660Z
+- Created at: 2026-06-18T06:18:24.5356215Z
 - Scope: handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score
 - Files checked: 1194
 - Warnings: 0
@@ -27,7 +27,7 @@
 | services\push-gateway\internal\infrastructure\redisroute\registry_test.go | test/runner | 1047 | 2500 | 3000 | 41.9 | 34.9 |
 | loadtest\sendmessage\main.go | test/runner | 1024 | 2500 | 3000 | 41 | 34.1 |
 | docs\sdd\delivery-service.md | docs | 510 | 1200 | 1500 | 42.5 | 34 |
+| services\api-gateway\cmd\api-gateway\rate_limit_config_test.go | test/runner | 1013 | 2500 | 3000 | 40.5 | 33.8 |
 | services\message-service\internal\infrastructure\postgres\repository_mutation_test.go | test/runner | 978 | 2500 | 3000 | 39.1 | 32.6 |
-| services\api-gateway\internal\api\grpc\server_test.go | test/runner | 975 | 2500 | 3000 | 39 | 32.5 |
 
 This is a complexity governance snapshot only. Large files are review priorities, not automatic design failures.

@@ -719,8 +719,8 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 		}
 		tenantPlanURLTLSConfig = tenantPlanURLTLSConfigFromEnv()
 	}
-	if tenantPlanReloadInterval > 0 && tenantPlanSnapshot.Source != "file" && tenantPlanSnapshot.Source != "url" {
-		return nil, nil, errors.New("api-gateway tenant plan reload requires NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE=file or url")
+	if tenantPlanReloadInterval > 0 && tenantPlanSnapshot.Source != "file" && tenantPlanSnapshot.Source != "url" && tenantPlanSnapshot.Source != "db" {
+		return nil, nil, errors.New("api-gateway tenant plan reload requires NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE=file, url or db")
 	}
 	config := ratelimitinfra.Config{
 		Enabled:                     enabled,

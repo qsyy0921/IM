@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/jackc/pgx/v5/pgxpool"
 	ratelimitinfra "github.com/qsyy0921/IM/services/api-gateway/internal/infrastructure/ratelimit"
 	grpcgo "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -692,9 +693,38 @@ func TestTenantRateLimitPlansFromEnvRejectsInvalidJSON(t *testing.T) {
 
 func TestTenantRateLimitPlansFromEnvRejectsUnsupportedSource(t *testing.T) {
 	clearAPIGatewayRateLimitConfig(t)
-	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE", "db")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE", "config-center")
 	if _, err := tenantRateLimitPlansFromEnv(context.Background()); err == nil {
 		t.Fatalf("expected unsupported tenant plan source to fail closed")
+	}
+}
+
+func TestTenantRateLimitPlansFromEnvRejectsDBSourceWithoutDSN(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	t.Setenv("NEXUSIM_PG_DSN", "")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE", "db")
+	if _, err := tenantRateLimitPlansFromEnv(context.Background()); err == nil {
+		t.Fatalf("expected tenant plan db source without DSN to fail")
+	}
+}
+
+func TestTenantRateLimitPlansFromEnvAutoIgnoresGenericPGDSN(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	t.Setenv("NEXUSIM_PG_DSN", "postgres://nexusim:nexusim@127.0.0.1:1/nexusim?sslmode=disable")
+	snapshot, err := tenantRateLimitPlansFromEnv(context.Background())
+	if err != nil {
+		t.Fatalf("auto tenant plan source should ignore generic NEXUSIM_PG_DSN: %v", err)
+	}
+	if snapshot.Source != "none" {
+		t.Fatalf("expected auto tenant plan source to remain none, got %q", snapshot.Source)
+	}
+}
+
+func TestTenantRateLimitPlansFromEnvAutoUsesExplicitDBDSN(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_DB_DSN", "://not-a-dsn")
+	if _, err := tenantRateLimitPlansFromEnv(context.Background()); err == nil {
+		t.Fatalf("expected explicit db source to be selected and fail connection")
 	}
 }
 
@@ -892,4 +922,92 @@ func TestStartTenantPlanReloaderRecordsLoadErrors(t *testing.T) {
 	waitForAPIGatewayTestCondition(t, time.Second, func() bool {
 		return limiter.Snapshot().TenantErrors > 0
 	})
+}
+
+func TestTenantRateLimitPlansFromDBIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openAPIGatewayTestPool(t)
+	resetAPIGatewayTenantPlanTables(t, ctx, pool)
+	_, err := pool.Exec(ctx, `
+INSERT INTO api_gateway_rate_limit_tenant_plans (tenant_id, requests_per_second, burst, enabled, source, updated_at)
+VALUES
+    ('tenant-db-a', 7.5, 8, true, 'operator', now() - interval '1 minute'),
+    ('tenant-db-disabled', 100, 100, false, 'operator', now());
+`)
+	if err != nil {
+		t.Fatalf("seed api-gateway tenant plans: %v", err)
+	}
+
+	snapshot, err := tenantRateLimitPlansFromDBPool(ctx, pool, time.Hour, true, true)
+	if err != nil {
+		t.Fatalf("load tenant plans from DB: %v", err)
+	}
+	if snapshot.Source != "db" ||
+		!strings.HasPrefix(snapshot.Version, "quota-v1.db.") ||
+		snapshot.GeneratedAtUnixMS <= 0 ||
+		!snapshot.ChecksumPresent {
+		t.Fatalf("unexpected DB tenant plan snapshot metadata: %+v", snapshot)
+	}
+	if len(snapshot.Plans) != 1 {
+		t.Fatalf("expected one enabled tenant plan, got %+v", snapshot.Plans)
+	}
+	if plan := snapshot.Plans["tenant-db-a"]; plan.RequestsPerSecond != 7.5 || plan.Burst != 8 {
+		t.Fatalf("unexpected DB tenant plan: %+v", plan)
+	}
+	if _, ok := snapshot.Plans["tenant-db-disabled"]; ok {
+		t.Fatalf("disabled DB tenant plan should not be loaded: %+v", snapshot.Plans)
+	}
+}
+
+func TestTenantRateLimitPlansFromDBRejectsStaleSnapshotIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openAPIGatewayTestPool(t)
+	resetAPIGatewayTenantPlanTables(t, ctx, pool)
+	_, err := pool.Exec(ctx, `
+INSERT INTO api_gateway_rate_limit_tenant_plans (tenant_id, requests_per_second, burst, enabled, source, updated_at)
+VALUES ('tenant-db-stale', 7.5, 8, true, 'operator', now() - interval '2 hours');
+`)
+	if err != nil {
+		t.Fatalf("seed stale api-gateway tenant plan: %v", err)
+	}
+	if _, err := tenantRateLimitPlansFromDBPool(ctx, pool, time.Hour, false, false); err == nil {
+		t.Fatalf("expected stale DB tenant plan snapshot to fail")
+	}
+}
+
+func openAPIGatewayTestPool(t *testing.T) *pgxpool.Pool {
+	t.Helper()
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("connect postgres: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	return pool
+}
+
+func resetAPIGatewayTenantPlanTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+	t.Helper()
+	migrationPath := filepath.Join("..", "..", "..", "..", "migrations", "postgres", "api-gateway", "000001_api_gateway_rate_limit_tenant_plans.sql")
+	migration, err := os.ReadFile(migrationPath)
+	if err != nil {
+		t.Fatalf("read api-gateway tenant plan migration: %v", err)
+	}
+	for _, statement := range strings.Split(string(migration), ";") {
+		statement = strings.TrimSpace(statement)
+		if statement == "" {
+			continue
+		}
+		if _, err := pool.Exec(ctx, statement); err != nil {
+			t.Fatalf("apply api-gateway tenant plan migration statement %q: %v", statement, err)
+		}
+	}
+	if _, err := pool.Exec(ctx, `TRUNCATE api_gateway_rate_limit_tenant_plans`); err != nil {
+		t.Fatalf("truncate api-gateway tenant plans: %v", err)
+	}
 }

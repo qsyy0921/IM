@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	ratelimitinfra "github.com/qsyy0921/IM/services/api-gateway/internal/infrastructure/ratelimit"
 )
 
@@ -52,6 +53,8 @@ func tenantRateLimitPlansFromEnv(ctx context.Context) (tenantRateLimitPlanSnapsh
 	raw := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON"))
 	path := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE"))
 	endpoint := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL"))
+	explicitDBDSN := tenantPlanExplicitDBDSNFromEnv()
+	dbDSN := tenantPlanDBDSNFromEnv()
 	maxAge, err := tenantPlanMaxAgeFromEnv()
 	if err != nil {
 		return tenantRateLimitPlanSnapshot{}, err
@@ -72,14 +75,16 @@ func tenantRateLimitPlansFromEnv(ctx context.Context) (tenantRateLimitPlanSnapsh
 			source = "file"
 		case endpoint != "":
 			source = "url"
+		case explicitDBDSN != "":
+			source = "db"
 		default:
 			source = "none"
 		}
 	}
 	switch source {
 	case "none":
-		if raw != "" || path != "" || endpoint != "" {
-			return tenantRateLimitPlanSnapshot{}, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE=none cannot be used with tenant plan JSON, file or URL")
+		if raw != "" || path != "" || endpoint != "" || explicitDBDSN != "" {
+			return tenantRateLimitPlanSnapshot{}, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE=none cannot be used with tenant plan JSON, file, URL or DB DSN")
 		}
 		return tenantRateLimitPlanSnapshot{Source: source}, nil
 	case "inline", "json":
@@ -110,8 +115,19 @@ func tenantRateLimitPlansFromEnv(ctx context.Context) (tenantRateLimitPlanSnapsh
 		}
 		snapshot.Source = source
 		return snapshot, nil
-	case "db", "database", "config", "config-center", "config_center":
-		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan source " + source + " is not supported yet; use inline, file or url")
+	case "db", "database":
+		if dbDSN == "" {
+			return tenantRateLimitPlanSnapshot{}, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_DB_DSN or NEXUSIM_PG_DSN is required when tenant plan source is db")
+		}
+		source = "db"
+		snapshot, err := tenantRateLimitPlansFromDB(ctx, dbDSN, maxAge, requireChecksum, requireVersioned)
+		if err != nil {
+			return tenantRateLimitPlanSnapshot{}, err
+		}
+		snapshot.Source = source
+		return snapshot, nil
+	case "config", "config-center", "config_center":
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan source " + source + " is not supported yet; use inline, file, url or db")
 	default:
 		return tenantRateLimitPlanSnapshot{}, errors.New("unsupported api-gateway tenant plan source")
 	}
@@ -124,6 +140,91 @@ func tenantRateLimitPlansFromEnv(ctx context.Context) (tenantRateLimitPlanSnapsh
 		return tenantRateLimitPlanSnapshot{}, err
 	}
 	return snapshot, nil
+}
+
+func tenantRateLimitPlansFromDB(ctx context.Context, dsn string, maxAge time.Duration, requireChecksum bool, requireVersioned bool) (tenantRateLimitPlanSnapshot, error) {
+	dsn = strings.TrimSpace(dsn)
+	if dsn == "" {
+		return tenantRateLimitPlanSnapshot{}, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_DB_DSN or NEXUSIM_PG_DSN is required when tenant plan source is db")
+	}
+	connectCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	pool, err := pgxpool.New(connectCtx, dsn)
+	if err != nil {
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan DB source connect failed")
+	}
+	defer pool.Close()
+	return tenantRateLimitPlansFromDBPool(ctx, pool, maxAge, requireChecksum, requireVersioned)
+}
+
+func tenantRateLimitPlansFromDBPool(ctx context.Context, pool *pgxpool.Pool, maxAge time.Duration, requireChecksum bool, requireVersioned bool) (tenantRateLimitPlanSnapshot, error) {
+	if pool == nil {
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan DB source is not configured")
+	}
+	queryCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	rows, err := pool.Query(queryCtx, `
+SELECT tenant_id, requests_per_second, burst, updated_at
+FROM api_gateway_rate_limit_tenant_plans
+WHERE enabled = true
+ORDER BY tenant_id
+`)
+	if err != nil {
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan DB source query failed")
+	}
+	defer rows.Close()
+
+	plans := make(map[string]ratelimitinfra.Plan)
+	var generatedAt time.Time
+	for rows.Next() {
+		var tenantID string
+		var rps float64
+		var burst int
+		var updatedAt time.Time
+		if err := rows.Scan(&tenantID, &rps, &burst, &updatedAt); err != nil {
+			return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan DB source query failed")
+		}
+		tenantID = strings.TrimSpace(tenantID)
+		if tenantID == "" || rps <= 0 || burst <= 0 {
+			return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan DB source row is invalid")
+		}
+		plans[tenantID] = ratelimitinfra.Plan{RequestsPerSecond: rps, Burst: burst}
+		if updatedAt.After(generatedAt) {
+			generatedAt = updatedAt
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan DB source query failed")
+	}
+	if generatedAt.IsZero() {
+		generatedAt = time.Now().UTC()
+	}
+	checksum, err := tenantPlanSnapshotChecksum(plans)
+	if err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
+	}
+	snapshot := tenantRateLimitPlanSnapshot{
+		Plans:             plans,
+		Source:            "db",
+		Version:           "quota-v1.db." + time.UnixMilli(generatedAt.UnixMilli()).UTC().Format("20060102T150405.000Z"),
+		GeneratedAtUnixMS: generatedAt.UnixMilli(),
+		ChecksumPresent:   checksum != "",
+	}
+	if err := validateTenantPlanSnapshotPolicy(snapshot, maxAge, requireChecksum, requireVersioned); err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
+	}
+	return snapshot, nil
+}
+
+func tenantPlanDBDSNFromEnv() string {
+	if dsn := tenantPlanExplicitDBDSNFromEnv(); dsn != "" {
+		return dsn
+	}
+	return strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+}
+
+func tenantPlanExplicitDBDSNFromEnv() string {
+	return strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_DB_DSN"))
 }
 
 func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge time.Duration, requireChecksum bool, requireVersioned bool) (tenantRateLimitPlanSnapshot, error) {
@@ -472,6 +573,8 @@ func tenantPlanReloadLocationFromEnv(source string) string {
 		return strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE"))
 	case "url":
 		return strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL"))
+	case "db":
+		return tenantPlanDBDSNFromEnv()
 	default:
 		return ""
 	}
@@ -486,8 +589,10 @@ func startTenantPlanReloader(ctx context.Context, limiter *ratelimitinfra.Limite
 			return nil, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_FILE is required when tenant plan reload is enabled")
 		case "url":
 			return nil, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL is required when tenant plan reload is enabled")
+		case "db":
+			return nil, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_DB_DSN or NEXUSIM_PG_DSN is required when tenant plan reload is enabled")
 		default:
-			return nil, errors.New("api-gateway tenant plan reload requires file or url source")
+			return nil, errors.New("api-gateway tenant plan reload requires file, url or db source")
 		}
 	}
 	if interval <= 0 {
@@ -536,8 +641,10 @@ func tenantRateLimitPlansFromSource(ctx context.Context, source string, location
 		return snapshot, nil
 	case "url":
 		return tenantRateLimitPlansFromURL(ctx, location, maxAge, requireChecksum, requireVersioned)
+	case "db":
+		return tenantRateLimitPlansFromDB(ctx, location, maxAge, requireChecksum, requireVersioned)
 	default:
-		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan reload requires file or url source")
+		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan reload requires file, url or db source")
 	}
 }
 

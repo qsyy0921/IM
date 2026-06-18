@@ -117,6 +117,80 @@ func TestIdentityOIDCDiscoveryBuildsMetadata(t *testing.T) {
 	}
 }
 
+func TestIdentityProductionKeyGuardDefaultsToDisabled(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_PRODUCTION_KEY_GUARD", "")
+	if err := validateIdentityProductionKeyGuardFromEnv(identityRuntimeKeyGuardScope{
+		GatewayToken:           true,
+		MFA:                    true,
+		MFARecovery:            true,
+		ChallengeRequestLimit:  true,
+		ChallengeDeliveryToken: true,
+	}); err != nil {
+		t.Fatalf("disabled key guard should not fail: %v", err)
+	}
+}
+
+func TestIdentityProductionKeyGuardRejectsLocalCompatibilityKeys(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_PRODUCTION_KEY_GUARD", "true")
+	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_FORMAT", "legacy")
+	t.Setenv("NEXUSIM_PUSH_AUTH_HMAC_SECRET", "shared-local-secret")
+
+	err := validateIdentityProductionKeyGuardFromEnv(identityRuntimeKeyGuardScope{
+		GatewayToken:           true,
+		MFA:                    true,
+		MFARecovery:            true,
+		ChallengeRequestLimit:  true,
+		ChallengeDeliveryToken: true,
+	})
+	if err == nil {
+		t.Fatal("expected production key guard to reject local compatibility config")
+	}
+	message := err.Error()
+	for _, want := range []string{
+		"NEXUSIM_IDENTITY_GATEWAY_TOKEN_FORMAT",
+		"NEXUSIM_IDENTITY_MFA_SECRET_KEY",
+		"NEXUSIM_IDENTITY_MFA_RECOVERY_CODE_SECRET",
+		"NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_SECRET",
+		"NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY",
+	} {
+		if !strings.Contains(message, want) {
+			t.Fatalf("expected error to mention %s, got %q", want, message)
+		}
+	}
+}
+
+func TestIdentityProductionKeyGuardAcceptsExplicitDedicatedKeys(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_PRODUCTION_KEY_GUARD", "true")
+	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_FORMAT", "rs256")
+	t.Setenv("NEXUSIM_IDENTITY_MFA_SECRET_KEYRING_JSON", `{"current":"v2","keys":{"v1":"old-mfa-key","v2":"new-mfa-key"}}`)
+	t.Setenv("NEXUSIM_IDENTITY_MFA_SECRET_KEYRING_FILE", "")
+	t.Setenv("NEXUSIM_IDENTITY_MFA_RECOVERY_CODE_SECRET", "recovery-key")
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_SECRET", "request-limit-key")
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY", "challenge-token-key")
+
+	if err := validateIdentityProductionKeyGuardFromEnv(identityRuntimeKeyGuardScope{
+		GatewayToken:           true,
+		MFA:                    true,
+		MFARecovery:            true,
+		ChallengeRequestLimit:  true,
+		ChallengeDeliveryToken: true,
+	}); err != nil {
+		t.Fatalf("expected explicit dedicated keys to pass: %v", err)
+	}
+}
+
+func TestIdentityProductionKeyGuardWorkerScopeDoesNotRequireGatewayKeys(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_PRODUCTION_KEY_GUARD", "true")
+	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_FORMAT", "legacy")
+	t.Setenv("NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY", "challenge-token-key")
+
+	if err := validateIdentityProductionKeyGuardFromEnv(identityRuntimeKeyGuardScope{
+		ChallengeDeliveryToken: true,
+	}); err != nil {
+		t.Fatalf("expected worker token-only scope to pass: %v", err)
+	}
+}
+
 func TestIdentityMFARecoveryRiskPolicyDefaultsToMFAEnv(t *testing.T) {
 	t.Setenv("NEXUSIM_IDENTITY_MFA_MAX_FAILED_ATTEMPTS", "7")
 	t.Setenv("NEXUSIM_IDENTITY_MFA_FAILURE_WINDOW", "21m")

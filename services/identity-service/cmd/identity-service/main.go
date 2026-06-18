@@ -78,6 +78,15 @@ func runGRPC() error {
 	if err := validateTrustedMetadataListenerConfig(addr, authMode, serverTLSConfig); err != nil {
 		return err
 	}
+	if err := validateIdentityProductionKeyGuardFromEnv(identityRuntimeKeyGuardScope{
+		GatewayToken:           true,
+		MFA:                    true,
+		MFARecovery:            true,
+		ChallengeRequestLimit:  true,
+		ChallengeDeliveryToken: challengeDeliveryMode() == "outbox",
+	}); err != nil {
+		return err
+	}
 
 	pool, err := openPGPool(ctx)
 	if err != nil {
@@ -297,6 +306,11 @@ func runOutboxRelay() error {
 func runChallengeDeliveryWorker() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if err := validateIdentityProductionKeyGuardFromEnv(identityRuntimeKeyGuardScope{
+		ChallengeDeliveryToken: true,
+	}); err != nil {
+		return err
+	}
 
 	pool, err := openPGPool(ctx)
 	if err != nil {

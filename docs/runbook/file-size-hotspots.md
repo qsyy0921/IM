@@ -1,8 +1,8 @@
 ﻿# File Size Budget Hotspots
 
-- Created at: 2026-06-18T04:12:31.5630161Z
+- Created at: 2026-06-18T04:26:25.6783647Z
 - Scope: handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score
-- Files checked: 1188
+- Files checked: 1189
 - Warnings: 0
 - Failures: 0
 - Hotspots at >= 75% of warning threshold: 0
@@ -14,9 +14,9 @@
 | loadtest\demo\run-local-secure-demo.ps1 | script/runner | 734 | 1000 | 1500 | 73.4 | 48.9 |
 | docs\runbook\local-loadtest.md | docs | 686 | 1200 | 1500 | 57.2 | 45.7 |
 | tools\run-loadtest-capacity-baseline-suite.ps1 | script/runner | 669 | 1000 | 1500 | 66.9 | 44.6 |
+| services\identity-service\cmd\identity-service\main_test.go | test/runner | 1272 | 2500 | 3000 | 50.9 | 42.4 |
 | loadtest\contacts\main.go | test/runner | 1246 | 2500 | 3000 | 49.8 | 41.5 |
 | docs\sdd\push-gateway.md | docs | 602 | 1200 | 1500 | 50.2 | 40.1 |
-| services\identity-service\cmd\identity-service\main_test.go | test/runner | 1198 | 2500 | 3000 | 47.9 | 39.9 |
 | docs\architecture\target-architecture-platform.md | docs | 574 | 1200 | 1500 | 47.8 | 38.3 |
 | docs\architecture\target-architecture-ai.md | docs | 546 | 1200 | 1500 | 45.5 | 36.4 |
 | services\contacts-service\internal\infrastructure\postgres\repository_test.go | test/runner | 1089 | 2500 | 3000 | 43.6 | 36.3 |

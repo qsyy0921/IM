@@ -197,12 +197,15 @@ MFA factor rules:
 - `NEXUSIM_IDENTITY_SERVICE_MODE=session-mfa-proof-audit` is a read-only operator that counts historical `identity_sessions` rows violating those MFA proof invariants and exits non-zero if any are found; it does not mutate data or validate constraints for the operator.
 - `NEXUSIM_IDENTITY_MFA_SECRET_KEY` is the local AES-GCM encryption key input; local smoke may fall back to the existing gateway token secret. Production-like local profiles can use `NEXUSIM_IDENTITY_MFA_SECRET_KEYRING_JSON` / `NEXUSIM_IDENTITY_MFA_SECRET_KEYRING_FILE` with one current key version plus old key versions, so newly enrolled TOTP factors are encrypted with the current version while existing factors can still be decrypted during a rotation window. This is local envelope keyring support, not KMS/HSM. If no MFA key is configured, the service still starts and existing Login/JWKS flows are unaffected, but MFA factor RPCs and MFA-protected Login return stable `MFA_UNAVAILABLE` / `mfa temporarily unavailable` until the key is configured.
 - `NEXUSIM_IDENTITY_MFA_RECOVERY_CODE_SECRET` is the preferred HMAC secret for recovery-code hashes. Local smoke may fall back to `NEXUSIM_IDENTITY_MFA_SECRET_KEY`; it does not fall back to gateway / push token secrets.
+- `NEXUSIM_IDENTITY_PRODUCTION_KEY_GUARD=true` is an opt-in startup guard for production-like profiles. In `grpc` mode it requires RS256 gateway-token signing, an explicit MFA key or keyring, an explicit recovery-code secret and an explicit challenge request-limit secret; when challenge delivery uses durable `outbox`, it also requires an explicit challenge-delivery token key or keyring. The `challenge-delivery-worker` mode validates only the challenge-delivery token key / keyring. This guard prevents local compatibility fallback keys from silently reaching production-like runs; it is still not KMS/HSM-backed key management.
 
 ```text
+NEXUSIM_IDENTITY_PRODUCTION_KEY_GUARD=true
 NEXUSIM_IDENTITY_MFA_SECRET_KEY=...
 NEXUSIM_IDENTITY_MFA_SECRET_KEYRING_JSON={"current":"v2","keys":{"local-v1":"old-secret","v2":"new-secret"}}
 NEXUSIM_IDENTITY_MFA_SECRET_KEYRING_FILE=/run/secrets/identity-mfa-keyring.json
 NEXUSIM_IDENTITY_MFA_RECOVERY_CODE_SECRET=...
+NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_SECRET=...
 ```
 
 Known MFA hardening still pending:
@@ -348,6 +351,8 @@ Claims:
 The default audience is `push-gateway`. Tokens are short-lived. Revocation is enforced at issuance / refresh time and asynchronously projected to push-gateway deny-lists through `im.identity.events`.
 
 The first RS256 implementation now supports a static local key-ring slice, a remote JWKS URL cache with periodic refresh, a manual old-public-key overlap window through key-ring `old_public_keys` or additional JWKS env/file configuration, and opt-in OIDC discovery metadata for URL issuers. The JWKS response is public-key only: additional / old entries must be RS256 RSA public keys, and HS256 symmetric keys or RSA private JWK fields are intentionally rejected. RSA private keys must be at least 2048 bits. It is still not a complete production key management system or external OIDC provider. Production hardening still needs external OIDC federation / OAuth client flows, automatic key rotation workflows, KMS / HSM backed private keys, stronger issuer governance, trace / alert coverage and operational runbooks.
+
+`NEXUSIM_IDENTITY_PRODUCTION_KEY_GUARD=true` rejects `legacy`, `hmac` and `jwt-hs256` gateway-token modes during `grpc` startup. This is a local startup safety rail for production-like profiles; it does not replace real KMS/HSM-backed private-key custody, issuer governance or automated rotation.
 
 `NEXUSIM_IDENTITY_SERVICE_MODE=gateway-token-keyring-rotate` is a one-shot local key-ring operator for the static RS256 file format. It requires `NEXUSIM_IDENTITY_GATEWAY_TOKEN_RS256_KEYRING_FILE`, generates a new current RSA private key, moves the previous current key into `old_public_keys` as public JWK only, preserves the issuer, rejects duplicate `kid` values, and keeps at most `NEXUSIM_IDENTITY_GATEWAY_TOKEN_ROTATE_OLD_KEY_LIMIT` old public keys. Optional inputs are `NEXUSIM_IDENTITY_GATEWAY_TOKEN_ROTATE_NEW_KID` and `NEXUSIM_IDENTITY_GATEWAY_TOKEN_ROTATE_RSA_BITS` (minimum 2048). The safe rollout order is:
 

@@ -1,7 +1,7 @@
 ﻿{
-    "created_at":  "2026-06-18T04:12:31.5630161Z",
+    "created_at":  "2026-06-18T04:26:25.6783647Z",
     "scope":  "handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score",
-    "file_count":  1188,
+    "file_count":  1189,
     "thresholds":  {
                        "production_warn_lines":  2500,
                        "production_max_lines":  3500,
@@ -65,6 +65,15 @@
                           "MaxRatio":  0.446
                       },
                       {
+                          "Path":  "services\\identity-service\\cmd\\identity-service\\main_test.go",
+                          "Lines":  1272,
+                          "Kind":  "test/runner",
+                          "Warn":  2500,
+                          "Max":  3000,
+                          "WarnRatio":  0.5088,
+                          "MaxRatio":  0.424
+                      },
+                      {
                           "Path":  "loadtest\\contacts\\main.go",
                           "Lines":  1246,
                           "Kind":  "test/runner",
@@ -81,15 +90,6 @@
                           "Max":  1500,
                           "WarnRatio":  0.5017,
                           "MaxRatio":  0.4013
-                      },
-                      {
-                          "Path":  "services\\identity-service\\cmd\\identity-service\\main_test.go",
-                          "Lines":  1198,
-                          "Kind":  "test/runner",
-                          "Warn":  2500,
-                          "Max":  3000,
-                          "WarnRatio":  0.4792,
-                          "MaxRatio":  0.3993
                       },
                       {
                           "Path":  "docs\\architecture\\target-architecture-platform.md",

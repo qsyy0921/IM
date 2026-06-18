@@ -30,7 +30,7 @@
 | 服务 | 未完成工作 |
 | --- | --- |
 | `api-gateway` | 在目标环境持续运行 legacy observation window gate，生成 / 归档 legacy descriptor removal plan 并执行最终删除；完整配置中心 / DB-backed quota 控制面接入（snapshot versioned / checksum guard 已有）；生产级 collector / alerting / dashboard；长时间容量曲线和生产 sizing。 |
-| `identity-service` | WebAuthn/passkeys；外部 OIDC federation / OAuth client flows；多 issuer 治理；KMS/HSM；完整风控；生产级 email/SMS provider；租户级通知模板；bounce handling；已有本地 Login/Refresh 30m 长跑切片，仍需更完整容量曲线和生产 sizing。 |
+| `identity-service` | WebAuthn/passkeys；外部 OIDC federation / OAuth client flows；多 issuer 治理；KMS/HSM-backed key management（first-stage production key guard 已避免 local fallback 进入 production-like 启动，但不等于 KMS/HSM）；完整风控；生产级 email/SMS provider；租户级通知模板；bounce handling；已有本地 Login/Refresh 30m 长跑切片，仍需更完整容量曲线和生产 sizing。 |
 | `message-service` | 会话级删除策略深化；provider-grade 外部 proof 工作流 / 审批系统集成；发送链路生产观测；已有本地 seeded 30m 长跑切片，仍需更完整容量曲线和生产 sizing；图片 / 文件 / 语音二进制上传处理后续由 media 能力承担。 |
 | `conversation-service` | 更完整群管理；owner transfer 策略继续打磨；完整历史窗口 / targeted replay repair；已有本地 seeded 30m 长跑切片，仍需更完整容量曲线和生产 sizing。 |
 | `delivery-service` | 更多 delivery event 消费方；已完成 projection failure audit / rewind / resolve / cleanup 第一阶段 operator 闭环，已有本地 seeded 30m 长跑切片，仍需更完整容量曲线和生产 sizing。 |

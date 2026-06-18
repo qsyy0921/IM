@@ -13,11 +13,11 @@
 9-service closeout（只补阻塞 AI 底座的 mutation/tombstone、visibility window、policy/audit/security 边界）
 -> search-service（projection smoke passed）
 -> memory-service（group memory / StructuredMemoryEvent projection smoke passed）
--> retrieval-gateway / EvidencePack（当前 active slice）
+-> retrieval-gateway / EvidencePack（first smoke passed）
 -> RAG / summary-service
 -> multi-agent：agent-service、skill-registry、mcp-gateway/tool-gateway、action-executor、ai-eval。
 
-当前 active slice：retrieval-gateway / EvidencePack。优先跑通真实 search + memory -> RetrieveEvidence smoke；EvidencePack 必须保留 source refs、temporal version、visibility/policy boundary，不直接读 message/conversation/private tables。
+当前 active slice：EvidencePack 字段 / policy hardening。retrieval-gateway 已跑通真实 search + memory -> RetrieveEvidence smoke；后续必须继续保留 source refs、temporal version、visibility/policy boundary，不直接读 message/conversation/private tables。
 
 短期不围绕生产级长压、完整 HA、sizing 或 provider-grade 运维打转；这些进入 hardening backlog，除非用户明确点名。本轮只做能推进这条主线的工作。
 

@@ -1,6 +1,6 @@
 # retrieval-gateway
 
-状态：foundation-active / first EvidencePack boundary implementation in progress。
+状态：foundation-active / first EvidencePack smoke passed。
 
 定位：统一 search + memory 的检索入口，向 RAG / summary / Agent 提供
 `EvidencePack`。它不直接读业务库，不调用 LLM，不执行 Agent 动作。
@@ -13,9 +13,14 @@
 - app usecase：调用 search / memory ports，归一成 EvidencePack
 - infrastructure RPC clients：只依赖 search / memory 公开 proto
 - registry / Docker runtime / local compose / Prometheus / Grafana foundation-active wiring
+- `loadtest/retrieval` 和真实本地 smoke：seed search / memory projection rows
+  -> search-service grpc + memory-service grpc -> retrieval-gateway grpc
+  -> `RetrieveEvidence` -> EvidencePack 同时包含 `SEARCH_MESSAGE` 和
+  `MEMORY_EVENT`
 
 下一步：
 
 - focused tests 和 `check-local` 收口。
-- 真实 `search-service + memory-service -> retrieval-gateway RetrieveEvidence` smoke。
+- EvidencePack 字段 / policy hardening：rerank score、source coverage、
+  dedupe reason、policy-service retrieval check。
 - 后续由 `rag-service` / `summary-service` / `agent-service` 消费 EvidencePack，不绕过 retrieval-gateway。

@@ -5,7 +5,7 @@
 ## 短 Goal Prompt
 
 ```text
-持续推进 E:\development\IM 的 NexusIM 项目。当前主线必须优先体现：先把已跑通的 9 个 IM 后端服务做必要收口，再转向 AI 大模型应用底座；不要把目标写成无限生产 hardening。主线顺序：9-service closeout（只补阻塞 AI 底座的 mutation/tombstone、visibility window、policy/audit/security 边界）-> search-service（projection smoke passed）-> memory-service（group memory / StructuredMemoryEvent projection smoke passed）-> retrieval-gateway / EvidencePack（当前 active slice）-> RAG / summary-service -> multi-agent：agent-service、skill-registry、mcp-gateway/tool-gateway、action-executor、ai-eval。当前 active slice：retrieval-gateway / EvidencePack。优先跑通真实 search + memory -> RetrieveEvidence smoke；EvidencePack 必须保留 source refs、temporal version、visibility/policy boundary，不直接读 message/conversation/private tables。短期不围绕生产级长压、完整 HA、sizing 或 provider-grade 运维打转；这些进入 hardening backlog，除非用户明确点名。本轮只做能推进这条主线的工作。每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 做互不重叠任务；不全文扫长历史文档，不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
+持续推进 E:\development\IM 的 NexusIM 项目。当前主线必须优先体现：先把已跑通的 9 个 IM 后端服务做必要收口，再转向 AI 大模型应用底座；不要把目标写成无限生产 hardening。主线顺序：9-service closeout（只补阻塞 AI 底座的 mutation/tombstone、visibility window、policy/audit/security 边界）-> search-service（projection smoke passed）-> memory-service（group memory / StructuredMemoryEvent projection smoke passed）-> retrieval-gateway / EvidencePack（first smoke passed）-> RAG / summary-service -> multi-agent：agent-service、skill-registry、mcp-gateway/tool-gateway、action-executor、ai-eval。当前 active slice：EvidencePack 字段 / policy hardening。retrieval-gateway 已跑通真实 search + memory -> RetrieveEvidence smoke；后续继续保留 source refs、temporal version、visibility/policy boundary，不直接读 message/conversation/private tables。短期不围绕生产级长压、完整 HA、sizing 或 provider-grade 运维打转；这些进入 hardening backlog，除非用户明确点名。本轮只做能推进这条主线的工作。每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 做互不重叠任务；不全文扫长历史文档，不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
 ```
 
 ## 当前具体执行目标
@@ -22,7 +22,7 @@ search-service v0.1（第一步，已完成第一轮 smoke）
 -> timeline decoder / consumer（已落地）
 -> timeline projection smoke: persisted / edited / revoked / deleted + member boundary（clean commit f2a57516 已通过）
 -> memory-service v0.1 SDD / proto / migration / implementation / clean projection smoke（已落地）
--> 当前 active：retrieval-gateway / EvidencePack 第一版边界
+-> retrieval-gateway / EvidencePack 第一版边界（真实 smoke 已通过）
 -> 不做孤立 LLM demo
 ```
 
@@ -39,7 +39,7 @@ search-service v0.1（第一步，已完成第一轮 smoke）
 1. 9 个现有服务必要收口：只补 search / memory / retrieval / Agent 必须依赖的消息 mutation、成员可见窗口、联系人隐私、policy decision source、tool policy precheck、audit 和安全边界。
 2. `search-service v0.1`：第一切片已落 proto / migration / 六层 skeleton / PG repository / `SearchMessages` / grpc runtime / timeline decoder / consumer，并已跑通 projection smoke，作为第一步 AI 数据入口。
 3. `memory-service`：SDD / proto / migration、六层 skeleton、repository first pass、projection usecase、runtime wiring、PG integration、timeline worker 单测和 clean projection smoke 已落。group memory / StructuredMemoryEvent / Memory Graph / profile aggregate 必须带 source refs、speaker / audience scope、valid_from / valid_to、supersedes、confidence 和 review state，不能把群聊事实直接升级成个人长期偏好。
-4. `retrieval-gateway`：当前 active slice，统一 EvidencePack、权限过滤、引用来源和 temporal version；第一版只通过 search / memory 公开 gRPC 契约聚合，不直接读业务库。
+4. `retrieval-gateway`：第一版真实 smoke 已通过，统一 EvidencePack、权限过滤、引用来源和 temporal version；第一版只通过 search / memory 公开 gRPC 契约聚合，不直接读业务库。下一步补 EvidencePack 字段 / policy hardening。
 5. RAG / `summary-service` / Agent / `skill-registry` / `mcp-gateway` / `action-executor`：只消费受控 EvidencePack 和 tool policy，不直接读业务库。
 6. 生产级观测、HA、长压和 sizing：继续作为 hardening backlog 推进，但不阻塞当前 AI 底座路线启动。
 
@@ -52,7 +52,7 @@ search-service v0.1（第一步，已完成第一轮 smoke）
 ```text
 9 个现有服务做必要收口
 -> search-service v0.1 第一实现切片已跑通 projection smoke
--> memory-service foundation-active projection smoke 已通过 / retrieval-gateway
+-> memory-service foundation-active projection smoke 已通过 / retrieval-gateway EvidencePack smoke 已通过
 -> RAG / summary-service / Agent
 -> skill-registry / mcp-gateway / action-executor
 ```

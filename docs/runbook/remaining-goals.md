@@ -58,7 +58,7 @@
 
 - `search-service`：AI 底座第一步，proto / migration / 六层 skeleton、PostgreSQL repository、真实 `SearchMessages` 查询、`grpc` runtime mode、timeline decoder / consumer 和 clean projection smoke 已落；后续只保留搜索 hardening / EvidencePack 字段深化，不做 LLM。
 - `memory-service` / group memory projection：foundation-active implementation 已完成第一轮 clean projection smoke：member join -> message persisted -> PENDING StructuredMemoryEvent + source ref -> Query/Get -> revoke hidden。后续做结构化协作记忆 hardening、版本语义、speaker / audience 归因、Memory Graph 和画像聚合；无 source ref 的长期 memory 不能进入 ACTIVE。
-- `retrieval-gateway`：foundation-active 第一实现切片已开始，目标是在 search / memory 之后做统一 EvidencePack、权限过滤、引用来源和 temporal version 入口；下一步补真实 `search + memory -> EvidencePack` smoke。
+- `retrieval-gateway`：foundation-active 第一版 EvidencePack 边界和真实 `search + memory -> RetrieveEvidence` smoke 已通过；后续补 EvidencePack 字段 / policy hardening（rerank score、source coverage、dedupe reason、policy-service retrieval check），再进入 RAG / summary / Agent。
 - `rag-service`：只消费 EvidencePack，不直接检索业务库。
 - `summary-service`：基于 EvidencePack 和可见窗口做摘要。
 - `agent-service`：先做 read-only / proposal-only / 极小 low-risk allowlist，并通过 policy-service `CheckToolAction` 做工具动作预检，再接 approval / executor。

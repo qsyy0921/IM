@@ -59,12 +59,12 @@ Current execution chain:
    operations in hardening backlog unless they directly unblock the current
    execution chain.
 
-Current active slice: `retrieval-gateway` / `EvidencePack`. `search-service`
-and `memory-service` projection smokes are already passed. Next work should
-make the retrieval boundary explicit: one search + memory entrypoint, source
-refs, temporal version, policy / visibility filtering, and no direct reads from
-message / conversation private tables. Do not build RAG or Agent before this
-boundary is explicit.
+Current active slice: EvidencePack field / policy hardening.
+`search-service`, `memory-service`, and first `retrieval-gateway` EvidencePack
+smokes are already passed. Next work should harden the retrieval boundary:
+source coverage, dedupe / rerank metadata, explicit policy-service retrieval
+check, and no direct reads from message / conversation private tables. Do not
+build RAG or Agent before this boundary remains explicit and testable.
 
 Current AI baseline: keep facts / projections / retrieval / controlled
 execution separate; build search -> memory -> retrieval before RAG / Agent;

@@ -27,10 +27,10 @@
 
 - `search-service`
 - `memory-service` / group memory projection
+- `retrieval-gateway` / EvidencePack
 
 当前尚未真实实现的后续 AI / Agent 能力：
 
-- `retrieval-gateway`（foundation-active 第一实现切片）
 - `rag-service`
 - `agent-service`
 - `skill-registry`
@@ -49,7 +49,7 @@
 -> 9 个现有服务必要收口
 -> search-service v0.1 第一实现切片已跑通 projection smoke
 -> memory-service foundation-active projection smoke 已通过
--> retrieval-gateway / EvidencePack 第一版边界（当前 active）
+-> retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过
 -> RAG / summary-service / Agent
 -> skill-registry / mcp-gateway / action-executor
 -> 安全 / 观测 / repair / 运维 hardening
@@ -173,7 +173,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 | `policy-service` | 已落地、已接主链路 | decision / user action restriction / first-stage ReBAC decision source / first-stage relationship gate + 本地低敏 relation operator / first-stage keyword + HTTP content moderation / first-stage tenant action quota / first-stage tool policy precheck + low-sensitive local audit / projection / outbox / audit / repair、outbox audit / repair / repair audit / cleanup JSON 留存、低敏 decision audit export / forward、本地 direct 短基线和 clean commit direct 30m 长跑切片 | `service-briefs/policy-service.md` |
 | `search-service` | 已跑通第一轮 projection smoke | `search_service.proto`、PostgreSQL core migration、六层 skeleton、`SearchMessages` app / domain / gRPC adapter、projection usecase skeleton、PostgreSQL repository、真实 PG visibility / tombstone 集成测试、`grpc` runtime mode、timeline decoder / consumer 和 clean projection smoke 已落地；定位为 search projection / visibility / tombstone / EvidencePack 前置，不做 LLM demo | `service-briefs/search-service.md` |
 | `memory-service` | 已跑通第一轮 projection smoke | `memory_service.proto`、PostgreSQL memory core migration、六层 skeleton、`QueryMemoryEvents` / `GetMemoryEvent` / `ListProfileAggregates` gRPC adapter、domain/types/app validation、PostgreSQL repository first pass、timeline projection usecase、`grpc` / `timeline-consumer` runtime、Docker / compose / Prometheus / Grafana wiring、PG integration tests、timeline worker tests 和 clean projection smoke 已落地；定位为 group memory / StructuredMemoryEvent / source refs / visibility window，不做 LLM demo | `service-briefs/memory-service.md` |
-| `retrieval-gateway` | foundation-active 第一实现切片 | `retrieval_gateway.proto`、SDD、六层 skeleton、`RetrieveEvidence` app / gRPC adapter、search / memory RPC clients、`grpc` runtime mode、本地 Docker / compose / Prometheus / Grafana wiring 已开始落地；定位为 EvidencePack 统一检索边界，不读业务库、不调用 LLM、不执行 Agent 动作 | `service-briefs/retrieval-gateway.md` |
+| `retrieval-gateway` | 已跑通第一轮 EvidencePack smoke | `retrieval_gateway.proto`、SDD、六层 skeleton、`RetrieveEvidence` app / gRPC adapter、search / memory RPC clients、`grpc` runtime mode、本地 Docker / compose / Prometheus / Grafana wiring 和真实本地 `search + memory -> RetrieveEvidence` smoke 已落地；定位为 EvidencePack 统一检索边界，不读业务库、不调用 LLM、不执行 Agent 动作 | `service-briefs/retrieval-gateway.md` |
 
 ## 剩余目标入口
 
@@ -188,7 +188,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 ```text
 前 9 个微服务已经能跑通 IM 主链路，
 现在处于“9 个现有服务做必要收口，并向 AI 大模型应用底座转进”，
-search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已从 contract 切到 foundation-active implementation 并跑通 clean projection smoke；当前 active 是 retrieval-gateway / EvidencePack 第一版边界，后续是 RAG、summary-service、Agent、skill-registry、mcp-gateway、action-executor。
+search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已从 contract 切到 foundation-active implementation 并跑通 clean projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，当前 active 是 EvidencePack 字段 / policy hardening，后续是 RAG、summary-service、Agent、skill-registry、mcp-gateway、action-executor。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。
 ```
 

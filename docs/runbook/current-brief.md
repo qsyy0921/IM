@@ -37,7 +37,7 @@ policy-service
 -> skill-registry / mcp-gateway / action-executor
 ```
 
-当前必要收口已推进到 policy-service tool policy precheck / low-sensitive audit。`search-service v0.1` 已落 proto、migration、六层 skeleton、`SearchMessages` app / domain / gRPC adapter、projection usecase skeleton、PostgreSQL repository、真实 PG visibility / tombstone 集成测试和 `grpc` runtime mode；下一步是 timeline projection consumer / decoder 和端到端 search smoke，不做 LLM。后续依次推进 `memory-service`、`retrieval-gateway`、RAG、`summary-service`、Agent、`skill-registry`、`mcp-gateway`、`action-executor`。完整系统测试、生产级 HA、长压和 sizing 后置为 hardening backlog。
+当前必要收口已推进到 policy-service tool policy precheck / low-sensitive audit。`search-service v0.1` 已落 proto、migration、六层 skeleton、`SearchMessages` app / domain / gRPC adapter、projection usecase skeleton、PostgreSQL repository、真实 PG visibility / tombstone 集成测试、`grpc` runtime mode 和 timeline projection consumer / decoder；下一步是端到端 search projection smoke，不做 LLM。后续依次推进 `memory-service`、`retrieval-gateway`、RAG、`summary-service`、Agent、`skill-registry`、`mcp-gateway`、`action-executor`。完整系统测试、生产级 HA、长压和 sizing 后置为 hardening backlog。
 
 ## 文档职责
 

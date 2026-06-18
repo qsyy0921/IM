@@ -17,7 +17,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	searchgrpc "github.com/qsyy0921/IM/services/search-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/search-service/internal/app"
+	kafkainfra "github.com/qsyy0921/IM/services/search-service/internal/infrastructure/kafka"
 	postgresinfra "github.com/qsyy0921/IM/services/search-service/internal/infrastructure/postgres"
+	"github.com/qsyy0921/IM/services/search-service/internal/trigger/timeline"
 	"google.golang.org/grpc"
 )
 
@@ -40,6 +42,8 @@ func run(ctx context.Context) error {
 		return runNoop(ctx)
 	case "grpc":
 		return runGRPC(ctx)
+	case "timeline-consumer":
+		return runTimelineConsumer(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_SEARCH_SERVICE_MODE %q", mode)
 	}
@@ -56,7 +60,7 @@ func runNoop(ctx context.Context) error {
 	}
 	defer stopDebug()
 
-	log.Println("search-service noop mode: repository and grpc wiring will be added in the projection slice")
+	log.Println("search-service noop mode: set NEXUSIM_SEARCH_SERVICE_MODE=grpc or timeline-consumer to start runtime roles")
 	<-ctx.Done()
 	return nil
 }
@@ -71,7 +75,7 @@ func searchServiceModeFromEnv() string {
 
 func validateSearchServiceMode(mode string) error {
 	switch mode {
-	case "noop", "grpc":
+	case "noop", "grpc", "timeline-consumer":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_SEARCH_SERVICE_MODE %q", mode)
@@ -124,6 +128,50 @@ func runGRPC(ctx context.Context) error {
 		}
 		return context.Canceled
 	}
+}
+
+func runTimelineConsumer(ctx context.Context) error {
+	debugAddr, err := searchDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	brokers := splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS"))
+	topic := envString("NEXUSIM_TIMELINE_TOPIC", timeline.TopicConversationTimelineEvents)
+	groupID := envString("NEXUSIM_SEARCH_CONSUMER_GROUP", "nexusim-search-service")
+	consumer, err := kafkainfra.NewReaderConsumer(kafkainfra.ReaderConfig{
+		Brokers: brokers,
+		Topic:   topic,
+		GroupID: groupID,
+	})
+	if err != nil {
+		return err
+	}
+	defer consumer.Close()
+
+	repository := postgresinfra.NewRepository(pool)
+	worker := timeline.NewWorker(
+		consumer,
+		app.NewProjectTimelineEventUseCase(repository),
+		groupID,
+		timeline.Config{
+			ErrorBackoff: envDuration("NEXUSIM_SEARCH_TIMELINE_CONSUMER_ERROR_BACKOFF", time.Second),
+			Logf:         log.Printf,
+		},
+	)
+	log.Printf("search-service timeline consumer started topic=%s group=%s", topic, groupID)
+	return worker.Run(ctx)
 }
 
 func searchDebugAddr() string {
@@ -181,6 +229,30 @@ func envString(name string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
+func envDuration(name string, fallback time.Duration) time.Duration {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }
 
 func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {

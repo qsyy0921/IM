@@ -12,27 +12,6 @@ import (
 	"github.com/qsyy0921/IM/services/search-service/internal/types"
 )
 
-const (
-	timelineEventMessagePersisted = "message.persisted.v1"
-	timelineEventMessageEdited    = "message.edited.v1"
-	timelineEventMessageRevoked   = "message.revoked.v1"
-	timelineEventMessageDeleted   = "message.deleted.v1"
-
-	timelineEventMemberJoined           = "conversation.member.joined.v1"
-	timelineEventMemberLeft             = "conversation.member.left.v1"
-	timelineEventMemberRemoved          = "conversation.member.removed.v1"
-	timelineEventMemberRoleChanged      = "conversation.member.role_changed.v1"
-	timelineEventMemberOwnerTransferred = "conversation.member.owner_transferred.v1"
-
-	tombstoneNone    = "NONE"
-	tombstoneRevoked = "REVOKED"
-	tombstoneDeleted = "DELETED"
-
-	memberStatusActive  = "ACTIVE"
-	memberStatusLeft    = "LEFT"
-	memberStatusRemoved = "REMOVED"
-)
-
 type Repository struct {
 	pool *pgxpool.Pool
 }
@@ -153,45 +132,55 @@ func (repository *Repository) ProjectTimelineEvent(
 	}
 
 	switch command.EventType {
-	case timelineEventMessagePersisted, timelineEventMessageEdited:
-		if err := upsertMessageDocument(ctx, tx, command, tombstoneNone); err != nil {
+	case types.TimelineEventMessagePersisted, types.TimelineEventMessageEdited:
+		if err := upsertMessageDocument(ctx, tx, command, types.SearchTombstoneNone); err != nil {
 			return types.ProjectTimelineEventResult{}, err
 		}
 		result.ProjectedDocument = true
-	case timelineEventMessageRevoked:
-		if err := tombstoneMessageDocument(ctx, tx, command, tombstoneRevoked); err != nil {
+	case types.TimelineEventMessageRevoked:
+		if err := tombstoneMessageDocument(ctx, tx, command, types.SearchTombstoneRevoked); err != nil {
 			return types.ProjectTimelineEventResult{}, err
 		}
 		result.ProjectedDocument = true
-	case timelineEventMessageDeleted:
+	case types.TimelineEventMessageDeleted:
 		status := strings.TrimSpace(command.TombstoneStatus)
 		if status == "" {
-			status = tombstoneDeleted
+			status = types.SearchTombstoneDeleted
 		}
 		if err := tombstoneMessageDocument(ctx, tx, command, status); err != nil {
 			return types.ProjectTimelineEventResult{}, err
 		}
 		result.ProjectedDocument = true
-	case timelineEventMemberJoined:
-		if err := upsertMembership(ctx, tx, command, memberStatusActive, true); err != nil {
+	case types.TimelineEventConversationMemberJoined:
+		if err := upsertMembership(ctx, tx, command, command.TargetUserID, command.MemberRole, types.SearchMemberStatusActive, true); err != nil {
 			return types.ProjectTimelineEventResult{}, err
 		}
 		result.ProjectedMember = true
-	case timelineEventMemberLeft:
-		if err := upsertMembership(ctx, tx, command, memberStatusLeft, false); err != nil {
+	case types.TimelineEventConversationMemberLeft:
+		if err := upsertMembership(ctx, tx, command, command.TargetUserID, command.MemberRole, types.SearchMemberStatusLeft, false); err != nil {
 			return types.ProjectTimelineEventResult{}, err
 		}
 		result.ProjectedMember = true
-	case timelineEventMemberRemoved:
-		if err := upsertMembership(ctx, tx, command, memberStatusRemoved, false); err != nil {
+	case types.TimelineEventConversationMemberRemoved:
+		if err := upsertMembership(ctx, tx, command, command.TargetUserID, command.MemberRole, types.SearchMemberStatusRemoved, false); err != nil {
 			return types.ProjectTimelineEventResult{}, err
 		}
 		result.ProjectedMember = true
-	case timelineEventMemberRoleChanged, timelineEventMemberOwnerTransferred:
-		if err := upsertMembership(ctx, tx, command, memberStatusActive, false); err != nil {
+	case types.TimelineEventConversationMemberRoleChanged:
+		if err := upsertMembership(ctx, tx, command, command.TargetUserID, command.MemberRole, types.SearchMemberStatusActive, false); err != nil {
 			return types.ProjectTimelineEventResult{}, err
 		}
 		result.ProjectedMember = true
+	case types.TimelineEventConversationMemberOwnerTransferred:
+		if err := upsertMembership(ctx, tx, command, command.PreviousOwnerUserID, command.PreviousOwnerRole, types.SearchMemberStatusActive, false); err != nil {
+			return types.ProjectTimelineEventResult{}, err
+		}
+		if err := upsertMembership(ctx, tx, command, command.NewOwnerUserID, command.NewOwnerRole, types.SearchMemberStatusActive, false); err != nil {
+			return types.ProjectTimelineEventResult{}, err
+		}
+		result.ProjectedMember = true
+	case types.TimelineEventConversationMemberBoundaryCancelled:
+		result.ProjectedMember = false
 	default:
 		return types.ProjectTimelineEventResult{}, types.NewUnsupportedPayload("unsupported timeline event type")
 	}
@@ -215,7 +204,7 @@ func upsertMessageDocument(
 		return types.NewInvalidArgument("message_id is required")
 	}
 	if tombstoneStatus == "" {
-		tombstoneStatus = tombstoneNone
+		tombstoneStatus = types.SearchTombstoneNone
 	}
 	_, err := tx.Exec(ctx, `
 INSERT INTO search_message_documents (
@@ -270,7 +259,7 @@ func tombstoneMessageDocument(
 		return types.NewInvalidArgument("message_id is required")
 	}
 	if tombstoneStatus == "" {
-		tombstoneStatus = tombstoneDeleted
+		tombstoneStatus = types.SearchTombstoneDeleted
 	}
 	tag, err := tx.Exec(ctx, `
 UPDATE search_message_documents
@@ -304,16 +293,18 @@ func upsertMembership(
 	ctx context.Context,
 	tx pgx.Tx,
 	command types.ProjectTimelineEventCommand,
+	userID types.UserID,
+	role string,
 	status string,
 	resetJoin bool,
 ) error {
-	if command.TargetUserID == "" {
+	if userID == "" {
 		return types.NewInvalidArgument("target_user_id is required")
 	}
-	role := strings.TrimSpace(command.MemberRole)
+	role = strings.TrimSpace(role)
 	joinSeq := command.ConversationSeq
 	leaveSeq := any(nil)
-	if status != memberStatusActive {
+	if status != types.SearchMemberStatusActive {
 		leaveSeq = command.ConversationSeq
 	}
 	if resetJoin {
@@ -345,7 +336,7 @@ ON CONFLICT (tenant_id, conversation_id, user_id) DO UPDATE SET
 	updated_at = now()
 `, command.TenantID,
 		command.ConversationID,
-		command.TargetUserID,
+		userID,
 		role,
 		status,
 		joinSeq,

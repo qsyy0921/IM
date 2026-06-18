@@ -19,8 +19,8 @@ search-service v0.1（第一步）
 -> SDD 收敛
 -> proto / migration / 六层 skeleton（第一切片已落地）
 -> PostgreSQL repository / SearchMessages / grpc runtime（已落地）
--> timeline decoder / consumer
--> timeline projection smoke: persisted / edited / revoked / deleted + member boundary
+-> timeline decoder / consumer（已落地）
+-> timeline projection smoke: persisted / edited / revoked / deleted + member boundary（下一步）
 -> 不做孤立 LLM demo
 ```
 
@@ -44,7 +44,7 @@ sub-agent C：负责测试缺口 / 运行验证 / 文档复核
 当前优先级：
 
 1. 9 个现有服务必要收口：只补 search / memory / retrieval / Agent 必须依赖的消息 mutation、成员可见窗口、联系人隐私、policy decision source、tool policy precheck、audit 和安全边界。
-2. `search-service v0.1`：第一切片已落 proto / migration / 六层 skeleton / PG repository / `SearchMessages` / grpc runtime；下一步补 timeline decoder / consumer 和 projection smoke，作为第一步 AI 数据入口。
+2. `search-service v0.1`：第一切片已落 proto / migration / 六层 skeleton / PG repository / `SearchMessages` / grpc runtime / timeline decoder / consumer；下一步跑 projection smoke，作为第一步 AI 数据入口。
 3. `memory-service`：在 search 事件边界稳定后做 group memory / StructuredMemoryEvent / Memory Graph / profile aggregate；必须带 source refs、speaker / audience scope、valid_from / valid_to、supersedes、confidence 和 review state，不能把群聊事实直接升级成个人长期偏好。
 4. `retrieval-gateway`：统一 EvidencePack、权限过滤、引用来源和 temporal version。
 5. RAG / `summary-service` / Agent / `skill-registry` / `mcp-gateway` / `action-executor`：只消费受控 EvidencePack 和 tool policy，不直接读业务库。
@@ -58,7 +58,7 @@ sub-agent C：负责测试缺口 / 运行验证 / 文档复核
 
 ```text
 9 个现有服务做必要收口
--> search-service v0.1 第一实现切片已开始
+-> search-service v0.1 第一实现切片已推进到 timeline consumer
 -> memory-service / retrieval-gateway
 -> RAG / summary-service / Agent
 -> skill-registry / mcp-gateway / action-executor

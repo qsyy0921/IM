@@ -20,7 +20,7 @@ func TestRepositoryProjectAndSearchMessagesIntegration(t *testing.T) {
 	project(t, ctx, repository, types.ProjectTimelineEventCommand{
 		TenantID:          "tenant-1",
 		EventID:           "event-member-join",
-		EventType:         timelineEventMemberJoined,
+		EventType:         types.TimelineEventConversationMemberJoined,
 		ConversationID:    "conv-1",
 		ConversationSeq:   1,
 		ConsumerGroup:     "search-test",
@@ -29,14 +29,14 @@ func TestRepositoryProjectAndSearchMessagesIntegration(t *testing.T) {
 		OffsetValue:       2,
 		TargetUserID:      "user-1",
 		MemberRole:        "MEMBER",
-		MemberStatus:      memberStatusActive,
+		MemberStatus:      types.SearchMemberStatusActive,
 		MemberVersion:     1,
 		PermissionVersion: 1,
 	})
 	project(t, ctx, repository, types.ProjectTimelineEventCommand{
 		TenantID:          "tenant-1",
 		EventID:           "event-message-1",
-		EventType:         timelineEventMessagePersisted,
+		EventType:         types.TimelineEventMessagePersisted,
 		ConversationID:    "conv-1",
 		ConversationSeq:   2,
 		ConsumerGroup:     "search-test",
@@ -115,7 +115,7 @@ func TestRepositoryProjectionEditLeaveAndTombstoneIntegration(t *testing.T) {
 	project(t, ctx, repository, types.ProjectTimelineEventCommand{
 		TenantID:          "tenant-1",
 		EventID:           "event-member-join",
-		EventType:         timelineEventMemberJoined,
+		EventType:         types.TimelineEventConversationMemberJoined,
 		ConversationID:    "conv-1",
 		ConversationSeq:   1,
 		ConsumerGroup:     "search-test",
@@ -129,7 +129,7 @@ func TestRepositoryProjectionEditLeaveAndTombstoneIntegration(t *testing.T) {
 	project(t, ctx, repository, types.ProjectTimelineEventCommand{
 		TenantID:        "tenant-1",
 		EventID:         "event-message-1",
-		EventType:       timelineEventMessagePersisted,
+		EventType:       types.TimelineEventMessagePersisted,
 		ConversationID:  "conv-1",
 		ConversationSeq: 2,
 		ConsumerGroup:   "search-test",
@@ -144,7 +144,7 @@ func TestRepositoryProjectionEditLeaveAndTombstoneIntegration(t *testing.T) {
 	project(t, ctx, repository, types.ProjectTimelineEventCommand{
 		TenantID:        "tenant-1",
 		EventID:         "event-message-1-edit",
-		EventType:       timelineEventMessageEdited,
+		EventType:       types.TimelineEventMessageEdited,
 		ConversationID:  "conv-1",
 		ConversationSeq: 2,
 		ConsumerGroup:   "search-test",
@@ -163,7 +163,7 @@ func TestRepositoryProjectionEditLeaveAndTombstoneIntegration(t *testing.T) {
 	project(t, ctx, repository, types.ProjectTimelineEventCommand{
 		TenantID:        "tenant-1",
 		EventID:         "event-member-left",
-		EventType:       timelineEventMemberLeft,
+		EventType:       types.TimelineEventConversationMemberLeft,
 		ConversationID:  "conv-1",
 		ConversationSeq: 3,
 		ConsumerGroup:   "search-test",
@@ -176,7 +176,7 @@ func TestRepositoryProjectionEditLeaveAndTombstoneIntegration(t *testing.T) {
 	project(t, ctx, repository, types.ProjectTimelineEventCommand{
 		TenantID:        "tenant-1",
 		EventID:         "event-message-2",
-		EventType:       timelineEventMessagePersisted,
+		EventType:       types.TimelineEventMessagePersisted,
 		ConversationID:  "conv-1",
 		ConversationSeq: 4,
 		ConsumerGroup:   "search-test",
@@ -195,7 +195,7 @@ func TestRepositoryProjectionEditLeaveAndTombstoneIntegration(t *testing.T) {
 	project(t, ctx, repository, types.ProjectTimelineEventCommand{
 		TenantID:        "tenant-1",
 		EventID:         "event-message-1-revoke",
-		EventType:       timelineEventMessageRevoked,
+		EventType:       types.TimelineEventMessageRevoked,
 		ConversationID:  "conv-1",
 		ConversationSeq: 5,
 		ConsumerGroup:   "search-test",
@@ -206,6 +206,106 @@ func TestRepositoryProjectionEditLeaveAndTombstoneIntegration(t *testing.T) {
 	})
 
 	assertSearchCount(t, ctx, repository, "user-1", "new", 0)
+}
+
+func TestRepositoryProjectsOwnerTransferAndBoundaryCancelIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openSearchTestPool(t)
+	resetSearchTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	project(t, ctx, repository, types.ProjectTimelineEventCommand{
+		TenantID:          "tenant-1",
+		EventID:           "event-owner-join",
+		EventType:         types.TimelineEventConversationMemberJoined,
+		ConversationID:    "conv-1",
+		ConversationSeq:   1,
+		ConsumerGroup:     "search-test",
+		Topic:             "conversation.timeline.events",
+		PartitionID:       0,
+		OffsetValue:       2,
+		TargetUserID:      "owner-1",
+		MemberRole:        types.SearchMemberRoleOwner,
+		MemberVersion:     1,
+		PermissionVersion: 1,
+	})
+	project(t, ctx, repository, types.ProjectTimelineEventCommand{
+		TenantID:          "tenant-1",
+		EventID:           "event-member-join",
+		EventType:         types.TimelineEventConversationMemberJoined,
+		ConversationID:    "conv-1",
+		ConversationSeq:   2,
+		ConsumerGroup:     "search-test",
+		Topic:             "conversation.timeline.events",
+		PartitionID:       0,
+		OffsetValue:       3,
+		TargetUserID:      "user-2",
+		MemberRole:        types.SearchMemberRoleMember,
+		MemberVersion:     2,
+		PermissionVersion: 2,
+	})
+	project(t, ctx, repository, types.ProjectTimelineEventCommand{
+		TenantID:            "tenant-1",
+		EventID:             "event-owner-transfer",
+		EventType:           types.TimelineEventConversationMemberOwnerTransferred,
+		ConversationID:      "conv-1",
+		ConversationSeq:     3,
+		ConsumerGroup:       "search-test",
+		Topic:               "conversation.timeline.events",
+		PartitionID:         0,
+		OffsetValue:         4,
+		PreviousOwnerUserID: "owner-1",
+		PreviousOwnerRole:   types.SearchMemberRoleAdmin,
+		NewOwnerUserID:      "user-2",
+		NewOwnerRole:        types.SearchMemberRoleOwner,
+		MemberVersion:       3,
+		PermissionVersion:   3,
+	})
+
+	assertMembershipRole(t, ctx, pool, "owner-1", types.SearchMemberRoleAdmin)
+	assertMembershipRole(t, ctx, pool, "user-2", types.SearchMemberRoleOwner)
+
+	project(t, ctx, repository, types.ProjectTimelineEventCommand{
+		TenantID:          "tenant-1",
+		EventID:           "event-boundary-cancel",
+		EventType:         types.TimelineEventConversationMemberBoundaryCancelled,
+		ConversationID:    "conv-1",
+		ConversationSeq:   4,
+		ConsumerGroup:     "search-test",
+		Topic:             "conversation.timeline.events",
+		PartitionID:       0,
+		OffsetValue:       5,
+		TargetUserID:      "user-3",
+		MemberRole:        types.SearchMemberRoleMember,
+		MemberVersion:     4,
+		PermissionVersion: 4,
+	})
+
+	var memberCount int
+	if err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM search_membership_projection
+WHERE tenant_id = 'tenant-1'
+  AND conversation_id = 'conv-1'
+`).Scan(&memberCount); err != nil {
+		t.Fatalf("query member count: %v", err)
+	}
+	if memberCount != 2 {
+		t.Fatalf("boundary cancel should not create membership rows, got %d", memberCount)
+	}
+	var checkpoint int64
+	if err := pool.QueryRow(ctx, `
+SELECT offset_value
+FROM search_projection_checkpoints
+WHERE consumer_group = 'search-test'
+  AND topic = 'conversation.timeline.events'
+  AND partition_id = 0
+`).Scan(&checkpoint); err != nil {
+		t.Fatalf("query checkpoint: %v", err)
+	}
+	if checkpoint != 5 {
+		t.Fatalf("expected boundary cancel to advance checkpoint, got %d", checkpoint)
+	}
 }
 
 func project(
@@ -243,6 +343,23 @@ func assertSearchCount(
 	}
 	if len(items) != want {
 		t.Fatalf("search %q got %d hits, want %d: %+v", query, len(items), want, items)
+	}
+}
+
+func assertMembershipRole(t *testing.T, ctx context.Context, pool *pgxpool.Pool, userID types.UserID, want string) {
+	t.Helper()
+	var role string
+	if err := pool.QueryRow(ctx, `
+SELECT role
+FROM search_membership_projection
+WHERE tenant_id = 'tenant-1'
+  AND conversation_id = 'conv-1'
+  AND user_id = $1
+`, userID).Scan(&role); err != nil {
+		t.Fatalf("query membership role for %s: %v", userID, err)
+	}
+	if role != want {
+		t.Fatalf("membership role for %s got %q, want %q", userID, role, want)
 	}
 }
 

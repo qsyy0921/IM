@@ -47,7 +47,7 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 第三阶段：补 delivery-service 和 push-gateway，把 durable inbox、PullInbox、AckDelivery、在线通知和跨实例 route 串起来。
 第四阶段：补 receipt-service、contacts-service、policy-service 和 api-gateway，把已读/未读、联系人、权限决策和统一入口补齐。
 第五阶段：集中治理分布式可靠性、安全启动门禁、trusted metadata / TLS 边界、repair / audit / cleanup、debug metrics 和代码复杂度。
-第六阶段：9 个服务做必要收口后，以 search-service v0.1 作为向 AI 大模型应用后端转进的第一步；当前 search-service 第一实现切片已推进到 PG repository、真实 SearchMessages 查询和 grpc runtime，后续再接 timeline consumer、memory、retrieval、RAG、summary、Agent、skill-registry、MCP gateway 和 action-executor。
+第六阶段：9 个服务做必要收口后，以 search-service v0.1 作为向 AI 大模型应用后端转进的第一步；当前 search-service 第一实现切片已推进到 PG repository、真实 SearchMessages 查询、grpc runtime 和 timeline consumer，后续再跑 projection smoke，并继续 memory、retrieval、RAG、summary、Agent、skill-registry、MCP gateway 和 action-executor。
 ```
 
 当前项目处在第五阶段到第六阶段之间：
@@ -56,7 +56,7 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 9 个后端服务已经能跑通主链路；
 短期目标是对 9 个服务做必要收口，然后向 AI 大模型应用后端转进；
 短期不以生产级完整系统测试或生产级 HA 作为进入 search-service v0.1 的前置阻塞，验证重点放在当前切片的本地检查、最小 smoke、权限过滤和 EvidencePack 证据边界；
-search-service v0.1 第一实现切片已推进到 PG repository、真实 SearchMessages 查询和 grpc runtime，下一步做 timeline consumer / projection smoke；
+search-service v0.1 第一实现切片已推进到 PG repository、真实 SearchMessages 查询、grpc runtime 和 timeline consumer，下一步做 projection smoke；
 后续按 memory / retrieval / RAG / summary / Agent / skill-registry / MCP gateway / action-executor 顺序推进；
 api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、DB-backed tenant plan snapshot source、本地 tenant quota audit / set operator、tenant quota approval manifest 强制校验、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、可选 checksum-required gate、applied quota snapshot stale 观测和 quota snapshot gate；
 api-gateway 已补 legacy/facade traffic metrics，以及 legacy observation-window / removal-plan 低敏 evidence manifest，用于旧 descriptor 迁移观察和归档；
@@ -190,7 +190,7 @@ AI 能力先按依赖逐步进入。`search-service` / group memory / retrieval 
 
 | 待开发服务 / 能力 | 目标 |
 | --- | --- |
-| `search-service` | 聊天记录搜索、索引、成员可见窗口过滤、编辑 / 撤回 / 删除 tombstone；第一切片已落 proto / migration / skeleton / PG repository / SearchMessages / grpc runtime，下一步补 consumer / smoke |
+| `search-service` | 聊天记录搜索、索引、成员可见窗口过滤、编辑 / 撤回 / 删除 tombstone；第一切片已落 proto / migration / skeleton / PG repository / SearchMessages / grpc runtime / timeline consumer，下一步跑 projection smoke |
 | `memory-service` / group memory projection | 多人、多群、多时间版本的 StructuredMemoryEvent、Memory Graph、ProfileAggregate；memory 必须有 source refs、speaker / audience、valid_from / valid_to、supersedes、confidence 和 review state；状态至少区分 PENDING / ACTIVE / SUPERSEDED / REJECTED / ARCHIVED，单条群消息不能直接升级成长期个人画像 |
 | `retrieval-gateway` | 统一结构过滤、BM25 / 向量 / 图扩展、policy check 和 EvidencePack |
 | `rag-service` | 基于聊天记录的权限安全问答，只消费 EvidencePack |
@@ -253,7 +253,7 @@ search / RAG / Agent 后端能力。
 
 1. 补齐 message / conversation / receipt / contacts / policy 中搜索和记忆依赖的事件语义；
 2. 保持安全启动门禁、trusted metadata、TLS / mTLS 边界；
-3. 继续 `search-service` v0.1 的 timeline consumer、projection smoke、visibility 和 tombstone 端到端验证；
+3. 继续 `search-service` v0.1 的 projection smoke、visibility 和 tombstone 端到端验证；
 4. 设计并实现 memory / group memory、EvidencePack 和 retrieval-gateway 最小链路；
 5. 收敛必要的观测、repair、audit、DLQ 和容量证据，不把生产级完整系统测试作为短期阻塞；
 6. 再进入 RAG / summary / Agent / skill-registry / MCP gateway / action-executor 的后端能力；
@@ -268,7 +268,7 @@ search / RAG / Agent 后端能力。
 
 在身份侧，我实现了登录、Refresh Token、MFA、recovery code、JWKS、challenge delivery outbox、SMTP / webhook challenge sender 和启动安全门禁。系统也补了 health、ready、debug metrics、repair、audit、cleanup、worker retry 和多种本地故障 smoke。
 
-后续我会先把 9 个服务做必要收口，补齐消息变更、成员窗口、群管理、回执、联系人和策略这些 AI 会依赖的 IM 语义；短期不把生产级完整系统测试作为转进阻塞，而是用切片级本地检查和最小 smoke 守住事实、权限和证据边界。当前 search-service v0.1 已推进到 PG repository、真实 SearchMessages 查询和 grpc runtime，下一步做 timeline consumer 和 projection smoke；后续再做 memory、retrieval-gateway、RAG、summary、Agent、skill-registry、MCP gateway 和 action-executor。大模型只能通过权限过滤后的 EvidencePack 访问聊天记录，Agent 写动作必须走 proposal、approval、executor 和 audit。
+后续我会先把 9 个服务做必要收口，补齐消息变更、成员窗口、群管理、回执、联系人和策略这些 AI 会依赖的 IM 语义；短期不把生产级完整系统测试作为转进阻塞，而是用切片级本地检查和最小 smoke 守住事实、权限和证据边界。当前 search-service v0.1 已推进到 PG repository、真实 SearchMessages 查询、grpc runtime 和 timeline consumer，下一步做 projection smoke；后续再做 memory、retrieval-gateway、RAG、summary、Agent、skill-registry、MCP gateway 和 action-executor。大模型只能通过权限过滤后的 EvidencePack 访问聊天记录，Agent 写动作必须走 proposal、approval、executor 和 audit。
 ```
 
 ## 维护规则

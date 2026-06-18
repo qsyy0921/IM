@@ -181,6 +181,12 @@
       "service": "identity-service",
       "env": "NEXUSIM_IDENTITY_SERVICE_MODE",
       "value": "outbox-relay"
+    },
+    {
+      "name": "search-service-timeline-consumer",
+      "service": "search-service",
+      "env": "NEXUSIM_SEARCH_SERVICE_MODE",
+      "value": "timeline-consumer"
     }
   ]
 }

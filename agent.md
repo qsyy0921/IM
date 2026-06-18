@@ -59,12 +59,12 @@ Current execution chain:
    operations in hardening backlog unless they directly unblock the current
    execution chain.
 
-Current active slice: close `memory-service foundation-active` implementation:
-six-layer skeleton, repository, timeline projection, runtime / observability
-wiring, focused tests, and projection smoke around `StructuredMemoryEvent`,
-source refs, speaker / audience scope, validity windows, supersession /
-contradiction, confidence, review state, and profile aggregation. Do not build
-RAG or Agent before memory and retrieval boundaries are explicit.
+Current active slice: start `retrieval-gateway` / `EvidencePack` after
+`search-service` and `memory-service` projection smokes. It should provide a
+single retrieval boundary over search + memory, preserve source refs and
+temporal version, apply policy / visibility filtering, and avoid direct reads
+from message / conversation private tables. Do not build RAG or Agent before
+this retrieval boundary is explicit.
 
 Current AI baseline: keep facts / projections / retrieval / controlled
 execution separate; build search -> memory -> retrieval before RAG / Agent;

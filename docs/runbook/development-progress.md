@@ -48,8 +48,8 @@
 -> 分布式可靠性
 -> 9 个现有服务必要收口
 -> search-service v0.1 第一实现切片已跑通 projection smoke
--> memory-service foundation-active implementation slice
--> retrieval-gateway
+-> memory-service foundation-active projection smoke 已通过
+-> retrieval-gateway / EvidencePack 第一版边界
 -> RAG / summary-service / Agent
 -> skill-registry / mcp-gateway / action-executor
 -> 安全 / 观测 / repair / 运维 hardening
@@ -172,7 +172,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 | `contacts-service` | 已落地、已接主链路 | request source metadata / source_ref 低敏 fail-fast 校验 / source policy gate / first-stage risk_level + `REVIEW_REQUIRED` operator 审批状态机 / ListContactRequests source-risk-review 过滤与分页 token 绑定 / first-stage ALLOW-DENY privacy exception set / list / delete / search-source privacy gate / profile visibility 总开关和字段级白名单 / contacts search / group filter / USER-TENANT-SYSTEM privacy / tenant privacy operator / outbox / audit / repair、outbox audit / repair / repair audit / cleanup 与 privacy / source policy audit / set / contact-request-review / contact-request-review-audit JSON 留存、repository 同 package 拆分、loadtest `capacity_summary` 口径和本地 stack 30m 长跑切片 | `service-briefs/contacts-service.md` |
 | `policy-service` | 已落地、已接主链路 | decision / user action restriction / first-stage ReBAC decision source / first-stage relationship gate + 本地低敏 relation operator / first-stage keyword + HTTP content moderation / first-stage tenant action quota / first-stage tool policy precheck + low-sensitive local audit / projection / outbox / audit / repair、outbox audit / repair / repair audit / cleanup JSON 留存、低敏 decision audit export / forward、本地 direct 短基线和 clean commit direct 30m 长跑切片 | `service-briefs/policy-service.md` |
 | `search-service` | 已跑通第一轮 projection smoke | `search_service.proto`、PostgreSQL core migration、六层 skeleton、`SearchMessages` app / domain / gRPC adapter、projection usecase skeleton、PostgreSQL repository、真实 PG visibility / tombstone 集成测试、`grpc` runtime mode、timeline decoder / consumer 和 clean projection smoke 已落地；定位为 search projection / visibility / tombstone / EvidencePack 前置，不做 LLM demo | `service-briefs/search-service.md` |
-| `memory-service` | foundation-active implementation slice | `memory_service.proto`、PostgreSQL memory core migration、六层 skeleton、`QueryMemoryEvents` / `GetMemoryEvent` / `ListProfileAggregates` gRPC adapter、domain/types/app validation、PostgreSQL repository first pass、timeline projection usecase skeleton、`grpc` / `timeline-consumer` runtime、Docker / compose / Prometheus / Grafana wiring 已开始落地；定位为 group memory / StructuredMemoryEvent / source refs / visibility window，不做 LLM demo | `service-briefs/memory-service.md` |
+| `memory-service` | 已跑通第一轮 projection smoke | `memory_service.proto`、PostgreSQL memory core migration、六层 skeleton、`QueryMemoryEvents` / `GetMemoryEvent` / `ListProfileAggregates` gRPC adapter、domain/types/app validation、PostgreSQL repository first pass、timeline projection usecase、`grpc` / `timeline-consumer` runtime、Docker / compose / Prometheus / Grafana wiring、PG integration tests、timeline worker tests 和 clean projection smoke 已落地；定位为 group memory / StructuredMemoryEvent / source refs / visibility window，不做 LLM demo | `service-briefs/memory-service.md` |
 
 ## 剩余目标入口
 
@@ -187,11 +187,11 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 ```text
 前 9 个微服务已经能跑通 IM 主链路，
 现在处于“9 个现有服务做必要收口，并向 AI 大模型应用底座转进”，
-search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已从 contract 切到 foundation-active implementation slice，六层 skeleton / repository first pass / projection usecase / runtime wiring 已开始落地，后续是 PG integration / focused smoke、retrieval-gateway、RAG、summary-service、Agent、skill-registry、mcp-gateway、action-executor。
+search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已从 contract 切到 foundation-active implementation 并跑通 clean projection smoke，后续是 retrieval-gateway / EvidencePack、RAG、summary-service、Agent、skill-registry、mcp-gateway、action-executor。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。
 ```
 
-AI 底座采用 v3.0 口径：能力面固定、服务边界 ADR 演进。最关键的不变量是 facts / projections / retrieval / controlled execution 分层；`memory-service` 已开始把 group memory、source refs、speaker / audience scope、validity windows、supersedes、confidence 和 review state 从 contract 推进到 foundation-active 实现，后续仍不能把群聊内容直接持久化成个人偏好或未经证据支持的 active memory。
+AI 底座采用 v3.0 口径：能力面固定、服务边界 ADR 演进。最关键的不变量是 facts / projections / retrieval / controlled execution 分层；`memory-service` 已把 group memory、source refs、speaker / audience scope、validity windows、supersedes、confidence 和 review state 推进到 first-stage source-backed projection，后续仍不能把群聊内容直接持久化成个人偏好或未经证据支持的 active memory。
 
 下一步优先级和剩余目标统一看 `remaining-goals.md`，不要在本页重复维护。
 

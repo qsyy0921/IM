@@ -1,0 +1,62 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "nexusim_memory_service_info",
+          "legendFormat": "memory-service"
+        },
+        {
+          "expr": "up{service=\"memory-service\"}",
+          "legendFormat": "metrics up"
+        }
+      ],
+      "title": "Memory service runtime",
+      "type": "stat"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "nexusim",
+    "memory-service"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "NexusIM memory-service observability",
+  "uid": "nexusim-memory-service",
+  "version": 1,
+  "weekStart": ""
+}

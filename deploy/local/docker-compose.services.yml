@@ -153,6 +153,22 @@ services:
       nexusim-services:
         ipv4_address: 172.30.80.20
 
+  memory-service-grpc:
+    image: nexusim/memory-service:local
+    container_name: nexusim-memory-service-grpc
+    environment:
+      NEXUSIM_MEMORY_SERVICE_MODE: grpc
+      NEXUSIM_MEMORY_GRPC_ADDR: 172.30.80.21:10580
+      NEXUSIM_MEMORY_DEBUG_ADDR: 172.30.80.21:11918
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+    ports:
+      - "10580:10580"
+      - "11918:11918"
+    restart: unless-stopped
+    networks:
+      nexusim-services:
+        ipv4_address: 172.30.80.21
+
   push-gateway-ws:
     image: nexusim/push-gateway:local
     container_name: nexusim-push-gateway-ws

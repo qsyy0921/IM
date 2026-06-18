@@ -88,7 +88,11 @@
     },
     {
       "name": "memory-service",
-      "stage": "future"
+      "stage": "foundation-active",
+      "local_process": "memory-service-grpc",
+      "debug_port": 11918,
+      "prometheus_rule_file": "prometheus-memory-service-alerts.yml",
+      "grafana_dashboard": "memory-service-observability.json"
     },
     {
       "name": "media-service",
@@ -186,6 +190,12 @@
       "name": "search-service-timeline-consumer",
       "service": "search-service",
       "env": "NEXUSIM_SEARCH_SERVICE_MODE",
+      "value": "timeline-consumer"
+    },
+    {
+      "name": "memory-service-timeline-consumer",
+      "service": "memory-service",
+      "env": "NEXUSIM_MEMORY_SERVICE_MODE",
       "value": "timeline-consumer"
     }
   ]

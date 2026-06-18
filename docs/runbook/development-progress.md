@@ -26,10 +26,10 @@
 当前已开始的 AI 大模型应用底座能力：
 
 - `search-service`
+- `memory-service` / group memory projection
 
 当前尚未真实实现的后续 AI / Agent 能力：
 
-- `memory-service` / group memory projection contracts started
 - `retrieval-gateway`
 - `rag-service`
 - `agent-service`
@@ -48,7 +48,8 @@
 -> 分布式可靠性
 -> 9 个现有服务必要收口
 -> search-service v0.1 第一实现切片已跑通 projection smoke
--> memory-service contracts / retrieval-gateway
+-> memory-service foundation-active implementation slice
+-> retrieval-gateway
 -> RAG / summary-service / Agent
 -> skill-registry / mcp-gateway / action-executor
 -> 安全 / 观测 / repair / 运维 hardening
@@ -140,14 +141,14 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - 文件大小预算门禁，手写 Go / Markdown / PowerShell / Bash 文件继续按生产代码、测试 / runner、文档和脚本分档控复杂度；`tools/check-file-size-budget.ps1` 可按需输出 JSON / Markdown hotspot summary，当前持久基线见 `docs/runbook/file-size-hotspot-baseline.json` 和 `docs/runbook/file-size-hotspots.md`，且摘要格式 / 持久基线均已有 `check-local` 自测门禁；`loadtest/pushgateway` 已按 config / model / auth / scenario / util 同 package 文件拆分，避免在线通知 / Redis route / slow-client / resume smoke 继续堆进单个 `main.go`；`loadtest/receipt`、`loadtest/policyintegration`、`loadtest/sendmessage` 已按 config / model / auth / util 等同 package 文件拆分；`contacts-service` PostgreSQL privacy / source-policy 集成测试已拆到同 package 测试文件；`message-service` PostgreSQL revoke / edit / delete mutation 集成测试已拆出同 package 测试文件；`identity-service` PostgreSQL challenge command methods 已拆出，核心 repository 文件降到约 1.4k 行，app 层登录 / MFA / Refresh / Challenge 测试和 cmd 层 challenge / MFA / gateway-token / env 配置 helper 也已按主题拆分；`api-gateway` cmd 层 rate-limit / tenant-plan 配置测试已从 `main_test.go` 拆到同 package 测试文件，继续降低启动配置测试文件复杂度
 - PowerShell / Bash 脚本解析门禁，`tools` 和 `loadtest` 下的 `.ps1` / `.sh` 都会进入本地检查，避免 smoke / 运维脚本语法回归
 - `check-local` 覆盖门禁，新增 `tools/check-*.ps1` 默认必须接入主检查；间接或手动检查必须显式列为例外
-- future service boundary 门禁仍保护未授权服务目录；`search-service v0.1` 已作为 AI 底座第一服务落地基础目录和 timeline consumer，后续 `memory-service` / `retrieval-gateway` / RAG / `summary-service` / Agent / `skill-registry` / `mcp-gateway` / `action-executor` 不能绕过 search / memory / retrieval / policy 直接落 demo
+- future service boundary 门禁仍保护未授权服务目录；`search-service v0.1` 和 `memory-service v0.1` 已作为 AI 底座 foundation-active 服务落地基础目录和 timeline consumer，后续 `retrieval-gateway` / RAG / `summary-service` / Agent / `skill-registry` / `mcp-gateway` / `action-executor` 不能绕过 search / memory / retrieval / policy 直接落 demo
 - 本地 Prometheus / Grafana / Alertmanager 覆盖门禁，已实现服务目录必须有 scrape / alert rules / dashboard 配置；`tools/run-local-observability-smoke.ps1` 可在本机已有镜像时验证 Prometheus rules、Grafana 9 服务 dashboard 和可选本地 Alertmanager null route 已由真实进程加载，也可按需把本地观测 smoke summary / report 写到 `H:\NexusIM\loadtest-results`；`tools/run-observability-target-smoke.ps1` 可对已有 Prometheus / Grafana 端点做目标环境 dashboard smoke，summary / validation 格式已有 `check-local` 自测门禁；`docs/runbook/observability-evidence.json` 已提供低敏观测证据索引，`tools/add-observability-evidence.ps1` 可追加本地 / 目标环境 smoke evidence，validator 支持 schema / H 盘文件复核；当前索引包含 policy-service debug metrics smoke 和本地观测镜像准备 dry-run 计划（`observability-image-prepare-plan`），不把目标环境 9 服务 dashboard smoke 写成已完成
 - 服务 cmd 层启动配置测试门禁，已实现服务必须保留 `main_test.go` 覆盖启动 / 监听 / TLS / auth guard 配置
-- 服务 cmd 构建门禁，9 个已实现服务的 `services/<service>/cmd/<service>` 必须能通过 `go build`
-- 服务 Linux 构建门禁，9 个已实现服务的 cmd 包必须能以 `CGO_ENABLED=0 GOOS=linux GOARCH=amd64/arm64` 交叉编译，保证本地 / Mac Docker runtime 的二进制基础不漂移
-- 服务包级测试门禁，`go test ./services/...` 默认进入 `check-local`，覆盖 9 个已实现服务的轻量单测 / 跳过型集成测试
+- 服务 cmd 构建门禁，当前 active 服务的 `services/<service>/cmd/<service>` 必须能通过 `go build`
+- 服务 Linux 构建门禁，当前 active 服务的 cmd 包必须能以 `CGO_ENABLED=0 GOOS=linux GOARCH=amd64/arm64` 交叉编译，保证本地 / Mac Docker runtime 的二进制基础不漂移
+- 服务包级测试门禁，`go test ./services/...` 默认进入 `check-local`，覆盖当前 active 服务的轻量单测 / 跳过型集成测试
 - 服务运行态端点门禁，已实现服务必须保留 `/healthz`、`/readyz`、`/debug/metrics` 和 `/metrics`
-- Docker runtime / 本机镜像构建 / Mac 镜像同步 / 本地服务 compose 覆盖门禁，9 个已实现服务必须都有 `deploy/docker/<service>.runtime.Dockerfile` 和 `nexusim/<service>:local` 编排入口，本机构建脚本和双机镜像同步脚本默认从 `services/` 推导完整服务集合；`tools/run-local-service-health-smoke.ps1` 可启动本地服务 compose 并检查 9 个服务的 `/healthz` / `/readyz`，也可按需把 Docker resource snapshot 写到 `H:\NexusIM\loadtest-results`，再用 `tools/summarize-local-service-resource-snapshot.ps1` 生成健康态资源摘要；摘要格式和 `docs/runbook/resource-snapshot-evidence.json` 低敏证据索引、validator、追加工具均已有 `check-local` 自测门禁
+- Docker runtime / 本机镜像构建 / Mac 镜像同步 / 本地服务 compose 覆盖门禁，当前 active 服务必须都有 `deploy/docker/<service>.runtime.Dockerfile` 和 `nexusim/<service>:local` 编排入口，本机构建脚本和双机镜像同步脚本默认从 `services/` 推导完整服务集合；`tools/run-local-service-health-smoke.ps1` 可启动本地服务 compose 并检查 active 服务的 `/healthz` / `/readyz`，也可按需把 Docker resource snapshot 写到 `H:\NexusIM\loadtest-results`，再用 `tools/summarize-local-service-resource-snapshot.ps1` 生成健康态资源摘要；摘要格式和 `docs/runbook/resource-snapshot-evidence.json` 低敏证据索引、validator、追加工具均已有 `check-local` 自测门禁
 - runbook consistency 门禁，防止 `development-progress.md` / service brief 已标记完成的事项继续残留在 `remaining-goals.md`
 - 压测原始输出路径门禁，loadtest / smoke 默认结果不能写回仓库内 `loadtest/results`，原始数据默认落 `H:\NexusIM\loadtest-results`；9 服务 `capacity_summary` 合约、`tools/summarize-loadtest-capacity-baselines.ps1` 容量基线汇总器、`tools/run-loadtest-capacity-baseline-suite.ps1` dry-run / 顺序执行入口、`tools/write-capacity-longrun-campaign-plan.ps1` 30m+ 长压 campaign 计划入口、`tools/test-capacity-longrun-campaign-preflight.ps1` plan-driven 长压就绪预检入口、`tools/invoke-capacity-longrun-campaign.ps1` plan-driven 长压执行 / dry-run 入口、`tools/summarize-capacity-longrun-campaign.ps1` 长压完成结果汇总 / report 生成入口，以及 `docs/runbook/capacity-baseline-evidence.json` / `docs/runbook/capacity-longrun-campaign-evidence.json` 低敏证据索引、validator 和追加工具已有本地自测门禁，suite 会区分 direct runner、需要后台角色的 stack runner 与 seeded-only runner；`deploy/local/docker-compose.service-workers.yml` 已提供本地 relay / consumer worker overlay，`loadtest/capacityseed` 已提供 message / conversation / delivery seeded runner fixture，且本地 seeded 短基线已覆盖 message / conversation / delivery；contacts stack 短基线已覆盖 contacts outbox relay 和 Kafka readback，且 contacts runner 已支持 `--duration` / `--vus` 容量模式；identity stack 短基线已覆盖临时 webhook fixture 与 challenge-delivery-worker，且 identity runner 已支持 `--duration` / `--vus` Login/Refresh 热路径容量模式；receipt stack 短基线已覆盖 message / delivery / receipt relay-consumer 链路和 receipt Kafka readback；api-gateway stack 短基线已覆盖 secure mTLS + HMAC GatewayService facade、push WebSocket、delivery / receipt / policy Kafka readback；push-gateway stack 短基线已覆盖 full 场景在线 notify / PullInbox / ACK / delivery_outbox；policy-service 已有本地 direct 短基线和一条 clean commit direct 30m 长跑切片；delivery-service、message-service、conversation-service 已有本地 seeded 30m 长跑切片；identity-service、contacts-service 和 receipt-service 已有本地 stack 30m 长跑切片；9 个服务的短基线证据已覆盖，且 9 服务 30m+ planned long-run campaign 已登记到 `capacity-longrun-campaign-evidence.json`，后续仍需完整 9 服务长时间运行、资源曲线和生产 sizing
 - outbox / projection / challenge delivery 等 repair / audit / cleanup operator，并通过 `docs/runbook/repair-operators.md` 提供统一入口；本地门禁会校验文档中的 operator mode 与对应服务 cmd 入口一致
@@ -171,6 +172,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 | `contacts-service` | 已落地、已接主链路 | request source metadata / source_ref 低敏 fail-fast 校验 / source policy gate / first-stage risk_level + `REVIEW_REQUIRED` operator 审批状态机 / ListContactRequests source-risk-review 过滤与分页 token 绑定 / first-stage ALLOW-DENY privacy exception set / list / delete / search-source privacy gate / profile visibility 总开关和字段级白名单 / contacts search / group filter / USER-TENANT-SYSTEM privacy / tenant privacy operator / outbox / audit / repair、outbox audit / repair / repair audit / cleanup 与 privacy / source policy audit / set / contact-request-review / contact-request-review-audit JSON 留存、repository 同 package 拆分、loadtest `capacity_summary` 口径和本地 stack 30m 长跑切片 | `service-briefs/contacts-service.md` |
 | `policy-service` | 已落地、已接主链路 | decision / user action restriction / first-stage ReBAC decision source / first-stage relationship gate + 本地低敏 relation operator / first-stage keyword + HTTP content moderation / first-stage tenant action quota / first-stage tool policy precheck + low-sensitive local audit / projection / outbox / audit / repair、outbox audit / repair / repair audit / cleanup JSON 留存、低敏 decision audit export / forward、本地 direct 短基线和 clean commit direct 30m 长跑切片 | `service-briefs/policy-service.md` |
 | `search-service` | 已跑通第一轮 projection smoke | `search_service.proto`、PostgreSQL core migration、六层 skeleton、`SearchMessages` app / domain / gRPC adapter、projection usecase skeleton、PostgreSQL repository、真实 PG visibility / tombstone 集成测试、`grpc` runtime mode、timeline decoder / consumer 和 clean projection smoke 已落地；定位为 search projection / visibility / tombstone / EvidencePack 前置，不做 LLM demo | `service-briefs/search-service.md` |
+| `memory-service` | foundation-active implementation slice | `memory_service.proto`、PostgreSQL memory core migration、六层 skeleton、`QueryMemoryEvents` / `GetMemoryEvent` / `ListProfileAggregates` gRPC adapter、domain/types/app validation、PostgreSQL repository first pass、timeline projection usecase skeleton、`grpc` / `timeline-consumer` runtime、Docker / compose / Prometheus / Grafana wiring 已开始落地；定位为 group memory / StructuredMemoryEvent / source refs / visibility window，不做 LLM demo | `service-briefs/memory-service.md` |
 
 ## 剩余目标入口
 
@@ -185,11 +187,11 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 ```text
 前 9 个微服务已经能跑通 IM 主链路，
 现在处于“9 个现有服务做必要收口，并向 AI 大模型应用底座转进”，
-search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已开始落 SDD / proto / migration contract，后续是 memory-service skeleton / retrieval-gateway / RAG / summary-service / Agent / skill-registry / mcp-gateway / action-executor。
+search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已从 contract 切到 foundation-active implementation slice，六层 skeleton / repository first pass / projection usecase / runtime wiring 已开始落地，后续是 PG integration / focused smoke、retrieval-gateway、RAG、summary-service、Agent、skill-registry、mcp-gateway、action-executor。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。
 ```
 
-AI 底座采用 v3.0 口径：能力面固定、服务边界 ADR 演进。最关键的不变量是 facts / projections / retrieval / controlled execution 分层；`memory-service` 已开始把 group memory、source refs、speaker / audience scope、validity windows、supersedes 和 confidence 落到 contract，后续实现仍不能把群聊内容直接持久化成个人偏好或未经证据支持的 active memory。
+AI 底座采用 v3.0 口径：能力面固定、服务边界 ADR 演进。最关键的不变量是 facts / projections / retrieval / controlled execution 分层；`memory-service` 已开始把 group memory、source refs、speaker / audience scope、validity windows、supersedes、confidence 和 review state 从 contract 推进到 foundation-active 实现，后续仍不能把群聊内容直接持久化成个人偏好或未经证据支持的 active memory。
 
 下一步优先级和剩余目标统一看 `remaining-goals.md`，不要在本页重复维护。
 

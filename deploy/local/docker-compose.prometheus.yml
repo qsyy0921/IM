@@ -23,3 +23,4 @@ services:
       - ./prometheus-contacts-service-alerts.yml:/etc/prometheus/rules/contacts-service.yml:ro
       - ./prometheus-policy-service-alerts.yml:/etc/prometheus/rules/policy-service.yml:ro
       - ./prometheus-search-service-alerts.yml:/etc/prometheus/rules/search-service.yml:ro
+      - ./prometheus-memory-service-alerts.yml:/etc/prometheus/rules/memory-service.yml:ro

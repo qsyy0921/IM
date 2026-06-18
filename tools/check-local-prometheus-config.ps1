@@ -255,4 +255,15 @@ foreach ($alert in $requiredSearchAlerts) {
     }
 }
 
+$requiredMemoryAlerts = @(
+    "NexusIMMemoryServiceDown",
+    "NexusIMMemoryServiceInfoMissing"
+)
+
+foreach ($alert in $requiredMemoryAlerts) {
+    if ($rulesByService["memory-service"] -notmatch [regex]::Escape($alert)) {
+        throw "Prometheus memory-service rules missing alert: $alert"
+    }
+}
+
 Write-Host "OK   local Prometheus config"

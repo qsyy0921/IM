@@ -7,13 +7,13 @@
 ```text
 持续推进 E:\development\IM 的 NexusIM 项目。
 
-当前唯一主线：把“高并发分布式 IM 后端”收成稳定底座，然后在其上建设 AI 大模型应用后端。短期不再围绕生产级长压 / HA 完整演练打转；这些进入 hardening backlog，除非用户明确点名。
+当前唯一主线：把“高并发分布式 IM 后端”收成稳定底座，然后转向 AI 大模型应用后端：search -> memory -> retrieval / EvidencePack -> RAG / summary -> Agent / skill / MCP / action。短期不再围绕生产级长压 / HA 完整演练打转；这些进入 hardening backlog，除非用户明确点名。
 
 当前执行链路：
 1. 9 个已成型后端服务只做阻塞 AI 底座的必要收口，不继续无限硬化。
 2. search-service v0.1 projection smoke 已通过，作为检索底座。
-3. memory-service v0.1 contracts 已落地，下一步优先做 memory-service 六层 skeleton / repository / timeline projection，支撑 group memory、StructuredMemoryEvent、source refs、speaker/audience scope、validity windows、supersedes、confidence、review state。
-4. memory-service 后继续 retrieval-gateway / EvidencePack。
+3. 当前 active slice 是收口 memory-service foundation-active implementation：六层 skeleton / repository / timeline projection / runtime wiring / focused tests / projection smoke，支撑 group memory、StructuredMemoryEvent、source refs、speaker/audience scope、validity windows、supersedes、confidence、review state。
+4. memory-service 收口后继续 retrieval-gateway / EvidencePack。
 5. 再进入 RAG / summary-service / agent-service / skill-registry / mcp-gateway / action-executor。
 
 本轮只做能推进这条主线的工作。每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 做互不重叠任务；不全文扫长历史文档，不回滚用户已有修改。
@@ -25,7 +25,7 @@
 - 具体执行目标维护在 `docs/runbook/current-goal.md`；目标框不要复制长目标。
 - Agent 进度管理规则见 `agent.md`；需要管理项目进度、分配子 agent 或选择下一切片时先读它。
 - `prompt.md` 只负责把 Codex 带到正确入口；`agent.md` 决定本轮需要按需读取和维护哪些项目文档。
-- 当前主线和 active slice 必须在目标框短 Prompt 第一屏明确出现：高并发分布式 IM 后端收口 -> search-service smoke passed -> memory-service skeleton/repository/projection -> retrieval / EvidencePack -> RAG / summary / Agent / skill / MCP / action execution；具体长目标仍由 runbook 维护。
+- 当前主线和 active slice 必须在目标框短 Prompt 第一屏明确出现：高并发分布式 IM 后端必要收口 -> search-service smoke passed -> memory-service implementation 收口 -> retrieval / EvidencePack -> RAG / summary / Agent / skill / MCP / action execution；具体长目标仍由 runbook 维护。
 - 具体当前阶段细节不在这里展开，见 `docs/runbook/current-brief.md`。
 - 当前未完成工作不在这里维护，见 `docs/runbook/remaining-goals.md`。
 - 单服务状态不在这里维护，见 `docs/runbook/service-briefs/<service>.md`。
@@ -39,7 +39,7 @@
 
 ## 工作原则
 
-1. 当前唯一主线是高并发分布式 IM 后端必要收口 -> search-service v0.1 -> memory-service skeleton/repository/projection -> retrieval-gateway / EvidencePack -> RAG / summary-service -> agent-service / skill-registry / mcp-gateway / action-executor；阶段细节以 `docs/runbook/current-brief.md` 和 `docs/runbook/remaining-goals.md` 为准，不在本文件重复维护。
+1. 当前唯一主线是高并发分布式 IM 后端必要收口 -> search-service v0.1 -> memory-service implementation 收口 -> retrieval-gateway / EvidencePack -> RAG / summary-service -> agent-service / skill-registry / mcp-gateway / action-executor；阶段细节以 `docs/runbook/current-brief.md` 和 `docs/runbook/remaining-goals.md` 为准，不在本文件重复维护。
 2. 小切片闭环：设计、代码、必要测试、文档一起收；短期生产级压测、长周期演练和生产就绪测试后置到明确阶段或用户指定任务。
 3. 降低耦合：不跨服务读内部表，不引入网状同步 RPC，不为了短期功能抽公共包。
 4. 控制复杂度：生产手写文件接近 2500 行、测试或 runner 接近 3000 行时，优先同 package 拆分。

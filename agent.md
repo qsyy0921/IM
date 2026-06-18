@@ -33,19 +33,12 @@ NexusIM's current main line is no longer "keep hardening everything forever".
 It is:
 
 ```text
-high-concurrency distributed IM backend closeout
--> search-service
--> memory-service
--> retrieval-gateway / EvidencePack
--> RAG / summary-service
--> agent-service
--> skill-registry / mcp-gateway / action-executor
+IM backend closeout -> search -> memory -> retrieval/EvidencePack -> RAG/summary -> Agent -> skill/MCP/action
 ```
 
 Production HA drills, long load tests, sizing, and provider-grade operations are
-hardening backlog unless the user explicitly names them. Choose work that moves
-the AI large-model application foundation forward, while keeping the existing IM
-backend clean enough to support it.
+hardening backlog unless explicitly named. Choose work that moves the AI
+foundation forward while keeping the existing IM backend clean enough.
 
 Existing real services: `api-gateway`, `identity-service`, `message-service`,
 `conversation-service`, `delivery-service`, `push-gateway`, `receipt-service`,
@@ -53,10 +46,10 @@ Existing real services: `api-gateway`, `identity-service`, `message-service`,
 
 Current execution chain:
 
-1. Close only the 9-service gaps that block search / memory / retrieval / Agent:
+1. Close only 9-service gaps that block search / memory / retrieval / Agent:
    mutation semantics, visibility windows, contacts privacy, policy, audit, and
-   security boundaries. Do not keep expanding production-grade hardening unless
-   it blocks the AI foundation or the user explicitly asks for it.
+   security boundaries. Do not keep expanding production hardening unless it
+   blocks the AI foundation or the user asks for it.
 2. Keep `search-service v0.1` as projection / visibility / tombstone /
    `SearchMessages`, not an LLM demo; its first projection smoke is now passed.
 3. Build `memory-service`, then `retrieval-gateway`, then RAG,
@@ -66,13 +59,12 @@ Current execution chain:
    operations in hardening backlog unless they directly unblock the current
    execution chain.
 
-Current active slice: `memory-service v0.1` contracts are being landed first
-as SDD / proto / migration around group memory projection and
-`StructuredMemoryEvent`: source refs, speaker / audience scope, validity
-windows, supersession / contradiction, confidence, review state, and profile
-aggregation rules. The next implementation slice is the six-layer skeleton,
-repository, and projection use case. Do not build RAG or Agent before memory
-and retrieval boundaries are explicit.
+Current active slice: close `memory-service foundation-active` implementation:
+six-layer skeleton, repository, timeline projection, runtime / observability
+wiring, focused tests, and projection smoke around `StructuredMemoryEvent`,
+source refs, speaker / audience scope, validity windows, supersession /
+contradiction, confidence, review state, and profile aggregation. Do not build
+RAG or Agent before memory and retrieval boundaries are explicit.
 
 Current AI baseline: keep facts / projections / retrieval / controlled
 execution separate; build search -> memory -> retrieval before RAG / Agent;

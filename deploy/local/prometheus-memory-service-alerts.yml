@@ -1,0 +1,20 @@
+groups:
+  - name: nexusim-memory-service
+    rules:
+      - alert: NexusIMMemoryServiceDown
+        expr: up{service="memory-service"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: memory-service
+        annotations:
+          summary: "memory-service metrics endpoint is down"
+
+      - alert: NexusIMMemoryServiceInfoMissing
+        expr: absent(nexusim_memory_service_info)
+        for: 1m
+        labels:
+          severity: warning
+          service: memory-service
+        annotations:
+          summary: "memory-service info metric is missing"

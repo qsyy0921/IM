@@ -1,7 +1,7 @@
 ﻿{
-    "created_at":  "2026-06-18T17:11:15.1580353Z",
+    "created_at":  "2026-06-18T17:39:07.2611274Z",
     "scope":  "handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score",
-    "file_count":  1243,
+    "file_count":  1268,
     "thresholds":  {
                        "production_warn_lines":  2500,
                        "production_max_lines":  3500,
@@ -101,7 +101,7 @@
                           "MaxRatio":  0.4153
                       },
                       {
-                          "Path":  "docs\\sdd\\delivery-service.md",
+                          "Path":  "docs\\runbook\\loadtest\\message-service\\loadtest-report-20260609.md",
                           "Lines":  622,
                           "Kind":  "docs",
                           "Warn":  1200,

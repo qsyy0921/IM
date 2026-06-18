@@ -5,7 +5,7 @@
 ## 短 Goal Prompt
 
 ```text
-持续推进 E:\development\IM 的 NexusIM 项目。当前唯一主线：9 个已成型后端服务只做阻塞 AI 底座的必要收口，然后转向 AI 大模型应用后端。执行顺序：search-service v0.1 projection smoke 已通过 -> memory-service v0.1 contracts 已开始落地（SDD/proto/migration，group memory、StructuredMemoryEvent、source refs、speaker/audience scope、validity windows、supersedes、confidence、review state）-> memory-service 六层 skeleton / repository / projection -> retrieval-gateway / EvidencePack -> RAG / summary-service -> agent-service -> skill-registry / mcp-gateway / action-executor。本轮只优先做能推进这条主线的工作；生产级 HA、长压、sizing、完整 provider 运维后置为 hardening backlog，除非用户明确点名。每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 做互不重叠任务；不全文扫长历史文档，不回滚用户已有修改。
+持续推进 E:\development\IM 的 NexusIM 项目。当前唯一主线：9 个已成型后端服务只做阻塞 AI 底座的必要收口，然后转向 AI 大模型应用后端。执行顺序：search-service v0.1 projection smoke 已通过 -> memory-service v0.1 contracts 已落地 -> memory-service foundation-active implementation（六层 skeleton / repository / projection / runtime wiring）-> retrieval-gateway / EvidencePack -> RAG / summary-service -> agent-service -> skill-registry / mcp-gateway / action-executor。本轮只优先做能推进这条主线的工作；生产级 HA、长压、sizing、完整 provider 运维后置为 hardening backlog，除非用户明确点名。每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 做互不重叠任务；不全文扫长历史文档，不回滚用户已有修改。
 ```
 
 ## 当前具体执行目标
@@ -21,21 +21,12 @@ search-service v0.1（第一步，已完成第一轮 smoke）
 -> PostgreSQL repository / SearchMessages / grpc runtime（已落地）
 -> timeline decoder / consumer（已落地）
 -> timeline projection smoke: persisted / edited / revoked / deleted + member boundary（clean commit f2a57516 已通过）
--> memory-service v0.1 SDD / proto / migration contract（当前切片）
--> 下一 active：memory-service 六层 skeleton / repository / projection usecase
+-> memory-service v0.1 SDD / proto / migration contract（已落地）
+-> 当前 active：memory-service 六层 skeleton / repository / projection usecase / runtime wiring
 -> 不做孤立 LLM demo
 ```
 
-当前可以采用 multi sub-agent 方式推进，但只用于互不重叠的工作：
-
-```text
-主 agent：统一方案、最终写入、集成和验证
-sub-agent A：只读检查架构 / SDD 一致性
-sub-agent B：负责某个服务或契约的独立实现切片
-sub-agent C：负责测试缺口 / 运行验证 / 文档复核
-```
-
-禁止多个 agent 同时改同一份架构文档、同一 service brief、同一 proto 或同一 migration；任何 sub-agent 产出都由主 agent 合并后再提交。
+当前可以采用 multi sub-agent 方式推进，但只用于互不重叠的服务、文档或验证范围；禁止多个 agent 同时改同一架构文档、service brief、proto 或 migration，最终由主 agent 合并验证。
 
 每个有意义切片都要尽量闭环：
 
@@ -47,7 +38,7 @@ sub-agent C：负责测试缺口 / 运行验证 / 文档复核
 
 1. 9 个现有服务必要收口：只补 search / memory / retrieval / Agent 必须依赖的消息 mutation、成员可见窗口、联系人隐私、policy decision source、tool policy precheck、audit 和安全边界。
 2. `search-service v0.1`：第一切片已落 proto / migration / 六层 skeleton / PG repository / `SearchMessages` / grpc runtime / timeline decoder / consumer，并已跑通 projection smoke，作为第一步 AI 数据入口。
-3. `memory-service`：当前已开始落 SDD / proto / migration contract；下一步基于已稳定的 search 事件边界做六层 skeleton、repository、projection usecase、group memory / StructuredMemoryEvent / Memory Graph / profile aggregate；必须带 source refs、speaker / audience scope、valid_from / valid_to、supersedes、confidence 和 review state，不能把群聊事实直接升级成个人长期偏好。
+3. `memory-service`：SDD / proto / migration contract 已落地；当前 active 是六层 skeleton、repository first pass、projection usecase 和 runtime wiring；下一步补真实 PG integration、timeline worker 单测和 focused projection smoke。group memory / StructuredMemoryEvent / Memory Graph / profile aggregate 必须带 source refs、speaker / audience scope、valid_from / valid_to、supersedes、confidence 和 review state，不能把群聊事实直接升级成个人长期偏好。
 4. `retrieval-gateway`：统一 EvidencePack、权限过滤、引用来源和 temporal version。
 5. RAG / `summary-service` / Agent / `skill-registry` / `mcp-gateway` / `action-executor`：只消费受控 EvidencePack 和 tool policy，不直接读业务库。
 6. 生产级观测、HA、长压和 sizing：继续作为 hardening backlog 推进，但不阻塞当前 AI 底座路线启动。
@@ -61,7 +52,7 @@ sub-agent C：负责测试缺口 / 运行验证 / 文档复核
 ```text
 9 个现有服务做必要收口
 -> search-service v0.1 第一实现切片已跑通 projection smoke
--> memory-service / retrieval-gateway
+-> memory-service foundation-active implementation / retrieval-gateway
 -> RAG / summary-service / Agent
 -> skill-registry / mcp-gateway / action-executor
 ```

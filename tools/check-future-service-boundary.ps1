@@ -58,8 +58,22 @@ foreach ($service in $currentFoundationServices) {
         throw "Missing active foundation service brief: docs\runbook\service-briefs\$service.md"
     }
     $brief = Read-UTF8Text -Path $briefPath
-    if (-not ($brief.Contains("search_service.proto") -and $brief.Contains("projection usecase skeleton"))) {
-        throw "Active foundation service brief must state first implementation slice: docs\runbook\service-briefs\$service.md"
+    switch ($service) {
+        "search-service" {
+            if (-not ($brief.Contains("search_service.proto") -and $brief.Contains("projection usecase skeleton"))) {
+                throw "Active search-service brief must state first implementation slice: docs\runbook\service-briefs\$service.md"
+            }
+        }
+        "memory-service" {
+            if (-not ($brief.Contains("memory_service.proto") -and $brief.Contains("projection usecase"))) {
+                throw "Active memory-service brief must state first implementation slice: docs\runbook\service-briefs\$service.md"
+            }
+        }
+        default {
+            if (-not $brief.Contains("foundation-active")) {
+                throw "Active foundation service brief must state foundation-active status: docs\runbook\service-briefs\$service.md"
+            }
+        }
     }
 }
 

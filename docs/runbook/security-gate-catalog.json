@@ -22,7 +22,7 @@
       "category": "architecture-boundary",
       "script": "tools/check-future-service-boundary.ps1",
       "check_local_label": "future service boundary",
-      "note": "Only the active foundation service search-service may appear during the current AI foundation phase; later memory, retrieval, RAG, agent, media, notification, audit, admin, and client-facing service directories must not appear before ADR/stage switch."
+      "note": "Only foundation-active services in service-registry.json may appear during the current AI foundation phase; later retrieval, RAG, agent, media, notification, audit, admin, and client-facing service directories must not appear before ADR/stage switch."
     },
     {
       "name": "debug listener exposure",

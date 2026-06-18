@@ -2,7 +2,7 @@
 
 本目录只放短状态索引。默认不要读全部服务文件；当前任务涉及哪个服务，就只读对应文件。
 
-## 服务索引
+## 已进入真实链路的 9 个服务
 
 - [message-service](message-service.md)
 - [conversation-service](conversation-service.md)
@@ -13,7 +13,16 @@
 - [identity-service](identity-service.md)
 - [policy-service](policy-service.md)
 - [api-gateway](api-gateway.md)
+
+## 下一阶段 planned service brief
+
 - [search-service](search-service.md)
+
+## 当前新增服务顺序
+
+- 先把现有 9 个服务做必要收口，补齐 search / memory / retrieval / RAG / Agent 依赖的事实、权限、事件和 tombstone 边界。
+- `search-service` v0.1 是向 AI 大模型应用后端转进的第一步，聚焦 projection / visibility / tombstone / `SearchMessages`。
+- 短期不以生产级完整系统测试或生产级 HA 作为转进阻塞；后续顺序是 memory / retrieval / RAG / Agent / skill-registry / MCP gateway / action-executor。
 
 ## 查询规则
 

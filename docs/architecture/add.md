@@ -1,5 +1,7 @@
 # NexusIM ADD v1.0
 
+> Legacy reference: this is an early architecture draft, not the current work entrypoint. Current routing starts from the root `prompt.md` / `agent.md`, and current architecture status is maintained in `docs/architecture/target-architecture.md` plus the runbook docs.
+
 ADD（Architecture Design Document）描述系统级业务架构、服务边界和关键业务链路。本文不展开具体 SQL、代码目录和部署参数；这些内容进入 TADD、SDD、契约和 migration。
 
 ## 1. 系统定位

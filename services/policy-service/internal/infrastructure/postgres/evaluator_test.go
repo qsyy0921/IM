@@ -851,7 +851,7 @@ func applyPolicyMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool)
 
 func resetPolicyTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	if _, err := pool.Exec(ctx, `TRUNCATE policy_decision_audit_outbox_repair_audit, policy_decision_audit_outbox, policy_rebac_message_action_rules, policy_user_message_action_restrictions, policy_message_ownership_override_rules, policy_conversation_role_action_rules, policy_conversation_members_projection, policy_tenant_message_action_quotas, policy_tenant_message_action_rules, policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
+	if _, err := pool.Exec(ctx, `TRUNCATE policy_tool_decision_audit, policy_tool_action_rules, policy_decision_audit_outbox_repair_audit, policy_decision_audit_outbox, policy_rebac_message_action_rules, policy_user_message_action_restrictions, policy_message_ownership_override_rules, policy_conversation_role_action_rules, policy_conversation_members_projection, policy_tenant_message_action_quotas, policy_tenant_message_action_rules, policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
 		t.Fatalf("reset policy tables: %v", err)
 	}
 }

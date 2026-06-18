@@ -1,5 +1,4 @@
 # message-service
-
 ## 当前状态
 
 - 已有 `SendMessage`、`EditMessage`、`RevokeMessage`、`DeleteMessage` 主链路；`SendMessage` 支持 `TEXT`、第一阶段 `IMAGE` / `FILE` / `VOICE` 附件引用消息，以及 `LOCATION` / `CARD` 结构化 payload 消息。
@@ -26,5 +25,6 @@
 
 ## 后续
 
-- 会话级删除策略深化、provider-grade 外部 proof 工作流 / 审批系统集成、更完整容量曲线和生产观测；用户私有隐藏已由 delivery-service `HideInboxItem` 承担，图片 / 文件 / 语音二进制上传和处理属于后续 media 能力。
+- AI 底座转进前的必要收口：继续确保 `EditMessage` / `RevokeMessage` / `DeleteMessage`、timeline / outbox、tombstone 和 delete proof 对 search / memory / retrieval 可重建且低敏。
+- Provider-grade 外部 proof 工作流 / 审批系统集成、更完整容量曲线和生产观测后置为 hardening backlog；用户私有隐藏已由 delivery-service `HideInboxItem` 承担，图片 / 文件 / 语音二进制上传和处理属于后续 media 能力。
 - 生产级 OTel collector、告警路由、retention 和 SLO dashboard 仍属于后续统一观测治理。

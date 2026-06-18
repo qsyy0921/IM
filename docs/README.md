@@ -12,17 +12,20 @@
 
 ## 当前阅读路径
 
-Codex 目标框只放根目录 `../prompt.md` 里的短 Prompt。每轮 Codex 工作先读仓库根目录 `prompt.md`，再按它的路由读取必要短文档。
+Codex 目标框只放根目录 `../prompt.md` 里的短 Prompt，不复制具体长目标。当前主线是必要收口 + 转向 AI 大模型应用底座；短期生产级测试、长周期演练和完整生产就绪验证后置到明确阶段或用户指定任务。
+
+每轮 Codex 工作先读仓库根目录 `prompt.md` 和 `agent.md`，再按任务路由读取必要短文档；不要为了了解全局而全文扫 SDD、archive、history 或 loadtest 长文档。
 
 1. `../prompt.md`：Codex 目标 prompt 的唯一维护源。
-2. `runbook/current-brief.md`：低 token 当前入口，确认当前阶段和文档路由。
-3. `runbook/README.md`：runbook 短路由页。
-4. `runbook/development-progress.md`：当前开发进度总览，只写已到哪里。
-5. `runbook/remaining-goals.md`：当前还没有完成的工作，只写待办。
-6. `runbook/service-briefs/<service>.md`：单服务当前事实。
-7. `architecture/target-architecture.md`：总架构短入口，按需跳转到分卷。
-8. `sdd/<service>.md`：服务设计，按服务名读取。
-9. `runbook/loadtest/<service>/`：smoke / 压测证据。
+2. `../agent.md`：Codex / sub-agent 文档路由、进度维护和并行协作规则。
+3. `runbook/current-brief.md`：低 token 当前入口，确认当前阶段和文档路由。
+4. `runbook/README.md`：runbook 短路由页。
+5. `runbook/development-progress.md`：当前开发进度总览，只写已到哪里。
+6. `runbook/remaining-goals.md`：当前还没有完成的工作，只写待办。
+7. `runbook/service-briefs/<service>.md`：单服务当前事实。
+8. `architecture/target-architecture.md`：总架构短入口，按需跳转到分卷。
+9. `sdd/<service>.md`：服务设计，按服务名读取。
+10. `runbook/loadtest/<service>/`：smoke / 压测证据，只有任务需要具体证据时读取。
 
 ## 文档职责边界
 
@@ -31,6 +34,7 @@ Codex 目标框只放根目录 `../prompt.md` 里的短 Prompt。每轮 Codex �
 - `service-briefs/<service>.md` 只写单服务当前事实和少量下一步。
 - `interview/project-progress.md` 是面试讲述稿，不作为工程任务来源。
 - `archive/`、`history/`、`loadtest/` 只存历史证据，不回填到入口文档。
+- sub-agent 可以并行协助开发或审查，但数量要受控，写入范围要拆开，结果合入后立即关闭。
 
 ## 写文档规则
 

@@ -6,6 +6,7 @@
 
 - 核心不变量、服务边界、演进原则保留，但不把服务数量、中间件和部署形态写死。
 - 服务级设计继续进入 `docs/sdd/`；接口、事件和 migration 继续落到 `api/`、`schemas/`、`migrations/`。
+- 短期阶段不以生产级 HA、全量压测、混沌和跨 Region 验证作为继续推进的阻塞；先完成当前 9 个 IM 后端服务的必要语义、安全和契约收口，再转向 AI 大模型应用底座。
 - 新服务或替换中间件必须说明兼容、迁移、回滚和验证证据，并通过 ADR。
 
 ## 阅读路由
@@ -30,8 +31,9 @@
 - 总架构只写跨服务不变量、边界和演进准则。
 - 服务级实现细节不重新堆回总架构。
 - Codex 每轮执行目标不写在架构文档里，统一读取 `../runbook/current-goal.md`。
-- 当前 9 个已实现服务优先补齐 AI 依赖的 IM 语义和安全边界；`search-service` 可作为下一阶段基础服务进入，但 RAG / Agent 不能绕过 search / memory / retrieval。
-- 后续服务和中间件都不是写死终局，只能按 ADR 和证据演进。
+- 当前 9 个已实现服务优先补齐 AI 依赖的 IM 语义、安全边界、事件契约和本地可验证闭环；生产级测试和 HA 证据作为后续加固项，不阻塞转入 AI 底座设计与第一批服务实现。
+- 未来 AI 层服务拆分以 `search-service`、`memory-service`、`retrieval-gateway`、`rag-service`、`summary-service`、`agent-service`、`skill-registry`、`mcp-gateway/tool-gateway`、`action-executor`、`ai-eval-service` 为基线。
+- 后续服务和中间件都不是写死终局；新增必须符合独立数据模型、独立伸缩、独立故障、独立安全边界之一，或显著降低复杂度，并通过 ADR 和证据演进。
 
 ## 快速定位
 

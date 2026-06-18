@@ -1,5 +1,7 @@
 package types
 
+import "strings"
+
 type AuthContext struct {
 	TenantID  TenantID
 	UserID    UserID
@@ -32,6 +34,24 @@ const (
 	PolicyDecisionSourceOwnershipOverride PolicyDecisionSource = "OWNERSHIP_OVERRIDE"
 	PolicyDecisionSourceMessageOwnership  PolicyDecisionSource = "MESSAGE_OWNERSHIP"
 	PolicyDecisionSourceContentModeration PolicyDecisionSource = "CONTENT_MODERATION"
+	PolicyDecisionSourceToolRule          PolicyDecisionSource = "TOOL_RULE"
+)
+
+type ToolAction string
+
+const (
+	ToolActionCall    ToolAction = "CALL"
+	ToolActionApprove ToolAction = "APPROVE"
+	ToolActionExecute ToolAction = "EXECUTE"
+)
+
+type ToolRiskLevel string
+
+const (
+	ToolRiskLevelLow      ToolRiskLevel = "LOW"
+	ToolRiskLevelMedium   ToolRiskLevel = "MEDIUM"
+	ToolRiskLevelHigh     ToolRiskLevel = "HIGH"
+	ToolRiskLevelCritical ToolRiskLevel = "CRITICAL"
 )
 
 type ReBACRelationType string
@@ -93,5 +113,69 @@ type MessageActionDecision struct {
 	Classification    string
 	Reason            string
 	OwnershipOverride bool
+	DecisionSource    PolicyDecisionSource
+}
+
+type CheckToolActionCommand struct {
+	AuthContext  AuthContext
+	ToolName     string
+	Action       ToolAction
+	ResourceType string
+	ResourceID   string
+	RiskLevel    ToolRiskLevel
+	Intent       string
+}
+
+func (c CheckToolActionCommand) Validate() error {
+	if c.AuthContext.TenantID == "" || c.AuthContext.UserID == "" || c.AuthContext.DeviceID == "" {
+		return NewInvalidArgument("auth context is required")
+	}
+	if strings.TrimSpace(c.ToolName) == "" {
+		return NewInvalidArgument("tool_name is required")
+	}
+	if len(c.ToolName) > 128 {
+		return NewInvalidArgument("tool_name is too long")
+	}
+	if strings.TrimSpace(c.ResourceType) == "" {
+		return NewInvalidArgument("resource_type is required")
+	}
+	if len(c.ResourceType) > 64 {
+		return NewInvalidArgument("resource_type is too long")
+	}
+	if len(c.ResourceID) > 256 {
+		return NewInvalidArgument("resource_id is too long")
+	}
+	if len(c.Intent) > 512 {
+		return NewInvalidArgument("intent is too long")
+	}
+	switch c.Action {
+	case ToolActionCall, ToolActionApprove, ToolActionExecute:
+	default:
+		return NewInvalidArgument("tool action is required")
+	}
+	if c.RiskLevel == "" {
+		return nil
+	}
+	switch c.RiskLevel {
+	case ToolRiskLevelLow, ToolRiskLevelMedium, ToolRiskLevelHigh, ToolRiskLevelCritical:
+		return nil
+	default:
+		return NewInvalidArgument("risk_level is invalid")
+	}
+}
+
+type ToolActionDecision struct {
+	TenantID          TenantID
+	UserID            UserID
+	ToolName          string
+	Action            ToolAction
+	ResourceType      string
+	ResourceID        string
+	RiskLevel         ToolRiskLevel
+	Allowed           bool
+	RequiresApproval  bool
+	PermissionVersion int64
+	Classification    string
+	Reason            string
 	DecisionSource    PolicyDecisionSource
 }

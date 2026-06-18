@@ -817,8 +817,11 @@ func runGRPC() error {
 	defer listener.Close()
 
 	policy := staticMessagePolicyFromEnv()
+	toolPolicy := staticToolPolicyFromEnv()
 	var evaluator app.MessagePolicyEvaluator = policy
+	var toolEvaluator app.ToolPolicyEvaluator = toolPolicy
 	var useCaseOptions []app.CheckMessageActionOption
+	var toolUseCaseOptions []app.CheckToolActionOption
 	var pool *pgxpool.Pool
 	rulesEnabled := envBool("NEXUSIM_POLICY_RULES_ENABLED", false)
 	if rulesEnabled {
@@ -834,10 +837,14 @@ func runGRPC() error {
 		defer pool.Close()
 		postgresEvaluator := postgresinfra.NewMessagePolicyEvaluator(pool, policy)
 		evaluator = postgresEvaluator
+		toolEvaluator = postgresinfra.NewToolPolicyEvaluator(pool, toolPolicy)
 		useCaseOptions = append(useCaseOptions, app.WithPolicyDecisionAuditor(postgresinfra.NewDecisionAuditOutbox(pool)))
+		toolUseCaseOptions = append(toolUseCaseOptions, app.WithToolDecisionAuditor(postgresinfra.NewToolDecisionAudit(pool)))
 		useCaseOptions = append(useCaseOptions, app.WithMessageOwnershipOverrideChecker(postgresEvaluator))
 		log.Println("policy-service message action rule store enabled")
+		log.Println("policy-service tool action rule store enabled")
 		log.Println("policy-service decision audit outbox enabled")
+		log.Println("policy-service tool decision audit enabled")
 	}
 	moderator, moderationEnabled, err := policyContentModeratorFromEnv()
 	if err != nil {
@@ -883,7 +890,10 @@ func runGRPC() error {
 		serverOptions = append(serverOptions, grpc.Creds(credentials.NewTLS(serverTLSConfig)))
 	}
 	server := grpc.NewServer(serverOptions...)
-	policygrpc.Register(server, policygrpc.NewServer(app.NewCheckMessageActionUseCase(evaluator, useCaseOptions...)))
+	policygrpc.Register(server, policygrpc.NewServer(
+		app.NewCheckMessageActionUseCase(evaluator, useCaseOptions...),
+		app.NewCheckToolActionUseCase(toolEvaluator, toolUseCaseOptions...),
+	))
 	go func() {
 		<-ctx.Done()
 		server.GracefulStop()
@@ -905,5 +915,19 @@ func staticMessagePolicyFromEnv() domain.StaticMessagePolicy {
 		PermissionVersion: permissionVersion,
 		Classification:    envString("NEXUSIM_POLICY_CLASSIFICATION", "INTERNAL"),
 		Reason:            envString("NEXUSIM_POLICY_DENY_REASON", ""),
+	}
+}
+
+func staticToolPolicyFromEnv() domain.StaticToolPolicy {
+	permissionVersion := int64(0)
+	if strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_TOOL_PERMISSION_VERSION")) != "" {
+		permissionVersion = envInt64("NEXUSIM_POLICY_TOOL_PERMISSION_VERSION", 0)
+	}
+	return domain.StaticToolPolicy{
+		Allowed:           envBool("NEXUSIM_POLICY_TOOL_ALLOWED", false),
+		RequiresApproval:  envBool("NEXUSIM_POLICY_TOOL_REQUIRES_APPROVAL", false),
+		PermissionVersion: permissionVersion,
+		Classification:    envString("NEXUSIM_POLICY_TOOL_CLASSIFICATION", "TOOL_STATIC_DENY"),
+		Reason:            envString("NEXUSIM_POLICY_TOOL_DENY_REASON", ""),
 	}
 }

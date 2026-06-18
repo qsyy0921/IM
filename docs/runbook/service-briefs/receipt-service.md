@@ -24,4 +24,5 @@
 
 ## 后续
 
-- 会话列表更多产品化能力（更多摘要策略等）；更完整长时间容量曲线、资源曲线和生产 sizing；生产级 OTel collector、Alertmanager、SLO dashboard 和容量验证仍属于后续统一观测治理。
+- AI 底座转进前的必要收口：继续收敛 group memory / summary / EvidencePack 需要的 unread、conversation summary、receipt projection 和低敏设备聚合语义。
+- 会话列表更多产品化能力（更多摘要策略等）、更完整长时间容量曲线、资源曲线和生产 sizing 后置为 hardening backlog；生产级 OTel collector、Alertmanager、SLO dashboard 和容量验证仍属于后续统一观测治理。

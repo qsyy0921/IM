@@ -1,8 +1,8 @@
 # policy-service SDD
 
-`policy-service` owns first-stage policy decisions that must not be hard-coded inside message-service. The initial implementation is intentionally small: it exposes a gRPC `CheckMessageAction` endpoint for message send / edit / revoke / delete decisions, and it returns a stable `permission_version`, `classification`, allow/deny flag and public deny reason.
+`policy-service` owns first-stage policy decisions that must not be hard-coded inside message-service or future Agent / MCP entry points. The initial message implementation exposes a gRPC `CheckMessageAction` endpoint for message send / edit / revoke / delete decisions, and it returns a stable `permission_version`, `classification`, allow/deny flag and public deny reason. The first-stage AI/action closeout also exposes `CheckToolAction` so future Agent / MCP / Skill callers can precheck tool actions through policy-service before creating proposals or executing actions.
 
-This service is a boundary extraction step. It is not yet a full ReBAC engine, tenant policy DSL / quota / risk engine, provider-grade content moderation platform or complete contacts/conversation policy engine. The current contacts projection is consumed only for direct conversation `SEND` hard-deny when the caller supplies safe direct-peer context, and as first-stage relationship evidence when a `DIRECT_CONTACT_ACTIVE` relation rule is configured. The current conversation member projection is consumed only as a first-stage role gate with a permission-version fence, as first-stage `CONVERSATION_MEMBER_ACTIVE` relationship evidence, and as a narrow `ADMIN` / `OWNER` message ownership override for mutations. The current moderation slices are limited to user-level message action restrictions such as tenant-local mute / action deny rules, plus first-stage configurable keyword and HTTP content moderator adapters for `SEND` / `EDIT` message text. A separate `MODERATOR` role, richer risk scoring and full product-level moderation policy remain future work.
+This service is a boundary extraction step. It is not yet a full ReBAC engine, tenant policy DSL / quota / risk engine, provider-grade content moderation platform, provider-grade tool policy engine or complete contacts/conversation policy engine. The current contacts projection is consumed only for direct conversation `SEND` hard-deny when the caller supplies safe direct-peer context, and as first-stage relationship evidence when a `DIRECT_CONTACT_ACTIVE` relation rule is configured. The current conversation member projection is consumed only as a first-stage role gate with a permission-version fence, as first-stage `CONVERSATION_MEMBER_ACTIVE` relationship evidence, and as a narrow `ADMIN` / `OWNER` message ownership override for mutations. The current moderation slices are limited to user-level message action restrictions such as tenant-local mute / action deny rules, plus first-stage configurable keyword and HTTP content moderator adapters for `SEND` / `EDIT` message text. The current tool policy slice is a precheck and low-sensitive local audit surface; it is not an Agent service, MCP gateway, approval system or action executor. A separate `MODERATOR` role, richer risk scoring and full product-level moderation policy remain future work.
 
 ## Boundary
 
@@ -13,6 +13,7 @@ Owns:
 - policy version and classification returned to callers;
 - policy-owned contacts edge and conversation member projection read models;
 - a policy-owned first-stage decision audit outbox;
+- policy-owned first-stage tool action rules and low-sensitive tool decision audit rows;
 - future adapters for conversation, identity, tenant risk and compliance projections.
 
 Does not own:
@@ -99,6 +100,24 @@ NEXUSIM_POLICY_MODERATION_DENY_REASON=content moderation provider denied
 ```
 
 `http://` provider endpoints are rejected unless `NEXUSIM_POLICY_MODERATION_HTTP_ALLOW_INSECURE=true` is explicitly set for local smoke. message-service forwards only `payload.text` for `SEND` / `EDIT`; it does not forward the whole message payload for policy classification. policy-service does not persist the text, does not write raw content or provider response bodies into `policy_decision_audit_outbox`, and returns only stable `classification` / public reason fields. Empty text, missing text or disabled moderation mode fall through to the normal contact / user restriction / role / exact / tenant / static policy path. Keyword mode is a local first-stage adapter; HTTP mode is a first-stage external provider adapter. Neither one is a complete risk score platform, prompt audit model or tenant policy DSL.
+
+The first-stage tool policy precheck is intentionally separate from message action policy:
+
+```text
+CheckToolAction:
+tenant_id + user_id + device_id
+tool_name + action(CALL / APPROVE / EXECUTE)
+resource_type + optional resource_id + risk_level
+-> allowed + requires_approval + permission_version + classification + public reason + decision_source
+
+policy_tool_action_rules:
+tenant_id + tool_name(or *) + action + resource_type(or *) + risk_level(or ANY)
+-> allowed + requires_approval + permission_version + classification + public reason + priority + enabled
+```
+
+`CheckToolAction` defaults to fail-closed static deny when rules are disabled or no matching rule exists. When PostgreSQL rules mode is enabled, the evaluator picks the most specific rule by exact tool, exact resource type and exact risk level before wildcard rows, then uses priority / updated time for deterministic tie-breaking. `requires_approval=true` means the caller may create or continue an approval/proposal flow, not that the action executor may mutate business facts immediately. Future Agent, MCP gateway and skill registry code must call this endpoint through a policy port; they must not read `policy_tool_action_rules` directly or hard-code tool allowlists in Agent code.
+
+Successful `CheckToolAction` decisions can be written to `policy_tool_decision_audit` before the response is returned. Audit failure fails closed as policy unavailable. Tool audit rows are local first-stage audit rows, not Kafka outbox rows in this slice. They store only low-sensitive fields: stable actor/device keys, tool name, action, resource type, `resource_id_present`, risk level, allow / requires-approval flags, permission version, classification, reason code, decision source and trace/request id. They must not store tool payloads, `intent` text, business resource IDs, prompt text, model output, raw user/device/session identifiers, tokens, credentials, provider body or SQL error text.
 
 The conversation role gate is a hard deny / freshness gate, not a complete role allow engine. `policy-service` consumes member boundary events from `conversation.timeline.events` into `policy_conversation_members_projection`. `message-service` forwards `conversation_permission_version` from the `ConversationSendContext` it already read from conversation-service. If a role gate rule exists in `policy_conversation_role_action_rules`, the caller's projected member row must exist, be at the same `permission_version`, be `ACTIVE`, and have a role rank greater than or equal to `min_role`. Missing projection, stale version or PostgreSQL lookup failure returns policy unavailable; insufficient role returns business deny with the projected `permission_version`. If the role gate passes, the request continues to exact / tenant / static decision logic.
 
@@ -302,6 +321,25 @@ These flags are available in `loadtest/policy`, `loadtest/policycontacts`, and `
 
 The response is a decision record. `allowed=false` is returned as a successful gRPC response so callers can preserve public deny semantics and use `reason` without relying on transport errors. Transport errors are reserved for invalid request, unavailable policy dependency or implementation failures.
 
+`CheckToolActionRequest` includes:
+
+- `AuthContext`: tenant, user, device, session and trace/request IDs;
+- `tool_name`: stable tool identifier, such as a skill or MCP tool name;
+- `action`: `CALL`, `APPROVE` or `EXECUTE`;
+- `resource_type`: stable resource class such as `conversation`, `message`, `contact`, `tenant_config` or `external_tool`;
+- `resource_id`: optional caller resource id; response may echo it, but low-sensitive audit stores only `resource_id_present`;
+- `risk_level`: `LOW`, `MEDIUM`, `HIGH` or `CRITICAL`;
+- `intent`: optional bounded caller intent summary. It is not persisted in policy audit tables.
+
+`CheckToolActionResponse` includes:
+
+- `allowed`;
+- `requires_approval`;
+- `permission_version`;
+- `classification`;
+- public `reason`;
+- `decision_source`, currently `TOOL_RULE` or `FALLBACK`.
+
 ## Message-Service Integration
 
 message-service continues to call only its `PolicyCheckPort`. It does not import policy-service internals. The RPC adapter lives in `message-service/internal/infrastructure/rpc`.
@@ -338,12 +376,12 @@ This is a local debug surface plus first-stage Prometheus text and trace emissio
 ## Limitations
 
 - First implementation still supports static environment configuration.
-- PostgreSQL rule store supports exact user/conversation rules, first-stage user action restrictions, first-stage tenant action defaults, a first-stage conversation role gate and first-stage relationship gates; no wildcard / provider-grade graph policy DSL yet.
+- PostgreSQL rule store supports exact user/conversation rules, first-stage user action restrictions, first-stage tenant action defaults, a first-stage conversation role gate, first-stage relationship gates and first-stage tool action rules; no provider-grade graph policy DSL yet.
 - Contacts block / unblock events are consumed only for direct `SEND` when safe `direct_peer_user_id` context is supplied.
 - ReBAC relationship policy is only a first-stage action-level gate backed by local contacts / conversation member projections and `policy_rebac_message_action_rules`. It is not a general graph traversal engine, Zanzibar/OpenFGA replacement, policy DSL, or synchronous query path into contacts-service / conversation-service.
 - Conversation role policy is only an action-level role gate backed by a local projection and permission-version fence. It is not complete ReBAC and does not synchronously query conversation-service.
 - Message ownership policy supports sender mutation and first-stage `ADMIN` / `OWNER` override for edit / revoke / delete when message-service supplies sender context. It does not implement a separate `MODERATOR` role, full ReBAC, owner transfer semantics, retention policy, compliance delete or user-private delete.
-- No tenant policy DSL, tenant quota / risk policy, external provider-backed moderation, risk scoring or rate limiting is implemented yet. First-stage keyword content moderation exists only as a local adapter and does not store message text.
+- No provider-grade tenant policy DSL, tool policy operator / approval integration, external provider-backed moderation, risk scoring or rate limiting is implemented yet. First-stage keyword content moderation exists only as a local adapter and does not store message text. First-stage tool policy precheck is a local rules and audit surface for future Agent / MCP / Skill callers; it is not an Agent service, MCP gateway, action executor or approval workflow.
 - Decision audit outbox rows can be relayed to `im.policy.events`, and explicit DLQ event IDs can be redriven through the repair operator after relay-equivalent validation. Broad repair workflow, poison-payload classification beyond fail-closed validation, retention policy and external sink remain future work.
 - First-stage static TLS / mTLS config exists for policy-service, the message-service policy RPC client and direct policy smoke clients, but there is no certificate issuance, rotation, dynamic service identity registry, service mesh policy, or all-service mTLS rollout yet.
 - First-stage OpenTelemetry gRPC server spans exist, but there is no shared collector deployment, fleet-wide sampling policy, dashboard or alerting rollout yet.

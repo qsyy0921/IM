@@ -22,5 +22,6 @@
 
 ## 后续
 
-- 更细隐私策略：组织级策略、租户默认值 / 来源策略 / 隐私例外接入 admin/config service 正式权限面；当前 `REVIEW_REQUIRED` 和 `contact-request-review` 是 first-stage 本地 operator 审批状态机，还不是完整后台审批产品。
+- AI 底座转进前的必要收口：继续确保联系人隐私、profile visibility、分组 / 搜索边界可供 memory/profile projection、retrieval 和 RAG 权限过滤复用。
+- 更细隐私策略、组织级策略、租户默认值 / 来源策略 / 隐私例外接入 admin/config service 正式权限面后置；当前 `REVIEW_REQUIRED` 和 `contact-request-review` 是 first-stage 本地 operator 审批状态机，还不是完整后台审批产品。
 - 生产级 OTel collector、Alertmanager、SLO dashboard、更完整容量曲线和生产 sizing 仍属于后续统一观测 / 容量治理。

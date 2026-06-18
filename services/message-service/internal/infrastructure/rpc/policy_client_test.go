@@ -221,6 +221,14 @@ func (f *fakePolicyServiceClient) CheckMessageAction(
 	return f.response, nil
 }
 
+func (f *fakePolicyServiceClient) CheckToolAction(
+	context.Context,
+	*policyv1.CheckToolActionRequest,
+	...grpc.CallOption,
+) (*policyv1.CheckToolActionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by message-service tests")
+}
+
 func testPolicyClientSendCommand() types.SendMessageCommand {
 	return types.SendMessageCommand{
 		AuthContext:    testPolicyClientAuth(),

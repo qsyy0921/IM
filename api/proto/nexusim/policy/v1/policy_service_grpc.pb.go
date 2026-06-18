@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	PolicyService_CheckMessageAction_FullMethodName = "/nexusim.policy.v1.PolicyService/CheckMessageAction"
+	PolicyService_CheckToolAction_FullMethodName    = "/nexusim.policy.v1.PolicyService/CheckToolAction"
 )
 
 // PolicyServiceClient is the client API for PolicyService service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PolicyServiceClient interface {
 	CheckMessageAction(ctx context.Context, in *CheckMessageActionRequest, opts ...grpc.CallOption) (*CheckMessageActionResponse, error)
+	CheckToolAction(ctx context.Context, in *CheckToolActionRequest, opts ...grpc.CallOption) (*CheckToolActionResponse, error)
 }
 
 type policyServiceClient struct {
@@ -47,11 +49,22 @@ func (c *policyServiceClient) CheckMessageAction(ctx context.Context, in *CheckM
 	return out, nil
 }
 
+func (c *policyServiceClient) CheckToolAction(ctx context.Context, in *CheckToolActionRequest, opts ...grpc.CallOption) (*CheckToolActionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CheckToolActionResponse)
+	err := c.cc.Invoke(ctx, PolicyService_CheckToolAction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PolicyServiceServer is the server API for PolicyService service.
 // All implementations must embed UnimplementedPolicyServiceServer
 // for forward compatibility.
 type PolicyServiceServer interface {
 	CheckMessageAction(context.Context, *CheckMessageActionRequest) (*CheckMessageActionResponse, error)
+	CheckToolAction(context.Context, *CheckToolActionRequest) (*CheckToolActionResponse, error)
 	mustEmbedUnimplementedPolicyServiceServer()
 }
 
@@ -64,6 +77,9 @@ type UnimplementedPolicyServiceServer struct{}
 
 func (UnimplementedPolicyServiceServer) CheckMessageAction(context.Context, *CheckMessageActionRequest) (*CheckMessageActionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CheckMessageAction not implemented")
+}
+func (UnimplementedPolicyServiceServer) CheckToolAction(context.Context, *CheckToolActionRequest) (*CheckToolActionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CheckToolAction not implemented")
 }
 func (UnimplementedPolicyServiceServer) mustEmbedUnimplementedPolicyServiceServer() {}
 func (UnimplementedPolicyServiceServer) testEmbeddedByValue()                       {}
@@ -104,6 +120,24 @@ func _PolicyService_CheckMessageAction_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PolicyService_CheckToolAction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckToolActionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PolicyServiceServer).CheckToolAction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PolicyService_CheckToolAction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PolicyServiceServer).CheckToolAction(ctx, req.(*CheckToolActionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PolicyService_ServiceDesc is the grpc.ServiceDesc for PolicyService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +148,10 @@ var PolicyService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CheckMessageAction",
 			Handler:    _PolicyService_CheckMessageAction_Handler,
+		},
+		{
+			MethodName: "CheckToolAction",
+			Handler:    _PolicyService_CheckToolAction_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

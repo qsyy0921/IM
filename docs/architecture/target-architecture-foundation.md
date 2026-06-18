@@ -20,6 +20,7 @@ NexusIM 是面向大规模企业协同的 IM + 智能协作平台。核心原则
 - 本文只维护目标态总架构和关键技术决策。
 - 服务级 SDD、Proto/OpenAPI/AsyncAPI、PostgreSQL migration、Kafka schema、压测脚本进入下一阶段工程契约，不继续并入本文。
 - 核心目标态按 ADR 治理，不把快速演进中的当前实现写死成不可变终局。
+- 短期工程节奏不以生产级 HA、全量压测、混沌和跨 Region 验证作为继续推进的阻塞；先完成当前 9 个 IM 后端服务的必要语义、安全和契约收口，再转向 AI 大模型应用底座。
 
 ## 2. 技术栈口径
 
@@ -115,12 +116,15 @@ flowchart TB
 
     subgraph Intelligence["检索与 Agent"]
         Search["search-service\nOpenSearch writer"]
-        Rag["rag-ingest-service\nchunk / embedding"]
+        Memory["memory-service\nstructured memory"]
         Retrieval["retrieval-gateway\nACL filter / rerank"]
+        Rag["rag-service\nRAG answer"]
+        Summary["summary-service\nsummary jobs"]
         Agent["agent-service"]
-        Tool["tool-service / MCP"]
-        Approval["approval-service"]
+        Skill["skill-registry\nskill metadata"]
+        Tool["mcp-gateway/tool-gateway"]
         Executor["action-executor\nTemporal worker"]
+        Eval["ai-eval-service"]
     end
 
     subgraph Infra["基础设施"]
@@ -165,33 +169,40 @@ flowchart TB
     Kafka --> Delivery
     Kafka --> Receipt
     Kafka --> Search
-    Kafka --> Rag
-    Kafka --> Agent
+    Kafka --> Memory
     Kafka --> Audit
     Delivery --> Push
 
     Search --> OS
-    Rag --> Milvus
+    Memory --> PG
+    Memory --> Milvus
     Retrieval --> OS
     Retrieval --> Milvus
     Retrieval --> Policy
     Agent --> Retrieval
+    Rag --> Retrieval
+    Summary --> Retrieval
+    Summary --> Memory
+    Agent --> Skill
     Agent --> Tool
-    Agent --> Approval
-    Approval --> Executor
+    Tool --> Executor
+    Retrieval --> Eval
+    Rag --> Eval
+    Summary --> Eval
+    Agent --> Eval
     Executor --> Temporal
     Executor --> API
 ```
 
 ## 4. 服务边界
 
-目标态核心服务清单是当前架构快照，不是服务数量上限。新增服务不写死，必须满足独立数据模型、独立伸缩需求、独立故障边界，或能显著降低现有服务复杂度，并通过 ADR。当前已独立实现的 `contacts-service` 正式纳入核心服务，不再把它隐含到 conversation-service。
+目标态核心服务清单是当前架构快照，不是服务数量上限。新增服务和中间件不写死，必须满足独立数据模型、独立伸缩需求、独立故障边界、独立安全边界之一，或能显著降低现有服务复杂度，并通过 ADR。当前已独立实现的 `contacts-service` 正式纳入核心服务，不再把它隐含到 conversation-service。
 
 | 层级 | 组件 |
 | --- | --- |
 | 接入层 | `api-gateway`、`route-service`、`push-gateway` |
 | IM 核心 | `identity-service`、`policy-service`、`control-plane-service`、`conversation-service`、`contacts-service`、`message-service`、`timeline-service`、`delivery-service`、`receipt-service`、`media-service`、`audit-service` |
-| 检索与 Agent 智能层 | `search-service`、`rag-ingest-service`、`retrieval-gateway`、`agent-service`、`tool-service`、`approval-service`、`action-executor` |
+| 检索与 Agent 智能层 | `search-service`、`memory-service`、`retrieval-gateway`、`rag-service`、`summary-service`、`agent-service`、`skill-registry`、`mcp-gateway/tool-gateway`、`action-executor`、`ai-eval-service` |
 
 | 服务 | 数据归属 | 核心职责 | 禁止事项 |
 | --- | --- | --- | --- |
@@ -209,21 +220,24 @@ flowchart TB
 | receipt-service | delivery ACK、read cursor、unread projection | ACK、已读、未读聚合 | 不改消息事实 |
 | media-service | media_objects、scan_jobs | 上传、扫描、短期 URL | 不绕过权限下载 |
 | search-service | search index | 产品搜索索引唯一写入口 | 其他服务不直写搜索后端 |
-| rag-ingest-service | rag_sources、rag_chunks、embedding_jobs | chunk、embedding、删除同步 | 不参与消息热路径 |
+| memory-service | structured memory、profile aggregate、memory graph | 结构化记忆、版本语义、画像聚合和跨群归因 | 不作为消息事实源、不替代 policy-service |
 | retrieval-gateway | evidence_pack、retrieval audit | 权限过滤、混合检索、rerank、EvidencePack | Agent/前端不直连索引 |
-| agent-service | agent_runs、proposals | 只读问答、写动作提案 | 不直接写业务库 |
-| tool-service | tool_registry、tool_call_log | MCP 工具注册、鉴权、调用路由 | 不绕过 approval 执行高风险动作 |
-| approval-service | approval_tasks、decisions | 审批、升级、超时 | 不跳过审计 |
-| action-executor | action_execution_attempts、Temporal workflow state | 执行已审批动作、调用工具或内部 API、写执行结果 | 不接收未审批写动作、不绕过业务 API |
+| rag-service | rag_sessions、answer audit、prompt/model refs | 基于 EvidencePack 生成带引用回答或拒答 | 不直接读索引、不无证据回答 |
+| summary-service | summary_jobs、summary_versions、source refs | 会话/项目/任务摘要和删除后重算 | 不把摘要当事实源 |
+| agent-service | agent_runs、proposals | 只读问答、计划、写动作提案 | 不直接写业务库、不直接执行高风险工具 |
+| skill-registry | skill metadata、tool schema、risk labels | 技能目录、schema 版本、owner 和风险策略 | 不执行工具、不保存业务事实 |
+| mcp-gateway/tool-gateway | tool_call_log、tool route config | MCP/内部工具调用入口、schema 校验、tool policy、调用路由 | 不绕过 policy/approval 执行高风险动作 |
+| action-executor | action_execution_attempts、Temporal workflow state | 执行低风险 allowlist 或已审批动作、调用公开业务 API、写执行结果 | 不接收未授权高风险动作、不绕过业务 API |
+| ai-eval-service | eval datasets、eval runs、failure records | 权限、证据、时间版本、tool policy 和模型/prompt/retrieval 变更门禁 | 不参与线上热路径 |
 | audit-service | audit_logs、audit_manifest | 不可变审计、导出、修复留痕 | 不作为业务状态源 |
 
 当前态 vs 目标态：
 
 | 范围 | 当前状态 | 后续差距 |
 | --- | --- | --- |
-| 9 个主链路服务 | `api-gateway`、`identity`、`message`、`conversation`、`delivery`、`push`、`receipt`、`contacts`、`policy` 已有真实链路或最小闭环 | 继续补生产级治理、故障验证和容量基线 |
-| 本地/双机分布式 | Win/Mac Docker smoke 已验证跨实例 route、resume、PullInbox fallback | Kafka HA、PostgreSQL failover、Redis quorum / 网络分区、K8s rollout 未验证 |
-| 后续新增服务 | search、media、notification、audit/admin、AI、presence/config 等示例方向 | 不预设最终数量；满足拆分准则后再立项，不一次性拆碎 |
+| 9 个主链路服务 | `api-gateway`、`identity`、`message`、`conversation`、`delivery`、`push`、`receipt`、`contacts`、`policy` 已有真实链路或最小闭环 | 短期补齐 AI 依赖的必要 IM 语义、安全边界、事件契约和本地可验证闭环；生产级治理、故障验证和容量基线作为后续加固项 |
+| 本地/双机分布式 | Win/Mac Docker smoke 已验证跨实例 route、resume、PullInbox fallback | Kafka HA、PostgreSQL failover、Redis quorum / 网络分区、K8s rollout 未验证，但不阻塞先进入 AI 大模型应用底座 |
+| 后续新增服务 | AI 层以 search、memory、retrieval、RAG、summary、Agent、skill、tool、executor、eval 为基线方向 | 不预设最终数量；满足拆分准则并通过 ADR 后再立项，不一次性拆碎 |
 
 工程分层约定为：
 

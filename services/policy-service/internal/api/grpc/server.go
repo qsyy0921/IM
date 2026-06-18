@@ -15,13 +15,22 @@ type CheckMessageActionExecutor interface {
 	Execute(context.Context, types.CheckMessageActionCommand) (types.MessageActionDecision, error)
 }
 
+type CheckToolActionExecutor interface {
+	Execute(context.Context, types.CheckToolActionCommand) (types.ToolActionDecision, error)
+}
+
 type Server struct {
 	policyv1.UnimplementedPolicyServiceServer
 	checkMessageAction CheckMessageActionExecutor
+	checkToolAction    CheckToolActionExecutor
 }
 
-func NewServer(checkMessageAction CheckMessageActionExecutor) *Server {
-	return &Server{checkMessageAction: checkMessageAction}
+func NewServer(checkMessageAction CheckMessageActionExecutor, toolExecutors ...CheckToolActionExecutor) *Server {
+	server := &Server{checkMessageAction: checkMessageAction}
+	if len(toolExecutors) > 0 {
+		server.checkToolAction = toolExecutors[0]
+	}
+	return server
 }
 
 func Register(registrar grpcgo.ServiceRegistrar, server *Server) {
@@ -62,6 +71,45 @@ func (s *Server) CheckMessageAction(
 		Classification:    decision.Classification,
 		Reason:            decision.Reason,
 		OwnershipOverride: decision.OwnershipOverride,
+		DecisionSource:    string(decision.DecisionSource),
+	}, nil
+}
+
+func (s *Server) CheckToolAction(
+	ctx context.Context,
+	request *policyv1.CheckToolActionRequest,
+) (*policyv1.CheckToolActionResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.checkToolAction == nil {
+		return nil, status.Error(codes.Unimplemented, "check tool action is not configured")
+	}
+	decision, err := s.checkToolAction.Execute(ctx, types.CheckToolActionCommand{
+		AuthContext:  authFromProto(request.GetAuthContext()),
+		ToolName:     request.GetToolName(),
+		Action:       toolActionFromProto(request.GetAction()),
+		ResourceType: request.GetResourceType(),
+		ResourceID:   request.GetResourceId(),
+		RiskLevel:    types.ToolRiskLevel(request.GetRiskLevel()),
+		Intent:       request.GetIntent(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &policyv1.CheckToolActionResponse{
+		TenantId:          string(decision.TenantID),
+		UserId:            string(decision.UserID),
+		ToolName:          decision.ToolName,
+		Action:            toolActionToProto(decision.Action),
+		ResourceType:      decision.ResourceType,
+		ResourceId:        decision.ResourceID,
+		RiskLevel:         string(decision.RiskLevel),
+		Allowed:           decision.Allowed,
+		RequiresApproval:  decision.RequiresApproval,
+		PermissionVersion: decision.PermissionVersion,
+		Classification:    decision.Classification,
+		Reason:            decision.Reason,
 		DecisionSource:    string(decision.DecisionSource),
 	}, nil
 }
@@ -107,6 +155,32 @@ func actionToProto(action types.MessageAction) policyv1.MessageAction {
 		return policyv1.MessageAction_MESSAGE_ACTION_DELETE
 	default:
 		return policyv1.MessageAction_MESSAGE_ACTION_UNSPECIFIED
+	}
+}
+
+func toolActionFromProto(action policyv1.ToolAction) types.ToolAction {
+	switch action {
+	case policyv1.ToolAction_TOOL_ACTION_CALL:
+		return types.ToolActionCall
+	case policyv1.ToolAction_TOOL_ACTION_APPROVE:
+		return types.ToolActionApprove
+	case policyv1.ToolAction_TOOL_ACTION_EXECUTE:
+		return types.ToolActionExecute
+	default:
+		return ""
+	}
+}
+
+func toolActionToProto(action types.ToolAction) policyv1.ToolAction {
+	switch action {
+	case types.ToolActionCall:
+		return policyv1.ToolAction_TOOL_ACTION_CALL
+	case types.ToolActionApprove:
+		return policyv1.ToolAction_TOOL_ACTION_APPROVE
+	case types.ToolActionExecute:
+		return policyv1.ToolAction_TOOL_ACTION_EXECUTE
+	default:
+		return policyv1.ToolAction_TOOL_ACTION_UNSPECIFIED
 	}
 }
 

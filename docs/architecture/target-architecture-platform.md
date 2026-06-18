@@ -23,8 +23,8 @@ business service -> policy-service -> relation tuple store / OpenFGA-compatible 
 | --- | --- | --- |
 | user / device / session | identity-service | 消费事件构建 subject projection |
 | conversation membership | conversation-service | 消费成员事件构建 relation tuples |
-| tool policy | tool-service | 消费工具策略事件构建 action relation |
-| approval policy | approval-service | 消费审批策略事件构建 risk relation |
+| tool policy | skill-registry + mcp-gateway/tool-gateway | 消费工具策略事件构建 action relation |
+| approval policy | action-executor / approval workflow | 消费审批和执行策略事件构建 risk relation |
 
 policy-service 是 authorization projection + decision center，不是所有权限关系的原始事实源。
 
@@ -45,7 +45,7 @@ Retrieval 权限规则：
 | 发消息 | 强校验 conversation-service / policy current version |
 | 下载文件 | 强校验 policy-service，必要时回源 media/conversation |
 | RAG 检索 | 默认 projection，`acl_version` stale 时 strict check |
-| Agent 写动作 | 强校验 policy-service + approval-service |
+| Agent 写动作 | 强校验 policy-service + tool policy + approval workflow / action-executor |
 | 普通搜索 | projection filter + 二次校验 |
 | 历史补拉 | 按 `join_seq / leave_seq` 强过滤 |
 
@@ -53,7 +53,7 @@ Relation tuple 重建：
 
 ```text
 freeze affected policy scope
--> replay identity/conversation/tool/approval events
+-> replay identity/conversation/tool/approval/action events
 -> rebuild relation tuples
 -> compare tuple count and checksum
 -> switch policy projection version
@@ -62,7 +62,7 @@ freeze affected policy scope
 
 ### 10.2 Search/RAG
 
-详细 AI / memory / Agent 后续目标架构见 `target-architecture-ai.md`。本节只保留跨服务硬边界。
+详细 AI / memory / Agent 后续目标架构见 `target-architecture-ai.md`。本节只保留跨服务硬边界。未来 AI 层服务拆分以 `search-service`、`memory-service`、`retrieval-gateway`、`rag-service`、`summary-service`、`agent-service`、`skill-registry`、`mcp-gateway/tool-gateway`、`action-executor`、`ai-eval-service` 为基线；服务和中间件不是写死终局，新增或替换必须符合独立数据模型、独立伸缩、独立故障、独立安全边界之一，或显著降低复杂度，并通过 ADR。
 
 OpenSearch 文档必须包含：
 
@@ -121,15 +121,15 @@ Agent 写动作固定流程：
 ```text
 agent detects write intent
 -> create Action Proposal
--> approval-service checks policy and risk
+-> policy-service and tool policy check actor/resource/action/risk
 -> workflow waits approval
--> action-executor calls tool-service / internal API
+-> action-executor calls mcp-gateway/tool-gateway or public business API
 -> audit-service appends result
 ```
 
 Agent 边界不变量：
 
-- Agent 不直接读 PostgreSQL、OpenSearch 或 Milvus，只能通过 retrieval-gateway、tool-service 或公开业务 API。
+- Agent 不直接读 PostgreSQL、OpenSearch 或 Milvus，只能通过 retrieval-gateway、mcp-gateway/tool-gateway 或公开业务 API。
 - Agent 不直接写业务库；所有写动作必须进入 proposal / approval / executor / audit。
 - Agent 输出必须携带 evidence pack id 或明确标记无证据回答，并被 AI eval / safety gate 覆盖。
 
@@ -202,7 +202,7 @@ retention scanner
 -> data.expire.requested
 -> message-service tombstone
 -> search-service delete/update index
--> rag-ingest-service delete chunk/vector
+-> memory-service / rag-service update memory, summary and vector visibility
 -> media-service delete object or mark expired
 -> audit-service write delete proof
 -> data.expire.completed
@@ -335,7 +335,7 @@ P0 Runbook 目录：
 
 ## 14. AI Safety Eval
 
-RAG/Agent 发布必须跑安全评测：
+RAG/summary/Agent 进入生产发布前必须跑安全评测。短期建设 AI 大模型应用底座时，先由 `ai-eval-service` 提供最小门禁，覆盖权限、删除、时间版本、证据归因和工具策略；生产级全量评测作为上线加固，不阻塞服务拆分和第一版闭环。
 
 | 测试 | 强验收 |
 | --- | --- |
@@ -347,7 +347,7 @@ RAG/Agent 发布必须跑安全评测：
 | 无证据回答 | `evidence_missing_answer_rate < threshold` |
 | 错误引用 | `citation_accuracy > threshold` |
 
-高风险评测失败阻断发布。
+高风险评测失败阻断生产发布；第一版底座阶段允许以明确风险记录和未上线标记继续实现后续服务边界。
 
 评测数据集管理：
 
@@ -403,37 +403,35 @@ RAG/Agent 发布必须跑安全评测：
 | ADR-032 | push-gateway 支持短断线 resume buffer | 提升移动端短断线体验，同时不改变 delivery 补拉事实源 |
 | ADR-033 | api-gateway tenant quota source 由控制面 / 配置源版本化发布 | 避免 user-facing gateway 直连业务内部表，DB-backed quota 需通过服务拥有的配置契约 |
 | ADR-034 | PostgreSQL production quorum boundary | 本地 `repmgr + pgpool` 只作为 smoke 拓扑；生产 HA 必须另有 quorum / fencing 证据 |
+| ADR-035 | AI 层以 search、memory、retrieval、RAG、summary、Agent、skill、tool、executor、eval 十个服务为目标基线 | 先形成可复用大模型应用底座；后续新增、合并或替换必须满足独立数据模型/伸缩/故障/安全边界或降低复杂度 |
 
 ## 16. 演进结论与下一阶段
 
-本文是目标态架构基线，不是终局服务数量或中间件清单。后续优先进入服务级设计、接口契约、数据库 schema、Kafka schema 和压测验证；新增总架构点必须通过 ADR，并说明为什么不能在现有服务或中间件边界内解决。
+本文是目标态架构基线，不是终局服务数量或中间件清单。短期路径调整为：先完成当前 9 个 IM 后端服务的必要语义、安全边界、事件契约和本地可验证闭环，再转向 AI 大模型应用底座。生产级 HA、全量压测、混沌和跨 Region 验证作为后续加固项，不作为当前转向 AI 底座的阻塞。新增总架构点必须通过 ADR，并说明为什么不能在现有服务或中间件边界内解决。
 
 优先交付：
 
 | 优先级 | 交付物 | 范围 |
 | --- | --- | --- |
-| P0 | `message-service SDD` | 已形成基线；发送、编辑、撤回、删除、本地事务、outbox、幂等、Runbook |
-| P0 | `timeline-service / sequencer SDD` | seq block、epoch fencing、journal、gap marker、模式切换 |
-| P0 | `conversation-service / member_change_saga SDD` | 成员事实、边界 seq、Saga、并发冲突、ACL 投影 |
-| P0 | `Proto / OpenAPI / AsyncAPI` | `SendMessage`、`AllocateSeqBlock`、`CreateMemberChange`、`AckDelivery`、`PullOfflineMessages`、`RetrieveEvidence` |
-| P0 | `PostgreSQL migration` | `conversation_seq`、`message_log`、`timeline`、`outbox`、`message_change_history`、`member_change_saga`、`inbox`、`cursor` |
-| P0 | `Kafka schema and topic config` | timeline、delivery、receipt、media、agent、repair 事件和 DLQ/retry |
-| P1 | `push-gateway SDD` | WebSocket 协议、resume buffer、错误码、连接状态机 |
-| P1 | `delivery-service SDD` | fanout、offline pull、inbox 重建、投递延迟 |
-| P1 | `retrieval-gateway SDD` | strict ACL、EvidencePack、索引版本、shadow rebuild |
-| P1 | `第一轮压测脚本` | WS 建连、消息写入、热点群、补拉、ACK、Kafka lag、RAG lag、Agent approval |
+| P0 | 9 服务必要收口 | 编辑、撤回、删除、群管理、成员窗口、回执、联系人、policy decision audit、事件契约和本地集成验证 |
+| P0 | 契约和 migration 补齐 | 当前 9 服务需要的 Proto / OpenAPI / AsyncAPI、PostgreSQL migration、Kafka schema，保证 search / memory 可消费 |
+| P1 | `search-service` + `memory-service` | 可重建搜索 projection、tombstone、成员可见窗口、StructuredMemoryEvent、版本语义和画像聚合 |
+| P1 | `retrieval-gateway` + `ai-eval-service` | strict ACL、EvidencePack、索引版本、最小权限/删除/时间版本/evidence/tool policy 门禁 |
+| P1 | `rag-service` + `summary-service` | 只消费 EvidencePack 的只读问答和摘要，不直接检索、不写事实源 |
+| P2 | `skill-registry` + `mcp-gateway/tool-gateway` + `action-executor` + `agent-service` | skill schema、tool policy、低风险 allowlist、proposal、idempotency、audit 和 read-only/proposal-only Agent |
+| P2 | 生产级验证和容量基线 | HA、全量压测、混沌、跨 Region、K8s rollout、容量模型和故障演练，作为上线加固而非当前阶段阻塞 |
 
-当前工程缺口和代码边界：
+九服务必要收口中的代码边界：
 
-| 缺口 | 对第一阶段代码的影响 | 边界约束 |
+| 缺口 | 对短期收口的影响 | 边界约束 |
 | --- | --- | --- |
-| `timeline-service / sequencer SDD` 未完成 | 不阻塞普通会话 `SendMessage`；阻塞热点会话生产实现 | 第一阶段只实现 `LOCAL_ROW_LOCK`，`SEQUENCER_BLOCK` 只定义 port 和 mock |
-| `conversation-service / member_change_saga SDD` 未完成 | 不阻塞 `GetSendContext` 会话发送上下文 read path；阻塞真实成员变更、群主/管理员规则和 ACL 投影 | message-service 只能依赖 `ConversationQueryPort`，并从 port 读取 `fanout_mode`、`fanout_policy_version`，不能写成员事实、角色规则或硬编码 fanout 策略 |
-| Proto / OpenAPI / AsyncAPI 未落文件 | 阻塞正式业务代码 | 先确定 `message_service.proto`、错误码和事件契约，再创建 service skeleton |
-| PostgreSQL migration 未落文件 | 阻塞本地事务代码 | 先落 `conversation_seq + message_log + timeline + outbox` 同分片约束 |
-| Kafka schema 未落文件 | 阻塞 outbox relay 对外发布 | 先落 `message.persisted.v1` 和 envelope，再实现 producer |
-| Outbox DLQ repair 契约文件未落地 | 不阻塞第一阶段 `SendMessage`，但阻塞后续运维闭环 | SDD 已定义 replay/skip 语义；后续必须落 Proto/AsyncAPI 和 `audit.repair.events` schema |
-| 跨服务 timeline append / publish ordering 未落地 | 不阻塞第一阶段只有 message event 的 `SendMessage`；阻塞成员边界、gap marker、repair event 生产化 | `conversation-service / member_change_saga SDD` 必须选择统一 timeline append / publish 机制 |
+| `timeline-service / sequencer SDD` 未完成 | 不阻塞普通会话 `SendMessage` 和 AI 底座先行消费既有 timeline 事件；阻塞热点会话生产实现 | 短期只要求普通会话语义闭环，`SEQUENCER_BLOCK` 可继续保留 port 和 mock |
+| `conversation-service / member_change_saga SDD` 未完成 | 不阻塞 `GetSendContext` 会话发送上下文 read path；真实成员变更、群主/管理员规则和 ACL 投影仍需收口 | message-service 只能依赖 `ConversationQueryPort`，并从 port 读取 `fanout_mode`、`fanout_policy_version`，不能写成员事实、角色规则或硬编码 fanout 策略 |
+| Proto / OpenAPI / AsyncAPI 未落文件 | 阻塞对应正式接口和事件契约，不阻塞先整理 AI 底座架构 | 先确定 9 服务必要收口涉及的 proto、错误码和事件契约，再扩展 AI proto |
+| PostgreSQL migration 未落文件 | 阻塞对应本地事务代码，不阻塞服务拆分设计 | 先落 9 服务必要收口涉及的事实表和唯一约束 |
+| Kafka schema 未落文件 | 阻塞 outbox relay 对外发布和 search / memory projection 消费 | 先落必要 timeline/message/member/receipt/policy 事件和 envelope，再实现 projection consumer |
+| Outbox DLQ repair 契约文件未落地 | 不阻塞当前消息链路 `SendMessage`，但阻塞后续运维闭环 | SDD 已定义 replay/skip 语义；后续必须落 Proto/AsyncAPI 和 `audit.repair.events` schema |
+| 跨服务 timeline append / publish ordering 未落地 | 不阻塞当前只有 message event 的 `SendMessage`；阻塞成员边界、gap marker、repair event 生产化 | `conversation-service / member_change_saga SDD` 必须选择统一 timeline append / publish 机制 |
 
 本地开发和双机压测配置属于运行手册，不固化在目标态架构正文中。当前机器 IP、端口、防火墙和代理约定见 `docs/runbook/local-loadtest.md`。
 
@@ -442,6 +440,8 @@ RAG/Agent 发布必须跑安全评测：
 | 已验证 | 未宣称 |
 | --- | --- |
 | 双机 Docker、多实例 push route、durable PullInbox fallback、基础 Redis route smoke | Kafka 多 broker HA、PostgreSQL 主从/failover、Redis Sentinel quorum/网络分区、Kubernetes 灰度和自动恢复 |
+
+未宣称的生产 HA 能力必须在正式上线前补证据，但不阻塞短期完成 9 服务必要收口并启动 AI 大模型应用底座。
 
 工程落地基线：
 
@@ -467,7 +467,7 @@ RAG/Agent 发布必须跑安全评测：
 - `api` 层只做对外接口适配和 request/response 转换，不写业务规则。
 - `trigger` 层只做后台触发、消费、巡检和补偿任务，不写业务规则。
 - `types` 层只放稳定基础类型，不允许变成全局工具箱或业务模型包。
-- 第一阶段允许 `policy-service`、`conversation-service`、`timeline-service` 使用 strict mock，但 mock 必须实现同名 port，不能把权限、成员、seq 逻辑硬编码进 message-service。
+- 短期允许 `policy-service`、`conversation-service`、`timeline-service` 使用 strict mock，但 mock 必须实现同名 port，不能把权限、成员、seq 逻辑硬编码进 message-service。
 
 代码复杂度治理：
 
@@ -475,7 +475,7 @@ RAG/Agent 发布必须跑安全评测：
 - 公共包至少需要两个以上真实调用方；禁止为了架构好看提前抽象。
 - 优先按已有端口、事实流、projection 和 read model 扩展；新抽象必须降低实际复杂度或隔离故障边界。
 
-第一条代码切片：
+消息链路切片范式：
 
 ```text
 message-service SendMessage
@@ -486,11 +486,11 @@ message-service SendMessage
 -> outbox relay publishes or records publish attempt
 -> integration test proves idempotency and transaction atomicity
 -> service listens on configured local load-test port
--> load client runs first baseline from local-loadtest runbook
--> record SendMessage baseline before expanding service scope
+-> focused local smoke / integration test passes
+-> optional load baseline records SendMessage capacity before production hardening
 ```
 
-第一阶段实现范围只包含：
+消息链路切片实现范围只包含：
 
 ```text
 SendMessage
@@ -502,7 +502,7 @@ outbox relay
 Kafka publish path
 ```
 
-第一阶段只实现普通会话本地行锁模式：
+消息链路切片只实现普通会话本地行锁模式：
 
 ```text
 LOCAL_ROW_LOCK
@@ -517,7 +517,7 @@ seq_allocation_journal table contract
 timeline_gap_markers table contract
 ```
 
-第一阶段只定义契约、不实现业务闭环：
+该切片只定义契约、不实现业务闭环：
 
 ```text
 EditMessage
@@ -530,19 +530,19 @@ RAG
 Agent
 ```
 
-第一阶段采用边搭建边压测：
+短期采用边搭建边验证：
 
 ```text
-small smoke load
+small smoke / focused integration
 -> SendMessage baseline
 -> idempotency and conflict test
 -> Kafka outage / outbox backlog test
--> short duration stability test
+-> short duration stability test when the slice touches runtime behavior
 ```
 
-不要等所有目标态服务全部部署后再压测；每完成一条真实链路就记录容量基线和瓶颈。
+不要等所有目标态服务全部部署后再验证；每完成一条真实链路都应保留本地或集成证据。容量基线和故障演练用于后续生产级加固，不作为当前转向 AI 底座的阻塞。
 
-进入编码前的门禁：
+进入九服务必要收口编码前的门禁：
 
 - `message-service.proto` 必须先确定 `SendMessage`、`EditMessage`、`RevokeMessage`、`DeleteMessage` 和错误码。
 - `EditMessage`、`RevokeMessage`、`DeleteMessage` request 必须携带 `conversation_id`，不能只靠 `message_id` 路由分片。
@@ -552,7 +552,7 @@ small smoke load
 - Kafka schema 必须覆盖 `message.persisted.v1`、`message.edited.v1`、`message.revoked.v1`、`message.deleted.v1`。
 - `conversation.timeline.events` 的跨服务 append / publish 顺序机制必须在成员边界生产化前确定。
 - 本地集成测试必须能一键启动依赖并清理数据。
-- 第一轮压测只接受真实服务进程，不接受仅返回固定字符串的 toy endpoint。
+- 需要做容量验证时只接受真实服务进程，不接受仅返回固定字符串的 toy endpoint。
 
 落地顺序：
 
@@ -563,8 +563,8 @@ service SDD first
 -> Kafka schema first
 -> code skeleton
 -> integration test baseline
--> load test baseline
--> fault drill
+-> focused local / integration validation
+-> record production load / fault drill gaps when not run
 ```
 
 核心验收：
@@ -573,4 +573,4 @@ service SDD first
 - Kafka 事件契约可注册、可兼容检查、可重放。
 - 客户端断线、重复发送、ACK 丢失、离线补拉均有确定协议。
 - RAG/Agent 无越权检索、无审批写动作、无证据回答可被评测阻断。
-- 压测输出真实容量基线和瓶颈表。
+- 生产级压测、HA 和故障演练有明确后续加固项；短期不阻塞 9 服务必要收口和 AI 底座启动。

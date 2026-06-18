@@ -27,16 +27,17 @@ contacts-service
 policy-service
 ```
 
-当前重点从“只收干净 9 个服务”调整为“补完整 IM 后端产品语义，并为 search / group memory / RAG / Agent 建立数据和权限底座”。
+当前重点调整为：9 个现有服务做必要收口，不再以短期生产级测试为阻塞；向 AI 大模型应用底座转进。
 
 ```text
-IM 语义补齐：编辑 / 撤回 / 删除 / 群管理 / 成员可见窗口 / 回执 / 联系人 / 策略
--> AI 数据底座：search projection / tombstone / visibility / EvidencePack / group memory
--> 安全边界：trusted metadata / TLS / policy / audit
--> 观测、repair、DLQ、容量和复杂度治理
+9 服务必要收口：mutation / visibility / contacts privacy / policy / audit / security
+-> search-service v0.1
+-> memory-service / retrieval-gateway
+-> RAG / agent-service
+-> skill-registry / mcp-gateway / action-executor
 ```
 
-当前下一步就是 `search-service v0.1`：先做 SDD 收敛、proto / migration / 六层 skeleton、timeline projection 和 `SearchMessages`，不做 LLM。RAG、summary、agent 必须建立在 search / memory / retrieval-gateway / policy / audit 之上。完整系统测试和生产级 HA 深水区后置，不阻塞当前功能推进。
+当前必要收口已继续推进到 policy-service tool policy precheck / low-sensitive audit，后续 Agent / MCP / Skill 可先调用 policy-service 预检，不直接绕过权限边界。当前下一步仍是 `search-service v0.1`：先做 SDD 收敛、proto / migration / 六层 skeleton、timeline projection 和 `SearchMessages`，不做 LLM。后续依次推进 `memory-service`、`retrieval-gateway`、RAG、Agent、`skill-registry`、`mcp-gateway`、`action-executor`。完整系统测试、生产级 HA、长压和 sizing 后置为 hardening backlog，不阻塞当前 AI 底座启动。
 
 ## 文档职责
 

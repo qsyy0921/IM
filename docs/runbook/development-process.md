@@ -20,10 +20,11 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 
 ```text
 先把主链路做对
--> 再把分布式和可靠性做稳
--> 再补完整 IM 产品语义
--> 再建设搜索、群组记忆和检索证据底座
--> 再扩 RAG / summary / Agent 后端
+-> 把 9 个核心服务做必要收口
+-> 以 search-service v0.1 建搜索、可见性和 tombstone 底座
+-> 再建设 memory / retrieval / EvidencePack
+-> 再扩 RAG / summary / Agent / MCP / Skill 后端
+-> 分布式可靠性和生产级完整测试按风险持续补强
 -> 最后按需要做客户端和产品化展示
 ```
 
@@ -35,6 +36,7 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 4. 功能能跑不等于阶段完成，必须有 smoke / audit / repair / hardening 证据。
 5. 代码复杂度要持续治理，不能把单个核心文件继续堆成大文件。
 6. 当前面试主线只覆盖后端、分布式可靠性和 AI 应用后端；客户端暂不作为当前开发主线。
+7. 短期转进 AI 大模型应用后端不以生产级完整系统测试或生产级 HA 为阻塞，但当前切片仍必须有本地检查、最小 smoke 或等价证据。
 
 ## 1. 第一阶段：最小 IM 主链路
 
@@ -100,7 +102,9 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 
 - 这 9 个服务都不是“只跑 happy path”
 - 各自主要 P2 hardening 已经收掉大头
+- search / memory / Agent 会依赖的事实、权限、事件和 tombstone 边界清楚
 - 关键文档、service brief、runbook 已经稳定
+- 不要求生产级完整系统测试或生产级 HA 全部完成后才启动 `search-service` v0.1
 
 当前项目就在这个阶段。
 
@@ -140,6 +144,7 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 
 - 本地 failover smoke 不等于生产 HA
 - 单 broker / 单 primary 切换成功，不等于多故障场景完成
+- 生产级 HA 和完整系统测试是持续补强目标，不作为 `search-service` v0.1 的短期阻塞
 
 这一阶段已经有可面试讲述的最小证据，但还没到生产级 HA。
 
@@ -186,17 +191,19 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 目标：
 
 ```text
-为聊天记录搜索、群组 memory 和 RAG 建立可控的检索事实层。
+以 search-service v0.1 作为第一步，
+为聊天记录搜索、群组 memory、retrieval 和后续 RAG / Agent / MCP / Skill 建立可控的检索事实层。
 ```
 
-进入这一阶段前，不要求所有生产级 HA 都完成，但 message / conversation / policy / delivery 的事实边界必须足够稳定，尤其是编辑、撤回、删除、成员窗口和权限策略。
+进入这一阶段前，不要求所有生产级 HA 或生产级完整系统测试都完成，但 message / conversation / policy / delivery 的事实边界必须足够稳定，尤其是编辑、撤回、删除、成员窗口和权限策略。
 
-`search-service` 第一阶段应该只做后端：
+`search-service` v0.1 应该只做后端：
 
 - 消费 message / member / revoke / delete 事件；
 - 维护 search index projection；
 - 强制 tenant / conversation / member visibility 过滤；
 - 支持撤回 / 删除 tombstone；
+- 提供 `SearchMessages` 最小查询和 EvidencePack 前置字段；
 - 不让 RAG 或 Agent 直接读业务库。
 
 `memory-service` / memory projection 第一阶段应该关注：
@@ -222,7 +229,9 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 2. `rag-service`
 3. `summary-service`
 4. `agent-service` read-only / proposal-only
-5. proposal / approval / executor / audit
+5. MCP tool surface
+6. Skill runtime / registry
+7. proposal / approval / executor / audit
 
 必须遵守的边界：
 
@@ -231,6 +240,7 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 - 撤回 / 删除 / 成员可见窗口必须影响搜索和 RAG；
 - AI 输出必须带 source message id、conversation seq 和 evidence pack；
 - Agent 写动作必须可审计、可审批、可回放。
+- MCP / Skill 只能封装已通过权限、证据和审计约束的后端能力。
 
 ## 7. 第七阶段：其它产品后端服务
 
@@ -282,6 +292,7 @@ Web / App / 桌面端是后续产品化展示层，
 2. 当前阶段的关键 P0/P1 已清掉。
 3. P2 hardening 不要求全部为零，但不能继续失控积压。
 4. 文档、runbook、service brief 能准确描述当前事实。
+5. 对 `search-service` v0.1 这类 AI 后端转进切片，生产级完整系统测试和生产级 HA 不作为硬门槛；本地检查、最小 smoke、权限过滤和证据边界必须闭环。
 
 什么时候不能切下一阶段：
 
@@ -296,15 +307,16 @@ Web / App / 桌面端是后续产品化展示层，
 
 ```text
 补完整当前 9 个核心服务的 IM 语义和 AI 所需事件边界
--> 启动 search-service，先做 projection / visibility / tombstone
--> 启动 group memory / retrieval-gateway / EvidencePack
+-> 启动 search-service v0.1，先做 projection / visibility / tombstone / SearchMessages
+-> 启动 memory / group memory / retrieval-gateway / EvidencePack
 -> 再进入 rag-service / summary-service / agent-service
--> 生产级 HA、完整系统测试和客户端产品化继续后置
+-> 再封装 MCP tool surface 和 Skill runtime / registry
+-> 生产级 HA、生产级完整系统测试和客户端产品化继续后置
 -> 后续再按需要补 media / notification / audit / admin / 客户端
 ```
 
 这条顺序的关键点只有一个：
 
 ```text
-先把 AI 会依赖的数据、权限、证据和审计底座做扎实，再继续长能力。
+先把 AI 会依赖的数据、权限、证据和审计底座做扎实，再继续长能力；短期不等待生产级完整系统测试全部完成。
 ```

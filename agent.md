@@ -1,43 +1,38 @@
 # NexusIM Agent Guide
 
-This file tells Codex and sub-agents how to manage NexusIM progress without
-reading or duplicating long documents.
+This file routes Codex and sub-agents without duplicating long project history.
 
 ## Start Every Turn
 
 1. Run `git status --short --branch --untracked-files=all`.
 2. Read `prompt.md`.
-3. Read `agent.md` to confirm progress-management rules.
-4. Read additional documents only when the current task needs them. Use the
-   routing table below instead of opening every runbook or SDD file.
+3. Read `agent.md` for progress-management rules.
+4. Read only the extra document required by the current task.
 
-Do not read long SDD, archive, history, or loadtest reports unless the current
-slice needs exact evidence from them.
+Do not read long SDD, archive, history, or loadtest reports unless exact evidence
+from them is needed.
 
 ## Document Routing
 
-Use this table to decide what to read and what to maintain.
-
 | Task | Read first | Maintain when facts change |
 | --- | --- | --- |
-| Continue the active Codex goal | `docs/runbook/current-goal.md` | `docs/runbook/current-goal.md` only if the concrete goal changed |
-| Understand current phase | `docs/runbook/current-brief.md` | `docs/runbook/current-brief.md` |
-| Choose next unfinished backend work | `docs/runbook/remaining-goals.md` | `docs/runbook/remaining-goals.md` |
-| Work on one service | `docs/runbook/service-briefs/README.md`, then that service brief | that service brief, plus `development-progress.md` if public progress changed |
-| Repair / DLQ / operator work | `docs/runbook/repair-operators.md` and the relevant service brief | `repair-operators.md`, relevant service brief |
-| Distributed smoke / fault evidence | relevant runbook README and only the exact report path needed | the new report or summary, not the entrance docs |
-| Interview progress narrative | `docs/interview/project-progress.md` | `docs/interview/project-progress.md` |
-| Architecture target or service split rules | `docs/architecture/target-architecture.md` only when architecture changes | target architecture or ADR, not routine progress docs |
+| Continue active goal | `docs/runbook/current-goal.md` | `docs/runbook/current-goal.md` |
+| Understand phase | `docs/runbook/current-brief.md` | `docs/runbook/current-brief.md` |
+| Choose unfinished work | `docs/runbook/remaining-goals.md` | `docs/runbook/remaining-goals.md` |
+| Work on one service | `docs/runbook/service-briefs/README.md`, then service brief | service brief; `development-progress.md` only for public progress |
+| Repair / DLQ / operator | `docs/runbook/repair-operators.md`, service brief | same |
+| Distributed smoke / fault evidence | relevant runbook README and exact report path | new report or summary only |
+| Interview narrative | `docs/interview/project-progress.md` | same |
+| Architecture / service split | `docs/architecture/target-architecture.md` | architecture doc or ADR |
 
-Do not duplicate the same status into every document. Keep entrance documents
-short, route to the owner document, and update only the owner document.
+Keep entrance docs short. Do not copy the same status into every file.
 
-## Current Project Direction
+## Current Direction
 
-NexusIM is currently in the "complete IM backend semantics and AI foundation"
+NexusIM is in the "necessary closeout + AI large-model application foundation"
 phase.
 
-The existing service set is:
+Existing real services:
 
 - `api-gateway`
 - `identity-service`
@@ -49,92 +44,85 @@ The existing service set is:
 - `contacts-service`
 - `policy-service`
 
-Do not start broad RAG, summary, autonomous Agent, media, notification, admin,
-or clients until the IM semantics needed by search / memory are stable.
-`search-service` may start when selected, but only as search / visibility /
-tombstone infrastructure, not as an LLM demo.
+Current main line:
+
+1. Close only the 9-service gaps that block search / memory / retrieval / Agent:
+   mutation semantics, visibility windows, contacts privacy, policy, audit, and
+   security boundaries.
+2. Start `search-service v0.1` as projection / visibility / tombstone /
+   `SearchMessages`, not an LLM demo.
+3. Then build `memory-service`, `retrieval-gateway`, RAG, Agent,
+   `skill-registry`, `mcp-gateway`, and `action-executor`.
+4. Keep production-grade HA, long load tests, sizing, full SLOs, and provider
+   operations in hardening backlog unless the user explicitly asks for them.
 
 ## Progress Documents
 
-Use these documents for different jobs:
+- `prompt.md`: goal-box prompt and route.
+- `agent.md`: this routing and collaboration guide.
+- `docs/runbook/current-goal.md`: concrete active goal.
+- `docs/runbook/current-brief.md`: current phase.
+- `docs/runbook/remaining-goals.md`: unfinished work only.
+- `docs/runbook/development-progress.md`: human progress overview.
+- `docs/runbook/service-briefs/<service>.md`: single-service state.
+- `docs/interview/project-progress.md`: interview-facing progress.
 
-- `prompt.md`: Codex goal-box prompt and document routing.
-- `agent.md`: document-routing and progress-maintenance rules for Codex and sub-agents.
-- `docs/runbook/current-goal.md`: concrete execution goal for Codex.
-- `docs/runbook/current-brief.md`: current phase and where to look next.
-- `docs/runbook/remaining-goals.md`: only unfinished work.
-- `docs/runbook/development-progress.md`: human-readable current progress.
-- `docs/runbook/service-briefs/<service>.md`: current state for one service.
-- `docs/interview/project-progress.md`: interview-facing backend progress.
-
-When a slice changes current facts, update the matching service brief and, if
-the high-level progress changed, `development-progress.md`.
-
-When a slice removes or discovers unfinished work, update `remaining-goals.md`.
-
-Do not copy the same long status paragraph across multiple files. Prefer links
-and short summaries. Do not maintain every document on every turn; update only
-the documents whose facts changed in the current slice.
-
-When new work is discovered, add it to `remaining-goals.md` first. Only promote
-it into `current-goal.md` when it becomes the active execution goal.
+When work changes facts, update only the owning document. New work goes into
+`remaining-goals.md`; promote it to `current-goal.md` only when active.
 
 ## Work Selection
 
-Prefer work in this order:
+Prefer:
 
-1. IM semantics required by search / memory / Agent.
-2. Security boundaries: public listener guards, mock auth boundaries, trusted
-   metadata, TLS / mTLS.
-3. Service P2 hardening from `remaining-goals.md`.
+1. IM semantics required by search / memory / retrieval / Agent.
+2. Security boundaries: public listener guards, mock auth, trusted metadata,
+   TLS / mTLS, sensitive data hygiene.
+3. Service hardening from `remaining-goals.md` only when it blocks the current
+   foundation work.
 4. Repair / DLQ / audit and operator safety.
-5. Search / group memory / retrieval foundations before RAG or Agent.
-6. Observability and fault-smoke evidence.
-7. Capacity and complexity governance.
+5. Search / group memory / retrieval before RAG or Agent.
+6. Observability, fault smoke, capacity, and complexity governance as
+   non-blocking hardening unless requested.
 
-Each slice should be small enough to close with code, tests, docs, and a clean
-commit.
+Each slice should close with code, tests, docs, and a focused commit when
+practical.
 
 ## Engineering Rules
 
 - Do not revert user changes.
 - Do not read another service's private tables from production code.
 - Do not introduce mesh-like synchronous RPC dependencies.
-- Do not create shared packages until at least two real callers need the same
-  stable contract.
+- Do not create shared packages until at least two real callers need a stable
+  contract.
 - Keep abstractions local until the second real use case appears.
-- If a production hand-written file approaches 2500 lines, split by topic in
-  the same package before adding more behavior.
-- If a test or runner approaches 3000 lines, split helpers or scenario files in
-  the same package.
-- If file-size hotspot baseline drifts legitimately, refresh it with
-  `tools/update-file-size-hotspot-baseline.ps1`; the scripts use explicit UTF-8.
-- Raw loadtest data belongs under `H:\NexusIM\loadtest-results`; the repository
-  only stores summaries and reports.
+- Split production files near 2500 lines; split tests or runners near 3000 lines.
+- Refresh legitimate file-size baseline drift with
+  `tools/update-file-size-hotspot-baseline.ps1`.
+- Raw loadtest data belongs under `H:\NexusIM\loadtest-results`; repo stores
+  summaries and reports only.
 
-## Sub-Agent Guidance
+## Sub-Agents
 
-Use sub-agents for parallel read-only review, test-gap discovery, or targeted
-implementation support when the scope is large.
+Use sub-agents only for explicitly requested parallel work, review, test-gap
+discovery, or disjoint implementation. Keep each task narrow: one service, one
+concern, one output format.
 
-Keep each sub-agent narrow:
-
-- one service,
-- one concern,
-- one output format,
-- no broad project-wide scans unless explicitly needed.
-
-Close sub-agents when their result has been incorporated. Do not keep stale
-sub-agents running.
+Bound concurrency. Normally use 2-3 agents; use more only when the user asks and
+write scopes are disjoint. Do not let two agents edit the same file or section.
+The main agent owns integration, consistency, validation, and closing stale
+agents.
 
 ## Validation Before Finishing
 
 For meaningful changes:
 
 1. Run focused service/package tests.
-2. Run any relevant integration or smoke command.
-3. Run `.\tools\check-local.ps1`.
+2. Run relevant integration or smoke checks.
+3. Run `.\tools\check-local.ps1` unless the change is docs-only and a focused
+   doc check is sufficient.
 4. Check `git status --short --branch --untracked-files=all`.
-5. Commit with a focused message.
+5. Commit with a focused message when requested or appropriate.
 
-If a check is skipped, document why in the final response.
+Short-term production-grade load tests, long fault drills, and full
+production-readiness checks are not default finishing gates for small slices.
+Run them only when the task, risk, or user request requires them.

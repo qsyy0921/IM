@@ -25,5 +25,6 @@
 
 ## 后续
 
-- 更完整群管理、owner transfer 策略继续打磨；完整历史窗口 / targeted replay repair 仍需后续设计，当前 `member-window-audit` 已能发现 owner 数量异常，但 `member-window-repair` 只修 conversation-service 当前窗口 cache 中可保守推导的窗口 / 版本问题，不自动修复 owner 数量冲突。
+- AI 底座转进前的必要收口：继续确保 owner transfer、成员历史可见窗口和 member boundary event 能支撑 search visibility、group memory 和 EvidencePack。
+- 更完整群管理产品化、完整历史窗口 / targeted replay repair 仍需后续设计；当前 `member-window-audit` 已能发现 owner 数量异常，但 `member-window-repair` 只修 conversation-service 当前窗口 cache 中可保守推导的窗口 / 版本问题，不自动修复 owner 数量冲突。
 - OTel collector / 生产级 alerting / SLO dashboard、更完整容量曲线仍属于后续统一观测治理。

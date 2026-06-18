@@ -1,6 +1,6 @@
 # NexusIM AI / Memory / Agent Target Architecture
 
-本文规划 NexusIM 后续 AI 相关后端能力。它不是一次性全开工清单；当前应先补齐 AI 会依赖的 IM 语义，然后按 search-service、group memory、retrieval-gateway、RAG、summary、agent 的顺序推进。本文用于保证后续能力不会各自长成孤岛。
+本文规划 NexusIM 后续 AI 相关后端能力。它不是一次性全开工清单；短期不以生产级 HA、全量压测、混沌和跨 Region 验证作为继续推进的阻塞，先完成当前 9 个 IM 后端服务的必要语义、安全和契约收口，然后转向 AI 大模型应用底座。本文用于保证后续 search、memory、retrieval、RAG、summary、Agent、tool 和 eval 能力不会各自长成孤岛。
 
 ## 1. 设计输入
 
@@ -37,28 +37,31 @@ EverMemBench 只是设计输入之一。它强调多人、多群、多时间版�
 
 1. IM 业务事实源仍在现有服务：message、conversation、delivery、identity、contacts、policy 等服务继续拥有各自事实。
 2. AI 服务只消费事件、构建 projection、生成证据包和建议，不直接改 IM 事实源。
-3. Agent 可以接入真实业务，但不能直连 PostgreSQL、OpenSearch、Milvus、Redis；只能通过 retrieval-gateway、tool-service、action-executor 或公开业务 API。
-4. Agent 写动作必须先做权限前置校验和 tool policy 检查；audit 是必要条件，但不能替代权限检查。
-5. 高风险 Agent 写动作必须走 `Proposal -> Approval -> Executor -> Audit`；低风险 allowlist 动作可在 policy 通过后自动执行并完整 audit。
-6. 搜索、RAG、Agent 的任何回答都必须能关联 EvidencePack；没有证据时必须明确标记。
-7. 成员 `join_seq / leave_seq`、消息撤回、删除、保留期清理和 legal hold 必须进入检索过滤。
-8. 旧事实和新事实不能并列无版本地塞进向量库；必须有 `active / superseded / archived / deleted` 语义。
+3. 未来 AI 层服务拆分以 `search-service`、`memory-service`、`retrieval-gateway`、`rag-service`、`summary-service`、`agent-service`、`skill-registry`、`mcp-gateway/tool-gateway`、`action-executor`、`ai-eval-service` 为基线，但服务和中间件不是写死终局。
+4. 新增服务必须满足独立数据模型、独立伸缩需求、独立故障边界、独立安全边界之一，或显著降低复杂度，并通过 ADR。
+5. Agent 可以接入真实业务，但不能直连 PostgreSQL、OpenSearch、Milvus、Redis；只能通过 retrieval-gateway、mcp-gateway/tool-gateway、action-executor 或公开业务 API。
+6. Agent 写动作必须先做权限前置校验和 tool policy 检查；audit 是必要条件，但不能替代权限检查。
+7. 高风险 Agent 写动作必须走 `Proposal -> Approval -> Executor -> Audit`；低风险 allowlist 动作可在 policy 通过后自动执行并完整 audit。
+8. 搜索、RAG、summary、Agent 的任何回答都必须能关联 EvidencePack；没有证据时必须明确标记。
+9. 成员 `join_seq / leave_seq`、消息撤回、删除、保留期清理和 legal hold 必须进入检索过滤。
+10. 旧事实和新事实不能并列无版本地塞进向量库；必须有 `active / superseded / archived / deleted` 语义。
 
 ## 3. 分层服务规划
 
-这些服务不是一次性全开工。新增服务必须满足独立数据模型、独立伸缩需求、独立故障边界或显著降低复杂度，并通过 ADR。
+这些服务不是一次性全开工，也不是永久写死的服务数量。未来 AI 层以以下拆分作为目标基线；新增、合并或替换服务/中间件时，必须满足独立数据模型、独立伸缩需求、独立故障边界、独立安全边界之一，或显著降低复杂度，并通过 ADR。
 
-| 层级 | 候选服务 | 责任 |
+| 层级 | 基线服务 | 责任 |
 | --- | --- | --- |
 | 搜索投影 | `search-service` | 消费 timeline 事件，构建可重建全文搜索 read model，处理 tombstone 和可见窗口 |
-| 记忆投影 | `memory-service` 或 `memory-projection-worker` | 抽取结构化协作事件、事实版本、人物/项目/任务图谱 |
-| RAG 摄取 | `rag-ingest-service` | chunk、embedding、向量元数据、删除证明、模型版本记录 |
+| 记忆投影 | `memory-service` | 抽取结构化协作事件、事实版本、人物/项目/任务图谱和画像聚合 |
 | 检索入口 | `retrieval-gateway` | 统一结构过滤、BM25、向量召回、事件图扩展、rerank、EvidencePack |
-| 画像聚合 | 可先归入 `memory-service` | 长期聚合 style / skill / role，不直接使用孤立片段 |
-| LLM 网关 | `llm-gateway` 或 provider adapter | 模型路由、预算、prompt 版本、provider 降级、脱敏和审计 |
+| RAG 问答 | `rag-service` | 只消费 EvidencePack 和受控模型适配器，生成带 citation / abstention 的回答 |
+| 摘要任务 | `summary-service` | 会话、项目、任务摘要和重算任务；摘要必须可追溯、可删除后重算 |
 | Agent 编排 | `agent-service` | 计划、工具调用意图、proposal 创建、approval 等待、结果解释 |
-| 工具执行 | `tool-service` / `action-executor` | 封装可调用工具和内部 API，不让 Agent 直接写库 |
-| AI 评测 | `ai-eval-service` 或 eval harness | 版本化数据集、oracle evidence、权限回归、模型/prompt/retrieval 变更门禁 |
+| 技能目录 | `skill-registry` | 管理 skill/tool 元数据、schema 版本、owner、风险级别和调用策略 |
+| 工具网关 | `mcp-gateway/tool-gateway` | MCP / 内部工具调用入口、schema 校验、tool policy、速率限制和审计引用 |
+| 动作执行 | `action-executor` | 只执行低风险 allowlist 或已审批动作，通过公开业务 API 写入并保证幂等 |
+| AI 评测 | `ai-eval-service` | 版本化数据集、oracle evidence、权限回归、模型/prompt/retrieval/tool 变更门禁 |
 
 ### 3.1 非目标
 
@@ -87,26 +90,32 @@ flowchart LR
     DomainEvents --> Memory
     Search --> Retrieval["retrieval-gateway"]
     Memory --> Retrieval
-    RagIngest["rag-ingest-service"] --> Retrieval
     Retrieval --> RAG["rag-service"]
+    Retrieval --> Summary["summary-service"]
     Retrieval --> Agent["agent-service"]
-    LLM["llm-gateway"] --> RAG
-    LLM --> Agent
+    Summary --> Memory
+    Agent --> Skills["skill-registry"]
+    Agent --> Tools["mcp-gateway/tool-gateway"]
     Agent --> Proposal["action proposal"]
-    Proposal --> Approval["approval-service"]
-    Approval --> Executor["action-executor"]
+    Tools --> Executor["action-executor"]
+    Proposal --> ApprovalWorkflow["approval workflow"]
+    ApprovalWorkflow --> Executor
     Executor --> APIs["public business APIs"]
-    Retrieval --> Eval["ai-eval harness"]
+    Retrieval --> Eval["ai-eval-service"]
+    RAG --> Eval
+    Summary --> Eval
     Agent --> Eval
     PolicyAPI --> Retrieval
-    PolicyAPI --> Approval
+    PolicyAPI --> Tools
+    PolicyAPI --> Executor
 ```
 
 关键点：
 
-- Kafka 事实事件驱动搜索、记忆和 RAG ingestion。
+- Kafka 事实事件先驱动搜索和记忆 projection；RAG、summary、Agent 都复用 retrieval-gateway 生成 EvidencePack。
 - retrieval-gateway 是所有检索的唯一入口。
-- policy-service 是检索和 Agent 写动作的授权入口。
+- skill-registry 只管理技能/工具目录和 schema；mcp-gateway/tool-gateway 才是工具调用边界。
+- policy-service 是检索、工具调用和 Agent 写动作的授权入口。
 - action-executor 只能调用公开业务 API，不绕过 api-gateway / service boundary。
 
 ### 3.3 服务边界细化
@@ -115,12 +124,14 @@ flowchart LR
 | --- | --- | --- | --- | --- |
 | `search-service` | search documents、search membership projection、index checkpoints | timeline / member / delete events | `SearchMessages`、index rebuild status | 不保存 LLM memory，不生成回答，不直写业务库 |
 | `memory-service` | structured memory events、profile aggregates、memory graph checkpoints | message / conversation / identity / contacts / receipt / policy events | memory query、profile query、memory graph expansion | 不作为消息事实源，不替代 policy |
-| `rag-ingest-service` | chunks、embedding jobs、vector metadata、delete proof | message/file/memory events | retrievable chunks、embedding status | 不暴露用户查询 API，不决定权限 |
 | `retrieval-gateway` | retrieval audit、EvidencePack | query、policy check、search/memory/vector recall | EvidencePack、ranked evidence | 不直接生成业务回答，不绕过 policy |
-| `rag-service` | RAG session、answer audit、prompt version | user query、EvidencePack、LLM provider | answer with citations / abstention | 不直接读索引，不无证据回答 |
-| `agent-service` | agent run、plan、tool intent、proposal ref | user intent、EvidencePack、tool catalog | proposal、read-only answer、agent trace | 不直接写业务事实，不直接执行高风险 tool |
-| `llm-gateway` | provider config、model policy、prompt registry、budget ledger | prompt request | model response、usage record | 不拥有业务事实，不存原始敏感上下文超 TTL |
-| `ai-eval` | eval dataset/run/result | dataset、model/prompt/retrieval versions | pass/fail、failure class | 不参与线上热路径 |
+| `rag-service` | RAG session、answer audit、prompt version、model usage refs | user query、EvidencePack、model provider adapter | answer with citations / abstention | 不直接读索引，不无证据回答 |
+| `summary-service` | summary jobs、summary versions、supporting evidence refs | schedule / user request、EvidencePack、message or memory changes | conversation / project / task summary | 不把 summary 当事实源，不绕过删除和可见性 |
+| `agent-service` | agent run、plan、tool intent、proposal ref | user intent、EvidencePack、skill catalog | proposal、read-only answer、agent trace | 不直接写业务事实，不直接执行高风险 tool |
+| `skill-registry` | skill metadata、tool schema、risk labels、owner refs | skill registration / version update | skill catalog、schema version、risk policy refs | 不执行工具，不保存业务事实 |
+| `mcp-gateway/tool-gateway` | tool call audit refs、tool route config | tool intent、skill schema、policy decision | validated tool call、tool result ref | 不绕过 policy，不执行未注册或 schema 不匹配的 tool |
+| `action-executor` | action attempts、idempotency ledger、execution result refs | low-risk allowlist action or approved proposal | execution status、business request id、audit refs | 不接收未授权高风险动作，不绕过公开业务 API |
+| `ai-eval-service` | eval dataset/run/result | dataset、model/prompt/retrieval/tool versions | pass/fail、failure class | 不参与线上热路径 |
 
 ## 4. 数据模型方向
 
@@ -512,7 +523,7 @@ evidence_pack_id
 
 ### 7.2 发布门禁
 
-以下变更必须跑 AI eval：
+以下变更进入生产发布前必须跑 AI eval；短期 AI 底座实现可以先用最小 `ai-eval-service` / harness 覆盖权限、删除、时间版本、证据归因和工具策略，不以生产级全量评测作为服务拆分和第一版实现的阻塞：
 
 - embedding model 变更；
 - reranker 变更；
@@ -527,7 +538,7 @@ evidence_pack_id
 
 ### 8.1 消费和重建
 
-搜索、记忆和 RAG projection 都必须可重建：
+搜索、记忆、summary 和 RAG 相关 projection 都必须可重建：
 
 ```text
 pause affected query scope
@@ -574,13 +585,14 @@ model
 
 ## 9. 推荐演进顺序
 
-1. 补齐已有 9 个后端服务中 AI 依赖的 IM 语义：编辑、撤回、删除、群管理、成员窗口、回执、联系人和 policy decision audit。
+1. 补齐已有 9 个后端服务中 AI 依赖的必要 IM 语义：编辑、撤回、删除、群管理、成员窗口、回执、联系人和 policy decision audit；生产级 HA、全量压测、混沌和跨 Region 验证不作为转入 AI 底座的短期阻塞。
 2. 实现 `search-service`：先做消息搜索 projection、成员可见窗口、撤回/删除 tombstone。
-3. 实现 `memory-service` / group memory projection：抽取结构化事件、版本语义、跨群归因和画像聚合。
+3. 实现 `memory-service`：抽取结构化事件、版本语义、跨群归因、memory graph 和画像聚合。
 4. 实现 `retrieval-gateway` 第一版：基于 search / memory 输出 EvidencePack，不急着做生成。
-5. 建立 AI eval harness：先覆盖权限、删除后不可见、时间版本、oracle evidence 和 attribution。
-6. 实现 RAG 问答：必须经过 retrieval-gateway 和 EvidencePack。
-7. 实现 Agent：只做低风险 read-only / proposal-only，再逐步接 approval / executor。
+5. 建立 `ai-eval-service` 最小门禁：先覆盖权限、删除后不可见、时间版本、oracle evidence、attribution 和 tool policy。
+6. 实现 `rag-service` 和 `summary-service`：必须经过 retrieval-gateway 和 EvidencePack。
+7. 实现 `skill-registry`、`mcp-gateway/tool-gateway`、`action-executor` 的最小 allowlist / proposal / idempotency / audit 边界。
+8. 实现 `agent-service`：先做 read-only / proposal-only，再逐步接低风险自动执行。
 
 ## 10. 与现有 9 服务的关系
 
@@ -600,10 +612,11 @@ model
 2. `SearchMessages` API：只返回可见消息，不做生成。
 3. `memory-service` / group memory 最小 projection：StructuredMemoryEvent + supersedes + source refs。
 4. `retrieval-gateway` thin facade：调用 search-service / memory-service，生成 EvidencePack。
-5. eval harness：覆盖权限泄漏、删除后不可见、oracle evidence、跨群归因和无证据拒答。
+5. `ai-eval-service` 最小 harness：覆盖权限泄漏、删除后不可见、oracle evidence、跨群归因和无证据拒答。
 6. `rag-service` read-only 问答：只接受 EvidencePack，不直接检索。
+7. `summary-service` 最小摘要任务：只基于 EvidencePack 生成，可按删除和 tombstone 重算。
 
-Agent 第一版必须等 retrieval-gateway 和 eval harness 稳定后再做。
+Agent 第一版必须等 retrieval-gateway 和 `ai-eval-service` 最小门禁稳定后再做；`skill-registry`、`mcp-gateway/tool-gateway`、`action-executor` 先只开放极小 allowlist 和 proposal 链路。
 
 ## 12. AI 能力复用矩阵
 
@@ -612,21 +625,21 @@ Agent 第一版必须等 retrieval-gateway 和 eval harness 稳定后再做。
 | 能力 | 必须依赖 | 第一版验收 | 不允许 |
 | --- | --- | --- | --- |
 | 聊天记录搜索 | search-service、policy-service | 可见窗口正确，删除/撤回后不可见 | 直接查 message-service 内部表 |
-| RAG 问答 | retrieval-gateway、EvidencePack、llm-gateway | 回答带 source refs，无证据拒答 | 直接向量检索后生成 |
-| 会话总结 | retrieval-gateway、summary job、EvidencePack | 总结可追溯到消息 seq，删除后可重算 | 把 summary 当事实源 |
+| RAG 问答 | retrieval-gateway、EvidencePack、rag-service、受控模型适配器 | 回答带 source refs，无证据拒答 | 直接向量检索后生成 |
+| 会话总结 | retrieval-gateway、summary-service、EvidencePack | 总结可追溯到消息 seq，删除后可重算 | 把 summary 当事实源 |
 | 长期记忆 | memory-service、memory graph、profile aggregate | active/superseded 版本正确 | 向量库里堆无版本事实 |
 | 用户画像 | profile aggregate、supporting evidence、用户控制 | 多证据聚合，可撤销/过期 | 从单条群消息生成长期偏好 |
 | 群聊问答 | search + memory + member visibility | 退群后不可见，跨群证据可归因 | 当前成员状态替代历史窗口 |
-| Agent 读助手 | retrieval-gateway、tool catalog | 只能读授权 evidence | 绕过 retrieval-gateway |
-| Agent 写动作 | policy、tool policy、proposal、approval、executor、audit | 低风险 allowlist 可自动执行；高风险动作必须审批 | 模型直接写库、绕过权限或只靠事后 audit |
+| Agent 读助手 | retrieval-gateway、skill-registry | 只能读授权 evidence | 绕过 retrieval-gateway |
+| Agent 写动作 | policy、tool policy、skill-registry、mcp-gateway/tool-gateway、proposal、approval、action-executor、audit | 低风险 allowlist 可自动执行；高风险动作必须审批 | 模型直接写库、绕过权限或只靠事后 audit |
 | 智能风控辅助 | audit、policy、EvidencePack | 只输出建议和证据 | AI 直接封禁或改权限 |
-| 客服机器人 | retrieval-gateway、agent-service、approval policy | 可回答 FAQ / 工单建议 | 直接外发敏感信息 |
+| 客服机器人 | retrieval-gateway、agent-service、skill-registry、approval policy | 可回答 FAQ / 工单建议 | 直接外发敏感信息 |
 
 如果某个新 AI 能力不能落在这张矩阵上，必须先补 ADR，说明它为什么需要新的服务、数据模型或中间件。
 
 ## 13. 第一版接口边界草案
 
-第一轮不要急着定义全部 AI proto。先把四个边界打稳：
+第一轮不要急着定义全部 AI proto。先把七个边界打稳：
 
 ```text
 SearchMessages(query, scope, after, limit)
@@ -637,6 +650,12 @@ RetrieveEvidence(query, scope, retrieval_options)
 
 AnswerWithEvidence(question, evidence_pack_id, answer_options)
 -> answer / abstain + citations
+
+SummarizeWithEvidence(scope, evidence_pack_id, summary_options)
+-> summary / abstain + source refs
+
+RegisterSkill(skill_manifest, schema_version, risk_policy)
+-> skill_id, version
 
 CreateActionProposal(intent, evidence_pack_id, tool_intent)
 -> proposal_id, required_approval
@@ -650,8 +669,10 @@ ExecuteLowRiskAction(tool_intent, evidence_pack_id, idempotency_key)
 - `SearchMessages` 属于 search-service；只返回搜索结果，不调用 LLM。
 - `RetrieveEvidence` 属于 retrieval-gateway；统一权限过滤、召回、rerank 和 EvidencePack。
 - `AnswerWithEvidence` 属于 rag-service；只能消费 EvidencePack，不能直接访问索引或业务库。
+- `SummarizeWithEvidence` 属于 summary-service；只能消费 EvidencePack，不能把摘要写回事实源。
+- `RegisterSkill` 属于 skill-registry；只注册目录和 schema，不执行工具。
 - `CreateActionProposal` 属于 agent-service；只创建高风险 proposal，不执行高风险写动作。
-- `ExecuteLowRiskAction` 可由 agent-service 通过 action-executor 执行极小 allowlist 动作；必须经过 policy、tool policy、idempotency 和 audit。
+- `ExecuteLowRiskAction` 可由 agent-service 通过 mcp-gateway/tool-gateway 和 action-executor 执行极小 allowlist 动作；必须经过 policy、tool policy、idempotency 和 audit。
 - `ExecuteApprovedAction` 后续归 action-executor，不属于 agent-service。
 
 这样可以先形成可测试的后端 AI 主链路：

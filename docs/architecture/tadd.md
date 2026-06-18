@@ -1,5 +1,7 @@
 # NexusIM TADD v1.0
 
+> Legacy reference: this is an early technical architecture draft, not the current work entrypoint. Current routing starts from the root `prompt.md` / `agent.md`, and current architecture status is maintained in `docs/architecture/target-architecture.md` plus the runbook docs. Technology choices here are not frozen as implemented facts unless confirmed by current service docs or ADR.
+
 TADD（Technical Architecture Design Document）描述技术栈、工程结构、中间件、部署、观测、压测和编码门禁。ADD 负责系统业务架构，SDD 负责单个服务设计。
 
 ## 1. 技术栈

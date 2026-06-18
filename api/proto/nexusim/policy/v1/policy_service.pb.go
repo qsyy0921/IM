@@ -76,6 +76,58 @@ func (MessageAction) EnumDescriptor() ([]byte, []int) {
 	return file_nexusim_policy_v1_policy_service_proto_rawDescGZIP(), []int{0}
 }
 
+type ToolAction int32
+
+const (
+	ToolAction_TOOL_ACTION_UNSPECIFIED ToolAction = 0
+	ToolAction_TOOL_ACTION_CALL        ToolAction = 1
+	ToolAction_TOOL_ACTION_APPROVE     ToolAction = 2
+	ToolAction_TOOL_ACTION_EXECUTE     ToolAction = 3
+)
+
+// Enum value maps for ToolAction.
+var (
+	ToolAction_name = map[int32]string{
+		0: "TOOL_ACTION_UNSPECIFIED",
+		1: "TOOL_ACTION_CALL",
+		2: "TOOL_ACTION_APPROVE",
+		3: "TOOL_ACTION_EXECUTE",
+	}
+	ToolAction_value = map[string]int32{
+		"TOOL_ACTION_UNSPECIFIED": 0,
+		"TOOL_ACTION_CALL":        1,
+		"TOOL_ACTION_APPROVE":     2,
+		"TOOL_ACTION_EXECUTE":     3,
+	}
+)
+
+func (x ToolAction) Enum() *ToolAction {
+	p := new(ToolAction)
+	*p = x
+	return p
+}
+
+func (x ToolAction) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ToolAction) Descriptor() protoreflect.EnumDescriptor {
+	return file_nexusim_policy_v1_policy_service_proto_enumTypes[1].Descriptor()
+}
+
+func (ToolAction) Type() protoreflect.EnumType {
+	return &file_nexusim_policy_v1_policy_service_proto_enumTypes[1]
+}
+
+func (x ToolAction) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ToolAction.Descriptor instead.
+func (ToolAction) EnumDescriptor() ([]byte, []int) {
+	return file_nexusim_policy_v1_policy_service_proto_rawDescGZIP(), []int{1}
+}
+
 type AuthContext struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
@@ -384,6 +436,238 @@ func (x *CheckMessageActionResponse) GetDecisionSource() string {
 	return ""
 }
 
+type CheckToolActionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext   *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	ToolName      string                 `protobuf:"bytes,2,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
+	Action        ToolAction             `protobuf:"varint,3,opt,name=action,proto3,enum=nexusim.policy.v1.ToolAction" json:"action,omitempty"`
+	ResourceType  string                 `protobuf:"bytes,4,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
+	ResourceId    string                 `protobuf:"bytes,5,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	RiskLevel     string                 `protobuf:"bytes,6,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
+	Intent        string                 `protobuf:"bytes,7,opt,name=intent,proto3" json:"intent,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckToolActionRequest) Reset() {
+	*x = CheckToolActionRequest{}
+	mi := &file_nexusim_policy_v1_policy_service_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckToolActionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckToolActionRequest) ProtoMessage() {}
+
+func (x *CheckToolActionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_policy_v1_policy_service_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckToolActionRequest.ProtoReflect.Descriptor instead.
+func (*CheckToolActionRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_policy_v1_policy_service_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *CheckToolActionRequest) GetAuthContext() *AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *CheckToolActionRequest) GetToolName() string {
+	if x != nil {
+		return x.ToolName
+	}
+	return ""
+}
+
+func (x *CheckToolActionRequest) GetAction() ToolAction {
+	if x != nil {
+		return x.Action
+	}
+	return ToolAction_TOOL_ACTION_UNSPECIFIED
+}
+
+func (x *CheckToolActionRequest) GetResourceType() string {
+	if x != nil {
+		return x.ResourceType
+	}
+	return ""
+}
+
+func (x *CheckToolActionRequest) GetResourceId() string {
+	if x != nil {
+		return x.ResourceId
+	}
+	return ""
+}
+
+func (x *CheckToolActionRequest) GetRiskLevel() string {
+	if x != nil {
+		return x.RiskLevel
+	}
+	return ""
+}
+
+func (x *CheckToolActionRequest) GetIntent() string {
+	if x != nil {
+		return x.Intent
+	}
+	return ""
+}
+
+type CheckToolActionResponse struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	TenantId          string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId            string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ToolName          string                 `protobuf:"bytes,3,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
+	Action            ToolAction             `protobuf:"varint,4,opt,name=action,proto3,enum=nexusim.policy.v1.ToolAction" json:"action,omitempty"`
+	ResourceType      string                 `protobuf:"bytes,5,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
+	ResourceId        string                 `protobuf:"bytes,6,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	RiskLevel         string                 `protobuf:"bytes,7,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
+	Allowed           bool                   `protobuf:"varint,8,opt,name=allowed,proto3" json:"allowed,omitempty"`
+	RequiresApproval  bool                   `protobuf:"varint,9,opt,name=requires_approval,json=requiresApproval,proto3" json:"requires_approval,omitempty"`
+	PermissionVersion int64                  `protobuf:"varint,10,opt,name=permission_version,json=permissionVersion,proto3" json:"permission_version,omitempty"`
+	Classification    string                 `protobuf:"bytes,11,opt,name=classification,proto3" json:"classification,omitempty"`
+	Reason            string                 `protobuf:"bytes,12,opt,name=reason,proto3" json:"reason,omitempty"`
+	DecisionSource    string                 `protobuf:"bytes,13,opt,name=decision_source,json=decisionSource,proto3" json:"decision_source,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *CheckToolActionResponse) Reset() {
+	*x = CheckToolActionResponse{}
+	mi := &file_nexusim_policy_v1_policy_service_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckToolActionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckToolActionResponse) ProtoMessage() {}
+
+func (x *CheckToolActionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_policy_v1_policy_service_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckToolActionResponse.ProtoReflect.Descriptor instead.
+func (*CheckToolActionResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_policy_v1_policy_service_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *CheckToolActionResponse) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *CheckToolActionResponse) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *CheckToolActionResponse) GetToolName() string {
+	if x != nil {
+		return x.ToolName
+	}
+	return ""
+}
+
+func (x *CheckToolActionResponse) GetAction() ToolAction {
+	if x != nil {
+		return x.Action
+	}
+	return ToolAction_TOOL_ACTION_UNSPECIFIED
+}
+
+func (x *CheckToolActionResponse) GetResourceType() string {
+	if x != nil {
+		return x.ResourceType
+	}
+	return ""
+}
+
+func (x *CheckToolActionResponse) GetResourceId() string {
+	if x != nil {
+		return x.ResourceId
+	}
+	return ""
+}
+
+func (x *CheckToolActionResponse) GetRiskLevel() string {
+	if x != nil {
+		return x.RiskLevel
+	}
+	return ""
+}
+
+func (x *CheckToolActionResponse) GetAllowed() bool {
+	if x != nil {
+		return x.Allowed
+	}
+	return false
+}
+
+func (x *CheckToolActionResponse) GetRequiresApproval() bool {
+	if x != nil {
+		return x.RequiresApproval
+	}
+	return false
+}
+
+func (x *CheckToolActionResponse) GetPermissionVersion() int64 {
+	if x != nil {
+		return x.PermissionVersion
+	}
+	return 0
+}
+
+func (x *CheckToolActionResponse) GetClassification() string {
+	if x != nil {
+		return x.Classification
+	}
+	return ""
+}
+
+func (x *CheckToolActionResponse) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *CheckToolActionResponse) GetDecisionSource() string {
+	if x != nil {
+		return x.DecisionSource
+	}
+	return ""
+}
+
 var File_nexusim_policy_v1_policy_service_proto protoreflect.FileDescriptor
 
 const file_nexusim_policy_v1_policy_service_proto_rawDesc = "" +
@@ -421,15 +705,49 @@ const file_nexusim_policy_v1_policy_service_proto_rawDesc = "" +
 	"message_id\x18\t \x01(\tR\tmessageId\x12-\n" +
 	"\x12ownership_override\x18\n" +
 	" \x01(\bR\x11ownershipOverride\x12'\n" +
-	"\x0fdecision_source\x18\v \x01(\tR\x0edecisionSource*\x97\x01\n" +
+	"\x0fdecision_source\x18\v \x01(\tR\x0edecisionSource\"\xac\x02\n" +
+	"\x16CheckToolActionRequest\x12A\n" +
+	"\fauth_context\x18\x01 \x01(\v2\x1e.nexusim.policy.v1.AuthContextR\vauthContext\x12\x1b\n" +
+	"\ttool_name\x18\x02 \x01(\tR\btoolName\x125\n" +
+	"\x06action\x18\x03 \x01(\x0e2\x1d.nexusim.policy.v1.ToolActionR\x06action\x12#\n" +
+	"\rresource_type\x18\x04 \x01(\tR\fresourceType\x12\x1f\n" +
+	"\vresource_id\x18\x05 \x01(\tR\n" +
+	"resourceId\x12\x1d\n" +
+	"\n" +
+	"risk_level\x18\x06 \x01(\tR\triskLevel\x12\x16\n" +
+	"\x06intent\x18\a \x01(\tR\x06intent\"\xe7\x03\n" +
+	"\x17CheckToolActionResponse\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +
+	"\ttool_name\x18\x03 \x01(\tR\btoolName\x125\n" +
+	"\x06action\x18\x04 \x01(\x0e2\x1d.nexusim.policy.v1.ToolActionR\x06action\x12#\n" +
+	"\rresource_type\x18\x05 \x01(\tR\fresourceType\x12\x1f\n" +
+	"\vresource_id\x18\x06 \x01(\tR\n" +
+	"resourceId\x12\x1d\n" +
+	"\n" +
+	"risk_level\x18\a \x01(\tR\triskLevel\x12\x18\n" +
+	"\aallowed\x18\b \x01(\bR\aallowed\x12+\n" +
+	"\x11requires_approval\x18\t \x01(\bR\x10requiresApproval\x12-\n" +
+	"\x12permission_version\x18\n" +
+	" \x01(\x03R\x11permissionVersion\x12&\n" +
+	"\x0eclassification\x18\v \x01(\tR\x0eclassification\x12\x16\n" +
+	"\x06reason\x18\f \x01(\tR\x06reason\x12'\n" +
+	"\x0fdecision_source\x18\r \x01(\tR\x0edecisionSource*\x97\x01\n" +
 	"\rMessageAction\x12\x1e\n" +
 	"\x1aMESSAGE_ACTION_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13MESSAGE_ACTION_SEND\x10\x01\x12\x17\n" +
 	"\x13MESSAGE_ACTION_EDIT\x10\x02\x12\x19\n" +
 	"\x15MESSAGE_ACTION_REVOKE\x10\x03\x12\x19\n" +
-	"\x15MESSAGE_ACTION_DELETE\x10\x042\x82\x01\n" +
+	"\x15MESSAGE_ACTION_DELETE\x10\x04*q\n" +
+	"\n" +
+	"ToolAction\x12\x1b\n" +
+	"\x17TOOL_ACTION_UNSPECIFIED\x10\x00\x12\x14\n" +
+	"\x10TOOL_ACTION_CALL\x10\x01\x12\x17\n" +
+	"\x13TOOL_ACTION_APPROVE\x10\x02\x12\x17\n" +
+	"\x13TOOL_ACTION_EXECUTE\x10\x032\xec\x01\n" +
 	"\rPolicyService\x12q\n" +
-	"\x12CheckMessageAction\x12,.nexusim.policy.v1.CheckMessageActionRequest\x1a-.nexusim.policy.v1.CheckMessageActionResponseB=Z;github.com/qsyy0921/IM/api/proto/nexusim/policy/v1;policyv1b\x06proto3"
+	"\x12CheckMessageAction\x12,.nexusim.policy.v1.CheckMessageActionRequest\x1a-.nexusim.policy.v1.CheckMessageActionResponse\x12h\n" +
+	"\x0fCheckToolAction\x12).nexusim.policy.v1.CheckToolActionRequest\x1a*.nexusim.policy.v1.CheckToolActionResponseB=Z;github.com/qsyy0921/IM/api/proto/nexusim/policy/v1;policyv1b\x06proto3"
 
 var (
 	file_nexusim_policy_v1_policy_service_proto_rawDescOnce sync.Once
@@ -443,25 +761,33 @@ func file_nexusim_policy_v1_policy_service_proto_rawDescGZIP() []byte {
 	return file_nexusim_policy_v1_policy_service_proto_rawDescData
 }
 
-var file_nexusim_policy_v1_policy_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_nexusim_policy_v1_policy_service_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_nexusim_policy_v1_policy_service_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_nexusim_policy_v1_policy_service_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_nexusim_policy_v1_policy_service_proto_goTypes = []any{
 	(MessageAction)(0),                 // 0: nexusim.policy.v1.MessageAction
-	(*AuthContext)(nil),                // 1: nexusim.policy.v1.AuthContext
-	(*CheckMessageActionRequest)(nil),  // 2: nexusim.policy.v1.CheckMessageActionRequest
-	(*CheckMessageActionResponse)(nil), // 3: nexusim.policy.v1.CheckMessageActionResponse
+	(ToolAction)(0),                    // 1: nexusim.policy.v1.ToolAction
+	(*AuthContext)(nil),                // 2: nexusim.policy.v1.AuthContext
+	(*CheckMessageActionRequest)(nil),  // 3: nexusim.policy.v1.CheckMessageActionRequest
+	(*CheckMessageActionResponse)(nil), // 4: nexusim.policy.v1.CheckMessageActionResponse
+	(*CheckToolActionRequest)(nil),     // 5: nexusim.policy.v1.CheckToolActionRequest
+	(*CheckToolActionResponse)(nil),    // 6: nexusim.policy.v1.CheckToolActionResponse
 }
 var file_nexusim_policy_v1_policy_service_proto_depIdxs = []int32{
-	1, // 0: nexusim.policy.v1.CheckMessageActionRequest.auth_context:type_name -> nexusim.policy.v1.AuthContext
+	2, // 0: nexusim.policy.v1.CheckMessageActionRequest.auth_context:type_name -> nexusim.policy.v1.AuthContext
 	0, // 1: nexusim.policy.v1.CheckMessageActionRequest.action:type_name -> nexusim.policy.v1.MessageAction
 	0, // 2: nexusim.policy.v1.CheckMessageActionResponse.action:type_name -> nexusim.policy.v1.MessageAction
-	2, // 3: nexusim.policy.v1.PolicyService.CheckMessageAction:input_type -> nexusim.policy.v1.CheckMessageActionRequest
-	3, // 4: nexusim.policy.v1.PolicyService.CheckMessageAction:output_type -> nexusim.policy.v1.CheckMessageActionResponse
-	4, // [4:5] is the sub-list for method output_type
-	3, // [3:4] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	2, // 3: nexusim.policy.v1.CheckToolActionRequest.auth_context:type_name -> nexusim.policy.v1.AuthContext
+	1, // 4: nexusim.policy.v1.CheckToolActionRequest.action:type_name -> nexusim.policy.v1.ToolAction
+	1, // 5: nexusim.policy.v1.CheckToolActionResponse.action:type_name -> nexusim.policy.v1.ToolAction
+	3, // 6: nexusim.policy.v1.PolicyService.CheckMessageAction:input_type -> nexusim.policy.v1.CheckMessageActionRequest
+	5, // 7: nexusim.policy.v1.PolicyService.CheckToolAction:input_type -> nexusim.policy.v1.CheckToolActionRequest
+	4, // 8: nexusim.policy.v1.PolicyService.CheckMessageAction:output_type -> nexusim.policy.v1.CheckMessageActionResponse
+	6, // 9: nexusim.policy.v1.PolicyService.CheckToolAction:output_type -> nexusim.policy.v1.CheckToolActionResponse
+	8, // [8:10] is the sub-list for method output_type
+	6, // [6:8] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_policy_v1_policy_service_proto_init() }
@@ -474,8 +800,8 @@ func file_nexusim_policy_v1_policy_service_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_policy_v1_policy_service_proto_rawDesc), len(file_nexusim_policy_v1_policy_service_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   3,
+			NumEnums:      2,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -6,6 +6,7 @@ option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/policy/v1;policyv1
 
 service PolicyService {
   rpc CheckMessageAction(CheckMessageActionRequest) returns (CheckMessageActionResponse);
+  rpc CheckToolAction(CheckToolActionRequest) returns (CheckToolActionResponse);
 }
 
 message AuthContext {
@@ -23,6 +24,13 @@ enum MessageAction {
   MESSAGE_ACTION_EDIT = 2;
   MESSAGE_ACTION_REVOKE = 3;
   MESSAGE_ACTION_DELETE = 4;
+}
+
+enum ToolAction {
+  TOOL_ACTION_UNSPECIFIED = 0;
+  TOOL_ACTION_CALL = 1;
+  TOOL_ACTION_APPROVE = 2;
+  TOOL_ACTION_EXECUTE = 3;
 }
 
 message CheckMessageActionRequest {
@@ -48,4 +56,30 @@ message CheckMessageActionResponse {
   string message_id = 9;
   bool ownership_override = 10;
   string decision_source = 11;
+}
+
+message CheckToolActionRequest {
+  AuthContext auth_context = 1;
+  string tool_name = 2;
+  ToolAction action = 3;
+  string resource_type = 4;
+  string resource_id = 5;
+  string risk_level = 6;
+  string intent = 7;
+}
+
+message CheckToolActionResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  string tool_name = 3;
+  ToolAction action = 4;
+  string resource_type = 5;
+  string resource_id = 6;
+  string risk_level = 7;
+  bool allowed = 8;
+  bool requires_approval = 9;
+  int64 permission_version = 10;
+  string classification = 11;
+  string reason = 12;
+  string decision_source = 13;
 }

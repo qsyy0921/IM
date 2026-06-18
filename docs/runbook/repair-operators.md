@@ -198,6 +198,8 @@ go run ./services/delivery-service/cmd/delivery-service
 
 `policy-service` 还提供 `tenant-quota-audit` / `tenant-quota-set`，用于审计和设置 first-stage tenant action quota。quota 按 tenant / action / window_seconds 统计已允许的历史 policy decision，达到 `max_decisions` 后 fail-closed deny；`tenant-quota-audit` 可选 `NEXUSIM_POLICY_TENANT_QUOTA_AUDIT_OUTPUT` 写低敏 JSON，`tenant-quota-set` 可选 `NEXUSIM_POLICY_TENANT_QUOTA_SET_OUTPUT` 写低敏 JSON。`tenant-quota-set` 支持 `NEXUSIM_POLICY_TENANT_QUOTA_SET_REASON_FILE` 读取 operator reason 原文，避免把 reason 写进 operator plan / shell env；输出只包含配置元数据和 reason-present，不输出 operator reason 原文。该能力不是 provider-grade tenant DSL / billing quota。
 
+`policy-service` 还提供 `rebac-relation-audit` / `rebac-relation-set`，用于审计和设置 first-stage ReBAC relation gate 规则。规则按 tenant / action / relation_type / conversation_scope 要求 `DIRECT_CONTACT_ACTIVE` 或 `CONVERSATION_MEMBER_ACTIVE` 关系，在 exact / tenant allow 规则前 fail-closed deny；`rebac-relation-audit` 可选 `NEXUSIM_POLICY_REBAC_RELATION_AUDIT_OUTPUT` 写低敏 JSON，`rebac-relation-set` 可选 `NEXUSIM_POLICY_REBAC_RELATION_SET_OUTPUT` 写低敏 JSON。`rebac-relation-set` 支持 `NEXUSIM_POLICY_REBAC_RELATION_SET_REASON_FILE` 读取 operator reason 原文，避免把 reason 写进 operator plan / shell env；输出只包含规则元数据和 reason-present，不输出 operator reason 原文。该能力不是 provider-grade ReBAC graph / policy DSL。
+
 ## Delivery Projection
 
 `delivery-service` 额外拥有 projection 排障入口：

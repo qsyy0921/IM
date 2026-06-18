@@ -153,7 +153,9 @@
         "outbox-repair-cleanup",
         "decision-audit-export",
         "tenant-quota-audit",
-        "tenant-quota-set"
+        "tenant-quota-set",
+        "rebac-relation-audit",
+        "rebac-relation-set"
       ],
       "output_envs": [
         "NEXUSIM_POLICY_OUTBOX_AUDIT_OUTPUT",
@@ -162,14 +164,17 @@
         "NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_OUTPUT",
         "NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_OUTPUT",
         "NEXUSIM_POLICY_TENANT_QUOTA_AUDIT_OUTPUT",
-        "NEXUSIM_POLICY_TENANT_QUOTA_SET_OUTPUT"
+        "NEXUSIM_POLICY_TENANT_QUOTA_SET_OUTPUT",
+        "NEXUSIM_POLICY_REBAC_RELATION_AUDIT_OUTPUT",
+        "NEXUSIM_POLICY_REBAC_RELATION_SET_OUTPUT"
       ],
       "dry_run_envs": [
         "NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_DRY_RUN"
       ],
       "reason_file_envs": [
         "NEXUSIM_POLICY_OUTBOX_REPAIR_REASON_FILE",
-        "NEXUSIM_POLICY_TENANT_QUOTA_SET_REASON_FILE"
+        "NEXUSIM_POLICY_TENANT_QUOTA_SET_REASON_FILE",
+        "NEXUSIM_POLICY_REBAC_RELATION_SET_REASON_FILE"
       ]
     },
     {

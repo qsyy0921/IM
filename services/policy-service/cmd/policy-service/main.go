@@ -36,7 +36,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("policy-service runtime wiring is idle; set NEXUSIM_POLICY_SERVICE_MODE=grpc, contact-consumer, timeline-consumer, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, decision-audit-export, tenant-quota-audit, or tenant-quota-set")
+		log.Println("policy-service runtime wiring is idle; set NEXUSIM_POLICY_SERVICE_MODE=grpc, contact-consumer, timeline-consumer, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, decision-audit-export, tenant-quota-audit, tenant-quota-set, rebac-relation-audit, or rebac-relation-set")
 		return nil
 	case "grpc":
 		return runGRPC()
@@ -60,6 +60,10 @@ func run() error {
 		return runTenantQuotaAudit()
 	case "tenant-quota-set":
 		return runTenantQuotaSet()
+	case "rebac-relation-audit":
+		return runReBACRelationRuleAudit()
+	case "rebac-relation-set":
+		return runReBACRelationRuleSet()
 	default:
 		return errors.New("unsupported NEXUSIM_POLICY_SERVICE_MODE")
 	}
@@ -563,6 +567,131 @@ func runTenantQuotaSet() error {
 	)
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_TENANT_QUOTA_SET_OUTPUT")); outputPath != "" {
 		if err := writeTenantQuotaSetOutput(outputPath, row); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runReBACRelationRuleAudit() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := envString("NEXUSIM_PG_DSN", "")
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required for policy rebac relation audit")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	enabled, enabledConfigured, err := envOptionalBool("NEXUSIM_POLICY_REBAC_RELATION_AUDIT_ENABLED")
+	if err != nil {
+		return err
+	}
+	var enabledFilter *bool
+	if enabledConfigured {
+		enabledFilter = &enabled
+	}
+	rows, err := postgresinfra.NewReBACRelationRuleStore(pool).AuditReBACRelationRules(ctx, postgresinfra.ReBACRelationRuleAuditOptions{
+		TenantID:          envString("NEXUSIM_POLICY_REBAC_RELATION_AUDIT_TENANT_ID", ""),
+		Action:            envString("NEXUSIM_POLICY_REBAC_RELATION_AUDIT_ACTION", ""),
+		RelationType:      envString("NEXUSIM_POLICY_REBAC_RELATION_AUDIT_RELATION_TYPE", ""),
+		ConversationScope: envString("NEXUSIM_POLICY_REBAC_RELATION_AUDIT_CONVERSATION_SCOPE", ""),
+		Enabled:           enabledFilter,
+		Limit:             envInt("NEXUSIM_POLICY_REBAC_RELATION_AUDIT_LIMIT", 20),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("policy-service rebac relation audit completed rows=%d", len(rows))
+	for _, row := range rows {
+		log.Printf(
+			"policy_rebac_relation tenant_id=%s action=%s relation_type=%s conversation_scope=%s permission_version=%d classification=%s priority=%d enabled=%t source=%s updated_at=%s",
+			row.TenantID,
+			row.Action,
+			row.RelationType,
+			row.ConversationScope,
+			row.PermissionVersion,
+			row.Classification,
+			row.Priority,
+			row.Enabled,
+			row.Source,
+			row.UpdatedAt.Format(time.RFC3339),
+		)
+	}
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_REBAC_RELATION_AUDIT_OUTPUT")); outputPath != "" {
+		if err := writeReBACRelationRuleAuditOutput(outputPath, rows); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runReBACRelationRuleSet() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	dsn := envString("NEXUSIM_PG_DSN", "")
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required for policy rebac relation set")
+	}
+	permissionVersion, err := envPositiveInt64("NEXUSIM_POLICY_REBAC_RELATION_SET_PERMISSION_VERSION", 0)
+	if err != nil {
+		return err
+	}
+	enabled, enabledConfigured, err := envOptionalBool("NEXUSIM_POLICY_REBAC_RELATION_SET_ENABLED")
+	if err != nil {
+		return err
+	}
+	if !enabledConfigured {
+		enabled = true
+	}
+	reason, err := policyOperatorReasonFromEnv(
+		"NEXUSIM_POLICY_REBAC_RELATION_SET_REASON",
+		"NEXUSIM_POLICY_REBAC_RELATION_SET_REASON_FILE",
+		"",
+	)
+	if err != nil {
+		return err
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	row, err := postgresinfra.NewReBACRelationRuleStore(pool).SetReBACRelationRule(ctx, postgresinfra.ReBACRelationRuleSetOptions{
+		TenantID:          envString("NEXUSIM_POLICY_REBAC_RELATION_SET_TENANT_ID", ""),
+		Action:            envString("NEXUSIM_POLICY_REBAC_RELATION_SET_ACTION", ""),
+		RelationType:      envString("NEXUSIM_POLICY_REBAC_RELATION_SET_RELATION_TYPE", ""),
+		ConversationScope: envString("NEXUSIM_POLICY_REBAC_RELATION_SET_CONVERSATION_SCOPE", "ANY"),
+		PermissionVersion: permissionVersion,
+		Classification:    envString("NEXUSIM_POLICY_REBAC_RELATION_SET_CLASSIFICATION", ""),
+		Reason:            reason,
+		Priority:          envInt("NEXUSIM_POLICY_REBAC_RELATION_SET_PRIORITY", 100),
+		Enabled:           enabled,
+		Source:            envString("NEXUSIM_POLICY_REBAC_RELATION_SET_SOURCE", "manual"),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"policy-service rebac relation set tenant_id=%s action=%s relation_type=%s conversation_scope=%s permission_version=%d classification=%s priority=%d enabled=%t source=%s",
+		row.TenantID,
+		row.Action,
+		row.RelationType,
+		row.ConversationScope,
+		row.PermissionVersion,
+		row.Classification,
+		row.Priority,
+		row.Enabled,
+		row.Source,
+	)
+	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_REBAC_RELATION_SET_OUTPUT")); outputPath != "" {
+		if err := writeReBACRelationRuleSetOutput(outputPath, row); err != nil {
 			return err
 		}
 	}

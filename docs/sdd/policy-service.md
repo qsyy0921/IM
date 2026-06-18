@@ -158,6 +158,10 @@ When PostgreSQL rules mode is enabled, successful `CheckMessageAction` decisions
 
 `NEXUSIM_POLICY_SERVICE_MODE=outbox-repair-cleanup` is a retention operator for `policy_decision_audit_outbox_repair_audit`. It deletes oldest repair audit rows before `now - retention`, supports optional `event_id / tenant_id / repair_operator / repair_outcome` filters for scoped cleanup, supports `NEXUSIM_POLICY_OUTBOX_REPAIR_CLEANUP_DRY_RUN=true` to count matching rows without deleting, records `dry_run` in the low-sensitive JSON summary, and never mutates the live outbox rows themselves.
 
+`NEXUSIM_POLICY_SERVICE_MODE=rebac-relation-audit` is a read-only operator view over `policy_rebac_message_action_rules`. It supports tenant / action / relation type / conversation scope / enabled filters, returns newest rows first, and can write a low-sensitive JSON result via `NEXUSIM_POLICY_REBAC_RELATION_AUDIT_OUTPUT`. The JSON output contains only rule metadata and `reason_present`; it does not output the operator reason text.
+
+`NEXUSIM_POLICY_SERVICE_MODE=rebac-relation-set` upserts one first-stage relation gate rule by tenant / action / relation type / conversation scope. It requires positive `permission_version`, non-empty `classification`, non-negative `priority`, and supports disabling rules with `NEXUSIM_POLICY_REBAC_RELATION_SET_ENABLED=false`. `NEXUSIM_POLICY_REBAC_RELATION_SET_REASON_FILE` may be used to read the operator reason from a local file so the reason does not appear in shell history or operator plans. The optional `NEXUSIM_POLICY_REBAC_RELATION_SET_OUTPUT` JSON output contains only rule metadata and `reason_present`. This remains a local first-stage operator, not a provider-grade ReBAC graph engine or tenant policy DSL.
+
 Audit rows intentionally store low-sensitive decision metadata:
 
 - stable object keys for actor user, device, conversation, message and direct peer context;

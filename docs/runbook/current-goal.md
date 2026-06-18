@@ -12,6 +12,17 @@
 
 持续推进 NexusIM 后端项目。当前主线是补完整 IM 后端产品语义，并为 search / group memory / RAG / Agent 建立数据、权限和审计底座；不要为了演示直接做孤立 LLM demo。
 
+当前 active slice：
+
+```text
+search-service v0.1
+-> SDD 收敛
+-> proto / migration / 六层 skeleton
+-> timeline projection: persisted / edited / revoked / deleted + member boundary
+-> SearchMessages: tenant / conversation / keyword / visibility / tombstone
+-> focused tests + search smoke
+```
+
 每个有意义切片都要尽量闭环：
 
 ```text

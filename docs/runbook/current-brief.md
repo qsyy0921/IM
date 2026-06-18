@@ -36,7 +36,7 @@ IM 语义补齐：编辑 / 撤回 / 删除 / 群管理 / 成员可见窗口 / �
 -> 观测、repair、DLQ、容量和复杂度治理
 ```
 
-`search-service` 可以作为下一阶段基础服务启动；RAG、summary、agent 必须建立在 search / memory / retrieval-gateway / policy / audit 之上。完整系统测试和生产级 HA 深水区后置，不阻塞当前功能推进。
+当前下一步就是 `search-service v0.1`：先做 SDD 收敛、proto / migration / 六层 skeleton、timeline projection 和 `SearchMessages`，不做 LLM。RAG、summary、agent 必须建立在 search / memory / retrieval-gateway / policy / audit 之上。完整系统测试和生产级 HA 深水区后置，不阻塞当前功能推进。
 
 ## 文档职责
 

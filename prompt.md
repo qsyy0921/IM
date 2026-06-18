@@ -7,19 +7,16 @@
 ```text
 持续推进 E:\development\IM 的 NexusIM 项目。
 
-当前主线必须优先体现：先把已跑通的 9 个 IM 后端服务做必要收口，再转向 AI 大模型应用底座；不要把目标写成无限生产 hardening。
+当前主线：面试导向的后端 + 分布式 + AI 大模型应用底座。不要把“继续开发”理解成无限做生产级长压、完整 HA、sizing 或 provider-grade 运维；这些只作为 hardening backlog，除非用户明确点名。
 
-主线顺序：
-9-service closeout（只补阻塞 AI 底座的 mutation/tombstone、visibility window、policy/audit/security 边界）
--> search-service（projection smoke passed）
--> memory-service（group memory / StructuredMemoryEvent projection smoke passed）
--> retrieval-gateway / EvidencePack（first smoke passed）
--> RAG / summary-service
--> multi-agent：agent-service、skill-registry、mcp-gateway/tool-gateway、action-executor、ai-eval。
+已完成基线：9 个 IM 后端服务已跑通主链路；search-service projection smoke passed；memory-service group memory / StructuredMemoryEvent projection smoke passed；retrieval-gateway 第一轮 search + memory -> EvidencePack smoke passed。
 
-当前 active slice：EvidencePack 字段 / policy hardening。retrieval-gateway 已跑通真实 search + memory -> RetrieveEvidence smoke；后续必须继续保留 source refs、temporal version、visibility/policy boundary，不直接读 message/conversation/private tables。
+当前开发主线：
+1. 只做会阻塞 AI 底座的 9-service closeout：mutation/tombstone、visibility window、contacts privacy、policy/audit/security 边界。
+2. 当前 active slice：retrieval-gateway / EvidencePack hardening，优先补 explicit policy-service retrieval check、source coverage、rerank score、dedupe reason；继续保证 source refs、temporal version、visibility / policy boundary，不直接读 message/conversation/private tables。
+3. 完成 EvidencePack 边界后，按顺序推进：rag-service -> summary-service -> agent-service -> skill-registry -> mcp-gateway/tool-gateway -> action-executor -> ai-eval。
 
-短期不围绕生产级长压、完整 HA、sizing 或 provider-grade 运维打转；这些进入 hardening backlog，除非用户明确点名。本轮只做能推进这条主线的工作。
+本轮只做能推进上述主线的工作；新发现的非阻塞生产化事项写入 docs/runbook/remaining-goals.md，不要抢占当前 AI 底座路线。
 
 每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 做互不重叠任务；不全文扫长历史文档，不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
 ```
@@ -30,7 +27,7 @@
 - 具体执行目标维护在 `docs/runbook/current-goal.md`；目标框不要复制长目标。
 - Agent 进度管理规则见 `agent.md`；需要管理项目进度、分配子 agent 或选择下一切片时先读它。
 - `prompt.md` 只负责把 Codex 带到正确入口；`agent.md` 决定本轮需要按需读取和维护哪些项目文档。
-- 当前主线和 active slice 必须在目标框短 Prompt 第一屏明确出现：9-service closeout -> search-service smoke passed -> memory-service smoke passed -> retrieval / EvidencePack -> RAG / summary -> multi-agent / skill / MCP / action execution；具体长目标仍由 runbook 维护。
+- 当前主线和 active slice 必须在目标框短 Prompt 第一屏明确出现：面试导向后端 + 分布式 + AI 底座；9-service closeout 只处理 AI 阻塞项；search / memory / retrieval smoke 已过；下一步 retrieval / EvidencePack hardening，然后 RAG / summary / Agent / skill / MCP / action execution。具体长目标仍由 runbook 维护。
 - 具体当前阶段细节不在这里展开，见 `docs/runbook/current-brief.md`。
 - 当前未完成工作不在这里维护，见 `docs/runbook/remaining-goals.md`。
 - 单服务状态不在这里维护，见 `docs/runbook/service-briefs/<service>.md`。

@@ -36,6 +36,11 @@ It is:
 IM backend closeout -> search -> memory -> retrieval/EvidencePack -> RAG/summary -> Agent -> skill/MCP/action
 ```
 
+When the user says "continue development", prefer this main line by default.
+Do not drift back into production-grade load testing, full HA drills, provider
+operations, or sizing unless the user explicitly asks for those areas or a P0/P1
+issue blocks the main line.
+
 Production HA drills, long load tests, sizing, and provider-grade operations are
 hardening backlog unless explicitly named. Choose work that moves the AI
 foundation forward while keeping the existing IM backend clean enough.

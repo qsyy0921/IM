@@ -24,6 +24,9 @@ type summary struct {
 	FinishedAt                 time.Time            `json:"finished_at"`
 	Success                    bool                 `json:"success"`
 	Error                      string               `json:"error,omitempty"`
+	CapacityMode               bool                 `json:"capacity_mode,omitempty"`
+	VUs                        int                  `json:"vus,omitempty"`
+	ConfiguredDurationSeconds  float64              `json:"configured_duration_seconds,omitempty"`
 	RegisterUser               registerSummary      `json:"register_user"`
 	RequestChallenge           challengeSummary     `json:"request_verification_challenge"`
 	Webhook                    webhookSummary       `json:"webhook"`
@@ -48,6 +51,10 @@ type summary struct {
 	ChallengeRow               challengeRow         `json:"challenge_row"`
 	LatenciesMS                map[string]float64   `json:"latencies_ms"`
 	Capacity                   *capacitySummary     `json:"capacity_summary,omitempty"`
+	capacityOperationCount     int
+	capacityTokenIssueCount    int
+	capacityExpectedErrorCount int
+	capacityLatencySamples     []float64
 }
 
 type identityChallengeClient interface {
@@ -173,6 +180,9 @@ type challengeRow struct {
 }
 
 type capacitySummary struct {
+	CapacityMode                     bool    `json:"capacity_mode,omitempty"`
+	VUs                              int     `json:"vus,omitempty"`
+	ConfiguredDurationSeconds        float64 `json:"configured_duration_seconds,omitempty"`
 	DurationSeconds                  float64 `json:"duration_seconds"`
 	OperationCount                   int     `json:"operation_count"`
 	TokenIssueCount                  int     `json:"token_issue_count"`

@@ -1,8 +1,8 @@
 ﻿# File Size Budget Hotspots
 
-- Created at: 2026-06-18T02:02:18.7578163Z
+- Created at: 2026-06-18T02:52:54.8231310Z
 - Scope: handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score
-- Files checked: 1184
+- Files checked: 1186
 - Warnings: 0
 - Failures: 0
 - Hotspots at >= 75% of warning threshold: 0
@@ -13,7 +13,7 @@
 | docs\sdd\contacts-service.md | docs | 794 | 1200 | 1500 | 66.2 | 52.9 |
 | loadtest\demo\run-local-secure-demo.ps1 | script/runner | 734 | 1000 | 1500 | 73.4 | 48.9 |
 | docs\runbook\local-loadtest.md | docs | 686 | 1200 | 1500 | 57.2 | 45.7 |
-| tools\run-loadtest-capacity-baseline-suite.ps1 | script/runner | 657 | 1000 | 1500 | 65.7 | 43.8 |
+| tools\run-loadtest-capacity-baseline-suite.ps1 | script/runner | 661 | 1000 | 1500 | 66.1 | 44.1 |
 | loadtest\contacts\main.go | test/runner | 1246 | 2500 | 3000 | 49.8 | 41.5 |
 | docs\sdd\push-gateway.md | docs | 602 | 1200 | 1500 | 50.2 | 40.1 |
 | docs\architecture\target-architecture-platform.md | docs | 574 | 1200 | 1500 | 47.8 | 38.3 |

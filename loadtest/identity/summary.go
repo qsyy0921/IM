@@ -51,19 +51,33 @@ func buildCapacitySummary(s summary) *capacitySummary {
 		return nil
 	}
 	operationCount := len(s.LatenciesMS)
+	if s.capacityOperationCount > 0 {
+		operationCount = s.capacityOperationCount
+	}
+	tokenIssueCount := tokenIssueCount(s)
+	if s.capacityTokenIssueCount > 0 {
+		tokenIssueCount = s.capacityTokenIssueCount
+	}
+	expectedErrorCount := expectedErrorCount(s)
+	if s.capacityExpectedErrorCount > 0 {
+		expectedErrorCount = s.capacityExpectedErrorCount
+	}
 	return &capacitySummary{
+		CapacityMode:                     s.CapacityMode,
+		VUs:                              s.VUs,
+		ConfiguredDurationSeconds:        s.ConfiguredDurationSeconds,
 		DurationSeconds:                  duration,
 		OperationCount:                   operationCount,
-		TokenIssueCount:                  tokenIssueCount(s),
-		ExpectedErrorCount:               expectedErrorCount(s),
+		TokenIssueCount:                  tokenIssueCount,
+		ExpectedErrorCount:               expectedErrorCount,
 		ChallengeDeliveryOutboxTotal:     s.ChallengeDeliveryOutbox.Total,
 		ChallengeDeliveryOutboxPending:   s.ChallengeDeliveryOutbox.Pending,
 		ChallengeDeliveryOutboxDelivered: s.ChallengeDeliveryOutbox.Delivered,
 		ChallengeDeliveryOutboxDLQ:       s.ChallengeDeliveryOutbox.DLQ,
 		ChallengeDeliveryAttemptCount:    s.ChallengeRow.DeliveryAttemptCount,
 		OperationsPerSecond:              ratePerSecond(operationCount, duration),
-		LatencyP95MS:                     latencyQuantile(s.LatenciesMS, 0.95),
-		LatencyP99MS:                     latencyQuantile(s.LatenciesMS, 0.99),
+		LatencyP95MS:                     latencyQuantileFromSummary(s, 0.95),
+		LatencyP99MS:                     latencyQuantileFromSummary(s, 0.99),
 		MFARecoveryCodeCount:             recoveryCodeCount(s),
 	}
 }
@@ -118,6 +132,29 @@ func latencyQuantile(values map[string]float64, quantile float64) float64 {
 	for _, value := range values {
 		sorted = append(sorted, value)
 	}
+	sort.Float64s(sorted)
+	index := int(math.Ceil(quantile*float64(len(sorted)))) - 1
+	if index < 0 {
+		index = 0
+	}
+	if index >= len(sorted) {
+		index = len(sorted) - 1
+	}
+	return sorted[index]
+}
+
+func latencyQuantileFromSummary(s summary, quantile float64) float64 {
+	if len(s.capacityLatencySamples) > 0 {
+		return latencyQuantileSlice(s.capacityLatencySamples, quantile)
+	}
+	return latencyQuantile(s.LatenciesMS, quantile)
+}
+
+func latencyQuantileSlice(values []float64, quantile float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	sorted := append([]float64(nil), values...)
 	sort.Float64s(sorted)
 	index := int(math.Ceil(quantile*float64(len(sorted)))) - 1
 	if index < 0 {

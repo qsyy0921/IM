@@ -68,6 +68,34 @@ func TestBuildCapacitySummaryRequiresPositiveDuration(t *testing.T) {
 	}
 }
 
+func TestBuildCapacitySummaryUsesCapacityCounters(t *testing.T) {
+	started := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)
+	capacity := buildCapacitySummary(summary{
+		StartedAt:                  started,
+		FinishedAt:                 started.Add(10 * time.Second),
+		CapacityMode:               true,
+		VUs:                        4,
+		ConfiguredDurationSeconds:  10,
+		ChallengeDeliveryOutbox:    outboxStats{Total: 4, Delivered: 4},
+		capacityOperationCount:     20,
+		capacityTokenIssueCount:    10,
+		capacityExpectedErrorCount: 2,
+		capacityLatencySamples:     []float64{1, 2, 3, 4, 5},
+	})
+	if capacity == nil {
+		t.Fatal("expected capacity summary")
+	}
+	if !capacity.CapacityMode || capacity.VUs != 4 || capacity.ConfiguredDurationSeconds != 10 {
+		t.Fatalf("unexpected capacity fields: %+v", capacity)
+	}
+	if capacity.OperationCount != 20 || capacity.TokenIssueCount != 10 || capacity.ExpectedErrorCount != 2 {
+		t.Fatalf("unexpected counters: %+v", capacity)
+	}
+	assertFloatNear(t, capacity.OperationsPerSecond, 2)
+	assertFloatNear(t, capacity.LatencyP95MS, 5)
+	assertFloatNear(t, capacity.LatencyP99MS, 5)
+}
+
 func assertFloatNear(t *testing.T, got float64, want float64) {
 	t.Helper()
 	if math.Abs(got-want) > 0.000001 {

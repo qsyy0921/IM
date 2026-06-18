@@ -21,7 +21,8 @@
 - `loadtest/identity` summary 已输出 `capacity_summary`，包含运行时长、identity 操作数、token 签发次数、预期 step-up 错误数、challenge delivery outbox 聚合、challenge delivery attempt 数、ops/s、latency p95/p99 和 MFA recovery code 数；后续容量验证可直接复用该结构。
 - `loadtest/identity` runner 已按 config / model / webhook / summary helper 同 package 拆分，避免 identity challenge / MFA / recovery-code 容量验证继续堆进单个 `main.go`。
 - `capacity-baseline-identity-stack-20260616` 本地 stack 短基线已跑通：临时 identity gRPC + webhook fixture + `challenge-delivery-worker` 覆盖 Register/Login/Refresh/Password Reset/MFA/recovery-code 管理，`challenge_delivery_outbox DELIVERED=2/PENDING=0/DLQ=0`，`operations_per_second=14.09`；报告见 `loadtest/distributed/loadtest-report-20260616-identity-stack-capacity-baseline.md`。
+- `identity-service-longrun-slice-20260618` 本地 30m 长跑切片已跑通：4 VUs 覆盖 `RegisterUser` 一次性准备和 `Login -> RefreshGatewayToken` 热路径循环，1800.806 秒内完成 114188 次操作、114184 次 token 签发，`operations_per_second=63.409`，p95 158.353ms、p99 270.042ms，`challenge_delivery_outbox PENDING=0/DLQ=0`；报告见 `docs/runbook/loadtest/identity-service/loadtest-report-20260618-identity-longrun-slice.md`，原始 summary 在 `H:\NexusIM\loadtest-results`。这是本地认证热路径长跑证据，不覆盖 challenge delivery / MFA 全链路，也不是生产 sizing 或 SLO。
 
 ## 后续
 
-- WebAuthn/passkeys、OIDC federation、KMS/HSM、完整风控、SMS provider、bounce handling、租户级通知模板治理；统一 OTel collector、生产告警路由、retention、SLO dashboard、长时间容量曲线仍属于后续统一观测治理。
+- WebAuthn/passkeys、OIDC federation、KMS/HSM、完整风控、SMS provider、bounce handling、租户级通知模板治理；统一 OTel collector、生产告警路由、retention、SLO dashboard、更完整容量曲线和生产 sizing 仍属于后续统一观测治理。

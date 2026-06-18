@@ -18,6 +18,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const defaultIdentityTenantID = "tenant-identity-smoke"
+
 func main() {
 	cfg := parseConfig()
 	var err error
@@ -37,6 +39,9 @@ func main() {
 
 func runClient(cfg config) error {
 	started := time.Now().UTC()
+	if cfg.duration > 0 && cfg.tenantID == defaultIdentityTenantID {
+		cfg.tenantID = cfg.tenantID + "-" + started.Format("20060102150405")
+	}
 	result := summary{
 		Commit:        gitOutput("rev-parse", "--short", "HEAD"),
 		CommitFull:    gitOutput("rev-parse", "HEAD"),
@@ -49,7 +54,12 @@ func runClient(cfg config) error {
 		UserID:        cfg.userID,
 		Destination:   cfg.destination,
 		StartedAt:     started,
+		CapacityMode:  cfg.duration > 0,
+		VUs:           cfg.vus,
 		LatenciesMS:   map[string]float64{},
+	}
+	if cfg.duration > 0 {
+		result.ConfiguredDurationSeconds = cfg.duration.Seconds()
 	}
 	if status := gitOutput("status", "--short"); strings.TrimSpace(status) != "" {
 		result.GitStatusShort = status
@@ -90,6 +100,9 @@ func runClientScenario(cfg config, result *summary) error {
 	var client identityChallengeClient = identityv1.NewIdentityServiceClient(conn)
 	if cfg.gatewayFacade {
 		client = gatewayv1.NewGatewayServiceClient(conn)
+	}
+	if cfg.duration > 0 {
+		return runCapacityScenario(ctx, cfg, client, pool, result)
 	}
 
 	registerStarted := time.Now()

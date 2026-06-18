@@ -21,6 +21,8 @@ type config struct {
 	requestTimeout     time.Duration
 	waitTimeout        time.Duration
 	pollInterval       time.Duration
+	duration           time.Duration
+	vus                int
 	tenantID           string
 	userID             string
 	deviceID           string
@@ -48,6 +50,8 @@ func parseConfig() config {
 	flag.DurationVar(&cfg.requestTimeout, "request-timeout", 5*time.Second, "per-request timeout")
 	flag.DurationVar(&cfg.waitTimeout, "wait-timeout", 20*time.Second, "wait timeout")
 	flag.DurationVar(&cfg.pollInterval, "poll-interval", 200*time.Millisecond, "poll interval")
+	flag.DurationVar(&cfg.duration, "duration", 0, "capacity mode duration; 0 runs the single smoke scenario")
+	flag.IntVar(&cfg.vus, "vus", 1, "capacity mode virtual users")
 	flag.StringVar(&cfg.tenantID, "tenant-id", "tenant-identity-smoke", "tenant id")
 	flag.StringVar(&cfg.userID, "user-id", "identity-user", "user id")
 	flag.StringVar(&cfg.deviceID, "device-id", "identity-device", "device id for Login and RefreshGatewayToken")
@@ -58,5 +62,11 @@ func parseConfig() config {
 	flag.BoolVar(&cfg.cleanup, "cleanup", false, "delete identity rows for this tenant before running")
 	flag.Parse()
 	cfg.mode = strings.ToLower(strings.TrimSpace(cfg.mode))
+	if cfg.vus <= 0 {
+		cfg.vus = 1
+	}
+	if cfg.duration > 0 && cfg.waitTimeout < 30*time.Second {
+		cfg.waitTimeout = 30 * time.Second
+	}
 	return cfg
 }

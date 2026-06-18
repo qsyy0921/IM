@@ -1,5 +1,5 @@
 ﻿{
-    "created_at":  "2026-06-18T04:58:50.9567179Z",
+    "created_at":  "2026-06-18T05:27:05.0124128Z",
     "scope":  "handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score",
     "file_count":  1190,
     "thresholds":  {
@@ -83,6 +83,15 @@
                           "MaxRatio":  0.4153
                       },
                       {
+                          "Path":  "services\\policy-service\\internal\\infrastructure\\postgres\\evaluator_test.go",
+                          "Lines":  1209,
+                          "Kind":  "test/runner",
+                          "Warn":  2500,
+                          "Max":  3000,
+                          "WarnRatio":  0.4836,
+                          "MaxRatio":  0.403
+                      },
+                      {
                           "Path":  "docs\\sdd\\push-gateway.md",
                           "Lines":  602,
                           "Kind":  "docs",
@@ -126,15 +135,6 @@
                           "Max":  1500,
                           "WarnRatio":  0.4517,
                           "MaxRatio":  0.3613
-                      },
-                      {
-                          "Path":  "services\\policy-service\\internal\\infrastructure\\postgres\\evaluator_test.go",
-                          "Lines":  1057,
-                          "Kind":  "test/runner",
-                          "Warn":  2500,
-                          "Max":  3000,
-                          "WarnRatio":  0.4228,
-                          "MaxRatio":  0.3523
                       },
                       {
                           "Path":  "docs\\runbook\\loadtest\\message-service\\loadtest-report-20260609.md",

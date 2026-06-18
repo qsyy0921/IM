@@ -67,6 +67,14 @@ func (e MessagePolicyEvaluator) DecideMessageAction(
 		return decision, nil
 	}
 
+	decision, rebacDenied, err := e.applyReBACRelationGate(ctx, command)
+	if err != nil {
+		return types.MessageActionDecision{}, err
+	}
+	if rebacDenied {
+		return decision, nil
+	}
+
 	decision, quotaExceeded, err := e.applyTenantActionQuota(ctx, command)
 	if err != nil {
 		return types.MessageActionDecision{}, err
@@ -299,6 +307,165 @@ type rolePolicyRule struct {
 	MinRole        string
 	Classification string
 	Reason         string
+}
+
+type rebacRelationRule struct {
+	RelationType      string
+	ConversationScope string
+	PermissionVersion int64
+	Classification    string
+	Reason            string
+}
+
+func (e MessagePolicyEvaluator) applyReBACRelationGate(
+	ctx context.Context,
+	command types.CheckMessageActionCommand,
+) (types.MessageActionDecision, bool, error) {
+	rows, err := e.pool.Query(ctx, `
+SELECT relation_type, conversation_scope, permission_version, classification, reason
+FROM policy_rebac_message_action_rules
+WHERE tenant_id = $1
+  AND action = $2
+  AND enabled = true
+  AND (conversation_scope = 'ANY' OR conversation_scope = $3)
+ORDER BY priority ASC, updated_at ASC, relation_type ASC
+`, command.AuthContext.TenantID, command.Action, rebacConversationScope(command))
+	if isUndefinedTable(err) {
+		return types.MessageActionDecision{}, false, nil
+	}
+	if err != nil {
+		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy rebac rule lookup failed")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var rule rebacRelationRule
+		if err := rows.Scan(
+			&rule.RelationType,
+			&rule.ConversationScope,
+			&rule.PermissionVersion,
+			&rule.Classification,
+			&rule.Reason,
+		); err != nil {
+			return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy rebac rule lookup failed")
+		}
+		rule.RelationType = strings.TrimSpace(rule.RelationType)
+		rule.ConversationScope = strings.TrimSpace(rule.ConversationScope)
+		rule.Classification = strings.TrimSpace(rule.Classification)
+		rule.Reason = strings.TrimSpace(rule.Reason)
+		if !validReBACRelationRule(rule) {
+			return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy rebac rule is invalid")
+		}
+		satisfied, err := e.rebacRelationSatisfied(ctx, command, rule)
+		if err != nil {
+			return types.MessageActionDecision{}, false, err
+		}
+		if satisfied {
+			continue
+		}
+		if rule.Reason == "" {
+			rule.Reason = "relationship policy denied"
+		}
+		return types.MessageActionDecision{
+			TenantID:          command.AuthContext.TenantID,
+			UserID:            command.AuthContext.UserID,
+			ConversationID:    command.ConversationID,
+			MessageID:         command.MessageID,
+			Action:            command.Action,
+			Allowed:           false,
+			PermissionVersion: rule.PermissionVersion,
+			Classification:    rule.Classification,
+			Reason:            rule.Reason,
+			DecisionSource:    types.PolicyDecisionSourceReBACRelation,
+		}, true, nil
+	}
+	if err := rows.Err(); err != nil {
+		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy rebac rule lookup failed")
+	}
+	return types.MessageActionDecision{}, false, nil
+}
+
+func validReBACRelationRule(rule rebacRelationRule) bool {
+	if rule.PermissionVersion <= 0 || rule.Classification == "" {
+		return false
+	}
+	switch types.ReBACRelationType(rule.RelationType) {
+	case types.ReBACRelationDirectContactActive, types.ReBACRelationConversationMemberActive:
+	default:
+		return false
+	}
+	switch types.ReBACConversationScope(rule.ConversationScope) {
+	case types.ReBACConversationScopeAny, types.ReBACConversationScopeDirect, types.ReBACConversationScopeGroup:
+		return true
+	default:
+		return false
+	}
+}
+
+func rebacConversationScope(command types.CheckMessageActionCommand) string {
+	if command.DirectPeerUserID != "" {
+		return string(types.ReBACConversationScopeDirect)
+	}
+	return string(types.ReBACConversationScopeGroup)
+}
+
+func (e MessagePolicyEvaluator) rebacRelationSatisfied(
+	ctx context.Context,
+	command types.CheckMessageActionCommand,
+	rule rebacRelationRule,
+) (bool, error) {
+	switch types.ReBACRelationType(rule.RelationType) {
+	case types.ReBACRelationDirectContactActive:
+		return e.directContactRelationActive(ctx, command)
+	case types.ReBACRelationConversationMemberActive:
+		return e.conversationMemberRelationActive(ctx, command)
+	default:
+		return false, types.NewDependencyUnavailable("policy rebac rule is invalid")
+	}
+}
+
+func (e MessagePolicyEvaluator) directContactRelationActive(
+	ctx context.Context,
+	command types.CheckMessageActionCommand,
+) (bool, error) {
+	if command.DirectPeerUserID == "" {
+		return false, nil
+	}
+	var activeEdges int
+	err := e.pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM policy_contact_edges_projection
+WHERE tenant_id = $1
+  AND status = $2
+  AND (
+      (owner_user_id = $3 AND contact_user_id = $4)
+      OR (owner_user_id = $4 AND contact_user_id = $3)
+  )
+`, command.AuthContext.TenantID, types.ContactEdgeStatusActive, command.AuthContext.UserID, command.DirectPeerUserID).Scan(&activeEdges)
+	if err != nil {
+		return false, types.NewDependencyUnavailable("policy contact relation lookup failed")
+	}
+	return activeEdges >= 2, nil
+}
+
+func (e MessagePolicyEvaluator) conversationMemberRelationActive(
+	ctx context.Context,
+	command types.CheckMessageActionCommand,
+) (bool, error) {
+	if command.ConversationPermissionVersion <= 0 {
+		return false, types.NewDependencyUnavailable("policy conversation permission version is required")
+	}
+	_, memberStatus, permissionVersion, found, err := e.lookupProjectedMember(ctx, command)
+	if err != nil {
+		return false, err
+	}
+	if !found {
+		return false, types.NewDependencyUnavailable("policy conversation member projection is missing")
+	}
+	if permissionVersion != command.ConversationPermissionVersion {
+		return false, types.NewDependencyUnavailable("policy conversation member projection is stale")
+	}
+	return memberStatus == types.ConversationMemberStatusActive, nil
 }
 
 func (e MessagePolicyEvaluator) applyRoleGate(

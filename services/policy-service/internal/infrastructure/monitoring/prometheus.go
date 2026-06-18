@@ -115,6 +115,7 @@ func writeRuleStorePrometheus(builder *strings.Builder, snapshot *RuleSnapshot, 
 	writeRuleDecisionPrometheus(builder, "tenant", snapshot.TenantMessageActions)
 	writeRoleRulePrometheus(builder, "conversation_role", snapshot.ConversationRoleActions)
 	writeRoleRulePrometheus(builder, "ownership_override", snapshot.OwnershipOverrides)
+	writeRelationRulePrometheus(builder, snapshot.ReBACRelations)
 }
 
 func writeRuleDecisionPrometheus(builder *strings.Builder, scope string, snapshot *RuleDecisionSnapshot) {
@@ -149,6 +150,32 @@ func writeRoleRulePrometheus(builder *strings.Builder, scope string, snapshot *R
 	})
 	for _, action := range actions {
 		writePrometheusSample(builder, "nexusim_policy_role_rule_actions", map[string]string{"scope": scope, "action": action.Action, "min_role": action.MinRole}, action.Total)
+	}
+}
+
+func writeRelationRulePrometheus(builder *strings.Builder, snapshot *RuleRelationSnapshot) {
+	writePrometheusHeader(builder, "nexusim_policy_rebac_relation_rules", "Policy ReBAC relation rule counts.", "gauge")
+	writePrometheusHeader(builder, "nexusim_policy_rebac_relation_rule_actions", "Policy ReBAC relation rule counts by action, relation and conversation scope.", "gauge")
+	if snapshot == nil {
+		return
+	}
+	writePrometheusSample(builder, "nexusim_policy_rebac_relation_rules", map[string]string{"state": "total"}, snapshot.Total)
+	actions := append([]RuleRelationActionSnapshot(nil), snapshot.Actions...)
+	sort.Slice(actions, func(i, j int) bool {
+		if actions[i].Action == actions[j].Action {
+			if actions[i].RelationType == actions[j].RelationType {
+				return actions[i].ConversationScope < actions[j].ConversationScope
+			}
+			return actions[i].RelationType < actions[j].RelationType
+		}
+		return actions[i].Action < actions[j].Action
+	})
+	for _, action := range actions {
+		writePrometheusSample(builder, "nexusim_policy_rebac_relation_rule_actions", map[string]string{
+			"action":             action.Action,
+			"relation_type":      action.RelationType,
+			"conversation_scope": action.ConversationScope,
+		}, action.Total)
 	}
 }
 

@@ -2,7 +2,7 @@
 
 `policy-service` owns first-stage policy decisions that must not be hard-coded inside message-service. The initial implementation is intentionally small: it exposes a gRPC `CheckMessageAction` endpoint for message send / edit / revoke / delete decisions, and it returns a stable `permission_version`, `classification`, allow/deny flag and public deny reason.
 
-This service is a boundary extraction step. It is not yet a full ReBAC engine, tenant policy DSL / quota / risk engine, provider-grade content moderation platform or complete contacts/conversation policy engine. The current contacts projection is consumed only for direct conversation `SEND` hard-deny when the caller supplies safe direct-peer context. The current conversation member projection is consumed only as a first-stage role gate with a permission-version fence and as a narrow `ADMIN` / `OWNER` message ownership override for mutations. The current moderation slices are limited to user-level message action restrictions such as tenant-local mute / action deny rules, plus first-stage configurable keyword and HTTP content moderator adapters for `SEND` / `EDIT` message text. A separate `MODERATOR` role, richer risk scoring and full product-level moderation policy remain future work.
+This service is a boundary extraction step. It is not yet a full ReBAC engine, tenant policy DSL / quota / risk engine, provider-grade content moderation platform or complete contacts/conversation policy engine. The current contacts projection is consumed only for direct conversation `SEND` hard-deny when the caller supplies safe direct-peer context, and as first-stage relationship evidence when a `DIRECT_CONTACT_ACTIVE` relation rule is configured. The current conversation member projection is consumed only as a first-stage role gate with a permission-version fence, as first-stage `CONVERSATION_MEMBER_ACTIVE` relationship evidence, and as a narrow `ADMIN` / `OWNER` message ownership override for mutations. The current moderation slices are limited to user-level message action restrictions such as tenant-local mute / action deny rules, plus first-stage configurable keyword and HTTP content moderator adapters for `SEND` / `EDIT` message text. A separate `MODERATOR` role, richer risk scoring and full product-level moderation policy remain future work.
 
 ## Boundary
 
@@ -46,7 +46,7 @@ The next table adds a tenant action default:
 tenant_id + action
 ```
 
-When `NEXUSIM_POLICY_RULES_ENABLED=true`, policy-service first evaluates hard contact-block denies for direct `SEND` requests that include `direct_peer_user_id`, then evaluates first-stage user-level message action restrictions from `policy_user_message_action_restrictions`. Active user restrictions are hard denies and intentionally override exact / tenant allow rules. It then applies the message ownership gate for mutation requests that include `message_sender_user_id`. Non-sender mutations can pass only through an explicit `policy_message_ownership_override_rules` row backed by a fresh `policy_conversation_members_projection` `ADMIN` / `OWNER` row. After ownership has passed, policy-service applies the conversation role gate, then checks `policy_message_action_rules`, then checks `policy_tenant_message_action_rules`, and finally falls back to the static policy. A matching exact or tenant rule returns its allow / deny decision, `permission_version`, `classification` and public reason. Exact user/conversation rules intentionally override tenant defaults only after the hard gates have passed.
+When `NEXUSIM_POLICY_RULES_ENABLED=true`, policy-service first evaluates hard contact-block denies for direct `SEND` requests that include `direct_peer_user_id`, then evaluates first-stage user-level message action restrictions from `policy_user_message_action_restrictions`. Active user restrictions are hard denies and intentionally override exact / tenant allow rules. It then applies the message ownership gate for mutation requests that include `message_sender_user_id`. Non-sender mutations can pass only through an explicit `policy_message_ownership_override_rules` row backed by a fresh `policy_conversation_members_projection` `ADMIN` / `OWNER` row. After ownership has passed, policy-service applies the conversation role gate, then applies first-stage `policy_rebac_message_action_rules` relationship gates, then tenant action quota, then checks `policy_message_action_rules`, then checks `policy_tenant_message_action_rules`, and finally falls back to the static policy. A matching exact or tenant rule returns its allow / deny decision, `permission_version`, `classification` and public reason. Exact user/conversation rules intentionally override tenant defaults only after the hard gates have passed.
 
 The first-stage moderation restriction table is deny-only:
 
@@ -56,6 +56,25 @@ tenant_id + user_id + action -> permission_version + classification + public rea
 ```
 
 It is intended for low-cardinality tenant-local controls such as temporarily preventing a user from sending messages. Expired rows are ignored by the evaluator. The table does not store message content, risk features, raw moderation provider output, prompt text or model output. Missing table during rollout is treated as no restriction, while other PostgreSQL errors fail closed as policy unavailable.
+
+The first-stage ReBAC relationship gate is deny-only. It is not a complete graph engine, but it lets policy-service express a small set of relationship requirements using only policy-owned projections:
+
+```text
+policy_rebac_message_action_rules:
+tenant_id + action + relation_type + conversation_scope
+-> permission_version + classification + public reason + priority + enabled
+
+relation_type:
+  DIRECT_CONTACT_ACTIVE
+  CONVERSATION_MEMBER_ACTIVE
+
+conversation_scope:
+  ANY
+  DIRECT
+  GROUP
+```
+
+When an enabled relation rule matches the request action and scope, the required relation must be proven before tenant quota, exact allow rules or tenant allow rules can apply. `DIRECT_CONTACT_ACTIVE` requires a direct peer context and two directed `ACTIVE` rows in `policy_contact_edges_projection`; if either edge is missing, policy-service returns `allowed=false` with `decision_source=REBAC_RELATION`. `CONVERSATION_MEMBER_ACTIVE` requires a fresh `policy_conversation_members_projection` row whose `permission_version` matches the caller-supplied `conversation_permission_version` and whose status is `ACTIVE`; missing or stale projection remains policy unavailable, while an inactive member is denied. A satisfied relationship gate only allows evaluation to continue; it never grants permission by itself.
 
 The first-stage content moderation adapter is configured with:
 
@@ -150,7 +169,7 @@ Audit rows must not store message content, raw session id, raw device id, raw di
 
 For the first-stage ownership gate, audit rows identify ownership denies by `classification=MESSAGE_OWNERSHIP_DENIED` / `reason_code=MESSAGE_OWNERSHIP_DENIED` and ownership overrides by `classification=MESSAGE_OWNERSHIP_ROLE_OVERRIDE`. Audit rows keep the stable `message_key` and intentionally do not store raw message sender id in this slice. A future audit schema can add a low-sensitive `message_sender_context_present` flag, ownership override flag or sender stable key if operations needs more ownership-specific attribution.
 
-`decision_source` is low-sensitive path metadata. Current values include `FALLBACK`, `EXACT_RULE`, `TENANT_RULE`, `USER_RESTRICTION`, `TENANT_QUOTA`, `CONVERSATION_ROLE`, `CONTACT_PROJECTION`, `MESSAGE_OWNERSHIP`, `OWNERSHIP_OVERRIDE` and `CONTENT_MODERATION`. It is not a free-text reason and must not contain provider body, message content, raw rule parameters or raw user identifiers.
+`decision_source` is low-sensitive path metadata. Current values include `FALLBACK`, `EXACT_RULE`, `TENANT_RULE`, `USER_RESTRICTION`, `TENANT_QUOTA`, `REBAC_RELATION`, `CONVERSATION_ROLE`, `CONTACT_PROJECTION`, `MESSAGE_OWNERSHIP`, `OWNERSHIP_OVERRIDE` and `CONTENT_MODERATION`. It is not a free-text reason and must not contain provider body, message content, raw rule parameters or raw user identifiers.
 
 Configuration:
 
@@ -298,7 +317,7 @@ When `NEXUSIM_POLICY_DEBUG_ADDR` is set, policy-service exposes:
 /metrics
 ```
 
-The debug metrics include aggregate gRPC request counts and status codes, aggregate final `CheckMessageAction` decision counts, per-action aggregate decision counts, optional PostgreSQL pool stats, optional rule-store row counts, optional projection row counts / checkpoints and optional decision audit outbox status counts. Decision metrics are recorded at the use-case boundary, so they include static / exact / user-restriction / tenant / role decisions as well as first-stage ownership denies and `ownership_override=true` allows. The `policy_rule_store` snapshot includes low-cardinality row counts for exact message action rules, user message action restrictions, tenant action defaults, conversation role gate rules and ownership override rules, grouped only by action / allow-deny / min-role where applicable. The `policy_projection` snapshot includes contact edge status counts, conversation member status / role counts and Kafka checkpoint topic aggregates. `/metrics` renders the same low-sensitive aggregate snapshot as Prometheus text for local scrape / dashboard prototypes. The local scrape target is `host.docker.internal:11916` when the service debug listener runs as `NEXUSIM_POLICY_DEBUG_ADDR=127.0.0.1:11916`. They intentionally do not expose tenant id, user id, conversation id, message id, device id, session id, request / response payloads, raw rule parameters, deny reason text, classification strings, DSNs or SQL error text.
+The debug metrics include aggregate gRPC request counts and status codes, aggregate final `CheckMessageAction` decision counts, per-action aggregate decision counts, optional PostgreSQL pool stats, optional rule-store row counts, optional projection row counts / checkpoints and optional decision audit outbox status counts. Decision metrics are recorded at the use-case boundary, so they include static / exact / user-restriction / tenant / role / relationship decisions as well as first-stage ownership denies and `ownership_override=true` allows. The `policy_rule_store` snapshot includes low-cardinality row counts for exact message action rules, user message action restrictions, tenant action defaults, conversation role gate rules, ownership override rules and ReBAC relationship rules, grouped only by action / allow-deny / min-role / relation type / conversation scope where applicable. The `policy_projection` snapshot includes contact edge status counts, conversation member status / role counts and Kafka checkpoint topic aggregates. `/metrics` renders the same low-sensitive aggregate snapshot as Prometheus text for local scrape / dashboard prototypes. The local scrape target is `host.docker.internal:11916` when the service debug listener runs as `NEXUSIM_POLICY_DEBUG_ADDR=127.0.0.1:11916`. They intentionally do not expose tenant id, user id, conversation id, message id, device id, session id, request / response payloads, raw rule parameters, deny reason text, classification strings, DSNs or SQL error text.
 
 The debug HTTP listener is intended for local smoke and private operational access. `NEXUSIM_POLICY_DEBUG_ADDR` may fall back to `NEXUSIM_DEBUG_ADDR`; by default the listener only allows loopback / RFC1918 private addresses. Binding the debug listener to a public or unspecified address requires explicit `NEXUSIM_POLICY_DEBUG_ALLOW_PUBLIC=true`.
 
@@ -311,8 +330,9 @@ This is a local debug surface plus first-stage Prometheus text and trace emissio
 ## Limitations
 
 - First implementation still supports static environment configuration.
-- PostgreSQL rule store supports exact user/conversation rules, first-stage user action restrictions, first-stage tenant action defaults and a first-stage conversation role gate; no wildcard / priority rule DSL yet.
+- PostgreSQL rule store supports exact user/conversation rules, first-stage user action restrictions, first-stage tenant action defaults, a first-stage conversation role gate and first-stage relationship gates; no wildcard / provider-grade graph policy DSL yet.
 - Contacts block / unblock events are consumed only for direct `SEND` when safe `direct_peer_user_id` context is supplied.
+- ReBAC relationship policy is only a first-stage action-level gate backed by local contacts / conversation member projections and `policy_rebac_message_action_rules`. It is not a general graph traversal engine, Zanzibar/OpenFGA replacement, policy DSL, or synchronous query path into contacts-service / conversation-service.
 - Conversation role policy is only an action-level role gate backed by a local projection and permission-version fence. It is not complete ReBAC and does not synchronously query conversation-service.
 - Message ownership policy supports sender mutation and first-stage `ADMIN` / `OWNER` override for edit / revoke / delete when message-service supplies sender context. It does not implement a separate `MODERATOR` role, full ReBAC, owner transfer semantics, retention policy, compliance delete or user-private delete.
 - No tenant policy DSL, tenant quota / risk policy, external provider-backed moderation, risk scoring or rate limiting is implemented yet. First-stage keyword content moderation exists only as a local adapter and does not store message text.

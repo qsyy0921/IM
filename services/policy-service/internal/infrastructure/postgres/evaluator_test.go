@@ -263,6 +263,129 @@ func TestMessagePolicyEvaluatorTenantQuotaAllowsBelowLimitIntegration(t *testing
 	}
 }
 
+func TestMessagePolicyEvaluatorReBACDirectContactActiveDeniesBeforeExactAllowIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           true,
+		PermissionVersion: 1,
+		Classification:    "STATIC_ALLOW",
+	})
+	command := testPolicyCommand(types.MessageActionSend)
+	command.DirectPeerUserID = "peer-policy"
+	seedReBACRelationRule(
+		t,
+		ctx,
+		pool,
+		command.AuthContext.TenantID,
+		command.Action,
+		types.ReBACRelationDirectContactActive,
+		types.ReBACConversationScopeDirect,
+		401,
+		"DIRECT_CONTACT_REQUIRED",
+		"direct contact required",
+	)
+	seedPolicyRule(t, ctx, pool, command, true, 99, "EXACT_ALLOW", "")
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if decision.Allowed ||
+		decision.PermissionVersion != 401 ||
+		decision.Classification != "DIRECT_CONTACT_REQUIRED" ||
+		decision.Reason != "direct contact required" {
+		t.Fatalf("expected rebac direct-contact deny before exact allow, got %+v", decision)
+	}
+	assertPolicyDecisionSource(t, decision, types.PolicyDecisionSourceReBACRelation)
+}
+
+func TestMessagePolicyEvaluatorReBACDirectContactActiveAllowsExactRuleWhenSatisfiedIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           false,
+		PermissionVersion: 1,
+		Classification:    "STATIC_DENY",
+	})
+	command := testPolicyCommand(types.MessageActionSend)
+	command.DirectPeerUserID = "peer-policy"
+	seedReBACRelationRule(
+		t,
+		ctx,
+		pool,
+		command.AuthContext.TenantID,
+		command.Action,
+		types.ReBACRelationDirectContactActive,
+		types.ReBACConversationScopeDirect,
+		401,
+		"DIRECT_CONTACT_REQUIRED",
+		"direct contact required",
+	)
+	seedContactEdge(t, ctx, pool, string(command.AuthContext.UserID), string(command.DirectPeerUserID), types.ContactEdgeStatusActive, 12)
+	seedContactEdge(t, ctx, pool, string(command.DirectPeerUserID), string(command.AuthContext.UserID), types.ContactEdgeStatusActive, 13)
+	seedPolicyRule(t, ctx, pool, command, true, 99, "EXACT_ALLOW", "")
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if !decision.Allowed || decision.PermissionVersion != 99 || decision.Classification != "EXACT_ALLOW" {
+		t.Fatalf("expected exact allow after satisfied rebac relation, got %+v", decision)
+	}
+	assertPolicyDecisionSource(t, decision, types.PolicyDecisionSourceExactRule)
+}
+
+func TestMessagePolicyEvaluatorReBACConversationMemberActiveDeniesLeftMemberIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           true,
+		PermissionVersion: 1,
+		Classification:    "STATIC_ALLOW",
+	})
+	command := testPolicyCommand(types.MessageActionSend)
+	seedReBACRelationRule(
+		t,
+		ctx,
+		pool,
+		command.AuthContext.TenantID,
+		command.Action,
+		types.ReBACRelationConversationMemberActive,
+		types.ReBACConversationScopeGroup,
+		402,
+		"ACTIVE_MEMBER_REQUIRED",
+		"",
+	)
+	seedConversationMember(
+		t,
+		ctx,
+		pool,
+		command.ConversationID,
+		command.AuthContext.UserID,
+		types.ConversationMemberRoleMember,
+		types.ConversationMemberStatusLeft,
+		5,
+		command.ConversationPermissionVersion,
+	)
+	seedTenantPolicyRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, true, 88, "TENANT_ALLOW", "")
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if decision.Allowed ||
+		decision.PermissionVersion != 402 ||
+		decision.Classification != "ACTIVE_MEMBER_REQUIRED" ||
+		decision.Reason != "relationship policy denied" {
+		t.Fatalf("expected rebac active-member deny before tenant allow, got %+v", decision)
+	}
+	assertPolicyDecisionSource(t, decision, types.PolicyDecisionSourceReBACRelation)
+}
+
 func TestMessagePolicyEvaluatorDisabledTenantQuotaFallsThroughIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -728,8 +851,37 @@ func applyPolicyMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool)
 
 func resetPolicyTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	if _, err := pool.Exec(ctx, `TRUNCATE policy_decision_audit_outbox_repair_audit, policy_decision_audit_outbox, policy_user_message_action_restrictions, policy_message_ownership_override_rules, policy_conversation_role_action_rules, policy_conversation_members_projection, policy_tenant_message_action_quotas, policy_tenant_message_action_rules, policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
+	if _, err := pool.Exec(ctx, `TRUNCATE policy_decision_audit_outbox_repair_audit, policy_decision_audit_outbox, policy_rebac_message_action_rules, policy_user_message_action_restrictions, policy_message_ownership_override_rules, policy_conversation_role_action_rules, policy_conversation_members_projection, policy_tenant_message_action_quotas, policy_tenant_message_action_rules, policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
 		t.Fatalf("reset policy tables: %v", err)
+	}
+}
+
+func seedReBACRelationRule(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	tenantID types.TenantID,
+	action types.MessageAction,
+	relationType types.ReBACRelationType,
+	scope types.ReBACConversationScope,
+	permissionVersion int64,
+	classification string,
+	reason string,
+) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+INSERT INTO policy_rebac_message_action_rules (
+    tenant_id,
+    action,
+    relation_type,
+    conversation_scope,
+    permission_version,
+    classification,
+    reason
+) VALUES ($1, $2, $3, $4, $5, $6, $7)
+`, tenantID, action, relationType, scope, permissionVersion, classification, reason)
+	if err != nil {
+		t.Fatalf("seed rebac relation rule: %v", err)
 	}
 }
 

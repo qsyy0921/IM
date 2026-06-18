@@ -201,6 +201,7 @@ type RuleSnapshot struct {
 	TenantMessageActions    *RuleDecisionSnapshot `json:"tenant_message_action_rules,omitempty"`
 	ConversationRoleActions *RuleRoleSnapshot     `json:"conversation_role_action_rules,omitempty"`
 	OwnershipOverrides      *RuleRoleSnapshot     `json:"message_ownership_override_rules,omitempty"`
+	ReBACRelations          *RuleRelationSnapshot `json:"rebac_message_action_rules,omitempty"`
 }
 
 type RuleDecisionSnapshot struct {
@@ -226,6 +227,18 @@ type RuleRoleActionSnapshot struct {
 	Action  string `json:"action"`
 	MinRole string `json:"min_role"`
 	Total   int64  `json:"total"`
+}
+
+type RuleRelationSnapshot struct {
+	Total   int64                        `json:"total"`
+	Actions []RuleRelationActionSnapshot `json:"actions"`
+}
+
+type RuleRelationActionSnapshot struct {
+	Action            string `json:"action"`
+	RelationType      string `json:"relation_type"`
+	ConversationScope string `json:"conversation_scope"`
+	Total             int64  `json:"total"`
 }
 
 type AuditOutboxSnapshot struct {
@@ -329,6 +342,15 @@ func queryRuleSnapshot(ctx context.Context, pool *pgxpool.Pool) (RuleSnapshot, e
 		}
 	} else {
 		snapshot.OwnershipOverrides = &ownership
+	}
+
+	rebac, err := queryReBACRelationRules(ctx, pool)
+	if err != nil {
+		if !isUndefinedTable(err) {
+			return RuleSnapshot{}, err
+		}
+	} else {
+		snapshot.ReBACRelations = &rebac
 	}
 
 	return snapshot, nil
@@ -438,6 +460,44 @@ FROM policy_message_ownership_override_rules
 GROUP BY action, min_role
 ORDER BY action, min_role
 `)
+}
+
+func queryReBACRelationRules(ctx context.Context, pool *pgxpool.Pool) (RuleRelationSnapshot, error) {
+	var snapshot RuleRelationSnapshot
+	if err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM policy_rebac_message_action_rules
+WHERE enabled = true
+`).Scan(&snapshot.Total); err != nil {
+		return RuleRelationSnapshot{}, err
+	}
+	rows, err := pool.Query(ctx, `
+SELECT action, relation_type, conversation_scope, COUNT(*)
+FROM policy_rebac_message_action_rules
+WHERE enabled = true
+GROUP BY action, relation_type, conversation_scope
+ORDER BY action, relation_type, conversation_scope
+`)
+	if err != nil {
+		return RuleRelationSnapshot{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var action RuleRelationActionSnapshot
+		if err := rows.Scan(
+			&action.Action,
+			&action.RelationType,
+			&action.ConversationScope,
+			&action.Total,
+		); err != nil {
+			return RuleRelationSnapshot{}, err
+		}
+		snapshot.Actions = append(snapshot.Actions, action)
+	}
+	if err := rows.Err(); err != nil {
+		return RuleRelationSnapshot{}, err
+	}
+	return snapshot, nil
 }
 
 func queryRoleRuleSnapshot(ctx context.Context, pool *pgxpool.Pool, totalQuery string, actionQuery string) (RuleRoleSnapshot, error) {

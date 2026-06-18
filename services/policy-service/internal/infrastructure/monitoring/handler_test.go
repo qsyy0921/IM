@@ -322,6 +322,17 @@ func TestRenderPrometheusIncludesPolicyAggregates(t *testing.T) {
 					{Action: "EDIT", MinRole: "OWNER", Total: 1},
 				},
 			},
+			ReBACRelations: &RuleRelationSnapshot{
+				Total: 1,
+				Actions: []RuleRelationActionSnapshot{
+					{
+						Action:            "SEND",
+						RelationType:      "DIRECT_CONTACT_ACTIVE",
+						ConversationScope: "DIRECT",
+						Total:             1,
+					},
+				},
+			},
 		},
 		Projection: &ProjectionSnapshot{
 			ContactEdges: &ContactEdgeProjectionSnapshot{
@@ -364,6 +375,8 @@ func TestRenderPrometheusIncludesPolicyAggregates(t *testing.T) {
 	assertContains(t, body, `nexusim_policy_rule_actions{action="SEND",decision="deny",scope="user_restriction"} 1`)
 	assertContains(t, body, `nexusim_policy_role_rules{scope="conversation_role"} 1`)
 	assertContains(t, body, `nexusim_policy_role_rule_actions{action="DELETE",min_role="ADMIN",scope="conversation_role"} 1`)
+	assertContains(t, body, `nexusim_policy_rebac_relation_rules{state="total"} 1`)
+	assertContains(t, body, `nexusim_policy_rebac_relation_rule_actions{action="SEND",conversation_scope="DIRECT",relation_type="DIRECT_CONTACT_ACTIVE"} 1`)
 	assertContains(t, body, `nexusim_policy_contact_edges_projection{state="blocked"} 1`)
 	assertContains(t, body, `nexusim_policy_conversation_members_projection{state="active"} 3`)
 	assertContains(t, body, `nexusim_policy_conversation_members_by_role{role="OWNER"} 1`)
@@ -415,6 +428,7 @@ func TestQueryRuleSnapshotIncludesAllPolicyRuleStoresIntegration(t *testing.T) {
 	applyPolicyMonitoringMigrations(t, ctx, pool)
 	if _, err := pool.Exec(ctx, `
 TRUNCATE
+    policy_rebac_message_action_rules,
     policy_user_message_action_restrictions,
     policy_message_ownership_override_rules,
     policy_conversation_role_action_rules,
@@ -453,6 +467,11 @@ INSERT INTO policy_message_ownership_override_rules (
 ) VALUES
     ('tenant-metrics', 'EDIT', 'ADMIN', 'OWNERSHIP_ADMIN'),
     ('tenant-metrics', 'DELETE', 'OWNER', 'OWNERSHIP_OWNER');
+INSERT INTO policy_rebac_message_action_rules (
+    tenant_id, action, relation_type, conversation_scope, permission_version, classification
+) VALUES
+    ('tenant-metrics', 'SEND', 'DIRECT_CONTACT_ACTIVE', 'DIRECT', 1, 'DIRECT_CONTACT_REQUIRED'),
+    ('tenant-metrics', 'EDIT', 'CONVERSATION_MEMBER_ACTIVE', 'ANY', 1, 'MEMBER_REQUIRED');
 `); err != nil {
 		t.Fatalf("seed policy rule tables: %v", err)
 	}
@@ -483,6 +502,9 @@ INSERT INTO policy_message_ownership_override_rules (
 	}
 	if snapshot.OwnershipOverrides == nil || snapshot.OwnershipOverrides.Total != 2 || len(snapshot.OwnershipOverrides.Actions) != 2 {
 		t.Fatalf("unexpected ownership override snapshot: %+v", snapshot.OwnershipOverrides)
+	}
+	if snapshot.ReBACRelations == nil || snapshot.ReBACRelations.Total != 2 || len(snapshot.ReBACRelations.Actions) != 2 {
+		t.Fatalf("unexpected rebac relation snapshot: %+v", snapshot.ReBACRelations)
 	}
 }
 
@@ -569,6 +591,7 @@ func applyPolicyMonitoringMigrations(t *testing.T, ctx context.Context, pool *pg
 		"000008_policy_conversation_role_rules.sql",
 		"000009_policy_message_ownership_override_rules.sql",
 		"000010_policy_user_message_action_restrictions.sql",
+		"000013_policy_rebac_relation_rules.sql",
 	} {
 		path := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "policy", name)
 		statement, err := os.ReadFile(path)

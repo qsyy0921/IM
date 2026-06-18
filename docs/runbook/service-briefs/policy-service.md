@@ -3,7 +3,8 @@
 ## 当前状态
 
 - 已有 `CheckMessageAction`、PG exact rules、user message action restrictions、tenant rules、conversation role gate、contacts projection。
-- 已补 first-stage ReBAC decision source：`CheckMessageActionResponse`、`policy_decision_audit_outbox`、低敏 `decision-audit-export` 和 `im.policy.events` 都会携带稳定 `decision_source`，用于区分 fallback、exact rule、tenant rule、user restriction、tenant quota、conversation role、contact projection、message ownership、ownership override 和 content moderation；该字段只表达决策路径，不包含 provider body、消息正文或原始用户标识。
+- 已补 first-stage ReBAC decision source：`CheckMessageActionResponse`、`policy_decision_audit_outbox`、低敏 `decision-audit-export` 和 `im.policy.events` 都会携带稳定 `decision_source`，用于区分 fallback、exact rule、tenant rule、user restriction、tenant quota、ReBAC relation gate、conversation role、contact projection、message ownership、ownership override 和 content moderation；该字段只表达决策路径，不包含 provider body、消息正文或原始用户标识。
+- 已补 first-stage ReBAC relationship gate：`policy_rebac_message_action_rules` 可按 action / conversation scope 配置 `DIRECT_CONTACT_ACTIVE` 和 `CONVERSATION_MEMBER_ACTIVE` 关系要求；不满足关系时会在 exact / tenant allow 前 fail-closed deny，满足关系只继续后续规则，不直接授予权限；本地 `/metrics` 只暴露 action / relation / scope 聚合计数。
 - 已有 ownership gate / override、decision audit outbox relay 和 repair。
 - 已补 `/healthz`、`/readyz`、`/debug/metrics` 和 first-stage Prometheus text `/metrics`，可观察低敏 gRPC、decision、PG pool、policy rule store、projection、worker / relay retry 和 `policy_decision_audit_outbox` 聚合状态；本地 Prometheus scrape target 为 `host.docker.internal:11916`，并已有本地 alert rules / Grafana dashboard 原型；debug HTTP 监听默认只允许 loopback / RFC1918 私网，公网或 unspecified 地址必须显式 `NEXUSIM_POLICY_DEBUG_ALLOW_PUBLIC=true`。
 - 已补 first-stage OpenTelemetry gRPC server span；gRPC access log 只记录低敏 `trace_id/request_id`，并对白名单外入口 metadata 直接丢弃。
@@ -24,4 +25,4 @@
 
 ## 后续
 
-- 完整 ReBAC graph / DSL、provider-grade moderation / risk scoring、provider-grade tenant DSL / quota、provider-grade 外部 audit sink；当前 decision source、keyword / HTTP moderation、decision-audit-export、tenant action quota、Prometheus / Grafana、direct capacity baseline 和单服务 30m 长跑切片只用于本地开发和面试展示，完整 9 服务长跑、生产 OTel collector / alerting / SLO dashboard、生产容量曲线和 sizing 仍属于后续统一观测治理。
+- provider-grade ReBAC graph / DSL、provider-grade moderation / risk scoring、provider-grade tenant DSL / quota、provider-grade 外部 audit sink；当前 decision source、first-stage relationship gate、keyword / HTTP moderation、decision-audit-export、tenant action quota、Prometheus / Grafana、direct capacity baseline 和单服务 30m 长跑切片只用于本地开发和面试展示，完整 9 服务长跑、生产 OTel collector / alerting / SLO dashboard、生产容量曲线和 sizing 仍属于后续统一观测治理。

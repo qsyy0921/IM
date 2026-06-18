@@ -26,11 +26,27 @@ const (
 	PolicyDecisionSourceTenantRule        PolicyDecisionSource = "TENANT_RULE"
 	PolicyDecisionSourceUserRestriction   PolicyDecisionSource = "USER_RESTRICTION"
 	PolicyDecisionSourceTenantQuota       PolicyDecisionSource = "TENANT_QUOTA"
+	PolicyDecisionSourceReBACRelation     PolicyDecisionSource = "REBAC_RELATION"
 	PolicyDecisionSourceConversationRole  PolicyDecisionSource = "CONVERSATION_ROLE"
 	PolicyDecisionSourceContactProjection PolicyDecisionSource = "CONTACT_PROJECTION"
 	PolicyDecisionSourceOwnershipOverride PolicyDecisionSource = "OWNERSHIP_OVERRIDE"
 	PolicyDecisionSourceMessageOwnership  PolicyDecisionSource = "MESSAGE_OWNERSHIP"
 	PolicyDecisionSourceContentModeration PolicyDecisionSource = "CONTENT_MODERATION"
+)
+
+type ReBACRelationType string
+
+const (
+	ReBACRelationDirectContactActive      ReBACRelationType = "DIRECT_CONTACT_ACTIVE"
+	ReBACRelationConversationMemberActive ReBACRelationType = "CONVERSATION_MEMBER_ACTIVE"
+)
+
+type ReBACConversationScope string
+
+const (
+	ReBACConversationScopeAny    ReBACConversationScope = "ANY"
+	ReBACConversationScopeDirect ReBACConversationScope = "DIRECT"
+	ReBACConversationScopeGroup  ReBACConversationScope = "GROUP"
 )
 
 type CheckMessageActionCommand struct {

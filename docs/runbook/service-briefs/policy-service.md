@@ -26,6 +26,5 @@
 - 已完成一条 clean commit direct 30m 长跑切片：commit `0f650e71`，4 VU，4,317,626 次 decision，约 2398.484 decisions/s，p95 4.444ms，p99 13.905ms；原始结果在 `H:\NexusIM\loadtest-results\capacity-longrun-nine-services-20260618-plan\policy-service`，报告见 `docs/runbook/loadtest/policy-service/loadtest-report-20260618-policy-direct-longrun-slice.md`。这不是完整 9 服务 campaign 或生产 sizing。
 
 ## 后续
-
-- AI 底座转进前的必要收口：继续确保 retrieval / RAG / Agent 可复用 `decision_source`、decision audit、strict check 和 first-stage tool policy precheck 边界。
-- Provider-grade ReBAC graph / DSL、provider-grade moderation / risk scoring、provider-grade tenant DSL / quota、provider-grade 外部 audit pipeline 后置；当前 decision source、first-stage relationship gate、rebac relation 本地 operator、keyword / HTTP moderation、decision-audit-export / forward、tenant action quota、Prometheus / Grafana、direct capacity baseline 和单服务 30m 长跑切片只用于本地开发和面试展示，完整 9 服务长跑、生产 OTel collector / alerting / SLO dashboard、生产容量曲线和 sizing 仍属于后续统一观测治理。
+- AI 底座转进前继续确保 retrieval / RAG / Agent 可复用 `decision_source`、decision audit、strict check 和 first-stage tool policy precheck 边界。
+- Provider-grade ReBAC graph / DSL、moderation / risk scoring、tenant DSL / quota、外部 audit pipeline 后置；当前能力只用于本地开发和面试展示，完整 9 服务长跑、生产 OTel / alerting / SLO dashboard、生产容量曲线和 sizing 仍属于后续统一治理。

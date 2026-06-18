@@ -56,7 +56,7 @@
 
 这些工作按依赖分批进入，不再永久等到所有生产级 hardening 完成后才启动：
 
-- `search-service`：AI 底座第一步，第一实现切片已落 proto / migration / 六层 skeleton；下一步补 v0.1 搜索 projection、visibility、tombstone、真实 `SearchMessages` 和 smoke，不做 LLM。
+- `search-service`：AI 底座第一步，proto / migration / 六层 skeleton、PostgreSQL repository、真实 `SearchMessages` 查询和 `grpc` runtime mode 已落；下一步补 timeline decoder / consumer、projection smoke、visibility / tombstone 端到端验证，不做 LLM。
 - `memory-service` / group memory projection：在 search-service 边界稳定后做结构化协作记忆、版本语义、speaker / audience 归因、Memory Graph 和画像聚合；无 source ref 的长期 memory 不能进入 ACTIVE。
 - `retrieval-gateway`：在 search / memory 之后做统一 EvidencePack、权限过滤、引用来源和 temporal version 入口。
 - `rag-service`：只消费 EvidencePack，不直接检索业务库。

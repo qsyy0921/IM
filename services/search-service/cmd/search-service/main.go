@@ -13,6 +13,12 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	searchgrpc "github.com/qsyy0921/IM/services/search-service/internal/api/grpc"
+	"github.com/qsyy0921/IM/services/search-service/internal/app"
+	postgresinfra "github.com/qsyy0921/IM/services/search-service/internal/infrastructure/postgres"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -29,7 +35,14 @@ func run(ctx context.Context) error {
 	if err := validateSearchServiceMode(mode); err != nil {
 		return err
 	}
-	return runNoop(ctx)
+	switch mode {
+	case "noop":
+		return runNoop(ctx)
+	case "grpc":
+		return runGRPC(ctx)
+	default:
+		return fmt.Errorf("unsupported NEXUSIM_SEARCH_SERVICE_MODE %q", mode)
+	}
 }
 
 func runNoop(ctx context.Context) error {
@@ -58,10 +71,58 @@ func searchServiceModeFromEnv() string {
 
 func validateSearchServiceMode(mode string) error {
 	switch mode {
-	case "noop":
+	case "noop", "grpc":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_SEARCH_SERVICE_MODE %q", mode)
+	}
+}
+
+func runGRPC(ctx context.Context) error {
+	debugAddr, err := searchDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	addr := envString("NEXUSIM_SEARCH_GRPC_ADDR", "127.0.0.1:10570")
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	repository := postgresinfra.NewRepository(pool)
+	server := grpc.NewServer()
+	searchgrpc.Register(server, searchgrpc.NewServer(app.NewSearchMessagesUseCase(repository)))
+
+	serveErr := make(chan error, 1)
+	go func() {
+		serveErr <- server.Serve(listener)
+	}()
+	log.Printf("search-service grpc listening on %s", addr)
+
+	select {
+	case err := <-serveErr:
+		if errors.Is(err, grpc.ErrServerStopped) {
+			return context.Canceled
+		}
+		return err
+	case <-ctx.Done():
+		server.GracefulStop()
+		err := <-serveErr
+		if err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			return err
+		}
+		return context.Canceled
 	}
 }
 
@@ -112,6 +173,28 @@ func envOptionalBool(name string) (bool, bool, error) {
 		return false, true, err
 	}
 	return value, true, nil
+}
+
+func envString(name string, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return nil, errors.New("NEXUSIM_PG_DSN is required")
+	}
+	config, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	connectCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	return pgxpool.NewWithConfig(connectCtx, config)
 }
 
 func startDebugServer(ctx context.Context, addr string) (func(), error) {

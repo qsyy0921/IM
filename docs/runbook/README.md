@@ -28,14 +28,13 @@
 - 本地分布式 / Docker / 观测 / 压测：`distributed-local.md`、`mac-arm64-docker-images.md`、`observability-local.md`、`local-loadtest.md`
 - 低敏证据 manifest：`distributed-smoke-evidence.json`、`observability-evidence.json`、`capacity-baseline-evidence.json`、`resource-snapshot-evidence.json`
 - 复杂度治理：`file-size-hotspots.md`、`file-size-hotspot-baseline.json`
-- repair / DLQ operator：`repair-operators.md`；机器可读 catalog：`repair-operators.catalog.json`
+- repair / DLQ operator：`repair-operators.md`、`repair-operators.catalog.json`
 - 研究论文分类：`../research/paper-organization.md`
 - 历史长文档：`archive/`、`history/`
 
 ## 维护规则
 
-- 当前入口和索引必须保持短。
-- 每轮只读取本轮必要文档；不要默认全文扫长 SDD、archive、history 或 loadtest 报告。
+- 当前入口和索引必须保持短；每轮只读取本轮必要文档，不默认全文扫长历史。
 - 历史事实写入 archive / history / loadtest 报告，不回填到入口文档。
 - sub-agent 可并行协助开发或审查，但要限制数量、拆分写入范围，结果合入后立即关闭。
 - 每轮结束按本轮风险运行必要检查；生产级测试不是短期默认收口条件。

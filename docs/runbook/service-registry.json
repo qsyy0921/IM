@@ -81,7 +81,7 @@
     {
       "name": "search-service",
       "stage": "foundation-active",
-      "local_process": "search-service-noop",
+      "local_process": "search-service-grpc",
       "debug_port": 11917,
       "prometheus_rule_file": "prometheus-search-service-alerts.yml",
       "grafana_dashboard": "search-service-observability.json"

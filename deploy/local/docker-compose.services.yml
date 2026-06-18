@@ -137,13 +137,16 @@ services:
       nexusim-services:
         ipv4_address: 172.30.80.17
 
-  search-service-noop:
+  search-service-grpc:
     image: nexusim/search-service:local
-    container_name: nexusim-search-service-noop
+    container_name: nexusim-search-service-grpc
     environment:
-      NEXUSIM_SEARCH_SERVICE_MODE: noop
+      NEXUSIM_SEARCH_SERVICE_MODE: grpc
+      NEXUSIM_SEARCH_GRPC_ADDR: 172.30.80.20:10570
       NEXUSIM_SEARCH_DEBUG_ADDR: 172.30.80.20:11917
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
     ports:
+      - "10570:10570"
       - "11917:11917"
     restart: unless-stopped
     networks:

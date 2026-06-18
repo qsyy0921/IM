@@ -14,14 +14,16 @@ func TestSearchServiceModeFromEnvDefaultsToNoop(t *testing.T) {
 	}
 }
 
-func TestValidateSearchServiceModeAcceptsNoop(t *testing.T) {
-	if err := validateSearchServiceMode("noop"); err != nil {
-		t.Fatalf("expected noop mode to be accepted: %v", err)
+func TestValidateSearchServiceModeAcceptsSupportedModes(t *testing.T) {
+	for _, mode := range []string{"noop", "grpc"} {
+		if err := validateSearchServiceMode(mode); err != nil {
+			t.Fatalf("expected %s mode to be accepted: %v", mode, err)
+		}
 	}
 }
 
 func TestValidateSearchServiceModeRejectsUnknownMode(t *testing.T) {
-	if err := validateSearchServiceMode("grpc"); err == nil {
+	if err := validateSearchServiceMode("timeline-consumer"); err == nil {
 		t.Fatalf("expected unsupported search-service mode to fail")
 	}
 }

@@ -280,7 +280,7 @@ INSERT INTO memory_structured_events (
 	source_projection_version, created_at, updated_at
 ) VALUES (
 	$1, $2, 'CONVERSATION', $3, $3, 'phoenix-launch',
-	'DECISION', 'ACTIVE', 'REVIEWED', $4, $5::jsonb, $6::jsonb,
+	'DECISION', 'ACTIVE', 'APPROVED', $4, $5::jsonb, $6::jsonb,
 	$7, $8, $9, NULL, '[]'::jsonb,
 	'[]'::jsonb, 0.9100, $10, 'rag-smoke-v1',
 	$11, $9, $9
@@ -501,7 +501,7 @@ func verifyMemoryItem(item *retrievalv1.EvidenceItem, seed seededData) error {
 	if item.GetTemporalStatus() != "ACTIVE" {
 		return fmt.Errorf("unexpected temporal status %q", item.GetTemporalStatus())
 	}
-	if item.GetReviewState() != "REVIEWED" {
+	if item.GetReviewState() != "APPROVED" {
 		return fmt.Errorf("unexpected review state %q", item.GetReviewState())
 	}
 	if item.GetExtractionVersion() != "rag-smoke-v1" {

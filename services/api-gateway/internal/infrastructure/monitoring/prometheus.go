@@ -114,6 +114,8 @@ func writeRateLimitPrometheus(builder *strings.Builder, snapshot ratelimit.Snaps
 	writePrometheusSample(builder, "nexusim_api_gateway_rate_limit_tenant_plan_reload_errors_total", labels, strconv.FormatInt(snapshot.TenantErrors, 10))
 	writePrometheusHeader(builder, "nexusim_api_gateway_rate_limit_tenant_plan_require_checksum", "Gauge", "Whether api-gateway requires tenant rate-limit plan snapshots to carry a valid checksum.")
 	writePrometheusSample(builder, "nexusim_api_gateway_rate_limit_tenant_plan_require_checksum", labels, prometheusBool(snapshot.TenantPlanRequireChecksum))
+	writePrometheusHeader(builder, "nexusim_api_gateway_rate_limit_tenant_plan_require_versioned", "Gauge", "Whether api-gateway requires tenant rate-limit plan snapshots to be versioned.")
+	writePrometheusSample(builder, "nexusim_api_gateway_rate_limit_tenant_plan_require_versioned", labels, prometheusBool(snapshot.TenantPlanRequireVersioned))
 	writePrometheusHeader(builder, "nexusim_api_gateway_rate_limit_tenant_plan_url_bearer_token_configured", "Gauge", "Whether api-gateway tenant rate-limit URL source has a bearer token configured.")
 	writePrometheusSample(builder, "nexusim_api_gateway_rate_limit_tenant_plan_url_bearer_token_configured", labels, prometheusBool(snapshot.TenantPlanURLBearerSet))
 	writePrometheusHeader(builder, "nexusim_api_gateway_rate_limit_tenant_plan_url_require_https", "Gauge", "Whether api-gateway tenant rate-limit URL source requires HTTPS.")

@@ -82,6 +82,7 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 			TenantPlanSource:           "file",
 			TenantPlanGeneratedAt:      1_800_000_000_000,
 			TenantPlanRequireChecksum:  true,
+			TenantPlanRequireVersioned: true,
 			TenantPlanMaxAgeMS:         3_600_000,
 			TenantPlanAgeMS:            3_700_000,
 			TenantPlanStale:            true,
@@ -122,6 +123,7 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 	assertContains(t, body, `nexusim_api_gateway_grpc_legacy_descriptor_last_seen_unix_milliseconds`)
 	assertContains(t, body, `nexusim_api_gateway_rate_limit_enabled{`+rateLabels+`} 1`)
 	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_require_checksum{`+rateLabels+`} 1`)
+	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_require_versioned{`+rateLabels+`} 1`)
 	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_url_bearer_token_configured{`+rateLabels+`} 1`)
 	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_url_require_https{`+rateLabels+`} 1`)
 	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_url_tls_configured{`+rateLabels+`} 1`)

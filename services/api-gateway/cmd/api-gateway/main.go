@@ -705,6 +705,10 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 	if err != nil {
 		return nil, nil, err
 	}
+	tenantPlanRequireVersioned, err := tenantPlanRequireVersionedFromEnv()
+	if err != nil {
+		return nil, nil, err
+	}
 	tenantPlanSourceIsURL := tenantPlanSnapshot.Source == "url"
 	tenantPlanURLRequireHTTPS := false
 	tenantPlanURLTLSConfig := tenantPlanURLTLSConfig{}
@@ -730,6 +734,7 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 		TenantPlanGeneratedAtUnixMS: tenantPlanSnapshot.GeneratedAtUnixMS,
 		TenantPlanChecksumPresent:   tenantPlanSnapshot.ChecksumPresent,
 		TenantPlanRequireChecksum:   tenantPlanRequireChecksum,
+		TenantPlanRequireVersioned:  tenantPlanRequireVersioned,
 		TenantPlanMaxAge:            tenantPlanMaxAge,
 		TenantPlanURLBearerTokenSet: tenantPlanSourceIsURL && tenantPlanURLBearerTokenConfigured(),
 		TenantPlanURLRequireHTTPS:   tenantPlanSourceIsURL && tenantPlanURLRequireHTTPS,
@@ -771,7 +776,7 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 		}
 		closeFn := func() error { return client.Close() }
 		if tenantPlanReloadInterval > 0 {
-			stopReloader, err := startTenantPlanReloader(ctx, limiter, tenantPlanSnapshot.Source, tenantPlanReloadLocationFromEnv(tenantPlanSnapshot.Source), tenantPlanMaxAge, tenantPlanRequireChecksum, tenantPlanReloadInterval)
+			stopReloader, err := startTenantPlanReloader(ctx, limiter, tenantPlanSnapshot.Source, tenantPlanReloadLocationFromEnv(tenantPlanSnapshot.Source), tenantPlanMaxAge, tenantPlanRequireChecksum, tenantPlanRequireVersioned, tenantPlanReloadInterval)
 			if err != nil {
 				_ = closeFn()
 				return nil, nil, err
@@ -786,7 +791,7 @@ func newRateLimiterFromEnv(ctx context.Context, authenticator *gatewayauth.Authe
 	}
 	closeFn := func() error { return nil }
 	if tenantPlanReloadInterval > 0 {
-		stopReloader, err := startTenantPlanReloader(ctx, limiter, tenantPlanSnapshot.Source, tenantPlanReloadLocationFromEnv(tenantPlanSnapshot.Source), tenantPlanMaxAge, tenantPlanRequireChecksum, tenantPlanReloadInterval)
+		stopReloader, err := startTenantPlanReloader(ctx, limiter, tenantPlanSnapshot.Source, tenantPlanReloadLocationFromEnv(tenantPlanSnapshot.Source), tenantPlanMaxAge, tenantPlanRequireChecksum, tenantPlanRequireVersioned, tenantPlanReloadInterval)
 		if err != nil {
 			return nil, nil, err
 		}

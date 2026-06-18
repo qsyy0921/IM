@@ -198,6 +198,7 @@ gate 失败时仍会写入证据文件，并以非零 exit code 返回，方便 
   -RequireRateLimitEnabled `
   -RequiredSource url `
   -RequireVersionedSnapshot `
+  -RequireVersionedPolicy `
   -RequireChecksum `
   -RequireChecksumPolicy `
   -RequireURLHTTPS `
@@ -207,7 +208,7 @@ gate 失败时仍会写入证据文件，并以非零 exit code 返回，方便 
   -MaxAllowedAge 30m
 ```
 
-这些选项只验证当前进程实际应用的低敏配置源状态：source、version、checksum、checksum-required policy、URL HTTPS / bearer / TLS / client-cert guard、snapshot age/stale 和 reload error。它不证明完整配置中心、审批、灰度、签名发布或审计已经完成。
+这些选项只验证当前进程实际应用的低敏配置源状态：source、version、versioned-required policy、checksum、checksum-required policy、URL HTTPS / bearer / TLS / client-cert guard、snapshot age/stale 和 reload error。它不证明完整配置中心、审批、灰度、签名发布或审计已经完成。
 
 ## Local Grafana
 

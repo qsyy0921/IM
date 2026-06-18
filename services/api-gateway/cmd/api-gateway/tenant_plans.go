@@ -60,6 +60,10 @@ func tenantRateLimitPlansFromEnv(ctx context.Context) (tenantRateLimitPlanSnapsh
 	if err != nil {
 		return tenantRateLimitPlanSnapshot{}, err
 	}
+	requireVersioned, err := tenantPlanRequireVersionedFromEnv()
+	if err != nil {
+		return tenantRateLimitPlanSnapshot{}, err
+	}
 	if source == "" || source == "auto" {
 		switch {
 		case raw != "":
@@ -91,7 +95,7 @@ func tenantRateLimitPlansFromEnv(ctx context.Context) (tenantRateLimitPlanSnapsh
 		if err != nil {
 			return tenantRateLimitPlanSnapshot{}, err
 		}
-		if err := validateTenantPlanSnapshotPolicy(snapshot, maxAge, requireChecksum); err != nil {
+		if err := validateTenantPlanSnapshotPolicy(snapshot, maxAge, requireChecksum, requireVersioned); err != nil {
 			return tenantRateLimitPlanSnapshot{}, err
 		}
 		return snapshot, nil
@@ -100,7 +104,7 @@ func tenantRateLimitPlansFromEnv(ctx context.Context) (tenantRateLimitPlanSnapsh
 			return tenantRateLimitPlanSnapshot{}, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL is required when tenant plan source is url")
 		}
 		source = "url"
-		snapshot, err := tenantRateLimitPlansFromURL(ctx, endpoint, maxAge, requireChecksum)
+		snapshot, err := tenantRateLimitPlansFromURL(ctx, endpoint, maxAge, requireChecksum, requireVersioned)
 		if err != nil {
 			return tenantRateLimitPlanSnapshot{}, err
 		}
@@ -116,13 +120,13 @@ func tenantRateLimitPlansFromEnv(ctx context.Context) (tenantRateLimitPlanSnapsh
 		return tenantRateLimitPlanSnapshot{}, err
 	}
 	snapshot.Source = source
-	if err := validateTenantPlanSnapshotPolicy(snapshot, maxAge, requireChecksum); err != nil {
+	if err := validateTenantPlanSnapshotPolicy(snapshot, maxAge, requireChecksum, requireVersioned); err != nil {
 		return tenantRateLimitPlanSnapshot{}, err
 	}
 	return snapshot, nil
 }
 
-func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge time.Duration, requireChecksum bool) (tenantRateLimitPlanSnapshot, error) {
+func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge time.Duration, requireChecksum bool, requireVersioned bool) (tenantRateLimitPlanSnapshot, error) {
 	endpoint = strings.TrimSpace(endpoint)
 	if endpoint == "" {
 		return tenantRateLimitPlanSnapshot{}, errors.New("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_URL is required when tenant plan source is url")
@@ -192,7 +196,7 @@ func tenantRateLimitPlansFromURL(ctx context.Context, endpoint string, maxAge ti
 	if snapshot.Version == "" {
 		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan URL source requires a versioned snapshot")
 	}
-	if err := validateTenantPlanSnapshotPolicy(snapshot, maxAge, requireChecksum); err != nil {
+	if err := validateTenantPlanSnapshotPolicy(snapshot, maxAge, requireChecksum, requireVersioned); err != nil {
 		return tenantRateLimitPlanSnapshot{}, err
 	}
 	snapshot.Source = "url"
@@ -427,7 +431,15 @@ func tenantPlanRequireChecksumFromEnv() (bool, error) {
 	return value, err
 }
 
-func validateTenantPlanSnapshotPolicy(snapshot tenantRateLimitPlanSnapshot, maxAge time.Duration, requireChecksum bool) error {
+func tenantPlanRequireVersionedFromEnv() (bool, error) {
+	value, _, err := envOptionalBool("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_REQUIRE_VERSIONED")
+	return value, err
+}
+
+func validateTenantPlanSnapshotPolicy(snapshot tenantRateLimitPlanSnapshot, maxAge time.Duration, requireChecksum bool, requireVersioned bool) error {
+	if requireVersioned && (strings.TrimSpace(snapshot.Version) == "" || snapshot.GeneratedAtUnixMS <= 0) {
+		return errors.New("api-gateway tenant plan snapshot version is required")
+	}
 	if err := validateTenantPlanMaxAge(snapshot, maxAge); err != nil {
 		return err
 	}
@@ -465,7 +477,7 @@ func tenantPlanReloadLocationFromEnv(source string) string {
 	}
 }
 
-func startTenantPlanReloader(ctx context.Context, limiter *ratelimitinfra.Limiter, source string, location string, maxAge time.Duration, requireChecksum bool, interval time.Duration) (func() error, error) {
+func startTenantPlanReloader(ctx context.Context, limiter *ratelimitinfra.Limiter, source string, location string, maxAge time.Duration, requireChecksum bool, requireVersioned bool, interval time.Duration) (func() error, error) {
 	source = strings.TrimSpace(source)
 	location = strings.TrimSpace(location)
 	if location == "" {
@@ -492,7 +504,7 @@ func startTenantPlanReloader(ctx context.Context, limiter *ratelimitinfra.Limite
 			case <-reloadCtx.Done():
 				return
 			case <-ticker.C:
-				snapshot, err := tenantRateLimitPlansFromSource(reloadCtx, source, location, maxAge, requireChecksum)
+				snapshot, err := tenantRateLimitPlansFromSource(reloadCtx, source, location, maxAge, requireChecksum, requireVersioned)
 				if err != nil {
 					limiter.RecordTenantPlanReloadError()
 					log.Printf("api-gateway tenant rate limit plan reload failed: %v", err)
@@ -511,19 +523,19 @@ func startTenantPlanReloader(ctx context.Context, limiter *ratelimitinfra.Limite
 	}, nil
 }
 
-func tenantRateLimitPlansFromSource(ctx context.Context, source string, location string, maxAge time.Duration, requireChecksum bool) (tenantRateLimitPlanSnapshot, error) {
+func tenantRateLimitPlansFromSource(ctx context.Context, source string, location string, maxAge time.Duration, requireChecksum bool, requireVersioned bool) (tenantRateLimitPlanSnapshot, error) {
 	switch source {
 	case "file":
 		snapshot, err := tenantRateLimitPlansFromFile(location)
 		if err != nil {
 			return tenantRateLimitPlanSnapshot{}, err
 		}
-		if err := validateTenantPlanSnapshotPolicy(snapshot, maxAge, requireChecksum); err != nil {
+		if err := validateTenantPlanSnapshotPolicy(snapshot, maxAge, requireChecksum, requireVersioned); err != nil {
 			return tenantRateLimitPlanSnapshot{}, err
 		}
 		return snapshot, nil
 	case "url":
-		return tenantRateLimitPlansFromURL(ctx, location, maxAge, requireChecksum)
+		return tenantRateLimitPlansFromURL(ctx, location, maxAge, requireChecksum, requireVersioned)
 	default:
 		return tenantRateLimitPlanSnapshot{}, errors.New("api-gateway tenant plan reload requires file or url source")
 	}

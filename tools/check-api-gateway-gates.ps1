@@ -75,6 +75,7 @@ try {
     $quotaGood = Join-Path $tempDir "quota-good.json"
     $quotaMissingClientCert = Join-Path $tempDir "quota-missing-client-cert.json"
     $quotaWrongRedisMode = Join-Path $tempDir "quota-wrong-redis-mode.json"
+    $quotaMissingVersionedPolicy = Join-Path $tempDir "quota-missing-versioned-policy.json"
     $quotaRedisErrors = Join-Path $tempDir "quota-redis-errors.json"
     $quotaIdentityErrors = Join-Path $tempDir "quota-identity-errors.json"
     $quotaTooFewPlans = Join-Path $tempDir "quota-too-few-plans.json"
@@ -91,6 +92,7 @@ try {
     "tenant_plan_generated_at_unix_ms": 1000000,
     "tenant_plan_checksum_present": true,
     "tenant_plan_require_checksum": true,
+    "tenant_plan_require_versioned": true,
     "tenant_plan_url_bearer_token_configured": true,
     "tenant_plan_url_require_https": true,
     "tenant_plan_url_tls_configured": true,
@@ -110,6 +112,7 @@ try {
     Write-JsonFile -Path $quotaGood -Content $quotaGoodJson
     Write-JsonFile -Path $quotaMissingClientCert -Content ($quotaGoodJson -replace '"tenant_plan_url_client_cert_configured": true', '"tenant_plan_url_client_cert_configured": false')
     Write-JsonFile -Path $quotaWrongRedisMode -Content ($quotaGoodJson -replace '"redis_mode": "cluster"', '"redis_mode": "single"')
+    Write-JsonFile -Path $quotaMissingVersionedPolicy -Content ($quotaGoodJson -replace '"tenant_plan_require_versioned": true', '"tenant_plan_require_versioned": false')
     Write-JsonFile -Path $quotaRedisErrors -Content ($quotaGoodJson -replace '"redis_error_count": 0', '"redis_error_count": 1')
     Write-JsonFile -Path $quotaIdentityErrors -Content ($quotaGoodJson -replace '"identity_error_count": 0', '"identity_error_count": 1')
     Write-JsonFile -Path $quotaTooFewPlans -Content ($quotaGoodJson -replace '"tenant_plan_count": 2', '"tenant_plan_count": 0')
@@ -125,6 +128,7 @@ try {
         "-RequiredSource", "url",
         "-RequiredRedisMode", "cluster",
         "-RequireVersionedSnapshot",
+        "-RequireVersionedPolicy",
         "-RequireChecksum",
         "-RequireChecksumPolicy",
         "-RequireURLHTTPS",
@@ -142,6 +146,7 @@ try {
     Invoke-GateExpectPass -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaGood))
     Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaMissingClientCert))
     Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaWrongRedisMode))
+    Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaMissingVersionedPolicy))
     Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaRedisErrors))
     Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaIdentityErrors))
     Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaTooFewPlans))

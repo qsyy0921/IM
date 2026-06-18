@@ -43,6 +43,7 @@ type Config struct {
 	TenantPlanGeneratedAtUnixMS int64
 	TenantPlanChecksumPresent   bool
 	TenantPlanRequireChecksum   bool
+	TenantPlanRequireVersioned  bool
 	TenantPlanMaxAge            time.Duration
 	TenantPlanURLBearerTokenSet bool
 	TenantPlanURLRequireHTTPS   bool
@@ -71,31 +72,32 @@ type Plan struct {
 }
 
 type Limiter struct {
-	enabled             bool
-	backend             string
-	scope               string
-	rate                float64
-	burst               float64
-	source              string
-	planVersion         string
-	planGeneratedAtMS   int64
-	planChecksum        bool
-	planRequireChecksum bool
-	planMaxAge          time.Duration
-	urlBearerSet        bool
-	urlRequireHTTPS     bool
-	urlTLSConfigured    bool
-	urlClientCertSet    bool
-	plansMu             sync.RWMutex
-	plans               map[string]quotaPlan
-	maxKeys             int
-	redis               redis.UniversalClient
-	redisMode           string
-	prefix              string
-	window              time.Duration
-	failOpen            bool
-	identity            IdentityFunc
-	now                 func() time.Time
+	enabled              bool
+	backend              string
+	scope                string
+	rate                 float64
+	burst                float64
+	source               string
+	planVersion          string
+	planGeneratedAtMS    int64
+	planChecksum         bool
+	planRequireChecksum  bool
+	planRequireVersioned bool
+	planMaxAge           time.Duration
+	urlBearerSet         bool
+	urlRequireHTTPS      bool
+	urlTLSConfigured     bool
+	urlClientCertSet     bool
+	plansMu              sync.RWMutex
+	plans                map[string]quotaPlan
+	maxKeys              int
+	redis                redis.UniversalClient
+	redisMode            string
+	prefix               string
+	window               time.Duration
+	failOpen             bool
+	identity             IdentityFunc
+	now                  func() time.Time
 
 	mu             sync.Mutex
 	buckets        map[string]*bucket
@@ -138,6 +140,7 @@ type Snapshot struct {
 	TenantPlanGeneratedAt      int64   `json:"tenant_plan_generated_at_unix_ms,omitempty"`
 	TenantPlanChecksumPresent  bool    `json:"tenant_plan_checksum_present,omitempty"`
 	TenantPlanRequireChecksum  bool    `json:"tenant_plan_require_checksum"`
+	TenantPlanRequireVersioned bool    `json:"tenant_plan_require_versioned"`
 	TenantPlanMaxAgeMS         int64   `json:"tenant_plan_max_age_ms,omitempty"`
 	TenantPlanAgeMS            int64   `json:"tenant_plan_age_ms,omitempty"`
 	TenantPlanStale            bool    `json:"tenant_plan_stale"`
@@ -173,30 +176,31 @@ func New(config Config) (*Limiter, error) {
 		scope = scopeToken
 	}
 	limiter := &Limiter{
-		enabled:             config.Enabled,
-		backend:             backend,
-		scope:               scope,
-		rate:                config.RequestsPerSecond,
-		burst:               float64(config.Burst),
-		source:              strings.TrimSpace(config.TenantPlanSource),
-		planVersion:         strings.TrimSpace(config.TenantPlanVersion),
-		planGeneratedAtMS:   config.TenantPlanGeneratedAtUnixMS,
-		planChecksum:        config.TenantPlanChecksumPresent,
-		planRequireChecksum: config.TenantPlanRequireChecksum,
-		planMaxAge:          config.TenantPlanMaxAge,
-		urlBearerSet:        config.TenantPlanURLBearerTokenSet,
-		urlRequireHTTPS:     config.TenantPlanURLRequireHTTPS,
-		urlTLSConfigured:    config.TenantPlanURLTLSConfigured,
-		urlClientCertSet:    config.TenantPlanURLClientCertSet,
-		maxKeys:             config.MaxKeys,
-		redis:               config.RedisClient,
-		redisMode:           redisMode,
-		prefix:              strings.Trim(strings.TrimSpace(config.RedisKeyPrefix), ":"),
-		window:              config.RedisWindow,
-		failOpen:            config.RedisFailOpen,
-		identity:            config.IdentityFunc,
-		now:                 config.Now,
-		buckets:             make(map[string]*bucket),
+		enabled:              config.Enabled,
+		backend:              backend,
+		scope:                scope,
+		rate:                 config.RequestsPerSecond,
+		burst:                float64(config.Burst),
+		source:               strings.TrimSpace(config.TenantPlanSource),
+		planVersion:          strings.TrimSpace(config.TenantPlanVersion),
+		planGeneratedAtMS:    config.TenantPlanGeneratedAtUnixMS,
+		planChecksum:         config.TenantPlanChecksumPresent,
+		planRequireChecksum:  config.TenantPlanRequireChecksum,
+		planRequireVersioned: config.TenantPlanRequireVersioned,
+		planMaxAge:           config.TenantPlanMaxAge,
+		urlBearerSet:         config.TenantPlanURLBearerTokenSet,
+		urlRequireHTTPS:      config.TenantPlanURLRequireHTTPS,
+		urlTLSConfigured:     config.TenantPlanURLTLSConfigured,
+		urlClientCertSet:     config.TenantPlanURLClientCertSet,
+		maxKeys:              config.MaxKeys,
+		redis:                config.RedisClient,
+		redisMode:            redisMode,
+		prefix:               strings.Trim(strings.TrimSpace(config.RedisKeyPrefix), ":"),
+		window:               config.RedisWindow,
+		failOpen:             config.RedisFailOpen,
+		identity:             config.IdentityFunc,
+		now:                  config.Now,
+		buckets:              make(map[string]*bucket),
 	}
 	if limiter.now == nil {
 		limiter.now = time.Now
@@ -307,6 +311,7 @@ func (limiter *Limiter) Snapshot() Snapshot {
 		TenantPlanGeneratedAt:      tenantPlanGeneratedAtMS,
 		TenantPlanChecksumPresent:  tenantPlanChecksumPresent,
 		TenantPlanRequireChecksum:  limiter.planRequireChecksum,
+		TenantPlanRequireVersioned: limiter.planRequireVersioned,
 		TenantPlanMaxAgeMS:         tenantPlanMaxAgeMS,
 		TenantPlanAgeMS:            tenantPlanAgeMS,
 		TenantPlanStale:            tenantPlanStale,

@@ -370,6 +370,36 @@ func TestTenantRateLimitPlansFromEnvRejectsMissingChecksumWhenRequired(t *testin
 	}
 }
 
+func TestTenantRateLimitPlansFromEnvRejectsUnversionedSnapshotWhenRequired(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE", "inline")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON", `{"tenant-a":{"requests_per_second":5,"burst":6}}`)
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_REQUIRE_VERSIONED", "true")
+	if _, err := tenantRateLimitPlansFromEnv(context.Background()); err == nil {
+		t.Fatalf("expected unversioned tenant plan snapshot to fail when versioned snapshots are required")
+	}
+}
+
+func TestNewRateLimiterFromEnvExposesTenantPlanVersionedPolicy(t *testing.T) {
+	clearAPIGatewayRateLimitConfig(t)
+	plans := map[string]ratelimitinfra.Plan{"tenant-a": {RequestsPerSecond: 5, Burst: 6}}
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_ENABLED", "true")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_RPS", "1")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_SOURCE", "inline")
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_JSON", versionedTenantPlanSnapshotJSON(t, plans, "quota-v1.require-versioned", time.Now().UnixMilli()))
+	t.Setenv("NEXUSIM_API_GATEWAY_RATE_LIMIT_TENANT_PLANS_REQUIRE_VERSIONED", "true")
+
+	limiter, closeFn, err := newRateLimiterFromEnv(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("new rate limiter with versioned tenant plan policy: %v", err)
+	}
+	defer closeFn()
+	snapshot := limiter.Snapshot()
+	if !snapshot.TenantPlanRequireVersioned || snapshot.TenantPlanVersion != "quota-v1.require-versioned" {
+		t.Fatalf("expected versioned tenant plan policy in snapshot, got %+v", snapshot)
+	}
+}
+
 func TestTenantRateLimitPlansFromEnvLoadsURLSnapshot(t *testing.T) {
 	clearAPIGatewayRateLimitConfig(t)
 	plans := map[string]ratelimitinfra.Plan{"tenant-url": {RequestsPerSecond: 9, Burst: 10}}
@@ -404,7 +434,7 @@ func TestTenantRateLimitPlansFromURLSanitizesTransportErrors(t *testing.T) {
 	endpoint := server.URL + "/quota?token=secret-token&user=user1@example.com"
 	server.Close()
 
-	_, err := tenantRateLimitPlansFromURL(context.Background(), endpoint, 0, false)
+	_, err := tenantRateLimitPlansFromURL(context.Background(), endpoint, 0, false, false)
 	if err == nil {
 		t.Fatalf("expected URL transport error")
 	}
@@ -704,7 +734,7 @@ func TestStartTenantPlanReloaderRequiresFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new limiter: %v", err)
 	}
-	if _, err := startTenantPlanReloader(context.Background(), limiter, "file", "", 0, false, time.Millisecond); err == nil {
+	if _, err := startTenantPlanReloader(context.Background(), limiter, "file", "", 0, false, false, time.Millisecond); err == nil {
 		t.Fatalf("expected missing tenant plan reload file to fail")
 	}
 }
@@ -715,7 +745,7 @@ func TestTenantRateLimitPlansFromSourceRejectsMissingChecksumWhenRequired(t *tes
 	if err := os.WriteFile(path, []byte(payload), 0o600); err != nil {
 		t.Fatalf("write tenant plans file: %v", err)
 	}
-	if _, err := tenantRateLimitPlansFromSource(context.Background(), "file", path, 0, true); err == nil {
+	if _, err := tenantRateLimitPlansFromSource(context.Background(), "file", path, 0, true, false); err == nil {
 		t.Fatalf("expected reload source without checksum to fail when checksum is required")
 	}
 }
@@ -725,7 +755,7 @@ func TestTenantRateLimitPlansFromSourceRejectsOversizedFileSnapshot(t *testing.T
 	if err := os.WriteFile(path, []byte(strings.Repeat("x", tenantPlanSnapshotMaxBytes+1)), 0o600); err != nil {
 		t.Fatalf("write oversized tenant plans file: %v", err)
 	}
-	if _, err := tenantRateLimitPlansFromSource(context.Background(), "file", path, 0, false); err == nil {
+	if _, err := tenantRateLimitPlansFromSource(context.Background(), "file", path, 0, false, false); err == nil {
 		t.Fatalf("expected oversized reload file snapshot to fail")
 	}
 }
@@ -736,7 +766,7 @@ func TestTenantRateLimitPlansFromSourceRejectsFutureSnapshot(t *testing.T) {
 	if err := os.WriteFile(path, []byte(versionedTenantPlanSnapshotJSON(t, plans, "quota-v1.reload-future", time.Now().Add(time.Hour).UnixMilli())), 0o600); err != nil {
 		t.Fatalf("write future tenant plans file: %v", err)
 	}
-	if _, err := tenantRateLimitPlansFromSource(context.Background(), "file", path, 0, false); err == nil {
+	if _, err := tenantRateLimitPlansFromSource(context.Background(), "file", path, 0, false, false); err == nil {
 		t.Fatalf("expected future reload file snapshot to fail")
 	}
 }
@@ -762,7 +792,7 @@ func TestStartTenantPlanReloaderUpdatesLimiter(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	stop, err := startTenantPlanReloader(ctx, limiter, "file", path, 0, false, 5*time.Millisecond)
+	stop, err := startTenantPlanReloader(ctx, limiter, "file", path, 0, false, false, 5*time.Millisecond)
 	if err != nil {
 		t.Fatalf("start tenant plan reloader: %v", err)
 	}
@@ -814,7 +844,7 @@ func TestStartTenantPlanReloaderKeepsLastValidURLSnapshotOnError(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	stop, err := startTenantPlanReloader(ctx, limiter, "url", server.URL, time.Hour, false, 5*time.Millisecond)
+	stop, err := startTenantPlanReloader(ctx, limiter, "url", server.URL, time.Hour, false, false, 5*time.Millisecond)
 	if err != nil {
 		t.Fatalf("start tenant plan reloader: %v", err)
 	}
@@ -853,7 +883,7 @@ func TestStartTenantPlanReloaderRecordsLoadErrors(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	stop, err := startTenantPlanReloader(ctx, limiter, "file", filepath.Join(t.TempDir(), "missing.json"), 0, false, 5*time.Millisecond)
+	stop, err := startTenantPlanReloader(ctx, limiter, "file", filepath.Join(t.TempDir(), "missing.json"), 0, false, false, 5*time.Millisecond)
 	if err != nil {
 		t.Fatalf("start tenant plan reloader: %v", err)
 	}

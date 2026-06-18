@@ -6,6 +6,7 @@ param(
     [string]$MaxAllowedAge = "",
     [switch]$RequireRateLimitEnabled,
     [switch]$RequireVersionedSnapshot,
+    [switch]$RequireVersionedPolicy,
     [switch]$RequireChecksum,
     [switch]$RequireChecksumPolicy,
     [switch]$RequireURLHTTPS,
@@ -113,6 +114,7 @@ $version = (Get-StringOrEmpty $rateLimit.tenant_plan_version).Trim()
 $generatedAtMS = Get-Int64OrZero $rateLimit.tenant_plan_generated_at_unix_ms
 $checksumPresent = Get-BoolOrFalse $rateLimit.tenant_plan_checksum_present
 $checksumRequired = Get-BoolOrFalse $rateLimit.tenant_plan_require_checksum
+$versionedRequired = Get-BoolOrFalse $rateLimit.tenant_plan_require_versioned
 $urlBearerTokenConfigured = Get-BoolOrFalse $rateLimit.tenant_plan_url_bearer_token_configured
 $urlRequireHTTPS = Get-BoolOrFalse $rateLimit.tenant_plan_url_require_https
 $urlTLSConfigured = Get-BoolOrFalse $rateLimit.tenant_plan_url_tls_configured
@@ -156,6 +158,11 @@ if ($requiredRedisModeValue -ne "" -and (Normalize-RedisMode $redisMode) -ne (No
 
 if ($RequireVersionedSnapshot -and ($version -eq "" -or $generatedAtMS -le 0)) {
     Write-Host "FAIL api-gateway tenant quota snapshot is not versioned: version=$version generated_at_unix_ms=$generatedAtMS." -ForegroundColor Red
+    $failed = $true
+}
+
+if ($RequireVersionedPolicy -and -not $versionedRequired) {
+    Write-Host "FAIL api-gateway tenant quota snapshot versioned policy is not enabled." -ForegroundColor Red
     $failed = $true
 }
 
@@ -255,4 +262,4 @@ if ($failed) {
 }
 
 Write-Host "OK   api-gateway tenant quota snapshot gate"
-Write-Host "     enabled=$enabled source=$source redis_mode=$redisMode version=$version generated_at_unix_ms=$generatedAtMS checksum_present=$checksumPresent checksum_required=$checksumRequired url_require_https=$urlRequireHTTPS url_bearer_token_configured=$urlBearerTokenConfigured url_tls_configured=$urlTLSConfigured url_client_cert_configured=$urlClientCertConfigured max_age_ms=$maxAgeMS age_ms=$ageMS stale=$stale reload_errors=$reloadErrors redis_errors=$redisErrors identity_errors=$identityErrors tenant_plans=$tenantPlans tracked_keys=$trackedKeys reloaded_at_unix_ms=$reloadAtMS now_unix_ms=$nowMS"
+Write-Host "     enabled=$enabled source=$source redis_mode=$redisMode version=$version generated_at_unix_ms=$generatedAtMS checksum_present=$checksumPresent checksum_required=$checksumRequired versioned_required=$versionedRequired url_require_https=$urlRequireHTTPS url_bearer_token_configured=$urlBearerTokenConfigured url_tls_configured=$urlTLSConfigured url_client_cert_configured=$urlClientCertConfigured max_age_ms=$maxAgeMS age_ms=$ageMS stale=$stale reload_errors=$reloadErrors redis_errors=$redisErrors identity_errors=$identityErrors tenant_plans=$tenantPlans tracked_keys=$trackedKeys reloaded_at_unix_ms=$reloadAtMS now_unix_ms=$nowMS"

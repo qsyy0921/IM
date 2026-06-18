@@ -90,7 +90,7 @@
       "script": "tools/check-api-gateway-quota-snapshot.ps1",
       "covered_by_script": "tools/check-api-gateway-gates.ps1",
       "check_local_label": "api-gateway gates",
-      "note": "Tenant quota snapshots must keep Redis mode, HTTPS, checksum, TLS/client-cert, freshness, and error guardrails."
+      "note": "Tenant quota snapshots must keep Redis mode, versioned/checksum policy, HTTPS, TLS/client-cert, freshness, and error guardrails."
     },
     {
       "name": "repair operator catalog",

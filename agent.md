@@ -63,12 +63,13 @@ Current execution chain:
    operations in hardening backlog unless they directly unblock the current
    execution chain.
 
-Current active slice: RAG boundary design / minimal read-only answer path.
+Current active slice: retrieval-gateway -> rag-service smoke / RAG eval adapter.
 Search, memory, and retrieval smokes are passed; EvidencePack now includes
 source coverage, rerank score, and dedupe reason. Optional policy-service
 retrieval precheck is wired, and first-stage AI eval cases are under
-`docs/runbook/ai-eval/`. RAG / summary / Agent may start only through EvidencePack
-and must not bypass message / conversation private table boundaries.
+`docs/runbook/ai-eval/`. `rag-service` first read-only answer path is landed;
+RAG / summary / Agent must stay EvidencePack-only and must not bypass message /
+conversation private table boundaries.
 
 Current AI baseline: keep facts / projections / retrieval / controlled
 execution separate; build search -> memory -> retrieval before RAG / Agent;

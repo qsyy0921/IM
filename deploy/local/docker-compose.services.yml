@@ -191,6 +191,25 @@ services:
       nexusim-services:
         ipv4_address: 172.30.80.22
 
+  rag-service-grpc:
+    image: nexusim/rag-service:local
+    container_name: nexusim-rag-service-grpc
+    depends_on:
+      retrieval-gateway-grpc:
+        condition: service_started
+    environment:
+      NEXUSIM_RAG_SERVICE_MODE: grpc
+      NEXUSIM_RAG_GRPC_ADDR: 172.30.80.23:10610
+      NEXUSIM_RAG_DEBUG_ADDR: 172.30.80.23:11920
+      NEXUSIM_RETRIEVAL_GRPC_ADDR: retrieval-gateway-grpc:10590
+    ports:
+      - "10610:10610"
+      - "11920:11920"
+    restart: unless-stopped
+    networks:
+      nexusim-services:
+        ipv4_address: 172.30.80.23
+
   push-gateway-ws:
     image: nexusim/push-gateway:local
     container_name: nexusim-push-gateway-ws

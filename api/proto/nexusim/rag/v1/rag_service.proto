@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package nexusim.rag.v1;
+
+import "nexusim/retrieval/v1/retrieval_gateway.proto";
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/rag/v1;ragv1";
+
+service RagService {
+  rpc AnswerQuestion(AnswerQuestionRequest) returns (AnswerQuestionResponse);
+}
+
+enum AnswerStatus {
+  ANSWER_STATUS_UNSPECIFIED = 0;
+  ANSWER_STATUS_GROUNDED = 1;
+  ANSWER_STATUS_INSUFFICIENT_EVIDENCE = 2;
+}
+
+message AnswerQuestionRequest {
+  nexusim.retrieval.v1.AuthContext auth_context = 1;
+  string question = 2;
+  string conversation_id = 3;
+  int64 after_seq = 4;
+  int32 limit = 5;
+  bool include_search = 6;
+  bool include_memory = 7;
+  repeated nexusim.retrieval.v1.EvidenceMemoryStatus memory_statuses = 8;
+}
+
+message Citation {
+  string evidence_id = 1;
+  nexusim.retrieval.v1.EvidenceSourceType source_type = 2;
+  string source_id = 3;
+  string source_event_id = 4;
+  string conversation_id = 5;
+  int64 conversation_seq = 6;
+  int64 occurred_at_unix_ms = 7;
+}
+
+message AnswerQuestionResponse {
+  string answer_id = 1;
+  AnswerStatus status = 2;
+  string answer_text = 3;
+  double confidence = 4;
+  repeated Citation citations = 5;
+  nexusim.retrieval.v1.EvidencePack evidence_pack = 6;
+  string rag_version = 7;
+  bool generated_by_llm = 8;
+}

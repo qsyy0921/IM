@@ -7,21 +7,20 @@
 ```text
 持续推进 E:\development\IM 的 NexusIM 项目。
 
-最高优先级主线：NexusIM 已从“只做 IM 后端服务”转向“面试导向的后端 + 分布式 + AI 大模型应用系统”。后续默认围绕 AI/RAG/Agent 主链路推进，而不是无限做生产化 hardening。
-
+当前主线必须放在第一位：NexusIM 已从“只做 IM 后端服务”转向“面试导向的后端 + 分布式 + AI 大模型应用系统”。后续默认围绕 AI/RAG/Agent 主链路推进，而不是无限做生产化 hardening。
+当前 active slice：`retrieval-gateway -> rag-service` 真实 smoke 和 RAG eval execution adapter。
 开发路线：
 1. 只做现有 9 个 IM 后端服务的必要收口；非阻塞生产化事项写入 backlog。
 2. 主动推进 AI 链路：search-service -> memory-service -> retrieval-gateway / EvidencePack -> rag-service -> summary-service -> agent-service -> skill-registry -> mcp-gateway/tool-gateway -> action-executor -> ai-eval。
 3. AI 重点：群组 memory、跨群/跨时间 evidence、权限过滤 RAG、multi-agent 协作、MCP/skill/tool 调用、proposal/approval/executor/audit 真实业务闭环。
 
 不要把“继续开发”理解成无限做生产级长压、完整 HA、sizing 或 provider-grade 运维；这些只作为 hardening backlog，除非用户明确点名。
-
-已完成基线：9 个 IM 后端服务已跑通主链路；search-service projection smoke passed；memory-service group memory / StructuredMemoryEvent projection smoke passed；retrieval-gateway 第一轮 search + memory -> EvidencePack smoke passed；EvidencePack field hardening first pass（source coverage / rerank score / dedupe reason）已落；AI eval harness first pass 已有低敏 case schema 和 validator。
+已完成基线：9 个 IM 后端服务已跑通主链路；search-service projection smoke passed；memory-service group memory / StructuredMemoryEvent projection smoke passed；retrieval-gateway 第一轮 search + memory -> EvidencePack smoke passed；EvidencePack field hardening first pass 已落；AI eval harness first pass 已有低敏 case schema 和 validator；rag-service first read-only answer path 已落。
 
 当前开发主线：
-1. 当前 active slice：RAG 前置设计和最小只读问答边界；policy-service retrieval precheck 已有 first-stage 可选接入，EvidencePack 必须继续保持 source refs、temporal version、visibility / policy boundary，不直接读 message/conversation/private tables。
+1. `retrieval-gateway -> rag-service` 真实 smoke 和 RAG eval execution adapter；EvidencePack 必须继续保持 source refs、temporal version、visibility / policy boundary，不直接读 message/conversation/private tables。
 2. RAG / summary / Agent 仍只能消费 EvidencePack；新增 eval case 先进入 docs/runbook/ai-eval/retrieval-eval-cases.json。
-3. 后续按顺序推进 RAG / summary / Agent / skill / MCP / action execution。
+3. 后续按顺序推进 summary / Agent / skill / MCP / action execution。
 
 本轮只做能推进上述主线的工作；新发现的非阻塞生产化事项写入 docs/runbook/remaining-goals.md，不要抢占当前 AI/RAG/Agent 路线。
 

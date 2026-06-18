@@ -103,6 +103,14 @@
       "grafana_dashboard": "retrieval-gateway-observability.json"
     },
     {
+      "name": "rag-service",
+      "stage": "foundation-active",
+      "local_process": "rag-service-grpc",
+      "debug_port": 11920,
+      "prometheus_rule_file": "prometheus-rag-service-alerts.yml",
+      "grafana_dashboard": "rag-service-observability.json"
+    },
+    {
       "name": "media-service",
       "stage": "future"
     },
@@ -116,10 +124,6 @@
     },
     {
       "name": "admin-service",
-      "stage": "future"
-    },
-    {
-      "name": "rag-service",
       "stage": "future"
     },
     {

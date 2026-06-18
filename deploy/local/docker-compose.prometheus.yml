@@ -25,3 +25,4 @@ services:
       - ./prometheus-search-service-alerts.yml:/etc/prometheus/rules/search-service.yml:ro
       - ./prometheus-memory-service-alerts.yml:/etc/prometheus/rules/memory-service.yml:ro
       - ./prometheus-retrieval-gateway-alerts.yml:/etc/prometheus/rules/retrieval-gateway.yml:ro
+      - ./prometheus-rag-service-alerts.yml:/etc/prometheus/rules/rag-service.yml:ro

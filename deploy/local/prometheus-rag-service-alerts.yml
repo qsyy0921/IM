@@ -1,0 +1,20 @@
+groups:
+  - name: nexusim-rag-service
+    rules:
+      - alert: NexusIMRAGServiceDown
+        expr: up{service="rag-service"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: rag-service
+        annotations:
+          summary: "rag-service metrics endpoint is down"
+
+      - alert: NexusIMRAGServiceInfoMissing
+        expr: absent(nexusim_rag_service_info)
+        for: 1m
+        labels:
+          severity: warning
+          service: rag-service
+        annotations:
+          summary: "rag-service info metric is missing"

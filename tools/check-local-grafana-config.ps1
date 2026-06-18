@@ -236,6 +236,10 @@ $memoryRequiredMetrics = @(
     "nexusim_memory_service_info"
 )
 
+$ragRequiredMetrics = @(
+    "nexusim_rag_service_info"
+)
+
 Test-Dashboard -Path $dashboardPathsByService["api-gateway"] -Name "api-gateway" -ExpectedUid "nexusim-api-gateway" -MinimumPanels 5 -RequiredMetrics $apiGatewayRequiredMetrics
 Test-Dashboard -Path $dashboardPathsByService["identity-service"] -Name "identity-service" -ExpectedUid "nexusim-identity-service" -MinimumPanels 8 -RequiredMetrics $identityRequiredMetrics
 Test-Dashboard -Path $dashboardPathsByService["message-service"] -Name "message-service" -ExpectedUid "nexusim-message-service" -MinimumPanels 8 -RequiredMetrics $messageRequiredMetrics
@@ -247,5 +251,6 @@ Test-Dashboard -Path $dashboardPathsByService["contacts-service"] -Name "contact
 Test-Dashboard -Path $dashboardPathsByService["policy-service"] -Name "policy-service" -ExpectedUid "nexusim-policy-service" -MinimumPanels 8 -RequiredMetrics $policyRequiredMetrics
 Test-Dashboard -Path $dashboardPathsByService["search-service"] -Name "search-service" -ExpectedUid "nexusim-search-service" -MinimumPanels 1 -RequiredMetrics $searchRequiredMetrics
 Test-Dashboard -Path $dashboardPathsByService["memory-service"] -Name "memory-service" -ExpectedUid "nexusim-memory-service" -MinimumPanels 1 -RequiredMetrics $memoryRequiredMetrics
+Test-Dashboard -Path $dashboardPathsByService["rag-service"] -Name "rag-service" -ExpectedUid "nexusim-rag-service" -MinimumPanels 1 -RequiredMetrics $ragRequiredMetrics
 
 Write-Host "OK   local Grafana config"

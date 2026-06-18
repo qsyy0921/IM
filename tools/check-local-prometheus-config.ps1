@@ -266,4 +266,15 @@ foreach ($alert in $requiredMemoryAlerts) {
     }
 }
 
+$requiredRAGAlerts = @(
+    "NexusIMRAGServiceDown",
+    "NexusIMRAGServiceInfoMissing"
+)
+
+foreach ($alert in $requiredRAGAlerts) {
+    if ($rulesByService["rag-service"] -notmatch [regex]::Escape($alert)) {
+        throw "Prometheus rag-service rules missing alert: $alert"
+    }
+}
+
 Write-Host "OK   local Prometheus config"

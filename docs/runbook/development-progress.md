@@ -28,11 +28,11 @@
 - `search-service`
 - `memory-service` / group memory projection
 - `retrieval-gateway` / EvidencePack
+- `rag-service` first read-only answer path
 - AI eval harness first-stage case schema / validator
 
 当前尚未真实实现的后续 AI / Agent 能力：
 
-- `rag-service`
 - `agent-service`
 - `skill-registry`
 - `mcp-gateway`
@@ -52,7 +52,8 @@
 -> memory-service foundation-active projection smoke 已通过
 -> retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，field hardening first pass 已落
 -> AI eval harness first pass 已落
--> RAG / summary-service / Agent
+-> rag-service first read-only answer path 已落
+-> summary-service / Agent
 -> skill-registry / mcp-gateway / action-executor
 -> 安全 / 观测 / repair / 运维 hardening
 ```
@@ -143,7 +144,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - 文件大小预算门禁，手写 Go / Markdown / PowerShell / Bash 文件继续按生产代码、测试 / runner、文档和脚本分档控复杂度；`tools/check-file-size-budget.ps1` 可按需输出 JSON / Markdown hotspot summary，当前持久基线见 `docs/runbook/file-size-hotspot-baseline.json` 和 `docs/runbook/file-size-hotspots.md`，且摘要格式 / 持久基线均已有 `check-local` 自测门禁；`loadtest/pushgateway` 已按 config / model / auth / scenario / util 同 package 文件拆分，避免在线通知 / Redis route / slow-client / resume smoke 继续堆进单个 `main.go`；`loadtest/receipt`、`loadtest/policyintegration`、`loadtest/sendmessage` 已按 config / model / auth / util 等同 package 文件拆分；`contacts-service` PostgreSQL privacy / source-policy 集成测试已拆到同 package 测试文件；`message-service` PostgreSQL revoke / edit / delete mutation 集成测试已拆出同 package 测试文件；`identity-service` PostgreSQL challenge command methods 已拆出，核心 repository 文件降到约 1.4k 行，app 层登录 / MFA / Refresh / Challenge 测试和 cmd 层 challenge / MFA / gateway-token / env 配置 helper 也已按主题拆分；`api-gateway` cmd 层 rate-limit / tenant-plan 配置测试已从 `main_test.go` 拆到同 package 测试文件，继续降低启动配置测试文件复杂度
 - PowerShell / Bash 脚本解析门禁，`tools` 和 `loadtest` 下的 `.ps1` / `.sh` 都会进入本地检查，避免 smoke / 运维脚本语法回归
 - `check-local` 覆盖门禁，新增 `tools/check-*.ps1` 默认必须接入主检查；间接或手动检查必须显式列为例外
-- future service boundary 门禁仍保护未授权服务目录；`search-service v0.1` 和 `memory-service v0.1` 已作为 AI 底座 foundation-active 服务落地基础目录和 timeline consumer，后续 `retrieval-gateway` / RAG / `summary-service` / Agent / `skill-registry` / `mcp-gateway` / `action-executor` 不能绕过 search / memory / retrieval / policy 直接落 demo
+- future service boundary 门禁仍保护未授权服务目录；`search-service v0.1`、`memory-service v0.1`、`retrieval-gateway` 和 `rag-service` 已作为 AI 底座 foundation-active 服务落地，后续 `summary-service` / Agent / `skill-registry` / `mcp-gateway` / `action-executor` 不能绕过 search / memory / retrieval / policy 直接落 demo
 - 本地 Prometheus / Grafana / Alertmanager 覆盖门禁，已实现服务目录必须有 scrape / alert rules / dashboard 配置；`tools/run-local-observability-smoke.ps1` 可在本机已有镜像时验证 Prometheus rules、Grafana 9 服务 dashboard 和可选本地 Alertmanager null route 已由真实进程加载，也可按需把本地观测 smoke summary / report 写到 `H:\NexusIM\loadtest-results`；`tools/run-observability-target-smoke.ps1` 可对已有 Prometheus / Grafana 端点做目标环境 dashboard smoke，summary / validation 格式已有 `check-local` 自测门禁；`docs/runbook/observability-evidence.json` 已提供低敏观测证据索引，`tools/add-observability-evidence.ps1` 可追加本地 / 目标环境 smoke evidence，validator 支持 schema / H 盘文件复核；当前索引包含 policy-service debug metrics smoke 和本地观测镜像准备 dry-run 计划（`observability-image-prepare-plan`），不把目标环境 9 服务 dashboard smoke 写成已完成
 - 服务 cmd 层启动配置测试门禁，已实现服务必须保留 `main_test.go` 覆盖启动 / 监听 / TLS / auth guard 配置
 - 服务 cmd 构建门禁，当前 active 服务的 `services/<service>/cmd/<service>` 必须能通过 `go build`
@@ -176,6 +177,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 | `search-service` | 已跑通第一轮 projection smoke | `search_service.proto`、PostgreSQL core migration、六层 skeleton、`SearchMessages` app / domain / gRPC adapter、projection usecase skeleton、PostgreSQL repository、真实 PG visibility / tombstone 集成测试、`grpc` runtime mode、timeline decoder / consumer 和 clean projection smoke 已落地；定位为 search projection / visibility / tombstone / EvidencePack 前置，不做 LLM demo | `service-briefs/search-service.md` |
 | `memory-service` | 已跑通第一轮 projection smoke | `memory_service.proto`、PostgreSQL memory core migration、六层 skeleton、`QueryMemoryEvents` / `GetMemoryEvent` / `ListProfileAggregates` gRPC adapter、domain/types/app validation、PostgreSQL repository first pass、timeline projection usecase、`grpc` / `timeline-consumer` runtime、Docker / compose / Prometheus / Grafana wiring、PG integration tests、timeline worker tests 和 clean projection smoke 已落地；定位为 group memory / StructuredMemoryEvent / source refs / visibility window，不做 LLM demo | `service-briefs/memory-service.md` |
 | `retrieval-gateway` | 已跑通第一轮 EvidencePack smoke，field hardening first pass 已落 | `retrieval_gateway.proto`、SDD、六层 skeleton、`RetrieveEvidence` app / gRPC adapter、search / memory RPC clients、可选 policy-service retrieval precheck、EvidencePack `rerank_score` / `dedupe_reason` / `source_coverage`、`grpc` runtime mode、本地 Docker / compose / Prometheus / Grafana wiring 和真实本地 `search + memory -> RetrieveEvidence` smoke 已落地；定位为 EvidencePack 统一检索边界，不读业务库、不调用 LLM、不执行 Agent 动作 | `service-briefs/retrieval-gateway.md` |
+| `rag-service` | 已落第一版只读问答路径 | `rag_service.proto`、SDD、六层 skeleton、`AnswerQuestion` app / gRPC adapter、retrieval-gateway RPC client、`grpc` runtime mode、本地 Docker / compose / Prometheus / Grafana wiring 已落地；第一版 deterministic extractive answer，保留 citations / EvidencePack，`generated_by_llm=false`，无 evidence 时拒答 | `service-briefs/rag-service.md` |
 
 ## 剩余目标入口
 
@@ -190,7 +192,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 ```text
 前 9 个微服务已经能跑通 IM 主链路，
 现在处于“9 个现有服务做必要收口，并向 AI 大模型应用底座转进”，
-search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已从 contract 切到 foundation-active implementation 并跑通 clean projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，policy precheck 和 EvidencePack 字段 hardening first pass 已落；AI eval harness first pass 已有低敏 case schema / validator，后续是 RAG、summary-service、Agent、skill-registry、mcp-gateway、action-executor。
+search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已从 contract 切到 foundation-active implementation 并跑通 clean projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，policy precheck 和 EvidencePack 字段 hardening first pass 已落；AI eval harness first pass 已有低敏 case schema / validator；rag-service first read-only answer path 已落，后续是 retrieval->rag smoke、RAG eval adapter、summary-service、Agent、skill-registry、mcp-gateway、action-executor。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。
 ```
 

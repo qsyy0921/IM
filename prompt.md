@@ -5,7 +5,7 @@
 把下面这段放进 Codex 目标框即可：
 
 ```text
-持续推进 E:\development\IM 的 NexusIM 项目，当前主线是必要收口 + 转向 AI 大模型应用底座。每轮先运行 git status --short --branch --untracked-files=all，然后读取仓库根目录 prompt.md 和 agent.md，再按需读取本轮必要文档；允许按 agent.md 使用多个 sub-agent 并行处理互不重叠的设计/实现/验证任务；短期生产级测试后置，不把具体长目标写进目标框，不全文扫长历史文档，不回滚用户已有修改。
+持续推进 E:\development\IM 的 NexusIM 项目。当前主线：先做 9 个现有后端服务的必要收口，然后推进 search-service v0.1，再进入 memory-service / retrieval-gateway / RAG / summary / agent / skill-registry / mcp-gateway / action-executor。每轮先运行 git status --short --branch --untracked-files=all，然后读取仓库根目录 prompt.md 和 agent.md，再按需读取本轮必要文档；允许按 agent.md 使用多个 sub-agent 并行处理互不重叠的设计/实现/验证任务；短期生产级测试后置，不全文扫长历史文档，不回滚用户已有修改。
 ```
 
 ## 本文件的作用
@@ -14,7 +14,7 @@
 - 具体执行目标维护在 `docs/runbook/current-goal.md`；目标框不要复制长目标。
 - Agent 进度管理规则见 `agent.md`；需要管理项目进度、分配子 agent 或选择下一切片时先读它。
 - `prompt.md` 只负责把 Codex 带到正确入口；`agent.md` 决定本轮需要按需读取和维护哪些项目文档。
-- 当前主线只在入口保持短句：必要收口 + 转向 AI 大模型应用底座；具体长目标仍由 runbook 维护。
+- 当前主线只在入口保持短句：9 服务必要收口 -> search-service -> memory / retrieval -> RAG / summary / Agent / tool execution；具体长目标仍由 runbook 维护。
 - 具体当前阶段不在这里维护，见 `docs/runbook/current-brief.md`。
 - 当前未完成工作不在这里维护，见 `docs/runbook/remaining-goals.md`。
 - 单服务状态不在这里维护，见 `docs/runbook/service-briefs/<service>.md`。
@@ -28,7 +28,7 @@
 
 ## 工作原则
 
-1. 当前主线是必要收口 + 转向 AI 大模型应用底座；阶段细节以 `docs/runbook/current-brief.md` 和 `docs/runbook/remaining-goals.md` 为准，不在本文件重复维护。
+1. 当前主线是 9 服务必要收口 -> search-service v0.1 -> memory-service / retrieval-gateway -> RAG / summary / Agent / skill / MCP / action execution；阶段细节以 `docs/runbook/current-brief.md` 和 `docs/runbook/remaining-goals.md` 为准，不在本文件重复维护。
 2. 小切片闭环：设计、代码、必要测试、文档一起收；短期生产级压测、长周期演练和生产就绪测试后置到明确阶段或用户指定任务。
 3. 降低耦合：不跨服务读内部表，不引入网状同步 RPC，不为了短期功能抽公共包。
 4. 控制复杂度：生产手写文件接近 2500 行、测试或 runner 接近 3000 行时，优先同 package 拆分。

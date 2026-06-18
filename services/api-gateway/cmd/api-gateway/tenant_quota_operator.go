@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -47,9 +48,10 @@ type apiGatewayTenantQuotaAuditOutput struct {
 }
 
 type apiGatewayTenantQuotaSetOutput struct {
-	GeneratedAt string                    `json:"generated_at"`
-	DryRun      bool                      `json:"dry_run"`
-	Row         apiGatewayTenantQuotaJSON `json:"row"`
+	GeneratedAt string                         `json:"generated_at"`
+	DryRun      bool                           `json:"dry_run"`
+	Row         apiGatewayTenantQuotaJSON      `json:"row"`
+	Approval    *apiGatewayTenantQuotaApproval `json:"approval,omitempty"`
 }
 
 type apiGatewayTenantQuotaJSON struct {
@@ -59,6 +61,29 @@ type apiGatewayTenantQuotaJSON struct {
 	Enabled           bool    `json:"enabled"`
 	Source            string  `json:"source"`
 	UpdatedAt         string  `json:"updated_at"`
+}
+
+type apiGatewayTenantQuotaApproval struct {
+	SchemaVersion     string                                   `json:"schema_version"`
+	Service           string                                   `json:"service"`
+	ApprovalType      string                                   `json:"approval_type"`
+	Status            string                                   `json:"status"`
+	ChangeID          string                                   `json:"change_id"`
+	TargetEnvironment string                                   `json:"target_environment"`
+	Operator          string                                   `json:"operator"`
+	Approver          string                                   `json:"approver"`
+	GeneratedAtUnixMS int64                                    `json:"generated_at_unix_ms"`
+	ApprovedAtUnixMS  int64                                    `json:"approved_at_unix_ms"`
+	ExpiresAtUnixMS   int64                                    `json:"expires_at_unix_ms"`
+	DesiredPlan       apiGatewayTenantQuotaApprovalDesiredPlan `json:"desired_plan"`
+}
+
+type apiGatewayTenantQuotaApprovalDesiredPlan struct {
+	TenantID          string  `json:"tenant_id"`
+	RequestsPerSecond float64 `json:"requests_per_second"`
+	Burst             int     `json:"burst"`
+	Enabled           bool    `json:"enabled"`
+	Source            string  `json:"source"`
 }
 
 func runTenantQuotaAudit() error {
@@ -145,6 +170,21 @@ func runTenantQuotaSet() error {
 	if err := validateAPIGatewayTenantQuotaSetOptions(options); err != nil {
 		return err
 	}
+	requireApproval, _, err := envOptionalBool("NEXUSIM_API_GATEWAY_TENANT_QUOTA_SET_REQUIRE_APPROVAL")
+	if err != nil {
+		return err
+	}
+	approvalPath := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_TENANT_QUOTA_SET_APPROVAL_PATH"))
+	var approval *apiGatewayTenantQuotaApproval
+	if !dryRun && (requireApproval || approvalPath != "") {
+		if approvalPath == "" {
+			return errors.New("NEXUSIM_API_GATEWAY_TENANT_QUOTA_SET_APPROVAL_PATH is required when tenant quota approval is required")
+		}
+		approval, err = readAndValidateAPIGatewayTenantQuotaApproval(approvalPath, options, time.Now)
+		if err != nil {
+			return err
+		}
+	}
 	var row apiGatewayTenantQuotaRow
 	if dryRun {
 		row = apiGatewayTenantQuotaRow{
@@ -181,7 +221,7 @@ func runTenantQuotaSet() error {
 		dryRun,
 	)
 	if outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_TENANT_QUOTA_SET_OUTPUT")); outputPath != "" {
-		if err := writeAPIGatewayTenantQuotaSetOutput(outputPath, row, dryRun); err != nil {
+		if err := writeAPIGatewayTenantQuotaSetOutput(outputPath, row, dryRun, approval); err != nil {
 			return err
 		}
 	}
@@ -328,6 +368,106 @@ func validateAPIGatewayTenantQuotaSetOptions(options apiGatewayTenantQuotaSetOpt
 	return nil
 }
 
+func readAndValidateAPIGatewayTenantQuotaApproval(path string, options apiGatewayTenantQuotaSetOptions, now func() time.Time) (*apiGatewayTenantQuotaApproval, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var approval apiGatewayTenantQuotaApproval
+	if err := json.Unmarshal(raw, &approval); err != nil {
+		return nil, errors.New("api-gateway tenant quota approval JSON is invalid")
+	}
+	if err := validateAPIGatewayTenantQuotaApproval(approval, options, now); err != nil {
+		return nil, err
+	}
+	return &approval, nil
+}
+
+func validateAPIGatewayTenantQuotaApproval(approval apiGatewayTenantQuotaApproval, options apiGatewayTenantQuotaSetOptions, now func() time.Time) error {
+	if approval.SchemaVersion != "nexusim.api_gateway.tenant_quota_approval.v1" {
+		return errors.New("api-gateway tenant quota approval has unsupported schema_version")
+	}
+	if approval.Service != "api-gateway" {
+		return errors.New("api-gateway tenant quota approval service must be api-gateway")
+	}
+	if approval.ApprovalType != "tenant_quota_change" {
+		return errors.New("api-gateway tenant quota approval has unsupported approval_type")
+	}
+	if approval.Status != "APPROVED" {
+		return errors.New("api-gateway tenant quota approval status must be APPROVED")
+	}
+	if err := validateLowSensitiveAPIGatewayApprovalLabel(approval.ChangeID, "change_id"); err != nil {
+		return err
+	}
+	if err := validateLowSensitiveAPIGatewayApprovalLabel(approval.TargetEnvironment, "target_environment"); err != nil {
+		return err
+	}
+	if err := validateLowSensitiveAPIGatewayApprovalLabel(approval.Operator, "operator"); err != nil {
+		return err
+	}
+	if err := validateLowSensitiveAPIGatewayApprovalLabel(approval.Approver, "approver"); err != nil {
+		return err
+	}
+	if approval.GeneratedAtUnixMS <= 0 || approval.ApprovedAtUnixMS <= 0 || approval.ExpiresAtUnixMS <= 0 {
+		return errors.New("api-gateway tenant quota approval timestamps must be positive")
+	}
+	if now == nil {
+		now = time.Now
+	}
+	nowMS := now().UnixMilli()
+	if approval.ApprovedAtUnixMS > nowMS+60_000 {
+		return errors.New("api-gateway tenant quota approval approved_at_unix_ms is in the future")
+	}
+	if approval.ExpiresAtUnixMS <= nowMS {
+		return errors.New("api-gateway tenant quota approval is expired")
+	}
+	if err := validateAPIGatewayTenantID(approval.DesiredPlan.TenantID); err != nil {
+		return err
+	}
+	if strings.TrimSpace(approval.DesiredPlan.TenantID) != strings.TrimSpace(options.TenantID) {
+		return errors.New("api-gateway tenant quota approval tenant_id does not match requested change")
+	}
+	if math.Abs(approval.DesiredPlan.RequestsPerSecond-options.RequestsPerSecond) > 1e-9 {
+		return errors.New("api-gateway tenant quota approval requests_per_second does not match requested change")
+	}
+	if approval.DesiredPlan.Burst != options.Burst {
+		return errors.New("api-gateway tenant quota approval burst does not match requested change")
+	}
+	if approval.DesiredPlan.Enabled != options.Enabled {
+		return errors.New("api-gateway tenant quota approval enabled does not match requested change")
+	}
+	if strings.TrimSpace(approval.DesiredPlan.Source) != strings.TrimSpace(options.Source) {
+		return errors.New("api-gateway tenant quota approval source does not match requested change")
+	}
+	return nil
+}
+
+func validateLowSensitiveAPIGatewayApprovalLabel(value string, fieldName string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return errors.New("api-gateway tenant quota approval " + fieldName + " is required")
+	}
+	if len(value) > 128 {
+		return errors.New("api-gateway tenant quota approval " + fieldName + " is too long")
+	}
+	for _, r := range value {
+		if unicode.IsControl(r) || unicode.IsSpace(r) {
+			return errors.New("api-gateway tenant quota approval " + fieldName + " must not contain whitespace or control characters")
+		}
+	}
+	lower := strings.ToLower(value)
+	sensitiveMarkers := []string{"password", "passwd", "secret", "token", "bearer", "credential", "api_key", "apikey", "access_key", "refresh", "session", "cookie", "sk-", "eyj"}
+	for _, marker := range sensitiveMarkers {
+		if strings.Contains(lower, marker) {
+			return errors.New("api-gateway tenant quota approval " + fieldName + " must be low-sensitive")
+		}
+	}
+	if strings.Contains(value, "@") {
+		return errors.New("api-gateway tenant quota approval " + fieldName + " must not contain email-like values")
+	}
+	return nil
+}
+
 func validateAPIGatewayTenantID(tenantID string) error {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
@@ -385,11 +525,12 @@ func writeAPIGatewayTenantQuotaAuditOutput(path string, rows []apiGatewayTenantQ
 	return writeAPIGatewayTenantQuotaJSON(path, output)
 }
 
-func writeAPIGatewayTenantQuotaSetOutput(path string, row apiGatewayTenantQuotaRow, dryRun bool) error {
+func writeAPIGatewayTenantQuotaSetOutput(path string, row apiGatewayTenantQuotaRow, dryRun bool, approval *apiGatewayTenantQuotaApproval) error {
 	return writeAPIGatewayTenantQuotaJSON(path, apiGatewayTenantQuotaSetOutput{
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339Nano),
 		DryRun:      dryRun,
 		Row:         apiGatewayTenantQuotaJSONFromRow(row),
+		Approval:    approval,
 	})
 }
 

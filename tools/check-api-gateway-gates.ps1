@@ -7,6 +7,8 @@ $legacyObservation = Join-Path $PSScriptRoot "record-api-gateway-legacy-observat
 $legacyObservationWindow = Join-Path $PSScriptRoot "check-api-gateway-legacy-observation-window.ps1"
 $legacyRemovalPlanCheck = Join-Path $PSScriptRoot "check-api-gateway-legacy-removal-plan.ps1"
 $legacyRemovalPlanValidator = Join-Path $PSScriptRoot "validate-api-gateway-legacy-removal-plan.ps1"
+$tenantQuotaApprovalWriter = Join-Path $PSScriptRoot "write-api-gateway-tenant-quota-approval.ps1"
+$tenantQuotaApprovalValidator = Join-Path $PSScriptRoot "validate-api-gateway-tenant-quota-approval.ps1"
 $powerShellExe = (Get-Command powershell -ErrorAction Stop).Source
 $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("nexusim-api-gateway-gates-" + [System.Guid]::NewGuid().ToString("N"))
 
@@ -153,6 +155,74 @@ try {
     Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaTooManyKeys))
     Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaOldReload))
     Invoke-GateExpectFail -Arguments ($quotaStrongArgs + @("-SnapshotPath", $quotaFutureSnapshot))
+
+    $tenantQuotaApproval = Join-Path $tempDir "tenant-quota-approval.json"
+    Invoke-GateExpectPass -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $tenantQuotaApprovalWriter,
+        "-OutputPath", $tenantQuotaApproval,
+        "-TenantID", "tenant-gate-a",
+        "-RequestsPerSecond", "10.5",
+        "-Burst", "12",
+        "-Enabled", "true",
+        "-PlanSource", "operator",
+        "-Operator", "operator-a",
+        "-Approver", "approver-a",
+        "-ChangeID", "quota-change-gate",
+        "-TargetEnvironment", "local-dev",
+        "-Force"
+    )
+    Invoke-GateExpectPass -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $tenantQuotaApprovalValidator,
+        "-ApprovalPath", $tenantQuotaApproval,
+        "-ExpectedTenantID", "tenant-gate-a",
+        "-ExpectedRequestsPerSecond", "10.5",
+        "-ExpectedBurst", "12",
+        "-ExpectedEnabled", "true",
+        "-ExpectedSource", "operator"
+    )
+    Invoke-GateExpectFail -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $tenantQuotaApprovalValidator,
+        "-ApprovalPath", $tenantQuotaApproval,
+        "-ExpectedTenantID", "tenant-gate-b"
+    )
+    Invoke-GateExpectFail -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $tenantQuotaApprovalWriter,
+        "-OutputPath", (Join-Path $repoRoot "tmp-tenant-quota-approval.json"),
+        "-TenantID", "tenant-gate-a",
+        "-RequestsPerSecond", "10.5",
+        "-Burst", "12",
+        "-Enabled", "true",
+        "-PlanSource", "operator",
+        "-Operator", "operator-a",
+        "-Approver", "approver-a",
+        "-ChangeID", "quota-change-gate",
+        "-TargetEnvironment", "local-dev",
+        "-Force"
+    )
+    Invoke-GateExpectFail -Arguments @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $tenantQuotaApprovalWriter,
+        "-OutputPath", (Join-Path $tempDir "tenant-quota-sensitive-approval.json"),
+        "-TenantID", "tenant-gate-a",
+        "-RequestsPerSecond", "10.5",
+        "-Burst", "12",
+        "-Enabled", "true",
+        "-PlanSource", "operator",
+        "-Operator", "operator-a",
+        "-Approver", "operator@example.com",
+        "-ChangeID", "quota-change-gate",
+        "-TargetEnvironment", "local-dev",
+        "-Force"
+    )
 
     $legacyGood = Join-Path $tempDir "legacy-good.json"
     $legacyNoFacade = Join-Path $tempDir "legacy-no-facade.json"

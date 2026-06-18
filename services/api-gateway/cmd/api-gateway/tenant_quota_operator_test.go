@@ -39,7 +39,8 @@ func TestAPIGatewayTenantQuotaOutputs(t *testing.T) {
 	}
 
 	setPath := filepath.Join(t.TempDir(), "quota", "set.json")
-	if err := writeAPIGatewayTenantQuotaSetOutput(setPath, row, true); err != nil {
+	approval := validAPIGatewayTenantQuotaApprovalForTest(row, time.Date(2026, 6, 18, 8, 0, 0, 0, time.UTC))
+	if err := writeAPIGatewayTenantQuotaSetOutput(setPath, row, true, &approval); err != nil {
 		t.Fatalf("write api-gateway tenant quota set output: %v", err)
 	}
 	rawSet, err := os.ReadFile(setPath)
@@ -50,13 +51,88 @@ func TestAPIGatewayTenantQuotaOutputs(t *testing.T) {
 	if err := json.Unmarshal(rawSet, &setOutput); err != nil {
 		t.Fatalf("decode api-gateway tenant quota set output: %v", err)
 	}
-	if setOutput.GeneratedAt == "" || !setOutput.DryRun || setOutput.Row.Burst != 16 {
+	if setOutput.GeneratedAt == "" || !setOutput.DryRun || setOutput.Row.Burst != 16 ||
+		setOutput.Approval == nil || setOutput.Approval.ChangeID != "quota-change-1" {
 		t.Fatalf("unexpected api-gateway tenant quota set output: %+v", setOutput)
 	}
 	for _, leaked := range []string{"password", "secret", "bearer"} {
 		if strings.Contains(strings.ToLower(string(rawSet)), leaked) || strings.Contains(strings.ToLower(string(rawAudit)), leaked) {
 			t.Fatalf("api-gateway tenant quota output leaked sensitive marker %q", leaked)
 		}
+	}
+}
+
+func TestAPIGatewayTenantQuotaApprovalValidation(t *testing.T) {
+	now := time.Date(2026, 6, 18, 8, 0, 0, 0, time.UTC)
+	options := apiGatewayTenantQuotaSetOptions{
+		TenantID:          "tenant-a",
+		RequestsPerSecond: 12.5,
+		Burst:             16,
+		Enabled:           true,
+		Source:            "operator",
+	}
+	row := apiGatewayTenantQuotaRow{
+		TenantID:          options.TenantID,
+		RequestsPerSecond: options.RequestsPerSecond,
+		Burst:             options.Burst,
+		Enabled:           options.Enabled,
+		Source:            options.Source,
+		UpdatedAt:         now,
+	}
+	valid := validAPIGatewayTenantQuotaApprovalForTest(row, now)
+	if err := validateAPIGatewayTenantQuotaApproval(valid, options, func() time.Time { return now }); err != nil {
+		t.Fatalf("expected valid tenant quota approval: %v", err)
+	}
+
+	cases := []struct {
+		name   string
+		mutate func(*apiGatewayTenantQuotaApproval)
+	}{
+		{
+			name: "tenant mismatch",
+			mutate: func(approval *apiGatewayTenantQuotaApproval) {
+				approval.DesiredPlan.TenantID = "tenant-b"
+			},
+		},
+		{
+			name: "rps mismatch",
+			mutate: func(approval *apiGatewayTenantQuotaApproval) {
+				approval.DesiredPlan.RequestsPerSecond = 13
+			},
+		},
+		{
+			name: "source mismatch",
+			mutate: func(approval *apiGatewayTenantQuotaApproval) {
+				approval.DesiredPlan.Source = "other"
+			},
+		},
+		{
+			name: "expired",
+			mutate: func(approval *apiGatewayTenantQuotaApproval) {
+				approval.ExpiresAtUnixMS = now.Add(-time.Minute).UnixMilli()
+			},
+		},
+		{
+			name: "sensitive approver",
+			mutate: func(approval *apiGatewayTenantQuotaApproval) {
+				approval.Approver = "operator@example.com"
+			},
+		},
+		{
+			name: "not approved",
+			mutate: func(approval *apiGatewayTenantQuotaApproval) {
+				approval.Status = "PENDING"
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			approval := valid
+			tc.mutate(&approval)
+			if err := validateAPIGatewayTenantQuotaApproval(approval, options, func() time.Time { return now }); err == nil {
+				t.Fatalf("expected approval validation failure")
+			}
+		})
 	}
 }
 
@@ -79,6 +155,29 @@ func TestAPIGatewayTenantQuotaValidation(t *testing.T) {
 		Source:            "operator",
 	}); err == nil {
 		t.Fatalf("expected non-positive rps to fail")
+	}
+}
+
+func validAPIGatewayTenantQuotaApprovalForTest(row apiGatewayTenantQuotaRow, now time.Time) apiGatewayTenantQuotaApproval {
+	return apiGatewayTenantQuotaApproval{
+		SchemaVersion:     "nexusim.api_gateway.tenant_quota_approval.v1",
+		Service:           "api-gateway",
+		ApprovalType:      "tenant_quota_change",
+		Status:            "APPROVED",
+		ChangeID:          "quota-change-1",
+		TargetEnvironment: "local-dev",
+		Operator:          "operator-a",
+		Approver:          "approver-a",
+		GeneratedAtUnixMS: now.Add(-10 * time.Minute).UnixMilli(),
+		ApprovedAtUnixMS:  now.Add(-5 * time.Minute).UnixMilli(),
+		ExpiresAtUnixMS:   now.Add(time.Hour).UnixMilli(),
+		DesiredPlan: apiGatewayTenantQuotaApprovalDesiredPlan{
+			TenantID:          row.TenantID,
+			RequestsPerSecond: row.RequestsPerSecond,
+			Burst:             row.Burst,
+			Enabled:           row.Enabled,
+			Source:            row.Source,
+		},
 	}
 }
 

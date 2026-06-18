@@ -1,8 +1,8 @@
 ﻿# File Size Budget Hotspots
 
-- Created at: 2026-06-18T07:02:29.7763467Z
+- Created at: 2026-06-18T07:25:56.8786920Z
 - Scope: handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score
-- Files checked: 1199
+- Files checked: 1201
 - Warnings: 0
 - Failures: 0
 - Hotspots at >= 80% of warning threshold: 0

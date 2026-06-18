@@ -93,6 +93,13 @@
       "note": "Tenant quota snapshots must keep Redis mode, versioned/checksum policy, HTTPS, TLS/client-cert, freshness, and error guardrails."
     },
     {
+      "name": "identity production key guard",
+      "category": "identity-security",
+      "script": "tools/check-identity-production-key-guard.ps1",
+      "check_local_label": "identity production key guard",
+      "note": "Production-like identity startup must reject legacy / HS256 gateway token mode and local fallback identity key material."
+    },
+    {
       "name": "repair operator catalog",
       "category": "operator-safety",
       "script": "tools/check-repair-operator-index.ps1",

@@ -197,6 +197,9 @@ try {
     Write-Host "== api-gateway gates =="
     Invoke-LocalCheck "check-api-gateway-gates.ps1"
 
+    Write-Host "== identity production key guard =="
+    Invoke-LocalCheck "check-identity-production-key-guard.ps1"
+
     Write-Host "== otel sampling policy =="
     Invoke-LocalCheck "check-otel-sampling-policy.ps1"
 

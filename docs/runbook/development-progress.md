@@ -138,7 +138,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - outbox / projection / challenge delivery 等 repair / audit / cleanup operator，并通过 `docs/runbook/repair-operators.md` 提供统一入口；本地门禁会校验文档中的 operator mode 与对应服务 cmd 入口一致
 - `check-local` 会显式检查子门禁脚本和原生命令 exit code，避免出现打印 `FAIL` 但总检查仍返回成功的假绿。
 - worker / relay 非取消错误退避重试
-- identity-service 已补 opt-in production key guard，生产样式启动会拒绝 legacy / HS256 gateway token 和 MFA / recovery / challenge token 的 local fallback key；这只是本地启动安全门禁，不等同于 KMS/HSM。
+- identity-service 已补 opt-in production key guard，并已纳入 `check-local` 与 security gate catalog；生产样式启动会拒绝 legacy / HS256 gateway token 和 MFA / recovery / challenge token 的 local fallback key；这只是本地启动安全门禁，不等同于 KMS/HSM。
 
 更完整的 trace / alert / structured logging、故障演练和运维 workflow 属于后续目标，统一维护在 `remaining-goals.md`。
 

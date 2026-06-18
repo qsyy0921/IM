@@ -26,7 +26,7 @@
 - 服务设计：`../sdd/<service>.md`
 - smoke / 压测证据：`loadtest/<service>/`
 - 本地分布式 / Docker / 观测 / 压测：`distributed-local.md`、`mac-arm64-docker-images.md`、`observability-local.md`、`local-loadtest.md`
-- 低敏证据 manifest：`distributed-smoke-evidence.json`、`observability-evidence.json`、`capacity-baseline-evidence.json`、`resource-snapshot-evidence.json`
+- AI eval harness / 低敏证据 manifest：`ai-eval/README.md`、`distributed-smoke-evidence.json`、`observability-evidence.json`、`capacity-baseline-evidence.json`、`resource-snapshot-evidence.json`
 - 复杂度治理：`file-size-hotspots.md`、`file-size-hotspot-baseline.json`
 - repair / DLQ operator：`repair-operators.md`、`repair-operators.catalog.json`
 - 研究论文分类：`../research/paper-organization.md`

@@ -7,37 +7,32 @@
 ```text
 持续推进 E:\development\IM 的 NexusIM 项目。
 
-当前主线必须放在第一优先级：面试导向的后端 + 分布式 + AI 大模型应用底座。
+最高优先级主线：NexusIM 已从“只做 IM 后端服务”转向“面试导向的后端 + 分布式 + AI 大模型应用系统”。后续默认围绕 AI/RAG/Agent 主链路推进，而不是无限做生产化 hardening。
 
 开发路线：
-1. 必要收口现有 9 个 IM 后端服务，只处理会阻塞 AI/RAG/Agent 的语义、安全和边界问题。
-2. 继续 AI 底座链路：search-service -> memory-service -> retrieval-gateway / EvidencePack -> rag-service -> summary-service -> agent-service -> skill-registry -> mcp-gateway/tool-gateway -> action-executor -> ai-eval。
-3. 后续 AI 能力重点包括群组 memory、跨群/跨时间 evidence、RAG 问答、multi-agent 协作、MCP/skill/tool 调用、proposal/approval/executor/audit 真实业务闭环。
+1. 只做现有 9 个 IM 后端服务的必要收口；非阻塞生产化事项写入 backlog。
+2. 主动推进 AI 链路：search-service -> memory-service -> retrieval-gateway / EvidencePack -> rag-service -> summary-service -> agent-service -> skill-registry -> mcp-gateway/tool-gateway -> action-executor -> ai-eval。
+3. AI 重点：群组 memory、跨群/跨时间 evidence、权限过滤 RAG、multi-agent 协作、MCP/skill/tool 调用、proposal/approval/executor/audit 真实业务闭环。
 
 不要把“继续开发”理解成无限做生产级长压、完整 HA、sizing 或 provider-grade 运维；这些只作为 hardening backlog，除非用户明确点名。
 
-已完成基线：9 个 IM 后端服务已跑通主链路；search-service projection smoke passed；memory-service group memory / StructuredMemoryEvent projection smoke passed；retrieval-gateway 第一轮 search + memory -> EvidencePack smoke passed；EvidencePack field hardening first pass（source coverage / rerank score / dedupe reason）已落。
+已完成基线：9 个 IM 后端服务已跑通主链路；search-service projection smoke passed；memory-service group memory / StructuredMemoryEvent projection smoke passed；retrieval-gateway 第一轮 search + memory -> EvidencePack smoke passed；EvidencePack field hardening first pass（source coverage / rerank score / dedupe reason）已落；AI eval harness first pass 已有低敏 case schema 和 validator。
 
 当前开发主线：
-1. 当前 active slice：retrieval-gateway regression / AI eval boundary；policy-service retrieval precheck 已有 first-stage 可选接入，EvidencePack 必须继续保持 source refs、temporal version、visibility / policy boundary，不直接读 message/conversation/private tables。
-2. 下一步开始进入 RAG / summary / Agent 前置设计和最小实现，仍只能消费 EvidencePack。
+1. 当前 active slice：RAG 前置设计和最小只读问答边界；policy-service retrieval precheck 已有 first-stage 可选接入，EvidencePack 必须继续保持 source refs、temporal version、visibility / policy boundary，不直接读 message/conversation/private tables。
+2. RAG / summary / Agent 仍只能消费 EvidencePack；新增 eval case 先进入 docs/runbook/ai-eval/retrieval-eval-cases.json。
 3. 后续按顺序推进 RAG / summary / Agent / skill / MCP / action execution。
 
-本轮只做能推进上述主线的工作；新发现的非阻塞生产化事项写入 docs/runbook/remaining-goals.md，不要抢占当前 AI 底座路线。
+本轮只做能推进上述主线的工作；新发现的非阻塞生产化事项写入 docs/runbook/remaining-goals.md，不要抢占当前 AI/RAG/Agent 路线。
 
 每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 做互不重叠任务；不全文扫长历史文档，不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
 ```
 
 ## 本文件的作用
 
-- 本文件只维护 Codex 目标框短 Prompt 和每轮文档路由。
-- 具体执行目标维护在 `docs/runbook/current-goal.md`；目标框不要复制长目标。
-- Agent 进度管理规则见 `agent.md`；需要管理项目进度、分配子 agent 或选择下一切片时先读它。
-- `prompt.md` 只负责把 Codex 带到正确入口；`agent.md` 决定本轮需要按需读取和维护哪些项目文档。
-- 当前主线和 active slice 必须在目标框短 Prompt 第一屏明确出现：面试导向后端 + 分布式 + AI 底座；9-service closeout 只处理 AI 阻塞项；search / memory / retrieval smoke 已过；EvidencePack source coverage / rerank / dedupe first pass 已落；下一步 RAG / summary / Agent / skill / MCP / action execution。具体长目标仍由 runbook 维护。
-- 具体当前阶段细节不在这里展开，见 `docs/runbook/current-brief.md`。
-- 当前未完成工作不在这里维护，见 `docs/runbook/remaining-goals.md`。
-- 单服务状态不在这里维护，见 `docs/runbook/service-briefs/<service>.md`。
+- 本文件只维护 Codex 目标框短 Prompt 和每轮文档路由；具体目标见 `docs/runbook/current-goal.md`。
+- `agent.md` 决定按需读取和维护哪些项目文档；阶段细节见 `docs/runbook/current-brief.md`。
+- 未完成工作见 `docs/runbook/remaining-goals.md`；单服务状态见 `docs/runbook/service-briefs/<service>.md`。
 
 ## 每轮开始
 
@@ -48,18 +43,15 @@
 
 ## 工作原则
 
-1. 当前唯一主线是 9-service closeout -> search-service v0.1 -> memory-service v0.1 -> retrieval-gateway / EvidencePack -> RAG / summary-service -> multi-agent / skill-registry / mcp-gateway / action-executor / ai-eval；阶段细节以 `docs/runbook/current-brief.md` 和 `docs/runbook/remaining-goals.md` 为准，不在本文件重复维护。
-2. 小切片闭环：设计、代码、必要测试、文档一起收；短期生产级压测、长周期演练和生产就绪测试后置到明确阶段或用户指定任务。
-3. 降低耦合：不跨服务读内部表，不引入网状同步 RPC，不为了短期功能抽公共包。
-4. 控制复杂度：生产手写文件接近 2500 行、测试或 runner 接近 3000 行时，优先同 package 拆分。
-5. 新服务和中间件不写死；只有独立数据模型、独立伸缩需求、独立故障边界或显著降低复杂度时才新增，并通过 ADR。
-6. 可以使用多个 sub-agent 加快推进，但必须拆分互不重叠的文件/服务/职责；主 agent 负责集成、最终检查和关闭不再需要的 sub-agent。
-7. 压测原始数据放 `H:\NexusIM\loadtest-results`；E 盘仓库只放报告和文档。
-8. 新发现的待完成工作写入 `docs/runbook/remaining-goals.md`。
-9. 不回滚用户已有修改。
+1. 主线阶段以 `current-brief.md` / `remaining-goals.md` 为准；不要在本文件重复维护长状态。
+2. 小切片闭环：设计、代码、必要测试、文档一起收；生产级长压 / HA / sizing 默认后置。
+3. 降低耦合并控制复杂度：不跨服务读内部表，不引入网状同步 RPC，接近行数阈值就拆同 package 文件。
+4. 新服务和中间件不写死；满足独立模型 / 伸缩 / 故障 / 安全边界或明显降复杂度时通过 ADR 新增。
+5. 可用多个 sub-agent，但必须拆分互不重叠职责；主 agent 负责集成和最终检查。
+6. 压测原始数据放 `H:\NexusIM\loadtest-results`；E 盘仓库只放报告和文档。
+7. 新发现待办写入 `docs/runbook/remaining-goals.md`；不回滚用户已有修改。
 
 ## 每轮结束
-
 1. 若当前阶段变化，更新 `docs/runbook/current-brief.md`。
 2. 若剩余工作变化，更新 `docs/runbook/remaining-goals.md`。
 3. 若服务状态变化，更新对应 `docs/runbook/service-briefs/<service>.md`。

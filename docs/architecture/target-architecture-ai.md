@@ -481,6 +481,11 @@ audit 约束：
 
 AI 能力上线前必须区分 retrieval failure 和 reasoning failure。
 
+第一阶段先落本地 harness，不声明生产 benchmark：低敏 case schema 位于
+`docs/runbook/ai-eval/retrieval-eval-cases.json`，结构和敏感内容由
+`tools/validate-ai-eval-cases.ps1` 校验。后续 `ai-eval-service` 应复用这套
+case taxonomy，再接真实 EvidencePack / RAG / Agent execution adapter。
+
 | 评测类型 | 目标 |
 | --- | --- |
 | normal retrieval | 检查真实检索链路能否找到证据 |

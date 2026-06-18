@@ -7,7 +7,7 @@
 - 当前工作入口先读 `docs/runbook/current-brief.md`。
 - 只在修改某个服务设计或契约时读取对应 SDD。
 - 需要历史 SDD 状态时按关键词查 `docs/sdd/archive/README-20260614-long.md`。
-- 当前 AI 底座路线只把 `search-service.md` 作为第一步 SDD；后续新增 `memory-service`、`retrieval-gateway`、RAG、summary、Agent、skill / MCP / action 服务时再补对应 SDD，不从旧文档推断目标。
+- 当前 AI 底座路线已进入 search / memory / retrieval / eval 边界；后续新增 RAG、summary、Agent、skill / MCP / action 服务时再补对应 SDD，不从旧文档推断目标。
 - 可以用 multi sub-agent 分别审查不同 SDD 或测试缺口，但同一 SDD、proto、migration 只能由一个 agent 修改，主 agent 负责最终集成。
 
 ## 服务 SDD
@@ -26,6 +26,7 @@
 - `search-service.md`
 - `memory-service.md`
 - `retrieval-gateway.md`
+- `ai-eval-harness.md`
 - 后续待新增：`rag-service.md`、`summary-service.md`、`agent-service.md`、`skill-registry.md`、`mcp-gateway.md`、`action-executor.md`。
 
 ## 通用约束

@@ -28,6 +28,7 @@
 - `search-service`
 - `memory-service` / group memory projection
 - `retrieval-gateway` / EvidencePack
+- AI eval harness first-stage case schema / validator
 
 当前尚未真实实现的后续 AI / Agent 能力：
 
@@ -50,6 +51,7 @@
 -> search-service v0.1 第一实现切片已跑通 projection smoke
 -> memory-service foundation-active projection smoke 已通过
 -> retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，field hardening first pass 已落
+-> AI eval harness first pass 已落
 -> RAG / summary-service / Agent
 -> skill-registry / mcp-gateway / action-executor
 -> 安全 / 观测 / repair / 运维 hardening
@@ -188,7 +190,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 ```text
 前 9 个微服务已经能跑通 IM 主链路，
 现在处于“9 个现有服务做必要收口，并向 AI 大模型应用底座转进”，
-search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已从 contract 切到 foundation-active implementation 并跑通 clean projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，policy precheck 和 EvidencePack 字段 hardening first pass 已落，后续是 RAG、summary-service、Agent、skill-registry、mcp-gateway、action-executor。
+search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已从 contract 切到 foundation-active implementation 并跑通 clean projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，policy precheck 和 EvidencePack 字段 hardening first pass 已落；AI eval harness first pass 已有低敏 case schema / validator，后续是 RAG、summary-service、Agent、skill-registry、mcp-gateway、action-executor。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。
 ```
 

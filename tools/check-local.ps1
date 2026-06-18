@@ -35,6 +35,9 @@ try {
     Write-Host "== runbook consistency =="
     Invoke-LocalCheck "check-runbook-consistency.ps1"
 
+    Write-Host "== ai eval cases =="
+    Invoke-LocalCheck "check-ai-eval-cases.ps1"
+
     Write-Host "== security gate catalog =="
     Invoke-LocalCheck "check-security-gate-catalog.ps1"
 

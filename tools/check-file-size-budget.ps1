@@ -76,7 +76,7 @@ $records = @()
 
 foreach ($file in $files) {
     $relativePath = Convert-ToRepoRelativePath -Path $file.FullName
-    $lineCount = (Get-Content -LiteralPath $file.FullName).Count
+    $lineCount = (Get-Content -LiteralPath $file.FullName -Encoding UTF8).Count
 
     if ($file.Extension -eq ".md") {
         $kind = "docs"

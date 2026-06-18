@@ -104,6 +104,10 @@ commit.
   the same package before adding more behavior.
 - If a test or runner approaches 3000 lines, split helpers or scenario files in
   the same package.
+- If legitimate file additions or line-count changes make the file-size hotspot
+  baseline drift, refresh it with `tools/update-file-size-hotspot-baseline.ps1`
+  instead of ad hoc `Get-Content` commands. The file-size scripts explicitly use
+  UTF-8 so the baseline does not depend on the current PowerShell profile.
 - Raw loadtest data belongs under `H:\NexusIM\loadtest-results`; the repository
   only stores summaries and reports.
 

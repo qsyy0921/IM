@@ -4,6 +4,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $checkerPath = Join-Path $PSScriptRoot "check-file-size-budget.ps1"
 $summaryPath = Join-Path $repoRoot "docs\runbook\file-size-hotspot-baseline.json"
 $markdownPath = Join-Path $repoRoot "docs\runbook\file-size-hotspots.md"
+$refreshHint = " Run tools\update-file-size-hotspot-baseline.ps1 from the repository root."
 
 if (-not (Test-Path -LiteralPath $checkerPath -PathType Leaf)) {
     throw "Missing file size budget checker: $checkerPath"
@@ -45,16 +46,16 @@ function Assert-FileSizeRowEqual {
         [string]$Context
     )
 
-    Assert-Condition ((Get-JsonPropertyString -Object $Actual -Name "Path") -eq (Get-JsonPropertyString -Object $Expected -Name "Path")) "$Context path drifted; refresh file-size hotspot baseline."
-    Assert-Condition ((Get-JsonPropertyString -Object $Actual -Name "Kind") -eq (Get-JsonPropertyString -Object $Expected -Name "Kind")) "$Context kind drifted; refresh file-size hotspot baseline."
-    Assert-Condition ([int]$Actual.Lines -eq [int]$Expected.Lines) "$Context line count drifted; refresh file-size hotspot baseline."
-    Assert-Condition ([int]$Actual.Warn -eq [int]$Expected.Warn) "$Context warn threshold drifted; refresh file-size hotspot baseline."
-    Assert-Condition ([int]$Actual.Max -eq [int]$Expected.Max) "$Context max threshold drifted; refresh file-size hotspot baseline."
-    Assert-Condition ([double]$Actual.WarnRatio -eq [double]$Expected.WarnRatio) "$Context warn ratio drifted; refresh file-size hotspot baseline."
-    Assert-Condition ([double]$Actual.MaxRatio -eq [double]$Expected.MaxRatio) "$Context max ratio drifted; refresh file-size hotspot baseline."
+    Assert-Condition ((Get-JsonPropertyString -Object $Actual -Name "Path") -eq (Get-JsonPropertyString -Object $Expected -Name "Path")) "$Context path drifted; refresh file-size hotspot baseline.$refreshHint"
+    Assert-Condition ((Get-JsonPropertyString -Object $Actual -Name "Kind") -eq (Get-JsonPropertyString -Object $Expected -Name "Kind")) "$Context kind drifted; refresh file-size hotspot baseline.$refreshHint"
+    Assert-Condition ([int]$Actual.Lines -eq [int]$Expected.Lines) "$Context line count drifted; refresh file-size hotspot baseline.$refreshHint"
+    Assert-Condition ([int]$Actual.Warn -eq [int]$Expected.Warn) "$Context warn threshold drifted; refresh file-size hotspot baseline.$refreshHint"
+    Assert-Condition ([int]$Actual.Max -eq [int]$Expected.Max) "$Context max threshold drifted; refresh file-size hotspot baseline.$refreshHint"
+    Assert-Condition ([double]$Actual.WarnRatio -eq [double]$Expected.WarnRatio) "$Context warn ratio drifted; refresh file-size hotspot baseline.$refreshHint"
+    Assert-Condition ([double]$Actual.MaxRatio -eq [double]$Expected.MaxRatio) "$Context max ratio drifted; refresh file-size hotspot baseline.$refreshHint"
 }
 
-$summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
+$summary = Get-Content -LiteralPath $summaryPath -Raw -Encoding UTF8 | ConvertFrom-Json
 
 Assert-Condition ((Get-JsonPropertyString -Object $summary -Name "scope") -match "not a code-quality score") "file size hotspot baseline scope must state it is not a code-quality score."
 Assert-Condition ([int]$summary.file_count -gt 0) "file size hotspot baseline must include file_count."
@@ -94,20 +95,20 @@ try {
     Assert-Condition (Test-Path -LiteralPath $currentSummaryPath -PathType Leaf) "file size budget checker did not write current summary."
     Assert-Condition (Test-Path -LiteralPath $currentMarkdownPath -PathType Leaf) "file size budget checker did not write current markdown."
 
-    $currentSummary = Get-Content -LiteralPath $currentSummaryPath -Raw | ConvertFrom-Json
-    Assert-Condition ([int]$currentSummary.file_count -eq [int]$summary.file_count) "file size hotspot baseline file_count drifted; refresh baseline JSON and markdown."
-    Assert-Condition ([int]$currentSummary.totals.warnings -eq [int]$summary.totals.warnings) "file size hotspot baseline warning count drifted; refresh baseline JSON and markdown."
-    Assert-Condition ([int]$currentSummary.totals.failures -eq [int]$summary.totals.failures) "file size hotspot baseline failure count drifted; refresh baseline JSON and markdown."
-    Assert-Condition ([int]$currentSummary.totals.hotspots -eq [int]$summary.totals.hotspots) "file size hotspot baseline hotspot count drifted; refresh baseline JSON and markdown."
+    $currentSummary = Get-Content -LiteralPath $currentSummaryPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    Assert-Condition ([int]$currentSummary.file_count -eq [int]$summary.file_count) "file size hotspot baseline file_count drifted; refresh baseline JSON and markdown.$refreshHint"
+    Assert-Condition ([int]$currentSummary.totals.warnings -eq [int]$summary.totals.warnings) "file size hotspot baseline warning count drifted; refresh baseline JSON and markdown.$refreshHint"
+    Assert-Condition ([int]$currentSummary.totals.failures -eq [int]$summary.totals.failures) "file size hotspot baseline failure count drifted; refresh baseline JSON and markdown.$refreshHint"
+    Assert-Condition ([int]$currentSummary.totals.hotspots -eq [int]$summary.totals.hotspots) "file size hotspot baseline hotspot count drifted; refresh baseline JSON and markdown.$refreshHint"
 
     $currentTopFiles = @($currentSummary.top_files)
-    Assert-Condition ($currentTopFiles.Count -eq $topFiles.Count) "file size hotspot baseline top file count drifted; refresh baseline JSON and markdown."
+    Assert-Condition ($currentTopFiles.Count -eq $topFiles.Count) "file size hotspot baseline top file count drifted; refresh baseline JSON and markdown.$refreshHint"
     for ($i = 0; $i -lt $topFiles.Count; $i++) {
         Assert-FileSizeRowEqual -Expected $topFiles[$i] -Actual $currentTopFiles[$i] -Context "file size hotspot top_files[$i]"
     }
 
     $currentHotspots = @($currentSummary.hotspots)
-    Assert-Condition ($currentHotspots.Count -eq $hotspots.Count) "file size hotspot baseline hotspot row count drifted; refresh baseline JSON and markdown."
+    Assert-Condition ($currentHotspots.Count -eq $hotspots.Count) "file size hotspot baseline hotspot row count drifted; refresh baseline JSON and markdown.$refreshHint"
     for ($i = 0; $i -lt $hotspots.Count; $i++) {
         Assert-FileSizeRowEqual -Expected $hotspots[$i] -Actual $currentHotspots[$i] -Context "file size hotspot hotspots[$i]"
     }
@@ -118,7 +119,7 @@ finally {
     }
 }
 
-$markdown = Get-Content -LiteralPath $markdownPath -Raw
+$markdown = Get-Content -LiteralPath $markdownPath -Raw -Encoding UTF8
 Assert-Condition ($markdown.Contains("# File Size Budget Hotspots")) "file size hotspot markdown missing title."
 Assert-Condition ($markdown.Contains("Large files are review priorities")) "file size hotspot markdown missing boundary text."
 Assert-Condition ($markdown.Contains("not automatic design failures")) "file size hotspot markdown must avoid over-claiming."

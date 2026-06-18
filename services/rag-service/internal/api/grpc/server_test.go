@@ -80,6 +80,16 @@ func TestAnswerQuestionMapsRetrievalUnavailable(t *testing.T) {
 	}
 }
 
+func TestAnswerQuestionMapsCitationVerificationFailure(t *testing.T) {
+	_, err := NewServer(fakeAnswerExecutor{err: types.ErrCitationVerification}).AnswerQuestion(context.Background(), validRequest())
+	if status.Code(err) != codes.Internal {
+		t.Fatalf("expected internal, got %v", err)
+	}
+	if status.Convert(err).Message() != "rag unavailable" {
+		t.Fatalf("unexpected public message: %q", status.Convert(err).Message())
+	}
+}
+
 func validRequest() *ragv1.AnswerQuestionRequest {
 	return &ragv1.AnswerQuestionRequest{
 		AuthContext: &retrievalv1.AuthContext{

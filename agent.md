@@ -47,9 +47,9 @@ Existing real services: `api-gateway`, `identity-service`, `message-service`,
 `conversation-service`, `delivery-service`, `push-gateway`, `receipt-service`,
 `contacts-service`, and `policy-service`.
 
-Current active slice: run the real `retrieval-gateway -> rag-service` RAG
-adapter smoke. Search, memory and retrieval smokes are passed; `rag-service`,
-`loadtest/rag`, and the first RAG eval execution adapter are landed.
+Current active slice: harden `rag-service` with a first-stage provider boundary
+and citation verifier, then move to `summary-service`. Search, memory,
+retrieval and real RAG adapter smokes are passed.
 
 AI invariants: keep facts, projections, retrieval and controlled execution
 separate. Memory requires source refs, scope, validity, supersession,

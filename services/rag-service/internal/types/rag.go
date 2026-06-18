@@ -198,6 +198,19 @@ type AnswerQuestionResult struct {
 	GeneratedByLLM bool
 }
 
+type AnswerGenerationRequest struct {
+	Question     string
+	EvidencePack EvidencePack
+}
+
+type AnswerGenerationResult struct {
+	Status         string
+	AnswerText     string
+	Confidence     float64
+	Citations      []Citation
+	GeneratedByLLM bool
+}
+
 func isValidMemoryStatus(status string) bool {
 	switch status {
 	case MemoryStatusPending, MemoryStatusActive, MemoryStatusSuperseded, MemoryStatusArchived:

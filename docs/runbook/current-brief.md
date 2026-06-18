@@ -37,7 +37,7 @@ policy-service
 -> skill-registry / mcp-gateway / action-executor
 ```
 
-当前必要收口已推进到 policy-service tool policy precheck / low-sensitive audit。`search-service v0.1` 已跑通真实 projection smoke；`memory-service v0.1` 已跑通 source-backed group memory projection smoke；`retrieval-gateway` / EvidencePack 已完成第一轮真实本地 smoke，并已补 policy precheck、`rerank_score`、`dedupe_reason`、`source_coverage`；AI eval harness first pass 已新增低敏 case schema / validator；`rag-service` 已完成 first read-only answer path、`loadtest/rag`、RAG eval execution adapter 和真实本地 RAG adapter smoke。当前下一步是设计 LLM provider 边界和 citation verifier，然后进入 `summary-service`、Agent、`skill-registry`、`mcp-gateway`、`action-executor`。完整系统测试、生产级 HA、长压和 sizing 后置为 hardening backlog。
+当前必要收口已推进到 policy-service tool policy precheck / low-sensitive audit。`search-service v0.1` 已跑通真实 projection smoke；`memory-service v0.1` 已跑通 source-backed group memory projection smoke；`retrieval-gateway` / EvidencePack 已完成第一轮真实本地 smoke，并已补 policy precheck、`rerank_score`、`dedupe_reason`、`source_coverage`；AI eval harness first pass 已新增低敏 case schema / validator；`rag-service` 已完成 first read-only answer path、真实本地 RAG adapter smoke、first-stage provider boundary 和 citation verifier。当前下一步进入 `summary-service`，之后推进 Agent、`skill-registry`、`mcp-gateway`、`action-executor`。完整系统测试、生产级 HA、长压和 sizing 后置为 hardening backlog。
 
 ## 文档职责
 

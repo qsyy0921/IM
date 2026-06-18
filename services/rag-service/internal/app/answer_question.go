@@ -10,10 +10,15 @@ import (
 
 type AnswerQuestionUseCase struct {
 	retrieval RetrievalPort
+	provider  AnswerProvider
 }
 
 func NewAnswerQuestionUseCase(retrieval RetrievalPort) AnswerQuestionUseCase {
-	return AnswerQuestionUseCase{retrieval: retrieval}
+	return NewAnswerQuestionUseCaseWithProvider(retrieval, ExtractiveAnswerProvider{})
+}
+
+func NewAnswerQuestionUseCaseWithProvider(retrieval RetrievalPort, provider AnswerProvider) AnswerQuestionUseCase {
+	return AnswerQuestionUseCase{retrieval: retrieval, provider: provider}
 }
 
 func (usecase AnswerQuestionUseCase) Execute(
@@ -25,6 +30,9 @@ func (usecase AnswerQuestionUseCase) Execute(
 	}
 	if usecase.retrieval == nil {
 		return types.AnswerQuestionResult{}, types.ErrRetrievalUnavailable
+	}
+	if usecase.provider == nil {
+		return types.AnswerQuestionResult{}, types.ErrRAGUnavailable
 	}
 	evidence, err := usecase.retrieval.RetrieveEvidence(ctx, types.RetrieveEvidenceQuery{
 		AuthContext:    command.AuthContext,
@@ -39,26 +47,47 @@ func (usecase AnswerQuestionUseCase) Execute(
 	if err != nil {
 		return types.AnswerQuestionResult{}, err
 	}
-	if len(evidence.Pack.Items) == 0 {
-		return types.AnswerQuestionResult{
-			AnswerID:       command.AnswerID(),
+	generation, err := usecase.provider.GenerateAnswer(ctx, types.AnswerGenerationRequest{
+		Question:     command.NormalizedQuestion(),
+		EvidencePack: evidence.Pack,
+	})
+	if err != nil {
+		return types.AnswerQuestionResult{}, err
+	}
+	if err := verifyAnswerCitations(evidence.Pack, generation); err != nil {
+		return types.AnswerQuestionResult{}, err
+	}
+	return types.AnswerQuestionResult{
+		AnswerID:       command.AnswerID(),
+		Status:         generation.Status,
+		AnswerText:     generation.AnswerText,
+		Confidence:     generation.Confidence,
+		Citations:      generation.Citations,
+		EvidencePack:   evidence.Pack,
+		RAGVersion:     types.RAGVersion,
+		GeneratedByLLM: generation.GeneratedByLLM,
+	}, nil
+}
+
+type ExtractiveAnswerProvider struct{}
+
+func (provider ExtractiveAnswerProvider) GenerateAnswer(
+	_ context.Context,
+	request types.AnswerGenerationRequest,
+) (types.AnswerGenerationResult, error) {
+	if len(request.EvidencePack.Items) == 0 {
+		return types.AnswerGenerationResult{
 			Status:         types.AnswerStatusInsufficientEvidence,
 			AnswerText:     "I do not have enough visible evidence to answer this question.",
 			Confidence:     0,
-			EvidencePack:   evidence.Pack,
-			RAGVersion:     types.RAGVersion,
 			GeneratedByLLM: false,
 		}, nil
 	}
-	citations := citationsFromEvidence(evidence.Pack.Items)
-	return types.AnswerQuestionResult{
-		AnswerID:       command.AnswerID(),
+	return types.AnswerGenerationResult{
 		Status:         types.AnswerStatusGrounded,
-		AnswerText:     buildExtractiveAnswer(evidence.Pack.Items),
-		Confidence:     answerConfidence(evidence.Pack.Items),
-		Citations:      citations,
-		EvidencePack:   evidence.Pack,
-		RAGVersion:     types.RAGVersion,
+		AnswerText:     buildExtractiveAnswer(request.EvidencePack.Items),
+		Confidence:     answerConfidence(request.EvidencePack.Items),
+		Citations:      citationsFromEvidence(request.EvidencePack.Items),
 		GeneratedByLLM: false,
 	}, nil
 }

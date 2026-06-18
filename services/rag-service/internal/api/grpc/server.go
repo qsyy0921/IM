@@ -92,6 +92,8 @@ func publicError(err error) error {
 		return status.Error(codes.PermissionDenied, "permission denied")
 	case errors.Is(err, types.ErrRetrievalUnavailable):
 		return status.Error(codes.Unavailable, "retrieval unavailable")
+	case errors.Is(err, types.ErrCitationVerification):
+		return status.Error(codes.Internal, "rag unavailable")
 	case errors.Is(err, types.ErrRAGUnavailable):
 		return status.Error(codes.Unavailable, "rag unavailable")
 	default:

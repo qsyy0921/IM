@@ -65,6 +65,87 @@ func TestAnswerQuestionBuildsGroundedExtractiveAnswer(t *testing.T) {
 	}
 }
 
+func TestAnswerQuestionUsesProviderBoundary(t *testing.T) {
+	now := time.UnixMilli(1710000000000)
+	retrieval := &fakeRetrievalPort{result: types.RetrieveEvidenceResult{
+		Pack: types.EvidencePack{
+			Items: []types.EvidenceItem{{
+				EvidenceID:      "search:msg-1",
+				SourceType:      types.EvidenceSourceSearchMessage,
+				SourceID:        "msg-1",
+				ConversationID:  "conv-1",
+				ConversationSeq: 3,
+				Text:            "source text",
+				SourceRefs: []types.EvidenceSourceRef{{
+					SourceID:        "msg-1",
+					SourceEventID:   "evt-1",
+					ConversationID:  "conv-1",
+					ConversationSeq: 3,
+					OccurredAt:      now,
+				}},
+			}},
+		},
+	}}
+	provider := fakeAnswerProvider{result: types.AnswerGenerationResult{
+		Status:     types.AnswerStatusGrounded,
+		AnswerText: "provider answer",
+		Confidence: 0.8,
+		Citations: []types.Citation{{
+			EvidenceID:      "search:msg-1",
+			SourceType:      types.EvidenceSourceSearchMessage,
+			SourceID:        "msg-1",
+			SourceEventID:   "evt-1",
+			ConversationID:  "conv-1",
+			ConversationSeq: 3,
+			OccurredAt:      now,
+		}},
+	}}
+	result, err := NewAnswerQuestionUseCaseWithProvider(retrieval, &provider).Execute(context.Background(), validCommand())
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if result.AnswerText != "provider answer" {
+		t.Fatalf("provider answer was not used: %q", result.AnswerText)
+	}
+	if !provider.called {
+		t.Fatal("provider was not called")
+	}
+	if provider.request.Question != "what changed?" {
+		t.Fatalf("unexpected provider question: %q", provider.request.Question)
+	}
+}
+
+func TestAnswerQuestionRejectsUngroundedCitation(t *testing.T) {
+	retrieval := &fakeRetrievalPort{result: types.RetrieveEvidenceResult{
+		Pack: types.EvidencePack{
+			Items: []types.EvidenceItem{{
+				EvidenceID:      "search:msg-1",
+				SourceType:      types.EvidenceSourceSearchMessage,
+				SourceID:        "msg-1",
+				ConversationID:  "conv-1",
+				ConversationSeq: 3,
+				Text:            "source text",
+			}},
+		},
+	}}
+	provider := fakeAnswerProvider{result: types.AnswerGenerationResult{
+		Status:     types.AnswerStatusGrounded,
+		AnswerText: "ungrounded answer",
+		Confidence: 0.8,
+		Citations: []types.Citation{{
+			EvidenceID:      "search:msg-1",
+			SourceType:      types.EvidenceSourceSearchMessage,
+			SourceID:        "different-message",
+			ConversationID:  "conv-1",
+			ConversationSeq: 3,
+		}},
+	}}
+	_, err := NewAnswerQuestionUseCaseWithProvider(retrieval, &provider).Execute(context.Background(), validCommand())
+	if !errors.Is(err, types.ErrCitationVerification) {
+		t.Fatalf("expected citation verification error, got %v", err)
+	}
+}
+
 func TestAnswerQuestionAbstainsWithoutEvidence(t *testing.T) {
 	result, err := NewAnswerQuestionUseCase(&fakeRetrievalPort{}).Execute(context.Background(), validCommand())
 	if err != nil {
@@ -126,4 +207,23 @@ func (port *fakeRetrievalPort) RetrieveEvidence(
 		return types.RetrieveEvidenceResult{}, port.err
 	}
 	return port.result, nil
+}
+
+type fakeAnswerProvider struct {
+	request types.AnswerGenerationRequest
+	result  types.AnswerGenerationResult
+	err     error
+	called  bool
+}
+
+func (provider *fakeAnswerProvider) GenerateAnswer(
+	_ context.Context,
+	request types.AnswerGenerationRequest,
+) (types.AnswerGenerationResult, error) {
+	provider.called = true
+	provider.request = request
+	if provider.err != nil {
+		return types.AnswerGenerationResult{}, provider.err
+	}
+	return provider.result, nil
 }

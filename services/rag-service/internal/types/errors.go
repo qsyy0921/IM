@@ -10,6 +10,7 @@ var (
 	ErrPermissionDenied     = errors.New("permission denied")
 	ErrRetrievalUnavailable = errors.New("retrieval unavailable")
 	ErrRAGUnavailable       = errors.New("rag unavailable")
+	ErrCitationVerification = errors.New("citation verification failed")
 )
 
 func NewInvalidArgument(reason string) error {

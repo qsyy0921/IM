@@ -1,6 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot "service-registry.ps1")
+
 $servicesRoot = Join-Path $repoRoot "services"
 $dockerRoot = Join-Path $repoRoot "deploy\docker"
 
@@ -15,7 +17,14 @@ function Convert-ToRepoRelativePath {
     return $fullPath -replace "/", "\"
 }
 
-$implementedServices = @(Get-ChildItem -LiteralPath $servicesRoot -Directory | Sort-Object Name | Select-Object -ExpandProperty Name)
+$implementedServices = Get-NexusIMRegistryServiceNames -RepoRoot $repoRoot -Active
+$actualServiceDirs = @(Get-ChildItem -LiteralPath $servicesRoot -Directory | Sort-Object Name | Select-Object -ExpandProperty Name)
+$serviceDirDiff = Compare-Object -ReferenceObject $implementedServices -DifferenceObject $actualServiceDirs
+if ($serviceDirDiff) {
+    $diffText = ($serviceDirDiff | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join ", "
+    throw "Service registry active services mismatch with services directory: $diffText"
+}
+
 $runtimeDockerfiles = @(Get-ChildItem -LiteralPath $dockerRoot -File -Filter "*.runtime.Dockerfile" |
     Where-Object { $_.Name -notlike "*loadtest*" } |
     Sort-Object Name)

@@ -1,6 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot "service-registry.ps1")
+
 $servicesRoot = Join-Path $repoRoot "services"
 
 function Convert-ToRepoRelativePath {
@@ -17,13 +19,22 @@ function Convert-ToRepoRelativePath {
 
 $violations = [System.Collections.Generic.List[string]]::new()
 
-foreach ($service in (Get-ChildItem -LiteralPath $servicesRoot -Directory | Sort-Object Name)) {
-    $canonicalCmdDir = Join-Path $service.FullName "cmd\$($service.Name)"
+$activeServices = Get-NexusIMRegistryServiceNames -RepoRoot $repoRoot -Active
+$actualServiceDirs = @(Get-ChildItem -LiteralPath $servicesRoot -Directory | Sort-Object Name | Select-Object -ExpandProperty Name)
+$serviceDirDiff = Compare-Object -ReferenceObject $activeServices -DifferenceObject $actualServiceDirs
+if ($serviceDirDiff) {
+    $diffText = ($serviceDirDiff | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join ", "
+    throw "Service registry active services mismatch with services directory: $diffText"
+}
+
+foreach ($serviceName in $activeServices) {
+    $servicePath = Join-Path $servicesRoot $serviceName
+    $canonicalCmdDir = Join-Path $servicePath "cmd\$serviceName"
     $canonicalMain = Join-Path $canonicalCmdDir "main.go"
     $canonicalTest = Join-Path $canonicalCmdDir "main_test.go"
 
     if (-not (Test-Path -LiteralPath $canonicalMain)) {
-        $violations.Add("services\$($service.Name) is missing canonical cmd\$($service.Name)\main.go")
+        $violations.Add("services\$serviceName is missing canonical cmd\$serviceName\main.go")
         continue
     }
     if (-not (Test-Path -LiteralPath $canonicalTest)) {

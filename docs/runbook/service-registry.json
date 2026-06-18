@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "description": "Single source of truth for NexusIM service lifecycle and local guard coverage. Gate scripts should read this file instead of hard-coding service lists.",
+  "active_stages": [
+    "core",
+    "foundation-active"
+  ],
+  "services": [
+    {
+      "name": "api-gateway",
+      "stage": "core",
+      "local_process": "api-gateway-grpc",
+      "debug_port": 11904,
+      "prometheus_rule_file": "prometheus-api-gateway-alerts.yml",
+      "grafana_dashboard": "api-gateway-observability.json"
+    },
+    {
+      "name": "identity-service",
+      "stage": "core",
+      "local_process": "identity-service-grpc",
+      "debug_port": 11905,
+      "prometheus_rule_file": "prometheus-identity-service-alerts.yml",
+      "grafana_dashboard": "identity-service-observability.json"
+    },
+    {
+      "name": "message-service",
+      "stage": "core",
+      "local_process": "message-service-grpc",
+      "debug_port": 11910,
+      "prometheus_rule_file": "prometheus-message-service-alerts.yml",
+      "grafana_dashboard": "message-service-observability.json"
+    },
+    {
+      "name": "conversation-service",
+      "stage": "core",
+      "local_process": "conversation-service-grpc",
+      "debug_port": 11911,
+      "prometheus_rule_file": "prometheus-conversation-service-alerts.yml",
+      "grafana_dashboard": "conversation-service-observability.json"
+    },
+    {
+      "name": "delivery-service",
+      "stage": "core",
+      "local_process": "delivery-service-grpc",
+      "debug_port": 11912,
+      "prometheus_rule_file": "prometheus-delivery-service-alerts.yml",
+      "grafana_dashboard": "delivery-service-observability.json"
+    },
+    {
+      "name": "push-gateway",
+      "stage": "core",
+      "local_process": "push-gateway-ws",
+      "debug_port": 11913,
+      "prometheus_rule_file": "prometheus-push-gateway-alerts.yml",
+      "grafana_dashboard": "push-gateway-observability.json"
+    },
+    {
+      "name": "receipt-service",
+      "stage": "core",
+      "local_process": "receipt-service-grpc",
+      "debug_port": 11914,
+      "prometheus_rule_file": "prometheus-receipt-service-alerts.yml",
+      "grafana_dashboard": "receipt-service-observability.json"
+    },
+    {
+      "name": "contacts-service",
+      "stage": "core",
+      "local_process": "contacts-service-grpc",
+      "debug_port": 11915,
+      "prometheus_rule_file": "prometheus-contacts-service-alerts.yml",
+      "grafana_dashboard": "contacts-service-observability.json"
+    },
+    {
+      "name": "policy-service",
+      "stage": "core",
+      "local_process": "policy-service-grpc",
+      "debug_port": 11916,
+      "prometheus_rule_file": "prometheus-policy-service-alerts.yml",
+      "grafana_dashboard": "policy-service-observability.json"
+    },
+    {
+      "name": "search-service",
+      "stage": "foundation-active",
+      "local_process": "search-service-noop",
+      "debug_port": 11917,
+      "prometheus_rule_file": "prometheus-search-service-alerts.yml",
+      "grafana_dashboard": "search-service-observability.json"
+    },
+    {
+      "name": "memory-service",
+      "stage": "future"
+    },
+    {
+      "name": "media-service",
+      "stage": "future"
+    },
+    {
+      "name": "notification-service",
+      "stage": "future"
+    },
+    {
+      "name": "audit-service",
+      "stage": "future"
+    },
+    {
+      "name": "admin-service",
+      "stage": "future"
+    },
+    {
+      "name": "retrieval-gateway",
+      "stage": "future"
+    },
+    {
+      "name": "rag-service",
+      "stage": "future"
+    },
+    {
+      "name": "summary-service",
+      "stage": "future"
+    },
+    {
+      "name": "agent-service",
+      "stage": "future"
+    },
+    {
+      "name": "ai-eval-service",
+      "stage": "future"
+    }
+  ],
+  "worker_roles": [
+    {
+      "name": "message-service-outbox-relay",
+      "service": "message-service",
+      "env": "NEXUSIM_MESSAGE_SERVICE_MODE",
+      "value": "outbox-relay"
+    },
+    {
+      "name": "delivery-service-timeline-consumer",
+      "service": "delivery-service",
+      "env": "NEXUSIM_DELIVERY_SERVICE_MODE",
+      "value": "timeline-consumer"
+    },
+    {
+      "name": "delivery-service-outbox-relay",
+      "service": "delivery-service",
+      "env": "NEXUSIM_DELIVERY_SERVICE_MODE",
+      "value": "outbox-relay"
+    },
+    {
+      "name": "push-gateway-delivery-consumer",
+      "service": "push-gateway",
+      "env": "NEXUSIM_PUSH_GATEWAY_MODE",
+      "value": "delivery-consumer"
+    },
+    {
+      "name": "push-gateway-identity-consumer",
+      "service": "push-gateway",
+      "env": "NEXUSIM_PUSH_GATEWAY_MODE",
+      "value": "identity-consumer"
+    },
+    {
+      "name": "receipt-service-delivery-consumer",
+      "service": "receipt-service",
+      "env": "NEXUSIM_RECEIPT_SERVICE_MODE",
+      "value": "delivery-consumer"
+    },
+    {
+      "name": "receipt-service-outbox-relay",
+      "service": "receipt-service",
+      "env": "NEXUSIM_RECEIPT_SERVICE_MODE",
+      "value": "outbox-relay"
+    },
+    {
+      "name": "contacts-service-outbox-relay",
+      "service": "contacts-service",
+      "env": "NEXUSIM_CONTACTS_SERVICE_MODE",
+      "value": "outbox-relay"
+    },
+    {
+      "name": "identity-service-outbox-relay",
+      "service": "identity-service",
+      "env": "NEXUSIM_IDENTITY_SERVICE_MODE",
+      "value": "outbox-relay"
+    }
+  ]
+}

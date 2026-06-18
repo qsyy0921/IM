@@ -1,6 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot "service-registry.ps1")
+
 $servicesRoot = Join-Path $repoRoot "services"
 
 function Convert-ToRepoRelativePath {
@@ -24,23 +26,32 @@ $requiredEndpoints = @(
 
 $violations = [System.Collections.Generic.List[string]]::new()
 
-foreach ($service in (Get-ChildItem -LiteralPath $servicesRoot -Directory | Sort-Object Name)) {
-    $productionFiles = @(Get-ChildItem -LiteralPath $service.FullName -Recurse -Filter "*.go" -File |
+$activeServices = Get-NexusIMRegistryServiceNames -RepoRoot $repoRoot -Active
+$actualServiceDirs = @(Get-ChildItem -LiteralPath $servicesRoot -Directory | Sort-Object Name | Select-Object -ExpandProperty Name)
+$serviceDirDiff = Compare-Object -ReferenceObject $activeServices -DifferenceObject $actualServiceDirs
+if ($serviceDirDiff) {
+    $diffText = ($serviceDirDiff | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join ", "
+    throw "Service registry active services mismatch with services directory: $diffText"
+}
+
+foreach ($serviceName in $activeServices) {
+    $servicePath = Join-Path $servicesRoot $serviceName
+    $productionFiles = @(Get-ChildItem -LiteralPath $servicePath -Recurse -Filter "*.go" -File |
         Where-Object { $_.Name -notlike "*_test.go" })
     if ($productionFiles.Count -eq 0) {
-        $violations.Add("services\$($service.Name) has no production Go files")
+        $violations.Add("services\$serviceName has no production Go files")
         continue
     }
 
     $content = ($productionFiles | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }) -join [Environment]::NewLine
     foreach ($endpoint in $requiredEndpoints) {
         if (-not $content.Contains("`"$endpoint`"")) {
-            $mainPath = Join-Path $service.FullName "cmd\$($service.Name)\main.go"
+            $mainPath = Join-Path $servicePath "cmd\$serviceName\main.go"
             if (Test-Path -LiteralPath $mainPath) {
                 $violations.Add("$(Convert-ToRepoRelativePath -Path $mainPath): service is missing runtime endpoint $endpoint")
             }
             else {
-                $violations.Add("services\$($service.Name): service is missing runtime endpoint $endpoint")
+                $violations.Add("services\${serviceName}: service is missing runtime endpoint $endpoint")
             }
         }
     }

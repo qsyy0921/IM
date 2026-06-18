@@ -1,29 +1,35 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot "service-registry.ps1")
+
 $servicesRoot = Join-Path $repoRoot "services"
 $composePath = Join-Path $repoRoot "deploy\local\docker-compose.grafana.yml"
 $datasourcePath = Join-Path $repoRoot "deploy\local\grafana-datasources.yml"
 $providerPath = Join-Path $repoRoot "deploy\local\grafana-dashboards.yml"
 $dashboardRoot = Join-Path $repoRoot "deploy\local\grafana\dashboards"
-$apiGatewayDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\api-gateway-observability.json"
-$identityDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\identity-service-observability.json"
-$messageDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\message-service-observability.json"
-$conversationDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\conversation-service-observability.json"
-$deliveryDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\delivery-service-observability.json"
-$pushGatewayDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\push-gateway-observability.json"
-$receiptDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\receipt-service-observability.json"
-$contactsDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\contacts-service-observability.json"
-$policyDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\policy-service-observability.json"
-$searchDashboardPath = Join-Path $repoRoot "deploy\local\grafana\dashboards\search-service-observability.json"
 
-foreach ($path in @($composePath, $datasourcePath, $providerPath, $apiGatewayDashboardPath, $identityDashboardPath, $messageDashboardPath, $conversationDashboardPath, $deliveryDashboardPath, $pushGatewayDashboardPath, $receiptDashboardPath, $contactsDashboardPath, $policyDashboardPath, $searchDashboardPath)) {
+$grafanaServices = @(Get-NexusIMRegistryServices -RepoRoot $repoRoot -Active |
+    Where-Object { [string]$_.grafana_dashboard -ne "" })
+$dashboardPathsByService = @{}
+foreach ($service in $grafanaServices) {
+    $dashboardPathsByService[[string]$service.name] = Join-Path $dashboardRoot ([string]$service.grafana_dashboard)
+}
+
+foreach ($path in @($composePath, $datasourcePath, $providerPath) + @($dashboardPathsByService.Values)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Missing local Grafana config file: $path"
     }
 }
 
-$implementedServices = @(Get-ChildItem -LiteralPath $servicesRoot -Directory | Sort-Object Name | Select-Object -ExpandProperty Name)
+$implementedServices = Get-NexusIMRegistryServiceNames -RepoRoot $repoRoot -Active
+$actualServiceDirs = @(Get-ChildItem -LiteralPath $servicesRoot -Directory | Sort-Object Name | Select-Object -ExpandProperty Name)
+$serviceDirDiff = Compare-Object -ReferenceObject $implementedServices -DifferenceObject $actualServiceDirs
+if ($serviceDirDiff) {
+    $diffText = ($serviceDirDiff | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join ", "
+    throw "Service registry active services mismatch with services directory: $diffText"
+}
+
 $dashboardServices = @(Get-ChildItem -LiteralPath $dashboardRoot -Filter "*-observability.json" -File |
     ForEach-Object { $_.BaseName -replace "-observability$", "" } |
     Sort-Object)
@@ -226,15 +232,15 @@ $searchRequiredMetrics = @(
     "nexusim_search_service_info"
 )
 
-Test-Dashboard -Path $apiGatewayDashboardPath -Name "api-gateway" -ExpectedUid "nexusim-api-gateway" -MinimumPanels 5 -RequiredMetrics $apiGatewayRequiredMetrics
-Test-Dashboard -Path $identityDashboardPath -Name "identity-service" -ExpectedUid "nexusim-identity-service" -MinimumPanels 8 -RequiredMetrics $identityRequiredMetrics
-Test-Dashboard -Path $messageDashboardPath -Name "message-service" -ExpectedUid "nexusim-message-service" -MinimumPanels 8 -RequiredMetrics $messageRequiredMetrics
-Test-Dashboard -Path $conversationDashboardPath -Name "conversation-service" -ExpectedUid "nexusim-conversation-service" -MinimumPanels 8 -RequiredMetrics $conversationRequiredMetrics
-Test-Dashboard -Path $deliveryDashboardPath -Name "delivery-service" -ExpectedUid "nexusim-delivery-service" -MinimumPanels 8 -RequiredMetrics $deliveryRequiredMetrics
-Test-Dashboard -Path $pushGatewayDashboardPath -Name "push-gateway" -ExpectedUid "nexusim-push-gateway" -MinimumPanels 8 -RequiredMetrics $pushGatewayRequiredMetrics
-Test-Dashboard -Path $receiptDashboardPath -Name "receipt-service" -ExpectedUid "nexusim-receipt-service" -MinimumPanels 8 -RequiredMetrics $receiptRequiredMetrics
-Test-Dashboard -Path $contactsDashboardPath -Name "contacts-service" -ExpectedUid "nexusim-contacts-service" -MinimumPanels 8 -RequiredMetrics $contactsRequiredMetrics
-Test-Dashboard -Path $policyDashboardPath -Name "policy-service" -ExpectedUid "nexusim-policy-service" -MinimumPanels 8 -RequiredMetrics $policyRequiredMetrics
-Test-Dashboard -Path $searchDashboardPath -Name "search-service" -ExpectedUid "nexusim-search-service" -MinimumPanels 1 -RequiredMetrics $searchRequiredMetrics
+Test-Dashboard -Path $dashboardPathsByService["api-gateway"] -Name "api-gateway" -ExpectedUid "nexusim-api-gateway" -MinimumPanels 5 -RequiredMetrics $apiGatewayRequiredMetrics
+Test-Dashboard -Path $dashboardPathsByService["identity-service"] -Name "identity-service" -ExpectedUid "nexusim-identity-service" -MinimumPanels 8 -RequiredMetrics $identityRequiredMetrics
+Test-Dashboard -Path $dashboardPathsByService["message-service"] -Name "message-service" -ExpectedUid "nexusim-message-service" -MinimumPanels 8 -RequiredMetrics $messageRequiredMetrics
+Test-Dashboard -Path $dashboardPathsByService["conversation-service"] -Name "conversation-service" -ExpectedUid "nexusim-conversation-service" -MinimumPanels 8 -RequiredMetrics $conversationRequiredMetrics
+Test-Dashboard -Path $dashboardPathsByService["delivery-service"] -Name "delivery-service" -ExpectedUid "nexusim-delivery-service" -MinimumPanels 8 -RequiredMetrics $deliveryRequiredMetrics
+Test-Dashboard -Path $dashboardPathsByService["push-gateway"] -Name "push-gateway" -ExpectedUid "nexusim-push-gateway" -MinimumPanels 8 -RequiredMetrics $pushGatewayRequiredMetrics
+Test-Dashboard -Path $dashboardPathsByService["receipt-service"] -Name "receipt-service" -ExpectedUid "nexusim-receipt-service" -MinimumPanels 8 -RequiredMetrics $receiptRequiredMetrics
+Test-Dashboard -Path $dashboardPathsByService["contacts-service"] -Name "contacts-service" -ExpectedUid "nexusim-contacts-service" -MinimumPanels 8 -RequiredMetrics $contactsRequiredMetrics
+Test-Dashboard -Path $dashboardPathsByService["policy-service"] -Name "policy-service" -ExpectedUid "nexusim-policy-service" -MinimumPanels 8 -RequiredMetrics $policyRequiredMetrics
+Test-Dashboard -Path $dashboardPathsByService["search-service"] -Name "search-service" -ExpectedUid "nexusim-search-service" -MinimumPanels 1 -RequiredMetrics $searchRequiredMetrics
 
 Write-Host "OK   local Grafana config"

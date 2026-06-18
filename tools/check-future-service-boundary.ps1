@@ -1,6 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot "service-registry.ps1")
+
 $servicesRoot = Join-Path $repoRoot "services"
 $currentBriefPath = Join-Path $repoRoot "docs\runbook\current-brief.md"
 $remainingGoalsPath = Join-Path $repoRoot "docs\runbook\remaining-goals.md"
@@ -18,34 +20,9 @@ function Read-UTF8Text {
     return [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
 }
 
-$currentImplementedServices = @(
-    "api-gateway",
-    "identity-service",
-    "message-service",
-    "conversation-service",
-    "delivery-service",
-    "push-gateway",
-    "receipt-service",
-    "contacts-service",
-    "policy-service"
-)
-
-$currentFoundationServices = @(
-    "search-service"
-)
-
-$futureServices = @(
-    "memory-service",
-    "media-service",
-    "notification-service",
-    "audit-service",
-    "admin-service",
-    "retrieval-gateway",
-    "rag-service",
-    "summary-service",
-    "agent-service",
-    "ai-eval-service"
-)
+$currentImplementedServices = Get-NexusIMRegistryServiceNames -RepoRoot $repoRoot -Stages @("core")
+$currentFoundationServices = Get-NexusIMRegistryServiceNames -RepoRoot $repoRoot -Stages @("foundation-active")
+$futureServices = Get-NexusIMRegistryServiceNames -RepoRoot $repoRoot -Stages @("future")
 
 $currentBrief = Read-UTF8Text -Path $currentBriefPath
 $remainingGoals = Read-UTF8Text -Path $remainingGoalsPath

@@ -1,34 +1,30 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot "service-registry.ps1")
+
 $servicesRoot = Join-Path $repoRoot "services"
 $composePath = Join-Path $repoRoot "deploy\local\docker-compose.prometheus.yml"
 $configPath = Join-Path $repoRoot "deploy\local\prometheus.yml"
-$apiGatewayRulesPath = Join-Path $repoRoot "deploy\local\prometheus-api-gateway-alerts.yml"
-$identityRulesPath = Join-Path $repoRoot "deploy\local\prometheus-identity-service-alerts.yml"
-$messageRulesPath = Join-Path $repoRoot "deploy\local\prometheus-message-service-alerts.yml"
-$conversationRulesPath = Join-Path $repoRoot "deploy\local\prometheus-conversation-service-alerts.yml"
-$deliveryRulesPath = Join-Path $repoRoot "deploy\local\prometheus-delivery-service-alerts.yml"
-$pushGatewayRulesPath = Join-Path $repoRoot "deploy\local\prometheus-push-gateway-alerts.yml"
-$receiptRulesPath = Join-Path $repoRoot "deploy\local\prometheus-receipt-service-alerts.yml"
-$contactsRulesPath = Join-Path $repoRoot "deploy\local\prometheus-contacts-service-alerts.yml"
-$policyRulesPath = Join-Path $repoRoot "deploy\local\prometheus-policy-service-alerts.yml"
-$searchRulesPath = Join-Path $repoRoot "deploy\local\prometheus-search-service-alerts.yml"
 
-$prometheusServices = @(
-    @{ Name = "api-gateway"; DebugPort = 11904; RuleFile = "prometheus-api-gateway-alerts.yml" },
-    @{ Name = "identity-service"; DebugPort = 11905; RuleFile = "prometheus-identity-service-alerts.yml" },
-    @{ Name = "message-service"; DebugPort = 11910; RuleFile = "prometheus-message-service-alerts.yml" },
-    @{ Name = "conversation-service"; DebugPort = 11911; RuleFile = "prometheus-conversation-service-alerts.yml" },
-    @{ Name = "delivery-service"; DebugPort = 11912; RuleFile = "prometheus-delivery-service-alerts.yml" },
-    @{ Name = "push-gateway"; DebugPort = 11913; RuleFile = "prometheus-push-gateway-alerts.yml" },
-    @{ Name = "receipt-service"; DebugPort = 11914; RuleFile = "prometheus-receipt-service-alerts.yml" },
-    @{ Name = "contacts-service"; DebugPort = 11915; RuleFile = "prometheus-contacts-service-alerts.yml" },
-    @{ Name = "policy-service"; DebugPort = 11916; RuleFile = "prometheus-policy-service-alerts.yml" },
-    @{ Name = "search-service"; DebugPort = 11917; RuleFile = "prometheus-search-service-alerts.yml" }
-)
+$prometheusServices = @(Get-NexusIMRegistryServices -RepoRoot $repoRoot -Active |
+    Where-Object { [string]$_.prometheus_rule_file -ne "" -and [int]$_.debug_port -gt 0 } |
+    ForEach-Object {
+        @{
+            Name = [string]$_.name
+            DebugPort = [int]$_.debug_port
+            RuleFile = [string]$_.prometheus_rule_file
+        }
+    })
 
-$implementedServices = @(Get-ChildItem -LiteralPath $servicesRoot -Directory | Sort-Object Name | Select-Object -ExpandProperty Name)
+$implementedServices = Get-NexusIMRegistryServiceNames -RepoRoot $repoRoot -Active
+$actualServiceDirs = @(Get-ChildItem -LiteralPath $servicesRoot -Directory | Sort-Object Name | Select-Object -ExpandProperty Name)
+$serviceDirDiff = Compare-Object -ReferenceObject $implementedServices -DifferenceObject $actualServiceDirs
+if ($serviceDirDiff) {
+    $diffText = ($serviceDirDiff | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join ", "
+    throw "Service registry active services mismatch with services directory: $diffText"
+}
+
 $configuredServices = @($prometheusServices | ForEach-Object { [string]$_.Name } | Sort-Object)
 $serviceDiff = Compare-Object -ReferenceObject $implementedServices -DifferenceObject $configuredServices
 if ($serviceDiff) {
@@ -36,20 +32,8 @@ if ($serviceDiff) {
     throw "Prometheus service coverage mismatch with services directory: $diffText"
 }
 
-$requiredConfigFiles = @(
-    $composePath,
-    $configPath,
-    $apiGatewayRulesPath,
-    $identityRulesPath,
-    $messageRulesPath,
-    $conversationRulesPath,
-    $deliveryRulesPath,
-    $pushGatewayRulesPath,
-    $receiptRulesPath,
-    $contactsRulesPath,
-    $policyRulesPath,
-    $searchRulesPath
-)
+$requiredConfigFiles = @($composePath, $configPath)
+$requiredConfigFiles += @($prometheusServices | ForEach-Object { Join-Path $repoRoot "deploy\local\$([string]$_.RuleFile)" })
 
 foreach ($path in $requiredConfigFiles) {
     if (-not (Test-Path -LiteralPath $path)) {
@@ -59,16 +43,10 @@ foreach ($path in $requiredConfigFiles) {
 
 $compose = Get-Content -LiteralPath $composePath -Raw
 $config = Get-Content -LiteralPath $configPath -Raw
-$apiGatewayRules = Get-Content -LiteralPath $apiGatewayRulesPath -Raw
-$identityRules = Get-Content -LiteralPath $identityRulesPath -Raw
-$messageRules = Get-Content -LiteralPath $messageRulesPath -Raw
-$conversationRules = Get-Content -LiteralPath $conversationRulesPath -Raw
-$deliveryRules = Get-Content -LiteralPath $deliveryRulesPath -Raw
-$pushGatewayRules = Get-Content -LiteralPath $pushGatewayRulesPath -Raw
-$receiptRules = Get-Content -LiteralPath $receiptRulesPath -Raw
-$contactsRules = Get-Content -LiteralPath $contactsRulesPath -Raw
-$policyRules = Get-Content -LiteralPath $policyRulesPath -Raw
-$searchRules = Get-Content -LiteralPath $searchRulesPath -Raw
+$rulesByService = @{}
+foreach ($service in $prometheusServices) {
+    $rulesByService[[string]$service.Name] = Get-Content -LiteralPath (Join-Path $repoRoot "deploy\local\$([string]$service.RuleFile)") -Raw
+}
 
 if ($compose -notmatch "19090:9090") {
     throw "Prometheus compose must expose host port 19090 to avoid existing local service ports."
@@ -115,7 +93,7 @@ $requiredAPIGatewayAlerts = @(
 )
 
 foreach ($alert in $requiredAPIGatewayAlerts) {
-    if ($apiGatewayRules -notmatch [regex]::Escape($alert)) {
+    if ($rulesByService["api-gateway"] -notmatch [regex]::Escape($alert)) {
         throw "Prometheus api-gateway rules missing alert: $alert"
     }
 }
@@ -134,7 +112,7 @@ $requiredIdentityAlerts = @(
 )
 
 foreach ($alert in $requiredIdentityAlerts) {
-    if ($identityRules -notmatch [regex]::Escape($alert)) {
+    if ($rulesByService["identity-service"] -notmatch [regex]::Escape($alert)) {
         throw "Prometheus identity-service rules missing alert: $alert"
     }
 }
@@ -149,7 +127,7 @@ $requiredMessageAlerts = @(
 )
 
 foreach ($alert in $requiredMessageAlerts) {
-    if ($messageRules -notmatch [regex]::Escape($alert)) {
+    if ($rulesByService["message-service"] -notmatch [regex]::Escape($alert)) {
         throw "Prometheus message-service rules missing alert: $alert"
     }
 }
@@ -165,7 +143,7 @@ $requiredConversationAlerts = @(
 )
 
 foreach ($alert in $requiredConversationAlerts) {
-    if ($conversationRules -notmatch [regex]::Escape($alert)) {
+    if ($rulesByService["conversation-service"] -notmatch [regex]::Escape($alert)) {
         throw "Prometheus conversation-service rules missing alert: $alert"
     }
 }
@@ -185,7 +163,7 @@ $requiredDeliveryAlerts = @(
 )
 
 foreach ($alert in $requiredDeliveryAlerts) {
-    if ($deliveryRules -notmatch [regex]::Escape($alert)) {
+    if ($rulesByService["delivery-service"] -notmatch [regex]::Escape($alert)) {
         throw "Prometheus delivery-service rules missing alert: $alert"
     }
 }
@@ -203,7 +181,7 @@ $requiredPushGatewayAlerts = @(
 )
 
 foreach ($alert in $requiredPushGatewayAlerts) {
-    if ($pushGatewayRules -notmatch [regex]::Escape($alert)) {
+    if ($rulesByService["push-gateway"] -notmatch [regex]::Escape($alert)) {
         throw "Prometheus push-gateway rules missing alert: $alert"
     }
 }
@@ -222,7 +200,7 @@ $requiredReceiptAlerts = @(
 )
 
 foreach ($alert in $requiredReceiptAlerts) {
-    if ($receiptRules -notmatch [regex]::Escape($alert)) {
+    if ($rulesByService["receipt-service"] -notmatch [regex]::Escape($alert)) {
         throw "Prometheus receipt-service rules missing alert: $alert"
     }
 }
@@ -240,7 +218,7 @@ $requiredContactsAlerts = @(
 )
 
 foreach ($alert in $requiredContactsAlerts) {
-    if ($contactsRules -notmatch [regex]::Escape($alert)) {
+    if ($rulesByService["contacts-service"] -notmatch [regex]::Escape($alert)) {
         throw "Prometheus contacts-service rules missing alert: $alert"
     }
 }
@@ -261,7 +239,7 @@ $requiredPolicyAlerts = @(
 )
 
 foreach ($alert in $requiredPolicyAlerts) {
-    if ($policyRules -notmatch [regex]::Escape($alert)) {
+    if ($rulesByService["policy-service"] -notmatch [regex]::Escape($alert)) {
         throw "Prometheus policy-service rules missing alert: $alert"
     }
 }
@@ -272,7 +250,7 @@ $requiredSearchAlerts = @(
 )
 
 foreach ($alert in $requiredSearchAlerts) {
-    if ($searchRules -notmatch [regex]::Escape($alert)) {
+    if ($rulesByService["search-service"] -notmatch [regex]::Escape($alert)) {
         throw "Prometheus search-service rules missing alert: $alert"
     }
 }

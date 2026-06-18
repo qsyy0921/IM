@@ -1,6 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot "service-registry.ps1")
+
 $servicesRoot = Join-Path $repoRoot "services"
 $serviceComposePath = Join-Path $repoRoot "deploy\local\docker-compose.services.yml"
 $workerComposePath = Join-Path $repoRoot "deploy\local\docker-compose.service-workers.yml"
@@ -14,9 +16,15 @@ if (-not (Test-Path -LiteralPath $workerComposePath)) {
 
 $compose = Get-Content -LiteralPath $serviceComposePath -Raw
 $workerCompose = Get-Content -LiteralPath $workerComposePath -Raw
-$implementedServices = @(Get-ChildItem -LiteralPath $servicesRoot -Directory |
+$implementedServices = Get-NexusIMRegistryServiceNames -RepoRoot $repoRoot -Active
+$actualServiceDirs = @(Get-ChildItem -LiteralPath $servicesRoot -Directory |
     Sort-Object Name |
     Select-Object -ExpandProperty Name)
+$serviceDirDiff = Compare-Object -ReferenceObject $implementedServices -DifferenceObject $actualServiceDirs
+if ($serviceDirDiff) {
+    $diffText = ($serviceDirDiff | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join ", "
+    throw "Service registry active services mismatch with services directory: $diffText"
+}
 
 foreach ($service in $implementedServices) {
     if ($compose -notmatch "image:\s+nexusim/$([regex]::Escape($service)):local") {
@@ -27,17 +35,10 @@ foreach ($service in $implementedServices) {
     }
 }
 
-$expectedProcesses = @(
-    "api-gateway-grpc",
-    "identity-service-grpc",
-    "message-service-grpc",
-    "conversation-service-grpc",
-    "delivery-service-grpc",
-    "push-gateway-ws",
-    "receipt-service-grpc",
-    "contacts-service-grpc",
-    "policy-service-grpc"
-)
+$expectedProcesses = @(Get-NexusIMRegistryServices -RepoRoot $repoRoot -Active |
+    Where-Object { [string]$_.local_process -ne "" } |
+    ForEach-Object { [string]$_.local_process } |
+    Sort-Object)
 
 foreach ($process in $expectedProcesses) {
     if ($compose -notmatch "(?m)^\s{2}$([regex]::Escape($process)):\s*$") {
@@ -65,17 +66,9 @@ foreach ($entry in $requiredEnvironment) {
     }
 }
 
-$expectedWorkerProcesses = @(
-    "message-service-outbox-relay",
-    "delivery-service-timeline-consumer",
-    "delivery-service-outbox-relay",
-    "push-gateway-delivery-consumer",
-    "push-gateway-identity-consumer",
-    "receipt-service-delivery-consumer",
-    "receipt-service-outbox-relay",
-    "contacts-service-outbox-relay",
-    "identity-service-outbox-relay"
-)
+$expectedWorkerProcesses = @(Get-NexusIMRegistryWorkerRoles -RepoRoot $repoRoot |
+    ForEach-Object { [string]$_.name } |
+    Sort-Object)
 
 foreach ($process in $expectedWorkerProcesses) {
     if ($workerCompose -notmatch "(?m)^\s{2}$([regex]::Escape($process)):\s*$") {
@@ -83,18 +76,9 @@ foreach ($process in $expectedWorkerProcesses) {
     }
 }
 
-$requiredWorkerEnvironment = @(
-    "NEXUSIM_MESSAGE_SERVICE_MODE: outbox-relay",
-    "NEXUSIM_DELIVERY_SERVICE_MODE: timeline-consumer",
-    "NEXUSIM_DELIVERY_SERVICE_MODE: outbox-relay",
-    "NEXUSIM_PUSH_GATEWAY_MODE: delivery-consumer",
-    "NEXUSIM_PUSH_GATEWAY_MODE: identity-consumer",
-    "NEXUSIM_RECEIPT_SERVICE_MODE: delivery-consumer",
-    "NEXUSIM_RECEIPT_SERVICE_MODE: outbox-relay",
-    "NEXUSIM_CONTACTS_SERVICE_MODE: outbox-relay",
-    "NEXUSIM_IDENTITY_SERVICE_MODE: outbox-relay",
-    "NEXUSIM_KAFKA_BROKERS: kafka:29092"
-)
+$requiredWorkerEnvironment = @(Get-NexusIMRegistryWorkerRoles -RepoRoot $repoRoot |
+    ForEach-Object { "$([string]$_.env): $([string]$_.value)" })
+$requiredWorkerEnvironment += "NEXUSIM_KAFKA_BROKERS: kafka:29092"
 
 foreach ($entry in $requiredWorkerEnvironment) {
     if ($workerCompose -notmatch [regex]::Escape($entry)) {

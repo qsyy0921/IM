@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -24,6 +25,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const defaultTenantID = "tenant-contacts-smoke"
+
 func main() {
 	cfg := parseConfig()
 	if err := run(cfg); err != nil {
@@ -35,6 +38,10 @@ func main() {
 func run(cfg config) error {
 	cfg.gatewayAuthMode = strings.ToLower(strings.TrimSpace(cfg.gatewayAuthMode))
 	cfg.gatewayAuthAudience = normalizedGatewayAuthAudience(cfg.gatewayAuthAudience)
+	startedAt := time.Now().UTC()
+	if cfg.duration > 0 && cfg.tenantID == defaultTenantID {
+		cfg.tenantID = defaultTenantID + "-" + startedAt.Format("20060102150405")
+	}
 	if cfg.gatewayFacade && cfg.gatewayAuthMode == "" {
 		return fmt.Errorf("--gateway-facade requires --gateway-auth-mode")
 	}
@@ -50,25 +57,27 @@ func run(cfg config) error {
 	if err := os.MkdirAll(cfg.resultDir, 0o755); err != nil {
 		return fmt.Errorf("create result dir: %w", err)
 	}
-	startedAt := time.Now().UTC()
 	s := summary{
-		Commit:               gitOutput("rev-parse", "--short", "HEAD"),
-		CommitFull:           gitOutput("rev-parse", "HEAD"),
-		GitStatusShort:       gitOutput("status", "--short"),
-		Target:               cfg.target,
-		TLSEnabled:           cfg.tls.Enabled(),
-		ResultDir:            cfg.resultDir,
-		TenantID:             cfg.tenantID,
-		SenderUserID:         cfg.senderUserID,
-		ReceiverUserID:       cfg.receiverUserID,
-		Scenario:             cfg.scenario,
-		ContactTopic:         cfg.contactTopic,
-		VerifiedAuthMetadata: cfg.verifiedMetadata,
-		GatewayFacade:        cfg.gatewayFacade,
-		GatewayAuthMode:      cfg.gatewayAuthMode,
-		GatewayAuthAudience:  gatewayAuthAudienceSummary(cfg.gatewayAuthMode, cfg.gatewayAuthAudience),
-		StartedAt:            startedAt,
-		LatenciesMS:          map[string]float64{},
+		Commit:                    gitOutput("rev-parse", "--short", "HEAD"),
+		CommitFull:                gitOutput("rev-parse", "HEAD"),
+		GitStatusShort:            gitOutput("status", "--short"),
+		Target:                    cfg.target,
+		TLSEnabled:                cfg.tls.Enabled(),
+		ResultDir:                 cfg.resultDir,
+		TenantID:                  cfg.tenantID,
+		SenderUserID:              cfg.senderUserID,
+		ReceiverUserID:            cfg.receiverUserID,
+		Scenario:                  cfg.scenario,
+		ContactTopic:              cfg.contactTopic,
+		CapacityMode:              cfg.duration > 0,
+		VUs:                       cfg.vus,
+		ConfiguredDurationSeconds: cfg.duration.Seconds(),
+		VerifiedAuthMetadata:      cfg.verifiedMetadata,
+		GatewayFacade:             cfg.gatewayFacade,
+		GatewayAuthMode:           cfg.gatewayAuthMode,
+		GatewayAuthAudience:       gatewayAuthAudienceSummary(cfg.gatewayAuthMode, cfg.gatewayAuthAudience),
+		StartedAt:                 startedAt,
+		LatenciesMS:               map[string]float64{},
 	}
 	s.GitDirty = strings.TrimSpace(s.GitStatusShort) != ""
 	defer func() {
@@ -77,8 +86,10 @@ func run(cfg config) error {
 		_ = writeSummary(cfg.resultDir, s)
 	}()
 
+	var pool *pgxpool.Pool
 	if cfg.pgDSN != "" {
-		pool, err := pgxpool.New(context.Background(), cfg.pgDSN)
+		var err error
+		pool, err = pgxpool.New(context.Background(), cfg.pgDSN)
 		if err != nil {
 			s.Error = err.Error()
 			return fmt.Errorf("open postgres: %w", err)
@@ -90,6 +101,9 @@ func run(cfg config) error {
 				return err
 			}
 		}
+	}
+	if pool != nil {
+		defer pool.Close()
 	}
 
 	dialOption, err := grpctls.DialOption(cfg.tls, "contacts-tls")
@@ -106,6 +120,14 @@ func run(cfg config) error {
 	var client contactsClient = contactsv1.NewContactsServiceClient(conn)
 	if cfg.gatewayFacade {
 		client = gatewayv1.NewGatewayServiceClient(conn)
+	}
+	if cfg.duration > 0 {
+		if err := runCapacity(cfg, client, pool, &s); err != nil {
+			s.Error = err.Error()
+			return err
+		}
+		s.Success = true
+		return nil
 	}
 
 	requestIDSuffix := time.Now().UTC().Format("20060102150405")
@@ -318,6 +340,105 @@ func sendContactRequest(cfg config, client contactsClient, suffix string) (sendS
 		Status:           resp.GetStatus().String(),
 		IdempotentReplay: resp.GetIdempotentReplay(),
 	}, elapsed, nil
+}
+
+func runCapacity(cfg config, client contactsClient, pool *pgxpool.Pool, s *summary) error {
+	if cfg.scenario != "accept" {
+		return fmt.Errorf("--duration capacity mode currently supports accept scenario only, got %q", cfg.scenario)
+	}
+	if pool == nil {
+		return fmt.Errorf("--pg-dsn is required for contacts capacity mode")
+	}
+	if len(cfg.kafkaBrokers) == 0 || cfg.contactTopic == "" {
+		return fmt.Errorf("--kafka-brokers and --contact-topic are required for contacts capacity mode")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.duration)
+	defer cancel()
+
+	var mu sync.Mutex
+	var firstErr error
+	successPairs := 0
+	errorCount := 0
+	latencySamples := make([]float64, 0, cfg.vus*64)
+	runSuffix := s.StartedAt.Format("20060102150405")
+
+	recordError := func(err error) {
+		if err == nil {
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		errorCount++
+		if firstErr == nil {
+			firstErr = err
+			cancel()
+		}
+	}
+	recordSuccess := func(sendMS, respondMS float64) {
+		mu.Lock()
+		defer mu.Unlock()
+		successPairs++
+		latencySamples = append(latencySamples, sendMS, respondMS)
+	}
+
+	var wg sync.WaitGroup
+	for vu := 0; vu < cfg.vus; vu++ {
+		vu := vu
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			iteration := 0
+			for ctx.Err() == nil {
+				localCfg := cfg
+				suffix := fmt.Sprintf("cap-%s-vu%02d-%06d", runSuffix, vu, iteration)
+				localCfg.senderUserID = fmt.Sprintf("%s-vu%02d-%06d-s", cfg.senderUserID, vu, iteration)
+				localCfg.receiverUserID = fmt.Sprintf("%s-vu%02d-%06d-r", cfg.receiverUserID, vu, iteration)
+				localCfg.senderDeviceID = fmt.Sprintf("%s-vu%02d-s", cfg.senderDeviceID, vu)
+				localCfg.receiverDeviceID = fmt.Sprintf("%s-vu%02d-r", cfg.receiverDeviceID, vu)
+
+				sendResult, sendMS, err := sendContactRequest(localCfg, client, suffix)
+				if err != nil {
+					recordError(err)
+					return
+				}
+				_, respondMS, err := respondContactRequest(localCfg, client, sendResult.RequestID, suffix)
+				if err != nil {
+					recordError(err)
+					return
+				}
+				recordSuccess(sendMS, respondMS)
+				iteration++
+			}
+		}()
+	}
+	wg.Wait()
+
+	mu.Lock()
+	s.CapacityOperationCount = successPairs * 2
+	s.CapacityErrorCount = errorCount
+	s.CapacityLatencySamplesMS = append([]float64(nil), latencySamples...)
+	err := firstErr
+	mu.Unlock()
+	if err != nil {
+		return err
+	}
+	if successPairs == 0 {
+		return fmt.Errorf("contacts capacity run completed with no successful contact request pairs")
+	}
+
+	wantEvents := successPairs * expectedEventCount(cfg.scenario)
+	outbox, err := waitOutboxPublished(context.Background(), pool, cfg, int64(wantEvents))
+	if err != nil {
+		return err
+	}
+	s.ContactsOutbox = outbox
+	eventCount, err := readContactEventCount(context.Background(), cfg, wantEvents)
+	if err != nil {
+		return err
+	}
+	s.CapacityContactEventCount = eventCount
+	return nil
 }
 
 func respondContactRequest(cfg config, client contactsClient, requestID string, suffix string) (respondSummary, float64, error) {
@@ -604,6 +725,45 @@ func readContactEvents(ctx context.Context, cfg config, want int) ([]contactKafk
 		return events, fmt.Errorf("expected %d contact Kafka events, got %d", want, len(events))
 	}
 	return events, nil
+}
+
+func readContactEventCount(ctx context.Context, cfg config, want int) (int, error) {
+	if want <= 0 {
+		return 0, nil
+	}
+	reader := kafkago.NewReader(kafkago.ReaderConfig{
+		Brokers:   cfg.kafkaBrokers,
+		Topic:     cfg.contactTopic,
+		Partition: 0,
+		MinBytes:  1,
+		MaxBytes:  10e6,
+	})
+	defer reader.Close()
+	if err := reader.SetOffset(kafkago.FirstOffset); err != nil {
+		return 0, err
+	}
+	deadline := time.Now().Add(cfg.waitTimeout)
+	seen := map[string]bool{}
+	for len(seen) < want && time.Now().Before(deadline) {
+		readCtx, cancel := context.WithTimeout(ctx, cfg.pollInterval)
+		message, err := reader.ReadMessage(readCtx)
+		cancel()
+		if err != nil {
+			continue
+		}
+		var event contacteventsv1.ContactEvent
+		if err := proto.Unmarshal(message.Value, &event); err != nil {
+			continue
+		}
+		if event.GetTenantId() != cfg.tenantID || seen[event.GetEventId()] {
+			continue
+		}
+		seen[event.GetEventId()] = true
+	}
+	if len(seen) < want {
+		return len(seen), fmt.Errorf("expected %d contact Kafka events, got %d", want, len(seen))
+	}
+	return len(seen), nil
 }
 
 func summarizeContactEvent(event *contacteventsv1.ContactEvent) contactKafkaEvent {
@@ -982,18 +1142,35 @@ func buildCapacitySummary(s summary) *capacitySummary {
 	}
 	operationCount := len(s.LatenciesMS)
 	eventCount := len(s.ContactKafkaEvents)
+	errorCount := 0
+	vus := 0
+	var latencyP95 float64
+	var latencyP99 float64
+	if s.CapacityMode {
+		operationCount = s.CapacityOperationCount
+		eventCount = s.CapacityContactEventCount
+		errorCount = s.CapacityErrorCount
+		vus = s.VUs
+		latencyP95 = latencySliceQuantile(s.CapacityLatencySamplesMS, 0.95)
+		latencyP99 = latencySliceQuantile(s.CapacityLatencySamplesMS, 0.99)
+	} else {
+		latencyP95 = latencyQuantile(s.LatenciesMS, 0.95)
+		latencyP99 = latencyQuantile(s.LatenciesMS, 0.99)
+	}
 	return &capacitySummary{
 		DurationSeconds:       duration,
 		Scenario:              s.Scenario,
 		OperationCount:        operationCount,
 		ContactEventCount:     eventCount,
+		ErrorCount:            errorCount,
+		VUs:                   vus,
 		ContactsOutboxTotal:   s.ContactsOutbox.Total,
 		ContactsOutboxPending: s.ContactsOutbox.Pending,
 		ContactsOutboxDLQ:     s.ContactsOutbox.DLQ,
 		OperationsPerSecond:   ratePerSecond(operationCount, duration),
 		EventsPerSecond:       ratePerSecond(eventCount, duration),
-		LatencyP95MS:          latencyQuantile(s.LatenciesMS, 0.95),
-		LatencyP99MS:          latencyQuantile(s.LatenciesMS, 0.99),
+		LatencyP95MS:          latencyP95,
+		LatencyP99MS:          latencyP99,
 	}
 }
 
@@ -1012,6 +1189,18 @@ func latencyQuantile(values map[string]float64, quantile float64) float64 {
 	for _, value := range values {
 		sorted = append(sorted, value)
 	}
+	return latencySortedQuantile(sorted, quantile)
+}
+
+func latencySliceQuantile(values []float64, quantile float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	sorted := append([]float64(nil), values...)
+	return latencySortedQuantile(sorted, quantile)
+}
+
+func latencySortedQuantile(sorted []float64, quantile float64) float64 {
 	sort.Float64s(sorted)
 	index := int(math.Ceil(quantile*float64(len(sorted)))) - 1
 	if index < 0 {

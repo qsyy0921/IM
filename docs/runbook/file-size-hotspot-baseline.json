@@ -1,7 +1,7 @@
 ﻿{
-    "created_at":  "2026-06-17T23:35:03.4292939Z",
+    "created_at":  "2026-06-18T00:24:00.0243734Z",
     "scope":  "handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score",
-    "file_count":  1181,
+    "file_count":  1182,
     "thresholds":  {
                        "production_warn_lines":  2500,
                        "production_max_lines":  3500,
@@ -57,12 +57,21 @@
                       },
                       {
                           "Path":  "tools\\run-loadtest-capacity-baseline-suite.ps1",
-                          "Lines":  641,
+                          "Lines":  645,
                           "Kind":  "script/runner",
                           "Warn":  1000,
                           "Max":  1500,
-                          "WarnRatio":  0.641,
-                          "MaxRatio":  0.4273
+                          "WarnRatio":  0.645,
+                          "MaxRatio":  0.43
+                      },
+                      {
+                          "Path":  "loadtest\\contacts\\main.go",
+                          "Lines":  1246,
+                          "Kind":  "test/runner",
+                          "Warn":  2500,
+                          "Max":  3000,
+                          "WarnRatio":  0.4984,
+                          "MaxRatio":  0.4153
                       },
                       {
                           "Path":  "docs\\sdd\\push-gateway.md",
@@ -117,15 +126,6 @@
                           "Max":  1500,
                           "WarnRatio":  0.4517,
                           "MaxRatio":  0.3613
-                      },
-                      {
-                          "Path":  "loadtest\\contacts\\main.go",
-                          "Lines":  1057,
-                          "Kind":  "test/runner",
-                          "Warn":  2500,
-                          "Max":  3000,
-                          "WarnRatio":  0.4228,
-                          "MaxRatio":  0.3523
                       },
                       {
                           "Path":  "docs\\runbook\\loadtest\\message-service\\loadtest-report-20260609.md",

@@ -33,6 +33,9 @@ type summary struct {
 	ReceiverUserID               string              `json:"receiver_user_id"`
 	Scenario                     string              `json:"scenario"`
 	ContactTopic                 string              `json:"contact_topic"`
+	CapacityMode                 bool                `json:"capacity_mode,omitempty"`
+	VUs                          int                 `json:"vus,omitempty"`
+	ConfiguredDurationSeconds    float64             `json:"configured_duration_seconds,omitempty"`
 	VerifiedAuthMetadata         bool                `json:"verified_auth_metadata"`
 	GatewayFacade                bool                `json:"gateway_facade"`
 	GatewayAuthMode              string              `json:"gateway_auth_mode,omitempty"`
@@ -63,6 +66,10 @@ type summary struct {
 	ContactKafkaEvents           []contactKafkaEvent `json:"contact_kafka_events"`
 	LatenciesMS                  map[string]float64  `json:"latencies_ms"`
 	Capacity                     *capacitySummary    `json:"capacity_summary,omitempty"`
+	CapacityOperationCount       int                 `json:"-"`
+	CapacityErrorCount           int                 `json:"-"`
+	CapacityContactEventCount    int                 `json:"-"`
+	CapacityLatencySamplesMS     []float64           `json:"-"`
 }
 
 type sendSummary struct {
@@ -137,6 +144,8 @@ type capacitySummary struct {
 	Scenario              string  `json:"scenario"`
 	OperationCount        int     `json:"operation_count"`
 	ContactEventCount     int     `json:"contact_event_count"`
+	ErrorCount            int     `json:"error_count,omitempty"`
+	VUs                   int     `json:"vus,omitempty"`
 	ContactsOutboxTotal   int64   `json:"contacts_outbox_total"`
 	ContactsOutboxPending int64   `json:"contacts_outbox_pending"`
 	ContactsOutboxDLQ     int64   `json:"contacts_outbox_dlq"`

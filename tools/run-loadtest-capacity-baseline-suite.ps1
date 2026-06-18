@@ -416,6 +416,10 @@ function Build-Step {
             $runnerArgsList.Add("--kafka-brokers")
             $runnerArgsList.Add($KafkaBrokers)
             $runnerArgsList.Add("--cleanup")
+            $runnerArgsList.Add("--vus")
+            $runnerArgsList.Add([string]$VUs)
+            $runnerArgsList.Add("--duration")
+            $runnerArgsList.Add($Duration)
             Add-ArgIfValue -ArgumentList $runnerArgsList -Name "--pg-dsn" -Value $PGDSN
             $step = New-Step `
                 -Service $Service `

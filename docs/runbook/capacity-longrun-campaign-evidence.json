@@ -1,6 +1,6 @@
 ﻿{
     "schema_version":  1,
-    "updated_at":  "2026-06-17",
+    "updated_at":  "2026-06-18",
     "scope":  "Local long-run capacity campaign evidence index for NexusIM. Planned entries reference external campaign plans; completed entries reference external raw summaries plus repository runbook reports. This is not a production SLO or sizing proof.",
     "entries":  [
                     {
@@ -32,6 +32,14 @@
                         "note":  "conversation-service seeded CreateMemberChange JOIN 30m local long-run slice with 4 VUs and a seeded ACTIVE owner; local evidence only, not production sizing.",
                         "summary_path":  "H:\\NexusIM\\loadtest-results\\capacity-longrun-nine-services-20260618-plan\\conversation-service\\capacity-longrun-campaign-summary.json",
                         "report_path":  "docs\\runbook\\loadtest\\conversation-service\\loadtest-report-20260618-conversation-longrun-slice.md"
+                    },
+                    {
+                        "name":  "contacts-service-longrun-slice-20260618",
+                        "status":  "completed",
+                        "plan_path":  "H:\\NexusIM\\loadtest-results\\capacity-longrun-nine-services-20260618-plan\\capacity-longrun-campaign-plan.json",
+                        "note":  "contacts-service stack contact request accept/outbox/Kafka readback 30m local long-run slice with 4 VUs; local evidence only, not production sizing.",
+                        "summary_path":  "H:\\NexusIM\\loadtest-results\\capacity-longrun-nine-services-20260618-plan\\contacts-service\\capacity-longrun-campaign-summary.json",
+                        "report_path":  "docs\\runbook\\loadtest\\contacts-service\\loadtest-report-20260618-contacts-longrun-slice.md"
                     }
                 ]
 }

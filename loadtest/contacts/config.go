@@ -25,6 +25,8 @@ type config struct {
 	senderDeviceID        string
 	receiverDeviceID      string
 	scenario              string
+	duration              time.Duration
+	vus                   int
 	cleanup               bool
 	verifiedMetadata      bool
 	gatewayFacade         bool
@@ -55,6 +57,8 @@ func parseConfig() config {
 	flag.StringVar(&cfg.senderDeviceID, "sender-device-id", "sender-device-1", "sender device id")
 	flag.StringVar(&cfg.receiverDeviceID, "receiver-device-id", "receiver-device-1", "receiver device id")
 	flag.StringVar(&cfg.scenario, "scenario", "accept", "scenario: accept, decline, cancel, delete, block, unblock, remark, or readd")
+	flag.DurationVar(&cfg.duration, "duration", 0, "capacity run duration; 0 runs a single smoke scenario")
+	flag.IntVar(&cfg.vus, "vus", 1, "capacity virtual users; used when --duration is greater than 0")
 	flag.BoolVar(&cfg.cleanup, "cleanup", false, "delete tenant contacts rows before running")
 	flag.BoolVar(&cfg.verifiedMetadata, "verified-auth-metadata", envBool("NEXUSIM_CONTACTS_LOADTEST_VERIFIED_AUTH_METADATA", false), "send gateway verified identity through contacts-service gRPC metadata")
 	flag.BoolVar(&cfg.gatewayFacade, "gateway-facade", envBool("NEXUSIM_CONTACTS_LOADTEST_GATEWAY_FACADE", false), "use nexusim.gateway.v1.GatewayService for contacts user-facing RPCs")
@@ -76,6 +80,12 @@ func parseConfig() config {
 	}
 	if cfg.waitTimeout <= 0 {
 		cfg.waitTimeout = 10 * time.Second
+	}
+	if cfg.vus <= 0 {
+		cfg.vus = 1
+	}
+	if cfg.duration > 0 && cfg.waitTimeout < 30*time.Second {
+		cfg.waitTimeout = 30 * time.Second
 	}
 	return cfg
 }

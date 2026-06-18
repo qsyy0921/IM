@@ -15,11 +15,12 @@
 - 当 `NEXUSIM_CONTACTS_AUTH_MODE=metadata|verified-metadata` 时，公网监听地址 + 无 gRPC mTLS client cert 的危险组合会在启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - PostgreSQL repository 已按主流程 / query / request-idempotency helper / edge helper / outbox helper / cursor helper / privacy / privacy exception / source policy 同 package 拆分，主 repository 文件已收敛到约 890 行，避免联系人逻辑继续堆进单个大文件；contacts types 已按 source / privacy / policy review / request list / edge command 拆分；PostgreSQL privacy / profile / exception / source-policy / contact-edge 集成测试也已拆到独立同 package 测试文件。
 - cmd 启动编排已把 outbox cleanup、tenant privacy、source policy、review operator 和 env / TLS / debug listener helper 拆到独立同 package 文件，`main.go` 保留核心 gRPC / relay / audit 编排。
-- `loadtest/contacts` summary 已输出 `capacity_summary`，包含运行时长、场景、操作数、Kafka contact event 数、contacts outbox 聚合、ops/s、events/s 和 latency p95/p99；后续容量验证可直接复用该结构。
+- `loadtest/contacts` summary 已输出 `capacity_summary`，包含运行时长、场景、操作数、Kafka contact event 数、contacts outbox 聚合、ops/s、events/s 和 latency p95/p99；runner 已支持 `--duration` / `--vus` 容量模式，保留原单次 smoke 语义。
 - `loadtest/contacts` runner 已按 config / model / auth helper 同 package 拆分，避免后续联系人容量和 stack smoke 继续堆进单个 `main.go`。
 - `capacity-baseline-contacts-stack-20260616-r2` 本地 stack 短基线已跑通：`contacts_outbox PUBLISHED=2/PENDING=0/DLQ=0`，Kafka 读回 `contact.request.created.v1` 和 `contact.request.accepted.v1`，`operations_per_second=0.89`；报告见 `loadtest/distributed/loadtest-report-20260616-contacts-stack-capacity-baseline.md`。
+- `contacts-service-longrun-slice-20260618` 本地 stack 30m 长跑切片已通过：4 VUs，`operation_count=97150`，`contact_event_count=97150`，`operations_per_second=53.66`，p95 `193.013ms`，p99 `328.359ms`，`contacts_outbox_pending=0`，`contacts_outbox_dlq=0`；报告见 `loadtest/contacts-service/loadtest-report-20260618-contacts-longrun-slice.md`。
 
 ## 后续
 
 - 更细隐私策略：组织级策略、租户默认值 / 来源策略 / 隐私例外接入 admin/config service 正式权限面；当前 `REVIEW_REQUIRED` 和 `contact-request-review` 是 first-stage 本地 operator 审批状态机，还不是完整后台审批产品。
-- 生产级 OTel collector、Alertmanager、SLO dashboard、长时间容量曲线仍属于后续统一观测治理。
+- 生产级 OTel collector、Alertmanager、SLO dashboard、更完整容量曲线和生产 sizing 仍属于后续统一观测 / 容量治理。

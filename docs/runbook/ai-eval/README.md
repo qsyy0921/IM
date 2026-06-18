@@ -7,8 +7,9 @@ summary, Agent and tool/action boundaries.
 
 - Case file: `retrieval-eval-cases.json`
 - Validator: `tools/validate-ai-eval-cases.ps1`
-- Scope: schema and assertion coverage only; not a production benchmark, not a
-  model-quality claim, and not a long-running eval platform.
+- RAG execution adapter: `tools/run-ai-eval-rag-adapter.ps1`
+- Scope: first-stage schema + local execution coverage only; not a production
+  benchmark, not a model-quality claim, and not a long-running eval platform.
 
 ## Case Rules
 
@@ -34,5 +35,21 @@ Optional report:
   -MarkdownPath H:\NexusIM\loadtest-results\ai-eval\ai-eval-cases.md
 ```
 
-Future RAG / Agent slices should add execution adapters that evaluate these
-cases against real EvidencePack outputs before making model-quality claims.
+First-stage RAG execution adapter:
+
+```powershell
+.\tools\run-ai-eval-rag-adapter.ps1 `
+  -PGDSN postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable `
+  -RAGTarget 127.0.0.1:10610
+```
+
+This adapter runs `loadtest/rag`, which seeds low-sensitive search / memory
+projection rows, calls real `rag-service AnswerQuestion`, and validates active
+`rag-service` cases against the returned answer, citations and EvidencePack.
+It requires `rag-service`, `retrieval-gateway`, `search-service` and
+`memory-service` runtime processes to be reachable. Raw execution summaries
+stay under `H:\NexusIM\loadtest-results`.
+
+Future Agent slices should add execution adapters that evaluate tool policy,
+proposal / approval and action safety against real EvidencePack outputs before
+making model-quality or agent-safety claims.

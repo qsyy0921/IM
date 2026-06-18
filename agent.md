@@ -63,13 +63,14 @@ Current execution chain:
    operations in hardening backlog unless they directly unblock the current
    execution chain.
 
-Current active slice: retrieval-gateway -> rag-service smoke / RAG eval adapter.
+Current active slice: run the real retrieval-gateway -> rag-service RAG adapter smoke.
 Search, memory, and retrieval smokes are passed; EvidencePack now includes
 source coverage, rerank score, and dedupe reason. Optional policy-service
 retrieval precheck is wired, and first-stage AI eval cases are under
-`docs/runbook/ai-eval/`. `rag-service` first read-only answer path is landed;
-RAG / summary / Agent must stay EvidencePack-only and must not bypass message /
-conversation private table boundaries.
+`docs/runbook/ai-eval/`. `rag-service` first read-only answer path,
+`loadtest/rag`, and the first RAG eval execution adapter are landed; next is
+runtime smoke. RAG / summary / Agent must stay EvidencePack-only and must not
+bypass message / conversation private table boundaries.
 
 Current AI baseline: keep facts / projections / retrieval / controlled
 execution separate; build search -> memory -> retrieval before RAG / Agent;
@@ -136,5 +137,4 @@ For meaningful changes:
 4. Check `git status --short --branch --untracked-files=all`.
 5. Commit with a focused message when requested or appropriate.
 
-Short-term production-grade load tests, long fault drills, and full
-production-readiness checks run only when the task, risk, or user asks for them.
+Short-term production-grade load tests, long fault drills, and full production-readiness checks run only when the task, risk, or user asks for them.

@@ -9,7 +9,7 @@
 
 当前主线必须放在第一位：面试导向的后端 + 分布式 + AI 大模型应用底座；默认围绕 AI/RAG/Agent 主链路推进，不要漂回无限生产化 hardening。
 
-当前 active slice：`retrieval-gateway -> rag-service` 真实 smoke 和 RAG eval execution adapter。
+当前 active slice：运行真实 `retrieval-gateway -> rag-service` RAG adapter smoke。
 
 已完成基线：9 个 IM 后端服务主链路、search-service projection smoke、memory-service group memory / StructuredMemoryEvent projection smoke、retrieval-gateway search + memory -> EvidencePack smoke、EvidencePack field hardening first pass、AI eval harness first pass、rag-service first read-only answer path。
 
@@ -32,7 +32,8 @@ search-service v0.1（第一步，已完成第一轮 smoke）
 -> memory-service v0.1 SDD / proto / migration / implementation / clean projection smoke（已落地）
 -> retrieval-gateway / EvidencePack 第一版边界（真实 smoke 已通过）
 -> rag-service first read-only answer path（已落地）
--> retrieval-gateway -> rag-service 真实 smoke / AI eval execution adapter
+-> loadtest/rag + RAG eval execution adapter（已落地）
+-> 启动 runtime 后运行真实 RAG adapter smoke
 -> 不做孤立 LLM demo
 ```
 
@@ -50,8 +51,8 @@ search-service v0.1（第一步，已完成第一轮 smoke）
 2. `search-service v0.1`：第一切片已落 proto / migration / 六层 skeleton / PG repository / `SearchMessages` / grpc runtime / timeline decoder / consumer，并已跑通 projection smoke，作为第一步 AI 数据入口。
 3. `memory-service`：SDD / proto / migration、六层 skeleton、repository first pass、projection usecase、runtime wiring、PG integration、timeline worker 单测和 clean projection smoke 已落。group memory / StructuredMemoryEvent / Memory Graph / profile aggregate 必须带 source refs、speaker / audience scope、valid_from / valid_to、supersedes、confidence 和 review state，不能把群聊事实直接升级成个人长期偏好。
 4. `retrieval-gateway`：第一版真实 smoke 已通过，统一 EvidencePack、权限过滤、引用来源和 temporal version；第一版只通过 search / memory 公开 gRPC 契约聚合，不直接读业务库；policy-service retrieval precheck 已有 first-stage 可选接入；EvidencePack 字段 hardening first pass 已补 source coverage、rerank score、dedupe reason。
-5. `rag-service`：first-stage 只读 answer path 已落；只消费 EvidencePack，返回 citations 和 `generated_by_llm=false`，无 evidence 必须拒答。
-6. AI eval harness：first-stage 低敏 case schema / validator 已落；后续补真实 EvidencePack / RAG / Agent execution adapter。
+5. `rag-service`：first-stage 只读 answer path、`loadtest/rag` 和 RAG eval execution adapter 已落；只消费 EvidencePack，返回 citations 和 `generated_by_llm=false`，无 evidence 必须拒答。
+6. AI eval harness：first-stage 低敏 case schema / validator 已落；RAG adapter 已落；后续补 Agent execution adapter。
 7. `summary-service` / Agent / `skill-registry` / `mcp-gateway` / `action-executor`：只消费受控 EvidencePack 和 tool policy，不直接读业务库。
 8. 生产级观测、HA、长压和 sizing：继续作为 hardening backlog 推进，但不阻塞当前 AI 底座路线启动。
 

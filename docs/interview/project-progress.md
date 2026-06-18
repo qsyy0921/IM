@@ -47,7 +47,7 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 第三阶段：补 delivery-service 和 push-gateway，把 durable inbox、PullInbox、AckDelivery、在线通知和跨实例 route 串起来。
 第四阶段：补 receipt-service、contacts-service、policy-service 和 api-gateway，把已读/未读、联系人、权限决策和统一入口补齐。
 第五阶段：集中治理分布式可靠性、安全启动门禁、trusted metadata / TLS 边界、repair / audit / cleanup、debug metrics 和代码复杂度。
-第六阶段：9 个核心服务做必要收口后，以 search-service v0.1 作为向 AI 大模型应用后端转进的第一步；当前 search-service 第一实现切片已跑通 projection smoke；memory-service 已跑通 source-backed projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，且已补 policy-service retrieval precheck 和 EvidencePack field hardening first pass；AI eval harness first pass 已有低敏 case schema / validator；rag-service 已落第一版只读问答路径；后续进入 RAG smoke / eval adapter、summary、Agent、skill-registry、MCP gateway 和 action-executor。
+第六阶段：9 个核心服务做必要收口后，以 search-service v0.1 作为向 AI 大模型应用后端转进的第一步；当前 search-service 第一实现切片已跑通 projection smoke；memory-service 已跑通 source-backed projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，且已补 policy-service retrieval precheck 和 EvidencePack field hardening first pass；AI eval harness first pass 已有低敏 case schema / validator；rag-service 已落第一版只读问答路径，并已补 `loadtest/rag` 与 RAG eval execution adapter；后续进入真实 RAG adapter smoke、summary、Agent、skill-registry、MCP gateway 和 action-executor。
 ```
 
 当前项目处在第五阶段到第六阶段之间：
@@ -64,7 +64,7 @@ legacy descriptor 已收敛为显式 opt-in 默认；
 当前 9 个服务已补 first-stage Prometheus text /metrics、本地 Prometheus alert rules 和本地 Grafana dashboard 原型；
 api-gateway 已补 first-stage OpenTelemetry 入口 server span 和下游 gRPC client span；当前 9 个服务均已纳入 first-stage trace runtime wiring，其中 8 个后端 gRPC 服务使用 server span，push-gateway 使用 WebSocket connection span，并由采样策略和本地 check-local 门禁约束；
 本地 OTel collector debug 入口和 policy OTLP smoke 脚本已补，可用于面试演示 OTLP trace 链路，但还不是生产告警平台；
-search-service v0.1 / group memory / retrieval / RAG 是下一阶段基础能力，其中 search-service 第一实现切片、memory-service source-backed projection smoke、retrieval-gateway EvidencePack smoke、retrieval policy precheck、EvidencePack field hardening first pass、AI eval harness first pass 和 rag-service first read-only answer path 均已跑通 / 落地；下一步进入 retrieval->rag smoke / RAG eval adapter / summary / Agent / skill-registry / MCP gateway / action-executor；
+search-service v0.1 / group memory / retrieval / RAG 是下一阶段基础能力，其中 search-service 第一实现切片、memory-service source-backed projection smoke、retrieval-gateway EvidencePack smoke、retrieval policy precheck、EvidencePack field hardening first pass、AI eval harness first pass、rag-service first read-only answer path、`loadtest/rag` 和 RAG eval adapter 已分别完成 smoke 或实现；下一步进入真实 RAG adapter smoke / summary / Agent / skill-registry / MCP gateway / action-executor；
 后续开发可以使用 multi sub-agent 并行推进，但以服务 / 文档 / 测试面拆分，最终由主 agent 统一集成和验证；
 客户端暂不纳入当前面试主线。
 ```
@@ -253,7 +253,7 @@ search / RAG / Agent 后端能力。
 
 1. 补齐 message / conversation / receipt / contacts / policy 中搜索和记忆依赖的事件语义；
 2. 保持安全启动门禁、trusted metadata、TLS / mTLS 边界；
-3. 基于已通过的 `search-service` v0.1 projection smoke、`memory-service` source-backed projection smoke、`retrieval-gateway` EvidencePack smoke、retrieval policy precheck、EvidencePack 字段 first pass、AI eval case schema 和 rag-service first read-only answer path，继续补 retrieval->rag smoke 和 eval execution adapter；
+3. 基于已通过的 `search-service` v0.1 projection smoke、`memory-service` source-backed projection smoke、`retrieval-gateway` EvidencePack smoke、retrieval policy precheck、EvidencePack 字段 first pass、AI eval case schema、rag-service first read-only answer path 和 RAG adapter runner，继续运行真实 RAG adapter smoke；
 4. 保持 search visibility / tombstone 语义后续不被 RAG / Agent 绕过；
 5. 收敛必要的观测、repair、audit、DLQ 和容量证据，不把生产级完整系统测试作为短期阻塞；
 6. 再进入 RAG / summary / Agent / skill-registry / MCP gateway / action-executor 的后端能力；
@@ -268,7 +268,7 @@ search / RAG / Agent 后端能力。
 
 在身份侧，我实现了登录、Refresh Token、MFA、recovery code、JWKS、challenge delivery outbox、SMTP / webhook challenge sender 和启动安全门禁。系统也补了 health、ready、debug metrics、repair、audit、cleanup、worker retry 和多种本地故障 smoke。
 
-后续我会先把 9 个核心服务做必要收口，补齐消息变更、成员窗口、群管理、回执、联系人和策略这些 AI 会依赖的 IM 语义；短期不把生产级完整系统测试作为转进阻塞，而是用切片级本地检查和最小 smoke 守住事实、权限和证据边界。当前 search-service v0.1 已跑通 projection smoke；memory-service 已跑通 source-backed group memory projection smoke；retrieval-gateway 已跑通 search + memory -> EvidencePack smoke，并已接入 first-stage 可选 policy-service retrieval precheck、EvidencePack field hardening first pass 和 AI eval harness first pass；rag-service 已落第一版只读 answer path。后续做 RAG smoke / eval adapter、summary、Agent、skill-registry、MCP gateway 和 action-executor。大模型只能通过权限过滤后的 EvidencePack 访问聊天记录，Agent 写动作必须走 proposal、approval、executor 和 audit。
+后续我会先把 9 个核心服务做必要收口，补齐消息变更、成员窗口、群管理、回执、联系人和策略这些 AI 会依赖的 IM 语义；短期不把生产级完整系统测试作为转进阻塞，而是用切片级本地检查和最小 smoke 守住事实、权限和证据边界。当前 search-service v0.1 已跑通 projection smoke；memory-service 已跑通 source-backed group memory projection smoke；retrieval-gateway 已跑通 search + memory -> EvidencePack smoke，并已接入 first-stage 可选 policy-service retrieval precheck、EvidencePack field hardening first pass 和 AI eval harness first pass；rag-service 已落第一版只读 answer path、RAG smoke runner 和 eval adapter。后续跑真实 RAG adapter smoke，再做 summary、Agent、skill-registry、MCP gateway 和 action-executor。大模型只能通过权限过滤后的 EvidencePack 访问聊天记录，Agent 写动作必须走 proposal、approval、executor 和 audit。
 ```
 
 ## 维护规则

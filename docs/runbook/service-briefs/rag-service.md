@@ -19,9 +19,11 @@
 - registry / Docker runtime / local compose / Prometheus / Grafana
   foundation-active wiring
 - app / gRPC / cmd focused tests
+- `loadtest/rag` 真实链路 runner：seed search / memory projection，调用
+  `rag-service AnswerQuestion`，验证 answer / citations / EvidencePack
+- `tools/run-ai-eval-rag-adapter.ps1` first-stage RAG eval execution adapter
 
 下一步：
 
-- 跑真实 `retrieval-gateway -> rag-service AnswerQuestion` 本地 smoke。
-- 补 AI eval execution adapter，让低敏 case 真正调用 RAG。
+- 启动 search / memory / retrieval / rag runtime 后跑真实 RAG adapter smoke。
 - 后续如果接 LLM provider，必须保持 EvidencePack 输入和 source refs 输出。

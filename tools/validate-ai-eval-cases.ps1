@@ -96,7 +96,10 @@ $knownAssertionTypes = @(
     "rerank_order",
     "must_abstain",
     "must_require_approval",
-    "must_deny"
+    "must_deny",
+    "answer_status",
+    "must_include_citation",
+    "must_not_claim_llm_generation"
 )
 
 $seenCaseIDs = @{}

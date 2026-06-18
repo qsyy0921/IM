@@ -48,11 +48,13 @@ Current main line:
 4. Keep production-grade HA, long load tests, sizing, full SLOs, and provider
    operations in hardening backlog unless the user explicitly asks for them.
 
-Current active slice: design `memory-service v0.1` contracts around group
-memory projection and `StructuredMemoryEvent`: source refs, speaker / audience
-scope, validity windows, supersession / contradiction, confidence, review state,
-and profile aggregation rules. Do not build RAG or Agent before memory and
-retrieval boundaries are explicit.
+Current active slice: `memory-service v0.1` contracts are being landed first
+as SDD / proto / migration around group memory projection and
+`StructuredMemoryEvent`: source refs, speaker / audience scope, validity
+windows, supersession / contradiction, confidence, review state, and profile
+aggregation rules. The next implementation slice is the six-layer skeleton,
+repository, and projection use case. Do not build RAG or Agent before memory
+and retrieval boundaries are explicit.
 
 Current AI baseline: keep facts / projections / retrieval / controlled
 execution separate; build search -> memory -> retrieval before RAG / Agent;

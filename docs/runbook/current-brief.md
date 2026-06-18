@@ -37,7 +37,7 @@ policy-service
 -> skill-registry / mcp-gateway / action-executor
 ```
 
-当前必要收口已推进到 policy-service tool policy precheck / low-sensitive audit。`search-service v0.1` 已落 proto、migration、六层 skeleton、`SearchMessages` app / domain / gRPC adapter、projection usecase skeleton、PostgreSQL repository、真实 PG visibility / tombstone 集成测试、`grpc` runtime mode、timeline projection consumer / decoder，并在 clean commit `f2a57516` 跑通真实 projection smoke：`conversation.timeline.events -> search timeline-consumer -> PostgreSQL projection -> SearchMessages`，覆盖 persisted / edited / revoked / deleted / member boundary。下一步进入 `memory-service v0.1` 设计 / 契约，不做孤立 LLM demo；后续依次推进 `retrieval-gateway`、RAG、`summary-service`、Agent、`skill-registry`、`mcp-gateway`、`action-executor`。完整系统测试、生产级 HA、长压和 sizing 后置为 hardening backlog。
+当前必要收口已推进到 policy-service tool policy precheck / low-sensitive audit。`search-service v0.1` 已落 proto、migration、六层 skeleton、`SearchMessages` app / domain / gRPC adapter、projection usecase skeleton、PostgreSQL repository、真实 PG visibility / tombstone 集成测试、`grpc` runtime mode、timeline projection consumer / decoder，并在 clean commit `f2a57516` 跑通真实 projection smoke：`conversation.timeline.events -> search timeline-consumer -> PostgreSQL projection -> SearchMessages`，覆盖 persisted / edited / revoked / deleted / member boundary。`memory-service v0.1` 已开始落设计 / 契约：SDD、proto 和 PostgreSQL projection migration 已定义 group memory、StructuredMemoryEvent、source refs、speaker / audience scope、validity windows、supersedes、confidence 和 review state；下一步是六层 skeleton / repository / projection usecase，不做孤立 LLM demo。后续依次推进 `retrieval-gateway`、RAG、`summary-service`、Agent、`skill-registry`、`mcp-gateway`、`action-executor`。完整系统测试、生产级 HA、长压和 sizing 后置为 hardening backlog。
 
 ## 文档职责
 

@@ -29,7 +29,7 @@
 
 当前尚未真实实现的后续 AI / Agent 能力：
 
-- `memory-service` / group memory projection
+- `memory-service` / group memory projection contracts started
 - `retrieval-gateway`
 - `rag-service`
 - `agent-service`
@@ -48,7 +48,7 @@
 -> 分布式可靠性
 -> 9 个现有服务必要收口
 -> search-service v0.1 第一实现切片已跑通 projection smoke
--> memory-service / retrieval-gateway
+-> memory-service contracts / retrieval-gateway
 -> RAG / summary-service / Agent
 -> skill-registry / mcp-gateway / action-executor
 -> 安全 / 观测 / repair / 运维 hardening
@@ -185,11 +185,11 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 ```text
 前 9 个微服务已经能跑通 IM 主链路，
 现在处于“9 个现有服务做必要收口，并向 AI 大模型应用底座转进”，
-search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；后续是 memory-service / retrieval-gateway / RAG / summary-service / Agent / skill-registry / mcp-gateway / action-executor。
+search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已开始落 SDD / proto / migration contract，后续是 memory-service skeleton / retrieval-gateway / RAG / summary-service / Agent / skill-registry / mcp-gateway / action-executor。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。
 ```
 
-AI 底座采用 v3.0 口径：能力面固定、服务边界 ADR 演进。最关键的不变量是 facts / projections / retrieval / controlled execution 分层；`memory-service` 后续必须支持 group memory、source refs、speaker / audience scope、validity windows、supersedes 和 confidence，不能把群聊内容直接持久化成个人偏好或未经证据支持的 active memory。
+AI 底座采用 v3.0 口径：能力面固定、服务边界 ADR 演进。最关键的不变量是 facts / projections / retrieval / controlled execution 分层；`memory-service` 已开始把 group memory、source refs、speaker / audience scope、validity windows、supersedes 和 confidence 落到 contract，后续实现仍不能把群聊内容直接持久化成个人偏好或未经证据支持的 active memory。
 
 下一步优先级和剩余目标统一看 `remaining-goals.md`，不要在本页重复维护。
 

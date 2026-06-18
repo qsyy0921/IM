@@ -1,0 +1,166 @@
+syntax = "proto3";
+
+package nexusim.memory.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/memory/v1;memoryv1";
+
+service MemoryService {
+  rpc QueryMemoryEvents(QueryMemoryEventsRequest) returns (QueryMemoryEventsResponse);
+  rpc GetMemoryEvent(GetMemoryEventRequest) returns (GetMemoryEventResponse);
+  rpc ListProfileAggregates(ListProfileAggregatesRequest) returns (ListProfileAggregatesResponse);
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+enum MemoryScope {
+  MEMORY_SCOPE_UNSPECIFIED = 0;
+  MEMORY_SCOPE_CONVERSATION = 1;
+  MEMORY_SCOPE_PROJECT = 2;
+  MEMORY_SCOPE_PERSONAL = 3;
+  MEMORY_SCOPE_TENANT = 4;
+}
+
+enum MemoryEventType {
+  MEMORY_EVENT_TYPE_UNSPECIFIED = 0;
+  MEMORY_EVENT_TYPE_TASK = 1;
+  MEMORY_EVENT_TYPE_DECISION = 2;
+  MEMORY_EVENT_TYPE_STATUS = 3;
+  MEMORY_EVENT_TYPE_BLOCKER = 4;
+  MEMORY_EVENT_TYPE_FILE = 5;
+  MEMORY_EVENT_TYPE_PREFERENCE_SIGNAL = 6;
+  MEMORY_EVENT_TYPE_ROLE_SIGNAL = 7;
+  MEMORY_EVENT_TYPE_PROFILE_SIGNAL = 8;
+}
+
+enum MemoryEventStatus {
+  MEMORY_EVENT_STATUS_UNSPECIFIED = 0;
+  MEMORY_EVENT_STATUS_PENDING = 1;
+  MEMORY_EVENT_STATUS_ACTIVE = 2;
+  MEMORY_EVENT_STATUS_SUPERSEDED = 3;
+  MEMORY_EVENT_STATUS_REJECTED = 4;
+  MEMORY_EVENT_STATUS_ARCHIVED = 5;
+  MEMORY_EVENT_STATUS_DELETED = 6;
+}
+
+enum MemoryReviewState {
+  MEMORY_REVIEW_STATE_UNSPECIFIED = 0;
+  MEMORY_REVIEW_STATE_UNREVIEWED = 1;
+  MEMORY_REVIEW_STATE_NEEDS_REVIEW = 2;
+  MEMORY_REVIEW_STATE_APPROVED = 3;
+  MEMORY_REVIEW_STATE_REJECTED = 4;
+}
+
+enum MemorySourceType {
+  MEMORY_SOURCE_TYPE_UNSPECIFIED = 0;
+  MEMORY_SOURCE_TYPE_MESSAGE = 1;
+  MEMORY_SOURCE_TYPE_TIMELINE_EVENT = 2;
+  MEMORY_SOURCE_TYPE_PROFILE_AGGREGATE = 3;
+  MEMORY_SOURCE_TYPE_SYSTEM = 4;
+}
+
+message SourceRef {
+  MemorySourceType source_type = 1;
+  string source_id = 2;
+  string source_event_id = 3;
+  string conversation_id = 4;
+  int64 conversation_seq = 5;
+  int64 occurred_at_unix_ms = 6;
+}
+
+message StructuredMemoryEvent {
+  string memory_event_id = 1;
+  MemoryScope scope = 2;
+  string scope_id = 3;
+  string conversation_id = 4;
+  string topic = 5;
+  MemoryEventType event_type = 6;
+  MemoryEventStatus status = 7;
+  MemoryReviewState review_state = 8;
+  string fact_text = 9;
+  repeated string actor_user_ids = 10;
+  repeated string audience_user_ids = 11;
+  repeated SourceRef source_refs = 12;
+  int64 valid_from_seq = 13;
+  int64 valid_to_seq = 14;
+  int64 valid_from_unix_ms = 15;
+  int64 valid_to_unix_ms = 16;
+  repeated string supersedes_event_ids = 17;
+  repeated string contradicts_event_ids = 18;
+  double confidence = 19;
+  int64 visibility_version = 20;
+  string extraction_version = 21;
+  int64 updated_at_unix_ms = 22;
+}
+
+message MemoryGraphEdge {
+  string edge_id = 1;
+  string from_memory_event_id = 2;
+  string to_memory_event_id = 3;
+  string relation_type = 4;
+  double confidence = 5;
+  repeated SourceRef source_refs = 6;
+}
+
+message ProfileAggregate {
+  string profile_id = 1;
+  string subject_user_id = 2;
+  string aggregate_type = 3;
+  string aggregate_key = 4;
+  MemoryEventStatus status = 5;
+  MemoryReviewState review_state = 6;
+  string summary_text = 7;
+  repeated string supporting_memory_event_ids = 8;
+  double confidence = 9;
+  int64 valid_from_unix_ms = 10;
+  int64 valid_to_unix_ms = 11;
+  int64 updated_at_unix_ms = 12;
+}
+
+message QueryMemoryEventsRequest {
+  AuthContext auth_context = 1;
+  MemoryScope scope = 2;
+  string scope_id = 3;
+  string conversation_id = 4;
+  string actor_user_id = 5;
+  string topic = 6;
+  string query = 7;
+  repeated MemoryEventStatus statuses = 8;
+  int64 after_valid_from_seq = 9;
+  int32 limit = 10;
+}
+
+message QueryMemoryEventsResponse {
+  repeated StructuredMemoryEvent items = 1;
+  string next_cursor = 2;
+  int64 projection_version = 3;
+}
+
+message GetMemoryEventRequest {
+  AuthContext auth_context = 1;
+  string memory_event_id = 2;
+}
+
+message GetMemoryEventResponse {
+  StructuredMemoryEvent item = 1;
+  repeated MemoryGraphEdge graph_edges = 2;
+}
+
+message ListProfileAggregatesRequest {
+  AuthContext auth_context = 1;
+  string subject_user_id = 2;
+  string aggregate_type = 3;
+  repeated MemoryEventStatus statuses = 4;
+  int32 limit = 5;
+}
+
+message ListProfileAggregatesResponse {
+  repeated ProfileAggregate items = 1;
+  string next_cursor = 2;
+}

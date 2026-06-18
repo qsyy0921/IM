@@ -25,6 +25,16 @@ func TestRetrieveEvidenceMapsResult(t *testing.T) {
 				ConversationSeq: 2,
 				Text:            "hello",
 				MessageID:       "msg-1",
+				RerankScore:     0.9,
+				DedupeReason:    types.EvidenceDedupeUniqueSource,
+			}},
+			SourceCoverage: []types.EvidenceSourceCoverage{{
+				SourceType:     types.EvidenceSourceSearchMessage,
+				Requested:      true,
+				CandidateCount: 2,
+				ReturnedCount:  1,
+				DedupedCount:   1,
+				Status:         types.EvidenceCoverageReturned,
 			}},
 		},
 	}})
@@ -37,6 +47,22 @@ func TestRetrieveEvidenceMapsResult(t *testing.T) {
 	}
 	if got := response.GetPack().GetItems()[0].GetSourceType(); got != retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE {
 		t.Fatalf("unexpected source type %v", got)
+	}
+	if got := response.GetPack().GetItems()[0].GetRerankScore(); got != 0.9 {
+		t.Fatalf("unexpected rerank score %v", got)
+	}
+	if got := response.GetPack().GetItems()[0].GetDedupeReason(); got != types.EvidenceDedupeUniqueSource {
+		t.Fatalf("unexpected dedupe reason %q", got)
+	}
+	coverage := response.GetPack().GetSourceCoverage()
+	if len(coverage) != 1 {
+		t.Fatalf("expected one source coverage row, got %d", len(coverage))
+	}
+	if got := coverage[0].GetStatus(); got != retrievalv1.EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_RETURNED {
+		t.Fatalf("unexpected coverage status %v", got)
+	}
+	if coverage[0].GetCandidateCount() != 2 || coverage[0].GetReturnedCount() != 1 || coverage[0].GetDedupedCount() != 1 {
+		t.Fatalf("unexpected coverage counts: %+v", coverage[0])
 	}
 }
 

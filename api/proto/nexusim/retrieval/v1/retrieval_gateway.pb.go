@@ -125,6 +125,61 @@ func (EvidenceMemoryStatus) EnumDescriptor() ([]byte, []int) {
 	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP(), []int{1}
 }
 
+type EvidenceSourceCoverageStatus int32
+
+const (
+	EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_UNSPECIFIED   EvidenceSourceCoverageStatus = 0
+	EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_NOT_REQUESTED EvidenceSourceCoverageStatus = 1
+	EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_EMPTY         EvidenceSourceCoverageStatus = 2
+	EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_RETURNED      EvidenceSourceCoverageStatus = 3
+	EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_FILTERED      EvidenceSourceCoverageStatus = 4
+)
+
+// Enum value maps for EvidenceSourceCoverageStatus.
+var (
+	EvidenceSourceCoverageStatus_name = map[int32]string{
+		0: "EVIDENCE_SOURCE_COVERAGE_STATUS_UNSPECIFIED",
+		1: "EVIDENCE_SOURCE_COVERAGE_STATUS_NOT_REQUESTED",
+		2: "EVIDENCE_SOURCE_COVERAGE_STATUS_EMPTY",
+		3: "EVIDENCE_SOURCE_COVERAGE_STATUS_RETURNED",
+		4: "EVIDENCE_SOURCE_COVERAGE_STATUS_FILTERED",
+	}
+	EvidenceSourceCoverageStatus_value = map[string]int32{
+		"EVIDENCE_SOURCE_COVERAGE_STATUS_UNSPECIFIED":   0,
+		"EVIDENCE_SOURCE_COVERAGE_STATUS_NOT_REQUESTED": 1,
+		"EVIDENCE_SOURCE_COVERAGE_STATUS_EMPTY":         2,
+		"EVIDENCE_SOURCE_COVERAGE_STATUS_RETURNED":      3,
+		"EVIDENCE_SOURCE_COVERAGE_STATUS_FILTERED":      4,
+	}
+)
+
+func (x EvidenceSourceCoverageStatus) Enum() *EvidenceSourceCoverageStatus {
+	p := new(EvidenceSourceCoverageStatus)
+	*p = x
+	return p
+}
+
+func (x EvidenceSourceCoverageStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (EvidenceSourceCoverageStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_nexusim_retrieval_v1_retrieval_gateway_proto_enumTypes[2].Descriptor()
+}
+
+func (EvidenceSourceCoverageStatus) Type() protoreflect.EnumType {
+	return &file_nexusim_retrieval_v1_retrieval_gateway_proto_enumTypes[2]
+}
+
+func (x EvidenceSourceCoverageStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use EvidenceSourceCoverageStatus.Descriptor instead.
+func (EvidenceSourceCoverageStatus) EnumDescriptor() ([]byte, []int) {
+	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP(), []int{2}
+}
+
 type AuthContext struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
@@ -415,6 +470,8 @@ type EvidenceItem struct {
 	TemporalStatus    string                 `protobuf:"bytes,18,opt,name=temporal_status,json=temporalStatus,proto3" json:"temporal_status,omitempty"`
 	ReviewState       string                 `protobuf:"bytes,19,opt,name=review_state,json=reviewState,proto3" json:"review_state,omitempty"`
 	ExtractionVersion string                 `protobuf:"bytes,20,opt,name=extraction_version,json=extractionVersion,proto3" json:"extraction_version,omitempty"`
+	RerankScore       float64                `protobuf:"fixed64,21,opt,name=rerank_score,json=rerankScore,proto3" json:"rerank_score,omitempty"`
+	DedupeReason      string                 `protobuf:"bytes,22,opt,name=dedupe_reason,json=dedupeReason,proto3" json:"dedupe_reason,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -589,6 +646,20 @@ func (x *EvidenceItem) GetExtractionVersion() string {
 	return ""
 }
 
+func (x *EvidenceItem) GetRerankScore() float64 {
+	if x != nil {
+		return x.RerankScore
+	}
+	return 0
+}
+
+func (x *EvidenceItem) GetDedupeReason() string {
+	if x != nil {
+		return x.DedupeReason
+	}
+	return ""
+}
+
 type EvidenceSourceCount struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SourceType    EvidenceSourceType     `protobuf:"varint,1,opt,name=source_type,json=sourceType,proto3,enum=nexusim.retrieval.v1.EvidenceSourceType" json:"source_type,omitempty"`
@@ -641,24 +712,109 @@ func (x *EvidenceSourceCount) GetCount() int32 {
 	return 0
 }
 
+type EvidenceSourceCoverage struct {
+	state          protoimpl.MessageState       `protogen:"open.v1"`
+	SourceType     EvidenceSourceType           `protobuf:"varint,1,opt,name=source_type,json=sourceType,proto3,enum=nexusim.retrieval.v1.EvidenceSourceType" json:"source_type,omitempty"`
+	Requested      bool                         `protobuf:"varint,2,opt,name=requested,proto3" json:"requested,omitempty"`
+	CandidateCount int32                        `protobuf:"varint,3,opt,name=candidate_count,json=candidateCount,proto3" json:"candidate_count,omitempty"`
+	ReturnedCount  int32                        `protobuf:"varint,4,opt,name=returned_count,json=returnedCount,proto3" json:"returned_count,omitempty"`
+	DedupedCount   int32                        `protobuf:"varint,5,opt,name=deduped_count,json=dedupedCount,proto3" json:"deduped_count,omitempty"`
+	Status         EvidenceSourceCoverageStatus `protobuf:"varint,6,opt,name=status,proto3,enum=nexusim.retrieval.v1.EvidenceSourceCoverageStatus" json:"status,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *EvidenceSourceCoverage) Reset() {
+	*x = EvidenceSourceCoverage{}
+	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EvidenceSourceCoverage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EvidenceSourceCoverage) ProtoMessage() {}
+
+func (x *EvidenceSourceCoverage) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EvidenceSourceCoverage.ProtoReflect.Descriptor instead.
+func (*EvidenceSourceCoverage) Descriptor() ([]byte, []int) {
+	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *EvidenceSourceCoverage) GetSourceType() EvidenceSourceType {
+	if x != nil {
+		return x.SourceType
+	}
+	return EvidenceSourceType_EVIDENCE_SOURCE_TYPE_UNSPECIFIED
+}
+
+func (x *EvidenceSourceCoverage) GetRequested() bool {
+	if x != nil {
+		return x.Requested
+	}
+	return false
+}
+
+func (x *EvidenceSourceCoverage) GetCandidateCount() int32 {
+	if x != nil {
+		return x.CandidateCount
+	}
+	return 0
+}
+
+func (x *EvidenceSourceCoverage) GetReturnedCount() int32 {
+	if x != nil {
+		return x.ReturnedCount
+	}
+	return 0
+}
+
+func (x *EvidenceSourceCoverage) GetDedupedCount() int32 {
+	if x != nil {
+		return x.DedupedCount
+	}
+	return 0
+}
+
+func (x *EvidenceSourceCoverage) GetStatus() EvidenceSourceCoverageStatus {
+	if x != nil {
+		return x.Status
+	}
+	return EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_UNSPECIFIED
+}
+
 type EvidencePack struct {
-	state                   protoimpl.MessageState `protogen:"open.v1"`
-	PackId                  string                 `protobuf:"bytes,1,opt,name=pack_id,json=packId,proto3" json:"pack_id,omitempty"`
-	TenantId                string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
-	Query                   string                 `protobuf:"bytes,3,opt,name=query,proto3" json:"query,omitempty"`
-	ConversationId          string                 `protobuf:"bytes,4,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	Items                   []*EvidenceItem        `protobuf:"bytes,5,rep,name=items,proto3" json:"items,omitempty"`
-	SourceCounts            []*EvidenceSourceCount `protobuf:"bytes,6,rep,name=source_counts,json=sourceCounts,proto3" json:"source_counts,omitempty"`
-	SearchProjectionVersion int64                  `protobuf:"varint,7,opt,name=search_projection_version,json=searchProjectionVersion,proto3" json:"search_projection_version,omitempty"`
-	MemoryProjectionVersion int64                  `protobuf:"varint,8,opt,name=memory_projection_version,json=memoryProjectionVersion,proto3" json:"memory_projection_version,omitempty"`
-	RetrievalVersion        string                 `protobuf:"bytes,9,opt,name=retrieval_version,json=retrievalVersion,proto3" json:"retrieval_version,omitempty"`
+	state                   protoimpl.MessageState    `protogen:"open.v1"`
+	PackId                  string                    `protobuf:"bytes,1,opt,name=pack_id,json=packId,proto3" json:"pack_id,omitempty"`
+	TenantId                string                    `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Query                   string                    `protobuf:"bytes,3,opt,name=query,proto3" json:"query,omitempty"`
+	ConversationId          string                    `protobuf:"bytes,4,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	Items                   []*EvidenceItem           `protobuf:"bytes,5,rep,name=items,proto3" json:"items,omitempty"`
+	SourceCounts            []*EvidenceSourceCount    `protobuf:"bytes,6,rep,name=source_counts,json=sourceCounts,proto3" json:"source_counts,omitempty"`
+	SearchProjectionVersion int64                     `protobuf:"varint,7,opt,name=search_projection_version,json=searchProjectionVersion,proto3" json:"search_projection_version,omitempty"`
+	MemoryProjectionVersion int64                     `protobuf:"varint,8,opt,name=memory_projection_version,json=memoryProjectionVersion,proto3" json:"memory_projection_version,omitempty"`
+	RetrievalVersion        string                    `protobuf:"bytes,9,opt,name=retrieval_version,json=retrievalVersion,proto3" json:"retrieval_version,omitempty"`
+	SourceCoverage          []*EvidenceSourceCoverage `protobuf:"bytes,10,rep,name=source_coverage,json=sourceCoverage,proto3" json:"source_coverage,omitempty"`
 	unknownFields           protoimpl.UnknownFields
 	sizeCache               protoimpl.SizeCache
 }
 
 func (x *EvidencePack) Reset() {
 	*x = EvidencePack{}
-	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[5]
+	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -670,7 +826,7 @@ func (x *EvidencePack) String() string {
 func (*EvidencePack) ProtoMessage() {}
 
 func (x *EvidencePack) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[5]
+	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -683,7 +839,7 @@ func (x *EvidencePack) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvidencePack.ProtoReflect.Descriptor instead.
 func (*EvidencePack) Descriptor() ([]byte, []int) {
-	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP(), []int{5}
+	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *EvidencePack) GetPackId() string {
@@ -749,6 +905,13 @@ func (x *EvidencePack) GetRetrievalVersion() string {
 	return ""
 }
 
+func (x *EvidencePack) GetSourceCoverage() []*EvidenceSourceCoverage {
+	if x != nil {
+		return x.SourceCoverage
+	}
+	return nil
+}
+
 type RetrieveEvidenceResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Pack          *EvidencePack          `protobuf:"bytes,1,opt,name=pack,proto3" json:"pack,omitempty"`
@@ -758,7 +921,7 @@ type RetrieveEvidenceResponse struct {
 
 func (x *RetrieveEvidenceResponse) Reset() {
 	*x = RetrieveEvidenceResponse{}
-	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[6]
+	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -770,7 +933,7 @@ func (x *RetrieveEvidenceResponse) String() string {
 func (*RetrieveEvidenceResponse) ProtoMessage() {}
 
 func (x *RetrieveEvidenceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[6]
+	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -783,7 +946,7 @@ func (x *RetrieveEvidenceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RetrieveEvidenceResponse.ProtoReflect.Descriptor instead.
 func (*RetrieveEvidenceResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP(), []int{6}
+	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *RetrieveEvidenceResponse) GetPack() *EvidencePack {
@@ -823,7 +986,7 @@ const file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc = "" +
 	"\x0fsource_event_id\x18\x03 \x01(\tR\rsourceEventId\x12'\n" +
 	"\x0fconversation_id\x18\x04 \x01(\tR\x0econversationId\x12)\n" +
 	"\x10conversation_seq\x18\x05 \x01(\x03R\x0fconversationSeq\x12-\n" +
-	"\x13occurred_at_unix_ms\x18\x06 \x01(\x03R\x10occurredAtUnixMs\"\xc1\x06\n" +
+	"\x13occurred_at_unix_ms\x18\x06 \x01(\x03R\x10occurredAtUnixMs\"\x89\a\n" +
 	"\fEvidenceItem\x12\x1f\n" +
 	"\vevidence_id\x18\x01 \x01(\tR\n" +
 	"evidenceId\x12I\n" +
@@ -850,11 +1013,21 @@ const file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc = "" +
 	"\x11audience_user_ids\x18\x11 \x03(\tR\x0faudienceUserIds\x12'\n" +
 	"\x0ftemporal_status\x18\x12 \x01(\tR\x0etemporalStatus\x12!\n" +
 	"\freview_state\x18\x13 \x01(\tR\vreviewState\x12-\n" +
-	"\x12extraction_version\x18\x14 \x01(\tR\x11extractionVersion\"v\n" +
+	"\x12extraction_version\x18\x14 \x01(\tR\x11extractionVersion\x12!\n" +
+	"\frerank_score\x18\x15 \x01(\x01R\vrerankScore\x12#\n" +
+	"\rdedupe_reason\x18\x16 \x01(\tR\fdedupeReason\"v\n" +
 	"\x13EvidenceSourceCount\x12I\n" +
 	"\vsource_type\x18\x01 \x01(\x0e2(.nexusim.retrieval.v1.EvidenceSourceTypeR\n" +
 	"sourceType\x12\x14\n" +
-	"\x05count\x18\x02 \x01(\x05R\x05count\"\xb2\x03\n" +
+	"\x05count\x18\x02 \x01(\x05R\x05count\"\xc2\x02\n" +
+	"\x16EvidenceSourceCoverage\x12I\n" +
+	"\vsource_type\x18\x01 \x01(\x0e2(.nexusim.retrieval.v1.EvidenceSourceTypeR\n" +
+	"sourceType\x12\x1c\n" +
+	"\trequested\x18\x02 \x01(\bR\trequested\x12'\n" +
+	"\x0fcandidate_count\x18\x03 \x01(\x05R\x0ecandidateCount\x12%\n" +
+	"\x0ereturned_count\x18\x04 \x01(\x05R\rreturnedCount\x12#\n" +
+	"\rdeduped_count\x18\x05 \x01(\x05R\fdedupedCount\x12J\n" +
+	"\x06status\x18\x06 \x01(\x0e22.nexusim.retrieval.v1.EvidenceSourceCoverageStatusR\x06status\"\x89\x04\n" +
 	"\fEvidencePack\x12\x17\n" +
 	"\apack_id\x18\x01 \x01(\tR\x06packId\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x14\n" +
@@ -864,7 +1037,9 @@ const file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc = "" +
 	"\rsource_counts\x18\x06 \x03(\v2).nexusim.retrieval.v1.EvidenceSourceCountR\fsourceCounts\x12:\n" +
 	"\x19search_projection_version\x18\a \x01(\x03R\x17searchProjectionVersion\x12:\n" +
 	"\x19memory_projection_version\x18\b \x01(\x03R\x17memoryProjectionVersion\x12+\n" +
-	"\x11retrieval_version\x18\t \x01(\tR\x10retrievalVersion\"R\n" +
+	"\x11retrieval_version\x18\t \x01(\tR\x10retrievalVersion\x12U\n" +
+	"\x0fsource_coverage\x18\n" +
+	" \x03(\v2,.nexusim.retrieval.v1.EvidenceSourceCoverageR\x0esourceCoverage\"R\n" +
 	"\x18RetrieveEvidenceResponse\x126\n" +
 	"\x04pack\x18\x01 \x01(\v2\".nexusim.retrieval.v1.EvidencePackR\x04pack*\x8a\x01\n" +
 	"\x12EvidenceSourceType\x12$\n" +
@@ -876,7 +1051,13 @@ const file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc = "" +
 	"\x1eEVIDENCE_MEMORY_STATUS_PENDING\x10\x01\x12!\n" +
 	"\x1dEVIDENCE_MEMORY_STATUS_ACTIVE\x10\x02\x12%\n" +
 	"!EVIDENCE_MEMORY_STATUS_SUPERSEDED\x10\x03\x12#\n" +
-	"\x1fEVIDENCE_MEMORY_STATUS_ARCHIVED\x10\x042\x85\x01\n" +
+	"\x1fEVIDENCE_MEMORY_STATUS_ARCHIVED\x10\x04*\x89\x02\n" +
+	"\x1cEvidenceSourceCoverageStatus\x12/\n" +
+	"+EVIDENCE_SOURCE_COVERAGE_STATUS_UNSPECIFIED\x10\x00\x121\n" +
+	"-EVIDENCE_SOURCE_COVERAGE_STATUS_NOT_REQUESTED\x10\x01\x12)\n" +
+	"%EVIDENCE_SOURCE_COVERAGE_STATUS_EMPTY\x10\x02\x12,\n" +
+	"(EVIDENCE_SOURCE_COVERAGE_STATUS_RETURNED\x10\x03\x12,\n" +
+	"(EVIDENCE_SOURCE_COVERAGE_STATUS_FILTERED\x10\x042\x85\x01\n" +
 	"\x10RetrievalGateway\x12q\n" +
 	"\x10RetrieveEvidence\x12-.nexusim.retrieval.v1.RetrieveEvidenceRequest\x1a..nexusim.retrieval.v1.RetrieveEvidenceResponseBCZAgithub.com/qsyy0921/IM/api/proto/nexusim/retrieval/v1;retrievalv1b\x06proto3"
 
@@ -892,35 +1073,40 @@ func file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP() []byte {
 	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescData
 }
 
-var file_nexusim_retrieval_v1_retrieval_gateway_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_nexusim_retrieval_v1_retrieval_gateway_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_nexusim_retrieval_v1_retrieval_gateway_proto_goTypes = []any{
-	(EvidenceSourceType)(0),          // 0: nexusim.retrieval.v1.EvidenceSourceType
-	(EvidenceMemoryStatus)(0),        // 1: nexusim.retrieval.v1.EvidenceMemoryStatus
-	(*AuthContext)(nil),              // 2: nexusim.retrieval.v1.AuthContext
-	(*RetrieveEvidenceRequest)(nil),  // 3: nexusim.retrieval.v1.RetrieveEvidenceRequest
-	(*EvidenceSourceRef)(nil),        // 4: nexusim.retrieval.v1.EvidenceSourceRef
-	(*EvidenceItem)(nil),             // 5: nexusim.retrieval.v1.EvidenceItem
-	(*EvidenceSourceCount)(nil),      // 6: nexusim.retrieval.v1.EvidenceSourceCount
-	(*EvidencePack)(nil),             // 7: nexusim.retrieval.v1.EvidencePack
-	(*RetrieveEvidenceResponse)(nil), // 8: nexusim.retrieval.v1.RetrieveEvidenceResponse
+	(EvidenceSourceType)(0),           // 0: nexusim.retrieval.v1.EvidenceSourceType
+	(EvidenceMemoryStatus)(0),         // 1: nexusim.retrieval.v1.EvidenceMemoryStatus
+	(EvidenceSourceCoverageStatus)(0), // 2: nexusim.retrieval.v1.EvidenceSourceCoverageStatus
+	(*AuthContext)(nil),               // 3: nexusim.retrieval.v1.AuthContext
+	(*RetrieveEvidenceRequest)(nil),   // 4: nexusim.retrieval.v1.RetrieveEvidenceRequest
+	(*EvidenceSourceRef)(nil),         // 5: nexusim.retrieval.v1.EvidenceSourceRef
+	(*EvidenceItem)(nil),              // 6: nexusim.retrieval.v1.EvidenceItem
+	(*EvidenceSourceCount)(nil),       // 7: nexusim.retrieval.v1.EvidenceSourceCount
+	(*EvidenceSourceCoverage)(nil),    // 8: nexusim.retrieval.v1.EvidenceSourceCoverage
+	(*EvidencePack)(nil),              // 9: nexusim.retrieval.v1.EvidencePack
+	(*RetrieveEvidenceResponse)(nil),  // 10: nexusim.retrieval.v1.RetrieveEvidenceResponse
 }
 var file_nexusim_retrieval_v1_retrieval_gateway_proto_depIdxs = []int32{
-	2, // 0: nexusim.retrieval.v1.RetrieveEvidenceRequest.auth_context:type_name -> nexusim.retrieval.v1.AuthContext
-	1, // 1: nexusim.retrieval.v1.RetrieveEvidenceRequest.memory_statuses:type_name -> nexusim.retrieval.v1.EvidenceMemoryStatus
-	0, // 2: nexusim.retrieval.v1.EvidenceItem.source_type:type_name -> nexusim.retrieval.v1.EvidenceSourceType
-	4, // 3: nexusim.retrieval.v1.EvidenceItem.source_refs:type_name -> nexusim.retrieval.v1.EvidenceSourceRef
-	0, // 4: nexusim.retrieval.v1.EvidenceSourceCount.source_type:type_name -> nexusim.retrieval.v1.EvidenceSourceType
-	5, // 5: nexusim.retrieval.v1.EvidencePack.items:type_name -> nexusim.retrieval.v1.EvidenceItem
-	6, // 6: nexusim.retrieval.v1.EvidencePack.source_counts:type_name -> nexusim.retrieval.v1.EvidenceSourceCount
-	7, // 7: nexusim.retrieval.v1.RetrieveEvidenceResponse.pack:type_name -> nexusim.retrieval.v1.EvidencePack
-	3, // 8: nexusim.retrieval.v1.RetrievalGateway.RetrieveEvidence:input_type -> nexusim.retrieval.v1.RetrieveEvidenceRequest
-	8, // 9: nexusim.retrieval.v1.RetrievalGateway.RetrieveEvidence:output_type -> nexusim.retrieval.v1.RetrieveEvidenceResponse
-	9, // [9:10] is the sub-list for method output_type
-	8, // [8:9] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	3,  // 0: nexusim.retrieval.v1.RetrieveEvidenceRequest.auth_context:type_name -> nexusim.retrieval.v1.AuthContext
+	1,  // 1: nexusim.retrieval.v1.RetrieveEvidenceRequest.memory_statuses:type_name -> nexusim.retrieval.v1.EvidenceMemoryStatus
+	0,  // 2: nexusim.retrieval.v1.EvidenceItem.source_type:type_name -> nexusim.retrieval.v1.EvidenceSourceType
+	5,  // 3: nexusim.retrieval.v1.EvidenceItem.source_refs:type_name -> nexusim.retrieval.v1.EvidenceSourceRef
+	0,  // 4: nexusim.retrieval.v1.EvidenceSourceCount.source_type:type_name -> nexusim.retrieval.v1.EvidenceSourceType
+	0,  // 5: nexusim.retrieval.v1.EvidenceSourceCoverage.source_type:type_name -> nexusim.retrieval.v1.EvidenceSourceType
+	2,  // 6: nexusim.retrieval.v1.EvidenceSourceCoverage.status:type_name -> nexusim.retrieval.v1.EvidenceSourceCoverageStatus
+	6,  // 7: nexusim.retrieval.v1.EvidencePack.items:type_name -> nexusim.retrieval.v1.EvidenceItem
+	7,  // 8: nexusim.retrieval.v1.EvidencePack.source_counts:type_name -> nexusim.retrieval.v1.EvidenceSourceCount
+	8,  // 9: nexusim.retrieval.v1.EvidencePack.source_coverage:type_name -> nexusim.retrieval.v1.EvidenceSourceCoverage
+	9,  // 10: nexusim.retrieval.v1.RetrieveEvidenceResponse.pack:type_name -> nexusim.retrieval.v1.EvidencePack
+	4,  // 11: nexusim.retrieval.v1.RetrievalGateway.RetrieveEvidence:input_type -> nexusim.retrieval.v1.RetrieveEvidenceRequest
+	10, // 12: nexusim.retrieval.v1.RetrievalGateway.RetrieveEvidence:output_type -> nexusim.retrieval.v1.RetrieveEvidenceResponse
+	12, // [12:13] is the sub-list for method output_type
+	11, // [11:12] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_retrieval_v1_retrieval_gateway_proto_init() }
@@ -933,8 +1119,8 @@ func file_nexusim_retrieval_v1_retrieval_gateway_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc), len(file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   7,
+			NumEnums:      3,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

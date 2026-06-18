@@ -114,6 +114,17 @@ func evidencePackToProto(pack types.EvidencePack) *retrievalv1.EvidencePack {
 			Count:      int32(count.Count),
 		})
 	}
+	coverage := make([]*retrievalv1.EvidenceSourceCoverage, 0, len(pack.SourceCoverage))
+	for _, item := range pack.SourceCoverage {
+		coverage = append(coverage, &retrievalv1.EvidenceSourceCoverage{
+			SourceType:     sourceTypeToProto(item.SourceType),
+			Requested:      item.Requested,
+			CandidateCount: int32(item.CandidateCount),
+			ReturnedCount:  int32(item.ReturnedCount),
+			DedupedCount:   int32(item.DedupedCount),
+			Status:         coverageStatusToProto(item.Status),
+		})
+	}
 	return &retrievalv1.EvidencePack{
 		PackId:                  pack.PackID,
 		TenantId:                string(pack.TenantID),
@@ -124,6 +135,7 @@ func evidencePackToProto(pack types.EvidencePack) *retrievalv1.EvidencePack {
 		SearchProjectionVersion: pack.SearchProjectionVersion,
 		MemoryProjectionVersion: pack.MemoryProjectionVersion,
 		RetrievalVersion:        pack.RetrievalVersion,
+		SourceCoverage:          coverage,
 	}
 }
 
@@ -160,6 +172,8 @@ func evidenceItemToProto(item types.EvidenceItem) *retrievalv1.EvidenceItem {
 		TemporalStatus:    item.TemporalStatus,
 		ReviewState:       item.ReviewState,
 		ExtractionVersion: item.ExtractionVersion,
+		RerankScore:       item.RerankScore,
+		DedupeReason:      item.DedupeReason,
 	}
 }
 
@@ -181,6 +195,21 @@ func sourceTypeToProto(sourceType string) retrievalv1.EvidenceSourceType {
 		return retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_MEMORY_EVENT
 	default:
 		return retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_UNSPECIFIED
+	}
+}
+
+func coverageStatusToProto(status string) retrievalv1.EvidenceSourceCoverageStatus {
+	switch status {
+	case types.EvidenceCoverageNotRequested:
+		return retrievalv1.EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_NOT_REQUESTED
+	case types.EvidenceCoverageEmpty:
+		return retrievalv1.EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_EMPTY
+	case types.EvidenceCoverageReturned:
+		return retrievalv1.EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_RETURNED
+	case types.EvidenceCoverageFiltered:
+		return retrievalv1.EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_FILTERED
+	default:
+		return retrievalv1.EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_UNSPECIFIED
 	}
 }
 

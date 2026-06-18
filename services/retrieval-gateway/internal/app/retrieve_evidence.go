@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/qsyy0921/IM/services/retrieval-gateway/internal/types"
 )
@@ -43,9 +44,9 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 	}
 
 	limit := command.EffectiveLimit()
-	items := make([]types.EvidenceItem, 0, limit)
-	sourceCounts := map[string]int{}
-	seen := map[string]struct{}{}
+	candidates := make([]types.EvidenceItem, 0, limit*2)
+	coverage := newSourceCoverage(command)
+	seen := map[string]int{}
 	var searchProjectionVersion int64
 	var memoryProjectionVersion int64
 
@@ -64,11 +65,10 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 			return types.RetrieveEvidenceResult{}, err
 		}
 		searchProjectionVersion = result.ProjectionVersion
+		coverage[types.EvidenceSourceSearchMessage].CandidateCount = len(result.Items)
 		for _, hit := range result.Items {
 			item := searchHitToEvidence(hit)
-			if appendEvidence(&items, seen, item, limit) {
-				sourceCounts[item.SourceType]++
-			}
+			appendEvidenceCandidate(&candidates, seen, coverage, item)
 		}
 	}
 
@@ -88,13 +88,15 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 			return types.RetrieveEvidenceResult{}, err
 		}
 		memoryProjectionVersion = result.ProjectionVersion
+		coverage[types.EvidenceSourceMemoryEvent].CandidateCount = len(result.Items)
 		for _, event := range result.Items {
 			item := memoryEventToEvidence(event)
-			if appendEvidence(&items, seen, item, limit) {
-				sourceCounts[item.SourceType]++
-			}
+			appendEvidenceCandidate(&candidates, seen, coverage, item)
 		}
 	}
+	items := rerankEvidence(candidates, limit)
+	sourceCounts := countEvidenceSources(items)
+	sourceCoverage := orderedSourceCoverage(coverage, sourceCounts)
 
 	return types.RetrieveEvidenceResult{
 		Pack: types.EvidencePack{
@@ -107,6 +109,7 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 			SearchProjectionVersion: searchProjectionVersion,
 			MemoryProjectionVersion: memoryProjectionVersion,
 			RetrievalVersion:        types.RetrievalVersion,
+			SourceCoverage:          sourceCoverage,
 		},
 	}, nil
 }
@@ -128,17 +131,76 @@ func (usecase RetrieveEvidenceUseCase) checkPolicy(ctx context.Context, command 
 	return nil
 }
 
-func appendEvidence(items *[]types.EvidenceItem, seen map[string]struct{}, item types.EvidenceItem, limit int) bool {
-	if len(*items) >= limit {
-		return false
+type sourceCoverageState struct {
+	Requested      bool
+	CandidateCount int
+	DedupedCount   int
+}
+
+func newSourceCoverage(command types.RetrieveEvidenceCommand) map[string]*sourceCoverageState {
+	return map[string]*sourceCoverageState{
+		types.EvidenceSourceSearchMessage: &sourceCoverageState{Requested: command.ShouldIncludeSearch()},
+		types.EvidenceSourceMemoryEvent:   &sourceCoverageState{Requested: command.ShouldIncludeMemory()},
 	}
+}
+
+func appendEvidenceCandidate(
+	items *[]types.EvidenceItem,
+	seen map[string]int,
+	coverage map[string]*sourceCoverageState,
+	item types.EvidenceItem,
+) {
 	key := item.SourceType + ":" + item.SourceID
-	if _, ok := seen[key]; ok {
-		return false
+	if index, ok := seen[key]; ok {
+		if state := coverage[item.SourceType]; state != nil {
+			state.DedupedCount++
+		}
+		(*items)[index].DedupeReason = types.EvidenceDedupeKeptFirstDuplicateSource
+		return
 	}
-	seen[key] = struct{}{}
+	item.RerankScore = evidenceRerankScore(item)
+	item.DedupeReason = types.EvidenceDedupeUniqueSource
+	seen[key] = len(*items)
 	*items = append(*items, item)
-	return true
+}
+
+func rerankEvidence(items []types.EvidenceItem, limit int) []types.EvidenceItem {
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].RerankScore > items[j].RerankScore
+	})
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return items
+}
+
+func evidenceRerankScore(item types.EvidenceItem) float64 {
+	switch item.SourceType {
+	case types.EvidenceSourceSearchMessage:
+		return clampScore(item.Score)
+	case types.EvidenceSourceMemoryEvent:
+		return clampScore(item.Score)
+	default:
+		return 0
+	}
+}
+
+func clampScore(score float64) float64 {
+	if score < 0 {
+		return 0
+	}
+	if score > 1 {
+		return 1
+	}
+	return score
+}
+
+func countEvidenceSources(items []types.EvidenceItem) map[string]int {
+	counts := map[string]int{}
+	for _, item := range items {
+		counts[item.SourceType]++
+	}
+	return counts
 }
 
 func searchHitToEvidence(hit types.SearchMessageEvidence) types.EvidenceItem {
@@ -204,6 +266,42 @@ func orderedSourceCounts(counts map[string]int) []types.EvidenceSourceCount {
 		}
 	}
 	return out
+}
+
+func orderedSourceCoverage(
+	coverage map[string]*sourceCoverageState,
+	sourceCounts map[string]int,
+) []types.EvidenceSourceCoverage {
+	out := make([]types.EvidenceSourceCoverage, 0, 2)
+	for _, sourceType := range []string{types.EvidenceSourceSearchMessage, types.EvidenceSourceMemoryEvent} {
+		state := coverage[sourceType]
+		if state == nil {
+			continue
+		}
+		returnedCount := sourceCounts[sourceType]
+		out = append(out, types.EvidenceSourceCoverage{
+			SourceType:     sourceType,
+			Requested:      state.Requested,
+			CandidateCount: state.CandidateCount,
+			ReturnedCount:  returnedCount,
+			DedupedCount:   state.DedupedCount,
+			Status:         sourceCoverageStatus(state, returnedCount),
+		})
+	}
+	return out
+}
+
+func sourceCoverageStatus(state *sourceCoverageState, returnedCount int) string {
+	switch {
+	case state == nil || !state.Requested:
+		return types.EvidenceCoverageNotRequested
+	case returnedCount > 0:
+		return types.EvidenceCoverageReturned
+	case state.CandidateCount == 0:
+		return types.EvidenceCoverageEmpty
+	default:
+		return types.EvidenceCoverageFiltered
+	}
 }
 
 func evidenceDebugString(items []types.EvidenceItem) string {

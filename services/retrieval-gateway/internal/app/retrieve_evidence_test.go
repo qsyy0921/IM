@@ -60,6 +60,23 @@ func TestRetrieveEvidenceMergesSearchAndMemory(t *testing.T) {
 	if result.Pack.RetrievalVersion != types.RetrievalVersion {
 		t.Fatalf("unexpected retrieval version %q", result.Pack.RetrievalVersion)
 	}
+	if result.Pack.Items[0].RerankScore != 1 || result.Pack.Items[0].DedupeReason != types.EvidenceDedupeUniqueSource {
+		t.Fatalf("unexpected search item rank metadata: %+v", result.Pack.Items[0])
+	}
+	if result.Pack.Items[1].RerankScore != 0.8 || result.Pack.Items[1].DedupeReason != types.EvidenceDedupeUniqueSource {
+		t.Fatalf("unexpected memory item rank metadata: %+v", result.Pack.Items[1])
+	}
+	if got := result.Pack.SourceCoverage; len(got) != 2 ||
+		got[0].SourceType != types.EvidenceSourceSearchMessage ||
+		got[0].CandidateCount != 1 ||
+		got[0].ReturnedCount != 1 ||
+		got[0].Status != types.EvidenceCoverageReturned ||
+		got[1].SourceType != types.EvidenceSourceMemoryEvent ||
+		got[1].CandidateCount != 1 ||
+		got[1].ReturnedCount != 1 ||
+		got[1].Status != types.EvidenceCoverageReturned {
+		t.Fatalf("unexpected source coverage: %+v", got)
+	}
 }
 
 func TestRetrieveEvidenceDefaultsToBothSources(t *testing.T) {
@@ -147,6 +164,63 @@ func TestRetrieveEvidenceHonorsSourceFlags(t *testing.T) {
 	}
 	if !search.called || memory.called {
 		t.Fatalf("expected only search to be called: search=%t memory=%t", search.called, memory.called)
+	}
+}
+
+func TestRetrieveEvidenceDedupeAndCoverage(t *testing.T) {
+	command := validCommand()
+	command.IncludeSearch = false
+	command.IncludeMemory = true
+	memory := fakeMemoryPort{result: types.MemoryResult{
+		Items: []types.MemoryEventEvidence{
+			{MemoryEventID: "mem-dup", ConversationID: "conv-1", FactText: "first", Confidence: 0.7},
+			{MemoryEventID: "mem-dup", ConversationID: "conv-1", FactText: "duplicate", Confidence: 0.9},
+		},
+	}}
+	result, err := NewRetrieveEvidenceUseCase(&fakeSearchPort{}, &memory).Execute(context.Background(), command)
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if got := len(result.Pack.Items); got != 1 {
+		t.Fatalf("expected one deduped item, got %d", got)
+	}
+	if item := result.Pack.Items[0]; item.Text != "first" || item.DedupeReason != types.EvidenceDedupeKeptFirstDuplicateSource {
+		t.Fatalf("unexpected deduped item: %+v", item)
+	}
+	if got := result.Pack.SourceCoverage; len(got) != 2 ||
+		got[0].SourceType != types.EvidenceSourceSearchMessage ||
+		got[0].Requested ||
+		got[0].Status != types.EvidenceCoverageNotRequested ||
+		got[1].SourceType != types.EvidenceSourceMemoryEvent ||
+		!got[1].Requested ||
+		got[1].CandidateCount != 2 ||
+		got[1].ReturnedCount != 1 ||
+		got[1].DedupedCount != 1 ||
+		got[1].Status != types.EvidenceCoverageReturned {
+		t.Fatalf("unexpected source coverage: %+v", got)
+	}
+}
+
+func TestRetrieveEvidenceReranksBeforeTruncating(t *testing.T) {
+	command := validCommand()
+	command.IncludeSearch = false
+	command.IncludeMemory = true
+	command.Limit = 1
+	memory := fakeMemoryPort{result: types.MemoryResult{
+		Items: []types.MemoryEventEvidence{
+			{MemoryEventID: "mem-low", ConversationID: "conv-1", FactText: "low", Confidence: 0.1},
+			{MemoryEventID: "mem-high", ConversationID: "conv-1", FactText: "high", Confidence: 0.9},
+		},
+	}}
+	result, err := NewRetrieveEvidenceUseCase(&fakeSearchPort{}, &memory).Execute(context.Background(), command)
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if got := result.Pack.Items[0].MemoryEventID; got != "mem-high" {
+		t.Fatalf("expected highest rerank item, got %q", got)
+	}
+	if coverage := result.Pack.SourceCoverage[1]; coverage.CandidateCount != 2 || coverage.ReturnedCount != 1 || coverage.Status != types.EvidenceCoverageReturned {
+		t.Fatalf("unexpected memory coverage: %+v", coverage)
 	}
 }
 

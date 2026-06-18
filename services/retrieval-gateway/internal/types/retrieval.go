@@ -18,6 +18,14 @@ const (
 	EvidenceSourceSearchMessage = "SEARCH_MESSAGE"
 	EvidenceSourceMemoryEvent   = "MEMORY_EVENT"
 
+	EvidenceCoverageNotRequested = "NOT_REQUESTED"
+	EvidenceCoverageEmpty        = "EMPTY"
+	EvidenceCoverageReturned     = "RETURNED"
+	EvidenceCoverageFiltered     = "FILTERED"
+
+	EvidenceDedupeUniqueSource             = "UNIQUE_SOURCE"
+	EvidenceDedupeKeptFirstDuplicateSource = "KEPT_FIRST_DUPLICATE_SOURCE"
+
 	RetrievalPolicyToolName                 = "retrieval.evidence"
 	RetrievalPolicyIntent                   = "retrieve_evidence"
 	RetrievalPolicyResourceTypeConversation = "conversation"
@@ -205,11 +213,22 @@ type EvidenceItem struct {
 	TemporalStatus    string
 	ReviewState       string
 	ExtractionVersion string
+	RerankScore       float64
+	DedupeReason      string
 }
 
 type EvidenceSourceCount struct {
 	SourceType string
 	Count      int
+}
+
+type EvidenceSourceCoverage struct {
+	SourceType     string
+	Requested      bool
+	CandidateCount int
+	ReturnedCount  int
+	DedupedCount   int
+	Status         string
 }
 
 type EvidencePack struct {
@@ -222,6 +241,7 @@ type EvidencePack struct {
 	SearchProjectionVersion int64
 	MemoryProjectionVersion int64
 	RetrievalVersion        string
+	SourceCoverage          []EvidenceSourceCoverage
 }
 
 type RetrieveEvidenceResult struct {

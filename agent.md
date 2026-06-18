@@ -33,13 +33,19 @@ NexusIM's current main line is no longer "keep hardening everything forever".
 It is:
 
 ```text
-IM backend closeout -> search -> memory -> retrieval/EvidencePack -> RAG/summary -> Agent -> skill/MCP/action
+9-service necessary closeout -> search -> group memory -> retrieval/EvidencePack
+-> RAG -> summary -> multi-agent -> skill registry -> MCP/tool gateway
+-> action executor -> AI evaluation
 ```
 
 Production HA drills, long load tests, sizing, and provider-grade operations are
-hardening backlog unless explicitly named; "continue development" means choose
-work that moves the AI
-foundation forward while keeping the existing IM backend clean enough.
+hardening backlog unless explicitly named; "continue development" means move
+the AI foundation forward while keeping the IM backend clean enough.
+
+The AI line is not a side quest. It is the main product direction after the
+existing IM backend is clean enough: group memory, cross-group/cross-time
+evidence, permissioned RAG, multi-agent collaboration, MCP/skill/tool execution,
+and proposal / approval / executor / audit for real business actions.
 
 Existing real services: `api-gateway`, `identity-service`, `message-service`,
 `conversation-service`, `delivery-service`, `push-gateway`, `receipt-service`,
@@ -48,25 +54,20 @@ Existing real services: `api-gateway`, `identity-service`, `message-service`,
 Current execution chain:
 
 1. Close only 9-service gaps that block search / memory / retrieval / Agent:
-   mutation semantics, visibility windows, contacts privacy, policy, audit, and
-   security boundaries. Do not keep expanding production hardening unless it
-   blocks the AI foundation or the user asks for it.
+   mutation semantics, visibility, contacts privacy, policy, audit, and security.
 2. Keep `search-service v0.1` as projection / visibility / tombstone /
    `SearchMessages`, not an LLM demo; its first projection smoke is now passed.
-3. Build `memory-service`, then `retrieval-gateway`, then RAG,
-   `summary-service`, Agent, `skill-registry`, `mcp-gateway`, and
-   `action-executor`.
+3. Build `memory-service`, `retrieval-gateway`, RAG, `summary-service`, Agent,
+   `skill-registry`, `mcp-gateway`, and `action-executor`.
 4. Keep production-grade HA, long load tests, sizing, full SLOs, and provider
    operations in hardening backlog unless they directly unblock the current
    execution chain.
 
-Current active slice: EvidencePack field / policy hardening.
-`search-service`, `memory-service`, and first `retrieval-gateway` EvidencePack
-smokes are already passed. Next work should harden the retrieval boundary:
-source coverage and dedupe / rerank metadata. A first-stage optional
-policy-service retrieval precheck is already wired; keep it explicit and do not
-directly read message / conversation private tables. Do not build RAG or Agent
-before this boundary remains explicit and testable.
+Current active slice: retrieval regression / AI eval boundary before RAG.
+Search, memory, and retrieval smokes are passed; EvidencePack now includes
+source coverage, rerank score, and dedupe reason. Optional policy-service
+retrieval precheck is wired. RAG / summary / Agent may start only through
+EvidencePack and must not bypass message / conversation private table boundaries.
 
 Current AI baseline: keep facts / projections / retrieval / controlled
 execution separate; build search -> memory -> retrieval before RAG / Agent;
@@ -134,5 +135,4 @@ For meaningful changes:
 5. Commit with a focused message when requested or appropriate.
 
 Short-term production-grade load tests, long fault drills, and full
-production-readiness checks are not default finishing gates for small slices.
-Run them only when the task, risk, or user request requires them.
+production-readiness checks run only when the task, risk, or user asks for them.

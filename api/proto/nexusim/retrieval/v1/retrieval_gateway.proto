@@ -31,6 +31,14 @@ enum EvidenceMemoryStatus {
   EVIDENCE_MEMORY_STATUS_ARCHIVED = 4;
 }
 
+enum EvidenceSourceCoverageStatus {
+  EVIDENCE_SOURCE_COVERAGE_STATUS_UNSPECIFIED = 0;
+  EVIDENCE_SOURCE_COVERAGE_STATUS_NOT_REQUESTED = 1;
+  EVIDENCE_SOURCE_COVERAGE_STATUS_EMPTY = 2;
+  EVIDENCE_SOURCE_COVERAGE_STATUS_RETURNED = 3;
+  EVIDENCE_SOURCE_COVERAGE_STATUS_FILTERED = 4;
+}
+
 message RetrieveEvidenceRequest {
   AuthContext auth_context = 1;
   string query = 2;
@@ -72,11 +80,22 @@ message EvidenceItem {
   string temporal_status = 18;
   string review_state = 19;
   string extraction_version = 20;
+  double rerank_score = 21;
+  string dedupe_reason = 22;
 }
 
 message EvidenceSourceCount {
   EvidenceSourceType source_type = 1;
   int32 count = 2;
+}
+
+message EvidenceSourceCoverage {
+  EvidenceSourceType source_type = 1;
+  bool requested = 2;
+  int32 candidate_count = 3;
+  int32 returned_count = 4;
+  int32 deduped_count = 5;
+  EvidenceSourceCoverageStatus status = 6;
 }
 
 message EvidencePack {
@@ -89,6 +108,7 @@ message EvidencePack {
   int64 search_projection_version = 7;
   int64 memory_projection_version = 8;
   string retrieval_version = 9;
+  repeated EvidenceSourceCoverage source_coverage = 10;
 }
 
 message RetrieveEvidenceResponse {

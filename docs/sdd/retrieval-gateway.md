@@ -42,6 +42,13 @@ RAG / summary / Agent 必须消费 `EvidencePack`，不能绕过 retrieval-gatew
 - `source_refs`：message id、source event id、conversation id、seq、occurred time。
 - `valid_from_seq` / `valid_to_seq`：memory temporal window。
 - `temporal_status` / `review_state` / `extraction_version`。
+- `rerank_score`：retrieval-gateway 本地统一排序分，第一版使用 search score /
+  memory confidence clamp 到 `[0, 1]`。
+- `dedupe_reason`：证据去重语义，第一版按 `source_type + source_id` 去重，保留
+  first duplicate source。
+- `source_coverage`：按 source type 返回 requested、candidate_count、
+  returned_count、deduped_count 和状态（not requested / empty / returned /
+  filtered），用于 RAG / Agent 判断 evidence 缺口，而不是把空结果误判成事实不存在。
 - `search_projection_version` / `memory_projection_version`。
 - `retrieval_version`。
 
@@ -81,8 +88,7 @@ visibility projection 跑本地 smoke。
 
 ## 后续
 
-- 真实 `search + memory -> EvidencePack` smoke。
-- EvidencePack 字段打磨：rerank score、source coverage、dedupe reason。
+- RAG / summary / Agent 接入前继续保持 EvidencePack smoke 和字段兼容性回归。
 - policy-service 显式 retrieval check 已有 first-stage 可选 precheck；后续如果
   RAG / Agent 需要更细粒度的 retrieval policy，可在 policy-service 规则侧扩展。
 - AI eval harness：retrieval miss、temporal version、attribution、permission leak。

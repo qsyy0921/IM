@@ -1,6 +1,6 @@
 # retrieval-gateway
 
-状态：foundation-active / first EvidencePack smoke passed。
+状态：foundation-active / first EvidencePack smoke passed / EvidencePack field hardening first pass。
 
 定位：统一 search + memory 的检索入口，向 RAG / summary / Agent 提供
 `EvidencePack`。它不直接读业务库，不调用 LLM，不执行 Agent 动作。
@@ -21,9 +21,14 @@
   -> search-service grpc + memory-service grpc -> retrieval-gateway grpc
   -> `RetrieveEvidence` -> EvidencePack 同时包含 `SEARCH_MESSAGE` 和
   `MEMORY_EVENT`
+- EvidencePack 字段 hardening first pass：`rerank_score`、`dedupe_reason`、
+  `source_coverage`（requested / candidate / returned / deduped / status）已在
+  proto、app types、usecase 和 gRPC adapter 中落地，app / gRPC tests 覆盖排序、
+  去重和覆盖统计。
 
 下一步：
 
 - focused tests 和 `check-local` 收口。
-- EvidencePack 字段 hardening：rerank score、source coverage、dedupe reason。
 - 后续由 `rag-service` / `summary-service` / `agent-service` 消费 EvidencePack，不绕过 retrieval-gateway。
+- RAG / summary / Agent 接入前继续补 AI eval harness 和 retrieval miss / temporal
+  version / permission leak 回归。

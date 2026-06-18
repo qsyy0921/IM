@@ -5,7 +5,7 @@
 ## 短 Goal Prompt
 
 ```text
-持续推进 E:\development\IM 的 NexusIM 项目。每轮先运行 git status --short --branch --untracked-files=all，然后读取仓库根目录 prompt.md 和 agent.md，并按文档指向的项目目标继续执行；不要把具体目标写在目标框里，不全文读取长历史文档，不回滚用户已有修改。
+持续推进 E:\development\IM 的 NexusIM 项目。当前主线：9 个现有后端服务只做阻塞 search / memory / retrieval / Agent 的必要收口；当前 active slice 是 search-service v0.1 projection smoke：conversation.timeline.events -> search timeline-consumer -> PostgreSQL projection -> SearchMessages，验证 persisted / edited / revoked / deleted / member boundary；随后依次推进 memory-service / retrieval-gateway / RAG / summary-service / agent-service / skill-registry / mcp-gateway / action-executor。每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 处理互不重叠任务；短期生产级 HA / 长压 / sizing 后置，不全文扫长历史文档，不回滚用户已有修改。
 ```
 
 ## 当前具体执行目标

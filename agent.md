@@ -48,6 +48,11 @@ Current main line:
 4. Keep production-grade HA, long load tests, sizing, full SLOs, and provider
    operations in hardening backlog unless the user explicitly asks for them.
 
+Current active slice: run a `search-service v0.1` projection smoke covering
+`conversation.timeline.events -> search timeline-consumer -> PostgreSQL
+projection -> SearchMessages`, including persisted / edited / revoked / deleted
+message events and member boundary visibility.
+
 Current AI baseline: keep facts / projections / retrieval / controlled
 execution separate; build search -> memory -> retrieval before RAG / Agent;
 memory requires source refs, scope, validity, supersession, confidence and

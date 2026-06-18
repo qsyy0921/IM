@@ -5,7 +5,7 @@
 把下面这段放进 Codex 目标框即可：
 
 ```text
-持续推进 E:\development\IM 的 NexusIM 项目。当前主线：先做 9 个现有后端服务的必要收口，然后推进 search-service v0.1，再进入 memory-service / retrieval-gateway / RAG / summary / agent / skill-registry / mcp-gateway / action-executor。每轮先运行 git status --short --branch --untracked-files=all，然后读取仓库根目录 prompt.md 和 agent.md，再按需读取本轮必要文档；允许按 agent.md 使用多个 sub-agent 并行处理互不重叠的设计/实现/验证任务；短期生产级测试后置，不全文扫长历史文档，不回滚用户已有修改。
+持续推进 E:\development\IM 的 NexusIM 项目。当前主线：9 个现有后端服务只做阻塞 search / memory / retrieval / Agent 的必要收口；当前 active slice 是 search-service v0.1 projection smoke：conversation.timeline.events -> search timeline-consumer -> PostgreSQL projection -> SearchMessages，验证 persisted / edited / revoked / deleted / member boundary；随后依次推进 memory-service / retrieval-gateway / RAG / summary-service / agent-service / skill-registry / mcp-gateway / action-executor。每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 处理互不重叠任务；短期生产级 HA / 长压 / sizing 后置，不全文扫长历史文档，不回滚用户已有修改。
 ```
 
 ## 本文件的作用
@@ -14,8 +14,8 @@
 - 具体执行目标维护在 `docs/runbook/current-goal.md`；目标框不要复制长目标。
 - Agent 进度管理规则见 `agent.md`；需要管理项目进度、分配子 agent 或选择下一切片时先读它。
 - `prompt.md` 只负责把 Codex 带到正确入口；`agent.md` 决定本轮需要按需读取和维护哪些项目文档。
-- 当前主线只在入口保持短句：9 服务必要收口 -> search-service -> memory / retrieval -> RAG / summary / Agent / tool execution；具体长目标仍由 runbook 维护。
-- 具体当前阶段不在这里维护，见 `docs/runbook/current-brief.md`。
+- 当前主线和 active slice 只在入口保持一行摘要：9 服务必要收口 -> search-service projection smoke -> memory / retrieval -> RAG / summary / Agent / tool execution；具体长目标仍由 runbook 维护。
+- 具体当前阶段细节不在这里展开，见 `docs/runbook/current-brief.md`。
 - 当前未完成工作不在这里维护，见 `docs/runbook/remaining-goals.md`。
 - 单服务状态不在这里维护，见 `docs/runbook/service-briefs/<service>.md`。
 

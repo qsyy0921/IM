@@ -43,10 +43,14 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_API_GATEWAY_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("api-gateway runtime wiring is idle; set NEXUSIM_API_GATEWAY_MODE=grpc")
+		log.Println("api-gateway runtime wiring is idle; set NEXUSIM_API_GATEWAY_MODE=grpc, tenant-quota-audit, or tenant-quota-set")
 		return nil
 	case "grpc":
 		return runGRPC()
+	case "tenant-quota-audit":
+		return runTenantQuotaAudit()
+	case "tenant-quota-set":
+		return runTenantQuotaSet()
 	default:
 		return errors.New("unsupported NEXUSIM_API_GATEWAY_MODE")
 	}

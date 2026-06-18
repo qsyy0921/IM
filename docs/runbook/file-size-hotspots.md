@@ -1,11 +1,11 @@
 ﻿# File Size Budget Hotspots
 
-- Created at: 2026-06-18T06:18:24.5356215Z
+- Created at: 2026-06-18T06:49:13.2815285Z
 - Scope: handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score
-- Files checked: 1194
+- Files checked: 1196
 - Warnings: 0
 - Failures: 0
-- Hotspots at >= 75% of warning threshold: 0
+- Hotspots at >= 80% of warning threshold: 0
 
 | File | Kind | Lines | Warn | Max | Warn % | Max % |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
@@ -24,10 +24,5 @@
 | docs\architecture\target-architecture-timeline.md | docs | 542 | 1200 | 1500 | 45.2 | 36.1 |
 | docs\runbook\loadtest\message-service\loadtest-report-20260609.md | docs | 528 | 1200 | 1500 | 44 | 35.2 |
 | loadtest\pushgateway\run-local-smoke.ps1 | script/runner | 524 | 1000 | 1500 | 52.4 | 34.9 |
-| services\push-gateway\internal\infrastructure\redisroute\registry_test.go | test/runner | 1047 | 2500 | 3000 | 41.9 | 34.9 |
-| loadtest\sendmessage\main.go | test/runner | 1024 | 2500 | 3000 | 41 | 34.1 |
-| docs\sdd\delivery-service.md | docs | 510 | 1200 | 1500 | 42.5 | 34 |
-| services\api-gateway\cmd\api-gateway\rate_limit_config_test.go | test/runner | 1013 | 2500 | 3000 | 40.5 | 33.8 |
-| services\message-service\internal\infrastructure\postgres\repository_mutation_test.go | test/runner | 978 | 2500 | 3000 | 39.1 | 32.6 |
 
 This is a complexity governance snapshot only. Large files are review priorities, not automatic design failures.

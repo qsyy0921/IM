@@ -248,6 +248,23 @@ $operatorSpecs = @(
         ReasonFileEnvs = @(
             "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_REASON_FILE"
         )
+    },
+    @{
+        Service = "api-gateway"
+        Cmd = "services\api-gateway\cmd\api-gateway\main.go"
+        Env = "NEXUSIM_API_GATEWAY_MODE"
+        Modes = @(
+            "tenant-quota-audit",
+            "tenant-quota-set"
+        )
+        OutputEnvs = @(
+            "NEXUSIM_API_GATEWAY_TENANT_QUOTA_AUDIT_OUTPUT",
+            "NEXUSIM_API_GATEWAY_TENANT_QUOTA_SET_OUTPUT"
+        )
+        DryRunEnvs = @(
+            "NEXUSIM_API_GATEWAY_TENANT_QUOTA_SET_DRY_RUN"
+        )
+        ReasonFileEnvs = @()
     }
 )
 
@@ -421,7 +438,7 @@ foreach ($spec in $operatorSpecs) {
     }
 }
 
-$operatorModePattern = "(audit|repair|cleanup|keyring-rotate|tenant-privacy-default-set|source-policy-set)"
+$operatorModePattern = "(audit|repair|cleanup|keyring-rotate|tenant-privacy-default-set|source-policy-set|tenant-quota-set)"
 $serviceCommandFiles = Get-ChildItem -LiteralPath (Join-Path $repoRoot "services") -Recurse -Filter "main.go" -File |
     Where-Object { $_.FullName -like "*\cmd\*" } |
     Sort-Object FullName

@@ -226,6 +226,22 @@
       "reason_file_envs": [
         "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_REPAIR_REASON_FILE"
       ]
+    },
+    {
+      "service": "api-gateway",
+      "mode_env": "NEXUSIM_API_GATEWAY_MODE",
+      "modes": [
+        "tenant-quota-audit",
+        "tenant-quota-set"
+      ],
+      "output_envs": [
+        "NEXUSIM_API_GATEWAY_TENANT_QUOTA_AUDIT_OUTPUT",
+        "NEXUSIM_API_GATEWAY_TENANT_QUOTA_SET_OUTPUT"
+      ],
+      "dry_run_envs": [
+        "NEXUSIM_API_GATEWAY_TENANT_QUOTA_SET_DRY_RUN"
+      ],
+      "reason_file_envs": []
     }
   ]
 }

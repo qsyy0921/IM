@@ -18,12 +18,13 @@
 
 - [search-service](search-service.md)
 - [memory-service](memory-service.md)
+- [retrieval-gateway](retrieval-gateway.md)
 
 ## 当前新增服务顺序
 
 - 先把现有 9 个服务做必要收口，补齐 search / memory / retrieval / RAG / summary / Agent 依赖的事实、权限、事件和 tombstone 边界。
 - `search-service` v0.1 是向 AI 大模型应用后端转进的第一步，聚焦 projection / visibility / tombstone / `SearchMessages`。
-- 短期不以生产级完整系统测试或生产级 HA 作为转进阻塞；后续顺序是 memory / retrieval / RAG / summary / Agent / skill-registry / MCP gateway / action-executor。
+- 短期不以生产级完整系统测试或生产级 HA 作为转进阻塞；当前 active slice 是 retrieval-gateway / EvidencePack，后续顺序是 RAG / summary / Agent / skill-registry / MCP gateway / action-executor。
 - `memory-service` 第一版 contracts 已开始落地，必须按 group memory 设计，而不是普通摘要缓存：source refs、speaker / audience、validity window、supersedes、confidence、review state 是基本字段。
 - Agent / skill-registry / MCP gateway / action-executor 接真实业务动作时必须先走 policy-service tool policy precheck；写动作默认 `Proposal -> Approval -> Executor -> Audit`，低风险 allowlist 也必须可审计和幂等。
 - 可以用 sub-agent 并行推进服务 brief / SDD / 测试缺口，但不同 agent 不能同时修改同一个服务文件。

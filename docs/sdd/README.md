@@ -25,7 +25,8 @@
 - `api-gateway.md`
 - `search-service.md`
 - `memory-service.md`
-- 后续待新增：`retrieval-gateway.md`、`rag-service.md`、`summary-service.md`、`agent-service.md`、`skill-registry.md`、`mcp-gateway.md`、`action-executor.md`。
+- `retrieval-gateway.md`
+- 后续待新增：`rag-service.md`、`summary-service.md`、`agent-service.md`、`skill-registry.md`、`mcp-gateway.md`、`action-executor.md`。
 
 ## 通用约束
 

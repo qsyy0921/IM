@@ -1,0 +1,20 @@
+groups:
+  - name: nexusim-retrieval-gateway
+    rules:
+      - alert: NexusIMRetrievalGatewayDown
+        expr: up{service="retrieval-gateway"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: retrieval-gateway
+        annotations:
+          summary: "retrieval-gateway metrics endpoint is down"
+
+      - alert: NexusIMRetrievalGatewayInfoMissing
+        expr: absent(nexusim_retrieval_gateway_info)
+        for: 1m
+        labels:
+          severity: warning
+          service: retrieval-gateway
+        annotations:
+          summary: "retrieval-gateway info metric is missing"

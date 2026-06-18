@@ -95,6 +95,14 @@
       "grafana_dashboard": "memory-service-observability.json"
     },
     {
+      "name": "retrieval-gateway",
+      "stage": "foundation-active",
+      "local_process": "retrieval-gateway-grpc",
+      "debug_port": 11919,
+      "prometheus_rule_file": "prometheus-retrieval-gateway-alerts.yml",
+      "grafana_dashboard": "retrieval-gateway-observability.json"
+    },
+    {
       "name": "media-service",
       "stage": "future"
     },
@@ -108,10 +116,6 @@
     },
     {
       "name": "admin-service",
-      "stage": "future"
-    },
-    {
-      "name": "retrieval-gateway",
       "stage": "future"
     },
     {

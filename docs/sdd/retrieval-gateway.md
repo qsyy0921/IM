@@ -1,0 +1,80 @@
+# retrieval-gateway SDD v0.1
+
+## 定位
+
+`retrieval-gateway` 是 AI 大模型应用底座中的统一检索边界。它位于
+`search-service` / `memory-service` 之后，`rag-service` / `summary-service` /
+`agent-service` 之前。
+
+第一版目标：
+
+- 对外提供 `RetrieveEvidence`。
+- 聚合 `search-service.SearchMessages` 和 `memory-service.QueryMemoryEvents`。
+- 返回统一 `EvidencePack`，保留 source refs、conversation seq、visibility
+  version、memory temporal status、review state 和 projection version。
+- 不直接读 message / conversation / delivery / memory / search 的私有表。
+- 不调用 LLM，不生成回答，不执行 Agent 动作。
+
+## 边界
+
+`retrieval-gateway` 只做受控证据入口，不做事实源：
+
+```text
+conversation.timeline.events
+-> search-service projection
+-> memory-service projection
+-> retrieval-gateway EvidencePack
+-> RAG / summary / Agent
+```
+
+RAG / summary / Agent 必须消费 `EvidencePack`，不能绕过 retrieval-gateway
+直接调用 search / memory 或业务库。
+
+## EvidencePack v0.1
+
+`EvidencePack` 第一版包含：
+
+- `pack_id`：由 tenant / user / query / limit / source flags 派生的稳定请求标识。
+- `query`、`conversation_id`。
+- `items`：
+  - `SEARCH_MESSAGE`：来自 search-service 的 message hit。
+  - `MEMORY_EVENT`：来自 memory-service 的 StructuredMemoryEvent。
+- `source_refs`：message id、source event id、conversation id、seq、occurred time。
+- `valid_from_seq` / `valid_to_seq`：memory temporal window。
+- `temporal_status` / `review_state` / `extraction_version`。
+- `search_projection_version` / `memory_projection_version`。
+- `retrieval_version`。
+
+## 权限与可见性
+
+第一版依赖下游服务各自的 visibility / tombstone / member-window projection：
+
+- search-service 负责消息可见性和 tombstone 过滤。
+- memory-service 负责 memory event 可见性和 revoked / deleted 隐藏。
+- retrieval-gateway 透传 verified auth metadata 和 request body auth context。
+
+后续如果接入更强 policy check，必须通过 policy-service port，而不是直接读其它服务内部表。
+
+## 运行模式
+
+第一版只有：
+
+- `noop`
+- `grpc`
+
+环境变量：
+
+- `NEXUSIM_RETRIEVAL_GATEWAY_MODE`
+- `NEXUSIM_RETRIEVAL_GRPC_ADDR`
+- `NEXUSIM_RETRIEVAL_DEBUG_ADDR`
+- `NEXUSIM_SEARCH_GRPC_ADDR`
+- `NEXUSIM_MEMORY_GRPC_ADDR`
+- `NEXUSIM_RETRIEVAL_DEPENDENCY_TIMEOUT`
+
+## 后续
+
+- 真实 `search + memory -> EvidencePack` smoke。
+- EvidencePack 字段打磨：rerank score、source coverage、dedupe reason。
+- policy-service 显式 retrieval check。
+- AI eval harness：retrieval miss、temporal version、attribution、permission leak。
+- RAG / summary / Agent 只能在本边界稳定后进入。

@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package nexusim.retrieval.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/retrieval/v1;retrievalv1";
+
+service RetrievalGateway {
+  rpc RetrieveEvidence(RetrieveEvidenceRequest) returns (RetrieveEvidenceResponse);
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+enum EvidenceSourceType {
+  EVIDENCE_SOURCE_TYPE_UNSPECIFIED = 0;
+  EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE = 1;
+  EVIDENCE_SOURCE_TYPE_MEMORY_EVENT = 2;
+}
+
+enum EvidenceMemoryStatus {
+  EVIDENCE_MEMORY_STATUS_UNSPECIFIED = 0;
+  EVIDENCE_MEMORY_STATUS_PENDING = 1;
+  EVIDENCE_MEMORY_STATUS_ACTIVE = 2;
+  EVIDENCE_MEMORY_STATUS_SUPERSEDED = 3;
+  EVIDENCE_MEMORY_STATUS_ARCHIVED = 4;
+}
+
+message RetrieveEvidenceRequest {
+  AuthContext auth_context = 1;
+  string query = 2;
+  string conversation_id = 3;
+  int64 after_seq = 4;
+  int32 limit = 5;
+  bool include_search = 6;
+  bool include_memory = 7;
+  repeated EvidenceMemoryStatus memory_statuses = 8;
+}
+
+message EvidenceSourceRef {
+  string source_type = 1;
+  string source_id = 2;
+  string source_event_id = 3;
+  string conversation_id = 4;
+  int64 conversation_seq = 5;
+  int64 occurred_at_unix_ms = 6;
+}
+
+message EvidenceItem {
+  string evidence_id = 1;
+  EvidenceSourceType source_type = 2;
+  string source_id = 3;
+  string conversation_id = 4;
+  int64 conversation_seq = 5;
+  string text = 6;
+  double score = 7;
+  string speaker_user_id = 8;
+  string message_id = 9;
+  string memory_event_id = 10;
+  int64 occurred_at_unix_ms = 11;
+  int64 valid_from_seq = 12;
+  int64 valid_to_seq = 13;
+  int64 visibility_version = 14;
+  repeated EvidenceSourceRef source_refs = 15;
+  repeated string actor_user_ids = 16;
+  repeated string audience_user_ids = 17;
+  string temporal_status = 18;
+  string review_state = 19;
+  string extraction_version = 20;
+}
+
+message EvidenceSourceCount {
+  EvidenceSourceType source_type = 1;
+  int32 count = 2;
+}
+
+message EvidencePack {
+  string pack_id = 1;
+  string tenant_id = 2;
+  string query = 3;
+  string conversation_id = 4;
+  repeated EvidenceItem items = 5;
+  repeated EvidenceSourceCount source_counts = 6;
+  int64 search_projection_version = 7;
+  int64 memory_projection_version = 8;
+  string retrieval_version = 9;
+}
+
+message RetrieveEvidenceResponse {
+  EvidencePack pack = 1;
+}

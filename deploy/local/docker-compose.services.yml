@@ -169,6 +169,28 @@ services:
       nexusim-services:
         ipv4_address: 172.30.80.21
 
+  retrieval-gateway-grpc:
+    image: nexusim/retrieval-gateway:local
+    container_name: nexusim-retrieval-gateway-grpc
+    depends_on:
+      search-service-grpc:
+        condition: service_started
+      memory-service-grpc:
+        condition: service_started
+    environment:
+      NEXUSIM_RETRIEVAL_GATEWAY_MODE: grpc
+      NEXUSIM_RETRIEVAL_GRPC_ADDR: 172.30.80.22:10590
+      NEXUSIM_RETRIEVAL_DEBUG_ADDR: 172.30.80.22:11919
+      NEXUSIM_SEARCH_GRPC_ADDR: search-service-grpc:10570
+      NEXUSIM_MEMORY_GRPC_ADDR: memory-service-grpc:10580
+    ports:
+      - "10590:10590"
+      - "11919:11919"
+    restart: unless-stopped
+    networks:
+      nexusim-services:
+        ipv4_address: 172.30.80.22
+
   push-gateway-ws:
     image: nexusim/push-gateway:local
     container_name: nexusim-push-gateway-ws

@@ -22,7 +22,7 @@ search-service v0.1（第一步，已完成第一轮 smoke）
 -> timeline decoder / consumer（已落地）
 -> timeline projection smoke: persisted / edited / revoked / deleted + member boundary（clean commit f2a57516 已通过）
 -> memory-service v0.1 SDD / proto / migration / implementation / clean projection smoke（已落地）
--> 当前 active：memory hardening 或 retrieval-gateway / EvidencePack
+-> 当前 active：retrieval-gateway / EvidencePack 第一版边界
 -> 不做孤立 LLM demo
 ```
 
@@ -39,7 +39,7 @@ search-service v0.1（第一步，已完成第一轮 smoke）
 1. 9 个现有服务必要收口：只补 search / memory / retrieval / Agent 必须依赖的消息 mutation、成员可见窗口、联系人隐私、policy decision source、tool policy precheck、audit 和安全边界。
 2. `search-service v0.1`：第一切片已落 proto / migration / 六层 skeleton / PG repository / `SearchMessages` / grpc runtime / timeline decoder / consumer，并已跑通 projection smoke，作为第一步 AI 数据入口。
 3. `memory-service`：SDD / proto / migration、六层 skeleton、repository first pass、projection usecase、runtime wiring、PG integration、timeline worker 单测和 clean projection smoke 已落。group memory / StructuredMemoryEvent / Memory Graph / profile aggregate 必须带 source refs、speaker / audience scope、valid_from / valid_to、supersedes、confidence 和 review state，不能把群聊事实直接升级成个人长期偏好。
-4. `retrieval-gateway`：统一 EvidencePack、权限过滤、引用来源和 temporal version。
+4. `retrieval-gateway`：当前 active slice，统一 EvidencePack、权限过滤、引用来源和 temporal version；第一版只通过 search / memory 公开 gRPC 契约聚合，不直接读业务库。
 5. RAG / `summary-service` / Agent / `skill-registry` / `mcp-gateway` / `action-executor`：只消费受控 EvidencePack 和 tool policy，不直接读业务库。
 6. 生产级观测、HA、长压和 sizing：继续作为 hardening backlog 推进，但不阻塞当前 AI 底座路线启动。
 

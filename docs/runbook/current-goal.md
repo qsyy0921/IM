@@ -5,7 +5,7 @@
 ## 短 Goal Prompt
 
 ```text
-持续推进 E:\development\IM 的 NexusIM 项目。当前主线：9 个现有后端服务只做阻塞 search / memory / retrieval / Agent 的必要收口；当前 active slice 是 search-service v0.1 projection smoke：conversation.timeline.events -> search timeline-consumer -> PostgreSQL projection -> SearchMessages，验证 persisted / edited / revoked / deleted / member boundary；随后依次推进 memory-service / retrieval-gateway / RAG / summary-service / agent-service / skill-registry / mcp-gateway / action-executor。每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 处理互不重叠任务；短期生产级 HA / 长压 / sizing 后置，不全文扫长历史文档，不回滚用户已有修改。
+持续推进 E:\development\IM 的 NexusIM 项目。当前唯一主线：9 个已成型后端服务只做阻塞 AI 底座的必要收口，然后转向 AI 大模型应用后端。执行顺序：search-service v0.1 projection smoke 已通过 -> memory-service v0.1 设计/契约（group memory、StructuredMemoryEvent、source refs、speaker/audience scope、validity windows、supersedes、confidence、review state）-> retrieval-gateway / EvidencePack -> RAG / summary-service -> agent-service -> skill-registry / mcp-gateway / action-executor。本轮只优先做能推进这条主线的工作；生产级 HA、长压、sizing、完整 provider 运维后置为 hardening backlog，除非用户明确点名。每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 做互不重叠任务；不全文扫长历史文档，不回滚用户已有修改。
 ```
 
 ## 当前具体执行目标
@@ -15,12 +15,13 @@
 当前 active slice：
 
 ```text
-search-service v0.1（第一步）
+search-service v0.1（第一步，已完成第一轮 smoke）
 -> SDD 收敛
 -> proto / migration / 六层 skeleton（第一切片已落地）
 -> PostgreSQL repository / SearchMessages / grpc runtime（已落地）
 -> timeline decoder / consumer（已落地）
--> timeline projection smoke: persisted / edited / revoked / deleted + member boundary（下一步）
+-> timeline projection smoke: persisted / edited / revoked / deleted + member boundary（clean commit f2a57516 已通过）
+-> 当前 active：memory-service v0.1 设计 / 契约
 -> 不做孤立 LLM demo
 ```
 
@@ -44,8 +45,8 @@ sub-agent C：负责测试缺口 / 运行验证 / 文档复核
 当前优先级：
 
 1. 9 个现有服务必要收口：只补 search / memory / retrieval / Agent 必须依赖的消息 mutation、成员可见窗口、联系人隐私、policy decision source、tool policy precheck、audit 和安全边界。
-2. `search-service v0.1`：第一切片已落 proto / migration / 六层 skeleton / PG repository / `SearchMessages` / grpc runtime / timeline decoder / consumer；下一步跑 projection smoke，作为第一步 AI 数据入口。
-3. `memory-service`：在 search 事件边界稳定后做 group memory / StructuredMemoryEvent / Memory Graph / profile aggregate；必须带 source refs、speaker / audience scope、valid_from / valid_to、supersedes、confidence 和 review state，不能把群聊事实直接升级成个人长期偏好。
+2. `search-service v0.1`：第一切片已落 proto / migration / 六层 skeleton / PG repository / `SearchMessages` / grpc runtime / timeline decoder / consumer，并已跑通 projection smoke，作为第一步 AI 数据入口。
+3. `memory-service`：当前 active，基于已稳定的 search 事件边界做 group memory / StructuredMemoryEvent / Memory Graph / profile aggregate；必须带 source refs、speaker / audience scope、valid_from / valid_to、supersedes、confidence 和 review state，不能把群聊事实直接升级成个人长期偏好。
 4. `retrieval-gateway`：统一 EvidencePack、权限过滤、引用来源和 temporal version。
 5. RAG / `summary-service` / Agent / `skill-registry` / `mcp-gateway` / `action-executor`：只消费受控 EvidencePack 和 tool policy，不直接读业务库。
 6. 生产级观测、HA、长压和 sizing：继续作为 hardening backlog 推进，但不阻塞当前 AI 底座路线启动。
@@ -58,7 +59,7 @@ sub-agent C：负责测试缺口 / 运行验证 / 文档复核
 
 ```text
 9 个现有服务做必要收口
--> search-service v0.1 第一实现切片已推进到 timeline consumer
+-> search-service v0.1 第一实现切片已跑通 projection smoke
 -> memory-service / retrieval-gateway
 -> RAG / summary-service / Agent
 -> skill-registry / mcp-gateway / action-executor

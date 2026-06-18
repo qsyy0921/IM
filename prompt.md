@@ -5,7 +5,7 @@
 把下面这段放进 Codex 目标框即可：
 
 ```text
-持续推进 E:\development\IM 的 NexusIM 项目。当前主线：9 个现有后端服务只做阻塞 search / memory / retrieval / Agent 的必要收口；当前 active slice 是 search-service v0.1 projection smoke：conversation.timeline.events -> search timeline-consumer -> PostgreSQL projection -> SearchMessages，验证 persisted / edited / revoked / deleted / member boundary；随后依次推进 memory-service / retrieval-gateway / RAG / summary-service / agent-service / skill-registry / mcp-gateway / action-executor。每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 处理互不重叠任务；短期生产级 HA / 长压 / sizing 后置，不全文扫长历史文档，不回滚用户已有修改。
+持续推进 E:\development\IM 的 NexusIM 项目。当前唯一主线：9 个已成型后端服务只做阻塞 AI 底座的必要收口，然后转向 AI 大模型应用后端。执行顺序：search-service v0.1 projection smoke 已通过 -> memory-service v0.1 设计/契约（group memory、StructuredMemoryEvent、source refs、speaker/audience scope、validity windows、supersedes、confidence、review state）-> retrieval-gateway / EvidencePack -> RAG / summary-service -> agent-service -> skill-registry / mcp-gateway / action-executor。本轮只优先做能推进这条主线的工作；生产级 HA、长压、sizing、完整 provider 运维后置为 hardening backlog，除非用户明确点名。每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 做互不重叠任务；不全文扫长历史文档，不回滚用户已有修改。
 ```
 
 ## 本文件的作用
@@ -14,7 +14,7 @@
 - 具体执行目标维护在 `docs/runbook/current-goal.md`；目标框不要复制长目标。
 - Agent 进度管理规则见 `agent.md`；需要管理项目进度、分配子 agent 或选择下一切片时先读它。
 - `prompt.md` 只负责把 Codex 带到正确入口；`agent.md` 决定本轮需要按需读取和维护哪些项目文档。
-- 当前主线和 active slice 只在入口保持一行摘要：9 服务必要收口 -> search-service projection smoke -> memory / retrieval -> RAG / summary / Agent / tool execution；具体长目标仍由 runbook 维护。
+- 当前主线和 active slice 必须在目标框短 Prompt 第一段明确出现：9 服务必要收口 -> search-service smoke passed -> memory / retrieval -> RAG / summary / Agent / tool execution；具体长目标仍由 runbook 维护。
 - 具体当前阶段细节不在这里展开，见 `docs/runbook/current-brief.md`。
 - 当前未完成工作不在这里维护，见 `docs/runbook/remaining-goals.md`。
 - 单服务状态不在这里维护，见 `docs/runbook/service-briefs/<service>.md`。
@@ -28,7 +28,7 @@
 
 ## 工作原则
 
-1. 当前主线是 9 服务必要收口 -> search-service v0.1 -> memory-service / retrieval-gateway -> RAG / summary / Agent / skill / MCP / action execution；阶段细节以 `docs/runbook/current-brief.md` 和 `docs/runbook/remaining-goals.md` 为准，不在本文件重复维护。
+1. 当前唯一主线是 9 服务必要收口 -> search-service v0.1 -> memory-service / retrieval-gateway -> RAG / summary / Agent / skill / MCP / action execution；阶段细节以 `docs/runbook/current-brief.md` 和 `docs/runbook/remaining-goals.md` 为准，不在本文件重复维护。
 2. 小切片闭环：设计、代码、必要测试、文档一起收；短期生产级压测、长周期演练和生产就绪测试后置到明确阶段或用户指定任务。
 3. 降低耦合：不跨服务读内部表，不引入网状同步 RPC，不为了短期功能抽公共包。
 4. 控制复杂度：生产手写文件接近 2500 行、测试或 runner 接近 3000 行时，优先同 package 拆分。

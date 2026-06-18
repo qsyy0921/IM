@@ -43,6 +43,10 @@ To run against already started search-service roles, call the runner directly:
 
 Raw summary is written outside the repository as `search-projection-summary.json`.
 
+Latest report:
+
+- `docs/runbook/loadtest/search-service/loadtest-report-20260619-search-projection-smoke.md`
+
 ## Verified Invariants
 
 - member join makes the viewer eligible for search results;

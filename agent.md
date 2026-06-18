@@ -41,17 +41,18 @@ Current main line:
 1. Close only the 9-service gaps that block search / memory / retrieval / Agent:
    mutation semantics, visibility windows, contacts privacy, policy, audit, and
    security boundaries.
-2. Start `search-service v0.1` as projection / visibility / tombstone /
-   `SearchMessages`, not an LLM demo.
-3. Then build `memory-service`, `retrieval-gateway`, RAG, `summary-service`,
+2. Keep `search-service v0.1` as projection / visibility / tombstone /
+   `SearchMessages`, not an LLM demo; its first projection smoke is now passed.
+3. Build `memory-service`, `retrieval-gateway`, RAG, `summary-service`,
    Agent, `skill-registry`, `mcp-gateway`, and `action-executor`.
 4. Keep production-grade HA, long load tests, sizing, full SLOs, and provider
    operations in hardening backlog unless the user explicitly asks for them.
 
-Current active slice: run a `search-service v0.1` projection smoke covering
-`conversation.timeline.events -> search timeline-consumer -> PostgreSQL
-projection -> SearchMessages`, including persisted / edited / revoked / deleted
-message events and member boundary visibility.
+Current active slice: design `memory-service v0.1` contracts around group
+memory projection and `StructuredMemoryEvent`: source refs, speaker / audience
+scope, validity windows, supersession / contradiction, confidence, review state,
+and profile aggregation rules. Do not build RAG or Agent before memory and
+retrieval boundaries are explicit.
 
 Current AI baseline: keep facts / projections / retrieval / controlled
 execution separate; build search -> memory -> retrieval before RAG / Agent;
@@ -78,6 +79,10 @@ Prefer:
 5. Search / group memory / retrieval before RAG or Agent.
 6. Observability, fault smoke, capacity, and complexity governance as
    non-blocking hardening unless requested.
+
+If a candidate task does not move the current main line, treat it as backlog
+unless it is a P0/P1 fix, a user-explicit request, or a small cleanup needed to
+unblock the active slice.
 
 Each slice should close with code, tests, docs, and a focused commit when
 practical.

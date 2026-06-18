@@ -3,8 +3,9 @@
 ## 当前状态
 
 - SDD v0.1 draft 已存在：`docs/sdd/search-service.md`。
-- 第一实现切片已继续推进：`search_service.proto`、PostgreSQL core migration、六层 package skeleton、`SearchMessages` app / domain / gRPC adapter、projection usecase skeleton、PostgreSQL repository、`grpc` runtime mode、timeline decoder / consumer 和 worker overlay 已落地。
-- 当前 active slice 下一步：跑真实 projection smoke，并把 `SearchMessages` 接入端到端查询验证。
+- 第一实现切片已继续推进：`search_service.proto`、PostgreSQL core migration、六层 package skeleton、`SearchMessages` app / domain / gRPC adapter、projection usecase skeleton、PostgreSQL repository、`grpc` runtime mode、timeline decoder / consumer、worker overlay 和 projection smoke runner 已落地。
+- 2026-06-19 已在 clean commit `f2a57516` 跑通真实 projection smoke：`conversation.timeline.events -> search-service timeline-consumer -> PostgreSQL projection -> SearchMessages`，覆盖 persisted / edited / revoked / deleted / member boundary。
+- 当前 active slice 已转入 `memory-service v0.1` 设计 / 契约；search-service 后续保留 EvidencePack 前置字段深化和搜索 hardening。
 - 短期不以生产级完整系统测试或生产级 HA 作为 v0.1 阻塞；v0.1 验证重点是切片级本地检查、projection / visibility / tombstone smoke 和 EvidencePack 前置字段。
 - 定位是搜索索引、成员可见窗口过滤、tombstone 和 EvidencePack 前置服务。
 - 不绑定具体搜索中间件；索引后端必须通过 port，可本地/PG 起步，后续按 ADR 替换。
@@ -18,7 +19,7 @@
 
 ## 后续
 
-- projection smoke：真实 timeline event -> PG projection -> `SearchMessages`。
-- search smoke：发消息可搜，编辑更新，撤回/删除不可见，退群后不可见。
+- projection smoke：真实 timeline event -> PG projection -> `SearchMessages` 已通过。
+- search smoke：发消息可搜，编辑更新，撤回/删除不可见，退群后不可见，stranger 不可见已通过。
 - EvidencePack 前置 smoke：搜索结果必须带 source message id、conversation seq、source event id 和 visibility version。
 - 后续链路：memory / group memory -> retrieval-gateway / EvidencePack -> RAG / summary -> Agent -> skill-registry -> mcp-gateway/tool-gateway -> action-executor。

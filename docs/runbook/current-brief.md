@@ -57,4 +57,4 @@ policy-service
 - 压测原始数据放 `H:\NexusIM\loadtest-results`，E 盘仓库只放报告和文档；`ResultRoot` / `OutputRoot` 类入口必须拒绝仓库内路径。
 - 新发现的待完成工作写入 `docs/runbook/remaining-goals.md`。
 - 每个有意义切片结束后运行 `.\tools\check-local.ps1`，并按风险追加服务级测试、集成测试或 smoke。
-- 安全启动门禁索引见 `docs/runbook/security-gate-catalog.json`，分布式 smoke 证据索引见 `docs/runbook/distributed-smoke-evidence.json`，短容量基线证据索引见 `docs/runbook/capacity-baseline-evidence.json`，长压 campaign 证据索引见 `docs/runbook/capacity-longrun-campaign-evidence.json`，资源快照证据索引见 `docs/runbook/resource-snapshot-evidence.json`，观测 smoke 证据索引见 `docs/runbook/observability-evidence.json`。
+- 安全启动门禁索引见 `docs/runbook/security-gate-catalog.json`，api-gateway legacy 迁移证据索引见 `docs/runbook/api-gateway-legacy-evidence.json`，分布式 smoke 证据索引见 `docs/runbook/distributed-smoke-evidence.json`，短容量基线证据索引见 `docs/runbook/capacity-baseline-evidence.json`，长压 campaign 证据索引见 `docs/runbook/capacity-longrun-campaign-evidence.json`，资源快照证据索引见 `docs/runbook/resource-snapshot-evidence.json`，观测 smoke 证据索引见 `docs/runbook/observability-evidence.json`。

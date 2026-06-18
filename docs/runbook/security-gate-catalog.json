@@ -93,6 +93,13 @@
       "note": "Tenant quota snapshots must keep Redis mode, versioned/checksum policy, HTTPS, TLS/client-cert, freshness, and error guardrails."
     },
     {
+      "name": "api-gateway legacy evidence manifest",
+      "category": "evidence-safety",
+      "script": "tools/check-api-gateway-legacy-evidence.ps1",
+      "check_local_label": "api-gateway legacy evidence",
+      "note": "Legacy descriptor observation-window and removal-plan evidence must stay low-sensitive and reference external raw evidence paths."
+    },
+    {
       "name": "identity production key guard",
       "category": "identity-security",
       "script": "tools/check-identity-production-key-guard.ps1",

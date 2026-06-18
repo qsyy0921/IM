@@ -1,6 +1,6 @@
 # summary-service
 
-状态：foundation-active / first read-only summary path.
+状态：foundation-active / first read-only summary path / adapter smoke passed.
 
 定位：会话摘要边界服务。它只消费 retrieval-gateway 返回的 `EvidencePack`，
 不直接读 message / conversation / search / memory 私有表，不执行 Agent 动
@@ -16,9 +16,11 @@
 - provider 输出后统一运行 citation verifier，无法匹配 EvidencePack 则
   fail closed
 - retrieval-gateway 公开 proto RPC client、app / gRPC / cmd focused tests
+- `loadtest/summary`、`tools/run-summary-adapter-smoke.ps1` 和真实本地
+  `retrieval-gateway -> summary-service` adapter smoke 已通过：
+  `docs/runbook/loadtest/summary-service/loadtest-report-20260619-summary-adapter-smoke.md`
 
 下一步：
 
-- 跑真实本地 `retrieval-gateway -> summary-service` adapter smoke。
 - 外部 LLM adapter 后续仍必须走 SummaryProvider port 和 citation verifier。
-- 后续进入 `agent-service`；summary / Agent 仍只能消费 EvidencePack。
+- 进入 `agent-service`；summary / Agent 仍只能消费 EvidencePack。

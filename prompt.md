@@ -9,14 +9,14 @@
 
 当前主线必须始终第一：NexusIM 现在已经从“9 个 IM 服务主链路收口”转入“AI/RAG/Agent 大模型应用底座”。如果用户只说“继续开发 / 继续 / 接下来做什么”，默认推进 AI/RAG/Agent 主链路；不要默认回到 9 服务 P2 hardening、生产级长压、完整 HA、sizing 或 provider-grade 运维，除非它阻塞 AI 主线或用户明确点名。
 
-当前 active slice：`summary-service` 已进入 foundation-active，第一版 read-only EvidencePack summary path 已落；下一步跑真实本地 `retrieval-gateway -> summary-service` adapter smoke，然后进入 `agent-service`。
+当前 active slice：`summary-service` 已进入 foundation-active，第一版 read-only EvidencePack summary path 和真实本地 `retrieval-gateway -> summary-service` adapter smoke 已落；下一步进入 `agent-service`。
 
 主线顺序：
 1. 现有 9 个 IM 后端服务只做阻塞 AI 链路的必要收口；非阻塞生产化事项写入 `docs/runbook/remaining-goals.md`，不要拿它们替代 AI 主线。
 2. 继续推进 AI 链路：search-service -> memory-service -> retrieval-gateway / EvidencePack -> rag-service -> summary-service -> agent-service -> skill-registry -> mcp-gateway/tool-gateway -> action-executor -> ai-eval。
 3. AI 重点：群组 memory、跨群 / 跨时间 evidence、权限过滤 RAG、multi-agent 协作、MCP / skill / tool 调用、proposal / approval / executor / audit 真实业务闭环。
 
-已完成基线：9 个 IM 后端服务已跑通主链路；search-service projection smoke passed；memory-service group memory / StructuredMemoryEvent projection smoke passed；retrieval-gateway 第一轮 search + memory -> EvidencePack smoke passed；EvidencePack field hardening first pass 已落；AI eval harness first pass 已有低敏 case schema / validator；rag-service first read-only answer path、`loadtest/rag`、RAG eval execution adapter、provider boundary 和 citation verifier 已落；summary-service first read-only summary path 已落。
+已完成基线：9 个 IM 后端服务已跑通主链路；search-service projection smoke passed；memory-service group memory / StructuredMemoryEvent projection smoke passed；retrieval-gateway 第一轮 search + memory -> EvidencePack smoke passed；EvidencePack field hardening first pass 已落；AI eval harness first pass 已有低敏 case schema / validator；rag-service first read-only answer path、`loadtest/rag`、RAG eval execution adapter、provider boundary 和 citation verifier 已落；summary-service first read-only summary path 和真实 adapter smoke 已落。
 
 硬约束：EvidencePack 必须保留 source refs、temporal version、visibility / policy boundary；RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；新增 eval case 先进入 `docs/runbook/ai-eval/retrieval-eval-cases.json`。
 

@@ -1,5 +1,5 @@
 ﻿{
-    "created_at":  "2026-06-18T02:52:54.8231310Z",
+    "created_at":  "2026-06-18T03:18:27.6687817Z",
     "scope":  "handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score",
     "file_count":  1186,
     "thresholds":  {
@@ -57,12 +57,12 @@
                       },
                       {
                           "Path":  "tools\\run-loadtest-capacity-baseline-suite.ps1",
-                          "Lines":  661,
+                          "Lines":  665,
                           "Kind":  "script/runner",
                           "Warn":  1000,
                           "Max":  1500,
-                          "WarnRatio":  0.661,
-                          "MaxRatio":  0.4407
+                          "WarnRatio":  0.665,
+                          "MaxRatio":  0.4433
                       },
                       {
                           "Path":  "loadtest\\contacts\\main.go",

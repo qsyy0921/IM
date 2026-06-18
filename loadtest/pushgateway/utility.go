@@ -34,6 +34,22 @@ func parseDeviceIDs(list string, fallback string) []string {
 	return result
 }
 
+func expandDeviceIDs(base string, count int) []string {
+	base = strings.TrimSpace(base)
+	if base == "" {
+		base = "push-device"
+	}
+	if count <= 1 {
+		return []string{base}
+	}
+	result := make([]string, 0, count)
+	result = append(result, base)
+	for i := 2; i <= count; i++ {
+		result = append(result, base+"-vu-"+strconv.Itoa(i))
+	}
+	return result
+}
+
 func derivePushMetricsURL(pushURL string) string {
 	parsed, err := url.Parse(pushURL)
 	if err != nil {

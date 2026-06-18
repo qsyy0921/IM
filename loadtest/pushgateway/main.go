@@ -52,6 +52,12 @@ func run(cfg config) error {
 	if cfg.pushAuthTokenTTL <= 0 {
 		return fmt.Errorf("--push-auth-token-ttl must be positive")
 	}
+	if cfg.capacityDuration < 0 {
+		return fmt.Errorf("--duration must not be negative")
+	}
+	if cfg.capacityDuration > 0 && cfg.scenario != "full" {
+		return fmt.Errorf("--duration is only supported for --scenario full")
+	}
 	if cfg.scenario == "cross-instance-resume" || cfg.scenario == "redis-sentinel-failover" || cfg.scenario == "redis-sentinel-master-stop" {
 		if cfg.routeBackend != "redis" {
 			return fmt.Errorf("%s scenario requires --route-backend redis", cfg.scenario)
@@ -155,6 +161,9 @@ func run(cfg config) error {
 		ReceiverUserID:                          cfg.receiverUserID,
 		ReceiverDeviceID:                        cfg.receiverDeviceID,
 		ReceiverDeviceIDs:                       cfg.receiverDeviceIDs,
+		CapacityMode:                            cfg.capacityDuration > 0,
+		CapacityDurationSeconds:                 cfg.capacityDuration.Seconds(),
+		VirtualUsers:                            cfg.virtualUsers,
 		MessageCount:                            cfg.messageCount,
 		StartedAt:                               time.Now().UTC(),
 		Latencies:                               map[string]float64{},
@@ -230,13 +239,25 @@ func run(cfg config) error {
 	}
 
 	var lastSend *messagev1.SendMessageResponse
+	messageCount := 0
+	capacityDeadline := time.Time{}
+	if cfg.capacityDuration > 0 {
+		capacityDeadline = time.Now().Add(cfg.capacityDuration)
+	}
 	begin = time.Now()
-	for messageIndex := 1; messageIndex <= cfg.messageCount; messageIndex++ {
+	for messageIndex := 1; ; messageIndex++ {
+		if cfg.capacityDuration == 0 && messageIndex > cfg.messageCount {
+			break
+		}
+		if cfg.capacityDuration > 0 && messageIndex > 1 && time.Now().After(capacityDeadline) {
+			break
+		}
 		send, err := sendMessage(ctx, cfg, messageClient, messageIndex)
 		if err != nil {
 			return finish(cfg, &result, fmt.Errorf("send message %d: %w", messageIndex, err))
 		}
 		lastSend = send
+		messageCount = messageIndex
 		result.SendMessage = sendSummary{MessageID: send.GetMessageId(), ConversationSeq: send.GetConversationSeq()}
 
 		for i, device := range devices {
@@ -250,18 +271,27 @@ func run(cfg config) error {
 			}
 		}
 	}
+	result.MessageCount = messageCount
 	result.Latencies["send_messages"] = elapsedMS(begin)
 	result.DeliveryNotify = result.DeviceNotifications[0].DeliveryNotify
 	if lastSend == nil {
 		return finish(cfg, &result, errors.New("no message was sent"))
 	}
 
-	pull, err := pullInboxAtLeast(ctx, cfg, deliveryClient, 0, cfg.messageCount+10, cfg.messageCount, lastSend.GetConversationSeq())
+	pullAfterSeq := int64(0)
+	pullLimit := messageCount + 10
+	minPullItems := messageCount
+	if cfg.capacityDuration > 0 {
+		pullAfterSeq = lastSend.GetConversationSeq() - 1
+		pullLimit = 10
+		minPullItems = 1
+	}
+	pull, err := pullInboxAtLeast(ctx, cfg, deliveryClient, pullAfterSeq, pullLimit, minPullItems, lastSend.GetConversationSeq())
 	if err != nil {
 		return finish(cfg, &result, fmt.Errorf("pull inbox: %w", err))
 	}
 	result.PullInbox = pull
-	if pull.ItemCount < cfg.messageCount || pull.MaxSeq < lastSend.GetConversationSeq() {
+	if pull.MaxSeq < lastSend.GetConversationSeq() || (cfg.capacityDuration == 0 && pull.ItemCount < messageCount) {
 		return finish(cfg, &result, fmt.Errorf("pull inbox did not include notify seq: %+v", pull))
 	}
 

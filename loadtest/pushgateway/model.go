@@ -79,6 +79,8 @@ type config struct {
 	receiverUserID                     string
 	receiverDeviceID                   string
 	receiverDeviceIDs                  []string
+	virtualUsers                       int
+	capacityDuration                   time.Duration
 	scenario                           string
 	messageCount                       int
 	slowMessageCount                   int
@@ -150,6 +152,9 @@ type summary struct {
 	ReceiverUserID                          string                      `json:"receiver_user_id"`
 	ReceiverDeviceID                        string                      `json:"receiver_device_id"`
 	ReceiverDeviceIDs                       []string                    `json:"receiver_device_ids,omitempty"`
+	CapacityMode                            bool                        `json:"capacity_mode"`
+	CapacityDurationSeconds                 float64                     `json:"capacity_duration_seconds,omitempty"`
+	VirtualUsers                            int                         `json:"virtual_users,omitempty"`
 	MessageCount                            int                         `json:"message_count,omitempty"`
 	StartedAt                               time.Time                   `json:"started_at"`
 	FinishedAt                              time.Time                   `json:"finished_at"`

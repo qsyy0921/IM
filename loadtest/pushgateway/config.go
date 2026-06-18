@@ -32,6 +32,8 @@ func parseConfig() config {
 	var receiverDeviceIDs string
 	flag.StringVar(&receiverDeviceIDs, "receiver-device-ids", "", "comma separated online receiver device ids; overrides receiver-device-id when set")
 	flag.StringVar(&cfg.scenario, "scenario", "full", "scenario: full, message-change-notify, resume-replay, redis-resume-negative, cross-instance-resume, slow-client, redis-fault, redis-cluster-node-stop, redis-cluster-failover, redis-sentinel-failover, redis-sentinel-master-stop, redis-sentinel-quorum-loss, redis-sentinel-network-partition, or identity-revoke")
+	flag.IntVar(&cfg.virtualUsers, "vus", 1, "number of online receiver devices used by the full capacity scenario when --receiver-device-ids is not set")
+	flag.DurationVar(&cfg.capacityDuration, "duration", 0, "run the full online notify scenario until this duration elapses; zero keeps single smoke mode")
 	flag.IntVar(&cfg.messageCount, "message-count", 1, "number of messages sent in the full online notify scenario")
 	flag.IntVar(&cfg.slowMessageCount, "slow-message-count", 128, "number of messages sent while slow client does not read")
 	flag.StringVar(&cfg.messageChangeAction, "message-change-action", "edit", "message-change-notify action: edit, revoke, or delete")
@@ -57,7 +59,14 @@ func parseConfig() config {
 	flag.BoolVar(&cfg.verifiedAuthMetadata, "verified-auth-metadata", envBool(false, "NEXUSIM_PUSHGATEWAY_LOADTEST_VERIFIED_AUTH_METADATA", "NEXUSIM_CONVERSATION_LOADTEST_VERIFIED_AUTH_METADATA", "NEXUSIM_MESSAGE_LOADTEST_VERIFIED_AUTH_METADATA", "NEXUSIM_DELIVERY_LOADTEST_VERIFIED_AUTH_METADATA"), "send gateway verified identity through user-facing gRPC metadata")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete existing rows for tenant before running")
 	flag.Parse()
-	cfg.receiverDeviceIDs = parseDeviceIDs(receiverDeviceIDs, cfg.receiverDeviceID)
+	if cfg.virtualUsers <= 0 {
+		cfg.virtualUsers = 1
+	}
+	if strings.TrimSpace(receiverDeviceIDs) == "" {
+		cfg.receiverDeviceIDs = expandDeviceIDs(cfg.receiverDeviceID, cfg.virtualUsers)
+	} else {
+		cfg.receiverDeviceIDs = parseDeviceIDs(receiverDeviceIDs, cfg.receiverDeviceID)
+	}
 	cfg.receiverDeviceID = cfg.receiverDeviceIDs[0]
 	cfg.scenario = strings.TrimSpace(cfg.scenario)
 	if cfg.scenario == "" {

@@ -62,6 +62,10 @@ try {
         Write-Host "FAIL push-gateway capacity suite step must run full scenario." -ForegroundColor Red
         exit 1
     }
+    if ($pushStep.command_line -notmatch "--duration 10s" -or $pushStep.command_line -notmatch "--vus 2") {
+        Write-Host "FAIL push-gateway capacity suite step must pass duration and VU controls." -ForegroundColor Red
+        exit 1
+    }
     if ($pushStep.requires_runtime_stack -ne $true -or $pushStep.baseline_mode -ne "requires_stack" -or $pushStep.status -ne "skipped_stack_required") {
         Write-Host "FAIL push-gateway capacity suite step must be marked stack-required by default." -ForegroundColor Red
         exit 1

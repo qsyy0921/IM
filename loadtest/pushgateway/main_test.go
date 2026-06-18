@@ -66,6 +66,17 @@ func TestParseDeviceIDs(t *testing.T) {
 	}
 }
 
+func TestExpandDeviceIDs(t *testing.T) {
+	if got := expandDeviceIDs("push-device-1", 1); !reflect.DeepEqual(got, []string{"push-device-1"}) {
+		t.Fatalf("expandDeviceIDs single = %#v", got)
+	}
+	got := expandDeviceIDs("push-device-1", 3)
+	want := []string{"push-device-1", "push-device-1-vu-2", "push-device-1-vu-3"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expandDeviceIDs = %#v, want %#v", got, want)
+	}
+}
+
 func TestDerivePushMetricsURL(t *testing.T) {
 	tests := []struct {
 		name string

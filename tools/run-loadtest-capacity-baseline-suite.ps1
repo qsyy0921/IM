@@ -383,6 +383,10 @@ function Build-Step {
             $runnerArgsList.Add($resultDir)
             $runnerArgsList.Add("--scenario")
             $runnerArgsList.Add("full")
+            $runnerArgsList.Add("--vus")
+            $runnerArgsList.Add([string]$VUs)
+            $runnerArgsList.Add("--duration")
+            $runnerArgsList.Add($Duration)
             Add-ArgIfValue -ArgumentList $runnerArgsList -Name "--pg-dsn" -Value $PGDSN
             $step = New-Step `
                 -Service $Service `

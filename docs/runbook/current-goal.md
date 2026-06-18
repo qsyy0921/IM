@@ -9,11 +9,11 @@
 
 当前主线必须放在第一位：面试导向的后端 + 分布式 + AI 大模型应用底座；默认围绕 AI/RAG/Agent 主链路推进，不要漂回无限生产化 hardening。
 
-当前 active slice：RAG provider boundary / citation verifier first pass 已落；下一步进入 `summary-service`。
+当前 active slice：`summary-service` first read-only EvidencePack summary path 已落；下一步跑真实本地 `retrieval-gateway -> summary-service` adapter smoke，然后进入 `agent-service`。
 
-已完成基线：9 个 IM 后端服务主链路、search-service projection smoke、memory-service group memory / StructuredMemoryEvent projection smoke、retrieval-gateway search + memory -> EvidencePack smoke、EvidencePack field hardening first pass、AI eval harness first pass、rag-service first read-only answer path、真实 RAG adapter smoke、provider boundary 和 citation verifier first pass。
+已完成基线：9 个 IM 后端服务主链路、search-service projection smoke、memory-service group memory / StructuredMemoryEvent projection smoke、retrieval-gateway search + memory -> EvidencePack smoke、EvidencePack field hardening first pass、AI eval harness first pass、rag-service first read-only answer path、真实 RAG adapter smoke、provider boundary 和 citation verifier first pass、summary-service first read-only summary path。
 
-当前开发规则：1. 只做阻塞 AI 底座的 9-service closeout：mutation/tombstone、visibility window、contacts privacy、policy/audit/security 边界；2. EvidencePack 必须保持 source refs、temporal version、visibility / policy boundary，不直接读 message/conversation/private tables；3. 后续依次推进 summary-service -> agent-service -> skill-registry -> mcp-gateway/tool-gateway -> action-executor -> ai-eval execution adapters，且 RAG / summary / Agent 只能消费 EvidencePack。不要把继续开发理解成无限生产级长压、完整 HA、sizing 或 provider-grade 运维；这些进入 hardening backlog，除非用户明确点名。本轮只做能推进这条主线的工作。每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 做互不重叠任务；不全文扫长历史文档，不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
+当前开发规则：1. 只做阻塞 AI 底座的 9-service closeout：mutation/tombstone、visibility window、contacts privacy、policy/audit/security 边界；2. EvidencePack 必须保持 source refs、temporal version、visibility / policy boundary，不直接读 message/conversation/private tables；3. 后续依次推进 summary-service adapter smoke -> agent-service -> skill-registry -> mcp-gateway/tool-gateway -> action-executor -> ai-eval execution adapters，且 RAG / summary / Agent 只能消费 EvidencePack。不要把继续开发理解成无限生产级长压、完整 HA、sizing 或 provider-grade 运维；这些进入 hardening backlog，除非用户明确点名。本轮只做能推进这条主线的工作。每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 做互不重叠任务；不全文扫长历史文档，不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
 ```
 
 ## 当前具体执行目标
@@ -35,7 +35,8 @@ search-service v0.1（第一步，已完成第一轮 smoke）
 -> loadtest/rag + RAG eval execution adapter（已落地）
 -> 真实 RAG adapter smoke（已通过）
 -> provider boundary / citation verifier first pass（已落地）
--> summary-service
+-> summary-service first read-only summary path（已落地）
+-> summary-service adapter smoke
 -> 不做孤立 LLM demo
 ```
 
@@ -55,8 +56,9 @@ search-service v0.1（第一步，已完成第一轮 smoke）
 4. `retrieval-gateway`：第一版真实 smoke 已通过，统一 EvidencePack、权限过滤、引用来源和 temporal version；第一版只通过 search / memory 公开 gRPC 契约聚合，不直接读业务库；policy-service retrieval precheck 已有 first-stage 可选接入；EvidencePack 字段 hardening first pass 已补 source coverage、rerank score、dedupe reason。
 5. `rag-service`：first-stage 只读 answer path、`loadtest/rag`、RAG eval execution adapter、真实 RAG adapter smoke、provider boundary 和 citation verifier first pass 已落；只消费 EvidencePack，返回 citations 和 `generated_by_llm=false`，无 evidence 必须拒答。
 6. AI eval harness：first-stage 低敏 case schema / validator 已落；RAG adapter 已落；后续补 Agent execution adapter。
-7. `summary-service` / Agent / `skill-registry` / `mcp-gateway` / `action-executor`：只消费受控 EvidencePack 和 tool policy，不直接读业务库。
-8. 生产级观测、HA、长压和 sizing：继续作为 hardening backlog 推进，但不阻塞当前 AI 底座路线启动。
+7. `summary-service`：first-stage 只读 summary path 已落；只消费受控 EvidencePack，返回 citations 和 `generated_by_llm=false`，无 evidence 必须拒绝摘要；下一步跑真实 adapter smoke。
+8. Agent / `skill-registry` / `mcp-gateway` / `action-executor`：只消费受控 EvidencePack 和 tool policy，不直接读业务库。
+9. 生产级观测、HA、长压和 sizing：继续作为 hardening backlog 推进，但不阻塞当前 AI 底座路线启动。
 
 新发现的待完成工作必须写入 `docs/runbook/remaining-goals.md`；已完成的工作从该文档移除，并同步到对应 service brief / progress 文档。
 

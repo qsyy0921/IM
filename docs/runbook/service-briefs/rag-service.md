@@ -23,4 +23,4 @@
 下一步：
 
 - 外部 LLM adapter 后续仍必须走 AnswerProvider port 和 citation verifier。
-- 下一步进入 `summary-service`；summary / Agent 仍只能消费 EvidencePack。
+- `summary-service` 已进入 foundation-active；summary / Agent 仍只能消费 EvidencePack。

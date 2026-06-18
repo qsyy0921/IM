@@ -1,0 +1,20 @@
+groups:
+  - name: nexusim-summary-service
+    rules:
+      - alert: NexusIMSummaryServiceDown
+        expr: up{service="summary-service"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: summary-service
+        annotations:
+          summary: "summary-service metrics endpoint is down"
+
+      - alert: NexusIMSummaryServiceInfoMissing
+        expr: absent(nexusim_summary_service_info)
+        for: 2m
+        labels:
+          severity: warning
+          service: summary-service
+        annotations:
+          summary: "summary-service info metric is missing"

@@ -21,6 +21,7 @@ protoc `
     "$ApiProtoDir/nexusim/receipt/v1/receipt_service.proto" `
     "$ApiProtoDir/nexusim/retrieval/v1/retrieval_gateway.proto" `
     "$ApiProtoDir/nexusim/search/v1/search_service.proto" `
+    "$ApiProtoDir/nexusim/summary/v1/summary_service.proto" `
     "$ApiProtoDir/nexusim/conversation/v1/conversation_service.proto" `
     "$ApiProtoDir/nexusim/message/v1/message_error.proto" `
     "$ApiProtoDir/nexusim/message/v1/message_service.proto"

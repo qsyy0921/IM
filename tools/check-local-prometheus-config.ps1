@@ -277,4 +277,15 @@ foreach ($alert in $requiredRAGAlerts) {
     }
 }
 
+$requiredSummaryAlerts = @(
+    "NexusIMSummaryServiceDown",
+    "NexusIMSummaryServiceInfoMissing"
+)
+
+foreach ($alert in $requiredSummaryAlerts) {
+    if ($rulesByService["summary-service"] -notmatch [regex]::Escape($alert)) {
+        throw "Prometheus summary-service rules missing alert: $alert"
+    }
+}
+
 Write-Host "OK   local Prometheus config"

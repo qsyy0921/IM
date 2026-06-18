@@ -26,3 +26,4 @@ services:
       - ./prometheus-memory-service-alerts.yml:/etc/prometheus/rules/memory-service.yml:ro
       - ./prometheus-retrieval-gateway-alerts.yml:/etc/prometheus/rules/retrieval-gateway.yml:ro
       - ./prometheus-rag-service-alerts.yml:/etc/prometheus/rules/rag-service.yml:ro
+      - ./prometheus-summary-service-alerts.yml:/etc/prometheus/rules/summary-service.yml:ro

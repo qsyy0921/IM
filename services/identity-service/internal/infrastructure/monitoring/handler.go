@@ -20,6 +20,7 @@ type Handler struct {
 	outboxRelaySnapshotFn    func() types.OutboxRelayWorkerSnapshot
 	traceStatsFunc           func() TraceSnapshot
 	jwkSet                   any
+	oidcDiscovery            *OIDCDiscovery
 }
 
 func NewHandler(pool *pgxpool.Pool, grpcMetrics ...*GRPCMetrics) *Handler {
@@ -32,6 +33,11 @@ func NewHandler(pool *pgxpool.Pool, grpcMetrics ...*GRPCMetrics) *Handler {
 
 func (h *Handler) WithJWKSet(jwkSet any) *Handler {
 	h.jwkSet = jwkSet
+	return h
+}
+
+func (h *Handler) WithOIDCDiscovery(discovery *OIDCDiscovery) *Handler {
+	h.oidcDiscovery = discovery
 	return h
 }
 
@@ -63,6 +69,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleReady(w, r)
 	case "/.well-known/jwks.json", "/jwks.json":
 		h.handleJWKS(w, r)
+	case "/.well-known/openid-configuration":
+		h.handleOIDCDiscovery(w, r)
 	case "/debug/metrics":
 		h.handleMetrics(w, r)
 	case "/metrics":
@@ -70,6 +78,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func (h *Handler) handleOIDCDiscovery(w http.ResponseWriter, r *http.Request) {
+	if h.oidcDiscovery == nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "oidc discovery is not configured"})
+		return
+	}
+	writeJSON(w, http.StatusOK, h.oidcDiscovery)
 }
 
 func (h *Handler) handleJWKS(w http.ResponseWriter, r *http.Request) {

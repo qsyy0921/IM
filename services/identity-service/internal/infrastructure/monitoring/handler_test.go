@@ -303,6 +303,43 @@ func TestHandlerJWKSNotConfigured(t *testing.T) {
 	}
 }
 
+func TestHandlerOIDCDiscovery(t *testing.T) {
+	handler := NewHandler(nil).WithOIDCDiscovery(&OIDCDiscovery{
+		Issuer:                           "https://identity.nexusim.test",
+		JWKSURI:                          "https://identity.nexusim.test/.well-known/jwks.json",
+		ResponseTypesSupported:           []string{"id_token"},
+		SubjectTypesSupported:            []string{"public"},
+		IDTokenSigningAlgValuesSupported: []string{"RS256"},
+		ClaimsSupported:                  []string{"iss", "sub", "aud"},
+	})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/.well-known/openid-configuration", nil))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", response.Code)
+	}
+	var body OIDCDiscovery
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode oidc discovery: %v", err)
+	}
+	if body.Issuer != "https://identity.nexusim.test" ||
+		body.JWKSURI != "https://identity.nexusim.test/.well-known/jwks.json" ||
+		len(body.IDTokenSigningAlgValuesSupported) != 1 ||
+		body.IDTokenSigningAlgValuesSupported[0] != "RS256" {
+		t.Fatalf("unexpected oidc discovery: %+v", body)
+	}
+}
+
+func TestHandlerOIDCDiscoveryNotConfigured(t *testing.T) {
+	handler := NewHandler(nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/.well-known/openid-configuration", nil))
+
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", response.Code)
+	}
+}
+
 func TestQueryIdentitySnapshotIncludesChallengeRequestLimiterIntegration(t *testing.T) {
 	pool := openMonitoringTestPool(t)
 	ctx := context.Background()

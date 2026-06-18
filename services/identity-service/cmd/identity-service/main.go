@@ -143,12 +143,17 @@ func runGRPC() error {
 	if err != nil {
 		return err
 	}
+	oidcDiscovery, err := identityOIDCDiscoveryFromEnv(signer, jwkSet)
+	if err != nil {
+		return err
+	}
 	debugAddr, err := identityDebugAddrFromEnv()
 	if err != nil {
 		return err
 	}
 	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool, grpcMetrics).
 		WithJWKSet(jwkSet).
+		WithOIDCDiscovery(oidcDiscovery).
 		WithChallengeDeliveryMetrics(challengeDeliveryMetrics).
 		WithTraceStats(traceRuntime.Snapshot))
 	if err != nil {

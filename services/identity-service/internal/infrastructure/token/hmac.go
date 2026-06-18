@@ -154,3 +154,10 @@ func (signer *HMACSigner) signJWT(payload gatewayClaims) (string, error) {
 func (signer *HMACSigner) JWKSet() JWKSet {
 	return JWKSet{Keys: []JWK{}}
 }
+
+func (signer *HMACSigner) Issuer() string {
+	if signer == nil {
+		return ""
+	}
+	return signer.issuer
+}

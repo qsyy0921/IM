@@ -56,6 +56,67 @@ func TestGatewayTokenJWKSetWithAdditionalKeysRejectsSymmetricKeys(t *testing.T) 
 	}
 }
 
+func TestIdentityOIDCDiscoveryDefaultsToDisabled(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_OIDC_DISCOVERY_ENABLED", "")
+	signer, err := tokeninfra.NewJWTSigner("secret", "kid", "https://identity.nexusim.test")
+	if err != nil {
+		t.Fatalf("create signer: %v", err)
+	}
+	discovery, err := identityOIDCDiscoveryFromEnv(signer, tokeninfra.JWKSet{})
+	if err != nil {
+		t.Fatalf("discovery disabled should not fail: %v", err)
+	}
+	if discovery != nil {
+		t.Fatalf("expected nil discovery when disabled, got %+v", discovery)
+	}
+}
+
+func TestIdentityOIDCDiscoveryRequiresPublicJWKS(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_OIDC_DISCOVERY_ENABLED", "true")
+	t.Setenv("NEXUSIM_IDENTITY_OIDC_ISSUER", "https://identity.nexusim.test")
+	signer, err := tokeninfra.NewJWTSigner("secret", "kid", "https://identity.nexusim.test")
+	if err != nil {
+		t.Fatalf("create signer: %v", err)
+	}
+	if _, err := identityOIDCDiscoveryFromEnv(signer, signer.JWKSet()); err == nil {
+		t.Fatal("expected OIDC discovery without public JWKS to fail")
+	}
+}
+
+func TestIdentityOIDCDiscoveryRejectsNonURLIssuer(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_OIDC_DISCOVERY_ENABLED", "true")
+	signer, err := tokeninfra.NewJWTSigner("secret", "kid", "nexusim-identity")
+	if err != nil {
+		t.Fatalf("create signer: %v", err)
+	}
+	jwkSet := tokeninfra.JWKSet{Keys: []tokeninfra.JWK{testGatewayRSAJWK(t, generateGatewayTestRSAKey(t), "current")}}
+	if _, err := identityOIDCDiscoveryFromEnv(signer, jwkSet); err == nil {
+		t.Fatal("expected non-url issuer to fail")
+	}
+}
+
+func TestIdentityOIDCDiscoveryBuildsMetadata(t *testing.T) {
+	t.Setenv("NEXUSIM_IDENTITY_OIDC_DISCOVERY_ENABLED", "true")
+	t.Setenv("NEXUSIM_IDENTITY_OIDC_ISSUER", "")
+	t.Setenv("NEXUSIM_IDENTITY_OIDC_JWKS_URI", "")
+	privateKey := generateGatewayTestRSAKey(t)
+	signer, err := tokeninfra.NewRS256SignerFromPEM(testGatewayRSAPrivateKeyPEM(privateKey), "current", "https://identity.nexusim.test")
+	if err != nil {
+		t.Fatalf("create signer: %v", err)
+	}
+	discovery, err := identityOIDCDiscoveryFromEnv(signer, signer.JWKSet())
+	if err != nil {
+		t.Fatalf("build oidc discovery: %v", err)
+	}
+	if discovery == nil ||
+		discovery.Issuer != "https://identity.nexusim.test" ||
+		discovery.JWKSURI != "https://identity.nexusim.test/.well-known/jwks.json" ||
+		len(discovery.IDTokenSigningAlgValuesSupported) != 1 ||
+		discovery.IDTokenSigningAlgValuesSupported[0] != "RS256" {
+		t.Fatalf("unexpected oidc discovery: %+v", discovery)
+	}
+}
+
 func TestIdentityMFARecoveryRiskPolicyDefaultsToMFAEnv(t *testing.T) {
 	t.Setenv("NEXUSIM_IDENTITY_MFA_MAX_FAILED_ATTEMPTS", "7")
 	t.Setenv("NEXUSIM_IDENTITY_MFA_FAILURE_WINDOW", "21m")

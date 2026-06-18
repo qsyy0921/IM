@@ -22,6 +22,7 @@ import (
 type gatewayTokenSigner interface {
 	SignGatewayToken(types.TokenClaims) (string, error)
 	JWKSet() tokeninfra.JWKSet
+	Issuer() string
 }
 
 type gatewayTokenKeyRingSigner struct {
@@ -35,6 +36,10 @@ func (signer gatewayTokenKeyRingSigner) SignGatewayToken(claims types.TokenClaim
 
 func (signer gatewayTokenKeyRingSigner) JWKSet() tokeninfra.JWKSet {
 	return signer.jwkSet
+}
+
+func (signer gatewayTokenKeyRingSigner) Issuer() string {
+	return signer.current.Issuer()
 }
 
 type gatewayTokenRS256KeyRingConfig struct {

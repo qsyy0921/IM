@@ -94,6 +94,13 @@ func (signer *RS256Signer) JWKSet() JWKSet {
 	}}}
 }
 
+func (signer *RS256Signer) Issuer() string {
+	if signer == nil {
+		return ""
+	}
+	return signer.issuer
+}
+
 func parseRSAPrivateKeyPEM(privateKeyPEM string) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode([]byte(strings.TrimSpace(privateKeyPEM)))
 	if block == nil {

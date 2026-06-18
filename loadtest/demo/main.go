@@ -54,6 +54,9 @@ func main() {
 	flag.StringVar(&cfg.senderUserID, "sender-user-id", "demo-sender", "sender user id")
 	flag.StringVar(&cfg.receiverUserID, "receiver-user-id", "demo-receiver", "receiver user id")
 	flag.StringVar(&cfg.receiverDevice, "receiver-device-id", "demo-device-1", "receiver device id")
+	flag.IntVar(&cfg.virtualUsers, "vus", 1, "logical send batch size used by capacity mode")
+	flag.DurationVar(&cfg.duration, "duration", 0, "run the gateway facade demo send/notify loop until this duration elapses; zero keeps single demo mode")
+	flag.IntVar(&cfg.messageCount, "message-count", 1, "number of messages sent in single demo mode")
 	flag.DurationVar(&cfg.requestTimeout, "request-timeout", 3*time.Second, "per request timeout")
 	flag.DurationVar(&cfg.waitTimeout, "wait-timeout", 20*time.Second, "async wait timeout")
 	flag.DurationVar(&cfg.pollInterval, "poll-interval", 200*time.Millisecond, "poll interval")
@@ -80,6 +83,15 @@ func run(ctx context.Context, cfg config) error {
 	cfg.gatewayAuthMode = strings.ToLower(strings.TrimSpace(cfg.gatewayAuthMode))
 	cfg.gatewayAuthAudience = normalizedGatewayAuthAudience(cfg.gatewayAuthAudience)
 	cfg.pushAuthMode = strings.ToLower(strings.TrimSpace(cfg.pushAuthMode))
+	if cfg.virtualUsers <= 0 {
+		cfg.virtualUsers = 1
+	}
+	if cfg.messageCount <= 0 {
+		cfg.messageCount = 1
+	}
+	if cfg.duration < 0 {
+		return fmt.Errorf("--duration must not be negative")
+	}
 	if strings.TrimSpace(cfg.pgDSN) == "" {
 		return fmt.Errorf("--pg-dsn is required for local demo seed and evidence collection")
 	}
@@ -100,25 +112,28 @@ func run(ctx context.Context, cfg config) error {
 	}
 	started := time.Now().UTC()
 	result := summary{
-		Commit:                 gitOutput("rev-parse", "--short", "HEAD"),
-		CommitFull:             gitOutput("rev-parse", "HEAD"),
-		GitDirty:               strings.TrimSpace(gitOutput("status", "--short")) != "",
-		ResultDir:              cfg.resultDir,
-		TenantID:               cfg.tenantID,
-		ConversationID:         cfg.conversationID,
-		SenderUserID:           cfg.senderUserID,
-		ReceiverUserID:         cfg.receiverUserID,
-		ReceiverDeviceID:       cfg.receiverDevice,
-		ConversationTLSEnabled: cfg.conversationTLS.Enabled(),
-		MessageTLSEnabled:      cfg.messageTLS.Enabled(),
-		DeliveryTLSEnabled:     cfg.deliveryTLS.Enabled(),
-		ReceiptTLSEnabled:      cfg.receiptTLS.Enabled(),
-		PushTLSEnabled:         cfg.pushTLS.Enabled(),
-		VerifiedAuthMetadata:   cfg.verifiedAuthMetadata,
-		GatewayFacade:          cfg.gatewayFacade,
-		GatewayAuthMode:        cfg.gatewayAuthMode,
-		GatewayAuthAudience:    gatewayAuthAudienceSummary(cfg.gatewayAuthMode, cfg.gatewayAuthAudience),
-		StartedAt:              started,
+		Commit:                  gitOutput("rev-parse", "--short", "HEAD"),
+		CommitFull:              gitOutput("rev-parse", "HEAD"),
+		GitDirty:                strings.TrimSpace(gitOutput("status", "--short")) != "",
+		ResultDir:               cfg.resultDir,
+		TenantID:                cfg.tenantID,
+		ConversationID:          cfg.conversationID,
+		SenderUserID:            cfg.senderUserID,
+		ReceiverUserID:          cfg.receiverUserID,
+		ReceiverDeviceID:        cfg.receiverDevice,
+		ConversationTLSEnabled:  cfg.conversationTLS.Enabled(),
+		MessageTLSEnabled:       cfg.messageTLS.Enabled(),
+		DeliveryTLSEnabled:      cfg.deliveryTLS.Enabled(),
+		ReceiptTLSEnabled:       cfg.receiptTLS.Enabled(),
+		PushTLSEnabled:          cfg.pushTLS.Enabled(),
+		VerifiedAuthMetadata:    cfg.verifiedAuthMetadata,
+		GatewayFacade:           cfg.gatewayFacade,
+		GatewayAuthMode:         cfg.gatewayAuthMode,
+		GatewayAuthAudience:     gatewayAuthAudienceSummary(cfg.gatewayAuthMode, cfg.gatewayAuthAudience),
+		CapacityMode:            cfg.duration > 0,
+		CapacityDurationSeconds: cfg.duration.Seconds(),
+		VirtualUsers:            cfg.virtualUsers,
+		StartedAt:               started,
 	}
 
 	pool, err := pgxpool.New(ctx, cfg.pgDSN)
@@ -207,19 +222,20 @@ func run(ctx context.Context, cfg config) error {
 	defer conn.CloseNow()
 	result.ServerHello = hello
 
-	sent, err := sendMessage(ctx, cfg, messageClient)
+	sent, notify, messageCount, err := runSendNotifyLoop(ctx, cfg, messageClient, conn)
 	if err != nil {
-		return finish(cfg, &result, fmt.Errorf("send message: %w", err))
+		return finish(cfg, &result, err)
 	}
 	result.SendMessage = sendSummary{MessageID: sent.GetMessageId(), ConversationSeq: sent.GetConversationSeq()}
-
-	notify, err := waitNotify(ctx, cfg, conn, sent.GetConversationSeq(), sent.GetMessageId())
-	if err != nil {
-		return finish(cfg, &result, fmt.Errorf("wait notify: %w", err))
-	}
 	result.Notify = notify
+	result.MessageCount = messageCount
+	result.NotifyFrameCount = messageCount
 
-	pull, err := pullInboxAtLeast(ctx, cfg, deliveryClient, sent.GetConversationSeq())
+	pullAfterSeq := int64(0)
+	if cfg.duration > 0 {
+		pullAfterSeq = sent.GetConversationSeq() - 1
+	}
+	pull, err := pullInboxAtLeast(ctx, cfg, deliveryClient, pullAfterSeq, sent.GetConversationSeq())
 	if err != nil {
 		return finish(cfg, &result, fmt.Errorf("pull inbox: %w", err))
 	}
@@ -266,6 +282,53 @@ func run(ctx context.Context, cfg config) error {
 	return finish(cfg, &result, nil)
 }
 
+func runSendNotifyLoop(
+	ctx context.Context,
+	cfg config,
+	client messagev1.MessageServiceClient,
+	conn *nhooyr.Conn,
+) (*messagev1.SendMessageResponse, serverFrame, int, error) {
+	deadline := time.Time{}
+	if cfg.duration > 0 {
+		deadline = time.Now().Add(cfg.duration)
+	}
+	var lastSent *messagev1.SendMessageResponse
+	var lastNotify serverFrame
+	messageIndex := 0
+	for {
+		if cfg.duration == 0 && messageIndex >= cfg.messageCount {
+			break
+		}
+		if cfg.duration > 0 && messageIndex > 0 && time.Now().After(deadline) {
+			break
+		}
+		batchSize := 1
+		if cfg.duration > 0 {
+			batchSize = cfg.virtualUsers
+		}
+		for i := 0; i < batchSize; i++ {
+			if cfg.duration == 0 && messageIndex >= cfg.messageCount {
+				break
+			}
+			messageIndex++
+			sent, err := sendMessage(ctx, cfg, client, messageIndex)
+			if err != nil {
+				return nil, serverFrame{}, messageIndex - 1, fmt.Errorf("send message %d: %w", messageIndex, err)
+			}
+			notify, err := waitNotify(ctx, cfg, conn, sent.GetConversationSeq(), sent.GetMessageId())
+			if err != nil {
+				return nil, serverFrame{}, messageIndex - 1, fmt.Errorf("wait notify %d: %w", messageIndex, err)
+			}
+			lastSent = sent
+			lastNotify = notify
+		}
+	}
+	if lastSent == nil {
+		return nil, serverFrame{}, 0, errors.New("no message was sent")
+	}
+	return lastSent, lastNotify, messageIndex, nil
+}
+
 type gatewayConversationClient struct {
 	gatewayv1.GatewayServiceClient
 }
@@ -309,8 +372,8 @@ func createReceiverJoin(ctx context.Context, cfg config, client conversationv1.C
 	})
 }
 
-func sendMessage(ctx context.Context, cfg config, client messagev1.MessageServiceClient) (*messagev1.SendMessageResponse, error) {
-	payload, err := structpb.NewStruct(map[string]any{"text": "NexusIM e2e demo message"})
+func sendMessage(ctx context.Context, cfg config, client messagev1.MessageServiceClient, index int) (*messagev1.SendMessageResponse, error) {
+	payload, err := structpb.NewStruct(map[string]any{"text": fmt.Sprintf("NexusIM e2e demo message %d", index)})
 	if err != nil {
 		return nil, err
 	}
@@ -338,13 +401,13 @@ func sendMessage(ctx context.Context, cfg config, client messagev1.MessageServic
 			RequestId: auth.requestID,
 		},
 		ConversationId: cfg.conversationID,
-		ClientMsgId:    "e2e-demo-message-1",
+		ClientMsgId:    fmt.Sprintf("e2e-demo-message-%d", index),
 		MessageType:    "TEXT",
 		Payload:        payload,
 	})
 }
 
-func pullInboxAtLeast(ctx context.Context, cfg config, client deliveryv1.DeliveryServiceClient, minSeq int64) (pullSummary, error) {
+func pullInboxAtLeast(ctx context.Context, cfg config, client deliveryv1.DeliveryServiceClient, afterSeq int64, minSeq int64) (pullSummary, error) {
 	deadline := time.Now().Add(cfg.waitTimeout)
 	for {
 		requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
@@ -371,7 +434,7 @@ func pullInboxAtLeast(ctx context.Context, cfg config, client deliveryv1.Deliver
 				RequestId: auth.requestID,
 			},
 			ConversationId: cfg.conversationID,
-			AfterSeq:       0,
+			AfterSeq:       afterSeq,
 			Limit:          100,
 		})
 		cancel()

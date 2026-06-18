@@ -43,6 +43,8 @@ func buildCapacitySummary(s summary) *capacitySummary {
 		GatewayAuthMode:          s.GatewayAuthMode,
 		UserFacingOperationCount: operationCount,
 		WebSocketFrameCount:      webSocketFrameCount(s),
+		MessageCount:             observedMessageCount(s),
+		NotifyFrameCount:         observedNotifyFrameCount(s),
 		ItemsPulled:              s.PullInbox.ItemCount,
 		MaxConversationSeq:       maxConversationSeq(s),
 		UnreadBeforeRead:         unreadCount(s.ListBeforeRead),
@@ -59,9 +61,7 @@ func userFacingOperationCount(s summary) int {
 	if s.MemberJoin.ChangeID != "" {
 		count++
 	}
-	if s.SendMessage.MessageID != "" {
-		count++
-	}
+	count += observedMessageCount(s)
 	if s.PullInbox.ItemCount > 0 {
 		count++
 	}
@@ -85,13 +85,31 @@ func webSocketFrameCount(s summary) int {
 	if s.ServerHello.Op != "" {
 		count++
 	}
-	if s.Notify.Op != "" {
-		count++
-	}
+	count += observedNotifyFrameCount(s)
 	if s.WebSocketAck.Op != "" {
 		count++
 	}
 	return count
+}
+
+func observedMessageCount(s summary) int {
+	if s.MessageCount > 0 {
+		return s.MessageCount
+	}
+	if s.SendMessage.MessageID != "" {
+		return 1
+	}
+	return 0
+}
+
+func observedNotifyFrameCount(s summary) int {
+	if s.NotifyFrameCount > 0 {
+		return s.NotifyFrameCount
+	}
+	if s.Notify.Op != "" {
+		return 1
+	}
+	return 0
 }
 
 func maxConversationSeq(s summary) int64 {

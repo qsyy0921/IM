@@ -52,6 +52,10 @@ try {
         Write-Host "FAIL api-gateway capacity suite step must use GatewayService facade in mock auth mode." -ForegroundColor Red
         exit 1
     }
+    if ($apiStep.command_line -notmatch "--duration 10s" -or $apiStep.command_line -notmatch "--vus 2") {
+        Write-Host "FAIL api-gateway capacity suite step must pass duration and VU controls." -ForegroundColor Red
+        exit 1
+    }
     if ($apiStep.requires_runtime_stack -ne $true -or $apiStep.baseline_mode -ne "requires_stack" -or $apiStep.status -ne "skipped_stack_required") {
         Write-Host "FAIL api-gateway capacity suite step must be marked stack-required by default." -ForegroundColor Red
         exit 1

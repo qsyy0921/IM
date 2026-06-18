@@ -3,40 +3,45 @@ package main
 import "time"
 
 type summary struct {
-	Commit                 string                   `json:"commit"`
-	CommitFull             string                   `json:"commit_full"`
-	GitDirty               bool                     `json:"git_dirty"`
-	ResultDir              string                   `json:"result_dir"`
-	TenantID               string                   `json:"tenant_id"`
-	ConversationID         string                   `json:"conversation_id"`
-	SenderUserID           string                   `json:"sender_user_id"`
-	ReceiverUserID         string                   `json:"receiver_user_id"`
-	ReceiverDeviceID       string                   `json:"receiver_device_id"`
-	ConversationTLSEnabled bool                     `json:"conversation_tls_enabled"`
-	MessageTLSEnabled      bool                     `json:"message_tls_enabled"`
-	DeliveryTLSEnabled     bool                     `json:"delivery_tls_enabled"`
-	ReceiptTLSEnabled      bool                     `json:"receipt_tls_enabled"`
-	PushTLSEnabled         bool                     `json:"push_tls_enabled"`
-	VerifiedAuthMetadata   bool                     `json:"verified_auth_metadata"`
-	GatewayFacade          bool                     `json:"gateway_facade"`
-	GatewayAuthMode        string                   `json:"gateway_auth_mode,omitempty"`
-	GatewayAuthAudience    string                   `json:"gateway_auth_audience,omitempty"`
-	StartedAt              time.Time                `json:"started_at"`
-	FinishedAt             time.Time                `json:"finished_at"`
-	Success                bool                     `json:"success"`
-	Error                  string                   `json:"error,omitempty"`
-	ServerHello            serverFrame              `json:"server_hello"`
-	MemberJoin             memberJoinSummary        `json:"member_join"`
-	SendMessage            sendSummary              `json:"send_message"`
-	Notify                 serverFrame              `json:"delivery_notify"`
-	PullInbox              pullSummary              `json:"pull_inbox"`
-	WebSocketAck           serverFrame              `json:"websocket_ack"`
-	MarkRead               markReadSummary          `json:"mark_read"`
-	ListBeforeRead         conversationListSummary  `json:"list_conversations_before_read"`
-	ListAfterRead          conversationListSummary  `json:"list_conversations_after_read"`
-	Postgres               postgresSummary          `json:"postgres"`
-	PolicyAuditKafka       *policyAuditKafkaSummary `json:"policy_audit_kafka,omitempty"`
-	Capacity               *capacitySummary         `json:"capacity_summary,omitempty"`
+	Commit                  string                   `json:"commit"`
+	CommitFull              string                   `json:"commit_full"`
+	GitDirty                bool                     `json:"git_dirty"`
+	ResultDir               string                   `json:"result_dir"`
+	TenantID                string                   `json:"tenant_id"`
+	ConversationID          string                   `json:"conversation_id"`
+	SenderUserID            string                   `json:"sender_user_id"`
+	ReceiverUserID          string                   `json:"receiver_user_id"`
+	ReceiverDeviceID        string                   `json:"receiver_device_id"`
+	ConversationTLSEnabled  bool                     `json:"conversation_tls_enabled"`
+	MessageTLSEnabled       bool                     `json:"message_tls_enabled"`
+	DeliveryTLSEnabled      bool                     `json:"delivery_tls_enabled"`
+	ReceiptTLSEnabled       bool                     `json:"receipt_tls_enabled"`
+	PushTLSEnabled          bool                     `json:"push_tls_enabled"`
+	VerifiedAuthMetadata    bool                     `json:"verified_auth_metadata"`
+	GatewayFacade           bool                     `json:"gateway_facade"`
+	GatewayAuthMode         string                   `json:"gateway_auth_mode,omitempty"`
+	GatewayAuthAudience     string                   `json:"gateway_auth_audience,omitempty"`
+	CapacityMode            bool                     `json:"capacity_mode"`
+	CapacityDurationSeconds float64                  `json:"capacity_duration_seconds,omitempty"`
+	VirtualUsers            int                      `json:"virtual_users,omitempty"`
+	MessageCount            int                      `json:"message_count,omitempty"`
+	NotifyFrameCount        int                      `json:"notify_frame_count,omitempty"`
+	StartedAt               time.Time                `json:"started_at"`
+	FinishedAt              time.Time                `json:"finished_at"`
+	Success                 bool                     `json:"success"`
+	Error                   string                   `json:"error,omitempty"`
+	ServerHello             serverFrame              `json:"server_hello"`
+	MemberJoin              memberJoinSummary        `json:"member_join"`
+	SendMessage             sendSummary              `json:"send_message"`
+	Notify                  serverFrame              `json:"delivery_notify"`
+	PullInbox               pullSummary              `json:"pull_inbox"`
+	WebSocketAck            serverFrame              `json:"websocket_ack"`
+	MarkRead                markReadSummary          `json:"mark_read"`
+	ListBeforeRead          conversationListSummary  `json:"list_conversations_before_read"`
+	ListAfterRead           conversationListSummary  `json:"list_conversations_after_read"`
+	Postgres                postgresSummary          `json:"postgres"`
+	PolicyAuditKafka        *policyAuditKafkaSummary `json:"policy_audit_kafka,omitempty"`
+	Capacity                *capacitySummary         `json:"capacity_summary,omitempty"`
 }
 
 type memberJoinSummary struct {
@@ -105,6 +110,8 @@ type capacitySummary struct {
 	GatewayAuthMode          string  `json:"gateway_auth_mode,omitempty"`
 	UserFacingOperationCount int     `json:"user_facing_operation_count"`
 	WebSocketFrameCount      int     `json:"websocket_frame_count"`
+	MessageCount             int     `json:"message_count"`
+	NotifyFrameCount         int     `json:"notify_frame_count"`
 	ItemsPulled              int     `json:"items_pulled"`
 	MaxConversationSeq       int64   `json:"max_conversation_seq"`
 	UnreadBeforeRead         int64   `json:"unread_before_read"`

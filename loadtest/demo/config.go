@@ -31,6 +31,9 @@ type config struct {
 	senderUserID   string
 	receiverUserID string
 	receiverDevice string
+	virtualUsers   int
+	duration       time.Duration
+	messageCount   int
 
 	requestTimeout time.Duration
 	waitTimeout    time.Duration

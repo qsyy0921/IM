@@ -231,6 +231,9 @@ func TestBuildCapacitySummary(t *testing.T) {
 	if capacity.WebSocketFrameCount != 3 {
 		t.Fatalf("websocket frame count = %d, want 3", capacity.WebSocketFrameCount)
 	}
+	if capacity.MessageCount != 1 || capacity.NotifyFrameCount != 1 {
+		t.Fatalf("unexpected message/notify counts: %+v", capacity)
+	}
 	if capacity.ItemsPulled != 1 || capacity.MaxConversationSeq != 2 {
 		t.Fatalf("unexpected inbox/seq fields: %+v", capacity)
 	}
@@ -241,6 +244,40 @@ func TestBuildCapacitySummary(t *testing.T) {
 		t.Fatalf("unexpected aggregate fields: %+v", capacity)
 	}
 	assertFloatNear(t, capacity.OperationsPerSecond, 3.5)
+}
+
+func TestBuildCapacitySummaryUsesCapacityCounts(t *testing.T) {
+	started := time.Date(2026, 6, 16, 10, 0, 0, 0, time.UTC)
+	s := summary{
+		GatewayFacade:    true,
+		StartedAt:        started,
+		FinishedAt:       started.Add(10 * time.Second),
+		ServerHello:      serverFrame{Op: opServerHello},
+		MemberJoin:       memberJoinSummary{ChangeID: "change-1", BoundarySeq: 1},
+		SendMessage:      sendSummary{MessageID: "msg-last", ConversationSeq: 42},
+		Notify:           serverFrame{Op: opDeliveryNotify, ConversationSeq: 42},
+		MessageCount:     20,
+		NotifyFrameCount: 20,
+		PullInbox:        pullSummary{ItemCount: 1, MaxSeq: 42},
+		WebSocketAck:     serverFrame{Op: opDeliveryAckOK, LastReceivedSeq: 42},
+		MarkRead:         markReadSummary{LastReadSeq: 42},
+		ListBeforeRead:   conversationListSummary{ItemCount: 1},
+		ListAfterRead:    conversationListSummary{ItemCount: 1},
+		Postgres:         postgresSummary{UserInboxCount: 20, UserConversationSummaries: 1},
+		PolicyAuditKafka: &policyAuditKafkaSummary{EventCount: 20},
+	}
+
+	capacity := buildCapacitySummary(s)
+	if capacity == nil {
+		t.Fatal("expected capacity summary")
+	}
+	if capacity.UserFacingOperationCount != 26 {
+		t.Fatalf("operation count = %d, want 26", capacity.UserFacingOperationCount)
+	}
+	if capacity.WebSocketFrameCount != 22 || capacity.MessageCount != 20 || capacity.NotifyFrameCount != 20 {
+		t.Fatalf("unexpected websocket/message counts: %+v", capacity)
+	}
+	assertFloatNear(t, capacity.OperationsPerSecond, 2.6)
 }
 
 func TestBuildCapacitySummaryRequiresPositiveDuration(t *testing.T) {

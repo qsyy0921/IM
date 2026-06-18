@@ -145,6 +145,45 @@ func TestBuildCapacitySummary(t *testing.T) {
 	assertFloatNear(t, capacity.OperationsPerSecond, 7.5)
 }
 
+func TestBuildCapacitySummaryUsesCapacityCounters(t *testing.T) {
+	started := time.Date(2026, 6, 18, 1, 2, 3, 0, time.UTC)
+	result := &summary{
+		CapacityMode:                   true,
+		VUs:                            4,
+		StartedAt:                      started,
+		FinishedAt:                     started.Add(10 * time.Second),
+		CapacityMessageCount:           10,
+		CapacityPullItemCount:          10,
+		CapacityAckCount:               10,
+		CapacityMarkReadCount:          10,
+		CapacityReceiptKafkaEventCount: 20,
+		CapacityLatencySamplesMS:       []float64{1, 5, 10, 20, 50},
+		ReceiptOutbox:                  receiptOutboxStats{Published: 20, Pending: 0, DLQ: 0},
+		DeliveryOutbox:                 outboxStats{Published: 10, Pending: 0, DLQ: 0},
+	}
+
+	capacity := buildCapacitySummary(result)
+	if capacity == nil {
+		t.Fatal("expected capacity summary")
+	}
+	if capacity.VUs != 4 ||
+		capacity.MessageCount != 10 ||
+		capacity.PullItemCount != 10 ||
+		capacity.AckCount != 10 ||
+		capacity.MarkReadCount != 10 ||
+		capacity.ReceiptKafkaEventCount != 20 ||
+		capacity.ReceiptStateQueryCount != 0 ||
+		capacity.ConversationListCallCount != 0 ||
+		capacity.StateMutationCount != 0 {
+		t.Fatalf("unexpected capacity counts: %+v", capacity)
+	}
+	assertFloatNear(t, capacity.OperationsPerSecond, 4)
+	assertFloatNear(t, capacity.MessagesPerSecond, 1)
+	assertFloatNear(t, capacity.ReceiptEventsPerSecond, 2)
+	assertFloatNear(t, capacity.LatencyP95MS, 50)
+	assertFloatNear(t, capacity.LatencyP99MS, 50)
+}
+
 func TestBuildCapacitySummaryRequiresPositiveDuration(t *testing.T) {
 	if got := buildCapacitySummary(&summary{}); got != nil {
 		t.Fatalf("expected nil capacity for empty timestamps, got %+v", got)

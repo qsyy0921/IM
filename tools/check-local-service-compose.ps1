@@ -54,7 +54,9 @@ $requiredEnvironment = @(
     "NEXUSIM_DELIVERY_AUTH_MODE: body",
     "NEXUSIM_RECEIPT_AUTH_MODE: body",
     "NEXUSIM_CONTACTS_AUTH_MODE: body",
-    "NEXUSIM_IDENTITY_ADMIN_AUTH_MODE: body"
+    "NEXUSIM_IDENTITY_ADMIN_AUTH_MODE: body",
+    "NEXUSIM_CONVERSATION_RPC_TIMEOUT: 500ms",
+    "NEXUSIM_POLICY_RPC_TIMEOUT: 2s"
 )
 
 foreach ($entry in $requiredEnvironment) {
@@ -91,7 +93,7 @@ $requiredWorkerEnvironment = @(
     "NEXUSIM_RECEIPT_SERVICE_MODE: outbox-relay",
     "NEXUSIM_CONTACTS_SERVICE_MODE: outbox-relay",
     "NEXUSIM_IDENTITY_SERVICE_MODE: outbox-relay",
-    "NEXUSIM_KAFKA_BROKERS: host.docker.internal:9092"
+    "NEXUSIM_KAFKA_BROKERS: kafka:29092"
 )
 
 foreach ($entry in $requiredWorkerEnvironment) {
@@ -114,6 +116,9 @@ if ($compose -match "NEXUSIM_.*(TOKEN|SECRET|PASSWORD).*:.*(sk-|bearer|token=|pa
 }
 if ($workerCompose -match "NEXUSIM_.*(TOKEN|SECRET|PASSWORD).*:.*(sk-|bearer|token=|password=)") {
     throw "Local service worker compose appears to contain a high-risk secret literal."
+}
+if ($workerCompose -notmatch "name:\s+nexusim-local_default") {
+    throw "Local service worker compose must attach workers to the base infrastructure network for Kafka internal listener access."
 }
 
 & docker compose -f $serviceComposePath config --quiet

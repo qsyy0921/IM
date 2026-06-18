@@ -26,6 +26,9 @@ type summary struct {
 	ReceiptConsumerGroup                     string                  `json:"receipt_consumer_group,omitempty"`
 	ReceiptEventsTopic                       string                  `json:"receipt_events_topic,omitempty"`
 	ReceiptEventsGroup                       string                  `json:"receipt_events_group,omitempty"`
+	CapacityMode                             bool                    `json:"capacity_mode,omitempty"`
+	VUs                                      int                     `json:"vus,omitempty"`
+	ConfiguredDurationSeconds                float64                 `json:"configured_duration_seconds,omitempty"`
 	StartedAt                                time.Time               `json:"started_at"`
 	FinishedAt                               time.Time               `json:"finished_at"`
 	Success                                  bool                    `json:"success"`
@@ -67,6 +70,13 @@ type summary struct {
 	DeliveryOutbox                           outboxStats             `json:"delivery_outbox"`
 	Capacity                                 *capacitySummary        `json:"capacity_summary,omitempty"`
 	LatenciesMS                              map[string]float64      `json:"latencies_ms"`
+	CapacityMessageCount                     int                     `json:"-"`
+	CapacityPullItemCount                    int                     `json:"-"`
+	CapacityAckCount                         int                     `json:"-"`
+	CapacityMarkReadCount                    int                     `json:"-"`
+	CapacityReceiptKafkaEventCount           int                     `json:"-"`
+	CapacityErrorCount                       int                     `json:"-"`
+	CapacityLatencySamplesMS                 []float64               `json:"-"`
 }
 
 type capacitySummary struct {
@@ -88,6 +98,10 @@ type capacitySummary struct {
 	OperationsPerSecond       float64 `json:"operations_per_second"`
 	MessagesPerSecond         float64 `json:"messages_per_second"`
 	ReceiptEventsPerSecond    float64 `json:"receipt_events_per_second"`
+	ErrorCount                int     `json:"error_count,omitempty"`
+	VUs                       int     `json:"vus,omitempty"`
+	LatencyP95MS              float64 `json:"latency_p95_ms,omitempty"`
+	LatencyP99MS              float64 `json:"latency_p99_ms,omitempty"`
 }
 
 type memberJoinSummary struct {

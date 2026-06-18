@@ -399,6 +399,18 @@ function Build-Step {
             $runnerArgsList.Add($ReceiptTarget)
             $runnerArgsList.Add("--result-dir")
             $runnerArgsList.Add($resultDir)
+            $runnerArgsList.Add("--kafka-brokers")
+            $runnerArgsList.Add($KafkaBrokers)
+            $runnerArgsList.Add("--delivery-consumer-group")
+            $runnerArgsList.Add("nexusim-receipt-capacity-delivery-$RunName")
+            $runnerArgsList.Add("--receipt-consumer-group")
+            $runnerArgsList.Add("nexusim-receipt-capacity-receipt-$RunName")
+            $runnerArgsList.Add("--receipt-events-consumer-group")
+            $runnerArgsList.Add("nexusim-receipt-capacity-events-$RunName")
+            $runnerArgsList.Add("--vus")
+            $runnerArgsList.Add([string]$VUs)
+            $runnerArgsList.Add("--duration")
+            $runnerArgsList.Add($Duration)
             Add-ArgIfValue -ArgumentList $runnerArgsList -Name "--pg-dsn" -Value $PGDSN
             $step = New-Step `
                 -Service $Service `

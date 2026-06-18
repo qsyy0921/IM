@@ -23,6 +23,34 @@ func buildCapacitySummary(result *summary) *capacitySummary {
 		return nil
 	}
 	durationSeconds := duration.Seconds()
+	if result.CapacityMode {
+		messageCount := result.CapacityMessageCount
+		operationCount := messageCount +
+			result.CapacityPullItemCount +
+			result.CapacityAckCount +
+			result.CapacityMarkReadCount
+		return &capacitySummary{
+			DurationMS:              float64(duration.Microseconds()) / 1000,
+			MessageCount:            messageCount,
+			PullItemCount:           result.CapacityPullItemCount,
+			AckCount:                result.CapacityAckCount,
+			MarkReadCount:           result.CapacityMarkReadCount,
+			ReceiptKafkaEventCount:  result.CapacityReceiptKafkaEventCount,
+			ReceiptOutboxPublished:  result.ReceiptOutbox.Published,
+			ReceiptOutboxPending:    result.ReceiptOutbox.Pending,
+			ReceiptOutboxDLQ:        result.ReceiptOutbox.DLQ,
+			DeliveryOutboxPublished: result.DeliveryOutbox.Published,
+			DeliveryOutboxPending:   result.DeliveryOutbox.Pending,
+			DeliveryOutboxDLQ:       result.DeliveryOutbox.DLQ,
+			OperationsPerSecond:     ratePerSecond(int64(operationCount), durationSeconds),
+			MessagesPerSecond:       ratePerSecond(int64(messageCount), durationSeconds),
+			ReceiptEventsPerSecond:  ratePerSecond(int64(result.CapacityReceiptKafkaEventCount), durationSeconds),
+			ErrorCount:              result.CapacityErrorCount,
+			VUs:                     result.VUs,
+			LatencyP95MS:            percentile(result.CapacityLatencySamplesMS, 0.95),
+			LatencyP99MS:            percentile(result.CapacityLatencySamplesMS, 0.99),
+		}
+	}
 	messageCount := receiptMessageCount(result)
 	receiptEventCount := len(result.ReceiptKafkaEvents)
 	operationCount := messageCount +

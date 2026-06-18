@@ -40,6 +40,14 @@
                         "note":  "contacts-service stack contact request accept/outbox/Kafka readback 30m local long-run slice with 4 VUs; local evidence only, not production sizing.",
                         "summary_path":  "H:\\NexusIM\\loadtest-results\\capacity-longrun-nine-services-20260618-plan\\contacts-service\\capacity-longrun-campaign-summary.json",
                         "report_path":  "docs\\runbook\\loadtest\\contacts-service\\loadtest-report-20260618-contacts-longrun-slice.md"
+                    },
+                    {
+                        "name":  "receipt-service-longrun-slice-20260618",
+                        "status":  "completed",
+                        "plan_path":  "H:\\NexusIM\\loadtest-results\\capacity-longrun-nine-services-20260618-plan\\capacity-longrun-campaign-plan.json",
+                        "note":  "receipt-service stack SendMessage PullInbox AckDelivery MarkRead outbox Kafka readback 30m local long-run slice with 4 VUs; local evidence only, not production sizing.",
+                        "summary_path":  "H:\\NexusIM\\loadtest-results\\capacity-longrun-nine-services-20260618-plan\\receipt-service\\capacity-longrun-campaign-summary.json",
+                        "report_path":  "docs\\runbook\\loadtest\\receipt-service\\loadtest-report-20260618-receipt-longrun-slice.md"
                     }
                 ]
 }

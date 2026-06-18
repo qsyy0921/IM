@@ -20,6 +20,9 @@ func (p StaticMessagePolicy) DecideMessageAction(
 ) (types.MessageActionDecision, error) {
 	permissionVersion := p.PermissionVersion
 	if permissionVersion <= 0 {
+		permissionVersion = command.ConversationPermissionVersion
+	}
+	if permissionVersion <= 0 {
 		permissionVersion = 1
 	}
 	classification := strings.TrimSpace(p.Classification)

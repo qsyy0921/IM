@@ -32,6 +32,8 @@ type config struct {
 	kafkaBrokers         []string
 	receiptEventsTopic   string
 	receiptEventsGroup   string
+	duration             time.Duration
+	vus                  int
 	verifiedAuthMetadata bool
 	cleanup              bool
 }
@@ -62,6 +64,8 @@ func parseConfig() config {
 	flag.StringVar(&kafkaBrokers, "kafka-brokers", "localhost:9092", "Kafka brokers for receipt event readback")
 	flag.StringVar(&cfg.receiptEventsTopic, "receipt-events-topic", "im.receipt.events", "receipt events topic")
 	flag.StringVar(&cfg.receiptEventsGroup, "receipt-events-consumer-group", "", "receipt event readback consumer group")
+	flag.DurationVar(&cfg.duration, "duration", 0, "capacity run duration; 0 runs the full smoke scenario")
+	flag.IntVar(&cfg.vus, "vus", 1, "capacity virtual users; used when --duration is greater than 0")
 	flag.BoolVar(&cfg.verifiedAuthMetadata, "verified-auth-metadata", envBool(false, "NEXUSIM_RECEIPT_LOADTEST_VERIFIED_AUTH_METADATA"), "send gateway verified identity through user-facing gRPC metadata")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete existing rows for tenant before smoke")
 	flag.Parse()
@@ -73,6 +77,12 @@ func parseConfig() config {
 	}
 	if cfg.pollInterval <= 0 {
 		cfg.pollInterval = 200 * time.Millisecond
+	}
+	if cfg.vus <= 0 {
+		cfg.vus = 1
+	}
+	if cfg.duration > 0 && cfg.waitTimeout < 30*time.Second {
+		cfg.waitTimeout = 30 * time.Second
 	}
 	cfg.kafkaBrokers = splitCSV(kafkaBrokers)
 	return cfg

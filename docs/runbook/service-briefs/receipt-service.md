@@ -20,7 +20,8 @@
 - receipt full-smoke runner 已按 config / model / auth / util / PostgreSQL 读回 / Kafka 读回同 package 拆分，`main.go` 已收敛到约 860 行，避免后续回执和会话列表验证继续堆进单个入口文件。
 - receipt full-smoke summary 已新增 `capacity_summary`，统一输出 actual duration、message/pull/ACK/mark-read/list/mutation/event 计数、outbox 计数和每秒速率；这是容量基线口径，不等于已完成生产容量压测。
 - `capacity-baseline-receipt-stack-20260616` 本地 stack 短基线已跑通：覆盖 message/delivery/receipt relay-consumer 链路、`MarkRead`、receipt state、会话列表 archive/pin/mute，`receipt_outbox PUBLISHED=3/PENDING=0/DLQ=0`、`delivery_outbox PUBLISHED=4/PENDING=0/DLQ=0`，Kafka 读回 3 条 receipt event；报告见 `loadtest/distributed/loadtest-report-20260616-receipt-stack-capacity-baseline.md`。
+- `receipt-service-longrun-slice-20260618` 本地 stack 30m 长跑切片已跑通：4 VUs 覆盖 `SendMessage -> PullInbox -> AckDelivery -> MarkRead -> receipt_outbox -> im.receipt.events`，1824.494 秒内完成 3318 条消息、3318 次 ACK、3318 次 MarkRead、6636 条 receipt Kafka event 读回，`receipt_outbox PUBLISHED=6636/PENDING=0/DLQ=0`、`delivery_outbox PUBLISHED=6636/PENDING=0/DLQ=0`，`operations_per_second=176.462`；报告见 `docs/runbook/loadtest/receipt-service/loadtest-report-20260618-receipt-longrun-slice.md`，原始 summary 在 `H:\NexusIM\loadtest-results`。这是本地长跑证据，不是生产 sizing 或 SLO。
 
 ## 后续
 
-- 会话列表更多产品化能力（更多摘要策略等）、长时间容量曲线；生产级 OTel collector、Alertmanager、SLO dashboard 和容量验证仍属于后续统一观测治理。
+- 会话列表更多产品化能力（更多摘要策略等）；更完整长时间容量曲线、资源曲线和生产 sizing；生产级 OTel collector、Alertmanager、SLO dashboard 和容量验证仍属于后续统一观测治理。

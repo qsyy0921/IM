@@ -24,6 +24,23 @@ func TestCheckMessageActionUseCaseAllowsStaticDecision(t *testing.T) {
 	}
 }
 
+func TestCheckMessageActionUseCaseStaticDecisionUsesConversationPermissionVersion(t *testing.T) {
+	useCase := NewCheckMessageActionUseCase(domain.StaticMessagePolicy{
+		Allowed:        true,
+		Classification: "CONTACT",
+	})
+	command := testPolicyCommand(types.MessageActionSend)
+	command.ConversationPermissionVersion = 42
+
+	result, err := useCase.Execute(context.Background(), command)
+	if err != nil {
+		t.Fatalf("check message action: %v", err)
+	}
+	if !result.Allowed || result.PermissionVersion != 42 || result.Classification != "CONTACT" {
+		t.Fatalf("unexpected decision: %+v", result)
+	}
+}
+
 func TestCheckMessageActionUseCaseDeniesModeratedContentBeforeEvaluator(t *testing.T) {
 	auditor := &fakePolicyDecisionAuditor{}
 	evaluator := &countingEvaluator{

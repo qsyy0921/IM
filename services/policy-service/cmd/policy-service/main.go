@@ -682,12 +682,7 @@ func runGRPC() error {
 	}
 	defer listener.Close()
 
-	policy := domain.StaticMessagePolicy{
-		Allowed:           envBool("NEXUSIM_POLICY_MESSAGE_ALLOWED", true),
-		PermissionVersion: envInt64("NEXUSIM_POLICY_PERMISSION_VERSION", 1),
-		Classification:    envString("NEXUSIM_POLICY_CLASSIFICATION", "INTERNAL"),
-		Reason:            envString("NEXUSIM_POLICY_DENY_REASON", ""),
-	}
+	policy := staticMessagePolicyFromEnv()
 	var evaluator app.MessagePolicyEvaluator = policy
 	var useCaseOptions []app.CheckMessageActionOption
 	var pool *pgxpool.Pool
@@ -764,4 +759,17 @@ func runGRPC() error {
 		return err
 	}
 	return ctx.Err()
+}
+
+func staticMessagePolicyFromEnv() domain.StaticMessagePolicy {
+	permissionVersion := int64(0)
+	if strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_PERMISSION_VERSION")) != "" {
+		permissionVersion = envInt64("NEXUSIM_POLICY_PERMISSION_VERSION", 0)
+	}
+	return domain.StaticMessagePolicy{
+		Allowed:           envBool("NEXUSIM_POLICY_MESSAGE_ALLOWED", true),
+		PermissionVersion: permissionVersion,
+		Classification:    envString("NEXUSIM_POLICY_CLASSIFICATION", "INTERNAL"),
+		Reason:            envString("NEXUSIM_POLICY_DENY_REASON", ""),
+	}
 }

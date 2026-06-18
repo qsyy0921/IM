@@ -165,6 +165,36 @@ func TestPolicyContentModeratorFromEnvRejectsInvalidConfig(t *testing.T) {
 	}
 }
 
+func TestStaticMessagePolicyFromEnvLeavesPermissionVersionUnsetByDefault(t *testing.T) {
+	t.Setenv("NEXUSIM_POLICY_MESSAGE_ALLOWED", "")
+	t.Setenv("NEXUSIM_POLICY_PERMISSION_VERSION", "")
+	t.Setenv("NEXUSIM_POLICY_CLASSIFICATION", "")
+	t.Setenv("NEXUSIM_POLICY_DENY_REASON", "")
+
+	policy := staticMessagePolicyFromEnv()
+	if !policy.Allowed ||
+		policy.PermissionVersion != 0 ||
+		policy.Classification != "INTERNAL" ||
+		policy.Reason != "" {
+		t.Fatalf("unexpected default static policy: %+v", policy)
+	}
+}
+
+func TestStaticMessagePolicyFromEnvUsesConfiguredPermissionVersion(t *testing.T) {
+	t.Setenv("NEXUSIM_POLICY_MESSAGE_ALLOWED", "false")
+	t.Setenv("NEXUSIM_POLICY_PERMISSION_VERSION", "17")
+	t.Setenv("NEXUSIM_POLICY_CLASSIFICATION", "TENANT_RULE")
+	t.Setenv("NEXUSIM_POLICY_DENY_REASON", "blocked")
+
+	policy := staticMessagePolicyFromEnv()
+	if policy.Allowed ||
+		policy.PermissionVersion != 17 ||
+		policy.Classification != "TENANT_RULE" ||
+		policy.Reason != "blocked" {
+		t.Fatalf("unexpected configured static policy: %+v", policy)
+	}
+}
+
 func TestLoadPolicyGRPCCredentialsFromEnvRequiresCertKeyPair(t *testing.T) {
 	clearPolicyGRPCTLSConfig(t)
 	t.Setenv("NEXUSIM_POLICY_GRPC_TLS_CERT_FILE", "server.crt")

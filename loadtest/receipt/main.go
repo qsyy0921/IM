@@ -22,6 +22,8 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+const defaultReceiptTenantID = "tenant-receipt-smoke"
+
 func main() {
 	cfg := parseConfig()
 	if err := run(cfg); err != nil {
@@ -33,6 +35,22 @@ func main() {
 func run(cfg config) error {
 	if cfg.pgDSN == "" {
 		return errors.New("pg-dsn is required")
+	}
+	startedAt := time.Now().UTC()
+	if cfg.duration > 0 {
+		suffix := startedAt.Format("20060102150405")
+		if cfg.tenantID == defaultReceiptTenantID {
+			cfg.tenantID = defaultReceiptTenantID + "-" + suffix
+		}
+		if cfg.receiptEventsGroup == "" {
+			cfg.receiptEventsGroup = "nexusim-receipt-events-capacity-" + suffix
+		}
+		if cfg.deliveryGroup == "" {
+			cfg.deliveryGroup = "nexusim-delivery-capacity-" + suffix
+		}
+		if cfg.receiptGroup == "" {
+			cfg.receiptGroup = "nexusim-receipt-capacity-" + suffix
+		}
 	}
 	if err := os.MkdirAll(cfg.resultDir, 0o755); err != nil {
 		return fmt.Errorf("create result dir: %w", err)
@@ -48,8 +66,10 @@ func run(cfg config) error {
 			return err
 		}
 	}
-	if err := seedConversation(ctx, pool, cfg); err != nil {
-		return err
+	if cfg.duration <= 0 {
+		if err := seedConversation(ctx, pool, cfg); err != nil {
+			return err
+		}
 	}
 
 	conversationDialOption, err := grpctls.DialOption(cfg.conversationTLS, "conversation-tls")
@@ -95,34 +115,41 @@ func run(cfg config) error {
 	receiptClient := receiptv1.NewReceiptServiceClient(receiptConn)
 
 	result := summary{
-		Commit:                 shortCommit(),
-		CommitFull:             fullCommit(),
-		GitDirty:               gitDirty(),
-		GitStatusShort:         gitStatusShort(),
-		ConversationTarget:     cfg.conversationTarget,
-		MessageTarget:          cfg.messageTarget,
-		DeliveryTarget:         cfg.deliveryTarget,
-		ReceiptTarget:          cfg.receiptTarget,
-		ConversationTLSEnabled: cfg.conversationTLS.Enabled(),
-		MessageTLSEnabled:      cfg.messageTLS.Enabled(),
-		DeliveryTLSEnabled:     cfg.deliveryTLS.Enabled(),
-		ReceiptTLSEnabled:      cfg.receiptTLS.Enabled(),
-		VerifiedAuthMetadata:   cfg.verifiedAuthMetadata,
-		ResultDir:              cfg.resultDir,
-		TenantID:               cfg.tenantID,
-		ConversationID:         cfg.conversationID,
-		OwnerUserID:            cfg.ownerUserID,
-		ReceiverUserID:         cfg.receiverUserID,
-		ReceiverDeviceID:       cfg.receiverDeviceID,
-		DeliveryConsumerGroup:  cfg.deliveryGroup,
-		ReceiptConsumerGroup:   cfg.receiptGroup,
-		ReceiptEventsTopic:     cfg.receiptEventsTopic,
-		ReceiptEventsGroup:     cfg.receiptEventsGroup,
-		StartedAt:              time.Now().UTC(),
-		LatenciesMS:            map[string]float64{},
+		Commit:                    shortCommit(),
+		CommitFull:                fullCommit(),
+		GitDirty:                  gitDirty(),
+		GitStatusShort:            gitStatusShort(),
+		ConversationTarget:        cfg.conversationTarget,
+		MessageTarget:             cfg.messageTarget,
+		DeliveryTarget:            cfg.deliveryTarget,
+		ReceiptTarget:             cfg.receiptTarget,
+		ConversationTLSEnabled:    cfg.conversationTLS.Enabled(),
+		MessageTLSEnabled:         cfg.messageTLS.Enabled(),
+		DeliveryTLSEnabled:        cfg.deliveryTLS.Enabled(),
+		ReceiptTLSEnabled:         cfg.receiptTLS.Enabled(),
+		VerifiedAuthMetadata:      cfg.verifiedAuthMetadata,
+		ResultDir:                 cfg.resultDir,
+		TenantID:                  cfg.tenantID,
+		ConversationID:            cfg.conversationID,
+		OwnerUserID:               cfg.ownerUserID,
+		ReceiverUserID:            cfg.receiverUserID,
+		ReceiverDeviceID:          cfg.receiverDeviceID,
+		DeliveryConsumerGroup:     cfg.deliveryGroup,
+		ReceiptConsumerGroup:      cfg.receiptGroup,
+		ReceiptEventsTopic:        cfg.receiptEventsTopic,
+		ReceiptEventsGroup:        cfg.receiptEventsGroup,
+		CapacityMode:              cfg.duration > 0,
+		VUs:                       cfg.vus,
+		ConfiguredDurationSeconds: cfg.duration.Seconds(),
+		StartedAt:                 startedAt,
+		LatenciesMS:               map[string]float64{},
 	}
 
-	if err := executeSmoke(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, receiptClient, &result); err != nil {
+	if cfg.duration > 0 {
+		if err := executeCapacity(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, receiptClient, &result); err != nil {
+			result.Error = err.Error()
+		}
+	} else if err := executeSmoke(ctx, cfg, pool, conversationClient, messageClient, deliveryClient, receiptClient, &result); err != nil {
 		result.Error = err.Error()
 	}
 	result.FinishedAt = time.Now().UTC()
@@ -520,7 +547,7 @@ func createReceiverJoin(
 		ChangeType:            conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_JOIN,
 		TargetRole:            conversationv1.MemberRole_MEMBER_ROLE_MEMBER,
 		ExpectedMemberVersion: 1,
-		IdempotencyKey:        "receipt-smoke-join-receiver",
+		IdempotencyKey:        fmt.Sprintf("receipt-smoke-join-receiver-%s", cfg.conversationID),
 		ConflictPolicy:        conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT,
 		Reason:                "receipt smoke receiver join",
 	})
@@ -538,7 +565,7 @@ func sendMessage(ctx context.Context, cfg config, client messagev1.MessageServic
 	return client.SendMessage(requestCtx, &messagev1.SendMessageRequest{
 		AuthContext:    messageAuth(auth),
 		ConversationId: cfg.conversationID,
-		ClientMsgId:    fmt.Sprintf("receipt-smoke-client-message-%d", index),
+		ClientMsgId:    fmt.Sprintf("receipt-smoke-client-message-%s-%d", cfg.conversationID, index),
 		MessageType:    "TEXT",
 		Payload:        payload,
 	})
@@ -557,10 +584,14 @@ func pullInboxAtLeast(
 		auth := receiverAuth(cfg, "receipt-smoke-pull", "receipt-smoke-pull")
 		requestCtx = withVerifiedAuthMetadata(requestCtx, cfg, auth)
 		begin := time.Now()
+		afterSeq := minSeq - 100
+		if afterSeq < 0 {
+			afterSeq = 0
+		}
 		response, err := client.PullInbox(requestCtx, &deliveryv1.PullInboxRequest{
 			AuthContext:    deliveryAuth(auth),
 			ConversationId: cfg.conversationID,
-			AfterSeq:       0,
+			AfterSeq:       afterSeq,
 			Limit:          100,
 		})
 		latencies = append(latencies, elapsedMS(begin))

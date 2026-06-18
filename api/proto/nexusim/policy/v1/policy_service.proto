@@ -47,4 +47,5 @@ message CheckMessageActionResponse {
   string reason = 8;
   string message_id = 9;
   bool ownership_override = 10;
+  string decision_source = 11;
 }

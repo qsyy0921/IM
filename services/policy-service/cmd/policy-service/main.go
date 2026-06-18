@@ -390,15 +390,16 @@ func runDecisionAuditExport() error {
 		return err
 	}
 	filters := map[string]string{
-		"event_id":       envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_EVENT_ID", ""),
-		"tenant_id":      envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_TENANT_ID", ""),
-		"action":         envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_ACTION", ""),
-		"allowed":        envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_ALLOWED", ""),
-		"classification": envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_CLASSIFICATION", ""),
-		"reason_code":    envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_REASON_CODE", ""),
-		"status":         envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_STATUS", ""),
-		"created_after":  formatOptionalFilterTime(createdAfter),
-		"created_before": formatOptionalFilterTime(createdBefore),
+		"event_id":        envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_EVENT_ID", ""),
+		"tenant_id":       envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_TENANT_ID", ""),
+		"action":          envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_ACTION", ""),
+		"allowed":         envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_ALLOWED", ""),
+		"classification":  envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_CLASSIFICATION", ""),
+		"reason_code":     envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_REASON_CODE", ""),
+		"decision_source": envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_DECISION_SOURCE", ""),
+		"status":          envString("NEXUSIM_POLICY_DECISION_AUDIT_EXPORT_STATUS", ""),
+		"created_after":   formatOptionalFilterTime(createdAfter),
+		"created_before":  formatOptionalFilterTime(createdBefore),
 	}
 	rows, err := postgresinfra.NewOutboxStore(pool).ExportDecisionAudit(ctx, postgresinfra.DecisionAuditExportOptions{
 		EventID:        filters["event_id"],
@@ -407,6 +408,7 @@ func runDecisionAuditExport() error {
 		Allowed:        allowedFilter,
 		Classification: filters["classification"],
 		ReasonCode:     filters["reason_code"],
+		DecisionSource: filters["decision_source"],
 		Status:         filters["status"],
 		CreatedAfter:   createdAfter,
 		CreatedBefore:  createdBefore,
@@ -418,13 +420,14 @@ func runDecisionAuditExport() error {
 	log.Printf("policy-service decision audit export completed rows=%d", len(rows))
 	for _, row := range rows {
 		log.Printf(
-			"policy_decision_audit event_id=%s tenant_id=%s action=%s allowed=%t classification=%s reason_code=%s status=%s permission_version=%d created_at=%s",
+			"policy_decision_audit event_id=%s tenant_id=%s action=%s allowed=%t classification=%s reason_code=%s decision_source=%s status=%s permission_version=%d created_at=%s",
 			row.EventID,
 			row.TenantID,
 			row.Action,
 			row.Allowed,
 			row.Classification,
 			row.ReasonCode,
+			row.DecisionSource,
 			row.Status,
 			row.PermissionVersion,
 			row.CreatedAt.Format(time.RFC3339),

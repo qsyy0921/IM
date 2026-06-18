@@ -78,6 +78,7 @@ func (m KeywordModerator) ModerateMessageContent(
 				PermissionVersion: m.permissionVersion,
 				Classification:    m.classification,
 				Reason:            m.reason,
+				DecisionSource:    types.PolicyDecisionSourceContentModeration,
 			}, true, nil
 		}
 	}

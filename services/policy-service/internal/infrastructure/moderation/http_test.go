@@ -43,7 +43,8 @@ func TestHTTPModeratorDeniesProviderDecision(t *testing.T) {
 		t.Fatalf("moderate message content: %v", err)
 	}
 	if !handled || decision.Allowed || decision.PermissionVersion != 41 ||
-		decision.Classification != "PROVIDER_RISK" || decision.Reason != "provider denied" {
+		decision.Classification != "PROVIDER_RISK" || decision.Reason != "provider denied" ||
+		decision.DecisionSource != types.PolicyDecisionSourceContentModeration {
 		t.Fatalf("unexpected provider decision: handled=%v decision=%+v", handled, decision)
 	}
 	if captured["message_text"] != "hello provider" ||

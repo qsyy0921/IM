@@ -26,7 +26,7 @@ func TestKeywordModeratorDeniesMatchingMessageText(t *testing.T) {
 	if err != nil {
 		t.Fatalf("moderate message content: %v", err)
 	}
-	if !handled || decision.Allowed || decision.PermissionVersion != 12 || decision.Classification != "CONTENT_REVIEW" || decision.Reason != "content rejected" {
+	if !handled || decision.Allowed || decision.PermissionVersion != 12 || decision.Classification != "CONTENT_REVIEW" || decision.Reason != "content rejected" || decision.DecisionSource != types.PolicyDecisionSourceContentModeration {
 		t.Fatalf("unexpected moderation decision: handled=%v decision=%+v", handled, decision)
 	}
 }

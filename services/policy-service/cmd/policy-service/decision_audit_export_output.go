@@ -30,6 +30,7 @@ type decisionAuditExportOutputRow struct {
 	PermissionVersion        int64  `json:"permission_version"`
 	Classification           string `json:"classification"`
 	ReasonCode               string `json:"reason_code,omitempty"`
+	DecisionSource           string `json:"decision_source"`
 	Status                   string `json:"status"`
 	EventType                string `json:"event_type"`
 	EventVersion             string `json:"event_version"`
@@ -63,6 +64,7 @@ func writeDecisionAuditExportOutput(path string, rows []postgresinfra.DecisionAu
 			PermissionVersion:        row.PermissionVersion,
 			Classification:           row.Classification,
 			ReasonCode:               row.ReasonCode,
+			DecisionSource:           row.DecisionSource,
 			Status:                   row.Status,
 			EventType:                row.EventType,
 			EventVersion:             row.EventVersion,

@@ -70,6 +70,7 @@ func (outbox *DecisionAuditOutbox) RecordPolicyDecision(
 	decidedAt := outbox.now()
 	classification := truncateAuditField(strings.TrimSpace(decision.Classification), 128)
 	reasonCode := policyDecisionReasonCode(decision)
+	decisionSource := policyDecisionSource(decision)
 	traceID := truncateAuditField(strings.TrimSpace(command.AuthContext.TraceID), 128)
 	requestID := truncateAuditField(strings.TrimSpace(command.AuthContext.RequestID), 128)
 	messageIDPresent := decision.MessageID != ""
@@ -100,6 +101,7 @@ func (outbox *DecisionAuditOutbox) RecordPolicyDecision(
 		PermissionVersion:        decision.PermissionVersion,
 		Classification:           classification,
 		ReasonCode:               reasonCode,
+		DecisionSource:           decisionSource,
 		TraceID:                  traceID,
 		RequestID:                requestID,
 		DecidedAt:                decidedAt.Format(time.RFC3339Nano),
@@ -127,6 +129,7 @@ INSERT INTO policy_decision_audit_outbox (
     permission_version,
     classification,
     reason_code,
+    decision_source,
     partition_key,
     correlation_id,
     causation_id,
@@ -135,7 +138,7 @@ INSERT INTO policy_decision_audit_outbox (
     created_at,
     available_at,
     updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22::jsonb, $23, $23, $23)
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23::jsonb, $24, $24, $24)
 `, eventID,
 		decision.TenantID,
 		"policy_decision",
@@ -153,6 +156,7 @@ INSERT INTO policy_decision_audit_outbox (
 		decision.PermissionVersion,
 		classification,
 		reasonCode,
+		decisionSource,
 		policyDecisionPartitionKey(decision.TenantID, conversationKey),
 		requestID,
 		requestID,
@@ -181,6 +185,7 @@ type policyDecisionAuditPayload struct {
 	PermissionVersion        int64  `json:"permission_version"`
 	Classification           string `json:"classification"`
 	ReasonCode               string `json:"reason_code,omitempty"`
+	DecisionSource           string `json:"decision_source"`
 	TraceID                  string `json:"trace_id,omitempty"`
 	RequestID                string `json:"request_id,omitempty"`
 	DecidedAt                string `json:"decided_at"`
@@ -222,6 +227,14 @@ func policyDecisionReasonCode(decision types.MessageActionDecision) string {
 		return truncateAuditField(classification, 128)
 	}
 	return "POLICY_DENIED"
+}
+
+func policyDecisionSource(decision types.MessageActionDecision) string {
+	source := strings.TrimSpace(string(decision.DecisionSource))
+	if source == "" {
+		return "UNSPECIFIED"
+	}
+	return truncateAuditField(source, 128)
 }
 
 func policyAuditStableKey(parts ...string) string {

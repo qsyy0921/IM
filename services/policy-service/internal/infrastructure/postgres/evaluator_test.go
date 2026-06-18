@@ -35,6 +35,7 @@ func TestMessagePolicyEvaluatorUsesPostgresRuleIntegration(t *testing.T) {
 	if !decision.Allowed || decision.PermissionVersion != 42 || decision.Classification != "PG_ALLOW" {
 		t.Fatalf("expected postgres allow rule, got %+v", decision)
 	}
+	assertPolicyDecisionSource(t, decision, types.PolicyDecisionSourceExactRule)
 	if decision.TenantID != command.AuthContext.TenantID ||
 		decision.UserID != command.AuthContext.UserID ||
 		decision.ConversationID != command.ConversationID ||
@@ -82,6 +83,7 @@ func TestMessagePolicyEvaluatorFallsBackWhenNoRuleIntegration(t *testing.T) {
 	if !decision.Allowed || decision.PermissionVersion != 9 || decision.Classification != "STATIC_ALLOW" {
 		t.Fatalf("expected static fallback decision, got %+v", decision)
 	}
+	assertPolicyDecisionSource(t, decision, types.PolicyDecisionSourceFallback)
 }
 
 func TestMessagePolicyEvaluatorUsesTenantRuleIntegration(t *testing.T) {
@@ -110,6 +112,7 @@ func TestMessagePolicyEvaluatorUsesTenantRuleIntegration(t *testing.T) {
 		decision.Action != command.Action {
 		t.Fatalf("expected tenant allow rule, got %+v", decision)
 	}
+	assertPolicyDecisionSource(t, decision, types.PolicyDecisionSourceTenantRule)
 }
 
 func TestMessagePolicyEvaluatorUsesTenantDenyDefaultReasonIntegration(t *testing.T) {
@@ -201,6 +204,7 @@ func TestMessagePolicyEvaluatorUserRestrictionOverridesExactAllowIntegration(t *
 		decision.Reason != "user muted" {
 		t.Fatalf("expected user restriction to override exact allow, got %+v", decision)
 	}
+	assertPolicyDecisionSource(t, decision, types.PolicyDecisionSourceUserRestriction)
 }
 
 func TestMessagePolicyEvaluatorTenantQuotaDeniesBeforeExactAllowIntegration(t *testing.T) {
@@ -228,6 +232,7 @@ func TestMessagePolicyEvaluatorTenantQuotaDeniesBeforeExactAllowIntegration(t *t
 		decision.Reason != "tenant quota exceeded" {
 		t.Fatalf("expected tenant quota deny before exact allow, got %+v", decision)
 	}
+	assertPolicyDecisionSource(t, decision, types.PolicyDecisionSourceTenantQuota)
 }
 
 func TestMessagePolicyEvaluatorTenantQuotaAllowsBelowLimitIntegration(t *testing.T) {
@@ -359,6 +364,7 @@ func TestMessagePolicyEvaluatorConversationRoleRuleDeniesLowRoleIntegration(t *t
 	if decision.Allowed || decision.PermissionVersion != command.ConversationPermissionVersion || decision.Classification != "ROLE_ADMIN" || decision.Reason != "conversation role policy denied" {
 		t.Fatalf("expected role deny decision, got %+v", decision)
 	}
+	assertPolicyDecisionSource(t, decision, types.PolicyDecisionSourceConversationRole)
 }
 
 func TestMessagePolicyEvaluatorConversationRoleRuleDeniesInactiveMemberIntegration(t *testing.T) {
@@ -475,6 +481,7 @@ func TestMessagePolicyEvaluatorAllowsMessageOwnershipOverrideIntegration(t *test
 		decision.MessageID != command.MessageID {
 		t.Fatalf("expected ownership override allow, allowed=%v decision=%+v", allowed, decision)
 	}
+	assertPolicyDecisionSource(t, decision, types.PolicyDecisionSourceOwnershipOverride)
 }
 
 func TestMessagePolicyEvaluatorMessageOwnershipOverrideIgnoresLowRoleIntegration(t *testing.T) {
@@ -569,6 +576,7 @@ func TestMessagePolicyEvaluatorContactBlockOverridesTenantRuleIntegration(t *tes
 		decision.Reason != "contact blocked" {
 		t.Fatalf("expected contact block to override tenant allow, got %+v", decision)
 	}
+	assertPolicyDecisionSource(t, decision, types.PolicyDecisionSourceContactProjection)
 }
 
 func TestMessagePolicyEvaluatorDeniesBlockedDirectPeerIntegration(t *testing.T) {
@@ -667,6 +675,13 @@ func TestIsUndefinedTable(t *testing.T) {
 	}
 	if isUndefinedTable(errors.New("plain error")) {
 		t.Fatalf("did not expect plain error to match")
+	}
+}
+
+func assertPolicyDecisionSource(t *testing.T, decision types.MessageActionDecision, want types.PolicyDecisionSource) {
+	t.Helper()
+	if decision.DecisionSource != want {
+		t.Fatalf("expected decision source %s, got %+v", want, decision)
 	}
 }
 

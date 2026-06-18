@@ -17,6 +17,7 @@ type DecisionAuditExportOptions struct {
 	Allowed        *bool
 	Classification string
 	ReasonCode     string
+	DecisionSource string
 	Status         string
 	CreatedAfter   *time.Time
 	CreatedBefore  *time.Time
@@ -38,6 +39,7 @@ type DecisionAuditExportRow struct {
 	PermissionVersion        int64
 	Classification           string
 	ReasonCode               string
+	DecisionSource           string
 	Status                   string
 	EventType                string
 	EventVersion             string
@@ -89,6 +91,10 @@ func (store *OutboxStore) ExportDecisionAudit(ctx context.Context, options Decis
 		args = append(args, reasonCode)
 		clauses = append(clauses, "reason_code = $"+strconv.Itoa(len(args)))
 	}
+	if decisionSource := strings.TrimSpace(options.DecisionSource); decisionSource != "" {
+		args = append(args, decisionSource)
+		clauses = append(clauses, "decision_source = $"+strconv.Itoa(len(args)))
+	}
 	if rawStatus := strings.TrimSpace(options.Status); rawStatus != "" {
 		status := normalizePolicyOutboxStatus(rawStatus)
 		if status == "" {
@@ -129,6 +135,7 @@ SELECT
     permission_version,
     classification,
     reason_code,
+    decision_source,
     status,
     event_type,
     event_version,
@@ -165,6 +172,7 @@ LIMIT $`+strconv.Itoa(len(args)), args...)
 			&row.PermissionVersion,
 			&row.Classification,
 			&row.ReasonCode,
+			&row.DecisionSource,
 			&row.Status,
 			&row.EventType,
 			&row.EventVersion,

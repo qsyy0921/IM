@@ -31,6 +31,7 @@ func TestWriteDecisionAuditExportOutput(t *testing.T) {
 			PermissionVersion:        43,
 			Classification:           "CONTENT_PROVIDER_DENIED",
 			ReasonCode:               "CONTENT_PROVIDER_DENIED",
+			DecisionSource:           "CONTENT_MODERATION",
 			Status:                   "PUBLISHED",
 			EventType:                "policy.message_action_decision.v1",
 			EventVersion:             "v1",
@@ -42,11 +43,12 @@ func TestWriteDecisionAuditExportOutput(t *testing.T) {
 			PublishedAt:              &publishedAt,
 		},
 	}, map[string]string{
-		"tenant_id":      "tenant-a",
-		"allowed":        "false",
-		"created_after":  "2026-06-17T09:00:00Z",
-		"created_before": "2026-06-17T10:00:00Z",
-		"event_id":       "",
+		"tenant_id":       "tenant-a",
+		"allowed":         "false",
+		"decision_source": "CONTENT_MODERATION",
+		"created_after":   "2026-06-17T09:00:00Z",
+		"created_before":  "2026-06-17T10:00:00Z",
+		"event_id":        "",
 	})
 	if err != nil {
 		t.Fatalf("write decision audit export output: %v", err)
@@ -72,6 +74,7 @@ func TestWriteDecisionAuditExportOutput(t *testing.T) {
 		row.Allowed ||
 		row.PermissionVersion != 43 ||
 		row.Classification != "CONTENT_PROVIDER_DENIED" ||
+		row.DecisionSource != "CONTENT_MODERATION" ||
 		row.PublishedAt == "" ||
 		row.CreatedAt == "" {
 		t.Fatalf("unexpected decision audit export row: %+v", row)

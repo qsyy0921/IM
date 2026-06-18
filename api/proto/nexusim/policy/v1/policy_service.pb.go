@@ -272,6 +272,7 @@ type CheckMessageActionResponse struct {
 	Reason            string                 `protobuf:"bytes,8,opt,name=reason,proto3" json:"reason,omitempty"`
 	MessageId         string                 `protobuf:"bytes,9,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
 	OwnershipOverride bool                   `protobuf:"varint,10,opt,name=ownership_override,json=ownershipOverride,proto3" json:"ownership_override,omitempty"`
+	DecisionSource    string                 `protobuf:"bytes,11,opt,name=decision_source,json=decisionSource,proto3" json:"decision_source,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -376,6 +377,13 @@ func (x *CheckMessageActionResponse) GetOwnershipOverride() bool {
 	return false
 }
 
+func (x *CheckMessageActionResponse) GetDecisionSource() string {
+	if x != nil {
+		return x.DecisionSource
+	}
+	return ""
+}
+
 var File_nexusim_policy_v1_policy_service_proto protoreflect.FileDescriptor
 
 const file_nexusim_policy_v1_policy_service_proto_rawDesc = "" +
@@ -399,7 +407,7 @@ const file_nexusim_policy_v1_policy_service_proto_rawDesc = "" +
 	"\x13direct_peer_user_id\x18\x05 \x01(\tR\x10directPeerUserId\x12F\n" +
 	"\x1fconversation_permission_version\x18\x06 \x01(\x03R\x1dconversationPermissionVersion\x123\n" +
 	"\x16message_sender_user_id\x18\a \x01(\tR\x13messageSenderUserId\x12!\n" +
-	"\fmessage_text\x18\b \x01(\tR\vmessageText\"\x8c\x03\n" +
+	"\fmessage_text\x18\b \x01(\tR\vmessageText\"\xb5\x03\n" +
 	"\x1aCheckMessageActionResponse\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12'\n" +
@@ -412,7 +420,8 @@ const file_nexusim_policy_v1_policy_service_proto_rawDesc = "" +
 	"\n" +
 	"message_id\x18\t \x01(\tR\tmessageId\x12-\n" +
 	"\x12ownership_override\x18\n" +
-	" \x01(\bR\x11ownershipOverride*\x97\x01\n" +
+	" \x01(\bR\x11ownershipOverride\x12'\n" +
+	"\x0fdecision_source\x18\v \x01(\tR\x0edecisionSource*\x97\x01\n" +
 	"\rMessageAction\x12\x1e\n" +
 	"\x1aMESSAGE_ACTION_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13MESSAGE_ACTION_SEND\x10\x01\x12\x17\n" +

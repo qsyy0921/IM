@@ -22,6 +22,7 @@ func TestServerCheckMessageAction(t *testing.T) {
 			Allowed:           true,
 			PermissionVersion: 9,
 			Classification:    "INTERNAL",
+			DecisionSource:    types.PolicyDecisionSourceExactRule,
 		},
 	}
 	server := NewServer(executor)
@@ -38,7 +39,7 @@ func TestServerCheckMessageAction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("check message action: %v", err)
 	}
-	if !response.GetAllowed() || response.GetPermissionVersion() != 9 || response.GetAction() != policyv1.MessageAction_MESSAGE_ACTION_SEND {
+	if !response.GetAllowed() || response.GetPermissionVersion() != 9 || response.GetAction() != policyv1.MessageAction_MESSAGE_ACTION_SEND || response.GetDecisionSource() != string(types.PolicyDecisionSourceExactRule) {
 		t.Fatalf("unexpected response: %+v", response)
 	}
 	if executor.command.MessageText != "hello policy" {
@@ -64,7 +65,7 @@ func TestServerCheckMessageActionWithStaticPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("check message action: %v", err)
 	}
-	if !response.GetAllowed() || response.GetPermissionVersion() != 9 || response.GetAction() != policyv1.MessageAction_MESSAGE_ACTION_SEND {
+	if !response.GetAllowed() || response.GetPermissionVersion() != 9 || response.GetAction() != policyv1.MessageAction_MESSAGE_ACTION_SEND || response.GetDecisionSource() != string(types.PolicyDecisionSourceFallback) {
 		t.Fatalf("unexpected response: %+v", response)
 	}
 }

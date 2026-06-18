@@ -209,6 +209,7 @@ func BuildPolicyEvent(message types.OutboxMessage) (*policyeventsv1.PolicyEvent,
 				Classification:           payload.Classification,
 				ReasonCode:               payload.ReasonCode,
 				DecidedAt:                timestamppb.New(payload.decidedAt),
+				DecisionSource:           payload.DecisionSource,
 			},
 		}
 		return event, nil
@@ -232,6 +233,7 @@ type messageActionDecisionPayload struct {
 	PermissionVersion        int64  `json:"permission_version"`
 	Classification           string `json:"classification"`
 	ReasonCode               string `json:"reason_code"`
+	DecisionSource           string `json:"decision_source"`
 	TraceID                  string `json:"trace_id"`
 	RequestID                string `json:"request_id"`
 	DecidedAt                string `json:"decided_at"`

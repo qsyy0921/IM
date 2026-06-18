@@ -174,5 +174,6 @@ func (u CheckMessageActionUseCase) messageOwnershipDecision(
 		PermissionVersion: command.ConversationPermissionVersion,
 		Classification:    "MESSAGE_OWNERSHIP_DENIED",
 		Reason:            "message ownership policy denied",
+		DecisionSource:    types.PolicyDecisionSourceMessageOwnership,
 	}, true, nil
 }

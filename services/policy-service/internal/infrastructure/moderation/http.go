@@ -162,6 +162,7 @@ func (m HTTPModerator) ModerateMessageContent(
 		PermissionVersion: permissionVersion,
 		Classification:    classification,
 		Reason:            reason,
+		DecisionSource:    types.PolicyDecisionSourceContentModeration,
 	}, true, nil
 }
 

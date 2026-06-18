@@ -43,5 +43,6 @@ func (p StaticMessagePolicy) DecideMessageAction(
 		PermissionVersion: permissionVersion,
 		Classification:    classification,
 		Reason:            reason,
+		DecisionSource:    types.PolicyDecisionSourceFallback,
 	}, nil
 }

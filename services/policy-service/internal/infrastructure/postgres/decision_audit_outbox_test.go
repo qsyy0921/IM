@@ -39,6 +39,7 @@ func TestDecisionAuditOutboxRecordsPolicyDecisionIntegration(t *testing.T) {
 		PermissionVersion: 12,
 		Classification:    "CONTACT_BLOCKED",
 		Reason:            "contact blocked",
+		DecisionSource:    types.PolicyDecisionSourceContactProjection,
 	}
 
 	if err := outbox.RecordPolicyDecision(ctx, command, decision); err != nil {
@@ -59,6 +60,7 @@ func TestDecisionAuditOutboxRecordsPolicyDecisionIntegration(t *testing.T) {
 		PermissionVersion int64
 		Classification    string
 		ReasonCode        string
+		DecisionSource    string
 		EventType         string
 		Producer          string
 		PartitionKey      string
@@ -82,6 +84,7 @@ SELECT
     permission_version,
     classification,
     reason_code,
+    decision_source,
     event_type,
     producer,
     partition_key,
@@ -105,6 +108,7 @@ WHERE tenant_id = $1
 		&row.PermissionVersion,
 		&row.Classification,
 		&row.ReasonCode,
+		&row.DecisionSource,
 		&row.EventType,
 		&row.Producer,
 		&row.PartitionKey,
@@ -133,6 +137,7 @@ WHERE tenant_id = $1
 		row.PermissionVersion != 12 ||
 		row.Classification != "CONTACT_BLOCKED" ||
 		row.ReasonCode != "CONTACT_BLOCKED" ||
+		row.DecisionSource != string(types.PolicyDecisionSourceContactProjection) ||
 		row.EventType != policyDecisionAuditEventType ||
 		row.Producer != "policy-service" ||
 		row.PartitionKey != "tenant-policy:"+expectedConversationKey ||
@@ -153,6 +158,7 @@ WHERE tenant_id = $1
 		payload["direct_peer_context_present"] != true ||
 		payload["classification"] != "CONTACT_BLOCKED" ||
 		payload["reason_code"] != "CONTACT_BLOCKED" ||
+		payload["decision_source"] != string(types.PolicyDecisionSourceContactProjection) ||
 		payload["decided_at"] != decidedAt.Format(time.RFC3339Nano) {
 		t.Fatalf("unexpected audit payload: %+v", payload)
 	}

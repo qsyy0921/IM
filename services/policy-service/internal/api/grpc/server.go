@@ -62,6 +62,7 @@ func (s *Server) CheckMessageAction(
 		Classification:    decision.Classification,
 		Reason:            decision.Reason,
 		OwnershipOverride: decision.OwnershipOverride,
+		DecisionSource:    string(decision.DecisionSource),
 	}, nil
 }
 

@@ -47,6 +47,7 @@ func (e MessagePolicyEvaluator) DecideMessageAction(
 			PermissionVersion: edgeVersion,
 			Classification:    "CONTACT_BLOCKED",
 			Reason:            "contact blocked",
+			DecisionSource:    types.PolicyDecisionSourceContactProjection,
 		}, nil
 	}
 
@@ -102,6 +103,7 @@ func (e MessagePolicyEvaluator) lookupUserRestriction(
 		MessageID:      command.MessageID,
 		Action:         command.Action,
 		Allowed:        false,
+		DecisionSource: types.PolicyDecisionSourceUserRestriction,
 	}
 	err := e.pool.QueryRow(ctx, `
 SELECT permission_version, classification, reason
@@ -155,6 +157,7 @@ func (e MessagePolicyEvaluator) lookupRule(
 		ConversationID: command.ConversationID,
 		MessageID:      command.MessageID,
 		Action:         command.Action,
+		DecisionSource: types.PolicyDecisionSourceExactRule,
 	}
 	err := e.pool.QueryRow(ctx, `
 SELECT allowed, permission_version, classification, reason
@@ -196,6 +199,7 @@ func (e MessagePolicyEvaluator) lookupTenantRule(
 		ConversationID: command.ConversationID,
 		MessageID:      command.MessageID,
 		Action:         command.Action,
+		DecisionSource: types.PolicyDecisionSourceTenantRule,
 	}
 	err := e.pool.QueryRow(ctx, `
 SELECT allowed, permission_version, classification, reason
@@ -239,6 +243,7 @@ func (e MessagePolicyEvaluator) applyTenantActionQuota(
 		MessageID:      command.MessageID,
 		Action:         command.Action,
 		Allowed:        false,
+		DecisionSource: types.PolicyDecisionSourceTenantQuota,
 	}
 	var maxDecisions int
 	var recentAllowedDecisions int
@@ -338,6 +343,7 @@ WHERE tenant_id = $1
 		Action:         command.Action,
 		Classification: rule.Classification,
 		Reason:         rule.Reason,
+		DecisionSource: types.PolicyDecisionSourceConversationRole,
 	}
 	memberRole, memberStatus, permissionVersion, found, err := e.lookupProjectedMember(ctx, command)
 	if err != nil {

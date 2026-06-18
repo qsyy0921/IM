@@ -76,5 +76,6 @@ WHERE tenant_id = $1
 		Classification:    rule.Classification,
 		Reason:            rule.Reason,
 		OwnershipOverride: true,
+		DecisionSource:    types.PolicyDecisionSourceOwnershipOverride,
 	}, true, nil
 }

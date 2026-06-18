@@ -65,6 +65,7 @@ func TestCheckMessageActionUseCaseDeniesModeratedContentBeforeEvaluator(t *testi
 			PermissionVersion: 11,
 			Classification:    "CONTENT_MODERATION_DENIED",
 			Reason:            "content moderation policy denied",
+			DecisionSource:    types.PolicyDecisionSourceContentModeration,
 		},
 	}
 	useCase := NewCheckMessageActionUseCase(
@@ -79,7 +80,7 @@ func TestCheckMessageActionUseCaseDeniesModeratedContentBeforeEvaluator(t *testi
 	if err != nil {
 		t.Fatalf("check message action: %v", err)
 	}
-	if result.Allowed || result.Classification != "CONTENT_MODERATION_DENIED" || result.PermissionVersion != 11 {
+	if result.Allowed || result.Classification != "CONTENT_MODERATION_DENIED" || result.PermissionVersion != 11 || result.DecisionSource != types.PolicyDecisionSourceContentModeration {
 		t.Fatalf("unexpected moderation decision: %+v", result)
 	}
 	if evaluator.calls != 0 {
@@ -231,7 +232,8 @@ func TestCheckMessageActionUseCaseDeniesNonSenderMutationBeforeEvaluator(t *test
 	if result.Allowed ||
 		result.PermissionVersion != 7 ||
 		result.Classification != "MESSAGE_OWNERSHIP_DENIED" ||
-		result.Reason != "message ownership policy denied" {
+		result.Reason != "message ownership policy denied" ||
+		result.DecisionSource != types.PolicyDecisionSourceMessageOwnership {
 		t.Fatalf("unexpected ownership deny: %+v", result)
 	}
 	if evaluator.calls != 0 {
@@ -272,6 +274,7 @@ func TestCheckMessageActionUseCaseAllowsNonSenderMutationWithOwnershipOverride(t
 			PermissionVersion: 7,
 			Classification:    "MESSAGE_OWNERSHIP_ROLE_OVERRIDE",
 			OwnershipOverride: true,
+			DecisionSource:    types.PolicyDecisionSourceOwnershipOverride,
 		},
 	}
 	useCase := NewCheckMessageActionUseCase(
@@ -289,7 +292,7 @@ func TestCheckMessageActionUseCaseAllowsNonSenderMutationWithOwnershipOverride(t
 	if err != nil {
 		t.Fatalf("check message action: %v", err)
 	}
-	if !result.Allowed || !result.OwnershipOverride || result.Classification != "MESSAGE_OWNERSHIP_ROLE_OVERRIDE" || result.PermissionVersion != 7 {
+	if !result.Allowed || !result.OwnershipOverride || result.Classification != "MESSAGE_OWNERSHIP_ROLE_OVERRIDE" || result.PermissionVersion != 7 || result.DecisionSource != types.PolicyDecisionSourceOwnershipOverride {
 		t.Fatalf("unexpected ownership override decision: %+v", result)
 	}
 	if evaluator.calls != 0 {

@@ -18,6 +18,21 @@ const (
 	MessageActionDelete MessageAction = "DELETE"
 )
 
+type PolicyDecisionSource string
+
+const (
+	PolicyDecisionSourceFallback          PolicyDecisionSource = "FALLBACK"
+	PolicyDecisionSourceExactRule         PolicyDecisionSource = "EXACT_RULE"
+	PolicyDecisionSourceTenantRule        PolicyDecisionSource = "TENANT_RULE"
+	PolicyDecisionSourceUserRestriction   PolicyDecisionSource = "USER_RESTRICTION"
+	PolicyDecisionSourceTenantQuota       PolicyDecisionSource = "TENANT_QUOTA"
+	PolicyDecisionSourceConversationRole  PolicyDecisionSource = "CONVERSATION_ROLE"
+	PolicyDecisionSourceContactProjection PolicyDecisionSource = "CONTACT_PROJECTION"
+	PolicyDecisionSourceOwnershipOverride PolicyDecisionSource = "OWNERSHIP_OVERRIDE"
+	PolicyDecisionSourceMessageOwnership  PolicyDecisionSource = "MESSAGE_OWNERSHIP"
+	PolicyDecisionSourceContentModeration PolicyDecisionSource = "CONTENT_MODERATION"
+)
+
 type CheckMessageActionCommand struct {
 	AuthContext                   AuthContext
 	ConversationID                ConversationID
@@ -62,4 +77,5 @@ type MessageActionDecision struct {
 	Classification    string
 	Reason            string
 	OwnershipOverride bool
+	DecisionSource    PolicyDecisionSource
 }

@@ -1,6 +1,6 @@
-﻿# File Size Budget Hotspots
+﻿﻿# File Size Budget Hotspots
 
-- Created at: 2026-06-18T04:35:42.2239443Z
+- Created at: 2026-06-18T04:58:50.9567179Z
 - Scope: handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score
 - Files checked: 1190
 - Warnings: 0
@@ -21,10 +21,10 @@
 | docs\architecture\target-architecture-ai.md | docs | 546 | 1200 | 1500 | 45.5 | 36.4 |
 | services\contacts-service\internal\infrastructure\postgres\repository_test.go | test/runner | 1089 | 2500 | 3000 | 43.6 | 36.3 |
 | docs\architecture\target-architecture-timeline.md | docs | 542 | 1200 | 1500 | 45.2 | 36.1 |
+| services\policy-service\internal\infrastructure\postgres\evaluator_test.go | test/runner | 1057 | 2500 | 3000 | 42.3 | 35.2 |
 | docs\runbook\loadtest\message-service\loadtest-report-20260609.md | docs | 528 | 1200 | 1500 | 44 | 35.2 |
 | loadtest\pushgateway\run-local-smoke.ps1 | script/runner | 524 | 1000 | 1500 | 52.4 | 34.9 |
 | services\push-gateway\internal\infrastructure\redisroute\registry_test.go | test/runner | 1047 | 2500 | 3000 | 41.9 | 34.9 |
-| services\policy-service\internal\infrastructure\postgres\evaluator_test.go | test/runner | 1042 | 2500 | 3000 | 41.7 | 34.7 |
 | loadtest\sendmessage\main.go | test/runner | 1024 | 2500 | 3000 | 41 | 34.1 |
 | docs\sdd\delivery-service.md | docs | 510 | 1200 | 1500 | 42.5 | 34 |
 | services\message-service\internal\infrastructure\postgres\repository_mutation_test.go | test/runner | 978 | 2500 | 3000 | 39.1 | 32.6 |

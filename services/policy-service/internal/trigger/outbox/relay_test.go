@@ -41,7 +41,8 @@ func TestBuildPolicyEventMessageActionDecision(t *testing.T) {
 		payload.GetDirectPeerKey() != "peer-key" ||
 		!payload.GetAllowed() ||
 		payload.GetPermissionVersion() != 41 ||
-		payload.GetClassification() != "POLICY_RPC_ALLOWED" {
+		payload.GetClassification() != "POLICY_RPC_ALLOWED" ||
+		payload.GetDecisionSource() != string(types.PolicyDecisionSourceExactRule) {
 		t.Fatalf("unexpected payload: %+v", payload)
 	}
 }
@@ -255,6 +256,7 @@ func testPolicyOutboxMessage(t *testing.T) types.OutboxMessage {
 			"permission_version":41,
 			"classification":"POLICY_RPC_ALLOWED",
 			"reason_code":"",
+			"decision_source":"EXACT_RULE",
 			"trace_id":"trace-policy",
 			"request_id":"request-policy",
 			"decided_at":"2026-06-13T01:02:03Z"

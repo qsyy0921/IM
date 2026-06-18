@@ -219,6 +219,7 @@ type PolicyMessageActionDecisionV1 struct {
 	Classification           string                 `protobuf:"bytes,12,opt,name=classification,proto3" json:"classification,omitempty"`
 	ReasonCode               string                 `protobuf:"bytes,13,opt,name=reason_code,json=reasonCode,proto3" json:"reason_code,omitempty"`
 	DecidedAt                *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=decided_at,json=decidedAt,proto3" json:"decided_at,omitempty"`
+	DecisionSource           string                 `protobuf:"bytes,15,opt,name=decision_source,json=decisionSource,proto3" json:"decision_source,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
@@ -351,6 +352,13 @@ func (x *PolicyMessageActionDecisionV1) GetDecidedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *PolicyMessageActionDecisionV1) GetDecisionSource() string {
+	if x != nil {
+		return x.DecisionSource
+	}
+	return ""
+}
+
 var File_policy_v1_im_policy_events_proto protoreflect.FileDescriptor
 
 const file_policy_v1_im_policy_events_proto_rawDesc = "" +
@@ -375,7 +383,7 @@ const file_policy_v1_im_policy_events_proto_rawDesc = "" +
 	"\voccurred_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"occurredAt\x12q\n" +
 	"\x17message_action_decision\x18\x14 \x01(\v27.nexusim.policy.events.v1.PolicyMessageActionDecisionV1H\x00R\x15messageActionDecisionB\t\n" +
-	"\apayload\"\xc7\x04\n" +
+	"\apayload\"\xf0\x04\n" +
 	"\x1dPolicyMessageActionDecisionV1\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12$\n" +
 	"\x0eactor_user_key\x18\x02 \x01(\tR\factorUserKey\x12\x1d\n" +
@@ -395,7 +403,8 @@ const file_policy_v1_im_policy_events_proto_rawDesc = "" +
 	"\vreason_code\x18\r \x01(\tR\n" +
 	"reasonCode\x129\n" +
 	"\n" +
-	"decided_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\tdecidedAtB?Z=github.com/qsyy0921/IM/schemas/kafka/policy/v1;policyeventsv1b\x06proto3"
+	"decided_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\tdecidedAt\x12'\n" +
+	"\x0fdecision_source\x18\x0f \x01(\tR\x0edecisionSourceB?Z=github.com/qsyy0921/IM/schemas/kafka/policy/v1;policyeventsv1b\x06proto3"
 
 var (
 	file_policy_v1_im_policy_events_proto_rawDescOnce sync.Once

@@ -143,12 +143,14 @@ Audit rows intentionally store low-sensitive decision metadata:
 
 - stable object keys for actor user, device, conversation, message and direct peer context;
 - context-present booleans such as `message_id_present` and `direct_peer_context_present`;
-- action, allowed, permission version, classification and bounded reason code;
+- action, allowed, permission version, classification, stable `decision_source` and bounded reason code;
 - trace id and request id for correlation.
 
 Audit rows must not store message content, raw session id, raw device id, raw direct peer id, raw conversation id, raw message id, raw rule parameters, SQL error text, DSNs, tokens, credentials or free-text provider/body data.
 
 For the first-stage ownership gate, audit rows identify ownership denies by `classification=MESSAGE_OWNERSHIP_DENIED` / `reason_code=MESSAGE_OWNERSHIP_DENIED` and ownership overrides by `classification=MESSAGE_OWNERSHIP_ROLE_OVERRIDE`. Audit rows keep the stable `message_key` and intentionally do not store raw message sender id in this slice. A future audit schema can add a low-sensitive `message_sender_context_present` flag, ownership override flag or sender stable key if operations needs more ownership-specific attribution.
+
+`decision_source` is low-sensitive path metadata. Current values include `FALLBACK`, `EXACT_RULE`, `TENANT_RULE`, `USER_RESTRICTION`, `TENANT_QUOTA`, `CONVERSATION_ROLE`, `CONTACT_PROJECTION`, `MESSAGE_OWNERSHIP`, `OWNERSHIP_OVERRIDE` and `CONTENT_MODERATION`. It is not a free-text reason and must not contain provider body, message content, raw rule parameters or raw user identifiers.
 
 Configuration:
 
@@ -266,6 +268,7 @@ These flags are available in `loadtest/policy`, `loadtest/policycontacts`, and `
 - `allowed`;
 - `permission_version`;
 - `classification`;
+- `decision_source`;
 - `reason`;
 - `message_id` echo for edit / revoke / delete;
 - `ownership_override`: true only when policy-service explicitly authorizes a non-sender `EDIT` / `REVOKE` / `DELETE` via the ownership override rule and fresh member projection.

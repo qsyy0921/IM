@@ -47,4 +47,5 @@ message PolicyMessageActionDecisionV1 {
   string classification = 12;
   string reason_code = 13;
   google.protobuf.Timestamp decided_at = 14;
+  string decision_source = 15;
 }

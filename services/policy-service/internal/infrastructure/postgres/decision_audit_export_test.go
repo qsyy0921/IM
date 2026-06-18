@@ -23,6 +23,7 @@ UPDATE policy_decision_audit_outbox
 SET allowed = false,
     classification = 'CONTENT_PROVIDER_DENIED',
     reason_code = 'CONTENT_PROVIDER_DENIED',
+    decision_source = 'CONTENT_MODERATION',
     status = 'PUBLISHED',
     created_at = $3,
     published_at = $2,
@@ -48,6 +49,7 @@ WHERE id = $1
 		Allowed:        &allowed,
 		Classification: "CONTENT_PROVIDER_DENIED",
 		ReasonCode:     "CONTENT_PROVIDER_DENIED",
+		DecisionSource: "CONTENT_MODERATION",
 		Status:         "published",
 		CreatedAfter:   &createdAfter,
 		CreatedBefore:  &createdBefore,
@@ -66,6 +68,7 @@ WHERE id = $1
 		row.Allowed ||
 		row.Classification != "CONTENT_PROVIDER_DENIED" ||
 		row.ReasonCode != "CONTENT_PROVIDER_DENIED" ||
+		row.DecisionSource != "CONTENT_MODERATION" ||
 		row.Status != types.OutboxStatusPublished ||
 		row.PublishedAt == nil ||
 		!row.MessageIDPresent ||

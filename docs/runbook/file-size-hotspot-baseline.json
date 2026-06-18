@@ -1,7 +1,7 @@
 ﻿{
-    "created_at":  "2026-06-18T07:25:56.8786920Z",
+    "created_at":  "2026-06-18T08:05:38.7996780Z",
     "scope":  "handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score",
-    "file_count":  1201,
+    "file_count":  1203,
     "thresholds":  {
                        "production_warn_lines":  2500,
                        "production_max_lines":  3500,
@@ -108,51 +108,6 @@
                           "Max":  1500,
                           "WarnRatio":  0.4783,
                           "MaxRatio":  0.3827
-                      },
-                      {
-                          "Path":  "docs\\architecture\\target-architecture-ai.md",
-                          "Lines":  546,
-                          "Kind":  "docs",
-                          "Warn":  1200,
-                          "Max":  1500,
-                          "WarnRatio":  0.455,
-                          "MaxRatio":  0.364
-                      },
-                      {
-                          "Path":  "services\\contacts-service\\internal\\infrastructure\\postgres\\repository_test.go",
-                          "Lines":  1089,
-                          "Kind":  "test/runner",
-                          "Warn":  2500,
-                          "Max":  3000,
-                          "WarnRatio":  0.4356,
-                          "MaxRatio":  0.363
-                      },
-                      {
-                          "Path":  "docs\\architecture\\target-architecture-timeline.md",
-                          "Lines":  542,
-                          "Kind":  "docs",
-                          "Warn":  1200,
-                          "Max":  1500,
-                          "WarnRatio":  0.4517,
-                          "MaxRatio":  0.3613
-                      },
-                      {
-                          "Path":  "docs\\runbook\\loadtest\\message-service\\loadtest-report-20260609.md",
-                          "Lines":  528,
-                          "Kind":  "docs",
-                          "Warn":  1200,
-                          "Max":  1500,
-                          "WarnRatio":  0.44,
-                          "MaxRatio":  0.352
-                      },
-                      {
-                          "Path":  "loadtest\\pushgateway\\run-local-smoke.ps1",
-                          "Lines":  524,
-                          "Kind":  "script/runner",
-                          "Warn":  1000,
-                          "Max":  1500,
-                          "WarnRatio":  0.524,
-                          "MaxRatio":  0.3493
                       }
                   ],
     "hotspots":  [

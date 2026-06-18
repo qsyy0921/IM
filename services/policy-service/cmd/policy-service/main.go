@@ -36,7 +36,7 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_POLICY_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("policy-service runtime wiring is idle; set NEXUSIM_POLICY_SERVICE_MODE=grpc, contact-consumer, timeline-consumer, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, decision-audit-export, tenant-quota-audit, tenant-quota-set, rebac-relation-audit, or rebac-relation-set")
+		log.Println("policy-service runtime wiring is idle; set NEXUSIM_POLICY_SERVICE_MODE=grpc, contact-consumer, timeline-consumer, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, decision-audit-export, decision-audit-forward, tenant-quota-audit, tenant-quota-set, rebac-relation-audit, or rebac-relation-set")
 		return nil
 	case "grpc":
 		return runGRPC()
@@ -56,6 +56,8 @@ func run() error {
 		return runOutboxRepairCleanup()
 	case "decision-audit-export":
 		return runDecisionAuditExport()
+	case "decision-audit-forward":
+		return runDecisionAuditForward()
 	case "tenant-quota-audit":
 		return runTenantQuotaAudit()
 	case "tenant-quota-set":

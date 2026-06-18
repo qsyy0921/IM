@@ -1,8 +1,8 @@
 ﻿# File Size Budget Hotspots
 
-- Created at: 2026-06-18T07:25:56.8786920Z
+- Created at: 2026-06-18T08:05:38.7996780Z
 - Scope: handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score
-- Files checked: 1201
+- Files checked: 1203
 - Warnings: 0
 - Failures: 0
 - Hotspots at >= 80% of warning threshold: 0
@@ -19,10 +19,5 @@
 | services\policy-service\internal\infrastructure\postgres\evaluator_test.go | test/runner | 1209 | 2500 | 3000 | 48.4 | 40.3 |
 | docs\sdd\push-gateway.md | docs | 602 | 1200 | 1500 | 50.2 | 40.1 |
 | docs\architecture\target-architecture-platform.md | docs | 574 | 1200 | 1500 | 47.8 | 38.3 |
-| docs\architecture\target-architecture-ai.md | docs | 546 | 1200 | 1500 | 45.5 | 36.4 |
-| services\contacts-service\internal\infrastructure\postgres\repository_test.go | test/runner | 1089 | 2500 | 3000 | 43.6 | 36.3 |
-| docs\architecture\target-architecture-timeline.md | docs | 542 | 1200 | 1500 | 45.2 | 36.1 |
-| docs\runbook\loadtest\message-service\loadtest-report-20260609.md | docs | 528 | 1200 | 1500 | 44 | 35.2 |
-| loadtest\pushgateway\run-local-smoke.ps1 | script/runner | 524 | 1000 | 1500 | 52.4 | 34.9 |
 
 This is a complexity governance snapshot only. Large files are review priorities, not automatic design failures.

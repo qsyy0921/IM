@@ -5,7 +5,7 @@
 ## 短 Goal Prompt
 
 ```text
-持续推进 E:\development\IM 的 NexusIM 项目。当前唯一主线：高并发分布式 IM 后端必要收口 -> search-service -> memory-service -> retrieval-gateway / EvidencePack -> RAG / summary-service -> agent-service -> skill-registry / mcp-gateway / action-executor。当前 active slice：retrieval-gateway / EvidencePack；search-service projection smoke 已通过，memory-service projection smoke 已通过，本轮优先设计并落地统一 search + memory 的 EvidencePack 检索边界，保留权限过滤、source refs、temporal version，不直接读业务库。生产级 HA、长压、sizing、完整 provider 运维后置为 hardening backlog，除非用户明确点名。每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 做互不重叠任务；不全文扫长历史文档，不回滚用户已有修改。
+持续推进 E:\development\IM 的 NexusIM 项目。当前主线必须优先体现：先把已跑通的 9 个 IM 后端服务做必要收口，再转向 AI 大模型应用底座；不要把目标写成无限生产 hardening。主线顺序：9-service closeout（只补阻塞 AI 底座的 mutation/tombstone、visibility window、policy/audit/security 边界）-> search-service（projection smoke passed）-> memory-service（group memory / StructuredMemoryEvent projection smoke passed）-> retrieval-gateway / EvidencePack（当前 active slice）-> RAG / summary-service -> multi-agent：agent-service、skill-registry、mcp-gateway/tool-gateway、action-executor、ai-eval。当前 active slice：retrieval-gateway / EvidencePack。优先跑通真实 search + memory -> RetrieveEvidence smoke；EvidencePack 必须保留 source refs、temporal version、visibility/policy boundary，不直接读 message/conversation/private tables。短期不围绕生产级长压、完整 HA、sizing 或 provider-grade 运维打转；这些进入 hardening backlog，除非用户明确点名。本轮只做能推进这条主线的工作。每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 做互不重叠任务；不全文扫长历史文档，不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
 ```
 
 ## 当前具体执行目标

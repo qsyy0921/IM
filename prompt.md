@@ -7,20 +7,21 @@
 ```text
 持续推进 E:\development\IM 的 NexusIM 项目。
 
-当前唯一主线：高并发分布式 IM 后端必要收口 -> search-service -> memory-service -> retrieval-gateway / EvidencePack -> RAG / summary-service -> agent-service -> skill-registry / mcp-gateway / action-executor。
+当前主线必须优先体现：先把已跑通的 9 个 IM 后端服务做必要收口，再转向 AI 大模型应用底座；不要把目标写成无限生产 hardening。
 
-当前 active slice：retrieval-gateway / EvidencePack。search-service projection smoke 已通过，memory-service projection smoke 已通过；本轮优先设计并落地统一 search + memory 的 EvidencePack 检索边界，保留权限过滤、source refs、temporal version，不直接读业务库。
+主线顺序：
+9-service closeout（只补阻塞 AI 底座的 mutation/tombstone、visibility window、policy/audit/security 边界）
+-> search-service（projection smoke passed）
+-> memory-service（group memory / StructuredMemoryEvent projection smoke passed）
+-> retrieval-gateway / EvidencePack（当前 active slice）
+-> RAG / summary-service
+-> multi-agent：agent-service、skill-registry、mcp-gateway/tool-gateway、action-executor、ai-eval。
 
-短期不再围绕生产级长压、完整 HA、sizing 或 provider-grade 运维打转；这些进入 hardening backlog，除非用户明确点名。
+当前 active slice：retrieval-gateway / EvidencePack。优先跑通真实 search + memory -> RetrieveEvidence smoke；EvidencePack 必须保留 source refs、temporal version、visibility/policy boundary，不直接读 message/conversation/private tables。
 
-当前执行链路：
-1. 9 个已成型后端服务只做阻塞 AI 底座的必要收口，不继续无限硬化。
-2. search-service v0.1 projection smoke 已通过，作为检索底座。
-3. memory-service foundation-active projection smoke 已通过：group memory、StructuredMemoryEvent、source refs、speaker/audience scope、validity windows、supersedes、confidence、review state 已有第一版 source-backed projection。
-4. retrieval-gateway / EvidencePack 是当前 active slice；RAG / summary / Agent 必须等这个边界清楚后再做。
-5. 再进入 RAG / summary-service / agent-service / skill-registry / mcp-gateway / action-executor。
+短期不围绕生产级长压、完整 HA、sizing 或 provider-grade 运维打转；这些进入 hardening backlog，除非用户明确点名。本轮只做能推进这条主线的工作。
 
-本轮只做能推进这条主线的工作。每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 做互不重叠任务；不全文扫长历史文档，不回滚用户已有修改。
+每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 做互不重叠任务；不全文扫长历史文档，不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
 ```
 
 ## 本文件的作用
@@ -29,7 +30,7 @@
 - 具体执行目标维护在 `docs/runbook/current-goal.md`；目标框不要复制长目标。
 - Agent 进度管理规则见 `agent.md`；需要管理项目进度、分配子 agent 或选择下一切片时先读它。
 - `prompt.md` 只负责把 Codex 带到正确入口；`agent.md` 决定本轮需要按需读取和维护哪些项目文档。
-- 当前主线和 active slice 必须在目标框短 Prompt 第一屏明确出现：高并发分布式 IM 后端必要收口 -> search-service smoke passed -> memory-service smoke passed -> retrieval / EvidencePack -> RAG / summary / Agent / skill / MCP / action execution；具体长目标仍由 runbook 维护。
+- 当前主线和 active slice 必须在目标框短 Prompt 第一屏明确出现：9-service closeout -> search-service smoke passed -> memory-service smoke passed -> retrieval / EvidencePack -> RAG / summary -> multi-agent / skill / MCP / action execution；具体长目标仍由 runbook 维护。
 - 具体当前阶段细节不在这里展开，见 `docs/runbook/current-brief.md`。
 - 当前未完成工作不在这里维护，见 `docs/runbook/remaining-goals.md`。
 - 单服务状态不在这里维护，见 `docs/runbook/service-briefs/<service>.md`。
@@ -43,7 +44,7 @@
 
 ## 工作原则
 
-1. 当前唯一主线是高并发分布式 IM 后端必要收口 -> search-service v0.1 -> memory-service v0.1 -> retrieval-gateway / EvidencePack -> RAG / summary-service -> agent-service / skill-registry / mcp-gateway / action-executor；阶段细节以 `docs/runbook/current-brief.md` 和 `docs/runbook/remaining-goals.md` 为准，不在本文件重复维护。
+1. 当前唯一主线是 9-service closeout -> search-service v0.1 -> memory-service v0.1 -> retrieval-gateway / EvidencePack -> RAG / summary-service -> multi-agent / skill-registry / mcp-gateway / action-executor / ai-eval；阶段细节以 `docs/runbook/current-brief.md` 和 `docs/runbook/remaining-goals.md` 为准，不在本文件重复维护。
 2. 小切片闭环：设计、代码、必要测试、文档一起收；短期生产级压测、长周期演练和生产就绪测试后置到明确阶段或用户指定任务。
 3. 降低耦合：不跨服务读内部表，不引入网状同步 RPC，不为了短期功能抽公共包。
 4. 控制复杂度：生产手写文件接近 2500 行、测试或 runner 接近 3000 行时，优先同 package 拆分。

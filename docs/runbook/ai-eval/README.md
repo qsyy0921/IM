@@ -15,6 +15,8 @@ summary, Agent and tool/action boundaries.
   `tools/run-ai-eval-action-external-adapter.ps1`
 - Python worker output-safety adapter: `tools/run-ai-eval-python-worker-adapter.ps1`
 - ai-eval-service recorder smoke: `tools/run-ai-eval-record-run-smoke.ps1`
+- ai-eval-service multi-adapter gate smoke:
+  `tools/run-ai-eval-regression-gate-smoke.ps1`
 - Go-side Python worker adapter smoke: `tools/python-worker-go-adapter-smoke`
 - rag-service service-level Python worker provider smoke:
   `services/rag-service/cmd/rag-python-worker-provider-smoke`
@@ -144,6 +146,17 @@ To record any existing low-sensitive adapter summary:
 .\tools\run-ai-eval-record-run-smoke.ps1 `
   -SummaryPath H:\NexusIM\loadtest-results\<run>\adapter-summary.json
 ```
+
+First-stage multi-adapter regression gate smoke:
+
+```powershell
+.\tools\run-ai-eval-regression-gate-smoke.ps1
+```
+
+This smoke runs profile / Agent output safety and action-executor external HTTP
+adapter evals, records both summaries into `ai-eval-service`, then writes a
+low-sensitive suite-level gate summary. It is a local regression gate skeleton,
+not a production CI gate and not a model-quality benchmark.
 
 First-stage Go-side Python worker adapter smoke:
 

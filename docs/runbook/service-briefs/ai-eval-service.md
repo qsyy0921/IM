@@ -13,6 +13,8 @@ adapter、状态、计数、summary/report 引用和低敏 metadata，方便后�
   wiring。
 - `ai-eval-record-smoke` 与 `run-ai-eval-record-run-smoke.ps1`：profile /
   Agent safety summary -> gRPC `RecordEvalRun` -> `GetEvalRun` / `ListEvalRuns`。
+- `run-ai-eval-regression-gate-smoke.ps1`：profile / Agent safety + action
+  external HTTP adapter summary -> catalog -> low-sensitive gate summary。
 
 边界：
 
@@ -24,5 +26,4 @@ adapter、状态、计数、summary/report 引用和低敏 metadata，方便后�
 
 下一步：
 
-- 做 multi-adapter aggregation / regression gate first path。
-- 扩展 RAG / Agent / Python worker / tool adapter summary 记录；后续再做 CI gate。
+- 做 gate policy manifest / optional service-stack adapter paths；后续再做 CI gate。

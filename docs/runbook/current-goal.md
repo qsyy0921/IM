@@ -28,13 +28,13 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 - Python AI Worker foundation、Go-side candidate adapter smoke、RAG / Summary /
   Agent 服务级 Python candidate guard。
 - profile overgeneralization / Agent output safety eval cases。
-- `ai-eval-service` persistent eval run catalog、RecordEvalRun recorder smoke
-  和报告：`docs/runbook/loadtest/ai-eval-service/`。
+- `ai-eval-service` persistent eval run catalog、RecordEvalRun recorder smoke、
+  multi-adapter regression gate smoke 和报告：`docs/runbook/loadtest/ai-eval-service/`。
 
 下一步默认推进：
 
 ```text
-AI eval multi-adapter aggregation / regression gate first path
+AI eval gate policy manifest / optional service-stack adapter paths
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

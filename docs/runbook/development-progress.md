@@ -34,7 +34,7 @@
 - `skill-registry` first catalog path + PG repository / gRPC runtime / Docker / observability wiring
 - `mcp-gateway` first prepare path + skill catalog check / policy precheck / low-sensitive audit
 - `action-executor` first execution audit path + proposal / approval / prepare audit linkage + local safe adapter + guarded external HTTP provider adapter + external adapter eval
-- `ai-eval-service` first persistent eval run catalog + low-sensitive `RecordEvalRun` / `GetEvalRun` / `ListEvalRuns` + recorder smoke
+- `ai-eval-service` first persistent eval run catalog + low-sensitive `RecordEvalRun` / `GetEvalRun` / `ListEvalRuns` + recorder / multi-adapter gate smoke
 - AI eval harness first-stage case schema / validator + RAG execution adapter + profile / Agent output safety adapter
 - Agent execution eval adapter + low-sensitive tool result projection + local safe tool adapter first path
 - Python AI Worker 边界已由 ADR-036 固定，且 foundation first path 已落：`ai/python` 目录、`IM` conda toolchain、candidate contract helpers、低敏 safety guard、contract validator、candidate-only worker CLI、malformed / unsafe output eval adapter、第一条 worker smoke、Go-side Python candidate adapter smoke，以及 `rag-service` / `summary-service` / `agent-service` 服务级 Python worker candidate guard；Python 只做模型 / 算法 / eval 候选层，Go 继续拥有控制面、状态、审计和持久化
@@ -76,7 +76,7 @@
 -> guarded external HTTP provider adapter first path 已落
 -> external adapter eval / failure smoke cases 已落
 -> profile overgeneralization / Agent output safety eval cases 已落
--> ai-eval-service first persistent eval run catalog / RecordEvalRun recorder smoke
+-> ai-eval-service first persistent eval run catalog / RecordEvalRun recorder / multi-adapter gate smoke
 -> 安全 / 观测 / repair / 运维 hardening
 ```
 
@@ -205,7 +205,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 | `skill-registry` | 已落第一版技能合约目录 | `skill_registry_service.proto`、SDD、migration、六层 skeleton、`UpsertSkill` / `GetSkill` / `ListSkills` app / gRPC adapter、PostgreSQL repository、`grpc` runtime mode、本地 Docker / compose / Prometheus / Grafana wiring 已落地；第一版只登记技能合约，不执行工具、不调用 MCP、不替代 policy-service | `service-briefs/skill-registry.md` |
 | `mcp-gateway` | 已落第一版工具调用 prepare 边界 | `mcp_gateway_service.proto`、SDD、migration、六层 skeleton、`PrepareToolCall` app / gRPC adapter、skill-registry RPC client、policy-service RPC client、PostgreSQL 低敏 audit repository、`grpc` runtime mode、本地 Docker / compose / Prometheus / Grafana wiring 已落地；第一版只做 skill contract 校验、policy precheck 和 audit，不执行外部 MCP tool | `service-briefs/mcp-gateway.md` |
 | `action-executor` | 已落第一版 approved execution audit + Agent approval preflight + result projection + local safe tool adapter + guarded external HTTP adapter + external adapter eval | `action_executor_service.proto`、SDD、migration、六层 skeleton、`ExecuteApprovedAction` app / gRPC adapter、agent-service proposal verification RPC client、skill-registry RPC client、policy-service RPC client、PostgreSQL 低敏 execution audit repository、低敏 `action_executor_tool_results` projection、`nexusim.local.echo` 本地安全 adapter、显式 allowlist + `LOW` risk 的外部 HTTP provider adapter、外部 adapter eval / failure smoke、`grpc` runtime mode、本地 Docker / compose / Prometheus / Grafana wiring 已落地；第一版强制 proposal / approval / prepare audit 关联，并通过 `agent-service.VerifyApprovedAgentProposal` 校验 proposal 已批准且字段匹配；未配置 adapter 的业务 tool 仍 `executed=false`，echo 和 allowlisted HTTP provider tool 可 `SUCCEEDED` 并只记录 output hash，不保存 raw input / provider output | `service-briefs/action-executor.md` |
-| `ai-eval-service` | 已落第一版持久化 eval run catalog 和 RecordEvalRun recorder smoke | `ai_eval_service.proto`、SDD、migration、六层 skeleton、`RecordEvalRun` / `GetEvalRun` / `ListEvalRuns` app / gRPC adapter、PostgreSQL repository、`grpc` runtime mode、本地 Docker / compose / Prometheus / Grafana wiring、`ai-eval-record-smoke` 和 `run-ai-eval-record-run-smoke.ps1` 已落地；第一版只保存低敏 run summary / refs / metadata，不运行 eval，不保存 raw prompt / EvidencePack / model output | `service-briefs/ai-eval-service.md` |
+| `ai-eval-service` | 已落第一版持久化 eval run catalog、RecordEvalRun recorder 和 multi-adapter gate smoke | `ai_eval_service.proto`、SDD、migration、六层 skeleton、`RecordEvalRun` / `GetEvalRun` / `ListEvalRuns` app / gRPC adapter、PostgreSQL repository、`grpc` runtime mode、本地 Docker / compose / Prometheus / Grafana wiring、`ai-eval-record-smoke`、`run-ai-eval-record-run-smoke.ps1` 和 `run-ai-eval-regression-gate-smoke.ps1` 已落地；第一版只保存低敏 run summary / refs / metadata，不运行 eval，不保存 raw prompt / EvidencePack / model output | `service-briefs/ai-eval-service.md` |
 
 ## 剩余目标入口
 

@@ -25,10 +25,10 @@ provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
 ## 当前未完成重点
 
 1. AI eval 回归扩展：
-   `RecordEvalRun` recorder smoke 已能把低敏 eval summary 写入
-   `ai-eval-service` PG catalog。下一步继续做 multi-adapter aggregation /
-   regression gate first path：记录 RAG / Agent / Python worker / tool adapter
-   等多类 summary，形成低敏 suite-level 聚合，不保存 raw prompt、
+   `ai-eval-service` 已能记录单个低敏 summary，并已具备 profile / Agent
+   safety + action-executor external adapter 的 multi-adapter gate smoke。下一步
+   做 gate policy manifest、阈值 / 必跑 suite 列表，以及 RAG / Agent / Python
+   worker 等 service-stack adapter 的可选路径；仍不得保存 raw prompt、
    EvidencePack、model output、用户正文、secret 或 tool input。
    继续补真实 Agent 输出回归、外部 MCP failure fallback、tool/action safety
    cases、profile overgeneralization 和 RAG / summary citation regression。所有

@@ -51,11 +51,14 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
   proposal provider mode 调用 Python worker CLI，只接受 proposal hash /
   citation metadata，最终 proposal、citation verifier、approval 和 audit
   仍由 Go 控制。
+- `action-executor` 外部 HTTP provider guarded adapter first path：默认关闭；
+  显式 `http` mode + allowlist + `LOW` risk 才执行，只发送 tool metadata /
+  `input_sha256`，provider output 继续走 safety gate 和 output hash projection。
 
 下一步默认推进：
 
 ```text
-external MCP / provider tool guarded adapter first path
+external adapter eval / failure smoke cases
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

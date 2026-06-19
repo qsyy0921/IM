@@ -152,13 +152,41 @@ func runGRPC(ctx context.Context) error {
 
 func newToolExecutorFromEnv() (app.ToolExecutorPort, error) {
 	localExecutor := toolinfra.NewLocalSafeExecutor()
+	executors := []toolinfra.Executor{localExecutor}
+	externalExecutor, err := externalMCPAdapterFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	if externalExecutor != nil {
+		executors = append(executors, externalExecutor)
+	}
 	externalFallback, err := toolinfra.NewExternalMCPFallbackExecutor(
 		envString("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_FALLBACK_MODE", toolinfra.ExternalMCPFallbackDisabled),
 	)
 	if err != nil {
 		return nil, err
 	}
-	return toolinfra.NewExecutorChain(localExecutor, externalFallback), nil
+	executors = append(executors, externalFallback)
+	return toolinfra.NewExecutorChain(executors...), nil
+}
+
+func externalMCPAdapterFromEnv() (toolinfra.Executor, error) {
+	mode := strings.ToLower(envString("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_ADAPTER_MODE", "disabled"))
+	mode = strings.ReplaceAll(mode, "_", "-")
+	switch mode {
+	case "disabled":
+		return nil, nil
+	case "http":
+		return toolinfra.NewExternalHTTPExecutor(toolinfra.ExternalHTTPExecutorOptions{
+			Endpoint:         envString("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_HTTP_ENDPOINT", ""),
+			BearerToken:      envString("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_HTTP_BEARER_TOKEN", ""),
+			AllowedTools:     splitCSV(os.Getenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_ALLOWED_TOOLS")),
+			Timeout:          envDuration("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_HTTP_TIMEOUT", 2*time.Second),
+			MaxResponseBytes: int64(envInt("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_HTTP_MAX_RESPONSE_BYTES", int(toolinfra.DefaultExternalHTTPMaxResponseBytes))),
+		})
+	default:
+		return nil, fmt.Errorf("unsupported NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_ADAPTER_MODE %q", mode)
+	}
 }
 
 func actionExecutorModeFromEnv() string {
@@ -245,6 +273,30 @@ func envDuration(name string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return parsed
+}
+
+func envInt(name string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }
 
 func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {

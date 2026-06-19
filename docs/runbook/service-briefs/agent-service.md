@@ -25,4 +25,4 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- external MCP / provider tool guarded adapter first path。
+- external adapter eval / failure smoke cases；Agent 仍只提交 proposal，不直接执行工具。

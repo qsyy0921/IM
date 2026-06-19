@@ -19,14 +19,14 @@ const (
 )
 
 type ExecutorChain struct {
-	executors []executor
+	executors []Executor
 }
 
-type executor interface {
+type Executor interface {
 	ExecuteTool(context.Context, types.ToolExecutionCommand) (types.ToolExecutionResult, error)
 }
 
-func NewExecutorChain(executors ...executor) ExecutorChain {
+func NewExecutorChain(executors ...Executor) ExecutorChain {
 	return ExecutorChain{executors: executors}
 }
 

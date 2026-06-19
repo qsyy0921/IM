@@ -1,6 +1,6 @@
 # action-executor Brief
 
-状态：foundation-active / approved execution audit + local safe adapter.
+状态：foundation-active / approved execution audit + local safe adapter + guarded external HTTP adapter.
 
 ## 已落
 
@@ -12,17 +12,19 @@
 - PostgreSQL `action_executor_execution_audits` 和 `action_executor_tool_results`。
 - 本地安全 `nexusim.local.echo`：仅 `LOW` risk，deterministic 低敏输出，不回显 raw input。
 - 外部 MCP fallback：默认关闭；显式开启后返回稳定低敏失败分类，不落 provider 原文。
+- 外部 HTTP provider adapter：默认关闭；显式 `http` mode + allowlist + `LOW` risk 才执行，
+  只发送 tool metadata / input hash，provider output 继续走 safety gate 和 output hash projection。
 - Tool output safety：malformed / oversize / secret-like / PII-like output fail closed，不入 hash。
 - Docker / Prometheus / Grafana wiring、聚焦测试、PG integration、Agent execution eval adapter。
 
 ## 边界
 
-- 不执行外部 MCP / provider tool；fallback 只证明失败审计语义。
-- 不执行业务写动作；当前唯一可执行 adapter 是 `nexusim.local.echo`。
+- 不执行任意外部 MCP / provider tool；当前只允许显式开启的 LOW-risk HTTP adapter first path。
+- 不自动执行高风险 / 真实业务写动作；执行前仍必须经过 proposal / approval / prepare / policy。
 - 不保存 raw `input_json`、provider secret 或 provider output。
-- 业务 tool 默认 `executed=false`；echo tool 可 `SUCCEEDED`，只证明 output hash / result projection。
+- 未配置 adapter 的业务 tool 默认 `executed=false`；echo 和 allowlisted HTTP provider tool 可 `SUCCEEDED`，只证明 output hash / result projection。
 
 ## 下一步
 
-- 真实外部 MCP / tool adapter、rate limit、DLQ / repair。
-- business tool safety eval adapter cases。
+- external adapter eval / failure smoke cases。
+- rate limit、DLQ / repair。

@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/qsyy0921/IM/services/action-executor/internal/types"
@@ -60,6 +63,61 @@ func TestNewToolExecutorFromEnvCanEnableExternalMCPFailureFallback(t *testing.T)
 	_, err = executor.ExecuteTool(context.Background(), types.ToolExecutionCommand{ToolName: "external.tool"})
 	if !errors.Is(err, types.ErrToolExecutionTimeout) {
 		t.Fatalf("expected timeout fallback, got %v", err)
+	}
+}
+
+func TestNewToolExecutorFromEnvCanEnableExternalHTTPAdapter(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if payload["tool_name"] != "provider.safe.echo" || payload["input_sha256"] != "abc123" {
+			t.Fatalf("unexpected request payload: %+v", payload)
+		}
+		_ = json.NewEncoder(writer).Encode(map[string]any{
+			"schema_version": 1,
+			"status":         "ok",
+			"adapter":        "external-http",
+		})
+	}))
+	defer server.Close()
+	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_ADAPTER_MODE", "http")
+	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_HTTP_ENDPOINT", server.URL)
+	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_ALLOWED_TOOLS", "provider.safe.echo")
+
+	executor, err := newToolExecutorFromEnv()
+	if err != nil {
+		t.Fatalf("new executor: %v", err)
+	}
+	result, err := executor.ExecuteTool(context.Background(), types.ToolExecutionCommand{
+		ToolName:    "provider.safe.echo",
+		RiskLevel:   "LOW",
+		InputSHA256: "abc123",
+	})
+	if err != nil {
+		t.Fatalf("execute external HTTP adapter: %v", err)
+	}
+	if !result.Executed || result.OutputJSON == "" {
+		t.Fatalf("expected executed external result: %+v", result)
+	}
+}
+
+func TestNewToolExecutorFromEnvRequiresExternalHTTPAllowlist(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	defer server.Close()
+	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_ADAPTER_MODE", "http")
+	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_HTTP_ENDPOINT", server.URL)
+
+	if _, err := newToolExecutorFromEnv(); err == nil {
+		t.Fatal("expected missing external HTTP allowlist to fail closed")
+	}
+}
+
+func TestNewToolExecutorFromEnvRejectsUnknownExternalMCPAdapterMode(t *testing.T) {
+	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_ADAPTER_MODE", "live")
+	if _, err := newToolExecutorFromEnv(); err == nil {
+		t.Fatal("expected unknown external adapter mode to fail closed")
 	}
 }
 

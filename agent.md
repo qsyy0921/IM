@@ -1,5 +1,4 @@
 # NexusIM Agent Guide
-
 This file routes Codex and sub-agents without duplicating long project history.
 
 ## Start Every Turn
@@ -66,13 +65,15 @@ adapter, and proposal approval operator first paths are landed. `agent-service` 
 `mcp-gateway.PrepareToolCall`, persists low-sensitive proposal / approval
 metadata, exposes `VerifyApprovedAgentProposal`, and publishes low-sensitive
 `im.agent.events` approval events through the approval outbox relay.
-`action-executor` can execute only the deterministic low-sensitive
-`nexusim.local.echo` local adapter and records output hash only; external
-MCP/provider fallback is classified as stable low-sensitive failure and unsafe
+`action-executor` can execute deterministic low-sensitive `nexusim.local.echo`
+and an explicitly configured LOW-risk external HTTP provider adapter; both
+record output hash only. External MCP/provider fallback is classified as stable low-sensitive failure and unsafe
 tool output is suppressed. Python AI Worker foundation is landed with the
 `ai/python` directory, reproducible `IM` conda toolchain and candidate contract
 guard. RAG/Summary guarded external HTTP boundary, Python worker safety eval,
-Go-side smoke, and RAG/Summary/Agent candidate guards are landed. Next move is external MCP / provider tool guarded adapter first path, or `current-goal.md`.
+Go-side smoke, RAG/Summary/Agent candidate guards, and action-executor guarded
+external HTTP adapter first path are landed. Next move is external adapter eval
+/ failure smoke cases, or `current-goal.md`.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.
@@ -136,4 +137,4 @@ Use tiered gates to avoid wasting time:
 3. Cross-service, generated code, migration, registry, Docker/compose, security
    boundary, or pre-push changes: run `.\tools\check-local.ps1`.
 4. Always end with `git status --short --branch --untracked-files=all`.
-Long load tests, fault drills, production-readiness checks, and full gates run only when risk, scope, or the user asks for them.
+Full gates, long load tests, fault drills and production-readiness checks run only when risk, scope, or the user asks.

@@ -27,4 +27,4 @@
 
 - provider-specific LLM / Python worker 后续仍必须走 AnswerProvider port、prompt
   guard 和 citation verifier。
-- `summary-service` 和 `agent-service` 服务级 Python candidate guard 已落；下一步默认推进 external MCP / provider tool guarded adapter first path。summary / Agent 仍只能消费 EvidencePack。
+- `summary-service`、`agent-service` 和 action-executor guarded external HTTP adapter first path 已落；下一步默认推进 external adapter eval / failure smoke cases。summary / Agent 仍只能消费 EvidencePack。

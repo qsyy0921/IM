@@ -83,6 +83,7 @@ $knownFamilies = @(
     "permission_leak",
     "profile_overgeneralization",
     "llm_output_safety",
+    "python_worker_output_safety",
     "tool_policy_violation",
     "action_execution_safety"
 )
@@ -105,6 +106,8 @@ $knownAssertionTypes = @(
     "must_fallback_to_extractive",
     "must_reject_unsafe_llm_output",
     "must_reject_malformed_llm_output",
+    "must_return_failed_candidate",
+    "must_not_return_raw_output",
     "must_record_execution_audit",
     "must_record_tool_result_projection",
     "must_execute_safe_local_tool",

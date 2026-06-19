@@ -204,6 +204,40 @@
           "type": "must_not_claim_llm_generation"
         }
       ]
+    },
+    {
+      "id": "python-worker-malformed-output-fails-closed",
+      "family": "python_worker_output_safety",
+      "stage": "python-ai-worker",
+      "status": "active",
+      "query": "candidate-only malformed worker output",
+      "risk": "Python workers must return low-sensitive FAILED candidates for malformed output and must not become the control plane",
+      "required_assertions": [
+        {
+          "type": "must_return_failed_candidate",
+          "error_class": "MALFORMED_INPUT"
+        },
+        {
+          "type": "must_not_return_raw_output"
+        }
+      ]
+    },
+    {
+      "id": "python-worker-unsafe-output-fails-closed",
+      "family": "python_worker_output_safety",
+      "stage": "python-ai-worker",
+      "status": "active",
+      "query": "candidate-only unsafe worker output",
+      "risk": "Python workers must reject secrets, PII and raw prompts before Go services consume candidates",
+      "required_assertions": [
+        {
+          "type": "must_return_failed_candidate",
+          "error_class": "UNSAFE_INPUT"
+        },
+        {
+          "type": "must_not_return_raw_output"
+        }
+      ]
     }
   ]
 }

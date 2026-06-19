@@ -9,6 +9,7 @@ summary, Agent and tool/action boundaries.
 - Validator: `tools/validate-ai-eval-cases.ps1`
 - RAG execution adapter: `tools/run-ai-eval-rag-adapter.ps1`
 - Agent execution adapter: `tools/run-ai-eval-agent-adapter.ps1`
+- Python worker output-safety adapter: `tools/run-ai-eval-python-worker-adapter.ps1`
 - Scope: first-stage schema + local execution coverage only; not a production
   benchmark, not a model-quality claim, and not a long-running eval platform.
 
@@ -19,7 +20,8 @@ summary, Agent and tool/action boundaries.
   at least one `required_assertions` entry.
 - Cases must test failure classes that matter to RAG / Agent safety:
   retrieval miss, temporal version, attribution, permission leak, profile
-  overgeneralization, tool policy violation and action execution safety.
+  overgeneralization, LLM output safety, Python worker output safety,
+  tool policy violation and action execution safety.
 - Do not include raw message bodies, secrets, bearer tokens, emails or phone
   numbers.
 
@@ -76,3 +78,14 @@ result-projection boundary and local safe tool output path only. External MCP
 fallback and unsafe output suppression are currently covered by action-executor
 focused tests; the eval adapter still does not execute external MCP/provider
 tools.
+
+First-stage Python worker output-safety adapter:
+
+```powershell
+.\tools\run-ai-eval-python-worker-adapter.ps1 `
+  -Python C:\Users\10495\anaconda3\envs\IM\python.exe
+```
+
+This adapter calls the local candidate-only Python worker CLI and verifies that
+malformed and unsafe inputs return low-sensitive `FAILED` candidates. It does
+not call external providers, databases or Go services.

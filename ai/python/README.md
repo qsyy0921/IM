@@ -33,6 +33,7 @@ ai/python/
   contracts/
     worker-candidate.schema.json
   scripts/
+    run_candidate_worker.py
     validate_contracts.py
   tests/
 ```
@@ -46,6 +47,7 @@ conda env create -f ai/python/environment.yml
 conda activate IM
 python -m pytest ai/python/tests -q
 python ai/python/scripts/validate_contracts.py
+python ai/python/scripts/run_candidate_worker.py <low-sensitive-request.json>
 python -m ruff check ai/python
 python -m mypy ai/python/nexusim_ai_common ai/python/scripts
 ```
@@ -65,8 +67,14 @@ Run this repo-level guard when changing Python worker foundations:
 
 ```powershell
 .\tools\check-python-ai-worker-boundary.ps1
+.\tools\run-python-ai-worker-smoke.ps1 -Python C:\Users\10495\anaconda3\envs\IM\python.exe
+.\tools\run-ai-eval-python-worker-adapter.ps1 -Python C:\Users\10495\anaconda3\envs\IM\python.exe
 ```
 
 The guard is intentionally small. It protects the first-stage boundary:
 candidate-only Python, Go-owned control plane, no direct IM PostgreSQL table
 access from Python workers, and a reproducible `IM` conda environment.
+
+The first worker smoke and eval adapter prove only local candidate contract
+safety: malformed / unsafe inputs fail closed, and successful candidates return
+hashes and source refs rather than raw output text.

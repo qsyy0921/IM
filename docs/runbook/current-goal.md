@@ -37,12 +37,13 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
   helpers、低敏安全检查和 `tools/check-python-ai-worker-boundary.ps1`。
 - RAG/Summary guarded external HTTP LLM boundary：prompt 只能来自 EvidencePack，
   provider failure 回退 extractive，unsafe / malformed output fail closed。
+- Python worker malformed / unsafe output eval coverage 和第一条 candidate-only
+  worker smoke。
 
 下一步默认推进：
 
 ```text
-Python worker malformed / unsafe output eval coverage
--> first Python worker smoke
+Go-side Python candidate adapter / first integration
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

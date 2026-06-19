@@ -71,9 +71,9 @@ metadata, exposes `VerifyApprovedAgentProposal`, and publishes low-sensitive
 MCP/provider fallback is classified as stable low-sensitive failure and unsafe
 tool output is suppressed. Python AI Worker foundation is landed with the
 `ai/python` directory, reproducible `IM` conda toolchain and candidate contract
-guard. RAG/Summary guarded external HTTP LLM boundary is landed. Next move is
-Python worker malformed / unsafe output eval coverage, first worker smoke, or
-the next AI mainline task from `current-goal.md`.
+guard. RAG/Summary guarded external HTTP LLM boundary, Python worker output
+safety eval and first candidate-only smoke are landed. Next move is Go-side
+Python candidate adapter / first integration, or the next AI mainline task from `current-goal.md`.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.

@@ -3,8 +3,7 @@
 状态：foundation-active / first persistent eval run catalog.
 
 定位：AI eval harness 的低敏持久化目录。它保存 eval run 的 suite、stage、
-adapter、状态、计数、summary/report 引用和低敏 metadata，方便后续把本地 eval
-脚本接成可查询、可审计、可回归的服务边界。
+adapter、状态、计数、summary/report 引用和低敏 metadata。
 
 当前已落：
 
@@ -18,13 +17,12 @@ adapter、状态、计数、summary/report 引用和低敏 metadata，方便后�
   读回、禁止持久化字段和可选 service-stack adapter。
 - gate runner 已支持显式 optional adapters；Python optional path 和 RAG /
   Agent service-stack live gate 已通过并登记到 catalog。
+- `check-ai-eval-regression-gate.ps1` 已接入 `check-local`，只跑 CI-safe
+  required adapters，不启动 Docker / PostgreSQL / live RAG-Agent stack。
 
-边界：
-
-- 不运行 eval。
-- 不调用 LLM / Python worker / tool provider。
+边界：不运行 eval，不调用 LLM / Python worker / tool provider。
 - 不保存 raw EvidencePack、raw prompt、raw model output、用户正文、secret 或
   tool input。
 - 不授权业务动作；真实动作仍走 policy、proposal / approval、executor 和 audit。
 
-下一步：做 CI gate skeleton；后续继续扩 RAG / Agent regression cases。
+下一步：继续扩 RAG / Agent regression cases。

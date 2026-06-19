@@ -21,6 +21,8 @@ summary, Agent and tool/action boundaries.
   `tools/validate-ai-eval-gate-policy.ps1`
 - ai-eval-service multi-adapter gate smoke:
   `tools/run-ai-eval-regression-gate-smoke.ps1`
+- CI-safe ai-eval regression gate:
+  `tools/check-ai-eval-regression-gate.ps1`
 - Go-side Python worker adapter smoke: `tools/python-worker-go-adapter-smoke`
 - rag-service service-level Python worker provider smoke:
   `services/rag-service/cmd/rag-python-worker-provider-smoke`
@@ -166,6 +168,16 @@ safety and action-executor external HTTP adapter evals, records both summaries
 into `ai-eval-service`, then writes a low-sensitive suite-level gate summary. It
 is a local regression gate skeleton, not a production CI gate and not a
 model-quality benchmark.
+
+CI-safe local gate:
+
+```powershell
+.\tools\check-ai-eval-regression-gate.ps1
+```
+
+This check validates the case schema and gate policy, runs only the required
+CI-safe adapters, and is now included by `check-local`. It does not connect to
+PostgreSQL, start Docker or run live RAG / Agent service-stack adapters.
 
 Optional adapters are opt-in so normal local gates do not require a full service
 stack:

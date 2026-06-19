@@ -31,13 +31,13 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 - `ai-eval-service` persistent eval run catalog、RecordEvalRun recorder smoke、
   multi-adapter regression gate smoke、gate policy manifest、Python optional
   adapter path、service-stack preflight wrapper、RAG / Agent optional
-  service-stack live gate smoke 和报告：
+  service-stack live gate smoke、CI-safe gate skeleton 和报告：
   `docs/runbook/loadtest/ai-eval-service/`。
 
 下一步默认推进：
 
 ```text
-AI eval CI gate skeleton / 继续扩 RAG-Agent regression cases
+继续扩 RAG-Agent regression cases
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

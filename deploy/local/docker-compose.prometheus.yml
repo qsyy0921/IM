@@ -31,3 +31,4 @@ services:
       - ./prometheus-skill-registry-alerts.yml:/etc/prometheus/rules/skill-registry.yml:ro
       - ./prometheus-mcp-gateway-alerts.yml:/etc/prometheus/rules/mcp-gateway.yml:ro
       - ./prometheus-action-executor-alerts.yml:/etc/prometheus/rules/action-executor.yml:ro
+      - ./prometheus-ai-eval-service-alerts.yml:/etc/prometheus/rules/ai-eval-service.yml:ro

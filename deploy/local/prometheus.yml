@@ -155,3 +155,11 @@ scrape_configs:
           - host.docker.internal:11925
         labels:
           service: action-executor
+
+  - job_name: nexusim-ai-eval-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:11926
+        labels:
+          service: ai-eval-service

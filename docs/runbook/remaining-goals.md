@@ -1,69 +1,98 @@
-﻿# NexusIM Remaining Goals
+# NexusIM Remaining Goals
 
-这份文档只记录当前还没有完成的工作。当前进度总览见 `development-progress.md`，单服务事实见 `service-briefs/<service>.md`。
+这份文档只记录当前还没有完成的工作。当前进度总览见
+`development-progress.md`，单服务事实见 `service-briefs/<service>.md`。
 
 维护规则：
 
 - 新发现的待完成工作追加到本文件。
-- 已完成的工作从本文件移除，并同步到对应 service brief / progress / smoke report。
+- 已完成工作从本文件移除，并同步到对应 service brief / progress / smoke report。
 - 不记录已完成证据，不写长历史，不替代 SDD / ADR。
 
-## 全局未完成工作
+## 当前默认主线
 
-排序说明：第 1 / 2 项是当前主线；生产级观测、HA、长压、sizing 和 provider-grade 运维属于后置 hardening backlog，不作为 `search-service` / `memory-service` / `retrieval-gateway` 转进的短期阻塞条件。
+AI 大模型应用底座仍是默认开发主线：
 
-1. 9 服务必要收口和 AI 大模型应用底座转进：
-   当前 9 个服务已跑通 IM 主链路，下一步不再把短期生产级测试、完整 HA、长压和生产 sizing 作为阻塞条件。只对现有服务做必要收口：消息编辑 / 撤回 / 删除的可检索 tombstone、群管理和 owner transfer、成员历史可见窗口、回执 / 未读 / 会话摘要、联系人隐私 / 分组 / 搜索、policy 决策来源和 audit 链路。AI 侧第一组 foundation-active 服务已覆盖 `search-service v0.1`、`memory-service`、`retrieval-gateway`、RAG、`summary-service`、Agent、`skill-registry`、`mcp-gateway` 和 `action-executor` first path；RAG / summary / Agent / action 不能直接读业务库或绕过 policy。
+```text
+search-service -> memory-service -> retrieval-gateway
+-> rag-service / summary-service -> agent-service
+-> skill-registry -> mcp-gateway -> action-executor -> ai-eval-service
+```
 
-2. AI 大模型应用底座架构深化：
-   需要把 `target-architecture-ai.md` 中的 group memory、StructuredMemoryEvent、Memory Graph、ProfileAggregate、EvidencePack、ActionProposal、Tool Policy、skill registry、MCP gateway、action executor 和 Python AI Worker 边界落成可执行 SDD / ADR。`memory-service` 已从 SDD / proto / migration contract 切到 foundation-active implementation 并跑通 clean projection smoke；`retrieval-gateway` 已完成 first-stage EvidencePack 字段 hardening（rerank score、source coverage、dedupe reason）；`rag-service` 已完成 first-stage read-only answer path、`loadtest/rag`、RAG eval execution adapter、真实 `retrieval -> rag` adapter smoke、provider boundary、citation verifier first pass、guarded external HTTP LLM boundary 和服务级 Python worker candidate guard；`summary-service` 已完成 first-stage read-only summary path、真实 `retrieval -> summary` adapter smoke、guarded external HTTP LLM boundary 和服务级 Python worker candidate guard；`agent-service` 已完成 first-stage proposal-only path、真实 `retrieval -> policy -> agent` adapter smoke、新的 `retrieval -> agent -> mcp-gateway` adapter smoke、proposal store、approval workflow、approval outbox relay、`VerifyApprovedAgentProposal`、proposal approval operator 和服务级 planner Python worker candidate guard first path；`skill-registry` 已完成 first catalog path；`mcp-gateway` 已完成 first prepare path、skill catalog check、policy precheck、低敏 audit、gRPC runtime、Docker / observability wiring 和聚焦测试；`action-executor` 已完成 first execution audit path、Agent approved proposal preflight、强制 proposal / approval / prepare audit 关联、skill execute contract check、policy execute precheck、低敏 audit、low-sensitive tool result projection、本地安全 `nexusim.local.echo` adapter first path、外部 MCP fallback 稳定失败分类、tool output safety first path、外部 HTTP provider guarded adapter first path、external adapter eval / failure smoke、gRPC runtime、Docker / observability wiring 和聚焦测试；Agent execution eval adapter 已完成 first path，覆盖 approved proposal / execution audit / result projection / no external execution 边界，并新增 safe local tool output case；Python AI Worker foundation 已完成 `ai/python` 目录、`IM` conda toolchain、candidate contract helpers、低敏 safety guard、contract validator、candidate-only worker CLI、malformed / unsafe output eval adapter、第一条 worker smoke、Go-side Python candidate adapter smoke 和 RAG / Summary / Agent 服务级 candidate guard；profile overgeneralization / Agent output safety eval cases 和本地低敏 fixture adapter 已落，覆盖单条群聊事实不能升级为 ACTIVE profile、profile candidate 必须 PENDING_REVIEW、Agent output 不能泄露 raw EvidencePack / secret-like 内容且不能发出未审批业务动作。下一步未完成重点是 `ai-eval-service` first skeleton / persistent eval run catalog。外部 LLM / Python worker / tool provider 后续扩展仍必须遵守 prompt boundary、token budget、PII / secret filter、provider failure fallback 和 ADR-036：Python 只产出候选结果，Go 负责校验、权限、审计和持久化。AI eval harness first pass 已落低敏 case schema / validator，当前覆盖 retrieval miss、temporal version、attribution、permission leak、profile overgeneralization、RAG grounded citations、tool policy violation、action execution audit safety、safe local tool output projection、LLM output safety schema、Python worker output-safety adapter、external HTTP provider guarded adapter 和 Agent output safety；后续需要落 `ai-eval-service` 持久化 eval run catalog 和更完整真实 Agent 输出回归。2025/2026 memory 论文和 benchmark 的设计启发必须继续进入 `memory-service`：source refs、speaker / audience scope、valid_from / valid_to、supersedes / contradicts、confidence、PENDING / ACTIVE / SUPERSEDED / REJECTED 状态、profile 不能从单条群消息直接升级。Agent 可以接入真实业务，但写动作必须走 policy precheck、tool policy、proposal / approval / executor / audit；高风险动作第一阶段禁止自动执行。
+9 个既有 IM 服务只做阻塞 AI 主线的必要收口；生产级 HA、长压、sizing、
+provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
 
-3. Multi sub-agent 开发治理：
-   当前可以使用多个 sub-agent 并行推进 AI 底座，但每个 sub-agent 必须有明确 owner scope：一个服务、一个文档集、一个测试面或一个只读审查问题。禁止多个 sub-agent 同时修改同一 proto、migration、service brief 或架构章节。主 agent 必须负责合并结果、运行最终检查、关闭 stale sub-agent，并把新发现的未完成工作写回本文件。
+## 当前未完成重点
 
-4. 后置 hardening backlog：生产级观测闭环：
-   当前 `/metrics`、Prometheus rules、Grafana dashboard、OTel trace wiring、本地 Alertmanager null route、本地观测栈 smoke runner、本地 summary 离线 validator、目标环境 Prometheus / Grafana 端点 smoke 入口、低敏 `observability-evidence.json` 证据索引和 `add-observability-evidence.ps1` 追加工具是本地开发 / 面试展示级；当前证据索引收录了 policy-service debug metrics smoke 和本地观测镜像准备 dry-run 计划。仍需在真实目标环境跑 9 服务 dashboard smoke 并归档结果、统一 collector、生产 Alertmanager 路由、retention、结构化日志汇聚、容量基线和 SLO 口径。
+1. `ai-eval-service` 写入 smoke：
+   现有 AI eval scripts 仍只产出本地 summary/report。下一步需要把至少一条
+   低敏 eval summary 通过 `ai-eval-service.RecordEvalRun` 写入 PG catalog，
+   再通过 `GetEvalRun` / `ListEvalRuns` 读回。不得保存 raw prompt、
+   EvidencePack、model output、用户正文、secret 或 tool input。
 
-5. 后置 hardening backlog：分布式 HA / 故障演练深化：
-   已有 Kafka producer first-stage `acks=all` / bounded retry-backoff 门禁、7 个 producer package 配置单测、config summary、ISR observation raw summary 的 JSON / Markdown validator、Kafka producer hardening evaluation（明确当前 `kafka-go` 不声明 idempotent / transactional producer 语义）、本地 `kafka-go` producer in-flight broker-fault observation（120 条 ack / consume unique，0 missing ack，0 observed duplicate）、push-gateway delivery-consumer 本地 consumer group rebalance smoke、本地 consumer churn smoke（2 轮 leave / rejoin、8 个 transition 均回到 Stable 且 3 个 partition 已分配）、本地 consumer churn probe smoke（8 个 transition 后共写入 24 条合法 `delivery.inbox_item.created.v1` probe，全部 ack 且 post-probe lag 回到 0），以及本地 Kafka KRaft repeated ISR flapping smoke（2 轮 broker stop/start，验证 ISR 2/3 收缩恢复和 `acks=all` 探针写入）。仍需补更长时间 / 更高频 consumer rebalance storm、长时间 ISR flapping / 容量曲线、更恶劣 fault 下的 ambiguous write / duplicate campaign，以及如果后续要声明 exactly-once producer 语义时的客户端替换和实测验证。Redis Cluster 本地真实拓扑、node-stop fallback、六节点自动 failover smoke、六节点短容量基线和 Redis smoke summary 离线 validator 已通过；PostgreSQL 本地 `repmgr + pgpool` failover / quorum observation smoke 和 summary 离线 validator 已通过；分布式 smoke 证据已有低敏 manifest、本地 validator 和 `add-distributed-smoke-evidence.ps1` 追加工具。后续仍需生产级 Redis HA 设计、长时间 Redis Cluster 容量曲线 / 生产 sizing、PostgreSQL split-brain fencing / 生产 quorum 方案和服务发现 / 部署编排。PostgreSQL 生产 quorum 边界以 ADR-034 为准。
+2. AI eval 回归扩展：
+   继续补真实 Agent 输出回归、外部 MCP failure fallback、tool/action safety
+   cases、profile overgeneralization 和 RAG / summary citation regression。所有
+   eval case 必须低敏，可复核，能区分 retrieval failure、reasoning failure 和
+   action boundary failure。
 
-6. Repair / DLQ / audit 产品化：
-   多数服务已有本地 operator / audit / cleanup，且已有统一 operator 索引、机器可读 `repair-operators.catalog.json`、只生成低敏 JSON 的 `write-repair-operator-plan.ps1` 计划入口、`write-repair-approval-request.ps1` first-stage 审批请求入口、`write-repair-approval-decision.ps1` first-stage 审批决定入口、`validate-repair-approval-chain.ps1` 执行前链路校验入口、默认不执行的 `invoke-approved-repair-operator.ps1` 本地执行预检入口，`write-repair-batch-manifest.ps1` / `validate-repair-batch-manifest.ps1` / `invoke-repair-batch-manifest.ps1` first-stage 批量交接、校验和执行预检入口，以及 `write-repair-audit-bundle.ps1` / `validate-repair-audit-bundle.ps1` first-stage 本地审计交接和校验 manifest；repair actor 和 approval / decision / batch / bundle 关联 ID 均有低敏格式门禁，repair/operator 输出产物路径会拒绝仓库内路径。后续要补正式审批系统、provider-grade 外部审计 sink、运维 UI 和 provider-grade 跨服务批量执行编排，不把手写 SQL 当作长期方案。
+3. Memory / retrieval 深化：
+   `memory-service` 继续按 2025/2026 group memory / collaborative memory 论文
+   方向深化 source refs、speaker / audience scope、valid_from / valid_to、
+   supersedes / contradicts、confidence、PENDING / ACTIVE / SUPERSEDED /
+   REJECTED 状态。单条群聊事实不能直接升级为个人 ACTIVE profile。
 
-7. 安全启动门禁维护：
-   现有 public listener、mock auth、metadata auth、verified metadata、TLS / mTLS allowlist 已纳入 `tools/check-local.ps1`，并已用 `docs/runbook/security-gate-catalog.json` 集中索引 architecture boundary、listener boundary、transport security、gateway security、identity production key guard、operator safety、evidence safety 等本地门禁；api-gateway legacy descriptor migration / observation-window / removal-plan / quota snapshot 子门禁也已在 catalog 中显式列出并绑定到 `check-api-gateway-gates.ps1`，且 `docs/runbook/api-gateway-legacy-evidence.json` / `add-api-gateway-legacy-evidence.ps1` / `validate-api-gateway-legacy-evidence.ps1` 已提供 legacy observation-window / removal-plan 的低敏外部证据索引；repair / cleanup operator 的 dry-run env 文档和 cmd wiring 已纳入 `check-repair-operator-index.ps1`，repair approval / batch / audit、message compliance proof manifest、api-gateway legacy evidence、capacity baseline / resource snapshot / distributed smoke / observability evidence manifest 门禁也已被 security gate catalog validator 强制索引，且新增 `check-*boundar*.ps1`、`check-cross-service-*.ps1`、`check-api-gateway-*.ps1`、`check-repair-*.ps1`、`check-*evidence*.ps1`、`check-*safety*.ps1`、`check-*guard*.ps1`、`check-*listener*.ps1`、`check-*tls*.ps1` 会被自动要求进入 catalog；ResultRoot / OutputRoot 原始运行证据输出必须通过统一 helper 拒绝仓库内路径，且本地门禁会扫描 helper 接入、真实 guard 调用、H 盘默认 fallback 顺序和仓库内结果路径，避免注释里的假调用或空默认值顺序错误绕过；api-gateway legacy、resource snapshot、distributed smoke、observability 和 capacity evidence manifest 的原始 summary / raw plan 路径必须落在 `H:\NexusIM\loadtest-results`，普通 observability report / capacity report 必须留在仓库 runbook 报告目录，image prepare 这类本地 raw plan report 跟随 H 盘 raw evidence；evidence manifest append 工具必须拒绝明显敏感 metadata，validator 失败时必须回滚原 manifest，且 `add-*evidence*.ps1` 接入 metadata safety helper 已被本地门禁扫描。后续新增 listener、服务、会 mutate / cleanup 的 operator 或会写原始运行证据 / evidence manifest 的入口时必须同步门禁、catalog 和服务级测试。
+4. Agent 真实业务动作扩展：
+   `agent-service`、`skill-registry`、`mcp-gateway`、`action-executor` 已具备
+   first path。后续接真实 MCP / provider tool 或业务写动作时，仍必须走：
+   policy precheck -> skill contract -> prepare audit -> proposal -> approval
+   -> executor -> low-sensitive result projection -> audit。高风险动作第一阶段
+   禁止自动执行。
 
-8. 后置 hardening backlog：容量和复杂度治理：
-   已有 9 服务健康态 Docker resource snapshot 入口、摘要工具、低敏证据索引 / validator / 追加工具、文件大小 hotspot summary 和持久 file-size hotspot baseline；file-size baseline 现在会和当前仓库重新生成的关键复杂度数据对比，避免 snapshot 悄悄漂移。9 个服务均已有可复用 `capacity_summary` 口径，其中 api-gateway 通过 `loadtest/demo --gateway-facade` 统计 GatewayService facade 端到端容量，且 demo runner 已支持 `--duration` / `--vus` facade 容量循环，其余服务通过对应 loadtest runner 统计；`tools/summarize-loadtest-capacity-baselines.ps1` 可从 H 盘原始结果聚合容量基线索引，`tools/run-loadtest-capacity-baseline-suite.ps1` 可 dry-run / 顺序执行 direct 短基线，并会把需要额外 relay/consumer 角色的 runner 标记为 `skipped_stack_required`、把需要预置业务数据的 runner 标记为 `skipped_seed_required`；`tools/write-capacity-longrun-campaign-plan.ps1` 可生成 30m+ 长压 campaign 计划，并强制原始输出根目录在仓库外、服务集合只限当前 9 服务、字段保持低敏；`tools/test-capacity-longrun-campaign-preflight.ps1` 可按 plan 检查长压所需 TCP 目标、PG / Kafka 入口和 H 盘输出边界，并支持按服务子集做增量预检；`tools/invoke-capacity-longrun-campaign.ps1` 可按 plan 复用已验证的 baseline suite 构造逻辑执行 / dry-run 长压 campaign，支持按服务子集增量执行，真实执行默认先跑 preflight，默认把 seeded / stack runner 纳入计划执行，并保持 H 盘原始输出边界；`tools/summarize-capacity-longrun-campaign.ps1` 可在实际执行后验证每个服务的 30m+ `capacity_summary` 并生成 H 盘 raw summary 与仓库 runbook report；`docs/runbook/capacity-longrun-campaign-evidence.json`、`validate-capacity-longrun-campaign-evidence.ps1` 和 `add-capacity-longrun-campaign-evidence.ps1` 已提供长压计划 / 完成结果的低敏索引和追加入口，且已登记 `nine-service-longrun-campaign-plan-20260618` 作为 9 服务 planned campaign；`docs/runbook/capacity-baseline-evidence.json` 已集中索引 9 服务本地短基线 summary / report，validator 会强制 summary 指向 H 盘原始结果、report 留在仓库 runbook，并可做 schema-only 或 H 盘真实文件复核；`tools/add-capacity-baseline-evidence.ps1` 已提供每服务证据槽的显式 `-Replace` 更新入口，避免手工改 JSON；`deploy/local/docker-compose.service-workers.yml` 已提供本地后台 relay / consumer overlay；`loadtest/capacityseed` 已提供 message / conversation / delivery seeded runner 的本地 fixture 准备入口，且三条 seeded 短基线已跑通；contacts stack 短基线已通过 contacts outbox relay 和 `im.contact.events` Kafka readback，且 contacts runner 已补 `--duration` / `--vus` 容量模式；identity stack 短基线已通过临时 webhook fixture 和 challenge-delivery-worker，且 identity runner 已补 `--duration` / `--vus` Login/Refresh 热路径容量模式；receipt stack 短基线已通过 message / delivery / receipt relay-consumer 链路和 receipt Kafka readback；api-gateway stack 短基线已通过 secure mTLS + HMAC GatewayService facade、push WebSocket、delivery / receipt / policy Kafka readback 链路；push-gateway stack 短基线已通过 full 场景在线 notify / PullInbox / ACK / delivery_outbox 链路，且 pushgateway runner 已支持 `--duration` / `--vus` full 场景容量循环；policy-service 已有本地 direct 短基线和一条 clean commit direct 30m 长跑切片；delivery-service、message-service、conversation-service 各已有一条本地 seeded 30m 长跑切片，identity-service、contacts-service 和 receipt-service 各已有一条本地 stack 30m 长跑切片，且 per-service long-run summary 快照已避免被后续子集运行覆盖。9 个服务的短基线证据已覆盖，后续仍需真正执行完整 9 服务长时间瓶颈、资源曲线和生产 sizing。生产手写文件接近 2500 行、测试或 runner 接近 3000 行时继续同 package 拆分。
+5. Python AI Worker 扩展：
+   `rag-service`、`summary-service`、`agent-service` 已接 candidate guard。
+   后续可扩 embedding / rerank / memory extraction / planner / eval 候选，但
+   Python 只返回候选和 hash / citation metadata；Go 继续拥有权限、审计、
+   状态和持久化。
 
-## 逐服务未完成工作
+## 9 个现有服务必要收口
 
-逐服务表同时记录当前必要收口和长期 hardening。涉及生产级 HA、长压、sizing、provider-grade 运维 UI / 审批 / 配置中心的条目均为后置 backlog，不阻塞当前 AI 大模型应用底座启动。
+这些不是默认下一步，只有阻塞 AI 主线或用户点名时才进入当前切片：
 
 | 服务 | 未完成工作 |
 | --- | --- |
-| `api-gateway` | 在目标环境持续运行 legacy observation window gate，并使用已建立的低敏 `api-gateway-legacy-evidence.json` 索引归档 observation-window / removal-plan 证据后执行最终删除；provider-grade 配置中心 quota 控制面、灰度治理 / 多环境发布审计（first-stage DB-backed tenant plan snapshot source、versioned / checksum guard、本地 `tenant-quota-audit` / `tenant-quota-set` operator 和低敏 approval manifest 强制校验已有）；生产级 collector / alerting / dashboard；长时间容量曲线和生产 sizing。 |
-| `identity-service` | WebAuthn/passkeys；外部 OIDC federation / OAuth client flows；多 issuer 治理；KMS/HSM-backed key management（first-stage production key guard 已避免 local fallback 进入 production-like 启动，但不等于 KMS/HSM）；完整风控；生产级 email/SMS provider；租户级通知模板；bounce handling；已有本地 Login/Refresh 30m 长跑切片，仍需更完整容量曲线和生产 sizing。 |
-| `message-service` | 会话级删除策略深化；provider-grade 外部 proof 工作流 / 审批系统集成；发送链路生产观测；已有本地 seeded 30m 长跑切片，仍需更完整容量曲线和生产 sizing；图片 / 文件 / 语音二进制上传处理后续由 media 能力承担。 |
-| `conversation-service` | 更完整群管理；owner transfer 策略继续打磨；完整历史窗口 / targeted replay repair；已有本地 seeded 30m 长跑切片，仍需更完整容量曲线和生产 sizing。 |
-| `delivery-service` | 更多 delivery event 消费方；已完成 projection failure audit / rewind / resolve / cleanup 第一阶段 operator 闭环，已有本地 seeded 30m 长跑切片，仍需更完整容量曲线和生产 sizing。 |
-| `push-gateway` | 生产级 Redis HA 设计；长时间容量曲线和生产 sizing。 |
-| `receipt-service` | 会话列表更多产品化能力（更多摘要策略等）；已有本地 stack 30m 长跑切片，仍需更完整容量曲线和生产 sizing。 |
-| `contacts-service` | 组织级策略、租户默认值 / 来源策略 / 隐私例外接入 admin/config service 正式权限面；已完成 first-stage 来源风险标注、`REVIEW_REQUIRED` 持久化和本地 operator 审批状态机，已有本地 stack 30m 长跑切片，仍需更完整容量曲线和生产 sizing。 |
-| `policy-service` | provider-grade ReBAC graph / DSL；provider-grade moderation / risk scoring；provider-grade tenant DSL / quota；provider-grade tool policy operator / approval integration；provider-grade 外部 audit pipeline；已完成 first-stage decision source、first-stage relationship gate、ReBAC relation 本地低敏 operator、keyword / HTTP content moderation、低敏 `decision-audit-export` 本地审计交接、低敏 `decision-audit-forward` 外部审计交接、first-stage tenant action quota、first-stage tool policy precheck / low-sensitive local audit 和本地 direct 短基线，仍需长时间容量曲线和生产 sizing。 |
+| `api-gateway` | legacy observation window 目标环境证据、provider-grade 配置中心 quota 控制面、灰度治理、生产观测。 |
+| `identity-service` | WebAuthn/passkeys、OIDC federation、多 issuer、KMS/HSM、完整风控、生产级 email/SMS provider。 |
+| `message-service` | 会话级删除策略深化、provider-grade 外部 proof 工作流、发送链路生产观测；媒体二进制后续由 media 能力承担。 |
+| `conversation-service` | 更完整群管理、owner transfer 策略深化、完整历史窗口 / targeted replay repair。 |
+| `delivery-service` | 更多 delivery event 消费方、projection repair 深化、容量曲线。 |
+| `push-gateway` | 生产级 Redis HA 设计、跨实例 resume 深化、长时间在线容量曲线。 |
+| `receipt-service` | 会话列表更多产品能力、更多摘要策略和容量曲线。 |
+| `contacts-service` | 组织级策略、租户默认值、来源策略、隐私例外接入 admin/config service。 |
+| `policy-service` | provider-grade ReBAC graph / DSL、moderation / risk scoring、tenant DSL / quota、外部 audit pipeline。 |
 
-## 后续待开发工作
+## 后置平台 / 产品化服务
 
-这些工作按依赖分批进入，不再永久等到所有生产级 hardening 完成后才启动：
+这些服务可以后续新增，不是当前阻塞项：
 
-- `search-service`：AI 底座第一步，proto / migration / 六层 skeleton、PostgreSQL repository、真实 `SearchMessages` 查询、`grpc` runtime mode、timeline decoder / consumer 和 clean projection smoke 已落；后续只保留搜索 hardening / EvidencePack 字段深化，不做 LLM。
-- `memory-service` / group memory projection：foundation-active implementation 已完成第一轮 clean projection smoke：member join -> message persisted -> PENDING StructuredMemoryEvent + source ref -> Query/Get -> revoke hidden。后续做结构化协作记忆 hardening、版本语义、speaker / audience 归因、Memory Graph 和画像聚合；无 source ref 的长期 memory 不能进入 ACTIVE。
-- `retrieval-gateway`：foundation-active 第一版 EvidencePack 边界和真实 `search + memory -> RetrieveEvidence` smoke 已通过；policy-service retrieval precheck 已有 first-stage 可选接入；EvidencePack 字段 hardening（rerank score、source coverage、dedupe reason）已完成 first pass。后续保持 retrieval regression / AI eval，再进入 RAG / summary / Agent。
-- `rag-service`：first-stage read-only answer path、`loadtest/rag`、RAG eval execution adapter、真实本地 adapter smoke、provider boundary、citation verifier first pass、guarded external HTTP LLM boundary 和服务级 Python worker candidate guard 已落；外部 LLM / Python worker 输出必须继续走 EvidencePack prompt guard、provider fallback、hash / citation metadata 校验和 citation verifier。
-- `summary-service`：first-stage read-only EvidencePack summary path、真实本地 adapter smoke、guarded external HTTP LLM boundary 和服务级 Python worker candidate guard 已落；外部 LLM / Python worker 输出必须继续走 SummaryProvider port、EvidencePack prompt guard、hash / citation metadata 校验和 citation verifier。
-- `agent-service`：first-stage proposal-only path、旧真实本地 adapter smoke、新的 Agent -> mcp-gateway adapter smoke、proposal store、approval workflow、approval outbox relay、`VerifyApprovedAgentProposal` first path、proposal approval operator first path、Agent execution eval adapter 和服务级 planner Python worker candidate guard 已落；当前 proposal 前调用 `mcp-gateway.PrepareToolCall`，再消费 retrieval-gateway EvidencePack 生成可引用 proposal，审批后由 action-executor 公开校验，并通过 `approval-outbox-relay` 发布低敏 `im.agent.events` approval event；真实业务动作仍不自动执行。下一步接真实外部 MCP adapter / provider tool 的 guarded first path。
-- `skill-registry`：first catalog path 已落：登记可被 Agent 调用的技能、输入输出合约、允许动作、风险等级、审批要求和审计元数据。后续由 Agent / MCP gateway / executor 读取，不执行工具。
-- `mcp-gateway`：first prepare path 已落；后续接真实 MCP adapter / tool provider 时必须继续走 skill catalog、policy、rate limit、低敏 audit 和 failure fallback。
-- `action-executor`：first execution audit path、Agent approved proposal preflight、low-sensitive tool result projection、本地安全 `nexusim.local.echo` adapter、外部 MCP fallback 稳定失败分类、tool output safety first path、外部 HTTP provider guarded adapter first path、external adapter eval / failure smoke 和 Agent eval adapter first path 已落；后续补 rate limit、真实业务 output projection 和 DLQ / repair。
-- `ai-eval-service` / AI eval harness：first-stage 低敏 case schema / validator、RAG answer adapter、Agent execution adapter、safe local tool output case、LLM output safety case schema、Python worker output-safety adapter、external HTTP provider guarded adapter、profile overgeneralization 和 Agent output safety fixture adapter first paths 已落；后续补 `ai-eval-service` 持久化 run catalog、外部 MCP failure fallback 和更完整 Agent tool/action safety cases。
-- 后续产品化 / 平台服务：`media-service`、`notification-service`、`audit-service`、`admin-service`、Web / App / 桌面端展示层。
+- `media-service`
+- `notification-service`
+- `audit-service`
+- `admin-service`
+- Web / App / 桌面端展示层
+
+新增服务必须满足独立数据模型、独立伸缩需求、独立故障边界、独立安全边界，
+或能显著降低现有服务复杂度，并通过 ADR。
+
+## 后置 Hardening
+
+- 生产级统一观测：collector、Alertmanager 路由、日志汇聚、SLO、retention。
+- 分布式 HA / 故障演练：Redis / Kafka / PostgreSQL 更长时长和多故障组合。
+- Repair / DLQ / audit 产品化：审批系统、运维 UI、批量 repair、外部审计。
+- 容量和复杂度治理：9 服务长压 campaign、资源曲线、生产 sizing、文件拆分。
+
+## Sub-Agent 规则
+
+可使用多个 sub-agent 并行推进，但必须按服务、文档集、测试面或只读审查问题
+拆分互不重叠职责。禁止多个 sub-agent 同时修改同一 proto、migration、service
+brief 或架构章节。主 agent 负责集成、检查和关闭 stale sub-agent。

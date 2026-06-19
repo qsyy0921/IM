@@ -1,0 +1,20 @@
+groups:
+  - name: nexusim-ai-eval-service
+    rules:
+      - alert: NexusIMAIEvalServiceDown
+        expr: up{service="ai-eval-service"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: ai-eval-service
+        annotations:
+          summary: "ai-eval-service metrics endpoint is down"
+
+      - alert: NexusIMAIEvalServiceInfoMissing
+        expr: absent(nexusim_ai_eval_service_info)
+        for: 2m
+        labels:
+          severity: warning
+          service: ai-eval-service
+        annotations:
+          summary: "ai-eval-service info metric is missing"

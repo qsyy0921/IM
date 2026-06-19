@@ -12,6 +12,7 @@ protoc `
     --go-grpc_out=$ApiProtoDir `
     --go-grpc_opt=paths=source_relative `
     "$ApiProtoDir/nexusim/actionexecutor/v1/action_executor_service.proto" `
+    "$ApiProtoDir/nexusim/aieval/v1/ai_eval_service.proto" `
     "$ApiProtoDir/nexusim/agent/v1/agent_service.proto" `
     "$ApiProtoDir/nexusim/contacts/v1/contacts_service.proto" `
     "$ApiProtoDir/nexusim/delivery/v1/delivery_service.proto" `

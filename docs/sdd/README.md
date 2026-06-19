@@ -32,6 +32,7 @@
 - `skill-registry.md`
 - `mcp-gateway.md`
 - `action-executor.md`
+- `ai-eval-service.md`
 - `ai-eval-harness.md`
 
 ## 通用约束

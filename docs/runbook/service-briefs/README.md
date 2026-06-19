@@ -16,12 +16,12 @@
 [retrieval](retrieval-gateway.md) / [rag](rag-service.md) /
 [summary](summary-service.md) / [agent](agent-service.md) /
 [skill-registry](skill-registry.md) / [mcp](mcp-gateway.md) /
-[action-executor](action-executor.md)
+[action-executor](action-executor.md) / [ai-eval](ai-eval-service.md)
 
 ## 当前新增服务顺序
 
 - 现有 9 个服务只做阻塞 AI 链路的必要收口。
-- 第一组 AI 服务为 search、memory、retrieval、RAG、summary、Agent、skill-registry、mcp-gateway、action-executor。
+- 第一组 AI 服务为 search、memory、retrieval、RAG、summary、Agent、skill-registry、mcp-gateway、action-executor、ai-eval-service。
 - memory 必须按 group memory 设计：source refs、speaker / audience、validity、supersedes、confidence、review state。
 - Agent 写动作必须先走 policy tool precheck，默认 `Proposal -> Approval -> Executor -> Audit`。
 - sub-agent 可并行推进，但不能同时修改同一服务文件。

@@ -61,11 +61,16 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
   profile / Agent safety cases 和本地 fixture adapter，覆盖单条群聊事实不能升级为
   ACTIVE profile、profile candidate 必须 PENDING_REVIEW、Agent output 不能泄露
   raw EvidencePack / secret-like 内容且不能发出未审批业务动作。
+- `ai-eval-service` first skeleton / persistent eval run catalog：新增
+  `RecordEvalRun` / `GetEvalRun` / `ListEvalRuns`、PG catalog、gRPC runtime、
+  Docker / compose / Prometheus / Grafana wiring 和聚焦测试；第一版只保存低敏
+  run summary / refs / metadata，不运行 eval，不保存 raw prompt / EvidencePack /
+  model output。
 
 下一步默认推进：
 
 ```text
-ai-eval-service first skeleton / persistent eval run catalog
+wire existing AI eval scripts to ai-eval-service RecordEvalRun smoke
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

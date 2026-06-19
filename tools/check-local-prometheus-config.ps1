@@ -332,4 +332,15 @@ foreach ($alert in $requiredActionExecutorAlerts) {
     }
 }
 
+$requiredAIEvalServiceAlerts = @(
+    "NexusIMAIEvalServiceDown",
+    "NexusIMAIEvalServiceInfoMissing"
+)
+
+foreach ($alert in $requiredAIEvalServiceAlerts) {
+    if ($rulesByService["ai-eval-service"] -notmatch [regex]::Escape($alert)) {
+        throw "Prometheus ai-eval-service rules missing alert: $alert"
+    }
+}
+
 Write-Host "OK   local Prometheus config"

@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package nexusim.aieval.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/aieval/v1;aievalv1";
+
+service AIEvalService {
+  rpc RecordEvalRun(RecordEvalRunRequest) returns (RecordEvalRunResponse);
+  rpc GetEvalRun(GetEvalRunRequest) returns (GetEvalRunResponse);
+  rpc ListEvalRuns(ListEvalRunsRequest) returns (ListEvalRunsResponse);
+}
+
+enum EvalRunStatus {
+  EVAL_RUN_STATUS_UNSPECIFIED = 0;
+  EVAL_RUN_STATUS_PENDING = 1;
+  EVAL_RUN_STATUS_RUNNING = 2;
+  EVAL_RUN_STATUS_PASSED = 3;
+  EVAL_RUN_STATUS_FAILED = 4;
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+message EvalRun {
+  string tenant_id = 1;
+  string run_id = 2;
+  string suite_id = 3;
+  string stage = 4;
+  string adapter = 5;
+  EvalRunStatus status = 6;
+  int32 case_count = 7;
+  int32 passed_count = 8;
+  int32 failed_count = 9;
+  int32 skipped_count = 10;
+  string summary_ref = 11;
+  string report_ref = 12;
+  string metadata_json = 13;
+  int64 created_at_unix_ms = 14;
+  int64 updated_at_unix_ms = 15;
+  int64 completed_at_unix_ms = 16;
+}
+
+message RecordEvalRunRequest {
+  AuthContext auth_context = 1;
+  EvalRun run = 2;
+}
+
+message RecordEvalRunResponse {
+  EvalRun run = 1;
+}
+
+message GetEvalRunRequest {
+  AuthContext auth_context = 1;
+  string run_id = 2;
+}
+
+message GetEvalRunResponse {
+  EvalRun run = 1;
+}
+
+message ListEvalRunsRequest {
+  AuthContext auth_context = 1;
+  string suite_id = 2;
+  EvalRunStatus status = 3;
+  string after_run_id = 4;
+  int32 limit = 5;
+}
+
+message ListEvalRunsResponse {
+  repeated EvalRun runs = 1;
+  string next_cursor = 2;
+}

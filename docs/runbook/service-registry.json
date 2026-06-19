@@ -151,6 +151,14 @@
       "grafana_dashboard": "action-executor-observability.json"
     },
     {
+      "name": "ai-eval-service",
+      "stage": "foundation-active",
+      "local_process": "ai-eval-service-grpc",
+      "debug_port": 11926,
+      "prometheus_rule_file": "prometheus-ai-eval-service-alerts.yml",
+      "grafana_dashboard": "ai-eval-service-observability.json"
+    },
+    {
       "name": "media-service",
       "stage": "future"
     },
@@ -164,10 +172,6 @@
     },
     {
       "name": "admin-service",
-      "stage": "future"
-    },
-    {
-      "name": "ai-eval-service",
       "stage": "future"
     }
   ],

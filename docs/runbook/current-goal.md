@@ -7,13 +7,18 @@
 ```text
 持续推进 E:\development\IM 的 NexusIM 项目。
 
-当前主线必须放在第一位：面试导向的后端 + 分布式 + AI 大模型应用底座；默认围绕 AI/RAG/Agent 主链路推进，不要漂回无限生产化 hardening。
+当前主线必须放在第一位：面试导向的后端 + 分布式 + AI 大模型应用底座。默认继续建设群组 memory、跨群 / 跨时间 EvidencePack、RAG、summary、multi-agent、skill registry、MCP/tool gateway、action-executor、approval/audit 和 ai-eval。
 
-当前 active slice：`agent-service` first proposal-only path 和真实本地 `retrieval-gateway -> policy-service -> agent-service` adapter smoke 已落；下一步推进 `skill-registry`，然后继续 `mcp-gateway` / `action-executor`。
+九个既有 IM 服务已经作为可运行基础；只处理阻塞 AI 主线的 P0/P1 或用户点名任务。不要把默认任务切回长期 P2 hardening、生产级长压、完整 HA、sizing 或 provider-grade 运维。
 
-已完成基线：9 个 IM 后端服务主链路、search-service projection smoke、memory-service group memory / StructuredMemoryEvent projection smoke、retrieval-gateway search + memory -> EvidencePack smoke、EvidencePack field hardening first pass、AI eval harness first pass、rag-service first read-only answer path、真实 RAG adapter smoke、provider boundary 和 citation verifier first pass、summary-service first read-only summary path 和真实 adapter smoke、agent-service first proposal-only path 和真实 adapter smoke。
+每轮开始：
+1. 执行 git status --short --branch --untracked-files=all。
+2. 读取 prompt.md 和 agent.md。
+3. 读取 docs/runbook/current-goal.md 的当前 active slice；再按需读取 current-brief、remaining-goals、相关 service brief 或 SDD；不要全文扫长历史文档。
 
-当前开发规则：1. 只做阻塞 AI 底座的 9-service closeout：mutation/tombstone、visibility window、contacts privacy、policy/audit/security 边界；2. EvidencePack 必须保持 source refs、temporal version、visibility / policy boundary，不直接读 message/conversation/private tables；3. 后续依次推进 skill-registry -> mcp-gateway/tool-gateway -> action-executor -> ai-eval execution adapters，且 RAG / summary / Agent 只能消费 EvidencePack。不要把继续开发理解成无限生产级长压、完整 HA、sizing 或 provider-grade 运维；这些进入 hardening backlog，除非用户明确点名。本轮只做能推进这条主线的工作。每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 做互不重叠任务；不全文扫长历史文档，不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
+当前 active slice：agent-service first proposal-only path 和真实本地 retrieval-gateway -> policy-service -> agent-service adapter smoke 已落；下一步推进 skill-registry，然后继续 mcp-gateway / action-executor。RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables。
+
+可用多个 sub-agent 做互不重叠任务；主 agent 负责集成、检查和文档同步。不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
 ```
 
 ## 当前具体执行目标

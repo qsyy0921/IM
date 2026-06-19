@@ -43,6 +43,25 @@ func TestRepositoryAgentProposalApprovalIntegration(t *testing.T) {
 	if err := repository.StoreAgentProposal(ctx, proposal); err != nil {
 		t.Fatalf("store proposal: %v", err)
 	}
+	auditRows, err := repository.AuditAgentProposalApprovals(ctx, AgentProposalApprovalAuditOptions{
+		TenantID:   string(proposal.TenantID),
+		ProposalID: proposal.ProposalID,
+		Status:     types.AgentProposalStatusProposed,
+		Limit:      10,
+	})
+	if err != nil {
+		t.Fatalf("audit proposal approvals: %v", err)
+	}
+	if len(auditRows) != 1 {
+		t.Fatalf("expected one approval audit row, got %d", len(auditRows))
+	}
+	if auditRows[0].ProposalID != proposal.ProposalID ||
+		auditRows[0].SkillID != proposal.SkillID ||
+		auditRows[0].PreparedAuditID != proposal.PreparedAuditID ||
+		auditRows[0].Status != types.AgentProposalStatusProposed ||
+		!auditRows[0].RequiresApproval {
+		t.Fatalf("unexpected approval audit row: %+v", auditRows[0])
+	}
 	approval, err := repository.ApproveAgentProposal(ctx, types.ApproveAgentProposalCommand{
 		AuthContext: types.AuthContext{TenantID: proposal.TenantID, UserID: "approver-1"},
 		ProposalID:  proposal.ProposalID,
@@ -53,6 +72,16 @@ func TestRepositoryAgentProposalApprovalIntegration(t *testing.T) {
 	}
 	if approval.Status != types.AgentProposalStatusApproved || approval.ApprovalID != "appr-pg-1" {
 		t.Fatalf("unexpected approval: %+v", approval)
+	}
+	candidate, err := repository.GetAgentProposalApprovalCandidate(ctx, string(proposal.TenantID), proposal.ProposalID)
+	if err != nil {
+		t.Fatalf("get approved candidate: %v", err)
+	}
+	if candidate.Status != types.AgentProposalStatusApproved ||
+		candidate.ApprovalID != "appr-pg-1" ||
+		candidate.ApprovedByUserID != "approver-1" ||
+		!candidate.ApprovalReasonPresent {
+		t.Fatalf("unexpected approved candidate: %+v", candidate)
 	}
 	var outboxStatus string
 	var eventType string

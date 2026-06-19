@@ -1,8 +1,8 @@
 ﻿# File Size Budget Hotspots
 
-- Created at: 2026-06-19T07:23:25.6103776Z
+- Created at: 2026-06-19T10:13:26.7295229Z
 - Scope: handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score
-- Files checked: 1461
+- Files checked: 1466
 - Warnings: 0
 - Failures: 0
 - Hotspots at >= 80% of warning threshold: 1
@@ -11,10 +11,10 @@
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | docs\sdd\message-service.md | docs | 1048 | 1200 | 1500 | 87.3 | 69.9 |
 | docs\sdd\contacts-service.md | docs | 945 | 1200 | 1500 | 78.8 | 63 |
+| docs\architecture\target-architecture-ai.md | docs | 769 | 1200 | 1500 | 64.1 | 51.3 |
 | docs\runbook\local-loadtest.md | docs | 768 | 1200 | 1500 | 64 | 51.2 |
 | docs\sdd\push-gateway.md | docs | 743 | 1200 | 1500 | 61.9 | 49.5 |
 | loadtest\demo\run-local-secure-demo.ps1 | script/runner | 734 | 1000 | 1500 | 73.4 | 48.9 |
-| docs\architecture\target-architecture-ai.md | docs | 692 | 1200 | 1500 | 57.7 | 46.1 |
 | tools\run-loadtest-capacity-baseline-suite.ps1 | script/runner | 669 | 1000 | 1500 | 66.9 | 44.6 |
 | loadtest\agent\main.go | test/runner | 1279 | 2500 | 3000 | 51.2 | 42.6 |
 | services\identity-service\cmd\identity-service\main_test.go | test/runner | 1272 | 2500 | 3000 | 50.9 | 42.4 |

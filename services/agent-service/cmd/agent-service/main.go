@@ -45,6 +45,10 @@ func run(ctx context.Context) error {
 		return runGRPC(ctx)
 	case "approval-outbox-relay":
 		return runApprovalOutboxRelay(ctx)
+	case "proposal-approval-audit":
+		return runProposalApprovalAudit(ctx)
+	case "proposal-approval-approve":
+		return runProposalApprovalApprove(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_AGENT_SERVICE_MODE %q", mode)
 	}
@@ -189,7 +193,7 @@ func agentServiceModeFromEnv() string {
 
 func validateAgentServiceMode(mode string) error {
 	switch mode {
-	case "noop", "grpc", "approval-outbox-relay":
+	case "noop", "grpc", "approval-outbox-relay", "proposal-approval-audit", "proposal-approval-approve":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_AGENT_SERVICE_MODE %q", mode)

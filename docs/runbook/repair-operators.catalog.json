@@ -242,6 +242,24 @@
         "NEXUSIM_API_GATEWAY_TENANT_QUOTA_SET_DRY_RUN"
       ],
       "reason_file_envs": []
+    },
+    {
+      "service": "agent-service",
+      "mode_env": "NEXUSIM_AGENT_SERVICE_MODE",
+      "modes": [
+        "proposal-approval-audit",
+        "proposal-approval-approve"
+      ],
+      "output_envs": [
+        "NEXUSIM_AGENT_PROPOSAL_APPROVAL_AUDIT_OUTPUT",
+        "NEXUSIM_AGENT_PROPOSAL_APPROVAL_OUTPUT"
+      ],
+      "dry_run_envs": [
+        "NEXUSIM_AGENT_PROPOSAL_APPROVAL_DRY_RUN"
+      ],
+      "reason_file_envs": [
+        "NEXUSIM_AGENT_PROPOSAL_APPROVAL_REASON_FILE"
+      ]
     }
   ]
 }

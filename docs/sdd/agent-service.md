@@ -34,6 +34,10 @@ proposal 元数据，并提供 approval / execution preflight 校验；它仍不
   approval / prepare audit / skill / tool / resource / risk / approver / time
   metadata，不保存 proposal 正文、objective、reason、EvidencePack 正文或
   raw tool input。
+- 本地 `proposal-approval-audit` / `proposal-approval-approve` operator 只通过
+  agent-service 自有 repository 审计 / 审批 proposal；approve 默认 dry-run，
+  reason 走文件，输出不包含 objective、proposal 正文、EvidencePack、citations
+  或 reason 原文。
 - `VerifyApprovedAgentProposal` 是 `action-executor` 的公开校验边界：
   proposal 必须 `APPROVED`，且 `approval_id`、`prepared_audit_id`、skill、
   tool、resource 字段全部匹配。
@@ -86,11 +90,13 @@ Agent 不允许绕过 mcp-gateway / policy，也不允许直接执行 mutation�
   外部 audit sink 已完成。
 - executor preflight 失败必须 fail closed；不匹配的 approval / prepare audit /
   skill / tool / resource 不能进入执行边界。
+- approval operator 只处理 agent-service 自有 `agent_proposals`，不能跨服务读私表；
+  mutate 审批必须显式关闭 dry-run。
 
 ## 后续
 
 - 接 `action-executor` 的真实 MCP / tool adapter，并继续保持 proposal /
   approval / executor / audit 串接。
-- 补 approval workflow 的 operator、approval outbox relay 和 external review UI。
+- 补 external review UI；当前 approval operator 和 approval outbox relay 已有 first path。
 - 外部 LLM adapter 接入时增加 prompt boundary、token budget、PII / secret
   filter、tool-call schema validation 和 provider failure fallback。

@@ -15,6 +15,7 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 - `approval-outbox-relay`：发布低敏 `im.agent.events`，unsupported / malformed fail-closed。
 - `ApproveAgentProposal` / `VerifyApprovedAgentProposal`：给 action-executor
   校验 approval / prepare audit / skill / tool / resource，不暴露私表。
+- `proposal-approval-audit` / `proposal-approval-approve`：默认 dry-run，reason 走文件，输出不含正文 / EvidencePack。
 - Agent adapter smoke、Agent -> mcp-gateway smoke 和 Agent execution eval adapter first path 已落。
 
 ## 边界
@@ -25,6 +26,5 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- approval operator。
 - external MCP adapter failure fallback。
 - 真实 tool output safety cases。

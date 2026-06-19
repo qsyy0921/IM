@@ -1,7 +1,7 @@
 ﻿{
-    "created_at":  "2026-06-19T07:23:25.6103776Z",
+    "created_at":  "2026-06-19T10:13:26.7295229Z",
     "scope":  "handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score",
-    "file_count":  1461,
+    "file_count":  1466,
     "thresholds":  {
                        "production_warn_lines":  2500,
                        "production_max_lines":  3500,
@@ -38,6 +38,15 @@
                           "MaxRatio":  0.63
                       },
                       {
+                          "Path":  "docs\\architecture\\target-architecture-ai.md",
+                          "Lines":  769,
+                          "Kind":  "docs",
+                          "Warn":  1200,
+                          "Max":  1500,
+                          "WarnRatio":  0.6408,
+                          "MaxRatio":  0.5127
+                      },
+                      {
                           "Path":  "docs\\runbook\\local-loadtest.md",
                           "Lines":  768,
                           "Kind":  "docs",
@@ -63,15 +72,6 @@
                           "Max":  1500,
                           "WarnRatio":  0.734,
                           "MaxRatio":  0.4893
-                      },
-                      {
-                          "Path":  "docs\\architecture\\target-architecture-ai.md",
-                          "Lines":  692,
-                          "Kind":  "docs",
-                          "Warn":  1200,
-                          "Max":  1500,
-                          "WarnRatio":  0.5767,
-                          "MaxRatio":  0.4613
                       },
                       {
                           "Path":  "tools\\run-loadtest-capacity-baseline-suite.ps1",

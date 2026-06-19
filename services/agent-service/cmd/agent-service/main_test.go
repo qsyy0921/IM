@@ -3,11 +3,17 @@ package main
 import (
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
+
+	postgresinfra "github.com/qsyy0921/IM/services/agent-service/internal/infrastructure/postgres"
 )
 
 func TestValidateAgentServiceMode(t *testing.T) {
-	for _, mode := range []string{"noop", "grpc", "approval-outbox-relay"} {
+	for _, mode := range []string{"noop", "grpc", "approval-outbox-relay", "proposal-approval-audit", "proposal-approval-approve"} {
 		if err := validateAgentServiceMode(mode); err != nil {
 			t.Fatalf("mode %s should be valid: %v", mode, err)
 		}
@@ -51,6 +57,92 @@ func TestNewDebugHandlerExposesMetrics(t *testing.T) {
 	body := string(recorder.body)
 	if body != "nexusim_agent_service_info 1\n" {
 		t.Fatalf("unexpected body %q", body)
+	}
+}
+
+func TestProposalApprovalDryRunDefaultsToTrue(t *testing.T) {
+	t.Setenv("NEXUSIM_AGENT_PROPOSAL_APPROVAL_DRY_RUN", "")
+	value, err := proposalApprovalDryRunFromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !value {
+		t.Fatal("expected approval operator dry-run default")
+	}
+	t.Setenv("NEXUSIM_AGENT_PROPOSAL_APPROVAL_DRY_RUN", "false")
+	value, err = proposalApprovalDryRunFromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if value {
+		t.Fatal("expected explicit false to disable dry-run")
+	}
+}
+
+func TestAgentOperatorReasonFromFile(t *testing.T) {
+	reasonPath := filepath.Join(t.TempDir(), "reason.txt")
+	if err := os.WriteFile(reasonPath, []byte(" approve grounded proposal "), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("NEXUSIM_AGENT_TEST_REASON_FILE", reasonPath)
+	reason, err := agentOperatorReasonFromEnv("NEXUSIM_AGENT_TEST_REASON", "NEXUSIM_AGENT_TEST_REASON_FILE", "fallback")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reason != "approve grounded proposal" {
+		t.Fatalf("unexpected reason %q", reason)
+	}
+}
+
+func TestWriteProposalApprovalOutputIsLowSensitive(t *testing.T) {
+	outputPath := filepath.Join(t.TempDir(), "approval.json")
+	now := time.Date(2026, 6, 19, 1, 2, 3, 0, time.UTC)
+	candidate := postgresinfra.AgentProposalApprovalAuditRow{
+		TenantID:              "tenant-1",
+		ProposalID:            "proposal-1",
+		UserID:                "user-1",
+		ConversationID:        "conv-1",
+		SkillID:               "nexusim.local.echo",
+		PreparedAuditID:       "mcp-audit-1",
+		ToolName:              "nexusim.local.echo",
+		ResourceType:          "conversation",
+		ResourceID:            "conv-1",
+		RiskLevel:             "LOW",
+		Status:                "PROPOSED",
+		RequiresApproval:      true,
+		Allowed:               true,
+		PermissionVersion:     1,
+		Classification:        "TOOL_ALLOWED",
+		DecisionSource:        "policy",
+		EvidencePackID:        "pack-1",
+		GeneratedByLLM:        false,
+		ApprovalReasonPresent: true,
+		CreatedAt:             now,
+		UpdatedAt:             now,
+	}
+	err := writeProposalApprovalApproveOutput(outputPath, true, proposalApprovalRequest{
+		TenantID:              "tenant-1",
+		ProposalID:            "proposal-1",
+		ApprovedByUserID:      "approver-1",
+		ApprovalReasonPresent: true,
+	}, &candidate, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	for _, forbidden := range []string{"objective", "proposal_text", "citations_json", "approve grounded proposal", "reason\": \"", "EvidencePack"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("approval output leaked forbidden content %q: %s", forbidden, text)
+		}
+	}
+	for _, required := range []string{"proposal-1", "approver-1", "approval_reason_present"} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("approval output missing %q: %s", required, text)
+		}
 	}
 }
 

@@ -33,6 +33,9 @@ const (
 	defaultToolName     = "conversation.note.create"
 	defaultSkillID      = "conversation.note.create"
 	defaultResource     = "conversation_note"
+
+	scenarioApproved     = "approved"
+	scenarioPolicyDenied = "policy-denied"
 )
 
 type config struct {
@@ -53,6 +56,7 @@ type config struct {
 	resourceID     string
 	riskLevel      string
 	intent         string
+	scenario       string
 	expectExecuted bool
 	requestTimeout time.Duration
 	tls            grpctls.Config
@@ -80,6 +84,7 @@ type agentSmokeSummary struct {
 	AgentTarget               string       `json:"agent_target"`
 	ActionExecutorTarget      string       `json:"action_executor_target"`
 	Objective                 string       `json:"objective"`
+	Scenario                  string       `json:"scenario"`
 	ToolName                  string       `json:"tool_name"`
 	SkillID                   string       `json:"skill_id"`
 	ResourceType              string       `json:"resource_type"`
@@ -216,6 +221,13 @@ func run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	if cfg.scenario == scenarioPolicyDenied {
+		summary, err := verifyPolicyDeniedWorkflow(ctx, pool, cfg, resultDir, seed, response, startedAt)
+		if err != nil {
+			return err
+		}
+		return writeSummary(resultDir, summary)
+	}
 	approval, err := approveProposal(ctx, cfg, response.GetProposalId())
 	if err != nil {
 		return err
@@ -251,6 +263,7 @@ func parseConfig(args []string) (config, error) {
 	flagSet.StringVar(&cfg.resourceID, "resource-id", "", "resource id for policy precheck")
 	flagSet.StringVar(&cfg.riskLevel, "risk-level", "LOW", "risk level for policy precheck")
 	flagSet.StringVar(&cfg.intent, "intent", "", "intent for policy precheck")
+	flagSet.StringVar(&cfg.scenario, "scenario", scenarioApproved, "smoke scenario: approved or policy-denied")
 	flagSet.BoolVar(&cfg.expectExecuted, "expect-executed", false, "expect action-executor to run a safe local tool and record a successful result projection")
 	flagSet.DurationVar(&cfg.requestTimeout, "request-timeout", 10*time.Second, "gRPC request timeout")
 	flagSet.StringVar(&cfg.tls.CAFile, "agent-tls-ca-file", "", "agent gRPC TLS CA file")
@@ -269,6 +282,7 @@ func parseConfig(args []string) (config, error) {
 	cfg.resourceType = strings.TrimSpace(cfg.resourceType)
 	cfg.riskLevel = strings.ToUpper(strings.TrimSpace(cfg.riskLevel))
 	cfg.intent = strings.TrimSpace(cfg.intent)
+	cfg.scenario = strings.ToLower(strings.TrimSpace(cfg.scenario))
 	if cfg.agentTarget == "" {
 		return config{}, errors.New("--agent-target is required")
 	}
@@ -292,6 +306,15 @@ func parseConfig(args []string) (config, error) {
 	}
 	if cfg.riskLevel == "" {
 		cfg.riskLevel = "LOW"
+	}
+	if cfg.scenario == "" {
+		cfg.scenario = scenarioApproved
+	}
+	if cfg.scenario != scenarioApproved && cfg.scenario != scenarioPolicyDenied {
+		return config{}, fmt.Errorf("unsupported --scenario %q", cfg.scenario)
+	}
+	if cfg.scenario == scenarioPolicyDenied && cfg.expectExecuted {
+		return config{}, errors.New("--expect-executed is incompatible with --scenario policy-denied")
 	}
 	if cfg.runName == "" {
 		cfg.runName = "agent-service-proposal-smoke-" + time.Now().UTC().Format("20060102-150405")
@@ -376,6 +399,7 @@ func seedToolingRows(ctx context.Context, pool *pgxpool.Pool, cfg config) error 
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	skillRequiresApproval := cfg.scenario != scenarioPolicyDenied
 	if _, err := tx.Exec(ctx, `
 INSERT INTO skill_registry_definitions (
 	tenant_id, skill_id, display_name, description, version, status, tool_name,
@@ -387,8 +411,8 @@ INSERT INTO skill_registry_definitions (
 	'v1', 'ACTIVE', $3, '[1,3]'::jsonb,
 	'{"type":"object","additionalProperties":true}'::jsonb,
 	'{"type":"object","additionalProperties":true}'::jsonb,
-	$4, $5, true, 'conversation.note.proposed.v1', 'agent-service',
-	'["agent-smoke"]'::jsonb, '{"source":"loadtest/agent"}'::jsonb, $6, $6
+	$4, $5, $6, 'conversation.note.proposed.v1', 'agent-service',
+	'["agent-smoke"]'::jsonb, '{"source":"loadtest/agent"}'::jsonb, $7, $7
 )
 ON CONFLICT (tenant_id, skill_id) DO UPDATE SET
 	display_name = EXCLUDED.display_name,
@@ -407,8 +431,19 @@ ON CONFLICT (tenant_id, skill_id) DO UPDATE SET
 	tags_json = EXCLUDED.tags_json,
 	metadata_json = EXCLUDED.metadata_json,
 	updated_at = EXCLUDED.updated_at
-`, cfg.tenantID, cfg.skillID, cfg.toolName, cfg.resourceType, cfg.riskLevel, now); err != nil {
+`, cfg.tenantID, cfg.skillID, cfg.toolName, cfg.resourceType, cfg.riskLevel, skillRequiresApproval, now); err != nil {
 		return fmt.Errorf("seed skill registry definition: %w", err)
+	}
+
+	allowed := true
+	requiresApproval := true
+	classification := "TOOL_APPROVAL_REQUIRED"
+	reason := "agent smoke requires approval before execution"
+	if cfg.scenario == scenarioPolicyDenied {
+		allowed = false
+		requiresApproval = false
+		classification = "TOOL_POLICY_DENIED"
+		reason = "agent smoke denies policy before proposal"
 	}
 
 	for _, action := range []string{"CALL", "EXECUTE"} {
@@ -418,9 +453,8 @@ INSERT INTO policy_tool_action_rules (
 	requires_approval, permission_version, classification, reason, priority,
 	enabled, source, updated_at
 ) VALUES (
-	$1, $2, $3, $4, $5, true, true, 42,
-	'TOOL_APPROVAL_REQUIRED', 'agent smoke requires approval before execution',
-	10, true, 'agent-smoke', $6
+	$1, $2, $3, $4, $5, $6, $7, 42,
+	$8, $9, 10, true, 'agent-smoke', $10
 )
 ON CONFLICT (tenant_id, tool_name, action, resource_type, risk_level) DO UPDATE SET
 	allowed = EXCLUDED.allowed,
@@ -432,7 +466,7 @@ ON CONFLICT (tenant_id, tool_name, action, resource_type, risk_level) DO UPDATE 
 	enabled = EXCLUDED.enabled,
 	source = EXCLUDED.source,
 	updated_at = EXCLUDED.updated_at
-`, cfg.tenantID, cfg.toolName, action, cfg.resourceType, cfg.riskLevel, now); err != nil {
+`, cfg.tenantID, cfg.toolName, action, cfg.resourceType, cfg.riskLevel, allowed, requiresApproval, classification, reason, now); err != nil {
 			return fmt.Errorf("seed policy tool action rule %s: %w", action, err)
 		}
 	}
@@ -826,6 +860,7 @@ func verifyWorkflow(
 		AgentTarget:               cfg.agentTarget,
 		ActionExecutorTarget:      cfg.actionTarget,
 		Objective:                 cfg.objective,
+		Scenario:                  cfg.scenario,
 		ToolName:                  cfg.toolName,
 		SkillID:                   cfg.skillID,
 		ResourceType:              cfg.resourceType,
@@ -870,6 +905,97 @@ func verifyWorkflow(
 		Verified:                  verified,
 		StartedAt:                 startedAt,
 		FinishedAt:                time.Now().UTC(),
+	}, nil
+}
+
+func verifyPolicyDeniedWorkflow(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	cfg config,
+	resultDir string,
+	seed seededData,
+	response *agentv1.CreateAgentProposalResponse,
+	startedAt time.Time,
+) (agentSmokeSummary, error) {
+	if response.GetStatus() != agentv1.AgentProposalStatus_AGENT_PROPOSAL_STATUS_BLOCKED {
+		return agentSmokeSummary{}, fmt.Errorf("unexpected denied proposal status %v", response.GetStatus())
+	}
+	if response.GetGeneratedByLlm() {
+		return agentSmokeSummary{}, errors.New("policy-denied proposal must not claim LLM generation")
+	}
+	if response.GetRequiresApproval() {
+		return agentSmokeSummary{}, errors.New("policy-denied proposal must not require approval")
+	}
+	if strings.TrimSpace(response.GetProposalText()) == "" {
+		return agentSmokeSummary{}, errors.New("policy-denied proposal text is empty")
+	}
+	if len(response.GetCitations()) != 0 {
+		return agentSmokeSummary{}, errors.New("policy-denied proposal must not include citations")
+	}
+	if response.GetEvidencePack() != nil && len(response.GetEvidencePack().GetItems()) != 0 {
+		return agentSmokeSummary{}, errors.New("policy-denied proposal must not retrieve evidence")
+	}
+	if strings.TrimSpace(response.GetPreparedAuditId()) == "" {
+		return agentSmokeSummary{}, errors.New("missing denied prepared_audit_id")
+	}
+	if strings.TrimSpace(response.GetAgentVersion()) == "" {
+		return agentSmokeSummary{}, errors.New("missing agent_version")
+	}
+	decision := response.GetToolPolicyDecision()
+	if decision == nil {
+		return agentSmokeSummary{}, errors.New("missing denied tool policy decision")
+	}
+	if decision.GetAllowed() || decision.GetRequiresApproval() {
+		return agentSmokeSummary{}, fmt.Errorf("unexpected denied policy decision allowed=%v requires_approval=%v", decision.GetAllowed(), decision.GetRequiresApproval())
+	}
+	if decision.GetAction() != policyv1.ToolAction_TOOL_ACTION_CALL {
+		return agentSmokeSummary{}, fmt.Errorf("unexpected denied tool action %v", decision.GetAction())
+	}
+	if decision.GetToolName() != cfg.toolName || decision.GetResourceType() != cfg.resourceType {
+		return agentSmokeSummary{}, fmt.Errorf("unexpected denied policy scope: %+v", decision)
+	}
+	if decision.GetClassification() != "TOOL_POLICY_DENIED" || decision.GetDecisionSource() != "TOOL_RULE" || decision.GetPermissionVersion() != 42 {
+		return agentSmokeSummary{}, fmt.Errorf("unexpected denied policy metadata: %+v", decision)
+	}
+
+	audit, err := verifyMCPAuditDenied(ctx, pool, cfg, response)
+	if err != nil {
+		return agentSmokeSummary{}, err
+	}
+	verified := []string{
+		"agent proposal was blocked by policy before retrieval",
+		"policy-denied branch produced no approval or execution",
+		"mcp-gateway recorded blocked prepare audit with input hash only",
+	}
+	return agentSmokeSummary{
+		RunName:                 cfg.runName,
+		ResultDir:               resultDir,
+		AgentTarget:             cfg.agentTarget,
+		ActionExecutorTarget:    cfg.actionTarget,
+		Objective:               cfg.objective,
+		Scenario:                cfg.scenario,
+		ToolName:                cfg.toolName,
+		SkillID:                 cfg.skillID,
+		ResourceType:            cfg.resourceType,
+		RiskLevel:               cfg.riskLevel,
+		Seed:                    seed,
+		ProposalID:              response.GetProposalId(),
+		PreparedAuditID:         response.GetPreparedAuditId(),
+		ProposalStatus:          proposalStatusName(response.GetStatus()),
+		ProposalText:            response.GetProposalText(),
+		RequiresApproval:        response.GetRequiresApproval(),
+		GeneratedByLLM:          response.GetGeneratedByLlm(),
+		CitationCount:           len(response.GetCitations()),
+		PolicyAllowed:           decision.GetAllowed(),
+		PolicyRequiresApproval:  decision.GetRequiresApproval(),
+		PolicyDecisionSource:    decision.GetDecisionSource(),
+		PolicyClassification:    decision.GetClassification(),
+		PolicyPermissionVersion: decision.GetPermissionVersion(),
+		MCPAudit:                audit,
+		AgentVersion:            response.GetAgentVersion(),
+		Verified:                verified,
+		StartedAt:               startedAt,
+		FinishedAt:              time.Now().UTC(),
 	}, nil
 }
 
@@ -944,6 +1070,81 @@ WHERE tenant_id = $1
 	}
 	if resourceID != cfg.resourceID {
 		return mcpAudit{}, fmt.Errorf("unexpected mcp audit resource_id %q", resourceID)
+	}
+	return audit, nil
+}
+
+func verifyMCPAuditDenied(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	cfg config,
+	response *agentv1.CreateAgentProposalResponse,
+) (mcpAudit, error) {
+	var audit mcpAudit
+	var inputSHA256 string
+	var idempotencyKey string
+	var resourceID string
+	err := pool.QueryRow(ctx, `
+SELECT
+	audit_id,
+	status,
+	allowed,
+	requires_approval,
+	permission_version,
+	classification,
+	decision_source,
+	tool_action,
+	input_sha256,
+	idempotency_key,
+	resource_id
+FROM mcp_gateway_tool_call_audits
+WHERE tenant_id = $1
+  AND audit_id = $2
+  AND skill_id = $3
+  AND tool_name = $4
+  AND resource_type = $5
+  AND risk_level = $6
+`, cfg.tenantID, response.GetPreparedAuditId(), cfg.skillID, cfg.toolName, cfg.resourceType, cfg.riskLevel).Scan(
+		&audit.AuditID,
+		&audit.Status,
+		&audit.Allowed,
+		&audit.RequiresApproval,
+		&audit.PermissionVersion,
+		&audit.Classification,
+		&audit.DecisionSource,
+		&audit.ToolAction,
+		&inputSHA256,
+		&idempotencyKey,
+		&resourceID,
+	)
+	if err != nil {
+		return mcpAudit{}, fmt.Errorf("query denied mcp-gateway prepare audit: %w", err)
+	}
+	rawInputColumnAbsent, err := columnAbsent(ctx, pool, "mcp_gateway_tool_call_audits", "input_json")
+	if err != nil {
+		return mcpAudit{}, err
+	}
+	audit.InputSHA256Present = strings.TrimSpace(inputSHA256) != ""
+	audit.IdempotencyKeyMatches = idempotencyKey == response.GetProposalId()
+	audit.RawInputColumnAbsent = rawInputColumnAbsent
+	audit.LowSensitiveAuditOnly = audit.InputSHA256Present && audit.RawInputColumnAbsent
+	if audit.Status != "BLOCKED" || audit.Allowed || audit.RequiresApproval {
+		return mcpAudit{}, fmt.Errorf("unexpected denied mcp audit decision: %+v", audit)
+	}
+	if audit.ToolAction != "CALL" {
+		return mcpAudit{}, fmt.Errorf("unexpected denied mcp audit action %q", audit.ToolAction)
+	}
+	if audit.PermissionVersion != 42 || audit.Classification != "TOOL_POLICY_DENIED" || audit.DecisionSource != "TOOL_RULE" {
+		return mcpAudit{}, fmt.Errorf("unexpected denied mcp audit policy metadata: %+v", audit)
+	}
+	if !audit.InputSHA256Present || !audit.RawInputColumnAbsent {
+		return mcpAudit{}, errors.New("denied mcp audit must store input_sha256 and no raw input column")
+	}
+	if !audit.IdempotencyKeyMatches {
+		return mcpAudit{}, fmt.Errorf("denied mcp audit idempotency key mismatch: %q != %q", idempotencyKey, response.GetProposalId())
+	}
+	if resourceID != cfg.resourceID {
+		return mcpAudit{}, fmt.Errorf("unexpected denied mcp audit resource_id %q", resourceID)
 	}
 	return audit, nil
 }

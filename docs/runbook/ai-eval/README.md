@@ -69,6 +69,8 @@ First-stage RAG execution adapter:
 This adapter runs `loadtest/rag`, which seeds low-sensitive search / memory
 projection rows, calls real `rag-service AnswerQuestion`, and validates active
 `rag-service` cases against the returned answer, citations and EvidencePack.
+Cases that require abstain / empty EvidencePack assertions run a second
+`-scenario no-evidence` path and verify no fabricated citations.
 It requires `rag-service`, `retrieval-gateway`, `search-service` and
 `memory-service` runtime processes to be reachable. Raw execution summaries
 stay under `H:\NexusIM\loadtest-results`.
@@ -95,7 +97,9 @@ result projection. For cases that require `must_execute_safe_local_tool`, it
 runs a second low-sensitive `nexusim.local.echo` path and verifies `SUCCEEDED`
 plus output hash only. It proves the proposal / approval / executor / audit /
 result-projection boundary and local safe tool output path only. It still does
-not execute external MCP/provider tools.
+not execute external MCP/provider tools. Cases that require policy-denied
+assertions run a separate `-scenario policy-denied` path and verify `BLOCKED`
+proposal status, no approval / execution state and blocked MCP prepare audit.
 
 First-stage profile overgeneralization / Agent output safety adapter:
 
@@ -217,6 +221,9 @@ payload refusal.
 The 2026-06-20 service-stack version / hash-only expansion run increased the
 live suite to 17 cases and added RAG / Agent version preservation plus
 action-executor hash-only audit checks.
+The 2026-06-20 negative RAG / Agent service-stack run increased the live suite
+to 19 cases and added RAG no-evidence abstain plus Agent policy-denied blocked
+proposal checks.
 
 First-stage Go-side Python worker adapter smoke:
 

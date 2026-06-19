@@ -104,6 +104,18 @@ function Test-RAGAssertion {
         "must_abstain" {
             return $Summary.answer_status -eq "INSUFFICIENT_EVIDENCE"
         }
+        "must_return_empty_evidencepack" {
+            return `
+                (Get-JsonPropertyString -Object $Summary -Name "pack_id").Length -gt 0 `
+                -and [int]$Summary.evidence_item_count -eq 0 `
+                -and [int]$Summary.search_item_count -eq 0 `
+                -and [int]$Summary.memory_item_count -eq 0 `
+                -and [int]$Summary.source_counts.search_message -eq 0 `
+                -and [int]$Summary.source_counts.memory_event -eq 0
+        }
+        "must_not_include_citation" {
+            return [int]$Summary.citation_count -eq 0
+        }
         default {
             throw "unsupported rag eval assertion type: $type"
         }
@@ -121,32 +133,51 @@ if ([string]::IsNullOrWhiteSpace($RunName)) {
     $RunName = "rag-eval-adapter-" + (Get-Date).ToUniversalTime().ToString("yyyyMMdd-HHmmss")
 }
 
-$runArgs = @(
-    "run", "./loadtest/rag",
-    "-pg-dsn", $PGDSN,
-    "-rag-target", $RAGTarget,
-    "-result-root", $ResultRoot,
-    "-run-name", $RunName,
-    "-question", "phoenix launch decision",
-    "-request-timeout", $RequestTimeout
-)
+function Invoke-RAGSmokeRun {
+    param(
+        [string]$SmokeRunName,
+        [string[]]$ExtraArgs = @()
+    )
 
-Push-Location $repoRoot
-try {
-    & go @runArgs
-    if ($LASTEXITCODE -ne 0) {
-        throw "loadtest/rag failed with exit code $LASTEXITCODE"
+    $runArgs = @(
+        "run", "./loadtest/rag",
+        "-pg-dsn", $PGDSN,
+        "-rag-target", $RAGTarget,
+        "-result-root", $ResultRoot,
+        "-run-name", $SmokeRunName,
+        "-question", "phoenix launch decision",
+        "-request-timeout", $RequestTimeout
+    )
+    $runArgs += $ExtraArgs
+
+    Push-Location $repoRoot
+    try {
+        & go @runArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw "loadtest/rag failed with exit code $LASTEXITCODE"
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    $resultDir = Join-Path $ResultRoot $SmokeRunName
+    $summaryPath = Join-Path $resultDir "rag-answer-summary.json"
+    Assert-Condition (Test-Path -LiteralPath $summaryPath -PathType Leaf) "RAG smoke summary missing: $summaryPath"
+    return [pscustomobject]@{
+        run_name = $SmokeRunName
+        result_dir = $resultDir
+        summary_path = $summaryPath
+        summary = (Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json)
     }
 }
-finally {
-    Pop-Location
-}
 
-$resultDir = Join-Path $ResultRoot $RunName
-$smokeSummaryPath = Join-Path $resultDir "rag-answer-summary.json"
-Assert-Condition (Test-Path -LiteralPath $smokeSummaryPath -PathType Leaf) "RAG smoke summary missing: $smokeSummaryPath"
-$summary = Get-Content -LiteralPath $smokeSummaryPath -Raw | ConvertFrom-Json
+$defaultRun = Invoke-RAGSmokeRun -SmokeRunName $RunName
+$summary = $defaultRun.summary
+$resultDir = $defaultRun.result_dir
+$smokeSummaryPath = $defaultRun.summary_path
 $caseDocument = Get-Content -LiteralPath $resolvedCasePath -Raw | ConvertFrom-Json
+$noEvidenceRun = $null
 
 $caseResults = New-Object System.Collections.Generic.List[object]
 foreach ($case in @($caseDocument.cases)) {
@@ -156,10 +187,32 @@ foreach ($case in @($caseDocument.cases)) {
         continue
     }
 
+    $caseSummary = $summary
+    $needsNoEvidenceRun = $false
+    foreach ($assertion in @($case.required_assertions)) {
+        $assertionType = Get-JsonPropertyString -Object $assertion -Name "type"
+        if ($assertionType -in @("must_abstain", "must_return_empty_evidencepack", "must_not_include_citation")) {
+            $needsNoEvidenceRun = $true
+        }
+    }
+    if ($needsNoEvidenceRun) {
+        if ($null -eq $noEvidenceRun) {
+            $noEvidenceRun = Invoke-RAGSmokeRun -SmokeRunName ($RunName + "-no-evidence") -ExtraArgs @(
+                "-scenario", "no-evidence",
+                "-question", "unseeded private roadmap"
+            )
+        }
+        $caseSummary = $noEvidenceRun.summary
+    }
+    $caseSmokeRunName = $defaultRun.run_name
+    if ($needsNoEvidenceRun) {
+        $caseSmokeRunName = $noEvidenceRun.run_name
+    }
+
     $assertionResults = New-Object System.Collections.Generic.List[object]
     foreach ($assertion in @($case.required_assertions)) {
         $type = Get-JsonPropertyString -Object $assertion -Name "type"
-        $passed = Test-RAGAssertion -Summary $summary -Assertion $assertion
+        $passed = Test-RAGAssertion -Summary $caseSummary -Assertion $assertion
         $assertionResults.Add([pscustomobject]@{
             type = $type
             passed = $passed
@@ -173,11 +226,18 @@ foreach ($case in @($caseDocument.cases)) {
         stage = $stage
         status = $status
         passed = $true
+        smoke_run_name = $caseSmokeRunName
         assertions = $assertionResults
     })
 }
 
 Assert-Condition ($caseResults.Count -gt 0) "No active rag-service eval cases found in $resolvedCasePath"
+$noEvidenceRunName = ""
+$noEvidenceSummaryPath = ""
+if ($null -ne $noEvidenceRun) {
+    $noEvidenceRunName = $noEvidenceRun.run_name
+    $noEvidenceSummaryPath = $noEvidenceRun.summary_path
+}
 
 $adapterSummary = [pscustomobject]@{
     schema_version = 1
@@ -188,6 +248,8 @@ $adapterSummary = [pscustomobject]@{
     run_name = $RunName
     result_dir = $resultDir
     smoke_summary_path = $smokeSummaryPath
+    no_evidence_run_name = $noEvidenceRunName
+    no_evidence_summary_path = $noEvidenceSummaryPath
     case_count = $caseResults.Count
     cases = $caseResults
 }

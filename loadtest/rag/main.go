@@ -26,6 +26,9 @@ const (
 	defaultRAGTarget  = "127.0.0.1:10610"
 	defaultResultRoot = `H:\NexusIM\loadtest-results`
 	defaultQuestion   = "phoenix launch decision"
+
+	scenarioGrounded   = "grounded"
+	scenarioNoEvidence = "no-evidence"
 )
 
 type config struct {
@@ -39,6 +42,7 @@ type config struct {
 	senderUserID   string
 	deviceID       string
 	question       string
+	scenario       string
 	requestTimeout time.Duration
 	tls            grpctls.Config
 }
@@ -64,6 +68,7 @@ type ragSummary struct {
 	ResultDir               string       `json:"result_dir"`
 	RAGTarget               string       `json:"rag_target"`
 	Question                string       `json:"question"`
+	Scenario                string       `json:"scenario"`
 	Seed                    seededData   `json:"seed"`
 	AnswerID                string       `json:"answer_id"`
 	AnswerStatus            string       `json:"answer_status"`
@@ -152,6 +157,7 @@ func parseConfig(args []string) (config, error) {
 	flagSet.StringVar(&cfg.senderUserID, "sender-user-id", "rag-sender", "sender user id")
 	flagSet.StringVar(&cfg.deviceID, "device-id", "rag-device", "viewer device id")
 	flagSet.StringVar(&cfg.question, "question", defaultQuestion, "question sent to rag-service")
+	flagSet.StringVar(&cfg.scenario, "scenario", scenarioGrounded, "smoke scenario: grounded or no-evidence")
 	flagSet.DurationVar(&cfg.requestTimeout, "request-timeout", 10*time.Second, "gRPC request timeout")
 	flagSet.StringVar(&cfg.tls.CAFile, "rag-tls-ca-file", "", "rag gRPC TLS CA file")
 	flagSet.StringVar(&cfg.tls.ServerName, "rag-tls-server-name", "", "rag gRPC TLS server name")
@@ -163,6 +169,7 @@ func parseConfig(args []string) (config, error) {
 	cfg.resultRoot = strings.TrimSpace(cfg.resultRoot)
 	cfg.ragTarget = strings.TrimSpace(cfg.ragTarget)
 	cfg.question = strings.TrimSpace(cfg.question)
+	cfg.scenario = strings.ToLower(strings.TrimSpace(cfg.scenario))
 	if cfg.ragTarget == "" {
 		return config{}, errors.New("--rag-target is required")
 	}
@@ -171,6 +178,12 @@ func parseConfig(args []string) (config, error) {
 	}
 	if cfg.question == "" {
 		return config{}, errors.New("--question is required")
+	}
+	if cfg.scenario == "" {
+		cfg.scenario = scenarioGrounded
+	}
+	if cfg.scenario != scenarioGrounded && cfg.scenario != scenarioNoEvidence {
+		return config{}, fmt.Errorf("unsupported --scenario %q", cfg.scenario)
 	}
 	if cfg.runName == "" {
 		cfg.runName = "rag-service-answer-smoke-" + time.Now().UTC().Format("20060102-150405")
@@ -259,6 +272,23 @@ INSERT INTO %s (
 		); err != nil {
 			return seededData{}, err
 		}
+	}
+
+	if cfg.scenario == scenarioNoEvidence {
+		if err := tx.Commit(ctx); err != nil {
+			return seededData{}, err
+		}
+		return seededData{
+			TenantID:            cfg.tenantID,
+			ConversationID:      cfg.conversationID,
+			ViewerUserID:        cfg.viewerUserID,
+			SenderUserID:        cfg.senderUserID,
+			ConversationSeq:     seq,
+			VisibilityVersion:   visibilityVersion,
+			MemoryValidFromSeq:  seq,
+			MemoryValidToSeq:    seq + 10,
+			MemoryProjectionVer: memoryProjectionVersion,
+		}, nil
 	}
 
 	if _, err := tx.Exec(ctx, `
@@ -358,6 +388,9 @@ func verifyAnswer(
 	response *ragv1.AnswerQuestionResponse,
 	startedAt time.Time,
 ) (ragSummary, error) {
+	if cfg.scenario == scenarioNoEvidence {
+		return verifyInsufficientAnswer(cfg, resultDir, seed, response, startedAt)
+	}
 	if response.GetStatus() != ragv1.AnswerStatus_ANSWER_STATUS_GROUNDED {
 		return ragSummary{}, fmt.Errorf("unexpected answer status %v", response.GetStatus())
 	}
@@ -433,6 +466,7 @@ func verifyAnswer(
 		ResultDir:               resultDir,
 		RAGTarget:               cfg.ragTarget,
 		Question:                cfg.question,
+		Scenario:                cfg.scenario,
 		Seed:                    seed,
 		AnswerID:                response.GetAnswerId(),
 		AnswerStatus:            answerStatusName(response.GetStatus()),
@@ -445,6 +479,74 @@ func verifyAnswer(
 		SearchItemCount:         int(counts.SearchMessage),
 		MemoryItemCount:         int(counts.MemoryEvent),
 		SourceCounts:            counts,
+		SearchProjectionVersion: pack.GetSearchProjectionVersion(),
+		MemoryProjectionVersion: pack.GetMemoryProjectionVersion(),
+		RAGVersion:              response.GetRagVersion(),
+		RetrievalVersion:        pack.GetRetrievalVersion(),
+		Verified:                verified,
+		StartedAt:               startedAt,
+		FinishedAt:              time.Now().UTC(),
+	}, nil
+}
+
+func verifyInsufficientAnswer(
+	cfg config,
+	resultDir string,
+	seed seededData,
+	response *ragv1.AnswerQuestionResponse,
+	startedAt time.Time,
+) (ragSummary, error) {
+	if response.GetStatus() != ragv1.AnswerStatus_ANSWER_STATUS_INSUFFICIENT_EVIDENCE {
+		return ragSummary{}, fmt.Errorf("unexpected answer status for no-evidence scenario: %v", response.GetStatus())
+	}
+	if response.GetGeneratedByLlm() {
+		return ragSummary{}, errors.New("insufficient-evidence answer must not claim LLM generation")
+	}
+	if strings.TrimSpace(response.GetAnswerText()) == "" {
+		return ragSummary{}, errors.New("insufficient-evidence answer text is empty")
+	}
+	if len(response.GetCitations()) != 0 {
+		return ragSummary{}, errors.New("insufficient-evidence answer must not include citations")
+	}
+	pack := response.GetEvidencePack()
+	if pack == nil {
+		return ragSummary{}, errors.New("missing evidence pack")
+	}
+	if pack.GetTenantId() != cfg.tenantID || pack.GetConversationId() != cfg.conversationID {
+		return ragSummary{}, fmt.Errorf("unexpected evidence pack scope tenant=%q conversation=%q", pack.GetTenantId(), pack.GetConversationId())
+	}
+	if len(pack.GetItems()) != 0 {
+		return ragSummary{}, fmt.Errorf("insufficient-evidence pack must be empty, got %d items", len(pack.GetItems()))
+	}
+	if strings.TrimSpace(pack.GetRetrievalVersion()) == "" {
+		return ragSummary{}, errors.New("missing retrieval version")
+	}
+	if strings.TrimSpace(response.GetRagVersion()) == "" {
+		return ragSummary{}, errors.New("missing rag_version")
+	}
+	verified := []string{
+		"RAG returned INSUFFICIENT_EVIDENCE with empty EvidencePack",
+		"RAG did not include citations for insufficient evidence",
+		"RAG preserved rag_version and retrieval_version for abstain path",
+	}
+	return ragSummary{
+		RunName:                 cfg.runName,
+		ResultDir:               resultDir,
+		RAGTarget:               cfg.ragTarget,
+		Question:                cfg.question,
+		Scenario:                cfg.scenario,
+		Seed:                    seed,
+		AnswerID:                response.GetAnswerId(),
+		AnswerStatus:            answerStatusName(response.GetStatus()),
+		AnswerText:              response.GetAnswerText(),
+		Confidence:              response.GetConfidence(),
+		GeneratedByLLM:          response.GetGeneratedByLlm(),
+		CitationCount:           len(response.GetCitations()),
+		PackID:                  pack.GetPackId(),
+		EvidenceItemCount:       len(pack.GetItems()),
+		SearchItemCount:         0,
+		MemoryItemCount:         0,
+		SourceCounts:            sourceCounts{},
 		SearchProjectionVersion: pack.GetSearchProjectionVersion(),
 		MemoryProjectionVersion: pack.GetMemoryProjectionVersion(),
 		RAGVersion:              response.GetRagVersion(),

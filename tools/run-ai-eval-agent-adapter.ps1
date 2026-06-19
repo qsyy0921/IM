@@ -184,6 +184,37 @@ function Test-AgentAssertion {
         "must_not_execute_external_tool" {
             return (-not [bool]$Summary.execution_executed) -and (-not [bool]$Summary.action_audit.executed)
         }
+        "must_block_policy_denied_agent_action" {
+            return `
+                (Get-JsonPropertyString -Object $Summary -Name "proposal_status") -eq "BLOCKED" `
+                -and (-not [bool]$Summary.policy_allowed) `
+                -and (-not [bool]$Summary.policy_requires_approval) `
+                -and (-not [bool]$Summary.requires_approval) `
+                -and (-not [bool]$Summary.generated_by_llm) `
+                -and (Get-JsonPropertyString -Object $Summary -Name "policy_decision_source") -eq "TOOL_RULE" `
+                -and (Get-JsonPropertyString -Object $Summary -Name "policy_classification") -eq "TOOL_POLICY_DENIED"
+        }
+        "must_not_create_approval_or_execution" {
+            return `
+                (Get-JsonPropertyString -Object $Summary -Name "approval_id").Length -eq 0 `
+                -and (Get-JsonPropertyString -Object $Summary -Name "execution_id").Length -eq 0 `
+                -and (-not [bool]$Summary.execution_executed) `
+                -and (Get-JsonPropertyString -Object $Summary -Name "execution_result_id").Length -eq 0
+        }
+        "must_record_denied_prepare_audit" {
+            return `
+                (Get-JsonPropertyString -Object $Summary -Name "prepared_audit_id").Length -gt 0 `
+                -and (Get-JsonPropertyString -Object $Summary.mcp_audit -Name "audit_id") -eq (Get-JsonPropertyString -Object $Summary -Name "prepared_audit_id") `
+                -and (Get-JsonPropertyString -Object $Summary.mcp_audit -Name "status") -eq "BLOCKED" `
+                -and (-not [bool]$Summary.mcp_audit.allowed) `
+                -and (-not [bool]$Summary.mcp_audit.requires_approval) `
+                -and (Get-JsonPropertyString -Object $Summary.mcp_audit -Name "classification") -eq "TOOL_POLICY_DENIED" `
+                -and (Get-JsonPropertyString -Object $Summary.mcp_audit -Name "decision_source") -eq "TOOL_RULE" `
+                -and [bool]$Summary.mcp_audit.input_sha256_present `
+                -and [bool]$Summary.mcp_audit.raw_input_column_absent `
+                -and [bool]$Summary.mcp_audit.idempotency_key_matches `
+                -and [bool]$Summary.mcp_audit.low_sensitive_audit_only
+        }
         default {
             throw "unsupported agent eval assertion type: $type"
         }
@@ -247,6 +278,7 @@ $summary = $defaultRun.summary
 $resultDir = $defaultRun.result_dir
 $smokeSummaryPath = $defaultRun.summary_path
 $safeToolRun = $null
+$policyDeniedRun = $null
 
 $caseResults = New-Object System.Collections.Generic.List[object]
 foreach ($case in @($caseDocument.cases)) {
@@ -258,10 +290,18 @@ foreach ($case in @($caseDocument.cases)) {
 
     $caseSummary = $summary
     $needsSafeToolRun = $false
+    $needsPolicyDeniedRun = $false
     foreach ($assertion in @($case.required_assertions)) {
-        if ((Get-JsonPropertyString -Object $assertion -Name "type") -eq "must_execute_safe_local_tool") {
+        $assertionType = Get-JsonPropertyString -Object $assertion -Name "type"
+        if ($assertionType -eq "must_execute_safe_local_tool") {
             $needsSafeToolRun = $true
         }
+        if ($assertionType -in @("must_block_policy_denied_agent_action", "must_not_create_approval_or_execution", "must_record_denied_prepare_audit")) {
+            $needsPolicyDeniedRun = $true
+        }
+    }
+    if ($needsSafeToolRun -and $needsPolicyDeniedRun) {
+        throw "Agent eval case $($case.id) cannot require both safe tool execution and policy-denied runs"
     }
     if ($needsSafeToolRun) {
         if ($null -eq $safeToolRun) {
@@ -275,9 +315,21 @@ foreach ($case in @($caseDocument.cases)) {
         }
         $caseSummary = $safeToolRun.summary
     }
+    if ($needsPolicyDeniedRun) {
+        if ($null -eq $policyDeniedRun) {
+            $policyDeniedRun = Invoke-AgentSmokeRun -SmokeRunName ($RunName + "-policy-denied") -ExtraArgs @(
+                "-scenario", "policy-denied",
+                "-risk-level", "LOW"
+            )
+        }
+        $caseSummary = $policyDeniedRun.summary
+    }
     $caseSmokeRunName = $defaultRun.run_name
     if ($needsSafeToolRun) {
         $caseSmokeRunName = $safeToolRun.run_name
+    }
+    if ($needsPolicyDeniedRun) {
+        $caseSmokeRunName = $policyDeniedRun.run_name
     }
 
     $assertionResults = New-Object System.Collections.Generic.List[object]
@@ -309,6 +361,12 @@ if ($null -ne $safeToolRun) {
     $safeToolRunName = $safeToolRun.run_name
     $safeToolSummaryPath = $safeToolRun.summary_path
 }
+$policyDeniedRunName = ""
+$policyDeniedSummaryPath = ""
+if ($null -ne $policyDeniedRun) {
+    $policyDeniedRunName = $policyDeniedRun.run_name
+    $policyDeniedSummaryPath = $policyDeniedRun.summary_path
+}
 
 $adapterSummary = [pscustomobject]@{
     schema_version = 1
@@ -321,6 +379,8 @@ $adapterSummary = [pscustomobject]@{
     smoke_summary_path = $smokeSummaryPath
     safe_tool_run_name = $safeToolRunName
     safe_tool_summary_path = $safeToolSummaryPath
+    policy_denied_run_name = $policyDeniedRunName
+    policy_denied_summary_path = $policyDeniedSummaryPath
     case_count = $caseResults.Count
     cases = $caseResults
 }

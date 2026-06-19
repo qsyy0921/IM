@@ -25,5 +25,4 @@
 下一步：
 
 - 让 `agent-service` 在 proposal 前读取 skill-registry，校验 tool name / action / schema 元数据。
-- 后续接 `mcp-gateway`，把外部 MCP server / tool adapter 纳入租户、限流、policy 和 audit 边界。
-- 后续接 `action-executor`，执行已审批低风险动作并记录幂等和 audit。
+- `mcp-gateway` 和 `action-executor` first path 已读取 skill contract；后续补 schema validation、version compatibility 和真实 tool adapter metadata。

@@ -31,8 +31,8 @@
 - `agent-service.md`
 - `skill-registry.md`
 - `mcp-gateway.md`
+- `action-executor.md`
 - `ai-eval-harness.md`
-- 后续待新增：`action-executor.md`。
 
 ## 通用约束
 

@@ -321,4 +321,15 @@ foreach ($alert in $requiredMCPGatewayAlerts) {
     }
 }
 
+$requiredActionExecutorAlerts = @(
+    "NexusIMActionExecutorDown",
+    "NexusIMActionExecutorInfoMissing"
+)
+
+foreach ($alert in $requiredActionExecutorAlerts) {
+    if ($rulesByService["action-executor"] -notmatch [regex]::Escape($alert)) {
+        throw "Prometheus action-executor rules missing alert: $alert"
+    }
+}
+
 Write-Host "OK   local Prometheus config"

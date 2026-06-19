@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package nexusim.actionexecutor.v1;
+
+import "nexusim/policy/v1/policy_service.proto";
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/actionexecutor/v1;actionexecutorv1";
+
+service ActionExecutorService {
+  rpc ExecuteApprovedAction(ExecuteApprovedActionRequest) returns (ExecuteApprovedActionResponse);
+}
+
+enum ActionExecutionStatus {
+  ACTION_EXECUTION_STATUS_UNSPECIFIED = 0;
+  ACTION_EXECUTION_STATUS_RECORDED = 1;
+  ACTION_EXECUTION_STATUS_BLOCKED = 2;
+  ACTION_EXECUTION_STATUS_FAILED = 3;
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+message ExecuteApprovedActionRequest {
+  AuthContext auth_context = 1;
+  string proposal_id = 2;
+  string approval_id = 3;
+  string prepared_audit_id = 4;
+  string skill_id = 5;
+  string tool_name = 6;
+  nexusim.policy.v1.ToolAction action = 7;
+  string resource_type = 8;
+  string resource_id = 9;
+  string risk_level = 10;
+  string intent = 11;
+  string input_json = 12;
+  string idempotency_key = 13;
+}
+
+message ExecuteApprovedActionResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  string execution_id = 3;
+  string proposal_id = 4;
+  string approval_id = 5;
+  string prepared_audit_id = 6;
+  string skill_id = 7;
+  string tool_name = 8;
+  nexusim.policy.v1.ToolAction action = 9;
+  string resource_type = 10;
+  string resource_id = 11;
+  string risk_level = 12;
+  ActionExecutionStatus status = 13;
+  bool allowed = 14;
+  bool requires_approval = 15;
+  int64 permission_version = 16;
+  string classification = 17;
+  string reason = 18;
+  string decision_source = 19;
+  bool executed = 20;
+  string output_json = 21;
+}

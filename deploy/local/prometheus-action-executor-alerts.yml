@@ -1,0 +1,21 @@
+groups:
+  - name: nexusim-action-executor
+    rules:
+      - alert: NexusIMActionExecutorDown
+        expr: up{service="action-executor"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: action-executor
+        annotations:
+          summary: "action-executor metrics endpoint is down"
+
+      - alert: NexusIMActionExecutorInfoMissing
+        expr: absent(nexusim_action_executor_service_info)
+        for: 2m
+        labels:
+          severity: warning
+          service: action-executor
+        annotations:
+          summary: "action-executor info metric is missing"
+

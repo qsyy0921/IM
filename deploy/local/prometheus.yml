@@ -147,3 +147,11 @@ scrape_configs:
           - host.docker.internal:11924
         labels:
           service: mcp-gateway
+
+  - job_name: nexusim-action-executor
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:11925
+        labels:
+          service: action-executor

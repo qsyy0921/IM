@@ -290,6 +290,29 @@ services:
       nexusim-services:
         ipv4_address: 172.30.80.27
 
+  action-executor-grpc:
+    image: nexusim/action-executor:local
+    container_name: nexusim-action-executor-grpc
+    depends_on:
+      skill-registry-grpc:
+        condition: service_started
+      policy-service-grpc:
+        condition: service_started
+    environment:
+      NEXUSIM_ACTION_EXECUTOR_MODE: grpc
+      NEXUSIM_ACTION_EXECUTOR_GRPC_ADDR: 172.30.80.28:10660
+      NEXUSIM_ACTION_EXECUTOR_DEBUG_ADDR: 172.30.80.28:11925
+      NEXUSIM_SKILL_REGISTRY_GRPC_ADDR: skill-registry-grpc:10640
+      NEXUSIM_POLICY_GRPC_ADDR: policy-service-grpc:10800
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+    ports:
+      - "10660:10660"
+      - "11925:11925"
+    restart: unless-stopped
+    networks:
+      nexusim-services:
+        ipv4_address: 172.30.80.28
+
   push-gateway-ws:
     image: nexusim/push-gateway:local
     container_name: nexusim-push-gateway-ws

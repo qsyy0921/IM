@@ -24,7 +24,7 @@ memory / policy 私有表。
 
 下一步：
 
-- 接 `skill-registry`，登记可被 Agent 调用的技能、输入输出合约、权限和
-  审计元数据。
-- 后续再接 `mcp-gateway` 和 `action-executor`。
+- proposal 前改为读取 `skill-registry`，再调用 `mcp-gateway` prepare。
+- 接正式 proposal store / approval workflow，再与 `action-executor` 串成
+  approved action path。
 - 外部 LLM adapter 后续仍必须走 ProposalProvider port 和 citation verifier。

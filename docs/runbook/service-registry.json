@@ -143,6 +143,14 @@
       "grafana_dashboard": "mcp-gateway-observability.json"
     },
     {
+      "name": "action-executor",
+      "stage": "foundation-active",
+      "local_process": "action-executor-grpc",
+      "debug_port": 11925,
+      "prometheus_rule_file": "prometheus-action-executor-alerts.yml",
+      "grafana_dashboard": "action-executor-observability.json"
+    },
+    {
       "name": "media-service",
       "stage": "future"
     },
@@ -156,10 +164,6 @@
     },
     {
       "name": "admin-service",
-      "stage": "future"
-    },
-    {
-      "name": "action-executor",
       "stage": "future"
     },
     {

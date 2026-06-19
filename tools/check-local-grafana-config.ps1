@@ -256,6 +256,10 @@ $mcpGatewayRequiredMetrics = @(
     "nexusim_mcp_gateway_service_info"
 )
 
+$actionExecutorRequiredMetrics = @(
+    "nexusim_action_executor_service_info"
+)
+
 Test-Dashboard -Path $dashboardPathsByService["api-gateway"] -Name "api-gateway" -ExpectedUid "nexusim-api-gateway" -MinimumPanels 5 -RequiredMetrics $apiGatewayRequiredMetrics
 Test-Dashboard -Path $dashboardPathsByService["identity-service"] -Name "identity-service" -ExpectedUid "nexusim-identity-service" -MinimumPanels 8 -RequiredMetrics $identityRequiredMetrics
 Test-Dashboard -Path $dashboardPathsByService["message-service"] -Name "message-service" -ExpectedUid "nexusim-message-service" -MinimumPanels 8 -RequiredMetrics $messageRequiredMetrics
@@ -272,5 +276,6 @@ Test-Dashboard -Path $dashboardPathsByService["summary-service"] -Name "summary-
 Test-Dashboard -Path $dashboardPathsByService["agent-service"] -Name "agent-service" -ExpectedUid "nexusim-agent-service" -MinimumPanels 1 -RequiredMetrics $agentRequiredMetrics
 Test-Dashboard -Path $dashboardPathsByService["skill-registry"] -Name "skill-registry" -ExpectedUid "nexusim-skill-registry" -MinimumPanels 1 -RequiredMetrics $skillRegistryRequiredMetrics
 Test-Dashboard -Path $dashboardPathsByService["mcp-gateway"] -Name "mcp-gateway" -ExpectedUid "nexusim-mcp-gateway" -MinimumPanels 1 -RequiredMetrics $mcpGatewayRequiredMetrics
+Test-Dashboard -Path $dashboardPathsByService["action-executor"] -Name "action-executor" -ExpectedUid "nexusim-action-executor" -MinimumPanels 1 -RequiredMetrics $actionExecutorRequiredMetrics
 
 Write-Host "OK   local Grafana config"

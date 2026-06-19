@@ -32,7 +32,7 @@
 - 服务级实现细节不重新堆回总架构。
 - Codex 每轮执行目标不写在架构文档里，统一读取 `../runbook/current-goal.md`。
 - 当前 9 个已实现服务优先补齐 AI 依赖的 IM 语义、安全边界、事件契约和本地可验证闭环；生产级测试和 HA 证据作为后续加固项，不阻塞转入 AI 底座设计与第一批服务实现。
-- AI 底座演进顺序为 `search-service v0.1 -> memory-service -> retrieval-gateway -> rag-service / summary-service -> agent-service -> skill-registry / mcp-gateway -> action-executor`；其中 `agent-service` first proposal-only path 已落，下一步补真实 adapter smoke；`ai-eval-service` 第一阶段可以先作为 harness / gate，不强制立刻拆成线上服务。
+- AI 底座演进顺序为 `search-service v0.1 -> memory-service -> retrieval-gateway -> rag-service / summary-service -> agent-service -> skill-registry / mcp-gateway -> action-executor`；当前第一组 foundation-active 已落到 `action-executor` first execution audit path，后续继续推进 approval / real tool adapter；`ai-eval-service` 第一阶段可以先作为 harness / gate，不强制立刻拆成线上服务。
 - 后续服务和中间件都不是写死终局；新增必须符合独立数据模型、独立伸缩、独立故障、独立安全边界之一，或显著降低复杂度，并通过 ADR 和证据演进。
 - 可以使用 multi sub-agent 推进互不重叠的服务、文档和验证任务；主 agent 负责统一方案、合并结果、最终检查和关闭 stale sub-agent。
 

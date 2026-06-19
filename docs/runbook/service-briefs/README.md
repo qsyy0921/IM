@@ -24,11 +24,12 @@
 - [agent-service](agent-service.md)
 - [skill-registry](skill-registry.md)
 - [mcp-gateway](mcp-gateway.md)
+- [action-executor](action-executor.md)
 
 ## 当前新增服务顺序
 
 - 现有 9 个服务只做阻塞 AI 链路的必要收口。
-- `search-service` / `memory-service` / `retrieval-gateway` / `rag-service` / `summary-service` / `agent-service` / `skill-registry` / `mcp-gateway` 是第一组 foundation-active AI 服务；后续顺序是 action-executor。
+- `search-service` / `memory-service` / `retrieval-gateway` / `rag-service` / `summary-service` / `agent-service` / `skill-registry` / `mcp-gateway` / `action-executor` 是第一组 foundation-active AI 服务。
 - `memory-service` 第一版 contracts 已开始落地，必须按 group memory 设计，而不是普通摘要缓存：source refs、speaker / audience、validity window、supersedes、confidence、review state 是基本字段。
 - Agent / skill-registry / MCP gateway / action-executor 接真实业务动作时必须先走 policy-service tool policy precheck；写动作默认 `Proposal -> Approval -> Executor -> Audit`，低风险 allowlist 也必须可审计和幂等。
 - 可以用 sub-agent 并行推进服务 brief / SDD / 测试缺口，但不同 agent 不能同时修改同一个服务文件。

@@ -27,4 +27,4 @@
 
 - 让 `agent-service` proposal 前调用 mcp-gateway prepare，而不是只直接调用 policy-service。
 - 后续实现真实 MCP adapter 时必须继续走 skill catalog、policy、rate limit、audit 和 failure fallback。
-- 后续接 `action-executor`，执行已审批动作并记录幂等和审计。
+- 与 `action-executor` 的 first audit path 已具备基础串接点；后续补正式 approval store 校验和真实 tool result handoff。

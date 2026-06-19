@@ -53,10 +53,11 @@ Existing real services: `api-gateway`, `identity-service`, `message-service`,
 `conversation-service`, `delivery-service`, `push-gateway`, `receipt-service`,
 `contacts-service`, and `policy-service`.
 
-Current active slice: `skill-registry` first catalog path and `mcp-gateway`
-first prepare path are landed after the real local
+Current active slice: `skill-registry` first catalog path, `mcp-gateway`
+first prepare path and `action-executor` first execution audit path are landed after the real local
 `retrieval-gateway -> policy-service -> agent-service` adapter smoke. Next move
-is `action-executor`. Search, memory, retrieval, real RAG / summary / Agent
+is the approval / real tool adapter follow-up or the next AI mainline slice from
+`current-goal.md`. Search, memory, retrieval, real RAG / summary / Agent
 adapter smokes, the skill catalog foundation, and the MCP prepare boundary are
 passed.
 

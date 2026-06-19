@@ -16,7 +16,7 @@
 2. 读取 prompt.md 和 agent.md。
 3. 读取 docs/runbook/current-goal.md 的当前 active slice；再按需读取 current-brief、remaining-goals、相关 service brief 或 SDD；不要全文扫长历史文档。
 
-当前 active slice：skill-registry first catalog path 和 mcp-gateway first prepare path 已落；mcp-gateway 只做 skill contract 校验、policy precheck 和低敏 audit，不执行外部工具。下一步推进 action-executor。RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；真实写动作必须继续走 policy、proposal / approval / executor / audit。
+当前 active slice：skill-registry first catalog path、mcp-gateway first prepare path 和 action-executor first execution audit path 已落；mcp-gateway 只做 skill contract 校验、policy precheck 和低敏 audit，不执行外部工具；action-executor 第一版只记录 approved execution boundary，`executed=false`，不连接外部 MCP/tool provider。下一步推进 approval / real tool adapter 串接，或按本页优先级继续 AI 主线。RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；真实写动作必须继续走 policy、proposal / approval / executor / audit。
 
 可用多个 sub-agent 做互不重叠任务；主 agent 负责集成、检查和文档同步。不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
 ```
@@ -46,7 +46,8 @@ search-service v0.1（第一步，已完成第一轮 smoke）
 -> agent-service adapter smoke（已通过）
 -> skill-registry first catalog path（已落）
 -> mcp-gateway first prepare path（已落）
--> action-executor
+-> action-executor first execution audit path（已落）
+-> approval / real tool adapter follow-up
 -> 不做孤立 LLM demo
 ```
 
@@ -67,7 +68,7 @@ search-service v0.1（第一步，已完成第一轮 smoke）
 5. `rag-service`：first-stage 只读 answer path、`loadtest/rag`、RAG eval execution adapter、真实 RAG adapter smoke、provider boundary 和 citation verifier first pass 已落；只消费 EvidencePack，返回 citations 和 `generated_by_llm=false`，无 evidence 必须拒答。
 6. AI eval harness：first-stage 低敏 case schema / validator 已落；RAG adapter 已落；后续补 Agent execution adapter。
 7. `summary-service`：first-stage 只读 summary path 和真实 adapter smoke 已落；只消费受控 EvidencePack，返回 citations 和 `generated_by_llm=false`，无 evidence 必须拒绝摘要。
-8. Agent / `skill-registry` / `mcp-gateway` / `action-executor`：只消费受控 EvidencePack 和 tool policy，不直接读业务库；`agent-service` first proposal-only path 和真实 adapter smoke 已落；`skill-registry` first catalog path 已落；`mcp-gateway` first prepare path 已落，下一步推进 `action-executor`。
+8. Agent / `skill-registry` / `mcp-gateway` / `action-executor`：只消费受控 EvidencePack 和 tool policy，不直接读业务库；`agent-service` first proposal-only path 和真实 adapter smoke 已落；`skill-registry` first catalog path 已落；`mcp-gateway` first prepare path 已落；`action-executor` first execution audit path 已落，后续推进 approval / real tool adapter 串接。
 9. 生产级观测、HA、长压和 sizing：继续作为 hardening backlog 推进，但不阻塞当前 AI 底座路线启动。
 
 新发现的待完成工作必须写入 `docs/runbook/remaining-goals.md`；已完成的工作从该文档移除，并同步到对应 service brief / progress 文档。

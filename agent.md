@@ -128,13 +128,12 @@ file or section, and close stale agents after integration.
 
 ## Validation Before Finishing
 
-For meaningful changes:
+Use tiered gates to avoid wasting time:
 
-1. Run focused service/package tests.
-2. Run relevant integration or smoke checks.
-3. Run `.\tools\check-local.ps1` unless the change is docs-only and a focused
-   doc check is sufficient.
-4. Check `git status --short --branch --untracked-files=all`.
-5. Commit with a focused message when requested or appropriate.
+1. Small docs or one-package code: run focused tests/scripts only.
+2. One-service changes: run that service tests, build, and relevant smoke.
+3. Cross-service, generated code, migration, registry, Docker/compose, security
+   boundary, or pre-push changes: run `.\tools\check-local.ps1`.
+4. Always end with `git status --short --branch --untracked-files=all`.
 
-Short-term production-grade load tests, long fault drills, and full production-readiness checks run only when the task, risk, or user asks for them.
+Long load tests, fault drills, production-readiness checks, and full gates run only when risk, scope, or the user asks for them.

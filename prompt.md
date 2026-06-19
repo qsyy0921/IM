@@ -23,6 +23,8 @@
 硬边界：RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；真实写动作必须继续走 policy、proposal / approval / executor / audit；Python AI Worker 只做模型 / 算法 / eval 候选层，Go 仍负责控制面和事实边界。
 
 可用多个 sub-agent 做互不重叠任务；主 agent 负责集成、检查和文档同步。不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
+
+门禁按风险分层：小改只跑相关测试 / 文档脚本；跨服务、生成代码、migration、service-registry、Docker/compose、安全边界或提交推送前才跑完整 check-local。
 ```
 
 ## 文档路由
@@ -34,7 +36,7 @@
 ## 工作原则
 
 1. 主线阶段以 `current-goal.md` 和 `current-brief.md` 为准；不要在本文件重复维护长状态。
-2. 小切片闭环：设计、代码、必要测试、文档一起收。
+2. 小切片闭环：设计、代码、必要测试、文档一起收；默认跑相关局部门禁，不频繁跑完整 `check-local`。
 3. 降低耦合并控制复杂度：不跨服务读内部表，不引入网状同步 RPC，接近行数阈值就拆同 package 文件。
 4. 新服务和中间件不写死；满足独立模型 / 伸缩 / 故障 / 安全边界或明显降复杂度时通过 ADR 新增。
 5. 可用多个 sub-agent，但必须拆分互不重叠职责；主 agent 负责集成和最终检查。

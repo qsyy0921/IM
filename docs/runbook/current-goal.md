@@ -6,14 +6,16 @@
 ## 当前默认主线
 
 ```text
-AI 大模型应用底座：
+当前唯一默认主线：AI 大模型应用底座。
 group memory -> EvidencePack -> RAG -> summary -> multi-agent
 -> skill-registry -> MCP/tool gateway -> action-executor
 -> proposal / approval / audit -> ai-eval
 ```
 
+如果用户只说“继续 / 接下来做什么 / 动手去做”，默认推进这条 AI 主线。
 9 个既有 IM 服务是可运行基础；默认只处理阻塞 AI 主线的 P0/P1、用户点名任务，
-或本轮切片必须补的边界。生产级 HA、长压、sizing、provider-grade 运维后置。
+或本轮切片必须补的边界。不要把任务自动切回九服务长期 P2 hardening、
+生产级 HA、长压、sizing、provider-grade 运维或 Docker/双机基础设施整理。
 
 ## 当前 Active Slice
 
@@ -44,10 +46,11 @@ policy、proposal / approval、executor 和 audit；不能直接读业务私表�
 
 ## 执行规则
 
-1. 每轮先读 `prompt.md`、`agent.md`、`current-brief.md`、`remaining-goals.md`。
-2. 当前任务涉及哪个服务，再读对应 `service-briefs/<service>.md` 和 SDD 章节。
-3. 新发现待办写入 `remaining-goals.md`。
-4. 有意义切片要闭环：代码、测试、文档、focused commit。
+1. 每轮先读 `prompt.md`、`agent.md` 和本文件。
+2. 需要阶段背景时读 `current-brief.md`；需要选择未完成任务时读 `remaining-goals.md`。
+3. 当前任务涉及哪个服务，再读对应 `service-briefs/<service>.md` 和必要 SDD 章节。
+4. 新发现待办写入 `remaining-goals.md`。
+5. 有意义切片要闭环：代码、测试、文档、focused commit。
 
 ## 分层路线
 

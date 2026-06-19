@@ -47,11 +47,15 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 - `summary-service` 服务级 Python worker candidate guard：`python-worker`
   provider mode 调用 Python worker CLI，只接受 hash / citation metadata，
   最终摘要、citation verifier 和 fail-closed 仍由 Go 控制。
+- `agent-service` 服务级 planner Python worker candidate guard：`python-worker`
+  proposal provider mode 调用 Python worker CLI，只接受 proposal hash /
+  citation metadata，最终 proposal、citation verifier、approval 和 audit
+  仍由 Go 控制。
 
 下一步默认推进：
 
 ```text
-agent-service planner Python candidate integration
+external MCP / provider tool guarded adapter first path
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

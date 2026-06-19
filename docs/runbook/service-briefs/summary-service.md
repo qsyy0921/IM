@@ -27,4 +27,4 @@
 
 - provider-specific LLM / Python worker 后续仍必须走 SummaryProvider port、
   prompt guard、hash / citation metadata 校验和 citation verifier。
-- 进入 agent-service planner Python candidate integration；summary / Agent 仍只能消费 EvidencePack。
+- `agent-service` 服务级 planner Python candidate guard 已落；下一步默认推进 external MCP / provider tool guarded adapter first path。summary / Agent 仍只能消费 EvidencePack。

@@ -20,6 +20,10 @@ proposal 元数据，并提供 approval / execution preflight 校验；它仍不
 - 调用 `retrieval-gateway.RetrieveEvidence` 获取 EvidencePack。
 - 第一版通过 `ProposalProvider` port 生成 deterministic extractive proposal；
   默认实现不调用外部 LLM provider。
+- 可选 `python-worker` provider mode 只作为第一阶段 planner candidate
+  guard：Go 先生成 grounded proposal，Python worker 只返回 proposal hash /
+  citations / confidence metadata；Go 校验 task / candidate id、hash 和 citations
+  后仍返回 Go 生成的 proposal。
 - response 必须保留 `tool_policy_decision`、`citations`、原始 `EvidencePack`、
   `skill_id`、`prepared_audit_id`、`agent_version` 和 `generated_by_llm=false`。
 - mcp prepare deny 时返回 `BLOCKED`，并且不检索 EvidencePack。
@@ -85,6 +89,8 @@ Agent 不允许绕过 mcp-gateway / policy，也不允许直接执行 mutation�
   evidence 原文或业务 payload；mcp-gateway 只保存 input hash。
 - `CreateAgentProposal` 不返回没有 EvidencePack 支撑的事实。
 - citations 必须可追踪到 evidence item 或 source ref。
+- Python worker 不能决定 proposal status、approval、execution 或 audit；
+  worker 输出仅用于候选完整性校验，不能成为业务事实源。
 - approval 只把 proposal 从 `PROPOSED` 转为 `APPROVED`，不执行业务 mutation。
 - approval outbox 是 first-stage local audit handoff，不代表 Kafka relay 或
   外部 audit sink 已完成。
@@ -98,5 +104,6 @@ Agent 不允许绕过 mcp-gateway / policy，也不允许直接执行 mutation�
 - 接 `action-executor` 的真实 MCP / tool adapter，并继续保持 proposal /
   approval / executor / audit 串接。
 - 补 external review UI；当前 approval operator 和 approval outbox relay 已有 first path。
-- 外部 LLM adapter 接入时增加 prompt boundary、token budget、PII / secret
-  filter、tool-call schema validation 和 provider failure fallback。
+- 外部 LLM / MCP provider adapter 接入时增加 prompt boundary、token budget、
+  PII / secret filter、tool-call schema validation、provider failure fallback
+  和 tool output safety cases。

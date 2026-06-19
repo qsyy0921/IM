@@ -72,6 +72,7 @@ Run this repo-level guard when changing Python worker foundations:
 go run ./tools/python-worker-go-adapter-smoke -python C:\Users\10495\anaconda3\envs\IM\python.exe
 go run ./services/rag-service/cmd/rag-python-worker-provider-smoke -python C:\Users\10495\anaconda3\envs\IM\python.exe
 go run ./services/summary-service/cmd/summary-python-worker-provider-smoke -python C:\Users\10495\anaconda3\envs\IM\python.exe
+go run ./services/agent-service/cmd/agent-python-worker-provider-smoke -python C:\Users\10495\anaconda3\envs\IM\python.exe
 ```
 
 The guard is intentionally small. It protects the first-stage boundary:
@@ -83,6 +84,6 @@ candidate contract safety: malformed / unsafe inputs fail closed, successful
 candidates return hashes and source refs rather than raw output text, and Go
 consumes candidate metadata rather than delegating control to Python.
 
-The RAG and summary provider smokes prove services can wrap Go-owned providers
-with a Python worker candidate guard while final state, citations and failure
-handling stay in Go.
+The RAG, summary and Agent provider smokes prove services can wrap Go-owned
+providers with a Python worker candidate guard while final state, citations,
+approval, audit and failure handling stay in Go.

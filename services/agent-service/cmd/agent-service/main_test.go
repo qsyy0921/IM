@@ -43,6 +43,28 @@ func TestValidateAgentDebugListenerConfigAllowsExplicitPublicOptIn(t *testing.T)
 	}
 }
 
+func TestAgentProposalProviderFromEnvAllowsPythonWorkerMode(t *testing.T) {
+	t.Setenv("NEXUSIM_AGENT_PROPOSAL_PROVIDER_MODE", "python-worker")
+	t.Setenv("NEXUSIM_AGENT_PYTHON_BIN", "python")
+	t.Setenv("NEXUSIM_AGENT_PYTHON_WORKER_SCRIPT", "ai/python/scripts/run_candidate_worker.py")
+
+	provider, err := agentProposalProviderFromEnv()
+	if err != nil {
+		t.Fatalf("python worker provider should be valid: %v", err)
+	}
+	if provider == nil {
+		t.Fatal("expected provider")
+	}
+}
+
+func TestAgentProposalProviderFromEnvRejectsUnknownMode(t *testing.T) {
+	t.Setenv("NEXUSIM_AGENT_PROPOSAL_PROVIDER_MODE", "unsafe-direct-provider")
+
+	if _, err := agentProposalProviderFromEnv(); err == nil {
+		t.Fatal("expected unsupported provider mode error")
+	}
+}
+
 func TestNewDebugHandlerExposesMetrics(t *testing.T) {
 	server := http.Server{Handler: newDebugHandler()}
 	request, err := http.NewRequest(http.MethodGet, "/metrics", nil)

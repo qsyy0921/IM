@@ -27,4 +27,4 @@
 
 - provider-specific LLM / Python worker 后续仍必须走 AnswerProvider port、prompt
   guard 和 citation verifier。
-- `summary-service` 已进入 foundation-active；下一步默认推进 agent-service planner Python candidate integration。summary / Agent 仍只能消费 EvidencePack。
+- `summary-service` 和 `agent-service` 服务级 Python candidate guard 已落；下一步默认推进 external MCP / provider tool guarded adapter first path。summary / Agent 仍只能消费 EvidencePack。

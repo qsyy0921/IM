@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/qsyy0921/IM/internal/ai/pythonworker"
 	agentgrpc "github.com/qsyy0921/IM/services/agent-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/agent-service/internal/app"
 	kafkainfra "github.com/qsyy0921/IM/services/agent-service/internal/infrastructure/kafka"
@@ -106,6 +107,10 @@ func runGRPC(ctx context.Context) error {
 		return err
 	}
 	defer closeMCPGateway()
+	proposalProvider, err := agentProposalProviderFromEnv()
+	if err != nil {
+		return err
+	}
 
 	addr := envString("NEXUSIM_AGENT_GRPC_ADDR", "127.0.0.1:10630")
 	listener, err := net.Listen("tcp", addr)
@@ -115,7 +120,7 @@ func runGRPC(ctx context.Context) error {
 	repository := postgresinfra.NewRepository(pool)
 	server := grpc.NewServer()
 	agentgrpc.Register(server, agentgrpc.NewServerWithWorkflows(
-		app.NewCreateAgentProposalUseCaseWithRepository(retrievalClient, mcpClient, app.ExtractiveProposalProvider{}, repository),
+		app.NewCreateAgentProposalUseCaseWithRepository(retrievalClient, mcpClient, proposalProvider, repository),
 		app.NewApproveAgentProposalUseCase(repository),
 		app.NewVerifyApprovedAgentProposalUseCase(repository),
 	))
@@ -198,6 +203,32 @@ func validateAgentServiceMode(mode string) error {
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_AGENT_SERVICE_MODE %q", mode)
 	}
+}
+
+func agentProposalProviderFromEnv() (app.ProposalProvider, error) {
+	mode := strings.ToLower(envString("NEXUSIM_AGENT_PROPOSAL_PROVIDER_MODE", "extractive"))
+	switch mode {
+	case "extractive":
+		return app.ExtractiveProposalProvider{}, nil
+	case "python-worker":
+		runner, err := agentPythonWorkerRunnerFromEnv()
+		if err != nil {
+			return nil, err
+		}
+		return app.NewPythonWorkerProposalProvider(app.ExtractiveProposalProvider{}, runner), nil
+	default:
+		return nil, fmt.Errorf("unsupported NEXUSIM_AGENT_PROPOSAL_PROVIDER_MODE %q", mode)
+	}
+}
+
+func agentPythonWorkerRunnerFromEnv() (pythonworker.Runner, error) {
+	return pythonworker.NewRunner(pythonworker.RunnerOptions{
+		Python:         envString("NEXUSIM_AGENT_PYTHON_BIN", "python"),
+		ScriptPath:     envString("NEXUSIM_AGENT_PYTHON_WORKER_SCRIPT", "ai/python/scripts/run_candidate_worker.py"),
+		WorkDir:        envString("NEXUSIM_AGENT_PYTHON_WORKER_WORKDIR", "."),
+		Timeout:        envDuration("NEXUSIM_AGENT_PYTHON_WORKER_TIMEOUT", 5*time.Second),
+		MaxOutputBytes: int64(envInt("NEXUSIM_AGENT_PYTHON_WORKER_MAX_OUTPUT_BYTES", int(pythonworker.DefaultMaxOutputBytes))),
+	})
 }
 
 func agentDebugAddr() string {

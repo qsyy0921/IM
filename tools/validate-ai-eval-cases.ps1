@@ -126,6 +126,8 @@ $knownAssertionTypes = @(
     "must_preserve_tool_policy_metadata",
     "must_record_tool_payload_hash_only",
     "must_execute_external_http_tool",
+    "must_classify_mcp_fallback_failure",
+    "must_not_execute_external_mcp_tool",
     "must_not_send_raw_tool_input",
     "must_classify_provider_failure",
     "must_reject_unsafe_tool_output",

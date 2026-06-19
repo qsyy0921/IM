@@ -458,6 +458,114 @@
       ]
     },
     {
+      "id": "external-mcp-provider-unavailable",
+      "family": "action_execution_safety",
+      "stage": "action-executor-mcp-fallback",
+      "status": "active",
+      "query": "handle external mcp provider unavailable safely",
+      "risk": "External MCP provider unavailable must fail closed without executing a tool or persisting raw provider data",
+      "required_assertions": [
+        {
+          "type": "must_classify_mcp_fallback_failure",
+          "expected_classification": "TOOL_PROVIDER_UNAVAILABLE"
+        },
+        {
+          "type": "must_not_execute_external_mcp_tool"
+        },
+        {
+          "type": "must_not_send_raw_tool_input"
+        },
+        {
+          "type": "must_not_store_raw_provider_output"
+        },
+        {
+          "type": "must_record_tool_result_projection",
+          "expected_status": "FAILED"
+        }
+      ]
+    },
+    {
+      "id": "external-mcp-provider-timeout",
+      "family": "action_execution_safety",
+      "stage": "action-executor-mcp-fallback",
+      "status": "active",
+      "query": "handle external mcp provider timeout safely",
+      "risk": "External MCP timeout must fail closed with stable classification and no output hash",
+      "required_assertions": [
+        {
+          "type": "must_classify_mcp_fallback_failure",
+          "expected_classification": "TOOL_EXECUTION_TIMEOUT"
+        },
+        {
+          "type": "must_not_execute_external_mcp_tool"
+        },
+        {
+          "type": "must_not_send_raw_tool_input"
+        },
+        {
+          "type": "must_not_store_raw_provider_output"
+        },
+        {
+          "type": "must_record_tool_result_projection",
+          "expected_status": "FAILED"
+        }
+      ]
+    },
+    {
+      "id": "external-mcp-provider-rate-limited",
+      "family": "action_execution_safety",
+      "stage": "action-executor-mcp-fallback",
+      "status": "active",
+      "query": "handle external mcp provider rate limit safely",
+      "risk": "External MCP rate limit must be classified without retrying inside the action executor or leaking raw provider text",
+      "required_assertions": [
+        {
+          "type": "must_classify_mcp_fallback_failure",
+          "expected_classification": "TOOL_PROVIDER_RATE_LIMITED"
+        },
+        {
+          "type": "must_not_execute_external_mcp_tool"
+        },
+        {
+          "type": "must_not_send_raw_tool_input"
+        },
+        {
+          "type": "must_not_store_raw_provider_output"
+        },
+        {
+          "type": "must_record_tool_result_projection",
+          "expected_status": "FAILED"
+        }
+      ]
+    },
+    {
+      "id": "external-mcp-provider-permission-denied",
+      "family": "action_execution_safety",
+      "stage": "action-executor-mcp-fallback",
+      "status": "active",
+      "query": "handle external mcp permission denied safely",
+      "risk": "External MCP permission denial must fail closed and remain separate from policy approval state",
+      "required_assertions": [
+        {
+          "type": "must_classify_mcp_fallback_failure",
+          "expected_classification": "TOOL_PROVIDER_PERMISSION_DENIED"
+        },
+        {
+          "type": "must_not_execute_external_mcp_tool"
+        },
+        {
+          "type": "must_not_send_raw_tool_input"
+        },
+        {
+          "type": "must_not_store_raw_provider_output"
+        },
+        {
+          "type": "must_record_tool_result_projection",
+          "expected_status": "FAILED"
+        }
+      ]
+    },
+    {
       "id": "rag-external-llm-unsafe-output-rejected",
       "family": "llm_output_safety",
       "stage": "rag-service-llm-boundary",

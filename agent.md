@@ -63,9 +63,8 @@ adapter, and proposal approval operator first paths are landed. `agent-service` 
 metadata, exposes `VerifyApprovedAgentProposal`, and publishes low-sensitive
 `im.agent.events` approval events through the approval outbox relay.
 `action-executor` can execute deterministic low-sensitive `nexusim.local.echo`
-and an explicitly configured LOW-risk external HTTP provider adapter; both
-record output hash only. External MCP/provider fallback is classified as stable low-sensitive failure and unsafe
-tool output is suppressed. Python AI Worker foundation is landed with the
+and an explicitly configured LOW-risk external HTTP provider adapter; both record output hash only.
+External MCP/provider fallback is classified as stable low-sensitive failure and unsafe tool output is suppressed. Python AI Worker foundation is landed with the
 `ai/python` directory, reproducible `IM` conda toolchain and candidate contract
 guard. RAG/Summary guarded external HTTP boundary, Python worker safety eval,
 Go-side smoke, RAG/Summary/Agent candidate guards, and action-executor guarded
@@ -74,7 +73,8 @@ safety expanded eval cases plus the local fixture adapter are landed.
 `ai-eval-service` catalog, RecordEvalRun recorder, gate policy, Python optional
 adapter, RAG / Agent live gate, CI-safe gate skeleton, RAG-Agent expansion,
 version / hash-only, negative cases, Summary live negative adapter, Python
-model-output and RAG/Summary citation regressions are landed. Next: external MCP fallback and tool/action safety.
+model-output, RAG/Summary citation regressions and external MCP fallback eval
+cases are landed. Next: tool/action safety and real Agent output regression.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.

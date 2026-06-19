@@ -33,7 +33,7 @@ provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
    expansion、negative RAG / Agent cases、Summary live negative adapter、
    Python / model-output negative cases 和 RAG / Summary citation regression 已落；仍不得保存 raw prompt、
    EvidencePack、model output、用户正文、secret 或 tool input。
-   继续补外部 MCP failure fallback、tool/action safety cases 和真实 Agent 输出回归。所有
+   继续补 tool/action safety cases 和真实 Agent 输出回归。所有
    eval case 必须低敏，可复核，能区分 retrieval failure、reasoning failure 和
    action boundary failure。
 

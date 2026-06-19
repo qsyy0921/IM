@@ -41,11 +41,14 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
   worker smoke。
 - Go-side Python candidate adapter smoke：Go 控制面调用 Python worker CLI，
   验证只消费低敏 candidate metadata / output hash。
+- `rag-service` 服务级 Python worker candidate guard：`python-worker` provider
+  mode 调用 Python worker CLI，只接受 hash / citation metadata，最终答案、
+  citation verifier 和 fail-closed 仍由 Go 控制。
 
 下一步默认推进：
 
 ```text
-Service-level Python candidate integration
+summary-service Python candidate integration
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

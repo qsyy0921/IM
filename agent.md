@@ -72,8 +72,8 @@ MCP/provider fallback is classified as stable low-sensitive failure and unsafe
 tool output is suppressed. Python AI Worker foundation is landed with the
 `ai/python` directory, reproducible `IM` conda toolchain and candidate contract
 guard. RAG/Summary guarded external HTTP LLM boundary, Python worker output
-safety eval, first candidate-only smoke and Go-side adapter smoke are landed.
-Next move is service-level Python candidate integration, or the next AI mainline task from `current-goal.md`.
+safety eval, first candidate-only smoke, Go-side adapter smoke, and rag-service
+Python worker candidate guard are landed. Next move is summary-service Python candidate integration, or the next AI mainline task from `current-goal.md`.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.

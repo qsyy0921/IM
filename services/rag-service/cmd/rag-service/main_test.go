@@ -40,6 +40,16 @@ func TestRAGAnswerProviderFromEnvAllowsLocalExternalEndpoint(t *testing.T) {
 	}
 }
 
+func TestRAGAnswerProviderFromEnvAllowsPythonWorkerMode(t *testing.T) {
+	t.Setenv("NEXUSIM_RAG_PROVIDER_MODE", "python-worker")
+	t.Setenv("NEXUSIM_RAG_PYTHON_BIN", "python")
+	t.Setenv("NEXUSIM_RAG_PYTHON_WORKER_SCRIPT", "ai/python/scripts/run_candidate_worker.py")
+	t.Setenv("NEXUSIM_RAG_PYTHON_WORKER_WORKDIR", ".")
+	if _, err := ragAnswerProviderFromEnv(); err != nil {
+		t.Fatalf("python worker provider should be valid: %v", err)
+	}
+}
+
 func TestRAGAnswerProviderFromEnvRejectsUnsupportedMode(t *testing.T) {
 	t.Setenv("NEXUSIM_RAG_PROVIDER_MODE", "bad")
 	if _, err := ragAnswerProviderFromEnv(); err == nil {

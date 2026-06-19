@@ -14,6 +14,10 @@ version 过滤的 `EvidencePack`，并向客户端返回带引用的回答。
   `AnswerProvider` port，prompt 只能由 EvidencePack 构造，HTTP 明文 endpoint
   只允许 loopback / private，provider failure 回退 extractive，unsafe /
   malformed output fail closed。
+- 可选 `python-worker` provider mode 只作为第一阶段服务级 Python candidate
+  guard：Go 先生成 grounded answer，Python worker 只返回 candidate hash /
+  citations / confidence metadata；Go 校验 task/candidate id、hash 和 citations
+  后才接受，失败时 fail closed。
 - response 必须保留 `citations`、原始 `EvidencePack`、`rag_version` 和
   `generated_by_llm`。
 - 无可见证据时返回 `INSUFFICIENT_EVIDENCE`，不能编造答案。
@@ -53,6 +57,6 @@ RAG / summary / Agent 后续能力只能沿用该 evidence boundary。任何新�
 ## 后续
 
 - 后续接 provider-specific LLM / Python worker 时继续复用 prompt boundary、
-  token budget、PII / secret filter、provider failure fallback 和 citation
-  verifier。
+  token budget、PII / secret filter、provider failure fallback、hash / citation
+  metadata 校验和 citation verifier。
 - `summary-service` 复用 EvidencePack 和 citation verifier 语义。

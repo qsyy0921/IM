@@ -1,6 +1,6 @@
 # rag-service
 
-状态：foundation-active / provider boundary + citation verifier first pass.
+状态：foundation-active / provider boundary + citation verifier + Python worker candidate guard first pass.
 
 定位：RAG 问答边界服务。它只消费 retrieval-gateway 返回的
 `EvidencePack`，不直接读 message / conversation / search / memory 私有表，
@@ -14,16 +14,17 @@
   extractive provider 基于 EvidencePack 生成 deterministic answer
 - 已补 guarded external HTTP LLM boundary：只由 EvidencePack 构造 prompt，
   provider failure 回退 extractive，unsafe / malformed output fail closed
+- 已补可选 `python-worker` provider mode：Go 先生成 grounded answer，Python
+  worker 只返回 candidate hash / citations；Go 校验 id、hash 和 citation
 - response 保留 citations、EvidencePack、`generated_by_llm=false`
 - provider 输出后统一运行 citation verifier，无法匹配 EvidencePack 则
   fail closed
 - retrieval-gateway 公开 proto RPC client、app / gRPC / cmd focused tests
 - `loadtest/rag`、`tools/run-ai-eval-rag-adapter.ps1` 和真实本地
-  `retrieval-gateway -> rag-service` adapter smoke 已通过：
-  `docs/runbook/loadtest/rag-service/loadtest-report-20260619-rag-adapter-smoke.md`
+  `retrieval-gateway -> rag-service` adapter smoke 已通过
 
 下一步：
 
 - provider-specific LLM / Python worker 后续仍必须走 AnswerProvider port、prompt
   guard 和 citation verifier。
-- `summary-service` 已进入 foundation-active；summary / Agent 仍只能消费 EvidencePack。
+- `summary-service` 已进入 foundation-active；下一步默认推进 summary-service Python candidate integration。summary / Agent 仍只能消费 EvidencePack。

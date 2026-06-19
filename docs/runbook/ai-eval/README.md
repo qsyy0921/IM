@@ -11,6 +11,8 @@ summary, Agent and tool/action boundaries.
 - Agent execution adapter: `tools/run-ai-eval-agent-adapter.ps1`
 - Python worker output-safety adapter: `tools/run-ai-eval-python-worker-adapter.ps1`
 - Go-side Python worker adapter smoke: `tools/python-worker-go-adapter-smoke`
+- rag-service service-level Python worker provider smoke:
+  `services/rag-service/cmd/rag-python-worker-provider-smoke`
 - Scope: first-stage schema + local execution coverage only; not a production
   benchmark, not a model-quality claim, and not a long-running eval platform.
 
@@ -101,3 +103,14 @@ go run ./tools/python-worker-go-adapter-smoke `
 This adapter proves Go can invoke the Python candidate CLI and consume only the
 validated candidate metadata / output hash. It still does not call external
 providers, databases or business services.
+
+First-stage `rag-service` service-level Python provider smoke:
+
+```powershell
+go run ./services/rag-service/cmd/rag-python-worker-provider-smoke `
+  -python C:\Users\10495\anaconda3\envs\IM\python.exe
+```
+
+This smoke proves `rag-service` can wrap its Go-owned answer provider with the
+Python worker candidate guard while final answer state and citation checks stay
+in Go.

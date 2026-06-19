@@ -1,55 +1,100 @@
 # NexusIM
 
-NexusIM 是面向企业协同的 IM + 智能协作平台。当前仓库已进入本地 / 双机可运行分布式 IM 后端阶段；Codex 目标框只放 `prompt.md` 的短 Prompt，最新工作入口以 `docs/runbook/current-brief.md` 和 `docs/runbook/README.md` 为准。
+NexusIM 是面向企业协同场景的分布式 IM + AI 协作平台。当前仓库已经从普通 IM demo 推进到：
+
+```text
+本地 / 双机可运行的分布式 IM 后端
+-> group memory / EvidencePack / RAG / summary / Agent 应用底座
+-> skill registry / MCP gateway / action executor / proposal approval / audit
+```
+
+GitHub 首页只放当前总览。每轮 Codex 继续开发时，目标框只复制 [prompt.md](prompt.md) 中的短 Prompt；具体进度入口看 [agent.md](agent.md)、[current-brief.md](docs/runbook/current-brief.md) 和 [remaining-goals.md](docs/runbook/remaining-goals.md)。
+
+## 当前状态
+
+已进入真实链路的 9 个 IM 后端服务：
+
+| 服务 | 作用 |
+| --- | --- |
+| `api-gateway` | 外部入口、认证透传、租户 quota、legacy descriptor 迁移门禁。 |
+| `identity-service` | 登录、Refresh、MFA、recovery code、JWKS、challenge delivery。 |
+| `message-service` | 发消息、编辑 / 撤回 / 删除、timeline / outbox。 |
+| `conversation-service` | 会话、成员边界、owner transfer、发送上下文。 |
+| `delivery-service` | durable inbox、`PullInbox`、`AckDelivery`、delivery outbox。 |
+| `push-gateway` | WebSocket 在线通知、Redis route、resume / PullInbox fallback。 |
+| `receipt-service` | 已读 / 送达回执、会话列表、未读 / 置顶 / 静音等读模型。 |
+| `contacts-service` | 联系人请求、隐私策略、分组 / 搜索、来源风险。 |
+| `policy-service` | 策略决策、ReBAC first path、moderation、tenant quota、tool policy precheck。 |
+
+已启动并持续推进的 AI / Agent 应用底座：
+
+| 服务 / 模块 | 当前状态 |
+| --- | --- |
+| `search-service` | 搜索 projection、visibility / tombstone、`SearchMessages`、timeline consumer、projection smoke。 |
+| `memory-service` | group memory projection、StructuredMemoryEvent、source refs、visibility window、revoke hidden。 |
+| `retrieval-gateway` | EvidencePack 统一边界，聚合 search / memory / policy precheck，不直接调用 LLM。 |
+| `rag-service` | 只读问答 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary。 |
+| `summary-service` | 只读摘要 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary。 |
+| `agent-service` | proposal-only path、mcp-gateway prepare、approval workflow、approval outbox relay、planner Python candidate guard。 |
+| `skill-registry` | 技能目录、输入输出合约、风险等级、审批要求和审计元数据。 |
+| `mcp-gateway` | tool prepare 边界、skill catalog check、policy precheck、低敏 audit，不直接执行外部工具。 |
+| `action-executor` | approved execution audit、proposal / approval / prepare audit 校验、本地安全 adapter、guarded external HTTP provider adapter、eval smoke。 |
+| `ai/python` | Python AI Worker 候选层：contract guard、低敏 safety guard、candidate-only worker CLI、`IM` conda toolchain。 |
+
+当前默认主线不是继续泛化清理 9 服务 P2 backlog，而是继续完善 AI 大模型应用底座：
+
+```text
+group memory
+-> EvidencePack
+-> RAG / summary
+-> multi-agent
+-> skill-registry
+-> MCP/tool gateway
+-> action-executor
+-> proposal / approval / audit
+-> ai-eval
+```
+
+下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，下一步是 profile overgeneralization / Agent output safety eval cases。
+
+## 不变量
+
+- PostgreSQL 是交易事实源；Kafka 是事件传播面；业务事务不能直接 publish Kafka，必须走 outbox relay。
+- RAG / summary / Agent 只能消费 EvidencePack，不能直接读 message / conversation / private tables。
+- Agent 写动作必须走 policy、tool policy、proposal、approval、action-executor 和 audit。
+- Python 只做 LLM / embedding / rerank / memory extraction / planner / eval 候选层；Go 负责控制面、权限、状态、审计和持久化。
+- push-gateway 不拥有 durable inbox；断线和慢连接恢复以 delivery-service `PullInbox` 为准。
+- 新服务和中间件不写死；只有当独立数据模型、伸缩、故障、安全边界或复杂度收益成立时才通过 ADR 新增。
+- 压测 / smoke 原始输出放 `H:\NexusIM\loadtest-results`，仓库只保存低敏报告、summary 和索引。
 
 ## 目录结构
 
 | 目录 | 作用 |
 | --- | --- |
-| `api/` | 同步接口契约。`api/proto/` 存放 gRPC Protobuf；`api/openapi/` 和 `api/asyncapi/` 后续分别承接外部 HTTP 与异步接口说明。 |
+| `api/` | 同步接口契约。`api/proto/` 存放 gRPC Protobuf。 |
 | `schemas/` | 异步事件契约。`schemas/kafka/` 存放 Kafka topic 的 Protobuf schema。 |
-| `services/` | 服务实现。每个服务统一使用 `api / app / domain / infrastructure / types / trigger` 六层 DDD 目录。 |
-| `migrations/` | 数据库 migration，按数据库和服务归档。 |
-| `deploy/` | 本地和部署基础设施。当前 `deploy/local/docker-compose.yml` 用于启动 PostgreSQL、Kafka、Schema Registry、Redis。 |
-| `loadtest/` | 压测脚本、压测结果和本地双机压测入口。脚本必须支持参数化目标地址、并发和持续时间。 |
-| `docs/` | 中文文档。包含目标态架构、服务级 SDD、Runbook 和文档索引。 |
-| `tools/` | 本地辅助脚本，例如 proto 生成和本地依赖启动/关闭。 |
+| `services/` | Go 服务实现。每个服务统一使用 `api / app / domain / infrastructure / types / trigger` 六层目录。 |
+| `ai/python/` | Python AI Worker 候选层代码和 `IM` conda 环境配置。 |
+| `migrations/` | PostgreSQL migration，按服务归档。 |
+| `deploy/` | 本地 Docker、观测、服务编排和运行配置。 |
+| `loadtest/` | smoke / loadtest runner。原始结果默认写到 H 盘。 |
+| `docs/` | 架构、SDD、ADR、runbook、面试叙事和证据索引。 |
+| `tools/` | 生成、门禁、smoke、evidence manifest、capacity / observability 辅助脚本。 |
 
-## 关键文档
+## 文档入口
 
-| 文档 | 作用 |
+| 文档 | 用途 |
 | --- | --- |
-| `docs/architecture/target-architecture.md` | NexusIM 目标态技术架构冻结稿，是总架构的唯一主文档。 |
-| `docs/architecture/add.md` | 业务架构补充文档，描述系统范围、服务边界和核心业务流。 |
-| `docs/architecture/tadd.md` | 技术架构补充文档，描述技术栈、工程目录、中间件、观测和编码门禁。 |
-| `docs/sdd/README.md` | 服务级 SDD 索引和编码门禁。 |
-| `docs/runbook/README.md` | Runbook 短路由页。先读它，再按需进入服务 brief、SDD 或 smoke 报告。 |
-| `docs/runbook/current-brief.md` | 每轮默认短入口，避免读取长历史文档。 |
-| `prompt.md` | Codex 目标 prompt 的唯一维护源；目标框只复制其中的短 Prompt。 |
-| `docs/runbook/local-loadtest.md` | 本地和双机压测 Runbook。 |
-
-## 当前实现范围
-
-当前主链路已扩展为本地 / 双机可运行的最小 IM 后端：
-
-```text
-conversation-service
--> message-service
--> delivery-service
--> push-gateway
-```
-
-已覆盖发送消息、会话上下文、outbox / Kafka timeline、durable inbox、PullInbox / AckDelivery、WebSocket notify、Redis route、基础回执 / 会话列表、联系人、policy-service 和 identity-service 的第一阶段能力。当前低 token 入口和最新边界以 `docs/runbook/current-brief.md` 为准。
-
-仍不作为当前主线完成项：
-
-```text
-热点 sequencer 生产逻辑
-生产级 Kafka / PostgreSQL HA
-全服务 mTLS rollout 和证书治理
-RAG
-Agent workflow
-```
+| [prompt.md](prompt.md) | Codex 目标框短 Prompt 的唯一维护源。 |
+| [agent.md](agent.md) | Codex / sub-agent 每轮读取和维护文档的路由规则。 |
+| [docs/runbook/current-brief.md](docs/runbook/current-brief.md) | 低 token 当前阶段入口。 |
+| [docs/runbook/current-goal.md](docs/runbook/current-goal.md) | 当前 active slice。 |
+| [docs/runbook/development-progress.md](docs/runbook/development-progress.md) | 当前开发进度总览。 |
+| [docs/runbook/remaining-goals.md](docs/runbook/remaining-goals.md) | 只记录还没有完成的工作。 |
+| [docs/runbook/service-briefs/README.md](docs/runbook/service-briefs/README.md) | 服务 brief 索引。 |
+| [docs/architecture/target-architecture.md](docs/architecture/target-architecture.md) | 总体目标架构。 |
+| [docs/architecture/target-architecture-ai.md](docs/architecture/target-architecture-ai.md) | AI / RAG / Agent 目标架构。 |
+| [docs/runbook/ai-eval/README.md](docs/runbook/ai-eval/README.md) | AI eval case schema、adapter 和运行入口。 |
 
 ## 六层 DDD 约束
 
@@ -67,89 +112,93 @@ services/<service-name>/
     trigger/
 ```
 
-依赖方向：
+允许依赖方向：
 
 ```text
-api -> app
-api -> types
-trigger -> app
-trigger -> types
-app -> domain
-app -> infrastructure
-app -> types
+api -> app/types
+trigger -> app/types
+app -> domain/infrastructure/types
 domain -> types
-infrastructure -> domain
-infrastructure -> types
+infrastructure -> domain/types
 ```
 
 禁止方向：
 
 ```text
-domain -> infrastructure
-domain -> api
-domain -> trigger
-infrastructure -> api
-infrastructure -> trigger
+domain -> infrastructure/api/trigger
+infrastructure -> api/trigger
 types -> app/domain/infrastructure/api/trigger
 ```
 
-依赖说明：
-
-- `infrastructure -> domain` 只用于 repository / publisher adapter 实现时转换领域输入、结果或领域对象；
-- `domain -> infrastructure` 仍然禁止，领域层不能依赖 SQL、Kafka、Redis 或外部 SDK；
-- 正式实现时优先由 `app` 定义 port，由 `cmd`/composition root 注入 infrastructure 实现。
-
 说明：
 
-- `api` 只做 gRPC/HTTP 适配和 request/response 转换；
-- `app` 负责编排 use case、事务和 port；
-- `domain` 只表达领域规则，不依赖 SQL、Kafka、Redis 或外部 SDK；
-- `infrastructure` 实现 PostgreSQL、Kafka、Redis、外部 RPC client 等能力；
-- `types` 放稳定类型、命令、枚举、错误码和跨层轻量 DTO；
-- `trigger` 放 Outbox Relay、Kafka consumer、定时巡检和补偿任务。
+- `api` 只做 gRPC/HTTP 适配和 request/response 转换。
+- `app` 编排 use case、事务和 port。
+- `domain` 表达领域规则，不依赖 SQL、Kafka、Redis 或外部 SDK。
+- `infrastructure` 实现 PostgreSQL、Kafka、Redis、外部 RPC client 和 provider adapter。
+- `trigger` 放 outbox relay、Kafka consumer、定时巡检和补偿任务。
 
 ## 常用命令
 
-生成 Protobuf 代码：
-
-```powershell
-. .\tools\go-env.ps1
-make proto
-```
-
-Windows 本地也可以直接使用：
+生成 Protobuf：
 
 ```powershell
 . .\tools\go-env.ps1
 .\tools\gen-proto.ps1
 ```
 
-当前唯一支持的生成入口是 `make proto` 或 `tools/gen-proto.ps1`。`buf.gen.yaml` 只保留为后续引入 Buf 工作流的配置草稿，不作为当前执行入口。
-
-启动本地依赖：
+启动 / 停止本地依赖：
 
 ```powershell
 make local-up
-```
-
-停止本地依赖：
-
-```powershell
 make local-down
 ```
 
-查看本地依赖日志：
+运行聚焦 Go 测试：
 
 ```powershell
-make local-logs
+. .\tools\go-env.ps1
+go test ./services/action-executor/... -count=1
 ```
 
-也可以直接使用 `tools/` 下的 PowerShell 脚本。
+使用 Python AI Worker 环境：
 
-## 开发顺序
+```powershell
+conda activate IM
+cd ai\python
+python -m pytest
+python -m ruff check .
+python -m mypy nexusim_ai_common scripts tests
+```
 
-1. 先落契约：Proto、Kafka schema、PostgreSQL migration。
-2. 只实现普通会话 `LOCAL_ROW_LOCK` 下的 `SendMessage`。
-3. 外部依赖全部通过 port 隔离：policy、conversation、sequencer、event publisher。
-4. 数据库事务只覆盖本地事实源：`conversation_seq + message_log + conversation_timeline_events + message_outbox`。
-5. Kafka 事件只能由 outbox relay 发布，业务事务不能直接 publish Kafka。
+运行当前 action-executor external adapter eval：
+
+```powershell
+. .\tools\go-env.ps1
+.\tools\validate-ai-eval-cases.ps1
+.\tools\run-ai-eval-action-external-adapter.ps1
+```
+
+完整本地门禁只在跨服务、生成代码、migration、service-registry、Docker/compose、安全边界或提交推送前需要：
+
+```powershell
+.\tools\check-local.ps1
+```
+
+## 当前不是已完成项
+
+以下内容仍属于后续 hardening 或产品化，不要在面试或文档里说成已经生产级完成：
+
+- 生产级 Redis / Kafka / PostgreSQL HA、长时间 fault campaign、split-brain fencing、生产 sizing。
+- 统一生产观测平台、Alertmanager 路由、日志汇聚、SLO 和长期 retention。
+- provider-grade OIDC / KMS / HSM / email / SMS / WebAuthn / complete risk engine。
+- provider-grade ReBAC DSL、外部 audit sink、运维 UI、批量 repair 审批系统。
+- 完整 Web / App / 桌面客户端。
+- 完整 media / notification / admin / audit 等产品化平台服务。
+
+当前最准确表述：
+
+```text
+NexusIM 已完成 9 个 IM 后端服务的主链路和一批本地 / 双机分布式 smoke，
+并正在这些事实源、投递、策略和审计边界之上构建 AI / RAG / Agent 应用底座。
+```

@@ -16,8 +16,8 @@ adapter、状态、计数、summary/report 引用和低敏 metadata，方便后�
 - `run-ai-eval-regression-gate-smoke.ps1`、`gate-policy.local.json` 和
   `validate-ai-eval-gate-policy.ps1`：声明必跑 adapter、阈值、Get / List
   读回、禁止持久化字段和可选 service-stack adapter。
-- gate runner 已支持显式 `-OptionalAdapter python-ai-worker` 并登记到 catalog；
-  RAG / Agent service-stack preflight wrapper 已落。
+- gate runner 已支持显式 optional adapters；Python optional path 和 RAG /
+  Agent service-stack live gate 已通过并登记到 catalog。
 
 边界：
 
@@ -27,4 +27,4 @@ adapter、状态、计数、summary/report 引用和低敏 metadata，方便后�
   tool input。
 - 不授权业务动作；真实动作仍走 policy、proposal / approval、executor 和 audit。
 
-下一步：做 RAG / Agent optional service-stack live gate smoke；后续再做 CI gate。
+下一步：做 CI gate skeleton；后续继续扩 RAG / Agent regression cases。

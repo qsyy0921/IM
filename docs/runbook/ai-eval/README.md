@@ -191,6 +191,9 @@ RAG / Agent service-stack gate wrapper:
 The preflight writes endpoint readiness only. It does not prove live RAG / Agent
 adapter behavior. Remove `-PreflightOnly` and `-AllowMissing` only after the
 RAG / Agent service stack is running.
+The first local live run passed with `profile-agent-safety`,
+`action-external-http-provider`, `rag-service` and `agent-action-executor`
+selected; see `docs/runbook/loadtest/ai-eval-service/`.
 
 First-stage Go-side Python worker adapter smoke:
 

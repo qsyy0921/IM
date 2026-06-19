@@ -224,30 +224,44 @@ if ($missing.Count -gt 0) {
 }
 
 $gateOutputPath = Join-Path $resultDir "ai-eval-regression-gate-summary.json"
-$gateArgs = @(
-    "-CasePath", $CasePath,
-    "-GatePolicyPath", $GatePolicyPath,
-    "-PGDSN", $PGDSN,
-    "-RAGTarget", $RAGTarget,
-    "-AgentTarget", $AgentTarget,
-    "-ActionExecutorTarget", $ActionExecutorTarget,
-    "-Python", $Python,
-    "-ResultRoot", $ResultRoot,
-    "-RunName", $RunName,
-    "-OutputPath", $gateOutputPath,
-    "-TenantID", "nexusim-local",
-    "-UserID", "ai-eval-service-stack-smoke",
-    "-DeviceID", "ai-eval-service-stack-smoke-device",
-    "-RequestTimeout", $RequestTimeout
-)
-foreach ($adapter in $adapters) {
-    $gateArgs += @("-OptionalAdapter", $adapter)
-}
+$gateScript = Join-Path $PSScriptRoot "run-ai-eval-regression-gate-smoke.ps1"
+$optionalAdapterValue = $adapters -join ","
 if ($NoApplyMigration) {
-    $gateArgs += "-NoApplyMigration"
+    & $gateScript `
+        -CasePath $CasePath `
+        -GatePolicyPath $GatePolicyPath `
+        -PGDSN $PGDSN `
+        -RAGTarget $RAGTarget `
+        -AgentTarget $AgentTarget `
+        -ActionExecutorTarget $ActionExecutorTarget `
+        -Python $Python `
+        -ResultRoot $ResultRoot `
+        -RunName $RunName `
+        -OutputPath $gateOutputPath `
+        -TenantID "nexusim-local" `
+        -UserID "ai-eval-service-stack-smoke" `
+        -DeviceID "ai-eval-service-stack-smoke-device" `
+        -RequestTimeout $RequestTimeout `
+        -OptionalAdapter $optionalAdapterValue `
+        -NoApplyMigration
+} else {
+    & $gateScript `
+        -CasePath $CasePath `
+        -GatePolicyPath $GatePolicyPath `
+        -PGDSN $PGDSN `
+        -RAGTarget $RAGTarget `
+        -AgentTarget $AgentTarget `
+        -ActionExecutorTarget $ActionExecutorTarget `
+        -Python $Python `
+        -ResultRoot $ResultRoot `
+        -RunName $RunName `
+        -OutputPath $gateOutputPath `
+        -TenantID "nexusim-local" `
+        -UserID "ai-eval-service-stack-smoke" `
+        -DeviceID "ai-eval-service-stack-smoke-device" `
+        -RequestTimeout $RequestTimeout `
+        -OptionalAdapter $optionalAdapterValue
 }
-
-& (Join-Path $PSScriptRoot "run-ai-eval-regression-gate-smoke.ps1") @gateArgs
 if ($LASTEXITCODE -ne 0) {
     throw "AI eval service-stack gate smoke failed with exit code $LASTEXITCODE"
 }

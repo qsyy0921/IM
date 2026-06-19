@@ -27,8 +27,8 @@ provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
 1. AI eval 回归扩展：
    `ai-eval-service` 已能记录低敏 summary，并已具备 profile / Agent safety、
    action-executor external adapter 和 Python worker 的 policy-driven
-   multi-adapter gate smoke，也有 RAG / Agent service-stack preflight wrapper。
-   下一步是在服务栈真实启动后跑 RAG / Agent live gate smoke；仍不得保存 raw prompt、
+   multi-adapter gate smoke，也已跑通 RAG / Agent service-stack live gate。
+   下一步是 CI gate skeleton 和更多 RAG / Agent regression cases；仍不得保存 raw prompt、
    EvidencePack、model output、用户正文、secret 或 tool input。
    继续补真实 Agent 输出回归、外部 MCP failure fallback、tool/action safety
    cases、profile overgeneralization 和 RAG / summary citation regression。所有

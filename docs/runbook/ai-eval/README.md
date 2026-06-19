@@ -69,5 +69,8 @@ skill / policy rows, calls real `agent-service CreateAgentProposal` and
 `ApproveAgentProposal`, calls real `action-executor ExecuteApprovedAction`, and
 validates active Agent / action-executor cases against the returned proposal,
 approval, execution response, low-sensitive audit rows and low-sensitive tool
-result projection. It proves the proposal / approval / executor / audit /
-result-projection boundary only; it still does not execute external MCP tools.
+result projection. For cases that require `must_execute_safe_local_tool`, it
+runs a second low-sensitive `nexusim.local.echo` path and verifies `SUCCEEDED`
+plus output hash only. It proves the proposal / approval / executor / audit /
+result-projection boundary and local safe tool output path only; it still does
+not execute external MCP/provider tools.

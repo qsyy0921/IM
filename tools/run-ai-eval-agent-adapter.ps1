@@ -96,13 +96,25 @@ function Test-AgentAssertion {
                 -and [bool]$Summary.action_audit.low_sensitive_audit_only
         }
         "must_record_tool_result_projection" {
+            $expectedStatus = Get-JsonPropertyString -Object $Assertion -Name "expected_status"
+            if ($expectedStatus.Length -eq 0) {
+                $expectedStatus = "NOT_EXECUTED"
+            }
             return `
                 (Get-JsonPropertyString -Object $Summary -Name "execution_result_id").Length -gt 0 `
-                -and (Get-JsonPropertyString -Object $Summary -Name "execution_result_status") -eq "NOT_EXECUTED" `
+                -and (Get-JsonPropertyString -Object $Summary -Name "execution_result_status") -eq $expectedStatus `
                 -and (Get-JsonPropertyString -Object $Summary -Name "execution_result_ref").Length -gt 0 `
-                -and (Get-JsonPropertyString -Object $Summary.action_audit -Name "result_status") -eq "NOT_EXECUTED" `
+                -and (Get-JsonPropertyString -Object $Summary.action_audit -Name "result_status") -eq $expectedStatus `
                 -and [bool]$Summary.action_audit.result_ref_present `
                 -and [bool]$Summary.action_audit.result_execution_matches
+        }
+        "must_execute_safe_local_tool" {
+            return `
+                [bool]$Summary.execution_executed `
+                -and [bool]$Summary.action_audit.executed `
+                -and [bool]$Summary.action_audit.output_sha256_present `
+                -and (Get-JsonPropertyString -Object $Summary -Name "tool_name") -eq "nexusim.local.echo" `
+                -and (Get-JsonPropertyString -Object $Summary -Name "execution_result_status") -eq "SUCCEEDED"
         }
         "must_not_execute_external_tool" {
             return (-not [bool]$Summary.execution_executed) -and (-not [bool]$Summary.action_audit.executed)
@@ -119,38 +131,57 @@ Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot $repoRoot -Name "Re
 
 $resolvedCasePath = Resolve-RepoPath $CasePath
 Assert-Condition (Test-Path -LiteralPath $resolvedCasePath -PathType Leaf) "CasePath does not exist: $resolvedCasePath"
+$caseDocument = Get-Content -LiteralPath $resolvedCasePath -Raw | ConvertFrom-Json
 
 if ([string]::IsNullOrWhiteSpace($RunName)) {
     $RunName = "agent-eval-adapter-" + (Get-Date).ToUniversalTime().ToString("yyyyMMdd-HHmmss")
 }
 
-$runArgs = @(
-    "run", "./loadtest/agent",
-    "-pg-dsn", $PGDSN,
-    "-agent-target", $AgentTarget,
-    "-action-executor-target", $ActionExecutorTarget,
-    "-result-root", $ResultRoot,
-    "-run-name", $RunName,
-    "-objective", "phoenix launch decision",
-    "-request-timeout", $RequestTimeout
-)
+function Invoke-AgentSmokeRun {
+    param(
+        [string]$SmokeRunName,
+        [string[]]$ExtraArgs = @()
+    )
 
-Push-Location $repoRoot
-try {
-    & go @runArgs
-    if ($LASTEXITCODE -ne 0) {
-        throw "loadtest/agent failed with exit code $LASTEXITCODE"
+    $runArgs = @(
+        "run", "./loadtest/agent",
+        "-pg-dsn", $PGDSN,
+        "-agent-target", $AgentTarget,
+        "-action-executor-target", $ActionExecutorTarget,
+        "-result-root", $ResultRoot,
+        "-run-name", $SmokeRunName,
+        "-objective", "phoenix launch decision",
+        "-request-timeout", $RequestTimeout
+    )
+    $runArgs += $ExtraArgs
+
+    Push-Location $repoRoot
+    try {
+        & go @runArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw "loadtest/agent failed with exit code $LASTEXITCODE"
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    $resultDir = Join-Path $ResultRoot $SmokeRunName
+    $summaryPath = Join-Path $resultDir "agent-proposal-summary.json"
+    Assert-Condition (Test-Path -LiteralPath $summaryPath -PathType Leaf) "Agent smoke summary missing: $summaryPath"
+    return [pscustomobject]@{
+        run_name = $SmokeRunName
+        result_dir = $resultDir
+        summary_path = $summaryPath
+        summary = (Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json)
     }
 }
-finally {
-    Pop-Location
-}
 
-$resultDir = Join-Path $ResultRoot $RunName
-$smokeSummaryPath = Join-Path $resultDir "agent-proposal-summary.json"
-Assert-Condition (Test-Path -LiteralPath $smokeSummaryPath -PathType Leaf) "Agent smoke summary missing: $smokeSummaryPath"
-$summary = Get-Content -LiteralPath $smokeSummaryPath -Raw | ConvertFrom-Json
-$caseDocument = Get-Content -LiteralPath $resolvedCasePath -Raw | ConvertFrom-Json
+$defaultRun = Invoke-AgentSmokeRun -SmokeRunName $RunName
+$summary = $defaultRun.summary
+$resultDir = $defaultRun.result_dir
+$smokeSummaryPath = $defaultRun.summary_path
+$safeToolRun = $null
 
 $caseResults = New-Object System.Collections.Generic.List[object]
 foreach ($case in @($caseDocument.cases)) {
@@ -160,10 +191,34 @@ foreach ($case in @($caseDocument.cases)) {
         continue
     }
 
+    $caseSummary = $summary
+    $needsSafeToolRun = $false
+    foreach ($assertion in @($case.required_assertions)) {
+        if ((Get-JsonPropertyString -Object $assertion -Name "type") -eq "must_execute_safe_local_tool") {
+            $needsSafeToolRun = $true
+        }
+    }
+    if ($needsSafeToolRun) {
+        if ($null -eq $safeToolRun) {
+            $safeToolRun = Invoke-AgentSmokeRun -SmokeRunName ($RunName + "-safe-local-tool") -ExtraArgs @(
+                "-tool-name", "nexusim.local.echo",
+                "-skill-id", "nexusim.local.echo",
+                "-resource-type", "diagnostic",
+                "-risk-level", "LOW",
+                "-expect-executed"
+            )
+        }
+        $caseSummary = $safeToolRun.summary
+    }
+    $caseSmokeRunName = $defaultRun.run_name
+    if ($needsSafeToolRun) {
+        $caseSmokeRunName = $safeToolRun.run_name
+    }
+
     $assertionResults = New-Object System.Collections.Generic.List[object]
     foreach ($assertion in @($case.required_assertions)) {
         $type = Get-JsonPropertyString -Object $assertion -Name "type"
-        $passed = Test-AgentAssertion -Summary $summary -Assertion $assertion
+        $passed = Test-AgentAssertion -Summary $caseSummary -Assertion $assertion
         $assertionResults.Add([pscustomobject]@{
             type = $type
             passed = $passed
@@ -177,11 +232,18 @@ foreach ($case in @($caseDocument.cases)) {
         stage = $stage
         status = $status
         passed = $true
+        smoke_run_name = $caseSmokeRunName
         assertions = $assertionResults
     })
 }
 
 Assert-Condition ($caseResults.Count -gt 0) "No active agent/action-executor eval cases found in $resolvedCasePath"
+$safeToolRunName = ""
+$safeToolSummaryPath = ""
+if ($null -ne $safeToolRun) {
+    $safeToolRunName = $safeToolRun.run_name
+    $safeToolSummaryPath = $safeToolRun.summary_path
+}
 
 $adapterSummary = [pscustomobject]@{
     schema_version = 1
@@ -192,6 +254,8 @@ $adapterSummary = [pscustomobject]@{
     run_name = $RunName
     result_dir = $resultDir
     smoke_summary_path = $smokeSummaryPath
+    safe_tool_run_name = $safeToolRunName
+    safe_tool_summary_path = $safeToolSummaryPath
     case_count = $caseResults.Count
     cases = $caseResults
 }

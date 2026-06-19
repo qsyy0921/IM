@@ -49,6 +49,72 @@ func TestExecuteApprovedActionRecordsAllowedExecutionWithoutRunningExternalTool(
 	}
 }
 
+func TestExecuteApprovedActionRunsSupportedToolExecutor(t *testing.T) {
+	audit := &fakeAuditRepository{}
+	executor := &fakeToolExecutor{result: types.ToolExecutionResult{
+		Executed:   true,
+		OutputJSON: `{"adapter":"local-safe-echo","status":"ok"}`,
+	}}
+	usecase := NewExecuteApprovedActionUseCaseWithToolExecutor(
+		fakeSkillCatalog{skill: activeSkill()},
+		fakeToolPolicy{decision: types.ToolPolicyDecision{
+			Allowed:           true,
+			RequiresApproval:  true,
+			PermissionVersion: 9,
+			Classification:    "TOOL_ALLOWED",
+			Reason:            "approved",
+			DecisionSource:    "TOOL_RULE",
+		}},
+		fakeApproval{},
+		audit,
+		executor,
+	)
+	result, err := usecase.Execute(context.Background(), validCommand())
+	if err != nil {
+		t.Fatalf("execute action: %v", err)
+	}
+	if !result.Executed || result.ResultStatus != types.ResultStatusSucceeded || result.OutputJSON == "{}" {
+		t.Fatalf("expected executed successful result, got %+v", result)
+	}
+	if executor.command.ToolName != validCommand().ToolName || executor.command.InputSHA256 == "" {
+		t.Fatalf("unexpected tool executor command: %+v", executor.command)
+	}
+	if len(audit.rows) != 1 || !audit.rows[0].Executed || audit.rows[0].OutputSHA256 == "" {
+		t.Fatalf("expected executed audit row with output hash, got %+v", audit.rows)
+	}
+	if len(audit.results) != 1 || !audit.results[0].Executed || audit.results[0].Status != types.ResultStatusSucceeded {
+		t.Fatalf("expected successful result projection, got %+v", audit.results)
+	}
+}
+
+func TestExecuteApprovedActionLeavesUnsupportedToolUnexecuted(t *testing.T) {
+	audit := &fakeAuditRepository{}
+	usecase := NewExecuteApprovedActionUseCaseWithToolExecutor(
+		fakeSkillCatalog{skill: activeSkill()},
+		fakeToolPolicy{decision: types.ToolPolicyDecision{
+			Allowed:           true,
+			RequiresApproval:  true,
+			PermissionVersion: 9,
+			Classification:    "TOOL_ALLOWED",
+			Reason:            "approved",
+			DecisionSource:    "TOOL_RULE",
+		}},
+		fakeApproval{},
+		audit,
+		&fakeToolExecutor{err: types.ErrToolExecutionUnsupported},
+	)
+	result, err := usecase.Execute(context.Background(), validCommand())
+	if err != nil {
+		t.Fatalf("execute action: %v", err)
+	}
+	if result.Executed || result.ResultStatus != types.ResultStatusNotExecuted {
+		t.Fatalf("expected unsupported tool to remain not executed, got %+v", result)
+	}
+	if len(audit.rows) != 1 || audit.rows[0].Executed || audit.rows[0].OutputSHA256 != "" {
+		t.Fatalf("expected not-executed audit row, got %+v", audit.rows)
+	}
+}
+
 func TestExecuteApprovedActionRequiresApprovalAndPreparedAudit(t *testing.T) {
 	command := validCommand()
 	command.ApprovalID = ""
@@ -218,4 +284,21 @@ func (repository *fakeAuditRepository) RecordExecution(
 	repository.rows = append(repository.rows, audit)
 	repository.results = append(repository.results, projection)
 	return nil
+}
+
+type fakeToolExecutor struct {
+	command types.ToolExecutionCommand
+	result  types.ToolExecutionResult
+	err     error
+}
+
+func (executor *fakeToolExecutor) ExecuteTool(
+	_ context.Context,
+	command types.ToolExecutionCommand,
+) (types.ToolExecutionResult, error) {
+	executor.command = command
+	if executor.err != nil {
+		return types.ToolExecutionResult{}, executor.err
+	}
+	return executor.result, nil
 }

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -16,6 +17,7 @@ type ExecuteApprovedActionUseCase struct {
 	policy   ToolPolicyPort
 	approval ProposalApprovalPort
 	audit    ExecutionAuditRepository
+	executor ToolExecutorPort
 }
 
 func NewExecuteApprovedActionUseCase(
@@ -25,6 +27,22 @@ func NewExecuteApprovedActionUseCase(
 	audit ExecutionAuditRepository,
 ) ExecuteApprovedActionUseCase {
 	return ExecuteApprovedActionUseCase{catalog: catalog, policy: policy, approval: approval, audit: audit}
+}
+
+func NewExecuteApprovedActionUseCaseWithToolExecutor(
+	catalog SkillCatalogPort,
+	policy ToolPolicyPort,
+	approval ProposalApprovalPort,
+	audit ExecutionAuditRepository,
+	executor ToolExecutorPort,
+) ExecuteApprovedActionUseCase {
+	return ExecuteApprovedActionUseCase{
+		catalog:  catalog,
+		policy:   policy,
+		approval: approval,
+		audit:    audit,
+		executor: executor,
+	}
 }
 
 func (usecase ExecuteApprovedActionUseCase) Execute(
@@ -94,6 +112,32 @@ func (usecase ExecuteApprovedActionUseCase) Execute(
 	status := types.ExecutionStatusRecorded
 	if !result.Allowed {
 		status = types.ExecutionStatusBlocked
+	} else if usecase.executor != nil {
+		execution, err := usecase.executor.ExecuteTool(ctx, types.ToolExecutionCommand{
+			AuthContext:  command.AuthContext,
+			Skill:        skill,
+			ToolName:     command.ToolName,
+			Action:       types.ToolActionExecute,
+			ResourceType: command.ResourceType,
+			ResourceID:   command.ResourceID,
+			RiskLevel:    result.RiskLevel,
+			Intent:       command.Intent,
+			InputSHA256:  command.InputSHA256(),
+		})
+		switch {
+		case err == nil:
+			result.Executed = execution.Executed
+			result.OutputJSON = stableOutputJSON(execution.OutputJSON)
+		case errors.Is(err, types.ErrToolExecutionUnsupported):
+			// Unsupported tools remain proposal/audit-only until a safe adapter is registered.
+		default:
+			status = types.ExecutionStatusFailed
+			result.Classification = "TOOL_EXECUTION_FAILED"
+			result.Reason = "tool execution failed"
+			result.DecisionSource = "action-executor"
+			result.Executed = false
+			result.OutputJSON = "{}"
+		}
 	}
 	return usecase.insertAudit(ctx, command, result, status)
 }
@@ -265,6 +309,14 @@ func outputSHA256(outputJSON string, executed bool) string {
 	}
 	sum := sha256.Sum256([]byte(outputJSON))
 	return hex.EncodeToString(sum[:])
+}
+
+func stableOutputJSON(outputJSON string) string {
+	outputJSON = strings.TrimSpace(outputJSON)
+	if outputJSON == "" {
+		return "{}"
+	}
+	return outputJSON
 }
 
 func PublicBlockedError(result types.ExecuteApprovedActionResult) error {

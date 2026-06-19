@@ -40,8 +40,8 @@ group memory -> cross-group/time EvidencePack -> RAG -> summary -> multi-agent
 -> AI evaluation.
 ```
 
-The AI/RAG/Agent line is the main product direction, not future side work.
-When the user says "continue development", move this chain forward by default.
+The AI/RAG/Agent line is the main product direction, not future side work; when
+the user says "continue development", move this chain forward by default.
 Production HA drills, long load tests, sizing, and provider-grade operations are
 hardening backlog unless explicitly named or they expose a P0/P1 blocker.
 The existing IM backend and distributed base are treated as a usable foundation;
@@ -50,9 +50,8 @@ AI line or the user explicitly asks for it.
 If the visible Codex goal prompt does not make this main line obvious, update
 `prompt.md` and the short prompt in `docs/runbook/current-goal.md` first before
 continuing implementation.
-The first paragraph of the short prompt must explicitly name the AI application
-foundation chain. Do not hide the main line only in `current-brief.md`,
-`remaining-goals.md`, or service briefs.
+The short prompt first line must say the only default main line is the AI
+application foundation. Do not hide it only in other docs.
 
 Existing real services: `api-gateway`, `identity-service`, `message-service`,
 `conversation-service`, `delivery-service`, `push-gateway`, `receipt-service`,
@@ -61,17 +60,19 @@ Existing real services: `api-gateway`, `identity-service`, `message-service`,
 Current active slice: `skill-registry` first catalog path, `mcp-gateway`
 first prepare path, `action-executor` first execution audit path, Agent ->
 mcp-gateway adapter smoke, proposal store, approval workflow,
-action-executor approved proposal handoff, Agent execution eval adapter, and
-low-sensitive tool result projection are landed. `agent-service` now calls
+action-executor approved proposal handoff, Agent execution eval adapter,
+low-sensitive tool result projection, and local safe tool adapter first path are
+landed. `agent-service` now calls
 `mcp-gateway.PrepareToolCall`, persists low-sensitive proposal / approval
 metadata, and exposes `VerifyApprovedAgentProposal` for `action-executor`.
-`action-executor` still does not execute external tools. Next move is real tool
-adapter, approval operator / audit outbox, true tool output safety cases, or the
-next AI mainline task from `current-goal.md`.
+`action-executor` can execute only the deterministic low-sensitive
+`nexusim.local.echo` local adapter and records output hash only; it still does
+not connect external MCP/provider tools. Next move is approval operator / audit
+outbox, external MCP adapter failure fallback, true tool output safety cases, or
+the next AI mainline task from `current-goal.md`.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.
-
 AI invariants: keep facts, projections, retrieval and controlled execution
 separate. Memory requires source refs, scope, validity, supersession,
 confidence and review state. RAG / summary / Agent consume EvidencePack only;

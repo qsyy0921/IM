@@ -17,6 +17,8 @@ const (
 	SkillStatusActive   = "ACTIVE"
 	SkillStatusDisabled = "DISABLED"
 
+	LocalSafeEchoToolName = "nexusim.local.echo"
+
 	ExecutionStatusRecorded = "RECORDED"
 	ExecutionStatusBlocked  = "BLOCKED"
 	ExecutionStatusFailed   = "FAILED"
@@ -240,6 +242,23 @@ type ExecuteApprovedActionResult struct {
 	ResultID          string
 	ResultStatus      string
 	ResultRef         string
+}
+
+type ToolExecutionCommand struct {
+	AuthContext  AuthContext
+	Skill        SkillDefinition
+	ToolName     string
+	Action       string
+	ResourceType string
+	ResourceID   string
+	RiskLevel    string
+	Intent       string
+	InputSHA256  string
+}
+
+type ToolExecutionResult struct {
+	Executed   bool
+	OutputJSON string
 }
 
 func normalizeToolAction(action string) string {

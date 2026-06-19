@@ -15,4 +15,6 @@ var (
 	ErrProposalApprovalUnavailable = errors.New("proposal approval unavailable")
 	ErrProposalNotApproved         = errors.New("proposal not approved")
 	ErrProposalMismatch            = errors.New("proposal mismatch")
+	ErrToolExecutionUnsupported    = errors.New("tool execution unsupported")
+	ErrToolExecutionFailed         = errors.New("tool execution failed")
 )

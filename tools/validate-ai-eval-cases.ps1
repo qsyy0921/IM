@@ -102,6 +102,7 @@ $knownAssertionTypes = @(
     "must_not_claim_llm_generation",
     "must_record_execution_audit",
     "must_record_tool_result_projection",
+    "must_execute_safe_local_tool",
     "must_not_execute_external_tool",
     "must_verify_approved_proposal"
 )

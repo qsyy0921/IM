@@ -5,7 +5,7 @@
 把下面这段放进 Codex 目标框即可：
 
 ```text
-持续推进 E:\development\IM 的 NexusIM 项目。当前主线就是 AI 大模型应用底座，不是继续泛化清九个 IM 服务 P2 backlog。
+当前唯一默认主线：AI 大模型应用底座。持续推进 E:\development\IM 的 NexusIM 项目，不要默认切回“清九个 IM 服务 P2 backlog”。
 
 【当前主线 / 不可偏移】
 默认推进这条链：group memory -> EvidencePack -> RAG -> summary -> multi-agent -> skill-registry -> MCP/tool gateway -> action-executor -> proposal / approval / audit -> ai-eval。
@@ -17,7 +17,7 @@
 2. 读取 prompt.md 和 agent.md。
 3. 读取 docs/runbook/current-goal.md 的当前 active slice；再按需读取 current-brief、remaining-goals、相关 service brief 或 SDD；不要全文扫长历史文档。
 
-当前 active slice：skill-registry first catalog path、mcp-gateway first prepare path、action-executor first execution audit path、Agent -> mcp-gateway adapter smoke、proposal store、approval workflow、action-executor approved proposal handoff、Agent execution eval adapter 和 low-sensitive tool result projection 已落；agent-service proposal 前会调用 mcp-gateway prepare，并返回 skill_id / prepared_audit_id；action-executor 会通过 agent-service 公开 RPC 校验 approved proposal，但仍不执行外部工具。下一步默认推进 real tool adapter、approval operator / audit outbox、真实 tool output safety cases；如果该串接已完成，则按 current-goal.md 选择下一项 AI 主线任务。
+当前 active slice：skill-registry first catalog path、mcp-gateway first prepare path、action-executor first execution audit path、Agent -> mcp-gateway adapter smoke、proposal store、approval workflow、action-executor approved proposal handoff、Agent execution eval adapter、low-sensitive tool result projection 和本地安全 tool adapter first path 已落；agent-service proposal 前会调用 mcp-gateway prepare，并返回 skill_id / prepared_audit_id；action-executor 会通过 agent-service 公开 RPC 校验 approved proposal，且只允许 `nexusim.local.echo` 这类低敏本地 adapter 真实执行并记录 output hash，仍不连接外部 MCP/provider。下一步默认推进 approval operator / audit outbox、外部 MCP adapter failure fallback、真实 tool output safety cases；如果该串接已完成，则按 current-goal.md 选择下一项 AI 主线任务。
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；真实写动作必须继续走 policy、proposal / approval / executor / audit。
 

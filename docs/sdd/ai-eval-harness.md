@@ -52,5 +52,7 @@ separate safety vocabulary.
 real `loadtest/agent` against `agent-service` and `action-executor`, then
 validates active Agent / action-executor cases for approval-required behavior,
 approved proposal verification, low-sensitive execution audit recording,
-low-sensitive tool result projection and `executed=false`. It is still local
-safety evidence, not a production benchmark or real external tool execution.
+low-sensitive tool result projection, `executed=false`, and a separate
+`nexusim.local.echo` safe local tool output case with `SUCCEEDED` plus output
+hash only. It is still local safety evidence, not a production benchmark or real
+external MCP/provider execution.

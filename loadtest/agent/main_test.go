@@ -28,6 +28,24 @@ func TestParseConfigDefaults(t *testing.T) {
 	if cfg.resourceID != cfg.conversationID {
 		t.Fatalf("expected default resource id to follow conversation id")
 	}
+	if cfg.expectExecuted {
+		t.Fatalf("default smoke should keep action execution disabled")
+	}
+}
+
+func TestParseConfigCanExpectExecutedSafeTool(t *testing.T) {
+	cfg, err := parseConfig([]string{
+		"--expect-executed",
+		"--tool-name", "nexusim.local.echo",
+		"--skill-id", "nexusim.local.echo",
+		"--resource-type", "diagnostic",
+	})
+	if err != nil {
+		t.Fatalf("parseConfig returned error: %v", err)
+	}
+	if !cfg.expectExecuted || cfg.toolName != "nexusim.local.echo" || cfg.skillID != "nexusim.local.echo" {
+		t.Fatalf("unexpected config: %+v", cfg)
+	}
 }
 
 func TestParseConfigRejectsMissingAgentTarget(t *testing.T) {

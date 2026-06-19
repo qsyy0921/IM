@@ -18,6 +18,10 @@ type ProposalApprovalPort interface {
 	VerifyApprovedProposal(context.Context, types.VerifyApprovedProposalCommand) (types.ApprovedProposal, error)
 }
 
+type ToolExecutorPort interface {
+	ExecuteTool(context.Context, types.ToolExecutionCommand) (types.ToolExecutionResult, error)
+}
+
 type ExecutionAuditRepository interface {
 	RecordExecution(context.Context, types.ExecutionAudit, types.ToolResultProjection) error
 }

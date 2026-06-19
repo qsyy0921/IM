@@ -53,6 +53,7 @@ type config struct {
 	resourceID     string
 	riskLevel      string
 	intent         string
+	expectExecuted bool
 	requestTimeout time.Duration
 	tls            grpctls.Config
 }
@@ -246,6 +247,7 @@ func parseConfig(args []string) (config, error) {
 	flagSet.StringVar(&cfg.resourceID, "resource-id", "", "resource id for policy precheck")
 	flagSet.StringVar(&cfg.riskLevel, "risk-level", "LOW", "risk level for policy precheck")
 	flagSet.StringVar(&cfg.intent, "intent", "", "intent for policy precheck")
+	flagSet.BoolVar(&cfg.expectExecuted, "expect-executed", false, "expect action-executor to run a safe local tool and record a successful result projection")
 	flagSet.DurationVar(&cfg.requestTimeout, "request-timeout", 10*time.Second, "gRPC request timeout")
 	flagSet.StringVar(&cfg.tls.CAFile, "agent-tls-ca-file", "", "agent gRPC TLS CA file")
 	flagSet.StringVar(&cfg.tls.ServerName, "agent-tls-server-name", "", "agent gRPC TLS server name")
@@ -717,13 +719,24 @@ func verifyWorkflow(
 	if !execution.GetAllowed() || !execution.GetRequiresApproval() {
 		return agentSmokeSummary{}, fmt.Errorf("unexpected execution decision allowed=%v requires_approval=%v", execution.GetAllowed(), execution.GetRequiresApproval())
 	}
-	if execution.GetExecuted() {
+	if cfg.expectExecuted {
+		if !execution.GetExecuted() {
+			return agentSmokeSummary{}, errors.New("expected action-executor to execute safe local tool")
+		}
+		if execution.GetResultStatus() != "SUCCEEDED" || !strings.Contains(execution.GetOutputJson(), "local-safe-echo") {
+			return agentSmokeSummary{}, fmt.Errorf("unexpected executed result: status=%q output=%q", execution.GetResultStatus(), execution.GetOutputJson())
+		}
+	} else if execution.GetExecuted() {
 		return agentSmokeSummary{}, errors.New("first-stage action-executor must not execute external tool")
 	}
 	if strings.TrimSpace(execution.GetExecutionId()) == "" {
 		return agentSmokeSummary{}, errors.New("missing execution_id")
 	}
-	if strings.TrimSpace(execution.GetResultId()) == "" || execution.GetResultStatus() != "NOT_EXECUTED" || strings.TrimSpace(execution.GetResultRef()) == "" {
+	expectedResultStatus := "NOT_EXECUTED"
+	if cfg.expectExecuted {
+		expectedResultStatus = "SUCCEEDED"
+	}
+	if strings.TrimSpace(execution.GetResultId()) == "" || execution.GetResultStatus() != expectedResultStatus || strings.TrimSpace(execution.GetResultRef()) == "" {
 		return agentSmokeSummary{}, fmt.Errorf("unexpected execution result projection fields: result_id=%q status=%q ref=%q", execution.GetResultId(), execution.GetResultStatus(), execution.GetResultRef())
 	}
 
@@ -795,7 +808,11 @@ func verifyWorkflow(
 		return agentSmokeSummary{}, err
 	}
 	verified = append(verified, "agent proposal approval recorded and verified by action-executor")
-	verified = append(verified, "action-executor recorded approved execution audit with executed=false")
+	if cfg.expectExecuted {
+		verified = append(verified, "action-executor executed safe local tool and recorded output hash only")
+	} else {
+		verified = append(verified, "action-executor recorded approved execution audit with executed=false")
+	}
 	verified = append(verified, "action-executor recorded low-sensitive tool result projection")
 	verified = append(verified, "first-stage response is proposal-only and generated_by_llm=false")
 
@@ -984,7 +1001,7 @@ WHERE tenant_id = $1
 	audit.ProposalIDMatches = proposalID == proposal.GetProposalId()
 	audit.ApprovalIDMatches = approvalID == approval.GetApprovalId()
 	audit.PreparedAuditIDMatches = preparedAuditID == proposal.GetPreparedAuditId()
-	audit.LowSensitiveAuditOnly = audit.InputSHA256Present && !audit.OutputSHA256Present
+	audit.LowSensitiveAuditOnly = audit.InputSHA256Present && (!audit.Executed || audit.OutputSHA256Present)
 	var resultExecutionID string
 	var resultRef string
 	err = pool.QueryRow(ctx, `
@@ -1015,13 +1032,22 @@ WHERE tenant_id = $1
 	if audit.PermissionVersion != 42 || audit.Classification != "TOOL_APPROVAL_REQUIRED" || audit.DecisionSource != "TOOL_RULE" {
 		return actionAudit{}, fmt.Errorf("unexpected action audit policy metadata: %+v", audit)
 	}
-	if audit.Executed {
-		return actionAudit{}, errors.New("action audit must keep executed=false in first-stage mode")
+	if audit.Executed != cfg.expectExecuted {
+		return actionAudit{}, fmt.Errorf("unexpected action audit executed=%v expect=%v", audit.Executed, cfg.expectExecuted)
 	}
 	if !audit.InputSHA256Present {
 		return actionAudit{}, errors.New("action audit must store low-sensitive input_sha256")
 	}
-	if audit.ResultID != execution.GetResultId() || audit.ResultStatus != "NOT_EXECUTED" || !audit.ResultRefPresent || !audit.ResultExecutionMatches {
+	expectedResultStatus := "NOT_EXECUTED"
+	if cfg.expectExecuted {
+		expectedResultStatus = "SUCCEEDED"
+		if !audit.OutputSHA256Present {
+			return actionAudit{}, errors.New("executed action audit must store output_sha256 only")
+		}
+	} else if audit.OutputSHA256Present {
+		return actionAudit{}, errors.New("not-executed action audit must not store output_sha256")
+	}
+	if audit.ResultID != execution.GetResultId() || audit.ResultStatus != expectedResultStatus || !audit.ResultRefPresent || !audit.ResultExecutionMatches {
 		return actionAudit{}, fmt.Errorf("unexpected action result projection: %+v", audit)
 	}
 	if !audit.ProposalIDMatches || !audit.ApprovalIDMatches || !audit.PreparedAuditIDMatches {

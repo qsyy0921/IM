@@ -19,6 +19,7 @@ import (
 	"github.com/qsyy0921/IM/services/action-executor/internal/app"
 	postgresinfra "github.com/qsyy0921/IM/services/action-executor/internal/infrastructure/postgres"
 	rpcinfra "github.com/qsyy0921/IM/services/action-executor/internal/infrastructure/rpc"
+	toolinfra "github.com/qsyy0921/IM/services/action-executor/internal/infrastructure/tool"
 	"google.golang.org/grpc"
 )
 
@@ -114,8 +115,15 @@ func runGRPC(ctx context.Context) error {
 		return err
 	}
 	repository := postgresinfra.NewRepository(pool)
+	toolExecutor := toolinfra.NewLocalSafeExecutor()
 	server := grpc.NewServer()
-	actiongrpc.Register(server, actiongrpc.NewServer(app.NewExecuteApprovedActionUseCase(skillClient, policyClient, agentClient, repository)))
+	actiongrpc.Register(server, actiongrpc.NewServer(app.NewExecuteApprovedActionUseCaseWithToolExecutor(
+		skillClient,
+		policyClient,
+		agentClient,
+		repository,
+		toolExecutor,
+	)))
 
 	serveErr := make(chan error, 1)
 	go func() {

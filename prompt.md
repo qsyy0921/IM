@@ -16,7 +16,7 @@
 2. 读取 prompt.md 和 agent.md。
 3. 读取 docs/runbook/current-goal.md 的当前 active slice；再按需读取 current-brief、remaining-goals、相关 service brief 或 SDD；不要全文扫长历史文档。
 
-当前 active slice：agent-service first proposal-only path 和真实本地 retrieval-gateway -> policy-service -> agent-service adapter smoke 已落；下一步推进 skill-registry，然后继续 mcp-gateway / action-executor。RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables。
+当前 active slice：skill-registry first catalog path 已落；下一步推进 mcp-gateway，然后继续 action-executor。RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；真实写动作必须继续走 policy、proposal / approval / executor / audit。
 
 可用多个 sub-agent 做互不重叠任务；主 agent 负责集成、检查和文档同步。不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
 ```

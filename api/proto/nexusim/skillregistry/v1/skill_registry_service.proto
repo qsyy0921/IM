@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package nexusim.skillregistry.v1;
+
+import "nexusim/policy/v1/policy_service.proto";
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/skillregistry/v1;skillregistryv1";
+
+service SkillRegistryService {
+  rpc UpsertSkill(UpsertSkillRequest) returns (UpsertSkillResponse);
+  rpc GetSkill(GetSkillRequest) returns (GetSkillResponse);
+  rpc ListSkills(ListSkillsRequest) returns (ListSkillsResponse);
+}
+
+enum SkillStatus {
+  SKILL_STATUS_UNSPECIFIED = 0;
+  SKILL_STATUS_ACTIVE = 1;
+  SKILL_STATUS_DISABLED = 2;
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+message SkillDefinition {
+  string tenant_id = 1;
+  string skill_id = 2;
+  string display_name = 3;
+  string description = 4;
+  string version = 5;
+  SkillStatus status = 6;
+  string tool_name = 7;
+  repeated nexusim.policy.v1.ToolAction allowed_actions = 8;
+  string input_schema_json = 9;
+  string output_schema_json = 10;
+  string permission_scope = 11;
+  string risk_level = 12;
+  bool requires_approval = 13;
+  string audit_event_type = 14;
+  string owner_service = 15;
+  repeated string tags = 16;
+  string metadata_json = 17;
+  int64 created_at_unix_ms = 18;
+  int64 updated_at_unix_ms = 19;
+}
+
+message UpsertSkillRequest {
+  AuthContext auth_context = 1;
+  SkillDefinition skill = 2;
+}
+
+message UpsertSkillResponse {
+  SkillDefinition skill = 1;
+}
+
+message GetSkillRequest {
+  AuthContext auth_context = 1;
+  string skill_id = 2;
+}
+
+message GetSkillResponse {
+  SkillDefinition skill = 1;
+}
+
+message ListSkillsRequest {
+  AuthContext auth_context = 1;
+  SkillStatus status = 2;
+  string owner_service = 3;
+  string tool_name = 4;
+  string tag = 5;
+  string after_skill_id = 6;
+  int32 limit = 7;
+}
+
+message ListSkillsResponse {
+  repeated SkillDefinition skills = 1;
+  string next_cursor = 2;
+}

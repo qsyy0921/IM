@@ -131,3 +131,11 @@ scrape_configs:
           - host.docker.internal:11922
         labels:
           service: agent-service
+
+  - job_name: nexusim-skill-registry
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:11923
+        labels:
+          service: skill-registry

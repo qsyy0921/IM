@@ -29,8 +29,9 @@
 - `rag-service.md`
 - `summary-service.md`
 - `agent-service.md`
+- `skill-registry.md`
 - `ai-eval-harness.md`
-- 后续待新增：`skill-registry.md`、`mcp-gateway.md`、`action-executor.md`。
+- 后续待新增：`mcp-gateway.md`、`action-executor.md`。
 
 ## 通用约束
 

@@ -1,0 +1,20 @@
+groups:
+  - name: nexusim-skill-registry
+    rules:
+      - alert: NexusIMSkillRegistryDown
+        expr: up{service="skill-registry"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: skill-registry
+        annotations:
+          summary: "skill-registry metrics endpoint is down"
+
+      - alert: NexusIMSkillRegistryInfoMissing
+        expr: absent(nexusim_skill_registry_service_info)
+        for: 2m
+        labels:
+          severity: warning
+          service: skill-registry
+        annotations:
+          summary: "skill-registry info metric is missing"

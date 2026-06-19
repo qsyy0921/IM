@@ -299,4 +299,15 @@ foreach ($alert in $requiredAgentAlerts) {
     }
 }
 
+$requiredSkillRegistryAlerts = @(
+    "NexusIMSkillRegistryDown",
+    "NexusIMSkillRegistryInfoMissing"
+)
+
+foreach ($alert in $requiredSkillRegistryAlerts) {
+    if ($rulesByService["skill-registry"] -notmatch [regex]::Escape($alert)) {
+        throw "Prometheus skill-registry rules missing alert: $alert"
+    }
+}
+
 Write-Host "OK   local Prometheus config"

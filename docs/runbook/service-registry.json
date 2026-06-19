@@ -127,6 +127,14 @@
       "grafana_dashboard": "agent-service-observability.json"
     },
     {
+      "name": "skill-registry",
+      "stage": "foundation-active",
+      "local_process": "skill-registry-grpc",
+      "debug_port": 11923,
+      "prometheus_rule_file": "prometheus-skill-registry-alerts.yml",
+      "grafana_dashboard": "skill-registry-observability.json"
+    },
+    {
       "name": "media-service",
       "stage": "future"
     },
@@ -140,6 +148,14 @@
     },
     {
       "name": "admin-service",
+      "stage": "future"
+    },
+    {
+      "name": "mcp-gateway",
+      "stage": "future"
+    },
+    {
+      "name": "action-executor",
       "stage": "future"
     },
     {

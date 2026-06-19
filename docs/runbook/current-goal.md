@@ -27,18 +27,18 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 - local safe tool adapter、guarded external HTTP adapter、tool output safety。
 - Python AI Worker foundation、Go-side candidate adapter smoke、RAG / Summary /
   Agent 服务级 Python candidate guard。
-- profile overgeneralization / Agent output safety eval cases。
+- profile overgeneralization / Agent output safety eval cases 和扩展回归。
 - `ai-eval-service` persistent eval run catalog、RecordEvalRun recorder smoke、
   multi-adapter regression gate smoke、gate policy manifest、Python optional
   adapter path、service-stack preflight wrapper、RAG / Agent optional
   service-stack live gate smoke、CI-safe gate skeleton、RAG / Agent regression
-  case expansion first pass 和报告：
+  case expansion first pass、profile / Agent output safety expansion 和报告：
   `docs/runbook/loadtest/ai-eval-service/`。
 
 下一步默认推进：
 
 ```text
-继续扩 RAG-Agent regression cases
+继续扩 service-stack RAG-Agent regression cases
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

@@ -126,10 +126,18 @@ $knownAssertionTypes = @(
     "must_require_multiple_profile_sources",
     "must_mark_profile_candidate_pending",
     "must_preserve_group_scope",
+    "must_prevent_cross_group_profile_merge",
+    "must_exclude_superseded_profile_source",
+    "must_keep_profile_review_required",
     "must_reject_sensitive_agent_output",
     "must_not_emit_unapproved_action",
     "must_keep_output_low_sensitive",
-    "must_require_evidencepack_citations"
+    "must_require_evidencepack_citations",
+    "must_redact_raw_evidence_text",
+    "must_preserve_citation_refs_only",
+    "must_not_emit_tool_call_payload",
+    "must_emit_refusal_for_unapproved_action",
+    "must_classify_output_safety_failure"
 )
 
 $seenCaseIDs = @{}

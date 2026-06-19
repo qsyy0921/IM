@@ -106,8 +106,10 @@ First-stage profile overgeneralization / Agent output safety adapter:
 This adapter uses a low-sensitive local fixture to verify that a single
 group-scoped memory fact is not promoted into an ACTIVE personal profile, that
 profile candidates stay `PENDING_REVIEW` until multi-source support and review
-exist, and that Agent output rejects raw EvidencePack text, secret-like content
-and unapproved business actions. It does not call models, databases or business
+exist, that cross-group observations are not merged into a global preference,
+that superseded memory is excluded from profile sources, and that Agent output
+rejects raw EvidencePack text, secret-like content, tool-call payloads and
+unapproved business actions. It does not call models, databases or business
 services.
 
 First-stage action-executor external HTTP adapter eval:
@@ -208,6 +210,10 @@ The first local live run passed with `profile-agent-safety`,
 selected; see `docs/runbook/loadtest/ai-eval-service/`.
 The 2026-06-20 expansion run added RAG EvidencePack coverage / projection
 checks and Agent prepare-audit / tool-policy metadata checks in the same folder.
+The 2026-06-20 profile / Agent output safety expansion run increased the
+CI-safe fixture adapter to 6 cases for cross-group profile isolation,
+superseded-memory exclusion, citation-only redaction and unapproved-action
+payload refusal.
 
 First-stage Go-side Python worker adapter smoke:
 

@@ -69,12 +69,12 @@ tool output is suppressed. Python AI Worker foundation is landed with the
 `ai/python` directory, reproducible `IM` conda toolchain and candidate contract
 guard. RAG/Summary guarded external HTTP boundary, Python worker safety eval,
 Go-side smoke, RAG/Summary/Agent candidate guards, and action-executor guarded
-external HTTP adapter + eval first paths are landed. Profile overgeneralization
-and Agent output safety eval cases plus the local fixture adapter are landed.
+external HTTP adapter + eval first paths are landed. Profile / Agent output
+safety expanded eval cases plus the local fixture adapter are landed.
 `ai-eval-service` catalog, RecordEvalRun recorder, multi-adapter gate smoke,
 gate policy manifest, Python optional adapter path, RAG / Agent service-stack
-live gate, CI-safe gate skeleton and first RAG-Agent regression expansion are
-landed. Next move is deeper RAG-Agent regression cases, or `current-goal.md`.
+live gate, CI-safe gate skeleton and first RAG-Agent regression expansion are landed.
+Next move is deeper service-stack RAG-Agent regression cases, or `current-goal.md`.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.

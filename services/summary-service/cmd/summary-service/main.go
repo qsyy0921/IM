@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/qsyy0921/IM/internal/ai/llmboundary"
+	"github.com/qsyy0921/IM/internal/ai/pythonworker"
 	summarygrpc "github.com/qsyy0921/IM/services/summary-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/summary-service/internal/app"
 	rpcinfra "github.com/qsyy0921/IM/services/summary-service/internal/infrastructure/rpc"
@@ -231,9 +232,25 @@ func summaryProviderFromEnv() (app.SummaryProvider, error) {
 			MaxEvidenceItems: envInt("NEXUSIM_SUMMARY_LLM_MAX_EVIDENCE_ITEMS", llmboundary.DefaultMaxEvidenceItems),
 			MaxTextRunes:     envInt("NEXUSIM_SUMMARY_LLM_MAX_TEXT_RUNES", llmboundary.DefaultMaxTextRunes),
 		}), nil
+	case "python-worker":
+		runner, err := summaryPythonWorkerRunnerFromEnv()
+		if err != nil {
+			return nil, err
+		}
+		return app.NewPythonWorkerSummaryProvider(app.ExtractiveSummaryProvider{}, runner), nil
 	default:
 		return nil, fmt.Errorf("unsupported NEXUSIM_SUMMARY_PROVIDER_MODE %q", mode)
 	}
+}
+
+func summaryPythonWorkerRunnerFromEnv() (pythonworker.Runner, error) {
+	return pythonworker.NewRunner(pythonworker.RunnerOptions{
+		Python:         envString("NEXUSIM_SUMMARY_PYTHON_BIN", "python"),
+		ScriptPath:     envString("NEXUSIM_SUMMARY_PYTHON_WORKER_SCRIPT", "ai/python/scripts/run_candidate_worker.py"),
+		WorkDir:        envString("NEXUSIM_SUMMARY_PYTHON_WORKER_WORKDIR", "."),
+		Timeout:        envDuration("NEXUSIM_SUMMARY_PYTHON_WORKER_TIMEOUT", 5*time.Second),
+		MaxOutputBytes: int64(envInt("NEXUSIM_SUMMARY_PYTHON_WORKER_MAX_OUTPUT_BYTES", int(pythonworker.DefaultMaxOutputBytes))),
+	})
 }
 
 func startDebugServer(ctx context.Context, addr string) (func(), error) {

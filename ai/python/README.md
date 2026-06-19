@@ -71,6 +71,7 @@ Run this repo-level guard when changing Python worker foundations:
 .\tools\run-ai-eval-python-worker-adapter.ps1 -Python C:\Users\10495\anaconda3\envs\IM\python.exe
 go run ./tools/python-worker-go-adapter-smoke -python C:\Users\10495\anaconda3\envs\IM\python.exe
 go run ./services/rag-service/cmd/rag-python-worker-provider-smoke -python C:\Users\10495\anaconda3\envs\IM\python.exe
+go run ./services/summary-service/cmd/summary-python-worker-provider-smoke -python C:\Users\10495\anaconda3\envs\IM\python.exe
 ```
 
 The guard is intentionally small. It protects the first-stage boundary:
@@ -82,7 +83,6 @@ candidate contract safety: malformed / unsafe inputs fail closed, successful
 candidates return hashes and source refs rather than raw output text, and Go
 consumes candidate metadata rather than delegating control to Python.
 
-`rag-python-worker-provider-smoke` is the first service-level integration
-smoke. It proves `rag-service` can wrap its Go-owned answer provider with a
-Python worker candidate guard while keeping final answer state, citations and
-failure handling in Go.
+The RAG and summary provider smokes prove services can wrap Go-owned providers
+with a Python worker candidate guard while final state, citations and failure
+handling stay in Go.

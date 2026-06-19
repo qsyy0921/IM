@@ -40,6 +40,16 @@ func TestSummaryProviderFromEnvAllowsLocalExternalEndpoint(t *testing.T) {
 	}
 }
 
+func TestSummaryProviderFromEnvAllowsPythonWorkerMode(t *testing.T) {
+	t.Setenv("NEXUSIM_SUMMARY_PROVIDER_MODE", "python-worker")
+	t.Setenv("NEXUSIM_SUMMARY_PYTHON_BIN", "python")
+	t.Setenv("NEXUSIM_SUMMARY_PYTHON_WORKER_SCRIPT", "ai/python/scripts/run_candidate_worker.py")
+	t.Setenv("NEXUSIM_SUMMARY_PYTHON_WORKER_WORKDIR", ".")
+	if _, err := summaryProviderFromEnv(); err != nil {
+		t.Fatalf("python worker provider should be valid: %v", err)
+	}
+}
+
 func TestSummaryProviderFromEnvRejectsUnsupportedMode(t *testing.T) {
 	t.Setenv("NEXUSIM_SUMMARY_PROVIDER_MODE", "bad")
 	if _, err := summaryProviderFromEnv(); err == nil {

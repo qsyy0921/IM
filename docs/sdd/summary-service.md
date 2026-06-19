@@ -16,6 +16,10 @@
   `SummaryProvider` port，prompt 只能由 EvidencePack 构造，HTTP 明文 endpoint
   只允许 loopback / private，provider failure 回退 extractive，unsafe /
   malformed output fail closed。
+- 可选 `python-worker` provider mode 只作为第一阶段服务级 Python candidate
+  guard：Go 先生成 grounded summary，Python worker 只返回 candidate hash /
+  citations / confidence metadata；Go 校验 task/candidate id、hash 和 citations
+  后才接受，失败时 fail closed。
 - response 必须保留 `citations`、原始 `EvidencePack`、`summary_version` 和
   `generated_by_llm`。
 - 无可见证据时返回 `INSUFFICIENT_EVIDENCE`，不能编造摘要。
@@ -57,6 +61,6 @@ citation verifier。
 ## 后续
 
 - 后续接 provider-specific LLM / Python worker 时继续复用 prompt boundary、
-  token budget、PII / secret filter、provider failure fallback 和 citation
-  verifier。
+  token budget、PII / secret filter、provider failure fallback、hash / citation
+  metadata 校验和 citation verifier。
 - 与 `agent-service` 对接时仍只暴露 EvidencePack summary，不授予业务写权限。

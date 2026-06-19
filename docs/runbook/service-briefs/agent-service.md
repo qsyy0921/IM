@@ -14,7 +14,7 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 - `approval-outbox-relay`：发布低敏 `im.agent.events`，unsupported / malformed fail-closed。
 - `ApproveAgentProposal` / `VerifyApprovedAgentProposal`：给 action-executor 校验 approval / prepare audit / skill / tool / resource，不暴露私表。
 - `proposal-approval-audit` / `proposal-approval-approve`：默认 dry-run，reason 走文件，输出不含正文 / EvidencePack。
-- 可选 `python-worker` proposal provider mode：Go 先生成 grounded proposal，Python worker 只返回 proposal hash / citation metadata；最终 proposal、citation verifier、approval 和 audit 仍由 Go 控制。
+- 可选 `python-worker` proposal provider mode：Go 先生成 grounded proposal，Python worker 只返回 proposal hash / citation metadata；hash / citation mismatch 与 worker failure 已有 Agent output regression。
 - Agent adapter smoke、Agent -> mcp-gateway smoke、Agent execution eval adapter first path 和 Agent output safety fixture eval 已落。
 
 ## 边界
@@ -25,4 +25,4 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- ai-eval-service first persistent eval run catalog 和 RecordEvalRun recorder smoke；Agent 仍只提交 proposal，不直接执行工具。
+- 继续补 tool/action safety cases；Agent 仍只提交 proposal，不直接执行工具。

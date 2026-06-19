@@ -93,6 +93,16 @@
       "requires": [
         "conda-env:IM"
       ]
+    },
+    {
+      "name": "agent-python-worker-provider",
+      "script": "run-ai-eval-agent-output-regression.ps1",
+      "run_suffix": "agent-python-worker-provider",
+      "summary_file": "agent-output-regression-summary.json",
+      "requires_service_stack": false,
+      "requires": [
+        "conda-env:IM"
+      ]
     }
   ],
   "forbidden_persisted_fields": [

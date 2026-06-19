@@ -16,6 +16,8 @@ summary, Agent and tool/action boundaries.
   `tools/run-ai-eval-action-external-adapter.ps1`
 - action-executor external MCP fallback adapter eval:
   `tools/run-ai-eval-action-mcp-fallback-adapter.ps1`
+- Agent output regression adapter:
+  `tools/run-ai-eval-agent-output-regression.ps1`
 - Python worker output-safety adapter: `tools/run-ai-eval-python-worker-adapter.ps1`
 - ai-eval-service recorder smoke: `tools/run-ai-eval-record-run-smoke.ps1`
 - ai-eval-service gate policy manifest:
@@ -171,6 +173,19 @@ runs Go-side Python runner regressions that reject candidate outputs containing
 forbidden `raw_output`, sensitive citation metadata or malformed output hashes.
 It does not call external providers, databases or business services.
 
+First-stage Agent output regression adapter:
+
+```powershell
+.\tools\run-ai-eval-agent-output-regression.ps1 `
+  -Python C:\Users\10495\anaconda3\envs\IM\python.exe
+```
+
+This adapter runs the `agent-service` Python worker proposal-provider smoke. It
+validates a grounded candidate success path and fails closed on hash mismatch,
+citation mismatch and worker failure. It is an optional adapter because it uses
+the local `IM` conda Python worker path. It does not call external providers,
+databases, live Agent services or business tools.
+
 First-stage `ai-eval-service` RecordEvalRun recorder smoke:
 
 ```powershell
@@ -227,6 +242,9 @@ stack:
   -Python C:\Users\10495\anaconda3\envs\IM\python.exe
 ```
 
+`agent-python-worker-provider` can be selected the same way to record the
+command-level Agent output regression through `ai-eval-service`.
+
 `rag-service`, `summary-service` and `agent-action-executor` can also be selected through
 `-OptionalAdapter`, but they require their listed service stacks and targets to
 already be running. The gate runner records any selected optional adapter through
@@ -269,6 +287,9 @@ service-stack rerun by itself.
 The 2026-06-20 action-executor external MCP fallback eval added 4 CI-safe cases
 for unavailable, timeout, rate-limit and permission-denied classifications with
 no execution, no output hash and no raw provider output persistence.
+The 2026-06-20 Agent output regression added 4 optional Python-worker provider
+cases for grounded candidate success, hash mismatch, citation mismatch and
+worker failure.
 
 First-stage Go-side Python worker adapter smoke:
 

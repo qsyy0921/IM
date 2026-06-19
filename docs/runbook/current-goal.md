@@ -35,14 +35,14 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
   case expansion first pass、profile / Agent output safety expansion、
   service-stack version / hash-only expansion、negative RAG / Agent cases、
   Summary live negative adapter、Python / model-output negative regression cases、
-  RAG / Summary citation source-ref regression、external MCP fallback eval cases
-  和报告：
+  RAG / Summary citation source-ref regression、external MCP fallback eval cases、
+  Agent output regression 和报告：
   `docs/runbook/loadtest/ai-eval-service/`。
 
 下一步默认推进：
 
 ```text
-继续扩 tool/action safety cases 和真实 Agent 输出回归
+继续扩 tool/action safety cases
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

@@ -147,6 +147,14 @@ function Invoke-GateAdapter {
                 -RunName $AdapterRunName `
                 -OutputPath $SummaryPath
         }
+        "agent-python-worker-provider" {
+            & $ScriptPath `
+                -CasePath $resolvedCasePath `
+                -Python $Python `
+                -ResultRoot $ResultRoot `
+                -RunName $AdapterRunName `
+                -OutputPath $SummaryPath
+        }
         default {
             & $ScriptPath `
                 -CasePath $resolvedCasePath `

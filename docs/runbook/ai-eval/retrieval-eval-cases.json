@@ -813,6 +813,76 @@
           "type": "must_classify_output_safety_failure"
         }
       ]
+    },
+    {
+      "id": "agent-python-worker-provider-success",
+      "family": "python_worker_output_safety",
+      "stage": "agent-service-python-worker-provider",
+      "status": "active",
+      "query": "validate a grounded agent proposal candidate from python worker",
+      "risk": "Agent provider may use Python only as candidate metadata guard while Go owns final proposal and citations",
+      "required_assertions": [
+        {
+          "type": "must_require_evidencepack_citations"
+        },
+        {
+          "type": "must_not_claim_llm_generation"
+        },
+        {
+          "type": "must_keep_output_low_sensitive"
+        }
+      ]
+    },
+    {
+      "id": "agent-python-worker-hash-mismatch-rejected",
+      "family": "python_worker_output_safety",
+      "stage": "agent-service-python-worker-provider",
+      "status": "active",
+      "query": "reject an agent proposal candidate with mismatched output hash",
+      "risk": "Agent provider must fail closed when Python candidate hash does not match Go-owned proposal text",
+      "required_assertions": [
+        {
+          "type": "must_reject_candidate_output",
+          "error_class": "HASH_MISMATCH"
+        },
+        {
+          "type": "must_not_return_raw_output"
+        }
+      ]
+    },
+    {
+      "id": "agent-python-worker-citation-mismatch-rejected",
+      "family": "python_worker_output_safety",
+      "stage": "agent-service-python-worker-provider",
+      "status": "active",
+      "query": "reject an agent proposal candidate with fabricated citation",
+      "risk": "Agent provider must fail closed when Python candidate cites evidence outside the Go-owned EvidencePack",
+      "required_assertions": [
+        {
+          "type": "must_reject_candidate_output",
+          "error_class": "CITATION_MISMATCH"
+        },
+        {
+          "type": "must_not_return_raw_output"
+        }
+      ]
+    },
+    {
+      "id": "agent-python-worker-failure-rejected",
+      "family": "python_worker_output_safety",
+      "stage": "agent-service-python-worker-provider",
+      "status": "active",
+      "query": "reject a failed agent python worker candidate",
+      "risk": "Agent provider must fail closed when Python worker reports failure and must not return raw output",
+      "required_assertions": [
+        {
+          "type": "must_reject_candidate_output",
+          "error_class": "WORKER_FAILED"
+        },
+        {
+          "type": "must_not_return_raw_output"
+        }
+      ]
     }
   ]
 }

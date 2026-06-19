@@ -72,5 +72,7 @@ approval, execution response, low-sensitive audit rows and low-sensitive tool
 result projection. For cases that require `must_execute_safe_local_tool`, it
 runs a second low-sensitive `nexusim.local.echo` path and verifies `SUCCEEDED`
 plus output hash only. It proves the proposal / approval / executor / audit /
-result-projection boundary and local safe tool output path only; it still does
-not execute external MCP/provider tools.
+result-projection boundary and local safe tool output path only. External MCP
+fallback and unsafe output suppression are currently covered by action-executor
+focused tests; the eval adapter still does not execute external MCP/provider
+tools.

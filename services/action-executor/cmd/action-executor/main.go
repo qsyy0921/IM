@@ -115,7 +115,10 @@ func runGRPC(ctx context.Context) error {
 		return err
 	}
 	repository := postgresinfra.NewRepository(pool)
-	toolExecutor := toolinfra.NewLocalSafeExecutor()
+	toolExecutor, err := newToolExecutorFromEnv()
+	if err != nil {
+		return err
+	}
 	server := grpc.NewServer()
 	actiongrpc.Register(server, actiongrpc.NewServer(app.NewExecuteApprovedActionUseCaseWithToolExecutor(
 		skillClient,
@@ -145,6 +148,17 @@ func runGRPC(ctx context.Context) error {
 		}
 		return context.Canceled
 	}
+}
+
+func newToolExecutorFromEnv() (app.ToolExecutorPort, error) {
+	localExecutor := toolinfra.NewLocalSafeExecutor()
+	externalFallback, err := toolinfra.NewExternalMCPFallbackExecutor(
+		envString("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_FALLBACK_MODE", toolinfra.ExternalMCPFallbackDisabled),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return toolinfra.NewExecutorChain(localExecutor, externalFallback), nil
 }
 
 func actionExecutorModeFromEnv() string {

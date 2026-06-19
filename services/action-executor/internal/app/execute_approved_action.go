@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -126,14 +127,25 @@ func (usecase ExecuteApprovedActionUseCase) Execute(
 		})
 		switch {
 		case err == nil:
-			result.Executed = execution.Executed
-			result.OutputJSON = stableOutputJSON(execution.OutputJSON)
+			if execution.Executed {
+				outputJSON, err := safeToolOutputJSON(execution.OutputJSON)
+				if err != nil {
+					status = types.ExecutionStatusFailed
+					result.Classification = "TOOL_OUTPUT_UNSAFE"
+					result.Reason = "tool output unsafe"
+					result.DecisionSource = "action-executor"
+					result.Executed = false
+					result.OutputJSON = "{}"
+					break
+				}
+				result.Executed = true
+				result.OutputJSON = outputJSON
+			}
 		case errors.Is(err, types.ErrToolExecutionUnsupported):
 			// Unsupported tools remain proposal/audit-only until a safe adapter is registered.
 		default:
 			status = types.ExecutionStatusFailed
-			result.Classification = "TOOL_EXECUTION_FAILED"
-			result.Reason = "tool execution failed"
+			result.Classification, result.Reason = toolExecutionFailurePublicFields(err)
 			result.DecisionSource = "action-executor"
 			result.Executed = false
 			result.OutputJSON = "{}"
@@ -311,12 +323,126 @@ func outputSHA256(outputJSON string, executed bool) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func stableOutputJSON(outputJSON string) string {
+func safeToolOutputJSON(outputJSON string) (string, error) {
 	outputJSON = strings.TrimSpace(outputJSON)
-	if outputJSON == "" {
-		return "{}"
+	if outputJSON == "" || len(outputJSON) > maxToolOutputJSONBytes {
+		return "", types.ErrToolOutputUnsafe
 	}
-	return outputJSON
+	var decoded any
+	if err := json.Unmarshal([]byte(outputJSON), &decoded); err != nil {
+		return "", types.ErrToolOutputUnsafe
+	}
+	object, ok := decoded.(map[string]any)
+	if !ok {
+		return "", types.ErrToolOutputUnsafe
+	}
+	if containsUnsafeToolOutputValue(object) {
+		return "", types.ErrToolOutputUnsafe
+	}
+	encoded, err := json.Marshal(object)
+	if err != nil {
+		return "", types.ErrToolOutputUnsafe
+	}
+	return string(encoded), nil
+}
+
+const maxToolOutputJSONBytes = 16 * 1024
+
+func containsUnsafeToolOutputValue(value any) bool {
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, nested := range typed {
+			if unsafeToolOutputKey(key) || containsUnsafeToolOutputValue(nested) {
+				return true
+			}
+		}
+	case []any:
+		for _, nested := range typed {
+			if containsUnsafeToolOutputValue(nested) {
+				return true
+			}
+		}
+	case string:
+		return unsafeToolOutputString(typed)
+	}
+	return false
+}
+
+func unsafeToolOutputKey(key string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(key))
+	normalized = strings.ReplaceAll(normalized, "-", "_")
+	sensitiveKeys := []string{
+		"authorization",
+		"api_key",
+		"access_key",
+		"credential",
+		"cookie",
+		"email",
+		"id_token",
+		"password",
+		"phone",
+		"private_key",
+		"refresh_token",
+		"secret",
+		"session",
+		"ssn",
+		"token",
+	}
+	for _, sensitive := range sensitiveKeys {
+		if normalized == sensitive || strings.Contains(normalized, "_"+sensitive) || strings.Contains(normalized, sensitive+"_") {
+			return true
+		}
+	}
+	return false
+}
+
+func unsafeToolOutputString(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if strings.Contains(value, "-----BEGIN ") && strings.Contains(value, " PRIVATE KEY-----") {
+		return true
+	}
+	sensitiveFragments := []string{
+		"authorization:",
+		"bearer ",
+		"password=",
+		"refresh_token",
+		"secret=",
+		"sk-",
+		"token=",
+	}
+	for _, fragment := range sensitiveFragments {
+		if strings.Contains(normalized, fragment) {
+			return true
+		}
+	}
+	return looksLikeEmail(value)
+}
+
+func looksLikeEmail(value string) bool {
+	value = strings.TrimSpace(value)
+	at := strings.Index(value, "@")
+	if at <= 0 || at >= len(value)-3 {
+		return false
+	}
+	domain := value[at+1:]
+	return strings.Contains(domain, ".") && !strings.ContainsAny(value, " \t\r\n")
+}
+
+func toolExecutionFailurePublicFields(err error) (string, string) {
+	switch {
+	case errors.Is(err, types.ErrToolExecutionTimeout):
+		return "TOOL_EXECUTION_TIMEOUT", "tool execution timeout"
+	case errors.Is(err, types.ErrToolProviderUnavailable):
+		return "TOOL_PROVIDER_UNAVAILABLE", "tool provider unavailable"
+	case errors.Is(err, types.ErrToolProviderRateLimited):
+		return "TOOL_PROVIDER_RATE_LIMITED", "tool provider rate limited"
+	case errors.Is(err, types.ErrToolProviderPermissionDenied):
+		return "TOOL_PROVIDER_PERMISSION_DENIED", "tool provider permission denied"
+	case errors.Is(err, types.ErrToolOutputUnsafe):
+		return "TOOL_OUTPUT_UNSAFE", "tool output unsafe"
+	default:
+		return "TOOL_EXECUTION_FAILED", "tool execution failed"
+	}
 }
 
 func PublicBlockedError(result types.ExecuteApprovedActionResult) error {

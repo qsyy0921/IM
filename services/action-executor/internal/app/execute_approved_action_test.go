@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/qsyy0921/IM/services/action-executor/internal/types"
@@ -115,6 +116,126 @@ func TestExecuteApprovedActionLeavesUnsupportedToolUnexecuted(t *testing.T) {
 	}
 }
 
+func TestExecuteApprovedActionClassifiesExternalToolExecutionFailures(t *testing.T) {
+	cases := []struct {
+		name           string
+		err            error
+		classification string
+		reason         string
+	}{
+		{
+			name:           "timeout",
+			err:            types.ErrToolExecutionTimeout,
+			classification: "TOOL_EXECUTION_TIMEOUT",
+			reason:         "tool execution timeout",
+		},
+		{
+			name:           "provider unavailable",
+			err:            types.ErrToolProviderUnavailable,
+			classification: "TOOL_PROVIDER_UNAVAILABLE",
+			reason:         "tool provider unavailable",
+		},
+		{
+			name:           "provider rate limited",
+			err:            types.ErrToolProviderRateLimited,
+			classification: "TOOL_PROVIDER_RATE_LIMITED",
+			reason:         "tool provider rate limited",
+		},
+		{
+			name:           "provider permission denied",
+			err:            types.ErrToolProviderPermissionDenied,
+			classification: "TOOL_PROVIDER_PERMISSION_DENIED",
+			reason:         "tool provider permission denied",
+		},
+		{
+			name:           "generic failure",
+			err:            errors.New("provider returned private body: token=abc"),
+			classification: "TOOL_EXECUTION_FAILED",
+			reason:         "tool execution failed",
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			audit := &fakeAuditRepository{}
+			usecase := NewExecuteApprovedActionUseCaseWithToolExecutor(
+				fakeSkillCatalog{skill: activeSkill()},
+				allowingPolicy(),
+				fakeApproval{},
+				audit,
+				&fakeToolExecutor{err: testCase.err},
+			)
+			result, err := usecase.Execute(context.Background(), validCommand())
+			if err != nil {
+				t.Fatalf("execute action: %v", err)
+			}
+			if result.Status != types.ExecutionStatusFailed || result.ResultStatus != types.ResultStatusFailed || result.Executed {
+				t.Fatalf("expected failed unexecuted result, got %+v", result)
+			}
+			if result.Classification != testCase.classification || result.Reason != testCase.reason {
+				t.Fatalf("unexpected public failure fields: %+v", result)
+			}
+			if strings.Contains(result.Reason, "token=abc") || strings.Contains(result.Classification, "token=abc") {
+				t.Fatalf("raw provider error leaked into public fields: %+v", result)
+			}
+			if len(audit.rows) != 1 || audit.rows[0].OutputSHA256 != "" || audit.rows[0].Executed {
+				t.Fatalf("expected failed audit without output hash, got %+v", audit.rows)
+			}
+			if len(audit.results) != 1 || audit.results[0].Status != types.ResultStatusFailed || audit.results[0].OutputSHA256 != "" {
+				t.Fatalf("expected failed result projection without output hash, got %+v", audit.results)
+			}
+		})
+	}
+}
+
+func TestExecuteApprovedActionRejectsUnsafeToolOutputs(t *testing.T) {
+	cases := []struct {
+		name       string
+		outputJSON string
+	}{
+		{name: "malformed json", outputJSON: `{"status":`},
+		{name: "array output", outputJSON: `[{"status":"ok"}]`},
+		{name: "secret key", outputJSON: `{"status":"ok","api_key":"sk-secret"}`},
+		{name: "token string", outputJSON: `{"status":"ok","message":"Bearer token=abc"}`},
+		{name: "private key", outputJSON: `{"status":"ok","pem":"-----BEGIN RSA PRIVATE KEY-----abc"}`},
+		{name: "email pii", outputJSON: `{"status":"ok","contact":"ops@example.com"}`},
+		{name: "oversized", outputJSON: `{"status":"ok","blob":"` + strings.Repeat("a", 20*1024) + `"}`},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			audit := &fakeAuditRepository{}
+			usecase := NewExecuteApprovedActionUseCaseWithToolExecutor(
+				fakeSkillCatalog{skill: activeSkill()},
+				allowingPolicy(),
+				fakeApproval{},
+				audit,
+				&fakeToolExecutor{result: types.ToolExecutionResult{
+					Executed:   true,
+					OutputJSON: testCase.outputJSON,
+				}},
+			)
+			result, err := usecase.Execute(context.Background(), validCommand())
+			if err != nil {
+				t.Fatalf("execute action: %v", err)
+			}
+			if result.Status != types.ExecutionStatusFailed || result.ResultStatus != types.ResultStatusFailed {
+				t.Fatalf("expected failed unsafe output result, got %+v", result)
+			}
+			if result.Executed || result.OutputJSON != "{}" || result.Classification != "TOOL_OUTPUT_UNSAFE" {
+				t.Fatalf("unsafe output should be suppressed, got %+v", result)
+			}
+			if strings.Contains(result.OutputJSON, "sk-secret") || strings.Contains(result.OutputJSON, "ops@example.com") {
+				t.Fatalf("unsafe output leaked into response: %+v", result)
+			}
+			if len(audit.rows) != 1 || audit.rows[0].OutputSHA256 != "" || audit.rows[0].Executed {
+				t.Fatalf("unsafe output should not be hashed as executed: %+v", audit.rows)
+			}
+			if len(audit.results) != 1 || audit.results[0].OutputSHA256 != "" || audit.results[0].Executed {
+				t.Fatalf("unsafe result projection should not store output hash: %+v", audit.results)
+			}
+		})
+	}
+}
+
 func TestExecuteApprovedActionRequiresApprovalAndPreparedAudit(t *testing.T) {
 	command := validCommand()
 	command.ApprovalID = ""
@@ -218,6 +339,17 @@ func activeSkill() types.SkillDefinition {
 		RiskLevel:        "LOW",
 		RequiresApproval: true,
 	}
+}
+
+func allowingPolicy() fakeToolPolicy {
+	return fakeToolPolicy{decision: types.ToolPolicyDecision{
+		Allowed:           true,
+		RequiresApproval:  true,
+		PermissionVersion: 9,
+		Classification:    "TOOL_ALLOWED",
+		Reason:            "approved",
+		DecisionSource:    "TOOL_RULE",
+	}}
 }
 
 type fakeSkillCatalog struct {

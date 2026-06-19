@@ -65,7 +65,7 @@
 -> Agent execution eval adapter first path 已落
 -> low-sensitive tool result projection first path 已落
 -> local safe tool adapter / safe output hash projection first path 已落
--> external MCP adapter failure fallback / true tool output safety follow-up
+-> Python AI Worker foundation / external LLM adapter boundary
 -> 安全 / 观测 / repair / 运维 hardening
 ```
 
@@ -208,7 +208,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 ```text
 前 9 个微服务已经能跑通 IM 主链路，
 现在处于“9 个现有服务做必要收口，并向 AI 大模型应用底座转进”，
-search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已从 contract 切到 foundation-active implementation 并跑通 clean projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，policy precheck 和 EvidencePack 字段 hardening first pass 已落；AI eval harness first pass 已有低敏 case schema / validator；rag-service first read-only answer path、`loadtest/rag`、RAG eval adapter、真实本地 adapter smoke、provider boundary 和 citation verifier first pass 已落；summary-service first read-only summary path 和真实本地 adapter smoke 已落；agent-service first proposal-only path 和真实本地 adapter smoke 已落，并已接入 mcp-gateway prepare、proposal store、approval preflight、approval outbox relay 和 approval operator；skill-registry first catalog path、mcp-gateway first prepare path、action-executor first execution audit / Agent approved proposal handoff、Agent execution eval adapter first path、low-sensitive tool result projection 和本地安全 tool adapter 已落，后续是 external MCP adapter failure fallback / true tool output safety follow-up。
+search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已从 contract 切到 foundation-active implementation 并跑通 clean projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，policy precheck 和 EvidencePack 字段 hardening first pass 已落；AI eval harness first pass 已有低敏 case schema / validator；rag-service first read-only answer path、`loadtest/rag`、RAG eval adapter、真实本地 adapter smoke、provider boundary 和 citation verifier first pass 已落；summary-service first read-only summary path 和真实本地 adapter smoke 已落；agent-service first proposal-only path 和真实本地 adapter smoke 已落，并已接入 mcp-gateway prepare、proposal store、approval preflight、approval outbox relay 和 approval operator；skill-registry first catalog path、mcp-gateway first prepare path、action-executor first execution audit / Agent approved proposal handoff、Agent execution eval adapter first path、low-sensitive tool result projection、本地安全 tool adapter、外部 MCP fallback 稳定失败分类和 tool output safety first path 已落，后续是 Python AI Worker foundation / external LLM adapter boundary。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。
 ```
 

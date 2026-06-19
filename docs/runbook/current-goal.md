@@ -30,14 +30,15 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 - `mcp-gateway` first prepare path。
 - `action-executor` first execution audit、approved proposal preflight、
   low-sensitive result projection、本地安全 `nexusim.local.echo` adapter。
+- `action-executor` 外部 MCP fallback 错误分类和 tool output safety first path。
 - Agent execution eval adapter 覆盖 approval / execution / result projection /
   safe local tool output。
 
 下一步默认推进：
 
 ```text
-external MCP adapter failure fallback
--> true tool output safety cases
+Python AI Worker foundation directory / toolchain / contract guard
+-> external LLM adapter boundary
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

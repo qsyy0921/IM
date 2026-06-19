@@ -4,7 +4,7 @@
 
 `action-executor` 是 NexusIM AI 应用底座中的受控动作执行边界。它承接 Agent proposal、approval 和 `mcp-gateway` prepare 之后的动作执行请求，把真实写动作纳入 policy precheck、审批关联和低敏 audit。
 
-当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。已支持本地安全 `nexusim.local.echo` adapter first path，用于验证真实低敏 output hash / result projection；不连接外部 MCP server，不执行真实业务写动作。
+当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。已支持本地安全 `nexusim.local.echo` adapter first path，用于验证真实低敏 output hash / result projection；已支持外部 MCP fallback 稳定失败分类和 tool output safety first path；不连接外部 MCP server，不执行真实业务写动作。
 
 ## 职责
 
@@ -37,6 +37,10 @@
   - `output_sha256`，当前未执行外部工具时为空
 - 对 `nexusim.local.echo` 这类本地安全 adapter，可生成低敏 output JSON、
   `output_sha256` 和 `SUCCEEDED` result projection。
+- 对显式启用的外部 MCP fallback，只返回 timeout / unavailable / rate-limit /
+  permission-denied / failed 等稳定分类，不保存 provider 原始错误。
+- 所有 adapter output 进入响应 / hash 前必须经过安全门禁：
+  valid JSON object、大小限制、无 secret-like / PII-like key 或 value。
 
 ## 非职责
 
@@ -92,6 +96,10 @@ agent-service proposal
 - 业务 tool 第一版只返回 `RECORDED` / `BLOCKED`，且 `executed=false`。
 - `nexusim.local.echo` 可返回 `executed=true`，但 output 只包含低敏 metadata
   和 `input_sha256`，不回显 raw input。
+- 外部 MCP fallback 使用 `NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_FALLBACK_MODE`
+  显式开启；默认 `disabled`，保持不执行外部工具。
+- unsafe tool output 必须 fail closed 为 `TOOL_OUTPUT_UNSAFE`，不写
+  `output_sha256`，响应只返回 `{}`。
 - `input_json` 只校验 JSON 和大小，audit 只保存 hash。
 - policy deny 必须 fail closed 并落低敏 audit。
 - tool result projection 不是 provider 输出存储；当前只记录
@@ -121,7 +129,7 @@ agent-service proposal
 
 ## 后续
 
-- 接入外部 MCP adapter / tool provider。
+- 接入真实外部 MCP adapter / tool provider。
 - per tenant / per tool rate limit。
-- provider failure fallback / retry / DLQ。
+- provider retry / DLQ。
 - 外部 audit sink。

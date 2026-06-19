@@ -67,10 +67,10 @@ adapter, and proposal approval operator first paths are landed. `agent-service` 
 metadata, exposes `VerifyApprovedAgentProposal`, and publishes low-sensitive
 `im.agent.events` approval events through the approval outbox relay.
 `action-executor` can execute only the deterministic low-sensitive
-`nexusim.local.echo` local adapter and records output hash only; it still does
-not connect external MCP/provider tools. Next move is external MCP adapter
-failure fallback, true tool output safety cases, or the next AI mainline task
-from `current-goal.md`.
+`nexusim.local.echo` local adapter and records output hash only; external
+MCP/provider fallback is classified as stable low-sensitive failure and unsafe
+tool output is suppressed. Next move is Python AI Worker foundation, external
+LLM adapter boundary, or the next AI mainline task from `current-goal.md`.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.

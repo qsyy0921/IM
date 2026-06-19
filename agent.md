@@ -60,12 +60,14 @@ Existing real services: `api-gateway`, `identity-service`, `message-service`,
 
 Current active slice: `skill-registry` first catalog path, `mcp-gateway`
 first prepare path, `action-executor` first execution audit path, Agent ->
-mcp-gateway adapter smoke, proposal store, approval workflow, and
-action-executor approved proposal handoff are landed. `agent-service` now calls
-`mcp-gateway.PrepareToolCall`, persists low-sensitive proposal / approval
-metadata, and exposes `VerifyApprovedAgentProposal` for `action-executor`.
-`action-executor` still does not execute external tools. Next move is real tool
-adapter follow-up or Agent execution eval adapter from `current-goal.md`.
+mcp-gateway adapter smoke, proposal store, approval workflow,
+action-executor approved proposal handoff, and Agent execution eval adapter are
+landed. `agent-service` now calls `mcp-gateway.PrepareToolCall`, persists
+low-sensitive proposal / approval metadata, and exposes
+`VerifyApprovedAgentProposal` for `action-executor`. `action-executor` still
+does not execute external tools. Next move is real tool adapter, tool result
+projection, approval operator / audit outbox, or the next AI mainline task from
+`current-goal.md`.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.

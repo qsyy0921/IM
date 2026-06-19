@@ -20,6 +20,8 @@
 - PostgreSQL `action_executor_execution_audits` 低敏审计表。
 - 本地 Docker / Prometheus / Grafana wiring。
 - 聚焦单测和 PG integration test。
+- Agent execution eval adapter first path：通过 `loadtest/agent` 建立 proposal、
+  approve 后调用 `ExecuteApprovedAction`，并校验 execution audit 低敏字段。
 
 ## 边界
 
@@ -33,4 +35,4 @@
 
 - 接真实 MCP / tool adapter。
 - 增加 rate limit、failure fallback、result projection 和 DLQ / repair。
-- 接 AI eval 的 Agent action safety adapter。
+- 扩展 AI eval 的真实 tool result / failure fallback safety cases。

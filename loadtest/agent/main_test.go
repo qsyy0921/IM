@@ -16,6 +16,9 @@ func TestParseConfigDefaults(t *testing.T) {
 	if cfg.agentTarget != defaultAgentTarget {
 		t.Fatalf("unexpected agent target %q", cfg.agentTarget)
 	}
+	if cfg.actionTarget != defaultActionTarget {
+		t.Fatalf("unexpected action executor target %q", cfg.actionTarget)
+	}
 	if cfg.resultRoot != defaultResultRoot {
 		t.Fatalf("unexpected result root %q", cfg.resultRoot)
 	}
@@ -30,6 +33,12 @@ func TestParseConfigDefaults(t *testing.T) {
 func TestParseConfigRejectsMissingAgentTarget(t *testing.T) {
 	if _, err := parseConfig([]string{"--agent-target", " "}); err == nil {
 		t.Fatalf("expected missing agent target to fail")
+	}
+}
+
+func TestParseConfigRejectsMissingActionExecutorTarget(t *testing.T) {
+	if _, err := parseConfig([]string{"--action-executor-target", " "}); err == nil {
+		t.Fatalf("expected missing action executor target to fail")
 	}
 }
 

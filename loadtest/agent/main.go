@@ -15,26 +15,30 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	actionexecutorv1 "github.com/qsyy0921/IM/api/proto/nexusim/actionexecutor/v1"
 	agentv1 "github.com/qsyy0921/IM/api/proto/nexusim/agent/v1"
 	policyv1 "github.com/qsyy0921/IM/api/proto/nexusim/policy/v1"
 	retrievalv1 "github.com/qsyy0921/IM/api/proto/nexusim/retrieval/v1"
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
-	defaultPGDSN       = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable"
-	defaultAgentTarget = "127.0.0.1:10630"
-	defaultResultRoot  = `H:\NexusIM\loadtest-results`
-	defaultObjective   = "phoenix launch decision"
-	defaultToolName    = "conversation.note.create"
-	defaultSkillID     = "conversation.note.create"
-	defaultResource    = "conversation_note"
+	defaultPGDSN        = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable"
+	defaultAgentTarget  = "127.0.0.1:10630"
+	defaultActionTarget = "127.0.0.1:10660"
+	defaultResultRoot   = `H:\NexusIM\loadtest-results`
+	defaultObjective    = "phoenix launch decision"
+	defaultToolName     = "conversation.note.create"
+	defaultSkillID      = "conversation.note.create"
+	defaultResource     = "conversation_note"
 )
 
 type config struct {
 	pgDSN          string
 	agentTarget    string
+	actionTarget   string
 	resultRoot     string
 	runName        string
 	tenantID       string
@@ -70,40 +74,52 @@ type seededData struct {
 }
 
 type agentSmokeSummary struct {
-	RunName                 string       `json:"run_name"`
-	ResultDir               string       `json:"result_dir"`
-	AgentTarget             string       `json:"agent_target"`
-	Objective               string       `json:"objective"`
-	ToolName                string       `json:"tool_name"`
-	SkillID                 string       `json:"skill_id"`
-	ResourceType            string       `json:"resource_type"`
-	RiskLevel               string       `json:"risk_level"`
-	Seed                    seededData   `json:"seed"`
-	ProposalID              string       `json:"proposal_id"`
-	PreparedAuditID         string       `json:"prepared_audit_id"`
-	ProposalStatus          string       `json:"proposal_status"`
-	ProposalText            string       `json:"proposal_text"`
-	RequiresApproval        bool         `json:"requires_approval"`
-	GeneratedByLLM          bool         `json:"generated_by_llm"`
-	CitationCount           int          `json:"citation_count"`
-	PolicyAllowed           bool         `json:"policy_allowed"`
-	PolicyRequiresApproval  bool         `json:"policy_requires_approval"`
-	PolicyDecisionSource    string       `json:"policy_decision_source"`
-	PolicyClassification    string       `json:"policy_classification"`
-	PolicyPermissionVersion int64        `json:"policy_permission_version"`
-	MCPAudit                mcpAudit     `json:"mcp_audit"`
-	PackID                  string       `json:"pack_id"`
-	EvidenceItemCount       int          `json:"evidence_item_count"`
-	SearchItemCount         int          `json:"search_item_count"`
-	MemoryItemCount         int          `json:"memory_item_count"`
-	SourceCounts            sourceCounts `json:"source_counts"`
-	SearchProjectionVersion int64        `json:"search_projection_version"`
-	MemoryProjectionVersion int64        `json:"memory_projection_version"`
-	AgentVersion            string       `json:"agent_version"`
-	RetrievalVersion        string       `json:"retrieval_version"`
-	Verified                []string     `json:"verified"`
-	StartedAt               time.Time    `json:"started_at"`
-	FinishedAt              time.Time    `json:"finished_at"`
+	RunName                   string       `json:"run_name"`
+	ResultDir                 string       `json:"result_dir"`
+	AgentTarget               string       `json:"agent_target"`
+	ActionExecutorTarget      string       `json:"action_executor_target"`
+	Objective                 string       `json:"objective"`
+	ToolName                  string       `json:"tool_name"`
+	SkillID                   string       `json:"skill_id"`
+	ResourceType              string       `json:"resource_type"`
+	RiskLevel                 string       `json:"risk_level"`
+	Seed                      seededData   `json:"seed"`
+	ProposalID                string       `json:"proposal_id"`
+	PreparedAuditID           string       `json:"prepared_audit_id"`
+	ProposalStatus            string       `json:"proposal_status"`
+	ApprovalID                string       `json:"approval_id"`
+	ApprovedByUserID          string       `json:"approved_by_user_id"`
+	ApprovedAtUnixMs          int64        `json:"approved_at_unix_ms"`
+	ExecutionID               string       `json:"execution_id"`
+	ExecutionStatus           string       `json:"execution_status"`
+	ExecutionAllowed          bool         `json:"execution_allowed"`
+	ExecutionRequiresApproval bool         `json:"execution_requires_approval"`
+	ExecutionDecisionSource   string       `json:"execution_decision_source"`
+	ExecutionClassification   string       `json:"execution_classification"`
+	ExecutionExecuted         bool         `json:"execution_executed"`
+	ProposalText              string       `json:"proposal_text"`
+	RequiresApproval          bool         `json:"requires_approval"`
+	GeneratedByLLM            bool         `json:"generated_by_llm"`
+	CitationCount             int          `json:"citation_count"`
+	PolicyAllowed             bool         `json:"policy_allowed"`
+	PolicyRequiresApproval    bool         `json:"policy_requires_approval"`
+	PolicyDecisionSource      string       `json:"policy_decision_source"`
+	PolicyClassification      string       `json:"policy_classification"`
+	PolicyPermissionVersion   int64        `json:"policy_permission_version"`
+	MCPAudit                  mcpAudit     `json:"mcp_audit"`
+	ActionAudit               actionAudit  `json:"action_audit"`
+	PackID                    string       `json:"pack_id"`
+	EvidenceItemCount         int          `json:"evidence_item_count"`
+	SearchItemCount           int          `json:"search_item_count"`
+	MemoryItemCount           int          `json:"memory_item_count"`
+	SourceCounts              sourceCounts `json:"source_counts"`
+	SearchProjectionVersion   int64        `json:"search_projection_version"`
+	MemoryProjectionVersion   int64        `json:"memory_projection_version"`
+	AgentVersion              string       `json:"agent_version"`
+	RetrievalVersion          string       `json:"retrieval_version"`
+	Verified                  []string     `json:"verified"`
+	StartedAt                 time.Time    `json:"started_at"`
+	FinishedAt                time.Time    `json:"finished_at"`
 }
 
 type mcpAudit struct {
@@ -118,6 +134,24 @@ type mcpAudit struct {
 	InputSHA256Present    bool   `json:"input_sha256_present"`
 	IdempotencyKeyMatches bool   `json:"idempotency_key_matches"`
 	LowSensitiveAuditOnly bool   `json:"low_sensitive_audit_only"`
+}
+
+type actionAudit struct {
+	ExecutionID            string `json:"execution_id"`
+	Status                 string `json:"status"`
+	Allowed                bool   `json:"allowed"`
+	RequiresApproval       bool   `json:"requires_approval"`
+	PermissionVersion      int64  `json:"permission_version"`
+	Classification         string `json:"classification"`
+	DecisionSource         string `json:"decision_source"`
+	ToolAction             string `json:"tool_action"`
+	Executed               bool   `json:"executed"`
+	InputSHA256Present     bool   `json:"input_sha256_present"`
+	OutputSHA256Present    bool   `json:"output_sha256_present"`
+	ProposalIDMatches      bool   `json:"proposal_id_matches"`
+	ApprovalIDMatches      bool   `json:"approval_id_matches"`
+	PreparedAuditIDMatches bool   `json:"prepared_audit_id_matches"`
+	LowSensitiveAuditOnly  bool   `json:"low_sensitive_audit_only"`
 }
 
 type sourceCounts struct {
@@ -170,7 +204,15 @@ func run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	summary, err := verifyProposal(ctx, pool, cfg, resultDir, seed, response, startedAt)
+	approval, err := approveProposal(ctx, cfg, response.GetProposalId())
+	if err != nil {
+		return err
+	}
+	execution, err := executeApprovedAction(ctx, cfg, response, approval)
+	if err != nil {
+		return err
+	}
+	summary, err := verifyWorkflow(ctx, pool, cfg, resultDir, seed, response, approval, execution, startedAt)
 	if err != nil {
 		return err
 	}
@@ -182,6 +224,7 @@ func parseConfig(args []string) (config, error) {
 	flagSet := flag.NewFlagSet("agent-smoke", flag.ContinueOnError)
 	flagSet.StringVar(&cfg.pgDSN, "pg-dsn", defaultPGDSN, "PostgreSQL DSN")
 	flagSet.StringVar(&cfg.agentTarget, "agent-target", defaultAgentTarget, "agent-service gRPC address")
+	flagSet.StringVar(&cfg.actionTarget, "action-executor-target", defaultActionTarget, "action-executor gRPC address")
 	flagSet.StringVar(&cfg.resultRoot, "result-root", defaultResultRoot, "external result root for raw smoke output")
 	flagSet.StringVar(&cfg.runName, "run-name", "", "run name under result root")
 	flagSet.StringVar(&cfg.tenantID, "tenant-id", "", "tenant id for seeded projection rows")
@@ -206,6 +249,7 @@ func parseConfig(args []string) (config, error) {
 	}
 	cfg.resultRoot = strings.TrimSpace(cfg.resultRoot)
 	cfg.agentTarget = strings.TrimSpace(cfg.agentTarget)
+	cfg.actionTarget = strings.TrimSpace(cfg.actionTarget)
 	cfg.objective = strings.TrimSpace(cfg.objective)
 	cfg.toolName = strings.TrimSpace(cfg.toolName)
 	cfg.skillID = strings.TrimSpace(cfg.skillID)
@@ -214,6 +258,9 @@ func parseConfig(args []string) (config, error) {
 	cfg.intent = strings.TrimSpace(cfg.intent)
 	if cfg.agentTarget == "" {
 		return config{}, errors.New("--agent-target is required")
+	}
+	if cfg.actionTarget == "" {
+		return config{}, errors.New("--action-executor-target is required")
 	}
 	if cfg.resultRoot == "" {
 		return config{}, errors.New("--result-root is required")
@@ -269,6 +316,8 @@ func applyProjectionMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 		filepath.Join("migrations", "postgres", "skill-registry", "000001_skill_registry_core.sql"),
 		filepath.Join("migrations", "postgres", "policy", "000014_policy_tool_action_rules.sql"),
 		filepath.Join("migrations", "postgres", "mcp-gateway", "000001_mcp_gateway_core.sql"),
+		filepath.Join("migrations", "postgres", "agent-service", "000001_agent_proposals.sql"),
+		filepath.Join("migrations", "postgres", "action-executor", "000001_action_executor_core.sql"),
 	} {
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -283,6 +332,8 @@ func applyProjectionMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 
 func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string) error {
 	for _, statement := range []string{
+		`DELETE FROM action_executor_execution_audits WHERE tenant_id = $1`,
+		`DELETE FROM agent_proposals WHERE tenant_id = $1`,
 		`DELETE FROM mcp_gateway_tool_call_audits WHERE tenant_id = $1`,
 		`DELETE FROM policy_tool_decision_audit WHERE tenant_id = $1`,
 		`DELETE FROM policy_tool_action_rules WHERE tenant_id = $1`,
@@ -318,7 +369,7 @@ INSERT INTO skill_registry_definitions (
 	metadata_json, created_at, updated_at
 ) VALUES (
 	$1, $2, $2, 'Agent smoke skill for controlled conversation note proposal.',
-	'v1', 'ACTIVE', $3, '[1]'::jsonb,
+	'v1', 'ACTIVE', $3, '[1,3]'::jsonb,
 	'{"type":"object","additionalProperties":true}'::jsonb,
 	'{"type":"object","additionalProperties":true}'::jsonb,
 	$4, $5, true, 'conversation.note.proposed.v1', 'agent-service',
@@ -345,15 +396,16 @@ ON CONFLICT (tenant_id, skill_id) DO UPDATE SET
 		return fmt.Errorf("seed skill registry definition: %w", err)
 	}
 
-	if _, err := tx.Exec(ctx, `
+	for _, action := range []string{"CALL", "EXECUTE"} {
+		if _, err := tx.Exec(ctx, `
 INSERT INTO policy_tool_action_rules (
 	tenant_id, tool_name, action, resource_type, risk_level, allowed,
 	requires_approval, permission_version, classification, reason, priority,
 	enabled, source, updated_at
 ) VALUES (
-	$1, $2, 'CALL', $3, $4, true, true, 42,
+	$1, $2, $3, $4, $5, true, true, 42,
 	'TOOL_APPROVAL_REQUIRED', 'agent smoke requires approval before execution',
-	10, true, 'agent-smoke', $5
+	10, true, 'agent-smoke', $6
 )
 ON CONFLICT (tenant_id, tool_name, action, resource_type, risk_level) DO UPDATE SET
 	allowed = EXCLUDED.allowed,
@@ -365,8 +417,9 @@ ON CONFLICT (tenant_id, tool_name, action, resource_type, risk_level) DO UPDATE 
 	enabled = EXCLUDED.enabled,
 	source = EXCLUDED.source,
 	updated_at = EXCLUDED.updated_at
-`, cfg.tenantID, cfg.toolName, cfg.resourceType, cfg.riskLevel, now); err != nil {
-		return fmt.Errorf("seed policy tool action rule: %w", err)
+`, cfg.tenantID, cfg.toolName, action, cfg.resourceType, cfg.riskLevel, now); err != nil {
+			return fmt.Errorf("seed policy tool action rule %s: %w", action, err)
+		}
 	}
 
 	return tx.Commit(ctx)
@@ -498,13 +551,98 @@ func createProposal(ctx context.Context, cfg config) (*agentv1.CreateAgentPropos
 	})
 }
 
-func verifyProposal(
+func approveProposal(
+	ctx context.Context,
+	cfg config,
+	proposalID string,
+) (*agentv1.ApproveAgentProposalResponse, error) {
+	dialOption, err := grpctls.DialOption(cfg.tls, "agent-tls")
+	if err != nil {
+		return nil, err
+	}
+	conn, err := grpc.NewClient("passthrough:///"+cfg.agentTarget, dialOption)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	return agentv1.NewAgentServiceClient(conn).ApproveAgentProposal(requestCtx, &agentv1.ApproveAgentProposalRequest{
+		AuthContext: &retrievalv1.AuthContext{
+			TenantId:  cfg.tenantID,
+			UserId:    cfg.viewerUserID,
+			DeviceId:  cfg.deviceID,
+			SessionId: "agent-smoke-session",
+			TraceId:   "agent-smoke-trace",
+			RequestId: "agent-smoke-approve-request",
+		},
+		ProposalId: proposalID,
+		Reason:     "agent smoke approval for first-stage execution boundary",
+	})
+}
+
+func executeApprovedAction(
+	ctx context.Context,
+	cfg config,
+	proposal *agentv1.CreateAgentProposalResponse,
+	approval *agentv1.ApproveAgentProposalResponse,
+) (*actionexecutorv1.ExecuteApprovedActionResponse, error) {
+	conn, err := grpc.NewClient(
+		"passthrough:///"+cfg.actionTarget,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	inputJSON, err := json.Marshal(map[string]string{
+		"conversation_id": cfg.conversationID,
+		"objective":       cfg.objective,
+		"source":          "loadtest/agent",
+	})
+	if err != nil {
+		return nil, err
+	}
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	return actionexecutorv1.NewActionExecutorServiceClient(conn).ExecuteApprovedAction(
+		requestCtx,
+		&actionexecutorv1.ExecuteApprovedActionRequest{
+			AuthContext: &actionexecutorv1.AuthContext{
+				TenantId:  cfg.tenantID,
+				UserId:    cfg.viewerUserID,
+				DeviceId:  cfg.deviceID,
+				SessionId: "agent-smoke-session",
+				TraceId:   "agent-smoke-trace",
+				RequestId: "agent-smoke-execute-request",
+			},
+			ProposalId:      proposal.GetProposalId(),
+			ApprovalId:      approval.GetApprovalId(),
+			PreparedAuditId: proposal.GetPreparedAuditId(),
+			SkillId:         cfg.skillID,
+			ToolName:        cfg.toolName,
+			Action:          policyv1.ToolAction_TOOL_ACTION_EXECUTE,
+			ResourceType:    cfg.resourceType,
+			ResourceId:      cfg.resourceID,
+			RiskLevel:       cfg.riskLevel,
+			Intent:          cfg.intent,
+			InputJson:       string(inputJSON),
+			IdempotencyKey:  proposal.GetProposalId() + "-execute",
+		},
+	)
+}
+
+func verifyWorkflow(
 	ctx context.Context,
 	pool *pgxpool.Pool,
 	cfg config,
 	resultDir string,
 	seed seededData,
 	response *agentv1.CreateAgentProposalResponse,
+	approval *agentv1.ApproveAgentProposalResponse,
+	execution *actionexecutorv1.ExecuteApprovedActionResponse,
 	startedAt time.Time,
 ) (agentSmokeSummary, error) {
 	if response.GetStatus() != agentv1.AgentProposalStatus_AGENT_PROPOSAL_STATUS_PROPOSED {
@@ -534,6 +672,47 @@ func verifyProposal(
 	}
 	if strings.TrimSpace(response.GetPreparedAuditId()) == "" {
 		return agentSmokeSummary{}, errors.New("missing prepared_audit_id")
+	}
+	if approval == nil {
+		return agentSmokeSummary{}, errors.New("missing approval response")
+	}
+	if approval.GetProposalId() != response.GetProposalId() {
+		return agentSmokeSummary{}, fmt.Errorf("approval proposal mismatch %q != %q", approval.GetProposalId(), response.GetProposalId())
+	}
+	if approval.GetStatus() != agentv1.AgentProposalStatus_AGENT_PROPOSAL_STATUS_APPROVED {
+		return agentSmokeSummary{}, fmt.Errorf("unexpected approval status %v", approval.GetStatus())
+	}
+	if strings.TrimSpace(approval.GetApprovalId()) == "" {
+		return agentSmokeSummary{}, errors.New("missing approval_id")
+	}
+	if approval.GetApprovedByUserId() != cfg.viewerUserID {
+		return agentSmokeSummary{}, fmt.Errorf("unexpected approved_by_user_id %q", approval.GetApprovedByUserId())
+	}
+	if approval.GetApprovedAtUnixMs() <= 0 {
+		return agentSmokeSummary{}, errors.New("missing approved_at")
+	}
+	if execution == nil {
+		return agentSmokeSummary{}, errors.New("missing action execution response")
+	}
+	if execution.GetProposalId() != response.GetProposalId() ||
+		execution.GetApprovalId() != approval.GetApprovalId() ||
+		execution.GetPreparedAuditId() != response.GetPreparedAuditId() {
+		return agentSmokeSummary{}, fmt.Errorf("action execution linkage mismatch: %+v", execution)
+	}
+	if execution.GetStatus() != actionexecutorv1.ActionExecutionStatus_ACTION_EXECUTION_STATUS_RECORDED {
+		return agentSmokeSummary{}, fmt.Errorf("unexpected execution status %v", execution.GetStatus())
+	}
+	if execution.GetAction() != policyv1.ToolAction_TOOL_ACTION_EXECUTE {
+		return agentSmokeSummary{}, fmt.Errorf("unexpected execution action %v", execution.GetAction())
+	}
+	if !execution.GetAllowed() || !execution.GetRequiresApproval() {
+		return agentSmokeSummary{}, fmt.Errorf("unexpected execution decision allowed=%v requires_approval=%v", execution.GetAllowed(), execution.GetRequiresApproval())
+	}
+	if execution.GetExecuted() {
+		return agentSmokeSummary{}, errors.New("first-stage action-executor must not execute external tool")
+	}
+	if strings.TrimSpace(execution.GetExecutionId()) == "" {
+		return agentSmokeSummary{}, errors.New("missing execution_id")
 	}
 
 	decision := response.GetToolPolicyDecision()
@@ -599,43 +778,61 @@ func verifyProposal(
 		return agentSmokeSummary{}, err
 	}
 	verified = append(verified, "mcp-gateway prepare audit recorded before proposal generation")
+	actionAudit, err := verifyActionAudit(ctx, pool, cfg, response, approval, execution)
+	if err != nil {
+		return agentSmokeSummary{}, err
+	}
+	verified = append(verified, "agent proposal approval recorded and verified by action-executor")
+	verified = append(verified, "action-executor recorded approved execution audit with executed=false")
 	verified = append(verified, "first-stage response is proposal-only and generated_by_llm=false")
 
 	return agentSmokeSummary{
-		RunName:                 cfg.runName,
-		ResultDir:               resultDir,
-		AgentTarget:             cfg.agentTarget,
-		Objective:               cfg.objective,
-		ToolName:                cfg.toolName,
-		SkillID:                 cfg.skillID,
-		ResourceType:            cfg.resourceType,
-		RiskLevel:               cfg.riskLevel,
-		Seed:                    seed,
-		ProposalID:              response.GetProposalId(),
-		PreparedAuditID:         response.GetPreparedAuditId(),
-		ProposalStatus:          proposalStatusName(response.GetStatus()),
-		ProposalText:            response.GetProposalText(),
-		RequiresApproval:        response.GetRequiresApproval(),
-		GeneratedByLLM:          response.GetGeneratedByLlm(),
-		CitationCount:           len(response.GetCitations()),
-		PolicyAllowed:           decision.GetAllowed(),
-		PolicyRequiresApproval:  decision.GetRequiresApproval(),
-		PolicyDecisionSource:    decision.GetDecisionSource(),
-		PolicyClassification:    decision.GetClassification(),
-		PolicyPermissionVersion: decision.GetPermissionVersion(),
-		MCPAudit:                audit,
-		PackID:                  pack.GetPackId(),
-		EvidenceItemCount:       len(pack.GetItems()),
-		SearchItemCount:         int(counts.SearchMessage),
-		MemoryItemCount:         int(counts.MemoryEvent),
-		SourceCounts:            counts,
-		SearchProjectionVersion: pack.GetSearchProjectionVersion(),
-		MemoryProjectionVersion: pack.GetMemoryProjectionVersion(),
-		AgentVersion:            response.GetAgentVersion(),
-		RetrievalVersion:        pack.GetRetrievalVersion(),
-		Verified:                verified,
-		StartedAt:               startedAt,
-		FinishedAt:              time.Now().UTC(),
+		RunName:                   cfg.runName,
+		ResultDir:                 resultDir,
+		AgentTarget:               cfg.agentTarget,
+		ActionExecutorTarget:      cfg.actionTarget,
+		Objective:                 cfg.objective,
+		ToolName:                  cfg.toolName,
+		SkillID:                   cfg.skillID,
+		ResourceType:              cfg.resourceType,
+		RiskLevel:                 cfg.riskLevel,
+		Seed:                      seed,
+		ProposalID:                response.GetProposalId(),
+		PreparedAuditID:           response.GetPreparedAuditId(),
+		ProposalStatus:            proposalStatusName(response.GetStatus()),
+		ApprovalID:                approval.GetApprovalId(),
+		ApprovedByUserID:          approval.GetApprovedByUserId(),
+		ApprovedAtUnixMs:          approval.GetApprovedAtUnixMs(),
+		ExecutionID:               execution.GetExecutionId(),
+		ExecutionStatus:           executionStatusName(execution.GetStatus()),
+		ExecutionAllowed:          execution.GetAllowed(),
+		ExecutionRequiresApproval: execution.GetRequiresApproval(),
+		ExecutionDecisionSource:   execution.GetDecisionSource(),
+		ExecutionClassification:   execution.GetClassification(),
+		ExecutionExecuted:         execution.GetExecuted(),
+		ProposalText:              response.GetProposalText(),
+		RequiresApproval:          response.GetRequiresApproval(),
+		GeneratedByLLM:            response.GetGeneratedByLlm(),
+		CitationCount:             len(response.GetCitations()),
+		PolicyAllowed:             decision.GetAllowed(),
+		PolicyRequiresApproval:    decision.GetRequiresApproval(),
+		PolicyDecisionSource:      decision.GetDecisionSource(),
+		PolicyClassification:      decision.GetClassification(),
+		PolicyPermissionVersion:   decision.GetPermissionVersion(),
+		MCPAudit:                  audit,
+		ActionAudit:               actionAudit,
+		PackID:                    pack.GetPackId(),
+		EvidenceItemCount:         len(pack.GetItems()),
+		SearchItemCount:           int(counts.SearchMessage),
+		MemoryItemCount:           int(counts.MemoryEvent),
+		SourceCounts:              counts,
+		SearchProjectionVersion:   pack.GetSearchProjectionVersion(),
+		MemoryProjectionVersion:   pack.GetMemoryProjectionVersion(),
+		AgentVersion:              response.GetAgentVersion(),
+		RetrievalVersion:          pack.GetRetrievalVersion(),
+		Verified:                  verified,
+		StartedAt:                 startedAt,
+		FinishedAt:                time.Now().UTC(),
 	}, nil
 }
 
@@ -705,6 +902,90 @@ WHERE tenant_id = $1
 	}
 	if resourceID != cfg.resourceID {
 		return mcpAudit{}, fmt.Errorf("unexpected mcp audit resource_id %q", resourceID)
+	}
+	return audit, nil
+}
+
+func verifyActionAudit(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	cfg config,
+	proposal *agentv1.CreateAgentProposalResponse,
+	approval *agentv1.ApproveAgentProposalResponse,
+	execution *actionexecutorv1.ExecuteApprovedActionResponse,
+) (actionAudit, error) {
+	var audit actionAudit
+	var inputSHA256 string
+	var outputSHA256 string
+	var proposalID string
+	var approvalID string
+	var preparedAuditID string
+	err := pool.QueryRow(ctx, `
+SELECT
+	execution_id,
+	proposal_id,
+	approval_id,
+	prepared_audit_id,
+	status,
+	allowed,
+	requires_approval,
+	permission_version,
+	classification,
+	decision_source,
+	tool_action,
+	executed,
+	input_sha256,
+	output_sha256
+FROM action_executor_execution_audits
+WHERE tenant_id = $1
+  AND execution_id = $2
+  AND skill_id = $3
+  AND tool_name = $4
+  AND resource_type = $5
+  AND resource_id = $6
+  AND risk_level = $7
+`, cfg.tenantID, execution.GetExecutionId(), cfg.skillID, cfg.toolName, cfg.resourceType, cfg.resourceID, cfg.riskLevel).Scan(
+		&audit.ExecutionID,
+		&proposalID,
+		&approvalID,
+		&preparedAuditID,
+		&audit.Status,
+		&audit.Allowed,
+		&audit.RequiresApproval,
+		&audit.PermissionVersion,
+		&audit.Classification,
+		&audit.DecisionSource,
+		&audit.ToolAction,
+		&audit.Executed,
+		&inputSHA256,
+		&outputSHA256,
+	)
+	if err != nil {
+		return actionAudit{}, fmt.Errorf("query action-executor execution audit: %w", err)
+	}
+	audit.InputSHA256Present = strings.TrimSpace(inputSHA256) != ""
+	audit.OutputSHA256Present = strings.TrimSpace(outputSHA256) != ""
+	audit.ProposalIDMatches = proposalID == proposal.GetProposalId()
+	audit.ApprovalIDMatches = approvalID == approval.GetApprovalId()
+	audit.PreparedAuditIDMatches = preparedAuditID == proposal.GetPreparedAuditId()
+	audit.LowSensitiveAuditOnly = audit.InputSHA256Present && !audit.OutputSHA256Present
+	if audit.Status != "RECORDED" || !audit.Allowed || !audit.RequiresApproval {
+		return actionAudit{}, fmt.Errorf("unexpected action audit decision: %+v", audit)
+	}
+	if audit.ToolAction != "EXECUTE" {
+		return actionAudit{}, fmt.Errorf("unexpected action audit action %q", audit.ToolAction)
+	}
+	if audit.PermissionVersion != 42 || audit.Classification != "TOOL_APPROVAL_REQUIRED" || audit.DecisionSource != "TOOL_RULE" {
+		return actionAudit{}, fmt.Errorf("unexpected action audit policy metadata: %+v", audit)
+	}
+	if audit.Executed {
+		return actionAudit{}, errors.New("action audit must keep executed=false in first-stage mode")
+	}
+	if !audit.InputSHA256Present {
+		return actionAudit{}, errors.New("action audit must store low-sensitive input_sha256")
+	}
+	if !audit.ProposalIDMatches || !audit.ApprovalIDMatches || !audit.PreparedAuditIDMatches {
+		return actionAudit{}, fmt.Errorf("action audit linkage mismatch: %+v", audit)
 	}
 	return audit, nil
 }
@@ -823,6 +1104,21 @@ func proposalStatusName(status agentv1.AgentProposalStatus) string {
 		return "BLOCKED"
 	case agentv1.AgentProposalStatus_AGENT_PROPOSAL_STATUS_INSUFFICIENT_EVIDENCE:
 		return "INSUFFICIENT_EVIDENCE"
+	case agentv1.AgentProposalStatus_AGENT_PROPOSAL_STATUS_APPROVED:
+		return "APPROVED"
+	default:
+		return "UNSPECIFIED"
+	}
+}
+
+func executionStatusName(status actionexecutorv1.ActionExecutionStatus) string {
+	switch status {
+	case actionexecutorv1.ActionExecutionStatus_ACTION_EXECUTION_STATUS_RECORDED:
+		return "RECORDED"
+	case actionexecutorv1.ActionExecutionStatus_ACTION_EXECUTION_STATUS_BLOCKED:
+		return "BLOCKED"
+	case actionexecutorv1.ActionExecutionStatus_ACTION_EXECUTION_STATUS_FAILED:
+		return "FAILED"
 	default:
 		return "UNSPECIFIED"
 	}

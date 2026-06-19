@@ -25,6 +25,9 @@ First-stage cases cover:
 
 - Case file: `docs/runbook/ai-eval/retrieval-eval-cases.json`
 - Validator: `tools/validate-ai-eval-cases.ps1`
+- Execution adapters:
+  - `tools/run-ai-eval-rag-adapter.ps1`
+  - `tools/run-ai-eval-agent-adapter.ps1`
 - Runbook: `docs/runbook/ai-eval/README.md`
 
 The case file is low-sensitive and synthetic. It stores expected assertions,
@@ -44,3 +47,10 @@ RAG / summary / Agent implementations must consume EvidencePack and can add
 execution adapters that evaluate these cases against real outputs. Any future
 `ai-eval-service` should reuse this case taxonomy rather than inventing a
 separate safety vocabulary.
+
+2026-06-19 update: first-stage Agent execution adapter is available. It runs
+real `loadtest/agent` against `agent-service` and `action-executor`, then
+validates active Agent / action-executor cases for approval-required behavior,
+approved proposal verification, low-sensitive execution audit recording and
+`executed=false`. It is still local safety evidence, not a production benchmark
+or real external tool execution.

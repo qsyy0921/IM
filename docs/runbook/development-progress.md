@@ -59,7 +59,8 @@
 -> skill-registry first catalog path 已落
 -> mcp-gateway first prepare path 已落
 -> action-executor first execution audit path + Agent approved proposal handoff 已落
--> real tool adapter / Agent execution eval adapter follow-up
+-> Agent execution eval adapter first path 已落
+-> real tool adapter / tool result projection / approval operator follow-up
 -> 安全 / 观测 / repair / 运维 hardening
 ```
 
@@ -202,7 +203,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 ```text
 前 9 个微服务已经能跑通 IM 主链路，
 现在处于“9 个现有服务做必要收口，并向 AI 大模型应用底座转进”，
-search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已从 contract 切到 foundation-active implementation 并跑通 clean projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，policy precheck 和 EvidencePack 字段 hardening first pass 已落；AI eval harness first pass 已有低敏 case schema / validator；rag-service first read-only answer path、`loadtest/rag`、RAG eval adapter、真实本地 adapter smoke、provider boundary 和 citation verifier first pass 已落；summary-service first read-only summary path 和真实本地 adapter smoke 已落；agent-service first proposal-only path 和真实本地 adapter smoke 已落，并已接入 mcp-gateway prepare、proposal store 和 approval preflight；skill-registry first catalog path、mcp-gateway first prepare path 和 action-executor first execution audit / Agent approved proposal handoff 已落，后续是 real tool adapter / Agent execution eval adapter follow-up。
+search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已从 contract 切到 foundation-active implementation 并跑通 clean projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，policy precheck 和 EvidencePack 字段 hardening first pass 已落；AI eval harness first pass 已有低敏 case schema / validator；rag-service first read-only answer path、`loadtest/rag`、RAG eval adapter、真实本地 adapter smoke、provider boundary 和 citation verifier first pass 已落；summary-service first read-only summary path 和真实本地 adapter smoke 已落；agent-service first proposal-only path 和真实本地 adapter smoke 已落，并已接入 mcp-gateway prepare、proposal store 和 approval preflight；skill-registry first catalog path、mcp-gateway first prepare path、action-executor first execution audit / Agent approved proposal handoff 和 Agent execution eval adapter first path 已落，后续是 real tool adapter / tool result projection / approval operator follow-up。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。
 ```
 

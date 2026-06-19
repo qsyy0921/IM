@@ -21,9 +21,12 @@ prepare audit。第一版持久化低敏 proposal / approval 元数据，给
   audit / skill / tool / resource 匹配，不暴露私表。
 - 旧 Agent adapter smoke 和新的 `retrieval-gateway -> agent-service ->
   mcp-gateway` adapter smoke 已通过。
+- Agent execution eval adapter 已覆盖 proposal -> approve -> action-executor
+  execution audit 的 first path，断言 approved proposal / approval / prepare
+  audit 关联成立，且不执行外部 tool。
 
 下一步：
 
 - 与 `action-executor` 的 approved proposal handoff 已有 first path；后续补
-  real tool adapter、approval operator / audit outbox 和 Agent execution eval adapter。
+  real tool adapter、approval operator / audit outbox 和真实 tool result。
 - 外部 LLM adapter 后续仍必须走 ProposalProvider port 和 citation verifier。

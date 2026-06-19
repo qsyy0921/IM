@@ -8,6 +8,7 @@ summary, Agent and tool/action boundaries.
 - Case file: `retrieval-eval-cases.json`
 - Validator: `tools/validate-ai-eval-cases.ps1`
 - RAG execution adapter: `tools/run-ai-eval-rag-adapter.ps1`
+- Agent execution adapter: `tools/run-ai-eval-agent-adapter.ps1`
 - Scope: first-stage schema + local execution coverage only; not a production
   benchmark, not a model-quality claim, and not a long-running eval platform.
 
@@ -53,3 +54,20 @@ stay under `H:\NexusIM\loadtest-results`.
 Future Agent slices should add execution adapters that evaluate tool policy,
 proposal / approval and action safety against real EvidencePack outputs before
 making model-quality or agent-safety claims.
+
+First-stage Agent execution adapter:
+
+```powershell
+.\tools\run-ai-eval-agent-adapter.ps1 `
+  -PGDSN postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable `
+  -AgentTarget 127.0.0.1:10630 `
+  -ActionExecutorTarget 127.0.0.1:10660
+```
+
+This adapter runs `loadtest/agent`, which seeds low-sensitive search / memory /
+skill / policy rows, calls real `agent-service CreateAgentProposal` and
+`ApproveAgentProposal`, calls real `action-executor ExecuteApprovedAction`, and
+validates active Agent / action-executor cases against the returned proposal,
+approval, execution response and low-sensitive audit rows. It proves the
+proposal / approval / executor / audit boundary only; it still does not execute
+external MCP tools.

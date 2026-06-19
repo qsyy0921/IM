@@ -30,11 +30,11 @@ provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
    multi-adapter gate smoke，也已跑通 RAG / Agent service-stack live gate 和
    CI-safe gate skeleton。RAG coverage / Agent prepare-audit 第一批扩展和
    profile / Agent output safety expansion、service-stack version / hash-only
-   expansion、negative RAG / Agent cases 和 Summary live negative adapter 已落；
-   下一步补 Python / model-output negative cases；仍不得保存 raw prompt、EvidencePack、model
-   output、用户正文、secret 或 tool input。
-   继续补真实 Agent 输出回归、外部 MCP failure fallback、tool/action safety
-   cases 和 RAG / summary citation regression。所有
+   expansion、negative RAG / Agent cases、Summary live negative adapter 和
+   Python / model-output negative cases 已落；仍不得保存 raw prompt、
+   EvidencePack、model output、用户正文、secret 或 tool input。
+   继续补外部 MCP failure fallback、tool/action safety cases、RAG / summary
+   citation regression 和真实 Agent 输出回归。所有
    eval case 必须低敏，可复核，能区分 retrieval failure、reasoning failure 和
    action boundary failure。
 

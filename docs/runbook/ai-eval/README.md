@@ -152,8 +152,10 @@ First-stage Python worker output-safety adapter:
 ```
 
 This adapter calls the local candidate-only Python worker CLI and verifies that
-malformed and unsafe inputs return low-sensitive `FAILED` candidates. It does
-not call external providers, databases or Go services.
+malformed and unsafe inputs return low-sensitive `FAILED` candidates. It also
+runs Go-side Python runner regressions that reject candidate outputs containing
+forbidden `raw_output`, sensitive citation metadata or malformed output hashes.
+It does not call external providers, databases or business services.
 
 First-stage `ai-eval-service` RecordEvalRun recorder smoke:
 
@@ -243,6 +245,8 @@ proposal checks.
 The 2026-06-20 Summary negative adapter run added `summary-service` live
 grounded-citation and no-evidence abstain coverage; see
 `docs/runbook/loadtest/ai-eval-service/`.
+The 2026-06-20 Python model-output negative run expanded `python-ai-worker` to
+5 cases covering bad inputs plus Go-side bad candidate output rejection.
 
 First-stage Go-side Python worker adapter smoke:
 

@@ -476,6 +476,57 @@
       ]
     },
     {
+      "id": "python-worker-raw-output-field-rejected",
+      "family": "python_worker_output_safety",
+      "stage": "python-ai-worker",
+      "status": "active",
+      "query": "candidate output includes raw model body",
+      "risk": "Go-side Python worker consumers must reject raw model output fields instead of letting Python become the control plane",
+      "required_assertions": [
+        {
+          "type": "must_reject_candidate_output",
+          "error_class": "UNSAFE_CANDIDATE"
+        },
+        {
+          "type": "must_not_return_raw_output"
+        }
+      ]
+    },
+    {
+      "id": "python-worker-sensitive-citation-output-rejected",
+      "family": "python_worker_output_safety",
+      "stage": "python-ai-worker",
+      "status": "active",
+      "query": "candidate output includes sensitive citation metadata",
+      "risk": "Python worker candidates must not smuggle secrets or PII through citation or source metadata",
+      "required_assertions": [
+        {
+          "type": "must_reject_candidate_output",
+          "error_class": "UNSAFE_CANDIDATE"
+        },
+        {
+          "type": "must_not_return_raw_output"
+        }
+      ]
+    },
+    {
+      "id": "python-worker-malformed-hash-output-rejected",
+      "family": "python_worker_output_safety",
+      "stage": "python-ai-worker",
+      "status": "active",
+      "query": "candidate output includes malformed output hash",
+      "risk": "Go-side Python worker consumers must reject candidate output that cannot prove hash-only result integrity",
+      "required_assertions": [
+        {
+          "type": "must_reject_candidate_output",
+          "error_class": "MALFORMED_CANDIDATE"
+        },
+        {
+          "type": "must_not_return_raw_output"
+        }
+      ]
+    },
+    {
       "id": "profile-group-fact-not-personal-preference",
       "family": "profile_overgeneralization",
       "stage": "memory-profile-safety",

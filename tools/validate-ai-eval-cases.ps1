@@ -108,6 +108,7 @@ $knownAssertionTypes = @(
     "must_reject_unsafe_llm_output",
     "must_reject_malformed_llm_output",
     "must_return_failed_candidate",
+    "must_reject_candidate_output",
     "must_not_return_raw_output",
     "must_record_execution_audit",
     "must_record_tool_result_projection",

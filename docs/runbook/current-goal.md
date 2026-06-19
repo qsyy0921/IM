@@ -34,13 +34,14 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
   service-stack live gate smoke、CI-safe gate skeleton、RAG / Agent regression
   case expansion first pass、profile / Agent output safety expansion、
   service-stack version / hash-only expansion、negative RAG / Agent cases、
-  Summary live negative adapter 和报告：
+  Summary live negative adapter、Python / model-output negative regression cases
+  和报告：
   `docs/runbook/loadtest/ai-eval-service/`。
 
 下一步默认推进：
 
 ```text
-继续扩 Python / model-output negative regression cases
+继续扩 external MCP failure fallback、tool/action safety cases 和 RAG / summary citation regression
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

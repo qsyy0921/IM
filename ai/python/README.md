@@ -82,7 +82,9 @@ access from Python workers, and a reproducible `IM` conda environment.
 The worker smoke, eval adapter and Go-side adapter smoke prove only local
 candidate contract safety: malformed / unsafe inputs fail closed, successful
 candidates return hashes and source refs rather than raw output text, and Go
-consumes candidate metadata rather than delegating control to Python.
+consumes candidate metadata rather than delegating control to Python. The
+Python eval adapter also covers Go-side rejection of forbidden `raw_output`,
+sensitive citation metadata and malformed output hashes.
 
 The RAG, summary and Agent provider smokes prove services can wrap Go-owned
 providers with a Python worker candidate guard while final state, citations,

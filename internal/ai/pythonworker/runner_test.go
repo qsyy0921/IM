@@ -55,6 +55,33 @@ func TestRunnerRejectsMalformedCandidateOutput(t *testing.T) {
 	}
 }
 
+func TestRunnerRejectsForbiddenRawOutputCandidate(t *testing.T) {
+	runner := newFakeRunner(t, "raw_output")
+
+	_, err := runner.Run(context.Background(), validRequest())
+	if !errors.Is(err, ErrUnsafeCandidate) {
+		t.Fatalf("Run() error = %v, want ErrUnsafeCandidate", err)
+	}
+}
+
+func TestRunnerRejectsSensitiveCitationCandidate(t *testing.T) {
+	runner := newFakeRunner(t, "sensitive_citation")
+
+	_, err := runner.Run(context.Background(), validRequest())
+	if !errors.Is(err, ErrUnsafeCandidate) {
+		t.Fatalf("Run() error = %v, want ErrUnsafeCandidate", err)
+	}
+}
+
+func TestRunnerRejectsMalformedHashCandidate(t *testing.T) {
+	runner := newFakeRunner(t, "bad_hash")
+
+	_, err := runner.Run(context.Background(), validRequest())
+	if !errors.Is(err, ErrMalformedCandidate) {
+		t.Fatalf("Run() error = %v, want ErrMalformedCandidate", err)
+	}
+}
+
 func newFakeRunner(t *testing.T, mode string) Runner {
 	t.Helper()
 	runner, err := NewRunner(RunnerOptions{
@@ -111,6 +138,49 @@ func runFakeWorker() {
 		os.Exit(2)
 	case "malformed":
 		_, _ = os.Stdout.WriteString(`{"schema_version":1,"status":"CANDIDATE"}`)
+		os.Exit(0)
+	case "raw_output":
+		_, _ = os.Stdout.WriteString(`{
+			"schema_version":1,
+			"task_id":"task_01",
+			"candidate_id":"cand_01",
+			"worker_kind":"MEMORY_EXTRACTION",
+			"status":"CANDIDATE",
+			"output_type":"MEMORY_EVENT_CANDIDATE",
+			"output_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"source_refs":["message:tenant:conversation:seq1"],
+			"citations":["message:tenant:conversation:seq1"],
+			"safety_flags":["LOW_SENSITIVE"],
+			"raw_output":"candidate body must not cross into Go"
+		}`)
+		os.Exit(0)
+	case "sensitive_citation":
+		_, _ = os.Stdout.WriteString(`{
+			"schema_version":1,
+			"task_id":"task_01",
+			"candidate_id":"cand_01",
+			"worker_kind":"MEMORY_EXTRACTION",
+			"status":"CANDIDATE",
+			"output_type":"MEMORY_EVENT_CANDIDATE",
+			"output_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"source_refs":["message:tenant:conversation:seq1"],
+			"citations":["Bearer secret-token-value"],
+			"safety_flags":["LOW_SENSITIVE"]
+		}`)
+		os.Exit(0)
+	case "bad_hash":
+		_, _ = os.Stdout.WriteString(`{
+			"schema_version":1,
+			"task_id":"task_01",
+			"candidate_id":"cand_01",
+			"worker_kind":"MEMORY_EXTRACTION",
+			"status":"CANDIDATE",
+			"output_type":"MEMORY_EVENT_CANDIDATE",
+			"output_sha256":"ABC",
+			"source_refs":["message:tenant:conversation:seq1"],
+			"citations":["message:tenant:conversation:seq1"],
+			"safety_flags":["LOW_SENSITIVE"]
+		}`)
 		os.Exit(0)
 	default:
 		os.Exit(1)

@@ -1,4 +1,5 @@
 param(
+    [string]$CasePath = "docs/runbook/ai-eval/retrieval-eval-cases.json",
     [string]$Python = "python",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
@@ -9,6 +10,14 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot "output-root-safety.ps1")
+$resolvedCasePath = if ([System.IO.Path]::IsPathRooted($CasePath)) {
+    [System.IO.Path]::GetFullPath($CasePath)
+} else {
+    [System.IO.Path]::GetFullPath((Join-Path $repoRoot $CasePath))
+}
+if (-not (Test-Path -LiteralPath $resolvedCasePath -PathType Leaf)) {
+    throw "CasePath does not exist: $resolvedCasePath"
+}
 $writeSummaryFile = -not [string]::IsNullOrWhiteSpace($OutputPath)
 if ($writeSummaryFile) {
     Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot $repoRoot -Name "ResultRoot"
@@ -38,10 +47,18 @@ function Invoke-WorkerCase {
     $Payload | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $requestPath -Encoding UTF8
 
     Push-Location $repoRoot
+    $previousPythonPath = $env:PYTHONPATH
     try {
+        $workerPythonPath = Join-Path $repoRoot "ai/python"
+        if ([string]::IsNullOrWhiteSpace($previousPythonPath)) {
+            $env:PYTHONPATH = $workerPythonPath
+        } else {
+            $env:PYTHONPATH = $workerPythonPath + [System.IO.Path]::PathSeparator + $previousPythonPath
+        }
         & $Python "ai/python/scripts/run_candidate_worker.py" $requestPath | Set-Content -LiteralPath $outputPath -Encoding UTF8
         $exitCode = $LASTEXITCODE
     } finally {
+        $env:PYTHONPATH = $previousPythonPath
         Pop-Location
     }
 
@@ -65,8 +82,37 @@ function Invoke-WorkerCase {
     [pscustomobject]@{
         case_id = $CaseID
         status = "passed"
+        stage = "python-ai-worker"
         expected_error_class = $ExpectedErrorClass
         candidate_status = $candidate.status
+        raw_output_returned = $false
+    }
+}
+
+function Invoke-GoRunnerCase {
+    param(
+        [string]$CaseID,
+        [string]$TestName,
+        [string]$ExpectedErrorClass
+    )
+
+    Push-Location $repoRoot
+    try {
+        & go test ./internal/ai/pythonworker -run "^$TestName$" -count=1 | Out-Host
+        $exitCode = $LASTEXITCODE
+    } finally {
+        Pop-Location
+    }
+    if ($exitCode -ne 0) {
+        throw "Case $CaseID Go runner regression test failed with exit code $exitCode"
+    }
+
+    [pscustomobject]@{
+        case_id = $CaseID
+        status = "passed"
+        stage = "python-ai-worker"
+        expected_error_class = $ExpectedErrorClass
+        candidate_status = "REJECTED"
         raw_output_returned = $false
     }
 }
@@ -95,7 +141,30 @@ try {
             -CaseID "python-worker-unsafe-output-fails-closed" `
             -Payload $unsafePayload `
             -ExpectedErrorClass "UNSAFE_INPUT"
+        Invoke-GoRunnerCase `
+            -CaseID "python-worker-raw-output-field-rejected" `
+            -TestName "TestRunnerRejectsForbiddenRawOutputCandidate" `
+            -ExpectedErrorClass "UNSAFE_CANDIDATE"
+        Invoke-GoRunnerCase `
+            -CaseID "python-worker-sensitive-citation-output-rejected" `
+            -TestName "TestRunnerRejectsSensitiveCitationCandidate" `
+            -ExpectedErrorClass "UNSAFE_CANDIDATE"
+        Invoke-GoRunnerCase `
+            -CaseID "python-worker-malformed-hash-output-rejected" `
+            -TestName "TestRunnerRejectsMalformedHashCandidate" `
+            -ExpectedErrorClass "MALFORMED_CANDIDATE"
     )
+
+    $caseDocument = Get-Content -LiteralPath $resolvedCasePath -Raw | ConvertFrom-Json
+    $activePythonCaseIDs = @($caseDocument.cases | Where-Object {
+            ([string]$_.stage).Trim() -eq "python-ai-worker" -and ([string]$_.status).Trim() -eq "active"
+        } | ForEach-Object { ([string]$_.id).Trim() } | Where-Object { $_.Length -gt 0 })
+    $executedCaseIDs = @($cases | ForEach-Object { $_.case_id })
+    foreach ($activeCaseID in $activePythonCaseIDs) {
+        if ($executedCaseIDs -notcontains $activeCaseID) {
+            throw "Active python-ai-worker eval case is not executed by adapter: $activeCaseID"
+        }
+    }
 
     $summary = [pscustomobject]@{
         schema_version = 1
@@ -105,6 +174,7 @@ try {
         run_name = $RunName
         result_dir = $resultDir
         case_count = $cases.Count
+        case_path = $resolvedCasePath
         scope = "local low-sensitive Python worker eval adapter; no external provider, no database, no business write"
         cases = $cases
     }

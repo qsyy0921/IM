@@ -78,6 +78,24 @@ function Test-RAGAssertion {
         "must_not_claim_llm_generation" {
             return -not [bool]$Summary.generated_by_llm
         }
+        "must_preserve_evidencepack_source_coverage" {
+            $searchCount = [int]$Summary.source_counts.search_message
+            $memoryCount = [int]$Summary.source_counts.memory_event
+            return `
+                (Get-JsonPropertyString -Object $Summary -Name "pack_id").Length -gt 0 `
+                -and [int]$Summary.evidence_item_count -eq ($searchCount + $memoryCount) `
+                -and [int]$Summary.search_item_count -eq $searchCount `
+                -and [int]$Summary.memory_item_count -eq $memoryCount `
+                -and $searchCount -gt 0 `
+                -and $memoryCount -gt 0
+        }
+        "must_preserve_projection_versions" {
+            return `
+                [int64]$Summary.search_projection_version -gt 0 `
+                -and [int64]$Summary.memory_projection_version -gt 0 `
+                -and [int64]$Summary.search_projection_version -eq [int64]$Summary.seed.visibility_version `
+                -and [int64]$Summary.memory_projection_version -eq [int64]$Summary.seed.memory_projection_version
+        }
         "must_abstain" {
             return $Summary.answer_status -eq "INSUFFICIENT_EVIDENCE"
         }

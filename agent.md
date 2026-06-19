@@ -73,8 +73,8 @@ external HTTP adapter + eval first paths are landed. Profile overgeneralization
 and Agent output safety eval cases plus the local fixture adapter are landed.
 `ai-eval-service` catalog, RecordEvalRun recorder, multi-adapter gate smoke,
 gate policy manifest, Python optional adapter path, RAG / Agent service-stack
-live gate and CI-safe gate skeleton are landed. Next move is more RAG-Agent
-regression cases, or `current-goal.md`.
+live gate, CI-safe gate skeleton and first RAG-Agent regression expansion are
+landed. Next move is deeper RAG-Agent regression cases, or `current-goal.md`.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.

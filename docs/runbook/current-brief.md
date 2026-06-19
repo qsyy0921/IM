@@ -30,8 +30,8 @@ AI foundation-active 服务：search、memory、retrieval、rag、summary、
 agent、skill-registry、mcp-gateway、action-executor、ai-eval。
 
 `ai-eval-service` catalog、RecordEvalRun recorder、multi-adapter gate、Python
-optional adapter path、RAG / Agent live gate 和 CI-safe gate skeleton 已落；
-只保存低敏 run refs / counters / metadata。
+optional adapter path、RAG / Agent live gate、CI-safe gate skeleton 和第一批
+RAG-Agent regression expansion 已落；只保存低敏 run refs / counters / metadata。
 
 当前下一步：
 

@@ -82,6 +82,48 @@ function Test-AgentAssertion {
         "must_not_claim_llm_generation" {
             return -not [bool]$Summary.generated_by_llm
         }
+        "must_preserve_evidencepack_source_coverage" {
+            $searchCount = [int]$Summary.source_counts.search_message
+            $memoryCount = [int]$Summary.source_counts.memory_event
+            return `
+                (Get-JsonPropertyString -Object $Summary -Name "pack_id").Length -gt 0 `
+                -and [int]$Summary.evidence_item_count -eq ($searchCount + $memoryCount) `
+                -and [int]$Summary.search_item_count -eq $searchCount `
+                -and [int]$Summary.memory_item_count -eq $memoryCount `
+                -and $searchCount -gt 0 `
+                -and $memoryCount -gt 0
+        }
+        "must_preserve_projection_versions" {
+            return `
+                [int64]$Summary.search_projection_version -gt 0 `
+                -and [int64]$Summary.memory_projection_version -gt 0 `
+                -and [int64]$Summary.search_projection_version -eq [int64]$Summary.seed.visibility_version `
+                -and [int64]$Summary.memory_projection_version -eq [int64]$Summary.seed.memory_projection_version
+        }
+        "must_record_prepare_audit" {
+            return `
+                (Get-JsonPropertyString -Object $Summary -Name "prepared_audit_id").Length -gt 0 `
+                -and (Get-JsonPropertyString -Object $Summary.mcp_audit -Name "audit_id") -eq (Get-JsonPropertyString -Object $Summary -Name "prepared_audit_id") `
+                -and (Get-JsonPropertyString -Object $Summary.mcp_audit -Name "status") -eq "ALLOWED" `
+                -and [bool]$Summary.mcp_audit.allowed `
+                -and [bool]$Summary.mcp_audit.requires_approval `
+                -and [bool]$Summary.mcp_audit.input_sha256_present `
+                -and [bool]$Summary.mcp_audit.idempotency_key_matches `
+                -and [bool]$Summary.mcp_audit.low_sensitive_audit_only
+        }
+        "must_preserve_tool_policy_metadata" {
+            return `
+                [bool]$Summary.policy_allowed `
+                -and [bool]$Summary.policy_requires_approval `
+                -and [int64]$Summary.policy_permission_version -gt 0 `
+                -and (Get-JsonPropertyString -Object $Summary -Name "policy_decision_source") -eq "TOOL_RULE" `
+                -and (Get-JsonPropertyString -Object $Summary -Name "policy_classification") -eq "TOOL_APPROVAL_REQUIRED" `
+                -and (Get-JsonPropertyString -Object $Summary.mcp_audit -Name "decision_source") -eq (Get-JsonPropertyString -Object $Summary -Name "policy_decision_source") `
+                -and (Get-JsonPropertyString -Object $Summary.mcp_audit -Name "classification") -eq (Get-JsonPropertyString -Object $Summary -Name "policy_classification") `
+                -and [int64]$Summary.mcp_audit.permission_version -eq [int64]$Summary.policy_permission_version `
+                -and (Get-JsonPropertyString -Object $Summary.action_audit -Name "decision_source") -eq (Get-JsonPropertyString -Object $Summary -Name "execution_decision_source") `
+                -and (Get-JsonPropertyString -Object $Summary.action_audit -Name "classification") -eq (Get-JsonPropertyString -Object $Summary -Name "execution_classification")
+        }
         "must_verify_approved_proposal" {
             return `
                 (Get-JsonPropertyString -Object $Summary -Name "approval_id").Length -gt 0 `

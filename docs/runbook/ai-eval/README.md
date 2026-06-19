@@ -206,6 +206,8 @@ RAG / Agent service stack is running.
 The first local live run passed with `profile-agent-safety`,
 `action-external-http-provider`, `rag-service` and `agent-action-executor`
 selected; see `docs/runbook/loadtest/ai-eval-service/`.
+The 2026-06-20 expansion run added RAG EvidencePack coverage / projection
+checks and Agent prepare-audit / tool-policy metadata checks in the same folder.
 
 First-stage Go-side Python worker adapter smoke:
 

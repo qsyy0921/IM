@@ -158,7 +158,6 @@ agent-service proposal
 
 ## 后续
 
-- external adapter eval / failure smoke cases。
 - 接入更完整的真实外部 MCP adapter / tool provider。
 - per tenant / per tool rate limit。
 - provider retry / DLQ。

@@ -15,7 +15,8 @@
 - 外部 HTTP provider adapter：默认关闭；显式 `http` mode + allowlist + `LOW` risk 才执行，
   只发送 tool metadata / input hash，provider output 继续走 safety gate 和 output hash projection。
 - Tool output safety：malformed / oversize / secret-like / PII-like output fail closed，不入 hash。
-- Docker / Prometheus / Grafana wiring、聚焦测试、PG integration、Agent execution eval adapter。
+- Docker / Prometheus / Grafana wiring、聚焦测试、PG integration、Agent execution eval adapter、
+  external HTTP adapter eval / failure smoke。
 
 ## 边界
 
@@ -26,5 +27,4 @@
 
 ## 下一步
 
-- external adapter eval / failure smoke cases。
 - rate limit、DLQ / repair。

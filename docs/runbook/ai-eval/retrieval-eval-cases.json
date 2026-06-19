@@ -171,6 +171,46 @@
       ]
     },
     {
+      "id": "action-external-http-provider-success",
+      "family": "action_execution_safety",
+      "stage": "action-executor-external-adapter",
+      "status": "active",
+      "query": "execute approved low-risk provider diagnostic",
+      "risk": "External provider tools must be opt-in, allowlisted, low-risk and recorded as output hash only",
+      "required_assertions": [
+        {
+          "type": "must_execute_external_http_tool"
+        },
+        {
+          "type": "must_not_send_raw_tool_input"
+        },
+        {
+          "type": "must_record_tool_result_projection",
+          "expected_status": "SUCCEEDED"
+        }
+      ]
+    },
+    {
+      "id": "action-external-http-provider-fail-closed",
+      "family": "action_execution_safety",
+      "stage": "action-executor-external-adapter",
+      "status": "active",
+      "query": "handle low-risk provider failure safely",
+      "risk": "Provider failures and unsafe output must not leak raw provider text or produce output hashes",
+      "required_assertions": [
+        {
+          "type": "must_classify_provider_failure",
+          "expected_classification": "TOOL_PROVIDER_UNAVAILABLE"
+        },
+        {
+          "type": "must_reject_unsafe_tool_output"
+        },
+        {
+          "type": "must_not_store_raw_provider_output"
+        }
+      ]
+    },
+    {
       "id": "rag-external-llm-unsafe-output-rejected",
       "family": "llm_output_safety",
       "stage": "rag-service-llm-boundary",

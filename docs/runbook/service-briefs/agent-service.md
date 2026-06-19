@@ -25,4 +25,4 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- external adapter eval / failure smoke cases；Agent 仍只提交 proposal，不直接执行工具。
+- profile overgeneralization / Agent output safety eval cases；Agent 仍只提交 proposal，不直接执行工具。

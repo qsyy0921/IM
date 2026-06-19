@@ -9,6 +9,8 @@ summary, Agent and tool/action boundaries.
 - Validator: `tools/validate-ai-eval-cases.ps1`
 - RAG execution adapter: `tools/run-ai-eval-rag-adapter.ps1`
 - Agent execution adapter: `tools/run-ai-eval-agent-adapter.ps1`
+- action-executor external HTTP adapter eval:
+  `tools/run-ai-eval-action-external-adapter.ps1`
 - Python worker output-safety adapter: `tools/run-ai-eval-python-worker-adapter.ps1`
 - Go-side Python worker adapter smoke: `tools/python-worker-go-adapter-smoke`
 - rag-service service-level Python worker provider smoke:
@@ -81,10 +83,20 @@ approval, execution response, low-sensitive audit rows and low-sensitive tool
 result projection. For cases that require `must_execute_safe_local_tool`, it
 runs a second low-sensitive `nexusim.local.echo` path and verifies `SUCCEEDED`
 plus output hash only. It proves the proposal / approval / executor / audit /
-result-projection boundary and local safe tool output path only. External MCP
-fallback and unsafe output suppression are currently covered by action-executor
-focused tests; the eval adapter still does not execute external MCP/provider
-tools.
+result-projection boundary and local safe tool output path only. It still does
+not execute external MCP/provider tools.
+
+First-stage action-executor external HTTP adapter eval:
+
+```powershell
+.\tools\run-ai-eval-action-external-adapter.ps1
+```
+
+This adapter runs a local `httptest` provider fixture through the real
+action-executor app usecase and external HTTP adapter. It verifies allowlisted
+LOW-risk success, stable provider failure classification, unsafe output
+suppression, raw input non-disclosure and output-hash-only projection. It does
+not call real external networks, arbitrary MCP servers or production tools.
 
 First-stage Python worker output-safety adapter:
 

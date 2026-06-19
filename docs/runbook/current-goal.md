@@ -54,11 +54,14 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 - `action-executor` 外部 HTTP provider guarded adapter first path：默认关闭；
   显式 `http` mode + allowlist + `LOW` risk 才执行，只发送 tool metadata /
   `input_sha256`，provider output 继续走 safety gate 和 output hash projection。
+- action-executor external adapter eval / failure smoke：本地 provider fixture
+  覆盖 allowlisted success、provider failure 分类、unsafe output 抑制和 raw input
+  不外发。
 
 下一步默认推进：
 
 ```text
-external adapter eval / failure smoke cases
+profile overgeneralization / Agent output safety eval cases
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

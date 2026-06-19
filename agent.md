@@ -72,8 +72,8 @@ tool output is suppressed. Python AI Worker foundation is landed with the
 `ai/python` directory, reproducible `IM` conda toolchain and candidate contract
 guard. RAG/Summary guarded external HTTP boundary, Python worker safety eval,
 Go-side smoke, RAG/Summary/Agent candidate guards, and action-executor guarded
-external HTTP adapter first path are landed. Next move is external adapter eval
-/ failure smoke cases, or `current-goal.md`.
+external HTTP adapter + eval first paths are landed. Next move is profile
+overgeneralization / Agent output safety eval, or `current-goal.md`.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.

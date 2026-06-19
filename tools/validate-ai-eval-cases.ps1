@@ -111,6 +111,11 @@ $knownAssertionTypes = @(
     "must_record_execution_audit",
     "must_record_tool_result_projection",
     "must_execute_safe_local_tool",
+    "must_execute_external_http_tool",
+    "must_not_send_raw_tool_input",
+    "must_classify_provider_failure",
+    "must_reject_unsafe_tool_output",
+    "must_not_store_raw_provider_output",
     "must_not_execute_external_tool",
     "must_verify_approved_proposal"
 )

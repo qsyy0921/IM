@@ -34,14 +34,13 @@
 - `skill-registry` first catalog path + PG repository / gRPC runtime / Docker / observability wiring
 - `mcp-gateway` first prepare path + skill catalog check / policy precheck / low-sensitive audit
 - `action-executor` first execution audit path + proposal / approval / prepare audit linkage + local safe adapter + guarded external HTTP provider adapter + external adapter eval
-- AI eval harness first-stage case schema / validator + RAG execution adapter
+- AI eval harness first-stage case schema / validator + RAG execution adapter + profile / Agent output safety adapter
 - Agent execution eval adapter + low-sensitive tool result projection + local safe tool adapter first path
 - Python AI Worker 边界已由 ADR-036 固定，且 foundation first path 已落：`ai/python` 目录、`IM` conda toolchain、candidate contract helpers、低敏 safety guard、contract validator、candidate-only worker CLI、malformed / unsafe output eval adapter、第一条 worker smoke、Go-side Python candidate adapter smoke，以及 `rag-service` / `summary-service` / `agent-service` 服务级 Python worker candidate guard；Python 只做模型 / 算法 / eval 候选层，Go 继续拥有控制面、状态、审计和持久化
 
 当前尚未真实实现的后续 AI / Agent 能力：
 
 - `ai-eval-service`
-- profile overgeneralization / Agent output safety eval cases
 - 后续产品化 / 平台服务：`media-service`、`notification-service`、`audit-service`、`admin-service`
 
 当前可以采用 multi sub-agent 方式加快后续 AI 底座开发，但只允许拆分互不重叠的服务、文档或验证范围；主 agent 保持最终方案、集成和检查责任。
@@ -73,7 +72,8 @@
 -> agent-service planner Python candidate guard
 -> guarded external HTTP provider adapter first path 已落
 -> external adapter eval / failure smoke cases 已落
--> profile overgeneralization / Agent output safety eval cases
+-> profile overgeneralization / Agent output safety eval cases 已落
+-> ai-eval-service first skeleton / persistent eval run catalog
 -> 安全 / 观测 / repair / 运维 hardening
 ```
 
@@ -216,7 +216,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 ```text
 前 9 个微服务已经能跑通 IM 主链路，
 现在处于“9 个现有服务做必要收口，并向 AI 大模型应用底座转进”，
-search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已从 contract 切到 foundation-active implementation 并跑通 clean projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，policy precheck 和 EvidencePack 字段 hardening first pass 已落；AI eval harness first pass 已有低敏 case schema / validator；rag-service first read-only answer path、`loadtest/rag`、RAG eval adapter、真实本地 adapter smoke、provider boundary、citation verifier first pass、guarded external HTTP LLM boundary 和服务级 Python worker candidate guard 已落；summary-service first read-only summary path、真实本地 adapter smoke、guarded external HTTP LLM boundary 和服务级 Python worker candidate guard 已落；agent-service first proposal-only path 和真实本地 adapter smoke 已落，并已接入 mcp-gateway prepare、proposal store、approval preflight、approval outbox relay、approval operator 和服务级 planner Python worker candidate guard；skill-registry first catalog path、mcp-gateway first prepare path、action-executor first execution audit / Agent approved proposal handoff、Agent execution eval adapter first path、low-sensitive tool result projection、本地安全 tool adapter、外部 MCP fallback 稳定失败分类、tool output safety first path、guarded external HTTP provider adapter first path、external adapter eval / failure smoke、Python AI Worker foundation、Python worker output-safety eval、第一条 candidate-only smoke 和 Go-side Python candidate adapter smoke 已落，后续是 profile overgeneralization / Agent output safety eval cases。
+search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已从 contract 切到 foundation-active implementation 并跑通 clean projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，policy precheck 和 EvidencePack 字段 hardening first pass 已落；AI eval harness first pass 已有低敏 case schema / validator；rag-service first read-only answer path、`loadtest/rag`、RAG eval adapter、真实本地 adapter smoke、provider boundary、citation verifier first pass、guarded external HTTP LLM boundary 和服务级 Python worker candidate guard 已落；summary-service first read-only summary path、真实本地 adapter smoke、guarded external HTTP LLM boundary 和服务级 Python worker candidate guard 已落；agent-service first proposal-only path 和真实本地 adapter smoke 已落，并已接入 mcp-gateway prepare、proposal store、approval preflight、approval outbox relay、approval operator 和服务级 planner Python worker candidate guard；skill-registry first catalog path、mcp-gateway first prepare path、action-executor first execution audit / Agent approved proposal handoff、Agent execution eval adapter first path、low-sensitive tool result projection、本地安全 tool adapter、外部 MCP fallback 稳定失败分类、tool output safety first path、guarded external HTTP provider adapter first path、external adapter eval / failure smoke、Python AI Worker foundation、Python worker output-safety eval、第一条 candidate-only smoke、Go-side Python candidate adapter smoke、profile overgeneralization / Agent output safety eval cases 和本地低敏 fixture adapter 已落，后续是 ai-eval-service first skeleton / persistent eval run catalog。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。
 ```
 

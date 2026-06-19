@@ -13,5 +13,6 @@
 - domain / types / app validation、PostgreSQL repository first pass、timeline projection usecase、PG integration tests、timeline worker tests
 - registry / Docker runtime / local compose / Prometheus / Grafana foundation-active wiring
 - `loadtest/memory` 和 clean projection smoke：member join -> message persisted -> PENDING StructuredMemoryEvent + source ref -> Query/Get -> revoke hidden
+- profile overgeneralization eval case + local fixture adapter：单条群聊事实不能升级为 ACTIVE profile，profile candidate 必须保留 GROUP scope 且 PENDING_REVIEW
 
 下一步：补 memory extraction / review / profile aggregate hardening，或进入 `retrieval-gateway` / EvidencePack。第一版仍不做 LLM extraction，不把单条群消息直接升级为 ACTIVE profile fact。

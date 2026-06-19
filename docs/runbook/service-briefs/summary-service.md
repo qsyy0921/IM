@@ -27,4 +27,4 @@
 
 - provider-specific LLM / Python worker 后续仍必须走 SummaryProvider port、
   prompt guard、hash / citation metadata 校验和 citation verifier。
-- `agent-service` 服务级 planner Python candidate guard 和 action-executor guarded external HTTP adapter eval 已落；下一步默认推进 profile overgeneralization / Agent output safety eval cases。summary / Agent 仍只能消费 EvidencePack。
+- `agent-service` 服务级 planner Python candidate guard、action-executor guarded external HTTP adapter eval 和 profile / Agent output safety eval 已落；下一步默认推进 ai-eval-service first skeleton / persistent eval run catalog。summary / Agent 仍只能消费 EvidencePack。

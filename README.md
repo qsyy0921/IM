@@ -55,7 +55,7 @@ group memory
 -> ai-eval
 ```
 
-下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，下一步是 profile overgeneralization / Agent output safety eval cases。
+下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，下一步是 ai-eval-service first skeleton / persistent eval run catalog。
 
 ## 不变量
 
@@ -171,12 +171,13 @@ python -m ruff check .
 python -m mypy nexusim_ai_common scripts tests
 ```
 
-运行当前 action-executor external adapter eval：
+运行当前 AI eval adapter：
 
 ```powershell
 . .\tools\go-env.ps1
 .\tools\validate-ai-eval-cases.ps1
 .\tools\run-ai-eval-action-external-adapter.ps1
+.\tools\run-ai-eval-profile-agent-safety.ps1
 ```
 
 完整本地门禁只在跨服务、生成代码、migration、service-registry、Docker/compose、安全边界或提交推送前需要：

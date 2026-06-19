@@ -57,11 +57,15 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 - action-executor external adapter eval / failure smoke：本地 provider fixture
   覆盖 allowlisted success、provider failure 分类、unsafe output 抑制和 raw input
   不外发。
+- profile overgeneralization / Agent output safety eval cases：新增低敏
+  profile / Agent safety cases 和本地 fixture adapter，覆盖单条群聊事实不能升级为
+  ACTIVE profile、profile candidate 必须 PENDING_REVIEW、Agent output 不能泄露
+  raw EvidencePack / secret-like 内容且不能发出未审批业务动作。
 
 下一步默认推进：
 
 ```text
-profile overgeneralization / Agent output safety eval cases
+ai-eval-service first skeleton / persistent eval run catalog
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

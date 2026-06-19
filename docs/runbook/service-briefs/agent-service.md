@@ -15,7 +15,7 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 - `ApproveAgentProposal` / `VerifyApprovedAgentProposal`：给 action-executor 校验 approval / prepare audit / skill / tool / resource，不暴露私表。
 - `proposal-approval-audit` / `proposal-approval-approve`：默认 dry-run，reason 走文件，输出不含正文 / EvidencePack。
 - 可选 `python-worker` proposal provider mode：Go 先生成 grounded proposal，Python worker 只返回 proposal hash / citation metadata；最终 proposal、citation verifier、approval 和 audit 仍由 Go 控制。
-- Agent adapter smoke、Agent -> mcp-gateway smoke 和 Agent execution eval adapter first path 已落。
+- Agent adapter smoke、Agent -> mcp-gateway smoke、Agent execution eval adapter first path 和 Agent output safety fixture eval 已落。
 
 ## 边界
 
@@ -25,4 +25,4 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- profile overgeneralization / Agent output safety eval cases；Agent 仍只提交 proposal，不直接执行工具。
+- ai-eval-service first skeleton / persistent eval run catalog；Agent 仍只提交 proposal，不直接执行工具。

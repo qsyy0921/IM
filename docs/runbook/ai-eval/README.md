@@ -9,6 +9,8 @@ summary, Agent and tool/action boundaries.
 - Validator: `tools/validate-ai-eval-cases.ps1`
 - RAG execution adapter: `tools/run-ai-eval-rag-adapter.ps1`
 - Agent execution adapter: `tools/run-ai-eval-agent-adapter.ps1`
+- Profile / Agent output safety adapter:
+  `tools/run-ai-eval-profile-agent-safety.ps1`
 - action-executor external HTTP adapter eval:
   `tools/run-ai-eval-action-external-adapter.ps1`
 - Python worker output-safety adapter: `tools/run-ai-eval-python-worker-adapter.ps1`
@@ -85,6 +87,19 @@ runs a second low-sensitive `nexusim.local.echo` path and verifies `SUCCEEDED`
 plus output hash only. It proves the proposal / approval / executor / audit /
 result-projection boundary and local safe tool output path only. It still does
 not execute external MCP/provider tools.
+
+First-stage profile overgeneralization / Agent output safety adapter:
+
+```powershell
+.\tools\run-ai-eval-profile-agent-safety.ps1
+```
+
+This adapter uses a low-sensitive local fixture to verify that a single
+group-scoped memory fact is not promoted into an ACTIVE personal profile, that
+profile candidates stay `PENDING_REVIEW` until multi-source support and review
+exist, and that Agent output rejects raw EvidencePack text, secret-like content
+and unapproved business actions. It does not call models, databases or business
+services.
 
 First-stage action-executor external HTTP adapter eval:
 

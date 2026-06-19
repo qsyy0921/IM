@@ -117,7 +117,15 @@ $knownAssertionTypes = @(
     "must_reject_unsafe_tool_output",
     "must_not_store_raw_provider_output",
     "must_not_execute_external_tool",
-    "must_verify_approved_proposal"
+    "must_verify_approved_proposal",
+    "must_not_promote_group_fact_to_profile",
+    "must_require_multiple_profile_sources",
+    "must_mark_profile_candidate_pending",
+    "must_preserve_group_scope",
+    "must_reject_sensitive_agent_output",
+    "must_not_emit_unapproved_action",
+    "must_keep_output_low_sensitive",
+    "must_require_evidencepack_citations"
 )
 
 $seenCaseIDs = @{}

@@ -14,6 +14,7 @@ const (
 	DefaultAgentEvidenceLimit = 12
 	MaxAgentEvidenceLimit     = 30
 	MaxAgentObjectiveLen      = 1024
+	MaxSkillIDLen             = 160
 	MaxToolNameLen            = 160
 	MaxResourceTypeLen        = 120
 	MaxResourceIDLen          = 256
@@ -42,6 +43,7 @@ type CreateAgentProposalCommand struct {
 	AuthContext    AuthContext
 	ConversationID ConversationID
 	Objective      string
+	SkillID        string
 	ToolName       string
 	ToolAction     string
 	ResourceType   string
@@ -70,6 +72,9 @@ func (command CreateAgentProposalCommand) Validate() error {
 	}
 	if command.NormalizedToolName() == "" {
 		return NewInvalidArgument("tool_name is required")
+	}
+	if len([]rune(command.NormalizedSkillID())) > MaxSkillIDLen {
+		return NewInvalidArgument("skill_id exceeds maximum")
 	}
 	if len([]rune(command.NormalizedToolName())) > MaxToolNameLen {
 		return NewInvalidArgument("tool_name exceeds maximum")
@@ -112,6 +117,14 @@ func (command CreateAgentProposalCommand) NormalizedObjective() string {
 
 func (command CreateAgentProposalCommand) NormalizedToolName() string {
 	return strings.TrimSpace(command.ToolName)
+}
+
+func (command CreateAgentProposalCommand) NormalizedSkillID() string {
+	skillID := strings.TrimSpace(command.SkillID)
+	if skillID == "" {
+		return command.NormalizedToolName()
+	}
+	return skillID
 }
 
 func (command CreateAgentProposalCommand) NormalizedResourceType() string {
@@ -161,11 +174,12 @@ func (command CreateAgentProposalCommand) EffectiveMemoryStatuses() []string {
 }
 
 func (command CreateAgentProposalCommand) ProposalID() string {
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%d|%d",
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%s|%d|%d",
 		command.AuthContext.TenantID,
 		command.AuthContext.UserID,
 		command.ConversationID,
 		command.NormalizedObjective(),
+		command.NormalizedSkillID(),
 		command.NormalizedToolName(),
 		command.ToolAction,
 		command.NormalizedResourceType(),
@@ -251,14 +265,17 @@ type RetrieveEvidenceResult struct {
 	Pack EvidencePack
 }
 
-type CheckToolActionCommand struct {
-	AuthContext  AuthContext
-	ToolName     string
-	Action       string
-	ResourceType string
-	ResourceID   string
-	RiskLevel    string
-	Intent       string
+type PrepareToolCallCommand struct {
+	AuthContext    AuthContext
+	SkillID        string
+	ToolName       string
+	Action         string
+	ResourceType   string
+	ResourceID     string
+	RiskLevel      string
+	Intent         string
+	InputJSON      string
+	IdempotencyKey string
 }
 
 type ToolPolicyDecision struct {
@@ -275,6 +292,42 @@ type ToolPolicyDecision struct {
 	Classification    string
 	Reason            string
 	DecisionSource    string
+}
+
+type ToolPrepareResult struct {
+	TenantID          TenantID
+	UserID            UserID
+	SkillID           string
+	ToolName          string
+	Action            string
+	ResourceType      string
+	ResourceID        string
+	RiskLevel         string
+	Allowed           bool
+	RequiresApproval  bool
+	PermissionVersion int64
+	Classification    string
+	Reason            string
+	DecisionSource    string
+	AuditID           string
+}
+
+func (result ToolPrepareResult) PolicyDecision() ToolPolicyDecision {
+	return ToolPolicyDecision{
+		TenantID:          result.TenantID,
+		UserID:            result.UserID,
+		ToolName:          result.ToolName,
+		Action:            result.Action,
+		ResourceType:      result.ResourceType,
+		ResourceID:        result.ResourceID,
+		RiskLevel:         result.RiskLevel,
+		Allowed:           result.Allowed,
+		RequiresApproval:  result.RequiresApproval,
+		PermissionVersion: result.PermissionVersion,
+		Classification:    result.Classification,
+		Reason:            result.Reason,
+		DecisionSource:    result.DecisionSource,
+	}
 }
 
 type Citation struct {
@@ -310,6 +363,8 @@ type CreateAgentProposalResult struct {
 	Status             string
 	ProposalText       string
 	RequiresApproval   bool
+	SkillID            string
+	PreparedAuditID    string
 	ToolPolicyDecision ToolPolicyDecision
 	Citations          []Citation
 	EvidencePack       EvidencePack

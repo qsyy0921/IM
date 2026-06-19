@@ -40,8 +40,10 @@ func TestServerCreateAgentProposal(t *testing.T) {
 			TenantID:       "tenant-1",
 			ConversationID: "conv-1",
 		},
-		AgentVersion:   types.AgentVersion,
-		GeneratedByLLM: false,
+		AgentVersion:    types.AgentVersion,
+		GeneratedByLLM:  false,
+		SkillID:         "conversation.note.create",
+		PreparedAuditID: "mcp-audit-1",
 	}}
 	server := NewServer(executor)
 
@@ -53,6 +55,7 @@ func TestServerCreateAgentProposal(t *testing.T) {
 		},
 		ConversationId: "conv-1",
 		Objective:      "draft action plan",
+		SkillId:        "conversation.note.create",
 		ToolName:       "conversation.note.create",
 		ToolAction:     policyv1.ToolAction_TOOL_ACTION_CALL,
 		ResourceType:   "conversation",
@@ -70,10 +73,13 @@ func TestServerCreateAgentProposal(t *testing.T) {
 	if response.GetProposalId() != "ap_1" ||
 		response.GetStatus() != agentv1.AgentProposalStatus_AGENT_PROPOSAL_STATUS_PROPOSED ||
 		response.GetToolPolicyDecision().GetAction() != policyv1.ToolAction_TOOL_ACTION_CALL ||
+		response.GetSkillId() != "conversation.note.create" ||
+		response.GetPreparedAuditId() != "mcp-audit-1" ||
 		len(response.GetCitations()) != 1 {
 		t.Fatalf("unexpected response: %+v", response)
 	}
 	if executor.command.ToolAction != types.ToolActionCall ||
+		executor.command.SkillID != "conversation.note.create" ||
 		executor.command.AuthContext.TenantID != "tenant-1" ||
 		len(executor.command.MemoryStatuses) != 1 {
 		t.Fatalf("unexpected command: %+v", executor.command)

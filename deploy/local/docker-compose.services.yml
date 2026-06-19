@@ -235,14 +235,14 @@ services:
     depends_on:
       retrieval-gateway-grpc:
         condition: service_started
-      policy-service-grpc:
+      mcp-gateway-grpc:
         condition: service_started
     environment:
       NEXUSIM_AGENT_SERVICE_MODE: grpc
       NEXUSIM_AGENT_GRPC_ADDR: 172.30.80.25:10630
       NEXUSIM_AGENT_DEBUG_ADDR: 172.30.80.25:11922
       NEXUSIM_RETRIEVAL_GRPC_ADDR: retrieval-gateway-grpc:10590
-      NEXUSIM_POLICY_GRPC_ADDR: policy-service-grpc:10800
+      NEXUSIM_MCP_GATEWAY_GRPC_ADDR: mcp-gateway-grpc:10650
     ports:
       - "10630:10630"
       - "11922:11922"

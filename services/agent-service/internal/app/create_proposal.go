@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -10,23 +11,23 @@ import (
 
 type CreateAgentProposalUseCase struct {
 	retrieval RetrievalPort
-	policy    ToolPolicyPort
+	prepare   ToolPreparePort
 	provider  ProposalProvider
 }
 
 func NewCreateAgentProposalUseCase(
 	retrieval RetrievalPort,
-	policy ToolPolicyPort,
+	prepare ToolPreparePort,
 ) CreateAgentProposalUseCase {
-	return NewCreateAgentProposalUseCaseWithProvider(retrieval, policy, ExtractiveProposalProvider{})
+	return NewCreateAgentProposalUseCaseWithProvider(retrieval, prepare, ExtractiveProposalProvider{})
 }
 
 func NewCreateAgentProposalUseCaseWithProvider(
 	retrieval RetrievalPort,
-	policy ToolPolicyPort,
+	prepare ToolPreparePort,
 	provider ProposalProvider,
 ) CreateAgentProposalUseCase {
-	return CreateAgentProposalUseCase{retrieval: retrieval, policy: policy, provider: provider}
+	return CreateAgentProposalUseCase{retrieval: retrieval, prepare: prepare, provider: provider}
 }
 
 func (usecase CreateAgentProposalUseCase) Execute(
@@ -36,8 +37,8 @@ func (usecase CreateAgentProposalUseCase) Execute(
 	if err := command.Validate(); err != nil {
 		return types.CreateAgentProposalResult{}, err
 	}
-	if usecase.policy == nil {
-		return types.CreateAgentProposalResult{}, types.ErrToolPolicyUnavailable
+	if usecase.prepare == nil {
+		return types.CreateAgentProposalResult{}, types.ErrToolPrepareUnavailable
 	}
 	if usecase.retrieval == nil {
 		return types.CreateAgentProposalResult{}, types.ErrRetrievalUnavailable
@@ -46,24 +47,30 @@ func (usecase CreateAgentProposalUseCase) Execute(
 		return types.CreateAgentProposalResult{}, types.ErrAgentUnavailable
 	}
 
-	policyDecision, err := usecase.policy.CheckToolAction(ctx, types.CheckToolActionCommand{
-		AuthContext:  command.AuthContext,
-		ToolName:     command.NormalizedToolName(),
-		Action:       command.ToolAction,
-		ResourceType: command.NormalizedResourceType(),
-		ResourceID:   strings.TrimSpace(command.ResourceID),
-		RiskLevel:    command.NormalizedRiskLevel(),
-		Intent:       command.NormalizedIntent(),
+	prepareResult, err := usecase.prepare.PrepareToolCall(ctx, types.PrepareToolCallCommand{
+		AuthContext:    command.AuthContext,
+		SkillID:        command.NormalizedSkillID(),
+		ToolName:       command.NormalizedToolName(),
+		Action:         command.ToolAction,
+		ResourceType:   command.NormalizedResourceType(),
+		ResourceID:     strings.TrimSpace(command.ResourceID),
+		RiskLevel:      command.NormalizedRiskLevel(),
+		Intent:         command.NormalizedIntent(),
+		InputJSON:      prepareInputJSON(command),
+		IdempotencyKey: command.ProposalID(),
 	})
 	if err != nil {
 		return types.CreateAgentProposalResult{}, err
 	}
+	policyDecision := prepareResult.PolicyDecision()
 	if !policyDecision.Allowed {
 		return types.CreateAgentProposalResult{
 			ProposalID:         command.ProposalID(),
 			Status:             types.AgentProposalStatusBlocked,
 			ProposalText:       "Agent proposal blocked by tool policy.",
 			RequiresApproval:   false,
+			SkillID:            prepareResult.SkillID,
+			PreparedAuditID:    prepareResult.AuditID,
 			ToolPolicyDecision: policyDecision,
 			AgentVersion:       types.AgentVersion,
 			GeneratedByLLM:     false,
@@ -89,6 +96,8 @@ func (usecase CreateAgentProposalUseCase) Execute(
 			Status:             types.AgentProposalStatusInsufficientEvidence,
 			ProposalText:       "I do not have enough visible evidence to create an agent proposal.",
 			RequiresApproval:   false,
+			SkillID:            prepareResult.SkillID,
+			PreparedAuditID:    prepareResult.AuditID,
 			ToolPolicyDecision: policyDecision,
 			EvidencePack:       evidence.Pack,
 			AgentVersion:       types.AgentVersion,
@@ -118,12 +127,28 @@ func (usecase CreateAgentProposalUseCase) Execute(
 		Status:             types.AgentProposalStatusProposed,
 		ProposalText:       generation.ProposalText,
 		RequiresApproval:   true,
+		SkillID:            prepareResult.SkillID,
+		PreparedAuditID:    prepareResult.AuditID,
 		ToolPolicyDecision: policyDecision,
 		Citations:          generation.Citations,
 		EvidencePack:       evidence.Pack,
 		AgentVersion:       types.AgentVersion,
 		GeneratedByLLM:     generation.GeneratedByLLM,
 	}, nil
+}
+
+func prepareInputJSON(command types.CreateAgentProposalCommand) string {
+	payload := map[string]any{
+		"source":                  "agent-service",
+		"proposal_id":             command.ProposalID(),
+		"conversation_id_present": strings.TrimSpace(string(command.ConversationID)) != "",
+		"resource_id_present":     strings.TrimSpace(command.ResourceID) != "",
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return "{}"
+	}
+	return string(encoded)
 }
 
 type ExtractiveProposalProvider struct{}

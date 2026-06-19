@@ -48,6 +48,7 @@ func (server *Server) CreateAgentProposal(
 		AuthContext:    auth,
 		ConversationID: types.ConversationID(request.GetConversationId()),
 		Objective:      request.GetObjective(),
+		SkillID:        request.GetSkillId(),
 		ToolName:       request.GetToolName(),
 		ToolAction:     toolActionFromProto(request.GetToolAction()),
 		ResourceType:   request.GetResourceType(),
@@ -101,6 +102,8 @@ func publicError(err error) error {
 		return status.Error(codes.Unavailable, "retrieval unavailable")
 	case errors.Is(err, types.ErrToolPolicyUnavailable):
 		return status.Error(codes.Unavailable, "tool policy unavailable")
+	case errors.Is(err, types.ErrToolPrepareUnavailable):
+		return status.Error(codes.Unavailable, "tool prepare unavailable")
 	case errors.Is(err, types.ErrCitationVerification):
 		return status.Error(codes.Internal, "agent unavailable")
 	case errors.Is(err, types.ErrAgentUnavailable):
@@ -135,6 +138,8 @@ func createAgentProposalResultToProto(
 		EvidencePack:       evidencePackToProto(result.EvidencePack),
 		AgentVersion:       result.AgentVersion,
 		GeneratedByLlm:     result.GeneratedByLLM,
+		SkillId:            result.SkillID,
+		PreparedAuditId:    result.PreparedAuditID,
 	}
 }
 

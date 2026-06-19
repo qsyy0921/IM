@@ -10,8 +10,8 @@ type RetrievalPort interface {
 	RetrieveEvidence(context.Context, types.RetrieveEvidenceQuery) (types.RetrieveEvidenceResult, error)
 }
 
-type ToolPolicyPort interface {
-	CheckToolAction(context.Context, types.CheckToolActionCommand) (types.ToolPolicyDecision, error)
+type ToolPreparePort interface {
+	PrepareToolCall(context.Context, types.PrepareToolCallCommand) (types.ToolPrepareResult, error)
 }
 
 type ProposalProvider interface {

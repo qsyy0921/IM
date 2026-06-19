@@ -91,6 +91,7 @@ type CreateAgentProposalRequest struct {
 	IncludeSearch  bool                      `protobuf:"varint,12,opt,name=include_search,json=includeSearch,proto3" json:"include_search,omitempty"`
 	IncludeMemory  bool                      `protobuf:"varint,13,opt,name=include_memory,json=includeMemory,proto3" json:"include_memory,omitempty"`
 	MemoryStatuses []v1.EvidenceMemoryStatus `protobuf:"varint,14,rep,packed,name=memory_statuses,json=memoryStatuses,proto3,enum=nexusim.retrieval.v1.EvidenceMemoryStatus" json:"memory_statuses,omitempty"`
+	SkillId        string                    `protobuf:"bytes,15,opt,name=skill_id,json=skillId,proto3" json:"skill_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -221,6 +222,13 @@ func (x *CreateAgentProposalRequest) GetMemoryStatuses() []v1.EvidenceMemoryStat
 		return x.MemoryStatuses
 	}
 	return nil
+}
+
+func (x *CreateAgentProposalRequest) GetSkillId() string {
+	if x != nil {
+		return x.SkillId
+	}
+	return ""
 }
 
 type AgentCitation struct {
@@ -466,6 +474,8 @@ type CreateAgentProposalResponse struct {
 	EvidencePack       *v1.EvidencePack       `protobuf:"bytes,7,opt,name=evidence_pack,json=evidencePack,proto3" json:"evidence_pack,omitempty"`
 	AgentVersion       string                 `protobuf:"bytes,8,opt,name=agent_version,json=agentVersion,proto3" json:"agent_version,omitempty"`
 	GeneratedByLlm     bool                   `protobuf:"varint,9,opt,name=generated_by_llm,json=generatedByLlm,proto3" json:"generated_by_llm,omitempty"`
+	SkillId            string                 `protobuf:"bytes,10,opt,name=skill_id,json=skillId,proto3" json:"skill_id,omitempty"`
+	PreparedAuditId    string                 `protobuf:"bytes,11,opt,name=prepared_audit_id,json=preparedAuditId,proto3" json:"prepared_audit_id,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -563,11 +573,25 @@ func (x *CreateAgentProposalResponse) GetGeneratedByLlm() bool {
 	return false
 }
 
+func (x *CreateAgentProposalResponse) GetSkillId() string {
+	if x != nil {
+		return x.SkillId
+	}
+	return ""
+}
+
+func (x *CreateAgentProposalResponse) GetPreparedAuditId() string {
+	if x != nil {
+		return x.PreparedAuditId
+	}
+	return ""
+}
+
 var File_nexusim_agent_v1_agent_service_proto protoreflect.FileDescriptor
 
 const file_nexusim_agent_v1_agent_service_proto_rawDesc = "" +
 	"\n" +
-	"$nexusim/agent/v1/agent_service.proto\x12\x10nexusim.agent.v1\x1a&nexusim/policy/v1/policy_service.proto\x1a,nexusim/retrieval/v1/retrieval_gateway.proto\"\xd9\x04\n" +
+	"$nexusim/agent/v1/agent_service.proto\x12\x10nexusim.agent.v1\x1a&nexusim/policy/v1/policy_service.proto\x1a,nexusim/retrieval/v1/retrieval_gateway.proto\"\xf4\x04\n" +
 	"\x1aCreateAgentProposalRequest\x12D\n" +
 	"\fauth_context\x18\x01 \x01(\v2!.nexusim.retrieval.v1.AuthContextR\vauthContext\x12'\n" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x1c\n" +
@@ -586,7 +610,8 @@ const file_nexusim_agent_v1_agent_service_proto_rawDesc = "" +
 	"\x05limit\x18\v \x01(\x05R\x05limit\x12%\n" +
 	"\x0einclude_search\x18\f \x01(\bR\rincludeSearch\x12%\n" +
 	"\x0einclude_memory\x18\r \x01(\bR\rincludeMemory\x12S\n" +
-	"\x0fmemory_statuses\x18\x0e \x03(\x0e2*.nexusim.retrieval.v1.EvidenceMemoryStatusR\x0ememoryStatuses\"\xc3\x02\n" +
+	"\x0fmemory_statuses\x18\x0e \x03(\x0e2*.nexusim.retrieval.v1.EvidenceMemoryStatusR\x0ememoryStatuses\x12\x19\n" +
+	"\bskill_id\x18\x0f \x01(\tR\askillId\"\xc3\x02\n" +
 	"\rAgentCitation\x12\x1f\n" +
 	"\vevidence_id\x18\x01 \x01(\tR\n" +
 	"evidenceId\x12I\n" +
@@ -613,7 +638,7 @@ const file_nexusim_agent_v1_agent_service_proto_rawDesc = "" +
 	" \x01(\x03R\x11permissionVersion\x12&\n" +
 	"\x0eclassification\x18\v \x01(\tR\x0eclassification\x12\x16\n" +
 	"\x06reason\x18\f \x01(\tR\x06reason\x12'\n" +
-	"\x0fdecision_source\x18\r \x01(\tR\x0edecisionSource\"\xfe\x03\n" +
+	"\x0fdecision_source\x18\r \x01(\tR\x0edecisionSource\"\xc5\x04\n" +
 	"\x1bCreateAgentProposalResponse\x12\x1f\n" +
 	"\vproposal_id\x18\x01 \x01(\tR\n" +
 	"proposalId\x12=\n" +
@@ -624,7 +649,10 @@ const file_nexusim_agent_v1_agent_service_proto_rawDesc = "" +
 	"\tcitations\x18\x06 \x03(\v2\x1f.nexusim.agent.v1.AgentCitationR\tcitations\x12G\n" +
 	"\revidence_pack\x18\a \x01(\v2\".nexusim.retrieval.v1.EvidencePackR\fevidencePack\x12#\n" +
 	"\ragent_version\x18\b \x01(\tR\fagentVersion\x12(\n" +
-	"\x10generated_by_llm\x18\t \x01(\bR\x0egeneratedByLlm*\xb4\x01\n" +
+	"\x10generated_by_llm\x18\t \x01(\bR\x0egeneratedByLlm\x12\x19\n" +
+	"\bskill_id\x18\n" +
+	" \x01(\tR\askillId\x12*\n" +
+	"\x11prepared_audit_id\x18\v \x01(\tR\x0fpreparedAuditId*\xb4\x01\n" +
 	"\x13AgentProposalStatus\x12%\n" +
 	"!AGENT_PROPOSAL_STATUS_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eAGENT_PROPOSAL_STATUS_PROPOSED\x10\x01\x12!\n" +

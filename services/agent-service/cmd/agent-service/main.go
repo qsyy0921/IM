@@ -81,15 +81,15 @@ func runGRPC(ctx context.Context) error {
 		return err
 	}
 	defer closeRetrieval()
-	policyClient, closePolicy, err := rpcinfra.DialPolicyClient(
+	mcpClient, closeMCPGateway, err := rpcinfra.DialMCPGatewayClient(
 		ctx,
-		envString("NEXUSIM_POLICY_GRPC_ADDR", "127.0.0.1:10800"),
+		envString("NEXUSIM_MCP_GATEWAY_GRPC_ADDR", "127.0.0.1:10650"),
 		timeout,
 	)
 	if err != nil {
 		return err
 	}
-	defer closePolicy()
+	defer closeMCPGateway()
 
 	addr := envString("NEXUSIM_AGENT_GRPC_ADDR", "127.0.0.1:10630")
 	listener, err := net.Listen("tcp", addr)
@@ -97,7 +97,7 @@ func runGRPC(ctx context.Context) error {
 		return err
 	}
 	server := grpc.NewServer()
-	agentgrpc.Register(server, agentgrpc.NewServer(app.NewCreateAgentProposalUseCase(retrievalClient, policyClient)))
+	agentgrpc.Register(server, agentgrpc.NewServer(app.NewCreateAgentProposalUseCase(retrievalClient, mcpClient)))
 
 	serveErr := make(chan error, 1)
 	go func() {

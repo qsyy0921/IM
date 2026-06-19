@@ -11,9 +11,10 @@ import (
 
 func TestCreateAgentProposalUseCaseReturnsProposal(t *testing.T) {
 	retrieval := &fakeRetrieval{result: types.RetrieveEvidenceResult{Pack: testEvidencePack()}}
-	policy := &fakePolicy{decision: types.ToolPolicyDecision{
+	prepare := &fakePrepare{result: types.ToolPrepareResult{
 		TenantID:          "tenant-1",
 		UserID:            "user-1",
+		SkillID:           "conversation.note.create",
 		ToolName:          "conversation.note.create",
 		Action:            types.ToolActionCall,
 		ResourceType:      "conversation",
@@ -25,47 +26,55 @@ func TestCreateAgentProposalUseCaseReturnsProposal(t *testing.T) {
 		Classification:    "TOOL_ALLOWED",
 		Reason:            "allowed",
 		DecisionSource:    "test",
+		AuditID:           "mcp-audit-1",
 	}}
-	usecase := NewCreateAgentProposalUseCase(retrieval, policy)
+	usecase := NewCreateAgentProposalUseCase(retrieval, prepare)
 
 	result, err := usecase.Execute(context.Background(), testCommand())
 	if err != nil {
 		t.Fatalf("create proposal: %v", err)
 	}
 	if result.Status != types.AgentProposalStatusProposed || result.ProposalID == "" ||
-		!result.RequiresApproval || len(result.Citations) != 1 || len(result.EvidencePack.Items) != 1 {
+		!result.RequiresApproval || result.PreparedAuditID != "mcp-audit-1" ||
+		result.SkillID != "conversation.note.create" || len(result.Citations) != 1 || len(result.EvidencePack.Items) != 1 {
 		t.Fatalf("unexpected result: %+v", result)
 	}
 	if retrieval.query.Query != "draft action plan" || retrieval.query.ConversationID != "conv-1" {
 		t.Fatalf("unexpected retrieval query: %+v", retrieval.query)
 	}
-	if policy.command.ToolName != "conversation.note.create" || policy.command.Action != types.ToolActionCall {
-		t.Fatalf("unexpected policy command: %+v", policy.command)
+	if prepare.command.SkillID != "conversation.note.create" ||
+		prepare.command.ToolName != "conversation.note.create" ||
+		prepare.command.Action != types.ToolActionCall ||
+		prepare.command.IdempotencyKey == "" ||
+		prepare.command.InputJSON == "" {
+		t.Fatalf("unexpected prepare command: %+v", prepare.command)
 	}
 }
 
 func TestCreateAgentProposalUseCaseBlockedByPolicyDoesNotRetrieve(t *testing.T) {
 	retrieval := &fakeRetrieval{err: errors.New("should not be called")}
-	policy := &fakePolicy{decision: types.ToolPolicyDecision{
+	prepare := &fakePrepare{result: types.ToolPrepareResult{
+		SkillID:        "conversation.note.create",
 		Allowed:        false,
 		Reason:         "tool policy denied",
 		DecisionSource: "test",
+		AuditID:        "mcp-audit-deny",
 	}}
-	usecase := NewCreateAgentProposalUseCase(retrieval, policy)
+	usecase := NewCreateAgentProposalUseCase(retrieval, prepare)
 
 	result, err := usecase.Execute(context.Background(), testCommand())
 	if err != nil {
 		t.Fatalf("create proposal: %v", err)
 	}
-	if result.Status != types.AgentProposalStatusBlocked || retrieval.called {
+	if result.Status != types.AgentProposalStatusBlocked || result.PreparedAuditID != "mcp-audit-deny" || retrieval.called {
 		t.Fatalf("expected blocked without retrieval, got result=%+v called=%v", result, retrieval.called)
 	}
 }
 
 func TestCreateAgentProposalUseCaseInsufficientEvidence(t *testing.T) {
 	retrieval := &fakeRetrieval{result: types.RetrieveEvidenceResult{Pack: types.EvidencePack{PackID: "pack-empty"}}}
-	policy := &fakePolicy{decision: types.ToolPolicyDecision{Allowed: true}}
-	usecase := NewCreateAgentProposalUseCase(retrieval, policy)
+	prepare := &fakePrepare{result: types.ToolPrepareResult{Allowed: true, SkillID: "conversation.note.create", AuditID: "mcp-audit-1"}}
+	usecase := NewCreateAgentProposalUseCase(retrieval, prepare)
 
 	result, err := usecase.Execute(context.Background(), testCommand())
 	if err != nil {
@@ -78,12 +87,12 @@ func TestCreateAgentProposalUseCaseInsufficientEvidence(t *testing.T) {
 
 func TestCreateAgentProposalUseCaseRejectsFabricatedCitation(t *testing.T) {
 	retrieval := &fakeRetrieval{result: types.RetrieveEvidenceResult{Pack: testEvidencePack()}}
-	policy := &fakePolicy{decision: types.ToolPolicyDecision{Allowed: true}}
+	prepare := &fakePrepare{result: types.ToolPrepareResult{Allowed: true, SkillID: "conversation.note.create"}}
 	provider := fakeProvider{result: types.AgentProposalGenerationResult{
 		ProposalText: "bad",
 		Citations:    []types.Citation{{EvidenceID: "missing"}},
 	}}
-	usecase := NewCreateAgentProposalUseCaseWithProvider(retrieval, policy, provider)
+	usecase := NewCreateAgentProposalUseCaseWithProvider(retrieval, prepare, provider)
 
 	_, err := usecase.Execute(context.Background(), testCommand())
 	if !errors.Is(err, types.ErrCitationVerification) {
@@ -153,18 +162,18 @@ func (fake *fakeRetrieval) RetrieveEvidence(
 	return fake.result, fake.err
 }
 
-type fakePolicy struct {
-	decision types.ToolPolicyDecision
-	err      error
-	command  types.CheckToolActionCommand
+type fakePrepare struct {
+	result  types.ToolPrepareResult
+	err     error
+	command types.PrepareToolCallCommand
 }
 
-func (fake *fakePolicy) CheckToolAction(
+func (fake *fakePrepare) PrepareToolCall(
 	_ context.Context,
-	command types.CheckToolActionCommand,
-) (types.ToolPolicyDecision, error) {
+	command types.PrepareToolCallCommand,
+) (types.ToolPrepareResult, error) {
 	fake.command = command
-	return fake.decision, fake.err
+	return fake.result, fake.err
 }
 
 type fakeProvider struct {

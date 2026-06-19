@@ -14,6 +14,8 @@
 - PostgreSQL audit repository、真实 PG 集成测试
 - `grpc` runtime mode、debug `/metrics`
 - Docker runtime、local compose、Prometheus rules、Grafana dashboard、`service-registry.json` wiring
+- `agent-service` proposal path 已接入 `PrepareToolCall`；Agent 会带回
+  `prepared_audit_id`，但仍不执行外部 tool
 
 边界：
 
@@ -25,6 +27,7 @@
 
 下一步：
 
-- 让 `agent-service` proposal 前调用 mcp-gateway prepare，而不是只直接调用 policy-service。
+- 跑新的真实本地 `retrieval-gateway -> agent-service -> mcp-gateway` adapter
+  smoke，验证 prepare audit 和 proposal-only 边界。
 - 后续实现真实 MCP adapter 时必须继续走 skill catalog、policy、rate limit、audit 和 failure fallback。
 - 与 `action-executor` 的 first audit path 已具备基础串接点；后续补正式 approval store 校验和真实 tool result handoff。

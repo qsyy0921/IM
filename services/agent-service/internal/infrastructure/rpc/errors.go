@@ -41,3 +41,20 @@ func mapPolicyError(err error) error {
 		return errors.Join(types.ErrToolPolicyUnavailable, err)
 	}
 }
+
+func mapMCPGatewayError(err error) error {
+	if err == nil {
+		return nil
+	}
+	code := status.Code(err)
+	switch code {
+	case codes.InvalidArgument:
+		return types.ErrInvalidArgument
+	case codes.PermissionDenied:
+		return types.ErrPermissionDenied
+	case codes.Unavailable, codes.DeadlineExceeded:
+		return types.ErrToolPrepareUnavailable
+	default:
+		return errors.Join(types.ErrToolPrepareUnavailable, err)
+	}
+}

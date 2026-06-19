@@ -4,7 +4,8 @@
 
 ## 当前主线
 
-- 当前主线是必要收口 + 转向 AI 大模型应用底座；短期优先关闭阻碍 search / memory / retrieval / evaluation 底座的必要缺口。
+- 当前主线是 AI 大模型应用底座：群组 memory、跨群 / 跨时间 EvidencePack、RAG、summary、multi-agent、skill registry、MCP/tool gateway、action-executor、approval/audit 和 ai-eval。
+- 9 个既有 IM 服务已经作为可运行基础；默认只处理阻塞 AI 主线的 P0/P1 或用户点名事项，不把长期 P2 hardening 当作当前主线。
 - 当前可使用多个 sub-agent 并行推进，但必须拆分互不重叠的服务、文档或验证职责；主 agent 负责合并、检查和关闭 sub-agent。
 - 生产级压测、长周期故障演练和完整生产就绪测试后置到明确阶段或用户指定任务。
 - 具体长目标不复制到本页；按入口路由读取 owner 文档。

@@ -7,14 +7,14 @@
 ```text
 持续推进 E:\development\IM 的 NexusIM 项目。
 
-当前主线：必要收口已经完成到可以转进，默认继续开发 AI/RAG/Agent 大模型应用底座；下一步优先推进 agent-service。不要把默认任务又切回 9 个 IM 服务的 P2 hardening、生产级长压、完整 HA、sizing 或 provider-grade 运维，除非用户明确点名，或它们阻塞 AI 主线。
+当前主线必须显式按这条走：IM 后端主链路和必要分布式基础已经收口到可转进状态；默认继续建设 AI 应用基础设施，包括群组 memory、跨群 / 跨时间 EvidencePack、RAG、summary、multi-agent、skill registry、MCP/tool gateway、action-executor、approval/audit 和 ai-eval。九个既有 IM 服务只处理阻塞 AI 主线的 P0/P1 或用户点名任务；不要把默认任务切回长期 P2 hardening、生产级长压、完整 HA、sizing 或 provider-grade 运维。
+
+当前 active slice：agent-service first proposal-only path 已落；下一步补真实本地 retrieval-gateway -> policy-service -> agent-service adapter smoke，然后继续 skill-registry / mcp-gateway / action-executor。
 
 每轮开始：
 1. 执行 git status --short --branch --untracked-files=all。
 2. 读取 prompt.md 和 agent.md。
 3. 再按需读取 docs/runbook/current-brief.md、docs/runbook/remaining-goals.md、相关 service brief 或 SDD；不要全文扫长历史文档。
-
-当前 active slice：agent-service first proposal-only path 已落；下一步补真实本地 retrieval-gateway -> policy-service -> agent-service adapter smoke，然后继续 skill-registry / mcp-gateway / action-executor。
 
 主线顺序：
 1. 现有 9 个 IM 后端服务只做阻塞 AI 链路的必要收口；非阻塞生产化事项写入 `docs/runbook/remaining-goals.md`，不要拿它们替代 AI 主线。

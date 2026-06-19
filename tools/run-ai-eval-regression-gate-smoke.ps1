@@ -5,6 +5,7 @@ param(
     [switch]$IncludeAllOptionalServiceStackAdapters,
     [string]$PGDSN = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
     [string]$RAGTarget = "127.0.0.1:10610",
+    [string]$SummaryTarget = "127.0.0.1:10620",
     [string]$AgentTarget = "127.0.0.1:10630",
     [string]$ActionExecutorTarget = "127.0.0.1:10660",
     [string]$Python = "python",
@@ -113,6 +114,16 @@ function Invoke-GateAdapter {
                 -CasePath $resolvedCasePath `
                 -PGDSN $PGDSN `
                 -RAGTarget $RAGTarget `
+                -ResultRoot $ResultRoot `
+                -RunName $AdapterRunName `
+                -OutputPath $SummaryPath `
+                -RequestTimeout $RequestTimeout
+        }
+        "summary-service" {
+            & $ScriptPath `
+                -CasePath $resolvedCasePath `
+                -PGDSN $PGDSN `
+                -SummaryTarget $SummaryTarget `
                 -ResultRoot $ResultRoot `
                 -RunName $AdapterRunName `
                 -OutputPath $SummaryPath `

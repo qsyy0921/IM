@@ -46,6 +46,20 @@
       ]
     },
     {
+      "name": "summary-service",
+      "script": "run-ai-eval-summary-adapter.ps1",
+      "run_suffix": "summary-service",
+      "summary_file": "summary-eval-adapter-summary.json",
+      "requires_service_stack": true,
+      "requires": [
+        "summary-service",
+        "retrieval-gateway",
+        "search-service",
+        "memory-service",
+        "postgres"
+      ]
+    },
+    {
       "name": "agent-action-executor",
       "script": "run-ai-eval-agent-adapter.ps1",
       "run_suffix": "agent-action-executor",

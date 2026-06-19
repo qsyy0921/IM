@@ -8,6 +8,7 @@ summary, Agent and tool/action boundaries.
 - Case file: `retrieval-eval-cases.json`
 - Validator: `tools/validate-ai-eval-cases.ps1`
 - RAG execution adapter: `tools/run-ai-eval-rag-adapter.ps1`
+- Summary execution adapter: `tools/run-ai-eval-summary-adapter.ps1`
 - Agent execution adapter: `tools/run-ai-eval-agent-adapter.ps1`
 - Profile / Agent output safety adapter:
   `tools/run-ai-eval-profile-agent-safety.ps1`
@@ -74,6 +75,21 @@ Cases that require abstain / empty EvidencePack assertions run a second
 It requires `rag-service`, `retrieval-gateway`, `search-service` and
 `memory-service` runtime processes to be reachable. Raw execution summaries
 stay under `H:\NexusIM\loadtest-results`.
+
+First-stage Summary execution adapter:
+
+```powershell
+.\tools\run-ai-eval-summary-adapter.ps1 `
+  -PGDSN postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable `
+  -SummaryTarget 127.0.0.1:10620
+```
+
+This adapter runs `loadtest/summary`, which seeds low-sensitive search / memory
+projection rows, calls real `summary-service GenerateConversationSummary`, and
+validates active `summary-service` cases against status, citations,
+EvidencePack coverage and version fields. Cases that require abstain / empty
+EvidencePack assertions run a second `-scenario no-evidence` path and verify no
+fabricated citations or LLM-generation claim.
 
 Future Agent slices should add execution adapters that evaluate tool policy,
 proposal / approval and action safety against real EvidencePack outputs before
@@ -194,7 +210,7 @@ stack:
   -Python C:\Users\10495\anaconda3\envs\IM\python.exe
 ```
 
-`rag-service` and `agent-action-executor` can also be selected through
+`rag-service`, `summary-service` and `agent-action-executor` can also be selected through
 `-OptionalAdapter`, but they require their listed service stacks and targets to
 already be running. The gate runner records any selected optional adapter through
 `ai-eval-service` with the same low-sensitive summary-only boundary.
@@ -206,9 +222,9 @@ RAG / Agent service-stack gate wrapper:
 .\tools\run-ai-eval-service-stack-gate-smoke.ps1
 ```
 
-The preflight writes endpoint readiness only. It does not prove live RAG / Agent
+The preflight writes endpoint readiness only. It does not prove live RAG / Summary / Agent
 adapter behavior. Remove `-PreflightOnly` and `-AllowMissing` only after the
-RAG / Agent service stack is running.
+selected service stack is running.
 The first local live run passed with `profile-agent-safety`,
 `action-external-http-provider`, `rag-service` and `agent-action-executor`
 selected; see `docs/runbook/loadtest/ai-eval-service/`.
@@ -224,6 +240,9 @@ action-executor hash-only audit checks.
 The 2026-06-20 negative RAG / Agent service-stack run increased the live suite
 to 19 cases and added RAG no-evidence abstain plus Agent policy-denied blocked
 proposal checks.
+The 2026-06-20 Summary negative adapter run added `summary-service` live
+grounded-citation and no-evidence abstain coverage; see
+`docs/runbook/loadtest/ai-eval-service/`.
 
 First-stage Go-side Python worker adapter smoke:
 

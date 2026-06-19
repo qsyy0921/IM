@@ -26,6 +26,9 @@ const (
 	defaultSummaryTarget = "127.0.0.1:10620"
 	defaultResultRoot    = `H:\NexusIM\loadtest-results`
 	defaultFocus         = "phoenix launch decision"
+
+	scenarioGrounded   = "grounded"
+	scenarioNoEvidence = "no-evidence"
 )
 
 type config struct {
@@ -39,6 +42,7 @@ type config struct {
 	senderUserID   string
 	deviceID       string
 	focus          string
+	scenario       string
 	requestTimeout time.Duration
 	tls            grpctls.Config
 }
@@ -64,6 +68,7 @@ type summarySmokeResult struct {
 	ResultDir               string       `json:"result_dir"`
 	SummaryTarget           string       `json:"summary_target"`
 	Focus                   string       `json:"focus"`
+	Scenario                string       `json:"scenario"`
 	Seed                    seededData   `json:"seed"`
 	SummaryID               string       `json:"summary_id"`
 	SummaryStatus           string       `json:"summary_status"`
@@ -152,6 +157,7 @@ func parseConfig(args []string) (config, error) {
 	flagSet.StringVar(&cfg.senderUserID, "sender-user-id", "summary-sender", "sender user id")
 	flagSet.StringVar(&cfg.deviceID, "device-id", "summary-device", "viewer device id")
 	flagSet.StringVar(&cfg.focus, "focus", defaultFocus, "focus sent to summary-service")
+	flagSet.StringVar(&cfg.scenario, "scenario", scenarioGrounded, "smoke scenario: grounded or no-evidence")
 	flagSet.DurationVar(&cfg.requestTimeout, "request-timeout", 10*time.Second, "gRPC request timeout")
 	flagSet.StringVar(&cfg.tls.CAFile, "summary-tls-ca-file", "", "summary gRPC TLS CA file")
 	flagSet.StringVar(&cfg.tls.ServerName, "summary-tls-server-name", "", "summary gRPC TLS server name")
@@ -163,6 +169,7 @@ func parseConfig(args []string) (config, error) {
 	cfg.resultRoot = strings.TrimSpace(cfg.resultRoot)
 	cfg.summaryTarget = strings.TrimSpace(cfg.summaryTarget)
 	cfg.focus = strings.TrimSpace(cfg.focus)
+	cfg.scenario = strings.ToLower(strings.TrimSpace(cfg.scenario))
 	if cfg.summaryTarget == "" {
 		return config{}, errors.New("--summary-target is required")
 	}
@@ -171,6 +178,12 @@ func parseConfig(args []string) (config, error) {
 	}
 	if cfg.focus == "" {
 		return config{}, errors.New("--focus is required")
+	}
+	if cfg.scenario == "" {
+		cfg.scenario = scenarioGrounded
+	}
+	if cfg.scenario != scenarioGrounded && cfg.scenario != scenarioNoEvidence {
+		return config{}, fmt.Errorf("unsupported --scenario %q", cfg.scenario)
 	}
 	if cfg.runName == "" {
 		cfg.runName = "summary-service-summary-smoke-" + time.Now().UTC().Format("20060102-150405")
@@ -259,6 +272,23 @@ INSERT INTO %s (
 		); err != nil {
 			return seededData{}, err
 		}
+	}
+
+	if cfg.scenario == scenarioNoEvidence {
+		if err := tx.Commit(ctx); err != nil {
+			return seededData{}, err
+		}
+		return seededData{
+			TenantID:            cfg.tenantID,
+			ConversationID:      cfg.conversationID,
+			ViewerUserID:        cfg.viewerUserID,
+			SenderUserID:        cfg.senderUserID,
+			ConversationSeq:     seq,
+			VisibilityVersion:   visibilityVersion,
+			MemoryValidFromSeq:  seq,
+			MemoryValidToSeq:    seq + 10,
+			MemoryProjectionVer: memoryProjectionVersion,
+		}, nil
 	}
 
 	if _, err := tx.Exec(ctx, `
@@ -363,6 +393,9 @@ func verifySummary(
 	response *summaryv1.GenerateConversationSummaryResponse,
 	startedAt time.Time,
 ) (summarySmokeResult, error) {
+	if cfg.scenario == scenarioNoEvidence {
+		return verifyInsufficientSummary(cfg, resultDir, seed, response, startedAt)
+	}
 	if response.GetStatus() != summaryv1.SummaryStatus_SUMMARY_STATUS_GROUNDED {
 		return summarySmokeResult{}, fmt.Errorf("unexpected summary status %v", response.GetStatus())
 	}
@@ -438,6 +471,7 @@ func verifySummary(
 		ResultDir:               resultDir,
 		SummaryTarget:           cfg.summaryTarget,
 		Focus:                   cfg.focus,
+		Scenario:                cfg.scenario,
 		Seed:                    seed,
 		SummaryID:               response.GetSummaryId(),
 		SummaryStatus:           summaryStatusName(response.GetStatus()),
@@ -450,6 +484,77 @@ func verifySummary(
 		SearchItemCount:         int(counts.SearchMessage),
 		MemoryItemCount:         int(counts.MemoryEvent),
 		SourceCounts:            counts,
+		SearchProjectionVersion: pack.GetSearchProjectionVersion(),
+		MemoryProjectionVersion: pack.GetMemoryProjectionVersion(),
+		SummaryVersion:          response.GetSummaryVersion(),
+		RetrievalVersion:        pack.GetRetrievalVersion(),
+		Verified:                verified,
+		StartedAt:               startedAt,
+		FinishedAt:              time.Now().UTC(),
+	}, nil
+}
+
+func verifyInsufficientSummary(
+	cfg config,
+	resultDir string,
+	seed seededData,
+	response *summaryv1.GenerateConversationSummaryResponse,
+	startedAt time.Time,
+) (summarySmokeResult, error) {
+	if response.GetStatus() != summaryv1.SummaryStatus_SUMMARY_STATUS_INSUFFICIENT_EVIDENCE {
+		return summarySmokeResult{}, fmt.Errorf("unexpected summary status for no-evidence scenario: %v", response.GetStatus())
+	}
+	if response.GetGeneratedByLlm() {
+		return summarySmokeResult{}, errors.New("insufficient-evidence summary must not claim LLM generation")
+	}
+	if strings.TrimSpace(response.GetSummaryText()) == "" {
+		return summarySmokeResult{}, errors.New("insufficient-evidence summary text is empty")
+	}
+	if len(response.GetCitations()) != 0 {
+		return summarySmokeResult{}, errors.New("insufficient-evidence summary must not include citations")
+	}
+	pack := response.GetEvidencePack()
+	if pack == nil {
+		return summarySmokeResult{}, errors.New("missing evidence pack")
+	}
+	if pack.GetTenantId() != cfg.tenantID || pack.GetConversationId() != cfg.conversationID {
+		return summarySmokeResult{}, fmt.Errorf("unexpected evidence pack scope tenant=%q conversation=%q", pack.GetTenantId(), pack.GetConversationId())
+	}
+	if pack.GetQuery() != strings.TrimSpace(cfg.focus) {
+		return summarySmokeResult{}, fmt.Errorf("unexpected evidence pack query %q", pack.GetQuery())
+	}
+	if len(pack.GetItems()) != 0 {
+		return summarySmokeResult{}, fmt.Errorf("insufficient-evidence pack must be empty, got %d items", len(pack.GetItems()))
+	}
+	if strings.TrimSpace(pack.GetRetrievalVersion()) == "" {
+		return summarySmokeResult{}, errors.New("missing retrieval version")
+	}
+	if strings.TrimSpace(response.GetSummaryVersion()) == "" {
+		return summarySmokeResult{}, errors.New("missing summary_version")
+	}
+	verified := []string{
+		"summary returned INSUFFICIENT_EVIDENCE with empty EvidencePack",
+		"summary did not include citations for insufficient evidence",
+		"summary preserved summary_version and retrieval_version for abstain path",
+	}
+	return summarySmokeResult{
+		RunName:                 cfg.runName,
+		ResultDir:               resultDir,
+		SummaryTarget:           cfg.summaryTarget,
+		Focus:                   cfg.focus,
+		Scenario:                cfg.scenario,
+		Seed:                    seed,
+		SummaryID:               response.GetSummaryId(),
+		SummaryStatus:           summaryStatusName(response.GetStatus()),
+		SummaryText:             response.GetSummaryText(),
+		Confidence:              response.GetConfidence(),
+		GeneratedByLLM:          response.GetGeneratedByLlm(),
+		CitationCount:           len(response.GetCitations()),
+		PackID:                  pack.GetPackId(),
+		EvidenceItemCount:       len(pack.GetItems()),
+		SearchItemCount:         0,
+		MemoryItemCount:         0,
+		SourceCounts:            sourceCounts{},
 		SearchProjectionVersion: pack.GetSearchProjectionVersion(),
 		MemoryProjectionVersion: pack.GetMemoryProjectionVersion(),
 		SummaryVersion:          response.GetSummaryVersion(),

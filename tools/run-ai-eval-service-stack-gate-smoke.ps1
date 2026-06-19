@@ -7,6 +7,7 @@ param(
     [string]$GatePolicyPath = "docs/runbook/ai-eval/gate-policy.local.json",
     [string]$PGDSN = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
     [string]$RAGTarget = "127.0.0.1:10610",
+    [string]$SummaryTarget = "127.0.0.1:10620",
     [string]$RetrievalTarget = "127.0.0.1:10590",
     [string]$SearchTarget = "127.0.0.1:10570",
     [string]$MemoryTarget = "127.0.0.1:10580",
@@ -170,6 +171,12 @@ if ($adapters -contains "rag-service") {
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "search-service" -Endpoint $SearchTarget -DefaultPort 10570
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "memory-service" -Endpoint $MemoryTarget -DefaultPort 10580
 }
+if ($adapters -contains "summary-service") {
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "summary-service" -Endpoint $SummaryTarget -DefaultPort 10620
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "retrieval-gateway" -Endpoint $RetrievalTarget -DefaultPort 10590
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "search-service" -Endpoint $SearchTarget -DefaultPort 10570
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "memory-service" -Endpoint $MemoryTarget -DefaultPort 10580
+}
 if ($adapters -contains "agent-action-executor") {
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "agent-service" -Endpoint $AgentTarget -DefaultPort 10630
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "action-executor" -Endpoint $ActionExecutorTarget -DefaultPort 10660
@@ -232,6 +239,7 @@ if ($NoApplyMigration) {
         -GatePolicyPath $GatePolicyPath `
         -PGDSN $PGDSN `
         -RAGTarget $RAGTarget `
+        -SummaryTarget $SummaryTarget `
         -AgentTarget $AgentTarget `
         -ActionExecutorTarget $ActionExecutorTarget `
         -Python $Python `
@@ -250,6 +258,7 @@ if ($NoApplyMigration) {
         -GatePolicyPath $GatePolicyPath `
         -PGDSN $PGDSN `
         -RAGTarget $RAGTarget `
+        -SummaryTarget $SummaryTarget `
         -AgentTarget $AgentTarget `
         -ActionExecutorTarget $ActionExecutorTarget `
         -Python $Python `

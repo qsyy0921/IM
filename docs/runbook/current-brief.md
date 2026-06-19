@@ -29,16 +29,16 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 AI foundation-active 服务：search、memory、retrieval、rag、summary、
 agent、skill-registry、mcp-gateway、action-executor、ai-eval。
 
-`ai-eval-service` catalog、RecordEvalRun recorder、multi-adapter gate、Python
-optional adapter path、RAG / Agent live gate、CI-safe gate skeleton、第一批
-RAG-Agent regression expansion、profile / Agent output safety expansion 和
-service-stack version / hash-only expansion、negative RAG / Agent cases 已落；
+`ai-eval-service` catalog、RecordEvalRun recorder、multi-adapter gate、Python optional
+adapter path、RAG / Agent live gate、CI-safe gate skeleton、RAG-Agent expansion、
+profile / Agent safety、version / hash-only、negative RAG-Agent cases 和 Summary
+live negative adapter 已落；
 只保存低敏 run refs / counters / metadata。
 
 当前下一步：
 
 ```text
-继续扩 Summary / Python / model-output negative regression cases
+继续扩 Python / model-output negative regression cases
 ```
 
 完整系统测试、生产级 HA、长压和 sizing 继续后置为 hardening backlog。

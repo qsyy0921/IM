@@ -93,6 +93,64 @@ func TestServerCreateAgentProposalRequiresAuth(t *testing.T) {
 	}
 }
 
+func TestServerApproveAndVerifyAgentProposal(t *testing.T) {
+	approver := &capturingApproveExecutor{result: types.ApproveAgentProposalResult{
+		ProposalID:       "ap_1",
+		ApprovalID:       "appr_1",
+		Status:           types.AgentProposalStatusApproved,
+		ApprovedByUserID: "approver-1",
+		ApprovedAt:       time.UnixMilli(1710000000123),
+	}}
+	verifier := &capturingVerifyExecutor{result: types.VerifyApprovedAgentProposalResult{
+		ProposalID:      "ap_1",
+		ApprovalID:      "appr_1",
+		Status:          types.AgentProposalStatusApproved,
+		UserID:          "user-1",
+		ConversationID:  "conv-1",
+		SkillID:         "skill-1",
+		PreparedAuditID: "mcp-audit-1",
+		ToolName:        "conversation.note.create",
+		ResourceType:    "conversation",
+		ResourceID:      "conv-1",
+		RiskLevel:       "LOW",
+		ApprovedAt:      time.UnixMilli(1710000000123),
+	}}
+	server := NewServerWithWorkflows(&capturingExecutor{}, approver, verifier)
+
+	approveResponse, err := server.ApproveAgentProposal(context.Background(), &agentv1.ApproveAgentProposalRequest{
+		AuthContext: &retrievalv1.AuthContext{TenantId: "tenant-1", UserId: "approver-1"},
+		ProposalId:  "ap_1",
+		Reason:      "approved",
+	})
+	if err != nil {
+		t.Fatalf("approve proposal: %v", err)
+	}
+	if approveResponse.GetStatus() != agentv1.AgentProposalStatus_AGENT_PROPOSAL_STATUS_APPROVED ||
+		approver.command.ProposalID != "ap_1" ||
+		approveResponse.GetApprovalId() != "appr_1" {
+		t.Fatalf("unexpected approve response=%+v command=%+v", approveResponse, approver.command)
+	}
+
+	verifyResponse, err := server.VerifyApprovedAgentProposal(context.Background(), &agentv1.VerifyApprovedAgentProposalRequest{
+		AuthContext:     &retrievalv1.AuthContext{TenantId: "tenant-1", UserId: "user-1"},
+		ProposalId:      "ap_1",
+		ApprovalId:      "appr_1",
+		PreparedAuditId: "mcp-audit-1",
+		SkillId:         "skill-1",
+		ToolName:        "conversation.note.create",
+		ResourceType:    "conversation",
+		ResourceId:      "conv-1",
+	})
+	if err != nil {
+		t.Fatalf("verify proposal: %v", err)
+	}
+	if verifyResponse.GetStatus() != agentv1.AgentProposalStatus_AGENT_PROPOSAL_STATUS_APPROVED ||
+		verifier.command.PreparedAuditID != "mcp-audit-1" ||
+		verifyResponse.GetRiskLevel() != "LOW" {
+		t.Fatalf("unexpected verify response=%+v command=%+v", verifyResponse, verifier.command)
+	}
+}
+
 type capturingExecutor struct {
 	command types.CreateAgentProposalCommand
 	result  types.CreateAgentProposalResult
@@ -103,6 +161,34 @@ func (executor *capturingExecutor) Execute(
 	_ context.Context,
 	command types.CreateAgentProposalCommand,
 ) (types.CreateAgentProposalResult, error) {
+	executor.command = command
+	return executor.result, executor.err
+}
+
+type capturingApproveExecutor struct {
+	command types.ApproveAgentProposalCommand
+	result  types.ApproveAgentProposalResult
+	err     error
+}
+
+func (executor *capturingApproveExecutor) Execute(
+	_ context.Context,
+	command types.ApproveAgentProposalCommand,
+) (types.ApproveAgentProposalResult, error) {
+	executor.command = command
+	return executor.result, executor.err
+}
+
+type capturingVerifyExecutor struct {
+	command types.VerifyApprovedAgentProposalCommand
+	result  types.VerifyApprovedAgentProposalResult
+	err     error
+}
+
+func (executor *capturingVerifyExecutor) Execute(
+	_ context.Context,
+	command types.VerifyApprovedAgentProposalCommand,
+) (types.VerifyApprovedAgentProposalResult, error) {
 	executor.command = command
 	return executor.result, executor.err
 }

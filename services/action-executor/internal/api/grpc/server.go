@@ -169,6 +169,12 @@ func grpcError(err error) error {
 		return status.Error(codes.Unavailable, "tool policy unavailable")
 	case errors.Is(err, types.ErrToolPolicyDenied):
 		return status.Error(codes.PermissionDenied, "tool policy denied")
+	case errors.Is(err, types.ErrProposalApprovalUnavailable):
+		return status.Error(codes.Unavailable, "proposal approval unavailable")
+	case errors.Is(err, types.ErrProposalNotApproved):
+		return status.Error(codes.FailedPrecondition, "proposal not approved")
+	case errors.Is(err, types.ErrProposalMismatch):
+		return status.Error(codes.FailedPrecondition, "proposal mismatch")
 	case errors.Is(err, types.ErrExecutionAuditFailed):
 		return status.Error(codes.Unavailable, "action execution audit unavailable")
 	default:

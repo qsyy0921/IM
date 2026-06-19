@@ -25,6 +25,7 @@ const (
 	AgentProposalStatusProposed             = "PROPOSED"
 	AgentProposalStatusBlocked              = "BLOCKED"
 	AgentProposalStatusInsufficientEvidence = "INSUFFICIENT_EVIDENCE"
+	AgentProposalStatusApproved             = "APPROVED"
 
 	ToolActionCall    = "CALL"
 	ToolActionApprove = "APPROVE"
@@ -370,6 +371,162 @@ type CreateAgentProposalResult struct {
 	EvidencePack       EvidencePack
 	AgentVersion       string
 	GeneratedByLLM     bool
+}
+
+type StoredAgentProposal struct {
+	TenantID          TenantID
+	ProposalID        string
+	UserID            UserID
+	ConversationID    ConversationID
+	Objective         string
+	SkillID           string
+	PreparedAuditID   string
+	ToolName          string
+	ToolAction        string
+	ResourceType      string
+	ResourceID        string
+	RiskLevel         string
+	Intent            string
+	Status            string
+	ProposalText      string
+	RequiresApproval  bool
+	Allowed           bool
+	PermissionVersion int64
+	Classification    string
+	Reason            string
+	DecisionSource    string
+	EvidencePackID    string
+	CitationsJSON     string
+	AgentVersion      string
+	GeneratedByLLM    bool
+	ApprovalID        string
+	ApprovedByUserID  UserID
+	ApprovedAt        time.Time
+	ApprovalReason    string
+}
+
+func ProposalFromCreateResult(command CreateAgentProposalCommand, result CreateAgentProposalResult, citationsJSON string) StoredAgentProposal {
+	return StoredAgentProposal{
+		TenantID:          command.AuthContext.TenantID,
+		ProposalID:        result.ProposalID,
+		UserID:            command.AuthContext.UserID,
+		ConversationID:    command.ConversationID,
+		Objective:         command.NormalizedObjective(),
+		SkillID:           result.SkillID,
+		PreparedAuditID:   result.PreparedAuditID,
+		ToolName:          result.ToolPolicyDecision.ToolName,
+		ToolAction:        result.ToolPolicyDecision.Action,
+		ResourceType:      result.ToolPolicyDecision.ResourceType,
+		ResourceID:        result.ToolPolicyDecision.ResourceID,
+		RiskLevel:         result.ToolPolicyDecision.RiskLevel,
+		Intent:            command.NormalizedIntent(),
+		Status:            result.Status,
+		ProposalText:      result.ProposalText,
+		RequiresApproval:  result.RequiresApproval,
+		Allowed:           result.ToolPolicyDecision.Allowed,
+		PermissionVersion: result.ToolPolicyDecision.PermissionVersion,
+		Classification:    result.ToolPolicyDecision.Classification,
+		Reason:            result.ToolPolicyDecision.Reason,
+		DecisionSource:    result.ToolPolicyDecision.DecisionSource,
+		EvidencePackID:    result.EvidencePack.PackID,
+		CitationsJSON:     citationsJSON,
+		AgentVersion:      result.AgentVersion,
+		GeneratedByLLM:    result.GeneratedByLLM,
+	}
+}
+
+type ApproveAgentProposalCommand struct {
+	AuthContext AuthContext
+	ProposalID  string
+	Reason      string
+}
+
+func (command ApproveAgentProposalCommand) Validate() error {
+	if err := command.AuthContext.Validate(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(command.ProposalID) == "" {
+		return NewInvalidArgument("proposal_id is required")
+	}
+	return nil
+}
+
+func (command ApproveAgentProposalCommand) NormalizedProposalID() string {
+	return strings.TrimSpace(command.ProposalID)
+}
+
+func (command ApproveAgentProposalCommand) NormalizedReason() string {
+	return strings.TrimSpace(command.Reason)
+}
+
+type ApproveAgentProposalResult struct {
+	ProposalID       string
+	ApprovalID       string
+	Status           string
+	ApprovedByUserID UserID
+	ApprovedAt       time.Time
+}
+
+type VerifyApprovedAgentProposalCommand struct {
+	AuthContext     AuthContext
+	ProposalID      string
+	ApprovalID      string
+	PreparedAuditID string
+	SkillID         string
+	ToolName        string
+	ResourceType    string
+	ResourceID      string
+}
+
+func (command VerifyApprovedAgentProposalCommand) Validate() error {
+	if err := command.AuthContext.Validate(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(command.ProposalID) == "" {
+		return NewInvalidArgument("proposal_id is required")
+	}
+	if strings.TrimSpace(command.ApprovalID) == "" {
+		return NewInvalidArgument("approval_id is required")
+	}
+	if strings.TrimSpace(command.PreparedAuditID) == "" {
+		return NewInvalidArgument("prepared_audit_id is required")
+	}
+	if strings.TrimSpace(command.SkillID) == "" {
+		return NewInvalidArgument("skill_id is required")
+	}
+	if strings.TrimSpace(command.ToolName) == "" {
+		return NewInvalidArgument("tool_name is required")
+	}
+	if strings.TrimSpace(command.ResourceType) == "" {
+		return NewInvalidArgument("resource_type is required")
+	}
+	return nil
+}
+
+func (command VerifyApprovedAgentProposalCommand) Normalized() VerifyApprovedAgentProposalCommand {
+	command.ProposalID = strings.TrimSpace(command.ProposalID)
+	command.ApprovalID = strings.TrimSpace(command.ApprovalID)
+	command.PreparedAuditID = strings.TrimSpace(command.PreparedAuditID)
+	command.SkillID = strings.TrimSpace(command.SkillID)
+	command.ToolName = strings.TrimSpace(command.ToolName)
+	command.ResourceType = strings.TrimSpace(command.ResourceType)
+	command.ResourceID = strings.TrimSpace(command.ResourceID)
+	return command
+}
+
+type VerifyApprovedAgentProposalResult struct {
+	ProposalID      string
+	ApprovalID      string
+	Status          string
+	UserID          UserID
+	ConversationID  ConversationID
+	SkillID         string
+	PreparedAuditID string
+	ToolName        string
+	ResourceType    string
+	ResourceID      string
+	RiskLevel       string
+	ApprovedAt      time.Time
 }
 
 func isValidToolAction(action string) bool {

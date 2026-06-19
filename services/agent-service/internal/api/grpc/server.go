@@ -17,17 +17,113 @@ type CreateAgentProposalExecutor interface {
 	Execute(context.Context, types.CreateAgentProposalCommand) (types.CreateAgentProposalResult, error)
 }
 
+type ApproveAgentProposalExecutor interface {
+	Execute(context.Context, types.ApproveAgentProposalCommand) (types.ApproveAgentProposalResult, error)
+}
+
+type VerifyApprovedAgentProposalExecutor interface {
+	Execute(context.Context, types.VerifyApprovedAgentProposalCommand) (types.VerifyApprovedAgentProposalResult, error)
+}
+
 type Server struct {
 	agentv1.UnimplementedAgentServiceServer
-	createProposal CreateAgentProposalExecutor
+	createProposal  CreateAgentProposalExecutor
+	approveProposal ApproveAgentProposalExecutor
+	verifyProposal  VerifyApprovedAgentProposalExecutor
 }
 
 func NewServer(createProposal CreateAgentProposalExecutor) *Server {
 	return &Server{createProposal: createProposal}
 }
 
+func NewServerWithWorkflows(
+	createProposal CreateAgentProposalExecutor,
+	approveProposal ApproveAgentProposalExecutor,
+	verifyProposal VerifyApprovedAgentProposalExecutor,
+) *Server {
+	return &Server{
+		createProposal:  createProposal,
+		approveProposal: approveProposal,
+		verifyProposal:  verifyProposal,
+	}
+}
+
 func Register(registrar grpcgo.ServiceRegistrar, server *Server) {
 	agentv1.RegisterAgentServiceServer(registrar, server)
+}
+
+func (server *Server) ApproveAgentProposal(
+	ctx context.Context,
+	request *agentv1.ApproveAgentProposalRequest,
+) (*agentv1.ApproveAgentProposalResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if server == nil || server.approveProposal == nil {
+		return nil, publicError(types.ErrProposalStoreUnavailable)
+	}
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
+	result, err := server.approveProposal.Execute(ctx, types.ApproveAgentProposalCommand{
+		AuthContext: auth,
+		ProposalID:  request.GetProposalId(),
+		Reason:      request.GetReason(),
+	})
+	if err != nil {
+		return nil, publicError(err)
+	}
+	return &agentv1.ApproveAgentProposalResponse{
+		ProposalId:       result.ProposalID,
+		ApprovalId:       result.ApprovalID,
+		Status:           proposalStatusToProto(result.Status),
+		ApprovedByUserId: string(result.ApprovedByUserID),
+		ApprovedAtUnixMs: unixMillis(result.ApprovedAt),
+	}, nil
+}
+
+func (server *Server) VerifyApprovedAgentProposal(
+	ctx context.Context,
+	request *agentv1.VerifyApprovedAgentProposalRequest,
+) (*agentv1.VerifyApprovedAgentProposalResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if server == nil || server.verifyProposal == nil {
+		return nil, publicError(types.ErrProposalStoreUnavailable)
+	}
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
+	result, err := server.verifyProposal.Execute(ctx, types.VerifyApprovedAgentProposalCommand{
+		AuthContext:     auth,
+		ProposalID:      request.GetProposalId(),
+		ApprovalID:      request.GetApprovalId(),
+		PreparedAuditID: request.GetPreparedAuditId(),
+		SkillID:         request.GetSkillId(),
+		ToolName:        request.GetToolName(),
+		ResourceType:    request.GetResourceType(),
+		ResourceID:      request.GetResourceId(),
+	})
+	if err != nil {
+		return nil, publicError(err)
+	}
+	return &agentv1.VerifyApprovedAgentProposalResponse{
+		ProposalId:       result.ProposalID,
+		ApprovalId:       result.ApprovalID,
+		Status:           proposalStatusToProto(result.Status),
+		UserId:           string(result.UserID),
+		ConversationId:   string(result.ConversationID),
+		SkillId:          result.SkillID,
+		PreparedAuditId:  result.PreparedAuditID,
+		ToolName:         result.ToolName,
+		ResourceType:     result.ResourceType,
+		ResourceId:       result.ResourceID,
+		RiskLevel:        result.RiskLevel,
+		ApprovedAtUnixMs: unixMillis(result.ApprovedAt),
+	}, nil
 }
 
 func (server *Server) CreateAgentProposal(
@@ -106,6 +202,16 @@ func publicError(err error) error {
 		return status.Error(codes.Unavailable, "tool prepare unavailable")
 	case errors.Is(err, types.ErrCitationVerification):
 		return status.Error(codes.Internal, "agent unavailable")
+	case errors.Is(err, types.ErrProposalStoreUnavailable):
+		return status.Error(codes.Unavailable, "proposal store unavailable")
+	case errors.Is(err, types.ErrProposalNotFound):
+		return status.Error(codes.NotFound, "proposal not found")
+	case errors.Is(err, types.ErrProposalNotApprovable):
+		return status.Error(codes.FailedPrecondition, "proposal not approvable")
+	case errors.Is(err, types.ErrProposalNotApproved):
+		return status.Error(codes.FailedPrecondition, "proposal not approved")
+	case errors.Is(err, types.ErrProposalMismatch):
+		return status.Error(codes.FailedPrecondition, "proposal mismatch")
 	case errors.Is(err, types.ErrAgentUnavailable):
 		return status.Error(codes.Unavailable, "agent unavailable")
 	default:
@@ -254,6 +360,8 @@ func proposalStatusToProto(status string) agentv1.AgentProposalStatus {
 		return agentv1.AgentProposalStatus_AGENT_PROPOSAL_STATUS_BLOCKED
 	case types.AgentProposalStatusInsufficientEvidence:
 		return agentv1.AgentProposalStatus_AGENT_PROPOSAL_STATUS_INSUFFICIENT_EVIDENCE
+	case types.AgentProposalStatusApproved:
+		return agentv1.AgentProposalStatus_AGENT_PROPOSAL_STATUS_APPROVED
 	default:
 		return agentv1.AgentProposalStatus_AGENT_PROPOSAL_STATUS_UNSPECIFIED
 	}

@@ -41,3 +41,26 @@ func mapPolicyError(err error) error {
 		return errors.Join(types.ErrToolPolicyUnavailable, err)
 	}
 }
+
+func mapAgentProposalError(err error) error {
+	if err == nil {
+		return nil
+	}
+	switch status.Code(err) {
+	case codes.InvalidArgument:
+		return types.ErrInvalidArgument
+	case codes.PermissionDenied:
+		return types.ErrPermissionDenied
+	case codes.NotFound:
+		return types.ErrProposalNotApproved
+	case codes.FailedPrecondition:
+		if parsed, ok := status.FromError(err); ok && parsed.Message() == "proposal not approved" {
+			return types.ErrProposalNotApproved
+		}
+		return types.ErrProposalMismatch
+	case codes.Unavailable, codes.DeadlineExceeded:
+		return types.ErrProposalApprovalUnavailable
+	default:
+		return errors.Join(types.ErrProposalApprovalUnavailable, err)
+	}
+}

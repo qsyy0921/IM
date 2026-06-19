@@ -133,6 +133,32 @@ type ToolPolicyDecision struct {
 	DecisionSource    string
 }
 
+type VerifyApprovedProposalCommand struct {
+	AuthContext     AuthContext
+	ProposalID      string
+	ApprovalID      string
+	PreparedAuditID string
+	SkillID         string
+	ToolName        string
+	ResourceType    string
+	ResourceID      string
+}
+
+type ApprovedProposal struct {
+	ProposalID      string
+	ApprovalID      string
+	Status          string
+	UserID          UserID
+	ConversationID  string
+	SkillID         string
+	PreparedAuditID string
+	ToolName        string
+	ResourceType    string
+	ResourceID      string
+	RiskLevel       string
+	ApprovedAt      time.Time
+}
+
 type ExecutionAudit struct {
 	TenantID          TenantID
 	ExecutionID       string

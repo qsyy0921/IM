@@ -14,8 +14,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	agentgrpc "github.com/qsyy0921/IM/services/agent-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/agent-service/internal/app"
+	postgresinfra "github.com/qsyy0921/IM/services/agent-service/internal/infrastructure/postgres"
 	rpcinfra "github.com/qsyy0921/IM/services/agent-service/internal/infrastructure/rpc"
 	"google.golang.org/grpc"
 )
@@ -71,6 +73,12 @@ func runGRPC(ctx context.Context) error {
 	}
 	defer stopDebug()
 
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
 	timeout := envDuration("NEXUSIM_AGENT_DEPENDENCY_TIMEOUT", 500*time.Millisecond)
 	retrievalClient, closeRetrieval, err := rpcinfra.DialRetrievalClient(
 		ctx,
@@ -96,8 +104,13 @@ func runGRPC(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	repository := postgresinfra.NewRepository(pool)
 	server := grpc.NewServer()
-	agentgrpc.Register(server, agentgrpc.NewServer(app.NewCreateAgentProposalUseCase(retrievalClient, mcpClient)))
+	agentgrpc.Register(server, agentgrpc.NewServerWithWorkflows(
+		app.NewCreateAgentProposalUseCaseWithRepository(retrievalClient, mcpClient, app.ExtractiveProposalProvider{}, repository),
+		app.NewApproveAgentProposalUseCase(repository),
+		app.NewVerifyApprovedAgentProposalUseCase(repository),
+	))
 
 	serveErr := make(chan error, 1)
 	go func() {
@@ -205,6 +218,20 @@ func envDuration(name string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return parsed
+}
+
+func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return nil, errors.New("NEXUSIM_PG_DSN is required")
+	}
+	config, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	connectCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	return pgxpool.NewWithConfig(connectCtx, config)
 }
 
 func startDebugServer(ctx context.Context, addr string) (func(), error) {

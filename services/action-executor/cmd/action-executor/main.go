@@ -98,6 +98,15 @@ func runGRPC(ctx context.Context) error {
 		return err
 	}
 	defer closePolicy()
+	agentClient, closeAgent, err := rpcinfra.DialAgentProposalClient(
+		ctx,
+		envString("NEXUSIM_AGENT_GRPC_ADDR", "127.0.0.1:10630"),
+		timeout,
+	)
+	if err != nil {
+		return err
+	}
+	defer closeAgent()
 
 	addr := envString("NEXUSIM_ACTION_EXECUTOR_GRPC_ADDR", "127.0.0.1:10660")
 	listener, err := net.Listen("tcp", addr)
@@ -106,7 +115,7 @@ func runGRPC(ctx context.Context) error {
 	}
 	repository := postgresinfra.NewRepository(pool)
 	server := grpc.NewServer()
-	actiongrpc.Register(server, actiongrpc.NewServer(app.NewExecuteApprovedActionUseCase(skillClient, policyClient, repository)))
+	actiongrpc.Register(server, actiongrpc.NewServer(app.NewExecuteApprovedActionUseCase(skillClient, policyClient, agentClient, repository)))
 
 	serveErr := make(chan error, 1)
 	go func() {

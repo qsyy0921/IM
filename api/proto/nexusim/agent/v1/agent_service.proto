@@ -9,6 +9,8 @@ option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/agent/v1;agentv1";
 
 service AgentService {
   rpc CreateAgentProposal(CreateAgentProposalRequest) returns (CreateAgentProposalResponse);
+  rpc ApproveAgentProposal(ApproveAgentProposalRequest) returns (ApproveAgentProposalResponse);
+  rpc VerifyApprovedAgentProposal(VerifyApprovedAgentProposalRequest) returns (VerifyApprovedAgentProposalResponse);
 }
 
 enum AgentProposalStatus {
@@ -16,6 +18,7 @@ enum AgentProposalStatus {
   AGENT_PROPOSAL_STATUS_PROPOSED = 1;
   AGENT_PROPOSAL_STATUS_BLOCKED = 2;
   AGENT_PROPOSAL_STATUS_INSUFFICIENT_EVIDENCE = 3;
+  AGENT_PROPOSAL_STATUS_APPROVED = 4;
 }
 
 message CreateAgentProposalRequest {
@@ -74,4 +77,44 @@ message CreateAgentProposalResponse {
   bool generated_by_llm = 9;
   string skill_id = 10;
   string prepared_audit_id = 11;
+}
+
+message ApproveAgentProposalRequest {
+  nexusim.retrieval.v1.AuthContext auth_context = 1;
+  string proposal_id = 2;
+  string reason = 3;
+}
+
+message ApproveAgentProposalResponse {
+  string proposal_id = 1;
+  string approval_id = 2;
+  AgentProposalStatus status = 3;
+  string approved_by_user_id = 4;
+  int64 approved_at_unix_ms = 5;
+}
+
+message VerifyApprovedAgentProposalRequest {
+  nexusim.retrieval.v1.AuthContext auth_context = 1;
+  string proposal_id = 2;
+  string approval_id = 3;
+  string prepared_audit_id = 4;
+  string skill_id = 5;
+  string tool_name = 6;
+  string resource_type = 7;
+  string resource_id = 8;
+}
+
+message VerifyApprovedAgentProposalResponse {
+  string proposal_id = 1;
+  string approval_id = 2;
+  AgentProposalStatus status = 3;
+  string user_id = 4;
+  string conversation_id = 5;
+  string skill_id = 6;
+  string prepared_audit_id = 7;
+  string tool_name = 8;
+  string resource_type = 9;
+  string resource_id = 10;
+  string risk_level = 11;
+  int64 approved_at_unix_ms = 12;
 }

@@ -20,6 +20,7 @@ func TestExecuteApprovedActionRecordsAllowedExecutionWithoutRunningExternalTool(
 			Reason:            "approved",
 			DecisionSource:    "TOOL_RULE",
 		}},
+		fakeApproval{},
 		audit,
 	)
 	result, err := usecase.Execute(context.Background(), validCommand())
@@ -41,7 +42,7 @@ func TestExecuteApprovedActionRecordsAllowedExecutionWithoutRunningExternalTool(
 func TestExecuteApprovedActionRequiresApprovalAndPreparedAudit(t *testing.T) {
 	command := validCommand()
 	command.ApprovalID = ""
-	usecase := NewExecuteApprovedActionUseCase(fakeSkillCatalog{}, fakeToolPolicy{}, &fakeAuditRepository{})
+	usecase := NewExecuteApprovedActionUseCase(fakeSkillCatalog{}, fakeToolPolicy{}, fakeApproval{}, &fakeAuditRepository{})
 	if _, err := usecase.Execute(context.Background(), command); !errors.Is(err, types.ErrInvalidArgument) {
 		t.Fatalf("expected invalid argument for missing approval: %v", err)
 	}
@@ -63,6 +64,7 @@ func TestExecuteApprovedActionRecordsPolicyDeny(t *testing.T) {
 			Reason:           "denied",
 			DecisionSource:   "TOOL_RULE",
 		}},
+		fakeApproval{},
 		audit,
 	)
 	result, err := usecase.Execute(context.Background(), validCommand())
@@ -74,6 +76,31 @@ func TestExecuteApprovedActionRecordsPolicyDeny(t *testing.T) {
 	}
 	if len(audit.rows) != 1 || audit.rows[0].Status != types.ExecutionStatusBlocked {
 		t.Fatalf("expected blocked audit row, got %+v", audit.rows)
+	}
+}
+
+func TestExecuteApprovedActionRejectsUnapprovedProposalBeforeAudit(t *testing.T) {
+	audit := &fakeAuditRepository{}
+	usecase := NewExecuteApprovedActionUseCase(
+		fakeSkillCatalog{skill: activeSkill()},
+		fakeToolPolicy{},
+		fakeApproval{err: types.ErrProposalNotApproved},
+		audit,
+	)
+	_, err := usecase.Execute(context.Background(), validCommand())
+	if !errors.Is(err, types.ErrProposalNotApproved) {
+		t.Fatalf("expected proposal not approved: %v", err)
+	}
+	if len(audit.rows) != 0 {
+		t.Fatalf("expected no audit rows for unapproved proposal, got %+v", audit.rows)
+	}
+}
+
+func TestExecuteApprovedActionRequiresProposalApprovalPort(t *testing.T) {
+	usecase := NewExecuteApprovedActionUseCase(fakeSkillCatalog{}, fakeToolPolicy{}, nil, &fakeAuditRepository{})
+	_, err := usecase.Execute(context.Background(), validCommand())
+	if !errors.Is(err, types.ErrProposalApprovalUnavailable) {
+		t.Fatalf("expected proposal approval unavailable: %v", err)
 	}
 }
 
@@ -133,6 +160,29 @@ func (policy fakeToolPolicy) CheckToolAction(context.Context, types.CheckToolAct
 		return types.ToolPolicyDecision{}, policy.err
 	}
 	return policy.decision, nil
+}
+
+type fakeApproval struct {
+	err error
+}
+
+func (approval fakeApproval) VerifyApprovedProposal(
+	_ context.Context,
+	command types.VerifyApprovedProposalCommand,
+) (types.ApprovedProposal, error) {
+	if approval.err != nil {
+		return types.ApprovedProposal{}, approval.err
+	}
+	return types.ApprovedProposal{
+		ProposalID:      command.ProposalID,
+		ApprovalID:      command.ApprovalID,
+		SkillID:         command.SkillID,
+		PreparedAuditID: command.PreparedAuditID,
+		ToolName:        command.ToolName,
+		ResourceType:    command.ResourceType,
+		ResourceID:      command.ResourceID,
+		RiskLevel:       "LOW",
+	}, nil
 }
 
 type fakeAuditRepository struct {

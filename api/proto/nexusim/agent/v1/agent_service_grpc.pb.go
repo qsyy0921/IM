@@ -19,7 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AgentService_CreateAgentProposal_FullMethodName = "/nexusim.agent.v1.AgentService/CreateAgentProposal"
+	AgentService_CreateAgentProposal_FullMethodName         = "/nexusim.agent.v1.AgentService/CreateAgentProposal"
+	AgentService_ApproveAgentProposal_FullMethodName        = "/nexusim.agent.v1.AgentService/ApproveAgentProposal"
+	AgentService_VerifyApprovedAgentProposal_FullMethodName = "/nexusim.agent.v1.AgentService/VerifyApprovedAgentProposal"
 )
 
 // AgentServiceClient is the client API for AgentService service.
@@ -27,6 +29,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AgentServiceClient interface {
 	CreateAgentProposal(ctx context.Context, in *CreateAgentProposalRequest, opts ...grpc.CallOption) (*CreateAgentProposalResponse, error)
+	ApproveAgentProposal(ctx context.Context, in *ApproveAgentProposalRequest, opts ...grpc.CallOption) (*ApproveAgentProposalResponse, error)
+	VerifyApprovedAgentProposal(ctx context.Context, in *VerifyApprovedAgentProposalRequest, opts ...grpc.CallOption) (*VerifyApprovedAgentProposalResponse, error)
 }
 
 type agentServiceClient struct {
@@ -47,11 +51,33 @@ func (c *agentServiceClient) CreateAgentProposal(ctx context.Context, in *Create
 	return out, nil
 }
 
+func (c *agentServiceClient) ApproveAgentProposal(ctx context.Context, in *ApproveAgentProposalRequest, opts ...grpc.CallOption) (*ApproveAgentProposalResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ApproveAgentProposalResponse)
+	err := c.cc.Invoke(ctx, AgentService_ApproveAgentProposal_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentServiceClient) VerifyApprovedAgentProposal(ctx context.Context, in *VerifyApprovedAgentProposalRequest, opts ...grpc.CallOption) (*VerifyApprovedAgentProposalResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(VerifyApprovedAgentProposalResponse)
+	err := c.cc.Invoke(ctx, AgentService_VerifyApprovedAgentProposal_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AgentServiceServer is the server API for AgentService service.
 // All implementations must embed UnimplementedAgentServiceServer
 // for forward compatibility.
 type AgentServiceServer interface {
 	CreateAgentProposal(context.Context, *CreateAgentProposalRequest) (*CreateAgentProposalResponse, error)
+	ApproveAgentProposal(context.Context, *ApproveAgentProposalRequest) (*ApproveAgentProposalResponse, error)
+	VerifyApprovedAgentProposal(context.Context, *VerifyApprovedAgentProposalRequest) (*VerifyApprovedAgentProposalResponse, error)
 	mustEmbedUnimplementedAgentServiceServer()
 }
 
@@ -64,6 +90,12 @@ type UnimplementedAgentServiceServer struct{}
 
 func (UnimplementedAgentServiceServer) CreateAgentProposal(context.Context, *CreateAgentProposalRequest) (*CreateAgentProposalResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateAgentProposal not implemented")
+}
+func (UnimplementedAgentServiceServer) ApproveAgentProposal(context.Context, *ApproveAgentProposalRequest) (*ApproveAgentProposalResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ApproveAgentProposal not implemented")
+}
+func (UnimplementedAgentServiceServer) VerifyApprovedAgentProposal(context.Context, *VerifyApprovedAgentProposalRequest) (*VerifyApprovedAgentProposalResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method VerifyApprovedAgentProposal not implemented")
 }
 func (UnimplementedAgentServiceServer) mustEmbedUnimplementedAgentServiceServer() {}
 func (UnimplementedAgentServiceServer) testEmbeddedByValue()                      {}
@@ -104,6 +136,42 @@ func _AgentService_CreateAgentProposal_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AgentService_ApproveAgentProposal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ApproveAgentProposalRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).ApproveAgentProposal(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_ApproveAgentProposal_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).ApproveAgentProposal(ctx, req.(*ApproveAgentProposalRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AgentService_VerifyApprovedAgentProposal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VerifyApprovedAgentProposalRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).VerifyApprovedAgentProposal(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_VerifyApprovedAgentProposal_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).VerifyApprovedAgentProposal(ctx, req.(*VerifyApprovedAgentProposalRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AgentService_ServiceDesc is the grpc.ServiceDesc for AgentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +182,14 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateAgentProposal",
 			Handler:    _AgentService_CreateAgentProposal_Handler,
+		},
+		{
+			MethodName: "ApproveAgentProposal",
+			Handler:    _AgentService_ApproveAgentProposal_Handler,
+		},
+		{
+			MethodName: "VerifyApprovedAgentProposal",
+			Handler:    _AgentService_VerifyApprovedAgentProposal_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

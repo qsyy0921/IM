@@ -11,17 +11,19 @@ import (
 )
 
 type ExecuteApprovedActionUseCase struct {
-	catalog SkillCatalogPort
-	policy  ToolPolicyPort
-	audit   ExecutionAuditRepository
+	catalog  SkillCatalogPort
+	policy   ToolPolicyPort
+	approval ProposalApprovalPort
+	audit    ExecutionAuditRepository
 }
 
 func NewExecuteApprovedActionUseCase(
 	catalog SkillCatalogPort,
 	policy ToolPolicyPort,
+	approval ProposalApprovalPort,
 	audit ExecutionAuditRepository,
 ) ExecuteApprovedActionUseCase {
-	return ExecuteApprovedActionUseCase{catalog: catalog, policy: policy, audit: audit}
+	return ExecuteApprovedActionUseCase{catalog: catalog, policy: policy, approval: approval, audit: audit}
 }
 
 func (usecase ExecuteApprovedActionUseCase) Execute(
@@ -38,8 +40,24 @@ func (usecase ExecuteApprovedActionUseCase) Execute(
 	if usecase.policy == nil {
 		return types.ExecuteApprovedActionResult{}, types.ErrToolPolicyUnavailable
 	}
+	if usecase.approval == nil {
+		return types.ExecuteApprovedActionResult{}, types.ErrProposalApprovalUnavailable
+	}
 	if usecase.audit == nil {
 		return types.ExecuteApprovedActionResult{}, types.ErrExecutionAuditFailed
+	}
+
+	if _, err := usecase.approval.VerifyApprovedProposal(ctx, types.VerifyApprovedProposalCommand{
+		AuthContext:     command.AuthContext,
+		ProposalID:      command.ProposalID,
+		ApprovalID:      command.ApprovalID,
+		PreparedAuditID: command.PreparedAuditID,
+		SkillID:         command.SkillID,
+		ToolName:        command.ToolName,
+		ResourceType:    command.ResourceType,
+		ResourceID:      command.ResourceID,
+	}); err != nil {
+		return types.ExecuteApprovedActionResult{}, err
 	}
 
 	skill, err := usecase.catalog.GetSkill(ctx, command.AuthContext, command.SkillID)

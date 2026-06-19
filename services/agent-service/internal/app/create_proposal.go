@@ -13,6 +13,7 @@ type CreateAgentProposalUseCase struct {
 	retrieval RetrievalPort
 	prepare   ToolPreparePort
 	provider  ProposalProvider
+	store     ProposalRepository
 }
 
 func NewCreateAgentProposalUseCase(
@@ -28,6 +29,15 @@ func NewCreateAgentProposalUseCaseWithProvider(
 	provider ProposalProvider,
 ) CreateAgentProposalUseCase {
 	return CreateAgentProposalUseCase{retrieval: retrieval, prepare: prepare, provider: provider}
+}
+
+func NewCreateAgentProposalUseCaseWithRepository(
+	retrieval RetrievalPort,
+	prepare ToolPreparePort,
+	provider ProposalProvider,
+	store ProposalRepository,
+) CreateAgentProposalUseCase {
+	return CreateAgentProposalUseCase{retrieval: retrieval, prepare: prepare, provider: provider, store: store}
 }
 
 func (usecase CreateAgentProposalUseCase) Execute(
@@ -64,7 +74,7 @@ func (usecase CreateAgentProposalUseCase) Execute(
 	}
 	policyDecision := prepareResult.PolicyDecision()
 	if !policyDecision.Allowed {
-		return types.CreateAgentProposalResult{
+		result := types.CreateAgentProposalResult{
 			ProposalID:         command.ProposalID(),
 			Status:             types.AgentProposalStatusBlocked,
 			ProposalText:       "Agent proposal blocked by tool policy.",
@@ -74,7 +84,8 @@ func (usecase CreateAgentProposalUseCase) Execute(
 			ToolPolicyDecision: policyDecision,
 			AgentVersion:       types.AgentVersion,
 			GeneratedByLLM:     false,
-		}, nil
+		}
+		return result, usecase.storeProposal(ctx, command, result)
 	}
 
 	evidence, err := usecase.retrieval.RetrieveEvidence(ctx, types.RetrieveEvidenceQuery{
@@ -91,7 +102,7 @@ func (usecase CreateAgentProposalUseCase) Execute(
 		return types.CreateAgentProposalResult{}, err
 	}
 	if len(evidence.Pack.Items) == 0 {
-		return types.CreateAgentProposalResult{
+		result := types.CreateAgentProposalResult{
 			ProposalID:         command.ProposalID(),
 			Status:             types.AgentProposalStatusInsufficientEvidence,
 			ProposalText:       "I do not have enough visible evidence to create an agent proposal.",
@@ -102,7 +113,8 @@ func (usecase CreateAgentProposalUseCase) Execute(
 			EvidencePack:       evidence.Pack,
 			AgentVersion:       types.AgentVersion,
 			GeneratedByLLM:     false,
-		}, nil
+		}
+		return result, usecase.storeProposal(ctx, command, result)
 	}
 
 	generation, err := usecase.provider.GenerateProposal(ctx, types.AgentProposalGenerationRequest{
@@ -122,7 +134,7 @@ func (usecase CreateAgentProposalUseCase) Execute(
 	if err := verifyProposalCitations(evidence.Pack, generation); err != nil {
 		return types.CreateAgentProposalResult{}, err
 	}
-	return types.CreateAgentProposalResult{
+	result := types.CreateAgentProposalResult{
 		ProposalID:         command.ProposalID(),
 		Status:             types.AgentProposalStatusProposed,
 		ProposalText:       generation.ProposalText,
@@ -134,7 +146,53 @@ func (usecase CreateAgentProposalUseCase) Execute(
 		EvidencePack:       evidence.Pack,
 		AgentVersion:       types.AgentVersion,
 		GeneratedByLLM:     generation.GeneratedByLLM,
-	}, nil
+	}
+	return result, usecase.storeProposal(ctx, command, result)
+}
+
+func (usecase CreateAgentProposalUseCase) storeProposal(
+	ctx context.Context,
+	command types.CreateAgentProposalCommand,
+	result types.CreateAgentProposalResult,
+) error {
+	if usecase.store == nil {
+		return nil
+	}
+	citationsJSON, err := encodeCitations(result.Citations)
+	if err != nil {
+		return err
+	}
+	return usecase.store.StoreAgentProposal(ctx, types.ProposalFromCreateResult(command, result, citationsJSON))
+}
+
+func encodeCitations(citations []types.Citation) (string, error) {
+	payload := make([]map[string]any, 0, len(citations))
+	for _, citation := range citations {
+		payload = append(payload, map[string]any{
+			"evidence_id":         citation.EvidenceID,
+			"source_type":         citation.SourceType,
+			"source_id":           citation.SourceID,
+			"source_event_id":     citation.SourceEventID,
+			"conversation_id":     string(citation.ConversationID),
+			"conversation_seq":    citation.ConversationSeq,
+			"occurred_at_unix_ms": unixMillis(citation.OccurredAt),
+		})
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+	return string(encoded), nil
+}
+
+func unixMillis(value interface {
+	IsZero() bool
+	UnixMilli() int64
+}) int64 {
+	if value.IsZero() {
+		return 0
+	}
+	return value.UnixMilli()
 }
 
 func prepareInputJSON(command types.CreateAgentProposalCommand) string {

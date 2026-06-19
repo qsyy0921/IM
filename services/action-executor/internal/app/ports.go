@@ -14,6 +14,10 @@ type ToolPolicyPort interface {
 	CheckToolAction(context.Context, types.CheckToolActionCommand) (types.ToolPolicyDecision, error)
 }
 
+type ProposalApprovalPort interface {
+	VerifyApprovedProposal(context.Context, types.VerifyApprovedProposalCommand) (types.ApprovedProposal, error)
+}
+
 type ExecutionAuditRepository interface {
 	InsertExecutionAudit(context.Context, types.ExecutionAudit) error
 }

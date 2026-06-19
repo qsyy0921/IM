@@ -30,6 +30,7 @@ const (
 	AgentProposalStatus_AGENT_PROPOSAL_STATUS_PROPOSED              AgentProposalStatus = 1
 	AgentProposalStatus_AGENT_PROPOSAL_STATUS_BLOCKED               AgentProposalStatus = 2
 	AgentProposalStatus_AGENT_PROPOSAL_STATUS_INSUFFICIENT_EVIDENCE AgentProposalStatus = 3
+	AgentProposalStatus_AGENT_PROPOSAL_STATUS_APPROVED              AgentProposalStatus = 4
 )
 
 // Enum value maps for AgentProposalStatus.
@@ -39,12 +40,14 @@ var (
 		1: "AGENT_PROPOSAL_STATUS_PROPOSED",
 		2: "AGENT_PROPOSAL_STATUS_BLOCKED",
 		3: "AGENT_PROPOSAL_STATUS_INSUFFICIENT_EVIDENCE",
+		4: "AGENT_PROPOSAL_STATUS_APPROVED",
 	}
 	AgentProposalStatus_value = map[string]int32{
 		"AGENT_PROPOSAL_STATUS_UNSPECIFIED":           0,
 		"AGENT_PROPOSAL_STATUS_PROPOSED":              1,
 		"AGENT_PROPOSAL_STATUS_BLOCKED":               2,
 		"AGENT_PROPOSAL_STATUS_INSUFFICIENT_EVIDENCE": 3,
+		"AGENT_PROPOSAL_STATUS_APPROVED":              4,
 	}
 )
 
@@ -587,6 +590,374 @@ func (x *CreateAgentProposalResponse) GetPreparedAuditId() string {
 	return ""
 }
 
+type ApproveAgentProposalRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext   *v1.AuthContext        `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	ProposalId    string                 `protobuf:"bytes,2,opt,name=proposal_id,json=proposalId,proto3" json:"proposal_id,omitempty"`
+	Reason        string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApproveAgentProposalRequest) Reset() {
+	*x = ApproveAgentProposalRequest{}
+	mi := &file_nexusim_agent_v1_agent_service_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApproveAgentProposalRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApproveAgentProposalRequest) ProtoMessage() {}
+
+func (x *ApproveAgentProposalRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_agent_v1_agent_service_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApproveAgentProposalRequest.ProtoReflect.Descriptor instead.
+func (*ApproveAgentProposalRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_agent_v1_agent_service_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ApproveAgentProposalRequest) GetAuthContext() *v1.AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *ApproveAgentProposalRequest) GetProposalId() string {
+	if x != nil {
+		return x.ProposalId
+	}
+	return ""
+}
+
+func (x *ApproveAgentProposalRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type ApproveAgentProposalResponse struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ProposalId       string                 `protobuf:"bytes,1,opt,name=proposal_id,json=proposalId,proto3" json:"proposal_id,omitempty"`
+	ApprovalId       string                 `protobuf:"bytes,2,opt,name=approval_id,json=approvalId,proto3" json:"approval_id,omitempty"`
+	Status           AgentProposalStatus    `protobuf:"varint,3,opt,name=status,proto3,enum=nexusim.agent.v1.AgentProposalStatus" json:"status,omitempty"`
+	ApprovedByUserId string                 `protobuf:"bytes,4,opt,name=approved_by_user_id,json=approvedByUserId,proto3" json:"approved_by_user_id,omitempty"`
+	ApprovedAtUnixMs int64                  `protobuf:"varint,5,opt,name=approved_at_unix_ms,json=approvedAtUnixMs,proto3" json:"approved_at_unix_ms,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ApproveAgentProposalResponse) Reset() {
+	*x = ApproveAgentProposalResponse{}
+	mi := &file_nexusim_agent_v1_agent_service_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApproveAgentProposalResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApproveAgentProposalResponse) ProtoMessage() {}
+
+func (x *ApproveAgentProposalResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_agent_v1_agent_service_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApproveAgentProposalResponse.ProtoReflect.Descriptor instead.
+func (*ApproveAgentProposalResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_agent_v1_agent_service_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ApproveAgentProposalResponse) GetProposalId() string {
+	if x != nil {
+		return x.ProposalId
+	}
+	return ""
+}
+
+func (x *ApproveAgentProposalResponse) GetApprovalId() string {
+	if x != nil {
+		return x.ApprovalId
+	}
+	return ""
+}
+
+func (x *ApproveAgentProposalResponse) GetStatus() AgentProposalStatus {
+	if x != nil {
+		return x.Status
+	}
+	return AgentProposalStatus_AGENT_PROPOSAL_STATUS_UNSPECIFIED
+}
+
+func (x *ApproveAgentProposalResponse) GetApprovedByUserId() string {
+	if x != nil {
+		return x.ApprovedByUserId
+	}
+	return ""
+}
+
+func (x *ApproveAgentProposalResponse) GetApprovedAtUnixMs() int64 {
+	if x != nil {
+		return x.ApprovedAtUnixMs
+	}
+	return 0
+}
+
+type VerifyApprovedAgentProposalRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext     *v1.AuthContext        `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	ProposalId      string                 `protobuf:"bytes,2,opt,name=proposal_id,json=proposalId,proto3" json:"proposal_id,omitempty"`
+	ApprovalId      string                 `protobuf:"bytes,3,opt,name=approval_id,json=approvalId,proto3" json:"approval_id,omitempty"`
+	PreparedAuditId string                 `protobuf:"bytes,4,opt,name=prepared_audit_id,json=preparedAuditId,proto3" json:"prepared_audit_id,omitempty"`
+	SkillId         string                 `protobuf:"bytes,5,opt,name=skill_id,json=skillId,proto3" json:"skill_id,omitempty"`
+	ToolName        string                 `protobuf:"bytes,6,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
+	ResourceType    string                 `protobuf:"bytes,7,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
+	ResourceId      string                 `protobuf:"bytes,8,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *VerifyApprovedAgentProposalRequest) Reset() {
+	*x = VerifyApprovedAgentProposalRequest{}
+	mi := &file_nexusim_agent_v1_agent_service_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyApprovedAgentProposalRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyApprovedAgentProposalRequest) ProtoMessage() {}
+
+func (x *VerifyApprovedAgentProposalRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_agent_v1_agent_service_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VerifyApprovedAgentProposalRequest.ProtoReflect.Descriptor instead.
+func (*VerifyApprovedAgentProposalRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_agent_v1_agent_service_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *VerifyApprovedAgentProposalRequest) GetAuthContext() *v1.AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *VerifyApprovedAgentProposalRequest) GetProposalId() string {
+	if x != nil {
+		return x.ProposalId
+	}
+	return ""
+}
+
+func (x *VerifyApprovedAgentProposalRequest) GetApprovalId() string {
+	if x != nil {
+		return x.ApprovalId
+	}
+	return ""
+}
+
+func (x *VerifyApprovedAgentProposalRequest) GetPreparedAuditId() string {
+	if x != nil {
+		return x.PreparedAuditId
+	}
+	return ""
+}
+
+func (x *VerifyApprovedAgentProposalRequest) GetSkillId() string {
+	if x != nil {
+		return x.SkillId
+	}
+	return ""
+}
+
+func (x *VerifyApprovedAgentProposalRequest) GetToolName() string {
+	if x != nil {
+		return x.ToolName
+	}
+	return ""
+}
+
+func (x *VerifyApprovedAgentProposalRequest) GetResourceType() string {
+	if x != nil {
+		return x.ResourceType
+	}
+	return ""
+}
+
+func (x *VerifyApprovedAgentProposalRequest) GetResourceId() string {
+	if x != nil {
+		return x.ResourceId
+	}
+	return ""
+}
+
+type VerifyApprovedAgentProposalResponse struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ProposalId       string                 `protobuf:"bytes,1,opt,name=proposal_id,json=proposalId,proto3" json:"proposal_id,omitempty"`
+	ApprovalId       string                 `protobuf:"bytes,2,opt,name=approval_id,json=approvalId,proto3" json:"approval_id,omitempty"`
+	Status           AgentProposalStatus    `protobuf:"varint,3,opt,name=status,proto3,enum=nexusim.agent.v1.AgentProposalStatus" json:"status,omitempty"`
+	UserId           string                 `protobuf:"bytes,4,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ConversationId   string                 `protobuf:"bytes,5,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	SkillId          string                 `protobuf:"bytes,6,opt,name=skill_id,json=skillId,proto3" json:"skill_id,omitempty"`
+	PreparedAuditId  string                 `protobuf:"bytes,7,opt,name=prepared_audit_id,json=preparedAuditId,proto3" json:"prepared_audit_id,omitempty"`
+	ToolName         string                 `protobuf:"bytes,8,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
+	ResourceType     string                 `protobuf:"bytes,9,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
+	ResourceId       string                 `protobuf:"bytes,10,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	RiskLevel        string                 `protobuf:"bytes,11,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
+	ApprovedAtUnixMs int64                  `protobuf:"varint,12,opt,name=approved_at_unix_ms,json=approvedAtUnixMs,proto3" json:"approved_at_unix_ms,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *VerifyApprovedAgentProposalResponse) Reset() {
+	*x = VerifyApprovedAgentProposalResponse{}
+	mi := &file_nexusim_agent_v1_agent_service_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyApprovedAgentProposalResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyApprovedAgentProposalResponse) ProtoMessage() {}
+
+func (x *VerifyApprovedAgentProposalResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_agent_v1_agent_service_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VerifyApprovedAgentProposalResponse.ProtoReflect.Descriptor instead.
+func (*VerifyApprovedAgentProposalResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_agent_v1_agent_service_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *VerifyApprovedAgentProposalResponse) GetProposalId() string {
+	if x != nil {
+		return x.ProposalId
+	}
+	return ""
+}
+
+func (x *VerifyApprovedAgentProposalResponse) GetApprovalId() string {
+	if x != nil {
+		return x.ApprovalId
+	}
+	return ""
+}
+
+func (x *VerifyApprovedAgentProposalResponse) GetStatus() AgentProposalStatus {
+	if x != nil {
+		return x.Status
+	}
+	return AgentProposalStatus_AGENT_PROPOSAL_STATUS_UNSPECIFIED
+}
+
+func (x *VerifyApprovedAgentProposalResponse) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *VerifyApprovedAgentProposalResponse) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *VerifyApprovedAgentProposalResponse) GetSkillId() string {
+	if x != nil {
+		return x.SkillId
+	}
+	return ""
+}
+
+func (x *VerifyApprovedAgentProposalResponse) GetPreparedAuditId() string {
+	if x != nil {
+		return x.PreparedAuditId
+	}
+	return ""
+}
+
+func (x *VerifyApprovedAgentProposalResponse) GetToolName() string {
+	if x != nil {
+		return x.ToolName
+	}
+	return ""
+}
+
+func (x *VerifyApprovedAgentProposalResponse) GetResourceType() string {
+	if x != nil {
+		return x.ResourceType
+	}
+	return ""
+}
+
+func (x *VerifyApprovedAgentProposalResponse) GetResourceId() string {
+	if x != nil {
+		return x.ResourceId
+	}
+	return ""
+}
+
+func (x *VerifyApprovedAgentProposalResponse) GetRiskLevel() string {
+	if x != nil {
+		return x.RiskLevel
+	}
+	return ""
+}
+
+func (x *VerifyApprovedAgentProposalResponse) GetApprovedAtUnixMs() int64 {
+	if x != nil {
+		return x.ApprovedAtUnixMs
+	}
+	return 0
+}
+
 var File_nexusim_agent_v1_agent_service_proto protoreflect.FileDescriptor
 
 const file_nexusim_agent_v1_agent_service_proto_rawDesc = "" +
@@ -652,14 +1023,60 @@ const file_nexusim_agent_v1_agent_service_proto_rawDesc = "" +
 	"\x10generated_by_llm\x18\t \x01(\bR\x0egeneratedByLlm\x12\x19\n" +
 	"\bskill_id\x18\n" +
 	" \x01(\tR\askillId\x12*\n" +
-	"\x11prepared_audit_id\x18\v \x01(\tR\x0fpreparedAuditId*\xb4\x01\n" +
+	"\x11prepared_audit_id\x18\v \x01(\tR\x0fpreparedAuditId\"\x9c\x01\n" +
+	"\x1bApproveAgentProposalRequest\x12D\n" +
+	"\fauth_context\x18\x01 \x01(\v2!.nexusim.retrieval.v1.AuthContextR\vauthContext\x12\x1f\n" +
+	"\vproposal_id\x18\x02 \x01(\tR\n" +
+	"proposalId\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\"\xfd\x01\n" +
+	"\x1cApproveAgentProposalResponse\x12\x1f\n" +
+	"\vproposal_id\x18\x01 \x01(\tR\n" +
+	"proposalId\x12\x1f\n" +
+	"\vapproval_id\x18\x02 \x01(\tR\n" +
+	"approvalId\x12=\n" +
+	"\x06status\x18\x03 \x01(\x0e2%.nexusim.agent.v1.AgentProposalStatusR\x06status\x12-\n" +
+	"\x13approved_by_user_id\x18\x04 \x01(\tR\x10approvedByUserId\x12-\n" +
+	"\x13approved_at_unix_ms\x18\x05 \x01(\x03R\x10approvedAtUnixMs\"\xd6\x02\n" +
+	"\"VerifyApprovedAgentProposalRequest\x12D\n" +
+	"\fauth_context\x18\x01 \x01(\v2!.nexusim.retrieval.v1.AuthContextR\vauthContext\x12\x1f\n" +
+	"\vproposal_id\x18\x02 \x01(\tR\n" +
+	"proposalId\x12\x1f\n" +
+	"\vapproval_id\x18\x03 \x01(\tR\n" +
+	"approvalId\x12*\n" +
+	"\x11prepared_audit_id\x18\x04 \x01(\tR\x0fpreparedAuditId\x12\x19\n" +
+	"\bskill_id\x18\x05 \x01(\tR\askillId\x12\x1b\n" +
+	"\ttool_name\x18\x06 \x01(\tR\btoolName\x12#\n" +
+	"\rresource_type\x18\a \x01(\tR\fresourceType\x12\x1f\n" +
+	"\vresource_id\x18\b \x01(\tR\n" +
+	"resourceId\"\xe0\x03\n" +
+	"#VerifyApprovedAgentProposalResponse\x12\x1f\n" +
+	"\vproposal_id\x18\x01 \x01(\tR\n" +
+	"proposalId\x12\x1f\n" +
+	"\vapproval_id\x18\x02 \x01(\tR\n" +
+	"approvalId\x12=\n" +
+	"\x06status\x18\x03 \x01(\x0e2%.nexusim.agent.v1.AgentProposalStatusR\x06status\x12\x17\n" +
+	"\auser_id\x18\x04 \x01(\tR\x06userId\x12'\n" +
+	"\x0fconversation_id\x18\x05 \x01(\tR\x0econversationId\x12\x19\n" +
+	"\bskill_id\x18\x06 \x01(\tR\askillId\x12*\n" +
+	"\x11prepared_audit_id\x18\a \x01(\tR\x0fpreparedAuditId\x12\x1b\n" +
+	"\ttool_name\x18\b \x01(\tR\btoolName\x12#\n" +
+	"\rresource_type\x18\t \x01(\tR\fresourceType\x12\x1f\n" +
+	"\vresource_id\x18\n" +
+	" \x01(\tR\n" +
+	"resourceId\x12\x1d\n" +
+	"\n" +
+	"risk_level\x18\v \x01(\tR\triskLevel\x12-\n" +
+	"\x13approved_at_unix_ms\x18\f \x01(\x03R\x10approvedAtUnixMs*\xd8\x01\n" +
 	"\x13AgentProposalStatus\x12%\n" +
 	"!AGENT_PROPOSAL_STATUS_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eAGENT_PROPOSAL_STATUS_PROPOSED\x10\x01\x12!\n" +
 	"\x1dAGENT_PROPOSAL_STATUS_BLOCKED\x10\x02\x12/\n" +
-	"+AGENT_PROPOSAL_STATUS_INSUFFICIENT_EVIDENCE\x10\x032\x82\x01\n" +
+	"+AGENT_PROPOSAL_STATUS_INSUFFICIENT_EVIDENCE\x10\x03\x12\"\n" +
+	"\x1eAGENT_PROPOSAL_STATUS_APPROVED\x10\x042\x86\x03\n" +
 	"\fAgentService\x12r\n" +
-	"\x13CreateAgentProposal\x12,.nexusim.agent.v1.CreateAgentProposalRequest\x1a-.nexusim.agent.v1.CreateAgentProposalResponseB;Z9github.com/qsyy0921/IM/api/proto/nexusim/agent/v1;agentv1b\x06proto3"
+	"\x13CreateAgentProposal\x12,.nexusim.agent.v1.CreateAgentProposalRequest\x1a-.nexusim.agent.v1.CreateAgentProposalResponse\x12u\n" +
+	"\x14ApproveAgentProposal\x12-.nexusim.agent.v1.ApproveAgentProposalRequest\x1a..nexusim.agent.v1.ApproveAgentProposalResponse\x12\x8a\x01\n" +
+	"\x1bVerifyApprovedAgentProposal\x124.nexusim.agent.v1.VerifyApprovedAgentProposalRequest\x1a5.nexusim.agent.v1.VerifyApprovedAgentProposalResponseB;Z9github.com/qsyy0921/IM/api/proto/nexusim/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_nexusim_agent_v1_agent_service_proto_rawDescOnce sync.Once
@@ -674,36 +1091,48 @@ func file_nexusim_agent_v1_agent_service_proto_rawDescGZIP() []byte {
 }
 
 var file_nexusim_agent_v1_agent_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_nexusim_agent_v1_agent_service_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_nexusim_agent_v1_agent_service_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_nexusim_agent_v1_agent_service_proto_goTypes = []any{
-	(AgentProposalStatus)(0),            // 0: nexusim.agent.v1.AgentProposalStatus
-	(*CreateAgentProposalRequest)(nil),  // 1: nexusim.agent.v1.CreateAgentProposalRequest
-	(*AgentCitation)(nil),               // 2: nexusim.agent.v1.AgentCitation
-	(*ToolPolicyDecision)(nil),          // 3: nexusim.agent.v1.ToolPolicyDecision
-	(*CreateAgentProposalResponse)(nil), // 4: nexusim.agent.v1.CreateAgentProposalResponse
-	(*v1.AuthContext)(nil),              // 5: nexusim.retrieval.v1.AuthContext
-	(v11.ToolAction)(0),                 // 6: nexusim.policy.v1.ToolAction
-	(v1.EvidenceMemoryStatus)(0),        // 7: nexusim.retrieval.v1.EvidenceMemoryStatus
-	(v1.EvidenceSourceType)(0),          // 8: nexusim.retrieval.v1.EvidenceSourceType
-	(*v1.EvidencePack)(nil),             // 9: nexusim.retrieval.v1.EvidencePack
+	(AgentProposalStatus)(0),                    // 0: nexusim.agent.v1.AgentProposalStatus
+	(*CreateAgentProposalRequest)(nil),          // 1: nexusim.agent.v1.CreateAgentProposalRequest
+	(*AgentCitation)(nil),                       // 2: nexusim.agent.v1.AgentCitation
+	(*ToolPolicyDecision)(nil),                  // 3: nexusim.agent.v1.ToolPolicyDecision
+	(*CreateAgentProposalResponse)(nil),         // 4: nexusim.agent.v1.CreateAgentProposalResponse
+	(*ApproveAgentProposalRequest)(nil),         // 5: nexusim.agent.v1.ApproveAgentProposalRequest
+	(*ApproveAgentProposalResponse)(nil),        // 6: nexusim.agent.v1.ApproveAgentProposalResponse
+	(*VerifyApprovedAgentProposalRequest)(nil),  // 7: nexusim.agent.v1.VerifyApprovedAgentProposalRequest
+	(*VerifyApprovedAgentProposalResponse)(nil), // 8: nexusim.agent.v1.VerifyApprovedAgentProposalResponse
+	(*v1.AuthContext)(nil),                      // 9: nexusim.retrieval.v1.AuthContext
+	(v11.ToolAction)(0),                         // 10: nexusim.policy.v1.ToolAction
+	(v1.EvidenceMemoryStatus)(0),                // 11: nexusim.retrieval.v1.EvidenceMemoryStatus
+	(v1.EvidenceSourceType)(0),                  // 12: nexusim.retrieval.v1.EvidenceSourceType
+	(*v1.EvidencePack)(nil),                     // 13: nexusim.retrieval.v1.EvidencePack
 }
 var file_nexusim_agent_v1_agent_service_proto_depIdxs = []int32{
-	5,  // 0: nexusim.agent.v1.CreateAgentProposalRequest.auth_context:type_name -> nexusim.retrieval.v1.AuthContext
-	6,  // 1: nexusim.agent.v1.CreateAgentProposalRequest.tool_action:type_name -> nexusim.policy.v1.ToolAction
-	7,  // 2: nexusim.agent.v1.CreateAgentProposalRequest.memory_statuses:type_name -> nexusim.retrieval.v1.EvidenceMemoryStatus
-	8,  // 3: nexusim.agent.v1.AgentCitation.source_type:type_name -> nexusim.retrieval.v1.EvidenceSourceType
-	6,  // 4: nexusim.agent.v1.ToolPolicyDecision.action:type_name -> nexusim.policy.v1.ToolAction
+	9,  // 0: nexusim.agent.v1.CreateAgentProposalRequest.auth_context:type_name -> nexusim.retrieval.v1.AuthContext
+	10, // 1: nexusim.agent.v1.CreateAgentProposalRequest.tool_action:type_name -> nexusim.policy.v1.ToolAction
+	11, // 2: nexusim.agent.v1.CreateAgentProposalRequest.memory_statuses:type_name -> nexusim.retrieval.v1.EvidenceMemoryStatus
+	12, // 3: nexusim.agent.v1.AgentCitation.source_type:type_name -> nexusim.retrieval.v1.EvidenceSourceType
+	10, // 4: nexusim.agent.v1.ToolPolicyDecision.action:type_name -> nexusim.policy.v1.ToolAction
 	0,  // 5: nexusim.agent.v1.CreateAgentProposalResponse.status:type_name -> nexusim.agent.v1.AgentProposalStatus
 	3,  // 6: nexusim.agent.v1.CreateAgentProposalResponse.tool_policy_decision:type_name -> nexusim.agent.v1.ToolPolicyDecision
 	2,  // 7: nexusim.agent.v1.CreateAgentProposalResponse.citations:type_name -> nexusim.agent.v1.AgentCitation
-	9,  // 8: nexusim.agent.v1.CreateAgentProposalResponse.evidence_pack:type_name -> nexusim.retrieval.v1.EvidencePack
-	1,  // 9: nexusim.agent.v1.AgentService.CreateAgentProposal:input_type -> nexusim.agent.v1.CreateAgentProposalRequest
-	4,  // 10: nexusim.agent.v1.AgentService.CreateAgentProposal:output_type -> nexusim.agent.v1.CreateAgentProposalResponse
-	10, // [10:11] is the sub-list for method output_type
-	9,  // [9:10] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	13, // 8: nexusim.agent.v1.CreateAgentProposalResponse.evidence_pack:type_name -> nexusim.retrieval.v1.EvidencePack
+	9,  // 9: nexusim.agent.v1.ApproveAgentProposalRequest.auth_context:type_name -> nexusim.retrieval.v1.AuthContext
+	0,  // 10: nexusim.agent.v1.ApproveAgentProposalResponse.status:type_name -> nexusim.agent.v1.AgentProposalStatus
+	9,  // 11: nexusim.agent.v1.VerifyApprovedAgentProposalRequest.auth_context:type_name -> nexusim.retrieval.v1.AuthContext
+	0,  // 12: nexusim.agent.v1.VerifyApprovedAgentProposalResponse.status:type_name -> nexusim.agent.v1.AgentProposalStatus
+	1,  // 13: nexusim.agent.v1.AgentService.CreateAgentProposal:input_type -> nexusim.agent.v1.CreateAgentProposalRequest
+	5,  // 14: nexusim.agent.v1.AgentService.ApproveAgentProposal:input_type -> nexusim.agent.v1.ApproveAgentProposalRequest
+	7,  // 15: nexusim.agent.v1.AgentService.VerifyApprovedAgentProposal:input_type -> nexusim.agent.v1.VerifyApprovedAgentProposalRequest
+	4,  // 16: nexusim.agent.v1.AgentService.CreateAgentProposal:output_type -> nexusim.agent.v1.CreateAgentProposalResponse
+	6,  // 17: nexusim.agent.v1.AgentService.ApproveAgentProposal:output_type -> nexusim.agent.v1.ApproveAgentProposalResponse
+	8,  // 18: nexusim.agent.v1.AgentService.VerifyApprovedAgentProposal:output_type -> nexusim.agent.v1.VerifyApprovedAgentProposalResponse
+	16, // [16:19] is the sub-list for method output_type
+	13, // [13:16] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_agent_v1_agent_service_proto_init() }
@@ -717,7 +1146,7 @@ func file_nexusim_agent_v1_agent_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_agent_v1_agent_service_proto_rawDesc), len(file_nexusim_agent_v1_agent_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

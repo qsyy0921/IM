@@ -13,6 +13,10 @@
   - `proposal_id`
   - `approval_id`
   - `prepared_audit_id`
+- 调用 `agent-service.VerifyApprovedAgentProposal`：
+  - proposal 必须已 `APPROVED`
+  - `approval_id`、`prepared_audit_id`、skill、tool、resource 必须匹配
+  - 不直接读取 `agent_proposals` 私表
 - 读取 `skill-registry.GetSkill`：
   - skill 必须 `ACTIVE`
   - request `tool_name` 必须匹配 skill contract
@@ -41,6 +45,7 @@
 ```text
 approved caller
 -> action-executor.ExecuteApprovedAction
+-> agent-service.VerifyApprovedAgentProposal
 -> skill-registry.GetSkill
 -> policy-service.CheckToolAction(action=EXECUTE)
 -> action_executor_execution_audits
@@ -61,6 +66,7 @@ agent-service proposal
 
 - `AuthContext` 必须包含 tenant / user / device。
 - `proposal_id`、`approval_id`、`prepared_audit_id` 必填。
+- proposal / approval 校验失败时不写 execution audit。
 - 第一版只返回 `RECORDED` / `BLOCKED`，且 `executed=false`。
 - `input_json` 只校验 JSON 和大小，audit 只保存 hash。
 - policy deny 必须 fail closed 并落低敏 audit。
@@ -79,7 +85,6 @@ agent-service proposal
 
 ## 后续
 
-- 接入正式 approval / proposal store 校验。
 - 接入真实 MCP adapter / tool provider。
 - 低风险动作 result projection。
 - per tenant / per tool rate limit。

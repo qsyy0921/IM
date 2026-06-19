@@ -51,6 +51,45 @@ func TestCreateAgentProposalUseCaseReturnsProposal(t *testing.T) {
 	}
 }
 
+func TestCreateAgentProposalUseCaseStoresProposalWhenRepositoryConfigured(t *testing.T) {
+	store := &fakeProposalStore{}
+	retrieval := &fakeRetrieval{result: types.RetrieveEvidenceResult{Pack: testEvidencePack()}}
+	prepare := &fakePrepare{result: types.ToolPrepareResult{
+		TenantID:          "tenant-1",
+		UserID:            "user-1",
+		SkillID:           "conversation.note.create",
+		ToolName:          "conversation.note.create",
+		Action:            types.ToolActionCall,
+		ResourceType:      "conversation",
+		ResourceID:        "conv-1",
+		RiskLevel:         "LOW",
+		Allowed:           true,
+		RequiresApproval:  true,
+		PermissionVersion: 3,
+		Classification:    "TOOL_ALLOWED",
+		Reason:            "allowed",
+		DecisionSource:    "test",
+		AuditID:           "mcp-audit-1",
+	}}
+	usecase := NewCreateAgentProposalUseCaseWithRepository(retrieval, prepare, ExtractiveProposalProvider{}, store)
+
+	result, err := usecase.Execute(context.Background(), testCommand())
+	if err != nil {
+		t.Fatalf("create proposal: %v", err)
+	}
+	if len(store.proposals) != 1 {
+		t.Fatalf("expected one stored proposal, got %d", len(store.proposals))
+	}
+	stored := store.proposals[0]
+	if stored.ProposalID != result.ProposalID ||
+		stored.Status != types.AgentProposalStatusProposed ||
+		stored.PreparedAuditID != "mcp-audit-1" ||
+		stored.CitationsJSON == "" ||
+		stored.EvidencePackID != "pack-1" {
+		t.Fatalf("unexpected stored proposal: %+v", stored)
+	}
+}
+
 func TestCreateAgentProposalUseCaseBlockedByPolicyDoesNotRetrieve(t *testing.T) {
 	retrieval := &fakeRetrieval{err: errors.New("should not be called")}
 	prepare := &fakePrepare{result: types.ToolPrepareResult{
@@ -179,6 +218,34 @@ func (fake *fakePrepare) PrepareToolCall(
 type fakeProvider struct {
 	result types.AgentProposalGenerationResult
 	err    error
+}
+
+type fakeProposalStore struct {
+	proposals []types.StoredAgentProposal
+	err       error
+}
+
+func (store *fakeProposalStore) StoreAgentProposal(_ context.Context, proposal types.StoredAgentProposal) error {
+	if store.err != nil {
+		return store.err
+	}
+	store.proposals = append(store.proposals, proposal)
+	return nil
+}
+
+func (store *fakeProposalStore) ApproveAgentProposal(
+	context.Context,
+	types.ApproveAgentProposalCommand,
+	string,
+) (types.ApproveAgentProposalResult, error) {
+	return types.ApproveAgentProposalResult{}, types.ErrAgentUnavailable
+}
+
+func (store *fakeProposalStore) VerifyApprovedAgentProposal(
+	context.Context,
+	types.VerifyApprovedAgentProposalCommand,
+) (types.VerifyApprovedAgentProposalResult, error) {
+	return types.VerifyApprovedAgentProposalResult{}, types.ErrAgentUnavailable
 }
 
 func (fake fakeProvider) GenerateProposal(

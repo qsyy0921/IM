@@ -33,12 +33,14 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 - `action-executor` 外部 MCP fallback 错误分类和 tool output safety first path。
 - Agent execution eval adapter 覆盖 approval / execution / result projection /
   safe local tool output。
+- Python AI Worker foundation 目录、`IM` conda toolchain、candidate contract
+  helpers、低敏安全检查和 `tools/check-python-ai-worker-boundary.ps1`。
 
 下一步默认推进：
 
 ```text
-Python AI Worker foundation directory / toolchain / contract guard
--> external LLM adapter boundary
+external LLM adapter boundary
+-> Python worker malformed / unsafe output eval coverage
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

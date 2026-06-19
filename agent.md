@@ -69,8 +69,10 @@ metadata, exposes `VerifyApprovedAgentProposal`, and publishes low-sensitive
 `action-executor` can execute only the deterministic low-sensitive
 `nexusim.local.echo` local adapter and records output hash only; external
 MCP/provider fallback is classified as stable low-sensitive failure and unsafe
-tool output is suppressed. Next move is Python AI Worker foundation, external
-LLM adapter boundary, or the next AI mainline task from `current-goal.md`.
+tool output is suppressed. Python AI Worker foundation is landed with the
+`ai/python` directory, reproducible `IM` conda toolchain and candidate contract
+guard. Next move is the external LLM adapter boundary or the next AI mainline
+task from `current-goal.md`.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.
@@ -115,8 +117,7 @@ practical.
   contract.
 - Keep abstractions local until the second real use case appears.
 - Split production files near 2500 lines; split tests or runners near 3000 lines.
-- Refresh legitimate file-size baseline drift with
-  `tools/update-file-size-hotspot-baseline.ps1`.
+- Refresh legitimate file-size baseline drift with `tools/update-file-size-hotspot-baseline.ps1`.
 - Raw loadtest data belongs under `H:\NexusIM\loadtest-results`; repo stores
   summaries and reports only.
 

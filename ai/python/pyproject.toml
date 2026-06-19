@@ -1,0 +1,44 @@
+[project]
+name = "nexusim-ai-workers"
+version = "0.1.0"
+description = "Candidate-only Python AI worker foundation for NexusIM"
+requires-python = ">=3.12"
+dependencies = [
+    "aiokafka>=0.10,<1",
+    "fastapi>=0.111,<1",
+    "grpcio>=1.64,<2",
+    "grpcio-tools>=1.64,<2",
+    "httpx>=0.27,<1",
+    "opentelemetry-api>=1.25,<2",
+    "opentelemetry-sdk>=1.25,<2",
+    "pydantic>=2.8,<3",
+    "uvicorn>=0.30,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.10,<2",
+    "pytest>=8,<9",
+    "ruff>=0.5,<1",
+    "uv>=0.4,<1",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["nexusim_ai_common*"]
+
+[tool.nexusim]
+boundary = "candidate-only"
+control_plane = "go-services"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true

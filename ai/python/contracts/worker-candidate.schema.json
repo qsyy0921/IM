@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "name": "nexusim.ai.worker_candidate.v1",
+  "scope": "low-sensitive candidate-only Python AI worker result; Go services validate, authorize, audit and persist final state",
+  "required": [
+    "schema_version",
+    "task_id",
+    "candidate_id",
+    "worker_kind",
+    "status",
+    "output_type",
+    "output_sha256"
+  ],
+  "allowed_worker_kinds": [
+    "LLM",
+    "EMBEDDING",
+    "RERANK",
+    "MEMORY_EXTRACTION",
+    "PLANNER",
+    "EVAL"
+  ],
+  "allowed_statuses": [
+    "CANDIDATE",
+    "ABSTAIN",
+    "FAILED"
+  ],
+  "forbidden": [
+    "raw_prompt",
+    "raw_provider_body",
+    "secret",
+    "token",
+    "password",
+    "session_id",
+    "approval_id",
+    "execution_id",
+    "sql"
+  ]
+}

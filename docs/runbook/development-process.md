@@ -23,7 +23,7 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 -> 把 9 个核心服务做必要收口
 -> 以 search-service v0.1 建搜索、可见性和 tombstone 底座
 -> 再建设 memory / retrieval / EvidencePack
--> 再扩 RAG / summary / Agent / skill-registry / mcp-gateway / action-executor 后端
+-> 再扩 RAG / summary / Agent / skill-registry / mcp-gateway / action-executor / Python AI Worker 后端
 -> 分布式可靠性和生产级完整测试按风险持续补强
 -> 最后按需要做客户端和产品化展示
 ```
@@ -193,7 +193,7 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 
 ```text
 以 search-service v0.1 作为第一步，
-为聊天记录搜索、群组 memory、retrieval 和后续 RAG / summary / Agent / skill-registry / mcp-gateway / action-executor 建立可控的检索事实层。
+为聊天记录搜索、群组 memory、retrieval 和后续 RAG / summary / Agent / skill-registry / mcp-gateway / action-executor / Python AI Worker 建立可控的检索事实层。
 ```
 
 进入这一阶段前，不要求所有生产级 HA 或生产级完整系统测试都完成，但 message / conversation / policy / delivery 的事实边界必须足够稳定，尤其是编辑、撤回、删除、成员窗口和权限策略。
@@ -236,6 +236,7 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 5. `skill-registry`
 6. `mcp-gateway/tool-gateway`
 7. `action-executor` + proposal / approval / audit
+8. Python AI Worker foundation + external LLM adapter boundary
 
 必须遵守的边界：
 
@@ -245,6 +246,7 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 - AI 输出必须带 source message id、conversation seq 和 evidence pack；
 - Agent 写动作必须可审计、可审批、可回放。
 - `skill-registry`、`mcp-gateway/tool-gateway` 和 `action-executor` 只能封装已通过权限、证据和审计约束的后端能力。
+- Python AI Worker 只返回模型 / 算法 / eval 候选结果；Go 服务继续负责权限、审批、审计、outbox 和持久化。
 
 ## 7. 第七阶段：其它产品后端服务
 
@@ -314,7 +316,7 @@ Web / App / 桌面端是后续产品化展示层，
 -> 启动 search-service v0.1，先做 projection / visibility / tombstone / SearchMessages
 -> 启动 memory / group memory / retrieval-gateway / EvidencePack
 -> 再进入 rag-service / summary-service / agent-service
--> 再封装 skill-registry / mcp-gateway / action-executor
+-> 再封装 skill-registry / mcp-gateway / action-executor / Python AI Worker foundation
 -> 生产级 HA、生产级完整系统测试和客户端产品化继续后置
 -> 后续再按需要补 media / notification / audit / admin / 客户端
 ```

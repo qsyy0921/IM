@@ -53,10 +53,11 @@ Existing real services: `api-gateway`, `identity-service`, `message-service`,
 `conversation-service`, `delivery-service`, `push-gateway`, `receipt-service`,
 `contacts-service`, and `policy-service`.
 
-Current active slice: `agent-service` first proposal-only path is landed.
-Next move is the real local `retrieval-gateway -> policy-service -> agent-service`
-adapter smoke, then `skill-registry`, `mcp-gateway`, and `action-executor`.
-Search, memory, retrieval and real RAG / summary adapter smokes are passed.
+Current active slice: `agent-service` first proposal-only path and the real
+local `retrieval-gateway -> policy-service -> agent-service` adapter smoke are
+landed. Next move is `skill-registry`, then `mcp-gateway` and
+`action-executor`. Search, memory, retrieval and real RAG / summary / Agent
+adapter smokes are passed.
 
 AI invariants: keep facts, projections, retrieval and controlled execution
 separate. Memory requires source refs, scope, validity, supersession,

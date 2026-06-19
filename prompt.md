@@ -9,7 +9,7 @@
 
 当前主线必须显式按这条走：IM 后端主链路和必要分布式基础已经收口到可转进状态；默认继续建设 AI 应用基础设施，包括群组 memory、跨群 / 跨时间 EvidencePack、RAG、summary、multi-agent、skill registry、MCP/tool gateway、action-executor、approval/audit 和 ai-eval。九个既有 IM 服务只处理阻塞 AI 主线的 P0/P1 或用户点名任务；不要把默认任务切回长期 P2 hardening、生产级长压、完整 HA、sizing 或 provider-grade 运维。
 
-当前 active slice：agent-service first proposal-only path 已落；下一步补真实本地 retrieval-gateway -> policy-service -> agent-service adapter smoke，然后继续 skill-registry / mcp-gateway / action-executor。
+当前 active slice：agent-service first proposal-only path 和真实本地 retrieval-gateway -> policy-service -> agent-service adapter smoke 已落；下一步推进 skill-registry，然后继续 mcp-gateway / action-executor。
 
 每轮开始：
 1. 执行 git status --short --branch --untracked-files=all。
@@ -21,7 +21,7 @@
 2. 继续推进 AI 链路：search-service -> memory-service -> retrieval-gateway / EvidencePack -> rag-service -> summary-service -> agent-service -> skill-registry -> mcp-gateway/tool-gateway -> action-executor -> ai-eval。
 3. AI 重点：群组 memory、跨群 / 跨时间 evidence、权限过滤 RAG、multi-agent 协作、MCP / skill / tool 调用、proposal / approval / executor / audit 真实业务闭环。
 
-已完成基线：9 个 IM 后端服务已跑通主链路；search-service projection smoke passed；memory-service group memory / StructuredMemoryEvent projection smoke passed；retrieval-gateway 第一轮 search + memory -> EvidencePack smoke passed；EvidencePack field hardening first pass 已落；AI eval harness first pass 已有低敏 case schema / validator；rag-service first read-only answer path、`loadtest/rag`、RAG eval execution adapter、provider boundary 和 citation verifier 已落；summary-service first read-only summary path 和真实 adapter smoke 已落；agent-service first proposal-only path 已落。
+已完成基线：9 个 IM 后端服务已跑通主链路；search-service projection smoke passed；memory-service group memory / StructuredMemoryEvent projection smoke passed；retrieval-gateway 第一轮 search + memory -> EvidencePack smoke passed；EvidencePack field hardening first pass 已落；AI eval harness first pass 已有低敏 case schema / validator；rag-service first read-only answer path、`loadtest/rag`、RAG eval execution adapter、provider boundary 和 citation verifier 已落；summary-service first read-only summary path 和真实 adapter smoke 已落；agent-service first proposal-only path 和真实 adapter smoke 已落。
 
 硬约束：EvidencePack 必须保留 source refs、temporal version、visibility / policy boundary；RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；新增 eval case 先进入 `docs/runbook/ai-eval/retrieval-eval-cases.json`。
 

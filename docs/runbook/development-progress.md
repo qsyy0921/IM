@@ -30,7 +30,7 @@
 - `retrieval-gateway` / EvidencePack
 - `rag-service` first read-only answer path + executable RAG adapter runner + real adapter smoke + provider boundary / citation verifier
 - `summary-service` first read-only EvidencePack summary path + real adapter smoke
-- `agent-service` first proposal-only path
+- `agent-service` first proposal-only path + real adapter smoke
 - AI eval harness first-stage case schema / validator + RAG execution adapter
 
 当前尚未真实实现的后续 AI / Agent 能力：
@@ -55,7 +55,7 @@
 -> AI eval harness first pass 已落
 -> rag-service first read-only answer path / loadtest runner / eval adapter / real adapter smoke / provider boundary / citation verifier 已落
 -> summary-service first read-only summary path + real adapter smoke 已落
--> agent-service first proposal-only path 已落
+-> agent-service first proposal-only path + real adapter smoke 已落
 -> skill-registry / mcp-gateway / action-executor
 -> 安全 / 观测 / repair / 运维 hardening
 ```
@@ -181,7 +181,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 | `retrieval-gateway` | 已跑通第一轮 EvidencePack smoke，field hardening first pass 已落 | `retrieval_gateway.proto`、SDD、六层 skeleton、`RetrieveEvidence` app / gRPC adapter、search / memory RPC clients、可选 policy-service retrieval precheck、EvidencePack `rerank_score` / `dedupe_reason` / `source_coverage`、`grpc` runtime mode、本地 Docker / compose / Prometheus / Grafana wiring 和真实本地 `search + memory -> RetrieveEvidence` smoke 已落地；定位为 EvidencePack 统一检索边界，不读业务库、不调用 LLM、不执行 Agent 动作 | `service-briefs/retrieval-gateway.md` |
 | `rag-service` | 已落第一版只读问答路径、真实 adapter smoke 和 citation verifier | `rag_service.proto`、SDD、六层 skeleton、`AnswerQuestion` app / gRPC adapter、retrieval-gateway RPC client、`grpc` runtime mode、本地 Docker / compose / Prometheus / Grafana wiring 已落地；第一版 deterministic extractive provider，保留 citations / EvidencePack，`generated_by_llm=false`，无 evidence 时拒答；provider 输出后统一通过 citation verifier，真实本地 `retrieval-gateway -> rag-service` adapter smoke 已通过 | `service-briefs/rag-service.md` |
 | `summary-service` | 已落第一版只读摘要路径和真实 adapter smoke | `summary_service.proto`、SDD、六层 skeleton、`GenerateConversationSummary` app / gRPC adapter、retrieval-gateway RPC client、`grpc` runtime mode、本地 Docker / compose / Prometheus / Grafana wiring、`loadtest/summary` 和真实本地 `retrieval-gateway -> summary-service` adapter smoke 已落地；第一版 deterministic extractive provider，保留 citations / EvidencePack，`generated_by_llm=false`，无 evidence 时拒绝摘要；provider 输出后统一通过 citation verifier | `service-briefs/summary-service.md` |
-| `agent-service` | 已落第一版 proposal-only path | `agent_service.proto`、SDD、六层 skeleton、`CreateAgentProposal` app / gRPC adapter、retrieval-gateway RPC client、policy-service tool policy RPC client、`grpc` runtime mode、本地 Docker / compose / Prometheus / Grafana wiring 已落地；第一版 deterministic extractive proposal，保留 tool policy decision / citations / EvidencePack，`generated_by_llm=false`，policy deny 时不检索证据，不执行工具动作 | `service-briefs/agent-service.md` |
+| `agent-service` | 已落第一版 proposal-only path 和真实 adapter smoke | `agent_service.proto`、SDD、六层 skeleton、`CreateAgentProposal` app / gRPC adapter、retrieval-gateway RPC client、policy-service tool policy RPC client、`grpc` runtime mode、本地 Docker / compose / Prometheus / Grafana wiring、`loadtest/agent` 和真实本地 `retrieval-gateway -> policy-service -> agent-service` adapter smoke 已落地；第一版 deterministic extractive proposal，保留 tool policy decision / citations / EvidencePack，`generated_by_llm=false`，policy deny 时不检索证据，不执行工具动作 | `service-briefs/agent-service.md` |
 
 ## 剩余目标入口
 
@@ -196,7 +196,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 ```text
 前 9 个微服务已经能跑通 IM 主链路，
 现在处于“9 个现有服务做必要收口，并向 AI 大模型应用底座转进”，
-search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已从 contract 切到 foundation-active implementation 并跑通 clean projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，policy precheck 和 EvidencePack 字段 hardening first pass 已落；AI eval harness first pass 已有低敏 case schema / validator；rag-service first read-only answer path、`loadtest/rag`、RAG eval adapter、真实本地 adapter smoke、provider boundary 和 citation verifier first pass 已落；summary-service first read-only summary path 和真实本地 adapter smoke 已落；agent-service first proposal-only path 已落，后续是 agent adapter smoke、skill-registry、mcp-gateway、action-executor。
+search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；memory-service 已从 contract 切到 foundation-active implementation 并跑通 clean projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，policy precheck 和 EvidencePack 字段 hardening first pass 已落；AI eval harness first pass 已有低敏 case schema / validator；rag-service first read-only answer path、`loadtest/rag`、RAG eval adapter、真实本地 adapter smoke、provider boundary 和 citation verifier first pass 已落；summary-service first read-only summary path 和真实本地 adapter smoke 已落；agent-service first proposal-only path 和真实本地 adapter smoke 已落，后续是 skill-registry、mcp-gateway、action-executor。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。
 ```
 

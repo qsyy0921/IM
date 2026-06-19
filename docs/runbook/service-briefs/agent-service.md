@@ -1,6 +1,6 @@
 # agent-service
 
-状态：foundation-active / first proposal-only path.
+状态：foundation-active / proposal-only path + real adapter smoke passed.
 
 定位：受控 Agent proposal 边界服务。它只消费 retrieval-gateway 返回的
 `EvidencePack`，并通过 policy-service `CheckToolAction` 做 tool action
@@ -18,10 +18,13 @@ memory / policy 私有表。
 - provider 输出后统一运行 citation verifier，无法匹配 EvidencePack 则
   fail closed
 - 第一版所有 proposed response 都保持 proposal-only，不执行工具动作
+- 真实本地 `retrieval-gateway -> policy-service -> agent-service` adapter
+  smoke 已通过，验证 tool policy allow、EvidencePack、citation 和
+  proposal-only 边界
 
 下一步：
 
-- 补真实本地 `retrieval-gateway -> policy-service -> agent-service` adapter
-  smoke。
-- 后续再接 `skill-registry`、`mcp-gateway` 和 `action-executor`。
+- 接 `skill-registry`，登记可被 Agent 调用的技能、输入输出合约、权限和
+  审计元数据。
+- 后续再接 `mcp-gateway` 和 `action-executor`。
 - 外部 LLM adapter 后续仍必须走 ProposalProvider port 和 citation verifier。

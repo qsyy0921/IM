@@ -145,6 +145,30 @@
       ]
     },
     {
+      "id": "rag-citation-source-ref-integrity",
+      "family": "attribution",
+      "stage": "rag-service",
+      "status": "active",
+      "query": "phoenix launch decision citation source ref",
+      "risk": "RAG citations must point back to an EvidencePack source ref instead of only returning a non-empty citation list",
+      "required_assertions": [
+        {
+          "type": "answer_status",
+          "expected_status": "GROUNDED"
+        },
+        {
+          "type": "must_include_citation",
+          "source_type": "MESSAGE"
+        },
+        {
+          "type": "must_match_citation_source_ref"
+        },
+        {
+          "type": "must_not_claim_llm_generation"
+        }
+      ]
+    },
+    {
       "id": "rag-insufficient-evidence-abstains",
       "family": "retrieval_miss",
       "stage": "rag-service",
@@ -185,6 +209,33 @@
         {
           "type": "must_return_source_type",
           "source_type": "MEMORY_EVENT"
+        },
+        {
+          "type": "must_not_claim_llm_generation"
+        },
+        {
+          "type": "must_preserve_summary_retrieval_versions"
+        }
+      ]
+    },
+    {
+      "id": "summary-citation-source-ref-integrity",
+      "family": "attribution",
+      "stage": "summary-service",
+      "status": "active",
+      "query": "phoenix launch decision citation source ref",
+      "risk": "Summary citations must point back to an EvidencePack source ref instead of only returning a non-empty citation list",
+      "required_assertions": [
+        {
+          "type": "summary_status",
+          "expected_status": "GROUNDED"
+        },
+        {
+          "type": "must_include_citation",
+          "source_type": "MESSAGE"
+        },
+        {
+          "type": "must_match_citation_source_ref"
         },
         {
           "type": "must_not_claim_llm_generation"

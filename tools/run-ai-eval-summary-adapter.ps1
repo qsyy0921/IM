@@ -55,6 +55,30 @@ function Get-ExpectedSourceCount {
     }
 }
 
+function Test-CitationSourceRefMatch {
+    param($Summary)
+
+    $seed = $Summary.seed
+    if ($null -eq $seed -or $null -eq $Summary.citation_refs) {
+        return $false
+    }
+    foreach ($ref in @($Summary.citation_refs)) {
+        $evidenceID = Get-JsonPropertyString -Object $ref -Name "evidence_id"
+        if ($evidenceID.Length -eq 0) {
+            continue
+        }
+        if (
+            (Get-JsonPropertyString -Object $ref -Name "source_id") -eq (Get-JsonPropertyString -Object $seed -Name "message_id") -and
+            (Get-JsonPropertyString -Object $ref -Name "source_event_id") -eq (Get-JsonPropertyString -Object $seed -Name "source_event_id") -and
+            (Get-JsonPropertyString -Object $ref -Name "conversation_id") -eq (Get-JsonPropertyString -Object $seed -Name "conversation_id") -and
+            [int64]$ref.conversation_seq -eq [int64]$seed.conversation_seq
+        ) {
+            return $true
+        }
+    }
+    return $false
+}
+
 function Test-SummaryAssertion {
     param(
         $Summary,
@@ -70,6 +94,9 @@ function Test-SummaryAssertion {
         }
         "must_include_citation" {
             return [int]$Summary.citation_count -gt 0
+        }
+        "must_match_citation_source_ref" {
+            return Test-CitationSourceRefMatch -Summary $Summary
         }
         "must_return_source_type" {
             $sourceType = Get-JsonPropertyString -Object $Assertion -Name "source_type"

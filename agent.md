@@ -73,8 +73,8 @@ external HTTP adapter + eval first paths are landed. Profile / Agent output
 safety expanded eval cases plus the local fixture adapter are landed.
 `ai-eval-service` catalog, RecordEvalRun recorder, gate policy, Python optional
 adapter, RAG / Agent live gate, CI-safe gate skeleton, RAG-Agent expansion,
-version / hash-only, negative cases, Summary live negative adapter and Python
-model-output negatives are landed. Next: external MCP fallback, tool/action safety and RAG/summary citation regression.
+version / hash-only, negative cases, Summary live negative adapter, Python
+model-output and RAG/Summary citation regressions are landed. Next: external MCP fallback and tool/action safety.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.

@@ -19,11 +19,11 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
   Agent service-stack live gate 已通过并登记到 catalog。
 - `check-ai-eval-regression-gate.ps1` 已接入 `check-local`，只跑 CI-safe
   required adapters，不启动 Docker / PostgreSQL / live RAG-Agent stack。
-- RAG / Agent live gate 已扩到 19 cases；Summary live adapter 覆盖 grounded citation / no-evidence abstain；profile fixture 6 cases；Python worker adapter 5 个 negative cases。
+- RAG / Agent live gate 已扩到 19 cases；Summary live adapter 覆盖 grounded / no-evidence；profile fixture 6 cases；Python worker 5 cases；RAG/Summary citation source-ref cases 已落。
 
 边界：不运行 eval，不调用 LLM / Python worker / tool provider。
 - 不保存 raw EvidencePack、raw prompt、raw model output、用户正文、secret 或
   tool input。
 - 不授权业务动作；真实动作仍走 policy、proposal / approval、executor 和 audit。
 
-下一步：补 external MCP failure fallback、tool/action safety cases 和 RAG / summary citation regression。
+下一步：补 external MCP failure fallback 和 tool/action safety cases。

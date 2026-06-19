@@ -102,6 +102,7 @@ $knownAssertionTypes = @(
     "answer_status",
     "summary_status",
     "must_include_citation",
+    "must_match_citation_source_ref",
     "must_not_claim_llm_generation",
     "must_not_send_sensitive_prompt",
     "must_fallback_to_extractive",

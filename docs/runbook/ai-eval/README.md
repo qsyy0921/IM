@@ -247,6 +247,10 @@ grounded-citation and no-evidence abstain coverage; see
 `docs/runbook/loadtest/ai-eval-service/`.
 The 2026-06-20 Python model-output negative run expanded `python-ai-worker` to
 5 cases covering bad inputs plus Go-side bad candidate output rejection.
+The 2026-06-20 RAG / Summary citation regression added source-ref integrity
+cases and low-sensitive `citation_refs` fields to the RAG / Summary smoke
+summaries. This proves adapter-level citation anchoring only; it is not a live
+service-stack rerun by itself.
 
 First-stage Go-side Python worker adapter smoke:
 

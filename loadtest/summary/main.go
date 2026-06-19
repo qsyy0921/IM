@@ -64,35 +64,45 @@ type seededData struct {
 }
 
 type summarySmokeResult struct {
-	RunName                 string       `json:"run_name"`
-	ResultDir               string       `json:"result_dir"`
-	SummaryTarget           string       `json:"summary_target"`
-	Focus                   string       `json:"focus"`
-	Scenario                string       `json:"scenario"`
-	Seed                    seededData   `json:"seed"`
-	SummaryID               string       `json:"summary_id"`
-	SummaryStatus           string       `json:"summary_status"`
-	SummaryText             string       `json:"summary_text"`
-	Confidence              float64      `json:"confidence"`
-	GeneratedByLLM          bool         `json:"generated_by_llm"`
-	CitationCount           int          `json:"citation_count"`
-	PackID                  string       `json:"pack_id"`
-	EvidenceItemCount       int          `json:"evidence_item_count"`
-	SearchItemCount         int          `json:"search_item_count"`
-	MemoryItemCount         int          `json:"memory_item_count"`
-	SourceCounts            sourceCounts `json:"source_counts"`
-	SearchProjectionVersion int64        `json:"search_projection_version"`
-	MemoryProjectionVersion int64        `json:"memory_projection_version"`
-	SummaryVersion          string       `json:"summary_version"`
-	RetrievalVersion        string       `json:"retrieval_version"`
-	Verified                []string     `json:"verified"`
-	StartedAt               time.Time    `json:"started_at"`
-	FinishedAt              time.Time    `json:"finished_at"`
+	RunName                 string        `json:"run_name"`
+	ResultDir               string        `json:"result_dir"`
+	SummaryTarget           string        `json:"summary_target"`
+	Focus                   string        `json:"focus"`
+	Scenario                string        `json:"scenario"`
+	Seed                    seededData    `json:"seed"`
+	SummaryID               string        `json:"summary_id"`
+	SummaryStatus           string        `json:"summary_status"`
+	SummaryText             string        `json:"summary_text"`
+	Confidence              float64       `json:"confidence"`
+	GeneratedByLLM          bool          `json:"generated_by_llm"`
+	CitationCount           int           `json:"citation_count"`
+	CitationRefs            []citationRef `json:"citation_refs"`
+	PackID                  string        `json:"pack_id"`
+	EvidenceItemCount       int           `json:"evidence_item_count"`
+	SearchItemCount         int           `json:"search_item_count"`
+	MemoryItemCount         int           `json:"memory_item_count"`
+	SourceCounts            sourceCounts  `json:"source_counts"`
+	SearchProjectionVersion int64         `json:"search_projection_version"`
+	MemoryProjectionVersion int64         `json:"memory_projection_version"`
+	SummaryVersion          string        `json:"summary_version"`
+	RetrievalVersion        string        `json:"retrieval_version"`
+	Verified                []string      `json:"verified"`
+	StartedAt               time.Time     `json:"started_at"`
+	FinishedAt              time.Time     `json:"finished_at"`
 }
 
 type sourceCounts struct {
 	SearchMessage int32 `json:"search_message"`
 	MemoryEvent   int32 `json:"memory_event"`
+}
+
+type citationRef struct {
+	EvidenceID      string `json:"evidence_id"`
+	SourceType      string `json:"source_type"`
+	SourceID        string `json:"source_id"`
+	SourceEventID   string `json:"source_event_id"`
+	ConversationID  string `json:"conversation_id"`
+	ConversationSeq int64  `json:"conversation_seq"`
 }
 
 func main() {
@@ -479,6 +489,7 @@ func verifySummary(
 		Confidence:              response.GetConfidence(),
 		GeneratedByLLM:          response.GetGeneratedByLlm(),
 		CitationCount:           len(response.GetCitations()),
+		CitationRefs:            citationRefsFromResponse(response.GetCitations()),
 		PackID:                  pack.GetPackId(),
 		EvidenceItemCount:       len(pack.GetItems()),
 		SearchItemCount:         int(counts.SearchMessage),
@@ -550,6 +561,7 @@ func verifyInsufficientSummary(
 		Confidence:              response.GetConfidence(),
 		GeneratedByLLM:          response.GetGeneratedByLlm(),
 		CitationCount:           len(response.GetCitations()),
+		CitationRefs:            citationRefsFromResponse(response.GetCitations()),
 		PackID:                  pack.GetPackId(),
 		EvidenceItemCount:       len(pack.GetItems()),
 		SearchItemCount:         0,
@@ -576,6 +588,24 @@ func verifyCitation(citation *summaryv1.Citation, seed seededData) error {
 		return fmt.Errorf("unexpected citation conversation ref: %+v", citation)
 	}
 	return nil
+}
+
+func citationRefsFromResponse(citations []*summaryv1.Citation) []citationRef {
+	refs := make([]citationRef, 0, len(citations))
+	for _, citation := range citations {
+		if citation == nil {
+			continue
+		}
+		refs = append(refs, citationRef{
+			EvidenceID:      citation.GetEvidenceId(),
+			SourceType:      citation.GetSourceType().String(),
+			SourceID:        citation.GetSourceId(),
+			SourceEventID:   citation.GetSourceEventId(),
+			ConversationID:  citation.GetConversationId(),
+			ConversationSeq: citation.GetConversationSeq(),
+		})
+	}
+	return refs
 }
 
 func verifySearchItem(item *retrievalv1.EvidenceItem, seed seededData) error {

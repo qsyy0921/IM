@@ -7,18 +7,19 @@
 ```text
 持续推进 E:\development\IM 的 NexusIM 项目。
 
-【当前主线 / 不可偏移】本阶段不是继续堆九个 IM 服务的长期 P2 hardening，也不是跑完整生产级 HA / 长压 / sizing；当前默认任务是：在已可运行的后端 + 分布式 IM 底座上，继续建设 AI 大模型应用底座。
+【当前主线 / 不可偏移】
+默认继续建设 AI 大模型应用底座：group memory -> EvidencePack -> RAG -> summary -> multi-agent -> skill-registry -> MCP/tool gateway -> action-executor -> proposal / approval / audit -> ai-eval。
 
-默认开发方向：群组 memory、跨群 / 跨时间 EvidencePack、RAG、summary、multi-agent、skill registry、MCP/tool gateway、action-executor、proposal / approval / audit 和 ai-eval。每轮“继续开发”都优先推进这条链，除非用户明确点名别的任务，或发现阻塞该主线的 P0/P1。
-
-九个既有 IM 服务已经作为可运行基础；只处理阻塞 AI 主线的 P0/P1 或用户点名任务。不要把默认任务切回长期 P2 hardening、生产级长压、完整 HA、sizing 或 provider-grade 运维。
+九个既有 IM 服务是可运行基础，不再作为默认主线继续堆长期 P2 hardening。只处理阻塞 AI 主线的 P0/P1、用户明确点名任务、或本轮切片必须补的边界。不要把默认任务切回生产级 HA、长压、sizing、provider-grade 运维或泛泛“把九服务继续做干净”。
 
 每轮开始：
 1. 执行 git status --short --branch --untracked-files=all。
 2. 读取 prompt.md 和 agent.md。
 3. 读取 docs/runbook/current-goal.md 的当前 active slice；再按需读取 current-brief、remaining-goals、相关 service brief 或 SDD；不要全文扫长历史文档。
 
-当前 active slice：skill-registry first catalog path、mcp-gateway first prepare path、action-executor first execution audit path 和新的 `retrieval-gateway -> agent-service -> mcp-gateway` adapter smoke 已落；agent-service proposal 前已改为调用 `mcp-gateway.PrepareToolCall`，返回 `skill_id` / `prepared_audit_id`，但仍不执行外部工具；mcp-gateway 只做 skill contract 校验、policy precheck 和低敏 audit；action-executor 第一版只记录 approved execution boundary，`executed=false`，不连接外部 MCP/tool provider。下一步默认推进 proposal store / approval workflow / action-executor 串接；如果该串接已完成，则按本页优先级继续下一项 AI 主线。RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；真实写动作必须继续走 policy、proposal / approval / executor / audit。
+当前 active slice：skill-registry first catalog path、mcp-gateway first prepare path、action-executor first execution audit path 和新的 `retrieval-gateway -> agent-service -> mcp-gateway` adapter smoke 已落；agent-service proposal 前已改为调用 `mcp-gateway.PrepareToolCall`，返回 `skill_id` / `prepared_audit_id`，但仍不执行外部工具；mcp-gateway 只做 skill contract 校验、policy precheck 和低敏 audit；action-executor 第一版只记录 approved execution boundary，`executed=false`，不连接外部 MCP/tool provider。下一步默认推进 proposal store / approval workflow / action-executor 串接；如果该串接已完成，则按本页优先级继续下一项 AI 主线。
+
+硬边界：RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；真实写动作必须继续走 policy、proposal / approval / executor / audit。
 
 可用多个 sub-agent 做互不重叠任务；主 agent 负责集成、检查和文档同步。不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
 ```

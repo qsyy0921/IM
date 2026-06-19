@@ -49,6 +49,9 @@ AI line or the user explicitly asks for it.
 If the visible Codex goal prompt does not make this main line obvious, update
 `prompt.md` and the short prompt in `docs/runbook/current-goal.md` first before
 continuing implementation.
+The first paragraph of the short prompt must explicitly name the AI application
+foundation chain. Do not hide the main line only in `current-brief.md`,
+`remaining-goals.md`, or service briefs.
 
 Existing real services: `api-gateway`, `identity-service`, `message-service`,
 `conversation-service`, `delivery-service`, `push-gateway`, `receipt-service`,

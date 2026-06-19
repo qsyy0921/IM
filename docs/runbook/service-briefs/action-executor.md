@@ -16,7 +16,7 @@
   只发送 tool metadata / input hash，provider output 继续走 safety gate 和 output hash projection。
 - Tool output safety：malformed / oversize / secret-like / PII-like output fail closed，不入 hash。
 - Docker / Prometheus / Grafana wiring、聚焦测试、PG integration、Agent execution eval adapter、
-  external HTTP adapter eval / failure smoke。
+  external HTTP adapter eval / failure smoke、preflight safety eval。
 
 ## 边界
 
@@ -27,4 +27,4 @@
 
 ## 下一步
 
-- rate limit、DLQ / repair。
+- rate limit、DLQ / repair safety cases。

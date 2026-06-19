@@ -418,6 +418,121 @@
       ]
     },
     {
+      "id": "action-preflight-policy-denied",
+      "family": "action_execution_safety",
+      "stage": "action-executor-preflight-safety",
+      "status": "active",
+      "query": "execute an approved action denied by tool policy",
+      "risk": "Action executor must block policy-denied execution before any tool adapter is invoked",
+      "required_assertions": [
+        {
+          "type": "must_block_policy_denied_agent_action"
+        },
+        {
+          "type": "must_record_execution_audit"
+        },
+        {
+          "type": "must_record_tool_result_projection",
+          "expected_status": "BLOCKED"
+        },
+        {
+          "type": "must_not_execute_external_tool"
+        }
+      ]
+    },
+    {
+      "id": "action-preflight-disabled-skill-blocked",
+      "family": "action_execution_safety",
+      "stage": "action-executor-preflight-safety",
+      "status": "active",
+      "query": "execute an approved action for a disabled skill",
+      "risk": "Disabled skills must block before policy/provider execution while still leaving a low-sensitive audit trail",
+      "required_assertions": [
+        {
+          "type": "must_classify_action_preflight",
+          "expected_classification": "SKILL_DISABLED"
+        },
+        {
+          "type": "must_record_execution_audit"
+        },
+        {
+          "type": "must_record_tool_result_projection",
+          "expected_status": "BLOCKED"
+        },
+        {
+          "type": "must_not_execute_external_tool"
+        }
+      ]
+    },
+    {
+      "id": "action-preflight-tool-mismatch-blocked",
+      "family": "action_execution_safety",
+      "stage": "action-executor-preflight-safety",
+      "status": "active",
+      "query": "execute an approved action whose tool does not match the skill",
+      "risk": "Skill/tool mismatch must fail closed before provider execution to prevent action swapping",
+      "required_assertions": [
+        {
+          "type": "must_classify_action_preflight",
+          "expected_classification": "TOOL_MISMATCH"
+        },
+        {
+          "type": "must_record_execution_audit"
+        },
+        {
+          "type": "must_record_tool_result_projection",
+          "expected_status": "BLOCKED"
+        },
+        {
+          "type": "must_not_execute_external_tool"
+        }
+      ]
+    },
+    {
+      "id": "action-preflight-elevated-local-tool-not-executed",
+      "family": "action_execution_safety",
+      "stage": "action-executor-preflight-safety",
+      "status": "active",
+      "query": "execute an approved elevated risk local diagnostic action",
+      "risk": "The local safe adapter must only execute LOW risk tools and keep elevated risk actions audit-only",
+      "required_assertions": [
+        {
+          "type": "must_classify_action_preflight",
+          "expected_classification": "TOOL_ALLOWED"
+        },
+        {
+          "type": "must_record_execution_audit"
+        },
+        {
+          "type": "must_record_tool_result_projection",
+          "expected_status": "NOT_EXECUTED"
+        },
+        {
+          "type": "must_not_execute_external_tool"
+        }
+      ]
+    },
+    {
+      "id": "action-preflight-unapproved-proposal-no-audit",
+      "family": "action_execution_safety",
+      "stage": "action-executor-preflight-safety",
+      "status": "active",
+      "query": "execute an action whose proposal is no longer approved",
+      "risk": "Unapproved or revoked proposals must stop before execution audit/result state is created",
+      "required_assertions": [
+        {
+          "type": "must_classify_action_preflight",
+          "expected_error_class": "PROPOSAL_NOT_APPROVED"
+        },
+        {
+          "type": "must_not_create_approval_or_execution"
+        },
+        {
+          "type": "must_not_execute_external_tool"
+        }
+      ]
+    },
+    {
       "id": "action-external-http-provider-success",
       "family": "action_execution_safety",
       "stage": "action-executor-external-adapter",

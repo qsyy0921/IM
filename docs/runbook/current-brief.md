@@ -31,14 +31,14 @@ agent、skill-registry、mcp-gateway、action-executor、ai-eval。
 
 `ai-eval-service` catalog、RecordEvalRun recorder、multi-adapter gate、Python optional
 adapter path、RAG / Agent live gate、CI-safe gate skeleton、RAG-Agent expansion、
-profile / Agent safety、version / hash-only、negative RAG-Agent cases、Summary live negative adapter、
-Python/model-output、RAG/Summary citation regression、external MCP fallback 和 Agent output regression 已落；
+profile / Agent safety、negative cases、Python/model-output、RAG/Summary citation、
+external MCP fallback、Agent output regression 和 action preflight safety eval 已落；
 只保存低敏 run refs / counters / metadata。
 
 当前下一步：
 
 ```text
-继续扩 tool/action safety cases
+继续扩 action-executor rate limit / DLQ / repair safety cases
 ```
 
 完整系统测试、生产级 HA、长压和 sizing 继续后置为 hardening backlog。

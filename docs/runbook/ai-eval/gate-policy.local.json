@@ -103,6 +103,13 @@
       "requires": [
         "conda-env:IM"
       ]
+    },
+    {
+      "name": "action-preflight-safety",
+      "script": "run-ai-eval-action-preflight-safety-adapter.ps1",
+      "run_suffix": "action-preflight-safety",
+      "summary_file": "action-preflight-safety-eval-summary.json",
+      "requires_service_stack": false
     }
   ],
   "forbidden_persisted_fields": [

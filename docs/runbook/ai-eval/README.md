@@ -16,6 +16,8 @@ summary, Agent and tool/action boundaries.
   `tools/run-ai-eval-action-external-adapter.ps1`
 - action-executor external MCP fallback adapter eval:
   `tools/run-ai-eval-action-mcp-fallback-adapter.ps1`
+- action-executor preflight safety adapter eval:
+  `tools/run-ai-eval-action-preflight-safety-adapter.ps1`
 - Agent output regression adapter:
   `tools/run-ai-eval-agent-output-regression.ps1`
 - Python worker output-safety adapter: `tools/run-ai-eval-python-worker-adapter.ps1`
@@ -160,6 +162,18 @@ and permission-denied failure classifications, no external execution, no output
 hash, raw input non-disclosure and no raw provider output persistence. It does
 not call real MCP servers, external networks, databases or production tools.
 
+First-stage action-executor preflight safety eval:
+
+```powershell
+.\tools\run-ai-eval-action-preflight-safety-adapter.ps1
+```
+
+This adapter runs the real action-executor app usecase against in-memory ports
+and the local safe executor. It verifies policy denial, disabled skill, tool
+mismatch, elevated-risk local tool no-execute, and unapproved proposal no-audit
+paths. It does not call real MCP servers, external networks, databases or
+production tools.
+
 First-stage Python worker output-safety adapter:
 
 ```powershell
@@ -244,6 +258,8 @@ stack:
 
 `agent-python-worker-provider` can be selected the same way to record the
 command-level Agent output regression through `ai-eval-service`.
+`action-preflight-safety` can also be selected to record the in-memory
+action-executor preflight safety regression.
 
 `rag-service`, `summary-service` and `agent-action-executor` can also be selected through
 `-OptionalAdapter`, but they require their listed service stacks and targets to
@@ -290,6 +306,9 @@ no execution, no output hash and no raw provider output persistence.
 The 2026-06-20 Agent output regression added 4 optional Python-worker provider
 cases for grounded candidate success, hash mismatch, citation mismatch and
 worker failure.
+The 2026-06-20 action preflight safety eval added 5 optional action-executor
+cases for policy denial, disabled skill, tool mismatch, elevated local risk and
+unapproved proposal no-audit behavior.
 
 First-stage Go-side Python worker adapter smoke:
 

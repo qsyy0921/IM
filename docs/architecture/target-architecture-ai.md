@@ -595,7 +595,7 @@ model
 3. 实现 `memory-service`：抽取结构化事件、版本语义、跨群归因、memory graph 和画像聚合。
 4. 实现 `retrieval-gateway` 第一版：基于 search / memory 输出 EvidencePack，不急着做生成。
 5. 实现 `rag-service` 和 `summary-service`：必须经过 retrieval-gateway 和 EvidencePack。
-6. 实现 `agent-service`：先做 read-only / proposal-only，再逐步接低风险自动执行意图。
+6. `agent-service` first proposal-only path 已落；下一步补真实 adapter smoke，再逐步接 proposal store / approval / executor。
 7. 实现 `skill-registry`、`mcp-gateway/tool-gateway`、`action-executor` 的最小 allowlist / proposal / idempotency / audit 边界。
 8. 建立 AI eval harness / `ai-eval-service` 最小门禁：伴随 search、retrieval、RAG、summary、Agent 和 tool policy 演进，覆盖权限、删除后不可见、时间版本、oracle evidence、attribution 和 tool policy。
 

@@ -288,4 +288,15 @@ foreach ($alert in $requiredSummaryAlerts) {
     }
 }
 
+$requiredAgentAlerts = @(
+    "NexusIMAgentServiceDown",
+    "NexusIMAgentServiceInfoMissing"
+)
+
+foreach ($alert in $requiredAgentAlerts) {
+    if ($rulesByService["agent-service"] -notmatch [regex]::Escape($alert)) {
+        throw "Prometheus agent-service rules missing alert: $alert"
+    }
+}
+
 Write-Host "OK   local Prometheus config"

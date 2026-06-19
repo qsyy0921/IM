@@ -7,20 +7,25 @@
 ```text
 持续推进 E:\development\IM 的 NexusIM 项目。
 
-当前主线必须始终第一：NexusIM 现在已经从“9 个 IM 服务主链路收口”转入“AI/RAG/Agent 大模型应用底座”。如果用户只说“继续开发 / 继续 / 接下来做什么”，默认推进 AI/RAG/Agent 主链路；不要默认回到 9 服务 P2 hardening、生产级长压、完整 HA、sizing 或 provider-grade 运维，除非它阻塞 AI 主线或用户明确点名。
+当前主线：必要收口已经完成到可以转进，默认继续开发 AI/RAG/Agent 大模型应用底座；下一步优先推进 agent-service。不要把默认任务又切回 9 个 IM 服务的 P2 hardening、生产级长压、完整 HA、sizing 或 provider-grade 运维，除非用户明确点名，或它们阻塞 AI 主线。
 
-当前 active slice：`summary-service` 已进入 foundation-active，第一版 read-only EvidencePack summary path 和真实本地 `retrieval-gateway -> summary-service` adapter smoke 已落；下一步进入 `agent-service`。
+每轮开始：
+1. 执行 git status --short --branch --untracked-files=all。
+2. 读取 prompt.md 和 agent.md。
+3. 再按需读取 docs/runbook/current-brief.md、docs/runbook/remaining-goals.md、相关 service brief 或 SDD；不要全文扫长历史文档。
+
+当前 active slice：agent-service first proposal-only path 已落；下一步补真实本地 retrieval-gateway -> policy-service -> agent-service adapter smoke，然后继续 skill-registry / mcp-gateway / action-executor。
 
 主线顺序：
 1. 现有 9 个 IM 后端服务只做阻塞 AI 链路的必要收口；非阻塞生产化事项写入 `docs/runbook/remaining-goals.md`，不要拿它们替代 AI 主线。
 2. 继续推进 AI 链路：search-service -> memory-service -> retrieval-gateway / EvidencePack -> rag-service -> summary-service -> agent-service -> skill-registry -> mcp-gateway/tool-gateway -> action-executor -> ai-eval。
 3. AI 重点：群组 memory、跨群 / 跨时间 evidence、权限过滤 RAG、multi-agent 协作、MCP / skill / tool 调用、proposal / approval / executor / audit 真实业务闭环。
 
-已完成基线：9 个 IM 后端服务已跑通主链路；search-service projection smoke passed；memory-service group memory / StructuredMemoryEvent projection smoke passed；retrieval-gateway 第一轮 search + memory -> EvidencePack smoke passed；EvidencePack field hardening first pass 已落；AI eval harness first pass 已有低敏 case schema / validator；rag-service first read-only answer path、`loadtest/rag`、RAG eval execution adapter、provider boundary 和 citation verifier 已落；summary-service first read-only summary path 和真实 adapter smoke 已落。
+已完成基线：9 个 IM 后端服务已跑通主链路；search-service projection smoke passed；memory-service group memory / StructuredMemoryEvent projection smoke passed；retrieval-gateway 第一轮 search + memory -> EvidencePack smoke passed；EvidencePack field hardening first pass 已落；AI eval harness first pass 已有低敏 case schema / validator；rag-service first read-only answer path、`loadtest/rag`、RAG eval execution adapter、provider boundary 和 citation verifier 已落；summary-service first read-only summary path 和真实 adapter smoke 已落；agent-service first proposal-only path 已落。
 
 硬约束：EvidencePack 必须保留 source refs、temporal version、visibility / policy boundary；RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；新增 eval case 先进入 `docs/runbook/ai-eval/retrieval-eval-cases.json`。
 
-每轮先运行 git status --short --branch --untracked-files=all，读取 prompt.md 和 agent.md，再按需读取 current-brief / remaining-goals / 相关 service brief；可用多个 sub-agent 做互不重叠任务；不全文扫长历史文档，不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
+可用多个 sub-agent 做互不重叠任务；主 agent 负责集成、检查和文档同步。不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
 ```
 
 ## 本文件的作用

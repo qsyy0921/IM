@@ -119,6 +119,14 @@
       "grafana_dashboard": "summary-service-observability.json"
     },
     {
+      "name": "agent-service",
+      "stage": "foundation-active",
+      "local_process": "agent-service-grpc",
+      "debug_port": 11922,
+      "prometheus_rule_file": "prometheus-agent-service-alerts.yml",
+      "grafana_dashboard": "agent-service-observability.json"
+    },
+    {
       "name": "media-service",
       "stage": "future"
     },
@@ -132,10 +140,6 @@
     },
     {
       "name": "admin-service",
-      "stage": "future"
-    },
-    {
-      "name": "agent-service",
       "stage": "future"
     },
     {

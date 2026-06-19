@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package nexusim.agent.v1;
+
+import "nexusim/policy/v1/policy_service.proto";
+import "nexusim/retrieval/v1/retrieval_gateway.proto";
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/agent/v1;agentv1";
+
+service AgentService {
+  rpc CreateAgentProposal(CreateAgentProposalRequest) returns (CreateAgentProposalResponse);
+}
+
+enum AgentProposalStatus {
+  AGENT_PROPOSAL_STATUS_UNSPECIFIED = 0;
+  AGENT_PROPOSAL_STATUS_PROPOSED = 1;
+  AGENT_PROPOSAL_STATUS_BLOCKED = 2;
+  AGENT_PROPOSAL_STATUS_INSUFFICIENT_EVIDENCE = 3;
+}
+
+message CreateAgentProposalRequest {
+  nexusim.retrieval.v1.AuthContext auth_context = 1;
+  string conversation_id = 2;
+  string objective = 3;
+  string tool_name = 4;
+  nexusim.policy.v1.ToolAction tool_action = 5;
+  string resource_type = 6;
+  string resource_id = 7;
+  string risk_level = 8;
+  string intent = 9;
+  int64 after_seq = 10;
+  int32 limit = 11;
+  bool include_search = 12;
+  bool include_memory = 13;
+  repeated nexusim.retrieval.v1.EvidenceMemoryStatus memory_statuses = 14;
+}
+
+message AgentCitation {
+  string evidence_id = 1;
+  nexusim.retrieval.v1.EvidenceSourceType source_type = 2;
+  string source_id = 3;
+  string source_event_id = 4;
+  string conversation_id = 5;
+  int64 conversation_seq = 6;
+  int64 occurred_at_unix_ms = 7;
+}
+
+message ToolPolicyDecision {
+  string tenant_id = 1;
+  string user_id = 2;
+  string tool_name = 3;
+  nexusim.policy.v1.ToolAction action = 4;
+  string resource_type = 5;
+  string resource_id = 6;
+  string risk_level = 7;
+  bool allowed = 8;
+  bool requires_approval = 9;
+  int64 permission_version = 10;
+  string classification = 11;
+  string reason = 12;
+  string decision_source = 13;
+}
+
+message CreateAgentProposalResponse {
+  string proposal_id = 1;
+  AgentProposalStatus status = 2;
+  string proposal_text = 3;
+  bool requires_approval = 4;
+  ToolPolicyDecision tool_policy_decision = 5;
+  repeated AgentCitation citations = 6;
+  nexusim.retrieval.v1.EvidencePack evidence_pack = 7;
+  string agent_version = 8;
+  bool generated_by_llm = 9;
+}

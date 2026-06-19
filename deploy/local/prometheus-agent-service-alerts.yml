@@ -1,0 +1,20 @@
+groups:
+  - name: nexusim-agent-service
+    rules:
+      - alert: NexusIMAgentServiceDown
+        expr: up{service="agent-service"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: agent-service
+        annotations:
+          summary: "agent-service metrics endpoint is down"
+
+      - alert: NexusIMAgentServiceInfoMissing
+        expr: absent(nexusim_agent_service_info)
+        for: 2m
+        labels:
+          severity: warning
+          service: agent-service
+        annotations:
+          summary: "agent-service info metric is missing"

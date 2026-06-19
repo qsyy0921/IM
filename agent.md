@@ -42,15 +42,17 @@ The AI/RAG/Agent line is the main product direction, not future side work.
 When the user says "continue development", move this chain forward by default.
 Production HA drills, long load tests, sizing, and provider-grade operations are
 hardening backlog unless explicitly named or they expose a P0/P1 blocker.
+If the visible Codex goal prompt does not make this main line obvious, update
+`prompt.md` first before continuing implementation.
 
 Existing real services: `api-gateway`, `identity-service`, `message-service`,
 `conversation-service`, `delivery-service`, `push-gateway`, `receipt-service`,
 `contacts-service`, and `policy-service`.
 
-Current active slice: `summary-service` first read-only EvidencePack summary
-path and real local `retrieval-gateway -> summary-service` adapter smoke are
-passed; next move to `agent-service`. Search, memory, retrieval and real RAG /
-summary adapter smokes are passed.
+Current active slice: `agent-service` first proposal-only path is landed.
+Next move is the real local `retrieval-gateway -> policy-service -> agent-service`
+adapter smoke, then `skill-registry`, `mcp-gateway`, and `action-executor`.
+Search, memory, retrieval and real RAG / summary adapter smokes are passed.
 
 AI invariants: keep facts, projections, retrieval and controlled execution
 separate. Memory requires source refs, scope, validity, supersession,

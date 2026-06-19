@@ -14,6 +14,7 @@ summary, Agent and tool/action boundaries.
 - action-executor external HTTP adapter eval:
   `tools/run-ai-eval-action-external-adapter.ps1`
 - Python worker output-safety adapter: `tools/run-ai-eval-python-worker-adapter.ps1`
+- ai-eval-service recorder smoke: `tools/run-ai-eval-record-run-smoke.ps1`
 - Go-side Python worker adapter smoke: `tools/python-worker-go-adapter-smoke`
 - rag-service service-level Python worker provider smoke:
   `services/rag-service/cmd/rag-python-worker-provider-smoke`
@@ -123,6 +124,26 @@ First-stage Python worker output-safety adapter:
 This adapter calls the local candidate-only Python worker CLI and verifies that
 malformed and unsafe inputs return low-sensitive `FAILED` candidates. It does
 not call external providers, databases or Go services.
+
+First-stage `ai-eval-service` RecordEvalRun recorder smoke:
+
+```powershell
+.\tools\run-ai-eval-record-run-smoke.ps1
+```
+
+By default this smoke runs the low-sensitive profile / Agent output safety
+adapter, writes the resulting summary under `H:\NexusIM\loadtest-results`, then
+records only the summary reference, counters and low-sensitive metadata through
+`ai-eval-service` `RecordEvalRun`. It verifies the run can be read back through
+`GetEvalRun` and `ListEvalRuns`. It applies the first ai-eval migration locally
+if needed and requires PostgreSQL through `-PGDSN` / `NEXUSIM_PG_DSN`.
+
+To record any existing low-sensitive adapter summary:
+
+```powershell
+.\tools\run-ai-eval-record-run-smoke.ps1 `
+  -SummaryPath H:\NexusIM\loadtest-results\<run>\adapter-summary.json
+```
 
 First-stage Go-side Python worker adapter smoke:
 

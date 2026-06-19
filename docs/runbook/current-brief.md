@@ -15,19 +15,8 @@
 
 NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端。
 
-已进入真实链路的 9 个后端服务：
-
-```text
-api-gateway
-identity-service
-message-service
-conversation-service
-delivery-service
-push-gateway
-receipt-service
-contacts-service
-policy-service
-```
+9 个后端服务已进入真实链路：api-gateway、identity、message、
+conversation、delivery、push、receipt、contacts、policy。
 
 当前唯一默认主线是 AI 大模型应用底座：
 
@@ -37,40 +26,23 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 -> proposal / approval / audit -> ai-eval
 ```
 
-当前已落的 AI foundation-active 服务：
+AI foundation-active 服务：search、memory、retrieval、rag、summary、
+agent、skill-registry、mcp-gateway、action-executor、ai-eval。
 
-```text
-search-service
-memory-service
-retrieval-gateway
-rag-service
-summary-service
-agent-service
-skill-registry
-mcp-gateway
-action-executor
-ai-eval-service
-```
-
-`ai-eval-service` first persistent eval run catalog 已落，第一版只保存低敏
-run summary / refs / metadata，不运行 eval，不保存 raw prompt / EvidencePack /
-model output。
+`ai-eval-service` first persistent eval run catalog 和 RecordEvalRun recorder
+smoke 已落，第一版只保存低敏 run summary / refs / metadata，不运行 eval，
+不保存 raw prompt / EvidencePack / model output。
 
 当前下一步：
 
 ```text
-wire existing AI eval scripts to ai-eval-service RecordEvalRun smoke
+AI eval multi-adapter aggregation / regression gate first path
 ```
 
 完整系统测试、生产级 HA、长压和 sizing 继续后置为 hardening backlog。
 
-## 文档职责
-
-- 当前进度总览：`docs/runbook/development-progress.md`
-- 当前未完成工作：`docs/runbook/remaining-goals.md`
-- 单服务状态：`docs/runbook/service-briefs/<service>.md`
-- 开发过程讲述线：`docs/runbook/development-process.md`
-- 面试讲述文档：`docs/interview/project-progress.md`
+文档职责：进度总览见 `development-progress.md`，未完成工作见
+`remaining-goals.md`，单服务状态见 `service-briefs/<service>.md`。
 
 ## 硬约束
 

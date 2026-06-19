@@ -21,56 +21,20 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 
 已落：
 
-- `search-service`、`memory-service`、`retrieval-gateway` first paths。
-- `rag-service`、`summary-service` read-only EvidencePack paths。
-- `agent-service` proposal-only path、mcp-gateway prepare、proposal store、
-  approval workflow、approval outbox relay、`VerifyApprovedAgentProposal`。
-- `agent-service` proposal approval operator first path。
-- `skill-registry` first catalog path。
-- `mcp-gateway` first prepare path。
-- `action-executor` first execution audit、approved proposal preflight、
-  low-sensitive result projection、本地安全 `nexusim.local.echo` adapter。
-- `action-executor` 外部 MCP fallback 错误分类和 tool output safety first path。
-- Agent execution eval adapter 覆盖 approval / execution / result projection /
-  safe local tool output。
-- Python AI Worker foundation 目录、`IM` conda toolchain、candidate contract
-  helpers、低敏安全检查和 `tools/check-python-ai-worker-boundary.ps1`。
-- RAG/Summary guarded external HTTP LLM boundary：prompt 只能来自 EvidencePack，
-  provider failure 回退 extractive，unsafe / malformed output fail closed。
-- Python worker malformed / unsafe output eval coverage 和第一条 candidate-only
-  worker smoke。
-- Go-side Python candidate adapter smoke：Go 控制面调用 Python worker CLI，
-  验证只消费低敏 candidate metadata / output hash。
-- `rag-service` 服务级 Python worker candidate guard：`python-worker` provider
-  mode 调用 Python worker CLI，只接受 hash / citation metadata，最终答案、
-  citation verifier 和 fail-closed 仍由 Go 控制。
-- `summary-service` 服务级 Python worker candidate guard：`python-worker`
-  provider mode 调用 Python worker CLI，只接受 hash / citation metadata，
-  最终摘要、citation verifier 和 fail-closed 仍由 Go 控制。
-- `agent-service` 服务级 planner Python worker candidate guard：`python-worker`
-  proposal provider mode 调用 Python worker CLI，只接受 proposal hash /
-  citation metadata，最终 proposal、citation verifier、approval 和 audit
-  仍由 Go 控制。
-- `action-executor` 外部 HTTP provider guarded adapter first path：默认关闭；
-  显式 `http` mode + allowlist + `LOW` risk 才执行，只发送 tool metadata /
-  `input_sha256`，provider output 继续走 safety gate 和 output hash projection。
-- action-executor external adapter eval / failure smoke：本地 provider fixture
-  覆盖 allowlisted success、provider failure 分类、unsafe output 抑制和 raw input
-  不外发。
-- profile overgeneralization / Agent output safety eval cases：新增低敏
-  profile / Agent safety cases 和本地 fixture adapter，覆盖单条群聊事实不能升级为
-  ACTIVE profile、profile candidate 必须 PENDING_REVIEW、Agent output 不能泄露
-  raw EvidencePack / secret-like 内容且不能发出未审批业务动作。
-- `ai-eval-service` first skeleton / persistent eval run catalog：新增
-  `RecordEvalRun` / `GetEvalRun` / `ListEvalRuns`、PG catalog、gRPC runtime、
-  Docker / compose / Prometheus / Grafana wiring 和聚焦测试；第一版只保存低敏
-  run summary / refs / metadata，不运行 eval，不保存 raw prompt / EvidencePack /
-  model output。
+- search / memory / retrieval / RAG / summary / Agent first paths。
+- skill-registry、mcp-gateway、action-executor first paths。
+- proposal / approval / audit / approval outbox relay / approved execution。
+- local safe tool adapter、guarded external HTTP adapter、tool output safety。
+- Python AI Worker foundation、Go-side candidate adapter smoke、RAG / Summary /
+  Agent 服务级 Python candidate guard。
+- profile overgeneralization / Agent output safety eval cases。
+- `ai-eval-service` persistent eval run catalog、RecordEvalRun recorder smoke
+  和报告：`docs/runbook/loadtest/ai-eval-service/`。
 
 下一步默认推进：
 
 ```text
-wire existing AI eval scripts to ai-eval-service RecordEvalRun smoke
+AI eval multi-adapter aggregation / regression gate first path
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

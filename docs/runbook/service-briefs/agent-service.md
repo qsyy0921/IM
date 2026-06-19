@@ -25,4 +25,4 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- ai-eval-service first skeleton / persistent eval run catalog；Agent 仍只提交 proposal，不直接执行工具。
+- ai-eval-service first persistent eval run catalog 和 RecordEvalRun recorder smoke；Agent 仍只提交 proposal，不直接执行工具。

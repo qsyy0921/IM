@@ -12,6 +12,8 @@ First stage:
 - query one run;
 - list runs by suite / status with cursor pagination;
 - store only low-sensitive metadata, counters and artifact references.
+- record an existing low-sensitive local AI eval summary through a recorder
+  smoke without storing raw eval payload.
 
 Out of scope:
 
@@ -80,7 +82,7 @@ Debug endpoints expose only first-stage service info:
 
 ## Next
 
-- Wire existing local AI eval scripts to `RecordEvalRun` through a small
-  low-sensitive recorder.
-- Add a smoke that writes one completed run and reads it back.
-- Add richer regression suite aggregation without storing raw user content.
+- Add richer multi-adapter regression suite aggregation without storing raw user
+  content.
+- Add first regression gate semantics for selected low-sensitive suites.
+- Keep CI / production policy decisions separate from the first-stage catalog.

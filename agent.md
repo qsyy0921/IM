@@ -47,10 +47,7 @@ The existing IM backend and distributed base are treated as a usable foundation;
 do not choose broad 9-service P2 hardening as the next task unless it blocks the
 AI line or the user explicitly asks for it.
 If the visible Codex goal prompt does not make this main line obvious, update
-`prompt.md` and the short prompt in `docs/runbook/current-goal.md` first before
-continuing implementation.
-The short prompt first line must say the only default main line is the AI
-application foundation. Do not hide it only in other docs.
+`prompt.md`; its first line must name AI application foundation as default.
 
 Existing real services: `api-gateway`, `identity-service`, `message-service`,
 `conversation-service`, `delivery-service`, `push-gateway`, `receipt-service`,
@@ -74,9 +71,9 @@ guard. RAG/Summary guarded external HTTP boundary, Python worker safety eval,
 Go-side smoke, RAG/Summary/Agent candidate guards, and action-executor guarded
 external HTTP adapter + eval first paths are landed. Profile overgeneralization
 and Agent output safety eval cases plus the local fixture adapter are landed.
-`ai-eval-service` first skeleton / persistent eval run catalog is landed.
-Next move is wiring existing AI eval scripts to ai-eval-service `RecordEvalRun`
-smoke, or `current-goal.md`.
+`ai-eval-service` first skeleton / persistent eval run catalog and generic
+RecordEvalRun recorder smoke are landed. Next move is AI eval multi-adapter
+aggregation / regression gate first path, or `current-goal.md`.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.

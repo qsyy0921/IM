@@ -8,14 +8,11 @@ adapter、状态、计数、summary/report 引用和低敏 metadata，方便后�
 
 当前已落：
 
-- `ai_eval_service.proto`
-- `migrations/postgres/ai-eval-service/000001_ai_eval_core.sql`
-- 六层 skeleton：api / app / domain / infrastructure / types / cmd
-- `RecordEvalRun`、`GetEvalRun`、`ListEvalRuns`
-- PostgreSQL repository、真实 PG 集成测试
-- `grpc` runtime mode、debug `/metrics`
-- Docker runtime、local compose、Prometheus rules、Grafana dashboard、
-  `service-registry.json` wiring
+- proto、migration、六层 skeleton、`RecordEvalRun` / `GetEvalRun` /
+  `ListEvalRuns`、PostgreSQL repository、`grpc` runtime 和 Docker / observability
+  wiring。
+- `ai-eval-record-smoke` 与 `run-ai-eval-record-run-smoke.ps1`：profile /
+  Agent safety summary -> gRPC `RecordEvalRun` -> `GetEvalRun` / `ListEvalRuns`。
 
 边界：
 
@@ -27,6 +24,5 @@ adapter、状态、计数、summary/report 引用和低敏 metadata，方便后�
 
 下一步：
 
-- 把现有 AI eval scripts 的 summary 通过 `RecordEvalRun` 写入 catalog。
-- 补本地 smoke：写入一个 completed run，再通过 Get/List 读回。
-- 后续再做 suite aggregation / CI gate，不把第一版 catalog 夸大成生产级 eval 平台。
+- 做 multi-adapter aggregation / regression gate first path。
+- 扩展 RAG / Agent / Python worker / tool adapter summary 记录；后续再做 CI gate。

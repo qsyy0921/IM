@@ -24,32 +24,31 @@ provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
 
 ## 当前未完成重点
 
-1. `ai-eval-service` 写入 smoke：
-   现有 AI eval scripts 仍只产出本地 summary/report。下一步需要把至少一条
-   低敏 eval summary 通过 `ai-eval-service.RecordEvalRun` 写入 PG catalog，
-   再通过 `GetEvalRun` / `ListEvalRuns` 读回。不得保存 raw prompt、
+1. AI eval 回归扩展：
+   `RecordEvalRun` recorder smoke 已能把低敏 eval summary 写入
+   `ai-eval-service` PG catalog。下一步继续做 multi-adapter aggregation /
+   regression gate first path：记录 RAG / Agent / Python worker / tool adapter
+   等多类 summary，形成低敏 suite-level 聚合，不保存 raw prompt、
    EvidencePack、model output、用户正文、secret 或 tool input。
-
-2. AI eval 回归扩展：
    继续补真实 Agent 输出回归、外部 MCP failure fallback、tool/action safety
    cases、profile overgeneralization 和 RAG / summary citation regression。所有
    eval case 必须低敏，可复核，能区分 retrieval failure、reasoning failure 和
    action boundary failure。
 
-3. Memory / retrieval 深化：
+2. Memory / retrieval 深化：
    `memory-service` 继续按 2025/2026 group memory / collaborative memory 论文
    方向深化 source refs、speaker / audience scope、valid_from / valid_to、
    supersedes / contradicts、confidence、PENDING / ACTIVE / SUPERSEDED /
    REJECTED 状态。单条群聊事实不能直接升级为个人 ACTIVE profile。
 
-4. Agent 真实业务动作扩展：
+3. Agent 真实业务动作扩展：
    `agent-service`、`skill-registry`、`mcp-gateway`、`action-executor` 已具备
    first path。后续接真实 MCP / provider tool 或业务写动作时，仍必须走：
    policy precheck -> skill contract -> prepare audit -> proposal -> approval
    -> executor -> low-sensitive result projection -> audit。高风险动作第一阶段
    禁止自动执行。
 
-5. Python AI Worker 扩展：
+4. Python AI Worker 扩展：
    `rag-service`、`summary-service`、`agent-service` 已接 candidate guard。
    后续可扩 embedding / rerank / memory extraction / planner / eval 候选，但
    Python 只返回候选和 hash / citation metadata；Go 继续拥有权限、审计、

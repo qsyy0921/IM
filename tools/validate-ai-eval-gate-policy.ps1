@@ -80,6 +80,18 @@ foreach ($requiredName in @($policy.policy.required_adapters)) {
     Assert-Condition ($requiredNames.Contains($required)) "required adapter is not marked required: $required"
 }
 
+foreach ($adapter in @($policy.optional_service_stack_adapters)) {
+    $name = Get-JsonPropertyString -Object $adapter -Name "name"
+    $script = Get-JsonPropertyString -Object $adapter -Name "script"
+    Assert-Condition ($name.Length -gt 0) "optional adapter.name is required"
+    Assert-Condition ($adapterNames.Add($name)) "duplicate adapter name: $name"
+    Assert-Condition ($script.Length -gt 0) "optional adapter.script is required for $name"
+    $scriptPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot $script))
+    Assert-Condition (Test-Path -LiteralPath $scriptPath -PathType Leaf) "optional adapter script does not exist for $name`: $scriptPath"
+    Assert-Condition ((Get-JsonPropertyString -Object $adapter -Name "run_suffix").Length -gt 0) "run_suffix is required for optional adapter $name"
+    Assert-Condition ((Get-JsonPropertyString -Object $adapter -Name "summary_file").Length -gt 0) "summary_file is required for optional adapter $name"
+}
+
 foreach ($forbidden in @($policy.forbidden_persisted_fields)) {
     Assert-Condition (([string]$forbidden).Trim().Length -gt 0) "forbidden persisted field list contains empty value"
 }

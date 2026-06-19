@@ -1,10 +1,28 @@
 param(
-    [string]$Python = "python"
+    [string]$Python = "python",
+    [string]$ResultRoot = "H:\NexusIM\loadtest-results",
+    [string]$RunName = "",
+    [string]$OutputPath = ""
 )
 
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot "output-root-safety.ps1")
+$writeSummaryFile = -not [string]::IsNullOrWhiteSpace($OutputPath)
+if ($writeSummaryFile) {
+    Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot $repoRoot -Name "ResultRoot"
+    if ([string]::IsNullOrWhiteSpace($RunName)) {
+        $RunName = "python-worker-eval-" + (Get-Date).ToUniversalTime().ToString("yyyyMMdd-HHmmss")
+    }
+    $resultDir = Join-Path $ResultRoot $RunName
+    Assert-ExternalOutputRoot -Value $resultDir -RepositoryRoot $repoRoot -Name "ResultDir"
+    if (-not (Test-Path -LiteralPath $resultDir)) {
+        New-Item -ItemType Directory -Force -Path $resultDir | Out-Null
+    }
+} else {
+    $resultDir = ""
+}
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("nexusim-python-worker-eval-" + [System.Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $tempRoot | Out-Null
 
@@ -79,14 +97,34 @@ try {
             -ExpectedErrorClass "UNSAFE_INPUT"
     )
 
-    [pscustomobject]@{
+    $summary = [pscustomobject]@{
         schema_version = 1
         adapter = "python-ai-worker"
+        generated_at = (Get-Date).ToUniversalTime().ToString("o")
         status = "passed"
+        run_name = $RunName
+        result_dir = $resultDir
         case_count = $cases.Count
         scope = "local low-sensitive Python worker eval adapter; no external provider, no database, no business write"
         cases = $cases
-    } | ConvertTo-Json -Depth 8
+    }
+    $summaryJson = $summary | ConvertTo-Json -Depth 8
+    if ($writeSummaryFile) {
+        if ([System.IO.Path]::IsPathRooted($OutputPath)) {
+            $resolvedOutputPath = [System.IO.Path]::GetFullPath($OutputPath)
+        } else {
+            $resolvedOutputPath = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $OutputPath))
+        }
+        $outputDir = Split-Path -Parent $resolvedOutputPath
+        Assert-ExternalOutputRoot -Value $outputDir -RepositoryRoot $repoRoot -Name "OutputPath directory"
+        if ($outputDir -and -not (Test-Path -LiteralPath $outputDir)) {
+            New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+        }
+        $summaryJson | Set-Content -LiteralPath $resolvedOutputPath -Encoding UTF8
+        Write-Host "OK   Python worker eval adapter summary written: $resolvedOutputPath"
+    } else {
+        $summaryJson
+    }
 } finally {
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }

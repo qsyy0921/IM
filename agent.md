@@ -71,9 +71,9 @@ guard. RAG/Summary guarded external HTTP boundary, Python worker safety eval,
 Go-side smoke, RAG/Summary/Agent candidate guards, and action-executor guarded
 external HTTP adapter + eval first paths are landed. Profile overgeneralization
 and Agent output safety eval cases plus the local fixture adapter are landed.
-`ai-eval-service` catalog, RecordEvalRun recorder, multi-adapter gate smoke and
-gate policy manifest are landed. Next move is AI eval optional service-stack
-adapter paths, or `current-goal.md`.
+`ai-eval-service` catalog, RecordEvalRun recorder, multi-adapter gate smoke,
+gate policy manifest and Python optional adapter path are landed. Next move is
+AI eval RAG / Agent optional service-stack live gate smoke, or `current-goal.md`.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.

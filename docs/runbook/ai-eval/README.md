@@ -167,6 +167,20 @@ into `ai-eval-service`, then writes a low-sensitive suite-level gate summary. It
 is a local regression gate skeleton, not a production CI gate and not a
 model-quality benchmark.
 
+Optional adapters are opt-in so normal local gates do not require a full service
+stack:
+
+```powershell
+.\tools\run-ai-eval-regression-gate-smoke.ps1 `
+  -OptionalAdapter python-ai-worker `
+  -Python C:\Users\10495\anaconda3\envs\IM\python.exe
+```
+
+`rag-service` and `agent-action-executor` can also be selected through
+`-OptionalAdapter`, but they require their listed service stacks and targets to
+already be running. The gate runner records any selected optional adapter through
+`ai-eval-service` with the same low-sensitive summary-only boundary.
+
 First-stage Go-side Python worker adapter smoke:
 
 ```powershell

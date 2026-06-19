@@ -30,13 +30,13 @@ AI foundation-active 服务：search、memory、retrieval、rag、summary、
 agent、skill-registry、mcp-gateway、action-executor、ai-eval。
 
 `ai-eval-service` catalog、RecordEvalRun recorder smoke、multi-adapter gate
-smoke 和 gate policy manifest 已落；只保存低敏 run refs / counters /
-metadata。
+smoke、gate policy manifest 和 Python optional adapter path 已落；只保存低敏
+run refs / counters / metadata。
 
 当前下一步：
 
 ```text
-AI eval optional service-stack adapter paths
+AI eval RAG / Agent optional service-stack live gate smoke
 ```
 
 完整系统测试、生产级 HA、长压和 sizing 继续后置为 hardening backlog。

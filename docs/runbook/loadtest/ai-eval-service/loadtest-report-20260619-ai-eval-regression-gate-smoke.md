@@ -10,13 +10,15 @@ Command:
 
 ```powershell
 .\tools\validate-ai-eval-gate-policy.ps1
-.\tools\run-ai-eval-regression-gate-smoke.ps1
+.\tools\run-ai-eval-regression-gate-smoke.ps1 `
+  -OptionalAdapter python-ai-worker `
+  -Python C:\Users\10495\anaconda3\envs\IM\python.exe
 ```
 
 Raw result root:
 
 ```text
-H:\NexusIM\loadtest-results\ai-eval-regression-gate-smoke-20260619-150125
+H:\NexusIM\loadtest-results\ai-eval-regression-gate-smoke-20260619-152028
 ```
 
 Gate policy:
@@ -30,6 +32,7 @@ Verified chain:
 ```text
 profile / Agent safety eval summary
 action-executor external HTTP adapter eval summary
+python-ai-worker output-safety eval summary
 -> ai-eval-service RecordEvalRun for each adapter
 -> GetEvalRun / ListEvalRuns for each adapter
 -> low-sensitive suite-level gate summary
@@ -39,9 +42,10 @@ Observed result:
 
 ```text
 status = passed
-adapter_count = 2
-case_count = 4
-passed_count = 4
+adapter_count = 3
+selected_optional_adapters = [python-ai-worker]
+case_count = 6
+passed_count = 6
 failed_count = 0
 skipped_count = 0
 
@@ -52,6 +56,11 @@ profile-agent-safety:
 
 action-external-http-provider:
   suite_id = ai-eval-action-external-http-provider
+  status = PASSED
+  case_count = 2
+
+python-ai-worker:
+  suite_id = ai-eval-python-ai-worker
   status = PASSED
   case_count = 2
 ```

@@ -1,7 +1,13 @@
 param(
     [string]$CasePath = "docs/runbook/ai-eval/retrieval-eval-cases.json",
     [string]$GatePolicyPath = "docs/runbook/ai-eval/gate-policy.local.json",
+    [string[]]$OptionalAdapter = @(),
+    [switch]$IncludeAllOptionalServiceStackAdapters,
     [string]$PGDSN = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
+    [string]$RAGTarget = "127.0.0.1:10610",
+    [string]$AgentTarget = "127.0.0.1:10630",
+    [string]$ActionExecutorTarget = "127.0.0.1:10660",
+    [string]$Python = "python",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
     [string]$OutputPath = "",
@@ -78,6 +84,68 @@ function Get-JsonPropertyBool {
     return [System.Convert]::ToBoolean($value)
 }
 
+function ConvertTo-NameList {
+    param([string[]]$Names)
+
+    $result = New-Object System.Collections.Generic.List[string]
+    foreach ($name in @($Names)) {
+        foreach ($part in ([string]$name).Split(",")) {
+            $trimmed = $part.Trim()
+            if ($trimmed.Length -gt 0) {
+                $result.Add($trimmed)
+            }
+        }
+    }
+    return $result.ToArray()
+}
+
+function Invoke-GateAdapter {
+    param(
+        [string]$AdapterName,
+        [string]$ScriptPath,
+        [string]$AdapterRunName,
+        [string]$SummaryPath
+    )
+
+    switch ($AdapterName) {
+        "rag-service" {
+            & $ScriptPath `
+                -CasePath $resolvedCasePath `
+                -PGDSN $PGDSN `
+                -RAGTarget $RAGTarget `
+                -ResultRoot $ResultRoot `
+                -RunName $AdapterRunName `
+                -OutputPath $SummaryPath `
+                -RequestTimeout $RequestTimeout
+        }
+        "agent-action-executor" {
+            & $ScriptPath `
+                -CasePath $resolvedCasePath `
+                -PGDSN $PGDSN `
+                -AgentTarget $AgentTarget `
+                -ActionExecutorTarget $ActionExecutorTarget `
+                -ResultRoot $ResultRoot `
+                -RunName $AdapterRunName `
+                -OutputPath $SummaryPath `
+                -RequestTimeout $RequestTimeout
+        }
+        "python-ai-worker" {
+            & $ScriptPath `
+                -Python $Python `
+                -ResultRoot $ResultRoot `
+                -RunName $AdapterRunName `
+                -OutputPath $SummaryPath
+        }
+        default {
+            & $ScriptPath `
+                -CasePath $resolvedCasePath `
+                -ResultRoot $ResultRoot `
+                -RunName $AdapterRunName `
+                -OutputPath $SummaryPath
+        }
+    }
+}
+
 function Invoke-EvalRecorder {
     param(
         [string]$SummaryPath,
@@ -136,8 +204,23 @@ $gatePolicy = Get-Content -LiteralPath $resolvedGatePolicyPath -Raw | ConvertFro
 Assert-Condition ([int]$gatePolicy.schema_version -eq 1) "unsupported gate policy schema_version"
 Assert-Condition (@($gatePolicy.adapters).Count -gt 0) "gate policy has no adapters"
 
-$adapters = @($gatePolicy.adapters | Where-Object { Get-JsonPropertyBool -Object $_ -Name "required" })
-Assert-Condition ($adapters.Count -gt 0) "gate policy has no required adapters"
+$requiredAdapters = @($gatePolicy.adapters | Where-Object { Get-JsonPropertyBool -Object $_ -Name "required" })
+Assert-Condition ($requiredAdapters.Count -gt 0) "gate policy has no required adapters"
+
+$optionalAdapters = @($gatePolicy.optional_service_stack_adapters)
+$selectedOptionalAdapters = @()
+$selectedOptionalNames = ConvertTo-NameList -Names $OptionalAdapter
+if ($IncludeAllOptionalServiceStackAdapters) {
+    $selectedOptionalAdapters = $optionalAdapters
+} elseif ($selectedOptionalNames.Count -gt 0) {
+    foreach ($selectedName in $selectedOptionalNames) {
+        $match = @($optionalAdapters | Where-Object { (Get-JsonPropertyString -Object $_ -Name "name") -eq $selectedName })
+        Assert-Condition ($match.Count -eq 1) "optional adapter is not declared in gate policy: $selectedName"
+        $selectedOptionalAdapters += $match[0]
+    }
+}
+
+$adapters = @($requiredAdapters + $selectedOptionalAdapters)
 
 $adapterResults = New-Object System.Collections.Generic.List[object]
 $totalCases = 0
@@ -159,11 +242,11 @@ foreach ($adapter in $adapters) {
     $scriptPath = Join-Path $PSScriptRoot $scriptName
     Assert-Condition (Test-Path -LiteralPath $scriptPath -PathType Leaf) "adapter script does not exist for $adapterName`: $scriptPath"
 
-    & $scriptPath `
-        -CasePath $resolvedCasePath `
-        -ResultRoot $ResultRoot `
-        -RunName $adapterRunName `
-        -OutputPath $summaryPath
+    Invoke-GateAdapter `
+        -AdapterName $adapterName `
+        -ScriptPath $scriptPath `
+        -AdapterRunName $adapterRunName `
+        -SummaryPath $summaryPath
 
     Assert-Condition (Test-Path -LiteralPath $summaryPath -PathType Leaf) "adapter summary missing: $summaryPath"
     Invoke-EvalRecorder -SummaryPath $summaryPath -RecordOutputPath $recordPath
@@ -221,12 +304,13 @@ if ($totalFailed -gt $maxFailedCount -or $totalCases -lt $minCaseCount) {
 $gateSummary = [pscustomobject]@{
     schema_version = 1
     status = $gateStatus
-    scope = "first-stage AI eval multi-adapter regression gate; low-sensitive local adapters only"
+    scope = "first-stage AI eval multi-adapter regression gate; required local adapters plus explicit optional adapters only"
     gate_id = Get-JsonPropertyString -Object $gatePolicy -Name "gate_id"
     gate_policy_ref = $resolvedGatePolicyPath
     run_name = $RunName
     result_dir = $resultDir
     adapter_count = $adapterResults.Count
+    selected_optional_adapters = @($selectedOptionalAdapters | ForEach-Object { Get-JsonPropertyString -Object $_ -Name "name" })
     case_count = $totalCases
     passed_count = $totalPassed
     failed_count = $totalFailed

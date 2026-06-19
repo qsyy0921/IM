@@ -15,6 +15,10 @@ summary, Agent and tool/action boundaries.
   `tools/run-ai-eval-action-external-adapter.ps1`
 - Python worker output-safety adapter: `tools/run-ai-eval-python-worker-adapter.ps1`
 - ai-eval-service recorder smoke: `tools/run-ai-eval-record-run-smoke.ps1`
+- ai-eval-service gate policy manifest:
+  `docs/runbook/ai-eval/gate-policy.local.json`
+- ai-eval-service gate policy validator:
+  `tools/validate-ai-eval-gate-policy.ps1`
 - ai-eval-service multi-adapter gate smoke:
   `tools/run-ai-eval-regression-gate-smoke.ps1`
 - Go-side Python worker adapter smoke: `tools/python-worker-go-adapter-smoke`
@@ -150,13 +154,18 @@ To record any existing low-sensitive adapter summary:
 First-stage multi-adapter regression gate smoke:
 
 ```powershell
+.\tools\validate-ai-eval-gate-policy.ps1
 .\tools\run-ai-eval-regression-gate-smoke.ps1
 ```
 
-This smoke runs profile / Agent output safety and action-executor external HTTP
-adapter evals, records both summaries into `ai-eval-service`, then writes a
-low-sensitive suite-level gate summary. It is a local regression gate skeleton,
-not a production CI gate and not a model-quality benchmark.
+The gate policy manifest declares required adapters, minimum case count, maximum
+failure count, `GetEvalRun` / `ListEvalRuns` readback requirements, forbidden
+persisted fields, and optional service-stack adapters for later RAG / Agent /
+Python worker coverage. The smoke runs the required profile / Agent output
+safety and action-executor external HTTP adapter evals, records both summaries
+into `ai-eval-service`, then writes a low-sensitive suite-level gate summary. It
+is a local regression gate skeleton, not a production CI gate and not a
+model-quality benchmark.
 
 First-stage Go-side Python worker adapter smoke:
 

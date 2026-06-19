@@ -13,8 +13,9 @@ adapter、状态、计数、summary/report 引用和低敏 metadata，方便后�
   wiring。
 - `ai-eval-record-smoke` 与 `run-ai-eval-record-run-smoke.ps1`：profile /
   Agent safety summary -> gRPC `RecordEvalRun` -> `GetEvalRun` / `ListEvalRuns`。
-- `run-ai-eval-regression-gate-smoke.ps1`：profile / Agent safety + action
-  external HTTP adapter summary -> catalog -> low-sensitive gate summary。
+- `run-ai-eval-regression-gate-smoke.ps1`、`gate-policy.local.json` 和
+  `validate-ai-eval-gate-policy.ps1`：声明必跑 adapter、阈值、Get / List
+  读回、禁止持久化字段和可选 service-stack adapter。
 
 边界：
 
@@ -24,6 +25,4 @@ adapter、状态、计数、summary/report 引用和低敏 metadata，方便后�
   tool input。
 - 不授权业务动作；真实动作仍走 policy、proposal / approval、executor 和 audit。
 
-下一步：
-
-- 做 gate policy manifest / optional service-stack adapter paths；后续再做 CI gate。
+下一步：做 optional service-stack adapter paths；后续再做 CI gate。

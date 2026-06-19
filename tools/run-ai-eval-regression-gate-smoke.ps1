@@ -1,5 +1,6 @@
 param(
     [string]$CasePath = "docs/runbook/ai-eval/retrieval-eval-cases.json",
+    [string]$GatePolicyPath = "docs/runbook/ai-eval/gate-policy.local.json",
     [string]$PGDSN = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
@@ -31,6 +32,50 @@ function Resolve-RepoPath {
         return [System.IO.Path]::GetFullPath($PathValue)
     }
     return [System.IO.Path]::GetFullPath((Join-Path $repoRoot $PathValue))
+}
+
+function Get-JsonPropertyValue {
+    param(
+        $Object,
+        [string]$Name,
+        $DefaultValue = $null
+    )
+
+    if ($null -eq $Object -or $null -eq $Object.PSObject.Properties[$Name]) {
+        return $DefaultValue
+    }
+    return $Object.$Name
+}
+
+function Get-JsonPropertyString {
+    param(
+        $Object,
+        [string]$Name,
+        [string]$DefaultValue = ""
+    )
+
+    $value = Get-JsonPropertyValue -Object $Object -Name $Name -DefaultValue $DefaultValue
+    if ($null -eq $value) {
+        return ""
+    }
+    return ([string]$value).Trim()
+}
+
+function Get-JsonPropertyBool {
+    param(
+        $Object,
+        [string]$Name,
+        [bool]$DefaultValue = $false
+    )
+
+    $value = Get-JsonPropertyValue -Object $Object -Name $Name -DefaultValue $DefaultValue
+    if ($value -is [bool]) {
+        return $value
+    }
+    if ($null -eq $value) {
+        return $DefaultValue
+    }
+    return [System.Convert]::ToBoolean($value)
 }
 
 function Invoke-EvalRecorder {
@@ -85,20 +130,14 @@ if (-not (Test-Path -LiteralPath $resultDir)) {
 $resolvedCasePath = Resolve-RepoPath $CasePath
 Assert-Condition (Test-Path -LiteralPath $resolvedCasePath -PathType Leaf) "CasePath does not exist: $resolvedCasePath"
 
-$adapters = @(
-    [pscustomobject]@{
-        name = "profile-agent-safety"
-        script = "run-ai-eval-profile-agent-safety.ps1"
-        run_suffix = "profile-agent-safety"
-        summary_file = "profile-agent-safety-eval-summary.json"
-    },
-    [pscustomobject]@{
-        name = "action-external-http-provider"
-        script = "run-ai-eval-action-external-adapter.ps1"
-        run_suffix = "action-external-http"
-        summary_file = "action-external-http-eval-summary.json"
-    }
-)
+$resolvedGatePolicyPath = Resolve-RepoPath $GatePolicyPath
+Assert-Condition (Test-Path -LiteralPath $resolvedGatePolicyPath -PathType Leaf) "GatePolicyPath does not exist: $resolvedGatePolicyPath"
+$gatePolicy = Get-Content -LiteralPath $resolvedGatePolicyPath -Raw | ConvertFrom-Json
+Assert-Condition ([int]$gatePolicy.schema_version -eq 1) "unsupported gate policy schema_version"
+Assert-Condition (@($gatePolicy.adapters).Count -gt 0) "gate policy has no adapters"
+
+$adapters = @($gatePolicy.adapters | Where-Object { Get-JsonPropertyBool -Object $_ -Name "required" })
+Assert-Condition ($adapters.Count -gt 0) "gate policy has no required adapters"
 
 $adapterResults = New-Object System.Collections.Generic.List[object]
 $totalCases = 0
@@ -107,10 +146,18 @@ $totalFailed = 0
 $totalSkipped = 0
 
 foreach ($adapter in $adapters) {
-    $adapterRunName = "$RunName-$($adapter.run_suffix)"
-    $summaryPath = Join-Path $resultDir $adapter.summary_file
-    $recordPath = Join-Path $resultDir "$($adapter.name)-record-summary.json"
-    $scriptPath = Join-Path $PSScriptRoot $adapter.script
+    $adapterName = Get-JsonPropertyString -Object $adapter -Name "name"
+    $scriptName = Get-JsonPropertyString -Object $adapter -Name "script"
+    $runSuffix = Get-JsonPropertyString -Object $adapter -Name "run_suffix" -DefaultValue $adapterName
+    $summaryFile = Get-JsonPropertyString -Object $adapter -Name "summary_file" -DefaultValue "$adapterName-summary.json"
+    Assert-Condition ($adapterName.Length -gt 0) "gate policy adapter name is required"
+    Assert-Condition ($scriptName.Length -gt 0) "gate policy script is required for $adapterName"
+
+    $adapterRunName = "$RunName-$runSuffix"
+    $summaryPath = Join-Path $resultDir $summaryFile
+    $recordPath = Join-Path $resultDir "$adapterName-record-summary.json"
+    $scriptPath = Join-Path $PSScriptRoot $scriptName
+    Assert-Condition (Test-Path -LiteralPath $scriptPath -PathType Leaf) "adapter script does not exist for $adapterName`: $scriptPath"
 
     & $scriptPath `
         -CasePath $resolvedCasePath `
@@ -123,10 +170,14 @@ foreach ($adapter in $adapters) {
     Assert-Condition (Test-Path -LiteralPath $recordPath -PathType Leaf) "record summary missing: $recordPath"
 
     $record = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
-    Assert-Condition ($record.status -eq "passed") "record smoke did not pass for $($adapter.name)"
-    Assert-Condition ($record.eval_run_status -eq "PASSED") "eval run status was not PASSED for $($adapter.name)"
-    Assert-Condition ([bool]$record.get_run_matched) "GetEvalRun did not match for $($adapter.name)"
-    Assert-Condition ([bool]$record.list_contains_run) "ListEvalRuns did not contain run for $($adapter.name)"
+    Assert-Condition ($record.status -eq "passed") "record smoke did not pass for $adapterName"
+    Assert-Condition ($record.eval_run_status -eq "PASSED") "eval run status was not PASSED for $adapterName"
+    if (Get-JsonPropertyBool -Object $gatePolicy.policy -Name "require_get_run" -DefaultValue $true) {
+        Assert-Condition ([bool]$record.get_run_matched) "GetEvalRun did not match for $adapterName"
+    }
+    if (Get-JsonPropertyBool -Object $gatePolicy.policy -Name "require_list_run" -DefaultValue $true) {
+        Assert-Condition ([bool]$record.list_contains_run) "ListEvalRuns did not contain run for $adapterName"
+    }
 
     $totalCases += [int]$record.case_count
     $totalPassed += [int]$record.passed_count
@@ -134,7 +185,7 @@ foreach ($adapter in $adapters) {
     $totalSkipped += [int]$record.skipped_count
 
     $adapterResults.Add([pscustomobject]@{
-        name = $adapter.name
+        name = $adapterName
         run_id = $record.run_id
         suite_id = $record.suite_id
         stage = $record.stage
@@ -149,7 +200,21 @@ foreach ($adapter in $adapters) {
 }
 
 $gateStatus = "passed"
-if ($totalFailed -gt 0 -or $totalCases -eq 0) {
+$maxFailedCount = [int](Get-JsonPropertyValue -Object $gatePolicy.policy -Name "max_failed_count" -DefaultValue 0)
+$minCaseCount = [int](Get-JsonPropertyValue -Object $gatePolicy.policy -Name "min_case_count" -DefaultValue 1)
+$requiredAdapterNames = @($gatePolicy.policy.required_adapters | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_.Length -gt 0 })
+foreach ($requiredName in $requiredAdapterNames) {
+    $found = $false
+    foreach ($adapterResult in $adapterResults.ToArray()) {
+        if ($adapterResult.name -eq $requiredName) {
+            $found = $true
+        }
+    }
+    if (-not $found) {
+        throw "required adapter did not run: $requiredName"
+    }
+}
+if ($totalFailed -gt $maxFailedCount -or $totalCases -lt $minCaseCount) {
     $gateStatus = "failed"
 }
 
@@ -157,6 +222,8 @@ $gateSummary = [pscustomobject]@{
     schema_version = 1
     status = $gateStatus
     scope = "first-stage AI eval multi-adapter regression gate; low-sensitive local adapters only"
+    gate_id = Get-JsonPropertyString -Object $gatePolicy -Name "gate_id"
+    gate_policy_ref = $resolvedGatePolicyPath
     run_name = $RunName
     result_dir = $resultDir
     adapter_count = $adapterResults.Count

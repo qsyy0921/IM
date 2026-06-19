@@ -29,13 +29,14 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 AI foundation-active 服务：search、memory、retrieval、rag、summary、
 agent、skill-registry、mcp-gateway、action-executor、ai-eval。
 
-`ai-eval-service` catalog、RecordEvalRun recorder smoke 和 multi-adapter gate
-smoke 已落；只保存低敏 run refs / counters / metadata。
+`ai-eval-service` catalog、RecordEvalRun recorder smoke、multi-adapter gate
+smoke 和 gate policy manifest 已落；只保存低敏 run refs / counters /
+metadata。
 
 当前下一步：
 
 ```text
-AI eval gate policy manifest / optional service-stack adapter paths
+AI eval optional service-stack adapter paths
 ```
 
 完整系统测试、生产级 HA、长压和 sizing 继续后置为 hardening backlog。

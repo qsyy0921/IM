@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "gate_id": "ai-eval-local-foundation-gate",
+  "scope": "first-stage low-sensitive local AI eval gate; not a production CI gate or model-quality benchmark",
+  "policy": {
+    "min_case_count": 4,
+    "max_failed_count": 0,
+    "require_get_run": true,
+    "require_list_run": true,
+    "required_adapters": [
+      "profile-agent-safety",
+      "action-external-http-provider"
+    ]
+  },
+  "adapters": [
+    {
+      "name": "profile-agent-safety",
+      "required": true,
+      "script": "run-ai-eval-profile-agent-safety.ps1",
+      "run_suffix": "profile-agent-safety",
+      "summary_file": "profile-agent-safety-eval-summary.json",
+      "requires_service_stack": false
+    },
+    {
+      "name": "action-external-http-provider",
+      "required": true,
+      "script": "run-ai-eval-action-external-adapter.ps1",
+      "run_suffix": "action-external-http",
+      "summary_file": "action-external-http-eval-summary.json",
+      "requires_service_stack": false
+    }
+  ],
+  "optional_service_stack_adapters": [
+    {
+      "name": "rag-service",
+      "script": "run-ai-eval-rag-adapter.ps1",
+      "requires": [
+        "rag-service",
+        "retrieval-gateway",
+        "search-service",
+        "memory-service",
+        "postgres"
+      ]
+    },
+    {
+      "name": "agent-action-executor",
+      "script": "run-ai-eval-agent-adapter.ps1",
+      "requires": [
+        "agent-service",
+        "action-executor",
+        "retrieval-gateway",
+        "mcp-gateway",
+        "skill-registry",
+        "policy-service",
+        "postgres"
+      ]
+    },
+    {
+      "name": "python-ai-worker",
+      "script": "run-ai-eval-python-worker-adapter.ps1",
+      "requires": [
+        "conda-env:IM"
+      ]
+    }
+  ],
+  "forbidden_persisted_fields": [
+    "raw_prompt",
+    "raw_evidencepack",
+    "raw_model_output",
+    "user_content",
+    "secret",
+    "tool_input",
+    "provider_response_body"
+  ]
+}

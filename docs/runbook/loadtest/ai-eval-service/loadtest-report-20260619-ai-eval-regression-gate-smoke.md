@@ -9,13 +9,20 @@ platform.
 Command:
 
 ```powershell
+.\tools\validate-ai-eval-gate-policy.ps1
 .\tools\run-ai-eval-regression-gate-smoke.ps1
 ```
 
 Raw result root:
 
 ```text
-H:\NexusIM\loadtest-results\ai-eval-regression-gate-smoke-20260619-144640
+H:\NexusIM\loadtest-results\ai-eval-regression-gate-smoke-20260619-150125
+```
+
+Gate policy:
+
+```text
+docs/runbook/ai-eval/gate-policy.local.json
 ```
 
 Verified chain:

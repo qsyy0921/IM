@@ -30,7 +30,7 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 - profile overgeneralization / Agent output safety eval cases。
 - `ai-eval-service` persistent eval run catalog、RecordEvalRun recorder smoke、
   multi-adapter regression gate smoke、gate policy manifest、Python optional
-  adapter path 和报告：
+  adapter path、service-stack preflight wrapper 和报告：
   `docs/runbook/loadtest/ai-eval-service/`。
 
 下一步默认推进：

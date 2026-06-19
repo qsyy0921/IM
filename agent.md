@@ -72,8 +72,9 @@ Go-side smoke, RAG/Summary/Agent candidate guards, and action-executor guarded
 external HTTP adapter + eval first paths are landed. Profile overgeneralization
 and Agent output safety eval cases plus the local fixture adapter are landed.
 `ai-eval-service` catalog, RecordEvalRun recorder, multi-adapter gate smoke,
-gate policy manifest and Python optional adapter path are landed. Next move is
-AI eval RAG / Agent optional service-stack live gate smoke, or `current-goal.md`.
+gate policy manifest, Python optional adapter path and service-stack preflight
+wrapper are landed. Next move is AI eval RAG / Agent optional service-stack live
+gate smoke, or `current-goal.md`.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.
@@ -124,9 +125,8 @@ practical.
 
 ## Sub-Agents
 
-Use sub-agents only for disjoint review, implementation or verification. Keep
-one service / concern / output per agent, avoid concurrent edits to the same
-file or section, and close stale agents after integration.
+Use sub-agents only for disjoint review, implementation or verification. Keep one
+service / concern / output per agent, avoid concurrent edits, and close stale agents.
 
 ## Validation Before Finishing
 

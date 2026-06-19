@@ -181,6 +181,17 @@ stack:
 already be running. The gate runner records any selected optional adapter through
 `ai-eval-service` with the same low-sensitive summary-only boundary.
 
+RAG / Agent service-stack gate wrapper:
+
+```powershell
+.\tools\run-ai-eval-service-stack-gate-smoke.ps1 -PreflightOnly -AllowMissing
+.\tools\run-ai-eval-service-stack-gate-smoke.ps1
+```
+
+The preflight writes endpoint readiness only. It does not prove live RAG / Agent
+adapter behavior. Remove `-PreflightOnly` and `-AllowMissing` only after the
+RAG / Agent service stack is running.
+
 First-stage Go-side Python worker adapter smoke:
 
 ```powershell

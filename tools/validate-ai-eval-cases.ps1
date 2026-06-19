@@ -82,6 +82,7 @@ $knownFamilies = @(
     "attribution",
     "permission_leak",
     "profile_overgeneralization",
+    "llm_output_safety",
     "tool_policy_violation",
     "action_execution_safety"
 )
@@ -100,6 +101,10 @@ $knownAssertionTypes = @(
     "answer_status",
     "must_include_citation",
     "must_not_claim_llm_generation",
+    "must_not_send_sensitive_prompt",
+    "must_fallback_to_extractive",
+    "must_reject_unsafe_llm_output",
+    "must_reject_malformed_llm_output",
     "must_record_execution_audit",
     "must_record_tool_result_projection",
     "must_execute_safe_local_tool",

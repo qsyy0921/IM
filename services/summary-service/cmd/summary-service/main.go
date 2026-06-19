@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/qsyy0921/IM/internal/ai/llmboundary"
 	summarygrpc "github.com/qsyy0921/IM/services/summary-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/summary-service/internal/app"
 	rpcinfra "github.com/qsyy0921/IM/services/summary-service/internal/infrastructure/rpc"
@@ -77,6 +78,10 @@ func runGRPC(ctx context.Context) error {
 		return err
 	}
 	defer closeRetrieval()
+	provider, err := summaryProviderFromEnv()
+	if err != nil {
+		return err
+	}
 
 	addr := envString("NEXUSIM_SUMMARY_GRPC_ADDR", "127.0.0.1:10620")
 	listener, err := net.Listen("tcp", addr)
@@ -84,7 +89,7 @@ func runGRPC(ctx context.Context) error {
 		return err
 	}
 	server := grpc.NewServer()
-	summarygrpc.Register(server, summarygrpc.NewServer(app.NewGenerateConversationSummaryUseCase(retrievalClient)))
+	summarygrpc.Register(server, summarygrpc.NewServer(app.NewGenerateConversationSummaryUseCaseWithProvider(retrievalClient, provider)))
 
 	serveErr := make(chan error, 1)
 	go func() {
@@ -192,6 +197,43 @@ func envDuration(name string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return parsed
+}
+
+func envInt(name string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func summaryProviderFromEnv() (app.SummaryProvider, error) {
+	mode := strings.ToLower(envString("NEXUSIM_SUMMARY_PROVIDER_MODE", "extractive"))
+	switch mode {
+	case "extractive":
+		return app.ExtractiveSummaryProvider{}, nil
+	case "external-http":
+		client, err := llmboundary.NewHTTPClient(llmboundary.HTTPClientOptions{
+			Endpoint:         envString("NEXUSIM_SUMMARY_LLM_ENDPOINT", ""),
+			BearerToken:      envString("NEXUSIM_SUMMARY_LLM_BEARER_TOKEN", ""),
+			Timeout:          envDuration("NEXUSIM_SUMMARY_LLM_TIMEOUT", 2*time.Second),
+			MaxResponseBytes: int64(envInt("NEXUSIM_SUMMARY_LLM_MAX_RESPONSE_BYTES", int(llmboundary.DefaultMaxResponseBytes))),
+		})
+		if err != nil {
+			return nil, err
+		}
+		return app.NewGuardedLLMSummaryProvider(client, llmboundary.Options{
+			TokenBudget:      envInt("NEXUSIM_SUMMARY_LLM_TOKEN_BUDGET", llmboundary.DefaultTokenBudget),
+			MaxEvidenceItems: envInt("NEXUSIM_SUMMARY_LLM_MAX_EVIDENCE_ITEMS", llmboundary.DefaultMaxEvidenceItems),
+			MaxTextRunes:     envInt("NEXUSIM_SUMMARY_LLM_MAX_TEXT_RUNES", llmboundary.DefaultMaxTextRunes),
+		}), nil
+	default:
+		return nil, fmt.Errorf("unsupported NEXUSIM_SUMMARY_PROVIDER_MODE %q", mode)
+	}
 }
 
 func startDebugServer(ctx context.Context, addr string) (func(), error) {

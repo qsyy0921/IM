@@ -17,6 +17,36 @@ func TestValidateSummaryServiceMode(t *testing.T) {
 	}
 }
 
+func TestSummaryProviderFromEnvDefaultsToExtractive(t *testing.T) {
+	t.Setenv("NEXUSIM_SUMMARY_PROVIDER_MODE", "")
+	if _, err := summaryProviderFromEnv(); err != nil {
+		t.Fatalf("default provider should be valid: %v", err)
+	}
+}
+
+func TestSummaryProviderFromEnvRequiresExternalEndpoint(t *testing.T) {
+	t.Setenv("NEXUSIM_SUMMARY_PROVIDER_MODE", "external-http")
+	t.Setenv("NEXUSIM_SUMMARY_LLM_ENDPOINT", "")
+	if _, err := summaryProviderFromEnv(); err == nil {
+		t.Fatal("expected missing external endpoint error")
+	}
+}
+
+func TestSummaryProviderFromEnvAllowsLocalExternalEndpoint(t *testing.T) {
+	t.Setenv("NEXUSIM_SUMMARY_PROVIDER_MODE", "external-http")
+	t.Setenv("NEXUSIM_SUMMARY_LLM_ENDPOINT", "http://127.0.0.1:18081/llm")
+	if _, err := summaryProviderFromEnv(); err != nil {
+		t.Fatalf("local external endpoint should be valid: %v", err)
+	}
+}
+
+func TestSummaryProviderFromEnvRejectsUnsupportedMode(t *testing.T) {
+	t.Setenv("NEXUSIM_SUMMARY_PROVIDER_MODE", "bad")
+	if _, err := summaryProviderFromEnv(); err == nil {
+		t.Fatal("expected unsupported provider mode error")
+	}
+}
+
 func TestValidateSummaryDebugListenerConfigAllowsEmptyOrPrivateAddress(t *testing.T) {
 	for _, addr := range []string{"", "localhost:11921", "127.0.0.1:11921", "172.30.80.24:11921"} {
 		if err := validateSummaryDebugListenerConfig(addr, false); err != nil {

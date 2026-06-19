@@ -12,8 +12,12 @@
 - 调用 `retrieval-gateway.RetrieveEvidence` 获取 EvidencePack。
 - 第一版通过 `SummaryProvider` port 生成 deterministic extractive summary；
   默认实现不调用外部 LLM provider。
+- 可选 `external-http` provider mode 只作为第一阶段外部 LLM boundary：它仍走
+  `SummaryProvider` port，prompt 只能由 EvidencePack 构造，HTTP 明文 endpoint
+  只允许 loopback / private，provider failure 回退 extractive，unsafe /
+  malformed output fail closed。
 - response 必须保留 `citations`、原始 `EvidencePack`、`summary_version` 和
-  `generated_by_llm=false`。
+  `generated_by_llm`。
 - 无可见证据时返回 `INSUFFICIENT_EVIDENCE`，不能编造摘要。
 - provider 输出必须经过 citation verifier；引用无法匹配 EvidencePack 时
   fail closed，不返回 ungrounded summary。
@@ -23,7 +27,7 @@
 - 不直接读 message / conversation / delivery / search / memory 私有表。
 - 不做 indexing、memory extraction、profile aggregate 或权限投影。
 - 不执行 Agent 动作，不写业务事实，不发布 Kafka 事件。
-- 不在第一版接外部 LLM adapter、prompt template registry 或缓存。
+- 不接 provider-specific SDK、prompt template registry、缓存或长期模型状态。
 
 ## 链路
 
@@ -52,6 +56,7 @@ citation verifier。
 
 ## 后续
 
-- 外部 LLM adapter 接入时增加 prompt boundary、token budget、PII / secret
-  filter 和 provider failure fallback。
+- 后续接 provider-specific LLM / Python worker 时继续复用 prompt boundary、
+  token budget、PII / secret filter、provider failure fallback 和 citation
+  verifier。
 - 与 `agent-service` 对接时仍只暴露 EvidencePack summary，不授予业务写权限。

@@ -12,6 +12,8 @@
   `/metrics`、registry / Docker / compose / Prometheus / Grafana wiring
 - app usecase 调用 retrieval port 和 `AnswerProvider` port；默认本地
   extractive provider 基于 EvidencePack 生成 deterministic answer
+- 已补 guarded external HTTP LLM boundary：只由 EvidencePack 构造 prompt，
+  provider failure 回退 extractive，unsafe / malformed output fail closed
 - response 保留 citations、EvidencePack、`generated_by_llm=false`
 - provider 输出后统一运行 citation verifier，无法匹配 EvidencePack 则
   fail closed
@@ -22,5 +24,6 @@
 
 下一步：
 
-- 外部 LLM adapter 后续仍必须走 AnswerProvider port 和 citation verifier。
+- provider-specific LLM / Python worker 后续仍必须走 AnswerProvider port、prompt
+  guard 和 citation verifier。
 - `summary-service` 已进入 foundation-active；summary / Agent 仍只能消费 EvidencePack。

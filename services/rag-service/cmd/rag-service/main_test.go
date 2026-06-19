@@ -17,6 +17,36 @@ func TestValidateRAGServiceMode(t *testing.T) {
 	}
 }
 
+func TestRAGAnswerProviderFromEnvDefaultsToExtractive(t *testing.T) {
+	t.Setenv("NEXUSIM_RAG_PROVIDER_MODE", "")
+	if _, err := ragAnswerProviderFromEnv(); err != nil {
+		t.Fatalf("default provider should be valid: %v", err)
+	}
+}
+
+func TestRAGAnswerProviderFromEnvRequiresExternalEndpoint(t *testing.T) {
+	t.Setenv("NEXUSIM_RAG_PROVIDER_MODE", "external-http")
+	t.Setenv("NEXUSIM_RAG_LLM_ENDPOINT", "")
+	if _, err := ragAnswerProviderFromEnv(); err == nil {
+		t.Fatal("expected missing external endpoint error")
+	}
+}
+
+func TestRAGAnswerProviderFromEnvAllowsLocalExternalEndpoint(t *testing.T) {
+	t.Setenv("NEXUSIM_RAG_PROVIDER_MODE", "external-http")
+	t.Setenv("NEXUSIM_RAG_LLM_ENDPOINT", "http://127.0.0.1:18080/llm")
+	if _, err := ragAnswerProviderFromEnv(); err != nil {
+		t.Fatalf("local external endpoint should be valid: %v", err)
+	}
+}
+
+func TestRAGAnswerProviderFromEnvRejectsUnsupportedMode(t *testing.T) {
+	t.Setenv("NEXUSIM_RAG_PROVIDER_MODE", "bad")
+	if _, err := ragAnswerProviderFromEnv(); err == nil {
+		t.Fatal("expected unsupported provider mode error")
+	}
+}
+
 func TestValidateRAGDebugListenerConfigAllowsEmptyOrPrivateAddress(t *testing.T) {
 	for _, addr := range []string{"", "localhost:11920", "127.0.0.1:11920", "172.30.80.23:11920"} {
 		if err := validateRAGDebugListenerConfig(addr, false); err != nil {

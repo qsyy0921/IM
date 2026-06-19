@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/qsyy0921/IM/internal/ai/llmboundary"
 	raggrpc "github.com/qsyy0921/IM/services/rag-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/rag-service/internal/app"
 	rpcinfra "github.com/qsyy0921/IM/services/rag-service/internal/infrastructure/rpc"
@@ -77,6 +78,10 @@ func runGRPC(ctx context.Context) error {
 		return err
 	}
 	defer closeRetrieval()
+	provider, err := ragAnswerProviderFromEnv()
+	if err != nil {
+		return err
+	}
 
 	addr := envString("NEXUSIM_RAG_GRPC_ADDR", "127.0.0.1:10610")
 	listener, err := net.Listen("tcp", addr)
@@ -84,7 +89,7 @@ func runGRPC(ctx context.Context) error {
 		return err
 	}
 	server := grpc.NewServer()
-	raggrpc.Register(server, raggrpc.NewServer(app.NewAnswerQuestionUseCase(retrievalClient)))
+	raggrpc.Register(server, raggrpc.NewServer(app.NewAnswerQuestionUseCaseWithProvider(retrievalClient, provider)))
 
 	serveErr := make(chan error, 1)
 	go func() {
@@ -192,6 +197,43 @@ func envDuration(name string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return parsed
+}
+
+func envInt(name string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func ragAnswerProviderFromEnv() (app.AnswerProvider, error) {
+	mode := strings.ToLower(envString("NEXUSIM_RAG_PROVIDER_MODE", "extractive"))
+	switch mode {
+	case "extractive":
+		return app.ExtractiveAnswerProvider{}, nil
+	case "external-http":
+		client, err := llmboundary.NewHTTPClient(llmboundary.HTTPClientOptions{
+			Endpoint:         envString("NEXUSIM_RAG_LLM_ENDPOINT", ""),
+			BearerToken:      envString("NEXUSIM_RAG_LLM_BEARER_TOKEN", ""),
+			Timeout:          envDuration("NEXUSIM_RAG_LLM_TIMEOUT", 2*time.Second),
+			MaxResponseBytes: int64(envInt("NEXUSIM_RAG_LLM_MAX_RESPONSE_BYTES", int(llmboundary.DefaultMaxResponseBytes))),
+		})
+		if err != nil {
+			return nil, err
+		}
+		return app.NewGuardedLLMAnswerProvider(client, llmboundary.Options{
+			TokenBudget:      envInt("NEXUSIM_RAG_LLM_TOKEN_BUDGET", llmboundary.DefaultTokenBudget),
+			MaxEvidenceItems: envInt("NEXUSIM_RAG_LLM_MAX_EVIDENCE_ITEMS", llmboundary.DefaultMaxEvidenceItems),
+			MaxTextRunes:     envInt("NEXUSIM_RAG_LLM_MAX_TEXT_RUNES", llmboundary.DefaultMaxTextRunes),
+		}), nil
+	default:
+		return nil, fmt.Errorf("unsupported NEXUSIM_RAG_PROVIDER_MODE %q", mode)
+	}
 }
 
 func startDebugServer(ctx context.Context, addr string) (func(), error) {

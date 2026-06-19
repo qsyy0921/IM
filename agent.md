@@ -71,8 +71,9 @@ metadata, exposes `VerifyApprovedAgentProposal`, and publishes low-sensitive
 MCP/provider fallback is classified as stable low-sensitive failure and unsafe
 tool output is suppressed. Python AI Worker foundation is landed with the
 `ai/python` directory, reproducible `IM` conda toolchain and candidate contract
-guard. Next move is the external LLM adapter boundary or the next AI mainline
-task from `current-goal.md`.
+guard. RAG/Summary guarded external HTTP LLM boundary is landed. Next move is
+Python worker malformed / unsafe output eval coverage, first worker smoke, or
+the next AI mainline task from `current-goal.md`.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.
@@ -136,5 +137,4 @@ Use tiered gates to avoid wasting time:
 3. Cross-service, generated code, migration, registry, Docker/compose, security
    boundary, or pre-push changes: run `.\tools\check-local.ps1`.
 4. Always end with `git status --short --branch --untracked-files=all`.
-
 Long load tests, fault drills, production-readiness checks, and full gates run only when risk, scope, or the user asks for them.

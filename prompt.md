@@ -7,7 +7,9 @@
 ```text
 持续推进 E:\development\IM 的 NexusIM 项目。
 
-当前主线必须放在第一位：面试导向的后端 + 分布式 + AI 大模型应用底座。默认继续建设群组 memory、跨群 / 跨时间 EvidencePack、RAG、summary、multi-agent、skill registry、MCP/tool gateway、action-executor、approval/audit 和 ai-eval。
+【当前主线 / 不可偏移】本阶段不是继续堆九个 IM 服务的长期 P2 hardening，也不是跑完整生产级 HA / 长压 / sizing；当前默认任务是：在已可运行的后端 + 分布式 IM 底座上，继续建设 AI 大模型应用底座。
+
+默认开发方向：群组 memory、跨群 / 跨时间 EvidencePack、RAG、summary、multi-agent、skill registry、MCP/tool gateway、action-executor、proposal / approval / audit 和 ai-eval。每轮“继续开发”都优先推进这条链，除非用户明确点名别的任务，或发现阻塞该主线的 P0/P1。
 
 九个既有 IM 服务已经作为可运行基础；只处理阻塞 AI 主线的 P0/P1 或用户点名任务。不要把默认任务切回长期 P2 hardening、生产级长压、完整 HA、sizing 或 provider-grade 运维。
 
@@ -16,7 +18,7 @@
 2. 读取 prompt.md 和 agent.md。
 3. 读取 docs/runbook/current-goal.md 的当前 active slice；再按需读取 current-brief、remaining-goals、相关 service brief 或 SDD；不要全文扫长历史文档。
 
-当前 active slice：skill-registry first catalog path、mcp-gateway first prepare path 和 action-executor first execution audit path 已落；agent-service 已改为 proposal 前调用 mcp-gateway prepare，并返回 skill_id / prepared_audit_id，但仍不执行外部工具。下一步跑新的 Agent -> mcp-gateway adapter smoke，并推进 proposal store / approval / real tool adapter 串接，或按 current-goal.md 选择下一项 AI 主线任务。RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；真实写动作必须继续走 policy、proposal / approval / executor / audit。
+当前 active slice：skill-registry first catalog path、mcp-gateway first prepare path 和 action-executor first execution audit path 已落；agent-service 已改为 proposal 前调用 mcp-gateway prepare，并返回 skill_id / prepared_audit_id，但仍不执行外部工具。下一步默认跑新的 Agent -> mcp-gateway adapter smoke，并推进 proposal store / approval / real tool adapter 串接；如果该 smoke 已完成，则按 current-goal.md 选择下一项 AI 主线任务。RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；真实写动作必须继续走 policy、proposal / approval / executor / audit。
 
 可用多个 sub-agent 做互不重叠任务；主 agent 负责集成、检查和文档同步。不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
 ```

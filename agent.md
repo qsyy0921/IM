@@ -47,7 +47,8 @@ The existing IM backend and distributed base are treated as a usable foundation;
 do not choose broad 9-service P2 hardening as the next task unless it blocks the
 AI line or the user explicitly asks for it.
 If the visible Codex goal prompt does not make this main line obvious, update
-`prompt.md` first before continuing implementation.
+`prompt.md` and the short prompt in `docs/runbook/current-goal.md` first before
+continuing implementation.
 
 Existing real services: `api-gateway`, `identity-service`, `message-service`,
 `conversation-service`, `delivery-service`, `push-gateway`, `receipt-service`,

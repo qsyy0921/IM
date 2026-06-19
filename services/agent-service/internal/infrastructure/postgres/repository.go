@@ -16,6 +16,13 @@ type Repository struct {
 	pool *pgxpool.Pool
 }
 
+const (
+	agentApprovalOutboxEventType      = "agent.proposal.approved.v1"
+	agentApprovalOutboxEventVersion   = "v1"
+	agentApprovalOutboxMappingVersion = 1
+	agentApprovalOutboxProducer       = "agent-service"
+)
+
 func NewRepository(pool *pgxpool.Pool) Repository {
 	return Repository{pool: pool}
 }
@@ -109,14 +116,37 @@ func (repository Repository) ApproveAgentProposal(
 
 	var status string
 	var requiresApproval bool
+	var preparedAuditID string
+	var skillID string
+	var toolName string
+	var resourceType string
+	var resourceID string
+	var riskLevel string
 	err = tx.QueryRow(ctx, `
-SELECT status, requires_approval
+SELECT
+    status,
+    requires_approval,
+    prepared_audit_id,
+    skill_id,
+    tool_name,
+    resource_type,
+    resource_id,
+    risk_level
 FROM agent_proposals
 WHERE tenant_id = $1 AND proposal_id = $2
 FOR UPDATE`,
 		string(command.AuthContext.TenantID),
 		command.NormalizedProposalID(),
-	).Scan(&status, &requiresApproval)
+	).Scan(
+		&status,
+		&requiresApproval,
+		&preparedAuditID,
+		&skillID,
+		&toolName,
+		&resourceType,
+		&resourceID,
+		&riskLevel,
+	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return types.ApproveAgentProposalResult{}, types.ErrProposalNotFound
 	}
@@ -148,6 +178,22 @@ WHERE tenant_id = $1 AND proposal_id = $2 AND status = 'PROPOSED'`,
 	}
 	if tag.RowsAffected() != 1 {
 		return types.ApproveAgentProposalResult{}, types.ErrProposalNotApprovable
+	}
+	if err := insertApprovalOutbox(ctx, tx, approvalOutboxEvent{
+		TenantID:          string(command.AuthContext.TenantID),
+		ProposalID:        command.NormalizedProposalID(),
+		ApprovalID:        approvalID,
+		PreparedAuditID:   preparedAuditID,
+		SkillID:           skillID,
+		ToolName:          toolName,
+		ResourceType:      resourceType,
+		ResourceID:        resourceID,
+		RiskLevel:         riskLevel,
+		ApprovedByUserID:  string(command.AuthContext.UserID),
+		ApprovedAtUnixMs:  approvedAt.UnixMilli(),
+		ApprovalEventType: agentApprovalOutboxEventType,
+	}); err != nil {
+		return types.ApproveAgentProposalResult{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return types.ApproveAgentProposalResult{}, fmt.Errorf("%w: %v", types.ErrProposalStoreUnavailable, err)
@@ -226,6 +272,87 @@ WHERE tenant_id = $1 AND proposal_id = $2`,
 		return types.VerifyApprovedAgentProposalResult{}, types.ErrProposalMismatch
 	}
 	return row, nil
+}
+
+type approvalOutboxEvent struct {
+	TenantID          string
+	ProposalID        string
+	ApprovalID        string
+	PreparedAuditID   string
+	SkillID           string
+	ToolName          string
+	ResourceType      string
+	ResourceID        string
+	RiskLevel         string
+	ApprovedByUserID  string
+	ApprovedAtUnixMs  int64
+	ApprovalEventType string
+}
+
+func insertApprovalOutbox(ctx context.Context, tx pgx.Tx, event approvalOutboxEvent) error {
+	_, err := tx.Exec(ctx, `
+INSERT INTO agent_approval_outbox (
+    event_id,
+    tenant_id,
+    proposal_id,
+    approval_id,
+    prepared_audit_id,
+    skill_id,
+    tool_name,
+    resource_type,
+    resource_id,
+    risk_level,
+    event_type,
+    event_version,
+    mapping_version,
+    partition_key,
+    producer,
+    payload_json
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8,
+    $9, $10, $11, $12, $13, $14, $15,
+    jsonb_build_object(
+        'schema_version', 1,
+        'event_type', $11::text,
+        'tenant_id', $2::text,
+        'proposal_id', $3::text,
+        'approval_id', $4::text,
+        'prepared_audit_id', $5::text,
+        'skill_id', $6::text,
+        'tool_name', $7::text,
+        'resource_type', $8::text,
+        'resource_id', $9::text,
+        'risk_level', $10::text,
+        'approved_by_user_id', $16::text,
+        'approved_at_unix_ms', $17::bigint
+    )
+) ON CONFLICT (tenant_id, approval_id) DO NOTHING`,
+		approvalEventID(event.ApprovalID),
+		event.TenantID,
+		event.ProposalID,
+		event.ApprovalID,
+		event.PreparedAuditID,
+		event.SkillID,
+		event.ToolName,
+		event.ResourceType,
+		event.ResourceID,
+		event.RiskLevel,
+		event.ApprovalEventType,
+		agentApprovalOutboxEventVersion,
+		agentApprovalOutboxMappingVersion,
+		event.ProposalID,
+		agentApprovalOutboxProducer,
+		event.ApprovedByUserID,
+		event.ApprovedAtUnixMs,
+	)
+	if err != nil {
+		return fmt.Errorf("%w: %v", types.ErrProposalStoreUnavailable, err)
+	}
+	return nil
+}
+
+func approvalEventID(approvalID string) string {
+	return "agent_approval_" + strings.TrimSpace(approvalID)
 }
 
 func truncateLowSensitive(value string, max int) string {

@@ -29,6 +29,11 @@ proposal 元数据，并提供 approval / execution preflight 校验；它仍不
 - PostgreSQL `agent_proposals` 只保存 proposal / approval / execution
   preflight 所需字段、proposal 文本、citation 元数据和低敏 policy metadata；
   不保存完整 EvidencePack 正文。
+- PostgreSQL `agent_approval_outbox` 在 approval 同一事务内写入
+  `agent.proposal.approved.v1` 低敏 audit event；payload 只包含 proposal /
+  approval / prepare audit / skill / tool / resource / risk / approver / time
+  metadata，不保存 proposal 正文、objective、reason、EvidencePack 正文或
+  raw tool input。
 - `VerifyApprovedAgentProposal` 是 `action-executor` 的公开校验边界：
   proposal 必须 `APPROVED`，且 `approval_id`、`prepared_audit_id`、skill、
   tool、resource 字段全部匹配。
@@ -56,6 +61,7 @@ client / future API gateway
 -> agent_proposals
 -> proposal response
 -> ApproveAgentProposal
+-> agent_approval_outbox(agent.proposal.approved.v1)
 -> VerifyApprovedAgentProposal
 -> action-executor.ExecuteApprovedAction
 ```
@@ -76,6 +82,8 @@ Agent 不允许绕过 mcp-gateway / policy，也不允许直接执行 mutation�
 - `CreateAgentProposal` 不返回没有 EvidencePack 支撑的事实。
 - citations 必须可追踪到 evidence item 或 source ref。
 - approval 只把 proposal 从 `PROPOSED` 转为 `APPROVED`，不执行业务 mutation。
+- approval outbox 是 first-stage local audit handoff，不代表 Kafka relay 或
+  外部 audit sink 已完成。
 - executor preflight 失败必须 fail closed；不匹配的 approval / prepare audit /
   skill / tool / resource 不能进入执行边界。
 
@@ -83,6 +91,6 @@ Agent 不允许绕过 mcp-gateway / policy，也不允许直接执行 mutation�
 
 - 接 `action-executor` 的真实 MCP / tool adapter，并继续保持 proposal /
   approval / executor / audit 串接。
-- 补 approval workflow 的 operator / audit outbox / external review UI。
+- 补 approval workflow 的 operator、approval outbox relay 和 external review UI。
 - 外部 LLM adapter 接入时增加 prompt boundary、token budget、PII / secret
   filter、tool-call schema validation 和 provider failure fallback。

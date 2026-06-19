@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -30,6 +31,9 @@ func TestRepositoryAgentProposalApprovalIntegration(t *testing.T) {
 	if _, err := pool.Exec(ctx, mustReadMigration(t)); err != nil {
 		t.Fatalf("apply migration: %v", err)
 	}
+	if _, err := pool.Exec(ctx, `DELETE FROM agent_approval_outbox WHERE tenant_id = 'tenant-agent-pg-test'`); err != nil {
+		t.Fatalf("cleanup approval outbox: %v", err)
+	}
 	if _, err := pool.Exec(ctx, `DELETE FROM agent_proposals WHERE tenant_id = 'tenant-agent-pg-test'`); err != nil {
 		t.Fatalf("cleanup: %v", err)
 	}
@@ -49,6 +53,40 @@ func TestRepositoryAgentProposalApprovalIntegration(t *testing.T) {
 	}
 	if approval.Status != types.AgentProposalStatusApproved || approval.ApprovalID != "appr-pg-1" {
 		t.Fatalf("unexpected approval: %+v", approval)
+	}
+	var outboxStatus string
+	var eventType string
+	var payload string
+	err = pool.QueryRow(ctx, `
+SELECT status, event_type, payload_json::text
+FROM agent_approval_outbox
+WHERE tenant_id = $1 AND approval_id = $2`,
+		string(proposal.TenantID),
+		"appr-pg-1",
+	).Scan(&outboxStatus, &eventType, &payload)
+	if err != nil {
+		t.Fatalf("query approval outbox: %v", err)
+	}
+	if outboxStatus != "PENDING" || eventType != "agent.proposal.approved.v1" {
+		t.Fatalf("unexpected approval outbox row status=%q event_type=%q payload=%s", outboxStatus, eventType, payload)
+	}
+	for _, required := range []string{
+		`"approval_id": "appr-pg-1"`,
+		`"prepared_audit_id": "mcp-audit-pg-1"`,
+		`"tool_name": "conversation.note.create"`,
+	} {
+		if !strings.Contains(payload, required) {
+			t.Fatalf("approval outbox payload missing %s: %s", required, payload)
+		}
+	}
+	var payloadFields map[string]any
+	if err := json.Unmarshal([]byte(payload), &payloadFields); err != nil {
+		t.Fatalf("decode approval outbox payload: %v", err)
+	}
+	for _, forbidden := range []string{"objective", "proposal_text", "reason", "citations_json"} {
+		if _, ok := payloadFields[forbidden]; ok {
+			t.Fatalf("approval outbox payload includes forbidden field %q: %s", forbidden, payload)
+		}
 	}
 	verified, err := repository.VerifyApprovedAgentProposal(ctx, types.VerifyApprovedAgentProposalCommand{
 		AuthContext:     types.AuthContext{TenantID: proposal.TenantID, UserID: proposal.UserID},
@@ -118,10 +156,22 @@ func mustReadMigration(t *testing.T) string {
 		t.Fatal("runtime caller unavailable")
 	}
 	root := filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "..", ".."))
-	path := filepath.Join(root, "migrations", "postgres", "agent-service", "000001_agent_proposals.sql")
-	content, err := os.ReadFile(path)
+	migrationDir := filepath.Join(root, "migrations", "postgres", "agent-service")
+	entries, err := os.ReadDir(migrationDir)
 	if err != nil {
-		t.Fatalf("read migration: %v", err)
+		t.Fatalf("read migration dir: %v", err)
 	}
-	return string(content)
+	var builder strings.Builder
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(migrationDir, entry.Name()))
+		if err != nil {
+			t.Fatalf("read migration %s: %v", entry.Name(), err)
+		}
+		builder.Write(content)
+		builder.WriteString("\n")
+	}
+	return builder.String()
 }

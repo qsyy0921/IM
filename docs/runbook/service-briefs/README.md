@@ -4,35 +4,27 @@
 
 ## 已进入真实链路的 9 个服务
 
-- [message-service](message-service.md)
-- [conversation-service](conversation-service.md)
-- [delivery-service](delivery-service.md)
-- [push-gateway](push-gateway.md)
-- [receipt-service](receipt-service.md)
-- [contacts-service](contacts-service.md)
-- [identity-service](identity-service.md)
-- [policy-service](policy-service.md)
-- [api-gateway](api-gateway.md)
+[message](message-service.md) / [conversation](conversation-service.md) /
+[delivery](delivery-service.md) / [push](push-gateway.md) /
+[receipt](receipt-service.md) / [contacts](contacts-service.md) /
+[identity](identity-service.md) / [policy](policy-service.md) /
+[api-gateway](api-gateway.md)
 
-## 下一阶段 planned service brief
+## Foundation-active AI 服务
 
-- [search-service](search-service.md)
-- [memory-service](memory-service.md)
-- [retrieval-gateway](retrieval-gateway.md)
-- [rag-service](rag-service.md)
-- [summary-service](summary-service.md)
-- [agent-service](agent-service.md)
-- [skill-registry](skill-registry.md)
-- [mcp-gateway](mcp-gateway.md)
-- [action-executor](action-executor.md)
+[search](search-service.md) / [memory](memory-service.md) /
+[retrieval](retrieval-gateway.md) / [rag](rag-service.md) /
+[summary](summary-service.md) / [agent](agent-service.md) /
+[skill-registry](skill-registry.md) / [mcp](mcp-gateway.md) /
+[action-executor](action-executor.md)
 
 ## 当前新增服务顺序
 
 - 现有 9 个服务只做阻塞 AI 链路的必要收口。
-- `search-service` / `memory-service` / `retrieval-gateway` / `rag-service` / `summary-service` / `agent-service` / `skill-registry` / `mcp-gateway` / `action-executor` 是第一组 foundation-active AI 服务。
-- `memory-service` 第一版 contracts 已开始落地，必须按 group memory 设计，而不是普通摘要缓存：source refs、speaker / audience、validity window、supersedes、confidence、review state 是基本字段。
-- Agent / skill-registry / MCP gateway / action-executor 接真实业务动作时必须先走 policy-service tool policy precheck；写动作默认 `Proposal -> Approval -> Executor -> Audit`，低风险 allowlist 也必须可审计和幂等。
-- 可以用 sub-agent 并行推进服务 brief / SDD / 测试缺口，但不同 agent 不能同时修改同一个服务文件。
+- 第一组 AI 服务为 search、memory、retrieval、RAG、summary、Agent、skill-registry、mcp-gateway、action-executor。
+- memory 必须按 group memory 设计：source refs、speaker / audience、validity、supersedes、confidence、review state。
+- Agent 写动作必须先走 policy tool precheck，默认 `Proposal -> Approval -> Executor -> Audit`。
+- sub-agent 可并行推进，但不能同时修改同一服务文件。
 
 ## 查询规则
 

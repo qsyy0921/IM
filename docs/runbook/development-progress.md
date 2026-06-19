@@ -55,11 +55,11 @@
 -> AI eval harness first pass 已落
 -> rag-service first read-only answer path / loadtest runner / eval adapter / real adapter smoke / provider boundary / citation verifier 已落
 -> summary-service first read-only summary path + real adapter smoke 已落
--> agent-service first proposal-only path + real adapter smoke 已落
+-> agent-service first proposal-only path + real adapter smoke + mcp-gateway prepare adapter smoke 已落
 -> skill-registry first catalog path 已落
 -> mcp-gateway first prepare path 已落
 -> action-executor first execution audit path 已落
--> approval / real tool adapter follow-up
+-> proposal store / approval / action-executor handoff / real tool adapter follow-up
 -> 安全 / 观测 / repair / 运维 hardening
 ```
 

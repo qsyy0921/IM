@@ -55,14 +55,14 @@ Existing real services: `api-gateway`, `identity-service`, `message-service`,
 `contacts-service`, and `policy-service`.
 
 Current active slice: `skill-registry` first catalog path, `mcp-gateway`
-first prepare path and `action-executor` first execution audit path are landed.
-`agent-service` now calls `mcp-gateway.PrepareToolCall` before retrieval /
-proposal generation and returns `skill_id` / `prepared_audit_id`; it still does
-not execute external tools. Next move is the Agent -> mcp-gateway adapter smoke,
-then proposal store / approval / real tool adapter follow-up or the next AI
-mainline slice from `current-goal.md`. Search, memory, retrieval, real RAG /
-summary / Agent adapter smokes, the skill catalog foundation, and the MCP
-prepare boundary are passed.
+first prepare path, `action-executor` first execution audit path, and the new
+Agent -> mcp-gateway adapter smoke are landed. `agent-service` now calls
+`mcp-gateway.PrepareToolCall` before retrieval / proposal generation and
+returns `skill_id` / `prepared_audit_id`; it still does not execute external
+tools. Next move is proposal store / approval workflow / action-executor
+handoff, then real tool adapter follow-up or the next AI mainline slice from
+`current-goal.md`. Search, memory, retrieval, real RAG / summary / Agent adapter
+smokes, the skill catalog foundation, and the MCP prepare boundary are passed.
 
 AI invariants: keep facts, projections, retrieval and controlled execution
 separate. Memory requires source refs, scope, validity, supersession,

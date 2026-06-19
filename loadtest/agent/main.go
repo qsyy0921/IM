@@ -28,6 +28,7 @@ const (
 	defaultResultRoot  = `H:\NexusIM\loadtest-results`
 	defaultObjective   = "phoenix launch decision"
 	defaultToolName    = "conversation.note.create"
+	defaultSkillID     = "conversation.note.create"
 	defaultResource    = "conversation_note"
 )
 
@@ -43,6 +44,7 @@ type config struct {
 	deviceID       string
 	objective      string
 	toolName       string
+	skillID        string
 	resourceType   string
 	resourceID     string
 	riskLevel      string
@@ -73,10 +75,12 @@ type agentSmokeSummary struct {
 	AgentTarget             string       `json:"agent_target"`
 	Objective               string       `json:"objective"`
 	ToolName                string       `json:"tool_name"`
+	SkillID                 string       `json:"skill_id"`
 	ResourceType            string       `json:"resource_type"`
 	RiskLevel               string       `json:"risk_level"`
 	Seed                    seededData   `json:"seed"`
 	ProposalID              string       `json:"proposal_id"`
+	PreparedAuditID         string       `json:"prepared_audit_id"`
 	ProposalStatus          string       `json:"proposal_status"`
 	ProposalText            string       `json:"proposal_text"`
 	RequiresApproval        bool         `json:"requires_approval"`
@@ -87,6 +91,7 @@ type agentSmokeSummary struct {
 	PolicyDecisionSource    string       `json:"policy_decision_source"`
 	PolicyClassification    string       `json:"policy_classification"`
 	PolicyPermissionVersion int64        `json:"policy_permission_version"`
+	MCPAudit                mcpAudit     `json:"mcp_audit"`
 	PackID                  string       `json:"pack_id"`
 	EvidenceItemCount       int          `json:"evidence_item_count"`
 	SearchItemCount         int          `json:"search_item_count"`
@@ -99,6 +104,20 @@ type agentSmokeSummary struct {
 	Verified                []string     `json:"verified"`
 	StartedAt               time.Time    `json:"started_at"`
 	FinishedAt              time.Time    `json:"finished_at"`
+}
+
+type mcpAudit struct {
+	AuditID               string `json:"audit_id"`
+	Status                string `json:"status"`
+	Allowed               bool   `json:"allowed"`
+	RequiresApproval      bool   `json:"requires_approval"`
+	PermissionVersion     int64  `json:"permission_version"`
+	Classification        string `json:"classification"`
+	DecisionSource        string `json:"decision_source"`
+	ToolAction            string `json:"tool_action"`
+	InputSHA256Present    bool   `json:"input_sha256_present"`
+	IdempotencyKeyMatches bool   `json:"idempotency_key_matches"`
+	LowSensitiveAuditOnly bool   `json:"low_sensitive_audit_only"`
 }
 
 type sourceCounts struct {
@@ -139,6 +158,9 @@ func run(ctx context.Context, args []string) error {
 	if err := cleanupTenant(ctx, pool, cfg.tenantID); err != nil {
 		return err
 	}
+	if err := seedToolingRows(ctx, pool, cfg); err != nil {
+		return err
+	}
 	seed, err := seedProjectionRows(ctx, pool, cfg)
 	if err != nil {
 		return err
@@ -148,7 +170,7 @@ func run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	summary, err := verifyProposal(cfg, resultDir, seed, response, startedAt)
+	summary, err := verifyProposal(ctx, pool, cfg, resultDir, seed, response, startedAt)
 	if err != nil {
 		return err
 	}
@@ -169,6 +191,7 @@ func parseConfig(args []string) (config, error) {
 	flagSet.StringVar(&cfg.deviceID, "device-id", "agent-device", "viewer device id")
 	flagSet.StringVar(&cfg.objective, "objective", defaultObjective, "objective sent to agent-service")
 	flagSet.StringVar(&cfg.toolName, "tool-name", defaultToolName, "tool name for policy precheck")
+	flagSet.StringVar(&cfg.skillID, "skill-id", defaultSkillID, "skill id registered in skill-registry")
 	flagSet.StringVar(&cfg.resourceType, "resource-type", defaultResource, "resource type for policy precheck")
 	flagSet.StringVar(&cfg.resourceID, "resource-id", "", "resource id for policy precheck")
 	flagSet.StringVar(&cfg.riskLevel, "risk-level", "LOW", "risk level for policy precheck")
@@ -185,6 +208,7 @@ func parseConfig(args []string) (config, error) {
 	cfg.agentTarget = strings.TrimSpace(cfg.agentTarget)
 	cfg.objective = strings.TrimSpace(cfg.objective)
 	cfg.toolName = strings.TrimSpace(cfg.toolName)
+	cfg.skillID = strings.TrimSpace(cfg.skillID)
 	cfg.resourceType = strings.TrimSpace(cfg.resourceType)
 	cfg.riskLevel = strings.ToUpper(strings.TrimSpace(cfg.riskLevel))
 	cfg.intent = strings.TrimSpace(cfg.intent)
@@ -199,6 +223,9 @@ func parseConfig(args []string) (config, error) {
 	}
 	if cfg.toolName == "" {
 		return config{}, errors.New("--tool-name is required")
+	}
+	if cfg.skillID == "" {
+		cfg.skillID = cfg.toolName
 	}
 	if cfg.resourceType == "" {
 		return config{}, errors.New("--resource-type is required")
@@ -239,6 +266,9 @@ func applyProjectionMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 	for _, path := range []string{
 		filepath.Join("migrations", "postgres", "search", "000001_search_core.sql"),
 		filepath.Join("migrations", "postgres", "memory", "000001_memory_core.sql"),
+		filepath.Join("migrations", "postgres", "skill-registry", "000001_skill_registry_core.sql"),
+		filepath.Join("migrations", "postgres", "policy", "000014_policy_tool_action_rules.sql"),
+		filepath.Join("migrations", "postgres", "mcp-gateway", "000001_mcp_gateway_core.sql"),
 	} {
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -253,6 +283,10 @@ func applyProjectionMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 
 func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string) error {
 	for _, statement := range []string{
+		`DELETE FROM mcp_gateway_tool_call_audits WHERE tenant_id = $1`,
+		`DELETE FROM policy_tool_decision_audit WHERE tenant_id = $1`,
+		`DELETE FROM policy_tool_action_rules WHERE tenant_id = $1`,
+		`DELETE FROM skill_registry_definitions WHERE tenant_id = $1`,
 		`DELETE FROM memory_graph_edges WHERE tenant_id = $1`,
 		`DELETE FROM memory_profile_aggregates WHERE tenant_id = $1`,
 		`DELETE FROM memory_event_source_refs WHERE tenant_id = $1`,
@@ -266,6 +300,76 @@ func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string) err
 		}
 	}
 	return nil
+}
+
+func seedToolingRows(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx, `
+INSERT INTO skill_registry_definitions (
+	tenant_id, skill_id, display_name, description, version, status, tool_name,
+	allowed_actions_json, input_schema_json, output_schema_json, permission_scope,
+	risk_level, requires_approval, audit_event_type, owner_service, tags_json,
+	metadata_json, created_at, updated_at
+) VALUES (
+	$1, $2, $2, 'Agent smoke skill for controlled conversation note proposal.',
+	'v1', 'ACTIVE', $3, '[1]'::jsonb,
+	'{"type":"object","additionalProperties":true}'::jsonb,
+	'{"type":"object","additionalProperties":true}'::jsonb,
+	$4, $5, true, 'conversation.note.proposed.v1', 'agent-service',
+	'["agent-smoke"]'::jsonb, '{"source":"loadtest/agent"}'::jsonb, $6, $6
+)
+ON CONFLICT (tenant_id, skill_id) DO UPDATE SET
+	display_name = EXCLUDED.display_name,
+	description = EXCLUDED.description,
+	version = EXCLUDED.version,
+	status = EXCLUDED.status,
+	tool_name = EXCLUDED.tool_name,
+	allowed_actions_json = EXCLUDED.allowed_actions_json,
+	input_schema_json = EXCLUDED.input_schema_json,
+	output_schema_json = EXCLUDED.output_schema_json,
+	permission_scope = EXCLUDED.permission_scope,
+	risk_level = EXCLUDED.risk_level,
+	requires_approval = EXCLUDED.requires_approval,
+	audit_event_type = EXCLUDED.audit_event_type,
+	owner_service = EXCLUDED.owner_service,
+	tags_json = EXCLUDED.tags_json,
+	metadata_json = EXCLUDED.metadata_json,
+	updated_at = EXCLUDED.updated_at
+`, cfg.tenantID, cfg.skillID, cfg.toolName, cfg.resourceType, cfg.riskLevel, now); err != nil {
+		return fmt.Errorf("seed skill registry definition: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
+INSERT INTO policy_tool_action_rules (
+	tenant_id, tool_name, action, resource_type, risk_level, allowed,
+	requires_approval, permission_version, classification, reason, priority,
+	enabled, source, updated_at
+) VALUES (
+	$1, $2, 'CALL', $3, $4, true, true, 42,
+	'TOOL_APPROVAL_REQUIRED', 'agent smoke requires approval before execution',
+	10, true, 'agent-smoke', $5
+)
+ON CONFLICT (tenant_id, tool_name, action, resource_type, risk_level) DO UPDATE SET
+	allowed = EXCLUDED.allowed,
+	requires_approval = EXCLUDED.requires_approval,
+	permission_version = EXCLUDED.permission_version,
+	classification = EXCLUDED.classification,
+	reason = EXCLUDED.reason,
+	priority = EXCLUDED.priority,
+	enabled = EXCLUDED.enabled,
+	source = EXCLUDED.source,
+	updated_at = EXCLUDED.updated_at
+`, cfg.tenantID, cfg.toolName, cfg.resourceType, cfg.riskLevel, now); err != nil {
+		return fmt.Errorf("seed policy tool action rule: %w", err)
+	}
+
+	return tx.Commit(ctx)
 }
 
 func seedProjectionRows(ctx context.Context, pool *pgxpool.Pool, cfg config) (seededData, error) {
@@ -378,6 +482,7 @@ func createProposal(ctx context.Context, cfg config) (*agentv1.CreateAgentPropos
 		},
 		ConversationId: cfg.conversationID,
 		Objective:      cfg.objective,
+		SkillId:        cfg.skillID,
 		ToolName:       cfg.toolName,
 		ToolAction:     policyv1.ToolAction_TOOL_ACTION_CALL,
 		ResourceType:   cfg.resourceType,
@@ -394,6 +499,8 @@ func createProposal(ctx context.Context, cfg config) (*agentv1.CreateAgentPropos
 }
 
 func verifyProposal(
+	ctx context.Context,
+	pool *pgxpool.Pool,
 	cfg config,
 	resultDir string,
 	seed seededData,
@@ -421,6 +528,12 @@ func verifyProposal(
 	}
 	if strings.TrimSpace(response.GetAgentVersion()) == "" {
 		return agentSmokeSummary{}, errors.New("missing agent_version")
+	}
+	if strings.TrimSpace(response.GetSkillId()) != cfg.skillID {
+		return agentSmokeSummary{}, fmt.Errorf("unexpected skill_id %q", response.GetSkillId())
+	}
+	if strings.TrimSpace(response.GetPreparedAuditId()) == "" {
+		return agentSmokeSummary{}, errors.New("missing prepared_audit_id")
 	}
 
 	decision := response.GetToolPolicyDecision()
@@ -481,6 +594,11 @@ func verifyProposal(
 	}
 	verified = append(verified, "source coverage and projection versions preserved")
 	verified = append(verified, "tool policy allow decision observed before proposal generation")
+	audit, err := verifyMCPAudit(ctx, pool, cfg, response)
+	if err != nil {
+		return agentSmokeSummary{}, err
+	}
+	verified = append(verified, "mcp-gateway prepare audit recorded before proposal generation")
 	verified = append(verified, "first-stage response is proposal-only and generated_by_llm=false")
 
 	return agentSmokeSummary{
@@ -489,10 +607,12 @@ func verifyProposal(
 		AgentTarget:             cfg.agentTarget,
 		Objective:               cfg.objective,
 		ToolName:                cfg.toolName,
+		SkillID:                 cfg.skillID,
 		ResourceType:            cfg.resourceType,
 		RiskLevel:               cfg.riskLevel,
 		Seed:                    seed,
 		ProposalID:              response.GetProposalId(),
+		PreparedAuditID:         response.GetPreparedAuditId(),
 		ProposalStatus:          proposalStatusName(response.GetStatus()),
 		ProposalText:            response.GetProposalText(),
 		RequiresApproval:        response.GetRequiresApproval(),
@@ -503,6 +623,7 @@ func verifyProposal(
 		PolicyDecisionSource:    decision.GetDecisionSource(),
 		PolicyClassification:    decision.GetClassification(),
 		PolicyPermissionVersion: decision.GetPermissionVersion(),
+		MCPAudit:                audit,
 		PackID:                  pack.GetPackId(),
 		EvidenceItemCount:       len(pack.GetItems()),
 		SearchItemCount:         int(counts.SearchMessage),
@@ -516,6 +637,76 @@ func verifyProposal(
 		StartedAt:               startedAt,
 		FinishedAt:              time.Now().UTC(),
 	}, nil
+}
+
+func verifyMCPAudit(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	cfg config,
+	response *agentv1.CreateAgentProposalResponse,
+) (mcpAudit, error) {
+	var audit mcpAudit
+	var inputSHA256 string
+	var idempotencyKey string
+	var resourceID string
+	err := pool.QueryRow(ctx, `
+SELECT
+	audit_id,
+	status,
+	allowed,
+	requires_approval,
+	permission_version,
+	classification,
+	decision_source,
+	tool_action,
+	input_sha256,
+	idempotency_key,
+	resource_id
+FROM mcp_gateway_tool_call_audits
+WHERE tenant_id = $1
+  AND audit_id = $2
+  AND skill_id = $3
+  AND tool_name = $4
+  AND resource_type = $5
+  AND risk_level = $6
+`, cfg.tenantID, response.GetPreparedAuditId(), cfg.skillID, cfg.toolName, cfg.resourceType, cfg.riskLevel).Scan(
+		&audit.AuditID,
+		&audit.Status,
+		&audit.Allowed,
+		&audit.RequiresApproval,
+		&audit.PermissionVersion,
+		&audit.Classification,
+		&audit.DecisionSource,
+		&audit.ToolAction,
+		&inputSHA256,
+		&idempotencyKey,
+		&resourceID,
+	)
+	if err != nil {
+		return mcpAudit{}, fmt.Errorf("query mcp-gateway prepare audit: %w", err)
+	}
+	audit.InputSHA256Present = strings.TrimSpace(inputSHA256) != ""
+	audit.IdempotencyKeyMatches = idempotencyKey == response.GetProposalId()
+	audit.LowSensitiveAuditOnly = audit.InputSHA256Present
+	if audit.Status != "ALLOWED" || !audit.Allowed || !audit.RequiresApproval {
+		return mcpAudit{}, fmt.Errorf("unexpected mcp audit decision: %+v", audit)
+	}
+	if audit.ToolAction != "CALL" {
+		return mcpAudit{}, fmt.Errorf("unexpected mcp audit action %q", audit.ToolAction)
+	}
+	if audit.PermissionVersion != 42 || audit.Classification != "TOOL_APPROVAL_REQUIRED" || audit.DecisionSource != "TOOL_RULE" {
+		return mcpAudit{}, fmt.Errorf("unexpected mcp audit policy metadata: %+v", audit)
+	}
+	if !audit.InputSHA256Present {
+		return mcpAudit{}, errors.New("mcp audit must store low-sensitive input_sha256")
+	}
+	if !audit.IdempotencyKeyMatches {
+		return mcpAudit{}, fmt.Errorf("mcp audit idempotency key mismatch: %q != %q", idempotencyKey, response.GetProposalId())
+	}
+	if resourceID != cfg.resourceID {
+		return mcpAudit{}, fmt.Errorf("unexpected mcp audit resource_id %q", resourceID)
+	}
+	return audit, nil
 }
 
 func verifyCitation(citation *agentv1.AgentCitation, seed seededData) error {

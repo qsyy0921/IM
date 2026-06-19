@@ -16,6 +16,9 @@
 - Docker runtime、local compose、Prometheus rules、Grafana dashboard、`service-registry.json` wiring
 - `agent-service` proposal path 已接入 `PrepareToolCall`；Agent 会带回
   `prepared_audit_id`，但仍不执行外部 tool
+- 新的真实本地 `retrieval-gateway -> agent-service -> mcp-gateway`
+  adapter smoke 已通过，验证 `mcp_gateway_tool_call_audits` 低敏 prepare
+  audit
 
 边界：
 
@@ -27,7 +30,5 @@
 
 下一步：
 
-- 跑新的真实本地 `retrieval-gateway -> agent-service -> mcp-gateway` adapter
-  smoke，验证 prepare audit 和 proposal-only 边界。
 - 后续实现真实 MCP adapter 时必须继续走 skill catalog、policy、rate limit、audit 和 failure fallback。
 - 与 `action-executor` 的 first audit path 已具备基础串接点；后续补正式 approval store 校验和真实 tool result handoff。

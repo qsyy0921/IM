@@ -18,7 +18,7 @@
 2. 读取 prompt.md 和 agent.md。
 3. 读取 docs/runbook/current-goal.md 的当前 active slice；再按需读取 current-brief、remaining-goals、相关 service brief 或 SDD；不要全文扫长历史文档。
 
-当前 active slice：skill-registry first catalog path、mcp-gateway first prepare path 和 action-executor first execution audit path 已落；agent-service 已改为 proposal 前调用 mcp-gateway prepare，并返回 skill_id / prepared_audit_id，但仍不执行外部工具。下一步默认跑新的 Agent -> mcp-gateway adapter smoke，并推进 proposal store / approval / real tool adapter 串接；如果该 smoke 已完成，则按 current-goal.md 选择下一项 AI 主线任务。RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；真实写动作必须继续走 policy、proposal / approval / executor / audit。
+当前 active slice：skill-registry first catalog path、mcp-gateway first prepare path、action-executor first execution audit path 和新的 Agent -> mcp-gateway adapter smoke 已落；agent-service proposal 前会调用 mcp-gateway prepare，并返回 skill_id / prepared_audit_id，但仍不执行外部工具。下一步默认推进 proposal store / approval workflow / action-executor 串接；如果该串接已完成，则按 current-goal.md 选择下一项 AI 主线任务。RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；真实写动作必须继续走 policy、proposal / approval / executor / audit。
 
 可用多个 sub-agent 做互不重叠任务；主 agent 负责集成、检查和文档同步。不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
 ```

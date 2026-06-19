@@ -5,6 +5,7 @@ param(
     [string]$RunName = "",
     [string]$Objective = "phoenix launch decision",
     [string]$ToolName = "conversation.note.create",
+    [string]$SkillID = "conversation.note.create",
     [string]$ResourceType = "conversation_note",
     [string]$RiskLevel = "LOW",
     [string]$RequestTimeout = "10s"
@@ -28,6 +29,7 @@ $runArgs = @(
     "-run-name", $RunName,
     "-objective", $Objective,
     "-tool-name", $ToolName,
+    "-skill-id", $SkillID,
     "-resource-type", $ResourceType,
     "-risk-level", $RiskLevel,
     "-request-timeout", $RequestTimeout
@@ -62,6 +64,21 @@ if ([bool]$summary.generated_by_llm) {
 }
 if (-not [bool]$summary.policy_allowed) {
     throw "agent smoke did not observe an allowed tool policy"
+}
+if ([string]::IsNullOrWhiteSpace([string]$summary.skill_id)) {
+    throw "agent smoke missing skill_id"
+}
+if ([string]::IsNullOrWhiteSpace([string]$summary.prepared_audit_id)) {
+    throw "agent smoke missing prepared_audit_id"
+}
+if (-not [bool]$summary.mcp_audit.allowed) {
+    throw "agent smoke did not verify mcp-gateway prepare audit allow decision"
+}
+if ($summary.mcp_audit.status -ne "ALLOWED") {
+    throw "unexpected mcp audit status: $($summary.mcp_audit.status)"
+}
+if (-not [bool]$summary.mcp_audit.input_sha256_present) {
+    throw "mcp audit did not store input_sha256"
 }
 if ([int]$summary.citation_count -lt 1) {
     throw "agent smoke missing citations"
